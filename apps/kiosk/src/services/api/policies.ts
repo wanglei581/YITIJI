@@ -22,6 +22,8 @@ export interface PolicyPostView {
   /** 发布方给的外部编号。没有就是空，页面写「—」，不编。 */
   externalId?: string | null
   publishedDate?: string
+  /** 确认发布的时间。publishedDate 为空时，发布日期用它的日期部分。 */
+  publishConfirmedAt?: string | null
   sourceName: string
   syncTime: string
 }
@@ -97,4 +99,31 @@ export async function getPublishedPolicies(params?: PolicyQueryParams): Promise<
     return { items, total: items.length }
   }
   return fetchPolicies(params)
+}
+
+/** 按条打开一条已发布政策。404 是找不到或已不在可查看范围；其它失败不冒充「没有这条」。 */
+export type PublishedPolicyLookup =
+  | { status: 'found'; policy: PolicyPostView }
+  | { status: 'missing' }
+  | { status: 'failed' }
+
+export async function getPublishedPolicy(id: string): Promise<PublishedPolicyLookup> {
+  const trimmed = id.trim()
+  if (!trimmed) return { status: 'missing' }
+  if (API_MODE !== 'http') {
+    const found = MOCK_POLICIES.find((item) => item.id === trimmed)
+    return found ? { status: 'found', policy: found } : { status: 'missing' }
+  }
+  try {
+    const res = await fetch(`${API_BASE_URL}/policies/${encodeURIComponent(trimmed)}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (res.status === 404) return { status: 'missing' }
+    if (!res.ok) return { status: 'failed' }
+    const body = (await res.json()) as { data?: PolicyPostView }
+    if (!body.data?.id) return { status: 'failed' }
+    return { status: 'found', policy: body.data }
+  } catch {
+    return { status: 'failed' }
+  }
 }

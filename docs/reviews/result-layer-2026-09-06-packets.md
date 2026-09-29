@@ -402,17 +402,17 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
   > 2. 「自动部署已生效」改回未勾：CI `34130143436` success 后 `workflow_run` `34130176570` / `34133158769` 均为 skipped；成功发布是手动 `workflow_dispatch` `34137990264`。
   > 3. 构建产物 hash 从 08-08 的 `index-DqleN77r.js` 改为今晚公网 `index-Do9twi7d.js`（与 deploy 构建日志一致）。
   > 4. HTTPS 证书复测：`notBefore=Sep 4 2026` / `notAfter=Dec 3 2026`（已续期）；timer 仍 B。
-  > 5. OS：直连 `120.48.13.190:22` 横幅 `OpenSSH_9.6p1 Ubuntu-3ubuntu13.14` → Ubuntu 24.04，补勾。
+  > 5. OS：直连 `<生产服务器 IP>:22` 横幅 `OpenSSH_9.6p1 Ubuntu-3ubuntu13.14` → Ubuntu 24.04，补勾。
   > 6. CORS 本轮实打 OPTIONS/GET：三源有 ACAO，`evil.example` 无 ACAO。
   > 7. WebSocket 条目退回 B（仓库搜注释 ≠ 服务器 nginx 配置）。
   > 8. Worker 已勾的判据改成 deploy PM2 表（只有 api + logrotate），不再用「package.json 是空壳」当运行证据。
   >
   > **取证锚点（本轮复测）**
-  > - DNS：本机 `zyidai.cn` → `198.18.0.110`。一律 `curl --resolve …:443:120.48.13.190`。
+  > - DNS：本机 `zyidai.cn` → `198.18.0.110`。一律 `curl --resolve …:443:<生产服务器 IP>`。
   > - 公网：`GET /api/v1/health` → `{"status":"ok","db":"postgres","degraded":[]}`；`GET /api/v1/health/ready` → 200 `status=ready`，redis `REDIS_REACHABLE 127.0.0.1:6379`，`since=2026-09-07T15:26:13.487Z`；`GET /api/v1/document-conversion/capabilities` → `wordToPdf:true engine:soffice cjkFonts:true`；`GET /api/v1/payment/channels` → `["alipay","wechat"]`；`jobs` / `job-fairs` / `policies` 均为 `pagination.total=0`。Kiosk / Admin / Partner 三主机 title 与 bundle 与 deploy 日志一致。`POST /api/v1/files` → 401 JSON `AUTH_MISSING_TOKEN`。
   > - CI：`34130143436`（main `759a37d4595c7932e804875db8686c73c09318c2`）四 job success：`build-and-verify` `101768117781`、`postgres-readiness` `101768117757`、`kiosk-browser-smoke`、`release-bundle`。
   > - 部署：`34137990264` workflow_dispatch 输入该 CI run，15:22:42Z–15:26:32Z success。`PREFLIGHT OK: 24 gates`（对真实 `.env` **叠加** `NODE_ENV=production`）、PG `ai_job_print@127.0.0.1:5432`、`67 migrations` / `No pending`、PM2 `ai-job-print-api` online、本机 health `127.0.0.1:3010`。预检叠加 NODE_ENV，**不能**单独给「进程内已是 production」打勾。
-  > - 对 `120.48.13.190` 的 5432/6379/3010：TCP SYN 有响应但协议横幅超时，**不**当作「已对公网关闭」或「已对公网开放」。22 有 OpenSSH 横幅。
+  > - 对 `<生产服务器 IP>` 的 5432/6379/3010：TCP SYN 有响应但协议横幅超时，**不**当作「已对公网关闭」或「已对公网开放」。22 有 OpenSSH 横幅。
   >
   > **小结**：原 82 = A 33 / B 39 / C 10；另把「自动部署」改回未勾。本章现已勾 39 / 未勾 50。上线阻塞首先是 C「三类内容 total=0」。
   >
@@ -422,7 +422,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 | # | 节 | 条目 | 证据（2026-09-07） |
 |---|---|---|---|
-| 1 | 3.1 | OS 版本 | 直连 `120.48.13.190:22` 横幅 `OpenSSH_9.6p1 Ubuntu-3ubuntu13.14`（24.04）+ `nginx/1.24.0 (Ubuntu)` |
+| 1 | 3.1 | OS 版本 | 直连 `<生产服务器 IP>:22` 横幅 `OpenSSH_9.6p1 Ubuntu-3ubuntu13.14`（24.04）+ `nginx/1.24.0 (Ubuntu)` |
 | 2 | 3.1 | pnpm 与锁文件兼容 | deploy `34137990264` 两次 `pnpm install --frozen-lockfile` 成功，`pnpm v11.2.2` |
 | 3 | 3.1 | Linux 已装中文字体 | 公网 `cjkFonts:true` + 预检真实 `probeCjkFont()` → `PREFLIGHT OK: 24 gates`（包名仍 B） |
 | 4 | 3.1 | Word→PDF 走服务端 soffice | 公网 `engine:soffice wordToPdf:true` |

@@ -124,9 +124,27 @@ check(
 )
 
 const report = read(pages[2])
-for (const token of ['printInterviewReport(', 'accessToken: state.accessToken', 'file.printFileUrl', 'fileUrl: file.printFileUrl', "throw new Error('打印链接未就绪，请稍后重试')", "navigate('/print/confirm'", "makePrintParams({ copies: 1, duplex: 'single', color: 'bw' })"]) {
+for (const token of ['printInterviewReport(', 'accessToken: state.accessToken', 'file.printFileUrl', 'fileUrl: file.printFileUrl', "throw new Error('打印链接未就绪，请稍后重试')", 'startPrint({', "origin: 'interview_report'"]) {
   check(report.includes(token), `${pages[2]} — Report 打印合同缺失：${token}`)
 }
+check(
+  report.includes('{COMPLIANCE_COPY.INTERVIEW_PRACTICE_RESULT_DISCLAIMER}'),
+  '面试报告页必须固定渲染共享免责说明',
+)
+check(report.includes('和目标岗位要求的对照'), '面试报告缺少「和目标岗位要求的对照」')
+check(!report.includes('LEVEL_META'), '面试报告不得渲染等级徽章')
+check(!report.includes('level.label'), '面试报告不得显示等级文案')
+check(!report.includes('岗位匹配度参考'), '面试报告不得写岗位匹配度参考')
+check(!report.includes('练习表现等级'), '面试报告不得写练习表现等级')
+check(!report.includes('HR 初筛'), '面试报告不得写 HR 初筛')
+check(setup.includes("label: 'HR 面试'"), '设置页面试官应为 HR 面试')
+check(session.includes("hr: 'HR 面试'"), '会话页面试官应为 HR 面试')
+check(!setup.includes('HR 初筛') && !session.includes('HR 初筛'), '设置页或会话页仍写 HR 初筛')
+const sharedCopy = read('../../packages/shared/src/types/complianceCopy.ts')
+check(
+  sharedCopy.includes("'模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。'"),
+  '共享免责说明句子不一致',
+)
 
 const reports = read(pages[4])
 for (const token of ['getMyInterviews(', 'deleteMyInterview(', '!isLoggedIn', "'loading' | 'error' | 'ready'", 'confirmId !== sessionId']) {

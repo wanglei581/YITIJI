@@ -10,6 +10,17 @@ const auth = require('../../utils/auth')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
 
+// 没有 AI 解读时说清为什么、要不要再试（后端 #1112 的 aiUnavailableReason）。
+// 闸门类重试没用，不提示重试；声明 / 登录缺失要先补再重新作答。
+const AI_GATE_REASONS = ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_PROVIDER_NOT_CONFIGURED', 'AI_ACCESS_CHECK_FAILED']
+function aiReasonText(code) {
+  if (!code) return 'AI 解读服务本次不可用，五段文字解读没有生成。'
+  if (AI_GATE_REASONS.indexOf(code) >= 0) return 'AI 解读当前没有开放，这次只有五维强度，重新作答也不会有文字解读。'
+  if (code === 'AI_DECLARATION_REQUIRED') return '还没有完成年满 14 周岁声明，所以没有 AI 解读。完成声明后重新作答，可以看到 AI 解读。'
+  if (code === 'AI_LOGIN_REQUIRED') return '按规定登录后才能生成 AI 解读。登录后重新作答，可以看到 AI 解读。'
+  return 'AI 解读服务本次不可用，五段文字解读没有生成。'
+}
+
 /**
  * 自我探索 · 倾向参考。
  *
@@ -35,24 +46,16 @@ const storage = require('../../utils/storage')
 
 /** 雷达图配色。canvas 读不到 CSS 变量，这里是 app.wxss 里 --teal 系与 --line 系的取值副本。 */
 
-/**
- * 知情同意条目。逐条对应服务端已实现的行为，用户勾的就是这几句原文。
- * 与一体机 apps/kiosk/src/pages/resume/selfAssessmentSession.ts 的 CONSENT_ITEMS 同源，
- * 另把「答案原文不入库、不送模型」这条数据流事实单独写出来 —— 那是用户决定要不要
- * 作答时唯一真正关心的一条，藏在「不留存」三个字里说不清楚。
- *
- * 版本号不写死在这里：consentVersion 一律用 questions 接口下发的值。写死会在
- * 同意书改版时静默失配（服务端会回 SELF_ASSESSMENT_CONSENT_VERSION_STALE）。
- */
-const CONSENT_ITEMS = [
-  '本工具基于你本人的作答给出倾向参考，不是临床、心理或人格诊断。',
-  '结果只对你本人可见，不向企业、合作机构或任何第三方推送。',
-  '答案原文不入库、也不发给 AI：服务端只保存作答摘要（哈希）、五维强度与解读文字，发给模型的只有五个维度名与对应强度分值。',
-  '本工具不判断你是否胜任某个岗位或职业，也不构成能力证明。',
-  '五维强度由固定权重累加算出，不经过 AI；五段解读由 AI 生成，仅供参考。',
-  '作答后可在结果页撤回：服务端会删除该次结果，并留下一条删除审计记录。',
-]
+// 知情同意的条款、勾选框文字、链接、版本号都由服务端下发，整理逻辑与理由见 consent-view.js。
+const consentView = require('./consent-view')
 
+/** 服务端说同意版本不是当前版本时的提示（合规窗口 9/29 裁定原文）。 */
+const STALE_TIP = '说明已更新，请重新确认。已答的题会保留。'
+
+/** 题目集指纹：维度 key + 题号。用来判断旧答案还能不能套到新拉的题上。 */
+function questionSignature(dims) {
+  return (dims || []).map((d) => `${d.key}:${d.questions.map((q) => q.idx).join(',')}`).join('|')
+}
 
 function trimmed(v) {
   return typeof v === 'string' && v.trim() ? v.trim() : ''
@@ -83,8 +86,15 @@ Page({
     taskId: '',
 
     // ── 同意书 ──
-    consentItems: CONSENT_ITEMS,
+    consentItems: [],
     consentVersion: '',
+    consentCheckboxLabel: '',
+    consentLinks: [],
+    /** 勾选框文字按链接切好的段：{ text, link }，link 为 -1 是普通文字。 */
+    checkboxParts: [],
+    extraLinks: [],
+    /** 条款、勾选框文字、版本号都从服务端拿到了，才允许开始作答。 */
+    consentReady: false,
     agreeNonSensitive: false,
     agreeSensitive: false,
     /** 题库里被标为敏感的题数，按下发的题目真值算，不写死。v1 实测 0 题。 */
@@ -200,10 +210,9 @@ Page({
           this._fail('暂时取不到题目，请稍后重试', false)
           return
         }
-        this.setData({
+        this.setData(Object.assign({
           phase: 'consent',
           dims: view.dims,
-          consentVersion: view.consentVersion,
           sensitiveCount: view.sensitiveCount,
           totalCount: view.totalCount,
           requiredCount: view.requiredCount,
@@ -214,7 +223,7 @@ Page({
           groupIdx: 0,
           groupDone: view.dims.map(() => false),
           isLastGroup: view.dims.length === 1,
-        })
+        }, view.consent))
       })
       .catch((err) => {
         if (this._gone || seq !== this._seq) return
@@ -250,10 +259,51 @@ Page({
       })
       if (items.length) dims.push({ key: trimmed(d.key), label: trimmed(d.label) || trimmed(d.key), questions: items })
     })
-    return { dims, totalCount, requiredCount, sensitiveCount, consentVersion: trimmed(res && res.consentVersion) }
+    return {
+      dims, totalCount, requiredCount, sensitiveCount,
+      consent: consentView.toConsentView(res, api.LEGAL_DOC_TITLES),
+    }
+  },
+
+  /** 同意勾选框里的链接：打开小程序内的法务页并定位到对应章节（小程序打不开外部网页）。 */
+  tapConsentLink(e) {
+    const link = this.data.consentLinks[Number(e.currentTarget.dataset.i)]
+    if (!link) return
+    const q = [`type=${encodeURIComponent(link.legalDocType)}`]
+    if (link.sectionTitle) q.push(`section=${encodeURIComponent(link.sectionTitle)}`)
+    wx.navigateTo({ url: `/pages/legal/legal?${q.join('&')}` })
+  },
+
+  /**
+   * 只重新拉条款与版本号，不动已答的题；勾选清零，要用户对新说明重新确认。
+   * 题目集若也变了（维度或题号对不上），旧答案不能套到新题上，这时整套重来。
+   */
+  _refreshConsent(tip) {
+    const seq = ++this._seq
+    const reset = { phase: 'consent', agreeNonSensitive: false, agreeSensitive: false, consentTip: tip || '' }
+    api.getSelfAssessmentQuestions()
+      .then((res) => {
+        if (this._gone || seq !== this._seq) return
+        const view = this._toQuestionsView(res)
+        if (questionSignature(view.dims) !== questionSignature(this.data.dims)) {
+          this.setData({ agreeNonSensitive: false, agreeSensitive: false, consentTip: tip || '' })
+          this._loadQuestions()
+          return
+        }
+        this.setData(Object.assign(reset, view.consent))
+      })
+      .catch(() => {
+        if (this._gone || seq !== this._seq) return
+        this.setData(Object.assign(reset, consentView.emptyConsentView()))
+      })
   },
 
   reload() {
+    // 同意页上的「重试」：题已经在手里（可能还答了），只补拉说明。
+    if (this.data.phase === 'consent' && this.data.dims.length) {
+      this._refreshConsent(this.data.consentTip)
+      return
+    }
     if (this.data.historyMode && this.data.taskId) {
       this.setData({ phase: 'loading', errMsg: '' })
       this._loadExisting(this.data.taskId)
@@ -273,13 +323,18 @@ Page({
   },
 
   startAsk() {
+    // 说明没取到：页面上已有原因和重试，这里不放行。
+    if (!this.data.consentReady) return
     // 同意前不得进入答题：这不是表单校验，是服务端也会拒的合规闸门
     // （nonSensitive 为 false → SELF_ASSESSMENT_CONSENT_REQUIRED）。
     if (!this.data.agreeNonSensitive) {
       wx.showToast({ title: '请先勾选第一项同意', icon: 'none', duration: 2000 })
       return
     }
-    this.setData({ phase: 'ask', groupIdx: 0, isLastGroup: this.data.dims.length === 1, consentTip: '' })
+    // 重新确认说明回来、题都答完了：直接落在最后一组，点提交即可，不用再翻一遍。
+    const last = this.data.dims.length - 1
+    const groupIdx = (this.data.answeredCount > 0 && this.data.submitReady) ? last : 0
+    this.setData({ phase: 'ask', groupIdx, isLastGroup: groupIdx === last, consentTip: '' })
     wx.pageScrollTo({ scrollTop: 0, duration: 200 })
   },
 
@@ -356,6 +411,8 @@ Page({
 
   submit() {
     if (this.data.phase === 'submitting') return
+    // 防御：说明不全时不提交。正常路径进不了答题（startAsk 已拦），这里防以后新加的入口绕过它。
+    if (!this.data.consentReady) return
     if (!this.data.agreeNonSensitive) {
       wx.showToast({ title: '请先勾选第一项同意', icon: 'none', duration: 2000 })
       return
@@ -396,13 +453,9 @@ Page({
         if (this._gone || seq !== this._seq) return
         // 同意书已改版：服务端拒绝用旧版本的同意放行，页面必须请用户重新读一遍，
         // 不能把旧勾选当成对新说明的同意。
+        // 已答的题保留（9/29 合规裁定）：换的是说明，不是题。
         if (err && err.code === 'SELF_ASSESSMENT_CONSENT_VERSION_STALE') {
-          this.setData({
-            agreeNonSensitive: false,
-            agreeSensitive: false,
-            consentTip: (err && err.message) || '知情同意说明已更新，请重新阅读并确认后再提交',
-          })
-          this._loadQuestions()
+          this._refreshConsent(STALE_TIP)
           return
         }
         this.setData({ phase: 'ask' })
@@ -529,8 +582,12 @@ Page({
       status,
       failReason: trimmed(res && res.failReason),
       summary: trimmed(res && res.summary),
-      // 服务端明说模型这次调不通时才是 llm_unavailable，不拿它猜别的失败原因
-      providerUnavailable: !!(res && res.providerName === 'llm_unavailable'),
+      // 有没有 AI 解读：优先读服务端的 interpretationAvailable（后端 #1112 起有）；
+      // 没有这个字段的旧服务端，退回「providerName 明说 llm_unavailable」。不拿别的失败猜。
+      providerUnavailable: res && typeof res.interpretationAvailable === 'boolean'
+        ? !res.interpretationAvailable
+        : !!(res && res.providerName === 'llm_unavailable'),
+      aiReasonText: aiReasonText(res && res.aiUnavailableReason),
       noteCount: dims.filter((d) => d.note).length,
       consentVersion: trimmed(res && res.consentVersion),
       consentedAt: N.dateTime(res && res.consentedAt) || '',

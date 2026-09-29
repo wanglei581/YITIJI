@@ -19,8 +19,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import {
+  COPY_GUIDE_KEY,
   HUB_ASK,
   HUB_TRUTH,
+  type HubFeatureState,
   type HubUiState,
   type MfpStatus,
   type ProbeStatus,
@@ -59,7 +61,7 @@ export interface QxPrintArrivalCodeView {
   stateNote?: string
 }
 
-type HubPageState = Exclude<HubUiState, 'feature-id-photo' | 'feature-not-found'>
+type HubPageState = Exclude<HubUiState, HubFeatureState>
 
 interface QxPrintHubViewProps {
   hubState: HubPageState
@@ -154,7 +156,13 @@ export function PrintHubTruth() {
   )
 }
 
-/** 记录卡 / 复印说明。Hub 与「能力说明不存在」页共用同一组卡面。 */
+/**
+ * 记录卡 / 复印说明。Hub 与「能力说明不存在」页共用同一组卡面。
+ *
+ * 复印卡：2.0 稿 10 画的是不可点的静态说明卡。R4（2026-09-29 产品负责人拍板）改成可点，
+ * 点进 /print-scan/feature/copy 看「怎么在打印机面板上复印」；卡面样子、图标、说明句不变，
+ * 只补一个与另两张卡同样式的去向提示。点击回调走 onOpen(COPY_GUIDE_KEY)，由页面决定跳转。
+ */
 export function PrintHubRecordNotes({
   links,
   onOpen,
@@ -184,24 +192,29 @@ export function PrintHubRecordNotes({
           </button>
         )
       })}
-      <div
+      <button
+        type="button"
         className="ph-note"
         style={stagger(links.length + 10)}
-        role="group"
         data-testid="print-hub-copy-note"
-        data-disclaimer="true"
-        data-static="true"
+        onClick={() => onOpen(COPY_GUIDE_KEY)}
       >
         <span className="ph-note-head">
           <span className="ph-note-ic" data-tone="wheat" aria-hidden="true">
             <CopyIcon size={24} />
           </span>
           <b>复印</b>
+          <span className="ph-note-go" aria-hidden="true">看步骤 →</span>
         </span>
         <span className="d">在打印机面板上操作，取走纸质复印件。</span>
-      </div>
+      </button>
     </div>
   )
+}
+
+/** emphasize 的组件形态，给说明页复用（复印步骤里把屏幕按钮名加粗）。 */
+export function PrintHubEmphasis({ text, marks }: { text: string; marks?: readonly string[] }) {
+  return <>{emphasize(text, marks)}</>
 }
 
 /** 入场逐卡浮现的序号。只给 CSS 算 animation-delay，不参与任何逻辑。 */
@@ -287,7 +300,7 @@ function HubBanner({
           testId="print-hub-fallback"
         >
           <p className="ph-state-p">
-            打印机当前<b>无法连接</b>。手机扫码上传、格式转换、签名盖章仍可使用。
+            打印机当前<b>无法连接</b>。手机扫码上传、格式转换、签名仍可使用。
           </p>
         </PrintHubState>
       )

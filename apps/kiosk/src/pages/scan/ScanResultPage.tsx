@@ -25,7 +25,9 @@ import {
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import { revokeLiveScanSession } from './scanSessionRevoke'
-import { savePrintMaterialSession, type PrintMaterialSource } from '../print/printMaterialSession'
+import { type PrintMaterialSource } from '../print/printMaterialSession'
+import { beginPrintHandoff, printHandoffTarget } from '../print/printHandoff'
+import { usePrintHandoffOwner } from '../print/usePrintHandoff'
 import {
   armScanRescanAuthority,
   beginPlainScanRestart,
@@ -80,6 +82,7 @@ function deriveOutcome(state: ScanResultState): ScanOutcome {
 
 export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
   const navigate = useNavigate()
+  const printOwner = usePrintHandoffOwner()
   const location = useLocation()
   const { isLoggedIn, getToken } = useAuth()
   const stored = readScanWorkbenchSession()
@@ -266,18 +269,16 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
    * 生产强制 PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒 PRINT_PII_SCAN_REQUIRED，
    * 而隐私检查只在打印台的材料检查里做 —— 所以去材料检查，不直达报价确认页（商用收口 P0-5）。
    *
-   * 写法与打印上传页相同：先把这份扫描件**整份**写进打印材料会话（旧文件的检查结论、参数一并作废），
-   * 再离开。/print/material-check 会 replace 重定向到 /print/desk?step=check，重定向不转发路由
-   * state，打印台只认会话 —— 所以必须先写，再走。
+   * 写法与打印上传页相同：先把这份扫描件**整份**写进打印交接上下文（旧文件的检查结论、参数一并作废），
+   * 再离开（撤服务端扫描任务、清本机登记），跳转只带交接编号，打印台只认上下文。
    */
   const handlePrint = () => {
     if (!file) return
     const printFile = { fileId: file.fileId, fileUrl: file.fileUrl, name: file.name, size: file.size, pages: file.pages, mimeType: file.mimeType }
     const source: PrintMaterialSource = scanType === 'resume' ? 'resume' : 'document'
-    savePrintMaterialSession({ file: printFile, source })
-    leaveScanFlow('/print/material-check', {
-      state: { file: printFile, source },
-    })
+    const target = printHandoffTarget(beginPrintHandoff({ origin: 'scan_result', file: printFile, source,
+      returnPath: '/scan', idDocument: scanType === 'id' }, printOwner))
+    leaveScanFlow(target.path, { state: target.state })
   }
 
   const handleDocuments = () => {

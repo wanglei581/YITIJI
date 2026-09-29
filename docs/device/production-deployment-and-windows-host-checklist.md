@@ -175,7 +175,7 @@
 ### 3.1 基础环境
 
 - [x] 操作系统版本记录清楚。
-  **证据（2026-09-07 包 P1，公网端口横幅，直连 `120.48.13.190:22` 而非域名）**：SSH 横幅 `SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14`（Ubuntu 24.04 / noble 的 OpenSSH 包名）；HTTPS 响应头 `server: nginx/1.24.0 (Ubuntu)`。精确 `VERSION_ID` / 内核仍可用 `os-release` 复验。
+  **证据（2026-09-07 包 P1，公网端口横幅，直连 `<生产服务器 IP>:22` 而非域名）**：SSH 横幅 `SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14`（Ubuntu 24.04 / noble 的 OpenSSH 包名）；HTTPS 响应头 `server: nginx/1.24.0 (Ubuntu)`。精确 `VERSION_ID` / 内核仍可用 `os-release` 复验。
   **待取证（服务器只读）**：`source /etc/os-release && echo "$PRETTY_NAME $VERSION_ID" && uname -r`
 - [x] Node.js 版本与项目要求一致。
   **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：Node v22.23.1（pm2 `node env: production`）。
@@ -217,7 +217,7 @@
 > **手改服务器 `.env` 后的强制自检（2026-09-07 新增，来自一次真实风险）**：任何人手工改动生产 `.env` 的键之后，**收工前必须跑一次发布脚本步骤 3c 用的同一个闸门脚本做干跑**，看到 `PREFLIGHT OK` 才算完成：
 >
 > ```bash
-> cd /root/YITIJI && node services/api/scripts/preflight-production-gates.mjs \
+> cd <服务器源码检出目录> && node services/api/scripts/preflight-production-gates.mjs \
 >   --env-file /srv/ai-job-print/services/api/.env \
 >   --force-true PRINT_REQUIRE_PII_SCAN,PRINT_REQUIRE_PRINTER_ONLINE
 > ```
@@ -245,7 +245,7 @@
 - [x] `REDIS_URL` 正确。
   **证据（2026-09-07，公网 ready）**：`GET https://zyidai.cn/api/v1/health/ready` → `subsystem=redis status=ok code=REDIS_REACHABLE message="Redis 可达（127.0.0.1:6379）"`。预检同时要求生产 `.env` 含 `REDIS_URL`。
 - [x] API 监听端口、前端 API base URL、CORS allowlist 正确。
-  **证据（2026-09-07 包 P1，公网 + deploy）**：deploy 健康检查 `http://127.0.0.1:3010/api/v1/health`；公网 `https://zyidai.cn/api/v1/*` 经 nginx 反代返回 JSON。CORS 实打（`curl --resolve zyidai.cn:443:120.48.13.190 -H Origin:`）：`https://zyidai.cn` / `https://admin.zyidai.cn` / `https://partner.zyidai.cn` 的 OPTIONS 与 GET 均回 `access-control-allow-origin` 为该源；`Origin: https://evil.example` 的 OPTIONS/GET **都没有** `access-control-allow-origin`。
+  **证据（2026-09-07 包 P1，公网 + deploy）**：deploy 健康检查 `http://127.0.0.1:3010/api/v1/health`；公网 `https://zyidai.cn/api/v1/*` 经 nginx 反代返回 JSON。CORS 实打（`curl --resolve zyidai.cn:443:<生产服务器 IP> -H Origin:`）：`https://zyidai.cn` / `https://admin.zyidai.cn` / `https://partner.zyidai.cn` 的 OPTIONS 与 GET 均回 `access-control-allow-origin` 为该源；`Origin: https://evil.example` 的 OPTIONS/GET **都没有** `access-control-allow-origin`。
 - [ ] COS bucket、region、secretId、secretKey、签名 TTL 正确。
   **待取证（服务器只读）**：在 API 运行目录执行（禁止打印 secret 值）：
   ```bash
@@ -260,9 +260,11 @@
 - [ ] AI provider / LLM 功能级配置可读取。
   **待取证（服务器只读）**：`grep -E '^(AI_PROVIDER|AI_LLM_API_KEY|TRTC_LLM_API_KEY)=' services/api/.env | sed -E 's/(API_KEY)=.*/\1=SET/'`
   （旁证：预检要求 `AI_PROVIDER=llm` 且至少一把 LLM key 非空；未做模型 live 调用。）
-- [~] `AIGC_CONTENT_PRODUCER` 设为公司全称或统一社会信用代码（取哪一个由产品负责人定）。它写进导出 PDF / DOCX 的 GB 45438 隐式标识 ContentProducer；生产空着或填产品名「职易达」，启动闸门报 `PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING`，部署在 3c 预检中止（备份与重启之前）。
-  **2026-09-27 现状：** 产品负责人自报已在服务器 API 的 `.env` 写入，取统一社会信用代码（协调窗口按 GB 32100 核过校验位；值不写入本仓库）。协调窗口不登服务器，未独立核对文件内容；下一次授权发布时 3c 预检会按启动闸门实际校验，通过后把本条改为 `[x]` 并写明发布批次。
+  **思考模式在线核对**（会访问模型，不进 CI）：在服务器的 `services/api` 目录执行 `npx -y pnpm@11.2.2 run probe:llm-thinking-live`。密钥与 API 进程同一处：先读后台 AI 槽位（`LlmConfigService` 解密后的配置），没有再读服务启动时加载的 `.env`（`AI_LLM_API_KEY`，否则 `TRTC_LLM_API_KEY`）。缺密钥打印 `未验证：DeepSeek`，退出码非 0。只有显式加上 `--allow-skip` 才允许跳过，此时仍打印「未验证」，退出码为 0。标准输出和标准错误都不打印密钥或密钥片段。CI 里的 `verify:llm-thinking-live-gate` 只做离线自检，不代替这次在线核对。
+- [~] `AIGC_CONTENT_PRODUCER` 设为公司全称或统一社会信用代码（取哪一个由产品负责人定）。它写进导出 PDF / DOCX 的 GB 45438 隐式标识 ContentProducer；生产空着或填产品名「职易达」：自 P1-18（2026-09-29）起**不再拒启动、预检不中止**，改为 AI 生成与带 AI 内容的导出降级（503 `AI_PROVIDER_NOT_CONFIGURED`）、`/health` degraded、3c 预检打 `AI_PLATFORM_DEGRADED` 告警——发布时看到这条告警必须先补齐再对外开放 AI。
+  **2026-09-27 现状：** 产品负责人自报已在服务器 API 的 `.env` 写入，取统一社会信用代码（协调窗口按 GB 32100 核过校验位；值不写入本仓库）。协调窗口不登服务器，未独立核对文件内容；下一次授权发布时看 3c 预检有无 `AI_PLATFORM_DEGRADED` 告警、`/health` 的 `ai-platform` 是否为 configured，确认后把本条改为 `[x]` 并写明发布批次。
 - [ ] ASR/TTS provider 与腾讯密钥正确。
+  音色在线核对用同一个探针，在 `services/api` 目录执行 `npx -y pnpm@11.2.2 run probe:llm-thinking-live -- --tts`。腾讯密钥按服务启动方式加载 `.env`，读取与 `TtsService` 相同（`TENCENT_TTS_SECRET_ID` / `TENCENT_TTS_SECRET_KEY`，否则 `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY`）；音色 ID 与小青相同（`TRTC_TTS_VOICE`，默认 1008）。缺密钥打印 `未验证：音色`，退出码非 0；`--allow-skip` 才把这次跳过当成通过，并且仍然打印「未验证」。模型密钥已核对、只有音色被跳过时，整次仍然是非 0。
 - [ ] `RESUME_PDF_FONT_PATH` / `RESUME_PDF_FONT_FAMILY` 已按需配置；默认系统候选可用时可留空。旧变量 `JOB_MATERIAL_PDF_FONT_PATH` / `_FAMILY` 仅作兼容回退，不再作为新部署主配置。
 - [~] `NODE_ENV=production` 下字体探测失败会以 `PRODUCTION_CJK_FONT_MISSING` 拒绝启动；管理员登录后读取 `GET /api/v1/health/cjk-font`，确认 `data.ok=true`、`path` / `family` 与预期一致。
   **2026-09-07 现状：端点实测未取到**（该端点需 Bearer Token，发布 lane 与 Windows lane 均无管理员账号，且都拒绝索取或代持管理员口令 —— 这个边界要保持）。
@@ -515,7 +517,7 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 - [x] 未登录游客不展示跨会话资产。 —— **PASS，且强于本条要求**
   **证据（2026-09-07 23:38–23:40，发布 `759a37d45` 之后，发布 lane 取证）**：**每条路由开全新浏览器上下文**（无 cookie / localStorage / sessionStorage），走真实域名逐条访问「我的」六个资产页并抓全部 `/api/v1/` 调用 —— `/me/resumes`、`/me/documents`、`/me/print-orders`、`/me/ai-records`、`/me/favorites`、`/me/activity` **六页登录门均在，且各发出 0 条 `/api/v1/` 调用**；六页文案均写「仅本人可见」，与 §10 数据边界一致。
   **为什么按「0 条调用」记而不是「返回 401」**：401 是**服务端过滤**（请求发生过、被拒），仍存在「过滤条件某天被改错就漏数据」的风险面；0 条是**客户端 fail-closed**，该风险面不存在。这个 0 也是回归时最灵敏的指标 —— 哪天有人加「先拉一下再判断登录」的优化，0 就会变非 0。
-  **复验方法（必照做）**：① **必须每条路由新开 context** —— 共用 context 时第一页登录门写进的本地状态会污染后续判断（发布 lane 曾因共用 page 被待机态污染，产出 74 条假结论）；② 域名侧需本机 DNS 劫持 + 浏览器 `--host-resolver-rules` 指向 `120.48.13.190`。
+  **复验方法（必照做）**：① **必须每条路由新开 context** —— 共用 context 时第一页登录门写进的本地状态会污染后续判断（发布 lane 曾因共用 page 被待机态污染，产出 74 条假结论）；② 域名侧需本机 DNS 劫持 + 浏览器 `--host-resolver-rules` 指向 `<生产服务器 IP>`。
 
 ### 4.2 AI 简历与「我的」闭环
 
@@ -606,7 +608,7 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 ### 5.1 Windows 环境
 
-- [ ] Windows 10/11 x64，版本记录清楚。
+- [ ] 系统版本按[母盘清单](windows-golden-image-and-install-checklist.md) A1：Windows 11 IoT 企业版 LTSC 2024（首选）/ Windows 11 专业版 25H2 及以后（兜底）/ Windows 10 IoT 企业版 LTSC 2021（兼容）；普通 Windows 10 已于 2025-10-14 停止支持，不合格；版本记录清楚。
 - [ ] 系统时区为 `Asia/Shanghai`。
 - [ ] 自动登录/开机启动策略符合现场 kiosk 使用方式。
 - [ ] Edge/Chrome 已安装并可进入全屏 Kiosk 模式。
@@ -648,7 +650,7 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 - [x] Kiosk 页面可从生产域名打开。
   **证据（2026-09-07 23:31，发布后，Windows lane 取证）**：`https://zyidai.cn/`（**非 IP**，真实域名 + HTTPS）；bundle `/assets/index-Do9twi7d.js`（本次发布新产物，域名侧已生效）；正文 615 字，首屏「今天想办什么 / 说出你的处境，顺序我来排」正常渲染；JS 运行错 0。
-  **取证方法（必抄，否则下一个人按域名复验会打到黑洞并误判「线上挂了」）**：本机 DNS 把 `zyidai.cn` 劫持到 `198.18.x`，浏览器 `--host-resolver-rules` 指向 `120.48.13.190`。
+  **取证方法（必抄，否则下一个人按域名复验会打到黑洞并误判「线上挂了」）**：本机 DNS 把 `zyidai.cn` 劫持到 `198.18.x`，浏览器 `--host-resolver-rules` 指向 `<生产服务器 IP>`。
 - [x] Kiosk 全屏模式无浏览器系统弹窗阻断主流程。（2026-07-25 F6：1080×1920；未覆盖 Assigned Access）
 - [x] `http://127.0.0.1:9527` 或当前 Agent local API 仅本机可访问。（2026-07-25 F3）
 - [ ] `GET /local/terminal-identity` 在允许 Origin 下只返回 `terminalId` / `terminalCode`，错误 Origin 返回 403；不得返回 Agent token、API URL、打印机名或本地路径。
@@ -866,7 +868,7 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 | 密钥 | 暴露情况 | 状态 |
 |---|---|---|
 | 百度 OCR（旧 AppID 7841387） | 曾在聊天明文暴露 | ✅ **已解除（2026-06-13）**：用户在百度控制台重建应用，新 Key 配入 `services/api/.env`；`verify:ocr-baidu-live` 真实联网通过，`accurate_basic` 识别与扫描件 `pdf_ocr` 全链路通过，置信度 high。旧 Key 作废以用户控制台操作为准 |
-| 腾讯云 COS CAM | 配置时曾在终端回显 | ✅ **已解除（2026-06-13）**：用户轮换 CAM 子用户密钥，新 Key 配入 `.env`；`verify:cos:live` 真实桶 `yitiji-prod-private-1257025684` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action |
+| 腾讯云 COS CAM | 配置时曾在终端回显 | ✅ **已解除（2026-06-13）**：用户轮换 CAM 子用户密钥，新 Key 配入 `.env`；`verify:cos:live` 真实桶 `<生产存储桶>` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action |
 | 腾讯云 ASR/TTS/TRTC | 未发现聊天暴露记录 | 上线时按最小权限签发生产专用 Key；TRTC 凭证只改 `services/api/.env`（代码冻结） |
 | 腾讯 SMS | — | **阻塞：短信签名/模板审核未过**；审核通过前生产不得设 `SMS_PROVIDER=log` 以外的假发送，服务端已有启动期校验（prod 强制 tencent，禁止 log） |
 | LLM（DeepSeek 等） | 未发现聊天暴露记录 | 上线使用生产专用 Key；真实联调证据：2026-06-12 2E/2D 真实 DeepSeek 浏览器验收通过 |

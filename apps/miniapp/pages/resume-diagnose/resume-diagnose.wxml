@@ -14,7 +14,7 @@
     </view>
     <view class="rs-title">正在获取诊断报告…</view>
     <view class="rs-sub">AI 分析结果由服务端生成,请稍候</view>
-    <view class="rs-disclaimer">分析结果仅供参考,不构成招聘意见</view>
+    <view class="rs-disclaimer">AI 生成，仅供参考：只帮你改简历，请逐条核对原文</view>
   </view>
 
   <!-- 无可展示任务:不伪造历史报告,给真实入口 -->
@@ -215,7 +215,7 @@
 
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <text>诊断结果由 AI 生成，仅供本人修改简历参考。请逐项核对原文，不代表用人单位意见。</text>
+      <text>AI 生成，仅供参考：诊断只用于你本人修改简历，请逐项核对原文。</text>
     </view>
 
   </view>

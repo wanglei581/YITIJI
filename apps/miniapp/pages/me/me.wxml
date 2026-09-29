@@ -44,6 +44,12 @@
           <view class="stat-label">{{item.label}}</view>
         </view>
       </view>
+      <!-- 计数没读到：说清楚，并给重试（只用全局 .list-state / .state-retry，不加样式） -->
+      <view class="list-state" wx:if="{{isLoggedIn && statsFailed}}" role="alert">
+        <view>部分数量没读到，显示「—」的项目请稍后重试。</view>
+        <view class="state-retry tap" hover-class="tap-press" bindtap="retryStats"
+              role="button" aria-label="重新读取数量">重试</view>
+      </view>
 
       <view class="section-row">
         <text class="section-title">我的服务</text>
@@ -92,7 +98,8 @@
         </view>
       </view>
 
-      <view class="privacy-note">你的简历、文档、打印订单和 AI 记录只对你本人可见，不提供给任何第三方。</view>
+      <!-- 与法务试运行版隐私政策同一口径：不在这里另写受托方清单，以后台发布的隐私政策为准。 -->
+      <view class="privacy-note">你的简历、文档、打印订单和 AI 记录只对你本人可见。个人信息怎么处理、交给哪些受托方，以<text class="privacy-link" bindtap="tapPrivacyPolicy">《隐私政策》</text>为准。</view>
       <view class="tab-spacer"></view>
     </view>
   </scroll-view>

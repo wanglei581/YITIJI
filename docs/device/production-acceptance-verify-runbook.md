@@ -70,21 +70,22 @@ A–E 全通过 + `/health` = PG + 日志无敏感正文 + CI 双绿 → 回写 
 
 ```bash
 node scripts/prod-readonly-probe.mjs
-node scripts/prod-readonly-probe.mjs --host 120.48.13.190 --domains zyidai.cn,admin.zyidai.cn,partner.zyidai.cn
+node scripts/prod-readonly-probe.mjs --host <生产服务器 IP> --domains zyidai.cn,admin.zyidai.cn,partner.zyidai.cn
 node scripts/prod-readonly-probe.mjs --expect-sha <本次发布 SHA 前缀>
 node scripts/prod-readonly-probe.mjs --json
 ```
 
 `--expect-sha` 只打印在报告头，请人工与服务器 `DEPLOY_SOURCE.txt` 核对。`--scheme http` / `--port` 仅供本地桩，CI 门禁 `pnpm verify:prod-readonly-probe` 不连生产。
 
-有 FAIL 退出码 1，WARN / INFO 仍为 0。公开列表 `total=0` 是 INFO（内容录入是负责人的事），不是 FAIL。
+有 FAIL 退出码 1，WARN / INFO 仍为 0。公开列表 `total=0` 是 INFO（内容录入是负责人的事），不是 FAIL。岗位、招聘会、政策、线下机构取第一页（`pageSize=50`），用户看得见的名称、标题、来源名、机构名里出现全角「（演示）」则 WARN 并列出前 3 个名字，没有则 PASS 并注明「无演示标记」；企业列表仍用宽匹配（演示|示例|测试数据|demo|sample），不收窄。线下机构若返回空数组，按 0 条记 INFO。
 
 | 项 | 判定 |
 |---|---|
 | `GET /api/v1/health` | 200 且 `data.status=ok`、`data.db=postgres`、`degraded=[]`；否则 FAIL，打印原文前 200 字 |
 | `GET /api/v1/health/ready` | 200 |
 | 三域名 `GET /` | 200，抽出 `assets/index-*.js` hash；同一 hash 出现在两个域名上 WARN（打到了默认 vhost） |
-| `GET /api/v1/jobs`、`/job-fairs`、`/policies` | 取 `pagination.total` 或 `items.length`；0 为 INFO |
+| `GET /api/v1/jobs?pageSize=50`、`/job-fairs`、`/policies`、`/kiosk/offline-agencies` | 取 `pagination.total`、`total` 或数组长度；0 为 INFO。名称类字段含全角「（演示）」为 WARN，否则 PASS（无演示标记） |
+| `GET /api/v1/companies?pageSize=50` | 条数规则同上；演示标记用宽匹配（演示\|示例\|测试数据\|demo\|sample），命中 WARN |
 | `GET /api/v1/kiosk/legal/privacy_policy`、`/terms_of_service` | 200 且 `data` 非空 |
 | `GET /api/v1/kiosk/legal/unknown_type` | **400**（#835） |
 | `POST /api/v1/terminals/session-token` 空体 | **400**（存在，非 404；#833） |

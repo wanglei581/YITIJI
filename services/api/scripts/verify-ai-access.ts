@@ -14,7 +14,7 @@
  * 运行：pnpm --filter @ai-job-print/api verify:ai-access
  */
 import 'reflect-metadata'
-import { RequestMethod } from '@nestjs/common'
+import { ForbiddenException, RequestMethod } from '@nestjs/common'
 import { METHOD_METADATA, MODULE_METADATA } from '@nestjs/common/constants'
 import { APP_GUARD, NestFactory, Reflector } from '@nestjs/core'
 import { AiAccessModule } from '../src/ai-access/ai-access.module'
@@ -241,6 +241,22 @@ async function guardOnRealRoutes(): Promise<void> {
   for (const [ctor, method] of allowed) {
     check(`guard:维护模式放行 ${ctor.name}.${method}`, (await through(ctor, method)) === 'PASS')
   }
+  // 打印前材料检查（原件打印必经）不调生成式模型：AI 暂停、登录档位、声明都不能挡；只受全机维护拦新建。
+  const materials = MaterialsController as unknown as Ctor
+  config = { ...OFF, maintenance: true }
+  check('guard:维护模式拦新建材料检查', (await through(materials, 'createTask')) === 'MAINTENANCE_MODE')
+  check('guard:维护模式不拦已开始检查的逐项裁决', (await through(materials, 'decidePiiFindings')) === 'PASS')
+  const materialsOpen: Array<[string, AiAccessConfig]> = [
+    ['AI 暂停', { ...OFF, paused: true }],
+    ['开始 AI 前登录', { ...OFF, loginGate: 'before_generate' }],
+    ['导出前登录', { ...OFF, loginGate: 'before_export' }],
+    ['声明强制', { ...OFF, declarationEnforced: true }],
+  ]
+  for (const [label, cfg] of materialsOpen) {
+    config = cfg
+    check(`guard:${label}不拦匿名材料检查（原件打印必经）`,
+      (await through(materials, 'createTask')) === 'PASS' && (await through(materials, 'decidePiiFindings')) === 'PASS')
+  }
   config = { ...OFF, paused: true }
   check('guard:AI 暂停拦顾问生成（run）', (await through(AdvisorController as unknown as Ctor, 'run')) === 'AI_PAUSED')
   check('guard:AI 暂停拦岗位 AI 解读（explain）', (await through(JobAiController as unknown as Ctor, 'explain')) === 'AI_PAUSED')
@@ -282,6 +298,7 @@ function coverage(): void {
     [ScanTasksController as unknown as Ctor, ['create']],
     [UploadSessionsController as unknown as Ctor, ['create']],
     [PrintConversionController as unknown as Ctor, ['imagesToPdf']],
+    [MaterialsController as unknown as Ctor, ['createTask']],
   ]
   for (const [ctor, expected] of onlyCreate) {
     const marked = routesOf(ctor).filter((method) => methodMeta(ctor, method, MAINTENANCE_BLOCKED_METADATA) === true).sort()
@@ -310,6 +327,27 @@ function coverage(): void {
   }
 }
 
+/** 经真实全局错误过滤器：缺了哪几项声明要真的出现在响应体里（details），客户端才能只补问缺的那几项。 */
+async function declarationSurvivesFilter(): Promise<void> {
+  const { HttpExceptionFilter } = await import('../src/common/filters/http-exception.filter')
+  const { service } = makeService()
+  let thrown: unknown = null
+  try {
+    await service.enforce('voice', false, ANON as never, { ...OFF, declarationEnforced: true })
+  } catch (error) {
+    thrown = error
+  }
+  let status = 0
+  let body: { error?: { code?: string; details?: unknown } } = {}
+  const response = { status: (s: number) => { status = s; return response }, json: (b: typeof body) => { body = b } }
+  const host = { switchToHttp: () => ({ getResponse: () => response, getRequest: () => ({ headers: {}, method: 'POST', url: '/ai/voice' }) }) }
+  new HttpExceptionFilter().catch(thrown, host as never)
+  check('filter:声明缺失经全局过滤器后仍带出缺哪几项（details）',
+    status === 403 && body.error?.code === 'AI_DECLARATION_REQUIRED'
+      && JSON.stringify(body.error?.details) === JSON.stringify(['age_14_plus', 'voice_recording']),
+    JSON.stringify({ status, body }))
+}
+
 async function adminSwitch(): Promise<void> {
   const roles = Reflect.getMetadata(ROLES_KEY, AdminAiAccessController) as string[] | undefined
   check('admin:切换接口只许 admin', JSON.stringify(roles) === JSON.stringify(['admin']), JSON.stringify(roles))
@@ -332,6 +370,47 @@ async function adminSwitch(): Promise<void> {
 }
 
 /** 真起完整 AppModule 发 HTTP：证明线上装配里守卫确实在拦（手动 new 守卫的测试测不出「没注册」）。 */
+/**
+ * 简历「按原样导出」（draft=true）是 AI 挂掉时的手动退路：不送模型，所以不查简历 AI 授权、不被 AI 闸门挡。
+ * draft=false（导出 AI 润色结果）照旧要授权、照旧过闸。只认严格布尔 true，其它一律照常过闸（失败关闭）。
+ */
+async function draftExportManualPath(): Promise<void> {
+  let config: AiAccessConfig = { ...OFF, paused: true }
+  const { service } = makeService()
+  ;(service as unknown as { getConfig: () => Promise<AiAccessConfig> }).getConfig = async () => config
+  const guard = new AiAccessGuard(reflector, service)
+  const exportWith = (body: unknown) => codeOf(() => guard.canActivate(contextFor(AiController as unknown as Ctor, 'exportGeneratedResume', { ...ANON, body })))
+  check('draft:AI 暂停时按原样导出照常放行（手动退路不跟着 AI 停）', (await exportWith({ draft: true })) === 'PASS')
+  check('draft:AI 暂停时导出 AI 润色结果（draft=false）照旧被拦', (await exportWith({ draft: false })) === 'AI_PAUSED')
+  check('draft:字符串 "true" 不算手动路径（只认严格布尔，失败关闭）', (await exportWith({ draft: 'true' })) === 'AI_PAUSED')
+  config = { ...OFF, loginGate: 'before_export' }
+  check('draft:登录档位「导出前登录」不挡按原样导出', (await exportWith({ draft: true })) === 'PASS')
+  check('draft:登录档位照旧挡 AI 导出', (await exportWith({ draft: false })) !== 'PASS')
+  config = { ...OFF, maintenance: true }
+  check('draft:维护模式照样拦按原样导出（设备维护停一切写操作）', (await exportWith({ draft: true })) === 'MAINTENANCE_MODE')
+
+  // 控制器：没有简历 AI 授权时，draft=true 照常导出、draft=false 403。
+  let consentCalls = 0
+  let exported = 0
+  const self = {
+    resolveAiResultRequester: async () => ({ endUserId: 'member-without-consent' }),
+    privacy: { requireActiveConsent: async () => { consentCalls += 1; throw new ForbiddenException({ error: { code: 'CONSENT_REQUIRED', message: '需要先同意' } }) } },
+    aiService: {
+      resolveExportSourceFileId: async () => null,
+      exportGeneratedResume: async () => { exported += 1; return { fileId: 'file-draft', pageCount: 1, sizeBytes: 10, printFileUrl: null } },
+    },
+    prisma: {},
+    audit: { write: async () => undefined, writeRequired: async () => 'audit-1' },
+    // 正文来源核对（A/B）另由 verify:resume-export-draft-source 真调；这里只看授权与闸门。
+    draftSource: { resolveDraftResume: async (resume: unknown) => resume },
+  }
+  const handler = (AiController.prototype as unknown as { exportGeneratedResume: (dto: unknown, req: unknown) => Promise<unknown> }).exportGeneratedResume
+  const draftResult = await codeOf(() => handler.call(self, { draft: true, basics: { name: '张三' } }, { headers: {} }))
+  check('draft:没有简历 AI 授权，按原样导出照常完成（不查授权）', draftResult === 'PASS' && exported === 1 && consentCalls === 0, `code=${draftResult} exported=${exported} consentCalls=${consentCalls}`)
+  const aiResult = await codeOf(() => handler.call(self, { draft: false, basics: { name: '张三' } }, { headers: {} }))
+  check('draft:没有简历 AI 授权，导出 AI 润色结果 403（照旧要授权）', aiResult === 'CONSENT_REQUIRED' && exported === 1 && consentCalls === 1, `code=${aiResult}`)
+}
+
 async function realApp(): Promise<void> {
   const saved = process.env['MAINTENANCE_MODE']
   process.env['MAINTENANCE_MODE'] = 'on'
@@ -364,6 +443,8 @@ void (async () => {
     await guardOnRealRoutes()
     coverage()
     await adminSwitch()
+    await declarationSurvivesFilter()
+    await draftExportManualPath()
     await realApp()
   } catch (error) {
     fail('runtime', error instanceof Error ? error.stack ?? error.message : String(error))

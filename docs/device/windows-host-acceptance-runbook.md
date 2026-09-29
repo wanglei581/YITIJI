@@ -15,7 +15,7 @@
 
 | 项 | 要求（来自设计文档 §8.1 / §8.7） |
 |---|---|
-| 操作系统 | Windows 10 x64 21H2+ 或 Windows 11 x64；时区 `Asia/Shanghai` |
+| 操作系统 | 按[母盘清单](windows-golden-image-and-install-checklist.md) A1：Windows 11 IoT 企业版 LTSC 2024（首选）/ Windows 11 专业版 25H2 及以后（兜底）/ Windows 10 IoT 企业版 LTSC 2021（兼容）；普通 Windows 10 已于 2025-10-14 停止支持，不合格；时区 `Asia/Shanghai` |
 | 打印机 | 奔图 CM2800ADN/CM2820ADN 系列驱动 V3.x+ 已装，USB 或有线网络连接 |
 | 浏览器 | Edge/Chrome，可进全屏 Kiosk 模式 |
 | .NET | Framework 4.8（Win10 预装，WIA 依赖） |
@@ -120,7 +120,7 @@ agent-ctl status | start | stop | restart | logs
 
 验收（checklist §5.3）：
 - [ ] 服务安装成功，可开机自启。重启机器后是否 Running、以及是否留下 `agent.pid`，必须在 **Windows 实测**；不得把设计文档里的 30s 写成已验收。
-单实例互斥由进程生命周期对象负责；`agent.pid` 只记录启动 PID 供诊断，残留文件不参与互斥，也不需要删除。启动失败时检查服务状态、命名管道或 Unix 套接字，并保留诊断文件。
+- [ ] 崩溃恢复：`taskkill /F` 后服务重新 Running，单实例锁随进程退出由系统释放；残留 `agent.pid` 只作诊断、不阻止启动，**不要删除**。启动失败先跑 `diagnose-production-agent.ps1`（只读）并保留 `last-startup-diagnostic.json`。
 - [ ] **单实例保护**：同时启两个实例，第二个写 `DUPLICATE_INSTANCE` 后 exit 1（设计文档 §8.8）；不得诱导“如果不正确就删除锁”。
 - [ ] 日志路径固定 `%ProgramData%\AIJobPrintAgent\logs\`，**不含用户文件正文 / 密钥**（§7.5）
 - [ ] `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须在 Windows 实测。干净停止是否留锁是条件 P0，不得在 macOS 推断。在该阶梯留下证据前，本机 **DEVICE 仍 NO-GO**。

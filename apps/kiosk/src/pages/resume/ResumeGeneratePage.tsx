@@ -19,8 +19,10 @@ import type {
   ResumeGenerateInput,
   ResumeGenerateResponse,
 } from '@ai-job-print/shared'
-import { EDUCATION_LEVEL_OPTIONS, makePrintParams } from '@ai-job-print/shared'
+import { EDUCATION_LEVEL_OPTIONS } from '@ai-job-print/shared'
 import { AiTaskRegion, useAiTask, isAiOutage, type AiAvailability, type AiTaskFallback } from '../../ai'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { aiDeclarationDeclineMessage, isAiDeclarationUserText } from '../../ai/aiDeclarationErrors'
 import {
   GraduationCapIcon,
   BriefcaseIcon,
@@ -40,6 +42,7 @@ import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
 import { ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-flow-qx.css'
 
@@ -126,6 +129,7 @@ function appendVoiceText(current: string | undefined, transcript: string): strin
 
 export function ResumeGeneratePage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const consent = useResumeAiConsent()
   const [showConsent, setShowConsent] = useState(false)
@@ -215,6 +219,11 @@ export function ResumeGeneratePage() {
       // 只传 result：预览页的 LocationState 虽然声明了 input，但从未解引用过。
       navigate('/resume/generate/preview', { state: { result } })
     } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setError(declined)
+        return
+      }
       const message = userMessageOf(err, 'AI 简历生成失败，请稍后重试')
       setError(message)
       // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误等只是本次失败，
@@ -264,19 +273,18 @@ export function ResumeGeneratePage() {
     try {
       const file = await exportResumeDraft(draft, getToken())
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size: file.sizeBytes >= 1024 * 1024
-              ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
-              : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+      startPrint({
+        origin: 'resume_generate',
+        returnPath: window.location.pathname,
+        file: {
+          name: file.filename,
+          size: file.sizeBytes >= 1024 * 1024
+            ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
+            : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
     } catch (err) {
@@ -306,7 +314,15 @@ export function ResumeGeneratePage() {
   const STILL_AVAILABLE =
     '你填的内容还留在这一页上，没有丢 —— 上下翻页、继续补充都照常。'
     + '导出与打印不经过 AI：下面这条可以把你填的原话直接排成 A4 PDF 打印带走（未经润色，也没有缺失提示）。'
-  const fallback: AiTaskFallback = aiOutage
+  const personalDecline = error != null && isAiDeclarationUserText(error)
+  const fallback: AiTaskFallback = personalDecline
+    ? {
+        mode: 'result-unavailable',
+        reason: error,
+        retryHint: '这次没有调用 AI。不想用 AI 的话，可以把已填内容原样导出打印。',
+        action: draftAction,
+      }
+    : aiOutage
     ? {
         // 能力级不可用：底部「让 AI 整理成新简历」这次按了也没用，置灰它并写清原因。
         mode: 'blocked',
@@ -351,16 +367,19 @@ export function ResumeGeneratePage() {
         {reviewing || step > 0 ? '上一步' : '返回简历服务'}
       </button>
       {reviewing ? (
-        <button
-          type="button"
-          className="qx-btn"
-          data-variant="primary"
-          disabled={generating}
-          onClick={() => void handleGenerate()}
-        >
-          <SparklesIcon className="h-5 w-5" aria-hidden="true" />
-          {generating ? '正在整理…' : '让 AI 整理成新简历'}
-        </button>
+        <span className="qx-ai-declaration-slot">
+          <button
+            type="button"
+            className="qx-btn"
+            data-variant="primary"
+            disabled={generating}
+            onClick={() => void handleGenerate()}
+          >
+            <SparklesIcon className="h-5 w-5" aria-hidden="true" />
+            {generating ? '正在整理…' : '让 AI 整理成新简历'}
+          </button>
+          <AiDeclarationNote />
+        </span>
       ) : step < STEPS.length - 1 ? (
         <button
           type="button"

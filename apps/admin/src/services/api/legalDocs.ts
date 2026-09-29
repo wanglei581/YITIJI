@@ -46,18 +46,39 @@ function handleAuthFailure(status: number): void {
   if (status === 401 || status === 403) redirectToLogin()
 }
 
+/**
+ * 服务端统一错误体是 `{ error: { code, message } }`（HttpExceptionFilter）。此前这里读的是
+ * 顶层 `body.message`，永远取不到，后台只会显示「获取失败」这类兜底句。顶层 message 仍兼容。
+ */
+async function toApiError(res: Response, fallbackCode: string, fallbackMessage: string): Promise<ApiHttpError> {
+  const body = (await res.json().catch(() => ({}))) as {
+    error?: { code?: string; message?: string }
+    message?: unknown
+  }
+  const message = body.error?.message ?? (typeof body.message === 'string' ? body.message : undefined)
+  return new ApiHttpError(body.error?.code ?? fallbackCode, message ?? fallbackMessage, res.status)
+}
+
 async function httpList(docType?: string): Promise<LegalDocVersionView[]> {
   const url = docType
     ? `${API_BASE_URL}/admin/legal-doc-versions?docType=${encodeURIComponent(docType)}`
     : `${API_BASE_URL}/admin/legal-doc-versions`
   const res = await fetch(url, { headers: authHeader() })
   handleAuthFailure(res.status)
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string }
-    throw new ApiHttpError('LIST_ERROR', body.message ?? '获取失败', res.status)
-  }
+  if (!res.ok) throw await toApiError(res, 'LIST_ERROR', '获取失败')
   const { data } = (await res.json()) as { data: LegalDocVersionView[] }
   return data ?? []
+}
+
+/** 管理员读取单个版本（含正文）；服务端每次读取都写访问审计。 */
+async function httpGet(id: string): Promise<LegalDocVersionDetail> {
+  const res = await fetch(`${API_BASE_URL}/admin/legal-doc-versions/${encodeURIComponent(id)}`, {
+    headers: authHeader(),
+  })
+  handleAuthFailure(res.status)
+  if (!res.ok) throw await toApiError(res, 'GET_ERROR', '正文加载失败')
+  const { data } = (await res.json()) as { data: LegalDocVersionDetail }
+  return data
 }
 
 async function httpCreate(input: CreateLegalDocVersionInput): Promise<LegalDocVersionView> {
@@ -67,10 +88,7 @@ async function httpCreate(input: CreateLegalDocVersionInput): Promise<LegalDocVe
     body: JSON.stringify(input),
   })
   handleAuthFailure(res.status)
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string }
-    throw new ApiHttpError('CREATE_ERROR', body.message ?? '创建失败', res.status)
-  }
+  if (!res.ok) throw await toApiError(res, 'CREATE_ERROR', '创建失败')
   const { data } = (await res.json()) as { data: LegalDocVersionView }
   return data
 }
@@ -81,10 +99,7 @@ async function httpActivate(id: string): Promise<LegalDocVersionView> {
     headers: authHeader(),
   })
   handleAuthFailure(res.status)
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string }
-    throw new ApiHttpError('ACTIVATE_ERROR', body.message ?? '激活失败', res.status)
-  }
+  if (!res.ok) throw await toApiError(res, 'ACTIVATE_ERROR', '激活失败')
   const { data } = (await res.json()) as { data: LegalDocVersionView }
   return data
 }
@@ -126,7 +141,7 @@ const MOCK_STORE: LegalDocVersionView[] = [
     id: 'mock-ai-v1',
     docType: 'ai_disclaimer',
     version: 'v1.0',
-    title: 'AI 服务免责声明',
+    title: 'AI 服务说明',
     isActive: false,
     publishedAt: null,
     publishedBy: null,
@@ -136,15 +151,29 @@ const MOCK_STORE: LegalDocVersionView[] = [
 
 const MOCK_ACTIVE_CONTENT: Record<string, string> = {
   terms_of_service:
-    '本后台为「AI求职打印服务终端」的运营管理系统，用于终端设备、打印订单、文件、AI 服务及第三方来源信息（岗位、招聘会、政策等）的管理与审核。\n\n本平台不是网络招聘平台：不提供平台内投递，不接收或转交求职者简历，不提供候选人筛选、面试邀约或录用管理功能。',
+    '本后台为「职易达」的运营管理系统，用于终端设备、打印订单、文件与 AI 服务的运营，以及合作机构入驻核验和机构内容（政策、官方渠道）的紧急下架；机构内容由机构自行审核发布。\n\n本平台不是网络招聘平台：不提供平台内投递，不接收或转交求职者简历，不提供候选人筛选、面试邀约或录用管理功能。',
   privacy_policy:
     '为提供后台登录与账号安全能力，系统处理以下信息：账号名、绑定手机号、登录时间与来源、后台操作日志。\n\n手机号仅用于短信验证码登录、本人验证与密码找回；操作日志仅用于安全审计与故障排查。',
 }
+
+/** mock「查看正文」用：非当前有效版本的演示正文，以及 mock 新建的草稿正文。 */
+const MOCK_CONTENT_BY_ID = new Map<string, string>([
+  ['mock-terms-v0', '（演示数据）旧版用户服务协议正文。\n\n第一条 服务内容\n本条为演示文字，用于查看已归档版本。'],
+  ['mock-ai-v1', '（演示数据）\n\n一、AI 生成内容仅供参考\n简历优化、模拟面试点评等结果由 AI 生成，请自行核对。\n\n二、如何投诉\n对 AI 生成内容有异议，可在一体机「意见反馈」选择「AI 内容投诉」。'],
+])
 
 let mockIdSeq = 1000
 
 function mockList(docType?: string): LegalDocVersionView[] {
   return docType ? MOCK_STORE.filter((d) => d.docType === docType) : [...MOCK_STORE]
+}
+
+function mockGet(id: string): LegalDocVersionDetail {
+  const row = MOCK_STORE.find((d) => d.id === id)
+  if (!row) throw new ApiHttpError('LEGAL_DOC_NOT_FOUND', '法务文档版本不存在', 404)
+  const content =
+    MOCK_CONTENT_BY_ID.get(id) ?? (row.isActive ? MOCK_ACTIVE_CONTENT[row.docType] : undefined) ?? '（演示数据：这一版没有示例正文）'
+  return { ...row, content }
 }
 
 function mockCreate(input: CreateLegalDocVersionInput): LegalDocVersionView {
@@ -159,6 +188,7 @@ function mockCreate(input: CreateLegalDocVersionInput): LegalDocVersionView {
     createdAt: new Date().toISOString(),
   }
   MOCK_STORE.push(item)
+  MOCK_CONTENT_BY_ID.set(item.id, input.content)
   return item
 }
 
@@ -178,10 +208,7 @@ async function httpGetActive(docType: string): Promise<LegalDocActiveView | null
   const res = await fetch(`${API_BASE_URL}/kiosk/legal/${encodeURIComponent(docType)}`, {
     headers: { Accept: 'application/json' },
   })
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string }
-    throw new ApiHttpError('LEGAL_DOC_LOAD_ERROR', body.message ?? '法务文档加载失败', res.status)
-  }
+  if (!res.ok) throw await toApiError(res, 'LEGAL_DOC_LOAD_ERROR', '法务文档加载失败')
   const body = (await res.json()) as { success?: boolean; data?: LegalDocActiveView | null }
   return body.data ?? null
 }
@@ -206,6 +233,10 @@ function mockGetActive(docType: string): LegalDocActiveView | null {
 export const legalDocsService = {
   list: (docType?: string) =>
     API_MODE === 'http' ? httpList(docType) : Promise.resolve(mockList(docType)),
+
+  /** 读取单个版本（含正文）；每次读取服务端写 legal_doc.view 访问审计。 */
+  get: (id: string) =>
+    API_MODE === 'http' ? httpGet(id) : Promise.resolve().then(() => mockGet(id)),
 
   create: (input: CreateLegalDocVersionInput) =>
     API_MODE === 'http' ? httpCreate(input) : Promise.resolve(mockCreate(input)),

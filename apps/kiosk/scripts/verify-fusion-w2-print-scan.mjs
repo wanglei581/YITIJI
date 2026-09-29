@@ -42,9 +42,17 @@ const frozenHashes = new Map([
   // 按钮不可点（此前一次误触即丢弃已上传文件）。冻结契约不放宽，仍逐字节校验；新行为由
   // verify:resume-phone-upload-ui 的两条 AST 断言反向钉死。
   // 旧哈希 c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50。
+  // 2026-09-29 重新冻结：确认使用这份简历后面板卸载，原先只在依赖变化时上报忙碌，
+  // 卸载不补 onBusyChange(false)，来源页一直停在「接收中」，开始诊断和更换文件一直不可点。
+  // 卸载时补报不忙。刷新仍先撤销旧会话，已上传时刷新按钮仍不可点。
+  // 冻结契约不放宽，仍逐字节校验。卸载清理由 verify:resume-phone-upload-ui 断言。
+  // 旧哈希 6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0。
+  // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
+  // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
+  // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0',
+    '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',
@@ -57,8 +65,16 @@ const frozenHashes = new Map([
   [
     // 2026-09-03：隐私遮挡改为按后端 claim 持久化 MaterialRedactionSummary，
     // 不再存 resultFileCreated。冻结契约不放宽，仍逐字节校验。
+    // 2026-09-29 重新冻结（商用收口 P0-5 第二、三批，规格 docs/reviews/print-handoff-unification-2026-09-28.md）：
+    // 同一存储位置升级为「打印交接上下文 v2」（交接编号、细分来源、归属标记、30 分钟有效期、链接到期、
+    // 检查策略、参数建议、建单标记）；读写拆成只做结构校验的 readStoredPrintHandoff / writeStoredPrintHandoff，
+    // 归属与有效期判定在 printHandoff.ts（有单元测试）。旧结构（v1）一律不认、当场清掉（9/29 拍板）。
+    // 保存时仍按白名单过滤字段。冻结契约不放宽，仍逐字节校验。
+    // 旧哈希 2e3dc36bc95ad4c48dfedc6d84957210de5e6115389f7cfe44da7cf771ad2f39。
+    // 2026-09-29 再次冻结：交接上下文增加证件件标记 idDocument（只有 true 才写入）。
+    // 旧哈希 10867e065d20081231c4738d3d56ce0ca70862d8108001b99d7791944be7bebe。
     'src/pages/print/printMaterialSession.ts',
-    '2e3dc36bc95ad4c48dfedc6d84957210de5e6115389f7cfe44da7cf771ad2f39',
+    '6d76cd193bb3d98032ae6b44a36c3b8bb302da1bacd917452afc80dc7d22fd38',
   ],
 ])
 
@@ -180,7 +196,10 @@ for (const [path, hash] of frozenHashes) assert.equal(sha256(path), hash, `${pat
 assert.match(read('src/pages/print/PrintPrototypeLayout.tsx'), /KioskPageFrame/)
 assert.match(read('src/pages/print/PrintPrototypeLayout.tsx'), /KioskPageHeader/)
 assert.match(read('src/pages/print/PrintMaterialCheckPage.tsx'), /MaterialCheckPresentation/)
-assert.match(read('src/pages/print/PrintDeskPage.tsx'), /readPrintMaterialSession/)
+// 2026-09-29 P0-5：打印台只认打印交接上下文（归属、有效期、交接编号当场核对），不再读临时状态里的文件。
+assert.match(read('src/pages/print/PrintDeskPage.tsx'), /readPrintHandoff\(owner\)/)
+assert.match(read('src/pages/print/PrintDeskPage.tsx'), /resolveRouteHandoff\(/)
+assert.doesNotMatch(read('src/pages/print/PrintDeskPage.tsx'), /locationState\?\.file|state\?\.file/, 'print desk never takes the file from route state')
 assert.match(read('src/pages/print/PrintDeskPage.tsx'), /replace:\s*true/)
 assert.match(read('src/pages/print/PrintDeskPage.tsx'), /parsePrintDeskStep/)
 assert.match(read('src/pages/print/PrintDeskPage.tsx'), /isPrintDeskPreviewAuthorized/)
@@ -417,11 +436,16 @@ assert.match(
   /\.i2p-lrows\s*\{[^}]*overflow-y:\s*auto/,
   'many-image list actually scrolls instead of clipping to three cards'
 )
+// 2026-09-29 P0-5：写打印交接上下文后跳转，落点由入口策略表 printHandoffPolicy 给出（原件类 = 打印台材料检查）。
 assert.match(
   convertImages,
-  /navigate\('\/print\/material-check'/,
-  'successful convert continues to material-check, not cashier or progress'
+  /origin: 'image_convert' as const/,
+  'successful convert continues through the print handoff context, not cashier or progress'
 )
+const handoffPolicy = read('src/pages/print/printHandoffPolicy.ts')
+for (const origin of ['upload', 'scan_result', 'resume_original', 'image_convert', 'sign_stamp'])
+  assert.match(handoffPolicy, new RegExp(`${origin}: REQUIRED`), `${origin} enters at material-check (REQUIRED)`)
+assert.match(handoffPolicy, /if \(entry === 'check'\) return '\/print\/desk\?step=check'/, 'check entry lands on the print desk check step')
 assert.match(
   convertImages,
   /旋转 90°[\s\S]*当前不可用/,
@@ -467,8 +491,8 @@ assert.match(
 )
 assert.match(
   read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'),
-  /\/print\/material-check/,
-  'sign-stamp primary exit is material-check, not a fabricated print success',
+  /startPrint\(\{ origin: 'sign_stamp'/,
+  'sign-stamp primary exit is the print handoff (material-check), not a fabricated print success',
 )
 assert.match(
   read('src/layouts/KioskRoot.tsx'),
@@ -589,14 +613,17 @@ assert.match(
   'material privacy decisions expose their selected state accessibly'
 )
 const materialContainer = read('src/pages/print/PrintMaterialCheckPage.tsx')
+// 2026-09-29 P0-5：检查页只按交接编号打补丁（编号对不上就不写、停下这一轮），
+// 403/404/410 只清同一编号的交接；文件身份由打印台读好的交接上下文传进来。
 for (const marker of [
   'waitForCompletedTask',
-  'readPrintMaterialSession',
-  'patchPrintMaterialSession',
-  'clearPrintMaterialSession',
+  'patchPrintHandoff\\(contextId',
+  'clearPrintHandoff\\(contextId\\)',
+  'PrintHandoffGoneError',
   'decidePiiFindings',
 ])
   assert.match(materialContainer, new RegExp(marker), `material container retains ${marker}`)
+assert.doesNotMatch(materialContainer, /location\.state|useLocation/, 'material check never takes the file from route state')
 for (const kind of ['inspection', 'normalize_a4', 'pii_scan', 'pii_redact']) {
   assert.match(
     materialContainer,
@@ -648,11 +675,12 @@ assert.match(
 )
 for (const path of ['src/pages/print/PrintPreviewPage.tsx']) {
   const body = read(path)
+  // 2026-09-29 P0-5：预览页文件身份来自打印台读好的交接上下文，参数随改随按编号写回。
   for (const marker of [
-    'readPrintMaterialSession',
+    'handoff\\?\\.file',
     'useTerminalDeviceStatus',
     'pageRange',
-    'patchPrintMaterialSession',
+    'patchPrintHandoff\\(contextId',
   ]) {
     assert.match(body, new RegExp(marker), `${path} retains ${marker}`)
   }
@@ -1091,7 +1119,7 @@ assert.match(
 const scanResult = read('src/pages/scan/ScanResultPage.tsx')
 // 打印出口 2026-09-28 起落在材料检查（商用收口 P0-5）：扫描件是本人原件，生产强制
 // PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒，所以不再直达 /print/confirm。
-for (const target of ['/print/material-check', '/me/documents', '/resume/parse']) {
+for (const target of ['/me/documents', '/resume/parse']) {
   assert.match(
     scanResult,
     new RegExp(target.replaceAll('/', '\\\/')),
@@ -1222,9 +1250,10 @@ assert.doesNotMatch(printUploadPage, /capture=1/, 'runtime does not implement ca
 assert.doesNotMatch(printUploadView, /合成演示/, 'runtime does not label synthetic uploaded files')
 assert.match(
   printUploadPage,
-  /navigate\('\/print\/material-check', \{ state: \{ file, source \} \}\)/,
-  'only material-check is the forward exit, and it carries file+source'
+  /startPrint\(\{\s*origin: 'upload',\s*file,\s*source,/,
+  'only the print handoff (upload → material-check) is the forward exit, and it carries file+source'
 )
+assert.match(scanResult, /origin: 'scan_result'/, 'scan result print goes through the print handoff (material-check)')
 assert.doesNotMatch(printUploadPage, /navigate\('\/print\/preview'/, 'upload page never skips to preview')
 assert.doesNotMatch(printUploadPage, /navigate\('\/print\/confirm'/, 'upload page never skips to confirm')
 assert.doesNotMatch(printUploadPage, /materialCheck\s*:/, 'upload page does not write a fake materialCheck summary')

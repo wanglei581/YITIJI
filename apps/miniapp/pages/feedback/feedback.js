@@ -4,7 +4,11 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 
-const CAT_LABEL = { device: '设备使用', print: '打印服务', file_process: '文件处理', general: '一般建议' }
+// ai_content（C3）：AI 内容投诉，服务端 member-feedback.dto.ts 的 FEEDBACK_CATEGORIES 里有这一类。
+// 个人信息请求不在这里开类别：在「隐私与数据」自助办，办不了的按那里写的方式联系（9/28 C3 口径）。
+const CAT_LABEL = { device: '设备使用', print: '打印服务', file_process: '文件处理', general: '一般建议', ai_content: 'AI 内容投诉' }
+// 答复时限（D5，律师再核）。写在页面上，也是对用户的承诺，改之前先改法务文档。
+const AI_COMPLAINT_REPLY_DAYS = 5
 const CATEGORIES = Object.keys(CAT_LABEL).map((value) => ({ value, label: CAT_LABEL[value] }))
 const STATUS_LABEL = { pending: '待处理', processing: '处理中', replied: '已回复', closed: '已关闭' }
 const STATUS_TONE = { pending: 'wheat', processing: 'teal', replied: 'ok', closed: '' }
@@ -68,22 +72,37 @@ Page({
     content: '',
     contentLen: 0,
     contactPhone: '',
+    aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
     submitting: false,
     canSubmit: false,
     list: [],
     listState: 'idle',
     loadError: '',
+    nextCursor: null,
+    loadingMore: false,
+    loadMoreError: '',
   },
 
-  onLoad() {
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+  onLoad(options) {
+    const preset = options && CAT_LABEL[options.category] ? options.category : ''
+    this.setData({
+      statusBarHeight: app.globalData.statusBarHeight || 20,
+      aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
+      category: preset || this.data.category,
+    })
   },
 
   onShow() {
-    const loggedIn = auth.isLoggedIn()
-    this.setData({ loggedIn })
-    if (loggedIn) this.loadList()
-    else this.setData({ list: [], listState: 'idle', loadError: '' })
+    if (!auth.isLoggedIn()) {
+      this._abandonList()
+      return
+    }
+    this.setData({ loggedIn: true })
+    this.loadList()
+  },
+
+  onReachBottom() {
+    this.loadList(true)
   },
 
   back() {
@@ -92,6 +111,15 @@ Page({
 
   goLogin() {
     wx.navigateTo({ url: '/pages/launch/launch' })
+  },
+
+  // 没登录也要有投诉的去处：经营者信息里有联系电话。
+  goOperatorInfo() {
+    wx.navigateTo({ url: '/pages/legal/legal?type=operator_info' })
+  },
+
+  goPrivacy() {
+    wx.navigateTo({ url: '/pages/privacy/privacy' })
   },
 
   setCategory(e) {
@@ -145,27 +173,94 @@ Page({
    */
   _handleAuthError(err) {
     if (!err || err.statusCode !== 401) return false
-    this.setData({ loggedIn: false, list: [], listState: 'idle', loadError: '', submitting: false, closingId: '' })
+    this._abandonList()
     wx.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
     return true
   },
 
-  loadList() {
-    this.setData({ listState: 'loading', loadError: '' })
-    api.getMyFeedback({ pageSize: 50 })
-      .then((items) => this.setData({ list: (items || []).map(toView), listState: 'ready' }))
-      .catch((err) => {
-        const login = err && err.statusCode === 401
+  // 未登录 / 401：本人工单不能留在屏幕上。序号作废在途请求，换号后迟到的一页写不回来。
+  _abandonList() {
+    this._seq = (this._seq || 0) + 1
+    this.setData({
+      loggedIn: false,
+      list: [],
+      listState: 'idle',
+      loadError: '',
+      submitting: false,
+      closingId: '',
+      nextCursor: null,
+      loadingMore: false,
+      loadMoreError: '',
+    })
+  },
+
+  loadList(append = false) {
+    if (!auth.isLoggedIn()) {
+      this._abandonList()
+      return
+    }
+    // 没有下一页、正在翻页、或整页还在加载：触底不再发请求。
+    if (append && (!this.data.nextCursor || this.data.loadingMore || this.data.listState === 'loading')) return
+    const seq = (this._seq = (this._seq || 0) + 1)
+    const cursor = append ? this.data.nextCursor : null
+    if (append) {
+      this.setData({ loadingMore: true, loadMoreError: '' })
+    } else {
+      this.setData({
+        loggedIn: true,
+        listState: 'loading',
+        loadError: '',
+        loadingMore: false,
+        loadMoreError: '',
+      })
+    }
+    // nextCursor 挂在返回数组上（utils/api.js unwrapList）。第 51 条起靠它再请求。
+    api.getMyFeedback({ pageSize: 50, ...(cursor ? { cursor } : {}) })
+      .then((items) => {
+        if (seq !== this._seq) return
+        if (!auth.isLoggedIn()) {
+          this._abandonList()
+          return
+        }
+        const page = (items || []).map(toView)
         this.setData({
-          loggedIn: login ? false : this.data.loggedIn,
+          loggedIn: true,
+          list: append ? this.data.list.concat(page) : page,
+          listState: 'ready',
+          loadError: '',
+          loadingMore: false,
+          loadMoreError: '',
+          nextCursor: (items && items.nextCursor) || null,
+        })
+      })
+      .catch((err) => {
+        if (seq !== this._seq) return
+        if (!auth.isLoggedIn() || (err && err.statusCode === 401)) {
+          this._abandonList()
+          return
+        }
+        // 翻页失败不把 listState 打成 error：那一支模板会换成错误卡片，已看到的反馈会消失。
+        if (append) {
+          this.setData({
+            loadingMore: false,
+            loadMoreError: (err && err.message) || '加载更多失败，点此重试',
+          })
+          return
+        }
+        this.setData({
           list: [],
-          listState: login ? 'idle' : 'error',
-          loadError: login ? '' : ((err && err.message) || '加载失败，请稍后重试'),
+          listState: 'error',
+          loadError: (err && err.message) || '加载失败，请稍后重试',
+          loadingMore: false,
+          nextCursor: null,
+          loadMoreError: '',
         })
       })
   },
 
   retryLoad() { this.loadList() },
+
+  retryLoadMore() { this.loadList(true) },
 
   toggleItem(e) {
     const id = e.currentTarget.dataset.id

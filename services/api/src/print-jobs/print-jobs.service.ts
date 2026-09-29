@@ -578,9 +578,9 @@ export class PrintJobsService {
   /**
    * 建单前确认文件走过隐私预检。
    *
-   * 判定：文件为「用户上传的原件」（assetCategory 非派生 + purpose 在白名单内）时，
-   * 必须存在一条 completed 的 pii_scan DocumentProcessTask，且不残留 pending 裁决。
-   * 派生产物与系统生成物放行。
+   * 判定：materialCheckRequired() 为真（原件，或图片/Office 转 PDF、签名合成等用户材料派生件，
+   * 见 material-check-policy.ts）时，必须存在一条 completed 的 pii_scan DocumentProcessTask，
+   * 且不残留 pending 裁决。AI / 系统生成件与隐私遮挡产物放行。
    *
    * 门控关闭时（默认）只写审计不拦截，用于先观察真实绕过量。
    */
@@ -661,12 +661,12 @@ export class PrintJobsService {
     }
     const signed = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
     await this.audit.write({
-      actorId: ctx.endUserId ?? null,
+      actorId: null, // AuditLog.actorId FK 指向运营 User：会员 ID 写进去会违反外键、被静默吞掉，改记 payload.endUserId
       actorRole: 'kiosk',
       action: 'print_job.takeaway_url',
       targetType: 'print_task',
       targetId: task.id,
-      payload: { orderId: order.id, orderNo: order.orderNo, fileId },
+      payload: { orderId: order.id, orderNo: order.orderNo, fileId, endUserId: ctx.endUserId ?? null },
       ipAddress: ctx.ipAddress ?? null,
       userAgent: ctx.userAgent ?? null,
     }).catch(() => undefined)
@@ -803,13 +803,13 @@ export class PrintJobsService {
     })
 
     await this.audit.write({
-      actorId: ctx.endUserId ?? null,
+      actorId: null, // 同上：会员 ID 记 payload.endUserId
       actorRole: 'kiosk',
       action: 'print_job.retry',
       targetType: 'print_task',
       targetId: task.id,
       payload: {
-        orderId: order.id,
+        endUserId: ctx.endUserId ?? null, orderId: order.id,
         orderNo: order.orderNo,
         amountCents: amountBefore,
         fromStatus: 'failed',

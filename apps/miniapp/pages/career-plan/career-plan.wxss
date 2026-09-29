@@ -58,6 +58,8 @@
   background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 28rpx; }
 .cb-cap { font-size: 24rpx; color: var(--muted); margin-bottom: 14rpx; }
 .cb-hint { font-size: 22rpx; color: var(--ghost); line-height: 1.6; margin-top: 12rpx; }
+/* 依据栏里的文字链：颜色用全局文字链变量 --link，可点高度由全局 .text-action 保证 */
+.cb-link { font-size: var(--fs-sm); color: var(--link); }
 
 .cp-summary { font-size: 27rpx; color: var(--ink); line-height: 1.8; }
 .cp-hint { font-size: 22rpx; color: var(--ghost); line-height: 1.6;

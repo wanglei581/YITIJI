@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { tc3Sign } from '../../common/tencent/tc3'
+import { isAiEndpointAllowed, isTencentRegionAllowed } from '../../common/outbound/ai-endpoint-allowlist'
 
 // ============================================================
 // 2C+ 面试官语音播报（腾讯云 TTS TextToVoice，官方语音包）。
@@ -33,6 +34,29 @@ function intEnv(name: string, fallback: number): number {
   return Number.isInteger(n) && n > 0 ? n : fallback
 }
 
+/**
+ * 腾讯云语音合成密钥。专用变量优先，否则与数字人共用 TENCENT_SECRET_*。
+ * 在线探针必须调用这里，不能自己再写一套变量名。返回值是密钥，调用方不得打印。
+ */
+export function readTencentTtsSecretPair(): { secretId: string | undefined; secretKey: string | undefined } {
+  return {
+    secretId: process.env['TENCENT_TTS_SECRET_ID'] || process.env['TENCENT_SECRET_ID'],
+    secretKey: process.env['TENCENT_TTS_SECRET_KEY'] || process.env['TENCENT_SECRET_KEY'],
+  }
+}
+
+/** TextToVoice 的主机、签名用主机名、URL 与地域。与 synthesizeSegment 同一处。 */
+export function readTextToVoiceTarget(): { host: string; signHost: string; url: string; region: string } {
+  const host = process.env['TENCENT_TTS_HOST'] ?? 'tts.tencentcloudapi.com'
+  const insecure = host.startsWith('127.0.0.1') || host.startsWith('localhost')
+  return {
+    host,
+    signHost: host.split(':')[0] || host,
+    url: `${insecure ? 'http' : 'https'}://${host}`,
+    region: process.env['TENCENT_TTS_REGION'] ?? 'ap-guangzhou',
+  }
+}
+
 /** 按句切分（保留标点），超长句硬切；过滤空段。 */
 export function splitForTts(text: string): string[] {
   const sentences = text.replace(/\s+/g, ' ').split(/(?<=[。！？!?；;])/)
@@ -62,11 +86,11 @@ export class TtsService {
   private readonly logger = new Logger(TtsService.name)
 
   private get secretId(): string | undefined {
-    return process.env['TENCENT_TTS_SECRET_ID'] || process.env['TENCENT_SECRET_ID']
+    return readTencentTtsSecretPair().secretId
   }
 
   private get secretKey(): string | undefined {
-    return process.env['TENCENT_TTS_SECRET_KEY'] || process.env['TENCENT_SECRET_KEY']
+    return readTencentTtsSecretPair().secretKey
   }
 
   private get voiceType(): number {
@@ -75,6 +99,12 @@ export class TtsService {
 
   private get host(): string {
     return process.env['TENCENT_TTS_HOST'] ?? 'tts.tencentcloudapi.com'
+  }
+
+  /** 合成请求实际要连的地址；本机 stub（verify 用）走 http，只在非生产放行。 */
+  private get endpoint(): string {
+    const insecure = this.host.startsWith('127.0.0.1') || this.host.startsWith('localhost') // verify stub 用
+    return `${insecure ? 'http' : 'https'}://${this.host}`
   }
 
   get enabled(): boolean {
@@ -89,6 +119,10 @@ export class TtsService {
     }
     const clean = text.trim().slice(0, 600)
     if (!clean) return { ok: false, errorMessage: '播报内容为空' }
+    // 出站白名单：地址不在单内就一段都不合成（前端照常降级本地播报）。
+    if (!isAiEndpointAllowed(this.endpoint, 'tts') || !isTencentRegionAllowed(process.env['TENCENT_TTS_REGION'] ?? 'ap-guangzhou', 'tts')) {
+      return { ok: false, errorMessage: '语音播报服务地址未通过核准，本次没有发出请求' }
+    }
     const t0 = Date.now()
     const segments = splitForTts(clean)
     const parts: Buffer[] = []
@@ -106,7 +140,8 @@ export class TtsService {
   }
 
   private async synthesizeSegment(text: string): Promise<Buffer | null> {
-    const insecure = this.host.startsWith('127.0.0.1') || this.host.startsWith('localhost') // verify stub 用
+    const target = readTextToVoiceTarget()
+    const secrets = readTencentTtsSecretPair()
     const payload = JSON.stringify({
       Text: text,
       SessionId: randomUUID(),
@@ -118,22 +153,22 @@ export class TtsService {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), intEnv('TENCENT_TTS_TIMEOUT_MS', 15_000))
     try {
-      const res = await fetch(`${insecure ? 'http' : 'https'}://${this.host}`, {
+      const res = await fetch(this.endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: tc3Sign({
-            host: this.host.split(':')[0],
+            host: target.signHost,
             service: 'tts',
             payload,
             ts,
-            secretId: this.secretId!,
-            secretKey: this.secretKey!,
+            secretId: secrets.secretId!,
+            secretKey: secrets.secretKey!,
           }),
           'X-TC-Action': 'TextToVoice',
           'X-TC-Version': TTS_VERSION,
           'X-TC-Timestamp': String(ts),
-          'X-TC-Region': process.env['TENCENT_TTS_REGION'] ?? 'ap-guangzhou',
+          'X-TC-Region': target.region,
         },
         body: payload,
         signal: controller.signal,

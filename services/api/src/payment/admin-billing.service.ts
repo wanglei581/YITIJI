@@ -4,8 +4,9 @@
  * 职责：PriceConfig 的管理端只读列表 + 改价/启停（**唯一合法改价路径**，改价必审计）。
  *
  * 硬约束：
- * - 只允许更新已存在的价目项；本波不开放新建/删除（新增计费项须随对应业务闭环评审落地，
- *   删除会破坏历史订单 itemsJson 的可解释性 —— 停用用 active=false）。
+ * - 只允许更新已存在的价目项；不开放任意新建/删除（新增计费项须随对应业务闭环评审落地，
+ *   删除会破坏历史订单 itemsJson 的可解释性 —— 停用用 active=false）。例外：列表时补齐缺失的
+ *   固定目录行（resume_export 启用 0 元；打印两档停用未定价），只补不改。
  * - 改价审计 `price.updated` 必须带 old/new 快照（对账与追责依据）；无变化的空 patch 拒绝。
  * - 改价即时生效（PricingService 每次报价实时读库，W-A 后前端展示价同源），无缓存一致性问题。
  * - 停用某项后对应报价 fail-closed（PRICE_CONFIG_UNAVAILABLE，绝不默认 0 元）——这是有意的
@@ -15,7 +16,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { AdminUpdatePriceConfigDto } from './dto/admin-billing.dto'
-import { ensureResumeExportPriceConfig } from './price-config.seed'
+import { ensurePrintPriceCatalogRows, ensureResumeExportPriceConfig } from './price-config.seed'
 import { descriptionContradictsAmount, statedYuanIn } from './price-description'
 
 export interface AdminPriceConfigItem {
@@ -38,6 +39,8 @@ export class AdminBillingService {
   /** 管理端全量价目（含 inactive；含时间戳，供审计对照）。 */
   async listPriceConfig(): Promise<{ items: AdminPriceConfigItem[] }> {
     await ensureResumeExportPriceConfig(this.prisma)
+    // 新库缺打印两档时补「停用、未定价」目录行，运营才能在计费页设价（W-02）；已有行一律不动。
+    await ensurePrintPriceCatalogRows(this.prisma)
     const rows = await this.prisma.priceConfig.findMany({ orderBy: { serviceKey: 'asc' } })
     return {
       items: rows.map((r) => ({

@@ -7,11 +7,8 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import {
-  getAdvisorSession,
-  printAdvisorArtifact,
-  type AdvisorArtifactPrintResult,
-} from '../../services/api/advisor'
+import { getAdvisorSession, printAdvisorArtifact } from '../../services/api/advisor'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { ArtifactBody, AdvisorHero, EvidenceLegend } from './AdvisorArtifactPanels'
 import {
   copyFor,
@@ -30,6 +27,8 @@ import {
 } from './advisorArtifactModel'
 import './styles/advisor-artifact-qx.css'
 
+const READ_LIMIT = 3
+
 function isNotFound(err: unknown): boolean {
   return err instanceof ApiHttpError && (
     err.status === 404
@@ -38,8 +37,17 @@ function isNotFound(err: unknown): boolean {
   )
 }
 
+function stableJson(value: unknown): string {
+  try {
+    return JSON.stringify(value ?? null)
+  } catch {
+    return ''
+  }
+}
+
 export function AiPlanPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const [search] = useSearchParams()
   const { getToken } = useAuth()
@@ -48,7 +56,16 @@ export function AiPlanPage() {
   const sessionId = parseId(search.get('sessionId')) ?? parseId(navState.sessionId)
   const artifactId = parseId(search.get('artifactId')) ?? parseId(navState.artifactId)
   const accessToken = typeof navState.accessToken === 'string' ? navState.accessToken : null
-  const bootstrapPayload = parsePayload(navState.artifact)
+  // 导航里的要点对象每次渲染都是新引用。只按序列化后的字符串记一份，避免读取效果跟着空转。
+  const artifactKey = stableJson(navState.artifact)
+  const bootstrapPayload = useMemo(() => {
+    if (!artifactKey) return null
+    try {
+      return parsePayload(JSON.parse(artifactKey))
+    } catch {
+      return null
+    }
+  }, [artifactKey])
   const printBlockedReason = navState.printUnavailableReason?.trim() || null
   const fixtureState = useMemo(() => resolveFixtureState(search), [search])
 
@@ -60,8 +77,8 @@ export function AiPlanPage() {
     sessionId && artifactId ? { sessionId, artifactId } : null,
   )
   const [printBusy, setPrintBusy] = useState(false)
-  const [printReceipt, setPrintReceipt] = useState<AdvisorArtifactPrintResult | null>(null)
   const [printError, setPrintError] = useState<string | null>(null)
+  const [readFailed, setReadFailed] = useState(false)
   const printLock = useRef(false)
   const requestSeq = useRef(0)
 
@@ -70,43 +87,56 @@ export function AiPlanPage() {
     const seq = requestSeq.current + 1
     requestSeq.current = seq
     setViewState('loading')
-    setPrintReceipt(null)
     setPrintError(null)
-    try {
-      const session = parseSessionView(await getAdvisorSession(sessionId, {
-        token: getToken(),
-        accessToken,
-      }))
-      if (seq !== requestSeq.current) return
-      if (!session || isExpiredIso(session.expiresAt)) {
-        setPayload(null)
-        setViewState('expired')
+    setReadFailed(false)
+    let missing = false
+    for (let attempt = 1; attempt <= READ_LIMIT; attempt += 1) {
+      try {
+        const session = parseSessionView(await getAdvisorSession(sessionId, {
+          token: getToken(),
+          accessToken,
+        }))
+        if (seq !== requestSeq.current) return
+        if (!session || isExpiredIso(session.expiresAt)) {
+          setPayload(null)
+          setViewState('expired')
+          return
+        }
+        const artifact = pickArtifact(session, artifactId)
+        if (!artifact || !artifact.payload || isExpiredIso(artifact.expiresAt)) {
+          setPayload(null)
+          setViewState('expired')
+          return
+        }
+        setActiveIds({ sessionId: session.sessionId, artifactId: artifact.artifactId })
+        setPayload(artifact.payload)
+        setViewState(deriveContentState(artifact.payload))
         return
+      } catch (err) {
+        if (seq !== requestSeq.current) return
+        if (isNotFound(err)) {
+          missing = true
+          break
+        }
+        if (attempt < READ_LIMIT) {
+          await new Promise((resolve) => window.setTimeout(resolve, 400))
+          if (seq !== requestSeq.current) return
+        }
       }
-      const artifact = pickArtifact(session, artifactId)
-      if (!artifact || !artifact.payload || isExpiredIso(artifact.expiresAt)) {
-        setPayload(null)
-        setViewState('expired')
-        return
-      }
-      setActiveIds({ sessionId: session.sessionId, artifactId: artifact.artifactId })
-      setPayload(artifact.payload)
-      setViewState(deriveContentState(artifact.payload))
-    } catch (err) {
-      if (seq !== requestSeq.current) return
-      if (isNotFound(err)) {
-        setPayload(null)
-        setViewState('expired')
-        return
-      }
-      if (bootstrapPayload) {
-        setPayload(bootstrapPayload)
-        setViewState(deriveContentState(bootstrapPayload))
-        return
-      }
-      setPayload(null)
-      setViewState('error')
     }
+    if (missing) {
+      setPayload(null)
+      setViewState('expired')
+      return
+    }
+    setReadFailed(true)
+    if (bootstrapPayload) {
+      setPayload(bootstrapPayload)
+      setViewState(deriveContentState(bootstrapPayload))
+      return
+    }
+    setPayload(null)
+    setViewState('error')
   }, [accessToken, artifactId, bootstrapPayload, fixtureState, getToken, sessionId])
 
   useEffect(() => {
@@ -143,7 +173,24 @@ export function AiPlanPage() {
         token: getToken(),
         accessToken,
       })
-      setPrintReceipt(printed)
+      if (!printed.printFileUrl) {
+        setPrintError('打印链接还没准备好，请稍后再试')
+        return
+      }
+      // F09：生成打印稿后直接进打印链（稿 52：先看价格再决定），和其他 AI 产物同一条路。
+      // 不再写「已保存到我的文档」：文件归属跟顾问会话走，游客时不属于任何人，本机说不准它存没存。
+      startPrint({
+        origin: 'advisor_artifact',
+        returnPath: window.location.pathname,
+        file: {
+          name: printed.filename,
+          size: printed.sizeBytes >= 1024 * 1024 ? `${(printed.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(printed.sizeBytes / 1024))} KB`,
+          pages: printed.pageCount > 0 ? printed.pageCount : null,
+          fileId: printed.fileId,
+          fileUrl: printed.printFileUrl,
+          mimeType: 'application/pdf',
+        },
+      })
     } catch (err) {
       if (isNotFound(err)) {
         setViewState('expired')
@@ -216,9 +263,6 @@ export function AiPlanPage() {
           {derivedState === 'print-unavailable' ? (
             <p className="why">打印能力读不到，按钮先不放出来 —— 不做点了没反应的按钮。</p>
           ) : null}
-          {printReceipt ? (
-            <p className="why">打印稿已生成，已保存到我的文档。还没有确认出纸。</p>
-          ) : null}
           {printError ? <p className="why" role="status">{printError}</p> : null}
         </>
       }
@@ -237,7 +281,18 @@ export function AiPlanPage() {
         />
         {showLegend ? <EvidenceLegend /> : null}
         <div className="aa-body qx-grow">
-          <ArtifactBody state={derivedState} payload={payload} onRetry={() => { void loadSession() }} />
+          <ArtifactBody state={derivedState} payload={payload} />
+          {(derivedState === 'error' || readFailed) && !fixtureState ? (
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="teal"
+              data-testid="advisor-artifact-reread"
+              onClick={() => { void loadSession() }}
+            >
+              重新读取
+            </button>
+          ) : null}
         </div>
       </div>
     </QxPageFrame>

@@ -20,6 +20,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const exportFile = require('./export-file')
 const dr = require('./data-rights')
+const consents = require('./consents')
 
 Page({
   data: {
@@ -38,6 +39,10 @@ Page({
     hasActiveRequest: false,
 
     savedFiles: [],
+
+    // 年龄声明与录音同意（C6）。登录着读服务端，没登录读本机，见 ./consents.js。
+    consents: { loaded: false, error: '', age: {}, voice: {}, resume: null },
+    privacyRequestDays: consents.PRIVACY_REQUEST_DAYS,
 
     busy: '',
 
@@ -66,6 +71,7 @@ Page({
     const isLoggedIn = auth.isLoggedIn()
     this._pollCount = 0
     this.setData({ isLoggedIn, savedFiles: exportFile.listSavedExports() })
+    this.loadConsents()
     if (isLoggedIn) this.loadRequests()
     else this.setData({ requests: [], latestExport: null, capabilityLoaded: false, hasActiveRequest: false })
   },
@@ -73,6 +79,7 @@ Page({
   onHide() { this.stopTimers() },
   onUnload() { this.stopTimers() },
   onPullDownRefresh() {
+    this.loadConsents()
     if (this.data.isLoggedIn) this.loadRequests(() => wx.stopPullDownRefresh())
     else wx.stopPullDownRefresh()
   },
@@ -415,6 +422,16 @@ Page({
     })
   },
 
+  // ---------- 年龄声明与录音同意（C6），逻辑在 ./consents.js ----------
+
+  loadConsents() { consents.load().then((view) => this.setData({ consents: view })) },
+
+  tapVoiceConsent() { if (!this.data.busy) consents.promptVoice(this) },
+
+  tapResumeConsent() { if (!this.data.busy) consents.promptResume(this) },
+
+  openPrivacyGuide() { consents.openPrivacyGuide() },
+
   // ---------- 账号注销 ----------
 
   requestAccountClosure() {
@@ -476,6 +493,8 @@ Page({
 
   toLogin() { wx.navigateTo({ url: '/pages/launch/launch' }) },
   toPolicy() { wx.navigateTo({ url: '/pages/legal/legal?type=privacy_policy' }) },
+  toOperatorInfo() { wx.navigateTo({ url: '/pages/legal/legal?type=operator_info' }) },
+  toFeedback() { wx.navigateTo({ url: '/pages/feedback/feedback' }) },
   toDocuments() { wx.navigateTo({ url: '/pages/documents/documents' }) },
   back() { wx.navigateBack({ delta: 1, fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
 })

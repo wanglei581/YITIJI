@@ -2,7 +2,7 @@
 
 > 版本：v1.6（上线前收口状态校正）
 > 创建时间：2026-05-26
-> 最后更新：2026-06-12（v1.6：对齐当前进度。Phase 8.0–8.2C 已作为代码与真机验证基线封板；生产服务器与新 Windows 主机仍须按上线清单复验后才能宣称生产就绪）
+> 最后更新：2026-06-12（v1.6：对齐当前进度。Phase 8.0–8.2C 已作为代码与真机验证基线封板；生产服务器与新 Windows 主机仍须按上线清单复验后才能宣称生产就绪）；2026-09-29 更正开放打印口径：本机能否经奔图云接单改为未经厂家确认，设备状态为 POST，回调为单地址按 topic 分流。
 > 状态：Phase 8 打印链路与安全基线已完成；扫描 / U盘 / 云打印等扩展能力仍按真实硬件验收推进，不得把前端演示写成已上线能力。
 > 关联文档：[pantum-api-design.md](./pantum-api-design.md) | [api-v1-design.md](../api/api-v1-design.md) | [CLAUDE.md](../../CLAUDE.md)
 
@@ -658,8 +658,8 @@ Kiosk 轮询后端任务状态，completed 时展示"打印完成"页面
 |--------|----------------------|---------|
 | 打印机识别 | `Get-Printer -Name "Pantum CM2800ADN Series"` | 返回对象，不抛 error |
 | 活动打印任务 | `Get-PrintJob -PrinterName "Pantum CM2800ADN Series"` | 打印进行中时返回 1+ 行 |
-| 打印机离线状态 | WMI `Win32_Printer.PrinterStatus` | `5` = Offline；若不可识别 → `UNKNOWN_PRINTER_STATUS` |
-| 打印机缺纸状态 | WMI `Win32_Printer.DetectedErrorState` | `5` = OutOfPaper；若不可识别 → `UNKNOWN_PRINTER_STATUS` |
+| 打印机离线状态 | WMI `Win32_Printer.PrinterStatus` | `7` = Offline（`WorkOffline=True` 或 `DetectedErrorState=9` 同判离线；`3` = Idle）；若不可识别 → `UNKNOWN_PRINTER_STATUS` |
+| 打印机缺纸状态 | WMI `Win32_Printer.DetectedErrorState` | `4` = No Paper（本机型驱动已知不置该位，见 `wmi.ts` 注释 N3；`3` = Low Paper、`5` = Low Toner 映射 `low_paper`）；若不可识别 → `UNKNOWN_PRINTER_STATUS` |
 | 任务完成检测 | `Get-PrintJob` 返回空 + 无 error | 判定为 `completed` |
 | 任务失败检测 | `Win32_PrintJob.StatusMask` bit 8 (Error) | 判定为 `failed` |
 
@@ -802,7 +802,7 @@ Kiosk 轮询到 completed，展示扫描结果预览
 
 | 项目 | 要求 |
 |------|------|
-| 操作系统 | Windows 10 x64 21H2+，Windows 11 x64 |
+| 操作系统 | x64；部署档位按[母盘清单](windows-golden-image-and-install-checklist.md) A1：Windows 11 IoT 企业版 LTSC 2024（首选）/ Windows 11 专业版 25H2 及以后（兜底）/ Windows 10 IoT 企业版 LTSC 2021（兼容）；普通 Windows 10 已于 2025-10-14 停止支持，不合格。Agent 代码本身仍须在 Windows 10/11 x64 上都能运行 |
 | 架构 | x64（一体机标准配置） |
 | 进程权限 | Service：LocalSystem 或专用服务账号；Helper：登录用户账号 |
 | 网络 | 有线网络（建议 DHCP 静态绑定） |
@@ -1001,7 +1001,7 @@ Agent 启动
 
 | # | 风险 | 可能性 | 影响 | 应对措施 |
 |---|------|--------|------|---------|
-| R1 | 奔图 CM2800ADN/CM2820ADN 系列无云端打印能力 | 已确认 | 高 | 主方案：Windows Terminal Agent + 本地 GDI 打印；开放 API 为后续预留，不替代本地方案 |
+| R1 | 奔图 CM2800ADN/CM2820ADN 能否经奔图云接单 | 未经厂家确认 | 高 | 确认前主方案仍是 Windows Terminal Agent + 本地 GDI 打印；开放 API 为后续预留，不替代本地方案。V1.0 未列适用机型，也未说明打印机如何接入奔图云 |
 | R2 | TWAIN 在 LocalSystem 下不可用（需要用户 Session） | 高 | 高 | **V01/V02 为 Phase 8.0 必验项**；双进程架构已针对此设计 |
 | R3 | `node-printer` Windows 兼容性不稳定 | 中 | 高 | **V06/V07** 提前验证；PowerShell 备用方案就位 |
 | R4 | 临时文件目录权限问题 | 低 | 中 | 使用 `%ProgramData%\...`（服务账号有写权限）；**V13** 验证 ACL |
@@ -1034,7 +1034,7 @@ Agent 启动
 │    └─ PantumCloudDispatchProvider ← 未来预留（不替代主方案）       │
 │         调用奔图开放打印 API                                       │
 │         appSecret 只保存在后端；sign = MD5(body+nonce+secret)    │
-│         color mode 待厂家确认后实现                                │
+│         V1.0 只有黑白；彩色不是开工前置条件                        │
 │                                                                  │
 └────────────────────────────────────────────────────────────────┘
                               │ Agent claim
@@ -1061,7 +1061,7 @@ Agent 启动
 |------|------|
 | **主方案不变** | Phase 8.1 主方案始终是 `LocalAgentDispatchProvider` + Windows Terminal Agent 本地打印，不要在 Phase 8.1 切换为奔图云打印 |
 | **appSecret 隔离** | `PantumCloudDispatchProvider` 的 appKey/appSecret 只保存在后端，Kiosk / Agent / 前端不得持有 |
-| **color mode TODO** | `PantumCloudDispatchProvider` 中 `color` → Pantum API mode 取值**待厂家确认**，未确认前禁止假设为 `"color"` |
+| **V1.0 只有黑白** | 开放 API 的彩色不在 V1.0 协议里（`mode` 只有 `"bw"`），不是开工前置条件；禁止假设为 `"color"`。会不会补，待奔图书面答复 |
 | **打印机名可配置** | Agent 打印机名称通过 `%ProgramData%\AIJobPrintAgent\agent-config.json` 中 `printerName` 字段传入；默认值 `"Pantum CM2800ADN Series"`；严禁硬编码到执行器内部 |
 | **能力待验证字段** | collate / paperType / feeder 为可选预留字段，CM2800ADN/CM2820ADN 实际支持情况需 Phase 8.2 真机验证后确认 |
 
@@ -1071,13 +1071,13 @@ Agent 启动
 
 | 状态码 | 含义 |
 |--------|------|
-| 100 | 打印完成 |
+| 100 | 打印完成（终态） |
 | 101 | 创建打印 |
 | 102 | 打印中 |
-| 103 | 取消打印 |
-| 104 | 打印错误 |
+| 103 | 取消打印（终态） |
+| 104 | 打印错误（终态） |
 
-预留接口：`device/register` / `print/createTask` / `print/cancel` / `device/status` / `callback/deviceUnbind` / `callback/printStatus`
+预留接口均为 POST：`{serverUrl}/device/register`、`{serverUrl}/print/createTask`、`{serverUrl}/print/cancel`、`{serverUrl}/device/status`。回调只有一个地址，按消息 topic 区分 `deviceUnbind/{pid}/{sn}`（解绑）与 `printStatus/{pid}/{sn}`（打印状态）。终态之后再来的 101、102 忽略。细则见 [pantum-api-design.md](./pantum-api-design.md) §5。
 
 ---
 

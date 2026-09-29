@@ -16,6 +16,7 @@
  * 而「哪些错误码算能力不可用」一旦各页漂移，降级行为就会各不相同。
  */
 import { userMessageOf } from '../services/api/userErrorMessage'
+import { aiDeclarationDeclineMessage } from './aiDeclarationErrors'
 import type { AiAvailability } from './useAiTask'
 
 /**
@@ -61,6 +62,23 @@ export const AI_OUTAGE_CODES: ReadonlySet<string> = new Set([
   // fetch 层根本没连上（DNS / TLS / 连接被拒 / 网络不可达）。
   // 拆码后它不再混着 429 与 5xx，是唯一能代表「模型真的够不着」的信号。
   'AI_PROVIDER_UNREACHABLE',
+  // ── 服务端「能力级停用」503（services/api/src/ai-access/ai-access.service.ts enforce，
+  //    在调用模型之前就拦下）。重试不会变好，只能等后台恢复 / 次日额度重置，因此与上面同类：
+  //    不再引导重试，页面落到不用 AI 的手动路径。
+  // 后台「AI 暂停」开关打开。
+  'AI_PAUSED',
+  // 模型服务地址不在出站白名单里（配置问题，不是「这次没成」）。
+  'AI_ENDPOINT_NOT_ALLOWED',
+  // 当日 AI 金额上限已到（details 为 global | terminal | member，都要等到次日）。
+  'AI_BUDGET_EXHAUSTED',
+  // 读不到当日花费，服务端为防超支先停 AI（失败关闭）。
+  'AI_BUDGET_UNAVAILABLE',
+  // 问 AI 闸门时闸门自己出错（services/api/src/ai/resume/self-assessment-interpretation.ts）：
+  // 与 AI_BUDGET_UNAVAILABLE 同一性质 —— 判定本身做不了，服务端失败关闭、不调模型。
+  // 目前只出现在自我探索结果的 aiUnavailableReason 里（打分照常返回，只缺解读）。
+  // 不收 AI_INTERPRETATION_UNAVAILABLE：那是「说不出原因」的兜底码，可能只是这一次没写出来，
+  // 进表会把可以重新作答的情况说成停用（verify-ai-down-fallbacks 的分类口径）。
+  'AI_ACCESS_CHECK_FAILED',
 ])
 
 /** 从任意 API error 上取错误码；取不到时归为 `UNKNOWN_ERROR`（= 不判定能力不可用）。 */
@@ -88,7 +106,7 @@ export function isAiOutage(error: unknown): boolean {
  * 环境变量名和字体路径的中文报错，见该模块头部注释）。
  */
 export function aiErrorMessageOf(error: unknown, fallback: string): string {
-  return userMessageOf(error, fallback)
+  return aiDeclarationDeclineMessage(error) ?? userMessageOf(error, fallback)
 }
 
 /**

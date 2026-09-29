@@ -41,25 +41,33 @@
           <text class="ficon i-info cs-ic"></text>
           <text class="cs-title">知情同意说明</text>
         </view>
-        <view class="cs-list">
-          <view wx:for="{{consentItems}}" wx:key="*this" class="cs-item">
-            <text class="ficon i-check cs-dot"></text>
-            <text class="cs-text">{{item}}</text>
+        <!-- 条款与版本号都是服务端同一次响应下发的原值，页面不写死：写死会在同意书改版后
+             把「对旧说明的同意」当成「对新说明的同意」，而这正是版本号存在的唯一理由。 -->
+        <block wx:if="{{consentReady}}">
+          <view class="cs-list">
+            <view wx:for="{{consentItems}}" wx:key="*this" class="cs-item">
+              <text class="ficon i-check cs-dot"></text>
+              <text class="cs-text">{{item}}</text>
+            </view>
           </view>
+          <view class="cs-ver">同意说明版本：{{consentVersion}}</view>
+        </block>
+        <view wx:else class="list-state">
+          <view>同意说明没有取到，请重试。先看到完整说明，才能开始作答。</view>
+          <view class="state-retry tap" hover-class="tap-press" bindtap="reload"
+                role="button" aria-label="重新加载同意说明">重试</view>
         </view>
-        <!-- 版本号是服务端下发的原值。页面不写死：写死会在同意书改版后把「对旧说明的
-             同意」当成「对新说明的同意」，而这正是版本号存在的唯一理由。 -->
-        <view class="cs-ver" wx:if="{{consentVersion}}">同意说明版本：{{consentVersion}}</view>
-        <view class="cs-ver" wx:else>服务端未下发同意说明版本号，本次将记为「未版本化同意」。</view>
       </view>
 
-      <view class="card card-inner rise-d3">
+      <view class="card card-inner rise-d3" wx:if="{{consentReady}}">
+        <!-- 勾选框文字与其中的链接都是服务端下发的原文；链接用 catchtap，点链接不会顺带勾选。 -->
         <view class="cbox tap" hover-class="tap-press" bindtap="toggleNonSensitive"
-              role="button" aria-label="{{agreeNonSensitive ? '已同意上述说明并开始作答，点击取消' : '同意上述说明并开始作答，必选'}}">
+              role="button" aria-label="{{agreeNonSensitive ? '已勾选，点击取消：' : '必选，点击勾选：'}}{{consentCheckboxLabel}}">
           <view class="cb {{agreeNonSensitive ? 'on' : ''}}"><text wx:if="{{agreeNonSensitive}}" class="ficon i-check"></text></view>
           <view class="cb-body">
-            <view class="cb-title">我已阅读并同意上述说明（必选）</view>
+            <view class="cb-title"><block wx:for="{{checkboxParts}}" wx:key="index"><text wx:if="{{item.link < 0}}">{{item.text}}</text><text wx:else class="cs-link" catchtap="tapConsentLink" data-i="{{item.link}}" role="link" aria-label="打开{{item.text}}">{{item.text}}</text></block></view>
             <view class="cb-desc">不勾选无法提交：服务端同样会拒绝没有这项同意的请求。</view>
+            <view class="cb-desc" wx:if="{{extraLinks.length}}">相关说明：<text wx:for="{{extraLinks}}" wx:key="link" class="cs-link" catchtap="tapConsentLink" data-i="{{item.link}}" role="link">{{item.label}} </text></view>
           </view>
         </view>
 
@@ -149,7 +157,7 @@
       <!-- 解读缺失要说清缺的是哪一半：缺的只是文字，强度是纯函数算的，不受影响 -->
       <view wx:if="{{result.status === 'rejected' || result.providerUnavailable}}" class="notice warn rise-d1">
         <text class="ficon i-warning n-ic"></text>
-        <text wx:if="{{result.providerUnavailable}}">AI 解读服务本次不可用，五段文字解读没有生成。五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
+        <text wx:if="{{result.providerUnavailable}}">{{result.aiReasonText}}五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
         <text wx:else>本次 AI 解读未通过服务端校验{{result.failReason ? '（' + result.failReason + '）' : ''}}，文字解读没有生成。五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
       </view>
 
@@ -298,7 +306,7 @@
         </view>
       </view>
 
-      <view class="compliance-note">本页只做本人自助参考，不参与任何岗位或招聘会的排序与筛选，也不会向企业、合作机构展示。</view>
+      <view class="compliance-note">本页只做本人自助参考，不参与任何排序与筛选，也不会向企业、合作机构展示。</view>
       <view class="spacer-lg"></view>
     </block>
 
@@ -306,7 +314,7 @@
 
   <!-- ── 底部操作条 ── -->
   <view class="actionbar" wx:if="{{phase === 'consent'}}">
-    <view class="btn lg block primary tap {{agreeNonSensitive ? '' : 'disabled'}}" hover-class="tap-press"
+    <view class="btn lg block primary tap {{agreeNonSensitive && consentReady ? '' : 'disabled'}}" hover-class="tap-press"
           bindtap="startAsk" role="button" aria-label="同意并开始作答">同意并开始作答</view>
   </view>
 

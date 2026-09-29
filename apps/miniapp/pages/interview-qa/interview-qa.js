@@ -2,6 +2,7 @@ const app = getApp()
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 const voice = require('../../utils/voice-recorder')
+const { userMessageOf } = require('../../utils/user-error')
 
 Page({
   data: {
@@ -20,7 +21,8 @@ Page({
     qType:          '',
     myAnswer:       '',
     failMsg:        '',
-    voiceAvailable: false,
+    // 先亮出「语音作答」；点了才问录音同意和麦克风权限（进页就弹系统授权框会打断读题）。
+    voiceAvailable: true,
     recStatus:      'idle',
     recError:       '',
     omitPrintAnswers: false,
@@ -38,9 +40,6 @@ Page({
       return
     }
     this.setData({ sessionId, accessToken, position, questionTarget })
-    voice.ensureRecordAuth().then((ok) => {
-      this.setData({ voiceAvailable: !!ok })
-    })
     this._start()
   },
   async _start() {
@@ -125,6 +124,20 @@ Page({
     }
     if (this.data.recStatus === 'recording' || this.data.recStatus === 'transcribing') return
     if (this.data.phase !== 'running') return
+    // 录音之前先问：年满 14 周岁 + 录音单独同意（与语音说简历、小青共用一次，C6）；再问麦克风权限。
+    api.ensureVoiceConsent()
+      .then(() => voice.ensureRecordAuth())
+      .then((ok) => {
+        if (!ok) {
+          this.setData({ voiceAvailable: false, recError: '没有麦克风权限，已改用文字输入' })
+          return
+        }
+        if (this.data.phase === 'running') this._record()
+      }, (err) => {
+        this.setData({ recError: userMessageOf(err, '这一题请用文字作答') })
+      })
+  },
+  _record() {
     this.setData({ recStatus: 'recording', recError: '' })
     voice.start(voice.QUESTION_MAX_MS)
       .then((res) => {

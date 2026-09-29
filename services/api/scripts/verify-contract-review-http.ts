@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import 'dotenv/config'
 import assert from 'node:assert/strict'
-import { closeSync, mkdtempSync, openSync, rmSync } from 'node:fs'
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -259,6 +259,19 @@ async function verifyExplicitHttpModule(): Promise<void> {
   })
   class ContractReviewHttpVerifierRoot {}
 
+  // P1-2a：/confirm 是 @AiUse('generate')，守卫会先核 AI 每日额度（读 AiUsageRecord）。
+  // 空的 harness 库里没有这张表 = 核不了额度 → 按设计失败关闭 503，轮不到 DTO 校验。
+  // 这里只建计量账这一张表（空表 = 今天还没花钱），让本门禁继续验它要验的 DTO / 归属 / 限流。
+  {
+    const { PrismaService } = await import('../src/prisma/prisma.service')
+    const bootstrap = new PrismaService()
+    await bootstrap.onModuleInit()
+    const migration = readFileSync(join(__dirname, '..', 'prisma', 'migrations', '20260929180000_ai_usage_record', 'migration.sql'), 'utf8')
+    const createTable = migration.split(';').find((statement) => statement.includes('CREATE TABLE "AiUsageRecord"'))
+    assert.ok(createTable, 'AiUsageRecord migration must contain CREATE TABLE')
+    await bootstrap.$transaction(async (tx) => { await (tx as unknown as { $executeRawUnsafe(sql: string): Promise<number> }).$executeRawUnsafe(createTable) })
+    await bootstrap.onModuleDestroy()
+  }
   const app = await NestFactory.create(
     ContractReviewHttpVerifierRoot,
     { logger: false },

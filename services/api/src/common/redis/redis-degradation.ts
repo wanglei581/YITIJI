@@ -62,6 +62,11 @@ export const REDIS_DEGRADED_IMPACT: BootImpactDeclaration = {
   'internal-auth': 'degraded',
   /** 管理端里直接对 Redis 写状态、且没有数据库真源可回退的动作（如退出时清理近期高风险验证）。 */
   'internal-console-redis-actions': 'unavailable',
+  /**
+   * 内部账号（管理员 / 合作机构 / 一体机内部账号）的**新登录**：密码尝试次数与短信验证码都存在 Redis，
+   * 没有数据库后备；数不了次数时拒绝登录（失败关闭，P1-4），否则撞库没有上限。已登录的会话不受影响。
+   */
+  'internal-password-login': 'unavailable',
   /** C 端会员登录会话 / 短信验证码 / 频控：Redis 就是真源，没有后备。 */
   'member-auth': 'unavailable',
   /** 终端 Agent 心跳 / 打印任务领取：整条链路不经过 Redis。 */
@@ -75,6 +80,7 @@ export function redisDegradedImpactSentence(): string {
     + '管理端、合作机构端、一体机内部账号的鉴权仍可用但已降级 —— '
     + '会话状态缓存失效，每个请求回源数据库校验（数据库是唯一真源，鉴权结论不变，代价是延迟与数据库负载上升）；'
     + '管理端中直接依赖 Redis 且无数据库真源的动作（如退出登录时清理近期高风险验证）仍会失败；'
+    + '内部账号的新登录（密码与短信）暂停，因为数不了尝试次数，已登录的页面照常；'
     + '打印任务领取与终端 Agent 链路不经过 Redis，不受影响。'
   )
 }

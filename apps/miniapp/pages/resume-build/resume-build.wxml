@@ -73,7 +73,7 @@
     <view class="content has-bar">
       <view class="notice plum rise-d1">
         <text class="ficon i-info n-ic"></text>
-        <text>以下建议由 AI 基于你的简历文本生成，仅供你本人参考，不构成职业指导意见，也不代表用人单位意见。</text>
+        <text>AI 生成，仅供参考：以下建议由 AI 基于你的简历文本生成，不构成职业指导意见。</text>
       </view>
 
       <view wx:if="{{result.isMockProvider}}" class="notice warn">

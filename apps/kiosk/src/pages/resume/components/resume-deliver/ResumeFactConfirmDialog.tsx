@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { maskPii } from '../../../../utils/maskPii'
 import type { ConfirmableFact } from './facts'
 
 export function ResumeFactConfirmDialog(props: {
@@ -24,7 +25,7 @@ export function ResumeFactConfirmDialog(props: {
         </p>
         {props.unconfirmed.length > 0 && (
           <p className="qx-rd-pending" role="note">
-            待本人确认：{props.unconfirmed.join('、')}
+            待本人确认：{props.unconfirmed.map((item) => maskPii(item)).join('、')}
           </p>
         )}
         {props.facts.length === 0 ? (
@@ -41,7 +42,7 @@ export function ResumeFactConfirmDialog(props: {
                   />
                   <span>
                     <b>{fact.label}</b>
-                    {fact.value}
+                    {maskPii(fact.value)}
                   </span>
                   <em>已核对</em>
                 </label>

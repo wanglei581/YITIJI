@@ -1,4 +1,5 @@
 import { Button } from '@ai-job-print/ui'
+import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
 import type { ExternalJobDTO } from '@ai-job-print/shared'
 import {
   ArrowRightIcon,
@@ -375,6 +376,7 @@ export function JobNextActionsSection({
           <ActionButton icon={BuildingIcon} label="查看企业" hint={job.companyProfileId ? job.company : '来源企业未关联'} disabled={!job.companyProfileId} onClick={onViewCompany} />
           <ActionButton icon={PrinterIcon} label="打印岗位信息" hint="A4 黑白 · 以现场公示价为准" onClick={onPrint} />
         </div>
+        <AiDeclarationNote />
       </section>
       <div className="jf-qr-panel">
         <div className="qr-title">扫码投递</div>

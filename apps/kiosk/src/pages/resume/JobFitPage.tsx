@@ -16,7 +16,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { ExternalJobDTO, JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import { BriefcaseIcon, CheckCircle2Icon, HelpCircleIcon, ListIcon, PrinterIcon, SearchIcon } from 'lucide-react'
 import { getJobs } from '../../services/api'
 import {
@@ -29,6 +28,8 @@ import {
   revokeJobFitConsent,
 } from '../../services/api/jobFit'
 import { isAiOutage } from '../../ai/aiOutage'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
@@ -49,6 +50,7 @@ import { JobAiConsentModal } from '../jobs/components/JobAiConsentModal'
 import { grantJobAiConsent } from '../../services/api/jobAi'
 import './job-fit-qx.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 /**
  * 舞台缩放开关：与 `KioskRoot.tsx`（isCompactViewport / usesFluidViewport）用**同一套判据**。
@@ -106,6 +108,7 @@ interface AnalysisFailure { kind: 'ai-down' | 'failed'; message: string }
 
 export function JobFitPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as PageState
@@ -333,6 +336,11 @@ export function JobFitPage() {
         setRejectedTask(true)
         return
       }
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setError(declined)
+        return
+      }
       if (err instanceof JobFitApiError && err.status === 403) {
         if (err.code === 'JOB_FIT_ANONYMOUS_CONSENT_REQUIRED' && !token && accessToken) {
           setPendingConsentInput(input)
@@ -377,6 +385,12 @@ export function JobFitPage() {
         setResult(res)
       }
     } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setShowAnonymousConsent(false)
+        setError(declined)
+        return
+      }
       if (err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
         setShowAnonymousConsent(false)
         setRejectedTask(true)
@@ -420,6 +434,12 @@ export function JobFitPage() {
         setResult(res)
       }
     } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setShowMemberConsent(false)
+        setError(declined)
+        return
+      }
       if (err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
         setShowMemberConsent(false)
         setRejectedTask(true)
@@ -477,17 +497,16 @@ export function JobFitPage() {
     try {
       const file = await printJobFit(taskId, { token: getToken(), accessToken })
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+      startPrint({
+        origin: 'job_fit',
+        returnPath: window.location.pathname,
+        file: {
+          name: file.filename,
+          size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
     } catch (err) {
@@ -635,9 +654,12 @@ export function JobFitPage() {
             <button type="button" className="qx-btn" data-variant="ghost" onClick={exits.resumeHub}>
               返回简历服务
             </button>
-            <button type="button" className="qx-btn" data-variant="primary" disabled={analyzing} aria-busy={analyzing} onClick={() => void handleAnalyze()}>
-              继续并确认授权
-            </button>
+            <span className="qx-ai-declaration-slot">
+              <button type="button" className="qx-btn" data-variant="primary" disabled={analyzing} aria-busy={analyzing} onClick={() => void handleAnalyze()}>
+                继续并确认授权
+              </button>
+              <AiDeclarationNote />
+            </span>
           </>
         }
       >

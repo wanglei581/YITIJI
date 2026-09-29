@@ -15,7 +15,11 @@
 #     -PromptForBindCode `
 #     -PrinterName "<exact Get-Printer name>" `
 #     -LocalApiAllowedOrigins "https://kiosk.example.com" `
-#     -ScanWatchFolder "C:\AIJobPrint\scan-inbox"
+#     -ScanWatchFolder "C:\ProgramData\AIJobPrintAgent\scan-inbox"
+#
+#   # A test machine that is also someone's work PC (e.g. KSK-001): add -KeepFileSelectionDialogs so the
+#   # machine-wide AllowFileSelectionDialogs=0 Edge policy is not written (it would break file uploads in
+#   # that person's normal Edge). Never use it on a dedicated kiosk (golden image checklist A7a).
 #
 #   # Replace previously preserved cross-origin Kiosk entries. Passing the
 #   # switch with no -LocalApiAllowedOrigins removes all historical extra origins.
@@ -95,6 +99,9 @@ param(
   [switch]$RemoveEdgeKioskPolicies,
 
   [Parameter(Mandatory = $false)]
+  [switch]$KeepFileSelectionDialogs,
+
+  [Parameter(Mandatory = $false)]
   [ValidateRange(1, 65535)]
   [int]$LocalApiPort = 9527,
 
@@ -137,7 +144,7 @@ function Fail([string]$Message) {
   exit 1
 }
 
-function Set-EdgeKioskPolicies([string[]]$Origins, [switch]$Remove) {
+function Set-EdgeKioskPolicies([string[]]$Origins, [switch]$Remove, [switch]$KeepFileDialogs) {
   if ($Remove) {
     if (Test-Path -LiteralPath $edgePolicyPath) {
       foreach ($policyName in @("LocalNetworkAccessAllowedForUrls", "AudioCaptureAllowedUrls")) {
@@ -162,7 +169,14 @@ function Set-EdgeKioskPolicies([string[]]$Origins, [switch]$Remove) {
       New-ItemProperty -LiteralPath $listKey -Name ([string]($index + 1)) -Value $validOrigins[$index] -PropertyType String -Force | Out-Null
     }
   }
-  New-ItemProperty -LiteralPath $edgePolicyPath -Name "AllowFileSelectionDialogs" -Value 0 -PropertyType DWord -Force | Out-Null
+  if ($KeepFileDialogs) {
+    # 只用于同时当工作电脑的测试机：AllowFileSelectionDialogs 是整机策略，会让这台电脑上的普通 Edge 也选不了文件。
+    # 专用一体机不得加这个开关（母盘清单 A7a）；已有的禁用值一并去掉，恢复文件选择框。
+    Remove-ItemProperty -LiteralPath $edgePolicyPath -Name "AllowFileSelectionDialogs" -ErrorAction SilentlyContinue
+    Write-WarnLine "AllowFileSelectionDialogs not written (-KeepFileSelectionDialogs): only for non-dedicated test machines, never a dedicated kiosk"
+  } else {
+    New-ItemProperty -LiteralPath $edgePolicyPath -Name "AllowFileSelectionDialogs" -Value 0 -PropertyType DWord -Force | Out-Null
+  }
   Write-Ok "Edge kiosk policies written for $($validOrigins -join ', ')"
 }
 
@@ -690,7 +704,7 @@ $apiBase = ConvertTo-CanonicalApiBaseUrl $ApiBaseUrl
 $apiOrigin = ([System.Uri]$apiBase).GetLeftPart([System.UriPartial]::Authority)
 $edgeKioskOrigins = @($LocalApiAllowedOrigins | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { ConvertTo-CanonicalOrigin $_ })
 if ($edgeKioskOrigins.Count -eq 0) { $edgeKioskOrigins = @($apiOrigin) }
-Set-EdgeKioskPolicies -Origins $edgeKioskOrigins -Remove:$RemoveEdgeKioskPolicies
+Set-EdgeKioskPolicies -Origins $edgeKioskOrigins -Remove:$RemoveEdgeKioskPolicies -KeepFileDialogs:$KeepFileSelectionDialogs
 if ($RemoveEdgeKioskPolicies) { exit 0 }
 $preservedLocalSettings = Get-PreservedLocalSettings `
   -ConfigPath $configPath `

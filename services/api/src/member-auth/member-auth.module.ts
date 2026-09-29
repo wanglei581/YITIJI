@@ -8,7 +8,10 @@ import { MemberAuthService } from './member-auth.service'
 import { MemberPhoneRebindService } from './member-phone-rebind.service'
 import { MemberQrLoginService } from './member-qr-login.service'
 import { MemberStepUpService } from './member-step-up.service'
-import { createSmsSender, SMS_SENDER } from './sms/sms-sender'
+import { SMS_SENDER } from './sms/sms-sender'
+import { createMemberBudgetedSmsSender } from './sms/sms-budget'
+import { SmsCodeThrottleBinder } from './sms/sms-code-throttle'
+import { RedisService } from '../common/redis/redis.service'
 
 /**
  * C 端求职者账号模块(阶段 A)。
@@ -43,7 +46,10 @@ import { createSmsSender, SMS_SENDER } from './sms/sms-sender'
     MemberPhoneRebindService,
     EndUserAuthGuard,
     MemberClosureReceiptGuard,
-    { provide: SMS_SENDER, useFactory: createSmsSender },
+    // 发验证码的每分钟限流：启动时把「终端验签」接上，只对这一条路由按已验签终端计。
+    SmsCodeThrottleBinder,
+    // P1-5：真实发送器外包额度层（会员桶每日总量 / 单终端每日上限），见 sms-budget.ts。
+    { provide: SMS_SENDER, useFactory: createMemberBudgetedSmsSender, inject: [RedisService] },
   ],
   exports: [EndUserAuthGuard, MemberClosureReceiptGuard, MemberStepUpService],
 })

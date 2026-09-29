@@ -30,7 +30,7 @@
 
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <text>上传的简历仅用于本次 AI 服务，不会共享给第三方。敏感文件会在服务完成后按设置自动清理。</text>
+      <text>上传的简历只用于这一次 AI 服务，不提供给任何单位；交给哪些受托方处理，以《隐私政策》为准。敏感文件会在服务完成后按设置自动清理。</text>
     </view>
 
   </view>

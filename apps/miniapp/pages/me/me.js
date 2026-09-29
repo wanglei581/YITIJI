@@ -11,6 +11,16 @@ function countFromResult(res) {
   return '—'
 }
 
+const STAT_DEFS = [
+  { key: 'resume', label: '简历',   load: function() { return api.getMyResumes({ pageSize: 1 }) } },
+  { key: 'docs',   label: '文档',   load: function() { return api.getMyDocuments({ pageSize: 1 }) } },
+  { key: 'order',  label: '打印单', load: function() { return api.getMyPrintOrders({ pageSize: 1 }) } },
+]
+
+function blankStats() {
+  return STAT_DEFS.map(function(d) { return { key: d.key, label: d.label, value: '—' } })
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -21,12 +31,9 @@ Page({
     capsuleInsetRight: 94,
     isLoggedIn: false,
     user: null,
-    // 概览计数（真实数据接入前为占位 0，不伪造已完成状态）
-    stats: [
-      { key: 'resume', label: '简历', value: '—' },
-      { key: 'docs',   label: '文档', value: '—' },
-      { key: 'order',  label: '打印单', value: '—' },
-    ],
+    // 概览计数：「—」= 还不知道（读取中或没读到），不写成 0。
+    stats: blankStats(),
+    statsFailed: false,
     entries: [
       { id: 'resume',    icon: 'file-text', title: '我的简历',      sub: '本人上传与 AI 处理记录', accent: 'plum'  },
       { id: 'docs',      icon: 'folder',    title: '我的文档',      sub: '可再次发起打印',       accent: 'teal'  },
@@ -54,28 +61,51 @@ Page({
     const loggedIn = auth.isLoggedIn()
     this.setData({ isLoggedIn: loggedIn, user: loggedIn ? auth.getUser() : null })
     if (loggedIn) {
-      Promise.all([
-        api.getMyResumes({ pageSize: 1 }).catch(() => null),
-        api.getMyDocuments({ pageSize: 1 }).catch(() => null),
-        api.getMyPrintOrders({ pageSize: 1 }).catch(() => null),
-      ]).then(function(results) {
-        this.setData({
-          stats: [
-            { key: 'resume', label: '简历',   value: countFromResult(results[0]) },
-            { key: 'docs',   label: '文档',   value: countFromResult(results[1]) },
-            { key: 'order',  label: '打印单', value: countFromResult(results[2]) },
-          ],
-        })
-      }.bind(this)).catch(function() {})
+      this.loadStats(STAT_DEFS.map(function(d) { return d.key }))
     } else {
-      this.setData({
-        stats: [
-          { key: 'resume', label: '简历',   value: '—' },
-          { key: 'docs',   label: '文档',   value: '—' },
-          { key: 'order',  label: '打印单', value: '—' },
-        ],
-      })
+      this._statsSeq = (this._statsSeq || 0) + 1
+      this._failedStatKeys = []
+      this.setData({ stats: blankStats(), statsFailed: false })
     }
+  },
+
+  // 读取失败与「还没读到」以前同样显示「—」，用户分不清要不要等（9/04 评审遗留，第 12 件）。
+  // 现在：失败的那几项仍显示「—」（不知道就不写数），计数卡下方说明「没读到」并给重试；
+  // 重试只重读失败的几项。序号挡住旧请求晚到时覆盖新结果（切走再回来会重新读一次）。
+  loadStats(keys) {
+    const seq = (this._statsSeq || 0) + 1
+    this._statsSeq = seq
+    const page = this
+    const wanted = STAT_DEFS.filter(function(d) { return keys.indexOf(d.key) >= 0 })
+    this.setData({ statsFailed: false })
+    return Promise.all(wanted.map(function(d) {
+      return d.load().then(
+        function(res) { return { key: d.key, ok: true, value: countFromResult(res) } },
+        function() { return { key: d.key, ok: false } }
+      )
+    })).then(function(results) {
+      if (page._statsSeq !== seq) return
+      const failed = results.filter(function(r) { return !r.ok }).map(function(r) { return r.key })
+      const byKey = {}
+      // 失败项一律回到「—」：上次读到的数此刻已不能确认，不留着冒充当前值。
+      results.forEach(function(r) { byKey[r.key] = r.ok ? r.value : '—' })
+      page._failedStatKeys = failed
+      page.setData({
+        stats: page.data.stats.map(function(s) {
+          return Object.prototype.hasOwnProperty.call(byKey, s.key)
+            ? { key: s.key, label: s.label, value: byKey[s.key] }
+            : s
+        }),
+        statsFailed: failed.length > 0,
+      })
+    })
+  },
+
+  retryStats() {
+    const keys = this._failedStatKeys && this._failedStatKeys.length
+      ? this._failedStatKeys
+      : STAT_DEFS.map(function(d) { return d.key })
+    this.loadStats(keys)
   },
 
   tapEntry(e) {
@@ -98,6 +128,10 @@ Page({
 
   tapNotify() {
     wx.navigateTo({ url: '/pages/notifications/notifications' })
+  },
+
+  tapPrivacyPolicy() {
+    wx.navigateTo({ url: '/pages/legal/legal?type=privacy_policy' })
   },
 
   onShareAppMessage() {

@@ -28,11 +28,16 @@ import {
 import { ScanQrLoginPanel } from './ScanQrLoginPanel'
 import {
   derivePhoneGateState,
+  isPhoneDailySmsCode,
   loginAnonEntries,
   LOGIN_GATE_COPY,
   LOGIN_GATE_PILL,
   loginReturnLabel,
+  PHONE_DAILY_GATE_COPY,
   resolveLoginReturnTo,
+  sendLimitedPrimaryLabel,
+  shouldKeepPhoneKeypadOnNumber,
+  smsUnavailableCopy,
   type LoginGateMode,
   type LoginQrState,
 } from './loginGateModel'
@@ -61,6 +66,7 @@ export function LoginPage() {
   const [agreed, setAgreed] = useState(false)
   const [qrPhase, setQrPhase] = useState<LoginQrState>('qr-loading')
   const qrRefreshRef = useRef<() => void>(() => undefined)
+  const limitedPhoneRef = useRef<string | null>(null)
 
   const goHome = useCallback(() => navigate('/'), [navigate])
 
@@ -118,10 +124,42 @@ export function LoginPage() {
     error: phoneLogin.error,
     errorCode: phoneLogin.errorCode,
   })
+  // 本机安全校验没过、换票也没换回来时，服务端原话带工程词会被过滤成「请稍后重试」——
+  // 这一态恰恰不该叫人重试，按错误码说清走得通的那条路（其余三种发不了码的原因服务端给了人话，照旧显示）。
+  const phoneDaily = isPhoneDailySmsCode(phoneLogin.errorCode)
+  const codeEntryOpen = phoneState === 'phone-code-sent' || phoneState === 'phone-code-invalid'
+  // 发码钩子在号码满 11 位时会把焦点拨到验证码。验证码还没发出，这里拨回手机号，
+  // 钩子在本组件里先注册，这一条写在它后面，同一轮里以这里为准。
+  useEffect(() => {
+    if (shouldKeepPhoneKeypadOnNumber({
+      codeOpen: codeEntryOpen,
+      phoneComplete: phoneLogin.phone.length === 11,
+      activeInput: phoneLogin.activeInput,
+    })) setPhoneLoginActiveInput('phone')
+  }, [codeEntryOpen, phoneLogin.activeInput, phoneLogin.phone.length, setPhoneLoginActiveInput])
+  useEffect(() => {
+    if (phoneDaily && phoneLogin.phone.length === 11) {
+      limitedPhoneRef.current = phoneLogin.phone
+      return
+    }
+    if (limitedPhoneRef.current && phoneLogin.phone !== limitedPhoneRef.current) {
+      limitedPhoneRef.current = null
+      clearPhoneLoginFeedback()
+    }
+  }, [clearPhoneLoginFeedback, phoneDaily, phoneLogin.phone])
+  const phoneFieldsError = phoneState === 'phone-sms-unavailable' && phoneLogin.errorCode === 'TERMINAL_SESSION_INVALID'
+    ? '这台机器现在发不了验证码，请改用扫码登录。'
+    : phoneLogin.error
   const mode: LoginGateMode = tab === 'scan' ? 'qr' : 'phone'
   const state = mode === 'qr' ? qrPhase : phoneState
-  const copy = LOGIN_GATE_COPY[state]
-  const pill = LOGIN_GATE_PILL[state]
+  const copy = phoneDaily && mode === 'phone'
+    ? PHONE_DAILY_GATE_COPY
+    : mode === 'phone' && phoneState === 'phone-sms-unavailable'
+      ? smsUnavailableCopy(phoneLogin.errorCode)
+      : LOGIN_GATE_COPY[state]
+  const pill = phoneDaily && mode === 'phone'
+    ? { tone: 'warn' as const, label: '这个号码今天已用完' }
+    : LOGIN_GATE_PILL[state]
   const canConfirm = agreed
     && phoneLogin.phone.length === 11
     && phoneLogin.code.length === 6
@@ -144,9 +182,9 @@ export function LoginPage() {
           back={{ label: '返回首页', onBack: goHome }}
           ctabar={
             <>
-              {mode === 'phone' && (state === 'phone-idle' || state === 'phone-sending' || state === 'phone-verifying') ? (
+              {mode === 'phone' && (state === 'phone-idle' || state === 'phone-sending' || state === 'phone-verifying' || state === 'phone-legal-unpublished' || state === 'phone-sms-unavailable' || phoneDaily) ? (
                 <button type="button" className="qx-btn" data-variant="ghost" data-testid="login-gate-anonymous" onClick={goHome}>
-                  {state === 'phone-idle' ? '不登录，继续使用' : '返回首页'}
+                  {state === 'phone-idle' || state === 'phone-legal-unpublished' || state === 'phone-sms-unavailable' || phoneDaily ? '不登录，继续使用' : '返回首页'}
                 </button>
               ) : (
                 <button type="button" className="qx-btn" data-variant="ghost" onClick={() => switchTab(mode === 'phone' ? 'scan' : 'phone')}>
@@ -166,7 +204,7 @@ export function LoginPage() {
                   确认登录
                 </button>
               ) : null}
-              {mode === 'phone' && (state === 'phone-send-limited' || state === 'phone-send-failed' || state === 'phone-code-expired' || state === 'phone-code-locked') ? (
+              {mode === 'phone' && !phoneDaily && (state === 'phone-send-limited' || state === 'phone-send-failed' || state === 'phone-code-expired' || state === 'phone-code-locked') ? (
                 <button
                   type="button"
                   className="qx-btn"
@@ -176,7 +214,19 @@ export function LoginPage() {
                   disabled={!agreed || phoneLogin.countdown > 0 || phoneLogin.loading}
                   onClick={phoneLogin.onSendCode}
                 >
-                  {state === 'phone-send-failed' ? '立刻重新获取' : '重新获取验证码'}
+                  {state === 'phone-send-failed' ? '立刻重新获取' : sendLimitedPrimaryLabel(phoneLogin.countdown)}
+                </button>
+              ) : null}
+              {/* 这台机器 / 全站今天发不了码，或这个号码今天已用完：再点「重新获取」没用，主按钮直接换到扫码登录。 */}
+              {mode === 'phone' && (state === 'phone-sms-unavailable' || phoneDaily) ? (
+                <button
+                  type="button"
+                  className="qx-btn"
+                  data-variant="primary"
+                  data-testid="login-gate-primary"
+                  onClick={() => switchTab('scan')}
+                >
+                  改用扫码登录
                 </button>
               ) : null}
               {mode === 'qr' && (state === 'qr-ready' || state === 'qr-expired' || state === 'qr-error') ? (
@@ -192,9 +242,9 @@ export function LoginPage() {
                   重新生成二维码
                 </button>
               ) : null}
-              {mode === 'phone' && (state === 'phone-sending' || state === 'phone-verifying') ? (
+              {mode === 'phone' && (state === 'phone-sending' || state === 'phone-verifying' || state === 'phone-legal-unpublished') ? (
                 <span className="qx-btn" role="button" data-variant="primary" aria-disabled="true" data-testid="login-gate-primary">
-                  {state === 'phone-sending' ? '正在等待结果' : '等待核验结果'}
+                  {state === 'phone-sending' ? '正在等待结果' : state === 'phone-legal-unpublished' ? '暂时无法登录' : '等待核验结果'}
                 </span>
               ) : null}
               {mode === 'qr' && (state === 'qr-loading' || state === 'qr-confirmed') ? (
@@ -242,7 +292,7 @@ export function LoginPage() {
               </div>
             ) : null}
             {mode === 'phone' ? (
-              <LoginGatePhoneFields {...phoneLogin.paneProps} state={phoneState} />
+              <LoginGatePhoneFields {...phoneLogin.paneProps} error={phoneFieldsError} state={phoneState} />
             ) : (
               <ScanQrLoginPanel
                 returnTo={returnTo}

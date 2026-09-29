@@ -11,7 +11,9 @@ import type {
   SelfAssessmentPrintResponse,
   SelfAssessmentSubmitResponse,
 } from '@ai-job-print/shared'
+import { rethrowAiDeclaration } from '../../ai/aiDeclarationErrors'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class SelfAssessmentApiError extends Error {
@@ -33,7 +35,7 @@ export interface SelfAssessmentAccess {
 async function call<T>(path: string, access: SelfAssessmentAccess, init?: { method?: string; body?: unknown }): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       method: init?.method ?? 'GET',
       headers: {
         Accept: 'application/json',
@@ -44,7 +46,8 @@ async function call<T>(path: string, access: SelfAssessmentAccess, init?: { meth
       credentials: 'include',
       body: init?.body ? JSON.stringify(init.body) : undefined,
     })
-  } catch {
+  } catch (err) {
+    rethrowAiDeclaration(err)
     throw new SelfAssessmentApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
   if (!res.ok) {
@@ -62,15 +65,21 @@ async function call<T>(path: string, access: SelfAssessmentAccess, init?: { meth
 }
 
 /**
- * 交卷。`consent.consentVersion` 送的是**用户当时勾选的那一版**（会话里存下来的），
- * 不是「当前常量」—— 两者在同意门禁下必然相等，但一旦门禁被绕过，
- * 送当前常量等于把旧同意伪装成新同意，正是版本化同意要防的那件事。
+ * 读题目与同一版的同意说明（条款、勾选框文字、链接、版本号）。免登录、不调模型。
+ * 同意页只渲染这一次响应里的说明，提交时送的也是这一次响应里的版本号原值。
+ */
+export function getSelfAssessmentQuestions(): Promise<unknown> {
+  if (API_MODE !== 'http') return Promise.reject(new SelfAssessmentApiError('MOCK_MODE', '演示模式不提供自我探索，请连接真实服务', 0))
+  return call<unknown>('/resume/self-assessment/questions', {})
+}
+
+/**
+ * 交卷。`consent.consentVersion` 送的是**用户当时勾选的那一版**（会话里存下来的、
+ * 题目接口下发的原值），不 trim、不拼接。
  *
  * 服务端处置（`services/api/src/ai/resume/self-assessment.service.ts`）：
- *   - 等于当前版本 → 记版本 + 勾选时刻；
- *   - 不等于       → 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，不落库；
- *   - 缺省         → 如实记 `null`，绝不补写当前版本。
- * 缺省一档是为老客户端留的，服务端刻意不拒；新客户端不该再走那一档。
+ *   - 逐字等于当前版本 → 记版本 + 勾选时刻；
+ *   - 其它（含缺省、空串、带首尾空格、旧版本）→ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，不落库。
  */
 export function submitSelfAssessment(
   body: {

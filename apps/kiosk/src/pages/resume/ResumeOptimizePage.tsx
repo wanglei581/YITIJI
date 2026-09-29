@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { makePrintParams, type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
+import { type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
@@ -14,6 +14,7 @@ import {
   exportResumeRecord,
   type ResumeLayoutAdjustAction,
 } from '../../services/api'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { DEFAULT_RESUME_LAYOUT, useResumeLayout } from './hooks/useResumeLayout'
 import { readAiResumeSession } from './aiResumeSession'
@@ -48,6 +49,7 @@ import {
 } from './components/resume-deliver/resumeDecisions'
 import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
 import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-optimize-qx.css'
 import './optimize-empty-state-qx.css'
 import './resume-r1-qx2.css'
@@ -58,6 +60,7 @@ const OPTIMIZE_AI_DRAFT = '我想把简历中的一句经历换个改法。请�
 
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
   const consent = useResumeAiConsent()
@@ -131,17 +134,23 @@ export function ResumeOptimizePage() {
   const choicePending = Boolean(token && draft.hasDraft && !draftAccepted && view === 'ready')
 
   const markEdited = () => { setIsDirty(true); setPreviewOpen(false); if (exported) setExported(null) }
-  const issueMessage = (failure: ResumeDecisionFailure) => {
+  const issueMessage = (failure: ResumeDecisionFailure, attempted?: ResumeModuleDecision) => {
     const index = modules.findIndex((module, i) => moduleKeyOf(module, i) === failure.key)
     const number = index + 1
+    if (failure.reason === 'not-found' && attempted !== 'original') {
+      return `第 ${number} 条改写没能自动放进稿里，请在编辑区手动改。`
+    }
     return failure.reason === 'not-found'
       ? `第 ${number} 条的改写在优化稿里找不到原句，这里没法替你换，请在编辑区里对照着改。`
       : failure.reason === 'original-empty'
       ? `第 ${number} 条是新加的一句，原文里没有对应的句子，这里没法替你换，请在编辑区里对照着改。`
       : `第 ${number} 条那段文字在编辑区里已经变了，没法自动换，请在编辑区里对照着改。`
   }
-  const setDecisionFailures = (failures: ResumeDecisionFailure[]) => {
-    setDecisionIssues(Object.fromEntries(failures.map((failure) => [failure.key, issueMessage(failure)])))
+  const setDecisionFailures = (failures: ResumeDecisionFailure[], attempted?: ResumeModuleDecision | Record<string, ResumeModuleDecision>) => {
+    setDecisionIssues(Object.fromEntries(failures.map((failure) => {
+      const choice = typeof attempted === 'string' ? attempted : attempted?.[failure.key]
+      return [failure.key, issueMessage(failure, choice)]
+    })))
   }
   const requestLeave = (action: LeaveAction) => {
     if (draft.unsaved || (isDirty && !exported && !token)) { setConfirmLeave(() => action); return }
@@ -155,7 +164,7 @@ export function ResumeOptimizePage() {
     if (index < 0 || !optimizedResume) return
     const result = toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? 'optimized', next, baseResume)
     if (!result.applied) {
-      setDecisionFailures(result.reason ? [{ key, reason: result.reason }] : [])
+      setDecisionFailures(result.reason ? [{ key, reason: result.reason }] : [], next)
       return
     }
     setOptimizedResume(result.resume)
@@ -173,7 +182,7 @@ export function ResumeOptimizePage() {
     const applied = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
     setOptimizedResume(applied.resume)
     setDecisions(applied.decisions)
-    setDecisionFailures(applied.failures)
+    setDecisionFailures(applied.failures, next)
     if (applied.failures.length < changes.length) markEdited()
   }
   const openCompare = (focusIndex?: number) => requestLeave(() => navigate('/resume/optimize/compare', {
@@ -184,7 +193,7 @@ export function ResumeOptimizePage() {
     apply: (changes) => {
       if (!optimizedResume) return
       const next = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
-      setOptimizedResume(next.resume); setDecisions(next.decisions); setDecisionFailures(next.failures)
+      setOptimizedResume(next.resume); setDecisions(next.decisions); setDecisionFailures(next.failures, Object.fromEntries(changes))
       if (next.failures.length < changes.length) markEdited()
     },
   })
@@ -229,11 +238,10 @@ export function ResumeOptimizePage() {
   const handlePrint = () => {
     if (printNavigating || !exported?.printFileUrl) return
     setPrintNavigating(true)
-    navigate('/print/confirm', {
-      state: {
-        file: { name: exported.filename, size: printFileSizeLabel(exported.sizeBytes), pages: exported.pageCount, fileId: exported.fileId, fileUrl: exported.printFileUrl, mimeType: 'application/pdf' },
-        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
-      },
+    startPrint({
+      origin: 'resume_optimize',
+      returnPath: window.location.pathname,
+      file: { name: exported.filename, size: printFileSizeLabel(exported.sizeBytes), pages: exported.pageCount, fileId: exported.fileId, fileUrl: exported.printFileUrl, mimeType: 'application/pdf' },
     })
   }
 
@@ -244,7 +252,7 @@ export function ResumeOptimizePage() {
       const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access)
       setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings?.length ? ['调整后的内容仍需你逐项核对，确认事实无误。'] : []); setExported(null); setIsDirty(true)
     } catch (err) {
-      setAdjustError(userMessageOf(err, 'AI 调整失败，请稍后重试或继续手动编辑'))
+      setAdjustError(aiDeclarationDeclineMessage(err) ?? userMessageOf(err, 'AI 调整失败，请稍后重试或继续手动编辑'))
     } finally { setAdjusting(null) }
   }
 
@@ -429,7 +437,7 @@ export function ResumeOptimizePage() {
           />
         )}
         {previewOpen && exported?.signedUrl && (
-          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportKind === 'change_list' ? 'pdf' : exportFormat} mimeType={exportKind === 'change_list' ? 'application/pdf' : undefined} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} onClose={() => setPreviewOpen(false)} />
+          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportKind === 'change_list' ? 'pdf' : exportFormat} mimeType={exportKind === 'change_list' ? 'application/pdf' : undefined} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && (exportKind === 'change_list' || exportFormat === 'pdf') ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
         {confirmLeave && (
           <ResumeOptimizeLeaveDialog

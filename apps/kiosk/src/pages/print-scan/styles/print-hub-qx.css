@@ -183,7 +183,7 @@ button.ph-chip { cursor: pointer; }
 .ph-cap-ic[data-tone='teal'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
 .ph-cap-ic[data-tone='slate'] { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
 .ph-cap-ic[data-tone='wheat'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
-/* tokens.css 没有 clay 组；照片 / 签章用 cinnabar-soft 会偏红。
+/* tokens.css 没有 clay 组；照片 / 签名用 cinnabar-soft 会偏红。
    这里用 wheat/cinnabar 之间的暖土色，全部走已有令牌混合，不写裸色值。 */
 .ph-cap-ic[data-tone='clay'],
 .ph-src-ic[data-tone='clay'] {
@@ -250,7 +250,7 @@ button.ph-chip { cursor: pointer; }
   background: currentColor;
   animation: ph-breathe 1600ms ease-in-out infinite;
 }
-/* 证件照宽卡：落在第三行「签名盖章」右侧的两格里，横排；徽标不折行。 */
+/* 证件照宽卡：落在第三行「签名」右侧的两格里，横排；徽标不折行。 */
 .ph-cap--wide { grid-column: 1 / -1; min-height: 106px; flex-direction: row; align-items: center; gap: 22px; padding: 14px 26px; }
 .ph-cap--wide .ph-cap-ic { margin-bottom: 0; }
 .ph-cap--wide .ph-cap-foot { flex: none; margin-top: 0; }
@@ -348,6 +348,45 @@ button.ph-chip { cursor: pointer; }
 .ph-plan li { list-style: none; display: flex; align-items: flex-start; gap: 12px; font-size: var(--qx-fs-aux); line-height: 1.5; color: var(--qx-ink-2); }
 .ph-plan .sq { flex: none; width: 10px; height: 10px; margin-top: 10px; border-radius: 3px; background: var(--qx-teal); }
 .ph-pgrp-note { margin: 18px 0 0; padding-top: 14px; border-top: 1px dashed var(--qx-line-2); font-size: var(--qx-fs-aux); line-height: 1.5; color: var(--qx-ink-3); }
+
+/* ── 复印说明（/print-scan/feature/copy）──────────────────────
+ * 稿 10 没有这一态（R4，2026-09-29 拍板后补；合规新状态不画新稿）。
+ * 全部沿用本页已有的卡面语言：白底细边圆角块、翡翠序号、正文 --qx-fs-body，不另起样式体系。 */
+.ph-steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.ph-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  min-height: 104px;
+  padding: 18px 26px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  background: var(--qx-surface);
+  animation: ph-rise 420ms var(--ph-ease) backwards;
+  animation-delay: calc(120ms + var(--ph-i, 0) * 36ms);
+}
+.ph-step-no {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--qx-deep);
+  color: var(--qx-emerald);
+  font-family: var(--qx-serif);
+  font-size: var(--qx-fs-btn);
+  font-weight: 700;
+}
+.ph-step-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ph-step-main b { font-size: var(--qx-fs-body-lg); font-weight: 700; line-height: 1.35; color: var(--qx-ink); }
+.ph-step-main .d { font-size: var(--qx-fs-body); line-height: 1.5; color: var(--qx-ink-2); text-wrap: pretty; }
+.ph-step-main .d b { font-size: inherit; color: var(--qx-ink); }
+.ph-notes--flush { margin-top: 0; }
+.ph-note[data-static='true'] .d b { font-size: inherit; color: var(--qx-ink); }
+.ph-page[data-state='feature-copy'] .ph-note { color: var(--qx-ink); }
+.ph-page[data-state='feature-copy'] .ph-note .d { color: var(--qx-ink-2); }
 
 /* ── 底注（价格 / 纸张 / 隐私）+ 说明全文开关 ───────────────── */
 .ph-foot {
@@ -559,6 +598,9 @@ button.ph-chip { cursor: pointer; }
   [data-kiosk-stage-fit='off'] .ph-note .d,
   [data-kiosk-stage-fit='off'] .ph-note-go { font-size: var(--qx-fs-body); }
 
+  [data-kiosk-stage-fit='off'] .ph-step { gap: 14px; min-height: 0; padding: 14px 16px; border-radius: 20px; }
+  [data-kiosk-stage-fit='off'] .ph-step-no { width: 44px; height: 44px; font-size: var(--qx-fs-body); }
+  [data-kiosk-stage-fit='off'] .ph-step-main b { font-size: var(--qx-fs-aux-lg); }
   [data-kiosk-stage-fit='off'] .ph-pgrp { padding: 16px 18px; border-radius: 20px; }
   [data-kiosk-stage-fit='off'] .ph-pgrp h4 { flex-wrap: wrap; font-size: var(--qx-fs-aux); }
   [data-kiosk-stage-fit='off'] .ph-pgrp h4 span { margin-left: 0; font-size: var(--qx-fs-aux); }

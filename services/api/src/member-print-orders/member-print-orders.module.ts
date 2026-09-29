@@ -7,6 +7,8 @@ import { MemberPrintOrderCreateService } from './member-print-order-create.servi
 import { PickupCodeReissueService } from './pickup-code-reissue.service'
 import { PackageOrdersController } from './package-orders.controller'
 import { PackageOrderService } from './package-order.service'
+import { MemberOrderTimelineService } from './member-order-timeline.service'
+import { MemberOrderClaimHereService } from './member-order-claim-here.service'
 import { PrintJobsModule } from '../print-jobs/print-jobs.module'
 import { PaymentModule } from '../payment/payment.module'
 import { TerminalsModule } from '../terminals/terminals.module'
@@ -37,6 +39,14 @@ import { TerminalsModule } from '../terminals/terminals.module'
     }),
   ],
   controllers: [MemberPrintOrdersController, MemberPendingTasksController, PackageOrdersController],
-  providers: [MemberPrintOrdersService, MemberPrintOrderCreateService, PickupCodeReissueService, PackageOrderService, EndUserAuthGuard],
+  providers: [
+    MemberPrintOrdersService,
+    MemberPrintOrderCreateService,
+    PickupCodeReissueService,
+    PackageOrderService,
+    MemberOrderTimelineService,
+    MemberOrderClaimHereService,
+    EndUserAuthGuard,
+  ],
 })
 export class MemberPrintOrdersModule {}

@@ -12,6 +12,7 @@ const runtimeSecurityPath = path.join(__dirname, 'provisioning-runtime-security.
 
 const installer = fs.readFileSync(installerPath, 'utf8')
 const diagnosis = fs.readFileSync(diagnosisPath, 'utf8')
+const diagnosisBytes = fs.readFileSync(diagnosisPath)
 const serviceIdentity = fs.readFileSync(serviceIdentityPath, 'utf8')
 const runtimeSecurity = fs.readFileSync(runtimeSecurityPath, 'utf8')
 
@@ -395,22 +396,36 @@ assert.doesNotMatch(
   'diagnosis must not make network, process, or print calls',
 )
 
-assert.match(diagnosis, /function Get-LockPathKind\(/, 'diagnosis must classify the instance lock path kind')
-assert.match(diagnosis, /function Get-StrictLockPidParse\(/, 'diagnosis must parse the lock PID with the same strict decimal rule')
-assert.match(diagnosis, /function Get-TasklistPidPresence\(/, 'diagnosis must query tasklist for the parsed lock PID')
+assert.match(diagnosis, /function Get-LockPathKind\(/, 'diagnosis must classify the agent.pid path kind')
+assert.match(diagnosis, /function Get-StrictLockPidParse\(/, 'diagnosis must parse the recorded PID with the same strict decimal rule')
+assert.match(diagnosis, /function Get-TasklistPidPresence\(/, 'diagnosis must query tasklist for the recorded PID')
 assert.match(diagnosis, /tasklist\.exe/, 'diagnosis must call tasklist.exe rather than infer process death')
-assert.match(
+// 2026-09-28 真机-8：单实例改为命名管道，进程退出即由系统释放；agent.pid 只剩诊断用途，
+// 不存在「人工复核后清锁」这一步。诊断改为报告 instance-id 是否有效、单实例管道是否在，且只列管道、不连接。
+assert.doesNotMatch(
   diagnosis,
-  /\$lockClearanceEligibility\s*=\s*"not_eligible_tasklist_unavailable"/,
-  'tasklist failure must not be treated as a dead pid that is safe to clear',
+  /lockClearanceEligibility|eligible_for_operator_review/,
+  'the named-pipe singleton has no manual lock-clearance step; diagnosis must not offer one',
 )
-assert.match(
-  diagnosis,
-  /\$lockClearanceEligibility\s*=\s*"eligible_for_operator_review"/,
-  'diagnosis may only mark operator review after service, PID parse, tasklist, and related-process checks',
-)
-assert.match(diagnosis, /不要先删除/, 'diagnosis must tell the operator not to delete the lock first')
+assert.match(diagnosis, /agent\.pid 只是诊断记录，任何情况下都不需要手工删除/, 'diagnosis must tell the operator agent.pid never needs manual deletion')
 assert.match(diagnosis, /Non-regular paths \(directory\/junction\/symlink\) must stay untouched/, 'diagnosis must keep directory/junction/symlink lock paths untouched')
+assert.match(diagnosis, /Join-Path\s+\$ProgramDataDir\s+"instance-id"/, 'diagnosis must read the machine instance identity the pipe name is derived from')
+assert.match(diagnosis, /GetFiles\('\\\\\.\\pipe\\'\)/, 'diagnosis must look for the singleton pipe by listing \\\\.\\pipe\\')
+assert.match(diagnosis, /"AIJobPrintAgent-\$instanceIdValue"/, 'diagnosis must derive the pipe name the same way the Agent does')
+assert.doesNotMatch(
+  diagnosis,
+  /NamedPipeClientStream|\.Connect\(|net\.pipe|\[System\.IO\.Pipes\./,
+  'diagnosis must list pipes, never connect to the running Agent singleton',
+)
+{
+  // 诊断脚本判 instance-id 是否有效的规则必须与 Agent 本身逐字一致，否则现场会把 Agent 拒绝启动的标识报成有效（或反之）。
+  const lockSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'agent', 'instance-lock.ts'), 'utf8')
+  const agentPattern = lockSource.match(/const MACHINE_ID_RE = \/(.+)\/\n/)?.[1]
+  const diagnosisPattern = diagnosis.match(/\$instanceIdPattern = '(.+)'/)?.[1]
+  assert.ok(agentPattern, 'instance-lock.ts must still define MACHINE_ID_RE')
+  assert.equal(diagnosisPattern, agentPattern, 'diagnosis instance-id rule must match the Agent MACHINE_ID_RE exactly')
+}
+assert.equal(diagnosisBytes[0] === 0xef && diagnosisBytes[1] === 0xbb && diagnosisBytes[2] === 0xbf, true, 'diagnosis is run by Windows PowerShell 5.1 outside the installer payload; it must be UTF-8 with BOM so the Chinese operator hint is readable')
 assert.doesNotMatch(
   diagnosis,
   /safe_to_delete|safe_to_clear|safe to delete|可以安全删除/i,
@@ -425,8 +440,9 @@ assert.match(diagnosisOutput, /^\s*lockPathKind\s*=\s*\$lockPathKind\s*$/m, 'dia
 assert.match(diagnosisOutput, /^\s*lockPidParseStatus\s*=\s*\$lockPidParseStatus\s*$/m, 'diagnosis must report strict lock PID parse status')
 assert.match(diagnosisOutput, /^\s*tasklistExitCode\s*=\s*\$tasklistExitCode\s*$/m, 'diagnosis must report tasklist exit code')
 assert.match(diagnosisOutput, /^\s*tasklistResult\s*=\s*\$tasklistResult\s*$/m, 'diagnosis must report tasklist result')
-assert.match(diagnosisOutput, /^\s*lockClearanceEligibility\s*=\s*\$lockClearanceEligibility\s*$/m, 'diagnosis must report whether operator lock review is allowed')
-assert.match(diagnosisOutput, /^\s*lockOperatorHint\s*=\s*\$lockOperatorHint\s*$/m, 'diagnosis must report the do-not-delete-first operator hint')
+assert.match(diagnosisOutput, /^\s*instanceIdStatus\s*=\s*\$instanceIdStatus\s*$/m, 'diagnosis must report whether the machine instance identity is valid')
+assert.match(diagnosisOutput, /^\s*singletonPipePresent\s*=\s*\$singletonPipePresent\s*$/m, 'diagnosis must report whether the singleton pipe exists')
+assert.match(diagnosisOutput, /^\s*lockOperatorHint\s*=\s*\$lockOperatorHint\s*$/m, 'diagnosis must report the operator hint')
 
 assert.match(diagnosis, /\$scriptRoot\s*=\s*\$PSScriptRoot/, 'diagnosis must capture PSScriptRoot after startup')
 assert.match(diagnosis, /MyInvocation\.MyCommand\.Path/, 'diagnosis must fall back to MyInvocation when PSScriptRoot is empty')

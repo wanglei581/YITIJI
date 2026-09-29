@@ -1,5 +1,309 @@
 # 下一步任务
 
+## 后端窗口待办（自我探索同意）
+
+已按合规裁定取消过渡期（服务端只收当前版本）。
+
+- **打开「四端同意版本一致」断言**：`services/api/src/ai/resume/__tests__/self-assessment-consent.test.ts` 里带 skip 的那条。负责人：后端窗口。触发条件：一体机（主执行窗口）与小程序（#1124）都已升到当前版本并用下发的 consentLinks、consentCheckboxLabel 渲染。
+
+## 2026-09-29：候选写入方（本窗口）的活，按先后
+
+> 分工（总指挥 9/29 转达产品负责人拍板）：总指挥窗口调度与汇总、不推候选；**本窗口是候选 `claude/codex-task-history-progress-0de1dc` 与 #1042 的唯一写入方**，其它窗口（合规与运维、Windows 真机、小程序、两个后台、后端排雷与资金）开 PR 进候选，由本窗口按顺序普通合并。实现一律 Claude 子代理；Codex 只读取证、结论核实后才用；agy 纯推理反方评审。
+
+1. **2.0 稿最终版冻结**（进行中）：定稿 C（13 只读态不画成冲突、14 三屏留白与零元单压字、20 手机传签名卡置灰、34 第 25 题屏留白）→ 全部稿统一「公共终端 / 这台机器」说法 → 全量审计与全状态文字探针 → 冻结门禁 `verify:qingxu-v2-frozen`（`FROZEN.json` 记哈希、进 CI；改稿须产品负责人同意）。
+2. **P0-5 打印交接第二、三批**（进行中，分支 `claude/p05-handoff-phase23-20260929`）：规格 `docs/reviews/print-handoff-unification-2026-09-28.md`；报价页不拦截照最终版稿 14；旧会话清掉；会员原件转成的 PDF 按原件过检查。
+3. **第三波运行页照最终版**：45、48（进行中）→ 03 → 30 → 22 → 23 → 21 → 29 → 10（#1046 已合入，可以动了）→ 打印链（P0-5 落地后）。9/29 拍板的 6 件一并落到运行页：34 跟运行页、46 不分档、31「抵扣功能尚未开放」、08 取不到正文如实说、51/20 只留手写签名（含 #1052 的一体机后续：我的文档签名按钮不看能力、签名页未开通态的写稿人用语）、52 保留。
+4. **合规改造的一体机那一半**：C1 AI 服务说明与经营者信息入口、C3 反馈加「AI 内容投诉」、C6 AI / 语音按钮下的声明行与请求头、C7 登录提示、C9 面试报告页去两张卡、C11 政策「本机未绑定机构」空态、C14 AI 暂停与全机维护页。（9/29 拍板：导出的简历不印可见 AI 字样，`RESUME_EXPORT_VISIBLE_LABEL` 保持关；C8 一体机界面撤下、代码路径保留，等律师答复第 21 问。）三个上线开关（声明、登录档位、政策范围）的一体机改动点盘点在合规窗口（Codex 只读、抽查两处属实）：AI 请求分散在约 10 个请求封装里，没有统一加请求头的地方；政策请求只带 Accept 头。共享错误文案表补 5 个错误码由合规窗口的 PR 做，合入后本窗口再在这张表上接活。
+5. **P0-7 / C4 一体机一半**（口径 9/29 总指挥定）：`apps/kiosk/src/services/auth/legalConsentVersions.ts` 正式生产构建取不到已发布协议版本时如实拦住登录、写明哪些功能不登录也能用（打印扫描等照常），开发与自动化测试保留回落；#1045 注释里「前端保留回落保应急口」作废；发布前由合规与运维窗口在 preflight 硬检查三份法务文档都已激活，缺一份就中止发布。同一个改动里要改 `services/api/scripts/verify-legal-doc-version.ts:127-129`：它现在断言一体机「必须保留回落草稿」（9/29 裁定前的口径），改成「正式构建不回落、开发与测试保留」（合规窗口不动它，免得两边打架）。
+6. **2.5 / P1-9 断网诚实态与 AI 降级**：失联自动切 09 离线页；出付款码前先查接口可达与支付通道状态；每个 AI 入口在 AI 关闭时都有手动路径（K-06、K-09）。
+7. **W3 一体机部分**（AI 结果找得回、AI 挂了能手动）：F07、F08、F10、F21、F13、F11、B-03、F15 的页面侧；B-07 小青给三个固定办事入口；A-05 扫描前探测本机投递程序。服务端由「后端排雷与资金」窗口做，接口交付单发来后再接。
+8. **P1-13 一体机前端错误全局捕获并上报**：前端挂钩（上报脱敏、限频）；接收端点由后端窗口做。
+9. **P2 路由数三处对不上**：注册 111、测试清单 110、进度 112。
+11. **试点「服务人次」一体机上报挂钩**（9/29 总指挥补）：`KioskSession` 接口一直返回 501，数据源从没写过；服务端写入与按机构聚合由两个后台窗口做，接口契约它发来后再做。一体机接在现有生命周期上（`useIdleLogout`、`KioskPrivacyGuard` 的清场与超时）：从待机屏唤醒记开始，清场或超时记结束，至少一次有效操作才上报；只报匿名的开始、结束、服务大类，不带个人信息，失败静默不影响操作。契约 v1（两个后台窗口 9/29）：终端身份头 `x-terminal-id` + `x-terminal-session-token`；`POST /api/v1/kiosk/session/start {clientSessionId(UUID v4), wokeAt, category}` 在一个周期内第一次有效操作时调（进入任一服务页或开始登录）、幂等；`POST .../heartbeat {clientSessionId, category?}` 进入新大类时调、同大类 5 分钟节流、404 忽略；`POST .../end {clientSessionId, endedAt, endReason: idle_timeout|user_exit|privacy_clear|handover|other}` 挂在清场回调、幂等；category 白名单 print / scan / resume / interview / assistant / career / policy / official_channel / member / help / other，多余字段 400；失败最多重试 1 次、离线直接丢。本窗口补充（已回对方）：任何一次清场之后也开始新周期（先 end 再换新 clientSessionId）。依赖对方服务端 PR 先合入候选。
+10. **#1042 合 main（N1）**：普通合并（不 squash），合并前打 `prod-api-20260917` → `50483cd28`、`prod-web-20260909` → `a8a521cb`；`DEPLOY_API_ENABLED=false`，合并不上线；等候选三作业同一 SHA 全绿、并经产品负责人本人在本窗口确认后执行；合完开新整合 PR，main CI 跑时停合并。发布分两次、每次仍要产品负责人授权：10 月中旬发当前候选（招聘内容默认关），10 月底发最终版页面并同批打开 `AI_DECLARATION_ENFORCEMENT` / `AI_LOGIN_GATE` / `POLICY_SCOPE`。
+11. **一体机「我的打印订单」跨端打通**（9/29 产品负责人：同账号同一套订单）：一体机现在只读 `GET /me/print-orders`，看不到手机上下单未到机的单和材料包；材料包逐份派发的打印任务还会混进列表，显示「未命名文件」。契约 v1 已发后端窗口：`GET /me/print-orders/timeline`（三来源归并、不下发到机码明文、带网点与 `claimableHere`）+ `POST /me/print-orders/:orderId/claim-here`（会员加终端双身份；终端不一致回 409 并附网点名，不计锁机）。接口合进候选后，一体机做页面：卡片按类型渲染，本机可取的给「在本机取件」，不在本机的写「请到 {网点} 取件」。
+## 2026-09-29：合规与运维（发布清单、C4 口径、法务与告示、官方原文核对）
+
+**分工**：9/29 起本窗口负责合规与运维（总指挥排定）；候选分支与 #1042 只由主执行窗口写入。9/28 那一节的 8 个 PR 已整批合入候选（`56bd387f2`）。
+
+**C4 口径（9/29 总指挥裁定）**：按 C4 原方案做——一体机与小程序的正式版取不到已发布的协议，就如实拦住登录；开发、测试、体验版保留回落草稿。服务端 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 这个应急口因此对正式版前端不再起作用。补位：发布前硬检查三份法务文档已激活（见下方清单第 1 条），并在发布流程的预检里加一步，调本机 API 的公开接口 `GET /api/v1/kiosk/legal/:type` 逐份核对，缺一份就在备份之前中止发布（另开 PR；一体机一半归主执行窗口，小程序一半归小程序窗口）。
+
+**本节之后另开的小 PR**：#1055 后台「AI 服务管理」页的 AI 服务开关面板（暂停、全机维护、登录档位、使用声明）；#1056 一体机错误文案表补 5 个错误码（AI 暂停、维护、需登录、需声明、内容被拦）。
+
+### 两次发布清单（生产侧动作都由产品负责人做）
+
+两次发布都走同一套流程（`.github/workflows/deploy.yml`）：main 的 CI 通过后自动发布，或手动触发 deploy 工作流并填那次 main CI 的运行号；两种方式都要求仓库变量 `DEPLOY_API_ENABLED=true`，同一时间只跑一个发布（`concurrency: production-deploy`）。发布流程自己会做预检 → 备份 → 迁移 → 切换 → 就绪检查（`/api/v1/health/ready`）；迁移失败或就绪检查失败，自动回到上一个运行目录和静态目录。
+
+#### 第一次发布（10 月中旬）：发当前候选，招聘内容默认关
+
+**发布前（产品负责人）**
+1. **法务文档先发布（硬检查）**：在现在的后台「法务文档版本」新增并激活「用户服务协议」「隐私政策」「AI 服务免责声明」三份（文本和逐步操作在法务私有页，不进公开仓库）。必须在发布前做：新版本会拒绝没有已激活协议的登录（C4）；按 9/29 裁定，一体机与小程序的正式版也不再回落草稿，`LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对正式版不起作用。发布流程的预检会逐份核对这三份，缺一份就中止发布（预检已随 #1059 进候选：`.github/scripts/deploy-api-release.sh:212-223` 调 `services/api/scripts/preflight-legal-docs.mjs`，查的是线上正在运行的旧版本 API）。预检留一个跳过变量，**只在新服务器首装、API 还没跑起来时用**，用了会在发布日志里打醒目告警。发布前可以先在本机仓库根目录自查一次（只读）：`node services/api/scripts/preflight-legal-docs.mjs --base-url https://zyidai.cn/api/v1`，三行都是 `OK`、末行是 `LEGAL DOCS PREFLIGHT OK: 3 docs` 才算过；出现 `缺` 就先去后台激活。
+   **「经营者信息」统一口径：第一次发布成功后当天在新后台激活，不在发布前。** 依据：线上旧版本 `50483cd2` 的 `LEGAL_DOC_TYPES` 里没有 `operator_info`（这一类由 `0b6498b04` 加入，现在在 `services/api/src/legal/legal.service.ts:5-12`），现在的后台建不了这一类；3d 预检只查上面三份（`preflight-legal-docs.mjs:20-24`），不查它，所以它不挡发布。它的读者是小程序首页页脚、反馈与隐私页（`apps/miniapp/pages/home/home.wxml` 等），一体机不读；小程序正式版提交审核前必须已经激活。本文件其它地方凡写「四份文档部署前发布」的，以本条为准。
+1. **法务文档先发布（硬检查）**：在现在的后台「法务文档版本」新增并激活「用户服务协议」「隐私政策」「AI 服务免责声明」三份（文本和逐步操作在法务私有页，不进公开仓库）。必须在发布前做：新版本会拒绝没有已激活协议的登录（C4）；按 9/29 裁定，一体机与小程序的正式版也不再回落草稿，`LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对正式版不起作用。发布流程的预检会逐份核对这三份，缺一份就中止发布（预检改动另开 PR）。预检留一个跳过变量，**只在新服务器首装、API 还没跑起来时用**，用了会在发布日志里打醒目告警。「经营者信息」这一类现在的后台还没有，发布后再发。预检还会检查隐私政策含「未满十四周岁未成年人个人信息处理规则」这一章，缺了就中止发布。
+2. **P0-13 生产核对**：
+   - **关闭招聘内容托管**（和「演示企业在库里下架」是两件事，分开验收，后者见「发布后核对」）：服务器 `.env` 里 `RECRUITMENT_CONTENT_HOSTING_ENABLED` 不设（或 false）。只读核对：在运行目录执行 `grep '^RECRUITMENT_CONTENT_HOSTING_ENABLED=' services/api/.env`，没有输出（没设）或输出 `…=false` 算通过；值是 `true`、`1`、`yes`、`on` 任一个就不通过（判定在 `services/api/src/recruitment-hosting/recruitment-hosting.ts:31-42`，不认识的值按关处理）。这个开关的代码随本次发布才上线，线上旧版本 `50483cd2` 没有它，所以发布前只能核对 `.env`；公开接口返回 0 条要等发布后核；
+   - **演示企业在库里下架**：发布前不做（可选的后台手工下架见下方 P0-1）。#1115 的维护命令只在候选里，线上旧版本的运行目录没有 `services/api/scripts/unpublish-demo-companies.ts`，在旧版本上跑会直接失败；发布成功后按「发布后核对」单独执行和验收；
+   - `KIOSK_PUBLIC_BASE_URL` 指向一体机前端地址；
+   - GitHub 仓库 Settings → Secrets and variables → Actions：**Secrets** 里 `DEPLOY_ADMIN_WEB_ROOT`、`DEPLOY_PARTNER_WEB_ROOT` 都已设置（`deploy.yml:384-385` 读的是 secrets；缺一个 full 发布就失败，`deploy.yml:282-285`）；**Variables** 里 `PRINT_REQUIRE_PII_SCAN` 为 `true`（不是 true 时 SSH 步骤一开始就退出，`deploy.yml:123-126`）；`DEPLOY_API_ENABLED` 此时保持 `false`，发布当天第 4 步才打开；
+   - 后台价目：黑白、彩色两行单价都设 0 元，说明都写「免费试运营」（9/29 产品负责人拍板试点免费；`print_color_page` 现在单价 1 元/页，必须改）；
+   - 签名盖章：#1052 起未登记的终端自动关闭，一体机显示「暂未开通」，不用逐台设置；想在后台一眼看清，可以逐台设「不支持」并写备注（可选）；
+   - 大模型厂家（后端 P1-3 端点白名单）：后台「AI 服务管理」里 15 个功能位逐个看实际生效的是哪家模型（没单独配过的功能位跟随上级功能位）；只要有一个用的是 MiniMax 或鱼人 API，新版本上线后这个功能位会被拒，发布前先换成 DeepSeek 或通义千问；
+   - 小青的对话与语音配置：服务器 `.env` 里如果设了 `TRTC_LLM_CONFIG_JSON` 或 `TRTC_TTS_CONFIG_JSON`，里面的接口地址必须在白名单内（以后端 P1-3 的 PR 说明为准）；没设就不用管；
+   - 服务器 Node 版本：`node -v` 不低于 22.13，且 pm2 运行 API 用的也是这个 Node（#1075 的 PDF 引擎依赖它；版本不够时 PDF 功能如实报不可用，不会退回旧引擎；仓库开了 engineStrict，版本不够时安装依赖这一步就会失败）。**Precheck 第二轮本来要自动输出这项，但已暂停、短期出不来，发布前由产品负责人在服务器上手动只读核对**（用运行 API 的那个账号执行，pm2 只看得到本账号的进程）：
+     - `node -v` → 形如 `v22.x.y`，且 x ≥ 13、主版本是 22（根 `package.json:6-9` 要求 `>=22.13 <23`）；
+     - `pm2 show ai-job-print-api`（进程名取 `.github/scripts/deploy-api-release.sh:36` 与 `deploy.yml:261` 的默认值；仓库 Secrets 里若另设了 `DEPLOY_PM2_NAME`，以它为准）→ 看 `node.js version` 那一行，同样要 ≥ 22.13 且 < 23。两行都满足才算过；`pm2 show` 报找不到进程，说明进程名或账号不对，先查清再往下走。9/08 只读实测是 v22.23.1（部署清单 `docs/device/production-deployment-and-windows-host-checklist.md:180-182`），发布当天要重看；
+   - 小青形象图：保存来源记录（生成记录或购买凭证、授权条款），需要时能证明不是真人照片（9/29 确认小青是数字人图片，不需要肖像授权）；
+   - HTTPS 证书 12 月 3 日到期前续期；云服务器、数据库、对象存储、短信、大模型账户的续费和余额告警都已打开。证书同样**不等 Precheck 第二轮**，产品负责人在服务器上只读核对：
+     - `sudo certbot certificates` → 每张证书有一段 `Expiry Date: … (VALID: N days)`；核对主域名、www、admin、partner 都在同一张或各自的证书里、到期日与剩余天数；
+     - `systemctl list-timers | grep -i certbot` → 有一行 `certbot.timer`，`NEXT` 列是未来的时间，算有自动续期；没有输出就是没有定时器，在 11/20 冻结前手动续一次（会改生产证书，产品负责人本人做）；
+   - 密钥轮换与关闭口令登录，按产品负责人自己的清单做。
+3. **服务器 `.env` 第一批**（只影响服务端，随时可以配）：
+   - `RESUME_EXPORT_VISIBLE_LABEL` **不设（保持关）**：9/29 产品负责人拍板导出的简历不印可见 AI 字样，取代 9/28 的 D2；隐式标识照常保留。`RESUME_EXPORT_UNLABELED_OPTION` 也不设，等律师答复第 21 问；`AIGC_CONTENT_PRODUCER` 按 9/29 拍板写「职易达（统一社会信用代码）」；
+   - `AI_FORBIDDEN_WORDS_FILE` 指向禁词表文件（C10）；
+   - `ALERT_WEBHOOK_URL` 填企业微信群机器人地址（派生告警、每日备份失败都会推到群里）；
+   - **这一批不要开**：`AI_DECLARATION_ENFORCEMENT`、`AI_LOGIN_GATE`、`POLICY_SCOPE`，第二次发布再开。
+   - `ADMIN_LOGIN_SECOND_FACTOR=sms` **保持关**：要等管理员登录页的短信第二步（#1091）合入并发布，而且每个启用中的管理员都已绑定并验证手机号，才能打开；提前打开会把没绑手机的管理员挡在后台外。
+4. **改完 `.env` 立刻干跑生产闸门预检**：命令与发布流程第 3c 步相同，见 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 第 2 节；通过时打印 `PREFLIGHT OK`。同时确认 `redis-cli ping` 返回 PONG、备份分区剩余空间大于 3GB。不要把 `.env` 内容贴进聊天或日志。
+4c. **自我探索同意条款两端对齐（硬要求）**：生产后端必须已经带上 #1119（条款由服务端下发、同意版本升级、不再接受旧版本）；小程序**第一次正式发布（完整版和不含 AI 的提审版都算）必须已经包含 #1124**；一体机与后端同一批发布。缺一个就会出现「用户看到的是旧条款、落库的是新版本号」。（不含 AI 的提审版按 #1114 停放了自我探索页面：不注册、不打包、源码保留，用户看不到这份同意；对提审版的要求是打包用的是 #1124 之后的代码。完整版里自我探索照常可用。）同时，隐私政策发布版要带上「未满十四周岁未成年人个人信息处理规则」专章（法务私有页第 12 版），同意勾选里链接的就是这一章。
+4b. **大模型关闭思考与小青音色自查（#1099 合入并发布后；产品负责人在服务器上跑）**：`cd services/api && npx -y pnpm@11.2.2 run probe:llm-thinking-live -- --tts`。脚本只读，不打印密钥，不进 CI；它**不读 `.env`，也不读后台里配的密钥**，要在同一个终端里临时设好 DeepSeek 密钥（脚本头部列的变量名之一）和腾讯云密钥再跑，跑完关掉终端；输出里出现「跳过 DeepSeek」说明密钥没设上，这次不算通过。三条同时满足才发布：
+   - 「关闭思考」那一行 reasoning_tokens 为 0 或「无」，耗时明显比「默认」那一行短；
+   - 音色那一行显示「可用」。不可用就先改 `TRTC_TTS_VOICE`（可同时改 `TENCENT_TTS_VOICE_TYPE`）再发布；候选 101001 智瑜（腾讯云官方示例用的），可以加 `--voice 101001` 先核对。音色选哪个在产品负责人待办页；
+   - 和小青真机对话一轮，回答正常，没有明显的额外等待。
+5. **运维底线（P0-2）**：装每日备份的定时任务，替换 nginx 日志轮转配置，执行 pm2 日志轮转脚本，用最近一份备份在临时库做一次恢复演练（临时库名必须含 `drill`）。步骤见 `docs/device/postgres-operations.md` 第 8 节。下面四项逐项写清在哪里做、怎么查、怎样算过。凡标「会改生产配置」的，都由产品负责人本人执行；其余是只读命令。服务器命令都用运行 API 的那个账号（9/07 取证 PM2 日志在 `/root/.pm2/logs`，即 root）。**时机**：这几个脚本随 #1050 进了候选，线上旧版本运行目录里还没有（`git cat-file -e 50483cd2:services/api/scripts/backup-postgres.sh` 不存在）。5a、5b、5c 与发布无关，发布前做；5d 的定时器与恢复演练指向运行目录里的脚本（`services/api/scripts/ai-job-print-backup.service` 的 `ExecStart`），**第一次发布成功后当天做**。这不削弱发布本身的安全：发布流程第 2 步自己先做全库备份并用 `pg_restore -l` 校验可读（`deploy-api-release.sh:225-228`），迁移只做新增。
+   - **5a 日志留存：PM2 与 nginx 都是 180 天**（仓库值：`services/api/scripts/pm2-logrotate-setup.sh:5` 的 `retain 180`，`services/api/scripts/logrotate/nginx:3-4` 的 `daily` + `rotate 180`）。部署清单 `:478` 记 9/07 线上 PM2 是 `retain 7`，同段 `:480` 又写保留份数未读出，以当天实测为准。
+     - 先只读看现状：`pm2 conf pm2-logrotate`，找 `retain`、`max_size`、`compress`、`rotateInterval` 四项；`cat /etc/logrotate.d/nginx`，找 `rotate` 那一行；`grep -rl '/var/log/nginx' /etc/logrotate.d/`，看有几份文件在管 nginx 日志。
+     - 不是 180 就改（**会改生产配置**）：PM2：照仓库 `services/api/scripts/pm2-logrotate-setup.sh` 里的 7 行 `pm2 install` / `pm2 set` 在服务器上逐行执行（旧版本运行目录里还没有这个文件；第一次发布后也可以直接 `bash /srv/ai-job-print/services/api/scripts/pm2-logrotate-setup.sh`）；nginx：把仓库 `services/api/scripts/logrotate/nginx`（14 行）的内容**整份替换** `/etc/logrotate.d/nginx`，不要两份并存（文件首行注释就是这句），替换前先 `sudo cp /etc/logrotate.d/nginx ~/nginx.logrotate.bak` 留一份原样。
+     - 改完预演（只读）：`sudo logrotate -d /etc/logrotate.d/nginx`，调试输出里没有 `error`，并能看到 `rotating pattern: /var/log/nginx/*.log` 一类的行。
+     - **通过标准**：`pm2 conf pm2-logrotate` 显示 `retain` 为 `180`、`max_size` 为 `50M`、`compress` 为 `true`、`rotateInterval` 为 `0 0 * * *`；`/etc/logrotate.d/nginx` 有 `daily` 与 `rotate 180`；`grep -rl '/var/log/nginx' /etc/logrotate.d/` 只列出这一个文件。
+   - **5b nginx 上传超时**（部署清单 `docs/device/production-deployment-and-windows-host-checklist.md:457-459`：9/07 三份站点配置都没配，走默认 60 秒，判不满足）。
+     - 只读看现状：`sudo nginx -T 2>/dev/null | grep -nE 'proxy_read_timeout|proxy_send_timeout|client_body_timeout'`。今天应是没有输出。
+     - 改（**会改生产配置**）：在三份站点配置里转发 `/api/v1/` 的 `location` 块加超时。仓库里只有一个参考值：`docs/device/production-deployment-runbook.md:472` 的样例 `proxy_read_timeout 120s;`（注释「大文件 / 弱网上传」）；`proxy_send_timeout`、`client_body_timeout` 仓库没有给定值，由产品负责人定，不要照抄别处。改完 `sudo nginx -t`，输出 `syntax is ok` 和 `test is successful` 才执行 `sudo systemctl reload nginx`；`nginx -t` 报错就不要 reload，改回原样。
+     - **通过标准**：再跑上面的只读 `grep`，三份站点配置里转发 API 的地方都能看到 `proxy_read_timeout`（以及产品负责人定下的另外两项）；公网 `https://zyidai.cn/api/v1/health` 仍返回 200。
+   - **5c 对象存储生命周期**（仓库里没有能查线上桶的命令：`verify:cos-lifecycle-policy` 只检查仓库文档，不是线上桶，部署清单 `:255-256`）。**控制台人工核对，只看不改**：腾讯云控制台 → 对象存储 COS → 存储桶列表 → 点生产桶（`.env` 里 `COS_BUCKET` 那个）→ 左侧「基础配置」下的「生命周期」。
+     - **通过标准**（规则来自 `docs/device/production-deployment-runbook.md:83-87`）：没有作用于整个存储桶的过期规则；如果有规则，作用前缀只能是 `tmp/`；列表里每条规则的规则名称、作用前缀、过期天数、启用状态截图存档（截图放产品负责人自己的资料里，不进公开仓库）。看到对整个桶生效的过期规则，就是不通过：它会把会员长期保存的文件也删掉，先停用再发布。
+   - **5d 每日备份与恢复演练**（第一次发布成功后当天做）。
+     - 装每日备份（**会改生产配置**）：二选一。systemd：`sudo cp /srv/ai-job-print/services/api/scripts/ai-job-print-backup.service /srv/ai-job-print/services/api/scripts/ai-job-print-backup.timer /etc/systemd/system/`（这两个文件里写死了运行目录 `/srv/ai-job-print`；仓库 Secrets 若另设了 `DEPLOY_API_DIR`，要先改 `.service` 里 `EnvironmentFile` 与 `ExecStart` 两行的路径），再 `sudo systemctl daemon-reload && sudo systemctl enable --now ai-job-print-backup.timer`；或 cron：照 `services/api/scripts/cron-backup.example` 那一行加进 crontab。两种都是每天 02:15，脚本自己读 `services/api/.env` 里的 `DATABASE_URL` 与 `ALERT_WEBHOOK_URL`。
+     - 装完立刻手动跑一次（只写备份目录，不动数据库）：`sudo systemctl start ai-job-print-backup.service`（或直接执行 `services/api/scripts/backup-postgres.sh`）。正常输出最后一行是 `BACKUP_OK: /var/backups/ai-job-print/postgres/postgres_<日期>.dump`；`cat /var/backups/ai-job-print/postgres/LAST_SUCCESS` 显示当天（UTC）日期和同一个文件名。出现 `BACKUP_ERROR:` 就是失败（配了 `ALERT_WEBHOOK_URL` 时群里同时收到「数据库每日备份失败」）。定时器是否在：`systemctl list-timers | grep ai-job-print-backup`，`NEXT` 列是下一个 02:15。
+     - 恢复演练（只写临时库，不碰生产库）：先用有建库权限的数据库账号建一个临时库，库名必须含 `drill`（`createdb <库名含 drill>`，`docs/device/postgres-operations.md` 第 4 节）；再在运行目录的 `services/api` 下执行 `POSTGRES_URL='<指向这个临时库的连接串>' scripts/restore-postgres-drill.sh /var/backups/ai-job-print/postgres/postgres_<日期>.dump`（同文件第 8 节）。连接串不要写进命令历史或聊天，照第 4b 条的做法在当前终端临时设好。库名不含 `drill`/`verify` 时脚本拒绝执行，退出码 2，这是保护，不是故障。
+     - **通过标准**：最后一行是 `RESTORE_OK: restored <备份文件> to <临时库名>; migration status checked`（`restore-postgres-drill.sh:10`），其上的 Prisma 迁移状态没有报错；任何一行 `RESTORE_ERROR:` 都不通过。演练完删掉这个临时库（`dropdb <同一个含 drill 的库名>`，只删它）。结果（日期、备份文件名、`RESTORE_OK` 一行）记进 `docs/progress/current-progress.md`。
+6. **空间硬门槛（根分区剩余 ≥ 10GB 才发布）**：低于 10GB 不发布。这是产品负责人发布前的人工门槛，标准与准备加进发布脚本的 `DEPLOY_MIN_FREE_FLOOR_MB=10240` 相同。脚本改动已开成 PR #1118（9/29 晚 `gh pr view 1118`：OPEN，与候选有冲突，head `d36681692`），合入后生效。该 head 里 `deploy-api-release.sh` 的空间门槛取原公式与 `DEPLOY_MIN_FREE_FLOOR_MB`（默认 10240MB）两者较大者，`deploy.yml` 在 full 发布 `pnpm install`、构建三端之前加了一道只读 `df` 检查，用的也是这个 10240MB 下限（不是 6GB；若以后改成别的值，以 #1118 合入时的内容为准）。当前候选的闸门在 `.github/scripts/deploy-api-release.sh:165-176`，按 API 目录大小加 1024MB，再加默认 1024MB 安全边界，大约是目录再加 2GB。#1118 合入前以本条 10GB 为准。**分工，不重复展开**：证书与 certbot、Node ≥ 22.13（含 PM2 实际用的 Node）本来由 Precheck 第二轮自动输出，第二轮已暂停、短期出不来，发布前按第 2 条里的手动只读命令核对；磁盘闸门「构建前就判」的时机问题由 #1118 的构建前检查补，#1118 没合入时，靠发布前人工看一次 `Deploy Precheck` 的 `BACKUP_DISK_AVAIL_GB`（见下）。第 4 条干跑预检要求备份分区剩余大于 3GB，那一条照做；本条是发布门槛，两道都要过。full 发布在进入上述闸门之前就会安装依赖并构建三端（`.github/workflows/deploy.yml:229-248`），构建本身也占根分区。
+
+   产品负责人本人在 GitHub Actions 按这个顺序点。工作流名字用文件里的 `name`：
+
+   - **`Deploy Precheck (read-only)`**（`.github/workflows/deploy-precheck.yml:17-19`），无参数。看 `BACKUP_DISK_AVAIL_GB`（备份父目录所在盘的剩余；和根分区同一块盘时，这就是根分区剩余）、`ROOT_TOTAL_GB`、`ROOT_USED_PCT`、`PNPM_STORE_MB`、`PM2_LOGS_MB`、`NGINX_LOGS_MB`、`JOURNAL_MB`（同文件 `:65-102`）。这个工作流不打印发布组数，也不打印 `ROOT_AVAIL_GB`。`BACKUP_FILE_COUNT` 和 `BACKUP_DIR_COUNT` 是文件数和目录数。它也不单独打印静态备份目录的大小。
+   - **`Server Cleanup (backups / pnpm store / journal)`**（`.github/workflows/server-cleanup.yml:21-39`），`dry_run=true`，`keep=3`。看 `RELEASE_GROUP_COUNT`、`PLAN_DELETE_GROUPS` 和这里才有的 `ROOT_AVAIL_GB`。`prune_pnpm` 与 `vacuum_journal` 默认都是 true；dry-run 不执行这两项，也不显示它们能释放多少（同文件 `:98-122`）。
+   - 剩余不足 10GB 时，同一工作流改 `dry_run=false`、`keep=3`，`prune_pnpm=true`，**`vacuum_journal=false`**。这样会删掉超出保留数的旧备份，并 prune pnpm store。真删只删 `.dump` 和 `.runtime`，不删 `.migrations.log`（同文件 `:105-109`）。`vacuum_journal` 的默认值是 true：`dry_run=false` 时若不改它，会执行 `journalctl --vacuum-size=200M`。系统日志含登录与安全日志，按法规留存不少于 6 个月，不建议在发布前清；清不清由产品负责人定，发布前的做法是显式填 false。
+   - **`Cleanup Stale Releases (guarded)`**（`.github/workflows/cleanup-stale-releases.yml:9-23`）：先 `execute=false`，`purge_trash_path` 留空，`confirm` 留空，只看清单。确认后 `execute=true` 且 `confirm` 填 `CLEANUP-CONFIRM`，只把白名单目录移到隔离区。同一分区内移动不释放空间（`.github/scripts/cleanup-stale-releases.sh:9-10`、`:40-42`；注释记 2026-08-17 实测移动后可用空间不变）。观察 24–72 小时，再把 `purge_trash_path` 填成那个隔离区路径、确认词照填，purge 才释放空间。
+
+   **推断**（本次没有登录服务器）：发布备份、运行目录、静态备份和每日数据库备份很可能在同一个 40GB 根分区上。依据是发布脚本注释里的历史读数（根分区 40GB，`.github/scripts/deploy-api-release.sh:151-159`），静态备份在成功重载 nginx 后只留 3 组（`.github/workflows/deploy.yml:286-364`），每日备份默认在 `services/api/scripts/backup-postgres.sh:3`、只有 `BACKUP_UPLOAD_ENABLED=1` 才上传（同文件 `:32-35`），仓库里没有独立数据盘挂载的记录。长期把这些备份放到独立数据盘或对象存储，列为产品负责人待定项，不在第一次发布前做。
+
+   **2026-09-29 只读体检结论**（产品负责人授权后由总指挥代为触发，main 上跑；Deploy Precheck、Server Cleanup dry-run、Cleanup Stale Releases dry-run 三次都成功，运行号见 current-progress）：
+   - 根分区 40GB，已用 46%，剩余 21GB，高于 10GB 门槛；API 本机健康、Redis 可达；线上运行版本仍是 9/17 发布的那一版。**第一次发布前不需要清理。**
+   - 占用：发布备份 2301MB（两组完整备份，各约 1.15GB，是 9/17、9/09 两个版本的回退锚点，要留）；pnpm store 2709MB；journal 约 415MB；PM2 日志 1MB；nginx 日志 12MB；数据库 7MB。/root 下源码检出约 1.6GB。
+   - Server Cleanup 按 keep=3 只会删 4 个各约 1MB 的「组」，几乎腾不出空间；这印证了清理工作流只按 `.dump` / `.runtime` 分组、零碎文件单独占分组名额的缺陷（修复在空间改进分支里，修好后拿这份清单做阳性对照）。
+   - Stale Releases 的白名单目录在服务器上都已不存在，可回收 0MB。服务器上实际残留的是 `/srv` 根目录下早期手动部署留下的几个目录（合计约 0.9GB），**要先查清有没有被 pm2 或 nginx 引用**再考虑处理，Precheck 第二轮会加只读输出。
+   - 以后可用降到 10GB 以下时：先跑 Server Cleanup `dry_run=false`、`keep=3`、`prune_pnpm=true`、`vacuum_journal=false`，只清 pnpm store；备份组和 journal 不动。
+   - Precheck 第二轮要补的只读项（9/29 晚已暂停，短期出不来；其中 Node 与证书两项先按第 2 条手动核对）：`node -v` 与 `pnpm -v`（发布前要确认 Node ≥ 22.13，见 4b 之前那条）、certbot 定时器与证书到期日、`/srv` 根目录残留目录被谁引用与最后修改时间、明文 80 端口上的终端 API 次数（带 443 心跳阳性对照）、各类缓存与日志大小。
+7. **线上问题清单（第一次发布前逐条对上负责方）**：下表覆盖 2026-09-29 只读盘点里的线上问题，加上磁盘清理没有盖住的留存与上传缺口。负责方只写一个：已有修复 PR 写 PR 号；还没有 PR、要改代码的写窗口；要登服务器、改生产配置、改 nginx、在对象存储控制台操作、到真机现场，或在后台点激活的，写产品负责人本人做。已经写在本清单里的，只写「见第 N 条」。核对基准原是 `a76817cf5`；9/29 晚按候选 `44cee4176` 复核，PR 状态逐个用 `gh pr view <号> --json state,mergedAt` 查过，合并提交逐个用 `git merge-base --is-ancestor <提交> 44cee4176` 查过。表里「本文件第 N 行」是按 `a76817cf5` 时的行号写的，此后本文件增删过，行号只作线索，以同名段落为准。
+
+| 问题 | 现象（一句话） | 负责方 | 第一次发布前要不要解决 |
+|---|---|---|---|
+| 会员打印取件审计丢失 | 取件链接和重试把会员 ID 写进 `AuditLog.actorId`（外键指向运营账号，`schema.prisma:2214`），失败被 `audit.service.ts:53-77` 吞掉；候选 `44cee4176` 的 `print-jobs.service.ts:664`、`:806` 仍如此（本文件「2026-09-28 深夜」一节「新发现的原有问题」记为未改） | #1110 | 要。#1110 仍是 OPEN，未进候选 |
+| 简历导出 draft 可伪造 | **已修（#1105，合并提交 `9538d062e`，已在候选）。** `draft` 仍由客户端声明，但正文不再信客户端：带生成任务号时一律按生成时留存的本人原始填写渲染，客户端正文一个字不用，取不到回 404 `RESUME_DRAFT_SOURCE_NOT_FOUND`；不带任务号时把客户端正文和可比对范围内的 AI 结果逐段比对，有 AI 段落就回 409 `RESUME_DRAFT_CONTAINS_AI_OUTPUT`（`ai.controller.ts:552` → `resume/resume-draft-source.service.ts:129-148`；一体机身份只认已验签的终端票，同文件 `:71-81`）。门禁 `verify:resume-export-draft-source` 30 条进 CI（`ci.yml:689`、`:1024`）。残余边界（设计如此，记在 `current-progress.md`「简历按原样导出」条目）：比对是规范化后逐段相同，改写过的 AI 段落认不出；排版调整的 AI 输出没落库，比对不到 | #1105 | 不用另做，随第一次发布带上。两项残余是否另开，由总指挥定 |
+| 模拟面试 / 合同审查被内容检查卡死 | 最后一题先落库再出报告，禁词拦下后报告拿不到、回答仍在（候选 `44cee4176` 上：最后一题落库在 `mock-interview.service.ts:242-262`，报告失败把会话退回进行中在 `:378-385`，内容拦截在 `mock-interview-llm.service.ts:359-362`）；合同检查把原文摘录和说明一起扫禁词（`contract-review-safety-gate.service.ts:226-230`） | 后端排雷窗口 | 要，排在本清单第 3 条配上禁词表之前。截至 `44cee4176` 的合并记录里仍没有对症 PR。#1049 是加上这道检查，#1109（已合入）只改面试口径，不涉及这里 |
+| 自我探索维度打分被 AI 闸门拦住 | **已修（#1112，合并提交 `8c006f1a5`，已在候选）。** 提交、打印、附加到简历三个接口改挂 `@AiUseExempt` + `@MaintenanceBlocked`，不再挂 `@AiUse`（`services/api/src/ai/self-assessment.controller.ts:48-52`、`:101-102`、`:144-145`、`:156-157`）：AI 暂停或未开通时打分照常出，只有全机维护会拦；AI 解读拆到 `resume/self-assessment-interpretation.ts`。门禁 `verify:self-assessment-ai-gate` 进 CI（`ci.yml:735`）。后台维护面板同步列上这三个接口（`52fed80f7`） | #1112 | 不用另做，随第一次发布带上 |
+| 每日备份、异地副本、恢复演练、日志 180 天，以及发布备份只有可读校验 | 见第 5 条（5a、5d）。安装脚本已随 #1050（已合入）进候选；「仓库里没有每日备份与日志轮转」的旧说法已过时。发布日志里的 `pg_restore -l` 只证明备份可读（部署清单 `:355-358`） | 产品负责人本人做 | 要 |
+| PostgreSQL WAL / archive | 仓库的脚本、工作流和文档里没有 `archive_mode`、`wal_keep_size` 或 WAL 归档目录 | 产品负责人本人做 | 不要改配置。发布前只读看数据库目录是否异常大 |
+| AuditLog 没有清理任务 | `services/api/src` 里没有审计表清理任务；`deleteMany` 只出现在 verify 脚本的测试收尾。本文件第 313、446 行要求的是日志保留不少于 180 天 | 后端排雷窗口 | 不要。发布前不要清审计表；试点前再定留存或归档 |
+| fail2ban / 主机安全基线 | 仓库没有安装脚本或 Actions；`current-progress.md:4662` 记 2026-08-05 只读确认过在线。部署清单第 155–167 行是 A/B/C 取证堆小结 | 产品负责人本人做 | 不要重装，也不挡发布。发布前只读核对是否仍在。口令登录见第 2 条 |
+| 会员上传确认、取消、过期清扫 | 盘点点名的隔离提交不在当前候选；后续的确认、取消、过期和墓碑清扫已在（`upload-session-member-bind.ts:642-689`），本文件第 308 行记为代码已解决、未上生产。未找到单独 PR | 产品负责人本人做 | 不要另开。随第一次发布带上；生产现在还没有 |
+| 反馈通知门禁自建库缺列 | 未设 `DATABASE_URL` 时手抄的 `User` 建表没有 `passwordProofState`（`verify-feedback-notifications.ts:288`；列在 `schema.prisma:821`）。CI 总是设置了 `DATABASE_URL` | #1110 | 不要卡发布。修复在同一个 PR 里，#1110 仍是 OPEN |
+| 网页 / API / Agent 版本不一致 | 本文件第 262 行记录生产网页与 API、Agent 不是同一次发布；部署清单第 319–322 行最近一次有记录的发布目标早于当前候选 | 产品负责人本人做 | 要。第一次发布就是把当前候选发上去 |
+| 自动发布被跳过 | 见下方「发布当天」第 4、5 步。现行跳过条件是仓库变量 `DEPLOY_API_ENABLED` 不为 `true`（`deploy.yml:42`）；9/29 那次 main CI 触发的发布就是这样跳过的（Deploy run 36526245784，skipped）。同文件第 9–12 行关于 CI 取消进行中运行的注释已过时；现行 `ci.yml:23-40` 对 main 按提交分组，且不取消进行中的运行 | 产品负责人本人做 | 要。发布当天打开；等 Deploy 的「Deploy via SSH」步骤进入进行中之后再关回，不要一触发就关（依据见「发布当天」第 5 步）（P1：手动发布路径可用）|
+| main 的 CI 曾被后续提交取消 | 候选已含按提交分组的修复（#1006，该合并在当前历史上） | #1006 | 不要再改。发布当天要有一次成功的 main CI 运行号 （P1：手动发布路径可用）|
+| 发布失败回退运行目录和静态目录 | 候选已在失败时回退运行目录，并先备份再切换静态目录（#1047，`deploy.yml:286-364`）。有记录的生产版本早于这次修复 | #1047 | 不要另做。随第一次发布。生产上的恢复演练见第 5 条 |
+| 法务三份文档未激活 | 见第 1 条。发布前逐份核对的预检已随 #1059（已合入）进候选。第四份「经营者信息」发布后激活，见第 1 条的统一口径 | 产品负责人本人做 | 要 |
+| 演示企业仍对公众可见 | 见上方 P0-1。一次性下架命令已随 #1115（合并提交 `ec74ba4f3`，已在候选）交付：只下架不删、默认 dry-run、带确认词和事由、每行一条审计（`services/api/scripts/unpublish-demo-companies.ts`，`services/api/package.json:227`）；只读探针的演示标记检查已随 #1116（`8e5738715`，已在候选）扩到所有公开列表。线上旧版本没有这个命令 | 产品负责人本人做 | 不用提前做。**发布后按「发布后核对」那几步执行**。它和「关闭招聘内容托管」分开验收：托管关闭后公开接口本来就返回 0 条，探针看不出库里那 3 行下没下架，要以维护命令的输出为准。不要为了填内容去导入 |
+| 价目描述与单价 | 见第 2 条 | 产品负责人本人做 | 要 |
+| 生产 AI 配置与小青音色 | 见第 4b 条。第 3 条那三个开关第一次发布不要开 | 产品负责人本人做 | 启用大模型或语音才要 |
+| 证书与续费告警 | 主域名、www、admin、partner 共用一张 Let's Encrypt 证书，**到期日 12/03**，落在试点期（12/1–12/14）中间（9/29 只读巡检）；是否有自动续期未知 | 产品负责人本人做 | 要。先核对 certbot 定时器在不在、下次续期时间：Deploy Precheck 第二轮本来会加只读输出，但已暂停，发布前按第 2 条的 `sudo certbot certificates`、`systemctl list-timers | grep -i certbot` 手动看；没有自动续期就在 11/20 冻结前手动续一次；续费与余额告警见第 2 条 |
+| 用服务器 IP 直接访问 | 用 `<生产服务器 IP>` 访问时，https 出示已过期的自签证书且证书名泄露内部主机名；http 明文可访问三端网页和 API（9/29 只读巡检）。KSK-001 的终端程序已核实走 https 域名 | 产品负责人本人做（改 nginx） | 不卡第一次发布，试点前做。**顺序**：先看 Deploy Precheck 第二轮的「近 7 天从 80 端口进来的终端 API 次数」（按终端编号汇总，同时统计 443 上的心跳作阳性对照，日志格式分不出端口时如实写「无法区分」）；读数为 0、对照大于 0、后台没有别的在线终端，才把 IP 的 80 改成 301 跳域名或 444，443 默认站点换正式证书或 444。顺序反了会断终端 |
+| 对象存储生命周期未验收 | 部署清单第 240–244 行有驱动为对象存储的预检记录；第 255–256 行生命周期截图仍未完成。禁止桶上全局过期，只有 `tmp/` 前缀可做兜底 | 产品负责人本人做 | 要。在控制台核对并留证，不改代码。在哪看、怎样算过见第 5 条 5c |
+| nginx 上传上限与应用不一致 | 清单第 447–454 行记录 nginx 为 100MB，应用代理上限 200MB（`file-validation.ts:134`）；超过 100MB 的只有宣传视频、待机素材、管理员上传（同文件 `:104-106`） | 产品负责人本人做 | 不要卡第一次发布当天。开通这三类之前三选一：提高 nginx、把这三类上限降到 nginx 以下、改走对象存储直传 |
+| nginx 上传超时未配置 | 清单第 457–459 行记录线上未配置 `proxy_read_timeout`、`proxy_send_timeout`、`client_body_timeout`，按默认 60 秒，并标为上线前要做。`production-deployment-runbook.md:472` 是样例，其中的 120 秒不能当成线上已经配置 | 产品负责人本人做 | 要。只读查法、修改命令与通过标准见第 5 条 5b |
+| PM2 与 nginx 日志留存期不一致 | 见第 5 条。仓库脚本是 PM2 `retain 180`（`pm2-logrotate-setup.sh:5`）和 nginx `rotate 180`（`logrotate/nginx:4`）。清单第 478 行写 2026-09-07 线上 `retain 7`，同段第 480 行又写保留份数未读出 | 产品负责人本人做 | 要。装完核对线上实际值，命令与通过标准见第 5 条 5a |
+| 服务端 PDF.js 高危版本 | **已修（#1075，合并提交 `96aed81e3`，已在候选）。** 服务端改用 `pdfjs-dist` 6.3.289 legacy 单一引擎，通过 unpdf 的 `definePDFJSModule` 替换它自带的 5.6.205（`services/api/src/common/pdf/pdfjs-document.ts:1-12`，`services/api/package.json:384`）。它要求服务器 Node ≥ 22.13，见第 2 条 | #1075 | 不用另做，随第一次发布带上。发布前按第 2 条核对 Node 版本 |
+| AI 生成的 PDF 被隐私检查拒单 | 第一批 `be02026d9` 与第二、三批合并 `247abd542` 已在候选 `44cee4176`（9/29 晚复核）。未找到第二、三批的独立 PR 号。本文件开头「候选写入方」第 2 条和「2026-09-28：全面商用收口评审」一节仍写进行中，以及报价页三项待定；本次未打开该合并的差异核对这三项是否已经落地 | 主执行窗口（P0-5） | 不要另开修复，随第一次发布带上。生产旧版没有。报价页那三项取舍仍以第 316 行的待定为准 |
+| KSK-001 现场锁定与最终硬件 | 真机-3 系统锁定和真机-12 最终竖屏仍未修（本文件第 270、296 行）。测试机保持 Windows 11 22H2 是 9/29 已拍板（第 291 行）。Agent 与策略修复已在候选（#1046、#1053、#1054、#1060） | 产品负责人本人做 | 不卡第一次发布。公众试点前到现场做锁定，并在最终竖屏硬件上复验 |
+
+**发布当天（定稿，9/29 按 `.github/workflows/deploy.yml`、`.github/workflows/ci.yml`、`.github/scripts/deploy-api-release.sh` 逐步核过；每一步都由产品负责人本人操作）**
+
+前提：上面「发布前」第 1–6 条都已完成，#1074 的三条必需检查是绿的、页面显示可以合并。本定稿走「合并后手动触发发布」这条路：开关在 main CI 跑完之后才打开，所以合并时自动触发的那次发布一定是 skipped，发布目标就是你手填的那个 CI 运行号对应的提交，不会被别的提交抢先。
+
+1. **冻结 main**
+   - 做什么：经总指挥通知所有窗口，从现在到第 8 步结束，不往 main 合并任何 PR；装了「CI 绿即自动合并」看门狗的窗口先停掉看门狗。
+   - 在哪：聊天；GitHub → Actions，左侧选「CI」，分支筛 main。
+   - 约多久：5 分钟。
+   - 怎么判断成了：main 上没有进行中（黄色）的 CI 运行；各窗口回复已停。
+   - 失败了怎么办：main 上还有 CI 在跑，就等它结束再往下。为什么要冻结：`DEPLOY_API_ENABLED=true` 期间，main 上每一次成功的 CI 都会自动触发一次 full 发布（`deploy.yml:4-7`、`:42`）；生产发布同一时间只跑一个，排队的只留最新一次（`deploy.yml:30-34`），中途进来的合并会被接着发上去。
+
+2. **看线上状态，给现在的生产版本打回退标签**
+   - 做什么：① 本机仓库根目录跑只读巡检 `node scripts/prod-readonly-probe.mjs`；② 服务器上读现在的生产提交：`sed -n 1,3p /srv/ai-job-print/DEPLOY_SOURCE.txt`（运行目录默认 `/srv/ai-job-print`，仓库 Secrets 若另设 `DEPLOY_API_DIR` 以它为准），第一行形如 `source=origin/main@<40 位提交号>`；③ 本机仓库打标签并推送：`git tag prod-before-release1 <上面那个 40 位提交号>`，`git push origin prod-before-release1`（会写仓库，只加一个标签；仓库没有按标签触发的工作流）。
+   - 约多久：10 分钟。
+   - 怎么判断成了：巡检里 `GET /api/v1/health` 一行是 `PASS status=ok db=postgres degraded=[]`，`GET /api/v1/health/ready` 一行是 `PASS 200`；`git ls-remote --tags origin prod-before-release1` 能看到标签，指向的提交与 `DEPLOY_SOURCE.txt` 一致（9/29 已知线上是 `50483cd2…`）。
+   - 失败了怎么办：health 不是 PASS（有 `degraded`、数据库不是 postgres、ready 不是 200），今天不发布，把巡检输出交总指挥；`DEPLOY_SOURCE.txt` 读不到，也先停下，不要猜提交号。
+
+3. **把候选合进 main（P0-4：普通合并，不 squash），等 main CI 跑完**
+   - 做什么：打开 PR #1074，合并按钮右侧下拉选「Create a merge commit」，再点确认（命令行等价：`gh pr merge 1074 --merge`）。不要选 Squash 或 Rebase。
+   - 在哪：GitHub PR #1074 页面；之后看 Actions → CI → main。
+   - 约多久：合并 2 分钟；main CI 9/08 那次成功运行约 37 分钟，最长受作业超时限制（浏览器冒烟作业 70 分钟，`ci.yml:1199`）。
+   - 怎么判断成了：PR 显示 Merged；Actions → CI 里出现这个合并提交的 main 运行并以绿色 success 结束。**记下两样**：合并提交号，和这次 CI 的运行号（运行页地址 `/actions/runs/` 后面那串数字）。同时 Actions → 「Deploy to zyidai.cn」会多一条事件为 workflow_run、结论 skipped 的运行——这是开关还关着的正常表现（9/29 的 36526245784 就是这样）。
+   - 失败了怎么办：CI 红了就不发布，把运行号交总指挥；修复合进 main 以后，用那次新的、绿色的 main CI 运行号继续第 4 步。不要拿 #1074 自己的 PR 检查运行号代替：发布只认 main 上 `name=CI`、`conclusion=success` 的运行（`deploy.yml:58-66`）。
+
+4. **打开发布开关，手动触发 full 发布**
+   - 做什么：① Settings → Secrets and variables → Actions → Variables，把 `DEPLOY_API_ENABLED` 改成 `true`；② Actions → 左侧「Deploy to zyidai.cn」→ 右上「Run workflow」，Branch 选 main，`ci_run_id` 填第 3 步记下的 CI 运行号，`deploy_scope` 选 **full**（默认值是 api-only，一定要改），点 Run workflow。
+   - 约多久：3 分钟。
+   - 怎么判断成了：出现一条事件为 workflow_dispatch 的新运行，**记下这个 Deploy 运行号**；点进去，job「Deploy to server」在执行（不是 skipped）；第一步「Resolve CI-verified target SHA」的日志里有 `手动补发：CI run <运行号>（main，success）→ <提交号>`，提交号等于第 3 步的合并提交。
+   - 失败了怎么办：job 是 skipped，说明变量不是 `true`（拼写、大小写），改好重新 Run workflow；第一步报「运行号 … 不满足发布前提」，说明运行号填错了或那次 CI 不是 main 上成功的，改对再 Run。这两种情况线上都没动过。
+
+5. **SSH 步骤进入进行中之后，把开关改回 false**
+   - 做什么：在这次 Deploy 运行页的步骤列表里，等「Deploy via SSH」变成进行中（黄色转圈，展开能看到 `DEPLOY_SCOPE=full` 和 `=== 拉取并检出 CI 已验证提交 ===`），然后回到 Variables 把 `DEPLOY_API_ENABLED` 改成 `false`。**不要一触发就关，也不用等整个发布结束。**
+   - 约多久：触发后通常一两分钟内进入 SSH 步骤；改变量 1 分钟。
+   - 依据：这个变量在工作流里只读两次，都发生在 SSH 步骤开始时或更早：① job 级条件 `vars.DEPLOY_API_ENABLED == 'true'`（`deploy.yml:42`），job 开始时判；② SSH 步骤的环境变量 `API_RELEASE_ENABLED: ${{ vars.DEPLOY_API_ENABLED }}`（`deploy.yml:381`），步骤开始时取值，随 `envs` 传到服务器（`deploy.yml:118`），服务器上的判断用的都是这份副本（`deploy.yml:127-131`、`:253-273`，`deploy-api-release.sh:11-14`）。所以在 SSH 步骤开始前就关，要么整个 job 被跳过，要么 SSH 步骤一开头就报 `API 发布授权闸门未开启` 退出——这次发布就没发出去；SSH 步骤已经开始后再关，不影响这次发布，还能挡住之后 main 上任何 CI 自动触发的发布。GitHub 文档没写明变量在哪一刻取值，所以以「SSH 步骤已在进行中」为准，不按秒数估。
+   - 怎么判断成了：Variables 页显示 `DEPLOY_API_ENABLED` 为 `false`，这次 Deploy 运行仍在进行。
+   - 失败了怎么办：关早了（job 被跳过，或 SSH 步骤报授权闸门未开启），线上没动；把变量改回 `true`，用同一个 CI 运行号从第 4 步重来。
+
+6. **等发布跑完，看结果**
+   - 做什么：看「Deploy via SSH」的日志，依次应出现：`磁盘空间充足，继续。` → `PREFLIGHT OK` → `LEGAL DOCS PREFLIGHT OK: 3 docs` → `=== 2. PostgreSQL 全库备份 + 可读校验 ===` → 迁移输出 → `API readiness OK:` → `=== 重载 nginx ===` → `✅ 部署完成`。#1118 合入后，安装依赖之前还会多一段 `=== full 发布构建前磁盘检查（只读，不清理）===`。
+   - 约多久：15–30 分钟（估计；SSH 步骤上限 45 分钟，`deploy.yml:117`）。
+   - 怎么判断成了：运行整体绿色，最后一行是 `✅ 部署完成`。
+   - 失败了怎么办：先记下 Deploy 运行号，main 继续冻结，然后看失败发生在哪一段——
+     - **备份之前**（磁盘不足、`生产闸门预检失败`、`法务文档预检失败`，日志都写「线上未动」）：按提示处理（磁盘见第 6 条的清理顺序；闸门预检补 `.env`；法务预检去后台激活缺的那份），再用同一个 CI 运行号从第 4 步重来，记得重新打开开关。
+     - **备份之后**（迁移或就绪检查失败）：脚本会自动把运行目录恢复到发布前备份、重启回旧版本（`deploy-api-release.sh:245-284`），日志写「已回退到 <旧提交>，回退后的就绪检查通过；本次发布仍记为失败」；数据库迁移不回退（都是新增，旧代码照常能跑）。如果日志写「回退后的就绪检查仍失败」或「运行目录恢复失败」，立刻找总指挥，备份路径在日志里。
+     - **静态目录切换或 nginx 重载失败**：三端静态目录自动恢复成旧版本（日志 `已恢复 kiosk 静态目录` 等），这时 API 已是新版本、前端还是旧版本，找总指挥决定是重发还是回退。
+
+7. **发布后核对**：按下面「发布后核对」逐项做，演示企业下架和真机过渡检查（现场验收单 R.1）都在其中。约 40 分钟（不含第二天的备份检查）。任何一项不通过，先停在这里找总指挥，不要解除冻结。
+
+8. **解除冻结，交记录**
+   - 做什么：再看一眼 Variables 里 `DEPLOY_API_ENABLED` 是 `false`；把合并提交号、CI 运行号、Deploy 运行号、回退标签名 `prod-before-release1`、发布后核对结果交总指挥，写进 `docs/progress/current-progress.md`；然后通知各窗口可以恢复往 main 合并。
+   - 约多久：10 分钟。
+   - 怎么判断成了：总指挥回执已记录；各窗口知道冻结已解除。
+
+   解除冻结之后（同日或次日，不挡解除冻结）：真机现场按现场验收单 **R.2–R.5** 做——产品负责人本人升级 Agent 到 0.4.13 或更高（含假脱机残留修复与旧遗留开机清理；装 0.4.12 不算过）并重跑生产安装脚本，再按其中的打印、扫描、到机码、缺纸与卡纸、到场一页纸，以及用户走后本机残留、打印中强杀与拔电、重新提交能否出纸逐项验收。
+
+**发布后核对**（按顺序做；只读探针可以由我们按域名代跑，服务器上的命令由产品负责人执行）
+1. **服务器上的版本**：`sed -n 1,3p /srv/ai-job-print/DEPLOY_SOURCE.txt`，第一行是 `source=origin/main@<合并提交>`，第三行 `ci_run=<第 3 步的 CI 运行号>`。
+2. **验收二：演示企业在库里下架**（#1115 随本次发布上线后，产品负责人授权执行；只下架、不删行；步骤见 `docs/device/production-deployment-runbook.md` §4.1）。在服务器运行目录（默认 `/srv/ai-job-print`）执行，命令自己读 `services/api/.env` 里的数据库连接：
+   1. 先 dry-run（默认，不改库）：`pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies`。核对「目标数据库」一行是生产 PostgreSQL；「将下架」清单里只有那 3 家带「（演示）」的企业；末行形如 `结果：将改 3 行 / 已下架 0 行。本次未改动任何数据。`（数字以当天为准；清单里多出别的企业就停下）。
+   2. 产品负责人授权后带确认词和事由执行：`UNPUBLISH_DEMO_COMPANIES_CONFIRM=UNPUBLISH_DEMO_COMPANIES UNPUBLISH_DEMO_COMPANIES_REASON='首次发布清理开发期演示企业（产品负责人授权）' pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies`（事由 2–200 字；确认词或事由不对时命令不连库、退出码 2）。「已下架」的 id 要和第 1 步清单逐一对上，对不上就停下人工核对，不要重复执行。
+   3. 再跑一次第 1 步的 dry-run 作验收：末行应是 `结果：将改 0 行 / 已下架 3 行。本次未改动任何数据。`，最后一行 JSON 是 `{"ok":true,"mode":"dry-run","toUnpublish":0,"alreadyUnpublished":3}`，这才算这一条通过。9/29 只读核过：生产岗位、招聘会都是 0 条，线下机构列表为空，都没有演示标记，所以只处理企业。
+3. **只读探针（严格模式，放在第 2 条之后）**：本机仓库根目录 `node scripts/prod-readonly-probe.mjs --strict --expect-sha <合并提交前 8 位>`。**通过标准**：退出码 0（`echo $?` 为 0）；`GET /api/v1/health`、`/health/ready` 与一体机、两个后台首页都是 PASS；法务三份（隐私政策、用户服务协议、AI 服务免责声明）都是 PASS；岗位、招聘会、企业三个公开列表都是 `PASS total=0，无演示标记`，任何列表都没有演示标记。这一条同时就是**验收一：招聘内容托管已关闭**——托管关着，公开列表才会是 0。**注意两点**：① `--strict` 与 AI 服务免责声明检查来自 #1129（9/29 晚未合入候选）；#1129 没进这次发布时，这个参数不存在，改跑不带 `--strict` 的 `node scripts/prod-readonly-probe.mjs`，逐行看岗位、招聘会、企业、线下机构四行都是 `INFO total=0`（不带 strict 时非零不报 FAIL，只能逐行看），AI 服务免责声明用 `node services/api/scripts/preflight-legal-docs.mjs --base-url https://zyidai.cn/api/v1` 补查（末行 `LEGAL DOCS PREFLIGHT OK: 3 docs`）。② 托管关闭后企业公开列表本来就是 0（`services/api/src/companies/companies.service.ts:134`），所以这一条通过不能证明第 2 条的库内下架，第 2 条以维护命令自己的输出为准。企业或岗位、招聘会出现非 0，就是托管没关，回到发布前第 2 条查 `.env`。
+4. **经营者信息（第四份，统一口径见发布前第 1 条）**：在新后台「法务文档版本」新增并激活「经营者信息」；页面顶部「上线就绪」卡四项都显示「已发布」。
+5. 会员能登录，协议显示的是新版本号。
+6. 一体机打印首页的签名盖章卡显示「本机暂未开通」。
+7. 告警推送通了：比如让测试终端离线几分钟，看群里是否收到。
+8. 当天装每日备份定时器并做恢复演练（第 5 条 5d）；第二天确认第一份自动备份成功：`cat /var/backups/ai-job-print/postgres/LAST_SUCCESS` 的日期更新了（脚本按 UTC 日期记），它写的那个 `postgres_<日期>.dump` 文件在同一目录里。
+9. #1099 已随本次发布上线，按第 4b 条在服务器上跑一次大模型关闭思考与小青音色自查。
+10. **真机过渡检查（新后端 + 旧 Agent）**：按 `docs/device/onsite-acceptance-runsheet-2026-09.md` 的 **R.1** 做——后台看终端心跳正常，打一张零元单能出纸。前置是本清单第 6 步已看到 `✅ 部署完成`。R.1 不通过就停在这里找总指挥，不解除冻结。
+
+#### 第二次发布（10 月底）：一体机最终版页面 + 三个开关同批打开
+
+**前提**：一体机最终版已经包含以下内容，并在候选上用三个开关都打开的状态测过——
+- AI 与语音按钮下的声明行，并带上声明请求头（AI 请求分散在约 10 个请求封装里，要逐个接上）；
+- `AI_LOGIN_REQUIRED` 时引导用户去登录；
+- 政策请求带上终端会话，终端没绑机构时显示「本终端未绑定机构」空态；
+- 暂停、维护、需要登录、需要声明、内容被拦这 5 种情况有准确提示；
+- 暂停与维护状态的页面显示。
+
+**发布前（产品负责人）**
+1. 服务器 `.env` 第二批：`AI_DECLARATION_ENFORCEMENT=on`、`AI_LOGIN_GATE=before_generate`、`POLICY_SCOPE=org`，和一体机新页面在同一次发布里生效。改完同样干跑预检。前两项也能在后台「AI 服务管理」页的开关面板即时切换（#1055）；`POLICY_SCOPE` 只能改 `.env`。
+2. 用户服务协议第四条写的是「用 AI 前要先登录」，和开关一致；如果登录开关推迟打开，先把协议这一句改回「以页面提示为准」再发布新版本。
+3. P0-13 再核一遍：证书、余额、价目。
+
+**发布当天**：同第一次。
+
+**发布后核对**
+- 未登录时点 AI 功能，提示先登录，并能从提示去登录；
+- 登录后 AI 按钮下有声明行，能正常生成；
+- 能看到本机构的政策，看不到别的机构的；没绑机构的终端显示空态；
+- 小青不提岗位；签名盖章仍显示「暂未开通」。
+
+#### P0-1 演示企业提前下架（产品负责人可选，第一次发布前）
+
+线上 `/api/v1/companies` 9/29 仍公开 3 家标「（演示）」的企业资料（岗位、招聘会已是 0 条）。第一次发布后招聘内容托管默认关闭，这 3 家会一起不再对外提供；发布时再用 #1115 的维护命令正式下架一次（见第一次发布「发布后核对」）。想在发布前提前下架，可以照下面做：
+
+后台左侧「企业展示管理」→ 逐个点开这 3 家 → 详情里「审核与发布」一栏点「下架」→ 在确认框（「下架后一体机不再展示该企业」）里确认。3 家都下架后，这个接口应返回 0 条：它只返回已审核且已发布的企业。
+
+下架前，另做两份只读清单（只看、只记，不在这一步处理）：
+1. 后台「合作机构管理」→ 筛选行的「机构类型」依次选「企业数据来源」「招聘会主办方」→ 记下列出的机构名称。
+2. 后台「终端管理」→ 看每台终端的「所属机构」一栏 → 记下属于上面这些机构的终端编号。按设计这两类是纯内容供给方、不拥有终端，这份清单用来确认有没有历史遗留的绑定。
+
+两个后台窗口这一批只禁止新建、改成和新绑这两类机构；存量机构和终端怎么处理，由产品负责人看完这两份清单再定。
+
+### 1.6 发布回退演练（已做）
+2026-09-29 在本机临时库上用真实脚本做完：备份、恢复、9 个新迁移、缺法务文档时中止、就绪失败自动回退运行目录、三端静态目录回退，全部符合预期；记录与本机踩到的问题见 `docs/device/postgres-operations.md` 第 9 节。生产上的恢复演练仍按第一次发布清单第 5 条由产品负责人做。
+
+### 9/29 收费与补缺方案：可以写进仓库的拍板
+产品负责人 2026-09-29 14:30 回复「20 件全部按推荐」。方案原文在私有页；价格、档位、客户与竞争判断只放私有页，不写进仓库。收费那几件（第 1、2、3、7 件）经总指挥联网复审后提出 R1–R4 四处改动，产品负责人 17:11 回复「按推荐来」，已定（下面的 R 条目）；价格与配额页数只在私有页。已写进正式文档的：
+- **对外叫法（第 14 件）**：投标、合同、机身铭牌用「AI 求职准备与打印终端」；「职易达」是品牌名；「AI 求职操作系统」只在产品内部和首页用（feature-scope §0.1）。
+- **招聘聚合、抓取、自营招聘闭环（第 15、16 件）**：长期口径「不做」；要做先拿人力资源服务许可证再单独立项，许可证 2027 年下半年再评估（compliance-boundary §二）。`recruitment-closure-license-gated-plan-2026-09.md` §7 的分类方案仍待签字。
+- **小程序首版不卖 AI（第 4 件）**、**客户机器打印按终端免费、按年收技术服务费、不按印张结算（第 20 件）**：feature-scope §0.2、compliance-boundary §1.2 F。
+- **一体机语音与数字人保留但可选、限时，完整语音面试主推小程序（第 5 件）；实时语音通话试点后再定（第 18 件）**：feature-scope §2.2A。
+- **新功能排期（第 8、10–13 件）**：
+  - A1 出纸完成与取件码快过期的订阅提醒、A2 一页「技能名片」、A3「发给微信好友」直接发 PDF：**第一次发布后开工**，约 5–7 个工作日；A1 开工前先在微信公众平台确认有合适的订阅消息模板，没有就只做一种提醒。
+  - B 档（求职材料夹、面试复盘对比、简历照片裁剪、英文简历、按职位要求另存一版、经历转换等）与 C 档（小程序次数包、政策补贴自查、练习提醒、自助退款与电子发票）：**试点之后再定**。其中经历转换（B7）先定提示语和拦截词再动工。
+  - 纸质证件照不做，只做简历照片裁剪（第 10 件，激光机不能进相纸）；小程序空态与错误样式暂不统一，只修「我的」计数加载失败显示「—」这一处的文字与重试（第 12 件）；简历分享链接、二维码先不做，用 A3 发 PDF 代替（第 13 件）。
+- **R1 耗材**：机构年费含基础耗材配额，配额**按打印机自己的总页数计**（面板复印也算在内），纸由机构提供，超出另买扩容包；公共点位默认只开黑白。具体页数只写在私有页与合同里。
+- **R2 商业点位向个人收费先办齐四件**（打印按页、AI 组合包都算）：①每个点位办一照多址备案或分支机构登记；②青岛市出版主管部门书面答复自助打印要不要印刷经营许可证；③青岛市通信管理局书面答复（另附律师意见）按次收 AI 费要不要增值电信许可；④人社备案的答复（《人力资源市场暂行条例》第十八条，律师答复）。**办齐之前，商业点位由场地方买单、个人免费。**
+- **R3 试点提前**：由 12/14–12/27 改到 **12/1–12/14**，试点签收单和书面采购意向争取 **12/18 前**拿到；第一个点位选零工之家或就业服务站，不选学校。阶段 5 的日期已同步前移（见下方「阶段 5」表与每周检查点后的改期说明）；前提是 11/15 那道关口按时通过。
+- **R4 复印（取代第 9、19 件的原推荐）**：复印和身份证复印改用打印机面板自带的「身份证复印」「票据复印」，**不再开发证件拼版**（原 B2 的拼版部分取消）；一体机只加一页说明（怎么在面板上复印、复印身份证，最后提醒取走原件），面板复印对用户开放、免费。证件图像不经过我们的系统；代价是后台看不到复印张数，只能靠打印机计数器算耗材（R1）。证件放法与翻面由 Windows 窗口到现场核实后写进说明页；律师第 22 问（身份证复印要不要额外告知）照样要问。
+- **R4 机柜供电**：按奔图手册，打印机直插带接地的墙上插座，**不接**延长线、多孔插排、PDU、UPS 和浪涌保护器；UPS 只接主机和屏幕。已交 Windows 窗口改机柜方案。
+- 碰红线不做（方案页原文）：邀请好友得次数、分享解锁；面试中实时给答案、笔试代答；简历代刷新、代投、谁看过我；薪资报告、岗位热度；机构报表里的就业率、录用率。
+
+### 9/29 其余待办按推荐定（产品负责人「其余也按推荐」）
+只写不涉及价格和预算数字的部分；预算相关只放私有页。
+- **专利申请费**：在申请日起两个月内按期缴（约 11/9–11/10 前）；缴之前先核对核心方案有没有在比赛里公开过，符合条件的先办费用减缴。
+- **试点签收**：拿「试点签收单 + 书面采购意向」，12/18 前（R3）。第一笔付款合同放在 2027 年上半年，对外不说 12 月能成交。
+- **点位优先级**：技工院校、就业服务站、零工之家优先，人资公司大厅其次；高校避开考试期。第一个点位选零工之家或就业服务站。
+- **新功能**：第一次发布之前，只做试点路径上的修复和合规项；新功能（含 A1–A3）等发布后再挑着做。
+- **小程序提审**：10/31 前拿到深度合成类目要的材料（所用大模型的备案信息，加上和模型厂商的协议），拿到就提完整版；拿不到，就先提不含 AI 的版本——只关掉 AI 入口开关，不删代码。材料由产品负责人联系模型厂商；开关与提审由小程序窗口做。
+- **机柜三问**（交 Windows 窗口改机柜方案）：露出打印机的稿台（平板）和上盖——要，面板复印与身份证复印要用（R4）；地面能不能打孔——到点位时问场地方，不能打就用加重底座加靠墙防倾支架；下单前先看样品——要。
+- **仓库改私有（9/29 晚更正）**：产品负责人定为**先不改私有，保持公开，等全部商业收口完成后再转**；N3（改私有前的清理、压 CI 用量、付款和预算）整体推迟到商业收口之后，已经做完的公开文档清理（#1064）保留不动，#1067 补完缺口后照常排队合并。仓库继续公开期间，下面几类一律不进仓库：价格、客户名单、律师清单、法务私有页内容。（奔图《开放打印能力》文档里的技术内容，产品负责人 9/29 晚确认「可以公开，没有关系」，不在此列。）将来改私有时，再核对分支保护、三个必需检查、Dependabot 与发布用的密钥。
+
+### P0-7 法务文档
+四份试运行版（用户服务协议、隐私政策、AI 服务说明、经营者信息）已排成可以直接粘进后台的格式，放在私有页，不进公开仓库。现在的生产后台「法务文档版本」只有前三类，「经营者信息」要等第一次发布后才有这一类。个人信息请求按实际入口写：「我的」里自助删除与撤回授权，其余通过公布的联系方式；意见反馈里没有单独的「个人信息请求」类别（要不要加由两个后台窗口与主执行窗口一起定）。
+
+### P0-11 递交材料
+网信上线登记、等保定级备案、网络安全负责人三件事的递交与签字清单见 `docs/compliance/pilot-compliance-procedures.md` 第 9 节（2026-09-29 逐条打开官方原文核对）。要点：山东对仅调用已备案大模型的产品是「报省委网信办进行上线登记」，公开稿没有公布表名、材料目录、时限与费用，要先通过咨询渠道确认；等保不预先假定等级，初步定为第二级及以上要组织专家评审，等级确定后 30 日内到设区的市级公安机关网安部门备案，「投入运行后 30 日内」的期限实际已过。
+
+### P0-12 现场告示
+机身告示与打印机旁一页纸：`docs/device/pilot-onsite-notices.html`（A4，浏览器打开直接打印，两页；方括号里的电话与名称由产品负责人填好再打印，不要把真实电话提交回仓库）。
+
+### 服务端 PDF 引擎漏洞（9/29 总指挥已提到试点前，交后端排雷窗口实现）
+- **状态（9/29 晚核对）**：已由 #1075 修复并合入候选（合并提交 `96aed81e3`），以下是当时的现状与做法记录。
+- 现状：`services/api` 解析用户上传 PDF 全部走 `unpdf 1.6.2` 内置的 PDF.js 5.6.205，包括页数统计（`files/file-page-count.util.ts`）与 OCR 渲染（`ai/resume/ocr/pdf-page-renderer.ts`，二者经 `getResolvedPDFJS()` 拿到的也是内置版）；另装的 `pdfjs-dist 6.3.289` 只提供字体与 CMap 数据。一体机浏览器预览用的是 6.3.289。
+- 风险：PDF.js 官方公告 GHSA-hq66-cqwq-w95j（CVE-2026-16633，高危）影响 5.6.83 及以上、6.2.108 修复，条件是开启脚本（`enableScripting` 默认开启）且没有内容安全策略拦截。服务端只做解析、抽文字和渲染，不跑查看器脚本，实际风险可能较低，但公告没有说明这种情况；代码里也没有显式关闭脚本。
+- 做法（总指挥定）：①先在服务端三个 PDF 入口（`common/pdf/pdfjs-document.ts`、`files/file-page-count.util.ts`、`ai/resume/ocr/pdf-page-renderer.ts`）显式传 `enableScripting: false`，保留 `isEvalSupported: false`；②再用 unpdf 的 `definePDFJSModule` 改用服务端已装的 `pdfjs-dist` 6.3.289 legacy 版，不等 unpdf 升级。加断言：运行时 PDF.js 版本不低于 6.2.108，并做反向变异。`definePDFJSModule` 必须在任何 unpdf 调用之前执行；PDF.js 6 去掉了 `destroy()`，仓库里几处调用要先改；服务端是 CommonJS，legacy 版的导入路径要实测。
+- 一体机浏览器预览本来就是 6.3.289，且 `isEvalSupported: false`，不受影响。
+- 改完必跑：API 类型检查与 lint，`verify:resume-extraction`、`verify:resume-report-export`、`verify:document-conversion`、`verify:file-display-truth`、`verify:materials-processing`、`verify:pii-redaction`、`verify:print-sign`、`verify:contract-review:units`，再补一个用真实 unpdf 的合同 PDF 冒烟；锁文件变了跑根目录 `verify:dependency-security`。
+## 2026-09-29：小程序余项（小程序窗口）
+
+- **提审前产品负责人在公众平台做的事**（清单已交总指挥）：用户隐私保护指引按 `apps/miniapp/scripts/privacy-api-inventory.json` 五类填；类目工具 > 办公；备案（0.11）；后台「法务文档」发布四份文档（先发布再部署，C4）；request / uploadFile / downloadFile 合法域名。
+- **交主执行窗口：** 一体机「我的打印订单」补读 `/me/print-orders/cloud` 与 `/orders/package`（手机上下的单在一体机上看不到，见 current-progress 同日条目）。
+- **交后端窗口（已转）：** 全局异常过滤器丢掉 `AI_DECLARATION_REQUIRED` 的 `missing`，建议放进 `details`；小程序两处都读，已兼容。
+- **待真机与实跑：** 对照工具 `apps/miniapp/tools/cross-end-member-parity.mjs` 连本地全栈或试点测试会员跑一次；分享图与作废重发、年龄与录音声明在两台真机各走一遍（4.3）。
+- **第二版：** 求职进度页（只许本人手填，`/me/job-applications`，同一 PR 给 `MINIAPP_REGISTERED_PAGES` 加一行）。
+- **录音同意里的服务商：** 按法务试运行版写「腾讯云」，前提是生产 `ASR_PROVIDER=tencent`；律师定稿或生产改用百度时同步改 `utils/ai-access.js` 的 `VOICE_CONSENT_ITEMS`。
+- **竞品补缺（9/29 14:30 产品负责人「全部按推荐」，调研页 https://claude.ai/artifact/TzX4Azu7yAyaegZjD5VVPA）：** 第 12 件「我的」计数失败可重试已做（current-progress 同日条目）。**首次发布后开工** A1 订阅消息（出纸完成、取件码快过期；动工前产品负责人先在公众平台确认「工具 > 办公」下有可用模板）、A2 技能名片（打印前没留联系方式要提示）、A3「发给微信好友」发 PDF（`wx.downloadFile` + `wx.shareFileMessage`，不支持时退回预览菜单）。**待办不动工：** 第 10 件只做简历照片本地裁剪、不做纸质证件照；第 11 件退役军人经历转换放「次做」，先定提示语与拦截词；第 13 件不做简历分享链接。约束照旧：小程序不出现 AI 价格，也不引导去一体机购买（运营规范 §5.13）；以后在小程序收打印费，要先加非管控类目，且打印与 AI 不同单付款。
+## 2026-09-29：后端排雷窗口（P1 安全与资金防线、1.8 / 3.7 排雷）
+
+- **已开 PR（P1-4、P1-5）：** 见 current-progress 同日条目。**上线开关顺序：** 先确认每个启用中的管理员账号已绑定并验证手机号 → 管理后台登录页接好第二步（两个后台窗口已做，分支 `claude/consoles-admin-2fa-20260929`，合入并发布后才算接好）→ 再开 `ADMIN_LOGIN_SECOND_FACTOR=sms`；`ADMIN_IP_ALLOWLIST` 按办公网络出口配置，依赖 `TRUST_PROXY_HOPS` 取真实来源地址。短信三档额度默认值（500 / 200 / 100）待产品负责人确认。
+- **接口交付单：** 两个后台窗口——管理员登录页接第二步（`secondFactorRequired` / `challengeTicket` / `codeSent`、`POST /auth/login/second-factor`、`.../resend`），并处理 403 `AUTH_ADMIN_IP_FORBIDDEN`（不是登出）、503 `AUTH_LOGIN_UNAVAILABLE`、403 `AUTH_SECOND_FACTOR_NOT_ENROLLED`、403 `AUTH_ADMIN_SMS_LOGIN_REQUIRES_PASSWORD`；主执行窗口——一体机发会员验证码带 `x-terminal-id` + `x-terminal-session-token`（沿用扫描接口的换票重试），并显示 429 `SMS_DAILY_TOTAL_LIMIT` / `SMS_TERMINAL_DAILY_LIMIT`、503 `SMS_BUDGET_UNAVAILABLE` 的服务端原话；小程序窗口——同三种错误码。
+- **进行中（各自独立工作目录，子代理实现、协调方审）：** 服务端 PDF.js 换 6.3.289（CVE-2026-16633，高危，最先合）；P1-3 模型 / OCR / 语音 / TRTC 出站端点白名单；P1-18 缺 AI 配置只降级 AI。
+- **随后：** P1-2 金额硬上限与 DeepSeek→千问切换（按台计要一体机 AI 请求带已验签终端号）；P1-6 敏感词库与输出拒答（叠在 #1049 上）；3.9 内部账号名册与备用管理员（含服务器端应急启用命令，总指挥已裁定做）；全局错误过滤器透传 `AI_DECLARATION_REQUIRED` 的 `missing`（小程序窗口提出，体验项）；P1-17 注销执行器；P1-13 前端错误上报端点；W3 后端（B-06、B-02 等）；1.2 / 1.4 / 1.5 余项。
+- **1.8 排雷第一批待复现（摘要）：** 退款查询成功缺金额仍记成功、已出纸订单仍可退款、微信退款通知不校验原支付单号、支付宝查询成功分支不校验退款请求号、`manual_review` 无出口；审计里原样存文件名与删除理由；二维码确认读后无 CAS、换绑后踢会话失败旧令牌仍有效、QR claim 先销毁票据；小青与模拟面试原文个人信息直送模型、TRTC 启动后映射写失败会话停不掉、同会话并发重复调模型。收费链路里的缺陷照修，收费功能本轮不做。
+- **1.8 C 组已修（9/29）：** 二维码确认读后无 CAS（C-3）、换绑后踢会话失败旧令牌仍有效（C-4）、QR claim 先销毁票据（C-5）三条已复现并修复，见 current-progress 同日条目；C-1、C-2、C-6 已由 P1-4 / P1-5 修掉。
+
 ## 2026-09-28 深夜：合规小改实现进度与上线配置清单
 
 **9/28 拍板结果**（产品负责人「按推荐拍板」，只覆盖合规小改的 D1–D6；收口评审的 11 条、四方评审的 23 条不在其中，仍待定）：
@@ -15,12 +319,12 @@
 | 项 | PR | 开关（默认 = 今天的行为） | 推荐上线值 / 前提 |
 |---|---|---|---|
 | C3 AI 内容投诉 | #1045 | 无（新增类别，页面上线后才有入口） | — |
-| C4 协议必须已发布 | #1045 | `LEGAL_DOCS_REQUIRE_PUBLISHED`：生产（`NODE_ENV=production`）默认要求，可显式 true / false | 先在后台发布试运行版协议与隐私政策，**再部署** |
-| C5 签名盖章默认关闭 | #1052 | 无开关：未登记签名盖章的终端一律拒绝（D3，**默认行为变化**） | 试点终端在后台显式设为不可用，见下方 6 |
+| C4 协议必须已发布 | #1045 | `LEGAL_DOCS_REQUIRE_PUBLISHED`：生产（`NODE_ENV=production`）默认要求，可显式 true / false | 先在后台发布试运行版协议与隐私政策，**再部署**（9/29 裁定：正式版前端不再回落，`false` 对正式版无效，改由发布前硬检查，见 9/29 节） |
+| C5 签名盖章默认关闭 | #1052 | 无开关：未登记签名盖章的终端一律拒绝（D3，**默认行为变化**） | 一体机已随 #1052 显示「暂未开通」；后台逐台设为不可用变为可选，见下方 6 |
 | C6 年满 14 周岁与录音声明 | #1048 | `AI_DECLARATION_ENFORCEMENT=off` | `on`（**等一体机页面带上声明请求头再开**，见下方 4） |
 | C7 AI 登录档位 | #1048 | `AI_LOGIN_GATE=off` | `before_generate`（D1；等一体机有登录引导再开） |
-| C14 AI 一键暂停 / 全机维护 | #1048 | `AI_PAUSED`、`MAINTENANCE_MODE` = off，后台可一键切换（必须填事由、先写留痕） | 按需 |
-| C8 简历导出显式标识 | #1044 | `RESUME_EXPORT_VISIBLE_LABEL=false`、`RESUME_EXPORT_UNLABELED_OPTION=false` | 前者 `true`（D2）；后者律师确认协议条款后再开 |
+| C14 AI 一键暂停 / 全机维护 | #1048 | `AI_PAUSED`、`MAINTENANCE_MODE` = off，后台可一键切换（必须填事由、先写留痕；开关面板见 #1055） | 按需 |
+| C8 简历导出显式标识 | #1044 | `RESUME_EXPORT_VISIBLE_LABEL=false`、`RESUME_EXPORT_UNLABELED_OPTION=false` | 两个都保持关（9/29 拍板导出不印 AI 字样，取代 D2）；律师认为必须带时两个一起开 |
 | C9 面试报告改字 | #1044 | 无（直接生效，方案已定） | — |
 | C10 内容双向检查 | #1049 | 词表为空即不检查 | 配置 `AI_FORBIDDEN_WORDS_FILE`（云审核兜底本轮未接） |
 | C11 政策只显示本机构 | #1049 | `POLICY_SCOPE=all` | `org`（D4；等一体机政策请求带上终端会话再开；本人收藏与浏览记录不受影响） |
@@ -31,16 +335,16 @@
 **上线前由产品负责人执行**（仓库不代做，不碰生产）：
 1. GitHub 配置里 `DEPLOY_ADMIN_WEB_ROOT`、`DEPLOY_PARTNER_WEB_ROOT` 都已设置——full 发布缺任何一个会直接失败（原来是静默跳过）。
 2. 发布前看一次 `/api/v1/health` 的 `data.degraded` 为空——发布的就绪检查改用 `/api/v1/health/ready`，Redis、数据库、会员隐私调度任一降级都会判失败并自动回退。
-3. 后台「法务文档」发布试运行版《用户服务协议》《隐私政策》、AI 服务说明、经营者信息——**先发布，再部署**（C4 生产默认拒绝未发布协议的登录；临时放开用 `LEGAL_DOCS_REQUIRE_PUBLISHED=false`）。
+3. 后台「法务文档」发布试运行版《用户服务协议》《隐私政策》、AI 服务说明——**先发布，再部署**；「经营者信息」旧后台建不了，第一次发布成功后当天在新后台激活（9/29 统一口径，见 9/29 节「第一次发布」第 1 条）（C4 生产默认拒绝未发布协议的登录；9/29 起正式版前端不再回落，`LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对正式版不起作用，发布前硬检查见 9/29 节）。
 4. 服务器 `.env` 分两批，**顺序不能反**：
-   - 随时可配（只动服务端）：`RESUME_EXPORT_VISIBLE_LABEL=true`（`RESUME_EXPORT_UNLABELED_OPTION` 保持 false，等律师确认）；`AI_FORBIDDEN_WORDS_FILE` 指向词表文件；`ALERT_WEBHOOK_URL` 填企业微信群机器人地址（新增的待处理 AI 内容投诉、终端离线等派生告警和每日备份失败都会推到群里）。
+   - 随时可配（只动服务端）：`RESUME_EXPORT_VISIBLE_LABEL` 保持关（9/29 拍板，取代 D2），`RESUME_EXPORT_UNLABELED_OPTION` 保持 false，等律师确认；`AI_FORBIDDEN_WORDS_FILE` 指向词表文件；`ALERT_WEBHOOK_URL` 填企业微信群机器人地址（新增的待处理 AI 内容投诉、终端离线等派生告警和每日备份失败都会推到群里）。
    - **等一体机对应页面改完、随同一次发布再打开**：`AI_DECLARATION_ENFORCEMENT=on`（一体机现在不带声明请求头，提前打开会让一体机所有 AI 生成与语音请求被拒）；`AI_LOGIN_GATE=before_generate`（提前打开，未登录用户的 AI 请求会被拒，页面上没有去登录的引导）；`POLICY_SCOPE=org`（一体机的政策请求现在不带终端会话，提前打开政策列表会是空的）。前两项也可以用后台的 AI 访问接口即时切换（后台页面见下方「需要页面配合」），`POLICY_SCOPE` 只能改 `.env`。
 5. 服务器安装（步骤见 `docs/device/postgres-operations.md` 第 8 节）：每日备份的 systemd timer 或 cron；用 `services/api/scripts/logrotate/nginx` 替换 `/etc/logrotate.d/nginx`；执行 `services/api/scripts/pm2-logrotate-setup.sh`；做一次恢复演练（临时库名必须含 `drill`）。
-6. 后台「打印扫描运维 → 设备能力」把试点终端的「签名盖章（默认关闭）」显式设为「不支持」并写备注。#1052 合入后不登记也会被拒，但只有显式登记，一体机才会显示「暂未开通」，而不是让用户上传完文件才报错。
+6. （可选）后台「打印扫描运维 → 设备能力」把试点终端的「签名盖章（默认关闭）」设为「不支持」并写备注。#1052 的一体机部分已让未登记的终端显示「暂未开通」，这一步只为在后台一眼看清。
 
 **需要页面配合**（一体机等 2.0 稿定稿后改；后台就地改；小程序交小程序窗口）：
-- 一体机：导出页写明「含人工智能辅助生成内容」，第二个开关打开后提供「不带标识」申请入口并提示隐式标识仍在；面试报告页去掉等级与匹配度；反馈弹层加「AI 内容投诉」与选填手机号（届时同步改 `verify:kiosk-feedback-entry` 里「弹层不提供联系方式输入框」那条）；登录页 `LEGAL_DOCS_NOT_PUBLISHED` 的提示；AI 与语音按钮下的声明行并带上声明请求头；`AI_LOGIN_REQUIRED` 的登录引导；读终端配置里的 `ai.paused` / `maintenance`，显示暂停提示与维护页；政策与社区请求带终端身份，「本终端未绑定机构」空态；`AI_CONTENT_BLOCKED` 的提示；**签名页（`useSignStampFlow.ts` 两处）与打印首页把未配置的 `signature_stamp` 按「暂未开通」处理**（同 `usePrintParamCapability` 对彩色 / 双面的做法），要和 #1052 一起上线，否则未登记的终端会把拒绝显示成「文件损坏」；反馈与投诉的受理回执、帮助页写明答复时限（D5：5 个 / 15 个工作日，律师确认后定稿）。
-- 后台：AI 服务管理页加暂停 / 维护 / 登录档位 / 声明开关（就地改现有页，必须填事由）。反馈页的新类别、「查看完整号码（会留痕）」和告警页的新告警类型已随 #1045 就地改完。
+- 一体机：导出页写明「含人工智能辅助生成内容」，第二个开关打开后提供「不带标识」申请入口并提示隐式标识仍在；面试报告页去掉等级与匹配度；反馈弹层加「AI 内容投诉」与选填手机号（届时同步改 `verify:kiosk-feedback-entry` 里「弹层不提供联系方式输入框」那条）；登录页 `LEGAL_DOCS_NOT_PUBLISHED` 的提示；AI 与语音按钮下的声明行并带上声明请求头；`AI_LOGIN_REQUIRED` 的登录引导；读终端配置里的 `ai.paused` / `maintenance`，显示暂停提示与维护页；政策与社区请求带终端身份，「本终端未绑定机构」空态；`AI_CONTENT_BLOCKED` 等 5 个错误码的提示文字已随 #1056 补进共享错误文案表（去登录按钮、维护页等界面仍按稿件做）；签名页与打印首页对未配置的签名盖章显示「暂未开通」已随 #1052 完成，剩「我的文档」每份文档的签名按钮不看能力、签名页未开通态两句写稿人用语（第三波）；反馈与投诉的受理回执、帮助页写明答复时限（D5：5 个 / 15 个工作日，律师确认后定稿）。
+- 后台：AI 服务管理页的暂停 / 维护 / 登录档位 / 声明开关已做（#1055，就地改现有页，必须填事由）。反馈页的新类别、「查看完整号码（会留痕）」和告警页的新告警类型已随 #1045 就地改完。
 - 小程序：会员反馈新类别、登录错误码、声明请求头、`AI_CONTENT_BLOCKED` 等按同一契约处理。
 
 **新发现的原有问题**（本批未改，入待办）：
@@ -56,13 +360,13 @@
 
 **来源与方法：** 产品负责人授权经 UU 远程控制真机。Claude 直接操作（Codex 命令行拿不到 UU 的应用授权），做了只读探测和一次一体机浏览器重启；两个 Claude 审查员与 Codex（`gpt-6-astra`）各自只读核对 main、候选 `856129b4c`、真机 Agent 提交 `50483cd`，结论经协调方逐条核对代码。原始事实与任务包在仓库外 `~/.cache/claude-lanes/field-fix-0928/`。
 
-**先说前提：** KSK-001 是测试机，不是最终形态——笔记本（自带摄像头与阵列麦，只有触摸板）+ 戴尔 27 寸横屏非触摸显示器，一体机页面跑在 UU 虚拟屏 1680×1055 横屏里；登录的是管理员账号，桌面上有个人微信和已登录的超管后台，装着 UU 与 ToDesk。《母盘镜像清单》A3、A8、A11、A11b、A12 基本都不满足。生产版本也不一致：一体机网页是 9/9 全量发布的 `a8a521cb`，API 与真机 Agent 是 9/17 的 `50483cd`。**在这台机器上做的界面与触控验收不能代表交付形态。**
+**先说前提：** KSK-001 是测试机，不是最终形态——笔记本（自带摄像头与阵列麦，只有触摸板）+ 戴尔 27 寸横屏非触摸显示器，一体机页面跑在 UU 虚拟屏 1680×1055 横屏里；登录的是管理员账号，桌面上有个人微信和已登录的超管后台，装着 UU 与 ToDesk。《母盘镜像清单》A3、A8、A11、A11b、A12 基本都不满足。生产版本也不一致：一体机网页是 9/9 全量发布的 `a8a521cb`，API 与真机 Agent 是 9/17 的 `50483cd`。**在这台机器上做的界面与触控验收不能代表交付形态。**本节凡标「真机已证实」「真机已复现」或写明在 KSK-001 上验证过的结论（包括下面的 Edge 策略手工验证），一律视为「最终硬件上需复验」（2026-09-29 补注）。
 
 **更正上方「评审记录」的一条驳回：** 「终端模式三处本机文件入口都有守卫」——守卫存在，但判据是「本机 Agent 给出了终端身份」（`apps/kiosk/src/services/api/screensaver.ts` 的 `isTerminalKiosk()`）；拿不到身份时这些入口会出现（打印上传默认就停在本机文件，`PrintUploadPage.tsx:145,195`；简历来源、面试准备、合同审查同理）。拿不到身份在真机上是常态，见下面真机-1。
 
 **P0（试点对公众开放前）：**
 
-1. **真机-1 浏览器每次重启都要人点「允许」才连得上本机 Agent（真机已证实）。** Edge 153 对「公网页面访问 127.0.0.1」弹 Chromium 本地网络访问权限框（「zyidai.cn 想要：访问此设备上的其他应用和服务」），几秒后收起，kiosk 没有地址栏找不回来；无人应答时页头一直「设备未绑定」（实测 3 分钟以上不自愈）。项目只按旧 PNA 规则回了 `Access-Control-Allow-Private-Network`，没有配企业策略。修：安装流程写入 `LocalNetworkAccessAllowedForUrls`（真机 `edge://policy` 确认生效）。**KSK-001 已先手工处理（9/28 23:24）：** 产品负责人以管理员身份写入 `LocalNetworkAccessAllowedForUrls`、`AudioCaptureAllowedUrls` 两条（值均为 `https://zyidai.cn`，按同名子键写）；`edge://policy` 两条状态「确定」；强制关闭一体机浏览器后看门狗同秒拉起（带引导票），首页直接显示「就业服务大厅 · KSK-001」「打印机在线」，不再弹授权框。`AllowFileSelectionDialogs=0` 有意没加：它对整台机器生效，会让这台工作电脑上的普通 Edge 也选不了文件，等有专用一体机账号或专用机器再加（真机-2 在那之前靠页面侧修复，随 #1042 与本组修复发布）。
+1. **真机-1 浏览器每次重启都要人点「允许」才连得上本机 Agent（真机已证实）。** Edge 153 对「公网页面访问 127.0.0.1」弹 Chromium 本地网络访问权限框（「zyidai.cn 想要：访问此设备上的其他应用和服务」），几秒后收起，kiosk 没有地址栏找不回来；无人应答时页头一直「设备未绑定」（实测 3 分钟以上不自愈）。项目只按旧 PNA 规则回了 `Access-Control-Allow-Private-Network`，没有配企业策略。修：安装流程写入 `LocalNetworkAccessAllowedForUrls`（真机 `edge://policy` 确认生效）。**KSK-001 已先手工处理（9/28 23:24）：** 产品负责人以管理员身份写入 `LocalNetworkAccessAllowedForUrls`、`AudioCaptureAllowedUrls` 两条（值均为 `https://zyidai.cn`，按同名子键写）；`edge://policy` 两条状态「确定」；强制关闭一体机浏览器后看门狗同秒拉起（带引导票），首页直接显示「就业服务大厅 · KSK-001」「打印机在线」，不再弹授权框（最终硬件上需复验）。`AllowFileSelectionDialogs=0` 有意没加：它对整台机器生效，会让这台工作电脑上的普通 Edge 也选不了文件，等有专用一体机账号或专用机器再加（真机-2 在那之前靠页面侧修复，随 #1042 与本组修复发布）。
 2. **真机-2 拿不到身份时一体机退化成「桌面浏览器」，露出本机文件入口**（代码已证实；Windows 文件框能否在 kiosk 里弹出待现场确认）。修：一体机启动标记（看门狗给启动地址加 `kiosk_launch=1`，页面记住）+ Edge 策略 `AllowFileSelectionDialogs=0` 兜底。
 3. **真机-3 系统层没有锁定**：Alt+Tab 能切出；9/28 17:57 一体机浏览器退出一次，桌面（个人微信、超管后台）直接暴露。按母盘清单 A3/A11/A11b/A12 做；一体机主机不得登录个人与管理账号。归入上方 P0-9。
 
@@ -85,10 +389,16 @@
 
 **本组修复（分支 `claude/field-fix-0928`，基线为候选分支，Codex 实现、Claude 验收并返工）：**
 
+> **9/29 状态**：#1046、#1053、#1054 已按总指挥整批顺序普通合并进候选 `56bd387f2`（候选 CI run 36456569799、windows-agent-installer run 36456569608）。真机装 0.4.12 以后者结果为准；KSK-001 这类兼作工作电脑的测试机重跑生产安装脚本时加 `-KeepFileSelectionDialogs`。KSK-001 系统是 Windows 11 专业工作站版 22H2，2024-10-08 起已无安全更新；**产品负责人 9/29 决定这台测试机保持 22H2、不升级**（担心新版卡顿），取证脚本 D1-1 在它上面报 FAIL 属已知，正式终端仍按母盘清单 A1。
+
 - 已修：真机-1、2 的 Edge 策略由生产安装写入（列表型策略按同名子键写）；真机-2 页面侧（一体机启动标记 `kiosk_launch=1` / `boot_ticket`，缺身份也按一体机处理）；真机-4；真机-5（白名单来源 + 桥接令牌可取票）；真机-6（本机服务先于注册启动、取票失败回 503 可重试、看门狗 5 次约 57 秒）；真机-9 文案与策略；真机-10；真机-11（候选已有诚实失败态「服务状态无法确认」，本组只补身份到达后自动重读与失败重试）；生产默认不放行开发来源；MSI 同版本升级；版本 0.4.12。
 - 已修（第三个 PR，分支 `claude/field-fix-c-0928`，叠在第二个 PR 之上）：真机-7。已绑定终端（有生产安装脚本写入的 `Bound` 标记）升级或修复后，安装包用系统 sc.exe 恢复自动启动、失败重启策略与 failureflag，并尽力启动一次；四个动作失败一律忽略，启动失败不再让安装回滚（第一版 ServiceControl Start="install" 在 Windows CI 上实测 Error 1920 → 回滚 1603，已弃用）。未绑定的新装机仍为手动 + 停止。从 0.4.11 首次升级时标记还不存在，装完须重跑一次生产安装脚本。以 PR 上 Windows 安装生命周期测试为准。
 - 已修（第二个 PR，分支 `claude/field-fix-b-0928`，叠在本分支之上）：真机-8 单实例改用带机器标识的 Windows 命名管道（进程退出由系统释放，断电后不再需要人工删 agent.pid；Windows 行为以 PR 上 `windows-agent-installer` 的进程级测试为准）；真机-13 扫描取消或过期后终端静默期 90 秒（可配，完成结束不触发）。
-- 未修（另立任务）：真机-3（母盘锁定，产品负责人现场执行）、真机-12（横屏整屏页与系统键盘，待竖屏触摸屏到位后按稿收口）。真机-8 在第一个 PR 里的初稿（「自动接管陈旧锁」，先查后改名有竞态、判断出错时放行）已撤回，改由第二个 PR 修；第二个 PR 合入并在 Windows CI 上跑过进程级测试之前，**仍不要把候选里的 Agent 装到真机**。
+- 未修（另立任务）：真机-3（母盘锁定，产品负责人现场执行）、真机-12（横屏整屏页与系统键盘，待竖屏触摸屏到位后按稿收口）。真机-8 在第一个 PR 里的初稿（「自动接管陈旧锁」，先查后改名有竞态、判断出错时放行）已撤回，改由第二个 PR 修；第二个 PR 已合入（Windows CI 进程级测试通过，另修掉锁持有者被「连上即断」打挂的 EPIPE 崩溃）。
+- 第四批（分支 `claude/field-ops-0929`，9/29，总指挥派的合并后 8 项）：现场诊断脚本跟上命名管道锁（不再给出「人工清锁」判定）；现场测试日一只读取证脚本 `collect-field-day-evidence.ps1` 与母盘清单 D 段 T1–T10（Windows CI 解析并实跑）；母盘 A1 按官方生命周期改档、A11b 官方做法、A11c 阻止新插入键盘、E 段远程运维；KSK-001 相关文档统一标「最终硬件上需复验」；代码签名两条路；耗材与冷备、彩色 / 双面开通前核对；**彩色任务原来不强制彩色（驱动默认灰度时付彩色价出黑白纸），已修**；生产安装脚本新增 `-KeepFileSelectionDialogs`（测试兼工作机不禁用 Edge 文件选择框）。
+- KSK-001 真机首跑取证脚本后交给产品负责人的（9/29，详见 current-progress 同日条目）：三款远程工具（UU / ToDesk / 向日葵）只留一款，卸载由产品负责人做；配分配访问前先打开 UAC；打印临时目录里两个遗留打印件（含一张 7/5 真实打印的图片）升到 0.4.12 后自动删除，等不及可手动删。
+- 到机码「已使用」提示（9/29 补现场脚本时发现，未修）：一体机文案映射缺 `PICKUP_CODE_ALREADY_USED`，超过 10 分钟再输同一码显示「请重试」兜底句，重试会累计到 10 次锁机 15 分钟；应映射为明确的「这份到机码已经用过」且不引导重试。改动范围只在一体机文案映射与对应门禁。
+- **P3（第一次发布之后再做，9/29 总指挥定方案 B）：低墨粉单独成状态 `toner_low`。** 现状 Agent 把 DetectedErrorState=5（低墨粉）映射成 `low_paper`，后台告警名字是错的（「打印机状态异常(low_paper)」、error 级）。要让「基础档由点位管理员换粉」的运维看得到低墨，三端一起改：① Agent：`wmi.ts` 映射 5→`toner_low`，`types.ts` 的 PrinterStatus 加该值，本机状态页 `status-panel.ts` 加标签，`verify-print-monitor-truth` 对照表同步；② 服务端：`derived-alerts.ts` 标签「打印机墨粉不足」、warning 级，`printer-availability.ts` 不把它列入拦单集合；③ 一体机：`useTerminalDeviceStatus.ts` 把 `toner_low` 按 ready 处理、不显示墨粉字样（不改则落 default 分支变「状态未知」并停接单）。推迟原因：奔图驱动不写这个字段，现在做没有效果；一体机与服务端近期改动多。
 
 **最终适配验收的前提：** 竖屏 27 寸触摸屏（或立式机柜，见 N2）到位 → 按母盘装机并写入 Edge 策略 → #1042 与本组修复受控发布 → 现场逐项：触控命中与 100% 缩放、系统键盘、首次用麦、断电重启后自恢复、升级后服务自启、彩色 / 双面登记后实际出纸、20 页进纸扫描取消竞态、U 盘导入。
 
@@ -110,17 +420,19 @@
 6. **P0-6（新增）AI 服务说明与投诉入口**：国家网信办 2026-01-09 公告要求已上线应用在显著位置公示所用模型名称与备案号或上线编号；《生成式人工智能服务管理暂行办法》第十五条要求投诉举报入口并公布处理流程和反馈时限；一体机与小程序页面均检索不到。一体机帮助页与首页页脚加「AI 服务说明」；复用「意见反馈」加「AI 内容投诉」「个人信息请求」两类与答复时限，后台按类别筛选计时；小程序一处交小程序窗口。1 天。
 7. **P0-7 协议回落草稿版本号**：`apps/kiosk/src/services/auth/legalConsentVersions.ts:25-30`、`apps/miniapp/utils/api.js:365-370` 在没有正式版本或请求失败时都用 `draft-pending-legal-review`。先把现有草稿审一遍、作为有版本号的试运行版在后台发布，律师定稿后替换；生产没有已发布版本时拒绝登录。对应 3.5a。
 8. **P0-8 试点前关闭「盖章」，只留本人手写签名**：`services/api/src/print-sign/print-sign.service.ts:243-251` 不拒公章与圆形章；识别与是否恢复按 §七 #20 拍板。
-9. **P0-9 现场测试日一（1.7）与试点机锁定（D-04、D-08）**：1.7 加两项——拔网线（离线提示、闲置清场照常）、断电重启（扫描目录、`_unclaimed`、打印临时目录、浏览器缓存逐项看）；分配访问或 Shell Launcher（安装包只有看门狗 `apps/terminal-agent/installer/kiosk/kiosk-watchdog.ps1`）、机箱加锁、禁用新接入的键盘类设备。试点主机用 Windows 11 或 Windows 10 IoT 企业版 LTSC 2021：`docs/device/windows-golden-image-and-install-checklist.md:10` 仍允许 Windows 10 普通版，它 2025-10-14 已停止支持。
-10. **P0-10 试点点位、试用协议与现场形态**：试用协议加场地、电源、网络、耗材、损坏责任附件；现场用稳的立式机柜、带锁打印机位、走线入槽（待拍板 N2）。
+9. **P0-9 现场测试日一（1.7）与试点机锁定（D-04、D-08）**：1.7 加两项——拔网线（离线提示、闲置清场照常）、断电重启（扫描目录、`_unclaimed`、打印临时目录、浏览器缓存逐项看）；分配访问或 Shell Launcher（安装包只有看门狗 `apps/terminal-agent/installer/kiosk/kiosk-watchdog.ps1`）、机箱加锁、禁用新接入的键盘类设备。试点主机用 Windows 11 或 Windows 10 IoT 企业版 LTSC 2021：`docs/device/windows-golden-image-and-install-checklist.md:10` 仍允许 Windows 10 普通版，它 2025-10-14 已停止支持。**9/29 已写**：母盘清单 D 段 T1–T10 与只读取证脚本 `apps/terminal-agent/scripts/collect-field-day-evidence.ps1`（动作前后各跑一次）；A1 改为首选 Win11 IoT 企业版 LTSC 2024、兜底 Win11 专业版 25H2+、Win10 IoT LTSC 2021 只作兼容；A11b 补分配访问官方做法；A11c 阻止新插入的键盘类设备。待最终硬件到位后现场执行。
+10. **P0-10 试点点位、试用协议与现场形态**：试用协议加场地、电源、网络、耗材、损坏责任附件；现场用稳的立式机柜、带锁打印机位、走线入槽（待拍板 N2；9/29 两方案已写进母盘清单 F 段，推荐定制宽柜 B）。
 11. **P0-11 网信登记、等保备案、安全制度签字、小青照片授权**：系统对公网开放已数月，等保备案「投入运行后 30 日内」的期限实际已过；先签 `docs/compliance/pilot-compliance-procedures.md` 里「网络安全负责人」「应急预案」两份。启动 1–2 周，办结 4–8 周，以窗口答复为准。
 12. **P0-12（新增）机身告示与现场一页纸**：机身贴经营者名称、服务电话、AI 与隐私摘要、投诉渠道、「本机不代收简历」；打印机侧贴加纸、换粉、卡纸、重启、报障的一页纸。1 天。
 13. **P0-13 生产核对清单（产品负责人，1.9b 前）**：`RECRUITMENT_CONTENT_HOSTING_ENABLED` 不设或 false；`KIOSK_PUBLIC_BASE_URL` 指向一体机前端；两个后台发布目录已配；价目两行在且描述与单价一致（试点免费就设 0）；密钥轮换与关口令登录；证书 12/3 到期与云资源续费、余额告警。
 
 **P1（24 条）：** P1-1 14 周岁声明与录音同意改为服务端拦截（§七 #24，试点前；点位可能有不满 14 周岁的人时升 P0）；P1-2 AI 金额硬上限与 DeepSeek→千问自动切换（§七 #6、#25，试点前）；P1-3 模型、OCR、语音、数字人端点白名单（§七 #26）；P1-4 管理员二次验证或 IP 限制，Redis 故障时登录锁定改 fail-closed（§七 #27）；P1-5（新增）短信每日总量与单终端上限（`services/api/src/auth/internal-otp.service.ts`，试点前）；P1-6 标准敏感词库与输出拒答（§七 #5，试点前）；P1-7 走查 W3 其余（F09、F11、B-03、B-06、B-02、A-04、A-05；A-04、A-05、B-06 试点前）；P1-8 模拟面试报告 PDF 去掉「练习表现等级」「岗位匹配度参考」（`services/api/src/mock-interview/interview-report-pdf.service.ts:67-72`，试点前）；P1-9 断网诚实态（2.5）；P1-10 试点签收四项指标（服务人次、出纸成功率、AI 可用率、故障与恢复）的口径与导出，机构能看到本机构这几项（P-04；机构「数据统计」只统计同步与发布量，`services/api/src/orgs/partner-stats.service.ts:89-126`）；P1-11（新增）交付物包：机构后台使用指南（试点前）、培训、验收单、试点报告模板、服务等级承诺；P1-12 远程运维：Agent 在线升级（D-02）、远程断电重启、远程桌面使用规则；P1-13（新增）一体机前端错误全局捕获并上报；P1-14 冷备与耗材、彩色价目描述与双面方向核对（试点前）；P1-15 外设状态页与内部名册（3.9）；P1-16 3.15 停放与存量授权；P1-17 注销执行器（3.5d）；P1-18 缺 AI 配置只降级 AI（3.6a）；P1-19 W4 页面与「不留大片空白」（试点路径页先）；P1-20 商务材料、拜访、软著、商标检索；P1-21（新增）政府采购资格要依法纳税与社保缴纳材料（《政府采购法实施条例》第十七条），与本人社保身份一起定；P1-22（新增）集成商授权协议加进律师一包；P1-23（新增）本地全栈演示包；P1-24 公司基本功与专利费（11/9–10 前）。
 
-**P2（11 条）：** 收费链路（2.9、1.11、3.6b、4.1）挪到有收费场景时，代码不停放、保持 CI 覆盖，首个收费场景前做一次 1 分钱实单；三套小青合并配置与记忆；服务端 PDF 引擎升级（unpdf 1.6.2 自带 PDF.js 5.6.205）；超 1000 行源文件 8 个、超 800 行 22 个（修 bug 时按边界拆）；一体机路由数三处不一致（注册 111、测试清单 110、进度 112）；适老化设置；Agent 令牌加密范围与扫码登录启动票；依赖安全豁免补到期日、小程序 U 盘页 TIFF 文案；托管 b 部署手册；b 版本岗位解读等级字样；扫描租约随机数待核。
+**9/29 进展（Windows 真机一路，分支 `claude/field-ops-0929`）：** P1-12 远程运维规则写进母盘清单 E 段（远程工具只留一款并逐次授权留痕、BIOS 来电开机 + 智能插座远程断电、在线更新 D-02 未进候选前手工升级与回退）；P1-14 耗材与冷备写进现场故障处置单，彩色 / 双面开通前五步核对写进打印能力加固清单 §8，并修掉彩色任务不强制彩色的问题；D-01 代码签名写进 `docs/device/windows-agent-msi-design.md` §10，**9/29 定口径（取代上文 0.8 / 4.2 / D-01 的「试点用内部自签名」）**：试点装在公司自有主机上一分钱不花——不买证书、不做内部根，U 盘或本机安装（SmartScreen 不拦），试点机关闭智能应用控制（产品负责人本人做或授权，母盘清单 A14）；装到客户或学校电脑前买 OV（GlobalSign 中国站 3,488 元/年或 SSL.com 约 2,200 元，材料步骤见 §10），证书费写进首单报价；「包内 exe/dll 都带我们的签名」门禁另立任务、优先级低，随买证书一起做：现有发布签名签的是身份已冻结的候选包，内层签名要改成「发布时先签 staging 里我们自己的 PE（含原生模块 .node）→ 重新打包 → 重跑安装测试 → 白名单签名者门禁」，方案见 §10。**D-02 在线升级依赖系统信任链**（`codex/windows-agent-online-update` 的 `terminal-update-helper.ps1` 要求 Authenticode 有效，否则拒装）：接入时改为配置了发布者指纹才校验 Authenticode，自签更新清单与 SHA-256 校验始终保留。N2 立式机柜两方案写进母盘清单 F 段（推荐定制宽柜，钣金本体推算 1.8–2.3 千元，7 项待产品负责人决定）。
 
-**待产品负责人拍板（新增 4 条；9/27 四方评审 23 条仍未拍板）：** N1 #1042 先合进 main、发布另行授权（推荐同意）；N2 试点现场形态（推荐询价两种稳的立式方案再选）；N3 仓库改私有前先清公开文档里的地址类信息、砍 CI 用量、绑付款方式并设 Actions 预算——GitHub 文档写明没有有效付款方式时「额度用完即阻止使用」，私有仓库免费 2000 分钟，近 30 天 CI 跑了 733 次、成功一次约 83 分钟；N4 演示用本地全栈演示包。本周必须定：四方 #1、#3、#4、#10、#18、#19、#20、#23。
+**P2（12 条）：** 收费链路（2.9、1.11、3.6b、4.1）挪到有收费场景时，代码不停放、保持 CI 覆盖，首个收费场景前做一次 1 分钱实单；三套小青合并配置与记忆；服务端 PDF 引擎升级（unpdf 1.6.2 自带 PDF.js 5.6.205）；超 1000 行源文件 8 个、超 800 行 22 个（修 bug 时按边界拆）；一体机路由数三处不一致（注册 111、测试清单 110、进度 112）；适老化设置；Agent 令牌加密范围与扫码登录启动票；依赖安全豁免补到期日、小程序 U 盘页 TIFF 文案；托管 b 部署手册；b 版本岗位解读等级字样；扫描租约随机数待核；**扫描「屏幕一点即扫」**——用 TWAIN/WIA 从一体机屏幕直接发起扫描，第一次发布之后做（奔图 CM2800 系列用户指南 V1.4 第 51 页，PDF 页码，写明本机符合 TWAIN/WIA；前置核实项见 `docs/device/pantum-cm2820adn.md` §八真机核实清单）。
+
+**待产品负责人拍板（新增 4 条；9/27 四方评审 23 条仍未拍板）：** N1 #1042 先合进 main、发布另行授权（推荐同意）；N2 试点现场形态（推荐询价两种稳的立式方案再选）；N3 仓库改私有前先清公开文档里的地址类信息、砍 CI 用量、绑付款方式并设 Actions 预算（**9/29 晚定：推迟到商业收口之后，仓库先保持公开；已做完的清理保留**）——GitHub 文档写明没有有效付款方式时「额度用完即阻止使用」，私有仓库免费 2000 分钟，近 30 天 CI 跑了 733 次、成功一次约 83 分钟；N4 演示用本地全栈演示包。本周必须定：四方 #1、#3、#4、#10、#18、#19、#20、#23。
 
 **排期判断：** 12 月试点来得及但窗口很窄。到 11/15，若「试用协议已签」「网信登记已受理」「首次受控发布已完成」三件里有一件没到，试点改到 2027 年 3 月，不赶考试周和寒假。
 
@@ -143,7 +455,7 @@
 - **C14 AI 一键暂停与全机维护（新增）**：后台 AI 功能位能逐个启停，但没有一键全停与全机维护页；加两个全局开关。
 - **工作量与分路**：合计约 17–25 个人日（Codex 只读核后上调），日历约 2–3 周。后端分五路、一路一个工作目录：① C1–C4 法务与反馈；② C6 + C7 同意与登录（碰同一批 AI 入口，必须同一实现方）；③ C8 + C9 两份 PDF（都碰产物版式，不能并行）；④ C10 + C11；⑤ C12 + C13 + C14；运维底线与发布回退（P0-2、P0-3）单独一路。
 - **界面稿**：7 个新状态画青序流光 2.0 稿（帮助与法务页新条目、意见反馈新类别、AI 按钮声明行与登录提示、导出标识选项、AI 暂停与维护、面试报告去掉两张卡、政策「未绑定机构」空态），产品负责人看过再改程序。
-- **顺序**：国庆期间起做后端与门禁；10/8 起画稿、改一体机页面；10 月下旬合 main、首次受控发布，产品负责人在后台发布三份文档（试运行版协议、AI 服务说明、经营者信息）、关试点终端的签名合成、价目设 0。
+- **顺序**：国庆期间起做后端与门禁；10/8 起画稿、改一体机页面；10 月下旬合 main、首次受控发布，产品负责人在后台发布三份文档（试运行版协议、AI 服务说明、经营者信息）、关试点终端的签名合成、价目设 0。（9/29 更正：发布前激活的是用户服务协议、隐私政策、AI 服务免责声明三份；经营者信息发布后当天激活，见 9/29 节「第一次发布」第 1 条。）
 - **待拍板**：D1 AI 登录档位（推荐先「开始 AI 前」）；D2 简历导出标识（推荐默认带、用户可选不带）；D3 签名合成（推荐试点先关）；D4 政策范围（推荐本机构 + 官方政策网站）；D5 投诉答复时限（推荐 AI 内容投诉 5 个工作日、个人信息请求 15 个工作日，待律师）；D6 AI 一键暂停与全机维护（推荐做）。
 - **未采纳的意见**：agy「只写元数据、不印可见标识」（标识办法第四条要求默认显式标识）；agy「法务文本打包成前端静态文件」（现有后台与读取链路更省、两端共用）；agy「我们替机构录市级政策兜底」（会变成内容发布者）；agy「跳过 2.0 稿直接改页面」（产品负责人定的流程是先看稿）；agy「60 秒闲置清场、离线页、缺纸拦截是漏项」（代码已有：`apps/kiosk/src/auth/useIdleLogout.ts:39-40` 默认 90 秒与 180 秒、`apps/kiosk/src/auth/KioskPrivacyGuard.tsx:24` 默认 300 秒，可配置，现场测试日验）；Codex「新增一种 AI 说明文档类型」（已有 `ai_disclaimer`）、「找不到 client-declaration 与 llm-guard」（它漏搜，两个文件都在）。
 
@@ -244,7 +556,7 @@
 **建议修改：**
 
 - **3.11 表述**：「设备与软件供应方」细化为「软件与技术服务为主、硬件可选」（身份不变；山东 2026 年集中采购目录把打印机、多功能一体机、台式计算机与触控一体机列入框架协议采购，应用软件与信息技术服务不在目录内）。
-- **5.5、5.6**：试点求职者免费，验收改用服务指标（服务人次、出纸成功率、AI 可用率、故障与恢复）；12/28 改为「试点签收 + 书面采购意向」；试点点位避开 12 月考试季的高校。
+- **5.5、5.6**：试点求职者免费，验收改用服务指标（服务人次、出纸成功率、AI 可用率、故障与恢复）；12/28 改为「试点签收 + 书面采购意向」（9/29 R3 再提前到 12/18 前，试点 12/1–12/14）；试点点位避开 12 月考试季的高校。
 - **0.8、4.2、D-01**：试点在自有主机上用内部自签名；装到客户或学校电脑前再买标准代码签名证书。
 - **2.4**：先还原试点路径上的页面，其余在首单后继续。
 - **0.11、5.4**：小程序备案与提审和试点解耦。
@@ -331,7 +643,7 @@
 | 0.5 修到三个必需作业全绿（进行中） | R-01、Q-02、R-09 | 按红灯所属模块交给对应分路修（见协作规则的分路表），Claude 逐个审；每个红灯记原因和修复提交。10/9 是目标，不是死线：红灯多就顺延，但不跳过。 | #1042 在候选上三作业全绿。（三个作业在同一个提交号上都是 success。） | 1.9 发布前提之一 | 9/28 – 10/9（按红灯数量浮动） |  |
 | 0.6 开放 PR 收拢成 1 个（已完成） | A-03 | 核实 #1021、#937 的内容已被候选中 941d10813、8feaadfac 取代后关闭；#1024、#742、#1031、#606 先关闭并注明「在 3.10 / 1.6 / 2.2 / 4.2 抽取」，分支保留到抽完。（原稿把 #1024 列为内容已在候选，核实后其走查脚本并未进候选，改归待抽取组。） | 开放 PR 只剩 #1042；每个关闭的 PR 都写明内容去向。（9/25 完成。）（gh pr list --state open 只剩 #1042。） | 0.7 旧分支清理 | 9/29 – 10/2 |  |
 | 0.7 远程旧分支清理（已完成） | A-07 | 逐个用只读接口确认没有开放 PR 在用、内容已进 main 或已明确放弃，再分批删；保留 main、整合分支、备份分支和待抽取的四支。9/25 清单：368 个中可直接删 259（86 个提交已在 main，173 个 PR 已合并且之后未再提交），逐个判断 102（合并后又有提交 13、PR 关闭未合并 70、从未开 PR 19），保留 7。 | 远程分支降到约 35 个。（9/25 两批共删 334 个，368 → 34：第一批 259 个提交已在 main 或 PR 已合并无新提交；第二批 75 个经 Grok 逐个比对、Claude 抽查、Agy 复核。保留 27 个有未吸收内容的分支待对应步骤后再清。清单、完整提交号与恢复方法见 docs/reviews/remote-branch-cleanup-2026-09-25.md。）（git ls-remote --heads 计数；删除清单入档（已合并 PR 的分支可在 GitHub 恢复）。） | 收尾项，不阻塞阶段 1 | 10/2 – 10/9 | 需要你同意 |
-| 0.8 国庆前发出全部外部依赖 | L-01、L-02、L-04、L-05、L-06、L-08、L-09、M-10、R-11、D-01、D-07 | 我在 9/29 前备好每一项的材料清单；你在 9/30 前发出：法务（小程序类目与许可、AI 登记或备案、隐私政策、账号注销、肖像授权、来源授权与免责）、微信支付商户核对、手机号登录的企业认证与额度、云资源到期与自动续费、正式代码签名证书采购、两个微信测试账号；奔图彩色参数发厂家询问（不阻塞）。 | 每一项都有负责人和预计办完日期，写进进度文档。这一步是「启动」，不是「办完」。（进度文档里的外部依赖表，每行有负责人、发出日期、预计日期。） | 0.11 小程序备案；3.5 法务落地；4.1 商户实单；4.2 正式签名 | 9/26 – 9/30 | 需要你和法务 |
+| 0.8 国庆前发出全部外部依赖 | L-01、L-02、L-04、L-06、L-08、L-09、M-10、R-11、D-01、D-07 | 我在 9/29 前备好每一项的材料清单；你在 9/30 前发出：法务（小程序类目与许可、AI 登记或备案、隐私政策、账号注销、来源授权与免责）、微信支付商户核对、手机号登录的企业认证与额度、云资源到期与自动续费、正式代码签名证书采购、两个微信测试账号；奔图彩色参数发厂家询问（不阻塞）。 | 每一项都有负责人和预计办完日期，写进进度文档。这一步是「启动」，不是「办完」。（进度文档里的外部依赖表，每行有负责人、发出日期、预计日期。） | 0.11 小程序备案；3.5 法务落地；4.1 商户实单；4.2 正式签名 | 9/26 – 9/30 | 需要你和法务 |
 | 0.9 生产只读体检（你负责） | R-03、R-08、R-12、R-13、R-15 | 由你自行完成（你已明确：这一项不需要我们处理）。我们只在需要时提供检查清单。 | 体检报告入档；要修的项排进 1.6、1.10、5.2。（Deploy Precheck 运行记录 + 预检脚本输出 PREFLIGHT OK。） | — | 授权后 1 – 2 天 |  |
 | 0.10 本机资产判定与空间回收 | A-01、A-02、A-04、A-05、A-06 | Grok 只读做并集盘点（每项是否已在候选、有没有独有价值）；Claude 判定迁移或废弃；只回收「干净 + 已并入 + 无进程引用」的目录，以 df 实测为准。 | 每项资产有结论；有价值的迁入候选；确认无用的回收空间。（盘点表入档；df 前后对比。） | 收尾项，与阶段 1 并行 | 10/2 – 10/23 | 删除清单需要你确认 |
 | 0.11 小程序备案与类目申报 | L-01、M-04 | 按法务对类目的结论，你在公众平台提交小程序备案和类目；我准备备案与类目需要的页面说明和截图。 | 备案通过、类目确定。（公众平台备案与类目截图入档。） | 5.4 首次提审 | 10/8 – 11/6 | 法务类目结论；公众平台管理员 |
@@ -393,36 +705,38 @@
 | 3.9 两个后台补全 | C-02、C-07 | 三个空页做成真功能：内部账号名册（含备用管理员）、外设真实状态、机构终端运营数据；16 处未完成点逐条做成真功能或如实下线入口。Grok 做接口，Claude 做页面。 备用管理员（9/25 三方定）：在名册里审计创建，绑定独立手机号，平时停用，只在主账号被锁、手机号丢失或人员变动时由你启用；后台显示最后登录时间。 9/26 起：管理员端不得新增任何代建、审核通过或发布招聘类内容的功能（见 3.13）；「机构终端运营数据」只给机构看它自己终端的数据。 | 两个后台没有空页、假数据和死按钮。（现有 Admin/Partner Playwright + route-sweep；机构数据字段白名单断言。） | 3.8 后台走查 | 10/19 – 11/13 | 你确认是否保留备用管理员 |
 | 3.10 全功能验收体系 | Q-04 | 复用现有 route-sweep、走查脚本（抽自 #1024）、Admin/Partner Playwright、小程序开发者工具探针，搭三层验收：CI 全页面、4 条主流程硬断言、按钮与出口人工表；「暂未开放」必须在允许名单里。 | 上线前能一键跑完三层验收并出结果。（三层验收脚本在最终版本上全绿。） | 5.1 冻结 | 11/2 – 11/13 |  |
 
-### 阶段 4 · 真机与真实资金（11/9 – 12/4）
+### 阶段 4 · 真机与真实资金（10/26 – 11/27；9/29 按 R3 重排，原 11/9 – 12/4）
 
 用真机、真实资金、真实微信账号把主链路走通；现场任务集中在两个测试日。
 
 | 步骤 | 解决 | 做法要点 | 结果（验收） | 下一步 | 时间 | 需要产品负责人 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 4.1 测试商户实单与对账（含小程序付款、自助退款） | F-05、L-06、M-11、F-14 | 3.6b 完成后，用测试商户跑：下单报价与回调金额一致 → 支付回调验签幂等 → 整单退款与迟到回调 → Agent 只领已付任务 → 出纸 → 订单沉淀；当天渠道账单与本地差异为 0。同时实测：小程序付款 → 一体机取件出纸；7 天未取自动退款；三个入口的自助退款（自动退与人工审核各一笔）。 | 真实资金链路证据；当天差异为 0。（商户平台记录 + 本地差异清单；verify:payment-flow 作为回归。） | 5.1 冻结 | 11/13 – 11/24 | 商户号与小额资金 |
-| 4.2 现场测试日二（Windows 全量） | D-01、D-02、D-04、D-05、D-06、D-08 | 集中在一到两天：装正式签名的包；更新器做成独立模块（同时调整对应门禁）做升级演练；按镜像清单执行锁定与自启；核对彩色价目描述后按台开通并核双面翻页方向；拔纸盒看耗材告警；验证超时退出与本地文件清理。 | 现场录像与记录；长边/短边翻页如实记录，不写「问题清零」。（pnpm --filter terminal-agent verify:signing-workflow-contract、verify:installer-inputs；API 侧 verify:print-color-duplex-capability、verify:admin-billing。） | 5.1 冻结 | 11/18 – 11/24 选一到两天 | 正式证书；现场人员一到两天 |
-| 4.3 实屏与真机走查 | K-08、M-03 | 一体机逐页触控走查录像；两个微信账号真机走登录、上传、下单、查看订单。 | 问题单入档，P0 进 4.6 队列。（录像与问题单；预检 test:browser:route-sweep。） | 4.6 现场问题队列 | 11/18 – 11/27 | 两个微信账号；与 4.2 同一天 |
-| 4.4 跨端现场闭环 | F-01、F-02 | 拆成两条：上传领取在 1.1 合入后就能做；凭证出纸要等 1.3 和 4.1。都在现场测试日二执行。另测取件码分享：本人分享给他人代取、作废重发。 | 两条主链路现场通过，各有录像。（现场录像；小程序 verify:static 中的上传用例作为预检。） | 5.1 冻结 | 11/18 – 11/27 | 现场人员与测试账号 |
-| 4.5 运营规程 | O-01、O-02、O-03 | 只改现有三份运营文档（退款异常处理、内容接入、打印部署矩阵），不新开手册；规程里每一步都要能在现有后台点到，点不到的回到 1.2 补。 | 运营人员照规程能处理异常；演练一次。（演练记录写进进度文档；verify:refund-idempotent 作为回归。） | 5.5 试点 | 11/16 – 12/4 | 你确认规程 |
-| 4.6 现场问题队列 | Q-01 | 只收现场 P0 与阻塞项，当批修；12/4 仍开着的转为 5.2 的放行条件，不写「清零」。 | 现场 P0 清零；其余有结论和负责人。（每个问题用所属模块的 verify 复现。） | 5.1 冻结 | 11/9 – 12/4 |  |
-| 4.7 真实 AI 与 OCR 验收 | F-10 | 0.2 轮换 OCR 密钥后，用合成样本跑真实 OCR 与大模型；材料包和转换没有真网脚本的各补一条；费用与服务商账单对照。 | 每类 AI 产物有真实样本证据与费用核账。（verify:ocr-baidu-live、verify:llm-connectivity -- --all、verify:ai-cost-coverage。） | 5.1 冻结 | 11/9 – 11/20 | 服务端真实密钥 |
+| 4.1 测试商户实单与对账（含小程序付款、自助退款） | F-05、L-06、M-11、F-14 | 3.6b 完成后，用测试商户跑：下单报价与回调金额一致 → 支付回调验签幂等 → 整单退款与迟到回调 → Agent 只领已付任务 → 出纸 → 订单沉淀；当天渠道账单与本地差异为 0。同时实测：小程序付款 → 一体机取件出纸；7 天未取自动退款；三个入口的自助退款（自动退与人工审核各一笔）。 | 真实资金链路证据；当天差异为 0。（商户平台记录 + 本地差异清单；verify:payment-flow 作为回归。） | 5.1 冻结 | 挪出试点关键路径：有收费场景时再做（原 11/13 – 11/24；9/29 重排，试点全免、价目为 0，代码停放不删） | 商户号与小额资金 |
+| 4.2 现场测试日二（Windows 全量） | D-01、D-02、D-04、D-05、D-06、D-08 | 集中在一到两天：装和发布版本同一个 SHA 的安装包（9/29：试点不买代码签名证书；原写「装正式签名的包」）；更新器做成独立模块（同时调整对应门禁）做升级演练；按镜像清单执行锁定与自启；核对彩色价目描述后按台开通并核双面翻页方向；拔纸盒看耗材告警；验证超时退出与本地文件清理。 | 现场录像与记录；长边/短边翻页如实记录，不写「问题清零」。（pnpm --filter terminal-agent verify:signing-workflow-contract、verify:installer-inputs；API 侧 verify:print-color-duplex-capability、verify:admin-billing。） | 5.1 冻结 | 11/2 – 11/13 选一到两天（原 11/18 – 11/24） | 现场人员一到两天；前提：正式整机和机柜到位（机柜约 30 天，10 月上旬下单） |
+| 4.3 实屏与真机走查 | K-08、M-03 | 一体机逐页触控走查录像；两个微信账号真机走登录、上传、下单、查看订单。 | 问题单入档，P0 进 4.6 队列。（录像与问题单；预检 test:browser:route-sweep。） | 4.6 现场问题队列 | 11/2 – 11/13（原 11/18 – 11/27） | 两个微信账号；与 4.2 同一天 |
+| 4.4 跨端现场闭环 | F-01、F-02 | 拆成两条：上传领取在 1.1 合入后就能做；凭证出纸要等 1.3（4.1 已挪出关键路径，试点按 0 元单走）。都在现场测试日二执行。另测取件码分享：本人分享给他人代取、作废重发。 | 两条主链路现场通过，各有录像。（现场录像；小程序 verify:static 中的上传用例作为预检。） | 5.1 冻结 | 11/2 – 11/13（原 11/18 – 11/27），在现场测试日二做 | 现场人员与测试账号 |
+| 4.5 运营规程 | O-01、O-02、O-03 | 只改现有三份运营文档（退款异常处理、内容接入、打印部署矩阵），不新开手册；规程里每一步都要能在现有后台点到，点不到的回到 1.2 补。 | 运营人员照规程能处理异常；演练一次。（演练记录写进进度文档；verify:refund-idempotent 作为回归。） | 5.5 试点 | 11/9 – 11/27（原 11/16 – 12/4），试点开始前演练一次 | 你确认规程 |
+| 4.6 现场问题队列 | Q-01 | 只收现场 P0 与阻塞项，当批修；P0 在 5.1 冻结前清完，11/20 仍开着的转为 5.2 的放行条件，不写「清零」。 | 现场 P0 清零；其余有结论和负责人。（每个问题用所属模块的 verify 复现。） | 5.1 冻结 | 11/2 – 11/20（原 11/9 – 12/4） |  |
+| 4.7 真实 AI 与 OCR 验收 | F-10 | 0.2 轮换 OCR 密钥后，用合成样本跑真实 OCR 与大模型；材料包和转换没有真网脚本的各补一条；费用与服务商账单对照。 | 每类 AI 产物有真实样本证据与费用核账。（verify:ocr-baidu-live、verify:llm-connectivity -- --all、verify:ai-cost-coverage。） | 5.1 冻结 | 10/26 – 11/6（原 11/9 – 11/20）；前提：0.2 已轮换 OCR 密钥 | 服务端真实密钥 |
 
-### 阶段 5 · 发布与试点（11/30 – 12/28）
+### 阶段 5 · 发布与试点（11/16 – 12/18；9/29 R3 由 11/30 – 12/28 整体前移两周）
 
 冻结最终版本，发布、提审、两周受控试点，最后商业签收。
 
 | 步骤 | 解决 | 做法要点 | 结果（验收） | 下一步 | 时间 | 需要产品负责人 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 5.1 冻结最终版本 | R-01 | 冻结整合 PR → 三个必需作业全绿 → 合入 main。 | 最终版本号。（三个作业在最终提交号上 success。） | 5.2 发布前检查 | 11/30 – 12/4 |  |
-| 5.2 发布前检查 | R-03、R-11、R-12、R-13、R-14 | 重跑 Deploy Precheck 与预检；核对云资源续费；按你的规则处理试运营数据（先备份）；逐条确认 4.6 遗留项的放行条件。 | 发布前检查单全部通过或有签字的放行条件。（Deploy Precheck + PREFLIGHT OK + 检查单。） | 5.3 受控全量发布 | 12/1 – 12/8 | 拍板：试运营数据、云资源到期负责人 |
-| 5.3 受控全量发布 | R-05、R-06 | 手动全量发布最终版本 → 健康检查 → 首页版本号与发布记录一致；回退已在 1.6 接好。 | 线上 = 最终版本；失败能自动退回。（健康检查 + 发布记录里的提交号。） | 5.5 试点 | 12/8 – 12/11 | 你授权发布 |
-| 5.4 小程序首次提审与发布 | M-04 | 冻结版本打体验版 → 你内测 → 提审；预留 3–5 天整改重审；发布后一体机二维码切成小程序码。类目没通过就按预案：试点先以一体机为主，小程序单独顺延。 | 小程序上线，一体机码直达小程序；或按预案顺延。（线上出码接口能出首页码；审核结果截图。） | 5.5 试点 | 11/30 – 12/11（审核时长不可控） | 0.11 备案与类目通过 |
-| 5.5 受控试点两周 | O-04 | 单网点、真实用户与资金；每天用 3.6b 的渠道对账核一次；事故当天记录。试点若在自营点位，招聘模块整体关闭（3.14）；若在学校或人社，由对方机构账号运营（3.11）。 | 资金错账 0、收钱未出纸未退款 0、崩溃未恢复 0；14 天渠道对账差额 0。（每日对账差异清单 + 事故记录。） | 5.6 商业签收 | 12/14 – 12/27 | 试点网点与运营人员 |
-| 5.6 商业签收 | O-04 | 按事先定好的标准逐项核对：P0（资金错账或卡钱、数据泄露或越权、主链路不可用、合规红线）全部清零，P1 有结论，证据齐全，试点达标。 | GO，或带条件的 GO；缓冲期到 2027/1/15。（证据索引与试点报告。） | — | 12/28 | 你签字 |
+| 5.1 冻结最终版本 | R-01 | 冻结整合 PR → 三个必需作业全绿 → 合入 main。 | 最终版本号。（三个作业在最终提交号上 success。） | 5.2 发布前检查 | 11/16 – 11/20（原 11/30 – 12/4） |  |
+| 5.2 发布前检查 | R-03、R-11、R-12、R-13、R-14 | 重跑 Deploy Precheck 与预检；核对云资源续费；按你的规则处理试运营数据（先备份）；逐条确认 4.6 遗留项的放行条件。 | 发布前检查单全部通过或有签字的放行条件。（Deploy Precheck + PREFLIGHT OK + 检查单。） | 5.3 受控全量发布 | 11/17 – 11/24（原 12/1 – 12/8） | 拍板：试运营数据、云资源到期负责人 |
+| 5.3 受控全量发布 | R-05、R-06 | 手动全量发布最终版本 → 健康检查 → 首页版本号与发布记录一致；回退已在 1.6 接好。 | 线上 = 最终版本；失败能自动退回。（健康检查 + 发布记录里的提交号。） | 5.5 试点 | 11/24 – 11/27（原 12/8 – 12/11） | 你授权发布 |
+| 5.4 小程序首次提审与发布 | M-04 | 冻结版本打体验版 → 你内测 → 提审；预留 3–5 天整改重审；发布后一体机二维码切成小程序码。类目没通过就按预案：试点先以一体机为主，小程序单独顺延。 | 小程序上线，一体机码直达小程序；或按预案顺延。（线上出码接口能出首页码；审核结果截图。） | 5.5 试点 | 11/16 – 11/27（原 11/30 – 12/11；审核时长不可控） | 0.11 备案与类目通过 |
+| 5.5 受控试点两周 | O-04 | 单网点试点，求职者全免，价目按 0 元（9/29 拍板；原写「真实用户与资金、每天渠道对账」，资金对账挪到「有收费场景时」）；事故当天记录。试点若在自营点位，招聘模块整体关闭（3.14）；若在学校或人社，由对方机构账号运营（3.11）。 | 看服务指标：服务人次、出纸成功率、AI 可用率、故障与恢复（机构后台「终端数据」可导出）；崩溃未恢复 0；「打印结果未确认」逐单有核查结论。（试点报告 + 事故记录。） | 5.6 商业签收 | 12/1 – 12/14（原 12/14 – 12/27） | 试点网点与运营人员；第一个点位选零工之家或就业服务站 |
+| 5.6 商业签收 | O-04 | 按事先定好的标准逐项核对：P0（数据泄露或越权、主链路不可用、合规红线）全部清零，P1 有结论，证据齐全，服务指标达到签收单约定。资金类 P0（错账、卡钱、收钱未出纸）在有收费场景时再纳入。 | 试点签收单 + 书面采购意向（12/18 前）；GO，或带条件的 GO；缓冲期到 2027/1/15。（证据索引与试点报告。） | — | 12/18 前（原 12/28） | 你签字 |
 
-**每周检查点：** W1（10/2）0.1、0.3、0.4、0.6 完成：基线确立，首次 CI 红灯清单拉出，开放 PR 只剩 1 个；外部依赖（许可证、商户、证书、测试账号）由你发出。；W2（10/9）0.5 三作业全绿（或红灯剩余数与归属明确）；0.7 分支清理完成；2.0 双端分工表经你确认；3.11 六件事拍板（第 ⑥ 条已做）。；W3（10/16）1.1 故障注入通过；1.6 临时库回滚演练通过；1.7 现场测试日一完成；2.1 差距清单出炉；3.12 口径落文。；W4（10/23）1.2、1.4、1.5 通过；2.2 动效就位；2.6 小程序提审障碍清除；0.10 资产判定完成；3.13 通过。；W5（10/30）1.3、1.8 完成；3.3、3.14、3.15 通过；1.9 发布条件全部满足（发布时岗位板块全局关）。；W6（11/6）1.9 第一次受控发布完成；1.11 自助退款可用；2.3 旧外壳清零；3.2、3.5a/b 完成（3.1 按 a 暂缓）。；W7（11/13）2.4 打印链与简历链还原完成；2.8、2.9、3.5c、3.6、3.9、3.10 完成。；W8（11/20）2.4 全部 51 稿、2.5、2.7、3.4、3.5d、3.7、3.8、4.7 完成。；W9（11/27）4.1 实单差异为 0（含小程序付款与自助退款）；4.2–4.4 现场测试日二完成并留档。；W10（12/4）4.5 规程演练完成；4.6 现场 P0 清零；5.1 最终版本冻结。；W11（12/11）5.2 检查单通过；5.3 全量发布完成；5.4 小程序上线或按预案顺延。；W12–13（12/14 – 12/27）5.5 试点两周：每日对账差额 0，零资金事故。；W14（12/28）5.6 商业签收。
+**每周检查点：** W1（10/2）0.1、0.3、0.4、0.6 完成：基线确立，首次 CI 红灯清单拉出，开放 PR 只剩 1 个；外部依赖（许可证、商户、证书、测试账号）由你发出。；W2（10/9）0.5 三作业全绿（或红灯剩余数与归属明确）；0.7 分支清理完成；2.0 双端分工表经你确认；3.11 六件事拍板（第 ⑥ 条已做）。；W3（10/16）1.1 故障注入通过；1.6 临时库回滚演练通过；1.7 现场测试日一完成；2.1 差距清单出炉；3.12 口径落文。；W4（10/23）1.2、1.4、1.5 通过；2.2 动效就位；2.6 小程序提审障碍清除；0.10 资产判定完成；3.13 通过。；W5（10/30）1.3、1.8 完成；3.3、3.14、3.15 通过；1.9 发布条件全部满足（发布时岗位板块全局关）。；W6（11/6）1.9 第一次受控发布完成；1.11 自助退款可用；2.3 旧外壳清零；3.2、3.5a/b 完成（3.1 按 a 暂缓）。；W7（11/13）2.4 打印链与简历链还原完成；2.8、2.9、3.5c、3.6、3.9、3.10 完成。；W8（11/20）2.4 全部 51 稿、2.5、2.7、3.4、3.5d、3.7、3.8、4.7 完成。；W9（11/27）4.1 实单差异为 0（含小程序付款与自助退款）；4.2–4.4 现场测试日二完成并留档。；W10（12/4）4.5 规程演练完成；4.6 现场 P0 清零；5.1 最终版本冻结。；W11（12/11）5.2 检查单通过；5.3 全量发布完成；5.4 小程序上线或按预案顺延。；W12–13（12/14 – 12/27）5.5 试点两周：每日对账差额 0，零资金事故（9/29 改为 12/1–12/14、看服务指标，见下方改期说明）。；W14（12/28）5.6 商业签收。
 
-**问题编号索引（94 项，P0 27；9/26 增补 C-08–C-11、L-11、L-12）：** F-01[P0] 会员手机上传：确认、取消、过期清扫三处数据不一致；F-02[P0] 取件码：可以分享给别人代取，也可以自己取；F-03[P0] 已付款但文件失效：任务被静默跳过，钱收了纸没出；F-04[P0] 已付款异常的状态机合同不完整；F-05[P0] 支付全链路从未真实跑通；F-06[P1] 部分退款实际不支持；F-07[P1] 与微信商户平台的日账单对账没做；F-08[P0] 取件会话安全只在桩上验过；F-09[P1] 收费简历导出：进程崩溃后文件与收费可能不一致；F-10[P1] AI 产物没用真实模型和真实存储验过；F-11[P1] AI 配置缺失会让整个 API 拒启，打印和支付一起停；F-12[P1] 内部账号禁用/降权后的旧缓存越权；F-13[P1] 候选迁上生产 PostgreSQL 的前向演练；F-14[P1] 自助申请退款（小程序、一体机「我的」、AI 客服）；K-01[P1] 6 个页面还是旧外壳；另有 6 个稿外旧页待定；K-02[P1] 02「全部服务」没有页面；52 号 AI 产物只有一种入口；K-03[P1] 约 30 张稿已挂新外壳，但没逐个状态对照原稿；K-04[P1] 已对齐的稿还有剩余状态；K-05[P1] 动效层缺失：「结构对、手感不对」；K-06[P1] 断网、弱网时的诚实状态；K-07[P2] 原稿里打印能力口径与真实能力不一致；K-08[P1] 没做过真机实屏验收；K-09[P1] AI 入口的降级完整性；E-01[P1] 双端生态分工：小程序做线上，一体机保留线下优势；M-01[P0] 缺微信隐私授权弹窗；M-02[P1] 求职进度：后端已做好，两端都不能手填；M-03[P1] 扫码登录、上传回执等只在本地夹具通过；M-04[P0] 小程序从没正式发布过：这次是首次提审；M-07[P1] 跨端同一会员验收；M-08[P0] 主包体积已顶到微信上限；M-09[P1] 小程序逐页界面与交互商用走查；M-10[P1] 手机号登录的资质与计费；M-11[P0] 小程序付款，一体机交付实物；C-01[P1] 线上平台目录：一体机有入口，后台没管理页；C-02[P1] 后台三个空页做成真功能；C-03[P0] 内容发布规则有合规缺口（9/26 按 a 暂缓到 b 版本）；C-04[P1] 内容全链路没用真实来源跑过；C-05[P1] 岗位同步：任务号用法会挡住每小时的再同步；C-06[P2] 两个后台的商用化走查；C-07[P1] 两个后台还有 16 处没做完；C-08[P0] 招聘类内容由我方管理员审核发布，机构只能提交和下架；C-09[P0] 公开读取不按终端所属机构隔离（含自营点位、小程序与网页直接调用），AI 推荐岗位跨机构取；C-10[P0] 管理员代建内容：企业资料与挂岗位、线下机构及其岗位、招聘会正文与展位资料、批量发布；C-11[P1] 机构类型与收益口径越界：企业来源方、无证商业招聘会主办方可导入，架构文档写有数据接入费、上架费、流量结算；L-01[P0] 岗位与招聘会信息需要人力资源服务许可证；L-02[P1] 生成式 AI 的登记/备案，以及境外模型；L-03[P1] AI 生成内容标识不完整；L-04[P1] 隐私政策与实际数据处理不一致；L-05[P1] 数字人「小青」的肖像授权；L-06[P0] 微信支付商户与资金准备；L-07[P0] 凭据轮换（服务器登录与 OCR 密钥）；L-08[P2] 来源授权与岗位免责声明；L-09[P1] 账号注销没有开通；L-10[P0] 代码仓库可见性与 Git 历史密钥扫描；L-11[P0] 公司角色、收费与托管方式（9/26 晚已拍板：设备与软件供应方，托管 a；待落文与合同）；L-12[P1] AI 岗位推荐可能构成「为劳动者介绍用人单位」（44 号令第十一条），只能在运营机构的终端上以其名义提供；R-01[P0] 候选 274 个提交从没跑过 CI；R-02[P0] 发布没有可执行的回滚；R-03[P0] 百度云容量、备份恢复没重新核过；R-04[P1] 对象存储（COS）没有备份恢复方案；R-05[P0] 生产落后：一体机和后台还是旧版；R-06[P1] 自动发布开关一打开就是全量覆盖；R-07[P1] 15 个依赖安全漏洞；R-08[P1] 日志轮转与告警推送；R-09[P2] CI 小缺口；R-10[P1] HTTPS 证书 12 月 3 日到期；R-11[P1] 云资源到期与快照；R-12[P1] 数据库每日自动备份没确认在跑；R-13[P1] 生产配置没核对过；R-14[P1] 试运营数据怎么处理；R-15[P2] 服务器安全基线与资源；D-01[P0] 没有正式代码签名证书；D-02[P1] Agent 在线更新没进候选；D-03[P0] 现场硬件证据不足；D-04[P1] 安装后自启与系统锁定；D-05[P1] 彩色/双面开通前的价目与方向核对；D-06[P2] 耗材告警与出纸遗留提醒；D-07[P2] 奔图开放 API 彩色参数；D-08[P1] 会话超时与本地临时文件清理没在现场验过；Q-01[P0] 隐藏 bug 还没被系统地找过；Q-02[P1] 候选首次全量 CI 会暴露一批问题；Q-03[P1] 屎山代码只在修 bug 时顺手治理；Q-04[P1] 「和市面上正常软件一样」的全功能验收；A-01[P1] 项目主目录是「脏树」，还是微信开发者工具入口；A-02[P1] 4 棵最大的 Grok 工作目录也是同一个脏分支；A-03[P1] 开放 PR 从 7 个收拢成 1 个；A-04[P1] 13 个本地分支有独有补丁；A-05[P2] 本机空间；A-06[P2] 小程序历史工作目录；A-07[P1] 368 个远程分支，334 个已无用；O-01[P1] 人工核纸与退款处置规程；O-02[P1] 三方对账；O-03[P1] 客服、报障、巡检与耗材；O-04[P0] 受控试点与商业签收。
+**9/29 R3 改期（覆盖上面 W10–W14 的阶段 5 部分）：** 5.1 冻结改到 W8（11/20）；5.2 检查单、5.3 全量发布、5.4 小程序上线或按预案顺延改到 W9（11/27）前；5.5 试点改为 12/1–12/14；5.6 签收单与书面采购意向争取 12/18 前拿到。阶段 4 按总指挥 9/29 重排（原则：往 5.1 冻结送东西的都在冻结前完成；11/15 关口不变）：4.7 真实 AI 与 OCR 验收 10/26–11/6（原 11/9–11/20，前提是 0.2 已轮换 OCR 密钥）；4.2 现场测试日二在 11/2–11/13 里选一到两天（原 11/18–11/24），装和发布版本同一个 SHA 的安装包（试点不买代码签名证书），前提是正式整机和机柜到位，机柜约 30 天，10 月上旬下单；4.3 实屏与真机走查、4.4 跨端现场闭环都在 11/2–11/13 与 4.2 同一天做（原 11/18–11/27）；4.6 现场问题队列 11/2–11/20（原 11/9–12/4），P0 在冻结前清完，没关掉的转成 5.2 放行条件；4.5 运营规程 11/9–11/27（原 11/16–12/4），试点开始前演练一次；4.1 测试商户实单与对账挪出试点关键路径，改到「有收费场景时再做」（试点全免、价目为 0；9/27 四方评审第 6 条已把小程序付款、7 天自动退款、自助退款挪到有收费场景时），代码停放不删。上面 W7–W10 里的阶段 4 项目按此理解，不再逐条改写。
+
+**问题编号索引（94 项，P0 27；9/26 增补 C-08–C-11、L-11、L-12）：** F-01[P0] 会员手机上传：确认、取消、过期清扫三处数据不一致；F-02[P0] 取件码：可以分享给别人代取，也可以自己取；F-03[P0] 已付款但文件失效：任务被静默跳过，钱收了纸没出；F-04[P0] 已付款异常的状态机合同不完整；F-05[P0] 支付全链路从未真实跑通；F-06[P1] 部分退款实际不支持；F-07[P1] 与微信商户平台的日账单对账没做；F-08[P0] 取件会话安全只在桩上验过；F-09[P1] 收费简历导出：进程崩溃后文件与收费可能不一致；F-10[P1] AI 产物没用真实模型和真实存储验过；F-11[P1] AI 配置缺失会让整个 API 拒启，打印和支付一起停；F-12[P1] 内部账号禁用/降权后的旧缓存越权；F-13[P1] 候选迁上生产 PostgreSQL 的前向演练；F-14[P1] 自助申请退款（小程序、一体机「我的」、AI 客服）；K-01[P1] 6 个页面还是旧外壳；另有 6 个稿外旧页待定；K-02[P1] 02「全部服务」没有页面；52 号 AI 产物只有一种入口；K-03[P1] 约 30 张稿已挂新外壳，但没逐个状态对照原稿；K-04[P1] 已对齐的稿还有剩余状态；K-05[P1] 动效层缺失：「结构对、手感不对」；K-06[P1] 断网、弱网时的诚实状态；K-07[P2] 原稿里打印能力口径与真实能力不一致；K-08[P1] 没做过真机实屏验收；K-09[P1] AI 入口的降级完整性；E-01[P1] 双端生态分工：小程序做线上，一体机保留线下优势；M-01[P0] 缺微信隐私授权弹窗；M-02[P1] 求职进度：后端已做好，两端都不能手填；M-03[P1] 扫码登录、上传回执等只在本地夹具通过；M-04[P0] 小程序从没正式发布过：这次是首次提审；M-07[P1] 跨端同一会员验收；M-08[P0] 主包体积已顶到微信上限；M-09[P1] 小程序逐页界面与交互商用走查；M-10[P1] 手机号登录的资质与计费；M-11[P0] 小程序付款，一体机交付实物；C-01[P1] 线上平台目录：一体机有入口，后台没管理页；C-02[P1] 后台三个空页做成真功能；C-03[P0] 内容发布规则有合规缺口（9/26 按 a 暂缓到 b 版本）；C-04[P1] 内容全链路没用真实来源跑过；C-05[P1] 岗位同步：任务号用法会挡住每小时的再同步；C-06[P2] 两个后台的商用化走查；C-07[P1] 两个后台还有 16 处没做完；C-08[P0] 招聘类内容由我方管理员审核发布，机构只能提交和下架；C-09[P0] 公开读取不按终端所属机构隔离（含自营点位、小程序与网页直接调用），AI 推荐岗位跨机构取；C-10[P0] 管理员代建内容：企业资料与挂岗位、线下机构及其岗位、招聘会正文与展位资料、批量发布；C-11[P1] 机构类型与收益口径越界：企业来源方、无证商业招聘会主办方可导入，架构文档写有数据接入费、上架费、流量结算；L-01[P0] 岗位与招聘会信息需要人力资源服务许可证；L-02[P1] 生成式 AI 的登记/备案，以及境外模型；L-03[P1] AI 生成内容标识不完整；L-04[P1] 隐私政策与实际数据处理不一致；L-05[P1] 数字人「小青」的肖像授权——不需要（9/29 确认数字人图片）；L-06[P0] 微信支付商户与资金准备；L-07[P0] 凭据轮换（服务器登录与 OCR 密钥）；L-08[P2] 来源授权与岗位免责声明；L-09[P1] 账号注销没有开通；L-10[P0] 代码仓库可见性与 Git 历史密钥扫描；L-11[P0] 公司角色、收费与托管方式（9/26 晚已拍板：设备与软件供应方，托管 a；待落文与合同）；L-12[P1] AI 岗位推荐可能构成「为劳动者介绍用人单位」（44 号令第十一条），只能在运营机构的终端上以其名义提供；R-01[P0] 候选 274 个提交从没跑过 CI；R-02[P0] 发布没有可执行的回滚；R-03[P0] 百度云容量、备份恢复没重新核过；R-04[P1] 对象存储（COS）没有备份恢复方案；R-05[P0] 生产落后：一体机和后台还是旧版；R-06[P1] 自动发布开关一打开就是全量覆盖；R-07[P1] 15 个依赖安全漏洞；R-08[P1] 日志轮转与告警推送；R-09[P2] CI 小缺口；R-10[P1] HTTPS 证书 12 月 3 日到期；R-11[P1] 云资源到期与快照；R-12[P1] 数据库每日自动备份没确认在跑；R-13[P1] 生产配置没核对过；R-14[P1] 试运营数据怎么处理；R-15[P2] 服务器安全基线与资源；D-01[P0] 没有正式代码签名证书；D-02[P1] Agent 在线更新没进候选；D-03[P0] 现场硬件证据不足；D-04[P1] 安装后自启与系统锁定；D-05[P1] 彩色/双面开通前的价目与方向核对；D-06[P2] 耗材告警与出纸遗留提醒；D-07[P2] 奔图开放 API 彩色参数；D-08[P1] 会话超时与本地临时文件清理没在现场验过；Q-01[P0] 隐藏 bug 还没被系统地找过；Q-02[P1] 候选首次全量 CI 会暴露一批问题；Q-03[P1] 屎山代码只在修 bug 时顺手治理；Q-04[P1] 「和市面上正常软件一样」的全功能验收；A-01[P1] 项目主目录是「脏树」，还是微信开发者工具入口；A-02[P1] 4 棵最大的 Grok 工作目录也是同一个脏分支；A-03[P1] 开放 PR 从 7 个收拢成 1 个；A-04[P1] 13 个本地分支有独有补丁；A-05[P2] 本机空间；A-06[P2] 小程序历史工作目录；A-07[P1] 368 个远程分支，334 个已无用；O-01[P1] 人工核纸与退款处置规程；O-02[P1] 三方对账；O-03[P1] 客服、报障、巡检与耗材；O-04[P0] 受控试点与商业签收。
 
 ## 2026-09-25：商业闭环逐步推进板（已由上方「商业收口推进方案」取代，保留作历史）
 
@@ -3159,7 +3473,7 @@ wxml 为逐字节纯撤回、无夹带；**内容经派发方核验后保留**�
 - [x] **AI / 求职产物 `printFileUrl` 契约动态无出纸验收**：2026-07-12 在当前预生产 release `9d48322b` 完成真实招聘会资料 bridge 动态探针：无个人信息最小 PDF 经发布资料与公共 `POST /job-fairs/:fairId/materials/:materialId/print-url` 返回内部 HMAC `printFileUrl`；其传入 `/print/jobs` 且绑定不存在终端时为 `PRINT_TERMINAL_NOT_FOUND`，证明通过 URL/bridge 校验并在建单前止损；同一原始资料的实际 COS 预签名 URL 为 `PRINT_INVALID_FILE_URL`；Admin 服务下架资料后旧内部 URL 为 `PRINT_FILE_REVOKED`。三次请求未创建订单或 PrintTask，未触发 Agent / 出纸；夹具机构、用户、招聘会、派生 FileObject、bridge 与 active task 均复核为 0，API health 仍为 PostgreSQL。边界：本项不等同真机出纸、价格/支付、或各 AI 产物页面的逐入口端到端验收。
 - [x] **预生产测试 PrintTask seed 重启安全收口（既有缺陷复发防护）**：2026-07-12 PR #198 已合入 `main`（`9d48322b`），两项 GitHub CI 通过；预生产隔离 release 的 API 与三端 production build、`verify:terminal-test-print-seed-guard`、`db:pg:sync:check` 和 PostgreSQL custom-format 可读备份通过。`NODE_ENV=staging` 下受控 PM2 reload 后，`ptask_seed_001` 保持 `cancelled`，active `pending/claimed/printing` 为 0，PM2 实际运行 `/srv/ai-job-print/services/api/dist/main.js`，三端静态入口与 API health 均为 HTTP 200。未创建打印任务、未触发 Agent claim 或真实出纸；该项不关闭其他 P0、支付或现场验收事项。
 
-- [x] 生产域名与 HTTPS：`zyidai.cn`、`www.zyidai.cn`、`admin.zyidai.cn`、`partner.zyidai.cn` 已解析到 `120.48.13.190`；nginx、HTTPS 证书、HTTP→HTTPS 跳转、上传限制、API 反代和 certbot 自动续期已配置并验证，百度云误解析记录已删除；`snap.certbot.renew.timer` 为 active，`certbot renew --dry-run` 对 `zyidai.cn` 与旧 `sslip.io` 证书均模拟续期成功。
+- [x] 生产域名与 HTTPS：`zyidai.cn`、`www.zyidai.cn`、`admin.zyidai.cn`、`partner.zyidai.cn` 已解析到 `<生产服务器 IP>`；nginx、HTTPS 证书、HTTP→HTTPS 跳转、上传限制、API 反代和 certbot 自动续期已配置并验证，百度云误解析记录已删除；`snap.certbot.renew.timer` 为 active，`certbot renew --dry-run` 对 `zyidai.cn` 与旧 `sslip.io` 证书均模拟续期成功。
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
 - [ ] **zyidai.cn 数据库高负载加固生产执行**：代码侧候选 `codex/db-load-hardening-zyidai-20260706` 已准备 PrintTask / PrintTaskStatusLog 热路径索引、双轨 migration、`verify:db-load-indexes` 和 `docs/device/postgres-load-hardening-runbook.md`；生产执行前必须先经用户确认，按 runbook 做只读预检、备份、低峰 migration 或 `CREATE INDEX CONCURRENTLY`、`pg_stat_statements` 观测、PostgreSQL 参数 / PgBouncer / PM2 cluster 调整和压测验收。未执行前不得宣称 zyidai.cn 已完成数据库高并发加固。
 - [ ] 三端登录 / 内部账号手机号认证生产验收：初版首次绑定已合入 `main@cb03b48`，Admin 严格对账加固已随 [PR #249](https://github.com/wanglei581/YITIJI/pull/249) 合入 `main@7d414f40`；两者的主线 GitHub CI 均成功，且 Claude 与 Antigravity 的有效终审均为 `APPROVE`（Critical 0 / Warning 0）。**均未部署，且不在已部署运行时 `6c2a9668` 中**。上线目标库须先执行 `prisma migrate deploy` / `pnpm --filter @ai-job-print/api db:pg:deploy`、migration 状态与 health 只读检查，再由已登录 admin / partner 本人在「账号设置」输入当前密码并完成真实短信绑定。**不得在生产或共享预生产运行** `verify:internal-auth-phone`，它会创建临时账号数据；该脚本仅可在明确隔离、非 production 的本机 SQLite / localhost PostgreSQL 中，以 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 执行。不得直改 `User` / Redis、创建临时管理员或使用后门 token。Codex 本地 SQLite `dev.db` 由 `db push` 创建无迁移基线；如新建 SQLite 空库跑 seed 遇到历史缺列，需手动补 `Organization.contactPhone`，生产 PostgreSQL 不受该遗留问题影响。
@@ -3192,9 +3506,9 @@ wxml 为逐字节纯撤回、无夹带；**内容经派发方核验后保留**�
 - [x] 真实库打印扫描 preflight（隔离预生产库）：已在服务器当前 monorepo 隔离 PostgreSQL 数据库 `ai_job_print_preprod` 上运行 `verify:print-scan-preflight:postgres`，结果无未完成打印任务 / 订单目标终端异常；该结论仅覆盖新建隔离预生产空库，不代表既有线上 `zlixc-api` 所连生产库、Windows 真机、扫描、证件照或 U 盘验收完成。
 - [x] 预生产部署目录确认：已选择新建并使用独立目录 `/www/wwwroot/ai-job-print-preprod/current` 部署当前 monorepo，不覆盖现有 `/www/wwwroot/zlixc-api`；服务器密码已在聊天中暴露，生产切换前必须轮换或改 SSH key。
 - [x] 预生产 env 与后端启动门禁：隔离目录 `/www/wwwroot/ai-job-print-preprod/current` 已完成依赖安装、typecheck、lint、text-only 前端 build、独立 staging `.env`、PostgreSQL migration、Redis 配置、`db:pg:sync:check`、`verify:production-runtime-gates` 自测、服务器 API build、独立 PM2 `ai-job-print-preprod-api` 启动、本机 health、`verify:print-scan-first-release` 和 `verify:print-scan-preflight:postgres`；现有 `zlixc-api` 仍 online。本项仍不代表 nginx 公网预览、正式生产部署或 Windows 真机完成。
-- [x] 预生产 nginx 预览入口（腾讯云临时预览历史记录）：曾使用 `82.157.43.217:8897/8898/8896` 做隔离 HTTP 预览；2026-07-01 已纠偏确认 `82.157.43.217` 是腾讯云公司网站服务器上的临时预览环境，仅保留为历史 smoke 记录，不作为本项目正式上线 / Windows 真机验收依据。正式验收以百度云项目服务器 `120.48.13.190` 为准。
-- [x] 预生产浏览器功能联调（腾讯云临时预览历史记录）：该轮 smoke 基于 `82.157.43.217` 三个临时 HTTP 预览入口，仅证明当时 Kiosk 首页、Admin 登录后 `/orders`、Partner 登录后 dashboard、Kiosk `/print-scan`、`/print/upload?source=document`、直达 `/print/progress` 保护分支可在该临时环境打开；不代表百度云项目服务器、正式 HTTPS、Windows 真机出纸或试运营验收。后续浏览器 / 真机验收必须使用 `120.48.13.190` 对应 Kiosk/Admin/API 地址重新执行。
-- [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。2026-07-06 已完成 Windows PDF 物理打印补证：直接烟测、Kiosk 同源代理正式端点链路、PS-G5 二次 PDF 样本均通过 `Pantum CM2800ADN Series` / `USB001` 打印 1 页，PrintService 有 Event ID 307 / 842，Windows PrintQueue 计数器累计 `TotalPagesPrinted 27 -> 30`。其中 PS-G5 任务 `ptask_kiosk_638475ac307beb0c` / `ORD-20260706-7B04908AD7` 由另一个可访问远程 API 的智能体仅调用 `/files/kiosk-upload -> /print/jobs` 下发，未启动 `terminal-agent agent`、未运行 claim loop；状态流转 `pending -> claimed -> printing -> completed`，现场人工反馈“已出纸”，满足“后端 completed + PrintService 有事件 + 现场确认出纸”。该结果只关闭“PDF 样张真实出纸 + Agent claim/printing/completed + 计数器/PrintService + 现场出纸确认”子项；仍不等于 Windows 真机整体验收通过。2026-07-08 又通过一笔正式生产业务打印样本 `ptask_kiosk_1568da9b5971c10f`（`pending -> claimed -> printing -> completed`，Windows 队列从 `Error, Printing, Retained` 清理恢复后完成）；仍需补真实扫描链路、U 盘 / 外设、断网 / 断电 / 重启恢复、Agent 降级 / 恢复和错终端回传拒绝演练。现场补验必须使用 `codex/print-scan-windows-acceptance` 当前验收候选 `0aa97b8`，不得继续要求 HEAD 为原始候选基线 `06287e11`；Windows 端先执行 `git fetch origin`、`git switch codex/print-scan-windows-acceptance`、`git pull --ff-only`，并确认 `git rev-parse --short HEAD` 输出 `0aa97b8`。验收地址固定为 Kiosk `http://120.48.13.190/`、Admin `http://120.48.13.190:8081/`、API `http://120.48.13.190/api/v1`。验收前必须确认 Kiosk 构建注入正确 `VITE_TERMINAL_ID` 且后台终端已注册并启用；`agent_degraded` 视为本地 Agent DB 降级，需要人工重启 Agent 后复测；真机打印必须由真实 Kiosk 页面上传创建真实终端绑定任务，不使用 `ptask_seed_001` 等 seed 任务替代。后续至少补验：真实 Kiosk 页面人工上传 PDF 1 单、PNG/JPG 打印 1 单，逐单记录 `taskId` / `orderNo`，肉眼或摄像头确认真实出纸、页数、方向、清晰度、彩色/黑白，核对 Kiosk 进度页最终状态与 Admin `/orders` 状态一致，并补测离线、取消、失败、Agent 重启、`agent_degraded` 中至少两个异常场景。扫描继续标记为“未完成 / 待单独任务”，不得写通过。PS-G5 暴露 `amountCents=100`、`payStatus=unpaid` 仍被 claim 并 completed，免费/付费试运营配置口径与支付门禁上线前需单独收口。
+- [x] 预生产 nginx 预览入口（腾讯云临时预览历史记录）：曾使用 `<历史预览服务器 IP>:8897/8898/8896` 做隔离 HTTP 预览；2026-07-01 已纠偏确认 `<历史预览服务器 IP>` 是腾讯云公司网站服务器上的临时预览环境，仅保留为历史 smoke 记录，不作为本项目正式上线 / Windows 真机验收依据。正式验收以百度云项目服务器 `<生产服务器 IP>` 为准。
+- [x] 预生产浏览器功能联调（腾讯云临时预览历史记录）：该轮 smoke 基于 `<历史预览服务器 IP>` 三个临时 HTTP 预览入口，仅证明当时 Kiosk 首页、Admin 登录后 `/orders`、Partner 登录后 dashboard、Kiosk `/print-scan`、`/print/upload?source=document`、直达 `/print/progress` 保护分支可在该临时环境打开；不代表百度云项目服务器、正式 HTTPS、Windows 真机出纸或试运营验收。后续浏览器 / 真机验收必须使用 `<生产服务器 IP>` 对应 Kiosk/Admin/API 地址重新执行。
+- [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。2026-07-06 已完成 Windows PDF 物理打印补证：直接烟测、Kiosk 同源代理正式端点链路、PS-G5 二次 PDF 样本均通过 `Pantum CM2800ADN Series` / `USB001` 打印 1 页，PrintService 有 Event ID 307 / 842，Windows PrintQueue 计数器累计 `TotalPagesPrinted 27 -> 30`。其中 PS-G5 任务 `ptask_kiosk_638475ac307beb0c` / `ORD-20260706-7B04908AD7` 由另一个可访问远程 API 的智能体仅调用 `/files/kiosk-upload -> /print/jobs` 下发，未启动 `terminal-agent agent`、未运行 claim loop；状态流转 `pending -> claimed -> printing -> completed`，现场人工反馈“已出纸”，满足“后端 completed + PrintService 有事件 + 现场确认出纸”。该结果只关闭“PDF 样张真实出纸 + Agent claim/printing/completed + 计数器/PrintService + 现场出纸确认”子项；仍不等于 Windows 真机整体验收通过。2026-07-08 又通过一笔正式生产业务打印样本 `ptask_kiosk_1568da9b5971c10f`（`pending -> claimed -> printing -> completed`，Windows 队列从 `Error, Printing, Retained` 清理恢复后完成）；仍需补真实扫描链路、U 盘 / 外设、断网 / 断电 / 重启恢复、Agent 降级 / 恢复和错终端回传拒绝演练。现场补验必须使用 `codex/print-scan-windows-acceptance` 当前验收候选 `0aa97b8`，不得继续要求 HEAD 为原始候选基线 `06287e11`；Windows 端先执行 `git fetch origin`、`git switch codex/print-scan-windows-acceptance`、`git pull --ff-only`，并确认 `git rev-parse --short HEAD` 输出 `0aa97b8`。验收地址固定为 Kiosk `http://<生产服务器 IP>/`、Admin `http://<生产服务器 IP>:8081/`、API `http://<生产服务器 IP>/api/v1`。验收前必须确认 Kiosk 构建注入正确 `VITE_TERMINAL_ID` 且后台终端已注册并启用；`agent_degraded` 视为本地 Agent DB 降级，需要人工重启 Agent 后复测；真机打印必须由真实 Kiosk 页面上传创建真实终端绑定任务，不使用 `ptask_seed_001` 等 seed 任务替代。后续至少补验：真实 Kiosk 页面人工上传 PDF 1 单、PNG/JPG 打印 1 单，逐单记录 `taskId` / `orderNo`，肉眼或摄像头确认真实出纸、页数、方向、清晰度、彩色/黑白，核对 Kiosk 进度页最终状态与 Admin `/orders` 状态一致，并补测离线、取消、失败、Agent 重启、`agent_degraded` 中至少两个异常场景。扫描继续标记为“未完成 / 待单独任务”，不得写通过。PS-G5 暴露 `amountCents=100`、`payStatus=unpaid` 仍被 claim 并 completed，免费/付费试运营配置口径与支付门禁上线前需单独收口。
 
   Windows 现场补验返回报告最少包含：Git（branch、commit）、Server（Kiosk/Admin/API 地址）、PDF 打印（taskId、orderNo、是否真实出纸、页数/方向/清晰度、Kiosk 最终状态、Admin 最终状态）、图片打印（taskId、orderNo、是否真实出纸、页数/方向/清晰度、Kiosk 最终状态、Admin 最终状态）、异常场景（至少两个场景与结果）、扫描（未完成/成功、阻塞点）、结论（是否可回 Mac 收口、仍需修复的问题）。判断标准不变：PDF 和图片没有真实出纸，不能回 Mac 写最终通过；Kiosk 和 Admin 状态不一致，也不能收口。
 

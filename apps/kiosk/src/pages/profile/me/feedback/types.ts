@@ -6,6 +6,7 @@ export const CATEGORY_OPTIONS: { value: FeedbackCategory; label: string; hint: s
   { value: 'print', label: '打印服务', hint: '打印、取件、纸张等问题' },
   { value: 'file_process', label: '文件处理', hint: '上传、预览、扫描文件处理' },
   { value: 'general', label: '一般建议', hint: '页面体验或服务建议' },
+  { value: 'ai_content', label: 'AI 内容投诉', hint: '对 AI 生成的内容有异议' },
 ]
 
 export const CATEGORY_META: Record<FeedbackCategory, { label: string; tone: string; icon: KioskIconName }> = {
@@ -13,6 +14,7 @@ export const CATEGORY_META: Record<FeedbackCategory, { label: string; tone: stri
   print: { label: '打印服务', tone: 'wheat', icon: 'printer' },
   file_process: { label: '文件处理', tone: 'teal', icon: 'files' },
   general: { label: '一般建议', tone: 'rose', icon: 'chat' },
+  ai_content: { label: 'AI 内容投诉', tone: 'plum', icon: 'sparkle' },
 }
 
 export const STATUS_META: Record<FeedbackStatus, { label: string; cls: string }> = {

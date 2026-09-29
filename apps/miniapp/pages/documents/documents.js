@@ -58,7 +58,9 @@ Page({
           wordConversionAvailable: available,
           wordConversionCopy: available
             ? conversion.WORD_CONVERSION_DISCLOSURE
-            : `${conversion.WORD_CONVERSION_UNAVAILABLE_COPY}；${(capabilities && capabilities.reason) || '转换引擎未就绪'}`,
+            // 服务端给了原因就只说原因：它本身就是「请另存为 PDF 上传」这类完整说法，
+            // 前面再拼本地那句会把同一件事说两遍（走查 9/29）。
+            : ((capabilities && capabilities.reason) || conversion.WORD_CONVERSION_UNAVAILABLE_COPY),
         })
       })
       .catch(() => {

@@ -471,7 +471,7 @@ export class FilesController {
     // 内部账号(admin / partner / kiosk)与会员一样必须回源:role / orgId 取当前
     // 数据库状态,已停用、已删除或 tokenVersion 过期的账号一律视为未登录。
     // 否则一张未过期的旧 token 就能继续读取 / 删除求职者简历与证件扫描件(CLAUDE.md §11)。
-    const internal = await resolveOptionalInternalUser(auth, this.jwt, this.redis, this.prisma)
+    const internal = await resolveOptionalInternalUser(auth, this.jwt, this.redis, this.prisma, extractIp(req))
     if (internal) {
       return { kind: 'user', userId: internal.userId, role: internal.role, orgId: internal.orgId }
     }

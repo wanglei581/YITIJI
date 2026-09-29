@@ -18,16 +18,14 @@ import {
   FLEET_SAMPLE_TAKE,
   JUMP_LOOKBACK_DAYS,
   JUMP_SOURCE_GROUP_TAKE,
-  PRINT_TREND_DAY_COUNT,
-  PRINT_TREND_ROW_CAP,
   daysAgoStart,
   hoursAgo,
   rateFromCounts,
-  shanghaiDayKey,
   shanghaiDayStart,
   unavailableMetric,
 } from './console-screen.metric'
 import { attachFleetCells } from './console-screen.fleet'
+import { loadPrintedPagesTotal, loadPrintedPagesTrend } from './console-screen.printed-pages'
 import {
   type PartnerOrgId,
   partnerOrgIdWhere,
@@ -38,8 +36,6 @@ import {
 const PENDING = { in: ['pending', 'reviewing'] }
 const PUBLISHED = { reviewStatus: 'approved', publishStatus: 'published' }
 const ACTIVE_PRINT = ['pending', 'claimed', 'printing']
-/** 累计只加已支付订单的内容页；不乘 copies，也不把 unpaid/refunded 算进去。 */
-const PAID_BILLABLE = { payStatus: 'paid', billablePages: { not: null } } as const
 
 const FLEET_TERMINAL_SELECT = {
   id: true,
@@ -72,7 +68,8 @@ export interface PrintLiveSlice {
 }
 
 export interface PrintCumulativeSlice {
-  pages: ScreenPrintPagesValue
+  /** 'capped'：出纸任务行超过上限，本次不给累计数。 */
+  pages: ScreenPrintPagesValue | 'capped'
   trend: ScreenPrintTrendValue | 'capped'
 }
 
@@ -281,58 +278,27 @@ export async function loadPrintLiveSlice(prisma: PrismaService, now: Date): Prom
   }
 }
 
+/** 累计与 14 天趋势的页数都在 console-screen.printed-pages.ts，这里只并行取回。 */
 export async function loadPrintCumulativeSlice(
   prisma: PrismaService,
   now: Date,
-  options?: { trendRowCap?: number },
+  options?: { trendRowCap?: number; printedRowCap?: number },
 ): Promise<PrintCumulativeSlice> {
-  const trendFrom = daysAgoStart(now, PRINT_TREND_DAY_COUNT)
-  const trendRowCap = options?.trendRowCap ?? PRINT_TREND_ROW_CAP
-  const paidTrendWhere = {
-    ...PAID_BILLABLE,
-    paidAt: { not: null, gte: trendFrom },
-  }
-  const [pageSum, trendRows] = await Promise.all([
-    prisma.order.aggregate({
-      where: PAID_BILLABLE,
-      _sum: { billablePages: true },
-    }),
-    prisma.order.findMany({
-      where: paidTrendWhere,
-      select: { paidAt: true, billablePages: true },
-      orderBy: [{ paidAt: 'asc' }, { id: 'asc' }],
-      take: trendRowCap + 1,
-    }),
+  const [printedPages, trend] = await Promise.all([
+    loadPrintedPagesTotal(prisma, { rowCap: options?.printedRowCap }),
+    loadPrintedPagesTrend(prisma, now, { rowCap: options?.trendRowCap }),
   ])
-  let trend: ScreenPrintTrendValue | 'capped' = 'capped'
-  if (trendRows.length <= trendRowCap) {
-    const buckets = new Map<string, number>()
-    for (let i = 0; i < PRINT_TREND_DAY_COUNT; i++) {
-      const day = shanghaiDayKey(new Date(trendFrom.getTime() + i * 24 * 60 * 60 * 1000))
-      buckets.set(day, 0)
-    }
-    for (const row of trendRows) {
-      if (!row.paidAt) continue
-      const key = shanghaiDayKey(row.paidAt)
-      if (!buckets.has(key)) continue
-      buckets.set(key, (buckets.get(key) ?? 0) + (row.billablePages ?? 0))
-    }
-    const days = Array.from(buckets.entries()).map(([date, pages]) => ({ date, pages }))
-    const peak = days.reduce<ScreenPrintTrendValue['peak']>((best, item) => {
-      if (!best || item.pages > best.pages) return item
-      return best
-    }, null)
-    trend = { days, peak: peak && peak.pages > 0 ? peak : null }
-  }
   return {
-    pages: {
-      totalPages: pageSum._sum.billablePages ?? 0,
-      byColor: unavailableMetric(
-        'Order.itemsJson',
-        'cumulative',
-        SCREEN_UNAVAILABLE_REASON.colorSplitNotIndexed,
-      ),
-    },
+    pages: printedPages === 'capped'
+      ? 'capped'
+      : {
+          totalPages: printedPages,
+          byColor: unavailableMetric(
+            'Order.itemsJson',
+            'cumulative',
+            SCREEN_UNAVAILABLE_REASON.colorSplitNotIndexed,
+          ),
+        },
     trend,
   }
 }

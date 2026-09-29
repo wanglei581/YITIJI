@@ -47,6 +47,8 @@ import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
+  COPY_GUIDE_KEY,
+  COPY_GUIDE_ROUTE,
   HUB_PILL,
   PRINT_HUB_PRICE_NOTICE,
   arrivalCodeStateNote,
@@ -213,7 +215,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     key: 'sign',
     cap: 'sign',
     icon: PenToolIcon,
-    title: '签名盖章',
+    title: '签名',
     description: '放入本人手写签名',
     to: '/print-scan/sign',
     aiRole: 'none',
@@ -396,7 +398,7 @@ export function PrintScanHomePage() {
           }
         }
 
-        // ② 管理员后台的能力配置覆盖。签名盖章这类默认拒绝的键：读取成功但没登记 =
+        // ② 管理员后台的能力配置覆盖。签名这类默认拒绝的键：读取成功但没登记 =
         //    本机暂未开通，按 not_verified 整卡停用（resolveCapabilityOverride），与服务端一致。
         const override = capabilityKey ? resolveCapabilityOverride(capabilityLoad, capabilityKey) : undefined
         let resolved = capability
@@ -453,11 +455,16 @@ export function PrintScanHomePage() {
       setFeedbackOpen(true)
       return
     }
+    // R4（2026-09-29）：复印卡改为可点，进「怎么在打印机面板上复印」说明态。
+    if (key === COPY_GUIDE_KEY) {
+      navigate(COPY_GUIDE_ROUTE)
+      return
+    }
     const link = QUICK_LINKS.find((item) => item.key === key)
     if (link?.to) navigate(link.to)
   }
 
-  // 只数管理员真配置过的行：签名盖章没登记是默认关，不是「被管理员关闭」，
+  // 只数管理员真配置过的行：签名没登记是默认关，不是「被管理员关闭」，
   // 不因它把整页切到 locked 态（那张卡已在 ② 里单独停用）。
   const locked =
     confirmed &&

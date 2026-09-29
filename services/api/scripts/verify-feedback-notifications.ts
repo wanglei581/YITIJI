@@ -1,8 +1,9 @@
 import 'dotenv/config'
 import 'reflect-metadata'
 import { randomUUID } from 'crypto'
-import { rmSync } from 'fs'
-import { createClient } from '@libsql/client'
+import { closeSync, openSync, rmSync } from 'fs'
+import { execFileSync } from 'child_process'
+import path from 'path'
 import { GUARDS_METADATA } from '@nestjs/common/constants'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
@@ -97,7 +98,20 @@ async function main() {
     else fail(`2. 本人隔离异常：A=${JSON.stringify(listA)} B=${JSON.stringify(listB)}`)
     await expectReject('FEEDBACK_NOT_FOUND', '3. 用户B不能关闭用户A反馈', () => feedback.closeByEndUser(userB, ticket.id))
 
+    // C3：没有任何管理员回复记录时，不能手动把状态改成「已回复」（会让答复时限停表、告警消失，而提交人什么都没收到）。
+    await expectReject('FEEDBACK_REPLY_REQUIRED', '3b. 没有回复记录时手动标「已回复」被拒', () => feedback.updateAdminStatus(admin, ticket.id, { status: 'replied' }))
+    const beforeReplyItem = (await feedback.listForAdmin({})).items.find((item) => item.id === ticket.id)
+    if (beforeReplyItem && beforeReplyItem.hasAdminReply === false && beforeReplyItem.status === 'pending') pass('3c. 回复前列表如实给出 hasAdminReply=false，状态未被改动')
+    else fail(`3c. 回复前列表字段异常：${JSON.stringify(beforeReplyItem)}`)
+
     const adminDetail = await feedback.addAdminReply(admin, ticket.id, { content: '已记录，现场工作人员会核对设备状态。' })
+    const afterReplyItem = (await feedback.listForAdmin({})).items.find((item) => item.id === ticket.id)
+    if (afterReplyItem?.hasAdminReply === true) pass('4b. 回复后列表 hasAdminReply=true')
+    else fail(`4b. 回复后列表字段异常：${JSON.stringify(afterReplyItem)}`)
+    const reprocessed = await feedback.updateAdminStatus(admin, ticket.id, { status: 'processing' })
+    const backToReplied = await feedback.updateAdminStatus(admin, ticket.id, { status: 'replied' })
+    if (reprocessed.status === 'processing' && backToReplied.status === 'replied') pass('4c. 已有回复记录时可以在处理中与已回复之间手动切换')
+    else fail(`4c. 有回复记录时状态切换异常：${reprocessed.status} → ${backToReplied.status}`)
     if (adminDetail.status === 'replied' && adminDetail.replies.some((reply) => reply.senderType === 'admin')) pass('4. Admin 回复反馈并流转为已回复')
     else fail(`4. Admin 回复异常：${JSON.stringify(adminDetail)}`)
 
@@ -282,27 +296,9 @@ function cleanupFallbackDb(): void {
 }
 
 async function initFallbackDb(): Promise<void> {
-  const client = createClient({ url: process.env['DATABASE_URL']! })
-  try {
-    await client.batch([
-      `CREATE TABLE "User" ("id" TEXT NOT NULL PRIMARY KEY, "username" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "name" TEXT NOT NULL, "role" TEXT NOT NULL, "orgId" TEXT, "phoneHash" TEXT, "phoneEnc" TEXT, "phoneVerifiedAt" DATETIME, "tokenVersion" INTEGER NOT NULL DEFAULT 0, "lastLoginAt" DATETIME, "enabled" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-      `CREATE UNIQUE INDEX "User_username_key" ON "User"("username")`,
-      `CREATE UNIQUE INDEX "User_phoneHash_key" ON "User"("phoneHash")`,
-      `CREATE INDEX "User_orgId_idx" ON "User"("orgId")`,
-      `CREATE INDEX "User_phoneVerifiedAt_idx" ON "User"("phoneVerifiedAt")`,
-      `CREATE TABLE "EndUser" ("id" TEXT NOT NULL PRIMARY KEY, "phoneHash" TEXT NOT NULL, "phoneEnc" TEXT NOT NULL, "nickname" TEXT, "wxOpenId" TEXT, "enabled" BOOLEAN NOT NULL DEFAULT true, "lastLoginAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-      `CREATE UNIQUE INDEX "EndUser_phoneHash_key" ON "EndUser"("phoneHash")`,
-      `CREATE UNIQUE INDEX "EndUser_wxOpenId_key" ON "EndUser"("wxOpenId")`,
-      `CREATE TABLE "AuditLog" ("id" TEXT NOT NULL PRIMARY KEY, "actorId" TEXT, "actorRole" TEXT NOT NULL, "action" TEXT NOT NULL, "targetType" TEXT NOT NULL, "targetId" TEXT, "payloadJson" TEXT NOT NULL DEFAULT '{}', "ipAddress" TEXT, "userAgent" TEXT, "requestId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-      `CREATE TABLE "PrintTask" ("id" TEXT NOT NULL PRIMARY KEY, "terminalId" TEXT, "endUserId" TEXT, "fileId" TEXT, "status" TEXT NOT NULL DEFAULT 'pending', "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-      `CREATE TABLE "MemberNotification" ("id" TEXT NOT NULL PRIMARY KEY, "endUserId" TEXT NOT NULL, "title" TEXT NOT NULL, "content" TEXT NOT NULL, "category" TEXT NOT NULL DEFAULT 'system', "relatedType" TEXT, "relatedId" TEXT, "isRead" BOOLEAN NOT NULL DEFAULT false, "readAt" DATETIME, "deletedAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-      `CREATE TABLE "SystemBroadcast" ("id" TEXT NOT NULL PRIMARY KEY, "title" TEXT NOT NULL, "content" TEXT NOT NULL, "category" TEXT NOT NULL DEFAULT 'system', "deletedAt" DATETIME, "createdBy" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-      `CREATE TABLE "BroadcastReadState" ("id" TEXT NOT NULL PRIMARY KEY, "endUserId" TEXT NOT NULL, "broadcastId" TEXT NOT NULL, "readAt" DATETIME, "dismissedAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-      `CREATE UNIQUE INDEX "BroadcastReadState_endUserId_broadcastId_key" ON "BroadcastReadState"("endUserId","broadcastId")`,
-      `CREATE TABLE "FeedbackTicket" ("id" TEXT NOT NULL PRIMARY KEY, "endUserId" TEXT NOT NULL, "terminalId" TEXT, "relatedPrintTaskId" TEXT, "category" TEXT NOT NULL, "title" TEXT, "content" TEXT NOT NULL, "contactPhoneEnc" TEXT, "status" TEXT NOT NULL DEFAULT 'pending', "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-      `CREATE TABLE "FeedbackReply" ("id" TEXT NOT NULL PRIMARY KEY, "ticketId" TEXT NOT NULL, "senderType" TEXT NOT NULL, "actorId" TEXT, "content" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-    ])
-  } finally {
-    client.close()
-  }
+  // 不设 DATABASE_URL 时自建库：直接按当前 schema 推表，不再手抄建表语句——
+  // 手抄的 User 表曾缺 passwordProofState，schema 一加列这里就过时（CI 走 DATABASE_URL，没暴露）。
+  const apiRoot = path.resolve(__dirname, '..')
+  closeSync(openSync(path.join(apiRoot, 'prisma', fallbackDbName!), 'a'))
+  execFileSync(path.join(apiRoot, 'node_modules', '.bin', 'prisma'), ['db', 'push', '--accept-data-loss'], { cwd: apiRoot, stdio: 'ignore', env: process.env })
 }

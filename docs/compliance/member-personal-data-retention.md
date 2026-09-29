@@ -16,11 +16,14 @@
 | 登录会员优化后简历 / AI 派生成果物 | 私有对象存储 + `FileObject(retentionPolicy=months_3/months_6/long_term)` | 默认 90 天 | 本人确认保存条款后可延长至 180 天或长期保存；长期保存为 `expiresAt = null`；本人可删除 | 只服务本人查看、下载、打印，不向企业或合作机构提供 |
 | 签名 URL | HMAC / COS 预签名 URL | 不超过 30 分钟 | URL 到期失效 | 仅本人 token 换取，不在列表接口直接返回长期链接 |
 | AI 简历结果 | `AiResumeResult` | 默认 24 小时 | 到期 cron 硬删；本人可删除关联记录 | 不长期保存简历派生文本。`optimize_draft` / `optimize_confirmed` 复用同一表与 TTL，不单独成行；删除 parse 按 taskId 级联；随账号注销走同一 AiResumeResult 清理 |
+| AI 简历生成时的原始填写 | `AiResumeResult(kind=generate_input)`；AI 结果行另记已验签的一体机编号 `terminalId` | 与同一任务的 `generate` 结果同一条留存、同一个到期时间（默认 24 小时），不单独延长 | 到期 cron 硬删；本人删除该条生成记录时一并删除；随账号注销走同一 AiResumeResult 清理；数据导出列入 AI 结果元数据 | 只用于「按原样导出」：带任务号时按原话渲染，不带任务号时核对草稿是否照抄 AI 结果；不进「AI 服务记录」列表，不回显给任何人 |
 | 模拟面试记录 | `MockInterviewSession` / `MockInterviewReport` | 匿名 2 小时；会员模拟面试 7 天 | 到期 cron 硬删；本人可删除 | 报告原文不写日志，不进入审计 payload |
 | 模拟面试回答与语音转写 | `MockInterviewTurn.content` / `.transcriptText` | 随所属会话（匿名 2 小时；会员 7 天） | 会话被硬删时级联物理删除 | 落库的是**未脱敏原文**（本人回看报告要看到自己的原话）；不写日志、不进审计 payload |
 | AI 助手对话 | 服务进程内存 `LlmChatService.sessions`（**不落库**） | 30 分钟无活动即淘汰；进程重启即失 | `pruneSessions` 按 TTL 主动淘汰 | 对话原文没有任何落库路径；审计只记 `sessionId / intent / provider` |
 | 顾问会话诉求与输入槽 | `AdvisorSession.topic` / `.slotsJson` / `AdvisorPin.content` | 24 小时（`ADVISOR_SESSION_TTL_HOURS`） | 到期由 `AdvisorRetentionTask` 每小时 cron 硬删，级联 pins/artifacts；删除写系统审计 | 落库的是**未脱敏原文**；脱敏只发生在送模型那一步，不回写本表；问答多轮上下文只在内存不落库 |
 | 顾问产物 | `AdvisorArtifact.payloadJson` | 24 小时（`ADVISOR_ARTIFACT_TTL_HOURS`） | 会话过期时级联硬删；自身 TTL 先到时由同一 cron 单独硬删 | 打印生成的 PDF 是独立 `FileObject`，按其 `retentionPolicy` 留存，不随产物行消失 |
+| AI 逐次用量明细 | `AiUsageRecord` | 默认 90 天（与 `AiServiceLog` 相同，读 `AI_SERVICE_LOG_RETENTION_DAYS`） | 到期由 `AiResultCleanupTask` 先按月汇总再分批硬删；会员注销时 `endUserId` 置空（`detachMemberAiUsageRecords`），不删行 | 只存功能、厂商、型号、状态、tokens、金额和已验签终端、机构、会员号，不含用户文本。置空后明细不再指向这个人；金额留到到期清理才滚进月汇总。账号注销入口仍未开放，置空函数不从拒绝路径调用 |
+| AI 用量月汇总 | `AiUsageMonthlySummary` | 长期保留 | 不随明细到期删除 | 只有金额和次数（北京时间月份、功能、厂商、型号、状态、调用次数、已计量金额、未计量次数），不含个人信息，不含会员、终端或机构号 |
 | 浏览记录 | `BrowseLog` | 默认 30 天 | 到期 cron 硬删；本人可删除 | 只记录本人浏览了哪个已发布目标 |
 | 外部跳转记录 | `ExternalJumpLog` | 默认 30 天 | 到期 cron 硬删；本人可删除 | 只记录打开来源平台入口，不记录投递/预约结果 |
 | 收藏记录 | `Favorite` | 账号存在期间 | 本人取消收藏即删除 | 收藏目标必须已审核已发布，标题由服务端派生 |
@@ -45,5 +48,6 @@
 - `verify:member-print-orders`：我的打印订单只返回安全元数据。
 - `verify:member-data-retention`：本矩阵与关键 TTL 常量保持一致。
 - `verify:ai-user-text-retention`：AI 自由文本的**落库与日志**口径 —— 派生出所有会构造 LLM/ASR 请求的模块，要求它们写入的每个模型都声明留存期限、且期限被 `deleteMany` 物理执行（只在读路径按 `expiresAt` 过滤不算清理）；同时断言这些模块的日志与审计 payload 不出现用户原话，以及本人回看时拿到的仍是自己写的原文而不是占位符。
+- `verify:ai-usage-retention`：计量表与 AI 服务日志同一保留期，到期先按月汇总再分批删；汇总表只有金额和次数，不含个人信息。
 
 > 边界说明：本矩阵只管「用户原话在我们这边怎么存、存多久、会不会进日志」。**用户原话要不要脱敏后再送给第三方大模型**是另一条链路，由 `verify:llm-input-pii-mask` 管；AI 助手对话与模拟面试转写这两条送模型路径目前仍是原文出境，属已登记的待裁决缺口，不要因为本矩阵写了「不写日志」就以为它们已经脱敏。

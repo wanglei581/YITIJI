@@ -10,7 +10,6 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import type { FileRetentionPolicy, FileRetentionUpdateRequest, MemberDocumentItem } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import { ClockIcon, EyeIcon, FilesIcon, FileTextIcon, PenToolIcon, PrinterIcon, ScanLineIcon, Trash2Icon, UploadIcon } from 'lucide-react'
 import {
   deleteMyDocument,
@@ -19,10 +18,11 @@ import {
   MemberAssetsApiError,
   updateMyDocumentRetention,
 } from '../../../services/api/memberAssets'
+import { documentsLoggedInTruth, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import { useAuth } from '../../../auth/useAuth'
 import { FileContentPreview } from '../../../components/FileContentPreview'
 import { formatTime } from '../assets/format'
-import { savePrintMaterialSession } from '../../print/printMaterialSession'
+import { useStartPrintHandoff } from '../../print/usePrintHandoff'
 import { DocumentConvertAction } from './components/DocumentConvertAction'
 import {
   DOCUMENT_NOT_REPRINTABLE_COPY,
@@ -49,7 +49,7 @@ const RETENTION_LABELS: Record<FileRetentionPolicy, string> = {
   system_short: '短期保存',
 }
 
-/** 允许跳转「签名盖章」的文档用途白名单——普通打印文档、简历、求职信等；不含高敏证件类。 */
+/** 允许跳转「签名」的文档用途白名单——普通打印文档、简历、求职信等；不含高敏证件类。 */
 const SIGNABLE_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan', 'cover_letter'])
 
 type SelectableRetentionPolicy = FileRetentionUpdateRequest['retentionPolicy']
@@ -103,6 +103,7 @@ function documentForConvertedPdf(
 
 export function MyDocumentsPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { isLoggedIn, getToken } = useAuth()
   const [reloadKey, setReloadKey] = useState(0)
   const [hint, setHint] = useState<Hint | null>(null)
@@ -156,7 +157,11 @@ export function MyDocumentsPage() {
     }
   }
 
-  const print = async (doc: MemberDocumentItem) => {
+  /**
+   * @param convertedFrom 刚在本页把这份原件转成 PDF 时的原件。转换件在服务端是派生，
+   *   但装的是本人原件的内容：按原件过材料检查（9/29 产品负责人拍板）。
+   */
+  const print = async (doc: MemberDocumentItem, convertedFrom?: MemberDocumentItem) => {
     if (opening || printingId || signingId || busyId || retentionBusy || convertingId) return
     if (!isDocumentReprintable(doc)) {
       setHint({ tone: 'bad', text: DOCUMENT_NOT_REPRINTABLE_COPY })
@@ -176,20 +181,18 @@ export function MyDocumentsPage() {
         fileUrl: res.printFileUrl,
         mimeType: doc.mimeType,
       }
-      if (documentNeedsPrintMaterialCheck(doc)) {
-        // 本人原件：生产隐私闸门要求先做完隐私检查才建单，检查只在打印台材料检查里做。
-        // 写法与打印上传页相同：先整份写打印材料会话（旧检查结论、旧参数一并作废），再去检查。
-        const source = documentPrintSource(doc)
-        savePrintMaterialSession({ file, source })
-        navigate('/print/material-check', { state: { file, source } })
-      } else {
-        navigate('/print/confirm', {
-          state: {
-            file,
-            params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
-          },
-        })
-      }
+      // 本人原件：生产隐私闸门要求先做完隐私检查才建单，检查只在打印台材料检查里做；
+      // 派生产物（AI 报告、优化稿……）免检查，直达报价确认页。入口由 printHandoffPolicy 按 requiresCheck 定。
+      // 写法与打印上传页相同：先整份写打印交接上下文（旧检查结论、旧参数一并作废），跳转只带交接编号。
+      const requiresCheck = documentNeedsPrintMaterialCheck(doc, convertedFrom)
+      startPrint({
+        origin: 'my_documents',
+        requiresCheck,
+        source: documentPrintSource(convertedFrom ?? doc),
+        returnPath: '/me/documents',
+        file,
+        idDocument: doc.purpose === 'id_scan' || convertedFrom?.purpose === 'id_scan',
+      })
     } catch (error) {
       setHint({ tone: 'bad', text: userMessageOf(error, '打印链接生成失败，可能已到期或被清理') })
     } finally {
@@ -216,7 +219,7 @@ export function MyDocumentsPage() {
         },
       })
     } catch (error) {
-      setHint({ tone: 'bad', text: userMessageOf(error, '打开签名盖章失败，文件可能已到期或被清理') })
+      setHint({ tone: 'bad', text: userMessageOf(error, '打开签名失败，文件可能已到期或被清理') })
     } finally {
       setSigningId(null)
     }
@@ -298,7 +301,7 @@ export function MyDocumentsPage() {
     <>
       <QxMeStructRow icon={FileTextIcon} title="文件名、格式与大小" desc="登录后上传、扫描或生成并保存的文件" mode={structMode} testid="member-assets-struct-documents-0" />
       <QxMeStructRow icon={ClockIcon} title="保存期限" desc="到期时间与可选的留存策略" mode={structMode} testid="member-assets-struct-documents-1" />
-      <QxMeStructRow icon={PrinterIcon} title="可以继续办的事" desc="查看、打印、签名盖章与删除" mode={structMode} testid="member-assets-struct-documents-2" />
+      <QxMeStructRow icon={PrinterIcon} title="可以继续办的事" desc="查看、打印、签名与删除" mode={structMode} testid="member-assets-struct-documents-2" />
     </>
   )
 
@@ -324,9 +327,9 @@ export function MyDocumentsPage() {
         <section className="qx-me-list qx-me-grow" aria-label="从这里开始添加文件">
           <QxMeStartRow icon={UploadIcon} title="从手机或 U 盘添加文件" desc="登录后上传的文件会出现在这里，之后可以预览和打印" label="添加文件" route="/print/upload" testid="member-assets-start-upload" onClick={() => navigate('/print/upload')} />
           <QxMeStartRow icon={ScanLineIcon} tone="slate" title="扫描纸质材料" desc="把纸质简历或证明扫成 PDF；未登录扫描件不会进入我的文档" label="去扫描" route="/scan" testid="member-assets-start-scan" onClick={() => navigate('/scan')} />
-          <div className="qx-me-legal">添加或扫描之后，可以回到这里继续预览、打印和签名盖章。</div>
+          <div className="qx-me-legal">添加或扫描之后，可以回到这里继续预览、打印和签名。</div>
         </section>
-        <QxMeGuide items={[['怎么产生', '登录后上传或扫描', '游客上传不会自动归入你的账号'], ['能做什么', '预览、打印、签名盖章', '从同一份文件继续办'], ['留存', '按系统的保存期限管理', '到期后无法恢复，需要请提前打印']]} />
+        <QxMeGuide items={[['怎么产生', '登录后上传或扫描', '游客上传不会自动归入你的账号'], ['能做什么', '预览、打印、签名', '从同一份文件继续办'], ['留存', '按系统的保存期限管理', '到期后无法恢复，需要请提前打印']]} />
       </>
     )
   } else {
@@ -392,7 +395,7 @@ export function MyDocumentsPage() {
                     {doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) && (
                       <button type="button" disabled={isAnyPending} onClick={() => void signStamp(doc)} title="在该文档上叠加本人手写签名图片" className="qx-me-small">
                         <PenToolIcon size={19} aria-hidden="true" />
-                        {signingId === doc.id ? '准备中' : '签名盖章'}
+                        {signingId === doc.id ? '准备中' : '签名'}
                       </button>
                     )}
                     <button
@@ -437,7 +440,7 @@ export function MyDocumentsPage() {
                   onError={(text) => setHint({ tone: 'bad', text })}
                   onBusyChange={(next) => setConvertingId(next ? doc.id : null)}
                   onPreview={(convertedId) => void open(documentForConvertedPdf(items, convertedId, doc))}
-                  onPrint={(convertedId) => void print(documentForConvertedPdf(items, convertedId, doc))}
+                  onPrint={(convertedId) => void print(documentForConvertedPdf(items, convertedId, doc), doc)}
                 />
               </article>
             )
@@ -459,7 +462,11 @@ export function MyDocumentsPage() {
       eyebrow="MY FILES & ORDERS"
       ask={<>你的文件，<em>随时接着办</em>。</>}
       doing={DOING[uiState]}
-      truth="这里只显示当前登录账号的文档；数量与保存期限一律由系统返回。"
+      truth={
+        isLoggedIn
+          ? documentsLoggedInTruth(resultIdleLogoutLabel())
+          : '这里只显示当前登录账号的文档；数量与保存期限一律由系统返回。'
+      }
       toast={hint}
       ctabar={ctabar}
     >
@@ -493,5 +500,5 @@ const DOING: Record<'login' | 'loading' | 'error' | 'empty' | 'ready', ReactNode
   loading: <>正在读取最新记录，<b>返回前一律显示「—」</b>。</>,
   error: <>列表这次没有更新，<b>重试不会重复创建记录</b>。</>,
   empty: <>还没有保存的文件。<b>先添加或扫描一份</b>，之后可以从这里继续办。</>,
-  ready: <>查看、打印和签名盖章，<b>从同一份文件继续</b>。</>,
+  ready: <>查看、打印和签名，<b>从同一份文件继续</b>。</>,
 }

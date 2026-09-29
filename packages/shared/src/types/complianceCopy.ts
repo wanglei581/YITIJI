@@ -66,12 +66,12 @@ export const COMPLIANCE_COPY = {
     '证件照、身份证等敏感文件仅用于本次打印/扫描,完成后按隐私策略自动清理,不长期留存;打印前隐私检查时,扫描件/图片可能通过第三方 OCR 服务识别文字。',
 
   /**
-   * Kiosk 签名盖章 MVP 说明页声明(蓝色 info)。
+   * Kiosk 签名（原名签名盖章）说明页声明(蓝色 info)。
    * 必须明确:图片合成的签名/印章预览不是 CA 认证电子签名,不具备法律效力;
    * 仅用于个人材料整理与打印辅助,不提供 CA 电子签 / 电子认证 / 合同签署服务。
    */
   KIOSK_PRINT_SCAN_ESIGN_NOTICE:
-    '签名盖章仅用于个人材料整理与打印辅助，不提供 CA 电子签、电子认证或合同签署服务；仅为图片合成预览，不具备法律认证效力，正式法律文件请通过具备资质的电子签名服务办理。',
+    '签名仅用于个人材料整理与打印辅助，不提供 CA 电子签、电子认证或合同签署服务；仅为图片合成预览，不具备法律认证效力，正式法律文件请通过具备资质的电子签名服务办理。',
 
   /**
    * Kiosk 材料扫描说明(蓝色 info 提示)。
@@ -128,6 +128,15 @@ export const COMPLIANCE_COPY = {
 
   /** Kiosk 合同审查分析中（确认提取结果弹窗）的结果性质说明。出处同上，表二 ContractReviewProcessingPage 行。 */
   KIOSK_CONTRACT_REVIEW_PROCESSING: '本次结果仅作风险提示，请自行核对原文',
+
+  /**
+   * 模拟面试练习结果固定免责（2026-09-29 合规窗口）。
+   * 一体机报告页、练习单 PDF、面试报告 PDF 都显示这一句，不折叠、不加字。
+   * 设置页不使用本句。服务端不能 import 本包，逐字镜像在
+   * services/api/src/mock-interview/interview-practice-sheet.ts。
+   */
+  INTERVIEW_PRACTICE_RESULT_DISCLAIMER:
+    '模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。',
 } as const
 
 export type ComplianceCopyKey = keyof typeof COMPLIANCE_COPY
@@ -170,6 +179,11 @@ export type AiLabelCopyKey = keyof typeof AI_LABEL_COPY
  * 2026-08-01 收敛:此前 CLAUDE.md §2(5 词)、compliance-boundary.md §三(含「投递简历」)、
  * role-boundary.md §7(含「一键报名」)与本常量互不一致,现合并为 7 项并以本常量为准。
  *
+ * 2026-09-29 合规窗口再加「初筛」「岗位匹配度参考」（模拟面试口径）。
+ * 「平台不做初筛」仍由既有 NEGATED 标记「不做」在回看窗口内放行，不新增豁免、不改判定。
+ * 「基本合格」「练习表现等级」本轮不加：小程序里还有，等那边改完由合规窗口补。
+ * 现为 9 项。
+ *
  * 消费方:`scripts/verify-compliance-copy.mjs`(CI 门禁)。该脚本用**文本解析**读取本块,
  * 不是 `import` —— `packages/shared` 只导出裸 TS(无 dist / 无 build),门禁在纯 `node` 下运行。
  * 因此改动本块的**格式**(而非内容)会让门禁 fail-closed 报错,这是刻意设计:
@@ -183,6 +197,8 @@ export const COMPLIANCE_FORBIDDEN_TERMS = [
   '企业收简历',
   '候选人管理',
   '一键报名',
+  '初筛',
+  '岗位匹配度参考',
 ] as const
 
 /**
@@ -216,6 +232,8 @@ export const COMPLIANCE_FORBIDDEN_TERM_PATTERNS: readonly RegExp[] = [
   /企业收简历/,
   /候选人管理/,
   /一键报名/,
+  /初筛/,
+  /岗位匹配度参考/,
 ]
 
 /**

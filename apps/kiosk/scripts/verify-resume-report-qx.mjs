@@ -58,7 +58,7 @@ assert(!/<(button|input)[^>]*\sdisabled(\s|=|>)/.test(`${files.actions}\n${files
 assert(has(files.takeaway, "exportKind === 'change_list' ? '打印修改清单' : '打印这份报告'"), 'print button label follows last export kind')
 assert(has(files.takeaway, '请先导出'), 'print/QR stay gated until a PDF is exported')
 assert(has(files.takeaway, 'printFileUrl'), 'print becomes available only after printFileUrl exists')
-assert(has(files.takeaway, "navigate('/print/confirm'"), 'print navigates to /print/confirm after export')
+assert(has(files.takeaway, "origin: 'resume_report'"), 'print writes the print handoff context (resume_report → confirm) after export')
 assert(has(files.takeaway, 'diagnosis_report'), 'export PDF uses kind=diagnosis_report')
 assert(has(files.takeaway, 'change_list'), 'change-list export uses kind=change_list')
 assert(has(files.takeaway, 'useResumeExportPricing'), 'takeaway reads GET /resume/export/pricing')
@@ -85,6 +85,26 @@ assert(!has(all, '一键投递') && !has(all, '立即投递') && !has(all, '平�
 assert(!has(all, '录用概率'), 'compliance: no hiring-probability percentage')
 assert(has(files.page, '<ResumeDiagnosisFailExits'), 'diagnose-failed keeps non-AI exits')
 assert(has(files.page, 'getResumeRecord(taskId, { token: getToken(), accessToken })'), 'record read stays credential-gated')
+const deliverConstants = read('src/pages/resume/components/resume-deliver/constants.ts')
+assert(/export const TASK_ID_RE = \/\^\[A-Za-z0-9_-\]\{1,64\}\$/.test(files.model), 'report task id accepts the 64-char resume intent id')
+assert(/export const TASK_ID_RE = \/\^\[A-Za-z0-9_-\]\{1,64\}\$/.test(deliverConstants), 'optimize and generate task id accept the 64-char resume intent id')
+assert(!has(files.issues, '这七块'), 'structure title does not hardcode seven blocks')
+assert(!has(files.model, '简历被读成七块'), 'report subtitle does not hardcode seven blocks')
+assert(has(files.issues, 'displayResumeExcerpt'), 'report display redacts masked placeholders')
+assert(has(files.page, 'reportBlocksSubtitle'), 'report subtitle uses the real block count')
+assert(has(files.model, '（已隐去）'), 'masked placeholder display copy exists')
+const placeholderLiteral = /const MASKED_PLACEHOLDER_RE = (\/[\s\S]*?\/g)/.exec(files.model)?.[1]
+assert(Boolean(placeholderLiteral), 'masked placeholder regex is present')
+if (placeholderLiteral) {
+  const placeholderRe = new Function(`return ${placeholderLiteral}`)()
+  const masked = '姓名 [劳动者_1] 电话 [手机号_1] 邮箱 [邮箱_1]'.replace(placeholderRe, '（已隐去）')
+  assert(masked === '姓名 （已隐去） 电话 （已隐去） 邮箱 （已隐去）', 'masked placeholders render as 已隐去')
+  assert('性别 女 城市 青岛'.replace(placeholderRe, '（已隐去）') === '性别 女 城市 青岛', 'plain report lines stay unchanged')
+}
+const taskIdRe = /^[A-Za-z0-9_-]{1,64}$/
+const sixtyFour = 'a'.repeat(64)
+assert(taskIdRe.test(sixtyFour) && !/^[A-Za-z0-9_-]{1,24}$/.test(sixtyFour), 'a 64-char task id is accepted and the old 24-char cap rejected it')
+assert(!taskIdRe.test('a'.repeat(65)) && !taskIdRe.test('bad id') && !taskIdRe.test(''), 'task id still rejects overlong, spaced, and empty values')
 
 if (failures.length) {
   console.error('verify-resume-report-qx failed:')

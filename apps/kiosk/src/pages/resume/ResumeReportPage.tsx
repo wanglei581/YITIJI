@@ -17,6 +17,7 @@ import {
   parseReportSearch,
   REPORT_HEAD,
   REPORT_STATUS,
+  reportBlocksSubtitle,
   shouldSkipReportFetch,
   showsReportBody,
   targetSummary,
@@ -42,12 +43,14 @@ interface ReportState {
   providerName?: string
   success?: boolean
   reason?: string
+  /** 解析页判定为 AI 能力级停用（暂停 / 当日额度已到 / 未配置）：失败屏不给「重新解析」。 */
+  aiDown?: boolean
   report?: ResumeReport
   extractionNotice?: { textSource: string; confidence: 'high' | 'medium' | 'low'; warnings: string[] }
   targetContext?: ResumeTargetContext
 }
 
-const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken', 'providerName'])
+const CONTROL_FIELDS = new Set(['success', 'reason', 'aiDown', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken', 'providerName'])
 const CONFIDENCE_LABEL: Record<'high' | 'medium' | 'low', string> = { high: '较高', medium: '中等', low: '较低' }
 
 function buildExtractionNotice(notice?: ReportState['extractionNotice']): string | null {
@@ -171,6 +174,9 @@ export function ResumeReportPage() {
         : null
   const displayReport = fixtureKind ? fixtureReport(fixtureKind) : report
   const displayIssues = displayReport?.issues ?? []
+  const reportSubtitle = viewState === 'report'
+    ? reportBlocksSubtitle(displayReport?.contentBlocks?.length ?? 0)
+    : REPORT_HEAD[viewState].sub
   const isFixture = Boolean(fixtureKind)
   const direction = targetContext ?? state.targetContext
   const summary = targetSummary(direction)
@@ -197,7 +203,16 @@ export function ResumeReportPage() {
    * 「重新解析」是一次新的提交（新的 AI 调用），因此只放在服务端明确说没成的这一屏。
    */
   const stepActions = <QxStepActions onPrev={() => navigate('/resume/source')}><QxAiHelp label="问小青：先改哪几处 →" draft="请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。" /></QxStepActions>
-  const failCta = (
+  // AI 停用时再解析一次也不会变好：不给「重新解析」，主按钮回简历来源（那里可以换办别的），
+  // 不用 AI 的出路（打印原件、自查清单）就在本屏下方。
+  const failCta = state.aiDown ? (
+    <>
+      {stepActions}
+      <p className="why" id="resume-report-why">AI 现在停用，再解析一次也不会变好；下面几条不需要 AI，现在就能做。</p>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')} data-route="/">返回首页</button>
+      <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/resume/source')} data-route="/resume/source" data-testid="resume-report-primary">返回简历来源</button>
+    </>
+  ) : (
     <>
       {stepActions}
       <p className="why" id="resume-report-why">上一次已明确没解析成功；重新解析会作为新的一次提交。这一屏一条 AI 结论都不给。</p>
@@ -237,7 +252,7 @@ export function ResumeReportPage() {
     <QxPageFrame
       title="简历诊断报告"
       back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }}
-      subtitle={REPORT_HEAD[viewState].sub}
+      subtitle={reportSubtitle}
       status={REPORT_STATUS[viewState]}
       terminalLabel="就业服务大厅"
       navbar={nav}
@@ -270,7 +285,7 @@ export function ResumeReportPage() {
         className="qx-scroll rrp-page"
         data-flat={parsed.flat ? '1' : undefined}
       >
-        <ResumeReportHead viewState={viewState} />
+        <ResumeReportHead viewState={viewState} subtitle={viewState === 'report' ? reportSubtitle : undefined} />
         {isFixture ? (
           <div className="rrp-idbar" data-testid="resume-report-fixture">
             <span className="rrp-fx">合成演示</span>

@@ -23,9 +23,14 @@
     <!-- 报告 -->
     <block wx:if="{{phase === 'done'}}">
 
-      <!-- 总评卡 -->
+      <!-- 固定免责说明（合规窗口 9/29 裁定，一字不差，不折叠）。样式照下方已有的说明文字。 -->
+      <view class="notice info ri-disc">
+        <text class="ficon i-info n-ic"></text>
+        <text>模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。</text>
+      </view>
+
+      <!-- 总评卡：练习表现等级不显示（合规窗口 9/29 裁定），只留岗位与总评文字。 -->
       <view class="ri-hero">
-        <view class="rh-level" style="color:{{overallColor}}">{{overallLabel}}</view>
         <view class="rh-pos">
           {{position}}
           <text wx:if="{{interviewerLabel}}" class="rh-iv"> · {{interviewerLabel}}</text>
@@ -107,7 +112,7 @@
 
       <view class="notice info ri-disc">
         <text class="ficon i-info n-ic"></text>
-        <text>以上复盘由 AI 生成，仅供个人练习参考，不代表任何招聘机构的评价标准。</text>
+        <text>AI 生成，仅供参考：以上复盘只用于你个人练习，不代表任何单位的评价标准。</text>
       </view>
 
     </block>

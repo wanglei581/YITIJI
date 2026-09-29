@@ -9,8 +9,11 @@ import { KIcon } from '../../components/kiosk-icon'
 import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
+import { API_BASE_URL } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
-import { AiTaskRegion, useAiTask } from '../../ai'
+import { AiTaskRegion, isAiOutage, useAiTask } from '../../ai'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { prepareAiDeclaration } from '../../ai/aiDeclarationGate'
 import { AssistantHoldToTalk } from './AssistantHoldToTalk'
 import { AssistantSessionSummaryBar } from './AssistantSessionSummaryBar'
 import type { AiAvailability, AiTaskFallback } from '../../ai'
@@ -39,6 +42,7 @@ import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecrui
 import { useAssistantDraftHandoff } from '../../services/assistantDraft'
 import { AssistantTaskPicker } from './AssistantTaskPicker'
 import { advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
+import { AI_CONTENT_COMPLAINT_ROUTE } from '../profile/me/feedback/aiComplaint'
 import './assistant-qingxu.css'
 
 const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
@@ -112,6 +116,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const [input, setInput] = useState('')
   useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)
   const [loading, setLoading] = useState(false)
+  const [declaring, setDeclaring] = useState(false)
   const quickQuestions = selectedTask?.questions ?? GENERAL_QUESTIONS
   const [aiAvailability, setAiAvailability] = useState<AiAvailability>('unknown')
   const [turnFailed, setTurnFailed] = useState(false)
@@ -124,6 +129,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const cancelledRef = useRef(false)
   const previousContextRef = useRef(`${toolboxSkill ?? 'general'}:${selectedTaskId ?? 'none'}`)
   const requestTokenRef = useRef(0)
+  const declaringRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const voiceTriggerRef = useRef<HTMLButtonElement>(null)
@@ -192,13 +198,49 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const sendMessage = useCallback(async (raw: string, options?: { resend?: boolean }) => {
     const text = raw.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH).trim()
     // 已确认回落到预置话术时不再发请求：既不刷成本，也不制造一个空转的 running 态。
-    if (!text || loading || aiAvailability === 'unavailable') return
+    if (!text || loading || declaringRef.current || aiAvailability === 'unavailable') return
     const assistantRequestMessage = selectedTask
       ? `当前咨询主题：${selectedTask.label}\n用户问题：${text}`
       : text
     const requestSessionId = sessionIdRef.current
     const requestToken = requestTokenRef.current + 1
     requestTokenRef.current = requestToken
+
+    // 年满 14 周岁还没点完之前，问题仍留在输入框，页面不写成「已发出」。
+    const token = getToken()
+    const declarationHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) declarationHeaders.Authorization = `Bearer ${token}`
+    declaringRef.current = true
+    setDeclaring(true)
+    try {
+      await prepareAiDeclaration(`${API_BASE_URL}/assistant/chat`, {
+        method: 'POST',
+        headers: declarationHeaders,
+      })
+    } catch (error) {
+      declaringRef.current = false
+      setDeclaring(false)
+      if (cancelledRef.current) return
+      if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
+      setMessages((current) => {
+        const base = options?.resend
+          ? current.filter((message, index) => !(index === current.length - 1 && message.kind === 'error'))
+          : [...current, { id: `u-${Date.now()}`, role: 'user' as const, kind: 'user' as const, text }]
+        return [...base, {
+          id: `err-${Date.now()}`,
+          role: 'assistant' as const,
+          kind: 'error' as const,
+          text: advisorErrorMessage(error, '这次没有发出'),
+        }]
+      })
+      if (!options?.resend) setInput('')
+      setTurnFailed(true)
+      return
+    }
+    declaringRef.current = false
+    setDeclaring(false)
+    if (cancelledRef.current) return
+    if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
 
     // 重试同一轮：不重复写一条「你的问题」，只把上一轮的失败说明撤下，再真实地发一次。
     setMessages((current) => (options?.resend
@@ -261,6 +303,17 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     } catch (error) {
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
+      // AI 能力级停用（暂停 / 当日额度已到 / 未配置）：重试这一轮不会变好。与「非 AI 回复」同样
+      // 锁住输入、转到不经过 AI 的四个入口；恢复后用户可点「重新检查 AI 顾问」再试。
+      if (isAiOutage(error)) {
+        setAiAvailability('unavailable')
+        setKeyboardOpen(false)
+        setMessages((current) => [
+          ...current,
+          { id: `err-${Date.now()}`, role: 'assistant', kind: 'error', text: advisorErrorMessage(error, 'AI 顾问现在停用，下面几项不经过 AI，照常能办。') },
+        ])
+        return
+      }
       setTurnFailed(true)
       setMessages((current) => [
         ...current,
@@ -552,8 +605,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             value={input}
             onChange={(event) => setInput(event.target.value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
             onKeyDown={handleKeyDown}
-            onFocus={() => !loading && !aiLocked && setKeyboardOpen(true)}
-            onClick={() => !loading && !aiLocked && setKeyboardOpen(true)}
+            onFocus={() => !loading && !declaring && !aiLocked && setKeyboardOpen(true)}
+            onClick={() => !loading && !declaring && !aiLocked && setKeyboardOpen(true)}
             inputMode="none"
             aria-label="输入咨询问题"
             placeholder={aiLocked
@@ -563,12 +616,12 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             maxLength={ASSISTANT_USER_MESSAGE_MAX_LENGTH}
             readOnly={aiLocked}
             aria-disabled={aiLocked || undefined}
-            disabled={!aiLocked && loading}
+            disabled={!aiLocked && (loading || declaring)}
           />
 
           <div className="assistant-dock-row">
             <AssistantHoldToTalk
-              unavailable={aiLocked || loading}
+              unavailable={aiLocked || loading || declaring}
               unavailableReason={aiLocked
                 ? '按住说话暂时停用，可选择上方的办事入口。'
                 : loading ? '正在等这一轮返回，请稍候再录音。' : undefined}
@@ -585,14 +638,14 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             />
             <span className="assistant-dock-spacer" />
             {draftLength > 0 && !aiLocked && (
-              <button type="button" className="assistant-dock-clear" disabled={loading} onClick={() => { setInput(''); focusComposer() }}>
+              <button type="button" className="assistant-dock-clear" disabled={loading || declaring} onClick={() => { setInput(''); focusComposer() }}>
                 清空草稿
               </button>
             )}
             <button
               type="button"
               className="assistant-tool-button"
-              disabled={!aiLocked && loading}
+              disabled={!aiLocked && (loading || declaring)}
               aria-disabled={aiLocked || undefined}
               onClick={() => {
                 if (aiLocked) return
@@ -611,7 +664,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 aria-haspopup="dialog"
                 aria-controls="assistant-voice-dialog"
                 aria-expanded={callActive}
-                disabled={loading}
+                disabled={loading || declaring}
                 onClick={openVoiceDialog}
               >
                 <KIcon name="mic" />
@@ -622,13 +675,14 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               type="button"
               className="assistant-send"
               onClick={aiLocked ? undefined : handleSend}
-              disabled={!aiLocked && (!input.trim() || loading)}
+              disabled={!aiLocked && (!input.trim() || loading || declaring)}
               aria-disabled={aiLocked || undefined}
             >
               <KIcon name="send" />
               {loading ? '等待返回' : '发送'}
             </button>
           </div>
+          <AiDeclarationNote />
 
           {aiLocked ? (
             <div className="assistant-composer-lock" role="status">
@@ -648,6 +702,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
         <footer className="assistant-truth" data-disclaimer="true">
           <p>{toolboxScene?.disclaimer ?? `${AI_LABEL_COPY.BASE}，身份、付款、打印、政策资格和录用结果都不由 AI 决定。`}</p>
+          {/* AI 内容投诉入口（C3，走查 W-01）：稿 05/52 没画，只放一个低调文字入口。 */}
+          <button type="button" className="assistant-complaint-link" data-route={AI_CONTENT_COMPLAINT_ROUTE} onClick={() => navigate(AI_CONTENT_COMPLAINT_ROUTE)}>
+            对回答有异议？投诉 AI 内容
+          </button>
         </footer>
       </div>
 

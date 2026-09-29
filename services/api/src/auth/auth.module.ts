@@ -4,7 +4,9 @@ import { AuditModule } from '../audit/audit.module'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RedisModule } from '../common/redis/redis.module'
 import { RolesGuard } from '../common/guards/roles.guard'
-import { createSmsSender, SMS_SENDER } from '../member-auth/sms/sms-sender'
+import { SMS_SENDER } from '../member-auth/sms/sms-sender'
+import { createInternalBudgetedSmsSender } from '../member-auth/sms/sms-budget'
+import { RedisService } from '../common/redis/redis.service'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AdminInitialPhoneBindService } from './admin-initial-phone-bind.service'
 import { AdminPhoneTransferService } from './admin-phone-transfer.service'
@@ -44,8 +46,9 @@ const JWT_TTL = '24h'
     InternalOtpService,
     JwtAuthGuard,
     RolesGuard,
-    { provide: SMS_SENDER, useFactory: createSmsSender },
+    // P1-5：真实发送器外包额度层（内部账号桶每日总量），见 sms-budget.ts。
+    { provide: SMS_SENDER, useFactory: createInternalBudgetedSmsSender, inject: [RedisService] },
   ],
-  exports:     [JwtModule, JwtAuthGuard, RolesGuard, AuthService, InternalOtpService],
+  exports:     [JwtModule, JwtAuthGuard, RolesGuard, AuthService, InternalOtpService, SMS_SENDER],
 })
 export class AuthModule {}

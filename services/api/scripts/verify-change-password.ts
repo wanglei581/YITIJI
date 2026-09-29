@@ -191,6 +191,7 @@ class MemoryRedis {
 
 class NoopSmsSender implements SmsSender {
   async sendCode(_phone: string, _code: string): Promise<void> {}
+  async sendPartnerPhoneRegisteredNotice(): Promise<void> {}
 }
 
 async function main() {

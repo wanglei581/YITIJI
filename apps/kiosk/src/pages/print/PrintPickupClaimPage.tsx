@@ -24,7 +24,6 @@
 // ============================================================
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { userMessageOf } from '../../services/api/userErrorMessage'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRightIcon, CheckIcon } from 'lucide-react'
@@ -46,7 +45,7 @@ import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
 import { PickupCodeBoxes, PickupFailurePanel, PickupKeypadCard, PickupOutsStrip, PickupSubtitle, PickupWinCard } from './components/PickupHidGuide'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
-import { PICKUP_LOCKED_MESSAGE, classifyClaimFailure, claimMetaLine, claimSuccessCopy, failureScreen, pickupCells } from './pickupClaimModel'
+import { classifyClaimFailure, claimMetaLine, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
 
 // ── 到机码工具 ────────────────────────────────────────────────
@@ -130,7 +129,7 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
       body.error?.message ??
       (Array.isArray(body.message) ? body.message.join('; ') : (body.message as string | undefined)) ??
       `到机码无效或已过期（${errCode}）`
-    // 带错误码抛出，userMessageOf 才能按 PICKUP_CODE_* 映射用户文案，而不是落到通用兜底
+    // 带错误码抛出，pickupClaimMessage 才能按 PICKUP_CODE_* 映射用户文案，而不是落到通用兜底
     throw new ApiHttpError(errCode, errMsg, res.status)
   }
   if (
@@ -212,7 +211,8 @@ export function PrintPickupClaimPage() {
       setCode('')
       const kind = classifyClaimFailure(err)
       setFailure({ kind, code: submittedCode })
-      setErrorMsg(kind === 'locked' ? PICKUP_LOCKED_MESSAGE : userMessageOf(err, '到机码校验没有完成，请重试或联系现场工作人员'))
+      // 文案按取件场景逐码登记（pickupClaimModel）；已用过 / 已退款这类终态码不许说「重试」。
+      setErrorMsg(pickupClaimMessage(err))
       setState('error')
       setTimeout(() => inputRef.current?.focus(), 80)
     }
@@ -298,9 +298,10 @@ export function PrintPickupClaimPage() {
     </QxPageFrame>
   )
 
-  // ── 成功：稿 rSuccess，分支只看服务端 released ─────────────────
+  // ── 成功：先看有没有放行，再看打印状态（已完成不能再说还在排队） ──
   if (state === 'success' && result) {
-    const copy = claimSuccessCopy(result.released)
+    const copy = claimSuccessCopy(result.released, result.printTaskStatus)
+    const destination = claimSuccessDestination(result)
     return frame(
       <div
         className="qx-scroll pickup-claim-page pickup-claim-success"
@@ -319,9 +320,15 @@ export function PrintPickupClaimPage() {
               type="button"
               className="qx-btn pcp-act pcp-act--go pcs-primary"
               data-testid="arrival-code-primary"
-              onClick={() => navigate(result.released ? '/print/progress' : '/print/cashier', {
+              onClick={() => navigate(destination, {
                 state: result.released
-                  ? { taskId: result.taskId, orderId: result.orderId, paymentSessionToken: result.paymentSessionToken }
+                  ? {
+                      taskId: result.taskId,
+                      orderId: result.orderId,
+                      orderNo: result.orderNo,
+                      amountCents: result.amountCents,
+                      paymentSessionToken: result.paymentSessionToken,
+                    }
                   : {
                       orderId: result.orderId,
                       orderNo: result.orderNo,

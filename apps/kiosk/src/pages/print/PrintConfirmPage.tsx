@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeftIcon, LoaderIcon, PrinterIcon } from 'lucide-react'
-import {
-  hasParamsBeyondCapability,
-  restrictToAllowedPrintParams,
-  type MemberBenefitItem,
-  type PrintJobParams,
-} from '@ai-job-print/shared'
+import type { MemberBenefitItem, PrintJobParams } from '@ai-job-print/shared'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
-import { loginPathForCurrentLocation } from '../../auth/returnPath'
+import { loginPathForPrintStep } from '../../auth/returnPath'
 import { API_MODE } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
 import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
@@ -30,14 +25,9 @@ import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
-import {
-  clearPrintMaterialSession,
-  printUploadPathForSource,
-  readPrintMaterialSession,
-  type MaterialCheckSummary,
-  type PrintMaterialSource,
-  type PrintFileState,
-} from './printMaterialSession'
+import { clearPrintMaterialSession, printUploadPathForSource, type PrintFileState } from './printMaterialSession'
+import { patchPrintHandoff } from './printHandoff'
+import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
 import { materialRedactionBadge } from './piiRedaction'
 import { subscribeTerminalSession, terminalSessionState, type TerminalSessionState } from '../../services/terminalAuth'
 import { PrintConfirmView } from './components/PrintConfirmView'
@@ -46,6 +36,7 @@ import {
   DUPLEX_LABEL,
   ORIENTATION_LABEL,
   PILL,
+  confirmScreenAllowsOrder,
   derivePrintConfirmScreen,
   type QuoteView,
 } from './printConfirmModel'
@@ -54,11 +45,8 @@ import './styles/print-confirm-qx.css'
 
 type PrintFile = PrintFileState
 
+/** 跳转带来的临时状态：文件、参数一律不从这里读（只认交接上下文），只剩合同报告的放弃凭据。 */
 interface LocationState {
-  file: PrintFile
-  params: PrintJobParams
-  materialCheck?: MaterialCheckSummary
-  source?: PrintMaterialSource
   contractReport?: {
     fileId: string
     abandonToken: string
@@ -113,18 +101,6 @@ function quoteKeyOf(fileUrl: string | null | undefined, params: PrintJobParams):
   return `${fileUrl ?? ''}|${JSON.stringify(params)}`
 }
 
-const DEFAULT_PARAMS: PrintJobParams = {
-  copies: 1,
-  colorMode: 'black_white',
-  duplex: 'simplex',
-  paperSize: 'A4',
-  pageRange: 'all',
-  orientation: 'auto',
-  quality: 'standard',
-  scale: 'fit',
-  pagesPerSheet: 1,
-}
-
 export function PrintConfirmPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -133,10 +109,11 @@ export function PrintConfirmPage() {
   const invalidReasonRef = useRef(invalidReason)
   if (queryInvalid && invalidReason) invalidReasonRef.current = invalidReason
   const state = location.state as LocationState | null
-  const restoredSession = useMemo(() => readPrintMaterialSession(), [])
-  const file = state?.file ?? restoredSession?.file ?? { name: '未知文件', size: '-', pages: null }
-  const incomingParams = state?.params ?? restoredSession?.printParams ?? DEFAULT_PARAMS
   const capability = usePrintParamCapability()
+  const {
+    handoff, problem, handoffInvalid, returnPath, ordered, params, adjustments, waitingCapability, paperNote,
+  } = usePrintConfirmHandoff(capability)
+  const file: PrintFile = handoff?.file ?? { name: '未知文件', size: '-', pages: null }
   const {
     printerReady,
     printerLabel,
@@ -152,17 +129,9 @@ export function PrintConfirmPage() {
       : printerKind === 'offline'
         ? `${printerLabel}。当前不能下单，不会扣费。请联系工作人员检查设备后再试。`
         : `${printerLabel}。当前不能下单，不会扣费。请联系工作人员。`
-  const capabilityAllows = useMemo(
-    () => ({ color: capability.color.allowed, duplex: capability.duplex.allowed }),
-    [capability.color.allowed, capability.duplex.allowed],
-  )
-  const paramsWereRestricted = hasParamsBeyondCapability(incomingParams, capabilityAllows)
-  const params = useMemo(
-    () => restrictToAllowedPrintParams(incomingParams, capabilityAllows),
-    [incomingParams, capabilityAllows],
-  )
-  const materialCheck = state?.materialCheck ?? restoredSession?.materialCheck
-  const source = state?.source ?? restoredSession?.source
+  const adjusted = adjustments.length > 0
+  const materialCheck = handoff?.materialCheck
+  const source = handoff?.source
   const uploadPath = printUploadPathForSource(source)
   const contractReport = state?.contractReport
   const isContractReport = Boolean(contractReport)
@@ -194,17 +163,17 @@ export function PrintConfirmPage() {
   const [priceNotice, setPriceNotice] = useState<{ key: string; text: string } | null>(null)
   const activeNotice = priceNotice?.key === quoteKey ? priceNotice.text : null
   const inFlightRef = useRef(false)
-  const hasFileContext = Boolean(state?.file ?? restoredSession?.file)
-  const benefitCardEnabled = API_MODE === 'http' && hasFileContext && !queryInvalid && !paramsWereRestricted
+  const hasFileContext = Boolean(handoff)
+  // 权益卡只在「不在等能力」时出（以前是「参数没被收口」时才出，收口后连登录入口都没了）。
+  const benefitCardEnabled = API_MODE === 'http' && hasFileContext && !queryInvalid && !waitingCapability && !ordered
   const [benefits, setBenefits] = useState<BenefitsView>({ status: 'loading' })
   const [priceCfg, setPriceCfg] = useState<PriceCfgView>({ status: 'loading' })
 
   useEffect(() => {
     if (API_MODE !== 'http') return
-    if (paramsWereRestricted) {
-      setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason: '彩色或双面本机暂未开通，已改回目前能打的参数' } })
-      return
-    }
+    // 本机能力还在加载、参数里又有彩色或双面：先别报价（停在「正在计算本次费用」），也不闪拦截屏。
+    // 建过单的只看状态，不再报价。
+    if (waitingCapability || ordered || !hasFileContext) return
     if (!file.fileUrl) {
       setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason: '打印文件尚未就绪，无法报价' } })
       return
@@ -231,7 +200,7 @@ export function PrintConfirmPage() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- quoteKey 已编码最终文件与全部打印参数
-  }, [quoteKey, paramsWereRestricted, quoteNonce])
+  }, [quoteKey, waitingCapability, ordered, hasFileContext, quoteNonce])
 
   useEffect(() => {
     if (!benefitCardEnabled) return
@@ -294,11 +263,24 @@ export function PrintConfirmPage() {
   }, [benefitCardEnabled, isLoggedIn, benefits, quote, priceCfg])
 
   // 稿 14 的 3×3 参数格。文件名、页数、大小在文件头里，不在格子里重复。
+  // 本机暂未开通、已改过的项画灰并就地写「已按……报价」（稿 14，9/29 定稿）。
+  const colorAdjusted = adjustments.some((item) => item.field === 'colorMode')
+  const duplexAdjusted = adjustments.some((item) => item.field === 'duplex')
   const summaryRows = [
     { label: '纸张规格', value: params.paperSize === 'A4' ? 'A4（210 × 297 mm）' : params.paperSize },
     { label: '页面方向', value: ORIENTATION_LABEL[params.orientation] ?? params.orientation },
-    { label: '色彩模式', value: COLOR_MODE_LABEL[params.colorMode] ?? params.colorMode },
-    { label: '单双面', value: DUPLEX_LABEL[params.duplex] ?? params.duplex },
+    {
+      label: '色彩模式',
+      value: colorAdjusted ? '彩色本机暂未开通，' : COLOR_MODE_LABEL[params.colorMode] ?? params.colorMode,
+      off: colorAdjusted,
+      note: colorAdjusted ? '已按黑白报价' : undefined,
+    },
+    {
+      label: '单双面',
+      value: duplexAdjusted ? '双面本机暂未开通，' : DUPLEX_LABEL[params.duplex] ?? params.duplex,
+      off: duplexAdjusted,
+      note: duplexAdjusted ? '已按单面报价' : undefined,
+    },
     { label: '版式', value: `${params.pagesPerSheet} 版/页` },
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
     { label: '页面范围', value: !params.pageRange || params.pageRange === 'all' ? '全部页面' : params.pageRange },
@@ -310,7 +292,10 @@ export function PrintConfirmPage() {
     queryInvalid,
     requestedState: scan.requestedState,
     hasFile: hasFileContext && !queryInvalid,
-    paramsWereRestricted,
+    handoffInvalid,
+    ordered,
+    waitingCapability,
+    adjusted,
     quote,
     benefitsError: benefits.status === 'error',
   })
@@ -320,6 +305,8 @@ export function PrintConfirmPage() {
     abandoning ||
     printerBlocked ||
     terminalSession !== 'ready' ||
+    !hasFileContext ||
+    (API_MODE === 'http' && !confirmScreenAllowsOrder(screen)) ||
     (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
 
   const handleBack = async () => {
@@ -351,6 +338,8 @@ export function PrintConfirmPage() {
       setSubmitError(printerBlockedReason)
       return
     }
+    // 同一份交接只能建一单；交接失效时不猜是哪一份。
+    if (!handoff || ordered) return
     if (API_MODE === 'http') {
       if (!file.fileUrl) {
         setSubmitError('打印文件尚未就绪，无法提交打印。请返回重新上传或重新生成文件后再试。')
@@ -407,7 +396,11 @@ export function PrintConfirmPage() {
           token:    getToken(),
         })
         leaving = true
-        clearPrintMaterialSession()
+        // 建单后只打标记、不清：收银页「返回确认页」只能看这一单，不能拿同一份再建第二单。完成页再清。
+        const marked = patchPrintHandoff(handoff.contextId, {
+          order: { orderId: created.orderId ?? null, taskId: created.taskId ?? null, orderedAt: new Date().toISOString() },
+        })
+        if (!marked) clearPrintMaterialSession()
         const nextState = {
           ...(isContractReport ? {} : location.state),
           file: { ...file, fileUrl: printFileUrl, name: printFileName, fileMd5: printFileMd5 },
@@ -420,6 +413,7 @@ export function PrintConfirmPage() {
           priceLines:  created.priceLines,
           paymentSessionToken: created.paymentSessionToken,
           hasEndUser:  created.hasEndUser,
+          idDocument:  handoff.idDocument === true,
         }
         if (created.amountCents > 0 && created.payStatus !== 'paid') {
           navigate('/print/cashier', { state: nextState })
@@ -449,9 +443,11 @@ export function PrintConfirmPage() {
       }
       return
     }
-    clearPrintMaterialSession()
+    if (!patchPrintHandoff(handoff.contextId, { order: { orderId: null, taskId: null, orderedAt: new Date().toISOString() } })) {
+      clearPrintMaterialSession()
+    }
     navigate('/print/progress', {
-      state: { ...(isContractReport ? {} : location.state), file, params, source },
+      state: { ...(isContractReport ? {} : location.state), file, params, source, idDocument: handoff.idDocument === true },
     })
   }
 
@@ -494,15 +490,9 @@ export function PrintConfirmPage() {
               ? '按以上设置打印风险提示报告'
               : appendEligible
                 ? '打印合并版（简历+自我探索）'
-                : screen === 'zero-amount'
-                  ? '确认并建单'
+                : quote.status === 'ready' && quote.amountCents === 0
+                  ? '确认并打印'
                   : '确认并去付款'
-
-  const primaryAccessible = reconfirmLabel ?? (isContractReport
-    ? '按以上设置打印风险提示报告'
-    : appendEligible
-      ? '打印合并版（简历+自我探索）'
-      : '确认并去付款 · 按以上设置打印原文件')
 
   // 稿 14 .cfm-act：动作收在 03 卡里（返回在左、主操作在右），不再挂在底部操作条上。
   const backLabel = isContractReport ? (abandoning ? '正在删除…' : '放弃打印') : '返回修改'
@@ -518,7 +508,7 @@ export function PrintConfirmPage() {
       className="qx-btn"
       data-variant="primary"
       disabled={confirmBlocked}
-      aria-label={primaryAccessible}
+      aria-label={label}
       onClick={() => void handleConfirm()}
     >
       {submitting ? <LoaderIcon size={24} aria-hidden="true" /> : <PrinterIcon size={24} aria-hidden="true" />}
@@ -533,13 +523,22 @@ export function PrintConfirmPage() {
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>我的打印订单</button>
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>重新选文件</button>
     </>
+  ) : screen === 'invalid-context' && handoffInvalid ? (
+    // 交接失效（上一位的、过期、被替换）：只给「回到上一步」和「重新选文件」，不提供切到别的那一份。
+    <>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => (returnPath ? navigate(returnPath) : navigate(-1))}>回到上一步</button>
+      <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>重新选文件</button>
+    </>
   ) : screen === 'invalid-context' ? (
     <>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print/desk')}>返回打印台</button>
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>重新选文件</button>
     </>
-  ) : screen === 'capability-invalid-params' ? (
-    <>{backButton('返回改参数')}{waitButton('参数回到黑白单面后可确认')}</>
+  ) : screen === 'ordered' ? (
+    <>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>我的打印订单</button>
+      <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(-1)}>回到这一单</button>
+    </>
   ) : screen === 'quoting' ? (
     <>{backButton()}{waitButton('获取报价后可继续')}</>
   ) : screen === 'quote-failed' ? (
@@ -599,7 +598,8 @@ export function PrintConfirmPage() {
 
   return (
     <QxPageFrame
-      back={{ label: '返回预览与参数', onBack: () => navigate('/print/preview') }}
+      // 直达打印台参数页（不经旧地址重定向）；是哪一份文件由交接上下文决定。
+      back={{ label: '返回预览与参数', onBack: () => navigate('/print/desk?step=preview') }}
       // 稿 14 没有独立页头：小青区就是页头。标题留给读屏，视觉上由小青区承担。
       title="报价确认"
       status={status}
@@ -612,15 +612,16 @@ export function PrintConfirmPage() {
         step={4}
         screen={screen}
         invalidReason={
-          invalidReason
+          (handoffInvalid ? problem : null)
+          || invalidReason
           || invalidReasonRef.current
           || '这一次没有真的核对失败：本屏是从地址栏直接指定的失败态。交接参数没通过登记核对。'
         }
         file={file}
         summaryRows={summaryRows}
-        incomingParams={incomingParams}
-        colorOff={!capabilityAllows.color && incomingParams.colorMode !== 'black_white'}
-        duplexOff={!capabilityAllows.duplex && incomingParams.duplex !== 'simplex'}
+        adjustments={adjustments}
+        paperNote={paperNote}
+        pricedParamsLabel={`${COLOR_MODE_LABEL[params.colorMode] ?? params.colorMode} · ${DUPLEX_LABEL[params.duplex] ?? params.duplex}`}
         quote={quote}
         costCalcLabel={costCalcLabel}
         amountText={amountText}
@@ -631,12 +632,12 @@ export function PrintConfirmPage() {
         printerBlockedReason={printerBlockedReason}
         terminalFailed={terminalSession === 'failed'}
         terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, '这台机器的安全校验没通过，请联系现场工作人员')}
-        paramsWereRestricted={paramsWereRestricted}
         selfAssessment={selfAssessment}
         printNotes={printNotes}
         actions={actions}
         submitError={submitError ?? activeNotice}
-        onLogin={() => navigate(loginPathForCurrentLocation())}
+        // 回跳地址只放路由路径：不带文件编号、打印链接、交接编号，也不带当前查询串。
+        onLogin={() => navigate(loginPathForPrintStep('confirm'))}
       />
     </QxPageFrame>
   )

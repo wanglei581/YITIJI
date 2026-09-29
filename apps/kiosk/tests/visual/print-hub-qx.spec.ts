@@ -217,7 +217,7 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
   expect(errors).toEqual([])
 })
 
-// D3（2026-09-28）：签名盖章默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS）。
+// D3（2026-09-28）：签名默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS）。
 // 能力读取成功、但本机没有已配置的 signature_stamp 行时，这张卡必须和管理员配成 not_verified 一样
 // 整卡停用、写明「本机暂未开通」—— 不能让人点进去、传完文件才被服务端拒绝。两种形状都要覆盖：
 //   · 列表里根本没有这一行；
@@ -341,5 +341,100 @@ test('unknown feature key fails closed with recovery actions @w2', async ({ page
   await expect(page.getByRole('button', { name: '联系工作人员' })).toBeVisible()
   await page.getByRole('button', { name: '返回打印扫描服务' }).click()
   await expect(page).toHaveURL(/\/print-scan$/)
+  expect(errors).toEqual([])
+})
+
+// R4（2026-09-29 产品负责人拍板）：复印走打印机面板自带功能。打印扫描首页的「复印」卡原是 2.0 稿 10
+// 里不可点的静态说明（data-static / role=group），按拍板改为可点，进 /print-scan/feature/copy。
+// 这条用例从首页真实点击进入说明态，再点「返回打印扫描」回到首页。
+test('copy card opens the panel copy guide and returns to the hub @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+
+  await page.goto('/print-scan')
+  await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
+  const copyCard = page.getByTestId('print-hub-copy-note')
+  // 依据 R4（9/29）：复印卡从静态说明改为可点按钮，不再带 data-static。
+  await expect(copyCard).toHaveRole('button')
+  await expect(copyCard).not.toHaveAttribute('data-static', /.*/)
+  await expect(copyCard).toContainText('在打印机面板上操作，取走纸质复印件。')
+  await page.screenshot({ path: test.info().outputPath('01-print-hub.png') })
+  await copyCard.click()
+
+  await expect(page).toHaveURL(/\/print-scan\/feature\/copy$/)
+  const guide = page.getByTestId('print-hub-state-feature-copy')
+  await expect(guide).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '怎么在打印机上复印' })).toHaveCount(1)
+  await expect(guide.getByText('不用在这台屏幕上下单', { exact: false })).toBeVisible()
+  await expect(guide.getByText('也不会出现在「我的打印订单」里', { exact: false })).toBeVisible()
+  await expect(page.getByTestId('print-hub-copy-steps').locator('li')).toHaveCount(5)
+  // 按钮名按面板屏幕实际字样：主屏的「复印」「身份证复印」「票据复印」。手册里前后不一的叫法不得出现。
+  for (const panelWord of ['「复印」', '「身份证复印」', '「票据复印」']) {
+    await expect(guide.getByText(panelWord, { exact: false }).first()).toBeVisible()
+  }
+  for (const manualWord of ['OK 键', 'OK键', '复印开始键']) {
+    await expect(guide.getByText(manualWord, { exact: false })).toHaveCount(0)
+  }
+  // 身份证放置位置待现场核实：只给指路句，不编造位置。
+  await expect(page.getByTestId('print-hub-copy-case-id-card')).toHaveAttribute('data-pending', 'true')
+  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕提示或找工作人员。')
+  await expect(page.getByTestId('print-hub-copy-take-original')).toContainText('别忘了取走玻璃上或进纸口里的原件（身份证等）')
+  await expect(page.getByTestId('print-hub-copy-legal')).toContainText('不得复印伪造的证件、印章、票据。')
+  // 不伪造结果、不写收费、不写工程词。
+  for (const word of ['已复印', '复印成功', '复印完成', '免费', '元/页', '服务端', 'Agent', '能力配置']) {
+    await expect(guide.getByText(word, { exact: false })).toHaveCount(0)
+  }
+  await expectNoForgedReady(page)
+  await assertNoHorizontalOverflow(page)
+
+  if (page.viewportSize()?.width === 1080) {
+    const geo = await page.evaluate(() => {
+      const scroller = document.querySelector('.ph-page') as HTMLElement
+      const box = scroller.getBoundingClientRect()
+      const lastBottom = Math.max(...[...scroller.children].map((el) => el.getBoundingClientRect().bottom))
+      const texts = [...scroller.querySelectorAll('b, .d, .ph-state-p, .ph-state-t, .ph-truth div, .ph-xq-doing, .ph-sec-h .t, .hint')]
+        .filter((el) => (el.textContent ?? '').trim().length > 0)
+        .map((el) => parseFloat(getComputedStyle(el).fontSize))
+      const ctas = [...document.querySelectorAll('.qx-ctabar .qx-btn')].map((el) => el.getBoundingClientRect().height)
+      return {
+        overflow: scroller.scrollHeight - scroller.clientHeight,
+        trailingBlank: box.bottom - lastBottom,
+        minFont: Math.min(...texts),
+        minCta: Math.min(...ctas),
+      }
+    })
+    console.log(`copy-guide-geometry ${JSON.stringify(geo)}`)
+    expect(geo.overflow, '1080×1920 一屏放下，不需要滚动').toBeLessThanOrEqual(1)
+    expect(geo.trailingBlank, '一屏内不许大片留白（整行 ≥160px 即算）').toBeLessThan(160)
+    expect(geo.minFont, '主要文字 ≥20px').toBeGreaterThanOrEqual(20)
+    expect(geo.minCta, '底部主按钮 ≥56px').toBeGreaterThanOrEqual(56)
+  }
+  await page.screenshot({ path: test.info().outputPath('02-copy-guide.png') })
+
+  // 点底部操作条里的「返回打印扫描」（顶栏返回键同名，这里点的是操作条那一个）。
+  await page.locator('.qx-ctabar').getByRole('button', { name: '返回打印扫描', exact: true }).click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('03-back-to-hub.png') })
+  expect(errors).toEqual([])
+})
+
+test('unknown feature page lists the copy guide as the second known explanation @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: [] },
+  })
+
+  await page.goto('/print-scan/feature/not-a-real-feature')
+  await expect(page.locator('[data-testid="print-hub-state-feature-not-found"]')).toBeVisible()
+  await page.getByTestId('print-hub-copy-note').click()
+  await expect(page).toHaveURL(/\/print-scan\/feature\/copy$/)
+  await expect(page.getByTestId('print-hub-state-feature-copy')).toBeVisible()
   expect(errors).toEqual([])
 })

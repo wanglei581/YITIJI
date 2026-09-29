@@ -8,7 +8,7 @@ import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
-import { seedMaterialSession, setReactRouterState, writeMaterialSession, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
+import { seedMaterialSession, seedPrintHandoff, setReactRouterState, writeMaterialSession, writePrintHandoff, W2_FILE, W2_ORDER, W2_PRINT_PARAMS, type PrintHandoffSeed } from './fixtures/fusion-w2-state'
 
 const NOW = '2026-07-24T00:00:00.000Z'
 const LATER = '2099-07-24T00:10:00.000Z'
@@ -91,6 +91,16 @@ function registerPrice(api: ApiRouter): void {
       ],
     },
   })
+}
+
+/**
+ * 打印交接统一（商用收口 P0-5）之后，打印台 / 确认页只认打印交接上下文，跳转临时状态里的文件一律不看。
+ * 以前这些用例用 setReactRouterState 把文件塞进临时状态造数；现在改为写一份 v2 上下文再重载。
+ */
+async function openWithHandoff(page: Page, path: string, seed: PrintHandoffSeed): Promise<void> {
+  await page.goto(path)
+  await writePrintHandoff(page, seed)
+  await page.reload({ waitUntil: 'domcontentloaded' })
 }
 
 test('pickup scanner auto-submits once and Enter suffix is deduplicated @w2', async ({ page, api }) => {
@@ -1028,8 +1038,7 @@ test('material checks require a PII decision, create the redacted task, and carr
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
 
-  await page.goto('/print/desk?step=check')
-  await setReactRouterState(page, '/print/desk?step=check', { file: W2_FILE, source: 'document' })
+  await openWithHandoff(page, '/print/desk?step=check', { materialCheck: null, printParams: null })
   await expect(page.getByRole('heading', { name: '有 1 处要你决定', exact: true })).toBeVisible()
   await expect(page.locator('.qpd-finding-snippet')).toHaveText('第 1 页 · 138****8000')
   await expect(page.locator('.qpd-decision-counts')).toContainText('已决定 0 / 1')
@@ -1055,8 +1064,7 @@ test('material check failure exposes its real retry action @w2', async ({ page, 
     json: { success: false, error: { code: 'MATERIAL_UNAVAILABLE', message: '材料服务暂不可用' } },
   })
 
-  await page.goto('/print/desk?step=check')
-  await setReactRouterState(page, '/print/desk?step=check', { file: W2_FILE, source: 'document' })
+  await openWithHandoff(page, '/print/desk?step=check', { materialCheck: null, printParams: null })
   await expect(page.getByRole('heading', { name: '材料检查未完成' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重试检查' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '现在的事实' })).toBeVisible()
@@ -1105,8 +1113,7 @@ test('direct preview without a completed PII summary is fail-closed @w2', async 
   const errors = collectRuntimeErrors(page)
   registerShell(api)
 
-  await page.goto('/print/desk?step=preview')
-  await setReactRouterState(page, '/print/desk?step=preview', { file: W2_FILE, source: 'document' })
+  await openWithHandoff(page, '/print/desk?step=preview', { materialCheck: null, printParams: null })
 
   const preview = page.locator('[data-w2-page="print-preview"]')
   await expect(preview).toHaveAttribute('data-qx-state', 'check-required')
@@ -1120,10 +1127,8 @@ test('preview rejects task ids without a trustworthy redaction result @w2', asyn
   const errors = collectRuntimeErrors(page)
   registerShell(api)
 
-  await page.goto('/print/desk?step=preview')
-  await setReactRouterState(page, '/print/desk?step=preview', {
-    file: W2_FILE,
-    source: 'document',
+  await openWithHandoff(page, '/print/desk?step=preview', {
+    printParams: null,
     materialCheck: {
       inspectionTaskId: 'w2-inspection-001',
       piiTaskId: 'w2-pii-001',
@@ -1435,7 +1440,7 @@ test('paid print-job amount routes confirmation to cashier @w2', async ({ page, 
 
   await page.goto('/print/confirm')
   await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /按以上设置打印原文件/ }).click()
+  await page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ }).click()
   await page.waitForURL('**/print/cashier')
   await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(W2_ORDER.paymentSessionToken)).toHaveCount(0)
@@ -2020,7 +2025,8 @@ function registerBenefits(api: ApiRouter, items: Record<string, unknown>[]): voi
   })
 }
 
-const CONFIRM_STATE = { file: W2_FILE, params: W2_PRINT_PARAMS, source: 'document' }
+/** 没有材料检查结论的确认页交接（ai-down / 登录后的会员用例）；游客写入、会员读到时按「中途登录」改绑。 */
+const CONFIRM_HANDOFF: PrintHandoffSeed = { materialCheck: null }
 
 const benefitCard = (page: Page) => page.locator('[data-benefit-state]')
 
@@ -2051,8 +2057,7 @@ test('benefit card survives the AI-down state and stays decoupled from 材料体
   registerPrice(api)
   registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
 
-  await page.goto('/print/confirm')
-  await setReactRouterState(page, '/print/confirm', CONFIRM_STATE)
+  await openWithHandoff(page, '/print/confirm', CONFIRM_HANDOFF)
   // 体检摘要缺席（ai-down），但权益卡与金额都在。
   await expect(page.getByText('隐私检查摘要')).toHaveCount(0)
   await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'guest')
@@ -2077,7 +2082,7 @@ test('benefit card reports 价目拉不到 when the quote fails and shows no amo
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新报价' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /按以上设置打印原文件/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2140,7 +2145,8 @@ test('benefit card lists usable grants but keeps redemption disabled and focusab
   ])
 
   await loginThroughVisibleUi(page, '/print/confirm')
-  await softNavigate(page, '/print/confirm', CONFIRM_STATE)
+  await writePrintHandoff(page, CONFIRM_HANDOFF)
+  await softNavigate(page, '/print/confirm', null)
 
   await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'available')
   await expect(page.getByText('你有 1 项权益在有效期内', { exact: true })).toBeVisible()
@@ -2191,7 +2197,8 @@ test('benefit card reports 已用完/过期 when no grant passes the server prec
   ])
 
   await loginThroughVisibleUi(page, '/print/confirm')
-  await softNavigate(page, '/print/confirm', CONFIRM_STATE)
+  await writePrintHandoff(page, CONFIRM_HANDOFF)
+  await softNavigate(page, '/print/confirm', null)
 
   await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'none')
   await expect(page.getByText('当前没有可核销的权益', { exact: true })).toBeVisible()
@@ -2215,7 +2222,8 @@ test('benefit card says 读不出来 instead of 没有权益 when /me/benefits f
   })
 
   await loginThroughVisibleUi(page, '/print/confirm')
-  await softNavigate(page, '/print/confirm', CONFIRM_STATE)
+  await writePrintHandoff(page, CONFIRM_HANDOFF)
+  await softNavigate(page, '/print/confirm', null)
 
   await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'error')
   await expect(page.getByText('权益暂时读不出来', { exact: true })).toBeVisible()
@@ -2293,7 +2301,7 @@ test('print confirm create-job payload matches the quoted file and params @w2', 
   await seedMaterialSession(page)
   await page.goto('/print/confirm')
   await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
-  await page.getByRole('button', { name: /按以上设置打印原文件/ }).click()
+  await page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ }).click()
   await page.waitForURL('**/print/cashier')
   expect(jobBody?.fileUrl).toBe(W2_FILE.fileUrl)
   expect(jobBody?.fileName).toBe(W2_FILE.name)
@@ -2388,37 +2396,7 @@ test('print preview paints each PDF page on a canvas and leaves without ERR_ABOR
     body: buildCanvasPreviewPdf(['0 0 0 rg\n30 30 40 140 re f\n', '0 0 0 rg\n130 30 40 140 re f\n']),
   }))
   const file = { ...W2_FILE, fileUrl: pdfPath, name: 'two-page.pdf', pages: 2 }
-  await page.addInitScript(({ key, value }) => {
-    window.sessionStorage.setItem(key, JSON.stringify(value))
-  }, {
-    key: 'ai-job-print:current-print-material-check',
-    value: {
-      file,
-      source: 'document',
-      materialCheck: {
-        inspectionTaskId: 'w2-inspection-001',
-        normalizeTaskId: 'w2-normalize-001',
-        piiTaskId: 'w2-pii-001',
-        piiRedactTaskId: 'w2-pii-redact-001',
-        checkedAt: '2026-07-24T00:00:00.000Z',
-        findingCount: 0,
-        redactedCount: 0,
-        keptCount: 0,
-        redaction: {
-          claim: 'nothing_to_redact',
-          redactedFileId: null,
-          appliedRedactedCount: 0,
-          failedNoPositionCount: 0,
-          keptCount: 0,
-          reverifyRemainingCount: null,
-          reverifyRan: false,
-        },
-        mode: 'checked',
-      },
-      printParams: W2_PRINT_PARAMS,
-      updatedAt: '2026-07-24T00:00:00.000Z',
-    },
-  })
+  await seedPrintHandoff(page, { file })
 
   await page.goto('/print/desk?step=preview')
   const host = page.locator(`[data-pdf-preview-host][data-preview-src="${pdfPath}"]`)
@@ -2464,37 +2442,7 @@ test('print preview paints preset-CMap Chinese text @w2', async ({ page, api }) 
     body: pdfBytes,
   }))
   const file = { ...W2_FILE, fileUrl: pdfPath, name: 'zh-cmap.pdf', pages: 1 }
-  await page.addInitScript(({ key, value }) => {
-    window.sessionStorage.setItem(key, JSON.stringify(value))
-  }, {
-    key: 'ai-job-print:current-print-material-check',
-    value: {
-      file,
-      source: 'document',
-      materialCheck: {
-        inspectionTaskId: 'w2-inspection-001',
-        normalizeTaskId: 'w2-normalize-001',
-        piiTaskId: 'w2-pii-001',
-        piiRedactTaskId: 'w2-pii-redact-001',
-        checkedAt: '2026-07-24T00:00:00.000Z',
-        findingCount: 0,
-        redactedCount: 0,
-        keptCount: 0,
-        redaction: {
-          claim: 'nothing_to_redact',
-          redactedFileId: null,
-          appliedRedactedCount: 0,
-          failedNoPositionCount: 0,
-          keptCount: 0,
-          reverifyRemainingCount: null,
-          reverifyRan: false,
-        },
-        mode: 'checked',
-      },
-      printParams: W2_PRINT_PARAMS,
-      updatedAt: '2026-07-24T00:00:00.000Z',
-    },
-  })
+  await seedPrintHandoff(page, { file })
 
   await page.goto('/print/desk?step=preview')
   const host = page.locator(`[data-pdf-preview-host][data-preview-src="${pdfPath}"]`)

@@ -27,8 +27,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type { FairVisitPlanResponse } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import { FileTextIcon, MapIcon, PrinterIcon, SparklesIcon, UsersIcon } from 'lucide-react'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import {
@@ -54,6 +55,7 @@ import {
   DirStrip,
   DirStripItem,
 } from '../../components/qingxu/directory/DirectoryBits'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 interface PageState {
   taskId?: string
@@ -96,6 +98,7 @@ const COPY = {
 
 export function FairVisitPlanPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const fairId = id ?? ''
@@ -173,6 +176,11 @@ export function FairVisitPlanPage() {
       if (result.status === 'failed') setError(result.failReason ?? '生成未完成，请稍后重试')
       else setPlan(result)
     } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setError(declined)
+        return
+      }
       // 能力级故障与「这次没成」分开报：前者说清 AI 不可用、浏览与打印不受影响，
       // 后者保留重试。把限流报成「功能不可用」本身就是伪造能力的一种。
       setAiUnavailable(isAiOutage(err))
@@ -189,17 +197,17 @@ export function FairVisitPlanPage() {
     try {
       const file = await printFairVisitPlan(fairId, taskId, { token: getToken(), accessToken })
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size: formatSize(file.sizeBytes),
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: file.pageCount > 1 ? 'double' : 'single', color: 'bw' }),
+      startPrint({
+        origin: 'fair_visit_plan',
+        returnPath: window.location.pathname,
+        paramsSuggestion: file.pageCount > 1 ? { duplex: 'duplex_long_edge' } : undefined,
+        file: {
+          name: file.filename,
+          size: formatSize(file.sizeBytes),
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
     } catch (err) {
@@ -270,17 +278,20 @@ export function FairVisitPlanPage() {
               底栏主键是「选择本人简历」—— 简历明明已经确认过了。 */}
           <p className="why">生成不保证成功；失败会明确说明原因，不会给你一份空清单。</p>
           <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>打印活动资料</button>
-          <button
-            type="button"
-            className="qx-btn narrow"
-            data-variant="primary"
-            data-testid="fair-visit-plan-generate"
-            disabled={generating}
-            onClick={() => void handleGenerate()}
-          >
-            <SparklesIcon size={20} aria-hidden />
-            {copy.generate}
-          </button>
+          <span className="qx-ai-declaration-slot">
+            <button
+              type="button"
+              className="qx-btn narrow"
+              data-variant="primary"
+              data-testid="fair-visit-plan-generate"
+              disabled={generating}
+              onClick={() => void handleGenerate()}
+            >
+              <SparklesIcon size={20} aria-hidden />
+              {copy.generate}
+            </button>
+            <AiDeclarationNote />
+          </span>
         </>
       )
     : uiState === 'load-failed'
@@ -296,17 +307,20 @@ export function FairVisitPlanPage() {
           >
             重新加载
           </button>
-          <button
-            type="button"
-            className="qx-btn narrow"
-            data-variant="primary"
-            data-testid="fair-visit-plan-generate"
-            disabled={generating}
-            onClick={() => void handleGenerate()}
-          >
-            <SparklesIcon size={20} aria-hidden />
-            {copy.generate}
-          </button>
+          <span className="qx-ai-declaration-slot">
+            <button
+              type="button"
+              className="qx-btn narrow"
+              data-variant="primary"
+              data-testid="fair-visit-plan-generate"
+              disabled={generating}
+              onClick={() => void handleGenerate()}
+            >
+              <SparklesIcon size={20} aria-hidden />
+              {copy.generate}
+            </button>
+            <AiDeclarationNote />
+          </span>
         </>
       )
     : uiState === 'generating'

@@ -351,7 +351,7 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
       <div className="mt-6 space-y-0.5 border-t border-neutral-100 pt-4 text-xs text-neutral-400">
         <p>· 只接收岗位/招聘会展示字段，不接收简历、候选人、面试、Offer 等招聘闭环数据</p>
         <p>· Webhook/API 凭证只保存在服务端，前端只显示是否已配置</p>
-        <p>· 所有导入岗位默认待审核（pending + draft），管理员审核发布后才展示</p>
+        <p>· 所有导入岗位默认待审核（pending + draft）；审核发布入口尚未开放（平台不代审、不代发），开放并发布前不展示</p>
       </div>
     </Card>
   )
@@ -641,7 +641,7 @@ export default function SourcesPage() {
           sourceName={excelSource.name}
           onClose={() => setExcelSource(null)}
           onImported={(count) => {
-            setImportNotice(`文件导入完成，共 ${count} 条（默认待审核，管理员发布后才会在终端展示）`)
+            setImportNotice(`文件导入完成，共 ${count} 条（默认待审核；平台不代审、不代发，审核发布入口尚未开放，开放并发布前终端不展示）`)
             void fetchSources()
           }}
         />
@@ -680,7 +680,7 @@ export default function SourcesPage() {
                 </p>
               )}
             </div>
-            <p className="text-xs text-neutral-400">payload 字段规范见对接文档;推送数据默认进入待审核,管理员审核通过后才会在终端展示。</p>
+            <p className="text-xs text-neutral-400">payload 字段规范见对接文档;推送数据默认进入待审核;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示。</p>
           </div>
         )}
       </Drawer>

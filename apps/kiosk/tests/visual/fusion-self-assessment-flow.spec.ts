@@ -3,6 +3,7 @@ import { test, expect } from '../fixtures/kiosk-test'
 import { registerW6Api } from './fixtures/fusion-w6-api'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
+import { CURRENT_SELF_ASSESSMENT_CONSENT_VERSION, SELF_ASSESSMENT_QUESTIONS_PATH, selfAssessmentQuestionsResponse } from '../fixtures/self-assessment-questions'
 
 /**
  * 上线前自评估 §1.6 修复：真网络端到端断言。
@@ -198,5 +199,110 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     const resp = await delResp
     expect(resp.status()).toBe(200)
     expect(errors).toEqual([])
+  })
+
+  // ── #1119 同批：同意说明只来自 /questions 下发 ──────────────────────────────
+  const served = selfAssessmentQuestionsResponse()
+  const minorChapter = '六、未满十四周岁未成年人个人信息处理规则'
+  const privacyText = [
+    '一、我们收集的信息\n登录信息：手机号，用于验证码登录，系统中加密存储。',
+    '二、信息如何使用\n简历内容只用于你本次发起的分析，不推送给任何企业。',
+    '三、保存期限与自动清理\n证件照与未登录上传的文件设置短期有效期，到期自动删除。',
+    '四、你的权利\n登录后可查看、下载、删除本人名下的文档与记录。',
+    '五、联系我们\n请联系现场工作人员，或按终端公示的方式与运营方联系。',
+    `${minorChapter}\n未满十四周岁的，须取得监护人同意，并由监护人陪同使用。`,
+  ].join('\n\n')
+  const registerLegal = (api: ReturnType<typeof Object>) => {
+    const r = api as { respond: (m: string, p: string, v: { status: number; json: unknown }) => void }
+    r.respond('GET', '/api/v1/kiosk/legal/privacy_policy', {
+      status: 200, json: { success: true, data: { content: privacyText, publishedAt: '2026-09-20T02:00:00.000Z', version: 'privacy-2026-09' } },
+    })
+    r.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  }
+
+  test('同意页渲染下发的条款与勾选框文字；链接打开到未成年人专章，返回后勾选仍在 @w3-kiosk', async ({ page, api }) => {
+    registerSelfAssessmentApi(api, page)
+    registerLegal(api)
+    await page.goto('/resume/self-assessment/intro')
+    const items = page.getByTestId('self-assessment-consent-items').locator('li > div')
+    await expect(items).toHaveText(served.consentItems)
+    const label = page.getByTestId('self-assessment-consent-required-label')
+    await expect(label).toHaveText(served.consentCheckboxLabel)
+    await expect(page.getByText(`同意版本 ${served.consentVersion}`)).toBeVisible()
+
+    const box = page.getByTestId('self-assessment-consent-required')
+    await expect(box).toHaveAttribute('aria-checked', 'false')
+    await expect(page.getByTestId('self-assessment-primary')).toHaveAttribute('aria-disabled', 'true')
+    await box.click()
+    await expect(box).toHaveAttribute('aria-checked', 'true')
+
+    await page.getByTestId('self-assessment-consent-link').click()
+    await expect(page).toHaveURL((url) => url.pathname === '/legal/privacy'
+      && url.searchParams.get('section') === served.consentLinks[0].sectionTitle)
+    const toc = page.getByTestId('legal-list').getByRole('button')
+    await expect(toc).toHaveCount(6)
+    await expect(page.getByTestId('legal-sec-5')).toHaveAttribute('aria-current', 'true')
+    await expect(page.locator('.legal-doc-body h3')).toHaveText(minorChapter)
+
+    await page.getByRole('button', { name: '返回上一页' }).first().click()
+    await expect(page).toHaveURL(/\/resume\/self-assessment\/intro$/)
+    await expect(page.getByTestId('self-assessment-consent-required')).toHaveAttribute('aria-checked', 'true')
+    await page.getByTestId('self-assessment-primary').click()
+    await expect(page).toHaveURL(/\/resume\/self-assessment\/questions$/)
+    const stored = await page.evaluate(() => JSON.parse(sessionStorage.getItem('self_assessment_session_v1') ?? '{}'))
+    expect(stored.consentVersion).toBe(served.consentVersion)
+  })
+
+  test('同意说明没有取到：不放行作答，重试取到后才可勾选 @w3-kiosk', async ({ page, api }) => {
+    registerSelfAssessmentApi(api, page)
+    api.respondWith('GET', SELF_ASSESSMENT_QUESTIONS_PATH, (n) => n === 1
+      ? { status: 503, json: { error: { code: 'MAINTENANCE_MODE', message: '设备维护中，请稍后再来' } } }
+      : { status: 200, json: served })
+    await page.goto('/resume/self-assessment/intro')
+    const card = page.getByTestId('self-assessment-consent')
+    await expect(card).toContainText('同意说明没有取到，请重试')
+    await expect(page.getByTestId('self-assessment-consent-items')).toHaveCount(0)
+    await expect(page.getByTestId('self-assessment-consent-required')).toHaveCount(0)
+    await expect(page.getByTestId('self-assessment-primary')).toHaveAttribute('aria-disabled', 'true')
+    await page.getByTestId('self-assessment-consent-retry').click()
+    await expect(page.getByTestId('self-assessment-consent-items').locator('li')).toHaveCount(served.consentItems.length)
+    expect(api.requestCount('GET', SELF_ASSESSMENT_QUESTIONS_PATH)).toBe(2)
+  })
+
+  test('旧版本会话提交被拒：回到重新确认，已答保留，确认后自动重交一次 @w3-kiosk', async ({ page, api }) => {
+    registerSelfAssessmentApi(api, page)
+    const bodies: Array<{ consent?: { consentVersion?: string } }> = []
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/self-assessment') bodies.push(request.postDataJSON())
+    })
+    api.respondWith('POST', '/api/v1/resume/self-assessment', (n) => n === 1
+      ? { status: 400, json: { error: { code: 'SELF_ASSESSMENT_CONSENT_VERSION_STALE', message: '知情同意说明已更新，请重新阅读并确认后再提交' } } }
+      : { status: 200, json: submissionData })
+    const answers = Object.fromEntries(served.dimensions.map((d) => [d.key, Object.fromEntries(d.questions.map((q) => [q.idx, q.choices[0].key]))]))
+    const total = served.dimensions.reduce((n, d) => n + d.questions.length, 0)
+    await page.addInitScript(({ key, value }) => {
+      if (!sessionStorage.getItem(key)) sessionStorage.setItem(key, JSON.stringify(value))
+    }, {
+      key: 'self_assessment_session_v1',
+      value: { answers, consent: { nonSensitive: true, sensitive: false }, consentVersion: 'sa-consent-v1.2026-08-16', consentedAt: '2026-09-29T01:00:00.000Z' },
+    })
+
+    await page.goto('/resume/self-assessment/result')
+    await expect(page).toHaveURL(/\/resume\/self-assessment\/questions$/)
+    const recover = page.getByTestId('self-assessment-recover')
+    await expect(page.locator('[data-kiosk-screen="resume-self-assessment-quiz"]')).toHaveAttribute('data-state', 'recover-consent')
+    await expect(recover).toContainText(`你已答的 ${total} 题都还在`)
+    const kept = await page.evaluate(() => JSON.parse(sessionStorage.getItem('self_assessment_session_v1') ?? '{}'))
+    expect(kept.answers).toEqual(answers)
+
+    await page.getByRole('button', { name: '去看说明并确认' }).click()
+    await expect(page).toHaveURL(/\/resume\/self-assessment\/intro$/)
+    await expect(page.getByTestId('self-assessment-consent-required')).toHaveAttribute('aria-checked', 'false')
+    await page.getByTestId('self-assessment-consent-required').click()
+    await page.getByRole('button', { name: '确认并重新提交' }).click()
+    await expect(page).toHaveURL(/\/resume\/self-assessment\/result$/)
+    await expect(page.getByText(submissionData.summary)).toBeVisible()
+    expect(bodies.map((b) => b.consent?.consentVersion)).toEqual(['sa-consent-v1.2026-08-16', CURRENT_SELF_ASSESSMENT_CONSENT_VERSION])
+    expect(api.requestCount('POST', '/api/v1/resume/self-assessment')).toBe(2)
   })
 })

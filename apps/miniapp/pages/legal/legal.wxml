@@ -2,20 +2,30 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
-      <view class="nav-title">{{title}}</view>
+      <!-- 顶栏固定用四类文档的短名：后台发布的标题可能很长，会压到微信胶囊下面（走查 W-13）。
+           后台标题照常出现在正文里。 -->
+      <view class="nav-title">{{navTitle}}</view>
       <view class="nav-right"></view>
     </view>
   </view>
 
   <view class="content legal-content">
-    <view wx:if="{{loading}}" class="legal-state">正在加载正式版本…</view>
+    <view wx:if="{{state === 'loading'}}" class="legal-state">正在读取正式版本…</view>
 
-    <view wx:elif="{{error}}" class="card legal-state">
+    <!-- 还没发布不是出错：说清没发布、发布后这里会写什么，不拿本机旧文本顶上。 -->
+    <view wx:elif="{{state === 'unpublished'}}" class="card legal-state">
       <text class="ficon i-info legal-state-icon"></text>
-      <view class="legal-state-title">暂时无法显示正式版本</view>
+      <view class="legal-state-title">{{title}}暂未发布</view>
+      <view class="legal-state-desc">{{unpublishedDesc}}</view>
+      <button class="btn ghost block" bindtap="loadDoc">重新查看</button>
+    </view>
+
+    <view wx:elif="{{state === 'error'}}" class="card legal-state">
+      <text class="ficon i-info legal-state-icon"></text>
+      <view class="legal-state-title">暂时读不到正式版本</view>
       <view class="legal-state-desc">{{error}}</view>
       <button class="btn primary block" bindtap="loadDoc">重新加载</button>
     </view>
@@ -23,7 +33,7 @@
     <view wx:else class="card legal-card">
       <view class="legal-meta">版本 {{version}}<text wx:if="{{publishedAt}}"> · 发布于 {{publishedAt}}</text></view>
       <block wx:for="{{blocks}}" wx:key="key">
-        <view wx:if="{{item.kind === 'heading'}}" class="legal-heading">{{item.text}}</view>
+        <view wx:if="{{item.kind === 'heading'}}" id="{{item.key}}" class="legal-heading">{{item.text}}</view>
         <view wx:elif="{{item.kind === 'bullet'}}" class="legal-paragraph legal-bullet">
           <text class="legal-bullet-dot"></text><text class="legal-bullet-text">{{item.text}}</text>
         </view>

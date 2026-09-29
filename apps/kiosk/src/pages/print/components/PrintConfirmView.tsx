@@ -1,40 +1,28 @@
 import type { ReactNode } from 'react'
-import {
-  AlertCircleIcon,
-  ChevronRightIcon,
-  FileTextIcon,
-  LockIcon,
-  ShieldCheckIcon,
-  TicketIcon,
-} from 'lucide-react'
-import type { MemberBenefitItem, PrintJobParams } from '@ai-job-print/shared'
+import { FileTextIcon, LockIcon } from 'lucide-react'
+import type { PrintParamAdjustment } from '@ai-job-print/shared'
 import type { PrintBenefitView } from '../../../services/api/benefits'
-import {
-  PRINT_BENEFIT_REDEEM_CTA_LABEL,
-  PRINT_BENEFIT_REDEEM_DISABLED_REASON,
-} from '../../../services/api/benefits'
-import { ASK, COLOR_MODE_LABEL, DUPLEX_LABEL, type PrintConfirmScreen, type QuoteView } from '../printConfirmModel'
-import { PrintAiHelp } from './PrintAiHelp'
+import { ASK, type PrintConfirmScreen, type QuoteView } from '../printConfirmModel'
 import type { PrintFileState } from '../printMaterialSession'
+import {
+  AmountCard,
+  BenefitCard,
+  Chips,
+  ConfirmCard,
+  CouponUnavailable,
+  FeeLines,
+  Plan,
+  Review,
+  Sec,
+  type SummaryRow,
+} from './PrintConfirmParts'
 
-// 报价确认页（原型 14-print-confirm.html）的展示件：小青区 → 四步条 → 01 核对打印内容 →
-// 02 费用明细 → 03 确认（动作在卡内）→ 权益卡 → 打印须知 → 三条规矩。只摆页面算好的数据与回调；
-// 报价、建单、终端能力收口与地址栏清洗都在 PrintConfirmPage / printConfirmQuery 里。
+// 报价确认页（原型 14-print-confirm.html，9/29 定稿）的展示件：小青区 → 四步条 → 01 核对打印内容 →
+// 02 费用明细 → 03 确认（动作在卡内）→ 权益卡 → 打印须知。只摆页面算好的数据与回调；
+// 报价、建单、终端能力求交、交接核对与地址栏清洗都在 PrintConfirmPage / printConfirmQuery 里。
 
 const STEPS = ['选文件', '材料检查', '预览与参数', '报价确认'] as const
-const BENEFIT_TYPE_LABEL: Record<string, string> = {
-  coupon: '优惠券',
-  free_quota: '免费次数',
-  package_entitlement: '服务额度',
-  subsidy_eligibility_hint: '政策资格提示',
-}
-const FILE_KIND: Record<string, string> = {
-  'application/pdf': 'PDF 文档',
-  'image/jpeg': 'JPG 图片',
-  'image/png': 'PNG 图片',
-}
-
-export type SummaryRow = { label: string; value: string; fileId?: string }
+export type { SummaryRow }
 
 type Props = {
   step: 4
@@ -42,9 +30,12 @@ type Props = {
   invalidReason: string
   file: PrintFileState
   summaryRows: SummaryRow[]
-  incomingParams: PrintJobParams
-  colorOff: boolean
-  duplexOff: boolean
+  /** 本机暂未开通、已按能打的参数改过的项（空 = 没改）。 */
+  adjustments: PrintParamAdjustment[]
+  /** 改参数后的用纸说明，如「比原来多用 2 张纸」「用纸张数不变」。 */
+  paperNote: string | null
+  /** 按改后参数的计价说明，如「黑白 · 单面」。 */
+  pricedParamsLabel: string
   quote: QuoteView
   costCalcLabel: string
   amountText: string
@@ -55,7 +46,6 @@ type Props = {
   printerBlockedReason: string
   terminalFailed: boolean
   terminalFailedText: string
-  paramsWereRestricted: boolean
   /** 附加自我探索的勾选卡：改的是「打印什么」，放在 01 里、确认键之前。 */
   selfAssessment: ReactNode
   /** 打印须知：确认之后才用得上的操作提醒，排在 03 之后。 */
@@ -83,8 +73,9 @@ function Steps({ idle, step }: { idle: boolean; step: 4 }) {
   )
 }
 
-function Advisor({ screen }: { screen: PrintConfirmScreen }) {
-  const { title, doing } = ASK[screen]
+function Advisor({ screen, doingOverride }: { screen: PrintConfirmScreen; doingOverride?: string | null }) {
+  const { title } = ASK[screen]
+  const doing = doingOverride ?? ASK[screen].doing
   return (
     <section className="pcf-xq" aria-label="小青提示">
       <div className="pcf-xq-row">
@@ -99,262 +90,11 @@ function Advisor({ screen }: { screen: PrintConfirmScreen }) {
   )
 }
 
-function fileMeta(file: PrintFileState): string {
-  const kind = file.mimeType ? FILE_KIND[file.mimeType] : undefined
-  const pages = file.pages === null ? '页数待识别，以实际打印为准' : `共 ${file.pages} 页`
-  return [kind, pages, file.size && file.size !== '-' ? file.size : null].filter(Boolean).join(' · ')
-}
-
-function Review({
-  file,
-  summaryRows,
-  colorOff,
-  duplexOff,
-  redactionText,
-  materialDemo,
-}: {
-  file: PrintFileState
-  summaryRows: SummaryRow[]
-  colorOff: boolean
-  duplexOff: boolean
-  redactionText: string | null
-  materialDemo: boolean
-}) {
-  const offFor = (label: string) =>
-    (label === '色彩模式' && colorOff) || (label === '单双面' && duplexOff)
-  return (
-    <div className="pcf-rev" data-testid="print-confirm-review">
-      <div className="pcf-rev-file">
-        <span className="pcf-rf-ic"><FileTextIcon size={36} aria-hidden="true" /></span>
-        <span className="pcf-rf-m">
-          <b className="print-file-name">{file.name}</b>
-          <span className="print-file-meta">{fileMeta(file)}</span>
-          {redactionText ? (
-            <span className="pcf-rf-check">
-              <ShieldCheckIcon size={18} aria-hidden="true" />
-              <b>隐私检查摘要{materialDemo ? '（流程演示）' : ''}</b>
-              {materialDemo ? '已完成打印前材料检查流程演示。' : ''}{redactionText}
-            </span>
-          ) : null}
-        </span>
-      </div>
-      <div className="pcf-rev-grid">
-        {summaryRows.map((row) => (
-          <div
-            key={row.label}
-            data-sum-row={row.label}
-            data-file-id={row.fileId}
-            className={offFor(row.label) ? 'off' : undefined}
-          >
-            <span>{row.label}</span>
-            <b className="v">{row.value}</b>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function AmountCard({ quote, amountText, source }: { quote: QuoteView; amountText: string; source: ReactNode }) {
-  const known = quote.status === 'ready'
-  return (
-    <div className="pcf-amount">
-      <div className="pcf-amount-lb">本次应付</div>
-      <div
-        className={`pcf-amount-row${known ? '' : ' is-msg'}`}
-        data-quote-slot="true"
-        data-quote-status={known ? 'known' : 'unavailable'}
-        data-testid="print-confirm-amount"
-      >
-        {known ? <span className="cur">¥</span> : null}
-        <span className="num">{amountText}</span>
-      </div>
-      <div className="pcf-amount-src" data-disclaimer="true" data-testid="print-confirm-amount-source">
-        {source}
-      </div>
-    </div>
-  )
-}
-
-function FeeLines({ rows }: { rows: Array<{ label: string; value: string; slot?: boolean; cost?: boolean }> }) {
-  return (
-    <div className="pcf-lines" data-testid="print-confirm-list">
-      {rows.map((row) => (
-        <div className="pcf-line" key={row.label}>
-          <span className="lb">{row.label}</span>
-          <span className={`vl${row.slot ? ' slot' : ''}`} data-cost-calc={row.cost ? true : undefined}>
-            {row.value}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function CouponUnavailable() {
-  return (
-    <div className="pcf-coupon-wrap">
-      <div className="pcf-coupon" data-coupon="unavailable" data-testid="print-confirm-coupon">
-        <span className="c-ic"><TicketIcon size={24} aria-hidden="true" /></span>
-        <span className="c-m">
-          <b>本单暂无可使用优惠券</b>
-          <span>优惠券功能尚未接通：系统还没有下发券面值与适用范围，本机不替你预判，也不试算抵扣。</span>
-        </span>
-        <span className="c-tag">不使用优惠券</span>
-      </div>
-      <p className="pcf-coupon-why">本机只展示、不试算、不抵扣，你的券不会因此被扣掉。</p>
-    </div>
-  )
-}
-
-function BenefitCard({ view, onLogin }: { view: PrintBenefitView; onLogin: () => void }) {
-  return (
-    <div className="qx-card pcf-benefit" data-benefit-state={view.state}>
-      <div className="pcf-benefit-head">
-        <TicketIcon size={22} aria-hidden="true" />
-        权益与本单价格
-        <span className="pcf-benefit-snap">价目与权益均来自机构配置</span>
-      </div>
-      <p className="pcf-benefit-title">{view.title}</p>
-      <p className="pcf-benefit-detail">{view.detail}</p>
-      {view.repricedUnits ? (
-        <p className="pcf-benefit-detail">
-          {`本单报价单价 ¥${(view.repricedUnits.quoteUnitCents / 100).toFixed(2)}，现行公示单价 ¥${(view.repricedUnits.configUnitCents / 100).toFixed(2)}`}
-        </p>
-      ) : null}
-      {view.grants.length > 0 ? (
-        <ul className="pcf-benefit-list">
-          {view.grants.map((grant: MemberBenefitItem) => (
-            <li key={grant.id} className="pcf-benefit-item">
-              <b>{grant.title}</b>
-              <span>
-                {BENEFIT_TYPE_LABEL[grant.benefitType] ?? grant.benefitType}
-                {' · '}
-                {grant.quantityTotal === null
-                  ? `剩余 ${grant.quantityRemaining ?? 0}`
-                  : `剩余 ${grant.quantityRemaining ?? 0} / ${grant.quantityTotal}`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {view.showLoginAction || view.state === 'available' ? (
-        <div className="pcf-benefit-acts">
-          {view.showLoginAction ? (
-            <button type="button" className="qx-btn" data-variant="teal" onClick={onLogin}>
-              去登录查看我的权益
-            </button>
-          ) : null}
-          {view.state === 'available' ? (
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="ghost"
-              aria-disabled="true"
-              aria-describedby="print-benefit-redeem-reason"
-              data-benefit-redeem="disabled"
-            >
-              {PRINT_BENEFIT_REDEEM_CTA_LABEL}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {view.state === 'available' ? (
-        <p className="pcf-benefit-reason" id="print-benefit-redeem-reason">{PRINT_BENEFIT_REDEEM_DISABLED_REASON}</p>
-      ) : null}
-    </div>
-  )
-}
-
-/** 稿 .cfm：流程三步（可选）→ 说明 → 黄色理由行 → 本屏唯一的错误/价格变更提示 → 动作行。 */
-function ConfirmCard({
-  tone,
-  flow,
-  note,
-  reason,
-  alert,
-  actions,
-}: {
-  tone?: 'warn' | 'error'
-  flow?: boolean
-  note: ReactNode
-  reason?: string
-  alert: string | null
-  actions: ReactNode
-}) {
-  return (
-    <div className="pcf-cfm" data-tone={tone}>
-      {flow ? (
-        <ol className="pcf-flow" aria-label="确认之后会发生什么">
-          <li className="cs on"><b>创建订单</b><span>点确认才建单</span></li>
-          <li className="ar" aria-hidden="true"><ChevronRightIcon size={20} /></li>
-          <li className="cs"><b>完成付款</b><span>付款成功才排队</span></li>
-          <li className="ar" aria-hidden="true"><ChevronRightIcon size={20} /></li>
-          <li className="cs"><b>开始打印</b><span>出纸口取件</span></li>
-        </ol>
-      ) : null}
-      <div className="pcf-cfm-note">{note}</div>
-      {reason ? <div className="pcf-cfm-reason" data-testid="print-confirm-disabled-reason">{reason}</div> : null}
-      {alert ? (
-        <div className="pcf-alert pcf-cfm-alert" data-tone="error" role="alert">
-          <AlertCircleIcon size={22} aria-hidden="true" />
-          <span>{alert}</span>
-        </div>
-      ) : null}
-      <div className="pcf-act">{actions}</div>
-      <div className="pcf-airow">
-        <PrintAiHelp
-          label="问小青：帮我看费用明细 →"
-          draft="请告诉我打印报价应该核对哪些项目，怎样确认页数、份数和费用是否一致？"
-        />
-      </div>
-    </div>
-  )
-}
-
-function Sec({ no, title, hint, children }: { no: string; title: string; hint?: string; children: ReactNode }) {
-  return (
-    <section className="pcf-sec" aria-label={title}>
-      <div className="pcf-sec-h">
-        <span className="no" aria-hidden="true">{no}</span>
-        <h2 className="t">{title}</h2>
-        {hint ? <span className="hint">{hint}</span> : null}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function Chips({ items }: { items: Array<string | { text: string; tone: 'warn' | 'live' }> }) {
-  return (
-    <div className="pcf-chips">
-      {items.map((item) => {
-        const text = typeof item === 'string' ? item : item.text
-        const tone = typeof item === 'string' ? undefined : item.tone
-        return (
-          <span key={text} className={`pcf-chip${tone === 'warn' ? ' warn' : ''}`}>
-            {tone === 'live' ? <span className="pcf-dot pcf-breathe" aria-hidden="true" /> : null}
-            {text}
-          </span>
-        )
-      })}
-    </div>
-  )
-}
-
-function Plan({ items }: { items: string[] }) {
-  return (
-    <ul className="pcf-plan">
-      {items.map((item) => <li key={item}><span className="sq" aria-hidden="true" /><span>{item}</span></li>)}
-    </ul>
-  )
-}
-
 export function PrintConfirmView(props: Props) {
   const {
-    screen, invalidReason, file, summaryRows, incomingParams, colorOff, duplexOff, quote, costCalcLabel,
+    screen, invalidReason, file, summaryRows, adjustments, paperNote, pricedParamsLabel, quote, costCalcLabel,
     amountText, benefitView, redactionText, materialDemo, printerBlocked, printerBlockedReason,
-    terminalFailed, terminalFailedText, paramsWereRestricted, selfAssessment, printNotes, actions,
+    terminalFailed, terminalFailedText, selfAssessment, printNotes, actions,
     submitError, onLogin,
   } = props
   const idle = screen === 'missing-context' || screen === 'invalid-context'
@@ -362,9 +102,11 @@ export function PrintConfirmView(props: Props) {
   const amountShown = quote.status === 'ready'
     ? amountText
     : quote.status === 'demo' ? '演示模式不显示金额' : quote.status === 'loading' ? '正在获取金额' : '金额暂不可用'
-  const offValue = (kind: 'color' | 'duplex') => kind === 'color'
-    ? `${COLOR_MODE_LABEL[incomingParams.colorMode] ?? incomingParams.colorMode} · 暂不可用`
-    : `${DUPLEX_LABEL[incomingParams.duplex] ?? incomingParams.duplex} · 暂不可用`
+  const adjustedFields = adjustments.map((item) => (item.field === 'colorMode' ? '彩色' : item.field === 'duplex' ? '双面' : '多版合一'))
+  const adjustedTo = adjustments.map((item) => (item.field === 'colorMode' ? '黑白' : item.field === 'duplex' ? '单面' : '每张一页'))
+  const capabilityDoing = screen === 'capability-invalid-params' && adjustments.length > 0
+    ? `${adjustedFields.join('、')}本机暂未开通，已改成${adjustedTo.join('、')}。价格以这组参数为准。`
+    : null
 
   return (
     <div
@@ -373,12 +115,12 @@ export function PrintConfirmView(props: Props) {
       data-state={screen}
       data-testid={`print-confirm-state-${screen}`}
     >
-      <Advisor screen={screen} />
+      <Advisor screen={screen} doingOverride={capabilityDoing} />
       <Steps idle={idle} step={props.step} />
 
       {printerBlocked && !idle ? <div className="pcf-alert" role="status">{printerBlockedReason}</div> : null}
       {terminalFailed ? <div className="pcf-alert" data-tone="error" role="alert">{terminalFailedText}</div> : null}
-      {paramsWereRestricted && screen !== 'capability-invalid-params' ? (
+      {adjustments.length > 0 && screen !== 'capability-invalid-params' ? (
         <div className="pcf-alert">彩色或双面本机暂未开通，已改回目前能打的参数。改回之后的参数才参与报价。</div>
       ) : null}
 
@@ -455,51 +197,68 @@ export function PrintConfirmView(props: Props) {
 
       {screen === 'capability-invalid-params' ? (
         <>
-          <Sec no="01" title="核对打印内容" hint="标红的项本机暂不可用">
-            <Review
-              file={file}
-              summaryRows={summaryRows.map((row) =>
-                row.label === '色彩模式' && colorOff ? { ...row, value: offValue('color') }
-                  : row.label === '单双面' && duplexOff ? { ...row, value: offValue('duplex') }
-                    : row)}
-              colorOff={colorOff}
-              duplexOff={duplexOff}
-              redactionText={redactionText}
-              materialDemo={materialDemo}
-            />
+          {/* 9/29 定稿（稿 14）：不拦截。灰色的项本机暂未开通，已按能打的参数照常报价，主按钮可点。 */}
+          <Sec no="01" title="核对打印内容" hint="灰色的项本机暂未开通，已按能用的参数报价">
+            <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
+            {selfAssessment}
           </Sec>
-          <Sec no="02" title="费用明细" hint="参数不可用时系统不出报价">
+          <Sec no="02" title="费用明细" hint="按本机能用的参数计价">
             <div className="pcf-fee">
-              <AmountCard quote={{ status: 'unavailable', reason: '' }} amountText="金额暂不可用" source="当前参数不可用，请修改后重新获取报价。" />
+              <AmountCard
+                quote={quote}
+                amountText={amountShown.replace(/^¥/, '')}
+                source={
+                  quote.status === 'ready' && quote.amountCents === 0
+                    ? <>免费试运营，本单 0 元。<br />{paperNote ?? '用纸张数以实际打印为准'}。</>
+                    : <>已按本机能用的参数报价，<br />{paperNote ?? '用纸张数以实际打印为准'}。</>
+                }
+              />
               <FeeLines rows={[
-                ...(colorOff ? [{ label: '颜色', value: offValue('color') }] : []),
-                ...(duplexOff ? [{ label: '单双面', value: offValue('duplex') }] : []),
-                { label: '计价来源', value: '未出报价', slot: true },
-                { label: '小计', value: '无法显示', slot: true },
+                {
+                  label: '计费页数',
+                  value: quote.status === 'ready' ? `${quote.billablePages} 页` : '未获取',
+                  slot: quote.status !== 'ready',
+                },
+                { label: '计价参数', value: pricedParamsLabel },
+                { label: '计费方式', value: costCalcLabel, slot: quote.status !== 'ready', cost: true },
+                { label: '小计', value: quote.status === 'ready' ? `¥${amountText}` : '无法显示', slot: quote.status !== 'ready' },
               ]} />
             </div>
-            <div className="pcf-grid2">
-              <div className="pcf-pgrp">
-                <h4>为什么被挡下</h4>
-                {colorOff ? <p className="pcf-reason">彩色打印本机暂未开通，暂不能按彩色下单</p> : null}
-                {duplexOff ? <p className="pcf-reason">双面打印本机暂未开通，暂不能按双面下单</p> : null}
-                <p>彩色或双面本机暂未开通，已改回目前能打的参数。改回黑白、单面才能继续报价。</p>
-              </div>
-              <div className="pcf-pgrp">
-                <h4>改回黑白单面就能继续</h4>
-                <p>回上一步把颜色改成<b>黑白</b>、单双面改成<b>单面</b>，再回来重新获取报价。</p>
-                <Chips items={['未建单', '未扣费', { text: '回到黑白单面可继续', tone: 'warn' }]} />
-              </div>
-            </div>
+            <CouponUnavailable free={quote.status === 'ready' && quote.amountCents === 0} />
           </Sec>
-          <Sec no="03" title="确认并付款" hint="参数修改后才可继续">
+          <Sec
+            no="03"
+            title={quote.status === 'ready' && quote.amountCents === 0 ? '确认并打印' : '确认并付款'}
+            hint={quote.status === 'ready' && quote.amountCents === 0 ? '这次不用付款' : '确认后进入付款'}
+          >
             <ConfirmCard
-              tone="warn"
-              note={<>当前参数被系统按本机能力登记拒绝，<b>这一页拿不到金额，也不会创建订单</b>。</>}
-              reason="参数回到黑白单面再报价，才能确认这一单"
+              flow={!(quote.status === 'ready' && quote.amountCents === 0)}
+              note={
+                quote.status === 'ready' && quote.amountCents === 0
+                  ? <>价格已按<b>{adjustedTo.join('、')}</b>算好。免费试运营，本单 0 元。确认后直接开始打印，<b>不用去付款</b>。</>
+                  : <>价格已按<b>{adjustedTo.join('、')}</b>算好。确认后进入付款，<b>付款完成后才开始打印</b>。</>
+              }
               alert={submitError}
               actions={actions}
             />
+          </Sec>
+          {benefitView ? <BenefitCard view={benefitView} onLogin={onLogin} /> : null}
+          {printNotes}
+        </>
+      ) : null}
+
+      {screen === 'ordered' ? (
+        <>
+          <Sec no="01" title="这一单已经提交" hint="同一份文件不会再建第二单">
+            <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
+          </Sec>
+          <Sec no="02" title="现在可以去哪">
+            <div className="pcf-state" data-tone="warn" data-testid="print-confirm-ordered">
+              <h3><LockIcon size={26} aria-hidden="true" />这份文件已经下过单</h3>
+              <p>付款和打印进度在这一单里看。要改参数或换文件，请<b>重新发起打印</b>，本页不会拿同一份再建一单。</p>
+              <Chips items={['已建单', '不会重复建单']} />
+            </div>
+            <ConfirmCard note={<>回到这一单继续付款或查看进度；也可以去「我的打印订单」按订单号查。</>} alert={submitError} actions={actions} />
           </Sec>
         </>
       ) : null}
@@ -507,14 +266,7 @@ export function PrintConfirmView(props: Props) {
       {screen === 'quoting' || screen === 'quote-failed' || quotedLike ? (
         <>
           <Sec no="01" title="核对打印内容" hint={screen === 'quote-failed' ? '文件和参数都保留着' : undefined}>
-            <Review
-              file={file}
-              summaryRows={summaryRows}
-              colorOff={false}
-              duplexOff={false}
-              redactionText={redactionText}
-              materialDemo={materialDemo}
-            />
+            <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
             {selfAssessment}
           </Sec>
           <Sec
@@ -523,7 +275,7 @@ export function PrintConfirmView(props: Props) {
             hint={
               screen === 'quoting' ? '正在核对这一单的价格'
                 : screen === 'quote-failed' ? '这一次没有拿到报价'
-                  : screen === 'zero-amount' ? '零元单也要先建单'
+                  : screen === 'zero-amount' ? '免费试运营，本单 0 元'
                     : '金额以实际结果为准'
             }
           >
@@ -533,7 +285,9 @@ export function PrintConfirmView(props: Props) {
                 amountText={amountShown.replace(/^¥/, '')}
                 source={
                   quote.status === 'ready'
-                    ? <>金额以实际结果为准，本机不估价。</>
+                    ? quote.amountCents === 0
+                      ? '免费试运营，本单 0 元。'
+                      : '金额以这一单的报价为准。'
                     : quote.status === 'demo'
                       ? '演示模式不显示金额'
                       : quote.status === 'unavailable'
@@ -550,8 +304,14 @@ export function PrintConfirmView(props: Props) {
                 { label: '计费方式', value: costCalcLabel, slot: quote.status !== 'ready', cost: true },
                 {
                   label: '权益抵扣',
-                  value: screen === 'benefit-unverified' ? '未核销，按原价' : '等报价返回后按原价显示',
-                  slot: true,
+                  value: screen === 'benefit-unverified'
+                    ? '未核销，按原价'
+                    : quote.status === 'ready'
+                      ? quote.amountCents === 0
+                        ? '这次免费，没有抵扣'
+                        : '按这一单的报价，没有抵扣'
+                      : '报价出来后再显示',
+                  slot: quote.status !== 'ready' || screen === 'benefit-unverified',
                 },
                 {
                   label: '小计',
@@ -576,23 +336,23 @@ export function PrintConfirmView(props: Props) {
                 </div>
               </div>
             ) : null}
-            {quotedLike ? <CouponUnavailable /> : null}
+            {quotedLike ? <CouponUnavailable free={quote.status === 'ready' && quote.amountCents === 0} /> : null}
             {screen === 'zero-amount' ? (
               <div className="pcf-grid2">
                 <div className="pcf-pgrp">
-                  <h4>计费页数怎么来的</h4>
-                  <p>计费页数和计价依据都以实际结果为准。本机不按屏幕上看到的页数自己计算。</p>
+                  <h4>页数怎么算</h4>
+                  <p>页数和价格都按这一单的报价。屏幕上看见的页数不会另外再算一次价。</p>
                 </div>
                 <div className="pcf-pgrp" data-testid="print-confirm-fallback">
-                  <h4>零元单也要先建单</h4>
-                  <p>确认后仍会建单再释放打印，<b>不存在「不建单直接出纸」的路径</b>。</p>
+                  <h4>免费试运营，本单 0 元</h4>
+                  <p>这次不用付款。确认后直接开始打印，请留在出纸口旁取纸。</p>
                 </div>
               </div>
             ) : null}
           </Sec>
           <Sec
             no="03"
-            title={screen === 'zero-amount' ? '确认并建单' : screen === 'quote-failed' ? '现在可以怎么办' : '确认并付款'}
+            title={screen === 'zero-amount' ? '确认并打印' : screen === 'quote-failed' ? '现在可以怎么办' : '确认并付款'}
             hint={screen === 'quoting' ? '金额确认后才可继续' : screen === 'quote-failed' ? '重试或改参数' : undefined}
           >
             {screen === 'quoting' ? (
@@ -612,7 +372,7 @@ export function PrintConfirmView(props: Props) {
               />
             ) : screen === 'zero-amount' ? (
               <ConfirmCard
-                note={<>金额为 0 时，<b>确认后仍会创建打印订单</b>，再直接进入打印流程。</>}
+                note={<>免费试运营，本单 0 元。确认后直接开始打印，<b>不用去付款</b>。</>}
                 alert={submitError}
                 actions={actions}
               />
@@ -639,7 +399,6 @@ export function PrintConfirmView(props: Props) {
         </>
       ) : null}
 
-      {screen === 'capability-invalid-params' ? printNotes : null}
     </div>
   )
 }

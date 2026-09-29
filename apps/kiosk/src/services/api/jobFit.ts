@@ -7,7 +7,9 @@
 // ============================================================
 
 import type { JobFitPrintResponse, JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
+import { rethrowAiDeclaration } from '../../ai/aiDeclarationErrors'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class JobFitApiError extends Error {
@@ -37,7 +39,7 @@ export interface JobFitConsentStatus {
 async function call<T>(path: string, access: JobFitAccess, init?: { method?: string; body?: unknown }): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       method: init?.method ?? 'GET',
       headers: {
         Accept: 'application/json',
@@ -48,7 +50,8 @@ async function call<T>(path: string, access: JobFitAccess, init?: { method?: str
       credentials: 'include',
       ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
     })
-  } catch {
+  } catch (err) {
+    rethrowAiDeclaration(err)
     throw new JobFitApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
   if (!res.ok) {

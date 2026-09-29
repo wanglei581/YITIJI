@@ -273,13 +273,24 @@ export interface MaskOptions {
    * 必须把占位符换回真值」的简历链才显式开启。
    */
   readonly collectRestoreMap?: boolean
+
+  /**
+   * 是否遮盖「劳动者 / 用人单位」两类**名称**（默认 true）。
+   *
+   * 关掉后只遮高置信的号码类与地址（身份证 / 手机号 / 银行卡 / 邮箱 / 详细地址 /
+   * 统一社会信用代码），`姓名：张三`、`甲方：某公司` 原样保留。
+   * 用于小青文字对话：遮掉称呼会让对话上下文断掉（「张三你好」变成「[劳动者_1]你好」），
+   * 而名字本身不是高置信敏感项。合同链路与简历链路都不传，行为逐字不变。
+   */
+  readonly maskPartyNames?: boolean
 }
 
 export function maskContractPages(pages: readonly ContractMaskPage[], options?: MaskOptions): ContractMaskResult {
   validatePages(pages)
+  const maskPartyNames = options?.maskPartyNames !== false
   const source = pages.map((page) => page.text).join('\n')
   const compatibilitySource = source.normalize('NFKC')
-  const knownEntities = extractKnownEntities(source)
+  const knownEntities = maskPartyNames ? extractKnownEntities(source) : []
   const searchWork = knownEntities.length * normalizeText(source).length
   if (knownEntities.length > MAX_UNIQUE_ENTITIES || !Number.isSafeInteger(searchWork) ||
       searchWork > MAX_ENTITY_SEARCH_WORK) throw new Error('CONTRACT_PII_MASK_ENTITY_LIMIT')
@@ -295,7 +306,7 @@ export function maskContractPages(pages: readonly ContractMaskPage[], options?: 
   const counters = new Map<MaskCategory, number>()
   let projectedOutputSize = 0
   const pagePlans = pages.map((page) => {
-    const candidates = findCandidates(page.text, knownEntities)
+    const candidates = findCandidates(page.text, knownEntities, maskPartyNames)
     const selected = selectNonOverlapping(candidates)
     const replacements = selected.map((candidate) => ({
       ...candidate,
@@ -390,11 +401,13 @@ function validatePages(pages: readonly ContractMaskPage[]): void {
   }
 }
 
-function findCandidates(text: string, knownEntities: readonly KnownEntity[]): Candidate[] {
+function findCandidates(text: string, knownEntities: readonly KnownEntity[], maskPartyNames = true): Candidate[] {
   const candidates: Candidate[] = []
-  addKnownEntities(candidates, text, knownEntities)
-  addCaptured(candidates, text, LABELED_WORKER, '劳动者', 140, normalizeText)
-  addCaptured(candidates, text, LABELED_EMPLOYER, '用人单位', 140, normalizeText)
+  if (maskPartyNames) {
+    addKnownEntities(candidates, text, knownEntities)
+    addCaptured(candidates, text, LABELED_WORKER, '劳动者', 140, normalizeText)
+    addCaptured(candidates, text, LABELED_EMPLOYER, '用人单位', 140, normalizeText)
+  }
   addCaptured(candidates, text, LABELED_ADDRESS, '详细地址', 140, normalizeText)
   addLabeledNumber(candidates, text, LABELED_BANK, '银行卡', 160, digitsOnly, isBankAccount)
   addLabeledNumber(candidates, text, LABELED_ID, '身份证', 160, digitsAndX, isStrictIdentity)

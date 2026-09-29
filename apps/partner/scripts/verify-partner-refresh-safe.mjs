@@ -91,8 +91,10 @@ for (const token of [
   "fairs: '对应一体机「招聘会信息」'",
   "policy: '对应一体机「政策服务」'",
   "smartCampus: '对应 Kiosk 首页「智慧校园」'",
-  "profile: '对应一体机「找企业」与岗位详情来源机构'",
+  "profile: '对应一体机「本机构官方渠道」与政策的来源机构'",
+  "profileHosted: '对应一体机「本机构官方渠道」「找企业」与岗位、政策的来源机构'",
   "companies: '对应一体机「找企业」与岗位详情来源机构'",
+  "terminals: '对应本机构一体机的打印扫描服务与设备运行'",
   "none: '不直接对应前端页面'",
   'export function withFrontendHint',
   'export function ListPagination',
@@ -112,7 +114,8 @@ const subtitlePages = [
   { name: 'sync-logs', file: '../src/routes/sync-logs/index.tsx', hint: 'FRONTEND_HINT.none' },
   { name: 'stats', file: '../src/routes/stats/index.tsx', hint: 'FRONTEND_HINT.none' },
   { name: 'account', file: '../src/routes/account/index.tsx', hint: 'FRONTEND_HINT.none' },
-  { name: 'terminals', file: '../src/routes/terminals/index.tsx', hint: 'FRONTEND_HINT.none' },
+  // 2026-09-29 终端数据页接真：统计的是本机构一体机的打印扫描与设备运行，副标题改指一体机
+  { name: 'terminals', file: '../src/routes/terminals/index.tsx', hint: 'FRONTEND_HINT.terminals' },
 ]
 for (const route of subtitlePages) {
   const text = readFileSync(fileURLToPath(new URL(route.file, import.meta.url)), 'utf8')

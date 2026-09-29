@@ -12,6 +12,8 @@ import { join } from 'node:path'
 
 const root = process.cwd()
 const pagePath = join(root, 'src/routes/print-scan/index.tsx')
+// 「设备能力」板块 2026-09-29 从 index.tsx 原样拆到独立文件；能力开关相关断言改读这里，强度不变。
+const capabilityPath = join(root, 'src/routes/print-scan/CapabilityCenter.tsx')
 const servicePath = join(root, 'src/services/api/printScan.ts')
 const closeFormPath = join(root, 'src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx')
 const routesPath = join(root, 'src/routes/index.tsx')
@@ -31,7 +33,9 @@ console.log('\n=== Admin print-scan ops UI verification ===')
 if (!existsSync(pagePath)) fail('print-scan page is missing')
 if (!existsSync(servicePath)) fail('printScan service is missing')
 if (!existsSync(closeFormPath)) fail('controlled unpaid-print close form is missing')
+if (!existsSync(capabilityPath)) fail('print-scan capability center is missing')
 const page = readFileSync(pagePath, 'utf8')
+const cap = readFileSync(capabilityPath, 'utf8')
 const service = readFileSync(servicePath, 'utf8')
 const closeForm = readFileSync(closeFormPath, 'utf8')
 const routes = readFileSync(routesPath, 'utf8')
@@ -98,8 +102,17 @@ for (const key of ["type: 'photo'", "type: 'copy'", "type: 'material_pack'"]) {
 }
 pass('mock adapter does not fabricate rows for unimplemented task types')
 
-// 3. 能力开关 fail-closed 文案
-if (page.includes('fail-closed') && page.includes('只有「可用」状态对普通用户开放')) {
+// 3. 能力开关 fail-closed 文案（板块在 CapabilityCenter.tsx，页面必须真的挂载它）
+if (
+  page.includes("import { CapabilityCenter } from './CapabilityCenter'") &&
+  page.includes("{section === 'capabilities' && <CapabilityCenter />}") &&
+  cap.includes('export function CapabilityCenter()')
+) {
+  pass('print-scan page mounts the extracted capability center')
+} else {
+  fail('print-scan page must import and render CapabilityCenter from ./CapabilityCenter')
+}
+if (cap.includes('fail-closed') && cap.includes('只有「可用」状态对普通用户开放')) {
   pass('capability center states the fail-closed rule')
 } else {
   fail('capability center must state the fail-closed rule (only available is user-facing)')
@@ -147,18 +160,18 @@ if (
 
 // 7. 保存请求必须同时绑定 sequence + terminal：A 的 success/catch/finally 都不得污染切到 B 后的 UI。
 if (
-  page.includes('const saveSeq = useRef(0)') &&
-  page.includes('saveSeq.current += 1') &&
-  page.includes('const requestSeq = ++saveSeq.current') &&
-  page.includes('const requestedTerminalId = terminalId') &&
-  page.includes('updateCapability(requestedTerminalId, key') &&
-  page.includes('const isCurrentSaveRequest = () =>') &&
-  page.includes('saveSeq.current === requestSeq') &&
-  page.includes('terminalIdRef.current === requestedTerminalId') &&
-  page.includes('if (!isCurrentSaveRequest()) return') &&
-  (page.match(/if \(isCurrentSaveRequest\(\)\) \{/g)?.length ?? 0) >= 2 &&
-  page.includes('setSavingKey(null)') &&
-  page.includes('setSaveError(null)')
+  cap.includes('const saveSeq = useRef(0)') &&
+  cap.includes('saveSeq.current += 1') &&
+  cap.includes('const requestSeq = ++saveSeq.current') &&
+  cap.includes('const requestedTerminalId = terminalId') &&
+  cap.includes('updateCapability(requestedTerminalId, key') &&
+  cap.includes('const isCurrentSaveRequest = () =>') &&
+  cap.includes('saveSeq.current === requestSeq') &&
+  cap.includes('terminalIdRef.current === requestedTerminalId') &&
+  cap.includes('if (!isCurrentSaveRequest()) return') &&
+  (cap.match(/if \(isCurrentSaveRequest\(\)\) \{/g)?.length ?? 0) >= 2 &&
+  cap.includes('setSavingKey(null)') &&
+  cap.includes('setSaveError(null)')
 ) {
   pass('capability save invalidates old terminal requests and guards success/catch/finally')
 } else {
@@ -166,7 +179,7 @@ if (
 }
 
 // 8. 用户切换终端的同一事件帧必须清空 A 的保存/能力 UI、失效旧加载请求并更新 ref，再更新 terminalId。
-const switchTerminalBlock = page.match(/const switchTerminal = \(nextTerminalId: string\) => \{[\s\S]*?\n  \}\n\n  const save/)?.[0] ?? ''
+const switchTerminalBlock = cap.match(/const switchTerminal = \(nextTerminalId: string\) => \{[\s\S]*?\n  \}\n\n  const save/)?.[0] ?? ''
 if (
   switchTerminalBlock.includes('saveSeq.current += 1') &&
   switchTerminalBlock.includes('capSeq.current += 1') &&
@@ -176,7 +189,7 @@ if (
   switchTerminalBlock.includes('setCapabilities(null)') &&
   switchTerminalBlock.includes('setLoading(true)') &&
   switchTerminalBlock.includes('setTerminalId(nextTerminalId)') &&
-  page.includes('onChange={(e) => switchTerminal(e.target.value)}')
+  cap.includes('onChange={(e) => switchTerminal(e.target.value)}')
 ) {
   pass('terminal selection synchronously invalidates old save/load/UI state before terminalId changes')
 } else {

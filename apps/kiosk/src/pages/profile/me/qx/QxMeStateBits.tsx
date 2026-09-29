@@ -173,7 +173,7 @@ export function QxMeLoginBlock({
 export function QxMeLoadingBlock({ title }: { title: string }) {
   return (
     <>
-      <QxMeBanner tone="calm" title={title} desc={<>正在读取当前账号的记录。<b>返回前一律显示「—」</b>，不会闪回上一位用户的内容。</>} minis={['共 —', '正在安全读取']} />
+      <QxMeBanner tone="calm" title={title} desc={<>正在读取当前登录账号的记录。<b>返回前先显示「—」</b>。上一位若没点结束使用，读出来的仍是那个账号。</>} minis={['共 —', '正在安全读取']} />
       <QxMeSkeletonList foot="这次读取失败不会删除任何记录，也不会改动任何已保存的内容。" />
       <QxMeGuide items={[...QX_ME_GUIDE.loading]} />
     </>

@@ -18,33 +18,10 @@ import { SELF_ASSESSMENT_QUESTIONS_V1 } from '@ai-job-print/shared'
 export const SESSION_STORAGE_KEY = 'self_assessment_session_v1'
 export const IDLE_TIMEOUT_MS = 60_000
 
-/**
- * 知情同意版本号。改动 `CONSENT_ITEMS` 任意一条**必须**同时提高它 ——
- * 版本号的唯一作用就是让「用户上次同意的那份说明」和「现在这份说明」可比：
- * 版本不一致的旧会话一律回同意页重勾，不拿旧同意去调模型。
- *
- * 落点口径（诚实声明，UI 上不得说得比这更多）：
- *   - 版本号与勾选时刻记在本机会话（sessionStorage），用于门禁与结果页回显；
- *   - 提交时该版本号随 `consent.consentVersion` 一起发给服务端
- *     （`apps/kiosk/src/services/api/selfAssessment.ts` → `submitSelfAssessment`）。
- *   - **服务端是否落库，取决于后端版本化同意是否已合入**：合入前该字段被静默忽略
- *     （`@Body()` 是内联类型，ValidationPipe 对 `Object` metatype 不校验，
- *     故多送字段不会 400）。在能读到回读响应的 `consentVersion` 之前，
- *     本页不得声称「同意版本已在服务端留存」。
- *
- * 单一真源待办：后端合入后，本常量应改为从 `@ai-job-print/shared` import，
- * 不再本地声明。在那之前由后端门禁断言三处声明逐字相等来防漂移。
- */
-export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v1.2026-08-16'
-
-/** 用户勾选「我已了解上述说明」时，同意的就是这几条原文（同一份数组直接渲染给用户看）。 */
-export const CONSENT_ITEMS: readonly string[] = [
-  '本工具基于本人作答提供倾向参考，不是临床 / 心理 / 人格诊断。',
-  '结果对本人可见，不向企业、合作机构、第三方推送。',
-  '作答后可在结果页一键撤回 / 物理删除；不留存本人答案原文。',
-  '本工具不评估「适合 / 不适合」任何岗位或职业，亦不构成能力证明。',
-  '5 段解读由 AI 生成（E3 · 仅供参考）；维度强度由固定权重算出，不经过 AI。',
-]
+// 知情同意的条款、勾选框文字、链接与版本号不在本机声明：一律取同一次
+// GET /resume/self-assessment/questions 的下发（见 `selfAssessmentConsent.ts`）。
+// 会话里只记「用户勾选的是哪一版」（下发的原值），提交时原样送给服务端，
+// 服务端逐字比对，不是当前版就 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`。
 
 /** 题库里被标为敏感的题。v1 题库实测 0 题 —— 按题库真值算，不写死数字。 */
 export const SENSITIVE_QUESTIONS: readonly string[] = SELF_ASSESSMENT_QUESTIONS_V1.dimensions.flatMap((d) =>
@@ -58,6 +35,10 @@ export interface SelfAssessmentSession {
   consentVersion?: string
   /** 勾选时刻（ISO8601），结果页与记录页回显用。 */
   consentedAt?: string
+  /** 同意页里还没点「开始」的勾选状态：去读隐私政策再回来时原样恢复（只对同一版说明有效）。 */
+  consentDraft?: { checkedVersion: string | null; sensitive: boolean }
+  /** 服务端说版本已更新时置真：重新确认说明后自动重交一次，已答的题不清空。 */
+  resubmitAfterConsent?: boolean
   taskId?: string
   accessToken?: string
   result?: SelfAssessmentSubmitResponse
@@ -83,11 +64,6 @@ export function saveSession(s: SelfAssessmentSession): void {
 
 export function clearSession(): void {
   try { sessionStorage.removeItem(SESSION_STORAGE_KEY) } catch { /* ignore */ }
-}
-
-/** 同意门禁：没有当前版本的显式同意，就不允许作答，更不允许提交去调模型。 */
-export function hasCurrentConsent(s: SelfAssessmentSession): boolean {
-  return s.consent.nonSensitive === true && s.consentVersion === SELF_ASSESSMENT_CONSENT_VERSION
 }
 
 /**

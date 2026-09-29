@@ -16,6 +16,7 @@ const printerLabels: Record<LocalAgentPanelStatus['printerStatus'], string> = {
   offline: '打印机离线',
   error: '打印机异常',
   low_paper: '打印纸不足',
+  paper_empty: '打印机缺纸',
   unknown: '打印机状态待确认',
 }
 

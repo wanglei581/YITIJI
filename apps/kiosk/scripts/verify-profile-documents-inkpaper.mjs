@@ -108,8 +108,10 @@ expectAbsent(page, /window\.open\(/, '我的文档不打开会逃逸公共终端
 // 默认黑白单面）一条没少，另加了「原件不许绕过检查」。
 expectMatches(
   page,
-  /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw[\s\S]*?fileId:\s*doc\.id,\s*\n\s*fileUrl:\s*res\.printFileUrl,\s*\n\s*mimeType:\s*doc\.mimeType[\s\S]*?if\s*\(documentNeedsPrintMaterialCheck\(doc\)\)\s*\{[\s\S]*?savePrintMaterialSession\(\{\s*file,\s*source\s*\}\)\s*\n\s*navigate\('\/print\/material-check',\s*\{\s*state:\s*\{\s*file,\s*source\s*\}\s*\}\)[\s\S]*?\}\s*else\s*\{\s*\n\s*navigate\('\/print\/confirm',\s*\{\s*\n\s*state:\s*\{\s*\n\s*file,\s*\n\s*params:\s*makePrintParams\(\{\s*copies:\s*1,\s*duplex:\s*'single',\s*color:\s*'bw'\s*\}\)/,
-  '打印文档只传内部 printFileUrl 并带 fileId：本人原件先整份写会话去材料检查，派生产物保留 /print/confirm state 结构和默认打印参数',
+  // 2026-09-29 P0-5：本人原件 / 派生产物的分流收进打印交接上下文（requiresCheck → printHandoffPolicy 定入口），
+  // 跳转只带交接编号；转换件按原件过材料检查（convertedFrom）。只传内部 printFileUrl、带 fileId 两条不变。
+  /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw[\s\S]*?fileId:\s*doc\.id,\s*\n\s*fileUrl:\s*res\.printFileUrl,\s*\n\s*mimeType:\s*doc\.mimeType[\s\S]*?const requiresCheck = documentNeedsPrintMaterialCheck\(doc, convertedFrom\)[\s\S]*?startPrint\(\{\s*\n\s*origin:\s*'my_documents',\s*\n\s*requiresCheck,/,
+  '打印文档只传内部 printFileUrl 并带 fileId：写打印交接上下文，本人原件（含原件转出的 PDF）先去材料检查，派生产物直达确认页',
 )
 {
   // 分流判据必须与服务端建单闸门同一份用途清单：服务端多管一种用途而这里没跟上，
@@ -118,7 +120,8 @@ expectMatches(
     const match = source.match(new RegExp(`${name}\\s*=\\s*new Set\\(\\[([^\\]]*)\\]\\)`))
     return match ? [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort() : null
   }
-  const server = setItems(readFileSync(join(repoRoot, 'services/api/src/print-jobs/pii-scan-gate.ts'), 'utf8'), 'PII_SCAN_REQUIRED_PURPOSES')
+  // 1.8 P-1 起用途清单定义在 material-check-policy.ts（闸门与「我的文档」materialCheckRequired 共用），pii-scan-gate.ts 只再导出。
+  const server = setItems(readFileSync(join(repoRoot, 'services/api/src/print-jobs/material-check-policy.ts'), 'utf8'), 'PII_SCAN_REQUIRED_PURPOSES')
   const kiosk = setItems(read('src/pages/profile/me/components/documentReprint.ts'), 'PRINT_PII_CHECK_PURPOSES')
   if (server && kiosk && JSON.stringify(server) === JSON.stringify(kiosk)) {
     pass(`我的文档的原件分流判据与服务端 PII_SCAN_REQUIRED_PURPOSES 同一份用途清单（${kiosk.join(' / ')}）`)
@@ -166,6 +169,14 @@ expectIncludes(page, '还没有文档', '我的文档保留空态标题')
 expectIncludes(page, '保存简历 / 打印材料等文档后，这里会显示你的文档记录', '我的文档保留空态说明')
 expectIncludes(page, '访问链接短期有效', '我的文档保留短期访问链接合规说明')
 expectIncludes(page, '原始简历/求职材料默认 90 天', '我的文档保留默认保存期限说明')
+expectIncludes(page, 'documentsLoggedInTruth(resultIdleLogoutLabel())', '已登录的文档说明引用结果页空闲时长')
+expectAbsent(page, /不会显示上一位/, '已登录的文档页不承诺看不到上一位的资料')
+const loadingBlock = read('src/pages/profile/me/qx/QxMeStateBits.tsx')
+const meGuide = read('src/pages/profile/me/qx/QxMeChrome.tsx')
+expectIncludes(loadingBlock, '上一位若没点结束使用，读出来的仍是那个账号。', '文档加载说明承认没结束使用时仍是那个账号')
+expectAbsent(loadingBlock, /不会闪回上一位用户的内容/, '文档加载不再写「不会闪回上一位」')
+expectIncludes(meGuide, '离开前请点结束使用，否则一段时间无操作后才会自动退出', '共用加载说明改为离开前结束使用')
+expectAbsent(meGuide, /上一位用户的内容不会残留在屏幕上/, '共用加载说明不再写上一位的内容不会残留')
 
 for (const [label, source] of [
   ['MyDocumentsPage', page],
