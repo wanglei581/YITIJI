@@ -156,13 +156,29 @@
   font-family: var(--qx-sans); font-size: 21px; font-weight: 700;
   text-align: left; cursor: pointer;
 }
-.sa-cbox[aria-checked='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.sa-cbox[aria-checked='true'],
+.sa-cbox[data-checked='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
 .sa-cbox .sa-box {
   flex: none; display: grid; place-items: center;
   width: 38px; height: 38px; border: 2px solid var(--qx-line-2); border-radius: 11px;
   color: transparent; font-size: 22px; font-weight: 800;
 }
-.sa-cbox[aria-checked='true'] .sa-box { border-color: var(--qx-teal); background: var(--qx-teal); color: var(--qx-on-solid); }
+.sa-cbox[aria-checked='true'] .sa-box,
+.sa-cbox[data-checked='true'] .sa-box { border-color: var(--qx-teal); background: var(--qx-teal); color: var(--qx-on-solid); }
+/* 句子里带链接的勾选块：方框单独是 checkbox 按钮（56px 触控），链接那一段原位可点。 */
+.sa-cbox-hit {
+  flex: none; display: grid; place-items: center;
+  width: 56px; height: 56px; margin: -9px; padding: 0;
+  border: 0; border-radius: 14px; background: transparent; cursor: pointer;
+}
+.sa-cbox-hit:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 2px; }
+.sa-cbox-link {
+  display: inline; padding: 8px 0; margin: 0;
+  border: 0; background: transparent; cursor: pointer;
+  font: inherit; color: var(--qx-teal-d);
+  text-decoration: underline; text-underline-offset: 5px;
+}
+.sa-cbox-link:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 2px; }
 .sa-cbox small { display: block; margin-top: 5px; font-size: 17px; font-weight: 400; color: var(--qx-ink-3); }
 .sa-cbox:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 
