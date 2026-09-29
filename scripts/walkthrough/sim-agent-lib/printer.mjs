@@ -282,7 +282,7 @@ export function startPrinterRuntime(options) {
   // ── 回写 ──────────────────────────────────────────────────────────────────
   async function patch(taskId, attempt, status, errorCode, errorMessage) {
     const n = normalizeAttempt(attempt)
-    const body = { status, attempt: n, ...(errorCode ? { errorCode } : {}), ...(errorMessage ? { errorMessage } : {}) }
+    const body = { status, ...(attempt === undefined || attempt === null ? {} : { attempt: n }), ...(errorCode ? { errorCode } : {}), ...(errorMessage ? { errorMessage } : {}) }
     try {
       await api('PATCH', `/print-tasks/${taskId}/status`, body)
       info('task.patch', `任务 ${taskId}：回写 ${status}${errorCode ? `（${errorCode}）` : ''} 成功`, { taskId, attempt: n, status, errorCode: errorCode ?? null })
@@ -309,7 +309,7 @@ export function startPrinterRuntime(options) {
   function enqueuePatch(taskId, attempt, status, errorCode, errorMessage) {
     const n = normalizeAttempt(attempt)
     state.pendingPatches = state.pendingPatches.filter((p) => !(p.taskId === taskId && normalizeAttempt(p.attempt) === n))
-    state.pendingPatches.push({ taskId, attempt: n, status, errorCode: errorCode ?? null, errorMessage: errorMessage ?? null, attempts: 0, nextRetryAt: Date.now(), createdAt: shanghaiIso() })
+    state.pendingPatches.push({ taskId, attempt: n, wireAttempt: attempt === undefined || attempt === null ? null : n, status, errorCode: errorCode ?? null, errorMessage: errorMessage ?? null, attempts: 0, nextRetryAt: Date.now(), createdAt: shanghaiIso() })
     saveState()
     warn('offline_queue.enqueued', `任务 ${taskId}：终态 ${status} 进本机重试队列`, { taskId, attempt: n, status })
   }
@@ -332,7 +332,7 @@ export function startPrinterRuntime(options) {
         continue
       }
       try {
-        await api('PATCH', `/print-tasks/${p.taskId}/status`, { status: p.status, attempt: normalizeAttempt(p.attempt), ...(p.errorCode ? { errorCode: p.errorCode } : {}), ...(p.errorMessage ? { errorMessage: p.errorMessage } : {}) })
+        await api('PATCH', `/print-tasks/${p.taskId}/status`, { status: p.status, ...(p.wireAttempt === null || p.wireAttempt === undefined ? {} : { attempt: p.wireAttempt }), ...(p.errorCode ? { errorCode: p.errorCode } : {}), ...(p.errorMessage ? { errorMessage: p.errorMessage } : {}) })
         state.pendingPatches = state.pendingPatches.filter((x) => x !== p)
         saveState()
         info('offline_queue.sent', `任务 ${p.taskId}：重试队列里的 ${p.status} 已送达`, { taskId: p.taskId })
@@ -382,7 +382,8 @@ export function startPrinterRuntime(options) {
   // ── 执行一个任务 ──────────────────────────────────────────────────────────
   async function executeTask(task) {
     const taskId = task.taskId
-    const spoolAttempt = normalizeAttempt(task.attempt)
+    // 旧服务端（#1152 之前）不下发 attempt、也不收：此时回写不带 attempt，本机记账仍按 0
+    const spoolAttempt = task.attempt === undefined || task.attempt === null ? undefined : normalizeAttempt(task.attempt)
     if (isUnauthorized()) return
 
     // Step 0：同一 (任务号, attempt) 才判重。attempt 变大才重新出纸（task-runner.ts 领取绑定）。
