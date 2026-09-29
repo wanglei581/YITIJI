@@ -10,7 +10,8 @@
 - **常量：** 一体机用 `COMPLIANCE_COPY.INTERVIEW_PRACTICE_RESULT_DISCLAIMER`。服务端不能引用 shared，镜像在 `interview-practice-sheet.ts` 的 `INTERVIEW_PRACTICE_RESULT_DISCLAIMER`，两份 PDF 都引用它，`verify:ai-safety-aigc` 对字节。
 - **禁词：** `COMPLIANCE_FORBIDDEN_TERMS` 增加「初筛」「岗位匹配度参考」（全局，不改门禁判定）。「平台不做初筛」仍由既有否定标记「不做」放行。合同审查安全闸门的禁词镜像同步这两项。`compliance-boundary.md` §三补了对应两行。「基本合格」「练习表现等级」本轮不加（小程序仍有）。
 - **C9：** 一体机这一半补齐。服务端 PDF 此前已去掉等级与「岗位匹配度」标题。
-- **合并前要产品负责人点头：** 「HR 初筛」改名涉及一体机 2.0 最终稿 `docs/design/kiosk-redesign-2026-08-v2/29-interview-training.html`（原稿 `docs/design/kiosk-redesign-2026-08/29-interview-training.html` 也仍是旧称）。两份稿都没改。
+- **2.0 稿：** 2.0 冻结稿 29-interview-training.html 的「HR 初筛」改为「HR 面试」，产品负责人 9/29 同意；原因是合规窗口裁定「初筛」属招聘方筛选动作、列入禁词；只改字未改版式；FROZEN.json 已按冻结规则重写；原稿目录未改。
+- **练习单考查点：** 终面题「什么样的工作环境会让你待不下去？」的考查点会印在题目单 PDF 上（5 分钟、8 分钟档包含该题）。「匹配度、表述分寸」改为「与岗位要求的契合、表述分寸」。一体机页面和小程序不渲染这句考查点；报告 PDF 不使用题库考查点。
 - 小程序未改。
 
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）

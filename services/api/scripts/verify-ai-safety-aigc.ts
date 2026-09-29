@@ -59,7 +59,7 @@ import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
 import { CareerPlanDegradedPdfService } from '../src/ai/resume/career-plan-degraded-pdf.service'
 import { InterviewPracticeSheetPdfService } from '../src/mock-interview/interview-practice-sheet-pdf.service'
-import { INTERVIEW_PRACTICE_RESULT_DISCLAIMER } from '../src/mock-interview/interview-practice-sheet'
+import { INTERVIEW_PRACTICE_RESULT_DISCLAIMER, pickPracticeQuestions } from '../src/mock-interview/interview-practice-sheet'
 import {
   AIGC_DEFAULT_PRODUCER,
   appendAigcPages,
@@ -645,6 +645,23 @@ async function main(): Promise<void> {
       fail(`pdf:${id}:disclaimer`, '题目单没有固定免责说明')
     } else pass(`pdf:${id}:honest`)
   }
+
+  // 终面 5/8 分钟档会把「什么样的工作环境会让你待不下去？」印上题目单，考察点跟着题干走。
+  const finalSheet = await new InterviewPracticeSheetPdfService().render({
+    date: '2026-09-26',
+    position: '行政专员',
+    industry: '通用',
+    interviewerLabel: '终面负责人',
+    questions: pickPracticeQuestions('final', 8),
+  })
+  const finalText = squash(await visibleText(finalSheet.buffer))
+  if (!finalText.includes('什么样的工作环境会让你待不下去')) {
+    fail('pdf:practice:environment-examines', '终面练习单没有印出环境题，考查点断言落空')
+  } else if (finalText.includes('匹配度')) {
+    fail('pdf:practice:environment-examines', '终面练习单印出了「匹配度」')
+  } else if (!finalText.includes('与岗位要求的契合、表述分寸')) {
+    fail('pdf:practice:environment-examines', '环境题考查点没有改成不带匹配度的说法')
+  } else pass('pdf:practice:environment-examines')
 
   const docx = await new ResumeDocxService().render(resume as never, { contentId: 'task-resume-docx' })
   const docxRequire = createRequire(require.resolve('docx'))

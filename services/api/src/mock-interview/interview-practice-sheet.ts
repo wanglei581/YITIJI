@@ -81,7 +81,7 @@ const FINAL_QUESTIONS: readonly PracticeSheetQuestion[] = [
   { question: '你做过最难的一次取舍是什么？', examines: '判断依据、价值排序' },
   { question: '别人对你评价最一致的一点是什么？你自己认吗？', examines: '自我认知' },
   { question: '你希望三年后自己在做什么？', examines: '发展预期（本机不预测能否达成）' },
-  { question: '什么样的工作环境会让你待不下去？', examines: '匹配度、表述分寸' },
+  { question: '什么样的工作环境会让你待不下去？', examines: '与岗位要求的契合、表述分寸' },
   { question: '如果这次没有通过，你觉得原因可能是什么？', examines: '复盘意愿' },
   { question: '你有什么想问我们的？', examines: '关注点' },
 ]
