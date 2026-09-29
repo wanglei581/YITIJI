@@ -3,6 +3,7 @@
 
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
@@ -25,6 +26,7 @@ const ASSISTANT_TOPICS: Partial<Record<HomeV6ActionId, 'resume' | 'jobfair'>> = 
 export function HomePage() {
   const navigate = useNavigate()
   const auth = useAuth()
+  const { endKioskUse } = useKioskSessionControl()
   const device = useOutletContext<TerminalDeviceStatusView>()
   const toolbox = useToolboxCapabilityState()
   const campus = useSmartCampusCapabilityState()
@@ -69,7 +71,6 @@ export function HomePage() {
         <QxHomeView
           isLoggedIn={auth.isLoggedIn}
           guestMode={auth.guestMode}
-          displayName={auth.displayName}
           device={device}
           toolbox={toolbox}
           campus={campus}
@@ -81,6 +82,7 @@ export function HomePage() {
           continueSlot={<ContinuePanel />}
           onAction={handleAction}
           onOpenDevice={() => navigate('/error-offline')}
+          onEndPrevious={() => endKioskUse('handover')}
         />
         <nav className="qx-navbar" aria-label="主导航">
           <QxHomeNavbar onAction={handleAction} />
