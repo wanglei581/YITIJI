@@ -28,6 +28,16 @@
 - **文档：** 母盘清单 A1 按官方生命周期改档（首选 Win11 IoT 企业版 LTSC 2024，兜底 Win11 专业版 25H2+，Win10 IoT LTSC 2021 只作兼容，普通 Win10 / 家庭版 / 非 IoT LTSC 不得用），A11b 分配访问官方做法，A11c 阻止新插入键盘（不追溯、分层评估、不挡 HID），D 段现场测试日一 T1–T10，E 段远程运维，换机流程更正为「设维护」（已停用的终端生成不了绑定码）；6 份写着 Windows 10/11 的部署要求改为引用 A1；7 份现场文档标注 KSK-001 结论需在最终硬件复验；MSI 设计文档补 #1054 的四个恢复动作与代码签名两条路；现场故障处置单补耗材更换与冷备；打印能力加固清单补彩色 / 双面开通前五步核对。
 - **发现并交给产品负责人的：** KSK-001 是 Windows 11 专业工作站版 22H2，2024-10-08 起已无安全更新；代码签名计划与现有工具冲突（试点自签要另立任务补流程）；包里的 WinSW 与 secure-scan-reader.exe 没有我们的签名。
 - **验证：** terminal-agent tsc、lint 0 error；`verify:field-day-evidence`、`verify:windows-service-recovery`、`verify:agent-unauthorized`、`verify:print-monitor-truth`、`verify:image-scale-truth`、`verify:printer-config`、`verify:print-scan-agent`、`verify:installer-inputs`、`verify:production-provisioning`、签名流程契约、`verify-repository-integrity`、`verify-ci-gate-coverage`、图谱检查本机通过；读 ci.yml 的 35 条门禁中，除一条需要数据库的 API 门禁外全部通过。PowerShell 语法与实跑以 PR 上的 Windows 工作流为准。
+## 2026-09-29：小程序提审合规与两端打通（小程序窗口，PR #1061 进候选）
+
+- **范围：** 只改 `apps/miniapp/**`，在唯一主项目 `.claude/worktrees/zhiyida-miniapp-main`（分支 `claude/miniapp-main`）上做；开发者工具里职易达只留这一个项目。
+- **盘点：** 分包、停放 20 页、托管 a 清理、`miniapp-nonrecruit-review-v2` 都已在候选。小程序本来就没有在线付款与退款入口（付款在一体机现场，门禁禁止 `wx.requestPayment`），收费链路按 9/28 评审挪后，小程序这边无需再收。签名功能只在一体机，小程序没有。
+- **地基（`fd8e38a35`）：** 新增 `utils/ai-access.js`（本机两项声明、声明请求头、单飞提示框）与 `utils/api-legal-consent.js`（法务文档四类、协议版本、AI 授权与声明、带 `ai` 标记请求的前后置）。未登录的请求带四个声明头，带会员令牌的不带（服务端对会员只认 `/me/ai-consents`，带头会绕过在别处的撤回）；服务端回 `AI_DECLARATION_REQUIRED` 就以服务端为准清掉本机记录补问一次再重发；`AI_LOGIN_REQUIRED` 弹登录提示；正式版取不到已发布协议不回落草稿（C4，代价是 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 应急口对小程序正式版无效，总指挥同意）。小青请求带 `channel=miniapp`（此前一直没带），卡片改认服务端回的小程序页面路径。`api.js` 31 处 AI 调用打标记，2047 → 2022 行；契约门禁同时读拆出去的 `api-*.js`。
+- **合规页面（`ef9c1bd6f`）：** AI 服务说明与经营者信息（关于、AI 工具页、小青、首页页脚、帮助）；意见反馈「AI 内容投诉」5 个工作日；隐私页年龄声明、录音同意与撤回、个人信息请求 15 个工作日、微信隐私保护指引入口；登录页「并确认已年满 14 周岁」，正式版协议未发布时在交出手机号之前拦住并写明不登录能做什么；语音说简历、模拟面试、小青共用一次录音同意（五件事，服务商照法务试运行版写腾讯云）；结果页统一「AI 生成，仅供参考」；去掉「不提供给任何第三方」（改为以隐私政策为准）、「AI 百宝箱」、小青免责句里的政策、打印确认页对账提示里错的按钮名。
+- **两端打通：** 首页待取件卡（有才显示，只说几单、哪个网点、多久到期，码在取件页里现取）、扫码连接一体机（进页即扫）、今日提醒（`ec5ce048d`）；取件码复制、分享给代取人（本机画一张取件图交给微信分享菜单，画不出就退回复制说明）、作废换新码（`2bd7483db`）；取件页纯函数拆到 `pickup-state.js`（827 → 793 行）。跨端对照工具 `tools/cross-end-member-parity.mjs`（`12b0c1446`，要连真 API，`--self-test` 验比对逻辑）。
+- **查出的跨端缺口：** 一体机「我的打印订单」只读 `/me/print-orders`（打印任务），手机上下的、还没到机核销的单和材料包单在一体机上看不到；归主执行窗口。
+- **验证：** `verify:static` 16 步全过；新增 `verify:ai-access`（13 个时序场景 + 9 个反向变异，全部判红在断言上）、首页取件摘要 4 例、取件动作 4 例；`verify:session-generation` 57 例；仓库 `verify-compliance-copy`、`verify-ci-gate-coverage` 通过。开发者工具逐页截图：首页、AI 工具、我的、关于、法务页（暂未发布态）、意见反馈、隐私、登录、帮助、小青、语音说简历、取件页动作行；分享图在运行时真画出（600×840，二维码由共用画法生成）。截图时查出并修掉两处：线上旧 API 不认「经营者信息」时显示成加载失败（改为暂未发布），AI 工具页链接折行。
+- **未做：** 求职进度页（总指挥裁定排到首发通过后的第二版）；对照工具连真 API 的实跑（需本地全栈或试点测试会员）；取件码分享、作废重发与声明流程的真机验收（4.3）。
 
 ## 2026-09-29 凌晨：2.0 稿定为最终版（收尾中）；第三波试点 16、06 运行页对齐稿
 

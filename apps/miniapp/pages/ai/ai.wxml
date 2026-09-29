@@ -19,10 +19,22 @@
       <view class="xq-go">对话 →</view>
     </view>
 
-    <!-- AI 免责声明（强制） -->
+    <!-- AI 生成标识（强制）。屏幕上统一写「AI 生成，仅供参考」，与一体机同一句。导出的文件不印这句，
+         内含符合国家标准的隐式标识（产品负责人 9/29；律师要求显式标识时只改服务端开关）。 -->
     <view class="as-disc">
       <text class="ficon i-info"></text>
-      <text>小青与各项结果均由 AI 生成，可能存在错误，请核对后使用。</text>
+      <text>AI 生成，仅供参考：小青的回答和下面各项结果都由 AI 生成，可能有错，请核对后再用。</text>
+    </view>
+    <!-- C1 模型名称与备案号在「AI 服务说明」里公示；C3 投诉入口。两处都放在 AI 功能的入口页上。 -->
+    <view class="as-links">
+      <view class="as-link tap" hover-class="tap-press" bindtap="openAiDisclaimer" role="button" aria-label="AI 服务说明，所用模型与备案号">
+        <text>AI 服务说明与备案号</text>
+        <text class="ficon i-right" aria-hidden="true"></text>
+      </view>
+      <view class="as-link tap" hover-class="tap-press" bindtap="openAiComplaint" role="button" aria-label="投诉 AI 生成的内容">
+        <text>投诉 AI 内容</text>
+        <text class="ficon i-right" aria-hidden="true"></text>
+      </view>
     </view>
 
 

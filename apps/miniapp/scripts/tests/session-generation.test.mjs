@@ -745,8 +745,19 @@ test('撕裂 + 删除失败：每一次读都还是关着的', () => {
 /** utils/api 替身：登录请求什么时候成功由测试说了算。 */
 function createApiStub() {
   const pending = {}
+  const calls = { sync: 0, legal: 0 }
   const defer = (key) => (...args) => new Promise((resolve, reject) => { pending[key] = { resolve, reject, args } })
-  return { pending, loginByPhone: defer('loginByPhone'), loginBySms: defer('loginBySms'), sendOtp: defer('sendOtp') }
+  return {
+    pending,
+    calls,
+    loginByPhone: defer('loginByPhone'),
+    loginBySms: defer('loginBySms'),
+    sendOtp: defer('sendOtp'),
+    // 登录页打开时先核对协议是否已发布（C4）；这里一律当作已发布，只测会话落盘。
+    getLegalVersions: () => { calls.legal += 1; return Promise.resolve({ termsVersion: 'v1', privacyVersion: 'v1' }) },
+    // 登录成功后对一次账（C6）。只数次数：没存下会话就不该对账。
+    syncAiDeclarationsAfterLogin: () => { calls.sync += 1; return Promise.resolve() },
+  }
 }
 
 async function runLaunchLogin({ entry, saveFault = null, opts }) {
@@ -769,13 +780,14 @@ async function runLaunchLogin({ entry, saveFault = null, opts }) {
   api.pending[key].resolve({ token: TOKEN_A, user: USER_A })
   await flush()
   ctx.wx.faults.set = null
-  return { ctx, page }
+  return { ctx, page, api }
 }
 
 for (const entry of ['wx', 'sms']) {
   for (const mode of ['throw', 'silent']) {
     test(`[登录页/${entry}] 会话写失败(${mode})：不报成功、不跳转、仍未登录`, async () => {
-      const { ctx, page } = await runLaunchLogin({ entry, saveFault: mode })
+      const { ctx, page, api } = await runLaunchLogin({ entry, saveFault: mode })
+      assert.equal(api.calls.sync, 0, '会话没存下，不去对账声明')
       assert.ok(!ctx.wx.calls.toast.includes('登录成功'), '存不下会话时不得提示登录成功')
       assert.ok(ctx.wx.calls.toast.some((t) => t.includes('未能保存')), '要给出明确的失败文案')
       ctx.runTimers() // 即便有挂起的计时器，也不该把人跳走
@@ -789,8 +801,10 @@ for (const entry of ['wx', 'sms']) {
   }
 
   test(`[登录页/${entry}] 正常登录不回归：提示成功并跳转`, async () => {
-    const { ctx } = await runLaunchLogin({ entry })
+    const { ctx, api } = await runLaunchLogin({ entry })
     assert.ok(ctx.wx.calls.toast.includes('登录成功'))
+    assert.equal(api.calls.legal, 1, '打开登录页先核对协议是否已发布')
+    assert.equal(api.calls.sync, 1, '登录成功后对一次账')
     assert.equal(ctx.auth.isLoggedIn(), true)
     assert.equal(ctx.auth.getToken(), TOKEN_A)
     assert.equal(ctx.auth.getUser().id, 'A')

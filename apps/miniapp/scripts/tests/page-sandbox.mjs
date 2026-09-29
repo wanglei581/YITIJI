@@ -48,6 +48,8 @@ export function loadPageDefinition(relPath, { wx, modules, timers = [] }) {
     Page: (def) => { pageDef = def },
     getApp: () => ({ globalData: { statusBarHeight: 20 } }),
     require: (id) => {
+      // 页面自己目录下的模块（如 print-pickup/pickup-state.js）：按页面目录解析，用真实实现。
+      if (id.startsWith('./')) return requireMiniapp(path.join(MINIAPP, path.dirname(relPath), id))
       const name = id.replace(/^.*\//, '').replace(/\.js$/, '')
       if (Object.prototype.hasOwnProperty.call(modules, name)) return modules[name]
       // 其余一律用真实实现（它们都是无 wx 依赖的纯模块）。

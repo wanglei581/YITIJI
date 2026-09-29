@@ -34,7 +34,7 @@
 
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <view>没找到答案？可以进入 AI 百宝箱使用小青助手。</view>
+      <view>没找到答案？可以问 AI 助手小青。</view>
     </view>
 
     <view class="help-fb tap" hover-class="tap-press" bindtap="goFeedback" role="button" aria-label="没解决？去反馈">

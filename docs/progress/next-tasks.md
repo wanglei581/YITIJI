@@ -115,6 +115,14 @@
 - 做法（总指挥定）：①先在服务端三个 PDF 入口（`common/pdf/pdfjs-document.ts`、`files/file-page-count.util.ts`、`ai/resume/ocr/pdf-page-renderer.ts`）显式传 `enableScripting: false`，保留 `isEvalSupported: false`；②再用 unpdf 的 `definePDFJSModule` 改用服务端已装的 `pdfjs-dist` 6.3.289 legacy 版，不等 unpdf 升级。加断言：运行时 PDF.js 版本不低于 6.2.108，并做反向变异。`definePDFJSModule` 必须在任何 unpdf 调用之前执行；PDF.js 6 去掉了 `destroy()`，仓库里几处调用要先改；服务端是 CommonJS，legacy 版的导入路径要实测。
 - 一体机浏览器预览本来就是 6.3.289，且 `isEvalSupported: false`，不受影响。
 - 改完必跑：API 类型检查与 lint，`verify:resume-extraction`、`verify:resume-report-export`、`verify:document-conversion`、`verify:file-display-truth`、`verify:materials-processing`、`verify:pii-redaction`、`verify:print-sign`、`verify:contract-review:units`，再补一个用真实 unpdf 的合同 PDF 冒烟；锁文件变了跑根目录 `verify:dependency-security`。
+## 2026-09-29：小程序余项（小程序窗口）
+
+- **提审前产品负责人在公众平台做的事**（清单已交总指挥）：用户隐私保护指引按 `apps/miniapp/scripts/privacy-api-inventory.json` 五类填；类目工具 > 办公；备案（0.11）；后台「法务文档」发布四份文档（先发布再部署，C4）；request / uploadFile / downloadFile 合法域名。
+- **交主执行窗口：** 一体机「我的打印订单」补读 `/me/print-orders/cloud` 与 `/orders/package`（手机上下的单在一体机上看不到，见 current-progress 同日条目）。
+- **交后端窗口（已转）：** 全局异常过滤器丢掉 `AI_DECLARATION_REQUIRED` 的 `missing`，建议放进 `details`；小程序两处都读，已兼容。
+- **待真机与实跑：** 对照工具 `apps/miniapp/tools/cross-end-member-parity.mjs` 连本地全栈或试点测试会员跑一次；分享图与作废重发、年龄与录音声明在两台真机各走一遍（4.3）。
+- **第二版：** 求职进度页（只许本人手填，`/me/job-applications`，同一 PR 给 `MINIAPP_REGISTERED_PAGES` 加一行）。
+- **录音同意里的服务商：** 按法务试运行版写「腾讯云」，前提是生产 `ASR_PROVIDER=tencent`；律师定稿或生产改用百度时同步改 `utils/ai-access.js` 的 `VOICE_CONSENT_ITEMS`。
 
 ## 2026-09-28 深夜：合规小改实现进度与上线配置清单
 
