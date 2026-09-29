@@ -67,13 +67,13 @@
     <view class="card" wx:else>
       <view class="empty-slot">
         <text class="ficon i-robot es-ic"></text>
-        <view class="es-t">暂无 AI 服务记录</view>
-        <view class="es-d">使用简历诊断、优化、模拟面试、简历对照或职业规划后可在此回看</view>
+        <view class="es-t">{{activeFilter === 'qa' ? '暂无问答要点' : '暂无 AI 服务记录'}}</view>
+        <view class="es-d">{{activeFilter === 'qa' ? '在小青对话里保存本次要点后，可以在这里回看条目' : '使用简历诊断、优化、模拟面试、简历对照、职业规划，或保存小青问答要点后可在此回看'}}</view>
       </view>
     </view>
 
     <view class="compliance-note">
-      带「查看」的记录可以打开结果；其他记录只显示当时的状态。所有 AI 结果仅供本人参考。
+      带「查看」的记录可以打开结果；问答要点只列出保存下来的条目，不含对话正文。所有 AI 结果仅供本人参考。
     </view>
   </view>
 </view>

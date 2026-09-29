@@ -77,6 +77,10 @@ function unwrapList(p) {
       if (res && res.pagination) list.pagination = res.pagination;
       if (meta && meta.nextCursor !== undefined) list.nextCursor = meta.nextCursor;
       if (meta && meta.total !== undefined) list.total = meta.total;
+      // /me/ai-records 同一次响应还带问答要点。挂在数组上，页面不用再请求一遍。
+      if (meta && Array.isArray(meta.qaRecords)) list.qaRecords = meta.qaRecords;
+      if (meta && meta.qaNextCursor !== undefined) list.qaNextCursor = meta.qaNextCursor;
+      if (meta && meta.qaTotal !== undefined) list.qaTotal = meta.qaTotal;
     } catch (_) {
       // 极端情况(数组被冻结)忽略,调用方仍拿到列表本体
     }
@@ -1163,9 +1167,10 @@ const api = {
   },
 
   /**
-   * 本人 AI 服务记录（需登录）。返回 MemberAiRecordItem[] 数组，附 .total。
+   * 本人 AI 服务记录（需登录）。返回 MemberAiRecordItem[] 数组，附 .total / .nextCursor。
+   * 同一次响应若带问答要点，还会挂上 .qaRecords / .qaNextCursor / .qaTotal（只有元数据，不含对话正文）。
    * kind 取值: parse | optimize | generate | job_fit | career_plan | fair_visit_plan | self_assessment
-   * 后端: GET /api/v1/me/ai-records?cursor=&pageSize=
+   * 后端: GET /api/v1/me/ai-records?cursor=&pageSize=&qaCursor=
    */
   getMyAiRecords(params = {}) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 服务记录'));
@@ -1253,6 +1258,18 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('问答记录'));
     return request('/me/ai-records', { method: 'GET', data: { pageSize: 1 }, needAuth: true })
       .then((res) => (res && Array.isArray(res.qaRecords) ? res.qaRecords : []));
+  },
+
+  /**
+   * 一份小青作业的只读详情（GET /advisor/sessions/:id）。
+   * 一体机从 AI 服务记录跳到 /ai/plan；小程序没有这一页，记录页用它把要点放进弹窗。
+   */
+  getAdvisorSession(sessionId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('问答要点'));
+    return request(`/advisor/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'GET',
+      needAuth: true,
+    });
   },
 
   // ---------- AI 简历从零生成 ----------
