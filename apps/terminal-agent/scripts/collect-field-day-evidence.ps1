@@ -132,7 +132,7 @@ Invoke-Check "D1-2" "分配访问与自动登录" {
   if (Get-Command Get-AssignedAccess -ErrorAction SilentlyContinue) {
     try { $aaCmdlet = "entries=" + @(Get-AssignedAccess -ErrorAction Stop).Count } catch { $aaCmdlet = "unavailable" }
   }
-  # 分配访问要求 UAC 开着；KSK-001 上 EnableLUA=0，普通开 PowerShell 就是管理员
+  # 分配访问要求 UAC 开着；KSK-001 上普通打开 PowerShell 就是管理员，疑似关了 UAC
   $uacEnabled = [string](Get-RegValue "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" "EnableLUA") -ne "0"
   $winlogon = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
   $autoLogon = [string](Get-RegValue $winlogon "AutoAdminLogon")
