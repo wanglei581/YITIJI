@@ -122,7 +122,7 @@ flowchart TD
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineJob** | 22 | Job、OfflineAgency | 1 个文件<br/>`offline-agencies/offline-agencies.service.ts` |
 | **OnlinePlatformDirectory** | 33 | FileObject、Organization | 3 个文件<br/>`official-channels/official-channels.service.ts`<br/>`recruitment-content/recruitment-content-read.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
-| **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 29 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
+| **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 27 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **OrderItem** | 15 | Order | 6 个文件<br/>`console-screen/console-screen.printed-pages.ts`<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`payment/pickup-expiry-refund.service.ts`<br/>… |
 | **OrderSubmissionLedger** | 11 | — | 1 个文件<br/>`member-print-orders/order-submission-ledger.ts` |
 | **Organization** | 27 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、Terminal、User | 18 个文件<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>`auth/partner-phone-rebind.service.ts`<br/>… |

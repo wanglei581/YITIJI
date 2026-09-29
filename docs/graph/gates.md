@@ -2216,7 +2216,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/config/production-runtime-gates.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-cjk-font.ts`<br/>`verify-payment-flow.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-production-real-services.ts`<br/>`verify-production-runtime-gates.ts` |
 | `services/api/src/config/trust-proxy.ts` | `verify-trust-proxy.ts` |
 | `services/api/src/console-screen/console-screen.admin.controller.ts` | `verify-console-screen-snapshot.ts` |
-| `services/api/src/console-screen/console-screen.assemble.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.assemble.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/console-screen/console-screen.cache.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts` |
 | `services/api/src/console-screen/console-screen.dto.ts` | `verify-console-screen-snapshot.ts` |
 | `services/api/src/console-screen/console-screen.fleet.ts` | `verify-console-screen-snapshot.ts` |
@@ -2224,11 +2224,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/console-screen/console-screen.module.ts` | `verify-console-screen-snapshot.ts` |
 | `services/api/src/console-screen/console-screen.org.ts` | `verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts` |
 | `services/api/src/console-screen/console-screen.partner.controller.ts` | `verify-console-screen-snapshot.ts` |
-| `services/api/src/console-screen/console-screen.printed-pages.ts` | `verify-console-screen-printed-visits.ts` |
+| `services/api/src/console-screen/console-screen.printed-pages.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/console-screen/console-screen.queries.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/console-screen/console-screen.service.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/console-screen/console-screen.timeline.ts` | `verify-console-screen-snapshot.ts` |
-| `services/api/src/console-screen/console-screen.twin.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/src/console-screen/console-screen.twin.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/console-screen/console-screen.types.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts` |
 | `services/api/src/console-screen/console-screen.usage.controller.ts` | `verify-console-screen-usage.ts` |
 | `services/api/src/console-screen/console-screen.usage.queries.ts` | `verify-console-screen-usage.ts` |

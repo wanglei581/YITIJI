@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-29：大屏 14 天打印趋势与单台「今日打印页数」改按出纸×份数、按出纸完成日（分支 `claude/backend-hardening-20260929-screen-print-trend`）
+
+- **做了什么（Grok 实现、协调方审，总指挥 9/29 拍板）：** 继 #1111 累计打印改口径后，趋势与单台今日页数也统一：只算真正出纸的任务，页数 = 计费页数 × 份数，按任务出纸完成时间（上海自然日）落日；付了款没出纸的不算。共用逻辑在 `console-screen.printed-pages.ts`。顺手按两个后台窗口的走查意见把注释与门禁说明改成界面用词（少于 5、数据量超出统计上限、服务人次）。
+- **验证：** `verify:console-screen-printed-visits` 42 条（新增跨午夜落日、单台乘份数）；Grok 两处变异、协调方抽 1 处（不乘份数）全红；snapshot、usage、admin console-screen-ui 与 api/admin/partner/ui/shared 类型检查全绿。
+- **交付单（两个后台）：** GovGrid 趋势说明、TwinTerminalBoard 说明两句要换成新口径，e2e 模拟数据的来源字符串同步（原文在 PR 说明里）。
+
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
 - **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。
