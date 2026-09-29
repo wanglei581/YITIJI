@@ -118,7 +118,7 @@
 **已解除（2026-06-13，新 Key live 复验通过）：**
 
 - ✅ **百度 OCR 密钥轮换**：用户在百度控制台重建应用后，新 Key 已配入 `services/api/.env`；`verify:ocr-baidu-live` 真实联网通过，`accurate_basic` 识别与扫描件 `pdf_ocr` 全链路通过，置信度 high。旧 Key 作废以用户控制台操作为准。
-- ✅ **腾讯云 COS CAM 密钥轮换**：用户轮换 CAM 子用户密钥后，新 Key 已配入 `.env`；`verify:cos:live` 真实桶 `yitiji-prod-private-1257025684`（ap-guangzhou）put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action。
+- ✅ **腾讯云 COS CAM 密钥轮换**：用户轮换 CAM 子用户密钥后，新 Key 已配入 `.env`；`verify:cos:live` 真实桶 `<生产存储桶>`（ap-guangzhou）put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action。
 - 生产服务器上线时，同一套新 Key 写入服务器环境变量即可，代码无需改动。
 
 **已完成（2026-06-14，Claude，上线前 P0 收口）：**
@@ -540,7 +540,7 @@ GitHub Actions 必须确认 SQLite 主 job 与 `postgres-readiness` 均通过。
 - ✅ 5 新端点:upload-intent / :id/raw / :id/complete / :id/download-url / :id/preview-url;下载预览支持 User + 会员双身份;管理员访问用户文件写审计。
 - ✅ 现有 Kiosk 上传 / 打印 / Admin 文件管理 / Partner 上传 / 宣传屏素材透明切 COS,前端无需改动。
 - ✅ api/shared/kiosk/admin typecheck/lint/build 全绿;`verify:cos`(37)+`verify:cos:files`(30) 全过;启动 + DI + 12 路由 mapped。
-- ✅ **[凭证]** 真实 COS 端到端：2026-06-13 已用新 CAM Key 跑通 `pnpm --filter @ai-job-print/api verify:cos:live`，真实桶 `yitiji-prod-private-1257025684` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。
+- ✅ **[凭证]** 真实 COS 端到端：2026-06-13 已用新 CAM Key 跑通 `pnpm --filter @ai-job-print/api verify:cos:live`，真实桶 `<生产存储桶>` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。
 - ⏳ **[择期]** 打印 / 宣传屏内容改 Kiosk/Agent 直连 COS 预签名 URL(当前走 `/content` 代理签名,短 TTL,合规可用,只是多一跳)。
 - ⏳ **[择期]** `AdAsset` 加 `bucket/region` 列以支持宣传屏素材跨后端混合环境(当前单 driver 部署足够)。
 - ⏳ **[基础设施]** PostgreSQL 迁移时,本迁移随 dev.db drift 一并重生成规范化(与既有 PG 迁移条目合并处理)。

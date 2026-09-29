@@ -483,7 +483,7 @@ function sessionExpired(){
   base('这一场练习<em>已经过期</em>。','这场练习是否过期，由系统判定。过期后不能续答，也不能把没答完的一场说成已完成。');
   body.innerHTML=statusbar('这场练习的状态',[['这场练习','已过期','off'],['未提交的回答','已失效'],['已生成的报告','不受影响','ok']])
     +'<section class="card empty tight bad"><div><div class="e">!</div><h2>这场练习已过期，需要重新开始</h2>'
-    +'<p>公用机器上的这场练习有有效期。过期之后旧的题目和未提交的回答都不能继续使用。</p></div></section>'
+    +'<p>公共终端上的这场练习有有效期。过期之后旧的题目和未提交的回答都不能继续使用。</p></div></section>'
     +'<section class="card"><div class="head"><b>接下来</b><span>选一条</span></div>'
     +optlist([{k:'练',t:'重新创建一场练习',d:'岗位、面试官、时长可以沿用刚才的选择，重新填一次即可。',href:urlFor('setup'),go:true},
               {k:'录',t:'查看本人练习记录',d:'过期前已经生成过的报告仍按保存规则保留。',href:urlFor('reports-loading')}])+'</section>'

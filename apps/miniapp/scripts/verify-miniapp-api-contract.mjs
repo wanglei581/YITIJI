@@ -7,7 +7,9 @@
  * 这个门禁把那条缝变成 CI 里的一条红线。
  *
  * 做三件事：
- *   1. 从 apps/miniapp/utils/api.js 抽出小程序真实发起的 (method, path)。
+ *   1. 从 api 门面（apps/miniapp/utils/api.js 与拆出去的 utils/api-*.js）抽出小程序真实发起的
+ *      (method, path)。api.js 过了 1000 行之后按领域拆段，拆出去的文件照样要进契约，
+ *      否则新端点会绕过门禁 —— 所以按文件名前缀收，不写死文件清单。
  *   2. 从 services/api/src 的控制器装饰器算出后端真实提供的路由集合。
  *   3. 和 contract/api-contract.json 快照比对，报告三类问题：
  *      - BROKEN：快照里承诺可用、现在后端没有了  →  另一条 lane 拆了小程序（必须红）
@@ -27,7 +29,9 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = resolve(HERE, '../../..')
-const API_JS = join(REPO, 'apps/miniapp/utils/api.js')
+const UTILS = join(REPO, 'apps/miniapp/utils')
+// api.js 必须在；api-<领域>.js 是从它拆出去的门面段（如 api-legal-consent.js）。
+const API_FILES = ['api.js', ...readdirSync(UTILS).filter((f) => /^api-[a-z0-9-]+\.js$/.test(f)).sort()]
 const API_SRC = join(REPO, 'services/api/src')
 const SNAPSHOT = join(HERE, 'api-contract.json')
 
@@ -68,9 +72,12 @@ const servedBy = (routes, callKey) =>
 // ---------- 1. 小程序侧 ----------
 
 function collectMiniappCalls() {
-  const src = readFileSync(API_JS, 'utf8')
-  const found = new Map() // key -> Set(行号)
+  const found = new Map() // key -> Set(文件:行号)
+  for (const file of API_FILES) collectCallsFrom(file, readFileSync(join(UTILS, file), 'utf8'), found)
+  return found
+}
 
+function collectCallsFrom(file, src, found) {
   // request('/x', {...})  /  request(`/x/${id}`, {...})  /  uploadFile('/x', file, {...})
   //
   // 三种定界符分开处理：反引号内部允许出现引号。
@@ -95,9 +102,8 @@ function collectMiniappCalls() {
     }
     const k = key(method, path)
     if (!found.has(k)) found.set(k, new Set())
-    found.get(k).add(line)
+    found.get(k).add(`${file}:${line}`)
   }
-  return found
 }
 
 // ---------- 2. 后端侧 ----------
@@ -142,7 +148,7 @@ const calls = collectMiniappCalls()
 const routes = collectApiRoutes()
 
 if (calls.size === 0) {
-  console.error('✗ 从 api.js 抽不出任何调用 —— 抽取逻辑已失效，不要当作通过')
+  console.error(`✗ 从 ${API_FILES.join('、')} 抽不出任何调用 —— 抽取逻辑已失效，不要当作通过`)
   process.exit(1)
 }
 if (routes.size === 0) {
@@ -166,7 +172,7 @@ if (WRITE) {
         _README:
           '小程序依赖的后端端点契约快照。任何 lane 改动 services/api 路由导致这里的端点消失，CI 会红。' +
           '新增小程序调用后跑 --write 更新；knownMissing 里的每一条都必须写清原因。',
-        generatedFrom: 'apps/miniapp/utils/api.js + services/api/src/**/*.controller.ts',
+        generatedFrom: 'apps/miniapp/utils/api.js + utils/api-*.js + services/api/src/**/*.controller.ts',
         endpoints,
         knownMissing,
       },
@@ -201,7 +207,7 @@ for (const k of declared) {
 for (const k of calls.keys()) {
   if (!declared.has(k)) {
     const lines = [...calls.get(k)].join(',')
-    problems.push(['UNDECLARED', k, `api.js:${lines} 新增了调用，但未进快照；跑 --write 并检查后端是否已提供`])
+    problems.push(['UNDECLARED', k, `${lines} 新增了调用，但未进快照；跑 --write 并检查后端是否已提供`])
   }
 }
 // STALE：豁免项后端已补上，豁免该删了

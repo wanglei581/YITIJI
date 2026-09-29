@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { getOrgProfile, updateOrgProfile, type PartnerOrgProfile } from '../../services/api/orgSelf'
 import { OfficialChannelsSection } from './OfficialChannelsSection'
+import { useRecruitmentHosting } from '../../services/capabilities'
 
 // ─── 机构资料（审计修复：原 MOCK_PROFILE 硬编码已删除，全部走 /partner/profile 真实数据）──
 // 机构自助仅可改 联系人/联系电话；名称、类型、场景模板、启用模块由管理员管理（运营边界）。
@@ -50,6 +51,10 @@ function fmtTime(iso: string | null | undefined): string {
 }
 
 export default function ProfilePage() {
+  // 托管 a（本平台默认）下机构只发布政策、维护官方渠道；岗位、招聘会、企业资料不在本平台（3.13）
+  const recruitmentHosting = useRecruitmentHosting() === 'on'
+  const frontendHint = recruitmentHosting ? FRONTEND_HINT.profileHosted : FRONTEND_HINT.profile
+  const contentKinds = recruitmentHosting ? '岗位、招聘会或政策内容' : '政策内容'
   const [profile, setProfile] = useState<PartnerOrgProfile | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [reloadKey, setReloadKey] = useState(0)
@@ -102,14 +107,14 @@ export default function ProfilePage() {
 
   if (state === 'loading') {
     return (
-      <Page title="机构资料" subtitle={withFrontendHint('机构基本信息与合作配置', FRONTEND_HINT.profile)}>
+      <Page title="机构资料" subtitle={withFrontendHint('机构基本信息与合作配置', frontendHint)}>
         <LoadingState className="py-20" />
       </Page>
     )
   }
   if (state === 'error' || !profile) {
     return (
-      <Page title="机构资料" subtitle={withFrontendHint('机构基本信息与合作配置', FRONTEND_HINT.profile)}>
+      <Page title="机构资料" subtitle={withFrontendHint('机构基本信息与合作配置', frontendHint)}>
         <ErrorState className="py-20" onRetry={() => setReloadKey((k) => k + 1)} />
       </Page>
     )
@@ -121,7 +126,7 @@ export default function ProfilePage() {
   return (
     <Page
       title="机构资料"
-      subtitle={withFrontendHint('机构基本信息与合作配置', FRONTEND_HINT.profile)}
+      subtitle={withFrontendHint('机构基本信息与合作配置', frontendHint)}
       actions={
         <Button size="sm" variant="outline" className="flex items-center gap-1.5" onClick={openEdit}>
           <PencilIcon className="h-4 w-4" />
@@ -209,7 +214,7 @@ export default function ProfilePage() {
               <div>
                 <p className="font-semibold text-success-fg">当前状态：内容可信（允许发布）</p>
                 <p className="mt-1 leading-relaxed text-neutral-600">
-                  机构内容信任核验已通过。审核通过的岗位、招聘会与政策内容可正常在终端发布上屏并对外展示。
+                  机构内容信任核验已通过。本机构审核通过的{contentKinds}可正常在终端发布上屏并对外展示。
                 </p>
               </div>
             </div>
@@ -233,7 +238,7 @@ export default function ProfilePage() {
               <div>
                 <p className="font-semibold text-warning-fg">当前状态：待核验（暂不可发布）</p>
                 <p className="mt-1 leading-relaxed text-neutral-600">
-                  机构内容信任尚未完成平台核验。根据平台发布安全闸门（fail-closed），在此状态下，<strong>即使单条岗位、招聘会或政策内容已通过审核，也无法在终端发布上屏，终端用户暂不可见</strong>。
+                  机构内容信任尚未完成平台核验。根据平台发布安全闸门（fail-closed），在此状态下，<strong>即使单条{contentKinds}已通过审核，也无法在终端发布上屏，终端用户暂不可见</strong>。
                 </p>
               </div>
             </div>
@@ -298,7 +303,7 @@ export default function ProfilePage() {
           <p className="font-medium text-neutral-600">操作指引</p>
           <p className="mt-1 leading-relaxed">
             {publishable
-              ? '机构端无需额外操作，正常录入与维护岗位、招聘会或政策内容即可。'
+              ? `机构端无需额外操作，正常录入与维护${contentKinds}即可。`
               : archived
                 ? '机构处于归档状态，如需恢复供稿与发布，请联系平台管理员解除归档并重新核验。'
                 : profile.contentTrustStatus === 'pending' || !profile.contentTrustStatus

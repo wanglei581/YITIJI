@@ -49,6 +49,13 @@
         <view class="ph-code-wrap"><text class="ph-code">{{code}}</text></view>
         <text class="ph-hint">二维码与下方到机码对应同一笔订单</text>
         <text class="ph-countdown" wx:if="{{countdown}}">{{countdown}}</text>
+        <!-- 到机码三个动作（9/25 拍板第 5 条：可以给别人代取，一次性，可作废重发）。 -->
+        <view class="ph-acts">
+          <view class="ph-act tap" hover-class="tap-press" bindtap="copyCode" role="button" aria-label="复制到机码">复制</view>
+          <view class="ph-act tap" hover-class="tap-press" bindtap="shareCode" role="button" aria-label="分享给代取人">分享给代取人</view>
+          <view class="ph-act tap {{reissuing ? 'off' : ''}}" hover-class="tap-press" bindtap="reissueCode" role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
+        </view>
+        <text class="ph-share-note">码发给谁，谁就能取；不想让对方取了，点「作废换新码」，旧码马上失效。</text>
       </block>
 
       <view class="status-visual" wx:else>
@@ -109,6 +116,9 @@
 
   <view style="height:calc(140rpx + env(safe-area-inset-bottom))"></view>
 </view>
+
+<!-- 分享给代取人的图画在这块屏幕外的 2d 画布上，不显示给用户。 -->
+<canvas type="2d" id="pickup-share-card" class="share-card-canvas" aria-hidden="true"></canvas>
 
 <view class="action-bar" wx:if="{{state === 'ready'}}">
   <view class="ab-btn tap" hover-class="tap-press" bindtap="home">完成</view>

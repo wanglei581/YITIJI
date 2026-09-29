@@ -29,6 +29,7 @@
     "verify:deploy-gates-in-sync": "node scripts/verify-deploy-gates-in-sync.mjs",
     "verify:deploy-rollback": "node scripts/verify-deploy-rollback.mjs",
     "verify:ci-changed-scopes": "node scripts/verify-ci-changed-scopes.mjs",
+    "verify:legal-docs-preflight": "node scripts/verify-legal-docs-preflight.mjs",
     "verify:release-bundle": "node scripts/verify-release-bundle.mjs",
     "verify:prod-readonly-probe": "node scripts/verify-prod-readonly-probe.mjs",
     "verify:deploy-authorization-gate": "node scripts/verify-deploy-authorization-gate.mjs",

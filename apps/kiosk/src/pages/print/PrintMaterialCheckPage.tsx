@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { AlertCircleIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
@@ -15,15 +15,16 @@ import {
   type PiiFindingView,
 } from '../../services/api/materials'
 import {
-  clearPrintMaterialSession,
-  patchPrintMaterialSession,
   printUploadPathForSource,
-  readPrintMaterialSession,
   type MaterialCheckSummary,
-  type PrintMaterialSource,
   type PrintFileState,
-  type PrintMaterialSession,
 } from './printMaterialSession'
+import {
+  clearPrintHandoff,
+  patchPrintHandoff,
+  type PrintHandoffContext,
+  type PrintHandoffPatch,
+} from './printHandoff'
 import { maskSnippet } from '../../utils/maskPii'
 import {
   hasUsableRedactedFile,
@@ -39,9 +40,11 @@ import {
 import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
 import './styles/print-desk-qx.css'
 
-interface LocationState {
-  file?: PrintFileState
-  source?: PrintMaterialSource
+/** 检查途中这一份交接已被替换或失效：迟到的结果一律不写，当场停下。 */
+class PrintHandoffGoneError extends Error {
+  constructor() {
+    super('这一单已失效，请重新发起。')
+  }
 }
 
 type InspectionMessageSeverity = 'info' | 'warning'
@@ -226,21 +229,22 @@ function shouldRecreateOnRetry(task: DocumentProcessTaskView, kind: 'inspection'
 }
 
 export function PrintMaterialCheckPage({
+  handoff = null,
+  problem = null,
   onAdvanceToPreview,
 }: {
+  /** 打印台读好的交接上下文（唯一的文件身份来源）；null = 这一页没有文件。 */
+  handoff?: PrintHandoffContext | null
+  /** 交接失效时的一句人话（归属不符、过期、被替换）；不回显旧文件的任何信息。 */
+  problem?: string | null
   onAdvanceToPreview?: () => void
 } = {}) {
   const navigate = useNavigate()
-  const location = useLocation()
   const { getToken } = useAuth()
-  const state = location.state as LocationState | null
-  const [session, setSession] = useState<PrintMaterialSession | null>(() => readPrintMaterialSession())
-  const stateFile = state?.file
-  const sessionFile = session?.file
-  const file = sessionFile?.fileId && stateFile?.fileId && sessionFile.fileId === stateFile.fileId
-    ? { ...stateFile, ...sessionFile }
-    : stateFile ?? sessionFile
-  const source = state?.source ?? session?.source
+  const [session, setSession] = useState<PrintHandoffContext | null>(handoff)
+  const contextId = handoff?.contextId ?? null
+  const file: PrintFileState | undefined = session?.file
+  const source = session?.source ?? handoff?.source
   const uploadPath = printUploadPathForSource(source)
 
   const [stage, setStage] = useState<MaterialCheckStage>('idle')
@@ -271,16 +275,18 @@ export function PrintMaterialCheckPage({
     selected: decisions[finding.id] ?? 'pending',
   }))
 
-  const persistSession = (patch: Partial<Omit<PrintMaterialSession, 'updatedAt'>>) => {
-    const nextFile = patch.file ?? file
-    if (!nextFile) return null
-    const next = patchPrintMaterialSession({ ...patch, file: nextFile })
+  // 所有写入都按交接编号打补丁：编号对不上（中途换了文件、被清场）就不写，并停下这一轮检查。
+  const persistSession = (patch: PrintHandoffPatch) => {
+    if (!contextId) throw new PrintHandoffGoneError()
+    const next = patchPrintHandoff(contextId, patch)
+    if (!next) throw new PrintHandoffGoneError()
     setSession(next)
     return next
   }
 
+  // 材料任务 403/404/410：只清这一份交接，不误清已经换成的新文件。
   const clearStaleSession = () => {
-    clearPrintMaterialSession()
+    if (contextId) clearPrintHandoff(contextId)
     setSession(null)
   }
 
@@ -299,9 +305,8 @@ export function PrintMaterialCheckPage({
     setDecisions({})
     // 新一轮检查一开始就作废上一轮的检查结论与遮挡结果（fail-closed）：结论只能由本轮 handleContinue 重新写入，
     // 否则检查未完成时直接进 ?step=preview 会凭旧摘要放行。文件、来源与可复用的检查任务保持不变。
-    persistSession({ materialCheck: undefined, piiRedactTask: undefined })
-
     try {
+      persistSession({ materialCheck: undefined, piiRedactTask: undefined })
       const token = getToken()
       const storedSession = session?.file.fileId === file.fileId ? session : null
       const storedInspection = storedSession?.inspectionTask
@@ -375,6 +380,12 @@ export function PrintMaterialCheckPage({
       persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize, piiTask: readyPii })
       setStage('review')
     } catch (err) {
+      if (err instanceof PrintHandoffGoneError) {
+        setSession(null)
+        setError(err.message)
+        setStage('error')
+        return
+      }
       if (err instanceof ApiHttpError && [403, 404, 410].includes(err.status)) {
         clearStaleSession()
       }
@@ -384,10 +395,6 @@ export function PrintMaterialCheckPage({
   }
 
   useEffect(() => {
-    if (state?.file) {
-      const next = patchPrintMaterialSession({ file: state.file })
-      setSession(next)
-    }
     void runChecks()
     // 首次进入页面即开始顺序检查；重试由按钮显式触发。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -472,9 +479,15 @@ export function PrintMaterialCheckPage({
       if (onAdvanceToPreview) {
         onAdvanceToPreview()
       } else {
-        navigate('/print/preview', { state: { file: printFile, materialCheck, source } })
+        navigate('/print/desk?step=preview')
       }
     } catch (err) {
+      if (err instanceof PrintHandoffGoneError) {
+        setSession(null)
+        setError(err.message)
+        setStage('error')
+        return
+      }
       setError(userMessageOf(err, '保存隐私选择失败，请重试'))
       setStage('review')
     }
@@ -502,7 +515,7 @@ export function PrintMaterialCheckPage({
             <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
             <div>
               <h2 className="qx-state-t">这一页没有待处理的文件</h2>
-              <p className="qx-state-d">材料检查和打印参数必须基于已经进入本次办理的真实文件。请回选文件步骤重新选择。</p>
+              <p className="qx-state-d" data-print-handoff-problem={problem ? 'true' : undefined}>{problem ?? '材料检查和打印参数必须基于已经进入本次办理的真实文件。请回选文件步骤重新选择。'}</p>
             </div>
           </div>
           <div className="qpd-empty-work qx-grow">

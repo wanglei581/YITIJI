@@ -159,7 +159,7 @@ Kiosk「我的」页**不再**承载独立的「账号资产 / 资产中心」�
 
 #### 3.9.1 页面-按钮-接口-数据-后台闭环矩阵（2026-06-19）
 
-> 2026-06-19 百度云预生产补充验证：最终 `a4b1803a` 已部署到 `120.48.13.190`，PostgreSQL 迁移、服务器核心 verify、公网 HTTP 权益活动领取链路、反馈/广播通知链路均已通过；通知「全部已读」已修复超过 100 条广播未归零问题，公网样本 `unreadBefore=338` → `unreadAfter=0`。公网截图仍沿用本轮早前截图：`/tmp/cloud-kiosk-activities-9766bd2d.png`、`/tmp/cloud-admin-benefit-activities-9766bd2d.png`、`/tmp/cloud-admin-member-feedback-9766bd2d.png`。仍不包含 Windows 真机、真实腾讯短信、支付/套餐/核销。
+> 2026-06-19 百度云预生产补充验证：最终 `a4b1803a` 已部署到 `<生产服务器 IP>`，PostgreSQL 迁移、服务器核心 verify、公网 HTTP 权益活动领取链路、反馈/广播通知链路均已通过；通知「全部已读」已修复超过 100 条广播未归零问题，公网样本 `unreadBefore=338` → `unreadAfter=0`。公网截图仍沿用本轮早前截图：`/tmp/cloud-kiosk-activities-9766bd2d.png`、`/tmp/cloud-admin-benefit-activities-9766bd2d.png`、`/tmp/cloud-admin-member-feedback-9766bd2d.png`。仍不包含 Windows 真机、真实腾讯短信、支付/套餐/核销。
 
 > 2026-07-04 Codex 本地复核：P0a/P0b/P1/P2 入口与接口未发现业务代码缺口，本轮只修验证门禁。`verify:member-benefits-admin`、`verify:benefit-activities`、`verify:feedback-notifications` 的临时 SQLite fallback 已对齐当前 `User` 字段；`verify:member-print-orders`、`verify:member-favorites-benefits` 在无 `DATABASE_URL` 的干净环境下会自动用当前 Prisma schema 创建临时库并清理。已本地通过 `verify:profile-inkpaper-home`、`verify:member-print-orders-ui`、`verify:member-benefits-admin`、`verify:benefit-activities`、`verify:feedback-notifications`、`verify:member-print-orders`、`verify:member-favorites-benefits`。仍不包含 Windows 真机、真实腾讯短信、支付/套餐/核销。
 
