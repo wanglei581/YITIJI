@@ -95,7 +95,8 @@ export class AiAccessService {
       const missing: string[] = []
       if (headers.age14.status !== 'declared' && !(member && await this.hasConsent(member.endUserId, 'age_14_plus'))) missing.push('age_14_plus')
       if (kind === 'voice' && headers.voiceRecording.status !== 'declared' && !(member && await this.hasConsent(member.endUserId, 'voice_recording'))) missing.push('voice_recording')
-      if (missing.length) throw new ForbiddenException({ error: { code: 'AI_DECLARATION_REQUIRED', missing, message: '使用 AI 前请先完成必要声明' } })
+      // 全局错误过滤器只透传字符串数组 details，不透传 missing；两处都给，客户端读哪个都行（小程序窗口 9/29 报）。
+      if (missing.length) throw new ForbiddenException({ error: { code: 'AI_DECLARATION_REQUIRED', missing, details: missing, message: '使用 AI 前请先完成必要声明' } })
     }
   }
   private async hasConsent(endUserId: string, scope: string): Promise<boolean> {
