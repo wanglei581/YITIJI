@@ -14,8 +14,16 @@ import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
 
 import { collectDerivedAlerts } from '../src/admin-ops/derived-alerts'
+import { fleetAlertForHeartbeat, printerFaultTitle } from '../src/console-screen/console-screen.fleet'
+import { OrderQuoteService } from '../src/payment/order-quote.service'
+import { describePrinterFault, toAdminPrinterStatus } from '../src/terminals/admin-printer-status'
 import { HeartbeatDto } from '../src/terminals/dto/heartbeat.dto'
-import { assertTerminalPrinterAvailable, UNAVAILABLE_PRINTER_STATUSES } from '../src/terminals/printer-availability'
+import {
+  assertTerminalPrinterAvailable,
+  QUEUE_DISPATCH_HALTED_MESSAGE,
+  QUEUE_DISPATCH_HALTED_STATUSES,
+  UNAVAILABLE_PRINTER_STATUSES,
+} from '../src/terminals/printer-availability'
 
 // terminals-agent.service 在模块加载期 requireEnv。静态 import 会被提到文件头，
 // 所以这里先写环境变量，再在 main 里动态 import。不覆盖外部已设值。
@@ -28,6 +36,20 @@ const LABELS = {
   queue_cleanup_failed: '开机清理失败，暂停接打印单',
   queue_pause_failed: '暂停队列失败，暂停接打印单',
 } as const
+const ADVICE = {
+  queue_cleanup_failed: '开机清理打印队列失败，已暂停接单。请到现场清空打印队列后重启 Agent。',
+  queue_pause_failed: '暂停打印队列失败，已暂停接单。请到现场检查打印队列后重启 Agent。',
+} as const
+const BW_PARAMS = {
+  copies: 1,
+  colorMode: 'black_white' as const,
+  duplex: 'simplex' as const,
+  paperSize: 'A4' as const,
+  orientation: 'auto' as const,
+  quality: 'standard' as const,
+  scale: 'fit' as const,
+  pagesPerSheet: 1 as const,
+}
 
 interface StoredHeartbeat {
   terminalId: string
@@ -97,12 +119,148 @@ async function assertAlertsDisappear(status: (typeof STATUSES)[number], label: s
   assert.equal(recovered.alerts.filter((alert) => alert.type === 'printer_issue').length, 0)
 }
 
+function heartbeatPrisma(printerStatus: string) {
+  const createdAt = new Date()
+  return {
+    terminal: { findFirst: async () => ({ id: TERMINAL_ID }) },
+    terminalHeartbeat: { findFirst: async () => ({ printerStatus, createdAt }) },
+  }
+}
+
+async function withPrinterSwitch(value: string | undefined, run: () => Promise<void>): Promise<void> {
+  const previous = process.env['PRINT_REQUIRE_PRINTER_ONLINE']
+  if (value === undefined) delete process.env['PRINT_REQUIRE_PRINTER_ONLINE']
+  else process.env['PRINT_REQUIRE_PRINTER_ONLINE'] = value
+  try {
+    await run()
+  } finally {
+    if (previous === undefined) delete process.env['PRINT_REQUIRE_PRINTER_ONLINE']
+    else process.env['PRINT_REQUIRE_PRINTER_ONLINE'] = previous
+  }
+}
+
+function quoteService(prisma: object): { quote: () => Promise<{ billablePages: number }>; pageCalls: () => number } {
+  let pageCalls = 0
+  const pageCount = {
+    resolveBillablePages: async () => {
+      pageCalls += 1
+      return { billablePages: 1, billingPageSource: 'pdf_lightweight_scan' as const }
+    },
+  }
+  const pricing = {
+    quotePrint: async (input: { billablePages: number; billingPageSource: 'pdf_lightweight_scan' | 'image_single_page' }) => ({
+      amountCents: 10,
+      billablePages: input.billablePages,
+      billingPageSource: input.billingPageSource,
+      lines: [],
+    }),
+  }
+  const quotes = new OrderQuoteService(pageCount as never, pricing as never, {} as never, prisma as never)
+  return {
+    quote: () => quotes.quote({
+      terminalId: TERMINAL_ID,
+      fileUrl: 'https://example.invalid/a.pdf',
+      params: BW_PARAMS,
+    }),
+    pageCalls: () => pageCalls,
+  }
+}
+
+async function expectHalted(run: () => Promise<unknown>): Promise<void> {
+  await assert.rejects(run, (error: unknown) => {
+    assert.ok(error instanceof BadRequestException)
+    const payload = error.getResponse() as { error?: { code?: string; message?: string } }
+    assert.equal(payload.error?.code, 'PRINTER_UNAVAILABLE')
+    assert.equal(payload.error?.message, QUEUE_DISPATCH_HALTED_MESSAGE)
+    return true
+  })
+}
+
+/** 开关关闭时，两个闸门状态仍拦截报价和建单；offline 仍按原语义放行。 */
+async function assertSwitchOffStillBlocksQueueGates(): Promise<void> {
+  for (const setting of [undefined, 'false'] as const) {
+    await withPrinterSwitch(setting, async () => {
+      for (const status of STATUSES) {
+        const prisma = heartbeatPrisma(status)
+        await expectHalted(() => assertTerminalPrinterAvailable(prisma as never, TERMINAL_ID, process.env))
+        const quoted = quoteService(prisma)
+        await expectHalted(() => quoted.quote())
+        assert.equal(quoted.pageCalls(), 0, `${status}: blocked quote must not count pages`)
+      }
+      const offline = heartbeatPrisma('offline')
+      await assertTerminalPrinterAvailable(offline as never, TERMINAL_ID, process.env)
+      const quoted = quoteService(offline)
+      const quote = await quoted.quote()
+      assert.equal(quote.billablePages, 1)
+      assert.equal(quoted.pageCalls(), 1, 'offline with the switch off still quotes')
+    })
+  }
+}
+
+function assertQueueGateDisplay(): void {
+  const now = new Date()
+  for (const status of STATUSES) {
+    assert.equal(QUEUE_DISPATCH_HALTED_STATUSES.has(status), true)
+    assert.equal(toAdminPrinterStatus(true, status), 'error')
+    assert.equal(describePrinterFault(true, status), ADVICE[status])
+    assert.equal(describePrinterFault(false, status), '终端离线，打印机状态未知')
+    assert.equal(printerFaultTitle(status), LABELS[status])
+    const alert = fleetAlertForHeartbeat({ createdAt: now, printerStatus: status }, now)
+    assert.equal(alert?.kind, 'printer_issue')
+    assert.equal(alert?.title, LABELS[status])
+  }
+}
+
+function assertMutationsFail(): void {
+  if (process.env['QUEUE_DISPATCH_MUTATION_CHILD'] === '1') return
+  const availabilityPath = join(__dirname, '../src/terminals/printer-availability.ts')
+  const original = readFileSync(availabilityPath, 'utf8')
+  const mutations: Array<[string, string, string]> = [
+    [
+      'drop queue_cleanup_failed from the halt set',
+      "export const QUEUE_DISPATCH_HALTED_STATUSES = new Set(['queue_cleanup_failed', 'queue_pause_failed'])",
+      "export const QUEUE_DISPATCH_HALTED_STATUSES = new Set(['queue_pause_failed'])",
+    ],
+    [
+      'put the halt back under the switch',
+      `  const availability = await readPrinterAvailability(prisma, terminalId)
+  // 先看闸门，再看开关。这两个状态表示 Agent 已经停领，不能被开关放行。
+  if (isQueueDispatchHalted(availability)) {`,
+      `  const availability = await readPrinterAvailability(prisma, terminalId)
+  if (!printerOnlineRequired(env)) return
+  // 先看闸门，再看开关。这两个状态表示 Agent 已经停领，不能被开关放行。
+  if (isQueueDispatchHalted(availability)) {`,
+    ],
+  ]
+  for (const [label, from, to] of mutations) {
+    assert.ok(original.includes(from), `${label}: anchor missing`)
+    writeFileSync(availabilityPath, original.replace(from, to))
+    try {
+      const result = spawnSync(
+        process.execPath,
+        ['-r', '@swc-node/register', join(__dirname, 'verify-queue-dispatch-printer-status.ts')],
+        {
+          cwd: join(__dirname, '..'),
+          encoding: 'utf8',
+          timeout: 120_000,
+          env: { ...process.env, QUEUE_DISPATCH_MUTATION_CHILD: '1' },
+        },
+      )
+      assert.notEqual(result.status, 0, `${label}: reversed behavior must fail\n${result.stdout}\n${result.stderr}`)
+    } finally {
+      writeFileSync(availabilityPath, original)
+    }
+  }
+}
+
 async function main(): Promise<void> {
   for (const status of STATUSES) {
     assert.equal(UNAVAILABLE_PRINTER_STATUSES.has(status), true)
     assert.equal((await validate(plainToInstance(HeartbeatDto, { printerStatus: status }))).length, 0)
   }
   assert.equal(UNAVAILABLE_PRINTER_STATUSES.has('unknown'), false)
+  await assertSwitchOffStillBlocksQueueGates()
+  assertQueueGateDisplay()
 
   const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
   const stored: StoredHeartbeat[] = []
@@ -163,8 +321,9 @@ async function main(): Promise<void> {
         () => assertTerminalPrinterAvailable(prisma as never, TERMINAL_ID, { PRINT_REQUIRE_PRINTER_ONLINE: 'true' }),
         (error: unknown) => {
           assert.ok(error instanceof BadRequestException)
-          const payload = error.getResponse() as { error?: { code?: string } }
+          const payload = error.getResponse() as { error?: { code?: string; message?: string } }
           assert.equal(payload.error?.code, 'PRINTER_UNAVAILABLE')
+          assert.equal(payload.error?.message, QUEUE_DISPATCH_HALTED_MESSAGE)
           return true
         },
       )
@@ -184,6 +343,7 @@ async function main(): Promise<void> {
     await assertAlertsDisappear(status, LABELS[status])
   }
   assertKioskFailClosed()
+  assertMutationsFail()
   console.log('PASS queue dispatch printer status')
 }
 

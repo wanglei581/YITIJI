@@ -11,6 +11,7 @@ import { runAgentBoot } from '../src/agent/boot-print-queue-order'
 import {
   claimPrintTasksIfGateOpen,
   noteStartupPrintQueueFailure,
+  PAUSE_RETRY_DELAYS_MS,
   pauseQueueAfterTerminalState,
   pauseQueueOnProcessStop,
   preparePrinterForDispatch,
@@ -19,6 +20,7 @@ import {
   __resetPrintDispatchGateForTests,
 } from '../src/agent/print-dispatch-gate'
 import {
+  CIM_METHOD_SCRIPT,
   cleanupStaleOwnPrintJobs,
   parsePrintJobListOutput,
   pauseConfiguredPrinterQueue,
@@ -28,6 +30,7 @@ import {
 } from '../src/agent/print-queue-hold'
 import { createTaskRunnerControl } from '../src/agent/task-runner-control'
 import { buildWin32PrinterProbeScript, configuredPrinterNameMatches } from '../src/agent/wmi'
+import { ESCAPE_WQL_LITERAL_FUNCTION, escapeWqlLiteral, win32PrinterNameFilter } from '../src/agent/wql-literal'
 
 const holdSourcePath = join(__dirname, '../src/agent/print-queue-hold.ts')
 const gateSourcePath = join(__dirname, '../src/agent/print-dispatch-gate.ts')
@@ -40,6 +43,7 @@ const OWN_ANCHOR = 'if (job.ownedByCurrentProcess) ids.push(job.id)'
 const UNREADABLE_ANCHOR = `    if (typeof owned !== 'boolean') {
       throw new PrintQueueHoldError('print job user is unreadable')
     }`
+const UNREADABLE_SKIP_ANCHOR = 'if (job.unreadableUser === true) continue'
 const CLAIM_BLOCK_ANCHOR = 'return false // print-dispatch-gate: keep claims blocked'
 const CLAIM_RETURN_ANCHOR = 'if (!mayClaim) return'
 const PAUSE_GATE_ANCHOR = "block = { kind: 'pause', heartbeat: 'queue_pause_failed' }"
@@ -97,6 +101,14 @@ function verifyComparisonTable(): void {
     () => parsePrintJobListOutput('{"jobs":[{"id":1}]}'),
     /print job user is unreadable/,
   )
+  const skipped = parsePrintJobListOutput(
+    '{"jobs":[{"id":2,"owned":true},{"id":7,"owned":true,"unreadable":true}],"unreadable":1}',
+  )
+  assert.equal(skipped.unreadableUserJobs, 1)
+  assert.equal(skipped.jobs.find((job) => job.id === 7)?.unreadableUser, true)
+  assert.deepEqual(selectOwnPrintJobIds(skipped.jobs), [2])
+  const reportedOnly = parsePrintJobListOutput('{"jobs":[{"id":7,"unreadable":true}],"unreadable":2}')
+  assert.equal(reportedOnly.unreadableUserJobs, 2)
 }
 
 function verifyConfigDefault(): void {
@@ -131,15 +143,31 @@ function verifyConfigDefault(): void {
 
 function verifyPrinterNameComparison(): void {
   const hold = readFileSync(holdSourcePath, 'utf8')
+  const wmi = readFileSync(join(__dirname, '../src/agent/wmi.ts'), 'utf8')
   const probe = buildWin32PrinterProbeScript()
   const weird = "\\\\server\\O'Brien"
   const tricky = "\\\\srv\\Pan'tum"
-  assert.doesNotMatch(hold, /-Filter\b/)
-  assert.doesNotMatch(probe, /-Filter\b/)
+  assert.match(hold, /-Filter \$filter/)
+  assert.match(probe, /-Filter \$filter/)
   assert.doesNotMatch(hold, /\$name\s*\+/)
   assert.doesNotMatch(probe, /\$name\s*\+/)
   assert.match(hold, /\.Name -eq \$name/)
   assert.match(probe, /\.Name -eq \$name/)
+  assert.match(hold, /ESCAPE_WQL_LITERAL_FUNCTION/)
+  assert.match(wmi, /ESCAPE_WQL_LITERAL_FUNCTION/)
+  assert.doesNotMatch(hold, /function Escape-WqlLiteral/)
+  assert.doesNotMatch(wmi, /function Escape-WqlLiteral/)
+  assert.ok(CIM_METHOD_SCRIPT.includes(ESCAPE_WQL_LITERAL_FUNCTION))
+  assert.ok(probe.includes(ESCAPE_WQL_LITERAL_FUNCTION))
+  assert.equal(escapeWqlLiteral(tricky), "\\\\\\\\srv\\\\Pan\\'tum")
+  assert.equal(escapeWqlLiteral("a\\b'c"), "a\\\\b\\'c")
+  assert.equal(win32PrinterNameFilter(tricky), "Name='\\\\\\\\srv\\\\Pan\\'tum'")
+  const backslashReplace = ".Replace('\\', '\\\\')"
+  const quoteReplace = '.Replace("\'", "\\\'")'
+  assert.ok(ESCAPE_WQL_LITERAL_FUNCTION.includes(backslashReplace))
+  assert.ok(
+    ESCAPE_WQL_LITERAL_FUNCTION.indexOf(backslashReplace) < ESCAPE_WQL_LITERAL_FUNCTION.indexOf(quoteReplace),
+  )
   assert.equal(JSON.parse(JSON.stringify({ printerName: weird, method: 'Pause' })).printerName, weird)
   assert.equal(JSON.parse(JSON.stringify({ printerName: tricky })).printerName, tricky)
   assert.equal(configuredPrinterNameMatches(tricky, tricky), true)
@@ -157,6 +185,9 @@ function verifyPrinterNameComparison(): void {
   assert.match(hold, /EndsWith\('\$'\)/)
   assert.match(hold, /throw 'print job user is unreadable'/)
   assert.match(hold, /throw 'print job user sid is unreadable'/)
+  assert.match(hold, /\$skippedUnreadable \+= 1/)
+  assert.match(hold, /\$unreadable = \$true/)
+  assert.match(hold, /print-queue-cleanup: skipped unreadable user jobs \(count=\$\{listed\.unreadableUserJobs\}\)/)
   assert.doesNotMatch(hold, /SubmittedTime/)
   assert.doesNotMatch(hold, /startedAtMs/)
   assert.doesNotMatch(hold, /DocumentName/)
@@ -251,12 +282,17 @@ async function verifyPrintDispatchGate(): Promise<void> {
   assert.equal(printerStatusForHeartbeat('ready'), 'ready')
 
   __resetPrintDispatchGateForTests()
+  assert.deepEqual(PAUSE_RETRY_DELAYS_MS, [1_000, 2_000, 4_000])
   let attempts = 0
+  const delays: number[] = []
   await pauseQueueAfterTerminalState(async () => {
     attempts += 1
     throw new Error('pause')
-  }, async () => undefined)
-  assert.equal(attempts, 3)
+  }, async (ms) => {
+    delays.push(ms)
+  })
+  assert.equal(attempts, 4)
+  assert.deepEqual(delays, [1_000, 2_000, 4_000])
   claims = 0
   await claimPrintTasksIfGateOpen(
     {
@@ -439,6 +475,7 @@ async function verifyNonWindowsNoop(): Promise<void> {
   assert.equal(resumed.skipped, true)
   assert.equal(cleaned.skipped, true)
   assert.equal(cleaned.removed, 0)
+  assert.equal(cleaned.unreadableUserJobs, 0)
 }
 
 function runNodeEval(code: string) {
@@ -463,6 +500,15 @@ const other = selectOwnPrintJobIds([{ id: 3, ownedByCurrentProcess: false }])
 if (other.includes(3)) process.exit(1)
 const own = selectOwnPrintJobIds([{ id: 2, ownedByCurrentProcess: true }])
 if (!own.includes(2)) process.exit(1)
+const parsed = parsePrintJobListOutput('{"jobs":[{"id":2,"owned":true},{"id":7,"owned":true,"unreadable":true}],"unreadable":1}')
+if (parsed.unreadableUserJobs !== 1) process.exit(1)
+let selected
+try {
+  selected = selectOwnPrintJobIds(parsed.jobs)
+} catch (error) {
+  process.exit(1)
+}
+if (!selected.includes(2) || selected.includes(7)) process.exit(1)
 process.exit(0)
 `
 
@@ -492,7 +538,7 @@ const gate = require('./src/agent/print-dispatch-gate')
     attempts += 1
     throw new Error('no')
   }, async () => {})
-  if (attempts !== 3) process.exit(1)
+  if (attempts !== 4) process.exit(1)
   let claims = 0
   await gate.claimPrintTasksIfGateOpen({
     holdEnabled: true,
@@ -627,6 +673,13 @@ function verifyReverseMutations(): void {
       continue
     }`,
     ],
+    [
+      'unreadable user throws',
+      holdSourcePath,
+      hold,
+      UNREADABLE_SKIP_ANCHOR,
+      `if (job.unreadableUser === true) throw new PrintQueueHoldError('print job user is unreadable')`,
+    ],
     ['claim while blocked', gateSourcePath, gate, CLAIM_RETURN_ANCHOR, ''],
     ['recovery reports open', gateSourcePath, gate, CLAIM_BLOCK_ANCHOR, 'return true // print-dispatch-gate: keep claims blocked'],
     ['pause failure still claims', gateSourcePath, gate, PAUSE_GATE_ANCHOR, ''],
@@ -671,6 +724,7 @@ function verifyReverseMutations(): void {
   const children: Record<string, string> = {
     'own-account filter': selectorChild,
     'unreadable user': selectorChild,
+    'unreadable user throws': selectorChild,
     'claim while blocked': claimChild,
     'recovery reports open': claimChild,
     'pause failure still claims': pauseChild,

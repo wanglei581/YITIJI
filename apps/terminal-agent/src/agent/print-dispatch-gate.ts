@@ -26,7 +26,8 @@ interface DispatchBlock {
   heartbeat: DispatchPrinterStatus
 }
 
-const PAUSE_RETRY_DELAYS_MS = [200, 400]
+/** 终态后再暂停：第一次失败后等 1 秒、2 秒、4 秒，连第一次一共 4 次。 */
+export const PAUSE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000]
 
 let block: DispatchBlock | null = null
 
@@ -118,20 +119,21 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * 任务到终态后暂停。失败则短间隔再试，一共 3 次。
+ * 任务到终态后暂停。失败则隔 1 秒、2 秒、4 秒再试，连第一次一共 4 次。
  * 仍失败就关上领取闸门，下一轮先暂停成功才放行。这一支不删作业。
  */
 export async function pauseQueueAfterTerminalState(
   pause: () => Promise<void>,
   sleep: (ms: number) => Promise<void> = delay,
 ): Promise<void> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (attempt > 0) await sleep(PAUSE_RETRY_DELAYS_MS[attempt - 1] ?? 200)
+  const maxAttempts = PAUSE_RETRY_DELAYS_MS.length + 1
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (attempt > 0) await sleep(PAUSE_RETRY_DELAYS_MS[attempt - 1] ?? 1_000)
     try {
       await pause()
       return
     } catch {
-      // 下一轮再试。三次都失败才关闸。
+      // 下一轮再试。四次都失败才关闸。
     }
   }
   notePauseAfterTerminalFailure()

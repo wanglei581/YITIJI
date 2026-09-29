@@ -51,6 +51,7 @@
 import { spawn } from 'child_process'
 import { warn } from '../logger'
 import type { PrinterStatus } from './types'
+import { ESCAPE_WQL_LITERAL_FUNCTION } from './wql-literal'
 import {
   mapWin32PrinterPreflight,
   mapWin32PrinterQuery,
@@ -118,19 +119,25 @@ function runPowerShell(script: string, stdin?: string, timeoutMs = 8_000): Promi
 
 /**
  * 心跳与预检共用这一条探针。打印机名走 stdin。
- * 先取出 Win32_Printer，再按 Name -eq 比较，不把名字拼进 WQL -Filter。
+ * 在 PowerShell 里用 Escape-WqlLiteral 组装 -Filter（先 `\` 再 `'`），
+ * 查到后再按 Name -eq 对原名核对一次。过滤查询失败退出 1，调用方当成未知，
+ * 不把查询失败说成「没找到这台打印机」。
  * 多读 PrinterState 与 ExtendedPrinterStatus，用来识别「只是被我们暂停」。
  */
 export function buildWin32PrinterProbeScript(): string {
-  return (
-    `$name = [Console]::In.ReadLine(); ` +
-    `$p = @(Get-CimInstance -ClassName Win32_Printer -ErrorAction SilentlyContinue) | ` +
-    `Where-Object { $_.Name -eq $name } | Select-Object -First 1; ` +
-    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline),$($p.PrinterState),$($p.ExtendedPrinterStatus)" } else { "not_found" }`
-  )
+  return [
+    ESCAPE_WQL_LITERAL_FUNCTION,
+    `$name = [Console]::In.ReadLine()`,
+    `$filter = "Name='" + (Escape-WqlLiteral $name) + "'"`,
+    `$p = $null`,
+    `try {`,
+    `  $p = @(Get-CimInstance -ClassName Win32_Printer -Filter $filter -ErrorAction Stop) | Where-Object { $_.Name -eq $name } | Select-Object -First 1`,
+    `} catch { exit 1 }`,
+    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline),$($p.PrinterState),$($p.ExtendedPrinterStatus)" } else { "not_found" }`,
+  ].join('\n')
 }
 
-/** 配置名与枚举名按原文字符比较。名字里的反斜杠和引号不进入 WQL。 */
+/** 配置名与枚举名按原文字符比较。过滤串命中多行时，这一步仍拒绝拿错打印机。 */
 export function configuredPrinterNameMatches(candidate: string, configured: string): boolean {
   return candidate === configured
 }

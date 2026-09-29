@@ -4,8 +4,8 @@
  * 纯进程内：注入 download / wait 函数，不碰网络、打印机、SQLite。
  *   1. downloadWithRetry：网络层错误与 5xx 按 2s/5s/10s 退避重试，第 4 次仍失败才抛；
  *      4xx 立即失败不重试；成功即停。
- *   2. computeMonitorTimeoutMs：预热 60s + 面数 × 每面秒数（黑白 3s、彩色 4s、双面 6s），
- *      封顶 15 分钟，且小于服务端 printing 未确认时限（20 分钟）。
+ *   2. computeMonitorTimeoutMs：预热 90s + 面数 × 每面秒数（黑白 3s、彩色 4s、黑白双面 6s、彩色双面 8s），
+ *      未知取值按 8s，封顶 15 分钟，且小于服务端 printing 未确认时限（20 分钟）。
  *   3. 源码契约：任务执行器用 computeMonitorTimeoutMs 而不是写死 30_000；
  *      PRINT_TIMEOUT 走队列监控而不是直接 failed；日志不落原始文件名。
  */
@@ -66,20 +66,23 @@ async function main(): Promise<void> {
   }
 
   // ── 2. computeMonitorTimeoutMs ────────────────────────────────────────────
-  assert.equal(computeMonitorTimeoutMs(undefined, undefined), 63_000, 'unknown pages/copies fall back to one simplex side plus warmup')
-  assert.equal(computeMonitorTimeoutMs(1, 1), 63_000)
-  assert.equal(computeMonitorTimeoutMs(3, 1), 69_000)
-  assert.equal(computeMonitorTimeoutMs(30, 2), 240_000, '30 pages × 2 copies = 60 simplex sides → 60s + 180s')
+  assert.equal(computeMonitorTimeoutMs(undefined, undefined), 93_000, 'unknown pages/copies fall back to one simplex side plus warmup')
+  assert.equal(computeMonitorTimeoutMs(1, 1), 93_000)
+  assert.equal(computeMonitorTimeoutMs(3, 1), 99_000)
+  assert.equal(computeMonitorTimeoutMs(30, 2), 270_000, '30 pages × 2 copies = 60 simplex sides → 90s + 180s')
   assert.equal(computeMonitorTimeoutMs(500, 5), PRINT_MONITOR_CAP_MS, 'window is capped at 15 minutes')
-  assert.equal(computeMonitorTimeoutMs(0, -1), 63_000, 'non-positive inputs fall back to one side')
-  assert.equal(computeMonitorTimeoutMs(Number.NaN, 2), 66_000, 'NaN pages fall back to 1 page but honour copies')
-  assert.equal(computeMonitorTimeoutMs(1, 1, { colorMode: 'color', duplex: 'simplex' }), 64_000)
-  assert.equal(computeMonitorTimeoutMs(1, 1, { colorMode: 'black_white', duplex: 'duplex_long_edge' }), 66_000)
-  assert.equal(computeMonitorTimeoutMs(1, 1, { colorMode: 'color', duplex: 'duplex_short_edge' }), 66_000, 'color and duplex use the slower duplex tier')
-  assert.equal(computeMonitorTimeoutMs(100, 1, { colorMode: 'color', duplex: 'duplex_long_edge' }), 660_000)
-  assert.equal(worstCaseDuplexColorTimeoutMs(), 660_000)
+  assert.equal(computeMonitorTimeoutMs(0, -1), 93_000, 'non-positive inputs fall back to one side')
+  assert.equal(computeMonitorTimeoutMs(Number.NaN, 2), 96_000, 'NaN pages fall back to 1 page but honour copies')
+  assert.equal(computeMonitorTimeoutMs(1, 1, { colorMode: 'color', duplex: 'simplex' }), 94_000)
+  assert.equal(computeMonitorTimeoutMs(1, 1, { colorMode: 'black_white', duplex: 'duplex_long_edge' }), 96_000)
+  assert.equal(computeMonitorTimeoutMs(1, 1, { colorMode: 'color', duplex: 'duplex_short_edge' }), 98_000, 'color and duplex use the 8s tier')
+  assert.equal(computeMonitorTimeoutMs(1, 1, { colorMode: ' Color ', duplex: ' Duplex_Long_Edge ' }), 98_000)
+  assert.equal(computeMonitorTimeoutMs(1, 1, { colorMode: 'nope', duplex: 'simplex' }), 98_000, 'unknown values use the slowest tier')
+  assert.equal(computeMonitorTimeoutMs(1, 1, { colorMode: '  ', duplex: '' }), 93_000, 'blank values stay simplex black and white')
+  assert.equal(computeMonitorTimeoutMs(100, 1, { colorMode: 'color', duplex: 'duplex_long_edge' }), 890_000)
+  assert.equal(worstCaseDuplexColorTimeoutMs(), 890_000)
   assert.equal(PRINT_MAX_SIDES_PER_ORDER, 100)
-  assert.equal(computeMonitorTimeoutMs(101, 1, { colorMode: 'color', duplex: 'duplex_long_edge' }), 666_000, '101 sides are not rejected here')
+  assert.equal(computeMonitorTimeoutMs(101, 1, { colorMode: 'color', duplex: 'duplex_long_edge' }), 898_000, '101 sides are not rejected here')
   assert.ok(computeMonitorTimeoutMs(9_999, 9_999) === PRINT_MONITOR_CAP_MS)
   assert.ok(PRINT_MONITOR_CAP_MS < 20 * 60_000)
   const hundred = await monitorHundredDuplexColorSides()
@@ -112,9 +115,9 @@ async function monitorHundredDuplexColorSides(): Promise<{ failed: boolean; erro
     sleep: async (ms) => { now += ms },
     dispatchedAtMs: 0,
     queryCompletionEvent: async () => false,
-    queryStatus: async () => (now >= 100 * 6_000 ? { status: 'completed' } : { status: 'printing' }),
+    queryStatus: async () => (now >= 100 * 8_000 ? { status: 'completed' } : { status: 'printing' }),
   })
-  assert.ok(now >= 600_000 && now <= timeoutMs, 'the clock must reach the conservative finish inside the window')
+  assert.ok(now >= 800_000 && now <= timeoutMs, 'the clock must reach the conservative finish inside the window')
   return outcome
 }
 
@@ -128,10 +131,16 @@ if (!match) process.exit(1)
 const serverMs = Number(match[1]) * 60 * 1000
 const worst = worstCaseDuplexColorTimeoutMs()
 if (PRINT_MAX_SIDES_PER_ORDER !== 100) process.exit(1)
-if (worst !== 660000) process.exit(1)
+if (worst !== 890000) process.exit(1)
 if (worst > PRINT_MONITOR_CAP_MS) process.exit(1)
 if (!(PRINT_MONITOR_CAP_MS < serverMs)) process.exit(1)
 if (!(worst > 5 * 60 * 1000)) process.exit(1)
+const nope = computeMonitorTimeoutMs(1, 1, { colorMode: 'Nope', duplex: 'simplex' })
+if (nope !== 98000) process.exit(1)
+const spaced = computeMonitorTimeoutMs(1, 1, { colorMode: ' Color ', duplex: ' duplex_short_edge ' })
+if (spaced !== 98000) process.exit(1)
+const blank = computeMonitorTimeoutMs(1, 1, { colorMode: '  ', duplex: '' })
+if (blank !== 93000) process.exit(1)
 ;(async () => {
   let now = 0
   const timeoutMs = computeMonitorTimeoutMs(100, 1, { colorMode: 'color', duplex: 'duplex_long_edge' })
@@ -141,10 +150,10 @@ if (!(worst > 5 * 60 * 1000)) process.exit(1)
     sleep: async (ms) => { now += ms },
     dispatchedAtMs: 0,
     queryCompletionEvent: async () => false,
-    queryStatus: async () => (now >= 100 * 6000 ? { status: 'completed' } : { status: 'printing' }),
+    queryStatus: async () => (now >= 100 * 8000 ? { status: 'completed' } : { status: 'printing' }),
   })
   if (outcome.failed || outcome.errorCode === 'PRINT_JOB_UNCONFIRMED') process.exit(1)
-  if (!(now >= 600000 && now <= timeoutMs)) process.exit(1)
+  if (!(now >= 800000 && now <= timeoutMs)) process.exit(1)
   process.exit(0)
 })().catch(() => process.exit(1))
 `
@@ -165,7 +174,8 @@ function verifyTimeoutOrderingMutations(): void {
   const mutations: Array<[string, string, string, string]> = [
     ['server timeout back to 10 minutes', serverPath, 'export const PRINTING_UNCONFIRMED_TIMEOUT_MS = 20 * 60 * 1000', 'export const PRINTING_UNCONFIRMED_TIMEOUT_MS = 10 * 60 * 1000'],
     ['agent cap at least 20 minutes', timeoutPath, 'export const PRINT_MONITOR_CAP_MS = 15 * 60_000', 'export const PRINT_MONITOR_CAP_MS = 20 * 60_000'],
-    ['duplex side fast enough to unconfirm 100 sides inside 5 minutes', timeoutPath, 'const DUPLEX_SIDE_MS = 6_000', 'const DUPLEX_SIDE_MS = 1_000'],
+    ['color duplex side fast enough to miss the 890s worst case', timeoutPath, 'const COLOR_DUPLEX_SIDE_MS = 8_000', 'const COLOR_DUPLEX_SIDE_MS = 1_000'],
+    ['unknown print params use the fastest tier', timeoutPath, 'if (!colorKnown || !duplexKnown) return COLOR_DUPLEX_SIDE_MS', 'if (!colorKnown || !duplexKnown) return SIMPLEX_BW_SIDE_MS'],
   ]
   for (const [label, file, from, to] of mutations) {
     const original = file === serverPath ? serverSource : timeoutSource

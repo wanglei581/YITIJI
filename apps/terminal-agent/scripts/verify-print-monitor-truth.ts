@@ -12,6 +12,7 @@ import {
   parsePrintJobStatus,
   type PrintJobMonitorStatus,
 } from '../src/agent/wmi'
+import { ESCAPE_WQL_LITERAL_FUNCTION, escapeWqlLiteral } from '../src/agent/wql-literal'
 import { printWithPdfToPrinter } from '../src/printer/print-with-pdf-to-printer'
 import { buildImageTempPdfFileName } from '../src/printer/image-to-pdf'
 
@@ -453,9 +454,12 @@ async function main(): Promise<void> {
       assert.equal(configuredPrinterNameMatches("' OR $_.Name -eq 'other", 'other'), false)
       const probe = buildWin32PrinterProbeScript()
       assert.equal(probe.includes(trickyName), false)
-      assert.doesNotMatch(probe, /-Filter\b/)
+      assert.match(probe, /-Filter \$filter/)
       assert.doesNotMatch(probe, /\$name\s*\+/)
       assert.match(probe, /\.Name -eq \$name/)
+      assert.ok(probe.includes(ESCAPE_WQL_LITERAL_FUNCTION))
+      assert.equal(escapeWqlLiteral(trickyName), "\\\\\\\\srv\\\\Pan\\'tum")
+      assert.equal(escapeWqlLiteral("a\\b'c"), "a\\\\b\\'c")
     } catch (error) {
       failures.push(`paper_empty contract: ${error instanceof Error ? error.message : String(error)}`)
     }

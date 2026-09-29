@@ -18,12 +18,17 @@ import {
   settlePrinterAfterTerminal,
 } from '../src/agent/print-dispatch-gate'
 import {
+  CIM_METHOD_SCRIPT,
   cleanupStaleOwnPrintJobs,
+  LIST_JOBS_SCRIPT,
   listConfiguredPrintJobs,
   pauseConfiguredPrinterQueue,
+  PrintQueueHoldError,
+  REMOVE_JOBS_SCRIPT,
   resolvePrintJobUserSid,
   resumeConfiguredPrinterQueue,
   type PrintJobSnapshot,
+  type PrintQueueCommandStep,
 } from '../src/agent/print-queue-hold'
 import { mapWin32PrinterPreflight, mapWin32PrinterQuery, queryWin32PrinterLine } from '../src/agent/wmi'
 
@@ -37,9 +42,39 @@ const TEST_PASSWORD = 'Aijob-Queue-Hold-1a'
 const HOLD_SOURCE = join(__dirname, '../src/agent/print-queue-hold.ts')
 const OWNER_ANCHOR = '$owned = $jobSid.Equals($currentSid)'
 const PAUSE_ANCHOR = "await invokePrinterCimMethod(printerName, 'Pause')"
+const UNREADABLE_SKIP_ANCHOR = `    $skippedUnreadable += 1
+    $unreadable = $true`
 
 function scrub(text: string): string {
   return text.split(TEST_PASSWORD).join('***')
+}
+
+function replayFailedQueueStep(step: PrintQueueCommandStep, printerName: string): void {
+  const script = step === 'list' ? LIST_JOBS_SCRIPT : step === 'remove' ? REMOVE_JOBS_SCRIPT : CIM_METHOD_SCRIPT
+  const stdin =
+    step === 'pause'
+      ? JSON.stringify({ printerName, method: 'Pause' })
+      : step === 'resume'
+        ? JSON.stringify({ printerName, method: 'Resume' })
+        : step === 'remove'
+          ? JSON.stringify({ printerName, ids: [] })
+          : JSON.stringify({ printerName })
+  const result = spawnSync('powershell', ['-NonInteractive', '-NoProfile', '-Command', script], {
+    input: stdin,
+    encoding: 'utf8',
+    timeout: 30_000,
+  })
+  const stderr = scrub(result.stderr || '') || '(empty)'
+  console.error(`queue-step ${step} replay exit=${result.status ?? 'null'} stderr=${stderr}`)
+}
+
+async function showQueueFailure<T>(fallback: PrintQueueCommandStep, printerName: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (error) {
+    if (error instanceof PrintQueueHoldError) replayFailedQueueStep(error.step ?? fallback, printerName)
+    throw error
+  }
 }
 
 function runPs(script: string): string {
@@ -73,7 +108,7 @@ async function waitForJob(
 ): Promise<PrintJobSnapshot> {
   const deadline = Date.now() + 25_000
   while (Date.now() < deadline) {
-    const listed = await listConfiguredPrintJobs(printerName)
+    const listed = await showQueueFailure('list', printerName, () => listConfiguredPrintJobs(printerName))
     const job = listed.jobs.find((entry) => predicate(entry))
     if (job) return job
     await sleep(500)
@@ -99,6 +134,17 @@ async function verifySidResolution(): Promise<void> {
 function createPrinters(): void {
   runPs(`
 $ErrorActionPreference = 'Stop'
+$driver = 'Generic / Text Only'
+$installed = Get-PrinterDriver -Name $driver -ErrorAction SilentlyContinue
+if (-not $installed) {
+  try {
+    Add-PrinterDriver -Name $driver
+  } catch {
+    throw ("Generic / Text Only driver is not installed and Add-PrinterDriver failed: " + $_.Exception.Message)
+  }
+}
+$installed = Get-PrinterDriver -Name $driver -ErrorAction SilentlyContinue
+if (-not $installed) { throw 'Generic / Text Only driver is not installed after Add-PrinterDriver' }
 foreach ($pair in @(
   @{ Name = '${PRINTER_A}'; Port = '${PORT_A}' },
   @{ Name = '${PRINTER_B}'; Port = '${PORT_B}' }
@@ -107,8 +153,13 @@ foreach ($pair in @(
     Add-PrinterPort -Name $pair.Port
   }
   if (-not (Get-Printer -Name $pair.Name -ErrorAction SilentlyContinue)) {
-    Add-Printer -Name $pair.Name -DriverName 'Generic / Text Only' -PortName $pair.Port
+    Add-Printer -Name $pair.Name -DriverName $driver -PortName $pair.Port
   }
+}
+foreach ($name in @('${PRINTER_A}','${PRINTER_B}')) {
+  $created = Get-Printer -Name $name -ErrorAction Stop
+  if ([string]$created.Name -ne $name) { throw 'created printer name mismatch' }
+  Write-Output ("printer-created " + $name)
 }
 `)
 }
@@ -143,14 +194,28 @@ function removeFixtures(): void {
       `
 $ErrorActionPreference = 'Continue'
 schtasks /Delete /TN ${TASK_NAME} /F 2>$null | Out-Null
-cmd /c "net user ${USER_NAME} /delete" | Out-Null
+cmd /c "net user ${USER_NAME} /delete >nul 2>&1"
+$cleanupError = $null
 foreach ($name in @('${PRINTER_A}','${PRINTER_B}')) {
-  if (Get-Printer -Name $name -ErrorAction SilentlyContinue) { Remove-Printer -Name $name }
+  $printer = Get-Printer -Name $name -ErrorAction SilentlyContinue
+  if ($printer) {
+    try { Remove-Printer -Name $name -ErrorAction Stop }
+    catch { $cleanupError = $_.Exception.Message }
+  }
 }
 foreach ($port in @('${PORT_A}','${PORT_B}')) {
-  if (Get-PrinterPort -Name $port -ErrorAction SilentlyContinue) { Remove-PrinterPort -Name $port }
+  $existing = Get-PrinterPort -Name $port -ErrorAction SilentlyContinue
+  if ($existing) {
+    try { Remove-PrinterPort -Name $port -ErrorAction Stop }
+    catch { $cleanupError = $_.Exception.Message }
+  }
 }
 Remove-Item -LiteralPath '${PORT_A}','${PORT_B}','${join(tmpdir(), 'aijob-residue-other.ps1')}' -Force -ErrorAction SilentlyContinue
+if ($null -ne $cleanupError) {
+  Write-Error $cleanupError
+  exit 1
+}
+exit 0
 `,
     ],
     { encoding: 'utf8', timeout: 90_000 },
@@ -163,8 +228,8 @@ Remove-Item -LiteralPath '${PORT_A}','${PORT_B}','${join(tmpdir(), 'aijob-residu
 async function runScenario(): Promise<void> {
   await verifySidResolution()
   createPrinters()
-  await pauseConfiguredPrinterQueue(PRINTER_A)
-  await pauseConfiguredPrinterQueue(PRINTER_B)
+  await showQueueFailure('pause', PRINTER_A, () => pauseConfiguredPrinterQueue(PRINTER_A))
+  await showQueueFailure('pause', PRINTER_B, () => pauseConfiguredPrinterQueue(PRINTER_B))
   submitOtherAccountJob()
   const other = await waitForJob(PRINTER_A, (job) => !job.ownedByCurrentProcess)
   submitOwnJob(PRINTER_A)
@@ -180,7 +245,7 @@ async function runScenario(): Promise<void> {
     outcome: 'failed',
     pauseAgain: false,
     removeOwnJobs: async () => {
-      await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A })
+      await showQueueFailure('list', PRINTER_A, () => cleanupStaleOwnPrintJobs({ printerName: PRINTER_A }))
     },
     pause: async () => {
       throw new Error('failed-terminal cleanup must not pause when idle hold is off')
@@ -200,7 +265,7 @@ async function runScenario(): Promise<void> {
   const prepared = await preparePrinterForDispatch({
     holdEnabled: false,
     removeOwnJobs: async () => {
-      await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A })
+      await showQueueFailure('list', PRINTER_A, () => cleanupStaleOwnPrintJobs({ printerName: PRINTER_A }))
     },
     resume: async () => {
       throw new Error('pre-dispatch cleanup must not resume when idle hold is off')
@@ -211,11 +276,37 @@ async function runScenario(): Promise<void> {
   assert.equal(kept.jobs.some((job) => job.id === jobB.id), false, 'pre-dispatch: own-account leftover must be removed')
   assert.equal(kept.jobs.some((job) => job.id === other.id), true, 'pre-dispatch: other-account job must still stay')
 
-  await resumeConfiguredPrinterQueue(PRINTER_A)
+  // 删掉提交那份作业的账号之后，用户名读不出来。清理必须成功，这份作业留下，本账号新作业删掉。
+  // 若已删账号仍能解析成 SID，这一段会失败：那说明跳过逻辑没被走到。
+  runPs(`
+$ErrorActionPreference = 'Stop'
+schtasks /Delete /TN ${TASK_NAME} /F | Out-Null
+cmd /c "net user ${USER_NAME} /delete"
+if ($LASTEXITCODE -ne 0) { throw "deleted-account fixture: net user /delete exited $LASTEXITCODE" }
+exit 0
+`)
+  submitOwnJob(PRINTER_A)
+  const jobAfterDelete = await waitForJob(
+    PRINTER_A,
+    (job) => job.ownedByCurrentProcess && job.id !== jobA.id && job.id !== jobB.id && job.id !== other.id,
+  )
+  const cleaned = await showQueueFailure('list', PRINTER_A, () => cleanupStaleOwnPrintJobs({ printerName: PRINTER_A }))
+  assert.ok(cleaned.unreadableUserJobs >= 1, 'unreadable user jobs must be counted, not fail the cleanup')
+  const afterUnreadable = await listConfiguredPrintJobs(PRINTER_A)
+  const keptUnreadable = afterUnreadable.jobs.find((job) => job.id === other.id)
+  assert.ok(keptUnreadable, 'job of the deleted account must stay')
+  assert.equal(keptUnreadable.unreadableUser, true, 'deleted-account job must be marked unreadable')
+  assert.equal(
+    afterUnreadable.jobs.some((job) => job.id === jobAfterDelete.id),
+    false,
+    'own job must still be removed when another job has an unreadable user',
+  )
+
+  await showQueueFailure('resume', PRINTER_A, () => resumeConfiguredPrinterQueue(PRINTER_A))
   const resumed = await queryWin32PrinterLine(PRINTER_A)
   console.log(`resumed-probe ${resumed ?? 'null'}`)
   assert.equal(pauseSignal(resumed), false, 'resume must clear the pause signal')
-  await pauseConfiguredPrinterQueue(PRINTER_A)
+  await showQueueFailure('pause', PRINTER_A, () => pauseConfiguredPrinterQueue(PRINTER_A))
   const paused = await queryWin32PrinterLine(PRINTER_A)
   console.log(`paused-probe ${paused ?? 'null'}`)
   assert.equal(pauseSignal(paused), true, 'idle hold must leave the queue paused')
@@ -255,7 +346,7 @@ function runSelf(): ReturnType<typeof spawnSync> {
   return spawnSync(process.execPath, ['-r', 'ts-node/register/transpile-only', __filename], {
     cwd: join(__dirname, '..'),
     encoding: 'utf8',
-    timeout: 180_000,
+    timeout: 240_000,
     env: { ...process.env, PRINT_QUEUE_RESIDUE_CHILD: '1', TS_NODE_TRANSPILE_ONLY: '1' },
   })
 }
@@ -265,6 +356,7 @@ async function verifyReverseMutations(): Promise<void> {
   const mutations: Array<[string, string, string]> = [
     ['owner', OWNER_ANCHOR, '$owned = $true'],
     ['pause', PAUSE_ANCHOR, 'await Promise.resolve()'],
+    ['unreadable user throws', UNREADABLE_SKIP_ANCHOR, `throw 'print job user sid is unreadable'`],
   ]
   for (const [label, from, to] of mutations) {
     assert.ok(original.includes(from), `${label}: anchor missing`)

@@ -21304,6 +21304,10 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
     ],
+    "apps/terminal-agent/src/agent/wql-literal.ts": [
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+    ],
     "apps/terminal-agent/src/config.ts": [
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
@@ -23857,7 +23861,8 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.fleet.ts": [
-      "services/api/scripts/verify-console-screen-snapshot.ts"
+      "services/api/scripts/verify-console-screen-snapshot.ts",
+      "services/api/scripts/verify-queue-dispatch-printer-status.ts"
     ],
     "services/api/src/console-screen/console-screen.metric.ts": [
       "services/api/scripts/verify-console-screen-printed-visits.ts",
@@ -25118,7 +25123,8 @@
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
-      "services/api/scripts/verify-print-parameter-capability.ts"
+      "services/api/scripts/verify-print-parameter-capability.ts",
+      "services/api/scripts/verify-queue-dispatch-printer-status.ts"
     ],
     "services/api/src/payment/order-status.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
@@ -25891,6 +25897,7 @@
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/terminals/admin-printer-status.ts": [
+      "services/api/scripts/verify-queue-dispatch-printer-status.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/admin-terminals.controller.ts": [
@@ -30948,6 +30955,7 @@
           "apps/terminal-agent/src/agent/printer-status-map.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/wmi.ts",
+          "apps/terminal-agent/src/agent/wql-literal.ts",
           "apps/terminal-agent/src/printer/image-to-pdf.ts",
           "apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
@@ -30998,6 +31006,7 @@
           "apps/terminal-agent/src/agent/task-runner-control.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/wmi.ts",
+          "apps/terminal-agent/src/agent/wql-literal.ts",
           "apps/terminal-agent/src/index.ts"
         ],
         "missing": []
@@ -38681,6 +38690,9 @@
         "files": [
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/console-screen/console-screen.fleet.ts",
+          "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/terminals/admin-printer-status.ts",
           "services/api/src/terminals/dto/heartbeat.dto.ts",
           "services/api/src/terminals/printer-availability.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
