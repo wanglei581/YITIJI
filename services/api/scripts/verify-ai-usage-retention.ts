@@ -116,8 +116,8 @@ function verifySources(): void {
   }
 
   for (const migrationPath of [
-    'services/api/prisma/migrations/20260929200000_ai_usage_retention_summary/migration.sql',
-    'services/api/prisma/postgres/migrations/20260929200000_ai_usage_retention_summary/migration.sql',
+    'services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql',
+    'services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql',
   ]) {
     const sql = read(migrationPath)
     check(`${migrationPath} 有汇总表`, sql.includes('AiUsageMonthlySummary') && sql.includes('summarizedAt'))
