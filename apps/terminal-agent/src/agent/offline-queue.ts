@@ -24,6 +24,7 @@ import {
   deadLetterPatch,
   markPatchAttempt,
   isDatabaseAvailable,
+  normalizePrintAttempt,
   type AgentDatabase,
   type PendingPatch,
 } from './db'
@@ -47,6 +48,12 @@ function nextRetryDelayMs(attempts: number): number {
 // ── Per-patch retry ───────────────────────────────────────────────────────────
 
 export type OfflinePatchOutcome = 'processed' | 'skipped' | 'paused_unauthorized'
+
+/** 服务端拒绝了更早一轮的状态补报。调用方应移出队列，不要当失败重试。 */
+export function isStalePrintAttemptError(error: unknown): boolean {
+  const data = (error as { response?: { data?: { error?: { code?: string } } } } | null)?.response?.data
+  return data?.error?.code === 'PRINT_STATUS_STALE_ATTEMPT'
+}
 
 export async function processPatch(
   patch: PendingPatch,
@@ -73,9 +80,17 @@ export async function processPatch(
     return 'paused_unauthorized'
   }
 
-  const payload: Record<string, string> = { status: patch.status }
-  if (patch.errorCode) payload['errorCode'] = patch.errorCode
-  if (patch.errorMessage) payload['errorMessage'] = patch.errorMessage
+  const payload: {
+    status: string
+    errorCode?: string
+    errorMessage?: string
+    attempt: number
+  } = {
+    status: patch.status,
+    attempt: normalizePrintAttempt(patch.printAttempt),
+  }
+  if (patch.errorCode) payload.errorCode = patch.errorCode
+  if (patch.errorMessage) payload.errorMessage = patch.errorMessage
 
   try {
     if (sendPatch) {
@@ -99,6 +114,12 @@ export async function processPatch(
           ' — unauthorized; retained for retry after re-bind',
       )
       return 'paused_unauthorized'
+    }
+
+    if (isStalePrintAttemptError(e)) {
+      log(patch.taskId)
+      markPatchAttempt(db, patch.id, true)
+      return 'processed'
     }
 
     const httpStatus = axios.isAxiosError(e) ? e.response?.status : undefined

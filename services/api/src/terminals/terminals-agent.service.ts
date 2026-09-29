@@ -37,6 +37,7 @@ import {
 } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
+import { assertFreshPrintStatusAttempt, reprintAttemptsByTaskId } from './print-status-attempt'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
 import type { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto'
 import {
@@ -179,31 +180,6 @@ export const SAMPLE_VISIBLE_PDF_SHA256 = crypto.createHash('sha256').update(SAMP
 
 const ADMIN_SECRET = requireEnv('TERMINAL_ADMIN_SECRET')
 const ACTION_TOKEN_SECRET = requireEnv('TERMINAL_ACTION_TOKEN_SECRET')
-
-/**
- * 本批任务各算一次。where 以 taskId 开头，可走 PrintTaskStatusLog 的 (taskId, createdAt) 索引。
- * 不按 errorCode 过滤：一体机重试和管理员重试都是 failed→pending，只是日志里的码不同。
- */
-async function reprintAttemptsByTaskId(
-  prisma: PrismaService,
-  taskIds: string[],
-): Promise<Map<string, number>> {
-  const attempts = new Map<string, number>()
-  if (taskIds.length === 0) return attempts
-  const rows = await prisma.printTaskStatusLog.groupBy({
-    by: ['taskId'],
-    where: {
-      taskId: { in: taskIds },
-      fromStatus: 'failed',
-      toStatus: 'pending',
-    },
-    _count: { _all: true },
-  })
-  for (const row of rows) {
-    attempts.set(row.taskId, row._count._all)
-  }
-  return attempts
-}
 
 function base64UrlJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
@@ -630,6 +606,9 @@ export class TerminalAgentService implements OnModuleInit {
     if (preCheck.terminalId !== terminalId) {
       throw new BadRequestException({ error: { code: 'TASK_NOT_OWNED', message: `任务 ${taskId} 不属于终端 ${terminalId}` } })
     }
+
+    // 落后的 attempt 在同一状态的幂等确认之前拒绝，避免旧 failed 把新一轮打回失败。
+    await assertFreshPrintStatusAttempt(this.prisma, taskId, dto.attempt)
 
     if (TERMINAL_STATES.includes(preCheck.status as TaskStatus)) {
       if (preCheck.status === dto.status) {

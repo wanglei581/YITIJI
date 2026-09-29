@@ -272,10 +272,10 @@ export type PrintJobMonitorStatus =
  * printerName and taskId are passed via a single stdin line ("printer|taskId")
  * so neither value can inject into the PowerShell parser.
  *
- * Matching: DocumentName -like "*<taskId>*"
- * The submitted PDF filename always contains taskId: downloaded PDFs use
- * "task_<taskId>.pdf", while converted images use
- * "print_<taskId>_<uuid>.pdf".
+ * Matching: attempt 0 keeps DocumentName -like "*<taskId>*".
+ * attempt>0 的查询键是 "<taskId>_a<attempt>"，后面必须是 "." 或 "_"，
+ * 这样不会选中上一轮的 task_<taskId>.pdf，也不会把 _a1 认成 _a10。
+ * Downloaded PDFs use "task_<stem>.pdf"; converted images use "print_<stem>_<uuid>.pdf".
  *
  * PaperOut confirmation: callers must require 2 consecutive 'paper_empty' results
  * before acting, to guard against transient driver state flicker.
@@ -301,7 +301,12 @@ export async function getPrintJobStatus(
     `$tId   = $line.Substring($sep + 1); ` +
     `$jobs  = Get-PrintJob -PrinterName $pName -ErrorAction SilentlyContinue; ` +
     `if ($null -eq $jobs) { 'not_found'; exit }; ` +
-    `$job = @($jobs) | Where-Object { $_.DocumentName -like "*$tId*" } | Select-Object -First 1; ` +
+    `$escaped = [regex]::Escape($tId); ` +
+    `$job = if ($tId -match '_a[0-9]+$') { ` +
+    `@($jobs) | Where-Object { [string]$_.DocumentName -match ($escaped + '([.]|_)') } | Select-Object -First 1 ` +
+    `} else { ` +
+    `@($jobs) | Where-Object { $_.DocumentName -like "*$tId*" } | Select-Object -First 1 ` +
+    `}; ` +
     `if ($null -eq $job) { 'not_found'; exit }; ` +
     `$job.JobStatus`
 
@@ -333,7 +338,7 @@ export function buildPrintServiceCompletionEventScript(): string {
     `$event = Get-WinEvent -FilterHashtable @{ LogName='Microsoft-Windows-PrintService/Operational'; Id=307; StartTime=$since } -ErrorAction SilentlyContinue | ` +
     `Where-Object { try { ` +
     `$raw = $_.ToXml(); ` +
-    `if ($raw -like "*$tId*") { $true } else { ` +
+    `if ($raw -like "*$tId*" -and -not ($tId -match '_a[0-9]+$' -and $raw -notmatch ([regex]::Escape($tId) + '([.]|_)'))) { $true } else { ` +
     `[xml]$xml = $raw; ` +
     `$documentNode = $xml.SelectSingleNode("/*[local-name()='Event']/*[local-name()='UserData']/*[local-name()='DocumentPrinted']/*[local-name()='Param2']"); ` +
     `$printerNode = $xml.SelectSingleNode("/*[local-name()='Event']/*[local-name()='UserData']/*[local-name()='DocumentPrinted']/*[local-name()='Param5']"); ` +

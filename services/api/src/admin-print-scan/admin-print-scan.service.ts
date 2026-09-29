@@ -16,7 +16,11 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
-import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
+import {
+  loadPaidReprintBlock,
+  paidReprintBlockReason,
+  throwIfAdminReprintBlocked,
+} from '../print-jobs/paid-reprint-eligibility'
 import {
   IMPLEMENTED_PRINT_SCAN_TASK_TYPES,
   type PrintScanTaskType,
@@ -450,24 +454,22 @@ export class AdminPrintScanService {
     if (!task) {
       throw new NotFoundException({ error: { code: 'PRINT_SCAN_TASK_NOT_FOUND', message: '任务不存在' } })
     }
-    if (task.status !== 'failed') {
-      throw new ConflictException({
-        error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '仅失败状态的打印任务可以重试' },
-      })
-    }
-    // Agent 已经把任务归档为“可能出纸但结果无法确认”时，重排会造成重复出纸风险。
-    // 门禁必须位于文件重签和任何事务写入之前，拒绝路径保持任务、订单和状态日志完全不变。
-    if (task.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE) {
-      throw new ConflictException({
-        error: {
-          code: 'PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN',
-          message: '打印结果未确认，禁止重新排队；请前往订单管理核查并按需退款',
-        },
-      })
-    }
-    // 失败任务多半已超过 30 分钟签名 TTL，原 fileUrl 重排后 Agent 必然下载失败：
-    // fileId 路径解析可在事务外做；文件未删除校验必须和状态 CAS 在同一事务内完成。
+    // 与会员端同一套资格：失败、已付款、非退款、非未确认、非只出一部分、文件仍可打印。
+    // 必须位于文件重签和任何事务写入之前，拒绝路径保持任务、订单和状态日志完全不变。
     const fileId = parsePrintFileId(task.fileUrl)
+    const previewFile = fileId
+      ? await this.prisma.fileObject.findUnique({
+          where: { id: fileId },
+          select: { status: true, deletedAt: true, expiresAt: true },
+        })
+      : null
+    const blockReason = await loadPaidReprintBlock(this.prisma, task, fileId ? previewFile : null)
+    if (!fileId && blockReason === 'file_unavailable') {
+      throw new ConflictException({
+        error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件链接无法解析，无法重试' },
+      })
+    }
+    throwIfAdminReprintBlocked(blockReason)
     if (!fileId) {
       throw new ConflictException({
         error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件链接无法解析，无法重试' },
@@ -497,25 +499,33 @@ export class AdminPrintScanService {
         })
       }
 
-      const file = await tx.fileObject.findUnique({
+      const liveTask = await tx.printTask.findUnique({
+        where: { id: taskId },
+        select: { status: true, errorCode: true },
+      })
+      const liveFile = await tx.fileObject.findUnique({
         where: { id: fileId },
         select: { status: true, deletedAt: true, expiresAt: true },
       })
-      if (!isPrintableFileRecord(file)) {
-        throw new ConflictException({
-          error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件已按隐私策略清理，无法重试' },
-        })
-      }
+      const order = await tx.order.findFirst({
+        where: { printTaskId: taskId },
+        select: { id: true, payStatus: true },
+      })
+      throwIfAdminReprintBlocked(paidReprintBlockReason({
+        status: liveTask?.status ?? '',
+        errorCode: liveTask?.errorCode,
+        payStatus: order?.payStatus ?? null,
+        file: liveFile,
+      }))
 
       // 关联订单以 Order.taskStatus 作为共同状态序列点。先抢占 Order 的 failed→pending，
       // 再更新 PrintTask；任一后续 CAS 失败都会回滚已更新的订单，避免 retry 覆盖退款/领取。
-      const order = await tx.order.findFirst({ where: { printTaskId: taskId }, select: { id: true } })
       if (order) {
         const updatedOrder = await tx.order.updateMany({
           where: {
             id: order.id,
             taskStatus: 'failed',
-            payStatus: { notIn: [...REFUND_PAY_STATUSES] },
+            payStatus: 'paid',
           },
           data: { taskStatus: 'pending' },
         })

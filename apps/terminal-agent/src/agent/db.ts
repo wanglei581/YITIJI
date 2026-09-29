@@ -62,6 +62,8 @@ export interface PendingPatch {
   manualReplayAttempts: number
   lastManualReplayAt: string | null
   manualReplayErrorCode: string | null
+  /** 入队时的打印 attempt。旧行迁移后为 0。 */
+  printAttempt: number
 }
 
 export type ScanDeletionResult = 'pending_delete' | 'deleted' | 'delete_failed'
@@ -122,7 +124,8 @@ CREATE TABLE IF NOT EXISTS pending_patches (
   resolution TEXT,
   manualReplayAttempts INTEGER NOT NULL DEFAULT 0,
   lastManualReplayAt TEXT,
-  manualReplayErrorCode TEXT
+  manualReplayErrorCode TEXT,
+  printAttempt INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS dead_letter_operator_audit (
@@ -248,6 +251,7 @@ export function openDatabase(): AgentDatabase {
     ensureColumn(db, 'pending_patches', 'manualReplayAttempts', 'INTEGER NOT NULL DEFAULT 0')
     ensureColumn(db, 'pending_patches', 'lastManualReplayAt', 'TEXT')
     ensureColumn(db, 'pending_patches', 'manualReplayErrorCode', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'printAttempt', 'INTEGER NOT NULL DEFAULT 0')
     ensureColumn(db, 'scan_deletion_audit', 'reportAttempts', 'INTEGER NOT NULL DEFAULT 0')
     ensureColumn(db, 'scan_deletion_audit', 'nextReportAt', 'TEXT')
     ensureColumn(db, 'scan_deletion_audit', 'reportedAt', 'TEXT')
@@ -310,6 +314,8 @@ export function isDatabaseAvailable(db: AgentDatabase): db is SqliteDb {
 /**
  * 一次 executeTask 里，省略 attempt 的读写都落在这次领取的 attempt 上。
  * 领取循环一次只跑一个任务，下一次 executeTask 会覆盖。并发执行同一个 db 不受支持。
+ * attempt>0 的重提在不认识该字段的老 Agent 上仍按 0 判重，不会再次出纸。
+ * 发布顺序是先服务端、再 Agent 0.4.13。
  */
 const printAttemptByDb = new WeakMap<SqliteDb, number>()
 
@@ -587,13 +593,14 @@ export function enqueuePatch(
   payload: PatchStatusPayload,
 ): void {
   if (!db) return
+  const printAttempt = normalizePrintAttempt(payload.attempt)
   const existing = db
     .prepare(
       `SELECT id, deadLetterAt FROM pending_patches
-       WHERE taskId = ? AND status = ? AND resolvedAt IS NULL
+       WHERE taskId = ? AND status = ? AND printAttempt = ? AND resolvedAt IS NULL
        ORDER BY id DESC LIMIT 1`,
     )
-    .get(taskId, payload.status)
+    .get(taskId, payload.status, printAttempt)
   if (existing) {
     const disposition = existing['deadLetterAt'] ? 'dead-lettered; operator action required' : 'already queued'
     warn(`db: PATCH status=${payload.status} for task ${taskId} not duplicated — ${disposition}`)
@@ -605,8 +612,8 @@ export function enqueuePatch(
   db
     .prepare(
       `INSERT INTO pending_patches
-       (taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt)
-       VALUES (?, ?, ?, ?, 0, ?, ?)`,
+       (taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt, printAttempt)
+       VALUES (?, ?, ?, ?, 0, ?, ?, ?)`,
     )
     .run(
       taskId,
@@ -615,6 +622,7 @@ export function enqueuePatch(
       payload.errorMessage ?? null,
       nextRetryAt,
       now,
+      printAttempt,
     )
   warn(`db: PATCH status=${payload.status} for task ${taskId} enqueued for offline retry`)
 }
@@ -630,7 +638,7 @@ export function getPendingPatches(db: AgentDatabase): PendingPatch[] {
     .prepare(
       `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
               deadLetterAt, deadLetterReason, operatorConfirmedAt, resolvedAt, resolution,
-              manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode
+              manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode, printAttempt
        FROM pending_patches WHERE deadLetterAt IS NULL AND nextRetryAt <= ?`,
     )
     .all(now) as unknown as PendingPatch[]
@@ -643,7 +651,7 @@ export function getDeadLetterPatches(db: AgentDatabase): PendingPatch[] {
     .prepare(
       `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
               deadLetterAt, deadLetterReason, operatorConfirmedAt, resolvedAt, resolution,
-              manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode
+              manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode, printAttempt
        FROM pending_patches
        WHERE deadLetterAt IS NOT NULL AND resolvedAt IS NULL
        ORDER BY deadLetterAt ASC`,

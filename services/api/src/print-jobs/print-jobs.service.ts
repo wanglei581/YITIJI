@@ -14,7 +14,7 @@ import {
 import { priceChanged } from '../payment/order-quote.service'
 import { PricingService } from '../payment/pricing.service'
 import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
-import { forbidsAutomaticReprint, PARTIAL_OUTPUT_ERROR_CODE } from './paid-anomaly-disposition'
+import { paidReprintBlockReason, throwIfMemberReprintBlocked } from './paid-reprint-eligibility'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
@@ -707,33 +707,13 @@ export class PrintJobsService {
         }
       }
     }
-    if (task.status !== 'failed') {
-      throw new ConflictException({
-        error: { code: 'PRINT_RETRY_INVALID_STATE', message: '仅失败的打印任务可以重新提交' },
-      })
-    }
-    if (forbidsAutomaticReprint(task.errorCode)) {
-      const partial = task.errorCode === PARTIAL_OUTPUT_ERROR_CODE
-      throw new ConflictException({
-        error: {
-          code: partial ? 'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN' : 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
-          message: partial
-            ? '只出了一部分，不能自动重打或自动退款，请联系工作人员'
-            : '打印结果未确认，不能重新提交，请联系工作人员核查',
-        },
-      })
-    }
-    if (order.payStatus !== 'paid') {
-      throw new ConflictException({
-        error: { code: 'PRINT_RETRY_NOT_PAID', message: '未完成支付的打印任务不能重新提交' },
-      })
-    }
-    if (!isPrintableFileRecord(file)) {
-      throw new ConflictException({
-        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
-      })
-    }
-    const fileId = task.fileId ?? file.id
+    throwIfMemberReprintBlocked(paidReprintBlockReason({
+      status: task.status,
+      errorCode: task.errorCode,
+      payStatus: order.payStatus,
+      file,
+    }))
+    const fileId = task.fileId ?? file?.id
     if (!fileId) {
       throw new ConflictException({
         error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
@@ -842,13 +822,13 @@ export class PrintJobsService {
   ): boolean {
     if (task.fileId && !file) return false
     if (task.terminalId && (terminal?.enabled !== true || terminal.lifecycleStatus !== 'active')) return false
-    return (
-      task.status === 'failed' &&
-      order.payStatus === 'paid' &&
-      order.taskStatus === 'failed' &&
-      !forbidsAutomaticReprint(task.errorCode) &&
-      isPrintableFileRecord(file)
-    )
+    if (order.taskStatus !== 'failed') return false
+    return paidReprintBlockReason({
+      status: task.status,
+      errorCode: task.errorCode,
+      payStatus: order.payStatus,
+      file,
+    }) === null
   }
 
   private async loadAccessiblePrintJob(taskId: string, ctx: PrintJobAccessContext) {

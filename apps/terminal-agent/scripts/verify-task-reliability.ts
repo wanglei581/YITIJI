@@ -204,6 +204,7 @@ function pendingPatch(attempts: number): PendingPatch {
     manualReplayAttempts: 0,
     lastManualReplayAt: null,
     manualReplayErrorCode: null,
+    printAttempt: 0,
   }
 }
 
@@ -249,8 +250,13 @@ function verifyDispatchIntentIsDurableBeforePrinterInvocation(): void {
   assert.ok(printInvocation > dispatchPersist, 'dispatching must be durable before the physical printer invocation')
   assert.match(
     source,
-    /const result = await print\([\s\S]*?\{ correlationId: task\.taskId \},[\s\S]*?\)/,
-    'the physical print call must propagate taskId for image spooler correlation',
+    /const correlationId = printSpoolStem\(task\.taskId, spoolAttempt\)/,
+    'print correlation must include the current attempt',
+  )
+  assert.match(
+    source,
+    /const result = await print\(\s*tempFilePath,[\s\S]*?\{ correlationId \}/,
+    'the physical print call must propagate the attempt-scoped correlation id',
   )
   assert.match(
     source,
@@ -387,6 +393,7 @@ async function verifyRealDatabaseMigrationAndTerminalReplay(): Promise<void> {
       'manualReplayAttempts',
       'lastManualReplayAt',
       'manualReplayErrorCode',
+      'printAttempt',
     ]) {
       assert.ok(columns.includes(column), `legacy local DB must add ${column}`)
     }
@@ -506,7 +513,7 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
     const replayed = await replayDeadLetter(db, successId, operatorConfig)
     assert.deepEqual(replayed, { outcome: 'archived', errorCode: null })
     assert.equal(server.requests.length, 1)
-    assert.deepEqual(server.requests[0]?.body, { status: 'completed' })
+    assert.deepEqual(server.requests[0]?.body, { status: 'completed', attempt: 0 })
     assert.equal(listDeadLetters(db).some((row) => row.id === successId), false)
     assert.equal(showDeadLetter(db, successId).resolution, 'replayed')
     const replayedStorage = storedSensitiveFields(successId)

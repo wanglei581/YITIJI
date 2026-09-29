@@ -70,14 +70,21 @@ function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) 
 /** attempt 必须在领取循环之后按 taskId 一次 groupBy，条件只有 failed→pending。 */
 function assertReprintAttemptQueryShape(): void {
   const source = readFileSync(join(__dirname, '../src/terminals/terminals-agent.service.ts'), 'utf8')
-  const fnStart = source.indexOf('async function reprintAttemptsByTaskId')
-  const fnEnd = source.indexOf('function base64UrlJson')
-  const fn = fnStart >= 0 && fnEnd > fnStart ? source.slice(fnStart, fnEnd) : ''
+  const attemptSource = readFileSync(join(__dirname, '../src/terminals/print-status-attempt.ts'), 'utf8')
+  const fnStart = attemptSource.indexOf('export async function reprintAttemptsByTaskId')
+  const fnEnd = attemptSource.indexOf('export async function assertFreshPrintStatusAttempt')
+  const fn = fnStart >= 0 && fnEnd > fnStart ? attemptSource.slice(fnStart, fnEnd) : ''
   const claimStart = source.indexOf('async claimTasks(')
   const claimEnd = source.indexOf('async patchTaskStatus(')
   const claim = claimStart >= 0 && claimEnd > claimStart ? source.slice(claimStart, claimEnd) : ''
   const loopAt = claim.indexOf('for (let i = 0; i < limit; i++)')
   const callAt = claim.indexOf('reprintAttemptsByTaskId(')
+  const patchStart = source.indexOf('async patchTaskStatus(')
+  const patchEnd = source.indexOf('async validateTerminalToken(')
+  const patch = patchStart >= 0 && patchEnd > patchStart ? source.slice(patchStart, patchEnd) : ''
+  const ownedAt = patch.indexOf("code: 'TASK_NOT_OWNED'")
+  const freshAt = patch.indexOf('assertFreshPrintStatusAttempt(')
+  const terminalAt = patch.indexOf('TERMINAL_STATES.includes(preCheck.status')
   if (
     !fn.includes('printTaskStatusLog.groupBy')
     || !fn.includes("fromStatus: 'failed'")
@@ -85,11 +92,16 @@ function assertReprintAttemptQueryShape(): void {
     || !fn.includes('taskId: { in: taskIds }')
     || /errorCode\s*:/.test(fn)
     || fn.includes('.count(')
+    || !attemptSource.includes('attempt < current')
+    || !attemptSource.includes('PRINT_STATUS_STALE_ATTEMPT')
     || loopAt < 0
     || callAt < loopAt
     || claim.includes('printTaskStatusLog.count')
+    || ownedAt < 0
+    || freshAt < ownedAt
+    || terminalAt < freshAt
   ) {
-    fail('attempt 必须在领取循环之后按 taskId 一次 groupBy，且只数 fromStatus=failed、toStatus=pending')
+    fail('attempt 必须在领取循环之后按 taskId 一次 groupBy，且只数 fromStatus=failed、toStatus=pending；落后补报要在终态幂等确认之前拒绝')
   }
   pass('attempt 计数：领取循环之后一次 groupBy(taskId)，不按 errorCode 过滤')
 }
@@ -921,6 +933,46 @@ async function main() {
     } else {
       fail(`8e2. attempt=1 异常: ${JSON.stringify(claimAttempt1.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
     }
+
+    await terminals.patchTaskStatus(
+      knownFailId,
+      { status: 'printing', attempt: 1 },
+      `Bearer ${agentToken}`,
+      terminalId,
+    )
+    const beforeStale = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const staleLogCount = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
+    await expectCode(
+      () => terminals.patchTaskStatus(
+        knownFailId,
+        { status: 'failed', errorCode: 'PAPER_EMPTY', attempt: 0 },
+        `Bearer ${agentToken}`,
+        terminalId,
+      ),
+      'PRINT_STATUS_STALE_ATTEMPT',
+      '8e2c. attempt 0 的 failed 在 attempt 1 已 printing 后被拒绝',
+    )
+    const afterStale = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const staleLogCountAfter = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
+    if (
+      afterStale?.status !== 'printing'
+      || afterStale.status !== beforeStale?.status
+      || afterStale.errorCode !== beforeStale?.errorCode
+      || staleLogCountAfter !== staleLogCount
+    ) {
+      fail(`8e2c. 落后补报改动了任务: before=${beforeStale?.status}/${beforeStale?.errorCode} after=${afterStale?.status}/${afterStale?.errorCode} logs=${staleLogCount}->${staleLogCountAfter}`)
+    }
+    await terminals.patchTaskStatus(
+      knownFailId,
+      { status: 'completed', attempt: 1 },
+      `Bearer ${agentToken}`,
+      terminalId,
+    )
+    const afterFreshComplete = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    if (afterFreshComplete?.status !== 'completed') {
+      fail(`8e2c. attempt 1 的 completed 未落库: ${afterFreshComplete?.status}`)
+    }
+    pass('8e2c. 落后 failed 被拒且状态不变，本轮 completed 仍能落库')
 
     // 领取响应丢失后再领：任务回到 pending，但不写新的 failed→pending。
     await prisma.printTask.update({

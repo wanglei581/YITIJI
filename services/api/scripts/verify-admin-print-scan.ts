@@ -381,6 +381,113 @@ async function main() {
     )
     pass('print-scan 展示 printOutcome，核查后仍禁止重试且不改 errorCode')
 
+    const partialTaskId = `pt_vps_partial_${suffix}`
+    const partialOrderId = `order_vps_partial_${suffix}`
+    createdPrintTaskIds.push(partialTaskId)
+    createdOrderIds.push(partialOrderId)
+    await prisma.printTask.create({
+      data: {
+        id: partialTaskId,
+        terminalId,
+        fileUrl: signFileUrl(fileId, 60_000).url,
+        fileMd5: 'partial-md5',
+        status: 'failed',
+        errorCode: 'PARTIAL_OUTPUT',
+        completedAt: new Date(),
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: partialOrderId,
+        orderNo: `NO-VPSP-${suffix}`,
+        type: 'print',
+        printTaskId: partialTaskId,
+        payStatus: 'paid',
+        taskStatus: 'failed',
+        amountCents: 100,
+      },
+    })
+    const [partialBefore, partialOrderBefore, partialLogsBefore] = await Promise.all([
+      prisma.printTask.findUniqueOrThrow({ where: { id: partialTaskId } }),
+      prisma.order.findUniqueOrThrow({ where: { id: partialOrderId } }),
+      prisma.printTaskStatusLog.count({ where: { taskId: partialTaskId } }),
+    ])
+    await expectHttpErrorCode(
+      () => printScan.applyAction('print', partialTaskId, 'retry'),
+      409,
+      'PRINT_SCAN_RETRY_PARTIAL_OUTPUT_FORBIDDEN',
+      'PARTIAL_OUTPUT retry → 409 + 精确业务错误码',
+    )
+    const [partialAfter, partialOrderAfter, partialLogsAfter] = await Promise.all([
+      prisma.printTask.findUniqueOrThrow({ where: { id: partialTaskId } }),
+      prisma.order.findUniqueOrThrow({ where: { id: partialOrderId } }),
+      prisma.printTaskStatusLog.count({ where: { taskId: partialTaskId } }),
+    ])
+    if (
+      partialAfter.status !== 'failed'
+      || partialAfter.errorCode !== 'PARTIAL_OUTPUT'
+      || JSON.stringify(partialAfter) !== JSON.stringify(partialBefore)
+      || partialOrderAfter.payStatus !== partialOrderBefore.payStatus
+      || partialOrderAfter.taskStatus !== partialOrderBefore.taskStatus
+      || partialLogsAfter !== partialLogsBefore
+    ) {
+      fail('PARTIAL_OUTPUT retry 拒绝后任务、订单和状态日志必须保持不变')
+    }
+    pass('管理员重试 PARTIAL_OUTPUT 被拒，任务状态不变')
+
+    const unpaidRetryTaskId = `pt_vps_unpaid_retry_${suffix}`
+    const unpaidRetryOrderId = `order_vps_unpaid_retry_${suffix}`
+    createdPrintTaskIds.push(unpaidRetryTaskId)
+    createdOrderIds.push(unpaidRetryOrderId)
+    await prisma.printTask.create({
+      data: {
+        id: unpaidRetryTaskId,
+        terminalId,
+        fileUrl: signFileUrl(fileId, 60_000).url,
+        fileMd5: 'unpaid-md5',
+        status: 'failed',
+        errorCode: 'printer_offline',
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: unpaidRetryOrderId,
+        orderNo: `NO-VPSUP-${suffix}`,
+        type: 'print',
+        printTaskId: unpaidRetryTaskId,
+        payStatus: 'unpaid',
+        taskStatus: 'failed',
+        amountCents: 100,
+      },
+    })
+    const [unpaidBefore, unpaidOrderBefore, unpaidLogsBefore] = await Promise.all([
+      prisma.printTask.findUniqueOrThrow({ where: { id: unpaidRetryTaskId } }),
+      prisma.order.findUniqueOrThrow({ where: { id: unpaidRetryOrderId } }),
+      prisma.printTaskStatusLog.count({ where: { taskId: unpaidRetryTaskId } }),
+    ])
+    await expectHttpErrorCode(
+      () => printScan.applyAction('print', unpaidRetryTaskId, 'retry'),
+      409,
+      'PRINT_SCAN_RETRY_NOT_PAID',
+      '未付款 retry → 409 + 精确业务错误码',
+    )
+    const [unpaidAfter, unpaidOrderAfter, unpaidLogsAfter] = await Promise.all([
+      prisma.printTask.findUniqueOrThrow({ where: { id: unpaidRetryTaskId } }),
+      prisma.order.findUniqueOrThrow({ where: { id: unpaidRetryOrderId } }),
+      prisma.printTaskStatusLog.count({ where: { taskId: unpaidRetryTaskId } }),
+    ])
+    if (
+      unpaidAfter.status !== 'failed'
+      || unpaidOrderAfter.payStatus !== 'unpaid'
+      || unpaidOrderAfter.taskStatus !== 'failed'
+      || unpaidOrderAfter.payStatus !== unpaidOrderBefore.payStatus
+      || JSON.stringify(unpaidAfter) !== JSON.stringify(unpaidBefore)
+      || unpaidLogsAfter !== unpaidLogsBefore
+    ) {
+      fail('未付款 retry 拒绝后任务、订单和状态日志必须保持不变')
+    }
+    pass('管理员重试未付款被拒，任务状态不变')
+
     // 退役与 retry 必须争用同一 Terminal 行：已退役终端的 failed 任务不能重新进入 pending，
     // 否则凭证已吊销且 claim 门禁为 active 的终端会留下永久无法领取的任务。
     const retiredTaskId = `pt_vps_retired_${suffix}`
@@ -535,6 +642,14 @@ async function main() {
     await prisma.printTask.create({
       data: { id: gonefileTaskId, terminalId, fileUrl: signFileUrl(goneFileId, 60_000).url, fileMd5: 'x', status: 'failed' },
     })
+    const goneOrderId = `order_vps_gone_${suffix}`
+    createdOrderIds.push(goneOrderId)
+    await prisma.order.create({
+      data: {
+        id: goneOrderId, orderNo: `NO-VPSGONE-${suffix}`, type: 'print', printTaskId: gonefileTaskId,
+        payStatus: 'paid', taskStatus: 'failed', amountCents: 100,
+      },
+    })
     await expectHttpError(() => printScan.applyAction('print', gonefileTaskId, 'retry'), 409, '文件已清理的任务 retry → 409')
     await prisma.fileObject.delete({ where: { id: goneFileId } }).catch(() => undefined)
 
@@ -543,6 +658,14 @@ async function main() {
     createdPrintTaskIds.push(raceTaskId)
     await prisma.printTask.create({
       data: { id: raceTaskId, terminalId, fileUrl: signFileUrl(fileId, 60_000).url, fileMd5: 'x', status: 'failed' },
+    })
+    const raceOrderId = `order_vps_race_${suffix}`
+    createdOrderIds.push(raceOrderId)
+    await prisma.order.create({
+      data: {
+        id: raceOrderId, orderNo: `NO-VPSRACE-${suffix}`, type: 'print', printTaskId: raceTaskId,
+        payStatus: 'paid', taskStatus: 'failed', amountCents: 100,
+      },
     })
     const raceResults = await Promise.allSettled([
       printScan.applyAction('print', raceTaskId, 'retry'),
