@@ -45,7 +45,7 @@ import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
 import { PickupCodeBoxes, PickupFailurePanel, PickupKeypadCard, PickupOutsStrip, PickupSubtitle, PickupWinCard } from './components/PickupHidGuide'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
-import { classifyClaimFailure, claimMetaLine, claimSuccessCopy, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
+import { classifyClaimFailure, claimMetaLine, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
 
 // ── 到机码工具 ────────────────────────────────────────────────
@@ -298,9 +298,10 @@ export function PrintPickupClaimPage() {
     </QxPageFrame>
   )
 
-  // ── 成功：稿 rSuccess，分支只看服务端 released ─────────────────
+  // ── 成功：先看有没有放行，再看打印状态（已完成不能再说还在排队） ──
   if (state === 'success' && result) {
-    const copy = claimSuccessCopy(result.released)
+    const copy = claimSuccessCopy(result.released, result.printTaskStatus)
+    const destination = claimSuccessDestination(result)
     return frame(
       <div
         className="qx-scroll pickup-claim-page pickup-claim-success"
@@ -319,9 +320,15 @@ export function PrintPickupClaimPage() {
               type="button"
               className="qx-btn pcp-act pcp-act--go pcs-primary"
               data-testid="arrival-code-primary"
-              onClick={() => navigate(result.released ? '/print/progress' : '/print/cashier', {
+              onClick={() => navigate(destination, {
                 state: result.released
-                  ? { taskId: result.taskId, orderId: result.orderId, paymentSessionToken: result.paymentSessionToken }
+                  ? {
+                      taskId: result.taskId,
+                      orderId: result.orderId,
+                      orderNo: result.orderNo,
+                      amountCents: result.amountCents,
+                      paymentSessionToken: result.paymentSessionToken,
+                    }
                   : {
                       orderId: result.orderId,
                       orderNo: result.orderNo,

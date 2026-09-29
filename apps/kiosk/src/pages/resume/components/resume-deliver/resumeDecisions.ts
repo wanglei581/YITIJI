@@ -77,6 +77,31 @@ export function isModuleSwitchable(base: GeneratedResume | null | undefined, mod
   return moduleSwitchBlock(base, module) === null
 }
 
+/**
+ * 对照页带回的选择里，哪些要真正去改编辑区。
+ * 选了「用改写」但改写不在稿里时，即使当前默认已是用改写，也要带上：否则会什么都没写进去，还被当成已经应用。
+ */
+export function compareDecisionChanges(
+  resume: GeneratedResume,
+  modules: ResumeOptimizeModule[],
+  current: ResumeDecisionMap,
+  incoming: ResumeDecisionMap,
+): Array<[string, ResumeModuleDecision]> {
+  const changes: Array<[string, ResumeModuleDecision]> = []
+  modules.forEach((module, index) => {
+    const key = moduleKeyOf(module, index)
+    const next = incoming[key]
+    if (!next) return
+    const now = current[key] ?? 'optimized'
+    if (now !== next) {
+      changes.push([key, next])
+      return
+    }
+    if (next === 'optimized' && !resumeContainsText(resume, module.after)) changes.push([key, next])
+  })
+  return changes
+}
+
 export function toggleModuleDecision(
   resume: GeneratedResume,
   module: ResumeOptimizeModule,
@@ -84,7 +109,13 @@ export function toggleModuleDecision(
   next: ResumeModuleDecision,
   base?: GeneratedResume | null,
 ): { resume: GeneratedResume; applied: boolean; reason?: ResumeDecisionFailureReason } {
-  if (current === next) return { resume, applied: true }
+  if (current === next) {
+    if (next === 'optimized' && !resumeContainsText(resume, module.after)) {
+      const block = moduleSwitchBlock(base, module)
+      return { resume, applied: false, reason: block === 'original-empty' ? 'original-empty' : 'not-found' }
+    }
+    return { resume, applied: true }
+  }
   const block = moduleSwitchBlock(base, module)
   if (block) return { resume, applied: false, reason: block }
   const from = next === 'original' ? module.after : module.before

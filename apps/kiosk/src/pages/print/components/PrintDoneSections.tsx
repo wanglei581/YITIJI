@@ -17,7 +17,7 @@ import { FileTextIcon, PrinterIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_COMPACT } from '../../../lib/fileName'
 import { formatCents } from '../cashierStatus'
-import { jobSubline, type OutOfPaperMoney } from '../printProgressModel'
+import { jobSubline, pagesPerCopy, publicOrderNo, type OutOfPaperMoney } from '../printProgressModel'
 import { PrintFileDeletionRecords } from './PrintFileDeletionRecords'
 import { PrintFileRetentionNotice } from './PrintFileRetentionNotice'
 import type { PrintFileRetentionInput } from './printFileRetention'
@@ -73,7 +73,7 @@ export function PrintDoneRecordSection({
   params,
   retention,
 }: {
-  file?: { name: string; pages: number }
+  file?: { name: string; pages: number | null }
   params?: PrintJobParams
   retention: PrintFileRetentionInput
 }) {
@@ -102,14 +102,19 @@ export function PrintDoneRecordSection({
 }
 
 export function PrintJobSummaryCard({ file, params }: {
-  file: { name: string; pages: number }
+  file: { name: string; pages: number | null }
   params: PrintJobParams
 }) {
+  const perCopy = pagesPerCopy(file, params)
+  const copies = params.copies >= 1 ? params.copies : 1
+  const pagesText = perCopy != null && perCopy >= 1
+    ? (copies > 1 ? `${perCopy} 页 × ${copies} 份` : `${perCopy} 页`)
+    : `${copies} 份，页数待识别`
   return (
     <div className="qx-card">
       <b className="pff-info-hd">本次任务摘要</b>
       <div className="pff-i-row"><span className="pff-i-k">文件名</span><span className="pff-i-v">{file.name}</span></div>
-      <div className="pff-i-row"><span className="pff-i-k">页数 / 份数</span><span className="pff-i-v">{file.pages} 页 × {params.copies} 份</span></div>
+      <div className="pff-i-row"><span className="pff-i-k">页数 / 份数</span><span className="pff-i-v">{pagesText}</span></div>
       <div className="pff-i-row"><span className="pff-i-k">打印面</span><span className="pff-i-v">{DUPLEX_LABEL[params.duplex] ?? params.duplex}</span></div>
       <div className="pff-i-row">
         <span className="pff-i-k">色彩 / 质量</span>
@@ -131,10 +136,11 @@ export function PrintJobSummaryCard({ file, params }: {
  * 费用只写订单事实与由谁核查，不写费用处理结果（本页拿不到）。
  */
 export function PrintOutOfPaperPanel({
-  file, params, taskId, orderNo, failureReason, money, canRetry, takeaway,
+  file, params, orderNo, failureReason, money, canRetry, takeaway,
 }: {
-  file: { name: string; pages: number } | null
+  file: { name: string; pages: number | null } | null
   params: Partial<PrintJobParams> | null
+  /** 调用方仍传入，页面不再把内部任务号展示给用户。 */
   taskId: string | null
   orderNo: string | null
   /** 服务端给用户看的安全文案（failureReasonForUser），不含 Agent 原始错误。 */
@@ -146,9 +152,10 @@ export function PrintOutOfPaperPanel({
   takeaway: ReactNode
 }) {
   const fileName = file?.name ? truncateFileNameMiddle(file.name, { maxLength: FILE_NAME_BUDGET_COMPACT }) : '本次打印任务'
-  const idLine = [taskId ? `任务号 ${taskId}` : '', orderNo ? `订单号 ${orderNo}` : ''].filter(Boolean).join(' · ')
+  const shownOrderNo = publicOrderNo(orderNo)
+  const idLine = shownOrderNo ? `订单号 ${shownOrderNo}` : ''
   const paid = money.fact === 'paid'
-  const orderRef = orderNo ? `订单号 ${orderNo}` : taskId ? `任务号 ${taskId}` : '这一单的订单号'
+  const orderRef = shownOrderNo ? `订单号 ${shownOrderNo}` : '这一单'
   return (
     <>
       <section className="pff-sec" aria-label="这一单现在的状态">
@@ -174,8 +181,7 @@ export function PrintOutOfPaperPanel({
             body={<>补纸只能由工作人员做，这次打印<b>不会在加纸后自动续打</b>。是否补打、是否处理费用、处理多少，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
             facts={
               <>
-                {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}
-                {taskId ? <span>任务号 <b>{taskId}</b></span> : null}
+                {shownOrderNo ? <span>订单 <b>{shownOrderNo}</b></span> : null}
                 <span>
                   支付状态 <b>{paid && money.amountCents != null ? `已付 ${formatCents(money.amountCents)}` : money.fact === 'free' ? '本次未收款' : '以订单为准'}</b>
                 </span>

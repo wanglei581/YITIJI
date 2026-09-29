@@ -12,7 +12,7 @@ const output = ts.transpileModule(source, {
 }).outputText
 const module = { exports: {} }
 new Function('exports', 'module', output)(module.exports, module)
-const { isModuleSwitchable, moduleSwitchBlock, toggleModuleDecision, applyDecisionChanges, applyResumeDecisionsWithStatus } = module.exports
+const { isModuleSwitchable, moduleSwitchBlock, toggleModuleDecision, applyDecisionChanges, applyResumeDecisionsWithStatus, compareDecisionChanges } = module.exports
 
 const makeResume = (text) => ({
   basic: { name: '求职者', phone: '', city: '' }, intention: { position: '', city: '' }, summary: text,
@@ -118,6 +118,41 @@ test('找不到改写优先于原文为空：两种都算只能手改，原因�
   assert.equal(moduleSwitchBlock(makeResume('正文'), moduleOf('', '不在正文的一句')), 'not-found')
   assert.equal(moduleSwitchBlock(makeResume('正文'), moduleOf('原文', '正文')), null)
   assert.equal(moduleSwitchBlock(null, moduleOf('', '')), null)
+})
+
+test('选了用改写但改写不在稿里时不标记已应用，正文不变', () => {
+  const item = moduleOf('带领班组完成设备调试', '写清本人承担的环节与实际结果')
+  const resume = makeResume('带领班组完成设备调试')
+  const sameChoice = toggleModuleDecision(resume, item, 'optimized', 'optimized', resume)
+  assert.equal(sameChoice.applied, false)
+  assert.equal(sameChoice.reason, 'not-found')
+  assert.equal(sameChoice.resume.summary, resume.summary)
+  const applied = applyDecisionChanges(resume, [item], {}, [['m0:经历', 'optimized']], resume)
+  assert.equal(applied.resume.summary, resume.summary)
+  assert.equal(applied.decisions['m0:经历'], undefined)
+  assert.deepEqual(applied.failures, [{ key: 'm0:经历', reason: 'not-found' }])
+})
+
+test('改写已经在稿里时，再次选择用改写仍算已应用', () => {
+  const item = moduleOf('原来的话', '更好的话')
+  const resume = makeResume('更好的话')
+  const result = toggleModuleDecision(resume, item, 'optimized', 'optimized', resume)
+  assert.equal(result.applied, true)
+  assert.equal(result.reason, undefined)
+  assert.equal(result.resume.summary, '更好的话')
+})
+
+test('对照页带回的用改写，改写不在稿里时仍进入待应用，已经写进稿里的不重复应用', () => {
+  const missing = moduleOf('原文一', '建议改为不在稿里的一句', '一')
+  const present = moduleOf('原文二', '改写二', '二')
+  const resume = makeResume('改写二')
+  const changes = compareDecisionChanges(
+    resume,
+    [missing, present],
+    {},
+    { 'm0:一': 'optimized', 'm1:二': 'optimized' },
+  )
+  assert.deepEqual(changes, [['m0:一', 'optimized']])
 })
 
 test('编辑区改过、但改写在基准稿里的条目仍报 edited，不报 not-found', () => {

@@ -39,7 +39,18 @@ export type FixtureState = (typeof FIXTURE_STATES)[number]
 export const REPORT_SEGS = ['structure', 'issues', 'scores', 'conclusions'] as const
 export type ReportSeg = (typeof REPORT_SEGS)[number]
 
-export const TASK_ID_RE = /^[A-Za-z0-9_-]{1,24}$/
+/** 简历任务号最长是 64 位十六进制（解析意图）；更短的任务号同样要认。只允许安全字符。 */
+export const TASK_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
+/** 送模型前的遮盖记号，例如 [劳动者_1]。报告里没有可还原的原文，展示时换成读者能懂的说法。 */
+const MASKED_PLACEHOLDER_RE = /\[[^\]\r\n]{1,32}_\d{1,4}\]/g
+
+export function displayResumeExcerpt(text: string): string {
+  return text.replace(MASKED_PLACEHOLDER_RE, '（已隐去）')
+}
+
+export function reportBlocksSubtitle(blockCount: number): string {
+  return `简历被读成 ${blockCount} 块，问题各自指到原文那一句。`
+}
 export const GUEST_TAKEAWAY_COPY = '登录后可存我的文档，本次可扫码带走'
 export const SAVED_TO_DOCUMENTS_COPY = '已存入我的文档'
 export const EXPORT_BEFORE_PRINT_COPY = '请先导出 PDF，成功后才能打印或扫码带走。'
@@ -75,7 +86,7 @@ export const FLOW_RAIL = ['上传与方向', 'AI 解析', '诊断报告', '优�
 export const REPORT_HEAD: Record<ReportViewState, { title: string; sub: string; tag: string; rail: number }> = {
   'no-context': { title: '简历诊断报告', sub: '需要一份已完成解析的本人简历，才会有报告。', tag: '无报告', rail: 0 },
   loading: { title: '简历诊断报告', sub: '正在按编号读取这份报告，读取本身不会改动任何文件。', tag: '读取中', rail: 2 },
-  report: { title: '简历诊断报告', sub: '简历被读成七块，问题各自指到原文那一句。', tag: '报告已读取', rail: 2 },
+  report: { title: '简历诊断报告', sub: '问题各自指到原文那一句。', tag: '报告已读取', rail: 2 },
   'report-minimal': { title: '简历诊断报告', sub: '这是一份早期报告：有分数和建议，但没有优先级和风险提醒。', tag: '早期报告', rail: 2 },
   'report-empty': { title: '简历诊断报告', sub: '报告读回来了，但里面一条内容都没有。', tag: '空报告', rail: 2 },
   'read-error': { title: '简历诊断报告', sub: '这次没能取到报告，你上传的原件不受影响。', tag: '读取失败', rail: 2 },

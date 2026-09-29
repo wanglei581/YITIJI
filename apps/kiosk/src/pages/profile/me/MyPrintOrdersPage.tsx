@@ -25,6 +25,7 @@ import {
   duplexShortLabel,
   formatAmountCents,
   memberPayStatusLabel,
+  publicOrderNo,
   paymentSourceLabel,
   PENDING_REFUND_LABEL,
 } from './printOrders/paymentCopy'
@@ -78,7 +79,8 @@ function metaLine(item: MemberPrintOrderItem): string {
 function paymentLine(item: MemberPrintOrderItem): string {
   if (item.payStatus == null) return '暂无支付信息'
   const parts: string[] = []
-  if (typeof item.amountCents === 'number') parts.push(formatAmountCents(item.amountCents))
+  if (item.amountCents === 0 || item.paymentSource === 'free') parts.push('0 元（免费试运营）')
+  else if (typeof item.amountCents === 'number') parts.push(formatAmountCents(item.amountCents))
   const sourceLabel = item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined
   const source = sourceLabel ? `（${sourceLabel}）` : ''
   parts.push(`${memberPayStatusLabel(item).label}${source}`)
@@ -347,6 +349,7 @@ export function MyPrintOrdersPage() {
                     <p className="qx-me-row-sub">{metaLine(item)}</p>
                     <div className="qx-me-row-foot">
                       <span className="qx-me-chip">{paymentLine(item)}</span>
+                      {publicOrderNo(item.orderNo) ? <span className="qx-me-chip">订单 {publicOrderNo(item.orderNo)}</span> : null}
                       {item.refundRequired === true && <span className="qx-me-chip" data-tone="warn">{PENDING_REFUND_LABEL}</span>}
                       {item.pickupCode && (
                         <span className="qx-me-chip" data-tone="ok">

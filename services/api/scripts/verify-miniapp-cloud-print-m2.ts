@@ -159,6 +159,7 @@ function assertCrossSurfaceWiring(): void {
   const miniappApi = readFileSync(path.join(repoRoot, 'apps/miniapp/utils/api.js'), 'utf8')
   const miniappPay = readFileSync(path.join(repoRoot, 'apps/miniapp/pages/print-pay/print-pay.js'), 'utf8')
   const kioskClaim = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx'), 'utf8')
+  const kioskClaimModel = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/pickupClaimModel.ts'), 'utf8')
   const kioskCashier = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/PrintCashierPage.tsx'), 'utf8')
   const kioskPaymentApi = readFileSync(path.join(repoRoot, 'apps/kiosk/src/services/print/paymentApi.ts'), 'utf8')
 
@@ -198,7 +199,11 @@ function assertCrossSurfaceWiring(): void {
     ],
     [memberController.includes("@Headers('idempotency-key')"), '建单读取 Idempotency-Key 请求头'],
     [memberController.includes('assertMemberPrintOrderIdempotencyKey(idempotencyKey)'), 'controller 在进 service 前校验幂等键'],
-    [kioskClaim.includes("result.released ? '/print/progress' : '/print/cashier'") && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],
+    // W-45 起分流收进 pickupClaimModel.claimSuccessDestination：未放行进收银；已放行进进度，已打完的进完成页（不再说还在排队）。
+    [kioskClaim.includes('claimSuccessDestination(result)')
+      && /if \(!input\.released\) return '\/print\/cashier'/.test(kioskClaimModel)
+      && /return '\/print\/progress'/.test(kioskClaimModel)
+      && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],
     [kioskCashier.includes('releasePickupOrder') && kioskCashier.includes('if (!state.taskId && orderId && paymentSessionToken)'), 'Kiosk 付款后才触发 Order-only release'],
     [kioskPaymentApi.includes("/print/jobs/${encodeURIComponent(input.orderId)}/release") && kioskPaymentApi.includes("'x-terminal-id': terminalId"), 'Kiosk release 请求携带终端与支付会话绑定'],
   ]
@@ -584,6 +589,16 @@ async function main(): Promise<void> {
     const memberTakeaway = await printJobs.issueTakeawayUrl(takeawayTaskId, { endUserId: userId })
     if (!memberTakeaway.signedUrl.includes('/files/') || memberTakeaway.orderId !== created.id) {
       fail(`会员带走 URL 签发失败: ${JSON.stringify(memberTakeaway)}`)
+    }
+    {
+      // AuditLog.actorId 外键指向运营账号表：会员 ID 写进去在 PostgreSQL 上违反外键、被 audit.write 静默吞掉，
+      // 会员的带走链接就没有审计。按仓库约定 actorId 记 null、会员 ID 放 payload.endUserId。
+      const row = await prisma.auditLog.findFirst({ where: { action: 'print_job.takeaway_url', targetId: takeawayTaskId }, orderBy: { createdAt: 'desc' } })
+      const payload = row ? JSON.parse(row.payloadJson ?? '{}') as { endUserId?: string } : {}
+      if (!row || row.actorId !== null || payload.endUserId !== userId) {
+        fail(`会员带走链接必须留审计（actorId=null、payload.endUserId=本人）：${JSON.stringify({ found: Boolean(row), actorId: row?.actorId, endUserId: payload.endUserId })}`)
+      }
+      pass('会员带走链接留审计：actorId 为空（外键指向运营账号），会员 ID 在 payload')
     }
     pass('会员 owner 无需终端会话即可签发带走 URL')
     const boundTakeaway = await printJobs.issueTakeawayUrl(takeawayTaskId, {

@@ -68,6 +68,7 @@ export function HomePage() {
       <div className="qx-stage" data-qx-frame="true">
         <QxHomeView
           isLoggedIn={auth.isLoggedIn}
+          guestMode={auth.guestMode}
           displayName={auth.displayName}
           device={device}
           toolbox={toolbox}

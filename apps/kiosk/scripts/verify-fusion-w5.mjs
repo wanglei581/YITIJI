@@ -57,7 +57,10 @@ const FROZEN = new Map([
   // 2026-09-28 用词：实付提示「无独立字段，不按应付减优惠推算」改为
   // 「没有单独记下实付，不按应付减优惠来推算」。仍然禁止用应付减优惠推算实付。
   // 旧哈希 edf85a5efbedc41feefa33097b5b62688af30d0d93b7f0a79dd74a9cd779e846。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb'],
+  // 2026-09-29 W-51：价目为 0 或免费来源时实付写「0 元（免费试运营）」；页范围没传写「全部页」；
+  // 订单号只认 ORD-。非 0 元仍标未记录，继续禁止用应付减优惠推算。
+  // 旧哈希 af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', '50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
@@ -67,7 +70,15 @@ const FROZEN = new Map([
   // 按钮不可点（此前一次误触即丢弃已上传文件）。冻结契约不放宽，仍逐字节校验；新行为由
   // verify:resume-phone-upload-ui 的两条 AST 断言反向钉死。
   // 旧哈希 c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0'],
+  // 2026-09-29 重新冻结：确认使用这份简历后面板卸载，原先只在依赖变化时上报忙碌，
+  // 卸载不补 onBusyChange(false)，来源页一直停在「接收中」，开始诊断和更换文件一直不可点。
+  // 卸载时补报不忙。刷新仍先撤销旧会话，已上传时刷新按钮仍不可点。
+  // 冻结契约不放宽，仍逐字节校验。卸载清理由 verify:resume-phone-upload-ui 断言。
+  // 旧哈希 6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0。
+  // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
+  // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
+  // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb'],
 ])
 
 function propertyName(node) {
