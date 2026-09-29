@@ -523,6 +523,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.recruitmentEmergencyHold
   }
 
+  get kioskSession() {
+    return this.client.kioskSession
+  }
+
   get partnerOrgNotice() {
     return this.client.partnerOrgNotice
   }

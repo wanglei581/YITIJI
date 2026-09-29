@@ -198,6 +198,7 @@
     "verify:partner-stats-contract": "node -r @swc-node/register scripts/verify-partner-stats-contract.ts",
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts && pnpm verify:partner-fair-subresources",
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
+    "verify:kiosk-session": "node -r @swc-node/register scripts/verify-kiosk-session.ts",
     "verify:policy-eligibility": "node -r @swc-node/register scripts/verify-policy-eligibility.ts",
     "verify:policy-eligibility-authoring": "node -r @swc-node/register scripts/verify-policy-eligibility-authoring.ts",
     "verify:bulk-publish": "node -r @swc-node/register scripts/verify-bulk-publish.ts",

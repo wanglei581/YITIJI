@@ -54,6 +54,15 @@
 - **agy 反方 18 条：** 采纳 5 条——管理员找回密码受名单约束且不暴露角色；管理员第二步的冷却与每日次数单独计（否则别人反复点「找回密码」就能让管理员整天登不上）；会员与内部账号额度分桶；只在明确拒发时退额度；未知账号做一次同成本比对抹平时间差。另有一条（非生产环境临时密码管理员跳过第二步）在它审的版本之后已修。未采纳：锁定可被拿来锁死管理员（原有取舍，开了地址名单后名单外连计数都碰不到）、密码通过即清零计数（该计数只防猜密码，验证码有独立 5 次上限）、同账号只认最新一张第二步凭证（设计如此）、别名锁定的 429/401 差异与未绑手机提示（原有 / 面向管理员的取舍，列 P2）。
 - **门禁：** 新增 `verify:admin-login-hardening`（54 条）、`verify:sms-budget`（33 条），进 CI SQLite 作业；4 个旧门禁的假 Redis 补 `reserveWithinLimitWithTtl`（它们以前能过正是靠旧锁定「读失败就放行」），`launch-audit-p5` 两条锁定用例换新接口、断言不变。反向变异 26 处（含真值门禁 HTTP 探针 1 处）全部在预期断言上变红，恢复后绿。关联门禁本地串行 46 条全绿，小程序接口契约 0 处拆坏。
 - **1.8 排雷第一批线索（Codex 只读 xhigh，四个模块共 34 条，逐条复现后才算数）：** 鉴权一路有 3 条与本 PR 重合、已修；其余在分诊中，结果进下一批 PR。
+## 2026-09-29：服务人次做成真数据——一体机会话接口从 501 改为真写入（服务端）
+
+- **起因：** 试点签收四项指标里「服务人次」没有数据源（`KioskSession` 表从未写入，`/kiosk/session/*` 直接 501）。总指挥 9/29 裁定做真的，不用打印任务数顶替：服务端归两个后台这一路，一体机上报挂钩归主执行窗口；做好之前机构端如实写「服务人次暂不能统计」。
+- **口径：** 一次会话 = 一个使用周期——从待机屏被唤醒、或上一次清场之后（闲置超时、隐私守卫、用户点结束、会员交接都算清场，主执行窗口补充）开始，到下一次清场或超时结束；周期内出现第一次有效操作（进入任一服务页或开始登录）才 start，误触不计。服务人次 = 统计窗口内 start 成功的会话数；没收到 end 的照样计数、按最后活跃时间算时长。
+- **契约 v1（一体机按此接）：** 鉴权同打印扫描，请求头 `x-terminal-id` + `x-terminal-session-token`（`TerminalIdentityGuard`）；按台限流（start 10、heartbeat 30、end 10 次/分钟）。`POST /api/v1/kiosk/session/start {clientSessionId: UUID v4, wokeAt, category}`，同一终端同一 clientSessionId 幂等、重放不改字段；`POST /kiosk/session/heartbeat {clientSessionId, category?}` 进入新大类时发，没 start 过 404 `KIOSK_SESSION_NOT_FOUND`（一体机忽略），已结束的不再续期；`POST /kiosk/session/end {clientSessionId, endedAt, endReason: idle_timeout|user_exit|privacy_clear|handover|other}`，重放不改。大类白名单 11 个：print、scan、resume、interview、assistant、career、policy、official_channel、member、help、other。请求体多一个字段就 400——不收手机号、会员号、文件、页面路径、输入内容。一体机上报失败最多重试 1 次、不阻塞界面、离线直接丢、不在本机缓存。
+- **服务端做了什么：** `KioskSession` 加机构快照 `orgId`、`clientSessionId`（与 terminalId 联合唯一）、`endedAt`、`endReason`、`categoriesJson` 与两个按时间的索引，SQLite 与 PostgreSQL 各一份迁移（`20260929120000_kiosk_session_visits`，只加列加索引），`memberId` 保持不写。开始时间只采信 10 分钟内的（清场后开始的周期可能空等很久），晚于服务器时间的按服务器时间记；结束时间只采信开始之后。机构快照取写入时终端所属机构，终端改绑不带走历史；`countKioskVisitsByTerminal` 只数快照为本机构、且终端当前仍属本机构的会话，空机构不做全局查询（下一步接进机构端「终端数据」页）。原始记录按开始时间保留 180 天（`KIOSK_SESSION_RETENTION_DAYS` 可配），每天 03:30 清理。
+- **门禁：** 新增 `verify:kiosk-session`（39 条：DTO 白名单、守卫与按台限流元数据、幂等、时间采信、跨终端碰不到、结束后不续期、改绑后按快照计数、窗口与空机构、保留期），接进 `build-and-verify` 与 `postgres-readiness` 两个作业；`verify:backend-p0-contracts` 原来钉「会话接口 501 不假成功」，随口径改钉「只认终端验签、真落库、不写会员号」。变异「计数去掉机构过滤」「控制器去掉终端守卫」都会红。
+- **验证：** api `tsc --noEmit`、新文件 eslint、`verify:kiosk-session`、`verify:backend-p0-contracts`、`verify:backend-p0-http`、`verify:ai-access`（会话控制器仍不带 AI 拦截标记）、`verify:console-screen-usage`、`verify:console-screen-snapshot`、`verify:recruitment-wave2-full-inventory`、`verify:policies`、`verify:admin-ops`、`verify:audit-logs`、`db:pg:sync:check`、`verify-ci-gate-coverage`、`verify:repository-integrity`、`graph:check` 通过。PostgreSQL 迁移与 schema 一致性看 CI 的 `postgres-readiness`。
+- **没做：** 一体机上报（主执行窗口，依赖本 PR 先合入候选）；机构端与数据大屏展示服务人次（数据大屏的 `visitCount` 仍如实标未接入，改它要连同 `verify:console-screen-*` 的钉子一起改，另排）。
 
 ## 2026-09-29 凌晨：2.0 稿定为最终版（收尾中）；第三波试点 16、06 运行页对齐稿
 
