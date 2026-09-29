@@ -47,6 +47,10 @@
    - **这一批不要开**：`AI_DECLARATION_ENFORCEMENT`、`AI_LOGIN_GATE`、`POLICY_SCOPE`，第二次发布再开。
    - `ADMIN_LOGIN_SECOND_FACTOR=sms` **保持关**：要等管理员登录页的短信第二步（#1091）合入并发布，而且每个启用中的管理员都已绑定并验证手机号，才能打开；提前打开会把没绑手机的管理员挡在后台外。
 4. **改完 `.env` 立刻干跑生产闸门预检**：命令与发布流程第 3c 步相同，见 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 第 2 节；通过时打印 `PREFLIGHT OK`。同时确认 `redis-cli ping` 返回 PONG、备份分区剩余空间大于 3GB。不要把 `.env` 内容贴进聊天或日志。
+4b. **大模型关闭思考与小青音色自查（#1099 合入并发布后；产品负责人在服务器上跑）**：`cd services/api && npx -y pnpm@11.2.2 run probe:llm-thinking-live -- --tts`。脚本只读，不打印密钥，不进 CI；它**不读 `.env`，也不读后台里配的密钥**，要在同一个终端里临时设好 DeepSeek 密钥（脚本头部列的变量名之一）和腾讯云密钥再跑，跑完关掉终端；输出里出现「跳过 DeepSeek」说明密钥没设上，这次不算通过。三条同时满足才发布：
+   - 「关闭思考」那一行 reasoning_tokens 为 0 或「无」，耗时明显比「默认」那一行短；
+   - 音色那一行显示「可用」。不可用就先改 `TRTC_TTS_VOICE`（可同时改 `TENCENT_TTS_VOICE_TYPE`）再发布；候选 101001 智瑜（腾讯云官方示例用的），可以加 `--voice 101001` 先核对。音色选哪个在产品负责人待办页；
+   - 和小青真机对话一轮，回答正常，没有明显的额外等待。
 5. **运维底线（P0-2）**：装每日备份的定时任务，替换 nginx 日志轮转配置，执行 pm2 日志轮转脚本，用最近一份备份在临时库做一次恢复演练（临时库名必须含 `drill`）。步骤见 `docs/device/postgres-operations.md` 第 8 节。
 
 **发布当天**
