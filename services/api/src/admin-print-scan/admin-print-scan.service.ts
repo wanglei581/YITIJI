@@ -7,6 +7,8 @@
  * 动作口径（保守最小集，其余一律 400 拒绝）：
  *   - print.retry  : failed → pending（清 claim 与错误字段，联动 Order.taskStatus，
  *                    终态 completed 永不可重置；CAS updateMany 防并发）。
+ *                    共享资格错误码是 PRINT_RETRY_*。本服务独有的终端已退役、
+ *                    终端不在运行状态、文件链接解析失败用 PRINT_SCAN_RETRY_*。
  *   - scan.cancel  : waiting → cancelled（对齐 ScanTasksService 的 CAS 语义）。
  *   - 不提供 print 强制 release：过期 claim / 卡死 printing 已由 terminals.service
  *     的 30s 自动回收处理；租约未到期就强制释放会造成同一任务双份出纸。
@@ -28,6 +30,13 @@ import {
   parseSignedPrintFileId,
   throwIfAdminReprintBlocked,
 } from '../print-jobs/paid-reprint-eligibility'
+import { lockPrintTaskRow } from '../terminals/print-status-attempt'
+import {
+  ADMIN_RETRY_STATE_CHANGED_MESSAGE,
+  ADMIN_RETRY_TERMINAL_NOT_ACTIVE_MESSAGE,
+  ADMIN_RETRY_TERMINAL_RETIRED_MESSAGE,
+  adminRetryBlockedReason,
+} from './admin-print-retry-block'
 import {
   IMPLEMENTED_PRINT_SCAN_TASK_TYPES,
   type PrintScanTaskType,
@@ -191,7 +200,7 @@ export class AdminPrintScanService {
         select: {
           id: true,
           terminalId: true,
-          terminal: { select: { terminalCode: true } },
+          terminal: { select: { terminalCode: true, enabled: true, lifecycleStatus: true } },
           endUserId: true,
           status: true,
           paramsJson: true,
@@ -200,7 +209,7 @@ export class AdminPrintScanService {
           fileUrl: true,
           createdAt: true,
           updatedAt: true,
-          order: { select: { payStatus: true } },
+          order: { select: { payStatus: true, taskStatus: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (params.page - 1) * params.pageSize,
@@ -233,7 +242,13 @@ export class AdminPrintScanService {
         expiresAt: null,
         ...safe,
         printOutcome: row.printOutcome === 'printed' || row.printOutcome === 'not_printed' ? row.printOutcome : null,
-        retryBlockedReason: retryReasons.get(row.id) ?? null,
+        retryBlockedReason: adminRetryBlockedReason({
+          sharedReason: retryReasons.get(row.id) ?? null,
+          terminalId: row.terminalId,
+          terminal: row.terminal,
+          hasOrder: row.order != null,
+          orderTaskStatus: row.order?.taskStatus ?? null,
+        }),
       }
     })
 
@@ -251,7 +266,7 @@ export class AdminPrintScanService {
       select: {
         id: true,
         terminalId: true,
-        terminal: { select: { terminalCode: true } },
+        terminal: { select: { terminalCode: true, enabled: true, lifecycleStatus: true } },
         endUserId: true,
         status: true,
         paramsJson: true,
@@ -306,7 +321,13 @@ export class AdminPrintScanService {
       closeUnpaidBlockReason: eligibility.reason,
       ...safe,
       printOutcome: row.printOutcome === 'printed' || row.printOutcome === 'not_printed' ? row.printOutcome : null,
-      retryBlockedReason: retryReasons.get(row.id) ?? null,
+      retryBlockedReason: adminRetryBlockedReason({
+        sharedReason: retryReasons.get(row.id) ?? null,
+        terminalId: row.terminalId,
+        terminal: row.terminal,
+        hasOrder: row.order != null,
+        orderTaskStatus: row.order?.taskStatus ?? null,
+      }),
     }
   }
 
@@ -483,8 +504,9 @@ export class AdminPrintScanService {
           select: { status: true, deletedAt: true, expiresAt: true },
         })
       : null
-    const agentVersion = await latestHeartbeatAgentVersion(this.prisma, task.terminalId)
-    const blockReason = await loadPaidReprintBlock(this.prisma, task, fileId ? previewFile : null)
+    const blockReason = await loadPaidReprintBlock(this.prisma, task, fileId ? previewFile : null, {
+      skipAgentVersion: true,
+    })
     throwIfAdminReprintBlocked(blockReason, { fileIdParsed: fileId != null })
     if (!fileId) {
       throw new ConflictException({
@@ -494,9 +516,12 @@ export class AdminPrintScanService {
     const { url: freshFileUrl } = signFileUrl(fileId, RETRY_FILE_URL_TTL_MS)
 
     await this.prisma.$transaction(async (tx) => {
+      await lockPrintTaskRow(tx, taskId)
+      const agentVersion = await latestHeartbeatAgentVersion(tx, task.terminalId)
       // retry 会把 failed 重新放回待领取队列，语义上等同于创建新任务：仅 active + enabled
       // 终端允许执行。与 retire/create/claim 共用 Terminal 行 no-op CAS，使 retry 与退役串行：
       // retry 先取得锁时，退役会看到新的 pending；退役先提交时，retry 会在这里明确失败。
+      // 共享资格用 PRINT_RETRY_*；下面终端退役 / 不在运行状态是管理员独有检查，用 PRINT_SCAN_RETRY_*。
       const activeTerminalLock = task.terminalId
         ? await tx.terminal.updateMany({
             where: { id: task.terminalId, enabled: true, lifecycleStatus: 'active' },
@@ -510,8 +535,8 @@ export class AdminPrintScanService {
         })
         throw new ConflictException({
           error: terminal?.lifecycleStatus === 'retired'
-            ? { code: 'PRINT_SCAN_RETRY_TERMINAL_RETIRED', message: '终端已永久退役，不能重新排队' }
-            : { code: 'PRINT_SCAN_RETRY_TERMINAL_NOT_ACTIVE', message: '终端不在 active 状态，不能重新排队' },
+            ? { code: 'PRINT_SCAN_RETRY_TERMINAL_RETIRED', message: ADMIN_RETRY_TERMINAL_RETIRED_MESSAGE }
+            : { code: 'PRINT_SCAN_RETRY_TERMINAL_NOT_ACTIVE', message: ADMIN_RETRY_TERMINAL_NOT_ACTIVE_MESSAGE },
         })
       }
 
@@ -556,7 +581,7 @@ export class AdminPrintScanService {
             })
           }
           throw new ConflictException({
-            error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
+            error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: ADMIN_RETRY_STATE_CHANGED_MESSAGE },
           })
         }
       }
@@ -577,7 +602,7 @@ export class AdminPrintScanService {
       })
       if (updated.count !== 1) {
         throw new ConflictException({
-          error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
+          error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: ADMIN_RETRY_STATE_CHANGED_MESSAGE },
         })
       }
       await tx.printTaskStatusLog.create({

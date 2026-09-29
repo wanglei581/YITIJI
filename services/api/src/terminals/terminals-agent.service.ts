@@ -37,7 +37,11 @@ import {
 } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
-import { readLockedPrintStatusAttempt, reprintAttemptsByTaskId } from './print-status-attempt'
+import {
+  readLockedPrintStatusAttempt,
+  reprintAttemptsByTaskId,
+  type PrintStatusAttemptMismatch,
+} from './print-status-attempt'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
 import type { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto'
 import {
@@ -607,40 +611,49 @@ export class TerminalAgentService implements OnModuleInit {
       throw new BadRequestException({ error: { code: 'TASK_NOT_OWNED', message: `任务 ${taskId} 不属于终端 ${terminalId}` } })
     }
 
-    // 不带 attempt 的老回放在开写事务之前决定，同一终态不再写任务、订单和状态日志。
-    // 带了 attempt 的不能走这里：旧 failed 会把新一轮的 failed 当成已经处理过。
+    // 不带 attempt、且仍在第 0 轮时，终态回放在开写事务之前决定，不再写任务、订单和状态日志。
+    // 同一终态先清合同审查打印件：第一次清理失败时，这次重放是兜底。
+    // 已经进入重试轮次（current > 0）不能在这里返回。缺 attempt 必须进锁后的读取，
+    // 按落后拒绝；带了 attempt 的也不能走这里，旧 failed 会把新一轮的 failed 当成已经处理过。
     const attemptUsable =
       typeof dto.attempt === 'number' && Number.isInteger(dto.attempt) && dto.attempt >= 0
     if (!attemptUsable && TERMINAL_STATES.includes(preCheck.status as TaskStatus)) {
-      if (preCheck.status === dto.status) return { acknowledged: true }
-      if (TERMINAL_STATES.includes(dto.status as TaskStatus)) {
-        throw new ConflictException({
-          error: {
-            code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
-            message: `任务已处于终态 ${preCheck.status}，不能确认不同终态 ${dto.status}`,
-          },
-        })
-      }
-      const replayAllowed = VALID_TRANSITIONS[preCheck.status]
-      if (!replayAllowed || !replayAllowed.includes(dto.status as TaskStatus)) {
-        throw new BadRequestException({
-          error: {
-            code: 'INVALID_STATUS_TRANSITION',
-            message: `任务当前状态 ${preCheck.status} 不允许转换为 ${dto.status}`,
-          },
-        })
+      const currentAttempt = (await reprintAttemptsByTaskId(this.prisma, [taskId])).get(taskId) ?? 0
+      if (currentAttempt === 0) {
+        if (preCheck.status === dto.status) {
+          await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
+          return { acknowledged: true }
+        }
+        if (TERMINAL_STATES.includes(dto.status as TaskStatus)) {
+          throw new ConflictException({
+            error: {
+              code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+              message: `任务已处于终态 ${preCheck.status}，不能确认不同终态 ${dto.status}`,
+            },
+          })
+        }
+        const replayAllowed = VALID_TRANSITIONS[preCheck.status]
+        if (!replayAllowed || !replayAllowed.includes(dto.status as TaskStatus)) {
+          throw new BadRequestException({
+            error: {
+              code: 'INVALID_STATUS_TRANSITION',
+              message: `任务当前状态 ${preCheck.status} 不允许转换为 ${dto.status}`,
+            },
+          })
+        }
       }
     }
 
-    // 锁、当前 attempt 和状态写入在同一个事务里。落后补报先记元数据日志再提交，
+    // 锁、当前 attempt 和状态写入在同一个事务里。落后或超前补报先记元数据日志再提交，
     // 冲突异常放在事务外抛，避免把这条日志一起回滚。
-    let staleAttempt: { requested: number; current: number } | null = null
+    // 用对象承接：事务回调里的赋值对 let 的控制流分析不可见，收窄后会变成 never。
+    const attemptOutcome: { mismatch: PrintStatusAttemptMismatch | null } = { mismatch: null }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (this.prisma.$transaction as any)(async (tx: any) => {
       const locked = await readLockedPrintStatusAttempt(tx, taskId, dto.attempt)
-      if (locked.stale) {
-        staleAttempt = locked.stale
+      if (locked.mismatch) {
+        attemptOutcome.mismatch = locked.mismatch
         return
       }
       const currentTask = locked.task
@@ -761,11 +774,17 @@ export class TerminalAgentService implements OnModuleInit {
       }
     })
 
-    if (staleAttempt) {
+    const mismatch = attemptOutcome.mismatch
+    if (
+      mismatch?.code === 'PRINT_STATUS_STALE_ATTEMPT'
+      || mismatch?.code === 'PRINT_STATUS_FUTURE_ATTEMPT'
+    ) {
       throw new ConflictException({
         error: {
-          code: 'PRINT_STATUS_STALE_ATTEMPT',
-          message: '状态回传属于更早的一次打印，已忽略',
+          code: mismatch.code,
+          message: mismatch.code === 'PRINT_STATUS_FUTURE_ATTEMPT'
+            ? '状态回传的轮次超前于服务端记录，已忽略'
+            : '状态回传属于更早的一次打印，已忽略',
         },
       })
     }

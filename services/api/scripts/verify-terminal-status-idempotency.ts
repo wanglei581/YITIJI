@@ -41,6 +41,9 @@ async function main(): Promise<void> {
         status: currentStatus,
       }),
     },
+    printTaskStatusLog: {
+      groupBy: async () => [],
+    },
     $transaction: async () => {
       transactionCalls += 1
       throw new Error('terminal-state replays must be decided before opening a write transaction')
@@ -152,6 +155,9 @@ async function main(): Promise<void> {
         status: 'printing',
       }),
     },
+    printTaskStatusLog: {
+      groupBy: async () => [],
+    },
     $transaction: async (run: (tx: unknown) => Promise<void>) =>
       run({
         $executeRaw: async () => 0,
@@ -164,9 +170,13 @@ async function main(): Promise<void> {
             id: 'task-terminal-status-race',
             terminalId: 'terminal-owner',
             status: concurrentStatus,
+            errorCode: null,
+            orderId: null,
+            endUserId: null,
           }),
         },
         printTaskStatusLog: {
+          groupBy: async () => [],
           create: async () => {
             concurrentSideEffects += 1
           },

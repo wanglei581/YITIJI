@@ -90,7 +90,7 @@ function fileRetentionFromStatus(result: PrintJobStatusResult) {
 /**
  * Agent 在派发已开始、但重启后无法确认纸到底出没出时上报的码
  * （`terminal-agent/src/agent/task-runner.ts`）。整条链路对它的口径都是「**无法确认**」：
- * 服务端在任何写入之前拒绝重排以防重复出纸（`PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN`），
+ * 服务端在任何写入之前拒绝重排以防重复出纸（`PRINT_RETRY_UNCONFIRMED_FORBIDDEN`），
  * Admin 也只引导人工核查后决定处理费用。
  *
  * 唯独本页此前把它和普通失败混在一起，标题写「打印失败」、副标题写

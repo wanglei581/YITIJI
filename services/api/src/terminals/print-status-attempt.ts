@@ -39,37 +39,110 @@ export async function reprintAttemptsByTaskId(
   return attempts
 }
 
+export type PrintStatusAttemptCode = 'PRINT_STATUS_STALE_ATTEMPT' | 'PRINT_STATUS_FUTURE_ATTEMPT'
+
+export type PrintStatusAttemptMismatch = {
+  code: PrintStatusAttemptCode
+  requested: number | null
+  current: number
+}
+
+type PrintTaskLockTx = Pick<PrismaTransactionClient, '$executeRaw'>
+
+/**
+ * 全系统唯一的 PrintTask 行锁。状态补报与两条重试入口都先调它，再更新 Order。
+ * 原始 SQL 不触发 Prisma 的 @updatedAt。不许再抄这一句。
+ */
+export async function lockPrintTaskRow(tx: PrintTaskLockTx, taskId: string): Promise<void> {
+  await tx.$executeRaw`UPDATE "PrintTask" SET "errorMessage" = "errorMessage" WHERE "id" = ${taskId}`
+}
+
+function usableAttempt(attempt: number | undefined): attempt is number {
+  return typeof attempt === 'number' && Number.isInteger(attempt) && attempt >= 0
+}
+
+async function recordAttemptMismatch(
+  tx: PrintStatusTx,
+  task: LockedPrintTaskSnapshot,
+  taskId: string,
+  code: PrintStatusAttemptCode,
+  requested: number | null,
+  current: number,
+  reqLabel: string,
+): Promise<PrintStatusAttemptMismatch> {
+  await tx.printTaskStatusLog.create({
+    data: {
+      taskId,
+      fromStatus: task.status,
+      toStatus: task.status,
+      errorCode: `${code} req=${reqLabel} cur=${current}`,
+    },
+  })
+  return { code, requested, current }
+}
+
 /**
  * 在调用方的状态更新事务里先锁住 PrintTask，再数当前 attempt。
- * 缺省、非整数或负数视为老 Agent，不拒绝。
- * 请求 attempt 小于或大于当前值都记一条同状态日志（不计入 failed→pending）并返回差值。
- * 大于当前值同样拒绝：计数以日志为准，超前的数字说明有缺陷或请求被伪造。
+ * current === 0 且请求缺 attempt 或 attempt 非法时，仍视为老 Agent，不拒绝。
+ * current > 0 时，缺省或非法一律按 PRINT_STATUS_STALE_ATTEMPT 拒绝：能进入重试轮次的终端当时必须带 attempt。
+ * attempt < current 记 PRINT_STATUS_STALE_ATTEMPT；attempt > current 记 PRINT_STATUS_FUTURE_ATTEMPT。
+ * 两条都不改任务状态，只写同状态元数据日志（不计入 failed→pending）。
  */
 export async function readLockedPrintStatusAttempt(
   tx: PrintStatusTx,
   taskId: string,
   attempt: number | undefined,
-): Promise<{ task: LockedPrintTaskSnapshot | null; stale: { requested: number; current: number } | null }> {
-  await tx.$executeRaw`UPDATE "PrintTask" SET "errorMessage" = "errorMessage" WHERE "id" = ${taskId}`
+): Promise<{ task: LockedPrintTaskSnapshot | null; mismatch: PrintStatusAttemptMismatch | null }> {
+  await lockPrintTaskRow(tx, taskId)
   const task = await tx.printTask.findUnique({
     where: { id: taskId },
     select: { status: true, terminalId: true, errorCode: true, orderId: true, endUserId: true },
   })
-  if (!task) return { task: null, stale: null }
-  if (typeof attempt !== 'number' || !Number.isInteger(attempt) || attempt < 0) {
-    return { task, stale: null }
-  }
+  if (!task) return { task: null, mismatch: null }
   const current = (await reprintAttemptsByTaskId(tx, [taskId])).get(taskId) ?? 0
-  if (attempt < current || attempt > current) {
-    await tx.printTaskStatusLog.create({
-      data: {
+  if (!usableAttempt(attempt)) {
+    if (current === 0) return { task, mismatch: null }
+    if (current > 0) {
+      const reqLabel = attempt === undefined ? 'missing' : 'invalid'
+      return {
+        task,
+        mismatch: await recordAttemptMismatch(
+          tx,
+          task,
+          taskId,
+          'PRINT_STATUS_STALE_ATTEMPT',
+          null,
+          current,
+          reqLabel,
+        ),
+      }
+    }
+  } else if (attempt > current) {
+    return {
+      task,
+      mismatch: await recordAttemptMismatch(
+        tx,
+        task,
         taskId,
-        fromStatus: task.status,
-        toStatus: task.status,
-        errorCode: `PRINT_STATUS_STALE_ATTEMPT req=${attempt} cur=${current}`,
-      },
-    })
-    return { task, stale: { requested: attempt, current } }
+        'PRINT_STATUS_FUTURE_ATTEMPT',
+        attempt,
+        current,
+        String(attempt),
+      ),
+    }
+  } else if (attempt < current) {
+    return {
+      task,
+      mismatch: await recordAttemptMismatch(
+        tx,
+        task,
+        taskId,
+        'PRINT_STATUS_STALE_ATTEMPT',
+        attempt,
+        current,
+        String(attempt),
+      ),
+    }
   }
-  return { task, stale: null }
+  return { task, mismatch: null }
 }

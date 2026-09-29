@@ -67,27 +67,64 @@ function fixtureFileSignature(fileId: string, expiresAtMs: number): string {
 }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
 
+function sliceBetween(source: string, startMarker: string, endMarker: string): string {
+  const start = source.indexOf(startMarker)
+  const end = source.indexOf(endMarker, start + startMarker.length)
+  return start >= 0 && end > start ? source.slice(start, end) : ''
+}
+
 /** attempt 必须在领取循环之后按 taskId 一次 groupBy，条件只有 failed→pending。 */
 function assertReprintAttemptQueryShape(): void {
   const source = readFileSync(join(__dirname, '../src/terminals/terminals-agent.service.ts'), 'utf8')
   const attemptSource = readFileSync(join(__dirname, '../src/terminals/print-status-attempt.ts'), 'utf8')
+  const memberSource = readFileSync(join(__dirname, '../src/print-jobs/print-jobs.service.ts'), 'utf8')
+  const adminSource = readFileSync(join(__dirname, '../src/admin-print-scan/admin-print-scan.service.ts'), 'utf8')
+  const lockSql = 'UPDATE "PrintTask" SET "errorMessage" = "errorMessage"'
   const fnStart = attemptSource.indexOf('export async function reprintAttemptsByTaskId')
-  const fnEnd = attemptSource.indexOf('export async function readLockedPrintStatusAttempt')
+  const fnEnd = attemptSource.indexOf('export async function lockPrintTaskRow')
   const fn = fnStart >= 0 && fnEnd > fnStart ? attemptSource.slice(fnStart, fnEnd) : ''
+  const lockFn = sliceBetween(attemptSource, 'export async function lockPrintTaskRow', 'export async function readLockedPrintStatusAttempt')
+  const reader = attemptSource.slice(attemptSource.indexOf('export async function readLockedPrintStatusAttempt'))
   const claimStart = source.indexOf('async claimTasks(')
   const claimEnd = source.indexOf('async patchTaskStatus(')
   const claim = claimStart >= 0 && claimEnd > claimStart ? source.slice(claimStart, claimEnd) : ''
   const loopAt = claim.indexOf('for (let i = 0; i < limit; i++)')
   const callAt = claim.indexOf('reprintAttemptsByTaskId(')
-  const patchStart = source.indexOf('async patchTaskStatus(')
-  const patchEnd = source.indexOf('async validateTerminalToken(')
-  const patch = patchStart >= 0 && patchEnd > patchStart ? source.slice(patchStart, patchEnd) : ''
+  const patch = sliceBetween(source, 'async patchTaskStatus(', 'async validateTerminalToken(')
   const ownedAt = patch.indexOf("code: 'TASK_NOT_OWNED'")
   const earlyAt = patch.indexOf('!attemptUsable && TERMINAL_STATES.includes(')
+  const fastCountAt = earlyAt < 0 ? -1 : patch.indexOf('reprintAttemptsByTaskId(', earlyAt)
+  const fastZeroAt = fastCountAt < 0 ? -1 : patch.indexOf('currentAttempt === 0', fastCountAt)
+  const fastCleanupAt = fastZeroAt < 0 ? -1 : patch.indexOf('cleanupTerminalTask(', fastZeroAt)
+  const fastReturnAt = fastCleanupAt < 0 ? -1 : patch.indexOf('return { acknowledged: true }', fastCleanupAt)
   const txAt = patch.indexOf('this.prisma.$transaction')
   const freshAt = patch.indexOf('readLockedPrintStatusAttempt(')
   const terminalAt = freshAt < 0 ? -1 : patch.indexOf('TERMINAL_STATES.includes(', freshAt)
   const updateAt = patch.indexOf('printTask.updateMany(')
+  const advanceAt = patch.indexOf('packageOrderFulfillment.advance')
+  const readerCountAt = reader.indexOf('reprintAttemptsByTaskId(')
+  const readerZeroAt = reader.indexOf('current === 0')
+  const readerAboveAt = reader.indexOf('current > 0')
+  const readerFutureAt = reader.indexOf('attempt > current')
+  const readerFutureCodeAt = reader.indexOf('PRINT_STATUS_FUTURE_ATTEMPT')
+  const readerStaleAt = reader.indexOf('attempt < current')
+  const memberRetry = sliceBetween(memberSource, 'async retryPaidFailedJob(', 'private canRetryPaidFailedJob(')
+  const adminRetry = sliceBetween(adminSource, 'private async retryPrintTask(', 'private async listScanTasks(')
+  const sqlHits = attemptSource.split(lockSql).length - 1
+  const retryLockOrderOk = [memberRetry, adminRetry].every((retry) => {
+    const transactionAt = retry.indexOf('$transaction')
+    const lockAt = retry.indexOf('lockPrintTaskRow(')
+    const versionAt = retry.indexOf('latestHeartbeatAgentVersion(')
+    const orderAt = retry.indexOf('order.updateMany(')
+    const taskAt = retry.indexOf('printTask.updateMany(')
+    return transactionAt >= 0
+      && lockAt > transactionAt
+      && versionAt > lockAt
+      && orderAt > lockAt
+      && taskAt > orderAt
+      && retry.indexOf('latestHeartbeatAgentVersion(') === versionAt
+      && !retry.includes(lockSql)
+  })
   if (
     !fn.includes('printTaskStatusLog.groupBy')
     || !fn.includes("fromStatus: 'failed'")
@@ -95,23 +132,46 @@ function assertReprintAttemptQueryShape(): void {
     || !fn.includes('taskId: { in: taskIds }')
     || /errorCode\s*:/.test(fn)
     || fn.includes('.count(')
-    || !attemptSource.includes('attempt < current')
-    || !attemptSource.includes('attempt > current')
-    || !attemptSource.includes('reprintAttemptsByTaskId(tx')
-    || !attemptSource.includes('PRINT_STATUS_STALE_ATTEMPT')
+    || sqlHits !== 1
+    || !lockFn.includes(lockSql)
+    || !reader.includes('lockPrintTaskRow(')
+    || reader.includes(lockSql)
+    || readerCountAt < 0
+    || readerZeroAt < readerCountAt
+    || readerAboveAt < readerZeroAt
+    || !reader.includes("'missing'")
+    || !reader.includes("'invalid'")
+    || readerFutureAt < readerAboveAt
+    || readerFutureCodeAt < readerFutureAt
+    || readerStaleAt < readerFutureCodeAt
+    || !reader.includes('PRINT_STATUS_STALE_ATTEMPT')
     || loopAt < 0
     || callAt < loopAt
     || claim.includes('printTaskStatusLog.count')
     || ownedAt < 0
     || earlyAt < ownedAt
-    || txAt < earlyAt
+    || fastCountAt < earlyAt
+    || fastZeroAt < fastCountAt
+    || fastCleanupAt < fastZeroAt
+    || fastReturnAt < fastCleanupAt
+    || txAt < fastReturnAt
     || freshAt < txAt
     || terminalAt < freshAt
     || updateAt < terminalAt
+    || advanceAt < freshAt
+    || !patch.includes('PRINT_STATUS_FUTURE_ATTEMPT')
+    || !patch.includes('PRINT_STATUS_STALE_ATTEMPT')
+    || !patch.includes('mismatch.code')
+    || source.includes(lockSql)
+    || memberSource.includes(lockSql)
+    || adminSource.includes(lockSql)
+    || !retryLockOrderOk
+    || !memberRetry.includes("payStatus: 'paid'")
+    || !memberRetry.includes('amountCents: amountBefore')
   ) {
-    fail('attempt 必须在领取循环之后按 taskId 一次 groupBy，且只数 fromStatus=failed、toStatus=pending；不带 attempt 的终态回放在事务外决定，带 attempt 的比较和终态确认在同一事务里、写入之前，小于和大于当前值都拒绝')
+    fail('attempt 必须在领取循环之后按 taskId 一次 groupBy，且只数 fromStatus=failed、toStatus=pending；PrintTask 行锁只有 lockPrintTaskRow 一处，补报和两条重试都先锁 PrintTask 再动 Order，并在锁后的同一事务里读心跳版本；第 0 轮缺 attempt 仍在事务外决定且同一终态会清理，重试轮次缺 attempt 按落后拒绝，超前与落后使用不同错误码')
   }
-  pass('attempt 计数：领取循环之后一次 groupBy(taskId)，不按 errorCode 过滤；补报在事务内双向拒绝')
+  pass('attempt 计数：领取循环之后一次 groupBy(taskId)，不按 errorCode 过滤；锁序统一为 PrintTask → Order，超前与落后分开拒绝')
 }
 
 function errBody(e: unknown): { code?: string; message?: string } | undefined {
@@ -992,12 +1052,13 @@ async function main() {
         `Bearer ${agentToken}`,
         terminalId,
       ),
-      'PRINT_STATUS_STALE_ATTEMPT',
-      '8e2d. attempt 大于当前值同样拒绝',
+      'PRINT_STATUS_FUTURE_ATTEMPT',
+      '8e2d. attempt 大于当前值按超前拒绝，不记成落后',
+      '状态回传的轮次超前于服务端记录，已忽略',
     )
     const afterAhead = await prisma.printTask.findUnique({ where: { id: knownFailId } })
     const aheadMeta = await prisma.printTaskStatusLog.findFirst({
-      where: { taskId: knownFailId, errorCode: 'PRINT_STATUS_STALE_ATTEMPT req=2 cur=1' },
+      where: { taskId: knownFailId, errorCode: 'PRINT_STATUS_FUTURE_ATTEMPT req=2 cur=1' },
     })
     const aheadLogCountAfter = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
     if (
@@ -1058,7 +1119,7 @@ async function main() {
     })
     await terminals.patchTaskStatus(
       knownFailId,
-      { status: 'failed', errorCode: '' },
+      { status: 'failed', errorCode: '', attempt: 1 },
       `Bearer ${agentToken}`,
       terminalId,
     )
@@ -1076,6 +1137,55 @@ async function main() {
     } else {
       fail(`8e3. errorCode 被冲掉: status=${afterBareFail?.status} task=${afterBareFail?.errorCode} log=${bareFailLog?.errorCode}`)
     }
+
+    const missingBefore = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const missingLogCount = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
+    await expectCode(
+      () => terminals.patchTaskStatus(
+        knownFailId,
+        { status: 'failed', errorCode: 'PAPER_EMPTY' },
+        `Bearer ${agentToken}`,
+        terminalId,
+      ),
+      'PRINT_STATUS_STALE_ATTEMPT',
+      '8e3b. 重试轮次里缺 attempt 按落后拒绝',
+      '状态回传属于更早的一次打印，已忽略',
+    )
+    const afterMissing = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const missingMeta = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: knownFailId, errorCode: 'PRINT_STATUS_STALE_ATTEMPT req=missing cur=1' },
+    })
+    const missingLogCountAfter = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
+    if (
+      afterMissing?.status !== 'failed'
+      || afterMissing.errorCode !== 'PAPER_EMPTY'
+      || afterMissing.status !== missingBefore?.status
+      || afterMissing.errorCode !== missingBefore?.errorCode
+      || !missingMeta
+      || missingMeta.fromStatus !== 'failed'
+      || missingMeta.toStatus !== 'failed'
+      || missingLogCountAfter !== missingLogCount + 1
+    ) {
+      fail(`8e3b. 缺 attempt 改动了任务或没留下元数据日志: status=${afterMissing?.status} code=${afterMissing?.errorCode} meta=${missingMeta?.errorCode}`)
+    }
+    await expectCode(
+      () => terminals.patchTaskStatus(
+        knownFailId,
+        { status: 'failed', errorCode: 'PAPER_EMPTY', attempt: -1 },
+        `Bearer ${agentToken}`,
+        terminalId,
+      ),
+      'PRINT_STATUS_STALE_ATTEMPT',
+      '8e3c. 重试轮次里非法 attempt 按落后拒绝',
+    )
+    const invalidMeta = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: knownFailId, errorCode: 'PRINT_STATUS_STALE_ATTEMPT req=invalid cur=1' },
+    })
+    const afterInvalid = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    if (afterInvalid?.status !== 'failed' || afterInvalid.errorCode !== 'PAPER_EMPTY' || !invalidMeta) {
+      fail(`8e3c. 非法 attempt 未被按落后拒绝: status=${afterInvalid?.status} meta=${invalidMeta?.errorCode}`)
+    }
+    pass('8e3b. 重试轮次缺 attempt 或 attempt 非法时按落后拒绝，状态不变')
 
     const retriedAfterPaper = await printJobs.retryPaidFailedJob(knownFailId, {
       paymentSessionToken: await sessionFor(knownFailId),

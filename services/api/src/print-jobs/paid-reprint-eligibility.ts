@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common'
-import type { PrismaService } from '../prisma/prisma.service'
+import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 import { isPrintableFileRecord } from './print-page-count.service'
 import {
   PARTIAL_OUTPUT_ERROR_CODE,
@@ -9,6 +9,10 @@ import {
 /**
  * 会员重新提交和管理员重试共用的资格。管理员另有终端退役、订单 taskStatus
  * 序列点和审计，不在这里。
+ *
+ * 共享检查的错误码用 PRINT_RETRY_*。管理员独有检查用 PRINT_SCAN_RETRY_*：
+ * 终端已退役、终端不在运行状态、文件链接解析失败（ADMIN_UNPARSED_FILE_CODE）。
+ * 那些检查留在 admin-print-scan，不进 paidReprintBlockReason。
  *
  * 有订单才看付款：试点 0 元单落库后 payStatus 就是 paid（见 order-status.service
  * markPaid 的 free 分支）。没有订单的自检或内部任务不适用付款条件。
@@ -78,6 +82,8 @@ export function paidReprintBlockReason(input: {
   file: { status?: string | null; deletedAt?: Date | null; expiresAt?: Date | null } | null
   terminalId?: string | null
   agentVersion?: string | null
+  /** 事务外的预检跳过版本。真正放行必须在锁住 PrintTask 之后再读心跳。 */
+  skipAgentVersion?: boolean
 }): PaidReprintBlockReason | null {
   if (input.status !== 'failed') return 'not_failed'
   if (input.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE) return 'unconfirmed'
@@ -85,7 +91,10 @@ export function paidReprintBlockReason(input: {
   if (input.hasOrder && input.payStatus != null && REFUND_PAY_STATUSES.has(input.payStatus)) return 'refunding'
   if (input.hasOrder && input.payStatus !== 'paid') return 'not_paid'
   if (!isPrintableFileRecord(input.file)) return 'file_unavailable'
-  if (!input.terminalId || !agentVersionMeetsReprintFloor(input.agentVersion)) return 'agent_version'
+  if (
+    !input.skipAgentVersion
+    && (!input.terminalId || !agentVersionMeetsReprintFloor(input.agentVersion))
+  ) return 'agent_version'
   return null
 }
 
@@ -139,8 +148,10 @@ export function parseSignedPrintFileId(fileUrl: string): string | null {
   }
 }
 
+type HeartbeatReader = Pick<PrismaTransactionClient, 'terminalHeartbeat'>
+
 async function latestAgentVersions(
-  prisma: PrismaService,
+  prisma: HeartbeatReader,
   terminalIds: string[],
 ): Promise<Map<string, string | null>> {
   const unique = [...new Set(terminalIds)]
@@ -169,7 +180,7 @@ async function latestAgentVersions(
 }
 
 export async function latestHeartbeatAgentVersion(
-  prisma: PrismaService,
+  prisma: HeartbeatReader | PrismaService,
   terminalId: string | null | undefined,
 ): Promise<string | null> {
   if (!terminalId) return null
@@ -181,12 +192,15 @@ export async function loadPaidReprintBlock(
   prisma: PrismaService,
   task: { id: string; status: string; errorCode?: string | null; terminalId?: string | null },
   file: { status?: string | null; deletedAt?: Date | null; expiresAt?: Date | null } | null,
+  options?: { skipAgentVersion?: boolean },
 ): Promise<PaidReprintBlockReason | null> {
   const order = await prisma.order.findFirst({
     where: { printTaskId: task.id },
     select: { payStatus: true },
   })
-  const agentVersion = await latestHeartbeatAgentVersion(prisma, task.terminalId)
+  const agentVersion = options?.skipAgentVersion
+    ? null
+    : await latestHeartbeatAgentVersion(prisma, task.terminalId)
   return paidReprintBlockReason({
     status: task.status,
     errorCode: task.errorCode,
@@ -195,6 +209,7 @@ export async function loadPaidReprintBlock(
     file,
     terminalId: task.terminalId,
     agentVersion,
+    skipAgentVersion: options?.skipAgentVersion,
   })
 }
 

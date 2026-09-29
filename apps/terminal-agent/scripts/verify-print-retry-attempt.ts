@@ -21,7 +21,7 @@ import {
   markTaskDone,
   openDatabase,
 } from '../src/agent/db'
-import { processPatch } from '../src/agent/offline-queue'
+import { MAX_ATTEMPTS, processPatch } from '../src/agent/offline-queue'
 import {
   BOOT_QUEUE_CLEANUP_TASK_FILE_RE,
   documentNameMatchesSpool,
@@ -377,6 +377,60 @@ async function verifyRetryAttempt(): Promise<void> {
     assert.equal(staleSends, 1)
     assert.equal(secondWave.length, 0)
     pass('收到 409 PRINT_STATUS_STALE_ATTEMPT 后该补报从 pending_patches 消失，且不会再发第二次')
+
+    const futureTask = 'ahead-round-task'
+    enqueuePatch(db, futureTask, { status: 'failed', errorCode: 'PAPER_EMPTY', attempt: 1 })
+    db.prepare('UPDATE pending_patches SET nextRetryAt = ? WHERE taskId = ?').run(
+      '2000-01-01T00:00:00.000Z',
+      futureTask,
+    )
+    const futurePatch = getPendingPatches(db).find((row) => row.taskId === futureTask)
+    assert.ok(futurePatch)
+    const futureError = {
+      isAxiosError: true,
+      response: { status: 409, data: { error: { code: 'PRINT_STATUS_FUTURE_ATTEMPT' } } },
+    }
+    await processPatch(futurePatch, agent, db, async () => {
+      throw futureError
+    })
+    const futureRow = db.prepare(
+      'SELECT attempts, deadLetterAt FROM pending_patches WHERE taskId = ?',
+    ).get(futureTask) as { attempts: number; deadLetterAt: string | null } | undefined
+    assert.ok(futureRow)
+    assert.equal(futureRow.attempts, 1)
+    assert.equal(futureRow.deadLetterAt, null)
+    assert.equal(getDeadLetterPatches(db).some((row) => row.taskId === futureTask), false)
+    pass('超前补报留在队列并增加次数，不删除、不进死信')
+
+    db.prepare('UPDATE pending_patches SET attempts = ?, nextRetryAt = ? WHERE taskId = ?').run(
+      MAX_ATTEMPTS - 1,
+      '2000-01-01T00:00:00.000Z',
+      futureTask,
+    )
+    const capped = getPendingPatches(db).find((row) => row.taskId === futureTask)
+    assert.ok(capped)
+    assert.equal(capped.attempts, MAX_ATTEMPTS - 1)
+    const futureLogged: string[] = []
+    const futureWrite = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      futureLogged.push(String(chunk))
+      return true
+    }) as typeof process.stdout.write
+    try {
+      await processPatch(capped, agent, db, async () => {
+        throw futureError
+      })
+    } finally {
+      process.stdout.write = futureWrite
+    }
+    const dead = getDeadLetterPatches(db).find((row) => row.taskId === futureTask)
+    assert.ok(dead)
+    assert.equal(dead.deadLetterReason, `MAX_ATTEMPTS_REACHED:${MAX_ATTEMPTS}`)
+    assert.equal(dead.attempts, MAX_ATTEMPTS)
+    assert.equal(getPendingPatches(db).some((row) => row.taskId === futureTask), false)
+    assert.ok(futureLogged.some((line) => line.includes(`INFO  ${futureTask}\n`)))
+    assert.equal(futureLogged.some((line) => /PAPER_EMPTY|FUTURE|attempt|dead-letter/i.test(line)), false)
+    pass('超前补报达到离线队列上限后只记任务号并进入死信，不再重试')
   } finally {
     await server.close()
     db.close()

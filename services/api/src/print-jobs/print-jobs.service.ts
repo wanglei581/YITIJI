@@ -20,6 +20,7 @@ import {
   paidReprintBlockReason,
   throwIfMemberReprintBlocked,
 } from './paid-reprint-eligibility'
+import { lockPrintTaskRow } from '../terminals/print-status-attempt'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
@@ -725,7 +726,7 @@ export class PrintJobsService {
       payStatus: order.payStatus,
       file,
       terminalId: task.terminalId,
-      agentVersion: await latestHeartbeatAgentVersion(this.prisma, task.terminalId),
+      skipAgentVersion: true,
     }))
     const fileId = task.fileId ?? file?.id
     if (!fileId) {
@@ -737,6 +738,22 @@ export class PrintJobsService {
     const amountBefore = order.amountCents
 
     await this.prisma.$transaction(async (tx) => {
+      await lockPrintTaskRow(tx, task.id)
+      const liveTask = await tx.printTask.findUnique({
+        where: { id: task.id },
+        select: { status: true, errorCode: true, terminalId: true },
+      })
+      const agentVersion = await latestHeartbeatAgentVersion(tx, liveTask?.terminalId ?? task.terminalId)
+      throwIfMemberReprintBlocked(paidReprintBlockReason({
+        status: liveTask?.status ?? '',
+        errorCode: liveTask?.errorCode,
+        hasOrder: true,
+        payStatus: order.payStatus,
+        file,
+        terminalId: liveTask?.terminalId ?? task.terminalId,
+        agentVersion,
+      }))
+
       const activeTerminalLock = task.terminalId
         ? await tx.terminal.updateMany({
             where: { id: task.terminalId, enabled: true, lifecycleStatus: 'active' },

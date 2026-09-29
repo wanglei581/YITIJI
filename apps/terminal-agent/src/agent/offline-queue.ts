@@ -8,6 +8,9 @@
  *   - Poll every 60s.
  *   - Exponential back-off: nextRetryAt = now + min(2^attempts * 30s, 30min).
  *   - 401 response → persist unauthorized latch and retain the patch for re-bind.
+ *   - PRINT_STATUS_STALE_ATTEMPT → drop that patch and log only the task id.
+ *   - PRINT_STATUS_FUTURE_ATTEMPT → keep the patch and back off until max attempts,
+ *     then dead-letter and log only the task id.
  *   - Other 4xx response → durable dead-letter (operator action required).
  *   - attempts >= 10 → durable dead-letter.
  *   - 2xx → success (remove from queue; log confirmation).
@@ -33,7 +36,7 @@ import { log, warn } from '../logger'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MAX_ATTEMPTS = 10
+export const MAX_ATTEMPTS = 10
 const RETRY_INTERVAL_MS = 60_000
 const BASE_DELAY_MS = 30_000      // first retry after 30s
 const MAX_DELAY_MS = 30 * 60_000  // cap at 30 min
@@ -49,10 +52,19 @@ function nextRetryDelayMs(attempts: number): number {
 
 export type OfflinePatchOutcome = 'processed' | 'skipped' | 'paused_unauthorized'
 
+function printStatusErrorCode(error: unknown): string | undefined {
+  const data = (error as { response?: { data?: { error?: { code?: string } } } } | null)?.response?.data
+  return data?.error?.code
+}
+
 /** 服务端拒绝了更早一轮的状态补报。调用方应移出队列，不要当失败重试。 */
 export function isStalePrintAttemptError(error: unknown): boolean {
-  const data = (error as { response?: { data?: { error?: { code?: string } } } } | null)?.response?.data
-  return data?.error?.code === 'PRINT_STATUS_STALE_ATTEMPT'
+  return printStatusErrorCode(error) === 'PRINT_STATUS_STALE_ATTEMPT'
+}
+
+/** 服务端还没有这一轮。补报留在队列里退避，直到离线队列的最大次数。 */
+export function isFuturePrintAttemptError(error: unknown): boolean {
+  return printStatusErrorCode(error) === 'PRINT_STATUS_FUTURE_ATTEMPT'
 }
 
 export async function processPatch(
@@ -119,6 +131,18 @@ export async function processPatch(
     if (isStalePrintAttemptError(e)) {
       log(patch.taskId)
       markPatchAttempt(db, patch.id, true)
+      return 'processed'
+    }
+
+    if (isFuturePrintAttemptError(e)) {
+      if (patch.attempts + 1 >= MAX_ATTEMPTS) {
+        log(patch.taskId)
+        deadLetterPatch(db, patch.id, `MAX_ATTEMPTS_REACHED:${MAX_ATTEMPTS}`, true)
+        return 'processed'
+      }
+      const delay = nextRetryDelayMs(patch.attempts + 1)
+      const nextRetryAt = new Date(Date.now() + delay).toISOString()
+      markPatchAttempt(db, patch.id, false, nextRetryAt)
       return 'processed'
     }
 
