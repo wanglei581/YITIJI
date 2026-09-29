@@ -1,6 +1,6 @@
 {
   "_README": "小程序依赖的后端端点契约快照。任何 lane 改动 services/api 路由导致这里的端点消失，CI 会红。新增小程序调用后跑 --write 更新；knownMissing 里的每一条都必须写清原因。",
-  "generatedFrom": "apps/miniapp/utils/api.js + services/api/src/**/*.controller.ts",
+  "generatedFrom": "apps/miniapp/utils/api.js + utils/api-*.js + services/api/src/**/*.controller.ts",
   "endpoints": [
     "DELETE /contract-reviews/:p",
     "DELETE /files/:p",
@@ -95,7 +95,7 @@
     "POST /materials/tasks",
     "POST /materials/tasks/:p/pii-findings/decisions",
     "POST /me/ai-consents",
-    "POST /me/ai-consents/job_ai/revoke",
+    "POST /me/ai-consents/:p/revoke",
     "POST /me/data-requests",
     "POST /me/data-requests/:p/download-authorizations",
     "POST /me/favorites",
@@ -103,6 +103,7 @@
     "POST /me/feedback/:p/replies",
     "POST /me/print-orders",
     "POST /me/print-orders/:p/cancel",
+    "POST /me/print-orders/:p/reissue-pickup-code",
     "POST /me/print-orders/submissions/resolve",
     "POST /member/auth/login",
     "POST /member/auth/logout",

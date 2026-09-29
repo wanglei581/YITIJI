@@ -17,6 +17,7 @@
         <view class="es-t">请先登录</view>
         <view class="es-d">登录后可提交意见反馈，并查看处理进度</view>
         <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goLogin" role="button" aria-label="去登录">去登录</view>
+        <view class="fb-alt tap" hover-class="tap-press" bindtap="goOperatorInfo" role="button" aria-label="不登录，按经营者信息里的联系方式联系我们">不登录，按「经营者信息」里的联系方式联系我们</view>
       </view>
     </view>
 
@@ -28,10 +29,11 @@
           <view class="cat tap {{category === item.value ? 'on' : ''}}" wx:for="{{categories}}" wx:key="value"
             hover-class="tap-press" data-value="{{item.value}}" bindtap="setCategory" role="button" aria-label="{{item.label}}">{{item.label}}</view>
         </view>
+        <view class="fb-note" wx:if="{{category === 'ai_content'}}">对 AI 生成的内容有异议，写清是哪个功能、大概什么时间、哪段内容有问题。我们在 {{aiReplyDays}} 个工作日内答复，答复在下方「我的反馈」里查看。</view>
         <view class="field-label">标题（选填）</view>
         <input class="fb-input" value="{{title}}" maxlength="80" placeholder="如：打印预览显示不完整" bindinput="onTitle" />
         <view class="field-label">反馈内容</view>
-        <textarea class="fb-area" value="{{content}}" maxlength="500" placeholder="请说明遇到的情况、发生页面或希望改进的地方（10–500 字）" bindinput="onContent" />
+        <textarea class="fb-area" value="{{content}}" maxlength="500" placeholder="{{category === 'ai_content' ? '哪个 AI 功能、什么时间、哪段内容有问题（10–500 字）' : '请说明遇到的情况、发生页面或希望改进的地方（10–500 字）'}}" bindinput="onContent" />
         <view class="fb-count {{contentLen < 10 ? 'short' : ''}}">{{contentLen}} / 500</view>
         <view class="field-label">联系电话（选填）</view>
         <input class="fb-input" type="number" value="{{contactPhone}}" maxlength="11" placeholder="便于必要时联系确认" bindinput="onPhone" />
@@ -79,6 +81,9 @@
           <view class="es-d">提交后，这里会显示处理状态与回复</view>
         </view>
       </view>
+
+      <!-- 个人信息请求不在反馈里开类别（C3），指到「隐私与数据」，时限写在那一页。 -->
+      <view class="fb-alt tap" hover-class="tap-press" bindtap="goPrivacy" role="button" aria-label="查阅、导出、删除个人信息，去隐私与数据">查阅、导出、删除个人信息，去「隐私与数据」</view>
     </block>
   </view>
 </view>

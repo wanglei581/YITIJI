@@ -68,7 +68,13 @@ export class MemberAuthService {
   ) {}
 
   /** 发送短信验证码:冷却 + 多维频控 + 写 Redis(TTL 5min)+ 下发。 */
-  async sendSmsCode(phone: string, deviceId: string | undefined, ip: string): Promise<SendCodeResult> {
+  /** `terminalId`：控制器验签过的一体机终端编号（P1-5 单终端短信额度用），不是一体机发起时为空。 */
+  async sendSmsCode(
+    phone: string,
+    deviceId: string | undefined,
+    ip: string,
+    terminalId: string | null = null,
+  ): Promise<SendCodeResult> {
     const phoneHash = hashPhone(phone)
 
     // 1) 同号冷却:60s 内重复请求直接拒,防短信轰炸。
@@ -104,7 +110,7 @@ export class MemberAuthService {
     // 4) 下发(dev: 仅服务端日志,不返回明文验证码)。若真实服务商发送失败,
     // 立即删除本次验证码,避免出现"短信未发出但验证码仍可用"的残留状态。
     try {
-      await this.sms.sendCode(phone, code)
+      await this.sms.sendCode(phone, code, { terminalId })
     } catch (error) {
       await this.redis.del(codeKey)
       await this.redis.del(this.k.cooldown(phoneHash))

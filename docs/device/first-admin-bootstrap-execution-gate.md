@@ -22,21 +22,21 @@
 - [ ] 目标主机 NTP 已同步；`date -u` 与授权窗口一致。
 - [ ] 凭据目录所在磁盘已静态加密，且不会被未加密备份、日志采集或制品归档收集。
 - [ ] 执行账户为受控 Linux 账户；记录 `id`、`whoami`、仓库 checkout HEAD（须为审定的 main SHA）。
-- [ ] 凭据父目录：`install -d -m 700 /root/ai-job-print-bootstrap`，属主为当前用户，group/other 无任何权限。
+- [ ] 凭据父目录：`install -d -m 700 <服务器上的初始化输出目录>`，属主为当前用户，group/other 无任何权限。
 - [ ] 环境变量注入方式不写入 shell 历史、聊天、仓库或日志（受控 env 文件/会话）。
 
 ## 3. 执行步骤
 
 ```bash
 # 先建立仅当前 Linux 用户可访问的仓库外目录
-install -d -m 700 /root/ai-job-print-bootstrap
+install -d -m 700 <服务器上的初始化输出目录>
 
 # NODE_ENV / DATABASE_URL 从受控生产环境读取，不把数据库口令写入命令历史
 export FIRST_ADMIN_BOOTSTRAP_CONFIRM=CREATE_FIRST_PRODUCTION_ADMIN
 export FIRST_ADMIN_BOOTSTRAP_AUTHORIZED_UNTIL='<未来10分钟内的RFC3339时间>'
 export FIRST_ADMIN_USERNAME='<首个管理员账号>'
 export FIRST_ADMIN_NAME='<管理员显示名>'
-export FIRST_ADMIN_CREDENTIALS_OUT=/root/ai-job-print-bootstrap/first-admin.json
+export FIRST_ADMIN_CREDENTIALS_OUT=<服务器上的首个管理员初始化输出文件>
 pnpm --filter @ai-job-print/api bootstrap:first-admin
 ```
 
@@ -47,7 +47,7 @@ pnpm --filter @ai-job-print/api bootstrap:first-admin
   "ok": true,
   "userId": "...",
   "username": "...",
-  "credentialsPath": "/root/ai-job-print-bootstrap/first-admin.json"
+  "credentialsPath": "<服务器上的首个管理员初始化输出文件>"
 }
 ```
 

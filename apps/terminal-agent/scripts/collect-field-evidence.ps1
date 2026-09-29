@@ -344,9 +344,9 @@ Invoke-CheckedItem -Id "5.1-1" -Name "Windows 版本" -Body {
     $os = [System.Environment]::OSVersion
     $value = "OsName=$($cv.ProductName) DisplayVersion=$($cv.DisplayVersion) OsVersion=$($os.Version) OsBuildNumber=$($cv.CurrentBuild).$($cv.UBR)"
   }
-  $verdict = "FAIL"
-  if ($value -match "Windows 10" -or $value -match "Windows 11") { $verdict = "PASS" }
-  Add-EvidenceRow -Id "5.1-1" -Name "Windows 版本" -Value $value -Verdict $verdict
+  # 只记录不判定：Windows 11 的注册表产品名仍写「Windows 10」，按名称判不出版本档位与支持期；
+  # 版本档位（母盘清单 A1）与剩余支持期统一由 collect-field-day-evidence.ps1 的 D1-1 判定。
+  Add-EvidenceRow -Id "5.1-1" -Name "Windows 版本" -Value ($value + " 档位与支持期见 collect-field-day-evidence.ps1 D1-1") -Verdict "UNKNOWN"
 }
 
 Invoke-CheckedItem -Id "5.1-2" -Name "时区" -Body {

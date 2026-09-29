@@ -27,7 +27,7 @@
     ① 探测轴优先。probe !== ok（loading / error）→ 七张能力卡**一律不开**，含证件照说明页；
        badge：loading = 「检查中」，error = 「暂不开放任务 · 服务状态无法确认」。
     ② 能力配置覆盖。CAPABILITY_STATUS_NOTES：testing=测试中，暂未对用户开放 / maintenance=维护中，暂时不可用 /
-       unsupported=本终端不支持该能力 / not_verified=本机暂未开通。
+       unsupported=这台机器不支持这项功能 / not_verified=本机暂未开通。
     ③ MFP 轴 unavailable = 确定出不了纸（敢说哪几项停）；unknown = 读不到状态，不敢声称离线。
   到机码例外: 到机码核销**不在** CARD_CAPABILITY_KEY 里，也不随 MFP 轴停用 —— 它核销的是已存在订单，不是新建本机任务；
              探测失败时仍可点，但卡面如实写「这台机器现在出不了纸」。
@@ -379,7 +379,7 @@ var CAPS=[
   href:'10-print-hub.html?state=feature-id-photo',route:'/print-scan/feature/id-photo',mfp:false}
 ];
 /* CAPABILITY_STATUS_NOTES 逐字对齐运行时 */
-var NOTES={testing:'测试中，暂未对用户开放',maintenance:'维护中，暂时不可用',unsupported:'本终端不支持该能力',not_verified:'本机暂未开通'};
+var NOTES={testing:'测试中，暂未对用户开放',maintenance:'维护中，暂时不可用',unsupported:'这台机器不支持这项功能',not_verified:'本机暂未开通'};
 /* opts: probe='ok'|'loading'|'error'；overrides={capKey:status}；mfp='ready'|'unavailable' */
 function capCard(c,opts){
  var closed=false,badge='';

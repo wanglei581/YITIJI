@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`559` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`562` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -197,6 +197,8 @@
 | POST | `/api/v1/auth/admin/phone/transfer/start` | AuthController.startAdminPhoneTransfer | admin | AdminPhoneTransferService | AuditLog<br/>User |
 | POST | `/api/v1/auth/admin/phone/transfer/verify` | AuthController.verifyAdminPhoneTransfer | admin | — | — |
 | POST | `/api/v1/auth/login` | AuthController.login | — | AuthService | AuditLog<br/>Organization<br/>User |
+| POST | `/api/v1/auth/login/second-factor` | AuthController.completeSecondFactor | — | AuthService | AuditLog<br/>Organization<br/>User |
+| POST | `/api/v1/auth/login/second-factor/resend` | AuthController.resendSecondFactor | — | — | — |
 | POST | `/api/v1/auth/login/sms` | AuthController.smsLogin | — | AuthService | AuditLog<br/>Organization<br/>User |
 | POST | `/api/v1/auth/logout` | AuthController.logout | — | — | — |
 | GET | `/api/v1/auth/me` | AuthController.me | — | — | — |
@@ -532,8 +534,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/session/extend` | KioskSessionController.extend | — | — | — |
-| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | — | — |
+| POST | `/api/v1/kiosk/session/end` | KioskSessionController.end | — | KioskSessionService | KioskSession<br/>Terminal |
+| POST | `/api/v1/kiosk/session/heartbeat` | KioskSessionController.heartbeat | — | KioskSessionService | KioskSession<br/>Terminal |
+| POST | `/api/v1/kiosk/session/start` | KioskSessionController.start | — | KioskSessionService | KioskSession<br/>Terminal |
 
 ## `services/api/src/legal/admin-legal-docs.controller.ts`
 

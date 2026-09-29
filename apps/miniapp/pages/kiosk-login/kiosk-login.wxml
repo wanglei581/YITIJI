@@ -4,7 +4,8 @@
   所以任何一屏都只说「已确认，回一体机看结果」。各分支内部不嵌套 <block>（测试按下一个 </block> 切块）。 -->
 <view class="relay">
   <view class="relaybar" style="padding-top:{{statusBarHeight}}px">
-    <view class="rb-row">
+    <!-- 右让微信胶囊：状态标签此前整块落在胶囊下面（开发者工具截图 2026-09-29）。值由 app.js 按胶囊位置算。 -->
+    <view class="rb-row" style="padding-right:{{capsuleInsetRight}}px">
       <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" aria-role="button" aria-label="返回">
         <text class="ficon i-right"></text>
       </view>

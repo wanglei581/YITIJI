@@ -1,9 +1,28 @@
 const app = getApp()
 const api = require('../../utils/api')
 
-const TYPES = {
-  terms_of_service: '用户服务协议',
-  privacy_policy: '隐私政策',
+// 四类文档都由管理员后台「法务文档」发布，一体机与小程序读同一份（C1）。
+// 标题只在服务端没给标题时兜底，类型表见 utils/api-legal-consent.js。
+const TYPES = api.LEGAL_DOC_TITLES
+
+// 「还没发布」不是出错：如实说没发布，并说清发布后这里会写什么。
+const UNPUBLISHED_DESC = {
+  terms_of_service: '正式版本发布之前，小程序暂时不能登录。不登录也可以看使用帮助和打印指引。',
+  privacy_policy: '正式版本发布之前，小程序暂时不能登录。不登录也可以看使用帮助和打印指引。',
+  ai_disclaimer: '发布后，这里会写明本服务用到的大模型名称与备案号，以及 AI 能做什么、不能做什么。',
+  operator_info: '发布后，这里会写明经营者名称、证照信息和联系方式。',
+}
+
+// 章节标题的认法与一体机一致（apps/kiosk/src/pages/legal/legalDocModel.ts 的 headingOf）：
+// Markdown 标题，或 30 字以内、不以标点结尾的「第X章 / 一、」式短行。两端读同一份后台正文，
+// 认法不一样，同一份协议在两端就分成不同的章。
+const ORDINAL_HEADING = /^(?:第[一二三四五六七八九十百零〇\d]+[章节条部分]|[一二三四五六七八九十]+、)/
+
+function headingOf(line) {
+  const markdown = line.match(/^#{1,6}\s+(.+)$/)
+  if (markdown) return markdown[1].trim()
+  if (line.length <= 30 && ORDINAL_HEADING.test(line) && !/[。；;，,]$/.test(line)) return line
+  return ''
 }
 
 function parseBlocks(content) {
@@ -12,8 +31,8 @@ function parseBlocks(content) {
     .map(line => line.trim())
     .filter(Boolean)
     .map((line, index) => {
-      const heading = line.match(/^#{1,6}\s+(.+)$/)
-      if (heading) return { key: `h-${index}`, kind: 'heading', text: heading[1] }
+      const heading = headingOf(line)
+      if (heading) return { key: `h-${index}`, kind: 'heading', text: heading }
       if (/^[-*]\s+/.test(line)) return { key: `b-${index}`, kind: 'bullet', text: line.replace(/^[-*]\s+/, '') }
       if (/^\d+[.)]\s+/.test(line)) return { key: `n-${index}`, kind: 'numbered', text: line }
       return { key: `p-${index}`, kind: 'paragraph', text: line }
@@ -27,8 +46,10 @@ Page({
     version: '',
     publishedAt: '',
     blocks: [],
-    loading: true,
+    // loading | ready | unpublished | error
+    state: 'loading',
     error: '',
+    unpublishedDesc: '',
   },
 
   onLoad(options) {
@@ -42,7 +63,7 @@ Page({
   },
 
   loadDoc() {
-    this.setData({ loading: true, error: '' })
+    this.setData({ state: 'loading', error: '' })
     api.getLegalDocument(this._type)
       .then(doc => {
         const publishedAt = doc.publishedAt
@@ -53,13 +74,20 @@ Page({
           version: doc.version || '',
           publishedAt,
           blocks: parseBlocks(doc.content),
-          loading: false,
+          state: 'ready',
         })
       })
-      .catch(err => this.setData({
-        loading: false,
-        error: (err && err.message) || '法律文档加载失败，请稍后重试',
-      }))
+      .catch(err => {
+        // 服务端还不认识这一类（旧版本没有「经营者信息」）同样是「还没发布」，不是加载失败。
+        if (err && (err.code === 'LEGAL_DOC_UNAVAILABLE' || err.code === 'LEGAL_DOC_TYPE_INVALID')) {
+          this.setData({ state: 'unpublished', unpublishedDesc: UNPUBLISHED_DESC[this._type] || '' })
+          return
+        }
+        this.setData({
+          state: 'error',
+          error: (err && err.message) || '法律文档加载失败，请稍后重试',
+        })
+      })
   },
 
   back() {

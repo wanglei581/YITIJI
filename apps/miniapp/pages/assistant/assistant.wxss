@@ -17,6 +17,9 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .chat-scroll { flex: 1; min-height: 0; overflow: hidden; }
 .chat-body { padding: 24rpx 28rpx 16rpx; }
 .as-disc { margin-bottom: 26rpx; padding: 15rpx 18rpx; border-radius: var(--r-sm); border: 1rpx solid var(--line-soft); background: #fff; color: var(--faint); font-size: var(--fs-xs); line-height: 1.5; text-align: center; }
+.as-disc-links { display: flex; align-items: center; justify-content: center; gap: 4rpx; }
+/* 文字链：纵向内边距把可点区撑到 48px 以上（行高约 33rpx + 上下各 34rpx） */
+.as-disc-link { display: inline-block; padding: 34rpx 14rpx; color: var(--teal-deep); font-size: var(--fs-sm); }
 .msg { margin-bottom: 28rpx; }
 .msg-ai { display: flex; align-items: flex-start; gap: 14rpx; }
 .msg-user { display: flex; justify-content: flex-end; }

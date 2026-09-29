@@ -16,14 +16,14 @@
 | 维度 | 实测值 | 结论 |
 |---|---|---|
 | `origin/main` | `64e0dcba` | 当前目标基线 |
-| `/root/YITIJI` HEAD | `616fd967` | 源码已接近 main，工作区干净 |
+| `<服务器源码检出目录>` HEAD | `616fd967` | 源码已接近 main，工作区干净 |
 | `/srv/ai-job-print/DEPLOY_SOURCE.txt` | `source=origin/main@50896ed1`、`deployed_at=20260805T1758+0800` | 未随 Actions Kiosk 部署更新，溯源失真 |
 | PM2 `ai-job-print-api` | `COMMIT=942c695a`、`STAMP=20260727T165244+0800`、script=`/srv/ai-job-print/services/api/dist/main.js`（mtime 2026-08-06 16:40） | 运行中 API 落后于源码 |
 | 生产 PostgreSQL `_prisma_migrations` | 已应用 `20260730100000_add_terminal_network_diagnostics`、`20260801090000_add_contract_review_task`、`20260801130000_add_contract_review_confirmation_checkpoint`、`20260802100000_add_wx_open_id_to_end_user` | DB 超前于运行 API；其中 network diagnostics 名称出现**两条记录**，待核实 |
 | `942c695a..64e0dcba` 迁移差异 | 正好新增上述 4 个迁移文件 | API 升级必须先执行 additive `db:pg:deploy` |
 | `.github/workflows/deploy.yml` | 只构建/复制 Kiosk、reload nginx | 不构建/重启 API、不写 `DEPLOY_SOURCE` |
 | 线上探测 | `https://zyidai.cn/` 200；`/api/v1/health` 200 且 `db=postgres` | 服务存活，但不等价于前后端一致 |
-| 生产布局 | `/srv/ai-job-print` 是完整运行副本（非 git 仓库）；`.env` 与 `storage` 仅存在运行目录；`/root/YITIJI` 为 git 源码目录（无 `.env`） | API 发布必须在运行目录内保留 `.env`/`storage` |
+| 生产布局 | `/srv/ai-job-print` 是完整运行副本（非 git 仓库）；`.env` 与 `storage` 仅存在运行目录；`<服务器源码检出目录>` 为 git 源码目录（无 `.env`） | API 发布必须在运行目录内保留 `.env`/`storage` |
 
 ## 3. 风险分级
 
@@ -43,7 +43,7 @@ API、Admin、Partner、Kiosk、DB 与 `DEPLOY_SOURCE` 均来自同一 `TARGET_C
 3. `pnpm install --frozen-lockfile`。
 4. 构建 Kiosk。
 5. 若 `DEPLOY_API_ENABLED=true`，脚本执行：
-   a. 校验 `/root/YITIJI` HEAD == `TARGET_SHA`；
+   a. 校验 `<服务器源码检出目录>` HEAD == `TARGET_SHA`；
    b. 从运行目录 `.env` 读取 `DATABASE_URL`（不打印）；
    c. `pg_dump -Fc` + `pg_restore -l` 可读校验；
    d. `cp -a` 备份运行目录（回滚锚点）；
