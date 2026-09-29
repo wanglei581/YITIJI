@@ -25,6 +25,19 @@ function headingOf(line) {
   return ''
 }
 
+// 章节锚点：其他页面用语义名链接到某一章（自我探索同意书 → 隐私政策「未成年人」专章）。
+// 按章节标题认，不按第几章：后台改章节顺序时链接不会指错地方。认不出就从头显示，不报错。
+const ANCHOR_HEADINGS = {
+  minors: /未成年/,
+}
+
+function anchorBlockKey(blocks, anchor) {
+  const pattern = ANCHOR_HEADINGS[anchor]
+  if (!pattern) return ''
+  const hit = blocks.find(b => b.kind === 'heading' && pattern.test(b.text))
+  return hit ? hit.key : ''
+}
+
 function parseBlocks(content) {
   return String(content || '')
     .split('\n')
@@ -55,6 +68,7 @@ Page({
   onLoad(options) {
     const type = TYPES[options.type] ? options.type : 'terms_of_service'
     this._type = type
+    this._anchor = options.anchor || ''
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       title: TYPES[type],
@@ -69,12 +83,16 @@ Page({
         const publishedAt = doc.publishedAt
           ? new Date(doc.publishedAt).toLocaleDateString('zh-CN')
           : ''
+        const blocks = parseBlocks(doc.content)
+        const anchorKey = anchorBlockKey(blocks, this._anchor)
         this.setData({
           title: doc.title || TYPES[this._type],
           version: doc.version || '',
           publishedAt,
-          blocks: parseBlocks(doc.content),
+          blocks,
           state: 'ready',
+        }, () => {
+          if (anchorKey) wx.pageScrollTo({ selector: `#${anchorKey}`, duration: 0 })
         })
       })
       .catch(err => {

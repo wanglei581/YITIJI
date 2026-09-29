@@ -35,17 +35,8 @@ const storage = require('../../utils/storage')
 
 /** 雷达图配色。canvas 读不到 CSS 变量，这里是 app.wxss 里 --teal 系与 --line 系的取值副本。 */
 
-/**
- * 知情同意条款与版本号都不写在这里（9/29 裁定）：一律用 questions 接口同一次响应里的
- * consentItems 与 consentVersion —— 两者是同一份说明，用户勾的就是那几句原文，
- * 提交时带回的就是那一个版本号。页面自己写一份条款，改版时就会出现「看的是这份、
- * 记的是那份」；写死版本号则会静默失配（服务端回 SELF_ASSESSMENT_CONSENT_VERSION_STALE）。
- * 响应里缺条款或缺版本号时不能开始作答：没看到说明的同意不算同意。
- */
-function toConsentItems(res) {
-  const raw = (res && Array.isArray(res.consentItems)) ? res.consentItems : []
-  return raw.map(trimmed).filter(Boolean)
-}
+// 知情同意的条款、勾选框文字、链接、版本号都由服务端下发，整理逻辑与理由见 consent-view.js。
+const consentView = require('./consent-view')
 
 /** 服务端说同意版本不是当前版本时的提示（合规窗口 9/29 裁定原文）。 */
 const STALE_TIP = '说明已更新，请重新确认。已答的题会保留。'
@@ -86,7 +77,12 @@ Page({
     // ── 同意书 ──
     consentItems: [],
     consentVersion: '',
-    /** 条款与版本号都从服务端拿到了，才允许开始作答。 */
+    consentCheckboxLabel: '',
+    consentLinks: [],
+    /** 勾选框文字按链接切好的段：{ text, link }，link 为 -1 是普通文字。 */
+    checkboxParts: [],
+    extraLinks: [],
+    /** 条款、勾选框文字、版本号都从服务端拿到了，才允许开始作答。 */
     consentReady: false,
     agreeNonSensitive: false,
     agreeSensitive: false,
@@ -203,12 +199,9 @@ Page({
           this._fail('暂时取不到题目，请稍后重试', false)
           return
         }
-        this.setData({
+        this.setData(Object.assign({
           phase: 'consent',
           dims: view.dims,
-          consentItems: view.consentItems,
-          consentVersion: view.consentVersion,
-          consentReady: view.consentItems.length > 0 && !!view.consentVersion,
           sensitiveCount: view.sensitiveCount,
           totalCount: view.totalCount,
           requiredCount: view.requiredCount,
@@ -219,7 +212,7 @@ Page({
           groupIdx: 0,
           groupDone: view.dims.map(() => false),
           isLastGroup: view.dims.length === 1,
-        })
+        }, view.consent))
       })
       .catch((err) => {
         if (this._gone || seq !== this._seq) return
@@ -257,9 +250,17 @@ Page({
     })
     return {
       dims, totalCount, requiredCount, sensitiveCount,
-      consentItems: toConsentItems(res),
-      consentVersion: trimmed(res && res.consentVersion),
+      consent: consentView.toConsentView(res, api.LEGAL_DOC_TITLES),
     }
+  },
+
+  /** 同意勾选框里的链接：打开小程序内的法务页并定位到对应章节（小程序打不开外部网页）。 */
+  tapConsentLink(e) {
+    const link = this.data.consentLinks[Number(e.currentTarget.dataset.i)]
+    if (!link) return
+    const q = [`type=${encodeURIComponent(link.legalDocType)}`]
+    if (link.anchor) q.push(`anchor=${encodeURIComponent(link.anchor)}`)
+    wx.navigateTo({ url: `/pages/legal/legal?${q.join('&')}` })
   },
 
   /**
@@ -278,15 +279,11 @@ Page({
           this._loadQuestions()
           return
         }
-        this.setData(Object.assign(reset, {
-          consentItems: view.consentItems,
-          consentVersion: view.consentVersion,
-          consentReady: view.consentItems.length > 0 && !!view.consentVersion,
-        }))
+        this.setData(Object.assign(reset, view.consent))
       })
       .catch(() => {
         if (this._gone || seq !== this._seq) return
-        this.setData(Object.assign(reset, { consentItems: [], consentVersion: '', consentReady: false }))
+        this.setData(Object.assign(reset, consentView.emptyConsentView()))
       })
   },
 

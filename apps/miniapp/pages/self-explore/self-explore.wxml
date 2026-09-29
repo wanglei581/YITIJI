@@ -53,19 +53,21 @@
           <view class="cs-ver">同意说明版本：{{consentVersion}}</view>
         </block>
         <view wx:else class="list-state">
-          <view>同意说明没有取到，暂时不能开始作答。先看到完整说明才能同意，请稍后重试。</view>
+          <view>同意说明没有取到，请重试。先看到完整说明，才能开始作答。</view>
           <view class="state-retry tap" hover-class="tap-press" bindtap="reload"
                 role="button" aria-label="重新加载同意说明">重试</view>
         </view>
       </view>
 
-      <view class="card card-inner rise-d3">
+      <view class="card card-inner rise-d3" wx:if="{{consentReady}}">
+        <!-- 勾选框文字与其中的链接都是服务端下发的原文；链接用 catchtap，点链接不会顺带勾选。 -->
         <view class="cbox tap" hover-class="tap-press" bindtap="toggleNonSensitive"
-              role="button" aria-label="{{agreeNonSensitive ? '已同意上述说明并开始作答，点击取消' : '同意上述说明并开始作答，必选'}}">
+              role="button" aria-label="{{agreeNonSensitive ? '已勾选，点击取消：' : '必选，点击勾选：'}}{{consentCheckboxLabel}}">
           <view class="cb {{agreeNonSensitive ? 'on' : ''}}"><text wx:if="{{agreeNonSensitive}}" class="ficon i-check"></text></view>
           <view class="cb-body">
-            <view class="cb-title">我已阅读并同意上述说明（必选）</view>
+            <view class="cb-title"><block wx:for="{{checkboxParts}}" wx:key="index"><text wx:if="{{item.link < 0}}">{{item.text}}</text><text wx:else class="cs-link" catchtap="tapConsentLink" data-i="{{item.link}}" role="link" aria-label="打开{{item.text}}">{{item.text}}</text></block></view>
             <view class="cb-desc">不勾选无法提交：服务端同样会拒绝没有这项同意的请求。</view>
+            <view class="cb-desc" wx:if="{{extraLinks.length}}">相关说明：<text wx:for="{{extraLinks}}" wx:key="link" class="cs-link" catchtap="tapConsentLink" data-i="{{item.link}}" role="link">{{item.label}} </text></view>
           </view>
         </view>
 
