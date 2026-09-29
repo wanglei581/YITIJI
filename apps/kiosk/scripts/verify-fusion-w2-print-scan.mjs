@@ -836,10 +836,17 @@ assert.match(
   /POLL_INTERVAL_MS = 3000/,
   'print progress still polls every 3 seconds from Agent hardware reflux'
 )
+// 2026-09-29 W-43：完成页不再自己只清打印材料，到点与「我拿走了，结束使用」都走统一的 endKioskUse，
+// 由它的 clearLocal（clearKioskSensitiveSession）清掉打印材料在内的本机数据并退出登录。
 assert.match(
   printDone,
-  /clearPrintMaterialSession\(\)/,
-  'print done wipe actually clears the print material session'
+  /endKioskUse\('print_done_timeout'\)/,
+  'print done countdown ends the whole use through endKioskUse'
+)
+assert.match(
+  read('src/auth/kioskSensitiveSession.ts'),
+  /export function clearKioskSensitiveSession[\s\S]{0,400}?clearPrintMaterialSession\(\)/,
+  'print done end-use actually clears the print material session (via clearKioskSensitiveSession)'
 )
 
 const pickupClaim = read('src/pages/print/PrintPickupClaimPage.tsx')

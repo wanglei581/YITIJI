@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
 import { KioskRoot } from '../layouts/KioskRoot'
+import { KioskHandoverGate } from '../auth/KioskHandoverGate'
 import { KioskRuntimeRoot } from '../layouts/KioskRuntimeRoot'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { MobileQrLoginPage } from '../pages/auth/MobileQrLoginPage'
@@ -157,24 +158,30 @@ export const kioskRouter = createBrowserRouter([
         children: [
       { index: true,               element: <HomePage /> },
       { path: 'assistant',         element: <AssistantPage /> },
-      { path: 'profile',           element: <ProfilePage /> },
-      // 「我的」明细页（本人 /me/* 真实数据；未登录引导登录，空态诚实，不造假数据）
-      { path: 'me/resumes',        element: <MyResumesPage /> },
-      { path: 'me/print-orders',   element: <MyPrintOrdersPage /> },
-      { path: 'me/documents',      element: <MyDocumentsPage /> },
-      { path: 'me/favorites',      element: <MyFavoritesPage /> },
-      { path: 'me/ai-records',     element: <MyAiRecordsPage /> },
-      { path: 'me/benefits',       element: <MyBenefitsPage /> },
-      { path: 'me/activity',       element: <MyActivityPage /> },
+      // 个人资产页一律先过「还是你吗？」（W-75）：有人登录着且进来前空了 30 秒以上，先问再显示。
       {
-        path: 'me/activity/:id',
-        lazy: async () => ({ Component: (await import('../pages/placeholders/MeActivityDetailPage')).default }),
+        element: <KioskHandoverGate />,
+        children: [
+          { path: 'profile',           element: <ProfilePage /> },
+          // 「我的」明细页（本人 /me/* 真实数据；未登录引导登录，空态诚实，不造假数据）
+          { path: 'me/resumes',        element: <MyResumesPage /> },
+          { path: 'me/print-orders',   element: <MyPrintOrdersPage /> },
+          { path: 'me/documents',      element: <MyDocumentsPage /> },
+          { path: 'me/favorites',      element: <MyFavoritesPage /> },
+          { path: 'me/ai-records',     element: <MyAiRecordsPage /> },
+          { path: 'me/benefits',       element: <MyBenefitsPage /> },
+          { path: 'me/activity',       element: <MyActivityPage /> },
+          {
+            path: 'me/activity/:id',
+            lazy: async () => ({ Component: (await import('../pages/placeholders/MeActivityDetailPage')).default }),
+          },
+          { path: 'me/notifications',  element: <MyNotificationsPage /> },
+          { path: 'me/feedback',       element: <MyFeedbackPage /> },
+          // 账号设置：只读状态 + 协议入口 + 退出/切换账号 + 换绑（验证码隐藏显示，不做注销）
+          { path: 'me/settings',       element: <MySettingsPage /> },
+          { path: 'me/privacy-requests', element: <MyPrivacyRequestsPage /> },
+        ],
       },
-      { path: 'me/notifications',  element: <MyNotificationsPage /> },
-      { path: 'me/feedback',       element: <MyFeedbackPage /> },
-      // 账号设置：只读状态 + 协议入口 + 退出/切换账号 + 换绑（验证码隐藏显示，不做注销）
-      { path: 'me/settings',       element: <MySettingsPage /> },
-      { path: 'me/privacy-requests', element: <MyPrivacyRequestsPage /> },
       // 帮助中心（静态 FAQ；仅描述已上线能力）
       { path: 'help',              element: <HelpCenterPage /> },
       // 权益活动中心（活动领取后生成 BenefitGrant，进入 /me/benefits；不含支付/套餐购买/招聘会凭证）

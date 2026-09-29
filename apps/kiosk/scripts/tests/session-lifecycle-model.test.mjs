@@ -144,10 +144,11 @@ test('W-54 full number stays on the phone keypad until a code exists', async () 
   assert.match(agreement, /agreed \? <CheckIcon/)
   assert.match(css, /\.lg-fields\s*\{[^}]*z-index:\s*50/)
   assert.match(css, /\.k-agree:not\(\.checked\) \.box svg\s*\{[^}]*opacity:\s*0/)
-  assert.match(profile, /clearSessionTo\(\{ path: '\/' \}\)/)
-  assert.doesNotMatch(profile, /clearSessionTo\(\{ path: '\/profile' \}\)/)
-  assert.match(settings, /clearSessionTo\(\{ path: '\/' \}\)/)
-  assert.match(settings, /clearSessionTo\(\{ path: '\/login', state: \{ from: '\/profile' \} \}\)/)
+  // 2026-09-29 统一清场：结束使用 / 换号都走 endKioskUse，目的地（首页 / 登录页）由 kioskEndUse 统一定。
+  assert.match(profile, /endKioskUse\('end_use'\)/)
+  assert.doesNotMatch(profile, /clearSessionTo/)
+  assert.match(settings, /endKioskUse\('end_use'\)/)
+  assert.match(settings, /endKioskUse\('switch_account'\)/)
 })
 
 test('login returnTo rejects unsafe query and does not echo it', async () => {

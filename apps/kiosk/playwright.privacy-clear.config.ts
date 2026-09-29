@@ -14,7 +14,9 @@ const previewPort = 4629
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /kiosk-privacy-clear-copy\.spec\.ts$/,
+  // kiosk-end-use：统一清场正式构建走查（W-75 / W-43 / W-64），要 30 秒以上的本页时钟，
+  // 不能放进把隐私硬截止压到 3 秒的 playwright.privacy.config.ts。
+  testMatch: /(kiosk-privacy-clear-copy|kiosk-end-use)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-privacy-clear',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
