@@ -25976,6 +25976,7 @@
     ],
     "services/api/src/terminals/terminals-agent.service.ts": [
       "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
@@ -32633,7 +32634,8 @@
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
-          "services/api/src/terminals/terminal-capabilities.types.ts"
+          "services/api/src/terminals/terminal-capabilities.types.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
         ],
         "missing": []
       },
