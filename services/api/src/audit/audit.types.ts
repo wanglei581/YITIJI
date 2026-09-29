@@ -62,6 +62,14 @@ export type AuditAction =
   | 'official_channel.archive'
   | 'user.create'
   | 'user.disable'
+  /** 内部账号名册（3.9）：启用管理员账号（后台启停或服务器端应急命令） */
+  | 'user.enable'
+  /** 账号管理动作的「管理员本人密码」确认失败 */
+  | 'user.step_up_failed'
+  /** 建备用管理员第一步：已给备用手机号发验证码 */
+  | 'user.backup_admin_challenge_started'
+  /** 服务器端应急命令第一步：已签发 10 分钟确认码（未改任何账号） */
+  | 'user.emergency_enable_requested'
   | 'system.login'
   | 'system.config_change'
   | 'print_job.admin_abandon'

@@ -796,6 +796,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:sms-budget
           # P1-4 管理员登录加固（锁定失败关闭、来源地址名单、短信第二步）；写隔离库。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-login-hardening
+          # 3.9 内部账号名册 + 备用管理员 + 服务器端应急启用：自建真实 SQLite 迁移临时库 + 真实 Redis + 进程内 HTTP。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:internal-accounts
           pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-real-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-governance-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-launch-events
@@ -922,6 +924,13 @@ jobs:
           NODE_ENV: test
           FIRST_ADMIN_BOOTSTRAP_VERIFY_TARGET: isolated
         run: pnpm verify:first-admin-bootstrap:postgres
+      - name: Verify backup admin constraint and concurrency on isolated PG
+        # 3.9：迁移里的条件唯一索引在 PG 上生效；并发互停 / 并发建备用管理员走 Serializable 冲突重试。
+        # 必须在 seed 之前（要求 User 表为空，跑完自清）。
+        working-directory: services/api
+        env:
+          VERIFICATION_DATABASE_TARGET: isolated
+        run: pnpm verify:internal-accounts:postgres
       - name: Seed on PG
         working-directory: services/api
         env:

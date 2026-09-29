@@ -339,6 +339,7 @@ export function prepareIsolatedDatabase(
           "lastLoginAt" DATETIME,
           "enabled" BOOLEAN NOT NULL DEFAULT true,
           "deletedAt" DATETIME,
+          "isBackupAdmin" BOOLEAN NOT NULL DEFAULT false,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "User_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "Organization" ("id") ON DELETE SET NULL ON UPDATE CASCADE

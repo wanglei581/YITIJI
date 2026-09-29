@@ -840,6 +840,10 @@ model User {
   lastLoginAt  DateTime?
   enabled      Boolean       @default(true)
   deletedAt    DateTime?
+  /// 备用管理员（3.9）：主管理员在后台建号（手机号建号时验证、随机不可知临时密码、默认停用），
+  /// 主账号登不上时由服务器端应急命令启用。全局最多 1 个未删除的备用管理员：
+  /// 条件唯一索引 "User_single_backup_admin"（只在两套迁移里，schema 语法表达不了 WHERE）。
+  isBackupAdmin Boolean      @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
