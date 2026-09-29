@@ -14,6 +14,7 @@
     "dev:partner": "pnpm --filter ./apps/partner dev",
     "demo": "node scripts/demo/demo.mjs start",
     "demo:start": "node scripts/demo/demo.mjs start",
+    "demo:sim": "node scripts/demo/demo.mjs start --sim-printer",
     "demo:reset": "node scripts/demo/demo.mjs reset",
     "build:kiosk:production": "pnpm --filter @ai-job-print/kiosk build && pnpm --filter @ai-job-print/kiosk verify:prod-build-config",
     "build": "pnpm -r --if-present build",

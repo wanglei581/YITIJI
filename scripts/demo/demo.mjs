@@ -3,6 +3,7 @@
 // 本地全栈演示包（P1-23）入口。
 //
 //   pnpm demo          体检 → 建演示库 → 灌演示数据 → 起服务端 + 一体机 + 两个后台
+//   pnpm demo:sim      同上，另开「模拟打印机」（--sim-printer 或 DEMO_SIM_PRINTER=1；默认关闭）
 //   pnpm demo:reset    删除 .demo/（演示库、上传文件、演示口令），下次 pnpm demo 重新生成
 //
 // Windows 10/11 与 macOS 通用：只用 node 内置模块，子进程一律用当前 node 直接起
@@ -27,6 +28,7 @@ import {
   readJsonIfExists,
 } from './lib/demo-config.mjs'
 import { startDemoBridge } from './lib/local-bridge.mjs'
+import { SIM_PAPER_EMPTY_MARKER, SIM_PRINTER_NAME, simPrinterEnabled, startSimPrinter } from './lib/sim-printer.mjs'
 import {
   DemoPreflightError,
   allocatePorts,
@@ -40,6 +42,7 @@ const paths = demoPaths()
 const runningFile = join(paths.demoDir, 'running.json')
 const children = new Map()
 let bridge = null
+let simPrinter = null
 let shuttingDown = false
 
 function say(line = '') {
@@ -151,6 +154,7 @@ async function shutdown(code) {
   if (shuttingDown) return
   shuttingDown = true
   say('\n正在停止演示环境……')
+  if (simPrinter) await simPrinter.close().catch(() => {})
   await Promise.all([...children.values()].map(stopChild))
   if (bridge) await bridge.close().catch(() => {})
   try {
@@ -216,7 +220,7 @@ function loadOrCreateState() {
   return { state, created: true }
 }
 
-function writeAccountsFile({ urls, passwords, users }) {
+function writeAccountsFile({ urls, passwords, users, sim }) {
   const admin = users.find((u) => u.role === 'admin')
   const partner = users.find((u) => u.role === 'partner')
   const text = [
@@ -229,6 +233,13 @@ function writeAccountsFile({ urls, passwords, users }) {
     `  账号：${partner.username}  口令：${passwords.partner}`,
     `服务端：    ${urls.api}`,
     '',
+    ...(sim
+      ? [
+          `本次开了${SIM_PRINTER_NAME}：能走到「打印完成」，但不会真的出纸。`,
+          `  模拟缺纸：在 .demo 文件夹里新建一个名为 ${SIM_PAPER_EMPTY_MARKER} 的空文件；删掉即恢复。`,
+          '',
+        ]
+      : []),
     '口令只保存在本机这个文件夹里（已被 git 忽略）。pnpm demo:reset 会删掉它并在下次启动时重新生成。',
     '',
   ].join('\n')
@@ -237,9 +248,10 @@ function writeAccountsFile({ urls, passwords, users }) {
 
 // ── 命令：start ──────────────────────────────────────────────────────────────
 
-async function start() {
+async function start(options) {
   const TOTAL = 6
   say('职易达 · 本地演示环境（所有数据均为演示数据）\n')
+  if (options.simPrinter) say(`已开启${SIM_PRINTER_NAME}：会领打印任务并回写完成，但不会真的出纸。\n`)
 
   step(1, TOTAL, '体检：Node.js、依赖、Redis、端口')
   checkNodeVersion()
@@ -254,7 +266,7 @@ async function start() {
 
   mkdirSync(paths.logDir, { recursive: true })
   mkdirSync(paths.storageDir, { recursive: true })
-  writeFileSync(runningFile, JSON.stringify({ pid: process.pid, ports, startedAt: new Date().toISOString() }))
+  writeFileSync(runningFile, JSON.stringify({ pid: process.pid, ports, simPrinter: options.simPrinter, startedAt: new Date().toISOString() }))
   // dotenv 指向这个空文件：services/api/.env 里开发者的真实配置在演示里完全不生效。
   writeFileSync(paths.dotenvFile, '# 演示包专用：刻意留空。演示服务端的全部配置由 scripts/demo/lib/demo-config.mjs 传入。\n')
 
@@ -283,9 +295,19 @@ async function start() {
   })
   await waitForHttp(`http://127.0.0.1:${ports.api}/api/v1/health`, { timeoutMs: 240_000, record: api })
 
-  step(5, TOTAL, '登记演示终端并启动本机演示网桥')
+  step(5, TOTAL, options.simPrinter ? `登记演示终端，启动本机演示网桥与${SIM_PRINTER_NAME}` : '登记演示终端并启动本机演示网桥')
   const terminal = data.terminals[0]
   const credential = await registerDemoTerminal({ ports, secrets: state.secrets, terminal })
+  if (options.simPrinter) {
+    // 终端凭证只在本进程内存里交给模拟打印机，不落盘、不打印。
+    simPrinter = startSimPrinter({
+      apiBaseUrl: `http://127.0.0.1:${ports.api}/api/v1`,
+      terminalId: credential.terminalId,
+      agentToken: credential.agentToken,
+      workDir: paths.demoDir,
+      log: (line) => say(`  [模拟打印机] ${line}`),
+    })
+  }
   bridge = await startDemoBridge({
     port: ports.bridge,
     allowedOrigins: [`http://127.0.0.1:${ports.kiosk}`, `http://localhost:${ports.kiosk}`],
@@ -295,6 +317,7 @@ async function start() {
     terminalCode: terminal.terminalCode,
     agentToken: credential.agentToken,
     log: (line) => say(`  [网桥] ${line}`),
+    wakePrintQueue: simPrinter ? () => simPrinter.wake() : undefined,
   })
   say(`  演示终端 ${terminal.terminalCode} 已登记`)
 
@@ -315,7 +338,7 @@ async function start() {
     partner: `http://127.0.0.1:${ports.partner}/`,
     api: `http://127.0.0.1:${ports.api}/api/v1/health`,
   }
-  writeAccountsFile({ urls, passwords: state.passwords, users: data.users })
+  writeAccountsFile({ urls, passwords: state.passwords, users: data.users, sim: options.simPrinter })
   const admin = data.users.find((u) => u.role === 'admin')
   const partner = data.users.find((u) => u.role === 'partner')
 
@@ -329,8 +352,11 @@ async function start() {
   say(` 服务端       ${urls.api}`)
   say('')
   say(` 演示账号也写在：${paths.accountsFile}`)
-  say(' 说明：AI 为模拟结果（未连接真实 AI 服务）；没有连接打印机，不会真的出纸；')
+  say(options.simPrinter
+    ? ` 说明：AI 为模拟结果（未连接真实 AI 服务）；打印由${SIM_PRINTER_NAME}接单，不会真的出纸；`
+    : ' 说明：AI 为模拟结果（未连接真实 AI 服务）；没有连接打印机，不会真的出纸；')
   say('       线上支付未开通；手机号登录的验证码会显示在本窗口。')
+  if (options.simPrinter) say(` 模拟缺纸：在 .demo 文件夹里新建空文件 ${SIM_PAPER_EMPTY_MARKER}；删掉即恢复。`)
   say(' 按 Ctrl+C 停止全部服务。')
   say('──────────────────────────────────────────────────────────────')
 }
@@ -357,18 +383,24 @@ function reset() {
 // ── 入口 ────────────────────────────────────────────────────────────────────
 
 const command = process.argv[2] ?? 'start'
+const flags = process.argv.slice(3)
 
 process.on('SIGINT', () => void shutdown(0))
 process.on('SIGTERM', () => void shutdown(0))
 if (process.platform === 'win32') process.on('SIGBREAK', () => void shutdown(0))
 
 try {
-  if (command === 'start') {
-    await start()
+  const unknownFlags = flags.filter((flag) => flag !== '--sim-printer')
+  if (unknownFlags.length > 0 || (command === 'reset' && flags.length > 0)) {
+    say(`不认识的参数：${flags.join(' ')}`)
+    say('用法：pnpm demo（启动）｜ pnpm demo:sim（启动并开模拟打印机）｜ pnpm demo:reset（清空演示数据）')
+    process.exitCode = 2
+  } else if (command === 'start') {
+    await start({ simPrinter: simPrinterEnabled(flags) })
   } else if (command === 'reset') {
     reset()
   } else {
-    say('用法：pnpm demo（启动）｜ pnpm demo:reset（清空演示数据）')
+    say('用法：pnpm demo（启动）｜ pnpm demo:sim（启动并开模拟打印机）｜ pnpm demo:reset（清空演示数据）')
     process.exitCode = 2
   }
 } catch (error) {

@@ -12,6 +12,11 @@
 // 不做的事（故意）：不上报心跳、不领打印任务、不碰打印机与扫描仪。
 // 所以一体机上的设备状态会如实显示「未连接」，打印任务不会被领走，
 // 页面上不会出现「已打印」。
+//
+// 例外：演示时打开了模拟打印机（--sim-printer，见 sim-printer.mjs），网桥再多接一条
+//   POST /local/print/wake  → 叫模拟打印机立刻领一次任务（照抄 qr-login-server.ts handlePrintWake：
+//                             必须带网桥令牌、只收 POST、不收查询参数，成功回 202）。
+// 没打开时这条和其它硬件接口一样如实回「不可用」。
 // ============================================================================
 
 import http from 'node:http'
@@ -45,7 +50,8 @@ function send(res, status, body, origin) {
 
 /**
  * @param {{ port: number, allowedOrigins: string[], bridgeToken: string, apiBaseUrl: string,
- *           terminalId: string, terminalCode: string, agentToken: string, log?: (line: string) => void }} options
+ *           terminalId: string, terminalCode: string, agentToken: string, log?: (line: string) => void,
+ *           wakePrintQueue?: () => { accepted: boolean, coalesced: boolean } }} options
  */
 export function startDemoBridge(options) {
   const { port, allowedOrigins, bridgeToken, apiBaseUrl, terminalId, terminalCode, agentToken } = options
@@ -104,6 +110,29 @@ export function startDemoBridge(options) {
         .catch(() => {
           send(res, 503, { success: false, error: { code: 'LOCAL_TERMINAL_BOOT_NOT_READY', message: '连不上本机演示服务端，请稍后重试' } }, origin)
         })
+      return
+    }
+
+    if (url.pathname === '/local/print/wake' && options.wakePrintQueue) {
+      if (!tokenMatches(req.headers['x-local-bridge-token'], bridgeToken)) {
+        send(res, 403, { success: false, error: { code: 'LOCAL_PRINT_BRIDGE_TOKEN_INVALID', message: '本机打印唤醒令牌校验失败' } }, origin)
+        return
+      }
+      if (req.method !== 'POST') {
+        send(res, 405, { success: false, error: { code: 'LOCAL_PRINT_METHOD_NOT_ALLOWED', message: '本机打印唤醒仅支持 POST' } }, origin)
+        return
+      }
+      if (url.search.length > 0) {
+        send(res, 400, { success: false, error: { code: 'LOCAL_PRINT_QUERY_NOT_ALLOWED', message: '本机打印唤醒不接受查询参数' } }, origin)
+        return
+      }
+      req.resume()
+      const result = options.wakePrintQueue()
+      if (!result?.accepted) {
+        send(res, 503, { success: false, error: { code: 'LOCAL_PRINT_WAKE_UNAVAILABLE', message: '本机打印任务调度暂不可用' } }, origin)
+        return
+      }
+      send(res, 202, { success: true, data: { accepted: true, coalesced: result.coalesced } }, origin)
       return
     }
 

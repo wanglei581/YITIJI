@@ -11,11 +11,16 @@
 //   5. 入口脚本跨平台：没有 bash 专用写法、没有写死本机路径，子进程用当前 node 直接起。
 //
 // 另外实跑一次演示网桥：只认演示一体机的 Origin，启动票必须带网桥令牌。
+// 以及可选的模拟打印机（--sim-printer）：默认关闭；打开后如实标注「演示」、不写真实型号，
+// 并对着一个假服务端实跑一遍心跳 / 领任务 / 下载校验 / 回写 /print-tasks/:id/status / 模拟缺纸。
 //
 // 只用 node 内置模块，可在 pnpm install 之前运行（CI「Repository integrity gate」步）。
 // ============================================================================
 
-import { readFileSync, readdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import http from 'node:http'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -32,6 +37,7 @@ import {
 } from './demo/lib/demo-config.mjs'
 import { startDemoBridge } from './demo/lib/local-bridge.mjs'
 import { allocatePorts } from './demo/lib/preflight.mjs'
+import { SIM_AGENT_VERSION, SIM_PAPER_EMPTY_MARKER, SIM_PRINTER_NAME, simPrinterEnabled, startSimPrinter } from './demo/lib/sim-printer.mjs'
 
 const repoRoot = join(fileURLToPath(new URL('.', import.meta.url)), '..')
 const failures = []
@@ -180,7 +186,7 @@ console.log('5. 入口脚本跨平台')
   const pkg = JSON.parse(read('package.json'))
   const demoScripts = Object.entries(pkg.scripts).filter(([k]) => k === 'demo' || k.startsWith('demo:'))
   check('根 package.json 有 demo / demo:start / demo:reset', ['demo', 'demo:start', 'demo:reset'].every((k) => k in pkg.scripts))
-  check('demo* 脚本只调 node scripts/demo/demo.mjs', demoScripts.every(([, v]) => /^node scripts\/demo\/demo\.mjs (start|reset)$/.test(v)),
+  check('demo* 脚本只调 node scripts/demo/demo.mjs', demoScripts.every(([, v]) => /^node scripts\/demo\/demo\.mjs (start( --sim-printer)?|reset)$/.test(v)),
     demoScripts.map(([k, v]) => `${k}=${v}`).join('; '))
   const dir = join(repoRoot, 'scripts', 'demo')
   const files = []
@@ -243,8 +249,110 @@ console.log('6. 演示网桥只认演示一体机')
     check('启动票必须带网桥令牌', noToken.status === 403)
     const usb = await fetch(`${base}/local/usb/status`, { headers: { Origin: origin } })
     check('硬件接口如实回「不可用」', usb.status === 503)
+    const wake = await fetch(`${base}/local/print/wake`, { method: 'POST', headers: { Origin: origin, 'X-Local-Bridge-Token': 'bridge-token-for-gate' } })
+    check('没开模拟打印机时打印唤醒如实回「不可用」', wake.status === 503)
   } finally {
     await bridge.close()
+  }
+}
+
+// ── 7. 模拟打印机（可选）─────────────────────────────────────────────────────
+console.log('7. 模拟打印机：默认关闭、如实标注、照抄终端程序协议')
+{
+  const pkg = JSON.parse(read('package.json'))
+  check('默认关闭：不带参数、不设环境变量时不开', simPrinterEnabled([], {}) === false && simPrinterEnabled([], { DEMO_SIM_PRINTER: '0' }) === false
+    && !pkg.scripts.demo.includes('--sim-printer') && !pkg.scripts['demo:start'].includes('--sim-printer'))
+  check('--sim-printer / DEMO_SIM_PRINTER=1 才打开，另有 demo:sim', simPrinterEnabled(['--sim-printer'], {}) && simPrinterEnabled([], { DEMO_SIM_PRINTER: '1' })
+    && pkg.scripts['demo:sim'] === 'node scripts/demo/demo.mjs start --sim-printer')
+  const entry = codeOnly(read('scripts/demo/demo.mjs'))
+  check('入口只在开关打开时启动模拟打印机', /if \(options\.simPrinter\) \{\s*\/\/[^\n]*\n\s*simPrinter = startSimPrinter\(/.test(read('scripts/demo/demo.mjs'))
+    && entry.includes('simPrinter: simPrinterEnabled(flags)'))
+  check('打印机名与心跳版本号都标「演示」', SIM_PRINTER_NAME.includes('演示') && SIM_AGENT_VERSION.includes('演示'), `${SIM_PRINTER_NAME} / ${SIM_AGENT_VERSION}`)
+  const demoFiles = []
+  const walkAll = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const full = join(d, e.name)
+      if (e.isDirectory()) walkAll(full)
+      else demoFiles.push(full)
+    }
+  }
+  walkAll(join(repoRoot, 'scripts', 'demo'))
+  const modelHits = demoFiles.filter((f) => /pantum|奔图|CM28\d\d/i.test(readFileSync(f, 'utf8'))).map((f) => relative(repoRoot, f))
+  check('演示包里不出现任何真实打印机型号（CLAUDE.md §3）', modelHits.length === 0, modelHits.join('、'))
+
+  // 假服务端：只认终端程序的三条接口，记下每一次请求。
+  const TOKEN = 'sim-gate-agent-token'
+  const pdf = Buffer.from('%PDF-1.4\n% demo gate file\n')
+  const sha = createHash('sha256').update(pdf).digest('hex')
+  const queue = []
+  const seen = { heartbeats: [], claims: 0, patches: [], other: [], badAuth: 0 }
+  const server = http.createServer((req, res) => {
+    let body = ''
+    req.on('data', (c) => { body += c })
+    req.on('end', () => {
+      const url = new URL(req.url, 'http://x')
+      const json = (status, data) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)) }
+      if (url.pathname === '/files/f1/content') { res.writeHead(200); res.end(pdf); return }
+      if (req.headers.authorization !== `Bearer ${TOKEN}` || req.headers['x-terminal-id'] !== 't_gate') { seen.badAuth += 1; json(401, {}); return }
+      if (req.method === 'PUT' && url.pathname === '/api/v1/terminals/t_gate/heartbeat') { seen.heartbeats.push(JSON.parse(body)); json(200, { acknowledged: true }); return }
+      if (req.method === 'POST' && url.pathname === '/api/v1/terminals/t_gate/tasks/claim') { seen.claims += 1; json(200, queue.splice(0, 1)); return }
+      const m = url.pathname.match(/^\/api\/v1\/print-tasks\/([^/]+)\/status$/)
+      if (req.method === 'PATCH' && m) { seen.patches.push({ taskId: m[1], ...JSON.parse(body) }); json(200, { acknowledged: true }); return }
+      seen.other.push(`${req.method} ${url.pathname}`)
+      json(404, {})
+    })
+  })
+  await new Promise((r) => server.listen(0, '127.0.0.1', r))
+  const apiOrigin = `http://127.0.0.1:${server.address().port}`
+  const task = (taskId, fileMd5) => ({ taskId, type: 'print', fileUrl: '/files/f1/content', fileMd5, fileName: 'a.pdf', mimeType: 'application/pdf', params: { copies: 1 } })
+  queue.push(task('T_OK', sha), task('T_BAD', 'f'.repeat(64)))
+  const workDir = mkdtempSync(join(tmpdir(), 'demo-sim-gate-'))
+  const lines = []
+  const until = async (fn, ms = 8_000) => {
+    const end = Date.now() + ms
+    while (Date.now() < end) {
+      if (fn()) return true
+      await new Promise((r) => setTimeout(r, 25))
+    }
+    return false
+  }
+  const sim = startSimPrinter({ apiBaseUrl: `${apiOrigin}/api/v1`, terminalId: 't_gate', agentToken: TOKEN, workDir,
+    log: (l) => lines.push(l), heartbeatIntervalMs: 60_000, claimIntervalMs: 80, markerPollMs: 40, simulatedPrintMs: 10 })
+  const bridge = await startDemoBridge({ port: 0, allowedOrigins: ['http://127.0.0.1:5373'], bridgeToken: 'gate-bridge', apiBaseUrl: `${apiOrigin}/api/v1`,
+    terminalId: 't_gate', terminalCode: 'DEMO-001', agentToken: TOKEN, wakePrintQueue: () => sim.wake() })
+  try {
+    const statuses = (id) => seen.patches.filter((p) => p.taskId === id).map((p) => p.status)
+    await until(() => statuses('T_OK').includes('completed') && statuses('T_BAD').includes('failed'))
+    const hb = seen.heartbeats[0] ?? {}
+    check('心跳走 PUT /terminals/:id/heartbeat，带终端凭证，报「演示」版本号与 ready', hb.status === 'online' && hb.printerStatus === 'ready' && hb.agentVersion === SIM_AGENT_VERSION && seen.badAuth === 0,
+      JSON.stringify(hb))
+    check('领任务走 POST /terminals/:id/tasks/claim', seen.claims >= 2)
+    check('回写走 PATCH /print-tasks/:id/status：printing → completed', JSON.stringify(statuses('T_OK')) === '["printing","completed"]', JSON.stringify(statuses('T_OK')))
+    check('只调用终端程序的三条接口，没有别的写入', seen.other.length === 0, seen.other.join(','))
+    const outLine = `${SIM_PRINTER_NAME}：任务 T_OK 已模拟出纸，未真实打印`
+    check('每次「出纸」打印一行如实说明', lines.includes(outLine), lines.join(' / '))
+    const bad = seen.patches.find((p) => p.taskId === 'T_BAD') ?? {}
+    check('文件真的下载并做 SHA-256 校验：哈希不符回写 failed 且不「出纸」', bad.status === 'failed' && bad.errorCode === 'DOWNLOAD_HASH_MISMATCH'
+      && !statuses('T_BAD').includes('printing') && !lines.some((l) => l.includes('T_BAD 已模拟出纸')))
+    check('终端凭证不出现在输出里', !lines.some((l) => l.includes(TOKEN)))
+
+    writeFileSync(join(workDir, SIM_PAPER_EMPTY_MARKER), '')
+    const paperEmptyBeat = await until(() => seen.heartbeats.some((h) => h.printerStatus === 'paper_empty'))
+    check('放缺纸标记后立刻补一次心跳，printerStatus=paper_empty', paperEmptyBeat)
+    queue.push(task('T_PAPER', sha))
+    const wake = await fetch(`http://127.0.0.1:${bridge.server.address().port}/local/print/wake`, { method: 'POST', headers: { Origin: 'http://127.0.0.1:5373', 'X-Local-Bridge-Token': 'gate-bridge' } })
+    check('打开模拟打印机后，网桥的打印唤醒回 202', wake.status === 202)
+    await until(() => statuses('T_PAPER').includes('failed'))
+    const paper = seen.patches.find((p) => p.taskId === 'T_PAPER') ?? {}
+    check('缺纸时领到的任务回写 failed + PAPER_EMPTY，不「出纸」', paper.errorCode === 'PAPER_EMPTY' && !statuses('T_PAPER').includes('printing'), JSON.stringify(paper))
+    rmSync(join(workDir, SIM_PAPER_EMPTY_MARKER))
+    const n = seen.heartbeats.length
+    check('删掉标记即恢复，心跳回到 ready', await until(() => seen.heartbeats.slice(n).some((h) => h.printerStatus === 'ready')))
+  } finally {
+    await sim.close()
+    await bridge.close()
+    await new Promise((r) => server.close(r))
+    rmSync(workDir, { recursive: true, force: true })
   }
 }
 

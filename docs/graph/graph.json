@@ -21171,6 +21171,10 @@
       "scripts/demo/demo.mjs",
       "scripts/verify-demo-kit.mjs"
     ],
+    "scripts/demo/lib/sim-printer.mjs": [
+      "scripts/demo/demo.mjs",
+      "scripts/verify-demo-kit.mjs"
+    ],
     "scripts/demo/seed-demo.ts": [
       "scripts/verify-demo-kit.mjs"
     ],
@@ -29689,7 +29693,8 @@
         "files": [
           "scripts/demo/lib/demo-config.mjs",
           "scripts/demo/lib/local-bridge.mjs",
-          "scripts/demo/lib/preflight.mjs"
+          "scripts/demo/lib/preflight.mjs",
+          "scripts/demo/lib/sim-printer.mjs"
         ],
         "missing": []
       },
@@ -29700,6 +29705,7 @@
       "scriptNames": [
         "ai-job-print-terminal::demo",
         "ai-job-print-terminal::demo:reset",
+        "ai-job-print-terminal::demo:sim",
         "ai-job-print-terminal::demo:start"
       ],
       "wired": true
@@ -29740,6 +29746,20 @@
         "missing": []
       },
       "file": "scripts/demo/lib/preflight.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/demo/lib/sim-printer.mjs",
       "helper": true,
       "inCi": false,
       "package": "",
@@ -30032,6 +30052,7 @@
           "scripts/demo/lib/demo-config.mjs",
           "scripts/demo/lib/local-bridge.mjs",
           "scripts/demo/lib/preflight.mjs",
+          "scripts/demo/lib/sim-printer.mjs",
           "scripts/demo/seed-demo.ts"
         ],
         "missing": []

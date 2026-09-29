@@ -41,7 +41,7 @@ _（空）_
 | `apps/kiosk/scripts/probe-ai-resume-closure-42.mjs` | `@ai-job-print/kiosk::verify:probe-ai-resume-closure-42` |
 | `apps/kiosk/scripts/probe-file-closure-43.mjs` | `@ai-job-print/kiosk::verify:probe-file-closure-43` |
 | `apps/kiosk/scripts/probe-member-session-41.mjs` | `@ai-job-print/kiosk::verify:probe-member-session-41` |
-| `scripts/demo/demo.mjs` | `ai-job-print-terminal::demo`<br/>`ai-job-print-terminal::demo:reset`<br/>`ai-job-print-terminal::demo:start` |
+| `scripts/demo/demo.mjs` | `ai-job-print-terminal::demo`<br/>`ai-job-print-terminal::demo:reset`<br/>`ai-job-print-terminal::demo:sim`<br/>`ai-job-print-terminal::demo:start` |
 | `scripts/generate-project-graph.mjs` | `ai-job-print-terminal::graph`<br/>`ai-job-print-terminal::graph:check` |
 | `scripts/project-graph-query.mjs` | `ai-job-print-terminal::graph:query` |
 | `scripts/verify-deploy-authorization-gate.mjs` | `ai-job-print-terminal::verify:deploy-authorization-gate` |
@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1585 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1586 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1682,13 +1682,14 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>scripts/demo/lib/</code> — 3 个文件</summary>
+<summary><code>scripts/demo/lib/</code> — 4 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `scripts/demo/lib/demo-config.mjs` | `demo.mjs`<br/>`verify-demo-kit.mjs` |
 | `scripts/demo/lib/local-bridge.mjs` | `demo.mjs`<br/>`verify-demo-kit.mjs` |
 | `scripts/demo/lib/preflight.mjs` | `demo.mjs`<br/>`verify-demo-kit.mjs` |
+| `scripts/demo/lib/sim-printer.mjs` | `demo.mjs`<br/>`verify-demo-kit.mjs` |
 
 </details>
 

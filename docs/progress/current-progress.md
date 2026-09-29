@@ -7,6 +7,7 @@
 - **终端身份：** 演示终端走服务端现成的 `/auth/terminal/register` 拿凭证；一个只监听 127.0.0.1 的演示网桥替代终端程序本机接口里的「终端身份」「启动票」两条，其余如实回「演示环境不可用」。不发心跳、不领打印任务，所以一体机如实显示「打印机离线」，不会出现「已打印」。
 - **门禁：** `verify:demo-kit`（只用 node 内置模块，接进 CI「Repository integrity gate」步）。
 - **已知限制：** 一体机首页品牌区是固定文案，没有「演示」字样（没改页面）；一体机按真实终端规则不弹文件选择框，U 盘、扫码登录不可用；Windows 上未实机跑过。
+- **追加：可选模拟打印机（`pnpm demo:sim` / `--sim-printer` / `DEMO_SIM_PRINTER=1`，默认关闭）：** `scripts/demo/lib/sim-printer.mjs` 照抄终端程序协议（`PUT /terminals/:id/heartbeat`、`POST /terminals/:id/tasks/claim`、`PATCH /print-tasks/:id/status`，真的下载文件并做 SHA-256 校验，只是不送打印机，每单打印「（演示）模拟打印机：任务 xxx 已模拟出纸，未真实打印」）；`.demo/sim-printer-paper-empty` 标记文件模拟缺纸（心跳 `printerStatus=paper_empty` → 后台派生「打印机缺纸」告警，删文件即恢复）；网桥在开启时接 `/local/print/wake`。服务端、一体机页面未改。本机实跑：一体机匿名打印「手机扫码上传 → 材料检查 → 预览 → 参数 → 报价 0 元 → 建单 → 模拟出纸 → 完成 → 清场」走通，Order `paid/completed`、PrintTask `completed`，后台订单可见、终端在线；缺纸告警出现并随恢复消失。`verify:demo-kit` 增加第 7 节（默认关闭、标「演示」、无真实型号、对假服务端实跑协议与缺纸）。
 
 ## 2026-09-29 凌晨：2.0 稿定为最终版（收尾中）；第三波试点 16、06 运行页对齐稿
 
