@@ -18,6 +18,7 @@ import {
   MemberAssetsApiError,
   updateMyDocumentRetention,
 } from '../../../services/api/memberAssets'
+import { documentsLoggedInTruth, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import { useAuth } from '../../../auth/useAuth'
 import { FileContentPreview } from '../../../components/FileContentPreview'
 import { formatTime } from '../assets/format'
@@ -460,7 +461,11 @@ export function MyDocumentsPage() {
       eyebrow="MY FILES & ORDERS"
       ask={<>你的文件，<em>随时接着办</em>。</>}
       doing={DOING[uiState]}
-      truth="这里只显示当前登录账号的文档；数量与保存期限一律由系统返回。"
+      truth={
+        isLoggedIn
+          ? documentsLoggedInTruth(resultIdleLogoutLabel())
+          : '这里只显示当前登录账号的文档；数量与保存期限一律由系统返回。'
+      }
       toast={hint}
       ctabar={ctabar}
     >

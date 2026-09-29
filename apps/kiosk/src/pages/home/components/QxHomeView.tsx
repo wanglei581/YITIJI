@@ -23,6 +23,8 @@ import type { RecruitmentHostingState } from '../../../hooks/useRecruitmentHosti
 import type { SmartCampusCapabilityState } from '../../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../../hooks/useTerminalDeviceStatus'
 import type { ToolboxCapabilityState } from '../../../hooks/useToolboxConfig'
+import { hasKioskSensitiveSession } from '../../../auth/kioskSensitiveSession'
+import { homeStandbyNote, publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import { rememberAssistantDraft } from '../../../services/assistantDraft'
 import { useTerminalKiosk } from '../../../services/api/screensaver'
 import type { HomeV6ActionId } from '../homeV6Domains'
@@ -34,12 +36,6 @@ import { HomeTile } from './HomeTile'
 
 const ASSISTANT_VOICE_ENTRY = import.meta.env.VITE_USE_TRTC_CALL === 'true'
 const HOME_ASK_DRAFT = '我想办一件事，请告诉我从哪一项开始。'
-
-function idleLogoutMinutes(): number {
-  const raw = Number(import.meta.env.VITE_KIOSK_LOGOUT_IDLE_SEC)
-  const sec = Number.isFinite(raw) && raw > 0 ? raw : 180
-  return Math.max(1, Math.round(sec / 60))
-}
 
 function greetingWord(date: Date): string {
   const hour = date.getHours()
@@ -62,6 +58,7 @@ function capabilityMark(
 
 interface QxHomeViewProps {
   isLoggedIn: boolean
+  guestMode: boolean
   displayName: string
   device: TerminalDeviceStatusView
   toolbox: ToolboxCapabilityState
@@ -123,6 +120,7 @@ export function QxHomeNavbar({ onAction }: Pick<QxHomeViewProps, 'onAction'>) {
 
 export function QxHomeView({
   isLoggedIn,
+  guestMode,
   displayName,
   device,
   toolbox,
@@ -161,6 +159,10 @@ export function QxHomeView({
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
   const hello = isLoggedIn && displayName ? `${displayName}，${greeting}` : greeting
+  const standbyNote = homeStandbyNote(
+    { isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() },
+    publicIdleLogoutLabel(),
+  )
 
   return (
     <div
@@ -209,7 +211,7 @@ export function QxHomeView({
             <span className="qx-home-context-icon" aria-hidden="true"><HistoryIcon /></span>
             <span>
               <strong>这台机器上没有待继续的办理</strong>
-              <small>从下面选一项重新开始，不会显示上一位使用者的资料</small>
+              <small>{standbyNote}</small>
             </span>
           </div>
         </div>
@@ -300,7 +302,9 @@ export function QxHomeView({
             <span aria-hidden="true">·</span>
             {kiosk ? <span>鲁公网安备37021402007308号</span> : (<a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer noopener">鲁公网安备37021402007308号</a>)}
             <span aria-hidden="true">·</span>
-            <span>离开 {idleLogoutMinutes()} 分钟自动退出登录</span>
+            <span>离开 {publicIdleLogoutLabel()} 无操作自动退出登录</span>
+            <span aria-hidden="true">·</span>
+            <span>打开本人文档、诊断报告或优化结果后 {resultIdleLogoutLabel()} 无操作自动退出</span>
           </p>
         </div>
       </footer>

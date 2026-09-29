@@ -286,6 +286,18 @@ check(
   kioskRoot.includes('<KioskStageFit enabled={!usesFluidViewport}>') && kioskRoot.includes("'/'"),
   '1080×1920 舞台缩放能力未被替换'
 )
+check(viewOnly.includes('homeStandbyNote('), '首页待机说明走同一套判定，不把「看不到上一位」写死')
+check(viewOnly.includes('publicIdleLogoutLabel()'), '首页退出时长引用公共空闲计时')
+check(viewOnly.includes('resultIdleLogoutLabel()'), '首页同时写出本人文档、诊断报告、优化结果的更短时长')
+check(!viewOnly.includes('idleLogoutMinutes'), '首页不再自算分钟数')
+check(!viewOnly.includes('VITE_KIOSK_LOGOUT_IDLE_SEC'), '首页不再自己读退出时长')
+check(!/离开\s*3\s*分钟/.test(viewOnly), '首页不再写死「离开 3 分钟」')
+check(!viewOnly.includes('不会显示上一位使用者的资料'), '「不会显示上一位」只留在干净机器的判定里，不写死在首页')
+check(
+  viewOnly.includes('打开本人文档、诊断报告或优化结果后'),
+  '首页写明哪些页面用更短的自动退出'
+)
+
 check(
   home.split('\n').length < 120 &&
     viewOnly.split('\n').length < 320 &&

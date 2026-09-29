@@ -335,8 +335,8 @@ export function PrintDonePage() {
     return (
       <QxPageFrame
         title="这趟办完了"
-        subtitle="本机上的本次打印文件预览和记录已清除"
-        status={{ tone: 'ok', label: '这次办理已清空' }}
+        subtitle="这次打印的预览已从这台机器收起，登录还在"
+        status={{ tone: 'ok', label: '预览已收起' }}
         terminalLabel="就业服务大厅"
         ctabar={
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/')}>
@@ -346,7 +346,7 @@ export function PrintDonePage() {
         navbar={navbar}
       >
         <div data-w2-page="print-done" data-print-flow-step={6} className="qx-scroll pff-page">
-          <PrintDoneXq ask="这趟办完了。" doing={<>本机上的本次打印文件预览和记录<b>已清除</b>。愿你求职顺利，下次再见。</>} />
+          <PrintDoneXq ask="这趟办完了。" doing={<>本机这次打印的文件预览已收起。账号还登录着，本人文档和订单仍可在「我的」里看到。离开前请点结束使用。</>} />
         </div>
       </QxPageFrame>
     )
@@ -658,7 +658,7 @@ export function PrintDonePage() {
               setWipeArmed(true)
             }}
           >
-            {wipeArmed ? '再按一次，确认清空这台机器上的数据' : '我拿走了，结束并清空'}
+            {wipeArmed ? '再按一次，确认收起这次预览' : '我拿走了，收起这次预览'}
           </button>
         </>
       }
@@ -737,12 +737,12 @@ export function PrintDonePage() {
 
         <div className="pff-wipe" data-live="true">
           <div>
-            <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />空闲超时自动清空</div>
-            <p className="pff-wipe-s">你不再操作这台机器后，本机上的文件预览和记录会被清除，下一个人看不到。也可以现在手动清。</p>
+            <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />一会儿收起这次预览</div>
+            <p className="pff-wipe-s">不再点屏幕后，这台机器上的本次打印预览会收起。账号不会因此退出。也可以现在就收起。</p>
           </div>
           <div className="pff-wipe-n">
             <div className="n">{idleLeft}</div>
-            <div className="u">秒空闲后自动清空</div>
+            <div className="u">秒后收起预览</div>
           </div>
         </div>
 

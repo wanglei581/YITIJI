@@ -72,6 +72,21 @@ const checks = [
   ['W6 直达完成页预期为无法确认', () => {
     assert.match(routeCasesSource, /pattern:\s*'\/print\/done'[\s\S]*?featureText:\s*'无法确认打印结果'/)
   }],
+  ['空闲后只收起本次预览，不说已经清场或退出登录', () => {
+    const wipe = doneRuntime.match(/const doWipe = useCallback\(\(\) => \{[\s\S]*?\}, \[\]\)/)
+    assert.ok(wipe, '完成页仍有 doWipe')
+    assert.match(wipe[0], /clearPrintMaterialSession\(\)/)
+    assert.doesNotMatch(wipe[0], /logout\s*\(/)
+    assert.match(doneRuntime, /setIdleLeft\(60\)/)
+    assert.match(doneRuntime, /登录还在/)
+    assert.match(doneRuntime, /账号还登录着/)
+    assert.match(doneRuntime, /收起这次预览/)
+    assert.match(doneRuntime, /账号不会因此退出/)
+    assert.doesNotMatch(
+      doneRuntime,
+      /隐私已清除|下一个人看不到|这次办理已清空|结束并清空|空闲超时自动清空|秒空闲后自动清空|已清除/,
+    )
+  }],
   ['出纸后提醒核对并取走', () => {
     // 稿 15 completed 只留一句「都打好了，拿走前核一下」，不再并列「请取走文件 / 请取走纸张」。
     assert.match(doneSource, /都打好了，拿走前核一下/)
