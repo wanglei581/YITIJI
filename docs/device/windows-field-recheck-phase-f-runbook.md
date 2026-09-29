@@ -1,5 +1,7 @@
 # WINDOWS_FIELD_RECHECK — 现场 Phase F 核对清单
 
+> **KSK-001 是测试机（2026-09-29 补注）**：笔记本 + 戴尔 27 寸横屏非触摸显示器，一体机页面跑在远程工具的 1680×1055 虚拟屏里，未按母盘清单装机。本文在 KSK-001 上得出的结论（尤其界面、触控、系统键盘、锁机、断电恢复相关）都要在最终硬件（27 寸竖屏触摸屏 + 按 [母盘清单](windows-golden-image-and-install-checklist.md) 装机）上复验，见 `docs/progress/next-tasks.md`「Windows 真机 KSK-001 远程审查增补」。
+>
 > 最后更新：2026-07-25  
 > 授权包名：`WINDOWS_FIELD_RECHECK`  
 > 终端：`t_ksk_001` / `KSK-001`  

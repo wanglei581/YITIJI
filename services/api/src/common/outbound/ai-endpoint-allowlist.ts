@@ -120,7 +120,7 @@ export interface AiEndpointVerdict {
   reason?: AiEndpointRejectReason
 }
 
-type EnvLike = Readonly<Record<string, string | undefined>>
+export type EnvLike = Readonly<Record<string, string | undefined>>
 
 const logger = new Logger('AiEndpointAllowlist')
 
@@ -219,7 +219,8 @@ export function hostMatchesAllowlist(host: string, allowlist: readonly string[])
   )
 }
 
-function isLoopbackHost(host: string): boolean {
+/** 回环地址（本机）。后台模型地址校验（llm-base-url.ts）也用它，两处口径必须一致。 */
+export function isLoopbackHost(host: string): boolean {
   if (host === 'localhost') return true
   const family = isIP(host)
   if (family === 4) return host.startsWith('127.')

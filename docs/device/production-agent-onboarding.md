@@ -36,7 +36,7 @@ powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\install-p
 
 重装未显式传值时，脚本只从 ACL 已受保护的现有配置保留 `scanWatchFolder`、`localApiAllowedOrigins`、`localApiPort` 与 `localApiBridgeToken`。生产默认只保留 API 同源 Origin 和显式传入的一体机 Origin；`http://localhost:5173`、`http://127.0.0.1:5173` 只有在临时现场调试时显式增加 `-AllowLocalDevelopmentOrigins` 才会写入。需要撤销已下线、失控或误配的历史 Origin 时，增加 `-ReplaceLocalApiAllowedOrigins` 并传入新的完整额外 Origin 列表；仅传替换开关而不传列表，可清除全部历史额外 Origin。`-KioskOrigins` / `-ReplaceKioskOrigins` 仅为旧命令兼容别名，新运维记录统一使用正式参数，禁止直接编辑受保护配置。
 
-安装脚本还会把一体机 Origin 写入 Edge 的 `LocalNetworkAccessAllowedForUrls`、`AudioCaptureAllowedUrls`，并写入 `AllowFileSelectionDialogs=0`。现场必须在 `edge://policy` 确认策略生效；这些是整机策略，只能用于专用一体机。撤销可用 `-RemoveEdgeKioskPolicies`，或按受控卸载脚本删除三项策略。
+安装脚本还会把一体机 Origin 写入 Edge 的 `LocalNetworkAccessAllowedForUrls`、`AudioCaptureAllowedUrls`，并写入 `AllowFileSelectionDialogs=0`。现场必须在 `edge://policy` 确认策略生效；这些是整机策略，只能用于专用一体机。撤销可用 `-RemoveEdgeKioskPolicies`，或按受控卸载脚本删除三项策略。测试机同时是个人工作电脑时（如 KSK-001），加 `-KeepFileSelectionDialogs`：不写 `AllowFileSelectionDialogs`、并去掉已有的禁用值，否则那台电脑上的普通 Edge 也选不了文件；专用一体机不得加这个开关（2026-09-29）。
 
 如果 token 已经保存在 `%ProgramData%\AIJobPrintAgent\agent.token`：
 

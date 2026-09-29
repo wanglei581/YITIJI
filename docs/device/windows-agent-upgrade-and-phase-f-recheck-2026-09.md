@@ -1,5 +1,7 @@
 # Windows 一体机 Agent 升级 + Phase F 复验执行单（2026-09）
 
+> **KSK-001 是测试机（2026-09-29 补注）**：笔记本 + 戴尔 27 寸横屏非触摸显示器，一体机页面跑在远程工具的 1680×1055 虚拟屏里，未按母盘清单装机。本文在 KSK-001 上得出的结论（尤其界面、触控、系统键盘、锁机、断电恢复相关）都要在最终硬件（27 寸竖屏触摸屏 + 按 [母盘清单](windows-golden-image-and-install-checklist.md) 装机）上复验，见 `docs/progress/next-tasks.md`「Windows 真机 KSK-001 远程审查增补」。
+>
 > 版本：安装包 `main@5bff1bc42`（CI run `34026906605`）· 线上 API `891492396`（含 #833 可信终端身份总闸门）
 > 执行人：____ · 核对人：____ · 日期：____
 > 本单是「到了机器旁按序做什么」；通过标准与勾选项仍以
@@ -98,7 +100,7 @@ sc.exe qc aijobprintagent.exe
 - [ ] 从 Mac 只读旁证（本机 `*.sslip.io` 被劫持，公网一律 `--resolve`）：
 
   ```bash
-  curl -s --resolve zyidai.cn:443:120.48.13.190 https://zyidai.cn/api/v1/terminals/t_ksk_001/printer-status
+  curl -s --resolve zyidai.cn:443:<生产服务器 IP> https://zyidai.cn/api/v1/terminals/t_ksk_001/printer-status
   ```
 
   期望 `isOnline=true`，`lastSeenAt` 为当前时间，`printerStatus=ready`。

@@ -34,6 +34,8 @@ Page({
     submitting: false,
     codeHint: '',
     returnTo: '',
+    // 正式版取不到已发布的协议（C4）：先说清楚，不让人交出手机号之后才失败。
+    legalBlocked: false,
   },
 
   onLoad(options) {
@@ -42,6 +44,43 @@ Page({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || fallback() || 20,
       returnTo: safeReturnTo(options && options.returnTo),
     })
+    this._checkLegal()
+  },
+
+  /**
+   * 正式版协议没发布就拦住登录（C4）。只认 LEGAL_DOCS_NOT_PUBLISHED；网络失败不下结论，
+   * 真去登录时会照实失败。开发版、体验版回落草稿版本号，这里不会拦（见 utils/api-legal-consent.js）。
+   */
+  _checkLegal() {
+    api.getLegalVersions().then(
+      () => this.setData({ legalBlocked: false }),
+      (err) => { if (err && err.code === 'LEGAL_DOCS_NOT_PUBLISHED') this.setData({ legalBlocked: true }) },
+    )
+  },
+
+  _explainLegalBlocked() {
+    wx.showModal({
+      title: '暂时不能登录',
+      content: '服务协议还没有正式发布，发布前不能登录。不登录也可以看使用帮助和打印指引，也可以扫一体机屏幕上的码，把文件传到一体机打印。',
+      showCancel: false,
+      confirmText: '知道了',
+    })
+  },
+
+  /** 服务端登录时才发现协议没发布（例如体验版连着生产）：同样拦住并说清楚。 */
+  _handleLoginError(err) {
+    if (!err || err.code !== 'LEGAL_DOCS_NOT_PUBLISHED') return false
+    this.setData({ legalBlocked: true, showSms: false })
+    this._explainLegalBlocked()
+    return true
+  },
+
+  /**
+   * 登录成功后对一次账：勾选行写着「并确认已年满 14 周岁」，登录即声明；
+   * 本机未登录时同意过的录音同意补写到账号里，在别处撤回的以撤回为准。失败不影响登录。
+   */
+  _syncDeclarations() {
+    api.syncAiDeclarationsAfterLogin()
   },
 
   onUnload() {
@@ -51,6 +90,7 @@ Page({
   // ── 微信一键登录 ──────────────────────────────────────────────────
 
   onGetPhoneNumber(e) {
+    if (this.data.legalBlocked) { this._explainLegalBlocked(); return }
     if (!this.data.agreed) {
       wx.showToast({ title: '请先阅读并同意服务协议和隐私政策', icon: 'none' })
       return
@@ -70,11 +110,13 @@ Page({
           wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })
           return
         }
+        this._syncDeclarations()
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => this._afterLogin(), 600)
       })
       .catch(err => {
         wx.hideLoading()
+        if (this._handleLoginError(err)) return
         wx.showToast({ title: (err && err.message) || '微信登录失败，请用短信验证码', icon: 'none' })
         setTimeout(() => this.setData({ showSms: true }), 1200)
       })
@@ -83,6 +125,7 @@ Page({
   // ── 短信验证码登录（内嵌，不跳页面）──────────────────────────────
 
   tapSmsLogin() {
+    if (this.data.legalBlocked) { this._explainLegalBlocked(); return }
     if (!this.data.agreed) {
       wx.showToast({ title: '请先阅读并同意服务协议和隐私政策', icon: 'none' })
       return
@@ -162,12 +205,14 @@ Page({
           wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })
           return
         }
+        this._syncDeclarations()
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => this._afterLogin(), 600)
       })
       .catch(err => {
         wx.hideLoading()
         this.setData({ submitting: false, code: '', otp: ['','','','','',''] })
+        if (this._handleLoginError(err)) return
         wx.showToast({ title: (err && err.message) || '登录失败，请重试', icon: 'none' })
       })
   },

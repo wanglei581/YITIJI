@@ -58,6 +58,8 @@ Program Files\\AIJobPrintAgent\\
 
 MSI 以管理员权限安装二进制并建立 `%ProgramData%\AIJobPrintAgent`，但未 Provisioning 时只注册 Manual/Stopped 服务，不写 token、配置或领取打印任务。独立 Provisioner 成功后才通过既有加固逻辑写入受 ACL 保护的配置与 DPAPI token，并把服务切换为 Automatic/Running；WinSW 继续使用既有 60 秒、300 秒恢复策略。
 
+已绑定终端（生产安装脚本在绑定成功后写入 `HKLM\SOFTWARE\AIJobPrint\Agent` 的 `Bound=1`）升级或修复时，MSI 用四个固定的系统 `sc.exe` 动作恢复自动启动、失败重启策略与 failureflag，并尽力启动一次；四个动作失败一律忽略，启动失败不会让安装回滚（真机-7，2026-09-29 合入；Windows CI 的 MSI 生命周期测试覆盖已绑定修复）。未绑定时行为不变。这是安装包里唯一允许的自定义动作，门禁 `verify-installer-inputs.mjs` 只放行这四个、只许调用系统 sc.exe。
+
 MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理员密钥。不得把 BindCode 放入 `msiexec` 命令行、MSI public property、CustomActionData、安装日志或注册表。
 
 安装完成后，由独立的本地 Provisioner 通过安全交互输入 BindCode，复用既有 `/auth/terminal/exchange-bind-code` 和 DPAPI LocalMachine 落盘能力。Provisioner 仅输出脱敏结果；成功后执行只读健康检查并由 Admin 确认心跳。Provisioner 的具体 UI/CLI、批量激活和远程下发另立任务，不随本设计实现。
@@ -141,3 +143,37 @@ Bundle 不声明可覆盖变量、MSI 属性、命令行透传或自定义动作
 构建顺序固定为 staging -> MSI -> EXE。`build-exe.ps1` 只接受唯一 MSI 输入并强制输出名；Windows CI 保留既有 required job 标识，新增 EXE build 和 install/repair/uninstall 生命周期验证，同时上传 MSI、EXE、manifest 和两套日志。macOS 上 WiX Burn 明确不支持生成 Windows 引导器，所以本地只运行静态契约和 NuGet 还原检查；EXE 产物、哈希和生命周期必须以 Windows 2022 CI/VM 为证据。
 
 本候选仍为 **NO-GO 发布候选**：在 Windows CI 全绿、企业 Authenticode 双重签名（内嵌 MSI 与外层 EXE）、签名者指纹/时间戳/发布 manifest 校验、Provisioner GUI 和至少一台隔离 Windows 真机验收完成前，不得把该 EXE 发给在役终端作为正式商用安装包。
+
+## 10. 代码签名：试点不花钱，客户电脑前买 OV（2026-09-29 定口径）
+
+> 依据：learn.microsoft.com《Code signing options》（2026-08-29 版）、SmartScreen 信誉、智能应用控制 FAQ、SignTool 与时间戳文档，CA/B Forum 代码签名基线要求，各 CA 价目页（价格为 2026-09-29 标价，汇率按 1 美元约 7.1 元粗估）。口径由总指挥 9/29 按产品负责人「有没有免费的」定下；买哪家、何时买由产品负责人拍板。
+
+**事实。** 公开受信的代码签名证书没有免费的（唯一免费的 SignPath Foundation 只给 OSI 许可的开源项目，我们不符合）；微软 Artifact Signing 只对美国、加拿大、欧盟、英国等地的机构开放且收费，中国注册的公司用不了。2023-06-01 起私钥必须在硬件（令牌、云 HSM、签名服务）里；2026-03-01 起单张证书最长 460 天。微软 2024 年起不再给 EV 首次下载免警告，OV 就够，EV 只在客户招标指定或将来做驱动时才需要。
+
+**试点（公司自有主机）：一分钱不花。**
+- 不买证书，也**不做**「内部根证书 + 试点机装根」这条路：它在试点后就作废，而且内部根无法吊销，装到兼作工作电脑的 KSK-001 上风险大。现有 `new-internal-code-signing-certificates.ps1`（CI 临时证书）与 `install-internal-code-signing-trust.ps1`（只许装在 GitHub 托管的 CI 机器）保持原样，只用于验证签名流程。
+- 安装包由我们用 U 盘或在本机安装，不走浏览器下载：没有网络来源标记，SmartScreen 不会拦。安装时 UAC 显示「未知发布者」，只有装机的人看得到，用户看不到。
+- 试点机关闭智能应用控制（SAC 只认受信任根计划内 CA 签的文件）。微软 FAQ 写明现在关掉后可以在「Windows 安全中心」重新打开，不用重装系统。**这一步由产品负责人本人做或他授权后做**，见母盘清单 A14。
+- 现有安装流程（MSI、生产安装脚本、看门狗、Agent 运行）不依赖签名受信任，已按代码核对（候选里只有发布签名流水线本身调用 `Get-AuthenticodeSignature`）。
+
+**在线升级（D-02）依赖系统信任链——接入前要改。** 更新器还在分支 `codex/windows-agent-online-update`，没进候选。它的 `terminal-update-helper.ps1` 在安装前要求 `Get-AuthenticodeSignature` 状态为 Valid，并比对发布者指纹与名称，否则报 `UPDATE_SIGNATURE_INVALID` 拒装；跳过签名的测试入口只许在 CI 里用。没有证书的试点机上，它会拒绝所有升级包。接入 D-02 时改为：配置了发布者指纹才校验 Authenticode；**我们自己密钥签发的更新清单与安装包 SHA-256 校验始终保留、不可关闭**（这才是完整性的保证）。
+
+**更新清单签名私钥的保管（没有证书时它是唯一防线）。** 分支里的设计：RSA ≥2048 位，私钥由 `create-update-manifest.ps1` 读取签清单，公钥在打包时由 `inject-update-policy.ps1` 钉进安装包里的更新助手。接 D-02 时照下面执行：
+- 放在哪：私钥只放在离线加密的 U 盘上，另存一份备份放在不同地点的保险柜；不进仓库、不进 CI 密钥、不进聊天与网盘，签名只在一台不上网的专用电脑上做。
+- 谁能用：产品负责人本人，外加他书面指定的一名发布负责人；每次签发记录版本、时间、人、安装包 SHA-256。
+- 丢了怎么办：公钥钉在已装好的安装包里，**私钥丢失后在线升级就签不出来了**，要用备份恢复；备份也丢了，只能生成新密钥对、打新安装包，逐台用 U 盘重装。
+- 泄露了怎么办：拿到私钥又能控制更新下载地址的人可以给所有终端推包，所以立即停用在线升级（后台关闭更新通道），生成新密钥对，逐台用 U 盘装带新公钥的安装包，旧公钥作废。
+
+**装到客户或学校自己的电脑之前：买 OV，证书费写进首单报价。** 两个选项的材料与步骤：
+
+| 项 | GlobalSign 中国站 | SSL.com |
+|---|---|---|
+| 价格 | OV 3,488 元/年（人民币发票） | OV 129 美元/年 + eSigner 云签名 180 美元/年，首年约 309 美元（约 2,200 元），外币付款 |
+| 私钥交付 | 硬件令牌或 HSM / Azure Key Vault（另计费），下单时确认 | eSigner 云签名；也可另买 YubiKey 令牌（+379 美元） |
+| 能否接 CI | 令牌只能插在自托管 Windows runner 上；云 HSM 另议 | 能：eSigner 可直接接 GitHub Actions 的 signtool 步骤 |
+| 共同材料 | 营业执照（法定名称、地址要能在政府来源查到）；能在第三方来源查到的公司电话，用于组织验证回拨（不能用自报号码，可先免费办邓白氏 D-U-N-S 编码，通常几个工作日）；申请人身份（公司成立不满 3 年要额外核验申请人本人）；签订户协议 | 同左 |
+| 周期 | 身份验证加令牌寄送或云签名开通，预留 2–4 周 | 同左 |
+
+买到后：`Release` 模式接上正式证书与 HTTPS 时间戳；**包内我们自己的 exe（WinSW `aijobprintagent.exe`、`secure-scan-reader.exe`）也要签**，「包内 exe/dll 都带我们的签名」做成门禁（优先级低，试点不依赖它，另立任务）；node.exe、SumatraPDF 用各自厂商的签名，发布前逐个核实。首批客户仍会看到「未识别的应用」提示，要提前告知。
+
+**内层文件签名（另立任务，随买证书一起做，不是加一条门禁就行）。** 现在的发布签名只接收一份已通过安装测试、身份冻结（每个文件的 SHA-256 已绑定）的未签名候选包，签 MSI、Burn 引擎与外层 EXE；包内文件在打 MSI 之前就定了。要让包内文件也带我们的签名，就得在发布时：①用正式证书先签 staging 里我们自己的 PE（WinSW `aijobprintagent.exe`、`secure-scan-reader.exe`，以及原生模块 `.node`——它们本质是 DLL，智能应用控制同样会判）；②用签过的 staging 重新打 MSI 与 EXE；③对签过的产物重跑 MSI / EXE 安装生命周期测试；④门禁：包内每个 PE 都带有效签名，且签名者在白名单里（我们自己；Node.js 官方的 OpenJS、SumatraPDF 作者这类厂商签名放行），否则红。已核：SumatraPDF-3.4.6 自带 Authenticode 签名；Node.js 官方 Windows 包带厂商签名；WinSW 2.12.0 发布版是否签名未核（在 Windows 上 `Get-AuthenticodeSignature` 一查即知）。PR CI 拿不到正式证书，所以这条门禁只在 Release 模式与内部签名验证作业里跑。

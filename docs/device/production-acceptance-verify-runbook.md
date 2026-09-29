@@ -70,7 +70,7 @@ A–E 全通过 + `/health` = PG + 日志无敏感正文 + CI 双绿 → 回写 
 
 ```bash
 node scripts/prod-readonly-probe.mjs
-node scripts/prod-readonly-probe.mjs --host 120.48.13.190 --domains zyidai.cn,admin.zyidai.cn,partner.zyidai.cn
+node scripts/prod-readonly-probe.mjs --host <生产服务器 IP> --domains zyidai.cn,admin.zyidai.cn,partner.zyidai.cn
 node scripts/prod-readonly-probe.mjs --expect-sha <本次发布 SHA 前缀>
 node scripts/prod-readonly-probe.mjs --json
 ```

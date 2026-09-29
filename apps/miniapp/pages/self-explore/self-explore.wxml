@@ -298,7 +298,7 @@
         </view>
       </view>
 
-      <view class="compliance-note">本页只做本人自助参考，不参与任何岗位或招聘会的排序与筛选，也不会向企业、合作机构展示。</view>
+      <view class="compliance-note">本页只做本人自助参考，不参与任何排序与筛选，也不会向企业、合作机构展示。</view>
       <view class="spacer-lg"></view>
     </block>
 

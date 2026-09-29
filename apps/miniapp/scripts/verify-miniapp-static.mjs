@@ -649,7 +649,8 @@ if (!/format\s*:\s*['"]PDF['"]/.test(resumesJs) && resumesJs.includes('仅记录
 }
 
 const pickupWxml = read('pages/print-pickup/print-pickup.wxml')
-const pickupJs = read('pages/print-pickup/print-pickup.js')
+// 取件页的纯状态函数 2026-09-29 拆到同目录 pickup-state.js（页面过了 800 行）；两份合起来查，断言不变。
+const pickupJs = read('pages/print-pickup/print-pickup.js') + '\n' + read('pages/print-pickup/pickup-state.js')
 const pickupQr = read('utils/pickup-qrcode.js')
 if (
   pickupWxml.includes('type="2d"') &&
