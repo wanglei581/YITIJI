@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-30：会员权益撤销提示去掉英文状态值（W-06 口径；分支 `claude/backend-hardening-20260930-benefit-copy`）
+
+- `BENEFIT_NOT_ACTIVE` 的提示从「只有 active 状态的权益可以撤销」改为「只有「可用」状态的权益可以撤销」，与管理员后台权益页的状态叫法一致（两个后台窗口提出，前端原样显示服务端 message）。member-benefits-admin、benefit-redemption 门禁全绿。同类的「终端不在 active 状态」在 admin-print-scan.service.ts，随 #1152 一并改。
+
 ## 2026-09-30：打印每单最多 100 面（产品负责人拍板；分支 `claude/backend-hardening-20260929-print-max-100-sides`）
 
 - **为什么：** 原来一单没有上限（份数最多 99、页数不限），Agent 判断「打没打完」的超时只有 5 分钟，长单会被误判为未确认、下一位派单前清理时剩下的页被删掉；纸盒也只装 250 张。有了上限，Windows 窗口才能按最坏情况算超时（Agent 15 分钟、服务端 20 分钟）。试点免费期也防一单打几百页耗材。
