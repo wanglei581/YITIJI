@@ -44,7 +44,7 @@ export default function SessionTimeoutPage() {
   const inDomain = (root: string) => sourcePath === root || sourcePath.startsWith(`${root}/`)
   const isHardware = inDomain('/print') || inDomain('/scan')
   // 这两页握着用户当场做的、还没提交的活：/print-scan/convert 是已选好待转 PDF 的图片，
-  // /print-scan/sign 是已上传的文档 + 印章 + 落章位置。清场会全部丢掉，必须说出来。
+  // /print-scan/sign 是已上传的文档 + 签名图 + 签名位置。清场会全部丢掉，必须说出来。
   // **逐条列，不能用 inDomain('/print-scan')** —— /print-scan 本身是入口 Hub，
   // 上面没有未保存的东西，套进来就成了吓唬人。
   const EDITING_ROUTES = ['/print-scan/convert', '/print-scan/sign']
