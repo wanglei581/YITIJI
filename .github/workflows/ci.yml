@@ -145,6 +145,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-terminal-bind-code-ui
           pnpm --filter @ai-job-print/admin verify:admin-peripheral-views
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
+          pnpm --filter @ai-job-print/admin verify:admin-ai-usage-ui
           pnpm --filter @ai-job-print/admin verify:console-plain-copy
           pnpm --filter @ai-job-print/admin verify:admin-internal-accounts-ui
           pnpm --filter @ai-job-print/admin verify:admin-partner-contact-phone-ui
