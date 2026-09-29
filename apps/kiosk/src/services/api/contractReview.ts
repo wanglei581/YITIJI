@@ -15,6 +15,7 @@ import type {
   ContractType,
 } from '@ai-job-print/shared'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 import { kioskUploadFile } from './files'
 
@@ -104,7 +105,7 @@ async function call<T>(
   access: ContractReviewAccess,
   init?: { method?: string; body?: unknown; extraHeaders?: Record<string, string> },
 ): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
     method: init?.method ?? 'GET',
     headers: {
       Accept: 'application/json',
