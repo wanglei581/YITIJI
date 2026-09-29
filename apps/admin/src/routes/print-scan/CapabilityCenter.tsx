@@ -216,8 +216,7 @@ export function CapabilityCenter() {
       </div>
 
       <p className="text-[12px] leading-relaxed text-neutral-500">
-        fail-closed 口径：只有「可用」状态对普通用户开放正式任务；「测试中」仅运维语境可见；其余状态一律在
-        一体机上不可用。彩色、自动双面、签名三项未登记即关闭，一体机显示「暂未开通」；其余能力未登记时按服务器部署设置处理
+        只有标为「可用」的能力对用户开放；「测试中」只给运维使用；没有登记的能力一律不开放。彩色、自动双面、签名三项未登记即关闭，一体机显示「暂未开通」；其余能力未登记时按服务器部署设置处理
         （常规设置下照常开放，严格设置下关闭）。登记后以此处为准，每次保存都记入操作审计。
       </p>
 
@@ -238,7 +237,7 @@ export function CapabilityCenter() {
               </tr>
             </thead>
             <tbody>
-              {capabilities.map((cap) =>
+              {capabilities.filter((cap) => cap.capabilityKey !== 'cloud_upload').map((cap) =>
                 cap.capabilityKey === 'signature_stamp' ? (
                   <SignatureCapabilityRow key={cap.capabilityKey} cap={cap} saving={savingKey === cap.capabilityKey} onSave={save} />
                 ) : (
