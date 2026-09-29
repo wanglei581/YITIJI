@@ -110,6 +110,10 @@
 | W-35 | 说明 | 一体机 | 一体机匿名反馈不挂账号，答复只能走会员路径——设计如此，写进帮助说明即可，不算缺陷 | 总指挥转 Codex 两端核查（`~/.cache/claude-lanes/xend-0929/codex-xend.md`，候选 d75be0345） | — | 不算缺陷 |
 | W-36 | **P0** | 小程序 | 登录会员在小程序用简历类 AI（上传解析 / 诊断 / 生成 / 语音说简历 / 优化 / 导出）一律「解析失败，请稍后重试」：服务端自 #794（9/06）起要求会员先有 `resume_ai` 授权（`ai.controller.ts:187/283/339/383/434/549` `requireActiveConsent`，403 `USER_AI_CONSENT_REQUIRED`），一体机有授权弹窗（`resumeAiConsent.ts`），小程序从没接；游客不受影响 | 小程序窗口实走（截图 31-resume-result）；走查 API 日志已核实 5:43:49 PM `requestId=57dfc1bb…` `POST /api/v1/resume/parse` 403 `USER_AI_CONSENT_REQUIRED` | 小程序窗口 / 小程序窗口（走查结束、TEST_BASE_URL 改回后修，修完同环境复走） | 已派 |
 | W-37 | P2 | 小程序 | 小青遇模型超时要转 45 秒才出「小青暂时无法回复」，中间没有「还在等」的提示 | 小程序窗口实走（21b-assistant-fault-after） | 小程序窗口 / 小程序窗口 | 已派 |
+| W-38 | P2 | 小程序 | 模拟面试设置页目标岗位、难度、时长、题型几块贴着屏幕左边缘，没有左右边距 | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` 40-interview-qa | 小程序窗口 / 小程序窗口 | 已派 |
+| W-39 | P3 | 服务端 + 两端 | 模拟面试结果总评标签「基本合格」、面试官标签「HR 初筛」，在练习工具里读起来像招聘结论；建议改训练口径（如「表达清楚」「还需准备」、「HR 面练习」） | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` 41-interview-result | 后端窗口（文案）+ 合规窗口复核 / 待定 | 待派 |
+| W-40 | P3 | 小程序 | AI 服务记录页脚「仅已接真实结果页的记录可直接回看」是工程用语 | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` 42-ai-records-after-interview | 小程序窗口 / 小程序窗口 | 已派 |
+| W-41 | P3 | 小程序 | 页面栈满 10 层时「开始模拟面试」跳转失败无提示，每点一次服务端多建一场面试（本次多出 3 场孤儿会话）：`interview-entry.js:68` navigateTo 没有 fail 分支 | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` | 小程序窗口 / 小程序窗口 | 已派 |
 
 ## 五、闭环矩阵
 
