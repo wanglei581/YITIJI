@@ -12051,7 +12051,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 180,
+      "reachableFileCount": 181,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12689,8 +12689,13 @@
             "GET /admin/ad-assets",
             "GET /admin/ad-playlists",
             "GET /admin/ai-posters/status",
+            "GET /admin/import-batches",
             "GET /admin/screensaver/terminals",
             "PATCH /admin/ad-assets/:param",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "POST /admin/ad-assets/external-video",
             "POST /admin/ad-playlists",
             "PUT /admin/ad-playlists/:param",
@@ -12796,7 +12801,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 205
+      "sourceFileCount": 206
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17880,6 +17885,9 @@
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/admin/src/lib/auditActionLabels.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/main.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -19386,7 +19394,8 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/pickupClaimModel.ts": [
-      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "apps/kiosk/src/pages/print/piiRedaction.ts": [
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs"
@@ -23292,6 +23301,7 @@
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
     "services/api/src/audit/audit.types.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
@@ -26516,6 +26526,27 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:admin-users-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          "apps/admin/src/lib/auditActionLabels.ts",
+          "services/api/src/audit/audit.types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:console-plain-copy"
       ],
       "wired": true
     },
@@ -36888,6 +36919,7 @@
         "files": [
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
+          "apps/kiosk/src/pages/print/pickupClaimModel.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/miniapp/pages/print-pay/print-pay.js",
           "apps/miniapp/utils/api.js",
