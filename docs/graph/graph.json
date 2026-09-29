@@ -17482,6 +17482,7 @@
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "packages/ui/scripts/verify-service-desk-foundation.mjs",
       "scripts/project-graph/gates.mjs",
+      "scripts/verify-ci-changed-scopes.mjs",
       "scripts/verify-ci-gate-coverage.mjs",
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-release-bundle.mjs",
@@ -17551,7 +17552,8 @@
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/index.tsx": [
-      "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
+      "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/admin/src/routes/alerts/index.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
@@ -18372,6 +18374,7 @@
       "apps/kiosk/scripts/verify-member-login-dialog.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs",
       "apps/kiosk/scripts/verify-smart-campus-ui.mjs",
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "apps/kiosk/src/pages/home/components/ContinuePanel.tsx": [
@@ -20381,6 +20384,9 @@
     "apps/partner/index.html": [
       "scripts/verify-compliance-copy.mjs"
     ],
+    "apps/partner/src/App.tsx": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "apps/partner/src/layouts/PartnerLayoutWrapper.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
       "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
@@ -20764,6 +20770,8 @@
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs"
     ],
     "docs/compliance/member-personal-data-retention.md": [
+      "scripts/ci-changed-scopes.mjs",
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-member-data-retention.ts"
     ],
@@ -20775,7 +20783,8 @@
       "apps/kiosk/scripts/verify-visual-evidence-manifest.mjs"
     ],
     "docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html": [
-      "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
+      "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html": [
       "apps/kiosk/scripts/extract-service-hub-specs.mjs",
@@ -20813,9 +20822,12 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
     ],
     "docs/graph/graph.json": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "scripts/verify-repository-integrity.mjs"
     ],
     "docs/operations/price-config-production.md": [
+      "scripts/ci-changed-scopes.mjs",
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-print-rollout-config.ts"
     ],
     "docs/operations/recruitment-wave2-readonly-planning-runbook.md": [
@@ -20857,6 +20869,7 @@
     "docs/progress/next-tasks.md": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
@@ -20982,6 +20995,7 @@
       "services/api/scripts/verify-contract-review-contract.ts"
     ],
     "packages/shared/src/types/device.ts": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "packages/shared/src/types/fairDto.ts": [
@@ -21078,7 +21092,8 @@
     ],
     "packages/ui/src/index.ts": [
       "packages/ui/scripts/verify-fusion-youth-foundation.mjs",
-      "packages/ui/scripts/verify-service-desk-foundation.mjs"
+      "packages/ui/scripts/verify-service-desk-foundation.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "packages/ui/src/layouts/AdminLayout.tsx": [
       "packages/ui/scripts/verify-service-desk-foundation.mjs"
@@ -21153,6 +21168,9 @@
       "packages/ui/scripts/verify-fusion-youth-foundation.mjs",
       "packages/ui/scripts/verify-service-desk-foundation.mjs"
     ],
+    "scripts/ci-changed-scopes.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "scripts/ci-gate-exemptions.json": [
       "scripts/verify-ci-gate-coverage.mjs"
     ],
@@ -21211,6 +21229,9 @@
     ],
     "scripts/verify-fixture-time-bombs.mjs": [
       "scripts/verify-fixture-time-bombs.mjs"
+    ],
+    "scripts/verify-repository-integrity.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "services/api/.env.example": [
       "services/api/scripts/d2-same-host/verify-cleanup-contract.mjs"
@@ -21927,6 +21948,7 @@
       "services/api/scripts/verify-governed-job-fit.ts"
     ],
     "services/api/src/ai/ai.service.ts": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-persistence-consistency.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
@@ -29667,6 +29689,23 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "docs/compliance/member-personal-data-retention.md",
+          "docs/operations/price-config-production.md"
+        ],
+        "missing": []
+      },
+      "file": "scripts/ci-changed-scopes.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "docs/graph"
         ],
@@ -29856,6 +29895,45 @@
       "package": "",
       "scriptNames": [],
       "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "docs/progress"
+        ],
+        "files": [
+          ".github/workflows/ci.yml",
+          "apps/admin/src/routes/ai-services/index.tsx",
+          "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/partner/src/App.tsx",
+          "docs/compliance/member-personal-data-retention.md",
+          "docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html",
+          "docs/graph/graph.json",
+          "docs/operations/price-config-production.md",
+          "docs/progress/next-tasks.md",
+          "packages/shared/src/types/device.ts",
+          "packages/ui/src/index.ts",
+          "scripts/ci-changed-scopes.mjs",
+          "scripts/verify-repository-integrity.mjs",
+          "services/api/src/ai/ai.service.ts"
+        ],
+        "missing": [
+          "apps/kiosk/src/b.tsx",
+          "apps/miniapp/pages/index/index.js",
+          "docs/a.md",
+          "docs/progress/x.md",
+          "services/api/src/a.ts"
+        ]
+      },
+      "file": "scripts/verify-ci-changed-scopes.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:ci-changed-scopes"
+      ],
+      "wired": true
     },
     {
       "asserts": {
@@ -30187,7 +30265,7 @@
         "missing": []
       },
       "file": "scripts/verify-repository-integrity.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "ai-job-print-terminal",
       "scriptNames": [
