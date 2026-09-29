@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-29：A-04 隐私检查不完整时的「本人确认」服务端留痕（分支 `claude/backend-hardening-20260929-pii-confirm`，叠在上一条之上）
+
+- **口径（主执行窗口采纳提案 B 及四个条件）：** 隐私扫描结论为 `partial`（页数截断）/ `degraded`（识别不可用）/ `unsupported_format` 时，不一刀切拒绝打印，由本人确认后继续，服务端留痕。新增 `POST /materials/tasks/:id/manual-confirmation`（body `{confirmed:true}`，与逐项裁决同鉴权），在该次扫描任务上记 `result.manualConfirmedAt`；重复确认 200 且时间不变，并发只写一次；审计 `material_task.pii_manual_confirmed` 只记任务号、mode、请求方类型、时间。
+- **建单闸门（`print-jobs/pii-scan-gate.ts`）：** 开关 `PRINT_PII_MANUAL_CONFIRM_ENFORCED` 默认关——小程序会员订单、材料包、到机码取件与一体机打印共用这道闸，目前只有一体机会做确认步骤；一体机材料检查页接好「我已确认，继续打印」后与 `AI_DECLARATION_ENFORCEMENT` 同批打开。开时未确认回 400 `PRINT_PII_MANUAL_CONFIRM_REQUIRED`；以该原件最新一次扫描为准，重扫后旧确认不继承；派生件与非生产不受影响。
+- **验证：** 新门禁 `verify:pii-manual-confirm`（18 条，进 CI SQLite 作业）；6 处反向变异全红；建单四个调用方与材料模块的关联门禁 17 条全绿（含小程序云打印、材料包履约、支付流程、生产闸门）。
+- **交付：** 一体机按钮与调用由主执行窗口在 P0-5 打印链改完后接。
+
 ## 2026-09-29：打印前材料检查不再被 AI 开关拦住（分支 `claude/backend-hardening-20260929-materials-gate`，首发前必修）
 
 - **问题：** `POST /materials/tasks` 与逐项裁决接口标着 `@AiUse('generate')`，但材料检查五种任务（体检、A4 规整、隐私扫描、遮挡、合订）都不调生成式模型。生产开着 `PRINT_REQUIRE_PII_SCAN`，原件打印必须先过材料检查；于是后台「AI 暂停」（#1055 会把开关放进后台）、`AI_LOGIN_GATE=before_generate`、声明强制任何一个打开，匿名用户的原件打印就全部停掉，违背「AI 挂了功能退化为手动」。P1-18 子代理查代码时发现，总指挥要求首发前修。
