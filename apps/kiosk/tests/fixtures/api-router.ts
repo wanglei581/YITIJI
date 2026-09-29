@@ -1,5 +1,6 @@
 import type { Page, Route } from '@playwright/test'
 import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
+import { SELF_ASSESSMENT_QUESTIONS_PATH, selfAssessmentQuestionsResponse } from './self-assessment-questions'
 
 export type AbortErrorCode = Parameters<Route['abort']>[0]
 
@@ -67,6 +68,9 @@ export class ApiRouter {
       status: 200,
       json: { items: [], legacyPlatforms: [] },
     })
+    // 自我探索同意页挂载时读题目与同一版的同意说明（#1119）。默认按服务端当前这一版应答；
+    // 要测「说明没取到」的用例自行 respond 覆盖。
+    this.respond('GET', SELF_ASSESSMENT_QUESTIONS_PATH, { status: 200, json: selfAssessmentQuestionsResponse() })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
       status: 200,

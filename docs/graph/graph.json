@@ -12055,7 +12055,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 180,
+      "reachableFileCount": 183,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12800,11 +12800,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 205
+      "sourceFileCount": 208
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 624,
+      "reachableFileCount": 629,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15795,7 +15795,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 717
+      "sourceFileCount": 722
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17916,6 +17916,9 @@
       "apps/admin/scripts/verify-feedback-sla.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
+    "apps/admin/src/routes/audit/index.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
+    ],
     "apps/admin/src/routes/billing/index.tsx": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "apps/kiosk/scripts/verify-price-single-source.mjs",
@@ -17925,6 +17928,7 @@
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
     ],
     "apps/admin/src/routes/dashboard/index.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/devices/TerminalFleetOverview.tsx": [
@@ -18023,9 +18027,11 @@
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
     ],
     "apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/routes/partners/PartnerAccountManager.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/routes/partners/contentTrustRules.ts": [
@@ -18039,10 +18045,17 @@
     "apps/admin/src/routes/partners/partner-account-action-steps/ActionCredentialSteps.tsx": [
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
+    "apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
+    ],
     "apps/admin/src/routes/partners/partner-account-action-steps/PhoneRebindSteps.tsx": [
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
+    "apps/admin/src/routes/partners/partnerContactPhoneEligibility.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
+    ],
     "apps/admin/src/routes/partners/usePartnerAccountAction.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx": [
@@ -18229,6 +18242,7 @@
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
     ],
     "apps/admin/src/services/api/orgsAdmin.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/services/api/policiesAdmin.ts": [
@@ -18237,6 +18251,9 @@
     "apps/admin/src/services/api/printScan.ts": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
+    ],
+    "apps/admin/src/services/api/registerPartnerContactPhone.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
     ],
     "apps/admin/src/services/api/screensaver.ts": [
       "services/api/scripts/verify-screensaver-content.ts"
@@ -18297,6 +18314,9 @@
     ],
     "apps/kiosk/scripts/tests/interview-workbench-model.test.mjs": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/scripts/tests/mask-pii.test.mjs": [
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs"
     ],
     "apps/kiosk/scripts/tests/scan-cleanup-gate.test.mjs": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
@@ -18617,7 +18637,8 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
     "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx": [
-      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
@@ -18669,7 +18690,8 @@
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
     "apps/kiosk/src/pages/assistant/advisorUserCopy.ts": [
-      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs"
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs"
     ],
     "apps/kiosk/src/pages/assistant/assistant-advisor.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
@@ -19125,6 +19147,7 @@
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/pages/legal/legal-service-desk.css": [
@@ -19132,6 +19155,7 @@
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
     ],
     "apps/kiosk/src/pages/legal/legalDocModel.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx": [
@@ -19388,7 +19412,8 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/pickupClaimModel.ts": [
-      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "apps/kiosk/src/pages/print/piiRedaction.ts": [
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs"
@@ -19955,6 +19980,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
@@ -19974,6 +20000,7 @@
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
       "services/api/scripts/verify-compliance.ts"
     ],
@@ -20050,6 +20077,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx": [
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx": [
@@ -20200,8 +20228,12 @@
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
     ],
+    "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
+    ],
     "apps/kiosk/src/pages/resume/selfAssessmentSession.ts": [
-      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
     ],
     "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
@@ -20217,6 +20249,9 @@
     ],
     "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
     ],
     "apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts": [
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
@@ -20397,6 +20432,7 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts": [
@@ -20625,6 +20661,7 @@
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-compliance.ts"
     ],
     "apps/kiosk/src/services/api/terminalConfig.ts": [
@@ -20725,6 +20762,7 @@
     ],
     "apps/kiosk/src/utils/maskPii.ts": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
     ],
     "apps/kiosk/src/utils/micCapability.ts": [
@@ -23100,8 +23138,10 @@
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/resume/self-assessment.types.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/self-assessment.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -26390,6 +26430,32 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/audit/index.tsx",
+          "apps/admin/src/routes/dashboard/index.tsx",
+          "apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx",
+          "apps/admin/src/routes/partners/PartnerAccountManager.tsx",
+          "apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx",
+          "apps/admin/src/routes/partners/partnerContactPhoneEligibility.ts",
+          "apps/admin/src/routes/partners/usePartnerAccountAction.ts",
+          "apps/admin/src/services/api/orgsAdmin.ts",
+          "apps/admin/src/services/api/registerPartnerContactPhone.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-partner-contact-phone-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx",
           "apps/admin/src/routes/peripherals/index.tsx",
           "apps/admin/src/routes/peripherals/peripheralViews.ts",
@@ -29592,6 +29658,30 @@
       "asserts": {
         "absent": [],
         "dirs": [],
+        "files": [
+          "apps/kiosk/scripts/tests/mask-pii.test.mjs",
+          "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx",
+          "apps/kiosk/src/pages/assistant/advisorUserCopy.ts",
+          "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx",
+          "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
+          "apps/kiosk/src/utils/maskPii.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-public-screen-mask.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:public-screen-mask"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
         "files": [],
         "missing": []
       },
@@ -30022,6 +30112,31 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:screensaver-empty-shell"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
+          "apps/kiosk/src/pages/legal/legalDocModel.ts",
+          "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts",
+          "apps/kiosk/src/pages/resume/selfAssessmentSession.ts",
+          "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts",
+          "apps/kiosk/src/services/api/selfAssessment.ts",
+          "services/api/src/ai/resume/self-assessment.types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:self-assessment-consent-source"
       ],
       "wired": true
     },
@@ -36868,6 +36983,7 @@
         "files": [
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
+          "apps/kiosk/src/pages/print/pickupClaimModel.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/miniapp/pages/print-pay/print-pay.js",
           "apps/miniapp/utils/api.js",
@@ -39604,6 +39720,7 @@
           "services/api/src/ai/resume/self-assessment-questions.ts",
           "services/api/src/ai/resume/self-assessment-scoring.ts",
           "services/api/src/ai/resume/self-assessment.service.ts",
+          "services/api/src/ai/resume/self-assessment.types.ts",
           "services/api/src/ai/self-assessment.controller.ts",
           "services/api/src/common/pdf/aigc-label.ts",
           "services/api/src/common/pdf/pdfjs-document.ts"

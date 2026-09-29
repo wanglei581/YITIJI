@@ -445,6 +445,9 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
       'AI_ENDPOINT_NOT_ALLOWED',
       'AI_BUDGET_EXHAUSTED',
       'AI_BUDGET_UNAVAILABLE',
+      // 闸门判定本身出错（self-assessment-interpretation.ts AI_ACCESS_CHECK_FAILED_CODE）：
+      // 与 AI_BUDGET_UNAVAILABLE 同性质的失败关闭，服务端这次不调模型，重试不会变好。
+      'AI_ACCESS_CHECK_FAILED',
     ])
     // 必须在表里的码：这几个进不了表，页面就会把「AI 停用」当成「这次没成」继续叫人重试。
     const MUST_BE_OUTAGE = [
@@ -475,6 +478,8 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
       'AI_TASK_NOT_FOUND', 'AI_RESULT_PERSISTENCE_FAILED',
       'AI_RESUME_SOURCE_UNAVAILABLE', 'AI_RESUME_SOURCE_EXPIRED', 'AI_RESUME_TEMPLATE_UNSUPPORTED',
       'AI_PUBLIC_QUOTA_EXCEEDED', 'AI_PUBLIC_QUOTA_UNAVAILABLE',
+      // 自我探索「解读缺席、说不出原因」的兜底码：可能只是这一次没写出来。
+      'AI_INTERPRETATION_UNAVAILABLE', 'AI_INTERPRETATION_UNPARSEABLE',
       'JOB_AI_QUOTA_EXCEEDED', 'JOB_AI_QUOTA_UNAVAILABLE',
       'AI_JOB_RECOMMEND_FAILED', 'AI_JOB_EXPLAIN_FAILED', 'AI_CAREER_PLAN_FAILED',
       'AI_JOB_FIT_FAILED', 'AI_FAIR_VISIT_PLAN_FAILED',

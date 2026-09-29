@@ -35,6 +35,8 @@
 .cs-item { display: flex; align-items: flex-start; gap: 12rpx; }
 .cs-dot { font-size: var(--fs-sm); color: var(--teal); margin-top: 6rpx; flex-shrink: 0; }
 .cs-text { flex: 1; font-size: var(--fs-base); line-height: 1.65; color: var(--ink-soft); }
+/* 同意文字里的法务链接：文字链一律用全局 --link（app.wxss 的约定），不另起颜色。 */
+.cs-link { color: var(--link); }
 
 .cs-ver {
   margin-top: 20rpx; padding-top: 18rpx;

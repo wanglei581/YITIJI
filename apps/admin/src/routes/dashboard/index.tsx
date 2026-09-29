@@ -108,6 +108,7 @@ function initialBlock<V>(loading = true): BlockEntry<V> {
 }
 
 const ACTION_LABELS: Record<string, string> = {
+  'partner_account.contact_phone_registered': '登记机构联系人手机',
   'ai_resume_result.cleanup_expired': '清理过期 AI 简历结果',
   'data_source.create': '创建数据源',
   'data_source.toggle': '启停数据源',

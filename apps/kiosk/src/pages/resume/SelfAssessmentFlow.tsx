@@ -32,11 +32,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams, type NavigateFunction } from 'react-router-dom'
 import type {
+  SelfAssessmentConsentLink,
   SelfAssessmentDimensionKey,
   SelfAssessmentDimensionResult,
 } from '@ai-job-print/shared'
 import { SELF_ASSESSMENT_DIMENSIONS } from '@ai-job-print/shared'
 import {
+  AI_OUTAGE_CODES,
   AiCapabilityChip,
   AiConclusion,
   AiTaskRegion,
@@ -57,21 +59,28 @@ import {
   withdrawSelfAssessment,
 } from '../../services/api/selfAssessment'
 import {
-  CONSENT_ITEMS,
-  SELF_ASSESSMENT_CONSENT_VERSION,
   SENSITIVE_QUESTIONS,
   clearSession,
   sessionForAssessmentRecord,
   flattenAnswers,
   formatBytes,
   formatDateTime,
-  hasCurrentConsent,
   loadSession,
   progress,
   questionsFor,
   saveSession,
   type SelfAssessmentSession,
 } from './selfAssessmentSession'
+import {
+  consentLinkRoute,
+  hasRecordedConsent,
+  initialCheckedVersion,
+  isConsentVersionStale,
+  sessionAfterConsent,
+  sessionAfterStaleConsent,
+} from './selfAssessmentConsent'
+import { useSelfAssessmentConsentBundle } from './useSelfAssessmentConsentBundle'
+import { interpretationGap } from './selfAssessmentInterpretation'
 import { useSelfAssessmentIdleExit } from './useSelfAssessmentIdleExit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -90,6 +99,7 @@ import {
   SaReviewGrid,
   type SaStatus,
 } from './components/self-assessment/SelfAssessmentQxKit'
+import { SaConsentBox, SaConsentLinkedCheck, SaConsentList } from './components/self-assessment/SelfAssessmentConsentKit'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 /** 稿底部那一行不可关闭的边界声明，四个页面共用。 */
@@ -173,70 +183,75 @@ function saExits(go: NavigateFunction, from: string, resumable: boolean) {
   ]
 }
 
-/** 知情同意勾选块。`role="checkbox"` + `aria-checked`，不是原生 input —— 触控目标要 84px。 */
-function ConsentBox({
-  checked, label, note, testId, onToggle,
-}: { checked: boolean; label: string; note?: string; testId: string; onToggle: () => void }) {
-  return (
-    <button type="button" className="sa-cbox" role="checkbox" aria-checked={checked} data-testid={testId} onClick={onToggle}>
-      <span className="sa-box" aria-hidden="true">✓</span>
-      <span>{label}{note ? <small>{note}</small> : null}</span>
-    </button>
-  )
-}
-
 // ============================================================
 // 1) 同意页
+//
+// 条款、勾选框文字、链接与版本号全部来自同一次 GET /questions（见 selfAssessmentConsent.ts）。
+// 没取到就如实说没取到、给重试，**不放行作答**，也不拿任何写死的条款顶上。
 // ============================================================
 export function SelfAssessmentIntroPage() {
   const navigate = useNavigate()
   const session = useMemo(() => loadSession(), [])
+  const consentBundle = useSelfAssessmentConsentBundle()
   useSelfAssessmentIdleExit()
-  const [consent, setConsent] = useState(
-    session.consentVersion === SELF_ASSESSMENT_CONSENT_VERSION
-      ? session.consent
-      : { nonSensitive: false, sensitive: false },
-  )
-  const bank = useMemo(() => questionsFor(consent.sensitive === true), [consent.sensitive])
+  const bundle = consentBundle.state.status === 'ready' ? consentBundle.state.bundle : null
+  // 勾选只对「这一版」有效：记下勾的是哪一版（下发原值）。没动过时按本机会话恢复，
+  // 且只有会话里记的版本与本次下发逐字相同才沿用，否则重勾。
+  const [toggled, setToggled] = useState<{ version: string; checked: boolean } | null>(null)
+  const [sensitive, setSensitive] = useState(session.consentDraft?.sensitive ?? session.consent.sensitive === true)
+  const ok = bundle !== null
+    && (toggled?.version === bundle.version ? toggled.checked : initialCheckedVersion(session, bundle.version))
+  const bank = useMemo(() => questionsFor(sensitive), [sensitive])
   const total = useMemo(() => progress(bank, {}).total, [bank])
   const dimCount = bank.dimensions.length
+  const resubmit = session.resubmitAfterConsent === true
   const start = useCallback(() => {
-    if (!consent.nonSensitive) return
-    const next: SelfAssessmentSession = {
-      ...session,
-      consent,
-      consentVersion: SELF_ASSESSMENT_CONSENT_VERSION,
-      consentedAt: new Date().toISOString(),
-      answers: {},
-    }
-    saveSession(next)
-    navigate('/resume/self-assessment/questions')
-  }, [consent, navigate, session])
+    if (!ok || !bundle) return
+    const keep = new Set(bank.dimensions.flatMap((d) => d.questions.map((q) => `${d.key}:${q.idx}`)))
+    const next = sessionAfterConsent(session, {
+      sensitive, version: bundle.version, now: new Date().toISOString(), keepAnswer: (dim, idx) => keep.has(`${dim}:${idx}`),
+    })
+    const { done, total: all } = progress(bank, next.answers)
+    saveSession({ ...next, resubmitAfterConsent: undefined })
+    // 服务端说版本已更新时，重新确认后自动重交一次（答满才重交；没答满回答题页接着答）。
+    navigate(resubmit && all > 0 && done >= all ? '/resume/self-assessment/result' : '/resume/self-assessment/questions')
+  }, [bank, bundle, navigate, ok, resubmit, sensitive, session])
+  // 去读隐私政策前把勾选状态记下，回来原样恢复；已答的题本来就在会话里，不动。
+  const openLink = (link: SelfAssessmentConsentLink) => {
+    saveSession({ ...session, consentDraft: { checkedVersion: ok && bundle ? bundle.version : null, sensitive } })
+    navigate(consentLinkRoute(link))
+  }
 
-  const ok = consent.nonSensitive
-  const status: SaStatus = ok ? { tone: 'ok', label: '已确认说明' } : { tone: 'warn', label: '待确认说明' }
+  const status: SaStatus = !bundle
+    ? consentBundle.state.status === 'error' ? { tone: 'bad', label: '说明没有取到' } : { tone: 'unknown', label: '正在读取说明' }
+    : ok ? { tone: 'ok', label: '已确认说明' } : { tone: 'warn', label: '待确认说明' }
+  const startLabel = resubmit ? '确认并重新提交' : '开始作答'
 
   return (
     <SaFrame
       {...SA_FRAME_BASE}
       screen="resume-self-assessment-intro"
-      state={ok ? 'intro-ready' : 'intro-consent-pending'}
+      state={!bundle ? (consentBundle.state.status === 'error' ? 'intro-consent-error' : 'intro-consent-loading') : ok ? 'intro-ready' : 'intro-consent-pending'}
       status={status}
       ask={<>把职业倾向，<em>说得更明白</em>。</>}
       doing={<>{total} 道选择题，覆盖 {dimCount} 个方向；<b>不评分、不排名，结果只给你自己看。</b></>}
       back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
       gate={
         <SaGate tone={ok ? 'ok' : 'warn'}>
-          {ok
-            ? <><b>已确认说明。</b>现在可以开始作答，答题过程中随时可以返回修改或退出。</>
-            : <><b>还没有勾选上面的确认，暂时不能开始作答。</b>先读完 {CONSENT_ITEMS.length} 条说明并勾选，「开始作答」才会变为可用。</>}
+          {!bundle
+            ? <><b>同意说明还没有读到，暂时不能开始作答。</b>读到之后请逐条看完再勾选。</>
+            : ok
+              ? resubmit
+                ? <><b>已确认新的说明。</b>你已答的题都还在，点「{startLabel}」会用这些答案重新提交一次。</>
+                : <><b>已确认说明。</b>现在可以开始作答，答题过程中随时可以返回修改或退出。</>
+              : <><b>还没有勾选上面的确认，暂时不能{resubmit ? '重新提交' : '开始作答'}。</b>先读完 {bundle.items.length} 条说明并勾选，「{startLabel}」才会变为可用。</>}
         </SaGate>
       }
       ctabar={
         <>
           <GhostButton label="返回简历服务" route={SA_BACK_ROUTE} onClick={() => navigate(SA_BACK_ROUTE)} />
           <GuardedButton variant="primary" testId="self-assessment-primary" onClick={start}
-            blockedReason={ok ? null : '需先勾选第一项同意才能开始作答'}>开始作答</GuardedButton>
+            blockedReason={!bundle ? '同意说明还没有读到，读到并勾选后才能开始' : ok ? null : '需先勾选第一项同意才能开始作答'}>{startLabel}</GuardedButton>
         </>
       }
     >
@@ -268,30 +283,38 @@ export function SelfAssessmentIntroPage() {
         />
       </SaCard>
 
-      <SaCard head="开始前请先确认" hint="勾选后才能作答">
-        <ol className="sa-consent">
-          {CONSENT_ITEMS.map((item, index) => (
-            <li key={item}><em>{index + 1}</em><div>{item}</div></li>
-          ))}
-        </ol>
-        <p className="sa-sub">
-          你现在勾选的是<b>上面这 {CONSENT_ITEMS.length} 条</b>，同意版本 {SELF_ASSESSMENT_CONSENT_VERSION}。
-          说明改动会提高版本号，届时会请你重新确认一次。
-        </p>
-        <ConsentBox
-          testId="self-assessment-consent-required" checked={consent.nonSensitive}
-          label="我已了解上述说明，并同意开始作答（必勾选）"
-          onToggle={() => setConsent({ ...consent, nonSensitive: !consent.nonSensitive })}
-        />
-        <ConsentBox
-          testId="self-assessment-consent-sensitive" checked={consent.sensitive}
-          label="同意作答涉及偏好 / 风格的敏感题（可选）"
-          note={SENSITIVE_QUESTIONS.length > 0
-            ? `不勾会跳过其中 ${SENSITIVE_QUESTIONS.length} 题，进度总数相应减少。`
-            : '当前题库（v1）没有标记为敏感的题目，勾不勾都不会改变题目；此项只记录你的意愿。'}
-          onToggle={() => setConsent({ ...consent, sensitive: !consent.sensitive })}
-        />
-      </SaCard>
+      {bundle ? (
+        <SaCard head="开始前请先确认" hint="勾选后才能作答" testId="self-assessment-consent">
+          <SaConsentList items={bundle.items} />
+          <p className="sa-sub">
+            你现在勾选的是<b>上面这 {bundle.items.length} 条和勾选框里的这句话</b>，同意版本 {bundle.version}。
+            说明改动会提高版本号，届时会请你重新确认一次。
+          </p>
+          <SaConsentLinkedCheck
+            testId="self-assessment-consent-required" checked={ok} label={bundle.checkboxLabel} links={bundle.links}
+            onToggle={() => setToggled({ version: bundle.version, checked: !ok })} onOpenLink={openLink}
+          />
+          <SaConsentBox
+            testId="self-assessment-consent-sensitive" checked={sensitive}
+            label="同意作答涉及偏好 / 风格的敏感题（可选）"
+            note={SENSITIVE_QUESTIONS.length > 0
+              ? `不勾会跳过其中 ${SENSITIVE_QUESTIONS.length} 题，进度总数相应减少。`
+              : '当前题库（v1）没有标记为敏感的题目，勾不勾都不会改变题目；此项只记录你的意愿。'}
+            onToggle={() => setSensitive(!sensitive)}
+          />
+        </SaCard>
+      ) : consentBundle.state.status === 'error' ? (
+        <SaCard head="同意说明没有取到，请重试" hint="没有说明就不能开始作答" tone="down" testId="self-assessment-consent">
+          <p className="sa-sub">这次没能取到要你确认的说明。本页不会拿旧的说明顶上，也不会跳过这一步。</p>
+          <div className="sa-quickrow">
+            <button type="button" className="sa-quick" data-testid="self-assessment-consent-retry" onClick={consentBundle.retry}>↻ 重新读取说明</button>
+          </div>
+        </SaCard>
+      ) : (
+        <SaCard head="开始前请先确认" hint="正在读取说明" testId="self-assessment-consent">
+          <p className="sa-sub" role="status">正在读取这次要确认的说明。读到之前不显示任何条款，也不能勾选。</p>
+        </SaCard>
+      )}
 
       <SaNotice>
         <b>本页是自我探索，不是心理、临床或能力测评。</b>它不会参与岗位排序，也不会把你的答案提供给企业或合作机构。
@@ -306,7 +329,7 @@ export function SelfAssessmentIntroPage() {
 export function SelfAssessmentQuizPage() {
   const navigate = useNavigate()
   const session = useMemo(() => loadSession(), [])
-  const consentOk = hasCurrentConsent(session)
+  const consentOk = hasRecordedConsent(session)
   const alreadySubmitted = Boolean(session.result)
   const questions = useMemo(() => questionsFor(session.consent.sensitive === true), [session.consent.sensitive])
   const [answers, setAnswers] = useState<Partial<Record<SelfAssessmentDimensionKey, Record<number, string>>>>(session.answers)
@@ -317,7 +340,8 @@ export function SelfAssessmentQuizPage() {
     return Math.max(1, Math.min(resumeAt.total, resumeAt.done + 1))
   })
   const [stage, setStage] = useState<'quiz' | 'review'>('quiz')
-  useSelfAssessmentIdleExit(consentOk)
+  // 等待重新确认说明时本机仍留着已答的题，闲置照样要清。
+  useSelfAssessmentIdleExit(consentOk || session.resubmitAfterConsent === true)
 
   useEffect(() => { if (consentOk) saveSession({ ...session, answers }) }, [answers, consentOk, session])
 
@@ -390,7 +414,9 @@ export function SelfAssessmentQuizPage() {
         ],
         body: consentOk
           ? '当前题目集为空，请回到说明页重新开始。'
-          : `这台机器上还没有记录到你对当前版本（${SELF_ASSESSMENT_CONSENT_VERSION}）说明的同意，或说明已更新。作答会被送去生成 AI 解读，所以必须先看过说明再开始。`,
+          : session.resubmitAfterConsent
+            ? `说明已经更新，提交前要请你按新的说明重新确认一次。你已答的 ${done} 题都还在，确认后会自动重新提交，不用重答。`
+            : '这台机器上还没有记录到你对当前说明的同意，或说明已更新。作答会被送去生成 AI 解读，所以必须先看过说明再开始。',
         secondary: { label: '返回简历服务', route: SA_BACK_ROUTE, onClick: () => navigate(SA_BACK_ROUTE) },
         primary: { label: '去看说明并确认', onClick: () => navigate('/resume/self-assessment/intro') },
       }
@@ -653,7 +679,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
 
   const result = session.result ?? null
   const taskId = session.taskId ?? result?.taskId ?? linkedTaskId
-  const consentOk = hasCurrentConsent(session)
+  const consentOk = hasRecordedConsent(session)
   // 依赖必须是稳定引用，否则下面那个 effect 会被反复触发。
   const pendingAnswers = useMemo(() => flattenAnswers(session.answers), [session.answers])
   const pendingComplete = useMemo(() => {
@@ -694,8 +720,8 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       ? submitSelfAssessment(
           {
             answers: pendingAnswers,
-            // 送会话里存的那一版，不是 SELF_ASSESSMENT_CONSENT_VERSION 常量：
-            // 报「用户实际同意的是哪一版」，而不是「本次构建认为当前是哪一版」。
+            // 送会话里存的那一版（题目接口下发的原值，不 trim、不拼接）：
+            // 报「用户实际同意的是哪一版」，由服务端逐字比对是不是当前版。
             consent: {
               nonSensitive: session.consent.nonSensitive,
               sensitive: session.consent.sensitive,
@@ -723,6 +749,12 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       .catch((err: unknown) => {
         // 失败必须看得见：不把「没生成出来 / 读不回来」渲染成「生成完了但内容为空」。
         if (!mountedRef.current) return
+        // 说明已更新：回答题页的「先确认说明」拦截面，已答的题留着，确认后自动重交一次。
+        if (mode === 'submit' && isConsentVersionStale(err)) {
+          saveSession(sessionAfterStaleConsent(loadSession()))
+          navigate('/resume/self-assessment/questions', { replace: true })
+          return
+        }
         const declined = aiDeclarationDeclineMessage(err)
         if (declined) {
           setTaskAiDown(false)
@@ -733,7 +765,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         setTaskError(err instanceof SelfAssessmentApiError ? err.message : mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试')
       })
       .finally(() => { if (mountedRef.current) setInflight(null) })
-  }, [attempt, consentOk, getToken, linkedTaskId, pendingAnswers, pendingComplete, result, session.accessToken, session.consent.nonSensitive, session.consent.sensitive, session.consentVersion])
+  }, [attempt, consentOk, getToken, linkedTaskId, navigate, pendingAnswers, pendingComplete, result, session.accessToken, session.consent.nonSensitive, session.consent.sensitive, session.consentVersion])
 
   // ── AI 任务四态（S1-1）。取的全是后端真值，前端没有可以自行推进的地方。 ──
   //   unavailable —— 后端明说 LLM 调不通（`llm-self-assessment.service.ts:113-118`）；
@@ -747,8 +779,10 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
   // 「这次没拿到结果」—— 白屏既说不清发生了什么，也把重试入口一起带走了。
   const dimensions = Array.isArray(result?.dimensions) ? result.dimensions : null
   const malformed = Boolean(result) && dimensions === null
-  const hasInterpretation = (dimensions?.some((d) => Boolean(d.note)) ?? false) || Boolean(result?.summary)
-  const aiUnavailable = result?.providerName === 'llm_unavailable'
+  // 解读缺没缺、为什么缺：优先读服务端 interpretationAvailable / aiUnavailableReason，打分始终照常显示。
+  const gap = interpretationGap(result, AI_OUTAGE_CODES)
+  const hasInterpretation = gap === 'none'
+  const aiUnavailable = result?.providerName === 'llm_unavailable' || (gap !== 'none' && gap !== 'rejected')
   const availability: AiAvailability = aiUnavailable ? 'unavailable' : result || inflight ? 'available' : 'unknown'
   const task = useAiTask({
     availability,
@@ -902,12 +936,23 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
     // AI 是这几段解读的唯一产出源，且没有「点一下重试」的入口 —— 结果区直接说办不到，
     // 不编一条假的手动路径（三种降级里只有 result-unavailable 对得上本页）。
     mode: 'result-unavailable',
-    reason: aiUnavailable
-      ? 'AI 解读服务当前不可用，这几段陈述这次没有生成。前面三步（作答、记分、依据题号）都已完成。'
-      : result.failReason
-        ?? '本次解读未能生成合规结果，已整体丢弃，不做任何替换或补写。',
-    retryHint: '答案原文不留存，服务恢复后也补不回这一次；要拿到解读需要重新作答（约 5 分钟）。下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。',
-    action: { label: '重新作答（约 5 分钟）', onClick: () => { clearSession(); navigate('/resume/self-assessment/intro') } },
+    reason: gap === 'declaration'
+      ? '这次没有确认是否年满 14 周岁，所以没有生成 AI 解读。完成确认后重新作答，可以获得 AI 解读。'
+      : gap === 'login'
+        ? '按规定登录后才能生成 AI 解读，这次没有生成。登录后重新作答，可以获得 AI 解读。'
+        : gap === 'stopped'
+          ? 'AI 解读当前没有开放，这次只有维度强度与依据题号；重新作答也不会有文字解读。'
+          : gap === 'unavailable'
+            ? 'AI 解读服务当前不可用，这几段陈述这次没有生成。前面三步（作答、记分、依据题号）都已完成。'
+            : result.failReason ?? '本次解读未能生成合规结果，已整体丢弃，不做任何替换或补写。',
+    ...(gap === 'stopped'
+      ? { retryHint: '下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。' }
+      : {
+          retryHint: '答案原文不留存，服务恢复后也补不回这一次；要拿到解读需要重新作答（约 5 分钟）。下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。',
+          action: gap === 'login'
+            ? { label: '先登录账号', onClick: () => navigate('/login', { state: { from: '/resume/self-assessment/intro' } }) }
+            : { label: '重新作答（约 5 分钟）', onClick: () => { clearSession(); navigate('/resume/self-assessment/intro') } },
+        }),
   }
 
   const completedAt = formatDateTime(session.consentedAt)
@@ -1126,7 +1171,7 @@ export function SelfAssessmentHistoryPage() {
       </SaCard>
 
       <SaCard head="现在可以做什么" hint="都是现在就能打开的入口" grow>
-        <SaPicks items={saExits(navigate, '/resume/self-assessment/history', hasCurrentConsent(session) && !session.result)} />
+        <SaPicks items={saExits(navigate, '/resume/self-assessment/history', hasRecordedConsent(session) && !session.result)} />
       </SaCard>
 
       <SaNotice>

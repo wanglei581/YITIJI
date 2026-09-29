@@ -159,6 +159,7 @@ function assertCrossSurfaceWiring(): void {
   const miniappApi = readFileSync(path.join(repoRoot, 'apps/miniapp/utils/api.js'), 'utf8')
   const miniappPay = readFileSync(path.join(repoRoot, 'apps/miniapp/pages/print-pay/print-pay.js'), 'utf8')
   const kioskClaim = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx'), 'utf8')
+  const kioskClaimModel = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/pickupClaimModel.ts'), 'utf8')
   const kioskCashier = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/PrintCashierPage.tsx'), 'utf8')
   const kioskPaymentApi = readFileSync(path.join(repoRoot, 'apps/kiosk/src/services/print/paymentApi.ts'), 'utf8')
 
@@ -198,7 +199,11 @@ function assertCrossSurfaceWiring(): void {
     ],
     [memberController.includes("@Headers('idempotency-key')"), '建单读取 Idempotency-Key 请求头'],
     [memberController.includes('assertMemberPrintOrderIdempotencyKey(idempotencyKey)'), 'controller 在进 service 前校验幂等键'],
-    [kioskClaim.includes("result.released ? '/print/progress' : '/print/cashier'") && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],
+    // W-45 起分流收进 pickupClaimModel.claimSuccessDestination：未放行进收银；已放行进进度，已打完的进完成页（不再说还在排队）。
+    [kioskClaim.includes('claimSuccessDestination(result)')
+      && /if \(!input\.released\) return '\/print\/cashier'/.test(kioskClaimModel)
+      && /return '\/print\/progress'/.test(kioskClaimModel)
+      && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],
     [kioskCashier.includes('releasePickupOrder') && kioskCashier.includes('if (!state.taskId && orderId && paymentSessionToken)'), 'Kiosk 付款后才触发 Order-only release'],
     [kioskPaymentApi.includes("/print/jobs/${encodeURIComponent(input.orderId)}/release") && kioskPaymentApi.includes("'x-terminal-id': terminalId"), 'Kiosk release 请求携带终端与支付会话绑定'],
   ]
