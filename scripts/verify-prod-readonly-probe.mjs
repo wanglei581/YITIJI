@@ -589,7 +589,7 @@ try {
   process.stdout.write(strictOne.stdout || '')
   expectExit(strictOne, 1, '--strict 企业数为 1')
   const strictOneLine = expectLine(strictOne.stdout, '/api/v1/companies', 'FAIL', '--strict 下企业数为 1 为 FAIL')
-  if (strictOneLine.includes('total=1')) pass('--strict 企业 FAIL 写明 total=1')
+  if (/\sFAIL\s/.test(strictOneLine) && strictOneLine.includes('total=1')) pass('--strict 企业 FAIL 写明 total=1')
   else fail(`--strict 企业 FAIL 必须写明条数。实际: ${strictOneLine.trim() || '(该行未出现)'}`)
   if (/FAIL 1\b/.test(strictOne.stdout || '')) pass('--strict 企业数为 1 时只有这一条 FAIL')
   else fail('企业数为 1 的 FAIL 必须是唯一失败项，否则退出码不是被这一条拉红的')
