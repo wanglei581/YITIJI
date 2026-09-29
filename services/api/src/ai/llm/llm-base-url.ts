@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common'
 import * as net from 'net'
-import { evaluateAiEndpoint, type AiEndpointRejectReason } from '../../common/outbound/ai-endpoint-allowlist'
+import { evaluateAiEndpoint, isLoopbackHost, type AiEndpointRejectReason, type EnvLike } from '../../common/outbound/ai-endpoint-allowlist'
 
 const NOT_APPROVED_REASON_TEXT: Record<AiEndpointRejectReason, string> = {
   host_not_allowed: '这个模型地址不在已核准的服务商名单里',
@@ -37,8 +37,12 @@ export function assertApprovedLlmBaseUrl(raw: string, action: '保存' | '测试
  * 连通性测试端点会再拦一次，防止环境变量里已有的内网地址被「测试」打到。
  *
  * 已知边界：不做 DNS，因此 `http://127.0.0.1.nip.io` 这类解析到内网的公网名会放行。
+ *
+ * 唯一例外：非生产环境放行回环地址（127.x、localhost、::1），与出站白名单同一口径、
+ * 同一个判定函数——走查与本地联调要在后台把模型地址配到本机的假大模型上。
+ * 生产（NODE_ENV=production）照旧拒绝；内网段、链路本地、0.0.0.0 在任何环境都拒绝。
  */
-export function assertPublicLlmBaseUrl(raw: string): void {
+export function assertPublicLlmBaseUrl(raw: string, env: EnvLike = process.env): void {
   const value = raw.trim()
   if (!value) {
     throw new BadRequestException({
@@ -58,6 +62,7 @@ export function assertPublicLlmBaseUrl(raw: string): void {
       error: { code: 'AI_BASE_URL_INVALID', message: '模型地址只允许 http 或 https' },
     })
   }
+  if (env['NODE_ENV'] !== 'production' && isLoopbackHost(normalizeLlmHost(parsed.hostname))) return
   if (isBlockedLlmHost(parsed.hostname)) {
     throw new BadRequestException({
       error: { code: 'AI_BASE_URL_PRIVATE', message: '模型地址不能指向本机或内网' },

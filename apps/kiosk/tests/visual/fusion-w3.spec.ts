@@ -1674,6 +1674,10 @@ test('advisor artifact print waits for the server receipt @w3-kiosk', async ({ p
       },
     }
   })
+  // 进打印链之后报价确认页会读的几条（本机能力、价目、报价）。
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', { status: 200, json: { terminalCode: 'KSK-001', capabilities: [] } })
+  api.respond('GET', '/api/v1/print/price-config', { status: 200, json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] } })
+  api.respond('POST', '/api/v1/orders/quote', { status: 200, json: { amountCents: 100, billablePages: 1, billingPageSource: 'detected', priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 1, amountCents: 100 }] } })
   page.on('request', (request) => {
     if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/artifacts/w3-art-1/print')) {
       printPath = new URL(request.url()).pathname
@@ -1690,7 +1694,11 @@ test('advisor artifact print waits for the server receipt @w3-kiosk', async ({ p
   await printButton.click()
   await expect(printButton).toHaveText(/正在生成打印稿/)
   await expect(page.getByText('已打印')).toHaveCount(0)
-  await expect(page.getByText('打印稿已生成，已保存到我的文档。还没有确认出纸。')).toBeVisible()
+  // 2026-09-29（P0-5，F09 / 稿 52）：打印稿生成后直接进打印链，先看价格再决定；
+  // 不再写「已保存到我的文档」—— 文件归属跟顾问会话走，游客时不属于任何人。
+  await page.waitForURL((url) => url.pathname === '/print/confirm')
+  await expect(page.locator('.print-file-name')).toHaveText('AI顾问-逐条比对表.pdf')
+  await expect(page.getByText('已保存到我的文档')).toHaveCount(0)
   expect(printPath).toBe('/api/v1/advisor/sessions/w3-art-sess/artifacts/w3-art-1/print')
   await expect(page.getByText('已打印')).toHaveCount(0)
   await assertNoHorizontalOverflow(page)
