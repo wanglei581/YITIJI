@@ -4,6 +4,8 @@
 
 > **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
 
+> **2026-09-29 一体机登录页走查 W-15 / W-19 / W-54（候选写入方）**：先勾选协议再切到扫码时，开发态严格模式会把二维码请求锁在「正在获取二维码」；卸下面板时同时放开这把锁，先勾后切、先切后勾都能出码，获取失败可以重新生成。短信发不出来时，这台机器的额度、今天的总额、这个号码今天用完分开写；机器和总额的主按钮仍是「改用扫码登录」，旁边可以「不登录，继续使用」；号码用完不再写成「重新获取验证码」。手机号输满后键盘还在，发码按钮留在号码上方可以点；协议未勾是空框；验证码发出后才聚焦验证码。在「我的」里点「结束使用」回到首页，与闲置清场同一去向。已知未做：别的一体机发码若不带终端编号和终端会话票，机器级短信额度计不上，归服务端窗口，本分支未改 `services/api`。
+
 ## 2026-09-29：content-pipeline-e2e 自签令牌改为 15 分钟，并核对与登录签发一致（PR #1097，未合入）
 
 - **寿命：** `issueInternalToken` 的自签令牌从 `24h` 改为 `15m`。这条门禁是隔离 SQLite + 进程内内存 Redis 的一次 HTTP 链路，脚本里没有 sleep / 轮询；2026-09-29 本机整段实测 48 秒，15 分钟够用。生产登录仍是 `auth.module.ts` 的 `JWT_TTL`（24h）。
