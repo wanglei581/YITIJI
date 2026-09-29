@@ -395,11 +395,11 @@ async function main(): Promise<void> {
   check('D2b 生产 PUT 回环模型地址 → 400 AI_BASE_URL_PRIVATE，不写审计、不改配置',
     httpErrorOf(prodPutError).code === 'AI_BASE_URL_PRIVATE' && auditWrites === 0 && config.getConfig('assistant_chat').baseURL === baseBeforeLoopback,
     JSON.stringify(httpErrorOf(prodPutError)))
-  await withEnv({ NODE_ENV: 'development' }, () => controller.updateOne('assistant_chat', { baseURL: loopbackBase }, admin, req))
+  const devPutError = await withEnv({ NODE_ENV: 'development' }, () => caught(() => controller.updateOne('assistant_chat', { baseURL: loopbackBase }, admin, req)))
   check('D2c 非生产 PUT 回环模型地址（本机假大模型）→ 保存成功并写审计',
-    config.getConfig('assistant_chat').baseURL === loopbackBase && auditWrites === 1)
+    devPutError === null && config.getConfig('assistant_chat').baseURL === loopbackBase && auditWrites === 1, JSON.stringify(httpErrorOf(devPutError)))
   chatTests = 0
-  await withEnv({ NODE_ENV: 'development' }, () => controller.testOne('assistant_chat'))
+  await withEnv({ NODE_ENV: 'development' }, () => caught(() => controller.testOne('assistant_chat')))
   const prodTestError = await withEnv(PROD, () => caught(() => controller.testOne('assistant_chat')))
   check('D2d 回环地址的连通性测试：非生产进入测试，生产拒绝且不调用测试',
     chatTests === 1 && httpErrorOf(prodTestError).code === 'AI_BASE_URL_PRIVATE', `chatTests=${chatTests} ${JSON.stringify(httpErrorOf(prodTestError))}`)
