@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-30：G8 一体机识别「打印闸门合上」（分支 `grok/kiosk-queue-gate-status-0930`，配合 #1150，不合入该 PR）
+
+- **做了什么：** 心跳 `queue_cleanup_failed` / `queue_pause_failed` 映射为暂停接单（kind 仍用已有的 error，printerReady=false）。首页打印磁贴、打印扫描要出纸的卡片、上传页、预览和确认、设备状态页都改口；文档打印、照片打印、材料扫描停用。手机上传、U 盘、格式转换、签名、到机码仍可进，到机码旁写明这台暂时不能出纸。首页整张磁贴不置灰，与缺纸、离线同一套：整卡停掉会把还能用的上传和加工一起堵死。
+- **新字段：** `printerNotice`（可选）。短标题必须是「暂停接单」，说明句没有现成的用户向字段可放。
+- **验证：** 既有 `verify:device-status-honest` 加了两条断言；`print-hub-qx.spec.ts` 两条运行用例。正式构建 + Playwright 通过。服务端不可用集合仍只有 offline / error / paper_empty，本分支不改 `services/api`。
+
 ## 2026-09-29：W-03 补——建号时填了但未验证的手机号，也可按确认函登记（分支 `claude/backend-hardening-20260929-w03-unverified-phone`）
 
 - **走查发现（两个后台窗口）：** 界面「新增账号」要求填手机号，建出来都是「临时密码 + 已填未验证的号」；按 #1128 的资格规则这类账号不能登记，W-03 在界面上做不出可登记的账号。

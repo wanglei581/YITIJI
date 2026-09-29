@@ -99,6 +99,61 @@ expectMatches(hookSrc, /tonerKnown:\s*false/, 'hook 声明 tonerKnown=false（Ag
 expectMatches(hookSrc, /网络正常/, 'hook 含「网络正常」文案（仅 API 可达时）')
 expectMatches(hookSrc, /状态未知/, 'hook 含「状态未知」文案')
 
+// 打印闸门合上：两个心跳值各走自己的 case，不掉进 default（default 是「状态未知」，入口不会停）。
+const QUEUE_GATE_NOTICE = '打印机暂时不可用，请联系现场工作人员'
+const hubPageSrc = read('src/pages/print-scan/PrintScanHomePage.tsx')
+const uploadSrc = read('src/pages/print/PrintUploadPage.tsx')
+const homeDomainSrc = read('src/pages/home/homeDomainStatus.ts')
+const homeViewSrc = read('src/pages/home/components/QxHomeView.tsx')
+for (const status of ['queue_cleanup_failed', 'queue_pause_failed']) {
+  const marker = `case '${status}':`
+  const idx = hookSrc.indexOf(marker)
+  if (idx < 0) {
+    fail(`mapTerminalPrinterStatus 缺少 ${status}`)
+    continue
+  }
+  const slice = hookSrc.slice(idx, idx + 900)
+  const retAt = slice.search(/return\s*\{/)
+  const block = retAt < 0 ? '' : slice.slice(retAt, retAt + 520)
+  if (!block) {
+    fail(`${status} 没有映射 return`)
+    continue
+  }
+  if (!/kind:\s*'error'/.test(block)) fail(`${status} kind 必须沿用 error`)
+  else pass(`${status} kind=error`)
+  if (!/printerReady:\s*false/.test(block)) fail(`${status} printerReady 必须是 false，打印入口才停`)
+  else pass(`${status} printerReady=false`)
+  if (!/deviceStatus:\s*'error'/.test(block)) fail(`${status} deviceStatus 必须是 error`)
+  else pass(`${status} deviceStatus=error`)
+  if (!block.includes("printerLabel: '暂停接单'")) fail(`${status} 入口短标题必须是「暂停接单」`)
+  else pass(`${status} 文案「暂停接单」`)
+  if (!block.includes(`printerNotice: '${QUEUE_GATE_NOTICE}'`)) fail(`${status} 缺少说明「${QUEUE_GATE_NOTICE}」`)
+  else pass(`${status} 文案「${QUEUE_GATE_NOTICE}」`)
+}
+expectMatches(
+  hubPageSrc,
+  /orderPaused \? device\.printerNotice/,
+  '打印扫描首页在闸门合上时用 printerNotice 作停用说明',
+)
+expectMatches(
+  hubPageSrc,
+  /unavailableBadge: orderPaused/,
+  '打印扫描首页在闸门合上时入口短标题改为暂停接单',
+)
+expectMatches(
+  hubPageSrc,
+  /available: false/,
+  '打印扫描首页停用卡保持 available:false',
+)
+expectMatches(uploadSrc, /device\.printerNotice/, '打印上传页展示暂停接单说明')
+expectMatches(
+  read('src/pages/print/file-source/FileSourceView.tsx'),
+  /orderPausedNotice/,
+  '上传页把暂停接单说明放到看得见的状态块（页头说明在本页只留给读屏）',
+)
+expectMatches(homeDomainSrc, /deviceNotice/, '首页说明接 printerNotice')
+expectMatches(homeViewSrc, /device\.printerNotice/, '首页把 printerNotice 传给打印入口说明')
+
 expectNotMatches(previewSrc, /function mapPrinterStatus/, 'PrintPreview 已删除内联 mapPrinterStatus')
 expectNotMatches(previewSrc, /function usePrinterStatus/, 'PrintPreview 已删除内联 usePrinterStatus')
 expectNotMatches(

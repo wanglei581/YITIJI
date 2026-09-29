@@ -117,6 +117,7 @@ export function PrintConfirmPage() {
   const {
     printerReady,
     printerLabel,
+    printerNotice,
     loading: printerLoading,
     kind: printerKind,
     printer,
@@ -124,11 +125,13 @@ export function PrintConfirmPage() {
   const printerBlocked = printerLoading || !printerReady
   const printerBlockedReason = printerLoading
     ? '正在确认打印机状态，请稍候'
-    : printer.errorCode === 'paperEmpty'
-      ? '打印机缺纸，当前不能下单，不会扣费。请联系工作人员补纸后再试。'
-      : printerKind === 'offline'
-        ? `${printerLabel}。当前不能下单，不会扣费。请联系工作人员检查设备后再试。`
-        : `${printerLabel}。当前不能下单，不会扣费。请联系工作人员。`
+    : printerNotice
+      ? printerNotice
+      : printer.errorCode === 'paperEmpty'
+        ? '打印机缺纸，当前不能下单，不会扣费。请联系工作人员补纸后再试。'
+        : printerKind === 'offline'
+          ? `${printerLabel}。当前不能下单，不会扣费。请联系工作人员检查设备后再试。`
+          : `${printerLabel}。当前不能下单，不会扣费。请联系工作人员。`
   const adjusted = adjustments.length > 0
   const materialCheck = handoff?.materialCheck
   const source = handoff?.source
@@ -483,7 +486,7 @@ export function PrintConfirmPage() {
         : printerLoading
           ? '设备检测中…'
           : !printerReady
-            ? '打印机不可用'
+            ? (printerNotice ? printerLabel : '打印机不可用')
             : reconfirmLabel
               ? reconfirmLabel
               : isContractReport

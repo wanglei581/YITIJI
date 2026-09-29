@@ -146,6 +146,7 @@ export function QxHomeView({
     deviceLoading: device.loading,
     deviceReady: device.printerReady,
     deviceLabel: device.printerLabel,
+    deviceNotice: device.printerNotice,
   })
   const fair = fairCopy(jobFair)
   const job = jobCopy(jobs)
