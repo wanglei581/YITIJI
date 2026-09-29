@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1706 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1711 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -140,7 +140,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 114 个文件</summary>
+<summary><code>apps/admin/src/</code> — 119 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -196,7 +196,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/peripherals/PeripheralDrawer.tsx` | `verify-admin-peripheral-views.mjs` |
 | `apps/admin/src/routes/peripherals/index.tsx` | `verify-admin-peripheral-views.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-honest-placeholders.mjs` |
 | `apps/admin/src/routes/peripherals/peripheralViews.ts` | `verify-admin-peripheral-views.mjs` |
-| `apps/admin/src/routes/permissions/index.tsx` | `verify-honest-placeholders.mjs` |
+| `apps/admin/src/routes/permissions/AccountStatusDialog.tsx` | `verify-admin-internal-accounts-ui.mjs` |
+| `apps/admin/src/routes/permissions/AccountsTable.tsx` | `verify-admin-internal-accounts-ui.mjs` |
+| `apps/admin/src/routes/permissions/BackupAdminDrawer.tsx` | `verify-admin-internal-accounts-ui.mjs` |
+| `apps/admin/src/routes/permissions/index.tsx` | `verify-admin-internal-accounts-ui.mjs`<br/>`verify-honest-placeholders.mjs` |
+| `apps/admin/src/routes/permissions/presentation.ts` | `verify-admin-internal-accounts-ui.mjs` |
 | `apps/admin/src/routes/policy-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/print-scan/CapabilityCenter.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx` | `verify-admin-print-scan-ui.mjs` |
@@ -244,6 +248,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/consoleScreen.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/services/api/devices.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/services/api/files.ts` | `verify-admin-file-lifecycle.mjs` |
+| `apps/admin/src/services/api/internalAccounts.ts` | `verify-admin-internal-accounts-ui.mjs` |
 | `apps/admin/src/services/api/jobMaterials.ts` | `verify-admin-job-materials-ui.mjs` |
 | `apps/admin/src/services/api/offlineAgenciesAdmin.ts` | `verify-admin-offline-agencies-ui.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/services/api/offlineAgencyGovernance.ts` | `verify-admin-offline-agencies-ui.mjs` |
