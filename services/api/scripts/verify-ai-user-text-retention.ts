@@ -184,6 +184,8 @@ const NO_TTL_REGISTRY: Record<string, string> = {
     '岗位数据源质量快照，只存机构/岗位维度的统计指标，不含任何求职者输入的文本',
   UserAiConsent:
     '同意记录必须与账号同生命周期，撤回写 revokedAt 而不是删除；不含用户自由文本',
+  AiUsageRecord:
+    'P1-2a 逐次计量账（额度与将来收费的底座），只落功能/厂商/型号/状态/tokens/金额/终端/机构/会员号等元数据，无任何用户文本字段；会员注销时 endUserId 经外键 SetNull 置空；留存期待产品负责人定。只记大模型调用（llmFetchJson + 合同审查）；TRTC 数字人、ASR、TTS、OCR 本期不计量、不写本表，只靠入口额度兜底（TRTC 开会话是 voice 类，会被额度拦）',
 }
 
 const writtenModels = new Map<string, string[]>()
