@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-29：PG 下 Serializable 冲突识别不到、被当成 500（分支 `claude/backend-hardening-20260929-pg-serialization-conflict`）
+
+- **问题（3.9 名册子代理在真 PG 上发现，本任务在真 PG 16 上复现）：** `@prisma/adapter-pg` 在 COMMIT 阶段的 Serializable 冲突抛 `DriverAdapterError`（`cause.originalCode=40001`、`kind=TransactionWriteConflict`），不是 P2034——实测 10 次冲突 9 次是这个形状（冲突在查询上时 Prisma 才转成 P2034）。只认 P2034 的六处：首位管理员引导、机构账号手机号换绑、机构账号删除、会员隐私与合同审查的事务重试、扫描任务、发布观察。旧代码上机构账号并发删除直接变 500「服务器内部错误」，首位管理员并发的败方报错码不对。
+- **修法（Claude 子代理实现，因本会话钩子不许写别的工作目录，子代理产出补丁、协调方在自己的工作目录应用）：** 新增共用 `common/prisma/serialization-conflict.ts`，六处只改「认不认得出」，重试次数、退避与对外错误码逐处不变。
+- **验证：** `verify:pg-serialization-conflict`（单元 + 静态扫描，进 CI 两作业）；`verify:pg-serialization-conflict:postgres`（屏障把冲突确定落在 COMMIT，真 PG 并发删机构账号，进 postgres-readiness）；首位管理员 PG 用例补屏障用例。子代理真 PG 上旧代码红、修复后两条 PG 用例各连跑 8 次全绿，7 类变异全红。协调方在 SQLite 独立复跑 10 条关联门禁全绿，变异「admin-orgs 改回只认 P2034」静态扫描点名变红。
+- **没做：** 发布观察的 createPlan / report 两个事务本来就不 catch（P2034 也原样 500），要不要回 409 另议；死锁 40P01 未纳入。
+
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
