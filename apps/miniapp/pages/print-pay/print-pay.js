@@ -41,6 +41,11 @@ function quoteParams(copies) {
   }
 }
 
+function decodeParam(value) {
+  if (typeof value !== 'string' || !value) return ''
+  try { return decodeURIComponent(value) } catch (e) { return value }
+}
+
 function colorLabelOf(colorMode) {
   return colorMode === 'color' ? '彩色' : '黑白'
 }
@@ -87,6 +92,7 @@ Page({
   data: {
     statusBarHeight: 20,
     q: {},
+    storeName: '',
     files: [{ name: '本人文件', price: '—' }],
     fee: { total: '—' },
     isFreeOrder: false,
@@ -141,6 +147,8 @@ Page({
     this.setData({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       q,
+      // 终端名由上一页 encodeURIComponent 传来，微信不替我们解码；只解这个显示用字段。
+      storeName: decodeParam(q.store),
       colorMode: ORDER_COLOR_MODE,
       duplex: ORDER_DUPLEX,
       colorLabel: colorLabelOf(ORDER_COLOR_MODE),

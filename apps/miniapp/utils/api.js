@@ -634,6 +634,7 @@ const api = {
       header: { 'x-resume-parse-intent': intent, 'x-resume-parse-proof': proof },
       needAuth: true,
       ai: 'generate',
+      resumeAi: true,
       timeout: config.aiTimeout,
     });
   },
@@ -663,6 +664,7 @@ const api = {
     return request(`/resume/records/${encodeURIComponent(taskId)}/export`, {
       method: 'POST',
       ai: 'export',
+      resumeAi: true,
       data,
       header: tokenHeader(accessToken),
       needAuth: true,
@@ -687,7 +689,7 @@ const api = {
   getResumeOptimize(taskId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历优化'));
     return request(`/resume/records/${taskId}/optimize`, {
-      method: 'GET', header: tokenHeader(accessToken), needAuth: !accessToken, timeout: config.aiTimeout, ai: 'generate',
+      method: 'GET', header: tokenHeader(accessToken), needAuth: !accessToken, timeout: config.aiTimeout, ai: 'generate', resumeAi: true,
     });
   },
 
@@ -698,7 +700,7 @@ const api = {
   putResumeDraft(taskId, payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历草稿'));
     return request(`/resume/records/${encodeURIComponent(taskId)}/draft`, {
-      method: 'PUT', data: payload, needAuth: true,
+      method: 'PUT', data: payload, needAuth: true, ai: 'read', resumeAi: true,
     });
   },
 
@@ -706,7 +708,7 @@ const api = {
   getResumeDraft(taskId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历草稿'));
     return request(`/resume/records/${encodeURIComponent(taskId)}/draft`, {
-      method: 'GET', needAuth: true,
+      method: 'GET', needAuth: true, ai: 'read', resumeAi: true,
     });
   },
 
@@ -725,7 +727,7 @@ const api = {
   factCheckResume(taskId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历事实核对'));
     return request(`/resume/records/${encodeURIComponent(taskId)}/fact-check`, {
-      method: 'POST', needAuth: true, ai: 'generate',
+      method: 'POST', needAuth: true, ai: 'generate', resumeAi: true,
     });
   },
 
@@ -1276,7 +1278,7 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
     return request('/resume/generate', {
       method: 'POST', data: payload, header: tokenHeader(accessToken),
-      needAuth: true, timeout: config.aiTimeout, ai: 'generate',
+      needAuth: true, timeout: config.aiTimeout, ai: 'generate', resumeAi: true,
     });
   },
 
@@ -1297,7 +1299,7 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
     return request('/resume/generate/export', {
       method: 'POST', data: payload, header: tokenHeader(accessToken),
-      needAuth: true, timeout: 60000, ai: 'export',
+      needAuth: true, timeout: 60000, ai: 'export', resumeAi: true,
     });
   },
 

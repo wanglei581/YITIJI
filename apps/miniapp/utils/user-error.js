@@ -61,6 +61,8 @@ const SHARED_USER_MESSAGES = {
   // 小程序自己的两句（utils/ai-access.js 在用户选「未满」或「改用手打」时抛出）。
   AI_AGE_NOT_DECLARED: '未满 14 周岁需要监护人同意后才能使用，小程序暂时办不了',
   AI_VOICE_NOT_CONSENTED: '没有同意录音，这一步请改用文字输入',
+  AI_RESUME_NOT_CONSENTED: '没有同意使用简历 AI，内容没有发给 AI。想用时再点一次，同意后继续',
+  USER_AI_CONSENT_REQUIRED: '需要先确认 AI 使用授权，才能继续',
 };
 
 /**
