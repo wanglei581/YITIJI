@@ -18175,7 +18175,8 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-field-safety.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
-      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs",
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
     ],
     "apps/kiosk/src/hooks/useToolboxConfig.ts": [
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
@@ -21900,6 +21901,7 @@
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
@@ -24926,6 +24928,7 @@
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
     "services/api/src/terminals/printer-availability.ts": [
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/terminals/printer-status.ts": [
@@ -29517,10 +29520,13 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/wmi.ts",
           "apps/terminal-agent/src/printer/image-to-pdf.ts",
-          "apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts"
+          "apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/terminals/printer-availability.ts"
         ],
         "missing": []
       },
