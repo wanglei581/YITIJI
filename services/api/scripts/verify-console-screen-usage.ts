@@ -526,7 +526,7 @@ async function assertBehavior(): Promise<void> {
       return item === undefined ? 'missing' : item.count
     }
     const aiResumeOps = ['parseResume', 'optimizeResume', 'adjustResumeLayout', 'generateResume']
-    assert('u11. 管理员指标键齐全且 visits 未接入', JSON.stringify(Object.keys(admin.metrics)) === JSON.stringify([...ADMIN_USAGE_METRIC_KEYS]) && admin.metrics.visits?.available === false && admin.metrics.visits.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten && !('value' in admin.metrics.visits))
+    assert('u11. 管理员指标键齐全且 visits 已接入（W-69，无会话为 0）', JSON.stringify(Object.keys(admin.metrics)) === JSON.stringify([...ADMIN_USAGE_METRIC_KEYS]) && admin.metrics.visits?.available === true && admin.metrics.visits.value === 0 && admin.metrics.visits.window === 'today')
     assert(
       'u12. 服务节点按口径求和，AI 只数成功，公司样本不足为 null',
       serviceCount('jobs') === show(countBrowse(['job'], today.from, today.to))
@@ -799,7 +799,7 @@ async function assertBehavior(): Promise<void> {
         && admin.status === 'ok'
         && admin.degraded === false
         && partnerA.range === 'today'
-        && partnerB.metrics.visits?.reason === 'kiosk_session_unwritten',
+        && partnerB.metrics.visits?.available === true && partnerB.metrics.visits.value === 0,
     )
 
     cache.clear()

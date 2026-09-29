@@ -292,22 +292,22 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/screen/snapshot` | AdminScreenController.getAdminSnapshot | admin | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| GET | `/api/v1/admin/screen/terminals/:terminalId` | AdminScreenController.getAdminTerminalTwin | admin | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/admin/screen/snapshot` | AdminScreenController.getAdminSnapshot | admin | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/admin/screen/terminals/:terminalId` | AdminScreenController.getAdminTerminalTwin | admin | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 
 ## `services/api/src/console-screen/console-screen.partner.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/partner/screen/snapshot` | PartnerScreenController.getPartnerSnapshot | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| GET | `/api/v1/partner/screen/terminals/:terminalId` | PartnerScreenController.getPartnerTerminalTwin | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/partner/screen/snapshot` | PartnerScreenController.getPartnerSnapshot | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/partner/screen/terminals/:terminalId` | PartnerScreenController.getPartnerTerminalTwin | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 
 ## `services/api/src/console-screen/console-screen.usage.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/screen/usage` | UsageRangeQueryDto.getAdminUsage | admin | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
-| GET | `/api/v1/partner/screen/usage` | UsageRangeQueryDto.getPartnerUsage | admin | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
+| GET | `/api/v1/admin/screen/usage` | UsageRangeQueryDto.getAdminUsage | admin | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
+| GET | `/api/v1/partner/screen/usage` | UsageRangeQueryDto.getPartnerUsage | admin | ConsoleScreenUsageService | AiServiceLog<br/>AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Favorite<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal |
 
 ## `services/api/src/content/ai-poster.controller.ts`
 

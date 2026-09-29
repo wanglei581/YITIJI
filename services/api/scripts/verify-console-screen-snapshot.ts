@@ -1285,8 +1285,8 @@ async function assertRecruitmentHostingContract(
         && dailyOff.days[0]?.browse === 6
         && dailyOff.days[0]?.sourceOpens === 6
         && partnerDiff === ''
-        && partnerUseOn.metrics.visits?.available === false
-        && partnerUseOn.metrics.visits.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten,
+        && partnerUseOn.metrics.visits?.available === true // 服务人次已接入（W-69）；本夹具没写会话 → 真 0
+        && partnerUseOn.metrics.visits.value === 0,
       `on=${JSON.stringify(dailyOn)} off=${JSON.stringify(dailyOff)} diff=${partnerDiff}`,
     )
   } finally {
@@ -1601,15 +1601,15 @@ async function assertServiceContract(): Promise<void> {
     const partnerB = await screen.getPartnerSnapshot(orgB)
 
     assert(
-      '3a. gov 含 visitCount 未接入，同时含任务流与告警',
-      Boolean(gov.metrics.visitCount && gov.metrics.visitCount.available === false && gov.metrics.alertsRealtime && gov.metrics.taskFlow24h),
+      '3a. gov 含 visitCount（已接入，W-69），同时含任务流与告警',
+      Boolean(gov.metrics.visitCount && gov.metrics.visitCount.available === true && gov.metrics.alertsRealtime && gov.metrics.taskFlow24h),
     )
     assert('3b. ops 含 alerts 且不含 visitCount', Boolean(ops.metrics.alertsRealtime && !ops.metrics.visitCount))
     assert(
-      '3c. 未接入不用 0 冒充',
-      gov.metrics.visitCount?.available === false
-        && gov.metrics.visitCount.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten
-        && !('value' in gov.metrics.visitCount),
+      '3c. 服务人次按今日会话计，本夹具没写会话就是真 0（不是未接入）',
+      gov.metrics.visitCount?.available === true
+        && gov.metrics.visitCount.window === 'shanghai-day'
+        && gov.metrics.visitCount.value === 0,
     )
     assert(
       '3d. Partner A 只看到本机构在架岗位 1，不含 B 的 2',
@@ -1701,9 +1701,9 @@ async function assertServiceContract(): Promise<void> {
     const yesterdayPages = trendDays.find((day) => day.date === yesterdayKey)?.pages
     const copiesProduct = 3 * 9 + 5 * 13 + 7 * 11
     assert(
-      '3h. 累计只计当前 paid 的内容页，不乘 copies，unpaid/refunded/paying 不计',
+      '3h. 累计按出纸任务×份数（W-68）：夹具里已付单都没出纸、唯一完成任务无订单页数 → 0，不是 paid 内容页 15',
       gov.metrics.printPagesCumulative?.available === true
-        && gov.metrics.printPagesCumulative.value.totalPages === 15
+        && gov.metrics.printPagesCumulative.value.totalPages === 0
         && gov.metrics.printPagesCumulative.value.totalPages !== copiesProduct
         && gov.metrics.printPagesCumulative.value.byColor.available === false,
       gov.metrics.printPagesCumulative?.available
@@ -1772,9 +1772,9 @@ async function assertServiceContract(): Promise<void> {
     const cumulative = await loadPrintCumulativeSlice(prisma, now)
     const cumulativeDays = cumulative.trend === 'capped' ? [] : cumulative.trend.days
     assert(
-      '3h5. 查询函数与快照口径一致：paid 内容页=15、今日失败日志=1',
+      '3h5. 查询函数与快照口径一致：出纸页=0、今日失败日志=1',
       live.failedToday === 1
-        && cumulative.pages.totalPages === 15
+        && cumulative.pages !== 'capped' && cumulative.pages.totalPages === 0
         && cumulative.trend !== 'capped'
         && cumulativeDays.some((day) => day.date === todayKey && day.pages === 10)
         && cumulativeDays.some((day) => day.date === yesterdayKey && day.pages === 5),
@@ -1785,9 +1785,9 @@ async function assertServiceContract(): Promise<void> {
     assert(
       '3h6. 趋势 take=cap+1 溢出则 capped，未溢出则仍按 paidAt 窗口可算',
       overflow.trend === 'capped'
-        && overflow.pages.totalPages === 15
+        && overflow.pages !== 'capped' && overflow.pages.totalPages === 0
         && atCap.trend !== 'capped'
-        && atCap.pages.totalPages === 15
+        && atCap.pages !== 'capped' && atCap.pages.totalPages === 0
         && atCapDays.some((day) => day.date === todayKey && day.pages === 10)
         && atCapDays.some((day) => day.date === yesterdayKey && day.pages === 5),
       overflow.trend === 'capped'
@@ -2081,7 +2081,7 @@ async function assertTwinCases(
   const adminText = JSON.stringify(adminTwin)
   const current = adminTwin.currentTask.available ? adminTwin.currentTask.value : undefined
   assert(
-    '5d. 管理员孪生给出设备块，今日按上海日，访问和耗材不可用，且不含文件名',
+    '5d. 管理员孪生给出设备块，今日按上海日，服务人次无会话为 0，耗材不可用，且不含文件名',
     adminTwin.audience === 'admin'
       && adminTwin.terminal.id === ids.termA
       && adminTwin.terminal.areaLabel === '天河区'
@@ -2106,9 +2106,8 @@ async function assertTwinCases(
       && adminTwin.today.printTasks === null
       && adminTwin.today.scans === 0
       && adminTwin.today.failed === null
-      && adminTwin.today.visits.available === false
-      && adminTwin.today.visits.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten
-      && !('value' in adminTwin.today.visits)
+      && adminTwin.today.visits.available === true
+      && adminTwin.today.visits.value === 0
       && adminTwin.consumables.available === false
       && adminTwin.consumables.reason === SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo
       && !('value' in adminTwin.consumables)

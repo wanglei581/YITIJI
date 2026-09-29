@@ -3752,6 +3752,7 @@
           "FairZone",
           "Job",
           "JobFair",
+          "KioskSession",
           "Order",
           "PolicyPost",
           "PrintTask",
@@ -3787,6 +3788,7 @@
           "FairZone",
           "Job",
           "JobFair",
+          "KioskSession",
           "Order",
           "PolicyPost",
           "PrintTask",
@@ -3824,6 +3826,7 @@
           "Favorite",
           "Job",
           "JobFair",
+          "KioskSession",
           "Order",
           "PolicyPost",
           "PrintTask",
@@ -9877,6 +9880,7 @@
           "FairZone",
           "Job",
           "JobFair",
+          "KioskSession",
           "Order",
           "PolicyPost",
           "PrintTask",
@@ -9912,6 +9916,7 @@
           "FairZone",
           "Job",
           "JobFair",
+          "KioskSession",
           "Order",
           "PolicyPost",
           "PrintTask",
@@ -9949,6 +9954,7 @@
           "Favorite",
           "Job",
           "JobFair",
+          "KioskSession",
           "Order",
           "PolicyPost",
           "PrintTask",
@@ -16820,6 +16826,7 @@
         "name": "KioskSession",
         "relations": [],
         "usedBy": [
+          "services/api/src/console-screen/console-screen.visits.ts",
           "services/api/src/kiosk-session/kiosk-session-retention.task.ts",
           "services/api/src/kiosk-session/kiosk-session.queries.ts",
           "services/api/src/kiosk-session/kiosk-session.service.ts"
@@ -16994,6 +17001,7 @@
           "Order"
         ],
         "usedBy": [
+          "services/api/src/console-screen/console-screen.printed-pages.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/pickup-validity.ts",
@@ -17154,6 +17162,7 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/console-screen/console-screen.fleet.ts",
+          "services/api/src/console-screen/console-screen.printed-pages.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.usage.queries.ts",
@@ -17336,6 +17345,7 @@
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
+          "services/api/src/console-screen/console-screen.visits.ts",
           "services/api/src/content/content.service.ts",
           "services/api/src/device-fleet/device-fleet.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
@@ -21158,6 +21168,7 @@
     ],
     "packages/shared/src/types/consoleScreen.ts": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts"
     ],
@@ -21758,6 +21769,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
@@ -21987,6 +21999,7 @@
     "services/api/src/admin-ops/admin-ops.service.ts": [
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/admin-ops/derived-alert-identity.ts": [
@@ -23206,6 +23219,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.cache.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts"
     ],
@@ -23216,6 +23230,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.metric.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts"
     ],
@@ -23229,10 +23244,15 @@
     "services/api/src/console-screen/console-screen.partner.controller.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
+    "services/api/src/console-screen/console-screen.printed-pages.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts"
+    ],
     "services/api/src/console-screen/console-screen.queries.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.service.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.timeline.ts": [
@@ -23242,6 +23262,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.types.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts"
     ],
@@ -23252,8 +23273,12 @@
       "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/src/console-screen/console-screen.usage.service.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts"
+    ],
+    "services/api/src/console-screen/console-screen.visits.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts"
     ],
     "services/api/src/content/content-signing.ts": [
       "services/api/scripts/verify-ad-asset-range.ts",
@@ -24802,6 +24827,7 @@
       "services/api/scripts/verify-closed-pending-print-task-disposition.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-companies.ts",
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-content-pipeline-e2e.ts",
@@ -32879,6 +32905,35 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:compliance"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "packages/shared/src/types/consoleScreen.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/console-screen/console-screen.cache.ts",
+          "services/api/src/console-screen/console-screen.metric.ts",
+          "services/api/src/console-screen/console-screen.printed-pages.ts",
+          "services/api/src/console-screen/console-screen.queries.ts",
+          "services/api/src/console-screen/console-screen.service.ts",
+          "services/api/src/console-screen/console-screen.types.ts",
+          "services/api/src/console-screen/console-screen.usage.service.ts",
+          "services/api/src/console-screen/console-screen.visits.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-console-screen-printed-visits.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:console-screen-printed-visits"
       ],
       "wired": true
     },

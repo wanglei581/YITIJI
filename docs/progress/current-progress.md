@@ -120,6 +120,14 @@
 > **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
 
 - **审查后补 A+B（9/29，总指挥裁定）：** 「按原样导出」的正文来源改由服务端决定。带 taskId：按生成时留存的本人原始填写渲染（`AiResumeResult` kind=`generate_input`，与生成结果同一留存期，纳入删除级联与留存矩阵），取不到回 404 `RESUME_DRAFT_SOURCE_NOT_FOUND` 并给下一步「用当前表格重新导出」。不带 taskId：客户端正文与可比对范围内的 AI 结果规范化比对（会员本人、已验签一体机本次使用期间，匿名离机时比对保留期内全部），含 AI 段落回 409 `RESUME_DRAFT_CONTAINS_AI_OUTPUT`，`error.nextAction=export_ai_labeled`；本人原话豁免、≥20 汉字当量才比对。`AiResumeResult` 加 `terminalId` 列（两套迁移）。新门禁 `verify:resume-export-draft-source` 30 条（旧代码上红 12 条），子代理 9 处反向变异全红；协调方复跑 11 条关联门禁全绿。待拍板：小程序草稿导出带 taskId 时导出的是生成时原话（推荐生成后改过表格就不带 taskId）；排版调整的 AI 输出未落库，比对不到（推荐另开一项）。
+## 2026-09-29：走查 W-68 大屏累计打印页数、W-69 服务人次读取接真（分支 `claude/backend-hardening-20260929-screen-printed-visits`）
+
+- **问题：** W-68 大屏「累计打印」取已付款订单的计费页之和，不乘份数，已付款但没出纸的单也算进去。W-69 #1065 只接了一体机会话写入，读取四处（政务版与机构快照 `visitCount`、服务调用 `visits`、单台 `today.visits`）仍写死「会话未写入」，共享契约还是 `ScreenMetric<never>`。
+- **修法（Claude 子代理实现、协调方审）：** 新文件 `console-screen.printed-pages.ts`：只计真正出纸的任务（completed 且未被核查为未出纸，或未确认出纸经管理员核查为已出纸），页数取材料包行或单文件订单的计费页，乘任务参数里的份数（缺失按 1、上限 99），退款不扣（纸已出），超过 20 万行如实标未计算。新文件 `console-screen.visits.ts`：四处共用一套口径，服务人次 = 窗口内开始的一体机会话数（是会话数不是人数）；机构只数快照为本机构且终端仍属本机构的会话；面向机构、服务调用、单台的 1–4 次标「样本不足」；原始记录只留 180 天，所以不做累计。共享契约改为 `ScreenMetric<number>`。
+- **验证：** 新门禁 `verify:console-screen-printed-visits` 30 条（CI SQLite 作业）；console-screen-snapshot / usage 与旧口径冲突的 9 条断言就地改写；子代理 9 处反向变异全红；协调方在最新候选上复跑 8 条关联门禁与 api / admin / partner / ui / shared / kiosk 类型检查全绿。复现：造三张已付款单共 12 页（两张出纸各 3 份），旧代码报 12、修后报 15；服务人次旧代码五处都是「未接入」、修后都是 6。
+- **待产品负责人拍板：** 14 天打印趋势与单台「今日打印页数」仍是旧口径（已付款内容页，不乘份数，页面说明本来就这么写），推荐下一步统一成出纸 × 份数、按出纸时间落日；政务版服务人次取「今日」。
+- **交付单（两个后台窗口）：** 政务版 GovGrid 加「今日服务人次」一格并注明是会话数；「累计打印」加口径脚注；UsageView 的「访问人次」统一成「服务人次」；机构后台主栅格加 `visitCount`；共用组件 TwinTerminalBoard 里「接入前不显示」的说明已过时。
+
 ## 2026-09-29：content-pipeline-e2e 自签令牌改为 15 分钟，并核对与登录签发一致（PR #1097，未合入）
 
 - **寿命：** `issueInternalToken` 的自签令牌从 `24h` 改为 `15m`。这条门禁是隔离 SQLite + 进程内内存 Redis 的一次 HTTP 链路，脚本里没有 sleep / 轮询；2026-09-29 本机整段实测 48 秒，15 分钟够用。生产登录仍是 `auth.module.ts` 的 `JWT_TTL`（24h）。
