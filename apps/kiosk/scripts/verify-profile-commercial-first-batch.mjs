@@ -202,7 +202,7 @@ const JOB_FIT_M1_5_CHANGED = new Set([
   'services/api/src/member-assets/member-assets.service.ts',
   'services/api/src/member-privacy/member-privacy.service.ts',
 ])
-// 签名盖章（feature/sign-stamp-design）批次：MyDocumentsPage.tsx 新增「签名盖章」动作按钮，
+// 签名（feature/sign-stamp-design，原名「签名盖章」）批次：MyDocumentsPage.tsx 新增「签名」动作按钮，
 // 连带触及 print-sign 新模块与 signature_image FilePurpose 全仓同步改动，与
 // PRINT_URL_CONTRACT_CHANGED / JOB_FIT_M1_5_CHANGED 同模式，非本守卫职责范围。
 const SIGN_STAMP_CHANGED = new Set([

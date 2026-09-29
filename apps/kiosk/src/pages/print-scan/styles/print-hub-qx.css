@@ -183,7 +183,7 @@ button.ph-chip { cursor: pointer; }
 .ph-cap-ic[data-tone='teal'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
 .ph-cap-ic[data-tone='slate'] { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
 .ph-cap-ic[data-tone='wheat'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
-/* tokens.css 没有 clay 组；照片 / 签章用 cinnabar-soft 会偏红。
+/* tokens.css 没有 clay 组；照片 / 签名用 cinnabar-soft 会偏红。
    这里用 wheat/cinnabar 之间的暖土色，全部走已有令牌混合，不写裸色值。 */
 .ph-cap-ic[data-tone='clay'],
 .ph-src-ic[data-tone='clay'] {
@@ -250,7 +250,7 @@ button.ph-chip { cursor: pointer; }
   background: currentColor;
   animation: ph-breathe 1600ms ease-in-out infinite;
 }
-/* 证件照宽卡：落在第三行「签名盖章」右侧的两格里，横排；徽标不折行。 */
+/* 证件照宽卡：落在第三行「签名」右侧的两格里，横排；徽标不折行。 */
 .ph-cap--wide { grid-column: 1 / -1; min-height: 106px; flex-direction: row; align-items: center; gap: 22px; padding: 14px 26px; }
 .ph-cap--wide .ph-cap-ic { margin-bottom: 0; }
 .ph-cap--wide .ph-cap-foot { flex: none; margin-top: 0; }
