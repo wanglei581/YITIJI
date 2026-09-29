@@ -92,8 +92,16 @@ interface OrgTypeMatrixRule {
 
 const matrixModules = (modules: string[]) => new Set(modules)
 
+const PUBLIC_EMPLOYMENT_RULE: OrgTypeMatrixRule = {
+  sceneTemplate: 'public_employment',
+  allowedModules: matrixModules([
+    'resume_service', 'print_scan', 'policy_service', 'job_info', 'job_fair',
+    'ai_interview', 'device_status', 'service_statistics', 'external_apply_redirect',
+  ]),
+}
+
 /** 机构类型矩阵: type 决定唯一场景模板和模块权限上限。 */
-const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
+export const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
   school_employment_center: {
     sceneTemplate: 'school',
     allowedModules: matrixModules([
@@ -109,20 +117,10 @@ const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
       'external_apply_redirect',
     ]),
   },
-  public_employment_service: {
-    sceneTemplate: 'public_employment',
-    allowedModules: matrixModules([
-      'resume_service',
-      'print_scan',
-      'policy_service',
-      'job_info',
-      'job_fair',
-      'ai_interview',
-      'device_status',
-      'service_statistics',
-      'external_apply_redirect',
-    ]),
-  },
+  public_employment_service: PUBLIC_EMPLOYMENT_RULE,
+  // 零工之家、就业服务站属公共就业服务体系，场景与模块上限同人社版（2026-09-29 新增）。
+  gig_worker_home: PUBLIC_EMPLOYMENT_RULE,
+  employment_service_station: PUBLIC_EMPLOYMENT_RULE,
   licensed_hr_agency: {
     sceneTemplate: 'licensed_hr_service',
     allowedModules: matrixModules([

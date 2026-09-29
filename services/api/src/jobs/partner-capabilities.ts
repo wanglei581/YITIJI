@@ -31,6 +31,18 @@ interface PartnerCapabilityRule {
 
 const FULL_ACCESS_MODES = ['api', 'excel', 'csv', 'json', 'webhook', 'manual'] as const
 
+const PUBLIC_EMPLOYMENT_CAPABILITIES: PartnerCapabilityRule = {
+  allowedAccessModes: FULL_ACCESS_MODES,
+  allowedSourceKinds: ['aggregator', 'manual'],
+  defaultSourceKind: 'aggregator',
+  canImportJobs: true,
+  canImportFairs: true,
+  canManagePolicies: true,
+  canManageSmartCampus: false,
+  canManageCompanies: true,
+  companyManageScope: 'unrestricted',
+}
+
 const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
   school_employment_center: {
     allowedAccessModes: FULL_ACCESS_MODES,
@@ -43,17 +55,10 @@ const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
     canManageCompanies: true,
     companyManageScope: 'unrestricted',
   },
-  public_employment_service: {
-    allowedAccessModes: FULL_ACCESS_MODES,
-    allowedSourceKinds: ['aggregator', 'manual'],
-    defaultSourceKind: 'aggregator',
-    canImportJobs: true,
-    canImportFairs: true,
-    canManagePolicies: true,
-    canManageSmartCampus: false,
-    canManageCompanies: true,
-    companyManageScope: 'unrestricted',
-  },
+  public_employment_service: PUBLIC_EMPLOYMENT_CAPABILITIES,
+  // 零工之家、就业服务站属公共就业服务体系，权限同公共就业服务机构（2026-09-29 新增）。
+  gig_worker_home: PUBLIC_EMPLOYMENT_CAPABILITIES,
+  employment_service_station: PUBLIC_EMPLOYMENT_CAPABILITIES,
   licensed_hr_agency: {
     allowedAccessModes: FULL_ACCESS_MODES,
     allowedSourceKinds: ['hr_company', 'job_platform', 'aggregator', 'manual'],

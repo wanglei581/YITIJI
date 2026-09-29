@@ -96,10 +96,12 @@ check(
     'licensed_hr_agency',
     'fair_organizer',
     'enterprise_source',
+    'gig_worker_home',
+    'employment_service_station',
     'assertDataSourceCapability',
     'assertPartnerDataTypeCapability',
   ]),
-  'All five Organization types have server-side source and content capability rules',
+  'All seven Organization types have server-side source and content capability rules',
 )
 check(
   containsAll(partnerJobsService, [
