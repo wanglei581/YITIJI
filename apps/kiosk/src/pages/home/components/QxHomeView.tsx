@@ -278,7 +278,7 @@ export function QxHomeView({
               </button>
             )}
           </>) : null}
-          <HomeTile actionId="policy-hub" title="查政策" description="补贴、社保怎么办，要带哪些材料，以官方发布为准" foot="带走：材料清单" badge="官方发布" icon={LandmarkIcon} tone="slate" onAction={onAction} />
+          <HomeTile actionId="policy-hub" title="查政策" description="补贴、社保怎么办，要带哪些材料，以官方发布为准" foot="查看政策说明" badge="官方发布" icon={LandmarkIcon} tone="slate" onAction={onAction} />
           {channelsTile ? (
             <HomeTile actionId="official-channels" title="机构官方渠道" description={`本机有 ${officialChannelCount} 个渠道，扫码到机构官网`} foot="扫码前往" badge="机构提供" icon={QrCodeIcon} tone="slate" onAction={onAction} />
           ) : null}

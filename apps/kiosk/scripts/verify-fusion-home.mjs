@@ -207,6 +207,10 @@ check(
   '青序次级服务卡完整映射到真实 action'
 )
 check(
+  view.includes('foot="查看政策说明"') && !view.includes('带走：材料清单'),
+  '查政策磁贴不再写带走材料清单，脚注改为当前能做的查看政策说明',
+)
+check(
   !view.includes('.filter((tile)') && !view.includes('visibleTiles'),
   '主服务卡不靠 visibleTiles 过滤丢入口'
 )
