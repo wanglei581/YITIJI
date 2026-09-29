@@ -22847,6 +22847,7 @@
     ],
     "services/api/src/common/filters/http-exception.filter.ts": [
       "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
@@ -31866,6 +31867,7 @@
           "services/api/src/ai/usage/ai-usage.module.ts",
           "services/api/src/app.module.ts",
           "services/api/src/common/decorators/roles.decorator.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/common/outbound/ai-endpoint-allowlist.ts",
           "services/api/src/materials/materials.controller.ts",
