@@ -52,6 +52,46 @@
    - 音色那一行显示「可用」。不可用就先改 `TRTC_TTS_VOICE`（可同时改 `TENCENT_TTS_VOICE_TYPE`）再发布；候选 101001 智瑜（腾讯云官方示例用的），可以加 `--voice 101001` 先核对。音色选哪个在产品负责人待办页；
    - 和小青真机对话一轮，回答正常，没有明显的额外等待。
 5. **运维底线（P0-2）**：装每日备份的定时任务，替换 nginx 日志轮转配置，执行 pm2 日志轮转脚本，用最近一份备份在临时库做一次恢复演练（临时库名必须含 `drill`）。步骤见 `docs/device/postgres-operations.md` 第 8 节。
+6. **空间硬门槛（根分区剩余 ≥ 10GB 才发布）**：低于 10GB 不发布。这是产品负责人发布前的人工门槛，标准与准备加进发布脚本的 `DEPLOY_MIN_FREE_FLOOR_MB=10240` 相同。脚本改动在分支 `grok/deploy-disk-space-0929`，还没开 PR，合入后生效。**未核实**：2026-09-29 打开该分支时，tip 仍是 `37bb0464e`，已提交内容里没有这个常量。当前闸门在 `.github/scripts/deploy-api-release.sh:165-176`，按 API 目录大小加 1024MB，再加默认 1024MB 安全边界，大约是目录再加 2GB。合入前以本条 10GB 为准。第 4 条干跑预检要求备份分区剩余大于 3GB，那一条照做；本条是发布门槛，两道都要过。full 发布在进入上述闸门之前就会安装依赖并构建三端（`.github/workflows/deploy.yml:229-248`），构建本身也占根分区。
+
+   产品负责人本人在 GitHub Actions 按这个顺序点。工作流名字用文件里的 `name`：
+
+   - **`Deploy Precheck (read-only)`**（`.github/workflows/deploy-precheck.yml:17-19`），无参数。看 `BACKUP_DISK_AVAIL_GB`（备份父目录所在盘的剩余；和根分区同一块盘时，这就是根分区剩余）、`ROOT_TOTAL_GB`、`ROOT_USED_PCT`、`PNPM_STORE_MB`、`PM2_LOGS_MB`、`NGINX_LOGS_MB`、`JOURNAL_MB`（同文件 `:65-102`）。这个工作流不打印发布组数，也不打印 `ROOT_AVAIL_GB`。`BACKUP_FILE_COUNT` 和 `BACKUP_DIR_COUNT` 是文件数和目录数。它也不单独打印静态备份目录的大小。
+   - **`Server Cleanup (backups / pnpm store / journal)`**（`.github/workflows/server-cleanup.yml:21-39`），`dry_run=true`，`keep=3`。看 `RELEASE_GROUP_COUNT`、`PLAN_DELETE_GROUPS` 和这里才有的 `ROOT_AVAIL_GB`。`prune_pnpm` 与 `vacuum_journal` 默认都是 true；dry-run 不执行这两项，也不显示它们能释放多少（同文件 `:98-122`）。
+   - 剩余不足 10GB 时，同一工作流改 `dry_run=false`、`keep=3`，`prune_pnpm=true`，**`vacuum_journal=false`**。这样会删掉超出保留数的旧备份，并 prune pnpm store。真删只删 `.dump` 和 `.runtime`，不删 `.migrations.log`（同文件 `:105-109`）。`vacuum_journal` 的默认值是 true：`dry_run=false` 时若不改它，会执行 `journalctl --vacuum-size=200M`。系统日志含登录与安全日志，按法规留存不少于 6 个月，不建议在发布前清；清不清由产品负责人定，发布前的做法是显式填 false。
+   - **`Cleanup Stale Releases (guarded)`**（`.github/workflows/cleanup-stale-releases.yml:9-23`）：先 `execute=false`，`purge_trash_path` 留空，`confirm` 留空，只看清单。确认后 `execute=true` 且 `confirm` 填 `CLEANUP-CONFIRM`，只把白名单目录移到隔离区。同一分区内移动不释放空间（`.github/scripts/cleanup-stale-releases.sh:9-10`、`:40-42`；注释记 2026-08-17 实测移动后可用空间不变）。观察 24–72 小时，再把 `purge_trash_path` 填成那个隔离区路径、确认词照填，purge 才释放空间。
+
+   **推断**（本次没有登录服务器）：发布备份、运行目录、静态备份和每日数据库备份很可能在同一个 40GB 根分区上。依据是发布脚本注释里的历史读数（根分区 40GB，`.github/scripts/deploy-api-release.sh:151-159`），静态备份在成功重载 nginx 后只留 3 组（`.github/workflows/deploy.yml:286-364`），每日备份默认在 `services/api/scripts/backup-postgres.sh:3`、只有 `BACKUP_UPLOAD_ENABLED=1` 才上传（同文件 `:32-35`），仓库里没有独立数据盘挂载的记录。长期把这些备份放到独立数据盘或对象存储，列为产品负责人待定项，不在第一次发布前做。
+7. **线上问题清单（第一次发布前逐条对上负责方）**：下表覆盖 2026-09-29 只读盘点里的线上问题，加上磁盘清理没有盖住的留存与上传缺口。负责方只写一个：已有修复 PR 写 PR 号；还没有 PR、要改代码的写窗口；要登服务器、改生产配置、改 nginx、在对象存储控制台操作、到真机现场，或在后台点激活的，写产品负责人本人做。已经写在本清单里的，只写「见第 N 条」。核对基准是本分支 `a76817cf5`。
+
+| 问题 | 现象（一句话） | 负责方 | 第一次发布前要不要解决 |
+|---|---|---|---|
+| 会员打印取件审计丢失 | 取件链接和重试把会员 ID 写进 `AuditLog.actorId`（外键指向运营账号，`schema.prisma:2214`），失败被 `audit.service.ts:53-77` 吞掉；当前候选 `print-jobs.service.ts:664`、`:806` 仍如此，本文件第 250 行记为未改 | #1110 | 要。PR 开着，未进当前候选 |
+| 简历导出 draft 可伪造 | 导出接口把客户端的 `draft === true` 直接交给导出（`ai.controller.ts:557-560`），草稿 PDF 元数据写成 `AIGenerated=false`（`resume-pdf.service.ts:109-110`） | 后端排雷窗口 | 要。未找到堵住客户端自报的 PR。#1105 只让这种导出绕过 AI 授权和闸门，仍然认客户端标记 |
+| 模拟面试 / 合同审查被内容检查卡死 | 最后一题先落库再出报告，禁词拦下后报告拿不到、回答仍在（`mock-interview.service.ts:238-258`、`:376-380`；拦截在 `mock-interview-llm.service.ts:323-326`）；合同检查把原文摘录和说明一起扫禁词（`contract-review-safety-gate.service.ts:200-202`、`:226`） | 后端排雷窗口 | 要，排在本清单第 3 条配上禁词表之前。未找到对症 PR。#1049 是加上这道检查，#1109 是改面试口径 |
+| 自我探索维度打分被 AI 闸门拦住 | 提交接口标了生成类用途（`self-assessment.controller.ts:79`），闸门在处理函数之前拦截（`ai-access.guard.ts:9-14`），纯计分在 `self-assessment.service.ts:178-179`，走不到；`current-progress.md` 开头仍写待后端拆开 | 后端排雷窗口 | 要。未找到 PR。后台已能暂停 AI（#1055 已在候选），暂停后计分会一起被挡 |
+| 每日备份、异地副本、恢复演练、日志 180 天，以及发布备份只有可读校验 | 见第 5 条。安装脚本已随 #1050 进候选；本文件第 313 行「仓库里没有每日备份与日志轮转」已过时。发布日志里的 `pg_restore -l` 只证明备份可读（部署清单 `:355-358`） | 产品负责人本人做 | 要 |
+| PostgreSQL WAL / archive | 仓库的脚本、工作流和文档里没有 `archive_mode`、`wal_keep_size` 或 WAL 归档目录 | 产品负责人本人做 | 不要改配置。发布前只读看数据库目录是否异常大 |
+| AuditLog 没有清理任务 | `services/api/src` 里没有审计表清理任务；`deleteMany` 只出现在 verify 脚本的测试收尾。本文件第 313、446 行要求的是日志保留不少于 180 天 | 后端排雷窗口 | 不要。发布前不要清审计表；试点前再定留存或归档 |
+| fail2ban / 主机安全基线 | 仓库没有安装脚本或 Actions；`current-progress.md:4662` 记 2026-08-05 只读确认过在线。部署清单第 155–167 行是 A/B/C 取证堆小结 | 产品负责人本人做 | 不要重装，也不挡发布。发布前只读核对是否仍在。口令登录见第 2 条 |
+| 会员上传确认、取消、过期清扫 | 盘点点名的隔离提交不在当前候选；后续的确认、取消、过期和墓碑清扫已在（`upload-session-member-bind.ts:642-689`），本文件第 308 行记为代码已解决、未上生产。未找到单独 PR | 产品负责人本人做 | 不要另开。随第一次发布带上；生产现在还没有 |
+| 反馈通知门禁自建库缺列 | 未设 `DATABASE_URL` 时手抄的 `User` 建表没有 `passwordProofState`（`verify-feedback-notifications.ts:288`；列在 `schema.prisma:821`）。CI 总是设置了 `DATABASE_URL` | #1110 | 不要卡发布。修复在同一个未合入的 PR 里 |
+| 网页 / API / Agent 版本不一致 | 本文件第 262 行记录生产网页与 API、Agent 不是同一次发布；部署清单第 319–322 行最近一次有记录的发布目标早于当前候选 | 产品负责人本人做 | 要。第一次发布就是把当前候选发上去 |
+| 自动发布被跳过 | 见发布当天第 3 条。现行跳过条件是仓库变量 `DEPLOY_API_ENABLED` 不为 `true`（`deploy.yml:42`）。同文件第 9–12 行关于 CI 取消进行中运行的注释已过时；现行 `ci.yml:23-40` 对 main 按提交分组，且不取消进行中的运行 | 产品负责人本人做 | 要。发布当天打开，SSH 步骤结束后关回 |
+| main 的 CI 曾被后续提交取消 | 候选已含按提交分组的修复（#1006，该合并在当前历史上） | #1006 | 不要再改。发布当天要有一次成功的 main CI 运行号 |
+| 发布失败回退运行目录和静态目录 | 候选已在失败时回退运行目录，并先备份再切换静态目录（#1047，`deploy.yml:286-364`）。有记录的生产版本早于这次修复 | #1047 | 不要另做。随第一次发布。生产上的恢复演练见第 5 条 |
+| 法务三份文档未激活 | 见第 1 条。发布前逐份核对的预检已在候选（#1059） | 产品负责人本人做 | 要 |
+| 演示企业仍对公众可见 | 见上方 P0-1。岗位和招聘会按本清单「发布后核对」应为 0 条 | 产品负责人本人做 | 不要必须提前做。第一次发布后招聘内容托管关闭，会一起不再对外；不要为了填内容去导入 |
+| 价目描述与单价 | 见第 2 条 | 产品负责人本人做 | 要 |
+| 生产 AI 配置与小青音色 | 见第 4b 条。第 3 条那三个开关第一次发布不要开 | 产品负责人本人做 | 启用大模型或语音才要 |
+| 证书与续费告警 | 见第 2 条 | 产品负责人本人做 | 要核对告警已打开。证书续期按第 2 条在到期前做 |
+| 对象存储生命周期未验收 | 部署清单第 240–244 行有驱动为对象存储的预检记录；第 255–256 行生命周期截图仍未完成。禁止桶上全局过期，只有 `tmp/` 前缀可做兜底 | 产品负责人本人做 | 要。在控制台核对并留证，不改代码 |
+| nginx 上传上限与应用不一致 | 清单第 447–454 行记录 nginx 为 100MB，应用代理上限 200MB（`file-validation.ts:134`）；超过 100MB 的只有宣传视频、待机素材、管理员上传（同文件 `:104-106`） | 产品负责人本人做 | 不要卡第一次发布当天。开通这三类之前三选一：提高 nginx、把这三类上限降到 nginx 以下、改走对象存储直传 |
+| nginx 上传超时未配置 | 清单第 455–457 行记录线上未配置 `proxy_read_timeout`、`proxy_send_timeout`、`client_body_timeout`，按默认 60 秒，并标为上线前要做。`production-deployment-runbook.md:360-385` 是样例，其中的 120 秒不能当成线上已经配置 | 产品负责人本人做 | 要 |
+| PM2 与 nginx 日志留存期不一致 | 见第 5 条。仓库脚本是 PM2 `retain 180`（`pm2-logrotate-setup.sh:5`）和 nginx `rotate 180`（`logrotate/nginx:3`）。清单第 476 行写 2026-09-07 线上 `retain 7`，同段第 478 行又写保留份数未读出 | 产品负责人本人做 | 要。装完核对线上实际值 |
+| 服务端 PDF.js 高危版本 | 服务端注释仍写 unpdf 内置 PDF.js 5.6.205（`pdfjs-document.ts:1-6`）。替换在 #1075，未合入 | #1075 | 试点前要。不单独卡住第一次发布当天；本文件「服务端 PDF 引擎」一节列为优先合 |
+| AI 生成的 PDF 被隐私检查拒单 | 第一批 `be02026d9` 与第二、三批合并 `247abd542` 已在当前候选。未找到第二、三批的独立 PR 号。本文件第 8 行和第 316 行仍写进行中，以及报价页三项待定；本次未打开该合并的差异核对这三项是否已经落地 | 产品负责人本人做 | 不要另开修复，随第一次发布带上。生产旧版没有。报价页那三项取舍仍以第 316 行的待定为准 |
+| KSK-001 现场锁定与最终硬件 | 真机-3 系统锁定和真机-12 最终竖屏仍未修（本文件第 270、296 行）。测试机保持 Windows 11 22H2 是 9/29 已拍板（第 291 行）。Agent 与策略修复已在候选（#1046、#1053、#1054、#1060） | 产品负责人本人做 | 不卡第一次发布。公众试点前到现场做锁定，并在最终竖屏硬件上复验 |
 
 **发布当天**
 1. 看一次 `/api/v1/health`，`data.degraded` 为空。
