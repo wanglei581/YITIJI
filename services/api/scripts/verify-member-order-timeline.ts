@@ -9,7 +9,7 @@
  *      严格倒序；total 与 status/kind 过滤一致；waiting ∪ printing ∪ done = all 且互不相交；
  *      材料包子任务不出现在 kiosk_task；序列化后的整页 JSON 不含任何到机码明文；
  *      pickupCode 与旧 /me/print-orders 逐字段同口径；claimableHere 五个条件逐一反例、终端验签失败为 false。
- *   D. claim-here：本人+本机成功、幂等（不重复派发）、他人 404、异机 409 带网点且锁机计数不变、
+ *   D. claim-here：本人+本机成功、幂等（不重复派发）、他人 404、异机 409 带网点且锁机计数不变、领取时撞上重发码回订单口吻、
  *      退款（pending/claimed 两种）/ 过期 / 已用 / 文件失效各拒，且每一种都与到机码入口 claim 同一错误码。
  *
  * 写库：必须 VERIFICATION_DATABASE_TARGET=isolated；SQLite 缺表时按迁移建表。Redis 用进程内替身。
@@ -701,6 +701,22 @@ async function main(): Promise<void> {
     const deadMember = await capture(() => claimHere.claimHere(U, deadA.id, T, source()))
     const deadCode = await capture(() => pickup.claim(deadB.pickupCode!, T, source()))
     check(deadMember.code === 'PRINT_FILE_EXPIRED' && deadCode.code === 'PRINT_FILE_EXPIRED', '文件已失效：两个入口同为 PRINT_FILE_EXPIRED', `${deadMember.code}/${deadCode.code}`)
+
+    // 领取瞬间到机码被重发（settleClaim 拿着旧 hash 做条件更新失败）：会员没输过码，不能回「到机码无效」。
+    const raceA = await single(U, fA, T)
+    const raceB = await single(U, fA, T)
+    const staleA = await prisma.order.findUniqueOrThrow({ where: { id: raceA.id } })
+    const staleB = await prisma.order.findUniqueOrThrow({ where: { id: raceB.id } })
+    await prisma.order.update({ where: { id: raceA.id }, data: { pickupCodeHash: `reissued-a-${sfx}` } })
+    await prisma.order.update({ where: { id: raceB.id }, data: { pickupCodeHash: `reissued-b-${sfx}` } })
+    const raceMember = await capture(() => pickup.settleClaim(staleA, { id: T }, 'member_order'))
+    const raceCode = await capture(() => pickup.settleClaim(staleB, { id: T }, 'pickup_code'))
+    const raceMsg = (raceMember.body as { error?: { message?: string } })?.error?.message ?? ''
+    check(raceMember.status === 400 && raceMember.code === 'PICKUP_CODE_UNAVAILABLE' && !raceMsg.includes('到机码') && raceMsg.includes('刷新订单')
+      && raceCode.status === 404 && raceCode.code === 'PICKUP_CODE_INVALID'
+      && (await prisma.order.findUniqueOrThrow({ where: { id: raceA.id } })).pickupStatus === 'pending',
+    '领取时撞上重发码：会员入口回订单口吻 PICKUP_CODE_UNAVAILABLE（请刷新订单），到机码入口照旧同文案 404，订单不变',
+    `member=${raceMember.status}/${raceMember.code}/${raceMsg} code=${raceCode.status}/${raceCode.code}`)
 
     // 已用：放行超过同机回放窗口后再领
     await prisma.printTask.update({ where: { id: h2v.taskId }, data: { createdAt: new Date(Date.now() - PICKUP_RELEASED_REPLAY_MS - 60_000) } })
