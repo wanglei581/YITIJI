@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
+
+- **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。
+- **修法（Claude 子代理实现、协调方审）：** 服务端所有打开 PDF 的地方收到 `common/pdf/pdfjs-document.ts` 一个入口：加载 `pdfjs-dist/legacy/build/pdf.mjs`（6.3.289），低于 6.2.108 拒绝启用；经 unpdf 的 `definePDFJSModule` 交给 unpdf，核对 unpdf 确实采用；外壳强制 `enableScripting:false`、`isEvalSupported:false`、`enableXfa:false`。两处 6.x 兼容修复：配 `wasmUrl`（JBIG2 / CCITT / JPEG2000 改成 wasm 解码，不配黑白扫描件渲染成空白）、给文档补回 `destroy()`（6.x 删掉了它，合同审查拿它判文档有效）。简历文字层文档此前从不释放，顺带在读完后释放。
+- **注意：** 入口靠 Node ≥22.12 的 `require()` 加载 `.mjs`（根 `engines` 已要求 ≥22.13）；版本不够时 PDF 功能如实报「解析器不可用」，不会退回旧引擎——生产核对清单加一条「服务器 Node 版本 ≥22.13」。
+- **验证：** 新门禁 `verify:pdfjs-engine`（22 条，运行时经 diagnostics_channel 核对每次打开的引擎版本与安全选项、整进程只求值一份引擎、CCITT G4 样本真渲染）。协调方独立复跑：材料处理（含 C-15 中文 CMap）、隐私遮挡、简历抽取、页数（file-display-truth 56 条）、OCR、签名合成、报告导出、文档转换、图片转 PDF、职业规划降级、AIGC 标识全绿；合同审查单元 306 条里一条计时断言（脱敏模块，与 PDF 无关）在本机高负载下超时，单独重跑通过。变异：去掉 `definePDFJSModule` 版本断言红、去掉 `enableScripting:false` 选项断言红，另三处（isEvalSupported、wasmUrl、destroy）也各自变红。
+- **顺带：** `services/api/.env.example` 简历导出显式标识一句改为「产品负责人 9/29 定：上线保持 false；律师要求时再打开，走标识办法第九条」。
+
 ## 2026-09-29 凌晨：2.0 稿定为最终版（收尾中）；第三波试点 16、06 运行页对齐稿
 
 - **产品负责人定：** 「这一遍就是最终版本，然后后续前端所有页面都按照这个最终版更新到线上」。这一轮收尾完成后冻结 `docs/design/kiosk-redesign-2026-08-v2/`，之后运行页和稿不一致时改运行页、不改稿（冻结门禁随定稿提交）；运行页全部照最终版实现、验收后发布（发布前按次确认）。同时拍板：打印参数全部放上页面，本机不可用的按钮灰色、可用的白色可点，报价页不再拦截；签名只保留本人手写签名；稿 34 自我探索改成与运行页一致（AI 解读、打印、记录保留）；稿 52 新加的「带走这一页」「三种作业」保留。按推荐默认：46 不分档、31 写「抵扣功能尚未开放」、08 取不到协议正文如实说、上线时正在办理的旧打印会话清掉、会员原件转成的 PDF 按原件过隐私检查。

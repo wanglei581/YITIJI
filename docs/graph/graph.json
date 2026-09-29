@@ -22259,7 +22259,8 @@
     "services/api/src/ai/resume/ocr/pdf-page-renderer.ts": [
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
-      "services/api/scripts/verify-pdf-cmap.ts"
+      "services/api/scripts/verify-pdf-cmap.ts",
+      "services/api/scripts/verify-pdfjs-engine.ts"
     ],
     "services/api/src/ai/resume/ocr/tencent-ocr.provider.stub.ts": [
       "services/api/scripts/verify-ocr-baidu-live.ts",
@@ -22283,6 +22284,7 @@
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
+      "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-resume-extraction.ts"
     ],
     "services/api/src/ai/resume/resume-fact-match.ts": [
@@ -22755,6 +22757,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-pdf-cmap.ts",
+      "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-report-export.ts"
@@ -22956,6 +22959,9 @@
     "services/api/src/contract-review/contract-review-error-log.ts": [
       "services/api/scripts/verify-contract-review-timeout.ts"
     ],
+    "services/api/src/contract-review/contract-review-extraction.service.ts": [
+      "services/api/scripts/verify-pdfjs-engine.ts"
+    ],
     "services/api/src/contract-review/contract-review-failure-reason.ts": [
       "services/api/scripts/verify-contract-review-timeout.ts"
     ],
@@ -23042,6 +23048,7 @@
     ],
     "services/api/src/files/file-page-count.util.ts": [
       "services/api/scripts/verify-file-display-truth.ts",
+      "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-print-sign.ts"
     ],
     "services/api/src/files/file-validation.ts": [
@@ -23584,6 +23591,7 @@
     "services/api/src/materials/materials.service.ts": [
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-pdf-cmap.ts",
+      "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
@@ -23599,6 +23607,7 @@
     ],
     "services/api/src/materials/pii-scan.util.ts": [
       "services/api/scripts/verify-pdf-cmap.ts",
+      "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-pii-redaction.ts"
     ],
     "services/api/src/materials/print-param-suggestion.rules.ts": [
@@ -35633,6 +35642,30 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:materials-processing"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/resume/ocr/pdf-page-renderer.ts",
+          "services/api/src/ai/resume/resume-extraction.service.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/contract-review/contract-review-extraction.service.ts",
+          "services/api/src/files/file-page-count.util.ts",
+          "services/api/src/materials/materials.service.ts",
+          "services/api/src/materials/pii-scan.util.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pdfjs-engine.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pdfjs-engine"
       ],
       "wired": true
     },
