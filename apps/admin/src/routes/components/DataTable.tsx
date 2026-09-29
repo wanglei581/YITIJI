@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { EmptyState } from '@ai-job-print/ui'
+import { ConsolePager, ConsoleTable, type ConsoleColumn } from '@ai-job-print/ui'
 
 export interface PaginationProps {
   total: number
@@ -11,36 +11,14 @@ export interface PaginationProps {
 }
 
 export function Pagination({ total, page, pageSize, onPageChange, onPageSizeChange }: PaginationProps) {
-  const totalPages = Math.ceil(total / pageSize)
-  const pages: Array<number | string> = []
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i)
-  } else {
-    pages.push(1)
-    if (page > 3) pages.push('ellipsis')
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i)
-    if (page < totalPages - 2) pages.push('ellipsis')
-    pages.push(totalPages)
-  }
   return (
-    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-neutral-100 px-4 py-3">
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-neutral-500"> 共 <span className="font-medium text-neutral-700">{total}</span> 条</span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-neutral-400">每页</span>
-          <select value={pageSize} onChange={(e) => { onPageSizeChange(Number(e.target.value)); onPageChange(1) }} className="rounded border border-neutral-200 bg-surface px-2 py-1 text-xs text-neutral-600 focus:border-primary-300 focus:outline-none">
-            {[10, 20, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-      </div>
-      {totalPages > 1 && (
-        <div className="flex items-center gap-1">
-          <button onClick={() => onPageChange(page - 1)} disabled={page === 1} className="flex h-7 min-w-[2rem] items-center justify-center rounded text-xs text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40">‹</button>
-          {pages.map((p, i) => p === 'ellipsis' ? <span key={'ellipsis-' + i} className="flex h-7 min-w-[2rem] items-center justify-center text-xs text-neutral-300">…</span> : <button key={p} onClick={() => onPageChange(p as number)} className={'flex h-7 min-w-[2rem] items-center justify-center rounded text-xs ' + (p === page ? 'bg-primary-600 text-white font-medium' : 'text-neutral-600 hover:bg-neutral-100')}>{p}</button>)}
-          <button onClick={() => onPageChange(page + 1)} disabled={page === totalPages} className="flex h-7 min-w-[2rem] items-center justify-center rounded text-xs text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40">›</button>
-        </div>
-      )}
-    </div>
+    <ConsolePager
+      total={total}
+      page={page}
+      pageSize={pageSize}
+      onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
+    />
   )
 }
 
@@ -52,7 +30,7 @@ export function FilterPills({ filters, active, counts, onChange }: FilterPillsPr
   return (
     <div className="flex flex-wrap gap-2">
       {filters.map((f) => (
-        <button key={f} onClick={() => onChange(f)} className={'rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ' + (active === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40')}>
+        <button key={f} onClick={() => onChange(f)} className={'rounded-full border px-[13px] py-1.5 text-xs font-bold transition-colors ' + (active === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40')}>
           {f}{counts && counts[f] !== undefined && <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>}
         </button>
       ))}
@@ -65,31 +43,32 @@ export interface DataTableProps<T> {
   empty?: { title: string; description?: string; action?: ReactNode }
   renderRow: (item: T, index: number) => ReactNode
   renderHeader: () => ReactNode
+  columns?: ConsoleColumn<T>[]
   page: number
   pageSize: number
   total: number
   onPageChange: (page: number) => void
   onPageSizeChange: (size: number) => void
   className?: string
+  scrollX?: boolean
 }
 
-export function DataTable<T>({ items, empty, renderRow, renderHeader, page, pageSize, total, onPageChange, onPageSizeChange, className }: DataTableProps<T>) {
-  if (items.length === 0 && empty) return (
-    <div>
-      <EmptyState title={empty.title} description={empty.description} action={empty.action} className="border-b border-neutral-100" />
-      <Pagination total={total} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-    </div>
-  )
+export function DataTable<T>({ items, empty, renderRow, renderHeader, columns, page, pageSize, total, onPageChange, onPageSizeChange, className, scrollX }: DataTableProps<T>) {
   return (
-    <div className={className}>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>{renderHeader()}</thead>
-          <tbody className="divide-y divide-neutral-900/[0.06]">{items.map((item, index) => renderRow(item, index))}</tbody>
-        </table>
-      </div>
-      <Pagination total={total} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-    </div>
+    <ConsoleTable
+      items={items}
+      empty={empty}
+      renderRow={renderRow}
+      renderHeader={renderHeader}
+      columns={columns}
+      page={page}
+      pageSize={pageSize}
+      total={total}
+      onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
+      className={className}
+      scrollX={scrollX}
+    />
   )
 }
 

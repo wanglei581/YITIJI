@@ -9,7 +9,7 @@ test.describe('智慧校园（mock 口径）', () => {
     const save = page.getByRole('button', { name: /保存/ }).first()
     if (await save.isVisible() && await save.isEnabled()) {
       await save.click()
-      await expect(page.locator('body')).toContainText(/已保存|保存失败|请先开启|mock/)
+      await expect(page.locator('body')).toContainText(/已保存|保存失败|请先开启|当前是演示数据，没有连上真实后台/)
     }
   })
 })
