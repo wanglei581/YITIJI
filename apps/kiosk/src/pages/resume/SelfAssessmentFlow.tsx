@@ -47,6 +47,8 @@ import {
   type AiAvailability,
   type AiTaskFallback,
 } from '../../ai'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import {
   SelfAssessmentApiError,
   getLatestSelfAssessment,
@@ -458,7 +460,10 @@ export function SelfAssessmentQuizPage() {
         ctabar={
           <>
             <GhostButton label="取消，返回修改" onClick={() => setStage('quiz')} />
-            <PrimaryButton label="确认提交" onClick={handOff} />
+            <span className="qx-ai-declaration-slot">
+              <PrimaryButton label="确认提交" onClick={handOff} />
+              <AiDeclarationNote />
+            </span>
           </>
         }
       >
@@ -718,6 +723,12 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       .catch((err: unknown) => {
         // 失败必须看得见：不把「没生成出来 / 读不回来」渲染成「生成完了但内容为空」。
         if (!mountedRef.current) return
+        const declined = aiDeclarationDeclineMessage(err)
+        if (declined) {
+          setTaskAiDown(false)
+          setTaskError(declined)
+          return
+        }
         setTaskAiDown(isAiOutage(err))
         setTaskError(err instanceof SelfAssessmentApiError ? err.message : mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试')
       })

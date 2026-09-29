@@ -14,6 +14,7 @@ import {
   exportResumeRecord,
   type ResumeLayoutAdjustAction,
 } from '../../services/api'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { DEFAULT_RESUME_LAYOUT, useResumeLayout } from './hooks/useResumeLayout'
 import { readAiResumeSession } from './aiResumeSession'
@@ -245,7 +246,7 @@ export function ResumeOptimizePage() {
       const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access)
       setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings?.length ? ['调整后的内容仍需你逐项核对，确认事实无误。'] : []); setExported(null); setIsDirty(true)
     } catch (err) {
-      setAdjustError(userMessageOf(err, 'AI 调整失败，请稍后重试或继续手动编辑'))
+      setAdjustError(aiDeclarationDeclineMessage(err) ?? userMessageOf(err, 'AI 调整失败，请稍后重试或继续手动编辑'))
     } finally { setAdjusting(null) }
   }
 

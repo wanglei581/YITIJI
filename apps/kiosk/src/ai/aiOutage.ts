@@ -16,6 +16,7 @@
  * 而「哪些错误码算能力不可用」一旦各页漂移，降级行为就会各不相同。
  */
 import { userMessageOf } from '../services/api/userErrorMessage'
+import { aiDeclarationDeclineMessage } from './aiDeclarationErrors'
 import type { AiAvailability } from './useAiTask'
 
 /**
@@ -99,7 +100,7 @@ export function isAiOutage(error: unknown): boolean {
  * 环境变量名和字体路径的中文报错，见该模块头部注释）。
  */
 export function aiErrorMessageOf(error: unknown, fallback: string): string {
-  return userMessageOf(error, fallback)
+  return aiDeclarationDeclineMessage(error) ?? userMessageOf(error, fallback)
 }
 
 /**

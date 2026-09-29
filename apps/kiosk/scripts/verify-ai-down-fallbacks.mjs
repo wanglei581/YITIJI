@@ -550,20 +550,36 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     failures.push('aiOutage: 无法解析 typescript，⑦-A 运行时判据没能执行（不接受跳过）')
   } else {
     const stub = Buffer.from('export function userMessageOf(_e, fallback) { return fallback }\n', 'utf8').toString('base64')
-    const js = ts.default.transpileModule(files.aiOutage, {
+    const transpile = (source) => ts.default.transpileModule(source, {
       compilerOptions: { module: ts.default.ModuleKind.ESNext, target: ts.default.ScriptTarget.ES2022 },
-    }).outputText.replace("from '../services/api/userErrorMessage'", `from 'data:text/javascript;base64,${stub}'`)
-    const mod = await import(`data:text/javascript;base64,${Buffer.from(js, 'utf8').toString('base64')}`)
-      .catch((err) => ({ __loadError: err }))
+    }).outputText
+    const toDataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code, 'utf8').toString('base64')}`
+    // aiOutage 现在会先认「本人拒绝声明」。data URL 模块解析不了相对路径，
+    // 要把声明文案和错误类一起编进来，否则本节运行时判据整段跳过。
+    const copyUrl = toDataUrl(transpile(kiosk('src/ai/aiDeclarationCopy.ts')))
+    const errorsJs = transpile(kiosk('src/ai/aiDeclarationErrors.ts'))
+      .replaceAll("from './aiDeclarationCopy'", `from '${copyUrl}'`)
+    const errorsUrl = toDataUrl(errorsJs)
+    const js = transpile(files.aiOutage)
+      .replace("from '../services/api/userErrorMessage'", `from 'data:text/javascript;base64,${stub}'`)
+      .replace("from './aiDeclarationErrors'", `from '${errorsUrl}'`)
+    const mod = await import(toDataUrl(js)).catch((err) => ({ __loadError: err }))
+    const errorsMod = await import(errorsUrl).catch((err) => ({ __loadError: err }))
     if (mod.__loadError) {
       failures.push(`aiOutage: 编译后无法加载（${mod.__loadError.message}）`)
+    } else if (errorsMod.__loadError) {
+      failures.push(`aiOutage: 声明错误模块无法加载（${errorsMod.__loadError.message}）`)
     } else {
       for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_PROVIDER_NOT_CONFIGURED']) {
         assert(mod.isAiOutage({ code, status: 503 }) === true, `aiOutage.isAiOutage 不认 ${code} —— 页面会把 AI 停用当成一次失败继续叫人重试`)
       }
-      for (const code of ['AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'REQUEST_TIMEOUT', 'NETWORK_ERROR']) {
+      for (const code of ['AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'REQUEST_TIMEOUT', 'NETWORK_ERROR', 'AI_DECLARATION_DECLINED', 'AI_DECLARATION_CLEARED']) {
         assert(mod.isAiOutage({ code, status: 503 }) === false, `aiOutage.isAiOutage 把单次失败 ${code} 判成了能力级停用`)
       }
+      const declined = new errorsMod.AiDeclarationDeclinedError('age_14_plus')
+      assert(mod.isAiOutage(declined) === false, '本人拒绝声明不得被当成 AI 停用')
+      const shown = mod.aiErrorMessageOf(declined, '请稍后重试')
+      assert(shown === declined.message && !shown.includes('请稍后重试'), '拒绝声明必须原样告诉用户，不能改写成请稍后重试')
     }
   }
 
@@ -588,10 +604,10 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     'assistantPage: 能力级停用必须置 unavailable 并在「本轮失败（可重试）」之前返回')
   // 自我探索：停用时不给「重试这一次」。
   must('selfAssessmentFlow', /taskAiDown\s*\n?\s*\? \{ retryHint: '[^']+' \}/, 'AI 停用时自我探索结果屏不得给「重试这一次」')
-  must('interviewSession', /setError\(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : userMessageOf\(err, '提交失败，请重试'\)\)/, 'AI 停用时模拟面试作答失败不得叫人重试')
+  must('interviewSession', /setError\(aiDeclarationDeclineMessage\(err\) \?\? \(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : userMessageOf\(err, '提交失败，请重试'\)\)\)/, 'AI 停用时模拟面试作答失败不得叫人重试')
   must('interviewSession', /setError\(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : `\$\{msg\}，可重新录音或改用文字输入`\)/, 'AI 停用时语音转写失败不得叫人重新录音')
   must('contractReviewHome', /setError\(isAiOutage\(err\)/, 'AI 停用时合同风险提示不得说成文件格式问题叫人重试')
-  must('contractReviewProcessing', /setError\(isAiOutage\(err\)/, 'AI 停用时合同确认失败不得叫人重试')
+  must('contractReviewProcessing', /setError\(declined \?\? \(isAiOutage\(err\)\s*\?\s*'[^']*暂时审不了[^']*'\s*:\s*'确认失败，请重试'\)\)/, 'AI 停用时合同确认失败不得叫人重试')
 }
 
 // ── 合规文案 ────────────────────────────────────────────────────────────────

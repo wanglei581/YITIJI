@@ -2,6 +2,7 @@
  * 一体机适配器共用的 HTTP 失败出口。
  * 一律抛 ApiHttpError(code, 中文, status)；带会员 token 的 401 触发会话重置。
  */
+import { rethrowAiDeclaration } from '../../ai/aiDeclarationErrors'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { ApiHttpError } from './httpAdapter'
 
@@ -37,6 +38,7 @@ export async function throwHttpError(res: Response, token?: string | null): Prom
 }
 
 export function networkError(err?: unknown): ApiHttpError {
+  rethrowAiDeclaration(err)
   if (err instanceof ApiHttpError) return err
   if (err instanceof Error && err.name === 'AbortError') {
     return new ApiHttpError('REQUEST_TIMEOUT', '本次请求响应超时，请重试', 408)

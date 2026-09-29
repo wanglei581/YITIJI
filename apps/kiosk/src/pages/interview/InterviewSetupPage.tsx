@@ -38,6 +38,8 @@ import {
   type AiAvailability,
   type AiTaskFallback,
 } from '../../ai'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { createInterview, printInterviewPracticeSheet, startInterview } from '../../services/api/interview'
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
@@ -248,6 +250,11 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         })
       }
     } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setError(declined)
+        return
+      }
       const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
       setError(message)
       setStartFailed(true)
@@ -360,16 +367,19 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             <button type="button" className="qx-btn" data-variant="ghost" onClick={goTips}>
               先看面试技巧
             </button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              data-testid="interview-primary"
-              disabled={creating || uploading}
-              onClick={() => void handleStart()}
-            >
-              {creating ? '正在为你准备面试官…' : <>创建并开始练习<em>→</em></>}
-            </button>
+            <span className="qx-ai-declaration-slot">
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="primary"
+                data-testid="interview-primary"
+                disabled={creating || uploading}
+                onClick={() => void handleStart()}
+              >
+                {creating ? '正在为你准备面试官…' : <>创建并开始练习<em>→</em></>}
+              </button>
+              <AiDeclarationNote />
+            </span>
           </div>
         </div>
       }

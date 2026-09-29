@@ -186,6 +186,9 @@ jobs:
           # 计 AI 每日额度、短信每台上限）：terminalAuth.ts 编译后真跑取头与换票，另用
           # TypeScript AST 扫 apps/kiosk/src 全部请求点。只读源码，不连库、不连网。
           pnpm --filter @ai-job-print/kiosk verify:ai-requests-terminal-session
+          # 一体机 AI 使用声明（W-16）：版本与请求头对照服务端源码，种类表对照 @AiUse，
+          # 编译后真跑确认、拒绝、开关关闭、403 重问一次，以及清场后声明失效。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-declaration
           pnpm --filter @ai-job-print/kiosk verify:scan-session-truth
           pnpm --filter @ai-job-print/kiosk verify:scan-quiet-period
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell

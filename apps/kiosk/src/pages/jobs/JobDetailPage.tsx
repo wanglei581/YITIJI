@@ -14,6 +14,7 @@ import {
 } from '../../services/api/jobAi'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { getTerminalId } from '../../services/api/screensaver'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { evaluateJobSourceTrust, sourceTrustReason } from './utils/sourceTrust'
@@ -393,6 +394,8 @@ export function JobDetailPage() {
 }
 
 function formatJobAiError(err: unknown): string {
+  const declined = aiDeclarationDeclineMessage(err)
+  if (declined) return declined
   if (err instanceof ApiHttpError) {
     if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
     if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return '岗位 AI 配额服务暂不可用，请联系现场工作人员确认服务状态。'
