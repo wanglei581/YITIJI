@@ -12,6 +12,7 @@ import { join } from 'node:path'
 
 const root = process.cwd()
 const pagePath = join(root, 'src/routes/print-scan/index.tsx')
+const retryButtonPath = join(root, 'src/routes/print-scan/PrintRetryButton.tsx')
 // 「设备能力」板块 2026-09-29 从 index.tsx 原样拆到独立文件；能力开关相关断言改读这里，强度不变。
 const capabilityPath = join(root, 'src/routes/print-scan/CapabilityCenter.tsx')
 const servicePath = join(root, 'src/services/api/printScan.ts')
@@ -34,7 +35,9 @@ if (!existsSync(pagePath)) fail('print-scan page is missing')
 if (!existsSync(servicePath)) fail('printScan service is missing')
 if (!existsSync(closeFormPath)) fail('controlled unpaid-print close form is missing')
 if (!existsSync(capabilityPath)) fail('print-scan capability center is missing')
+if (!existsSync(retryButtonPath)) fail('print retry button is missing')
 const page = readFileSync(pagePath, 'utf8')
+const retryUi = readFileSync(retryButtonPath, 'utf8')
 const cap = readFileSync(capabilityPath, 'utf8')
 const service = readFileSync(servicePath, 'utf8')
 const closeForm = readFileSync(closeFormPath, 'utf8')
@@ -194,6 +197,48 @@ if (
   pass('terminal selection synchronously invalidates old save/load/UI state before terminalId changes')
 } else {
   fail('terminal selection must invalidate old save/load/UI state before changing terminalId')
+}
+
+// 9. 重试按钮事先显示能不能点：只看服务端 retryBlockedReason，不在前端推断。
+if (service.includes('retryBlockedReason?: string | null')) {
+  pass('print task type carries optional retryBlockedReason')
+} else {
+  fail('print task type must declare retryBlockedReason?: string | null')
+}
+if ((page.match(/<PrintRetryButton/g) ?? []).length === 2 && page.includes('legacyVisible={canRetry}') && page.includes('legacyVisible={false}')) {
+  pass('list and detail both render the shared retry button; missing field keeps the old list hidden')
+} else {
+  fail('list and detail must both render PrintRetryButton, detail legacyVisible={canRetry}, list legacyVisible={false}')
+}
+if (
+  retryUi.includes("const retryBlocked = typeof retryBlockedReason === 'string'") &&
+  retryUi.includes('disabled={busy || retryBlocked}') &&
+  retryUi.includes('aria-disabled={busy || retryBlocked}') &&
+  retryUi.includes('if (retryBlockedReason === undefined && !legacyVisible) return null') &&
+  !/disabled=\{[^}]*retryBlockedReason == null/.test(retryUi) &&
+  !/disabled=\{[^}]*!retryBlockedReason/.test(retryUi) &&
+  !/disabled=\{[^}]*(status|errorCode|canRetry)/.test(retryUi)
+) {
+  pass('retry button disables only when retryBlockedReason is a string; a missing field is not greyed out')
+} else {
+  fail('retry disabled must be exactly busy || retryBlocked, and retryBlocked must be typeof retryBlockedReason === \'string\'')
+}
+if (/<p [^>]*>\{retryBlockedReason\}<\/p>/.test(retryUi) && !/title=\{retryBlockedReason\}/.test(retryUi)) {
+  pass('blocked reason is rendered as text under the button')
+} else {
+  fail('retryBlockedReason must be rendered in a paragraph, not only as a title tooltip')
+}
+const forceReprintNote = '后台不提供强制重打；需要补打请让用户另下新单。'
+const forceReprintCount = page.split(forceReprintNote).length - 1
+if (forceReprintCount === 1 && !retryUi.includes(forceReprintNote)) {
+  pass('force reprint note is written once on the page')
+} else {
+  fail(`force reprint note must appear once on the page and not inside each button, found ${forceReprintCount}`)
+}
+if (page.includes("setActionError(e instanceof Error ? e.message : '操作失败')")) {
+  pass('rejected retry keeps the server message')
+} else {
+  fail('retry failure must surface the server error message')
 }
 
 console.log('\nverify-admin-print-scan-ui: ok')
