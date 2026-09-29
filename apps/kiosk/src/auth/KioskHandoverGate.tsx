@@ -43,7 +43,7 @@ export function KioskHandoverGate() {
         status={{ tone: 'warn', label: '公共设备，请保护个人信息' }}
         navbar={<QxMemberNavbar current="profile" />}
       >
-        <div className="qx-card" role="note">
+        <div className="qx-card" role="note" style={{ fontSize: 'var(--qx-fs-body)', lineHeight: 1.45 }}>
           这台机器上有人登录着，已经有一会儿没人点屏幕了。本人请点「是我，继续」；不是的话点「不是我」，会结束上一位的使用并回到首页。
         </div>
       </QxPageFrame>

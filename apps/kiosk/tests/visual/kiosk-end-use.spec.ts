@@ -110,7 +110,10 @@ async function expectNextPersonSeesNothing(page: Page, calls: MeCall[], previous
   await expectNoTraceOf(page, previous)
   await shot(page, `${label}-deeplink-documents.png`)
   // 后退可能落进边界之前的旧历史：守卫会当场遮罩、清场并重载回首页。等它走完再看。
-  await page.goBack()
+  // 守卫当场重载会把这次后退导航打断（ERR_ABORTED），这是预期行为，别的错误照常抛。
+  await page.goBack().catch((error: Error) => {
+    if (!/ERR_ABORTED|frame was detached/.test(error.message)) throw error
+  })
   await settle(page)
   await expectNoTraceOf(page, previous)
   await page.goto('/profile')
