@@ -217,7 +217,7 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
   expect(errors).toEqual([])
 })
 
-// D3（2026-09-28）：签名盖章默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS）。
+// D3（2026-09-28）：签名默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS）。
 // 能力读取成功、但本机没有已配置的 signature_stamp 行时，这张卡必须和管理员配成 not_verified 一样
 // 整卡停用、写明「本机暂未开通」—— 不能让人点进去、传完文件才被服务端拒绝。两种形状都要覆盖：
 //   · 列表里根本没有这一行；

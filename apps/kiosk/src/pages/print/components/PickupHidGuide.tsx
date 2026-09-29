@@ -32,6 +32,8 @@ export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
       return <>输错次数太多，<b>这台机器的输码暂时停用了</b>。</>
     case 'network-error':
       return <>暂时没有拿到<b>可信的校验结果</b>。</>
+    case 'closed':
+      return <>这个到机码<b>不能再用来取件</b>。</>
     case 'failed':
       return <>这次<b>没能完成校验</b>。</>
     case 'success':
@@ -281,8 +283,8 @@ export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: 
 }
 
 /**
- * 认领失败的四种屏（稿 rInvalid / rLocked / rNetwork，外加「其他」）。
- * message 由页面经 userMessageOf 映射，这里只摆位置；role="alert" 每屏恰好一个。
+ * 认领失败的五种屏（稿 rInvalid / rLocked / rNetwork，外加「码已是终态」与「其他」）。
+ * message 由页面经 pickupClaimMessage 映射，这里只摆位置；role="alert" 每屏恰好一个。
  */
 export function PickupFailurePanel({
   failure,
@@ -337,6 +339,27 @@ export function PickupFailurePanel({
           )}
         </div>
       </section>
+    )
+  }
+
+  // 终态码（已用过、已退款、文件失效……）：在这台机器上重输不会有别的结果，
+  // 主操作给「回到首页」把屏让给下一位；输另一个码是次要出口。不出现「重试 / 重新输入同一个码」。
+  if (failure === 'closed') {
+    return (
+      <>
+        <div id="pcp-error-msg" className="pcp-strip pcp-strip--error pcp-enter" role="alert">
+          <AlertCircleIcon size={28} aria-hidden="true" />
+          <span>{message}</span>
+        </div>
+        <div className="pcp-actions">
+          <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onHome}>
+            回到首页
+          </button>
+          <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onReset}>
+            输另一个到机码
+          </button>
+        </div>
+      </>
     )
   }
 
