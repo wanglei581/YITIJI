@@ -1,6 +1,16 @@
 # 当前开发进度
 
+> **2026-09-29 G1 一体机打印链走查（`grok/kiosk-print-chain-walk-0929`，未推送）**：报价为 0 时写「免费试运营，本单 0 元」，主按钮与读屏同为「确认并打印」。普通 PDF 完成页不再提示证件水印，只有证件件才提示（运行时并没有真正盖上这行水印）。到机码在出纸后再输入、服务端回已完成时，写「这一单已经打印完成」。完成页和进度页只显示 ORD- 订单号；「再印一份」在价目为 0 时写「免费试运营，不另收费」。0 元详单写「实付 0 元（免费试运营）」，没传页范围写「全部页」，份数按每份页数相乘；页数未知时写「全部纸张」，不写「共 0 面」。文字识别不可用时，材料检查可以点「我已确认，继续打印」进入预览。会员列表上的 ORD- 号要等 `GET /me/print-orders` 带回 `orderNo`；人工确认没有调用尚未合入候选的 A-04 留痕 #1068。
+
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
+
+## 2026-09-29：G1 一体机打印链走查（W-44、W-21、W-23、W-45、W-46、W-51、W-17）
+
+- **范围：** 只改一体机打印链与「我的 → 打印订单」的可见说法和能走通的路径。分支 `grok/kiosk-print-chain-walk-0929`，基于候选 `3841b823a`，未推送。没有改登录页、AI 故障判定、打印扫描首页、隐私清场、小程序、设计稿、图谱产物和服务端。
+- **用户能看见的变化：** 0 元报价写「免费试运营，本单 0 元」，按钮是「确认并打印」（付费单仍是「确认并去付款」，看得见的字和读屏同一句）。普通 PDF 完成页不提证件水印；证件扫描件和「我的文档」里的证件用途才提示「仅供求职使用」。到机码再输入时按 `printTaskStatus` 分流，已完成写「这一单已经打印完成」。完成页、进度页和会员详单只显示 ORD- 号，没有就不显示，不显示内部任务号。0 元写「实付 0 元（免费试运营）」；页范围没传写「全部页」；2 页 × 3 份单面写成全部 6 页、共 6 张（6 面）；页数未知写「全部纸张」和「页数待识别」。文字识别不可用时出现「我已确认，继续打印」，点下去进入预览。
+- **验证：** kiosk `tsc --noEmit`、改动文件 eslint、`verify:print-confirm-honest`、`verify:print-done-truth`（含 `print-walk-copy`）、`verify:pickup-claim-error-coverage`、`verify:pii-redaction-contract`（含 `print-manual-ack`）、`verify:member-print-orders-ui`、`verify:profile-print-orders-inkpaper`、`verify:fusion-w2`、`verify:fusion-w5`、`verify:scan-session-truth`、`verify:profile-commercial-first-batch`、`verify:compliance-copy`、`verify:ci-gate-coverage`、`verify:repository-integrity`、`verify:wave3-print-aftercare` 通过。把对应旧说法改回去，上述门禁退出码为 1。正式 `vite build` + preview（47291）加路由夹具截图在本机 `~/.cache/walk0929/evidence/fix-print-chain/`，不进仓库。预览构建额外设了 `VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN`，否则确认页会停在安全校验。
+- **留给服务端：** `GET /me/print-orders` 目前不返回 `order.orderNo`，生产列表要等这个字段；A-04 留痕 #1068 未合入，前端这次没有调用；完成页的证件提示只是文字，打印文件上并没有盖水印。
+
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
 - **P-01（机构政策列表）：** 平台紧急下架的政策此前和机构自己下架的一样显示「已下架」，还给「编辑」「审核通过」「发布」（发布会被服务端以 `EMERGENCY_TAKEDOWN_IRREVERSIBLE` 拒绝，编辑后永远发不出去）。服务端 `getPartnerPolicies` 给本机构列表每行附上 `emergencyTakedown` / `emergencyReasonCode` / `emergencyReasonText` / `emergencyTakedownAt`（只按本机构 `orgId` 加本页 id 查 `RecruitmentEmergencyHold`，公开读取不带；改动前已告知后端窗口，对方同意并提了按机构过滤、跨机构断言两条，均照做）。机构后台对这类行显示「平台已紧急下架」、下方整行写事由、说明、下架时间与「已冻结」，只留删除；与官方渠道面板同一口径。门禁 `verify:policies` 加一段：被下架行带出事由、其余行为 false、A/B 两个机构互相看不到对方的事由、公开列表不带这几个字段；变异「不附下架信息」即红。演示模式补一条被下架的示例，演示发布与服务端同样拒绝。
