@@ -1,6 +1,13 @@
 # 当前开发进度
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
+## 2026-09-29：补 CI 按改动范围跳过的三处漏跑（分支 `grok/ci-scope-gaps-0929`，基于 #1067）
+
+- **浏览器作业：** 分路 PR 只改「浏览器作业会执行」的一体机门禁脚本时不再跳过该作业。清单是 fusion-w2 到 w6、fusion-home / shell / baseline、青序原型几何、浏览器作业里 `node --test` 实际跑的两份契约测试，以及它们 import 的契约模块和几何基线夹具。`verify:scan-input-safety`、`verify:kiosk-feedback-entry`、后台与机构后台的 `run-e2e.mjs` 同样算进。只在主作业里跑的一体机门禁脚本（如 `verify-jobfair-ui.mjs`）仍不因此拉起浏览器作业。
+- **触发清单：** `apps/admin/tests/**`、`apps/partner/tests/**`、各应用 `playwright*.config.ts`、`package.json`、`vite.config.ts`、`index.html`、`public/**` 改了会跑浏览器作业。小程序和 Agent 的 `package.json` 不再被「整目录可跳过」挡住。根目录 `package.json` 与根目录 `scripts/**` 两个大作业都跑。
+- **PostgreSQL 作业：** `services/api/src` 里文件名不是 service / query、但源码发出 Prisma 查询的文件，以及 `services/api/scripts/**`、`services/api/package.json`，改了会跑。只把客户端传下去、自己不调用查询方法的文件（如 `ai.controller.ts`）仍不跑。
+- **标签：** `ci.yml` 不再监听 `labeled`。新增 `ci-full-label.yml`，只有标签名是 `full-ci` 才调用 CI。其它标签不新开运行，也不取消正在跑的 CI。
+- **验证：** `verify:repository-integrity`、`node scripts/verify-ci-changed-scopes.mjs`、`verify:ci-gate-coverage`、图谱重新生成后 `graph:check` 通过。每一类新规则都做了反向变异：删掉后自检变红，恢复后为绿。未推送。
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
 - **P-01（机构政策列表）：** 平台紧急下架的政策此前和机构自己下架的一样显示「已下架」，还给「编辑」「审核通过」「发布」（发布会被服务端以 `EMERGENCY_TAKEDOWN_IRREVERSIBLE` 拒绝，编辑后永远发不出去）。服务端 `getPartnerPolicies` 给本机构列表每行附上 `emergencyTakedown` / `emergencyReasonCode` / `emergencyReasonText` / `emergencyTakedownAt`（只按本机构 `orgId` 加本页 id 查 `RecruitmentEmergencyHold`，公开读取不带；改动前已告知后端窗口，对方同意并提了按机构过滤、跨机构断言两条，均照做）。机构后台对这类行显示「平台已紧急下架」、下方整行写事由、说明、下架时间与「已冻结」，只留删除；与官方渠道面板同一口径。门禁 `verify:policies` 加一段：被下架行带出事由、其余行为 false、A/B 两个机构互相看不到对方的事由、公开列表不带这几个字段；变异「不附下架信息」即红。演示模式补一条被下架的示例，演示发布与服务端同样拒绝。

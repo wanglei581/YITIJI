@@ -17591,7 +17591,14 @@
     ],
     "apps/admin/package.json": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
-      "apps/kiosk/scripts/verify-data-request-ui.mjs"
+      "apps/kiosk/scripts/verify-data-request-ui.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/admin/playwright.config.ts": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/admin/scripts/run-e2e.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/admin/scripts/support/admin-phone-transfer-ui-contract.mjs": [
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs"
@@ -17940,12 +17947,16 @@
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
+    "apps/admin/tests/e2e/login.spec.ts": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "apps/kiosk/index.html": [
       "scripts/verify-compliance-copy.mjs"
     ],
     "apps/kiosk/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/playwright.w2.config.ts": [
       "scripts/verify-ci-changed-scopes.mjs"
@@ -17953,13 +17964,18 @@
     "apps/kiosk/scripts/extract-service-hub-specs.mjs": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
+    "apps/kiosk/scripts/fixtures/qingxu-proto-geometry-baseline.json": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "apps/kiosk/scripts/lib/fusion-baseline-contract.mjs": [
-      "apps/kiosk/scripts/verify-fusion-baseline.mjs"
+      "apps/kiosk/scripts/verify-fusion-baseline.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/scripts/lib/shell-chrome-contract.mjs": [
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
-      "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+      "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/scripts/lib/visible-copy.mjs": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
@@ -17969,6 +17985,12 @@
     ],
     "apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/scripts/tests/fusion-baseline-contract.test.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/scripts/tests/fusion-w6-contract.test.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/scripts/tests/interview-workbench-model.test.mjs": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
@@ -18000,15 +18022,41 @@
     "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    "apps/kiosk/scripts/verify-fusion-baseline.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "apps/kiosk/scripts/verify-fusion-home.mjs": [
       "apps/kiosk/scripts/verify-home-narrow-visual-balance.mjs",
-      "apps/kiosk/scripts/verify-home-prototype-v1.mjs"
+      "apps/kiosk/scripts/verify-home-prototype-v1.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/scripts/verify-fusion-shell.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/scripts/verify-fusion-w3.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/scripts/verify-fusion-w4.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/scripts/verify-fusion-w5.mjs": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/scripts/verify-fusion-w6.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+    ],
+    "apps/kiosk/scripts/verify-jobfair-ui.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -18056,6 +18104,12 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
+    ],
+    "apps/kiosk/scripts/verify-qingxu-proto-geometry.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/scripts/verify-scan-input-safety.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/scripts/verify-user-center-wave0.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -20309,7 +20363,8 @@
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/vite.config.ts": [
-      "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs"
+      "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/miniapp/app.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -20321,6 +20376,9 @@
     ],
     "apps/miniapp/custom-tab-bar/index.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
+    "apps/miniapp/package.json": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/miniapp/pages/ai-records/ai-records.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
@@ -20490,7 +20548,14 @@
       "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/partner/index.html": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "scripts/verify-compliance-copy.mjs"
+    ],
+    "apps/partner/playwright.screen.config.ts": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/partner/scripts/run-e2e.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/partner/src/App.tsx": [
       "scripts/verify-ci-changed-scopes.mjs"
@@ -20629,6 +20694,9 @@
     ],
     "apps/partner/src/services/auth/index.ts": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+    ],
+    "apps/partner/tests/e2e/login.spec.ts": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/terminal-agent/config/agent-config.example.json": [
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
@@ -21283,6 +21351,9 @@
     "scripts/ci-gate-exemptions.json": [
       "scripts/verify-ci-gate-coverage.mjs"
     ],
+    "scripts/ci/drop-unused-apt-sources.sh": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "scripts/fixture-time-bomb-baseline.json": [
       "scripts/verify-fixture-time-bombs.mjs"
     ],
@@ -21349,6 +21420,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-info-ai-real-acceptance.ts",
@@ -21927,6 +21999,7 @@
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
@@ -22415,6 +22488,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/resume/resume-draft.store.ts": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-resume-draft-versions.ts"
     ],
@@ -22715,6 +22789,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts"
     ],
     "services/api/src/common/auth/optional-end-user.ts": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-auth.ts"
     ],
@@ -23697,6 +23772,7 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "services/api/src/jobs/partner-fairs.controller.ts": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts"
     ],
@@ -25186,7 +25262,7 @@
         "missing": []
       },
       "file": "apps/admin/scripts/run-e2e.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": false,
       "package": "@ai-job-print/admin",
       "scriptNames": [
@@ -26216,7 +26292,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-fusion-baseline.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26271,7 +26347,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-fusion-shell.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26347,7 +26423,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26414,7 +26490,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-fusion-w3.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26471,7 +26547,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-fusion-w4.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26571,7 +26647,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-fusion-w6.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26905,7 +26981,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-jobfair-ui.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -27010,7 +27086,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -28358,7 +28434,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-qingxu-proto-geometry.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -28682,7 +28758,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-scan-input-safety.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -29203,7 +29279,7 @@
         "missing": []
       },
       "file": "apps/partner/scripts/run-e2e.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/partner",
       "scriptNames": [
@@ -30128,12 +30204,40 @@
         ],
         "files": [
           ".github/workflows/ci.yml",
+          "apps/admin/package.json",
+          "apps/admin/playwright.config.ts",
+          "apps/admin/scripts/run-e2e.mjs",
           "apps/admin/src/routes/ai-services/index.tsx",
+          "apps/admin/tests/e2e/login.spec.ts",
+          "apps/kiosk/package.json",
           "apps/kiosk/playwright.w2.config.ts",
+          "apps/kiosk/scripts/fixtures/qingxu-proto-geometry-baseline.json",
+          "apps/kiosk/scripts/lib/fusion-baseline-contract.mjs",
+          "apps/kiosk/scripts/lib/shell-chrome-contract.mjs",
+          "apps/kiosk/scripts/tests/fusion-baseline-contract.test.mjs",
+          "apps/kiosk/scripts/tests/fusion-w6-contract.test.mjs",
+          "apps/kiosk/scripts/verify-fusion-baseline.mjs",
+          "apps/kiosk/scripts/verify-fusion-home.mjs",
+          "apps/kiosk/scripts/verify-fusion-shell.mjs",
+          "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+          "apps/kiosk/scripts/verify-fusion-w3.mjs",
+          "apps/kiosk/scripts/verify-fusion-w4.mjs",
+          "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "apps/kiosk/scripts/verify-fusion-w6.mjs",
+          "apps/kiosk/scripts/verify-jobfair-ui.mjs",
+          "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs",
+          "apps/kiosk/scripts/verify-qingxu-proto-geometry.mjs",
+          "apps/kiosk/scripts/verify-scan-input-safety.mjs",
           "apps/kiosk/src/pages/home/HomePage.tsx",
           "apps/kiosk/tests/visual/print-hub-qx.spec.ts",
+          "apps/kiosk/vite.config.ts",
           "apps/miniapp/app.js",
+          "apps/miniapp/package.json",
+          "apps/partner/index.html",
+          "apps/partner/playwright.screen.config.ts",
+          "apps/partner/scripts/run-e2e.mjs",
           "apps/partner/src/App.tsx",
+          "apps/partner/tests/e2e/login.spec.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "docs/compliance/member-personal-data-retention.md",
           "docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html",
@@ -30143,13 +30247,18 @@
           "packages/shared/src/types/device.ts",
           "packages/ui/src/index.ts",
           "scripts/ci-changed-scopes.mjs",
+          "scripts/ci/drop-unused-apt-sources.sh",
+          "services/api/package.json",
           "services/api/prisma/postgres/schema.prisma",
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.service.ts",
-          "services/api/src/console-screen/console-screen.usage.queries.ts"
+          "services/api/src/ai/resume/resume-draft.store.ts",
+          "services/api/src/common/auth/optional-end-user.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
+          "services/api/src/jobs/partner-fairs.controller.ts"
         ],
         "missing": [
-          "apps/kiosk/scripts/verify-fusion-w2.mjs",
           "apps/kiosk/src/b.tsx",
           "apps/miniapp/pages/index/index.js",
           "docs/a.md",

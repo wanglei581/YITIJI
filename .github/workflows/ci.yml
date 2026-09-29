@@ -10,9 +10,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    # labeled：给分路 PR 打 full-ci 标签时重新触发，跑完整三作业（N3，2026-09-29）
-    types: [opened, synchronize, reopened, labeled]
+    # full-ci 标签的重跑在 ci-full-label.yml。这里若监听 labeled，任何标签都会重跑，
+    # 并且 concurrency 会取消同一 PR 上正在跑的运行。
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
+  workflow_call:
 
 # PR 分支上「新推送取消旧运行」是对的，省 CI 时间；
 # 但 main 上取消会让**发布永远拿不到绿运行号** —— 部署强制要求

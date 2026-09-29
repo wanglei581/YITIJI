@@ -1,0 +1,15 @@
+# 只在打上 full-ci 时调用 CI。
+# pull_request 的 labeled 不能按标签名过滤：若把 labeled 放进 ci.yml，
+# 任何标签都会新开一次运行，并取消同一 PR 上正在跑的 CI。
+# 这个工作流名字不同、也不设 concurrency，其它标签只跳过本作业，不碰正在跑的 CI。
+name: CI full-ci label
+
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  full:
+    if: github.event.label.name == 'full-ci'
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
