@@ -14,8 +14,8 @@
 // signedUrl 由后端 kiosk-upload 返回（5-min TTL）；
 // PrintConfirmPage 创建打印任务时后端会重新签发 30-min TTL（B1 方案）。
 //
-// 隐私预检不可绕过：本页只把文件搬进本次办理，下一步固定
-// navigate('/print/material-check', { state: { file, source } })。
+// 隐私预检不可绕过：本页只把文件搬进本次办理，下一步固定写打印交接上下文（origin: 'upload'）
+// 再去打印台材料检查（商用收口 P0-5：跳转只带交接编号，文件身份只认上下文）。
 // 没有当前文件时主操作禁用；本页不伪造「已检查」、不跳预览/确认。
 // ============================================================
 
@@ -40,9 +40,9 @@ import {
   WORD_CONVERSION_UNAVAILABLE_COPY,
 } from '../../services/api/documentConversion'
 import { useUploadSession, type PhoneUploadedFile } from '../upload/hooks/useUploadSession'
+import { useStartPrintHandoff } from './usePrintHandoff'
 import {
   clearPrintMaterialSession,
-  savePrintMaterialSession,
   type PrintFileState,
   type PrintMaterialContentCategory,
   type PrintMaterialSource,
@@ -118,6 +118,7 @@ function qxStatusFromDevice(device: ReturnType<typeof useTerminalDeviceStatus>):
 
 export function PrintUploadPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { getToken, isLoggedIn } = useAuth()
@@ -241,15 +242,13 @@ export function PrintUploadPage() {
     }
   }, [tab, usbConfigured, file, usbUploading, usbSelected, usbPollKey])
 
+  // 上传成功只把文件放进本页；点「下一步」才整份写打印交接上下文。
+  // 以前上传成功就写，不点下一步也留在本机，会被下一位或下一个来源当成「上一份」复水。
   const persistFile = useCallback((nextFile: UploadedFile, origin: FileOrigin) => {
+    clearPrintMaterialSession()
     setFile(nextFile)
     setFileOrigin(origin)
-    savePrintMaterialSession({
-      file: nextFile,
-      source,
-      contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType),
-    })
-  }, [contentCategory, source])
+  }, [])
 
   const handleQrUploaded = useCallback((uploaded: PhoneUploadedFile) => {
     if (!uploaded.fileUrl) {
@@ -373,12 +372,13 @@ export function PrintUploadPage() {
 
   const handleNext = () => {
     if (!file) return
-    savePrintMaterialSession({
+    startPrint({
+      origin: 'upload',
       file,
       source,
+      returnPath: window.location.pathname,
       contentCategory: resolveContentCategory(contentCategory, file.mimeType),
     })
-    navigate('/print/material-check', { state: { file, source } })
   }
 
   const clearCurrentFile = () => {

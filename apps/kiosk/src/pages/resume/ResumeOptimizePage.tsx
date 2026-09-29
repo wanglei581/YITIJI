@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { makePrintParams, type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
+import { type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
@@ -48,6 +48,7 @@ import {
 } from './components/resume-deliver/resumeDecisions'
 import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
 import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-optimize-qx.css'
 import './optimize-empty-state-qx.css'
 import './resume-r1-qx2.css'
@@ -58,6 +59,7 @@ const OPTIMIZE_AI_DRAFT = '我想把简历中的一句经历换个改法。请�
 
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
   const consent = useResumeAiConsent()
@@ -229,11 +231,10 @@ export function ResumeOptimizePage() {
   const handlePrint = () => {
     if (printNavigating || !exported?.printFileUrl) return
     setPrintNavigating(true)
-    navigate('/print/confirm', {
-      state: {
-        file: { name: exported.filename, size: printFileSizeLabel(exported.sizeBytes), pages: exported.pageCount, fileId: exported.fileId, fileUrl: exported.printFileUrl, mimeType: 'application/pdf' },
-        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
-      },
+    startPrint({
+      origin: 'resume_optimize',
+      returnPath: window.location.pathname,
+      file: { name: exported.filename, size: printFileSizeLabel(exported.sizeBytes), pages: exported.pageCount, fileId: exported.fileId, fileUrl: exported.printFileUrl, mimeType: 'application/pdf' },
     })
   }
 
@@ -429,7 +430,7 @@ export function ResumeOptimizePage() {
           />
         )}
         {previewOpen && exported?.signedUrl && (
-          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportKind === 'change_list' ? 'pdf' : exportFormat} mimeType={exportKind === 'change_list' ? 'application/pdf' : undefined} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} onClose={() => setPreviewOpen(false)} />
+          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportKind === 'change_list' ? 'pdf' : exportFormat} mimeType={exportKind === 'change_list' ? 'application/pdf' : undefined} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && (exportKind === 'change_list' || exportFormat === 'pdf') ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
         {confirmLeave && (
           <ResumeOptimizeLeaveDialog
