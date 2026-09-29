@@ -1,0 +1,15 @@
+# 只在打上 full-ci 时调用 CI。
+# pull_request 的 labeled 不能按标签名过滤，所以单独放在这个工作流里。
+# 其它标签跳过本作业；full-ci 标签的运行有自己的并发组，不取消普通 CI；
+# 之后再推送只取消同组的旧运行。
+name: CI full-ci label
+
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  full:
+    if: github.event.label.name == 'full-ci'
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit

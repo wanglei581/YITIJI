@@ -10,9 +10,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    # labeled：给分路 PR 打 full-ci 标签时重新触发，跑完整三作业（N3，2026-09-29）
-    types: [opened, synchronize, reopened, labeled]
+    # full-ci 标签的重跑在 ci-full-label.yml。其它标签跳过那个作业，不进这里。
+    # full-ci 标签的运行有自己的并发组，不取消普通 CI；之后再推送只取消同组的旧运行。
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
+  workflow_call:
 
 # PR 分支上「新推送取消旧运行」是对的，省 CI 时间；
 # 但 main 上取消会让**发布永远拿不到绿运行号** —— 部署强制要求
@@ -38,7 +40,9 @@ concurrency:
   #
   # 代价是 main 上可能同时跑多个 run（合并密集时约 2–3 个）。这是有意的交换：
   # runner 分钟换「每个进 main 的提交都有自己的结论」。
-  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  # full-ci 经 workflow_call 进来时 github.ref 仍是这个 PR，会和普通 CI 挤在同一组，
+  # 把分支保护要求的 build-and-verify 取消掉。labeled 单独加 -full，两组互不取消。
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}${{ github.event.action == 'labeled' && '-full' || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
