@@ -22062,6 +22062,7 @@
     ],
     "services/api/scripts/support/boot-api-child.ts": [
       "services/api/scripts/verify-error-observability.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
     ],
     "services/api/scripts/support/content-pipeline-fixtures.ts": [
@@ -22069,6 +22070,9 @@
     ],
     "services/api/scripts/support/content-pipeline-harness.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts"
+    ],
+    "services/api/scripts/support/ephemeral-redis-server.ts": [
+      "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
     "services/api/scripts/support/inmemory-redis-server.ts": [
       "services/api/scripts/verify-upload-scene.ts"
@@ -22081,7 +22085,8 @@
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
@@ -22099,6 +22104,7 @@
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-job-review.ts",
       "services/api/scripts/verify-jobfair-review.ts",
@@ -23235,8 +23241,12 @@
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts"
     ],
+    "services/api/src/auth/password-login-attempts.ts": [
+      "services/api/scripts/verify-internal-login-real-redis.ts"
+    ],
     "services/api/src/auth/password-proof-state.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/benefit-activities/admin-benefit-activities.controller.ts": [
@@ -23313,7 +23323,8 @@
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/src/common/crypto/secret-cipher.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts",
@@ -24394,6 +24405,9 @@
     "services/api/src/legal/legal.service.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "services/api/src/main.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
     "services/api/src/materials/image-print-quality.util.ts": [
       "services/api/scripts/verify-file-display-truth.ts"
     ],
@@ -24489,11 +24503,13 @@
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-auth.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-auth.service.ts": [
@@ -24502,7 +24518,8 @@
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-member-sms-provider-errors.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/src/member-auth/member-phone-rebind.service.ts": [
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
@@ -24526,7 +24543,17 @@
     "services/api/src/member-auth/sms/sms-budget.ts": [
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
+    "services/api/src/member-auth/sms/sms-code-throttle.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
+    "services/api/src/member-auth/sms/sms-egress-config.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
+    "services/api/src/member-auth/sms/sms-egress-limits.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/src/member-auth/sms/sms-sender.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
@@ -25370,6 +25397,7 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-job-application-track.ts",
@@ -34866,6 +34894,29 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/ephemeral-redis-server.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/auth/password-login-attempts.ts",
+          "services/api/src/auth/password-proof-state.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-internal-login-real-redis.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:internal-login-real-redis"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/scripts/support/isolated-verification-database.ts"
         ],
         "missing": []
@@ -39362,6 +39413,33 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:sms-budget"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/main.ts",
+          "services/api/src/member-auth/member-auth.controller.ts",
+          "services/api/src/member-auth/member-auth.module.ts",
+          "services/api/src/member-auth/member-auth.service.ts",
+          "services/api/src/member-auth/sms/sms-budget.ts",
+          "services/api/src/member-auth/sms/sms-code-throttle.ts",
+          "services/api/src/member-auth/sms/sms-egress-config.ts",
+          "services/api/src/member-auth/sms/sms-egress-limits.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-sms-egress-limits.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:sms-egress-limits"
       ],
       "wired": true
     },
