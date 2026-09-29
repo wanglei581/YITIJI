@@ -64,6 +64,17 @@ function clientErrorFallbackCode(status: number): string {
   }
 }
 
+type MismatchTerminal = { id: string; displayName: string | null; locationLabel: string | null }
+
+/** 白名单取值：只有 id/displayName/locationLabel 三个字符串（后两者可空），其它一概丢掉。 */
+function pickMismatchTerminal(value: unknown): MismatchTerminal | null {
+  if (typeof value !== 'object' || value === null) return null
+  const t = value as Record<string, unknown>
+  if (typeof t['id'] !== 'string') return null
+  const text = (v: unknown) => (typeof v === 'string' ? v : null)
+  return { id: t['id'], displayName: text(t['displayName']), locationLabel: text(t['locationLabel']) }
+}
+
 /**
  * 全局异常过滤器。除了把异常整形成统一错误响应，还负责**唯一一条**
  * 服务端异常日志 —— 此前这里一行日志都不写，所有 500 在服务端零痕迹。
@@ -87,6 +98,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message: string = DEFAULT_ERROR_MESSAGE
     let details: string[] | undefined
     let memberFileRetained = false
+    let mismatchTerminal: MismatchTerminal | null | undefined
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -111,6 +123,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
           }
           // 只透传这一个布尔。其它未知字段（文件名、fileId、对象键）继续丢掉。
           if (err['memberFileRetained'] === true) memberFileRetained = true
+          // 会员本机领取走错机器：给本人看该去哪台（网点名）。只认这一个错误码、只取三个字符串列。
+          if (err['code'] === 'PICKUP_TERMINAL_MISMATCH') mismatchTerminal = pickMismatchTerminal(err['terminal'])
         } else if (typeof errField === 'string') {
           const bodyMessage = b['message']
           if (typeof bodyMessage === 'string' && isMachineErrorCode(bodyMessage)) {
@@ -186,6 +200,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message,
         ...(details ? { details } : {}),
         ...(memberFileRetained ? { memberFileRetained: true as const } : {}),
+        ...(mismatchTerminal !== undefined ? { terminal: mismatchTerminal } : {}),
       },
       requestId: request.requestId,
     }

@@ -616,6 +616,9 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders
+          # 跨端订单时间线 + 会员本机领取：三路归并翻页不重不漏、过滤与 total 同口径、到机码明文不下发、
+          # claim-here 与到机码入口共用同一段核销判定。含排序与 count，PG 侧同样跑。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-order-timeline
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-anonymous-feedback
           pnpm --filter @ai-job-print/api verify:ai-persistence-consistency
           pnpm --filter @ai-job-print/api verify:materials-processing
@@ -1077,6 +1080,9 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders
+          # 跨端订单时间线 + 会员本机领取：三路归并翻页不重不漏、过滤与 total 同口径、到机码明文不下发、
+          # claim-here 与到机码入口共用同一段核销判定。含排序与 count，PG 侧同样跑。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-order-timeline
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-anonymous-feedback
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:pii-redaction
