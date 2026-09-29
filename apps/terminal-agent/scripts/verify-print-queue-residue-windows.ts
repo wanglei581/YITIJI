@@ -305,9 +305,25 @@ function submitOwnJob(printerName: string): void {
   runPs(`'queued' | Out-Printer -Name '${printerName}'`)
 }
 
+/**
+ * 计划任务以临时账号运行，读不到 runner 账号临时目录里的脚本文件，所以不落文件：
+ * 命令按 UTF-16LE 编成 base64，经 -EncodedCommand 传给 powershell，也免掉 /TR 里的引号转义。
+ */
+function otherAccountPrintCommand(): string {
+  const encoded = Buffer.from(`'queued' | Out-Printer -Name '${PRINTER_A}'`, 'utf16le').toString('base64')
+  return `powershell.exe -NoProfile -NonInteractive -EncodedCommand ${encoded}`
+}
+
+/** 别的账号的作业没出现时，打出计划任务的状态和上次运行结果，便于看出是没跑、跑失败还是没权限。 */
+function printOtherAccountTaskDiagnostics(): void {
+  const result = spawnSync('schtasks', ['/Query', '/TN', TASK_NAME, '/V', '/FO', 'LIST'], { encoding: 'utf8', timeout: 30_000 })
+  const lines = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+    .split(/\r?\n/)
+    .filter((line) => /^(Status|Last Run Time|Last Result|Logon Mode|Run As User|Task To Run)\s*:/i.test(line.trim()) || /ERROR/i.test(line))
+  console.error(scrub(`other-account task diagnostics exit=${result.status ?? 'null'}\n${lines.join('\n') || '(no task info)'}`))
+}
+
 function submitOtherAccountJob(): void {
-  const scriptPath = join(tmpdir(), 'aijob-residue-other.ps1')
-  writeFileSync(scriptPath, `'queued' | Out-Printer -Name '${PRINTER_A}'\r\n`, 'utf8')
   runPs(`
 $ErrorActionPreference = 'Stop'
 cmd /c "net user ${USER_NAME} /delete" | Out-Null
@@ -316,7 +332,7 @@ if ($LASTEXITCODE -ne 0) { throw 'local user was not created' }
 # 任务可能还不存在。Windows PowerShell 5.1 在 Stop 模式下会把被 2> 重定向的原生 stderr 当成异常，所以交给 cmd 吞掉。
 cmd /c "schtasks /Delete /TN ${TASK_NAME} /F >nul 2>&1"
 # schtasks /RU 不认 .\\用户名（No mapping between account names and security IDs），要写机器名\\用户名。
-schtasks /Create /TN ${TASK_NAME} /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${scriptPath}" /SC ONCE /ST 23:59 /RU "$env:COMPUTERNAME\\${USER_NAME}" /RP $env:AIJOB_RESIDUE_PW /F /RL LIMITED
+schtasks /Create /TN ${TASK_NAME} /TR "${otherAccountPrintCommand()}" /SC ONCE /ST 23:59 /RU "$env:COMPUTERNAME\\${USER_NAME}" /RP $env:AIJOB_RESIDUE_PW /F /RL LIMITED
 if ($LASTEXITCODE -ne 0) { throw 'scheduled task was not created' }
 schtasks /Run /TN ${TASK_NAME}
 if ($LASTEXITCODE -ne 0) { throw 'scheduled task did not start' }
@@ -381,7 +397,13 @@ async function runScenario(): Promise<void> {
   await showQueueFailure('pause', PRINTER_A, () => pauseConfiguredPrinterQueue(PRINTER_A))
   await showQueueFailure('pause', PRINTER_B, () => pauseConfiguredPrinterQueue(PRINTER_B))
   runLabeled('submitOtherAccountJob', () => submitOtherAccountJob())
-  const other = await waitForJob(PRINTER_A, (job) => !job.ownedByCurrentProcess)
+  let other: PrintJobSnapshot
+  try {
+    other = await waitForJob(PRINTER_A, (job) => !job.ownedByCurrentProcess)
+  } catch (error) {
+    printOtherAccountTaskDiagnostics()
+    throw error
+  }
   submitOwnJob(PRINTER_A)
   submitOwnJob(PRINTER_B)
   const jobA = await waitForJob(PRINTER_A, (job) => job.ownedByCurrentProcess && job.id !== other.id)
