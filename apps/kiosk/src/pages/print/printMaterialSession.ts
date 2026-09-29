@@ -71,9 +71,42 @@ export interface MaterialCheckSummary {
 
 export type PrintMaterialContentCategory = 'photo'
 
+/** 交接上下文的归属：游客，或「会员 + 本次登录在内存里生成的随机标记」。不存会员 id、手机号、令牌。 */
+export type PrintHandoffOwner = { kind: 'guest' } | { kind: 'member'; mark: string }
+
+/** 这一份打印前要不要先做材料检查（由来源决定，见 printHandoffPolicy）。 */
+export type PrintCheckPolicy = 'required' | 'exempt'
+
+/** 建单后打的标记：只记本单编号，同一份交接不能再建第二单。 */
+export interface PrintHandoffOrderMark {
+  orderId: string | null
+  taskId: string | null
+  orderedAt: string
+}
+
+/**
+ * 打印交接上下文（v2，商用收口 P0-5）。同一个 sessionStorage 位置，原「打印材料会话」升级而来：
+ * 清场清单（登出、换人、闲置、屏保、换引导票、完成页）不用改，全部自动覆盖。
+ * 只有来源能整份写入（printHandoff.beginPrintHandoff）；打印链各页只能按 contextId 打补丁。
+ */
 export interface PrintMaterialSession {
+  v: 2
+  contextId: string
+  /** 细分来源（printHandoffPolicy 的 PrintHandoffOrigin）。 */
+  origin: string
   file: PrintFileState
+  /** 只决定「重新选文件」回简历打印还是文档打印。 */
   source?: PrintMaterialSource
+  /** 站内路径（只有路径部分），给「回到上一步」用。 */
+  returnPath?: string
+  /** 打印链接自己的到期时间（从链接里的 expires 解析）；null = 未知，不拦。 */
+  fileUrlExpiresAt: string | null
+  owner: PrintHandoffOwner
+  createdAt: string
+  expiresAt: string
+  checkPolicy: PrintCheckPolicy
+  /** 来源给的参数建议（如两页以上建议双面），只是建议。 */
+  paramsSuggestion?: Partial<PrintJobParams>
   /** 来自入口页面传递的内容类别提示（目前只有 'photo'）；仅作为审计字段随 pii_scan 请求持久化，不影响是否真实扫描。 */
   contentCategory?: PrintMaterialContentCategory
   inspectionTask?: StoredMaterialTask
@@ -81,7 +114,9 @@ export interface PrintMaterialSession {
   piiTask?: StoredMaterialTask
   piiRedactTask?: StoredMaterialTask
   materialCheck?: MaterialCheckSummary
+  /** 用户最后确定、并已与本机能力求交的参数。 */
   printParams?: PrintJobParams
+  order?: PrintHandoffOrderMark
   updatedAt: string
 }
 
@@ -173,10 +208,39 @@ function toStoredMaterialTask(task: DocumentProcessTaskView | StoredMaterialTask
   }
 }
 
-function sanitizeSession(next: Omit<PrintMaterialSession, 'updatedAt'>): Omit<PrintMaterialSession, 'updatedAt'> {
+function sanitizeOwner(owner: unknown): PrintHandoffOwner | null {
+  if (!isRecord(owner)) return null
+  if (owner['kind'] === 'guest') return { kind: 'guest' }
+  if (owner['kind'] === 'member' && typeof owner['mark'] === 'string' && owner['mark'].length >= 8) {
+    return { kind: 'member', mark: owner['mark'] }
+  }
+  return null
+}
+
+function sanitizeOrder(order: unknown): PrintHandoffOrderMark | undefined {
+  if (!isRecord(order) || typeof order['orderedAt'] !== 'string') return undefined
   return {
+    orderId: optionalString(order['orderId']) ?? null,
+    taskId: optionalString(order['taskId']) ?? null,
+    orderedAt: order['orderedAt'],
+  }
+}
+
+/** 保存时按白名单过滤字段：不认识的键（会员 id、令牌、昵称……）一律不落盘。 */
+function sanitizeSession(next: PrintMaterialSession): PrintMaterialSession {
+  return {
+    v: 2,
+    contextId: next.contextId,
+    origin: next.origin,
     file: sanitizeFile(next.file),
-    source: next.source,
+    source: next.source === 'resume' || next.source === 'document' ? next.source : undefined,
+    returnPath: next.returnPath,
+    fileUrlExpiresAt: next.fileUrlExpiresAt,
+    owner: sanitizeOwner(next.owner) ?? { kind: 'guest' },
+    createdAt: next.createdAt,
+    expiresAt: next.expiresAt,
+    checkPolicy: next.checkPolicy === 'exempt' ? 'exempt' : 'required',
+    paramsSuggestion: next.paramsSuggestion,
     contentCategory: next.contentCategory,
     inspectionTask: toStoredMaterialTask(next.inspectionTask),
     normalizeTask: toStoredMaterialTask(next.normalizeTask),
@@ -184,42 +248,59 @@ function sanitizeSession(next: Omit<PrintMaterialSession, 'updatedAt'>): Omit<Pr
     piiRedactTask: toStoredMaterialTask(next.piiRedactTask),
     materialCheck: next.materialCheck,
     printParams: next.printParams,
+    order: sanitizeOrder(next.order),
+    updatedAt: next.updatedAt,
   }
 }
 
-export function readPrintMaterialSession(): PrintMaterialSession | null {
-  if (!isBrowserStorageAvailable()) return null
+const isIsoDate = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value))
+
+/** v2 结构校验：旧结构（没有 v、contextId、归属、有效期）一律不认。 */
+function isStoredHandoff(value: unknown): value is PrintMaterialSession {
+  if (!isRecord(value) || value['v'] !== 2) return false
+  if (typeof value['contextId'] !== 'string' || value['contextId'].length < 8) return false
+  if (typeof value['origin'] !== 'string' || !value['origin']) return false
+  if (!isPrintFileState(value['file'])) return false
+  const file = value['file'] as unknown as Record<string, unknown>
+  if (!optionalString(file['fileId']) || !optionalString(file['fileUrl'])) return false
+  if (!sanitizeOwner(value['owner'])) return false
+  if (!isIsoDate(value['createdAt']) || !isIsoDate(value['expiresAt'])) return false
+  if (value['fileUrlExpiresAt'] !== null && !isIsoDate(value['fileUrlExpiresAt'])) return false
+  return value['checkPolicy'] === 'required' || value['checkPolicy'] === 'exempt'
+}
+
+export type StoredHandoffRead =
+  | { status: 'none' }
+  | { status: 'invalid' }
+  | { status: 'ok'; value: PrintMaterialSession }
+
+/** 只读存储并校验结构；归属、有效期由 printHandoff 判。结构不对时不在这里清（调用方决定）。 */
+export function readStoredPrintHandoff(): StoredHandoffRead {
+  if (!isBrowserStorageAvailable()) return { status: 'none' }
+  let raw: string | null
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
+    raw = window.sessionStorage.getItem(STORAGE_KEY)
+  } catch {
+    return { status: 'none' }
+  }
+  if (!raw) return { status: 'none' }
+  try {
     const parsed = JSON.parse(raw) as unknown
-    if (!isRecord(parsed) || !isPrintFileState(parsed['file'])) return null
-    return parsed as unknown as PrintMaterialSession
+    return isStoredHandoff(parsed) ? { status: 'ok', value: parsed } : { status: 'invalid' }
   } catch {
-    return null
+    return { status: 'invalid' }
   }
 }
 
-export function savePrintMaterialSession(next: Omit<PrintMaterialSession, 'updatedAt'>): void {
-  if (!isBrowserStorageAvailable()) return
+/** 整份写入（已过白名单）。写不进返回 false —— 调用方必须如实告诉用户，不能静默退回临时状态。 */
+export function writeStoredPrintHandoff(next: PrintMaterialSession): boolean {
+  if (!isBrowserStorageAvailable()) return false
   try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...sanitizeSession(next), updatedAt: new Date().toISOString() }))
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeSession(next)))
+    return true
   } catch {
-    // sessionStorage can be unavailable in restricted browser modes; the flow still works with route state.
+    return false
   }
-}
-
-export function patchPrintMaterialSession(patch: Partial<Omit<PrintMaterialSession, 'updatedAt'>>): PrintMaterialSession | null {
-  const current = readPrintMaterialSession()
-  const file = patch.file ?? current?.file
-  if (!file) return null
-  const next: Omit<PrintMaterialSession, 'updatedAt'> = {
-    ...(current ?? { file }),
-    ...patch,
-    file,
-  }
-  savePrintMaterialSession(next)
-  return readPrintMaterialSession()
 }
 
 export function clearPrintMaterialSession(): void {

@@ -1,0 +1,135 @@
+/* 政策服务 /renshi · 手机与窄桌面（390 一类的宽度）。从 renshi-policy-fusion.css 拆出（那份按稿收口后仍近 800 行）。
+ * 1080 舞台的版式在 renshi-policy-fusion.css 与 renshi-eligibility-qx.css；这里只收紧窄屏。 */
+
+/* 手机与窄桌面：舞台不缩放、按真实宽度排版（只作用于 data-kiosk-stage-fit="off"）。
+ * 任务头、页签和内容一起纵向滚动（整页一个滚动区），底部操作条与导航收紧；触控目标仍 ≥48px，按钮 ≥56px。
+ * 条件核对的收紧也写在这里：renshi-eligibility-qx.css 里的 min-height 只给 1080 舞台的可点元素。 */
+@media (max-width: 720px) {
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.w4-policy-page) { --qx-gutter: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.w4-policy-page) .qx-pagehead { margin-top: 12px; gap: 6px 10px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.w4-policy-page) .qx-pagehead h1 { font-size: 26px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.w4-policy-page) .qx-pagehead p { flex-basis: 100%; min-width: 0; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.w4-policy-page) .qx-navbar { height: 72px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.w4-policy-page) .qx-nav-item { gap: 2px; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.w4-policy-page) .qx-nav-item svg { width: 24px; height: 24px; }
+  [data-kiosk-stage-fit='off'] .rq-page { overflow-y: auto; }
+  [data-kiosk-stage-fit='off'] .rq-lead { min-height: 0; gap: 10px; }
+  [data-kiosk-stage-fit='off'] .rq-lead > .rq-steps,
+  [data-kiosk-stage-fit='off'] .rq-lead > .rq-steps + * { margin-top: 0; }
+  [data-kiosk-stage-fit='off'] .rq-scroll { flex: none; min-height: auto; overflow: visible; padding-top: 12px; }
+  [data-kiosk-stage-fit='off'] .rq-scroll::after { display: none; }
+  [data-kiosk-stage-fit='off'] .rq-scroll > .rq-deadend,
+  [data-kiosk-stage-fit='off'] .rq-scroll > .k8-elig { flex: none; }
+  [data-kiosk-stage-fit='off'] .rq-deadend > .rq-exits,
+  [data-kiosk-stage-fit='off'] .rq-deadend > .rq-note { margin-top: 0; }
+  [data-kiosk-stage-fit='off'] .rq-deadend::after { display: none; }
+  [data-kiosk-stage-fit='off'] .k8-elig > .rq-deadend { flex: none; }
+  [data-kiosk-stage-fit='off'] .rq-more,
+  [data-kiosk-stage-fit='off'] .rq-srcline,
+  [data-kiosk-stage-fit='off'] .rq-note,
+  [data-kiosk-stage-fit='off'] .rq-why { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .rq-steps { flex-direction: column; gap: 6px; }
+  [data-kiosk-stage-fit='off'] .rq-steps li { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .rq-steps b { font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .rq-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  [data-kiosk-stage-fit='off'] .rq-tab { min-height: 64px; border-radius: 16px; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .rq-tab svg { width: 22px; height: 22px; }
+  [data-kiosk-stage-fit='off'] .rq-chip { min-height: 48px; padding: 0 12px; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .rq-grp b { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .rq-grp span { flex-basis: 100%; min-width: 0; font-size: 14px; text-align: left; }
+  [data-kiosk-stage-fit='off'] .rq-item-main,
+  [data-kiosk-stage-fit='off'] .rq-list[data-count='1'] .rq-item-main { min-height: 72px; gap: 12px; padding: 12px 14px; }
+  [data-kiosk-stage-fit='off'] .rq-list[data-count='1'] .rq-acc { gap: 10px; padding: 2px 14px 14px; }
+  [data-kiosk-stage-fit='off'] .rq-list[data-count='1'] .rq-note { min-height: 0; padding: 12px 14px; }
+  [data-kiosk-stage-fit='off'] .rq-list[data-count='1'] .rq-strip > .rq-exit { min-height: 72px; padding: 10px 14px; }
+  [data-kiosk-stage-fit='off'] .rq-item-ic,
+  [data-kiosk-stage-fit='off'] .rq-list[data-count='1'] .rq-item-ic { width: 44px; height: 44px; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .rq-item-tx b,
+  [data-kiosk-stage-fit='off'] .rq-blk-h b { font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .rq-item-sub,
+  [data-kiosk-stage-fit='off'] .rq-blk-h small { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .rq-item-tail { flex-direction: column; align-items: flex-end; gap: 4px; }
+  [data-kiosk-stage-fit='off'] .rq-tag { min-height: 28px; padding: 0 8px; font-size: 13px; }
+  [data-kiosk-stage-fit='off'] .rq-fav { width: 48px; min-height: 48px; margin: 12px 8px 12px 0; }
+  [data-kiosk-stage-fit='off'] .rq-acc { gap: 10px; padding: 2px 14px 14px; }
+  [data-kiosk-stage-fit='off'] .rq-quote,
+  [data-kiosk-stage-fit='off'] .rq-dsec li,
+  [data-kiosk-stage-fit='off'] .rq-steps-mini li,
+  [data-kiosk-stage-fit='off'] .rq-kv,
+  [data-kiosk-stage-fit='off'] .rq-fact,
+  [data-kiosk-stage-fit='off'] .rq-ai-off span { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .rq-dsec-h,
+  [data-kiosk-stage-fit='off'] .rq-ai-off b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .rq-grid,
+  [data-kiosk-stage-fit='off'] .rq-dsec-cols ul { grid-template-columns: 1fr; }
+  [data-kiosk-stage-fit='off'] .rq-blk { padding: 16px; border-radius: 22px; }
+  [data-kiosk-stage-fit='off'] .rq-kv { flex-wrap: wrap; gap: 4px 12px; }
+  [data-kiosk-stage-fit='off'] .rq-kv span { width: auto; }
+  [data-kiosk-stage-fit='off'] .rq-exit,
+  [data-kiosk-stage-fit='off'] .rq-exits .rq-exit { min-height: 72px; gap: 12px; padding: 10px 14px; border-radius: 18px; }
+  [data-kiosk-stage-fit='off'] .rq-exit svg { width: 22px; height: 22px; padding: 11px; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .rq-exit b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .rq-exit small { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .rq-mini { min-height: 56px; padding: 0 14px; font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .rq-state,
+  [data-kiosk-stage-fit='off'] .rq-state-lg { padding: 16px; border-radius: 22px; }
+  [data-kiosk-stage-fit='off'] .rq-state b,
+  [data-kiosk-stage-fit='off'] .rq-state-lg .rq-state-h { font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .rq-state p { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .rq-state-ic { width: 44px; height: 44px; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .rq-state-ic svg { width: 22px; height: 22px; }
+  [data-kiosk-stage-fit='off'] .rq-cta-row { flex-wrap: wrap; gap: 6px 10px; min-height: 0; padding: 10px 0 8px; }
+  [data-kiosk-stage-fit='off'] .rq-cta-host { flex-wrap: wrap; gap: 6px 10px; }
+  [data-kiosk-stage-fit='off'] .rq-cta-row > .why,
+  [data-kiosk-stage-fit='off'] .rq-cta-host .why { flex-basis: 100%; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.w4-policy-page) > .qx-ctabar .qx-btn[data-variant='primary'] { min-width: 0; min-height: 56px; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .rq-cta-count { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .rq-cta-count b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .rq-cta-stack .rq-truth { padding: 6px 0 8px; font-size: 13px; }
+  /* 条件核对 */
+  [data-kiosk-stage-fit='off'] .rq-cta-host .k8-elig-submit,
+  [data-kiosk-stage-fit='off'] .rq-cta-host .k8-elig-restart,
+  [data-kiosk-stage-fit='off'] .rq-cta-host .k8-elig-notice-retry,
+  [data-kiosk-stage-fit='off'] .rq-cta-host .k8-elig-print-blocked { flex: 1 1 100%; min-width: 0; min-height: 56px; padding: 0 12px; font-size: 17px; white-space: normal; }
+  [data-kiosk-stage-fit='off'] .k8-elig { gap: 12px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-steps { gap: 8px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-step { min-height: 48px; padding: 8px 10px; border-radius: 14px; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-step-n { width: 26px; height: 26px; border-radius: 9px; font-size: 13px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-privacy,
+  [data-kiosk-stage-fit='off'] .k8-elig-disclaimer,
+  [data-kiosk-stage-fit='off'] .k8-elig-noai,
+  [data-kiosk-stage-fit='off'] .k8-elig-headline-text,
+  [data-kiosk-stage-fit='off'] .k8-elig-card-overall,
+  [data-kiosk-stage-fit='off'] .k8-elig-cond-reason,
+  [data-kiosk-stage-fit='off'] .k8-elig-cond-src,
+  [data-kiosk-stage-fit='off'] .k8-elig-cond-basis { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-privacy,
+  [data-kiosk-stage-fit='off'] .k8-elig-q,
+  [data-kiosk-stage-fit='off'] .k8-elig-disclaimer { padding: 12px 14px; border-radius: 16px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-q-title { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-q-title small { font-size: 13px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-opt { min-height: 48px; padding: 0 12px; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-headline,
+  [data-kiosk-stage-fit='off'] .k8-elig-card { padding: 14px; border-radius: 18px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-headline-label,
+  [data-kiosk-stage-fit='off'] .k8-elig-e2,
+  [data-kiosk-stage-fit='off'] .k8-elig-chip { font-size: 13px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-card h3 { font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-cond { gap: 10px; padding: 10px 12px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-cond-main { grid-template-columns: 1fr; }
+  [data-kiosk-stage-fit='off'] .k8-elig-cond-head b { font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .k8-elig-cond-tag,
+  [data-kiosk-stage-fit='off'] .k8-elig-cond-k { font-size: 13px; }
+  /* 来源二维码弹层：码在上、核对信息在下，整张卡可滚动；关闭键仍是整行主按钮。 */
+  [data-kiosk-stage-fit='off'] .rq-qr-layer { padding: 12px; }
+  [data-kiosk-stage-fit='off'] .rq-qr-card { max-height: 100%; gap: 12px; padding: 16px; border-radius: 22px; overflow-y: auto; }
+  [data-kiosk-stage-fit='off'] .rq-qr-card h2 { font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .rq-qr-mid { flex-direction: column; align-items: center; gap: 12px; }
+  [data-kiosk-stage-fit='off'] .rq-qr-code { width: 220px; height: 220px; }
+  [data-kiosk-stage-fit='off'] .rq-qr-code svg { width: 196px; height: 196px; }
+  [data-kiosk-stage-fit='off'] .rq-qr-meta { width: 100%; gap: 6px; }
+  [data-kiosk-stage-fit='off'] .rq-qr-meta div { gap: 10px; padding: 8px 10px; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .rq-qr-meta dt { width: 64px; }
+  [data-kiosk-stage-fit='off'] .rq-qr-note { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .rq-qr-card .rq-qr-close { min-height: 56px; font-size: 18px; }
+}
