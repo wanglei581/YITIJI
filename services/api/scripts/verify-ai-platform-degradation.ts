@@ -22,7 +22,7 @@
  * 再在请求期把 NODE_ENV 切成 production —— AI 闸门、能力接口、isReady 都是请求期读环境，走的是真判定。
  * 「生产缺 AI 仍能过启动闸门」由 [A] 与 verify:production-runtime-gates 直接调用闸门函数证明。
  *
- * 不触网（百度 OCR 指向死端口）、不写库。
+ * 不触网（OCR 探测把全局 fetch 换成只记账的替身）、不写库。
  * 运行：pnpm --filter @ai-job-print/api verify:ai-platform-degradation
  */
 import 'reflect-metadata'
@@ -79,8 +79,9 @@ const PROD_AI_OK: Record<AiKey, string | undefined> = {
   OCR_PROVIDER: 'baidu',
   BAIDU_OCR_API_KEY: 'verify-baidu-api-key',
   BAIDU_OCR_SECRET_KEY: 'verify-baidu-secret-key',
-  // 死端口：[D] 的 OCR 探测只看「有没有去识别」，绝不真的出网。
-  BAIDU_OCR_BASE_URL: 'http://127.0.0.1:9',
+  // 用白名单里的真实百度主机（生产下 P1-3 出站白名单拒绝回环地址，死端口会在发请求前被拦、误判成「OCR 不可用」）。
+  // [D] 的 OCR 探测把全局 fetch 换成只记账不出网的替身，只看「有没有去识别」，绝不真的出网。
+  BAIDU_OCR_BASE_URL: 'https://aip.baidubce.com',
   AIGC_CONTENT_PRODUCER: '示例信息技术有限公司',
 }
 
@@ -299,11 +300,18 @@ const SURFACE_PROBES: Record<string, SurfaceProbe> = {
     },
   },
   'ocr-recognition': {
-    describe: '按当前环境新构造的 OcrService 识别一张图（死端口，只看「有没有去识别」）',
+    describe: '按当前环境新构造的 OcrService 识别一张图（fetch 替身不出网，只看「有没有去识别」）',
     run: async () => {
       const ocr = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider(), new BaiduOcrProvider())
-      const result = await ocr.recognize({ buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]), mimeType: 'image/png' })
-      return { succeeded: result.errorCode !== 'OCR_NOT_CONFIGURED', detail: `provider=${ocr.activeProviderName} → ${result.ok ? 'ok' : result.errorCode}` }
+      const realFetch = globalThis.fetch
+      let attempted = 0
+      globalThis.fetch = (async () => { attempted += 1; throw new TypeError('verify-ai-platform-degradation: offline fetch stub') }) as typeof fetch
+      try {
+        const result = await ocr.recognize({ buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]), mimeType: 'image/png' })
+        return { succeeded: result.errorCode !== 'OCR_NOT_CONFIGURED', detail: `provider=${ocr.activeProviderName} → ${result.ok ? 'ok' : result.errorCode}；尝试出网 ${attempted} 次（替身拦下）` }
+      } finally {
+        globalThis.fetch = realFetch
+      }
     },
   },
   'print-scan': {
