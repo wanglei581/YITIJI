@@ -1,4 +1,4 @@
-# 生产服务器盘点与清理方案（120.48.13.190，2026-09-06）
+# 生产服务器盘点与清理方案（<生产服务器 IP>，2026-09-06）
 
 **本次只做只读盘点，没有在服务器上删除、重启或改任何配置。** 下面每一档都附可直接执行的命令，等产品负责人勾选后再执行。
 
@@ -23,7 +23,7 @@
 | 数据库 | PostgreSQL `ai_job_print`，**48 MB** | `pg_database_size` |
 | 缓存 | Redis，7.6 MB | `du /var/lib/redis` |
 
-`/root/YITIJI` 是源码检出（378 MB），**不是运行路径**，进程不读它。
+`<服务器源码检出目录>` 是源码检出（378 MB），**不是运行路径**，进程不读它。
 
 数据库只有 48 MB——数据完全不是空间问题。
 
@@ -57,13 +57,13 @@
 先做一次演练，确认要删的里面没有在跑的路径：
 
 ```bash
-ls -d /srv/ai-job-print-prev-* /srv/ai-job-print-previous-* /srv/ai-job-print-releases /srv/ai-job-print-backups /srv/ai-job-print-rollbacks /srv/ai-job-print-release-backups 2>/dev/null | grep -x /srv/ai-job-print && echo "危险：命中在跑路径，停手" || echo "安全：未命中 /srv/ai-job-print"
+ls -d /srv/ai-job-print-prev-* /srv/ai-job-print-previous-* /srv/ai-job-print-releases /srv/ai-job-print-backups /srv/ai-job-print-rollbacks /srv/<发布包存储桶>-backups 2>/dev/null | grep -x /srv/ai-job-print && echo "危险：命中在跑路径，停手" || echo "安全：未命中 /srv/ai-job-print"
 ```
 
 确认输出「安全」后再执行：
 
 ```bash
-rm -rf /srv/ai-job-print-prev-* /srv/ai-job-print-previous-* /srv/ai-job-print-releases /srv/ai-job-print-backups /srv/ai-job-print-rollbacks /srv/ai-job-print-release-backups /srv/ai-job-print-candidate-main-api-* /srv/ai-job-print-api-failed-precheck-* /srv/ai-job-print-api-drycheck-* /srv/ai-job-print-release-30d168ce-*
+rm -rf /srv/ai-job-print-prev-* /srv/ai-job-print-previous-* /srv/ai-job-print-releases /srv/ai-job-print-backups /srv/ai-job-print-rollbacks /srv/<发布包存储桶>-backups /srv/ai-job-print-candidate-main-api-* /srv/ai-job-print-api-failed-precheck-* /srv/ai-job-print-api-drycheck-* /srv/<发布包存储桶>-30d168ce-*
 ```
 
 归档包（251 MB）：
@@ -72,7 +72,7 @@ rm -rf /srv/ai-job-print-prev-* /srv/ai-job-print-previous-* /srv/ai-job-print-r
 rm -f /srv/*.tar.gz /srv/*.tgz /srv/*.tar
 ```
 
-**保留不动**：`/srv/ai-job-print`（在跑）、`/srv/ai-job-print-db-backups`、`/srv/db-backups`、`/srv/ai-job-print-secrets`、`/srv/secrets`、`/srv/ai-job-print-env-backups`、`/srv/zhiyida-site`、`/srv/node_modules`。
+**保留不动**：`/srv/ai-job-print`（在跑）、`/srv/ai-job-print-db-backups`、`/srv/db-backups`、`<服务器密钥目录>`、`/srv/secrets`、`/srv/ai-job-print-env-backups`、`/srv/zhiyida-site`、`/srv/node_modules`。
 
 **2. 可再生缓存（约 1.7 GB）**
 
@@ -99,21 +99,21 @@ pnpm store prune
 
 只删没有任何项目引用的包。风险是下次构建要重新下载，**建议在没有待发布版本时做**。
 
-**2. `/root/YITIJI` 源码检出（378 MB）**
+**2. `<服务器源码检出目录>` 源码检出（378 MB）**
 
 不是运行路径，删了不影响服务。但它是服务器上唯一的源码副本，**删之前先确认部署流程不依赖它**（当前部署脚本在 `/srv/deploy-*.sh`，需要读一遍确认）。建议先留着。
 
 ### 第三档：涉及数据，本次不建议动
 
 - `/srv/ai-job-print-db-backups`、`/srv/db-backups`（共 54 MB）：数据库备份，占用极小，**不要删**。
-- `/srv/ai-job-print-secrets`、`/srv/secrets`：密钥，**不要删**。
+- `<服务器密钥目录>`、`/srv/secrets`：密钥，**不要删**。
 - PostgreSQL 数据目录 120 MB：正常。
 
 ## 五、比空间更要紧的三件事
 
 ### 1. 线上跑的是 19 天前的代码（最高优先，落后 243 个提交）
 
-`/root/YITIJI` 停在 `771d53e2`（2026-08-18），`/srv/ai-job-print` 的构建产物同期。这意味着 8 月 18 日之后合入 main 的所有修复**一行都没上线**。
+`<服务器源码检出目录>` 停在 `771d53e2`（2026-08-18），`/srv/ai-job-print` 的构建产物同期。这意味着 8 月 18 日之后合入 main 的所有修复**一行都没上线**。
 
 > **更正（2026-09-06，本节初版写错了，原文如实保留在下面一段）**
 >
@@ -156,10 +156,10 @@ pm2 set pm2-logrotate:compress true
 
 ### 3. 两个凭据文件明文躺在 /root
 
-- `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（权限 0600）
-- `/root/tencent-jobs-preprod-credentials-0701162419.json`（权限 0600）
+- `<服务器上的口令轮换输出文件>+0800.txt`（权限 0600）
+- `<服务器上的凭证文件>`（权限 0600）
 
-**本次盘点没有读取这两个文件的内容。** 权限是对的（仅 root 可读），但明文凭据留在家目录不符合本仓 §12「密钥只保存在服务端受控位置」的口径。建议确认是否仍在使用：仍用则移入 `/srv/ai-job-print-secrets` 并轮换，不用则删除。这一步涉及密钥，**必须由产品负责人本人操作或明确授权**。
+**本次盘点没有读取这两个文件的内容。** 权限是对的（仅 root 可读），但明文凭据留在家目录不符合本仓 §12「密钥只保存在服务端受控位置」的口径。建议确认是否仍在使用：仍用则移入 `<服务器密钥目录>` 并轮换，不用则删除。这一步涉及密钥，**必须由产品负责人本人操作或明确授权**。
 
 另注：`docs/progress/current-progress.md` 里已记过「百度 OCR 密钥曾在聊天暴露，上线前须在百度控制台重建应用轮换」，这条待办仍未见完成记录。
 
@@ -187,11 +187,11 @@ pm2 set pm2-logrotate:compress true
 
 **磁盘：28 GB 用 → 13 GB 用，剩余 9.6 GB → 25 GB。** 比第一档预估的「剩 28 GB」少 3 GB，因为估算时用的是「总量减保留集」下限口径，实际硬链接共享比估的少。
 
-删后核验（全部通过）：API `/health` 200；nginx `/`、`/admin/`、`/partner/` 均 200；`/srv/ai-job-print/services/api/dist` 在；`/srv/ai-job-print-db-backups`、`/srv/ai-job-print-secrets` 原样保留。
+删后核验（全部通过）：API `/health` 200；nginx `/`、`/admin/`、`/partner/` 均 200；`/srv/ai-job-print/services/api/dist` 在；`/srv/ai-job-print-db-backups`、`<服务器密钥目录>` 原样保留。
 
 执行时一处插曲：删发布树时 SSH 被服务端断开一次，但删除已在断开前完成（重连核验：发布树剩 0、API 200）。后续步骤加 `ServerAliveInterval` 后无异常。
 
-**仍未动**：第二档（pnpm store prune、`/root/YITIJI` 源码检出）、第三档（数据库备份、密钥）、两个 `/root` 下的明文凭据文件（去留待产品负责人本人操作）。
+**仍未动**：第二档（pnpm store prune、`<服务器源码检出目录>` 源码检出）、第三档（数据库备份、密钥）、两个 `/root` 下的明文凭据文件（去留待产品负责人本人操作）。
 
 ## 八、重新部署事故记录（2026-09-06，产品负责人批准「现在就做」后执行）
 
@@ -231,7 +231,7 @@ PRINT_REQUIRE_PRINTER_ONLINE 必须显式为 true（打印机离线、缺纸或�
 
 - **前端未更新**：脚本在健康检查处退出，未执行「拷 dist + reload nginx」。当前状态 = 新 API + 旧前端。处置：按 runbook 重跑目标提交的 CI 让流水线完整跑一遍（服务器已在目标 SHA 时会跳过拉取；迁移无变化；再备份一次约 1.1 GB）。
 - **防复发**：3b 改为按 `REQUIRED_PRODUCTION_GATES` 数组循环持久化；新增 `verify:deploy-gates-in-sync` 门禁在 CI 里比对闸门源码与脚本清单（变异测试：数组删一键 → 红）；runbook §2 补 2.0 前置项。
-- **探测教训**：事故中我从本机打公网 `https://120.48.13.190.sslip.io` 全部 `000`，一度误判主机不可达；实为本机 DNS 把 `sslip.io` 解析到 `198.18.1.0`（RFC 2544 基准段）。改走 `http://120.48.13.190/api/v1/health`（:80 按 IP）才拿到真相。公网复验时不要信 sslip 域名，按 IP 打。
+- **探测教训**：事故中我从本机打公网 `https://<预发域名>` 全部 `000`，一度误判主机不可达；实为本机 DNS 把 `sslip.io` 解析到 `198.18.1.0`（RFC 2544 基准段）。改走 `http://<生产服务器 IP>/api/v1/health`（:80 按 IP）才拿到真相。公网复验时不要信 sslip 域名，按 IP 打。
 - **SSH 断连**：崩溃循环期间 SSH 会话多次被服务端关闭；加 `ServerAliveInterval=5 ServerAliveCountMax=2` 且把命令拆短后稳定。
 
 ### 收口：完整重发 `6ee09fcc0`（2026-09-06 15:15–15:37，UTC+8）
@@ -250,7 +250,7 @@ PRINT_REQUIRE_PRINTER_ONLINE 必须显式为 true（打印机离线、缺纸或�
 | 磁盘 | 16G 已用 / 22G 可用（42%），本次又落一份 `pre-6ee09fcc0…` 备份 |
 | 开关 | deploy 的 SSH 步骤进入 in_progress 后立即置 `DEPLOY_API_ENABLED=false`（步骤 env 已在起步时求值，此后再翻不影响本次发布） |
 
-04:18Z 那次 deploy run `34011164995` 显示 skipped 曾被误读为流水线异常：查 attempt 1 实为 success，跳过只因当时开关仍为 false。**复验探针注意**：按 IP 打 `/admin/`、`/partner/` 路径拿到的永远是 kiosk（nginx 里三前台分别是 :80 默认、:8081、:8082 与 `*.zyidai.cn` 三个 443 vhost，8081/8082 未对公网开放），要用 `curl --resolve admin.zyidai.cn:443:120.48.13.190` 这种方式按域名打。
+04:18Z 那次 deploy run `34011164995` 显示 skipped 曾被误读为流水线异常：查 attempt 1 实为 success，跳过只因当时开关仍为 false。**复验探针注意**：按 IP 打 `/admin/`、`/partner/` 路径拿到的永远是 kiosk（nginx 里三前台分别是 :80 默认、:8081、:8082 与 `*.zyidai.cn` 三个 443 vhost，8081/8082 未对公网开放），要用 `curl --resolve admin.zyidai.cn:443:<生产服务器 IP>` 这种方式按域名打。
 
 防复发两件已合入 main：#829（3b 按 `REQUIRED_PRODUCTION_GATES` 循环持久化 + PM2 重启前 export 全部闸门键 + `verify:deploy-gates-in-sync` 钉进 `REQUIRED_COMMANDS`，deterministic 16→17 + 授权门禁改按数组断言）。
 
@@ -267,9 +267,9 @@ PRINT_REQUIRE_PRINTER_ONLINE 必须显式为 true（打印机离线、缺纸或�
 | 备份 | `pre-7f826bcb9…-20260906T093532Z.{dump,runtime}` |
 | 开关 | SSH 步骤 in_progress 后立即置 false |
 
-**第二档结果**：`pnpm store prune`（store `/root/.local/share/pnpm/store/v11`）前后均 2.7G，**没有可回收的无引用包**；磁盘 17G 已用 / 21G 可用。`/root/YITIJI` 按建议保留。第三档不动。
+**第二档结果**：`pnpm store prune`（store `/root/.local/share/pnpm/store/v11`）前后均 2.7G，**没有可回收的无引用包**；磁盘 17G 已用 / 21G 可用。`<服务器源码检出目录>` 按建议保留。第三档不动。
 
-**取证注意**：`gh run list --workflow=deploy.yml` 显示的 `headSha` 是 main 当时的 tip（workflow_run 事件特性），不是发布目标；本次列表显示 `891492396` 而实际目标是 `7f826bcb9`，以服务器 `ps` 里的 `TARGET_SHA=`、`/root/YITIJI` HEAD 或 `DEPLOY_SOURCE.txt` 为准。
+**取证注意**：`gh run list --workflow=deploy.yml` 显示的 `headSha` 是 main 当时的 tip（workflow_run 事件特性），不是发布目标；本次列表显示 `891492396` 而实际目标是 `7f826bcb9`，以服务器 `ps` 里的 `TARGET_SHA=`、`<服务器源码检出目录>` HEAD 或 `DEPLOY_SOURCE.txt` 为准。
 
 ### 第三次发布 `fd2a126b9`（2026-09-06 18:59–19:01，UTC+8）——main 顶端，含 #833 可信终端身份
 

@@ -321,7 +321,7 @@ Phase 2D G0 只补齐“怎么验收”的执行标准和静态门禁，不代�
 
 ## 十五、首批低风险 AI skill 真实验收执行包
 
-真实验收执行包已补齐。2026-07-02 已完成 TAS-G0 本地静态门禁、TAS-G1 预生产只读预检和 TAS-G2 真实 LLM 边界探针，阶段结论为 `TAS-G2 PASSED WITH NOTES`；同日已完成 SEC-G1 管理员 JWT 暴露收口，旧 admin token 已返回 `401 / AUTH_TOKEN_INVALID`；SEC-G2 已完成 root OS 密码轮换和预生产临时可信 HTTPS 域名 `https://120.48.13.190.sslip.io`。随后已用该可信 HTTPS 入口完成 TAS-G3 Kiosk 浏览器真实链路验收和 TAS-G4 公共终端隐私竞态验收，证据 ID 为 `TAS-G3-G4-20260702-browser-privacy-8329b7ea36a1`。该结论只代表首批低风险 AI skill 候选代码已部署到预生产、health / 深链 / 脱敏 AI 配置 / 部署来源核对通过、`assistant_chat` 真实模型接口连通、三类 synthetic prompt 初步边界检查通过、真实浏览器链路通过、公共终端隐私竞态通过，以及管理员 token、root OS 密码和预生产 HTTPS 技术阻断项已闭合；不代表 Windows 真机、正式自有域名 HTTPS、试运营或商用上线完成。
+真实验收执行包已补齐。2026-07-02 已完成 TAS-G0 本地静态门禁、TAS-G1 预生产只读预检和 TAS-G2 真实 LLM 边界探针，阶段结论为 `TAS-G2 PASSED WITH NOTES`；同日已完成 SEC-G1 管理员 JWT 暴露收口，旧 admin token 已返回 `401 / AUTH_TOKEN_INVALID`；SEC-G2 已完成 root OS 密码轮换和预生产临时可信 HTTPS 域名 `https://<预发域名>`。随后已用该可信 HTTPS 入口完成 TAS-G3 Kiosk 浏览器真实链路验收和 TAS-G4 公共终端隐私竞态验收，证据 ID 为 `TAS-G3-G4-20260702-browser-privacy-8329b7ea36a1`。该结论只代表首批低风险 AI skill 候选代码已部署到预生产、health / 深链 / 脱敏 AI 配置 / 部署来源核对通过、`assistant_chat` 真实模型接口连通、三类 synthetic prompt 初步边界检查通过、真实浏览器链路通过、公共终端隐私竞态通过，以及管理员 token、root OS 密码和预生产 HTTPS 技术阻断项已闭合；不代表 Windows 真机、正式自有域名 HTTPS、试运营或商用上线完成。
 
 已进入仓库的能力：
 
