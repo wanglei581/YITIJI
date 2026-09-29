@@ -82,6 +82,16 @@ async function main(): Promise<void> {
   assert.equal(computeMonitorTimeoutMs(100, 1, { colorMode: 'color', duplex: 'duplex_long_edge' }), 890_000)
   assert.equal(worstCaseDuplexColorTimeoutMs(), 890_000)
   assert.equal(PRINT_MAX_SIDES_PER_ORDER, 100)
+  // 服务端按它拒单，Agent 按它算最坏出纸时间，任何一端单独改都会让超时窗口失真。
+  for (const rel of [
+    'packages/shared/src/types/print.ts',
+    'services/api/src/print-jobs/verified-print-parameters.ts',
+  ]) {
+    const text = fs.readFileSync(path.join(__dirname, '../../..', rel), 'utf8')
+    const found = text.match(/export const PRINT_MAX_SIDES_PER_ORDER = (\d+)/)
+    assert.ok(found, `${rel} must export PRINT_MAX_SIDES_PER_ORDER`)
+    assert.equal(Number(found[1]), PRINT_MAX_SIDES_PER_ORDER, `${rel} must equal the agent cap`)
+  }
   assert.equal(computeMonitorTimeoutMs(101, 1, { colorMode: 'color', duplex: 'duplex_long_edge' }), 898_000, '101 sides are not rejected here')
   assert.ok(computeMonitorTimeoutMs(9_999, 9_999) === PRINT_MONITOR_CAP_MS)
   assert.ok(PRINT_MONITOR_CAP_MS < 20 * 60_000)

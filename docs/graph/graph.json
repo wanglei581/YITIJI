@@ -21785,6 +21785,7 @@
     ],
     "packages/shared/src/types/print.ts": [
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
     ],
@@ -25549,6 +25550,7 @@
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "services/api/src/print-jobs/verified-print-parameters.ts": [
+      "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
@@ -31159,6 +31161,8 @@
           "apps/terminal-agent/src/agent/print-monitor-timeout.ts",
           "apps/terminal-agent/src/agent/scan-watcher.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
+          "packages/shared/src/types/print.ts",
+          "services/api/src/print-jobs/verified-print-parameters.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ],
         "missing": []
