@@ -23,6 +23,7 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
+import { deepseekThinkingOff } from '../llm/deepseek-thinking'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../llm/llm-failure'
 import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
@@ -264,8 +265,8 @@ export class LlmSelfAssessmentService {
             ],
             temperature: cfg.temperature,
             stream: false,
-            // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
-            ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
+            // DeepSeek 系模型一律关闭思考（见 ai/llm/deepseek-thinking.ts），避免 reasoning 占满输出导致 content 为空、按输出价多计费
+            ...deepseekThinkingOff(cfg.model),
           }),
         },
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'self_assessment', forbiddenWords: cfg.forbiddenWords } },

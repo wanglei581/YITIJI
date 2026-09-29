@@ -164,6 +164,13 @@
 - **同步：** `pantum-cm2820adn.md`、`windows-terminal-agent-design.md` 的接口方法、回调路径、状态码终态，以及「已确认无云端打印」和「等彩色取值确认后才实现」，改为同一口径。
 - **未改：** CLAUDE.md、AGENTS.md、代码（含 `packages/shared/src/types/print.ts`）和证据文件。CLAUDE.md 第 3 节的改法只留在任务汇报里。
 - **验证：** 图谱生成与 `--check` 退出码均为 0，图谱文件无变化。三份设备文档没有关联门禁。`current-progress.md` 关联的 13 条门禁退出码均为 0。
+## 2026-09-29：DeepSeek 思考模式统一关闭、小青关闭思考、音色 1008 核对（分支 `claude/backend-hardening-20260929-llm-thinking-off`）
+
+- **背景（总指挥联网核价后转来，协调方与子代理分别核了官方页）：** DeepSeek 思考模式默认开启、effort 默认 high，思考 tokens 按输出价计费且拉长等待；官方推荐模型名是 `deepseek-flash`。仓库 10 处各自写 `startsWith('deepseek-v4')`，换成推荐名就会重新打开思考；另有 3 处（小青对话要点、岗位推荐 / 解读、模拟面试）原本就没关。小青的 TRTC LLMConfig 没传任何关闭参数。
+- **修法（Claude 子代理实现；因本会话钩子不许写别的工作目录，子代理出补丁、协调方在自己的工作目录应用）：** 共用 `ai/llm/deepseek-thinking.ts`（模型名以 deepseek 开头即关闭），13 处统一引用；小青默认配置对 DeepSeek 加 `ExtraBody:{thinking:{type:'disabled'}}`（腾讯云官方说明 ExtraBody 用于透传「例如关闭思考」，合并方式未写明，需真机核对），`TRTC_LLM_CONFIG_JSON` 覆盖时原样使用。千问 qwen-plus 默认不思考，未动。
+- **音色：** 1008 不在腾讯云当前音色列表（2026-09-20 版）里，也找不到计费档位；默认值不动，`.env.example` 写明上线前必须核对，候选精品女声 101001 / 101027 / 101026（0.3 元/万字符）待产品负责人选。新增只读核对脚本 `probe:llm-thinking-live`（不进 CI），产品负责人用自己的密钥在服务器跑，对比关 / 不关思考的 reasoning_tokens 与耗时，并用 `--tts` 核对音色。
+- **验证：** 新门禁 `verify:llm-thinking-off` 52 条（运行时断言 + 本地假上游抓请求体 + 静态扫描不许再出现旧前缀判断），子代理 10 处变异全红；协调方复跑 13 条关联门禁全绿，变异「共用函数改回只认 deepseek-v4」变红。
+- **待拍板：** 合同审查有意用推理模型、保持思考开着（异步任务，不卡用户）；音色换不换；以后换 Qwen3.6+ 时要给共用函数加千问分支。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 ## 2026-09-29：管理员登录页接上短信第二步（P1-4 前端，分支 `claude/consoles-admin-2fa-20260929`）

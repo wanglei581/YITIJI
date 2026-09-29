@@ -25,6 +25,7 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../ai/llm/llm-http'
+import { deepseekThinkingOff } from '../ai/llm/deepseek-thinking'
 import { llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
 import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
 import { LlmChatService, assistantOwnerKey } from '../ai/llm/llm-chat.service'
@@ -270,6 +271,9 @@ export class AssistantSummaryService {
               { role: 'user', content: `【本次对话】\n${transcript}` },
             ],
             stream: false,
+            // DeepSeek 系模型一律关闭思考（见 ai/llm/deepseek-thinking.ts）。此前这里没关：默认模型
+            // deepseek-v4-flash 一直在思考模式下跑，多等、多按输出价计费，temperature 也被忽略。
+            ...deepseekThinkingOff(cfg.model),
           }),
         },
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'assistant_summary', forbiddenWords: cfg.forbiddenWords } },

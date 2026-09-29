@@ -27,6 +27,7 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from './llm-http'
+import { deepseekThinkingOff } from './deepseek-thinking'
 import { llmEndpointNotAllowedError } from './llm-failure'
 import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWords, enforceForbiddenWords, safeRefusalReply } from './llm-guard'
@@ -425,7 +426,7 @@ export class LlmChatService {
             'Content-Type':  'application/json',
             'Authorization': `Bearer ${apiKey}`,
           },
-          body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
+          body: JSON.stringify({ model, messages, temperature, stream: false, ...deepseekThinkingOff(model) }),
         },
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: featureKey, forbiddenWords } },
       )

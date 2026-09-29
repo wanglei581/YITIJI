@@ -22570,6 +22570,9 @@
     "services/api/src/ai/llm/assistant-channel.ts": [
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
+    "services/api/src/ai/llm/deepseek-thinking.ts": [
+      "services/api/scripts/verify-llm-thinking-off.ts"
+    ],
     "services/api/src/ai/llm/llm-base-url.ts": [
       "services/api/scripts/verify-ai-config.ts"
     ],
@@ -22593,6 +22596,7 @@
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-llm-connectivity.ts",
+      "services/api/scripts/verify-llm-thinking-off.ts",
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
     "services/api/src/ai/llm/llm-failure.ts": [
@@ -23692,7 +23696,8 @@
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-contract-review-timeout.ts",
-      "services/api/scripts/verify-llm-input-pii-mask.ts"
+      "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-llm-thinking-off.ts"
     ],
     "services/api/src/contract-review/contract-review-report-pdf.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -23889,7 +23894,8 @@
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
-      "services/api/scripts/verify-llm-input-pii-mask.ts"
+      "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-llm-thinking-off.ts"
     ],
     "services/api/src/job-ai/job-ai-quota.service.ts": [
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -25819,6 +25825,7 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-llm-thinking-off.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/upload-sessions/upload-scene.ts": [
@@ -35665,6 +35672,28 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:llm-input-pii-mask"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/llm/deepseek-thinking.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/contract-review/contract-review-provider.service.ts",
+          "services/api/src/job-ai/job-ai-llm.service.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-llm-thinking-off.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:llm-thinking-off"
       ],
       "wired": true
     },

@@ -16,6 +16,7 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
+import { deepseekThinkingOff } from '../llm/deepseek-thinking'
 import { llmEndpointNotAllowedError } from '../llm/llm-failure'
 import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { containsForbiddenWord } from '../llm/llm-guard'
@@ -343,7 +344,7 @@ export class LlmResumeOptimizeService {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
+          body: JSON.stringify({ model, messages, temperature, stream: false, ...deepseekThinkingOff(model) }),
         },
         { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_optimize', forbiddenWords } },
       )
