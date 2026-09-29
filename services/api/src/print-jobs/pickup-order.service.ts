@@ -36,6 +36,38 @@ const CLAIMABLE_PAY_STATUSES = ['unpaid', 'paying', 'paid'] as const
 /** 同一终端核销后这段时间内再输同一码，返回已放行视图，不再建任务。 */
 export const PICKUP_RELEASED_REPLAY_MS = 10 * 60 * 1000
 
+/**
+ * 核销入口。`pickup_code` = 一体机输入到机码（claim-pickup）；
+ * `member_order` = 会员在一体机「我的打印订单」里点本机领取（claim-here）。
+ * 两个入口只在「怎么找到这张单」上不同，找到之后走同一段 {@link PickupOrderService.settleClaim}。
+ */
+export type PickupClaimVia = 'pickup_code' | 'member_order'
+
+/**
+ * 取件窗口是否已关：未认领过期、付款已满 7 天，或 claimed 未付租约已过。
+ * 核销判定与「我的订单」列表的 claimableHere 共用这一处，两边不会各算一套。
+ */
+export function isPickupClaimWindowClosed(
+  order: {
+    pickupCodeExpiresAt: Date | null
+    pickupStatus: string
+    printTaskId: string | null
+    payStatus: string
+    pickupClaimedAt: Date | null
+    paidAt: Date | null
+    pickupCodeHash: string | null
+  },
+  now: Date = new Date(),
+): boolean {
+  const paymentWindowClosed = Boolean(
+    order.paidAt
+    && order.pickupCodeHash
+    && !isLiveKioskPickupLease(order, now)
+    && order.paidAt.getTime() + PICKUP_VALIDITY_FROM_PAYMENT_MS <= now.getTime(),
+  )
+  return isPickupWindowClosed(order, now) || paymentWindowClosed
+}
+
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
 
@@ -97,6 +129,21 @@ export class PickupOrderService {
       await this.noteClaimFailure(terminal.id, 'terminal_mismatch', order.id)
       throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     }
+    return this.settleClaim(order, terminal, 'pickup_code')
+  }
+
+  /**
+   * 核销的「码以外」判定与派发：退款、过期、已用与同机回放、文件就绪、能力、认领、付款/放行。
+   *
+   * 到机码（claim）与会员本机领取（claim-here）都走这里，不许各写一份 ——
+   * 两份判定迟早漂移，漂移的那一份就是能绕过退款或过期出纸的那一份。
+   * 调用方负责先把单找出来、并按各自口径处理「单不属于本机」；下面那行只是兜底。
+   *
+   * via 只影响两件事：到机码成功才清零本机失败计数（它证明手里是真码，会员入口不证明这一点，
+   * 否则登录用户可以拿自己的单反复清零、给枚举续命）；审计 payload 记下入口。
+   */
+  async settleClaim(order: OrderRecord, terminal: { id: string }, via: PickupClaimVia) {
+    if (order.terminalId !== terminal.id) throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     // 退款态必须先于关窗判断：claimed + refunding 不再算活租约，否则会先被写成
     // PICKUP_CODE_EXPIRED，把「钱已退」说成「码过期」。
     if (REFUNDED_PAY_STATUSES.has(order.payStatus)) {
@@ -112,16 +159,10 @@ export class PickupOrderService {
     if (order.pickupStatus === 'used' || order.printTaskId) {
       return this.replayReleasedClaim(order, terminal.id)
     }
-    const paymentWindowClosed = Boolean(
-      order.paidAt
-      && order.pickupCodeHash
-      && !isLiveKioskPickupLease(order)
-      && order.paidAt.getTime() + PICKUP_VALIDITY_FROM_PAYMENT_MS <= Date.now(),
-    )
     // 未认领过期、付款已满 7 天，或 claimed 未付租约已过：落 expired 并拒绝。
     // 活着的 claimed 租约（含已付）不算关窗，落到下面的幂等认领 / 付款 / release。
     // pending 过期写只打 pending，避免并发认领后被误关；claimed 未付过期另走租约 CAS。
-    if (isPickupWindowClosed(order) || paymentWindowClosed) {
+    if (isPickupClaimWindowClosed(order)) {
       await this.prisma.order.updateMany({
         where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
         data: {
@@ -136,10 +177,10 @@ export class PickupOrderService {
       })
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_EXPIRED', message: '到机码已过期，请在小程序重新下单' } })
     }
-    // 走到这里说明用户手里拿的是一枚**属于本终端的真码**，即他是真实用户而非枚举者。
+    // 到机码入口走到这里，说明用户手里拿的是一枚**属于本终端的真码**，即他是真实用户而非枚举者。
     // 清零该终端的失败计数：这是「正常用户手误不受影响」那条约束的主要实现手段 ——
     // 繁忙机器上成功远多于失败，计数攒不起来；纯枚举场景没有成功，计数会一路涨到阈值。
-    await clearPickupClaimFailures(this.redis, terminal.id)
+    if (via === 'pickup_code') await clearPickupClaimFailures(this.redis, terminal.id)
 
     if (!['pending', 'claimed'].includes(order.pickupStatus)) {
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '到机码当前不可使用' } })
@@ -185,7 +226,7 @@ export class PickupOrderService {
     const fresh = await this.prisma.order.findUnique({ where: { id: order.id } })
     if (!fresh) throw new NotFoundException('ORDER_NOT_FOUND')
 
-    if (fresh.payStatus === 'paid') return this.release(fresh.id, terminal.id, this.paymentToken(fresh))
+    if (fresh.payStatus === 'paid') return this.release(fresh.id, terminal.id, this.paymentToken(fresh), via)
     if (!['unpaid', 'paying'].includes(fresh.payStatus)) {
       throw new BadRequestException({ error: { code: 'ORDER_PAYMENT_UNAVAILABLE', message: '订单当前无法付款' } })
     }
@@ -196,7 +237,7 @@ export class PickupOrderService {
       action: 'print_order.pickup_claim',
       targetType: 'order',
       targetId: fresh.id,
-      payload: { terminalId: terminal.id },
+      payload: via === 'member_order' ? { terminalId: terminal.id, via } : { terminalId: terminal.id },
     })
     return {
       released: false,
@@ -210,7 +251,12 @@ export class PickupOrderService {
     }
   }
 
-  async release(orderId: string, terminalRef: string | undefined, paymentSessionToken: string | undefined) {
+  async release(
+    orderId: string,
+    terminalRef: string | undefined,
+    paymentSessionToken: string | undefined,
+    via: PickupClaimVia = 'pickup_code',
+  ) {
     const terminal = await this.requireTerminal(terminalRef)
     const order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
@@ -290,7 +336,9 @@ export class PickupOrderService {
         action: 'print_order.release',
         targetType: 'print_task',
         targetId: result.taskId,
-        payload: { orderId: order.id, terminalId: terminal.id },
+        payload: via === 'member_order'
+          ? { orderId: order.id, terminalId: terminal.id, via }
+          : { orderId: order.id, terminalId: terminal.id },
       })
     }
     const fresh = await this.prisma.order.findUnique({ where: { id: order.id } })
@@ -345,7 +393,8 @@ export class PickupOrderService {
     await recordPickupClaimFailure(this.redis, terminalId)
   }
 
-  private async requireTerminal(terminalRef: string | undefined) {
+  /** 本机是否能接单（启用、在线、本地任务库可用）。会员本机领取也先过这一道。 */
+  async requireTerminal(terminalRef: string | undefined) {
     const ref = terminalRef?.trim()
     if (!ref) throw new BadRequestException({ error: { code: 'TERMINAL_ID_REQUIRED', message: '终端身份未就绪' } })
     const terminal = await this.prisma.terminal.findFirst({

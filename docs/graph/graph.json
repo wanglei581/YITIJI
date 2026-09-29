@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 559,
+    "endpointCount": 561,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -7521,6 +7521,18 @@
       },
       {
         "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
+        "handler": "MemberPrintOrdersController.claimHere",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/me/print-orders/:orderId/claim-here",
+        "roles": [],
+        "serviceFiles": [],
+        "services": [
+          "MemberOrderClaimHereService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
         "handler": "MemberPrintOrdersController.reissuePickupCode",
         "method": "POST",
         "models": [
@@ -7578,6 +7590,18 @@
         ],
         "services": [
           "MemberPrintOrderCreateService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
+        "handler": "MemberPrintOrdersController.listTimeline",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/me/print-orders/timeline",
+        "roles": [],
+        "serviceFiles": [],
+        "services": [
+          "MemberOrderTimelineService"
         ]
       },
       {
@@ -24831,6 +24855,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/terminals/terminal-session.service.ts": [
+      "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-terminal-identity.ts",
@@ -34522,7 +34547,8 @@
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.interface.ts",
           "services/api/src/storage/storage.service.ts",
-          "services/api/src/terminals/terminal-capabilities.service.ts"
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
         ],
         "missing": []
       },
