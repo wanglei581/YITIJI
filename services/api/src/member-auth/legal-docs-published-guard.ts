@@ -12,10 +12,10 @@ import { LEGAL_DRAFT_FALLBACK_VERSION } from '../legal/legal-constants'
 // LEGAL_DOCS_REQUIRE_PUBLISHED=true / false 可显式覆盖；false 只作生产应急口，用完改回。
 // 发布顺序不能反：先在后台「法务文档」发布两份文档，再部署带本闸门的版本，否则会员登不上。
 //
-// 一体机（2026-09-29 口径）：正式生产构建取不到已发布版本时不再回落草稿哨兵，直接在登录页如实
-// 拦住（apps/kiosk/src/services/auth/legalConsentVersions.ts）；开发、单测、E2E 构建照旧回落。
-// 因此 LEGAL_DOCS_REQUIRE_PUBLISHED=false 对一体机正式构建不再生效，这是有意的：发布前 preflight
-// 会硬检查三份法务文档都已激活。小程序仍在取不到版本时回落，由这里的服务端闸门兜底。
+// 前端口径（2026-09-29 总指挥裁定，按 C4 原方案）：一体机与小程序的正式版取不到已发布的协议就
+// 如实拦住登录，只有开发、测试、体验版保留回落草稿哨兵。所以 LEGAL_DOCS_REQUIRE_PUBLISHED=false
+// 这个应急口只对非正式版前端有效；正式版靠发布前硬检查（预检逐份核对三份法务文档已激活）补位。
+// 代码位置：一体机 apps/kiosk/src/services/auth/legalConsentVersions.ts；小程序 apps/miniapp/utils/api-legal-consent.js。
 // ============================================================
 
 export interface ResolvedLegalVersions {
