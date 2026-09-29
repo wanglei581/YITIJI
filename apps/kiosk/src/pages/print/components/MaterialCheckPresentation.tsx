@@ -247,8 +247,8 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                 <Summary
                   title="文件体检"
                   detail={props.inspection.pageLabel}
-                  state={props.inspection.canPrint === true ? '可继续' : props.requiresFormatReview ? '需重新上传' : '请核对文件'}
-                  warning={props.requiresFormatReview}
+                  state={props.encryptedPdf ? '打不开' : props.inspection.canPrint === true ? '可继续' : props.requiresFormatReview ? '需重新上传' : '请核对文件'}
+                  warning={Boolean(props.encryptedPdf) || props.requiresFormatReview}
                   messages={props.inspection.messages}
                 />
               ) : null}

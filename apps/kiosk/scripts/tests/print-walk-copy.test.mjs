@@ -48,6 +48,7 @@ const previewKind = await import(previewKindUrl)
 const phone = await import(phoneUrl)
 const progressPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintProgressPage.tsx'), 'utf8')
 const materialPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintMaterialCheckPage.tsx'), 'utf8')
+const materialPresentation = readFileSync(join(kioskRoot, 'src/pages/print/components/MaterialCheckPresentation.tsx'), 'utf8')
 const previewCanvas = readFileSync(join(kioskRoot, 'src/components/PdfCanvasPreview.tsx'), 'utf8')
 
 test('publicOrderNo 只接受 ORD- 号', () => {
@@ -198,6 +199,7 @@ test('W-93 加密 PDF 说明原因并重新选择，页数未识别本身不算�
   assert.match(materialPage, /!encryptedPdf/)
   assert.match(materialPage, /重新选择文件/)
   assert.match(materialPage, /onEncryptedPdf/)
+  assert.match(materialPresentation, /encryptedPdf \? '打不开'/)
   assert.match(previewCanvas, /onPasswordRequired/)
   assert.match(previewCanvas, /setPasswordBlocked\(true\)/)
 })
