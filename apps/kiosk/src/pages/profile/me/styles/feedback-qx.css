@@ -30,7 +30,8 @@
 .fb-summary-main strong { display: block; font-size: 34px; font-weight: 800; line-height: 1.2; margin-top: 2px; }
 .fb-summary-main span { display: block; margin-top: 4px; font-size: 17px; color: var(--qx-ink-3); line-height: 1.45; }
 
-.fb-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+/* 五类（含 AI 内容投诉）：大屏一行排满，窄屏自动折成两列，不留单个孤项挤在四列里。 */
+.fb-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .fb-pick {
   min-height: 76px;
   padding: 8px 10px;

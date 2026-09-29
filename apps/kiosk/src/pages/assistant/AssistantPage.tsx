@@ -39,6 +39,7 @@ import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecrui
 import { useAssistantDraftHandoff } from '../../services/assistantDraft'
 import { AssistantTaskPicker } from './AssistantTaskPicker'
 import { advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
+import { AI_CONTENT_COMPLAINT_ROUTE } from '../profile/me/feedback/aiComplaint'
 import './assistant-qingxu.css'
 
 const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
@@ -648,6 +649,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
         <footer className="assistant-truth" data-disclaimer="true">
           <p>{toolboxScene?.disclaimer ?? `${AI_LABEL_COPY.BASE}，身份、付款、打印、政策资格和录用结果都不由 AI 决定。`}</p>
+          {/* AI 内容投诉入口（C3，走查 W-01）：稿 05/52 没画，只放一个低调文字入口。 */}
+          <button type="button" className="assistant-complaint-link" data-route={AI_CONTENT_COMPLAINT_ROUTE} onClick={() => navigate(AI_CONTENT_COMPLAINT_ROUTE)}>
+            对回答有异议？投诉 AI 内容
+          </button>
         </footer>
       </div>
 

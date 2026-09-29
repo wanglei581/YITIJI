@@ -43,7 +43,13 @@ const FROZEN = new Map([
   ['src/pages/profile/profileEntries.ts', 'c3eab9286546efab60ec8e3e5dfe9f1a4724c0e17e27f09e159a541ac4ef83e3'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
-  ['src/pages/profile/me/feedback/types.ts', 'a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f'],
+  // 2026-09-29 走查 W-01：反馈分类补「AI 内容投诉」（ai_content，C3）。纯追加：
+  // CATEGORY_OPTIONS 与 CATEGORY_META 各加一行，原有四类、状态表、解析函数一字未动；
+  // 服务端与小程序早已有这一类，缺这一行时小程序提交的 AI 投诉在一体机列表里取不到类别元数据。
+  // 投诉说明与答复天数放在同目录 aiComplaint.ts，不进冻结文件。
+  // 冻结契约不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
+  // 旧哈希 a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f。
+  ['src/pages/profile/me/feedback/types.ts', '8154883cc92aaba2888e8b614690e964d6f23fb43c172eae729096a5eefd4199'],
   // 哈希随 API-20「顾客侧待退款状态」同步更新（2026-09-06）。
   // 纯追加：原有导出未删；新增 refunding 展示、PENDING_REFUND_* 常量与
   // memberPayStatusLabel（待退款信号优先于「已支付」）。到账时间不以天数承诺。
