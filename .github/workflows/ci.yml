@@ -519,6 +519,8 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-state
+          # 屏保终端配置与百宝箱动作的状态单测（此前没挂进 CI；清理批准单第 3 条：模块仍在用，补进 CI 而不删）
+          pnpm --filter @ai-job-print/admin test:admin-state-units
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/admin verify:data-request-ui
           pnpm --filter @ai-job-print/admin verify:admin-users-ui
