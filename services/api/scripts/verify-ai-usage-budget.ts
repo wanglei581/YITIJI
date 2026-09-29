@@ -37,9 +37,9 @@ async function outcome(op: () => Promise<unknown>): Promise<string> {
     await op()
     return 'PASS'
   } catch (error) {
-    const body = (error as { getResponse?: () => { error?: { code?: string; scope?: string } } }).getResponse?.()
+    const body = (error as { getResponse?: () => { error?: { code?: string; details?: string[] } } }).getResponse?.()
     const status = (error as { getStatus?: () => number }).getStatus?.()
-    if (body?.error?.code) return `${status}:${body.error.code}${body.error.scope ? `:${body.error.scope}` : ''}`
+    if (body?.error?.code) return `${status}:${body.error.code}${body.error.details?.[0] ? `:${body.error.details[0]}` : ''}`
     return (error as Error).name
   }
 }
@@ -277,6 +277,17 @@ async function main(): Promise<void> {
     const reached = logLines.filter((l) => l.startsWith('AI_DAILY_BUDGET_REACHED scope=member'))
     check('B1 首次触顶记一条固定标记日志（limit / day），第二次不重复', reached.length === 1 && reached[0] === `AI_DAILY_BUDGET_REACHED scope=member limit=0.2 day=${d}`, JSON.stringify(reached))
     check('B1 日志里没有会员号', !logLines.some((l) => l.includes(memberA.id)))
+    // 经真实全局错误过滤器：前端拿到的范围在 details 里（过滤器只透传字符串数组 details，别的字段会丢）。
+    const { HttpExceptionFilter } = await import('../src/common/filters/http-exception.filter')
+    let thrown: unknown = null
+    await withIdentity(asMember(memberA.id), async () => { try { await access.enforce('generate', false, { headers: {} }, OFF) } catch (error) { thrown = error } })
+    let filtered = { status: 0, body: {} as { error?: { code?: string; details?: unknown; message?: string } } }
+    const res = { status: (s: number) => { filtered.status = s; return res }, json: (b: typeof filtered.body) => { filtered.body = b } }
+    new HttpExceptionFilter().catch(thrown, { switchToHttp: () => ({ getResponse: () => res, getRequest: () => ({ headers: {}, method: 'POST', url: '/ai/x' }) }) } as never)
+    check('B1 经全局过滤器后：503、码不变、范围在 details、文案是人话',
+      filtered.status === 503 && filtered.body.error?.code === 'AI_BUDGET_EXHAUSTED'
+        && JSON.stringify(filtered.body.error?.details) === '["member"]' && (filtered.body.error?.message ?? '').includes('明天'),
+      JSON.stringify(filtered))
   }
   {
     const d = setDay(2)

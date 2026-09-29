@@ -144,7 +144,8 @@ export class AiBudgetService implements AiUsageSink, OnModuleInit, OnModuleDestr
       }
       if (spent >= scope.limit) {
         this.logReached(dayKey, scope)
-        throw new ServiceUnavailableException({ error: { code: AI_BUDGET_EXHAUSTED, scope: scope.kind, message: EXHAUSTED_MESSAGE[scope.kind] } })
+        // 范围放在 details：全局错误过滤器只透传字符串数组 details，error 里别的字段（如 scope）会被丢掉。
+        throw new ServiceUnavailableException({ error: { code: AI_BUDGET_EXHAUSTED, details: [scope.kind], message: EXHAUSTED_MESSAGE[scope.kind] } })
       }
     }
   }
