@@ -21744,6 +21744,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
@@ -22870,6 +22871,7 @@
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
+      "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-qr-login.ts",
@@ -23099,6 +23101,7 @@
       "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
+      "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
@@ -23996,10 +23999,12 @@
     ],
     "services/api/src/member-auth/member-phone-rebind.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-qr-login.service.ts": [
       "services/api/scripts/verify-legal-doc-version.ts",
+      "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-member-auth.ts"
     ],
     "services/api/src/member-auth/member-step-up.service.ts": [
@@ -34981,6 +34986,28 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:member-assets"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/member-auth/member-phone-rebind.service.ts",
+          "services/api/src/member-auth/member-qr-login.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-member-auth-races.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:member-auth-races"
       ],
       "wired": true
     },

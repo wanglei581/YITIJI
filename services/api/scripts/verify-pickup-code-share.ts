@@ -421,6 +421,29 @@ async function main(): Promise<void> {
     if (!usedReissue.thrown || usedReissue.code !== 'PICKUP_CODE_NOT_REISSUABLE') {
       fail(`已核销不得重发，实际 ${JSON.stringify(usedReissue)}`)
     }
+    // 已用过的码（同机、超过 10 分钟）不计入锁机：能走到这一步说明手里是本机的一枚真码，
+    // 不是枚举；计进去会让一位反复重试的本人把整台机器锁 15 分钟、连累后面的人（9/29 总指挥问）。
+    // 也不清零计数：它不是一次成功认领，不能拿来给枚举者洗白。
+    redis.reset()
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD; i += 1) {
+      const again = await capture(() => pickup.claim(reissued.pickupCode!, terminalId, `used-burst-${i}`))
+      if (again.code !== 'PICKUP_CODE_ALREADY_USED') fail(`已用码重复输入应一直如实回 PICKUP_CODE_ALREADY_USED，实际 ${JSON.stringify(again)}`)
+    }
+    const afterUsedBurst = await capture(() => pickup.claim('10000097', terminalId, 'used-burst-probe'))
+    if (afterUsedBurst.code !== 'PICKUP_CODE_INVALID') {
+      fail(`已用码输满 ${PICKUP_LOCKOUT_FAILURE_THRESHOLD} 次不得把本机锁住，实际 ${JSON.stringify(afterUsedBurst)}`)
+    }
+    redis.reset()
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+      await capture(() => pickup.claim(`2000000${i}`.slice(0, 8), terminalId, `mix-src-${i}`))
+    }
+    await capture(() => pickup.claim(reissued.pickupCode!, terminalId, 'mix-used'))
+    await capture(() => pickup.claim('20000099', terminalId, 'mix-last'))
+    const mixedLocked = await capture(() => pickup.claim('20000098', terminalId, 'mix-probe'))
+    if (mixedLocked.code !== 'PICKUP_CLAIM_LOCKED') {
+      fail(`已用码不得清零失败计数（夹在枚举中间照样锁），实际 ${JSON.stringify(mixedLocked)}`)
+    }
+    redis.reset()
     pass('同机 10 分钟内再输已核销码交回原任务且不改状态；其它终端或超过 10 分钟拒绝，事后重发也拒绝')
 
     redis.reset()
