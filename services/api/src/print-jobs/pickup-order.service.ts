@@ -177,11 +177,6 @@ export class PickupOrderService {
       })
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_EXPIRED', message: '到机码已过期，请在小程序重新下单' } })
     }
-    // 到机码入口走到这里，说明用户手里拿的是一枚**属于本终端的真码**，即他是真实用户而非枚举者。
-    // 清零该终端的失败计数：这是「正常用户手误不受影响」那条约束的主要实现手段 ——
-    // 繁忙机器上成功远多于失败，计数攒不起来；纯枚举场景没有成功，计数会一路涨到阈值。
-    if (via === 'pickup_code') await clearPickupClaimFailures(this.redis, terminal.id)
-
     if (!['pending', 'claimed'].includes(order.pickupStatus)) {
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '到机码当前不可使用' } })
     }
@@ -211,6 +206,11 @@ export class PickupOrderService {
         },
         data: { pickupStatus: 'claimed', pickupClaimedAt: new Date(), taskStatus: 'awaiting_payment' },
       })
+      // 到机码入口**本次**把一枚属于本终端的真码从 pending 认领成 claimed：持码人是真实用户而非枚举者，
+      // 清零该终端的失败计数（「正常用户手误不受影响」的主要实现手段——繁忙机器上成功远多于失败）。
+      // 只在这一次清零（1.8 P-2）：已认领的活租约可同码幂等重领，若每次都清零，持一张自己的未付单
+      // （下单免费）就能夹在猜码中间无限清零，锁机形同虚设。每张单因此最多清零一次。
+      if (claimed.count === 1 && via === 'pickup_code') await clearPickupClaimFailures(this.redis, terminal.id)
       if (claimed.count !== 1) {
         const raced = await this.prisma.order.findUnique({ where: { id: order.id } })
         if (!raced) throw new NotFoundException('ORDER_NOT_FOUND')

@@ -433,6 +433,37 @@ async function main(): Promise<void> {
     if (otherOpen.code === 'PICKUP_CLAIM_LOCKED') fail('锁定不得蔓延到其它终端')
     pass('多次输错仍按终端锁定，其它终端不受影响')
 
+    // 1.8 P-2：只有「本次把 pending 变成 claimed」的那一次认领清零失败计数。
+    // 已认领未付的活租约可以同码反复重领（幂等）；若每次都清零，持一张自己的未付单（下单免费）
+    // 就能夹在猜码中间无限清零，锁机形同虚设。
+    redis.reset()
+    const newOrder = () => memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
+    const ownOrder = await newOrder()
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+      await capture(() => pickup.claim(`3000000${i}`.slice(0, 8), terminalId, `p2-first-${i}`))
+    }
+    const firstClaim = await capture(() => pickup.claim(ownOrder.pickupCode!, terminalId, 'p2-own-first'))
+    if (firstClaim.thrown) fail(`自己的单首次认领应成功，实际 ${JSON.stringify(firstClaim)}`)
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+      await capture(() => pickup.claim(`3100000${i}`.slice(0, 8), terminalId, `p2-after-first-${i}`))
+    }
+    const afterFirst = await capture(() => pickup.claim('31000099', terminalId, 'p2-after-first-probe'))
+    if (afterFirst.code !== 'PICKUP_CODE_INVALID') fail(`首次认领真码应清零计数（正常用户手误不受影响），实际 ${JSON.stringify(afterFirst)}`)
+    redis.reset()
+    let lockedMidway = false
+    for (let round = 0; round < 3 && !lockedMidway; round += 1) {
+      for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+        const guess = await capture(() => pickup.claim(`32${round}0000${i}`.slice(0, 8), terminalId, `p2-r${round}-${i}`))
+        if (guess.code === 'PICKUP_CLAIM_LOCKED') { lockedMidway = true; break }
+      }
+      await capture(() => pickup.claim(ownOrder.pickupCode!, terminalId, `p2-own-${round}`))
+    }
+    const finalProbe = await capture(() => pickup.claim('32999999', terminalId, 'p2-final'))
+    if (!lockedMidway && finalProbe.code !== 'PICKUP_CLAIM_LOCKED') {
+      fail(`重输自己已认领的码不得清零失败计数：27 次猜码后必须已锁机，实际 ${JSON.stringify(finalProbe)}`)
+    }
+    pass('首次认领真码仍清零计数；已认领的码反复重输不再清零，夹在猜码中间照样锁机')
+
     redis.reset()
     const rateOrder = await memberOrders.create(
       userId,
