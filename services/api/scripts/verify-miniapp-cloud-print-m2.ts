@@ -25,6 +25,7 @@ import { PrintPageCountService } from '../src/print-jobs/print-page-count.servic
 import { PrismaService } from '../src/prisma/prisma.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
+import { MaterialsService } from '../src/materials/materials.service'
 import { setPrintScanCapabilityModeForTest, TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { signFileUrl } from '../src/files/signing'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -607,10 +608,14 @@ async function main(): Promise<void> {
     pass('已退款 / 退款中 / 部分退款的到机码一律 ORDER_REFUNDED 拒绝，且不写坏订单状态、不建打印任务')
 
     // 隐私检查任务只留 24 小时，到机码可以留 7 天。清理跑过之后，认领和放行都不得再要求任务还在。
-    const removedScans = await prisma.documentProcessTask.deleteMany({
-      where: { sourceFileId: fileId, kind: 'pii_scan' },
-    })
-    if (removedScans.count < 1) fail('清理模拟必须删掉这份文件已完成的隐私检查任务')
+    // 真跑一次生产清理：把时钟拨到 25 小时后调 MaterialsService.cleanupExpired()（它只用到数据库）。
+    const scansBefore = await prisma.documentProcessTask.count({ where: { sourceFileId: fileId, kind: 'pii_scan' } })
+    const cleanup = await new MaterialsService(prisma, {} as never, {} as never, {} as never)
+      .cleanupExpired(new Date(Date.now() + 25 * 60 * 60 * 1000))
+    const scansAfter = await prisma.documentProcessTask.count({ where: { sourceFileId: fileId, kind: 'pii_scan' } })
+    if (scansBefore < 1 || scansAfter !== 0 || cleanup.deletedTasks < 1) {
+      fail(`25 小时后的真实清理必须删掉这份文件的隐私检查任务：before=${scansBefore} after=${scansAfter}`)
+    }
     const claimedAfterCleanup = await pickup.claim(created.pickupCode, terminalId)
     if (claimedAfterCleanup.released !== false || claimedAfterCleanup.orderId !== created.id) {
       fail('隐私检查记录被清理后，到机认领仍必须成功')
