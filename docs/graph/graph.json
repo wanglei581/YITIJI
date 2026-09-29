@@ -12606,7 +12606,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 600,
+      "reachableFileCount": 602,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14535,6 +14535,8 @@
           ],
           "path": "/renshi",
           "styles": [
+            "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
+            "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -15584,7 +15586,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 693
+      "sourceFileCount": 695
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19426,7 +19428,7 @@
     "apps/kiosk/src/pages/renshi/eligibilityOutcome.ts": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
-    "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css": [
+    "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/shared.ts": [
@@ -27615,7 +27617,7 @@
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/renshi/components.tsx",
           "apps/kiosk/src/pages/renshi/eligibilityOutcome.ts",
-          "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
+          "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
           "apps/kiosk/src/pages/renshi/shared.ts",
           "apps/kiosk/src/services/api/policy-eligibility.ts"
         ],
