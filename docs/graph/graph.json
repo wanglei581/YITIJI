@@ -17859,6 +17859,9 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/playwright.w2.config.ts": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "apps/kiosk/scripts/extract-service-hub-specs.mjs": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
@@ -20194,6 +20197,9 @@
     "apps/kiosk/tests/visual/print-done-truth.spec.ts": [
       "apps/kiosk/scripts/verify-print-done-truth.mjs"
     ],
+    "apps/kiosk/tests/visual/print-hub-qx.spec.ts": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "apps/kiosk/tests/visual/route-manifest.ts": [
       "apps/kiosk/scripts/verify-fusion-baseline.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -20207,7 +20213,8 @@
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs"
     ],
     "apps/miniapp/app.js": [
-      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/miniapp/app.json": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -20623,7 +20630,8 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
-      "apps/terminal-agent/scripts/verify-task-reliability.ts"
+      "apps/terminal-agent/scripts/verify-task-reliability.ts",
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/terminal-agent/src/agent/types.ts": [
       "apps/terminal-agent/scripts/verify-local-print-wake.ts",
@@ -21230,9 +21238,6 @@
     "scripts/verify-fixture-time-bombs.mjs": [
       "scripts/verify-fixture-time-bombs.mjs"
     ],
-    "scripts/verify-repository-integrity.mjs": [
-      "scripts/verify-ci-changed-scopes.mjs"
-    ],
     "services/api/.env.example": [
       "services/api/scripts/d2-same-host/verify-cleanup-contract.mjs"
     ],
@@ -21356,6 +21361,7 @@
     ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
@@ -21922,6 +21928,7 @@
       "services/api/scripts/verify-job-ai-backend.ts"
     ],
     "services/api/src/ai/ai.controller.ts": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
@@ -22950,6 +22957,7 @@
       "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/src/console-screen/console-screen.usage.queries.ts": [
+      "scripts/verify-ci-changed-scopes.mjs",
       "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/src/console-screen/console-screen.usage.service.ts": [
@@ -29905,8 +29913,12 @@
         "files": [
           ".github/workflows/ci.yml",
           "apps/admin/src/routes/ai-services/index.tsx",
+          "apps/kiosk/playwright.w2.config.ts",
           "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/kiosk/tests/visual/print-hub-qx.spec.ts",
+          "apps/miniapp/app.js",
           "apps/partner/src/App.tsx",
+          "apps/terminal-agent/src/agent/task-runner.ts",
           "docs/compliance/member-personal-data-retention.md",
           "docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html",
           "docs/graph/graph.json",
@@ -29915,15 +29927,18 @@
           "packages/shared/src/types/device.ts",
           "packages/ui/src/index.ts",
           "scripts/ci-changed-scopes.mjs",
-          "scripts/verify-repository-integrity.mjs",
-          "services/api/src/ai/ai.service.ts"
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts"
         ],
         "missing": [
+          "apps/kiosk/scripts/verify-fusion-w2.mjs",
           "apps/kiosk/src/b.tsx",
           "apps/miniapp/pages/index/index.js",
           "docs/a.md",
           "docs/progress/x.md",
-          "services/api/src/a.ts"
+          "services/api/src/c.service.ts"
         ]
       },
       "file": "scripts/verify-ci-changed-scopes.mjs",
@@ -30265,7 +30280,7 @@
         "missing": []
       },
       "file": "scripts/verify-repository-integrity.mjs",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "ai-job-print-terminal",
       "scriptNames": [
