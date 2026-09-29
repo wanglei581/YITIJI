@@ -3,6 +3,7 @@
 import { buildCsv } from '../../lib/csv'
 import type {
   PartnerTerminalOpsView,
+  TerminalOpsFaultTotals,
   TerminalOpsOutput,
   TerminalOpsRow,
   TerminalOpsUnavailable,
@@ -105,6 +106,17 @@ export const RUN_STATE_VIEW: Record<TerminalRunState, { label: string; status: '
   silent: { label: '从未上报', status: 'default' },
 }
 
+/**
+ * 统计期内一次心跳都没有上报的终端（从未连接或整段离线）：故障计数全是 0，
+ * 但那是「没测到」，不是「没故障」。页面、抽屉、导出都按这句如实写，不显示 0 次 / 没有未恢复。
+ */
+export const FAULTS_NOT_REPORTED = '统计期内没有上报心跳，无法统计'
+
+/** 合计：只要有一台在统计期内上报过，就能给出故障合计；全部没上报时合计也是「没测到」。 */
+export function totalsFaultsReported(data: PartnerTerminalOpsView): boolean {
+  return data.totals.terminalCount > 0 && data.totals.silentTerminals < data.totals.terminalCount
+}
+
 /** 每张指标卡下面那一行口径说明，页面与导出共用。 */
 export const METRIC_NOTES = {
   visit: '服务人次 = 统计期内本机构终端的使用次数：从待机唤醒或上一位清场之后，第一次进入某项服务算一次，误触不算；按终端当时所属的机构统计。会话记录随 2026 年 9 月底的版本上线，此前的时段没有数。',
@@ -124,6 +136,9 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
   ]
   const csvCount = (value: number | null) => (value === null ? '少于5（不显示具体数字）' : value)
   const csvRate = (output: TerminalOpsOutput) => (output.successRate === null ? rateText(output) : `${output.successRate.toFixed(1)}%`)
+  const faultCells = (f: TerminalOpsFaultTotals, reported: boolean, unrecoveredCell: string | number): (string | number)[] => (reported
+    ? [f.offlineCount, f.offlineMinutes, f.printerFaultCount, f.printerFaultMinutes, f.recoveredCount, f.avgRecoveryMinutes ?? '', f.longestMinutes ?? '', unrecoveredCell]
+    : [FAULTS_NOT_REPORTED, '', '', '', '', '', '', ''])
   const rows = data.terminals.map((row) => [
     row.terminalCode,
     terminalName(row),
@@ -136,14 +151,7 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
     csvCount(row.output.settled),
     csvRate(row.output),
     csvCount(row.output.unconfirmed),
-    row.faults.offlineCount,
-    row.faults.offlineMinutes,
-    row.faults.printerFaultCount,
-    row.faults.printerFaultMinutes,
-    row.faults.recoveredCount,
-    row.faults.avgRecoveryMinutes ?? '',
-    row.faults.longestMinutes ?? '',
-    row.faults.unrecovered ? '是' : '否',
+    ...faultCells(row.faults, row.faults.reportedInWindow, row.faults.unrecovered ? '是' : '否'),
     row.faults.reportedInWindow ? '是' : '否',
   ])
   const totals = data.totals
@@ -151,9 +159,8 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
     '合计', `${totals.terminalCount} 台`, '', `在线 ${totals.onlineTerminals} 台`, '',
     data.visitCount.recordingStarted ? csvCount(totals.visitCount) : VISIT_NOT_STARTED, csvCount(totals.serviceCount), csvCount(totals.output.printed), csvCount(totals.output.settled),
     csvRate(totals.output), csvCount(totals.output.unconfirmed),
-    totals.faults.offlineCount, totals.faults.offlineMinutes, totals.faults.printerFaultCount, totals.faults.printerFaultMinutes,
-    totals.faults.recoveredCount, totals.faults.avgRecoveryMinutes ?? '', totals.faults.longestMinutes ?? '',
-    `${totals.unrecoveredTerminals} 台`, `${totals.terminalCount - totals.silentTerminals} 台`,
+    ...faultCells(totals.faults, totalsFaultsReported(data), `${totals.unrecoveredTerminals} 台`),
+    `${totals.terminalCount - totals.silentTerminals} 台`,
   ]
   return buildCsv([
     ['统计窗口', `${windowText(data)}（${data.timezone}）`],

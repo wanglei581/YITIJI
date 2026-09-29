@@ -2,7 +2,17 @@ import type { ReactNode } from 'react'
 import { Card } from '@ai-job-print/ui'
 import { ActivityIcon, BotIcon, PrinterIcon, UsersIcon, type LucideIcon } from 'lucide-react'
 import type { PartnerTerminalOpsView } from '../../services/api/terminalOps'
-import { METRIC_NOTES, VISIT_NOT_STARTED_NOTE, countText, minutesText, rateText, unavailableReason, visitText } from './terminalOpsFormat'
+import {
+  FAULTS_NOT_REPORTED,
+  METRIC_NOTES,
+  VISIT_NOT_STARTED_NOTE,
+  countText,
+  minutesText,
+  rateText,
+  totalsFaultsReported,
+  unavailableReason,
+  visitText,
+} from './terminalOpsFormat'
 
 function MetricCard({
   icon: Icon,
@@ -69,6 +79,13 @@ export function TerminalOpsCards({ data }: { data: PartnerTerminalOpsView }) {
       </MetricCard>
 
       <MetricCard icon={ActivityIcon} title="故障与恢复" tone="bg-warning-bg text-warning-fg" note={METRIC_NOTES.faults}>
+        {!totalsFaultsReported(data) ? (
+          <>
+            <BigValue muted>无法统计</BigValue>
+            <p className="text-xs text-neutral-500">本机构终端{FAULTS_NOT_REPORTED}（从未连接或整段离线），不能说没有故障。</p>
+          </>
+        ) : (
+        <>
         <p>
           离线 <strong className="tabular-nums text-neutral-900">{totals.faults.offlineCount}</strong> 次，共 {minutesText(totals.faults.offlineMinutes)}
         </p>
@@ -81,8 +98,17 @@ export function TerminalOpsCards({ data }: { data: PartnerTerminalOpsView }) {
           {totals.faults.longestMinutes !== null && <>，最长一次 {minutesText(totals.faults.longestMinutes)}</>}
         </p>
         <p className={totals.unrecoveredTerminals > 0 ? 'font-semibold text-error-fg' : 'text-neutral-500'}>
-          {totals.unrecoveredTerminals > 0 ? `当前有 ${totals.unrecoveredTerminals} 台未恢复` : '当前没有未恢复的故障'}
+          {totals.unrecoveredTerminals > 0
+            ? `当前有 ${totals.unrecoveredTerminals} 台未恢复`
+            : totals.silentTerminals > 0 ? '已上报的终端当前没有未恢复的故障' : '当前没有未恢复的故障'}
         </p>
+        {totals.silentTerminals > 0 && (
+          <p className="text-xs font-medium text-warning-fg">
+            另有 {totals.silentTerminals} 台{FAULTS_NOT_REPORTED}，未计入以上数字。
+          </p>
+        )}
+        </>
+        )}
       </MetricCard>
     </div>
   )

@@ -12,6 +12,7 @@ import {
   shanghaiDateTime,
   terminalName,
   VISIT_NOT_STARTED,
+  FAULTS_NOT_REPORTED,
 } from './terminalOpsFormat'
 
 function Item({ label, children }: { label: string; children: ReactNode }) {
@@ -80,6 +81,14 @@ export function TerminalOpsDrawer({
         </Section>
 
         <Section title="故障与恢复" note={METRIC_NOTES.faults}>
+          {!faults.reportedInWindow ? (
+            <Item label="统计">
+              <span className="text-neutral-500">
+                {FAULTS_NOT_REPORTED}{row.lastHeartbeatAt ? '（整段离线）' : '（这台终端从未上报过心跳）'}，不能说没有故障。
+              </span>
+            </Item>
+          ) : (
+          <>
           <Item label="离线">{faults.offlineCount} 次，共 {minutesText(faults.offlineMinutes)}</Item>
           <Item label="打印机故障">{faults.printerFaultCount} 次，共 {minutesText(faults.printerFaultMinutes)}</Item>
           <Item label="已恢复">{faults.recoveredCount} 次</Item>
@@ -90,6 +99,8 @@ export function TerminalOpsDrawer({
               ? <span className="text-error-fg">仍未恢复（时长算到现在）</span>
               : '没有未恢复的故障'}
           </Item>
+          </>
+          )}
         </Section>
 
         <p className="text-xs leading-relaxed text-neutral-500">

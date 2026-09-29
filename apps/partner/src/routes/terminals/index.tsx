@@ -28,6 +28,7 @@ import {
   RUN_STATE_VIEW,
   buildTerminalOpsCsv,
   countText,
+  FAULTS_NOT_REPORTED,
   visitText,
   minutesText,
   rateText,
@@ -211,7 +212,7 @@ export default function TerminalsPage() {
                 <tbody className="divide-y divide-neutral-900/[0.06]">
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-sm text-neutral-500">
+                      <td colSpan={9} className="px-4 py-10 text-center text-sm text-neutral-500">
                         没有符合条件的终端，换个筛选或关键词试试
                       </td>
                     </tr>
@@ -244,13 +245,21 @@ export default function TerminalsPage() {
                           <p className="text-[11px] text-neutral-500">{countText(row.output.printed)} / {countText(row.output.settled)}</p>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 tabular-nums">{countText(row.output.unconfirmed)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs">{row.faults.offlineCount} 次 · {minutesText(row.faults.offlineMinutes)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs">{row.faults.printerFaultCount} 次 · {minutesText(row.faults.printerFaultMinutes)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs">
-                          {row.faults.unrecovered
-                            ? <span className="font-semibold text-error-fg">未恢复</span>
-                            : <span className="text-neutral-500">无</span>}
-                        </td>
+                        {row.faults.reportedInWindow ? (
+                          <>
+                            <td className="whitespace-nowrap px-4 py-3 text-xs">{row.faults.offlineCount} 次 · {minutesText(row.faults.offlineMinutes)}</td>
+                            <td className="whitespace-nowrap px-4 py-3 text-xs">{row.faults.printerFaultCount} 次 · {minutesText(row.faults.printerFaultMinutes)}</td>
+                            <td className="whitespace-nowrap px-4 py-3 text-xs">
+                              {row.faults.unrecovered
+                                ? <span className="font-semibold text-error-fg">未恢复</span>
+                                : <span className="text-neutral-500">无</span>}
+                            </td>
+                          </>
+                        ) : (
+                          <td colSpan={3} className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
+                            {FAULTS_NOT_REPORTED}
+                          </td>
+                        )}
                       </tr>
                     )
                   })}
