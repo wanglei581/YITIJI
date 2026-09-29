@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-29：开放打印设计按《开放打印能力》V1.0 核对改正（只改文档）
+
+- **`docs/device/pantum-api-design.md` 升到 v1.1：** 时间戳改为秒；请求头只有 `appKey`、`timeStamp`、`nonce`、`sign`；份数字段改为 `numOfCopies`；设备状态改为 POST；回调改为单一地址按 topic 分流；任务 ID 按字符串处理；验签用原始请求体；删去协议里没有的 orientation / quality；本机能否经奔图云接单改为未经厂家确认；开放 API 不再把彩色取值确认当作开工前置条件；第 7 节按 V1.0 已回答的项关闭并重排待问清单。
+- **同步：** `pantum-cm2820adn.md`、`windows-terminal-agent-design.md` 的接口方法、回调路径、状态码终态，以及「已确认无云端打印」和「等彩色取值确认后才实现」，改为同一口径。
+- **未改：** CLAUDE.md、AGENTS.md、代码（含 `packages/shared/src/types/print.ts`）和证据文件。CLAUDE.md 第 3 节的改法只留在任务汇报里。
+- **验证：** 图谱生成与 `--check` 退出码均为 0，图谱文件无变化。三份设备文档没有关联门禁。`current-progress.md` 关联的 13 条门禁退出码均为 0。
+
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 
 ## 2026-09-29：奔图官方手册事实补进设备文档（分支 `glm/pantum-manual-facts-0929`）

@@ -1,6 +1,6 @@
 # 奔图 Pantum CM2800ADN Series 设备文档
 
-> 最后更新：2026-05-27
+> 最后更新：2026-09-29（开放打印：设备状态为 POST、回调单地址按 topic 分流、本机能否经奔图云接单改为未经厂家确认）
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [pantum-api-design.md](./pantum-api-design.md)
 
 ---
@@ -43,20 +43,18 @@
 
 ## 三、开放打印 API 能力（需单独确认）
 
-以下为《开放打印能力.pdf》描述的 API 能力，**不代表 CM2800ADN Series 当前可用**。
+以下为《开放打印能力》V1.0 描述的 API 能力。本机能否经奔图云接单**未经厂家确认**，不代表 CM2800ADN Series 当前可用。
 
-> ⚠️ 硬件支持彩色打印，不代表开放 API 的 color 参数已确认。
-> `printSetting.mode` 只明确写了 `"bw"`（黑白）。
-> **彩色值需厂家另行确认，不得默认假设可用。**
+> 硬件支持彩色打印。开放 API 的 V1.0 没有彩色取值（`printSetting.mode` 只有 `"bw"`）。
+> 会不会在后续版本补上，待奔图书面答复。答复前不得传 `"color"`，也不得把彩色静默改成黑白。
 
 | API 能力 | 状态 | 说明 |
 |---------|------|------|
-| 设备注册 /device/register | 预留 | |
-| 创建打印任务 /print/createTask | 预留 | 文件类型：doc/docx/ppt/pptx/xls/xlsx/txt/jpg/png/jpeg/bmp/pdf |
-| 取消打印 /print/cancel | 预留 | |
-| 查询设备状态 /device/status | 预留 | |
-| 打印状态回调 | 预留 | 100 完成 / 101 创建 / 102 打印中 / 103 取消 / 104 错误 |
-| 设备解绑回调 | 预留 | |
+| 设备注册 POST `{serverUrl}/device/register` | 预留 | |
+| 创建打印任务 POST `{serverUrl}/print/createTask` | 预留 | 文件类型：doc、docx、ppt、pptx、xls、xlsx、txt、jpg、png、jpeg、bmp、pdf |
+| 取消打印 POST `{serverUrl}/print/cancel` | 预留 | |
+| 查询设备状态 POST `{serverUrl}/device/status` | 预留 | 方法是 POST |
+| 回调（只有一个地址） | 预留 | 按 topic 区分：`deviceUnbind/{pid}/{sn}` 解绑，`printStatus/{pid}/{sn}` 打印状态。状态码 100 完成 / 101 创建 / 102 打印中 / 103 取消 / 104 错误；100、103、104 为终态 |
 
 详细 API 规范见 [pantum-api-design.md](./pantum-api-design.md)。
 
@@ -83,7 +81,7 @@
 
 ### 后续扩展：PantumCloudDispatchProvider
 
-未来如厂家开放云打印能力，在后端 `services/print/` 层实现 PantumCloudDispatchProvider。
+厂家确认本机能经奔图云接单之后，再在后端 `services/print/` 层实现 PantumCloudDispatchProvider。
 详细设计见 [windows-terminal-agent-design.md](./windows-terminal-agent-design.md) §PrintProvider 架构。
 
 ---
@@ -94,7 +92,7 @@
 2. **不要假设 A3**：所有打印功能设计只考虑 A4 及以下
 3. **不要假设 WiFi**：设备只有有线网络
 4. **不要假设云端扫描 API**：扫描由本地 TWAIN/WIA 或 SMB 目录监听实现
-5. **彩色 API 值待确认**：printSetting.mode 的彩色值不得假设为 `"color"`，需厂家确认
+5. **彩色不在 V1.0 协议里**：`printSetting.mode` 只有 `"bw"`。会不会补，待奔图书面答复；答复前不得假设为 `"color"`
 6. **测试环境**：开发阶段可用虚拟打印机（PDF 打印机）模拟，上线前必须在真机测试
 7. **驱动安装**：部署时需预装 `"Pantum CM2800ADN Series"` 驱动程序
 
