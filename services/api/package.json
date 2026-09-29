@@ -220,6 +220,8 @@
     "verify:job-application-track": "node -r @swc-node/register scripts/verify-job-application-track.ts",
     "verify:content-pipeline-e2e": "node -r @swc-node/register scripts/verify-content-pipeline-e2e.ts",
     "maintenance:backfill-org-content-trust": "node -r @swc-node/register scripts/backfill-org-content-trust.ts",
+    "maintenance:unpublish-demo-companies": "node -r @swc-node/register scripts/unpublish-demo-companies.ts",
+    "verify:demo-company-unpublish": "node -r @swc-node/register scripts/verify-demo-company-unpublish.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
     "verify:console-screen-snapshot": "node -r @swc-node/register scripts/verify-console-screen-snapshot.ts",
     "verify:console-screen-usage": "node -r @swc-node/register scripts/verify-console-screen-usage.ts",

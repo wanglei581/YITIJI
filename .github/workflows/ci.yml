@@ -799,6 +799,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-param-suggestion
           pnpm --filter @ai-job-print/api verify:resume-diagnosis-context
           pnpm --filter @ai-job-print/api verify:admin-pending-dispose
+          # 一次性维护命令：下架 name 与 sourceName 都带全角「（演示）」的企业（首次发布时执行）。
+          # 自建独立临时 SQLite，子进程真跑命令：dry-run 不改库、确认词/事由缺失退出码 2、
+          # 只动双标记行、每行一条审计且与状态同事务、二次执行无改动无新审计。
+          pnpm --filter @ai-job-print/api verify:demo-company-unpublish
           pnpm --filter @ai-job-print/api verify:admin-print-outcome
           pnpm --filter @ai-job-print/api verify:benefit-activities
           pnpm --filter @ai-job-print/api verify:change-password
