@@ -26,6 +26,11 @@
 - **缺口（总指挥问、协调方核实）：** CI 里原来没有一条门禁在真 Redis 下走过真实密码登录：`verify:redis-degradation-truth` 只测 Redis 挂掉时登录被拒，`verify:admin-login-hardening` 用内存桩，content-pipeline 门禁已改用内部签发令牌。
 - **补法（Grok 实现、协调方审）：** 新门禁 `verify:internal-login-real-redis`（18 条，挂 CI SQLite 作业，并钉进 ci-gate-coverage 的必跑清单）：起真实 `src/main.ts` 与临时 redis-server；管理员、机构账号用真实密码登录后各自读到业务数据，机构凭证调管理员接口被拒；连续 5 次错误密码后正确密码也登不上，锁定计数在真 Redis 里查得到；改密后旧凭证被拒。只加门禁，不改登录逻辑。
 - **验证：** Grok 三处反向变异（不签发凭证、锁定阈值失效、守卫不校验版本）全红；协调方在候选 840ea7d31 上复跑本门禁与 redis-degradation-truth、ci-gate-coverage 全绿。门禁约 70 秒（要等一个登录限流窗口）。
+## 2026-09-29：大屏 14 天打印趋势与单台「今日打印页数」改按出纸×份数、按出纸完成日（分支 `claude/backend-hardening-20260929-screen-print-trend`）
+
+- **做了什么（Grok 实现、协调方审，总指挥 9/29 拍板）：** 继 #1111 累计打印改口径后，趋势与单台今日页数也统一：只算真正出纸的任务，页数 = 计费页数 × 份数，按任务出纸完成时间（上海自然日）落日；付了款没出纸的不算。共用逻辑在 `console-screen.printed-pages.ts`。顺手按两个后台窗口的走查意见把注释与门禁说明改成界面用词（少于 5、数据量超出统计上限、服务人次）。
+- **验证：** `verify:console-screen-printed-visits` 42 条（新增跨午夜落日、单台乘份数）；Grok 两处变异、协调方抽 1 处（不乘份数）全红；snapshot、usage、admin console-screen-ui 与 api/admin/partner/ui/shared 类型检查全绿。
+- **交付单（两个后台）：** GovGrid 趋势说明、TwinTerminalBoard 说明两句要换成新口径，e2e 模拟数据的来源字符串同步（原文在 PR 说明里）。
 
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 

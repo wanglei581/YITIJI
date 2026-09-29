@@ -3868,7 +3868,6 @@
           "Job",
           "JobFair",
           "KioskSession",
-          "Order",
           "PolicyPost",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -3904,7 +3903,6 @@
           "Job",
           "JobFair",
           "KioskSession",
-          "Order",
           "PolicyPost",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10054,7 +10052,6 @@
           "Job",
           "JobFair",
           "KioskSession",
-          "Order",
           "PolicyPost",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10090,7 +10087,6 @@
           "Job",
           "JobFair",
           "KioskSession",
-          "Order",
           "PolicyPost",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -17163,8 +17159,6 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
-          "services/api/src/console-screen/console-screen.queries.ts",
-          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
@@ -23656,6 +23650,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.assemble.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.cache.ts": [
@@ -23685,7 +23680,8 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.printed-pages.ts": [
-      "services/api/scripts/verify-console-screen-printed-visits.ts"
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.queries.ts": [
       "services/api/scripts/verify-console-screen-printed-visits.ts",
@@ -23699,6 +23695,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.twin.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.types.ts": [
@@ -33630,11 +33627,13 @@
           "packages/shared/src/types/consoleScreen.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/console-screen/console-screen.assemble.ts",
           "services/api/src/console-screen/console-screen.cache.ts",
           "services/api/src/console-screen/console-screen.metric.ts",
           "services/api/src/console-screen/console-screen.printed-pages.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.types.ts",
           "services/api/src/console-screen/console-screen.usage.service.ts",
           "services/api/src/console-screen/console-screen.visits.ts",
@@ -33680,6 +33679,7 @@
           "services/api/src/console-screen/console-screen.module.ts",
           "services/api/src/console-screen/console-screen.org.ts",
           "services/api/src/console-screen/console-screen.partner.controller.ts",
+          "services/api/src/console-screen/console-screen.printed-pages.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
           "services/api/src/console-screen/console-screen.timeline.ts",
