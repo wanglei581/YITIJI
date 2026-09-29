@@ -71,20 +71,25 @@ assert(
 assert(
   session.includes("PrintMaterialSource = 'resume' | 'document'") &&
     session.includes('source?: PrintMaterialSource') &&
-    session.includes('source: next.source') &&
+    session.includes("source: next.source === 'resume' || next.source === 'document' ? next.source : undefined") &&
     session.includes('printUploadPathForSource'),
-  'printMaterialSession 支持保存打印来源 source，并集中生成回到上传页的路径',
+  'printMaterialSession（打印交接上下文 v2）支持保存打印来源 source，并集中生成回到上传页的路径',
 )
 
-// 上传成功路径现共有三条（本机上传/扫码上传/U盘导入），调用处在 source 之后追加了
-// contentCategory 审计字段且 U 盘路径为多行调用，故按 handler 逐一正则断言。
-// source 必须是简写属性（后跟 , 或 }），排除 source: undefined 等同名不同值的误匹配。
-const saveWithSourcePattern = /savePrintMaterialSession\(\{\s*file:\s*nextFile,\s*source\s*[,}]/
+// 2026-09-29 商用收口 P0-5：上传成功只把文件放进本页，不再写打印交接上下文 ——
+// 以前上传成功就写，不点「下一步」也留在本机，会被下一位或下一个来源当成「上一份」复水。
+// 点「下一步」才整份写（origin: 'upload'，带 source 与 contentCategory），跳转只带交接编号。
 const persistStart = uploadPage.indexOf('const persistFile')
-const persistBody = uploadPage.slice(persistStart, persistStart + 600)
+const persistBody = uploadPage.slice(persistStart, uploadPage.indexOf('}, [])', persistStart))
 assert(
-  persistStart >= 0 && saveWithSourcePattern.test(persistBody),
-  'persistFile 上传成功后把 source 写入当前打印材料 session',
+  persistStart >= 0 && persistBody.includes('clearPrintMaterialSession()') && !/startPrint|beginPrintHandoff|savePrintMaterialSession/.test(persistBody),
+  'persistFile 上传成功只放进本页并作废旧的打印交接，不提前写交接上下文',
+)
+const nextStart = uploadPage.indexOf('const handleNext')
+const nextBody = uploadPage.slice(nextStart, uploadPage.indexOf('\n  }\n', nextStart))
+assert(
+  nextStart >= 0 && /startPrint\(\{\s*origin:\s*'upload',\s*file,\s*source,/.test(nextBody) && nextBody.includes('contentCategory: resolveContentCategory(contentCategory, file.mimeType)'),
+  '「下一步」整份写打印交接上下文（origin upload，带 source 与内容类别）再进打印台检查',
 )
 for (const [handler, marker] of [
   ['uploadLocalFile', 'persistFile(nextFile, \'file\')'],
@@ -96,21 +101,20 @@ for (const [handler, marker] of [
   const body = uploadPage.slice(start, nextTopLevelDecl === -1 ? undefined : nextTopLevelDecl)
   assert(
     start >= 0 && body.includes(marker),
-    `${handler} 上传成功后经 persistFile 把 source 写入当前打印材料 session`,
+    `${handler} 上传成功后经 persistFile 放进本页`,
   )
 }
 
+// 打印链只从打印交接上下文读 source：跳转带来的临时状态里只有交接编号，
+// 登录回跳、返回预览、刷新之后 source 仍在（以前靠 route state 和会话双通道，临时状态一丢就退回上一份）。
 assert(
-  uploadPage.includes("navigate('/print/material-check', { state: { file, source } })") &&
-    materialCheckPage.includes('source?: PrintMaterialSource') &&
-    materialCheckPage.includes('state?.source ?? session?.source') &&
-    /navigate\('\/print\/preview',\s*\{\s*state:\s*\{\s*file(?:: printFile)?,\s*materialCheck,\s*source\s*\}\s*\}\)/.test(materialCheckPage) &&
-    previewPage.includes('source?: PrintMaterialSource') &&
-    previewPage.includes('restoredSession?.source ?? locationState?.source') &&
-    previewPage.includes("navigate('/print/confirm', { state: { file, params, materialCheck, source } })") &&
-    confirmPage.includes('source?: PrintMaterialSource') &&
-    confirmPage.includes('state?.source ?? restoredSession?.source'),
-  '打印流程通过 route state 和 session 双通道保留 source，支持重试和 session 清理后的回退',
+  materialCheckPage.includes('const source = session?.source ?? handoff?.source') &&
+    !materialCheckPage.includes('location.state') &&
+    previewPage.includes('const source = handoff?.source') &&
+    previewPage.includes("navigate('/print/confirm', { state: { printContextId: saved.contextId } })") &&
+    confirmPage.includes('const source = handoff?.source') &&
+    !/state\?\.(file|params|source|materialCheck)\b/.test(confirmPage),
+  '打印流程只从打印交接上下文读 source 与文件身份，跳转只带交接编号',
 )
 
 for (const file of flowPages) {
