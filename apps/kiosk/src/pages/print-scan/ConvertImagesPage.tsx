@@ -16,8 +16,7 @@ import { getTerminalId, isTerminalKiosk, useTerminalKiosk } from '../../services
 import { getTerminalCode } from '../../services/api/terminalConfig'
 import { convertImagesToPdf } from '../../services/api/printConversion'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { beginPrintHandoff } from '../print/printHandoff'
-import { usePrintHandoffOwner, useStartPrintHandoff } from '../print/usePrintHandoff'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import type { PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { ConvertImagesCta } from './ConvertImagesPanels'
 import { ConvertImagesView } from './ConvertImagesView'
@@ -44,7 +43,6 @@ const LIMIT_MESSAGE = `最多支持 ${MAX_IMAGES} 张图片，已达上限`
 export function ConvertImagesPage() {
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
-  const printOwner = usePrintHandoffOwner()
   const { getToken } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const uploadGen = useRef(0)
@@ -267,12 +265,12 @@ export function ConvertImagesPage() {
     if (input) startPrint(input)
   }
 
-  // 「先登录再保存」：登录页是另一条路由，本页内存里的合成结果一离开就没了。
-  // 先把这份 PDF 写成打印交接上下文，登录回来直接落到打印台检查这一份（游客中途登录视为同一人继续办理）。
+  // 「先登录再转换」：转换件归不归本人，是转换那一刻带没带会员令牌决定的（hasEndUser）；
+  // 后端没有「游客转换件登录后认领」的接口，事后登录这份也进不了「我的文档」。
+  // 所以登录回来回到本页重新选图、由用户自己再点转换；不替用户把这份带去打印台，免得让人以为它被保存了。
+  // 已转好的这份要打印，走旁边的「拿这份 PDF 去打印」，不需要登录。
   const handleLogin = () => {
-    const input = printInput()
-    const begun = input ? beginPrintHandoff(input, printOwner) : null
-    navigate(begun?.ok ? `/login?from=${encodeURIComponent('/print/desk?step=check')}` : '/login')
+    navigate(`/login?from=${encodeURIComponent('/print-scan/convert')}`)
   }
 
   const handleRestoreOrder = () => {

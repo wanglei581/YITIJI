@@ -44,7 +44,7 @@ export function registerW6Api(api: ApiRouter): void {
   })
 
   get('/api/v1/health', { success: true, data: { status: 'ok' } })
-  // D3（2026-09-28）：签名盖章默认关，未登记即停用。本夹具代表按稿开通了全部服务的终端，
+  // D3（2026-09-28）：签名默认关，未登记即停用。本夹具代表按稿开通了全部服务的终端，
   // 显式登记为可用，否则稿 10 默认态的签名卡会变成停用，稿件对照与证据截图都会对不上。
   get('/api/v1/terminals/KSK-001/capabilities', {
     capabilities: [
