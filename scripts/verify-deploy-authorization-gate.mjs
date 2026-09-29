@@ -194,7 +194,7 @@ assert.ok(
   'persistent PII gate must be written after the rollback backup and before migration'
 )
 
-const fullBuildDiskAt = deployJob.indexOf('=== full 发布构建前磁盘检查（只读，不清理）===')
+const fullBuildDiskAt = deployJob.indexOf('=== full 发布构建前磁盘检查 ===')
 const pnpmInstallAt = deployJob.indexOf('pnpm install --frozen-lockfile')
 const kioskBuildAt = deployJob.indexOf('pnpm build:kiosk:production')
 assert.ok(
@@ -202,20 +202,21 @@ assert.ok(
   'full publish must check free disk and be able to exit before pnpm install and the three frontend builds'
 )
 const fullBuildDiskBlock = deployJob.slice(fullBuildDiskAt, pnpmInstallAt)
-assert.match(fullBuildDiskBlock, /DEPLOY_MIN_FREE_BUILD_MB:-6144/)
+assert.match(fullBuildDiskBlock, /DEPLOY_MIN_FREE_FLOOR_MB:-10240/)
 assert.doesNotMatch(
   fullBuildDiskBlock,
-  /DEPLOY_MIN_FREE_FLOOR_MB:-10240/,
-  'pre-build gate must not reuse the 10GB release floor, or 6-10GB never reaches safe cleanup'
+  /DEPLOY_MIN_FREE_BUILD_MB/,
+  'pre-build gate uses the same 10GB floor as the release script'
 )
+assert.match(fullBuildDiskBlock, /pnpm store prune/)
 assert.match(
   fullBuildDiskBlock,
-  /构建前磁盘空间不足[\s\S]{0,500}Server Cleanup \(backups \/ pnpm store \/ journal\)[\s\S]{0,120}dry_run=true[\s\S]{0,80}exit 1/
+  /构建前磁盘空间不足[\s\S]{0,800}dry_run=false、keep=3、prune_pnpm=true、vacuum_journal=false[\s\S]{0,40}exit 1/
 )
 assert.doesNotMatch(
   fullBuildDiskBlock,
-  /pnpm store prune|journalctl/,
-  'the pre-build disk check is read-only and must not clean'
+  /journalctl/,
+  'the pre-build disk check may prune the pnpm store, not the journal'
 )
 assert.match(
   releaseScript,

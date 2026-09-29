@@ -148,7 +148,16 @@ jobs:
               rm -f -- "$CONTROL_PLANE_HELPER"
               rm -f -- /tmp/release.bundle
             }
+            on_control_plane_signal() {
+              trap '' HUP INT TERM PIPE
+              cleanup_control_plane_helper
+              exit "$1"
+            }
             trap cleanup_control_plane_helper EXIT
+            trap 'on_control_plane_signal 129' HUP
+            trap 'on_control_plane_signal 130' INT
+            trap 'on_control_plane_signal 143' TERM
+            trap 'on_control_plane_signal 141' PIPE
             if [ -z "${CONTROL_PLANE_DEPLOY_HELPER_B64:-}" ] || [ -z "${CONTROL_PLANE_DEPLOY_HELPER_SHA256:-}" ]; then
               echo "::error::当前工作流未携带受审核的 API 发布 helper" >&2
               exit 1
@@ -228,10 +237,11 @@ jobs:
             test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
             if [ "$DEPLOY_SCOPE" = "full" ]; then
-              echo "=== full 发布构建前磁盘检查（只读，不清理）==="
-              # 只挡构建本身写满盘，默认 6144MB。10GB 发布门槛仍由发布脚本在清理之后判断，
-              # 可用空间落在两者之间时，发布脚本还能先做安全清理。
-              # 部署目录和备份目录不在同一分区时，两个都量，取较小的可用 MB。这里只读 df，不清理。
+              echo "=== full 发布构建前磁盘检查 ==="
+              # 门槛与发布脚本相同，默认 10240MB（DEPLOY_MIN_FREE_FLOOR_MB）。
+              # 6–10GB 时若先构建，还会再吃掉 2–3GB，之后发布脚本的 10GB 门槛必然失败。
+              # 部署目录和备份目录不在同一分区时，两个都量，取较小的可用 MB。
+              # 不够时先 pnpm store prune 再判一次；仍不够就在安装依赖和构建之前停。
               normalize_build_mb() {
                 local raw="$1" shown stripped
                 shown="$raw"
@@ -240,14 +250,16 @@ jobs:
                 fi
                 case "$raw" in
                   ''|*[!0-9]*|[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*)
-                    echo "::warning::DEPLOY_MIN_FREE_BUILD_MB=${shown} 不是 1 到 7 位数字，改用默认值 6144" >&2
-                    printf '%s' 6144
+                    echo "::warning::DEPLOY_MIN_FREE_FLOOR_MB=${shown} 不是 1 到 7 位数字，改用默认值 10240" >&2
+                    printf '%s' 10240
                     return 0
                     ;;
                 esac
                 stripped="${raw#"${raw%%[!0]*}"}"
                 if [ -z "$stripped" ]; then
-                  stripped=0
+                  echo "::warning::DEPLOY_MIN_FREE_FLOOR_MB=${shown} 不是 1 到 7 位数字，改用默认值 10240" >&2
+                  printf '%s' 10240
+                  return 0
                 fi
                 printf '%s' "$((10#$stripped))"
               }
@@ -264,25 +276,38 @@ jobs:
               disk_fs_of() {
                 df -Pm "$1" 2>/dev/null | awk 'NR==2 { print $1 }'
               }
-              BUILD_MB="$(normalize_build_mb "${DEPLOY_MIN_FREE_BUILD_MB:-6144}")"
-              deploy_avail="$(disk_avail_of .)"
-              deploy_fs="$(disk_fs_of .)"
-              backup_target="${DEPLOY_BACKUP_ROOT:-/srv/ai-job-print-backups}"
-              while [ -n "$backup_target" ] && [ ! -e "$backup_target" ] && [ "$backup_target" != "/" ]; do
-                backup_target="$(dirname "$backup_target")"
-              done
-              backup_avail="$(disk_avail_of "$backup_target")"
-              backup_fs="$(disk_fs_of "$backup_target")"
-              if [ -n "$deploy_fs" ] && [ "$deploy_fs" = "$backup_fs" ]; then
-                AVAIL_MB="$deploy_avail"
-              elif [ "$deploy_avail" -le "$backup_avail" ]; then
-                AVAIL_MB="$deploy_avail"
-              else
-                AVAIL_MB="$backup_avail"
-              fi
-              echo "FULL_BUILD_DISK_AVAIL_MB=${AVAIL_MB} DEPLOY_MIN_FREE_BUILD_MB=${BUILD_MB} DEPLOY_DIR_AVAIL_MB=${deploy_avail} BACKUP_DIR_AVAIL_MB=${backup_avail}"
+              measure_build_avail() {
+                deploy_avail="$(disk_avail_of .)"
+                deploy_fs="$(disk_fs_of .)"
+                backup_target="${DEPLOY_BACKUP_ROOT:-/srv/ai-job-print-backups}"
+                while [ -n "$backup_target" ] && [ ! -e "$backup_target" ] && [ "$backup_target" != "/" ]; do
+                  backup_target="$(dirname "$backup_target")"
+                done
+                backup_avail="$(disk_avail_of "$backup_target")"
+                backup_fs="$(disk_fs_of "$backup_target")"
+                if [ -n "$deploy_fs" ] && [ "$deploy_fs" = "$backup_fs" ]; then
+                  AVAIL_MB="$deploy_avail"
+                elif [ "$deploy_avail" -le "$backup_avail" ]; then
+                  AVAIL_MB="$deploy_avail"
+                else
+                  AVAIL_MB="$backup_avail"
+                fi
+              }
+              BUILD_MB="$(normalize_build_mb "${DEPLOY_MIN_FREE_FLOOR_MB:-10240}")"
+              measure_build_avail
+              echo "FULL_BUILD_DISK_AVAIL_MB=${AVAIL_MB} DEPLOY_MIN_FREE_FLOOR_MB=${BUILD_MB} DEPLOY_DIR_AVAIL_MB=${deploy_avail} BACKUP_DIR_AVAIL_MB=${backup_avail}"
               if [ "$AVAIL_MB" -lt "$BUILD_MB" ]; then
-                echo "::error::构建前磁盘空间不足：可用 ${AVAIL_MB}MB < 构建门槛 ${BUILD_MB}MB。未安装依赖、未构建三端前端。请先跑工作流 Server Cleanup (backups / pnpm store / journal)，先 dry-run（输入 dry_run=true）。" >&2
+                echo "构建前可用 ${AVAIL_MB}MB，低于门槛 ${BUILD_MB}MB，先 pnpm store prune 再复判。"
+                if command -v pnpm >/dev/null 2>&1; then
+                  pnpm store prune || echo "::warning::pnpm store prune 失败，已跳过"
+                else
+                  echo "pnpm 不可用，跳过 store prune"
+                fi
+                measure_build_avail
+                echo "pnpm store prune 后 FULL_BUILD_DISK_AVAIL_MB=${AVAIL_MB} DEPLOY_MIN_FREE_FLOOR_MB=${BUILD_MB} DEPLOY_DIR_AVAIL_MB=${deploy_avail} BACKUP_DIR_AVAIL_MB=${backup_avail}"
+              fi
+              if [ "$AVAIL_MB" -lt "$BUILD_MB" ]; then
+                echo "::error::构建前磁盘空间不足：可用 ${AVAIL_MB}MB < 门槛 ${BUILD_MB}MB。未安装依赖、未构建三端前端。在 Actions 跑 Server Cleanup：dry_run=false、keep=3、prune_pnpm=true、vacuum_journal=false。" >&2
                 exit 1
               fi
               echo "构建前磁盘空间够用。"

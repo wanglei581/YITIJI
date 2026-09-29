@@ -279,12 +279,13 @@ if (
     fail('deploy-api-release.sh 必须保留 DEPLOY_MIN_FREE_FLOOR_MB 默认值 10240')
   }
   if (
-    deployWorkflow.includes('DEPLOY_MIN_FREE_BUILD_MB:-6144') &&
-    !deployWorkflow.includes('DEPLOY_MIN_FREE_FLOOR_MB:-10240')
+    deployWorkflow.includes('DEPLOY_MIN_FREE_FLOOR_MB:-10240') &&
+    deployWorkflow.includes('pnpm store prune') &&
+    !deployWorkflow.includes('DEPLOY_MIN_FREE_BUILD_MB')
   ) {
-    pass('full 构建前检查用 DEPLOY_MIN_FREE_BUILD_MB 默认 6144，不把 10GB 发布门槛提前到构建前')
+    pass('full 构建前检查用 DEPLOY_MIN_FREE_FLOOR_MB 默认 10240，不够时先 pnpm store prune')
   } else {
-    fail('deploy.yml 的构建前门槛必须是 DEPLOY_MIN_FREE_BUILD_MB 默认 6144，且不能再用 DEPLOY_MIN_FREE_FLOOR_MB 默认 10240')
+    fail('deploy.yml 的构建前门槛必须是 DEPLOY_MIN_FREE_FLOOR_MB 默认 10240，并在不够时先 pnpm store prune；不得再使用 DEPLOY_MIN_FREE_BUILD_MB')
   }
 
   const dumpMvAt = deploySource.indexOf('mv -f -- "$DUMP_PARTIAL" "$BACKUP_PREFIX.dump"')

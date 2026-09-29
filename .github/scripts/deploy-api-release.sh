@@ -40,6 +40,53 @@ HEALTH_ATTEMPTS="${DEPLOY_HEALTH_ATTEMPTS:-30}"
 HEALTH_DELAY_SECONDS="${DEPLOY_HEALTH_DELAY_SECONDS:-2}"
 
 API_DIR="$RUNTIME_ROOT/services/api"
+
+# 信号从这里就生效，不等到 pg_dump。Actions 取消后 SSH 断开，远端收不到 INT/TERM，
+# 下一次往 stdout 写才会被 SIGPIPE（13）杀掉；所以 PIPE 和 HUP/INT/TERM 走同一个函数。
+# pre：备份还没开始，只退出。backup：删 partial。restore：回退运行目录。
+# committed：健康检查已通过，由主流程忽略信号并写完元数据。
+# 一进来先忽略后续信号，再把输出改到文件，避免处理函数自己的 echo 再次触发 SIGPIPE。
+release_signal_phase=pre
+on_release_signal() {
+  local sig_name="$1" sig_num=15 stamp log_dir
+  case "$sig_name" in
+    HUP) sig_num=1 ;;
+    INT) sig_num=2 ;;
+    TERM) sig_num=15 ;;
+    PIPE) sig_num=13 ;;
+  esac
+  trap '' HUP INT TERM PIPE
+  set +e
+  stamp="${TS:-$(date -u +%Y%m%dT%H%M%SZ)}"
+  log_dir="${BACKUP_ROOT:-}"
+  if [ -z "$log_dir" ] || [ ! -d "$log_dir" ] || [ ! -w "$log_dir" ]; then
+    log_dir="/tmp"
+  fi
+  exec >>"${log_dir}/release-signal-${stamp}.log" 2>&1
+  trap - ERR
+  case "${release_signal_phase:-pre}" in
+    pre)
+      exit "$((128 + sig_num))"
+      ;;
+    restore)
+      restore_runtime_and_exit "发布被 ${sig_name} 中断" "$((128 + sig_num))"
+      ;;
+    committed)
+      exit "$((128 + sig_num))"
+      ;;
+    *)
+      set +e
+      cleanup_backup_partials
+      echo "::error::备份被中断，已删除不完整文件" >&2
+      exit "$((128 + sig_num))"
+      ;;
+  esac
+}
+trap 'on_release_signal HUP' HUP
+trap 'on_release_signal INT' INT
+trap 'on_release_signal TERM' TERM
+trap 'on_release_signal PIPE' PIPE
+
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_PREFIX="$BACKUP_ROOT/pre-$TARGET_SHA-$TS"
 
@@ -66,7 +113,7 @@ REQUIRED_PRODUCTION_GATES=(
 # · 一组包含 <stem>.dump、<stem>.runtime、<stem>.migrations.log，以及
 #   <stem>.dump.partial、<stem>.runtime.partial、<stem>.ok。partial 与 .ok 都归进 stem，
 #   不单占名额。只有 partial、没有同时具备 .dump 和 .runtime 的组，清理时删掉。
-# · 目录里只要存在 .ok，最新一组完整且带 .ok 的备份（最近一次成功发布）无论 keep 多少都留。
+# · 目录里只要存在 .ok，最新一组完整且带 .ok 的备份（最近一次成功发布前的快照（回退锚点））无论 keep 多少都留。
 #   一个 .ok 都没有时（旧版本留下的备份），仍按时间留最新 keep 组。
 # · 0b 与步骤 9 都不许删到 0 组完整备份。本次 current_stem 不删。.ok 随组一起删。
 # · 只操作 BACKUP_ROOT（DEPLOY_BACKUP_ROOT，默认 /srv/ai-job-print-backups），
@@ -90,8 +137,11 @@ normalize_decimal_setting() {
       ;;
   esac
   stripped="${raw#"${raw%%[!0]*}"}"
+  # 全零（0、00、0000000）算出来是 0，会把空间门槛或保留数乘成「永远通过」。
   if [ -z "$stripped" ]; then
-    stripped=0
+    echo "::warning::${name}=${shown} 不是 1 到 7 位数字，改用默认值 ${default}" >&2
+    printf '%s' "$default"
+    return 0
   fi
   printf '%s' "$((10#$stripped))"
 }
@@ -126,14 +176,19 @@ prune_old_backups() {
   current_stem="$(basename "$BACKUP_PREFIX")"
 
   # 按 mtime 新→旧列出，去掉后缀后按 stem 归组去重。
+  # 只认这六种后缀；目录里的其他文件不计组、不删除。
   # 去重保留首次出现，即取每组最新的 mtime（.dump 由 pg_dump 新写入，时间可靠；
   # .runtime 由 cp -a 保留源目录时间，可能偏旧，因此不能单独作为排序依据）。
   # 较长的后缀必须写在前面，否则 foo.dump.partial 会被先剪成 foo.partial。
   stems="$(find "$BACKUP_ROOT" -maxdepth 1 -mindepth 1 -printf '%T@\t%f\n' 2>/dev/null \
     | sort -rn \
     | cut -f2- \
-    | sed -E 's/\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$//' \
-    | awk 'NF && !seen[$0]++')"
+    | awk '
+        /\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/ {
+          sub(/\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/, "")
+          if ($0 != "" && !seen[$0]++) print
+        }
+      ')"
 
   any_ok=0
   for ok_file in "$BACKUP_ROOT"/*.ok; do
@@ -469,38 +524,9 @@ cleanup_backup_partials() {
     rm -rf -- "$RUNTIME_PARTIAL"
   fi
 }
-# 同一个处理函数覆盖整个发布，不在中途 trap - 清掉 HUP/INT/TERM。
-# backup：删 partial 后退出。restore：与 ERR 一样走 restore_runtime_and_exit。
-# committed：健康检查已通过，不再回退运行目录。
-# 这里只挂 HUP/INT/TERM，不碰 EXIT（3b 清 .env 临时文件的 EXIT trap 必须留着）。
-# 信号退出码是 128+信号号。处理过程中忽略后续信号，只为避免重入。
+# 陷阱在脚本开头就挂上了，这里不重新 trap，避免把 PIPE 弄丢，也不碰 EXIT。
+# 从这一行起进入 backup：中断只删 partial，不以回退运行目录的方式处理。
 release_signal_phase=backup
-on_release_signal() {
-  local sig_name="$1" sig_num=15
-  case "$sig_name" in
-    HUP) sig_num=1 ;;
-    INT) sig_num=2 ;;
-    TERM) sig_num=15 ;;
-  esac
-  trap '' HUP INT TERM
-  trap - ERR
-  case "${release_signal_phase:-backup}" in
-    restore)
-      restore_runtime_and_exit "发布被 ${sig_name} 中断" "$((128 + sig_num))"
-      ;;
-    committed)
-      exit "$((128 + sig_num))"
-      ;;
-    *)
-      cleanup_backup_partials
-      echo "::error::备份被中断，已删除不完整文件" >&2
-      exit "$((128 + sig_num))"
-      ;;
-  esac
-}
-trap 'on_release_signal HUP' HUP
-trap 'on_release_signal INT' INT
-trap 'on_release_signal TERM' TERM
 rm -f -- "$DUMP_PARTIAL"
 if ! pg_dump "$DBURL" -Fc -f "$DUMP_PARTIAL"; then
   cleanup_backup_partials
@@ -549,6 +575,8 @@ check_ready() {
 
 restore_runtime_and_exit() {
   local reason="$1" exit_code="${2:-1}" rollback_version ok=false
+  # 回退不可重入：再来的 HUP/INT/TERM/PIPE 直接忽略，set +e 避免中途命令失败把回退打断。
+  trap '' HUP INT TERM PIPE
   trap - ERR
   set +e
   echo "::error::${reason}；开始把运行目录恢复到发布前备份（数据库迁移不回退）。" >&2
@@ -683,8 +711,9 @@ pm2 restart "$PM2_NAME" --update-env
 for _ in $(seq 1 "$HEALTH_ATTEMPTS"); do
   if check_ready; then
     echo "API readiness OK: $HEALTH_URL"
-    # 新版本已就绪：之后写发布指针或清理备份失败都只告警，不能把一个健康的版本回退掉。
-    # 信号同样不再回退；EXIT trap 不动。
+    # 新版本已就绪。先忽略 HUP/INT/TERM/PIPE，再写发布指针和 .ok。
+    # 这段期间来的信号不回退，也不打断这两份元数据。EXIT trap 不动。
+    trap '' HUP INT TERM PIPE
     release_signal_phase=committed
     trap - ERR
     echo "=== 8. 写 DEPLOY_SOURCE（就绪检查通过后，不含秘密） ==="
@@ -702,7 +731,7 @@ EOF
     echo "=== 9. 发布成功，清理历史备份 ==="
     # 健康检查已通过。成功标记让以后的清理留住这一组，即使 keep=1 且后面又有失败发布。
     if ! printf 'ok\n' > "$BACKUP_PREFIX.ok"; then
-      echo "::warning::本次备份的成功标记没有写上，清理时不会把它当成最近一次成功发布。" >&2
+      echo "::warning::本次备份的成功标记没有写上，清理时不会把它当成最近一次成功发布前的快照（回退锚点）。" >&2
     fi
     # 清理失败不影响本次发布结果（发布已经成功），只记 warning。
     prune_old_backups || echo "::warning::备份清理失败，已跳过（不影响本次发布）"

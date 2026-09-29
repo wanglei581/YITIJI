@@ -39,6 +39,12 @@ on:
         type: boolean
         default: true
 
+# 与生产发布共用并发组：发布正在写备份时，清理在队列里等，不并发删。
+# 不取消进行中的发布或清理。cleanup-stale-releases.yml 需要同样的组，由另一路改。
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   cleanup:
     name: Reclaim disk space
@@ -86,11 +92,17 @@ jobs:
                 fi
                 ;;
             esac
+            # 只认 .dump / .runtime / .migrations.log / .dump.partial / .runtime.partial / .ok。
+            # 其他文件不计组、不尝试删除。
             STEMS="$(find "$BK" -maxdepth 1 -mindepth 1 -printf '%T@\t%p\n' \
                      | sort -rn \
                      | sed 's#.*/##' \
-                     | sed -E 's/\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$//' \
-                     | awk '!seen[$0]++')"
+                     | awk '
+                         /\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/ {
+                           sub(/\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/, "")
+                           if ($0 != "" && !seen[$0]++) print
+                         }
+                       ')"
             TOTAL="$(echo "$STEMS" | grep -c . || true)"
             echo "RELEASE_GROUP_COUNT=$TOTAL"
 
@@ -160,7 +172,7 @@ jobs:
               MARK=""
               if [ -f "$BK/$stem.dump" ] && [ -d "$BK/$stem.runtime" ]; then
                 if [ "$stem" = "$OK_ANCHOR" ]; then
-                  MARK="最近一次成功发布"
+                  MARK="最近一次成功发布前的快照（回退锚点）"
                 fi
               else
                 MARK="不完整"
@@ -180,7 +192,7 @@ jobs:
               if [ "$DEL_COUNT" -eq 0 ]; then
                 echo "备份份数未超过保留数，无需删除"
               else
-                echo "=== 执行删除（保留最近一次成功发布，且至少留一组完整备份）==="
+                echo "=== 执行删除（保留最近一次成功发布前的快照（回退锚点），且至少留一组完整备份）==="
                 for stem in $DEL_LIST; do
                   # 双重保险：跳过保留名单中的任何 stem
                   case " $KEEP_LIST " in *" $stem "*) echo "  跳过（在保留名单）"; continue;; esac
