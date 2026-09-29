@@ -19,6 +19,7 @@ import {
   type MaterialCheckSummary,
   type PrintFileState,
 } from './printMaterialSession'
+import { ENCRYPTED_PDF_BLOCK_COPY, inspectionSignalsEncrypted } from './components/printPreviewKind'
 import {
   clearPrintHandoff,
   patchPrintHandoff,
@@ -254,6 +255,8 @@ export function PrintMaterialCheckPage({
   const [piiTask, setPiiTask] = useState<DocumentProcessTaskView | null>(null)
   const [decisions, setDecisions] = useState<Record<string, PiiFindingAction>>({})
   const [error, setError] = useState<string | null>(null)
+  const [encryptedByPreview, setEncryptedByPreview] = useState(false)
+  useEffect(() => { setEncryptedByPreview(false) }, [file?.fileId])
 
   const findings = piiTask?.piiFindings ?? []
   const allDecided = findings.every((finding) => decisions[finding.id] === 'keep' || decisions[finding.id] === 'redact')
@@ -262,8 +265,10 @@ export function PrintMaterialCheckPage({
   const requiresFormatReview = inspectionSummary?.canPrint === false
   const piiModeCopy = useMemo(() => piiScanModeCopy(piiTask), [piiTask])
   const piiScanIncomplete = piiModeCopy?.tone === 'warning'
-  const canContinue = stage === 'review' && allDecided && !requiresFormatReview && !piiScanIncomplete
-  const canManualAck = stage === 'review' && allDecided && !requiresFormatReview && piiScanIncomplete
+  const encryptedByCode = inspectionSignalsEncrypted(inspectionSummary?.messages.map((message) => message.code) ?? [])
+  const encryptedPdf = encryptedByPreview || encryptedByCode
+  const canContinue = stage === 'review' && allDecided && !requiresFormatReview && !piiScanIncomplete && !encryptedPdf
+  const canManualAck = stage === 'review' && allDecided && !requiresFormatReview && piiScanIncomplete && !encryptedPdf
     && Boolean(file?.fileId && inspectionTask && piiTask)
   const isWorking = stage === 'inspection' || stage === 'normalize_a4' || stage === 'pii_scan' || stage === 'submitting'
   useBusyLock(isWorking)
@@ -615,7 +620,9 @@ export function PrintMaterialCheckPage({
 
   const allFindingsDecided = findings.length === 0 || allDecided
   const submitFailed = stage === 'review' && error !== null
-  const status = stage === 'error'
+  const status = encryptedPdf
+    ? { tone: 'bad' as const, label: '这份 PDF 打不开' }
+    : stage === 'error'
     ? { tone: 'bad' as const, label: '材料检查失败 · 结果未知' }
     : submitFailed
       ? { tone: 'bad' as const, label: '遮挡处理未完成 · 请重试' }
@@ -642,7 +649,9 @@ export function PrintMaterialCheckPage({
         <PrintDeskFooter step="check" onBack={() => navigate(uploadPath)}>
           <button className="qx-btn" data-variant="ghost" type="button" disabled={isWorking} onClick={() => navigate(uploadPath)}>返回选文件</button>
           <p className="why">
-            {stage === 'error'
+            {encryptedPdf
+              ? ENCRYPTED_PDF_BLOCK_COPY
+              : stage === 'error'
               ? '检查结果未知，隐私预检不可跳过。请重试或返回重新选择文件。'
               : isWorking
                 ? stage === 'submitting'
@@ -664,10 +673,12 @@ export function PrintMaterialCheckPage({
             className="qx-btn"
             data-variant="primary"
             type="button"
-            disabled={!(canContinue || canManualAck)}
-            onClick={() => void handleContinue()}
+            disabled={encryptedPdf ? isWorking : !(canContinue || canManualAck)}
+            onClick={() => { if (encryptedPdf) { navigate(uploadPath); return } void handleContinue() }}
           >
-            {stage === 'submitting'
+            {encryptedPdf
+              ? '重新选择文件'
+              : stage === 'submitting'
               ? (piiScanIncomplete ? '正在继续…' : '保存选择中…')
               : requiresFormatReview
                 ? '请重新上传文件'
@@ -679,8 +690,8 @@ export function PrintMaterialCheckPage({
       )}
     >
       <PrintDeskGuide step={2}
-        title={stage === 'error' ? <>检查<em>没做成</em>。</> : isWorking ? <>正在<em>读这份文件</em>。</> : findings.length > 0 ? <>有 {findings.length} 处<em>要你拿主意</em>。</> : <>先<em>看清楚</em>再出纸。</>}
-        detail={stage === 'error' ? '请重试检查，或返回选择其他文件。' : '检查格式、页数和个人信息，逐项确认后再设打印参数。'}
+        title={encryptedPdf ? <>这份 PDF <em>打不开</em>。</> : stage === 'error' ? <>检查<em>没做成</em>。</> : isWorking ? <>正在<em>读这份文件</em>。</> : findings.length > 0 ? <>有 {findings.length} 处<em>要你拿主意</em>。</> : <>先<em>看清楚</em>再出纸。</>}
+        detail={encryptedPdf ? ENCRYPTED_PDF_BLOCK_COPY : stage === 'error' ? '请重试检查，或返回选择其他文件。' : '检查格式、页数和个人信息，逐项确认后再设打印参数。'}
       />
       <div className="qpd-check-page">
         <div className="qpd-check-intro" data-feature="文件预检">
@@ -702,7 +713,9 @@ export function PrintMaterialCheckPage({
             canNormalize: normalizeSummary.canNormalize,
             messages: normalizeSummary.messages.map((message) => message.text),
           } : null}
-          privacyModeWarning={piiScanIncomplete ? piiModeCopy?.label ?? null : null}
+          privacyModeWarning={encryptedPdf ? ENCRYPTED_PDF_BLOCK_COPY : piiScanIncomplete ? piiModeCopy?.label ?? null : null}
+          encryptedPdf={encryptedPdf}
+          onEncryptedPdf={() => setEncryptedByPreview(true)}
           privacyModeNotice={piiModeCopy && !piiScanIncomplete ? piiModeCopy.label : null}
           demoMode={isDemoTask(inspectionTask) || isDemoTask(piiTask)}
           findings={presentationFindings}

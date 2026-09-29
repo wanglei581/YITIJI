@@ -4,7 +4,7 @@ import { FileContentPreview } from '../../../components/FileContentPreview'
 import { PdfPreviewFrame } from '../PdfPreviewFrame'
 import { isWordDocument, useDocumentConversionCapabilities, WORD_CONVERSION_DISCLOSURE } from '../../../services/api/documentConversion'
 import type { PrintFileState as PrintFile } from '../printMaterialSession'
-import { previewKindForFile } from './printPreviewKind'
+import { ENCRYPTED_PDF_BLOCK_COPY, previewKindForFile } from './printPreviewKind'
 import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/fileName'
 import '../styles/print-desk-qx.css'
 
@@ -36,24 +36,27 @@ export function PrintFilePreviewModal({ file, token, onClose }: {
   )
 }
 
-export function FilePreviewPanel({ file, token, caption, children }: {
+export function FilePreviewPanel({ file, token, caption, children, onEncrypted }: {
   file: PrintFile
   token: string | null
   caption?: string
   children?: ReactNode
+  /** 预览发现打开密码时通知材料检查页，拦住下一步。 */
+  onEncrypted?: () => void
 }) {
   const { capabilities } = useDocumentConversionCapabilities()
   const previewKind = previewKindForFile(file)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [pageCount, setPageCount] = useState<number | null>(null)
-  useEffect(() => { setPage(1); setPageCount(null); setPreviewOpen(false) }, [file.fileId, file.fileUrl])
+  const [encrypted, setEncrypted] = useState(false)
+  useEffect(() => { setPage(1); setPageCount(null); setPreviewOpen(false); setEncrypted(false) }, [file.fileId, file.fileUrl])
 
   return (
     <>
       <div className="qpd-preview-shell">
         {previewKind === 'pdf' && file.fileUrl ? (
-          <PdfPreviewFrame className="max-h-full" title={`${file.name} 预览`} src={file.fileUrl} page={page} onPageChange={setPage} onReady={({ pageCount: count }) => setPageCount(count)} />
+          <PdfPreviewFrame className="max-h-full" title={`${file.name} 预览`} src={file.fileUrl} page={page} onPageChange={setPage} onReady={({ pageCount: count }) => setPageCount(count)} passwordMessage={ENCRYPTED_PDF_BLOCK_COPY} onPasswordRequired={() => { setEncrypted(true); onEncrypted?.() }} />
         ) : null}
         {previewKind === 'image' ? <img className="max-h-full" src={file.fileUrl} alt={`${file.name} 预览`} onLoad={() => setPageCount(1)} /> : null}
         {previewKind === 'word' && capabilities.wordToPdf ? (
@@ -70,7 +73,7 @@ export function FilePreviewPanel({ file, token, caption, children }: {
       </div>
       <p className="qpd-preview-caption">{pageCount === null ? '页码以预览显示为准' : `第 ${page} 页 / 共 ${pageCount} 页`}{caption ? ` · 出纸示意：${caption}` : ''}</p>
       <div className="qpd-preview-meta" aria-label="当前文件">
-        <strong>{file.name}</strong><span>{file.size} · {file.pages === null ? '页数待识别' : `${file.pages} 页`}</span>
+        <strong>{file.name}</strong><span>{file.size} · {encrypted ? '打不开' : file.pages === null ? '页数待识别' : `${file.pages} 页`}</span>
         {children}
       </div>
       <button className="qx-btn qpd-open-preview" data-variant="primary" type="button" onClick={() => setPreviewOpen(true)}><EyeIcon aria-hidden="true" />打开完整预览 · 逐页看清</button>

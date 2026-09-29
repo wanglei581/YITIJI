@@ -44,6 +44,9 @@ export interface MaterialCheckPresentationProps {
   findings: readonly MaterialFindingPresentation[]
   requiresFormatReview: boolean
   isWorking: boolean
+  /** 预览认出打开密码。为真时不再把「重新检查」当成出路。 */
+  encryptedPdf?: boolean
+  onEncryptedPdf?: () => void
   onRetry: () => void
   onBack: () => void
   onApplySuggested: () => void
@@ -112,7 +115,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
   return (
     <div className="qpd-check-grid" data-w2-page="print-material-check" data-qx-state={props.stage}>
       <aside className="qpd-check-left">
-        <FilePreviewPanel file={props.file} token={props.token} />
+        <FilePreviewPanel file={props.file} token={props.token} onEncrypted={props.onEncryptedPdf} />
         <section className="qpd-options-note">
           <h3>两个选项分别是什么意思</h3>
           <p><b>保留：</b>这一处原样印在纸上。</p>
@@ -170,7 +173,9 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
               <div>
                 <h2>{props.privacyModeWarning ?? props.privacyModeNotice ?? (props.findings.length > 0 ? `发现 ${props.findings.length} 个需确认片段` : '检查完成，请自行再核对')}</h2>
                 <p>
-                  {props.privacyModeWarning
+                  {props.encryptedPdf
+                    ? '预览打不开，也不能按这一份继续。请去掉密码后重新选择文件。'
+                    : props.privacyModeWarning
                     ? '扫描结果不完整，页面不会把它说成“没有隐私信息”。'
                     : props.privacyModeNotice
                       ? '本次没有做内容扫描，页面不会把它说成“没有隐私信息”，请结合预览自行确认。'
@@ -182,7 +187,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
               {props.demoMode ? <span>流程演示</span> : null}
             </section> : null}
 
-            {props.privacyModeWarning ? (
+            {props.privacyModeWarning && !props.encryptedPdf ? (
               <button className="qx-btn qpd-retry-scan" data-variant="danger" type="button" onClick={props.onRetry}>
                 重新检查隐私内容
               </button>

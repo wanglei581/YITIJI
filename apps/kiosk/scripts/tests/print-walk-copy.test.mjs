@@ -33,9 +33,17 @@ const progressUrl = transpile(join(kioskRoot, 'src/pages/print/printProgressMode
 })
 const paymentUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/paymentCopy.ts'))
 
+const conversionStub = toDataUrl('export function isWordDocument() { return false }')
+const previewKindUrl = transpile(join(kioskRoot, 'src/pages/print/components/printPreviewKind.ts'), {
+  '../../../services/api/documentConversion': conversionStub,
+})
+
 const progress = await import(progressUrl)
 const payment = await import(paymentUrl)
+const previewKind = await import(previewKindUrl)
 const progressPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintProgressPage.tsx'), 'utf8')
+const materialPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintMaterialCheckPage.tsx'), 'utf8')
+const previewCanvas = readFileSync(join(kioskRoot, 'src/components/PdfCanvasPreview.tsx'), 'utf8')
 
 test('publicOrderNo 只接受 ORD- 号', () => {
   for (const fn of [progress.publicOrderNo, payment.publicOrderNo]) {
@@ -143,6 +151,7 @@ test('0 元实付写免费试运营，其余仍标未记录且不推算', () => 
 })
 
 const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
+const ENCRYPTED_COPY = '这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传'
 
 test('W-91 出纸中长时间没有新状态就换掉正在出纸', () => {
   assert.equal(progress.PRINT_PROGRESS_QUIET_MS, 45_000)
@@ -171,4 +180,19 @@ test('W-88 已知失败不再说排队', () => {
   assert.match(progressPage, /重新打印/)
   assert.match(progressPage, /联系工作人员/)
   assert.match(progressPage, /data-testid="print-progress-failure"/)
+})
+
+test('W-93 加密 PDF 说明原因并重新选择，页数未识别本身不算加密', () => {
+  assert.equal(previewKind.ENCRYPTED_PDF_BLOCK_COPY, ENCRYPTED_COPY)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['PDF_PAGE_COUNT_NOT_DETECTED']), false)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['SOURCE_FILE_BYTES_UNAVAILABLE']), false)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['PDF_ENCRYPTED']), true)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['encrypted']), true)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['PII_REDACT_ENCRYPTED']), true)
+  assert.match(materialPage, /ENCRYPTED_PDF_BLOCK_COPY/)
+  assert.match(materialPage, /!encryptedPdf/)
+  assert.match(materialPage, /重新选择文件/)
+  assert.match(materialPage, /onEncryptedPdf/)
+  assert.match(previewCanvas, /onPasswordRequired/)
+  assert.match(previewCanvas, /setPasswordBlocked\(true\)/)
 })
