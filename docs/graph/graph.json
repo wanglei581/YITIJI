@@ -21774,7 +21774,7 @@
     "services/api/prisma/migrations/20260925143000_add_terminal_area_geo/migration.sql": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
-    "services/api/prisma/migrations/20260929200000_ai_usage_retention_summary/migration.sql": [
+    "services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
       "services/api/scripts/verify-ai-usage-retention.ts"
     ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
@@ -21823,7 +21823,7 @@
     "services/api/prisma/postgres/migrations/20260925143000_add_terminal_area_geo/migration.sql": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
-    "services/api/prisma/postgres/migrations/20260929200000_ai_usage_retention_summary/migration.sql": [
+    "services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
       "services/api/scripts/verify-ai-usage-retention.ts"
     ],
     "services/api/prisma/postgres/schema.prisma": [
@@ -32868,8 +32868,8 @@
           "docs/compliance/member-personal-data-retention.md",
           "docs/progress/current-progress.md",
           "packages/shared/src/types/memberPrivacy.ts",
-          "services/api/prisma/migrations/20260929200000_ai_usage_retention_summary/migration.sql",
-          "services/api/prisma/postgres/migrations/20260929200000_ai_usage_retention_summary/migration.sql",
+          "services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql",
+          "services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql",
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
           "services/api/scripts/support/isolated-verification-database.ts",

@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-09-29：AI 用量账到期自动清理、按月汇总、纳入会员导出（分支 `claude/backend-hardening-20260929-ai-usage-retention`）
+
+- **做了什么（Grok 实现、协调方审，产品负责人 9/29 拍板）：** `AiUsageRecord` 接进每小时清理任务，保留期与 `AiServiceLog` 同读 `AI_SERVICE_LOG_RETENTION_DAYS`（默认 90 天）；删除前先把即将删除的行按北京时间月份、功能、厂商、型号、结局汇总进新表 `AiUsageMonthlySummary`（两套迁移 `20260929230000_ai_usage_retention_summary`），只存次数、已计量金额与未计量次数，**不存会员、终端、机构**，长期保留；汇总与打标同一事务，重复跑结果不变。会员数据导出加 `aiUsage` 段（本人的功能、时间、状态、金额）；注销处置定为置空（`detachMemberAiUsageRecords`，等注销执行器接入）。留存矩阵与数据清单同步。
+- **验证：** 新门禁 `verify:ai-usage-retention` 66 条（CI SQLite 与 postgres-readiness）；Grok 6 处、协调方抽 1 处（每小时任务不清用量账）变异全红；ai-usage-budget、ai-user-text-retention、member-data-export / request-contract / retention、recruitment-p1-schema 等 10 条与 PG schema 同步校验全绿。法务草稿里「到期自动清理」那句，本 PR 合入后即可发布。
+
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
 - **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。
