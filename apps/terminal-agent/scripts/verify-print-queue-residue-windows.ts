@@ -329,6 +329,10 @@ $ErrorActionPreference = 'Stop'
 cmd /c "net user ${USER_NAME} /delete" | Out-Null
 cmd /c "net user ${USER_NAME} %AIJOB_RESIDUE_PW% /add"
 if ($LASTEXITCODE -ne 0) { throw 'local user was not created' }
+# 普通账号没有「作为批处理作业登录」权限，计划任务替它登录不了，Last Result 停在 0x41303（从未运行）。
+# 一次性 runner 上的临时账号加进管理员组拿到这项权限；任务仍按 /RL LIMITED 的受限令牌运行。
+cmd /c "net localgroup Administrators ${USER_NAME} /add"
+if ($LASTEXITCODE -ne 0) { throw 'local user was not added to Administrators' }
 # 任务可能还不存在。Windows PowerShell 5.1 在 Stop 模式下会把被 2> 重定向的原生 stderr 当成异常，所以交给 cmd 吞掉。
 cmd /c "schtasks /Delete /TN ${TASK_NAME} /F >nul 2>&1"
 # schtasks /RU 不认 .\\用户名（No mapping between account names and security IDs），要写机器名\\用户名。
