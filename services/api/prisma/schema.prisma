@@ -1970,12 +1970,35 @@ model AiUsageRecord {
   orgId            String?
   endUserId        String?
   endUser          EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  /// 到期清理前已滚进月汇总的时间。空 = 还没汇总；未到期的行保持为空。
+  summarizedAt     DateTime?
 
   @@index([dayKey])
   @@index([dayKey, terminalId])
   @@index([dayKey, endUserId])
   @@index([orgId, dayKey])
   @@index([endUserId])
+  @@index([createdAt])
+}
+
+/// 按月费用汇总。只有金额和次数，不含会员、终端、机构或任何用户文本。
+/// 长期保留，不随明细到期删除。只汇总即将被删、且还没汇总过的 AiUsageRecord。
+/// model 用空字符串而不是 NULL，否则唯一索引在 SQLite 与 PostgreSQL 上都不把多行 NULL 收成同一键。
+model AiUsageMonthlySummary {
+  id               String   @id @default(cuid())
+  /// 北京时间 YYYY-MM
+  monthKey         String
+  featureKey       String
+  vendor           String
+  /// 空字符串 = 当时没取到型号。不用 NULL：两边的唯一索引都不把多个 NULL 当成同一键，重跑会插出多行。
+  model            String   @default("")
+  status           String
+  callCount        Int
+  measuredCostCny  Float    @default(0)
+  unmeasuredCount  Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  @@unique([monthKey, featureKey, vendor, model, status], map: "AiUsageMonthly_dims_key")
 }
 
 model UserAiConsent {

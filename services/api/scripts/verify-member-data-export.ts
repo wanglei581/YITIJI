@@ -69,6 +69,8 @@ const COLLECTION_MODELS = [
   'feedbackTicket',
   'userAiConsent',
   'userDataRequest',
+  // AI 用量明细。加进导出就必须同时加进本清单，否则假 prisma 上没有这个委托。
+  'aiUsageRecord',
 ] as const
 
 function date(day: number): Date {
@@ -116,6 +118,11 @@ function dualUserFixtures(): FixtureStore {
     userAiConsent: [],
     userDataRequest: [
       { ...base('request-one', 'member-one'), requestType: 'export', status: 'pending', executionStep: null, exportExpiresAt: null, downloadConsumedAt: null, failureCode: null, requestedAt: date(3), handledAt: null, auditRef: 'secret' },
+    ],
+    aiUsageRecord: [
+      { ...base('usage-one', 'member-one'), featureKey: 'resume_optimize', status: 'ok', costCny: 1.25, createdAt: date(5), terminalId: 'TERMINAL_SECRET', orgId: 'ORG_SECRET', model: 'deepseek-v4-flash', vendor: 'deepseek', promptTokens: 12345 },
+      { ...base('usage-unmeasured', 'member-one'), featureKey: 'resume_optimize', status: 'timeout', costCny: null, createdAt: date(4), terminalId: 'TERMINAL_SECRET', orgId: 'ORG_SECRET' },
+      { ...base('usage-other', 'member-two'), featureKey: 'OTHER_MEMBER_SECRET', status: 'ok', costCny: 9, createdAt: date(5) },
     ],
   }
 }
@@ -321,7 +328,7 @@ async function verifyDualUserIsolation(): Promise<void> {
   const envelope = await mapper.build({ endUserId: 'member-one', requestId: 'request-one', generatedAt: date(17) })
   const serialized = JSON.stringify(envelope)
   assert.match(serialized, /目标会员/)
-  assert.doesNotMatch(serialized, /member-two|OTHER_MEMBER_SECRET/)
+  assert.doesNotMatch(serialized, /member-two|OTHER_MEMBER_SECRET|TERMINAL_SECRET|ORG_SECRET/)
   assert.deepEqual(envelope.sections.aiRecords.jobSessions, [])
   assert.deepEqual(envelope.sections.aiRecords.mockInterviews, [])
   assert.equal(calls.length, COLLECTION_MODELS.length + 1)
@@ -338,9 +345,17 @@ async function verifyWhitelistEnvelope(): Promise<void> {
   assert.equal(envelope.generatedAt, date(17).toISOString())
   assert.equal(envelope.requestId, 'request-one')
   assert.deepEqual(Object.keys(envelope.sections), [
-    'account', 'files', 'aiRecords', 'printOrders', 'favorites', 'jobApplications', 'benefits',
+    'account', 'files', 'aiRecords', 'aiUsage', 'printOrders', 'favorites', 'jobApplications', 'benefits',
     'activity', 'notifications', 'feedback', 'consents', 'requests',
   ])
+  const usageCall = calls.find((call) => call.model === 'aiUsageRecord')
+  assert.ok(usageCall, '导出必须查询本人 AI 用量')
+  assert.deepEqual(Object.keys(usageCall!.select).sort(), ['costCny', 'createdAt', 'featureKey', 'status'])
+  const usage = envelope.sections.aiUsage
+  assert.equal(usage.length, 2)
+  assert.ok(usage.some((row) => row['costCny'] === 1.25))
+  assert.ok(usage.some((row) => row['costCny'] === null), '取不到用量的金额保持为空，不写成 0')
+  assert.ok(usage.every((row) => Object.keys(row).sort().join(',') === 'costCny,createdAt,featureKey,status'))
   assertNoSensitiveExportData(envelope)
   for (const call of calls) {
     assert.ok(call.select && Object.keys(call.select).length > 0, `${call.model} 必须显式 select`)
