@@ -554,6 +554,23 @@ check(/short:\s*'暂时取不到'/.test(copyBlock), '源查询失败显示「暂
 check(/数据量超出统计上限，显示不全/.test(copyBlock), '统计行数超上限如实写「数据量超出统计上限，显示不全」')
 check(!/接入前不显示/.test(twinBoard), '单台孪生不再写服务人次接入前不显示')
 check(/少于 5/.test(twinBoard) && /暂时取不到/.test(twinBoard), '单台孪生说明里写明少于 5 与暂时取不到')
+check(
+  govGrid.includes('近 14 个上海自然日，只统计已经出纸的任务：页数按打印页数乘以份数，记在出纸完成的那一天。')
+    && govGrid.includes('付了款但没出纸的不算')
+    && govGrid.includes('「今日」是今天 0 点到明天 0 点已经出纸的页数。')
+    && twinBoard.includes('今日打印页数只统计这台机器今天已经出纸的页数（打印页数乘以份数，按出纸完成时间，上海自然日）')
+    && twinBoard.includes('打印页数、打印任务、扫描、打印失败大于 0 且少于 5 时只显示「少于 5」')
+    && twinBoard.includes('服务人次是今天在这台机器上开始的使用次数。')
+    && twinBoard.includes('1 到 4 次显示「少于 5」，取不到时显示「暂时取不到」')
+    && govGrid.includes('乘以份数')
+    && govGrid.includes('出纸')
+    && twinBoard.includes('乘以份数')
+    && twinBoard.includes('出纸')
+    && !govGrid.includes('不乘份数')
+    && !govGrid.includes('已支付打印订单的内容页')
+    && !twinBoard.includes('已支付订单页数'),
+  '政务版趋势与单台今日说明都在，且都写明乘以份数、按出纸计',
+)
 for (const [name, source] of [
   ['管理员服务调用', adminUsage],
   ['机构信息使用', partnerUsage],

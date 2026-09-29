@@ -190,7 +190,7 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
       </TwinSlot>
 
       <TwinSlot slot="r2">
-        <TwinPanel title="今日服务" sub="本机 · 上海自然日" source="已支付订单页数（按支付时间）、今日创建的打印与扫描任务、今日失败次数。一台机器的计数少于 5 时只显示「少于 5」。服务人次是本机今日一体机会话数，不是人数；1 到 4 次显示「少于 5」，取不到时显示「暂时取不到」。">
+        <TwinPanel title="今日服务" sub="本机 · 上海自然日" source="今日打印页数只统计这台机器今天已经出纸的页数（打印页数乘以份数，按出纸完成时间，上海自然日）。打印任务、扫描按今天新建的次数计，打印失败按今天发生的失败次数计。打印页数、打印任务、扫描、打印失败大于 0 且少于 5 时只显示「少于 5」。服务人次是今天在这台机器上开始的使用次数。1 到 4 次显示「少于 5」，取不到时显示「暂时取不到」。">
           <TwinTiles
             items={[
               { value: smallCount(twin.today.printPages), unit: '页', label: '打印页数' },

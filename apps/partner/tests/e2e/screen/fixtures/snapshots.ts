@@ -153,7 +153,11 @@ function snapshotWith(fleet: ScreenFleetWallValue): ScreenSnapshot {
       printInProgress: na('PrintTask', 'current', MISSING_ORG),
       printFailedToday: na('PrintTask', 'current', MISSING_ORG),
       printPagesCumulative: na('Order', 'current', MISSING_ORG),
-      printTrend14d: na('Order', 'current', MISSING_ORG),
+      printTrend14d: na(
+        'PrintTask.completedAt(completed|printOutcome=printed) × copies; OrderItem/Order.billablePages',
+        'current',
+        MISSING_ORG,
+      ),
       taskFlow24h: na('PrintTask/ScanTask', 'current', MISSING_ORG),
       aiCallsCumulative: na('AiServiceLog', 'current', MISSING_ORG),
       aiBreakdown24h: na('AiServiceLog', 'current', MISSING_ORG),
