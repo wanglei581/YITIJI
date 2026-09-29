@@ -1012,8 +1012,9 @@ expectMatches(
   /label:\s*'本次产物',\s*value:\s*'打印件',\s*fileId:\s*file\.fileId\s*\?\?\s*''/,
   '确认页末格展示「打印件」，文件号仍取自 file.fileId',
 )
+// 2026-09-29：核对区（Review）随小件一起拆到 PrintConfirmParts.tsx（PrintConfirmView 超 600 行）。
 expectMatches(
-  read('src/pages/print/components/PrintConfirmView.tsx'),
+  read('src/pages/print/components/PrintConfirmParts.tsx'),
   /data-file-id=\{row\.fileId\}/,
   '确认页把文件号写在 data-file-id，不写进可见文案',
 )

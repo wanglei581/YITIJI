@@ -98,10 +98,11 @@ function ProfileContent() {
   const headerPhoneMasked = accountPhoneDisplay(user?.phoneMasked ?? displayName)
   const goLogin = () => navigate('/login', { state: { from: location.pathname } })
   // 「本次记录」里的条目只有文件名和大小，没有可打印的文件凭证（全仓也没有页面往这里传记录）。
-  // 打印交接只收带文件编号和打印链接的文件（商用收口 P0-5），所以这里如实回到选文件，不造一份空交接。
+  // 打印交接只收带文件编号和打印链接的文件（商用收口 P0-5），所以不造一份空交接：
+  // 打印台没有交接就落「这一页没有待处理的文件」，按钮带用户去选文件。
   const printFile = (file: { name: string; size: string; pages?: number }) => {
     void file
-    navigate('/print/upload?source=document')
+    navigate('/print/preview')
   }
 
   const uiState = deriveProfileState({

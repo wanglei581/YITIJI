@@ -269,12 +269,18 @@ export function PrintConfirmPage() {
   const summaryRows = [
     { label: '纸张规格', value: params.paperSize === 'A4' ? 'A4（210 × 297 mm）' : params.paperSize },
     { label: '页面方向', value: ORIENTATION_LABEL[params.orientation] ?? params.orientation },
-    colorAdjusted
-      ? { label: '色彩模式', value: '彩色本机暂未开通，', off: true, note: '已按黑白报价' }
-      : { label: '色彩模式', value: COLOR_MODE_LABEL[params.colorMode] ?? params.colorMode },
-    duplexAdjusted
-      ? { label: '单双面', value: '双面本机暂未开通，', off: true, note: '已按单面报价' }
-      : { label: '单双面', value: DUPLEX_LABEL[params.duplex] ?? params.duplex },
+    {
+      label: '色彩模式',
+      value: colorAdjusted ? '彩色本机暂未开通，' : COLOR_MODE_LABEL[params.colorMode] ?? params.colorMode,
+      off: colorAdjusted,
+      note: colorAdjusted ? '已按黑白报价' : undefined,
+    },
+    {
+      label: '单双面',
+      value: duplexAdjusted ? '双面本机暂未开通，' : DUPLEX_LABEL[params.duplex] ?? params.duplex,
+      off: duplexAdjusted,
+      note: duplexAdjusted ? '已按单面报价' : undefined,
+    },
     { label: '版式', value: `${params.pagesPerSheet} 版/页` },
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
     { label: '页面范围', value: !params.pageRange || params.pageRange === 'all' ? '全部页面' : params.pageRange },
