@@ -1,118 +1,154 @@
-/* 本机构官方渠道（/official-channels，next-tasks 3.14）。
- * 版式取稿 45 的目录行（.dw-plat）：图标字 · 名称与地址 · 右侧出口；出口从按钮换成可直接扫的二维码。
+/* 本机构官方渠道（/official-channels，next-tasks 3.14）· 青序流光 2.0 最终版稿 45。
  * 颜色只用 var(--qx-*)，选择器都以 .oc- 起头（或挂在 .oc-page 之下），不外溢到共享层。
  *
- * 1080×1920 定高舞台的余量（primitives.css .qx-grow 规则）：吸收余量的是整页容器 .dw-page.qx-grow，内容块都按内容高。
- *   · 有渠道：「还不确定先看什么」贴底（margin-top:auto），空白在说明条与它之间；渠道多时整页滚动，卡片一律不被压扁。
- *   · 没有渠道 / 读取失败：「可以先办这些」是紧凑行，空白留在行下面。 */
-.oc-page { --oc-qr: 200px; gap: 20px; }
-/* 渠道越少二维码越大：一张 320、两张 280、三张及以上 200（站着扫，280 在 27 寸竖屏上约 8.7 厘米见方）。 */
-.oc-page[data-density='comfortable'] { --oc-qr: 280px; }
-.oc-page[data-density='roomy'] { --oc-qr: 320px; }
-.oc-page > * { flex-shrink: 0; }
-.oc-assist { margin-top: auto; }
-/* 兜底去处（空态 / 失败态）：与招聘托管说明页（.rh-off-actions）同一套 qx-row、同一个行高——舞台上 128px。
- * 稿 45 的兜底去处用的是会平分余量的 .dw-exitlist，只有三项时每项被拉到 400 多像素，成了一张张空卡。 */
-.oc-alt-rows .qx-row { min-height: 128px; }
-.oc-alt-rows .qx-row-ic { color: var(--qx-teal-d); background: var(--qx-teal-soft); border-color: transparent; }
-/* 共享的 .dw-stripitem span 连标题外层的 .si-tx 也染成三级灰，标题看起来像被禁用；本页把标题拉回正文色。 */
-.oc-page .dw-stripitem .si-tx { color: var(--qx-ink); }
+ * 1080×1920 定高舞台的余量：内容块都按内容高，余高平均分到三处（稿 45 的 margin-top:auto）——
+ *   · 有渠道：三步说明→码卡、码卡→问小青、问小青→底部按钮；
+ *   · 没有渠道 / 读取失败 / 读取中：页头→状态块、状态块→可以先办这些、→问小青、→底部按钮。
+ *   渠道多时整页滚动，卡片一律不被压扁（内容一超出，auto 边距就归零）。 */
 
-.oc-list { display: flex; flex-direction: column; gap: 18px; margin: 0; padding: 0; list-style: none; }
-.oc-card {
-  display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: 0 24px;
-  padding: 24px 28px; border: 1px solid var(--qx-line); border-radius: 32px; background: var(--qx-surface);
-}
-.oc-card-ic {
-  width: 92px; height: 92px; border-radius: 27px;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--qx-serif); font-size: 36px; font-weight: 700;
-  color: var(--qx-teal-d); background: var(--qx-teal-soft);
-}
-.oc-card[data-channel-kind='legacy'] .oc-card-ic { color: var(--qx-slate-d); background: var(--qx-slate-soft); }
-.oc-card-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.oc-card-kicker { font-size: var(--qx-fs-aux); font-weight: 600; letter-spacing: 1px; color: var(--qx-ink-3); }
-.oc-card-name { margin: 0; font-size: var(--qx-fs-sec); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
-.oc-card-host { font-size: var(--qx-fs-body); color: var(--qx-ink-2); overflow-wrap: anywhere; }
-/* 来源说明放不下一行时只在「，」处断（keep-all：Chromium 实测不在汉字之间断），不把「为准」拆成孤字挂到下一行；
- * 前半句自己就放不下（手机、机构名很长）才由 anywhere 兜底。 */
-.oc-caption {
-  margin: 10px 0 0; padding-top: 12px; border-top: 1px dashed var(--qx-line-2);
-  font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); color: var(--qx-ink-2);
-  word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty;
-}
-.oc-qr { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.oc-qr-code svg { display: block; width: var(--oc-qr); height: var(--oc-qr); }
-.oc-qr-hint { display: inline-flex; align-items: center; gap: 8px; font-size: var(--qx-fs-aux); font-weight: 600; color: var(--qx-teal-d); }
-.oc-page .dw-sec-h .t { font-size: var(--qx-fs-sec); }
-.oc-page .dw-sec-h .no,
-.oc-page .dw-sec-h .hint { font-size: var(--qx-fs-aux-lg); }
-/* 共享 .dw-stripitem span 是 17px，低于 --qx-fs-aux。这一区提到辅助字以上。 */
-.oc-page .oc-assist .dw-stripitem b { font-size: var(--qx-fs-btn); }
-.oc-page .oc-assist .dw-stripitem .si-tx > span {
-  font-size: var(--qx-fs-aux-lg);
-  line-height: 1.4;
-  color: var(--qx-ink-2);
-}
-.oc-ask {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 96px;
-  padding: 12px 18px;
-  border: 1px solid var(--qx-line);
-  border-radius: 24px;
-  background: var(--qx-surface);
-}
-.oc-ask-ic {
-  flex: none;
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--qx-teal-d);
-  background: var(--qx-teal-soft);
-}
-.oc-ask-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.oc-page .oc-ask .qx-step-actions { min-height: 0; justify-content: flex-start; }
-.oc-page .oc-ask .qx-ai-help {
-  margin: 0;
-  padding: 0;
-  min-height: 48px;
-  width: 100%;
-  justify-content: flex-start;
-  text-align: left;
-  font-size: var(--qx-fs-btn);
-  font-weight: 700;
-}
-.oc-ask-desc { font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink-2); }
-.qx-stage:has(.oc-page) > .qx-ctabar {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding-top: 12px;
-  padding-bottom: 10px;
-}
-.oc-cta { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-.oc-cta-btns { display: flex; gap: 14px; }
-.oc-cta-btns .qx-btn { flex: 1; min-height: var(--qx-btn-h); }
-.oc-cta-btns .qx-btn[data-variant='primary'] { flex: 1.6; min-height: var(--qx-btn-h-lg); }
-.oc-privacy { margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
-.oc-privacy b { margin-right: 8px; color: var(--qx-ink); font-weight: 700; }
-.oc-steps { display: flex; gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
+/* 页头：标题、说明各占一行（稿 45 .taskhead 竖排），说明用正文色。 */
+.qx-stage:has(.oc-page) .qx-pagehead { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; margin-top: 16px; }
+.qx-stage:has(.oc-page) .qx-pagehead p { min-width: 0; line-height: 1.5; color: var(--qx-ink); }
+
+.oc-page { --oc-qr: 200px; gap: 20px; }
+/* 渠道越少二维码越大：两张 280、三张及以上 200（站着扫，280 在 27 寸竖屏上约 8.7 厘米见方）；一张照稿见下。 */
+.oc-page[data-density='comfortable'] { --oc-qr: 280px; }
+.oc-page > * { flex-shrink: 0; }
+.oc-push { margin-top: auto; }
+.oc-page::after { content: ''; flex: none; margin-top: auto; }
+
+.oc-steps { display: flex; gap: 14px; margin: 6px 0 0; padding: 0; list-style: none; }
 .oc-steps li {
   flex: 1; padding-top: 8px; border-top: 2px solid var(--qx-line);
   font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink);
 }
 .oc-steps b { display: block; margin-bottom: 4px; font-family: var(--qx-serif); font-size: var(--qx-fs-btn); color: var(--qx-teal-d); line-height: 1.2; }
-.oc-page[data-density='roomy'] { --oc-qr: 460px; }
-.oc-page[data-density='roomy'] .oc-card {
-  grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 28px 36px 32px;
+
+.oc-page .dw-sec-h .t { font-size: var(--qx-fs-sec); }
+.oc-page .dw-sec-h .no,
+.oc-page .dw-sec-h .hint { font-size: var(--qx-fs-aux-lg); }
+
+/* ── 渠道卡：多张时是目录行（图标字 · 名称与地址 · 右侧二维码），来源说明在名称下方 ── */
+.oc-list { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.oc-card {
+  display: grid; grid-template-columns: 92px minmax(0, 1fr) auto;
+  grid-template-areas: 'ic main qr' 'ic cap qr'; align-items: center; gap: 0 24px;
+  padding: 20px 28px; border: 1px solid var(--qx-line); border-radius: 32px; background: var(--qx-surface);
 }
-.oc-page[data-density='roomy'] .oc-card-main { align-items: center; }
-.oc-page[data-density='roomy'] .oc-card-ic { display: none; }
+.oc-card-ic {
+  grid-area: ic; width: 92px; height: 92px; border-radius: 27px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--qx-serif); font-size: 36px; font-weight: 700;
+  color: var(--qx-teal-d); background: var(--qx-teal-soft);
+}
+.oc-card[data-channel-kind='legacy'] .oc-card-ic { color: var(--qx-slate-d); background: var(--qx-slate-soft); }
+.oc-card-main { grid-area: main; align-self: end; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.oc-card-kicker { font-size: var(--qx-fs-aux); font-weight: 600; letter-spacing: 1px; color: var(--qx-ink-3); }
+.oc-card-name { margin: 0; font-size: var(--qx-fs-sec); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.oc-card-addr { font-size: var(--qx-fs-body); color: var(--qx-ink-2); overflow-wrap: anywhere; }
+.oc-card-host { font-weight: 600; color: var(--qx-ink); }
+/* 来源说明放不下一行时只在「，」处断（keep-all：Chromium 实测不在汉字之间断），不把「为准」拆成孤字挂到下一行；
+ * 前半句自己就放不下（手机、机构名很长）才由 anywhere 兜底。 */
+.oc-caption {
+  grid-area: cap; align-self: start;
+  margin: 10px 0 0; padding-top: 12px; border-top: 1px dashed var(--qx-line-2);
+  font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); color: var(--qx-ink-2);
+  word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty;
+}
+.oc-qr { grid-area: qr; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.oc-qr-code svg { display: block; width: var(--oc-qr); height: var(--oc-qr); }
+.oc-qr-hint { display: inline-flex; align-items: center; gap: 8px; font-size: var(--qx-fs-aux); font-weight: 600; color: var(--qx-teal-d); }
+
+/* ── 一张渠道：稿 45 的码卡 ─────────────────────────────────────
+ * 左上名称与目标地址（名称 32、地址 22），正中 680 见方的码位（虚线、米纸底），码位里是真实二维码：
+ * 看得见的码 430（稿里示例码按码位放大后约 430），下面一行「手机扫码打开」；来源说明压在卡底。 */
+.oc-page[data-density='roomy'] { --oc-qr: 430px; }
+.oc-page[data-density='roomy'] .oc-card {
+  grid-template-columns: minmax(0, 1fr); grid-template-areas: 'main' 'qr' 'cap';
+  gap: 22px 0; padding: 28px 32px;
+}
+.oc-page[data-density='roomy'] .oc-card-ic,
+.oc-page[data-density='roomy'] .oc-card-kicker { display: none; }
+.oc-page[data-density='roomy'] .oc-card-main { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+.oc-page[data-density='roomy'] .oc-card-name { font-size: 32px; line-height: 1.25; }
+.oc-page[data-density='roomy'] .oc-card-addr { flex: 1; min-width: 260px; color: var(--qx-ink); }
+.oc-page[data-density='roomy'] .oc-qr {
+  justify-self: center; box-sizing: border-box; width: 680px; height: 680px;
+  justify-content: center; gap: 24px;
+  border: 2px dashed var(--qx-line-2); border-radius: 24px; background: var(--qx-paper);
+}
+.oc-page[data-density='roomy'] .oc-qr-hint { font-size: var(--qx-fs-body); }
+.oc-page[data-density='roomy'] .oc-caption {
+  margin: 0; padding: 0; border-top: 0;
+  font-weight: 600; line-height: 1.5; color: var(--qx-ink);
+}
+
+/* ── 兜底去处（空态 / 失败态 / 读取中）：与招聘托管说明页（.rh-off-actions）同一套 qx-row。
+ * 稿 45 的兜底去处用的是会平分余量的 .dw-exitlist，只有三项时每项被拉到 400 多像素，成了一张张空卡；
+ * 这里定高 156（舞台上图标、标题、说明一行一组，不留空洞），余高交给区块之间。 */
+/* 状态块居中排：图标在上、标题与一句话在下，读取中 / 没有渠道 / 读取失败三态同一个样子。 */
+.oc-state .qx-state { flex-direction: column; align-items: center; gap: 14px; padding: 36px 40px; text-align: center; }
+.oc-state .qx-state-t { font-size: var(--qx-fs-sec); }
+.oc-state .qx-state-d { margin-top: 10px; font-size: var(--qx-fs-body); line-height: 1.6; }
+.oc-alt-rows .qx-row { min-height: 156px; }
+.oc-alt-rows .qx-row-ic { color: var(--qx-teal-d); background: var(--qx-teal-soft); border-color: transparent; }
+
+/* ── 也可以问小青：稿里整行可点的入口行（行高 120、行尾「›」）。
+ * 第一行的点击交给共享的 QxAiHelp（标题那颗按钮），用伪元素把它的触控面积铺满整行；
+ * 「AI 求职方向探索」是同一行里的第二项，同一个样子。 */
+.oc-assist-strip { align-items: stretch; }
+/* 页上还没有码时两行上下排（第一行灰着写原因）。 */
+.oc-assist-strip.is-stacked { flex-direction: column; }
+.oc-ask,
+.oc-assist .dw-stripitem {
+  position: relative; display: flex; align-items: center; gap: 14px;
+  min-height: 120px; padding: 14px 18px; box-sizing: border-box;
+  border: 1px solid var(--qx-line); border-radius: 24px; background: var(--qx-surface);
+}
+.oc-ask::after,
+.oc-assist .dw-stripitem::after { content: '›'; flex: none; margin-left: auto; font-size: 40px; line-height: 1; color: var(--qx-ink-3); }
+.oc-ask-ic {
+  flex: none; width: 52px; height: 52px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--qx-teal-d); background: var(--qx-teal-soft);
+}
+.oc-ask-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.oc-page .oc-ask .qx-ai-help {
+  margin: 0; padding: 0; min-height: 48px;
+  justify-content: flex-start; text-align: left;
+  font-size: var(--qx-fs-btn); font-weight: 700; line-height: 1.25; color: var(--qx-ink);
+}
+.oc-page .oc-ask .qx-ai-help::after { content: ''; position: absolute; inset: 0; border-radius: 24px; }
+.oc-page .oc-ask:has(.qx-ai-help:focus-visible) { outline: 3px solid var(--qx-deep); outline-offset: 3px; }
+.oc-page .oc-ask .qx-ai-help:focus-visible { outline: 0; }
+.oc-ask-desc { font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink-2); word-break: keep-all; overflow-wrap: anywhere; }
+/* 灰着的一问：米纸底、虚线框、图标与标题转灰，行尾不画「›」，原因用提醒色常显。 */
+.oc-ask[data-blocked='true'] { background: var(--qx-paper); border-style: dashed; border-color: var(--qx-line-2); }
+.oc-ask[data-blocked='true']::after { content: none; }
+.oc-ask[data-blocked='true'] .oc-ask-ic { color: var(--qx-ink-3); background: var(--qx-line); }
+.oc-page .oc-ask[data-blocked='true'] .qx-ai-help { color: var(--qx-muted-ink); cursor: default; }
+.oc-page .oc-ask[data-blocked='true'] .qx-ai-help::after { content: none; }
+.oc-ask[data-blocked='true'] .oc-ask-desc { font-weight: 600; color: var(--qx-wheat-d); }
+/* 共享 .dw-stripitem span 是 17px、三级灰，连标题外层的 .si-tx 也染灰；这一区提到辅助字以上、标题拉回正文色。 */
+.oc-page .oc-assist .dw-stripitem .si-tx { color: var(--qx-ink); }
+.oc-page .oc-assist .dw-stripitem b { font-size: var(--qx-fs-btn); }
+/* 两行时只在「，」处断（keep-all），不把「方向」拆成孤字挂到下一行。 */
+.oc-page .oc-assist .dw-stripitem .si-tx > span { font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink-2); word-break: keep-all; overflow-wrap: anywhere; }
+
+/* ── 底部：稿 45 两颗按钮（返回全部服务 / 回首页）+ 一句隐私提示 ── */
+.qx-stage:has(.oc-page) > .qx-ctabar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding-top: 14px;
+  padding-bottom: 10px;
+}
+.oc-cta { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.oc-cta-btns { display: flex; gap: 14px; }
+.oc-cta-btns .qx-btn { flex: 1; min-height: var(--qx-btn-h); }
+.oc-cta-btns .qx-btn[data-variant='primary'] { flex: 1.6; }
+.oc-privacy { margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+.oc-privacy b { margin-right: 8px; color: var(--qx-ink); font-weight: 700; }
 
 /* 手机与窄桌面：舞台不缩放、按真实宽度排版（与 shell.css 同样只作用于 data-kiosk-stage-fit="off"）。
  * 整页纵向滚动，二维码换到名称下面整行居中；触控目标仍 ≥48px，按钮 ≥56px。 */
@@ -120,7 +156,7 @@
   [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) { --qx-gutter: 16px; }
   [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-pagehead { margin-top: 12px; gap: 8px; }
   [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-pagehead h1 { font-size: 26px; }
-  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-pagehead p { flex-basis: 100%; min-width: 0; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-pagehead p { flex-basis: auto; min-width: 0; font-size: 15px; }
   [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) > .qx-ctabar { flex-wrap: wrap; gap: 8px 10px; padding: 10px var(--qx-gutter); }
   [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) > .qx-ctabar .why { flex-basis: 100%; font-size: 14px; }
   [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) > .qx-ctabar .qx-btn { flex: 1 1 0; min-width: 0; min-height: 56px; padding: 0 12px; font-size: 18px; }
@@ -130,24 +166,30 @@
 
   [data-kiosk-stage-fit='off'] .oc-page,
   [data-kiosk-stage-fit='off'] .oc-page[data-density] { --oc-qr: 200px; gap: 14px; padding-top: 12px; }
+  [data-kiosk-stage-fit='off'] .oc-page::after { display: none; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-sec-h { flex-wrap: wrap; gap: 4px 10px; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-sec-h .no { font-size: 16px; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-sec-h .t { font-size: 21px; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-sec-h .hint { flex-basis: 100%; margin-left: 0; text-align: left; font-size: 14px; }
-  [data-kiosk-stage-fit='off'] .oc-page .qx-state { gap: 12px; padding: 16px; }
+  [data-kiosk-stage-fit='off'] .oc-page .qx-state,
+  [data-kiosk-stage-fit='off'] .oc-state .qx-state { gap: 12px; padding: 16px; }
   [data-kiosk-stage-fit='off'] .oc-page .qx-state-ic { width: 44px; height: 44px; }
   [data-kiosk-stage-fit='off'] .oc-page .qx-state-t { font-size: 19px; }
-  [data-kiosk-stage-fit='off'] .oc-page .qx-state-d { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-page .qx-state-d { margin-top: 6px; font-size: 15px; line-height: 1.5; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-noteline { min-height: 0; padding: 10px 14px; font-size: 15px; }
   [data-kiosk-stage-fit='off'] .oc-page .dw-strip-t { font-size: 19px; }
-  [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem { min-height: 72px; padding: 12px 16px; gap: 14px; }
+  [data-kiosk-stage-fit='off'] .oc-assist-strip { flex-direction: column; gap: 10px; }
+  [data-kiosk-stage-fit='off'] .oc-ask,
+  [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem { min-height: 72px; padding: 12px 16px; gap: 14px; border-radius: 18px; }
+  [data-kiosk-stage-fit='off'] .oc-ask::after,
+  [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem::after { font-size: 30px; }
+  [data-kiosk-stage-fit='off'] .oc-page .oc-ask .qx-ai-help::after { border-radius: 18px; }
+  [data-kiosk-stage-fit='off'] .oc-ask-ic,
   [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem .si-ic { width: 48px; height: 48px; border-radius: 14px; }
-  [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem b { font-size: 19px; }
-  [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem .si-tx span { margin-top: 4px; font-size: 15px; }
   [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem b,
-  [data-kiosk-stage-fit='off'] .oc-page .oc-ask .qx-ai-help { font-size: 21px; }
+  [data-kiosk-stage-fit='off'] .oc-page .oc-ask .qx-ai-help { font-size: 19px; }
   [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem .si-tx > span,
-  [data-kiosk-stage-fit='off'] .oc-ask-desc { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .oc-ask-desc { margin-top: 4px; font-size: 15px; }
   [data-kiosk-stage-fit='off'] .oc-cta-btns { flex-wrap: wrap; }
   [data-kiosk-stage-fit='off'] .oc-privacy { font-size: 15px; }
   /* 去处行在手机上收到 88px（与 .rh-off-actions 的手机档一致）。 */
@@ -157,18 +199,31 @@
   [data-kiosk-stage-fit='off'] .oc-alt-rows .qx-row-d { font-size: 15px; }
 
   [data-kiosk-stage-fit='off'] .oc-list { gap: 12px; }
-  [data-kiosk-stage-fit='off'] .oc-card { grid-template-columns: 52px minmax(0, 1fr); align-items: start; gap: 14px; padding: 16px; border-radius: 22px; }
-  [data-kiosk-stage-fit='off'] .oc-card-ic { width: 52px; height: 52px; border-radius: 16px; font-size: 22px; }
-  [data-kiosk-stage-fit='off'] .oc-card-kicker { font-size: 13px; }
-  [data-kiosk-stage-fit='off'] .oc-card-name { font-size: 21px; }
-  [data-kiosk-stage-fit='off'] .oc-card-host { font-size: 15px; }
-  [data-kiosk-stage-fit='off'] .oc-caption { margin-top: 6px; padding-top: 8px; font-size: var(--qx-fs-aux); }
-  [data-kiosk-stage-fit='off'] .oc-qr { grid-column: 1 / -1; }
-  [data-kiosk-stage-fit='off'] .oc-qr-hint { font-size: var(--qx-fs-aux); }
-  [data-kiosk-stage-fit='off'] .oc-steps { flex-direction: column; }
+  [data-kiosk-stage-fit='off'] .oc-card,
   [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card {
-    grid-template-columns: 52px minmax(0, 1fr); justify-items: stretch; text-align: left; padding: 16px;
+    grid-template-columns: 52px minmax(0, 1fr); grid-template-areas: 'ic main' 'cap cap' 'qr qr';
+    align-items: start; gap: 10px 14px; padding: 16px; border-radius: 22px;
   }
-  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-main { align-items: flex-start; }
-  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-ic { display: flex; }
+  [data-kiosk-stage-fit='off'] .oc-card-ic,
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-ic { display: flex; width: 52px; height: 52px; border-radius: 16px; font-size: 22px; }
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-kicker { display: inline; }
+  [data-kiosk-stage-fit='off'] .oc-card-kicker { font-size: 13px; }
+  [data-kiosk-stage-fit='off'] .oc-card-main,
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-main { flex-direction: column; align-items: flex-start; gap: 4px; }
+  [data-kiosk-stage-fit='off'] .oc-card-name,
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-name { font-size: 21px; }
+  [data-kiosk-stage-fit='off'] .oc-card-addr,
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-addr { min-width: 0; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-caption,
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-caption {
+    margin: 0; padding-top: 8px; border-top: 1px dashed var(--qx-line-2);
+    font-size: var(--qx-fs-aux); font-weight: 400; color: var(--qx-ink-2);
+  }
+  [data-kiosk-stage-fit='off'] .oc-qr,
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-qr {
+    justify-self: center; width: auto; height: auto; gap: 10px; border: 0; background: none;
+  }
+  [data-kiosk-stage-fit='off'] .oc-qr-hint,
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-qr-hint { font-size: var(--qx-fs-aux); }
+  [data-kiosk-stage-fit='off'] .oc-steps { flex-direction: column; }
 }

@@ -13,7 +13,7 @@ import {
 } from '../../../services/api/printScanCapabilities'
 import { signCompose, signInspect } from '../../../services/api/printSign'
 import { errorCodeOf, userMessageOf } from '../../../services/api/userErrorMessage'
-import { savePrintMaterialSession } from '../../print/printMaterialSession'
+import { useStartPrintHandoff } from '../../print/usePrintHandoff'
 import type { PhoneUploadedFile } from '../../upload/components/UploadSessionQrPanel'
 import {
   AUTHORIZATION_LABEL,
@@ -71,6 +71,7 @@ function capStatusOf(result: CapabilitiesLoadResult): CapStatus {
 
 export function useSignStampFlow() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken, isLoggedIn, ready } = useAuth()
   const query = useMemo(() => parseSignStampQuery(location.search), [location.search])
@@ -330,8 +331,8 @@ export function useSignStampFlow() {
       fileMd5: result.fileMd5,
       mimeType: 'application/pdf',
     }
-    savePrintMaterialSession({ file, source: 'document' })
-    navigate('/print/material-check', { state: { file, source: 'document' } })
+    // 签章件装的是用户原件内容：写打印交接上下文后去打印台材料检查（与普通上传同一条路）。
+    startPrint({ origin: 'sign_stamp', source: 'document', returnPath: window.location.pathname, file })
   }
 
   const addAnother = () => {
