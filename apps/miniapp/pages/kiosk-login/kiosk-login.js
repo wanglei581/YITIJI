@@ -101,6 +101,7 @@ function devCard(phase, label) {
 Page({
   data: {
     statusBarHeight: 20,
+    capsuleInsetRight: 94,
     isLoggedIn: false,
     // idle 引导扫码 · scanning 扫码中 · scan-error 没扫到 / 不是一体机的码
     // checking 读票据 · status-error 没读到（可重读） · ticket-dead 票据已不能再确认（回一体机）
@@ -124,6 +125,7 @@ Page({
     this._gen = auth.sessionGeneration()
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
+      capsuleInsetRight: app.globalData.capsuleInsetRight || 94,
       isLoggedIn: auth.isLoggedIn(),
     })
     // 首页「扫码连接一体机」进来：直接开扫码。取消扫码就停在本页说明上，不算出错。
