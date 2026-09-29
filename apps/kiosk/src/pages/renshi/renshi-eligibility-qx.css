@@ -1,0 +1,327 @@
+/* 政策服务 /renshi · 条件核对（稿 48 ?tab=eligibility）· 青序流光 2.0 最终版。
+ * 字阶只用 --qx-fs-*，条件核对各处字号不低于 20（稿 48 注释第 2 条）；原稿壳层的放大档（fit-3/4）不照抄。
+ * 从 renshi-policy-fusion.css 拆出（那份已近千行）。verify:policy-eligibility-ui 读本文件：
+ * `.k8-elig {` 之后出现的 min-height 全部 ≥56px（可点元素的触控下限），所以手机宽度的收紧规则放在
+ * renshi-policy-fusion.css，不放这里。 */
+
+.k8-elig {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── 步骤条（稿 .steps2）：两段，当前一步深底翠字 ── */
+.k8-elig-steps {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.k8-elig-step {
+  display: flex;
+  min-height: 64px;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--qx-line);
+  border-radius: 22px;
+  background: var(--qx-surface);
+  padding: 10px 18px;
+  font-size: var(--qx-fs-aux);
+  font-weight: 600;
+  color: var(--qx-ink-3);
+}
+
+.k8-elig-step[aria-current='step'] { border-color: transparent; background: var(--qx-deep); color: var(--qx-paper); }
+
+.k8-elig-step-n {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 11px;
+  background: var(--qx-paper);
+  font-size: var(--qx-fs-aux);
+  font-weight: 700;
+}
+
+.k8-elig-step[aria-current='step'] .k8-elig-step-n {
+  border-color: transparent;
+  background: var(--qx-emerald);
+  color: var(--qx-deep);
+}
+
+/* ── 作答（稿 .privacy / .q / .opt）── */
+.k8-elig-privacy,
+.k8-elig-disclaimer {
+  margin: 0;
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.5;
+}
+
+.k8-elig-privacy {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  border: 1px solid var(--qx-slate-soft);
+  border-radius: 22px;
+  background: var(--qx-slate-soft);
+  padding: 13px 18px;
+  color: var(--qx-slate-d);
+}
+.k8-elig-privacy svg { width: 22px; height: 22px; flex: none; margin-top: 3px; }
+
+.k8-elig-questions { display: flex; flex-direction: column; gap: 11px; }
+
+.k8-elig-q {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  min-inline-size: 0;
+  border: 1px solid var(--qx-line);
+  border-radius: 22px;
+  background: var(--qx-surface);
+  padding: 14px 18px 16px;
+}
+
+.k8-elig-q-head {
+  display: flex;
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+}
+
+.k8-elig-q-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  float: none;
+  font-size: var(--qx-fs-body-lg);
+  font-weight: 700;
+}
+.k8-elig-q-title small {
+  font-size: var(--qx-fs-aux);
+  font-weight: 600;
+  color: var(--qx-wheat-d);
+}
+
+.k8-elig-opts { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.k8-elig-opt {
+  display: inline-flex;
+  min-height: 56px;
+  align-items: center;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 15px;
+  background: var(--qx-paper);
+  padding: 0 20px;
+  font-size: var(--qx-fs-aux-lg);
+  font-weight: 600;
+  color: var(--qx-ink-2);
+}
+
+.k8-elig-opt[aria-pressed='true'] {
+  border-color: transparent;
+  background: var(--qx-deep);
+  font-weight: 700;
+  color: var(--qx-paper);
+}
+
+.k8-elig-disclaimer {
+  border: 1px dashed var(--qx-line-2);
+  border-radius: 22px;
+  background: var(--qx-paper);
+  padding: 12px 18px;
+  color: var(--qx-ink-2);
+}
+
+/* ── 底部操作条里的按钮（稿 .btn：主按钮深底翠字，打印清单置灰写原因）── */
+.k8-elig-actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.k8-elig-submit,
+.k8-elig-restart,
+.k8-elig-print-blocked,
+.k8-elig-notice-retry {
+  display: inline-flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 21px;
+  background: var(--qx-surface);
+  padding: 0 24px;
+  font-size: var(--qx-fs-btn);
+  font-weight: 700;
+  color: var(--qx-ink);
+  white-space: nowrap;
+}
+
+.k8-elig-submit,
+.k8-elig-restart,
+.k8-elig-notice-retry {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qx-emerald);
+}
+
+.k8-elig-submit[aria-disabled='true'],
+.k8-elig-print-blocked[aria-disabled='true'] {
+  border-color: var(--qx-line);
+  background: var(--qx-muted-bg);
+  color: var(--qx-muted-ink);
+  cursor: default;
+}
+
+/* ── 检查中 / 做不了 / 没东西可比：步骤条下面是死路屏（renshi-policy-fusion.css .rq-deadend），它吃掉余高 ── */
+.k8-elig > .rq-deadend { flex: 1 0 auto; }
+
+/* ── 逐条结果（稿 .rescard / .overall / .cond）── */
+.k8-elig-headline,
+.k8-elig-card {
+  border: 1px solid var(--qx-line);
+  background: var(--qx-surface);
+}
+
+.k8-elig-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 30px;
+  padding: 20px 24px;
+}
+.k8-elig-headline-label {
+  margin: 0;
+  font-size: var(--qx-fs-aux-lg);
+  color: var(--qx-ink-3);
+}
+.k8-elig-headline-label b { margin-right: 14px; font-size: var(--qx-fs-body); color: var(--qx-ink); }
+.k8-elig-headline-text {
+  margin: 0;
+  font-size: var(--qx-fs-body);
+  font-weight: 600;
+  line-height: var(--qx-lh-body);
+}
+.k8-elig-headline-meta,
+.k8-elig-card-src {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+/* 只读的小块（不可点）：高度靠内边距撑到约 48，不写 min-height（本文件的 min-height 专给可点元素）。 */
+.k8-elig-e2,
+.k8-elig-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 13px;
+  background: var(--qx-paper);
+  padding: 10px 16px;
+  font-size: var(--qx-fs-aux-lg);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--qx-ink-2);
+}
+.k8-elig-chip b { font-weight: 700; color: var(--qx-ink); }
+.k8-elig-e2 { border-color: transparent; background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.k8-elig-chip-slate { border-color: transparent; background: var(--qx-slate-soft); color: var(--qx-slate-d); }
+.k8-elig-chip-slate b { color: var(--qx-slate-d); }
+.k8-elig-noai { margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+
+.k8-elig-results { display: flex; flex-direction: column; gap: 10px; }
+.k8-elig-cards { display: flex; flex-direction: column; gap: 12px; }
+.k8-elig-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 22px;
+  padding: 18px 22px;
+}
+.k8-elig-card h3 {
+  margin: 0;
+  font-size: var(--qx-fs-btn);
+  font-weight: 700;
+  line-height: 1.3;
+}
+.k8-elig-card-overall {
+  margin: 0;
+  border-radius: 15px;
+  background: var(--qx-teal-soft);
+  padding: 12px 16px;
+  font-size: var(--qx-fs-aux-lg);
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--qx-teal-d);
+}
+
+.k8-elig-conds { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.k8-elig-cond {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  border: 1px solid var(--qx-line);
+  border-radius: 15px;
+  background: var(--qx-paper);
+  padding: 14px 18px;
+}
+.k8-elig-cond--matched { background: var(--qx-teal-soft); }
+.k8-elig-cond--conflict { background: var(--qx-cinnabar-soft); }
+.k8-elig-cond--unknown { background: var(--qx-wheat-soft); }
+.k8-elig-cond-ic { width: 24px; height: 24px; flex: none; margin-top: 4px; }
+.k8-elig-cond--matched .k8-elig-cond-ic { color: var(--qx-teal-d); }
+.k8-elig-cond--conflict .k8-elig-cond-ic { color: var(--qx-cinnabar-d); }
+.k8-elig-cond--unknown .k8-elig-cond-ic { color: var(--qx-wheat-d); }
+/* 条件名在左、判定在右端；判定说明与政策原文左右两栏，依据你填的整行在下。 */
+.k8-elig-cond-main {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 24px;
+}
+.k8-elig-cond-head {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+}
+.k8-elig-cond-head b { font-size: var(--qx-fs-body-lg); }
+.k8-elig-cond-tag {
+  flex: none;
+  border-radius: 11px;
+  background: var(--qx-surface);
+  padding: 4px 12px;
+  font-size: var(--qx-fs-aux);
+  font-weight: 700;
+}
+.k8-elig-cond-reason,
+.k8-elig-cond-src,
+.k8-elig-cond-basis {
+  margin: 0;
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.5;
+  color: var(--qx-ink-2);
+}
+.k8-elig-cond-src,
+.k8-elig-cond-basis { color: var(--qx-ink-3); }
+.k8-elig-cond-basis { grid-column: 1 / -1; }
+.k8-elig-cond-k { display: block; margin-bottom: 2px; font-size: var(--qx-fs-aux); font-weight: 700; color: var(--qx-ink-3); }

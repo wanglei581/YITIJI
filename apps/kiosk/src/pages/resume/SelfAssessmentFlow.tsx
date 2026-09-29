@@ -35,7 +35,7 @@ import type {
   SelfAssessmentDimensionKey,
   SelfAssessmentDimensionResult,
 } from '@ai-job-print/shared'
-import { SELF_ASSESSMENT_DIMENSIONS, makePrintParams } from '@ai-job-print/shared'
+import { SELF_ASSESSMENT_DIMENSIONS } from '@ai-job-print/shared'
 import {
   AiCapabilityChip,
   AiConclusion,
@@ -87,6 +87,7 @@ import {
   SaReviewGrid,
   type SaStatus,
 } from './components/self-assessment/SelfAssessmentQxKit'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 /** 稿底部那一行不可关闭的边界声明，四个页面共用。 */
 const SA_RAIL = ['结果仅供自我参考', '不评分不排名', '不替代能力证明'] as const
@@ -621,6 +622,7 @@ export function SelfAssessmentResultPage() {
 
 function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | null }) {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const [session, setSession] = useState<SelfAssessmentSession>(() => {
     const saved = loadSession()
@@ -830,17 +832,16 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
    */
   const handoffToPrint = () => {
     if (!printed?.printFileUrl) return
-    navigate('/print/confirm', {
-      state: {
-        file: {
-          name: printed.filename,
-          size: formatBytes(printed.sizeBytes),
-          pages: printed.pageCount,
-          fileId: printed.fileId,
-          fileUrl: printed.printFileUrl,
-          mimeType: 'application/pdf',
-        },
-        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+    startPrint({
+      origin: 'self_assessment',
+      returnPath: window.location.pathname,
+      file: {
+        name: printed.filename,
+        size: formatBytes(printed.sizeBytes),
+        pages: printed.pageCount,
+        fileId: printed.fileId,
+        fileUrl: printed.printFileUrl,
+        mimeType: 'application/pdf',
       },
     })
   }

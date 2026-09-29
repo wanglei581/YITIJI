@@ -9,32 +9,37 @@ import {
   type PrintDeskStep,
 } from './printDeskModel'
 import {
-  readPrintMaterialSession,
-  type MaterialCheckSummary,
-  type PrintFileState,
-  type PrintMaterialSource,
-} from './printMaterialSession'
-
-interface LocationState {
-  file?: PrintFileState
-  materialCheck?: MaterialCheckSummary
-  source?: PrintMaterialSource
-}
+  printHandoffProblemText,
+  readPrintHandoff,
+  resolveRouteHandoff,
+  type PrintHandoffRouteState,
+} from './printHandoff'
+import { usePrintHandoffOwner } from './usePrintHandoff'
 
 /**
  * 青序流光 13-print-desk：材料检查（第 2 步）与预览参数（第 3 步）同页分阶段。
  * 阶段切换只 replace `?step=`，不推新的历史条目。
- * 首屏从 sessionStorage 复水，看门狗 reload 后仍停在用户原来的阶段。
+ *
+ * 文件身份只认打印交接上下文（商用收口 P0-5）：跳转带来的临时状态里只有交接编号，
+ * 文件、检查结论一律从上下文读；归属不符、过期、被替换时当场清掉并落空态，不退回任何「上一份」。
+ * 看门狗 reload 后仍从上下文复水，停在用户原来的阶段。
  */
 export function PrintDeskPage() {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const locationState = location.state as LocationState | null
+  const owner = usePrintHandoffOwner()
   const requested = parsePrintDeskStep(searchParams.get('step'))
-  const session = readPrintMaterialSession()
-  const file = session?.file ?? locationState?.file
-  const materialCheck = session?.materialCheck ?? locationState?.materialCheck
-  const previewAuthorized = isPrintDeskPreviewAuthorized(materialCheck, file)
+  // location.key 变了（换阶段、检查写回之后）就重读一次上下文。
+  const resolved = useMemo(
+    () => resolveRouteHandoff(readPrintHandoff(owner), location.state as PrintHandoffRouteState | null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- location.state 随 location.key 一起变
+    [owner, location.key],
+  )
+  const handoff = resolved.status === 'ok' ? resolved.context : null
+  const problem = printHandoffProblemText(resolved.status)
+  const previewAuthorized = handoff
+    ? handoff.checkPolicy === 'exempt' || isPrintDeskPreviewAuthorized(handoff.materialCheck, handoff.file)
+    : false
   const view = useMemo(
     () => resolvePrintDeskView({ requested, previewAuthorized }),
     [requested, previewAuthorized],
@@ -58,9 +63,9 @@ export function PrintDeskPage() {
   return (
     <div data-print-desk="" data-print-desk-step={view} style={{ display: 'contents' }}>
       {view === 'preview' ? (
-        <PrintPreviewPage onBackToCheck={() => go('check')} />
+        <PrintPreviewPage key={`preview-${handoff?.contextId ?? 'none'}`} handoff={handoff} problem={problem} onBackToCheck={() => go('check')} />
       ) : (
-        <PrintMaterialCheckPage onAdvanceToPreview={() => go('preview')} />
+        <PrintMaterialCheckPage key={`check-${handoff?.contextId ?? 'none'}`} handoff={handoff} problem={problem} onAdvanceToPreview={() => go('preview')} />
       )}
     </div>
   )
