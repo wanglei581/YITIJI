@@ -163,7 +163,7 @@ function verifyStartupWiring(): void {
   const printCall = taskRunner.indexOf('const result = await print(')
   const pauseAfter = taskRunner.indexOf('pauseQueueAfterTerminalState(')
   const claimGate = taskRunner.indexOf('claimPrintTasksIfGateOpen(')
-  const claimPost = taskRunner.indexOf('/tasks/claim')
+  const claimPost = taskRunner.indexOf('/tasks/claim`')
   assert.ok(resume > 0 && resume < printCall, 'resume immediately before print')
   assert.ok(pauseAfter > printCall, 'pause again after the terminal state')
   assert.ok(claimGate > 0 && claimGate < claimPost, 'gate sits in front of the claim request')
