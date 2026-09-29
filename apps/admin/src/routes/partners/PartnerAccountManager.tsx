@@ -7,6 +7,7 @@ import {
   type AdminOrgAccount,
 } from '../../services/api/orgsAdmin'
 import { PartnerAccountActionDialog } from './PartnerAccountActionDialog'
+import { contactPhoneRegistrationOffer } from './partnerContactPhoneEligibility'
 import { usePartnerAccountAction } from './usePartnerAccountAction'
 
 const inputCls =
@@ -251,6 +252,7 @@ export function PartnerAccountManager({
           {accounts.map((account) => {
             const actionsUnavailable = account.availableActionVerificationMethods.length === 0
             const isLastEnabledAccount = account.enabled && enabledAccountCount <= 1
+            const registration = contactPhoneRegistrationOffer(account)
             return (
             <div key={account.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
@@ -299,6 +301,17 @@ export function PartnerAccountManager({
                   <MailIcon className="h-3.5 w-3.5" />
                   {account.emailMasked ? '换绑登录邮箱' : '绑定登录邮箱'}
                 </button>
+                {registration.visible && (
+                  <button
+                    type="button"
+                    onClick={(event) => actionFlow.open('register_contact_phone', account, event.currentTarget)}
+                    disabled={accountBusy !== null || securityActionOpen}
+                    className="inline-flex min-h-12 items-center gap-1 rounded px-3 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <SmartphoneIcon className="h-3.5 w-3.5" />
+                    {registration.label}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={(event) => actionFlow.open('rebind_phone', account, event.currentTarget)}
@@ -318,6 +331,9 @@ export function PartnerAccountManager({
                   删除账号
                 </button>
               </div>
+              {!registration.visible && (
+                <p className="basis-full text-xs leading-5 text-neutral-500">{registration.reason}</p>
+              )}
               {actionsUnavailable && (
                 <p className="basis-full rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
                   该账号安全验证未就绪；如原已验证手机可用，请由持有人通过手机找回密码，否则只能走独立线下核验，本系统不提供管理员绕过。

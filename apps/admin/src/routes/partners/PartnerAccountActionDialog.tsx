@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { ActionCredentialSteps } from './partner-account-action-steps/ActionCredentialSteps'
+import { ContactPhoneRegistrationSteps } from './partner-account-action-steps/ContactPhoneRegistrationSteps'
 import { PartnerAccountDeleteConfirmationDialog } from './partner-account-action-steps/PartnerAccountDeleteConfirmationDialog'
 import { PhoneRebindSteps } from './partner-account-action-steps/PhoneRebindSteps'
 import type { UsePartnerAccountActionResult } from './usePartnerAccountAction'
@@ -26,6 +27,14 @@ const errorMessages: Record<string, string> = {
   SMS_PROVIDER_PHONE_DAILY_LIMIT: '该手机号今日短信发送次数已达上限，请稍后处理。',
   SMS_PROVIDER_RATE_LIMIT: '短信通道繁忙，请稍后重试。',
   SMS_SEND_FAILED: '短信发送失败；若旧因子授权已被消费，请重新完成安全验证。',
+  PARTNER_CONTACT_PHONE_NOT_ELIGIBLE: '这个账号现在不能登记手机号（已自证、非临时密码、已停用、不属于本机构等）。',
+  CONTACT_PHONE_MISMATCH: '手机号和机构确认函上登记的联系人手机不一致，请先核对机构资料。',
+  CONTACT_PHONE_RECENTLY_CHANGED: '机构联系人手机 24 小时内改过，请过 24 小时再登记。',
+  PHONE_IN_USE: '这个手机号已被其他账号使用。',
+  CONTACT_PHONE_NOTICE_UNAVAILABLE: '知会短信暂时发不出，暂不能登记。',
+  DEMO_MODE_READONLY: '当前为 mock 模式，登记手机号需要连接真实后端。',
+  VALIDATION_ERROR: '请按页面提示修正手机号、确认函编号和本人密码。',
+  INVALID_RESPONSE: '服务响应异常，请稍后再试。',
 }
 
 function secondsLeft(deadline: number, nowMs: number): number {
@@ -65,7 +74,9 @@ export function PartnerAccountActionDialog({
   if (!open || !flow.account) return null
 
   const deleting = flow.state.action === 'delete_account'
-  const title = deleting ? '安全删除机构账号' : '安全换绑机构账号手机号'
+  const registering = flow.state.action === 'register_contact_phone'
+  const title = deleting ? '安全删除机构账号' : registering ? '登记联系人手机号' : '安全换绑机构账号手机号'
+  const serverMessage = registering ? flow.errorMessage : ''
   const ticketSeconds = secondsLeft(flow.actionTicketDeadline, flow.nowMs)
 
   return (
@@ -106,7 +117,9 @@ export function PartnerAccountActionDialog({
           <div>
             <h2 id="partner-account-action-title" className="text-base font-semibold text-neutral-900">{title}</h2>
             <p id="partner-account-action-description" className="mt-1 text-xs leading-5 text-neutral-500">
-              安全挑战、操作授权和换绑票据仅保存在当前弹窗内存中，关闭后会尽力撤销。
+              {registering
+                ? '手机号、确认函编号和本人密码只用于这一次登记，不会写入浏览器存储。'
+                : '安全挑战、操作授权和换绑票据仅保存在当前弹窗内存中，关闭后会尽力撤销。'}
             </p>
           </div>
           <button
@@ -114,7 +127,7 @@ export function PartnerAccountActionDialog({
             aria-label="关闭账号安全操作"
             disabled={flow.state.busy}
             onClick={() => void flow.close()}
-            className="rounded px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 disabled:opacity-40"
+            className="inline-flex min-h-12 min-w-12 items-center justify-center rounded px-3 text-sm text-neutral-500 hover:bg-neutral-100 disabled:opacity-40"
           >
             关闭
           </button>
@@ -122,7 +135,7 @@ export function PartnerAccountActionDialog({
 
         {flow.state.errorCode && (
           <p role="alert" className="mt-4 rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg">
-            {errorMessages[flow.state.errorCode] ?? '操作未完成，请检查信息后重试。'}
+            {serverMessage || errorMessages[flow.state.errorCode] || '操作未完成，请检查信息后重试。'}
           </p>
         )}
         {flow.statusMessage && (
@@ -134,6 +147,7 @@ export function PartnerAccountActionDialog({
         <div className="mt-5">
           <ActionCredentialSteps flow={flow} />
           <PhoneRebindSteps flow={flow} />
+          <ContactPhoneRegistrationSteps flow={flow} />
 
           {flow.state.step === 'result_uncertain' && (
             <div className="space-y-3">
@@ -141,16 +155,16 @@ export function PartnerAccountActionDialog({
                 最终请求的结果暂时无法确认，系统没有自动重试。机构详情已刷新，请以当前账号列表为准。
               </p>
               <div className="flex justify-end">
-                <button type="button" data-autofocus className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white" onClick={() => void flow.close()}>我已核对</button>
+                <button type="button" data-autofocus className="inline-flex min-h-12 items-center rounded-lg bg-primary-600 px-4 text-sm font-medium text-white" onClick={() => void flow.close()}>我已核对</button>
               </div>
             </div>
           )}
 
-          {flow.state.step === 'success' && (
+          {flow.state.step === 'success' && !registering && (
             <div className="space-y-3">
               <p className="text-sm text-success-fg">{deleting ? '账号已安全删除，机构详情已刷新。' : '手机号已换绑并验证，机构详情已刷新。'}</p>
               <div className="flex justify-end">
-                <button type="button" data-autofocus className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white" onClick={() => void flow.close()}>完成</button>
+                <button type="button" data-autofocus className="inline-flex min-h-12 items-center rounded-lg bg-primary-600 px-4 text-sm font-medium text-white" onClick={() => void flow.close()}>完成</button>
               </div>
             </div>
           )}

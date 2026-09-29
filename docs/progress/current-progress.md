@@ -1,5 +1,6 @@
 # 当前开发进度
 
+> **2026-09-29 W-03 管理员登记机构联系人手机（候选，仅前端）**：合作机构详情的机构账号区，对启用中、手机未验证、且没有「本人密码」验证方式的账号显示「登记手机号」；若列表带回 `contactPhoneRegisteredAt` 则显示「重新登记手机号」。弹层走现有机构账号动作，提交 `POST /admin/orgs/:orgId/accounts/:accountId/contact-phone`，请求体恰好 `phone`、`confirmationLetterNo`、`currentPassword`。mock 不假成功。账号列表 GET 仍缺字段：`services/api/src/orgs/admin-org-account-view.ts` 的 `mapAdminOrgAccount` 查了 `passwordProofState` 但没有返回；也没有「联系人手机已登记、本人尚未自证」的 `contactPhoneRegisteredAt`（`phoneMasked` 是登录手机，创建时就有，不能当已登记）。缺字段时先按现有字段否掉停用、已验证、已有密码方式，其余显示按钮，由服务端 409 兜底。本轮没有打真实后端。
 > **2026-09-29 一体机自我探索同意条款三端对齐（一体机半，随 #1119；候选写入方）**：同意页的条款（6 条，含年龄一条）、确认式勾选框文字（含《隐私政策》未成年人专章链接）、同意版本（sa-consent-v2.2026-09-29）全部来自同一次 GET /resume/self-assessment/questions 响应，源码不再写死；取不到说明时如实提示「同意说明没有取到，请重试」、不放行；旧版本提交 400 SELF_ASSESSMENT_CONSENT_VERSION_STALE 回到重新确认、已答不清空、确认后自动重交。法务文档页支持 ?section= 按章节标题「包含」定位，找不到停在开头、不做近似兜底。结果页按 interpretationAvailable / aiUnavailableReason 说明 AI 解读缺失原因，维度打分始终显示；职业规划 selfAssessmentExcluded='consent_outdated' 时在依据旁说明并给重新确认入口。门禁 verify:self-assessment-consent-source（进 CI）+ 10 条单测，14 个反向变异全红；本地独立 API + 正式构建走通正常提交与旧版本重确认两条路。待办：①声明开关打开后一体机不会主动问年满 14 周岁（提交接口是 exempt），须在第二次发布前补主动确认；②重新确认拦截面约 750px 留白；③服务端 A6「四端一致」测试打开时改为「一体机按下发渲染、无写死常量」口径。小程序半边 #1124 由小程序窗口并新基线后紧跟合入，三端须同一次发布上线（发布清单 #1127 第 4c 条）。
 ## 2026-09-29：一体机公共屏打码，并修通小青作业页与扫码等待（分支 `grok/kiosk-public-screen-mask-20260929`）
 
