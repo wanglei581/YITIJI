@@ -44,7 +44,7 @@ const MAX_ANSWER_CHARS = 2000
 const DURATION_TARGET: Record<number, number> = { 3: 4, 5: 6, 8: 8 }
 
 export const INTERVIEWER_LABEL: Record<string, string> = {
-  hr: 'HR 初筛', manager: '业务主管', tech: '技术面试官', campus: '校招面试官', final: '终面负责人',
+  hr: 'HR 面试', manager: '业务主管', tech: '技术面试官', campus: '校招面试官', final: '终面负责人',
 }
 
 export interface InterviewRequester {

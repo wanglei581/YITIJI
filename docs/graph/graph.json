@@ -21212,9 +21212,11 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
-      "scripts/verify-compliance-copy.mjs"
+      "scripts/verify-compliance-copy.mjs",
+      "services/api/scripts/verify-ai-safety-aigc.ts"
     ],
     "packages/shared/src/types/consoleScreen.ts": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
@@ -23129,6 +23131,7 @@
     "services/api/src/common/pdf/pdfjs-document.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-pdf-cmap.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-pii-redaction.ts",
@@ -24302,7 +24305,9 @@
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-practice-sheet.ts": [
-      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs"
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/interview-report-pdf.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -27784,7 +27789,8 @@
           "apps/kiosk/src/pages/interview/styles/interview-report.css",
           "apps/kiosk/src/pages/interview/styles/interview-responsive.css",
           "apps/kiosk/src/pages/interview/styles/interview-session.css",
-          "apps/kiosk/src/pages/interview/styles/interview-shell.css"
+          "apps/kiosk/src/pages/interview/styles/interview-shell.css",
+          "packages/shared/src/types/complianceCopy.ts"
         ],
         "missing": []
       },
@@ -32163,6 +32169,7 @@
           "services/api/src"
         ],
         "files": [
+          "packages/shared/src/types/complianceCopy.ts",
           "services/api/src/advisor/advisor-pdf.service.ts",
           "services/api/src/advisor/assistant-summary.service.ts",
           "services/api/src/advisor/llm-advisor.service.ts",
@@ -32195,6 +32202,7 @@
           "services/api/src/files/files.service.ts",
           "services/api/src/job-ai/job-ai-llm.service.ts",
           "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
+          "services/api/src/mock-interview/interview-practice-sheet.ts",
           "services/api/src/mock-interview/interview-report-pdf.service.ts",
           "services/api/src/mock-interview/mock-interview-llm.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -35807,9 +35815,11 @@
         "files": [
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
           "services/api/src/mock-interview/asr/asr.service.ts",
           "services/api/src/mock-interview/asr/tts.service.ts",
           "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
+          "services/api/src/mock-interview/interview-practice-sheet.ts",
           "services/api/src/mock-interview/interview-report-pdf.service.ts",
           "services/api/src/mock-interview/mock-interview-llm.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
