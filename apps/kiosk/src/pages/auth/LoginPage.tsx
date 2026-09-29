@@ -144,9 +144,9 @@ export function LoginPage() {
           back={{ label: '返回首页', onBack: goHome }}
           ctabar={
             <>
-              {mode === 'phone' && (state === 'phone-idle' || state === 'phone-sending' || state === 'phone-verifying') ? (
+              {mode === 'phone' && (state === 'phone-idle' || state === 'phone-sending' || state === 'phone-verifying' || state === 'phone-legal-unpublished') ? (
                 <button type="button" className="qx-btn" data-variant="ghost" data-testid="login-gate-anonymous" onClick={goHome}>
-                  {state === 'phone-idle' ? '不登录，继续使用' : '返回首页'}
+                  {state === 'phone-idle' || state === 'phone-legal-unpublished' ? '不登录，继续使用' : '返回首页'}
                 </button>
               ) : (
                 <button type="button" className="qx-btn" data-variant="ghost" onClick={() => switchTab(mode === 'phone' ? 'scan' : 'phone')}>
@@ -192,9 +192,9 @@ export function LoginPage() {
                   重新生成二维码
                 </button>
               ) : null}
-              {mode === 'phone' && (state === 'phone-sending' || state === 'phone-verifying') ? (
+              {mode === 'phone' && (state === 'phone-sending' || state === 'phone-verifying' || state === 'phone-legal-unpublished') ? (
                 <span className="qx-btn" role="button" data-variant="primary" aria-disabled="true" data-testid="login-gate-primary">
-                  {state === 'phone-sending' ? '正在等待结果' : '等待核验结果'}
+                  {state === 'phone-sending' ? '正在等待结果' : state === 'phone-legal-unpublished' ? '暂时无法登录' : '等待核验结果'}
                 </span>
               ) : null}
               {mode === 'qr' && (state === 'qr-loading' || state === 'qr-confirmed') ? (

@@ -459,7 +459,7 @@ var V={};
 V['warning']=function(){
  return {body:guardBlock({num:'60',unit:'秒后按本机计时清场',from:true,
    title:'还在办吗？<br><em>没操作</em>有一会儿了',
-   copy:'这是公共机器的隐私保护。<b>时间一到，这台机器上这次留下的东西会被清掉</b>。已经交出去的打印、扫描和账号里的资料不受影响。'})+
+   copy:'这是公共终端的隐私保护。<b>时间一到，这台机器上这次留下的东西会被清掉</b>。已经交出去的打印、扫描和账号里的资料不受影响。'})+
    (SRC.given&&!SRC.known?'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-source-note">'+
     '<div class="state-h">'+svg('info','currentColor',28)+'这次读不到可用的来源页</div>'+
     '<div class="state-p">'+(REASON_HUMAN[SRC.reason]||'没对上刚才那一页')+'，所以「继续办理」<b>只能回首页</b>，按钮上也是这么写的。对不上、或时间已经到了，就清掉这台机器上的内容再回首页，不会假装还能接着办。</div></div></section>':'')+
@@ -475,7 +475,7 @@ V['warning-no-continue']=function(){
    copy:'这次已经到了最长使用时间，不能靠反复点「继续」一直留在这台机器上。<b>你可以现在清掉，也可以等计时走完。</b>'})+
    '<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('lock','currentColor',28)+'为什么没有「继续办理」</div>'+
-   '<div class="state-p">公共机器有一个<b>最长使用时间</b>，到点就要清掉这台机器上的内容。这不是故障，也不是你操作错了。</div>'+
+   '<div class="state-p">公共终端有一个<b>最长使用时间</b>，到点就要清掉这台机器上的内容。这不是故障，也不是你操作错了。</div>'+
    '<div class="state-p">'+(SRC.known?'你刚才在 <b>'+pageName(SRC.route)+'</b>。这次不能就地接着办，清掉之后重新进入即可。':'这次也没记住你刚才在哪一页。')+'</div>'+
    '<div class="state-p">清掉之后重新登录就能继续；<b>账号里已经保存的东西不会因此消失。</b></div></div></section>'+
    whatClears(),

@@ -16,6 +16,10 @@ const auth = require('./auth');
 const { KEY_RE: PRINT_ORDER_IDEMPOTENCY_KEY_RE } = require('./print-order-idempotency');
 const { KEY_RE: PACKAGE_IDEMPOTENCY_KEY_RE } = require('./package-order-idempotency');
 const { withQuotedAmount } = require('./price-confirmation');
+// 法务文档、协议版本、AI 授权与声明、AI 请求前后置（C1/C4/C6/C7）。本文件已过 1000 行，
+// 这一段拆到 api-legal-consent.js，方法在文件末尾并进同一个 api 对象。
+// 加载它的同时也向 request.js 注册了 ai 标记请求的前后置。
+const legalConsent = require('./api-legal-consent');
 
 /**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
@@ -342,40 +346,7 @@ const api = {
     return request(`/policies/${id}`, { method: 'GET', needAuth: false }).then(N.policyDetail);
   },
 
-  // ---------- 法务协议版本 ----------
-  /** 读取当前激活的法务文档；没有正式激活版本时 fail-closed。 */
-  getLegalDocument(docType) {
-    const allowed = ['terms_of_service', 'privacy_policy'];
-    if (!allowed.includes(docType)) return Promise.reject(new Error('不支持的法律文档类型'));
-    if (config.USE_MOCK) return Promise.reject(new Error('演示数据模式不提供正式法律文档'));
-    return request(`/kiosk/legal/${docType}`, { method: 'GET', needAuth: false }).then(doc => {
-      if (!doc || !doc.version || !doc.content) {
-        const e = new Error('正式法律文档尚未发布');
-        e.code = 'LEGAL_DOC_UNAVAILABLE';
-        throw e;
-      }
-      return doc;
-    });
-  },
-
-  /**
-   * 取当前有效协议版本。无激活版本时回落草拟哨兵,与服务端 resolveActiveLegalVersions 口径一致。
-   * 注意:线上目前两份文档均无激活版本,实际会拿到 'draft-pending-legal-review'。
-   */
-  getLegalVersions() {
-    const FALLBACK = 'draft-pending-legal-review';
-    const fetchOne = (docType) =>
-      request(`/kiosk/legal/${docType}`, { method: 'GET', needAuth: false })
-        .then(doc => {
-          const v = doc && doc.version;
-          return typeof v === 'string' && v.trim() ? v.trim() : FALLBACK;
-        })
-        .catch(() => FALLBACK);
-    return Promise.all([
-      fetchOne('terms_of_service'),
-      fetchOne('privacy_policy'),
-    ]).then(([termsVersion, privacyVersion]) => ({ termsVersion, privacyVersion }));
-  },
+  // 法务文档与协议版本（getLegalDocument / getLegalVersions）见 utils/api-legal-consent.js。
 
   // ---------- 鉴权 ----------
   // C 端会员走 /api/v1/member/* (EndUser 体系),与内部 /api/v1/auth/* (admin/partner) 完全隔离。
@@ -404,7 +375,7 @@ const api = {
       e.statusCode = 501;
       return Promise.reject(e);
     }
-    return this.getLegalVersions().then(v => {
+    return legalConsent.getLegalVersions().then(v => {
       const data = {
         phone,
         code,
@@ -496,7 +467,7 @@ const api = {
         fail: err => reject(Object.assign(new Error('wx.login 调用失败'), { detail: err })),
       });
     });
-    return Promise.all([codeP, this.getLegalVersions()]).then(([code, v]) => {
+    return Promise.all([codeP, legalConsent.getLegalVersions()]).then(([code, v]) => {
       return request('/member/auth/wx-login', {
         method: 'POST',
         data: {
@@ -533,6 +504,7 @@ const api = {
         name: 'file',
         formData: { purpose },
         needAuth: true, // 已登录则带 token 归属到本人,未登录走匿名
+        ai: 'upload',
       }).then(
         (res) => { prepared.cleanup(); return res; },
         (err) => { prepared.cleanup(); throw err; }
@@ -607,6 +579,7 @@ const api = {
         name: 'file',
         formData: { uploadToken },
         needAuth: false,
+        ai: 'upload',
       }).then(
         (res) => { prepared.cleanup(); return res; },
         (err) => { prepared.cleanup(); throw err; }
@@ -621,6 +594,7 @@ const api = {
         name: 'file',
         formData: { purpose: 'print_doc' },
         needAuth: true,
+        ai: 'upload',
       }).then(
         (res) => { prepared.cleanup(); return res; },
         (err) => { prepared.cleanup(); throw err; }
@@ -659,6 +633,7 @@ const api = {
       data: p,
       header: { 'x-resume-parse-intent': intent, 'x-resume-parse-proof': proof },
       needAuth: true,
+      ai: 'generate',
       timeout: config.aiTimeout,
     });
   },
@@ -687,6 +662,7 @@ const api = {
     if (benefitGrantId) data.benefitGrantId = benefitGrantId;
     return request(`/resume/records/${encodeURIComponent(taskId)}/export`, {
       method: 'POST',
+      ai: 'export',
       data,
       header: tokenHeader(accessToken),
       needAuth: true,
@@ -711,7 +687,7 @@ const api = {
   getResumeOptimize(taskId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历优化'));
     return request(`/resume/records/${taskId}/optimize`, {
-      method: 'GET', header: tokenHeader(accessToken), needAuth: !accessToken, timeout: config.aiTimeout,
+      method: 'GET', header: tokenHeader(accessToken), needAuth: !accessToken, timeout: config.aiTimeout, ai: 'generate',
     });
   },
 
@@ -749,7 +725,7 @@ const api = {
   factCheckResume(taskId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历事实核对'));
     return request(`/resume/records/${encodeURIComponent(taskId)}/fact-check`, {
-      method: 'POST', needAuth: true,
+      method: 'POST', needAuth: true, ai: 'generate',
     });
   },
 
@@ -765,7 +741,7 @@ const api = {
   generateCareerPlan(taskId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 职业规划'));
     return request(`/resume/career-plan/${taskId}`, {
-      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: config.aiTimeout, ai: 'generate',
     });
   },
 
@@ -790,7 +766,7 @@ const api = {
   printCareerPlan(taskId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 职业规划'));
     return request(`/resume/career-plan/${taskId}/print`, {
-      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: 60000,
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: 60000, ai: 'export',
     });
   },
 
@@ -822,31 +798,7 @@ const api = {
     });
   },
 
-  /**
-   * 会员岗位 AI 授权。会员授权是账号级 job_ai scope，不得复用匿名任务 consent。
-   * 页面拿到的统一 active 字段只用于展示分流，服务端仍保留原始授权版本与时间。
-   */
-  getMemberJobFitConsent() {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('岗位匹配参考'));
-    return request('/me/ai-consents/status', { method: 'GET', needAuth: true }).then((list) => {
-      const item = Array.isArray(list) ? list.find((v) => v && v.scope === 'job_ai') : null;
-      return item ? { ...item, active: item.granted === true } : { scope: 'job_ai', active: false };
-    });
-  },
-
-  grantMemberJobFitConsent() {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('岗位匹配参考'));
-    return request('/me/ai-consents', {
-      method: 'POST', data: { scope: 'job_ai' }, needAuth: true,
-    }).then((item) => ({ ...item, active: !!(item && item.granted) }));
-  },
-
-  revokeMemberJobFitConsent() {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('岗位匹配参考'));
-    return request('/me/ai-consents/job_ai/revoke', {
-      method: 'POST', needAuth: true,
-    }).then((item) => ({ ...item, active: !!(item && item.granted) }));
-  },
+  // 会员岗位 AI 授权（get / grant / revokeMemberJobFitConsent）见 utils/api-legal-consent.js。
 
   /**
    * 岗位匹配分析。实测 6~37s 波动很大(同一份简历两次分别 37s / 6s),
@@ -857,7 +809,7 @@ const api = {
   analyzeJobFit(p, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('岗位匹配参考'));
     return request('/resume/job-fit', {
-      method: 'POST', data: p, header: tokenHeader(accessToken), needAuth: !accessToken, timeout: config.aiTimeout,
+      method: 'POST', data: p, header: tokenHeader(accessToken), needAuth: !accessToken, timeout: config.aiTimeout, ai: 'generate',
     });
   },
 
@@ -877,7 +829,7 @@ const api = {
   printJobFitReport(taskId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('岗位匹配参考'));
     return request(`/resume/job-fit/${taskId}/print`, {
-      method: 'POST', header: tokenHeader(accessToken), needAuth: !accessToken, timeout: 60000,
+      method: 'POST', header: tokenHeader(accessToken), needAuth: !accessToken, timeout: 60000, ai: 'export',
     });
   },
 
@@ -890,14 +842,14 @@ const api = {
    */
   createInterview(p) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
-    return request('/mock-interviews', { method: 'POST', data: p, needAuth: true, timeout: config.aiTimeout });
+    return request('/mock-interviews', { method: 'POST', data: p, needAuth: true, timeout: config.aiTimeout, ai: 'generate' });
   },
 
   /** 开始面试,返回第一题 */
   startInterview(sessionId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
     return request(`/mock-interviews/${sessionId}/start`, {
-      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout, ai: 'generate',
     });
   },
 
@@ -910,7 +862,7 @@ const api = {
   answerInterview(sessionId, p, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
     return request(`/mock-interviews/${sessionId}/answer`, {
-      method: 'POST', data: p, header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+      method: 'POST', data: p, header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout, ai: 'generate',
     });
   },
 
@@ -937,7 +889,7 @@ const api = {
   printInterviewReport(sessionId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
     return request(`/mock-interviews/${sessionId}/report/print`, {
-      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout, ai: 'export',
     });
   },
 
@@ -954,6 +906,7 @@ const api = {
       header: interviewHeader(accessToken),
       needAuth: true,
       timeout: config.aiTimeout,
+      ai: 'generate',
     });
   },
 
@@ -978,7 +931,7 @@ const api = {
   printInterviewPracticeSheet(sessionId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
     return request(`/mock-interviews/${sessionId}/practice-sheet`, {
-      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout, ai: 'export',
     });
   },
 
@@ -993,6 +946,7 @@ const api = {
       header: interviewHeader(accessToken),
       needAuth: true,
       timeout: config.aiTimeout,
+      ai: 'voice',
     }).then((res) => ({
       text: res && typeof res.text === 'string' ? res.text : '',
     }));
@@ -1237,7 +1191,8 @@ const api = {
    */
   assistantChat(message, sessionId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 助手'));
-    const body = { message };
+    // channel=miniapp：服务端只回小程序已注册页面的跳转，也不引导岗位、招聘会、企业（C12）。
+    const body = { message, channel: 'miniapp' };
     if (sessionId) body.sessionId = sessionId;
     const token = auth.getToken();
     return request('/assistant/chat', {
@@ -1246,6 +1201,7 @@ const api = {
       needAuth: false,
       header: token ? { Authorization: 'Bearer ' + token } : {},
       timeout: config.aiTimeout,
+      ai: 'generate',
     });
   },
 
@@ -1260,6 +1216,7 @@ const api = {
       needAuth: false,
       header: auth.getToken() ? { Authorization: 'Bearer ' + auth.getToken() } : {},
       timeout: config.aiTimeout,
+      ai: 'voice',
     }).then((res) => ({
       text: res && typeof res.text === 'string' ? res.text : '',
       providerName: (res && res.providerName) || '',
@@ -1277,6 +1234,7 @@ const api = {
       data: {},
       needAuth: true,
       timeout: config.aiTimeout,
+      ai: 'generate',
     });
   },
 
@@ -1318,7 +1276,7 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
     return request('/resume/generate', {
       method: 'POST', data: payload, header: tokenHeader(accessToken),
-      needAuth: true, timeout: config.aiTimeout,
+      needAuth: true, timeout: config.aiTimeout, ai: 'generate',
     });
   },
 
@@ -1339,7 +1297,7 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
     return request('/resume/generate/export', {
       method: 'POST', data: payload, header: tokenHeader(accessToken),
-      needAuth: true, timeout: 60000,
+      needAuth: true, timeout: 60000, ai: 'export',
     });
   },
 
@@ -1363,6 +1321,7 @@ const api = {
       name: 'audio',
       needAuth: true,
       timeout: config.aiTimeout,
+      ai: 'voice',
     }).then((res) => ({
       text: res && typeof res.text === 'string' ? res.text : '',
       providerName: (res && res.providerName) || '',
@@ -1435,6 +1394,7 @@ const api = {
       header: tokenHeader(accessToken),
       needAuth: true,
       timeout: config.aiTimeout,
+      ai: 'generate',
     });
   },
 
@@ -1450,7 +1410,7 @@ const api = {
   printSelfAssessment(taskId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
     return request(`/resume/self-assessment/${encodeURIComponent(taskId)}/print`, {
-      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: 60000,
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: 60000, ai: 'export',
     });
   },
 
@@ -1535,18 +1495,30 @@ const api = {
     });
   },
 
+  /**
+   * 作废当前到机码、重发一枚新码（单件与材料包同一个端点）。旧码立即失效，截止时间不变。
+   * 已核销、已过期、已退款、已开始出纸的单服务端拒绝：400 PICKUP_CODE_NOT_REISSUABLE。
+   * 回的是这张单的最新详情（含新码）。
+   */
+  reissuePickupCode(orderId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('作废重发到机码'));
+    return request(`/me/print-orders/${encodeURIComponent(orderId)}/reissue-pickup-code`, {
+      method: 'POST', needAuth: true,
+    });
+  },
+
   /** 打印前隐私检查；会员 token 保证只能检查本人文件。 */
   createPrintPiiScan(fileId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
     return request('/materials/tasks', {
-      method: 'POST', data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout,
+      method: 'POST', data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout, ai: 'generate',
     });
   },
 
   decidePrintPiiFindings(taskId, decisions) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
     return request(`/materials/tasks/${encodeURIComponent(taskId)}/pii-findings/decisions`, {
-      method: 'POST', data: { decisions }, needAuth: true, timeout: config.aiTimeout,
+      method: 'POST', data: { decisions }, needAuth: true, timeout: config.aiTimeout, ai: 'generate',
     });
   },
 
@@ -1738,7 +1710,7 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('今日提醒'));
     const data = {};
     if (city) data.city = city;
-    return request('/assistant/daily-report', { method: 'POST', data, needAuth: true });
+    return request('/assistant/daily-report', { method: 'POST', data, needAuth: true, ai: 'generate' });
   },
 
   // ---------- 合同审查（后端 contract-review.controller.ts 已实现） ----------
@@ -2031,6 +2003,8 @@ const api = {
   },
 };
 
+// 法务文档、协议版本、AI 授权与声明的门面方法并进同一个 api 对象（见文件头）。
+Object.assign(api, legalConsent);
 
 module.exports = api;
 
@@ -2043,5 +2017,6 @@ api.appendSelfAssessmentToResume = function appendSelfAssessmentToResume(taskId,
     header: tokenHeader(accessToken),
     needAuth: true,
     timeout: 60000,
+    ai: 'generate',
   });
 };

@@ -83,6 +83,7 @@
 未改：颜色令牌、圆角、深绿英雄区、二十五道题原文、三 Tab、不打分的边界。
 9/28 留白：英雄区不再钉死 360px 高（三步下面空着一截深色），改为按内容高；省下的高度还给卡片区，说明页首屏多露出「还没有勾选…」那条提示。无新增内容。
 9/29 定稿：按运行页实际做的事改写（SelfAssessmentFlow.tsx + 服务端 self-assessment*）。完成页画五个方向的强弱（与服务端同一算法：所选选项的 weight 相加，0–5，本页据此当场算出）、「小青写的解读 · AI 生成 · 仅供参考」和打印、撤回；ai-down 改画运行页的 result-ai-down（完成页的一种：强弱与打印照常，只缺解读），route 随之改为 /result；同意书第 3、5 条、提交前三件事、记录页按真实保存口径（已登录记进「我的 · AI 服务记录」保留 24 小时，未登录只在这次办理里）重写；「不评分」改「不打总分」；完成页方向格小字和答题页方向小标补到 20px（2.0 字阶）。文件里其它写着「不读 weight / 不计分 / 不写账号 / 不出打印文件 / ai-down 是 intro 降级态」的旧注释，一律以本行为准。无新增区块。
+9/29 定稿（最后一批）：答题页三个选项由一列三行改成一行三格（同高、字号不变、长选项折成两行并按行平衡），原来选项文字左对齐、右半边空着（第 25 题那一屏 276px）。二十五题都排得下，不用再往上滑，「下面还有内容」提示条自然不出现。无新增内容，状态键、data-testid 不改。
 -->
 <style id="qx2">
 .pill{font-size:21px!important}
@@ -122,6 +123,10 @@
 .cov p{font-size:20px!important;line-height:1.4!important}
 #body[data-state="ai-down"]{justify-content:space-between}
 .qnum em{font-size:20px!important}
+.answers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.answer{min-height:112px;padding:16px 20px;gap:12px;text-wrap:balance}
+/* 9/29 定稿：还没开放的题号数字从 --line2（#d4cdb6）加深到 #b3ab98，与 29、52 的示意灰一致，不再读成空白 */
+.qcell.lock{color:#b3ab98}
 </style>
 </head><body>
 <div id="stage"><header class="top"><a class="back m-press" href="16-service-hubs.html?hub=resume" aria-label="返回简历服务"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></a><div class="logo"><div class="mark">职</div><div class="brand">职易达</div></div><div class="space"></div><div class="pill"><i class="m-dot breathe"></i>自我探索</div><time class="clock" id="clock" aria-label="终端墙上时钟">--:--</time></header><section class="hero"><div class="hero-row"><div class="face m-face-ring">青</div><div><div class="eyebrow">自我探索</div><div class="ask" id="ask"></div><div class="doing" id="doing"></div></div></div><ol class="qx-steps"><li><b>1</b>先读说明，勾选后再开始</li><li><b>2</b>二十五道题，按平时的习惯选</li><li><b>3</b>带走强弱和 AI 解读，可打印</li></ol></section><main id="body" data-screen="self-assessment" data-state="intro" data-testid="self-assessment-state-intro"></main><div class="scrollcue" id="scrollcue">下面还有内容，手指往上滑</div><div class="actions" id="actions"></div><nav class="nav" aria-label="全局导航"><a href="01-home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 10 9-7 9 7v11H3z"/><path d="M9 21v-8h6v8"/></svg>首页</a><a href="05-ai-cockpit.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a><a href="30-my-profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a></nav></div>

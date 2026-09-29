@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 9/29 定稿（最后一批）：missing-context / quoting / quote-failed 三屏下面空着 240–480px，余高分到三段之前（与 capability-invalid-params 同一做法），missing-context 另把卡内间距放回原稿值；zero-amount 的「问小青」被底部导航压住，删去确认区说明与「零元单也要先建单」卡里重复的「本屏是排版演示…」一句（运行页本来就没有这句）；不带 debug 打开那三屏的说明里「原型演示模式」改「示例模式」。状态键、data-testid、结构不改，不加区块、不放大字。
 - 9/29 定稿：capability-invalid-params 不再拦截（状态键不改）。带进来的彩色 / 双面本机暂未开通时，按本机能用的参数（黑白、单面）照常报价、主按钮「确认并去付款」可点（去 32 收银台）；「核对打印内容」里被改的那一项画灰（虚线、弱化色，同稿 13 不可用样式）并就地写「彩色 / 双面本机暂未开通，已按黑白 / 单面报价」；价格旁写「已按本机能用的参数报价，比原来多用 N 张纸」（N 按示例文件页数与份数算，1 页文件写「用纸张数不变」）；金额是示例值，标「界面示例」（与 32 收银台同一说法）。删去「为什么被挡下」两卡，余高分到三段之间。页内旧注释里「本机暂未开通 → 强制拦截 / 拒绝报价」的说法以这一条为准。
 - 9/28 去掉内部英文键名
 - 9/28 逐状态检查修压字
@@ -401,6 +402,18 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .rev-grid>div.off>b svg{flex:none}
 .rev-grid>div.off>em{font-style:normal;font-size:24px;font-weight:700;line-height:1.3;color:var(--wheat-d)}
 #body-root[data-state=capability-invalid-params] .sec{margin-top:auto}
+#body-root:is([data-state=missing-context],[data-state=quoting],[data-state=quote-failed]) .sec{margin-top:auto}
+#body-root:is([data-state=missing-context],[data-state=quoting],[data-state=quote-failed]) .sec.last{margin-bottom:24px}
+#body-root[data-state=missing-context] .sec-label{margin-bottom:10px}
+#body-root[data-state=missing-context] .state{padding:24px 34px}
+#body-root[data-state=missing-context] .state-p{margin-top:12px}
+#body-root[data-state=missing-context] .pgrp{padding:18px 24px}
+#body-root[data-state=missing-context] .plan{margin-top:16px;gap:11px}
+#body-root[data-state=missing-context] .cfm{padding:18px 28px 20px}
+#body-root[data-state=missing-context] .cfm-act{margin-top:16px}
+#body-root[data-state=missing-context] .grid2{align-items:stretch}
+#body-root[data-state=missing-context] .grid2>.pgrp{display:flex;flex-direction:column}
+#body-root[data-state=missing-context] .grid2>.pgrp>.state-p:last-child{margin-top:auto;padding-top:12px}
 
 </style>
 </head>
@@ -786,7 +799,7 @@ else if(CTX.ok&&rawState!==null&&STATES.indexOf(rawState)<0)
  CTX={ok:false,reason:'页面状态「'+shown(rawState)+'」不在本页登记的状态里。'};
 /* 会摆出金额的三屏在正常访问下不给：这台机器上没有真实报价，给了就是拿写死的数字冒充它。 */
 else if(CTX.ok&&!DEBUG&&SYNTHETIC_STATES.indexOf(rawState)>=0)
- CTX={ok:false,reason:'「已报价」「权益未抵扣」「零元单」这三屏会在屏幕上摆出金额，还摆出一单看着能确认的订单。这台机器上没有真实的报价结果，本页不拿写死的数字冒充它，所以这三屏只在原型演示模式里当排版看，正常打开一律停在这一屏。'};
+ CTX={ok:false,synthetic:true,reason:'「已报价」「权益未抵扣」「零元单」这三屏会在屏幕上摆出金额，还摆出一单看着能确认的订单。这台机器上没有真实的报价结果，本页不拿写死的数字冒充它，所以这三屏只在示例模式里当排版看，正常打开一律停在这一屏。'};
 var DOC=CTX.ok?CTX.doc:DOC_DEFAULT;
 /* 优惠券设计状态：默认 unavailable。未登记取值、或非 debug 下请求合成态，一律回落
    unavailable —— 正常打开这一页永远只会看到「功能尚未接通」，看不到任何可减价的样子。
@@ -1050,8 +1063,8 @@ V['missing-context']=function(){
    旧写法会把未知取值静默改写成 quoted，等于替用户宣布「有一单可以确认」。 */
 V['invalid-context']=function(){
  var reason=CTX.ok
-  ?'这一次没有真的核对失败：本屏是从演示面板或地址栏直接指定的失败态。'
-  :CTX.reason;
+  ?'界面示例：这是交接内容没通过核对时的样子，这一次并没有真的核对失败。'
+  :(CTX.synthetic?CTX.reason:'这份文件的交接信息和登记的对不上，本机不按猜测继续。');
  return sec('01','这一单没法确认','交接内容没通过登记核对',
   '<div class="state" data-kind="error" data-testid="'+SCREEN+'-fallback">'+
   '<div class="state-h">'+svg('lock','currentColor',28)+'交接内容没通过核对</div>'+
@@ -1197,10 +1210,10 @@ V['zero-amount']=function(){
    '<div style="margin-top:16px">'+couponBlock()+'</div>'+
    '<div class="grid2" style="margin-top:16px">'+pageSrcCard()+
    '<div class="pgrp" data-testid="'+SCREEN+'-fallback"><h4>零元单也要先建单</h4>'+
-   '<div class="state-p">真实步骤里确认后仍会建单再释放打印，<b>不存在「不建单直接出纸」的路径</b>。本屏是排版演示，不建单。</div></div></div>')+
+   '<div class="state-p">真实步骤里确认后仍会建单再释放打印，<b>不存在「不建单直接出纸」的路径</b>。</div></div></div>')+
   sec('03','确认并建单','演示排版 · 这一步点不动',confirmBlock({
    tone:'warn',
-   note:'真实步骤里金额为 0 时，<b>确认后仍会创建打印订单</b>，再直接进入打印流程。<b>本屏是排版演示，这一步点不动。</b>',
+   note:'真实步骤里金额为 0 时，<b>确认后仍会创建打印订单</b>，再直接进入打印流程。',
    reason:'合成排版演示 —— 屏上的 0 不是系统结果，本屏不会建单，也不会释放打印',
    secondary:backSecondary(),
    primary:{label:'确认并建单（演示中不可点）'}}),'last');

@@ -69,6 +69,8 @@ async function main() {
       return 1
     },
     setJsonIfVersionNotOlder: async () => 'stored' as const,
+    // P1-4：密码登录先原子预留尝试额度，预留不到（含 Redis 不可用）即失败关闭；本门禁不测锁定，按「有额度」应答。
+    reserveWithinLimitWithTtl: async () => true,
   } as never
   const auth = new AuthService(
     new JwtService({ secret: 'verify-admin-orgs-test-secret' }),

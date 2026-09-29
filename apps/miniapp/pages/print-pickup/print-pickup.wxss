@@ -61,6 +61,15 @@
 .ph-code { display: block; color: var(--ink); font-size: 52rpx; line-height: 1.1; font-weight: 850; letter-spacing: 3rpx; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ph-hint { display: block; color: var(--muted); font-size: 22rpx; line-height: 1.5; }
 .ph-countdown { display: block; margin-top: 10rpx; color: var(--teal); font-size: 21rpx; font-weight: 600; }
+/* 到机码三个动作：一行三颗，可点高度守 48px */
+.ph-acts { display: flex; gap: 12rpx; width: 100%; margin-top: 22rpx; }
+.ph-act { flex: 1; min-width: 0; min-height: 96rpx; padding: 0 8rpx; border-radius: var(--r-full); border: 1rpx solid var(--teal-soft);
+  background: var(--surface); color: var(--teal-deep); font-size: var(--fs-base); font-weight: 600;
+  display: flex; align-items: center; justify-content: center; text-align: center; }
+.ph-act.off { opacity: .5; }
+.ph-share-note { display: block; margin-top: 12rpx; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+/* 分享图的画布：画在屏幕外，不参与布局。尺寸与 utils/pickup-actions.js 的 CARD_W / CARD_H 一致。 */
+.share-card-canvas { position: fixed; left: -2000rpx; top: 0; width: 600px; height: 840px; }
 
 .status-visual { padding: 24rpx 0 12rpx; }
 .sv-icon { width: 108rpx; height: 108rpx; margin: 0 auto 20rpx; border-radius: 34rpx; background: var(--warn-soft); color: var(--warn); display: flex; align-items: center; justify-content: center; }

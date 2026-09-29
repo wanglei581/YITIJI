@@ -9,10 +9,10 @@
 
 ## 怎么跑
 
-在生产机（检出一般在 `/root/YITIJI`，运行目录 `/srv/ai-job-print`）：
+在生产机（检出一般在 `<服务器源码检出目录>`，运行目录 `/srv/ai-job-print`）：
 
 ```bash
-bash /root/YITIJI/scripts/collect-production-evidence.sh
+bash <服务器源码检出目录>/scripts/collect-production-evidence.sh
 ```
 
 或把脚本单独拷上去再跑。stdout 整段贴进工单即可。
@@ -57,7 +57,7 @@ bash /root/YITIJI/scripts/collect-production-evidence.sh
 | B08 | 3.1 | `df -Pk /` 余量 |
 | B09 | 3.1 | `free -m` / `nproc` / loadavg |
 | B10 | 3.1 | `ss -lnt`：80/443/22；5432/6379 不得 `0.0.0.0` |
-| B11 | 2.1 | `/root/YITIJI` `git rev-parse HEAD` + dirty 行数 |
+| B11 | 2.1 | `<服务器源码检出目录>` `git rev-parse HEAD` + dirty 行数 |
 | B12 | 3.8 | `/srv/ai-job-print/DEPLOY_SOURCE.txt` |
 | B13 | 3.8 | PM2 cwd / script / node / pid |
 | B14 | 2.2 | `.env` mode 600 + 源码 index 里没有 `.env` |

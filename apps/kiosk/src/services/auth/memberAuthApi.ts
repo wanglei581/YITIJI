@@ -23,6 +23,9 @@ export class MemberApiError extends Error {
   }
 }
 
+/** 协议还没正式发布时的登录拦截文案（C4）：一体机正式构建与服务端 LEGAL_DOCS_NOT_PUBLISHED 共用。 */
+export const LEGAL_DOCS_NOT_PUBLISHED_COPY = '暂时无法登录：用户协议和隐私政策还没有正式发布。不登录也能打印和扫描。'
+
 /**
  * 将 API 错误收敛为可直接展示给用户的文案。
  * 明确的业务消息原样保留；网络错误和通用 HTTP 占位消息使用调用场景自己的恢复提示。

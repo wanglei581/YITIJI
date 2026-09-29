@@ -209,6 +209,19 @@ if ! node services/api/scripts/preflight-production-gates.mjs \
   exit 1
 fi
 
+echo "=== 3d. 法务文档预检（线上正在运行的 API：三份必须已激活）==="
+# 2026-09-29 C4 口径：一体机与小程序正式版取不到已发布的协议就拦住登录，
+# LEGAL_DOCS_REQUIRE_PUBLISHED=false 对正式版前端不起作用，所以发布前逐份核对
+# 用户服务协议、隐私政策、AI 服务免责声明。失败必须在 pg_dump 之前中止。
+# 只有新服务器首装（API 还没跑起来）时，才允许 DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT=first-install 跳过。
+LEGAL_BASE_URL="${DEPLOY_LEGAL_BASE_URL:-${HEALTH_URL%/health/ready}}"
+if [ "${DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT:-}" = "first-install" ]; then
+  echo "::warning::已跳过法务文档预检（DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT=first-install）。只允许新服务器首装时用；发布后立刻在后台「法务文档版本」激活用户服务协议、隐私政策、AI 服务免责声明三份，否则会员登不上。"
+elif ! node services/api/scripts/preflight-legal-docs.mjs --base-url "$LEGAL_BASE_URL"; then
+  echo "::error::法务文档预检失败，发布在备份前中止（线上未动）。先在后台「法务文档版本」激活缺少的文档，再发布。"
+  exit 1
+fi
+
 echo "=== 2. PostgreSQL 全库备份 + 可读校验 ==="
 mkdir -p "$BACKUP_ROOT"
 pg_dump "$DBURL" -Fc -f "$BACKUP_PREFIX.dump"

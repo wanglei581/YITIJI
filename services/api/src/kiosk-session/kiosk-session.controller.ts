@@ -1,31 +1,40 @@
-import { Controller, HttpCode, HttpStatus, NotImplementedException, Post } from '@nestjs/common'
+import { Body, Controller, Headers, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common'
+import { ApiResponse } from '../common/dto/api-response.dto'
+import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
+import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
+import { EndKioskSessionDto, StartKioskSessionDto, TouchKioskSessionDto } from './dto/kiosk-session.dto'
+import { KioskSessionService } from './kiosk-session.service'
 
 /**
- * 一体机会话记账尚未实现（KioskSession 表零写入是已知缺口）。
- * 前端不调用本控制器；隐私清场走本地 idle timer。
- * 假成功会违反 CLAUDE.md §9，因此明确 501，保留模块便于以后接真写入。
+ * 一体机会话（服务人次）上报。只认终端验签身份（x-terminal-id + x-terminal-session-token），
+ * 限流按台计。一体机上报失败不影响用户操作，也不在本机缓存使用记录。
  */
 @Controller('kiosk/session')
+@UseGuards(TerminalIdentityGuard)
 export class KioskSessionController {
-  @Post('heartbeat')
-  @HttpCode(HttpStatus.NOT_IMPLEMENTED)
-  heartbeat(): never {
-    throw new NotImplementedException({
-      error: {
-        code: 'KIOSK_SESSION_NOT_IMPLEMENTED',
-        message: '一体机会话记账尚未实现，本端点不会记录服务人次',
-      },
-    })
+  constructor(private readonly sessions: KioskSessionService) {}
+
+  /** 一个使用周期里第一次有效操作时调用一次；同一 clientSessionId 重放只记一条。 */
+  @Post('start')
+  @HttpCode(HttpStatus.OK)
+  @TerminalScopedThrottle(10)
+  async start(@Headers('x-terminal-id') terminalId: string, @Body() dto: StartKioskSessionDto) {
+    return ApiResponse.ok(await this.sessions.start(terminalId, dto))
   }
 
-  @Post('extend')
-  @HttpCode(HttpStatus.NOT_IMPLEMENTED)
-  extend(): never {
-    throw new NotImplementedException({
-      error: {
-        code: 'KIOSK_SESSION_NOT_IMPLEMENTED',
-        message: '一体机会话记账尚未实现，本端点不会延长会话',
-      },
-    })
+  /** 进入新的服务大类时调用；同一大类由一体机节流到 5 分钟一次。 */
+  @Post('heartbeat')
+  @HttpCode(HttpStatus.OK)
+  @TerminalScopedThrottle(30)
+  async heartbeat(@Headers('x-terminal-id') terminalId: string, @Body() dto: TouchKioskSessionDto) {
+    return ApiResponse.ok(await this.sessions.touch(terminalId, dto))
+  }
+
+  /** 清场或超时时调用；重复调用不改已记下的结束时间。 */
+  @Post('end')
+  @HttpCode(HttpStatus.OK)
+  @TerminalScopedThrottle(10)
+  async end(@Headers('x-terminal-id') terminalId: string, @Body() dto: EndKioskSessionDto) {
+    return ApiResponse.ok(await this.sessions.end(terminalId, dto))
   }
 }

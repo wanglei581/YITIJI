@@ -102,6 +102,15 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   margin-top: 16rpx;
 }
 
+/* 分享给代取人 / 作废换新码：两颗等宽按钮，可点高度守 48px */
+.code-acts { display: flex; gap: 16rpx; margin-top: 16rpx; }
+.code-act { flex: 1; min-height: 96rpx; border-radius: var(--r-full); border: 1rpx solid var(--teal-soft); background: var(--surface);
+  color: var(--teal-deep); font-size: var(--fs-base); font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.code-act.off { opacity: .5; }
+.code-share-note { margin-top: 12rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; text-align: center; }
+/* 分享图的画布：画在屏幕外，不参与布局。尺寸与 utils/pickup-actions.js 的 CARD_W / CARD_H 一致。 */
+.share-card-canvas { position: fixed; left: -2000rpx; top: 0; width: 600px; height: 840px; }
+
 /* 订单信息 */
 .info-row {
   display: flex;

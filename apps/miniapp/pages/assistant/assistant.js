@@ -2,6 +2,8 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const voice = require('../../utils/voice-recorder')
+const aiAccess = require('../../utils/ai-access')
+const { userMessageOf } = require('../../utils/user-error')
 
 // 后端 route 字符串 → 小程序页面路径映射（后端返回 actions[].route 时使用）。
 // 没有映射的 route 会被丢掉（见 _send 里的 .filter）：服务端给一体机的岗位、招聘会、
@@ -17,6 +19,16 @@ const ROUTE_MAP = {
   '/print':            '/pages/print/print',
   '/print/upload':     '/pages/print-upload/print-upload',
   '/ai-records':       '/pages/ai-records/ai-records',
+}
+
+// 请求带 channel=miniapp 之后（C12），服务端回的 route 已经是小程序页面路径，而且只会是 app.json
+// 里注册过的页面（services/api/src/ai/llm/assistant-channel.ts）。上面这张表留给还没升级的服务端。
+const MINIAPP_PAGE_RE = /^\/pages\/[a-z0-9-]+\/[a-z0-9-]+$/
+
+function cardUrlOf(route) {
+  const raw = String(route || '')
+  if (ROUTE_MAP[raw]) return ROUTE_MAP[raw]
+  return MINIAPP_PAGE_RE.test(raw.split('?')[0]) ? raw : ''
 }
 
 // Tab 页只能 switchTab 进，navigateTo 会直接失败（「打印」成为 Tab 后，
@@ -66,7 +78,8 @@ Page({
     // 滚动到底部：两值交替使 scroll-top 绑定每次触发
     _stFlip: false,
     scrollTop: 0,
-    disclaimer: 'AI 助手小青的回答由 AI 生成，可能存在错误。政策、补贴等信息请以官方渠道为准。',
+    // 小程序渠道不提政策（C12：本渠道没有政策页），这里也不再写「政策、补贴以官方渠道为准」。
+    disclaimer: 'AI 生成，仅供参考：小青的回答由 AI 生成，可能有错，请核对后再用。',
   },
 
   onLoad() {
@@ -102,7 +115,7 @@ Page({
     const { url } = e.currentTarget.dataset
     if (!url) return
     if (TAB_PAGES.includes(String(url).split('?')[0])) wx.switchTab({ url: String(url).split('?')[0] })
-    else wx.navigateTo({ url })
+    else wx.navigateTo({ url, fail() { wx.showToast({ title: '这个页面当前版本暂未开放', icon: 'none' }) } })
   },
 
   /** 滚动到底部（两值交替保证 scroll-top binding 每次都触发渲染） */
@@ -126,14 +139,14 @@ Page({
     try {
       const res = await api.assistantChat(text, this.data.sessionId)
 
-      // 将 backend actions 转成引导卡（只保留有已知映射的路由）
+      // 将 backend actions 转成引导卡（只保留认得出的小程序页面）
       const cards = (res.actions || []).map(a => ({
         id:   a.route,
         icon: iconForRoute(a.route),
         tone: 'teal',
         title: a.label,
         sub:  '',
-        url:  ROUTE_MAP[a.route] || '',
+        url:  cardUrlOf(a.route),
       })).filter(c => c.url)
 
       // 服务端专门透出 aiGenerated / providerLabel，就是为了让前端分辨
@@ -158,8 +171,9 @@ Page({
         sessionId: res.sessionId || this.data.sessionId,
         sending:   false,
       })
-    } catch (_) {
-      const aiMsg = { id: loadingMsg.id, role: 'ai', text: '小青暂时无法回复，请稍后再试。' }
+    } catch (err) {
+      // 说得出原因的就照实说：没登录、AI 暂停、年龄没确认、内容处理不了；其余才是「暂时无法回复」。
+      const aiMsg = { id: loadingMsg.id, role: 'ai', text: userMessageOf(err, '小青暂时无法回复，请稍后再试。') }
       const msgs  = this.data.messages.slice(0, -1).concat(aiMsg)
       this.setData({ messages: msgs, sending: false })
     }
@@ -185,6 +199,16 @@ Page({
   onHoldStart() {
     if (this.data.sending || this.data.holding || this.data.transcribing) return
     if (!this.data.asrEnabled) return
+    if (!aiAccess.isDeclared(aiAccess.AGE_SCOPE) || !aiAccess.isDeclared(aiAccess.VOICE_SCOPE)) {
+      // 第一次：先问年满 14 周岁与录音单独同意（与语音说简历、模拟面试共用一次，C6）。
+      // 提示框会打断按住的手指，这一次只问不录，同意后提示再按住说话；不同意照样能打字。
+      this._wantRecord = false
+      api.ensureVoiceConsent().then(
+        () => wx.showToast({ title: '已同意录音，请再按住说话', icon: 'none' }),
+        (err) => wx.showToast({ title: userMessageOf(err, '这一步请改用文字输入'), icon: 'none', duration: 2500 }),
+      )
+      return
+    }
     this._wantRecord = true
     voice.ensureRecordAuth().then((ok) => {
       if (!this._wantRecord) return null
@@ -276,15 +300,28 @@ Page({
 
   tapMore() {
     wx.showActionSheet({
-      itemList: ['清空对话记录', '查看 AI 服务记录'],
+      itemList: ['清空对话记录', '查看 AI 服务记录', 'AI 服务说明', '投诉 AI 回答'],
       success: (res) => {
         if (res.tapIndex === 0) {
           this.setData({ messages: [this.data.messages[0]], sessionId: '' })
-        } else {
+        } else if (res.tapIndex === 1) {
           wx.navigateTo({ url: '/pages/ai-records/ai-records' })
+        } else if (res.tapIndex === 2) {
+          this.openAiDisclaimer()
+        } else if (res.tapIndex === 3) {
+          this.openAiComplaint()
         }
       },
     })
+  },
+
+  // C1 所用模型与备案号、C3 投诉入口：声明条里与右上角菜单里各一处。
+  openAiDisclaimer() {
+    wx.navigateTo({ url: '/pages/legal/legal?type=ai_disclaimer' })
+  },
+
+  openAiComplaint() {
+    wx.navigateTo({ url: '/pages/feedback/feedback?category=ai_content' })
   },
 
   onShareAppMessage() {

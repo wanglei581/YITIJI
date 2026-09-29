@@ -31,6 +31,7 @@ import {
 } from './member-step-up.service'
 
 import { resolveClientIpOrUnknown } from '../common/client-ip'
+import { TerminalSessionService } from '../terminals/terminal-session.service'
 /**
  * 只使用 Express 解析后的客户端 IP。
  * 默认不信任客户端直传的 X-Forwarded-For；若生产经反代，必须在应用入口显式配置可信代理后，
@@ -51,13 +52,26 @@ export class MemberAuthController {
     private readonly qrLogin: MemberQrLoginService,
     private readonly stepUp: MemberStepUpService,
     private readonly phoneRebind: MemberPhoneRebindService,
+    private readonly terminalSessions: TerminalSessionService,
   ) {}
 
-  /** 发送验证码。IP 维度再加一层粗限流(细粒度多维频控在 service 内走 Redis)。 */
+  /**
+   * 发送验证码。IP 维度再加一层粗限流(细粒度多维频控在 service 内走 Redis)。
+   * 一体机发起时带 x-terminal-id + x-terminal-session-token，按终端计每日短信额度（P1-5）；
+   * 带了终端编号却验不过签的一律拒绝——否则谁都能冒用某台一体机的编号把它当天的额度刷光。
+   */
   @Post('auth/sms-code')
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async sendSmsCode(@Body() dto: SendSmsCodeDto, @Req() req: Request): Promise<ApiResponse<SendCodeResult>> {
-    return ApiResponse.ok(await this.service.sendSmsCode(dto.phone, dto.deviceId, clientIp(req)))
+    const terminalId = await this.verifiedTerminalId(req)
+    return ApiResponse.ok(await this.service.sendSmsCode(dto.phone, dto.deviceId, clientIp(req), terminalId))
+  }
+
+  private async verifiedTerminalId(req: Request): Promise<string | null> {
+    const terminalId = req.header('x-terminal-id')?.trim()
+    if (!terminalId) return null
+    await this.terminalSessions.validate(terminalId, req.header('x-terminal-session-token'))
+    return terminalId
   }
 
   /** 手机号 + 验证码登录。 */

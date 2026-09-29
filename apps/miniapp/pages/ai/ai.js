@@ -116,6 +116,16 @@ Page({
     wx.navigateTo({ url: '/pages/assistant/assistant' })
   },
 
+  // C1：所用模型名称与备案号写在后台发布的「AI 服务说明」里，这里是它的入口。
+  openAiDisclaimer() {
+    wx.navigateTo({ url: '/pages/legal/legal?type=ai_disclaimer' })
+  },
+
+  // C3：投诉入口直接落到「意见反馈」的「AI 内容投诉」类别。
+  openAiComplaint() {
+    wx.navigateTo({ url: '/pages/feedback/feedback?category=ai_content' })
+  },
+
   toRecords() {
     wx.navigateTo({ url: '/pages/ai-records/ai-records' })
   },
