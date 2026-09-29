@@ -25,6 +25,11 @@ import type { LocalAgentPanelStatus } from './local-api/types'
 // Phase 8.1C additions
 import { acquireLock, releaseLock } from './agent/instance-lock'
 import { cleanupCrashLeftoverPrintTaskTemps } from './agent/print-task-temp-cleanup'
+import {
+  agentProcessStartedAtMs,
+  cleanupStaleOwnPrintJobs,
+  pauseConfiguredPrinterQueue,
+} from './agent/print-queue-hold'
 import { isDatabaseAvailable, openDatabase, type AgentDatabase } from './agent/db'
 import { startOfflineRetry } from './agent/offline-queue'
 import { startScanDeletionAuditReporter } from './agent/scan-deletion-audit-reporter'
@@ -97,6 +102,25 @@ program
       assertAgentProfileAllowsApiBaseUrl(config)
     } catch (error) {
       failStartup(error, 'AGENT_PROFILE_REJECTED')
+    }
+
+    // 上一进程若在「已恢复、还没再暂停」时崩溃，队列可能仍在跑。
+    // 先暂停，再删本账号在本次进程启动前提交的作业。清理不看 hold 开关。
+    // 非 Windows 两步都空转，不因此拒绝启动。
+    try {
+      if (config.holdPrinterQueueWhenIdle) {
+        const paused = await pauseConfiguredPrinterQueue(config.printerName)
+        if (!paused.skipped) log('print-queue-hold: idle queue paused')
+      }
+      await cleanupStaleOwnPrintJobs({
+        printerName: config.printerName,
+        startedAtMs: agentProcessStartedAtMs(),
+      })
+    } catch (error) {
+      err(
+        'AGENT_STARTUP_FAILED: printer queue could not be paused or leftover jobs removed; refusing to claim new work.',
+      )
+      failStartup(error, 'AGENT_STARTUP_FAILED')
     }
 
     // Start the loopback API before cloud registration so the watchdog and

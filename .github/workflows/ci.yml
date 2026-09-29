@@ -389,6 +389,8 @@ jobs:
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
           pnpm run verify:print-monitor-truth
+          # 解析 Get-PrintJob 输出并按账号、提交时间筛选。不建打印机。
+          pnpm run verify:print-queue-residue
           # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
           pnpm run verify:image-scale-truth
           pnpm run verify:network-diagnostics

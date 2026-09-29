@@ -72,9 +72,9 @@
 ### R.2 升级 Agent
 
 1. **做什么**  
-   产品负责人本人双击安装本次发布的 MSI（U 盘拷入或本机下载后安装，见母盘清单 A14）。**从 0.4.11 首次升级时，装完须按 [生产接入说明](production-agent-onboarding.md) 重跑一次生产安装脚本**（这台兼作工作电脑，带 `-KeepFileSelectionDialogs`），否则升级后的自动启动恢复标记还不存在。
+   产品负责人本人双击安装本次发布的 MSI（U 盘拷入或本机下载后安装，见母盘清单 A14）。发布当天装的 Agent 必须是 **0.4.13 或更高**，并且必须包含「图片临时 PDF 开机清理」与「打印队列空闲暂停 + 开机清理残留作业」两处修复。**从 0.4.11 首次升级时，装完须按 [生产接入说明](production-agent-onboarding.md) 重跑一次生产安装脚本**（这台兼作工作电脑，带 `-KeepFileSelectionDialogs`，并加 `-KeepPrinterQueueUnpaused`），否则升级后的自动启动恢复标记还不存在，而且空闲暂停会挡住这台电脑上别的程序打印。专用一体机不要加 `-KeepPrinterQueueUnpaused`。
 2. **应该看到什么**  
-   后台同一行「Agent 版本」变成新版本，运行状态回到「在线」；一体机首页「打印 · 扫描」徽章回到「打印机在线」（见 A.7）。
+   后台同一行「Agent 版本」变成 0.4.13 或更高（来源：`apps/admin/src/routes/terminals/index.tsx:768`），运行状态回到「在线」（来源：同文件 `:91`）；一体机首页「打印 · 扫描」徽章回到「打印机在线」（见 A.7，来源：`apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts:36`）。版本号来源：`apps/terminal-agent/package.json` 的 `version` 与 `apps/terminal-agent/scripts/install-production-agent.ps1:81`。兼作工作电脑的开关来源：同文件 `:23`、`:108`；生产默认写入暂停的来源：同文件 `:900`。
 3. **看不到时属于哪一类**  
    ① 本机装机 / Agent。
 4. **现场立刻能做的补救**  
@@ -84,13 +84,14 @@
 
 升级后按 **C → E → H → I** 走（D 支付、F 扫码枪、G 小程序上传按当次发布范围决定是否走）。每段通过标准见各段末尾；四段的出纸照片、三处状态截图、告警截图都记进文末「现场记录」。
 
-### R.4 需要产品负责人本人到机器旁的事（一页纸，约 90 分钟）
+### R.4 需要产品负责人本人到机器旁的事（一页纸，约 100 分钟）
 
 | 顺序 | 环节 | 本人要做的事 | 预计 |
 |---|---|---|---|
 | 1 | 开始前 | 纸盒装满 A4；后台**本人登录**（密码不交给任何人或模型） | 5 分钟 |
 | 2 | R.1 过渡检查 | 手机扫屏上码传一份 PDF，看零元单出纸，拍出纸照片 | 10 分钟 |
-| 3 | R.2 升级 | 装 MSI、重跑一次生产安装脚本 | 15 分钟 |
+| 3 | R.2 升级 | 装 MSI、重跑一次生产安装脚本（KSK-001 加 `-KeepFileSelectionDialogs -KeepPrinterQueueUnpaused`） | 15 分钟 |
+| 3b | R.5 空闲断电 | 在没加 `-KeepPrinterQueueUnpaused` 的机器上，空闲时拔电再上电，确认残留作业不自己出纸 | 10 分钟 |
 | 4 | C 打印闭环 | 手机扫码传文件，取纸拍照，看后台订单「已完成」 | 10 分钟 |
 | 5 | E 扫描回传 | 把一张**无个人信息**的样张放进进纸器，按面板扫描，看文档里出现 | 10 分钟 |
 | 6 | H 到机码 | 小程序下单拿码，到机输码，取纸拍照，看小程序订单「已完成」 | 10 分钟 |
@@ -98,6 +99,17 @@
 | 8 | I 卡纸 | 出纸中**打开前盖**制造卡纸；按奔图说明取出卡纸；清队列 | 15 分钟 |
 
 远程能做的（一体机页面操作、截图、Agent 日志与心跳读取）由 Windows 真机路经 UU 远程做，不需要本人守着；本人只在上表的步骤到场。
+
+### R.5 空闲断电：残留作业停住，不打给下一位
+
+1. **做什么**  
+   用一台**按生产默认安装、没有加 `-KeepPrinterQueueUnpaused`** 的机器。打印机空闲、没有正在出纸时，拔掉主机电源再上电（或长按电源键超过 2 秒关机后再开）。等 Agent 服务起来。KSK-001 若按 R.2 加了 `-KeepPrinterQueueUnpaused`，队列不会被暂停，本步的「不自己出纸」在这台机器上不成立；要验这一条就临时去掉该开关重跑生产安装脚本，验完再加回去。**不要在正在出纸时拔电**——那一小段队列是恢复着的，打印服务可能在 Agent 起来之前把纸送出，本步不覆盖。暂停状态断电后是否还在，奔图驱动上尚未验证，以这次实测为准。
+2. **应该看到什么**  
+   拔电上电后，队列里的残留作业停在暂停状态，并被 Agent 清掉，不自己出纸。Agent 日志里出现 `print-queue-hold: idle queue paused`（来源：`apps/terminal-agent/src/index.ts:113`）。若确实删了作业，还有 `print-queue-cleanup: removed leftover print jobs (count=`（来源：`apps/terminal-agent/src/agent/print-queue-hold.ts:276`），只记数量、没有文档名。图片临时 PDF 若有残留，日志是 `print-temp-cleanup: removed leftover print task files (count=`（来源：`apps/terminal-agent/src/agent/print-task-temp-cleanup.ts:113`）。一体机首页徽章回到「打印机在线」（来源：`apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts:36`），不会因为队列暂停变成状态未知。
+3. **看不到时属于哪一类**  
+   ① 本机装机 / Agent。上电后纸自己出来，记发布阻塞，把时间和出了几张写进文末记录表。
+4. **现场立刻能做的补救**  
+   在打印机面板或 Windows 打印队列里取消残留作业，这台机器先不要给下一位使用。暂停/恢复在奔图上的结果写「通过」或「未验证」，没测到不要写成已经覆盖。
 
 ---
 

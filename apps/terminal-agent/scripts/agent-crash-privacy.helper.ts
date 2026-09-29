@@ -111,35 +111,62 @@ function verifyRegularCleanupAndPreservation(): void {
   const leftover = join(tempDir, 'task_ptask_kiosk_deadbeef.pdf')
   const leftoverJpg = join(tempDir, 'task_abc123.jpg')
   const unrelatedPrint = join(tempDir, 'print_uuid.pdf')
+  const imageTemp = join(tempDir, 'print_x_12345678-1234-1234-1234-123456789abc.pdf')
+  const bareImageTemp = join(tempDir, 'print_12345678-1234-1234-1234-123456789abc.pdf')
   const notes = join(tempDir, 'notes.txt')
   const wrongExt = join(tempDir, 'task_abc.doc')
   const bak = join(tempDir, 'task_abc.pdf.bak')
   const nestedDir = join(tempDir, 'nested')
   mkdirSync(nestedDir)
   const nestedLeftover = join(nestedDir, 'task_nested.pdf')
+  const nestedPrint = join(nestedDir, 'print_x_12345678-1234-1234-1234-123456789abc.pdf')
   const matchingDir = join(tempDir, 'task_dironly.pdf')
   mkdirSync(matchingDir)
   writeFileSync(join(matchingDir, 'inside.pdf'), secret)
   writeFileSync(leftover, secret)
   writeFileSync(leftoverJpg, 'jpg')
   writeFileSync(unrelatedPrint, 'print leftover')
+  writeFileSync(imageTemp, secret)
+  writeFileSync(bareImageTemp, secret)
   writeFileSync(notes, 'notes')
   writeFileSync(wrongExt, 'doc')
   writeFileSync(bak, secret)
   writeFileSync(nestedLeftover, secret)
+  writeFileSync(nestedPrint, secret)
+  const outsidePrint = join(root, 'outside-print.pdf')
+  const printLink = join(tempDir, 'print_abcdef01-2345-6789-abcd-ef0123456789.pdf')
+  let printLinked = false
+  if (process.platform !== 'win32') {
+    writeFileSync(outsidePrint, secret)
+    try {
+      symlinkSync(outsidePrint, printLink)
+      printLinked = true
+    } catch {
+      printLinked = false
+    }
+  }
 
   const logs = captureStdio(() => {
     cleanupCrashLeftoverPrintTaskTemps({ tempDir })
   })
   assert.equal(existsSync(leftover), false, 'matching pdf leftover must be removed')
   assert.equal(existsSync(leftoverJpg), false, 'matching jpg leftover must be removed')
-  assert.equal(existsSync(unrelatedPrint), true, 'print_ artifacts must be preserved')
+  assert.equal(existsSync(imageTemp), false, 'image temp pdf must be removed')
+  assert.equal(existsSync(bareImageTemp), false, 'bare image temp pdf must be removed')
+  assert.equal(existsSync(unrelatedPrint), true, 'unrelated print_ names must be preserved')
   assert.equal(existsSync(notes), true)
   assert.equal(existsSync(wrongExt), true)
   assert.equal(existsSync(bak), true)
   assert.equal(existsSync(nestedLeftover), true, 'files in subdirectories must not be touched')
+  assert.equal(existsSync(nestedPrint), true, 'print_ pdf inside a subdirectory must be preserved')
   assert.equal(existsSync(join(matchingDir, 'inside.pdf')), true, 'matching-name directories must be rejected')
+  if (printLinked) {
+    assert.equal(existsSync(printLink), true, 'print_ symlink must not be unlinked')
+    assert.equal(existsSync(outsidePrint), true, 'print_ symlink target outside the temp dir must stay')
+    assert.equal(readFileSync(outsidePrint, 'utf8'), secret)
+  }
   assert.doesNotMatch(logs, /task_ptask_kiosk_deadbeef/)
+  assert.doesNotMatch(logs, /print_x_12345678/)
   assert.doesNotMatch(logs, /SENSITIVE_RESUME_CONTENT_XYZ/)
   assert.doesNotMatch(logs, new RegExp(tempDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   rmSync(root, { recursive: true, force: true })
@@ -261,12 +288,102 @@ function verifyMissingTempDirIsOk(): void {
   rmSync(root, { recursive: true, force: true })
 }
 
+function verifyPrintImageDeletionFailure(): void {
+  const root = isolatedRoot()
+  const tempDir = join(root, 'temp')
+  mkdirSync(tempDir, { recursive: true })
+  const leftover = join(tempDir, 'print_x_12345678-1234-1234-1234-123456789abc.pdf')
+  writeFileSync(leftover, 'SENSITIVE_RESUME_CONTENT_XYZ')
+  const logs = captureStdio(() => {
+    assert.throws(
+      () =>
+        cleanupCrashLeftoverPrintTaskTemps({
+          tempDir,
+          unlinkSync: () => {
+            throw new Error('EACCES')
+          },
+        }),
+      /leftover print task temp file could not be removed/,
+    )
+  })
+  assert.equal(existsSync(leftover), true, 'eligible image temp must remain when unlink fails')
+  assert.doesNotMatch(logs, /print_x_12345678/)
+  assert.doesNotMatch(logs, /SENSITIVE_RESUME_CONTENT_XYZ/)
+  rmSync(root, { recursive: true, force: true })
+}
+
+function runNodeEval(code: string) {
+  return spawnSync(process.execPath, ['-r', 'ts-node/register/transpile-only', '-e', code], {
+    cwd: join(__dirname, '..'),
+    encoding: 'utf8',
+    timeout: 60_000,
+    env: { ...process.env, TS_NODE_TRANSPILE_ONLY: '1' },
+  })
+}
+
+const printImageCleanupChild = `
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { cleanupCrashLeftoverPrintTaskTemps } = require('./src/agent/print-task-temp-cleanup')
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'print-temp-mutation-'))
+const tempDir = path.join(root, 'temp')
+fs.mkdirSync(tempDir)
+const file = path.join(tempDir, 'print_x_12345678-1234-1234-1234-123456789abc.pdf')
+fs.writeFileSync(file, 'secret')
+cleanupCrashLeftoverPrintTaskTemps({ tempDir })
+if (fs.existsSync(file)) process.exit(1)
+fs.rmSync(root, { recursive: true, force: true })
+process.exit(0)
+`
+
+const bootCleanupCallChild = `
+const fs = require('fs')
+const index = fs.readFileSync('./src/index.ts', 'utf8')
+const acquire = index.indexOf('await acquireLock()')
+const cleanup = index.indexOf('cleanupCrashLeftoverPrintTaskTemps()')
+if (!(acquire >= 0 && cleanup > acquire)) process.exit(1)
+process.exit(0)
+`
+
+function verifyPrintTempBootMutations(): void {
+  const cleanupSource = readFileSync(cleanupSourcePath, 'utf8')
+  const indexSource = readFileSync(indexSourcePath, 'utf8')
+  const ruleAnchor = 'isEligibleTaskTempName(name) || isEligiblePrintImageTempName(name)'
+  const callAnchor = 'cleanupCrashLeftoverPrintTaskTemps()'
+  assert.ok(cleanupSource.includes(ruleAnchor), 'print_ eligibility anchor must exist')
+  assert.ok(indexSource.includes(callAnchor), 'boot cleanup call anchor must exist')
+
+  const originalChild = runNodeEval(printImageCleanupChild)
+  assert.equal(originalChild.status, 0, `${originalChild.stdout ?? ''}\n${originalChild.stderr ?? ''}`)
+  const originalOrder = runNodeEval(bootCleanupCallChild)
+  assert.equal(originalOrder.status, 0, `${originalOrder.stdout ?? ''}\n${originalOrder.stderr ?? ''}`)
+
+  writeFileSync(cleanupSourcePath, cleanupSource.replace(ruleAnchor, 'isEligibleTaskTempName(name)'))
+  try {
+    const removedRule = runNodeEval(printImageCleanupChild)
+    assert.notEqual(removedRule.status, 0, 'removing the print_ rule must fail the boot cleanup gate')
+  } finally {
+    writeFileSync(cleanupSourcePath, cleanupSource)
+  }
+
+  writeFileSync(indexSourcePath, indexSource.replace(callAnchor, '/* mutation: boot cleanup call removed */'))
+  try {
+    const removedCall = runNodeEval(bootCleanupCallChild)
+    assert.notEqual(removedCall.status, 0, 'removing the index.ts boot cleanup call must fail the gate')
+  } finally {
+    writeFileSync(indexSourcePath, indexSource)
+  }
+}
+
 export function runPrintTaskTempCleanupTests(): void {
   verifyStartupOrderingSource()
   verifyRegularCleanupAndPreservation()
   verifySymlinkRejection()
   verifyDeletionFailure()
+  verifyPrintImageDeletionFailure()
   verifyTempDirSymlinkFailClosed()
   verifyMissingTempDirIsOk()
+  verifyPrintTempBootMutations()
   console.log('PASS print-task temp leftover cleanup')
 }

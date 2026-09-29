@@ -35,6 +35,8 @@
  *   DetectedErrorState=2 (No Error)               → 'ready'
  *   DetectedErrorState=0 (CIM Unknown) + PrinterStatus 3/4/5 and not offline
  *                                                 → 'ready'    (Pantum never sets this field)
+ *   PrinterState / ExtendedPrinterStatus 仅表示暂停（Extended=8 或 PAUSED 位），
+ *   且没有离线、缺纸、故障、粉量低位                 → 'ready'
  *   DetectedErrorState=0 with any other PrinterStatus → 'unknown'
  *   Win32_Printer not found                       → 'error'    (distinct from query failure)
  *   query failure / unparseable                   → 'unknown'
@@ -47,6 +49,14 @@
 import { spawn } from 'child_process'
 import { warn } from '../logger'
 import type { PrinterStatus } from './types'
+import {
+  mapWin32PrinterPreflight,
+  mapWin32PrinterQuery,
+  type PrinterPreflight,
+} from './printer-status-map'
+
+export { mapWin32PrinterPreflight, mapWin32PrinterQuery } from './printer-status-map'
+export type { PrinterPreflight } from './printer-status-map'
 
 // ── Async PowerShell runner ───────────────────────────────────────────────────
 
@@ -105,52 +115,20 @@ function runPowerShell(script: string, stdin?: string, timeoutMs = 8_000): Promi
 // ── Printer status ────────────────────────────────────────────────────────────
 
 /**
- * Map one Win32_Printer WMI line to heartbeat PrinterStatus.
- *
- * Aligns with getPrinterPreflight's split at not_found vs empty output:
- * missing printer is a definitive fault; a failed query is unknown.
- * DetectedErrorState=0 is CIM Unknown, not No Error — only 2 is ready.
+ * 心跳与预检共用这一条探针。打印机名走 stdin，过滤条件里单引号成对转义。
+ * 多读 PrinterState 与 ExtendedPrinterStatus，用来识别「只是被我们暂停」。
  */
-export function mapWin32PrinterQuery(output: string | null): PrinterStatus {
-  if (!output) return 'unknown'
-  if (output === 'not_found') return 'error'
+export function buildWin32PrinterProbeScript(): string {
+  return (
+    `$name = [Console]::In.ReadLine(); ` +
+    `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace("'", "''"))'" -ErrorAction SilentlyContinue; ` +
+    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline),$($p.PrinterState),$($p.ExtendedPrinterStatus)" } else { "not_found" }`
+  )
+}
 
-  const [statusStr, errorStr, workOfflineStr] = output.split(',')
-  const printerStatusCode = parseInt(statusStr ?? '', 10)
-  const detectedError = parseInt(errorStr ?? '', 10)
-
-  if (isNaN(printerStatusCode) || isNaN(detectedError)) return 'unknown'
-
-  if (workOfflineStr === 'True') return 'offline'
-  if (printerStatusCode === 7 || detectedError === 9) return 'offline'
-  // 4 = No Paper. Until 2026-09-29 this was folded into 'error', so a driver that does
-  // report paper-out showed up as a generic fault and the server/kiosk paper_empty paths
-  // (「打印机缺纸」) were unreachable from a real Agent. Pantum CM2800ADN is unaffected: it
-  // never sets DetectedErrorState (N3), so paper-out there still surfaces only as an
-  // unconfirmed job.
-  if (detectedError === 4) return 'paper_empty'
-  if (detectedError === 6 || detectedError === 7 || detectedError === 8) {
-    return 'error'
-  }
-  if (detectedError === 3 || detectedError === 5) return 'low_paper'
-  if (detectedError === 2) return 'ready'
-  // DetectedErrorState=0 is CIM "Unknown", and the Pantum CM2800ADN driver never
-  // populates this field: the hardening checklist [N2] recorded 0 both while idle
-  // and while powered off. Reading 0 as "not ready" therefore pins this hardware to
-  // 'unknown' forever — 2026-09-07 KSK-001 reported 614 consecutive 'unknown'
-  // heartbeats and the Kiosk blocked every print order (printerReady=false).
-  // Offline is already ruled out above by WorkOffline=True / PrinterStatus=7, which
-  // is exactly what flips on this driver when the printer is switched off, so the
-  // operational PrinterStatus is the honest signal left: 3 Idle / 4 Printing /
-  // 5 Warmup mean the queue can accept work.
-  if (
-    detectedError === 0 &&
-    (printerStatusCode === 3 || printerStatusCode === 4 || printerStatusCode === 5)
-  ) {
-    return 'ready'
-  }
-
-  return 'unknown'
+export async function queryWin32PrinterLine(printerName: string): Promise<string | null> {
+  if (process.platform !== 'win32') return null
+  return runPowerShell(buildWin32PrinterProbeScript(), printerName)
 }
 
 /**
@@ -162,12 +140,7 @@ export function mapWin32PrinterQuery(output: string | null): PrinterStatus {
 export async function getPrinterStatus(printerName: string): Promise<PrinterStatus> {
   if (process.platform !== 'win32') return 'unknown'
 
-  const script =
-    `$name = [Console]::In.ReadLine(); ` +
-    `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace("'", "''"))'" -ErrorAction SilentlyContinue; ` +
-    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline)" } else { "not_found" }`
-
-  const output = await runPowerShell(script, printerName)
+  const output = await queryWin32PrinterLine(printerName)
   if (output === 'not_found') {
     warn('wmi: configured printerName not found via Win32_Printer — reporting error')
   }
@@ -177,49 +150,14 @@ export async function getPrinterStatus(printerName: string): Promise<PrinterStat
 // ── Printer pre-flight (打印前预检) ─────────────────────────────────────────────
 
 /**
- * 打印前打印机预检结果。比 getPrinterStatus 多区分 not_found / paper_empty，
- * 用于在打印前快速拦截明确的故障，给出精确 errorCode（而非等 5min 超时）。
- *
- *   'ok'          可打印（含 low_paper / low_toner 等非阻塞警告）
- *   'not_found'   WMI 查不到该名称的打印机 → PRINTER_NOT_FOUND
- *   'offline'     WorkOffline=True / PrinterStatus=7 / DetectedErrorState=9 → PRINTER_OFFLINE
- *   'paper_empty' DetectedErrorState=4（No Paper）→ PAPER_EMPTY
- *                 NOTE: Pantum CM2800ADN driver never sets this via WMI (N3 known limit).
- *   'error'       DetectedErrorState=6/7/8（缺粉/开盖/卡纸）→ PRINTER_ERROR
- *   'unknown'     非 Windows / 查询失败 / 无法识别 → 不阻塞，交由 print() 处理
- */
-export type PrinterPreflight = 'ok' | 'not_found' | 'offline' | 'paper_empty' | 'error' | 'unknown'
-
-/**
  * Query Win32_Printer for a pre-print health check.
  * Best-effort: returns 'unknown' on non-Windows or query failure (caller must NOT block on 'unknown').
  * Only definitive bad states (not_found/offline/paper_empty/error) should gate printing.
+ * 暂停本身不是故障：预检与心跳共用 mapWin32PrinterPreflight。
  */
 export async function getPrinterPreflight(printerName: string): Promise<PrinterPreflight> {
   if (process.platform !== 'win32') return 'unknown'
-
-  const script =
-    `$name = [Console]::In.ReadLine(); ` +
-    `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace("'", "''"))'" -ErrorAction SilentlyContinue; ` +
-    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline)" } else { "not_found" }`
-
-  const output = await runPowerShell(script, printerName)
-  if (!output) return 'unknown'
-  if (output === 'not_found') return 'not_found'
-
-  const [statusStr, errorStr, workOfflineStr] = output.split(',')
-  const printerStatusCode = parseInt(statusStr ?? '', 10)
-  const detectedError = parseInt(errorStr ?? '', 10)
-  if (isNaN(printerStatusCode) || isNaN(detectedError)) return 'unknown'
-
-  // WorkOffline=True: printer powered off / set offline in Windows — catches N2 case
-  // where PrinterStatus stays 3 (Idle) despite printer being off.
-  if (workOfflineStr === 'True') return 'offline'
-  if (printerStatusCode === 7 || detectedError === 9) return 'offline'
-  if (detectedError === 4) return 'paper_empty'
-  if (detectedError === 6 || detectedError === 7 || detectedError === 8) return 'error'
-  // 0/2 normal, 3 low paper, 5 low toner, others → 可打印（非阻塞）
-  return 'ok'
+  return mapWin32PrinterPreflight(await queryWin32PrinterLine(printerName))
 }
 
 // ── Disk free space ───────────────────────────────────────────────────────────

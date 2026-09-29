@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process'
 import { monitorPrintJob } from '../src/agent/task-runner'
 import {
   buildPrintServiceCompletionEventScript,
+  mapWin32PrinterPreflight,
   mapWin32PrinterQuery,
   parsePrintJobStatus,
   type PrintJobMonitorStatus,
@@ -361,36 +362,62 @@ async function main(): Promise<void> {
   // DetectedErrorState=0 is CIM Unknown and the Pantum driver never populates it
   // (checklist [N2]: 0 both idle and powered off), so readiness falls back to
   // PrinterStatus once WorkOffline / PrinterStatus=7 have ruled out offline.
-  const printerQueryCases: Array<[string | null, string]> = [
-    [null, 'unknown'],
-    ['', 'unknown'],
-    ['not_found', 'error'],
-    ['3,0,False', 'ready'],
-    ['4,0,False', 'ready'],
-    ['5,0,False', 'ready'],
-    ['3,0,True', 'offline'],
-    ['7,0,False', 'offline'],
-    ['6,0,False', 'unknown'],
-    ['2,0,False', 'unknown'],
-    ['3,4,True', 'offline'],
-    ['3,2,False', 'ready'],
-    ['3,3,False', 'low_paper'],
-    ['3,5,False', 'low_paper'],
-    ['3,4,False', 'paper_empty'],
-    ['3,6,False', 'error'],
-    ['3,7,False', 'error'],
-    ['3,8,False', 'error'],
-    ['7,2,False', 'offline'],
-    ['3,9,False', 'offline'],
-    ['3,2,True', 'offline'],
-    ['idle,nope,False', 'unknown'],
+  // 第三列是预检。查询失败仍是 unknown；解析成功但心跳 unknown 时预检不拦打印（ok）。
+  // 后两列是 PrinterState,ExtendedPrinterStatus。仅暂停视为就绪；离线/缺纸/故障位优先。
+  const printerQueryCases: Array<[string | null, string, string]> = [
+    [null, 'unknown', 'unknown'],
+    ['', 'unknown', 'unknown'],
+    ['not_found', 'error', 'not_found'],
+    ['3,0,False', 'ready', 'ok'],
+    ['4,0,False', 'ready', 'ok'],
+    ['5,0,False', 'ready', 'ok'],
+    ['3,0,True', 'offline', 'offline'],
+    ['7,0,False', 'offline', 'offline'],
+    ['6,0,False', 'unknown', 'ok'],
+    ['2,0,False', 'unknown', 'ok'],
+    ['3,4,True', 'offline', 'offline'],
+    ['3,2,False', 'ready', 'ok'],
+    ['3,3,False', 'low_paper', 'ok'],
+    ['3,5,False', 'low_paper', 'ok'],
+    ['3,4,False', 'paper_empty', 'paper_empty'],
+    ['3,6,False', 'error', 'error'],
+    ['3,7,False', 'error', 'error'],
+    ['3,8,False', 'error', 'error'],
+    ['7,2,False', 'offline', 'offline'],
+    ['3,9,False', 'offline', 'offline'],
+    ['3,2,True', 'offline', 'offline'],
+    ['idle,nope,False', 'unknown', 'unknown'],
+    ['1,0,False', 'unknown', 'ok'],
+    ['1,0,False,1,8', 'ready', 'ok'],
+    ['6,0,False,1,8', 'ready', 'ok'],
+    ['2,0,False,1,8', 'ready', 'ok'],
+    ['1,0,False,0,3', 'unknown', 'ok'],
+    ['1,0,False,,8', 'ready', 'ok'],
+    ['3,0,True,1,8', 'offline', 'offline'],
+    ['7,0,False,1,8', 'offline', 'offline'],
+    ['3,9,False,1,8', 'offline', 'offline'],
+    ['3,4,False,1,8', 'paper_empty', 'paper_empty'],
+    ['3,8,False,1,8', 'error', 'error'],
+    ['1,3,False,1,8', 'low_paper', 'ok'],
+    ['1,0,False,129,8', 'offline', 'offline'],
+    ['1,0,False,17,8', 'paper_empty', 'paper_empty'],
+    ['1,0,False,9,8', 'error', 'error'],
+    ['1,0,False,3,8', 'error', 'error'],
+    ['3,0,False,0,3', 'ready', 'ok'],
+    ['4,0,False,1,8', 'ready', 'ok'],
+    ['1,0,False,131073,8', 'unknown', 'ok'],
   ]
-  for (const [input, expected] of printerQueryCases) {
+  for (const [input, expectedHeartbeat, expectedPreflight] of printerQueryCases) {
     try {
       assert.equal(
         mapWin32PrinterQuery(input),
-        expected,
+        expectedHeartbeat,
         `mapWin32PrinterQuery(${JSON.stringify(input)})`,
+      )
+      assert.equal(
+        mapWin32PrinterPreflight(input),
+        expectedPreflight,
+        `mapWin32PrinterPreflight(${JSON.stringify(input)})`,
       )
     } catch (error) {
       failures.push(`printer query ${JSON.stringify(input)}: ${error instanceof Error ? error.message : String(error)}`)

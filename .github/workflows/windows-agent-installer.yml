@@ -59,7 +59,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.12"
+            -ProductVersion "0.4.13"
 
       - name: Exercise EXE install, repair, and uninstall
         shell: powershell
@@ -102,7 +102,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.12"
+            -ProductVersion "0.4.13"
 
       - name: Upload exact tested unsigned candidate
         uses: actions/upload-artifact@v4
@@ -176,6 +176,13 @@ jobs:
           pnpm --filter ./apps/terminal-agent verify:singleton-process
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Same pre-staging window: ts-node is gone after build-staging --prod.
+      - name: Verify idle print queue hold and leftover jobs
+        shell: pwsh
+        run: |
+          pnpm --filter ./apps/terminal-agent verify:print-queue-residue-windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build candidate upgrade fixture
         shell: powershell
         run: |
@@ -243,7 +250,7 @@ jobs:
             -Mode Create `
             -CandidateRoot $candidateRoot `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.12"
+            -ProductVersion "0.4.13"
 
       - name: Build exact field predecessor 0.4.10 upgrade fixture
         shell: powershell
@@ -278,7 +285,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.12"
+            -ProductVersion "0.4.13"
 
       - name: Transfer exact upgrade-tested candidate
         uses: actions/upload-artifact@v4
@@ -343,7 +350,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.12"
+            -ProductVersion "0.4.13"
 
       - name: Exercise internal signing pipeline and signed installer lifecycles
         shell: powershell
@@ -352,7 +359,7 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-internal-signing-pipeline.ps1 `
             -UnsignedCandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.12" `
+            -ProductVersion "0.4.13" `
             -EvidenceRoot "$env:RUNNER_TEMP\ai-job-print-internal-signing-evidence" `
             -WixToolPath $wix `
             -ExerciseLifecycle `

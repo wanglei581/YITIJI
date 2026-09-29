@@ -17847,6 +17847,9 @@
       "scripts/verify-deploy-rollback.mjs",
       "scripts/verify-release-bundle.mjs"
     ],
+    ".github/workflows/windows-agent-installer.yml": [
+      "scripts/verify-ci-gate-coverage.mjs"
+    ],
     "apps/admin/index.html": [
       "scripts/verify-compliance-copy.mjs"
     ],
@@ -31357,6 +31360,7 @@
         "dirs": [],
         "files": [
           ".github/workflows/ci.yml",
+          ".github/workflows/windows-agent-installer.yml",
           "scripts/ci-gate-exemptions.json",
           "scripts/project-graph/gates.mjs",
           "scripts/project-graph/repo.mjs"

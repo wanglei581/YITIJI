@@ -1,6 +1,6 @@
 {
   "name": "terminal-agent",
-  "version": "0.4.12",
+  "version": "0.4.13",
   "private": true,
   "description": "Windows Terminal Agent — Phase 8.1C: DPAPI token encryption / SQLite idempotency / single-instance lock / Windows service / offline PATCH queue",
   "scripts": {
@@ -18,6 +18,8 @@
     "verify:task-reliability": "ts-node scripts/verify-task-reliability.ts",
     "verify:print-truth-hardening": "ts-node scripts/verify-print-truth-hardening.ts",
     "verify:print-monitor-truth": "ts-node scripts/verify-print-monitor-truth.ts",
+    "verify:print-queue-residue": "ts-node scripts/verify-print-queue-residue.ts",
+    "verify:print-queue-residue-windows": "ts-node scripts/verify-print-queue-residue-windows.ts",
     "verify:image-scale-truth": "ts-node scripts/verify-image-scale-truth.ts",
     "verify:usb-import-agent": "ts-node scripts/verify-usb-import-agent.ts",
     "verify:printer-config": "node scripts/verify-printer-config.mjs",
