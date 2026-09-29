@@ -732,7 +732,13 @@
 ### I.1 缺纸
 
 1. **做什么**  
-   按故障处置单 F1 ① 制造缺纸（纸盒留 5–10 张，出纸开始后抽走剩余纸）。等一体机进入结果页，最多约 5 分钟。然后打开后台「告警中心」。
+   按故障处置单 F1 ① 制造缺纸（纸盒留 5–10 张，出纸开始后抽走剩余纸）。等一体机进入结果页，最多约 5 分钟。然后打开后台「告警中心」。  
+   **抽走纸之后、补纸之前**，在管理员 PowerShell 里做一次只读探测（Windows 真机路经远程做，产品负责人不用动手；打印机名用 `Get-Printer` 里看到的那个）：
+   ```powershell
+   Get-CimInstance Win32_Printer -Filter "Name='<打印机名>'" | Select-Object PrinterStatus,DetectedErrorState,ExtendedDetectedErrorState,PrinterState,ExtendedPrinterStatus,WorkOffline,PortName | Format-List
+   Get-PrintJob -PrinterName '<打印机名>' | Select-Object Id,JobStatus,PagesPrinted,TotalPages | Format-List
+   ```
+   两条都只读，不输出文件名。补纸后再跑一次做对照。**可选**（不在必做步骤里）：打印机当天若另插了网线、有固定 IP，Windows 真机路再探一次 SNMP 的打印机错误状态。这些读数用来决定要不要让 Agent 走网口读缺纸（2026-09-29 总指挥定：先拿读数再决定，不先写代码）。
 2. **应该看到什么**  
    - 一体机结果页按终态分叉：`PAPER_EMPTY` 时标题「打印机缺纸」，副标题「已经登记缺纸，这次打印不会在加纸后自动续打」（来源：`apps/kiosk/src/pages/print/PrintDonePage.tsx:497-498`）；本机型更常见的是「打印结果未确认」（来源：同文件 `:543`）。  
    - 后台「告警中心」（来源：`apps/admin/src/routes/alerts/index.tsx:153`）出现类型「打印失败」（来源：同文件 `:19`），标题形如「打印任务失败(PAPER_EMPTY)」或「打印任务失败(PRINT_JOB_UNCONFIRMED)」（来源：`services/api/src/admin-ops/derived-alerts.ts:244`）。  
@@ -826,6 +832,7 @@
 | G 段：小程序是否已发布 / 是否跳过 | |
 | H 段：订单号 / 核销是否出纸 / 后台·小程序·一体机三处状态 | |
 | I 段：缺纸与卡纸各自的 `errorCode` / 告警标题原文 / 恢复方式（重提或核查）/ 实出张数 | |
+| I 段：缺纸时与补纸后两次探测的 `DetectedErrorState` / `ExtendedDetectedErrorState` / `PrinterState` / `JobStatus`（可选：SNMP 读数） | |
 | 未验证项 | |
 | 结论（可多勾） | □ C 出纸通过　□ D 支付+出纸通过　□ H 到机码闭环通过　□ I 缺纸/卡纸闭环通过　□ 未通过，阻塞：____ |
 
