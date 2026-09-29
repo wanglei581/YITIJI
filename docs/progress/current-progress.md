@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-09-29：生产只读巡检补 AI 服务说明、加 --strict 发布后核对（分支 `claude/backend-hardening-20260929-probe-strict-ai-disclaimer`）
+
+- **做了什么（Grok 实现、协调方审，合规运维窗口要求）：** `scripts/prod-readonly-probe.mjs` 法务文档补查 `ai_disclaimer`（未激活即 FAIL，与发布流程 3d 预检三份一起查对齐）；新增 `--strict`：岗位、招聘会、企业公开条数非 0 或任何列表出现演示标记都 FAIL、退出码非 0；不带时行为逐字不变。发布清单与运维手册里的发布后核对命令改成 `--strict`，须在演示企业用 #1115 下架之后跑。
+- **验证：** verify-prod-readonly-probe 补 ai_disclaimer 未激活、--strict 企业数 1 与全 0 等夹具；Grok 两处、协调方抽 1 处（去掉 ai_disclaimer）变异全红；ci-gate-coverage 通过。
+
 ## 2026-09-29：小程序「我的文档」页数恒为 0——文件表加识别页数列（分支 `claude/backend-hardening-20260929-doc-pagecount`）
 
 - **根因：** `FileObject` 原来没有页数列，`GET /me/documents` 的 select 也没选，字段缺失传到小程序被收成 0。
