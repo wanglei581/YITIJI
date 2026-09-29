@@ -8,6 +8,7 @@ import { normalizeLlmUsage, type RawLlmUsage } from '../ai/ai-log.service'
 import type { AiTokenUsage } from '../ai/interfaces/ai-provider.interface'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 import { assertContentAllowed } from '../ai/llm/llm-guard'
+import { isAiEndpointAllowed } from '../common/outbound/ai-endpoint-allowlist'
 
 const MAX_INPUT_CODE_UNITS = 500_000
 const MAX_RESPONSE_BYTES = 512 * 1024
@@ -176,6 +177,9 @@ export class StrictFetchContractProviderTransport implements ContractProviderTra
 
   async send(request: ContractProviderTransportRequest): Promise<ContractProviderTransportResponse> {
     const timeoutMs = this.resolveTimeout(request.timeoutMs)
+    // 出站白名单（common/outbound/ai-endpoint-allowlist.ts）：放在 try 之外，
+    // 否则会被下面的 catch 塌成 TRANSPORT_FAILED —— 那等于把「我们没发」说成「网络不通」。
+    if (!isAiEndpointAllowed(request.url, 'contract_review')) throw new Error('CONTRACT_PROVIDER_ENDPOINT_NOT_ALLOWED')
     const controller = new AbortController()
     let timedOut = false
     const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
@@ -281,6 +285,8 @@ export class ContractReviewProviderService {
       // 超时必须原样冒泡：塌成 TRANSPORT_FAILED 就等于把「合同太长」
       // 说成「网络不通」，用户会去重连 WiFi，而真正该做的是换短一点的文件。
       if (error instanceof Error && error.message === 'CONTRACT_PROVIDER_TIMEOUT') throw error
+      // 地址未通过出站白名单：请求根本没发出，同样原样冒泡，不能说成「连不上」。
+      if (error instanceof Error && error.message === 'CONTRACT_PROVIDER_ENDPOINT_NOT_ALLOWED') throw error
       throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')
     }
     if (!response || typeof response !== 'object') throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')

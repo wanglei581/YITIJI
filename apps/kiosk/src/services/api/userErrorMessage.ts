@@ -96,6 +96,9 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   AI_LOGIN_REQUIRED: '使用 AI 功能需要先用手机号登录',
   AI_DECLARATION_REQUIRED: '使用 AI 前需要先确认年满 14 周岁；用到语音时还需同意录音',
   AI_CONTENT_BLOCKED: '内容里有不能处理的信息，请修改后再试',
+  // 2026-09-29 AI 每日金额上限（服务端 ai-access 额度检查，503）。重试当天不会成功，明说「明天恢复」。
+  AI_BUDGET_EXHAUSTED: '今天的 AI 服务额度已用完，明天恢复；打印、扫描照常可用',
+  AI_BUDGET_UNAVAILABLE: '暂时核对不了 AI 额度，为防超支先暂停 AI；打印、扫描照常可用',
 }
 
 /**

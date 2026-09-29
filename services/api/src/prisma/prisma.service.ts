@@ -331,6 +331,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.aiServiceLog
   }
 
+  get aiUsageRecord() {
+    return this.client.aiUsageRecord
+  }
+
   get userAiConsent() {
     return this.client.userAiConsent
   }

@@ -8,6 +8,23 @@
 - **验证：** 新门禁 `verify:ai-platform-degradation` 115 条（进 CI SQLite 作业）；子代理 11 处反向变异全红、关联门禁 66 条通过（3 条红逐条核过与本改动无关）。协调方逐行审了启动闸门（删掉的正好是四类 AI 项），独立复跑 12 条关联门禁（含 deploy-gates-in-sync、deploy-rollback、prod-readonly-probe、print-scan-first-release）全绿；抽 2 处变异（去掉守卫拦截、支付会话密钥缺失也放行）各自变红。
 - **给前端：** 一体机不用改（`AI_PROVIDER_NOT_CONFIGURED` 已在 aiOutage 里）；小程序 `utils/user-error.js` 建议补这一码的映射。发布前在服务器跑一次预检干跑，看有无 `AI_PLATFORM_DEGRADED`。
 
+## 2026-09-29：P1-2a AI 逐次计量账与三档每日金额硬上限（分支 `claude/backend-hardening-20260929-ai-budget`，叠在 P1-3 上）
+
+- **做了什么（Claude 子代理实现、协调方审）：** 新表 `AiUsageRecord`（SQLite + PG 两套迁移）：每次真实发出的模型调用记一行——功能、服务商、型号、结局（成功 / 上游错 / 上游 429 / 超时 / 网络错 / 断开 / 输出被拦）、tokens、折算金额（取不到用量记空不记 0）、已验签终端、机构、会员（注销置空）；不存正文与提示词。计量点在所有请求路径共用的 `llmFetchJson`，白名单拒绝、输入拦截、并发闸门拒绝、发前取消不记账。一体机与小程序同一会员记同一本账。
+- **价目：** 按官方页 2026-09-29 重定（DeepSeek 按高峰、缓存未命中价；千问按分档），全仓只有一张价目表，后台 AI 服务日志的估算也改用它（千问估算约降到原来的 1/25，DeepSeek Flash 上调）。
+- **额度：** 全站 100 元 / 单机 30 元 / 会员 5 元（北京时间自然日，`.env.example` 可配，额度填 0 = 当天 AI 全停）；超限 503 `AI_BUDGET_EXHAUSTED`（范围在 `details`：global / terminal / member），读不到当日花费 503 `AI_BUDGET_UNAVAILABLE`（失败关闭）；只拦生成与语音，导出、只读、材料检查（打印链）一律不拦。后台只读汇总 `GET /admin/ai-usage/daily`（不含会员号）。
+- **验证：** 新门禁 `verify:ai-usage-budget` 82 条（CI SQLite 与 postgres-readiness 两个作业）；子代理 16 处反向变异全红。协调方审出一处：触顶范围原先放在 `error.scope`，全局错误过滤器会丢掉，前端根本拿不到——改放 `details` 并加一条经真实过滤器的断言；独立复跑 13 条关联门禁全绿，抽 3 处变异（去掉守卫额度检查、范围放回 scope、读不到花费放行）全红。
+- **已知限制：** 一体机 AI 请求目前不带终端会话令牌，单机上限对一体机暂不生效（交付单已发主执行窗口）；多进程下 10 秒缓存期内可能冲过上限约 10 秒的量；合同审查、TRTC 数字人、OCR、语音本期不计量；`ai.service.ts` 一处落账标签不带型号，会按 V4-Pro 价高估。
+- **待产品负责人拍板：** 三档金额与未计量调用的保守单价（现为 100 / 30 / 5 / 0.05 元）；计量表留存期（推荐按财务留存期）；匿名请求只受全站上限约束是否可接受。
+
+## 2026-09-29：P1-3 模型、OCR、语音、数字人、短信的出站端点白名单（分支 `claude/backend-hardening-20260929-ai-guard`）
+
+- **问题（§七 #26）：** 模型地址可在后台随手改，OCR、语音、短信主机与数字人交给腾讯云代调的模型地址都能用环境变量改成任意公网地址；原 `llm-base-url.ts` 只拦本机与内网。
+- **修法（Claude 子代理实现、协调方审）：** 一张白名单、一个判定函数（`common/outbound/ai-endpoint-allowlist.ts`），所有 AI 类出站在发请求前判定，不在单内一个请求都不发、不回退 mock：`llmFetchJson`（12 个调用点映射成 503 `AI_ENDPOINT_NOT_ALLOWED`，且不记假账）、合同审查、百度 OCR 与语音（在换 token 之前，查询串里就是密钥）、腾讯语音识别 / 合成 / TRTC / 短信、TRTC 代调的模型与语音合成配置；后台保存模型地址与连通性测试回 400 `AI_BASE_URL_NOT_ALLOWED`。默认单是代码里实际在用的境内**精确**主机（DeepSeek、通义千问、百度两处、腾讯云四处），刻意不用 `*.tencentcloudapi.com`（该后缀下有境外地域）；`AI_ENDPOINT_ALLOWLIST` 整张替换、`AI_ENDPOINT_ALLOWLIST_EXTRA` 追加，写错的条目只会让单变小；生产拒绝 http 与本机；日志只有服务类别、主机名、原因。
+- **部署前请产品负责人核对：** 后台 15 个 AI 功能位若有 MiniMax 或鱼人（GPT 中转），上线后调用被拒、改该功能位任何字段也被拒，须换成 DeepSeek 或千问；若生产设了 `TRTC_LLM_CONFIG_JSON` / `TRTC_TTS_CONFIG_JSON`，其中地址须在单内。
+- **验证：** 新门禁 `verify:ai-endpoint-allowlist`（123 条；在旧代码上红 51 条）；20 处反向变异全红；子代理跑相关门禁 47 条、协调方独立复跑新门禁与 AI 核心门禁全绿。
+- **走查阻塞（总指挥 9/29 转合规窗口发现）：** 后台保存 / 测试模型地址还有一道 `assertPublicLlmBaseUrl`，不分环境拒绝回环，走查窗口没法在后台把地址配到本机假大模型。现改为非生产放行 127.x、localhost、::1（与白名单同一个判定函数），内网段、链路本地、0.0.0.0、v4-mapped 回环任何环境都拒；生产照旧拒绝回环，且白名单那一关会再拒一次。门禁 `verify:ai-config` 加 7e / 7e2 / 7e3，`verify:ai-endpoint-allowlist` 加控制器层 D2b / D2c / D2d（126 条）；三处变异（生产也放行、去掉放行、非生产放行全部内网）全红。
+- **看到未做：** 腾讯云地域参数仍可指向境外（主机名白名单管不到）；顾问可用性探针不看白名单；一体机可把 `AI_ENDPOINT_NOT_ALLOWED` 加进能力级停用码（交付单已写）。
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 

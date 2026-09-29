@@ -7,7 +7,8 @@ import { RedisModule } from '../common/redis/redis.module'
 import { AiAccessGuard } from './ai-access.guard'
 import { AiAccessService } from './ai-access.service'
 import { AdminAiAccessController } from './admin-ai-access.controller'
-@Module({ imports: [AuthModule, AuditModule, PrismaModule, RedisModule], controllers: [AdminAiAccessController], providers: [
+import { AiUsageModule } from '../ai/usage/ai-usage.module'
+@Module({ imports: [AuthModule, AuditModule, PrismaModule, RedisModule, AiUsageModule], controllers: [AdminAiAccessController], providers: [
     Reflector,
     AiAccessService,
     AiAccessGuard,

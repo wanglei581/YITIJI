@@ -9,7 +9,8 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
-import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../llm/llm-failure'
+import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 
@@ -409,6 +410,8 @@ export class LlmJobFitService {
       )
     } catch (error) {
       if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
+      if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
         this.logger.warn(`jobfit.llm busy limit=${error.limit}`)
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })

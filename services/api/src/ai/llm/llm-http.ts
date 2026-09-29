@@ -33,6 +33,9 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { AiContentBlockedError, assertContentAllowed, configuredForbiddenWords } from './llm-guard'
+import { assertAiEndpointAllowed } from '../../common/outbound/ai-endpoint-allowlist'
+// P1-2a 逐次计量：这里只留开始 / 响应 / 结束几行调用，逻辑在 ai/usage/ai-usage-meter.ts
+import { startLlmUsageMeter } from '../usage/ai-usage-meter'
 
 /** 当前 HTTP 请求的 abort signal。客户端断开时取消上游 LLM，从而走配额回滚。 */
 export const llmRequestAbort = new AsyncLocalStorage<AbortSignal>()
@@ -188,6 +191,7 @@ export interface LlmFetchOptions {
  * 发一次 OpenAI 兼容的 Chat Completions 请求，并把响应体读完。
  *
  * 抛出：
+ *   - `AiEndpointNotAllowedError` —— 地址不在出站白名单，请求未发出（不占槽位、不做内容检查）
  *   - `LlmBusyError`    —— 在途已达上限，请求未发出
  *   - `LlmTimeoutError` —— 超时，已主动 abort（**连读包阶段也算**，见下）
  *   - 其余原始错误      —— 网络/DNS/TLS 等，调用方按各自既有分支处理
@@ -203,6 +207,8 @@ export async function llmFetchJson(
   init: LlmFetchInit,
   options: LlmFetchOptions,
 ): Promise<LlmJsonResponse> {
+  // 第一道：出站白名单。注入的 fetchImpl 同样要过（门禁不许绕），不在单内一个请求都不发。
+  assertAiEndpointAllowed(url, 'llm')
   const gate = options.gate ?? llmConcurrencyGate
   const doFetch = options.fetchImpl ?? fetch
   const { timeoutMs } = options
@@ -248,6 +254,8 @@ export async function llmFetchJson(
     if (!timedOut && !controller.signal.aborted) controller.abort()
   }
   requestAbort?.addEventListener('abort', onRequestAbort, { once: true })
+  // 走到这里请求一定会发出（白名单、输入检查、闸门、发前取消都已过）；此后每个结局各记一行账。
+  const usage = startLlmUsageMeter(url, init.body, moderation?.feature)
 
   try {
     const res = await doFetch(url, { ...init, signal: controller.signal })
@@ -260,12 +268,15 @@ export async function llmFetchJson(
       if (timedOut) throw error
       data = null
     }
+    usage.responded(res.status, data)
     if (res.ok) {
       const reply = (data as { choices?: Array<{ message?: { content?: unknown } }> } | null)?.choices?.[0]?.message?.content
       if (typeof reply === 'string') assertContentAllowed(reply, 'output', words, moderation)
     }
+    usage.completed()
     return { ok: res.ok, status: res.status, statusText: res.statusText, data }
   } catch (error) {
+    usage.failed(timedOut ? 'timeout' : error instanceof AiContentBlockedError ? 'blocked' : requestAbort?.aborted ? 'aborted' : 'network_error')
     // 分类只看自己设的 timedOut 标记，不看 error.name：
     // AbortError / TimeoutError 的 name 在不同 runtime 上并不稳定
     // （合同审查那边已经踩过，见 contract-review-provider.service.ts）。

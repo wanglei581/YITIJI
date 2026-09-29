@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`562` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`563` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -86,8 +86,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/ai-access` | AdminAiAccessController.get | admin | AiAccessService | AuditLog<br/>UserAiConsent |
-| PUT | `/api/v1/admin/ai-access` | AdminAiAccessController.update | admin | AiAccessService | AuditLog<br/>UserAiConsent |
+| GET | `/api/v1/admin/ai-access` | AdminAiAccessController.get | admin | AiAccessService | AiUsageRecord<br/>AuditLog<br/>UserAiConsent |
+| PUT | `/api/v1/admin/ai-access` | AdminAiAccessController.update | admin | AiAccessService | AiUsageRecord<br/>AuditLog<br/>UserAiConsent |
 
 ## `services/api/src/ai/ai.controller.ts`
 
@@ -173,6 +173,12 @@
 | POST | `/api/v1/resume/self-assessment/:taskId/append` | SelfAssessmentController.appendToResume | — | AppendedSelfAssessmentService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/resume/self-assessment/:taskId/print` | SelfAssessmentController.print | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | GET | `/api/v1/resume/self-assessment/questions` | SelfAssessmentController.questions | — | — | — |
+
+## `services/api/src/ai/usage/admin-ai-usage.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/ai-usage/daily` | AdminAiUsageController.daily | admin | — | — |
 
 ## `services/api/src/assistant/daily-brief.controller.ts`
 

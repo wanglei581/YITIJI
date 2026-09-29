@@ -1,6 +1,9 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { genUserSig } from './usersig.util'
 import { callTencentApi } from './tencent-api.util'
+import { assertTrtcDelegatedEndpoints } from './trtc-delegated-endpoints'
+import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
+import { llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 import {
   DEFAULT_FORBIDDEN_WORDS,
@@ -157,6 +160,8 @@ export class TrtcService {
     }
 
     try {
+      // 交给腾讯云代调的模型 / 语音合成地址先过出站白名单：不在单内就不调腾讯云、不建房。
+      assertTrtcDelegatedEndpoints(llmConfig, ttsConfig)
       const resp = await callTencentApi<{ TaskId: string }>({
         secretId, secretKey: cloudKey, region,
         action: 'StartAIConversation',
@@ -166,6 +171,8 @@ export class TrtcService {
       this.logger.log(`AI 会话已启动 room=${roomId} task=${resp.TaskId}`)
       return { sdkAppId, userId, userSig, roomId, taskId: resp.TaskId }
     } catch (err: unknown) {
+      // 地址未通过出站白名单（代调地址或腾讯云主机）：一个请求都没发，如实报 503，不报成 500。
+      if (err instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       const msg = err instanceof Error ? err.message : String(err)
       this.logger.error('StartAIConversation 失败', msg)
       throw new InternalServerErrorException(`启动 AI 对话失败: ${msg}`)
@@ -186,6 +193,8 @@ export class TrtcService {
       })
       this.logger.log(`AI 会话已结束 task=${taskId}`)
     } catch (err: unknown) {
+      // 腾讯云主机被移出出站白名单：请求没发出，重试也不会成功，不报成「请重试」。
+      if (err instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       const msg = err instanceof Error ? err.message : String(err)
       this.logger.warn(`StopAIConversation 失败: ${msg}`)
       throw new ServiceUnavailableException({
