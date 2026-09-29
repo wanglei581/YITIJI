@@ -29,35 +29,36 @@ const check = (ok, m, detail = '') => {
 const pr = (files) => classify({ event: 'pull_request', files })
 
 // ── 一、判定规格 ──
+const lane = (files, labels = []) => classify({ event: 'pull_request', files, baseRef: 'claude/some-lane', labels })
+const integ = (files) => classify({ event: 'pull_request', files, baseRef: 'main' })
+const both = (r) => r.browser && r.postgres
+const none = (r) => !r.browser && !r.postgres
 for (const event of ['push', 'workflow_dispatch', '']) {
-  const r = classify({ event, files: ['docs/a.md'] })
-  check(r.browser && r.postgres, `事件 ${event || '(空)'}：两个作业都跑`)
+  check(both(classify({ event, files: ['docs/a.md'] })), `事件 ${event || '(空)'}：两个作业都跑`)
 }
-check(pr([]).browser && pr([]).postgres, '拿不到改动清单（空）：两个作业都跑')
-check(pr(null).browser && pr(null).postgres, '拿不到改动清单（null）：两个作业都跑')
+check(both(lane([])) && both(lane(null)), '拿不到改动清单（空或 null）：两个作业都跑')
+check(both(classify({ event: 'pull_request', files: ['docs/a.md'] })), '拿不到 base 分支名时按整合 PR 处理：两个都跑')
+check(both(integ(['docs/progress/next-tasks.md'])) && both(integ(['apps/miniapp/app.js'])), '整合 PR（base = main）：不论改什么都全跑')
+check(both(lane(['docs/a.md'], ['full-ci'])), '分路 PR 带 full-ci 标签：全跑')
 
-const docsOnly = pr(['docs/progress/next-tasks.md', 'docs/graph/graph.json'])
-check(!docsOnly.browser && !docsOnly.postgres, '只改普通文档与图谱：两个作业都跳过')
-check(pr(['docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html']).browser, '改稿件目录：浏览器作业必须跑')
-check(pr(['docs/compliance/member-personal-data-retention.md']).postgres, '改会员个人数据留存文档：PostgreSQL 作业必须跑')
-check(pr(['docs/operations/price-config-production.md']).postgres, '改生产价目配置文档：PostgreSQL 作业必须跑')
-
-const apiOnly = pr(['services/api/src/ai/ai.service.ts'])
-check(!apiOnly.browser && apiOnly.postgres, '只改服务端：浏览器作业跳过、PostgreSQL 作业要跑')
-const kioskOnly = pr(['apps/kiosk/src/pages/home/HomePage.tsx'])
-check(kioskOnly.browser && !kioskOnly.postgres, '只改一体机：浏览器作业要跑、PostgreSQL 作业跳过')
-check(pr(['apps/admin/src/routes/ai-services/index.tsx']).browser, '改管理员后台：浏览器作业要跑（该作业含后台浏览器用例）')
-check(pr(['apps/partner/src/App.tsx']).browser, '改机构后台：浏览器作业要跑')
-const miniOnly = pr(['apps/miniapp/pages/index/index.js'])
-check(!miniOnly.browser && !miniOnly.postgres, '只改小程序：两个作业都跳过')
-
-for (const f of ['packages/shared/src/types/device.ts', 'packages/ui/src/index.ts', 'pnpm-lock.yaml', 'package.json',
-  '.github/workflows/ci.yml', 'scripts/verify-repository-integrity.mjs', 'tsconfig.base.json', 'CLAUDE.md']) {
-  const r = pr([f])
-  check(r.browser && r.postgres, `改 ${f}：两个作业都跑`)
+// 分路 PR：高风险路径自动跑（主执行窗口给的清单），其余走轻量
+check(none(lane(['docs/progress/next-tasks.md', 'docs/graph/graph.json'])), '分路：只改文档与图谱 → 都不跑')
+check(none(lane(['apps/terminal-agent/src/agent/task-runner.ts'])) && none(lane(['apps/miniapp/pages/index/index.js'])), '分路：只改 Agent 或小程序 → 都不跑')
+check(none(lane(['apps/kiosk/scripts/verify-fusion-w2.mjs'])), '分路：只改一体机门禁脚本 → 都不跑')
+for (const f of ['apps/kiosk/src/pages/home/HomePage.tsx', 'apps/kiosk/tests/visual/print-hub-qx.spec.ts', 'apps/kiosk/playwright.w2.config.ts',
+  'apps/admin/src/routes/ai-services/index.tsx', 'apps/partner/src/App.tsx', 'docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html']) {
+  const r = lane([f]); check(r.browser && !r.postgres, `分路：改 ${f} → 自动跑浏览器作业`)
 }
-const mixed = pr(['docs/progress/next-tasks.md', 'services/api/src/a.ts', 'apps/kiosk/src/b.tsx'])
-check(mixed.browser && mixed.postgres, '混合改动：只要有一个文件需要，就跑')
+for (const f of ['services/api/prisma/postgres/schema.prisma', 'services/api/src/ai/ai.service.ts', 'services/api/src/console-screen/console-screen.usage.queries.ts',
+  'docs/compliance/member-personal-data-retention.md', 'docs/operations/price-config-production.md']) {
+  const r = lane([f]); check(!r.browser && r.postgres, `分路：改 ${f} → 自动跑 PostgreSQL 作业`)
+}
+check(none(lane(['services/api/src/ai/ai.controller.ts'])), '分路：只改服务端控制器（非 service / 查询）→ 都不跑，主作业覆盖')
+for (const f of ['packages/shared/src/types/device.ts', '.github/workflows/ci.yml', 'pnpm-lock.yaml']) {
+  check(both(lane([f])), `分路：改 ${f} → 两个都跑`)
+}
+{ const r = lane(['packages/ui/src/index.ts']); check(r.browser && !r.postgres, '分路：改 packages/ui → 跑浏览器作业') }
+check(both(lane(['docs/a.md', 'apps/kiosk/src/b.tsx', 'services/api/src/c.service.ts'])), '分路：混合改动，只要有一个高风险文件就跑对应作业')
 
 // ── 二、命令行在真实 git 仓库里取改动（含中文路径下的入口判定） ──
 {
@@ -75,7 +76,9 @@ check(mixed.browser && mixed.postgres, '混合改动：只要有一个文件需�
     git('-c', 'user.email=d@x.invalid', '-c', 'user.name=d', 'commit', '-qm', 'docs')
     const head = git('rev-parse', 'HEAD')
     const run = (args) => execFileSync(process.execPath, [join(repoRoot, 'scripts/ci-changed-scopes.mjs'), ...args], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-    check(run(['--event', 'pull_request', '--base', base, '--head', head]) === 'browser=false\npostgres=false\n', '命令行：PR 只改文档时输出两个 false')
+    check(run(['--event', 'pull_request', '--base', base, '--head', head, '--base-ref', 'claude/lane', '--labels', '[]']) === 'browser=false\npostgres=false\n', '命令行：分路 PR 只改文档时输出两个 false')
+    check(run(['--event', 'pull_request', '--base', base, '--head', head, '--base-ref', 'claude/lane', '--labels', '["full-ci"]']) === 'browser=true\npostgres=true\n', '命令行：带 full-ci 标签时两个都跑')
+    check(run(['--event', 'pull_request', '--base', base, '--head', head, '--base-ref', 'main']) === 'browser=true\npostgres=true\n', '命令行：整合 PR 两个都跑')
     check(run(['--event', 'pull_request', '--base', 'not-a-sha', '--head', head]) === 'browser=true\npostgres=true\n', '命令行：基线不合法时两个都跑')
     check(run(['--event', 'pull_request', '--base', '0000000', '--head', head]) === 'browser=true\npostgres=true\n', '命令行：git diff 失败时两个都跑')
     check(run(['--event', 'push']) === 'browser=true\npostgres=true\n', '命令行：推送时两个都跑')
@@ -88,8 +91,9 @@ check(mixed.browser && mixed.postgres, '混合改动：只要有一个文件需�
 
 // ── 三、ci.yml 接线 ──
 const ci = readFileSync(join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
-check(/\n  changes:\n[\s\S]*?fetch-depth: 0[\s\S]*?scripts\/ci-changed-scopes\.mjs --event "\$EVENT" --base "\$BASE_SHA" --head "\$HEAD_SHA" >> "\$GITHUB_OUTPUT"/.test(ci),
-  'ci.yml 有 changes 作业：拉全量历史、调用判定脚本、写进作业输出')
+check(/\n  changes:\n[\s\S]*?fetch-depth: 0[\s\S]*?BASE_REF: \$\{\{ github\.base_ref \}\}[\s\S]*?LABELS: \$\{\{ toJSON\(github\.event\.pull_request\.labels\.\*\.name\) \}\}[\s\S]*?scripts\/ci-changed-scopes\.mjs --event "\$EVENT" --base "\$BASE_SHA" --head "\$HEAD_SHA" --base-ref "\$BASE_REF" --labels "\$LABELS" >> "\$GITHUB_OUTPUT"/.test(ci),
+  'ci.yml 有 changes 作业：拉全量历史、传 base 分支与标签、调用判定脚本、写进作业输出')
+check(/  pull_request:\n(?:\s*#[^\n]*\n)*\s*types: \[opened, synchronize, reopened, labeled\]/.test(ci), 'pull_request 触发包含 labeled（打 full-ci 标签会重跑）')
 for (const [job, key] of [['postgres-readiness', 'postgres'], ['kiosk-browser-smoke', 'browser']]) {
   const block = ci.slice(ci.indexOf(`\n  ${job}:\n`), ci.indexOf(`\n  ${job}:\n`) + 400)
   check(block.includes('needs: [changes]'), `${job} 依赖 changes`)

@@ -10,6 +10,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # labeled：给分路 PR 打 full-ci 标签时重新触发，跑完整三作业（N3，2026-09-29）
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 # PR 分支上「新推送取消旧运行」是对的，省 CI 时间；
@@ -59,7 +61,9 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node scripts/ci-changed-scopes.mjs --event "$EVENT" --base "$BASE_SHA" --head "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          BASE_REF: ${{ github.base_ref }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: node scripts/ci-changed-scopes.mjs --event "$EVENT" --base "$BASE_SHA" --head "$HEAD_SHA" --base-ref "$BASE_REF" --labels "$LABELS" >> "$GITHUB_OUTPUT"
 
   build-and-verify:
     runs-on: ubuntu-latest

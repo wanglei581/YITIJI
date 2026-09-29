@@ -42,12 +42,29 @@ export function postgresCanSkip(file) {
   return ['apps/kiosk/', 'apps/admin/', 'apps/partner/', 'apps/miniapp/', 'apps/terminal-agent/'].some((prefix) => file.startsWith(prefix))
 }
 
-export function classify({ event, files }) {
+// ── 第二层（2026-09-29 与主执行窗口对齐）：分路 PR 只在改到「高风险路径」时自动跑大作业 ──
+// 分路 PR = base 不是 main 的 PR（合进候选分支的各窗口 PR）。整合 PR（base = main）与推送一律全跑。
+// 高风险路径按作业分开：改页面自动跑浏览器作业，改服务端数据层自动跑 PostgreSQL 作业；
+// workflow、依赖锁、共享包两个都跑。打 full-ci 标签时两个都跑（手动补充，不靠它兜底）。
+const BROWSER_FULL = [/^apps\/kiosk\/src\//, /^apps\/kiosk\/tests\//, /^apps\/kiosk\/playwright[^/]*\.ts$/, /^apps\/admin\/src\//, /^apps\/partner\/src\//,
+  /^packages\//, /^\.github\/workflows\//, /^pnpm-lock\.yaml$/, /^docs\/design\//]
+const POSTGRES_FULL = [/^services\/api\/prisma\//, /^services\/api\/src\/.*\.service\.ts$/, /^services\/api\/src\/.*(repository|quer(y|ies))[^/]*\.ts$/,
+  /^packages\/shared\//, /^\.github\/workflows\//, /^pnpm-lock\.yaml$/]
+const matchesAny = (patterns, file) => patterns.some((re) => re.test(file)) || (patterns === POSTGRES_FULL && POSTGRES_DOC_TRIGGERS.has(file))
+
+export function classify({ event, files, baseRef = 'main', labels = [] }) {
   if (event !== 'pull_request') return { browser: true, postgres: true, reason: `事件 ${event || '未知'}：全跑` }
   if (!files || files.length === 0) return { browser: true, postgres: true, reason: '拿不到改动清单：全跑' }
-  const browser = !files.every(browserCanSkip)
-  const postgres = !files.every(postgresCanSkip)
-  return { browser, postgres, reason: `改动 ${files.length} 个文件：浏览器作业${browser ? '要跑' : '跳过'}，PostgreSQL 作业${postgres ? '要跑' : '跳过'}` }
+  if (labels.includes('full-ci')) return { browser: true, postgres: true, reason: 'PR 带 full-ci 标签：全跑' }
+  // 整合 PR（base = main）照旧全跑三作业，这条不动（与主执行窗口约定）
+  if (baseRef === 'main') return { browser: true, postgres: true, reason: '整合 PR（base = main）：全跑' }
+  // 第一层：与作业无关的改动不跑
+  let browser = !files.every(browserCanSkip)
+  let postgres = !files.every(postgresCanSkip)
+  // 第二层：分路 PR 只在改到高风险路径时才跑
+  browser = browser && files.some((f) => matchesAny(BROWSER_FULL, f))
+  postgres = postgres && files.some((f) => matchesAny(POSTGRES_FULL, f))
+  return { browser, postgres, reason: `分路 PR，改动 ${files.length} 个文件：浏览器作业${browser ? '要跑' : '跳过'}，PostgreSQL 作业${postgres ? '要跑' : '跳过'}` }
 }
 
 function arg(name) {
@@ -74,7 +91,10 @@ const isMain = Boolean(process.argv[1]) && pathToFileURL(process.argv[1]).href =
 if (isMain) {
   const event = arg('--event')
   const files = event === 'pull_request' ? changedFiles() : []
-  const result = classify({ event, files })
+  let labels = []
+  try { labels = JSON.parse(arg('--labels') || '[]') } catch { labels = [] }
+  // base 拿不到时按整合 PR 处理（全量判定），宁可多跑
+  const result = classify({ event, files, baseRef: arg('--base-ref') || 'main', labels })
   console.log(`browser=${result.browser}`)
   console.log(`postgres=${result.postgres}`)
   console.error(result.reason)
