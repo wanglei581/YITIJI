@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-09-30：W-86 第五轮——锁序统一为 PrintTask → Order，超前补报与同一终态清理分开（分支 `grok/print-retry-attempt-0929`，提交 `bda0b4979`）
+
+- **锁序。** 全系统先锁 PrintTask 再动 Order。唯一行锁是 `print-status-attempt.ts` 的 `lockPrintTaskRow`（56–58 行，一句不改 `updatedAt` 的 `UPDATE "PrintTask"`）。状态补报经 `readLockedPrintStatusAttempt` 先调它。会员 `retryPaidFailedJob` 与管理员 `retryPrintTask` 在事务开头调用同一函数，然后再做 Order 的 CAS 和 PrintTask 更新。不许再写第二句同样的 SQL。
+- **退款 CAS 仍在。** agy 说会员重试事务内漏判退款，核对后不成立，没有改语义。`print-jobs.service.ts` 779–792 行 `tx.order.updateMany({ where: { id, taskStatus: 'failed', payStatus: 'paid', amountCents: amountBefore } })` 就是退款条件：并发把订单打成退款后更新条数为 0，事务回滚。
+- **超前和落后分开。** 请求 attempt 大于当前值回 409 `PRINT_STATUS_FUTURE_ATTEMPT`，小于当前值仍是 `PRINT_STATUS_STALE_ATTEMPT`。都不改任务状态，只写同状态元数据日志。Agent 收到 `FUTURE` 不删补报，沿用离线队列退避；`MAX_ATTEMPTS` 仍是 10，超过后进死信，日志只有任务号。只有 `STALE` 删除。
+- **重试轮次里缺 attempt。** `current > 0` 时，请求缺 attempt 或 attempt 非法，按 `PRINT_STATUS_STALE_ATTEMPT` 拒绝（日志 `req=missing` / `req=invalid`）。`current === 0` 仍兼容老 Agent。事务外的快速路径在 `current > 0` 时不再提前返回。第 0 轮同一终态仍不进写事务；这里和锁之间有一段极短的空窗，幂等门禁不许第 0 轮打开事务，所以不能在那条路径上加锁。
+- **同一终态清理补回。** 不带 attempt、第 0 轮、状态相同的快速返回，在 `return { acknowledged: true }` 之前重新调用 `cleanupTerminalTask`。带 attempt 的同终态重放没有事务外快速返回，事务提交后的清理还在。
+- **版本在锁之后读。** 两条重试入口的事务外预检用 `skipAgentVersion: true`。锁住 PrintTask 之后、同一事务里读最新心跳再判定。带走链接和 `canRetry` 仍在事务外读版本，那两条不改状态。
+- **管理员原因与动作一致。** 列表和详情在共享原因之后，再看终端已退役、终端不在运行状态、有订单但 `Order.taskStatus` 不是 failed。人话与动作拒绝逐字相同：「终端已永久退役，不能重新排队」「终端不在 active 状态，不能重新排队」「任务状态已变更，请刷新后重试」。这三项在 `admin-print-retry-block.ts`，不进会员共用的资格函数。共享检查用 `PRINT_RETRY_*`，管理员独有检查用 `PRINT_SCAN_RETRY_*`。
+- **没改的三条。** 心跳 `groupBy`：`TerminalHeartbeat` 已有 `@@index([terminalId, createdAt])`（`schema.prisma` 267 行，postgres schema 272 行），列表每页一次可接受；没有心跳就判版本过旧是有意的。无订单任务的 CAS 是 `admin-print-scan.service.ts` 591–606 行 `printTask.updateMany({ where: { id, status: 'failed' } })`，条数不是 1 即 409。新 Agent 打老后端会因 `main.ts` 98 行 `forbidNonWhitelisted` 得到 400；发布顺序仍是先后端后 Agent（现场脚本 R.1→R.2），不改代码。Agent 版本仍是 `package.json` 的 0.4.12，不带 v 前缀。
+- **本机已跑（隔离 SQLite，库文件在 `~/.cache/claude-lanes/print-retry-0929/verify-w86-r5-*.db`）：** `services/api` 的 `tsc --noEmit` 退出 0。`verify:print-jobs`（含 `verify:pickup-code-share`）、`verify:admin-print-scan`、`verify:contract-review:print-lifecycle`（6 条）、`verify:terminal-status-idempotency`、`verify:refund-idempotent`、`verify:payment-flow`、`verify:member-order-timeline` 退出 0。`verify:print-retry-attempt` 退出 0。改动文件 eslint 退出 0。变异在 `bda0b4979` 之后做，每条退出 1，随后 `git checkout` 还原：把 `FUTURE` 当 `STALE` 删掉；去掉超前补报的次数上限；去掉快速路径的 `cleanupTerminalTask`；去掉退役原因；去掉订单状态原因；重试轮次缺 attempt 当成老 Agent 放行；把会员重试的行锁挪到 Order CAS 之后。
+- **没在本机跑：** `verify:print-retry-lock:postgres`。本机 `pg_isready -h 127.0.0.1 -p 5432` 无响应，没有启动用户的数据库。脚本只挂在 postgres-readiness，要求 `DATABASE_URL` 是 PostgreSQL。会员重提和管理员重试同时打同一单时，不得出现 40P01，也不得两边都成功。以 CI 为准。真 Windows 打印机和 GitHub CI 全量也没在本机跑。图谱已按代码重生成，`pnpm graph:check` 通过；`verify:repository-integrity` 通过。没有 push。
+
 ## 2026-09-29：W-03 补——建号时填了但未验证的手机号，也可按确认函登记（分支 `claude/backend-hardening-20260929-w03-unverified-phone`）
 
 - **走查发现（两个后台窗口）：** 界面「新增账号」要求填手机号，建出来都是「临时密码 + 已填未验证的号」；按 #1128 的资格规则这类账号不能登记，W-03 在界面上做不出可登记的账号。
