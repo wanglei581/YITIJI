@@ -20,6 +20,14 @@
 - **过程：** `codex-run.sh` 在非 git 目录会被 Codex 拒绝，原来被当成「原因不明」重试 15 次；已改为第一次就停下并返回 64（在非 git 目录实测）。
 - **追加（同晚）：** 发布前法务文档预检另开 #1059（3d，缺一份就在备份前中止）；1.6 演练在本机临时库上用真实脚本做完，记录在 `docs/device/postgres-operations.md` 第 9 节；合规总表两处按原文更正（五部门通知要求取证的只有经营性人力资源服务机构与为用人单位提供招聘信息发布服务的网络平台；山东集中采购目录里与信息技术相关的只有基础软件、政务云、电子政务外网接入）；P0-1 补两份只读清单（企业数据来源、招聘会主办方两类机构及其绑定终端）。
 - **本窗口待办：** 仓库改私有前的清理与 CI 用量压缩、依赖漏洞升级、试用协议附件 / 交付物包 / 集成商授权协议（起草完，复核后发私有页）、本地演示包。
+## 2026-09-29：Windows 真机一路合并后第一批（现场测试日一、版本与锁机、签名、耗材、彩色修复）
+
+- **背景：** #1046、#1053、#1054 已由主执行窗口按总指挥顺序合进候选 `56bd387f2`。总指挥派给本路的合并后 8 项里，除 N2 立式机柜外本批全部落盘（分支 `claude/field-ops-0929`）。调研由 3 个 Claude 子代理只读取证（微软官方生命周期与锁机文档、CA/B Forum 与各 CA 价目、奔图官网与英文用户指南），结论经协调方对照代码逐条核实后才写进文档。
+- **代码：** ①`diagnose-production-agent.ps1` 跟上命名管道单实例：去掉旧 PID 锁的「人工清锁」判定（`eligible_for_operator_review`），改报 `instanceIdStatus`（规则与 Agent 逐字一致）与 `singletonPipePresent`（只列管道不连接），提示改为「agent.pid 只是诊断记录，任何情况下都不需要手工删除」，加 UTF-8 BOM（它不在安装包里，没有 BOM 时中文提示在 PowerShell 5.1 里是乱码）。②新增只读取证脚本 `collect-field-day-evidence.ps1`（14 项：系统版本与支持期、分配访问、Shell Launcher / 键盘筛选器、新键盘阻止、Edge 策略、远程工具、睡眠；断电残留、单实例、启动诊断），只计数不列文件名、不输出账户名；`collect-field-evidence.ps1` 已超 800 行，故单独成文件。③**彩色任务原来不下发「彩色」**，全看驱动默认值，驱动默认灰度时用户付 1 元/页却拿到黑白纸——改为显式下发（pdf-to-printer 把 `monochrome=false` 译成 `color`）。④生产安装脚本新增 `-KeepFileSelectionDialogs`，兼作工作电脑的测试机不写整机的「禁用文件选择框」。⑤`collect-field-evidence.ps1` 的 5.1-1 不再按名称判 PASS（Win11 注册表产品名仍写 Windows 10）。
+- **门禁：** 新增 `verify:field-day-evidence`（只读、唯一写入是回执、不连管道、规则与 Agent 一致、Edge 策略名与安装脚本一致、键盘与 HID 类 GUID、支持期关键日期、隔离区 24 小时与 scan-watcher 一致）进主 CI；`verify-windows-service-recovery` 的清锁断言换成新机制断言；`verify-print-monitor-truth` 加下发参数断言；`verify-installer-inputs` 加开关断言。Windows 工作流新增一步：两份不打进安装包的现场脚本做 BOM 与 PowerShell 5.1 语法检查，取证脚本在临时 ProgramData 下带合法 instance-id 实跑。反向变异共 17 项全部报错。
+- **文档：** 母盘清单 A1 按官方生命周期改档（首选 Win11 IoT 企业版 LTSC 2024，兜底 Win11 专业版 25H2+，Win10 IoT LTSC 2021 只作兼容，普通 Win10 / 家庭版 / 非 IoT LTSC 不得用），A11b 分配访问官方做法，A11c 阻止新插入键盘（不追溯、分层评估、不挡 HID），D 段现场测试日一 T1–T10，E 段远程运维，换机流程更正为「设维护」（已停用的终端生成不了绑定码）；6 份写着 Windows 10/11 的部署要求改为引用 A1；7 份现场文档标注 KSK-001 结论需在最终硬件复验；MSI 设计文档补 #1054 的四个恢复动作与代码签名两条路；现场故障处置单补耗材更换与冷备；打印能力加固清单补彩色 / 双面开通前五步核对。
+- **发现并交给产品负责人的：** KSK-001 是 Windows 11 专业工作站版 22H2，2024-10-08 起已无安全更新；代码签名计划与现有工具冲突（试点自签要另立任务补流程）；包里的 WinSW 与 secure-scan-reader.exe 没有我们的签名。
+- **验证：** terminal-agent tsc、lint 0 error；`verify:field-day-evidence`、`verify:windows-service-recovery`、`verify:agent-unauthorized`、`verify:print-monitor-truth`、`verify:image-scale-truth`、`verify:printer-config`、`verify:print-scan-agent`、`verify:installer-inputs`、`verify:production-provisioning`、签名流程契约、`verify-repository-integrity`、`verify-ci-gate-coverage`、图谱检查本机通过；读 ci.yml 的 35 条门禁中，除一条需要数据库的 API 门禁外全部通过。PowerShell 语法与实跑以 PR 上的 Windows 工作流为准。
 
 ## 2026-09-29 凌晨：2.0 稿定为最终版（收尾中）；第三波试点 16、06 运行页对齐稿
 

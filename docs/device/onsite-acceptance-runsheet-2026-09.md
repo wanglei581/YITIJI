@@ -1,5 +1,7 @@
 # 现场验收操作脚本（2026-09）
 
+> **KSK-001 是测试机（2026-09-29 补注）**：笔记本 + 戴尔 27 寸横屏非触摸显示器，一体机页面跑在远程工具的 1680×1055 虚拟屏里，未按母盘清单装机。本文在 KSK-001 上得出的结论（尤其界面、触控、系统键盘、锁机、断电恢复相关）都要在最终硬件（27 寸竖屏触摸屏 + 按 [母盘清单](windows-golden-image-and-install-checklist.md) 装机）上复验，见 `docs/progress/next-tasks.md`「Windows 真机 KSK-001 远程审查增补」。
+>
 > 读者：产品负责人本人，站在 **Windows 主机 + 奔图打印机** 前按步骤走。  
 > 代码基线：`origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`（2026-09-17）。现场必须先记录实际部署 SHA；若已前进，重新核对受影响步骤，不把本基线证据自动外推。
 > 本脚本不替代：`windows-golden-image-and-install-checklist.md`、`production-agent-onboarding.md`、`production-deployment-and-windows-host-checklist.md`。  

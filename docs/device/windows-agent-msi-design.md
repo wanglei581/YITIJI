@@ -58,6 +58,8 @@ Program Files\\AIJobPrintAgent\\
 
 MSI 以管理员权限安装二进制并建立 `%ProgramData%\AIJobPrintAgent`，但未 Provisioning 时只注册 Manual/Stopped 服务，不写 token、配置或领取打印任务。独立 Provisioner 成功后才通过既有加固逻辑写入受 ACL 保护的配置与 DPAPI token，并把服务切换为 Automatic/Running；WinSW 继续使用既有 60 秒、300 秒恢复策略。
 
+已绑定终端（生产安装脚本在绑定成功后写入 `HKLM\SOFTWARE\AIJobPrint\Agent` 的 `Bound=1`）升级或修复时，MSI 用四个固定的系统 `sc.exe` 动作恢复自动启动、失败重启策略与 failureflag，并尽力启动一次；四个动作失败一律忽略，启动失败不会让安装回滚（真机-7，2026-09-29 合入；Windows CI 的 MSI 生命周期测试覆盖已绑定修复）。未绑定时行为不变。这是安装包里唯一允许的自定义动作，门禁 `verify-installer-inputs.mjs` 只放行这四个、只许调用系统 sc.exe。
+
 MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理员密钥。不得把 BindCode 放入 `msiexec` 命令行、MSI public property、CustomActionData、安装日志或注册表。
 
 安装完成后，由独立的本地 Provisioner 通过安全交互输入 BindCode，复用既有 `/auth/terminal/exchange-bind-code` 和 DPAPI LocalMachine 落盘能力。Provisioner 仅输出脱敏结果；成功后执行只读健康检查并由 Admin 确认心跳。Provisioner 的具体 UI/CLI、批量激活和远程下发另立任务，不随本设计实现。
@@ -141,3 +143,25 @@ Bundle 不声明可覆盖变量、MSI 属性、命令行透传或自定义动作
 构建顺序固定为 staging -> MSI -> EXE。`build-exe.ps1` 只接受唯一 MSI 输入并强制输出名；Windows CI 保留既有 required job 标识，新增 EXE build 和 install/repair/uninstall 生命周期验证，同时上传 MSI、EXE、manifest 和两套日志。macOS 上 WiX Burn 明确不支持生成 Windows 引导器，所以本地只运行静态契约和 NuGet 还原检查；EXE 产物、哈希和生命周期必须以 Windows 2022 CI/VM 为证据。
 
 本候选仍为 **NO-GO 发布候选**：在 Windows CI 全绿、企业 Authenticode 双重签名（内嵌 MSI 与外层 EXE）、签名者指纹/时间戳/发布 manifest 校验、Provisioner GUI 和至少一台隔离 Windows 真机验收完成前，不得把该 EXE 发给在役终端作为正式商用安装包。
+
+## 10. 代码签名：试点自签与客户部署两条路（2026-09-29 调研）
+
+> 价格是 2026-09-29 各家官网标价，汇率按 1 美元约 7.1 元粗估，下单前以当时页面为准。依据：learn.microsoft.com 的代码签名选项、SmartScreen 信誉、SignTool、时间戳、受信任根计划文档，CA/B Forum 代码签名基线要求，各 CA 价目页。由产品负责人拍板。
+
+**现状。** 流水线有两种模式：`InternalTest` 在 CI 里临时生成根证书（30 天）与签名证书（7 天），标注 NOT FOR DEPLOYMENT，信任只许装在 GitHub 托管的 CI 机器上；`Release` 代码已在，但没有正式证书，只做过「缺时间戳必须失败」的反向测试。签名只覆盖 MSI、Burn 引擎和外层 EXE；MSI 里的 WinSW `aijobprintagent.exe`、`secure-scan-reader.exe` 没有我们的签名（node.exe、SumatraPDF 用各自厂商的签名，发布前要逐个核实）。智能应用控制（SAC）和应用控制（WDAC）逐个文件判定，没签名的内层文件在开着 SAC 的客户电脑上可能被拦。
+
+**路线一：内部自签，只用于公司自有、由我们管理的试点机。**
+- 做法：根证书离线保管，不放在任何联网机器上；代码签名证书的私钥放在专用签名机的 TPM 里，设为不可导出；用 `Release` 模式签名并强制 RFC 3161 时间戳；试点机用 `certutil -addstore Root`（或 `Import-Certificate` 到 LocalMachine\Root）逐台装根证书并登记；确认试点机上 SAC 已关闭。
+- 费用：现金 0 元；人工约 1–2 人日建根与签名机，每台约 10 分钟，签名证书每年换一次。
+- 风险：内部根没有吊销渠道，私钥一旦泄露，所有试点机都会把攻击者的程序当成我们发布的，只能逐台删根；根证书要限定只能用于代码签名（需要实测）。SmartScreen 把自签名当未签名，但 U 盘、内网或 Agent 自更新不经浏览器下载，基本不触发它。
+- **工具要另立任务补**：现有 `new-internal-code-signing-certificates.ps1` 只造 CI 临时证书，`install-internal-code-signing-trust.ps1` 明令不得装到生产一体机——这条防线是对的，不要放开；试点要另写「持久内部根 + 试点机信任登记」的流程与门禁。
+
+**路线二：公开受信任证书，装到客户或学校的电脑之前买。**
+- 规则：2023-06-01 起私钥必须在硬件（USB 令牌、云 HSM 或签名服务）里生成和使用；2026-03-01 起单张证书最长 460 天。OV 就够：微软 2024 年起不再给 EV 首次下载免警告，OV 和 EV 都要靠下载量积累 SmartScreen 信誉；EV 只在客户招标指定或将来要做驱动时才需要。
+- 能接 CI 的云签名：SSL.com OV 129 美元 + eSigner 180 美元/年，首年约 309 美元（约 2,200 元）；DigiCert OV（KeyLocker 云存储）页面标 696 美元（约 4,900 元）。
+- 需要人民币发票：GlobalSign 中国站 OV 3,488 元/年；沃通 OV 3,588 元/年，但沃通自有根不在微软受信任根清单里，购买前要它书面确认签发链。
+- EV：沃通 4,288 元/年起，天威代理的 DigiCert 11,570 元/年。
+- 微软 Artifact Signing（原 Trusted Signing）：公开信任只对美国、加拿大、欧盟、英国、澳大利亚、新西兰、日本、韩国等地的机构开放，中国注册的公司目前用不了。
+- 周期：身份验证加令牌或云签名开通，预留 2–4 周；公司成立不满 3 年要额外核验申请人本人。首批客户仍会看到「未识别的应用」提示，要提前告知；内层 PE 要一起签。
+
+**推荐。** 试点先走路线一（0 元、1–2 天，工具另立任务补）；签第一份客户合同前买 OV：要接 CI 选 SSL.com eSigner，要人民币发票选 GlobalSign 中国站；同时把 `Release` 模式接上正式证书，并补签内层 PE。

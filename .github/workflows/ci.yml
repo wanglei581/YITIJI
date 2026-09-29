@@ -364,6 +364,8 @@ jobs:
           pnpm run verify:task-reliability
           # Real child processes race for the process-lifetime singleton (Unix socket here, named pipe on Windows).
           pnpm run verify:singleton-process
+          # Field test day 1 (P0-9) evidence script: read-only, count-only, same singleton rule as the Agent.
+          pnpm run verify:field-day-evidence
           # Injected download/wait seams only: download retry backoff, monitor window scaling, log masking contract.
           pnpm run verify:print-truth-hardening
           # Pure in-process scheduler control; proves wake coalescing without HTTP, DB, or hardware.
