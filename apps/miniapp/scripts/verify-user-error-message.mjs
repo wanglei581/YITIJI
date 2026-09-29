@@ -79,6 +79,11 @@ console.log('\nD. 透传白名单')
   const e = await errorOf(400, { success: false, error: { code: 'PRINT_TERMINAL_OFFLINE', message: '目标终端当前离线，请稍后重试' } })
   assert(e.message === '目标终端当前离线，请稍后重试', 'PRINT_TERMINAL_OFFLINE 保留服务端中文')
   assert(PASSTHROUGH_MESSAGE_CODES.length > 0, '透传白名单非空')
+  // 终端暂停接打印单（#1150 新码）：原话原样到达；老码 PRINTER_UNAVAILABLE 的「本机…」仍被挡住
+  const halted = await errorOf(400, { success: false, error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message: '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端' } })
+  assert(halted.message === '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端', `PRINT_TERMINAL_QUEUE_HALTED 保留服务端中文（实际「${halted.message || '(空→页面兜底句)'}」）`)
+  const oldCode = await errorOf(400, { success: false, error: { code: 'PRINTER_UNAVAILABLE', message: '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请联系工作人员' } })
+  assert(!oldCode.message, 'PRINTER_UNAVAILABLE 仍不透传（「本机」是写给一体机现场的）')
 }
 
 // E. 共享技术码给统一中文

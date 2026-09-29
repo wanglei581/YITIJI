@@ -258,6 +258,8 @@ test('错误码 → 可执行的下一步：每条都不是「请稍后重试」
     // 打印机这一个部件出不了纸（离线 / 缺纸 / 故障）。与上面三类都不是一回事，
     // 见下一条测试对 recover 取值的说明。
     ['PRINTER_UNAVAILABLE', 'retry'],
+    // 终端打印队列闸门合上（#1150）：现场修不好、重核价也不会过，只能换服务点。
+    ['PRINT_TERMINAL_QUEUE_HALTED', 'store'],
   ]
   for (const [code, recover] of cases) {
     const shown = pkg.describePackageError({ code, statusCode: 400, message: '' }, '兜底句')
@@ -311,6 +313,18 @@ test('错误码：打印机出不了纸时说的是「可以处理完再来」�
   const userError = requireMiniapp('./user-error.js')
   assert.ok(!userError.PASSTHROUGH_MESSAGE_CODES.includes('PRINTER_UNAVAILABLE'),
     '不透传服务端原文（它面向一体机现场，「本机」在手机上会被读成用户自己的手机）')
+})
+
+test('错误码：终端暂停接打印单时显示服务端原话，按钮是换服务点', () => {
+  const HALTED = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
+  const shown = pkg.describePackageError({ code: 'PRINT_TERMINAL_QUEUE_HALTED', statusCode: 400, message: HALTED }, '创建订单失败，请稍后重试。')
+  assert.equal(shown.text, HALTED, '服务端原话原样显示')
+  assert.equal(shown.recover, 'store', '不是缺纸，重新核价不会过，只能换服务点')
+  assert.ok(!/本机/.test(shown.title + shown.text), '不出现「本机」（在手机上会被读成自己的手机）')
+  // 原话进了 PASSTHROUGH，request.js 才不会把它清空；老码仍然不放行。
+  const userError = requireMiniapp('./user-error.js')
+  assert.ok(userError.PASSTHROUGH_MESSAGE_CODES.includes('PRINT_TERMINAL_QUEUE_HALTED'))
+  assert.ok(!userError.PASSTHROUGH_MESSAGE_CODES.includes('PRINTER_UNAVAILABLE'))
 })
 
 test('错误码：401 单独成一类，去登录而不是重试', () => {

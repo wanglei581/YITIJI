@@ -84,6 +84,7 @@ const PASSTHROUGH_MESSAGE_CODES = [
   'PRINT_TERMINAL_NOT_ACTIVE',   // 目标终端当前不接收打印订单
   'PRINT_ORDER_NOT_CANCELLABLE', // 订单当前状态不能取消
   'PICKUP_CODE_EXPIRED',         // 到机码已过期，请在小程序重新下单
+  'PRINT_TERMINAL_QUEUE_HALTED', // 这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端（#1150；老码 PRINTER_UNAVAILABLE 仍不放行）
 
   // ── 登录 / 认证链路 ────────────────────────────────────────────────
   // 2026-09-08 回归修复：本模块首版把这些码一并挡在 fail-closed 之外，
