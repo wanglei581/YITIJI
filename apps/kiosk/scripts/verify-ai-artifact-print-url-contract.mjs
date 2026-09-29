@@ -180,7 +180,7 @@ const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entr
   return entry.name.endsWith('.ts') ? [full] : []
 })
 const regressions = walk(path.join(repoRoot, 'services/api/src'))
-  .filter((file) => /printFileUrl:\s*signFileUrl\((?:uploaded\.fileId|printFileId|access\.fileId)\)/.test(fs.readFileSync(file, 'utf8')))
+  .filter((file) => /printFileUrl\s*[:=]\s*signFileUrl\((?:uploaded\.fileId|printFileId|access\.fileId)\)/.test(fs.readFileSync(file, 'utf8')))
   .map((file) => path.relative(repoRoot, file))
 if (regressions.length === 0) pass('services/api/src 没有产物打印链接退回默认 5 分钟')
 else fail(`产物打印链接退回默认有效期：${regressions.join(', ')}`)
