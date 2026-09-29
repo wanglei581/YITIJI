@@ -27,12 +27,22 @@ import {
 } from './advisorArtifactModel'
 import './styles/advisor-artifact-qx.css'
 
+const READ_LIMIT = 3
+
 function isNotFound(err: unknown): boolean {
   return err instanceof ApiHttpError && (
     err.status === 404
     || err.code === 'ADVISOR_SESSION_NOT_FOUND'
     || err.code === 'ADVISOR_ARTIFACT_NOT_FOUND'
   )
+}
+
+function stableJson(value: unknown): string {
+  try {
+    return JSON.stringify(value ?? null)
+  } catch {
+    return ''
+  }
 }
 
 export function AiPlanPage() {
@@ -46,7 +56,16 @@ export function AiPlanPage() {
   const sessionId = parseId(search.get('sessionId')) ?? parseId(navState.sessionId)
   const artifactId = parseId(search.get('artifactId')) ?? parseId(navState.artifactId)
   const accessToken = typeof navState.accessToken === 'string' ? navState.accessToken : null
-  const bootstrapPayload = parsePayload(navState.artifact)
+  // 导航里的要点对象每次渲染都是新引用。只按序列化后的字符串记一份，避免读取效果跟着空转。
+  const artifactKey = stableJson(navState.artifact)
+  const bootstrapPayload = useMemo(() => {
+    if (!artifactKey) return null
+    try {
+      return parsePayload(JSON.parse(artifactKey))
+    } catch {
+      return null
+    }
+  }, [artifactKey])
   const printBlockedReason = navState.printUnavailableReason?.trim() || null
   const fixtureState = useMemo(() => resolveFixtureState(search), [search])
 
@@ -59,6 +78,7 @@ export function AiPlanPage() {
   )
   const [printBusy, setPrintBusy] = useState(false)
   const [printError, setPrintError] = useState<string | null>(null)
+  const [readFailed, setReadFailed] = useState(false)
   const printLock = useRef(false)
   const requestSeq = useRef(0)
 
@@ -68,41 +88,55 @@ export function AiPlanPage() {
     requestSeq.current = seq
     setViewState('loading')
     setPrintError(null)
-    try {
-      const session = parseSessionView(await getAdvisorSession(sessionId, {
-        token: getToken(),
-        accessToken,
-      }))
-      if (seq !== requestSeq.current) return
-      if (!session || isExpiredIso(session.expiresAt)) {
-        setPayload(null)
-        setViewState('expired')
+    setReadFailed(false)
+    let missing = false
+    for (let attempt = 1; attempt <= READ_LIMIT; attempt += 1) {
+      try {
+        const session = parseSessionView(await getAdvisorSession(sessionId, {
+          token: getToken(),
+          accessToken,
+        }))
+        if (seq !== requestSeq.current) return
+        if (!session || isExpiredIso(session.expiresAt)) {
+          setPayload(null)
+          setViewState('expired')
+          return
+        }
+        const artifact = pickArtifact(session, artifactId)
+        if (!artifact || !artifact.payload || isExpiredIso(artifact.expiresAt)) {
+          setPayload(null)
+          setViewState('expired')
+          return
+        }
+        setActiveIds({ sessionId: session.sessionId, artifactId: artifact.artifactId })
+        setPayload(artifact.payload)
+        setViewState(deriveContentState(artifact.payload))
         return
+      } catch (err) {
+        if (seq !== requestSeq.current) return
+        if (isNotFound(err)) {
+          missing = true
+          break
+        }
+        if (attempt < READ_LIMIT) {
+          await new Promise((resolve) => window.setTimeout(resolve, 400))
+          if (seq !== requestSeq.current) return
+        }
       }
-      const artifact = pickArtifact(session, artifactId)
-      if (!artifact || !artifact.payload || isExpiredIso(artifact.expiresAt)) {
-        setPayload(null)
-        setViewState('expired')
-        return
-      }
-      setActiveIds({ sessionId: session.sessionId, artifactId: artifact.artifactId })
-      setPayload(artifact.payload)
-      setViewState(deriveContentState(artifact.payload))
-    } catch (err) {
-      if (seq !== requestSeq.current) return
-      if (isNotFound(err)) {
-        setPayload(null)
-        setViewState('expired')
-        return
-      }
-      if (bootstrapPayload) {
-        setPayload(bootstrapPayload)
-        setViewState(deriveContentState(bootstrapPayload))
-        return
-      }
-      setPayload(null)
-      setViewState('error')
     }
+    if (missing) {
+      setPayload(null)
+      setViewState('expired')
+      return
+    }
+    setReadFailed(true)
+    if (bootstrapPayload) {
+      setPayload(bootstrapPayload)
+      setViewState(deriveContentState(bootstrapPayload))
+      return
+    }
+    setPayload(null)
+    setViewState('error')
   }, [accessToken, artifactId, bootstrapPayload, fixtureState, getToken, sessionId])
 
   useEffect(() => {
@@ -247,7 +281,18 @@ export function AiPlanPage() {
         />
         {showLegend ? <EvidenceLegend /> : null}
         <div className="aa-body qx-grow">
-          <ArtifactBody state={derivedState} payload={payload} onRetry={() => { void loadSession() }} />
+          <ArtifactBody state={derivedState} payload={payload} />
+          {(derivedState === 'error' || readFailed) && !fixtureState ? (
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="teal"
+              data-testid="advisor-artifact-reread"
+              onClick={() => { void loadSession() }}
+            >
+              重新读取
+            </button>
+          ) : null}
         </div>
       </div>
     </QxPageFrame>
