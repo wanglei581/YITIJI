@@ -660,6 +660,24 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /** INCR 并在首次出现时设置过期,返回自增后的值(用于滑动窗口计数)。 */
+  /**
+   * 计数减 1、不低于 0、保留原有效期（DECR 不动 TTL）；键不在返回 0，减到 0 时删键。原子（Lua）。
+   * 给取件失败计数「成功认领抵一次失败」用（1.8 P-2）。
+   */
+  async decrementFloorKeepTtl(key: string): Promise<number> {
+    const result = await this.client.eval(
+      `
+      local v = tonumber(redis.call('GET', KEYS[1]))
+      if not v then return 0 end
+      if v <= 1 then redis.call('DEL', KEYS[1]) return 0 end
+      return redis.call('DECR', KEYS[1])
+      `,
+      1,
+      key,
+    )
+    return Number(result)
+  }
+
   async incrWithTtl(key: string, ttlSeconds: number): Promise<number> {
     const result = await this.client.eval(
       `

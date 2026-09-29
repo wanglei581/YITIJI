@@ -352,9 +352,10 @@ check(
   '锁定参数为 10 次/10 分钟 → 锁 15 分钟（改这三个数就是改 8 位码的安全结论，先重算）',
 )
 check(
-  lockoutSrc.includes('export async function clearPickupClaimFailures') &&
-    pickupOrderSrc.includes('await clearPickupClaimFailures(this.redis, terminal.id)'),
-  '成功认领清零失败计数（否则繁忙终端会被零散手误累积锁死）',
+  lockoutSrc.includes('export async function creditPickupClaimSuccess') &&
+    pickupOrderSrc.includes('await creditPickupClaimSuccess(this.redis, terminal.id)') &&
+    !lockoutSrc.includes('clearPickupClaimFailures'),
+  '成功认领抵掉一次失败计数（否则繁忙终端会被零散手误累积锁死；不整个清零，否则一张新单换一次清零——1.8 P-2）',
 )
 check(
   lockoutSrc.includes('tryRedis(') &&

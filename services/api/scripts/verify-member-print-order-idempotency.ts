@@ -65,6 +65,13 @@ class FakeRedis {
   async get(key: string): Promise<string | null> { return this.values.get(key) ?? null }
   async setEx(key: string, _ttl: number, value: string): Promise<void> { this.values.set(key, value) }
   async del(key: string): Promise<number> { return this.values.delete(key) ? 1 : 0 }
+  async decrementFloorKeepTtl(key: string): Promise<number> {
+    const v = Number(this.values.get(key) ?? 'NaN')
+    if (!Number.isFinite(v)) return 0
+    if (v <= 1) { this.values.delete(key); return 0 }
+    this.values.set(key, String(v - 1))
+    return v - 1
+  }
   async incrWithTtl(key: string, _ttl: number): Promise<number> {
     const value = Number(this.values.get(key) ?? '0') + 1
     this.values.set(key, String(value))
