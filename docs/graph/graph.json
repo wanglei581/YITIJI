@@ -12645,7 +12645,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 610,
+      "reachableFileCount": 611,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15636,7 +15636,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 703
+      "sourceFileCount": 704
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18375,6 +18375,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
+      "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
@@ -18412,7 +18413,8 @@
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
     "apps/kiosk/src/pages/assistant/assistant-qingxu.css": [
-      "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
+      "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
+      "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs"
     ],
     "apps/kiosk/src/pages/auth/LoginPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -19357,8 +19359,14 @@
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
     "apps/kiosk/src/pages/profile/me/feedback/types.ts": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
@@ -27822,6 +27830,8 @@
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
+          "apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts",
+          "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
@@ -28539,6 +28549,8 @@
         "files": [
           ".github/workflows/ci.yml",
           "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+          "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/assistant/assistant-qingxu.css",
           "apps/kiosk/src/pages/profile/me/MyActivityPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx",
@@ -28549,6 +28561,7 @@
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
+          "apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts",
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
           "services/api/package.json",
@@ -28627,6 +28640,7 @@
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
+          "apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts",
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",

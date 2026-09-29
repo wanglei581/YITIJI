@@ -192,6 +192,12 @@
 - **寿命：** `issueInternalToken` 的自签令牌从 `24h` 改为 `15m`。这条门禁是隔离 SQLite + 进程内内存 Redis 的一次 HTTP 链路，脚本里没有 sleep / 轮询；2026-09-29 本机整段实测 48 秒，15 分钟够用。生产登录仍是 `auth.module.ts` 的 `JWT_TTL`（24h）。
 - **签发核对：** 签完解码，字段表从 `auth.service.ts` 的 `issueLogin` 和 `auth.module.ts` 的 `signOptions` 读，不另抄一份。当前契约是 `sub`、`role`、`orgId`、`ver`、`jti`，`aud` 与 `iss` 缺省。对不上就抛错，退出码不是 0。故意把 `aud` 写成 `mutated-wrong-audience` 时，门禁在签发处失败（pnpm 退出码 1），夹具已清理，随后已改回。
 - **验证：** `verify:content-pipeline-e2e` 123/123，退出码 0；`verify:admin-login-hardening` 54/54，退出码 0；`verify:redis-degradation-truth` 39/39，退出码 0。Node 22。
+## 2026-09-29：一体机补「AI 内容投诉」入口（走查 W-01，分支 `claude/kiosk-ai-content-complaint-20260929`）
+
+- **问题：** 服务端（会员反馈类别 `ai_content`）和小程序早就有 AI 内容投诉，一体机没有：「我的→意见反馈」只有四类，AI 页面上也没有入口，一体机任何地方都点不到。另一个后果：同一账号在小程序提交过 AI 投诉，一体机「我的反馈」列表取不到这一类的徽章元数据。
+- **改动：** 反馈类别加「AI 内容投诉」（`ai_content`），选中时显示与小程序同口径的说明（写清哪个功能、什么时间、哪段内容；5 个工作日内答复，依据 `docs/compliance/pilot-compliance-procedures.md` 制度 7）；`?category=ai_content` 直接选中；游客从入口进来，登录后回到同一分类。2.0 定稿（05、22、23、29、39、40、52）与原稿都没画投诉入口，所以只在「AI 服务记录」与小青页各加一个低调文字入口，不改稿。未改服务端。匿名（不登录）的 AI 投诉表单留作后续。
+- **门禁：** `verify:fusion-w5` 冻结的 `feedback/types.ts` 哈希随纯追加前移；`verify:lightflow-profile-entry`、`verify:profile-inkpaper-home`、`verify:profile-feedback-inkpaper` 三处范围白名单只加行；`verify:profile-feedback-inkpaper` 加 AI 投诉正向断言；`profile-qx.spec.ts` 加一条「AI 服务记录入口→预选→按 ai_content 提交」的浏览器用例。
+- **验证：** 见 PR 描述；本地走查全栈（模拟外部服务）上走通小青页/AI 服务记录页入口→登录回跳→提交→「我的反馈」显示「AI 内容投诉」→管理员后台收到，截图在 `~/.cache/walk0929/evidence/ai-complaint/`（本机，不进仓库）。
 
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 

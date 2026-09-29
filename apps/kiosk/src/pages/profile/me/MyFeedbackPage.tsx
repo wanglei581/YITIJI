@@ -1,7 +1,8 @@
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 // 我的意见反馈 — /me/feedback（本人）。
-// 分类限定为设备 / 打印 / 文件处理 / 一般建议，不涉及招聘闭环承诺。
+// 分类限定为设备 / 打印 / 文件处理 / 一般建议 / AI 内容投诉（C3），不涉及招聘闭环承诺。
+// AI 内容投诉承诺 AI_COMPLAINT_REPLY_DAYS 个工作日内答复；其余分类不承诺回复时限。
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -23,6 +24,7 @@ import { QxMemberNavbar } from '../components/QxMemberNavbar'
 import { FeedbackDetailPanel } from './feedback/FeedbackDetailPanel'
 import { FeedbackFormPanel } from './feedback/FeedbackFormPanel'
 import { FeedbackListPanel } from './feedback/FeedbackListPanel'
+import { AI_COMPLAINT_REPLY_DAYS } from './feedback/aiComplaint'
 import { emptyFeedbackForm, parseFeedbackCategory, type FeedbackFormState } from './feedback/types'
 import './styles/feedback-qx.css'
 
@@ -52,6 +54,8 @@ export function MyFeedbackPage() {
   const relatedPrintTaskId = searchParams.get('relatedPrintTaskId')?.trim() ?? ''
   const categoryFromQuery = parseFeedbackCategory(searchParams.get('category'))
   const loginFrom = '/me/feedback' // loginFrom="/me/feedback"
+  // 从 AI 页面带着 ?category=ai_content 进来的游客：登录后回到同一分类，不丢投诉入口的意图。
+  const loginReturnTo = categoryFromQuery ? `${loginFrom}?category=${categoryFromQuery}` : loginFrom
 
   const token = getToken()
   const fetchPage = useCallback((cursor?: string) => getMyFeedback(token, { pageSize: 50, cursor }), [token])
@@ -189,7 +193,9 @@ export function MyFeedbackPage() {
     ? { tone: 'bad' as const, label: '反馈列表这次没取到' }
     : uiState === 'loading' || uiState === 'detail-loading'
       ? { tone: 'unknown' as const, label: '正在读取本人工单' }
-      : { tone: 'unknown' as const, label: '本人工单，不承诺回复时限' }
+      : form.category === 'ai_content' && !relatedPrintTaskId
+        ? { tone: 'unknown' as const, label: `AI 内容投诉 ${AI_COMPLAINT_REPLY_DAYS} 个工作日内答复` }
+        : { tone: 'unknown' as const, label: '本人工单，不承诺回复时限' }
 
   return (
     <div
@@ -207,7 +213,7 @@ export function MyFeedbackPage() {
         ctabar={
           <FeedbackCta
             uiState={uiState}
-            onLogin={() => navigate('/login', { state: { from: loginFrom } })}
+            onLogin={() => navigate('/login', { state: { from: loginReturnTo } })}
             onRetry={refresh}
             onHome={() => navigate('/profile')}
           />
@@ -231,7 +237,7 @@ export function MyFeedbackPage() {
             <div className="fb-summary-main">
               <b>服务反馈</b>
               <strong>{items.length}</strong>
-              <span>本人设备、打印、文件处理与一般建议，不涉及招聘平台闭环承诺</span>
+              <span>本人设备、打印、文件处理、一般建议与 AI 内容投诉，不涉及招聘平台闭环承诺</span>
             </div>
             <div>
               <span className="fb-st">{canUseRemote ? '可提交' : '待登录'}</span>
@@ -305,7 +311,7 @@ export function MyFeedbackPage() {
 
           <p className="fb-legal">
             <b>诚实说明</b>
-            本页是登录后的本人反馈，与不用登录的一体机问题反馈不是同一条流程；不承诺受理结论或回复时限。
+            本页是登录后的本人反馈，与不用登录的一体机问题反馈不是同一条流程；AI 内容投诉 {AI_COMPLAINT_REPLY_DAYS} 个工作日内答复，其他反馈不承诺受理结论或回复时限。
           </p>
           {isLoggedIn && loadState === 'ready' && !selected ? <MemberLoadMore {...pagination} /> : null}
         </div>
