@@ -1,0 +1,805 @@
+{
+  "schemaVersion": 2,
+  "asOf": "2026-09-29",
+  "description": "走查数据集 v2 人设。全部虚构。手机号只用 13800000601–13800000628。证件号前 6 位 370200，校验位按 GB 11643-1999。年龄按 asOf 当天的周岁。",
+  "phoneRange": {
+    "start": "13800000601",
+    "end": "13800000628"
+  },
+  "sites": [
+    {
+      "id": "service-hall",
+      "name": "服务大厅",
+      "org": "示例·市南区公共就业服务中心",
+      "terminal": "WALK-001",
+      "traits": "工作日上午排队；中老年多；一台机器几个人轮流"
+    },
+    {
+      "id": "gig-home",
+      "name": "零工之家",
+      "org": "示例·崂山区零工之家",
+      "terminal": "WALK-002",
+      "traits": "早 7–9 点高峰；外卖、家政、装修零工；多数不带 U 盘、手机为主；赶时间"
+    },
+    {
+      "id": "campus",
+      "name": "高校就业中心",
+      "org": "示例·某高校就业指导中心（黄岛）",
+      "terminal": "WALK-003",
+      "traits": "应届生；Word/WPS 简历、多份打印、面试练习；秋招 10 月高峰"
+    },
+    {
+      "id": "community",
+      "name": "社区服务站",
+      "org": "示例·城阳区某社区服务站",
+      "terminal": "WALK-004",
+      "traits": "宝妈、退役军人、帮子女来打印的老人；下午多；网络偶尔断"
+    }
+  ],
+  "personas": [
+    {
+      "id": "p601",
+      "name": "张建国",
+      "age": 47,
+      "gender": "男",
+      "phone": "13800000601",
+      "birthDate": "1979-03-16",
+      "idNumber": "37020019790316007X",
+      "siteId": "service-hall",
+      "cohort": "40+再就业",
+      "deviceSkill": "不会触屏",
+      "hasSmartphone": true,
+      "smartphoneNote": "有一台老安卓，只用来接电话，不会把文件发到机器上。",
+      "carried": {
+        "kinds": ["纸质"],
+        "detail": "两页 A4 纸质简历，折了四折，电话号码用圆珠笔改过。身份证原件在上衣内袋。"
+      },
+      "goal": "把纸质简历扫描后再打 3 份黑白。看不清屏幕小字，不会在触屏上打字，准备用手写或直接叫工作人员。",
+      "habits": {
+        "misclickRate": 0.38,
+        "leaveMidwayProbability": 0.12,
+        "whenConfused": "手指停在屏幕上方不点，回头找穿马甲的工作人员，不自己试第二遍。",
+        "patienceMinutes": 18,
+        "asksStaff": true
+      },
+      "isMember": false,
+      "features": ["扫描原件", "打印", "向工作人员求助"]
+    },
+    {
+      "id": "p602",
+      "name": "欧阳春梅",
+      "age": 54,
+      "gender": "女",
+      "phone": "13800000602",
+      "birthDate": "1972-01-08",
+      "idNumber": "370200197201080024",
+      "siteId": "service-hall",
+      "cohort": "失业转岗",
+      "deviceSkill": "低",
+      "hasSmartphone": true,
+      "smartphoneNote": "智能手机主要用来看微信，文件是女儿前天夜里发来的。",
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "微信文件传输助手里有一份两页 PDF 简历，文件名是女儿起的，她自己对不上号。"
+      },
+      "goal": "把简历打 2 份，再问窗口灵活就业相关的公开政策怎么看。愿意注册会员，但密码想让女儿设。",
+      "habits": {
+        "misclickRate": 0.22,
+        "leaveMidwayProbability": 0.15,
+        "whenConfused": "会把手机屏幕转给身后排队的人看，问「这个是不是按这里」。",
+        "patienceMinutes": 14,
+        "asksStaff": true
+      },
+      "isMember": true,
+      "features": ["扫码上传", "政策查询", "打印"]
+    },
+    {
+      "id": "p603",
+      "name": "孙伟",
+      "age": 41,
+      "gender": "男",
+      "phone": "13800000603",
+      "birthDate": "1985-07-22",
+      "idNumber": "370200198507220012",
+      "siteId": "service-hall",
+      "cohort": "裁员再就业",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["U盘"],
+        "detail": "一只黑色旧 U 盘，根目录有三个同名简历：新建文档、新建文档(1)、简历最新(2)，还有一份更早的 .doc。他自己也说不清哪份是改过电话的。"
+      },
+      "goal": "从 U 盘里挑一份简历打 4 份黑白。想改一个错字，发现机器上改不了就会放弃修改，先打出来。",
+      "habits": {
+        "misclickRate": 0.11,
+        "leaveMidwayProbability": 0.08,
+        "whenConfused": "退回上一页重来一次，还不行就拿着 U 盘去问工作人员哪一份是最新的。",
+        "patienceMinutes": 12,
+        "asksStaff": true
+      },
+      "isMember": true,
+      "features": ["U盘导入", "打印预览", "打印"]
+    },
+    {
+      "id": "p604",
+      "name": "韩冰",
+      "age": 38,
+      "gender": "女",
+      "phone": "13800000604",
+      "birthDate": "1988-04-02",
+      "idNumber": "370200198804020025",
+      "siteId": "service-hall",
+      "cohort": "会计转行",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["U盘", "微信文件"],
+        "detail": "U 盘里有表格版简历和一份 WPS 表格个人情况表。她习惯先对页数再下单。"
+      },
+      "goal": "打印带表格的简历 2 份。本来想要双面，看到机器没开通双面就改成单面，不会跟窗口吵。",
+      "habits": {
+        "misclickRate": 0.04,
+        "leaveMidwayProbability": 0.05,
+        "whenConfused": "会把提示读完，对着 U 盘里的文件名核对，再决定按哪一个。",
+        "patienceMinutes": 15,
+        "asksStaff": false
+      },
+      "isMember": true,
+      "features": ["U盘导入", "打印", "AI简历诊断"]
+    },
+    {
+      "id": "p605",
+      "name": "郑大山",
+      "age": 59,
+      "gender": "男",
+      "phone": "13800000605",
+      "birthDate": "1967-05-19",
+      "idNumber": "37020019670519029X",
+      "siteId": "service-hall",
+      "cohort": "临近退休求兼职",
+      "deviceSkill": "低",
+      "hasSmartphone": true,
+      "smartphoneNote": "手机字小，他基本不看屏幕，只用来接儿女电话。",
+      "carried": {
+        "kinds": ["纸质"],
+        "detail": "身份证原件，外加一张自己用格子纸写的求职登记，只有半页。"
+      },
+      "goal": "复印身份证正反面各 2 份，再把那张手写登记打清楚或复印 1 份。不注册。",
+      "habits": {
+        "misclickRate": 0.27,
+        "leaveMidwayProbability": 0.1,
+        "whenConfused": "把老花镜摘下来又戴上，然后直接喊「小姑娘这个怎么弄」。",
+        "patienceMinutes": 16,
+        "asksStaff": true
+      },
+      "isMember": false,
+      "features": ["复印", "证件复印", "打印"]
+    },
+    {
+      "id": "p606",
+      "name": "林晓燕",
+      "age": 33,
+      "gender": "女",
+      "phone": "13800000606",
+      "birthDate": "1993-02-14",
+      "idNumber": "370200199302140021",
+      "siteId": "service-hall",
+      "cohort": "随迁人员求职",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "电脑微信收到的简历，文件名变成乱码。她会在列表里按时间和页数认，不按文件名认。"
+      },
+      "goal": "打 2 份简历。想顺便看公开的就业政策，但不愿意在大厅里念自己的手机号。",
+      "habits": {
+        "misclickRate": 0.09,
+        "leaveMidwayProbability": 0.06,
+        "whenConfused": "先退出到首页，重新从扫码进去；两次不行才问人。",
+        "patienceMinutes": 10,
+        "asksStaff": false
+      },
+      "isMember": false,
+      "features": ["扫码上传", "政策查询", "打印"]
+    },
+    {
+      "id": "p607",
+      "name": "黄志强",
+      "age": 44,
+      "gender": "男",
+      "phone": "13800000607",
+      "birthDate": "1982-09-03",
+      "idNumber": "370200198209030018",
+      "siteId": "service-hall",
+      "cohort": "司机改行",
+      "deviceSkill": "低",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["没带"],
+        "detail": "简历在出租屋的 U 盘上，出门忘了。到了机器前才想起来，准备让妻子用微信发，等不及就走。"
+      },
+      "goal": "本来要打 10 份简历去劳务市场。文件没带成，可能白跑一趟，或者在大厅里等微信文件，超过十几分钟就放弃。",
+      "habits": {
+        "misclickRate": 0.2,
+        "leaveMidwayProbability": 0.48,
+        "whenConfused": "会来回走两步，看排队的人多就直接离开，不跟工作人员解释。",
+        "patienceMinutes": 8,
+        "asksStaff": false
+      },
+      "isMember": false,
+      "features": ["扫码上传", "打印"]
+    },
+    {
+      "id": "p608",
+      "name": "马犇",
+      "age": 34,
+      "gender": "男",
+      "phone": "13800000608",
+      "birthDate": "1992-04-27",
+      "idNumber": "370200199204270017",
+      "siteId": "gig-home",
+      "cohort": "返乡务工",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "只有微信里转出来的简历，文件名是乱码 ç®€åŽ†.pdf。没有 U 盘。"
+      },
+      "goal": "尽快打 2 份简历就走。不注册会员。中途手机如果来单，会先接单再回来，可能不回来。",
+      "habits": {
+        "misclickRate": 0.12,
+        "leaveMidwayProbability": 0.24,
+        "whenConfused": "连按返回，重新扫一次二维码；队伍长就不问人。",
+        "patienceMinutes": 6,
+        "asksStaff": false
+      },
+      "isMember": false,
+      "features": ["扫码上传", "打印"]
+    },
+    {
+      "id": "p609",
+      "name": "买买提·吐尔逊",
+      "age": 29,
+      "gender": "男",
+      "phone": "13800000609",
+      "birthDate": "1997-08-11",
+      "idNumber": "37020019970811005X",
+      "siteId": "gig-home",
+      "cohort": "零工（外卖）",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "smartphoneNote": "用的是 iPhone，相册里的证件和简历是 HEIC，不是 JPG。",
+      "carried": {
+        "kinds": ["手机相册"],
+        "detail": "只要一页简历，加上身份证正反面。照片是早上用手机拍的，原件也带在身上。"
+      },
+      "goal": "赶在早高峰之前复印身份证正反面，并把一页简历打 1 份。不聊天，不注册。",
+      "habits": {
+        "misclickRate": 0.1,
+        "leaveMidwayProbability": 0.3,
+        "whenConfused": "看一眼表，如果已经过了四分钟就收起手机去送单，下次再来。",
+        "patienceMinutes": 4,
+        "asksStaff": false
+      },
+      "isMember": false,
+      "features": ["手机相册上传", "复印", "打印"]
+    },
+    {
+      "id": "p610",
+      "name": "李秀兰",
+      "age": 52,
+      "gender": "女",
+      "phone": "13800000610",
+      "birthDate": "1974-06-05",
+      "idNumber": "37020019740605038X",
+      "siteId": "gig-home",
+      "cohort": "零工（家政）",
+      "deviceSkill": "不会触屏",
+      "hasSmartphone": false,
+      "smartphoneNote": "没有智能手机，家里的老人机不带出门。",
+      "carried": {
+        "kinds": ["纸质"],
+        "detail": "一张手写的自我介绍，身份证原件用塑料套装着。不会登录。"
+      },
+      "goal": "完全靠现场提示。希望有人帮她复印身份证，并把那张手写纸扫描或复印 1 份。",
+      "habits": {
+        "misclickRate": 0.42,
+        "leaveMidwayProbability": 0.05,
+        "whenConfused": "站着不动，两手抱着塑料袋，等别人先开口问她要办什么。",
+        "patienceMinutes": 20,
+        "asksStaff": true
+      },
+      "isMember": false,
+      "features": ["扫描原件", "复印", "向工作人员求助"]
+    },
+    {
+      "id": "p611",
+      "name": "陈磊",
+      "age": 26,
+      "gender": "男",
+      "phone": "13800000611",
+      "birthDate": "2000-06-18",
+      "idNumber": "370200200006180016",
+      "siteId": "gig-home",
+      "cohort": "零工（装修）",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "工友用微信发来的一页简历，文件名被拖得很长，里面还写着「打 3 份」。"
+      },
+      "goal": "打 3 份一页简历，带到工地旁边的劳务点。不要会员，不要诊断。",
+      "habits": {
+        "misclickRate": 0.05,
+        "leaveMidwayProbability": 0.14,
+        "whenConfused": "自己退出重进；文件名显示不全时按文件大小认。",
+        "patienceMinutes": 5,
+        "asksStaff": false
+      },
+      "isMember": false,
+      "features": ["扫码上传", "打印"]
+    },
+    {
+      "id": "p612",
+      "name": "杨秀珍",
+      "age": 45,
+      "gender": "女",
+      "phone": "13800000612",
+      "birthDate": "1981-04-12",
+      "idNumber": "370200198104120025",
+      "siteId": "gig-home",
+      "cohort": "零工（保洁）",
+      "deviceSkill": "低",
+      "hasSmartphone": true,
+      "smartphoneNote": "手机会用微信收儿子发的文件，别的软件点开就慌。",
+      "carried": {
+        "kinds": ["微信文件", "纸质"],
+        "detail": "儿子发来的一页自我介绍，自己还夹着一张健康证明复印件，要再复印。"
+      },
+      "goal": "自我介绍打 2 份，健康证明复印件再复印 1 份。不登录。",
+      "habits": {
+        "misclickRate": 0.21,
+        "leaveMidwayProbability": 0.1,
+        "whenConfused": "给儿子打电话，把听筒凑到机器旁边让儿子听提示音。",
+        "patienceMinutes": 9,
+        "asksStaff": true
+      },
+      "isMember": false,
+      "features": ["扫码上传", "复印", "打印"]
+    },
+    {
+      "id": "p613",
+      "name": "郭鹏",
+      "age": 31,
+      "gender": "男",
+      "phone": "13800000613",
+      "birthDate": "1995-01-23",
+      "idNumber": "370200199501230011",
+      "siteId": "gig-home",
+      "cohort": "零工（搬家）",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["手机相册"],
+        "detail": "没有电子简历，昨晚用手机斜着拍了一张纸质简历，边缘是黑的，字有点糊。"
+      },
+      "goal": "把这张照片打出来看清不清。清楚就打 2 份，糊了就放弃，不在机器上重做简历。",
+      "habits": {
+        "misclickRate": 0.13,
+        "leaveMidwayProbability": 0.2,
+        "whenConfused": "放大预览看两眼，觉得字糊就取消订单离开。",
+        "patienceMinutes": 5,
+        "asksStaff": false
+      },
+      "isMember": false,
+      "features": ["手机相册上传", "打印"]
+    },
+    {
+      "id": "p614",
+      "name": "周敏",
+      "age": 23,
+      "gender": "女",
+      "phone": "13800000614",
+      "birthDate": "2003-03-09",
+      "idNumber": "370200200303090025",
+      "siteId": "gig-home",
+      "cohort": "零工（快递分拣）",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "手机里有一页简历 PDF，是她自己在手机备忘录里写完再导出的。"
+      },
+      "goal": "打 1 份简历。如果屏幕上能看到零工相关的公开政策标题，会点开看一眼，但不停留。已经注册过会员。",
+      "habits": {
+        "misclickRate": 0.03,
+        "leaveMidwayProbability": 0.08,
+        "whenConfused": "自己找到返回，不会叫人，除非付款那一步金额不是 0。",
+        "patienceMinutes": 4,
+        "asksStaff": false
+      },
+      "isMember": true,
+      "features": ["扫码上传", "政策查询", "打印"]
+    },
+    {
+      "id": "p615",
+      "name": "王堃",
+      "age": 22,
+      "gender": "男",
+      "phone": "13800000615",
+      "birthDate": "2004-05-12",
+      "idNumber": "370200200405120010",
+      "siteId": "campus",
+      "cohort": "应届生",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "手机里有 WPS 导出的 .wps 和一份 .docx，还有微信重复接收生成的个人简历(1)。会拿着岗位要求对照。"
+      },
+      "goal": "先让 AI 看简历，再按优化结果打 5 份。会自己核对页数、错字和岗位里的关键词，熟练。",
+      "habits": {
+        "misclickRate": 0.03,
+        "leaveMidwayProbability": 0.04,
+        "whenConfused": "把提示原文读完，再决定是重传文件还是继续。不会一上来就叫老师。",
+        "patienceMinutes": 20,
+        "asksStaff": false
+      },
+      "isMember": true,
+      "features": ["简历上传", "AI简历诊断", "AI简历优化", "简历打印", "模拟面试"]
+    },
+    {
+      "id": "p616",
+      "name": "诸葛小雨",
+      "age": 23,
+      "gender": "女",
+      "phone": "13800000616",
+      "birthDate": "2003-04-18",
+      "idNumber": "370200200304180022",
+      "siteId": "campus",
+      "cohort": "应届生",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["U盘"],
+        "detail": "U 盘里放了中文、英文、一页纸三个版本，文件名只差最后两个字。"
+      },
+      "goal": "三个版本各打 2 份，下午拿去宣讲会。英文那份她会自己看有没有中文残留。",
+      "habits": {
+        "misclickRate": 0.02,
+        "leaveMidwayProbability": 0.03,
+        "whenConfused": "先看预览缩略图区分版本，不对就换文件，不重复下单。",
+        "patienceMinutes": 18,
+        "asksStaff": false
+      },
+      "isMember": true,
+      "features": ["U盘导入", "AI简历优化", "打印", "模拟面试"]
+    },
+    {
+      "id": "p617",
+      "name": "吴迪",
+      "age": 22,
+      "gender": "男",
+      "phone": "13800000617",
+      "birthDate": "2004-09-02",
+      "idNumber": "370200200409020017",
+      "siteId": "campus",
+      "cohort": "应届生",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "招聘网站导出的 Word，页眉还留着网站口号，编号跳号。他知道文件很乱，但来不及重排。"
+      },
+      "goal": "先诊断一下，再打 3 份。在一体机上会紧张，预览时要来回确认是不是导出了多余的封面。",
+      "habits": {
+        "misclickRate": 0.14,
+        "leaveMidwayProbability": 0.07,
+        "whenConfused": "会小声问旁边同学，不找老师；同学也不确定就先打一份看。",
+        "patienceMinutes": 12,
+        "asksStaff": false
+      },
+      "isMember": true,
+      "features": ["扫码上传", "AI简历诊断", "打印"]
+    },
+    {
+      "id": "p618",
+      "name": "徐梦洁",
+      "age": 24,
+      "gender": "女",
+      "phone": "13800000618",
+      "birthDate": "2002-02-28",
+      "idNumber": "370200200202280022",
+      "siteId": "campus",
+      "cohort": "研究生应届",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["U盘"],
+        "detail": "简历是三页 Word，另有一份 WPS 表格的科研成果清单，下午宣讲会要用。"
+      },
+      "goal": "简历打 8 份，成果清单打 2 份。她会自己数页，发现页眉写着「共 1 页」会在所里改，不在机器上改。",
+      "habits": {
+        "misclickRate": 0.02,
+        "leaveMidwayProbability": 0.02,
+        "whenConfused": "打开预览逐页翻，确认没有空白页再付钱。",
+        "patienceMinutes": 16,
+        "asksStaff": false
+      },
+      "isMember": true,
+      "features": ["U盘导入", "打印"]
+    },
+    {
+      "id": "p619",
+      "name": "何俊",
+      "age": 21,
+      "gender": "男",
+      "phone": "13800000619",
+      "birthDate": "2005-07-07",
+      "idNumber": "370200200507070018",
+      "siteId": "campus",
+      "cohort": "专科应届",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "手机 WPS 里只有半页简历，自我评价几乎是空的。"
+      },
+      "goal": "想让 AI 把半页简历扩开再打 4 份。看到要登录会犹豫，可能只打原件就走。还没注册会员。",
+      "habits": {
+        "misclickRate": 0.1,
+        "leaveMidwayProbability": 0.18,
+        "whenConfused": "在登录和直接打印之间来回点，超过两分钟就选择直接打印原件。",
+        "patienceMinutes": 8,
+        "asksStaff": false
+      },
+      "isMember": false,
+      "features": ["扫码上传", "AI简历优化", "打印"]
+    },
+    {
+      "id": "p620",
+      "name": "司马晴",
+      "age": 22,
+      "gender": "女",
+      "phone": "13800000620",
+      "birthDate": "2004-01-15",
+      "idNumber": "370200200401150028",
+      "siteId": "campus",
+      "cohort": "应届生",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "作品集 PDF 设了打开密码，密码在手机备忘录里。简历是另一份没加密的 PDF。文件名很长。"
+      },
+      "goal": "简历打 3 份。作品集要到了机器前才想起有密码，输错一次会去翻备忘录，再不行就先不打作品集。",
+      "habits": {
+        "misclickRate": 0.04,
+        "leaveMidwayProbability": 0.1,
+        "whenConfused": "先检查是不是密码错，而不是以为机器坏了。",
+        "patienceMinutes": 12,
+        "asksStaff": false
+      },
+      "isMember": true,
+      "features": ["扫码上传", "打印"]
+    },
+    {
+      "id": "p621",
+      "name": "丁一鸣",
+      "age": 23,
+      "gender": "男",
+      "phone": "13800000621",
+      "birthDate": "2003-08-19",
+      "idNumber": "370200200308190017",
+      "siteId": "campus",
+      "cohort": "往届未就业",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["U盘"],
+        "detail": "简历里有一段考研空档，他写得很绕，自己也觉得不顺。"
+      },
+      "goal": "先做诊断和优化，把空档那句改清楚，再打 6 份，然后做一次模拟面试。",
+      "habits": {
+        "misclickRate": 0.04,
+        "leaveMidwayProbability": 0.06,
+        "whenConfused": "会把优化前后的句子对一遍，接受不了就撤销，不用第一版。",
+        "patienceMinutes": 25,
+        "asksStaff": false
+      },
+      "isMember": true,
+      "features": ["U盘导入", "AI简历诊断", "AI简历优化", "模拟面试", "打印"]
+    },
+    {
+      "id": "p622",
+      "name": "刘喆",
+      "age": 36,
+      "gender": "女",
+      "phone": "13800000622",
+      "birthDate": "1990-06-25",
+      "idNumber": "370200199006250023",
+      "siteId": "community",
+      "cohort": "宝妈再就业",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["U盘"],
+        "detail": "表格排版的 Word 简历，右上角嵌了示例头像。2021 年 6 月离开上一家单位后一直没写工作，空白大约 5 年。"
+      },
+      "goal": "想改简历又怕在机器上填个人信息。先打 3 份。孩子放学她会中途走开，可能不点结束。",
+      "habits": {
+        "misclickRate": 0.16,
+        "leaveMidwayProbability": 0.55,
+        "whenConfused": "停住，看是不是要填身份证号；要是要填就退出。电话一响就去门口接孩子。",
+        "patienceMinutes": 7,
+        "asksStaff": true
+      },
+      "isMember": true,
+      "features": ["U盘导入", "AI简历诊断", "打印"]
+    },
+    {
+      "id": "p623",
+      "name": "赵卫东",
+      "age": 28,
+      "gender": "男",
+      "phone": "13800000623",
+      "birthDate": "1998-04-04",
+      "idNumber": "370200199804040012",
+      "siteId": "community",
+      "cohort": "退役军人",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["U盘"],
+        "detail": "U 盘里是一份四十多页的扫描件，封面写着示例材料。他只想打其中几页，但经常选成整份。"
+      },
+      "goal": "先查公开的就业政策，再把材料里需要的页打出来。不希望整本 40 多页都被打出来。",
+      "habits": {
+        "misclickRate": 0.09,
+        "leaveMidwayProbability": 0.08,
+        "whenConfused": "会问工作人员能不能只打选中的页，不自己猜页码。",
+        "patienceMinutes": 15,
+        "asksStaff": true
+      },
+      "isMember": true,
+      "features": ["U盘导入", "政策查询", "打印"]
+    },
+    {
+      "id": "p624",
+      "name": "周桂芳",
+      "age": 66,
+      "gender": "女",
+      "phone": "13800000624",
+      "birthDate": "1960-02-12",
+      "idNumber": "370200196002120025",
+      "siteId": "community",
+      "cohort": "帮子女打印的老人",
+      "deviceSkill": "不会触屏",
+      "hasSmartphone": false,
+      "smartphoneNote": "她自己不带手机。文件是儿子周博（虚构，不是另一个人设）前一天晚上用自己的手机上传的。",
+      "carried": {
+        "kinds": ["纸质"],
+        "detail": "只带了一张纸条，上面抄着取件码，有一位数字涂改过。简历本身她没带。"
+      },
+      "goal": "凭纸条上的码取昨晚上传的简历。码可能抄错或已经过期。取不出来就到门口给儿子打电话，不自己重传。",
+      "habits": {
+        "misclickRate": 0.46,
+        "leaveMidwayProbability": 0.28,
+        "whenConfused": "把纸条举到窗口，请工作人员看，不在屏幕上连续试错。",
+        "patienceMinutes": 10,
+        "asksStaff": true
+      },
+      "isMember": false,
+      "features": ["取件"]
+    },
+    {
+      "id": "p625",
+      "name": "钱芳",
+      "age": 32,
+      "gender": "女",
+      "phone": "13800000625",
+      "birthDate": "1994-09-29",
+      "idNumber": "370200199409290046",
+      "siteId": "community",
+      "cohort": "宝妈兼职",
+      "deviceSkill": "中",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "兼职简历在微信里，两页，孩子在旁边拉她的袖子。"
+      },
+      "goal": "打 2 份兼职简历。操作会被孩子打断，容易点错份数。不注册。",
+      "habits": {
+        "misclickRate": 0.28,
+        "leaveMidwayProbability": 0.4,
+        "whenConfused": "一手按屏幕一手拉孩子，点错了会说「刚刚那下不算」，然后重复按。",
+        "patienceMinutes": 6,
+        "asksStaff": true
+      },
+      "isMember": false,
+      "features": ["扫码上传", "打印"]
+    },
+    {
+      "id": "p626",
+      "name": "冯国华",
+      "age": 63,
+      "gender": "男",
+      "phone": "13800000626",
+      "birthDate": "1963-02-02",
+      "idNumber": "370200196302020018",
+      "siteId": "community",
+      "cohort": "退休后找零活",
+      "deviceSkill": "低",
+      "hasSmartphone": true,
+      "smartphoneNote": "会看微信，不会从聊天里保存文件，通常把手机递给女儿远程讲。",
+      "carried": {
+        "kinds": ["纸质", "微信文件"],
+        "detail": "两页纸质说明要扫描。女儿另外发来一张表格，列着今天要打的材料。"
+      },
+      "goal": "先扫描两页纸，再把女儿发来的表打出来。网络一断，他就觉得机器坏了。",
+      "habits": {
+        "misclickRate": 0.24,
+        "leaveMidwayProbability": 0.16,
+        "whenConfused": "以为机器坏了，离开屏幕去叫社区工作人员，不刷新页面。",
+        "patienceMinutes": 11,
+        "asksStaff": true
+      },
+      "isMember": false,
+      "features": ["扫描原件", "扫码上传", "打印"]
+    },
+    {
+      "id": "p627",
+      "name": "上官燕",
+      "age": 29,
+      "gender": "女",
+      "phone": "13800000627",
+      "birthDate": "1997-05-05",
+      "idNumber": "370200199705050020",
+      "siteId": "community",
+      "cohort": "灵活就业",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件", "手机相册"],
+        "detail": "简历 PDF 在微信里，证件照是示例头像，不是现场拍的。"
+      },
+      "goal": "查公开政策，并把简历打 2 份。她会自己看公告是不是过期、是不是还写着待审核。",
+      "habits": {
+        "misclickRate": 0.03,
+        "leaveMidwayProbability": 0.05,
+        "whenConfused": "记下屏幕上的原话，再问工作人员这是公告状态还是她操作错了。",
+        "patienceMinutes": 14,
+        "asksStaff": true
+      },
+      "isMember": true,
+      "features": ["政策查询", "扫码上传", "打印"]
+    },
+    {
+      "id": "p628",
+      "name": "罗小军",
+      "age": 19,
+      "gender": "男",
+      "phone": "13800000628",
+      "birthDate": "2007-03-16",
+      "idNumber": "370200200703160010",
+      "siteId": "community",
+      "cohort": "职校实习",
+      "deviceSkill": "高",
+      "hasSmartphone": true,
+      "carried": {
+        "kinds": ["微信文件"],
+        "detail": "微信接收的文件名非常长。同一份简历还有一个不带长文件名的 docx 和一份(1)，内容不一样。"
+      },
+      "goal": "打 4 份实习简历。可能顺手点开 AI 优化，看不懂第一句就退出，回到打印。",
+      "habits": {
+        "misclickRate": 0.06,
+        "leaveMidwayProbability": 0.09,
+        "whenConfused": "关掉看不懂的那一页，回到文件列表，选名字最短的那份。",
+        "patienceMinutes": 8,
+        "asksStaff": false
+      },
+      "isMember": false,
+      "features": ["扫码上传", "AI简历优化", "打印"]
+    }
+  ]
+}
