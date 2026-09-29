@@ -21751,6 +21751,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
@@ -22039,6 +22040,7 @@
     ],
     "services/api/src/advisor/assistant-summary.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
@@ -22069,6 +22071,7 @@
     "services/api/src/ai/ai-log.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
@@ -22081,6 +22084,7 @@
     ],
     "services/api/src/ai/ai-public-quota.service.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
@@ -22099,6 +22103,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -22126,6 +22131,7 @@
       "services/api/scripts/verify-ai-persistence-consistency.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
@@ -22253,6 +22259,7 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
     "services/api/src/ai/llm/llm-presets.ts": [
@@ -22551,25 +22558,31 @@
       "services/api/scripts/verify-ai-usage-budget.ts"
     ],
     "services/api/src/ai/usage/ai-budget.service.ts": [
-      "services/api/scripts/verify-ai-usage-budget.ts"
+      "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-pricing.ts": [
-      "services/api/scripts/verify-ai-usage-budget.ts"
+      "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-request-context.middleware.ts": [
-      "services/api/scripts/verify-ai-usage-budget.ts"
+      "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-usage-context.ts": [
-      "services/api/scripts/verify-ai-usage-budget.ts"
+      "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-usage-meter.ts": [
-      "services/api/scripts/verify-ai-usage-budget.ts"
+      "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-usage-summary.ts": [
       "services/api/scripts/verify-ai-usage-budget.ts"
     ],
     "services/api/src/ai/usage/ai-usage.module.ts": [
-      "services/api/scripts/verify-ai-usage-budget.ts"
+      "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/app.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -22592,6 +22605,7 @@
     "services/api/src/asr/asr.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-voice-generate.ts"
     ],
@@ -22619,6 +22633,7 @@
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-audit-logs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -22789,6 +22804,7 @@
       "services/api/scripts/verify-benefit-activities.ts"
     ],
     "services/api/src/benefit-redemption/benefit-redemption.service.ts": [
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-benefit-redemption.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-redemption-audit.ts",
@@ -22924,6 +22940,7 @@
     "services/api/src/common/guards/end-user-auth.guard.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-content-pipeline-e2e.ts",
@@ -23056,6 +23073,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-alert-push.cjs",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-change-password.ts",
@@ -23224,6 +23242,7 @@
     ],
     "services/api/src/contract-review/contract-review-orchestrator.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/contract-review/contract-review-pii-masker.ts": [
@@ -23234,6 +23253,7 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-contract-review-timeout.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
@@ -24118,6 +24138,7 @@
     ],
     "services/api/src/member-privacy/member-privacy.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts",
@@ -24706,6 +24727,7 @@
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
@@ -25130,6 +25152,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/terminals/terminal-session.service.ts": [
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-terminal-identity.ts",
@@ -32017,6 +32040,46 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-ai-usage-budget.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-usage-budget"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/ai-public-quota.service.ts",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/llm/llm-http.ts",
+          "services/api/src/ai/usage/ai-budget.service.ts",
+          "services/api/src/ai/usage/ai-pricing.ts",
+          "services/api/src/ai/usage/ai-request-context.middleware.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/ai/usage/ai-usage-meter.ts",
+          "services/api/src/ai/usage/ai-usage.module.ts",
+          "services/api/src/asr/asr.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/benefit-redemption/benefit-redemption.service.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/contract-review/contract-review-orchestrator.service.ts",
+          "services/api/src/contract-review/contract-review-provider.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-usage-coverage.ts",
       "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
