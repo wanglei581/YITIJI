@@ -28,6 +28,7 @@ import {
   unavailableMetric,
 } from './console-screen.metric'
 import { attachFleetCells } from './console-screen.fleet'
+import { loadPrintedPagesTotal } from './console-screen.printed-pages'
 import {
   type PartnerOrgId,
   partnerOrgIdWhere,
@@ -38,7 +39,10 @@ import {
 const PENDING = { in: ['pending', 'reviewing'] }
 const PUBLISHED = { reviewStatus: 'approved', publishStatus: 'published' }
 const ACTIVE_PRINT = ['pending', 'claimed', 'printing']
-/** 累计只加已支付订单的内容页；不乘 copies，也不把 unpaid/refunded 算进去。 */
+/**
+ * 打印量趋势（14 天）仍按已支付订单的内容页、按 paidAt 落日；不乘 copies，也不把 unpaid/refunded 算进去。
+ * 累计打印页数已改为「出纸任务 × 份数」，见 console-screen.printed-pages.ts。
+ */
 const PAID_BILLABLE = { payStatus: 'paid', billablePages: { not: null } } as const
 
 const FLEET_TERMINAL_SELECT = {
@@ -72,7 +76,8 @@ export interface PrintLiveSlice {
 }
 
 export interface PrintCumulativeSlice {
-  pages: ScreenPrintPagesValue
+  /** 'capped'：出纸任务行超过上限，本次不给累计数。 */
+  pages: ScreenPrintPagesValue | 'capped'
   trend: ScreenPrintTrendValue | 'capped'
 }
 
@@ -284,7 +289,7 @@ export async function loadPrintLiveSlice(prisma: PrismaService, now: Date): Prom
 export async function loadPrintCumulativeSlice(
   prisma: PrismaService,
   now: Date,
-  options?: { trendRowCap?: number },
+  options?: { trendRowCap?: number; printedRowCap?: number },
 ): Promise<PrintCumulativeSlice> {
   const trendFrom = daysAgoStart(now, PRINT_TREND_DAY_COUNT)
   const trendRowCap = options?.trendRowCap ?? PRINT_TREND_ROW_CAP
@@ -292,11 +297,8 @@ export async function loadPrintCumulativeSlice(
     ...PAID_BILLABLE,
     paidAt: { not: null, gte: trendFrom },
   }
-  const [pageSum, trendRows] = await Promise.all([
-    prisma.order.aggregate({
-      where: PAID_BILLABLE,
-      _sum: { billablePages: true },
-    }),
+  const [printedPages, trendRows] = await Promise.all([
+    loadPrintedPagesTotal(prisma, { rowCap: options?.printedRowCap }),
     prisma.order.findMany({
       where: paidTrendWhere,
       select: { paidAt: true, billablePages: true },
@@ -325,14 +327,16 @@ export async function loadPrintCumulativeSlice(
     trend = { days, peak: peak && peak.pages > 0 ? peak : null }
   }
   return {
-    pages: {
-      totalPages: pageSum._sum.billablePages ?? 0,
-      byColor: unavailableMetric(
-        'Order.itemsJson',
-        'cumulative',
-        SCREEN_UNAVAILABLE_REASON.colorSplitNotIndexed,
-      ),
-    },
+    pages: printedPages === 'capped'
+      ? 'capped'
+      : {
+          totalPages: printedPages,
+          byColor: unavailableMetric(
+            'Order.itemsJson',
+            'cumulative',
+            SCREEN_UNAVAILABLE_REASON.colorSplitNotIndexed,
+          ),
+        },
     trend,
   }
 }

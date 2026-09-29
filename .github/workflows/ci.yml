@@ -611,6 +611,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:console-screen-snapshot
           # 服务调用 / 信息使用：会 import src，必须在 Prisma client 生成之后。
           pnpm --filter @ai-job-print/api verify:console-screen-usage
+          # 大屏累计打印页数 = 出纸任务 × 份数（W-68）；服务人次读一体机会话（W-69）。自建临时 SQLite。
+          pnpm --filter @ai-job-print/api verify:console-screen-printed-visits
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:isolated-verification-database
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
