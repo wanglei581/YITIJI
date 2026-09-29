@@ -71,12 +71,14 @@ export function FilePreviewPanel({ file, token, caption, children, onEncrypted }
         ) : null}
         <span className="qpd-preview-label">文件预览</span>
       </div>
-      <p className="qpd-preview-caption">{pageCount === null ? '页码以预览显示为准' : `第 ${page} 页 / 共 ${pageCount} 页`}{caption ? ` · 出纸示意：${caption}` : ''}</p>
+      <p className="qpd-preview-caption">{encrypted ? '这份 PDF 打不开，看不到页码' : pageCount === null ? '页码以预览显示为准' : `第 ${page} 页 / 共 ${pageCount} 页`}{caption ? ` · 出纸示意：${caption}` : ''}</p>
       <div className="qpd-preview-meta" aria-label="当前文件">
         <strong>{file.name}</strong><span>{file.size} · {encrypted ? '打不开' : file.pages === null ? '页数待识别' : `${file.pages} 页`}</span>
         {children}
       </div>
-      <button className="qx-btn qpd-open-preview" data-variant="primary" type="button" onClick={() => setPreviewOpen(true)}><EyeIcon aria-hidden="true" />打开完整预览 · 逐页看清</button>
+      {encrypted ? null : (
+        <button className="qx-btn qpd-open-preview" data-variant="primary" type="button" onClick={() => setPreviewOpen(true)}><EyeIcon aria-hidden="true" />打开完整预览 · 逐页看清</button>
+      )}
       <div className="qpd-conversion-note">
         {capabilities.wordToPdf
           ? `PDF、图片和 Word 可预览；${WORD_CONVERSION_DISCLOSURE}`
