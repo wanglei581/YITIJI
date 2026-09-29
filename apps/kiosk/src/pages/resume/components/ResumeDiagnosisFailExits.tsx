@@ -19,7 +19,7 @@
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BookOpenIcon, QrCodeIcon, PrinterIcon } from 'lucide-react'
-import { savePrintMaterialSession } from '../../print/printMaterialSession'
+import { useStartPrintHandoff } from '../../print/usePrintHandoff'
 import { MANUAL_CHECKS } from '../resume-report-model'
 
 export interface ResumeDiagnosisFailFile {
@@ -46,13 +46,14 @@ const DEAD_ROW: CSSProperties = { borderStyle: 'dashed', color: 'var(--qx-ink-3)
 
 export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const canPrintOriginal = Boolean(fileId && file?.fileUrl)
 
   const printOriginal = () => {
     if (!file?.fileUrl) return
     if (!fileId) return
-    // 写法与打印上传页相同：先整份写打印材料会话（旧文件的检查结论、参数一并作废），再去材料检查。
-    // /print/material-check 会重定向到 /print/desk?step=check，重定向不转发路由 state，打印台只认会话。
+    // 写法与打印上传页相同：先整份写打印交接上下文（旧文件的检查结论、参数一并作废），再去材料检查。
+    // 跳转只带交接编号，打印台只认上下文。
     const printFile = {
       name: file.name,
       size: file.size,
@@ -61,8 +62,7 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
       fileUrl: file.fileUrl,
       mimeType: file.mimeType,
     }
-    savePrintMaterialSession({ file: printFile, source: 'resume' })
-    navigate('/print/material-check', { state: { file: printFile, source: 'resume' } })
+    startPrint({ origin: 'resume_original', file: printFile, source: 'resume', returnPath: window.location.pathname })
   }
 
   return (
