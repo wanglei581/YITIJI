@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-29：修 #1074 build-and-verify 红——机构账号列表不再下发原始密码状态（分支 `claude/backend-hardening-20260929-w03-no-proof-state`）
+
+- **原因：** #1128（W-03）为让后台判断「能否登记手机号」，把 `passwordProofState` 放进了 `AdminOrgAccount`，违反 `verify:partner-account-action:schema`「后台账号响应不得暴露 passwordProofState」（run 36584114028 第 180 步）。协调方推 #1128 前没跑这条 schema 门禁，漏了。
+- **修法：** 门禁不放宽。去掉该字段，后台只看服务端算好的 `canRegisterContactPhone` 与 `phoneRegisteredByAdminAt`；W-03 门禁改为断言不下发原始状态。两个后台窗口前端同步改读法。
+- **验证：** schema 门禁通过；反向变异「把 passwordProofState 放回响应」红在该断言；W-03、机构账号操作（含 otp/redis）、admin-orgs、admin-orgs-delete-schema、partner-org-self、internal-auth-phone 全绿。
+
 ## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
 
 - **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
