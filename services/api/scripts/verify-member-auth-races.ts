@@ -10,11 +10,13 @@
  *   [C-5] 扫码领取在取走票据后若签发失败，票据恢复、「已领取」标记撤掉，用户重试能拿到登录；
  *         成功领取后票据不可再领。
  *
- * 纯进程内：受控屏障造并发交错，内存 Redis 按生产 Lua 的语义实现用到的几个方法；不连外部服务。
+ * 服务层用受控屏障造并发交错、内存 Redis 按生产 Lua 的语义实现；末段对真 Redis（REDIS_URL）直测
+ * replaceExactWithCurrentTtl 的 Lua 本身——内存假库证明不了 Lua 写对了。
  */
 import 'reflect-metadata'
 import 'dotenv/config'
 import { createHash, randomBytes } from 'crypto'
+import Redis from 'ioredis'
 import { errorCode } from './support/internal-auth-verify-harness'
 
 let failures = 0
@@ -205,6 +207,33 @@ async function main(): Promise<void> {
     const { service, redis, updates } = await setupRebind(false)
     const r = await outcome(() => service.rebind('member-A', 'step-up', newPhone, '123456'))
     check('踢会话成功后才改手机号', r.ok && redis.revoked.includes('member-A') && updates.length === 1, JSON.stringify(r))
+  }
+
+  console.log('\n[C-3] 真 Redis：replaceExactWithCurrentTtl 的 Lua')
+  {
+    const redisUrl = process.env['REDIS_URL']
+    if (!redisUrl) {
+      check('需要 REDIS_URL 才能直测 Lua（CI 两个作业都有）', false)
+    } else {
+      const { RedisService } = await import('../src/common/redis/redis.service')
+      const raw = new Redis(redisUrl, { maxRetriesPerRequest: 1 })
+      const real = new RedisService(raw)
+      const key = `verify:member-auth-races:${randomBytes(8).toString('hex')}`
+      try {
+        await raw.set(key, 'pending-json', 'EX', 120)
+        check('原值相符：写入并返回 updated', (await real.replaceExactWithCurrentTtl(key, 'pending-json', 'confirmed-A')) === 'updated' && (await raw.get(key)) === 'confirmed-A')
+        const ttl = await raw.ttl(key)
+        check('写入保留原有效期（不续命、不变永久）', ttl > 0 && ttl <= 120, `ttl=${ttl}`)
+        check('原值已变：返回 changed、不覆盖', (await real.replaceExactWithCurrentTtl(key, 'pending-json', 'confirmed-B')) === 'changed' && (await raw.get(key)) === 'confirmed-A')
+        await raw.del(key)
+        check('键已不在：返回 missing、不凭空建键', (await real.replaceExactWithCurrentTtl(key, 'pending-json', 'confirmed-B')) === 'missing' && (await raw.exists(key)) === 0)
+        await raw.set(key, 'pending-json')
+        check('没有有效期的键：返回 missing、不改', (await real.replaceExactWithCurrentTtl(key, 'pending-json', 'confirmed-B')) === 'missing' && (await raw.get(key)) === 'pending-json')
+      } finally {
+        await raw.del(key).catch(() => undefined)
+        raw.disconnect()
+      }
+    }
   }
 
   console.log(`\nverify:member-auth-races：${checks - failures}/${checks} 通过`)
