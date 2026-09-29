@@ -9,7 +9,7 @@ import { recordExternalJump } from '../../services/api/activity'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
-import { savePrintMaterialSession } from '../print/printMaterialSession'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import {
@@ -46,6 +46,7 @@ function formatSize(bytes: number): string {
 
 export function FairCompanyDetailPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { id, companyId } = useParams<{ id: string; companyId: string }>()
   const location = useLocation()
   const { getToken } = useAuth()
@@ -111,10 +112,8 @@ export function FairCompanyDetailPage() {
         fileUrl: printable.printFileUrl,
         mimeType: printable.mimeType,
       }
-      savePrintMaterialSession({ file })
-      navigate('/print/preview', {
-        state: { file },
-      })
+      // 企业资料是运营资料（派生），免检查：写打印交接上下文后进参数页（入口见 printHandoffPolicy）。
+      startPrint({ origin: 'fair_company', file, returnPath: window.location.pathname })
     } catch (err) {
       setPrintError(userMessageOf(err, '打印文件准备失败，请稍后重试'))
     } finally {

@@ -276,6 +276,56 @@ export function restrictToAllowedPrintParams(
   }
 }
 
+/** 能力求交的输入：与一体机 usePrintParamCapability 的返回同形。 */
+export interface PrintCapabilityProbe {
+  loading: boolean
+  color: { allowed: boolean; reason: string | null }
+  duplex: { allowed: boolean; reason: string | null }
+}
+
+export interface PrintParamAdjustment {
+  field: 'colorMode' | 'duplex' | 'pagesPerSheet'
+  from: string | number
+  to: string | number
+  /** 给用户看的原因（本机能力给的原话）。 */
+  reason: string
+}
+
+export interface NegotiatedPrintParams {
+  params: PrintJobParams
+  adjustments: PrintParamAdjustment[]
+  /** 能力还在加载、且请求里有彩色或双面：先别报价，免得按保守参数报一个不是用户要的价。 */
+  waiting: boolean
+}
+
+/**
+ * 请求参数与本机能力求交（商用收口 P0-5，F02 / F20）。不拦人：本机不许的项改成能打的，并逐项说明。
+ * 服务端仍按终端能力登记 fail-closed 复核，这里只决定前端报价与显示用哪一组参数。
+ */
+export function negotiatePrintParams(requested: PrintJobParams, capability: PrintCapabilityProbe): NegotiatedPrintParams {
+  const needsCapability = requested.colorMode !== 'black_white' || requested.duplex !== 'simplex'
+  if (capability.loading && needsCapability) {
+    return {
+      params: restrictToAllowedPrintParams(requested, { color: false, duplex: false }),
+      adjustments: [],
+      waiting: true,
+    }
+  }
+  const allows = { color: !capability.loading && capability.color.allowed, duplex: !capability.loading && capability.duplex.allowed }
+  const params = restrictToAllowedPrintParams(requested, allows)
+  const adjustments: PrintParamAdjustment[] = []
+  if (params.colorMode !== requested.colorMode) {
+    adjustments.push({ field: 'colorMode', from: requested.colorMode, to: params.colorMode, reason: capability.color.reason ?? '本机彩色打印暂未开通' })
+  }
+  if (params.duplex !== requested.duplex) {
+    adjustments.push({ field: 'duplex', from: requested.duplex, to: params.duplex, reason: capability.duplex.reason ?? '本机自动双面暂未开通' })
+  }
+  if (params.pagesPerSheet !== requested.pagesPerSheet) {
+    adjustments.push({ field: 'pagesPerSheet', from: requested.pagesPerSheet, to: params.pagesPerSheet, reason: '每张纸只印一页内容' })
+  }
+  return { params, adjustments, waiting: false }
+}
+
 /**
  * 旧扁平字段输入（历史遗留 / 简化调用方）。
  * 允许使用旧字段名 color / 旧 duplex 取值 'single' / 'double'，

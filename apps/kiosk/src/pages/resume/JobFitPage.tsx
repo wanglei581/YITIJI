@@ -16,7 +16,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { ExternalJobDTO, JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import { BriefcaseIcon, CheckCircle2Icon, HelpCircleIcon, ListIcon, PrinterIcon, SearchIcon } from 'lucide-react'
 import { getJobs } from '../../services/api'
 import {
@@ -49,6 +48,7 @@ import { JobAiConsentModal } from '../jobs/components/JobAiConsentModal'
 import { grantJobAiConsent } from '../../services/api/jobAi'
 import './job-fit-qx.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 /**
  * 舞台缩放开关：与 `KioskRoot.tsx`（isCompactViewport / usesFluidViewport）用**同一套判据**。
@@ -106,6 +106,7 @@ interface AnalysisFailure { kind: 'ai-down' | 'failed'; message: string }
 
 export function JobFitPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as PageState
@@ -477,17 +478,16 @@ export function JobFitPage() {
     try {
       const file = await printJobFit(taskId, { token: getToken(), accessToken })
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+      startPrint({
+        origin: 'job_fit',
+        returnPath: window.location.pathname,
+        file: {
+          name: file.filename,
+          size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
     } catch (err) {
