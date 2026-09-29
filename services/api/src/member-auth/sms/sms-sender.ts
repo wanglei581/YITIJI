@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { maskPhone } from '../../common/crypto/phone-identity'
 import { tc3Sign } from '../../common/tencent/tc3'
-import { isAiEndpointAllowed } from '../../common/outbound/ai-endpoint-allowlist'
+import { isAiEndpointAllowed, isTencentRegionAllowed } from '../../common/outbound/ai-endpoint-allowlist'
 
 export const SMS_SENDER = Symbol('SMS_SENDER')
 
@@ -131,7 +131,7 @@ export class TencentSmsSender implements SmsSender {
     const endpoint = `${insecure ? 'http' : 'https'}://${host}`
     // 出站白名单（与模型、语音同一张单）：手机号是个人信息，地址不在单内就不发。
     // 本机 stub 的 http 只在非生产放行。providerCode 只用于服务端分类，不回给前端。
-    if (!isAiEndpointAllowed(endpoint, 'sms')) {
+    if (!isAiEndpointAllowed(endpoint, 'sms') || !isTencentRegionAllowed(this.config.region, 'sms')) {
       this.logger.error(`SMS 下发被拦 phone=${maskPhone(phone)} reason=endpoint_not_allowed`)
       throw new SmsSendError('endpoint_not_allowed')
     }
