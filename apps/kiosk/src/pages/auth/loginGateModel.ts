@@ -211,3 +211,29 @@ export const LOGIN_ANON_ENTRIES = [
 export function loginAnonEntries(): ReadonlyArray<{ id: string; title: string; desc: string; route: string }> {
   return LOGIN_ANON_ENTRIES
 }
+
+export interface QrFetchGuard {
+  refreshing: boolean
+  generation: number
+}
+
+/** 已有一次取码在途，或还没勾选协议，就不再开下一次。 */
+export function beginQrFetch(guard: QrFetchGuard, agreed: boolean): { guard: QrFetchGuard; generation: number } | null {
+  if (guard.refreshing || !agreed) return null
+  const generation = guard.generation + 1
+  return { guard: { refreshing: true, generation }, generation }
+}
+
+/** 只有仍是这一次取码时才放开锁。被取消的那次不能把后一次的锁清掉。 */
+export function finishQrFetch(guard: QrFetchGuard, generation: number): QrFetchGuard {
+  if (guard.generation !== generation) return guard
+  return { refreshing: false, generation: guard.generation }
+}
+
+/**
+ * 面板卸下时调用。只把代数加一、不放开锁的话，下一次挂载会看见锁还在，
+ * 停在「正在获取二维码」（开发构建里严格模式会把面板卸下再挂上）。
+ */
+export function cancelQrFetch(guard: QrFetchGuard): QrFetchGuard {
+  return { refreshing: false, generation: guard.generation + 1 }
+}

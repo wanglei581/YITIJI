@@ -73,6 +73,33 @@ test('login: this machine cannot send SMS today → its own state that leads to 
   assert.match(m.LOGIN_GATE_COPY['phone-sms-unavailable'].sub, /扫码登录/)
 })
 
+test('W-15 canceling a QR fetch releases the lock so the next attempt can start', async () => {
+  const m = await loadModule('src/pages/auth/loginGateModel.ts')
+  const started = m.beginQrFetch({ refreshing: false, generation: 0 }, true)
+  assert.ok(started)
+  assert.equal(started.guard.refreshing, true)
+  // 只加代数、不放开锁：下一次取码直接放弃，页面停在「正在获取二维码」。
+  assert.equal(m.beginQrFetch({ refreshing: true, generation: started.guard.generation + 1 }, true), null)
+  const cancelled = m.cancelQrFetch(started.guard)
+  assert.equal(cancelled.refreshing, false)
+  assert.equal(cancelled.generation, started.guard.generation + 1)
+  const again = m.beginQrFetch(cancelled, true)
+  assert.ok(again)
+  assert.equal(again.guard.refreshing, true)
+  // 被取消的那次结束时，不能清掉后一次的锁。
+  assert.equal(m.finishQrFetch(again.guard, started.generation).refreshing, true)
+  assert.equal(m.finishQrFetch(again.guard, again.generation).refreshing, false)
+  assert.equal(m.beginQrFetch({ refreshing: false, generation: 0 }, false), null)
+
+  const panel = readFileSync(join(kioskRoot, 'src/pages/auth/ScanQrLoginPanel.tsx'), 'utf8')
+  const cleanupAt = panel.indexOf('useEffect(() => () => {')
+  const refreshAt = panel.indexOf('const refresh = useCallback')
+  const cleanup = panel.slice(cleanupAt, refreshAt)
+  assert.match(cleanup, /cancelQrFetch\(/)
+  assert.match(cleanup, /refreshingRef\.current = cancelled\.refreshing/)
+  assert.doesNotMatch(cleanup, /requestGeneration\.current \+= 1/)
+})
+
 test('login returnTo rejects unsafe query and does not echo it', async () => {
   const m = await loadModule('src/pages/auth/loginGateModel.ts')
   const isSafe = (p) => p.startsWith('/') && !p.startsWith('//') && !p.includes('\\') && p !== '/login'
