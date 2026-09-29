@@ -4,28 +4,31 @@ import { join } from 'node:path'
 import { AiContentBlockedError } from '../src/ai/llm/llm-guard'
 import { llmFetchJson, LlmConcurrencyGate } from '../src/ai/llm/llm-http'
 async function main() {
+// 出站白名单（common/outbound/ai-endpoint-allowlist.ts）只在非生产放行本机地址；
+// fetch 全部是注入 / 替换的假实现，这个地址不会真的被连。
+const STUB_URL = 'http://127.0.0.1/chat/completions'
 const response = (body: unknown) => ({ ok: true, status: 200, statusText: 'OK', json: async () => body }) as Response
 let calls = 0
 const fetchImpl = async (_url: string, init: RequestInit) => { calls++; let request: any = {}; try { request = JSON.parse(String(init.body)) } catch {} return response({ choices: [{ message: { content: calls === 1 ? '输出禁词' : '干净回复' } }] }) }
-await assert.rejects(llmFetchJson('http://test', { method: 'POST', headers: {}, body: JSON.stringify({ messages: [{ role: 'user', content: '输入禁词' }] }) }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { feature: 'verify', forbiddenWords: ['输入禁词'] } }), (e: unknown) => e instanceof AiContentBlockedError && e.direction === 'input')
+await assert.rejects(llmFetchJson(STUB_URL, { method: 'POST', headers: {}, body: JSON.stringify({ messages: [{ role: 'user', content: '输入禁词' }] }) }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { feature: 'verify', forbiddenWords: ['输入禁词'] } }), (e: unknown) => e instanceof AiContentBlockedError && e.direction === 'input')
 assert.equal(calls, 0)
-await assert.rejects(llmFetchJson('http://test', { method: 'POST', headers: {}, body: JSON.stringify({ messages: [{ role: 'user', content: '正常' }] }) }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { feature: 'verify', forbiddenWords: ['输出禁词'] } }), (e: unknown) => e instanceof AiContentBlockedError && e.direction === 'output')
+await assert.rejects(llmFetchJson(STUB_URL, { method: 'POST', headers: {}, body: JSON.stringify({ messages: [{ role: 'user', content: '正常' }] }) }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { feature: 'verify', forbiddenWords: ['输出禁词'] } }), (e: unknown) => e instanceof AiContentBlockedError && e.direction === 'output')
 assert.equal(calls, 1)
-const clean = await llmFetchJson('http://test', { method: 'POST', headers: {}, body: JSON.stringify({ messages: [{ role: 'user', content: '正常' }] }) }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: [] } })
+const clean = await llmFetchJson(STUB_URL, { method: 'POST', headers: {}, body: JSON.stringify({ messages: [{ role: 'user', content: '正常' }] }) }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: [] } })
 assert.equal((clean.data as any).choices[0].message.content, '干净回复')
 // 只查最新一条用户消息：历史里的旧消息不再二次拦截（词表热更新后也不会锁死会话）
 const history = JSON.stringify({ messages: [{ role: 'user', content: '旧话含输入禁词' }, { role: 'assistant', content: '好' }, { role: 'user', content: '新的一句' }] })
 const beforeHistory = calls
-await llmFetchJson('http://test', { method: 'POST', headers: {}, body: history }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: ['输入禁词'] } })
+await llmFetchJson(STUB_URL, { method: 'POST', headers: {}, body: history }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: ['输入禁词'] } })
 assert.equal(calls, beforeHistory + 1, '历史里的旧消息命中不应再拦本轮')
 const latestHit = JSON.stringify({ messages: [{ role: 'user', content: '旧话' }, { role: 'assistant', content: '好' }, { role: 'user', content: '新的一句含输入禁词' }] })
-await assert.rejects(llmFetchJson('http://test', { method: 'POST', headers: {}, body: latestHit }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: ['输入禁词'] } }), (e: unknown) => e instanceof AiContentBlockedError && e.direction === 'input')
-const malformed = await llmFetchJson('http://test', { method: 'POST', headers: {}, body: 'not-json' }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: ['输入禁词'] } })
+await assert.rejects(llmFetchJson(STUB_URL, { method: 'POST', headers: {}, body: latestHit }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: ['输入禁词'] } }), (e: unknown) => e instanceof AiContentBlockedError && e.direction === 'input')
+const malformed = await llmFetchJson(STUB_URL, { method: 'POST', headers: {}, body: 'not-json' }, { timeoutMs: 5000, gate: new LlmConcurrencyGate(2), fetchImpl, contentModeration: { forbiddenWords: ['输入禁词'] } })
 assert.equal(malformed.ok, true)
 // 小青：命中给礼貌拒答、不报错；输入侧命中的原话不能留在会话历史里——
 // 否则下一轮带着整段历史再发，检查点再次命中，这个会话之后每句都会被拒答。
 const { LlmChatService } = await import('../src/ai/llm/llm-chat.service')
-const chatConfig = { vendor: 'openai', model: 'm', baseURL: 'http://llm.invalid/v1', systemPrompt: '你是就业服务助手', roleScope: '', forbiddenWords: ['违禁词甲'], temperature: 0, enabled: true }
+const chatConfig = { vendor: 'openai', model: 'm', baseURL: 'http://127.0.0.1/v1', systemPrompt: '你是就业服务助手', roleScope: '', forbiddenWords: ['违禁词甲'], temperature: 0, enabled: true }
 const chat = new LlmChatService({ getApiKey: () => 'verify-key', getConfig: () => chatConfig } as never)
 const sentBodies: string[] = []
 let modelReply = '好的，我们继续看简历。'

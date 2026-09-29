@@ -1,23 +1,18 @@
 // ============================================================
 // 扫描版 PDF 页面渲染器（Stage 3 OCR 前置步骤）。
 //
-// 为什么不用 unpdf.renderPageAsImage：unpdf 1.6.2 打包的 pdfjs 在 Node 下的
+// 为什么不用 unpdf.renderPageAsImage：当初 unpdf 1.6.2 打包的 pdfjs 在 Node 下的
 // NodeCanvasFactory 是恒抛错的占位（含图片的 PDF——恰恰是扫描件——必然渲染失败）。
-// 这里改为：unpdf.getResolvedPDFJS() 拿到其内部 pdfjs，再通过 getDocument 的
-// `CanvasFactory` 注入 @napi-rs/canvas 实现（三平台均有预编译二进制，无原生编译）。
+// 这里改为：经服务端唯一的 PDF 打开入口（common/pdf/pdfjs-document.ts，引擎为 pdfjs-dist
+// 6.3.289 legacy）拿文档，通过 getDocument 的 `CanvasFactory` 注入 @napi-rs/canvas 实现
+// （三平台均有预编译二进制，无原生编译）。换引擎后仍注入自己的工厂，渲染行为不随引擎默认值漂移。
 //
 // 安全：渲染只在内存进行，输入 buffer 与输出 PNG 均不落盘、不写日志。
-// isEvalSupported:false —— 禁止 pdfjs 对 PDF 内嵌函数走 eval 路径（防御不可信文件）。
+// 打开选项（isEvalSupported:false、enableScripting:false 等）由共用入口统一强制，本文件不再各传各的。
 // ============================================================
 
 import { createCanvas, ImageData, Path2D, DOMMatrix } from '@napi-rs/canvas'
-import { pdfjsPresetDataOptions } from '../../../common/pdf/pdfjs-document'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { getResolvedPDFJS } = require('unpdf') as {
-  getResolvedPDFJS(): Promise<{
-    getDocument(params: Record<string, unknown>): { promise: Promise<PdfjsDocument> }
-  }>
-}
+import { openPdfjsDocument } from '../../../common/pdf/pdfjs-document'
 
 interface PdfjsPage {
   getViewport(opts: { scale: number }): { width: number; height: number }
@@ -118,13 +113,9 @@ export interface RenderedPdf {
 /** 打开 PDF 供逐页渲染（调用方负责 destroy）。 */
 export async function openPdfForRender(buffer: Buffer): Promise<RenderedPdf> {
   ensureArrayBufferTransferToFixedLength()
-  const pdfjs = await getResolvedPDFJS()
-  const doc = await pdfjs.getDocument({
-    ...pdfjsPresetDataOptions(),
-    data: new Uint8Array(buffer),
+  const doc = await openPdfjsDocument<PdfjsDocument>(new Uint8Array(buffer), {
     CanvasFactory: NapiCanvasFactory,
-    isEvalSupported: false,
-  }).promise
+  })
   return {
     totalPages: doc.numPages,
     async renderPage(pageNumber: number, scale: number): Promise<Buffer> {

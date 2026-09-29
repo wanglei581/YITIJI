@@ -135,8 +135,8 @@ export class TerminalsService {
     return this.admin.listOrganizationOptions()
   }
 
-  assignTerminalOrg(terminalId: string, orgId: string | null) {
-    return this.admin.assignTerminalOrg(terminalId, orgId)
+  assignTerminalOrg(terminalId: string, orgId: string | null, now?: Date) {
+    return this.admin.assignTerminalOrg(terminalId, orgId, now)
   }
 
   updateTerminalProfile(terminalId: string, dto: UpdateTerminalProfileDto) {

@@ -23,8 +23,16 @@ import {
   type LlmPreset,
   type LlmVendor,
 } from '../../services/api/aiConfig'
+import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+
+/**
+ * 依赖招聘内容托管的 AI 功能：托管关闭时服务端对它们的接口回 403（岗位、招聘会在我们云上不开放），
+ * 这里就不能照样标「已接入」。只改标签，不改配置能力——b 版本打开托管后照常使用。
+ */
+const RECRUITMENT_HOSTED_FEATURES: ReadonlySet<AiModelFeatureKey> = new Set<AiModelFeatureKey>(['fair_visit_plan', 'job_recommend', 'job_explain'])
 
 export default function AiConfigPage() {
+  const hosting = useRecruitmentHosting()
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
   const [presets, setPresets] = useState<LlmPreset[]>([])
@@ -215,12 +223,21 @@ export default function AiConfigPage() {
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${configured ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
                         {configured ? '配置可用' : '未启用'}
                       </span>
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${feature.status === 'active'
-                        ? 'bg-info-bg text-info-fg'
-                        : 'bg-warning-bg text-warning-fg'}`}
-                      >
-                        {feature.status === 'active' ? '已接入' : '后续接入'}
-                      </span>
+                      {RECRUITMENT_HOSTED_FEATURES.has(feature.key) && hosting.status !== 'ready' ? (
+                        // 托管状态没读到时按关闭处理：不说「已接入」，也不冒充「托管关闭」
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-500">
+                          {hosting.status === 'error' ? '托管状态未读到' : '正在确认托管状态'}
+                        </span>
+                      ) : RECRUITMENT_HOSTED_FEATURES.has(feature.key) && hosting.status === 'ready' && !hosting.enabled ? (
+                        <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[11px] font-medium text-warning-fg">托管关闭，不可用</span>
+                      ) : (
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${feature.status === 'active'
+                          ? 'bg-info-bg text-info-fg'
+                          : 'bg-warning-bg text-warning-fg'}`}
+                        >
+                          {feature.status === 'active' ? '已接入' : '后续接入'}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <p className="mt-1 text-xs text-neutral-500">{feature.description}</p>

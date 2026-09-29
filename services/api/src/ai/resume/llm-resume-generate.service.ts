@@ -9,10 +9,13 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
-import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
+import { deepseekThinkingOff } from '../llm/deepseek-thinking'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../llm/llm-failure'
+import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { AiContentBlockedError, containsForbiddenWord } from '../llm/llm-guard'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
+import { containsMaskPlaceholder, maskUserTextsForLlmReversible } from '../../common/pii/llm-input-mask'
 
 // ============================================================
 // LlmResumeGenerateService — 阶段2A 真实简历生成(单轮、结构化 JSON,OpenAI 兼容)
@@ -118,9 +121,12 @@ export class LlmResumeGenerateService {
       })
     }
 
+    // 描述 / 自我评价是自由文本，常夹着手机号、邮箱、证件号：送模型前可还原遮盖，
+    // 模型回包里的占位符在下面 restorePolish 换回真值后再组装成用户的简历。
+    const masked = maskResumeFreeText(input)
     const baseMessages: ChatMessage[] = [
       { role: 'system', content: GENERATE_SYSTEM_PROMPT },
-      { role: 'user', content: buildGenerateUserPrompt(input) },
+      { role: 'user', content: buildGenerateUserPrompt(masked.input) },
     ]
 
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -131,7 +137,7 @@ export class LlmResumeGenerateService {
         `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, onLlmCall,
       )
       const polish = this.parsePolish(raw, input)
-      if (polish) return assembleResume(input, polish, cfg.forbiddenWords)
+      if (polish) return assembleResume(input, restorePolish(polish, masked.restore), cfg.forbiddenWords)
       this.logger.warn(`resume generate: invalid output (attempt ${attempt}/2)`)
     }
 
@@ -165,12 +171,14 @@ export class LlmResumeGenerateService {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${apiKey}`,
           },
-          body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
+          body: JSON.stringify({ model, messages, temperature, stream: false, ...deepseekThinkingOff(model) }),
         },
         { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_generate', forbiddenWords } },
       )
     } catch (error) {
       if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
+      if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
       }
@@ -247,6 +255,58 @@ function extractJson(raw: string): string | null {
   const end = cleaned.lastIndexOf('}')
   if (start < 0 || end <= start) return null
   return cleaned.slice(start, end + 1)
+}
+
+/**
+ * 送模型前遮盖自由文本字段（教育 / 经历 / 项目描述、自我评价草稿），可还原。
+ *
+ * 只遮这几类：它们是用户随手写的长文本，会夹带联系方式；学校 / 公司 / 职务 / 技能 /
+ * 证书是有长度上限的事实短字段，服务端组装时从用户输入逐字复制，不经模型改写。
+ * 各段一起遮，占位符编号全局一致，一个 restore() 对所有润色文本都有效。
+ * 姓名 / 电话 / 邮箱这些身份字段本来就不进 prompt（见 buildGenerateUserPrompt），不在此列。
+ */
+function maskResumeFreeText(input: ResumeGenerateInput): {
+  input: ResumeGenerateInput
+  restore: (value: string) => string
+} {
+  const segments = [
+    ...input.education.map((e) => e.description ?? ''),
+    ...input.experience.map((e) => e.description),
+    ...input.projects.map((p) => p.description),
+    input.selfIntro ?? '',
+  ]
+  const masked = maskUserTextsForLlmReversible(segments, 'resume_generate')
+  let cursor = 0
+  const next = (): string => masked.texts[cursor++] ?? ''
+  const education = input.education.map((e) => {
+    const description = next()
+    return e.description === undefined ? { ...e } : { ...e, description }
+  })
+  const experience = input.experience.map((e) => ({ ...e, description: next() }))
+  const projects = input.projects.map((p) => ({ ...p, description: next() }))
+  const selfIntro = next()
+  return {
+    input: { ...input, education, experience, projects, ...(input.selfIntro === undefined ? {} : { selfIntro }) },
+    restore: masked.restore,
+  }
+}
+
+/**
+ * 把润色文本里的占位符还原成真值。还原后仍残留占位符（模型编造了不存在的编号）的那条
+ * 置空 —— assembleResume 会回退用户原文，绝不把 `[手机号_9]` 印到用户简历上。
+ */
+function restorePolish(polish: PolishPayload, restore: (value: string) => string): PolishPayload {
+  const one = (value: string): string => {
+    const restored = restore(value)
+    return containsMaskPlaceholder(restored) ? '' : restored
+  }
+  return {
+    summary: one(polish.summary),
+    educationDesc: polish.educationDesc.map(one),
+    experienceDesc: polish.experienceDesc.map(one),
+    projectDesc: polish.projectDesc.map(one),
+    skillsPolished: polish.skillsPolished.map(one),
+  }
 }
 
 function buildGenerateUserPrompt(input: ResumeGenerateInput): string {

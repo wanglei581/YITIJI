@@ -19,6 +19,9 @@
  *   - 不伪造漏斗：归因恒 available:false，且服务不得去 join 行为日志。
  *   - 无个人明细：响应里不得出现任何求职者身份字段。
  *
+ * 2026-09-29 起同一门禁覆盖 GET /partner/terminal-operations（本机构终端运营数据），
+ * 用例在 scripts/support/partner-terminal-ops-cases.ts。
+ *
  * Run: pnpm --filter @ai-job-print/api verify:partner-stats-contract
  */
 import 'dotenv/config'
@@ -33,6 +36,7 @@ import {
   MIN_AGGREGATE_SAMPLE,
   STATS_TIMEZONE,
 } from '../src/orgs/partner-stats.service'
+import { verifyTerminalOperations } from './support/partner-terminal-ops-cases'
 
 let passed = 0
 let failed = 0
@@ -380,6 +384,10 @@ async function main(): Promise<void> {
       '3p. 数据模式标记为 live（真实库数据）',
       a.dataMode === 'live',
     )
+    // 3j/3k 的禁用键同样约束终端数据端点，另加机构、终端内部与单据字段
+    await verifyTerminalOperations(assert, prisma, [
+      ...fabricated, ...personal, 'orgId', 'terminalId', 'taskId', 'orderId', 'errorCode', 'printOutcome', 'id',
+    ])
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

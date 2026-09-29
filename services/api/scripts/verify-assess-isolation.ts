@@ -168,11 +168,22 @@ try {
     addAt > 0 && countAt > addAt && /return \{[\s\S]*?,\s*pageCount\s*\}/.test(appendFn.slice(countAt)),
     'append 必须在合并后读取 merged.getPageCount()，不能用附录页数冒充总页数（appendAigcPages 先 addPage 再取页数并返回）',
   )
+  // 只有打分（不含 AI 解读）时改走本文件的 appendPlainPages（只拷页、不写 AIGC 标识），
+  // 两条分支都必须取合并后的页数。
   assert.match(
     appendSrc,
-    /const mergedPdf = await appendAigcPages\([^)]*\)\s*\n\s*const mergedPageCount = mergedPdf\.pageCount/,
-    'append 的总页数取自 appendAigcPages 合并后的文档',
+    /const mergedPdf = (?:await appendAigcPages\([^)]*\)|withAi\s*\?\s*await appendAigcPages\([^)]*\)\s*:\s*await appendPlainPages\([^)]*\))\s*\n\s*const mergedPageCount = mergedPdf\.pageCount/,
+    'append 的总页数取自 appendAigcPages / appendPlainPages 合并后的文档',
   )
+  if (appendSrc.includes('appendPlainPages(')) {
+    const plainFn = appendSrc.slice(appendSrc.indexOf('async function appendPlainPages('))
+    const plainAdd = plainFn.indexOf('merged.addPage(')
+    const plainCount = plainFn.indexOf('pageCount: merged.getPageCount()')
+    assert.ok(
+      plainAdd > 0 && plainCount > plainAdd,
+      'appendPlainPages 必须先 addPage 再取 merged.getPageCount()，不能用附录页数冒充总页数',
+    )
+  }
   assert.match(
     appendSrc,
     /pageCount:\s*mergedPageCount/,

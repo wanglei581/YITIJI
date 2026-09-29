@@ -1,14 +1,14 @@
 // ============================================================
 // 会员意见反馈 API（本人）。
 //
-// 仅用于设备 / 打印 / 文件处理 / 一般建议反馈。mock 模式 / 游客态返回空页或 no-op，
+// 用于设备 / 打印 / 文件处理 / 一般建议反馈，以及 AI 内容投诉（ai_content，C3）。mock 模式 / 游客态返回空页或 no-op，
 // 不伪造工单与回复。
 // ============================================================
 
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
-export type FeedbackCategory = 'device' | 'print' | 'file_process' | 'general'
+export type FeedbackCategory = 'device' | 'print' | 'file_process' | 'general' | 'ai_content'
 export type FeedbackStatus = 'pending' | 'processing' | 'replied' | 'closed'
 export type FeedbackSenderType = 'user' | 'admin' | 'system'
 

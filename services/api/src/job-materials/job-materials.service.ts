@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { randomUUID } from 'node:crypto'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
-import { signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { Prisma } from '../generated/prisma/client'
 import { JOB_MATERIAL_TEMPLATES } from './job-material-templates'
@@ -256,6 +256,7 @@ export class JobMaterialsService {
       uploaderId: null,
       endUserId: ctx.endUserId,
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       sourceFileId: null,
       actorRole: null,
       actorOrgId: null,
@@ -290,7 +291,7 @@ export class JobMaterialsService {
       sizeBytes: uploaded.sizeBytes,
       pageCount: rendered.pageCount,
       signedUrl: uploaded.signedUrl,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
       signedUrlExpiresAt: uploaded.signedUrlExpiresAt,
       fileExpiresAt: uploaded.fileExpiresAt,
       previewUrlPath: `/files/${uploaded.fileId}/preview-url`,

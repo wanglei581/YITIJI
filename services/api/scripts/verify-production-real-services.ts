@@ -72,36 +72,22 @@ function main(): void {
     '生产环境允许 TRTC_LLM_API_KEY 作为 LLM 密钥兼容项',
   )
 
-  expectRejected(
-    { ...PROD_OK, AI_PROVIDER: undefined },
-    'PRODUCTION_AI_PROVIDER_NOT_LLM',
-    '生产环境拒绝未设置 AI_PROVIDER',
-  )
-  expectRejected(
-    { ...PROD_OK, AI_PROVIDER: 'mock' },
-    'PRODUCTION_AI_PROVIDER_NOT_LLM',
-    '生产环境拒绝 AI_PROVIDER=mock',
-  )
-  expectRejected(
-    { ...PROD_OK, AI_PROVIDER: 'openai' },
-    'PRODUCTION_AI_PROVIDER_NOT_LLM',
-    '生产环境拒绝接入未闭环的 AI provider stub',
-  )
-  expectRejected(
-    { ...PROD_OK, AI_LLM_API_KEY: '   ', TRTC_LLM_API_KEY: undefined },
-    'PRODUCTION_LLM_CONFIG_MISSING',
-    '生产环境拒绝缺失真实 LLM 密钥',
-  )
-  expectRejected(
-    { ...PROD_OK, OCR_PROVIDER: undefined },
-    'PRODUCTION_OCR_PROVIDER_NOT_BAIDU',
-    '生产环境拒绝未设置 OCR_PROVIDER',
-  )
-  expectRejected(
-    { ...PROD_OK, OCR_PROVIDER: 'disabled' },
-    'PRODUCTION_OCR_PROVIDER_NOT_BAIDU',
-    '生产环境拒绝 OCR_PROVIDER=disabled',
-  )
+  // F-11（产品负责人 2026-09-29 批准方案①）：生产缺真实 AI / OCR 不再拒启动，只降级 AI。
+  // 「生产不得用 mock 冒充结果」这条底线改由请求期守：AI 路由 503、provider 恒为 llm，
+  // 实测见 verify:ai-platform-degradation。这里断言降级码如实带出。
+  const aiCases: Array<[Env, string, string]> = [
+    [{ ...PROD_OK, AI_PROVIDER: undefined }, 'AI_PROVIDER_NOT_LLM', '生产未设置 AI_PROVIDER：放行并记 AI 降级'],
+    [{ ...PROD_OK, AI_PROVIDER: 'mock' }, 'AI_PROVIDER_NOT_LLM', '生产 AI_PROVIDER=mock：放行并记 AI 降级'],
+    [{ ...PROD_OK, AI_PROVIDER: 'openai' }, 'AI_PROVIDER_NOT_LLM', '生产未闭环 AI provider stub：放行并记 AI 降级'],
+    [{ ...PROD_OK, AI_LLM_API_KEY: '   ', TRTC_LLM_API_KEY: undefined }, 'AI_LLM_API_KEY_MISSING', '生产缺真实 LLM 密钥：放行并记 AI 降级'],
+    [{ ...PROD_OK, OCR_PROVIDER: undefined }, 'OCR_PROVIDER_NOT_BAIDU', '生产未设置 OCR_PROVIDER：放行并记 OCR 降级'],
+    [{ ...PROD_OK, OCR_PROVIDER: 'disabled' }, 'OCR_PROVIDER_NOT_BAIDU', '生产 OCR_PROVIDER=disabled：放行并记 OCR 降级'],
+  ]
+  for (const [env, code, label] of aiCases) {
+    const issues = assertProductionRuntimeGates(env).aiPlatform.issues.map((issue) => issue.code)
+    if (issues.length !== 1 || issues[0] !== code) throw new Error(`${label}: 期望降级码 ${code}，实际 ${issues.join(',') || '无'}`)
+    console.log(`  PASS ${label}`)
+  }
   expectRejected(
     { ...PROD_OK, REDIS_URL: undefined },
     'PRODUCTION_REDIS_URL_MISSING',

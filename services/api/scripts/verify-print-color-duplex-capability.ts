@@ -158,7 +158,8 @@ async function main(): Promise<void> {
   } else {
     fail('Admin 前端 printScan.ts 能力键副本未同步（管理员将无法配置彩色/双面）')
   }
-  const adminPage = read(repoRoot, 'apps/admin/src/routes/print-scan/index.tsx')
+  // 「设备能力」板块 2026-09-29 从 print-scan/index.tsx 拆到 CapabilityCenter.tsx，能力标签随之搬家。
+  const adminPage = read(repoRoot, 'apps/admin/src/routes/print-scan/CapabilityCenter.tsx')
   if (adminPage.includes('color_print:') && adminPage.includes('duplex_print:')) {
     pass('Admin 能力配置页提供彩色/双面标签（管理员可显式放行）')
   } else {

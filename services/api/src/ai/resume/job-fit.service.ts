@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
 import { FilesService } from '../../files/files.service'
-import { signFileUrl } from '../../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmJobFitService, type JobFitPayload, type JobFitTokenUsage } from './llm-job-fit.service'
 import { JobFitPdfService } from './job-fit-pdf.service'
@@ -248,9 +248,10 @@ export class JobFitService {
       filename: '简历对照.pdf',
       mimeType: 'application/pdf',
       purpose: 'print_doc',
-      // AI 生成的派生稿，不是用户手里的原件：生产隐私闸门（PRINT_REQUIRE_PII_SCAN）按类别放行，
+      // AI 生成的派生稿，不是用户手里的原件：生产隐私闸门（PRINT_REQUIRE_PII_SCAN）按 derivationKind=ai_generated 放行，
       // 否则一体机直达报价页后建单会被拒 PRINT_PII_SCAN_REQUIRED（商用收口 P0-5）。
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       uploaderId: null,
       endUserId: parse.endUserId,
       createdBy: 'job_fit',
@@ -271,7 +272,7 @@ export class JobFitService {
       filename: uploaded.filename,
       sizeBytes: uploaded.sizeBytes,
       pageCount,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
     }
   }
 

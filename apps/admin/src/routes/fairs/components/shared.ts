@@ -30,7 +30,7 @@ export const ZONE_CATEGORY_LABELS: Record<string, string> = {
 }
 
 export const REVIEW_BADGE: Record<string, { status: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
-  pending:   { status: 'warning', label: '待审核' },
+  pending:   { status: 'warning', label: '未审核' },
   reviewing: { status: 'info',    label: '审核中' },
   approved:  { status: 'success', label: '已通过' },
   rejected:  { status: 'error',   label: '已拒绝' },

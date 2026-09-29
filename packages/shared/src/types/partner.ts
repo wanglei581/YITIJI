@@ -11,6 +11,8 @@ export type PartnerType =
   | 'licensed_hr_agency'         // 持证人力资源服务机构
   | 'fair_organizer'             // 招聘会主办方/承办方
   | 'enterprise_source'          // 企业数据来源方
+  | 'gig_worker_home'            // 零工之家（公共就业服务体系，场景同人社版）
+  | 'employment_service_station' // 就业服务站（公共就业服务体系，场景同人社版）
 
 /**
  * 场景模板（预设模块组合 + 界面风格，按运营场景选择）
@@ -182,6 +184,8 @@ export const ORG_TYPE_SCENE_TEMPLATE: Record<PartnerType, SceneTemplate | null> 
   licensed_hr_agency:        'licensed_hr_service',
   fair_organizer:            null,
   enterprise_source:         null,
+  gig_worker_home:           'public_employment',
+  employment_service_station: 'public_employment',
 }
 
 /** 该机构类型是否为 source-only（不拥有终端场景，只供给内容） */
@@ -199,6 +203,8 @@ export const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {
   licensed_hr_agency:        '持证人力资源机构',
   fair_organizer:            '招聘会主办方',
   enterprise_source:         '企业数据来源',
+  gig_worker_home:           '零工之家',
+  employment_service_station: '就业服务站',
 }
 
 export const SCENE_TEMPLATE_LABELS: Record<SceneTemplate, string> = {

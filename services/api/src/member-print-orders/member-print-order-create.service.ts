@@ -468,7 +468,8 @@ export class MemberPrintOrderCreateService {
     await this.expirePendingForUser(order.endUserId ?? '', order.id)
   }
 
-  private async expirePendingForUser(endUserId: string, orderId?: string): Promise<void> {
+  /** 本人单件云打印到期落 expired。跨端时间线列表前也调它，口径与 listCloud 一致。 */
+  async expirePendingForUser(endUserId: string, orderId?: string): Promise<void> {
     const now = new Date()
     const scope = {
       ...(orderId ? { id: orderId } : { endUserId }),
