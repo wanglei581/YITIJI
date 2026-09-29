@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`563` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`572` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -33,6 +33,15 @@
 | DELETE | `/api/v1/me/browse-logs/:id` | MeActivityController.deleteBrowseLog | — | ActivityService<br/>AuditService | AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>Job<br/>JobFair<br/>PolicyPost |
 | GET | `/api/v1/me/external-jump-logs` | MeActivityController.jumpLogs | — | ActivityService | BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>Job<br/>JobFair<br/>PolicyPost |
 | DELETE | `/api/v1/me/external-jump-logs/:id` | MeActivityController.deleteJumpLog | — | ActivityService<br/>AuditService | AuditLog<br/>BrowseLog<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>Job<br/>JobFair<br/>PolicyPost |
+
+## `services/api/src/admin-internal-accounts/admin-internal-accounts.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/internal-accounts` | AdminInternalAccountsController.list | admin | AdminInternalAccountsService | AuditLog<br/>User |
+| PATCH | `/api/v1/admin/internal-accounts/:id/status` | AdminInternalAccountsController.setStatus | admin | AdminInternalAccountsService | AuditLog<br/>User |
+| POST | `/api/v1/admin/internal-accounts/backup-admin/start` | AdminInternalAccountsController.startBackupAdmin | admin | BackupAdminCreateService | AuditLog<br/>User |
+| POST | `/api/v1/admin/internal-accounts/backup-admin/verify` | AdminInternalAccountsController.verifyBackupAdmin | admin | BackupAdminCreateService | AuditLog<br/>User |
 
 ## `services/api/src/admin-ops/admin-ops.controller.ts`
 
@@ -676,9 +685,11 @@
 | POST | `/api/v1/me/print-orders` | MemberPrintOrdersController.create | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/me/print-orders/:orderId/claim-here` | MemberPrintOrdersController.claimHere | — | MemberOrderClaimHereService | FileObject<br/>Order<br/>OrderItem<br/>PrintTask<br/>Terminal |
 | POST | `/api/v1/me/print-orders/:orderId/reissue-pickup-code` | MemberPrintOrdersController.reissuePickupCode | — | PickupCodeReissueService | AuditLog<br/>FileObject<br/>Order<br/>Terminal |
 | GET | `/api/v1/me/print-orders/cloud` | MemberPrintOrdersController.listCloud | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/submissions/resolve` | MemberPrintOrdersController.resolveSubmissions | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
+| GET | `/api/v1/me/print-orders/timeline` | MemberPrintOrdersController.listTimeline | — | MemberOrderTimelineService | FileObject<br/>Order<br/>PrintTask<br/>Terminal |
 
 ## `services/api/src/member-print-orders/package-orders.controller.ts`
 

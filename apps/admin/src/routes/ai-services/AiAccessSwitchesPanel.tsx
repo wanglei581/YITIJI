@@ -7,7 +7,7 @@
 //
 // 说明文字逐条对齐 services/api/src/ai-access/ 的行为，不许夸大：
 // - AI 暂停：AI 生成、语音、导出类接口返回 503 AI_PAUSED；读取类不受影响。
-// - 全机维护：AI（读取类除外）与标了 @MaintenanceBlocked() 的七个接口返回 503 MAINTENANCE_MODE。
+// - 全机维护：AI（读取类除外）与标了 @MaintenanceBlocked() 的十个接口返回 503 MAINTENANCE_MODE。
 // - 登录档位：off / before_export / before_generate；没登录返回 401 AI_LOGIN_REQUIRED。
 // - 使用声明：AI 生成与语音缺声明（且会员没有留存同意）返回 403 AI_DECLARATION_REQUIRED。
 // - 生效：服务端写 Redis 保存一年，各进程缓存 30 秒；Redis 读不到时回落服务器 .env。
@@ -55,8 +55,8 @@ const GATE_LABEL: Record<AiLoginGate, string> = {
   before_generate: '使用 AI 前登录',
 }
 
-/** 服务端标了 @MaintenanceBlocked() 的七个接口，逐个核对过 services/api/src（#1066 起含打印前材料检查）。 */
-const MAINTENANCE_BLOCKED = '会员打印下单、材料包下单、格式转换（图片转 PDF）、打印任务创建、扫描任务创建、上传会话创建、打印前材料检查'
+/** 服务端标了 @MaintenanceBlocked() 的十个接口，逐个核对过 services/api/src（#1066 起含打印前材料检查，#1112 起含自我探索的提交、追加作答与打印）。 */
+const MAINTENANCE_BLOCKED = '会员打印下单、材料包下单、格式转换（图片转 PDF）、打印任务创建、扫描任务创建、上传会话创建、打印前材料检查、自我探索（提交、追加作答、打印）'
 
 const ROWS: ReadonlyArray<{ key: SwitchKey; title: string; explain: string; kioskNote?: string }> = [
   {
