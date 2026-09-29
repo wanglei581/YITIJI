@@ -25,6 +25,7 @@ import {
   XCircleIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { isAiOutage } from '../../ai/aiOutage'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import {
@@ -164,8 +165,10 @@ export function ContractReviewProcessingPage() {
         { token: getToken(), accessToken },
       )
       pollRef.current = setTimeout(poll, 1500)
-    } catch {
-      setError('确认失败，请重试')
+    } catch (err) {
+      setError(isAiOutage(err)
+        ? 'AI 现在停用，这份合同暂时审不了。可以删除本次任务，合同原件到打印扫描里直接打印。'
+        : '确认失败，请重试')
     } finally {
       if (mountedRef.current) setConfirming(false)
     }

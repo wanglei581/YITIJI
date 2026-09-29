@@ -290,7 +290,7 @@ export const COCKPIT_COPY: Record<CockpitState, CockpitCopy> = {
   'ai-unavailable': {
     title: ['AI 顾问', '暂不可用', '。'],
     lede: '四个入口不经过 AI，照常能办。',
-    pill: { tone: 'bad', label: '模型未接入' },
+    pill: { tone: 'bad', label: 'AI 暂不可用' },
     section: ['继续办理', '下面四项不经过 AI'],
   },
   'voice-gate': {
