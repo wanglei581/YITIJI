@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 562,
+    "endpointCount": 563,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -341,6 +341,7 @@
         "handler": "AdminAiAccessController.get",
         "method": "GET",
         "models": [
+          "AiUsageRecord",
           "AuditLog",
           "UserAiConsent"
         ],
@@ -360,6 +361,7 @@
         "handler": "AdminAiAccessController.update",
         "method": "PUT",
         "models": [
+          "AiUsageRecord",
           "AuditLog",
           "UserAiConsent"
         ],
@@ -557,6 +559,18 @@
         "services": [
           "AiPosterService"
         ]
+      },
+      {
+        "controller": "services/api/src/ai/usage/admin-ai-usage.controller.ts",
+        "handler": "AdminAiUsageController.daily",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/admin/ai-usage/daily",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/ai/ai.controller.ts",
@@ -16159,7 +16173,10 @@
         "relations": [
           "EndUser"
         ],
-        "usedBy": []
+        "usedBy": [
+          "services/api/src/ai/usage/ai-budget.service.ts",
+          "services/api/src/ai/usage/ai-usage-summary.ts"
+        ]
       },
       {
         "fieldCount": 12,
@@ -17294,6 +17311,7 @@
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
@@ -21680,6 +21698,7 @@
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
@@ -21983,14 +22002,17 @@
       "services/api/scripts/verify-ai-access.ts"
     ],
     "services/api/src/ai-access/ai-access.guard.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts"
     ],
     "services/api/src/ai-access/ai-access.module.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts"
     ],
     "services/api/src/ai-access/ai-access.service.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts"
     ],
     "services/api/src/ai/ai-log.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
@@ -22024,6 +22046,7 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -22170,12 +22193,14 @@
     "services/api/src/ai/llm/llm-guard.ts": [
       "services/api/scripts/verify-ai-content-moderation.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-llm-guard.ts"
     ],
     "services/api/src/ai/llm/llm-http.ts": [
       "services/api/scripts/verify-ai-content-moderation.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
     "services/api/src/ai/llm/llm-presets.ts": [
@@ -22236,6 +22261,7 @@
     ],
     "services/api/src/ai/resume-report-export.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -22469,9 +22495,34 @@
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts"
     ],
+    "services/api/src/ai/usage/admin-ai-usage.controller.ts": [
+      "services/api/scripts/verify-ai-usage-budget.ts"
+    ],
+    "services/api/src/ai/usage/ai-budget.service.ts": [
+      "services/api/scripts/verify-ai-usage-budget.ts"
+    ],
+    "services/api/src/ai/usage/ai-pricing.ts": [
+      "services/api/scripts/verify-ai-usage-budget.ts"
+    ],
+    "services/api/src/ai/usage/ai-request-context.middleware.ts": [
+      "services/api/scripts/verify-ai-usage-budget.ts"
+    ],
+    "services/api/src/ai/usage/ai-usage-context.ts": [
+      "services/api/scripts/verify-ai-usage-budget.ts"
+    ],
+    "services/api/src/ai/usage/ai-usage-meter.ts": [
+      "services/api/scripts/verify-ai-usage-budget.ts"
+    ],
+    "services/api/src/ai/usage/ai-usage-summary.ts": [
+      "services/api/scripts/verify-ai-usage-budget.ts"
+    ],
+    "services/api/src/ai/usage/ai-usage.module.ts": [
+      "services/api/scripts/verify-ai-usage-budget.ts"
+    ],
     "services/api/src/app.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -22788,6 +22839,7 @@
     "services/api/src/common/decorators/roles.decorator.ts": [
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
@@ -22818,6 +22870,7 @@
     ],
     "services/api/src/common/guards/end-user-auth.guard.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-content-pipeline-e2e.ts",
@@ -22886,7 +22939,8 @@
       "services/api/scripts/verify-error-observability.ts"
     ],
     "services/api/src/common/outbound/ai-endpoint-allowlist.ts": [
-      "services/api/scripts/verify-ai-endpoint-allowlist.ts"
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts"
     ],
     "services/api/src/common/pdf/aigc-label.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -23747,6 +23801,7 @@
     ],
     "services/api/src/materials/materials.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-material-task-token-transport.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
@@ -24050,6 +24105,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
     "services/api/src/mock-interview/mock-interview.module.ts": [
@@ -24591,6 +24647,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
@@ -31783,6 +31840,46 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-throttle-dimension"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai-access/ai-access.guard.ts",
+          "services/api/src/ai-access/ai-access.module.ts",
+          "services/api/src/ai-access/ai-access.service.ts",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/llm/llm-guard.ts",
+          "services/api/src/ai/llm/llm-http.ts",
+          "services/api/src/ai/resume-report-export.controller.ts",
+          "services/api/src/ai/usage/admin-ai-usage.controller.ts",
+          "services/api/src/ai/usage/ai-budget.service.ts",
+          "services/api/src/ai/usage/ai-pricing.ts",
+          "services/api/src/ai/usage/ai-request-context.middleware.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/ai/usage/ai-usage-meter.ts",
+          "services/api/src/ai/usage/ai-usage-summary.ts",
+          "services/api/src/ai/usage/ai-usage.module.ts",
+          "services/api/src/app.module.ts",
+          "services/api/src/common/decorators/roles.decorator.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/outbound/ai-endpoint-allowlist.ts",
+          "services/api/src/materials/materials.controller.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-usage-budget.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-usage-budget"
       ],
       "wired": true
     },
