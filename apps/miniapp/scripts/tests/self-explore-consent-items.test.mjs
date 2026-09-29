@@ -14,7 +14,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
+import { createRequire } from 'node:module'
+import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const REL = 'pages/self-explore/self-explore.js'
@@ -347,4 +348,90 @@ test('变异：法务页加回「未成年」兜底 → 判红', async () => {
 test('法务页：章节标题带 id，滚动选择器能找到', () => {
   const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/legal/legal.wxml'), 'utf8')
   assert.match(wxml, /kind === 'heading'\}\}" id="\{\{item\.key\}\}"/)
+})
+// ── 复核补充（Codex 9/29）：版本号空白、重试乱序、submit 自己也把关 ──
+
+// consent-view 是页面目录下的纯模块，直接真跑；变异时用改过的源码现编译一份。
+const CONSENT_VIEW = path.join(PAGE_DIR, 'consent-view.js')
+const CONSENT_VIEW_SRC = fs.readFileSync(CONSENT_VIEW, 'utf8')
+const DOC_TYPES = { privacy_policy: '隐私政策' }
+function compileConsentView(src) {
+  const mod = { exports: {} }
+  new Function('module', 'exports', 'require', src)(mod, mod.exports, createRequire(CONSENT_VIEW))
+  return mod.exports
+}
+
+function checkBlankVersionNotReady(cv) {
+  for (const v of [undefined, '', '   ', '\n\t']) {
+    const view = cv.toConsentView(readyFixture({ consentVersion: v }), DOC_TYPES)
+    assert.equal(view.consentReady, false, `版本号为 ${JSON.stringify(v)} 时不就绪`)
+  }
+  assert.equal(cv.toConsentView(readyFixture(), DOC_TYPES).consentReady, true, '阳性对照：齐全时就绪')
+}
+
+test('版本号缺失或全是空白：不就绪', () => checkBlankVersionNotReady(compileConsentView(CONSENT_VIEW_SRC)))
+
+test('版本号空白：页面置灰、进不了答题', () => checkMissingBlocks({ consentVersion: '   ' }))
+
+test('变异：就绪判断不看版本号 → 判红', () => {
+  const from = 'items.length > 0 && !!version && !!checkboxLabel'
+  assert.ok(CONSENT_VIEW_SRC.includes(from))
+  const cv = compileConsentView(CONSENT_VIEW_SRC.replace(from, 'items.length > 0 && !!checkboxLabel'))
+  assert.throws(() => checkBlankVersionNotReady(cv), (e) => e.code === 'ERR_ASSERTION')
+})
+
+/**
+ * 重试乱序：先发的旧请求晚到，必须被丢弃。页面上的条款与提交的版本号都来自最后一次请求。
+ */
+const OLD_ITEMS = ['夹具旧条款：只用于测试。']
+const OLD_VERSION = 'fixture-consent-v8'
+async function checkRetryOutOfOrder(source) {
+  const first = deferred()
+  const second = deferred()
+  const { page, calls } = makePage([readyFixture(), first.promise, second.promise], source)
+  page.onLoad({})
+  await flush()
+  page.reload()   // 第 1 次重试（旧）
+  page.reload()   // 第 2 次重试（新）
+  second.resolve(readyFixture({ consentItems: NEW_ITEMS, consentVersion: NEW_VERSION }))
+  await flush()
+  first.resolve(readyFixture({ consentItems: OLD_ITEMS, consentVersion: OLD_VERSION }))
+  await flush()
+  assert.equal(JSON.stringify(Array.from(page.data.consentItems)), JSON.stringify(NEW_ITEMS), '显示的是最后一次请求的条款')
+  assert.equal(page.data.consentVersion, NEW_VERSION)
+  page.toggleNonSensitive()
+  page.startAsk()
+  page.tapChoice({ currentTarget: { dataset: { g: 0, q: 0, c: 'a' } } })
+  page.submit()
+  assert.equal(calls.submit.length, 1)
+  assert.equal(calls.submit[0].consentVersion, NEW_VERSION, '提交的版本号与显示的条款同出一次响应')
+}
+
+test('重试乱序：旧响应晚到被丢弃，条款与提交版本号同源', () => checkRetryOutOfOrder())
+
+test('变异：补拉说明不丢弃旧响应 → 判红', async () => {
+  const from = '      .then((res) => {\n        if (this._gone || seq !== this._seq) return\n        const view = this._toQuestionsView(res)\n        if (questionSignature'
+  const src = mutated(from, from.replace('if (this._gone || seq !== this._seq) return', 'if (this._gone) return'))
+  await assert.rejects(checkRetryOutOfOrder(src), (e) => e.code === 'ERR_ASSERTION')
+})
+
+/** submit 自己把关：说明不就绪时即使已在答题页也不提交。 */
+async function checkSubmitGuard(source) {
+  const { page, calls } = makePage(readyFixture(), source)
+  page.onLoad({})
+  await flush()
+  page.toggleNonSensitive()
+  page.startAsk()
+  page.tapChoice({ currentTarget: { dataset: { g: 0, q: 0, c: 'a' } } })
+  page.setData({ consentReady: false })   // 模拟以后新加的入口绕过 startAsk
+  page.submit()
+  assert.equal(calls.submit.length, 0, '说明不就绪不提交')
+}
+
+test('submit 自己检查说明是否就绪', () => checkSubmitGuard())
+
+test('变异：submit 去掉就绪检查 → 判红', async () => {
+  const guard = '    if (!this.data.consentReady) return\n    if (!this.data.agreeNonSensitive) {'
+  const src = mutated(guard, '    if (!this.data.agreeNonSensitive) {')
+  await assert.rejects(checkSubmitGuard(src), (e) => e.code === 'ERR_ASSERTION')
 })

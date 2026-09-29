@@ -400,6 +400,8 @@ Page({
 
   submit() {
     if (this.data.phase === 'submitting') return
+    // 防御：说明不全时不提交。正常路径进不了答题（startAsk 已拦），这里防以后新加的入口绕过它。
+    if (!this.data.consentReady) return
     if (!this.data.agreeNonSensitive) {
       wx.showToast({ title: '请先勾选第一项同意', icon: 'none', duration: 2000 })
       return
