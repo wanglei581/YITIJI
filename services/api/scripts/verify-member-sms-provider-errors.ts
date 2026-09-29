@@ -63,7 +63,10 @@ async function expectSmsFailureMapping(
   label: string,
 ): Promise<void> {
   const redis = new FakeRedis()
-  const sms: SmsSender = { sendCode: async () => { throw sourceError } }
+  const sms: SmsSender = {
+    sendCode: async () => { throw sourceError },
+    sendPartnerPhoneRegisteredNotice: async () => { throw sourceError },
+  }
   const service = new MemberAuthService({} as never, redis as never, {} as never, sms)
 
   try {

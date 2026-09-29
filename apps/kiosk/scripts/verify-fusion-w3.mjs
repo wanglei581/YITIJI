@@ -357,6 +357,13 @@ for (const marker of ['startCall', 'resumePlay', 'toggleMute', 'endCall', 'needR
 includes('src/pages/interview/InterviewReportPage.tsx', '<b>{AI_LABEL_COPY.INTERVIEW_REPORT}。</b>', 'interview report banner leads with the shared user-only AI label')
 includes('../../packages/shared/src/types/complianceCopy.ts', "INTERVIEW_REPORT: 'AI 生成，仅供参考，只用于本人练习复盘'", 'interview report label keeps the user-only practice wording')
 includes('src/pages/interview/InterviewReportPage.tsx', '也不会发送给任何企业。', 'interview report keeps the user-only privacy boundary')
+includes('src/pages/interview/InterviewReportPage.tsx', '{COMPLIANCE_COPY.INTERVIEW_PRACTICE_RESULT_DISCLAIMER}', 'interview report renders the shared practice disclaimer')
+includes('src/pages/interview/InterviewReportPage.tsx', '和目标岗位要求的对照', 'interview report uses the C9 comparison title')
+check(!read('src/pages/interview/InterviewReportPage.tsx').includes('LEVEL_META'), 'interview report must not render LEVEL_META')
+check(!read('src/pages/interview/InterviewReportPage.tsx').includes('岗位匹配度参考'), 'interview report must not say 岗位匹配度参考')
+check(!read('src/pages/interview/InterviewReportPage.tsx').includes('练习表现等级'), 'interview report must not say 练习表现等级')
+includes('src/pages/interview/InterviewSetupPage.tsx', "label: 'HR 面试'", 'setup interviewer label is HR 面试')
+includes('src/pages/interview/InterviewSessionPage.tsx', "hr: 'HR 面试'", 'session interviewer label is HR 面试')
 const jobGuidancePresentation = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/CareerPlanPage.tsx')}\n${read('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')}`
 for (const forbidden of ['录用概率', '保证录用', '一键投递', '立即投递']) check(!jobGuidancePresentation.includes(forbidden), `job guidance rejects ${forbidden}`)
 for (const forbidden of ['localStorage', 'sessionStorage']) check(!read('src/pages/assistant/AssistantPage.tsx').includes(forbidden), `assistant avoids ${forbidden}`)

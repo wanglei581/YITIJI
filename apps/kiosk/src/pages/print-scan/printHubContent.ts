@@ -8,7 +8,11 @@
 /** 原型能力卡 data-cap / key，迁移时逐字保留，便于和原型逐卡对照。 */
 export type PrintHubCap = 'doc' | 'phone' | 'usb' | 'scan' | 'photo' | 'idphoto' | 'convert' | 'sign'
 
-/** 原型 STATES。Hub 页覆盖前五态；后两态在 /print-scan/feature/:key。 */
+/**
+ * 原型 STATES。Hub 页覆盖前五态；feature-* 在 /print-scan/feature/:key。
+ * feature-copy 是 2.0 稿之外的运行页状态（R4，9/29 产品负责人拍板：复印走打印机面板自带功能；
+ * 同日定合规新状态不画新稿，用 2.0 现有组件与字阶实现）。
+ */
 export type HubUiState =
   | 'capability-loading'
   | 'default'
@@ -16,7 +20,11 @@ export type HubUiState =
   | 'locked'
   | 'device-off'
   | 'feature-id-photo'
+  | 'feature-copy'
   | 'feature-not-found'
+
+/** 说明页的三个状态；Hub 页本身不会进入这几个。 */
+export type HubFeatureState = Extract<HubUiState, `feature-${string}`>
 
 /** 能力探测轴（原型 data-probe）：本机连自己的能力配置都读不到时为 unknown。 */
 export type ProbeStatus = 'loading' | 'ok' | 'error'
@@ -199,17 +207,24 @@ export const PRINT_HUB_PROBE_UNKNOWN_BAND: PrintHubBandCopy = {
 }
 
 /**
- * 原型把「为什么七项全停」这段运维口径收进 <details>，
- * 用户可见区只留一句 + 替代路径。迁移保留这个折叠。
+ * 原型把「为什么七项全停」这段收进 <details>，用户可见区只留一句 + 替代路径。
+ * W-08（2026-09-29 走查）：原文是开发者口吻（「连能力都读不到」「无权声称任何一项正常」），
+ * 改成用户能懂、有下一步的话。2.0 稿 10 的 capability-error 态没有这段，照稿里同态的
+ * 「暂时无法确认这台机器开放了哪些服务」口径写。
  */
 export const PRINT_HUB_PROBE_UNKNOWN_TECH_NOTE =
-  '未取得本机打印扫描能力配置 —— 这和「一体机离线」不是一回事：那次知道坏在哪，这次连能力都读不到。读不到能力配置，本机就无权声称任何一项正常，连上传、格式转换、签名也不敢开 —— 传上来接不接得住、合成完存不存得下，现在都答不上来。重新检测一次不花钱。'
+  '暂时查不到这台机器能用哪些功能，所以先都不开放，免得你点进去才发现办不了。请点「重新检测」，或找工作人员；已经下过单的，到机码照常能用。'
 
 // ── 分组标题右侧的副文案（随两条轴切换） ─────────────────────
 
+/**
+ * W-08：2.0 稿 10 这两态的副文案是「正在读取本机能力配置」「能力配置读取失败」，属工程词。
+ * 改用稿里同态状态块的用户口径（「正在检查本机能力」→ 正在确认可用服务；
+ * 「服务状态无法确认」→ 查不到可用服务），并给出下一步（页底的「重新检测」）。
+ */
 export function capabilityGroupHint(probe: ProbeStatus, mfp: MfpStatus, locked = false): string {
-  if (probe === 'loading') return '正在读取本机能力配置'
-  if (probe !== 'ok') return '能力配置读取失败'
+  if (probe === 'loading') return '正在确认可用服务，请稍候'
+  if (probe !== 'ok') return '查不到可用服务，请点页底「重新检测」'
   if (mfp === 'unavailable') return '一体机确认离线'
   if (locked) return '部分能力被管理员关闭'
   return '选一项开始准备材料'
@@ -230,6 +245,7 @@ export const HUB_PILL: Record<
   locked: { tone: 'warn', label: '部分能力已被管理员关闭' },
   'device-off': { tone: 'warn', label: '一体机离线 · 出纸类暂停' },
   'feature-id-photo': { tone: 'warn', label: '证件照尚未开放' },
+  'feature-copy': { tone: 'unknown', label: '复印在打印机面板上操作' },
   'feature-not-found': { tone: 'warn', label: '能力说明不存在' },
 }
 
@@ -240,6 +256,7 @@ export const HUB_ASK: Record<HubUiState, { text: string; em: string }> = {
   locked: { text: '有几项被关掉了。', em: '被关掉了' },
   'device-off': { text: '这台机器出不了纸。', em: '出不了纸' },
   'feature-id-photo': { text: '证件照还没开放。', em: '还没开放' },
+  'feature-copy': { text: '复印，在打印机屏幕上点。', em: '打印机屏幕' },
   'feature-not-found': { text: '这个能力名我不认识。', em: '我不认识' },
 }
 
@@ -284,7 +301,7 @@ export function deriveHubUiState(input: {
   probe: ProbeStatus
   mfp: MfpStatus
   locked: boolean
-}): Exclude<HubUiState, 'feature-id-photo' | 'feature-not-found'> {
+}): Exclude<HubUiState, HubFeatureState> {
   if (input.probe === 'loading') return 'capability-loading'
   if (input.probe === 'error') return 'capability-error'
   if (input.mfp === 'unavailable') return 'device-off'
@@ -300,3 +317,84 @@ export function colorDuplexChip(colorOn: boolean, duplexOn: boolean): string {
   )
   return bits.join(' · ')
 }
+
+// ── 复印说明（/print-scan/feature/copy） ─────────────────────
+// R4（2026-09-29 产品负责人拍板）：复印、身份证复印改用打印机（奔图 CM2800 系列）面板自带功能，
+// 不开发证件拼版；面板复印对用户开放，不经过本机下单，也不进「我的打印订单」。
+// 内容来源：CM2800 系列中文用户指南 V1.4 第 3 节提取稿（p30–33、p45–50、p3）。
+// 按钮名按面板屏幕实际字样写（主屏四个大按钮：复印 / 扫描 / 身份证复印 / 票据复印），
+// 不照抄手册里前后不一的「按 OK 键」「复印开始键」。现场没核实过的，一律写「以打印机屏幕为准」。
+
+/** 打印扫描首页「复印」卡与说明页共用的 key：/print-scan/feature/copy。 */
+export const COPY_GUIDE_KEY = 'copy'
+export const COPY_GUIDE_ROUTE = `/print-scan/feature/${COPY_GUIDE_KEY}`
+
+export interface CopyGuideStep {
+  title: string
+  body: string
+  /** 正文里要加粗的片段，便于用户扫一眼找到按钮名。 */
+  emphasis?: readonly string[]
+}
+
+export const COPY_GUIDE_STEPS: readonly CopyGuideStep[] = [
+  {
+    title: '放原件',
+    body: '多页普通纸：放进打印机上方的进纸口，字朝上。单页、证件、书本：掀开上盖，字朝下放在玻璃上，对齐左上角，再合上盖。',
+    emphasis: ['字朝上', '字朝下'],
+  },
+  {
+    title: '在打印机屏幕上选功能',
+    body: '普通复印点「复印」；复印身份证点「身份证复印」；复印发票、收据点「票据复印」。',
+    emphasis: ['「复印」', '「身份证复印」', '「票据复印」'],
+  },
+  {
+    title: '需要时改设置',
+    body: '可以改份数、黑白或彩色、单面或双面、放大缩小。每一项在哪里改，以打印机屏幕显示为准；上一位调过的设置可能还在，开始前看一眼。',
+  },
+  {
+    title: '开始复印',
+    body: '点打印机屏幕上的「复印」开始。原件放在玻璃上时，扫描过程中不要掀盖。',
+    emphasis: ['「复印」'],
+  },
+  {
+    title: '取走复印件和原件',
+    body: '复印件从出纸口取。原件还在玻璃上或进纸口里，一起带走。',
+  },
+]
+
+/**
+ * 身份证放置位置与翻面步骤 —— 占位。
+ * 手册只写了「点身份证复印 → 调好设置 → 点复印」，没写证件放在玻璃哪里、正反面怎么翻、
+ * 屏幕会不会提示翻面。【待 Windows 窗口现场核实后填写】在那之前不编造位置，只给一句指路。
+ */
+export const COPY_ID_CARD_PLACEMENT_PENDING = '身份证怎么放、怎么翻面，请看打印机屏幕提示或找工作人员。'
+
+export interface CopyGuideCase {
+  key: 'id-card' | 'receipt' | 'duplex'
+  title: string
+  body: string
+  /** 待现场核实的占位项：卡面标出来，免得被当成已确认的步骤。 */
+  pending?: boolean
+}
+
+export const COPY_GUIDE_CASES: readonly CopyGuideCase[] = [
+  {
+    key: 'id-card',
+    title: '身份证',
+    body: `在打印机屏幕上点「身份证复印」。${COPY_ID_CARD_PLACEMENT_PENDING}`,
+    pending: true,
+  },
+  {
+    key: 'receipt',
+    title: '发票、收据',
+    body: '在打印机屏幕上点「票据复印」，原件字朝下放在玻璃上、合上盖；摆放位置以打印机屏幕提示为准。',
+  },
+  {
+    key: 'duplex',
+    title: '正反两面都有字',
+    body: '第一面印完，原件会从上方出纸口出来。照原样放回进纸口，不翻面、不掉头，再点开始；等太久没放，就只印单面。',
+  },
+]
+
+/** 与现场告示口径一致（pilot-onsite-notices：不得打印、复印、扫描伪造的证件、印章、票据）。 */
+export const COPY_GUIDE_LEGAL = '不得复印伪造的证件、印章、票据。'

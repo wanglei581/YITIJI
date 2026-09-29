@@ -37,8 +37,14 @@ function voiceRow(on, date, source, revoked) {
   return { on, text: revoked ? '已撤回：录音入口会先问你，不同意就改用手打' : '还没有同意：第一次录音前会先问你' }
 }
 
+function resumeRow(on, date, revoked) {
+  if (on) return { on, text: `已授权${date ? `（${date}）` : ''}：简历诊断、优化、生成共用` }
+  return { on, text: revoked ? '已撤回：下次用简历 AI 前会先问你' : '还没有授权：第一次用简历诊断、优化、生成时会先问你' }
+}
+
 /**
- * @returns {Promise<{ loaded: boolean, error: string, age: object, voice: object }>}
+ * @returns {Promise<{ loaded: boolean, error: string, age: object, voice: object, resume: object|null }>}
+ *   resume 只对会员有（游客不入库，服务端也不拦），未登录为 null、页面不显示这一行。
  */
 function load() {
   if (!auth.isLoggedIn()) {
@@ -47,24 +53,59 @@ function load() {
       error: '',
       age: ageRow(aiAccess.isDeclared(aiAccess.AGE_SCOPE), localAt(aiAccess.AGE_SCOPE), '，本机'),
       voice: voiceRow(aiAccess.isDeclared(aiAccess.VOICE_SCOPE), localAt(aiAccess.VOICE_SCOPE), '，本机', false),
+      resume: null,
     })
   }
   return api.getAiConsentStatus().then((rows) => {
     const find = (scope) => rows.find((r) => r && r.scope === scope) || null
     const age = find(aiAccess.AGE_SCOPE)
     const voice = find(aiAccess.VOICE_SCOPE)
+    const resume = find(aiAccess.RESUME_AI_SCOPE)
     return {
       loaded: true,
       error: '',
       age: ageRow(!!(age && age.granted), age && age.granted ? fmtDate(age.grantedAt) : '', ''),
       voice: voiceRow(!!(voice && voice.granted), voice && voice.granted ? fmtDate(voice.grantedAt) : '', '', !!(voice && voice.revokedAt)),
+      resume: resumeRow(!!(resume && resume.granted), resume && resume.granted ? fmtDate(resume.grantedAt) : '', !!(resume && resume.revokedAt)),
     }
   }, () => ({
     loaded: true,
     error: '暂时读不到账号里的记录，请稍后下拉刷新',
     age: { on: false, text: '' },
     voice: { on: false, text: '' },
+    resume: null,
   }))
+}
+
+/**
+ * 点「简历 AI 授权」这一行：已授权可撤回，没授权只说明什么时候会问。
+ * 撤回失败如实说没撤成。
+ */
+function promptResume(page) {
+  const granted = !!(page.data.consents.resume && page.data.consents.resume.on)
+  wx.showModal({
+    title: granted ? '撤回简历 AI 授权' : '简历 AI 授权',
+    content: granted
+      ? '撤回后，简历诊断、优化、生成会先问你，不同意就不发给 AI。已经生成的结果还在「我的」里，可以自己删。'
+      : '第一次用简历诊断、优化、生成时会先问你。同意后，简历内容发送到系统里的 AI 分析，结果只给你本人看。',
+    confirmText: granted ? '确认撤回' : '知道了',
+    showCancel: granted,
+    cancelText: '保留',
+    success: (r) => {
+      if (!granted || !r.confirm) return
+      page.setData({ busy: '正在撤回…' })
+      api.revokeAiConsent(aiAccess.RESUME_AI_SCOPE)
+        .then(() => {
+          page.setData({ busy: '' })
+          wx.showToast({ title: '已撤回简历 AI 授权', icon: 'none' })
+          page.loadConsents()
+        })
+        .catch(() => {
+          page.setData({ busy: '' })
+          wx.showModal({ title: '撤回没有完成', content: '这一次没撤成，授权还在。请检查网络后再试。', showCancel: false })
+        })
+    },
+  })
 }
 
 /** 录音同意写的五件事，给「查看 / 撤回」弹框用。 */
@@ -116,4 +157,4 @@ function openPrivacyGuide() {
   })
 }
 
-module.exports = { PRIVACY_REQUEST_DAYS, load, promptVoice, openPrivacyGuide }
+module.exports = { PRIVACY_REQUEST_DAYS, load, promptVoice, promptResume, openPrivacyGuide }

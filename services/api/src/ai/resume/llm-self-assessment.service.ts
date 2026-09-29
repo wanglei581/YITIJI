@@ -23,10 +23,13 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
-import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
+import { deepseekThinkingOff } from '../llm/deepseek-thinking'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../llm/llm-failure'
+import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import type { SelfAssessmentDimensionResult } from './self-assessment.types'
+import { INTERPRETATION_UNPARSEABLE_CODE, errorCodeOf } from './self-assessment-interpretation'
 
 export const SELF_ASSESSMENT_SYSTEM_PROMPT = withAiSafety(
   '你是「自我探索 · 倾向参考」工具的解读助手。' +
@@ -123,6 +126,8 @@ export interface LlmSelfAssessmentOutput {
   dimensions: SelfAssessmentDimensionResult[]
   summary: string | null
   providerName: string
+  /** 解读没生成出来的原因码（模型调不通 / 回包解析不出）；只存码，不带 message。 */
+  unavailableReason?: string
 }
 
 interface LlmParsedOutput {
@@ -149,6 +154,7 @@ export class LlmSelfAssessmentService {
         dimensions: input.scored.dimensions.map((d) => ({ ...d, note: null })),
         summary: null,
         providerName: 'llm_unavailable',
+        unavailableReason: errorCodeOf(err, 'AI_UNAVAILABLE'),
       }
     }
 
@@ -160,6 +166,7 @@ export class LlmSelfAssessmentService {
         dimensions: input.scored.dimensions.map((d) => ({ ...d, note: null })),
         summary: null,
         providerName,
+        unavailableReason: INTERPRETATION_UNPARSEABLE_CODE,
       }
     }
 
@@ -258,14 +265,16 @@ export class LlmSelfAssessmentService {
             ],
             temperature: cfg.temperature,
             stream: false,
-            // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
-            ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
+            // DeepSeek 系模型一律关闭思考（见 ai/llm/deepseek-thinking.ts），避免 reasoning 占满输出导致 content 为空、按输出价多计费
+            ...deepseekThinkingOff(cfg.model),
           }),
         },
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'self_assessment', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
       if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
+      if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
         // 闸门拒绝时请求根本没发出 → 不落账，否则等于凭空记一次没花过的调用。
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })

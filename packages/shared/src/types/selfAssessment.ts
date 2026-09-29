@@ -145,6 +145,22 @@ export interface SelfAssessmentSubmitResponse {
    * **不得**因为记录里有一条同意就继续放行。
    */
   consentCurrent?: boolean
+  /**
+   * 本条结果里有没有 AI 写的解读（任一维 note 或 summary 非空）。
+   * false ⇒ 打分照常、解读缺席：AI 被闸门拦下（暂停 / 额度用完 / 未开通 / 声明缺失 / 须登录）或模型调不通。
+   * 旧服务端不回本字段，前端缺省时按 providerName === 'llm_unavailable' 兜底判断。
+   */
+  interpretationAvailable?: boolean
+  /**
+   * 解读缺席的原因码；interpretationAvailable=true 时为 null。
+   * 闸门码：AI_PAUSED / AI_BUDGET_EXHAUSTED / AI_BUDGET_UNAVAILABLE / AI_PROVIDER_NOT_CONFIGURED /
+   * AI_DECLARATION_REQUIRED / AI_LOGIN_REQUIRED / AI_ACCESS_CHECK_FAILED；
+   * 模型码：AI_NOT_CONFIGURED / AI_BUSY / AI_SELF_ASSESSMENT_TIMEOUT / AI_PROVIDER_* / AI_EMPTY_RESPONSE /
+   * AI_CONTENT_BLOCKED / AI_ENDPOINT_NOT_ALLOWED / AI_UNAVAILABLE / AI_INTERPRETATION_UNPARSEABLE；
+   * 说不出原因时 AI_INTERPRETATION_UNAVAILABLE；
+   * 整体合规拒答（status=rejected）为 COMPLIANCE_REJECT。
+   */
+  aiUnavailableReason?: string | null
 }
 
 /** 读回响应。 */

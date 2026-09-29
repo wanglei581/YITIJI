@@ -60,6 +60,9 @@ Page({
     statusBarHeight: 20,
     resumes: [],
     loginRequired: false,
+    nextCursor: null,
+    loadingMore: false,
+    loadMoreError: '',
   },
 
   onLoad() {
@@ -70,24 +73,83 @@ Page({
     this._load()
   },
 
-  async _load() {
+  onReachBottom() {
+    this._load(true)
+  },
+
+  retryLoadMore() {
+    this._load(true)
+  },
+
+  // 未登录 / 401：屏幕上的简历属于上一个会话，连同游标一起清掉。
+  // 序号作废还在飞的那一页，避免退出或换号之后迟到的响应把旧列表写回来。
+  _clearForLoggedOut() {
+    this._seq = (this._seq || 0) + 1
+    const refreshing = this._refreshing
+    this._refreshing = false
+    if (refreshing) wx.hideLoading()
+    this.setData({
+      loginRequired: true,
+      resumes: [],
+      nextCursor: null,
+      loadingMore: false,
+      loadMoreError: '',
+    })
+  },
+
+  async _load(append = false) {
     if (!auth.isLoggedIn()) {
-      this.setData({ loginRequired: true, resumes: [] })
+      this._clearForLoggedOut()
       return
     }
-    this.setData({ loginRequired: false })
-    wx.showLoading({ title: '加载中…', mask: true })
+    // 没有下一页、正在翻页、或整页刷新还没回来：触底不再发请求。
+    if (append && (!this.data.nextCursor || this.data.loadingMore || this._refreshing)) return
+    const seq = (this._seq = (this._seq || 0) + 1)
+    const cursor = append ? this.data.nextCursor : null
+    if (append) {
+      this.setData({ loadingMore: true, loadMoreError: '' })
+    } else {
+      this._refreshing = true
+      this.setData({ loginRequired: false, loadingMore: false, loadMoreError: '' })
+      wx.showLoading({ title: '加载中…', mask: true })
+    }
     try {
-      const list = await api.getMyResumes({ pageSize: 50 })
-      this.setData({ resumes: (list || []).map(mapResume) })
-    } catch (e) {
-      if (e.statusCode === 401) {
-        this.setData({ loginRequired: true, resumes: [] })
-      } else {
-        wx.showToast({ title: e.message || '加载失败', icon: 'none', duration: 2000 })
+      // nextCursor 挂在返回数组上（utils/api.js unwrapList）。第 51 份起靠它再请求。
+      const list = await api.getMyResumes({ pageSize: 50, ...(cursor ? { cursor } : {}) })
+      if (seq !== this._seq) return
+      if (!auth.isLoggedIn()) {
+        this._clearForLoggedOut()
+        return
       }
+      const start = append ? this.data.resumes.length : 0
+      const page = (list || []).map((item, index) => mapResume(item, start + index))
+      this.setData({
+        loginRequired: false,
+        resumes: append ? this.data.resumes.concat(page) : page,
+        nextCursor: (list && list.nextCursor) || null,
+        loadingMore: false,
+        loadMoreError: '',
+      })
+    } catch (e) {
+      if (seq !== this._seq) return
+      if (!auth.isLoggedIn() || (e && e.statusCode === 401)) {
+        this._clearForLoggedOut()
+        return
+      }
+      // 翻页失败只在底部说明：已显示的简历留在屏幕上，游标留着以便重试。
+      if (append) {
+        this.setData({
+          loadingMore: false,
+          loadMoreError: (e && e.message) || '加载更多失败，点此重试',
+        })
+        return
+      }
+      wx.showToast({ title: (e && e.message) || '加载失败', icon: 'none', duration: 2000 })
     } finally {
-      wx.hideLoading()
+      if (!append && seq === this._seq) {
+        this._refreshing = false
+        wx.hideLoading()
+      }
     }
   },
 

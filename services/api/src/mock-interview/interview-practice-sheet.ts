@@ -81,7 +81,7 @@ const FINAL_QUESTIONS: readonly PracticeSheetQuestion[] = [
   { question: '你做过最难的一次取舍是什么？', examines: '判断依据、价值排序' },
   { question: '别人对你评价最一致的一点是什么？你自己认吗？', examines: '自我认知' },
   { question: '你希望三年后自己在做什么？', examines: '发展预期（本机不预测能否达成）' },
-  { question: '什么样的工作环境会让你待不下去？', examines: '匹配度、表述分寸' },
+  { question: '什么样的工作环境会让你待不下去？', examines: '与岗位要求的契合、表述分寸' },
   { question: '如果这次没有通过，你觉得原因可能是什么？', examines: '复盘意愿' },
   { question: '你有什么想问我们的？', examines: '关注点' },
 ]
@@ -110,9 +110,17 @@ export function pickPracticeQuestions(
   return list.slice(0, count)
 }
 
+/**
+ * 固定免责。必须与 packages/shared 的
+ * COMPLIANCE_COPY.INTERVIEW_PRACTICE_RESULT_DISCLAIMER 逐字相同
+ * （services/api 走 commonjs，不能 import 该包）。两份 PDF 都引用这一处。
+ */
+export const INTERVIEW_PRACTICE_RESULT_DISCLAIMER =
+  '模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。'
+
 /** 面试官身份 → 中文名。与 mock-interview.service.ts 的 INTERVIEWER_LABEL 同源含义。 */
 export const PRACTICE_SHEET_INTERVIEWER_LABEL: Record<string, string> = {
-  hr: 'HR 初筛',
+  hr: 'HR 面试',
   manager: '业务主管',
   tech: '技术面试官',
   campus: '校招面试官',

@@ -120,7 +120,8 @@ expectMatches(
     const match = source.match(new RegExp(`${name}\\s*=\\s*new Set\\(\\[([^\\]]*)\\]\\)`))
     return match ? [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort() : null
   }
-  const server = setItems(readFileSync(join(repoRoot, 'services/api/src/print-jobs/pii-scan-gate.ts'), 'utf8'), 'PII_SCAN_REQUIRED_PURPOSES')
+  // 1.8 P-1 起用途清单定义在 material-check-policy.ts（闸门与「我的文档」materialCheckRequired 共用），pii-scan-gate.ts 只再导出。
+  const server = setItems(readFileSync(join(repoRoot, 'services/api/src/print-jobs/material-check-policy.ts'), 'utf8'), 'PII_SCAN_REQUIRED_PURPOSES')
   const kiosk = setItems(read('src/pages/profile/me/components/documentReprint.ts'), 'PRINT_PII_CHECK_PURPOSES')
   if (server && kiosk && JSON.stringify(server) === JSON.stringify(kiosk)) {
     pass(`我的文档的原件分流判据与服务端 PII_SCAN_REQUIRED_PURPOSES 同一份用途清单（${kiosk.join(' / ')}）`)

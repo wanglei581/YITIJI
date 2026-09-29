@@ -82,6 +82,12 @@
         </view>
       </view>
 
+      <view class="list-state" wx:if="{{listState === 'ready' && list.length && loadingMore}}">正在加载更多…</view>
+      <view class="list-state" wx:elif="{{listState === 'ready' && list.length && loadMoreError}}">
+        <view class="state-retry tap" hover-class="tap-press" bindtap="retryLoadMore" role="button" aria-label="重新加载更多反馈">加载更多失败，点此重试</view>
+      </view>
+      <view class="list-state" wx:elif="{{listState === 'ready' && list.length && nextCursor}}">上拉加载更多</view>
+
       <!-- 个人信息请求不在反馈里开类别（C3），指到「隐私与数据」，时限写在那一页。 -->
       <view class="fb-alt tap" hover-class="tap-press" bindtap="goPrivacy" role="button" aria-label="查阅、导出、删除个人信息，去隐私与数据">查阅、导出、删除个人信息，去「隐私与数据」</view>
     </block>

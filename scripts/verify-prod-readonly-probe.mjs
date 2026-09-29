@@ -54,6 +54,7 @@ for (const needle of [
   '/api/v1/job-fairs',
   '/api/v1/policies',
   '/api/v1/companies',
+  '/api/v1/kiosk/offline-agencies',
   '/kiosk/legal/privacy_policy',
   '/kiosk/legal/terms_of_service',
   '/kiosk/legal/unknown_type',
@@ -64,10 +65,25 @@ for (const needle of [
   else fail(`缺少真实端点 ${needle}`)
 }
 
+for (const path of [
+  '/api/v1/jobs?pageSize=50',
+  '/api/v1/job-fairs?pageSize=50',
+  '/api/v1/policies?pageSize=50',
+  '/api/v1/kiosk/offline-agencies?pageSize=50',
+]) {
+  if (src.includes(path)) pass(`第一页 ${path}`)
+  else fail(`缺少 ${path}（后端接受 pageSize=50）`)
+}
+if (src.includes('（演示）')) pass('岗位/招聘会/政策/线下机构使用全角（演示）字面量')
+else fail('缺少全角（演示）字面量')
+if (src.includes('演示|示例|测试数据|demo|sample')) pass('企业宽正则仍在，未被收窄')
+else fail('企业宽正则被收窄或删除')
+
 if (!src.includes('15000') && !src.includes('15_000')) fail('每项超时必须是 15s')
 else pass('每项超时 15s')
 
 let mutation = 'ok'
+const seenPaths = []
 
 function send(res, status, body, contentType = 'application/json; charset=utf-8') {
   const raw = typeof body === 'string' ? body : JSON.stringify(body)
@@ -79,9 +95,117 @@ function send(res, status, body, contentType = 'application/json; charset=utf-8'
   res.end(raw)
 }
 
+function pageEnvelope(data, total) {
+  return { data, pagination: { page: 1, pageSize: 50, total, totalPages: 1 } }
+}
+
+function jobsPayload(mode) {
+  if (mode === 'lists_empty') return pageEnvelope([], 0)
+  if (mode === 'demo_all') {
+    return pageEnvelope([
+      {
+        id: 'job-id-不含标记',
+        title: '仓库管理员（演示）',
+        company: '正常企业股份有限公司',
+        sourceName: '市人社公共就业平台',
+      },
+      { id: 'j2', title: '会计', company: '另一家正常企业', sourceName: '市人社公共就业平台' },
+    ], 2)
+  }
+  // 阳性对照：id 里的「（演示）」不在白名单；sourceName 的 sample 只会被企业那条宽正则打中。
+  return pageEnvelope([
+    {
+      id: 'id-（演示）-不该扫到',
+      title: '仓储管理员',
+      company: '正常企业股份有限公司',
+      sourceName: 'sample 来源不应命中',
+    },
+    { id: 'j2', title: '会计', company: '另一家正常企业', sourceName: '市人社公共就业平台' },
+  ], 2)
+}
+
+function fairsPayload(mode) {
+  if (mode === 'fairs_clean') {
+    return pageEnvelope([
+      {
+        id: 'fair-id-（演示）',
+        name: '春季综合招聘会',
+        organizer: '市人社',
+        sourceName: 'sample 来源不应命中',
+        venue: '市人才市场',
+      },
+    ], 1)
+  }
+  if (mode === 'demo_all') {
+    // 标记只在 sourceName，不在 name：白名单必须扫来源名，不能只看标题。
+    return pageEnvelope([
+      {
+        id: 'f1',
+        name: '春季综合招聘会',
+        organizer: '市人社',
+        sourceName: '市人社招聘会来源（演示）',
+        venue: '市人才市场',
+      },
+    ], 1)
+  }
+  return pageEnvelope([], 0)
+}
+
+function policiesPayload(mode) {
+  if (mode === 'lists_empty') return pageEnvelope([], 0)
+  if (mode === 'demo_all') {
+    // 标记只在 summary：列表上看得见的摘要必须进白名单。
+    return pageEnvelope([
+      { id: 'p1', title: '灵活就业补贴', summary: '灵活就业补贴说明（演示）', sourceName: '市人社' },
+      { id: 'p2', title: '档案转递', summary: '摘要', sourceName: '市人社' },
+    ], 2)
+  }
+  return pageEnvelope([
+    { id: 'p-（演示）', title: '灵活就业补贴', summary: '正常摘要', sourceName: 'sample 来源不应命中' },
+    { id: 'p2', title: '档案转递', summary: '摘要', sourceName: '市人社' },
+  ], 2)
+}
+
+function agenciesPayload(mode) {
+  if (mode === 'lists_empty') return []
+  if (mode === 'agencies_bare_demo') {
+    return [{ id: 'a1', name: '槐荫街道职介（演示）', address: '经十路 1 号', district: '槐荫区' }]
+  }
+  if (mode === 'demo_all') {
+    // 标记只在 address：机构名干净时仍要 WARN，并列出带标记的地址。
+    return {
+      data: [{
+        id: 'a1',
+        name: '槐荫街道职业介绍',
+        address: '经十路（演示）1号',
+        district: '槐荫区',
+        description: '职业介绍',
+        services: ['求职登记'],
+      }],
+      total: 1,
+      page: 1,
+      pageSize: 50,
+    }
+  }
+  return {
+    data: [{
+      id: 'a-（演示）',
+      name: '槐荫街道职业介绍',
+      address: 'sample 路 1 号',
+      district: '槐荫区',
+      description: '职业介绍',
+      services: ['求职登记'],
+    }],
+    total: 1,
+    page: 1,
+    pageSize: 50,
+  }
+}
+
 function handle(req, res) {
   const url = new URL(req.url || '/', 'http://127.0.0.1')
   const path = url.pathname
+  seenPaths.push(`${path}${url.search}`)
   const host = String(req.headers.host || '').split(':')[0]
 
   const hashes = {
@@ -120,15 +244,19 @@ function handle(req, res) {
     return
   }
   if (req.method === 'GET' && path === '/api/v1/jobs') {
-    send(res, 200, { data: [{ id: 'j1' }, { id: 'j2' }, { id: 'j3' }], pagination: { page: 1, pageSize: 20, total: 3, totalPages: 1 } })
+    send(res, 200, jobsPayload(mutation))
     return
   }
   if (req.method === 'GET' && path === '/api/v1/job-fairs') {
-    send(res, 200, { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } })
+    send(res, 200, fairsPayload(mutation))
     return
   }
   if (req.method === 'GET' && path === '/api/v1/policies') {
-    send(res, 200, { data: [{ id: 'p1' }, { id: 'p2' }], pagination: { page: 1, pageSize: 200, total: 2, totalPages: 1 } })
+    send(res, 200, policiesPayload(mutation))
+    return
+  }
+  if (req.method === 'GET' && path === '/api/v1/kiosk/offline-agencies') {
+    send(res, 200, agenciesPayload(mutation))
     return
   }
   if (req.method === 'GET' && path === '/api/v1/companies') {
@@ -227,6 +355,17 @@ function expectExit(result, expected, label) {
   return actual === expected
 }
 
+function lineOf(stdout, needle) {
+  return (stdout || '').split('\n').find((line) => line.includes(needle)) || ''
+}
+
+function expectLine(stdout, needle, result, label) {
+  const line = lineOf(stdout, needle)
+  if (new RegExp(`\\s${result}\\s`).test(line)) pass(label)
+  else fail(`${label}，实际: ${line.trim() || '(该行未出现)'}`)
+  return line
+}
+
 const server = createServer((req, res) => {
   const done = () => handle(req, res)
   req.on('data', () => {})
@@ -248,13 +387,33 @@ try {
 
   console.log('\n=== 本地桩：合规响应 ===')
   mutation = 'ok'
+  seenPaths.length = 0
   const happyTable = await runProbe(port)
   process.stdout.write(happyTable.stdout || '')
   expectExit(happyTable, 0, '合规桩')
   if (!/PASS \d+ \/ WARN \d+ \/ FAIL \d+/.test(happyTable.stdout || '')) fail('合规桩未打印 PASS/WARN/FAIL 汇总行')
   else pass('合规桩打印汇总行')
-  if (!/total=0（内容录入是负责人的事）/.test(happyTable.stdout || '')) fail('total=0 应标 INFO 而不是 FAIL')
-  else pass('招聘会 total=0 为 INFO')
+  const fairLine = expectLine(happyTable.stdout, '/api/v1/job-fairs', 'INFO', '招聘会 total=0 为 INFO')
+  if (fairLine.includes('total=0（内容录入是负责人的事）')) pass('招聘会 INFO 说明是内容录入')
+  else fail(`招聘会空列表说明不对: ${fairLine.trim() || '(该行未出现)'}`)
+  const jobsClean = expectLine(happyTable.stdout, '/api/v1/jobs?', 'PASS', '岗位无「（演示）」为 PASS')
+  if (jobsClean.includes('无演示标记')) pass('岗位 PASS 注明无演示标记')
+  else fail(`岗位 PASS 必须注明无演示标记: ${jobsClean.trim()}`)
+  const policyClean = expectLine(happyTable.stdout, '/api/v1/policies', 'PASS', '政策无「（演示）」为 PASS')
+  if (policyClean.includes('无演示标记')) pass('政策 PASS 注明无演示标记')
+  else fail(`政策 PASS 必须注明无演示标记: ${policyClean.trim()}`)
+  const agencyClean = expectLine(happyTable.stdout, '/kiosk/offline-agencies', 'PASS', '线下机构无「（演示）」为 PASS')
+  if (agencyClean.includes('无演示标记')) pass('线下机构 PASS 注明无演示标记')
+  else fail(`线下机构 PASS 必须注明无演示标记: ${agencyClean.trim()}`)
+  for (const path of [
+    '/api/v1/jobs?pageSize=50',
+    '/api/v1/job-fairs?pageSize=50',
+    '/api/v1/policies?pageSize=50',
+    '/api/v1/kiosk/offline-agencies?pageSize=50',
+  ]) {
+    if (seenPaths.includes(path)) pass(`实际请求了 ${path}`)
+    else fail(`未请求 ${path}`)
+  }
   if (!/expect-sha=deadbeef/.test(happyTable.stdout || '')) fail('未打印 --expect-sha')
   else pass('报告头含 expect-sha')
 
@@ -318,6 +477,56 @@ try {
   const cleanLine = (clean.stdout || '').split('\n').find((l) => l.includes('/api/v1/companies')) || ''
   if (/\sPASS\s/.test(cleanLine)) pass('表中 companies 干净时为 PASS')
   else fail(`企业干净时应为 PASS,实际: ${cleanLine.trim() || '(该行未出现)'}`)
+
+  console.log('\n=== 四项公开列表带「（演示）」必须 WARN，并点名 ===')
+  // 与企业那条一样：内容问题不是故障，退出码保持 0。
+  // 锚在夹具名字上，不锚在说明文字里的「演示」。
+  mutation = 'demo_all'
+  const marked = await runProbe(port)
+  process.stdout.write(marked.stdout || '')
+  expectExit(marked, 0, '四项演示标记只 WARN 不改变退出码')
+  const markedCases = [
+    ['/api/v1/jobs?', '仓库管理员（演示）', '岗位'],
+    ['/api/v1/job-fairs', '市人社招聘会来源（演示）', '招聘会'],
+    ['/api/v1/policies', '灵活就业补贴说明（演示）', '政策'],
+    ['/kiosk/offline-agencies', '经十路（演示）1号', '线下机构'],
+  ]
+  for (const [needle, name, label] of markedCases) {
+    const line = expectLine(marked.stdout, needle, 'WARN', `表中 ${label} 为 WARN`)
+    if (line.includes(name)) pass(`${label} WARN 点名了 ${name}`)
+    else fail(`${label} WARN 必须点名。实际: ${line.trim() || '(该行未出现)'}`)
+  }
+
+  console.log('\n=== 招聘会不带「（演示）」必须 PASS（阳性对照） ===')
+  mutation = 'fairs_clean'
+  const fairCleanRun = await runProbe(port)
+  const fairCleanLine = expectLine(fairCleanRun.stdout, '/api/v1/job-fairs', 'PASS', '招聘会干净时为 PASS')
+  if (fairCleanLine.includes('无演示标记')) pass('招聘会 PASS 注明无演示标记')
+  else fail(`招聘会 PASS 必须注明无演示标记: ${fairCleanLine.trim()}`)
+  expectExit(fairCleanRun, 0, '招聘会干净不改变退出码')
+
+  console.log('\n=== 四项空列表为 INFO；线下机构裸数组 [] 也算空 ===')
+  mutation = 'lists_empty'
+  const emptyRun = await runProbe(port)
+  expectExit(emptyRun, 0, '空列表不改变退出码')
+  for (const [needle, label] of [
+    ['/api/v1/jobs?', '岗位'],
+    ['/api/v1/job-fairs', '招聘会'],
+    ['/api/v1/policies', '政策'],
+    ['/kiosk/offline-agencies', '线下机构'],
+  ]) {
+    const line = expectLine(emptyRun.stdout, needle, 'INFO', `${label} 空列表为 INFO`)
+    if (line.includes('total=0（内容录入是负责人的事）')) pass(`${label} INFO 说明是内容录入`)
+    else fail(`${label} 空列表说明不对: ${line.trim() || '(该行未出现)'}`)
+  }
+
+  console.log('\n=== 线下机构裸数组（非空）里的「（演示）」必须 WARN ===')
+  mutation = 'agencies_bare_demo'
+  const bare = await runProbe(port)
+  expectExit(bare, 0, '裸数组演示标记只 WARN')
+  const bareLine = expectLine(bare.stdout, '/kiosk/offline-agencies', 'WARN', '裸数组线下机构为 WARN')
+  if (bareLine.includes('槐荫街道职介（演示）')) pass('裸数组 WARN 点名了机构')
+  else fail(`裸数组 WARN 必须点名。实际: ${bareLine.trim() || '(该行未出现)'}`)
 
   console.log('\n=== 恢复后合规桩 ===')
   mutation = 'ok'

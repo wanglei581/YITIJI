@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { maskPhone } from '../../common/crypto/phone-identity'
+import { isValidCnMobile, maskPhone, normalizePhone } from '../../common/crypto/phone-identity'
 import { tc3Sign } from '../../common/tencent/tc3'
+import { isAiEndpointAllowed, isTencentRegionAllowed } from '../../common/outbound/ai-endpoint-allowlist'
 
 export const SMS_SENDER = Symbol('SMS_SENDER')
 
@@ -17,6 +18,32 @@ export type SmsProvider = 'log' | 'tencent'
  */
 export interface SmsSender {
   sendCode(phone: string, code: string, meta?: SmsSendMeta): Promise<void>
+  /** 管理员登记机构联系人手机后的知会，不是验证码。 */
+  sendPartnerPhoneRegisteredNotice(phone: string, orgName: string, meta?: SmsSendMeta): Promise<void>
+}
+
+/** 知会模板只带机构名，句子本身写在短信平台的模板里。 */
+export function noticeOrgName(name: string): string {
+  let cleaned = ''
+  for (const char of name) {
+    const code = char.codePointAt(0) ?? 0
+    cleaned += code <= 0x1f ? ' ' : char
+  }
+  const collapsed = cleaned.replace(/\s+/g, ' ').trim()
+  const sliced = Array.from(collapsed).slice(0, 30).join('')
+  return sliced || '机构'
+}
+
+export function partnerPhoneRegisteredNoticeText(orgName: string): string {
+  return `平台管理员已为『${noticeOrgName(orgName)}』机构账号登记本手机号，用于找回密码。如非本机构操作，请联系平台客服。`
+}
+
+/** 知会只发中国大陆手机号。验证码发送保持原样，不走这里。 */
+export function assertMainlandNoticePhone(phone: string): string {
+  const stripped = phone.startsWith('+86') ? phone.slice(3) : phone
+  const normalized = normalizePhone(stripped)
+  if (!isValidCnMobile(normalized)) throw new SmsSendError('region_rejected')
+  return normalized
 }
 
 /** 发送上下文。只放额度计数要用的非个人信息（sms-budget.ts）。 */
@@ -103,6 +130,11 @@ export class LogSmsSender implements SmsSender {
   async sendCode(phone: string, code: string): Promise<void> {
     this.logger.warn(`[DEV 短信] ${maskPhone(phone)} 验证码: ${code}(仅开发环境打印,生产替换为真实服务商)`)
   }
+
+  async sendPartnerPhoneRegisteredNotice(phone: string, orgName: string): Promise<void> {
+    const normalized = assertMainlandNoticePhone(phone)
+    this.logger.warn(`[DEV 短信] ${maskPhone(normalized)} ${partnerPhoneRegisteredNoticeText(orgName)}`)
+  }
 }
 
 /** 腾讯云短信 SendSms API 版本（国内短信）。 */
@@ -124,27 +156,44 @@ export class TencentSmsSender implements SmsSender {
   constructor(private readonly config: TencentSmsConfig) {}
 
   async sendCode(phone: string, code: string): Promise<void> {
+    const expireMinutes = (process.env['TENCENT_SMS_CODE_EXPIRE_MINUTES'] ?? '').trim()
+    const templateParamSet = expireMinutes ? [code, expireMinutes] : [code]
+    await this.postSendSms(phone, this.config.templateId, templateParamSet)
+  }
+
+  async sendPartnerPhoneRegisteredNotice(phone: string, orgName: string): Promise<void> {
+    const normalized = assertMainlandNoticePhone(phone)
+    const templateId = process.env['SMS_TEMPLATE_PARTNER_PHONE_REGISTERED']?.trim()
+    if (!templateId) throw new SmsSendError('template_missing')
+    await this.postSendSms(normalized, templateId, [noticeOrgName(orgName)])
+  }
+
+  private async postSendSms(phone: string, templateId: string, templateParamSet: string[]): Promise<void> {
     const host = this.config.host
     // 本地 stub（127.0.0.1/localhost）走 http，便于无外网联调；真实腾讯云始终 https。
     const insecure = host.startsWith('127.0.0.1') || host.startsWith('localhost')
+    const endpoint = `${insecure ? 'http' : 'https'}://${host}`
+    // 出站白名单（与模型、语音同一张单）：手机号是个人信息，地址不在单内就不发。
+    // 本机 stub 的 http 只在非生产放行。providerCode 只用于服务端分类，不回给前端。
+    if (!isAiEndpointAllowed(endpoint, 'sms') || !isTencentRegionAllowed(this.config.region, 'sms')) {
+      this.logger.error(`SMS 下发被拦 phone=${maskPhone(phone)} reason=endpoint_not_allowed`)
+      throw new SmsSendError('endpoint_not_allowed')
+    }
     // 腾讯云要求 E.164（带国家码）；大陆手机号补 +86，已带 + 则原样。
     const e164 = phone.startsWith('+') ? phone : `+86${phone}`
-
-    const expireMinutes = (process.env['TENCENT_SMS_CODE_EXPIRE_MINUTES'] ?? '').trim()
-    const templateParamSet = expireMinutes ? [code, expireMinutes] : [code]
 
     const payload = JSON.stringify({
       PhoneNumberSet: [e164],
       SmsSdkAppId: this.config.sdkAppId,
       SignName: this.config.signName,
-      TemplateId: this.config.templateId,
+      TemplateId: templateId,
       TemplateParamSet: templateParamSet,
     })
     const ts = Math.floor(Date.now() / 1000)
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), Number(process.env['TENCENT_SMS_TIMEOUT_MS']) || 10_000)
     try {
-      const res = await fetch(`${insecure ? 'http' : 'https'}://${host}`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

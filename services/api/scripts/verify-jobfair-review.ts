@@ -144,13 +144,15 @@ async function main() {
       data: {
         id: orgId,
         name: `招聘会审核机构_${suffix}`,
-        type: 'fair_organizer',
+        // 3.15 起招聘会主办方已停放、不能导入招聘会（partner-capabilities.ts）；本门禁测审核闭环，
+        // 机构类型只是前置条件，改用仍可导入招聘会的公共就业服务机构。停放类型被拒见 verify:partner-source-capabilities。
+        type: 'public_employment_service',
         // 发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)
         contentTrustStatus: 'active',
       },
     })
     await prisma.organization.create({
-      data: { id: otherOrgId, name: `对照招聘会机构_${suffix}`, type: 'fair_organizer' },
+      data: { id: otherOrgId, name: `对照招聘会机构_${suffix}`, type: 'public_employment_service' },
     })
     await prisma.user.create({
       data: { id: adminUser.userId, username: `${RESIDUE_TAG}_admin_${suffix}`, passwordHash: 'x', name: '招聘会审核验证管理员', role: 'admin' },

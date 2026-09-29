@@ -24,8 +24,11 @@ import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal
 import { RedisService } from '../common/redis/redis.service'
 import { tryRedis } from '../common/redis/redis-degradation'
 import { Prisma } from '../generated/prisma/client'
+import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import { PASSWORD_PROOF_STATE, passwordProofState } from '../auth/password-proof-state'
+import { contactPhoneAssignment } from './contact-phone-change'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
+import { isParkedOrgType, throwOrgTypeParked } from './parked-org-types'
 import {
   ADMIN_ORG_ACCOUNT_SELECT,
   mapAdminOrgAccount,
@@ -90,8 +93,16 @@ interface OrgTypeMatrixRule {
 
 const matrixModules = (modules: string[]) => new Set(modules)
 
+const PUBLIC_EMPLOYMENT_RULE: OrgTypeMatrixRule = {
+  sceneTemplate: 'public_employment',
+  allowedModules: matrixModules([
+    'resume_service', 'print_scan', 'policy_service', 'job_info', 'job_fair',
+    'ai_interview', 'device_status', 'service_statistics', 'external_apply_redirect',
+  ]),
+}
+
 /** 机构类型矩阵: type 决定唯一场景模板和模块权限上限。 */
-const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
+export const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
   school_employment_center: {
     sceneTemplate: 'school',
     allowedModules: matrixModules([
@@ -107,20 +118,10 @@ const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
       'external_apply_redirect',
     ]),
   },
-  public_employment_service: {
-    sceneTemplate: 'public_employment',
-    allowedModules: matrixModules([
-      'resume_service',
-      'print_scan',
-      'policy_service',
-      'job_info',
-      'job_fair',
-      'ai_interview',
-      'device_status',
-      'service_statistics',
-      'external_apply_redirect',
-    ]),
-  },
+  public_employment_service: PUBLIC_EMPLOYMENT_RULE,
+  // 零工之家、就业服务站属公共就业服务体系，场景与模块上限同人社版（2026-09-29 新增）。
+  gig_worker_home: PUBLIC_EMPLOYMENT_RULE,
+  employment_service_station: PUBLIC_EMPLOYMENT_RULE,
   licensed_hr_agency: {
     sceneTemplate: 'licensed_hr_service',
     allowedModules: matrixModules([
@@ -302,7 +303,7 @@ export class AdminOrgsService {
   async createOrg(dto: CreateOrgDto, admin: AuthedUser): Promise<AdminOrgDetail> {
     const enabledModules = this.sanitizeModules(dto.enabledModules)
     const sceneTemplate = dto.sceneTemplate ?? null
-    this.assertOrgTypeMatrix({ type: dto.type, sceneTemplate, enabledModules })
+    this.assertOrgTypeMatrix({ type: dto.type, sceneTemplate, enabledModules, typeIsNew: true })
 
     if (dto.account) {
       const exists = await this.prisma.user.findUnique({ where: { username: dto.account.username } })
@@ -383,8 +384,9 @@ export class AdminOrgsService {
     const nextModules = modulesChanged ? this.sanitizeModules(requestedModules) : currentModules
     const nextType = dto.type ?? current.type
     const nextSceneTemplate = dto.sceneTemplate !== undefined ? dto.sceneTemplate : current.sceneTemplate
+    const typeChanged = dto.type !== undefined && dto.type !== current.type
     const matrixFieldsChanged =
-      (dto.type !== undefined && dto.type !== current.type) ||
+      typeChanged ||
       (dto.sceneTemplate !== undefined && (dto.sceneTemplate ?? null) !== (current.sceneTemplate ?? null)) ||
       modulesChanged
     if (matrixFieldsChanged) {
@@ -392,6 +394,8 @@ export class AdminOrgsService {
         type: nextType,
         sceneTemplate: nextSceneTemplate ?? null,
         enabledModules: nextModules,
+        // 只有「改成」停放类型才拒；存量停放机构原样回传自己的类型（前端编辑抽屉就是这么送的）不算改。
+        typeIsNew: typeChanged,
       })
     }
     await this.prisma.$transaction(async (tx) => {
@@ -401,7 +405,7 @@ export class AdminOrgsService {
           ...(dto.name !== undefined ? { name: dto.name } : {}),
           ...(dto.type !== undefined ? { type: dto.type } : {}),
           ...(dto.contact !== undefined ? { contact: dto.contact } : {}),
-          ...(dto.contactPhone !== undefined ? { contactPhone: dto.contactPhone } : {}),
+          ...(dto.contactPhone !== undefined ? contactPhoneAssignment(current.contactPhone, dto.contactPhone) : {}),
           ...(dto.sceneTemplate !== undefined ? { sceneTemplate: dto.sceneTemplate } : {}),
           ...(modulesChanged ? { enabledModulesJson: JSON.stringify(nextModules) } : {}),
         },
@@ -717,7 +721,13 @@ export class AdminOrgsService {
     return unique
   }
 
-  private assertOrgTypeMatrix(input: { type: string; sceneTemplate: string | null; enabledModules: string[] }): void {
+  private assertOrgTypeMatrix(input: {
+    type: string
+    sceneTemplate: string | null
+    enabledModules: string[]
+    /** 新建机构，或本次把类型改成了 type。只有这时才按停放清单拒绝。 */
+    typeIsNew: boolean
+  }): void {
     for (const moduleName of input.enabledModules) {
       if (PROHIBITED_MODULES.has(moduleName)) {
         throw new BadRequestException({
@@ -725,6 +735,9 @@ export class AdminOrgsService {
         })
       }
     }
+    // 3.15 停放：企业来源方 / 招聘会主办方不能新建、不能改成（见 parked-org-types.ts）。
+    // 放在招聘闭环模块之后、矩阵之前：闭环模块仍是最高优先级，停放类型不再往下给「矩阵不合法」这种误导的原因。
+    if (input.typeIsNew && isParkedOrgType(input.type)) throwOrgTypeParked(input.type)
     const rule = ORG_TYPE_MATRIX[input.type]
     if (!rule) {
       throw new BadRequestException({
@@ -804,7 +817,7 @@ export class AdminOrgsService {
       try {
         return await operation()
       } catch (error) {
-        const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
+        const retryable = isSerializationConflict(error)
         if (!retryable || attempt === 2) throw error
       }
     }
@@ -940,9 +953,18 @@ export class AdminOrgsService {
     if (!user.orgId) {
       throw new ForbiddenException({ error: { code: 'ORG_REQUIRED', message: '当前账号未绑定机构' } })
     }
-    const data: Record<string, string> = {}
-    if (dto.contact !== undefined) data['contact'] = dto.contact.trim()
-    if (dto.contactPhone !== undefined) data['contactPhone'] = dto.contactPhone.trim()
+    const currentProfile = await this.prisma.organization.findUnique({
+      where: { id: user.orgId },
+      select: { contactPhone: true },
+    })
+    if (!currentProfile) {
+      throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
+    }
+    const data: Prisma.OrganizationUpdateInput = {}
+    if (dto.contact !== undefined) data.contact = dto.contact.trim()
+    if (dto.contactPhone !== undefined) {
+      Object.assign(data, contactPhoneAssignment(currentProfile.contactPhone, dto.contactPhone.trim()))
+    }
     if (Object.keys(data).length === 0) {
       throw new BadRequestException({ error: { code: 'ORG_PROFILE_EMPTY', message: '没有可更新的字段' } })
     }

@@ -11,11 +11,12 @@ import { RedisModule } from '../common/redis/redis.module'
 import { PartnerAccountActionService } from '../auth/partner-account-action.service'
 import { PartnerPhoneRebindService } from '../auth/partner-phone-rebind.service'
 import { PartnerAccountActionController } from './partner-account-action.controller'
+import { PartnerContactPhoneRegistrationService } from './partner-contact-phone-registration.service'
 
 @Module({
   // AuthModule:导出 JwtAuthGuard / RolesGuard;AuditService 为 @Global 直接注入
   imports:     [PrismaModule, RedisModule, AuthModule],
-  providers:   [AdminOrgsService, AdminOrgContentTrustService, PartnerStatsService, PartnerAccountActionService, PartnerPhoneRebindService],
+  providers:   [AdminOrgsService, AdminOrgContentTrustService, PartnerStatsService, PartnerAccountActionService, PartnerPhoneRebindService, PartnerContactPhoneRegistrationService],
   controllers: [AdminOrgsController, PartnerOrgController, PartnerStatsController, PartnerAccountActionController],
   exports:     [AdminOrgsService],
 })
