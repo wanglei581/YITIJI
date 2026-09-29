@@ -5,6 +5,15 @@
 - 把 `docs/operations/content-ingestion-operator-guide.md`（原「托管 a 下的内容录入」，还停在 3.13/3.14 开发中的口径）扩写成《机构后台使用指南（托管 a）》，不新开手册：登录与账号、菜单一览、工作台与平台处置通知、机构资料与内容可信、本机构官方渠道、政策公告（含申领条件与平台紧急下架后的处理）、终端数据（试点签收指标的口径与导出）、数据大屏与数据统计、智慧校园、本平台不做的事、停下来联系本公司的情形，附管理员对应操作。菜单名与一体机入口名按合规与运维窗口「试点交付物包」的术语对照统一；写的是 #1057、#1065、#1076、#1080、#1082 合入后的界面，文首注明发布前以本机为准。两处引用它的链接文字同步改名。现场人员培训材料在交付物包里，不在本文。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
+
+> **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
+
+## 2026-09-29：content-pipeline-e2e 自签令牌改为 15 分钟，并核对与登录签发一致（PR #1097，未合入）
+
+- **寿命：** `issueInternalToken` 的自签令牌从 `24h` 改为 `15m`。这条门禁是隔离 SQLite + 进程内内存 Redis 的一次 HTTP 链路，脚本里没有 sleep / 轮询；2026-09-29 本机整段实测 48 秒，15 分钟够用。生产登录仍是 `auth.module.ts` 的 `JWT_TTL`（24h）。
+- **签发核对：** 签完解码，字段表从 `auth.service.ts` 的 `issueLogin` 和 `auth.module.ts` 的 `signOptions` 读，不另抄一份。当前契约是 `sub`、`role`、`orgId`、`ver`、`jti`，`aud` 与 `iss` 缺省。对不上就抛错，退出码不是 0。故意把 `aud` 写成 `mutated-wrong-audience` 时，门禁在签发处失败（pnpm 退出码 1），夹具已清理，随后已改回。
+- **验证：** `verify:content-pipeline-e2e` 123/123，退出码 0；`verify:admin-login-hardening` 54/54，退出码 0；`verify:redis-degradation-truth` 39/39，退出码 0。Node 22。
+
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
 - **P-01（机构政策列表）：** 平台紧急下架的政策此前和机构自己下架的一样显示「已下架」，还给「编辑」「审核通过」「发布」（发布会被服务端以 `EMERGENCY_TAKEDOWN_IRREVERSIBLE` 拒绝，编辑后永远发不出去）。服务端 `getPartnerPolicies` 给本机构列表每行附上 `emergencyTakedown` / `emergencyReasonCode` / `emergencyReasonText` / `emergencyTakedownAt`（只按本机构 `orgId` 加本页 id 查 `RecruitmentEmergencyHold`，公开读取不带；改动前已告知后端窗口，对方同意并提了按机构过滤、跨机构断言两条，均照做）。机构后台对这类行显示「平台已紧急下架」、下方整行写事由、说明、下架时间与「已冻结」，只留删除；与官方渠道面板同一口径。门禁 `verify:policies` 加一段：被下架行带出事由、其余行为 false、A/B 两个机构互相看不到对方的事由、公开列表不带这几个字段；变异「不附下架信息」即红。演示模式补一条被下架的示例，演示发布与服务端同样拒绝。

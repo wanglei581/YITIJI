@@ -15,7 +15,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'auth-unknown': {
       kind: 'lock',
       title: '还没确认你是谁',
-      body: '签名和印章是高敏材料，在确认身份之前，这一页不提供上传、不显示任何文件，也不合成。',
+      body: '签名是高敏材料，在确认身份之前，这一页不提供上传、不显示任何文件，也不合成。',
       chips: [
         { text: '这一页不显示任何文件' },
         { text: '不生成、不保存、不上传' },
@@ -24,8 +24,8 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'login-required': {
       kind: 'lock',
-      title: '先登录才能做签名盖章',
-      body: '本人手写签名图片属于高敏个人材料，只允许本人在登录后上传与合成。未登录不提供这项能力。',
+      title: '先登录才能签名',
+      body: '本人手写签名图片属于高敏个人材料，只允许本人在登录后上传与合成。未登录不能在这里签名。',
       chips: [
         { text: '这一页不显示任何文件' },
         { text: '不生成、不保存、不上传' },
@@ -51,25 +51,25 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'terminal-missing': {
       kind: 'error',
       title: '这台机器还没完成登记',
-      body: '签名盖章要先确认这台机器是否被允许使用。读不到登记信息就不放行，不把读不到当成可以用。',
+      body: '签名要先确认这台机器是否被允许使用。读不到登记信息就不放行，不把读不到当成可以用。',
       chips: [{ text: '不假设读不到就是可用' }, { text: '请联系现场工作人员' }],
     },
     'capability-loading': {
       kind: 'info',
       title: '正在读取这台机器的能力开关',
-      body: '还没拿到「签名盖章」在这台机器上是否开放的答复。拿到之前不提供上传，也不显示任何文件。',
+      body: '还没拿到「签名」在这台机器上是否开放的答复。拿到之前不提供上传，也不显示任何文件。',
       chips: [{ text: '读取中不等于可用' }, { text: '这里不画进度条' }],
     },
     'capability-disabled': {
       kind: 'lock',
-      title: '这台机器没有开放签名盖章',
-      body: '管理员没有为这台机器开放「签名盖章」。未登记一律按不允许处理，不做静默降级。',
+      title: '这台机器没有开放签名',
+      body: '管理员没有为这台机器开放「签名」。未登记一律按不允许处理，不做静默降级。',
       chips: [{ text: '文档打印扫描不受影响', tone: 'ok' }, { text: '需要开放请联系工作人员' }],
     },
     'capability-maintenance': {
       kind: 'warn',
-      title: '签名盖章正在维护',
-      body: '这台机器的签名盖章被管理员置为维护状态，暂时不受理新的合成。已生成的文件不受影响。',
+      title: '签名正在维护',
+      body: '这台机器的签名功能被管理员置为维护状态，暂时不受理新的合成。已生成的文件不受影响。',
       chips: [{ text: '维护是管理员登记的真实状态' }, { text: '恢复时间请问现场工作人员' }],
     },
     'capability-error': {
@@ -127,7 +127,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'document-format-rejected': {
       kind: 'warn',
       title: '这份不是 PDF',
-      body: '签名盖章只收 PDF。刚才那份没有进入流程；图片要盖章，先用「格式转换」拼成 PDF。',
+      body: '签名只能放在 PDF 上。刚才那份不是 PDF，没有进入流程；图片要签名，先用「格式转换」拼成 PDF。',
       chips: [{ text: '原文档未被改写', tone: 'ok' }, { text: '没有生成任何文件', tone: 'ok' }],
     },
     'document-too-large': {

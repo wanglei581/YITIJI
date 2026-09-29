@@ -61,6 +61,18 @@ test('login phone states do not invent 已登录', async () => {
   assert.equal(allCopy.includes('已登录'), false)
 })
 
+test('login: this machine cannot send SMS today → its own state that leads to QR login', async () => {
+  const m = await loadModule('src/pages/auth/loginGateModel.ts')
+  const base = { sendingCode: false, submitting: false, countdown: 0, notice: null, error: '请明天再试' }
+  for (const errorCode of ['SMS_TERMINAL_DAILY_LIMIT', 'SMS_DAILY_TOTAL_LIMIT', 'SMS_BUDGET_UNAVAILABLE', 'TERMINAL_SESSION_INVALID']) {
+    assert.equal(m.derivePhoneGateState({ ...base, errorCode }), 'phone-sms-unavailable', errorCode)
+  }
+  // 限的是这个号码：换号 / 等冷却能过，仍是 send-limited（主按钮「再试一次发码」）。
+  assert.equal(m.derivePhoneGateState({ ...base, errorCode: 'SMS_DAILY_LIMIT' }), 'phone-send-limited')
+  assert.ok(m.LOGIN_PHONE_STATES.includes('phone-sms-unavailable'))
+  assert.match(m.LOGIN_GATE_COPY['phone-sms-unavailable'].sub, /扫码登录/)
+})
+
 test('login returnTo rejects unsafe query and does not echo it', async () => {
   const m = await loadModule('src/pages/auth/loginGateModel.ts')
   const isSafe = (p) => p.startsWith('/') && !p.startsWith('//') && !p.includes('\\') && p !== '/login'
