@@ -24,6 +24,8 @@ const PRINTER_ADVICE: Readonly<Record<string, string>> = {
   paper_empty: '补充 A4 纸。',
   not_found: '确认打印机驱动已安装，终端配置里的打印机名称与驱动一致。',
   unknown: '驱动没有返回状态；持续出现时重启 Terminal Agent 或检查打印机驱动。',
+  queue_cleanup_failed: '请到机器前看打印机和 Windows 打印队列，恢复后会自动解除。',
+  queue_pause_failed: '请到机器前看打印机和 Windows 打印队列，恢复后会自动解除。',
 }
 
 /** 终端离线时，除 Agent 一项外都给这句：离线前的上报不代表现状，先恢复连接再看。 */
