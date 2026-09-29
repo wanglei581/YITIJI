@@ -345,7 +345,11 @@ export function PartnerAccountManager({
               )}
               {actionsUnavailable && (
                 <p className="basis-full rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
-                  该账号安全验证未就绪；如原已验证手机可用，请由持有人通过手机找回密码，否则只能走独立线下核验，本系统不提供管理员绕过。
+                  {registration.pending
+                    ? '已登记联系人手机，等机构本人在机构后台登录页点「忘记密码」完成自证。'
+                    : registration.visible
+                      ? '该账号还没有可用的验证手机。请先线下核对机构盖章确认函，再用「登记手机号」登记联系人手机；之后由机构本人在登录页点「忘记密码」完成自证。管理员不能代收验证码。'
+                      : '该账号安全验证未就绪，请由持有人用已验证的手机在机构后台登录页点「忘记密码」找回。'}
                 </p>
               )}
               {isLastEnabledAccount && (
