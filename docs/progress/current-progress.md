@@ -98,6 +98,12 @@
 - **修法（Claude 子代理实现，因本会话钩子不许写别的工作目录，子代理产出补丁、协调方在自己的工作目录应用）：** 新增共用 `common/prisma/serialization-conflict.ts`，六处只改「认不认得出」，重试次数、退避与对外错误码逐处不变。
 - **验证：** `verify:pg-serialization-conflict`（单元 + 静态扫描，进 CI 两作业）；`verify:pg-serialization-conflict:postgres`（屏障把冲突确定落在 COMMIT，真 PG 并发删机构账号，进 postgres-readiness）；首位管理员 PG 用例补屏障用例。子代理真 PG 上旧代码红、修复后两条 PG 用例各连跑 8 次全绿，7 类变异全红。协调方在 SQLite 独立复跑 10 条关联门禁全绿，变异「admin-orgs 改回只认 P2034」静态扫描点名变红。
 - **没做：** 发布观察的 createPlan / report 两个事务本来就不 catch（P2034 也原样 500），要不要回 409 另议；死锁 40P01 未纳入。
+## 2026-09-29：后端排雷新增错误码的一体机人话与覆盖门禁（分支 `claude/backend-hardening-20260929-kiosk-error-coverage`）
+
+- **分工（总指挥 9/29）：** 谁新增的错误码，谁补各端文案；一体机码表由后端窗口维护（取件码那组归主执行窗口的 `verify:pickup-claim-error-coverage`），后台码表归两个后台窗口，小程序码与建议文案发小程序窗口。
+- **做了什么：** 账号码表补 `REBIND_UNAVAILABLE`、`ACCOUNT_UNAVAILABLE` 与三个短信额度码（`SMS_DAILY_TOTAL_LIMIT`、`SMS_TERMINAL_DAILY_LIMIT`、`SMS_BUDGET_UNAVAILABLE`，都给出「或用手机扫码登录」的下一步）；共享码表补 `AI_ENDPOINT_NOT_ALLOWED`。换绑遇到 `REBIND_UNAVAILABLE`（503，手机号没改、登录仍有效）改为「从旧号重来」，不再让人重新登录核对。
+- **门禁：** 新增 `verify:backend-error-copy-coverage`（进 CI）：用语法树从服务端换绑与短信额度源码抽出全部错误码、真编译一体机模块逐个调用，必须拿到登记的话而不是兜底；AI 类码清单在服务端源码出现即要求有映射，所以未合入 PR（#1077、#1081、#1088）的码合入后自动纳入。临时取入这两个 PR 的服务端文件做阳性对照，新码都被检查到并通过。`fusion-w5` 换绑失败表加 `REBIND_UNAVAILABLE` 一行，真页面 7 条换绑用例全过。
+- **变异：** 删 `SMS_TERMINAL_DAILY_LIMIT` 文案、删 `ACCOUNT_UNAVAILABLE` 文案 → 覆盖门禁红；换绑 503 改回重新登录 → 真页面用例红（找不到「重新验证旧手机号」）。一体机 tsc、lint、runtime-error-boundary、pickup-claim-error-coverage、w4-login-profile-l1、no-raw-error-render、5 个相关 node 测试（56 条）全绿。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 
