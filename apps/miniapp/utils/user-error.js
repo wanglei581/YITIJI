@@ -96,6 +96,13 @@ const PASSTHROUGH_MESSAGE_CODES = [
   'SMS_CODE_INVALID',            // 验证码不正确，请重新输入
   'SMS_TOO_FREQUENT',            // 验证码发送过于频繁,请 60 秒后再试
   'SMS_SEND_FAILED',             // 短信发送失败，请稍后再试
+  // 发送量限制（走查 9/29：此前不在放行表，一律显示成笼统的「发送失败」，用户不知道要等多久）
+  'SMS_IP_LIMIT',                // 当前网络请求过于频繁,请稍后再试
+  'SMS_DAILY_LIMIT',             // 今日验证码请求次数过多,请明天再试
+  'SMS_DEVICE_LIMIT',            // 当前设备请求过于频繁,请稍后再试
+  'SMS_DAILY_TOTAL_LIMIT',       // 今天的短信验证码发送量已达上限，请明天再试
+  'SMS_TERMINAL_DAILY_LIMIT',    // 这台机器今天发出的短信验证码已达上限，请明天再试
+  'SMS_BUDGET_UNAVAILABLE',      // 短信发送量暂时无法核对……先暂停发送，请稍后再试
   'WX_CONFIG_MISSING',           // 微信小程序登录暂不可用，请使用短信验证码登录
   'WX_CODE_INVALID',             // 微信登录凭证无效或已过期，请重试
   'WX_CODE2SESSION_FAILED',      // 微信登录服务异常，请稍后再试
