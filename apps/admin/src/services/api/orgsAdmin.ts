@@ -15,6 +15,19 @@ import {
   contentTrustSubmitBlock,
   type OrgContentTrustStatus,
 } from '../../routes/partners/contentTrustRules'
+import {
+  registerPartnerContactPhone as postPartnerContactPhone,
+  type RegisterPartnerContactPhoneInput,
+  type RegisterPartnerContactPhoneResponse,
+} from './registerPartnerContactPhone'
+
+export {
+  registerPartnerContactPhone,
+  contactPhoneRegistrationFieldError,
+  type RegisterPartnerContactPhoneInput,
+  type RegisterPartnerContactPhoneResponse,
+  type RegisterPartnerContactPhoneResult,
+} from './registerPartnerContactPhone'
 
 // ─── 类型(契约 = services/api AdminOrgsService 返回形状)───────────────────
 
@@ -29,6 +42,16 @@ export interface AdminOrgAccount {
   emailVerifiedAt: string | null
   emailVerifyMethod: string | null
   availableActionVerificationMethods: PartnerAccountVerificationMethod[]
+  /**
+   * 账号列表目前不返回（admin-org-account-view 查了但没映射出来）。
+   * 有值时登记按钮才按 temporary / owner_managed / legacy 区分。
+   */
+  passwordProofState?: 'temporary' | 'owner_managed' | 'legacy' | null
+  /**
+   * 账号列表目前不返回。有值表示联系人手机已登记、本人尚未自证。
+   * 不要用 phoneMasked 代替：创建账号时登录手机就会被脱敏展示。
+   */
+  contactPhoneRegisteredAt?: string | null
   createdAt: string
 }
 
@@ -196,6 +219,11 @@ export interface OrgsAdminServiceInterface {
     signal?: AbortSignal,
   ): Promise<void>
   revokePhoneRebindTicket(orgId: string, accountId: string, rebindTicket: string): Promise<void>
+  registerPartnerContactPhone(
+    orgId: string,
+    accountId: string,
+    body: RegisterPartnerContactPhoneInput,
+  ): Promise<RegisterPartnerContactPhoneResponse>
 }
 
 // ─── HTTP adapter ─────────────────────────────────────────────────────────────
@@ -312,6 +340,7 @@ const httpAdapter: OrgsAdminServiceInterface = {
       headers: { 'X-Phone-Rebind-Ticket': rebindTicket },
     })
   },
+  registerPartnerContactPhone: (orgId, accountId, body) => postPartnerContactPhone(orgId, accountId, body),
 }
 
 // ─── Mock adapter(内存可变,演示用)─────────────────────────────────────────
@@ -614,6 +643,7 @@ const mockAdapter: OrgsAdminServiceInterface = {
     const ticket = mockRebindTickets.get(rebindTicket)
     if (ticket?.orgId === orgId && ticket.accountId === accountId) mockRebindTickets.delete(rebindTicket)
   },
+  registerPartnerContactPhone: (orgId, accountId, body) => postPartnerContactPhone(orgId, accountId, body),
 }
 
 // ─── Facade ───────────────────────────────────────────────────────────────────
