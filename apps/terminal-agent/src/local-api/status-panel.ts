@@ -18,6 +18,8 @@ const printerLabels: Record<LocalAgentPanelStatus['printerStatus'], string> = {
   low_paper: '打印纸不足',
   paper_empty: '打印机缺纸',
   unknown: '打印机状态待确认',
+  queue_cleanup_failed: '开机清理失败，暂停接打印单',
+  queue_pause_failed: '暂停队列失败，暂停接打印单',
 }
 
 const scanLabels: Record<LocalAgentPanelStatus['scanInputReason'], string> = {

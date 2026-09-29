@@ -157,7 +157,15 @@ export interface AgentConfig {
 // ── Heartbeat ────────────────────────────────────────────────────────────────
 
 export type TerminalStatus = 'online' | 'offline' | 'error' | 'agent_degraded'
-export type PrinterStatus = 'ready' | 'offline' | 'error' | 'low_paper' | 'paper_empty' | 'unknown'
+export type PrinterStatus =
+  | 'ready'
+  | 'offline'
+  | 'error'
+  | 'low_paper'
+  | 'paper_empty'
+  | 'unknown'
+  | 'queue_cleanup_failed'
+  | 'queue_pause_failed'
 
 export interface HeartbeatPayload {
   status: TerminalStatus

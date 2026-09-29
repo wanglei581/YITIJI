@@ -43,7 +43,10 @@ import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { print } from '../printer/print'
 import { cleanupStaleOwnPrintJobs, pauseConfiguredPrinterQueue, resumeConfiguredPrinterQueue } from './print-queue-hold'
-import { claimPrintTasksIfGateOpen, pauseQueueAfterTerminalState } from './print-dispatch-gate'
+import { claimPrintTasksIfGateOpen, preparePrinterForDispatch, settlePrinterAfterTerminal } from './print-dispatch-gate'
+import { computeMonitorTimeoutMs } from './print-monitor-timeout'
+
+export { computeMonitorTimeoutMs }
 import { monitorPrintJob } from './print-job-monitor'
 import { getPrinterPreflight, type PrinterPreflight } from './wmi'
 
@@ -123,18 +126,6 @@ export async function downloadWithRetry(
     }
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError))
-}
-
-/**
- * AGT-02：出纸监控窗口按 页数 × 份数 放大。SumatraPDF 在 spool 完成即退出，多页多份
- * 任务的 despool 时间全部落在监控窗口里；固定 30s 会把正常长任务判成 PRINT_JOB_UNCONFIRMED，
- * 用户重下单就重复出纸。基线 30s + 每面 3s，封顶 5 分钟（服务端 printing 超时 10 分钟，须大于此上限）。
- */
-export function computeMonitorTimeoutMs(billablePages: number | undefined, copies: number | undefined): number {
-  const pages = Number.isFinite(billablePages) && (billablePages as number) > 0 ? Math.floor(billablePages as number) : 1
-  const copyCount = Number.isFinite(copies) && (copies as number) > 0 ? Math.floor(copies as number) : 1
-  const sheets = pages * copyCount
-  return Math.min(5 * 60_000, 30_000 + sheets * 3_000)
 }
 
 /**
@@ -319,14 +310,17 @@ export async function executeTask(
 
   // Define patch helper early so it's available in both Step 0 (spooled reconcile)
   // and the main execution path below.
-  const patch = (status: ReportableStatus, errorCode?: string, errorMessage?: string) =>
-    patchStatus(
+  let terminalOutcome: 'failed' | 'completed' | 'open' = 'open'
+  const patch = (status: ReportableStatus, errorCode?: string, errorMessage?: string) => {
+    if (status === 'failed' || status === 'completed') terminalOutcome = status
+    return patchStatus(
       task.taskId,
       { status, ...(errorCode ? { errorCode } : {}), ...(errorMessage ? { errorMessage } : {}) },
       apiBaseUrl,
       agentToken,
       terminalId,
     )
+  }
 
   // ── Step 0: Idempotency check ─────────────────────────────────────────────
   if (isTaskDone(db, task.taskId)) {
@@ -360,6 +354,12 @@ export async function executeTask(
       const ok = await patch('failed', 'LOCAL_TASK_STATE_UNKNOWN', msg)
       if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'LOCAL_TASK_STATE_UNKNOWN', errorMessage: msg })
     }
+    await settlePrinterAfterTerminal({
+      outcome: terminalOutcome,
+      pauseAgain: false,
+      removeOwnJobs: async () => { await cleanupStaleOwnPrintJobs({ printerName }) },
+      pause: async () => undefined,
+    })
     return
   }
 
@@ -475,31 +475,27 @@ export async function executeTask(
     }
 
     // 领取与监控串行（inFlight，maxTasks 为 1）。恢复只包住这一单的 print() 与队列监控。
-    if (config.holdPrinterQueueWhenIdle) {
+    // 派发前先删本进程 SID 的残留，再按空闲暂停开关决定要不要恢复队列。
+    const prepared = await preparePrinterForDispatch({
+      holdEnabled: config.holdPrinterQueueWhenIdle === true,
+      removeOwnJobs: async () => { await cleanupStaleOwnPrintJobs({ printerName }) },
+      resume: async () => { await resumeConfiguredPrinterQueue(printerName) },
+    })
+    if (prepared !== 'ready') {
+      const msg = prepared === 'cleanup-failed'
+        ? '打印队列里的残留作业没能删除，本次没有送去打印'
+        : '打印队列没能恢复，本次没有送去打印'
+      err(`task ${task.taskId}: ${msg}`)
       try {
-        await resumeConfiguredPrinterQueue(printerName)
-        releaseQueueAfterTerminalState = true
-      } catch {
-        const msg = '打印队列没能恢复，本次没有送去打印'
-        err(`task ${task.taskId}: ${msg}`)
-        try {
-          markTaskDone(db, task.taskId, 'failed')
-        } catch (dbErr) {
-          err(
-            `task ${task.taskId}: failed to record failed in local DB — ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`,
-          )
-        }
-        const ok = await patch('failed', 'PRINT_COMMAND_FAILED', msg)
-        if (!ok) {
-          enqueuePatch(db, task.taskId, {
-            status: 'failed',
-            errorCode: 'PRINT_COMMAND_FAILED',
-            errorMessage: msg,
-          })
-        }
-        return
+        markTaskDone(db, task.taskId, 'failed')
+      } catch (dbErr) {
+        err(`task ${task.taskId}: failed to record failed in local DB — ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`)
       }
+      const ok = await patch('failed', 'PRINT_COMMAND_FAILED', msg)
+      if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED', errorMessage: msg })
+      return
     }
+    if (config.holdPrinterQueueWhenIdle) releaseQueueAfterTerminalState = true
 
     const result = await print(
       tempFilePath,
@@ -543,7 +539,7 @@ export async function executeTask(
       // Ambiguous outcomes (timeout / never observed / monitor unavailable) fail
       // closed. Only an explicit spooler completion or an observed job followed
       // by queue removal may reach the server as completed.
-      const monitorTimeoutMs = computeMonitorTimeoutMs(task.billablePages, task.params?.copies)
+      const monitorTimeoutMs = computeMonitorTimeoutMs(task.billablePages, task.params?.copies, task.params)
       log(`task ${task.taskId}: monitoring print queue for up to ${monitorTimeoutMs / 1000}s (pages=${task.billablePages ?? '?'} copies=${task.params?.copies ?? 1})`)
       const monitorOutcome = await monitorPrintJob(
         resolvedPrinter,
@@ -617,12 +613,15 @@ export async function executeTask(
       }
     }
   } finally {
-    if (releaseQueueAfterTerminalState) {
-      await pauseQueueAfterTerminalState(async () => {
+    await settlePrinterAfterTerminal({
+      outcome: terminalOutcome,
+      pauseAgain: releaseQueueAfterTerminalState,
+      removeOwnJobs: async () => { await cleanupStaleOwnPrintJobs({ printerName }) },
+      pause: async () => {
         const paused = await pauseConfiguredPrinterQueue(printerName)
         if (!paused.skipped) log('print-queue-hold: queue paused after terminal state')
-      })
-    }
+      },
+    })
     // ── Always clean up temp file ─────────────────────────────────────────
     if (fs.existsSync(tempFilePath)) {
       try {

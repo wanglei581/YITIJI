@@ -5,6 +5,8 @@ import { spawnSync } from 'node:child_process'
 import { monitorPrintJob } from '../src/agent/task-runner'
 import {
   buildPrintServiceCompletionEventScript,
+  buildWin32PrinterProbeScript,
+  configuredPrinterNameMatches,
   mapWin32PrinterPreflight,
   mapWin32PrinterQuery,
   parsePrintJobStatus,
@@ -445,6 +447,15 @@ async function main(): Promise<void> {
       assert.match(serverAvailability, /UNAVAILABLE_PRINTER_STATUSES = new Set\(\[[^\]]*'paper_empty'/, 'server must refuse new orders on paper_empty')
       assert.match(serverAlerts, /paper_empty: '打印机缺纸'/, 'server alert must label paper_empty')
       assert.match(kioskStatus, /case 'paper_empty':/, 'kiosk must map paper_empty to its own view')
+      const trickyName = "\\\\srv\\Pan'tum"
+      assert.equal(configuredPrinterNameMatches(trickyName, trickyName), true)
+      assert.equal(configuredPrinterNameMatches(trickyName, "\\\\srv\\Pantum"), false)
+      assert.equal(configuredPrinterNameMatches("' OR $_.Name -eq 'other", 'other'), false)
+      const probe = buildWin32PrinterProbeScript()
+      assert.equal(probe.includes(trickyName), false)
+      assert.doesNotMatch(probe, /-Filter\b/)
+      assert.doesNotMatch(probe, /\$name\s*\+/)
+      assert.match(probe, /\.Name -eq \$name/)
     } catch (error) {
       failures.push(`paper_empty contract: ${error instanceof Error ? error.message : String(error)}`)
     }

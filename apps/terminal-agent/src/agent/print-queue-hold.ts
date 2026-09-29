@@ -19,7 +19,9 @@
  * 不把名字拼进 WQL 过滤字符串（反斜杠和引号会把过滤条件弄断）。
  *
  * 领取是串行的。恢复队列只包住当前这一单的打印和监控。
- * 日志只记数量和阶段，不记文档名、打印机名、账号。非 Windows 安全空转，不抛错。
+ * 同一删除还用在两处：任务失败终态（再暂停之前），以及每次派发前（恢复队列之前）。
+ * 这两处都不看空闲暂停开没开。日志只记数量和阶段，不记文档名、打印机名、账号。
+ * 非 Windows 安全空转，不抛错。
  */
 
 import { spawn } from 'child_process'
@@ -300,8 +302,10 @@ export async function cleanupStaleOwnPrintJobs(options: {
   if (process.platform !== 'win32') return { removed: 0, skipped: true }
   const listed = await listConfiguredPrintJobs(options.printerName)
   const ids = selectOwnPrintJobIds(listed.jobs)
-  if (ids.length === 0) return { removed: 0, skipped: false }
-  await removePrintJobs(options.printerName, ids)
-  log(`print-queue-cleanup: removed leftover print jobs (count=${ids.length})`)
+  if (ids.length > 0) {
+    await removePrintJobs(options.printerName, ids)
+    log(`print-queue-cleanup: removed leftover print jobs (count=${ids.length})`)
+  }
+  log(`print-queue-cleanup: matched by SID (count=${ids.length})`)
   return { removed: ids.length, skipped: false }
 }

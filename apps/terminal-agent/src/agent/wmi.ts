@@ -130,6 +130,11 @@ export function buildWin32PrinterProbeScript(): string {
   )
 }
 
+/** 配置名与枚举名按原文字符比较。名字里的反斜杠和引号不进入 WQL。 */
+export function configuredPrinterNameMatches(candidate: string, configured: string): boolean {
+  return candidate === configured
+}
+
 export async function queryWin32PrinterLine(printerName: string): Promise<string | null> {
   if (process.platform !== 'win32') return null
   return runPowerShell(buildWin32PrinterProbeScript(), printerName)

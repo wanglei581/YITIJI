@@ -19,9 +19,11 @@ import type { PrismaService } from '../prisma/prisma.service'
 export const TERMINAL_ONLINE_WINDOW_MS = 5 * 60 * 1000
 export const PRINTER_ONLINE_WINDOW_MS = TERMINAL_ONLINE_WINDOW_MS
 
-/** Agent 心跳 printerStatus 枚举里，明确不能出纸的取值。unknown 不在其中：
- *  驱动查询失败或未配置时是 unknown，由 Kiosk 端 fail-closed 展示，这里不重复拦。 */
-export const UNAVAILABLE_PRINTER_STATUSES = new Set(['offline', 'error', 'paper_empty'])
+/** Agent 心跳 printerStatus 里，明确不能出纸的取值。unknown 不在其中：
+ *  驱动查询失败或未配置时是 unknown，由 Kiosk 端 fail-closed 展示，这里不重复拦。
+ *  queue_cleanup_failed / queue_pause_failed 是 Agent 清残留或暂停队列失败，
+ *  闸门已停领新单，服务端同样不接新打印单。 */
+export const UNAVAILABLE_PRINTER_STATUSES = new Set(['offline', 'error', 'paper_empty', 'queue_cleanup_failed', 'queue_pause_failed'])
 
 export function printerOnlineRequired(env: NodeJS.ProcessEnv = process.env): boolean {
   return env['PRINT_REQUIRE_PRINTER_ONLINE'] === 'true'

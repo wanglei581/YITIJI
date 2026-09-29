@@ -19,6 +19,7 @@ import { registerOrLoad } from './agent/registration'
 import { sendHeartbeat, startHeartbeat } from './agent/heartbeat'
 import { startScanWatcher } from './agent/scan-watcher'
 import { startTaskRunner } from './agent/task-runner'
+import { runAgentBoot } from './agent/boot-print-queue-order'
 import type { AgentConfig } from './agent/types'
 import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/qr-login-server'
 import type { LocalAgentPanelStatus } from './local-api/types'
@@ -72,72 +73,17 @@ program
     // ── Safety-net: release lock on any exit (including process.exit()) ───
     process.on('exit', releaseLock)
 
-    // ── Step 1: Single-instance lock ──────────────────────────────────────
-    await acquireLock()
-
-    // ── Step 2: Open SQLite (task state + offline PATCH queue) ────────────
-    const db: AgentDatabase = openDatabase()
-    const localTaskDatabaseAvailable = isDatabaseAvailable(db)
-
-    // ── Step 3: Load config (includes Phase 8.1B → 8.1C migration) ───────
-    let config: AgentConfig
-    try {
-      config = loadConfig()
-    } catch (error) {
-      failStartup(error, 'AGENT_STARTUP_FAILED')
-    }
-    log(`config loaded — terminal="${config.terminalCode}"  api=${config.apiBaseUrl}`)
-    try {
-      assertAgentProfileAllowsApiBaseUrl(config)
-    } catch (error) {
-      failStartup(error, 'AGENT_PROFILE_REJECTED')
-    }
-
     // 三项开机清理各自独立：任何一项抛错，另外两项仍执行。配置没加载成功时这三项都还没跑。
     // W-85 失败仍让进程退出。队列暂停或残留作业清理失败不退出：心跳、本机接口、扫描照常，
     // 但打印领取闸门关上，直到后续领取周期重试成功。
     // 旧遗留是历史垃圾，删除失败只记日志，不拒绝启动。
+    // 运行时顺序由 runAgentBoot 保证：拿到单实例锁之后、第一次领取之前做队列清理。
+    let db!: AgentDatabase
+    let config!: AgentConfig
+    let localTaskDatabaseAvailable = false
     let printTempCleanupError: unknown = null
-    try {
-      cleanupCrashLeftoverPrintTaskTemps()
-    } catch (error) {
-      printTempCleanupError = error
-      err(
-        'AGENT_STARTUP_FAILED: leftover print task temp files could not be removed; refusing to claim new work after the other startup cleanups.',
-      )
-    }
-
     let printQueueCleanupError: unknown = null
-    try {
-      // 上一进程若在「已恢复、还没再暂停」时崩溃，队列可能仍在跑。
-      // 先暂停，再删本进程账号留在这台打印机上的作业。清理不看提交时间，也不看 hold 开关。
-      // 非 Windows 两步都空转，不因此拒绝启动。
-      if (config.holdPrinterQueueWhenIdle) {
-        const paused = await pauseConfiguredPrinterQueue(config.printerName)
-        if (!paused.skipped) log('print-queue-hold: idle queue paused')
-      }
-      await cleanupStaleOwnPrintJobs({ printerName: config.printerName })
-    } catch (error) {
-      printQueueCleanupError = error
-      err(
-        'print-queue-hold: printer queue could not be paused or leftover jobs removed; print claims stay blocked until a later cycle recovers.',
-      )
-    }
-
-    try {
-      cleanupKnownLegacyResidue()
-    } catch {
-      err('legacy-residue-cleanup: failed; startup continues.')
-    }
-
-    if (printTempCleanupError) failStartup(printTempCleanupError, 'AGENT_STARTUP_FAILED')
-    if (printQueueCleanupError) {
-      noteStartupPrintQueueFailure()
-    }
-
-    // Start the loopback API before cloud registration so the watchdog and
-    // Kiosk can obtain identity immediately and receive retryable 503s while
-    // registration/heartbeat are still recovering.
+    let startupQueueFailure: 'pause' | 'cleanup' = 'cleanup'
     let panelCloudConnected = false
     let panelLastHeartbeatAt: string | null = null
     let panelPrinterStatus: LocalAgentPanelStatus['printerStatus'] = 'unknown'
@@ -148,7 +94,73 @@ program
       status: 'unconfigured',
       reason: 'not_configured',
     }
-    try {
+    let offlineRetryTimer: NodeJS.Timeout | null = null
+    let scanDeletionAuditReporterTimer: NodeJS.Timeout | null = null
+    let scanWatcherHandle: ReturnType<typeof startScanWatcher> | undefined
+
+    await runAgentBoot({
+      acquireLock: async () => {
+        await acquireLock()
+      },
+      afterLock: async () => {
+        db = openDatabase()
+        localTaskDatabaseAvailable = isDatabaseAvailable(db)
+        try {
+          config = loadConfig()
+        } catch (error) {
+          failStartup(error, 'AGENT_STARTUP_FAILED')
+        }
+        log(`config loaded — terminal="${config.terminalCode}"  api=${config.apiBaseUrl}`)
+        try {
+          assertAgentProfileAllowsApiBaseUrl(config)
+        } catch (error) {
+          failStartup(error, 'AGENT_PROFILE_REJECTED')
+        }
+        try {
+          cleanupCrashLeftoverPrintTaskTemps()
+        } catch (error) {
+          printTempCleanupError = error
+          err(
+            'AGENT_STARTUP_FAILED: leftover print task temp files could not be removed; refusing to claim new work after the other startup cleanups.',
+          )
+        }
+      },
+      cleanupOwnPrintJobs: async () => {
+        try {
+          // 上一进程若在「已恢复、还没再暂停」时崩溃，队列可能仍在跑。
+          // 先暂停，再删本进程账号留在这台打印机上的作业。清理不看提交时间，也不看 hold 开关。
+          // 非 Windows 两步都空转，不因此拒绝启动。暂停失败与清理失败分开记，心跳用不同状态。
+          if (config.holdPrinterQueueWhenIdle) {
+            try {
+              const paused = await pauseConfiguredPrinterQueue(config.printerName)
+              if (!paused.skipped) log('print-queue-hold: idle queue paused')
+            } catch (error) {
+              startupQueueFailure = 'pause'
+              throw error
+            }
+          }
+          await cleanupStaleOwnPrintJobs({ printerName: config.printerName })
+        } catch (error) {
+          printQueueCleanupError = error
+          if (startupQueueFailure !== 'pause') startupQueueFailure = 'cleanup'
+          err(
+            'print-queue-hold: printer queue could not be paused or leftover jobs removed; print claims stay blocked until a later cycle recovers.',
+          )
+        }
+      },
+      beforeClaim: async () => {
+        try {
+          cleanupKnownLegacyResidue()
+        } catch {
+          err('legacy-residue-cleanup: failed; startup continues.')
+        }
+
+        if (printTempCleanupError) failStartup(printTempCleanupError, 'AGENT_STARTUP_FAILED')
+        if (printQueueCleanupError) {
+          noteStartupPrintQueueFailure(startupQueueFailure)
+        }
+
+        try {
       qrLocalServer = startQrLoginLocalServer(config, {
         wakePrintQueue: () => taskRunner?.wake() ?? { accepted: false, coalesced: false },
         getPanelStatus: () => ({
@@ -221,20 +233,15 @@ program
     }
     heartbeatTimer = startHeartbeat(heartbeatOptions, false)
     panelScanHealth = inspectScanInputFolder(config.scanWatchFolder)
-    const scanWatcherHandle = startScanWatcher(config)
-
-    // ── Step 6: Start claim / print loop ──────────────────────────────────
+    scanWatcherHandle = startScanWatcher(config)
+      },
+      startClaimLoop: () => {
     taskRunner = startTaskRunner({ config, db })
-
-    // ── Step 7: Start offline PATCH retry loop ────────────────────────────
-    const offlineRetryTimer = startOfflineRetry(config, db)
-
-    // ── Step 8: Report PII-safe expired-scan deletion evidence ────────────
-    const scanDeletionAuditReporterTimer = startScanDeletionAuditReporter(config, db)
+    offlineRetryTimer = startOfflineRetry(config, db)
+    scanDeletionAuditReporterTimer = startScanDeletionAuditReporter(config, db)
 
     log('Agent running. Press Ctrl+C to stop.')
 
-    // ── Graceful shutdown ─────────────────────────────────────────────────
     let shuttingDown = false
     const shutdown = (signal: string) => {
       if (shuttingDown) return
@@ -242,8 +249,8 @@ program
       log(`Agent: received ${signal}, shutting down...`)
       if (heartbeatTimer) clearInterval(heartbeatTimer)
       taskRunner?.stop()
-      clearInterval(offlineRetryTimer)
-      clearInterval(scanDeletionAuditReporterTimer)
+      if (offlineRetryTimer) clearInterval(offlineRetryTimer)
+      if (scanDeletionAuditReporterTimer) clearInterval(scanDeletionAuditReporterTimer)
       void pauseQueueOnProcessStop({
         enabled: config.holdPrinterQueueWhenIdle === true,
         pause: () => pauseConfiguredPrinterQueue(config.printerName),
@@ -263,6 +270,8 @@ program
     process.on('unhandledRejection', (reason) => {
       err(`unhandledRejection: ${String(reason)}`)
       process.exit(1)
+    })
+      },
     })
   })
 

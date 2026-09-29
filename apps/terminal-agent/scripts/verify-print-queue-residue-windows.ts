@@ -11,6 +11,13 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  __resetPrintDispatchGateForTests,
+  claimPrintTasksIfGateOpen,
+  preparePrinterForDispatch,
+  printerStatusForHeartbeat,
+  settlePrinterAfterTerminal,
+} from '../src/agent/print-dispatch-gate'
+import {
   cleanupStaleOwnPrintJobs,
   listConfiguredPrintJobs,
   pauseConfiguredPrinterQueue,
@@ -164,22 +171,45 @@ async function runScenario(): Promise<void> {
   submitOwnJob(PRINTER_B)
   const jobA = await waitForJob(PRINTER_A, (job) => job.ownedByCurrentProcess && job.id !== other.id)
   const jobC = await waitForJob(PRINTER_B, (job) => job.ownedByCurrentProcess)
-  await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A })
+  const currentSid = runPs('[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value').trim()
+  assert.match(currentSid, /^S-1-5-/, 'current process SID must be a Windows SID')
+  assert.equal(jobA.ownedByCurrentProcess, true, 'failed-terminal: current process SID matched the own-account job')
+  assert.equal(other.ownedByCurrentProcess, false, 'failed-terminal: other-account job is not this process SID')
+  __resetPrintDispatchGateForTests()
+  await settlePrinterAfterTerminal({
+    outcome: 'failed',
+    pauseAgain: false,
+    removeOwnJobs: async () => {
+      await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A })
+    },
+    pause: async () => {
+      throw new Error('failed-terminal cleanup must not pause when idle hold is off')
+    },
+  })
   const afterCleanup = await listConfiguredPrintJobs(PRINTER_A)
-  assert.equal(afterCleanup.jobs.some((job) => job.id === jobA.id), false, 'job A must be removed')
-  assert.equal(afterCleanup.jobs.some((job) => job.id === other.id), true, 'other-account job must stay')
+  assert.equal(afterCleanup.jobs.some((job) => job.id === jobA.id), false, 'failed-terminal: own-account job must be removed')
+  assert.equal(afterCleanup.jobs.some((job) => job.id === other.id), true, 'failed-terminal: other-account job must stay')
   const onOtherPrinter = await listConfiguredPrintJobs(PRINTER_B)
-  assert.equal(onOtherPrinter.jobs.some((job) => job.id === jobC.id), true, 'job C on the other printer must stay')
+  assert.equal(onOtherPrinter.jobs.some((job) => job.id === jobC.id), true, 'failed-terminal: job on the other printer must stay')
 
   submitOwnJob(PRINTER_A)
   const jobB = await waitForJob(
     PRINTER_A,
     (job) => job.ownedByCurrentProcess && job.id !== jobA.id && job.id !== other.id,
   )
-  await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A })
+  const prepared = await preparePrinterForDispatch({
+    holdEnabled: false,
+    removeOwnJobs: async () => {
+      await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A })
+    },
+    resume: async () => {
+      throw new Error('pre-dispatch cleanup must not resume when idle hold is off')
+    },
+  })
+  assert.equal(prepared, 'ready', 'pre-dispatch: cleanup of the real queue must succeed')
   const kept = await listConfiguredPrintJobs(PRINTER_A)
-  assert.equal(kept.jobs.some((job) => job.id === jobB.id), false, 'same-account job is removed without a time check')
-  assert.equal(kept.jobs.some((job) => job.id === other.id), true, 'other-account job must still stay')
+  assert.equal(kept.jobs.some((job) => job.id === jobB.id), false, 'pre-dispatch: own-account leftover must be removed')
+  assert.equal(kept.jobs.some((job) => job.id === other.id), true, 'pre-dispatch: other-account job must still stay')
 
   await resumeConfiguredPrinterQueue(PRINTER_A)
   const resumed = await queryWin32PrinterLine(PRINTER_A)
@@ -191,6 +221,34 @@ async function runScenario(): Promise<void> {
   assert.equal(pauseSignal(paused), true, 'idle hold must leave the queue paused')
   assert.equal(mapWin32PrinterQuery(paused), 'ready', 'paused queue must still report ready')
   assert.equal(mapWin32PrinterPreflight(paused), 'ok', 'paused queue must still pass preflight')
+
+  __resetPrintDispatchGateForTests()
+  const missing = await preparePrinterForDispatch({
+    holdEnabled: false,
+    removeOwnJobs: async () => {
+      await cleanupStaleOwnPrintJobs({ printerName: 'AIJobResidueMissing' })
+    },
+    resume: async () => {
+      throw new Error('must not resume after a failed cleanup')
+    },
+  })
+  assert.equal(missing, 'cleanup-failed')
+  assert.equal(printerStatusForHeartbeat('ready'), 'queue_cleanup_failed')
+  let claims = 0
+  await claimPrintTasksIfGateOpen(
+    {
+      holdEnabled: false,
+      pause: async () => undefined,
+      cleanup: async () => {
+        await cleanupStaleOwnPrintJobs({ printerName: 'AIJobResidueMissing' })
+      },
+    },
+    async () => {
+      claims += 1
+    },
+  )
+  assert.equal(claims, 0, 'delete failure must keep the claim gate closed')
+  __resetPrintDispatchGateForTests()
 }
 
 function runSelf(): ReturnType<typeof spawnSync> {
