@@ -386,7 +386,7 @@ async function verifyPrintDispatchGate(): Promise<void> {
 async function verifyInFlightSkipsPreDispatch(): Promise<void> {
   let claims = 0
   let preDispatch = 0
-  let releaseMonitor = () => undefined
+  let releaseMonitor: () => void = () => undefined
   const monitoring = new Promise<void>((resolve) => { releaseMonitor = resolve })
   const control = createTaskRunnerControl({
     intervalMs: 60_000,
