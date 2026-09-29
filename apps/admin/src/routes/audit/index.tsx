@@ -1,3 +1,4 @@
+import { formatDateTime } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState } from 'react'
 import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { ScrollTextIcon, RefreshCwIcon } from 'lucide-react'
@@ -228,7 +229,7 @@ export default function AuditPage() {
                 items.map((r) => (
                   <tr key={r.id} className="hover:bg-neutral-50">
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
-                      {new Date(r.createdAt).toLocaleString('zh-CN')}
+                      {formatDateTime(r.createdAt)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-700">
                       {r.actorId ?? <span className="text-neutral-300">—</span>}

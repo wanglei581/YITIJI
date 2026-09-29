@@ -35,7 +35,11 @@ function load(rel, requireMap) {
 }
 
 const csv = load('src/lib/csv.ts', {})
-const fmt = load('src/routes/terminals/terminalOpsFormat.ts', { '../../lib/csv': csv })
+const shared = load('../../packages/shared/src/formatDateTime.ts', {})
+const fmt = load('src/routes/terminals/terminalOpsFormat.ts', {
+  '../../lib/csv': csv,
+  '@ai-job-print/shared': shared,
+})
 
 const zeroFaults = { offlineCount: 0, offlineMinutes: 0, printerFaultCount: 0, printerFaultMinutes: 0, recoveredCount: 0, avgRecoveryMinutes: null, longestMinutes: null }
 const output = { printed: 0, settled: 0, unconfirmed: 0, successRate: null }
@@ -73,6 +77,7 @@ check('A0 常量是一句说明而不是数字', typeof NOT === 'string' && /没
   check('A1 静默终端导出行写明无法统计', silentLine.includes(NOT), silentLine)
   check('A2 静默终端导出行只在「统计期内有上报」一列写「否」（不说没有未恢复）', (silentLine.match(/"否"/g) ?? []).length === 1 && silentLine.endsWith('"否"'), silentLine)
   check('A3 上报过的终端仍导出真实计数', !reportedLine.includes(NOT) && /"0","0","0","0","0","","","否","是"$/.test(reportedLine), reportedLine)
+  check('A3b 最后心跳走共享北京时间，UTC 08:00 显示为 16:00', reportedLine.includes('2026-09-29 16:00') && !reportedLine.includes('08:00'), reportedLine)
   check('A4 部分静默时合计仍可统计', fmt.totalsFaultsReported(data) === true)
 }
 // 全部静默

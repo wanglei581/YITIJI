@@ -1,10 +1,10 @@
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
 import { FolderIcon } from 'lucide-react'
 import { Pagination } from '../components/DataTable'
 import type { ViewFile } from './fileMeta'
 import {
   CLEAN_MAP,
-  fmtDate,
 } from './fileMeta'
 import {
   assetCategoryLabel,
@@ -102,7 +102,7 @@ export function FileTable({
                       {v.raw.retentionLockedReason && <div className="mt-1 text-error-fg">{v.raw.retentionLockedReason}</div>}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                      {fmtDate(v.raw.retentionConsentAt, '-')}
+                      {formatDateTime(v.raw.retentionConsentAt, { fallback: '-' })}
                       {v.raw.retentionConsentVersion && <div className="mt-1 text-neutral-400">{v.raw.retentionConsentVersion}</div>}
                     </td>
                     <td className="px-4 py-3">

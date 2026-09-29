@@ -152,6 +152,27 @@ export function toDatetimeLocalValue(value: string | Date | null | undefined): s
   return `${parts.dateKey}T${pad(parts.hour)}:${pad(parts.minute)}`
 }
 
+/**
+ * 相对时间。无效值走 fallback；未来时间不写成负数，改展示完整北京时间。
+ * 悬停全文仍由调用方把 title 设为 formatDateTime。
+ */
+export function formatRelativeTime(
+  value: string | Date | null | undefined,
+  now: Date = new Date(),
+  fallback = '—',
+): string {
+  const instant = parseInstant(value)
+  if (!instant) return fallback
+  const diff = now.getTime() - instant.getTime()
+  if (diff < 0) return formatDateTime(instant)
+  if (diff < 60_000) return '刚刚'
+  const minutes = Math.floor(diff / 60_000)
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  return `${Math.floor(hours / 24)} 天前`
+}
+
 /** 把 datetime-local 墙钟按 Asia/Shanghai 解释成 ISO（含 Z）。 */
 export function fromDatetimeLocalValue(value: string): string {
   const trimmed = value.trim()

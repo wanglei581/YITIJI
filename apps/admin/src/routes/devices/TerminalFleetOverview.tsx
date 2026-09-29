@@ -1,4 +1,5 @@
 import { useRefreshable } from '@ai-job-print/refresh'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, StatusBadge } from '@ai-job-print/ui'
 import { AlertTriangleIcon, RefreshCwIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -54,9 +55,7 @@ type FleetConfig = DeviceFleetTerminal['config'][keyof DeviceFleetTerminal['conf
 
 function formatTime(value: string | null): string {
   if (!value) return '从未'
-  const time = new Date(value)
-  if (Number.isNaN(time.getTime())) return '无效时间'
-  return time.toLocaleString('zh-CN', { hour12: false })
+  return formatDateTime(value, { fallback: '无效时间' })
 }
 
 function configStatus(config: FleetConfig): string {

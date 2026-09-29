@@ -1,3 +1,4 @@
+import { formatDateTime } from '@ai-job-print/shared'
 import { useState } from 'react'
 import { mergeById, useRefreshable } from '@ai-job-print/refresh'
 import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
@@ -254,7 +255,7 @@ export default function PrintersPage() {
                       <td className="px-4 py-3 text-xs">
                         <FaultCell printer={p} />
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-neutral-500">{relativeTime(p.lastSyncAt)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-neutral-500" title={p.lastSyncAt ? formatDateTime(p.lastSyncAt) : undefined}>{relativeTime(p.lastSyncAt)}</td>
                     </tr>
                   )
                 })

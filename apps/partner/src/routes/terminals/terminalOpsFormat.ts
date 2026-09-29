@@ -1,5 +1,6 @@
 // 终端数据页的文案与格式化。所有数字都来自服务端，这里只决定怎么说。
 
+import { formatDate, formatDateTime } from '@ai-job-print/shared'
 import { buildCsv } from '../../lib/csv'
 import type {
   PartnerTerminalOpsView,
@@ -45,32 +46,13 @@ export function minutesText(minutes: number | null): string {
   return `${Math.floor(hours / 24)} 天 ${hours % 24} 小时`
 }
 
-const SH_DATE_TIME = new Intl.DateTimeFormat('zh-CN', {
-  timeZone: 'Asia/Shanghai',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
-
-const SH_DATE = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Shanghai',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-})
-
 export function shanghaiDateTime(iso: string | null): string {
   if (!iso) return '—'
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '—' : SH_DATE_TIME.format(date)
+  return formatDateTime(iso)
 }
 
 export function shanghaiDate(iso: string): string {
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '' : SH_DATE.format(date)
+  return formatDate(iso, '')
 }
 
 export function windowText(data: PartnerTerminalOpsView): string {

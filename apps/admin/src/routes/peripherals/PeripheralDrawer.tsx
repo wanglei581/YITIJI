@@ -1,11 +1,11 @@
+import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer, StatusBadge } from '@ai-job-print/ui'
 import type { AdminTerminalRecord } from '../../services/api/devices'
 import { UNREPORTED_PERIPHERALS, peripheralItems } from './peripheralViews'
 
 function timeText(iso: string | null): string {
   if (!iso) return '无记录'
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '无记录' : date.toLocaleString('zh-CN', { hour12: false })
+  return formatDateTime(iso, { fallback: '无记录' })
 }
 
 export function PeripheralDrawer({ terminal, onClose }: { terminal: AdminTerminalRecord | null; onClose: () => void }) {

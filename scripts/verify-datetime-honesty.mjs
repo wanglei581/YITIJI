@@ -17,11 +17,18 @@ import { dirname, extname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   formatDateTime,
+  formatRelativeTime,
   fromDatetimeLocalValue,
   isParseableInstant,
   parseInstant,
   toDatetimeLocalValue,
 } from '../packages/shared/src/formatDateTime.ts'
+import {
+  formatCents,
+  formatCount,
+  formatPercent,
+  formatYuan,
+} from '../packages/shared/src/formatNumber.ts'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -185,6 +192,101 @@ if (!hasDateFn) {
   fail('sourceTrust.hasDate 必须走 parseInstant，不得再用 new Date(无时区串)（Safari Invalid Date 会停用外跳）')
 } else {
   pass('sourceTrust.hasDate 走 isParseableInstant，Safari 不再因空格 UTC 串误判缺失')
+}
+
+console.log('\n── D. 两后台时间显示不走本地时区 ──────────────────────────────')
+
+const CONSOLE_DIRS = [
+  { dir: 'apps/admin/src', exts: ['.ts', '.tsx'] },
+  { dir: 'apps/partner/src', exts: ['.ts', '.tsx'] },
+]
+const LOCAL_TIME_RULES = [
+  { label: 'toLocaleDateString(', pattern: /toLocaleDateString\s*\(/ },
+  { label: 'toLocaleTimeString(', pattern: /toLocaleTimeString\s*\(/ },
+  { label: 'new Date(...).toLocaleString(', pattern: /new Date\([^)\n]*\)\.toLocaleString\s*\(/ },
+  { label: 'toLocaleString(locale, options)', pattern: /toLocaleString\s*\(\s*['"][^'"]*['"]\s*,/ },
+  { label: '.slice(0, 10) 截 ISO 当日期', pattern: /\.slice\s*\(\s*0\s*,\s*10\s*\)/ },
+]
+
+function intlConstructors(source) {
+  const found = []
+  const re = /new Intl\.DateTimeFormat\s*\(/g
+  let match
+  while ((match = re.exec(source))) {
+    let index = match.index + match[0].length
+    let depth = 1
+    while (index < source.length && depth > 0) {
+      const ch = source[index]
+      if (ch === '(') depth += 1
+      else if (ch === ')') depth -= 1
+      index += 1
+    }
+    found.push(source.slice(match.index, index))
+  }
+  return found
+}
+
+let consoleFiles = 0
+const localHits = []
+for (const spec of CONSOLE_DIRS) {
+  const files = walk(join(repoRoot, spec.dir), spec.exts)
+  if (files.length === 0) {
+    fail(`${spec.dir} 扫描到 0 个文件（门禁失效）`)
+    continue
+  }
+  consoleFiles += files.length
+  for (const file of files) {
+    const stripped = stripComments(readFileSync(file, 'utf8'))
+    const rel = relative(repoRoot, file)
+    for (const rule of LOCAL_TIME_RULES) {
+      if (rule.pattern.test(stripped)) localHits.push(`${rel} · ${rule.label}`)
+    }
+    for (const ctor of intlConstructors(stripped)) {
+      if (!/timeZone\s*:/.test(ctor)) localHits.push(`${rel} · Intl.DateTimeFormat 未指定 timeZone`)
+    }
+  }
+}
+if (localHits.length === 0) {
+  pass(`管理员与合作机构 ${consoleFiles} 个文件无本地时区时间显示（数字 toLocaleString 仍允许）`)
+} else {
+  for (const hit of localHits) fail(hit)
+}
+
+console.log('\n── E. 相对时间、金额、数量、百分比 ────────────────────────────')
+
+const relativeNow = new Date('2026-06-20T01:03:00.000Z')
+const relativeGot = formatRelativeTime('2026-06-20T01:00:00.000Z', relativeNow)
+if (relativeGot === '3 分钟前') pass(`formatRelativeTime → ${relativeGot}`)
+else fail(`formatRelativeTime 得到 ${relativeGot}，期望 3 分钟前`)
+
+const futureGot = formatRelativeTime('2026-06-20T02:00:00.000Z', relativeNow)
+if (futureGot === '2026-06-20 10:00') pass(`未来时间改为完整北京时间 ${futureGot}`)
+else fail(`未来相对时间得到 ${futureGot}，期望 2026-06-20 10:00`)
+
+if (formatYuan(1234.5) === '¥1,234.50' && formatYuan(0) === '¥0.00' && formatYuan(-2) === '-¥2.00') {
+  pass('formatYuan 两位小数、千分位、¥')
+} else {
+  fail(`formatYuan 异常：${formatYuan(1234.5)} / ${formatYuan(0)} / ${formatYuan(-2)}`)
+}
+if (formatCents(199) === '¥1.99' && formatCents(123456) === '¥1,234.56') {
+  pass('formatCents 分转元')
+} else {
+  fail(`formatCents 异常：${formatCents(199)} / ${formatCents(123456)}`)
+}
+if (formatCount(1234567) === '1,234,567' && formatCount(12.9) === '12') {
+  pass('formatCount 千分位并向零取整')
+} else {
+  fail(`formatCount 异常：${formatCount(1234567)} / ${formatCount(12.9)}`)
+}
+if (formatPercent(1, 3) === '33.3%' && formatPercent(1, 2) === '50.0%') {
+  pass('formatPercent 一位小数')
+} else {
+  fail(`formatPercent 异常：${formatPercent(1, 3)} / ${formatPercent(1, 2)}`)
+}
+if (formatPercent(5, 0) === '—' && formatPercent(5, 0, '暂无') === '暂无') {
+  pass('分母为 0 时不给百分比')
+} else {
+  fail(`分母为 0 得到 ${formatPercent(5, 0)} / ${formatPercent(5, 0, '暂无')}`)
 }
 
 if (failures > 0) {

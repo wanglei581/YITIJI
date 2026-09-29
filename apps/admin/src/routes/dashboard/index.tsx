@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime, formatTime } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState, type ElementType, type ReactNode } from 'react'
 import { ErrorState, LoadingState, Meter, SectionCard, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
@@ -69,6 +70,7 @@ interface TodoRow {
   href: string
   actionLabel: string
   warn?: boolean
+  timeTitle?: string
 }
 
 /**
@@ -133,9 +135,7 @@ function relTime(iso: string): string {
 }
 
 function clockTime(iso: string): string {
-  const time = Date.parse(iso)
-  if (Number.isNaN(time)) return iso
-  return new Date(time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  return formatTime(iso, iso)
 }
 
 /** 非空平均值；全为空返回 null（诚实：无上报不显示均值）。 */
@@ -250,7 +250,7 @@ function TodoItemRow({ row, isFirst }: { row: TodoRow; isFirst: boolean }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-bold text-neutral-900">{row.title}</p>
-        <p className="mt-0.5 truncate text-[11.5px] text-neutral-500">{row.sub}</p>
+        <p className="mt-0.5 truncate text-[11.5px] text-neutral-500" title={row.timeTitle}>{row.sub}</p>
       </div>
       <a href={row.href} className="shrink-0 text-xs font-bold text-primary-700 hover:text-primary-600">
         {row.actionLabel}
@@ -301,7 +301,7 @@ function RecentPrintTasks({ tasks, total }: { tasks: AdminPrintTaskItem[]; total
                       <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5">
                         <StatusBadge dot status={st.status} label={st.label} />
                       </td>
-                      <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5 tabular-nums text-neutral-500">
+                      <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5 tabular-nums text-neutral-500" title={formatDateTime(task.createdAt)}>
                         {clockTime(task.createdAt)}
                       </td>
                     </tr>
@@ -356,7 +356,7 @@ function RecentActivity({ logs }: { logs: AuditLogRecord[] }) {
                     {target ? ` · ${target}` : ''}
                   </p>
                 </div>
-                <span className="shrink-0 text-xs tabular-nums text-neutral-500">
+                <span className="shrink-0 text-xs tabular-nums text-neutral-500" title={formatDateTime(log.createdAt)}>
                   {relTime(log.createdAt)}
                 </span>
               </div>
@@ -441,6 +441,7 @@ function buildAlertRows(alerts: AdminAlertItem[]): TodoRow[] {
         ? `意见反馈 · ${relTime(alert.occurredAt)}`
         : `${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`,
     href: alert.type === 'feedback_pending' ? '/member-feedback?category=ai_content' : '/alerts',
+    timeTitle: formatDateTime(alert.occurredAt),
     actionLabel: '处理',
     warn: true,
   }))
@@ -503,12 +504,7 @@ export default function DashboardPage() {
     void loadBlocks(ALL_BLOCKS).finally(() => setInitialLoading(false))
   }, [loadBlocks])
 
-  const today = new Date().toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-  })
+  const today = formatDate(new Date())
 
   const entry = <K extends BlockKey>(key: K): BlockEntry =>
     blocks[key] ?? { value: null, error: null, loading: true }

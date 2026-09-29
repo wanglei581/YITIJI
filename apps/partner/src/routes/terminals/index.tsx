@@ -9,6 +9,7 @@
 //   - 1–4 的计数服务端已置空，页面写「少于 5」，不自行估算；
 //   - 导出 CSV 只把已过服务端白名单的这份数据原样写出，不另查任何明细。
 
+import { formatDateTime } from '@ai-job-print/shared'
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { DownloadIcon, MonitorIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
@@ -236,7 +237,7 @@ export default function TerminalsPage() {
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <StatusBadge dot status={run.status} label={run.label} />
-                          <p className="mt-1 text-[11px] text-neutral-500">{relativeTime(row.lastHeartbeatAt)}</p>
+                          <p className="mt-1 text-[11px] text-neutral-500" title={row.lastHeartbeatAt ? formatDateTime(row.lastHeartbeatAt) : undefined}>{relativeTime(row.lastHeartbeatAt)}</p>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 tabular-nums">{visitText(data, row.visitCount)}</td>
                         <td className="whitespace-nowrap px-4 py-3 tabular-nums">{countText(row.serviceCount)}</td>
