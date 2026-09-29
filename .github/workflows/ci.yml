@@ -733,6 +733,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:llm-timeout-concurrency
           # AI 类出站端点白名单（P1-3）：模型 / OCR / 语音 / 数字人 / 短信 / 合同审查，白名单外一个请求都不发。
           pnpm --filter @ai-job-print/api verify:ai-endpoint-allowlist
+          # DeepSeek 思考模式统一关闭：派生式扫描所有 LLM 调用点的请求体都展开
+          # deepseekThinkingOff(model)，含官方推荐名 deepseek-flash 与 TRTC 小青的 LLMConfig。
+          pnpm --filter @ai-job-print/api verify:llm-thinking-off
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           # P1-2a AI 逐次计量账 + 每日金额硬上限（全局 / 单台终端 / 单个会员）；写隔离库，不触网。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-budget
