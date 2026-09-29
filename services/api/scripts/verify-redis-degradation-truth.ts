@@ -196,6 +196,9 @@ interface SurfaceProbe {
   run: (port: number, adminToken: string) => Promise<{ succeeded: boolean; detail: string }>
 }
 
+/** [B] 里建的真实可登录管理员（bcrypt 真哈希），供「内部账号新登录」探针使用。 */
+let loginProbeCredentials: { loginId: string; password: string } | null = null
+
 const SURFACE_PROBES: Record<string, SurfaceProbe> = {
   'internal-auth': {
     describe: '带 JwtAuthGuard 的内部端点（管理端 / 合作机构端 / 一体机内部账号）',
@@ -209,6 +212,21 @@ const SURFACE_PROBES: Record<string, SurfaceProbe> = {
     run: async (port, token) => {
       const result = await probe(port, '/auth/logout', { method: 'POST', token })
       return { succeeded: result.status < 400, detail: `POST /auth/logout → ${result.status}` }
+    },
+  },
+  'internal-password-login': {
+    describe: '内部账号新登录（密码尝试次数存 Redis，数不了就拒绝，P1-4）',
+    run: async (port) => {
+      if (!loginProbeCredentials) return { succeeded: true, detail: '门禁夹具缺失：没有可登录的管理员' }
+      const result = await probe(port, '/auth/login', {
+        method: 'POST',
+        body: { loginId: loginProbeCredentials.loginId, password: loginProbeCredentials.password, portal: 'admin' },
+      })
+      const code = (result.body as { error?: { code?: string } } | null)?.error?.code
+      // 只有「因为数不了次数而拒绝」才算这一面不可用；密码错、账号不存在这类失败不能冒充证据，
+      // 一律记成「未证明不可用」让门禁红。夹具账号用真 bcrypt 哈希与正确密码。
+      const refusedForRedis = result.status === 503 && code === 'AUTH_LOGIN_UNAVAILABLE'
+      return { succeeded: !refusedForRedis, detail: `POST /auth/login → ${result.status} ${code ?? ''}` }
     },
   },
   'member-auth': {
@@ -249,6 +267,8 @@ async function verifyHealthHonesty(deadRedisPort: number): Promise<void> {
   await prisma.onModuleInit()
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
   const adminId = `${FIXTURE_PREFIX}http-admin-${suffix}`
+  const loginAdminId = `${FIXTURE_PREFIX}http-login-${suffix}`
+  const loginPassword = `Verify-Login-${suffix}-Aa1!`
 
   const app = await bootApp({ REDIS_URL: `redis://127.0.0.1:${deadRedisPort}` }, 120_000)
   try {
@@ -258,6 +278,15 @@ async function verifyHealthHonesty(deadRedisPort: number): Promise<void> {
         name: '门禁临时管理员(HTTP)', role: 'admin', tokenVersion: 0, enabled: true,
       },
     })
+    const bcrypt = await import('bcryptjs')
+    await prisma.user.create({
+      data: {
+        id: loginAdminId, username: `${FIXTURE_PREFIX}http-login-${suffix}`,
+        passwordHash: await bcrypt.hash(loginPassword, 4), passwordProofState: 'owner_managed',
+        name: '门禁临时管理员(登录探针)', role: 'admin', tokenVersion: 0, enabled: true,
+      },
+    })
+    loginProbeCredentials = { loginId: `${FIXTURE_PREFIX}http-login-${suffix}`, password: loginPassword }
     const adminToken = jwt.sign({ sub: adminId, role: 'admin', orgId: null, ver: 0 })
 
     check('Redis 不可达时 API 仍完成启动', app.listening, `exitCode=${app.child.exitCode}`)
@@ -311,7 +340,8 @@ async function verifyHealthHonesty(deadRedisPort: number): Promise<void> {
       `实际 ${ready.status}`)
   } finally {
     await app.stop()
-    await prisma.user.deleteMany({ where: { id: adminId } })
+    loginProbeCredentials = null
+    await prisma.user.deleteMany({ where: { id: { in: [adminId, loginAdminId] } } })
     await prisma.onModuleDestroy()
   }
 }

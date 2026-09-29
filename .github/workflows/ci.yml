@@ -791,6 +791,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:package-order-fulfillment
           pnpm --filter @ai-job-print/api verify:sms-provider
           pnpm --filter @ai-job-print/api verify:sms-send
+          # P1-5 短信发送额度（全站每日总量 / 单终端每日上限、Redis 核不了即暂停）；内存 Redis，不连外网。
+          pnpm --filter @ai-job-print/api verify:sms-budget
+          # P1-4 管理员登录加固（锁定失败关闭、来源地址名单、短信第二步）；写隔离库。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-login-hardening
           pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-real-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-governance-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-launch-events
