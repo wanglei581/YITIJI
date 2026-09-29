@@ -373,3 +373,25 @@ test('U10 打印页生成的登录回跳地址不含查询串和文件身份', a
     assert.ok(!/fileId|fileUrl|sig=|expires=|contextId|state=|#/.test(from), `${from} 不带文件身份与原查询串`)
   }
 })
+
+test('U11 我的文档：原件、原件转出的 PDF 先过材料检查；AI 报告、优化稿直达报价（9/29 拍板）', async () => {
+  const stubs = {
+    '../../../../services/api/httpAdapter': toDataUrl('export class ApiHttpError extends Error {}'),
+    '../../../../services/api/userErrorMessage': toDataUrl('export const errorCodeOf = () => null; export const userMessageOf = (_e, f) => f'),
+  }
+  const url = transpile(join(kioskRoot, 'src/pages/profile/me/components/documentReprint.ts'), stubs)
+  seq += 1
+  const { documentNeedsPrintMaterialCheck } = await import(`${url}#${seq}`)
+  const original = { purpose: 'resume_upload', assetCategory: 'original' }
+  const wordOriginal = { purpose: 'print_doc', assetCategory: 'original' }
+  const convertedFromWord = { purpose: 'print_doc', assetCategory: 'derived' }
+  assert.equal(documentNeedsPrintMaterialCheck(original), true, '本人原件先查')
+  assert.equal(documentNeedsPrintMaterialCheck(wordOriginal), true, 'print_doc 原件先查')
+  assert.equal(documentNeedsPrintMaterialCheck(convertedFromWord), false, '单看派生的 print_doc（AI 报告同形）放行')
+  assert.equal(documentNeedsPrintMaterialCheck(convertedFromWord, wordOriginal), true, '刚从原件转出的 PDF 按原件先查')
+  assert.equal(documentNeedsPrintMaterialCheck({ purpose: 'resume_upload', assetCategory: 'derived' }), true, '简历原件转出的派生件只可能来自本人原件，先查')
+  assert.equal(documentNeedsPrintMaterialCheck({ purpose: 'id_scan', assetCategory: 'derived' }), true, '证件扫描的派生件先查')
+  assert.equal(documentNeedsPrintMaterialCheck({ purpose: 'print_doc', assetCategory: 'derived' }), false, 'AI 报告（派生 print_doc）直达报价')
+  assert.equal(documentNeedsPrintMaterialCheck({ purpose: 'resume_upload', assetCategory: 'optimized' }), false, '优化稿直达报价')
+  assert.equal(documentNeedsPrintMaterialCheck({ purpose: 'print_doc', assetCategory: null }), true, '类别缺失按原件（fail-closed）')
+})
