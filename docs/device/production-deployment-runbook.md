@@ -125,6 +125,8 @@ ASR_PROVIDER=disabled
 > 上线前务必确认这一项。`AI_PROVIDER` / `OCR_PROVIDER` 填非法值会让 API 启动直接报错
 > （不静默回退），这是预期保护。
 
+思考模式与小青音色的在线核对用 `probe:llm-thinking-live`（在 `services/api` 目录执行；加 `--tts` 才核音色）。密钥与 API 进程同一处：文字模型先读后台 AI 槽位，再读上面这份 `.env`；音色密钥与 `TtsService` 相同。缺密钥或有一项被跳过时打印「未验证：…」，退出码非 0。只有显式加上 `--allow-skip` 才允许跳过，此时仍打印「未验证」，退出码为 0。输出里不会有密钥。这条探针不进 CI；CI 只跑离线自检 `verify:llm-thinking-live-gate`。发布清单里的同一说明见 `production-deployment-and-windows-host-checklist.md` 的 AI / ASR 两条。
+
 ### 2.3 前端构建变量（三端）
 
 三个前端 app 走同源相对路径最稳（由 nginx 反代到 API）：

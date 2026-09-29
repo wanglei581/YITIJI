@@ -16,6 +16,11 @@
 - **做法（Grok 实现，安全口径由协调方定稿，总指挥拍板方案 A + 防线）：** 新接口 `POST /api/v1/admin/orgs/:id/accounts/:accountId/contact-phone`（管理员本人密码确认，复用机构账号操作的 5 次 / 5 分钟锁）。防线：只对「临时密码、手机未自证」的机构账号开放；手机号必须等于机构资料里确认函上的联系人手机；机构联系人手机 24 小时内改过就不许登记（防管理员先改成自己的号）；审计记确认函编号、不记明文手机号，与写入同一事务；写库后给该号发知会短信，生产没配模板时写库前就拒（失败关闭），发送失败补偿清回。之后机构本人在登录页「忘记密码」用这个号收码、设新密码，账号变本人自管、手机算自证；管理员无法代收验证码，管理员账号的找回规则不变。新列 `User.phoneRegisteredByAdminAt`、`Organization.contactPhoneChangedAt`（两套迁移 `20260929235000_add_partner_contact_phone_registration`）；后台账号列表按与两个后台的约定下发 `passwordProofState`、`phoneRegisteredByAdminAt`、`canRegisterContactPhone`。
 - **验证：** 新门禁 `verify:partner-contact-phone-registration` 46 条（整条链：登记 → 本人找回 → 自管 → 做一项自管操作，加反例），挂 CI；Grok 7 处、协调方 4 处行为变异（不核对联系人手机、不看冷却、找回对所有角色放开、资格不看临时密码）全红；机构账号操作、内部账号、改密、手机转移、短信额度等 17 条关联门禁与 PG schema 同步校验全绿。
 - **待办：** 短信平台要另申请知会模板，配到 `SMS_TEMPLATE_PARTNER_PHONE_REGISTERED`，没配之前生产上这个接口一律 503（失败关闭）。
+## 2026-09-29：思考模式在线探针缺密钥不再算通过（分支 `claude/backend-hardening-20260929-thinking-probe-strict`）
+
+- **问题（合规窗口查出）：** `probe:llm-thinking-live` 只从进程环境变量读密钥，不读服务的 .env 与后台 AI 槽位；服务器上一缺密钥就打印「跳过」并退出码 0，看上去通过，其实没验。
+- **修法（Grok 实现、协调方审）：** 取密钥与 API 进程同一处（先后台 AI 槽位，再服务 .env）；缺密钥或任何一项被跳过都非 0 退出并打印「未验证」，只有显式 `--allow-skip` 才允许跳过；上游失败即使带 `--allow-skip` 也非 0；全程不打印密钥。TTS 读取密钥与目标地址的逻辑抽成共用函数，服务与探针同一份。发布清单与运维手册写明新行为。
+- **验证：** 新离线自检 `verify:llm-thinking-live-gate` 37 条（挂 CI）；协调方在候选 840ea7d31 上复跑 llm-thinking-off、ai-endpoint-allowlist、llm-input-pii-mask、mock-interview、trtc-ownership、ai-safety-aigc、d2-same-host-contract、ai-throttle-dimension 与 api tsc 全绿，变异「探针恒退出 0」变红。解冲突时保留了候选里 TTS 的出站白名单与地域校验，发布清单保留候选较新的 AIGC 条目。
 
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
