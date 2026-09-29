@@ -270,6 +270,61 @@ test('conversion success stays on the page until the print CTA and does not clai
   expect(errors).toEqual([])
 })
 
+// 后端没有「游客转换件登录后认领」的接口：归属在转换那一刻按会员令牌定死（hasEndUser）。
+// 所以游客完成态的登录按钮只能叫「先登录再转换」，登录回来回到本页重新选图，由用户自己再点转换；
+// 不能把这份游客件带去打印台，让人以为登录就把它存下了。
+test('guest login from a finished conversion comes back to convert again, not to a "saved" copy @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerConvertUpload(api)
+  registerMemberLogin(api)
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: 'w2-pdf-guest-login',
+        printFileUrl: '/w2-fixtures/image.png',
+        fileMd5: 'f'.repeat(32),
+        sizeBytes: 2048,
+        pages: 1,
+        hasEndUser: false,
+      },
+    },
+  })
+
+  await page.goto('/print-scan/convert')
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'w2-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('synthetic-w2-image'),
+  })
+  await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
+  await expect(page.getByTestId('img2pdf-band')).toContainText('转好之后再登录也存不进去')
+  await expect(page.getByTestId('img2pdf-band')).toContainText('不登录也能直接打印这份')
+  await expect(page.getByRole('button', { name: '先登录再保存' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '拿这份 PDF 去打印' })).toBeVisible()
+
+  await page.getByRole('button', { name: '先登录再转换', exact: true }).click()
+  await expect(page).toHaveURL(/\/login\?from=%2Fprint-scan%2Fconvert$/)
+  // 没有替用户把这份游客件写成打印交接：登录回来不会落到打印台。
+  expect(
+    await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-print-material-check')),
+  ).toBeNull()
+
+  await loginThroughVisibleUi(page, '/print-scan/convert')
+  await expect(page).toHaveURL(/\/print-scan\/convert$/)
+  // 回到选图这一步：列表是空的，转换要用户自己重新做；规则卡按已登录说「会进我的文档」。
+  await expect(page.getByText('w2-image.png', { exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toHaveCount(0)
+  await expect(page.getByTestId('img2pdf-primary')).toBeDisabled()
+  expect(api.requestCount('POST', '/api/v1/print/convert/images-to-pdf')).toBe(1)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
 const W2_MEMBER_TOKEN = 'w2-sign-memory-token'
 const W2_MEMBER_PHONE = '13800138000'
 const W2_MEMBER_CODE = '123456'
@@ -336,14 +391,14 @@ test('signature page fails closed for anonymous users @w2', async ({ page, api }
 
   await page.goto('/print-scan/sign')
   await expect(page.locator('[data-testid="sign-stamp-state-login-required"]')).toBeVisible()
-  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('先登录才能做签名盖章')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('先登录才能签名')
   await expect(page.locator('[data-w2-page="print-scan-sign"]')).toContainText('不提供 CA 电子签')
   await expectHealthy(page, errors, 'print-scan-sign')
   await page.getByTestId('sign-stamp-primary').click()
   await expect(page).toHaveURL(/\/login/)
 })
 
-// D3（2026-09-28）：签名盖章默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS，
+// D3（2026-09-28）：签名默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS，
 // 未配置即以 CAPABILITY_NOT_CONFIGURED 拒绝）。能力读取成功、但本机没有已配置的 signature_stamp 行时，
 // 已登录用户直接进签名页也必须停在「没有开放」，不给任何上传入口 —— 否则传完文件才被拒，
 // 页面还会把那次拒绝说成「PDF 读不开」。
@@ -365,7 +420,7 @@ const SIGNATURE_NEVER_ENABLED = [
 
 async function expectSignatureNotOpen(page: Page, api: ApiRouter): Promise<void> {
   await expect(page.locator('[data-testid="sign-stamp-state-capability-disabled"]')).toBeVisible()
-  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('没有开放签名盖章')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('这台机器没有开放签名')
   // 没有任何上传入口：选 PDF / 传签名图的卡片都不出现，页面上也没有带「上传」的按钮。
   await expect(page.locator('[data-testid^="sign-stamp-pick-"]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /上传/ })).toHaveCount(0)

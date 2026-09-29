@@ -116,7 +116,7 @@ export const SIGN_STAMP_STATE_SET = new Set<string>(SIGN_STAMP_STATES)
 export const FX = {
   doc: { name: '就业协议书-示例.pdf', size: '1.8 MB', pages: 6 },
   stamp: { name: '签名-示例.png', size: '240 KB', w: 900, h: 360 },
-  out: { name: '就业协议书-示例-签章合成.pdf', size: '2.1 MB', pages: 6 },
+  out: { name: '就业协议书-示例-已签名.pdf', size: '2.1 MB', pages: 6 },
 } as const
 
 export function formatBytes(bytes: number): string {

@@ -78,7 +78,7 @@ export function Retention({ loggedIn }: { loggedIn: boolean }) {
       <div className="i2p-band-p">
         {loggedIn
           ? <>转换生成的 PDF 会进<b>「我的文档」</b>，默认保存约 24 小时，可以在那一页手动延长保存期限。</>
-          : <><b>未登录状态下生成的 PDF 不会进入「我的文档」</b>，只能在本次操作内直接继续；这是公用终端，也<b>不会下载到本机</b>。</>}
+          : <><b>登录后再转换，才会存进「我的文档」</b>；不登录也能转换、直接打印，但转好之后再登录也存不进去。这是公用终端，也<b>不会下载到本机</b>。</>}
       </div>
       <div className="i2p-band-p">打印用的临时链接 <b>30 分钟内有效</b>，过期后回到这一页重新取一次。</div>
     </div>
@@ -571,7 +571,7 @@ export function ConvertImagesCta(props: {
         {typeof hasEndUser === 'boolean'
           ? hasEndUser
             ? <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onDocuments}>查看我的文档</button>
-            : <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onLogin}>先登录再保存</button>
+            : <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onLogin}>先登录再转换</button>
           : null}
         <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" onClick={props.onPrint}>
           拿这份 PDF 去打印
