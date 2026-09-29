@@ -65,7 +65,7 @@ const PRINTER_STATUS_MAP: Readonly<Record<string, { badge: BadgeTone; label: str
   ok:          { badge: 'success', label: '正常' },
   ready:       { badge: 'success', label: '正常' },
   idle:        { badge: 'success', label: '正常' },
-  low_paper:   { badge: 'warning', label: '纸张不足，需补纸' },
+  low_paper:   { badge: 'warning', label: '纸张或墨粉不足，需补充' },
   offline:     { badge: 'error',   label: '离线' },
   paper_empty: { badge: 'warning', label: '缺纸' },
   error:       { badge: 'error',   label: '故障' },
