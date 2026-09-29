@@ -764,6 +764,9 @@ function careerPlan(raw) {
     directions: objList(raw.directions).map((d) => ({ title: d.title || '', why: d.why || '', firstStep: d.firstStep || '' })),
     skillPlan: objList(raw.skillPlan).map((s) => ({ skill: s.skill || '', action: s.action || '', timeframe: s.timeframe || '' })),
     actionChecklist: strList(raw.actionChecklist),
+    // 自我探索没纳入的原因要如实说（合规 9/29：不许悄悄不纳入）。只认服务端明确给的
+    // 'consent_outdated'；null / 缺字段 / 其他值一律当作没有这回事，页面什么都不显示。
+    selfAssessmentOutdated: raw.selfAssessmentExcluded === 'consent_outdated',
   };
 }
 
