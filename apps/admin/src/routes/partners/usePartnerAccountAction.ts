@@ -3,13 +3,14 @@ import { ApiHttpError } from '../../services/api/client'
 import {
   orgsAdminService,
   type AdminOrgAccount,
-  type PartnerAccountAction,
   type PartnerAccountVerificationMethod,
+  type RegisterPartnerContactPhoneInput,
 } from '../../services/api/orgsAdmin'
 import {
   initialPartnerAccountActionState,
   reducePartnerAccountAction,
   shouldExpirePartnerAccountResource,
+  type PartnerAccountAction,
   type PartnerAccountActionState,
 } from './partnerAccountActionMachine'
 
@@ -26,6 +27,8 @@ export interface UsePartnerAccountActionResult {
   rebindTicketDeadline: number
   resendAvailableAt: number
   statusMessage: string
+  errorMessage: string
+  contactPhoneResult: { phoneMasked: string; registeredAt: string } | null
   triggerElementRef: React.MutableRefObject<HTMLElement | null>
   open(action: PartnerAccountAction, account: AdminOrgAccount, trigger: HTMLElement): void
   close(): Promise<void>
@@ -38,6 +41,8 @@ export interface UsePartnerAccountActionResult {
   resendNewPhoneCode(): Promise<void>
   verifyNewPhone(code: string): Promise<void>
   commitDelete(): Promise<void>
+  clearContactPhoneError(): void
+  submitContactPhone(input: RegisterPartnerContactPhoneInput): Promise<void>
 }
 
 function errorCode(error: unknown): string {
@@ -62,12 +67,15 @@ export function usePartnerAccountAction(
   const [rebindTicketDeadline, setRebindTicketDeadline] = useState(0)
   const [resendAvailableAt, setResendAvailableAt] = useState(0)
   const [statusMessage, setStatusMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [contactPhoneResult, setContactPhoneResult] = useState<{ phoneMasked: string; registeredAt: string } | null>(null)
   const operationIdRef = useRef(0)
   const controllerRef = useRef<AbortController | null>(null)
   const stateRef = useRef(state)
   const accountRef = useRef(account)
   const warnedTicketRef = useRef(false)
   const triggerElementRef = useRef<HTMLElement | null>(null)
+  const contactPhoneSubmitRef = useRef(false)
 
   stateRef.current = state
   accountRef.current = account
@@ -95,6 +103,7 @@ export function usePartnerAccountAction(
     setResendAvailableAt(0)
     setPhoneMasked(null)
     setStatusMessage('')
+    setErrorMessage('')
     warnedTicketRef.current = false
   }, [])
 
@@ -116,7 +125,7 @@ export function usePartnerAccountAction(
   ) => {
     const target = accountRef.current
     const action = stateRef.current.action
-    if (!target || !action) return
+    if (!target || (action !== 'delete_account' && action !== 'rebind_phone')) return
     const operationId = operationIdRef.current
     const controller = new AbortController()
     controllerRef.current = controller
@@ -154,6 +163,7 @@ export function usePartnerAccountAction(
     clearTiming()
     triggerElementRef.current = trigger
     setAccount(target)
+    setContactPhoneResult(null)
     dispatch({ type: 'OPEN', action, targetAccountId: target.id })
     const operationId = operationIdRef.current
     void orgsAdminService.getOrgDetail(orgId).then((detail) => {
@@ -168,6 +178,7 @@ export function usePartnerAccountAction(
     invalidateOperation()
     dispatch({ type: 'CLOSE' })
     setAccount(null)
+    setContactPhoneResult(null)
     clearTiming()
     await revokeResources(snapshot, target)
   }, [clearTiming, invalidateOperation, revokeResources])
@@ -178,6 +189,7 @@ export function usePartnerAccountAction(
     invalidateOperation()
     clearTiming()
     dispatch({ type: 'SWITCH_ACTION', action })
+    setContactPhoneResult(null)
     await revokeResources(snapshot, accountRef.current)
   }, [clearTiming, invalidateOperation, revokeResources])
 
@@ -314,6 +326,54 @@ export function usePartnerAccountAction(
     }
   }, [finishSuccess, handleError, orgId, refreshForConvergence])
 
+  const clearContactPhoneError = useCallback(() => {
+    setErrorMessage('')
+    if (stateRef.current.errorCode) dispatch({ type: 'CLEAR_ERROR' })
+  }, [])
+
+  const submitContactPhone = useCallback(async (input: RegisterPartnerContactPhoneInput) => {
+    const snapshot = stateRef.current
+    const target = accountRef.current
+    if (
+      contactPhoneSubmitRef.current
+      || !target
+      || snapshot.busy
+      || snapshot.action !== 'register_contact_phone'
+      || snapshot.step !== 'contact_phone_form'
+    ) return
+    contactPhoneSubmitRef.current = true
+    const operationId = operationIdRef.current
+    dispatch({ type: 'REQUEST_STARTED' })
+    setErrorMessage('')
+    try {
+      const result = await orgsAdminService.registerPartnerContactPhone(orgId, target.id, input)
+      if (operationId !== operationIdRef.current) return
+      if (!result.ok) {
+        setErrorMessage(result.message)
+        dispatch({ type: 'ERROR', code: result.code })
+        if (result.code === 'PARTNER_CONTACT_PHONE_NOT_ELIGIBLE') void refreshForConvergence()
+        return
+      }
+      try {
+        await onChanged()
+      } catch {
+        if (operationId !== operationIdRef.current) return
+        dispatch({ type: 'FINAL_RESULT_UNCERTAIN' })
+        return
+      }
+      if (operationId !== operationIdRef.current) return
+      setContactPhoneResult({ phoneMasked: result.phoneMasked, registeredAt: result.registeredAt })
+      dispatch({ type: 'SUCCESS' })
+      clearTiming()
+    } catch {
+      if (operationId !== operationIdRef.current) return
+      dispatch({ type: 'FINAL_RESULT_UNCERTAIN' })
+      void refreshForConvergence()
+    } finally {
+      contactPhoneSubmitRef.current = false
+    }
+  }, [clearTiming, onChanged, orgId, refreshForConvergence])
+
   const commitDelete = useCallback(async () => {
     const snapshot = stateRef.current
     const target = accountRef.current
@@ -373,9 +433,10 @@ export function usePartnerAccountAction(
 
   return {
     state, account, organizationName, phoneMasked, nowMs, challengeDeadline, actionTicketDeadline,
-    rebindTicketDeadline, resendAvailableAt, statusMessage, triggerElementRef,
+    rebindTicketDeadline, resendAvailableAt, statusMessage, errorMessage, contactPhoneResult, triggerElementRef,
     open, close, confirm: () => dispatch({ type: 'CONFIRM' }), switchAction, chooseMethod,
     submitAdminPassword: (password) => createChallenge(stateRef.current.verifyMethod ?? 'sms', password),
     verifyCredential, startRebind, resendNewPhoneCode, verifyNewPhone, commitDelete,
+    clearContactPhoneError, submitContactPhone,
   }
 }
