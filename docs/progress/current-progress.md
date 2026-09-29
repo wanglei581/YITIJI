@@ -63,6 +63,12 @@
 - **门禁：** 新增 `verify:kiosk-session`（39 条：DTO 白名单、守卫与按台限流元数据、幂等、时间采信、跨终端碰不到、结束后不续期、改绑后按快照计数、窗口与空机构、保留期），接进 `build-and-verify` 与 `postgres-readiness` 两个作业；`verify:backend-p0-contracts` 原来钉「会话接口 501 不假成功」，随口径改钉「只认终端验签、真落库、不写会员号」。变异「计数去掉机构过滤」「控制器去掉终端守卫」都会红。
 - **验证：** api `tsc --noEmit`、新文件 eslint、`verify:kiosk-session`、`verify:backend-p0-contracts`、`verify:backend-p0-http`、`verify:ai-access`（会话控制器仍不带 AI 拦截标记）、`verify:console-screen-usage`、`verify:console-screen-snapshot`、`verify:recruitment-wave2-full-inventory`、`verify:policies`、`verify:admin-ops`、`verify:audit-logs`、`db:pg:sync:check`、`verify-ci-gate-coverage`、`verify:repository-integrity`、`graph:check` 通过。PostgreSQL 迁移与 schema 一致性看 CI 的 `postgres-readiness`。
 - **没做：** 一体机上报（主执行窗口，依赖本 PR 先合入候选）；机构端与数据大屏展示服务人次（数据大屏的 `visitCount` 仍如实标未接入，改它要连同 `verify:console-screen-*` 的钉子一起改，另排）。
+## 2026-09-29：打印前材料检查不再被 AI 开关拦住（分支 `claude/backend-hardening-20260929-materials-gate`，首发前必修）
+
+- **问题：** `POST /materials/tasks` 与逐项裁决接口标着 `@AiUse('generate')`，但材料检查五种任务（体检、A4 规整、隐私扫描、遮挡、合订）都不调生成式模型。生产开着 `PRINT_REQUIRE_PII_SCAN`，原件打印必须先过材料检查；于是后台「AI 暂停」（#1055 会把开关放进后台）、`AI_LOGIN_GATE=before_generate`、声明强制任何一个打开，匿名用户的原件打印就全部停掉，违背「AI 挂了功能退化为手动」。P1-18 子代理查代码时发现，总指挥要求首发前修。
+- **修法：** 两个入口改为 `@AiUseExempt`（写明原因），新建检查仍受全机维护拦截（与打印下单一致），已开始的逐项裁决不受维护拦截。
+- **验证：** `verify:ai-access` 新增 6 条（维护拦新建、不拦裁决；AI 暂停、开始 AI 前登录、导出前登录、声明强制都不拦匿名材料检查）并把材料新建入口加进「只有新建入口受维护拦截」清单；两处反向变异（改回 generate、去掉维护拦截）分别红 4 条、2 条。关联门禁 7 条（含小程序接口契约）全绿。
+- **待定：** 隐私检查降级（OCR 不可用、页数截断、格式不支持）时「本人确认后可继续」（A-04）的服务端留痕口径已发主执行窗口确认，确认后另开 PR。
 
 ## 2026-09-29 凌晨：2.0 稿定为最终版（收尾中）；第三波试点 16、06 运行页对齐稿
 

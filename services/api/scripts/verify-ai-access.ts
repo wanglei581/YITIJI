@@ -241,6 +241,22 @@ async function guardOnRealRoutes(): Promise<void> {
   for (const [ctor, method] of allowed) {
     check(`guard:维护模式放行 ${ctor.name}.${method}`, (await through(ctor, method)) === 'PASS')
   }
+  // 打印前材料检查（原件打印必经）不调生成式模型：AI 暂停、登录档位、声明都不能挡；只受全机维护拦新建。
+  const materials = MaterialsController as unknown as Ctor
+  config = { ...OFF, maintenance: true }
+  check('guard:维护模式拦新建材料检查', (await through(materials, 'createTask')) === 'MAINTENANCE_MODE')
+  check('guard:维护模式不拦已开始检查的逐项裁决', (await through(materials, 'decidePiiFindings')) === 'PASS')
+  const materialsOpen: Array<[string, AiAccessConfig]> = [
+    ['AI 暂停', { ...OFF, paused: true }],
+    ['开始 AI 前登录', { ...OFF, loginGate: 'before_generate' }],
+    ['导出前登录', { ...OFF, loginGate: 'before_export' }],
+    ['声明强制', { ...OFF, declarationEnforced: true }],
+  ]
+  for (const [label, cfg] of materialsOpen) {
+    config = cfg
+    check(`guard:${label}不拦匿名材料检查（原件打印必经）`,
+      (await through(materials, 'createTask')) === 'PASS' && (await through(materials, 'decidePiiFindings')) === 'PASS')
+  }
   config = { ...OFF, paused: true }
   check('guard:AI 暂停拦顾问生成（run）', (await through(AdvisorController as unknown as Ctor, 'run')) === 'AI_PAUSED')
   check('guard:AI 暂停拦岗位 AI 解读（explain）', (await through(JobAiController as unknown as Ctor, 'explain')) === 'AI_PAUSED')
@@ -282,6 +298,7 @@ function coverage(): void {
     [ScanTasksController as unknown as Ctor, ['create']],
     [UploadSessionsController as unknown as Ctor, ['create']],
     [PrintConversionController as unknown as Ctor, ['imagesToPdf']],
+    [MaterialsController as unknown as Ctor, ['createTask']],
   ]
   for (const [ctor, expected] of onlyCreate) {
     const marked = routesOf(ctor).filter((method) => methodMeta(ctor, method, MAINTENANCE_BLOCKED_METADATA) === true).sort()
