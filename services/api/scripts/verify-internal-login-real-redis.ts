@@ -20,8 +20,9 @@
  * 不是这里要证明的事，避免调用方环境把回环地址挡在管理员登录之外。
  *
  * 登录路由按来源 IP 每 60 秒最多 5 次，和密码失败上限同为 5。
- * 第 6 次若紧接着发，会被 IP 限流挡在登录逻辑之前，看到的是 RATE_LIMITED，
- * 不能证明账号锁定。因此 5 次错误密码之后先等这个窗口过去，再拿正确密码去撞锁定。
+ * 第 6 次若从同一 IP 紧接着发，会被 IP 限流挡在登录逻辑之前，看到的是 RATE_LIMITED，
+ * 不能证明账号锁定。因此子进程开 TRUST_PROXY_HOPS=1，每次登录换一个 X-Forwarded-For：
+ * IP 限流插不进来，账号锁定（按账号计、存在 Redis）照样生效。不再真等 60 秒窗口。
  *
  * 数据库不用调用方传来的库（CI 上是共享的 prisma/dev.db，文件名里的 dev 能通过
  * 隔离检查）。每次自己 mkdtemp + prisma migrate deploy 出一个临时 SQLite，用完删除。
@@ -42,7 +43,7 @@ import {
   startEphemeralRedis,
   type EphemeralRedis,
 } from './support/ephemeral-redis-server'
-import { bootApp, probe, sleep, type BootedApp, type HttpProbeResult } from './support/boot-api-child'
+import { bootApp, probe, type BootedApp, type HttpProbeResult } from './support/boot-api-child'
 import {
   PASSWORD_LOGIN_FAILURE_LIMIT,
   passwordLoginAccountKey,
@@ -52,11 +53,6 @@ import { PASSWORD_PROOF_STATE } from '../src/auth/password-proof-state'
 
 /** 产品规则：连续 5 次错误密码后锁定。循环次数写死这个数，不跟着实现常量走。 */
 const SPEC_FAILURE_LIMIT = 5
-/**
- * auth.controller.ts 登录路由 `@Throttle({ default: { ttl: 60_000, limit: 5 } })`。
- * 多等 8 秒，盖过进程繁忙时定时器晚到。
- */
-const LOGIN_IP_WINDOW_WAIT_MS = 68_000
 const apiRoot = join(import.meta.dirname, '..')
 
 let failures = 0
@@ -164,11 +160,15 @@ async function bootApi(env: Record<string, string>): Promise<BootedApp> {
   throw new Error('API 端口连续落在 4100-4199，本门禁不占用这段端口')
 }
 
+let loginSourceSeq = 0
+/** 每次登录用不同的来源 IP（TEST-NET-2 段），路由的 IP 限流不会插进来；账号锁定按账号计，不受影响。 */
 function login(port: number, loginId: string, password: string, portal: 'admin' | 'partner'): Promise<HttpProbeResult> {
+  loginSourceSeq += 1
   return probe(port, '/auth/login', {
     method: 'POST',
     body: { loginId, password, portal },
     timeoutMs: 20_000,
+    headers: { 'X-Forwarded-For': `198.51.100.${loginSourceSeq}` },
   })
 }
 
@@ -307,7 +307,9 @@ async function main(): Promise<void> {
       VERIFICATION_DATABASE_TARGET: 'isolated',
       ADMIN_LOGIN_SECOND_FACTOR: 'off',
       ADMIN_IP_ALLOWLIST: '',
-      TRUST_PROXY_HOPS: '',
+      // 每次登录换一个来源 IP（见 login()）：本门禁测的是按账号计的密码锁定，不是按 IP 的路由限流。
+      // 以前靠真等 68 秒 IP 窗口过期，整条门禁 70 多秒，压垮了 CI 30 分钟时限。
+      TRUST_PROXY_HOPS: '1',
     })
     check('真实 src/main.ts 已监听', app.listening, app.listening ? '' : app.output().slice(-800))
     if (!app.listening) return
@@ -348,17 +350,8 @@ async function main(): Promise<void> {
       `实际 ${accountBefore ?? '无此键'}`,
     )
 
-    console.log('  … 等待登录路由的 60 秒 IP 窗口过去，再拿正确密码验证锁定（避免第 6 次被限流截走）')
-    await sleep(LOGIN_IP_WINDOW_WAIT_MS)
-
-    let locked = await login(app.port, partnerLogin, partnerPassword, 'partner')
-    if (locked.status === 429 && errorCode(locked.body) === 'RATE_LIMITED') {
-      // 触发限流的那一次已经把这个 IP 封住 blockDuration（等于窗口 60 秒）。
-      // 只再等十几秒仍会看到 RATE_LIMITED，必须再等一个完整窗口。
-      console.log('  … IP 窗口尚未让出，再等一个完整窗口后重试这一次')
-      await sleep(LOGIN_IP_WINDOW_WAIT_MS)
-      locked = await login(app.port, partnerLogin, partnerPassword, 'partner')
-    }
+    // 换了来源 IP，路由限流插不进来；被拦只能是账号锁定（Redis 计数）。
+    const locked = await login(app.port, partnerLogin, partnerPassword, 'partner')
     check(
       '正确密码在锁定后也登不上（429 AUTH_LOGIN_LOCKED，不是 IP 限流）',
       locked.status === 429 && errorCode(locked.body) === 'AUTH_LOGIN_LOCKED',
