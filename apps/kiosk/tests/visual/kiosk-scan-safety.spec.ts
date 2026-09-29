@@ -1709,7 +1709,7 @@ function registerCompletedExitDestinations(api: ApiRouter): void {
 // handover：这个去向怎么把文件交给落点。
 // · print-session：打印台材料检查读「打印材料会话」（sessionStorage）。/print/material-check 是
 //   replace 重定向到 /print/desk?step=check 的旧地址，重定向不转发路由 state，所以文件必须在
-//   离开之前写进会话 —— 和打印上传页、图片转 PDF、签名盖章同一种写法。
+//   离开之前写进会话 —— 和打印上传页、图片转 PDF、签名同一种写法。
 // · route-state：解析页读 `state.fileId`。
 // · none：「我的文档」不带文件（它自己去查）。
 // 这一位是「清场不许连落点一起清掉」的判据 —— 见下面 history 那一组的断言 ①。

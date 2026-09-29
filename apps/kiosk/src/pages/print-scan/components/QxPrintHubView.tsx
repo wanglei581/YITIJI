@@ -287,7 +287,7 @@ function HubBanner({
           testId="print-hub-fallback"
         >
           <p className="ph-state-p">
-            打印机当前<b>无法连接</b>。手机扫码上传、格式转换、签名盖章仍可使用。
+            打印机当前<b>无法连接</b>。手机扫码上传、格式转换、签名仍可使用。
           </p>
         </PrintHubState>
       )

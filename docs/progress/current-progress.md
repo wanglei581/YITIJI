@@ -1,6 +1,15 @@
 # 当前开发进度
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
+
+> **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
+
+## 2026-09-29：content-pipeline-e2e 自签令牌改为 15 分钟，并核对与登录签发一致（PR #1097，未合入）
+
+- **寿命：** `issueInternalToken` 的自签令牌从 `24h` 改为 `15m`。这条门禁是隔离 SQLite + 进程内内存 Redis 的一次 HTTP 链路，脚本里没有 sleep / 轮询；2026-09-29 本机整段实测 48 秒，15 分钟够用。生产登录仍是 `auth.module.ts` 的 `JWT_TTL`（24h）。
+- **签发核对：** 签完解码，字段表从 `auth.service.ts` 的 `issueLogin` 和 `auth.module.ts` 的 `signOptions` 读，不另抄一份。当前契约是 `sub`、`role`、`orgId`、`ver`、`jti`，`aud` 与 `iss` 缺省。对不上就抛错，退出码不是 0。故意把 `aud` 写成 `mutated-wrong-audience` 时，门禁在签发处失败（pnpm 退出码 1），夹具已清理，随后已改回。
+- **验证：** `verify:content-pipeline-e2e` 123/123，退出码 0；`verify:admin-login-hardening` 54/54，退出码 0；`verify:redis-degradation-truth` 39/39，退出码 0。Node 22。
+
 ## 2026-09-29：补 CI 按改动范围跳过的三处漏跑（分支 `grok/ci-scope-gaps-0929`，基于 #1067）
 
 - **浏览器作业：** 分路 PR 只改「浏览器作业会执行」的一体机门禁脚本时不再跳过该作业。清单是 fusion-w2 到 w6、fusion-home / shell / baseline、青序原型几何、浏览器作业里 `node --test` 实际跑的两份契约测试，以及它们 import 的契约模块和几何基线夹具。`verify:scan-input-safety`、`verify:kiosk-feedback-entry`、后台与机构后台的 `run-e2e.mjs` 同样算进。只在主作业里跑的一体机门禁脚本（如 `verify-jobfair-ui.mjs`）仍不因此拉起浏览器作业。
