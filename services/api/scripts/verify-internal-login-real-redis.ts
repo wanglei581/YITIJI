@@ -22,14 +22,26 @@
  * 登录路由按来源 IP 每 60 秒最多 5 次，和密码失败上限同为 5。
  * 第 6 次若紧接着发，会被 IP 限流挡在登录逻辑之前，看到的是 RATE_LIMITED，
  * 不能证明账号锁定。因此 5 次错误密码之后先等这个窗口过去，再拿正确密码去撞锁定。
+ *
+ * 数据库不用调用方传来的库（CI 上是共享的 prisma/dev.db，文件名里的 dev 能通过
+ * 隔离检查）。每次自己 mkdtemp + prisma migrate deploy 出一个临时 SQLite，用完删除。
  */
 import 'reflect-metadata'
 import 'dotenv/config'
+import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
+import { closeSync, existsSync, mkdtempSync, openSync, rmSync, statSync, type Stats } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { isAbsolute, join, resolve, sep } from 'node:path'
 import { Redis } from 'ioredis'
 import * as bcrypt from 'bcryptjs'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
-import { startEphemeralRedis, type EphemeralRedis } from './support/ephemeral-redis-server'
+import { collectEphemeralRedisSelfChecks } from './support/ephemeral-redis-self-check'
+import {
+  registerProcessCleanup,
+  startEphemeralRedis,
+  type EphemeralRedis,
+} from './support/ephemeral-redis-server'
 import { bootApp, probe, sleep, type BootedApp, type HttpProbeResult } from './support/boot-api-child'
 import {
   PASSWORD_LOGIN_FAILURE_LIMIT,
@@ -45,6 +57,7 @@ const SPEC_FAILURE_LIMIT = 5
  * 多等 8 秒，盖过进程繁忙时定时器晚到。
  */
 const LOGIN_IP_WINDOW_WAIT_MS = 68_000
+const apiRoot = join(import.meta.dirname, '..')
 
 let failures = 0
 let checks = 0
@@ -82,6 +95,66 @@ function isPostSuccess(status: number): boolean {
   return status === 200 || status === 201
 }
 
+interface IsolatedDatabase {
+  directory: string
+  databasePath: string
+  databaseUrl: string
+  cleanup: () => void
+}
+
+function inheritedFileDatabasePath(): string | null {
+  const databaseUrl = process.env['DATABASE_URL']?.trim()
+  if (!databaseUrl?.startsWith('file:')) return null
+  const raw = databaseUrl.slice('file:'.length).split(/[?#]/, 1)[0] ?? ''
+  if (!raw || raw === ':memory:') return null
+  return isAbsolute(raw) ? raw : resolve(apiRoot, raw)
+}
+
+function prismaCli(): string {
+  const candidates = [
+    join(apiRoot, 'node_modules', 'prisma', 'build', 'index.js'),
+    join(apiRoot, '..', '..', 'node_modules', 'prisma', 'build', 'index.js'),
+  ]
+  const found = candidates.find((path) => existsSync(path))
+  if (!found) throw new Error(`找不到 Prisma CLI：${candidates.join(' , ')}`)
+  return found
+}
+
+function deployIsolatedSqlite(): IsolatedDatabase {
+  if (process.env['NODE_ENV']?.trim().toLowerCase() === 'production') {
+    throw new Error('VERIFICATION_DATABASE_PRODUCTION_FORBIDDEN')
+  }
+  const directory = mkdtempSync(join(tmpdir(), 'verify-internal-login-real-redis-'))
+  const databasePath = join(directory, 'verify.db')
+  closeSync(openSync(databasePath, 'a'))
+  const databaseUrl = `file:${databasePath}`
+  const cleanup = (): void => {
+    rmSync(directory, { recursive: true, force: true })
+  }
+  registerProcessCleanup(cleanup)
+  process.env['DATABASE_URL'] = databaseUrl
+  process.env['VERIFICATION_DATABASE_TARGET'] = 'isolated'
+  try {
+    assertIsolatedVerificationDatabase()
+  } catch (error) {
+    cleanup()
+    throw error
+  }
+  try {
+    execFileSync(process.execPath, [prismaCli(), 'migrate', 'deploy'], {
+      cwd: apiRoot,
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  } catch (error) {
+    cleanup()
+    const err = error as { stderr?: string; stdout?: string; message?: string }
+    throw new Error(`prisma migrate deploy 失败：${(err.stderr || err.stdout || err.message || '').trim()}`)
+  }
+  return { directory, databasePath, databaseUrl, cleanup }
+}
+
 async function bootApi(env: Record<string, string>): Promise<BootedApp> {
   for (let attempt = 1; attempt <= 6; attempt += 1) {
     const app = await bootApp(env, 120_000)
@@ -105,9 +178,31 @@ async function redisCount(redis: Redis, key: string): Promise<number | null> {
   return Number(raw)
 }
 
+function finish(code: number): void {
+  console.log(`\nverify:internal-login-real-redis：${checks - failures}/${checks} 通过`)
+  if (code !== 0) console.error(`❌ ${failures} 项失败`)
+  else console.log('✅ 全部通过')
+  process.exit(code)
+}
+
 async function main(): Promise<void> {
   console.log('=== 真 Redis 内部账号密码登录 verify:internal-login-real-redis ===')
-  assertIsolatedVerificationDatabase()
+  const inheritedDatabasePath = inheritedFileDatabasePath()
+  const inheritedBefore: Stats | null = inheritedDatabasePath && existsSync(inheritedDatabasePath)
+    ? statSync(inheritedDatabasePath)
+    : null
+  for (const item of await collectEphemeralRedisSelfChecks()) {
+    check(item.name, item.ok, item.detail ?? '')
+  }
+  if (failures > 0) finish(1)
+
+  const database = deployIsolatedSqlite()
+  const sharedDevDb = resolve(apiRoot, 'prisma', 'dev.db')
+  check(
+    '登录门禁用的是独立临时库，不是 prisma/dev.db',
+    resolve(database.databasePath) !== sharedDevDb && database.databasePath.endsWith(`${sep}verify.db`),
+    database.databasePath,
+  )
   check(
     '密码失败上限常量仍是 5（规格；实现把上限改大时，不能靠把循环也改大来放过）',
     PASSWORD_LOGIN_FAILURE_LIMIT === SPEC_FAILURE_LIMIT,
@@ -136,6 +231,13 @@ async function main(): Promise<void> {
     user: { create: (args: unknown) => Promise<unknown>; deleteMany: (args: unknown) => Promise<unknown> }
     auditLog: { deleteMany: (args: unknown) => Promise<unknown> }
   } | null = null
+
+  registerProcessCleanup(() => {
+    const child = app?.child
+    if (child && child.exitCode === null && typeof child.pid === 'number') {
+      try { child.kill('SIGKILL') } catch { /* 子进程已经没了 */ }
+    }
+  })
 
   const removeFixtures = async (): Promise<void> => {
     if (!prisma) return
@@ -201,6 +303,8 @@ async function main(): Promise<void> {
     console.log('  … 子进程 ADMIN_LOGIN_SECOND_FACTOR=off：短信第二步不签发登录凭证，且要真实短信，本门禁不测那一步')
     app = await bootApi({
       REDIS_URL: redisServer.url,
+      DATABASE_URL: database.databaseUrl,
+      VERIFICATION_DATABASE_TARGET: 'isolated',
       ADMIN_LOGIN_SECOND_FACTOR: 'off',
       ADMIN_IP_ALLOWLIST: '',
       TRUST_PROXY_HOPS: '',
@@ -334,23 +438,26 @@ async function main(): Promise<void> {
     )
   } finally {
     if (app) await app.stop().catch(() => undefined)
-    try {
-      await removeFixtures()
-    } catch (error) {
-      check('清掉本门禁造的账号与机构', false, error instanceof Error ? error.message : String(error))
-    }
     if (prisma) await prisma.onModuleDestroy().catch(() => undefined)
+    database.cleanup()
+    check(
+      '临时数据库已删除',
+      !existsSync(database.databasePath) && !existsSync(database.directory),
+      database.databasePath,
+    )
+    if (inheritedBefore && inheritedDatabasePath && existsSync(inheritedDatabasePath)) {
+      const inheritedAfter = statSync(inheritedDatabasePath)
+      check(
+        '没有写入调用方传来的数据库',
+        inheritedBefore.size === inheritedAfter.size && inheritedBefore.mtimeMs === inheritedAfter.mtimeMs,
+        inheritedDatabasePath,
+      )
+    }
     if (inspector) inspector.disconnect()
     if (redisServer) await redisServer.stop().catch(() => undefined)
   }
 
-  console.log(`\nverify:internal-login-real-redis：${checks - failures}/${checks} 通过`)
-  if (failures > 0) {
-    console.error(`❌ ${failures} 项失败`)
-    process.exit(1)
-  }
-  console.log('✅ 全部通过')
-  process.exit(0)
+  finish(failures > 0 ? 1 : 0)
 }
 
 void main().catch((error: unknown) => {
