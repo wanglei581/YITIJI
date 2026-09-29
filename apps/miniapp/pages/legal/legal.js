@@ -78,7 +78,8 @@ Page({
         })
       })
       .catch(err => {
-        if (err && err.code === 'LEGAL_DOC_UNAVAILABLE') {
+        // 服务端还不认识这一类（旧版本没有「经营者信息」）同样是「还没发布」，不是加载失败。
+        if (err && (err.code === 'LEGAL_DOC_UNAVAILABLE' || err.code === 'LEGAL_DOC_TYPE_INVALID')) {
           this.setData({ state: 'unpublished', unpublishedDesc: UNPUBLISHED_DESC[this._type] || '' })
           return
         }

@@ -27,7 +27,7 @@
     <!-- C1 模型名称与备案号在「AI 服务说明」里公示；C3 投诉入口。两处都放在 AI 功能的入口页上。 -->
     <view class="as-links">
       <view class="as-link tap" hover-class="tap-press" bindtap="openAiDisclaimer" role="button" aria-label="AI 服务说明，所用模型与备案号">
-        <text>AI 服务说明 · 模型与备案号</text>
+        <text>AI 服务说明与备案号</text>
         <text class="ficon i-right" aria-hidden="true"></text>
       </view>
       <view class="as-link tap" hover-class="tap-press" bindtap="openAiComplaint" role="button" aria-label="投诉 AI 生成的内容">
