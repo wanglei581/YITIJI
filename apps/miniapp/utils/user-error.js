@@ -55,6 +55,9 @@ const SHARED_USER_MESSAGES = {
   AI_LOGIN_REQUIRED: '用 AI 之前需要先用手机号登录',
   AI_DECLARATION_REQUIRED: '年龄或录音确认没有记上，请稍后再试',
   AI_PAUSED: 'AI 服务暂停中，打印等其他功能照常可以用',
+  // 后端 9/29 交付：生产缺 AI 配置时 AI 路由 503；换绑手机号时没能先清掉旧登录 503（手机号没改）。
+  AI_PROVIDER_NOT_CONFIGURED: 'AI 服务暂未开通，本次没有生成结果；打印等其他功能照常',
+  REBIND_UNAVAILABLE: '暂时无法换绑，手机号没有改动，请稍后重试',
   MAINTENANCE_MODE: '系统维护中，请稍后再来',
   AI_CONTENT_BLOCKED: 'AI 不能处理这段内容，请换个说法或修改后再试',
   LEGAL_DOCS_NOT_PUBLISHED: '服务协议还没有正式发布，暂时不能登录',

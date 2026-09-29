@@ -183,7 +183,7 @@
           <view class="oc-foot">
             <view class="oc-price">{{item.price}}</view>
             <view class="oc-btns">
-              <view wx:if="{{item.cloudOrder}}" class="oc-btn tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="detail">订单详情</view>
+              <view wx:if="{{item.detailId}}" class="oc-btn tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="detail">订单详情</view>
               <!-- 打印历史行（PrintTask）没有线上详情端点，不放会 404 的按钮。手机下单、到机核销后的单
                    也落在这里（服务端这一行不带 orderId），所以不能说它是「一体机任务」、把人指去一体机（W-走查）。 -->
               <text wx:else class="oc-note">终端打印记录，状态以上方为准</text>
