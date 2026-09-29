@@ -175,6 +175,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:scan-quiet-period
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
           pnpm --filter @ai-job-print/kiosk verify:v6-type-floor
+          pnpm --filter @ai-job-print/kiosk verify:qingxu-v2-frozen
           pnpm --filter @ai-job-print/kiosk verify:visual-evidence-manifest
           pnpm --filter @ai-job-print/admin verify:source-publish-actions
           pnpm --filter @ai-job-print/refresh verify:runtime

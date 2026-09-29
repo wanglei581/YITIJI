@@ -111,6 +111,7 @@
     "verify:deploy-vite-env-coverage": "node scripts/verify-deploy-vite-env-coverage.mjs",
     "verify:contract-review-session": "node scripts/verify-contract-review-session.mjs",
     "verify:contract-review-report-print": "node scripts/verify-contract-review-report-print.mjs",
+    "verify:qingxu-v2-frozen": "node scripts/verify-qingxu-v2-frozen.mjs",
     "verify:visual-evidence-manifest": "node scripts/verify-visual-evidence-manifest.mjs",
     "verify:kiosk-visual-unity": "node scripts/verify-kiosk-visual-unity.mjs",
     "test:browser:p1-evidence": "playwright test --config=playwright.p1-evidence.config.ts",
