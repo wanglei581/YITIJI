@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-09-30：管理员后台两个状态单测挂进 CI（清理批准单第 3 条）
+
+- `apps/admin/src/routes/screensaver/terminalConfigState.test.ts`（屏保终端配置保存）与 `apps/admin/src/routes/toolbox/toolboxActionState.test.ts`（百宝箱发布与错误提示）测的模块都还在用，此前从没进过 CI。按批准单不删、补进 CI：新脚本 `test:admin-state-units` 用 node --test 跑两者，挂在现有 `verify:partner-account-action-state` 后面，不新开作业。
+- 反向变异：屏保「按服务端回读的启用状态回填表单」改坏、百宝箱「保存时去掉只读投影字段」改坏、百宝箱「400 错误带出可操作原因」改坏，各自对应测试变红，还原后 3/3 通过。
+
 ## 2026-09-29：W-03 补——建号时填了但未验证的手机号，也可按确认函登记（分支 `claude/backend-hardening-20260929-w03-unverified-phone`）
 
 - **走查发现（两个后台窗口）：** 界面「新增账号」要求填手机号，建出来都是「临时密码 + 已填未验证的号」；按 #1128 的资格规则这类账号不能登记，W-03 在界面上做不出可登记的账号。
