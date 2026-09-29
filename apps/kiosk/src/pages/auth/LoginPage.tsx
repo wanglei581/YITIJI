@@ -118,6 +118,11 @@ export function LoginPage() {
     error: phoneLogin.error,
     errorCode: phoneLogin.errorCode,
   })
+  // 本机安全校验没过、换票也没换回来时，服务端原话带工程词会被过滤成「请稍后重试」——
+  // 这一态恰恰不该叫人重试，按错误码说清走得通的那条路（其余三种发不了码的原因服务端给了人话，照旧显示）。
+  const phoneFieldsError = phoneState === 'phone-sms-unavailable' && phoneLogin.errorCode === 'TERMINAL_SESSION_INVALID'
+    ? '这台机器现在发不了验证码，请改用扫码登录。'
+    : phoneLogin.error
   const mode: LoginGateMode = tab === 'scan' ? 'qr' : 'phone'
   const state = mode === 'qr' ? qrPhase : phoneState
   const copy = LOGIN_GATE_COPY[state]
@@ -144,9 +149,9 @@ export function LoginPage() {
           back={{ label: '返回首页', onBack: goHome }}
           ctabar={
             <>
-              {mode === 'phone' && (state === 'phone-idle' || state === 'phone-sending' || state === 'phone-verifying' || state === 'phone-legal-unpublished') ? (
+              {mode === 'phone' && (state === 'phone-idle' || state === 'phone-sending' || state === 'phone-verifying' || state === 'phone-legal-unpublished' || state === 'phone-sms-unavailable') ? (
                 <button type="button" className="qx-btn" data-variant="ghost" data-testid="login-gate-anonymous" onClick={goHome}>
-                  {state === 'phone-idle' || state === 'phone-legal-unpublished' ? '不登录，继续使用' : '返回首页'}
+                  {state === 'phone-idle' || state === 'phone-legal-unpublished' || state === 'phone-sms-unavailable' ? '不登录，继续使用' : '返回首页'}
                 </button>
               ) : (
                 <button type="button" className="qx-btn" data-variant="ghost" onClick={() => switchTab(mode === 'phone' ? 'scan' : 'phone')}>
@@ -177,6 +182,18 @@ export function LoginPage() {
                   onClick={phoneLogin.onSendCode}
                 >
                   {state === 'phone-send-failed' ? '立刻重新获取' : '重新获取验证码'}
+                </button>
+              ) : null}
+              {/* 这台机器 / 全站今天发不了码：再点「重新获取」没用，主按钮直接换到扫码登录。 */}
+              {mode === 'phone' && state === 'phone-sms-unavailable' ? (
+                <button
+                  type="button"
+                  className="qx-btn"
+                  data-variant="primary"
+                  data-testid="login-gate-primary"
+                  onClick={() => switchTab('scan')}
+                >
+                  改用扫码登录
                 </button>
               ) : null}
               {mode === 'qr' && (state === 'qr-ready' || state === 'qr-expired' || state === 'qr-error') ? (
@@ -242,7 +259,7 @@ export function LoginPage() {
               </div>
             ) : null}
             {mode === 'phone' ? (
-              <LoginGatePhoneFields {...phoneLogin.paneProps} state={phoneState} />
+              <LoginGatePhoneFields {...phoneLogin.paneProps} error={phoneFieldsError} state={phoneState} />
             ) : (
               <ScanQrLoginPanel
                 returnTo={returnTo}

@@ -1,5 +1,6 @@
 // 顾问作业面：只封装已经存在的端点，不发明「列出全部产物」。
 
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 import { networkError, throwHttpError } from './throwHttpError'
@@ -34,7 +35,7 @@ async function request(path: string, init: RequestInit, access?: AdvisorAccess):
   const ac = new AbortController()
   const timer = setTimeout(() => ac.abort(), TIMEOUT_MS)
   try {
-    return await fetch(`${API_BASE_URL}${path}`, {
+    return await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       ...init,
       headers: {
         ...accessHeaders(access),
