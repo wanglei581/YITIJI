@@ -43,15 +43,14 @@ export interface AdminOrgAccount {
   emailVerifyMethod: string | null
   availableActionVerificationMethods: PartnerAccountVerificationMethod[]
   /**
-   * 账号列表目前不返回（admin-org-account-view 查了但没映射出来）。
-   * 有值时登记按钮才按 temporary / owner_managed / legacy 区分。
+   * 服务端账号列表下发。三个字段缺省表示这份响应还没有它们：
+   * 登记按钮不显示，前端不根据停用、手机验证或验证方式自行推断。
    */
   passwordProofState?: 'temporary' | 'owner_managed' | 'legacy' | null
-  /**
-   * 账号列表目前不返回。有值表示联系人手机已登记、本人尚未自证。
-   * 不要用 phoneMasked 代替：创建账号时登录手机就会被脱敏展示。
-   */
-  contactPhoneRegisteredAt?: string | null
+  /** 非空表示管理员已登记联系人手机，机构本人尚未自证。 */
+  phoneRegisteredByAdminAt?: string | null
+  /** 服务端算好的登记资格。只有严格 true 才显示按钮。 */
+  canRegisterContactPhone?: boolean
   createdAt: string
 }
 
