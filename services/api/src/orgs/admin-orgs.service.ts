@@ -26,6 +26,7 @@ import { tryRedis } from '../common/redis/redis-degradation'
 import { Prisma } from '../generated/prisma/client'
 import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import { PASSWORD_PROOF_STATE, passwordProofState } from '../auth/password-proof-state'
+import { contactPhoneAssignment } from './contact-phone-change'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
 import { isParkedOrgType, throwOrgTypeParked } from './parked-org-types'
 import {
@@ -404,7 +405,7 @@ export class AdminOrgsService {
           ...(dto.name !== undefined ? { name: dto.name } : {}),
           ...(dto.type !== undefined ? { type: dto.type } : {}),
           ...(dto.contact !== undefined ? { contact: dto.contact } : {}),
-          ...(dto.contactPhone !== undefined ? { contactPhone: dto.contactPhone } : {}),
+          ...(dto.contactPhone !== undefined ? contactPhoneAssignment(current.contactPhone, dto.contactPhone) : {}),
           ...(dto.sceneTemplate !== undefined ? { sceneTemplate: dto.sceneTemplate } : {}),
           ...(modulesChanged ? { enabledModulesJson: JSON.stringify(nextModules) } : {}),
         },
@@ -952,9 +953,18 @@ export class AdminOrgsService {
     if (!user.orgId) {
       throw new ForbiddenException({ error: { code: 'ORG_REQUIRED', message: '当前账号未绑定机构' } })
     }
-    const data: Record<string, string> = {}
-    if (dto.contact !== undefined) data['contact'] = dto.contact.trim()
-    if (dto.contactPhone !== undefined) data['contactPhone'] = dto.contactPhone.trim()
+    const currentProfile = await this.prisma.organization.findUnique({
+      where: { id: user.orgId },
+      select: { contactPhone: true },
+    })
+    if (!currentProfile) {
+      throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
+    }
+    const data: Prisma.OrganizationUpdateInput = {}
+    if (dto.contact !== undefined) data.contact = dto.contact.trim()
+    if (dto.contactPhone !== undefined) {
+      Object.assign(data, contactPhoneAssignment(currentProfile.contactPhone, dto.contactPhone.trim()))
+    }
     if (Object.keys(data).length === 0) {
       throw new BadRequestException({ error: { code: 'ORG_PROFILE_EMPTY', message: '没有可更新的字段' } })
     }

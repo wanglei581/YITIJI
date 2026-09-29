@@ -677,6 +677,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-account-action:otp
           pnpm --filter @ai-job-print/api verify:partner-account-action:redis
           pnpm --filter @ai-job-print/api verify:partner-account-action
+          pnpm --filter @ai-job-print/api verify:partner-contact-phone-registration
           pnpm --filter @ai-job-print/api verify:resume-generate
           pnpm --filter @ai-job-print/api verify:resume-export-formats
           # 按原样导出的正文来源：带任务号只用留存原话；不带任务号拒照抄 AI 结果（会员 / 匿名一体机）
@@ -1154,6 +1155,7 @@ jobs:
           # DriverAdapterError（不是 P2034），重试逻辑必须认得出，不能变成 500。
           pnpm --filter @ai-job-print/api verify:pg-serialization-conflict
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-serialization-conflict:postgres
+          pnpm --filter @ai-job-print/api verify:partner-contact-phone-registration
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
           # KIOSK-DEBT 三处前端欠账。纯读 apps/kiosk 源码、不连库，

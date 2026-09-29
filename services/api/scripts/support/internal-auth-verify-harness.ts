@@ -2,7 +2,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import type { SmsSender } from '../../src/member-auth/sms/sms-sender'
+import { partnerPhoneRegisteredNoticeText, type SmsSender } from '../../src/member-auth/sms/sms-sender'
 import { PrismaService } from '../../src/prisma/prisma.service'
 
 export class VerificationFailure extends Error {
@@ -72,10 +72,17 @@ export function assertFailureUnwindsCleanup(): void {
 export class CapturingSmsSender implements SmsSender {
   lastCode: string | null = null
   deliveries = 0
+  readonly codes: Array<{ phone: string; code: string }> = []
+  readonly notices: Array<{ phone: string; orgName: string; text: string }> = []
 
-  async sendCode(_phone: string, code: string): Promise<void> {
+  async sendCode(phone: string, code: string): Promise<void> {
     this.lastCode = code
     this.deliveries += 1
+    this.codes.push({ phone, code })
+  }
+
+  async sendPartnerPhoneRegisteredNotice(phone: string, orgName: string): Promise<void> {
+    this.notices.push({ phone, orgName, text: partnerPhoneRegisteredNoticeText(orgName) })
   }
 }
 
@@ -308,6 +315,7 @@ export function prepareIsolatedDatabase(
           "type" TEXT NOT NULL,
           "contact" TEXT,
           "contactPhone" TEXT,
+          "contactPhoneChangedAt" DATETIME,
           "sceneTemplate" TEXT,
           "enabledModulesJson" TEXT NOT NULL DEFAULT '[]',
           "enabled" BOOLEAN NOT NULL DEFAULT true,
@@ -331,6 +339,7 @@ export function prepareIsolatedDatabase(
           "phoneHash" TEXT,
           "phoneEnc" TEXT,
           "phoneVerifiedAt" DATETIME,
+          "phoneRegisteredByAdminAt" DATETIME,
           "emailHash" TEXT,
           "emailEnc" TEXT,
           "emailVerifiedAt" DATETIME,

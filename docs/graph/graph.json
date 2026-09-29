@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 572,
+    "endpointCount": 573,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -2861,6 +2861,26 @@
         ],
         "services": [
           "AdminOrgsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/orgs/admin-orgs.controller.ts",
+        "handler": "AdminOrgsController.registerContactPhone",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "User"
+        ],
+        "path": "/api/v1/admin/orgs/:id/accounts/:accountId/contact-phone",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/orgs/partner-contact-phone-registration.service.ts"
+        ],
+        "services": [
+          "PartnerContactPhoneRegistrationService"
         ]
       },
       {
@@ -17194,7 +17214,7 @@
         ]
       },
       {
-        "fieldCount": 27,
+        "fieldCount": 28,
         "name": "Organization",
         "relations": [
           "CompanyProfile",
@@ -17223,6 +17243,7 @@
           "services/api/src/orgs/admin-org-account-security.ts",
           "services/api/src/orgs/admin-org-content-trust.service.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/partner-contact-phone-registration.service.ts",
           "services/api/src/policies/policies.service.ts",
           "services/api/src/recruitment-content/recruitment-content-read.service.ts",
           "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
@@ -17689,7 +17710,7 @@
         ]
       },
       {
-        "fieldCount": 27,
+        "fieldCount": 28,
         "name": "User",
         "relations": [
           "AuditLog",
@@ -17708,6 +17729,7 @@
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
           "services/api/src/auth/admin-login-second-factor.ts",
           "services/api/src/auth/admin-phone-transfer.service.ts",
+          "services/api/src/auth/admin-registered-phone-reset.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/first-admin-bootstrap.ts",
           "services/api/src/auth/initial-phone-bind.service.ts",
@@ -17717,6 +17739,7 @@
           "services/api/src/common/health.controller.ts",
           "services/api/src/orgs/admin-org-account-security.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/partner-contact-phone-registration.service.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
@@ -21434,7 +21457,8 @@
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
     "packages/shared/src/types/audit.ts": [
-      "services/api/scripts/verify-change-password.ts"
+      "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "packages/shared/src/types/campusRecruitmentStats.ts": [
       "services/api/scripts/verify-campus-recruitment-stats.ts"
@@ -22061,6 +22085,7 @@
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
@@ -23092,6 +23117,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
@@ -23135,7 +23161,8 @@
     ],
     "services/api/src/audit/audit.types.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
-      "services/api/scripts/verify-change-password.ts"
+      "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/auth/admin-initial-phone-bind.service.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts",
@@ -23143,6 +23170,9 @@
     ],
     "services/api/src/auth/admin-phone-transfer.service.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts"
+    ],
+    "services/api/src/auth/admin-registered-phone-reset.ts": [
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/auth/auth.controller.ts": [
       "services/api/scripts/verify-change-password.ts",
@@ -23161,6 +23191,7 @@
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts"
     ],
     "services/api/src/auth/dto/internal-auth.dto.ts": [
@@ -23191,6 +23222,7 @@
       "services/api/scripts/verify-partner-account-action-otp.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/auth/internal-otp.types.ts": [
@@ -23201,7 +23233,8 @@
     ],
     "services/api/src/auth/partner-account-action.service.ts": [
       "services/api/scripts/verify-partner-account-action-postgres.ts",
-      "services/api/scripts/verify-partner-account-action.ts"
+      "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/auth/partner-phone-rebind.service.ts": [
       "services/api/scripts/verify-partner-account-action-postgres.ts",
@@ -23209,7 +23242,8 @@
       "services/api/scripts/verify-pg-serialization-conflict.ts"
     ],
     "services/api/src/auth/password-proof-state.ts": [
-      "services/api/scripts/verify-admin-phone-transfer.ts"
+      "services/api/scripts/verify-admin-phone-transfer.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/benefit-activities/admin-benefit-activities.controller.ts": [
       "services/api/scripts/verify-benefit-activities.ts"
@@ -23284,6 +23318,7 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/common/crypto/secret-cipher.ts": [
@@ -23316,6 +23351,7 @@
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-official-channels.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-excel-import.ts",
@@ -23499,13 +23535,15 @@
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-redis.ts",
-      "services/api/scripts/verify-partner-account-action.ts"
+      "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/common/redis/redis-degradation.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
@@ -23542,6 +23580,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
@@ -23603,6 +23642,7 @@
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
       "services/api/scripts/verify-cjk-font.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-production-real-services.ts",
@@ -24487,6 +24527,7 @@
     ],
     "services/api/src/member-auth/sms/sms-budget.ts": [
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/member-auth/sms/sms-sender.ts": [
@@ -24496,6 +24537,7 @@
       "services/api/scripts/verify-member-sms-provider-errors.ts",
       "services/api/scripts/verify-member-step-up.helpers.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-sms-provider.ts",
       "services/api/scripts/verify-sms-send.ts"
@@ -24771,7 +24813,8 @@
       "services/api/scripts/verify-content-trust-publish-gate.ts"
     ],
     "services/api/src/orgs/admin-orgs.controller.ts": [
-      "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
+      "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/orgs/admin-orgs.service.ts": [
       "services/api/scripts/verify-admin-orgs-delete-concurrency.ts",
@@ -24781,11 +24824,15 @@
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts"
+    ],
+    "services/api/src/orgs/contact-phone-change.ts": [
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/orgs/dto/admin-org.dto.ts": [
       "services/api/scripts/verify-org-type-enum-sync.ts"
@@ -24793,8 +24840,14 @@
     "services/api/src/orgs/dto/partner-account-action.dto.ts": [
       "services/api/scripts/verify-partner-account-action.ts"
     ],
+    "services/api/src/orgs/dto/register-partner-contact-phone.dto.ts": [
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
+    ],
     "services/api/src/orgs/parked-org-types.ts": [
       "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+    ],
+    "services/api/src/orgs/partner-contact-phone-registration.service.ts": [
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/orgs/partner-stats.controller.ts": [
       "services/api/scripts/verify-partner-stats-contract.ts"
@@ -25364,6 +25417,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
@@ -37029,6 +37083,46 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:partner-account-action"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "packages/shared/src/types/audit.ts",
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/audit/audit.types.ts",
+          "services/api/src/auth/admin-registered-phone-reset.ts",
+          "services/api/src/auth/auth.service.ts",
+          "services/api/src/auth/internal-otp.service.ts",
+          "services/api/src/auth/partner-account-action.service.ts",
+          "services/api/src/auth/password-proof-state.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/common/redis/partner-account-action-redis.service.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/member-auth/sms/sms-budget.ts",
+          "services/api/src/member-auth/sms/sms-sender.ts",
+          "services/api/src/orgs/admin-orgs.controller.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/contact-phone-change.ts",
+          "services/api/src/orgs/dto/register-partner-contact-phone.dto.ts",
+          "services/api/src/orgs/partner-contact-phone-registration.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-partner-contact-phone-registration.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:partner-contact-phone-registration"
       ],
       "wired": true
     },

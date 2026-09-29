@@ -15,6 +15,8 @@ import {
 import { BindAccountEmailDto } from './dto/bind-account-email.dto'
 import { OrgContentTrustDto } from './dto/org-content-trust.dto'
 import { AdminOrgContentTrustService } from './admin-org-content-trust.service'
+import { RegisterPartnerContactPhoneDto } from './dto/register-partner-contact-phone.dto'
+import { PartnerContactPhoneRegistrationService } from './partner-contact-phone-registration.service'
 
 /**
  * Admin 合作机构管理(阶段1B)。
@@ -29,6 +31,7 @@ import { AdminOrgContentTrustService } from './admin-org-content-trust.service'
  *   PATCH  /admin/orgs/:id/accounts/:accountId/status   账号启停
  *   PATCH  /admin/orgs/:id/accounts/:accountId/password 重置账号密码
  *   PUT    /admin/orgs/:id/accounts/:accountId/email    代绑/换绑登录邮箱（Admin 人工核验，无 SMTP）
+ *   POST   /admin/orgs/:id/accounts/:accountId/contact-phone  登记机构联系人手机（临时密码且未自证）
  *   GET    /admin/orgs/:id/content-trust                内容信任状态（发布闸门读什么，这里就显示什么）
  *   PATCH  /admin/orgs/:id/content-trust                标记内容信任（active 才允许发布该机构内容）
  *
@@ -41,6 +44,7 @@ export class AdminOrgsController {
   constructor(
     private readonly orgs: AdminOrgsService,
     private readonly contentTrust: AdminOrgContentTrustService,
+    private readonly contactPhones: PartnerContactPhoneRegistrationService,
   ) {}
 
   @Get('admin/orgs')
@@ -103,6 +107,16 @@ export class AdminOrgsController {
   @Patch('admin/orgs/:id/content-trust')
   setContentTrust(@Param('id') id: string, @Body() dto: OrgContentTrustDto, @CurrentUser() user: AuthedUser) {
     return this.contentTrust.setContentTrust(id, dto, user)
+  }
+
+  @Post('admin/orgs/:id/accounts/:accountId/contact-phone')
+  registerContactPhone(
+    @Param('id') id: string,
+    @Param('accountId') accountId: string,
+    @Body() dto: RegisterPartnerContactPhoneDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.contactPhones.register(id, accountId, dto, user)
   }
 
   @Put('admin/orgs/:id/accounts/:accountId/email')

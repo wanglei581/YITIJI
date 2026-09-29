@@ -10,6 +10,12 @@
 
 - **做了什么（Grok 实现、协调方审，产品负责人 9/29 拍板）：** `AiUsageRecord` 接进每小时清理任务，保留期与 `AiServiceLog` 同读 `AI_SERVICE_LOG_RETENTION_DAYS`（默认 90 天）；删除前先把即将删除的行按北京时间月份、功能、厂商、型号、结局汇总进新表 `AiUsageMonthlySummary`（两套迁移 `20260929230000_ai_usage_retention_summary`），只存次数、已计量金额与未计量次数，**不存会员、终端、机构**，长期保留；汇总与打标同一事务，重复跑结果不变。会员数据导出加 `aiUsage` 段（本人的功能、时间、状态、金额）；注销处置定为置空（`detachMemberAiUsageRecords`，等注销执行器接入）。留存矩阵与数据清单同步。
 - **验证：** 新门禁 `verify:ai-usage-retention` 66 条（CI SQLite 与 postgres-readiness）；Grok 6 处、协调方抽 1 处（每小时任务不清用量账）变异全红；ai-usage-budget、ai-user-text-retention、member-data-export / request-contract / retention、recruitment-p1-schema 等 10 条与 PG schema 同步校验全绿。法务草稿里「到期自动清理」那句，本 PR 合入后即可发布。
+## 2026-09-29：W-03 机构账号「临时密码、没绑手机」死锁打通——管理员按确认函登记手机号、本人短信自证（分支 `claude/backend-hardening-20260929-w03-contact-phone`）
+
+- **问题：** 管理员建的机构账号只有临时密码、没绑手机时，找回密码要求已自证手机、本人绑手机又不算自证（临时密码管理员也知道），账号永远变不成本人自管，机构自管操作做不了。
+- **做法（Grok 实现，安全口径由协调方定稿，总指挥拍板方案 A + 防线）：** 新接口 `POST /api/v1/admin/orgs/:id/accounts/:accountId/contact-phone`（管理员本人密码确认，复用机构账号操作的 5 次 / 5 分钟锁）。防线：只对「临时密码、手机未自证」的机构账号开放；手机号必须等于机构资料里确认函上的联系人手机；机构联系人手机 24 小时内改过就不许登记（防管理员先改成自己的号）；审计记确认函编号、不记明文手机号，与写入同一事务；写库后给该号发知会短信，生产没配模板时写库前就拒（失败关闭），发送失败补偿清回。之后机构本人在登录页「忘记密码」用这个号收码、设新密码，账号变本人自管、手机算自证；管理员无法代收验证码，管理员账号的找回规则不变。新列 `User.phoneRegisteredByAdminAt`、`Organization.contactPhoneChangedAt`（两套迁移 `20260929235000_add_partner_contact_phone_registration`）；后台账号列表按与两个后台的约定下发 `passwordProofState`、`phoneRegisteredByAdminAt`、`canRegisterContactPhone`。
+- **验证：** 新门禁 `verify:partner-contact-phone-registration` 46 条（整条链：登记 → 本人找回 → 自管 → 做一项自管操作，加反例），挂 CI；Grok 7 处、协调方 4 处行为变异（不核对联系人手机、不看冷却、找回对所有角色放开、资格不看临时密码）全红；机构账号操作、内部账号、改密、手机转移、短信额度等 17 条关联门禁与 PG schema 同步校验全绿。
+- **待办：** 短信平台要另申请知会模板，配到 `SMS_TEMPLATE_PARTNER_PHONE_REGISTERED`，没配之前生产上这个接口一律 503（失败关闭）。
 
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
