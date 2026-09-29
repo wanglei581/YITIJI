@@ -1,5 +1,17 @@
 # 当前开发进度
 
+## 2026-09-30：W-86 第四轮——重试资格补付款与版本门槛，落后补报在事务内双向拒绝（分支 `grok/print-retry-attempt-0929`，提交 `ac0c10b65`、`829171130`、`eb2a3c998`）
+
+- **有订单才看付款。** 试点 0 元单落库后就是 `payStatus='paid'`：`order-status.service.ts` 206–207 规定 `paymentSource='free'` 且金额不是 0 就拒绝，231–234 的 CAS 写成 `paid`；一体机免费单在 `print-jobs.service.ts` 530–533 走 `markPaid({ paymentSource: 'free' })`；会员云打印在 `member-print-order-create.service.ts` 322–323 同样置 paid，376 行用 `amountCents===0 && payStatus==='paid' && paymentSource==='free'` 识别免费单；套餐在 `package-order.service.ts` 241、335。没有另设 free 付款状态。没有订单的自检或内部任务不套付款和退款条件，管理员仍可重试。
+- **只出一部分。** 会员端和管理员端都拒绝，人话都是「这单已经出了一部分纸，不能整单重打；需要补打请另下新单」。管理员后台不开放强制重打。
+- **同一句人话。** 未付、退款、未确认、只出一部分、文件过期、状态不是失败、终端版本不够，两条入口的错误码和人话一致。管理员原有的终端退役、订单序列点、审计保留。解析不出文件链接仍是管理员自己的 `PRINT_SCAN_RETRY_FILE_UNAVAILABLE`。
+- **落后补报。** 当前 attempt 与状态写入在同一个事务里：先锁住 PrintTask 行，再用和领取相同的 `reprintAttemptsByTaskId`（只数 failed→pending，不按 errorCode 过滤）。请求的 attempt 小于或大于当前值都回 409 `PRINT_STATUS_STALE_ATTEMPT`，事务内写一条同状态日志，只记任务号、请求的 attempt、当前 attempt，不计入重提次数。不带 attempt 的老 Agent 保持原样，同一终态的回放仍在打开写事务之前决定。
+- **按钮原因。** 管理员打印任务列表和详情增加 `retryBlockedReason`，由同一个资格函数算出。null 表示可以重试，否则与拒绝人话相同。没有改 `apps/admin`。后台窗口若仍按旧错误码显示，需要另接。
+- **版本门槛。** 任务所属终端最近一次心跳的 `agentVersion` 低于 0.4.13、读不到、格式不合法，或任务没有终端，都不许重试。比较取开头的主.次.修订逐段比数字，后缀忽略。人话：「这台终端的打印程序版本过旧，升级到 0.4.13 后才能重新提交」。Agent 版本号仍是 0.4.12，本轮没有改版本号，也没有 push。
+- **两种老 Agent：** 老 Agent 加上新服务端的重提，现在被版本门槛挡住，不会派单。老 Agent 离线补报不带 attempt，不会串到新一轮，因为 attempt≥1 的重提不会再派给老 Agent。不带 attempt 的同机重提竞态还在；现场应先升级 Agent 再开放重提。发布清单不由本窗口写。
+- **本机已跑（隔离 SQLite `file:~/.cache/claude-lanes/print-retry-0929/verify-w86-r3.db`）：** `verify:print-jobs`、`verify:pickup-code-share`、`verify:admin-print-scan`、`verify:refund-idempotent`、`verify:payment-flow`、`verify:member-order-timeline`、`verify:terminal-status-idempotency` 退出 0；`verify:print-retry-attempt` 退出 0。`verify:miniapp-cloud-print-m2` 退出 1，与基线 `90eb5a21c` 相同（一体机取件页已不再包含 `result.released ? '/print/progress' : '/print/cashier'`），未改。变异在提交之后做，每条退出 1，随后 `git checkout` 还原：管理员放行 PARTIAL_OUTPUT；去掉落后比较（8e2c 未抛）；计数改成只数 kiosk_retry；落后补报不删队列；attempt 大于当前值时放行；版本比较方向写反（0.4.12 被放行）；改成字符串比较（0.4.9 被放行）。图谱已重生成，`pnpm graph:check` 通过。
+- **没在本机验证：** 真 Windows 打印机、真缺纸、GitHub CI 全量。PR #1131 的 PostgreSQL 审计脚本不在本分支和 `origin/main`，只在 `claude/backend-hardening-20260929-member-print-audit-pg`；本机 PostgreSQL 16 服务未启动，5432 无监听，Docker 也不可用，没有启动用户本机的数据库，也没有把那份脚本拣进本分支。
+
 ## 2026-09-30：W-86 第三轮——重提作业按 attempt 关联，两条入口共用重试资格（分支 `grok/print-retry-attempt-0929`，提交 `705c1c433`）
 
 - **关联键：** 临时文件名、`correlationId`、WMI 队列匹配都带 attempt。attempt=0 仍是 `task_<taskId>.<ext>`，新名字仍能被开机清队列正则 `^task_[A-Za-z0-9_-]{1,128}(\.[A-Za-z0-9]+)$` 认出来。没有重做另一支的开机清队列。

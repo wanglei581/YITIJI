@@ -10479,7 +10479,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/print/jobs",
         "roles": [],
@@ -10529,7 +10530,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/print/jobs/:taskId",
         "roles": [],
@@ -10555,7 +10557,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/print/jobs/:taskId/retry",
         "roles": [],
@@ -10581,7 +10584,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/print/jobs/:taskId/takeaway-url",
         "roles": [],
@@ -16804,6 +16808,7 @@
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/payment/pickup-validity.ts",
           "services/api/src/print-conversion/print-conversion.service.ts",
+          "services/api/src/print-jobs/paid-reprint-eligibility.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/pii-scan-gate.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
@@ -17378,6 +17383,7 @@
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
+          "services/api/src/terminals/print-status-attempt.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
@@ -17613,6 +17619,7 @@
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/orgs/partner-stats.service.ts",
+          "services/api/src/print-jobs/paid-reprint-eligibility.ts",
           "services/api/src/terminals/printer-availability.ts",
           "services/api/src/terminals/terminal-heartbeat-retention.task.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
