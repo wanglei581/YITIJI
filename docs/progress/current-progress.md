@@ -1,5 +1,7 @@
 # 当前开发进度
 
+> **2026-09-29 一体机自我探索同意条款三端对齐（一体机半，随 #1119；候选写入方）**：同意页的条款（6 条，含年龄一条）、确认式勾选框文字（含《隐私政策》未成年人专章链接）、同意版本（sa-consent-v2.2026-09-29）全部来自同一次 GET /resume/self-assessment/questions 响应，源码不再写死；取不到说明时如实提示「同意说明没有取到，请重试」、不放行；旧版本提交 400 SELF_ASSESSMENT_CONSENT_VERSION_STALE 回到重新确认、已答不清空、确认后自动重交。法务文档页支持 ?section= 按章节标题「包含」定位，找不到停在开头、不做近似兜底。结果页按 interpretationAvailable / aiUnavailableReason 说明 AI 解读缺失原因，维度打分始终显示；职业规划 selfAssessmentExcluded='consent_outdated' 时在依据旁说明并给重新确认入口。门禁 verify:self-assessment-consent-source（进 CI）+ 10 条单测，14 个反向变异全红；本地独立 API + 正式构建走通正常提交与旧版本重确认两条路。待办：①声明开关打开后一体机不会主动问年满 14 周岁（提交接口是 exempt），须在第二次发布前补主动确认；②重新确认拦截面约 750px 留白；③服务端 A6「四端一致」测试打开时改为「一体机按下发渲染、无写死常量」口径。小程序半边 #1124 由小程序窗口并新基线后紧跟合入，三端须同一次发布上线（发布清单 #1127 第 4c 条）。
+
 ## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
 
 - **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。

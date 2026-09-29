@@ -12800,7 +12800,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 624,
+      "reachableFileCount": 629,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15791,7 +15791,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 717
+      "sourceFileCount": 722
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19116,6 +19116,7 @@
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/pages/legal/legal-service-desk.css": [
@@ -19123,6 +19124,7 @@
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
     ],
     "apps/kiosk/src/pages/legal/legalDocModel.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx": [
@@ -19965,6 +19967,7 @@
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
       "services/api/scripts/verify-compliance.ts"
     ],
@@ -20191,8 +20194,12 @@
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
     ],
+    "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
+    ],
     "apps/kiosk/src/pages/resume/selfAssessmentSession.ts": [
-      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
     ],
     "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
@@ -20208,6 +20215,9 @@
     ],
     "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
     ],
     "apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts": [
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
@@ -20616,6 +20626,7 @@
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-compliance.ts"
     ],
     "apps/kiosk/src/services/api/terminalConfig.ts": [
@@ -23079,6 +23090,7 @@
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/resume/self-assessment.types.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
@@ -29998,6 +30010,31 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:screensaver-empty-shell"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
+          "apps/kiosk/src/pages/legal/legalDocModel.ts",
+          "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts",
+          "apps/kiosk/src/pages/resume/selfAssessmentSession.ts",
+          "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts",
+          "apps/kiosk/src/services/api/selfAssessment.ts",
+          "services/api/src/ai/resume/self-assessment.types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:self-assessment-consent-source"
       ],
       "wired": true
     },

@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1699 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1701 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -316,7 +316,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 522 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 524 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -485,9 +485,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/jobs/styles/jobs-list-qx.css` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/jobs/utils/sourceContentTrust.ts` | `verify-job-info-ui.mjs` |
 | `apps/kiosk/src/pages/jobs/utils/sourceTrust.ts` | `verify-jobfair-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
-| `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-legal-retention-copy.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-legal-doc-version.ts` |
+| `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-legal-retention-copy.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-self-assessment-consent-source.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/kiosk/src/pages/legal/legal-service-desk.css` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-k1-public-entry.mjs` |
-| `apps/kiosk/src/pages/legal/legalDocModel.ts` | `verify-legal-doc-version.ts` |
+| `apps/kiosk/src/pages/legal/legalDocModel.ts` | `verify-self-assessment-consent-source.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/offline-agencies/OfflineAgenciesPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/kiosk/src/pages/offline-agencies/OfflineAgencyDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-backend-p0-contracts.mjs` |
@@ -647,7 +647,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/ResumeReportPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-no-raw-error-render.mjs` |
-| `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-w3a-ai-records.mjs`<br/>`verify-compliance.ts` |
+| `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-self-assessment-consent-source.mjs`<br/>`verify-w3a-ai-records.mjs`<br/>`verify-compliance.ts` |
 | `apps/kiosk/src/pages/resume/aiResumeSession.ts` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/resume/components/DiagnosisDirectionForm.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/OptimizedResumeEditor.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
@@ -714,12 +714,14 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/resume-triage-panels-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-triage-qx.css` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/self-assessment-lightflow.css` | `verify-compliance.ts` |
-| `apps/kiosk/src/pages/resume/selfAssessmentSession.ts` | `verify-kiosk-ai-declaration.mjs` |
+| `apps/kiosk/src/pages/resume/selfAssessmentConsent.ts` | `verify-self-assessment-consent-source.mjs` |
+| `apps/kiosk/src/pages/resume/selfAssessmentSession.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-common.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-job-fit.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/resume/styles/resume-fusion-library.css` | `verify-fusion-w3.mjs` |
+| `apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts` | `verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/pages/scan/ScanProgressPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/scan/ScanResultPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-done-truth.mjs`<br/>`verify-scan-session-truth.mjs` |
@@ -813,7 +815,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/services/api/printSign.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/services/api/scanTasks.ts` | `verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/services/api/screensaver.ts` | `verify-kiosk-field-safety.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-print-scan-first-release.ts` |
-| `apps/kiosk/src/services/api/selfAssessment.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-compliance.ts` |
+| `apps/kiosk/src/services/api/selfAssessment.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-self-assessment-consent-source.mjs`<br/>`verify-compliance.ts` |
 | `apps/kiosk/src/services/api/terminalConfig.ts` | `verify-home-toolbox-ui.mjs`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-device-config.ts` |
 | `apps/kiosk/src/services/api/throwHttpError.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/services/api/toolboxLaunchEvents.ts` | `verify-home-toolbox-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
@@ -2152,7 +2154,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/self-assessment-questions.ts` | `verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/resume/self-assessment-scoring.ts` | `verify-self-assessment-ai-gate.ts`<br/>`verify-self-assessment.ts` |
 | `services/api/src/ai/resume/self-assessment.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
-| `services/api/src/ai/resume/self-assessment.types.ts` | `verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
+| `services/api/src/ai/resume/self-assessment.types.ts` | `verify-self-assessment-consent-source.mjs`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/self-assessment.controller.ts` | `verify-ai-access.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/usage/admin-ai-usage.controller.ts` | `verify-ai-usage-budget.ts` |
 | `services/api/src/ai/usage/ai-budget.service.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
