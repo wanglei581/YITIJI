@@ -229,6 +229,7 @@ guard_trash_root() {
 }
 
 REF_LOADED=no
+REF_HIT=""
 PM2_INDETERMINATE=no
 NGINX_INDETERMINATE=no
 PM2_PATHS=()
@@ -437,12 +438,13 @@ path_related() {
   return 1
 }
 
-# 打印 pm2、nginx、pm2,nginx、none 或 indeterminate。
+# 把引用结果写进 REF_HIT（pm2、nginx、pm2,nginx、none 或 indeterminate）。
+# 不能放进 $(...)：那样 load_runtime_refs 在子 shell 里，REF_LOADED 留不下，删除前的重新加载会失效。
 reference_of() {
   local resolved="$1" p hit_pm2=no hit_nginx=no
   load_runtime_refs
   if [ "$PM2_INDETERMINATE" = yes ] || [ "$NGINX_INDETERMINATE" = yes ]; then
-    printf '%s\n' "indeterminate"
+    REF_HIT="indeterminate"
     return 0
   fi
   if [ "${#PM2_PATHS[@]}" -gt 0 ]; then
@@ -460,13 +462,13 @@ reference_of() {
     done
   fi
   if [ "$hit_pm2" = yes ] && [ "$hit_nginx" = yes ]; then
-    printf '%s\n' "pm2,nginx"
+    REF_HIT="pm2,nginx"
   elif [ "$hit_pm2" = yes ]; then
-    printf '%s\n' "pm2"
+    REF_HIT="pm2"
   elif [ "$hit_nginx" = yes ]; then
-    printf '%s\n' "nginx"
+    REF_HIT="nginx"
   else
-    printf '%s\n' "none"
+    REF_HIT="none"
   fi
 }
 
@@ -497,7 +499,8 @@ recheck_target() {
     echo "   ❌ 拒绝处理：删除前内部挂载点不可判定或存在：${target}"
     return 1
   fi
-  ref="$(reference_of "$resolved")"
+  reference_of "$resolved"
+  ref="$REF_HIT"
   if [ "$ref" != none ]; then
     echo "   ❌ 拒绝处理：删除前引用复查未过（${ref}）：${target}"
     return 1
@@ -627,7 +630,8 @@ preflight() {
     echo "      dry-run 只报告该差异。"
   fi
 
-  ref="$(reference_of "$resolved")"
+  reference_of "$resolved"
+  ref="$REF_HIT"
   if [ "$ref" = indeterminate ] || [ -z "$ref" ]; then
     echo "   ❌ 拒绝处理：pm2 或 nginx 引用不可判定，本目录不移动也不删除：${target}"
     return 1
