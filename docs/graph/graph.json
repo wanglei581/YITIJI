@@ -10558,22 +10558,26 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
+          "KioskSession",
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "Terminal",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/generate",
         "roles": [],
         "serviceFiles": [
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume/resume-draft-source.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "services": [
           "AiService",
           "AuditService",
-          "MemberPrivacyService"
+          "MemberPrivacyService",
+          "ResumeDraftSourceService"
         ]
       },
       {
@@ -10614,22 +10618,26 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
+          "KioskSession",
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "Terminal",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/generate/export",
         "roles": [],
         "serviceFiles": [
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume/resume-draft-source.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "services": [
           "AiService",
           "AuditService",
-          "MemberPrivacyService"
+          "MemberPrivacyService",
+          "ResumeDraftSourceService"
         ]
       },
       {
@@ -10948,16 +10956,19 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
+          "KioskSession",
           "Order",
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "Terminal",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/records/:taskId/optimize",
         "roles": [],
         "serviceFiles": [
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume/resume-draft-source.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
@@ -10966,7 +10977,8 @@
           "AiService",
           "AuditService",
           "BenefitRedemptionService",
-          "MemberPrivacyService"
+          "MemberPrivacyService",
+          "ResumeDraftSourceService"
         ]
       },
       {
@@ -16139,7 +16151,7 @@
         ]
       },
       {
-        "fieldCount": 15,
+        "fieldCount": 16,
         "name": "AiResumeResult",
         "relations": [
           "EndUser"
@@ -16154,6 +16166,7 @@
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
           "services/api/src/ai/resume/job-fit-hosting.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
+          "services/api/src/ai/resume/resume-draft-source.service.ts",
           "services/api/src/ai/resume/resume-draft.store.ts",
           "services/api/src/ai/resume/self-assessment.service.ts",
           "services/api/src/job-ai/job-ai.service.ts",
@@ -16794,6 +16807,7 @@
         "name": "KioskSession",
         "relations": [],
         "usedBy": [
+          "services/api/src/ai/resume/resume-draft-source.service.ts",
           "services/api/src/kiosk-session/kiosk-session-retention.task.ts",
           "services/api/src/kiosk-session/kiosk-session.queries.ts",
           "services/api/src/kiosk-session/kiosk-session.service.ts"
@@ -21751,6 +21765,7 @@
       "services/api/scripts/verify-recruitment-hosting-default-off.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
@@ -22145,6 +22160,7 @@
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
@@ -22230,6 +22246,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
@@ -22437,6 +22454,9 @@
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
+    "services/api/src/ai/resume/resume-draft-source.service.ts": [
+      "services/api/scripts/verify-resume-parse-intent-http.ts"
+    ],
     "services/api/src/ai/resume/resume-draft.store.ts": [
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-resume-draft-versions.ts"
@@ -22516,6 +22536,7 @@
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-upload-sessions-http.ts"
     ],
@@ -22843,6 +22864,7 @@
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
@@ -22864,6 +22886,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts"
     ],
@@ -23002,6 +23025,7 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
       "services/api/scripts/verify-sms-budget.ts",
@@ -23043,7 +23067,8 @@
       "services/api/scripts/verify-companies.ts"
     ],
     "services/api/src/config/body-parsers.ts": [
-      "services/api/scripts/verify-payment-real-channels.ts"
+      "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts"
     ],
     "services/api/src/config/production-runtime-gates.ts": [
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -23288,6 +23313,7 @@
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
@@ -23825,6 +23851,7 @@
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
@@ -24040,6 +24067,7 @@
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -24725,6 +24753,7 @@
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
@@ -37234,6 +37263,35 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/providers/mock.provider.ts",
+          "services/api/src/app.module.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/config/body-parsers.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-export-draft-source.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-export-draft-source"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "packages/shared/src/types/ai.ts",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.service.ts",
@@ -37437,6 +37495,7 @@
           "services/api/src/ai/resume-parse-intent-runner.service.ts",
           "services/api/src/ai/resume-parse-intent.ts",
           "services/api/src/ai/resume-parse-submission.service.ts",
+          "services/api/src/ai/resume/resume-draft-source.service.ts",
           "services/api/src/asr/asr.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
