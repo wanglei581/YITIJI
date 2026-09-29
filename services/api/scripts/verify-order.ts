@@ -9,7 +9,6 @@
 import 'dotenv/config'
 import { randomBytes, randomUUID } from 'crypto'
 import { AuditService } from '../src/audit/audit.service'
-import { PICKUP_CODE_LENGTH, PICKUP_CODE_PATTERN } from '../src/common/pickup-code'
 import { signFileUrl } from '../src/files/signing'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
 import { RefundService } from '../src/payment/refund.service'
@@ -379,25 +378,6 @@ async function main(): Promise<void> {
     // ============================================================
     console.log('\n--- P0a payment-domain contract (batch1, expect RED before impl) ---')
 
-    /**
-     * 取件码规格断言。
-     *
-     * 原写法是 `pickupCode.length >= 8`（一条熵下限）。2026-08-18 产品裁决把取件码
-     * 从 10 位字母数字改为 6 位纯数字后，`>= 8` 会把合规的新码判红。
-     *
-     * 处理方式是**收紧而不是删除**：由「至少 8 个任意字符」改为「恰好等于规格长度
-     * 且逐字符符合规格字符集」，判别力比原来更强（原断言放行 'ABCDEFGH'、
-     * 放行任意 9 位、放行含空格的串，新断言都不放行）。
-     *
-     * 需要说清楚的取舍：绝对熵确实下降了（31^10 ≈ 49 bit → 10^8 ≈ 26.6 bit）。
-     * 补偿它的是另外三条控制，而它们各自有自己的断言，不在本文件：
-     *   - claim-pickup 限流 20 次/分钟 → scripts/verify-miniapp-cloud-print-m2.ts
-     *   - 取件码 24h 失效 → 本文件同批 pickupCodeVisibleFor 门 + m2 的过期用例
-     *   - 认领必须命中订单绑定终端 + 按终端失败锁定 → m2 的预言机合并 / 锁定用例
-     * 任何一条被放宽，6 位就不再成立 —— 别只改这里。
-     */
-    const isSpecPickupCode = (value: unknown): boolean =>
-      typeof value === 'string' && value.length === PICKUP_CODE_LENGTH && PICKUP_CODE_PATTERN.test(value)
     // wechat/alipay/benefit 为未来扩展，本批 markPaid 必须拒绝（对齐 packages/shared P0A_ALLOWED_PAYMENT_SOURCES）。
     const P0A_FORBIDDEN_SOURCES = ['wechat', 'alipay', 'benefit'] as const
     const VALID_PAGE_SOURCES = ['pdf_lightweight_scan', 'image_single_page'] as const
@@ -423,6 +403,7 @@ async function main(): Promise<void> {
       paymentSource: string | null
       paidAt: Date | null
       pickupCode: string | null
+      pickupCodeHash: string | null
       billablePages: number | null
       billingPageSource: string | null
       refundReason: string | null
@@ -468,7 +449,7 @@ async function main(): Promise<void> {
     })
 
     // (3) 支付状态机幂等 + paid 必带 paymentSource + 禁 wechat/alipay/benefit（OrderStatusService，Task 6）。
-    await p0aGuard('OrderStatusService.markPaid: unpaid→paid requires allowed paymentSource, sets paidAt+pickupCode, audited, idempotent', async () => {
+    await p0aGuard('OrderStatusService.markPaid: unpaid→paid requires allowed paymentSource, sets paidAt, leaves both pickup columns null, audited, idempotent', async () => {
       const mod = (await import('../src/payment/order-status.service')) as {
         OrderStatusService: new (p: typeof prisma, a: typeof audit) => {
           markPaid: (orderId: string, opts: { paymentSource: string; operatorId?: string }) => Promise<OrderRow>
@@ -481,13 +462,16 @@ async function main(): Promise<void> {
       const paid = await svc.markPaid(target.id, { paymentSource: 'offline', operatorId: 'verify' })
       const idem = await svc.markPaid(target.id, { paymentSource: 'offline', operatorId: 'verify' })
       const after = await prisma.auditLog.count({ where: { targetId: target.id } })
+      const storedPaid = await prisma.order.findUnique({ where: { id: target.id } })
       const okHappy =
         paid.payStatus === 'paid' &&
         paid.paymentSource === 'offline' &&
         !!paid.paidAt &&
-        isSpecPickupCode(paid.pickupCode) &&
+        paid.pickupCode === null &&
+        storedPaid?.pickupCode === null &&
+        storedPaid?.pickupCodeHash === null &&
         idem.payStatus === 'paid' &&
-        idem.pickupCode === paid.pickupCode &&
+        idem.pickupCode === null &&
         after - before === 1 // 幂等：重复 markPaid 不重复写审计
       // ── 支付来源白名单：必须在**仍是 unpaid** 的新订单上验 ──────────────────
       //
@@ -497,8 +481,7 @@ async function main(): Promise<void> {
       // 却对红线本身零敏感度。判据也从「有没有抛错」改成「抛的是不是 PAYMENT_SOURCE_INVALID」，
       // 因为「有没有抛错」正是被另一条 guard 冒充的那个判据。
       //
-      // 防住什么：白名单放开 = 一分钱没收的打印单可被写成 paid + wechat，
-      // 而状态机会给这种单子签发取件码，用户凭码就能取走纸。
+      // 防住什么：白名单放开 = 一分钱没收的打印单可被写成 paid + wechat。
       const whitelistPrint = await printJobs.create(
         {
           fileUrl: await seedPdfFixture('srcwhitelist', 1),
@@ -560,9 +543,9 @@ async function main(): Promise<void> {
       )
     })
 
-    // (5) 免费单真实覆盖：临时把 print_bw_page 单价置 0，走真实 create() → 状态机应落 paid+free+paidAt+pickupCode。
+    // (5) 免费单真实覆盖：临时把 print_bw_page 单价置 0，走真实 create() → 状态机应落 paid+free+paidAt，两列取件码都空。
     // 不 mock page counter、不加测试后门、不信任前端 pages；用后还原价目。
-    await p0aGuard('free order (amountCents=0) settled paid+free with paidAt + pickupCode', async () => {
+    await p0aGuard('free order (amountCents=0) settled paid+free with paidAt and no pickup code', async () => {
       await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
       try {
         const freePrint = await printJobs.create(
@@ -582,7 +565,8 @@ async function main(): Promise<void> {
           o.payStatus === 'paid' &&
           o.paymentSource === 'free' &&
           !!o.paidAt &&
-          isSpecPickupCode(o.pickupCode)
+          o.pickupCode === null &&
+          o.pickupCodeHash === null
         )
       } finally {
         await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: PRINT_UNIT_PRICE_CENTS.black_white } })
@@ -639,6 +623,7 @@ async function main(): Promise<void> {
         'billablePages' in item &&
         'billingPageSource' in item &&
         'pickupCode' in item &&
+        item['pickupCode'] === null &&
         item['payStatus'] === 'paid' &&
         item['paymentSource'] === 'offline' &&
         item['paymentSource'] !== 'wechat' &&
@@ -676,6 +661,7 @@ async function main(): Promise<void> {
       const auditBefore = await prisma.auditLog.count({ where: { targetId: ordA.id } })
       const paid = await adminCtl.markPaid(ordA.id, { paymentSource: 'offline' }, adminUser)
       const idem = await adminCtl.markPaid(ordA.id, { paymentSource: 'offline' }, adminUser)
+      const storedA = await prisma.order.findUnique({ where: { id: ordA.id } })
       const auditAfterPaid = await prisma.auditLog.count({ where: { targetId: ordA.id } })
 
       let rejectsNoReason = false
@@ -695,9 +681,11 @@ async function main(): Promise<void> {
         rejectsBadSource &&
         paid.payStatus === 'paid' &&
         paid.paymentSource === 'offline' &&
-        isSpecPickupCode(paid.pickupCode) &&
+        paid.pickupCode === null &&
+        storedA?.pickupCode === null &&
+        storedA?.pickupCodeHash === null &&
         idem.payStatus === 'paid' &&
-        idem.pickupCode === paid.pickupCode &&
+        idem.pickupCode === null &&
         auditAfterPaid - auditBefore === 1 && // 幂等：mark-paid 只写 1 条审计
         rejectsNoReason &&
         // C5-4：RefundService 返回 RefundResultView（Refund 账本 + 订单态）。

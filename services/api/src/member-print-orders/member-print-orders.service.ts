@@ -124,6 +124,8 @@ export type MemberOrderPaymentSource = {
   billablePages: number | null
   billingPageSource: string | null
   pickupCode: string | null
+  /** 没有哈希的是现场单。视图不得把认领不了的明文下发出去。 */
+  pickupCodeHash: string | null
   taskStatus: string
   refundedAt: Date | null
   refundedAmountCents: number
@@ -133,13 +135,13 @@ export type MemberOrderPaymentSource = {
 
 /**
  * 「我的打印订单」支付字段的唯一口径：历史无 Order 一律 null，不编造。
- * 取件凭证码走 pickupCodeVisibleFor 门控（仅 paid 且未退款、任务未进入完成/取消/失败终态）。
+ * 取件凭证码还要有 pickupCodeHash，并走 pickupCodeVisibleFor 门控（仅 paid 且未退款、任务未进入完成/取消/失败终态）。
  * `/me/print-orders` 与跨端时间线共用，不许在别处另写一套。
  */
 export function memberOrderPaymentFields(order: MemberOrderPaymentSource | null) {
-  // 取件码门控：仅 paid 且未退款、任务未进入完成/取消/失败终态时返回；其余（unpaid/refunded/终态）一律 null。
+  // 现场单没有哈希，即使明文列还有历史值也不下发。有哈希时才走可见性门控。
   const pickupCode =
-    order && pickupCodeVisibleFor({ payStatus: order.payStatus, taskStatus: order.taskStatus, refundedAt: order.refundedAt })
+    order && order.pickupCodeHash != null && pickupCodeVisibleFor({ payStatus: order.payStatus, taskStatus: order.taskStatus, refundedAt: order.refundedAt })
       ? order.pickupCode
       : null
   return {
@@ -195,6 +197,7 @@ export class MemberPrintOrdersService {
             billablePages: true,
             billingPageSource: true,
             pickupCode: true,
+            pickupCodeHash: true,
             taskStatus: true,
             refundedAt: true,
             // C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）。

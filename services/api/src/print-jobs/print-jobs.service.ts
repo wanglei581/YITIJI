@@ -524,7 +524,7 @@ export class PrintJobsService {
       return { task, order }
     })
 
-    // 免费单（报价为 0，如 0 价项）：经状态机置 paid + paymentSource=free + paidAt + pickupCode + 审计，
+    // 免费单（报价为 0，如 0 价项）：经状态机置 paid + paymentSource=free + paidAt + 审计，不铸取件码。
     // 不伪造真实收款；付费单保持 unpaid + paymentSource=null。
     if (quote.amountCents === 0) {
       await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })

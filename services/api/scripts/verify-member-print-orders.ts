@@ -322,7 +322,7 @@ async function main() {
       })
     }
     const ord8 = suffix.slice(0, 8).toUpperCase()
-    // unpaid 订单故意带 pickupCode（DB 里有值），门控必须隐藏它；paid 可见；refunded 隐藏。
+    // 这些单都没有 pickupCodeHash。unpaid / refunded 本来就隐藏明文；已付现场单即使库里有明文也不下发。
     await prisma.order.create({ data: { orderNo: `ORD-DU-${ord8}`, type: 'print', printTaskId: dPay.unpaid, endUserId: userD, amountCents: 100, billablePages: 1, billingPageSource: 'pdf_lightweight_scan', payStatus: 'unpaid', paymentSource: null, taskStatus: 'pending', pickupCode: `UNPD${ord8}`, discountCents: 0, refundedAmountCents: 0 } })
     await prisma.order.create({ data: { orderNo: `ORD-DP-${ord8}`, type: 'print', printTaskId: dPay.paid, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'paid', paymentSource: 'offline', paidAt: at(41), taskStatus: 'pending', pickupCode: `PAID${ord8}`, discountCents: 50, refundedAmountCents: 0 } })
     await prisma.order.create({ data: { orderNo: `ORD-DR-${ord8}`, type: 'print', printTaskId: dPay.refunded, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'refunded', paymentSource: 'offline', paidAt: at(41), refundReason: '测试退款', refundedAt: at(42), taskStatus: 'pending', pickupCode: `RFND${ord8}`, discountCents: 0, refundedAmountCents: 200 } })
@@ -362,7 +362,8 @@ async function main() {
     const xItem = findD(dPay.pendingRefund)
 
     const okUnpaid = !!uItem && uItem.amountCents === 100 && uItem.payStatus === 'unpaid' && uItem.paymentSource === null && uItem.billablePages === 1 && uItem.billingPageSource === 'pdf_lightweight_scan' && uItem.pickupCode === null && uItem.discountCents === 0 && uItem.refundedAmountCents === 0 && uItem.refundRequired === false
-    const okPaid = !!pItem && pItem.payStatus === 'paid' && pItem.paymentSource === 'offline' && pItem.amountCents === 200 && typeof pItem.pickupCode === 'string' && (pItem.pickupCode ?? '').length > 0 && pItem.discountCents === 50 && pItem.refundedAmountCents === 0 && pItem.refundRequired === false
+    const paidStored = await prisma.order.findFirst({ where: { printTaskId: dPay.paid }, select: { pickupCode: true, pickupCodeHash: true } })
+    const okPaid = !!pItem && pItem.payStatus === 'paid' && pItem.paymentSource === 'offline' && pItem.amountCents === 200 && pItem.pickupCode === null && paidStored?.pickupCode === `PAID${ord8}` && paidStored.pickupCodeHash == null && pItem.discountCents === 50 && pItem.refundedAmountCents === 0 && pItem.refundRequired === false
     const okRefunded = !!rItem && rItem.payStatus === 'refunded' && rItem.pickupCode === null && rItem.refundedAmountCents === 200 && rItem.discountCents === 0 && rItem.refundRequired === false
     const okNoOrder = !!nItem && nItem.amountCents === null && nItem.payStatus === null && nItem.paymentSource === null && nItem.billablePages === null && nItem.billingPageSource === null && nItem.pickupCode === null && nItem.discountCents === null && nItem.refundedAmountCents === null && nItem.refundRequired === null
     const okPendingRefund = !!xItem && xItem.payStatus === 'paid' && xItem.refundRequired === true && xItem.refundedAmountCents === 0
@@ -371,7 +372,7 @@ async function main() {
       && !JSON.stringify(listD).includes(PAID_UNFULFILLED_PENDING_REFUND_REASON)
 
     if (okUnpaid && okPaid && okRefunded && okNoOrder && okPendingRefund && noLiveGateway && noInternalReason) {
-      pass('7. 支付字段真实化：有 Order 返回诚实字段（含 discountCents/refundedAmountCents/refundRequired）；无 Order 全 null；unpaid/refunded 隐藏 pickupCode、paid 可见；待退款信号派生且不回传内部原因码；无微信/支付宝来源')
+      pass('7. 支付字段真实化：有 Order 返回诚实字段（含 discountCents/refundedAmountCents/refundRequired）；无 Order 全 null；无哈希的单不下发 pickupCode（库里的明文仍在）；待退款信号派生且不回传内部原因码；无微信/支付宝来源')
     } else {
       fail(`7. 支付字段异常：unpaid=${JSON.stringify(uItem)} paid=${JSON.stringify(pItem)} refunded=${JSON.stringify(rItem)} noOrder=${JSON.stringify(nItem)} pendingRefund=${JSON.stringify(xItem)} noLiveGateway=${noLiveGateway} noInternalReason=${noInternalReason}`)
     }
