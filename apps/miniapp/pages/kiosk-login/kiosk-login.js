@@ -115,7 +115,7 @@ Page({
     note: '',
   },
 
-  onLoad() {
+  onLoad(options) {
     // 票据只留在内存：不进 data（手机可能被人凑过来看，也不该进截图 / 日志）。
     this._ticketId = ''
     // 每次扫码 / 重置都换一轮；晚到的响应对不上轮次就丢弃。
@@ -126,6 +126,8 @@ Page({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       isLoggedIn: auth.isLoggedIn(),
     })
+    // 首页「扫码连接一体机」进来：直接开扫码。取消扫码就停在本页说明上，不算出错。
+    if (options && options.autoScan === '1') this.scanCode()
   },
 
   onShow() {

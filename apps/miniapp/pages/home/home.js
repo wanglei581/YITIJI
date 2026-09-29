@@ -1,6 +1,11 @@
 // pages/home/home.js
 const app = getApp()
 const auth = require('../../utils/auth')
+const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const pickup = require('./pickup-summary')
+
+// 首页是 Tab 页，每次切回来都会 onShow：同一个人 30 秒内不重复拉订单。
+const PICKUP_FRESH_MS = 30 * 1000
 
 // 问候语按时段
 function greetWord() {
@@ -42,9 +47,17 @@ Page({
     ],
     // 原「求职信息」区块（发现岗位 / 招聘会 / 就业政策）已随对应页面停放：
     // 无人力资源服务许可证期间小程序按非招聘类目提审，见 compliance-boundary.md §1.1。
+
+    // 待取件（两端打通）：只有登录且真有待取件的单才出卡片；最近订单只在没有待取件时给一行去处。
+    // 读失败就不出卡片（订单页有完整的失败态），不拿旧数据充当现在的状态。
+    pickupCount: 0,
+    pickupNearest: null,
+    latestOrderAt: '',
   },
 
   onLoad() {
+    this._guard = createLifecycleGuard()
+    this._pickupAt = 0
     const g = app.globalData || {}
     this.setData({
       statusBarHeight: g.statusBarHeight || 20,
@@ -58,7 +71,54 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })
     }
+    this._guard.activate()
     this._refresh()
+    this._loadPickup()
+  },
+
+  onHide() {
+    this._guard.deactivate()
+  },
+
+  /**
+   * 待取件卡片。身份一变（登出 / 换号）当场清掉上一位的数据，在途响应一并作废（page-guard）。
+   */
+  _loadPickup() {
+    const identity = memberIdentityKey(auth)
+    const changed = this._guard.setIdentity(identity)
+    if (changed || !isMemberIdentity(identity)) {
+      this._pickupAt = 0
+      this.setData({ pickupCount: 0, pickupNearest: null, latestOrderAt: '' })
+    }
+    if (!isMemberIdentity(identity)) return
+    if (this._pickupAt && Date.now() - this._pickupAt < PICKUP_FRESH_MS) return
+    const token = this._guard.issue('pickup')
+    pickup.load().then((sum) => {
+      if (!this._guard.accepts(token, memberIdentityKey(auth))) return
+      this._pickupAt = Date.now()
+      this.setData({ pickupCount: sum.pendingCount, pickupNearest: sum.nearest, latestOrderAt: sum.latestAt })
+    }, () => {
+      if (!this._guard.accepts(token, memberIdentityKey(auth))) return
+      this.setData({ pickupCount: 0, pickupNearest: null, latestOrderAt: '' })
+    })
+  },
+
+  tapPickup() {
+    const url = pickup.pickupUrl(this.data.pickupNearest)
+    if (url) wx.navigateTo({ url })
+  },
+
+  tapOrders() {
+    wx.navigateTo({ url: '/pages/orders/orders' })
+  },
+
+  // 扫一体机屏幕上的码：登录码或上传码都认（kiosk-login 页按码型分流），进页就开扫码。
+  tapScanKiosk() {
+    wx.navigateTo({ url: '/pages/kiosk-login/kiosk-login?autoScan=1' })
+  },
+
+  tapDaily() {
+    wx.navigateTo({ url: '/pages/daily-report/daily-report' })
   },
 
   _refresh() {

@@ -83,6 +83,18 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .info-title { font-size: 27rpx; font-weight: 650; }
 .info-desc { margin-top: 5rpx; font-size: var(--fs-base); color: var(--muted); }
 .info-arrow { color: var(--ghost); }
+/* 待取件卡：问候下面第一张，白底 + 品牌色描边，与下方深色打印主卡区分（那张是「去下单」，这张是「去取件」） */
+.pickup-card { margin-top: 4rpx; border-radius: 32rpx; background: #fff; border: 2rpx solid var(--teal-soft); overflow: hidden; }
+.pickup-main { min-height: 120rpx; padding: 22rpx 22rpx 18rpx; display: flex; align-items: center; gap: 18rpx; }
+.pickup-icon { width: 76rpx; height: 76rpx; flex-shrink: 0; border-radius: 24rpx; background: var(--teal-wash); color: var(--teal); display: flex; align-items: center; justify-content: center; }
+.pickup-icon .ficon { width: 38rpx; height: 38rpx; }
+.pickup-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.pickup-title { font-size: var(--fs-md); font-weight: 750; color: var(--ink); }
+.pickup-sub { font-size: var(--fs-base); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickup-go { flex-shrink: 0; min-height: 72rpx; padding: 0 22rpx; border-radius: var(--r-full); background: var(--teal); color: #fff; font-size: var(--fs-base); font-weight: 650; display: flex; align-items: center; }
+.pickup-more { min-height: 96rpx; border-top: 1rpx solid var(--line-faint); display: flex; align-items: center; justify-content: center; font-size: var(--fs-sm); color: var(--teal-deep); }
+.pickup-latest { min-height: 96rpx; margin-top: 4rpx; padding: 0 24rpx; border-radius: 24rpx; background: #fff; border: 1rpx solid var(--line-soft); display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-base); color: var(--ink-soft); }
+.pickup-latest .ficon { width: 20rpx; height: 20rpx; color: var(--ghost); }
 .home-note { padding: 24rpx 12rpx 8rpx; color: var(--muted); font-size: var(--fs-base); line-height: 1.6; text-align: center; }
 /* 经营者信息与 AI 服务说明：页脚两条文字链，可点高度守 48px（纵向内边距撑开，视觉不变） */
 .home-legal { display: flex; align-items: center; justify-content: center; gap: 4rpx; }
