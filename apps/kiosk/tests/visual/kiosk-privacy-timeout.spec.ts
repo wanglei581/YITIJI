@@ -400,7 +400,8 @@ test('manual profile logout clears token-bearing cashier history @privacy-kiosk 
   await page.waitForURL((url) => url.pathname === '/profile')
 
   await page.getByRole('button', { name: '结束使用', exact: true }).click()
-  await expect(page.getByRole('button', { name: '去登录', exact: true })).toHaveCount(2)
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  await expect(page.getByTestId('qx-home')).toBeVisible()
   const requestCountAfterLogout = requests.paymentRequests().length
 
   for (const direction of ['back', 'forward'] as const) {

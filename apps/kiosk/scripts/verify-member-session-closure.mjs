@@ -396,8 +396,9 @@ assert(
     kioskSessionControl.includes("path: '/login'") &&
     kioskPrivacyGuard.includes('pushSanitizedDestination') &&
     kioskPrivacyGuard.includes('establishPrivacyBoundary()') &&
-    /clearSessionTo\(\{\s*path:\s*'\/profile'\s*\}\)/s.test(profilePage),
-  'Profile 手动退出统一建立隐私 history boundary，不再直接清会话后留下 token-bearing 历史',
+    /clearSessionTo\(\{\s*path:\s*'\/'\s*\}\)/s.test(profilePage) &&
+    !/clearSessionTo\(\{\s*path:\s*'\/profile'\s*\}\)/s.test(profilePage),
+  'Profile 结束使用回到首页，与闲置清场同一目的地，并走隐私 history boundary',
 )
 
 // 清场后跳回干净入口这一步，不能只挂在 requestAnimationFrame 上。
@@ -426,11 +427,12 @@ const settingsLogout = extractConstFunction(mySettingsPage, 'handleLogout')
 const settingsSwitch = extractConstFunction(mySettingsPage, 'handleSwitch')
 const settingsRebindDone = extractConstFunction(mySettingsPage, 'handleRebindDone')
 assert(
-  /clearSessionTo\(\{\s*path:\s*'\/profile'\s*\}\)/s.test(settingsLogout) &&
+  /clearSessionTo\(\{\s*path:\s*'\/'\s*\}\)/s.test(settingsLogout) &&
+    !/clearSessionTo\(\{\s*path:\s*'\/profile'\s*\}\)/s.test(settingsLogout) &&
     /clearSessionTo\(\{\s*path:\s*'\/login',\s*state:\s*\{\s*from:\s*'\/profile'\s*\}\s*\}\)/s.test(settingsSwitch) &&
     /clearSessionTo\(\{[\s\S]*path:\s*'\/login',[\s\S]*from:\s*'\/profile'[\s\S]*hint:\s*'换绑成功，请用新手机号登录'/s.test(settingsRebindDone) &&
     !/\blogout\s*\(/.test(settingsLogout + settingsSwitch + settingsRebindDone),
-  'MySettings 退出、切换账号、换绑完成均走同一隐私边界，并保留 /profile 与 /login 目的地语义',
+  'MySettings 退出回到首页，切换账号与换绑仍到登录页，三者都走同一隐私边界',
 )
 
 const phoneRebindPanel = read('src/pages/profile/me/components/PhoneRebindPanel.tsx')
