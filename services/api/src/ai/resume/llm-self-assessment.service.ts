@@ -23,7 +23,8 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
-import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../llm/llm-failure'
+import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import type { SelfAssessmentDimensionResult } from './self-assessment.types'
@@ -266,6 +267,8 @@ export class LlmSelfAssessmentService {
       )
     } catch (error) {
       if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
+      if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
         // 闸门拒绝时请求根本没发出 → 不落账，否则等于凭空记一次没花过的调用。
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })

@@ -22174,6 +22174,9 @@
     "services/api/src/ai/llm/ai-config-audit.ts": [
       "services/api/scripts/verify-ai-contract-mirror.mjs"
     ],
+    "services/api/src/ai/llm/ai-config.controller.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts"
+    ],
     "services/api/src/ai/llm/ai-prompt-safety.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts"
     ],
@@ -22186,6 +22189,7 @@
     "services/api/src/ai/llm/llm-chat.service.ts": [
       "services/api/scripts/verify-ai-content-moderation.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
@@ -22195,12 +22199,16 @@
     ],
     "services/api/src/ai/llm/llm-config.service.ts": [
       "services/api/scripts/verify-ai-config.ts",
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-llm-connectivity.ts",
       "services/api/scripts/verify-print-param-suggestion.ts"
+    ],
+    "services/api/src/ai/llm/llm-failure.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
     "services/api/src/ai/llm/llm-guard.ts": [
       "services/api/scripts/verify-ai-content-moderation.ts",
@@ -22209,6 +22217,7 @@
     ],
     "services/api/src/ai/llm/llm-http.ts": [
       "services/api/scripts/verify-ai-content-moderation.ts",
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
@@ -22402,6 +22411,7 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/ai/resume/ocr/baidu-ocr.provider.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
@@ -22522,6 +22532,7 @@
       "services/api/scripts/verify-upload-sessions-http.ts"
     ],
     "services/api/src/asr/asr.service.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-voice-generate.ts"
@@ -22919,6 +22930,9 @@
     "services/api/src/common/middleware/request-id.middleware.ts": [
       "services/api/scripts/verify-error-observability.ts"
     ],
+    "services/api/src/common/outbound/ai-endpoint-allowlist.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts"
+    ],
     "services/api/src/common/pdf/aigc-label.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-production-runtime-gates.ts",
@@ -23144,6 +23158,7 @@
       "services/api/scripts/verify-pdfjs-engine.ts"
     ],
     "services/api/src/contract-review/contract-review-failure-reason.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-contract-review-timeout.ts"
     ],
     "services/api/src/contract-review/contract-review-http.module.ts": [
@@ -23158,6 +23173,7 @@
     ],
     "services/api/src/contract-review/contract-review-provider.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-contract-review-timeout.ts",
@@ -23348,6 +23364,7 @@
       "services/api/scripts/verify-job-ai-privacy.ts"
     ],
     "services/api/src/job-ai/job-ai-llm.service.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -23894,6 +23911,7 @@
       "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/member-auth/sms/sms-sender.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-sms-provider-errors.ts",
@@ -24059,6 +24077,7 @@
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/asr/tts.service.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
@@ -24077,6 +24096,7 @@
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-mock-interview.ts"
@@ -25171,6 +25191,9 @@
     "services/api/src/terminals/toolbox-projection.ts": [
       "services/api/scripts/verify-toolbox-review-workflow.ts"
     ],
+    "services/api/src/trtc/tencent-api.util.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts"
+    ],
     "services/api/src/trtc/trtc.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
@@ -25180,6 +25203,7 @@
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/trtc/trtc.service.ts": [
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
@@ -31694,6 +31718,39 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-cost-coverage"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/llm/ai-config.controller.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/ai/llm/llm-failure.ts",
+          "services/api/src/ai/llm/llm-http.ts",
+          "services/api/src/ai/resume/ocr/baidu-ocr.provider.ts",
+          "services/api/src/asr/asr.service.ts",
+          "services/api/src/common/outbound/ai-endpoint-allowlist.ts",
+          "services/api/src/contract-review/contract-review-failure-reason.ts",
+          "services/api/src/contract-review/contract-review-provider.service.ts",
+          "services/api/src/job-ai/job-ai-llm.service.ts",
+          "services/api/src/member-auth/sms/sms-sender.ts",
+          "services/api/src/mock-interview/asr/tts.service.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/trtc/tencent-api.util.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-endpoint-allowlist.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-endpoint-allowlist"
       ],
       "wired": true
     },

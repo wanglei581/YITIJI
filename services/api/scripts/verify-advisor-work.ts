@@ -55,6 +55,11 @@ process.on('exit', () => {
 process.env['SECRET_ENCRYPTION_KEY'] ??= 'verify-advisor-secret-key-0123456789abcdef'
 process.env['JWT_SECRET'] ??= 'verify-advisor-jwt-secret-0123456789abcdef'
 process.env['FILE_SIGNING_SECRET'] ??= 'verify-advisor-file-signing-secret-0123456789abcdef'
+// 出站白名单（common/outbound/ai-endpoint-allowlist.ts）：本脚本用保留域名 llm.invalid
+// 配合替换全局 fetch 做假模型。这里在门禁自己的 env 里显式追加这个测试主机 ——
+// 白名单判定照常执行，生产代码不对测试开任何口子。
+process.env['AI_ENDPOINT_ALLOWLIST_EXTRA'] = [process.env['AI_ENDPOINT_ALLOWLIST_EXTRA'], 'llm.invalid']
+  .filter(Boolean).join(',')
 
 let passCount = 0
 function pass(message: string) { passCount += 1; console.log(`  PASS ${message}`) }

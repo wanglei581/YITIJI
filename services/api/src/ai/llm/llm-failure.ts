@@ -36,6 +36,15 @@ export const AI_PROVIDER_ERROR = 'AI_PROVIDER_ERROR'
 export const AI_PROVIDER_REQUEST_ERROR = 'AI_PROVIDER_REQUEST_ERROR'
 /** 2xx 但没有内容：模型返回了空回复。单次失败。 */
 export const AI_EMPTY_RESPONSE = 'AI_EMPTY_RESPONSE'
+/**
+ * 模型地址不在已核准的出站白名单里（common/outbound/ai-endpoint-allowlist.ts），
+ * 请求**根本没发出**。配置级问题：重试没有用，要管理员改地址或运维改白名单。
+ * 不许糊进 AI_PROVIDER_UNREACHABLE —— 那等于把「我们没发」说成「对方连不上」。
+ */
+export const AI_ENDPOINT_NOT_ALLOWED = 'AI_ENDPOINT_NOT_ALLOWED'
+/** 用户可见文案：如实说没发出、内容没外发，并说明其他功能没坏（对齐 LLM_BUSY_MESSAGE）。 */
+export const AI_ENDPOINT_NOT_ALLOWED_MESSAGE =
+  'AI 服务地址未通过核准，本次未发出请求，内容没有被发送；打印、扫描等其他功能不受影响'
 
 function serviceUnavailable(code: string, message: string): ServiceUnavailableException {
   return new ServiceUnavailableException({ error: { code, message } })
@@ -69,4 +78,14 @@ export function llmUpstreamStatusError(label: string, status: number): ServiceUn
 /** 2xx 但 content 为空。 */
 export function llmEmptyResponseError(label: string): ServiceUnavailableException {
   return serviceUnavailable(AI_EMPTY_RESPONSE, `${label}未返回内容，请稍后重试`)
+}
+
+/**
+ * 出站白名单拒绝（AiEndpointNotAllowedError）→ 503 + AI_ENDPOINT_NOT_ALLOWED。
+ *
+ * 调用方在 catch 里**先于**通用「连不上」分支处理它，且**不落账**（onLlmCall）：
+ * 请求没发出，记一次调用就是凭空多算一笔没花过的钱。
+ */
+export function llmEndpointNotAllowedError(): ServiceUnavailableException {
+  return serviceUnavailable(AI_ENDPOINT_NOT_ALLOWED, AI_ENDPOINT_NOT_ALLOWED_MESSAGE)
 }

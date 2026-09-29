@@ -17,7 +17,8 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
-import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../llm/llm-failure'
+import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import {
@@ -287,6 +288,8 @@ export class LlmResumeService {
       if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       // 不记请求/响应正文（可能回显简历文本），只抛明确错误。
       // 「忙」「超时」「连不上」三态各自独立成码，不合并 —— 合并等于放弃根因。
+      // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
+      if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
       }
