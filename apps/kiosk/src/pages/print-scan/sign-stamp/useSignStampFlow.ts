@@ -295,7 +295,7 @@ export function useSignStampFlow() {
         },
         { token: getToken(), idempotencyKey },
       )
-      setResult({ ...res, name: `${document.name.replace(/\.pdf$/i, '')}-签章合成.pdf` })
+      setResult({ ...res, name: `${document.name.replace(/\.pdf$/i, '')}-已签名.pdf` })
       setPhase(retrySame ? 'recovered' : 'completed')
       setOutErr(null)
       setViewPage(page)
@@ -331,7 +331,7 @@ export function useSignStampFlow() {
       fileMd5: result.fileMd5,
       mimeType: 'application/pdf',
     }
-    // 签章件装的是用户原件内容：写打印交接上下文后去打印台材料检查（与普通上传同一条路）。
+    // 签好的 PDF 装的是用户原件内容：写打印交接上下文后去打印台材料检查（与普通上传同一条路）。
     startPrint({ origin: 'sign_stamp', source: 'document', returnPath: window.location.pathname, file })
   }
 

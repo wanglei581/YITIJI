@@ -330,15 +330,15 @@ export function resolveRouteHandoff(
 export function printHandoffProblemText(status: ResolvedPrintHandoff['status']): string | null {
   switch (status) {
     case 'owner_mismatch':
-      return '这份文件属于上一位使用者，或登录身份变了，为保护隐私已清除。请重新选择文件。'
+      return '这份文件属于上一位使用者，或登录身份变了，这一单已作废。请重新选择文件。'
     case 'expired':
-      return '这一单放置超过 30 分钟已失效，为保护隐私已清除。请重新发起打印。'
+      return '这一单放置超过 30 分钟，已经作废。请重新发起打印。'
     case 'link_expired':
       return '这份文件的打印链接已过期，请回到上一步重新生成。'
     case 'replaced':
       return '这一单已失效，请重新发起。'
     case 'invalid':
-      return '打印信息不完整或已过时，为保护隐私已清除。请重新选择文件。'
+      return '打印信息不完整或已过时，这一单已作废。请重新选择文件。'
     case 'storage_unavailable':
     case 'invalid_input':
       return printHandoffFailureText(status)
