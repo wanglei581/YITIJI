@@ -114,17 +114,31 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
  * 而真实原因可能是「合成图片尺寸不受支持」—— 重试永远不会成功，正确动作是换一张图。
  * 这不只是 helpfulness 损失，是把用户导向一个无效操作。
  *
+ * `PRINTER_UNAVAILABLE` 也在这张表里，且只加这一个码（#1150，本分支不合入那份服务端改动）。
+ * 同一个码下服务端有三句，都在 `printer-availability.ts` 里写成给一体机前求职者看的话：
+ * 闸门合上（queue_cleanup_failed / queue_pause_failed）是
+ * 「本机暂停接打印单，暂不能下单，请稍后再试或换一台终端」；
+ * 另外两句是打印机离线、缺纸或故障，以及没有可用心跳时打印服务未就绪。
+ * 固定覆盖会把「暂停接单、换一台终端」说成泛泛的「打印机当前不可用」。
+ * 这个码仍留在 SHARED_USER_MESSAGES：原话缺失，或通不过下面的形状检查，就回退到那句固定文案。
+ *
  * 加码进这张表的判据（三条都要满足）：
  * 1. 该码的服务端 message 由业务代码显式写成面向求职者的中文，不是异常串或运维提示
  *    （反例见本文件顶部那条「请配置 JOB_MATERIAL_PDF_FONT_PATH」）；
  * 2. message 不含内部状态：路径、SQL、堆栈、配置项名、内部 ID；
  * 3. 有门禁或浏览器用例钉住前两条。CONVERT_FAILED 由
  *    fusion-w2-tools.spec.ts「conversion page renders a server conversion error
- *    without fabricating output」钉住。
+ *    without fabricating output」钉住。PRINTER_UNAVAILABLE 由
+ *    verify-kiosk-runtime-error-boundary.mjs 钉住：合格中文原话原样显示，
+ *    英文堆栈或路径回退固定文案，未登记的码仍不透传。
  *
  * 未登记的码一律仍走调用方兜底句 —— 对披露 fail-closed 的默认没有变。
+ * userMessageOf 先看这张表、再看固定码表：两张表都有的码，原话合格用原话，不合格才用固定文案。
  */
-const PASSTHROUGH_MESSAGE_CODES: ReadonlySet<string> = new Set(['CONVERT_FAILED'])
+const PASSTHROUGH_MESSAGE_CODES: ReadonlySet<string> = new Set([
+  'CONVERT_FAILED',
+  'PRINTER_UNAVAILABLE',
+])
 
 /**
  * 透传前的最后一道形状检查。不是判据（判据是上面那三条 + 逐码登记），
@@ -157,11 +171,13 @@ export function errorCodeOf(error: unknown): string | undefined {
  */
 export function userMessageOf(error: unknown, fallback: string): string {
   const code = errorCodeOf(error)
-  if (code && code in SHARED_USER_MESSAGES) return SHARED_USER_MESSAGES[code] as string
+  // 透传先于固定覆盖。目前只有 PRINTER_UNAVAILABLE 两张表都在：
+  // 原话过形状检查就显示原话，否则落到下面的固定文案。没进透传表的码行为不变。
   if (code && PASSTHROUGH_MESSAGE_CODES.has(code)) {
     const serverMessage = displayableServerMessage(error)
     if (serverMessage) return serverMessage
   }
+  if (code && code in SHARED_USER_MESSAGES) return SHARED_USER_MESSAGES[code] as string
   // 浏览器 fetch 失败是 TypeError。普通 Error('Failed to fetch') 仍走兜底——
   // verify-kiosk-runtime-error-boundary 钉死不得按 message 文本猜测。
   if (error instanceof TypeError) return SHARED_USER_MESSAGES.NETWORK_ERROR as string
