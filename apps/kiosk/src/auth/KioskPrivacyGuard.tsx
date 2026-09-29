@@ -19,6 +19,8 @@ import {
 import { useKioskBusy } from '../contexts/KioskBusyContext'
 import { useAuth } from './useAuth'
 import { useIdleLogout, type KioskIdleWarningRequest } from './useIdleLogout'
+import { endKioskVisit, useKioskSessionReporting } from './useKioskSessionReporting'
+import type { KioskVisitEndReason } from '../services/api/kioskSession'
 import '../pages/session-guard/styles/session-guard-qx.css'
 
 const DEFAULT_PRIVACY_IDLE_SEC = 300
@@ -312,9 +314,11 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     return nextBoundary
   }, [])
 
-  const clearSessionTo = useCallback((destination: KioskSessionClearDestination) => {
+  const clearSessionFor = useCallback((destination: KioskSessionClearDestination, reason: KioskVisitEndReason) => {
     if (!claimClearing('hard')) return
     returningWarningRef.current = false
+    // 服务人次：这一位用完了，结束当前使用周期（失败静默，不等网络）。
+    endKioskVisit(reason)
 
     // 先 fail-closed 阻断交互；本地敏感状态同步清除，不等待网络。
     // 传当前令牌：清掉本地扫描会话之前要先撤掉服务端那个还活着的扫描任务，
@@ -340,9 +344,16 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     hold(() => scheduleSanitizedDestination(nextBoundary, destination))
   }, [claimClearing, establishPrivacyBoundary, getToken, hold, logout])
 
-  const hardClear = useCallback(() => {
-    clearSessionTo({ path: '/' })
-  }, [clearSessionTo])
+  /** 页面主动「结束使用」（我的 / 设置页换号、退出）。 */
+  const clearSessionTo = useCallback(
+    (destination: KioskSessionClearDestination) => clearSessionFor(destination, 'user_exit'),
+    [clearSessionFor],
+  )
+
+  /** 默认原因是隐私兜底（旧历史项、BFCache 恢复、孤立的超时页）；空闲到点的调用点显式传 idle_timeout。 */
+  const hardClear = useCallback((reason: KioskVisitEndReason = 'privacy_clear') => {
+    clearSessionFor({ path: '/' }, reason)
+  }, [clearSessionFor])
 
   const clearToScreensaver = useCallback((): void => {
     if (returningWarningRef.current) {
@@ -352,11 +363,12 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     const pendingWarning = pendingWarningRef.current
     const playlist = pendingWarning?.exitTo === 'screensaver' ? pendingWarning.playlist : null
     if (!playlist?.enabled || playlist.items.length === 0) {
-      hardClear()
+      hardClear('idle_timeout')
       return
     }
     if (!claimClearing('screensaver')) return
     returningWarningRef.current = false
+    endKioskVisit('idle_timeout')
 
     setClearing(true)
     // 同 hardClear：进屏保同样是「这一位用完了」，服务端扫描任务要跟着撤。
@@ -411,7 +423,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
         return
       }
       if (Date.now() >= request.deadlineAt) {
-        hardClear()
+        hardClear('idle_timeout')
         return
       }
 
@@ -479,6 +491,16 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
 
   const { active: screensaverActive } = useScreensaverController(handleScreensaverWarning)
   useIdleLogout(screensaverActive, handleOrdinaryWarning)
+  useKioskSessionReporting(pathname)
+
+  /**
+   * 给超时提醒页用的清场：倒计时到点算空闲超时，到点前按「结束」算本人退出。
+   * 包一层也挡住 onClick 把点击事件当成原因传进来。
+   */
+  const hardClearFromWarning = useCallback((): void => {
+    const pendingWarning = pendingWarningRef.current
+    hardClear(pendingWarning !== null && Date.now() >= pendingWarning.deadlineAt ? 'idle_timeout' : 'user_exit')
+  }, [hardClear])
 
   useEffect(() => {
     if (!isStaleHistoryEntry) return
@@ -534,7 +556,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
         clearToScreensaver()
         return
       }
-      hardClear()
+      hardClear('idle_timeout')
     }
     const remainingMs = warning.deadlineAt - Date.now()
     if (remainingMs <= 0) {
@@ -594,7 +616,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
         timer = window.setTimeout(checkDeadline, Math.min(1000, busyCapDeadline - now))
         return
       }
-      hardClear()
+      hardClear('idle_timeout')
     }
 
     const scheduleFromNow = (): void => {
@@ -648,11 +670,11 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     () => ({
       warning,
       continueSession,
-      hardClear,
+      hardClear: hardClearFromWarning,
       clearSessionTo,
       clearToScreensaver,
     }),
-    [clearSessionTo, clearToScreensaver, continueSession, hardClear, warning]
+    [clearSessionTo, clearToScreensaver, continueSession, hardClearFromWarning, warning]
   )
 
   return (

@@ -7,6 +7,7 @@
 
 import type { FairVisitPlanPrintResponse, FairVisitPlanResponse } from '@ai-job-print/shared'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class FairVisitPlanApiError extends Error {
@@ -34,7 +35,7 @@ async function call<T>(
 ): Promise<T> {
   let res: Response
   try {
-    res = await fetch(
+    res = await terminalAttributedFetch(
       `${API_BASE_URL}/job-fairs/${encodeURIComponent(fairId)}/visit-plan/${encodeURIComponent(taskId)}${suffix}`,
       {
         method: init?.method ?? 'GET',

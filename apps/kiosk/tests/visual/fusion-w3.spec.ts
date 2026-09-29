@@ -781,6 +781,32 @@ test('resume parse public quota rejection clears the local intent before the fai
   expect(posts[1].proof).not.toBe(posts[0].proof)
 })
 
+test('resume parse AI paused lands on the failure report with non-AI exits and no re-parse @w3-kiosk', async ({ page, api }) => {
+  const tickets: string[] = []
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    tickets.push(route.request().headers()['x-terminal-session-token'] ?? '')
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中，打印扫描照常' } }),
+    })
+  })
+  await page.goto('/resume/source')
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  // AI 停用是能力级：不留在解析页叫人「原样再试」，转明确失败屏。
+  await page.waitForURL('/resume/report')
+  await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
+  await expect(page.getByText('AI 服务暂停中', { exact: false }).first()).toBeVisible()
+  // 不用 AI 的出路在，「重新解析」不在。
+  await expect(page.getByTestId('resume-report-fail-exits')).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新解析' })).toHaveCount(0)
+  await expect(page.getByTestId('resume-report-primary')).toHaveText('返回简历来源')
+  expect(tickets, '只提交一次，且 AI 请求带终端会话票').toEqual([expect.stringMatching(/.+/)])
+})
+
 test('resume parse public quota rejection stays on the parse page when the intent cannot be cleared @w3-kiosk', async ({ page, api }) => {
   const posts: string[] = []
   terminalBaseline(api)
@@ -1262,6 +1288,31 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
 
   await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
   await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('assistant: AI budget exhausted locks the composer and offers non-AI entries instead of a retry @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  const tickets: string[] = []
+  await page.route('**/api/v1/assistant/chat', async (route) => {
+    tickets.push(route.request().headers()['x-terminal-session-token'] ?? '')
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: { code: 'AI_BUDGET_EXHAUSTED', details: ['terminal'], message: '这台机器今天的 AI 额度已用完' } }),
+    })
+  })
+  await page.goto('/assistant')
+  await page.getByLabel('输入咨询问题').fill('我该先做简历还是先看岗位？')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByRole('button', { name: /重新检查 AI 顾问/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /重试这一轮/ })).toHaveCount(0)
+  await expect(page.locator('.assistant-send')).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^打印扫描/ })).toBeVisible()
+  expect(tickets, 'AI 请求带终端会话票').toEqual([expect.stringMatching(/.+/)])
   expect(runtimeErrors).toEqual([])
 })
 
