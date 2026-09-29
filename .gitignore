@@ -122,3 +122,6 @@ docs/design/.kiosk-redesign-backup-*.tar.gz
 /.claude/worktrees/
 **/.claude/worktrees/
 /_external/
+
+# 本地演示包（pnpm demo）：演示库、上传文件、日志与演示口令，只存在本机
+/.demo/

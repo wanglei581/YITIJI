@@ -12,6 +12,9 @@
     "dev:kiosk": "pnpm --filter ./apps/kiosk dev",
     "dev:admin": "pnpm --filter ./apps/admin dev",
     "dev:partner": "pnpm --filter ./apps/partner dev",
+    "demo": "node scripts/demo/demo.mjs start",
+    "demo:start": "node scripts/demo/demo.mjs start",
+    "demo:reset": "node scripts/demo/demo.mjs reset",
     "build:kiosk:production": "pnpm --filter @ai-job-print/kiosk build && pnpm --filter @ai-job-print/kiosk verify:prod-build-config",
     "build": "pnpm -r --if-present build",
     "lint": "pnpm -r --if-present lint",
@@ -37,7 +40,8 @@
     "verify:list-truncation-honesty": "node scripts/verify-list-truncation-honesty.mjs",
     "verify:no-raw-error-render": "node scripts/verify-no-raw-error-render.mjs",
     "verify:mock-server-contract": "node scripts/verify-mock-server-contract.mjs",
-    "verify:ci-main-runs-complete": "node scripts/verify-ci-main-runs-complete.mjs"
+    "verify:ci-main-runs-complete": "node scripts/verify-ci-main-runs-complete.mjs",
+    "verify:demo-kit": "node scripts/verify-demo-kit.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",

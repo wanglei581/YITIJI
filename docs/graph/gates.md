@@ -26,7 +26,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 有脚本名但不在 CI 执行闭包里（13）
+## 有脚本名但不在 CI 执行闭包里（14）
 
 这一栏是**尽力而为的推断**，权威是 `verify:ci-gate-coverage` 加
 `scripts/ci-gate-exemptions.json`。已在豁免清单里登记的（需要真实凭证 / 真机 /
@@ -41,6 +41,7 @@ _（空）_
 | `apps/kiosk/scripts/probe-ai-resume-closure-42.mjs` | `@ai-job-print/kiosk::verify:probe-ai-resume-closure-42` |
 | `apps/kiosk/scripts/probe-file-closure-43.mjs` | `@ai-job-print/kiosk::verify:probe-file-closure-43` |
 | `apps/kiosk/scripts/probe-member-session-41.mjs` | `@ai-job-print/kiosk::verify:probe-member-session-41` |
+| `scripts/demo/demo.mjs` | `ai-job-print-terminal::demo`<br/>`ai-job-print-terminal::demo:reset`<br/>`ai-job-print-terminal::demo:start` |
 | `scripts/generate-project-graph.mjs` | `ai-job-print-terminal::graph`<br/>`ai-job-print-terminal::graph:check` |
 | `scripts/project-graph-query.mjs` | `ai-job-print-terminal::graph:query` |
 | `scripts/verify-deploy-authorization-gate.mjs` | `ai-job-print-terminal::verify:deploy-authorization-gate` |
@@ -68,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1580 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1585 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1668,6 +1669,35 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `scripts/ci-gate-exemptions.json` | `verify-ci-gate-coverage.mjs` |
+
+</details>
+
+<details>
+<summary><code>scripts/demo/demo.mjs/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `scripts/demo/demo.mjs` | `verify-demo-kit.mjs` |
+
+</details>
+
+<details>
+<summary><code>scripts/demo/lib/</code> — 3 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `scripts/demo/lib/demo-config.mjs` | `demo.mjs`<br/>`verify-demo-kit.mjs` |
+| `scripts/demo/lib/local-bridge.mjs` | `demo.mjs`<br/>`verify-demo-kit.mjs` |
+| `scripts/demo/lib/preflight.mjs` | `demo.mjs`<br/>`verify-demo-kit.mjs` |
+
+</details>
+
+<details>
+<summary><code>scripts/demo/seed-demo.ts/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `scripts/demo/seed-demo.ts` | `verify-demo-kit.mjs` |
 
 </details>
 

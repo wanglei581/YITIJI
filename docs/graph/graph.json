@@ -21156,6 +21156,24 @@
     "scripts/ci-gate-exemptions.json": [
       "scripts/verify-ci-gate-coverage.mjs"
     ],
+    "scripts/demo/demo.mjs": [
+      "scripts/verify-demo-kit.mjs"
+    ],
+    "scripts/demo/lib/demo-config.mjs": [
+      "scripts/demo/demo.mjs",
+      "scripts/verify-demo-kit.mjs"
+    ],
+    "scripts/demo/lib/local-bridge.mjs": [
+      "scripts/demo/demo.mjs",
+      "scripts/verify-demo-kit.mjs"
+    ],
+    "scripts/demo/lib/preflight.mjs": [
+      "scripts/demo/demo.mjs",
+      "scripts/verify-demo-kit.mjs"
+    ],
+    "scripts/demo/seed-demo.ts": [
+      "scripts/verify-demo-kit.mjs"
+    ],
     "scripts/fixture-time-bomb-baseline.json": [
       "scripts/verify-fixture-time-bombs.mjs"
     ],
@@ -29667,6 +29685,70 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "scripts/demo/lib/demo-config.mjs",
+          "scripts/demo/lib/local-bridge.mjs",
+          "scripts/demo/lib/preflight.mjs"
+        ],
+        "missing": []
+      },
+      "file": "scripts/demo/demo.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::demo",
+        "ai-job-print-terminal::demo:reset",
+        "ai-job-print-terminal::demo:start"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/demo/lib/demo-config.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/demo/lib/local-bridge.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/demo/lib/preflight.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "docs/graph"
         ],
@@ -29938,6 +30020,28 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:datetime-honesty"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "scripts/demo/demo.mjs",
+          "scripts/demo/lib/demo-config.mjs",
+          "scripts/demo/lib/local-bridge.mjs",
+          "scripts/demo/lib/preflight.mjs",
+          "scripts/demo/seed-demo.ts"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-demo-kit.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:demo-kit"
       ],
       "wired": true
     },

@@ -113,6 +113,8 @@ jobs:
           pnpm verify:prod-readonly-probe
           pnpm verify:ci-gate-coverage
           pnpm verify:fixture-time-bombs
+          # 本地演示包（P1-23）：演示库不是开发库、演示数据带「演示」、AI 模拟、托管关闭、入口跨平台
+          pnpm verify:demo-kit
           pnpm --filter @ai-job-print/api verify:backup-ops
 
       - name: Deploy authorization gate

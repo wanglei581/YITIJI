@@ -1,0 +1,106 @@
+{
+  "_comment": "本地演示包（P1-23）的全部演示数据。只写入 .demo/ 下的演示库，不进开发库 services/api/prisma/dev.db。每一条对外可见的名称、标题、正文都必须带「演示」标记，终端编号必须以 DEMO- 开头（门禁 scripts/verify-demo-kit.mjs 逐条检查）。不写岗位、招聘会、企业：我们云上招聘内容托管保持关闭（CLAUDE.md §1）。",
+  "organizations": [
+    {
+      "id": "demo-org-001",
+      "name": "（演示）某区公共就业服务中心",
+      "type": "public_employment_service",
+      "contact": "demo-service@example.com"
+    },
+    {
+      "id": "demo-org-002",
+      "name": "（演示）某高校就业指导中心",
+      "type": "school_employment_center",
+      "contact": "demo-campus@example.com"
+    }
+  ],
+  "users": [
+    {
+      "username": "demo-admin",
+      "name": "演示管理员",
+      "role": "admin",
+      "orgId": null,
+      "passwordEnv": "DEMO_ADMIN_PASSWORD"
+    },
+    {
+      "username": "demo-partner",
+      "name": "演示机构运营员",
+      "role": "partner",
+      "orgId": "demo-org-001",
+      "passwordEnv": "DEMO_PARTNER_PASSWORD"
+    }
+  ],
+  "terminals": [
+    {
+      "terminalCode": "DEMO-001",
+      "displayName": "（演示）一体机 1 号",
+      "locationLabel": "（演示）服务大厅入口",
+      "orgId": "demo-org-001"
+    }
+  ],
+  "policies": [
+    {
+      "id": "demo-policy-001",
+      "sourceOrgId": "demo-org-001",
+      "sourceName": "（演示）某区公共就业服务中心",
+      "kind": "policy_guide",
+      "category": "policy",
+      "audience": "graduate",
+      "externalId": "DEMO-POLICY-001",
+      "title": "（演示）高校毕业生求职创业补贴申领说明",
+      "summary": "演示数据：用于展示政策服务页面的样式，不是真实政策，请勿据此申领。",
+      "content": "【演示文本】本条仅用于本地演示政策服务页面的版式与交互。\n真实政策以运营机构在后台审核发布的内容为准。\n演示环境中的条件、金额、时限均不代表任何地区的真实规定。"
+    },
+    {
+      "id": "demo-policy-002",
+      "sourceOrgId": "demo-org-001",
+      "sourceName": "（演示）某区公共就业服务中心",
+      "kind": "policy_guide",
+      "category": "policy",
+      "audience": "flexible",
+      "externalId": "DEMO-POLICY-002",
+      "title": "（演示）灵活就业人员社保补贴办理指引",
+      "summary": "演示数据：展示政策详情与打印入口的效果，不是真实政策。",
+      "content": "【演示文本】本条仅用于本地演示。\n办理材料、流程与时限均为示意，不代表任何地区的真实规定。"
+    },
+    {
+      "id": "demo-policy-003",
+      "sourceOrgId": "demo-org-001",
+      "sourceName": "（演示）某区公共就业服务中心",
+      "kind": "notice",
+      "category": "announcement",
+      "audience": "general",
+      "externalId": "DEMO-NOTICE-001",
+      "title": "（演示）服务大厅开放时间通知",
+      "summary": "演示数据：展示机构公告的效果。",
+      "content": "【演示文本】本通知仅用于本地演示，开放时间为示意。"
+    }
+  ],
+  "legalDocs": [
+    {
+      "docType": "privacy_policy",
+      "version": "demo-1",
+      "title": "（演示）隐私政策",
+      "content": "【演示文本】本文件仅用于本地演示，不是正式法律文本，不具任何法律效力。\n正式版本由运营方在管理员后台「法务文档」中发布。"
+    },
+    {
+      "docType": "terms_of_service",
+      "version": "demo-1",
+      "title": "（演示）用户服务协议",
+      "content": "【演示文本】本文件仅用于本地演示，不是正式法律文本，不具任何法律效力。\n正式版本由运营方在管理员后台「法务文档」中发布。"
+    },
+    {
+      "docType": "ai_disclaimer",
+      "version": "demo-1",
+      "title": "（演示）AI 服务说明",
+      "content": "【演示文本】演示环境未连接真实 AI 服务，页面上的 AI 结果均为演示数据，仅用于展示流程。"
+    },
+    {
+      "docType": "operator_info",
+      "version": "demo-1",
+      "title": "（演示）经营者信息",
+      "content": "【演示文本】演示环境不展示真实经营者信息。正式部署时由运营方在管理员后台发布。"
+    }
+  ],
+  "priceDescriptionPrefix": "（演示）演示价，非正式价："
+}
