@@ -53,8 +53,12 @@ overrides:
   #   GHSA-jqff-g426-hqxp（百分号编码 scheme 规范化导致 host 混淆）
   # 原先钉的 3.1.5 当初本身就是安全修复，现在被新公告覆盖，必须再往前。
   # 取 3.1.6（2026-08-23）而非昨日发布的 3.1.7：同样越过四条，且满足 minimumReleaseAge。
+  # 2026-09-29 更新：9/28 夜又发两条 high，都打在 3.1.6 上、首修 3.1.7 ——
+  #   GHSA-qw65-cvwx-89v3（serialize 未校验端口导致 authority 注入，影响 >=3.0.0 <3.1.7）
+  #   GHSA-58mr-gqgx-xq4g（authority 里未闭合方括号导致 host 混淆，影响 =3.1.6）
+  # 改钉 3.1.7（2026-09-02 发布，已过 minimumReleaseAge）。
   # 不取 4.x：跨大版本，fast-uri 是 ajv 的传递依赖，风险不成比例。
-  fast-uri: 3.1.6
+  fast-uri: 3.1.7
   # postcss: GHSA-fxqj-rqcc-2cmp (sourceMappingURL reads arbitrary .map files
   # when `from` is unset) affects <=8.5.22. First fix is 8.5.23.
   # The previous pin 8.5.18 is inside that range. vite@6.4.3 asks for
