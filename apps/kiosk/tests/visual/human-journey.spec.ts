@@ -175,15 +175,18 @@ test.describe('真人走查（模拟数据）', () => {
     test(`旅程 B-${c.key}：Hub → 到机码核销 → 输 8 位码 → ${c.label} @kiosk`, async ({ page, api }) => {
       registerW6Api(api)
       const s: Step = { n: 0 }
-      let claimBody: unknown = null
+      // 每一次认领都记下来：手按「确认校验」与输满后的自动校验合起来也只许发出一次（页面的提交锁）。
+      const claimBodies: unknown[] = []
       let printTaskCreated = 0
       api.respond('POST', '/api/v1/print/jobs/claim-pickup', { status: c.status, json: c.json })
       page.on('request', (r) => {
         const u = r.url()
         if (r.method() !== 'POST') return
-        if (u.includes('/print/jobs/claim-pickup')) claimBody = r.postDataJSON()
+        if (u.includes('/print/jobs/claim-pickup')) claimBodies.push(r.postDataJSON())
         if (/\/print\/jobs$/.test(new URL(u).pathname)) printTaskCreated += 1
       })
+      // 页面时钟在导航前装好，页面从加载起用的就是它。装完照常走时，只在下面输最后一位到按「确认校验」这一段停住。
+      await page.clock.install()
 
       await page.goto('/print-scan')
       await expect(page.getByRole('button', { name: /到机码核销/ })).toBeVisible({ timeout: 15000 })
@@ -194,22 +197,34 @@ test.describe('真人走查（模拟数据）', () => {
       await step(page, s, `${c.key}-empty`)
 
       // 真人按数字键盘逐位输入
-      for (const d of '12345678') await page.getByRole('button', { name: d, exact: true }).click()
+      for (const d of '1234567') await page.getByRole('button', { name: d, exact: true }).click()
+      // 输满 8 位后页面静默 250ms（PrintPickupClaimPage 的 SETTLE_MS）就自动校验，这是给 USB/HID
+      // 扫码器的正式路径，不改。但下面这张截图只要慢过 250ms，自动校验就先发出去了，「确认校验」
+      // 随即变成「正在校验…」或整屏换成结果，click() 只能等到超时（CI 上出现过）。
+      // 所以最后一位之前停住页面时钟：截图和点击都落在页面时间的同一刻，定时器没机会先跑。
+      // 自动校验那条路径由 fusion-w2-print.spec.ts 的 8 位码用例覆盖。
+      // pauseAt 只能往前跳；多给 1 秒余量，免得两次往返之间页面时间已经走过了目标点。
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000)
+      await page.getByRole('button', { name: '8', exact: true }).click()
       await step(page, s, `${c.key}-typed`)
 
       await page.getByRole('button', { name: /确认校验/ }).click()
+      // 页面时间还停着，此刻发出的认领只可能来自这次点击。等恢复之后再数就分不清了：
+      // 按钮坏了，250ms 后的自动校验照样会把认领发出去，用例照样绿。
+      await expect.poll(() => claimBodies.length, { message: '按「确认校验」必须当场发出认领' }).toBe(1)
+      await page.clock.resume()
       await page.waitForTimeout(1800)
       await step(page, s, `${c.key}-result`)
 
       const body = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
       expect(body, `${c.label}：页面没有给出预期结论`).toMatch(c.expectText)
-      expect(claimBody, '提交体必须只含 code，不得夹带其他字段').toEqual({ code: '12345678' })
+      expect(claimBodies, '只许认领一次，提交体必须只含 code，不得夹带其他字段').toEqual([{ code: '12345678' }])
       // 退款单：绝不能创建打印任务
       if (c.key === 'refunded-blocked') {
         expect(printTaskCreated, '已退款订单不得创建任何打印任务').toBe(0)
         expect(body, '退款单页面不得出现「进入现场支付」').not.toContain('进入现场支付')
       }
-      console.log(`\n  【${c.label}】提交体=${JSON.stringify(claimBody)}  建单次数=${printTaskCreated}`)
+      console.log(`\n  【${c.label}】提交体=${JSON.stringify(claimBodies)}  建单次数=${printTaskCreated}`)
     })
   }
 
