@@ -176,6 +176,9 @@ jobs:
           # 到机码认领失败码全覆盖：读服务端认领链路源码抽码（TypeScript AST，不 import），
           # 真跑一体机码表模块；已用过 / 已退款等终态码不许叫人重试。
           pnpm --filter @ai-job-print/kiosk verify:pickup-claim-error-coverage
+          # 服务人次上报（KioskSession 契约 v1）：接线 AST 取证 + 上报器单测真跑；
+          # 白名单对照服务端 kiosk-session.types.ts 源码文本，不 import、不连库。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-session-reporting
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
