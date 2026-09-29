@@ -1,4 +1,4 @@
-// 签名盖章（图形排版），/print-scan/sign。青序流光 20-sign-stamp.html。
+// 签名（图形排版），/print-scan/sign。青序流光 20-sign-stamp.html。
 // 四步：选文档 → 传本人手写签名图 → 选位置 → 合成结果。业务调用仍走
 // signInspect / signCompose，本文件只换外壳并补状态覆盖。
 
@@ -35,7 +35,7 @@ export function SignStampPage() {
   return (
     <QxPageFrame
       back={{ label: '返回打印扫描', onBack: () => flow.navigate('/print-scan') }}
-      title="签名盖章"
+      title="签名"
       subtitle="把本人手写签名图片叠到 PDF 上，生成一份新文件。只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。"
       terminalLabel={terminalLabel}
       status={flow.pill}
