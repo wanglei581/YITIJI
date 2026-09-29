@@ -55,12 +55,17 @@ const SHARED_USER_MESSAGES = {
   AI_LOGIN_REQUIRED: '用 AI 之前需要先用手机号登录',
   AI_DECLARATION_REQUIRED: '年龄或录音确认没有记上，请稍后再试',
   AI_PAUSED: 'AI 服务暂停中，打印等其他功能照常可以用',
+  // 后端 9/29 交付：生产缺 AI 配置时 AI 路由 503；换绑手机号时没能先清掉旧登录 503（手机号没改）。
+  AI_PROVIDER_NOT_CONFIGURED: 'AI 服务暂未开通，本次没有生成结果；打印等其他功能照常',
+  REBIND_UNAVAILABLE: '暂时无法换绑，手机号没有改动，请稍后重试',
   MAINTENANCE_MODE: '系统维护中，请稍后再来',
   AI_CONTENT_BLOCKED: 'AI 不能处理这段内容，请换个说法或修改后再试',
   LEGAL_DOCS_NOT_PUBLISHED: '服务协议还没有正式发布，暂时不能登录',
   // 小程序自己的两句（utils/ai-access.js 在用户选「未满」或「改用手打」时抛出）。
   AI_AGE_NOT_DECLARED: '未满 14 周岁需要监护人同意后才能使用，小程序暂时办不了',
   AI_VOICE_NOT_CONSENTED: '没有同意录音，这一步请改用文字输入',
+  AI_RESUME_NOT_CONSENTED: '没有同意使用简历 AI，内容没有发给 AI。想用时再点一次，同意后继续',
+  USER_AI_CONSENT_REQUIRED: '需要先确认 AI 使用授权，才能继续',
 };
 
 /**
@@ -94,6 +99,13 @@ const PASSTHROUGH_MESSAGE_CODES = [
   'SMS_CODE_INVALID',            // 验证码不正确，请重新输入
   'SMS_TOO_FREQUENT',            // 验证码发送过于频繁,请 60 秒后再试
   'SMS_SEND_FAILED',             // 短信发送失败，请稍后再试
+  // 发送量限制（走查 9/29：此前不在放行表，一律显示成笼统的「发送失败」，用户不知道要等多久）
+  'SMS_IP_LIMIT',                // 当前网络请求过于频繁,请稍后再试
+  'SMS_DAILY_LIMIT',             // 今日验证码请求次数过多,请明天再试
+  'SMS_DEVICE_LIMIT',            // 当前设备请求过于频繁,请稍后再试
+  'SMS_DAILY_TOTAL_LIMIT',       // 今天的短信验证码发送量已达上限，请明天再试
+  'SMS_TERMINAL_DAILY_LIMIT',    // 这台机器今天发出的短信验证码已达上限，请明天再试
+  'SMS_BUDGET_UNAVAILABLE',      // 短信发送量暂时无法核对……先暂停发送，请稍后再试
   'WX_CONFIG_MISSING',           // 微信小程序登录暂不可用，请使用短信验证码登录
   'WX_CODE_INVALID',             // 微信登录凭证无效或已过期，请重试
   'WX_CODE2SESSION_FAILED',      // 微信登录服务异常，请稍后再试

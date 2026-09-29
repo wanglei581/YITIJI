@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const qa = require('./qa-records')
 
 /** 后端真实 kind → 展示与现有结果页。没有结果页的类型保持诚实状态展示。 */
 const KIND_META = {
@@ -56,6 +57,7 @@ function mapRecord(item) {
     title,
     day: dayLabel(item.createdAt),
     time: timeLabel(item.createdAt),
+    createdAt: item.createdAt || '',
     status,
     statusLabel: STATUS_LABEL[status] || status || '状态未知',
     icon: meta.icon,
@@ -77,6 +79,7 @@ function mapInterview(item) {
     title: item.position ? `模拟面试 · ${item.position}` : '模拟面试',
     day: dayLabel(item.createdAt),
     time: timeLabel(item.createdAt),
+    createdAt: item.createdAt || '',
     status: item.hasReport ? 'completed' : 'failed',
     statusLabel: item.hasReport ? '已完成' : '无报告',
     icon: 'i-form',
@@ -113,6 +116,7 @@ Page({
       // 这一组装的是职业规划 / 自我探索，没有一项是「评估」。
       { key: 'career', label: '规划探索' },
       { key: 'interview', label: '模拟面试' },
+      qa.FILTER,
     ],
     groups: [],
     loginRequired: false,
@@ -121,6 +125,14 @@ Page({
   },
 
   _all: [],
+  _records: [],
+  _qa: [],
+  _interviews: [],
+  _nextCursor: null,
+  _qaNextCursor: null,
+  _accountKeySeen: '',
+  _loadGen: 0,
+  _loadingMore: false,
 
   onLoad() {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
@@ -134,56 +146,118 @@ Page({
     this._load(true)
   },
 
+  _accountKey() {
+    if (!auth.isLoggedIn()) return ''
+    const gen = typeof auth.sessionGeneration === 'function' ? String(auth.sessionGeneration()) : ''
+    const user = typeof auth.getUser === 'function' ? auth.getUser() : null
+    const id = user && user.id != null && String(user.id) ? String(user.id) : ''
+    if (id) return `u:${id}:${gen}`
+    const token = typeof auth.getToken === 'function' ? String(auth.getToken() || '') : ''
+    return token ? `t:${token}:${gen}` : (gen ? `in:${gen}` : 'in')
+  },
+
+  _clearLoggedOut() {
+    this._records = []
+    this._qa = []
+    this._interviews = []
+    this._all = []
+    this._nextCursor = null
+    this._qaNextCursor = null
+    this._accountKeySeen = ''
+    this.setData({ loginRequired: true, groups: [], loading: false, loadError: '' })
+  },
+
+  _publish() {
+    this._all = qa.combine(this._records || [], this._qa || [], this._interviews || [])
+    this._applyFilter(this.data.activeFilter)
+  },
+
+  _stale(gen, key) {
+    return this._loadGen !== gen || this._accountKey() !== key
+  },
+
   async _load(append = false) {
-    if (append && (!this._nextCursor || this._loadingMore)) return
-    this._loadingMore = append
+    const keyAtStart = this._accountKey()
+    if (!keyAtStart) {
+      this._loadGen = (this._loadGen || 0) + 1
+      this._clearLoggedOut()
+      this._loadingMore = false
+      return
+    }
+    if (this._accountKeySeen && this._accountKeySeen !== keyAtStart) {
+      append = false
+      this._records = []
+      this._qa = []
+      this._interviews = []
+      this._all = []
+      this._nextCursor = null
+      this._qaNextCursor = null
+      this.setData({ groups: [], loginRequired: false, loadError: '' })
+    }
+    const recordCursor = append ? (this._nextCursor || '') : ''
+    const qaCursor = append ? (this._qaNextCursor || '') : ''
+    if (append && ((!recordCursor && !qaCursor) || this._loadingMore)) return
+    const gen = ++this._loadGen
+    this._accountKeySeen = keyAtStart
+    this._loadingMore = !!append
     try {
-      if (!auth.isLoggedIn()) {
-        this._all = []
-        this.setData({ loginRequired: true, groups: [], loading: false, loadError: '' })
-        return
-      }
       // append 时不进整页 loading：那会把已渲染的列表打回加载态闪一下
       this.setData(append ? { loginRequired: false } : { loginRequired: false, loading: true, loadError: '' })
-      // 2026-09-03：同 documents 的「50 条静默截断」——nextCursor 一直被丢弃，
-      // 第 51 条起永远不显示。分页写法对照 orders.js / documents.js。
-      const cursor = append ? this._nextCursor : null
-      const list = await api.getMyAiRecords({ pageSize: 50, ...(cursor ? { cursor } : {}) })
-      const page = (list || []).filter((item) => !HIDDEN_KINDS.includes(item && item.kind)).map(mapRecord)
-      let interviews = this._interviews || []
+      // 首页这一次 GET /me/ai-records 的响应里已经带着 qaRecords。
+      // 翻页才把各自的 cursor / qaCursor 带上；只翻其中一边时，另一边响应里的第一页不要再并进来。
+      const params = { pageSize: 50 }
+      if (recordCursor) params.cursor = recordCursor
+      if (qaCursor) params.qaCursor = qaCursor
+      const list = await api.getMyAiRecords(params)
+      if (this._stale(gen, keyAtStart)) return
+      const recordsRequested = !append || !!recordCursor
+      const qaRequested = !append || !!qaCursor
+      if (recordsRequested) {
+        const page = (list || []).filter((item) => !HIDDEN_KINDS.includes(item && item.kind)).map(mapRecord)
+        this._records = append ? [...(this._records || []), ...page] : page
+        this._nextCursor = (list && list.nextCursor) || null
+      }
+      if (qaRequested) {
+        const bundle = qa.readQaBundle(list)
+        const mapped = bundle.records.map(qa.mapQaRecord).filter(Boolean)
+        this._qa = append ? qa.appendQa(this._qa || [], mapped) : mapped
+        this._qaNextCursor = bundle.nextCursor
+      }
       if (!append) {
         try {
           const iv = await api.getMyMockInterviews({ pageSize: 50 })
-          interviews = (iv || []).map(mapInterview)
+          if (this._stale(gen, keyAtStart)) return
+          this._interviews = (iv || []).map(mapInterview)
         } catch (_) {
-          interviews = []
+          if (this._stale(gen, keyAtStart)) return
+          this._interviews = []
         }
-        this._interviews = interviews
       }
-      const merged = append ? [...this._all.filter((r) => r.source !== 'interview'), ...page] : page
-      this._all = [...merged, ...interviews]
-      this._nextCursor = (list && list.nextCursor) || null
-      this._applyFilter(this.data.activeFilter)
-      this.setData({ loading: false })
+      this._publish()
+      this.setData({ loading: false, loadError: '' })
     } catch (err) {
+      if (this._stale(gen, keyAtStart)) return
       if (err && err.statusCode === 401) {
-        this._all = []
-        this.setData({ loginRequired: true, groups: [], loading: false })
+        this._clearLoggedOut()
+      } else if (append) {
+        this.setData({ loading: false })
+        if (typeof wx.showToast === 'function') {
+          wx.showToast({ title: (err && err.message) || '加载更多失败', icon: 'none' })
+        }
       } else {
         this.setData({ loading: false, loadError: (err && err.message) || '加载记录失败，请稍后重试' })
       }
     } finally {
-      // 必须在 finally 复位：未登录的提前 return 和两个 catch 分支原先都不复位，
-      // 于是「加载更多」失败一次之后，上面那道 _loadingMore guard 会把后续每一次
-      // 加载更多静默吞掉——列表永久停在 50 条，且不再报任何错。
-      // 本页是全仓唯一用实例字段（而非 data）做加载闸的列表页，
-      // documents / notifications / orders 都在 catch 里复位了 data.loadingMore。
-      this._loadingMore = false
+      // 必须在 finally 复位：未登录的提前 return 和失败分支原先都不复位，
+      // 于是「加载更多」失败一次之后，_loadingMore 会把后续每一次静默吞掉。
+      // 换账号后旧请求的 gen 对不上，不能把新请求的闸门清掉。
+      if (this._loadGen === gen) this._loadingMore = false
     }
   },
 
   _applyFilter(key) {
-    const list = key === 'all' ? this._all : this._all.filter((record) => record.type === key)
+    const all = this._all || []
+    const list = key === 'all' ? all : all.filter((record) => record.type === key)
     this.setData({ groups: group(list) })
   },
 
@@ -193,9 +267,49 @@ Page({
     this._applyFilter(key)
   },
 
+  _find(id) {
+    return (this._all || []).find((item) => item.id === String(id || ''))
+  },
+
+  _showQa(record) {
+    const owner = this._accountKey()
+    const show = (lines, mode) => {
+      if (this._accountKey() !== owner) return
+      wx.showModal({
+        title: record.title || '小青问答要点',
+        content: qa.modalContent(record, lines, mode),
+        showCancel: false,
+        confirmText: '知道了',
+      })
+    }
+    const cached = record.points || []
+    if (cached.length) {
+      show(cached, 'points')
+      return
+    }
+    if (!record.sessionId || typeof api.getAdvisorSession !== 'function') {
+      show([], 'metadata')
+      return
+    }
+    api.getAdvisorSession(record.sessionId)
+      .then((session) => {
+        if (this._accountKey() !== owner) return
+        const lines = qa.pointsFromSession(session, record.artifactId)
+        show(lines, lines.length ? 'points' : 'empty')
+      })
+      .catch(() => {
+        if (this._accountKey() !== owner) return
+        show([], 'unavailable')
+      })
+  },
+
   openRecord(e) {
-    const record = this._all.find((item) => item.id === String(e.currentTarget.dataset.id || ''))
+    const record = this._find(e.currentTarget.dataset.id)
     if (!record) return
+    if (record.source === 'qa') {
+      this._showQa(record)
+      return
+    }
     if (record.canOpen) {
       if (record.source === 'interview') {
         wx.navigateTo({ url: `${record.route}?sessionId=${encodeURIComponent(record.sessionId)}` })
@@ -217,8 +331,13 @@ Page({
   },
 
   moreRecord(e) {
-    const record = this._all.find((item) => item.id === String(e.currentTarget.dataset.id || ''))
+    const record = this._find(e.currentTarget.dataset.id)
     if (!record) return
+    // 问答要点的 id 不是 AI 记录 id，不能走 deleteMyAiRecord。这里只读，不删。
+    if (record.source === 'qa') {
+      this._showQa(record)
+      return
+    }
     wx.showActionSheet({
       itemList: ['删除记录'],
       success: (res) => {

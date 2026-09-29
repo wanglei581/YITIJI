@@ -11,7 +11,7 @@
   <view class="steps rise-d1">
     <view class="st on"><text class="n">1</text><text class="nl">选择文件</text></view>
     <view class="line"></view>
-    <view class="st"><text class="n">2</text><text class="nl">选门店</text></view>
+    <view class="st"><text class="n">2</text><text class="nl">选终端</text></view>
     <view class="line"></view>
     <view class="st"><text class="n">3</text><text class="nl">到机核验</text></view>
     <view class="line"></view>
@@ -144,7 +144,7 @@
     <view wx:else class="pc-state">选择文件后开始检查</view>
   </view>
 
-  <view class="compliance-note rise-d6">{{amountCents === 0 ? '当前为免费试运营：到机核验后直接进入打印队列；到机确认前不会创建 Agent 可领取的打印任务。' : '本期为小程序预提交、到机码核验和机端支付；到机确认前不会创建 Agent 可领取的打印任务。'}}</view>
+  <view class="compliance-note rise-d6">{{amountCents === 0 ? '当前为免费试运营：到机核验后直接进入打印队列；在终端核验之前不会开始打印。' : '在终端扫码或输入到机码核验之前，不会开始打印。'}}</view>
 </view>
 
 <view class="actionbar">

@@ -11,6 +11,7 @@ import {
 } from './console-screen.types'
 import { isPrinterIssueStatus, printerFaultTitle, screenGeo } from './console-screen.fleet'
 import { availableMetric, hoursAgo, shanghaiDayStart, unavailableMetric } from './console-screen.metric'
+import { loadTerminalPrintedPagesToday } from './console-screen.printed-pages'
 import {
   TIMELINE_HEARTBEAT_ROW_CAP,
   TIMELINE_PRINT_ROW_CAP,
@@ -197,7 +198,7 @@ export async function loadTerminalTwin(
     heartbeatRows,
     heartbeatBefore,
     printTasks,
-    printPages,
+    printedToday,
     printTaskCount,
     scanCount,
     failedCount,
@@ -273,10 +274,7 @@ export async function loadTerminalTwin(
         },
       },
     }),
-    prisma.order.aggregate({
-      where: { terminalId, payStatus: 'paid', billablePages: { not: null }, paidAt: { gte: dayStart } },
-      _sum: { billablePages: true },
-    }),
+    loadTerminalPrintedPagesToday(prisma, terminalId, now),
     prisma.printTask.count({ where: { terminalId, createdAt: { gte: dayStart } } }),
     prisma.scanTask.count({ where: { terminalId, createdAt: { gte: dayStart } } }),
     prisma.printTaskStatusLog.count({
@@ -367,7 +365,7 @@ export async function loadTerminalTwin(
     scanner: availableMetric('TerminalHeartbeat+ScanTask', 'current', scannerState(scanningCount > 0, heartbeat?.scanInputHealth)),
     currentTask: currentMetric,
     today: {
-      printPages: suppressTerminalTodayCount(printPages._sum.billablePages ?? 0),
+      printPages: suppressTerminalTodayCount(printedToday),
       printTasks: suppressTerminalTodayCount(printTaskCount),
       scans: suppressTerminalTodayCount(scanCount),
       failed: suppressTerminalTodayCount(failedCount),
