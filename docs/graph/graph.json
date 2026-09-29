@@ -21927,6 +21927,7 @@
       "services/api/scripts/verify-admin-users.ts"
     ],
     "services/api/src/advisor/advisor-artifact.service.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-advisor-work.ts"
     ],
     "services/api/src/advisor/advisor-artifact.types.ts": [
@@ -22035,6 +22036,7 @@
       "services/api/scripts/verify-governed-job-fit.ts"
     ],
     "services/api/src/ai/ai.service.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-persistence-consistency.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
@@ -22214,11 +22216,13 @@
       "services/api/scripts/verify-resume-parse-submission.ts"
     ],
     "services/api/src/ai/resume-report-export.controller.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/ai/resume/appended-self-assessment.service.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts"
     ],
@@ -22434,6 +22438,7 @@
       "services/api/scripts/verify-self-assessment.ts"
     ],
     "services/api/src/ai/resume/self-assessment.service.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts"
@@ -23148,6 +23153,7 @@
       "services/api/scripts/verify-document-conversion.ts"
     ],
     "services/api/src/document-conversion/document-conversion.service.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-conversion-queue-bound.mjs",
       "services/api/scripts/verify-document-conversion.ts"
     ],
@@ -23257,6 +23263,7 @@
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/files/signing.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
@@ -23460,6 +23467,7 @@
       "services/api/scripts/verify-partner-excel-template.ts"
     ],
     "services/api/src/jobs/fair-company-print.service.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-cjk-font.ts"
     ],
@@ -25861,13 +25869,21 @@
           "packages/shared/src/types/file.ts",
           "packages/shared/src/types/jobMaterials.ts",
           "packages/shared/src/types/mockInterview.ts",
+          "services/api/src/advisor/advisor-artifact.service.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume-report-export.controller.ts",
+          "services/api/src/ai/resume/appended-self-assessment.service.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
+          "services/api/src/ai/resume/self-assessment.service.ts",
+          "services/api/src/document-conversion/document-conversion.service.ts",
           "services/api/src/files/file.types.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/job-materials/job-materials.service.ts",
           "services/api/src/jobs/admin-fairs.service.ts",
+          "services/api/src/jobs/fair-company-print.service.ts",
           "services/api/src/jobs/fair-material-print-bridge.service.ts",
           "services/api/src/jobs/fair-material.service.ts",
           "services/api/src/jobs/jobs.controller.ts",
