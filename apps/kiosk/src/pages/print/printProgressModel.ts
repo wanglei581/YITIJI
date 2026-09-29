@@ -210,3 +210,44 @@ export function backendStatusToStep(status: BackendJobStatus): Step {
   if (status === 'printing') return 'printing'
   return 'queuing'
 }
+
+/**
+ * 出纸中若这么久没有新的任务状态，就不再说「正在出纸」。
+ * 终端心跳默认 30 秒。晚一次心跳仍可能是同一条「正在出纸」，所以留到一个半心跳（45 秒）。
+ * 超过这个时间，页面没有新的进度可说。不把这一单改成失败：大约 10 分钟后的收口在服务端。
+ */
+export const PRINT_PROGRESS_QUIET_MS = 45_000
+
+export const PRINT_PROGRESS_QUIET_COPY =
+  '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
+
+/** 同一份回报不算「新状态」。状态、失败原因或完成时间变了才重新计时。 */
+export function progressStatusFingerprint(result: {
+  status?: string
+  errorCode?: string
+  failureReasonForUser?: string
+  completedAt?: string | null
+}): string {
+  return [
+    result.status ?? '',
+    result.errorCode ?? '',
+    result.failureReasonForUser ?? '',
+    result.completedAt ?? '',
+  ].join('\u001f')
+}
+
+/** 已经知道失败之后的进度页文案。不再套用排队或「等待领取」。 */
+export function progressFailurePresentation(reason: string): {
+  headerTitle: string
+  badge: string
+  ask: string
+  doing: string
+} {
+  const text = reason.trim()
+  return {
+    headerTitle: '打印没有完成',
+    badge: '打印未完成',
+    ask: text || '打印没有完成，请联系现场工作人员核对。',
+    doing: '可以联系现场工作人员，查看打印订单，或重新选文件再印。',
+  }
+}

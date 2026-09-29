@@ -35,6 +35,7 @@ const paymentUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/p
 
 const progress = await import(progressUrl)
 const payment = await import(paymentUrl)
+const progressPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintProgressPage.tsx'), 'utf8')
 
 test('publicOrderNo 只接受 ORD- 号', () => {
   for (const fn of [progress.publicOrderNo, payment.publicOrderNo]) {
@@ -139,4 +140,35 @@ test('0 元实付写免费试运营，其余仍标未记录且不推算', () => 
 
   const missing = payment.netPaidDisplay({ amountCents: null })
   assert.equal(missing.value, '未记录')
+})
+
+const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
+
+test('W-91 出纸中长时间没有新状态就换掉正在出纸', () => {
+  assert.equal(progress.PRINT_PROGRESS_QUIET_MS, 45_000)
+  assert.equal(progress.PRINT_PROGRESS_QUIET_COPY, QUIET_COPY)
+  const printing = { status: 'printing', errorCode: '', failureReasonForUser: '', completedAt: '' }
+  assert.equal(progress.progressStatusFingerprint(printing), progress.progressStatusFingerprint({ ...printing }))
+  assert.notEqual(progress.progressStatusFingerprint(printing), progress.progressStatusFingerprint({ ...printing, status: 'failed' }))
+  assert.match(progressPage, /PRINT_PROGRESS_QUIET_MS/)
+  assert.match(progressPage, /PRINT_PROGRESS_QUIET_COPY/)
+  assert.match(progressPage, /backendStatus === 'printing' && !progressQuiet/)
+  assert.match(progressPage, /progressQuiet\s*\?\s*<>\{PRINT_PROGRESS_QUIET_COPY\}<\/>/)
+})
+
+test('W-88 已知失败不再说排队', () => {
+  const view = progress.progressFailurePresentation('打印机缺纸，请联系工作人员补纸')
+  assert.equal(view.headerTitle, '打印没有完成')
+  assert.equal(view.badge, '打印未完成')
+  assert.match(view.ask, /打印机缺纸/)
+  assert.doesNotMatch(`${view.headerTitle}${view.badge}${view.ask}${view.doing}`, /排队|等待终端领取|正在出纸/)
+  const blank = progress.progressFailurePresentation('   ')
+  assert.match(blank.ask, /请联系现场工作人员/)
+  assert.doesNotMatch(blank.badge, /排队/)
+  assert.match(progressPage, /progressFailurePresentation/)
+  assert.match(progressPage, /failed && !isSim \? failureView\.badge/)
+  assert.match(progressPage, /查看订单/)
+  assert.match(progressPage, /重新打印/)
+  assert.match(progressPage, /联系工作人员/)
+  assert.match(progressPage, /data-testid="print-progress-failure"/)
 })
