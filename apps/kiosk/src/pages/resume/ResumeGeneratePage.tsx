@@ -19,7 +19,7 @@ import type {
   ResumeGenerateInput,
   ResumeGenerateResponse,
 } from '@ai-job-print/shared'
-import { EDUCATION_LEVEL_OPTIONS, makePrintParams } from '@ai-job-print/shared'
+import { EDUCATION_LEVEL_OPTIONS } from '@ai-job-print/shared'
 import { AiTaskRegion, useAiTask, isAiOutage, type AiAvailability, type AiTaskFallback } from '../../ai'
 import {
   GraduationCapIcon,
@@ -40,6 +40,7 @@ import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
 import { ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-flow-qx.css'
 
@@ -126,6 +127,7 @@ function appendVoiceText(current: string | undefined, transcript: string): strin
 
 export function ResumeGeneratePage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const consent = useResumeAiConsent()
   const [showConsent, setShowConsent] = useState(false)
@@ -264,19 +266,18 @@ export function ResumeGeneratePage() {
     try {
       const file = await exportResumeDraft(draft, getToken())
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size: file.sizeBytes >= 1024 * 1024
-              ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
-              : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+      startPrint({
+        origin: 'resume_generate',
+        returnPath: window.location.pathname,
+        file: {
+          name: file.filename,
+          size: file.sizeBytes >= 1024 * 1024
+            ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
+            : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
     } catch (err) {

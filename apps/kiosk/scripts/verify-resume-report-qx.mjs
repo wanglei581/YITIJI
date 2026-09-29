@@ -58,7 +58,7 @@ assert(!/<(button|input)[^>]*\sdisabled(\s|=|>)/.test(`${files.actions}\n${files
 assert(has(files.takeaway, "exportKind === 'change_list' ? '打印修改清单' : '打印这份报告'"), 'print button label follows last export kind')
 assert(has(files.takeaway, '请先导出'), 'print/QR stay gated until a PDF is exported')
 assert(has(files.takeaway, 'printFileUrl'), 'print becomes available only after printFileUrl exists')
-assert(has(files.takeaway, "navigate('/print/confirm'"), 'print navigates to /print/confirm after export')
+assert(has(files.takeaway, "origin: 'resume_report'"), 'print writes the print handoff context (resume_report → confirm) after export')
 assert(has(files.takeaway, 'diagnosis_report'), 'export PDF uses kind=diagnosis_report')
 assert(has(files.takeaway, 'change_list'), 'change-list export uses kind=change_list')
 assert(has(files.takeaway, 'useResumeExportPricing'), 'takeaway reads GET /resume/export/pricing')

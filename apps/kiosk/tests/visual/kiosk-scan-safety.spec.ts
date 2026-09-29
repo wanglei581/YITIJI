@@ -823,6 +823,25 @@ async function landOnFailedPriorScan(page: Page): Promise<void> {
   await expect(page.getByText('扫描未完成', { exact: true }).first()).toBeVisible()
 }
 
+/**
+ * 把页面时钟停住。前提是导航之前已经 `page.clock.install()`。
+ *
+ * install 之后页面时间是**照常流动**的：Playwright 1.55 注入假时钟后立刻 resume
+ * （playwright-core `clockSource` 的 `inject()`），定时器按真实速度自己触发，直到 pauseAt
+ * 才停；官方 Clock 文档的推荐用法也是「先 install、让页面自然加载，再 pauseAt」。
+ * 停住之后只有 setSystemTime / runFor / fastForward 动页面时间，其中 setSystemTime
+ * 只改墙上时间、不触发任何定时器。
+ *
+ * pauseAt 只能往前跳，目标早于页面当前时间会抛「Cannot fast-forward to the past」，
+ * 所以取页面此刻的时间再留 1 秒余量；这 1 秒里到期的定时器各触发一次。
+ *
+ * 停住之后照样用真实 click()：Playwright 的可操作性检查（可见 / 稳定 / 可点 / 命中）
+ * 跑在注入脚本里，用的是假时钟装上之前留存的原生 requestAnimationFrame，不受这里影响。
+ */
+async function freezePageClock(page: Page): Promise<void> {
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000)
+}
+
 test('the safe rescan sends the prior task id in the body and its token only in the header @scan-safety', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -1048,18 +1067,23 @@ test('a stale safe rescan is refused at click time and creates nothing @scan-saf
   registerScanCapabilities(api)
   const server = installSameSheetScanServer(page)
 
-  // 时钟装在导航之前（clock 只能这样用）。装完是**暂停**的：定时器不会自己跑，
-  // 所以那个每 5 秒重新采样的按钮文案不会在我们点击之前改口 —— 这正是要复现的那一帧：
+  // 时钟装在导航之前：结果页那只每 5 秒重新采样按钮文案的定时器要从一开始就归假时钟管。
+  // 装完时间照常流动（落到结果页靠进度页自己轮询），所以落稳之后**显式停住**：
+  // 停住之后那只定时器不再跑，按钮文案不会在点击之前改口 —— 这正是要复现的那一帧：
   // 屏幕上还写着「同一份材料」，而本机手里那份凭据已经过了 15 分钟。
+  // 不停的话，setSystemTime 之后下一次 5 秒重采样随时可能抢在点击之前把按钮改成
+  // 「重新开始一次扫描」，按精确名字取的 retry 就再也找不到了。
   await page.clock.install()
   await landOnFailedPriorScan(page)
   const retry = page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true })
   await expect(retry).toBeVisible()
+  await freezePageClock(page)
 
   await page.clock.setSystemTime(new Date(Date.now() + 16 * 60 * 1000))
-  // 时钟暂停时 requestAnimationFrame 也是假的，click() 的稳定性检查会等在那儿；
-  // dispatchEvent 直接投事件，绕开那道检查，React 的 onClick 照常收到。
-  await retry.dispatchEvent('click')
+  // 前提先钉住：墙上时间已过 15 分钟，按钮仍写着「同一份材料」。
+  await expect(retry).toBeVisible()
+  // 真实点击（带可见 / 稳定 / 可点 / 命中检查），和用户按下去是同一条路。
+  await retry.click()
 
   // ① 一个请求都不许发出去。旧实现在这里会跳设置页，然后发一个不带两半的普通创建。
   expect(server.creates).toHaveLength(0)
@@ -2028,9 +2052,15 @@ test('a rescan deferred past its local window sends no unsigned create @scan-saf
     return { status: 200, json: { sessionToken: 'rotated-terminal-session-token' } }
   })
 
-  // 时钟装在导航之前（clock 只能这样用）。装完是暂停的，由用例自己推进。
+  // 时钟装在导航之前，页面里的 Date 与定时器才归假时钟管。装完时间照常流动
+  // （落到结果页靠进度页自己轮询），所以落稳之后、续期发出之前**显式停住**：
+  // 续期请求自带 4 秒超时（terminalAuth 的 fetchWithTimeout），时钟在走的话，
+  // 它会在这边挂住期间自己 abort、转进重试，再撞上下面的 +16 分钟就落到
+  // 「安全校验没通过」—— 「挂住不放就停在 checking」这个前提就不成立了。
+  // 停住之后只有下面那一次 setSystemTime 动页面时间。
   await page.clock.install()
   await landOnFailedPriorScan(page)
+  await freezePageClock(page)
 
   // 先让续期在飞，再按「重试扫描（同一份材料）」：设置页挂载时状态就是 checking，
   // 创建 effect 在终端分支早退，授权还原封不动躺在内存槽位里。
@@ -2041,7 +2071,7 @@ test('a rescan deferred past its local window sends no unsigned create @scan-saf
   })
   await refreshArrived
 
-  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).dispatchEvent('click')
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
   await expect(page.getByText('正在做这台机器的安全校验', { exact: true }).first()).toBeVisible()
   expect(server.creates, '换票没出结果之前一个创建请求都不许发').toHaveLength(0)

@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1594 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1597 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -300,7 +300,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 492 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 495 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -496,7 +496,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/cashierStatus.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-payment-codepay.ts` |
 | `apps/kiosk/src/pages/print/components/MaterialCheckPresentation.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-pii-redaction-contract.mjs` |
 | `apps/kiosk/src/pages/print/components/PickupHidGuide.tsx` | `verify-fusion-w2-print-scan.mjs` |
-| `apps/kiosk/src/pages/print/components/PrintConfirmView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs` |
+| `apps/kiosk/src/pages/print/components/PrintConfirmParts.tsx` | `verify-print-confirm-honest.mjs` |
+| `apps/kiosk/src/pages/print/components/PrintConfirmView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-parameter-capability.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintDoneSections.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx` | `verify-print-confirm-honest.mjs` |
@@ -509,6 +510,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/print-prototype.css` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-print-cta-contrast.mjs` |
 | `apps/kiosk/src/pages/print/printConfirmQuery.ts` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/printDeskModel.ts` | `verify-fusion-w2-print-scan.mjs` |
+| `apps/kiosk/src/pages/print/printHandoffPolicy.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/print/printMaterialSession.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-pii-redaction-contract.mjs`<br/>`verify-print-entry-source-split.mjs` |
 | `apps/kiosk/src/pages/print/printUsageEstimate.ts` | `verify-file-display-truth.mjs` |
 | `apps/kiosk/src/pages/print/styles/file-source-qx.css` | `verify-fusion-w2-print-scan.mjs` |
@@ -517,6 +519,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/styles/print-desk-qx.css` | `verify-print-parameter-capability.mjs` |
 | `apps/kiosk/src/pages/print/styles/print-pickup-claim.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/styles/print-upload.css` | `verify-fusion-w2-print-scan.mjs` |
+| `apps/kiosk/src/pages/print/usePrintConfirmHandoff.ts` | `verify-print-parameter-capability.mjs` |
 | `apps/kiosk/src/pages/profile/ProfilePage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-w4-login-profile-l1.mjs`<br/>`verify-activity-logs.ts` |
 | `apps/kiosk/src/pages/profile/assets/format.ts` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/profile/assets/useMemberAssetCounts.ts` | `verify-profile-inkpaper-home.mjs`<br/>`verify-w4-login-profile-l1.mjs` |
@@ -592,7 +595,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/renshi/builtinData.ts` | `verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/components.tsx` | `verify-policy-eligibility-ui.mjs`<br/>`verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/eligibilityOutcome.ts` | `verify-policy-eligibility-ui.mjs` |
-| `apps/kiosk/src/pages/renshi/renshi-policy-fusion.css` | `verify-policy-eligibility-ui.mjs` |
+| `apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css` | `verify-policy-eligibility-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/shared.ts` | `verify-policy-eligibility-ui.mjs`<br/>`verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2a-career.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-w3a-ai-records.mjs` |
 | `apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
