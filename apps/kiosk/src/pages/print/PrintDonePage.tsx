@@ -668,7 +668,7 @@ export function PrintDonePage() {
       navbar={navbar}
     >
       <div data-w2-page="print-done" data-print-flow-step={6} data-pff-head="xq" data-testid="print-fulfill-state-completed" className="qx-scroll pff-page">
-        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing={idDocument ? '拿走前记得核一下页数和水印，少页当场能处理。' : '拿走前记得核一下页数，少页当场能处理。'} />
+        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing={idDocument ? '拿走前记得核一下页数，证件原件和复印件一起带走。' : '拿走前记得核一下页数，少页当场能处理。'} />
 
         <div className="qx-card">
           <div className="pff-done-title" role="status">
@@ -691,7 +691,7 @@ export function PrintDonePage() {
           {idDocument ? (
             <div className="pff-step">
               <span className="pff-step-no">3</span>
-              <span className="pff-step-txt">证件页确认带 <b>「仅供求职使用」水印</b>，再离开。</span>
+              <span className="pff-step-txt">证件<b>原件和复印件一起带走</b>，别留在机器旁；复印件只用于本人求职等正当用途。</span>
             </div>
           ) : null}
           {pickupCode && (

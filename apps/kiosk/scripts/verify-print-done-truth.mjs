@@ -87,10 +87,12 @@ const checks = [
       /隐私已清除|下一个人看不到|这次办理已清空|结束并清空|空闲超时自动清空|秒空闲后自动清空|已清除/,
     )
     }],
-  ['W-23 证件水印只在证件件提示', () => {
+  ['W-23 证件提醒只在证件件出现，且不声称文件上有水印（本机不盖水印）', () => {
     assert.match(doneRuntime, /const idDocument = state\.idDocument === true/)
-    assert.match(doneRuntime, /\{idDocument \? \([\s\S]{0,280}仅供求职使用/)
-    assert.match(doneRuntime, /idDocument \? '拿走前记得核一下页数和水印/)
+    assert.match(doneRuntime, /\{idDocument \? \([\s\S]{0,280}原件和复印件一起带走/)
+    assert.match(doneRuntime, /idDocument \? '拿走前记得核一下页数，证件原件和复印件一起带走/)
+    // 服务端与 Agent 都没有加水印的实现：页面不得让用户去核对一个并不存在的水印。
+    assert.doesNotMatch(doneRuntime, /仅供求职使用」?\s*(<\/?b>)?\s*水印|页数和水印/)
     assert.match(doneRuntime, /: '拿走前记得核一下页数，少页当场能处理。'/)
     const handoff = read('src/pages/print/printHandoff.ts')
     const confirm = read('src/pages/print/PrintConfirmPage.tsx')
@@ -100,7 +102,6 @@ const checks = [
     assert.match(confirm, /idDocument:\s*handoff\.idDocument === true/)
     assert.match(scan, /idDocument: scanType === 'id'/)
     assert.match(documents, /doc\.purpose === 'id_scan'/)
-    assert.doesNotMatch(doneRuntime, /证件页确认带[\s\S]{0,40}仅供求职使用[\s\S]{0,40}再离开。[\s\S]{0,80}证件页确认带/)
   }],
   ['出纸后提醒核对并取走', () => {
     // 稿 15 completed 只留一句「都打好了，拿走前核一下」，不再并列「请取走文件 / 请取走纸张」。
