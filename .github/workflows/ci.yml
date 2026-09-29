@@ -192,6 +192,10 @@ jobs:
           # 一体机 AI 使用声明（W-16）：版本与请求头对照服务端源码，种类表对照 @AiUse，
           # 编译后真跑确认、拒绝、开关关闭、403 重问一次，以及清场后声明失效。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-declaration
+          # 自我探索同意说明只来自 /questions 下发（与后端 #1119 同批）：源码无写死条款与版本号；
+          # 编译真跑提交体版本与下发逐字相同、缺说明不放行、版本过期回重新确认且已答保留、
+          # 法务文档页按章节标题打开。只读源码，不连库、不连网。
+          pnpm --filter @ai-job-print/kiosk verify:self-assessment-consent-source
           pnpm --filter @ai-job-print/kiosk verify:scan-session-truth
           pnpm --filter @ai-job-print/kiosk verify:scan-quiet-period
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
