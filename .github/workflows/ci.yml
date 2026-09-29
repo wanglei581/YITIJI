@@ -42,7 +42,8 @@ concurrency:
 jobs:
   build-and-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 2026-09-29：Verify suites 已 321 条，#1122 真 Redis 登录门禁每次多等限流窗口，30 分钟被强制取消（run 36577612869）。
+    timeout-minutes: 45
     services:
       # C-2D 会员资产 E2E（verify:member-assets-c2d）需要 Redis：
       # 短信验证码 / 频控 / 会员会话全部落 Redis（dev SMS provider = log）。
