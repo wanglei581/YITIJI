@@ -24,6 +24,7 @@ import {
   listConfiguredPrintJobs,
   pauseConfiguredPrinterQueue,
   pauseSignalFromProbeLine,
+  printJobUserSidCommand,
   PrintQueueHoldError,
   REMOVE_JOBS_SCRIPT,
   resolvePrintJobUserSid,
@@ -80,6 +81,74 @@ async function showQueueFailure<T>(fallback: PrintQueueCommandStep, printerName:
   }
 }
 
+function failStep(label: string, error: unknown): never {
+  const detail = error instanceof Error ? error.stack || error.message : String(error)
+  console.error(`step ${label} failed: ${scrub(detail)}`)
+  throw error
+}
+
+function runLabeled(label: string, run: () => void): void {
+  try {
+    run()
+  } catch (error) {
+    failStep(label, error)
+  }
+}
+
+async function listLabeled(
+  label: string,
+  printerName: string,
+): Promise<{ jobs: PrintJobSnapshot[]; unreadableUserJobs: number }> {
+  try {
+    return await listConfiguredPrintJobs(printerName)
+  } catch (error) {
+    console.error(`step ${label} failed`)
+    if (error instanceof PrintQueueHoldError) replayFailedQueueStep(error.step ?? 'list', printerName)
+    throw error
+  }
+}
+
+function replaySidStep(label: string, user: string): { status: number | null; stderr: string } {
+  const command = printJobUserSidCommand(user)
+  const result = spawnSync('powershell', ['-NonInteractive', '-NoProfile', '-Command', command.script], {
+    input: command.stdin,
+    encoding: 'utf8',
+    timeout: 30_000,
+  })
+  const stderr = scrub([result.stderr, result.error?.message].filter(Boolean).join('\n')) || '(empty)'
+  console.error(`sid-step ${label} replay exit=${result.status ?? 'null'} stderr=${stderr}`)
+  return { status: result.status, stderr }
+}
+
+/** 只认解析函数自己抛出的那句。解析错误、找不到命令、超时都不是干净拒绝。 */
+function isCleanUnreadableSid(replay: { status: number | null; stderr: string }): boolean {
+  if (replay.status === null || replay.status === 0) return false
+  if (/ParserError|CommandNotFoundException/i.test(replay.stderr)) return false
+  return replay.stderr.includes('print job user sid is unreadable')
+}
+
+async function resolveSid(label: string, user: string): Promise<string> {
+  try {
+    return (await resolvePrintJobUserSid(user)).trim()
+  } catch (error) {
+    replaySidStep(label, user)
+    throw error
+  }
+}
+
+async function expectSidRejection(label: string, user: string): Promise<void> {
+  let sid: string | undefined
+  let rejected: unknown
+  try {
+    sid = await resolvePrintJobUserSid(user)
+  } catch (error) {
+    rejected = error
+  }
+  if (rejected instanceof PrintQueueHoldError) return
+  replaySidStep(label, user)
+  throw rejected instanceof Error ? rejected : new Error(`${label}: expected rejection, got ${sid ?? 'undefined'}`)
+}
+
 function runPs(script: string): string {
   const result = spawnSync('powershell', ['-NonInteractive', '-NoProfile', '-Command', script], {
     encoding: 'utf8',
@@ -111,19 +180,89 @@ async function waitForJob(
   throw new Error(`print job did not appear on ${printerName}`)
 }
 
+function runPsLabeled(label: string, script: string): string {
+  try {
+    return runPs(script)
+  } catch (error) {
+    failStep(label, error)
+  }
+}
+
+/**
+ * 解析失败时（工作组上的「机器名$」通常如此），列出作业必须跳过、不删，
+ * 列表命令本身成功。这次跳过不算清理失败。
+ */
+function assertUnreadableMachineAccountSkipsCleanup(): void {
+  const script = LIST_JOBS_SCRIPT
+  const resolveAt = script.indexOf('function Resolve-PrintJobUserSid')
+  const loopAt = script.indexOf('foreach ($job in $raw)')
+  assert.ok(resolveAt >= 0 && loopAt > resolveAt, 'resolver stays inside the list script')
+  const resolveFn = script.slice(resolveAt, loopAt)
+  assert.ok(resolveFn.includes("EndsWith('$')"), 'computer account is a lookup candidate')
+  const lookupAt = resolveFn.indexOf('LookupAccountName')
+  const throwAt = resolveFn.lastIndexOf("throw 'print job user sid is unreadable'")
+  assert.ok(lookupAt > 0 && throwAt > lookupAt, 'lookup failure throws inside the resolver')
+  const callAt = script.indexOf('Resolve-PrintJobUserSid ([string]$job.UserName)', loopAt)
+  const catchAt = script.indexOf('} catch {', callAt)
+  const idAt = script.indexOf('$idText', catchAt)
+  assert.ok(callAt > loopAt && catchAt > callAt && idAt > catchAt)
+  const catchBody = script.slice(catchAt, idAt)
+  assert.ok(catchBody.includes('$skippedUnreadable += 1'))
+  assert.ok(catchBody.includes('$unreadable = $true'))
+  assert.equal(/\bthrow\b/.test(catchBody), false, 'unreadable owner must not fail the list command')
+  assert.ok(script.indexOf('ConvertTo-Json', idAt) > idAt, 'list command still prints JSON')
+  const hold = readFileSync(HOLD_SOURCE, 'utf8')
+  const cleanupAt = hold.indexOf('export async function cleanupStaleOwnPrintJobs')
+  const cleanup = cleanupAt < 0 ? '' : hold.slice(cleanupAt)
+  assert.match(cleanup, /return \{ removed: ids\.length, skipped: false, unreadableUserJobs: listed\.unreadableUserJobs \}/)
+  assert.doesNotMatch(cleanup, /if \(listed\.unreadableUserJobs[\s\S]{0,160}throw/)
+}
+
+async function resolveMachineAccount(label: string, user: string, inDomain: boolean): Promise<string | null> {
+  try {
+    return (await resolvePrintJobUserSid(user)).trim()
+  } catch (error) {
+    const replay = replaySidStep(label, user)
+    // 工作组：只接受「账号读不出」这一种拒绝。别的异常继续失败。
+    if (!inDomain && isCleanUnreadableSid(replay)) return null
+    throw error
+  }
+}
+
 async function verifySidResolution(): Promise<void> {
-  assert.equal((await resolvePrintJobUserSid('SYSTEM')).trim(), 'S-1-5-18')
-  assert.equal((await resolvePrintJobUserSid('NT AUTHORITY\\SYSTEM')).trim(), 'S-1-5-18')
-  assert.equal((await resolvePrintJobUserSid('system')).trim(), 'S-1-5-18')
-  const currentName = runPs('[System.Security.Principal.WindowsIdentity]::GetCurrent().Name').trim()
-  const currentSid = runPs('[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value').trim()
-  assert.equal((await resolvePrintJobUserSid(currentName)).trim(), currentSid)
-  const machine = runPs('[Environment]::MachineName').trim()
-  const machineSid = (await resolvePrintJobUserSid(`${machine}$`)).trim()
-  assert.match(machineSid, /^S-1-/)
-  assert.equal((await resolvePrintJobUserSid(`${machine}\\${machine}$`)).trim(), machineSid)
-  await assert.rejects(() => resolvePrintJobUserSid('   '))
-  await assert.rejects(() => resolvePrintJobUserSid('NoSuchPrintJobUser-xyz'))
+  assertUnreadableMachineAccountSkipsCleanup()
+  assert.equal(await resolveSid('system', 'SYSTEM'), 'S-1-5-18')
+  assert.equal(await resolveSid('nt-authority-system', 'NT AUTHORITY\\SYSTEM'), 'S-1-5-18')
+  assert.equal(await resolveSid('system-folded', 'system'), 'S-1-5-18')
+  const currentName = runPsLabeled('current-user-name', '[System.Security.Principal.WindowsIdentity]::GetCurrent().Name').trim()
+  const currentSid = runPsLabeled('current-user-sid', '[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value').trim()
+  assert.equal(await resolveSid('current-user', currentName), currentSid)
+  const partOfDomain = runPsLabeled(
+    'part-of-domain',
+    '(Get-CimInstance Win32_ComputerSystem).PartOfDomain',
+  ).trim().toLowerCase()
+  const inDomain = partOfDomain === 'true'
+  const machine = runPsLabeled('machine-name', '[Environment]::MachineName').trim()
+  // 工作组没有域计算机账号。GitHub 的 Windows runner 和 KSK-001 都是工作组，
+  // LookupAccountName("机器名$") 通常查不到。查不到时是干净拒绝：解析函数抛出
+  // print job user sid is unreadable，进程非 0 退出。生产列表脚本把这次拒绝当成
+  // 读不出账号：跳过、不删，列表命令仍然成功，所以不算清理失败。这一项不能删。
+  // 域里必须解析出 S-1-5-21-…。脚本错误、超时和别的异常仍然让门禁失败。
+  const bare = await resolveMachineAccount('machine-account', `${machine}$`, inDomain)
+  const qualified = await resolveMachineAccount('machine-qualified-machine-account', `${machine}\\${machine}$`, inDomain)
+  if (inDomain) {
+    if (bare === null || qualified === null) throw new Error('domain computer account must resolve')
+    assert.match(bare, /^S-1-5-21-/)
+    assert.equal(qualified, bare)
+  } else {
+    if (bare !== null) assert.match(bare, /^S-1-/)
+    if (qualified !== null) {
+      assert.match(qualified, /^S-1-/)
+      if (bare !== null) assert.equal(qualified, bare)
+    }
+  }
+  await expectSidRejection('blank-user', '   ')
+  await expectSidRejection('unknown-user', 'NoSuchPrintJobUser-xyz')
 }
 
 function createPrinters(): void {
@@ -230,10 +369,10 @@ exit 0
 
 async function runScenario(): Promise<void> {
   await verifySidResolution()
-  createPrinters()
+  runLabeled('createPrinters', () => createPrinters())
   await showQueueFailure('pause', PRINTER_A, () => pauseConfiguredPrinterQueue(PRINTER_A))
   await showQueueFailure('pause', PRINTER_B, () => pauseConfiguredPrinterQueue(PRINTER_B))
-  submitOtherAccountJob()
+  runLabeled('submitOtherAccountJob', () => submitOtherAccountJob())
   const other = await waitForJob(PRINTER_A, (job) => !job.ownedByCurrentProcess)
   submitOwnJob(PRINTER_A)
   submitOwnJob(PRINTER_B)
@@ -254,10 +393,10 @@ async function runScenario(): Promise<void> {
       throw new Error('failed-terminal cleanup must not pause when idle hold is off')
     },
   })
-  const afterCleanup = await listConfiguredPrintJobs(PRINTER_A)
+  const afterCleanup = await listLabeled('listConfiguredPrintJobs:after-failed-terminal', PRINTER_A)
   assert.equal(afterCleanup.jobs.some((job) => job.id === jobA.id), false, 'failed-terminal: own-account job must be removed')
   assert.equal(afterCleanup.jobs.some((job) => job.id === other.id), true, 'failed-terminal: other-account job must stay')
-  const onOtherPrinter = await listConfiguredPrintJobs(PRINTER_B)
+  const onOtherPrinter = await listLabeled('listConfiguredPrintJobs:other-printer', PRINTER_B)
   assert.equal(onOtherPrinter.jobs.some((job) => job.id === jobC.id), true, 'failed-terminal: job on the other printer must stay')
 
   submitOwnJob(PRINTER_A)
@@ -275,7 +414,7 @@ async function runScenario(): Promise<void> {
     },
   })
   assert.equal(prepared, 'ready', 'pre-dispatch: cleanup of the real queue must succeed')
-  const kept = await listConfiguredPrintJobs(PRINTER_A)
+  const kept = await listLabeled('listConfiguredPrintJobs:after-pre-dispatch', PRINTER_A)
   assert.equal(kept.jobs.some((job) => job.id === jobB.id), false, 'pre-dispatch: own-account leftover must be removed')
   assert.equal(kept.jobs.some((job) => job.id === other.id), true, 'pre-dispatch: other-account job must still stay')
 
@@ -295,7 +434,7 @@ exit 0
   )
   const cleaned = await showQueueFailure('list', PRINTER_A, () => cleanupStaleOwnPrintJobs({ printerName: PRINTER_A }))
   assert.ok(cleaned.unreadableUserJobs >= 1, 'unreadable user jobs must be counted, not fail the cleanup')
-  const afterUnreadable = await listConfiguredPrintJobs(PRINTER_A)
+  const afterUnreadable = await listLabeled('listConfiguredPrintJobs:after-unreadable', PRINTER_A)
   const keptUnreadable = afterUnreadable.jobs.find((job) => job.id === other.id)
   assert.ok(keptUnreadable, 'job of the deleted account must stay')
   assert.equal(keptUnreadable.unreadableUser, true, 'deleted-account job must be marked unreadable')

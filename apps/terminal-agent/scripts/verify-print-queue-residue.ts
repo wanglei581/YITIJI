@@ -284,6 +284,43 @@ function verifyPrinterNameComparison(): void {
   assert.doesNotMatch(hold, /DocumentName/)
 }
 
+/**
+ * 工作组上作业所有者是「机器名$」、LookupAccountName 查不到时：
+ * 解析函数抛出 print job user sid is unreadable，列表脚本抓住后标成读不出账号，
+ * 跳过、不删，列表命令仍然输出 JSON。清理只删本进程 SID，不把这次跳过当成失败。
+ */
+function verifyWorkgroupMachineAccountSkips(): void {
+  const script = LIST_JOBS_SCRIPT
+  const resolveAt = script.indexOf('function Resolve-PrintJobUserSid')
+  const loopAt = script.indexOf('foreach ($job in $raw)')
+  assert.ok(resolveAt >= 0 && loopAt > resolveAt, 'resolver stays inside the list script')
+  const resolveFn = script.slice(resolveAt, loopAt)
+  assert.ok(resolveFn.includes("EndsWith('$')"), 'computer account is a lookup candidate')
+  assert.ok(resolveFn.includes('[Environment]::MachineName'))
+  const lookupAt = resolveFn.indexOf('LookupAccountName')
+  const throwAt = resolveFn.lastIndexOf("throw 'print job user sid is unreadable'")
+  assert.ok(lookupAt > 0 && throwAt > lookupAt, 'lookup failure throws inside the resolver')
+  const callAt = script.indexOf('Resolve-PrintJobUserSid ([string]$job.UserName)', loopAt)
+  const catchAt = script.indexOf('} catch {', callAt)
+  const idAt = script.indexOf('$idText', catchAt)
+  assert.ok(callAt > loopAt && catchAt > callAt && idAt > catchAt)
+  const catchBody = script.slice(catchAt, idAt)
+  assert.ok(catchBody.includes('$skippedUnreadable += 1'))
+  assert.ok(catchBody.includes('$unreadable = $true'))
+  assert.equal(/\bthrow\b/.test(catchBody), false, 'unreadable owner must not fail the list command')
+  assert.ok(script.indexOf('ConvertTo-Json', idAt) > idAt, 'list command still prints JSON')
+  const hold = readFileSync(holdSourcePath, 'utf8')
+  const cleanupAt = hold.indexOf('export async function cleanupStaleOwnPrintJobs')
+  const cleanup = cleanupAt < 0 ? '' : hold.slice(cleanupAt)
+  assert.match(cleanup, /return \{ removed: ids\.length, skipped: false, unreadableUserJobs: listed\.unreadableUserJobs \}/)
+  assert.doesNotMatch(cleanup, /if \(listed\.unreadableUserJobs[\s\S]{0,160}throw/)
+  const listed = parsePrintJobListOutput('{"jobs":[{"id":9,"owned":false,"unreadable":true}],"unreadable":1}')
+  assert.equal(listed.unreadableUserJobs, 1)
+  assert.equal(listed.jobs[0]?.unreadableUser, true)
+  assert.equal(listed.jobs[0]?.ownedByCurrentProcess, false)
+  assert.deepEqual(selectOwnPrintJobIds(listed.jobs), [])
+}
+
 function verifyStartupWiring(): void {
   const index = readFileSync(indexSourcePath, 'utf8')
   const acquire = index.indexOf('await acquireLock()')
@@ -1161,6 +1198,7 @@ async function main(): Promise<void> {
   verifyComparisonTable()
   verifyConfigDefault()
   verifyPrinterNameComparison()
+  verifyWorkgroupMachineAccountSkips()
   verifyStartupWiring()
   await verifyPrintDispatchGate()
   await verifyQueueStateReadback()

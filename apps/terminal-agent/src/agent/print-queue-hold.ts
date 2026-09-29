@@ -15,6 +15,8 @@
  * 本进程账号（生产为 SYSTEM，已特判 S-1-5-18；CI 为 runner 账号）一定能解析，
  * 所以不会漏删自己的作业。别的程序、已删账号、服务账号读不出时，若让整次清理失败，
  * 闸门会永久合上、整机停打。这类作业视为不是本进程的：跳过、不删，日志只记跳过数。
+ * 工作组没有域计算机账号。作业所有者是「机器名$」时 LookupAccountName 通常失败，
+ * 同样走这条跳过，列表命令仍然成功，不算清理失败。域里则解析成 S-1-5-21-… 再比较。
  * 本账号作业的 ID 不是正整数时，这份作业删不掉，整次清理失败、合闸门。
  * 别的账号上 ID 异常不影响。读不出账号的作业仍跳过。
  * 只有「列出作业」或「删除作业」命令本身失败，或本账号作业 ID 无效，才算清理失败。
@@ -187,7 +189,8 @@ foreach ($job in $raw) {
     $jobSid = New-Object System.Security.Principal.SecurityIdentifier($resolved)
     $owned = $jobSid.Equals($currentSid)
   } catch {
-    # 读不出账号就当不是本进程的：跳过、不删。ID 是否能删由 Node 判断。
+    # 读不出账号就当不是本进程的：跳过、不删。工作组上的「机器名$」查不到也走这里，不算清理失败。
+    # ID 是否能删由 Node 判断。
     $skippedUnreadable += 1
     $unreadable = $true
   }
@@ -441,9 +444,17 @@ export async function listConfiguredPrintJobs(printerName: string): Promise<{ jo
   }
 }
 
+/** 与 resolvePrintJobUserSid 同一段脚本、同一份 stdin。门禁用它重放失败的那一次。 */
+export function printJobUserSidCommand(user: string): { script: string; stdin: string } {
+  return {
+    script: `$ErrorActionPreference = 'Stop'\n${RESOLVE_PRINT_JOB_USER_SID}\n$payload = [Console]::In.ReadToEnd() | ConvertFrom-Json\nResolve-PrintJobUserSid ([string]$payload.user)`,
+    stdin: JSON.stringify({ user }),
+  }
+}
+
 export async function resolvePrintJobUserSid(user: string): Promise<string> {
-  const script = `$ErrorActionPreference = 'Stop'\n${RESOLVE_PRINT_JOB_USER_SID}\n$payload = [Console]::In.ReadToEnd() | ConvertFrom-Json\nResolve-PrintJobUserSid ([string]$payload.user)`
-  return runPowerShellOrThrow(script, JSON.stringify({ user }))
+  const command = printJobUserSidCommand(user)
+  return runPowerShellOrThrow(command.script, command.stdin)
 }
 
 async function removePrintJobs(printerName: string, ids: number[]): Promise<void> {
