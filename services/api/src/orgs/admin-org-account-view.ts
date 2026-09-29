@@ -19,8 +19,12 @@ export interface AdminOrgAccount {
   emailVerifiedAt: string | null
   emailVerifyMethod: string | null
   availableActionVerificationMethods: PartnerAccountVerificationMethod[]
-  /** 临时密码且手机尚未本人自证时，后台可以显示「登记手机号」。 */
-  contactPhoneRegistrationAvailable: boolean
+  /** 密码状态：temporary=管理员给的临时密码；owner_managed=本人自管；legacy=历史账号。 */
+  passwordProofState: PasswordProofState
+  /** 非空 = 管理员已按确认函登记手机号，机构本人还没用「忘记密码」自证。 */
+  phoneRegisteredByAdminAt: string | null
+  /** 服务端按登记接口同一套资格规则算好；后台按钮只看它，不自行推断。 */
+  canRegisterContactPhone: boolean
   createdAt: string
 }
 
@@ -86,12 +90,14 @@ export function mapAdminOrgAccount(account: AdminOrgAccountRow): AdminOrgAccount
     emailVerifiedAt: account.emailVerifiedAt?.toISOString() ?? null,
     emailVerifyMethod: account.emailVerifyMethod,
     availableActionVerificationMethods: availableMethodsForAccount({ ...account, passwordProofState }),
-    contactPhoneRegistrationAvailable: contactPhoneRegistrationAvailable({ ...account, passwordProofState }),
+    passwordProofState,
+    phoneRegisteredByAdminAt: account.phoneRegisteredByAdminAt?.toISOString() ?? null,
+    canRegisterContactPhone: canRegisterContactPhone({ ...account, passwordProofState }),
     createdAt: account.createdAt.toISOString(),
   }
 }
 
-export function contactPhoneRegistrationAvailable(account: {
+export function canRegisterContactPhone(account: {
   enabled: boolean
   phoneHash: string | null
   phoneVerifiedAt: Date | null
