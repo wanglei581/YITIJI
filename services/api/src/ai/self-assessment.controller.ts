@@ -13,7 +13,9 @@ import { AppendedSelfAssessmentService } from './resume/appended-self-assessment
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { AppendSelfAssessmentDto, SubmitSelfAssessmentDto } from './dto/self-assessment.dto'
 import {
+  SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL,
   SELF_ASSESSMENT_CONSENT_ITEMS,
+  SELF_ASSESSMENT_CONSENT_LINKS,
   SELF_ASSESSMENT_CONSENT_VERSION,
   type SelfAssessmentQuestionsResponse,
 } from './resume/self-assessment.types'
@@ -98,9 +100,8 @@ export class SelfAssessmentController {
   @Post()
   @PaidAiThrottle(6)
   /**
-   * `consent.consentVersion` 可选：现网前端只发两个布尔。缺省 ⇒ 记为「未版本化同意」；
-   * 当前版本与清单里点名的旧版本可以提交，落库存实际提交的版本号，不升级成当前版本；
-   * 清单外 ⇒ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`。
+   * `consent.consentVersion` 可选：旧客户端只发两个布尔。缺省 ⇒ 记为「未版本化同意」；
+   * 只有当前版本可以提交；其它已提交的版本 ⇒ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`。
    * 判定逻辑集中在 service，controller 不做第二份版本比较（避免两处口径漂移）。
    */
   @AiUseExempt(SCORING_EXEMPT_REASON)
@@ -124,7 +125,7 @@ export class SelfAssessmentController {
    * 从根上排除「题目和计分口径不一致」。
    *
    * 免登录：与 POST 同口径（submit 也允许匿名 x-resume-access-token）。
-   * 只返回题目、当前同意版本和配套条款原文，不含任何本人数据。
+   * 只返回题目，以及与当前版本配套的条款、链接和勾选框文字，不含任何本人数据。
    */
   @Get('questions')
   @AiUse('read')
@@ -135,6 +136,8 @@ export class SelfAssessmentController {
       dimensions: SELF_ASSESSMENT_QUESTIONS_V1.dimensions,
       consentVersion: SELF_ASSESSMENT_CONSENT_VERSION,
       consentItems: [...SELF_ASSESSMENT_CONSENT_ITEMS],
+      consentLinks: SELF_ASSESSMENT_CONSENT_LINKS.map((link) => ({ ...link })),
+      consentCheckboxLabel: SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL,
     }
   }
 

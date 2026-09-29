@@ -1,11 +1,10 @@
 # 下一步任务
 
-## 后端窗口待办（自我探索同意过渡）
+## 后端窗口待办（自我探索同意）
 
-- **去掉自我探索同意旧版本清单**
-  - 负责人：后端窗口
-  - 触发条件：小程序带新条款的版本全量
-  - 改哪个常量：`services/api/src/ai/resume/self-assessment.types.ts` 的 `SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS`（现在只含 `sa-consent-v1.2026-08-16`）。删掉或清空后，这个旧版本提交必须回到 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，不要改成「任何更早的版本都收」。
+已按合规裁定取消过渡期（服务端只收当前版本）。
+
+- **打开「四端同意版本一致」断言**：`services/api/src/ai/resume/__tests__/self-assessment-consent.test.ts` 里带 skip 的那条。负责人：后端窗口。触发条件：一体机（主执行窗口）与小程序（#1124）都已升到当前版本并用下发的 consentLinks、consentCheckboxLabel 渲染。
 
 ## 2026-09-29：候选写入方（本窗口）的活，按先后
 

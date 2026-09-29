@@ -6,7 +6,8 @@
 //  A. 【版本化同意】旧版本同意**不得**被当成新版本同意。
 //     只存一个布尔 `consented:true` 的系统，在同意书改版后会把用户对旧说明的
 //     同意当成对新说明的同意 —— 用户从未看过新条款，系统却按「已同意」放行。
-//     这里逐条钉死：显式旧版本被拒、缺省版本不被静默升级、回读不粉饰。
+//     这里逐条钉死：已提交的非当前版本一律拒绝（没有旧版本清单）、缺省版本
+//     不被静默升级、回读不粉饰。已落库的旧版本仍可查看、打印、撤回。
 //
 //  B. 【记录追加】`/append` 不得成为覆盖写，并发追加不得互相丢失。
 //     并附带证明 append 产出带 `printFileUrl`（内部 HMAC URL），
@@ -36,12 +37,22 @@ import { SELF_ASSESSMENT_CONSENT_VERSION } from '../self-assessment.types'
 
 const repoRoot = resolve(__dirname, '../../../../../..')
 const CURRENT = SELF_ASSESSMENT_CONSENT_VERSION
-/** 冻结的新版本。测试不得改用导入常量，否则把常量改回旧值时请求会跟着变绿。 */
-const NEW_VERSION = 'sa-consent-v1.2026-09-29'
-/** 清单里点名的那一个旧版本。删掉清单项之后，用它提交必须 400。 */
+/** 冻结的当前版本。测试不得改用导入常量，否则把常量改回旧值时请求会跟着变绿。 */
+const NEW_VERSION = 'sa-consent-v2.2026-09-29'
+/** #1119 下发过的版本。取消过渡期后，用它提交必须 400。 */
+const PREVIOUS_VERSION = 'sa-consent-v1.2026-09-29'
+/** 更早的一体机版本。同样必须 400，不能再进白名单。 */
 const LEGACY_VERSION = 'sa-consent-v1.2026-08-16'
 const AGE_ITEM = '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。'
-/** 一个不在清单里的旧版本。它必须永远打不开门，即使看起来比清单项更早。 */
+const CHECKBOX_LABEL =
+  '我已阅读上述说明和《隐私政策》中的未成年人个人信息处理规则，确认本人已满 14 周岁；未满 14 周岁的，已取得监护人同意并由监护人陪同。'
+const CONSENT_LINK = {
+  label: '《隐私政策》中的未成年人个人信息处理规则',
+  legalDocType: 'privacy_policy' as const,
+  sectionTitle: '未满十四周岁未成年人个人信息处理规则',
+}
+const STALE_MESSAGE = '知情同意说明已更新，请重新阅读并确认后再提交'
+/** 一个从未下发过的版本。它必须永远打不开门。 */
 const STALE = 'sa-consent-v0.2026-01-01'
 
 function resultTtlMs(): number {
@@ -204,6 +215,26 @@ function readConstStrings(src: string, name: string): string[] {
   return items
 }
 
+function readStringConst(src: string, name: string): string {
+  const matched = src.match(new RegExp(`(?:export\\s+)?const\\s+${name}\\s*=\\s*'([^']*)'`))
+  assert.ok(matched, `必须能读到 ${name}`)
+  return matched![1]!
+}
+
+function readConsentLinks(src: string): Array<{ label: string; legalDocType: string; sectionTitle: string }> {
+  const matched = src.match(/const\s+SELF_ASSESSMENT_CONSENT_LINKS\b[\s\S]*?=\s*\[([\s\S]*?)\n\]/)
+  assert.ok(matched, '必须能读到 SELF_ASSESSMENT_CONSENT_LINKS')
+  return [...matched![1]!.matchAll(/\{([\s\S]*?)\}/g)].map((hit) => {
+    const body = hit[1]!
+    const pick = (key: string) => {
+      const field = body.match(new RegExp(`${key}\\s*:\\s*'([^']*)'`))
+      assert.ok(field, `链接缺少 ${key}`)
+      return field![1]!
+    }
+    return { label: pick('label'), legalDocType: pick('legalDocType'), sectionTitle: pick('sectionTitle') }
+  })
+}
+
 function listMiniappSources(): string[] {
   const root = resolve(repoRoot, 'apps/miniapp')
   const out: string[] = []
@@ -245,7 +276,7 @@ test('A1 持旧版本同意的提交被拒绝，而不是静默放行', async ()
   assert.equal(audits.length, 0, '旧版本同意不得产生 create 审计')
 })
 
-test('A1b 清单外的旧版本一律 400，不能因为「看起来更早」就收下', async () => {
+test('A1b 不是当前版本的字符串一律 400，不能因为「看起来更早」就收下', async () => {
   const outsiders = [
     'sa-consent-v1.2026-08-15',
     'sa-consent-v1.2020-01-01',
@@ -266,7 +297,7 @@ test('A1b 清单外的旧版本一律 400，不能因为「看起来更早」就
         assert.match(JSON.stringify(error.getResponse()), /SELF_ASSESSMENT_CONSENT_VERSION_STALE/)
         return true
       },
-      `${version} 不在清单里，必须 400`,
+      `${version} 不是当前版本，必须 400`,
     )
     assert.equal(rows.length, 0, `${version} 不得落库`)
   }
@@ -287,19 +318,30 @@ test('A2 新版本提交通过，并按新版本落库', async () => {
   assertAnonymousShortRetention(rows[0]!, '新版本匿名')
 })
 
-test('A2b 清单内旧版本通过，落库存旧版本号，不算已同意当前说明', async () => {
-  const { service, rows } = makeHarness()
-  const ok = await service.submit(anon, {
-    answers: answers(),
-    consent: { nonSensitive: true, sensitive: false, consentVersion: LEGACY_VERSION },
-  })
-  assert.equal(ok.status, 'completed')
-  assert.equal(ok.consentVersion, LEGACY_VERSION, '必须原样记下旧版本，不能升级成当前版本')
-  assert.notEqual(ok.consentVersion, NEW_VERSION)
-  assert.equal(ok.consentCurrent, false, '旧版本同意不算已同意当前说明')
-  const stored = JSON.parse(rows[0]!.payloadJson) as { consentVersion: string }
-  assert.equal(stored.consentVersion, LEGACY_VERSION)
-  assertAnonymousShortRetention(rows[0]!, '旧版本匿名')
+test('A2b #1119 版本与更早版本一律 400，不落库、不写创建审计', async () => {
+  for (const version of [PREVIOUS_VERSION, LEGACY_VERSION]) {
+    const { service, rows, audits } = makeHarness()
+    await assert.rejects(
+      () => service.submit(anon, {
+        answers: answers(),
+        consent: { nonSensitive: true, sensitive: false, consentVersion: version },
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof BadRequestException, `${version} 必须是 400`)
+        const body = error.getResponse() as { error?: { code?: string; message?: string } }
+        assert.equal(body.error?.code, 'SELF_ASSESSMENT_CONSENT_VERSION_STALE')
+        assert.equal(body.error?.message, STALE_MESSAGE)
+        return true
+      },
+      `${version} 已不是当前版本，必须拒绝`,
+    )
+    assert.equal(rows.length, 0, `${version} 不得留下任何结果行`)
+    assert.equal(
+      audits.filter((event) => event.action === 'resume.self_assessment_create').length,
+      0,
+      `${version} 不得产生 create 审计`,
+    )
+  }
 })
 
 test('A3 未带版本号的提交如实记为 null，不被补写成当前版本', async () => {
@@ -365,6 +407,29 @@ test('A4b 回读「本次改动之前落库的老行」不得被粉饰成已同�
   assert.equal(read.consentCurrent, false, '老行不得被判定为「已同意当前说明」')
 })
 
+test('A4c 会员名下的旧版本记录仍可查看、打印、撤回', async () => {
+  const member = { endUserId: 'member-1', accessToken: null }
+  const h = makeHarness()
+  await h.service.submit(member, {
+    answers: answers(),
+    consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION },
+  })
+  const row = h.rows[0]!
+  const payload = JSON.parse(row.payloadJson) as Record<string, unknown>
+  payload['consentVersion'] = PREVIOUS_VERSION
+  row.payloadJson = JSON.stringify(payload)
+
+  const read = await h.service.getLatest(row.taskId, member)
+  assert.equal(read.consentVersion, PREVIOUS_VERSION, '查看必须回报存下来的旧版本')
+  assert.equal(read.consentCurrent, false)
+
+  const printed = await h.service.printReport(row.taskId, member)
+  assert.match(printed.printFileUrl, /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]{64}$/)
+
+  const withdrawn = await h.service.withdraw(row.taskId, member)
+  assert.deepEqual(withdrawn, { deleted: true })
+})
+
 test('A5 版本判定是严格相等，不做前缀/大小写/子串兼容', () => {
   assert.equal(isConsentCurrent(CURRENT), true)
   for (const near of [
@@ -378,54 +443,74 @@ test('A5 版本判定是严格相等，不做前缀/大小写/子串兼容', () 
   }
 })
 
-test('A6 当前版本 shared = 服务端 = 冻结新版本；一体机与小程序过渡期只能停在清单内旧版本', () => {
+test(
+  'A6 一体机、小程序、shared、服务端四处版本号全部相等',
+  {
+    skip: '等一体机与小程序同批升版后开启：一体机仍写死旧版本，本批不改 apps。打开前须确认两端版本与条款都等于服务端当前版本，且页面用题目接口下发的 consentLinks、consentCheckboxLabel 渲染。小程序源码里没有写死版本号时，本断言不会因此变红，不能单独当成页面已升版。',
+  },
+  () => {
+    const read = (p: string) => readFileSync(resolve(repoRoot, p), 'utf8')
+    const pick = (src: string, file: string) => {
+      const m = src.match(/SELF_ASSESSMENT_CONSENT_VERSION\s*=\s*'([^']+)'/)
+      assert.ok(m, `${file} 必须声明 SELF_ASSESSMENT_CONSENT_VERSION`)
+      return m![1]
+    }
+    const sharedSrc = read('packages/shared/src/types/selfAssessment.ts')
+    const apiSrc = read('services/api/src/ai/resume/self-assessment.types.ts')
+    const kioskSrc = read('apps/kiosk/src/pages/resume/selfAssessmentSession.ts')
+    const shared = pick(sharedSrc, 'packages/shared')
+    const api = pick(apiSrc, 'services/api')
+    const kiosk = pick(kioskSrc, 'apps/kiosk')
+    assert.equal(shared, NEW_VERSION)
+    assert.equal(api, NEW_VERSION)
+    assert.equal(kiosk, NEW_VERSION, '一体机版本必须等于当前版本')
+    assert.equal(api, shared)
+
+    const sharedItems = readConstStrings(sharedSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
+    assert.deepEqual(readConstStrings(apiSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS'), sharedItems)
+    assert.deepEqual(readConstStrings(kioskSrc, 'CONSENT_ITEMS'), sharedItems, '一体机条款必须与 shared 逐字相同')
+
+    const versionRe = /sa-consent-v\d+\.\d{4}-\d{2}-\d{2}/g
+    for (const file of listMiniappSources()) {
+      const text = readFileSync(file, 'utf8')
+      for (const hit of text.match(versionRe) ?? []) {
+        assert.equal(hit, NEW_VERSION, `小程序写死的同意版本 ${hit} 必须等于当前版本`)
+      }
+    }
+  },
+)
+
+test('A6b shared 与服务端的版本、条款、链接、勾选框文字逐字一致，并随题目下发', () => {
   const read = (p: string) => readFileSync(resolve(repoRoot, p), 'utf8')
-  const pick = (src: string, file: string) => {
-    const m = src.match(/SELF_ASSESSMENT_CONSENT_VERSION\s*=\s*'([^']+)'/)
-    assert.ok(m, `${file} 必须声明 SELF_ASSESSMENT_CONSENT_VERSION`)
-    return m![1]
-  }
   const sharedSrc = read('packages/shared/src/types/selfAssessment.ts')
   const apiSrc = read('services/api/src/ai/resume/self-assessment.types.ts')
-  const kioskSrc = read('apps/kiosk/src/pages/resume/selfAssessmentSession.ts')
-  const shared = pick(sharedSrc, 'packages/shared')
-  const api = pick(apiSrc, 'services/api')
-  const kiosk = pick(kioskSrc, 'apps/kiosk')
-
-  assert.equal(shared, NEW_VERSION, 'shared 当前版本必须是冻结的新版本')
-  assert.equal(api, NEW_VERSION, '服务端当前版本必须是冻结的新版本')
-  assert.equal(api, shared, '服务端 CJS 镜像与 packages/shared 真源必须逐字相等')
+  assert.equal(readStringConst(sharedSrc, 'SELF_ASSESSMENT_CONSENT_VERSION'), NEW_VERSION)
+  assert.equal(readStringConst(apiSrc, 'SELF_ASSESSMENT_CONSENT_VERSION'), NEW_VERSION)
+  assert.equal(CURRENT, NEW_VERSION, '运行中的服务端常量必须等于冻结的当前版本')
 
   const sharedItems = readConstStrings(sharedSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
   const apiItems = readConstStrings(apiSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
   assert.deepEqual(apiItems, sharedItems, '服务端条款必须与 shared 逐字相同')
-  assert.equal(sharedItems.at(-1), AGE_ITEM, '当前条款必须含年龄这一条')
+  assert.equal(sharedItems.at(-1), AGE_ITEM)
   assert.equal(sharedItems.length, 6)
+  assert.equal(readStringConst(sharedSrc, 'SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL'), CHECKBOX_LABEL)
+  assert.equal(readStringConst(apiSrc, 'SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL'), CHECKBOX_LABEL)
+  assert.deepEqual(readConsentLinks(sharedSrc), [CONSENT_LINK])
+  assert.deepEqual(readConsentLinks(apiSrc), [CONSENT_LINK])
 
-  const legacy = readConstStrings(apiSrc, 'SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS')
-  assert.deepEqual(legacy, [LEGACY_VERSION], '旧版本清单目前只能有点名的那一个，不能是范围')
+  const legalSrc = read('services/api/src/legal/legal.service.ts')
+  const legalController = read('services/api/src/legal/legal.controller.ts')
+  assert.match(legalSrc, /'privacy_policy'/, 'privacy_policy 必须是现有法务文档类型')
+  assert.match(legalController, /@Controller\('kiosk\/legal'\)/)
 
-  // 一体机页面本批不改。它仍可以停在清单内的旧版本；一旦改成当前版本，条款必须与 shared 相同。
-  const kioskItems = readConstStrings(kioskSrc, 'CONSENT_ITEMS')
-  if (kiosk === NEW_VERSION) {
-    assert.deepEqual(kioskItems, sharedItems, '一体机改到当前版本时，条款必须与 shared 逐字相同')
-  } else {
-    assert.equal(kiosk, LEGACY_VERSION, '一体机版本只能是当前版本，或清单里那一个旧版本')
-    assert.deepEqual(kioskItems, sharedItems.slice(0, -1), '一体机仍用旧版本时，条款必须是加上年龄条之前的那 5 条')
-  }
-
-  const versionRe = /sa-consent-v\d+\.\d{4}-\d{2}-\d{2}/g
-  const miniappVersions = new Set<string>()
-  for (const file of listMiniappSources()) {
-    const text = readFileSync(file, 'utf8')
-    for (const hit of text.match(versionRe) ?? []) miniappVersions.add(hit)
-  }
-  for (const version of miniappVersions) {
-    assert.ok(
-      version === NEW_VERSION || version === LEGACY_VERSION,
-      `小程序写死的同意版本 ${version} 必须是当前版本或清单内旧版本`,
-    )
-  }
+  const controller = new SelfAssessmentController(
+    null as never, null as never, null as never, null as never, null as never, null as never,
+  )
+  const questions = controller.questions()
+  assert.equal(questions.consentVersion, NEW_VERSION, '链接和勾选框必须配当前版本下发')
+  assert.deepEqual([...questions.consentItems], sharedItems)
+  assert.deepEqual(questions.consentLinks, [CONSENT_LINK])
+  assert.equal(questions.consentCheckboxLabel, CHECKBOX_LABEL)
 })
 
 test('A8 题目接口下发的 consentItems 等于 shared 当前条款，且含年龄这一条', () => {

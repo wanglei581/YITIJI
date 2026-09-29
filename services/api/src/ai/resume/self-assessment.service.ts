@@ -154,13 +154,12 @@ export class SelfAssessmentService {
     }
 
     // ── 版本化同意门禁 ────────────────────────────────────────────────
-    // 接受当前版本，以及 `SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS` 里点名的旧版本。
-    // 清单外一律 400。这里不把旧版本改写成当前版本 —— 落库存的是实际提交的那一串。
-    // `isConsentCurrent()` 仍只认当前版本，旧版本同意不算已同意现在这份说明。
+    // 只接受当前版本。已提交的其它版本一律 400，不改写成当前版本。
+    // 没有过渡期，也没有旧版本清单。
     //
-    // 版本号**缺省**（现网 S2-7 前端只发两个布尔）⇒ 如实记为 null「未版本化同意」，
-    // 同样**不补写当前版本**。null 在 `isConsentCurrent()` 下判 false，
-    // 读回时 `consentCurrent:false`，前端据此请用户重新确认。
+    // 版本号**缺省**（旧客户端只发两个布尔）⇒ 如实记为 null「未版本化同意」，
+    // **不补写当前版本**。null 在 `isConsentCurrent()` 下判 false，
+    // 读回时 `consentCurrent:false`。拿这条结果再去做新的模型生成会被拒绝。
     const suppliedVersion =
       typeof input.consent.consentVersion === 'string' ? input.consent.consentVersion.trim() : ''
     if (suppliedVersion && !isAcceptedSelfAssessmentConsentVersion(suppliedVersion)) {
