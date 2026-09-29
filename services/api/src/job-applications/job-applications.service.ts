@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 import {
@@ -118,8 +118,13 @@ export class JobApplicationsService {
     endUserId: string,
     page: MemberPageQuery,
     status?: JobApplicationStatus,
+    options?: { omitLinkedJobs?: boolean },
   ): Promise<{ items: JobApplicationItem[]; nextCursor: string | null; total: number }> {
-    const where = { endUserId, ...(status ? { status } : {}) }
+    const where = {
+      endUserId,
+      ...(status ? { status } : {}),
+      ...(options?.omitLinkedJobs ? { jobId: null } : {}),
+    }
     const total = await this.prisma.jobApplication.count({ where })
     const rows = await this.prisma.jobApplication.findMany({
       where,
@@ -201,6 +206,7 @@ export class JobApplicationsService {
     endUserId: string,
     id: string,
     input: UpdateJobApplicationInput,
+    options?: { rejectLinkedJob?: boolean },
   ): Promise<JobApplicationItem> {
     const existing = await this.prisma.jobApplication.findFirst({
       where: { id, endUserId },
@@ -209,6 +215,11 @@ export class JobApplicationsService {
     if (!existing) {
       throw new NotFoundException({
         error: { code: 'JOB_APPLICATION_NOT_FOUND', message: '求职进度记录不存在' },
+      })
+    }
+    if (options?.rejectLinkedJob && existing.jobId) {
+      throw new ForbiddenException({
+        error: { code: 'KIOSK_JOB_BOARD_DISABLED', message: '岗位板块已关闭' },
       })
     }
 

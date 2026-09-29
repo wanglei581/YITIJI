@@ -11,6 +11,8 @@ export function ResumeExportResult(props: {
   kind: 'resume' | 'change_list'
   savedToDocuments?: boolean
   guest: boolean
+  /** 非 PDF：这一页不把打印链接交出去。不传则保持原说明。 */
+  downloadOnly?: boolean
 }) {
   const countdown = useCountdown(props.exported.expiresAt)
   const expired = countdown.expired
@@ -53,7 +55,7 @@ export function ResumeExportResult(props: {
         />
       )}
       {hasFile && !isPdf && (
-        <p>此格式不能在页内预览。打印用的是同内容 PDF 副本（须打印链接就绪）。</p>
+        <p>{props.downloadOnly ? '这一份不能在页内预览，也暂不开放打印。可以扫码保存到手机。' : '此格式不能在页内预览。打印用的是同内容 PDF 副本（须打印链接就绪）。'}</p>
       )}
       {hasFile && !expired && (
         <div className="qx-rd-qr">

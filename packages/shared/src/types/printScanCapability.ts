@@ -5,7 +5,7 @@
 // 在任务创建边界强制执行，Kiosk UI 只是体验层）；'testing' 仅测试/运维语境可见；
 // 其余状态一律不可用。未配置行 = 管理员未接管，服务端放行既有已验证闭环。
 //
-// 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print 未配置 = 拒绝。
+// 例外见下方 DEFAULT_DENY_CAPABILITY_KEYS：color_print / duplex_print / signature_stamp 未配置 = 拒绝。
 
 export type PrintScanCapabilityKey =
   | 'document_print'
@@ -77,10 +77,16 @@ export const DEPRECATED_CAPABILITY_ALIAS: Partial<Record<PrintScanCapabilityKey,
  *
  * 该默认**不受 PRINT_SCAN_CAPABILITY_MODE 影响**：managed 模式放行的是既有闭环，
  * 不含这两个键。放行只有一条路径 —— 管理员在真机验过后显式配成 available。
+ *
+ * signature_stamp（签名盖章）列入本名单的理由是合规而不是「没验过」（2026-09-28 D3）：
+ * 只有一个图片位，本人签名与单位印章分不开，试点与新机器默认关，管理员逐台配成
+ * available 才开。Kiosk 对未配置的 signature_stamp 必须按「暂未开通」展示，
+ * 与服务端 assertUserTaskAllowed 一致（同 color_print / duplex_print 的处理）。
  */
 export const DEFAULT_DENY_CAPABILITY_KEYS: readonly PrintScanCapabilityKey[] = [
   'color_print',
   'duplex_print',
+  'signature_stamp',
 ] as const
 
 /**

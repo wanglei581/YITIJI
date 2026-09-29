@@ -20,6 +20,7 @@ import {
   copiesText,
   duplexText,
   NET_PAID_UNRECORDED,
+  opsAttentionText,
   pageRangeText,
   recordedCentsText,
 } from './orderHonestyCopy'
@@ -42,7 +43,8 @@ const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 
   paid:             { badge: 'success', label: '已支付' },
   refunding:        { badge: 'warning', label: '退款中' },
   refunded:         { badge: 'default', label: '已退款' },
-  partial_refunded: { badge: 'default', label: '部分退款' },
+  // 产品只做整单退款，服务端不再写入 partial_refunded；万一出现即为异常，需人工核对。
+  partial_refunded: { badge: 'warning', label: '退款异常·待核对' },
   failed:           { badge: 'error',   label: '支付失败' },
   closed:           { badge: 'default', label: '已关闭' },
 }
@@ -64,13 +66,20 @@ const PAY_FILTERS = [
   { label: '支付中', value: 'paying' },
   { label: '已支付', value: 'paid' },
   { label: '退款中', value: 'refunding' },
-  { label: '部分退款', value: 'partial_refunded' },
   { label: '已退款', value: 'refunded' },
   { label: '支付失败', value: 'failed' },
   { label: '已关闭', value: 'closed' },
 ] as const
 
 const OWNER_LABELS: Record<string, string> = { member: '会员', anonymous: '游客' }
+
+// 待退款信号的内部 refundReason 码 → 中文。两个码的唯一来源是
+// services/api/src/payment/pending-refund-signal.ts；管理员发起退款时写入的是
+// 人工填写的中文原因，因此未命中的值原样展示（不编造含义，也不吞掉真实文案）。
+const REFUND_REASON_LABELS: Record<string, string> = {
+  PAID_UNFULFILLED_PENDING_REFUND: '已付款未出纸',
+  ONLINE_PAID_PENDING_REFUND: '渠道已收款，但取件窗口已关、订单未转已支付',
+}
 
 // 收款入账来源：后端 AdminMarkPaidDto 只放行这两个（free 由 0 元建单自动产生，
 // 线上通道各走各的回调路径），文案与「我的」订单侧的来源展示保持一致。
@@ -150,6 +159,7 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [payStatus, setPayStatus] = useState('')
   const [refundRequiredFilter, setRefundRequiredFilter] = useState(false)
+  const [opsAttentionFilter, setOpsAttentionFilter] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -176,7 +186,7 @@ export default function OrdersPage() {
   const [verifyConfirm, setVerifyConfirm] = useState('')
   const [verifySubmitting, setVerifySubmitting] = useState(false)
   const [verifyError, setVerifyError] = useState<string | null>(null)
-  const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${refundRequiredFilter}:${search}:${page}:${pageSize}`
+  const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${refundRequiredFilter}:${opsAttentionFilter}:${search}:${page}:${pageSize}`
 
   const {
     data: orderPage,
@@ -189,6 +199,7 @@ export default function OrdersPage() {
       payStatus: payStatus || undefined,
       search: search || undefined,
       refundRequired: refundRequiredFilter || undefined,
+      opsAttention: opsAttentionFilter || undefined,
       page,
       pageSize,
     }),
@@ -391,7 +402,7 @@ export default function OrdersPage() {
                 key={f.label}
                 active={statusFilter === f.value}
                 label={f.label}
-                onClick={() => { setStatusFilter(f.value); setRefundRequiredFilter(false); setPage(1) }}
+                onClick={() => { setStatusFilter(f.value); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPage(1) }}
               />
             ))}
           </div>
@@ -402,18 +413,41 @@ export default function OrdersPage() {
                 key={f.label}
                 active={payStatus === f.value}
                 label={f.label}
-                onClick={() => { setPayStatus(f.value); setRefundRequiredFilter(false); setPage(1) }}
+                onClick={() => { setPayStatus(f.value); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPage(1) }}
               />
             ))}
             <FilterChip
-              active={statusFilter === 'failed' && payStatus === 'paid' && !refundRequiredFilter}
+              active={statusFilter === 'failed' && payStatus === 'paid' && !refundRequiredFilter && !opsAttentionFilter}
               label="已支付失败待核查"
-              onClick={() => { setStatusFilter('failed'); setPayStatus('paid'); setRefundRequiredFilter(false); setPage(1) }}
+              onClick={() => { setStatusFilter('failed'); setPayStatus('paid'); setRefundRequiredFilter(false); setOpsAttentionFilter(false); setPage(1) }}
             />
+            {/*
+              待退款覆盖**两类**信号单（服务端 refundRequired 的 OR 两支）：
+                ① 已付款未出纸       payStatus=paid    + PAID_UNFULFILLED_PENDING_REFUND
+                ② 渠道已收款未转 paid payStatus∈{closed,unpaid,paying} + ONLINE_PAID_PENDING_REFUND
+              ② 永远不是 paid。旧写法这里钉死 setPayStatus('paid')，后端收到
+              refundRequired=true + payStatus=paid 后只查 ①，于是「渠道已经收了钱、
+              却没有出款路径」的那一类整体被挡在筛选之外 —— 页面不报错，只是查不到。
+              所以这里必须**清空** payStatus，让后端走 OR 两支。
+            */}
             <FilterChip
               active={refundRequiredFilter}
-              label="待退款（已付款未出纸）"
-              onClick={() => { setRefundRequiredFilter(true); setPayStatus('paid'); setStatusFilter(''); setPage(1) }}
+              label="待退款（已收款未出纸）"
+              onClick={() => { setRefundRequiredFilter(true); setOpsAttentionFilter(false); setPayStatus(''); setStatusFilter(''); setPage(1) }}
+            />
+            {/*
+              需运营关注 = 服务端 opsAttention 的**三支 OR**：待退款、退款中、
+              渠道已受理但本地确认未落地。后两支在本页此前完全没有入口。
+
+              与上面那条同一个坑，必须再说一遍：这里**不能**顺手补 payStatus。
+              `channel_accepted_unconfirmed` 的 payStatus 是 paying / closed ——
+              渠道收了钱、本地没转成已支付。钉任何 payStatus 都会把这一类
+              整体挡在筛选外，而页面不会报错，只是查不到；那正是最该被看见的一类。
+            */}
+            <FilterChip
+              active={opsAttentionFilter}
+              label="需运营关注"
+              onClick={() => { setOpsAttentionFilter(true); setRefundRequiredFilter(false); setPayStatus(''); setStatusFilter(''); setPage(1) }}
             />
           </div>
         </div>
@@ -460,7 +494,17 @@ export default function OrdersPage() {
                           <td className={`${TD_CLS} tabular-nums text-neutral-700`}>{amountText(order.amountCents, order.currency)}</td>
                           <td className={TD_CLS}>
                             <StatusBadge dot status={pay.badge} label={pay.label} />
-                            {order.refundRequired ? (
+                            {/*
+                              角标读 opsAttentionCode 而不是 refundRequired：后者只覆盖三类里的一类，
+                              「退款中」「渠道已受理未确认」此前在列表上完全不可见。
+                              后端未返回该字段时 opsAttentionText 回 null —— 保留既有 refundRequired
+                              角标作为降级，不知道就不说，绝不默认「无异常」。
+                            */}
+                            {opsAttentionText(order.opsAttentionCode) ? (
+                              <span className="ml-1 text-[11px] font-bold text-warning-fg">
+                                {opsAttentionText(order.opsAttentionCode)}
+                              </span>
+                            ) : order.opsAttentionCode === undefined && order.refundRequired ? (
                               <span className="ml-1 text-[11px] font-bold text-warning-fg">待退款</span>
                             ) : null}
                           </td>
@@ -538,7 +582,7 @@ export default function OrdersPage() {
                 <Info label="退款时间" value={fmt(detail.refundedAt)} />
               )}
               {detail.refundReason && detail.payStatus !== 'paid' ? (
-                <Info label="退款原因" value={detail.refundReason} />
+                <Info label="退款原因" value={REFUND_REASON_LABELS[detail.refundReason] ?? detail.refundReason} />
               ) : null}
             </div>
 
@@ -618,8 +662,17 @@ export default function OrdersPage() {
             )}
             {detail.refundRequired && detail.printOutcome !== 'not_printed' && (
               <div className="mt-4 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3 text-[12.5px] leading-relaxed text-warning-fg">
-                <p className="font-extrabold">待退款：已付款但未出纸</p>
+                {/* 渠道已收款那一类订单的 payStatus 是 closed/unpaid/paying，不是 paid；
+                    统一写「已付款」会在管理端摆一个与支付状态相反的结论。 */}
+                <p className="font-extrabold">
+                  {detail.refundReason === 'ONLINE_PAID_PENDING_REFUND'
+                    ? '待退款：渠道已收款，订单未转已支付'
+                    : '待退款：已付款但未出纸'}
+                </p>
                 <p className="mt-1">
+                  {detail.refundReason === 'ONLINE_PAID_PENDING_REFUND'
+                    ? '取件窗口已关，系统未把该单转为已支付、未发放取件码。'
+                    : ''}
                   金额以本页服务端金额为准。系统不会自动出款，请走下方全额退款。
                 </p>
               </div>
@@ -828,7 +881,7 @@ export default function OrdersPage() {
                       </p>
                       <p className="mt-0.5 text-xs text-neutral-500">
                         {detail.refundRequired
-                          ? '已付款未出纸。系统不会自动出款；只有管理员点确认后才会向支付渠道发起。金额以本页服务端金额为准。'
+                          ? `${detail.refundReason === 'ONLINE_PAID_PENDING_REFUND' ? '渠道已收款但订单未转已支付' : '已付款未出纸'}。系统不会自动出款；只有管理员点确认后才会向支付渠道发起。金额以本页服务端金额为准。`
                           : `退款 ${amountText(detail.amountCents, detail.currency)}，操作不可撤销，仅 admin 可执行`}
                       </p>
                     </div>

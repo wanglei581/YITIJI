@@ -38,6 +38,12 @@ export interface AdminOrderReadonlyItem {
   retryForbidden: boolean
   /** 已付款未出纸、已落待退款信号。不会自动出款。 */
   refundRequired: boolean
+  /**
+   * 运营必须看见：待退款、退款中、或渠道已受理但本地确认未落地。
+   * 只读；不自动出款、不改 payStatus。
+   */
+  opsAttention: boolean
+  opsAttentionCode: 'refund_required' | 'refunding' | 'channel_accepted_unconfirmed' | null
   createdAt: string
   updatedAt: string
 }

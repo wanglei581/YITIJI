@@ -80,11 +80,19 @@ pass('4. /me/ai-records 只加 qaRecords 元数据字段')
 
 if (!holdSrc.includes('aria-pressed')) fail('5a. 一体机按住说话必须 aria-pressed')
 if (!holdSrc.includes('aria-disabled')) fail('5b. 麦克风/ASR 不可用必须 aria-disabled')
-if (!holdSrc.includes('min-height') && !readFileSync(join(root, '../../apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css'), 'utf-8').includes('assistant-hold-talk-btn')) {
-  fail('5c. 按住说话按钮必须有独立样式')
-}
-const holdCss = readFileSync(join(root, '../../apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css'), 'utf-8')
-if (!holdCss.includes('assistant-hold-talk-btn') || !holdCss.includes('56px')) fail('5c. 按住说话按钮触控高度必须 ≥56px')
+// 顾问页实际在用的样式：AssistantPage 直接 import 的 css，加上它们 @import 的分片。按导入关系取、
+// 不写死文件名 —— 2026-09-28 换成青序样式后，这里曾还在读一份已经没人引用的旧 chat css。
+const assistantDir = join(root, '../../apps/kiosk/src/pages/assistant')
+const pageCss = [...kioskPage.matchAll(/import '\.\/([\w-]+\.css)'/g)].map((m) => m[1])
+const activeCss = [...new Set(pageCss.flatMap((file) => [
+  file,
+  ...[...readFileSync(join(assistantDir, file), 'utf-8').matchAll(/@import '\.\/([\w-]+\.css)'/g)].map((m) => m[1]),
+]))].map((file) => readFileSync(join(assistantDir, file), 'utf-8')).join('\n')
+const holdRule = activeCss.match(/\.assistant-hold-talk-btn\s*\{([^}]*)\}/)
+if (!holdSrc.includes('min-height') && !holdRule) fail('5c. 按住说话按钮必须有独立样式')
+// 同一条规则里的 min-height ≥ 56px，而不是文件里某处出现过「56px」。
+const holdMin = holdRule?.[1].match(/min-height:\s*(\d+)px/)
+if (!holdMin || Number(holdMin[1]) < 56) fail('5c. 按住说话按钮触控高度必须 ≥56px')
 if (!kioskPage.includes('AssistantHoldToTalk')) fail('5d. AssistantPage 必须接入按住说话')
 if (!kioskPage.includes('AssistantSessionSummaryBar')) fail('5e. AssistantPage 必须提供保存本次要点')
 if (!kioskPage.includes('AssistantCallPanel')) fail('5f. 不得拆掉 TRTC 通话入口')

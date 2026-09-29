@@ -72,7 +72,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -293,9 +293,9 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
     <div id="truth-abnormal"><b>异常处理</b>结果长时间未更新时，请先查看你的支付账单，再联系工作人员。</div>
   </div>
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
   <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true">
@@ -569,7 +569,7 @@ function couponRows(){
    让位的只有「第二遍」解释卡：订单信息、取件凭证码、状态块与 CTA 一律不动。 */
 function aside(html){return COUPON==='none'?(html||''):''}
 function orderInfo(extra){
- return '<div class="pgrp" data-evidence-fixture="synthetic"><h4>订单信息 <span class="chip">界面排版示例</span></h4><div class="kv" style="margin-top:12px">'+
+ return '<div class="pgrp" data-evidence-fixture="synthetic"><h4>订单信息 <span class="chip">订单信息预览</span></h4><div class="kv" style="margin-top:12px">'+
   '<div><span>订单号</span><b>当前打印订单</b></div>'+
   '<div><span>内容</span><b>求职简历.pdf · 3 页 · 1 份</b></div>'+
   '<div><span>参数</span><b>A4 · 黑白 · 单面</b></div>'+couponRows()+(extra||'')+'</div></div>';
@@ -691,7 +691,7 @@ V['pending']=function(){
   (re?lockedNote():''),
   (re?'<span class="chip warn">上一次尝试已结束</span><span class="chip">金额与优惠已锁定</span>':'<span class="chip ok">尚未发起支付</span>')+'<span class="chip">先选通道</span>',
   '<div><span>支付状态</span><b>'+(re?'上一次尝试已结束，本次尚未重新出码':'尚未发起')+'</b></div><div><span>下一步</span><b>选择一个支付通道</b></div>',
-  '本次应付','排版示例金额；正式前端必须绑定订单真实金额。',mainAmount(),
+  '本次应付','当前为界面示例，实际应付金额以订单结算结果为准。',mainAmount(),
   re?'':'<div class="pgrp"><h4>为什么分两步选择</h4><div class="state-p">支付通道决定由哪个支付平台收款；扫码方式决定是你扫屏幕，还是本机读取你的付款码。</div></div>',
   re?'上一次支付尝试已结束，本次尚未重新出码；金额与优惠沿用本单已锁定的结果。':'当前尚未创建支付尝试；请先选择支付通道。')+
   ctaDisabled('选择上方支付通道','尚未选择支付通道',paramsBackCta());
@@ -716,15 +716,15 @@ V['channel-selected']=function(){
      通道的 data-testid 随之落到订单信息那一行（channelRow），不会因为收 chip 而丢。 */
   FIX.locked?'':'<span class="chip ok" data-testid="cashier-selected-channel">'+label+'</span><span class="chip">尚未创建尝试</span>',
   (FIX.locked?channelRow():'<div><span>支付通道</span><b>'+label+'</b></div>')+'<div><span>下一步</span><b>选择扫码方式</b></div>',
-  '本次应付','排版示例金额；正式前端必须绑定订单真实金额。',mainAmount(),
+  '本次应付','当前为界面示例，实际应付金额以订单结算结果为准。',mainAmount(),
   FIX.locked?'':'<div class="pgrp"><h4>'+(only?'为什么只有一个':'还可以改通道')+'</h4><div class="state-p">'+(only?'页面只列出本机已启用的支付通道；没启用的不会摆在这里让你白点。':'本次还没有向支付平台发起收款，所以仍可改选'+others+'；出码或提交付款码之后才锁定。')+'</div></div>',
   '通道已选，但支付尝试尚未创建；请选择扫码方式。')+
   ctaDisabled('选择上方扫码方式','尚未选择扫码方式',only?paramsBackCta():'<a class="btn ghost press" href="'+selfLink('pending',{channel:''})+'" data-route="/print/cashier">重新选通道</a>');
 };
 V['pending-qr']=function(){
  return '<section class="sec"><div class="paywrap" data-evidence-fixture="synthetic"><div class="paycol">'+qrBlock(false,'收款码排版示例，不可扫码')+
-  '<div class="qr-cap"><b>界面排版示例 · 不可扫码</b><br>这张码属于'+FIX.label+'，只能用'+FIX.label+'扫；接入真实支付接口后显示可用收款码</div></div>'+
-  '<div class="side">'+amountCard(mainAmount(),'本次应付','排版示例金额；正式前端必须绑定订单真实金额。')+
+  '<div class="qr-cap"><b>订单信息预览 · 不可扫码</b><br>这张码属于'+FIX.label+'，只能用'+FIX.label+'扫；接入真实支付接口后显示可用收款码</div></div>'+
+  '<div class="side">'+amountCard(mainAmount(),'本次应付','当前为界面示例，实际应付金额以订单结算结果为准。')+
   orderInfo(channelRow()+'<div><span>支付状态</span><b>等待付款</b></div>')+
   /* 底部事实说明条已经写着「页面会在系统确认结果后更新」，主按钮本身就是「刷新付款结果」，
      所以券摘要在场时这张卡整块让位。这一屏的金额卡在右栏，让位的高度正好抵掉明细的高度。 */
@@ -746,7 +746,7 @@ V['pending-scan']=function(){
      左栏只有一张 454.4px 的扫码卡，空着 362px；而 .paywrap 取两栏较高的那个，多出来的高度全部由
      下面 flex:1 的收尾卡承担，卡片边界因此被压破 15.6px。这句话本来就是说给正在出示付款码的人听的。 */
   aside('<div class="pgrp"><h4>安全提示</h4><div class="state-p">读满后只提交一次。请勿重复出示付款码。</div></div>')+'</div>'+
-  '<div class="side">'+amountCard(mainAmount(),'本次应付','排版示例金额；正式前端必须绑定订单真实金额。')+
+  '<div class="side">'+amountCard(mainAmount(),'本次应付','当前为界面示例，实际应付金额以订单结算结果为准。')+
   orderInfo(channelRow()+'<div><span>扫码方式</span><b>出示付款码</b></div><div><span>支付状态</span><b>尚未提交付款码</b></div>')+
   /* 这张卡和左栏那张「安全提示」说的话，下面的「付款提示」收尾卡逐条讲过：仍可改回屏幕码 /
      换通道（基准句）、只操作一次（第 2 条）、付款码不完整显示或保存（第 3 条 + 上面 .hid 里的那行）。
@@ -762,7 +762,7 @@ V['awaiting-code-confirmation']=function(){
   '<div class="state-p">支付平台正在确认。<b>请勿重复出示付款码或重新下单。</b></div>',
   '<span class="chip">确认中</span><span class="chip warn">请勿重复出示</span>',
   channelRow()+'<div><span>付款码</span><b>已提交，不会保存在页面</b></div><div><span>支付状态</span><b>正在确认</b></div>',
-  '本次应付','排版示例金额；正式前端必须绑定订单真实金额。',mainAmount())+
+  '本次应付','当前为界面示例，实际应付金额以订单结算结果为准。',mainAmount())+
   '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
   '<a class="btn primary press" style="flex:1.6" href="'+selfLink('awaiting-code-confirmation')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">刷新付款结果</a></div>';
 };
@@ -771,7 +771,7 @@ V['pending-verification']=function(){
   '<div class="state-p">请先查看你的'+FIX.label+'账单，<b>不要重复付款</b>。仍无法确认时请联系工作人员。</div>',
   '<span class="chip warn">结果未确认</span><span class="chip bad">请勿重复扫码</span>',
   channelRow()+'<div><span>本次支付</span><b>结果暂未确认</b></div><div><span>下一步</span><b>先查'+FIX.label+'账单</b></div>',
-  '本次应付','排版示例金额；正式前端必须绑定订单真实金额。',mainAmount())+
+  '本次应付','当前为界面示例，实际应付金额以订单结算结果为准。',mainAmount())+
   '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员核实</a>'+
   '<a class="btn primary press" style="flex:1.6" href="'+selfLink('pending-verification')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">再次刷新结果</a></div>';
 };
@@ -780,7 +780,7 @@ V['paid']=function(){
   '<div class="state-h">'+svg('check','currentColor',28)+'付款成功</div>'+
   '<div class="state-p">系统已确认付款，正在准备打印。</div></div></section>'+
   '<section class="sec"><div class="paywrap" data-evidence-fixture="synthetic"><div class="paycol">'+
-  amountCard(mainAmount(),'已付金额','排版示例金额；正式前端必须绑定支付结果。')+'</div>'+
+  amountCard(mainAmount(),'已付金额','当前为界面示例，实际已付金额以支付结果为准。')+'</div>'+
   '<div class="side">'+orderInfo(channelRow()+'<div><span>支付状态</span><b>已付款</b></div><div><span>下一步</span><b>开始打印</b></div>')+
   '<div class="pgrp"><h4>取件凭证码</h4>'+
   '<div class="state-p" data-testid="cashier-pickup-code" data-pickup-status="pending"><b>取件凭证正在生成</b><br>生成后会显示在订单详情中；暂未生成时也可以查看打印进度。</div></div>'+
@@ -807,7 +807,7 @@ V['release-failed']=function(){
   '<div class="state-p">服务端已经确认这笔'+FIX.label+'付款成功，但本次创建打印任务没有完成。<b>不要重新付款</b>，请重试创建同一打印任务。</div>',
   '<span class="chip ok">已付款</span><span class="chip warn">打印任务待恢复</span>',
   channelRow()+'<div><span>支付状态</span><b>已付款（服务端确认）</b></div><div><span>打印任务</span><b>尚未建立</b></div>',
-  '已付金额','排版示例金额；正式前端必须绑定支付结果。',mainAmount(),
+  '已付金额','当前为界面示例，实际已付金额以支付结果为准。',mainAmount(),
   '<div class="pgrp"><h4>为什么不会重新收款</h4><div class="state-p">这里只重试服务端的幂等任务释放，不会再次创建支付尝试。</div></div>',
   '付款已经完成；当前只恢复打印任务，不再进入收款流程。')+
   '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
@@ -818,7 +818,7 @@ V['display-expired-reconciling']=function(){
   '正在确认付款结果，请勿重复支付。</div></section>'+
   '<section class="sec"><div class="paywrap"><div class="paycol">'+qrBlock(true,'收款码显示期已过，正在核验')+
   '<div class="qr-cap">收款码已停止显示</div></div>'+
-  '<div class="side" data-evidence-fixture="synthetic">'+amountCard(mainAmount(),'本次应付','排版示例金额；正式前端必须绑定订单真实金额。')+
+  '<div class="side" data-evidence-fixture="synthetic">'+amountCard(mainAmount(),'本次应付','当前为界面示例，实际应付金额以订单结算结果为准。')+
   orderInfo(channelRow()+'<div><span>支付状态</span><b>正在确认</b></div>')+
   /* 「请勿重复付款」在下面那张 grow 状态块里已经是整屏最大的一句，这里让位不丢信息。 */
   aside('<div class="pgrp"><h4>请稍候</h4><div class="state-p">你可能刚好在最后一秒完成付款。确认结果前，请勿再次支付。</div></div>')+

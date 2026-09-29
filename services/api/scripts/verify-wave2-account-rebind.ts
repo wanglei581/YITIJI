@@ -97,7 +97,11 @@ assert(memberAuthApi.includes("'/member/phone/rebind'"), "kiosk: API 路径指�
 // ── 6. Kiosk 设置页集成 ───────────────────────────────────────────
 console.log('\n[6] Kiosk 设置页集成')
 const settingsPage = readKiosk('pages/profile/me/MySettingsPage.tsx')
-assert(settingsPage.includes('PhoneRebindOverlay'), "MySettingsPage 包含 PhoneRebindOverlay 组件")
+// 2026-09-28 换绑从弹层改成页内四步面板（稿 30），组件由 PhoneRebindOverlay 换成 PhoneRebindPanel。
+assert(
+  settingsPage.includes("import { PhoneRebindPanel } from './components/PhoneRebindPanel'") && settingsPage.includes('<PhoneRebindPanel'),
+  "MySettingsPage 引入并渲染 PhoneRebindPanel 换绑面板",
+)
 assert(settingsPage.includes('showRebind'), "MySettingsPage 含 showRebind 状态")
 assert(settingsPage.includes('handleRebindDone'), "MySettingsPage 含 handleRebindDone 换绑完成处理")
 assert(settingsPage.includes('换绑手机号'), "MySettingsPage 可见文案「换绑手机号」")

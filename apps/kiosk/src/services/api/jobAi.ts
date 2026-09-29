@@ -41,7 +41,7 @@ const adapter: JobAiServiceInterface = API_MODE === 'http' ? jobAiHttpAdapter : 
 function rejectMock<T>(): Promise<T> {
   return Promise.reject(new ApiHttpError(
     'JOB_AI_MOCK_DISABLED',
-    '岗位 AI 需要连接真实后端服务后使用',
+    '岗位解读需要接上系统之后才能使用',
     503,
   ))
 }

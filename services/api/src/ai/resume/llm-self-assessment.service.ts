@@ -1,3 +1,4 @@
+import { AiContentBlockedError } from '../llm/llm-guard'
 // ============================================================
 // 自我探索 · 倾向参考 —— LLM 解读服务（v1）
 //
@@ -12,7 +13,7 @@
 // - 复用 resume_optimize LLM 接入（密钥仅服务端）。
 // ============================================================
 
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../llm/llm-config.service'
 import {
   LLM_BUSY_MESSAGE,
@@ -24,7 +25,21 @@ import {
 } from '../llm/llm-http'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
+import { withAiSafety } from '../llm/ai-prompt-safety'
 import type { SelfAssessmentDimensionResult } from './self-assessment.types'
+
+export const SELF_ASSESSMENT_SYSTEM_PROMPT = withAiSafety(
+  '你是「自我探索 · 倾向参考」工具的解读助手。' +
+  '输入是 5 个维度（兴趣偏好 / 工作风格 / 团队偏向 / 价值取向 / 求职动机）的强度分（0-5）。' +
+  '请为每个维度写一段自然语言解读（≤ 300 字），并写一段整体解读（≤ 300 字）。' +
+  '\n硬性要求：' +
+  '\n1. 不引用任何临床量表、心理学标签、性格类型；不输出诊断或疾病相关表述。' +
+  '\n2. 不出现「适合 / 不适合 / 推荐岗位 / 推荐企业 / 适合做 / 应该 / 你必须 / 排序 / 排名 / Top%」等指令性词。' +
+  '\n3. 解读只描述本次作答的倾向，不延伸到对人格、能力、心理的判断，不做职业排名。' +
+  '\n4. 整体解读末尾追加：「本解读基于本人作答，仅作为自助参考，不代任何招聘结果、能力证明或心理评估」。' +
+  '\n只输出 JSON（不要 markdown 代码块）：' +
+  '{"dimensions":[{"key":"interest","note":"..."},{"key":"style","note":"..."},{"key":"team","note":"..."},{"key":"value","note":"..."},{"key":"motivation","note":"..."}],"summary":"整体解读"}',
+)
 
 const MAX_NOTE_CHARS = 300
 const MAX_SUMMARY_CHARS = 300
@@ -222,17 +237,7 @@ export class LlmSelfAssessmentService {
     }
     const providerLabel = `llm:${cfg.vendor}:${cfg.model}`
     const url = `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`
-    const system =
-      '你是「自我探索 · 倾向参考」工具的解读助手。' +
-      '输入是 5 个维度（兴趣偏好 / 工作风格 / 团队偏向 / 价值取向 / 求职动机）的强度分（0-5）。' +
-      '请为每个维度写一段自然语言解读（≤ 300 字），并写一段整体解读（≤ 300 字）。' +
-      '\n硬性要求：' +
-      '\n1. 不引用任何临床量表、心理学标签、性格类型；不输出诊断或疾病相关表述。' +
-      '\n2. 不出现「适合 / 不适合 / 推荐岗位 / 推荐企业 / 适合做 / 应该 / 你必须 / 排序 / 排名 / Top%」等指令性词。' +
-      '\n3. 解读只描述本次作答的倾向，不延伸到对人格、能力、心理的判断，不做职业排名。' +
-      '\n4. 整体解读末尾追加：「本解读基于本人作答，仅作为自助参考，不代任何招聘结果、能力证明或心理评估」。' +
-      '\n只输出 JSON（不要 markdown 代码块）：' +
-      '{"dimensions":[{"key":"interest","note":"..."},{"key":"style","note":"..."},{"key":"team","note":"..."},{"key":"value","note":"..."},{"key":"motivation","note":"..."}],"summary":"整体解读"}'
+    const system = SELF_ASSESSMENT_SYSTEM_PROMPT
 
     const user =
       '请基于以下 5 维度强度生成本次自然语言解读：\n' +
@@ -257,9 +262,10 @@ export class LlmSelfAssessmentService {
             ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
           }),
         },
-        { timeoutMs: LLM_TIMEOUT_MS },
+        { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'self_assessment', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       if (error instanceof LlmBusyError) {
         // 闸门拒绝时请求根本没发出 → 不落账，否则等于凭空记一次没花过的调用。
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })

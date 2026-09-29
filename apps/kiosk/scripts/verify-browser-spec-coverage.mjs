@@ -26,7 +26,7 @@
  *
  * 豁免必须写理由，且**只许减不许增**（与 verify-ci-gate-coverage.mjs 同口径）。
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve, basename } from 'node:path'
 
@@ -48,6 +48,11 @@ const EXEMPT = new Map([
     'kiosk-p1-visual-evidence.spec.ts',
     '证据产出脚本（playwright.p1-evidence.config.ts），用途是生成验收截图而不是断言，'
       + '没有失败判据，进 CI 只会浪费时间。',
+  ],
+  [
+    'qingxu-pairs.spec.ts',
+    '按需并排截图（playwright.qingxu-pairs.config.ts / capture:qingxu-pairs）。'
+      + '产出原稿与运行页对照图，没有失败判据；全量要几十分钟，进 CI 会占住浏览器 job。与 kiosk-p1-visual-evidence 同类。',
   ],
 ])
 
@@ -79,10 +84,19 @@ const tagMiss = new Map()
 
 const invoked = [...new Set(ciYml.match(/test:browser[a-z:0-9-]*/g) ?? [])]
 const covered = new Set()
+/**
+ * 脚本点名、磁盘上却不存在的 spec 路径。playwright 把点名当过滤条件：一条都匹配不上就
+ * 静默略过，其余照跑、照样绿。2026-09-28 实测：journeys 点名的是
+ * tests/visual/qr-login-render.spec.ts，文件其实在 tests/qr-login-render.spec.ts ——
+ * 这套扫码登录用例从没在 CI 跑过。旧判法只比文件名，同名的真文件被错算成已覆盖。
+ */
+const missingPaths = []
 for (const script of invoked) {
   const cmd = pkg[script]
   if (!cmd) continue
-  const files = (cmd.match(/tests\/\S+?\.spec\.ts/g) ?? []).map((f) => basename(f))
+  const namedPaths = cmd.match(/tests\/\S+?\.spec\.ts/g) ?? []
+  for (const p of namedPaths) if (!existsSync(join(kioskRoot, p))) missingPaths.push(`${script}: ${p}`)
+  const files = namedPaths.filter((p) => existsSync(join(kioskRoot, p))).map((f) => basename(f))
   for (const file of files) covered.add(file)
   const cfgNames = (cmd.match(/--config[= ]([^\s]+)/g) ?? []).map((c) => c.replace(/^--config[= ]/, ''))
   // 没写 --config 就是默认 playwright.config.ts
@@ -125,6 +139,12 @@ const check = (name, ok, detail = '') => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'} ${name}${ok || !detail ? '' : ` — ${detail}`}`)
 }
 
+check(
+  'CI 脚本点名的 spec 路径都真实存在',
+  missingPaths.length === 0,
+  `以下点名的文件不存在，playwright 会静默略过它们：\n      ${missingPaths.join('\n      ')}`,
+)
+
 const orphans = specs.filter((s) => !covered.has(s) && !EXEMPT.has(s))
 check(
   '每个浏览器 spec 都在 CI 执行闭包内',
@@ -143,7 +163,9 @@ check(
 )
 
 // 豁免只许减不许增：写下当前值，改大必须显式改这个数并说明。
-const EXEMPT_LIMIT = 2
+// 2026-09-25：qingxu-pairs.spec.ts 与既有 p1 证据脚本同类，按需截图、不进 CI。
+// 孤儿检查和理由长度检查没有放宽；这个数是新增一条豁免时门禁要求的显式登记。
+const EXEMPT_LIMIT = 3
 check(
   `豁免条目不超过 ${EXEMPT_LIMIT} 条（只许降）`,
   EXEMPT.size <= EXEMPT_LIMIT,

@@ -11,12 +11,20 @@
 // 合规：线下机构只做信息展示 + 到店指引，不代收简历、不做平台内投递
 // ============================================================
 
-import { Controller, Get, Param, Query } from '@nestjs/common'
+import { Controller, Get, Param, Query, Req } from '@nestjs/common'
 import { OfflineAgenciesService, type AgencyListQuery, type JobListQuery } from './offline-agencies.service'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+  type KioskJobBoardRequest,
+} from '../terminals/kiosk-job-board.service'
 
 @Controller('kiosk/offline-agencies')
 export class OfflineAgenciesController {
-  constructor(private readonly service: OfflineAgenciesService) {}
+  constructor(
+    private readonly service: OfflineAgenciesService,
+    private readonly jobBoard: KioskJobBoardService,
+  ) {}
 
   @Get()
   async findAll(@Query() query: AgencyListQuery) {
@@ -24,12 +32,20 @@ export class OfflineAgenciesController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.service.findOne(id)
+  async findOne(@Param('id') id: string, @Req() req: KioskJobBoardRequest) {
+    const data = await this.service.findOne(id)
+    const open = (await this.jobBoard.resolve(kioskJobBoardTerminalRef(req))).enabled
+    if (open) return data
+    return { ...data, jobs: [], jobCount: 0 }
   }
 
   @Get(':id/jobs')
-  async findJobsByAgency(@Param('id') agencyId: string, @Query() query: JobListQuery) {
+  async findJobsByAgency(
+    @Param('id') agencyId: string,
+    @Query() query: JobListQuery,
+    @Req() req: KioskJobBoardRequest,
+  ) {
+    await this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req))
     return this.service.findJobsByAgency(agencyId, query)
   }
 }

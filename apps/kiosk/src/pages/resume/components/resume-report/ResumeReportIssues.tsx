@@ -3,8 +3,7 @@ import { RESUME_CONTENT_BLOCKS } from '@ai-job-print/shared'
 import { blockLabel, dimLabel, evidenceLineSet, issuesOfBlock, sevOf } from '../../resume-report-model'
 
 function Prov({ kind }: { kind: 'contract' | 'derived' | 'fixture' }) {
-  const label = kind === 'contract' ? '合同' : kind === 'derived' ? '本页算' : '夹具'
-  return <span className="rrp-prov" data-p={kind}>{label}</span>
+  return <span className="rrp-prov" data-p={kind} aria-hidden="true" />
 }
 
 export function IssueCard({
@@ -89,7 +88,7 @@ export function StructureZone({
       </div>
       <p className="rrp-zfoot">
         {fixture
-          ? '这一块的内容结构与原文片段是本页合成样本：夹具门打开时用来核对版式，不是你的简历。'
+          ? '这里展示的是演示样本，不是你的简历原文。'
           : '片段逐字摘自送模型的那份简历文本（已遮盖联系方式）。一行都没留下的块不会出现。'}
       </p>
     </section>
@@ -122,7 +121,7 @@ export function IssuesZone({
       </div>
       <p className="rrp-zfoot">
         维度名来自六个固定评分维度；严重度由该维分数机械分档（不足一半＝高）。
-        {fixture ? ' 标题、原文、影响与改法是夹具样本。' : ' 原文引用、影响与改法来自服务端问题清单。'}
+        {fixture ? ' 标题、原文、影响与改法是演示样本。' : ' 原文引用、影响与改法来自本次报告。'}
       </p>
     </section>
   )

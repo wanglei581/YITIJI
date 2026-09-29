@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import type { FeedbackCategory, FeedbackStatus } from './member-feedback.types'
 import { FEEDBACK_CATEGORIES } from './dto/member-feedback.dto'
 import {
+  KIOSK_FEEDBACK_CONTACT_ALLOWED,
   KIOSK_FEEDBACK_ISSUE_MAP,
   KIOSK_FEEDBACK_SATISFACTION_LABEL,
   type CreateKioskFeedbackDto,
@@ -11,6 +12,7 @@ import {
   type KioskFeedbackSatisfaction,
 } from './dto/kiosk-feedback.dto'
 import { detectKioskFeedbackPii, sanitizeKioskFeedbackText } from './kiosk-feedback-text'
+import { encryptPhone, hashPhone } from '../common/crypto/phone-identity'
 
 /** 匿名工单的 submitterType 取值，后台据此与会员工单分开处置。 */
 export const ANONYMOUS_KIOSK_SUBMITTER = 'anonymous_kiosk'
@@ -93,6 +95,10 @@ export class KioskFeedbackService {
     if (!(FEEDBACK_CATEGORIES as readonly string[]).includes(category)) {
       badRequest('FEEDBACK_CATEGORY_INVALID', '反馈分类不支持')
     }
+    // 匿名工单没有账号归属，手机号只为「让投诉人收到处理结果」才收；现场报障一律不收。
+    if (dto.contactPhone && !(dto.issueCode && KIOSK_FEEDBACK_CONTACT_ALLOWED.includes(dto.issueCode))) {
+      badRequest('KIOSK_FEEDBACK_CONTACT_NOT_ALLOWED', '这类反馈不需要留手机号，请删除后再提交')
+    }
 
     // 4) 终端必须真实存在。否则攻击者可以每次换一个 terminalId 绕开按终端限流。
     const terminal = await this.prisma.terminal.findUnique({ where: { id: terminalId }, select: { id: true } })
@@ -126,7 +132,7 @@ export class KioskFeedbackService {
           content,
           satisfaction: dto.satisfaction ?? null,
           dedupKey: dedup.writeKey,
-          contactPhoneEnc: null,
+          contactPhoneEnc: dto.contactPhone ? encryptPhone(dto.contactPhone) : null,
         },
       })
       return this.toReceipt(row, dto.issueCode ?? null, false)
@@ -230,6 +236,9 @@ export class KioskFeedbackService {
       dto.relatedPrintTaskId?.trim() ?? '',
       dto.relatedScanTaskId?.trim() ?? '',
       createHash('sha256').update(content).digest('hex'),
+      // 两个人在同一台机器上交同样的投诉（常见：都没写正文），不能被合并成一单而丢掉后一个人的号码。
+      // 用带密钥的 hashPhone，不让 dedupKey 成为可穷举手机号的旁路。
+      dto.contactPhone ? hashPhone(dto.contactPhone) : '',
     ].join('|')
     const keyFor = (b: number) => createHash('sha256').update(`${base}|${b}`).digest('hex')
     return { writeKey: keyFor(bucket), lookupKeys: [keyFor(bucket), keyFor(bucket - 1)] }

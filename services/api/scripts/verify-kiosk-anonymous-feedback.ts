@@ -41,6 +41,7 @@ import {
   KIOSK_FEEDBACK_ISSUE_MAP,
 } from '../src/member-feedback/dto/kiosk-feedback.dto'
 import { FEEDBACK_CATEGORIES } from '../src/member-feedback/dto/member-feedback.dto'
+import { decryptPhone } from '../src/common/crypto/phone-identity'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 const apiRoot = path.resolve(__dirname, '..')
@@ -108,7 +109,7 @@ async function main() {
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   // 每组用独立终端：限流按终端收敛，共用终端会让前一组的建单吃掉后一组的额度。
   const T = (k: string) => `term_kfb_${k}_${suffix}`
-  const terminalIds = ['main', 'other', 'rate', 'ratehour', 'dedup', 'dedup2', 'concurrent'].map(T)
+  const terminalIds = ['main', 'other', 'ai', 'rate', 'ratehour', 'dedup', 'dedup2', 'concurrent'].map(T)
   const printTaskId = `ptask_kfb_${suffix}`
   const scanTaskId = `stask_kfb_${suffix}`
   const memberId = `eu_kfb_${suffix}`
@@ -191,16 +192,46 @@ async function main() {
       through({ terminalId: T('main'), issueCode: '<script>alert(1)</script>' }))
     await expectCode('2d. 私带 category 想绕过映射被拒（forbidNonWhitelisted）', 'VALIDATION_FAILED', () =>
       through({ terminalId: T('main'), issueCode: 'other', category: 'recruiting' }))
+    await expectCode('2d. 私带 category=ai_content 同样被拒（category 只能由 issueCode 映射）', 'VALIDATION_FAILED', () =>
+      through({ terminalId: T('ai'), category: 'ai_content', content: 'AI 内容投诉描述不少于十字' }))
     await expectCode('2e. 越界满意度被拒', 'VALIDATION_FAILED', () =>
       through({ terminalId: T('main'), satisfaction: 'excellent' }))
     await expectCode('2f. 既无 issueCode 也无满意度的空提交被拒', 'KIOSK_FEEDBACK_EMPTY', async () =>
       kiosk.submit(await through({ terminalId: T('main') })))
 
+    // C3：AI 内容投诉。匿名也能投诉；手机号选填、只对这一类收、只存加密值；
+    // 两个人交同样的投诉不能被幂等合并成一单（否则后一个人的号码丢了）。
+    const aiNoPhone = await kiosk.submit(await through({ terminalId: T('ai'), issueCode: 'ai_content_complaint', content: 'AI 生成的简历内容有误导' }))
+    const aiNoPhoneRow = await prisma.feedbackTicket.findUnique({ where: { id: aiNoPhone.ticketId } })
+    if (aiNoPhoneRow?.category !== 'ai_content' || aiNoPhoneRow.contactPhoneEnc !== null) fail('2g. AI 内容投诉（不留手机号）落库错误')
+    pass('2g. 匿名 AI 内容投诉可提交，映射为 ai_content，不留手机号时不存联系方式')
+    const phoneA = '13812345678'
+    const phoneB = '13987654321'
+    const aiA = await kiosk.submit(await through({ terminalId: T('ai'), issueCode: 'ai_content_complaint', contactPhone: phoneA }))
+    const aiARow = await prisma.feedbackTicket.findUnique({ where: { id: aiA.ticketId } })
+    if (!aiARow?.contactPhoneEnc || aiARow.contactPhoneEnc.includes(phoneA) || decryptPhone(aiARow.contactPhoneEnc) !== phoneA) {
+      fail('2h. AI 内容投诉的手机号没有按加密值保存')
+    }
+    pass('2h. AI 内容投诉可选填手机号，库里只有加密值且能解回原号')
+    const aiB = await kiosk.submit(await through({ terminalId: T('ai'), issueCode: 'ai_content_complaint', contactPhone: phoneB }))
+    if (aiB.ticketId === aiA.ticketId || aiB.deduplicated) fail('2i. 两个人交同样的 AI 内容投诉被合并成一单，后一个人的号码丢了')
+    pass('2i. 不同手机号的同内容投诉各建一单（幂等键含手机号的带密钥哈希）')
+    const aiARetry = await kiosk.submit(await through({ terminalId: T('ai'), issueCode: 'ai_content_complaint', contactPhone: phoneA }))
+    if (aiARetry.ticketId !== aiA.ticketId || !aiARetry.deduplicated) fail('2j. 同一人双击重复提交没有回到原单')
+    pass('2j. 同一手机号的重复提交仍按幂等回原单')
+    const aiRows = await prisma.feedbackTicket.findMany({ where: { terminalId: T('ai') }, select: { dedupKey: true } })
+    if (aiRows.some((row) => (row.dedupKey ?? '').includes(phoneA) || (row.dedupKey ?? '').includes(phoneB))) fail('2k. 幂等键里出现了明文手机号')
+    pass('2k. 幂等键不含明文手机号')
+    await expectCode('2l. 现场报障带手机号被拒（匿名面只为 AI 内容投诉收号码）', 'KIOSK_FEEDBACK_CONTACT_NOT_ALLOWED', async () =>
+      kiosk.submit(await through({ terminalId: T('main'), issueCode: 'print_other', contactPhone: phoneA })))
+    await expectCode('2l. 只有满意度也不能带手机号', 'KIOSK_FEEDBACK_CONTACT_NOT_ALLOWED', async () =>
+      kiosk.submit(await through({ terminalId: T('main'), satisfaction: 'bad', contactPhone: phoneA })))
+
     const strayCategory = KIOSK_FEEDBACK_ISSUE_CODES
       .map((code) => KIOSK_FEEDBACK_ISSUE_MAP[code].category)
       .filter((c) => !(FEEDBACK_CATEGORIES as readonly string[]).includes(c))
-    if (strayCategory.length) fail(`2g. issueCode 映射出了枚举外的 category: ${strayCategory.join(',')}`)
-    pass(`2g. ${KIOSK_FEEDBACK_ISSUE_CODES.length} 个 issueCode 全部映射到既有 FEEDBACK_CATEGORIES 枚举内`)
+    if (strayCategory.length) fail(`2m. issueCode 映射出了枚举外的 category: ${strayCategory.join(',')}`)
+    pass(`2m. ${KIOSK_FEEDBACK_ISSUE_CODES.length} 个 issueCode 全部映射到既有 FEEDBACK_CATEGORIES 枚举内`)
 
     // ---------------------------------------------------------------- 3. PII 拒绝
     console.log('\n[3] 不收 PII / 文本清洗')

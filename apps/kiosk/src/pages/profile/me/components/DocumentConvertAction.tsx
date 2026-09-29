@@ -59,7 +59,9 @@ export function DocumentConvertAction({
   const printBlocked = previewBlocked || !reprintable
   const unavailableReason = available
     ? null
-    : `${WORD_CONVERSION_UNAVAILABLE_COPY}${capabilities.reason?.trim() ? `；${capabilities.reason.trim()}` : ''}`
+    : WORD_CONVERSION_UNAVAILABLE_COPY
+  // 版式提示上面已固定显示一次；服务端 warnings 里同一句不再重复列出。
+  const extraWarnings = result ? result.warnings.filter((warning) => warning !== WORD_CONVERSION_DISCLOSURE) : []
 
   const convert = async () => {
     if (!available || converting || busy) return
@@ -110,15 +112,15 @@ export function DocumentConvertAction({
             {formatBytes(result.sizeBytes)}
             {' · '}
             {remaining < 0
-              ? '有效期未返回'
+              ? '有效期未知'
               : remaining === 0
                 ? '预览链接已过期'
                 : `预览剩余 ${formatRemainingSeconds(remaining)}`}
           </p>
           <p className="me-row-meta mt-1">{WORD_CONVERSION_DISCLOSURE}</p>
-          {result.warnings.length > 0 && (
+          {extraWarnings.length > 0 && (
             <ul className="me-row-meta mt-1">
-              {result.warnings.map((warning) => (
+              {extraWarnings.map((warning) => (
                 <li key={warning}>{warning}</li>
               ))}
             </ul>

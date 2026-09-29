@@ -10,7 +10,7 @@ const LEVEL_MAP = {
 }
 const SECTION_TITLES = {
   expression:   '表达能力',
-  positionFit:  '岗位匹配',
+  positionFit:  '岗位相关性',
   credibility:  '可信度',
   professional: '专业能力',
   adaptability: '应变能力',

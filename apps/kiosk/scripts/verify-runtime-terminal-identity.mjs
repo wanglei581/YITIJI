@@ -1,3 +1,5 @@
+import ts from 'typescript'
+import { execFileSync, spawnSync } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -45,7 +47,7 @@ if (seamAssignments > 0) {
   )
 }
 
-assert.match(identity, /export const isTerminalKiosk = \(\): boolean => getTerminalId\(\) !== '' && !IS_E2E_BUILD/, 'kiosk-only UI gating must be off in E2E builds and on whenever a real terminal identity exists')
+assert.match(identity, /isTerminalKiosk = \(\): boolean => !IS_E2E_BUILD && \(getTerminalId\(\) !== '' \|\| HAS_KIOSK_LAUNCH_MARKER\)/, 'kiosk-only UI gating must be off in E2E builds and on for identity or launch-marked kiosk sessions')
 
 const terminalScopedConsumers = [
   'src/services/print/printJobsApi.ts',
@@ -84,10 +86,70 @@ assert.match(terminalAuth, /RETRY_WINDOW_MS = 60_000/, 'session recovery must re
 assert.match(terminalAuth, /10 \* 60_000/, 'healthy kiosk must refresh its terminal session every ten minutes')
 assert.match(terminalAuth, /API_MODE !== 'http'/, 'mock mode must not request terminal tickets')
 assert.match(terminalAuth, /x-terminal-session-token/, 'protected Kiosk requests must carry the terminal session token')
+const exchangeBody = terminalAuth.slice(
+  terminalAuth.indexOf('async function exchangeBootTicket'),
+  terminalAuth.indexOf('async function requestLocalBootTicket'),
+)
+const clearAt = exchangeBody.indexOf('clearSensitiveStateForNewTerminalSession()')
+const saveAt = exchangeBody.lastIndexOf('saveToken(')
+assert.ok(clearAt > exchangeBody.indexOf('if (!payload.sessionToken)'), 'a failed or empty ticket exchange must not clear the occupant still using the machine')
+assert.ok(saveAt > clearAt, 'the new terminal session token is written after the sensitive-state clear')
+assert.match(advisorCall, /terminalProtectedFetch\([\s\S]*?\/trtc\/session['"`]/, 'TRTC session create must send the terminal session credential')
+const stopBackend = advisorCall.slice(advisorCall.indexOf('function stopBackendTask'), advisorCall.indexOf('export type CallPhase'))
+assert.match(stopBackend, /fetch\(/, 'TRTC stop stays a direct keepalive fetch')
+assert.doesNotMatch(stopBackend, /terminalProtectedFetch/, 'TRTC stop must not wait on a terminal session')
 
 for (const [path, source] of terminalScopedConsumers) {
   assert.match(source, /getTerminalId/, `${path} must use the runtime terminal identity getter`)
   assert.doesNotMatch(source, /VITE_TERMINAL_ID/, `${path} must not read a build-time terminal ID directly`)
 }
 
+const behavior = spawnSync(process.execPath, ['--test', join(ROOT, 'scripts/tests/boot-ticket-clears-sensitive-session.test.mjs')], {
+  stdio: 'inherit',
+})
+if (behavior.status !== 0) process.exit(behavior.status ?? 1)
+
+// Every file picker must be inside its terminal-mode render guard, including phone links
+// accidentally opened on the terminal. Parse JSX so a guard in a comment cannot pass.
+const filePickers = new Map([
+  ['src/pages/resume/ResumeSourcePage.tsx', '!kiosk'],
+  ['src/pages/print-scan/ConvertImagesView.tsx', '!kiosk'],
+  ['src/pages/print-scan/SignStampPage.tsx', '!flow.localDisabled'],
+  ['src/pages/print/file-source/FileSourceView.tsx', 'showFileChannel'],
+  ['src/pages/contract-review/ContractReviewHomePage.tsx', '!kiosk'],
+  ['src/pages/interview/InterviewSetupPage.tsx', '!kiosk'],
+  ['src/pages/upload/PhoneUploadPage.tsx', '!kiosk'],
+])
+for (const [file, guard] of filePickers) {
+  const ast = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let count = 0
+  function visit(node) {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'input'
+      && node.attributes.properties.some((prop) => ts.isJsxAttribute(prop) && prop.name.getText(ast) === 'type' && prop.initializer?.text === 'file')) {
+      count++
+      let parent = node.parent
+      let guarded = false
+      while (parent) {
+        if (ts.isBinaryExpression(parent) && parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+          && parent.left.getText(ast) === guard) guarded = true
+        parent = parent.parent
+      }
+      assert.ok(guarded, `${file}: file input must be conditionally absent on terminals`)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.equal(count, file.endsWith('SignStampPage.tsx') ? 2 : 1, `${file}: retain desktop/E2E upload coverage`)
+}
+assert.match(read('src/pages/resume/ResumeSourcePage.tsx'), /isTerminalKiosk\(\) \? 'phone' : 'cloud'/, 'terminal resume source defaults to an allowed channel')
+assert.match(read('src/pages/print/PrintUploadPage.tsx'), /if \(!isTerminalKiosk\(\)\) inputRef\.current\?\.click\(\)/, 'delayed replace-file callback rechecks terminal identity')
+for (const file of ['src/pages/home/components/QxHomeView.tsx', 'src/pages/help/HelpCenterPage.tsx']) {
+  const source = read(file)
+  assert.match(source, /kiosk \? <span>鲁ICP备[^<]+<\/span> : \(<a href="https:\/\/beian\.miit\.gov\.cn\//)
+  assert.match(source, /kiosk \? <span>鲁公网安备[^<]+<\/span> : \(<a href="https:\/\/beian\.mps\.gov\.cn\//)
+}
+console.log('PASS terminal pickers are absent; website filing links are preserved')
+
+// W1: production, DEV and E2E exercise the real query parsers, including the fetch decision.
+execFileSync(process.execPath, ['--test', join(ROOT, 'tests/w1-a-build-mode.test.mjs')], { stdio: 'inherit' })
 console.log('verify-runtime-terminal-identity: ok')

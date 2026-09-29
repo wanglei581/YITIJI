@@ -1,11 +1,4 @@
-// ============================================================
-// 模拟面试 — 对话进行页（2C + 2C+ 语音回合制）。
-//
-// 语音主路径：面试官数字人播报问题 → 用户显式开始/结束录音 →
-// 服务端转写 → 转写文本可编辑确认 → 既有 /answer。
-// 文字输入是硬兜底；麦克风、TTS、ASR 任何一步失败都不能阻塞主流程。
-// ============================================================
-
+// 模拟面试作答页。文字是硬兜底；麦克风、播报、转写任何一步失败都不阻塞。
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { InterviewSessionInvalid } from './session/InterviewSessionInvalid'
@@ -24,7 +17,9 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { InterviewAnswerDock } from './session/InterviewAnswerDock'
+import { InterviewSessionBar } from './session/InterviewSessionBar'
 import { InterviewSessionPanels } from './session/InterviewSessionPanels'
+import { speakInterview } from './session/speakInterview'
 import { useInterviewLivePersist } from './session/useInterviewLivePersist'
 import { InterviewShell } from './InterviewShell'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
@@ -35,6 +30,7 @@ import {
 } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
+import './styles/interview-qx2.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const advisorPortrait = '/assets/ai-advisor.png'
@@ -48,22 +44,6 @@ const INTERVIEWER_LABEL: Record<string, string> = {
 }
 
 const MAX_RECORD_SEC = 58
-
-function speak(text: string, onState?: (speaking: boolean) => void): void {
-  try {
-    if (!('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(text)
-    u.lang = 'zh-CN'
-    u.rate = 1
-    u.onstart = () => onState?.(true)
-    u.onend = () => onState?.(false)
-    u.onerror = () => onState?.(false)
-    window.speechSynthesis.speak(u)
-  } catch {
-    // TTS 不可用不阻塞面试主流程。
-  }
-}
 
 export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
@@ -195,12 +175,12 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
           audioRef.current = el
           el.onplay = () => setSpeaking(true)
           el.onended = () => setSpeaking(false)
-          el.onerror = () => { setSpeaking(false); speak(lastInterviewerMsg, setSpeaking) }
-          void el.play().catch(() => speak(lastInterviewerMsg, setSpeaking))
+          el.onerror = () => { setSpeaking(false); speakInterview(lastInterviewerMsg, setSpeaking) }
+          void el.play().catch(() => speakInterview(lastInterviewerMsg, setSpeaking))
         })
-        .catch(() => { if (!cancelled) speak(lastInterviewerMsg, setSpeaking) })
+        .catch(() => { if (!cancelled) speakInterview(lastInterviewerMsg, setSpeaking) })
     } else {
-      speak(lastInterviewerMsg, setSpeaking)
+      speakInterview(lastInterviewerMsg, setSpeaking)
     }
     return () => { cancelled = true; stopPlayback() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -388,7 +368,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const timeUp = remainingSec === 0
   const busyTurn = phase === 'thinking' || phase === 'finishing'
   const voiceLocked = voice.kind === 'requesting_permission' || voice.kind === 'transcribing'
-  const ttsLabel = ttsOfficial ? '官方语音播报' : '浏览器语音兜底'
+  const ttsLabel = ttsOfficial ? '官方语音播报' : '本机语音播报'
   // 状态胶囊直述硬件事实：探测中不下结论，只有确实探到设备才敢说「可用」。
   const micStatusLabel = micCapability === null ? '正在检测麦克风…' : MIC_STATUS_LABEL[micCapability]
   const micStatusTone =
@@ -409,8 +389,29 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     <InterviewShell
       title={<>第 {questionIndex} 题，<em>{titleParts.em}</em>。</>}
       subtitle={copy.subtitle}
-      status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : '模拟练习' }}
-      navbar={false}
+      status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : 'AI 模拟面试' }}
+      live={voice.kind === 'recording'}
+      ctabar={(
+        <InterviewSessionBar
+          mode={mode}
+          phase={phase}
+          voiceKind={voice.kind}
+          voiceAvailable={voiceAvailable}
+          busy={busyTurn || voiceLocked}
+          onFinish={() => void finish()}
+          onSubmit={() => void submit({ text: draft, skip: false })}
+          onUseText={() => { resetVoiceState(); setMode('text'); setMicError(false) }}
+          onStop={() => void stopRecording()}
+          onConfirm={() => {
+            if (voice.kind !== 'review') return
+            void submit({ text: voice.edited, skip: false, voiceMeta: { transcript: voice.transcript, edited: voice.edited.trim() !== voice.transcript.trim(), durationSec: voice.durationSec } })
+          }}
+          onUseVoice={() => {
+            if (!voiceAvailable) return
+            setMode('voice'); setMicError(false); setError(null)
+          }}
+        />
+      )}
     >
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-session" data-qx-interview="" className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewSessionPanels
@@ -434,8 +435,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         lastInterviewerMessageIndex={lastInterviewerMessageIndex}
         phase={phase}
         listRef={listRef}
-      />
-
+      >
       <InterviewAnswerDock
         micError={micError}
         error={error}
@@ -485,6 +485,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         omitPrintAnswers={omitPrintAnswers}
         onOmitPrintAnswersChange={setOmitPrintAnswers}
       />
+      </InterviewSessionPanels>
     </div>
     </InterviewShell>
   )

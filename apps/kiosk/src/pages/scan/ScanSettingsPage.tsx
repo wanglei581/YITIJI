@@ -108,6 +108,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const [scanTaskId, setScanTaskId] = useState<string | null>(restoredLive?.scanTaskId ?? null)
   const [expiresAt, setExpiresAt] = useState<string | null>(restoredLive?.expiresAt ?? null)
   const [countdown, setCountdown] = useState('--:--')
+  const [quietPeriodRemaining, setQuietPeriodRemaining] = useState(0)
+  const [quietPeriodBlocked, setQuietPeriodBlocked] = useState(false)
   const [controlToken, setControlToken] = useState<string | null>(restoredLive?.controlToken ?? null)
   /**
    * 这一场的状态位（性质标注 / 进度 / fail-closed / 终端身份 / 收尾闸）连同推进后两位的
@@ -256,6 +258,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
      * 页面刚刚对用户宣告过结论，重不重开由他按「重新开始一次扫描」决定。
      * 那一按会把这一位复位，effect 随之重跑并发出那一次新的创建。 */
     if (ackRefused) return
+    // 服务端静默期是隐私闸门：倒计时未结束前不重发创建请求。
+    if (quietPeriodBlocked) return
     /* fail-closed：带着安全重扫意图进来，凭据却已经不在内存里（整页重载抹掉的）。
      * 这一条必须排在终端会话那两个分支**之前** —— 页面此刻要说的是「凭据没了」，
      * 不是「正在做终端安全校验」。它是这次修复的核心：这里 return 掉的正是那一个
@@ -292,10 +296,10 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         // 它回来时就是个没人认领的任务 —— 登记这一笔，让它到时候把自己撤掉。
         terminalFailClosedRef.current = true
         setFailure({
-          title: '终端安全校验失败',
+          title: '这台机器的安全校验没通过',
           description: userMessageOf(
             { code: 'TERMINAL_SESSION_INVALID' },
-            '终端安全校验失败，请联系现场工作人员',
+            '这台机器的安全校验没通过，请联系现场工作人员',
           ),
         })
         setPhase('error')
@@ -489,6 +493,10 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         // 结论文案按失败码翻译，纯函数、不碰状态（scanRescanRecovery）。
         // 「服务端不认」那一支的授权已在上面丢弃，这里只负责把出路切成普通新会话。
         const verdict = classifyCreateFailure(error)
+        if (verdict.quietPeriodSeconds !== undefined) {
+          setQuietPeriodRemaining(verdict.quietPeriodSeconds)
+          setQuietPeriodBlocked(true)
+        }
         if (verdict.refusedRescan) setRescanRefusedByServer(true)
         setFailure(verdict.failure)
         setPhase('error')
@@ -520,7 +528,15 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     // 订阅把它打回 false，这一次创建才发得出去。不进依赖的话页面会永远停在
     // 「还在收上一场的尾」，而收尾其实早就结束了。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding])
+  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding, quietPeriodBlocked])
+
+  useEffect(() => {
+    if (!quietPeriodBlocked || quietPeriodRemaining <= 0) return undefined
+    const timer = window.setInterval(() => {
+      setQuietPeriodRemaining((seconds) => Math.max(0, seconds - 1))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [quietPeriodBlocked, quietPeriodRemaining])
 
   /**
    * 投递确认（ACK）：唯一一处让这一场在服务端变得可投递的地方（见 scanDeliveryAck）。
@@ -601,8 +617,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         cancelSessionOnce(createdIdRef.current, controlTokenRef.current)
       }
       setFailure({
-        title: '扫描会话已过期',
-        description: '当前会话已超过服务端返回的有效期，本页已停止继续操作。请返回扫描首页重新创建。',
+        title: '这次扫描已过期',
+        description: '这一次已超过系统给出的有效期，本页已停止继续操作。请返回扫描首页重新创建。',
       })
       setPhase('expired')
     }
@@ -663,6 +679,14 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     // 不复位的话，创建 effect 会在 `if (ackRefused) return` 处早退，按钮按下去毫无反应。
     setAckRefused(false)
     setAckState('idle')
+    setFailure(null)
+    setPhase('loading')
+  }
+
+  const handleQuietPeriodRetry = () => {
+    if (!scanType || quietPeriodRemaining > 0) return
+    sessionPromiseRef.current = null
+    setQuietPeriodBlocked(false)
     setFailure(null)
     setPhase('loading')
   }
@@ -728,8 +752,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     return <ScanSettingsStatusView {...{
       phase, ackState, scanType, terminalSession, failure, replayingLostCreate,
       rescanRetryable, rescanCredentialsLost, rescanRefusedByServer, ackRefused, liveNotDurable,
-      cleanupHolding,
-      handleSafeReturn, handlePlainRestart, handleRescanRetry, handleAckRetry,
+      cleanupHolding, quietPeriodRemaining, quietPeriodBlocked,
+      handleSafeReturn, handlePlainRestart, handleRescanRetry, handleAckRetry, handleQuietPeriodRetry,
     }} />
   }
 
@@ -738,7 +762,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       page="scan-settings"
       state="panel-instruction"
       title="扫描指引"
-      subtitle={<><b>扫描任务已创建</b>，请仅按服务端返回的当前会话指引操作。</>}
+      subtitle={<><b>扫描任务已创建</b>，请只按系统给出的这一次操作说明来做。</>}
       status={{ tone: 'ok', label: '第 2 步 · 去面板操作' }}
       ctabar={
         <ScanCta>
@@ -751,13 +775,13 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         </ScanCta>
       }
     >
-      <ScanSec no="01" title="照着做：全在机器面板上" hint="服务端下发原文，本机不改写" grow>
+      <ScanSec no="01" title="照着做：全在机器面板上" hint="以下是系统给的原文，本机不改写" grow>
         <ScanPanelMock
           instructions={instructions.map((instruction) => instruction)}
           scanLabel={SCAN_TYPE_LABELS[scanType]}
         />
       </ScanSec>
-      <ScanSec no="02" title="现在在第一段" hint="链路位置，不是百分比">
+      <ScanSec no="02" title="现在在第一段" hint="流程走到哪，不是百分比">
         <ScanChain active={0} />
       </ScanSec>
       {/* 「这次会话」整张卡是纯展示，已搬去 ScanSettingsStatusView。restoredFromStorage 必须喂

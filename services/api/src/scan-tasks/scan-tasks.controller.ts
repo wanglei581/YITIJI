@@ -1,3 +1,4 @@
+import { MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import {
   BadRequestException,
   Body,
@@ -40,6 +41,7 @@ export class ScanTasksController {
   @Post('scan/sessions')
   @UseGuards(TerminalIdentityGuard)
   @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @MaintenanceBlocked()
   async create(
     @Body() dto: CreateScanTaskDto,
     @Req() req: Request,

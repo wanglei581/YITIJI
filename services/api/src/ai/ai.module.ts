@@ -6,6 +6,8 @@ import { AiController } from './ai.controller'
 import { AiService } from './ai.service'
 import { AiLogService } from './ai-log.service'
 import { AiPublicQuotaService } from './ai-public-quota.service'
+import { ResumeParseSubmissionService } from './resume-parse-submission.service'
+import { ResumeParseIntentRunner } from './resume-parse-intent-runner.service'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
 import { ClaudeProvider } from './providers/claude.provider.stub'
@@ -54,17 +56,20 @@ import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
 import { ResumeReportExportController } from './resume-report-export.controller'
 import { DiagnosisReportPdfService } from './resume/diagnosis-report-pdf.service'
 import { KioskAiCapabilitiesController } from './kiosk-ai-capabilities.controller'
+import { TerminalsModule } from '../terminals/terminals.module'
 
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
-  imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule],
+  imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule],
   controllers: [AiController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController],
   providers: [
     AiService,
     AiLogService,
     // 匿名公网 AI 端点（/assistant/chat、/resume/parse）的日配额闸门。
     AiPublicQuotaService,
+    ResumeParseSubmissionService,
+    ResumeParseIntentRunner,
     MockAiProvider,
     OpenAiProvider,
     ClaudeProvider,

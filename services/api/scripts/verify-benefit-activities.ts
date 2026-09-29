@@ -3,7 +3,16 @@ import 'reflect-metadata'
 import { randomUUID } from 'crypto'
 import { rmSync } from 'fs'
 import { createClient } from '@libsql/client'
+import {
+  BadRequestException,
+  Module,
+  ValidationPipe,
+  type ValidationError,
+} from '@nestjs/common'
 import { GUARDS_METADATA } from '@nestjs/common/constants'
+import { NestFactory, Reflector } from '@nestjs/core'
+import { JwtModule, JwtService } from '@nestjs/jwt'
+import type { NestExpressApplication } from '@nestjs/platform-express'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
@@ -17,6 +26,8 @@ import { BenefitActivitiesController } from '../src/benefit-activities/benefit-a
 import { AdminBenefitActivitiesController } from '../src/benefit-activities/admin-benefit-activities.controller'
 import { MemberBenefitsService } from '../src/member-benefits/member-benefits.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+
+type ActivityInput = Parameters<BenefitActivitiesService['create']>[1]
 
 const fallbackDbName = process.env['DATABASE_URL'] ? null : `verify-benefit-activities-${randomUUID().slice(0, 8)}.db`
 if (fallbackDbName) process.env['DATABASE_URL'] = `file:./prisma/${fallbackDbName}`
@@ -39,10 +50,11 @@ async function expectReject(code: string, label: string, fn: () => Promise<unkno
   }
 }
 
-function guardNames(target: Function | object, propertyKey?: string): string[] {
-  const handler = propertyKey ? (target as Record<string, unknown>)[propertyKey] : target
-  const metadata = Reflect.getMetadata(GUARDS_METADATA, handler)
-  return ((metadata ?? []) as Function[]).map((g) => g.name)
+function guardNames(target: object, propertyKey?: string): string[] {
+  const record = target as Record<string, unknown>
+  const handler = propertyKey ? record[propertyKey] : target
+  const metadata = Reflect.getMetadata(GUARDS_METADATA, handler as object) as Array<{ name?: string }> | undefined
+  return (metadata ?? []).map((guard) => guard.name ?? '')
 }
 
 async function main() {
@@ -229,6 +241,8 @@ async function main() {
       adminRoles.includes('admin')
     ) pass('13. 控制器鉴权元数据正确')
     else fail('13. 控制器鉴权元数据异常')
+
+    await verifyRedeemableQuantity({ prisma, activities, audit, admin, suffix, activityIds, userA, userB })
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
@@ -255,12 +269,13 @@ async function initFallbackDb(): Promise<void> {
   const client = createClient({ url: process.env['DATABASE_URL']! })
   try {
     await client.batch([
-      `CREATE TABLE "User" ("id" TEXT NOT NULL PRIMARY KEY, "username" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "name" TEXT NOT NULL, "role" TEXT NOT NULL, "orgId" TEXT, "phoneHash" TEXT, "phoneEnc" TEXT, "phoneVerifiedAt" DATETIME, "tokenVersion" INTEGER NOT NULL DEFAULT 0, "lastLoginAt" DATETIME, "enabled" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+      `CREATE TABLE "User" ("id" TEXT NOT NULL PRIMARY KEY, "username" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "passwordProofState" TEXT NOT NULL DEFAULT 'legacy', "name" TEXT NOT NULL, "role" TEXT NOT NULL, "orgId" TEXT, "phoneHash" TEXT, "phoneEnc" TEXT, "phoneVerifiedAt" DATETIME, "emailHash" TEXT, "emailEnc" TEXT, "emailVerifiedAt" DATETIME, "emailVerifyMethod" TEXT, "tokenVersion" INTEGER NOT NULL DEFAULT 0, "lastLoginAt" DATETIME, "enabled" BOOLEAN NOT NULL DEFAULT true, "deletedAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE UNIQUE INDEX "User_username_key" ON "User"("username")`,
       `CREATE UNIQUE INDEX "User_phoneHash_key" ON "User"("phoneHash")`,
+      `CREATE UNIQUE INDEX "User_emailHash_key" ON "User"("emailHash")`,
       `CREATE INDEX "User_orgId_idx" ON "User"("orgId")`,
       `CREATE INDEX "User_phoneVerifiedAt_idx" ON "User"("phoneVerifiedAt")`,
-      `CREATE TABLE "EndUser" ("id" TEXT NOT NULL PRIMARY KEY, "phoneHash" TEXT NOT NULL, "phoneEnc" TEXT NOT NULL, "nickname" TEXT, "wxOpenId" TEXT, "enabled" BOOLEAN NOT NULL DEFAULT true, "lastLoginAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+      `CREATE TABLE "EndUser" ("id" TEXT NOT NULL PRIMARY KEY, "phoneHash" TEXT NOT NULL, "phoneEnc" TEXT NOT NULL, "nickname" TEXT, "wxOpenId" TEXT, "enabled" BOOLEAN NOT NULL DEFAULT true, "status" TEXT NOT NULL DEFAULT 'active', "statusChangedAt" DATETIME, "closingRequestedAt" DATETIME, "anonymizedAt" DATETIME, "lastLoginAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE UNIQUE INDEX "EndUser_phoneHash_key" ON "EndUser"("phoneHash")`,
       `CREATE UNIQUE INDEX "EndUser_wxOpenId_key" ON "EndUser"("wxOpenId")`,
       `CREATE TABLE "AuditLog" ("id" TEXT NOT NULL PRIMARY KEY, "actorId" TEXT, "actorRole" TEXT NOT NULL, "action" TEXT NOT NULL, "targetType" TEXT NOT NULL, "targetId" TEXT, "payloadJson" TEXT NOT NULL DEFAULT '{}', "ipAddress" TEXT, "userAgent" TEXT, "requestId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "AuditLog_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE)`,
@@ -279,5 +294,428 @@ async function initFallbackDb(): Promise<void> {
     ])
   } finally {
     client.close()
+  }
+}
+
+
+let httpPrisma: PrismaService | null = null
+let httpAudit: AuditService | null = null
+const httpRedisCache = new Map<string, string>()
+const httpRedis = {
+  async get(key: string) { return httpRedisCache.get(key) ?? null },
+  async del(key: string) { return httpRedisCache.delete(key) ? 1 : 0 },
+  async setJsonIfVersionNotOlder(key: string, _ttl: number, value: string, tokenVersion: number) {
+    const current = httpRedisCache.get(key)
+    const currentVersion = current ? (JSON.parse(current) as { tokenVersion?: number }).tokenVersion : undefined
+    if (typeof currentVersion === 'number' && currentVersion > tokenVersion) return 'stale' as const
+    httpRedisCache.set(key, value)
+    return 'stored' as const
+  },
+}
+
+@Module({
+  imports: [JwtModule.register({ secret: process.env['JWT_SECRET'], signOptions: { expiresIn: '30m' } })],
+  controllers: [AdminBenefitActivitiesController],
+  providers: [
+    { provide: PrismaService, useFactory: () => httpPrisma ?? fail('HTTP 测试未绑定 Prisma') },
+    { provide: AuditService, useFactory: () => httpAudit ?? fail('HTTP 测试未绑定 Audit') },
+    BenefitActivitiesService,
+    Reflector,
+    RolesGuard,
+    JwtAuthGuard,
+    { provide: loadRedisService(), useValue: httpRedis },
+  ],
+})
+class BenefitActivityQuantityHttpModule {}
+
+// 分段加载真实模块：静态路径会给本门禁增加图谱边，而本任务不能刷新 docs/graph。
+function loadModule(segments: string[]): Record<string, unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require(segments.join('/')) as Record<string, unknown>
+}
+
+function loadNamed(segments: string[], name: string): unknown {
+  const value = loadModule(segments)[name]
+  if (value === undefined) fail(`${name} 不可读`)
+  return value
+}
+
+function loadRedeemableBenefitTypes(): readonly string[] {
+  const types = loadNamed(['..', 'src', 'benefit-redemption', 'benefit-redemption.types'], 'REDEEMABLE_BENEFIT_TYPES')
+  if (!Array.isArray(types) || types.some((item) => typeof item !== 'string')) fail('REDEEMABLE_BENEFIT_TYPES 不可读')
+  return types as readonly string[]
+}
+
+function loadRedisService(): new (...args: never[]) => unknown {
+  const Service = loadNamed(['..', 'src', 'common', 'redis', 'redis.service'], 'RedisService')
+  if (typeof Service !== 'function') fail('RedisService 不可读')
+  return Service as new (...args: never[]) => unknown
+}
+
+function loadHttpExceptionFilter(): new () => { catch(exception: unknown, host: unknown): void } {
+  const Filter = loadNamed(['..', 'src', 'common', 'filters', 'http-exception.filter'], 'HttpExceptionFilter')
+  if (typeof Filter !== 'function') fail('HttpExceptionFilter 不可读')
+  return Filter as new () => { catch(exception: unknown, host: unknown): void }
+}
+
+function activityInput(benefitType: string, title: string, quantity: number | null | undefined): ActivityInput {
+  const input: ActivityInput = {
+    title,
+    description: '额度校验活动。',
+    rulesText: null,
+    benefitType,
+    sourceType: 'platform',
+    stockTotal: null,
+    validFrom: null,
+    validUntil: null,
+    grantValidDays: null,
+  }
+  if (quantity !== undefined) input.quantityTotal = quantity
+  return input
+}
+
+function flattenValidationErrors(errors: ValidationError[], parent = ''): string[] {
+  const out: string[] = []
+  for (const error of errors) {
+    const field = parent ? `${parent}.${error.property}` : error.property
+    if (error.constraints) for (const message of Object.values(error.constraints)) out.push(`${field}: ${message}`)
+    if (error.children?.length) out.push(...flattenValidationErrors(error.children, field))
+  }
+  return out
+}
+
+function thrownCode(error: unknown): string | undefined {
+  const body = (error as { getResponse?: () => unknown; response?: unknown }).getResponse?.()
+    ?? (error as { response?: unknown }).response
+  return (body as { error?: { code?: string } } | undefined)?.error?.code
+}
+
+async function counts(prisma: PrismaService): Promise<string> {
+  const [activities, grants, claims, audits] = await Promise.all([
+    prisma.benefitActivity.count(),
+    prisma.benefitGrant.count(),
+    prisma.benefitClaim.count(),
+    prisma.auditLog.count(),
+  ])
+  return `${activities}:${grants}:${claims}:${audits}`
+}
+
+async function footprint(prisma: PrismaService, activityId: string): Promise<string> {
+  const activity = await prisma.benefitActivity.findUnique({ where: { id: activityId } })
+  const grants = await prisma.benefitGrant.findMany({
+    where: { sourceRef: activityId },
+    select: { id: true, quantityTotal: true, quantityRemaining: true, updatedAt: true },
+    orderBy: { id: 'asc' },
+  })
+  const [claims, audits] = await Promise.all([
+    prisma.benefitClaim.count({ where: { activityId } }),
+    prisma.auditLog.count({ where: { action: 'benefit_activity.claim', targetId: activityId } }),
+  ])
+  return JSON.stringify({
+    quantityTotal: activity?.quantityTotal ?? null,
+    stockRemaining: activity?.stockRemaining ?? null,
+    status: activity?.status ?? null,
+    updatedAt: activity?.updatedAt.getTime() ?? null,
+    claims,
+    audits,
+    grants: grants.map((grant) => [grant.id, grant.quantityTotal, grant.quantityRemaining, grant.updatedAt.getTime()]),
+  })
+}
+
+async function expectNoWrite(
+  prisma: PrismaService,
+  code: string,
+  label: string,
+  fn: () => Promise<unknown>,
+  activityId?: string,
+): Promise<void> {
+  const beforeCounts = await counts(prisma)
+  const beforeFoot = activityId ? await footprint(prisma, activityId) : ''
+  let actual: string | undefined
+  try {
+    await fn()
+  } catch (error) {
+    actual = thrownCode(error)
+  }
+  if (actual !== code) fail(`${label} — expected ${code}, got ${actual ?? 'success'}`)
+  if (beforeCounts !== await counts(prisma)) fail(`${label} 写入了活动、权益、领取或审计`)
+  if (activityId && beforeFoot !== await footprint(prisma, activityId)) fail(`${label} 改变了活动、库存、权益、领取或审计`)
+  pass(label)
+}
+
+async function verifyRedeemableQuantity(input: {
+  prisma: PrismaService
+  activities: BenefitActivitiesService
+  audit: AuditService
+  admin: AuthedUser
+  suffix: string
+  activityIds: string[]
+  userA: string
+  userB: string
+}): Promise<void> {
+  const { prisma, activities, audit, admin, suffix, activityIds, userA, userB } = input
+  const redeemable = loadRedeemableBenefitTypes()
+  if (redeemable.length === 0 || redeemable.includes('subsidy_eligibility_hint')) fail(`可核销类型常量异常：${redeemable.join(',')}`)
+  const anchorType = redeemable[0] ?? 'coupon'
+  pass(`14. 可核销类型：${redeemable.join(',')}`)
+
+  let anchorDraft: { id: string; title: string } | null = null
+  let preservedId = ''
+  for (const benefitType of redeemable) {
+    for (const quantity of [undefined, null] as const) {
+      const state = quantity === undefined ? '缺省' : 'null'
+      await expectNoWrite(prisma, 'BENEFIT_ACTIVITY_QUANTITY_REQUIRED', `${benefitType} create ${state}`, () =>
+        activities.create(admin, activityInput(benefitType, `${benefitType}-c-${state}-${suffix}`, quantity)))
+    }
+    const created = await activities.create(admin, activityInput(benefitType, `${benefitType}-草稿-${suffix}`, 4))
+    activityIds.push(created.id)
+    if (created.quantityTotal !== 4) fail(`${benefitType} 有效额度未按原值保存`)
+    if (benefitType === anchorType) {
+      anchorDraft = created
+      const preserved = await prisma.benefitGrant.create({
+        data: {
+          endUserId: userA,
+          benefitType,
+          title: `已有额度 ${suffix}`,
+          quantityTotal: 4,
+          quantityRemaining: 2,
+          status: 'active',
+          sourceType: 'platform',
+          sourceRef: created.id,
+        },
+      })
+      preservedId = preserved.id
+    }
+    for (const quantity of [undefined, null] as const) {
+      const state = quantity === undefined ? '缺省' : 'null'
+      await expectNoWrite(
+        prisma,
+        'BENEFIT_ACTIVITY_QUANTITY_REQUIRED',
+        `${benefitType} update ${state} 不改活动`,
+        () => activities.update(admin, created.id, activityInput(benefitType, created.title, quantity)),
+        created.id,
+      )
+    }
+  }
+  if (!anchorDraft) fail('缺少锚点活动')
+  const draft = anchorDraft
+  const still = await prisma.benefitGrant.findUnique({ where: { id: preservedId } })
+  if (still?.quantityTotal !== 4 || still.quantityRemaining !== 2) fail('空额度更新改写了已有 BenefitGrant')
+
+  const bounded = await activities.create(admin, activityInput(anchorType, `边界额度 ${suffix}`, 1))
+  activityIds.push(bounded.id)
+  const raised = await activities.update(admin, bounded.id, activityInput(anchorType, bounded.title, 9999))
+  if (bounded.quantityTotal !== 1 || raised.quantityTotal !== 9999) fail(`边界额度异常 ${bounded.quantityTotal}/${raised.quantityTotal}`)
+  pass('15. 1 与 9999 的 create/update 通过')
+
+  for (const value of [0, -1, 10000, 1.5, Number.NaN]) {
+    await expectNoWrite(prisma, 'BENEFIT_ACTIVITY_QUANTITY_REQUIRED', `service 拒绝 ${value}`, () =>
+      activities.update(admin, draft.id, activityInput(anchorType, draft.title, value)), draft.id)
+  }
+  for (const value of ['3', true] as const) {
+    const body = activityInput(anchorType, draft.title, undefined)
+    body.quantityTotal = value as unknown as number
+    await expectNoWrite(prisma, 'BENEFIT_ACTIVITY_QUANTITY_REQUIRED', `service 拒绝 ${typeof value}`, () =>
+      activities.update(admin, draft.id, body), draft.id)
+  }
+
+  let hintId = ''
+  let hintTitle = ''
+  for (const quantity of [undefined, null] as const) {
+    const state = quantity === undefined ? '缺省' : 'null'
+    const created = await activities.create(admin, activityInput('subsidy_eligibility_hint', `提示-${state}-${suffix}`, quantity))
+    activityIds.push(created.id)
+    const updated = await activities.update(admin, created.id, activityInput('subsidy_eligibility_hint', created.title, quantity))
+    if (created.quantityTotal !== null || updated.quantityTotal !== null) fail('政策提示写成了额度')
+    hintId = created.id
+    hintTitle = created.title
+  }
+  const publishedHint = await activities.publish(admin, hintId)
+  const hintGrant = await activities.claim(userB, hintId)
+  if (publishedHint.quantityTotal !== null || hintGrant.quantityTotal !== null) fail('政策提示领取写成了额度')
+  pass('16. 政策提示 null/缺省可创建、发布并领取')
+  await expectNoWrite(prisma, 'BENEFIT_ACTIVITY_QUANTITY_FORBIDDEN', '政策提示带额度仍拒绝', () =>
+    activities.update(admin, hintId, activityInput('subsidy_eligibility_hint', hintTitle, 1)), hintId)
+
+  const ghost = await prisma.benefitActivity.create({
+    data: { title: `历史草稿 ${suffix}`, benefitType: anchorType, sourceType: 'platform', quantityTotal: null, status: 'draft' },
+  })
+  activityIds.push(ghost.id)
+  await expectNoWrite(prisma, 'BENEFIT_ACTIVITY_QUANTITY_REQUIRED', '历史空额度草稿不能发布', () =>
+    activities.publish(admin, ghost.id), ghost.id)
+
+  const legacy = await prisma.benefitActivity.create({
+    data: {
+      title: `历史已发布 ${suffix}`,
+      benefitType: anchorType,
+      sourceType: 'platform',
+      quantityTotal: null,
+      stockTotal: 4,
+      stockRemaining: 4,
+      status: 'published',
+    },
+  })
+  activityIds.push(legacy.id)
+  await prisma.benefitGrant.create({
+    data: {
+      endUserId: userA,
+      benefitType: anchorType,
+      title: `历史权益 ${suffix}`,
+      quantityTotal: 3,
+      quantityRemaining: 3,
+      status: 'active',
+      sourceType: 'platform',
+      sourceRef: legacy.id,
+    },
+  })
+  await expectNoWrite(prisma, 'BENEFIT_ACTIVITY_QUANTITY_REQUIRED', '已发布空额度领取被拒且无副作用', () =>
+    activities.claim(userA, legacy.id), legacy.id)
+
+  await verifyQuantityHttp({ prisma, audit, admin, suffix, activityIds, userA, anchorType })
+}
+
+async function verifyQuantityHttp(input: {
+  prisma: PrismaService
+  audit: AuditService
+  admin: AuthedUser
+  suffix: string
+  activityIds: string[]
+  userA: string
+  anchorType: string
+}): Promise<void> {
+  const { prisma, audit, admin, suffix, activityIds, userA, anchorType } = input
+  httpPrisma = prisma
+  httpAudit = audit
+  const Filter = loadHttpExceptionFilter()
+  const app = await NestFactory.create<NestExpressApplication>(BenefitActivityQuantityHttpModule, { logger: ['error'] })
+  app.setGlobalPrefix('api/v1')
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    exceptionFactory: (errors) => {
+      const details = flattenValidationErrors(errors)
+      const message = details[0] ?? '请求参数校验失败'
+      return new BadRequestException({ error: { code: 'VALIDATION_FAILED', message, details } })
+    },
+  }))
+  app.useGlobalFilters(new Filter())
+  await app.listen(0, '127.0.0.1')
+  const base = `${(await app.getUrl()).replace('[::1]', '127.0.0.1')}/api/v1`
+  const token = app.get(JwtService).sign({ sub: admin.userId, ver: 0 })
+  const required = '可核销权益必须填写 1 到 9999 的整数额度'
+
+  async function request(method: string, path: string, body?: ActivityInput) {
+    const response = await fetch(`${base}${path}`, {
+      method,
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+    return { status: response.status, json: await response.json() as Record<string, unknown> }
+  }
+
+  function errorOf(json: Record<string, unknown>): { code?: string; message?: string } {
+    const error = json['error']
+    return error && typeof error === 'object' ? error as { code?: string; message?: string } : {}
+  }
+
+  async function expectHttpReject(code: string, message: string, label: string, method: string, path: string, body: ActivityInput, activityId?: string) {
+    const beforeCounts = await counts(prisma)
+    const beforeFoot = activityId ? await footprint(prisma, activityId) : ''
+    const result = await request(method, path, body)
+    const actual = errorOf(result.json)
+    if (result.status !== 400 || actual.code !== code || actual.message !== message) {
+      fail(`${label} — expected 400 ${code}, got ${result.status} ${actual.code ?? ''} ${actual.message ?? ''}`)
+    }
+    if (beforeCounts !== await counts(prisma)) fail(`${label} 写入了活动、权益、领取或审计`)
+    if (activityId && beforeFoot !== await footprint(prisma, activityId)) fail(`${label} 改变了活动、库存、权益或领取`)
+    pass(label)
+  }
+
+  try {
+    for (const quantity of [undefined, null] as const) {
+      const state = quantity === undefined ? '缺省' : 'null'
+      await expectHttpReject(
+        'BENEFIT_ACTIVITY_QUANTITY_REQUIRED',
+        required,
+        `HTTP create ${anchorType} ${state}`,
+        'POST',
+        '/admin/benefit-activities',
+        activityInput(anchorType, `HTTP-${state}-${suffix}`, quantity),
+      )
+    }
+    await expectHttpReject(
+      'VALIDATION_FAILED',
+      'quantityTotal: quantityTotal must not be less than 1',
+      'HTTP create 额度 0 由 ValidationPipe 拒绝',
+      'POST',
+      '/admin/benefit-activities',
+      activityInput(anchorType, `HTTP-zero-${suffix}`, 0),
+    )
+
+    const created = await request('POST', '/admin/benefit-activities', activityInput(anchorType, `HTTP-ok-${suffix}`, 4))
+    const createdData = created.json['data'] as { id?: string; quantityTotal?: number | null } | undefined
+    if (created.status !== 201 || created.json['success'] !== true || !createdData?.id || createdData.quantityTotal !== 4) {
+      fail(`HTTP 有效 create 异常：${created.status} ${JSON.stringify(created.json)}`)
+    }
+    const createdId = createdData.id
+    activityIds.push(createdId)
+    const httpGrant = await prisma.benefitGrant.create({
+      data: {
+        endUserId: userA,
+        benefitType: anchorType,
+        title: `HTTP 已有权益 ${suffix}`,
+        quantityTotal: 4,
+        quantityRemaining: 4,
+        status: 'active',
+        sourceType: 'platform',
+        sourceRef: createdId,
+      },
+    })
+    pass('HTTP create 有效整数 201')
+    const patch = `/admin/benefit-activities/${createdId}`
+    for (const quantity of [null, undefined] as const) {
+      const state = quantity === undefined ? '缺失' : '清空'
+      await expectHttpReject(
+        'BENEFIT_ACTIVITY_QUANTITY_REQUIRED',
+        required,
+        `HTTP update ${state}`,
+        'PATCH',
+        patch,
+        activityInput(anchorType, `HTTP-ok-${suffix}`, quantity),
+        createdId,
+      )
+    }
+    const updated = await request('PATCH', patch, activityInput(anchorType, `HTTP-ok-${suffix}`, 6))
+    const updatedData = updated.json['data'] as { quantityTotal?: number | null } | undefined
+    const stored = await prisma.benefitActivity.findUnique({ where: { id: createdId } })
+    const grantAfter = await prisma.benefitGrant.findUnique({ where: { id: httpGrant.id } })
+    if (updated.status !== 200 || updatedData?.quantityTotal !== 6 || stored?.quantityTotal !== 6 || grantAfter?.quantityTotal !== 4 || grantAfter.quantityRemaining !== 4) {
+      fail(`HTTP 有效 update 异常：${updated.status} ${JSON.stringify(updatedData)}`)
+    }
+    pass('HTTP update 有效整数 200，已有 BenefitGrant 仍是 4')
+
+    for (const quantity of [undefined, null] as const) {
+      const state = quantity === undefined ? '缺省' : 'null'
+      const hint = await request('POST', '/admin/benefit-activities', activityInput('subsidy_eligibility_hint', `HTTP-hint-${state}-${suffix}`, quantity))
+      const hintData = hint.json['data'] as { id?: string; quantityTotal?: number | null } | undefined
+      if (hint.status !== 201 || !hintData?.id || hintData.quantityTotal !== null) fail(`HTTP 政策提示 ${state} 异常：${hint.status}`)
+      activityIds.push(hintData.id)
+    }
+    pass('HTTP 政策提示 null 与缺省仍创建成功')
+    await expectHttpReject(
+      'BENEFIT_ACTIVITY_QUANTITY_FORBIDDEN',
+      '政策资格提示不允许设置额度',
+      'HTTP 政策提示带额度仍是原错误',
+      'POST',
+      '/admin/benefit-activities',
+      activityInput('subsidy_eligibility_hint', `HTTP-hint-qty-${suffix}`, 1),
+    )
+  } finally {
+    await app.close()
   }
 }

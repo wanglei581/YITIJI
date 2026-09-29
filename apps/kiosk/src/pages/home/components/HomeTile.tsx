@@ -10,6 +10,8 @@ export interface HomeTileProps {
   icon: LucideIcon
   tone?: 'teal' | 'slate' | 'clay' | 'neutral'
   size?: 'feature' | 'regular' | 'slim'
+  /** 单独一张时横跨两列，避免旁边空一格。 */
+  span?: 'full'
   disabled?: boolean
   /**
    * 为什么点不动。**只允许填能力闸门**（`capability:<配置项>`）——
@@ -32,12 +34,16 @@ export function HomeTile({
   icon: Icon,
   tone = 'teal',
   size = 'regular',
+  span,
   disabled = false,
   disabledReason,
   statusText,
   panelAttrs,
   onAction,
 }: HomeTileProps) {
+  const titleId = `qx-home-${actionId}-title`
+  const descId = `qx-home-${actionId}-desc`
+  const statusId = statusText ? `qx-home-${actionId}-status` : undefined
   return (
     <button
       type="button"
@@ -45,19 +51,21 @@ export function HomeTile({
       data-action={actionId}
       data-tone={tone}
       data-size={size}
+      data-span={span}
       disabled={disabled}
       data-disabled-reason={disabled ? disabledReason : undefined}
       onClick={() => onAction(actionId)}
-      aria-describedby={statusText ? `qx-home-${actionId}-status` : undefined}
+      aria-labelledby={titleId}
+      aria-describedby={[descId, statusId].filter(Boolean).join(' ')}
       {...panelAttrs}
     >
       <span className="qx-home-tile-head">
         <span className="qx-home-tile-icon"><Icon aria-hidden="true" /></span>
         {badge ? <span className="qx-home-tile-badge">{badge}</span> : null}
       </span>
-      <strong>{title}</strong>
-      <span className="qx-home-tile-desc">{description}</span>
-      {statusText ? <span id={`qx-home-${actionId}-status`} className="qx-home-tile-status">{statusText}</span> : null}
+      <strong id={titleId}>{title}</strong>
+      <span id={descId} className="qx-home-tile-desc">{description}</span>
+      {statusText ? <span id={statusId} className="qx-home-tile-status">{statusText}</span> : null}
       {foot ? <span className="qx-home-tile-foot">{foot} <ArrowRightIcon aria-hidden="true" /></span> : null}
     </button>
   )

@@ -52,7 +52,9 @@ $allowedDiagnosticCodes = @(
   "AGENT_REGISTRATION_FAILED",
   "AGENT_UNAUTHORIZED",
   "AGENT_STARTUP_FAILED",
-  "AGENT_READY"
+  "AGENT_READY",
+  "DUPLICATE_INSTANCE",
+  "INSTANCE_LOCK_UNAVAILABLE"
 )
 
 function Get-Utf8BomState([string]$Path) {
@@ -237,6 +239,63 @@ function Get-RuntimeRootAclStatus([string]$Path) {
   }
 }
 
+function Get-LockPathKind([string]$Path) {
+  try {
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    $isReparse = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+    if ($item.PSIsContainer) {
+      if ($isReparse) { return "junction" }
+      return "directory"
+    }
+    if ($isReparse) { return "symlink" }
+    return "regular_file"
+  } catch {
+    $presence = Get-PathPresenceStatus $Path
+    if ($presence -eq "missing") { return "missing" }
+    return "unavailable"
+  }
+}
+
+function Get-StrictLockPidParse([string]$Path) {
+  try {
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -gt 32) {
+      return [pscustomobject]@{ Status = "unproven"; ParsedPid = $null }
+    }
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+    if ($text -cmatch '^([1-9][0-9]{0,9})\n?$' ) {
+      return [pscustomobject]@{ Status = "strict_pid"; ParsedPid = [int64]$Matches[1] }
+    }
+    return [pscustomobject]@{ Status = "unproven"; ParsedPid = $null }
+  } catch {
+    return [pscustomobject]@{ Status = "unavailable"; ParsedPid = $null }
+  }
+}
+
+function Get-TasklistPidPresence([int64]$ProcessIdValue) {
+  $tasklistExe = Join-Path $env:SystemRoot "System32\tasklist.exe"
+  if ([string]::IsNullOrWhiteSpace($env:SystemRoot) -or -not (Test-Path -LiteralPath $tasklistExe -PathType Leaf)) {
+    return [pscustomobject]@{ ExitCode = $null; Result = "unavailable"; PidPresent = "unavailable" }
+  }
+  try {
+    $output = & $tasklistExe /FI "PID eq $ProcessIdValue" /FO CSV /NH 2>&1 | Out-String
+    $code = $LASTEXITCODE
+    if ($null -eq $code) { $code = 1 }
+    if ($code -ne 0) {
+      return [pscustomobject]@{ ExitCode = $code; Result = "unavailable"; PidPresent = "unavailable" }
+    }
+    $needle = ',"' + $ProcessIdValue + '",'
+    $present = $output.Contains($needle)
+    return [pscustomobject]@{
+      ExitCode = $code
+      Result = $(if ($present) { "pid_listed" } else { "pid_not_listed" })
+      PidPresent = $(if ($present) { "true" } else { "false" })
+    }
+  } catch {
+    return [pscustomobject]@{ ExitCode = $null; Result = "unavailable"; PidPresent = "unavailable" }
+  }
+}
+
 $service = $null
 $serviceResolution = "not_found"
 try {
@@ -336,6 +395,71 @@ if ($serviceExists) {
   }
 }
 
+$lockPath = Join-Path $ProgramDataDir "agent.pid"
+$lockPathKind = Get-LockPathKind $lockPath
+$lockPidParseStatus = "missing"
+$lockPid = $null
+$lockMtimeUtc = $null
+$lockAclStatus = "missing"
+$tasklistExitCode = $null
+$tasklistResult = "not_run"
+$tasklistPidPresent = "not_run"
+$relatedAgentProcessCount = $null
+$lockClearanceEligibility = "not_eligible_lock_missing"
+$lockOperatorHint = "不要先删除. First verify the Agent service and lock PID. Non-regular paths (directory/junction/symlink) must stay untouched and be escalated."
+
+if ($lockPathKind -eq "unavailable") {
+  $lockPidParseStatus = "unavailable"
+  $lockAclStatus = "unavailable"
+  $lockClearanceEligibility = "not_eligible_not_regular_file"
+} elseif ($lockPathKind -eq "missing") {
+  $lockPidParseStatus = "missing"
+  $lockAclStatus = "missing"
+  $lockClearanceEligibility = "not_eligible_lock_missing"
+} elseif ($lockPathKind -ne "regular_file") {
+  $lockPidParseStatus = "not_regular"
+  $lockAclStatus = Get-ProgramDataAclStatus $lockPath
+  $lockClearanceEligibility = "not_eligible_not_regular_file"
+} else {
+  $lockAclStatus = Get-ProgramDataAclStatus $lockPath
+  try {
+    $lockItem = Get-Item -LiteralPath $lockPath -Force -ErrorAction Stop
+    $lockMtimeUtc = $lockItem.LastWriteTimeUtc.ToString("o")
+  } catch {
+    $lockMtimeUtc = $null
+  }
+  $parsedLock = Get-StrictLockPidParse $lockPath
+  $lockPidParseStatus = [string]$parsedLock.Status
+  $lockPid = $parsedLock.ParsedPid
+  if ($lockPidParseStatus -ne "strict_pid" -or $null -eq $lockPid) {
+    $lockClearanceEligibility = "not_eligible_unproven_pid"
+  } else {
+    $tasklist = Get-TasklistPidPresence ([int64]$lockPid)
+    $tasklistExitCode = $tasklist.ExitCode
+    $tasklistResult = [string]$tasklist.Result
+    $tasklistPidPresent = [string]$tasklist.PidPresent
+    try {
+      $related = @(Get-Process -ErrorAction Stop | Where-Object { $_.ProcessName -like "*aijobprintagent*" })
+      $relatedAgentProcessCount = $related.Count
+    } catch {
+      $relatedAgentProcessCount = $null
+    }
+    if ($serviceExists -and $serviceState -ne "Stopped") {
+      $lockClearanceEligibility = "not_eligible_service_not_stopped"
+    } elseif ($tasklistPidPresent -eq "unavailable") {
+      $lockClearanceEligibility = "not_eligible_tasklist_unavailable"
+    } elseif ($tasklistPidPresent -eq "true") {
+      $lockClearanceEligibility = "not_eligible_live_pid"
+    } elseif ($null -eq $relatedAgentProcessCount) {
+      $lockClearanceEligibility = "not_eligible_related_process"
+    } elseif ($relatedAgentProcessCount -gt 0) {
+      $lockClearanceEligibility = "not_eligible_related_process"
+    } else {
+      $lockClearanceEligibility = "eligible_for_operator_review"
+    }
+  }
+}
+
 [pscustomobject]@{
   serviceExists = $serviceExists
   serviceAmbiguous = $serviceAmbiguous
@@ -368,4 +492,16 @@ if ($serviceExists) {
   tokenFileAclStatus = $tokenFileAclStatus
   runtimeRootAclStatus = $runtimeRootAclStatus
   scmFailurePolicy = $scmFailurePolicy
+  lockPath = $lockPath
+  lockPathKind = $lockPathKind
+  lockPidParseStatus = $lockPidParseStatus
+  lockPid = $lockPid
+  lockMtimeUtc = $lockMtimeUtc
+  lockAclStatus = $lockAclStatus
+  tasklistExitCode = $tasklistExitCode
+  tasklistResult = $tasklistResult
+  tasklistPidPresent = $tasklistPidPresent
+  relatedAgentProcessCount = $relatedAgentProcessCount
+  lockClearanceEligibility = $lockClearanceEligibility
+  lockOperatorHint = $lockOperatorHint
 }

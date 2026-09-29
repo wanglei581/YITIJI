@@ -1,5 +1,3 @@
-import { Button, Card } from '@ai-job-print/ui'
-
 interface MemberJobFitConsentCardProps {
   /** 就地授权。走既有 `POST /me/ai-consents`（scope `job_ai`），不新增第二套 consent 模型。 */
   onAuthorize: () => void
@@ -22,18 +20,13 @@ interface MemberJobFitConsentCardProps {
  */
 export function MemberJobFitConsentCard({ onAuthorize, busy = false }: MemberJobFitConsentCardProps) {
   return (
-    <Card className="job-fit-card p-5">
-      <p className="text-sm leading-relaxed text-neutral-600">
+    <div className="qx-card jfq-consent-card" data-live="true">
+      <p>
         岗位匹配参考需要你先同意「岗位 AI 辅助」。结果只展示给你本人，不会共享给企业或合作机构。
       </p>
-      <Button
-        size="lg"
-        className="job-fit-primary-action mt-3 h-14 w-full"
-        onClick={onAuthorize}
-        disabled={busy}
-      >
+      <button type="button" className="qx-btn" data-variant="primary" onClick={onAuthorize} disabled={busy}>
         {busy ? '正在授权…' : '开启岗位 AI 辅助'}
-      </Button>
-    </Card>
+      </button>
+    </div>
   )
 }

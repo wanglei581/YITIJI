@@ -1,0 +1,456 @@
+/* ============================================================
+   运营数据大屏 · 内容块
+
+   本文件是 ops-screen.css 的续篇，按「壳 / 块 / 字阶」三刀拆开的第二刀。
+   拆分是纯机械的：规则、顺序、选择器一字未改，只是换了文件 ——
+   原文件 1005 行超过了仓库的单文件阈值，而这三段的职责本来就不同。
+
+   这里放卡片**内部**的呈现块：KPI、未接入说明、设备墙点阵、横条统计、
+   分项小格、告警 / 归并列表、折线、整屏状态面板与骨架。
+
+   所有块都是 --ops-panel-2 平面（无边框、圆角与卡片不同），
+   不构成第二层卡片 —— `.ops-card` 里不允许再出现 `.ops-card`。
+
+   引入顺序必须在 ops-screen.css 之后：变量定义在那边。
+   ============================================================ */
+
+/* ---------- KPI ---------- */
+.ops-kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* 同上：KPI 的主数与副行也不许被压扁。 */
+.ops-kpi .ops-n,
+.ops-kpi .ops-lb {
+  flex: none;
+}
+
+.ops-kpi .ops-n {
+  font-weight: 700;
+  font-family: var(--ops-mono);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.ops-kpi .ops-n.is-warn { color: var(--ops-warn); }
+.ops-kpi .ops-n.is-error { color: var(--ops-err); }
+
+.ops-kpi .ops-u {
+  font-weight: 500;
+  color: var(--ops-ink-2);
+  margin-left: 6px;
+}
+
+.ops-kpi .ops-lb {
+  color: var(--ops-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-kpi .ops-lb-muted {
+  color: var(--ops-ink-3);
+}
+
+/* ---------- 未接入：不是 0，不是占位动画，是一句说明 ---------- */
+.ops-na {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  background: repeating-linear-gradient(135deg, rgba(111, 141, 132, 0.05) 0 8px, transparent 8px 16px);
+  border-radius: 10px;
+  height: 100%;
+  min-width: 0;
+}
+
+[data-ops-screen='wall'] .ops-na { padding: 14px; }
+[data-ops-screen='desk'] .ops-na { padding: 10px 12px; }
+
+.ops-na .ops-na-t {
+  font-weight: 600;
+  color: var(--ops-ink-3);
+}
+
+.ops-na .ops-na-d {
+  color: var(--ops-ink-3);
+  line-height: 1.55;
+  overflow: hidden;
+}
+
+.ops-card.is-na {
+  border-style: dashed;
+  border-color: #2c534a;
+}
+
+/* 取数失败与结构性未接入必须长得不一样：一个下次刷新会回来，一个要改数据层 */
+.ops-card.is-failed {
+  border-style: solid;
+  border-color: #5a4030;
+}
+
+.ops-card.is-failed .ops-na {
+  background: repeating-linear-gradient(135deg, rgba(216, 144, 92, 0.08) 0 8px, transparent 8px 16px);
+}
+
+.ops-card.is-failed .ops-na-t {
+  color: var(--ops-warn);
+}
+
+/* ---------- 设备墙 ---------- */
+.ops-fleet {
+  display: flex;
+  flex-direction: column;
+  /* 摘要与点阵之间留 10px：定高卡里这 6px 余量正好是点阵最后一行差的量 */
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+.ops-fleet-sum {
+  display: flex;
+  gap: 30px;
+  flex: none;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.ops-frow {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.ops-frow .ops-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  align-self: center;
+}
+
+.ops-frow .ops-v {
+  font-weight: 700;
+  font-family: var(--ops-mono);
+}
+
+.ops-frow .ops-k {
+  color: var(--ops-ink-2);
+}
+
+.ops-dots {
+  /* 格子必须**定尺**，不能 1fr 也不能 flex-grow：
+     - `minmax(44px,1fr)` 在十几条轨道上把分数宽度逐条向上取整，合计比内容盒宽 3–4px；
+     - 换成 flex-wrap 之后更糟 —— 最后一行item少，flex-grow 把它们撑到 max-width，
+       于是最后一行的格子比上面几行大一倍，截图上看像渲染坏了（机构侧只有一行时
+       整行被 align-content:stretch 拉成 110px 高的长方块）。
+     定尺 + align-content:flex-start 两个问题一起消失：格子等大、行高一致、不取整溢出。 */
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 36px);
+  grid-auto-rows: 36px;
+  justify-content: space-between;
+  align-content: flex-start;
+  gap: 8px;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+[data-ops-screen='desk'] .ops-dots {
+  grid-template-columns: repeat(auto-fill, minmax(26px, 1fr));
+  grid-auto-rows: 18px;
+  gap: 6px;
+}
+
+.ops-d {
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.ops-d.is-ok { background: rgba(53, 171, 142, 0.3); border-color: var(--ops-ok); }
+.ops-d.is-warn { background: rgba(216, 144, 92, 0.3); border-color: var(--ops-warn); border-style: dashed; }
+.ops-d.is-err { background: rgba(224, 112, 90, 0.32); border-color: var(--ops-err); border-style: double; }
+.ops-d.is-unk { background: rgba(111, 141, 132, 0.16); border-color: #33564d; border-style: dotted; }
+
+/* ---------- 横条统计 ---------- */
+.ops-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  justify-content: center;
+  height: 100%;
+  min-width: 0;
+}
+
+.ops-card.ops-tall .ops-bars {
+  justify-content: space-evenly;
+}
+
+.ops-bar-r {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 74px;
+  align-items: center;
+  gap: 11px;
+}
+
+[data-ops-screen='desk'] .ops-bar-r {
+  grid-template-columns: 88px minmax(0, 1fr) 62px;
+  gap: 8px;
+}
+
+.ops-bar-r .ops-bl {
+  color: var(--ops-ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-bar-t {
+  height: 11px;
+  border-radius: 6px;
+  background: var(--ops-panel-2);
+  overflow: hidden;
+}
+
+[data-ops-screen='desk'] .ops-bar-t { height: 8px; }
+
+.ops-bar-f {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--ops-p-500);
+}
+
+.ops-bar-f.is-warn { background: var(--ops-warn); }
+.ops-bar-f.is-error { background: var(--ops-err); }
+.ops-bar-f.is-info { background: var(--ops-info); }
+
+.ops-bar-r .ops-bv {
+  font-family: var(--ops-mono);
+  text-align: right;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 分项小格（平面块，不是卡片） ---------- */
+.ops-mini {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 14px;
+  height: 100%;
+  align-content: stretch;
+  min-width: 0;
+}
+
+.ops-mini .ops-m {
+  background: var(--ops-panel-2);
+  border-radius: 10px;
+  /* 内边距从 14px 收到 10px：轨道是 minmax(0,1fr)，压不下去的是内容本身，
+     截图上表现为标签与提示被拦腰切掉半行（justify-content:center 时上下都切）。 */
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 三个子元素一律 flex:none。
+   默认的 flex-shrink:1 会在容器不够高时把它们压到低于行高，
+   字就被切在自己的盒子里 —— 而容器 scrollHeight 仍等于 clientHeight，
+   任何「查容器溢出」的门禁都看不见。禁止收缩后，放不下就变成真溢出，
+   探针能抓到，人也能在截图上看出来。 */
+.ops-mini .ops-mv,
+.ops-mini .ops-mk,
+.ops-mini .ops-ms {
+  flex: none;
+}
+
+.ops-mini .ops-mv {
+  font-weight: 700;
+  font-family: var(--ops-mono);
+  line-height: 1.1;
+}
+
+.ops-mini .ops-mv.is-na {
+  color: var(--ops-ink-3);
+  font-family: inherit;
+  /* 主数那条 line-height:1.1 是给等宽数字的；中文字形在 1.1 下会被自己的行盒切掉
+     （探针报「文字被压扁 2px」）。未接入格写的是中文，单独给回正常行高。 */
+  line-height: 1.35;
+}
+
+.ops-mini .ops-mk {
+  color: var(--ops-ink-2);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-mini .ops-ms {
+  color: var(--ops-ink-3);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-mini.is-sm {
+  gap: 9px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, auto);
+}
+
+.ops-mini.is-sm .ops-m { padding: 8px 12px; }
+.ops-mini.is-sm .ops-ms { margin-top: 1px; }
+
+/* ---------- 列表（告警 / 归并说明），平面块 ---------- */
+.ops-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  height: 100%;
+  min-width: 0;
+}
+
+.ops-card.ops-tall .ops-list {
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.ops-li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: var(--ops-panel-2);
+  border-radius: 9px;
+  padding: 9px 12px;
+  flex: none;
+  min-width: 0;
+}
+
+.ops-card.ops-tall .ops-li { padding: 7px 12px; }
+
+.ops-li .ops-sev {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 3px;
+  flex: none;
+  background: var(--ops-info);
+}
+
+.ops-li .ops-sev.is-error { background: var(--ops-err); }
+.ops-li .ops-sev.is-warn { background: var(--ops-warn); }
+
+.ops-li .ops-tx {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-li .ops-tm {
+  color: var(--ops-ink-3);
+  font-family: var(--ops-mono);
+  flex: none;
+}
+
+.ops-empty {
+  color: var(--ops-ink-3);
+  text-align: center;
+  padding: 22px 0;
+}
+
+.ops-more {
+  flex: none;
+  color: var(--ops-ink-3);
+  text-align: right;
+  padding-top: 2px;
+}
+
+/* ---------- 未接入归并面板（Partner）：平面行，不是卡中卡 ---------- */
+.ops-gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
+.ops-gap-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  background: var(--ops-panel-2);
+  border-radius: 9px;
+  padding: 9px 12px;
+  min-width: 0;
+}
+
+.ops-gap-row .ops-gap-keys {
+  color: var(--ops-ink-2);
+  min-width: 0;
+}
+
+.ops-gap-row .ops-gap-why {
+  color: var(--ops-ink-3);
+  line-height: 1.45;
+  min-width: 0;
+}
+
+/* 接入方式独占一列并且永不截断：它是唯一能拿去做事的信息。 */
+.ops-gap-row .ops-gap-how {
+  color: var(--ops-ink-2);
+  line-height: 1.45;
+  min-width: 0;
+}
+
+/* ---------- 折线 ---------- */
+.ops-spark {
+  width: 100%;
+  height: 100%;
+  display: block;
+  min-height: 0;
+}
+
+/* ---------- 整屏状态面板（未登录 / 403 / 全局错误 / mock） ---------- */
+.ops-panel-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  border-radius: 14px;
+  border: 1px solid var(--ops-line);
+  background: var(--ops-panel);
+  padding: 48px 32px;
+  min-height: 320px;
+}
+
+.ops-panel-state .ops-ps-t {
+  font-weight: 700;
+  color: var(--ops-ink);
+}
+
+.ops-panel-state .ops-ps-d {
+  color: var(--ops-ink-2);
+  max-width: 64ch;
+  line-height: 1.6;
+}
+
+/* ---------- 骨架：静态占位，不做呼吸动画（3 米外只会晃眼） ---------- */
+.ops-skel {
+  border-radius: 8px;
+  background: var(--ops-panel-2);
+}

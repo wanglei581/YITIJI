@@ -118,9 +118,51 @@ export const COMPLIANCE_COPY = {
    */
   PARTNER_DASHBOARD_TOP:
     '本后台用于合作数据维护与运营统计,不承接平台内简历投递、候选人筛选和面试邀约。',
+
+  /**
+   * Kiosk 合同审查（AI 签约风险提示）首页的服务性质说明：页头副标题与知情同意首句。
+   * 对外不写「法律意见」「律师审查」「判断合同有效」（compliance-boundary §1.2 D）。
+   * 取值出处：docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md 表二 ContractReviewHomePage 行。
+   */
+  KIOSK_CONTRACT_REVIEW_SCOPE: '仅作条款风险提示，请自行核对原文',
+
+  /** Kiosk 合同审查分析中（确认提取结果弹窗）的结果性质说明。出处同上，表二 ContractReviewProcessingPage 行。 */
+  KIOSK_CONTRACT_REVIEW_PROCESSING: '本次结果仅作风险提示，请自行核对原文',
 } as const
 
 export type ComplianceCopyKey = keyof typeof COMPLIANCE_COPY
+
+/**
+ * AI 可见标识文案（next-tasks 3.5c）。
+ *
+ * 依据：compliance-boundary §1.2 A「生成式 AI 登记与标识」「数字人形象与声音」、§1.2 E；
+ * feature-scope §0.5 第 5 条（界面显式标注「AI 生成，仅供参考」）、§七 #19。
+ *
+ * 全站只有一个底句 `BASE`；页面需要交代场景时，只在底句后面接一小段，不另起说法。
+ * 各键的取值逐字来自 docs/reviews/2026-09-26-ai-label-copy-prompt-audit.md（表一、表二）的
+ * 「建议」栏，门禁 apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs 按审计行号核对取值。
+ * 改动取值必须先改审计口径，再同步门禁。
+ *
+ * 小程序不能 import 本包；小程序同名文案由小程序专用会话按同一张审计表维护。
+ */
+export const AI_LABEL_COPY = {
+  /** 底句。一体机 AIGC 可见标识（AigcMark）、AI 助手对话、语音条、职业规划说明都用它。 */
+  BASE: 'AI 生成，仅供参考',
+  /** 审计表一「简历诊断（屏）」：真实报告的说明。 */
+  RESUME_DIAGNOSIS: 'AI 生成，仅供参考，请对照原文核对',
+  /** 审计表一「简历优化对照（屏）」：对照卡的改写栏与优化 / 生成预览页的徽标。 */
+  RESUME_OPTIMIZE: 'AI 生成，仅供参考，请自行核对',
+  /** 审计表一「模拟面试报告（一体机）」：报告页横幅。 */
+  INTERVIEW_REPORT: 'AI 生成，仅供参考，只用于本人练习复盘',
+  /** 审计表一「面试进行中」：会话页页头。 */
+  INTERVIEW_SESSION: '题目由 AI 生成，仅供参考',
+  /** 审计表二「ContractReviewResultPage」：合同审查结果页免责横幅。 */
+  CONTRACT_REVIEW_RESULT: '本结果由 AI 生成，仅供参考，只提示需要核对的条款',
+  /** compliance-boundary §1.2 A「数字人形象与声音」、feature-scope §七 #19：语音通话界面明说。 */
+  DIGITAL_HUMAN: '小青是 AI 数字人，形象与声音由 AI 生成',
+} as const
+
+export type AiLabelCopyKey = keyof typeof AI_LABEL_COPY
 
 /**
  * UI 文案禁词清单(唯一 SSOT)。任何用户可见文案(按钮 / 提示 / 标题)出现这些词必须改写。
@@ -202,6 +244,21 @@ export const COMPLIANCE_PII_REDACTION_FORBIDDEN_PATTERNS: readonly RegExp[] = [
  * OUTBOUND —— 指向第三方 / 官方来源平台的站外引导,是合规白名单文案本身。
  *
  * 以上两类按**前向回看窗口**判定(见 COMPLIANCE_EXEMPTION_LOOKBEHIND)。
+ *
+ * NEGATED_ADJACENT —— 否定前缀**紧贴**命中词(命中位置之前的文本以它结尾),不走回看窗口。
+ *
+ * 为什么要第三类:回看窗口对两字否定词一律不安全,而真实的边界声明句偏偏需要它们。
+ * 2026-09-20 的实例是稿 28-jobfair-enhanced.html 的参展企业边界原话
+ * 「本机不代收简历,也不在平台内投递」—— 否定词是「不在」,窗口式判定要么接不住这句话
+ * (于是一条如实的否定声明被判违规),要么把「不在」收进 NEGATED 而顺带放行
+ * 「不在校学生也能平台内投递」这类句式。
+ *
+ * 紧贴判定同时解决两边:否定词必须**直接管住**那个短语,中间插一个字都不再豁免。
+ * 反例对照钉在 scripts/verify-compliance-copy.mjs 的 probe 里长期跑:
+ * 「不在乎学历门槛,一键投递到企业」「不在校学生也能平台内投递」都必须判违规。
+ *
+ * 新增本类条目前先问一句:这个前缀紧贴禁词时,有没有可能构成一句**承诺**?
+ * 能想出反例就不要加,改用整句改写。
  */
 export const COMPLIANCE_EXEMPTION_MARKERS = {
   NEGATED: [
@@ -218,6 +275,7 @@ export const COMPLIANCE_EXEMPTION_MARKERS = {
     '禁止',
     '未取得',
   ],
+  NEGATED_ADJACENT: ['不在'],
   OUTBOUND: ['来源', '外部', '第三方', '官方', '站外'],
 } as const
 

@@ -55,6 +55,9 @@ git rev-parse --short HEAD | tee "$EVIDENCE_ROOT/PS-G0/git-head.log"
 git status --short --branch | tee "$EVIDENCE_ROOT/PS-G0/git-status.log"
 
 pnpm --filter @ai-job-print/api typecheck 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/api-typecheck.log"
+# typecheck 会执行 prisma generate；如果拆开或跳过 typecheck，必须先显式生成客户端，
+# 否则 verify:print-jobs 的模块缺失不是业务失败。
+pnpm --filter @ai-job-print/api exec prisma generate 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/prisma-generate.log"
 pnpm --filter @ai-job-print/api verify:print-scan-first-release 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/verify-print-scan-first-release.log"
 pnpm --filter @ai-job-print/api verify:print-jobs 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/verify-print-jobs.log"
 pnpm --filter terminal-agent typecheck 2>&1 | tee "$EVIDENCE_ROOT/PS-G0/terminal-agent-typecheck.log"
@@ -415,7 +418,19 @@ pnpm --filter terminal-agent agent 2>&1 | Tee-Object (Join-Path $EvidenceRoot "P
 
 恢复：
 
-先在窗口 B 中按 `Ctrl+C` 停止降级 Agent，确认该进程退出后再执行恢复。否则恢复后启动的新 Agent 会因为 `agent.pid` 实例锁仍存在而退出。
+先停止降级 Agent，确认进程退出后再启动服务。进程生命周期锁由 Windows 命名管道释放；POSIX 开发环境使用 Unix 域套接字，残留套接字由启动时探测并清理。`agent.pid` 仅记录启动 PID，残留文件不参与互斥，也不需要删除。启动失败时检查服务状态、命名管道或 Unix 套接字，并保留诊断文件。
+
+Windows 管道名包含 `%ProgramData%\AIJobPrintAgent\instance-id` 中的安装随机标识；标识缺失或无效时 fail-closed。DEVICE 仍 NO-GO，直到真机完成强杀、断电、重启和双开验证。
+
+```powershell
+# 只读取证：不要删除 agent.pid。
+Get-Service | Where-Object { $_.Name -match 'AIJob|aijobprintagent' } | Format-List Name, Status, StartType
+Get-Process | Where-Object { $_.ProcessName -match 'node|WinSW|aijobprint' } | Format-Table Id, ProcessName
+powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\diagnose-production-agent.ps1
+```
+
+不得同时删除 `agent.db`、`agent.token` 或配置文件；清锁后只启动一个 Agent，并保存服务状态、锁内
+PID、清锁时间和重启日志作为现场证据。
 
 ```powershell
 $AgentDataDir = Join-Path $env:PROGRAMDATA "AIJobPrintAgent"
@@ -512,3 +527,6 @@ Mac：只能证明代码、CI、迁移脚本和证据包准备就绪。
 Windows：证明 Terminal Agent、奔图真机、降级恢复、隐私删除和异常恢复。
 未完成 Windows 主机 PS-G3 / PS-G4 前，不得宣称打印扫描商用全闭环完成。
 ```
+
+
+> 2026-09-28 真机-8：单实例互斥由 Windows 命名管道或 POSIX Unix 域套接字持有，进程退出后由操作系统释放（包括强杀、断电后的系统回收）。`agent.pid` 仅写入启动 PID 供诊断，残留文件不阻止启动，也不应手工删除。Windows 管道名包含安装时写入 `%ProgramData%\AIJobPrintAgent\instance-id` 的随机标识；读取不到标识时 fail-closed。现场验证应记录第二实例被拒、强杀后自动启动、双开只有一个成功，以及残留 `agent.pid` 仍能启动。

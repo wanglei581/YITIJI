@@ -140,6 +140,44 @@ if (!page.includes('print_duplex_surcharge') && !page.includes('双面附加')) 
   fail('计费页不得把 print_duplex_surcharge / 双面附加标成价目（双面不计价）')
 }
 
+// M-2（2026-09-18）：对账差异码不得裸着甩给运营。
+//
+// 差异清单里 `DISCREPANCY_LABELS[d.code] ?? d.code` 有回落分支，漏配一个码不会报错，
+// 只会在页面上摆一串英文常量（实际发生过：ONLINE_COLLECTED_PENDING_REFUND 与
+// ORDER_EXTRA_COLLECTION_AFTER_REFUND 随迟到回调退款一起落地，中文没跟上）。
+//
+// 因此**不在门禁里另抄一份码表**：直接从 reconciliation.service.ts 反解出
+// push(discrepancies, 'CODE', …) 的全部取值，逐个要求本页有中文。
+// 后端新增差异码而前端漏配，这条会自己转红。
+const reconciliationSource = readFileSync(
+  join(root, '../../services/api/src/payment/reconciliation.service.ts'),
+  'utf8',
+)
+const emittedCodes = [
+  ...new Set(
+    [...reconciliationSource.matchAll(/push\(\s*discrepancies\s*,\s*'([A-Z_]+)'/g)].map((m) => m[1]),
+  ),
+]
+const labelBlock = page.match(/const DISCREPANCY_LABELS[^{]*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+if (emittedCodes.length < 5) {
+  fail(`未能从 reconciliation.service.ts 反解出差异码（解析到 ${emittedCodes.length} 个），门禁无法判定`)
+} else {
+  const naked = emittedCodes.filter((code) => !new RegExp(`\\b${code}\\s*:\\s*'`).test(labelBlock))
+  if (naked.length > 0) {
+    fail(`对账差异码缺中文标签，会以裸码呈现给运营：${naked.join(', ')}`)
+  } else {
+    pass(`对账差异码全部有中文标签（从服务端源码反解 ${emittedCodes.length} 个，未在门禁内重抄码表）`)
+  }
+  // 本轮明确要求的两个码必须真的在反解结果里，避免正则失效后上面那条空转成绿。
+  for (const required of ['ONLINE_COLLECTED_PENDING_REFUND', 'ORDER_EXTRA_COLLECTION_AFTER_REFUND']) {
+    if (emittedCodes.includes(required)) {
+      pass(`反解到 ${required}（迟到回调待退 / 退款后额外收款）`)
+    } else {
+      fail(`未从 reconciliation.service.ts 反解到 ${required}，上面的覆盖断言可能已空转`)
+    }
+  }
+}
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — Admin 计费/对账 UI 守卫未通过\n`)
   process.exit(1)

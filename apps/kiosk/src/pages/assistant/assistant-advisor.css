@@ -454,3 +454,37 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 稿 05 首屏层级（2026-09-24）：必须留在本文件末尾 —— 它是 /assistant 最后生效的一层，
+ * 写在 shell / batch8 里会被这里之前的同权重规则覆盖。1080 首屏要让发送键落在 .qx-navbar 之上。 */
+.kassist.kassist-lightflow { padding-top: 4px; }
+.kassist.kassist-lightflow .assistant-workbench { gap: 6px; }
+.kassist.kassist-lightflow .assistant-conversation { min-height: 0; }
+.kassist.kassist-lightflow .assistant-transcript { min-height: 80px; }
+.kassist.kassist-lightflow .assistant-ai-tools-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 799px) {
+  .kassist.kassist-lightflow { padding-top: 8px; }
+  .kassist.kassist-lightflow .assistant-task-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .kassist.kassist-lightflow .assistant-task { min-height: 0; padding: 12px; }
+  .kassist.kassist-lightflow .assistant-task-copy small { display: none; }
+  .kassist.kassist-lightflow .assistant-ai-tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}
+/* 390 竖屏：头像 + 顶部语音键曾把问候与免责挤成一两个字一行。顶部语音键在窄屏收起 ——
+ * 输入区的「按住说话」与 .assistant-voice-trigger 仍在，语音能力可达性不变。 */
+@media (max-width: 520px) {
+  .kassist.kassist-lightflow .assistant-prototype-head { align-items: flex-start; gap: 12px; }
+  .kassist.kassist-lightflow .assistant-prototype-head > div { flex: 1 1 0; min-width: 0; }
+  .kassist.kassist-lightflow .assistant-prototype-head > button { display: none; }
+  .kassist.kassist-lightflow .assistant-prototype-avatar { width: 48px; height: 48px; font-size: 24px; }
+  .kassist.kassist-lightflow .assistant-prototype-head h2 { font-size: 24px; }
+  /* 免责原是 flex 胶囊，<b> 与文本节点会被拆成三列、一两个字一行；窄屏改回普通段落流。 */
+  .kassist.kassist-lightflow .assistant-prototype-head p.assistant-advisor-disclosure { display: block; border-radius: 12px; }
+}
+/* 1080 舞台四列工具卡：原 64px 图标 + 16px 间距把标题挤成「AI 自我介/绍生成」断词；顶部语音键也被挤成两行。 */
+@media (min-width: 800px) {
+  .kassist.kassist-lightflow .assistant-prototype-head > button { flex: 0 0 auto; white-space: nowrap; }
+  .kassist.kassist-lightflow .assistant-ai-tool-card { gap: 10px; padding: 14px; }
+  .kassist.kassist-lightflow .aat-icon { width: 44px; height: 44px; border-radius: 12px; }
+  .kassist.kassist-lightflow .aat-icon svg { width: 24px; height: 24px; }
+  .kassist.kassist-lightflow .aat-body strong { font-size: 17px; }
+}

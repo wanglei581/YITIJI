@@ -61,10 +61,13 @@ export function VenueGuideTab({
   fairId,
   venueDefault,
   companies,
+  readOnly = false,
 }: {
   fairId: string
   venueDefault: string
   companies: FairCompanyView[]
+  /** 托管关闭（我们云上默认）时只读：只看布局，不配置、不保存、不删除（点了也只会 403）。 */
+  readOnly?: boolean
 }) {
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   /** null = 尚未配置(空态);非 null = 编辑中的配置 */
@@ -169,15 +172,21 @@ export function VenueGuideTab({
         <MapIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
         <div>
           <p className="text-base font-semibold text-neutral-700">该招聘会尚未配置场馆导览</p>
-          <p className="mt-1 text-xs text-neutral-400">配置展厅布局、企业展位与设施点位后,一体机详情页将显示「场馆导览」</p>
+          <p className="mt-1 text-xs text-neutral-400">
+            {readOnly
+              ? '当前只读：场馆导览不能新建或编辑，原因见页面顶部说明。'
+              : '配置展厅布局、企业展位与设施点位后,一体机详情页将显示「场馆导览」'}
+          </p>
         </div>
-        <button
-          onClick={() => setDraft({ venueName: venueDefault, halls: [{ ...EMPTY_HALL, hallCode: 'A', hallName: 'A 厅' }], facilities: [] })}
-          className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-        >
-          <PlusIcon className="h-4 w-4" />
-          开始配置
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setDraft({ venueName: venueDefault, halls: [{ ...EMPTY_HALL, hallCode: 'A', hallName: 'A 厅' }], facilities: [] })}
+            className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          >
+            <PlusIcon className="h-4 w-4" />
+            开始配置
+          </button>
+        )}
       </Card>
     )
   }
@@ -221,94 +230,110 @@ export function VenueGuideTab({
         </div>
       </Card>
 
-      <Card className="p-4">
-        <Field label="场馆名称" required>
-          <input className={inputCls} value={draft.venueName} onChange={(e) => setDraft((d) => d ? { ...d, venueName: e.target.value } : d)} />
-        </Field>
-      </Card>
-
-      {/* 展厅列表 */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-neutral-700">展厅({draft.halls.length})</p>
-        <button
-          onClick={() => {
-            const nextCode = String.fromCharCode(65 + draft.halls.length) // A,B,C...
-            setDraft((d) => d ? { ...d, halls: [...d.halls, { ...EMPTY_HALL, hallCode: nextCode, hallName: `${nextCode} 厅` }] } : d)
-            setEditingHall(draft.halls.length)
-          }}
-          className="flex items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
-        >
-          <PlusIcon className="h-3.5 w-3.5" />
-          添加展厅
-        </button>
-      </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {draft.halls.map((h, i) => (
-          <Card key={i} className="p-4">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-white ${HALL_COLORS[i % HALL_COLORS.length]}`}>
-                  {h.hallCode.toUpperCase() || '?'}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-neutral-800">{h.hallName || '(未命名)'}</p>
-                  <p className="text-xs text-neutral-400">{h.industryCategory || '未设置行业'} · {h.companies.length} 家企业{h.boothRange ? ` · ${h.boothRange}` : ''}</p>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <button onClick={() => setEditingHall(i)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">编辑</button>
-                <TwoStepDelete onConfirm={() => setDraft((d) => d ? { ...d, halls: d.halls.filter((_, idx) => idx !== i) } : d)} />
-              </div>
-            </div>
+      {readOnly ? (
+        <Card className="space-y-2 p-4 text-sm text-neutral-600">
+          <p>场馆：{draft.venueName || '—'}</p>
+          <ul className="space-y-1 text-xs text-neutral-500">
+            {draft.halls.map((h, i) => (
+              <li key={i}>
+                {h.hallCode.toUpperCase()} · {h.hallName}（{h.companies.length} 家企业{h.boothRange ? ` · 展位 ${h.boothRange}` : ''}）
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-neutral-400">当前只读：场馆导览不能编辑、保存或删除，原因见页面顶部说明。</p>
+        </Card>
+      ) : (
+        <>
+          <Card className="p-4">
+            <Field label="场馆名称" required>
+              <input className={inputCls} value={draft.venueName} onChange={(e) => setDraft((d) => d ? { ...d, venueName: e.target.value } : d)} />
+            </Field>
           </Card>
-        ))}
-      </div>
 
-      {/* 设施点位 */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-neutral-700">设施点位({draft.facilities.length})</p>
-        <button
-          onClick={() => setDraft((d) => d ? { ...d, facilities: [...d.facilities, { type: 'entrance', name: '入口', locationLabel: '', relatedHallCode: '' } as SaveVenueFacilityInput] } : d)}
-          className="flex items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
-        >
-          <PlusIcon className="h-3.5 w-3.5" />
-          添加设施
-        </button>
-      </div>
-      <Card className="divide-y divide-neutral-900/[0.06] p-0">
-        {draft.facilities.length === 0 && (
-          <p className="py-6 text-center text-xs text-neutral-400">暂无设施点位(入口/服务台/打印点/咨询区)</p>
-        )}
-        {draft.facilities.map((f, i) => (
-          <div key={i} className="grid grid-cols-1 gap-2 px-4 py-3 md:grid-cols-[140px_1fr_1fr_90px_auto] md:items-center">
-            <select
-              className={inputCls}
-              value={f.type}
-              onChange={(e) => setDraft((d) => d ? { ...d, facilities: d.facilities.map((x, idx) => idx === i ? { ...x, type: e.target.value as FairVenueFacilityType } : x) } : d)}
+          {/* 展厅列表 */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-neutral-700">展厅({draft.halls.length})</p>
+            <button
+              onClick={() => {
+                const nextCode = String.fromCharCode(65 + draft.halls.length) // A,B,C...
+                setDraft((d) => d ? { ...d, halls: [...d.halls, { ...EMPTY_HALL, hallCode: nextCode, hallName: `${nextCode} 厅` }] } : d)
+                setEditingHall(draft.halls.length)
+              }}
+              className="flex items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
             >
-              {FACILITY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <input className={inputCls} placeholder="名称,如 主入口" value={f.name} onChange={(e) => setDraft((d) => d ? { ...d, facilities: d.facilities.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x) } : d)} />
-            <input className={inputCls} placeholder="位置说明,如 南门入口" value={f.locationLabel ?? ''} onChange={(e) => setDraft((d) => d ? { ...d, facilities: d.facilities.map((x, idx) => idx === i ? { ...x, locationLabel: e.target.value } : x) } : d)} />
-            <input className={inputCls} placeholder="关联厅" value={f.relatedHallCode ?? ''} onChange={(e) => setDraft((d) => d ? { ...d, facilities: d.facilities.map((x, idx) => idx === i ? { ...x, relatedHallCode: e.target.value } : x) } : d)} />
-            <TwoStepDelete onConfirm={() => setDraft((d) => d ? { ...d, facilities: d.facilities.filter((_, idx) => idx !== i) } : d)} />
+              <PlusIcon className="h-3.5 w-3.5" />
+              添加展厅
+            </button>
           </div>
-        ))}
-      </Card>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {draft.halls.map((h, i) => (
+              <Card key={i} className="p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-white ${HALL_COLORS[i % HALL_COLORS.length]}`}>
+                      {h.hallCode.toUpperCase() || '?'}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-neutral-800">{h.hallName || '(未命名)'}</p>
+                      <p className="text-xs text-neutral-400">{h.industryCategory || '未设置行业'} · {h.companies.length} 家企业{h.boothRange ? ` · ${h.boothRange}` : ''}</p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button onClick={() => setEditingHall(i)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">编辑</button>
+                    <TwoStepDelete onConfirm={() => setDraft((d) => d ? { ...d, halls: d.halls.filter((_, idx) => idx !== i) } : d)} />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
 
-      {error && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{error}</p>}
-      {savedAt && !error && <p className="rounded-lg bg-success-bg px-3 py-2 text-xs text-success-fg">已保存,一体机刷新后即可看到最新导览。</p>}
+          {/* 设施点位 */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-neutral-700">设施点位({draft.facilities.length})</p>
+            <button
+              onClick={() => setDraft((d) => d ? { ...d, facilities: [...d.facilities, { type: 'entrance', name: '入口', locationLabel: '', relatedHallCode: '' } as SaveVenueFacilityInput] } : d)}
+              className="flex items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+              添加设施
+            </button>
+          </div>
+          <Card className="divide-y divide-neutral-900/[0.06] p-0">
+            {draft.facilities.length === 0 && (
+              <p className="py-6 text-center text-xs text-neutral-400">暂无设施点位(入口/服务台/打印点/咨询区)</p>
+            )}
+            {draft.facilities.map((f, i) => (
+              <div key={i} className="grid grid-cols-1 gap-2 px-4 py-3 md:grid-cols-[140px_1fr_1fr_90px_auto] md:items-center">
+                <select
+                  className={inputCls}
+                  value={f.type}
+                  onChange={(e) => setDraft((d) => d ? { ...d, facilities: d.facilities.map((x, idx) => idx === i ? { ...x, type: e.target.value as FairVenueFacilityType } : x) } : d)}
+                >
+                  {FACILITY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+                <input className={inputCls} placeholder="名称,如 主入口" value={f.name} onChange={(e) => setDraft((d) => d ? { ...d, facilities: d.facilities.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x) } : d)} />
+                <input className={inputCls} placeholder="位置说明,如 南门入口" value={f.locationLabel ?? ''} onChange={(e) => setDraft((d) => d ? { ...d, facilities: d.facilities.map((x, idx) => idx === i ? { ...x, locationLabel: e.target.value } : x) } : d)} />
+                <input className={inputCls} placeholder="关联厅" value={f.relatedHallCode ?? ''} onChange={(e) => setDraft((d) => d ? { ...d, facilities: d.facilities.map((x, idx) => idx === i ? { ...x, relatedHallCode: e.target.value } : x) } : d)} />
+                <TwoStepDelete onConfirm={() => setDraft((d) => d ? { ...d, facilities: d.facilities.filter((_, idx) => idx !== i) } : d)} />
+              </div>
+            ))}
+          </Card>
 
-      <div className="flex items-center justify-between">
-        <TwoStepDelete label="删除整个导览配置" onConfirm={() => void removeGuide()} />
-        <button
-          onClick={() => void save()}
-          disabled={saving || !draft.venueName.trim()}
-          className="rounded-lg bg-primary-600 px-5 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-        >
-          {saving ? '保存中…' : '保存导览配置'}
-        </button>
-      </div>
+          {error && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{error}</p>}
+          {savedAt && !error && <p className="rounded-lg bg-success-bg px-3 py-2 text-xs text-success-fg">已保存,一体机刷新后即可看到最新导览。</p>}
+
+          <div className="flex items-center justify-between">
+            <TwoStepDelete label="删除整个导览配置" onConfirm={() => void removeGuide()} />
+            <button
+              onClick={() => void save()}
+              disabled={saving || !draft.venueName.trim()}
+              className="rounded-lg bg-primary-600 px-5 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+            >
+              {saving ? '保存中…' : '保存导览配置'}
+            </button>
+          </div>
+        </>
+      )}
 
       <p className="text-xs text-neutral-400">
         合规说明:场馆导览仅用于会场位置与展区信息展示;企业绑定来自本招聘会参展企业,系统不接收求职者简历,不参与招聘闭环。

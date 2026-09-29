@@ -1,8 +1,10 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
+import { stampAigcPageHeader } from '../../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont as registerCommonCjkFont } from '../../common/pdf/cjk-font'
 import type { CareerPlanPayload } from './llm-career-plan.service'
+import { sanitizeCareerPlanPayload } from './career-plan-payload-safety'
 
 // ============================================================
 // 职业规划建议单 PDF（2E）：专属版式（非面试报告复用——语境与分节不同）。
@@ -32,15 +34,17 @@ export class CareerPlanPdfService {
         interview: string | null
         selfAssessment?: string | null
       }
+      contentId: string
     },
     plan: CareerPlanPayload,
   ): Promise<{ buffer: Buffer; pageCount: number }> {
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
-    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    plan = sanitizeCareerPlanPayload(plan)
+    const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
     applyAigcPdfMetadata(doc, {
       title: 'AI 职业规划建议',
       subject: 'AI 生成的职业方向与技能计划建议，仅供求职者本人参考，不构成就业结果或薪资承诺',
       kind: 'careerplan',
+      contentId: meta.contentId,
     })
     const ok = registerCjkFont(doc)
     if (!ok) {
@@ -77,7 +81,7 @@ export class CareerPlanPdfService {
     title('三、发展方向建议（参考）')
     plan.directions.forEach((d, i) => {
       doc.fontSize(11).fillColor('#1d4ed8').text(`${i + 1}. ${d.title}`, { lineGap: 2 })
-      doc.fontSize(10).fillColor('#374151').text(`   为什么适合：${d.why}`, { lineGap: 2 })
+      doc.fontSize(10).fillColor('#374151').text(`   已有事实的延伸：${d.why}`, { lineGap: 2 })
       doc.fontSize(10).fillColor('#374151').text(`   第一步：${d.firstStep}`, { lineGap: 4 })
     })
 
@@ -87,6 +91,7 @@ export class CareerPlanPdfService {
     title('五、近期行动清单')
     plan.actionChecklist.forEach((a) => doc.fontSize(10.5).fillColor('#374151').text(`□ ${a}`, { lineGap: 4 }))
 
+    stampAigcPageHeader(doc)
     const pageCount = doc.bufferedPageRange().count
     doc.end()
     const buffer = await done

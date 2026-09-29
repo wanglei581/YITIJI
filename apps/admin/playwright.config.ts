@@ -16,6 +16,11 @@ const HOST = '127.0.0.1'
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: /.*\.spec\.ts$/,
+  // 大屏用例归 playwright.screen.config.ts 独占：那边是 VITE_API_MODE=http 构建，
+  // 这边是 mock 包（大屏在 mock 下一个请求都不发）。不排除的话默认 config 会把
+  // tests/e2e/screen/** 一并收进来，在 mock 服务器上跑出与口径无关的红。
+  // 匹配走绝对路径 + minimatch（Playwright 会自动补 `**/` 前缀），故写全相对段。
+  testIgnore: '**/tests/e2e/screen/**',
   outputDir: '../../test-results/admin-e2e',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

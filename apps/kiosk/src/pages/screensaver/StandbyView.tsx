@@ -1,7 +1,8 @@
 import type { KioskScreensaverItem } from '@ai-job-print/shared'
 import type { StandbyPhase } from './standbyModel'
 
-const CHIPS = ['材料打印', '简历服务', '岗位信息', '招聘会信息'] as const
+/** 稿 00：胶囊不是按钮，整屏只有一处唤醒。 */
+const CHIPS = ['改简历', '练面试', '打印扫描', '查政策'] as const
 
 export function StandbyView({
   phase,
@@ -12,6 +13,7 @@ export function StandbyView({
   mediaUrl,
   loopVideo,
   onAdvance,
+  onMediaError,
   onWake,
 }: {
   phase: StandbyPhase
@@ -22,6 +24,8 @@ export function StandbyView({
   mediaUrl: string | null
   loopVideo: boolean
   onAdvance: () => void
+  /** 素材本身加载失败（不是播完）：由页面记下并跳过，全部失败时显示「暂无宣传内容」。 */
+  onMediaError: () => void
   onWake: () => void
 }) {
   const playing = phase === 'playing' && current && mediaUrl
@@ -55,12 +59,12 @@ export function StandbyView({
             playsInline
             loop={loopVideo}
             onEnded={() => { if (!loopVideo) onAdvance() }}
-            onError={() => onAdvance()}
+            onError={() => onMediaError()}
             onCanPlay={(e) => { void e.currentTarget.play().catch(() => onAdvance()) }}
           />
         ) : null}
         {playing && current.type === 'image' ? (
-          <img key={current.id} src={mediaUrl} alt="" onError={() => onAdvance()} />
+          <img key={current.id} src={mediaUrl} alt="" onError={() => onMediaError()} />
         ) : null}
         {!playing ? (
           <div className="sb-fallback" data-testid="standby-material-fallback">
@@ -74,27 +78,24 @@ export function StandbyView({
         ) : null}
       </section>
 
-      <div className="sb-chips" aria-label="可进入的服务类别">
+      <div className="sb-chips" aria-label="进门后可办">
+        <span className="sb-chips-lead">进门后可办</span>
         {CHIPS.map((chip) => <span key={chip} className="sb-chip">{chip}</span>)}
       </div>
 
       <section className="sb-cta-zone" aria-hidden="true">
+        <div className="sb-halo" />
+        <div className="sb-halo sb-halo-b" />
         <div className="screensaver-wake-prompt sb-cta">
           <strong>轻触屏幕，开始办事</strong>
-          <span>触摸屏幕开始使用 · 服务状态进入具体页面后核验</span>
+          <span>AI 帮你改简历、练面试；还能打印、扫描材料</span>
         </div>
       </section>
 
       <footer className="sb-bottom">
-        <div className="sb-truth" data-disclaimer="true">
-          <span>不预报设备状态</span>
-          <span>不展示虚构数量</span>
-          <span>异常会如实提示</span>
-        </div>
-        <div className="sb-boundary">
-          本机提供求职材料服务与第三方信息入口：<strong>不代收简历 · 不替你投递</strong>
-          <br />
-          公共终端，结束办理后请清空本次资料
+        <div className="sb-boundary" data-disclaimer="true">
+          <strong>本机不代收简历 · 不替你投递</strong>
+          {' · AI 内容会标明 · 闲置后自动退出'}
         </div>
       </footer>
 

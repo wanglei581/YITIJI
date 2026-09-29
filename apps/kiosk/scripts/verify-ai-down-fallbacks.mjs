@@ -34,6 +34,7 @@ const files = {
   source: kiosk('src/pages/resume/ResumeSourcePage.tsx'),
   report: kiosk('src/pages/resume/ResumeReportPage.tsx'),
   reportExits: kiosk('src/pages/resume/components/ResumeDiagnosisFailExits.tsx'),
+  reportCss: kiosk('src/pages/resume/resume-report-qx.css'),
   generate: kiosk('src/pages/resume/ResumeGeneratePage.tsx'),
   interviewSetup: kiosk('src/pages/interview/InterviewSetupPage.tsx'),
   careerPlan: kiosk('src/pages/resume/CareerPlanPage.tsx'),
@@ -113,15 +114,24 @@ must('source', /mimeType: uploadedFile\.mimeType/, '上传页必须把 mimeType 
 must('report', /if \(!success\)/, '报告页必须保留诊断失败分支')
 must('report', /<ResumeDiagnosisFailExits/, '诊断失败分支必须挂上非 AI 出路组件')
 
+// 2026-09-28 商用收口 P0-5：上传的简历是本人原件（resume_upload / resume_scan · original）。
+// 生产强制 PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒 PRINT_PII_SCAN_REQUIRED，
+// 而检查只在打印台材料检查里做 —— 所以打印原件改走 /print/material-check，不再直达 /print/confirm。
+// 原先「必须给出 makePrintParams 默认参数」一条随之换掉：去材料检查不带参数（与打印上传页同一种写法，
+// 参数在检查后的预览步里选），它要守的「不是空 onClick、真的进打印链」由下面几条接住，
+// 另加两条：必须带上传结果的 fileId（材料检查按它建任务），必须先整份写打印材料会话。
 mustHandler('reportExits', 'printOriginal', [
   [/if \(!file\?\.fileUrl\) return/, '必须在没有打印链接时提前返回，不给一个点了没反应的按钮'],
-  ["navigate('/print/confirm'", '打印原件必须走既有打印链路 /print/confirm'],
-  [/fileUrl: file\.fileUrl/, '必须把真实 HMAC content URL 交给打印链路'],
-  ['makePrintParams', '必须给出真实打印参数，不构造裸对象'],
+  [/if \(!fileId\) return/, '必须在没有 fileId 时提前返回：材料检查按 fileId 建任务，没有它只会落到空态'],
+  [/fileId,\s*\n\s*fileUrl: file\.fileUrl/, '交给打印链的文件必须同时带上传结果的 fileId 与真实 HMAC content URL'],
+  [/savePrintMaterialSession\(\{ file: printFile, source: 'resume' \}\)/, '必须先整份写打印材料会话：旧地址会重定向，重定向不转发路由 state，打印台只认会话'],
+  ["navigate('/print/material-check'", '打印原件必须走打印台材料检查：原件没做完隐私检查，直达报价页会在建单时被拒'],
 ])
+mustNot('reportExits', "navigate('/print/confirm'", '打印原件不得直达报价确认页（生产隐私闸门会拒单）')
+must('report', /fileId=\{typeof state\.fileId === 'string' \? state\.fileId : undefined\}/, '报告页必须把上传结果的 fileId 交给诊断失败出路（它在解析页 state 顶层，失败时随整份 state 转过来）')
 
-// 其余三条出路（原型 09 的 ai-down 支线：去打印 / 看岗位 / 看招聘会）必须真的通到路由。
-for (const route of ['/print-scan', '/jobs', '/job-fairs']) {
+// 其余三条出路（2.0 稿 22 托管 a 的 ai-down 支线：去打印 / 查政策 / 本机构官方渠道）必须真的通到路由。
+for (const route of ['/print-scan', '/policy-service', '/official-channels']) {
   must('reportExits', `navigate('${route}')`, `诊断失败态必须保留通往 ${route} 的非 AI 出路`)
 }
 
@@ -132,10 +142,17 @@ must('reportExits', /id="resume-fail-print-reason"/, '置灰原因必须是常�
 mustNot('reportExits', /<button[^>]*\sdisabled(\s|=|>)/, '禁止对置灰按钮使用原生 disabled')
 
 // E：触控。1080×1920 竖屏，主操作 ≥56px。
+// 2026-09-24 出路区并入稿 22 的青序 `.rrp-row`（高度写在 resume-report-qx.css），
+// 不再逐个挂 Tailwind `min-h-[56px]`；判据换成「四条出路都是 rrp-row」+「rrp-row 的 min-height ≥56px」。
 assert(
-  (files.reportExits.match(/min-h-\[56px\]/g) ?? []).length >= 4,
-  'reportExits: 每条出路按钮都必须 ≥56px（min-h-[56px]）',
+  (files.reportExits.match(/className="rrp-row"/g) ?? []).length >= 4,
+  'reportExits: 四条出路都必须用报告页的 rrp-row 行（可点高度由页面样式统一给）',
 )
+{
+  const rowRule = /\.rrp-row\s*\{([^}]*)\}/.exec(files.reportCss)?.[1] ?? ''
+  const minHeight = Number(/min-height:\s*(\d+)px/.exec(rowRule)?.[1] ?? 0)
+  assert(minHeight >= 56, `resume-report-qx.css: .rrp-row 的 min-height 必须 ≥56px（实测 ${minHeight}px）`)
+}
 
 // C：不伪造 —— 诊断没跑出来就不许给任何结论。
 must('reportExits', '不拿通用建议顶替', '失败态必须写明不给结论，不用通用建议冒充诊断')

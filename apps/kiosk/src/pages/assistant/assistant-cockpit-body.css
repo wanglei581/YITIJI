@@ -1,0 +1,780 @@
+/* ============================================================
+ * assistant-cockpit-body.css — 稿 05-ai-cockpit 的主体分区、输入坞与边界说明
+ *
+ * 与 assistant-cockpit.css 同一层（紧随其后导入），按 CLAUDE.md §8 从那份文件拆出：
+ * 那份管页壳、舱面与能力仪表带，这份管舱面以下的编号分区、对话、四个非 AI 入口与输入坞。
+ * 只用青序令牌（--qx-*），不写裸 hex；动效 keyframes 定义在 assistant-cockpit.css。
+ * ============================================================ */
+
+/* ══ 主体分区 ═══════════════════════════════════════════════════ */
+.kassist.kassist-lightflow .assistant-cockpit-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  padding: 0 var(--ck-gutter) 6px;
+}
+/* 主体是定高滚动区：分区与分区内各块一律按自然高度排，不许被 flex 压扁（压扁会叠字）。 */
+.kassist.kassist-lightflow .assistant-cockpit-body > section,
+.kassist.kassist-lightflow .assistant-cockpit-body > section > *,
+.kassist.kassist-lightflow .assistant-transcript > * { flex-shrink: 0; }
+.kassist.kassist-lightflow .assistant-cockpit-body > section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  animation: kassist-cockpit-enter 260ms var(--ck-ease) both;
+}
+.kassist.kassist-lightflow .assistant-sec-label { display: flex; align-items: baseline; gap: 16px; min-width: 0; }
+.kassist.kassist-lightflow .assistant-sec-no {
+  flex: none;
+  color: var(--qx-teal-d);
+  font-family: var(--qx-serif);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+.kassist.kassist-lightflow .assistant-sec-label h2 {
+  margin: 0;
+  color: var(--qx-ink);
+  font-family: var(--qx-sans);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.kassist.kassist-lightflow .assistant-sec-label h2:focus:not(:focus-visible) { outline: none; }
+.kassist.kassist-lightflow .assistant-sec-hint {
+  margin-left: auto;
+  color: var(--qx-ink-3);
+  font-size: 18px;
+  text-align: right;
+}
+
+/* 咨询主题：一排五格。选中带左侧光条（240ms 由上向下长出）。 */
+.kassist.kassist-lightflow .assistant-task-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, .78fr);
+  gap: 12px;
+}
+.kassist.kassist-lightflow :is(.assistant-task, .assistant-direct-question) {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: auto;
+  min-width: 0;
+  min-height: 84px;
+  padding: 12px 14px;
+  overflow: hidden;
+  border: 1px solid var(--qx-line);
+  border-radius: 20px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  box-shadow: none;
+  text-align: left;
+}
+.kassist.kassist-lightflow .assistant-task[data-task-id] { border-left: 1px solid var(--qx-line); }
+.kassist.kassist-lightflow .assistant-direct-question { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; border-style: dashed; }
+.kassist.kassist-lightflow .assistant-task-icon {
+  display: grid;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--qx-teal-d);
+  background: var(--qx-teal-soft);
+}
+.kassist.kassist-lightflow .assistant-task-icon svg { width: 24px; height: 24px; }
+.kassist.kassist-lightflow .assistant-task[data-task-id='interview'] .assistant-task-icon,
+.kassist.kassist-lightflow .assistant-task[data-task-id='jobs'] .assistant-task-icon { color: var(--qx-slate-d); background: var(--qx-slate-soft); }
+.kassist.kassist-lightflow .assistant-task[data-task-id='workplace'] .assistant-task-icon { color: var(--qx-wheat-d); background: var(--qx-wheat-soft); }
+.kassist.kassist-lightflow .assistant-task-copy { display: grid; gap: 3px; min-width: 0; }
+.kassist.kassist-lightflow .assistant-task[data-task-id] .assistant-task-copy strong,
+.kassist.kassist-lightflow .assistant-direct-question strong {
+  display: block;
+  color: var(--qx-ink);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.kassist.kassist-lightflow .assistant-task-copy small,
+.kassist.kassist-lightflow .assistant-direct-question small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--qx-ink-3);
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.kassist.kassist-lightflow :is(.assistant-task, .assistant-direct-question)[aria-pressed='true'] {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal-soft);
+  box-shadow: none;
+}
+.kassist.kassist-lightflow :is(.assistant-task, .assistant-direct-question)[aria-pressed='true']::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 6px;
+  border-radius: 0 6px 6px 0;
+  background: var(--qx-teal);
+  transform-origin: top;
+  animation: kassist-cockpit-bar 240ms var(--ck-ease) both;
+}
+
+/* 常见问题：整行可点，点完落进输入框。 */
+.kassist.kassist-lightflow .assistant-quick-questions {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 12px;
+  margin: 0;
+  overflow: visible;
+}
+.kassist.kassist-lightflow .assistant-quick-questions button {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  min-height: 84px;
+  padding: 0 24px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  box-shadow: none;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+}
+.kassist.kassist-lightflow .assistant-quick-questions button:active { border-color: var(--qx-teal); transform: scale(.99); }
+.kassist.kassist-lightflow .assistant-quick-icon {
+  display: grid;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 15px;
+  color: var(--qx-teal-d);
+  background: var(--qx-paper);
+}
+.kassist.kassist-lightflow .assistant-quick-icon svg { width: 26px; height: 26px; }
+.kassist.kassist-lightflow .assistant-quick-text { flex: 1; min-width: 0; }
+.kassist.kassist-lightflow .assistant-quick-go {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--qx-teal-d);
+  font-size: 18px;
+  font-weight: 600;
+}
+.kassist.kassist-lightflow .assistant-quick-go svg { width: 20px; height: 20px; }
+
+/* composer 态：将要发送的内容（只读预览，真正的输入在底部输入坞）。 */
+.kassist.kassist-lightflow .assistant-draft-card {
+  padding: 18px 22px;
+  border: 1.5px dashed var(--qx-teal-line);
+  border-radius: 24px;
+  background: var(--qx-surface);
+}
+.kassist.kassist-lightflow .assistant-draft-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--qx-teal-d);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.kassist.kassist-lightflow .assistant-draft-head svg { width: 22px; height: 22px; }
+.kassist.kassist-lightflow .assistant-draft-text {
+  display: -webkit-box;
+  margin: 8px 0 0;
+  overflow: hidden;
+  color: var(--qx-ink);
+  font-size: 22px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.kassist.kassist-lightflow .assistant-draft-note { margin: 8px 0 0; color: var(--qx-ink-3); font-size: 16px; line-height: 1.5; }
+
+/* ── 对话 ─────────────────────────────────────────────────────── */
+.kassist.kassist-lightflow .assistant-conversation { min-height: 0; }
+.kassist.kassist-lightflow .assistant-context-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.kassist.kassist-lightflow .assistant-context-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  color: var(--qx-slate-d);
+  background: var(--qx-slate-soft);
+  font-size: 17px;
+  font-weight: 700;
+}
+.kassist.kassist-lightflow .assistant-context-chip {
+  width: auto;
+  min-height: 48px;
+  justify-content: center;
+  padding: 0 18px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 14px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  font-size: 17px;
+  font-weight: 600;
+}
+.kassist.kassist-lightflow .assistant-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: none;
+}
+.kassist.kassist-lightflow .assistant-message { display: flex; align-items: flex-start; gap: 14px; max-width: 100%; }
+.kassist.kassist-lightflow .assistant-message--user { justify-content: flex-end; align-self: stretch; }
+.kassist.kassist-lightflow .assistant-message-avatar {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border: 1px solid var(--qx-line);
+  border-radius: 16px;
+  background: var(--qx-paper);
+}
+.kassist.kassist-lightflow .assistant-message-bubble {
+  max-width: min(100%, 820px);
+  padding: 18px 22px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  box-shadow: none;
+}
+.kassist.kassist-lightflow .assistant-message--user .assistant-message-bubble {
+  border-color: var(--qx-line-2);
+  color: var(--qx-ink);
+  background: var(--qx-paper);
+}
+.kassist.kassist-lightflow .assistant-message-who {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--qx-ink-3);
+  font-size: 16px;
+  font-weight: 700;
+}
+.kassist.kassist-lightflow .assistant-message-bubble p { margin: 0; font-size: 22px; line-height: 1.55; overflow-wrap: anywhere; }
+.kassist.kassist-lightflow .assistant-message-bubble strong { display: block; margin-bottom: 8px; font-size: 22px; font-weight: 700; }
+.kassist.kassist-lightflow .assistant-message[data-message-kind='ai'] .assistant-message-bubble { border-color: var(--qx-teal-line); }
+.kassist.kassist-lightflow .assistant-message-provider {
+  display: block;
+  margin-top: 10px;
+  color: var(--qx-ink-3);
+  font-size: 15px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+.kassist.kassist-lightflow .assistant-message-bubble--not-ai {
+  border: 1px solid color-mix(in srgb, var(--qx-wheat) 36%, transparent);
+  color: var(--qx-ink);
+  background: var(--qx-wheat-soft);
+}
+.kassist.kassist-lightflow .assistant-message-bubble--not-ai strong { color: var(--qx-wheat-d); }
+.kassist.kassist-lightflow .assistant-message-bubble--not-ai p { font-size: 19px; color: var(--qx-ink-2); }
+.kassist.kassist-lightflow .assistant-message-bubble--error {
+  border: 1px solid var(--qx-cinnabar-line);
+  color: var(--qx-ink);
+  background: var(--qx-cinnabar-soft);
+}
+.kassist.kassist-lightflow .assistant-message-bubble--error strong { color: var(--qx-cinnabar-d); }
+
+/* 来源读数：providerLabel / aiGenerated 两行。 */
+.kassist.kassist-lightflow .assistant-provenance {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 24px;
+  margin: 14px 0 0;
+  font-size: 18px;
+  line-height: 1.5;
+}
+.kassist.kassist-lightflow .assistant-provenance > div { display: contents; }
+.kassist.kassist-lightflow .assistant-provenance dt { color: var(--qx-ink-3); font-family: var(--qx-mono); font-size: 16px; }
+.kassist.kassist-lightflow .assistant-provenance dd { margin: 0; color: var(--qx-ink); font-weight: 600; }
+.kassist.kassist-lightflow .assistant-provenance dd.assistant-message-provider { margin: 0; color: var(--qx-ink); font-size: 18px; }
+.kassist.kassist-lightflow .assistant-gate-note { display: block; margin: 10px 0 0; color: var(--qx-ink-2); font-size: 16px; line-height: 1.55; }
+.kassist.kassist-lightflow .assistant-gate-note code {
+  padding: 1px 7px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 7px;
+  background: var(--qx-paper);
+  font-family: var(--qx-mono);
+}
+
+/* submitting：只说「在等」。无百分比、无阶段、无预计时间。 */
+.kassist.kassist-lightflow .assistant-ai-status { margin: 0; }
+.kassist.kassist-lightflow .assistant-thinking {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 20px 26px;
+  border: 1.5px dashed var(--qx-line-2);
+  border-radius: 28px;
+  background: var(--qx-surface);
+  box-shadow: none;
+}
+.kassist.kassist-lightflow .assistant-thinking-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--qx-line-2);
+  color: var(--qx-ink-2);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.kassist.kassist-lightflow .assistant-thinking-dots { display: inline-flex; flex: none; gap: 9px; }
+.kassist.kassist-lightflow .assistant-thinking-dots i {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--qx-teal);
+  animation: kassist-cockpit-dot 1200ms ease-in-out infinite;
+}
+.kassist.kassist-lightflow .assistant-thinking-dots i:nth-child(2) { animation-delay: 160ms; }
+.kassist.kassist-lightflow .assistant-thinking-dots i:nth-child(3) { animation-delay: 320ms; }
+.kassist.kassist-lightflow .assistant-thinking-slot {
+  margin: 0;
+  padding: 18px 24px;
+  color: var(--qx-ink-3);
+  font-size: 19px;
+  line-height: 1.55;
+  text-align: center;
+}
+.kassist.kassist-lightflow .assistant-thinking .assistant-provenance { margin-top: 0; padding-top: 12px; border-top: 1px dashed var(--qx-line-2); }
+
+.kassist.kassist-lightflow .assistant-ai-idle { margin: 0; color: var(--qx-ink-3); font-size: 18px; line-height: 1.6; }
+.kassist.kassist-lightflow .assistant-ai-status .kiosk-ai-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  color: var(--qx-ink-2);
+  font-size: 17px;
+  line-height: 1.6;
+}
+.kassist.kassist-lightflow .assistant-nodo {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 10px 0 0;
+  color: var(--qx-ink-2);
+  font-size: 17px;
+  line-height: 1.5;
+}
+.kassist.kassist-lightflow .assistant-nodo b { flex: none; color: var(--qx-cinnabar-d); font-weight: 700; }
+
+/* 失败 / 非 AI / 未接模型：同一块状态卡，底色按原因换。 */
+.kassist.kassist-lightflow .assistant-ai-status .kiosk-ai-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 22px 26px;
+  border: 1px solid var(--qx-line);
+  border-radius: 28px;
+  background: var(--qx-surface);
+}
+.kassist.kassist-lightflow .assistant-workbench[data-cockpit-state='reply-error'] .assistant-ai-status .kiosk-ai-fallback { border-color: var(--qx-cinnabar-line); background: var(--qx-cinnabar-soft); }
+.kassist.kassist-lightflow .assistant-workbench[data-cockpit-state='reply-not-ai'] .assistant-ai-status .kiosk-ai-fallback { border-color: color-mix(in srgb, var(--qx-wheat) 36%, transparent); background: var(--qx-wheat-soft); }
+.kassist.kassist-lightflow .assistant-workbench[data-cockpit-state='ai-unavailable'] .assistant-ai-status .kiosk-ai-fallback { border-color: color-mix(in srgb, var(--qx-slate) 26%, transparent); background: var(--qx-slate-soft); }
+.kassist.kassist-lightflow .assistant-ai-status .kiosk-ai-fallback__head { display: flex; align-items: center; gap: 12px; margin: 0; font-size: 22px; font-weight: 700; }
+.kassist.kassist-lightflow .assistant-ai-status .kiosk-ai-fallback__reason { margin: 0; color: var(--qx-ink); font-size: 20px; line-height: 1.6; }
+.kassist.kassist-lightflow .assistant-ai-status .kiosk-ai-fallback__path { margin: 0; color: var(--qx-ink-2); font-size: 17px; line-height: 1.6; }
+.kassist.kassist-lightflow .assistant-ai-status .kiosk-ai-fallback__action {
+  align-self: flex-start;
+  min-height: 56px;
+  padding: 0 22px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 16px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.kassist.kassist-lightflow .assistant-turn-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.kassist.kassist-lightflow .assistant-turn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 0 24px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 18px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  font-size: 20px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.kassist.kassist-lightflow .assistant-turn-action svg { width: 22px; height: 22px; }
+.kassist.kassist-lightflow .assistant-turn-action[data-primary] { border-color: transparent; color: var(--qx-emerald); background: var(--qx-deep); }
+.kassist.kassist-lightflow .assistant-turn-action:active { transform: scale(.985); }
+
+.kassist.kassist-lightflow .assistant-summary-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0; }
+.kassist.kassist-lightflow .assistant-summary-save {
+  width: auto;
+  min-height: 56px;
+  padding: 0 22px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 16px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  font-size: 18px;
+}
+.kassist.kassist-lightflow .assistant-summary-reason { flex: 1 1 320px; margin: 0; color: var(--qx-ink-3); font-size: 16px; line-height: 1.5; }
+
+/* ── 可以直接去的地方（路由白名单） ───────────────────────────── */
+.kassist.kassist-lightflow .action-chips { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; }
+.kassist.kassist-lightflow .action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 0 22px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 18px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  box-shadow: none;
+  font-size: 20px;
+  font-weight: 650;
+}
+.kassist.kassist-lightflow .action-chip small { color: var(--qx-ink-3); font-family: var(--qx-mono); font-size: 14px; font-weight: 500; }
+.kassist.kassist-lightflow .action-chip svg { width: 20px; height: 20px; color: var(--qx-teal-d); }
+.kassist.kassist-lightflow .assistant-drop-note { margin: 0; color: var(--qx-ink-3); font-size: 16px; line-height: 1.5; }
+
+/* ── 不经过 AI 也能办：平时一排四格；AI 答不了时 2×2 占主视野 ──────── */
+.kassist.kassist-lightflow .assistant-manual-entries {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+}
+.kassist.kassist-lightflow .assistant-manual-entries[data-variant='full'] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.kassist.kassist-lightflow .assistant-manual-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 14px 18px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  text-align: left;
+  cursor: pointer;
+}
+.kassist.kassist-lightflow .assistant-manual-entry:hover { border-color: var(--qx-teal-line); background: var(--qx-surface); }
+.kassist.kassist-lightflow .assistant-manual-entry:active { border-color: var(--qx-teal); transform: scale(.985); }
+.kassist.kassist-lightflow .assistant-manual-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.kassist.kassist-lightflow .assistant-manual-icon {
+  display: grid;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--qx-teal-d);
+  background: var(--qx-teal-soft);
+}
+.kassist.kassist-lightflow .assistant-manual-entry:nth-child(2) .assistant-manual-icon,
+.kassist.kassist-lightflow .assistant-manual-entry:nth-child(3) .assistant-manual-icon { color: var(--qx-slate-d); background: var(--qx-slate-soft); }
+.kassist.kassist-lightflow .assistant-manual-icon svg { width: 24px; height: 24px; }
+.kassist.kassist-lightflow .assistant-manual-top strong { flex: 1; min-width: 0; font-size: 21px; font-weight: 700; line-height: 1.3; }
+.kassist.kassist-lightflow .assistant-manual-top > svg { flex: none; width: 22px; height: 22px; color: var(--qx-teal-d); }
+.kassist.kassist-lightflow .assistant-manual-entry small { color: var(--qx-ink-3); font-size: 16px; line-height: 1.4; }
+.kassist.kassist-lightflow [data-variant='full'] .assistant-manual-entry { justify-content: flex-start; gap: 12px; padding: 20px 24px; }
+.kassist.kassist-lightflow [data-variant='full'] .assistant-manual-top strong { font-size: 24px; }
+.kassist.kassist-lightflow [data-variant='full'] .assistant-manual-entry small { font-size: 17px; }
+.kassist.kassist-lightflow .assistant-manual-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--qx-line-2);
+}
+.kassist.kassist-lightflow .assistant-manual-details span {
+  display: flex;
+  gap: 11px;
+  color: var(--qx-ink-2);
+  font-size: 17px;
+  line-height: 1.4;
+}
+.kassist.kassist-lightflow .assistant-manual-details span::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 2px;
+  background: var(--qx-teal);
+}
+
+/* ══ 输入坞 ═════════════════════════════════════════════════════ */
+.kassist.kassist-lightflow .assistant-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 16px var(--ck-gutter) 14px;
+  border: 0;
+  border-top: 1px solid var(--qx-line);
+  border-radius: 0;
+  background: var(--qx-surface);
+  box-shadow: none;
+}
+.kassist.kassist-lightflow .assistant-composer textarea {
+  width: 100%;
+  height: 98px;
+  min-height: 0;
+  padding: 16px 20px;
+  resize: none;
+  border: 1px solid var(--qx-teal-line);
+  border-radius: 24px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  font-size: 22px;
+  line-height: 1.5;
+}
+.kassist.kassist-lightflow .assistant-composer textarea::placeholder { color: var(--qx-ink-3); opacity: .75; }
+.kassist.kassist-lightflow .assistant-composer textarea:focus,
+.kassist.kassist-lightflow .assistant-composer textarea:focus-visible {
+  border-color: var(--qx-teal);
+  outline: 4px solid var(--qx-teal);
+  outline-offset: 2px;
+  background: var(--qx-surface);
+}
+.kassist.kassist-lightflow .assistant-composer textarea:is([readonly], :disabled) {
+  border-color: var(--qx-line-2);
+  color: var(--qx-ink-2);
+  background: var(--qx-muted-bg);
+}
+.kassist.kassist-lightflow .assistant-dock-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.kassist.kassist-lightflow .assistant-dock-spacer { flex: 1 1 0; min-width: 0; }
+.kassist.kassist-lightflow .assistant-hold-talk { display: contents; }
+.kassist.kassist-lightflow :is(.assistant-hold-talk-btn, .assistant-tool-button, .assistant-dock-clear) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: auto;
+  min-height: 64px;
+  padding: 0 20px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 20px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  box-shadow: none;
+  font-size: 20px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kassist.kassist-lightflow :is(.assistant-hold-talk-btn, .assistant-tool-button) svg { width: 24px; height: 24px; }
+.kassist.kassist-lightflow .assistant-dock-clear { min-height: 56px; padding: 0 18px; color: var(--qx-ink-2); background: var(--qx-paper); font-size: 17px; }
+.kassist.kassist-lightflow .assistant-hold-talk-btn[aria-pressed='true'] { border-color: var(--qx-teal); color: var(--qx-teal-d); background: var(--qx-teal-soft); }
+.kassist.kassist-lightflow .assistant-hold-talk-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 16px;
+  color: var(--qx-ink-2);
+  background: var(--qx-paper);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kassist.kassist-lightflow .assistant-hold-talk-switch::before {
+  content: '';
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--qx-line-2);
+  border-radius: 7px;
+  background: var(--qx-surface);
+}
+.kassist.kassist-lightflow .assistant-hold-talk-switch[data-checked]::before {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal) linear-gradient(135deg, transparent 45%, var(--qx-surface) 45%, var(--qx-surface) 58%, transparent 58%);
+}
+.kassist.kassist-lightflow .assistant-hold-talk-switch[data-blocked] { opacity: .5; cursor: not-allowed; }
+.kassist.kassist-lightflow .assistant-hold-talk-switch:has(input:focus-visible) { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.kassist.kassist-lightflow .assistant-hold-talk-reason {
+  flex-basis: 100%;
+  order: 10;
+  margin: 0;
+  color: var(--qx-ink-3);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.kassist.kassist-lightflow .assistant-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  min-width: 150px;
+  min-height: 64px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: 20px;
+  color: var(--qx-emerald);
+  background: var(--qx-deep);
+  box-shadow: none;
+  font-size: 23px;
+  font-weight: 650;
+}
+.kassist.kassist-lightflow .assistant-send svg { width: 24px; height: 24px; }
+.kassist.kassist-lightflow :is(.assistant-send, .assistant-tool-button, .assistant-hold-talk-btn, .assistant-dock-clear):is(:disabled, [aria-disabled='true']) {
+  opacity: .5;
+  filter: none;
+  cursor: not-allowed;
+}
+.kassist.kassist-lightflow .assistant-dock-note {
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+  margin: 0;
+  color: var(--qx-ink-2);
+  font-size: 17px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.kassist.kassist-lightflow .assistant-dock-note b { flex: none; color: var(--qx-wheat-d); font-weight: 700; }
+.kassist.kassist-lightflow .assistant-composer-lock {
+  display: block;
+  margin: 0;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 16px;
+  color: var(--qx-slate-d);
+  background: var(--qx-slate-soft);
+}
+.kassist.kassist-lightflow .assistant-composer-lock p { margin: 0; color: inherit; font-size: 17px; line-height: 1.55; }
+.kassist.kassist-lightflow .assistant-composer-lock b { margin-right: 10px; font-weight: 700; }
+
+/* ══ 边界说明 ═══════════════════════════════════════════════════ */
+.kassist.kassist-lightflow .assistant-truth {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin: 0;
+  padding: 12px var(--ck-gutter) 14px;
+  border-top: 1px solid var(--qx-line);
+  background: var(--qx-paper);
+}
+.kassist.kassist-lightflow .assistant-truth p { margin: 0; color: var(--qx-ink-3); font-size: 15px; line-height: 1.5; }
+.kassist.kassist-lightflow .assistant-truth b { margin-right: 6px; color: var(--qx-ink-2); font-weight: 700; }
+
+/* 舞台模式里输入坞与边界说明紧贴导航，不留行间距。 */
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-truth { margin-top: -16px; }
+
+/* ── 软键盘打开：只收起「看状态」的仪表带与边界说明，把输入坞抬到键盘上沿。
+ * 键盘固定在舞台底部、先盖住 132px 的主导航，所以输入坞只需再让出「键盘高 − 导航高」。 ── */
+.kassist.kassist-lightflow .assistant-workbench[data-kb-open] .assistant-cockpit .assistant-ai-tools,
+.kassist.kassist-lightflow .assistant-workbench[data-kb-open] .assistant-cockpit-disclosure,
+.kassist.kassist-lightflow .assistant-workbench[data-kb-open] .assistant-truth { display: none; }
+.kassist.kassist-lightflow .assistant-workbench[data-kb-open] .assistant-composer {
+  margin-bottom: max(0px, calc(var(--kassist-kb-h, 0px) - 132px));
+}
+
+/* ══ 流式模式（手机 / 窄屏）：主体、输入坞与边界说明 ═══════════════ */
+@media (max-width: 760px) {
+  .kassist.kassist-lightflow { --ck-gutter: 14px; padding-top: 10px; }
+  .kassist.kassist-lightflow .assistant-workbench { gap: 16px; }
+
+  .kassist.kassist-lightflow .assistant-cockpit-body { gap: 20px; }
+  .kassist.kassist-lightflow .assistant-sec-label { flex-wrap: wrap; gap: 4px 12px; }
+  .kassist.kassist-lightflow .assistant-sec-label h2 { font-size: 21px; }
+  .kassist.kassist-lightflow .assistant-sec-no { font-size: 16px; }
+  .kassist.kassist-lightflow .assistant-sec-hint { width: 100%; margin-left: 0; font-size: 14px; text-align: left; }
+  .kassist.kassist-lightflow .assistant-task-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .kassist.kassist-lightflow :is(.assistant-task, .assistant-direct-question) { min-height: 60px; padding: 10px 12px; border-radius: 16px; }
+  .kassist.kassist-lightflow .assistant-direct-question { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 10px; }
+  .kassist.kassist-lightflow .assistant-task-icon { width: 36px; height: 36px; border-radius: 11px; }
+  .kassist.kassist-lightflow .assistant-task-icon svg { width: 20px; height: 20px; }
+  .kassist.kassist-lightflow .assistant-task[data-task-id] .assistant-task-copy strong,
+  .kassist.kassist-lightflow .assistant-direct-question strong { font-size: 16px; }
+  .kassist.kassist-lightflow .assistant-task-copy small { display: none; }
+  .kassist.kassist-lightflow .assistant-direct-question small { font-size: 13px; }
+  .kassist.kassist-lightflow .assistant-quick-questions button { gap: 12px; min-height: 64px; padding: 10px 14px; border-radius: 18px; font-size: 17px; }
+  .kassist.kassist-lightflow .assistant-quick-icon { width: 36px; height: 36px; border-radius: 11px; }
+  .kassist.kassist-lightflow .assistant-quick-icon svg { width: 20px; height: 20px; }
+  .kassist.kassist-lightflow .assistant-quick-go { font-size: 0; }
+  .kassist.kassist-lightflow .assistant-message-bubble { padding: 14px 16px; border-radius: 18px; }
+  .kassist.kassist-lightflow .assistant-message-bubble p { font-size: 17px; }
+  .kassist.kassist-lightflow .assistant-message-bubble strong { font-size: 18px; }
+  .kassist.kassist-lightflow .assistant-message-avatar { width: 40px; height: 40px; border-radius: 12px; }
+  .kassist.kassist-lightflow .assistant-provenance { gap: 2px 14px; font-size: 15px; }
+  .kassist.kassist-lightflow .assistant-thinking { padding: 16px; border-radius: 20px; }
+  .kassist.kassist-lightflow .assistant-thinking-bar { font-size: 15px; }
+  .kassist.kassist-lightflow .assistant-thinking-slot { padding: 8px 4px; font-size: 15px; }
+  .kassist.kassist-lightflow .assistant-ai-status .kiosk-ai-fallback { padding: 16px; border-radius: 20px; }
+  .kassist.kassist-lightflow .assistant-ai-status .kiosk-ai-fallback__reason { font-size: 16px; }
+  .kassist.kassist-lightflow .assistant-turn-action { min-height: 56px; padding: 0 16px; font-size: 16px; }
+  .kassist.kassist-lightflow .action-chip { min-height: 56px; font-size: 16px; }
+  .kassist.kassist-lightflow .assistant-manual-entries,
+  .kassist.kassist-lightflow .assistant-manual-entries[data-variant='full'] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .kassist.kassist-lightflow .assistant-manual-entry { min-height: 88px; padding: 12px; border-radius: 18px; }
+  .kassist.kassist-lightflow .assistant-manual-icon { width: 36px; height: 36px; border-radius: 11px; }
+  .kassist.kassist-lightflow .assistant-manual-top { gap: 8px; }
+  .kassist.kassist-lightflow .assistant-manual-top strong,
+  .kassist.kassist-lightflow [data-variant='full'] .assistant-manual-top strong { font-size: 16px; }
+  .kassist.kassist-lightflow .assistant-manual-entry small,
+  .kassist.kassist-lightflow [data-variant='full'] .assistant-manual-entry small { font-size: 13px; }
+  .kassist.kassist-lightflow [data-variant='full'] .assistant-manual-entry { padding: 12px; }
+  .kassist.kassist-lightflow .assistant-manual-details span { font-size: 13px; }
+  .kassist.kassist-lightflow .assistant-composer { padding: 14px var(--ck-gutter); }
+  .kassist.kassist-lightflow .assistant-composer textarea { height: 88px; font-size: 17px; border-radius: 18px; }
+  .kassist.kassist-lightflow .assistant-dock-row { gap: 8px; }
+  .kassist.kassist-lightflow .assistant-dock-spacer { display: none; }
+  .kassist.kassist-lightflow :is(.assistant-hold-talk-btn, .assistant-tool-button) { flex: 1 1 140px; min-height: 56px; font-size: 16px; }
+  .kassist.kassist-lightflow .assistant-hold-talk-switch { flex: 1 1 140px; font-size: 15px; }
+  .kassist.kassist-lightflow .assistant-send { flex: 1 1 100%; min-height: 60px; font-size: 19px; }
+  .kassist.kassist-lightflow .assistant-dock-note,
+  .kassist.kassist-lightflow .assistant-composer-lock p { font-size: 14px; }
+  .kassist.kassist-lightflow .assistant-truth { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .kassist.kassist-lightflow .assistant-truth p { font-size: 13px; }
+}

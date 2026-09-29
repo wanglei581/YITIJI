@@ -25,6 +25,7 @@ import { FilesService } from '../files/files.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { signFileUrl } from '../files/signing'
 import { withPublicFairDemoExclusion } from './jobs-shared'
+import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 
 /** 派生打印文件 TTL：与活动资料桥接件保持一致（1 小时）。 */
 const PRINT_FILE_TTL_MS = 60 * 60 * 1000
@@ -104,6 +105,7 @@ export class FairCompanyPrintService {
   ) {}
 
   async prepare(fairId: string, companyId: string, rawVariant: string | undefined): Promise<FairCompanyPrintView> {
+    assertRecruitmentContentHostingEnabled()
     const variant = parseVariant(rawVariant)
     const company = await this.requirePrintableCompany(fairId, companyId)
     if (variant === 'positions' && company.positions.length === 0) {

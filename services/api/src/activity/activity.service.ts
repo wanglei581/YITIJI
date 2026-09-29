@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
 import {
   ACTIVITY_TARGET_TYPES,
   JUMP_ACTIONS_BY_TARGET,
@@ -105,7 +106,7 @@ export class ActivityService {
       return company && { targetTitle: company.name, sourceName: company.jobFair.sourceName, sourceUrl: company.sourceUrl, externalId: company.jobFair.id }
     }
     const policy = await this.prisma.policyPost.findFirst({
-      where: { id: targetId, ...published },
+      where: await publicPolicyLookupWhere(this.prisma, { id: targetId, ...published }),
       select: { title: true, sourceName: true, externalUrl: true },
     })
     // 政策无外部编号；官方入口可能未提供（info-only 条目），如实存 null
@@ -189,9 +190,23 @@ export class ActivityService {
   }
 
   /** 本人浏览记录（仅未过期；可按目标类型过滤；游标分页）。 */
-  async listBrowse(endUserId: string, page: MemberPageQuery, targetType?: string) {
+  async listBrowse(
+    endUserId: string,
+    page: MemberPageQuery,
+    targetType?: string,
+    options?: { excludeTargetTypes?: string[] },
+  ) {
     if (targetType !== undefined) assertTargetType(targetType)
-    const where = { endUserId, expiresAt: { gt: new Date() }, ...(targetType ? { targetType } : {}) }
+    const excluded = options?.excludeTargetTypes
+    const where = {
+      endUserId,
+      expiresAt: { gt: new Date() },
+      ...(targetType
+        ? { targetType }
+        : excluded && excluded.length > 0
+          ? { targetType: { notIn: excluded } }
+          : {}),
+    }
     const total = await this.prisma.browseLog.count({ where })
     const rows = await this.prisma.browseLog.findMany({
       where,
@@ -214,9 +229,23 @@ export class ActivityService {
   }
 
   /** 本人外部跳转记录（仅未过期；可按目标类型过滤；游标分页）。 */
-  async listJumps(endUserId: string, page: MemberPageQuery, targetType?: string) {
+  async listJumps(
+    endUserId: string,
+    page: MemberPageQuery,
+    targetType?: string,
+    options?: { excludeTargetTypes?: string[] },
+  ) {
     if (targetType !== undefined) assertTargetType(targetType)
-    const where = { endUserId, expiresAt: { gt: new Date() }, ...(targetType ? { targetType } : {}) }
+    const excluded = options?.excludeTargetTypes
+    const where = {
+      endUserId,
+      expiresAt: { gt: new Date() },
+      ...(targetType
+        ? { targetType }
+        : excluded && excluded.length > 0
+          ? { targetType: { notIn: excluded } }
+          : {}),
+    }
     const total = await this.prisma.externalJumpLog.count({ where })
     const rows = await this.prisma.externalJumpLog.findMany({
       where,

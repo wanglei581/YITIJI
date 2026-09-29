@@ -96,7 +96,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -124,7 +124,7 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 .pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
 .pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
 .clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
-.xq{flex:none;margin:18px 44px 0;border-radius:34px;padding:24px 40px 22px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
+.xq{flex:none;margin:16px 44px 0;border-radius:34px;padding:20px 40px 18px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
 .xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
 .xq-row{display:flex;align-items:center;gap:22px;position:relative;z-index:1}
 .xq-face{flex:none;width:92px;height:92px;border-radius:50%;background:rgba(46,230,168,.1);border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;font-size:42px;color:var(--emerald)}
@@ -135,9 +135,10 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 .xq-doing{margin-top:9px;font-size:20px;line-height:1.5;color:rgba(242,239,228,.74)}
 .xq-doing b{color:#fff;font-weight:600}
 .body{flex:1;min-height:0;display:flex;flex-direction:column}
-.sec{flex:none;padding:0 44px;margin-top:20px}
+.sec{flex:none;padding:0 44px;margin-top:16px}
 .sec.grow{flex:1;min-height:0;display:flex;flex-direction:column}
-.sec.grow>.card,.sec.grow>.state{flex:1;min-height:0}
+.sec.grow>.card,.sec.grow>.state{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
+.sec.grow>.card{padding:22px 30px;gap:14px}
 .sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:12px}
 .sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
 .sec-label .t{font-size:30px;font-weight:700;display:flex;align-items:center;gap:10px}
@@ -158,7 +159,7 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 .btn[aria-disabled=true]{opacity:.55;cursor:default}
 .ctabar{flex:none;margin-top:auto;padding:18px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
 .ctabar .btn{flex:1}
-.cta-reason{flex:none;padding:0 44px 10px;margin-top:16px;font-size:21px;font-weight:600;color:var(--wheat-d);display:flex;align-items:center;gap:10px}
+.cta-reason{flex:none;padding:0 44px 10px;margin-top:12px;font-size:21px;font-weight:600;color:var(--wheat-d);display:flex;align-items:center;gap:10px}
 .truth{flex:none;padding:14px 44px 16px;border-top:1px solid var(--line);display:flex;gap:24px}
 .truth div{flex:1;font-size:17px;line-height:1.45;color:var(--ink-3)}
 .truth b{color:var(--ink-2);font-weight:600}
@@ -175,6 +176,10 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 .demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:15px;padding:0 14px;border-radius:11px;background:rgba(255,255,255,.07);white-space:nowrap}
 .demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
 .flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:not([tabindex="-1"]):focus-visible{outline:4px solid var(--teal);outline-offset:3px}
+.ch:focus-visible,.mini:focus-visible,.btn:focus-visible,.sbtn:focus-visible,.chip:focus-visible{outline:4px solid var(--teal);outline-offset:3px}
+.nav-item:focus-visible{outline:4px solid var(--teal);outline-offset:-6px}
+.back:focus-visible{outline:4px solid var(--teal);outline-offset:4px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ---------- 来源卡片 ---------- */
@@ -263,9 +268,7 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 .mini h4{font-size:23px;font-weight:700;display:flex;align-items:center;gap:10px}
 .mini p{margin-top:10px;font-size:20px;line-height:1.55;color:var(--ink-2)}
 .spread{justify-content:space-evenly}
-/* 2026-09-05 体检修复：source-chooser / phone-cancel-requesting 等态「当前文件」卡内容超高时画到下方警示行上，
-   卡片改为自身滚动；正常态内容不超高时行为不变。 */
-.sec.grow>.card{justify-content:space-evenly;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin}
+.sec.grow>.card{justify-content:space-evenly}
 .pvopen{width:100%;margin-top:16px;justify-content:center}
 
 /* ---------- 完整预览：同一宿主内的 near-full-stage 模态 ---------- */
@@ -344,14 +347,14 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 
   <div class="truth" data-disclaimer="true" data-testid="file-source-truth">
     <div><b>二维码</b>只是让你的手机打开上传页。本机<b>看不到你扫没扫</b>，只认服务端返回的会话状态。</div>
-    <div><b>U 盘</b>由这台终端的本地服务读取并逐份上传；网页不直接访问磁盘，也<b>没有「安全弹出」按钮</b>。</div>
+    <div><b>U 盘</b>由这台机器读取，选中的文件一份份传上去；屏幕上<b>没有「安全弹出」按钮</b>，传完直接拔走就行。</div>
     <div><b>留存</b>结束会话或闲置超时只清除本机登录态与临时会话信息；已上传文件与订单按服务端留存期限管理，<b>不承诺永久保留</b>。</div>
   </div>
 
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item" href="01-home.html" data-route="/" aria-label="回到首页"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant" aria-label="AI 顾问"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item" href="30-my-profile.html" data-route="/profile" aria-label="我的"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item" href="01-home.html" data-route="/" aria-label="回到首页"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant" aria-label="AI 顾问"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile" aria-label="我的"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
 </div>
 <script>
@@ -500,13 +503,13 @@ function statusCard(kind,icon,title,paras,chips,tid){
 }
 var CH_DEF={
  file:{n:'本机选文件',ic:'folder',bg:'var(--clay-soft)',st:'#9e5330',
-   d:'弹系统文件窗口挑一份。<b>这条是桌面浏览器的验证 / 兼容路径</b>，公共一体机上不推荐先用它。',
+   d:'在这台机器上弹出文件窗口，自己翻着挑一份。<b>公共屏幕上翻自己的文件不方便</b>，一般先用手机扫码。',
    f:'PDF / JPG / PNG · 单份 ≤ 15MB',st2:'local-guide'},
  qr:{n:'手机扫码上传',ic:'phone',bg:'var(--teal-soft)',st:'#157a67',tag:'一体机首选',
    d:'手机扫屏幕上的码，打开上传页选文件。不用登录，也不用装软件。',
    f:'PDF / JPG / PNG · 单份 ≤ 10MB',st2:'phone-generating'},
  usb:{n:'U 盘导入',ic:'usb',bg:'var(--slate-soft)',st:'#35608f',
-   d:'插右侧 USB 口，本地服务列出根目录里的文件，你在屏幕上选。',
+   d:'把 U 盘插右侧 USB 口，屏幕上会列出盘里的文件，直接选。',
    f:'PDF / JPG / PNG · 单份 ≤ 15MB',st2:'usb-wait'}
 };
 /* usbMode: ok | unavailable | offline */
@@ -517,7 +520,7 @@ function channels(active,usbMode,keys){
   if(k==='usb'&&usbMode==='unavailable'){dis=true;d='这台终端没有配置 U 盘导入的本地令牌，所以这条通道不能用。';f='本机未接通 · 重试也没用';tag=null}
   if(k==='usb'&&usbMode==='offline'){dis=true;d='本地令牌配好了，但现在连不上这台机器的 Terminal Agent。和「未配置」不是一回事。';f='Agent 离线 · 可以重试';tag=null}
   var body='<span class="ch-ic" style="background:'+c.bg+'">'+svg(c.ic,c.st,32)+'</span>'+
-   '<span class="ch-n"><span>'+c.n+'</span>'+(tag?'<span class="tag">'+tag+'</span>':'')+(k==='file'?'<span class="tag mut">桌面验证</span>':'')+'</span>'+
+   '<span class="ch-n"><span>'+c.n+'</span>'+(tag?'<span class="tag">'+tag+'</span>':'')+(k==='file'?'<span class="tag mut">备用通道</span>':'')+'</span>'+
    '<span class="ch-d"><span>'+d+'</span></span><span class="ch-f">'+f+'</span>';
   if(dis)h+='<div class="ch" role="group" aria-disabled="true" data-testid="'+SCREEN+'-ch-'+k+'" aria-label="'+c.n+'（'+f+'）">'+body+'</div>';
   else h+='<a class="ch press'+(active===k?' on':'')+'" href="'+to(c.st2)+'" data-route="/print/upload" data-testid="'+SCREEN+'-ch-'+k+'" aria-label="'+c.n+'（'+f+'）"'+(active===k?' aria-current="true"':'')+'>'+body+'</a>';
@@ -622,14 +625,14 @@ V['source-chooser']=function(){
   channels(TAB==='usb'?'usb':(TAB==='qr'?'qr':null),'ok')+'</section>'+
   existingSourceLinks('02')+
   '<section class="sec"><div class="split">'+
-   '<div class="mini"><h4>'+svg('cloud','currentColor',22)+'<span>第三方网盘尚未接入</span></h4><p>本机不做百度网盘 / 微信文件的授权登录 —— 公共终端上登录你的网盘账号不安全。<b>但你自己存过的材料一直在</b>：登录后从「我的文档」直接选，不用重传。没存过的，先在手机上下到本地，再用上面的手机扫码上传。</p></div>'+
+   '<div class="mini"><h4>'+svg('cloud','currentColor',22)+'<span>第三方网盘尚未接入</span></h4><p>本机不接百度网盘 / 微信文件的授权登录 —— 在公共机器上登你的网盘账号不安全。<b>你自己存过的材料一直在</b>：登录后从「我的文档」直接选。没存过的，先存到手机里，再用手机扫码上传。</p></div>'+
    '<div class="mini"><h4>'+svg('info','currentColor',22)+'<span>两个上限不一样</span></h4><p>手机上传单份 <b>≤ 10MB</b>；本机选和 U 盘导入单份 <b>≤ 15MB</b>。都只收 PDF / JPG / PNG，Word / Excel / 压缩包不收。</p></div>'+
   '</div></section>'+
   '<section class="sec grow"><div class="card"><div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:25px">当前文件</span><span class="hint">0 份</span></div>'+
-   '<div class="note"><span class="sq"></span><span>还没有文件。三条通道任选一条把文件搬进来，文件名会出现在这里。</span></div></div>'+
-   nextSteps('搬进来之后',['服务端校验格式和大小，确认落库。','文件名和大小显示在这一栏。','下一步「材料检查」才会亮起来。'])+
-   '<div class="note"><span class="sq"></span><span><b>没有文件就进不了材料检查</b>，所以下一步先按住不放。</span></div></div></section>'+
-  reasonLine('这一步还没有文件，先用上面任一通道把文件搬进来')+
+   '<div class="note"><span class="sq"></span><span>还没有文件。上面三条通道任选一条，搬进来的文件名会显示在这里。</span></div></div>'+
+   nextSteps('搬进来之后',['机器先看格式和大小对不对，确认收下。','文件名和大小显示在这一栏。','下一步「材料检查」才会亮起来。'])+
+   '</div></section>'+
+  reasonLine('还没有文件，所以「下一步：材料检查」暂时按住不放；先用上面任一通道搬一份进来')+
   ctaBar(EXIT(),primaryOff(IS_RESUME?'下一步：材料检查':'下一步：材料检查','还没有任何文件'));
 };
 
@@ -659,9 +662,9 @@ V['unknown']=function(){
 
 /* ---------- 本机通道 ---------- */
 V['local-guide']=function(){
- return '<section class="sec">'+statusCard('plain','folder','本机选文件：桌面验证 / 兼容路径',[
+ return '<section class="sec">'+statusCard('plain','folder','本机选文件：备用通道',[
   '这条会弹出<b>系统文件窗口</b>。一体机上不推荐先用它 —— 系统弹窗会盖住流程，公共屏也不该暴露本机目录。',
-  '桌面浏览器验证、或者手机和 U 盘都不方便时再用。<b>单份 ≤ 15MB，只收 PDF / JPG / PNG。</b>'
+  '手机和 U 盘都不方便时再用这条。<b>单份 ≤ 15MB，只收 PDF / JPG / PNG。</b>'
  ],[['','PDF / JPG / PNG','file'],['','单份 ≤ 15MB','info']],SCREEN+'-status')+'</section>'+
   '<section class="sec grow"><div class="card spread" style="flex:1">'+
    '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">点下面这一下会发生什么</span></div>'+
@@ -699,7 +702,7 @@ V['local-cancelled']=function(){
  ],[['','关掉窗口 · 未开始上传','check']],SCREEN+'-status')+'</section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">接着走哪条</span><span class="hint">三条都还在</span></div>'+
   channels('file','ok')+'</section>'+
-  tailCard('info','本机通道的定位','系统文件窗口是<b>桌面验证 / 兼容路径</b>，不是公共一体机的首选。一体机上优先手机扫码。','为什么一体机上更推荐手机扫码',['不用在公共屏上翻本机目录。','系统弹窗不会盖住流程。','要打的文件本来就多半在你手机里。'],'桌面浏览器验证、或者手机和 U 盘都不方便时，<b>本机通道照样能走</b>。')+
+  tailCard('info','本机通道的定位','在屏幕上弹文件窗口是<b>备用通道</b>，不是这台机器的首选。现场优先用手机扫码。','为什么一体机上更推荐手机扫码',['不用在公共屏上翻本机目录。','系统弹窗不会盖住流程。','要打的文件本来就多半在你手机里。'],'手机和 U 盘都不方便时，<b>本机通道照样能走</b>。')+
   reasonLine('这一步还没有文件，材料检查按住不放')+
   ctaBar(EXIT(),primaryLink('再打开一次文件窗口',to('local-picking'),'/print/upload'));
 };

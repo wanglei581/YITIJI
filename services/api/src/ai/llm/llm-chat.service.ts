@@ -27,8 +27,10 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from './llm-http'
+import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWords, enforceForbiddenWords, safeRefusalReply } from './llm-guard'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
-import { buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
+import { withAiSafety } from './ai-prompt-safety'
+import { applyAssistantChannel, kioskChannelConstraint, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -145,7 +147,7 @@ const SKILL_SCOPED_PROMPTS: Record<AssistantSkill, string> = {
     '请用通俗语言解释入职、试用期、社保、公积金、离职、请假等常见 HR 流程和劳动常识。',
     '不得对具体争议给出确定法律结论，不得承诺仲裁、赔偿或维权结果。',
     '涉及劳动争议、赔偿、合同解除、工伤、仲裁等高风险问题时，应提示咨询官方人社窗口、法律援助或专业律师。',
-    '结论必须标明仅供常识参考，不构成正式法律意见或官方政策承诺。',
+    '结论必须标明仅供常识参考，不代替专业人士判断，也不是官方政策承诺。',
   ].join('\n'),
   self_intro_gen: [
     '当前处于百宝箱「AI 自我介绍生成」技能场景。',
@@ -197,8 +199,16 @@ const SKILL_SCOPED_PROMPTS: Record<AssistantSkill, string> = {
   ].join('\n'),
 }
 
+export function assistantSkillSystemPrompt(skill: AssistantSkill): string {
+  return withAiSafety(SKILL_SCOPED_PROMPTS[skill])
+}
+
+export function assistantSkillPrompts(): string[] {
+  return (Object.keys(SKILL_SCOPED_PROMPTS) as AssistantSkill[]).map(assistantSkillSystemPrompt)
+}
+
 function buildSkillScopedSystemPrompt(basePrompt: string, skill?: AssistantSkill): string {
-  const scopedPrompt = skill ? SKILL_SCOPED_PROMPTS[skill] : undefined
+  const scopedPrompt = skill ? assistantSkillSystemPrompt(skill) : undefined
   return scopedPrompt ? `${basePrompt}\n\n${scopedPrompt}` : basePrompt
 }
 
@@ -307,13 +317,35 @@ export class LlmChatService {
     session.messages.push({ role: 'user', content: input.message })
     const skill = input.skill
 
+    const channel = resolveAssistantChannel(input.channel)
+    const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
+    const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()
+    const systemPrompt = channelConstraint ? `${guarded}\n\n${channelConstraint}` : guarded
     const payloadMessages: ChatMessage[] = [
-      { role: 'system', content: buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill) },
+      { role: 'system', content: systemPrompt },
       ...session.messages.slice(-MAX_HISTORY),
     ]
 
-    const rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, onLlmCall)
-    const reply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
+    let rawReply: string
+    try {
+      rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, cfg.forbiddenWords, onLlmCall)
+    } catch (error) {
+      if (error instanceof AiContentBlockedError) {
+        // 命中禁词：和输出侧原有做法一样给礼貌拒答，不报错。
+        const reply = safeRefusalReply(configuredForbiddenWords(cfg.forbiddenWords))
+          || '这个问题超出当前助手的服务范围，请换一个合规问题。'
+        // 被拦的原话不能留在会话历史里：下一轮会带着整段历史再发给模型，检查点会再次命中，
+        // 这个会话之后每句话都会被拒答。输出侧命中时用户原话没问题，保留它，把拒答记进历史。
+        if (error.direction === 'input') session.messages.pop()
+        else session.messages.push({ role: 'assistant', content: reply })
+        session.updatedAt = Date.now()
+        this.sessions.set(sessionId, session)
+        return { sessionId, reply, intent: classifyIntent(input.message), actions: [] }
+      }
+      throw error
+    }
+    const guardedReply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
+    const reply = channel === 'miniapp' ? applyAssistantChannel({ reply: guardedReply }, 'miniapp').reply : guardedReply
     if (reply !== rawReply) {
       this.logger.warn('LLM 回复命中禁用词，已替换为范围内兜底回复')
     }
@@ -327,13 +359,14 @@ export class LlmChatService {
     this.sessions.set(sessionId, session)
 
     const intent = classifyIntent(input.message)
-    const actions = skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]
+    const routed = skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]
+    const actions = applyAssistantChannel({ reply, actions: routed }, channel).actions
 
     return {
       sessionId,
       reply,
       intent,
-      actions: actions.length ? actions : undefined,
+      actions,
     }
   }
 
@@ -346,6 +379,7 @@ export class LlmChatService {
     model: string,
     temperature: number,
     messages: ChatMessage[],
+    forbiddenWords: readonly string[],
     onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     // AI-COST-TRUTH：落账标签必须含厂商名，否则定价表匹配不到 → 永远算不出成本。
@@ -364,9 +398,10 @@ export class LlmChatService {
           },
           body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
         },
-        { timeoutMs: LLM_TIMEOUT_MS },
+        { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: featureKey, forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw error
       // 「AI 正忙」和「超时」都必须能和下面的 network_error 分开报：三者的处置完全不同
       // （加容量 / 查模型端 / 查网络）。糊成一个码就等于把根因抹掉。
       if (error instanceof LlmBusyError) {
@@ -421,7 +456,7 @@ export class LlmChatService {
         { role: 'system', content: buildGuardedSystemPrompt(cfg) },
         { role: 'user', content: '你好，请用一句话自我介绍。' },
       ]
-      const rawReply = await this.callLlm(feature, cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, messages)
+      const rawReply = await this.callLlm(feature, cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, messages, cfg.forbiddenWords)
       return { ok: true, reply: enforceForbiddenWords(rawReply, cfg.forbiddenWords) }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }

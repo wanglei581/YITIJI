@@ -103,6 +103,7 @@
     "POST /me/feedback/:p/replies",
     "POST /me/print-orders",
     "POST /me/print-orders/:p/cancel",
+    "POST /me/print-orders/submissions/resolve",
     "POST /member/auth/login",
     "POST /member/auth/logout",
     "POST /member/auth/qr/:p/confirm-by-token",

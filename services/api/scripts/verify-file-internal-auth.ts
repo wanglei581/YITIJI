@@ -370,14 +370,13 @@ async function main(): Promise<void> {
     assert.equal(world.calls.getAccessUrl, 0, 'aud=enduser token 不得被当作内部账号放行')
   })
 
-  // 10. 性能取舍的安全下界:会话状态缓存必须有界。缓存命中可以省掉数据库查询,
-  //     但 TTL 必须足够短,否则「停用即生效」变成空话。
-  await scenario(`会话状态缓存有界(TTL=${INTERNAL_SESSION_CACHE_TTL_SECONDS}s)且缓存命中不查库`, async () => {
+  // 10. 缓存 TTL 仍须有界。enabled 快照不是身份:非 partner 命中后也必须回源,
+  //     否则数据库已停用的账号会在 TTL 内被旧缓存放行。
+  await scenario(`会话状态缓存有界(TTL=${INTERNAL_SESSION_CACHE_TTL_SECONDS}s)且 enabled 缓存仍回源`, async () => {
     assert.ok(
       INTERNAL_SESSION_CACHE_TTL_SECONDS > 0 && INTERNAL_SESSION_CACHE_TTL_SECONDS <= 60,
       `内部会话状态缓存 TTL 必须在 (0, 60] 秒,当前 ${INTERNAL_SESSION_CACHE_TTL_SECONDS}`,
     )
-    // 热路径:缓存命中的非 partner 账号不再查库。
     const cached = JSON.stringify({
       userId: 'admin-1',
       role: 'admin',
@@ -393,11 +392,24 @@ async function main(): Promise<void> {
     })
     const token = internalToken({ sub: 'admin-1', role: 'admin', orgId: null, ver: 3 })
     await world.controller.downloadUrl(MEMBER_RESUME.id, request(token))
-    assert.equal(world.calls.userFindUnique, 0, '缓存命中的非 partner 账号不应再查库(热路径成本)')
+    assert.ok(world.calls.userFindUnique >= 1, 'enabled 缓存命中仍必须回源数据库,不能凭缓存放行')
+
+    const disabled = createWorld({
+      users: [{ ...ACTIVE_ADMIN, enabled: false }],
+      seedSessionState: [{ key: 'internal:session-state:admin-1', value: cached }],
+    })
+    await expectRejection(
+      () => disabled.controller.downloadUrl(MEMBER_RESUME.id, request(token)),
+      { status: 401, code: 'AUTH_REQUIRED' },
+      'enabled 缓存不能放行数据库已停用的账号',
+    )
+    assert.equal(disabled.calls.getAccessUrl, 0, '停用账号即使缓存仍显示启用也不得进入文件服务')
   })
 
   // 11. 停用写入缓存墓碑后必须立刻生效,而不是等 TTL 过期。
-  await scenario('停用墓碑写入缓存后立即生效,无需等待 TTL', async () => {
+  await scenario('停用立即生效:数据库已停用即拒绝,不等缓存 TTL', async () => {
+    // 放行的唯一真源是数据库(optional-internal-user.ts 头注释)。停用路径先提交数据库再写墓碑,
+    // 所以「立即生效」验的是:数据库行已停用时,无论缓存里是墓碑还是旧的启用快照,本次都拒绝。
     const tombstone = JSON.stringify({
       userId: 'admin-1',
       role: 'admin',
@@ -408,15 +420,16 @@ async function main(): Promise<void> {
       orgEnabled: null,
     })
     const world = createWorld({
-      users: [ACTIVE_ADMIN],
+      users: [{ ...ACTIVE_ADMIN, enabled: false, deletedAt: new Date() }],
       seedSessionState: [{ key: 'internal:session-state:admin-1', value: tombstone }],
     })
     const token = internalToken({ sub: 'admin-1', role: 'admin', orgId: null, ver: 3 })
     await expectRejection(
       () => world.controller.downloadUrl(MEMBER_RESUME.id, request(token)),
       { status: 401, code: 'AUTH_REQUIRED' },
-      '缓存墓碑(已停用)',
+      '数据库已停用(缓存为墓碑)',
     )
+    assert.equal(world.calls.getAccessUrl, 0, '已停用账号不得进入文件服务')
   })
 
   // 12. partner 缓存命中仍必须回源,防止 Redis 残留把已删机构账号短暂复活。

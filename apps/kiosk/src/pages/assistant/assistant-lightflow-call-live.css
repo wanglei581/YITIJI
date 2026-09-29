@@ -1,343 +1,126 @@
-/* ── Live call state — service-desk (fusion-youth) 色调 ── */
-.kassist-lightflow .assistant-voice-live {
+/* ── 通话中（voice-connecting / voice-live / mic-denied）
+ * 声波、计时、字幕都只跟 TRTC 的真实事件走：没进房不计时，没有音量信号声波就静止。 */
+.kassist.kassist-lightflow .assistant-voice-live .assistant-voice-panel { align-items: stretch; }
+.kassist.kassist-lightflow .assistant-voice-live-status {
   display: flex;
-  flex: 1;
-  flex-direction: column;
   align-items: center;
-  padding-top: 30px;
-  gap: 20px;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
 }
-
-/* 通话状态条 */
-.kassist-lightflow .assistant-voice-live-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 28px;
-  border: 1px solid rgba(31, 158, 134, 0.35);
-  border-radius: 999px;
-  color: var(--k-teal-deep);
-  background: var(--k-teal-soft);
-  font-size: 20px;
-}
-
-.kassist-lightflow .assistant-voice-live-status > span {
+.kassist.kassist-lightflow .assistant-voice-live-status .is-live {
+  flex: none;
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--k-muted);
-  flex-shrink: 0;
+  background: var(--qx-emerald);
+  box-shadow: 0 0 0 0 rgb(46 230 168 / 50%);
+  animation: kassist-lightflow-voice-live 2400ms ease-in-out infinite;
 }
-
-.kassist-lightflow .assistant-voice-live-status > span.is-live {
-  background: var(--color-primary-500);
-  box-shadow: 0 0 0 5px rgba(53, 171, 142, 0.2);
-  animation: kassist-lf-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes kassist-lf-pulse {
-  0%, 100% { box-shadow: 0 0 0 4px rgba(53,171,142,.25); }
-  50%       { box-shadow: 0 0 0 9px rgba(53,171,142,.1); }
-}
-
-.kassist-lightflow .assistant-voice-live-status strong {
+.kassist.kassist-lightflow .assistant-voice-live-status strong { color: rgb(242 239 228); font-size: 24px; font-weight: 700; }
+.kassist.kassist-lightflow .assistant-voice-live-status time {
+  margin-left: auto;
+  color: rgb(242 239 228 / 70%);
+  font-family: var(--qx-mono);
   font-size: 20px;
-  font-weight: 700;
-  color: var(--k-teal-deep);
-}
-
-.kassist-lightflow .assistant-voice-live-status time {
-  color: var(--k-muted);
-  font-size: 18px;
   font-variant-numeric: tabular-nums;
 }
-
-/* 头像 */
-.kassist-lightflow .assistant-voice-avatar--live {
-  width: 240px;
-  height: 240px;
+.kassist.kassist-lightflow .assistant-voice-dots { display: inline-flex; flex: none; gap: 9px; }
+.kassist.kassist-lightflow .assistant-voice-dots i {
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  border: 4px solid var(--k-surface, var(--color-surface));
-  box-shadow: 0 0 0 8px var(--k-teal-soft), 0 20px 48px rgba(16, 48, 43, 0.18);
-  position: relative;
-  overflow: visible;
+  background: var(--qx-emerald);
+  animation: kassist-lightflow-voice-dot 1200ms ease-in-out infinite;
 }
+.kassist.kassist-lightflow .assistant-voice-dots i:nth-child(2) { animation-delay: 160ms; }
+.kassist.kassist-lightflow .assistant-voice-dots i:nth-child(3) { animation-delay: 320ms; }
 
-.kassist-lightflow .assistant-voice-avatar--live::before,
-.kassist-lightflow .assistant-voice-avatar--live::after {
-  content: '';
-  position: absolute;
-  inset: -12px;
-  border: 1.5px solid rgba(31, 158, 134, 0.3);
+.kassist.kassist-lightflow .assistant-voice-avatar--live {
+  align-self: center;
+  width: 176px;
+  height: 176px;
+  overflow: hidden;
+  border: 1.5px solid rgb(46 230 168 / 40%);
   border-radius: 50%;
-  animation: kassist-lf-ripple 2.4s ease-out infinite;
+  background: rgb(46 230 168 / 8%);
+  box-shadow: none;
 }
-
-.kassist-lightflow .assistant-voice-avatar--live::after {
-  animation-delay: 1.2s;
-}
-
-@keyframes kassist-lf-ripple {
-  0%   { transform: scale(.82); opacity: .9; }
-  100% { transform: scale(1.08); opacity: 0; }
-}
-
-/* 声纹 */
-.kassist-lightflow .assistant-voice-wave {
+.kassist.kassist-lightflow .assistant-voice-avatar--live img { width: 100%; height: 100%; object-fit: cover; }
+.kassist.kassist-lightflow .assistant-voice-wave {
   display: flex;
+  align-self: center;
   align-items: center;
-  justify-content: center;
-  height: 80px;
-  gap: 8px;
-}
-
-.kassist-lightflow .assistant-voice-wave i {
-  width: 9px;
-  border-radius: 999px;
-  background: var(--k-teal);
-  animation: kassist-lf-wave 1s ease-in-out infinite;
-}
-
-.kassist-lightflow .assistant-voice-wave i:nth-child(1),
-.kassist-lightflow .assistant-voice-wave i:nth-child(10) { height: 20px; }
-.kassist-lightflow .assistant-voice-wave i:nth-child(2),
-.kassist-lightflow .assistant-voice-wave i:nth-child(9) { height: 34px; animation-delay: 0.12s; }
-.kassist-lightflow .assistant-voice-wave i:nth-child(3),
-.kassist-lightflow .assistant-voice-wave i:nth-child(8) { height: 52px; animation-delay: 0.24s; }
-.kassist-lightflow .assistant-voice-wave i:nth-child(4),
-.kassist-lightflow .assistant-voice-wave i:nth-child(7) { height: 62px; animation-delay: 0.08s; }
-.kassist-lightflow .assistant-voice-wave i:nth-child(5),
-.kassist-lightflow .assistant-voice-wave i:nth-child(6) { height: 70px; animation-delay: 0.18s; }
-
-.kassist-lightflow .assistant-voice-wave.is-quiet i {
-  opacity: 0.3;
-  transform: scaleY(0.25);
-  animation-play-state: paused;
-}
-
-@keyframes kassist-lf-wave {
-  0%, 100% { transform: scaleY(.48); opacity: .55; }
-  50%       { transform: scaleY(1);   opacity: 1; }
-}
-
-/* 继续播放提示 */
-.kassist-lightflow .assistant-voice-resume {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 50px;
-  gap: 10px;
-  padding: 0 22px;
-  border: 1px solid rgba(31, 158, 134, 0.45);
-  border-radius: 999px;
-  color: var(--k-teal-deep);
-  background: var(--k-teal-soft);
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* 实时字幕 */
-.kassist-lightflow .assistant-voice-caption {
-  width: min(720px, 100%);
-  min-height: 120px;
-  padding: 20px 26px;
-  border: 1px solid var(--k-line);
-  border-radius: 18px;
-  background: var(--k-paper, var(--color-canvas));
-}
-
-.kassist-lightflow .assistant-voice-caption > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.kassist-lightflow .assistant-voice-caption strong {
-  color: var(--k-ink);
-  font-size: 16px;
-  font-weight: 800;
-  font-family: var(--font-serif, 'Noto Serif SC', serif);
-}
-
-.kassist-lightflow .assistant-voice-caption > div span {
-  color: var(--k-muted);
-  font-size: 14px;
-}
-
-.kassist-lightflow .assistant-voice-caption > p {
-  margin: 12px 0 0;
-  color: var(--k-ink);
-  font-size: 20px;
-  line-height: 1.65;
-}
-
-.kassist-lightflow .assistant-voice-caption .assistant-voice-mic-warning {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  color: var(--color-wheat-deep);
-  background: var(--color-wheat-soft);
-  font-size: 14px;
-}
-
-/* 通话操作按钮组 */
-.kassist-lightflow .assistant-voice-controls {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(88px, 1fr));
-  width: min(720px, 100%);
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid var(--k-line);
-  border-radius: 18px;
-  background: var(--k-surface, var(--color-surface));
-  box-shadow: 0 8px 24px rgba(16, 48, 43, 0.07);
-}
-
-.kassist-lightflow .assistant-voice-control {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 120px;
-  gap: 10px;
-  border: 1px solid var(--k-line);
-  border-radius: 14px;
-  color: var(--k-ink);
-  background: var(--k-paper, var(--color-canvas));
-  font-size: 20px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 120ms ease, background 120ms ease, transform 100ms ease;
-}
-
-.kassist-lightflow .assistant-voice-control:hover {
-  background: var(--k-teal-soft);
-  border-color: rgba(31, 158, 134, 0.35);
-  transform: translateY(-1px);
-}
-
-.kassist-lightflow .assistant-voice-control > span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
+  gap: 6px;
   height: 48px;
-  border: 1px solid var(--k-line);
-  border-radius: 50%;
-  background: var(--k-surface, var(--color-surface));
 }
-
-.kassist-lightflow .assistant-voice-control svg {
-  width: 24px;
-  height: 24px;
+.kassist.kassist-lightflow .assistant-voice-wave i {
+  width: 6px;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--qx-emerald);
+  transform-origin: center;
+  animation: kassist-lightflow-voice-wave 900ms ease-in-out infinite;
 }
+.kassist.kassist-lightflow .assistant-voice-wave i:nth-child(odd) { animation-delay: 150ms; }
+.kassist.kassist-lightflow .assistant-voice-wave i:nth-child(3n) { animation-delay: 300ms; }
+.kassist.kassist-lightflow .assistant-voice-wave.is-quiet i { opacity: .4; transform: scaleY(.18); animation: none; }
 
-.kassist-lightflow .assistant-voice-control.is-active {
-  color: var(--k-teal-deep);
-  background: var(--k-teal-soft);
-  border-color: rgba(31, 158, 134, 0.45);
-}
-
-.kassist-lightflow .assistant-voice-control.is-active > span {
-  background: var(--k-teal);
-  border-color: var(--k-teal);
-  color: var(--k-surface, var(--color-surface));
-}
-
-/* 挂断按钮 — 红色 */
-.kassist-lightflow .assistant-voice-control--hangup {
-  color: var(--color-error);
-  background: var(--color-error-bg);
-  border-color: rgba(193, 74, 52, 0.35);
-}
-
-.kassist-lightflow .assistant-voice-control--hangup > span {
-  border-color: rgba(193, 74, 52, 0.5);
-  color: var(--k-surface, var(--color-surface));
-  background: var(--color-error);
-}
-
-.kassist-lightflow .assistant-voice-control--hangup svg {
-  transform: rotate(135deg);
-}
-
-.kassist-lightflow .assistant-voice-control:disabled,
-.kassist-lightflow .assistant-voice-close:disabled,
-.kassist-lightflow .assistant-voice-error-actions button:disabled {
-  opacity: 0.45;
-  cursor: wait;
-  transform: none;
-}
-
-/* 错误状态 */
-.kassist-lightflow .assistant-voice-error {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.kassist-lightflow .assistant-voice-avatar--static {
-  width: 180px;
-  height: 210px;
-  margin-bottom: 28px;
+.kassist.kassist-lightflow .assistant-voice-caption {
+  width: 100%;
+  padding: 16px 20px;
+  border: 1.5px solid rgb(46 230 168 / 30%);
   border-radius: 24px;
-  border: 1px solid var(--k-line);
+  background: rgb(242 239 228 / 6%);
 }
+.kassist.kassist-lightflow .assistant-voice-caption > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.kassist.kassist-lightflow .assistant-voice-caption strong { color: var(--qx-emerald); font-family: var(--qx-sans); font-size: 18px; font-weight: 700; }
+.kassist.kassist-lightflow .assistant-voice-caption > div span { color: rgb(242 239 228 / 55%); font-size: 15px; }
+.kassist.kassist-lightflow .assistant-voice-caption > p { margin: 8px 0 0; color: rgb(242 239 228 / 92%); font-size: 22px; line-height: 1.5; }
 
-.kassist-lightflow .assistant-voice-error-message {
-  max-width: 620px;
-  margin: 18px 0 0;
-  color: var(--k-muted);
-  font-size: 17px;
-  line-height: 1.65;
-  overflow-wrap: anywhere;
-}
-
-.kassist-lightflow .assistant-voice-error-actions {
-  display: flex;
-  gap: 14px;
-  margin-top: 28px;
-}
-
-.kassist-lightflow .assistant-voice-error-actions button {
+.kassist.kassist-lightflow .assistant-voice-resume {
   display: inline-flex;
+  align-self: center;
   align-items: center;
-  justify-content: center;
-  min-height: 56px;
-  gap: 9px;
-  padding: 0 28px;
-  border: 1px solid rgba(31, 158, 134, 0.4);
-  border-radius: 14px;
-  color: var(--k-teal-deep);
-  background: var(--k-teal-soft);
-  font-size: 18px;
+  gap: 10px;
+  min-height: 64px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 18px;
+  color: var(--qx-deep);
+  background: var(--qx-emerald);
+  font-size: 20px;
   font-weight: 700;
-  cursor: pointer;
 }
+.kassist.kassist-lightflow .assistant-voice-resume svg { width: 24px; height: 24px; }
 
-.kassist-lightflow .assistant-voice-error-actions button:last-child {
-  color: var(--k-surface, var(--color-surface));
-  background: var(--k-teal);
-  border-color: var(--k-teal);
+.kassist.kassist-lightflow .assistant-voice-controls {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 14px;
+  width: 100%;
+  margin-top: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
 }
+.kassist.kassist-lightflow .assistant-voice-control { flex-direction: row; }
+.kassist.kassist-lightflow .assistant-voice-control.is-active { border-color: var(--qx-teal); color: var(--qx-teal-d); background: var(--qx-teal-soft); }
+.kassist.kassist-lightflow .assistant-voice-control--hangup { border-color: transparent; color: var(--qx-on-solid); background: var(--qx-cinnabar); }
 
-/* 隐私提示 */
-.kassist-lightflow .assistant-voice-privacy {
-  margin: 0;
-  color: var(--k-muted);
-  font-size: 15px;
-  line-height: 1.65;
-  text-align: center;
+@keyframes kassist-lightflow-voice-live {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(46 230 168 / 50%); }
+  50% { box-shadow: 0 0 0 6px rgb(46 230 168 / 0%); }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .kassist-lightflow .assistant-voice-live-status > span.is-live,
-  .kassist-lightflow .assistant-voice-avatar--live::before,
-  .kassist-lightflow .assistant-voice-avatar--live::after,
-  .kassist-lightflow .assistant-voice-wave i { animation: none; }
+@keyframes kassist-lightflow-voice-dot {
+  0%, 100% { opacity: .28; }
+  50% { opacity: 1; }
+}
+@keyframes kassist-lightflow-voice-wave {
+  0%, 100% { transform: scaleY(.35); }
+  50% { transform: scaleY(1); }
 }

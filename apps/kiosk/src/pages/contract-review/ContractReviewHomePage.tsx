@@ -3,11 +3,12 @@
 //
 // 步骤 1/3。用户上传合同文件，选择合同类型，阅读并确认知情
 // 同意书后点击「开始 AI 审查」进入分析阶段。
-// 合规：仅作风险提示，不构成正式法律意见；原文会话后即弃。
+// 合规：仅作条款风险提示，对外文案不写「法律意见」「律师审查」「判断合同有效」
+// （compliance-boundary §1.2 D；门禁 verify:kiosk-ai-label-copy）；原文会话后即弃。
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
-import { isTerminalKiosk } from '../../services/api/screensaver'
+import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { useNavigate } from 'react-router-dom'
 import {
   Button,
@@ -16,7 +17,7 @@ import {
   KioskPageFrame,
   KioskPageHeader,
 } from '@ai-job-print/ui'
-import type { ContractType } from '@ai-job-print/shared'
+import { COMPLIANCE_COPY, type ContractType } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
   FileTextIcon,
@@ -65,7 +66,9 @@ export function ContractReviewHomePage() {
 
   const [file, setFile] = useState<File | null>(null)
   const [phoneSource, setPhoneSource] = useState<PhoneSource | null>(null)
-  const [channel, setChannel] = useState<ContractChannel>('phone')
+  const kiosk = useTerminalKiosk()
+  const [selectedChannel, setChannel] = useState<ContractChannel>('phone')
+  const channel = kiosk ? 'phone' : selectedChannel
   const [contractType, setContractType] = useState<ContractType>('labor_contract')
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentScope, setConsentScope] = useState<ConsentScope | null>(null)
@@ -88,6 +91,7 @@ export function ContractReviewHomePage() {
   }, [])
 
   function handleFileChange(f: File | null) {
+    if (isTerminalKiosk()) return
     if (!f) return
     if (f.size > DESKTOP_MAX_SIZE_MB * 1024 * 1024) {
       setError(`本机验证文件不能超过 ${DESKTOP_MAX_SIZE_MB}MB`)
@@ -154,7 +158,7 @@ export function ContractReviewHomePage() {
           header={
             <KioskPageHeader
               title="AI 签约风险提示"
-              description="风险提示 · 仅供参考 · 非法律意见"
+              description={COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_SCOPE}
               onBack={() => navigate('/resume-service')}
               backLabel="返回简历服务"
             />
@@ -227,13 +231,15 @@ export function ContractReviewHomePage() {
               </button>
             )}
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED}
-            className="sr-only"
-            onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
-          />
+          {!kiosk && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED}
+              className="sr-only"
+              onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+            />
+          )}
           {channel === 'phone' ? (
             selectedName && phoneSource ? (
               <div className="cr-upload-zone cr-upload-zone--filled">
@@ -270,11 +276,11 @@ export function ContractReviewHomePage() {
               drag ? 'cr-upload-zone--drag' : '',
               file ? 'cr-upload-zone--filled' : '',
             ].join(' ')}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}
             onKeyDown={(e) => {
               if (e.key !== 'Enter' && e.key !== ' ') return
               e.preventDefault()
-              fileInputRef.current?.click()
+              if (!isTerminalKiosk()) fileInputRef.current?.click()
             }}
             onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}
@@ -348,7 +354,7 @@ export function ContractReviewHomePage() {
             <>
               <div className="cr-consent-body">
                 <p style={{ marginBottom: 10 }}>
-                  <b>本服务仅作风险提示，不构成正式法律意见。</b>重大争议请咨询律师或官方机构。
+                  <b>本服务{COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_SCOPE}。</b>重大争议请咨询律师或官方机构。
                 </p>
                 <p style={{ marginBottom: 10 }}>
                   您上传的合同原件仅在本项目受控存储中短期用于 OCR 与风险分析，

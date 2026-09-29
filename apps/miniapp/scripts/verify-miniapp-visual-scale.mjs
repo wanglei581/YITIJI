@@ -26,8 +26,9 @@ const FS_SCALE = new Set([20, 22, 26, 30, 34, 40, 52])
 /** app.wxss --r-* 的 px 取值换算成 rpx，加上 999(=--r-full) */
 const RADIUS_SCALE = new Set([12, 18, 24, 32, 40, 48, 999])
 
-// 实测基线（2026-09-02）。只允许降，不允许升。
-const BASELINE = { fontSize: 439, radius: 181 }
+// 实测基线（2026-09-02 为 439/181；2026-09-26 简历对照去掉等级块、「我的」去掉权益条后降到 415/168）。
+// 只允许降，不允许升。
+const BASELINE = { fontSize: 415, radius: 168 }
 
 const pageDirs = readdirSync(join(ROOT, 'pages'), { withFileTypes: true })
   .filter((e) => e.isDirectory())

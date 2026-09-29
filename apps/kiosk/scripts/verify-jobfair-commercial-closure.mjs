@@ -50,7 +50,11 @@ console.log('\n=== 招聘会三入口商用闭环防回退验证 ===')
   const files = [
     'src/pages/job-fairs/JobFairsPage.tsx',
     'src/pages/job-fairs/JobFairDetailPage.tsx',
-    'src/pages/job-fairs/components/JobFairDetailTabs.tsx',
+    // 2026-09-20 青序流光迁移：旧 components/JobFairDetailTabs.tsx 的四 Tab 壳退休，
+    // 详情页正文改由下面两个文件承载（分区 + 共享工作台宿主），断言跟到新落点。
+    'src/pages/job-fairs/components/FairDetailSections.tsx',
+    'src/pages/job-fairs/components/FairWorkbenchBits.tsx',
+    'src/pages/job-fairs/QxFairWorkbench.tsx',
     'src/pages/job-fairs/FairCompaniesPage.tsx',
     'src/pages/job-fairs/FairCompanyDetailPage.tsx',
     'src/pages/job-fairs/FairVisitPlanPage.tsx',
@@ -97,14 +101,23 @@ console.log('\n=== 招聘会三入口商用闭环防回退验证 ===')
 }
 
 {
+  // 2026-09-20 迁移后统计只剩两个消费面：统计页本身，和详情页 subnav 的「现场统计」一行。
+  // 旧的 components/FairDataScreen.tsx 已随四 Tab 壳退休，这里不再读它。
+  // 两处都写 `stats?.isMockData`（stats 可为 null），所以正则允许可选链。
   const statsPage = read('src/pages/job-fairs/FairStatsPage.tsx')
-  const dataScreen = read('src/pages/job-fairs/components/FairDataScreen.tsx')
   const detailPage = read('src/pages/job-fairs/JobFairDetailPage.tsx')
-  const hasDevOnlyMockCard = /stats\.isMockData\s*&&\s*import\.meta\.env\.DEV/.test(statsPage)
-  const statsBlocksMock = /stats\.isMockData/.test(statsPage) && /真实数据正在接入|暂无真实统计/.test(statsPage)
-  const detailBlocksMock = /stats\?\.isMockData/.test(detailPage) || /!stats\.isMockData/.test(detailPage) || /stats\.isMockData/.test(dataScreen)
+  const detailSections = read('src/pages/job-fairs/components/FairDetailSections.tsx')
+  const hasDevOnlyMockCard = /stats\??\.isMockData\s*&&\s*import\.meta\.env\.DEV/.test(statsPage)
+  const statsBlocksMock = /stats\??\.isMockData/.test(statsPage) && /真实数据正在接入|暂无真实统计/.test(statsPage)
+  // 详情页必须把 isMockData 折算进「有没有真统计」，且这个判定要真的传进 subnav。
+  // 变量名放开（现在是 statsResult.stats），但「取反 isMockData」与「这个判定传进 subnav」
+  // 两条不放开。改成正向判断或不传 subnav，任一都会红。
+  const detailBlocksMock =
+    /![A-Za-z_$][\w$]*(?:\.[\w$]+)*\.isMockData/.test(detailPage)
+    && /hasRealStats/.test(detailPage)
+    && /hasRealStats/.test(detailSections)
   if (hasDevOnlyMockCard || !statsBlocksMock || !detailBlocksMock) {
-    fail('isMockData 不能只做 DEV 提示，必须在详情 Tab 与统计页降级为空态')
+    fail('isMockData 不能只做 DEV 提示，必须在详情 subnav 与统计页降级为空态')
   } else {
     pass('isMockData 在招聘会详情与统计页均降级为真实空态')
   }
@@ -183,7 +196,10 @@ const FREE_CLAIMS = ['免费打印', '免费出纸', '可免费打印', '免费�
 
 for (const [rel, label] of [
   ['src/pages/job-fairs/FairMaterialsPage.tsx', '6a 活动资料页'],
-  ['src/pages/job-fairs/components/JobFairDetailTabs.tsx', '6b 招聘会详情 Tab'],
+  // 6b 原本守旧四 Tab 壳（JobFairDetailTabs.tsx）；2026-09-20 迁移后详情页正文
+  // 在 FairDetailSections.tsx，物料那一行的副文案也在那里，所以守它。
+  ['src/pages/job-fairs/components/FairDetailSections.tsx', '6b 招聘会详情分区'],
+  ['src/pages/job-fairs/JobFairDetailPage.tsx', '6b2 招聘会详情页'],
 ]) {
   const visible = visibleTextOf(rel)
   if (visible === null) {

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthModule } from '../auth/auth.module'
+import { TerminalsModule } from '../terminals/terminals.module'
 import { CompaniesController } from './companies.controller'
 import { CompaniesService } from './companies.service'
 
@@ -12,7 +13,7 @@ import { CompaniesService } from './companies.service'
  * AuthModule 提供 JwtAuthGuard / RolesGuard（admin / partner 端点）。
  */
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule, TerminalsModule],
   controllers: [CompaniesController],
   providers: [CompaniesService],
   exports: [CompaniesService],

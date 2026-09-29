@@ -338,6 +338,6 @@ Page({
     })
   },
 
-  goPrint() { wx.navigateTo({ url: '/pages/print/print' }) },
-  viewJobs() { wx.switchTab({ url: '/pages/jobs/jobs' }) },
+  // 「打印」是底部 Tab 页，只能 switchTab 进。
+  goPrint() { wx.switchTab({ url: '/pages/print/print' }) },
 })

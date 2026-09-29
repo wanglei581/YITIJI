@@ -546,7 +546,7 @@ expectMatches(
   /<button(?=[^>]*onClick=\{handleContinueAsGuest\})[^>]*>\s*继续游客体验\s*<\/button>/,
   '继续游客体验按钮绑定真实游客 handler',
 )
-expectMatches(loginDialog, /公共设备长时间无操作将自动退出并清理本次会话/, '登录弹窗提示公共终端空闲清场')
+expectMatches(loginDialog, /公共设备长时间无操作将自动退出并清理这次办理/, '登录弹窗提示公共终端空闲清场')
 
 expectMatches(agreement, /<Link\s+[^>]*to="\/legal\/terms"/, '共享协议组件链接真实用户服务协议')
 expectMatches(agreement, /<Link\s+[^>]*to="\/legal\/privacy"/, '共享协议组件链接真实隐私政策')

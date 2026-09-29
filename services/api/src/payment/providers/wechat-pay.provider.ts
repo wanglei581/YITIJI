@@ -499,10 +499,15 @@ export class WechatPayProvider implements PaymentProvider {
     const status = WechatPayProvider.mapRefundStatus(asString(resp['status']))
     // 查证接口的未知状态按 unknown 处理（不回滚不完成，等下次查证），仅明确 ABNORMAL/CLOSED 判失败。
     const raw = asString(resp['status'])
+    const amount = resp['amount'] as { refund?: unknown } | undefined
+    const refundAmountCents =
+      typeof amount?.refund === 'number' && Number.isInteger(amount.refund) && amount.refund >= 0
+        ? amount.refund
+        : null
     if (status === 'failed' && raw !== 'ABNORMAL' && raw !== 'CLOSED') {
-      return { status: 'unknown', channelRefundNo: asString(resp['refund_id']) }
+      return { status: 'unknown', channelRefundNo: asString(resp['refund_id']), refundAmountCents }
     }
-    return { status, channelRefundNo: asString(resp['refund_id']) }
+    return { status, channelRefundNo: asString(resp['refund_id']), refundAmountCents }
   }
 
   /**

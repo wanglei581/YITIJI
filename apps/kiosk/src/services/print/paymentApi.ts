@@ -137,7 +137,9 @@ export interface PickupReleaseView {
  * 终端会话票失效时由 terminalProtectedFetch 刷新一次；刷不出来就抛
  * TERMINAL_SESSION_INVALID，由收银页落到 releaseFailed 提示重试，绝不拿旧票重放。
  */
-export async function releasePickupOrder(input: PaymentSessionInput): Promise<PickupReleaseView> {
+export async function releasePickupOrder(
+  input: PaymentSessionInput & { staleSignal?: AbortSignal },
+): Promise<PickupReleaseView> {
   const terminalId = getTerminalId()
   if (!terminalId) {
     throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
@@ -151,6 +153,8 @@ export async function releasePickupOrder(input: PaymentSessionInput): Promise<Pi
         'x-terminal-id': terminalId,
         ...paymentSessionHeaders(input),
       },
+      // 不取消在途释放。调用方卸载后，终端会话层不再重放这一单。
+      staleSignal: input.staleSignal,
     })
   } catch (err) {
     throw networkError(err)

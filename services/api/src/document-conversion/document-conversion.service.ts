@@ -38,7 +38,9 @@ const execFileAsync = promisify(execFile)
 const PDF_MIME = 'application/pdf' as const
 const TIMEOUT_MS = 60_000
 const MAX_OUTPUT_BYTES = 15 * 1024 * 1024
-const CONVERSION_WARNING = '由转换引擎生成，复杂版式可能有偏差，请预览核对'
+// 原样显示给用户（一体机「我的文档」、小程序文档页都会列出 warnings），
+// 必须与一体机 WORD_CONVERSION_DISCLOSURE 是同一句用户话，不提「转换引擎」。
+const CONVERSION_WARNING = '转为 PDF 后，复杂版式可能有偏差，请预览核对'
 
 export interface DocumentConversionRuntimeOptions {
   concurrency?: number
@@ -56,7 +58,7 @@ export class DocumentConversionService implements OnModuleInit {
   private capabilities: DocumentConversionCapabilities = {
     wordToPdf: false,
     engine: 'none',
-    reason: '服务端未配置转换引擎',
+    reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。',
     cjkFonts: false,
   }
 
@@ -85,7 +87,7 @@ export class DocumentConversionService implements OnModuleInit {
       this.capabilities = {
         wordToPdf: false,
         engine: 'none',
-        reason: '服务端未配置转换引擎',
+        reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。',
         cjkFonts,
       }
       setWordToPdfUploadAvailable(false)
@@ -99,14 +101,14 @@ export class DocumentConversionService implements OnModuleInit {
       timeoutMs: PROBE_TIMEOUT_MS,
     }).catch(() => ({
       available: false,
-      reason: '服务端转换引擎探测失败',
+      reason: '暂时无法确认 Word 转 PDF 是否可用，请先另存为 PDF 上传。',
     }))
     const wordToPdf = probe.available && cjkFonts
     this.capabilities = {
       wordToPdf,
       engine: this.adapter.engine,
       ...(!wordToPdf
-        ? { reason: probe.available ? '服务端未安装可用中文字体' : (probe.reason ?? '服务端转换引擎探测失败') }
+        ? { reason: probe.available ? '转换所需的中文字体尚未准备好，请先另存为 PDF 上传。' : (probe.reason ?? '暂时无法确认 Word 转 PDF 是否可用，请先另存为 PDF 上传。') }
         : {}),
       cjkFonts,
     }
@@ -235,7 +237,7 @@ export class DocumentConversionService implements OnModuleInit {
       throw new ServiceUnavailableException({
         error: {
           code: 'CONVERSION_UNAVAILABLE',
-          message: this.capabilities.reason ?? '服务端未配置转换引擎',
+          message: this.capabilities.reason ?? 'Word 转 PDF 暂未开通，请另存为 PDF 上传。',
         },
       })
     }

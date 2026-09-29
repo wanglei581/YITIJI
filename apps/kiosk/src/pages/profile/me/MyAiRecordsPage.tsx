@@ -1,3 +1,8 @@
+import { useMemberCursorPage } from './useMemberCursorPage'
+import { MemberLoadMore } from './MemberLoadMore'
+import { QaRecords } from './QaRecords'
+import { aiRecordPath, recordUnavailableReason } from './aiRecordNavigation'
+import { clearResumeReferences } from '../../resume/clearResumeReferences'
 // AI 服务记录 — /me/ai-records（本人，仅元数据）。
 // 删除成功只在服务端回执后展示；确认超时回到未确认，不乐观移除。
 
@@ -8,6 +13,7 @@ import type {
   MemberAiRecordItem,
   MemberAiRecordKind,
   MemberInterviewItem,
+  MemberQaRecordItem,
 } from '@ai-job-print/shared'
 import {
   BriefcaseIcon,
@@ -17,10 +23,11 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react'
-import { deleteMyAiRecord, getMyAiRecords } from '../../../services/api/memberAssets'
+import { deleteMyAiRecord, getMyAiRecords, type AiRecordsPage } from '../../../services/api/memberAssets'
 import { deleteMyJobAiSession, listMyJobAiSessions } from '../../../services/api/jobAi'
 import { deleteMyInterview, getMyInterviews } from '../../../services/api/interview'
 import { useAuth } from '../../../auth/useAuth'
+import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import { formatTime } from '../assets/format'
 import { QxMeGuide, QxMePage, QxMeSummary, recordsCtabar } from './qx/QxMeChrome'
 import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMeStartRow, QxMeStructRow } from './qx/QxMeStateBits'
@@ -37,7 +44,7 @@ const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; tone?
   parse: { label: '简历诊断', hint: '上传简历后的诊断记录' },
   optimize: { label: '简历优化', hint: '基于诊断生成的优化建议', tone: 'plum' },
   generate: { label: 'AI 简历生成', hint: 'AI 引导生成的简历记录' },
-  job_fit: { label: '岗位匹配参考', hint: '仅供求职准备参考', tone: 'slate' },
+  job_fit: { label: '简历对照', hint: '仅供求职准备参考', tone: 'slate' },
   career_plan: { label: '职业规划建议', hint: '阶段性行动建议记录', tone: 'wheat' },
   fair_visit_plan: { label: '招聘会准备单', hint: '基于招聘会公开信息生成', tone: 'wheat' },
   self_assessment: { label: '自我探索 / 个人倾向参考（仅本人可见）', hint: '基于本人作答的 5 维度倾向参考', tone: 'slate' },
@@ -69,16 +76,16 @@ function shouldDisplayJobAiSession(
     || !completedJobFitTaskIds.has(session.session.resumeTaskId)
 }
 
-type LoadState = 'loading' | 'error' | 'ready'
 type Toast = { tone: 'ok' | 'bad'; text: string }
 
 export function MyAiRecordsPage() {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
-  const [items, setItems] = useState<AiRecordView[]>([])
-  const [jobAiSessions, setJobAiSessions] = useState<JobAiSessionListItem[]>([])
-  const [interviews, setInterviews] = useState<MemberInterviewItem[]>([])
-  const [state, setState] = useState<LoadState>('loading')
+  // 招聘内容托管（3.13）关闭时：不读、不列岗位 AI 会话与招聘会准备单，也不摆岗位 AI 类入口与说明（那些页不开放）。
+  // 托管还没读到时先不拉列表：否则先按「关闭」拉一遍、读到「打开」再拉一遍，列表会闪一次骨架。
+  const hosting = useRecruitmentHosting()
+  const hostingOpen = hosting.enabled
+  const hostingKnown = hosting.status === 'ready'
   const [reloadKey, setReloadKey] = useState(0)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [confirmExpired, setConfirmExpired] = useState(false)
@@ -88,53 +95,40 @@ export function MyAiRecordsPage() {
   const [busyJobAiSessionId, setBusyJobAiSessionId] = useState<string | null>(null)
   const [busyInterviewId, setBusyInterviewId] = useState<string | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
-  const mountedRef = useRef(false)
-  const loadSeqRef = useRef(0)
+  const token = getToken()
+  const enabled = isLoggedIn && hostingKnown
+  // GET /me/ai-records 的首页同时带回记录和小青作业。两个分页器各拉一遍就是两次一模一样的请求，
+  // 所以首页由记录分页器发、小青作业分页器共用同一个请求；之后各按自己的游标加载更多。
+  // 两个分页器的 effect 依赖相同、按声明顺序执行，记录那边总是先发出新的首页请求。
+  const firstRecordsPage = useRef<Promise<AiRecordsPage> | null>(null)
+  const fetchRecords = useCallback((cursor?: string) => {
+    if (cursor) return getMyAiRecords(token, { pageSize: 50, cursor })
+    const request = getMyAiRecords(token, { pageSize: 50 })
+    firstRecordsPage.current = request
+    return request
+  }, [token])
+  const fetchQa = useCallback(async (qaCursor?: string) => {
+    const page = await (qaCursor
+      ? getMyAiRecords(token, { pageSize: 50, qaCursor })
+      : firstRecordsPage.current ?? getMyAiRecords(token, { pageSize: 50 }))
+    return { items: page.qaRecords, total: page.qaTotal, nextCursor: page.qaNextCursor }
+  }, [token])
+  const fetchSessions = useCallback((cursor?: string) => listMyJobAiSessions(token, { pageSize: 50, cursor }), [token])
+  const fetchInterviews = useCallback((cursor?: string) => getMyInterviews(token, { pageSize: 50, cursor }), [token])
+  const recordsPage = useMemberCursorPage<AiRecordView>({ enabled, identityKey: token, reloadKey, fetchPage: fetchRecords })
+  const qaPage = useMemberCursorPage<MemberQaRecordItem>({ enabled, identityKey: token, reloadKey, fetchPage: fetchQa })
+  const sessionsPage = useMemberCursorPage<JobAiSessionListItem>({ enabled: enabled && hostingOpen, identityKey: token, reloadKey, fetchPage: fetchSessions, keyOf: (item) => item.session.id })
+  const interviewPage = useMemberCursorPage<MemberInterviewItem>({ enabled, identityKey: token, reloadKey, fetchPage: fetchInterviews, keyOf: (item) => item.sessionId })
+  const { setItems } = recordsPage
+  const { items: interviews, setItems: setInterviews } = interviewPage
+  const { setItems: setJobAiSessions } = sessionsPage
+  const items = hostingOpen ? recordsPage.items : recordsPage.items.filter((item) => item.kind !== 'fair_visit_plan')
+  const completedJobFitTaskIds = new Set(items.filter((item) => item.kind === 'job_fit' && item.status === 'completed').map((item) => item.taskId))
+  const jobAiSessions = sessionsPage.items.filter((item) => shouldDisplayJobAiSession(item, completedJobFitTaskIds))
+  const pages = [recordsPage, qaPage, interviewPage, ...(hostingOpen ? [sessionsPage] : [])]
+  const state = !hostingKnown || pages.some((page) => page.state === 'loading') ? 'loading'
+    : pages.some((page) => page.state === 'error') ? 'error' : 'ready'
 
-  useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-      loadSeqRef.current += 1
-    }
-  }, [])
-
-  const load = useCallback(() => {
-    const seq = loadSeqRef.current + 1
-    loadSeqRef.current = seq
-    if (!isLoggedIn) {
-      setItems([])
-      setJobAiSessions([])
-      setInterviews([])
-      setState('ready')
-      return
-    }
-    setState('loading')
-    const token = getToken()
-    Promise.all([
-      getMyAiRecords(token, { pageSize: 50 }),
-      listMyJobAiSessions(token, { pageSize: 50 }),
-      getMyInterviews(token),
-    ])
-      .then(([recordsPage, sessionsPage, interviewPage]) => {
-        if (!mountedRef.current || loadSeqRef.current !== seq) return
-        setItems(recordsPage.items as AiRecordView[])
-        const completedJobFitTaskIds = new Set(
-          recordsPage.items
-            .filter((item) => item.kind === 'job_fit' && item.status === 'completed')
-            .map((item) => item.taskId),
-        )
-        setJobAiSessions(sessionsPage.items.filter((session) => shouldDisplayJobAiSession(session, completedJobFitTaskIds)))
-        setInterviews(interviewPage.items)
-        setState('ready')
-      })
-      .catch(() => {
-        if (!mountedRef.current || loadSeqRef.current !== seq) return
-        setState('error')
-      })
-  }, [getToken, isLoggedIn])
-
-  useEffect(() => { load() }, [load, reloadKey])
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(null), 3000)
@@ -181,6 +175,8 @@ export function MyAiRecordsPage() {
           item.session.operation === 'match' && item.session.resumeTaskId === record.taskId
         )))
       }
+      clearResumeReferences(record.taskId)
+      setReloadKey((key) => key + 1)
       setConfirmId(null)
       setToast({ tone: 'ok', text: result.deletedCount > 1 ? '记录及关联分析结果已删除' : '记录已删除' })
     } catch {
@@ -201,6 +197,7 @@ export function MyAiRecordsPage() {
     try {
       await deleteMyJobAiSession(token, sessionId)
       setJobAiSessions((prev) => prev.filter((item) => item.session.id !== sessionId))
+      setReloadKey((key) => key + 1)
       setConfirmJobAiSessionId(null)
       setToast({ tone: 'ok', text: '岗位 AI 参考记录已删除' })
     } catch {
@@ -221,6 +218,7 @@ export function MyAiRecordsPage() {
     try {
       await deleteMyInterview(token, sessionId)
       setInterviews((prev) => prev.filter((item) => item.sessionId !== sessionId))
+      setReloadKey((key) => key + 1)
       setConfirmInterviewId(null)
       setToast({ tone: 'ok', text: '模拟面试记录已删除' })
     } catch {
@@ -235,8 +233,8 @@ export function MyAiRecordsPage() {
     navigate(`/job-fairs/${encodeURIComponent(item.ref.id)}/visit-plan`, { state: { taskId: item.taskId } })
   }
 
-  const totalCount = items.length + jobAiSessions.length + interviews.length
-  const empty = totalCount === 0
+  const totalCount = items.length + jobAiSessions.length + interviews.length + qaPage.items.length
+  const empty = totalCount === 0 && !pages.some((page) => page.nextCursor)
   const uiState = !isLoggedIn
     ? 'login'
     : state === 'loading'
@@ -259,9 +257,9 @@ export function MyAiRecordsPage() {
 
   const struct = (
     <>
-      <QxMeStructRow icon={FileCheckIcon} title="简历诊断与优化记录" desc="只存服务元数据，不存原文与模型输出" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-0" />
+      <QxMeStructRow icon={FileCheckIcon} title="简历诊断与优化记录" desc="只存服务记录，不存原文与模型输出" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-0" />
       <QxMeStructRow icon={RouteIcon} title="职业规划建议记录" desc="阶段性行动建议的服务记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-1" />
-      <QxMeStructRow icon={BriefcaseIcon} title="岗位 AI 参考会话" desc="基于公开岗位字段的解读记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-2" />
+      {hostingOpen ? <QxMeStructRow icon={BriefcaseIcon} title="岗位 AI 参考记录" desc="基于公开岗位内容的解读记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-2" /> : null}
     </>
   )
 
@@ -279,17 +277,19 @@ export function MyAiRecordsPage() {
           <span className="qx-me-banner-ico" aria-hidden="true"><SparklesIcon size={34} /></span>
           <span className="qx-me-banner-main">
             <h2 className="qx-me-banner-t">还没有 AI 服务记录</h2>
-            <span className="qx-me-banner-p">完成简历诊断、优化、模拟面试、岗位 AI 参考、职业规划或参会准备后，这里会显示记录。<b>空就是空</b>。</span>
+            <span className="qx-me-banner-p">{hostingOpen ? '完成小青作业、简历诊断、优化、模拟面试、岗位 AI 参考、职业规划或参会准备后，这里会显示记录。' : '完成小青作业、简历诊断、优化、模拟面试、简历对照或职业规划后，这里会显示记录。'}<b>空就是空</b>。</span>
           </span>
           <span className="qx-me-banner-mini"><i>共 0</i></span>
         </section>
         <section className="qx-me-list qx-me-grow" aria-label="从这里开始">
           <QxMeStartRow icon={FileCheckIcon} title="做一次简历诊断" desc="诊断结果会生成一条可回看的服务记录" label="去诊断" route="/resume/source?intent=diagnose" testid="member-records-start-diagnose" onClick={() => navigate('/resume/source?intent=diagnose')} />
-          <QxMeStartRow icon={BriefcaseIcon} tone="slate" title="让 AI 解读一个岗位" desc="基于来源岗位的公开字段生成参考解读" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
+          {hostingOpen
+            ? <QxMeStartRow icon={BriefcaseIcon} tone="slate" title="让 AI 解读一个岗位" desc="基于来源岗位的公开内容生成参考解读" label="查看岗位" route="/jobs" testid="member-records-start-jobs" onClick={() => navigate('/jobs')} />
+            : <QxMeStartRow icon={BriefcaseIcon} tone="slate" title="做一次简历对照" desc="填一份岗位要求，AI 对照你的简历" label="去对照" route="/resume/job-fit" testid="member-records-start-job-fit" onClick={() => navigate('/resume/job-fit')} />}
           <QxMeStartRow icon={RouteIcon} tone="wheat" title="做一次职业规划" desc="阶段性行动建议会存成一条服务记录" label="去规划" route="/resume-service" testid="member-records-start-plan" onClick={() => navigate('/resume-service')} />
-          <div className="qx-me-legal">仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或模型原始输出。</div>
+          <div className="qx-me-legal">仅展示本人 AI 服务记录，不展示简历原文、诊断正文或模型原始输出。</div>
         </section>
-        <QxMeGuide items={[['怎么产生', '用过 AI 服务之后', '诊断、优化、规划、参会准备都会记'], ['这里显示什么', '只有服务元数据', '不展示提示词或模型原始输出'], ['可以删除', '两步确认', '删除后不可恢复']]} />
+        <QxMeGuide items={[['怎么产生', '用过 AI 服务之后', hostingOpen ? '诊断、优化、规划、参会准备都会记' : '诊断、优化、对照、规划都会记'], ['这里显示什么', '只有服务记录', '不展示提示词或模型原始输出'], ['可以删除', '两步确认', '删除后不可恢复']]} />
       </>
     )
   } else {
@@ -297,12 +297,14 @@ export function MyAiRecordsPage() {
       <>
         <QxMeSummary
           icon={<SparklesIcon size={32} />}
-          label="AI 服务记录"
+          label="已加载 AI 服务记录"
           big={totalCount}
-          desc="仅展示本人服务元数据，不展示简历原文、诊断正文或模型原始输出"
-          minis={[`当前 ${totalCount} 行`]}
+          desc="仅展示本人服务记录，不展示简历原文、诊断正文或模型原始输出"
+          minis={[`已加载 ${totalCount} 条`, `小青作业共 ${qaPage.total} 条`]}
         />
         <section className="qx-me-list qx-me-grow" data-testid="member-records-list" aria-label="AI 服务记录">
+          <QaRecords items={qaPage.items} token={token ?? null} onDeleted={() => setReloadKey((key) => key + 1)} />
+          <MemberLoadMore {...qaPage} label="加载更多小青作业" />
           <MockInterviewRecords
             items={interviews}
             confirmId={confirmInterviewId}
@@ -315,18 +317,24 @@ export function MyAiRecordsPage() {
             }}
             onDelete={(sessionId) => void removeInterview(sessionId)}
           />
-          <JobAiSessionRecords
-            items={jobAiSessions}
-            confirmId={confirmJobAiSessionId}
-            busyId={busyJobAiSessionId}
-            onDelete={(sessionId) => void removeJobAiSession(sessionId)}
-          />
+          <MemberLoadMore {...interviewPage} label="加载更多模拟面试" />
+          {hostingOpen ? (
+            <JobAiSessionRecords
+              items={jobAiSessions}
+              confirmId={confirmJobAiSessionId}
+              busyId={busyJobAiSessionId}
+              onDelete={(sessionId) => void removeJobAiSession(sessionId)}
+            />
+          ) : null}
+          {hostingOpen ? <MemberLoadMore {...sessionsPage} label="加载更多岗位 AI 记录" /> : null}
           {items.length > 0 ? (
-            <div className="qx-me-legal">简历与规划 AI 记录 · 仅展示服务元数据，不展示简历原文或诊断正文</div>
+            <div className="qx-me-legal">简历与规划 AI 记录 · 仅展示服务记录，不展示简历原文或诊断正文</div>
           ) : null}
           {items.map((item) => {
-            const kind = KIND_META[item.kind] ?? { label: 'AI 服务记录', hint: '本人 AI 服务元数据', tone: 'slate' as const }
+            const kind = KIND_META[item.kind] ?? { label: 'AI 服务记录', hint: '本人 AI 服务记录', tone: 'slate' as const }
             const status = STATUS_META[item.status]
+            const openPath = aiRecordPath(item)
+            const openReason = recordUnavailableReason(item)
             const confirming = confirmId === item.id
             const expired = confirmExpired && !confirmId && items[0]?.id === item.id
             const busy = busyId === item.id
@@ -340,14 +348,16 @@ export function MyAiRecordsPage() {
                   </span>
                   <span className="qx-me-row-title" style={{ marginTop: 8 }}>{item.kind === 'fair_visit_plan' && item.ref?.name ? item.ref.name : kind.hint}</span>
                   <span className="qx-me-row-sub">{metaLine(item)}</span>
-                  {confirming && item.kind === 'parse' ? <span className="qx-me-reason">删除这条诊断记录时，服务端会同时删除同一任务的派生记录与岗位 AI 会话。</span> : null}
+                  {openReason ? <span className="qx-me-reason">{openReason}</span> : null}
+                  {confirming && item.kind === 'parse' ? <span className="qx-me-reason">删除这条诊断记录时，会同时删除这份简历的优化稿、简历对照、职业规划及相关 AI 分析记录。</span> : null}
                   {expired ? <span className="qx-me-reason">上一次确认已超时失效，删除未执行；需要重新点击删除。</span> : null}
                   {confirming ? <span className="qx-me-reason">成功即完成删除，失败会提示稍后重试；本页不会提前显示成功。</span> : null}
-                  {item.kind === 'fair_visit_plan' && item.ref?.type === 'job_fair' && item.ref.id && item.status === 'completed' ? (
+                  {hostingOpen && item.kind === 'fair_visit_plan' && item.ref?.type === 'job_fair' && item.ref.id && item.status === 'completed' ? (
                     <button type="button" className="qx-me-small" style={{ marginTop: 8 }} onClick={() => openFairPlan(item)}>打开这场招聘会规划</button>
                   ) : null}
                 </span>
                 <span className="qx-me-acts">
+                  {openPath ? <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(openPath)}>打开</button> : null}
                   {confirming ? (
                     <>
                       <button type="button" className="qx-me-small" aria-label="取消删除这条记录" onClick={() => setConfirmId(null)}>
@@ -398,8 +408,8 @@ export function MyAiRecordsPage() {
       screenState={`ai-records-${uiState}`}
       eyebrow="AI SERVICE RECORDS"
       ask={<>AI 帮你做过什么，<em>一条不落</em>。</>}
-      doing={<>只展示<b>服务元数据</b>，不展示简历原文、诊断正文或模型原始输出。</>}
-      truth="删除后不可恢复；删除简历诊断记录会同时删除同一任务的派生记录与岗位 AI 会话。"
+      doing={<>只展示<b>服务记录</b>，不展示简历原文、诊断正文或模型原始输出。</>}
+      truth="删除后不可恢复；删除简历诊断记录会同时删除这份简历的优化稿、简历对照、职业规划及相关 AI 分析记录。"
       toast={toast}
       ctabar={recordsCtabar(
         uiState === 'login' || uiState === 'loading' || uiState === 'error' ? uiState : 'ready',
@@ -411,12 +421,13 @@ export function MyAiRecordsPage() {
       )}
     >
       {body}
+      {isLoggedIn && state === 'ready' ? <MemberLoadMore {...recordsPage} label="加载更多简历与规划记录" /> : null}
     </QxMePage>
   )
 }
 
 function confirmingLine(confirmId: string | null): string {
   return confirmId
-    ? '再次点击「确认删除」后不可恢复；删除简历诊断记录会同时删除同一任务的派生记录与岗位 AI 会话。'
-    : '删除需要两步确认；未在确认时限内再次点击，会回到未确认状态。删除简历诊断记录会同时删除同一任务的派生记录与岗位 AI 会话。'
+    ? '再次点击「确认删除」后不可恢复；删除简历诊断记录会同时删除这份简历的优化稿、简历对照、职业规划及相关 AI 分析记录。'
+    : '删除需要两步确认；未在确认时限内再次点击，会回到未确认状态。删除简历诊断记录会同时删除这份简历的优化稿、简历对照、职业规划及相关 AI 分析记录。'
 }

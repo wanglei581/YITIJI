@@ -123,7 +123,7 @@ export function recordedAmountDisplay(amountCents: number | null | undefined): s
 
 /** 实付无独立真源字段，禁止用应付减优惠推算。 */
 export const NET_PAID_UNRECORDED = '未记录'
-export const NET_PAID_UNRECORDED_HINT = '无独立字段，不按应付减优惠推算'
+export const NET_PAID_UNRECORDED_HINT = '没有单独记下实付，不按应付减优惠来推算'
 
 /** API-20：已付款未出纸的待退款展示。到账时间不以天数承诺，渠道不在我们控制范围内。 */
 export const PENDING_REFUND_LABEL = '待退款'

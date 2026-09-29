@@ -44,7 +44,7 @@
 
   <view wx:if="{{phase === 'done' && fromJobFit}}" class="notice info">
     <text class="ficon i-info n-ic"></text>
-    <text>已从“{{targetPosition || '目标岗位'}}”匹配结果进入。本页优化基于原简历诊断生成，请回到匹配结果逐项核对岗位差距，不会替你补写不存在的经历。</text>
+    <text>已从“{{targetPosition || '目标岗位'}}”的简历对照结果进入。本页优化基于原简历诊断生成，请回到对照结果逐项核对差距，不会替你补写不存在的经历。</text>
   </view>
 
   <view wx:if="{{phase === 'done'}}" class="content">

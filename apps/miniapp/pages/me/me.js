@@ -32,11 +32,10 @@ Page({
       { id: 'docs',      icon: 'folder',    title: '我的文档',      sub: '可再次发起打印',       accent: 'teal'  },
       { id: 'orders',    icon: 'printer',   title: '打印订单',      sub: '到机码与出纸状态',     accent: 'clay'  },
       { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'cyan'  },
-      { id: 'favorites', icon: 'inbox',     title: '我的收藏',      sub: '岗位、招聘会与政策',   accent: 'teal'  },
-      { id: 'reminders', icon: 'bell',      title: '招聘会提醒',    sub: '仅保存在本机，换设备不同步', accent: 'clay'  },
-      { id: 'activity',  icon: 'history',   title: '浏览与跳转记录', sub: '仅记录本人浏览与跳转', accent: 'wheat' },
-      { id: 'feedback',  icon: 'comment',   title: '意见反馈',      sub: '提交后可看处理进度',   accent: 'cyan'  },
-      { id: 'membership',icon: 'crown',     title: '我的权益',      sub: '查看本人实际权益记录', accent: 'wheat' },
+      // 我的收藏 / 招聘会提醒 / 浏览与跳转记录只装岗位、招聘会、企业、政策四类内容，
+      // 「我的权益」首发不对 AI 收费、先收起：四页随岗位招聘会政策页一起停放
+      // （首发按非招聘类目提审，compliance-boundary.md §1.1）。
+      { id: 'feedback',  icon: 'comment',   title: '意见反馈与投诉', sub: '提交后可看处理进度',   accent: 'cyan'  },
       { id: 'settings',  icon: 'setting',   title: '账号设置',      sub: '手机号、隐私与登录',   accent: 'slate' },
     ],
   },
@@ -86,11 +85,7 @@ Page({
       docs:       '/pages/documents/documents',
       orders:     '/pages/orders/orders',
       ai:         '/pages/ai-records/ai-records',
-      favorites:  '/pages/favorites/favorites',
-      reminders:  '/pages/fair-reminders/fair-reminders',
-      activity:   '/pages/browse-history/browse-history',
       feedback:   '/pages/feedback/feedback',
-      membership: '/pages/membership/membership',
       settings:   '/pages/settings/settings',
     }
     if (routes[id]) wx.navigateTo({ url: routes[id] })

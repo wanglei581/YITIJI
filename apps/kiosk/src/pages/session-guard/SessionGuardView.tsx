@@ -27,13 +27,15 @@ export function SessionGuardView({
   const title = state === 'warning-no-continue'
     ? <>这次<em>不能</em>就地继续</>
     : state === 'clearing'
-      ? <>正在<em>清除</em>本机会话</>
+      ? <>正在<em>清除</em>这台机器上的这次使用记录</>
       : <>还在用吗？<em>没操作</em>有一会儿了</>
   const copy = state === 'warning-no-continue'
-    ? '会话守卫这次没有给出「继续使用」的许可。你可以立刻结束并清场，也可以等计时走完。'
+    ? '这一次不允许再点「继续使用」。你可以立刻结束并清场，也可以等计时走完。'
     : state === 'clearing'
-      ? '清的是这台机器上的登录态与临时会话信息。结果由清场例程返回，本页不提前写成已完成。'
-      : '这是公共终端的隐私保护。时间一到，本机上这趟留下的东西会被清掉；已经交给服务端的任务和账号数据不受影响。'
+      ? (isAnonymous
+        ? '清的是这台机器上这次的临时使用记录。结果要等清除做完才算数，本页不提前写成已完成。'
+        : '清的是这台机器上的登录状态和这次的临时使用记录。结果要等清除做完才算数，本页不提前写成已完成。')
+      : '这是公用设备的隐私保护。时间一到，本机上这趟留下的东西会被清掉；已经交给系统的任务和账号数据不受影响。'
 
   return (
     <div className="sg-page qx-grow qx-scroll" data-screen="session-guard" data-state={state} data-testid={`session-guard-state-${state}`}>
@@ -51,7 +53,7 @@ export function SessionGuardView({
           {state === 'warning' ? (
             <div className="sg-from">
               继续后回到 {sourceKnown ? <b>{sourcePath}</b> : <b>首页</b>}
-              {sourceKnown ? null : '（这次读不到可用的来源页，按 fail-closed 处理）'}
+              {sourceKnown ? null : '（这次读不到可用的来源页，所以回到首页）'}
             </div>
           ) : null}
         </div>
@@ -62,7 +64,7 @@ export function SessionGuardView({
           <div className="qx-state" data-tone="info" data-testid="session-guard-fallback">
             <div>
               <div className="qx-state-t">为什么没有「继续使用」</div>
-              <p className="qx-state-d">公共终端的会话有一个最长时限，到点就必须清场，不能靠反复点「继续」无限延长。</p>
+              <p className="qx-state-d">这台机器上的一次使用有最长时限，到点就必须清场，不能靠反复点「继续」无限延长。</p>
             </div>
           </div>
         </section>
@@ -72,7 +74,7 @@ export function SessionGuardView({
         <div className="sg-sec-h"><span className="t">这次会清掉什么</span></div>
         <p className="sg-impact" data-testid="session-guard-impact">{sessionImpact}</p>
         <p className="sg-impact" data-testid="session-guard-identity">
-          <span>{isAnonymous ? '当前会话：' : '当前登录：'}<b>{accountLabel}</b></span>
+          <span>{isAnonymous ? '这次使用：' : '当前登录：'}<b>{accountLabel}</b></span>
           {' · '}
           {/* 独立 span：用例按 exact 匹配这一句，混在同一个元素里会匹配不到，
               而这句是匿名用户唯一能看到的「退出就没了」的提示，不能被稀释。 */}
@@ -106,8 +108,11 @@ export function SessionGuardView({
 
       <div className="sg-truth" data-disclaimer="true" data-testid="session-guard-truth">
         <div><b>倒计时</b>由本机时钟执行，不依赖网络与 AI；这台机器没有离人传感器，也不做人脸判断。</div>
-        <div><b>清除范围</b>结束会话清除本机登录态与临时会话信息；服务端的订单与文件按留存期限管理。</div>
-        <div><b>已创建的任务</b>打印/扫描任务在服务端继续运行，不会因为这次清场被取消。</div>
+        {/* 没登录的人不该看到「登录状态」一类字眼（会话提醒用例钉着）：按是否登录分开说。 */}
+        <div><b>清除范围</b>{isAnonymous
+          ? '结束这次使用，会清掉这台机器上这次留下的临时记录；系统里的订单与文件按保存期限管理。'
+          : '结束这次使用，会退出登录，并清掉这台机器上的临时使用记录；系统里的订单与文件按保存期限管理。'}</div>
+        <div><b>已创建的任务</b>打印/扫描任务在系统里继续运行，不会因为这次清场被取消。</div>
       </div>
     </div>
   )

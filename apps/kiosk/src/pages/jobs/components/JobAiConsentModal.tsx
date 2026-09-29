@@ -19,7 +19,7 @@ export function JobAiConsentModal({
       open={open}
       onClose={onCancel}
       title="开启岗位 AI 辅助"
-      description="基于本人简历与来源岗位字段生成参考建议，不代表录用结果。"
+      description="基于本人简历与来源岗位内容生成参考建议，不代表录用结果。"
       className="w-[30rem] max-w-full"
       actions={(
         <>
@@ -35,7 +35,7 @@ export function JobAiConsentModal({
           <SparklesIcon className="h-6 w-6" aria-hidden="true" />
         </div>
         <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-          本系统会基于你的本人简历和岗位来源字段生成岗位解读、匹配参考和准备建议，结果仅供求职参考，不代表录用结果。
+          本系统会基于你的本人简历和岗位来源内容生成岗位解读、匹配参考和准备建议，结果仅供求职参考，不代表录用结果。
         </p>
 
         <div className="mt-4 space-y-2 rounded-xl bg-neutral-50 px-4 py-3">

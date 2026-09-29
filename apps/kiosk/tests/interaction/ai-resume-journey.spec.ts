@@ -62,9 +62,9 @@ async function enterResumeHub(page: Page, journey: string, collectors: ReturnTyp
     page, journey, step: 'home-resume-hub', control: 'AI 简历服务', selectorHint: '[data-domain-id=resume] .v6-home-domain__main',
     kind: 'click', collectors,
     act: async () => {
-      const card = page.locator('[data-domain-id="resume"] .v6-home-domain__main')
+      const card = page.locator('[data-action="resume-hub"]')
       if (await card.count()) await card.click()
-      else await clickNamed(page, /AI 简历服务/)
+      else await clickNamed(page, /改简历/)
       await page.waitForURL((url) => url.pathname === '/resume-service', { timeout: 15_000 })
     },
   })
@@ -382,11 +382,13 @@ test('J3 匿名 · AI 帮你生成一份 → 预览 → 导出 PDF @interaction'
     await waitReady(page)
     const skills = page.getByLabel(/技能/)
     if (await skills.count()) await skills.fill('TypeScript, React')
+    // 稿 24 最后一步先「去核对」，核对屏主按钮才是「让 AI 整理成新简历」。仍用按钮角色点击，并等到预览页。
+    await page.getByRole('button', { name: '去核对' }).click()
     await recordStep({
-      page, journey, step: 'generate-submit', control: '生成我的简历', selectorHint: 'button:生成我的简历',
+      page, journey, step: 'generate-submit', control: '让 AI 整理成新简历', selectorHint: 'button:让 AI 整理成新简历',
       kind: 'click', collectors,
       act: async () => {
-        await page.getByRole('button', { name: /生成我的简历/ }).click()
+        await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
         await confirmAiConsent(page, journey, collectors)
         await page.waitForURL((url) => url.pathname === '/resume/generate/preview', { timeout: 60_000 })
       },
@@ -399,6 +401,8 @@ test('J3 匿名 · AI 帮你生成一份 → 预览 → 导出 PDF @interaction'
         const cta = page.getByTestId('resume-generate-preview-cta-export')
         if (await cta.count()) await cta.click()
         else await page.getByRole('button', { name: /去导出|导出 PDF/ }).click()
+        const confirm = page.getByTestId('resume-generate-preview-cta-confirm-export')
+        if (await confirm.count()) await confirm.click()
         await confirmFactsIfOpen(page, journey, collectors)
         await page.waitForTimeout(1500)
       },
@@ -499,7 +503,7 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
     const login = await loginMemberViaSms(page, journey, collectors)
     if (!login.codeSource) {
       appendOperation({
-        journey, step: 'member-login-failed', route: new URL(page.url()).pathname, control: '验证并登录',
+        journey, step: 'member-login-failed', route: new URL(page.url()).pathname, control: '确认登录',
         selectorHint: 'sms-log/redis', kind: 'click', disabled: false, dead: false,
         observations: { urlChanged: false, apiRequests: [], domChanged: false, overlayOrToastOrError: true, beforeUrl: '/login', afterUrl: new URL(page.url()).pathname, beforeTextLen: 0, afterTextLen: 0 },
         runtimeErrors: [], forbiddenCopy: [], screenshot: await shot(page, journey, 'login-no-code'),
@@ -538,7 +542,12 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
     }
     expect(page.url(), '会员未走到优化页').toContain('/resume/optimize')
     {
+      // 稿 23（2.0）：有可对照的条目时先落在建议总览（点「编辑并导出」进编辑区），没有条目时直接是编辑区。
+      // 先等两者之一真的出现，再决定点不点，不靠一次不等待的 count()。
+      const toEditor = page.getByRole('button', { name: '编辑并导出', exact: true })
       const exportBtn = page.getByRole('button', { name: /确认优化版，导出 PDF|导出 PDF/ })
+      await expect(toEditor.or(exportBtn).first()).toBeVisible({ timeout: 15_000 })
+      if (await toEditor.isVisible()) await toEditor.click()
       expect(await exportBtn.count(), '优化页没有导出按钮 —— 会员导出闭环无法验证').toBeGreaterThan(0)
       {
         await exportBtn.first().click()

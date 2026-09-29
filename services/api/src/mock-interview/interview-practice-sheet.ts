@@ -43,7 +43,7 @@ const HR_QUESTIONS: readonly PracticeSheetQuestion[] = [
 ]
 
 const MANAGER_QUESTIONS: readonly PracticeSheetQuestion[] = [
-  { question: '请介绍你最近负责的一件完整的事，从开始到交付。', examines: '执行链路、责任范围' },
+  { question: '请介绍你最近负责的一件完整的事，从开始到交付。', examines: '执行过程、责任范围' },
   { question: '这件事里哪一部分是你自己做的，哪一部分是别人做的？', examines: '职责边界、表述诚实度' },
   { question: '这个岗位每天大概要做什么，你怎么理解？', examines: '岗位理解' },
   { question: '你遇到过最棘手的一次问题是什么，最后怎么收的？', examines: '问题解决、复盘能力' },

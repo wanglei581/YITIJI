@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
 import type { ResumeParseResponse, ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
-import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
 import { isAiOutage } from '../../ai'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { resumeUserReason } from './resumeUserCopy'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { ResumeDiagnosisFailExits } from './components/ResumeDiagnosisFailExits'
 import { readAiResumeSession } from './aiResumeSession'
@@ -27,11 +29,14 @@ import { EmptyReportBody, ResumeReportBody } from './components/resume-report/Re
 import { ResumeReportCta } from './components/resume-report/ResumeReportActions'
 import { ResumeReportTakeaway } from './components/resume-report/ResumeReportTakeaway'
 import './resume-report-qx.css'
+import './resume-r1-qx2.css'
 
 interface ReportState {
   intent?: string
   source?: string
   file?: { name: string; size: string; format: string; fileUrl?: string; mimeType?: string }
+  /** 上传结果的 fileId：来源页放在解析页 state 顶层，解析失败时随整份 state 转过来（打印原件要用）。 */
+  fileId?: string
   taskId?: string
   accessToken?: string
   providerName?: string
@@ -47,10 +52,10 @@ const CONFIDENCE_LABEL: Record<'high' | 'medium' | 'low', string> = { high: '较
 
 function buildExtractionNotice(notice?: ReportState['extractionNotice']): string | null {
   if (!notice) return null
-  const isOcr = notice.textSource === 'image_ocr' || notice.textSource === 'pdf_ocr'
-  const warningText = notice.warnings.length > 0 ? notice.warnings.join('；') : ''
+  const isOcr = notice.textSource === 'image_ocr' || notice.textSource === 'pdf_ocr' || notice.textSource === 'ocr'
+  const warningText = notice.warnings.length > 0 ? '部分图片文字需要本人复核' : ''
   if (isOcr) {
-    const head = `本简历经文字识别（OCR）提取，识别置信度${CONFIDENCE_LABEL[notice.confidence]}。`
+    const head = `本简历通过图片识别读取文字，清晰程度${CONFIDENCE_LABEL[notice.confidence]}。`
     return warningText ? `${head} ${warningText}。` : head
   }
   return warningText ? `${warningText}。` : null
@@ -65,27 +70,27 @@ function ReportNoticePanel({
   extractionNotice?: ReportState['extractionNotice']
   truncated?: boolean
 }) {
+  // AI 可见标识与识别提醒常显；更长的用途说明可展开，避免重复占满首屏。
   const notices = [
-    isDemoReport ? COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE : null,
     isDemoReport
       ? '演示报告不基于你上传的文件内容生成，仅用于展示报告结构；它不会发送给企业，也不代表录用、面试或投递结果。'
-      : '本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。',
-    buildExtractionNotice(extractionNotice),
+      : '本报告只依据上传文件中可解析出的内容，不会发送给企业，也不代表录用、面试或投递结果。',
     truncated ? '本次诊断只看了简历前若干字符，后面的内容块可能整块缺失，不是简历里没有那些部分。' : null,
     COMPLIANCE_COPY.KIOSK_RESUME_REPORT_DISCLAIMER,
     COMPLIANCE_COPY.KIOSK_RESUME_NO_SEND_ENTERPRISE,
   ].filter((item): item is string => Boolean(item))
-  const ocr = extractionNotice && (extractionNotice.textSource === 'image_ocr' || extractionNotice.textSource === 'pdf_ocr')
+  const extractionMessage = buildExtractionNotice(extractionNotice)
   return (
     <>
-      {truncated ? <p className="rrp-banner" data-kind="trunc" data-testid="resume-report-trunc">本次诊断没有看完整份简历（输入被截断）。</p> : null}
-      {ocr ? <p className="rrp-banner" data-kind="ocr" data-testid="resume-report-ocr">{buildExtractionNotice(extractionNotice)}</p> : null}
-      <section className="rrp-notice">
-        <p className="text-sm font-semibold">报告说明</p>
+      {truncated ? <p className="rrp-banner" data-kind="trunc" data-testid="resume-report-trunc">本次诊断没有看完整份简历，仅分析了可读取的部分。</p> : null}
+      {extractionMessage ? <p className="rrp-banner" data-kind="ocr" data-testid="resume-report-ocr">{extractionMessage}</p> : null}
+      <p className="rrp-ai-label">{isDemoReport ? COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE : AI_LABEL_COPY.RESUME_DIAGNOSIS}</p>
+      <details className="rrp-notice">
+        <summary>报告说明</summary>
         <ul>
           {notices.map((notice) => <li key={notice}>{notice}</li>)}
         </ul>
-      </section>
+      </details>
     </>
   )
 }
@@ -187,15 +192,28 @@ export function ResumeReportPage() {
     </>
   )
 
+  /*
+   * 只有**明确失败**会到这里：解析结果未知留在解析页（稿 21 parse-unknown），不转成失败屏。
+   * 「重新解析」是一次新的提交（新的 AI 调用），因此只放在服务端明确说没成的这一屏。
+   */
+  const stepActions = <QxStepActions onPrev={() => navigate('/resume/source')}><QxAiHelp label="问小青：先改哪几处 →" draft="请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。" /></QxStepActions>
+  const failCta = (
+    <>
+      {stepActions}
+      <p className="why" id="resume-report-why">上一次已明确没解析成功；重新解析会作为新的一次提交。这一屏一条 AI 结论都不给。</p>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')} data-route="/">返回首页</button>
+      <button type="button" className="qx-btn" data-variant="primary" onClick={handleRetry} data-route="/resume/parse" data-testid="resume-report-primary">重新解析</button>
+    </>
+  )
   const failView = (failReason: string) => (
-    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={<p className="why">这一屏一条 AI 结论都不给。</p>}>
-      <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-ai-down-exits="resume-diagnosis" data-state="diagnose-failed" data-testid="resume-report-state-diagnose-failed" className="qx-scroll rrp-page">
+    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }} status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={failCta}>
+      <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-takeaway="诊断报告与修改清单" data-ai-down-exits="resume-diagnosis" data-state="diagnose-failed" data-testid="resume-report-state-diagnose-failed" className="qx-scroll rrp-page">
         <ResumeReportHead viewState="diagnose-failed" />
         <section className="rrp-state">
           <h2>解析中断，中断的只是「读懂它」这一步</h2>
-          <p>失败原因：{failReason}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。</p>
+          <p>失败原因：{resumeUserReason(failReason, '这次未能完成解析，请重试或换一份清晰的简历。')}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。</p>
         </section>
-        <ResumeDiagnosisFailExits file={state.file} onRetry={handleRetry} onHome={() => navigate('/')} />
+        <ResumeDiagnosisFailExits file={state.file} fileId={typeof state.fileId === 'string' ? state.fileId : undefined} />
       </section>
     </QxPageFrame>
   )
@@ -208,7 +226,7 @@ export function ResumeReportPage() {
   const canOptimize = Boolean(taskId) && (viewState === 'report' || viewState === 'report-minimal' || isExportCaptureState(viewState))
   const why =
     viewState === 'loading' ? '读取还没有结束，现在还不知道有没有报告，所以下一步先不给出口。'
-    : viewState === 'unavailable' ? '能力没接通时不提供优化入口：优化和诊断走同一条 AI 链路，这时候点进去只会再失败一次。'
+    : viewState === 'unavailable' ? 'AI 暂时不可用，可以先查政策、查看官方渠道或打印材料。'
     : viewState === 'read-error' ? '优化那一步要用同一份报告作输入，报告没取到就先不给入口。'
     : viewState === 'report-empty' ? '报告里没有内容，优化那一步就没有可对照的原文片段，所以下一步先不给入口。'
     : viewState === 'no-context' || viewState === 'illegal' ? '没有可展示的报告时，从上传入口重新开始。'
@@ -218,11 +236,13 @@ export function ResumeReportPage() {
   return (
     <QxPageFrame
       title="简历诊断报告"
+      back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }}
       subtitle={REPORT_HEAD[viewState].sub}
       status={REPORT_STATUS[viewState]}
       terminalLabel="就业服务大厅"
       navbar={nav}
-      ctabar={
+      ctabar={<>
+        {stepActions}
         <ResumeReportCta
           viewState={viewState}
           canOptimize={canOptimize}
@@ -237,11 +257,11 @@ export function ResumeReportPage() {
           }}
           onOptimize={() => navigate('/resume/optimize', { state: { ...state, taskId, accessToken, targetContext: state.targetContext ?? targetContext } })}
         />
-      }
+      </>}
     >
       <section
         data-kiosk-domain="resume"
-        data-kiosk-screen="resume-report"
+        data-kiosk-screen="resume-report" data-takeaway="诊断报告与修改清单"
         data-route="/resume/report"
         data-state={viewState}
         data-testid={`resume-report-state-${viewState}`}

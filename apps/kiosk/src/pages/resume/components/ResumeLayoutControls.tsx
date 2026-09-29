@@ -11,6 +11,9 @@ type ResumeLayoutControlsProps = {
   layout: Required<ResumeLayoutSettings>
   onChange: (next: Required<ResumeLayoutSettings>) => void
   disabled?: boolean
+  /** 只渲染这些组。不传则字号、行距、页边距、主色、栏数都在。 */
+  only?: LayoutKey[]
+  className?: string
 }
 
 const groups: Array<{
@@ -56,11 +59,12 @@ const groups: Array<{
  * `min-w-[48px]` / `min-h-[48px]` 是兜底：将来这块被放进更窄的容器时，
  * 按钮会换行而不是再被压成竖条。
  */
-export function ResumeLayoutControls({ layout, onChange, disabled = false }: ResumeLayoutControlsProps) {
+export function ResumeLayoutControls({ layout, onChange, disabled = false, only, className }: ResumeLayoutControlsProps) {
+  const shown = only ? groups.filter((group) => only.includes(group.key)) : groups
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+    <div className={className ?? 'rounded-2xl border border-gray-200 bg-white p-4'}>
       <div className="flex flex-col gap-3">
-        {groups.map((group) => (
+        {shown.map((group) => (
           <div key={group.key}>
             <p className="mb-1.5 text-xs font-semibold text-gray-500">{group.label}</p>
             <div className="flex flex-wrap gap-2">

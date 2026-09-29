@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Card, ComplianceBanner, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { Card, ComplianceBanner } from '@ai-job-print/ui'
 import type { InterviewReportResponse } from '@ai-job-print/shared'
 
 type InterviewQaExcerpt = {
@@ -22,7 +22,7 @@ type InterviewReportView = InterviewReportResponse & {
   qaExcerpts?: InterviewQaExcerpt[]
   includeAnswersInPrint?: boolean
 }
-import { makePrintParams } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, makePrintParams } from '@ai-job-print/shared'
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -35,7 +35,9 @@ import {
 import { getInterviewReport, printInterviewReport } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { InterviewShell } from './InterviewShell'
+import { InterviewNotice, InterviewRail, InterviewStatus } from './interviewQxParts'
 import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
 import {
   patchInterviewWorkbenchSession,
@@ -43,6 +45,9 @@ import {
 } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
+import './styles/interview-qx2.css'
+
+const REPORT_AI_DRAFT = '我刚完成一场模拟面试，想看懂练习报告。请先问我想看的部分，再说明这只供我自己复盘，不要预测录用。'
 
 interface ReportState {
   sessionId?: string
@@ -154,11 +159,21 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
     return (
       <InterviewShell
         title={<>正在核对<em>报告状态</em>。</>}
-        subtitle="报告必须由本场会话和当前凭证读取；加载中不展示上一次内容，也不提前放开打印。"
+        subtitle="报告只按这场练习读取。读取完成前不展示上一次内容，也不提前放开打印。"
         status={{ tone: 'unknown', label: '正在读取' }}
+        ctabar={
+          <div className="interview-qx-cta">
+            <QxStepActions>
+              <QxAiHelp label="问小青：报告还在读取怎么办" draft="练习报告还在读取。请说明我可以先做什么，不要假装报告已经生成。" />
+            </QxStepActions>
+          </div>
+        }
       >
-        <div data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
-          <LoadingState className="py-24" />
+        <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+          <div className="interview-flow__scroll">
+            <InterviewStatus label="报告读取状态" items={[{ k: '报告内容', v: '读取中' }, { k: '打印版', v: '未生成' }, { k: '录用预测', v: '不提供' }]} />
+            <section className="iv-card iv-empty"><div><h2>正在读取本场练习报告</h2><p>读取完成前，这里不展示上一次的内容。</p></div></section>
+          </div>
         </div>
       </InterviewShell>
     )
@@ -167,17 +182,26 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
     return (
       <InterviewShell
         title={<>这份报告暂时<em>不能查看</em>。</>}
-        subtitle="报告可能尚未生成、已经过期，或当前账号没有访问权限；不能用固定内容替代实际结果。"
+        subtitle="报告可能还没生成、已经过期，或当前账号不能查看；不能用固定内容替代实际结果。"
         status={{ tone: 'bad', label: '报告不可用' }}
         ctabar={
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={goReports}>查看报告历史</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={goSetup}>重新开始练习</button>
-          </>
+          <div className="interview-qx-cta">
+            <div className="iv-cta-row">
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={goReports}>查看报告历史</button>
+              <button type="button" className="qx-btn" data-variant="primary" onClick={goSetup}>重新开始练习<em aria-hidden="true">→</em></button>
+            </div>
+          </div>
         }
       >
       <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
-        <ErrorState message="报告不存在或已过期" className="py-4" />
+        <div className="interview-flow__scroll">
+          <section className="iv-card iv-empty is-bad">
+            <div>
+              <h2>报告不存在或已过期</h2>
+              <p>没有真实报告时，不显示评分、打印成功或可下载文件。</p>
+            </div>
+          </section>
+        </div>
       </div>
       </InterviewShell>
     )
@@ -192,28 +216,40 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
       title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
       subtitle={`${data.position} · ${data.industry} · ${data.interviewerLabel}。练习表现等级只用于本人复盘，不代表通过率或录用结果。`}
       ctabar={
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={goSetup}>
-            重新练习
-          </button>
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="primary"
-            data-testid="interview-primary"
-            disabled={printing}
-            onClick={() => void handlePrint()}
-          >
-            {printing ? '正在生成打印版…' : '打印报告'}
-          </button>
-        </>
+        <div className="interview-qx-cta">
+          <QxStepActions onPrev={goReports} prevLabel="查看历史报告">
+            <QxAiHelp label="问小青：这份练习报告怎么看" draft={REPORT_AI_DRAFT} />
+          </QxStepActions>
+          <div className="iv-history-actions">
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={goSetup}>重新练习</button>
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="primary"
+              data-testid="interview-primary"
+              disabled={printing}
+              onClick={() => void handlePrint()}
+            >
+              {printing ? '正在生成打印版…' : '生成打印版'}
+            </button>
+          </div>
+        </div>
       }
     >
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
 
-      <div className="interview-flow__scroll flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
+      <div className="interview-flow__scroll">
+        <InterviewStatus
+          label="报告与打印状态"
+          items={[
+            { k: '报告内容', v: '可以查看', tone: 'ok' },
+            { k: '打印版', v: printing ? '生成中' : printError ? '没有生成' : '还没有', tone: printError ? 'off' : undefined },
+            { k: '录用预测', v: '不提供' },
+          ]}
+        />
+        {/* 横幅以 AI 可见标识开头（审计表一「模拟面试报告（一体机）」，next-tasks 3.5c）。 */}
         <ComplianceBanner tone="info">
-          本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。练习结果仅供本人复盘，不会发送给任何企业。
+          <b>{AI_LABEL_COPY.INTERVIEW_REPORT}。</b>不代表任何招聘结果，不参与企业筛选、面试邀约或录用决策，也不会发送给任何企业。
         </ComplianceBanner>
 
         {/* 综合表现 */}
@@ -300,12 +336,11 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
           </ul>
         </Section>
 
-        {printError && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{printError}</p>}
-        <div className="interview-rail" aria-label="练习边界">
-          <span>只供本人练习参考</span>
-          <span>不发送给任何企业</span>
-          <span>不预测录用结果</span>
-        </div>
+        {printError && <p className="iv-alert" role="alert">{printError}</p>}
+        <InterviewNotice>
+          <b>打印不会先假装成功。</b>只有真正生成文件之后，才会进入打印确认；失败时仍停在报告页并写明原因。
+        </InterviewNotice>
+        <InterviewRail />
       </div>
     </div>
     </InterviewShell>

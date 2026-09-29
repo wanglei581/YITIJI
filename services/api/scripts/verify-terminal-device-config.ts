@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
+import { verifyKioskJobBoardSwitch } from './verify-kiosk-job-board-switch'
 
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-terminal-admin-secret-0123456789'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-terminal-action-secret-0123456789'
@@ -1127,6 +1128,7 @@ async function main(): Promise<void> {
   } finally {
     cleanupTempDatabase(prepared)
   }
+  await verifyKioskJobBoardSwitch()
   console.log('\n✅ ALL PASS — 终端设备档案 + Kiosk 统一配置闭环验证通过\n')
 }
 

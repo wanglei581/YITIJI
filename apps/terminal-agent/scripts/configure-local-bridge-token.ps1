@@ -1,7 +1,7 @@
 # AI Job Print Terminal — Gate 0k local bridge token field configure
 #
 # Admin-only. Reads the bridge token from a local file (USB / offline copy of
-# /root/ai-job-print-secrets/kiosk-local-bridge-token), writes
+# the server-side kiosk-local-bridge-token file), writes
 # localApiBridgeToken + merges localApiAllowedOrigins into agent-config.json,
 # never prints the token.
 #

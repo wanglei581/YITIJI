@@ -39,7 +39,7 @@
   <view class="card flat fee rise-d4">
     <view class="fee-row total"><text>{{isFreeOrder ? '免费试运营' : (quoteState === 'ready' ? '服务端核定金额' : '金额待服务端核定')}}</text><text class="amt">{{isFreeOrder ? '免费' : (quoteState === 'ready' ? '¥' + fee.total : '—')}}</text></view>
     <!-- 报价拿不到时**不本地补一个数字**：只说清楚，并给一条可执行的重试。
-         下单本身不被挡住——建单时服务端会自己计价。 -->
+         提交要等到服务端核定出金额之后才放行（建单会带上这个用户确认过的金额）。 -->
     <view class="fee-row quote-fail" wx:if="{{quoteState === 'error'}}">
       <text class="qf-text">{{quoteError}}</text>
       <!-- 按 quoteRecover 这个**状态字段**分流，不按文案里有没有「登录」两个字。
@@ -51,14 +51,28 @@
     <view class="fee-row" wx:elif="{{quoteState === 'loading'}}"><text class="qf-text">正在向服务端核定页数与金额…</text></view>
   </view>
 
+  <!-- 价格已更新：服务端拒绝了按旧金额建单（没建单、没扣款），上面的金额已换成服务端当前价格。
+       只有用户自己再点一次下方按钮才会按新金额提交，页面不自动重发。 -->
+  <view class="notice warn rise-d5" wx:if="{{priceChangeText && !createdLocked}}">
+    <text class="ficon i-info n-ic"></text>
+    <view class="locked-main">
+      <view class="locked-t">价格已更新</view>
+      <view class="locked-d">{{priceChangeText}}</view>
+    </view>
+  </view>
+
   <!-- 订单已经建成、只是没能自动跳转：必须说清楚它在哪、并且不许再提交一次。
        但「已经建成」不等于「还能用」——那张订单可能早就取消 / 过期 / 打完了，
        而本机那条恢复记录活 7 天。所以标题与下一步都跟着 createdState 走，
-       只有服务端证明它走到终态（createdCanReorder）时才给出「重新下单」。 -->
+       只有服务端证明它走到终态（createdCanReorder）时才给出「重新下单」。
+
+       'abandoned' 单独一档、**不能并进 'terminal'**：那一支根本没有"上一张订单"——
+       服务端证明的是这次提交从没建成过任何东西。写成「上一张订单已经结束」是在屏幕上
+       陈述一件没发生过的事，而下面 createdNotice 那句写的恰恰相反，两句自相矛盾。 -->
   <view class="notice warn rise-d5" wx:if="{{createdLocked}}">
     <text class="ficon i-info n-ic"></text>
     <view class="locked-main">
-      <view class="locked-t">{{createdState === 'terminal' ? '上一张订单已经结束' : (createdState === 'unknown' ? '暂时核对不上上一张订单' : '订单已创建，请不要重复提交')}}</view>
+      <view class="locked-t">{{createdState === 'abandoned' ? '上一次提交没有建成订单' : createdState === 'terminal' ? '上一张订单已经结束' : (createdState === 'unknown' ? '暂时核对不上上一张订单' : '订单已创建，请不要重复提交')}}</view>
       <view class="locked-d">{{createdNotice || '到机码已经生成，只是这一步没能自动跳转。到「我的 · 打印订单」就能找回这张订单，点进去即是到机码。'}}</view>
       <view wx:if="{{createdCanReorder}}" class="locked-btn tap" hover-class="tap-press" bindtap="startNewOrder" role="button">重新下单</view>
       <view wx:elif="{{createdState === 'unknown'}}" class="locked-btn tap" hover-class="tap-press" bindtap="retryCreatedCheck" role="button">重新核对订单状态</view>
@@ -77,6 +91,6 @@
   <!-- 订单建成后按钮永久变灰。服务端现在按 (endUserId, idempotency-key) 回放，
        再点一次不会多出一张单；但页面仍必须变灰 —— 让一个已经下过单的人反复点
        「提交」本身就是在骗他，而且那次回放对他毫无意义。 -->
-  <view class="btn wx lg {{submitting || createdLocked ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : '提交并生成到机码')}}</view>
+  <view class="btn wx lg {{submitting || createdLocked || quoteState !== 'ready' ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : (priceConfirmLabel || '提交并生成到机码'))}}</view>
 </view>
 </view>

@@ -43,6 +43,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
   UploadedFile,
   UseGuards,
@@ -72,6 +73,12 @@ import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
 import { AuthScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { firstQueryString, type PartnerImportDataType, type PartnerListQuery } from './jobs-shared'
+import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+  type KioskJobBoardRequest,
+} from '../terminals/kiosk-job-board.service'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
@@ -132,12 +139,17 @@ export class JobsController {
     // 门面是被 Kiosk/Admin/Partner 共用的高频冲突点，这几个端点是纯 Partner 语义，
     // 多一层同名透传只会让"改哪一层"更难判断。控制器本来就已注入多个子服务。
     private readonly jobsPartner: JobsPartnerService,
+    private readonly jobBoard: KioskJobBoardService,
   ) {}
+
+  private assertJobBoard(req: KioskJobBoardRequest): Promise<void> {
+    return this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req))
+  }
 
   // ── Kiosk ───────────────────────────────────────────────────────────────────
 
   @Get('jobs')
-  getJobs(
+  async getJobs(
     @Query('keyword')     keyword?:     string | string[],
     @Query('city')        city?:        string,
     @Query('industry')    industry?:    string,
@@ -147,7 +159,9 @@ export class JobsController {
     @Query('tag')         tag?:         string,
     @Query('page')        pageStr?:     string,
     @Query('pageSize')    sizeStr?:     string,
+    @Req() req?: KioskJobBoardRequest,
   ) {
+    await this.assertJobBoard(req ?? {})
     const page     = safeInt(pageStr, 1, 1, 10_000)
     const pageSize = safeInt(sizeStr, 20, 1, 100)
     // workType('full_time' 等)与 category('fulltime' 等)二选一,category 优先
@@ -164,14 +178,16 @@ export class JobsController {
    * 无鉴权：与 GET /jobs 同为已审核已发布岗位的公开只读聚合，且不返回任何岗位标识。
    */
   @Get('jobs/requirement-stats')
-  getJobRequirementStats(
+  async getJobRequirementStats(
     @Query('keyword')     keyword?:     string | string[],
     @Query('city')        city?:        string,
     @Query('industry')    industry?:    string,
     @Query('category')    category?:    string,
     @Query('workType')    workType?:    string,
     @Query('sourceOrgId') sourceOrgId?: string,
+    @Req() req?: KioskJobBoardRequest,
   ) {
+    await this.assertJobBoard(req ?? {})
     const effectiveCategory = category ?? (workType ? mapWorkTypeToCategory(workType) : undefined)
     return this.jobRequirementStats.getStats({
       keyword: firstQueryString(keyword), city, industry, category: effectiveCategory, sourceOrgId,
@@ -179,7 +195,8 @@ export class JobsController {
   }
 
   @Get('jobs/:id')
-  getJobById(@Param('id') id: string) {
+  async getJobById(@Param('id') id: string, @Req() req?: KioskJobBoardRequest) {
+    await this.assertJobBoard(req ?? {})
     return this.jobsService.getPublishedJobById(id)
   }
 
@@ -441,6 +458,7 @@ export class JobsController {
     @Body() dto: RotateDataSourceCredentialDto,
     @CurrentUser() user: AuthedUser,
   ) {
+    assertRecruitmentContentHostingEnabled()
     return this.jobsPartner.rotatePartnerDataSourceCredential(id, dto, user)
   }
 
@@ -455,6 +473,7 @@ export class JobsController {
     @Param('id') id: string,
     @CurrentUser() user: AuthedUser,
   ) {
+    assertRecruitmentContentHostingEnabled()
     return this.jobsPartner.archivePartnerDataSource(id, true, user)
   }
 
@@ -466,6 +485,7 @@ export class JobsController {
     @Param('id') id: string,
     @CurrentUser() user: AuthedUser,
   ) {
+    assertRecruitmentContentHostingEnabled()
     return this.jobsPartner.archivePartnerDataSource(id, false, user)
   }
 

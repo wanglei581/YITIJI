@@ -16,6 +16,12 @@ import type {
   AdminUpdateCompanyDto, CompanyFieldsDto, PartnerImportCompaniesDto, PartnerUpdateCompanyDto,
 } from './dto/company.dto'
 import { getPartnerCapabilities } from '../jobs/partner-capabilities'
+import {
+  assertNotEmergencyHeld,
+  assertRecruitmentContentHostingEnabled,
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
 
 // ============================================================
 // 企业展示服务（CompanyProfile，来源企业与岗位导览）。
@@ -74,8 +80,11 @@ function addRegionFilter(where: Record<string, unknown>, field: 'province' | 'ci
   where[field] = variants.length > 1 ? { in: variants } : variants[0]
 }
 
-/** 把筛选条件编译为 Prisma where（只允许白名单枚举；地区支持规范名与常见无后缀录入匹配）。 */
-function publicWhere(f: PublicCompanyFilters) {
+/**
+ * 把筛选条件编译为 Prisma where（只允许白名单枚举；地区支持规范名与常见无后缀录入匹配）。
+ * matchJobTitles 为 false 时，关键词不再命中岗位标题，避免岗位板块关闭后用搜索摸出岗位。
+ */
+function publicWhere(f: PublicCompanyFilters, options?: { matchJobTitles?: boolean }) {
   assertEnum(f.companyType, COMPANY_TYPES, '企业类型')
   assertEnum(f.industry, COMPANY_INDUSTRIES, '行业')
   assertEnum(f.recruitType, COMPANY_RECRUIT_TYPES, '招聘类型')
@@ -95,11 +104,14 @@ function publicWhere(f: PublicCompanyFilters) {
   }
   const kw = f.keyword?.trim()
   if (kw) {
-    where['OR'] = [
+    const or: Record<string, unknown>[] = [
       { name: { contains: kw } },
       { description: { contains: kw } },
-      { jobs: { some: { ...publishedJob(), title: { contains: kw } } } },
     ]
+    if (options?.matchJobTitles !== false) {
+      or.push({ jobs: { some: { ...publishedJob(), title: { contains: kw } } } })
+    }
+    where['OR'] = or
   }
   return where
 }
@@ -113,9 +125,15 @@ export class CompaniesService {
 
   // ── Kiosk 公开读 ──────────────────────────────────────────────────────────
 
-  /** 找企业列表（游标分页；openJobCount / 代表岗位均为真实统计）。 */
-  async listPublic(filters: PublicCompanyFilters, page: MemberPageQuery) {
-    const where = publicWhere(filters)
+  /** 找企业列表（游标分页；openJobCount / 代表岗位均为真实统计）。岗位板块关闭时不返回代表岗位标题。 */
+  async listPublic(
+    filters: PublicCompanyFilters,
+    page: MemberPageQuery,
+    options?: { includeJobTitles?: boolean },
+  ) {
+    if (!isRecruitmentContentHostingEnabled()) return buildMemberPage([], page, 0, (row: never) => row)
+    const includeJobTitles = options?.includeJobTitles !== false
+    const where = publicWhere(filters, { matchJobTitles: includeJobTitles })
     const total = await this.prisma.companyProfile.count({ where })
     const rows = await this.prisma.companyProfile.findMany({
       where,
@@ -129,7 +147,7 @@ export class CompaniesService {
     })
     // 代表岗位：当前页企业的已发布岗位标题各取前 3（真实数据，无则空数组）
     const ids = rows.map((r) => r.id)
-    const jobRows = ids.length === 0 ? [] : await this.prisma.job.findMany({
+    const jobRows = !includeJobTitles || ids.length === 0 ? [] : await this.prisma.job.findMany({
       where: { companyProfileId: { in: ids }, ...publishedJob() },
       select: { companyProfileId: true, title: true },
       orderBy: [{ syncTime: 'desc' }],
@@ -152,7 +170,7 @@ export class CompaniesService {
       city: r.city,
       district: r.district,
       description: r.description,
-      repJobTitles: repMap.get(r.id) ?? [],
+      repJobTitles: includeJobTitles ? (repMap.get(r.id) ?? []) : [],
       openJobCount: r._count.jobs,
       fairParticipant: r.fairParticipant,
       tags: parseJsonArray(r.tagsJson),
@@ -161,6 +179,9 @@ export class CompaniesService {
 
   /** 找企业页统计条（全部真实聚合；按当前筛选范围计算）。 */
   async statsPublic(filters: PublicCompanyFilters) {
+    if (!isRecruitmentContentHostingEnabled()) {
+      return { companyCount: 0, openJobCount: 0, todayNewJobCount: 0, fairCompanyCount: 0 }
+    }
     const where = publicWhere(filters)
     const companyCount = await this.prisma.companyProfile.count({ where })
     const fairCompanyCount = await this.prisma.companyProfile.count({ where: { ...where, fairParticipant: true } })
@@ -175,6 +196,9 @@ export class CompaniesService {
 
   /** 兼容/诊断筛选聚合：只来自真实已发布企业；Kiosk 当前不再用它生成完整筛选字典。 */
   async filtersPublic() {
+    if (!isRecruitmentContentHostingEnabled()) {
+      return { regions: [], industries: [], companyTypes: [], sourceKinds: [] }
+    }
     const rows = await this.prisma.companyProfile.findMany({
       where: { ...PUBLISHED },
       select: { province: true, city: true, district: true, industry: true, companyType: true, org: { select: { type: true } } },
@@ -213,6 +237,7 @@ export class CompaniesService {
 
   /** 企业详情（已发布；右侧指标=开关开启且有真实数据的项，缺项不展示）。 */
   async getPublic(id: string) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     const c = await this.prisma.companyProfile.findFirst({
       where: { id, ...PUBLISHED },
       include: { _count: { select: { jobs: { where: publishedJob() } } } },
@@ -251,11 +276,26 @@ export class CompaniesService {
     }
   }
 
-  /** 企业在招岗位（仅已发布；行内引导既有岗位详情/来源投递链路）。 */
-  async listPublicJobs(companyId: string, page: MemberPageQuery) {
+  /**
+   * 企业在招岗位（仅已发布；行内引导既有岗位详情/来源投递链路）。
+   * includeJobs 为 false 时企业仍须存在，但岗位标题与来源链接不返回。
+   */
+  async listPublicJobs(
+    companyId: string,
+    page: MemberPageQuery,
+    options?: { includeJobs?: boolean },
+  ) {
+    if (!isRecruitmentContentHostingEnabled()) {
+      const existing = await this.prisma.companyProfile.findFirst({ where: { id: companyId }, select: { id: true } })
+      if (!existing) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在或未发布' } })
+      return buildMemberPage([], page, 0, (row: never) => row)
+    }
     const company = await this.prisma.companyProfile.findFirst({ where: { id: companyId, ...PUBLISHED }, select: { id: true } })
     if (!company) {
       throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在或未发布' } })
+    }
+    if (options?.includeJobs === false) {
+      return { items: [], nextCursor: null, total: 0 }
     }
     const where = { companyProfileId: companyId, ...publishedJob() }
     const total = await this.prisma.job.count({ where })
@@ -356,6 +396,7 @@ export class CompaniesService {
   }
 
   async adminCreate(dto: AdminCreateCompanyDto, actor: { userId: string }) {
+    assertRecruitmentContentHostingEnabled()
     const org = await this.prisma.organization.findFirst({ where: { id: dto.sourceOrgId, enabled: true } })
     if (!org) {
       throw new BadRequestException({ error: { code: 'COMPANY_ORG_NOT_FOUND', message: '来源机构不存在或已停用' } })
@@ -380,6 +421,7 @@ export class CompaniesService {
   }
 
   async adminUpdate(id: string, dto: AdminUpdateCompanyDto, actor: { userId: string }) {
+    assertRecruitmentContentHostingEnabled()
     const existing = await this.prisma.companyProfile.findUnique({ where: { id }, select: { id: true } })
     if (!existing) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
     await this.prisma.companyProfile.update({ where: { id }, data: this.fieldsToData(dto) })
@@ -392,6 +434,7 @@ export class CompaniesService {
   }
 
   async adminReview(id: string, dto: AdminReviewCompanyDto, actor: { userId: string }) {
+    assertRecruitmentContentHostingEnabled()
     const existing = await this.prisma.companyProfile.findUnique({ where: { id }, select: { id: true } })
     if (!existing) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
     if (dto.action === 'reject' && !dto.rejectReason?.trim()) {
@@ -412,6 +455,8 @@ export class CompaniesService {
   }
 
   async adminPublish(id: string, dto: AdminPublishCompanyDto, actor: { userId: string }) {
+    assertRecruitmentContentHostingEnabled()
+    if (dto.publish) await assertNotEmergencyHeld(this.prisma, 'company', id)
     const existing = await this.prisma.companyProfile.findUnique({
       where: { id },
       select: { reviewStatus: true, sourceOrgId: true },
@@ -478,6 +523,7 @@ export class CompaniesService {
   }
 
   async adminLinkJobs(id: string, dto: AdminLinkJobsDto, actor: { userId: string }) {
+    assertRecruitmentContentHostingEnabled()
     const company = await this.prisma.companyProfile.findUnique({ where: { id }, select: { sourceOrgId: true } })
     if (!company) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
     // 只允许关联：同来源机构 + 已审核发布的岗位（合规：不能借关联夹带未审内容）
@@ -579,6 +625,7 @@ export class CompaniesService {
   }
 
   async partnerImport(orgId: string, dto: PartnerImportCompaniesDto, actor: { userId: string }) {
+    assertRecruitmentContentHostingEnabled()
     const org = await this.prisma.organization.findFirst({ where: { id: orgId, enabled: true } })
     if (!org) {
       throw new BadRequestException({ error: { code: 'COMPANY_ORG_DISABLED', message: '机构不存在或已被停用' } })
@@ -623,6 +670,7 @@ export class CompaniesService {
   }
 
   async partnerUpdate(orgId: string, id: string, dto: PartnerUpdateCompanyDto, actor: { userId: string }) {
+    assertRecruitmentContentHostingEnabled()
     const org = await this.prisma.organization.findFirst({ where: { id: orgId, enabled: true } })
     if (!org) {
       throw new BadRequestException({ error: { code: 'COMPANY_ORG_DISABLED', message: '机构不存在或已被停用' } })
@@ -662,6 +710,7 @@ export class CompaniesService {
    * 不动 reviewStatus、不触发重审、不做 Partner 重新发布(重新上架仍走 编辑 → Admin 审核发布)。
    */
   async partnerUnpublish(orgId: string, id: string, actor: { userId: string }) {
+    assertRecruitmentContentHostingEnabled()
     const existing = await this.prisma.companyProfile.findFirst({
       where: { id, sourceOrgId: orgId },
       select: { id: true, publishStatus: true },

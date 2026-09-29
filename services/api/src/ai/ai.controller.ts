@@ -1,4 +1,5 @@
-import { BadRequestException, Controller, Post, Put, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Controller, Optional, Post, Put, Get, Header, Param, Body, Query, Req, ServiceUnavailableException, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -34,10 +35,14 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { BenefitRedemptionService } from '../benefit-redemption/benefit-redemption.service'
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { runWithPublicQuota } from './ai-request-guard'
+import { readResumeParseIntentHeaders } from './resume-parse-intent'
+import { ResumeParseIntentRunner } from './resume-parse-intent-runner.service'
 import { assistantOwnerKey } from './llm/llm-chat.service'
 import { AssistantSummaryService } from '../advisor/assistant-summary.service'
 
 import { resolveClientIp } from '../common/client-ip'
+import { prepareUnlabeledExport } from './resume/resume-unlabeled-export'
+import { parseContentFileId } from '../files/signing'
 interface ReqLike {
   requestId?: string
   headers: Record<string, string | string[] | undefined>
@@ -63,6 +68,22 @@ function authOf(req: ReqLike): string | undefined {
   if (typeof auth === 'string') return auth
   if (Array.isArray(auth)) return auth[0]
   return undefined
+}
+
+function resumeParseAuthorization(req: ReqLike): string | undefined {
+  const direct = authOf(req)
+  if (direct !== undefined) return direct
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (key.toLowerCase() !== 'authorization') continue
+    if (typeof value === 'string') return value
+    if (Array.isArray(value) && typeof value[0] === 'string') return value[0]
+  }
+  return undefined
+}
+
+/** Same prefix rule as resolveOptionalEndUser: scheme case does not matter, and a missing space is not a Bearer. */
+function presentedMemberBearer(authorization: string | undefined): boolean {
+  return typeof authorization === 'string' && authorization.toLowerCase().startsWith('bearer ')
 }
 
 /**
@@ -123,6 +144,7 @@ export class AiController {
     private readonly publicQuota: AiPublicQuotaService,
     private readonly privacy: MemberPrivacyService,
     private readonly assistantSummary: AssistantSummaryService,
+    @Optional() private readonly resumeParseIntent?: ResumeParseIntentRunner,
   ) {}
 
   /**
@@ -146,22 +168,43 @@ export class AiController {
    */
   @Post('resume/parse')
   @TerminalScopedThrottle(6) // 触发 LLM/OCR，与兄弟 LLM 路由同档；按台计数以免整个大厅共用 6 次
+  @AiUse('generate')
+
   async submitResumeParse(
     @Body() dto: ResumeParseRequestDto,
     @Req() req: ReqLike,
   ): Promise<ResumeParseResponseDto> {
-    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    const authorization = resumeParseAuthorization(req)
+    const endUser = await resolveOptionalEndUser(authorization, this.jwt, this.redis, this.prisma)
+    const intentHeaders = readResumeParseIntentHeaders(req.headers)
+    // 带意图头时，已出示但解析失败的 Bearer 不能降级成匿名，否则会把意图记到空归属上。
+    if (intentHeaders.status === 'present' && presentedMemberBearer(authorization) && !endUser) {
+      throw new UnauthorizedException({
+        error: { code: 'MEMBER_TOKEN_INVALID', message: '登录已失效,请重新登录' },
+      })
+    }
     if (endUser) {
       await this.privacy.requireActiveConsent(endUser.endUserId, 'resume_ai')
     }
-    const quotaTicket = await this.publicQuota.consume('resume_parse', {
+    if (intentHeaders.status === 'rejected') {
+      throw new BadRequestException({
+        error: { code: 'RESUME_PARSE_INTENT_MALFORMED', message: '简历解析意图标识无效' },
+      })
+    }
+    const quotaContext = {
       member: endUser?.endUserId ?? null,
       terminal: throttleTerminalIdOf(req),
       ip: ipOf(req),
-    })
-    const result = await runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
-      this.aiService.submitResumeParse(dto, endUser?.endUserId ?? null),
-    )
+    }
+    // 两头都缺才是过渡期旧路径。带意图头时不得再走 publicQuota.consume。
+    const result = intentHeaders.status === 'present'
+      ? await this.submitKeyedResumeParse(dto, quotaContext.member, quotaContext, intentHeaders.intentKey, intentHeaders.proof)
+      : await (async () => {
+        const quotaTicket = await this.publicQuota.consume('resume_parse', quotaContext)
+        return runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
+          this.aiService.submitResumeParse(dto, quotaContext.member),
+        )
+      })()
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -187,6 +230,21 @@ export class AiController {
     return result
   }
 
+  private submitKeyedResumeParse(
+    dto: ResumeParseRequestDto,
+    endUserId: string | null,
+    quotaContext: { member: string | null; terminal: string | null; ip: string | null },
+    intentKey: string,
+    proof: string,
+  ): Promise<ResumeParseResponseDto> {
+    if (!this.resumeParseIntent) {
+      throw new ServiceUnavailableException({
+        error: { code: 'RESUME_PARSE_INTENT_UNAVAILABLE', message: '解析意图服务暂不可用，请稍后重试' },
+      })
+    }
+    return this.resumeParseIntent.submit(dto, endUserId, quotaContext, intentKey, proof)
+  }
+
   /**
    * 查询解析结果。
    *
@@ -195,6 +253,8 @@ export class AiController {
    * 越权 / 无 token / 错 token 一律 AI_TASK_NOT_FOUND（service 层校验）。
    */
   @Get('resume/records/:taskId')
+  @AiUse('read')
+
   async getResumeRecord(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -210,15 +270,20 @@ export class AiController {
   // no-store：本端点可触发权益核销状态变更（benefitGrantId），禁止中间层缓存吞掉真实核销结果。
   @Get('resume/records/:taskId/optimize')
   @Header('Cache-Control', 'no-store')
+  @AiUse('generate')
+
   async getResumeOptimize(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
     @Query('benefitGrantId') benefitGrantId?: string,
+    @Query('existingOnly') existingOnly?: string,
   ): Promise<ResumeOptimizeResponseDto> {
     const requester = await this.resolveAiResultRequester(req)
     if (requester.endUserId) {
       await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
     }
+    // 历史记录回看不懒生成，也不核销权益。
+    if (existingOnly === '1') return this.aiService.getResumeOptimize(taskId, requester, true)
     const result = await this.aiService.getResumeOptimize(taskId, requester)
 
     // 权益核销：仅当优化结果真实生成（completed）且显式传入 benefitGrantId 时才核销；
@@ -258,10 +323,10 @@ export class AiController {
     })
     return result
   }
-
   @Put('resume/records/:taskId/draft')
   @Header('Cache-Control', 'no-store')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  @AiUseExempt('保存本人草稿，不调模型')
   async putResumeDraft(
     @Param('taskId') taskId: string,
     @Body() dto: ResumeDraftPutDto,
@@ -277,6 +342,8 @@ export class AiController {
 
   @Get('resume/records/:taskId/draft')
   @Header('Cache-Control', 'no-store')
+  @AiUse('read')
+
   async getResumeDraft(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -290,6 +357,8 @@ export class AiController {
 
   @Get('resume/records/:taskId/versions')
   @Header('Cache-Control', 'no-store')
+  @AiUse('read')
+
   async listResumeVersions(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -303,6 +372,8 @@ export class AiController {
 
   @Post('resume/records/:taskId/fact-check')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async factCheckResume(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -316,6 +387,8 @@ export class AiController {
 
   @Post('resume/records/:taskId/layout-adjust')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async adjustResumeLayout(
     @Param('taskId') taskId: string,
     @Body() dto: ResumeLayoutAdjustDto,
@@ -350,6 +423,8 @@ export class AiController {
    */
   @Post('resume/generate')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async submitResumeGenerate(
     @Body() dto: ResumeGenerateRequestDto,
     @Req() req: ReqLike,
@@ -383,6 +458,8 @@ export class AiController {
 
   /** 阶段2A — 读取生成结果(归属/令牌门禁同 parse)。 */
   @Get('resume/generate/:taskId')
+  @AiUse('read')
+
   async getResumeGenerate(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -402,8 +479,11 @@ export class AiController {
   // 人说话物理上到不了 20 次/分；每 IP 每小时 AI_IP_HOURLY_CEILING（默认 300）的天花板仍在。
   @PaidAiThrottle(20)
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @AiUse('voice')
+
   async transcribeResumeVoice(
     @UploadedFile() audio: Express.Multer.File | undefined,
+    @Req() req: ReqLike,
   ): Promise<ResumeVoiceTranscribeResponseDto> {
     if (!audio?.buffer?.length) {
       throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
@@ -412,6 +492,7 @@ export class AiController {
       throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
     }
     // A-6 成本可见性：ASR 按时长计费，tokenUsage 恒为空，不编造单价。
+    const voiceMember = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
     const asrStartedAt = Date.now()
     const result = await this.asr.recognizeWav(audio.buffer)
     this.logService.record({
@@ -422,7 +503,7 @@ export class AiController {
       latencyMs: Math.max(0, Date.now() - asrStartedAt),
       tokenUsage: undefined,
       errorCode: result.ok ? undefined : (result.errorCode ?? 'ASR_FAILED'),
-      endUserId: null,
+      endUserId: voiceMember?.endUserId ?? null,
       terminalId: null,
     })
     if (!result.ok) {
@@ -445,6 +526,8 @@ export class AiController {
    */
   @Get('resume/export/pricing')
   @Header('Cache-Control', 'no-store')
+  @AiUse('read')
+
   async getResumeExportPricing(@Req() req: ReqLike) {
     const requester = await this.resolveAiResultRequester(req)
     return this.aiService.getResumeExportPricing(requester.endUserId)
@@ -456,21 +539,29 @@ export class AiController {
    */
   @Post('resume/generate/export')
   @Throttle({ default: { ttl: 60_000, limit: 10 } }) // 服务端 PDF 渲染 + 对象存储写入,防滥用
+  @AiUse('export')
+
   async exportGeneratedResume(
     @Body() dto: ResumeGenerateExportDto,
     @Req() req: ReqLike,
   ) {
     const requester = await this.resolveAiResultRequester(req)
     await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
-    const { taskId, format, layout, templateId, draft, ...resume } = dto
+    const { taskId, format, layout, templateId, draft, unlabeled, ...resume } = dto
     delete (resume as { benefitGrantId?: string }).benefitGrantId
     delete (resume as { factsConfirmedAt?: string }).factsConfirmedAt
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
-    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt })
-    await this.audit.write({
+    // C8：不带显式标识只对「开关已开 + 登录会员 + 已同意正式协议」放行，放行前先写必须成功的留痕。
+    const unlabeledPlan = await prepareUnlabeledExport(
+      { prisma: this.prisma, audit: this.audit },
+      { requested: unlabeled === true, draft: draft === true, endUserId: requester.endUserId, taskId: taskId ?? null, format: format ?? 'pdf' },
+      { ipAddress: ipOf(req), userAgent: uaOf(req), requestId: req.requestId ?? null },
+    )
+    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt, unlabeled: unlabeledPlan.applied })
+    const exportAudit = {
       actorId: null,
       actorRole: 'kiosk',
-      action: 'resume.generate_exported',
+      action: 'resume.generate_exported', // 上线核验清单按这个动作名判「导出成功」；是否去标识看 payload.unlabeledApplied
       targetType: 'file',
       targetId: result.fileId,
       payload: {
@@ -481,16 +572,24 @@ export class AiController {
         pageCount: result.pageCount,
         sizeBytes: result.sizeBytes,
         hasEndUser: Boolean(requester.endUserId),
+        // docx/txt/md 另渲染的打印用 PDF 副本也记下编号（pdf 时与 fileId 相同）
+        printFileId: result.printFileUrl ? parseContentFileId(result.printFileUrl) : null,
+        ...unlabeledPlan.auditPayload,
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
       requestId: req.requestId ?? null,
-    })
+    }
+    // 去标识的导出，文件编号这条留痕也必须写成功，写不进去就不把文件交出去
+    if (unlabeledPlan.applied) await this.audit.writeRequired(this.prisma, exportAudit)
+    else await this.audit.write(exportAudit)
     return result
   }
 
   @Post('assistant/chat')
   @TerminalScopedThrottle(12) // 对话式调用比单次生成频繁，但远低于此前落进的 60 次/分钟公共桶
+  @AiUse('generate')
+
   async chatWithAssistant(
     @Body() dto: AssistantChatRequestDto,
     @Req() req: ReqLike,
@@ -506,6 +605,7 @@ export class AiController {
       this.aiService.chatWithAssistant(
         dto,
         assistantOwnerKey(chatMember?.endUserId ?? null, ipOf(req)),
+        chatMember?.endUserId ?? null,
       ),
     )
     await this.audit.write({
@@ -539,6 +639,8 @@ export class AiController {
   @Post('assistant/voice')
   @TerminalScopedThrottle(12)
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @AiUse('voice')
+
   async transcribeAssistantVoice(
     @UploadedFile() audio: Express.Multer.File | undefined,
     @Req() req: ReqLike,
@@ -606,6 +708,8 @@ export class AiController {
    */
   @Post('assistant/sessions/:sessionId/summary')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async summarizeAssistantSession(
     @Param('sessionId') sessionId: string,
     @Req() req: ReqLike,

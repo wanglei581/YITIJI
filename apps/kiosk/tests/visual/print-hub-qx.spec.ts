@@ -59,11 +59,87 @@ test('print hub default state reads capabilities and never claims 设备正常 @
   await expect(page.getByRole('button', { name: /文档打印/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /U 盘导入打印/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /到机码核销/ })).toContainText('不是付款后的取件凭证码')
-  await expect(page.getByText('请直接在奔图机器面板上操作')).toBeVisible()
+  await expect(page.getByRole('button', { name: /到机码核销/ })).toContainText('不是取件码')
+  await expect(page.getByText('在打印机面板上操作，取走纸质复印件。')).toBeVisible()
+  await expect(page.getByRole('button', { name: '问小青：怎么选打印方式 →' })).toBeVisible()
+  await page.locator('.ph-page').evaluate((element) => { element.scrollTop = 0 })
+  const firstCard = await page.getByTestId('print-hub-cap-doc-print').boundingBox()
+  expect(firstCard!.y, '2.0 可点能力卡位于顶部只读区之后').toBeGreaterThanOrEqual(500)
   await expectNoForgedReady(page)
   await assertNoHorizontalOverflow(page)
+  // 稿 10：无独立页头（h1 只给读屏），1080 首屏横幅紧贴顶栏，快捷入口与底注整屏可见、不被底栏遮住。
+  await expect(page.getByRole('heading', { level: 1, name: '打印扫描服务' })).toHaveCount(1)
+  if (page.viewportSize()?.width === 1080) {
+    const geo = await page.evaluate(() => {
+      const box = (el: Element | null) => el!.getBoundingClientRect()
+      const notes = [...document.querySelectorAll('.ph-note')].map((el) => el.getBoundingClientRect().bottom)
+      return {
+        pageheadH: box(document.querySelector('.qx-pagehead')).height,
+        heroTop: box(document.querySelector('.ph-xq')).top,
+        heroBottom: box(document.querySelector('.ph-xq')).bottom,
+        gridTop: box(document.querySelector('.ph-grid')).top,
+        gridBottom: box(document.querySelector('.ph-grid')).bottom,
+        srcBottom: box(document.querySelector('.ph-src')).bottom,
+        noticesBottom: box(document.querySelector('.ph-notices')).bottom,
+        truthTop: box(document.querySelector('.ph-truth')).top,
+        notesBottom: Math.max(...notes),
+        truthBottom: box(document.querySelector('.ph-truth')).bottom,
+        navTop: box(document.querySelector('.qx-navbar')).top,
+      }
+    })
+    console.log(`print-hub-geometry ${JSON.stringify(geo)}`)
+    await page.screenshot({ path: 'test-results/print-hub-qx-1080x1920.png' })
+    expect(geo.pageheadH).toBeLessThanOrEqual(1)
+    expect(geo.heroTop).toBeLessThan(140)
+    expect(geo.notesBottom).toBeLessThanOrEqual(geo.navTop)
+    expect(geo.truthBottom).toBeLessThanOrEqual(geo.navTop)
+    expect(geo.noticesBottom).toBeLessThanOrEqual(geo.navTop)
+  }
   await page.screenshot({ path: test.info().outputPath('print-hub-default.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
+test('print hub 390 keeps hero readable and bottom notes above the nav bar @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/print-scan')
+  await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
+  await assertNoHorizontalOverflow(page)
+  // 手机宽度下横幅标题曾被「青」头像挤成逐字竖排：要求占到过半宽度、每行不少于四个字。
+  const hero = await page.locator('.ph-xq-ask').evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const lines = new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top))).size
+    return { width: el.getBoundingClientRect().width, lines, chars: (el.textContent ?? '').length }
+  })
+  expect(hero.width, '横幅标题不得被挤成窄条').toBeGreaterThan(390 * 0.5)
+  expect(hero.chars / hero.lines, '横幅标题不得逐字竖排').toBeGreaterThanOrEqual(4)
+
+  // 滚到底：底注与快捷入口必须落在底栏之上，不被遮住。
+  const geo = await page.locator('.qx-scroll').evaluate((scroller) => {
+    scroller.scrollTop = scroller.scrollHeight
+    const notes = [...document.querySelectorAll('.ph-note')].map((el) => el.getBoundingClientRect().bottom)
+    return {
+      atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
+      scrolls: scroller.scrollHeight > scroller.clientHeight,
+      notesBottom: Math.max(...notes),
+      truthBottom: document.querySelector('.ph-truth')!.getBoundingClientRect().bottom,
+      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+    }
+  })
+  expect(geo.scrolls && geo.atEnd, '390 下内容应在 .qx-scroll 内滚动且已滚到底').toBe(true)
+  expect(geo.truthBottom).toBeLessThanOrEqual(geo.navTop)
+  expect(geo.notesBottom).toBeLessThanOrEqual(geo.navTop)
+  await expect(page.getByTestId('print-hub-truth')).toBeInViewport()
+  await expect(page.getByTestId('print-hub-copy-note')).toBeInViewport()
+  await assertNoHorizontalOverflow(page)
+  await expectNoForgedReady(page)
   expect(errors).toEqual([])
 })
 
@@ -97,8 +173,8 @@ test('print hub capability-error fail-closes tasks and keeps arrival-code @w2', 
   await expect(page.locator('[data-testid="print-hub-state-capability-error"]')).toBeVisible()
   await expect(page.getByTestId('print-hub-fallback').getByText('服务状态无法确认', { exact: true })).toBeVisible()
   await expect(page.getByTestId('print-hub-cap-doc-print')).toBeDisabled()
-  await expect(page.getByTestId('print-hub-fallback').getByRole('button', { name: '重新检测', exact: true })).toBeVisible()
-  await expect(page.getByTestId('print-hub-fallback').getByRole('button', { name: '联系工作人员', exact: true })).toBeVisible()
+  await expect(page.locator('.ph-actions').getByRole('button', { name: '重新检测', exact: true })).toBeVisible()
+  await expect(page.locator('.ph-actions').getByRole('button', { name: '联系工作人员', exact: true })).toBeVisible()
   await expect(page.getByTestId('print-hub-primary')).toBeEnabled()
   await expectNoForgedReady(page)
   expect(errors).toEqual([])
@@ -125,9 +201,59 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
   await expect(page.getByRole('button', { name: /材料扫描/ })).toBeDisabled()
   await expect(page.getByText('扫描仪正在保养', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /格式转换/ })).toBeEnabled()
+  const bottom = await page.locator('.ph-page').evaluate((scroller) => {
+    scroller.scrollTop = scroller.scrollHeight
+    return {
+      atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
+      actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
+      footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
+      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+    }
+  })
+  expect(bottom.atEnd).toBe(true)
+  expect(bottom.actionsBottom).toBeLessThanOrEqual(bottom.navTop)
+  expect(bottom.footerBottom).toBeLessThanOrEqual(bottom.navTop)
   await expectNoForgedReady(page)
   expect(errors).toEqual([])
 })
+
+// D3（2026-09-28）：签名盖章默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS）。
+// 能力读取成功、但本机没有已配置的 signature_stamp 行时，这张卡必须和管理员配成 not_verified 一样
+// 整卡停用、写明「本机暂未开通」—— 不能让人点进去、传完文件才被服务端拒绝。两种形状都要覆盖：
+//   · 列表里根本没有这一行；
+//   · 真实后端的形状：每个键都下发，没配置过的是 configured=false（listForTerminal）。
+const WITHOUT_SIGNATURE = AVAILABLE.filter((row) => row.capabilityKey !== 'signature_stamp')
+for (const variant of [
+  { name: 'row absent', capabilities: WITHOUT_SIGNATURE },
+  {
+    name: 'row configured=false',
+    capabilities: [
+      ...WITHOUT_SIGNATURE,
+      { capabilityKey: 'signature_stamp', status: 'not_verified', note: null, configured: false, updatedAt: null },
+    ],
+  },
+]) {
+  test(`print hub keeps the signature card closed on a terminal that never enabled it (${variant.name}) @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+      status: 200,
+      json: { capabilities: variant.capabilities },
+    })
+
+    await page.goto('/print-scan')
+    const sign = page.getByTestId('print-hub-cap-sign')
+    await expect(sign).toBeDisabled()
+    await expect(sign).toContainText('本机暂未开通')
+    // 停用要真的点不进去，不只是换个样子。
+    await sign.click({ force: true })
+    await expect(page).toHaveURL(/\/print-scan$/)
+    // 阳性对照：读取本身是成功的 —— 同样不经过打印机、已登记可用的格式转换照常可点。
+    await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
+    await expectNoForgedReady(page)
+    expect(errors).toEqual([])
+  })
+}
 
 test('print hub device-off pauses paper paths and keeps software paths @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
@@ -146,6 +272,18 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
   await expect(page.getByTestId('print-hub-cap-sign')).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeEnabled()
   await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText('这台机器现在出不了纸')
+  const bottom = await page.locator('.ph-page').evaluate((scroller) => {
+    scroller.scrollTop = scroller.scrollHeight
+    return {
+      atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
+      actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
+      footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
+      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+    }
+  })
+  expect(bottom.atEnd).toBe(true)
+  expect(bottom.actionsBottom).toBeLessThanOrEqual(bottom.navTop)
+  expect(bottom.footerBottom).toBeLessThanOrEqual(bottom.navTop)
   await expectNoForgedReady(page)
   expect(errors).toEqual([])
 })

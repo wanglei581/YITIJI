@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
+import { AiContentBlockedError } from '../../ai/llm/llm-guard'
 import {
   ContractReviewProviderService,
   StrictFetchContractProviderTransport,
@@ -531,3 +535,30 @@ function fakeTransportRequest(): ContractProviderTransportRequest {
     timeoutMs: CONTRACT_PROVIDER_MIN_TIMEOUT_MS,
   }
 }
+
+test('C10：合同原文里出现禁词不拦，模型回复里出现禁词才拦', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'contract-forbidden-words-'))
+  const file = join(dir, 'words.txt')
+  writeFileSync(file, '违禁示例词\n')
+  const saved = process.env['AI_FORBIDDEN_WORDS_FILE']
+  process.env['AI_FORBIDDEN_WORDS_FILE'] = file
+  try {
+    // 合同原文是待审材料，不是用户对模型说的话：原文含禁词照常送审
+    const input = { ...maskedInput(), pages: [{ pageNumber: 1, text: '违禁示例词。乙方：[劳动者_1]，试用期为六个月。' }] }
+    let sent = 0
+    const clean = approvedService(async () => { sent += 1; return { status: 200, redirected: false, body: wireBody() } })
+    assert.deepEqual(await clean.review(input), validDraft)
+    assert.equal(sent, 1)
+    // 模型回复含禁词：拦下，不返回
+    const dirty = approvedService(async () => ({
+      status: 200,
+      redirected: false,
+      body: JSON.stringify({ choices: [{ message: { content: '{"findings":[],"note":"违禁示例词"}' } }] }),
+    }))
+    await assert.rejects(() => dirty.review(maskedInput()), (error: unknown) => error instanceof AiContentBlockedError && error.direction === 'output')
+  } finally {
+    if (saved === undefined) delete process.env['AI_FORBIDDEN_WORDS_FILE']
+    else process.env['AI_FORBIDDEN_WORDS_FILE'] = saved
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

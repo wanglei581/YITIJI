@@ -19,11 +19,25 @@ const CONTRACT_REPORT_MIN_PRINT_REMAINING_MS = 30 * 60 * 1000
  *   契约值且已落库，改名需同步前端类型与历史数据，不在本次范围；它现在表示「PDF 页数识别」
  *   这一类来源，不再字面对应正则扫描实现。
  * - 图片（png/jpeg/webp）：按 1 页。
- * - 签名不合法 / FileObject 缺失或已删 / 未知 MIME / 读取失败 → fail-closed。
+ * - 签名不合法 / FileObject 缺失、未激活、已删、已过期 / 未知 MIME / 读取失败 → fail-closed。
  *
  * fail-closed 语义：抛出 `BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')` 即拒绝创建付费订单，
  * 绝不回退到前端估算或单页假设。（Task 4 只提供能力；接线到建单/报价在 Task 5/6。）
  */
+
+/** 计费与建单只接受仍有效的 active 文件。验签通过不等于可以读对象。 */
+export function isPrintableFileRecord<T extends {
+  status?: string | null
+  deletedAt?: Date | null
+  expiresAt?: Date | null
+}>(file: T | null | undefined, now = Date.now()): file is T {
+  if (!file || file.status !== 'active' || file.deletedAt !== null) return false
+  if (file.expiresAt === null) return true
+  return file.expiresAt instanceof Date
+    && Number.isFinite(file.expiresAt.getTime())
+    && file.expiresAt.getTime() > now
+}
+
 @Injectable()
 export class PrintPageCountService {
   constructor(
@@ -36,7 +50,8 @@ export class PrintPageCountService {
     if (!fileId) throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
 
     const file = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
-    if (!file || file.deletedAt) throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
+    // 必须先于完整性复核和对象读取：uploading / quarantined / 已过期不得被有效 HMAC 读出。
+    if (!isPrintableFileRecord(file)) throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
     await assertFileContentIntegrity({ prisma: this.prisma, storage: this.storage, fileId })
 
     if (

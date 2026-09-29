@@ -21,7 +21,7 @@ export function FileSourceHero({ screen, isResume }: { screen: FileSourceScreen;
   const ask = FILE_SOURCE_ASK[screen]
   const doing =
     isResume && screen === 'source-chooser'
-      ? '这里只是把简历文件搬进来打印，不做 AI 诊断 —— 诊断在简历服务那条线上。'
+      ? '上传已有简历，检查后带走打印件。'
       : ask.doing
   return (
     <section className="fs-hero" data-testid="file-source-hero">
@@ -56,7 +56,7 @@ export function FileSourceStatus({
     kind === 'error' ? XCircleIcon : kind === 'warn' ? AlertCircleIcon : kind === 'lock' ? InfoIcon : CheckCircle2Icon
   return (
     <div className="qx-card fs-status" data-kind={kind} data-testid="file-source-status">
-      <div className="fs-status-h">
+      <div className="fs-status-h" role="status">
         {pulsing ? <span className="fs-dot breathe" aria-hidden="true" /> : <Icon size={28} aria-hidden="true" />}
         <span>{title}</span>
       </div>
@@ -86,7 +86,7 @@ export function FileSourceSteps({ title, items }: { title?: string; items: strin
     <div>
       {title ? (
         <div className="fs-sec-h" style={{ marginBottom: 8 }}>
-          <span className="t" style={{ fontSize: 24 }}>{title}</span>
+          <span className="t" style={{ fontSize: 'var(--qx-fs-body-lg)' }}>{title}</span>
         </div>
       ) : null}
       <ol className="fs-steps">
@@ -202,7 +202,7 @@ export function NowFileCard({
         {previewLabel}
       </button>
       <div className="fs-hr" />
-      <FileSourceNote>本次办理<b>只带这一份</b>。这台机器一次只记得住一份已选文件，没有多文件队列，也不会一次传两份。</FileSourceNote>
+      <FileSourceNote>本次办理<b>只带这一份</b>。需要打印其他材料时，完成这一份后再选择。</FileSourceNote>
       <div style={{ marginTop: 10 }}>
         <FileSourceNote>页数、可打印性和敏感信息检查在<b>下一步（材料检查）</b>做，这一页不预告结论。</FileSourceNote>
       </div>
@@ -217,7 +217,7 @@ export function NowFileCard({
 const CHANNEL_COPY: Record<UploadTab, { name: string; desc: string; limit: string; tone: 'clay' | 'teal' | 'slate' }> = {
   file: {
     name: '本机选文件',
-    desc: '弹系统文件窗口挑一份。这条是桌面浏览器的验证 / 兼容路径，公共一体机上不推荐先用它。',
+    desc: '从电脑的文件窗口选一份，选好后开始上传。',
     limit: 'PDF / JPG / PNG · 单份 ≤ 15MB',
     tone: 'clay',
   },
@@ -253,18 +253,18 @@ export function ChannelGrid({
         const disabled = key === 'usb' && usbMode !== 'ok'
         const desc =
           key === 'usb' && usbMode === 'unavailable'
-            ? '这台终端没有配置 U 盘导入的本地令牌，所以这条通道不能用。'
+            ? '本机暂未开通 U 盘导入，请改用手机上传。'
             : key === 'usb' && usbMode === 'offline'
-              ? '本地令牌配好了，但现在连不上这台机器的 Terminal Agent。和「未配置」不是一回事。'
+              ? '暂时无法读取 U 盘，可以重新连接或改用手机上传。'
               : copy.desc
         const limit =
           key === 'usb' && usbMode === 'unavailable'
-            ? '本机未接通 · 重试也没用'
+            ? '本机暂未开通'
             : key === 'usb' && usbMode === 'offline'
-              ? 'Agent 离线 · 可以重试'
+              ? '暂时无法读取 · 可以重试'
               : copy.limit
         const note =
-          key === 'file' ? '桌面验证' : key === 'qr' ? '一体机首选' : usbMode === 'unavailable' ? '本机未配置' : undefined
+          key === 'file' ? '电脑文件' : key === 'qr' ? '一体机首选' : usbMode === 'unavailable' ? '暂未开通' : undefined
         const Icon = key === 'file' ? FolderIcon : key === 'qr' ? SmartphoneIcon : UsbIcon
         return (
           <button
@@ -284,7 +284,7 @@ export function ChannelGrid({
             <span className="fs-ch-n">
               <span>{copy.name}</span>
               {key === 'qr' ? <span className="fs-tag">一体机首选</span> : null}
-              {key === 'file' ? <span className="fs-tag mut">桌面验证</span> : null}
+              {key === 'file' ? <span className="fs-tag mut">电脑文件</span> : null}
               {disabled && note ? <span className="fs-tag mut">{note}</span> : null}
             </span>
             <span className="fs-ch-d">{desc}</span>
@@ -310,13 +310,13 @@ export function ExistingSourceLinks({
       <div className="fs-sec-h">
         <span className="no">02</span>
         <span className="t">文件不在手机或 U 盘？</span>
-        <span className="hint">两条真实入口</span>
+        <span className="hint">继续准备材料</span>
       </div>
       <div className="fs-split">
         {showScan ? (
           <button type="button" className="fs-mini" onClick={onScan} data-testid="file-source-scan-source" aria-label="扫描纸质原件">
             <h4><ScanLineIcon size={22} aria-hidden="true" /><span>扫描纸质原件</span></h4>
-            <p>先建扫描会话，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；网页不能远程启动扫描仪。</p>
+            <p>先开始扫描办理，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；网页不能远程启动扫描仪。</p>
           </button>
         ) : null}
         <button type="button" className="fs-mini" onClick={onDocuments} data-testid="file-source-member-source" aria-label="从我的文档或最近打印文件选择">
@@ -355,7 +355,7 @@ export function PhoneQrSlot({
         <span>
           {expiresLabel
             ? `二维码有效期 ${expiresLabel}，文件最大 10MB。`
-            : '有效期以服务端返回时间为准，文件最大 10MB。'}
+            : '文件最大 10MB，请上传后回到这里确认。'}
         </span>
       </div>
     )
@@ -366,8 +366,8 @@ export function PhoneQrSlot({
       <strong>{failed ? '码没出来' : '码还没出来'}</strong>
       <span>
         {failed
-          ? '向服务端要上传会话失败了。本机不会先出一张假码。'
-          : '拿到服务端下发的一次性链接之后这里才会出现二维码'}
+          ? '请重新生成二维码，或换一种上传方式。'
+          : '正在准备上传二维码，请稍候。'}
       </span>
     </div>
   )
@@ -376,9 +376,7 @@ export function PhoneQrSlot({
 export function FileSourceTruth() {
   return (
     <div className="fs-truth" data-testid="file-source-truth">
-      <div><b>二维码</b>只是让你的手机打开上传页。本机<b>看不到你扫没扫</b>，只认服务端返回的会话状态。</div>
-      <div><b>U 盘</b>由这台终端的本地服务读取并逐份上传；网页不直接访问磁盘，也<b>没有「安全弹出」按钮</b>。</div>
-      <div><b>留存</b>结束会话或闲置超时只清除本机登录态与临时会话信息；已上传文件与订单按服务端留存期限管理，<b>不承诺永久保留</b>。</div>
+      <p>结束办理或闲置超时会清除本机临时信息；已上传文件按留存期限管理。</p>
     </div>
   )
 }

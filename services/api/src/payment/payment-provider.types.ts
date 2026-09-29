@@ -131,6 +131,8 @@ export interface RefundExecuteResult {
 export interface RefundQueryResult {
   status: 'success' | 'failed' | 'processing' | 'unknown'
   channelRefundNo: string | null
+  /** 渠道确认的本次退款额（分）。有值且不等于整单实付时不得完成退款。缺省不代表金额正确。 */
+  refundAmountCents?: number | null
 }
 
 /** 退款结果异步通知归一化事件（wechat REFUND.SUCCESS/CLOSED/ABNORMAL 通知解析后）。 */

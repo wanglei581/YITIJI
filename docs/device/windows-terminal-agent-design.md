@@ -208,12 +208,9 @@ Agent 首次启动时向后端注册本终端，获取 `terminalId` 和 `agentTo
 
 ### 2.12 单实例锁
 
-Agent 启动时创建 **Windows 全局 Mutex**（`Global\AIJobPrintAgentSingleton`）：
-
-- Mutex 创建成功：继续启动流程
-- Mutex 已存在（另一实例正在运行）：写日志 `DUPLICATE_INSTANCE_DETECTED`，`process.exit(1)`
-- 无论正常退出还是崩溃，Windows 自动释放 Mutex，下次启动可重新创建
-- Windows 服务的"崩溃自动重启"机制天然保证 Mutex 释放后重启不会死锁
+Windows 使用带安装时随机 `instance-id` 的命名管道；开发与 CI 使用 Unix 域套接字。对象由进程生命周期持有，服务端收到连接立即关闭；已占用时返回 `DUPLICATE_INSTANCE`。
+Unix 套接字残留时先尝试连接，连接成功表示已有实例，`ECONNREFUSED` 才删除残留文件并重试。权限或监听失败一律 fail-closed。
+`agent.pid` 只记录启动 PID 供诊断，残留文件不参与互斥，也不需要删除。Windows 读不到 `%ProgramData%\AIJobPrintAgent\instance-id` 时拒绝启动并写明确诊断。
 
 ---
 
@@ -817,7 +814,7 @@ Kiosk 轮询到 completed，展示扫描结果预览
 ```
 方式 A（推荐）：注册为 Windows Service
   工具：node-windows 或 NSSM
-  优点：系统级启动，无需用户登录，崩溃自动重启
+  优点：系统级启动，无需用户登录；进程退出后命名管道由系统释放，残留 agent.pid 仅作诊断
   
 方式 B（备用）：任务计划程序
   触发器：系统启动时
@@ -829,18 +826,15 @@ Kiosk 轮询到 completed，展示扫描结果预览
 
 Session Helper 由 Service 在用户登录事件后（监听 `WTS_SESSION_LOGON` 消息或轮询活跃 Session）通过 `CreateProcessAsUser` 启动。
 
-### 8.3 崩溃自动重启
+### 8.3 崩溃后的服务拉起与锁恢复
 
-Windows 服务"失败操作"配置：
+生产安装脚本写入的 SCM 失败操作是两次有限重启（约 60 秒、300 秒）后停止，不是“30 秒后必然 Running”。
+WinSW / SCM 只会**尝试**再拉起进程。进程退出后命名管道由系统释放；Unix 套接字由启动器探测残留并清理。残留 `agent.pid` 只作诊断，不阻止新实例，也不需要人工删除。
+`Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须在
+Windows 实测；干净停止是否留下锁是条件 P0，不得在 macOS 推断。DEVICE 在该阶梯完成前保持 NO-GO。
 
-```
-第 1 次失败：30 秒后重启服务
-第 2 次失败：60 秒后重启服务
-后续失败：120 秒后重启服务
-重置计数器：每 24 小时
-```
-
-Agent 内部捕获 `uncaughtException` / `unhandledRejection`，写日志后 `process.exit(1)` 触发服务重启。
+Agent 内部捕获 `uncaughtException` / `unhandledRejection`，写日志后 `process.exit(1)` 触发服务
+**尝试**重启；锁仍按 §2.12 / §8.8 fail-closed。
 
 ### 8.4 后台服务模式
 
@@ -889,14 +883,16 @@ Agent 内部捕获 `uncaughtException` / `unhandledRejection`，写日志后 `pr
 ### 8.8 单实例锁
 
 ```
-Agent 启动 → CreateMutex("Global\AIJobPrintAgentSingleton")
-    │
-    ├─ 成功（首个实例）→ 继续启动
-    │
-    └─ 失败（已有实例）→ 写日志 DUPLICATE_INSTANCE_DETECTED → process.exit(1)
+Agent 启动
+    ├─ Windows：读取 instance-id → 监听命名管道
+    └─ macOS/Linux：探测并按需清理 agent.sock → 监听 Unix 套接字
+        ├─ 监听成功 → 写入 agent.pid 诊断 → 继续启动
+        ├─ 已占用 / 可连接 → DUPLICATE_INSTANCE → process.exit(1)
+        └─ 标识缺失、权限或监听失败 → fail-closed → process.exit(1)
 ```
 
-Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后续重启可正常创建。Windows 服务的自动重启机制与 Mutex 释放天然衔接，不会死锁。
+单实例互斥由进程生命周期对象负责；`agent.pid` 只记录启动 PID 供诊断，残留文件不参与互斥，也不需要删除。启动失败时检查服务状态、命名管道或 Unix 套接字，并保留诊断文件。
+正常退出、强杀、断电、系统崩溃和原生崩溃都由操作系统释放进程生命周期对象。`agent.pid` 不参与互斥，现场保留它用于诊断即可。
 
 ---
 
@@ -915,14 +911,14 @@ Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后�
 | V05 | **Claim lease 超时重新领取** | Agent claim 任务后不 PATCH，等待 claimExpiresAt 过期，另一进程重新 claim | 原任务重置为 pending，可被重新 claim |
 | V06 | **`node-printer` 调用奔图打印机** | 打印测试 PDF（1 页，A4，彩色） | 打印成功，状态正确回传 |
 | V07 | **PowerShell 打印备用方案** | `Start-Process ... -Verb Print` 调用同一打印机 | 打印成功（V06 失败时的备用验证） |
-| V08 | **Windows 服务开机自启 + 崩溃重启** | 注册服务，重启机器验证自启；kill 进程验证自动重启 | 开机后 30s 内服务 Running |
+| V08 | **Windows 服务开机自启 + 崩溃重启** | 注册服务，重启机器、`taskkill /F`、断电后记录管道释放与新进程启动 | 第二实例被拒；强杀/断电后可启动；须留下 Windows 阶梯证据 |
 | V09 | **`CreateProcessAsUser` 启动 Helper** | Service 以 LocalSystem 调用 API 在当前登录用户 Session 启动子进程 | Helper 进程出现在用户 Session 的任务管理器中 |
 | V10 | **打包方案对比（pkg / nexe / electron-builder / .NET wrapper）** | 各方案分别打包，测试：启动时间、文件大小、原生 addon 加载、Windows 服务兼容性 | 选定最优方案，记录结论 |
 | V11 | **DPAPI 加密存储** | 加密写入 agent.token，在本机解密；拷贝 agent.token 到其他机器尝试解密；验证文件 ACL 拒绝普通用户读取 | 原机可解密；换机不可解密；普通用户收到拒绝访问错误 |
 | V12 | **PDF 合并性能（50 页 ADF 扫描）** | 生成 50 张 A4 JPEG，合并为 PDF，记录耗时 | ≤ 10 秒 |
 | V13 | **磁盘 ACL 验证** | 以普通用户账号尝试读写 `%ProgramData%\AIJobPrintAgent\temp\` | 普通用户收到拒绝访问错误 |
 | V14 | **断网重连幂等** | 断网时完成打印，网络恢复后观察 PATCH 行为 | completed 只上报一次，不重复计费 |
-| V15 | **单实例 Mutex** | 同时启动两个 Agent 实例 | 第二个实例立即退出并写日志 |
+| V15 | **单实例进程生命周期锁** | 同时启动两个 Agent；强杀第一个后立即启动第三个；留下 agent.pid 再启动 | 第二个立即退出；强杀后可启动；残留 agent.pid 不阻止启动 |
 
 ### Phase 8.1 — MVP（技术验证通过后实现）
 
@@ -931,7 +927,7 @@ Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后�
 | 能力 | 说明 | 状态 |
 |------|------|------|
 | 终端注册 | 注册获取 terminalId + agentToken（`POST /auth/terminal/register`） | ✅ Phase 8.1B |
-| 单实例锁 | PID 文件锁（`%ProgramData%\AIJobPrintAgent\agent.pid`），ESRCH 僵尸锁检测，重复启动 exit 1 | ✅ Phase 8.1C |
+| 单实例锁 | Windows 命名管道；POSIX Unix 套接字；agent.pid 仅诊断 | ✅ 真机-8 代码完成，待 Windows 阶梯验证 |
 | 心跳上报 | 每 30s（`PUT /terminals/:id/heartbeat`） | ✅ Phase 8.1B |
 | 打印任务 Claim | `POST /terminals/:id/tasks/claim`，5s 轮询 | ✅ Phase 8.1B |
 | 打印任务执行 | 下载 → MD5 校验 → pdf-to-printer/SumatraPDF → 状态回传 | ✅ Phase 8.1B |
@@ -943,7 +939,7 @@ Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后�
 | 临时文件清理 | try/finally 任务结束立即删除临时 PDF | ✅ Phase 8.1B |
 | image-to-pdf 路由 | pdfkit 将 JPG/PNG 转为临时 PDF → Method B | ✅ Phase 8.1A |
 | 断网重试专项验证 | 真机断网条件下验证 pending_patches 入队与自动重试 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
-| 单实例锁专项验证 | 同时启动两个 Agent 进程，验证 DUPLICATE_INSTANCE exit 1 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
+| 单实例锁专项验证 | 双进程并发、强杀后立即启动、残留 agent.pid 启动 | 📋 真机-8：待 Windows 阶梯验证 |
 | Windows 服务专项验证 | 安装→重启自启→心跳持续→卸载全流程 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
 | local-api-server | 127.0.0.1:9527，localAuthToken + actionToken 全部鉴权 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
 | actionToken HMAC | HMAC-SHA256 签名校验 | ✅ Phase 8.2C 基线完成；新 Windows 主机需复验 |
@@ -1112,3 +1108,6 @@ Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后�
 | PDF 合并 | `pdf-lib` | Ghostscript CLI |
 | HTTP 客户端 | `axios` + 自定义重试 | `got` |
 | 日志 | `winston` + 日志滚动 | `pino` |
+
+
+> 2026-09-28 真机-8：单实例互斥由 Windows 命名管道或 POSIX Unix 域套接字持有，进程退出后由操作系统释放（包括强杀、断电后的系统回收）。`agent.pid` 仅写入启动 PID 供诊断，残留文件不阻止启动，也不应手工删除。Windows 管道名包含安装时写入 `%ProgramData%\AIJobPrintAgent\instance-id` 的随机标识；读取不到标识时 fail-closed。现场验证应记录第二实例被拒、强杀后自动启动、双开只有一个成功，以及残留 `agent.pid` 仍能启动。

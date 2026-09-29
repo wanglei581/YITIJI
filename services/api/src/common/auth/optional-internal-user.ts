@@ -39,18 +39,22 @@ const fallbackLogger = new Logger('InternalSessionResolver')
  *
  * ── Redis 在这里到底是什么（决定了它挂掉时该怎么办）──────────────────────────
  *
- * `internal:session-state:{userId}` 是**数据库行的只读缓存**，不是登出黑名单：
+ * `internal:session-state:{userId}` 不是登出黑名单，也不作为本次请求的身份。
  * 会话是否仍然有效，唯一真源是 `User` 表的 `tokenVersion / enabled / deletedAt`
  * 与 `Organization.enabled`。全部撤销动作（改密、禁用账号、删除账号、机构停用、
  * 手机号换绑）都是先提交数据库，再把新状态**镜像**进 Redis；
  * `POST /auth/logout` 在源码注释里已明确声明「本端点不声称在服务端撤销已签发 JWT」。
  *
- * 因此 Redis 不可用时绕过缓存直接回源数据库，**不是放松鉴权**：
- * 它得到的是与缓存命中时同一个判据的、更新鲜的版本，
- * 反而消掉了缓存最多 60s 的陈旧窗口。真正危险的做法是相反方向 ——
- * 「Redis 挂了就放行」或「缓存写失败就当鉴权失败」，两者本仓都不采用。
+ * 每次请求都直接读数据库，鉴权路径不再 GET 这份缓存。这是安全选择，
+ * 也是性能代价：每个已登录的内部请求都会多查一次 User，partner 再查一次机构。
+ * 真实负载还没有压测，门禁通过不能写成高并发已经成立。
  *
- * 缓存写入失败同理不影响判定：下次请求读不到缓存就再回源一次。
+ * Redis 写入只做版本屏障。`setJsonIfVersionNotOlder` 看到更高的 tokenVersion
+ * 就不覆盖；Lua 解析失败的脏值会被新值盖掉，所以这里不为脏值单独 DEL。
+ * 屏障返回 stale 时本次直接拒绝：不能把那份更高版本的缓存当成当前身份，
+ * 它的角色和机构可能已经和数据库不一致。读不回缓存也不退回刚读到的数据库行。
+ * Redis 不可用时写入失败，仍用本次数据库快照判定。
+ * 「Redis 挂了就放行」或「缓存写失败就当鉴权失败」，两者本仓都不采用。
  */
 export async function resolveOptionalInternalUser(
   authorization: string | undefined,
@@ -95,28 +99,6 @@ async function loadInternalSessionState(
   logger: Logger,
 ): Promise<InternalSessionState | null> {
   const cacheKey = `internal:session-state:${userId}`
-  // 缓存读取有界且绝不抛出：读不到（超时/故障/未命中）一律按未命中处理，回源数据库。
-  const cached = await tryRedis('session-state:get', () => redis.get(cacheKey), logger)
-  if (cached.ok && cached.value) {
-    const parsed = parseInternalSessionState(cached.value)
-    if (parsed) {
-      if (parsed.role !== 'partner') return parsed
-      // Partner 缓存命中也必须回源，避免 Redis 残留把已删除账号短暂复活。
-      return loadInternalSessionStateFromDatabase(userId, cacheKey, redis, prisma, logger)
-    }
-    await tryRedis('session-state:del', () => redis.del(cacheKey), logger)
-  }
-
-  return loadInternalSessionStateFromDatabase(userId, cacheKey, redis, prisma, logger)
-}
-
-async function loadInternalSessionStateFromDatabase(
-  userId: string,
-  cacheKey: string,
-  redis: RedisService,
-  prisma: PrismaService,
-  logger: Logger,
-): Promise<InternalSessionState | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, role: true, orgId: true, enabled: true, tokenVersion: true, deletedAt: true },
@@ -141,7 +123,8 @@ async function loadInternalSessionStateFromDatabase(
     deletedAt: user.deletedAt?.toISOString() ?? null,
     orgEnabled,
   }
-  // 回写只是加速下一次请求。写失败不改变本次判定 —— state 已经是数据库真源。
+  // 写入不是给下一次请求当身份缓存。失败时用本次数据库行；
+  // 已有更高 tokenVersion 时不覆盖，并拒绝本次，避免采信一份可能过期的管理员快照。
   const writeResult = await tryRedis(
     'session-state:set',
     () => redis.setJsonIfVersionNotOlder(
@@ -152,27 +135,6 @@ async function loadInternalSessionStateFromDatabase(
     ),
     logger,
   )
-  if (writeResult.ok && writeResult.value === 'stale') {
-    // 缓存里有更高的 tokenVersion（并发撤销已经先落缓存）——以那份更新的为准。
-    // 读不回来时退回本次数据库快照，不会因此放行更旧的版本。
-    const latest = await tryRedis('session-state:get', () => redis.get(cacheKey), logger)
-    const parsed = latest.ok && latest.value ? parseInternalSessionState(latest.value) : null
-    return parsed ?? state
-  }
+  if (writeResult.ok && writeResult.value === 'stale') return null
   return state
-}
-
-function parseInternalSessionState(raw: string): InternalSessionState | null {
-  try {
-    const parsed = JSON.parse(raw) as Partial<InternalSessionState>
-    if (
-      typeof parsed.userId !== 'string'
-      || typeof parsed.tokenVersion !== 'number'
-      || typeof parsed.enabled !== 'boolean'
-      || (typeof parsed.deletedAt !== 'string' && parsed.deletedAt !== null)
-    ) return null
-    return parsed as InternalSessionState
-  } catch {
-    return null
-  }
 }

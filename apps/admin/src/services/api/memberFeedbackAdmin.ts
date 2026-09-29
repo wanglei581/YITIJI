@@ -1,7 +1,7 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
-export type FeedbackCategory = 'device' | 'print' | 'file_process' | 'general'
+export type FeedbackCategory = 'device' | 'print' | 'file_process' | 'general' | 'ai_content'
 export type FeedbackStatus = 'pending' | 'processing' | 'replied' | 'closed'
 export type FeedbackSenderType = 'user' | 'admin' | 'system'
 
@@ -113,6 +113,11 @@ export const memberFeedbackAdminApi = {
   reply(id: string, content: string): Promise<AdminFeedbackTicketDetail> {
     if (API_MODE !== 'http') return Promise.reject(new ApiHttpError('MOCK_DISABLED', 'mock 模式不支持回复反馈', 400))
     return request(`/admin/feedback/${encodeURIComponent(id)}/replies`, { method: 'POST', body: { content } })
+  },
+  /** 查看提交人留的完整联系电话；服务端每次都先留痕，写不进去就不返回。 */
+  revealContactPhone(id: string): Promise<{ phone: string }> {
+    if (API_MODE !== 'http') return Promise.reject(new ApiHttpError('MOCK_DISABLED', 'mock 模式不支持查看联系电话', 400))
+    return request(`/admin/feedback/${encodeURIComponent(id)}/contact-phone`, { method: 'POST' })
   },
   updateStatus(id: string, status: FeedbackStatus): Promise<AdminFeedbackTicketDetail> {
     if (API_MODE !== 'http') return Promise.reject(new ApiHttpError('MOCK_DISABLED', 'mock 模式不支持更新反馈状态', 400))

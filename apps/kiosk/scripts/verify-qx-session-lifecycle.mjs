@@ -12,6 +12,8 @@ const files = {
   standbyView: read('src/pages/screensaver/StandbyView.tsx'),
   standbyModel: read('src/pages/screensaver/standbyModel.ts'),
   loginPage: read('src/pages/auth/LoginPage.tsx'),
+  profilePage: read('src/pages/profile/ProfilePage.tsx'),
+  settingsPage: read('src/pages/profile/me/MySettingsPage.tsx'),
   loginModel: read('src/pages/auth/loginGateModel.ts'),
   loginFields: read('src/pages/auth/components/LoginGatePhoneFields.tsx'),
   sessionPage: read('src/pages/placeholders/SessionTimeoutPage.tsx'),
@@ -20,7 +22,7 @@ const files = {
   overlay: read('src/auth/KioskPrivacyGuard.tsx'),
   /* 2026-09-15：清场遮罩的标记从 KioskPrivacyGuard 搬进了自己的组件（它现在还要
      如实展示收尾闸在等什么）。断言跟着搬，判据一个字没变 —— 遮罩仍然必须挂住整屏、
-     仍然必须说「正在清除本机会话」。 */
+     仍然必须说「正在清除这台机器上的这次使用记录」。 */
   clearingOverlay: read('src/auth/KioskClearingOverlay.tsx'),
   clearingOverlayCss: read('src/pages/session-guard/styles/session-guard-qx.css'),
   sensitive: read('src/auth/kioskSensitiveSession.ts'),
@@ -64,7 +66,13 @@ check('standby empty playlist still exits home and does not invent media', () =>
 
 check('login gate has a leave-without-login exit and no 已登录 overlay', () => {
   assert.match(files.loginPage, /QxPageFrame/)
-  assert.match(files.loginPage, /back=\{\{\s*label:\s*'返回首页'/)
+  // 规则 1：顶栏返回键保留，底部也要有回退。03 / 30 三张稿顶栏都有返回键。
+  assert.match(files.loginPage, /<QxStepActions onPrev=\{goHome\} prevLabel="返回首页"/)
+  assert.match(files.loginPage, /back=\{\{\s*label:\s*'返回首页',\s*onBack:\s*goHome\s*\}\}/)
+  assert.match(files.profilePage, /back=\{\{\s*label:\s*'返回首页'/)
+  assert.match(files.profilePage, /<QxStepActions onPrev=/)
+  assert.match(files.settingsPage, /back=\{\{\s*label:\s*'返回我的'/)
+  assert.match(files.settingsPage, /<QxStepActions onPrev=/)
   assert.match(files.loginPage, /不登录，继续使用/)
   assert.match(files.loginPage, /useMemberPhoneLogin\(/)
   assert.match(files.loginPage, /phoneLogin\.paneProps/)
@@ -84,10 +92,10 @@ check('login keypad remains on-page and agreement-gated', () => {
 check('session guard continue is fail-closed and clearing overlay still blocks', () => {
   assert.match(files.sessionPage, /continueSession/)
   assert.match(files.sessionPage, /hardClear/)
-  assert.match(files.sessionPage, /结束并清除本机会话/)
+  assert.match(files.sessionPage, /结束并清除这台机器上的这次使用记录/)
   assert.match(files.sessionPage, /我还在，继续使用/)
   assert.match(files.clearingOverlay, /data-kiosk-privacy-clearing="true"/)
-  assert.match(files.clearingOverlay, /正在清除本机会话/)
+  assert.match(files.clearingOverlay, /正在清除这台机器上的这次使用记录/)
   assert.match(files.overlay, /clearKioskSensitiveSession\(getToken\(\)\)/)
   // 遮罩仍然是 KioskPrivacyGuard 在 clearing / 陈旧历史项 / 孤儿会话路由三种情况下
   // 画的那一块；换成别的组件（或忘了挂）就等于把上一位的页面露出来。
@@ -135,3 +143,6 @@ if (failures) {
   process.exit(1)
 }
 console.log('\nALL PASS qx session lifecycle')
+
+// W4 L1: real return-path/error-copy/phone-hook regression; runs in the existing CI gate.
+await import('./verify-w4-login-profile-l1.mjs')

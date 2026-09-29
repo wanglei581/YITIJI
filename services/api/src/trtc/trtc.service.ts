@@ -1,12 +1,20 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { genUserSig } from './usersig.util'
 import { callTencentApi } from './tencent-api.util'
+import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 import {
   DEFAULT_FORBIDDEN_WORDS,
   DEFAULT_ROLE_SCOPE,
   buildGuardedSystemPrompt,
   normalizeForbiddenWords,
 } from '../ai/llm/llm-guard'
+
+export const TRTC_DEFAULT_SYSTEM_PROMPT = withAiSafety(
+  '你是一位专业、亲切的就业服务顾问，名字叫小青。' +
+  '你只提供简历整理、打印帮助和就业政策说明。' +
+  '不引导查询云上的岗位或招聘会。' +
+  '回答简洁口语化，每次回复控制在 100 字以内。',
+)
 
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name]
@@ -111,10 +119,7 @@ export class TrtcService {
     }
 
     const systemPrompt = buildGuardedSystemPrompt({
-      systemPrompt: process.env['TRTC_SYSTEM_PROMPT'] ||
-        '你是一位专业、亲切的就业政策与求职服务顾问，名字叫小青。' +
-        '你为求职者提供简历优化建议、求职指导、就业政策解读和打印服务帮助。' +
-        '回答简洁口语化，每次回复控制在 100 字以内。',
+      systemPrompt: process.env['TRTC_SYSTEM_PROMPT'] || TRTC_DEFAULT_SYSTEM_PROMPT,
       roleScope: process.env['TRTC_ROLE_SCOPE'] || process.env['AI_ASSISTANT_ROLE_SCOPE'] || DEFAULT_ROLE_SCOPE,
       forbiddenWords: envForbiddenWords('TRTC_FORBIDDEN_WORDS', 'AI_ASSISTANT_FORBIDDEN_WORDS'),
     })

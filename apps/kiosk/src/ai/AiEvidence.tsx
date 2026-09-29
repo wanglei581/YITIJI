@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { AI_LABEL_COPY } from '@ai-job-print/shared'
 // 样式随组件走（与 AssistantPage 的 assistant-advisor.css 同一模式），
 // 不进 index.css —— index.css 的 import 顺序是 verify-fusion-shell 锁死的合同。
 import '../styles/ai-primitives.css'
@@ -36,8 +37,13 @@ export const AI_JUDGEMENT_DISCLAIMER = '仅供参考'
 /** 全站统一的「AI 判断 · 仅供参考」整串文案。 */
 export const AI_JUDGEMENT_TEXT = `${EVIDENCE_LABEL.E3} · ${AI_JUDGEMENT_DISCLAIMER}`
 
-/** AIGC 可见标识文案（每页恰好一次）。 */
-export const AIGC_MARK_TEXT = 'AI 生成内容（AIGC）· 仅供参考'
+/**
+ * AIGC 可见标识文案（每页恰好一次）。
+ *
+ * 取共享底句「AI 生成，仅供参考」（packages/shared `AI_LABEL_COPY.BASE`，next-tasks 3.5c）：
+ * 一体机各 AI 结果页与这枚标识说同一句话，不再另用「AI 生成内容（AIGC）」的说法。
+ */
+export const AIGC_MARK_TEXT = AI_LABEL_COPY.BASE
 
 /**
  * E3 结论里禁止出现的量化断言（`interface-handoff.md` §3：禁止百分比 / 录用概率 / 通过率）。

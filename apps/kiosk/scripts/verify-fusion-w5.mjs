@@ -26,18 +26,21 @@ const SELF_ASSESSMENT_V1_ROUTES = [
 const W5_ROUTES_EXPANDED = [...W5_ROUTES, ...SELF_ASSESSMENT_V1_ROUTES]
 
 const FROZEN = new Map([
+  // W4 L1：掩码、真实冷却/有效期、错误码分态；新基线另由 verify-w4-login-profile-l1 动态回归。
   // 哈希随 A2.1 登录切片同步更新（V6 落 main）：该 hook 的两处错误文案由
   // `cause instanceof MemberApiError ? cause.message : 兜底` 改为统一走
   // resolveMemberApiErrorMessage(cause, 兜底)，行为等价且兜底文案更具体。
   // 冻结契约本身不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
-  ['src/pages/auth/hooks/useMemberPhoneLogin.ts', '8f60d06f1e9d0dc2825882f64095d7cf4263b5aa61f32ea2e6736ecef11c40f8'],
+  ['src/pages/auth/hooks/useMemberPhoneLogin.ts', 'c8c88ed5a85d1e3c3d22d8715a23fc9168a50876b194b3352a182d5ff2c97824'],
   ['src/pages/profile/assets/useMemberProfileOverview.ts', '3679de500e38d9d84b5f77680090997dc27eabca861af58c3d407eeb9e420395'],
   // 哈希随「扫描入口统一到 /scan」同步更新（2026-09-13）：唯一改动是「扫描文件」这条
   // 入口的 route 从兼容重定向地址 '/scan/start' 改成工作台真地址 '/scan'，不增不减入口。
   // 冻结契约不放宽，仍逐字节校验；入口标签与地址另有 verify:profile-inkpaper-home /
   // verify:lightflow-profile-entry 的 22 条对照表钉死。
   // 旧哈希 dad0e5fbf3d7ea3e22ffa852750158d5ee1af50e028a7b8df9fc01c0a3a2b0ae。
-  ['src/pages/profile/profileEntries.ts', '3b05eac00356d5e5c59912752a105bdb268c2bec5b0b57bc455a2a69d63103e0'],
+  // 2026-09-28 用词：账号设置说明「登录状态与会话说明」改为「登录状态与公共设备使用说明」。
+  // 入口条数、路由、图标都没变。旧哈希 3b05eac00356d5e5c59912752a105bdb268c2bec5b0b57bc455a2a69d63103e0。
+  ['src/pages/profile/profileEntries.ts', 'c3eab9286546efab60ec8e3e5dfe9f1a4724c0e17e27f09e159a541ac4ef83e3'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
   ['src/pages/profile/me/feedback/types.ts', 'a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f'],
@@ -45,7 +48,10 @@ const FROZEN = new Map([
   // 纯追加：原有导出未删；新增 refunding 展示、PENDING_REFUND_* 常量与
   // memberPayStatusLabel（待退款信号优先于「已支付」）。到账时间不以天数承诺。
   // 冻结契约不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'edf85a5efbedc41feefa33097b5b62688af30d0d93b7f0a79dd74a9cd779e846'],
+  // 2026-09-28 用词：实付提示「无独立字段，不按应付减优惠推算」改为
+  // 「没有单独记下实付，不按应付减优惠来推算」。仍然禁止用应付减优惠推算实付。
+  // 旧哈希 edf85a5efbedc41feefa33097b5b62688af30d0d93b7f0a79dd74a9cd779e846。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
@@ -144,9 +150,9 @@ function assertSharedPageShell(source, path) {
   assert.match(source, /<KioskPageHeader\b/, `${path} uses the shared KioskPageHeader`)
 }
 
-function assertSinglePaddingNeutralizer(source, path, scopePattern) {
+function assertSinglePaddingNeutralizer(source, path, scopePattern, wrapperSelector = '.ui-kiosk-page-content') {
   const blocks = [...source.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter((match) => match[1].includes('.ui-kiosk-page-content'))
+    .filter((match) => match[1].includes(wrapperSelector))
   assert.equal(blocks.length, 1, `${path} declares exactly one shared-content padding neutralizer`)
   assert.match(blocks[0][1], scopePattern, `${path} scopes the shared-content padding neutralizer to its page`)
   assert.match(blocks[0][2], /\bpadding:\s*0(?:px)?\s*;/, `${path} neutralizes the shared content padding`)
@@ -199,16 +205,36 @@ for (const marker of ['config.enabled', 'items.length > 0', '<QrLaunchModal', '<
   assert.match(toolbox, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `toolbox keeps real branch/modal ${marker}`)
 }
 assert.doesNotMatch(toolbox, /<\/?main\b/, 'toolbox leaves the main landmark to KioskLayout')
-assertSharedPageShell(legalDoc, 'LegalDocPage')
+/* 2026-09-25 稿 08-legal 迁入青序流光，同强度替换三条：
+ * ① 页壳 KioskPageFrame/KioskPageHeader → QxPageFrame（并断言已退出 V6 壳）；
+ * ② 旧页用 `apiContent ? ( … )` / `!apiContent && ( … )` 两支表达「服务端正文 / 本机留存文本」，
+ *    新页拆成显式视图：ready 只渲染服务端正文分出的章节，fallback 渲染本机留存文本且必须挂「不作为正式版本」标注；
+ * ③ 内容区留白中和器从旧壳的 .ui-kiosk-page-content 换到青序壳的 .qx-body（稿自带 44px 页边）。 */
+assert.match(legalDoc, /<QxPageFrame\b/, 'LegalDocPage uses the Qingxu page frame')
+assert.doesNotMatch(legalDoc, /KioskPageFrame|KioskPageHeader/, 'LegalDocPage has left the V6 frame')
 assert.match(legalDoc, /data-kiosk-screen="legal-doc"/, 'legal document keeps its stable screen marker')
-assert.match(legalDoc, /apiContent\s*\?\s*\(/, 'legal document keeps the real API-content branch')
-assert.match(legalDoc, /!apiContent\s*&&\s*\(/, 'legal document keeps the audited fallback branch')
+assert.match(
+  legalDoc,
+  /docLoad\?\.status === 'ready' \? splitLegalSections\(docLoad\.content\)/,
+  'legal document keeps the real API-content branch (served text is what the reader shows)',
+)
+assert.match(
+  legalDoc,
+  /view === 'fallback'[\s\S]{0,1600}?data-testid="legal-doc-fallback-warning"[\s\S]{0,400}?不作为正式版本/,
+  'legal document keeps the audited fallback branch and labels it as not the official version',
+)
+/* 离线页的健康探测必须走与其它接口相同的 API_BASE_URL（与 useApiReadiness 同源）：写死 '/api/v1/health' 时，
+ * VITE_API_BASE_URL 指向别的源就永远探测失败，一体机卡在离线页。浏览器夹具的基址恰好也是 /api/v1，测不出这一条。 */
+const errorOffline = read('src/pages/placeholders/ErrorOfflinePage.tsx')
+assert.match(errorOffline, /fetch\(`\$\{API_BASE_URL\}\/health`/, 'offline page probes /health through API_BASE_URL')
+assert.doesNotMatch(errorOffline, /fetch\(\s*['"`]\/api\//, 'offline page hard-codes no /api path in its probes')
 assertSinglePaddingNeutralizer(
   benefitActivityDetailCss,
   'activities-detail-inkpaper.css',
   /\.k8-act-detail\b/,
 )
-assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/)
+assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/, '.qx-body')
+assert.doesNotMatch(legalDocCss, /\.ui-kiosk-page-content/, 'legal-service-desk.css carries no dead selector for the retired V6 content wrapper')
 assertSinglePaddingNeutralizer(toolboxCss, 'toolbox-zone.css', /\.kpv1\.ktoolbox\b/)
 assert.match(
   profileCss,
@@ -253,11 +279,8 @@ for (const path of productionFiles) {
 
 const concretePages = [
   'src/pages/profile/ProfilePage.tsx',
-  'src/pages/profile/me/MyPrintOrdersPage.tsx',
-  'src/pages/profile/me/MyDocumentsPage.tsx',
   'src/pages/profile/me/MyBenefitsPage.tsx',
   'src/pages/profile/me/MyFeedbackPage.tsx',
-  'src/pages/profile/me/MySettingsPage.tsx',
   'src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   'src/pages/auth/LoginPage.tsx',
   'src/pages/auth/MobileQrLoginPage.tsx',
@@ -283,10 +306,16 @@ const qxMePages = [
   'src/pages/profile/me/MyActivityPage.tsx',
   'src/pages/profile/me/MyNotificationsPage.tsx',
   'src/pages/placeholders/MeActivityDetailPage.tsx',
+  // 稿 38-member-assets（2026-09-23）：文档与打印订单从旧 MeListShell 迁入青序记录壳。
+  // 上面 concretePages 只认 `fusion-w5|MeListShell` 字样，迁走后移到这里按青序壳断言。
+  'src/pages/profile/me/MyDocumentsPage.tsx',
+  'src/pages/profile/me/MyPrintOrdersPage.tsx',
+  // 稿 30 ?screen=settings（2026-09-23）：账号设置从墨青纸感 KioskPageFrame 迁入青序会员壳的 settings 视图。
+  'src/pages/profile/me/MySettingsPage.tsx',
 ]
 for (const path of qxMePages) {
   const source = read(path)
-  assert.match(source, /QxMePage/, `${path} uses Qingxu member chrome`)
+  assert.match(source, path.endsWith('/MySettingsPage.tsx') ? /<QxPageFrame/ : /QxMePage/, `${path} uses its Qingxu page frame`)
   assert.doesNotMatch(source, /KioskPageFrame/, `${path} has left the V6 frame`)
   assert.doesNotMatch(source, /className="qx-nav-item"/, `${path} does not inline navbar items`)
 }
@@ -305,6 +334,29 @@ assert.match(kioskRootSrc, /['"]\/me\/favorites['"]/, '/me/favorites is register
 assert.match(kioskRootSrc, /['"]\/me\/ai-records['"]/, '/me/ai-records is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity['"]/, '/me/activity is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity\/['"]/, '/me/activity/:id uses a precise prefix')
+/* 文档与打印订单同属稿 38，是「文件资产 → 打印订单」这条跨端主链的两屏：
+ * 页面换成青序壳却漏登记，KioskLayout 会在青序页上再叠一层旧顶栏和底栏（两套 chrome 同屏）。
+ * 所以这里同时钉三件事：进了精确集合、页面不再挂旧壳、页面声明的分域视图就是这两张 Tab。 */
+const qxMigratedSet = kioskRootSrc.match(/const QX_MIGRATED_ROUTES = new Set<string>\(\[([\s\S]*?)\]\)/)?.[1] ?? ''
+for (const [route, file, view] of [
+  ['/me/documents', 'src/pages/profile/me/MyDocumentsPage.tsx', 'documents'],
+  ['/me/print-orders', 'src/pages/profile/me/MyPrintOrdersPage.tsx', 'orders'],
+  ['/me/settings', 'src/pages/profile/me/MySettingsPage.tsx', 'settings'],
+]) {
+  assert.match(qxMigratedSet, new RegExp(`['"]${route.replace(/\//g, '\\/')}['"]`), `${route} is registered in QX_MIGRATED_ROUTES (exact set, not a prefix)`)
+  const source = read(file)
+  assert.doesNotMatch(source, /MeListShell|me-detail-inkpaper|useInkRipple|me-inkdetail/, `${file} has left the legacy InkPaper member shell`)
+  assert.match(source, new RegExp(`view="${view}"`), `${file} renders the ${view} asset view of the Qingxu member chrome`)
+}
+assert.match(qxMeChrome, /key: 'documents'[^\n]*to: '\/me\/documents'/, 'member chrome exposes the 我的文档 asset tab')
+assert.match(qxMeChrome, /key: 'orders'[^\n]*to: '\/me\/print-orders'/, 'member chrome exposes the 打印订单 asset tab')
+/* 账号设置迁入同一青序会员壳：视图要在共享壳里声明、测试作用域独立，且不挂记录分类 Tab
+ * （设置不是记录，也不是资产分域）。页面自身仍须保留 member-settings 屏标，visual 用例与 W6 路由扫描都按它定位。 */
+assert.match(qxMeChrome, /\| 'settings'/, 'member chrome declares the settings view')
+assert.match(qxMeChrome, /'member-settings'/, 'member chrome exposes the member-settings screen and test scope')
+assert.match(qxMeChrome, /view === 'notifications' \|\| isSettingsView \? \[\]/, 'settings view renders no record-category tabs')
+const settingsPageQx = read('src/pages/profile/me/MySettingsPage.tsx')
+assert.match(settingsPageQx, /data-kiosk-screen="member-settings"/, 'MySettingsPage keeps the member-settings screen marker on the Qingxu chrome')
 assert.doesNotMatch(kioskRootSrc, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/me\/['"]/, 'does not use a wide /me/ prefix')
 const profilePageQx = read('src/pages/profile/ProfilePage.tsx')
 const benefitsPageQx = read('src/pages/profile/me/MyBenefitsPage.tsx')

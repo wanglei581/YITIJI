@@ -1,3 +1,4 @@
+import { ALLOW_FIXTURES } from '../../../utils/buildMode'
 import type { SignStampPosition, SignStampSize } from '@ai-job-print/shared'
 import {
   FROM_WHITELIST,
@@ -49,7 +50,7 @@ export interface SignStampQuery {
 
 export function parseSignStampQuery(search: string): SignStampQuery {
   const q = new URLSearchParams(search)
-  const capture = q.get('capture') === '1' || q.get('debug') === '1'
+  const capture = ALLOW_FIXTURES && (q.get('capture') === '1' || q.get('debug') === '1')
   const rawFrom = q.get('from')
   let from: SignStampFrom = 'hub'
   let fromUnknown = false
@@ -282,7 +283,7 @@ export function pillOf(
     return { tone: 'warn', label: '暂不受理 · 可稍后重试' }
   }
   if (live.phase === 'completed' || live.phase === 'recovered') {
-    return { tone: live.outErr ? 'warn' : 'ok', label: live.outErr ? '已生成 · 预览受限' : '派生 PDF 已生成' }
+    return { tone: live.outErr ? 'warn' : 'ok', label: live.outErr ? '已生成 · 预览受限' : '生成的新 PDF 已生成' }
   }
   if (!live.doc) return { tone: 'unknown', label: '第 1 步 · 选 PDF' }
   if (!live.stamp) return { tone: 'unknown', label: '第 2 步 · 传签名图' }

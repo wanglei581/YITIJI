@@ -1,24 +1,10 @@
 import mammoth from 'mammoth'
+import { openUnpdfDocument } from '../common/pdf/pdfjs-document'
 import { isSinglePageImage } from '../files/file-page-count.util'
 import type { FilePurpose } from '../files/file.types'
 import type { OcrService } from '../ai/resume/ocr/ocr.service'
 import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
 import type { PiiFindingAction } from './materials.types'
-
-/**
- * unpdf 提供 CJS 构建；services/api 是 commonjs + node10 resolution，
- * 不读 exports 的 types 字段，故用 require + 本地最小类型签名规避类型解析问题
- * （做法与 resume-extraction.service.ts 一致）。
- */
-interface UnpdfApi {
-  getDocumentProxy(data: Uint8Array): Promise<unknown>
-  extractText(
-    pdf: unknown,
-    options?: { mergePages?: boolean },
-  ): Promise<{ totalPages: number; text: string | string[] }>
-}
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const unpdf = require('unpdf') as UnpdfApi
 
 /** pdfjs TextItem 的最小结构（本地类型，理由同上：不依赖 unpdf 的 types 解析）。 */
 interface PdfTextItem {
@@ -157,7 +143,7 @@ export async function extractTextForPiiScan(
     let totalPages = 0
     let pdf: PdfDocumentProxy
     try {
-      pdf = (await unpdf.getDocumentProxy(new Uint8Array(buffer))) as PdfDocumentProxy
+      pdf = await openUnpdfDocument<PdfDocumentProxy>(new Uint8Array(buffer))
     } catch {
       return { pages: [], outcome: 'degraded', truncated: false }
     }

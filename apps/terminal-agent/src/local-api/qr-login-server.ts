@@ -36,6 +36,8 @@ const LOCAL_HOST = '127.0.0.1'
 const CLAIM_TOKEN_TTL_BUFFER_MS = 5_000
 const MAX_BODY_BYTES = 8 * 1024
 const TICKET_ID_RE = /^[A-Za-z0-9_-]{32,96}$/
+const BOOT_TICKET_RATE_WINDOW_MS = 60_000
+const BOOT_TICKET_RATE_LIMIT = 6
 
 interface StoredClaim {
   claimToken: string
@@ -58,8 +60,7 @@ export function startQrLoginLocalServer(
   options: LocalQrServerOptions = {},
 ): LocalQrServerHandle | null {
   if (!config.terminalId || !config.agentToken) {
-    warn('local-qr: terminal credentials missing; QR local bridge disabled')
-    return null
+    warn('local-qr: terminal credentials not ready; local identity stays available and cloud routes return retryable 503')
   }
 
   const localApiPort = normalizePort(config.localApiPort)
@@ -68,14 +69,26 @@ export function startQrLoginLocalServer(
     warn('local-qr: no allowed origins configured; browser requests will be rejected')
   }
   const claims = new Map<string, StoredClaim>()
+  const bootTicketRequests: number[] = []
   const bridgeSessions = createLocalBridgeSessionStore()
-  const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
+  // The server starts before cloud registration completes, so credentials can
+  // arrive later. Build the client from the current config instead of patching
+  // headers in an interceptor: a per-request override (the USB resume upload
+  // swaps in the member token) must never be overwritten by the Agent token.
+  let cachedClient: { key: string; client: ReturnType<typeof createApiClient> } | null = null
+  const currentClient = (): ReturnType<typeof createApiClient> => {
+    const key = `${config.agentToken ?? ''}\u0000${config.terminalId ?? ''}`
+    if (!cachedClient || cachedClient.key !== key) {
+      cachedClient = { key, client: createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId) }
+    }
+    return cachedClient.client
+  }
   const bridgeToken = config.localApiBridgeToken?.trim() || undefined
   if (!bridgeToken) log('local-qr: static bridge token not configured; using short-lived local browser sessions')
 
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin
-    void handleRequest({ req, res, origins, claims, client, bridgeToken, bridgeSessions, config, options }).catch((error) => {
+    void handleRequest({ req, res, origins, claims, bootTicketRequests, client: currentClient(), bridgeToken, bridgeSessions, config, options }).catch((error) => {
       const isUsbRoute = (req.url ?? '').startsWith('/local/usb/')
       const isPrintRoute = (req.url ?? '').startsWith('/local/print/')
       const context = isUsbRoute ? 'usb' : isPrintRoute ? 'print' : 'qr'
@@ -115,13 +128,14 @@ async function handleRequest(input: {
   res: ServerResponse
   origins: string[]
   claims: Map<string, StoredClaim>
+  bootTicketRequests: number[]
   client: ReturnType<typeof createApiClient>
   bridgeToken: string | undefined
   bridgeSessions: LocalBridgeSessionStore
   config: AgentConfig
   options: LocalQrServerOptions
 }): Promise<void> {
-  const { req, res, origins, claims, client, bridgeToken, bridgeSessions, config, options } = input
+  const { req, res, origins, claims, bootTicketRequests, client, bridgeToken, bridgeSessions, config, options } = input
   const origin = req.headers.origin
   const url = new URL(req.url ?? '/', `http://${LOCAL_HOST}`)
   const isUsbRoute = url.pathname.startsWith('/local/usb/')
@@ -149,20 +163,33 @@ async function handleRequest(input: {
   // The watchdog has no browser Origin. The server is loopback-only and returns
   // a one-minute, one-time ticket instead of ever exposing an Agent credential.
   if (req.method === 'POST' && url.pathname === '/local/terminal-boot-ticket') {
-    if (origin) {
-      sendJson(res, 403, { code: 'LOCAL_TERMINAL_BOOT_ORIGIN_FORBIDDEN', message: '终端启动票仅供本机启动器使用' })
+    if (origin && (!isOriginAllowed(origin, origins) || !isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken))) {
+      sendJson(res, 403, { code: 'LOCAL_TERMINAL_BOOT_ORIGIN_FORBIDDEN', message: '终端启动票仅供本机启动器使用' }, isOriginAllowed(origin, origins) ? origin : undefined)
       return
     }
     if (url.search.length > 0) {
       sendJson(res, 400, { code: 'LOCAL_TERMINAL_BOOT_QUERY_NOT_ALLOWED', message: '终端启动票不接受查询参数' })
       return
     }
+    const now = Date.now()
+    while (bootTicketRequests[0] !== undefined && bootTicketRequests[0] <= now - BOOT_TICKET_RATE_WINDOW_MS) bootTicketRequests.shift()
+    if (bootTicketRequests.length >= BOOT_TICKET_RATE_LIMIT) {
+      sendJson(res, 429, { code: 'LOCAL_TERMINAL_BOOT_RATE_LIMITED', message: '终端启动票请求过于频繁，请稍后重试' }, origin)
+      return
+    }
+    bootTicketRequests.push(now)
+    if (!config.terminalId || !config.agentToken) {
+      sendJson(res, 503, { code: 'LOCAL_TERMINAL_BOOT_NOT_READY', message: '终端云端注册尚未就绪，请稍后重试' }, origin)
+      return
+    }
     await assertEmptyBody(req)
+    // 只请求一次：两个调用方（看门狗、页面）都是 4 秒超时并自带重试，这里再重试只会在它们放弃后白白换票。
+    // 云端没就绪时回 503 可重试码，调用方据此稍后再来。
     const response = await client.post<ApiEnvelope<LocalTerminalBootTicketResponse> | LocalTerminalBootTicketResponse>('/terminals/boot-ticket', undefined, {
       ...NO_RETRY_CONFIG,
       timeout: 3_000,
     })
-      .catch((error) => { throw backendError(error, 'qr') })
+      .catch((error) => { throw backendError(error, 'qr', true) })
     const payload = response.data
     const ticket = 'data' in payload ? payload.data : payload
     sendEnvelope(res, 200, ticket, origin ?? '')
@@ -189,7 +216,7 @@ async function handleRequest(input: {
 
   if (req.method === 'GET' && url.pathname === '/local/terminal-identity') {
     const identity: LocalTerminalIdentityResponse = {
-      terminalId: config.terminalId!.trim(),
+      terminalId: config.terminalId?.trim() ?? '',
       terminalCode: config.terminalCode.trim(),
     }
     sendEnvelope(res, 200, identity, origin)
@@ -517,16 +544,16 @@ interface LocalApiException {
   error: LocalApiError
 }
 
-function backendError(error: unknown, context: 'qr' | 'usb' = 'qr'): LocalApiException {
+function backendError(error: unknown, context: 'qr' | 'usb' = 'qr', retryable = false): LocalApiException {
   const fallbackCode = context === 'usb' ? 'LOCAL_USB_BACKEND_ERROR' : 'LOCAL_QR_BACKEND_ERROR'
   const fallbackMessage = context === 'usb' ? 'U 盘文件上传后端请求失败' : '扫码登录后端请求失败'
   if (axios.isAxiosError<ApiErrorEnvelope>(error)) {
     const status = error.response?.status ?? 502
     const code = error.response?.data?.error?.code ?? fallbackCode
     const message = error.response?.data?.error?.message ?? fallbackMessage
-    return { status, error: { code, message } }
+    return { status: retryable ? 503 : status, error: { code: retryable ? 'LOCAL_TERMINAL_BOOT_RETRYABLE' : code, message } }
   }
-  return { status: 502, error: { code: fallbackCode, message: fallbackMessage } }
+  return { status: retryable ? 503 : 502, error: { code: retryable ? 'LOCAL_TERMINAL_BOOT_RETRYABLE' : fallbackCode, message: retryable ? '云端暂不可用，请稍后重试' : fallbackMessage } }
 }
 
 function localExceptionFromUnknown(error: unknown, context: 'qr' | 'usb' | 'print' = 'qr'): LocalApiException {

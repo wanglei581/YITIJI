@@ -37,23 +37,6 @@ function expectAbsent(source, pattern, message) {
 function git(args) {
   return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 }
-function listChangedFiles() {
-  const committed = git(['diff', '--name-only', 'origin/main...HEAD'])
-    .split('\n')
-    .filter(Boolean)
-  const unstaged = git(['diff', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const staged = git(['diff', '--cached', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const untracked = git(['ls-files', '--others', '--exclude-standard'])
-    .split('\n')
-    .filter(Boolean)
-
-  return [...new Set([...committed, ...unstaged, ...staged, ...untracked])]
-}
-
 console.log('\n=== Profile 简历与消息明细页墨青纸感守卫 ===')
 
 const resumes = read('src/pages/profile/me/MyResumesPage.tsx')
@@ -73,23 +56,23 @@ for (const [label, source] of [
 expectIncludes(resumes, "import './styles/member-records-qx.css'", 'MyResumesPage 引入青序记录页 CSS')
 expectIncludes(notifications, "import './styles/notifications-qx.css'", 'MyNotificationsPage 引入青序消息页 CSS')
 
-expectIncludes(resumes, 'getMyResumes(getToken(), { pageSize: 50 })', '我的简历保留本人简历真实 API 拉取')
+expectIncludes(resumes, 'getMyResumes(token, { pageSize: 50, cursor })', '我的简历保留本人简历真实 API 拉取')
 expectIncludes(resumes, "loginFrom=\"/me/resumes\"", '我的简历保留登录回跳来源')
-expectIncludes(resumes, 'setItems([])', '我的简历保留游客态清空列表')
-expectIncludes(resumes, 'setTotal(0)', '我的简历保留游客态清空总数')
+expectIncludes(read('src/pages/profile/me/useMemberCursorPage.ts'), 'setItems([])', '我的简历保留游客态清空列表')
+expectIncludes(read('src/pages/profile/me/useMemberCursorPage.ts'), 'setPage(null)', '我的简历保留游客态清空总数')
 expectIncludes(resumes, "taskPath('/resume/report', taskId)", '我的简历保留诊断报告跳转')
 expectIncludes(resumes, "taskPath('/resume/optimize', taskId)", '我的简历保留优化页跳转')
-expectIncludes(resumes, "navigate('/resume/job-fit')", '我的简历保留岗位匹配参考跳转')
+expectIncludes(resumes, 'taskId: item.taskId, resumeName: resumeLabel(item)', '我的简历保留岗位匹配参考跳转')
 expectIncludes(resumes, "taskPath('/resume/generate/preview', taskId)", '我的简历保留 AI 生成预览跳转')
 expectIncludes(resumes, "item.status === 'completed'", '我的简历保留完成态才可操作')
-expectIncludes(resumes, "item.status === 'failed' ? '任务已失败，不可继续操作' : '任务完成后可用'", '我的简历保留未完成/失败禁用原因')
+expectIncludes(resumes, 'recordUnavailableReason(item)', '我的简历保留未完成/失败禁用原因')
 expectIncludes(resumes, '还没有登录后保存的简历', '我的简历保留空态标题')
 expectIncludes(resumes, '公共一体机上的游客上传不会自动绑定到账号', '我的简历保留游客上传不自动绑定说明')
 expectIncludes(resumes, "navigate('/resume/source')", '我的简历保留上传入口跳转')
 expectIncludes(resumes, '不向企业提供或投递', '我的简历保留合规边界说明')
 
 expectIncludes(notifications, "API_MODE === 'http' && Boolean(getToken())", '消息通知保留真实服务可用判断')
-expectIncludes(notifications, 'getMyNotifications(getToken(), { pageSize: 50, unreadOnly })', '消息通知保留本人消息真实 API 拉取')
+expectIncludes(notifications, 'getMyNotifications(token, { pageSize: 50, cursor, unreadOnly })', '消息通知保留本人消息真实 API 拉取')
 expectIncludes(notifications, 'markAllMyNotificationsRead(getToken())', '消息通知保留全部已读接口')
 expectIncludes(notifications, 'markMyNotificationRead(getToken(), item.kind, item.id)', '消息通知保留单条已读接口')
 expectIncludes(notifications, 'deleteMyNotification(getToken(), item.kind, item.id)', '消息通知保留删除接口')
@@ -113,9 +96,33 @@ expectIncludes(ci, 'verify:profile-resumes-notifications-inkpaper', 'CI Verify s
 expectIncludes(homeVerify, 'MyResumesPage.tsx', 'profile-inkpaper-home 范围守卫允许本批简历页换装')
 expectIncludes(homeVerify, 'MyNotificationsPage.tsx', 'profile-inkpaper-home 范围守卫允许本批消息页换装')
 
+// 范围基线（2026-09-28，接着下面「条件触发」那次根因修复）：本守卫的本意是「换装这两页的那批改动
+// 不夹带硬冻结后端、共享类型、Agent 或数据库」，不该拦截其它批次。集成分支 #1042 长期累积很多批次，
+// origin/main...HEAD 会把其它批次的改动全算进来（实测 364 个文件），一碰本页就误红。改为只看
+// 「碰了这两页的那些提交」各自改了什么；工作区未提交改动若碰了这两页，整体计入。禁止清单与判定不变。
+function isOwnedResumesNotificationsFile(file) {
+  return file === 'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx' ||
+    file === 'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx'
+}
+function listScopeChangedFiles(isOwned) {
+  const lines = (text) => text.split('\n').filter(Boolean)
+  const files = new Set()
+  for (const sha of lines(git(['rev-list', '--no-merges', 'origin/main..HEAD']))) {
+    const changed = lines(git(['diff-tree', '--no-commit-id', '--name-only', '-r', sha]))
+    if (changed.some(isOwned)) for (const file of changed) files.add(file)
+  }
+  const local = [
+    ...lines(git(['diff', '--name-only'])),
+    ...lines(git(['diff', '--cached', '--name-only'])),
+    ...lines(git(['ls-files', '--others', '--exclude-standard'])),
+  ]
+  if (local.some(isOwned)) for (const file of local) files.add(file)
+  return [...files]
+}
+
 let changedFiles = []
 try {
-  changedFiles = listChangedFiles()
+  changedFiles = listScopeChangedFiles(isOwnedResumesNotificationsFile)
 } catch (error) {
   if (error instanceof Error) console.error(`  ${error.message}`)
   fail('范围守卫无法读取 git diff')

@@ -10,6 +10,7 @@ import { JobAiService } from './job-ai.service'
 import { JobAiLlmService } from './job-ai-llm.service'
 import { JobContextService } from './job-context.service'
 import { JobAiQuotaService } from './job-ai-quota.service'
+import { TerminalsModule } from '../terminals/terminals.module'
 
 /**
  * 岗位 AI 后端模块。
@@ -19,6 +20,7 @@ import { JobAiQuotaService } from './job-ai-quota.service'
  */
 @Module({
   imports: [
+    TerminalsModule,
     AiModule,
     MemberPrivacyModule,
     JwtModule.registerAsync({

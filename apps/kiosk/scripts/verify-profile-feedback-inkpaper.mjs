@@ -37,23 +37,6 @@ function expectAbsent(source, pattern, message) {
 function git(args) {
   return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 }
-function listChangedFiles() {
-  const committed = git(['diff', '--name-only', 'origin/main...HEAD'])
-    .split('\n')
-    .filter(Boolean)
-  const unstaged = git(['diff', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const staged = git(['diff', '--cached', '--name-only'])
-    .split('\n')
-    .filter(Boolean)
-  const untracked = git(['ls-files', '--others', '--exclude-standard'])
-    .split('\n')
-    .filter(Boolean)
-
-  return [...new Set([...committed, ...unstaged, ...staged, ...untracked])]
-}
-
 console.log('\n=== Profile 意见反馈页墨青纸感守卫 ===')
 
 const page = read('src/pages/profile/me/MyFeedbackPage.tsx')
@@ -70,7 +53,7 @@ expectIncludes(page, 'QxPageFrame', 'MyFeedbackPage 使用青序页框')
 expectAbsent(page, /KioskPageFrame/, 'MyFeedbackPage has left the V6 frame')
 expectIncludes(page, 'loginFrom="/me/feedback"', '意见反馈保留登录回跳来源')
 
-expectIncludes(page, 'getMyFeedback(getToken(), { pageSize: 50 })', '意见反馈保留本人反馈真实列表 API')
+expectIncludes(page, 'getMyFeedback(token, { pageSize: 50, cursor })', '意见反馈保留本人反馈真实列表 API')
 expectIncludes(page, 'getMyFeedbackDetail(getToken(), selectedId)', '意见反馈保留 query ticket 详情拉取')
 expectIncludes(page, 'getMyFeedbackDetail(getToken(), id)', '意见反馈保留点击列表读取详情')
 expectIncludes(page, 'createMyFeedback(getToken(), {', '意见反馈保留创建反馈 API')
@@ -81,7 +64,7 @@ expectIncludes(page, 'closeMyFeedback(getToken(), selected.id)', '意见反馈�
 expectIncludes(page, "MemberFeedbackApiError && error.code === 'FEEDBACK_PRINT_TASK_INVALID'", '意见反馈保留关联打印订单错误提示')
 expectIncludes(page, 'setSearchParams({ ticket: detail.id })', '提交反馈后保留 ticket 深链')
 expectIncludes(page, 'setSearchParams({ ticket: id })', '打开详情后保留 ticket 深链')
-expectIncludes(page, 'setItems([])', '意见反馈保留游客态清空列表')
+expectIncludes(read('src/pages/profile/me/useMemberCursorPage.ts'), 'setItems([])', '意见反馈保留游客态清空列表')
 expectIncludes(page, 'setSelected(null)', '意见反馈保留游客态清空详情')
 expectIncludes(page, 'parseFeedbackCategory(searchParams.get', '意见反馈保留 category 查询参数解析')
 
@@ -131,9 +114,33 @@ expectIncludes(ci, 'verify:profile-feedback-inkpaper', 'CI Verify suites 接入�
 expectIncludes(homeVerify, 'MyFeedbackPage.tsx', 'profile-inkpaper-home 范围守卫允许本批反馈页换装')
 expectIncludes(homeVerify, 'src/pages/profile/me/feedback/', 'profile-inkpaper-home 范围守卫允许反馈页子组件')
 
+// 范围基线（2026-09-28，接着下面「条件触发」那次根因修复）：本守卫的本意是「换装这一页的那批改动
+// 不夹带后端或其他明细页」，并写明批次守卫不应拦截其它批次。集成分支 #1042 长期累积很多批次，
+// origin/main...HEAD 会把其它批次的改动全算进来（实测 388 个文件），一碰本页就误红。改为只看
+// 「碰了本页的那些提交」各自改了什么；工作区未提交改动若碰了本页，整体计入。禁止清单与判定不变。
+function isOwnedFeedbackFile(file) {
+  return file === 'apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx' ||
+    file.startsWith('apps/kiosk/src/pages/profile/me/feedback/')
+}
+function listScopeChangedFiles(isOwned) {
+  const lines = (text) => text.split('\n').filter(Boolean)
+  const files = new Set()
+  for (const sha of lines(git(['rev-list', '--no-merges', 'origin/main..HEAD']))) {
+    const changed = lines(git(['diff-tree', '--no-commit-id', '--name-only', '-r', sha]))
+    if (changed.some(isOwned)) for (const file of changed) files.add(file)
+  }
+  const local = [
+    ...lines(git(['diff', '--name-only'])),
+    ...lines(git(['diff', '--cached', '--name-only'])),
+    ...lines(git(['ls-files', '--others', '--exclude-standard'])),
+  ]
+  if (local.some(isOwned)) for (const file of local) files.add(file)
+  return [...files]
+}
+
 let changedFiles = []
 try {
-  changedFiles = listChangedFiles()
+  changedFiles = listScopeChangedFiles(isOwnedFeedbackFile)
 } catch (error) {
   if (error instanceof Error) console.error(`  ${error.message}`)
   fail('范围守卫无法读取 git diff')

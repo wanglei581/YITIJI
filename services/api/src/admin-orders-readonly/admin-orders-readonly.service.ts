@@ -1,7 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import {
-  isPaidUnfulfilledRefundRequired,
+  channelAcceptedUnconfirmedWhere,
+  EMPTY_IDENTIFIER_LOOKBACK_MS,
+  isChannelAcceptedUnconfirmedAttempt,
+} from '../payment/channel-accepted-signal'
+import {
+  isAdminRefundRequired,
+  isOnlineCollectedPendingRefund,
+  ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES,
+  ONLINE_PAID_PENDING_REFUND_REASON,
   PAID_UNFULFILLED_PENDING_REFUND_REASON,
 } from '../payment/pending-refund-signal'
 import type {
@@ -56,9 +64,18 @@ function parsePrintOutcome(value: string | null | undefined): AdminOrderReadonly
   return null
 }
 
-function deriveAftercare(row: OrderRow): Pick<
+function deriveAftercare(
+  row: OrderRow,
+  channelAcceptedUnconfirmed: boolean,
+): Pick<
   AdminOrderReadonlyItem,
-  'aftercareStatus' | 'refundEligible' | 'retryForbidden' | 'printOutcome' | 'refundRequired'
+  | 'aftercareStatus'
+  | 'refundEligible'
+  | 'retryForbidden'
+  | 'printOutcome'
+  | 'refundRequired'
+  | 'opsAttention'
+  | 'opsAttentionCode'
 > {
   const printOutcome = parsePrintOutcome(row.printTask?.printOutcome)
   const unconfirmedFailure =
@@ -72,11 +89,28 @@ function deriveAftercare(row: OrderRow): Pick<
   return {
     printOutcome,
     aftercareStatus: manualCheckRequired ? 'manual_check_required' : null,
-    // 已确认出纸禁止退款；RefundService 仍是最终写入门禁。
-    refundEligible: row.payStatus === 'paid' && printOutcome !== 'printed',
+    // 已确认出纸禁止退款；RefundService 仍是最终写入门禁。迟到回调待退未转 paid，但可退。
+    refundEligible:
+      (row.payStatus === 'paid' || isOnlineCollectedPendingRefund(row)) && printOutcome !== 'printed',
     // 未确认历史原因仍在时禁止重打，核查后同样禁止。
     retryForbidden: unconfirmedFailure,
-    refundRequired: isPaidUnfulfilledRefundRequired(row),
+    refundRequired: isAdminRefundRequired(row),
+    ...deriveOpsAttention(row, channelAcceptedUnconfirmed),
+  }
+}
+
+function deriveOpsAttention(
+  row: Pick<OrderRow, 'payStatus' | 'refundReason'>,
+  channelAcceptedUnconfirmed: boolean,
+): Pick<AdminOrderReadonlyItem, 'opsAttention' | 'opsAttentionCode'> {
+  const refundRequired = isAdminRefundRequired(row)
+  let opsAttentionCode: AdminOrderReadonlyItem['opsAttentionCode'] = null
+  if (channelAcceptedUnconfirmed) opsAttentionCode = 'channel_accepted_unconfirmed'
+  else if (refundRequired) opsAttentionCode = 'refund_required'
+  else if (row.payStatus === 'refunding') opsAttentionCode = 'refunding'
+  return {
+    opsAttention: opsAttentionCode !== null,
+    opsAttentionCode,
   }
 }
 
@@ -87,8 +121,10 @@ export interface ListAdminOrdersReadonlyParams {
   channel?: string
   pickupStatus?: string
   search?: string
-  /** true = 只看已付款且已落待退款信号的单（不会自动出款）。 */
+  /** true = 只看待退款信号单（已付款未出纸，或渠道已收款未转 paid）。不会自动出款。 */
   refundRequired?: boolean
+  /** true = 待退款 ∪ 退款中 ∪ 渠道已受理未确认。只读可见性，不发起退款。 */
+  opsAttention?: boolean
   page: number
   pageSize: number
 }
@@ -146,9 +182,41 @@ export class AdminOrdersReadonlyService {
     if (params.channel) where['channel'] = params.channel
     if (params.pickupStatus) where['pickupStatus'] = params.pickupStatus
     if (params.search && params.search.trim()) where['orderNo'] = { contains: params.search.trim() }
-    if (params.refundRequired === true) {
-      where['payStatus'] = 'paid'
-      where['refundReason'] = PAID_UNFULFILLED_PENDING_REFUND_REASON
+    if (params.opsAttention === true) {
+      const unconfirmedIds = await this.unconfirmedAttemptOrderIds()
+      where['OR'] = [
+        {
+          payStatus: 'paid',
+          refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON,
+        },
+        {
+          payStatus: { in: [...ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES] },
+          refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
+        },
+        { payStatus: 'refunding' },
+        ...(unconfirmedIds.length > 0 ? [{ id: { in: unconfirmedIds } }] : []),
+      ]
+    } else if (params.refundRequired === true) {
+      const collected = {
+        payStatus: { in: [...ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES] },
+        refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
+      }
+      const paidUnfulfilled = {
+        payStatus: 'paid',
+        refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON,
+      }
+      if (params.payStatus === 'paid') {
+        where['refundReason'] = PAID_UNFULFILLED_PENDING_REFUND_REASON
+      } else if (
+        params.payStatus &&
+        (ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES as readonly string[]).includes(params.payStatus)
+      ) {
+        where['refundReason'] = ONLINE_PAID_PENDING_REFUND_REASON
+      } else if (!params.payStatus) {
+        where['OR'] = [paidUnfulfilled, collected]
+      } else {
+        where['id'] = { in: [] }
+      }
     }
 
     const [rows, total] = await Promise.all([
@@ -164,8 +232,9 @@ export class AdminOrdersReadonlyService {
 
     const orderRows = rows as unknown as OrderRow[]
     const labels = await this.lookupLabels(orderRows)
+    const unconfirmed = await this.unconfirmedOrderIdSet(orderRows.map((row) => row.id))
     return {
-      items: orderRows.map((row) => this.toItem(row, labels)),
+      items: orderRows.map((row) => this.toItem(row, labels, unconfirmed.has(row.id))),
       pagination: {
         page: params.page,
         pageSize: params.pageSize,
@@ -185,7 +254,8 @@ export class AdminOrdersReadonlyService {
     }
 
     const labels = await this.lookupLabels([row])
-    const item = this.toItem(row, labels)
+    const unconfirmed = await this.unconfirmedOrderIdSet([row.id])
+    const item = this.toItem(row, labels, unconfirmed.has(row.id))
     const summary = row.printTask ? parseSafePrintSummary(row.printTask.paramsJson) : null
     const statusLogs = row.printTask
       ? await this.prisma.printTaskStatusLog.findMany({
@@ -245,7 +315,40 @@ export class AdminOrdersReadonlyService {
     }
   }
 
-  private toItem(row: OrderRow, labels: LabelMaps): AdminOrderReadonlyItem {
+  private async unconfirmedAttemptOrderIds(): Promise<string[]> {
+    const rows = await this.prisma.paymentAttempt.findMany({
+      where: channelAcceptedUnconfirmedWhere(new Date(), { fuzzyLookbackMs: EMPTY_IDENTIFIER_LOOKBACK_MS }),
+      select: {
+        orderId: true,
+        status: true,
+        prepayId: true,
+        qrCodeContent: true,
+        channelTxnNo: true,
+        failReason: true,
+        createdAt: true,
+      },
+    })
+    return [...new Set(rows.filter((row) => isChannelAcceptedUnconfirmedAttempt(row)).map((row) => row.orderId))]
+  }
+
+  private async unconfirmedOrderIdSet(orderIds: string[]): Promise<Set<string>> {
+    if (orderIds.length === 0) return new Set()
+    const rows = await this.prisma.paymentAttempt.findMany({
+      where: { orderId: { in: orderIds }, ...channelAcceptedUnconfirmedWhere() },
+      select: {
+        orderId: true,
+        status: true,
+        prepayId: true,
+        qrCodeContent: true,
+        channelTxnNo: true,
+        failReason: true,
+        createdAt: true,
+      },
+    })
+    return new Set(rows.filter((row) => isChannelAcceptedUnconfirmedAttempt(row)).map((row) => row.orderId))
+  }
+
+  private toItem(row: OrderRow, labels: LabelMaps, channelAcceptedUnconfirmed = false): AdminOrderReadonlyItem {
     const printSummary = parseSafePrintSummary(row.printTask?.paramsJson)
     const effectiveTerminalId = row.terminalId ?? row.printTask?.terminalId ?? null
     const ownerType = row.endUserId ? 'member' : 'anonymous'
@@ -270,7 +373,7 @@ export class AdminOrdersReadonlyService {
       colorMode: printSummary.colorMode,
       paperSize: printSummary.paperSize,
       errorCode: row.printTask?.errorCode ?? null,
-      ...deriveAftercare(row),
+      ...deriveAftercare(row, channelAcceptedUnconfirmed),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }

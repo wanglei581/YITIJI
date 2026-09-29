@@ -1,17 +1,17 @@
 <!--pages/job-fit/job-fit.wxml-->
-<!-- 合规：只展示后端给出的三档参考等级，不展示数字比例或招聘结果预测。 -->
+<!-- 合规：只列「已经写到 / 还没体现」的岗位要求和修改建议；不展示等级、总评、数字比例或招聘结果预测。 -->
 <view class="page-wrap">
   <view style="height:{{statusBarHeight}}px"></view>
   <view class="navbar">
     <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
-    <view class="nav-center nav-title">岗位匹配参考</view>
+    <view class="nav-center nav-title">简历对照</view>
   </view>
 
   <!-- 无已解析简历:不伪造分析结果,给真实入口 -->
   <view wx:if="{{phase === 'no-task'}}" class="running-state">
     <view class="st-ic"><text class="ficon i-file-text"></text></view>
     <view class="rs-title">还没有可用的简历</view>
-    <view class="rs-sub">岗位匹配需要先上传并解析一份简历,才能与岗位要求做对比</view>
+    <view class="rs-sub">简历对照需要先上传并解析一份简历，才能和你填写的岗位要求做对比</view>
     <view class="jf-cta tap" bindtap="toUpload">
       <text>去上传简历</text><text class="ficon i-right jf-cta-arrow"></text>
     </view>
@@ -22,7 +22,7 @@
       <view class="rs-ring"></view>
       <text class="ficon i-history rs-ic"></text>
     </view>
-    <view class="rs-title">正在读取历史岗位匹配结果…</view>
+    <view class="rs-title">正在读取历史对照结果…</view>
     <view class="rs-sub">只读取账户中已保存的结果，不会重新调用 AI</view>
   </view>
 
@@ -31,7 +31,7 @@
     <view class="card">
       <view class="card-head"><view class="ch-title">需要你的授权</view></view>
       <view class="card-inner">
-        <view class="jf-p">岗位匹配需要读取你已解析简历中的文本内容(教育、经历、技能等),与目标岗位要求做对比分析。</view>
+        <view class="jf-p">简历对照需要读取你已解析简历中的文本内容(教育、经历、技能等),与你填写的岗位要求做对比分析。</view>
         <view class="jf-p">分析结果只提供给你本人参考,<text class="jf-strong">不会发送给任何用人单位,也不构成投递</text>。</view>
         <view class="jf-p">授权可以随时撤销。</view>
         <view wx:if="{{resumeName}}" class="jf-file">
@@ -42,21 +42,14 @@
     </view>
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <text>本功能只输出三档参考等级与文字建议，不提供数字比例，也不预测招聘结果。</text>
+      <text>本功能只列出简历里已经写到、还没体现的岗位要求和修改建议，不打分，也不预测招聘结果。</text>
     </view>
     <view class="jf-act"><view class="btn primary block tap" bindtap="tapGrant">我已阅读并授权</view></view>
   </view>
 
-  <!-- 确认目标岗位 -->
+  <!-- 填写目标岗位：首发只能用自己填写的岗位名称与要求做对照 -->
   <view wx:elif="{{phase === 'target'}}" class="content">
-    <view wx:if="{{jobId}}" class="card">
-      <view class="card-head"><view class="ch-title">目标岗位</view></view>
-      <view class="card-inner">
-        <view class="jf-target-title">{{jobTitleHint || '已选择系统内岗位'}}</view>
-        <view class="jf-hint">将按该岗位的公开要求做对比分析。</view>
-      </view>
-    </view>
-    <view wx:else class="card">
+    <view class="card">
       <view class="card-head"><view class="ch-title">填写目标岗位</view></view>
       <view class="card-inner">
         <view class="jf-label">岗位名称</view>
@@ -98,7 +91,7 @@
   <view wx:elif="{{phase === 'done'}}" class="content has-bar">
     <view class="notice plum">
       <text class="ficon i-info n-ic"></text>
-      <text>以下结论由 AI 基于简历文本与岗位要求生成,仅供你本人参考,不代表用人单位的实际招聘判断。</text>
+      <text>以下对照由 AI 根据简历文本与岗位要求整理，仅供你本人修改简历参考，不代表用人单位的判断。</text>
     </view>
 
     <view wx:if="{{historyMode}}" class="notice info">
@@ -111,22 +104,12 @@
       <text>当前服务端使用占位分析模型,以下内容仅用于流程演示,不能作为求职依据。</text>
     </view>
 
-    <!-- 参考等级:三档文字,无百分比。等级缺失时如实说明,不兜底造词 -->
+    <!-- 对照对象。不展示等级与「总评」（见 job-fit.js 文件头）；
+         旧记录里平台岗位的公司名、来源也不展示：首发小程序不出现任何岗位信息。 -->
     <view class="fit-hero">
-      <view class="fit-level {{fit.fitTone}}">
-        <view class="fl-label">{{fit.fitLabel || '等级未提供'}}</view>
-        <view class="fl-cap">{{fit.fitLabel ? 'AI 参考等级' : '本次分析未返回等级'}}</view>
-      </view>
-      <view class="fit-info">
-        <view class="fit-job">{{fit.job.title || jobTitleHint || '目标岗位'}}</view>
-        <view wx:if="{{fit.job.company}}" class="fit-org">{{fit.job.company}}</view>
-        <view class="fit-src">{{fit.job.hasSource ? '来源：' + (fit.job.sourceName || '第三方平台') : '你手动填写的目标岗位'}}</view>
-      </view>
-    </view>
-
-    <view wx:if="{{fit.summary}}" class="card">
-      <view class="card-head"><view class="ch-title">总体说明</view></view>
-      <view class="card-inner"><view class="jf-summary">{{fit.summary}}</view></view>
+      <view class="fit-cap">对照的目标岗位</view>
+      <view class="fit-job">{{fit.job.title || manualTitle || '目标岗位'}}</view>
+      <view wx:if="{{!fit.job.hasSource}}" class="fit-src">岗位名称与要求由你本人填写</view>
     </view>
 
     <block wx:if="{{fit.hasRequirementBreakdown}}">
@@ -157,11 +140,11 @@
           </view>
         </view>
       </view>
-      <view class="jf-source-note">以上条目仅摘自岗位原文，不代表平台新增招聘标准。</view>
+      <view class="jf-source-note">以上条目只从岗位要求原文中整理，平台没有另加条件。</view>
     </block>
 
     <block wx:if="{{fit.matchPoints.length}}">
-      <view class="section-t">岗位要求与简历证据</view>
+      <view class="section-t">简历里已经写到的要求</view>
       <view class="fit-list">
         <view class="fit-item plus tap" wx:for="{{fit.matchPoints}}" wx:key="point"
               data-title="{{item.point}}" data-text="{{item.evidence}}" bindtap="tapText">
@@ -169,14 +152,14 @@
           <view class="fi-body">
             <view wx:if="{{item.requirement}}" class="fi-requirement">岗位要求 · {{item.requirement}}</view>
             <view class="fi-text">{{item.point}}</view>
-            <view wx:if="{{item.evidence}}" class="fi-sub">简历证据 · {{item.evidence}}</view>
+            <view wx:if="{{item.evidence}}" class="fi-sub">简历原文 · {{item.evidence}}</view>
           </view>
         </view>
       </view>
     </block>
 
     <block wx:if="{{fit.gapPoints.length}}">
-      <view class="section-t">岗位要求与补强建议</view>
+      <view class="section-t">简历里还没体现的要求</view>
       <view class="fit-list">
         <view class="fit-item minus tap" wx:for="{{fit.gapPoints}}" wx:key="gap"
               data-title="{{item.gap}}" data-text="{{item.suggestion}}" bindtap="tapText">
@@ -212,7 +195,7 @@
     </block>
 
     <block wx:if="{{fit.targetedSuggestions.length}}">
-      <view class="section-t">针对性建议</view>
+      <view class="section-t">修改建议</view>
       <view class="fit-list">
         <view class="fit-sug" wx:for="{{fit.targetedSuggestions}}" wx:key="*this">
           <view class="fs-idx">{{index + 1}}</view>
@@ -243,13 +226,12 @@
 
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <text>以上分析不代表招聘方意见。投递须前往来源平台操作。</text>
+      <text>以上分析不代表用人单位意见，仅供你本人修改简历参考。</text>
     </view>
-    <view wx:if="{{!historyMode}}" class="jf-revoke tap" bindtap="tapRevokeConsent">撤销岗位分析授权</view>
+    <view wx:if="{{!historyMode}}" class="jf-revoke tap" bindtap="tapRevokeConsent">撤销 AI 分析授权</view>
   </view>
 
   <view wx:if="{{phase === 'done'}}" class="actionbar">
-    <view class="btn ghost tap {{printing ? 'disabled' : ''}}" bindtap="tapPrint">{{printing ? '生成中…' : '生成报告去打印'}}</view>
-    <view wx:if="{{fit.job.id || jobId}}" class="btn primary tap flex-1-6" bindtap="tapViewJob">查看岗位</view>
+    <view class="btn primary block tap {{printing ? 'disabled' : ''}}" bindtap="tapPrint">{{printing ? '生成中…' : '生成报告去打印'}}</view>
   </view>
 </view>

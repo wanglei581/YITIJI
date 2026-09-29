@@ -119,12 +119,12 @@ export interface PrintBenefitView {
  * 必须常驻可见（不是 tooltip、不是只在 focus 时出现），否则就成了「死按钮」。
  */
 export const PRINT_BENEFIT_REDEEM_DISABLED_REASON =
-  '抵扣规则（适用品类、面值上限、退款后是否恢复）还没有在服务端落地，现在核销会把整单直接免掉。' +
+  '抵扣规则（适用品类、面值上限、退款后是否恢复）系统还没准备好，现在使用会把整单直接免掉。' +
   '为避免错扣你的权益，本轮只展示、不核销。权益不会因此失效，可在「我的 · 我的权益」查看有效期；' +
   '本单请按现场公示价支付。'
 
 /** 机端核销 CTA 文案。明说「本轮不支持」，不说「即将上线」这类没有依据的承诺。 */
-export const PRINT_BENEFIT_REDEEM_CTA_LABEL = '本轮暂不支持在机端核销权益'
+export const PRINT_BENEFIT_REDEEM_CTA_LABEL = '本轮暂不支持在这台机器上使用权益抵扣'
 
 /**
  * 六态判定。**全部依据真实数据**：登录态、GET /me/benefits、POST /orders/quote、
@@ -143,7 +143,7 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
       state: 'price_unavailable',
       title: '本机没能取到现行价目',
       detail:
-        '价目与权益都来自后台配置。取不到就不显示金额、不试算抵扣，也不会拿上一次的价格当现价。'
+        '价目与权益都来自机构配置。取不到就不显示金额、不试算抵扣，也不会拿上一次的价格当现价。'
         + '请稍后重试，或联系现场工作人员。',
     }
   }
@@ -155,7 +155,7 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
       ...base,
       state: 'loading',
       title: '正在读取价目与权益…',
-      detail: '金额与可用权益都以服务端返回为准，读到之前这里不显示任何结论。',
+      detail: '金额与可用权益都以系统返回为准，读到之前这里不显示任何结论。',
     }
   }
 
@@ -171,9 +171,9 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
     return {
       ...base,
       state: 'repriced',
-      title: '后台刚调过价，本屏报价已不是现价',
+      title: '价格刚更新过，本屏报价已不是现价',
       detail:
-        '本机取到的公示价与本单报价单价不一致，说明后台在这两次读取之间改过价。'
+        '本机取到的公示价与本单报价单价不一致，说明价格在这两次读取之间更新过。'
         + '请返回上一步重新核价后再继续，不要按本屏金额付款。',
       repricedUnits: { quoteUnitCents: input.quote.unitCents, configUnitCents },
     }
@@ -187,7 +187,7 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
       state: 'not_applicable',
       title: '本单无需权益抵扣',
       detail:
-        '本单应付 0 元，服务端对免费单不接受核销。你的权益留着下次用，不会因为这一单被扣掉。',
+        '本单应付 0 元，系统对免费单不接受抵扣。你的权益留着下次用，不会因为这一单被扣掉。',
     }
   }
 
@@ -211,7 +211,7 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
       state: 'error',
       title: '权益暂时读不出来',
       detail:
-        '本机没能从服务端取到你的权益列表，所以这里不给出任何「可用 / 不可用」结论。'
+        '本机没能从系统取到你的权益列表，所以这里不给出任何「可用 / 不可用」结论。'
         + '可稍后重试；本单仍可按现场公示价支付。',
     }
   }
@@ -237,7 +237,7 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
     // 这句是本卡最重要的一句诚实声明：适用范围（品类 / 面值上限 / 色彩）在服务端
     // BenefitGrant 上**没有对应字段**，所以本机不判定「这一张能不能用于本单」。
     detail:
-      '能否用于本单由服务端在核销时裁定。服务端目前没有下发适用范围（品类 / 面值上限 / 色彩）字段，'
+      '能否用于本单由系统在使用时判定。系统目前没有给出适用范围（品类 / 面值上限 / 色彩）这项，'
       + '本机不替你预判，也不显示抵扣金额。',
   }
 }

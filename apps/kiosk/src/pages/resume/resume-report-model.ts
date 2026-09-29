@@ -1,3 +1,4 @@
+import { ALLOW_FIXTURES } from '../../utils/buildMode'
 import type {
   ResumeContentBlock,
   ResumeContentBlockKey,
@@ -44,7 +45,7 @@ export const SAVED_TO_DOCUMENTS_COPY = '已存入我的文档'
 export const EXPORT_BEFORE_PRINT_COPY = '请先导出 PDF，成功后才能打印或扫码带走。'
 export const EXPORT_ERROR_COPY: Record<string, string> = {
   AI_RESULT_NOT_READY: '诊断结果还没准备好，请稍后再导出。刷新本页或重新诊断后再试。',
-  RESUME_PDF_FONT_NOT_FOUND: '服务器缺少中文字体，已通知运维；你可以先打印原件或扫码保存。',
+  RESUME_PDF_FONT_NOT_FOUND: '这次无法生成报告文件，请稍后再试或联系现场工作人员。',
   RESUME_EXPORT_UNAVAILABLE: '简历导出当前不可用（价目已停用，不是免费）。',
   AI_TASK_NOT_FOUND: '找不到这份报告，可能已过期或无权查看。请从简历来源重新进入。',
 }
@@ -80,7 +81,7 @@ export const REPORT_HEAD: Record<ReportViewState, { title: string; sub: string; 
   'read-error': { title: '简历诊断报告', sub: '这次没能取到报告，你上传的原件不受影响。', tag: '读取失败', rail: 2 },
   'diagnose-failed': { title: '简历诊断报告', sub: '解析中断，你上传的文件没有丢。', tag: '解析失败', rail: 1 },
   unavailable: { title: '简历诊断报告', sub: '这台机器还没有接通报告读取能力，不是你的简历有问题。', tag: '未接通', rail: 0 },
-  illegal: { title: '简历诊断报告', sub: '地址里的参数不在登记范围内，已按不可用处理。', tag: '参数不合法', rail: 0 },
+  illegal: { title: '简历诊断报告', sub: '请从简历来源或我的诊断记录重新进入。', tag: '地址无法打开', rail: 0 },
   'export-ready': { title: '简历诊断报告', sub: '诊断报告 PDF 已生成，可打印或扫码带走。', tag: '导出已生成', rail: 2 },
   'export-failed': { title: '简历诊断报告', sub: '这次没有生成文件，按钮不会假装成功。', tag: '导出失败', rail: 2 },
   'pricing-charged': { title: '简历诊断报告', sub: '导出按次收费，没有可用权益时按钮不可用。', tag: '收费导出', rail: 2 },
@@ -96,7 +97,7 @@ export const REPORT_STATUS: Record<ReportViewState, { tone: 'ok' | 'warn' | 'bad
   'read-error': { tone: 'bad', label: '读取失败' },
   'diagnose-failed': { tone: 'bad', label: '解析失败' },
   unavailable: { tone: 'warn', label: '能力未接通' },
-  illegal: { tone: 'warn', label: '参数不合法' },
+  illegal: { tone: 'warn', label: '地址无法打开' },
   'export-ready': { tone: 'ok', label: '导出已生成' },
   'export-failed': { tone: 'bad', label: '导出失败' },
   'pricing-charged': { tone: 'warn', label: '收费导出' },
@@ -163,13 +164,13 @@ export function showsReportBody(viewState: ReportViewState): boolean {
 
 export function parseReportSearch(search: string): ReportSearch {
   const q = new URLSearchParams(search)
-  const capture = q.get('capture') === '1'
-  const debug = q.get('debug') === '1'
+  const capture = ALLOW_FIXTURES && q.get('capture') === '1'
+  const debug = ALLOW_FIXTURES && q.get('debug') === '1'
   const tech = capture || debug
   const flat = q.get('flat') === '1' || capture
   let fallback = false
 
-  const wanted = q.get('state')
+  const wanted = ALLOW_FIXTURES ? q.get('state') : null
   let urlState: ReportViewState | null = null
   if (wanted === null) urlState = null
   else if (!isState(wanted)) {

@@ -1,4 +1,4 @@
-import type { ResumeExportFormat } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, type ResumeExportFormat } from '@ai-job-print/shared'
 
 export const EXPORT_FORMAT_OPTIONS: { value: ResumeExportFormat; label: string }[] = [
   { value: 'pdf', label: 'PDF' },
@@ -50,7 +50,8 @@ export const GENERATE_FIXTURE_STATES = new Set<GeneratePreviewViewState>([
 ])
 
 export const TASK_ID_RE = /^[A-Za-z0-9_-]{1,24}$/
-export const AIGC_SCREEN_MARK = 'AI 优化稿，请自行核对'
+/** 优化页与生成预览页常驻的 AI 可见标识（审计表一「简历优化对照（屏）」，next-tasks 3.5c）。 */
+export const AIGC_SCREEN_MARK = AI_LABEL_COPY.RESUME_OPTIMIZE
 export const HTML_PREVIEW_NOTE = '示意，非打印稿'
 export const PRINT_THIS_COPY = '打印的就是这一份'
 export const SYNTHETIC_BANNER = '合成演示'

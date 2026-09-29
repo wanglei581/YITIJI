@@ -28,6 +28,10 @@ const KEYS = {
   // 只在 wizard 走完、即将 redirect 到 resume-build 时写入，resume-build 读完即删。
   // 不复用 RESUME_TASK：那是解析任务凭证，写进去会把诊断/优化五页指到 kind 不对的任务上。
   RESUME_VOICE_HANDOFF: 'zyd_resume_voice_handoff',
+
+  // 尚未落定的简历解析意图（owner、解析材料标识、两个请求头、时间）。
+  // 不存放简历原文。未落定记录不能被另一份材料或另一个账号覆盖。
+  RESUME_PARSE_INTENT: 'zyd_resume_parse_intent',
 };
 
 function get(key, fallback = null) {

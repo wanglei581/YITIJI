@@ -4,6 +4,7 @@ import { Card, Drawer, EmptyState, StatusBadge, LoadingState } from '@ai-job-pri
 import { FRONTEND_HINT, ListPagination, Page, withFrontendHint } from '../Page'
 import { ClipboardListIcon, FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
+import { PolicyReleaseDialog } from './PolicyReleaseDialog'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import {
   partnerPoliciesService,
@@ -95,8 +96,12 @@ function errMsg(e: unknown): string {
  *
  * 更新/下架/删除不校验类型，存量内容必须还能被机构自己下架，
  * 所以此页不隐藏、只禁用「新增」。
+ *
+ * 3.13 起政策由本机构自己「审核通过」并「发布」（发布前须确认发布责任，服务端审计记下
+ * 确认人、时间与内容版本）；平台管理员只保留紧急下架。修改已发布的政策会生成新版本、
+ * 自动撤下并回到待审核，页面上要把这一点说清楚。审核 / 发布同样不校验机构类型。
  */
-const CANNOT_CREATE_HINT = '政策内容属官方性质，仅公共就业服务机构与高校就业中心可发布。本机构可查看与下架已有内容。'
+const CANNOT_CREATE_HINT = '政策内容属官方性质，仅公共就业服务机构与高校就业中心可发布。本机构不能新增，只能处理已有内容（查看、审核发布、下架）。'
 
 export default function PolicyPage() {
   const canCreate = useCapability('canManagePolicies')
@@ -109,6 +114,8 @@ export default function PolicyPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerPolicyRecord | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<PartnerPolicyRecord | null>(null)
+  /** 发布责任确认弹窗（3.13：政策由本机构自己发布） */
+  const [releasing, setReleasing] = useState<PartnerPolicyRecord | null>(null)
   /** P21 申领条件录入面(只对政策扶持条目开放;公告没有申领条件) */
   const [rulesFor, setRulesFor] = useState<PartnerPolicyRecord | null>(null)
   const [page, setPage] = useState(1)
@@ -131,7 +138,7 @@ export default function PolicyPage() {
   )
 
   useInteractionLock(
-    editing !== null || saving || busyId !== null || confirmDelete !== null || confirmUnpublish !== null || rulesFor !== null,
+    editing !== null || saving || busyId !== null || confirmDelete !== null || confirmUnpublish !== null || rulesFor !== null || releasing !== null,
     [policiesRefreshKey],
     'hard',
   )
@@ -189,11 +196,14 @@ export default function PolicyPage() {
       if (editing === 'new') {
         await partnerPoliciesService.createPolicy(payload)
         setNoticeIsError(false)
-        setNotice('政策内容已提交,进入待审核;管理员审核通过并发布后,终端才会展示。')
+        setNotice('政策内容已保存为待审核;本机构审核通过并确认发布后,终端才会展示。')
       } else if (editing) {
-        await partnerPoliciesService.updatePolicy(editing.id, payload)
+        const updated = await partnerPoliciesService.updatePolicy(editing.id, payload)
         setNoticeIsError(false)
-        setNotice('修改已保存。该内容已重新进入待审核,审核通过并重新发布前,终端不展示。')
+        setNotice(
+          `修改已保存${typeof updated.contentVersion === 'number' ? `,内容版本更新为 v${updated.contentVersion}` : ''}。`
+          + '该内容已回到待审核,本机构重新审核通过并确认发布前,终端不展示。',
+        )
       }
       setEditing(null)
       void refresh()
@@ -201,6 +211,21 @@ export default function PolicyPage() {
       setFormError(errMsg(e))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleApprove = async (row: PartnerPolicyRecord) => {
+    setBusyId(row.id)
+    try {
+      await partnerPoliciesService.approvePolicy(row.id)
+      setNoticeIsError(false)
+      setNotice(`「${row.title}」已审核通过。发布前还需确认发布责任,点「发布」完成。`)
+      void refresh()
+    } catch (e) {
+      setNoticeIsError(true)
+      setNotice(errMsg(e))
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -311,7 +336,7 @@ export default function PolicyPage() {
           title={reviewFilter === '全部' ? '暂无政策内容' : '当前筛选条件下无政策'}
           description={reviewFilter === '全部'
             ? (canCreate
-              ? '点击右上角"新增政策内容",发布就业政策说明与公告(经管理员审核后在一体机展示)'
+              ? '点击右上角"新增政策内容",录入就业政策说明与公告(本机构审核通过并确认发布后在一体机展示)'
               : CANNOT_CREATE_HINT)
             : '请调整审核状态后重试'}
           className="py-16"
@@ -341,6 +366,14 @@ export default function PolicyPage() {
                       <td className="max-w-96 px-4 py-3">
                         <p className="font-medium text-neutral-800">{r.title}</p>
                         {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-neutral-400">{r.summary}</p>}
+                        {typeof r.contentVersion === 'number' && (
+                          <p className="mt-0.5 text-xs text-neutral-400">
+                            内容版本 v{r.contentVersion}
+                            {r.publishStatus === 'published' && typeof r.publishConfirmedContentVersion === 'number'
+                              ? ` · 已由本机构确认发布 v${r.publishConfirmedContentVersion}`
+                              : ''}
+                          </p>
+                        )}
                         <RejectReason reviewStatus={r.reviewStatus as ReviewStatus} reason={r.rejectReason} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
@@ -369,6 +402,26 @@ export default function PolicyPage() {
                             >
                               <ClipboardListIcon className="h-3.5 w-3.5" />
                               申领条件
+                            </button>
+                          )}
+                          {(r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
+                            <button
+                              type="button"
+                              disabled={busyId === r.id}
+                              onClick={() => void handleApprove(r)}
+                              className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg disabled:opacity-50"
+                            >
+                              审核通过
+                            </button>
+                          )}
+                          {r.reviewStatus === 'approved' && r.publishStatus !== 'published' && (
+                            <button
+                              type="button"
+                              disabled={busyId === r.id}
+                              onClick={() => setReleasing(r)}
+                              className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:opacity-50"
+                            >
+                              发布
                             </button>
                           )}
                           {r.publishStatus === 'published' && (
@@ -405,7 +458,7 @@ export default function PolicyPage() {
       )}
 
       <p className="mt-3 text-xs text-neutral-400">
-        政策内容为 info-only:仅政策说明、材料清单与来源链接;不承诺补贴到账、不代申请。提交后需管理员审核通过并发布,才会在一体机「政策服务」页展示。
+        政策内容为 info-only:仅政策说明、材料清单与来源链接;不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会在一体机「政策服务」页展示;平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
         政策扶持条目可另行录入「申领条件」:条件按政策原文逐条录入,一体机据此给出「相符 / 不符 / 无法判定」的机械比对结果,不做资格认定;未录入条件的政策不会出现任何判定结论。
       </p>
 
@@ -438,9 +491,11 @@ export default function PolicyPage() {
       >
         <div className="space-y-4">
           {formError && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{formError}</p>}
-          {editing !== 'new' && (
+          {editing !== null && editing !== 'new' && (
             <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
-              保存后该内容将重新进入待审核状态;审核通过并重新发布前,终端不展示。
+              {editing.publishStatus === 'published'
+                ? `这条政策已发布${typeof editing.contentVersion === 'number' ? `(v${editing.contentVersion})` : ''}。保存修改会生成新的内容版本,并立即从终端撤下、回到待审核;须本机构重新审核通过并确认发布后,终端才会展示新版本。`
+                : '保存后该内容将重新进入待审核状态,内容版本随之更新;本机构审核通过并确认发布前,终端不展示。'}
             </p>
           )}
           <Field label="内容类型" required>
@@ -487,6 +542,21 @@ export default function PolicyPage() {
           </p>
         </div>
       </Drawer>
+
+      <PolicyReleaseDialog
+        policy={releasing}
+        onClose={() => setReleasing(null)}
+        onReleased={(updated) => {
+          setReleasing(null)
+          setNoticeIsError(false)
+          setNotice(
+            `「${updated.title}」已发布`
+            + (typeof updated.publishConfirmedContentVersion === 'number' ? `(v${updated.publishConfirmedContentVersion})` : '')
+            + ',发布责任确认已记录。',
+          )
+          void refresh()
+        }}
+      />
 
       <ConfirmActionDialog
         open={confirmUnpublish !== null}

@@ -31,7 +31,7 @@ interface ResponseEnvelope<T> {
 }
 
 export const WORD_CONVERSION_UNAVAILABLE_COPY = 'Word 转换暂未开放，请另存为 PDF 上传'
-export const WORD_CONVERSION_DISCLOSURE = '由转换引擎生成，复杂版式可能有偏差，请预览核对'
+export const WORD_CONVERSION_DISCLOSURE = '转为 PDF 后，复杂版式可能有偏差，请预览核对'
 export const WORD_EXTENSIONS = ['doc', 'docx'] as const
 export const WORD_MIME_TYPES = [
   'application/msword',

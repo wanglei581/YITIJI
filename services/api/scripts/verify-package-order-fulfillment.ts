@@ -96,8 +96,8 @@ async function main(): Promise<void> {
   const audit = new AuditService(prisma)
   const capabilities = new TerminalCapabilitiesService(prisma)
   const quotes = new OrderQuoteService(new PrintPageCountService(prisma, storage), new PricingService(prisma), capabilities, prisma)
-  const packages = new PackageOrderService(prisma, quotes, capabilities, audit)
   const statuses = new OrderStatusService(prisma, audit)
+  const packages = new PackageOrderService(prisma, quotes, capabilities, audit, statuses)
   const pickup = new PickupOrderService(prisma, capabilities, audit, new FakeRedis() as unknown as RedisService, storage)
   const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
   const agent = new TerminalAgentService(prisma, audit)
@@ -168,7 +168,7 @@ async function main(): Promise<void> {
         terminalId,
         files: fileIds.map((fileId) => ({ fileId })),
         params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
-      }),
+      }, randomUUID()),
       'PII_SCAN_STALE',
       'RES-1 package-order sha256 不一致 → 409 PII_SCAN_STALE',
     )
@@ -183,7 +183,7 @@ async function main(): Promise<void> {
       terminalId,
       files: fileIds.map((fileId) => ({ fileId })),
       params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
-    })
+    }, randomUUID())
     const beforeRelease = await prisma.order.findUnique({
       where: { id: created.orderId }, include: { orderItems: { orderBy: { seq: 'asc' } } },
     })
@@ -290,6 +290,15 @@ async function main(): Promise<void> {
     if (secondClaim.length !== 1 || secondClaim[0]?.taskId !== secondTaskId || secondClaim[0]?.taskId === released.taskId) {
       fail('已有 completed 行时 Agent 只能领取当前 seq=1，不得领回旧任务')
     }
+    await prisma.fileObject.update({ where: { id: fileIds[2] }, data: { expiresAt: new Date(Date.now() - 1_000) } })
+    await expectCode(
+      () => agent.patchTaskStatus(secondTaskId, { status: 'completed' }, authorization, terminalId),
+      'PACKAGE_FILE_UNAVAILABLE',
+      '下一行文件过期时完成回传不得派发后续 PrintTask，且事务回滚',
+    )
+    const afterBlockedCompletion = await prisma.printTask.findUnique({ where: { id: secondTaskId }, select: { status: true } })
+    if (afterBlockedCompletion?.status !== 'claimed') fail('下一行文件不可用时，当前任务状态必须保持 claimed')
+    await prisma.fileObject.update({ where: { id: fileIds[2] }, data: { expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) } })
     await agent.patchTaskStatus(secondTaskId, { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED' }, authorization, terminalId)
     const afterFailed = await prisma.order.findUnique({
       where: { id: created.orderId }, include: { orderItems: { orderBy: { seq: 'asc' } } },

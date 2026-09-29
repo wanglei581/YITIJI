@@ -34,6 +34,61 @@
   验收范围：静态原型表现；不证明 React 接线、API 可用、生产数据或硬件链路
 -->
 <link rel="stylesheet" href="directory-workspaces.css">
+<style>
+/* ── 本页覆盖：只写在这一份宿主 HTML 里，不改共享样式表 ─────────────
+   ① 可见焦点：公共触控终端也会接外接键盘与无障碍设备，Tab 到哪必须一眼看得见。
+      统一用「青 3px + 墨 3px」双色环：浅底输入框、浅底卡片和深色主按钮上都够对比。
+      只用 outline / box-shadow，不改盒模型、不位移、不新增任何持续动画。
+   ② 触控目标：本页所有真实可点元素沿用共享样式的 ≥48px，主行动按钮 ≥56px；
+      这里只补焦点表现，不缩小任何热区。 */
+#stage a:focus-visible,
+#stage button:focus-visible,
+#stage input:focus-visible,
+#stage select:focus-visible,
+#stage textarea:focus-visible,
+#stage [tabindex]:focus-visible{
+  outline:3px solid var(--emerald);
+  outline-offset:2px;
+  box-shadow:0 0 0 6px var(--deep);
+  position:relative;
+  z-index:4;
+}
+/* 置灰控件也要能被 Tab 到并看清，但焦点色不得让它看起来像可用 */
+#stage [aria-disabled="true"]:focus-visible{
+  outline:3px solid var(--wheat-d);
+  outline-offset:2px;
+  box-shadow:0 0 0 6px var(--surface);
+}
+
+/* ③ 名单可滚动时给出线索：27 寸触屏没有 hover、也没有滚轮，
+      而系统滚动条在不同机器上可能是「滑动时才浮现」的覆盖式，靠不住。
+      所以这里自己画一条常显的位置条（右侧轨道 + 滑块）＋ 名单下方一句常显提示，
+      两条线索都是静态的：滑块只随手指滚动改变位置，不自己动。
+      同时给列表留出底部余量——底栏动作是常规流里的固定条，
+      最后一条既不会被它压住，也不会贴着卡片边缘。 */
+#stage .rbox{position:relative}
+/* 左/上/下留出 ≥8px：焦点环画在行的外侧，列表又是滚动容器，留白不够就会被容器裁掉半圈。 */
+#stage .rlist{padding:8px 26px 16px 8px;scroll-padding-block:8px 16px;scrollbar-width:none}
+#stage .rlist::-webkit-scrollbar{width:0;height:0}
+#stage .scrollrail{display:none}
+#stage .rbox.is-scrollable .scrollrail{
+  display:block;position:absolute;right:24px;width:10px;
+  border-radius:5px;background:var(--line);pointer-events:none;
+}
+#stage .rbox.is-scrollable .scrollrail>i{
+  display:block;position:absolute;left:0;width:10px;
+  border-radius:5px;background:var(--teal-d);
+}
+#stage .scrollcue{display:none}
+#stage .rbox.is-scrollable .scrollcue{
+  flex:none;display:flex;align-items:center;gap:10px;
+  min-height:48px;padding:9px 16px;border-radius:14px;
+  background:var(--teal-soft);color:var(--teal-d);
+  font-size:18px;font-weight:600;line-height:1.35;
+}
+#stage .rbox.is-scrollable .scrollcue .sc-i{flex:none;font-size:20px;line-height:1}
+#stage .rbox.is-scrollable.is-at-end .scrollcue{background:var(--paper);color:var(--ink-3);border:1px solid var(--line)}
+</style>
 </head>
 <body>
 <div id="stage">
@@ -56,14 +111,107 @@
     <div><b>隐私提示</b>结束会话或闲置超时清除本机登录态和临时会话信息；文件与订单按服务端留存期限管理。</div>
   </div>
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
   <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>
 </div>
 <script>window.DW_SCREEN='company-directory'</script>
 <script src="directory-workspaces.js"></script>
+<script>
+/* 本页脚本：只做两件不改真话的事 ——
+   ① 把用户画面上的技术词换成人话（只替换纯文本节点，不动结构、链接、真实数据、
+      空态口径与「投递在来源平台完成」一类合规说明）；
+   ② 名单需要滚动时给出可见线索。
+   共享运行时 directory-workspaces.js 在 load 前同步渲染完主体，这里只在其后做覆盖。 */
+(function () {
+  'use strict'
+  var SCREEN = 'company-directory'
+  var stage = document.getElementById('stage')
+  /* 人话覆盖表：左边是共享运行时里写给工程的说法，右边是给现场用户看的说法。 */
+  var PLAIN = [
+    ['所有条件均对应真实 CompanyQuery',
+     '查询条件可组合，也可以只填一项'],
+    ['省市区在 React 中使用完整全国行政区划联动；静态页允许手动输入全称，不用几枚城市按钮冒充完整字典。',
+     '省、市、区县请填写全称，三项可以只填一项，也可以一起填；这里不用几个城市按钮冒充完整的全国地区名单。'],
+    ['每次加载 10 条；只有接口返回 nextCursor 时才显示此动作。',
+     '每次加载 10 条；有更多结果时才会出现「加载更多」。'],
+    ['已按筛选条件重新请求，条件只改请求参数。',
+     '已按你选的条件重新查了一次；条件只影响这次查询，不改企业信息。'],
+    ['企业列表与在招岗位数一起返回，取到之前不显示数字。',
+     '企业名单和在招岗位数一起返回，没取到之前不显示数字。']
+  ]
+  function plainify (root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null)
+    var node
+    while ((node = walker.nextNode())) {
+      var text = node.nodeValue
+      for (var i = 0; i < PLAIN.length; i++) {
+        if (text.indexOf(PLAIN[i][0]) >= 0) text = text.split(PLAIN[i][0]).join(PLAIN[i][1])
+      }
+      if (text !== node.nodeValue) node.nodeValue = text
+    }
+  }
+  plainify(stage)
+  /* 页内 AI 辅助会整块重绘：重绘后再覆盖一次，不新增计时器。 */
+  new MutationObserver(function () { plainify(stage) })
+    .observe(stage, { childList: true, subtree: true })
+
+  /* 名单滚动线索：只读元素尺寸，切换 class、位置条几何和提示文案。
+     不改任何真实数据、不改链接，也不推进任何业务状态；没有计时器，也没有动画。 */
+  function wireScrollCue () {
+    Array.prototype.forEach.call(stage.querySelectorAll('.rbox'), function (box) {
+      var list = box.querySelector('.rlist')
+      if (!list || list.classList.contains('skeleton-list')) return
+      var rail = box.querySelector('.scrollrail')
+      if (!rail) {
+        rail = document.createElement('div')
+        rail.className = 'scrollrail'
+        rail.setAttribute('aria-hidden', 'true')
+        rail.setAttribute('data-testid', SCREEN + '-scroll-rail')
+        rail.innerHTML = '<i></i>'
+        box.appendChild(rail)
+      }
+      var thumb = rail.firstElementChild
+      var cue = box.querySelector('.scrollcue')
+      if (!cue) {
+        cue = document.createElement('div')
+        cue.className = 'scrollcue'
+        cue.setAttribute('data-testid', SCREEN + '-scroll-cue')
+        cue.innerHTML = '<span class="sc-i" aria-hidden="true">↕</span><span class="sc-t"></span>'
+        list.insertAdjacentElement('afterend', cue)
+      }
+      var label = cue.querySelector('.sc-t')
+      var sync = function () {
+        /* 先按当前尺寸判断要不要露出提示条，再重新量一次：
+           提示条本身会占掉列表的一点高度，位置条的几何必须按露出之后的高度算。 */
+        box.classList.toggle('is-scrollable', list.scrollHeight - list.clientHeight > 4)
+        var view = list.clientHeight
+        var full = list.scrollHeight
+        var scrollable = full - view > 4
+        var maxTop = Math.max(1, full - view)
+        var atEnd = list.scrollTop >= maxTop - 4
+        box.classList.toggle('is-scrollable', scrollable)
+        box.classList.toggle('is-at-end', scrollable && atEnd)
+        label.textContent = !scrollable ? ''
+          : atEnd ? '已经是本页名单的最后一条。'
+                  : '名单没有显示完，在名单区上下滑动可以看到后面的条目。'
+        if (!scrollable) return
+        rail.style.top = list.offsetTop + 'px'
+        rail.style.height = view + 'px'
+        var h = Math.max(64, Math.round(view * view / full))
+        thumb.style.height = h + 'px'
+        thumb.style.top = Math.round((view - h) * (list.scrollTop / maxTop)) + 'px'
+      }
+      list.addEventListener('scroll', sync, { passive: true })
+      addEventListener('resize', sync)
+      sync()
+    })
+  }
+  wireScrollCue()
+})()
+</script>
 </body>
 </html>

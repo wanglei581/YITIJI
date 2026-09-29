@@ -1,6 +1,7 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
+import { requireAigcProduceId, resumeExportShowsVisibleLabel, stampAigcPageFooter } from '../../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../../common/pdf/cjk-font'
 import type { GeneratedResume, ResumeLayoutSettings } from '../interfaces/ai-provider.interface'
 import type { ResumeTemplateLayoutPreset, ResumeTemplateSectionKey } from '../../job-materials/job-materials.types'
@@ -70,10 +71,14 @@ export interface ResumePdfRenderOptions {
    * 把一份一个字都不是 AI 写的文件标成 AI 产物，和反过来把 AI 产物标成人工一样失真。
    */
   draft?: boolean
+  /** 任务号，写入 AIGC.ProduceID。非草稿必填。草稿路径不写 AIGC。 */
+  contentId?: string | null
+  /** 开关开启时，按用户申请去掉每页页脚显式标识；隐式标识仍保留。 */
+  unlabeled?: boolean
 }
 
 function isRenderOptions(value: ResumeLayoutSettings | ResumePdfRenderOptions | undefined): value is ResumePdfRenderOptions {
-  return Boolean(value && ('layout' in value || 'templatePreset' in value || 'draft' in value))
+  return Boolean(value && ('layout' in value || 'templatePreset' in value || 'draft' in value || 'contentId' in value || 'unlabeled' in value))
 }
 
 @Injectable()
@@ -116,11 +121,7 @@ export class ResumePdfService {
       bufferPages: true,
       info: { Title: `${resume.basic.name} 的简历` },
     })
-    // S0-4 / 风险 R4：本服务只被 AI 简历生成 / 优化导出链路调用（ai.service.ts，
-    // createdBy='ai_resume_generate'），产物按 AIGC 标注文件级元数据。
-    //
-    // ⚠️ 只加隐式 metadata，**不加任何可见水印/页眉/页脚** —— 简历是用户要拿去
-    // 投递的材料，是否在版面上出现可见 AI 标识属于产品裁决，不由工程侧单方面决定。
+    // S0-4：AI 简历导出保留隐式元数据；每页显式页脚标识由 RESUME_EXPORT_VISIBLE_LABEL 控制（默认关，上线按拍板打开）。
     // 事实字段仍由服务端逐字复制用户输入（防编造契约），AI 只参与表达润色。
     if (renderOptions.draft) {
       // 原样草稿：一个字都不是模型写的，绝不能标 AIGenerated='true'。
@@ -132,6 +133,7 @@ export class ResumePdfService {
         title: `${resume.basic.name} 的简历`,
         subject: '经 AI 简历服务生成/优化的简历文件；事实信息来自用户本人填写或原简历，AI 只参与表达润色',
         kind: 'resume',
+        contentId: requireAigcProduceId(renderOptions.contentId ?? ''),
       })
     }
     this.resolveFont(doc)
@@ -284,6 +286,11 @@ export class ResumePdfService {
 
     // 页数必须在 end() 前取:bufferPages 的页在 end 时刷出,之后 range 为空
     const pageCount = doc.bufferedPageRange().count
+    // 页脚显式标识受 RESUME_EXPORT_VISIBLE_LABEL 控制（默认关，与合入前一致）；
+    // 原样草稿不是 AI 产物，永不加；用户经开关申请去标识时也不加。
+    if (resumeExportShowsVisibleLabel({ draft: renderOptions.draft, unlabeled: renderOptions.unlabeled })) {
+      stampAigcPageFooter(doc)
+    }
     doc.end()
     const buffer = await done
     return { buffer, pageCount }

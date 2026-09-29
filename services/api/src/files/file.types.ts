@@ -65,6 +65,16 @@ export const FILE_DEFAULT_TTL_HOURS: Record<FileSensitiveLevel, number> = {
   highly_sensitive: 1,
 }
 
+/**
+ * 收费导出在核销提交前的预写锁。
+ * 直传确认、保存期限修改和会员列表都不得把这种行当成已购文件。
+ */
+export const RESUME_EXPORT_STAGING_LOCK = 'resume_export_pending'
+
+/** 预写行的最长寿命。崩溃后的孤儿靠这个到期时间进入既有 cleanupExpired。 */
+export const RESUME_EXPORT_STAGING_TTL_MS = 10 * 60 * 1000
+export const RESUME_EXPORT_STAGING_MAX_MS = 15 * 60 * 1000
+
 export interface FileMetadata {
   id: string
   bucket: string

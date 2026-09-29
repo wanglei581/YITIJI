@@ -164,11 +164,13 @@ export interface JobsDrawerProps {
   onClose: () => void
   onJobCountChange?: (count: number) => void
   onJobsChanged?: () => void | Promise<void>
+  /** 托管关闭（我们云上默认）时只读：只列岗位，不新增、不编辑、不删除（点了也只会 403）。 */
+  readOnly?: boolean
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChange, onJobsChanged }: JobsDrawerProps) {
+export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChange, onJobsChanged, readOnly = false }: JobsDrawerProps) {
   const [jobs,        setJobs]        = useState<OfflineAgencyJob[]>([])
   const [jobsTotal,   setJobsTotal]   = useState(0)
   const [loadState,   setLoadState]   = useState<'loading' | 'error' | 'ready'>('loading')
@@ -269,7 +271,7 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
     <Drawer
       open={open}
       onClose={onClose}
-      title={`岗位管理 — ${agencyName}`}
+      title={readOnly ? `岗位（只读）— ${agencyName}` : `岗位管理 — ${agencyName}`}
       size="lg"
       footer={
         <div className="flex items-center justify-between">
@@ -279,9 +281,15 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
       }
     >
       <div className="space-y-4">
-        <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
-          新增或修改岗位会使所属机构回到“待审核 + 草稿”，管理员重新审核发布后才会公开展示。
-        </div>
+        {readOnly ? (
+          <div className="rounded-lg border border-info/20 bg-info-bg px-3 py-2 text-xs text-info-fg">
+            当前只读：不新增、不编辑、不删除岗位；如需处置这家机构，请在列表中用「紧急下架」。
+          </div>
+        ) : (
+          <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
+            新增或修改岗位会使所属机构回到“待审核 + 草稿”，管理员重新审核发布后才会公开展示。
+          </div>
+        )}
         {jobsTotal > jobs.length && (
           <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
             仅显示最近 {jobs.length} 条（共 {jobsTotal} 条）。
@@ -293,7 +301,7 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
           </div>
         )}
         {/* 新增按钮 */}
-        {formMode === 'none' && (
+        {!readOnly && formMode === 'none' && (
           <button
             onClick={() => { setFormMode('create'); setFormError(null); setActionError(null) }}
             className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-neutral-200 py-3 text-sm font-medium text-neutral-500 hover:border-primary-300 hover:text-primary-600"
@@ -330,7 +338,7 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
         {loadState === 'ready' && jobs.length === 0 && formMode !== 'create' && (
           <EmptyState
             title="暂无岗位"
-            description="点击上方按钮添加线下招聘岗位"
+            description={readOnly ? '这家机构没有岗位记录' : '点击上方按钮添加线下招聘岗位'}
             icon={BriefcaseIcon}
             className="py-10"
           />
@@ -365,21 +373,25 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    onClick={() => openEdit(job)}
-                    className="rounded p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
-                    title="编辑"
-                  >
-                    <PencilIcon className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => { if (window.confirm(`确定删除岗位「${job.title}」？`)) void handleDelete(job.id) }}
-                    disabled={deletingId === job.id}
-                    className="rounded p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-                    title="删除"
-                  >
-                    <Trash2Icon className="h-3.5 w-3.5" />
-                  </button>
+                  {!readOnly && (
+                    <>
+                      <button
+                        onClick={() => openEdit(job)}
+                        className="rounded p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+                        title="编辑"
+                      >
+                        <PencilIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => { if (window.confirm(`确定删除岗位「${job.title}」？`)) void handleDelete(job.id) }}
+                        disabled={deletingId === job.id}
+                        className="rounded p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                        title="删除"
+                      >
+                        <Trash2Icon className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}

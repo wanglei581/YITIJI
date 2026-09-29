@@ -16,6 +16,7 @@ export const FRONTEND_HINT = {
   smartCampus: '对应 Kiosk 首页「智慧校园」',
   profile: '对应一体机「找企业」与岗位详情来源机构',
   companies: '对应一体机「找企业」与岗位详情来源机构',
+  screen: '汇总本机构在一体机与小程序上的可见内容与终端状态',
   none: '不直接对应前端页面',
 } as const
 

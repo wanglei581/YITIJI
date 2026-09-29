@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, BadRequestException } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards, BadRequestException } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
@@ -11,6 +11,11 @@ import {
   type JobApplicationItem,
   type JobApplicationStatus,
 } from './job-application.types'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+  type KioskJobBoardRequest,
+} from '../terminals/kiosk-job-board.service'
 
 /**
  * 我的求职进度接口。路由前缀 /api/v1/me/job-applications。
@@ -27,7 +32,15 @@ import {
 @Controller('me/job-applications')
 @UseGuards(EndUserAuthGuard)
 export class JobApplicationsController {
-  constructor(private readonly applications: JobApplicationsService) {}
+  constructor(
+    private readonly applications: JobApplicationsService,
+    private readonly jobBoard: KioskJobBoardService,
+  ) {}
+
+  /** 关联本站岗位的进度会带回岗位标题。手填且不关联岗位的记录仍可读写。 */
+  private async jobBoardOpen(req?: KioskJobBoardRequest): Promise<boolean> {
+    return (await this.jobBoard.resolve(kioskJobBoardTerminalRef(req ?? {}))).enabled
+  }
 
   /** 我的求职进度列表（本人，可选 ?status= 过滤；游标分页）。 */
   @Get()
@@ -36,9 +49,16 @@ export class JobApplicationsController {
     @Query('status') status?: string,
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
+    @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<{ items: JobApplicationItem[]; nextCursor: string | null; total: number }>> {
+    const open = await this.jobBoardOpen(req)
     return ApiResponse.ok(
-      await this.applications.list(user.endUserId, parseMemberPageQuery(cursor, pageSize), this.parseStatus(status)),
+      await this.applications.list(
+        user.endUserId,
+        parseMemberPageQuery(cursor, pageSize),
+        this.parseStatus(status),
+        open ? undefined : { omitLinkedJobs: true },
+      ),
     )
   }
 
@@ -47,7 +67,9 @@ export class JobApplicationsController {
   async create(
     @CurrentEndUser() user: AuthedEndUser,
     @Body() dto: CreateJobApplicationDto,
+    @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<JobApplicationItem>> {
+    if (dto.jobId) await this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
     return ApiResponse.ok(await this.applications.create(user.endUserId, dto))
   }
 
@@ -57,8 +79,15 @@ export class JobApplicationsController {
     @CurrentEndUser() user: AuthedEndUser,
     @Param('id') id: string,
     @Body() dto: UpdateJobApplicationDto,
+    @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<JobApplicationItem>> {
-    return ApiResponse.ok(await this.applications.update(user.endUserId, id, dto))
+    const open = await this.jobBoardOpen(req)
+    return ApiResponse.ok(await this.applications.update(
+      user.endUserId,
+      id,
+      dto,
+      open ? undefined : { rejectLinkedJob: true },
+    ))
   }
 
   /** 删除本人的一条记录（幂等）。 */

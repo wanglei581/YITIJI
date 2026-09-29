@@ -63,6 +63,8 @@ async function main() {
 
   async function cleanup() {
     await prisma.auditLog.deleteMany({ where: { actorId: adminId } }).catch(() => undefined)
+    // 第 7 步建的 105 条广播不挂会员，之前没人删：同一个库第二次跑会在第 5 步把它们当成串号。
+    await prisma.systemBroadcast.deleteMany({ where: { createdBy: adminId } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: { in: [userA, userB] } } }).catch(() => undefined)
     await prisma.user.deleteMany({ where: { id: adminId } }).catch(() => undefined)
   }
@@ -179,8 +181,50 @@ async function main() {
       feedback.addAdminReply(admin, ticket.id, { content: '已收到企业面试邀约，请查看投递结果。' }),
     )
 
+    // C3：会员也能提 AI 内容投诉，手机号选填；「个人信息请求」不另开类别（会员走现有隐私请求）。
+    const aiFeedback = await feedback.create(userA, {
+      category: 'ai_content', content: '会员 AI 内容投诉描述不少于十字',
+    })
+    if (aiFeedback.category === 'ai_content' && aiFeedback.contactPhoneMasked === null) pass('C3-a. 会员 AI 内容投诉可提交，手机号选填')
+    else fail('C3-a. 会员 AI 内容投诉类别或选填手机号行为错误')
+    await expectReject('FEEDBACK_CATEGORY_INVALID', 'C3-b. 不另开「个人信息请求」类别', () =>
+      feedback.create(userA, { category: 'privacy', content: '会员个人信息请求描述不少于十字' }),
+    )
+
+    // C3：后台查看完整联系电话 —— 只给提交人主动留的号码，每次先写必须成功的审计。
+    const withPhone = await feedback.create(userA, {
+      category: 'ai_content', contactPhone: phoneB, content: '留了手机号的 AI 内容投诉描述',
+    })
+    const revealed = await feedback.revealContactPhoneForAdmin(admin, withPhone.id)
+    const revealLogs = await prisma.auditLog.findMany({ where: { actorId: adminId, action: 'feedback.contact_phone_revealed', targetId: withPhone.id } })
+    if (revealed.phone !== phoneB) fail('C3-c. 查看完整号码返回的不是提交人留的号码')
+    else if (revealLogs.length !== 1 || (revealLogs[0]?.payloadJson ?? '').includes(phoneB)) fail('C3-c. 查看完整号码没有留痕，或留痕里写了明文号码')
+    else pass('C3-c. 后台可查看提交人留的完整号码，每次留一条不含号码的审计')
+    await expectReject('FEEDBACK_CONTACT_NOT_FOUND', 'C3-d. 没留手机号的工单不能「查看完整号码」（不拿账号手机号顶替）', () =>
+      feedback.revealContactPhoneForAdmin(admin, aiFeedback.id),
+    )
+    const failingAudit = { writeRequired: async () => { throw new Error('audit down') } } as unknown as AuditService
+    const noAuditFeedback = new MemberFeedbackService(prisma, failingAudit, notifications)
+    let leaked: string | null = null
+    await noAuditFeedback.revealContactPhoneForAdmin(admin, withPhone.id).then((res) => { leaked = res.phone }).catch(() => undefined)
+    if (leaked) fail('C3-e. 审计写不进去时仍返回了完整号码')
+    else pass('C3-e. 审计写不进去就不返回完整号码')
+    const revealGuards = guardNames(AdminMemberFeedbackController)
+    const revealRoles = Reflect.getMetadata(ROLES_KEY, AdminMemberFeedbackController) as UserRole[] | undefined
+    const revealLimit = Reflect.getMetadata('THROTTLER:LIMITdefault', AdminMemberFeedbackController.prototype.revealContactPhone) as number | undefined
+    if (!revealGuards.includes(JwtAuthGuard.name) || !revealGuards.includes(RolesGuard.name)) fail('C3-f. 查看完整号码所在控制器缺少管理员鉴权')
+    else if (JSON.stringify(revealRoles) !== JSON.stringify(['admin'])) fail(`C3-f. 查看完整号码只许 admin 角色，实际 ${JSON.stringify(revealRoles)}`)
+    else if (!revealLimit || revealLimit > 10) fail(`C3-f. 查看完整号码缺少限流（每分钟不超过 10 次），实际 ${revealLimit}`)
+    else pass('C3-f. 查看完整号码只许 admin 角色，且每分钟限 10 次')
+    const generalWithPhone = await feedback.create(userA, {
+      category: 'general', contactPhone: phoneB, content: '会员一般反馈也留了联系电话',
+    })
+    await expectReject('FEEDBACK_CONTACT_NOT_REVEALABLE', 'C3-g. 非 AI 内容投诉不开放查看完整号码（会员回复在「我的反馈」送达）', () =>
+      feedback.revealContactPhoneForAdmin(admin, generalWithPhone.id),
+    )
+
     const extraFeedbacks = await Promise.all(Array.from({ length: 101 }, (_, index) => feedback.create(userA, {
-      category: 'general',  // FEEDBACK_CATEGORIES 只有 device/print/file_process/general，'other' 会被 DTO 400
+      category: 'general',
       title: `分页反馈 ${index}`,
       content: '用于验证后台反馈列表总数不因展示上限失真。',
     })))

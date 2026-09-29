@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 const TOKEN_VERSION = 'pst_v1'
 const CLAIM_VERSION = 1
 const SIGNING_DOMAIN = `${TOKEN_VERSION}|payment-session|`
-const DEFAULT_TTL_MS = 30 * 60 * 1000
+export const DEFAULT_PAYMENT_SESSION_TTL_MS = 30 * 60 * 1000
 const MIN_SECRET_LENGTH = 32
 
 export type PaymentSessionErrorCode =
@@ -52,9 +52,10 @@ export function assertPaymentSessionSecretConfigured(): void {
   getSecret()
 }
 
-function ttlMsFromEnv(): number {
+/** Shared TTL for payment-session tokens and claimed kiosk fulfillment leases. */
+export function paymentSessionTtlMs(): number {
   const raw = Number(process.env['PAYMENT_SESSION_TTL_SECONDS'])
-  if (!Number.isFinite(raw) || raw < 60 || raw > 24 * 3600) return DEFAULT_TTL_MS
+  if (!Number.isFinite(raw) || raw < 60 || raw > 24 * 3600) return DEFAULT_PAYMENT_SESSION_TTL_MS
   return Math.floor(raw) * 1000
 }
 
@@ -123,7 +124,7 @@ export function createPaymentSessionToken(input: PaymentSessionSubject): string 
     amountCents: input.amountCents,
     printTaskId: input.printTaskId ?? null,
     iat: now,
-    exp: now + ttlMsFromEnv(),
+    exp: now + paymentSessionTtlMs(),
   })
   return `${TOKEN_VERSION}.${payload}.${sign(payload)}`
 }

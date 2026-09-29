@@ -26,7 +26,7 @@ export function JobOverviewPanel({
       <OverviewTile icon={BriefcaseIcon} label="已发布岗位" value={insights.total} hint={`当前载入 ${insights.loadedCount} 个 / 显示 ${displayedCount} 个`} />
       <OverviewTile icon={LayersIcon} label="来源机构" value={insights.sourceCount} hint="按当前载入数据统计" />
       <OverviewTile icon={MapPinIcon} label="覆盖城市" value={insights.cityCount} hint={`当前载入含 ${insights.industryCount} 个行业`} />
-      <OverviewTile icon={ShieldCheckIcon} label="字段完整度" value={`${insights.fieldCompleteness}%`} hint="按可展示字段估算" />
+      <OverviewTile icon={ShieldCheckIcon} label="内容完整度" value={`${insights.fieldCompleteness}%`} hint="按可展示内容估算" />
     </section>
   )
 }
@@ -174,8 +174,8 @@ export function DataReadinessPanel({ insights }: { insights: JobInsights }) {
           客户数据接入提示
         </div>
         <p className="mt-2 text-xs leading-relaxed text-neutral-500">
-          当前页面只消费标准岗位字段：标题、企业、城市、行业、薪资、描述、要求、标签、来源机构、外部编号、来源链接和同步时间。
-          客户通过 API、Webhook 或 Excel 导入这些字段后，页面会自动进入列表筛选、详情展示、收藏和来源跳转闭环。
+          当前页面只使用这些岗位内容：标题、企业、城市、行业、薪资、描述、要求、标签、来源机构、外部编号、来源链接和同步时间。
+          这些内容齐了之后，列表筛选、详情、收藏和打开来源都会用上。
         </p>
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
           <ReadinessMetric label="薪资可见" value={insights.withSalary} total={insights.loadedCount} />
@@ -186,17 +186,17 @@ export function DataReadinessPanel({ insights }: { insights: JobInsights }) {
       <Card padding="none" className="p-5">
         <div className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
           <BarChart3Icon className="h-4 w-4 text-primary-600" />
-          字段完整度
+          内容完整度
         </div>
         <div className="mt-4 flex items-end gap-2">
           <span className="text-4xl font-semibold tabular-nums text-neutral-950">{insights.fieldCompleteness}%</span>
-          <span className="pb-1 text-xs text-neutral-400">按展示字段估算</span>
+          <span className="pb-1 text-xs text-neutral-400">按展示内容估算</span>
         </div>
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-100">
           <div className="h-full rounded-full bg-primary-600" style={{ width: `${Math.min(100, insights.fieldCompleteness)}%` }} />
         </div>
         <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-          缺失字段不会硬造数据，页面会显示“来源平台未提供”或隐藏对应模块。
+          缺了的内容不会硬造，页面会显示“来源平台未提供”或隐藏对应模块。
         </p>
       </Card>
     </section>

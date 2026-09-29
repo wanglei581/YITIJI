@@ -311,17 +311,16 @@ for (const [route, element] of [
 expectIncludes(favoritesPage, "import './styles/member-records-qx.css'", 'MyFavoritesPage 引入青序记录页 CSS')
 expectIncludes(favoritesPage, 'QxMePage', 'MyFavoritesPage 使用青序记录壳')
 expectAbsent(favoritesPage, /KioskPageFrame/, 'MyFavoritesPage 已离开 V6 KioskPageFrame')
-// 这张表列的是「还留在墨青明细设计上的页」，不是能力清单：页一旦迁进青序流光就
-// 必须移出，否则等于断言它不许迁。MyBenefitsPage（#931）与 MyFavoritesPage（#934）
-// 都已迁走，各自的青序断言在下方 311-313 / 324-326 行，覆盖没有减少。
-for (const [label, source] of [
-  ['MySettingsPage', settingsPage],
-]) {
-  expectIncludes(source, "import './me-detail-inkpaper.css'", `${label} 引入明细页局部 CSS`)
-  expectIncludes(source, "useInkRipple('.me-inkdetail", `${label} 只在 .me-inkdetail 作用域启用涟漪`)
-  expectClassTokens(source, ['me-inkdetail'], `${label} 使用 .me-inkdetail 根作用域`)
-  expectIncludes(source, 'KIcon', `${label} 复用 KIcon 图标系统`)
-}
+// 这里原来有一张「还留在墨青明细设计上的页」表（局部 CSS、涟漪作用域、根类名、KIcon），
+// 不是能力清单：页一旦迁进青序流光就必须移出，否则等于断言它不许迁。MyBenefitsPage（#931）、
+// MyFavoritesPage（#934）先后迁走；2026-09-23 最后一页 MySettingsPage 也迁入青序会员壳
+// 的 settings 视图，表空了，换成下面的同位青序断言。能力断言（授权查询/撤回、登录、会话说明、
+// 退出、未开放说明）在本文件下方一条不删。
+expectIncludes(settingsPage, "from '../../../components/qingxu/QxPageFrame'", 'MySettingsPage 复用青序共享页框')
+expectMatches(settingsPage, /data-qx-view="settings"[\s\S]*<QxPageFrame/, 'MySettingsPage 使用青序会员壳的「账号设置」视图')
+expectAbsent(settingsPage, /KioskPageFrame|me-detail-inkpaper|useInkRipple|me-inkdetail/, 'MySettingsPage 已离开墨青纸感 / V6 旧壳')
+expectIncludes(settingsPage, "navigate('/login', { state: { from: '/me/settings' } })", '账号设置保留登录回跳 /me/settings')
+expectIncludes(settingsPage, "error: { text: '本次未取到'", '账号设置授权读取失败显示「本次未取到」，不猜成未授权')
 expectIncludes(benefitsPage, "import './styles/benefits-qx.css'", 'MyBenefitsPage 引入青序局部 CSS')
 expectIncludes(benefitsPage, 'QxPageFrame', 'MyBenefitsPage 使用青序页框')
 expectAbsent(benefitsPage, /KioskPageFrame/, 'MyBenefitsPage has left the V6 frame')
@@ -343,7 +342,7 @@ expectIncludes(favoritesPage, "return '/renshi?tab=policy'", '我的收藏保留
 expectIncludes(favoritesPage, '还没有收藏', '我的收藏保留空态标题')
 expectIncludes(favoritesPage, '在岗位 / 招聘会 / 政策详情页点收藏', '我的收藏保留空态说明')
 
-expectIncludes(benefitsPage, 'getMyBenefits(getToken(), { pageSize: 50 })', '我的权益保留真实 API 拉取')
+expectIncludes(benefitsPage, 'getMyBenefits(token, { pageSize: 50, cursor })', '我的权益保留真实 API 拉取')
 expectIncludes(benefitsPage, '还没有权益', '我的权益保留空态标题')
 expectIncludes(benefitsPage, '政策资格提示只提供信息指引，具体办理与结果以官方平台为准', '我的权益保留政策合规说明')
 expectAbsent(benefitsPage, /立即支付|去支付|确认核销|核销成功|办理成功/, '我的权益不新增支付/核销/办理结果口径')
@@ -351,7 +350,7 @@ expectAbsent(benefitsPage, /立即支付|去支付|确认核销|核销成功|办
 expectIncludes(settingsPage, 'getJobAiConsentStatus', '账号设置保留岗位 AI 授权状态查询')
 expectIncludes(settingsPage, 'revokeJobAiConsent', '账号设置保留撤回岗位 AI 授权能力')
 expectIncludes(settingsPage, '手机号登录', '账号设置保留游客登录按钮')
-expectIncludes(settingsPage, '公共终端会话说明', '账号设置保留公共终端会话说明')
+expectIncludes(settingsPage, '公共终端使用说明', '账号设置保留公共终端使用说明')
 expectIncludes(settingsPage, '退出登录', '账号设置保留退出登录操作')
 // Wave 2 已实现换绑，只有注销和数据导出仍未开放
 expectIncludes(settingsPage, '账号注销和数据导出尚未开放', '账号设置明确尚未开放的账户能力')
@@ -395,9 +394,18 @@ const allowedProfileLandingChanged = new Set([
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
 ])
 const allowedLowRiskInkpaperChanged = new Set([
+  // W3-a: 本人结果恢复与列表分页，不新增页面。
+  'apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx',
+  'apps/kiosk/src/pages/profile/me/QaRecords.tsx',
+  'apps/kiosk/src/pages/profile/me/aiRecordNavigation.ts',
+  'apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts',
   'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  // W4 L1：设置页拆分四步表单和确认框，CSS 仅限本页。
+  'apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx',
+  'apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx',
+  'apps/kiosk/src/pages/profile/me/styles/settings-qx2.css',
   'apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx',
   'apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx',
   'apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx',

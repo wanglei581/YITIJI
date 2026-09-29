@@ -17,6 +17,7 @@ import {
   ShieldCheckIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 interface GuideEntry {
@@ -32,7 +33,7 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     key: 'print',
     icon: PrinterIcon,
     title: '打印材料',
-    description: '上传报到表、承诺书等 PDF 或图片，本机预览后打印。Word 需转换引擎开放后才能转 PDF。',
+    description: '上传报到表、承诺书等 PDF 或图片，本机预览后打印。',
     to: '/print/upload',
   },
   {
@@ -68,6 +69,9 @@ const GUIDE_ENTRIES: GuideEntry[] = [
 export function FreshmanInsightsPage() {
   const navigate = useNavigate()
   const back = () => navigate('/smart-campus')
+  // 招聘内容托管（3.13）关闭时校园招聘不开放：不摆这一格（剩四格，双列不留空）。
+  const hostingOpen = useRecruitmentHosting().enabled
+  const entries = hostingOpen ? GUIDE_ENTRIES : GUIDE_ENTRIES.filter((entry) => !isRecruitmentRoute(entry.to))
 
   return (
     <KioskPageFrame
@@ -87,7 +91,7 @@ export function FreshmanInsightsPage() {
         </div>
 
         <div className="sc-mod-grid">
-          {GUIDE_ENTRIES.map((entry) => {
+          {entries.map((entry) => {
             const Icon = entry.icon
             return (
               <button

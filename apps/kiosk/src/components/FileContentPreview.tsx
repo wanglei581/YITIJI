@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FileWarningIcon, Loader2Icon } from 'lucide-react'
+import { PdfCanvasPreview, type PdfCanvasFit } from './PdfCanvasPreview'
 import {
   convertDocumentToPdf,
   isWordDocument,
@@ -9,7 +10,7 @@ import {
 } from '../services/api/documentConversion'
 import { userMessageOf } from '../services/api/userErrorMessage'
 
-type PreviewKind = 'pdf' | 'image' | 'word' | 'unsupported' | 'unavailable'
+export type PreviewKind = 'pdf' | 'image' | 'word' | 'unsupported' | 'unavailable'
 
 interface FileContentPreviewProps {
   fileUrl?: string | null
@@ -20,6 +21,19 @@ interface FileContentPreviewProps {
   token?: string | null
   className?: string
   compact?: boolean
+  /**
+   * 旧的打开参数（如 `page=2&view=FitH`）。现在换成画布上的真实页码和适宽 / 适整页，
+   * 不再拼进链接。显式的 pdfPage / pdfFit 优先。
+   */
+  pdfOpenParams?: string | null
+  pdfPage?: number
+  pdfFit?: PdfCanvasFit
+  /** 外层自己有翻页条时关掉组件内的「上一页 / 下一页」。 */
+  showPdfPager?: boolean
+  /** 打开文件后数到的页数。外层没有回执页数时用它翻页，不在读到之前编页码。 */
+  onPdfPageCount?: (pageCount: number) => void
+  /** 实际渲染成了哪一种（含渲染失败后的 unavailable），给外层决定能摆哪些查看控件。 */
+  onKindChange?: (kind: PreviewKind) => void
 }
 
 function resolvePreviewKind(
@@ -41,6 +55,17 @@ function resolvePreviewKind(
   return 'unsupported'
 }
 
+function parsePdfOpenParams(params: string | null | undefined): { page?: number; fit?: PdfCanvasFit } {
+  if (!params) return {}
+  const query = new URLSearchParams(params)
+  const pageNumber = Number(query.get('page'))
+  const view = query.get('view')
+  return {
+    page: Number.isFinite(pageNumber) && pageNumber >= 1 ? Math.floor(pageNumber) : undefined,
+    fit: view === 'FitH' ? 'width' : view === 'Fit' ? 'page' : undefined,
+  }
+}
+
 export function FileContentPreview({
   fileUrl,
   fileName,
@@ -50,6 +75,12 @@ export function FileContentPreview({
   token,
   className = '',
   compact = false,
+  pdfOpenParams,
+  pdfPage,
+  pdfFit,
+  showPdfPager,
+  onPdfPageCount,
+  onKindChange,
 }: FileContentPreviewProps) {
   const [renderFailed, setRenderFailed] = useState(false)
   const [convertedUrl, setConvertedUrl] = useState<string | null>(null)
@@ -92,7 +123,15 @@ export function FileContentPreview({
         ? 'unsupported'
         : sourceKind
   const previewUrl = convertedUrl ?? fileUrl
-  const wordUnavailableReason = capabilities.reason?.trim() || WORD_CONVERSION_UNAVAILABLE_COPY
+  const pdfBytesUrl = previewUrl?.split('#', 1)[0] ?? ''
+  const parsedOpen = parsePdfOpenParams(pdfOpenParams)
+  const canvasPage = pdfPage ?? parsedOpen.page
+  const canvasFit = pdfFit ?? parsedOpen.fit ?? 'width'
+  const canvasPager = showPdfPager ?? pdfOpenParams == null
+
+  useEffect(() => {
+    onKindChange?.(kind)
+  }, [kind, onKindChange])
 
   return (
     <section
@@ -101,14 +140,17 @@ export function FileContentPreview({
       data-file-preview-kind={kind}
     >
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-white">
-        {kind === 'pdf' && (
-          <iframe
+        {kind === 'pdf' && pdfBytesUrl ? (
+          <PdfCanvasPreview
+            src={pdfBytesUrl}
             title={`${fileName} 预览`}
-            src={previewUrl ?? undefined}
-            className={`h-full w-full bg-white ${compact ? 'min-h-[240px]' : 'min-h-[360px]'}`}
-            onError={() => setRenderFailed(true)}
+            page={canvasPage}
+            fit={canvasFit}
+            showPager={canvasPager}
+            onReady={({ pageCount }) => onPdfPageCount?.(pageCount)}
+            className={`h-full min-h-0 ${compact ? 'min-h-[240px]' : 'min-h-[360px]'}`}
           />
-        )}
+        ) : null}
         {kind === 'image' && (
           <img
             src={fileUrl ?? undefined}
@@ -129,16 +171,16 @@ export function FileContentPreview({
               {capabilitiesLoading
                 ? '正在确认 Word 转换能力，PDF 和图片仍可正常预览。'
                 : !capabilities.wordToPdf
-                  ? `${WORD_CONVERSION_UNAVAILABLE_COPY}。${wordUnavailableReason}`
+                  ? WORD_CONVERSION_UNAVAILABLE_COPY
                   : !fileId
-                    ? '缺少文件标识，无法生成 Word 页内预览；文件本身是否可用以页面文件状态为准。'
+                    ? '暂时无法为这份 Word 文件生成预览；文件本身是否可用以页面文件状态为准。'
                     : conversionError
                       ? `Word 页内预览生成失败：${conversionError}`
-                      : '正在由转换引擎生成 PDF 预览，请稍候。'}
+                      : '正在将 Word 转为 PDF 预览，请稍候。'}
             </p>
             {!capabilities.wordToPdf && (
               <span aria-disabled="true" className="sr-only">
-                Word 页内预览不可用：{wordUnavailableReason}
+                {WORD_CONVERSION_UNAVAILABLE_COPY}
               </span>
             )}
           </div>
@@ -160,7 +202,7 @@ export function FileContentPreview({
             <p className="max-w-lg text-xs leading-5 text-neutral-500">
               {kind === 'unsupported'
                 ? sourceKind === 'word'
-                  ? `Word 文档暂不能页内预览（${wordUnavailableReason}）；可扫码到手机打开原件，或另存为 PDF 后上传。`
+                  ? WORD_CONVERSION_UNAVAILABLE_COPY
                   : '该格式不能在当前浏览器内直接显示，请更换为 PDF、JPG、PNG 或 WebP 文件后预览。'
                 : '这份文件无法在本页内嵌预览；预览失败不代表文件本身有问题，文件状态以页面上的文件卡为准。'}
             </p>

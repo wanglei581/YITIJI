@@ -19,10 +19,10 @@ import type { ResumeReport } from '../src/ai/interfaces/ai-provider.interface'
 import { FilesService } from '../src/files/files.service'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import { StorageService } from '../src/storage/storage.service'
 
 interface UnpdfApi {
-  getDocumentProxy(data: Uint8Array): Promise<unknown>
   extractText(pdf: unknown, options: { mergePages: boolean }): Promise<{ text: string | string[] }>
 }
 // services/api 是 CommonJS；unpdf 的可用运行时入口由 require 导出。
@@ -59,7 +59,7 @@ function hash(value: string): string {
 }
 
 async function pdfText(buffer: Buffer): Promise<string> {
-  const proxy = await unpdf.getDocumentProxy(new Uint8Array(buffer))
+  const proxy = await openUnpdfDocument(new Uint8Array(buffer))
   const extracted = await unpdf.extractText(proxy, { mergePages: true })
   return Array.isArray(extracted.text) ? extracted.text.join('\n') : extracted.text
 }
@@ -228,6 +228,12 @@ async function main(): Promise<void> {
       diagnosisText.includes('扫描文字置信度有限，请人工核对') && diagnosisText.includes('本次诊断只处理了简历前部内容')
     )
     assert(memberPathOk, '会员路径：真实 PDF + 派生血缘 + 我的文档 + 文件名/页眉/严重度/OCR/截断说明')
+    // 来源与置信度印成中文；内部键（pdf_ocr / low）不许上纸。
+    assert(
+      diagnosisText.includes('文字来源：扫描识别') && diagnosisText.includes('识别置信度：低') &&
+        !diagnosisText.includes('pdf_ocr') && !diagnosisText.includes('识别置信度：low'),
+      '诊断 PDF：文字来源与识别置信度印成中文，不印内部键',
+    )
 
     const changeResult = await controller.export(memberTask, { kind: 'change_list' }, {
       headers: { authorization: 'Bearer member-a' },

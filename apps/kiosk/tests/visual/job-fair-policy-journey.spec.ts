@@ -259,7 +259,10 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
 
     await fairsEntry.click()
     await page.waitForURL((u) => u.pathname === '/fairs-service', { timeout: 10000 })
-    const social = page.getByRole('button', { name: /社会招聘会/ }).first()
+    // /fairs-service 迁入青序流光（稿 16）后，能力卡由「社会招聘会」改称「招聘会列表」，
+    // 落点仍是 /job-fairs。本旅程夹具把 /health 打成 200，所以这张 info 卡可点；
+    // API checking/unavailable 时它仍 fail-closed，不得理解成「永远 enabled」。
+    const social = page.getByRole('button', { name: /招聘会列表/ }).first()
     await expect(social).toBeEnabled({ timeout: 15000 })
     await step(page, s, 'fairs-hub')
 

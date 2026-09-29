@@ -15,7 +15,7 @@ const COMPLIANCE_FORBIDDEN_TERMS = [
 
 export const CONTRACT_SAFETY_LOW_OCR_NOTICE = '文字识别置信度较低，请以合同原件为准。'
 export const CONTRACT_SAFETY_TRUNCATED_NOTICE = '本次仅分析了部分内容，未覆盖部分需要人工核对。'
-export const CONTRACT_SAFETY_FIELD_CONFLICT_NOTICE = '提取字段存在冲突，请结合合同原件人工核对。'
+export const CONTRACT_SAFETY_FIELD_CONFLICT_NOTICE = '提取出的信息有不一致之处，请对照合同原件逐项核对。'
 
 export interface ContractReviewSafetyContext {
   readonly expectedDisclaimerVersion: string

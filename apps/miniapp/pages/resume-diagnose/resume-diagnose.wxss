@@ -96,6 +96,8 @@
 .content-line { margin-top: 10rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; }
 .fail-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; }
 .fail-actions .btn { min-width: 0; }
+/* 三个按钮排两列：主操作「重试诊断」独占第二行 */
+.fail-actions .btn.primary { grid-column: 1 / -1; }
 
 .export-panel { margin: 30rpx 32rpx 0; padding: 24rpx; border: 1rpx solid var(--line-soft);
   border-radius: var(--r-md); background: var(--surface); }

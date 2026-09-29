@@ -40,11 +40,8 @@ Page({
       // 会形成死路由。改为已实现的职业规划，四格构成完整 AI 服务集：诊断→优化→面试→规划。
       { title: '职业规划', icon: 'compass', tone: 'orange', url: '/pages/career-plan/career-plan' },
     ],
-    discoveryLinks: [
-      { title: '发现岗位', desc: '查看第三方或官方来源岗位', icon: 'solution', tone: 'indigo', url: '/pages/jobs/jobs' },
-      { title: '招聘会', desc: '查看时间、地点与来源信息', icon: 'calendar', tone: 'rose', url: '/pages/fairs/fairs' },
-      { title: '就业政策', desc: '了解官方政策与办事入口', icon: 'form', tone: 'amber', url: '/pages/policies/policies' },
-    ],
+    // 原「求职信息」区块（发现岗位 / 招聘会 / 就业政策）已随对应页面停放：
+    // 无人力资源服务许可证期间小程序按非招聘类目提审，见 compliance-boundary.md §1.1。
   },
 
   onLoad() {
@@ -79,7 +76,7 @@ Page({
     const tabPages = new Set([
       '/pages/home/home',
       '/pages/ai/ai',
-      '/pages/jobs/jobs',
+      '/pages/print/print',
       '/pages/me/me',
     ])
     if (tabPages.has(url)) {
@@ -97,13 +94,9 @@ Page({
     wx.switchTab({ url: '/pages/ai/ai' })
   },
 
-  tapJobs() {
-    wx.switchTab({ url: '/pages/jobs/jobs' })
-  },
-
   onShareAppMessage() {
     return {
-      title: '职易达 · AI 求职与打印服务',
+      title: '职易达 · AI 简历与打印服务',
       path: '/pages/home/home',
     }
   },

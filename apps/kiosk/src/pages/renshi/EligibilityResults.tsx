@@ -19,7 +19,9 @@
 // tab 序、被读屏跳过（口径见 #620）。
 // ============================================================
 
-import { CheckCircle2Icon, CircleHelpIcon, InfoIcon, PrinterIcon, RotateCcwIcon, XCircleIcon } from 'lucide-react'
+import { type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { CheckCircle2Icon, CircleHelpIcon, PrinterIcon, RotateCcwIcon, XCircleIcon } from 'lucide-react'
 import type {
   ConditionCheck,
   EligibilityCheckItem,
@@ -43,19 +45,19 @@ const RESULT_ICON = {
 
 /** 置灰打印按钮的原因 —— 一句话讲清「为什么现在印不了」，不留想象空间。 */
 const PRINT_BLOCKED_WHY =
-  '本机暂时无法把这份核对结果印成纸：服务端还没有生成核对清单文件的通路，' +
-  '而且你填的条件按隐私口径不做任何保存，要打印就得先把这些信息存成文件 —— ' +
-  '这个取舍还没有做。需要留存请自行拍照或抄录；如需打印你自己带来的材料，' +
-  '请回到「就业政策」页使用上传入口。'
+  '本机还不能把这份核对结果印成纸：你填的内容不做保存，要打印就得先存成文件，这个做法还没有开放。' +
+  '需要留存请自行拍照或抄录；如需打印你自己带来的材料，请回到「就业政策」使用上传入口。'
 
 export function EligibilityResults({
   result,
   questions,
   onRestart,
+  ctaHost,
 }: {
   result: EligibilityCheckResult
   questions: EligibilityQuestionSet
   onRestart: () => void
+  ctaHost: HTMLElement | null
 }) {
   const outcome = deriveOutcome(result.items)
   const comparable = result.items.filter((item) => item.conditionsRecorded)
@@ -99,30 +101,35 @@ export function EligibilityResults({
         </div>
       )}
 
-      <div className="k8-elig-actionbar">
-        <button type="button" className="k8-elig-restart" onClick={onRestart}>
-          <RotateCcwIcon className="h-6 w-6" aria-hidden="true" />
-          重新填写并再比对一次
-        </button>
-        <button
-          type="button"
-          className="k8-elig-print-blocked"
-          aria-disabled="true"
-          aria-describedby="k8-elig-print-why"
-          onClick={(event) => event.preventDefault()}
-        >
-          <PrinterIcon className="h-6 w-6" aria-hidden="true" />
-          打印核对清单（暂不可用）
-        </button>
-      </div>
-      <p id="k8-elig-print-why" className="k8-elig-why">
-        <InfoIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
-        {PRINT_BLOCKED_WHY}
-      </p>
+      <ResultActions host={ctaHost} onRestart={onRestart} />
 
       <p className="k8-elig-disclaimer">{result.disclaimer}</p>
     </div>
   )
+}
+
+function ResultActions({ host, onRestart }: { host: HTMLElement | null; onRestart: () => void }) {
+  const actions: ReactNode = (
+    <>
+      <button type="button" className="k8-elig-restart" onClick={onRestart}>
+        <RotateCcwIcon className="h-6 w-6" aria-hidden="true" />
+        重新填写并再比对一次
+      </button>
+      <button
+        type="button"
+        className="k8-elig-print-blocked"
+        aria-disabled="true"
+        aria-describedby="k8-elig-print-why"
+        onClick={(event) => event.preventDefault()}
+      >
+        <PrinterIcon className="h-6 w-6" aria-hidden="true" />
+        打印核对清单（暂不可用）
+      </button>
+      <p id="k8-elig-print-why" className="why">{PRINT_BLOCKED_WHY}</p>
+    </>
+  )
+  if (!host) return <div className="k8-elig-actionbar">{actions}</div>
+  return createPortal(actions, host)
 }
 
 function PolicyResultCard({ item }: { item: EligibilityCheckItem }) {
@@ -131,7 +138,7 @@ function PolicyResultCard({ item }: { item: EligibilityCheckItem }) {
       <h3>{item.title}</h3>
       {/* 来源标识按 CLAUDE.md §10：来源机构 / 同步时间 / 外部ID 都要露出，缺失如实写「来源未提供」 */}
       <p className="k8-elig-card-src">
-        来源 <b>{item.source.sourceName}</b> · 同步于 {item.source.syncTime.slice(0, 10)} · 外部ID{' '}
+        来源机构 <b>{item.source.sourceName}</b> · 同步时间 {item.source.syncTime.slice(0, 10)} · 外部编号{' '}
         {item.source.externalId ?? '来源未提供'}
       </p>
       {/* 结论文案由服务端给定，前端不改写 */}

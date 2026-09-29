@@ -54,7 +54,9 @@ test('login phone states do not invent 已登录', async () => {
   assert.equal(m.derivePhoneGateState({ sendingCode: false, submitting: false, countdown: 0, notice: null, error: '短信发送失败,请稍后再试' }), 'phone-send-failed')
   assert.equal(m.derivePhoneGateState({ sendingCode: false, submitting: false, countdown: 0, notice: null, error: '验证码发送过于频繁,请 60 秒后再试' }), 'phone-send-limited')
   assert.equal(m.derivePhoneGateState({ sendingCode: false, submitting: false, countdown: 0, notice: null, error: '验证码不正确' }), 'phone-code-invalid')
-  assert.equal(m.derivePhoneGateState({ sendingCode: false, submitting: false, countdown: 0, notice: null, error: '验证码尝试次数过多,请重新获取' }), 'phone-code-expired')
+  // 错、过期、锁定三种下一步不同（W4 L1，2026-09-28）：锁定单列 phone-code-locked，不再并进过期。
+  assert.equal(m.derivePhoneGateState({ sendingCode: false, submitting: false, countdown: 0, notice: null, error: '验证码尝试次数过多,请重新获取' }), 'phone-code-locked')
+  assert.equal(m.derivePhoneGateState({ sendingCode: false, submitting: false, countdown: 0, notice: null, error: '验证码已过期,请重新获取' }), 'phone-code-expired')
   const allCopy = Object.values(m.LOGIN_GATE_COPY).map((row) => `${row.title}${row.sub}`).join('')
   assert.equal(allCopy.includes('已登录'), false)
 })

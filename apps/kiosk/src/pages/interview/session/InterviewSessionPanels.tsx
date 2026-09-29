@@ -1,25 +1,14 @@
-import type { ElementType, RefObject } from 'react'
+import type { ReactNode, RefObject } from 'react'
+import { AI_LABEL_COPY } from '@ai-job-print/shared'
+import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus, InterviewSteps } from '../interviewQxParts'
 import {
-  BotIcon,
   Loader2Icon,
-  MicIcon,
   ShieldCheckIcon,
-  TimerIcon,
-  Volume2Icon,
 } from 'lucide-react'
 import type { InterviewMessage, InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
 
 type PillTone = 'gray' | 'blue' | 'red' | 'green'
-
-function StatusPill({ icon: Icon, label, tone = 'gray' }: { icon: ElementType; label: string; tone?: PillTone }) {
-  return (
-    <span className={`interview-session__status-pill is-${tone}`}>
-      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-      {label}
-    </span>
-  )
-}
 
 interface InterviewSessionPanelsProps {
   advisorPortrait: string
@@ -42,6 +31,7 @@ interface InterviewSessionPanelsProps {
   lastInterviewerMessageIndex: number
   phase: InterviewSessionPhase
   listRef: RefObject<HTMLDivElement>
+  children?: ReactNode
 }
 
 export function InterviewSessionPanels({
@@ -53,7 +43,6 @@ export function InterviewSessionPanels({
   questionTarget,
   statusText,
   timeUp,
-  voiceKind,
   ttsLabel,
   ttsOfficial,
   micStatusLabel,
@@ -65,62 +54,63 @@ export function InterviewSessionPanels({
   lastInterviewerMessageIndex,
   phase,
   listRef,
+  children,
 }: InterviewSessionPanelsProps) {
-  const progress = Math.min(100, Math.round((questionIndex / Math.max(1, questionTarget)) * 100))
   const previousQuestion = messages
     .filter((message) => message.role === 'interviewer')
     .slice(-2, -1)[0]?.content
 
+  const micTone = micStatusTone === 'green' ? 'ok' : micStatusTone === 'red' ? 'off' : undefined
+
   return (
     <>
-      <div className="interview-session__pagehead">
-        <div className="interview-session__identity">
-          <div className="interview-session__mark"><BotIcon aria-hidden="true" /></div>
-          <div className="min-w-0 flex-1">
-            <h1>模拟面试 · {position}</h1>
-            <p>模拟练习，仅供参考 · 按自己的真实经历作答即可</p>
-          </div>
-        </div>
-        <div className="interview-session__status-row">
-          <StatusPill icon={MicIcon} label={micStatusLabel} tone={micStatusTone} />
-          <StatusPill icon={Volume2Icon} label={ttsLabel} tone={ttsOfficial ? 'green' : 'blue'} />
-        </div>
-      </div>
-
       <div className="interview-session__content">
-        <section className="interview-session__progress-card">
-          <span className="interview-session__question-count">第 {questionIndex} 题<small>/ 目标 {questionTarget} 题</small></span>
-          <div className="interview-session__progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
-          <span className={`interview-session__timer ${timeUp ? 'is-warning' : ''}`}>
-            <TimerIcon aria-hidden="true" />
-            本场剩余 {formatInterviewClock(remainingSec)}
-          </span>
-        </section>
-
+        <InterviewStatus
+          label="本场作答状态"
+          items={[
+            { k: '麦克风', v: micStatusLabel, tone: micTone },
+            { k: '语音播报', v: ttsLabel, tone: ttsOfficial ? 'ok' : undefined },
+            { k: '剩余时间', v: formatInterviewClock(remainingSec), tone: timeUp ? 'off' : 'ok' },
+          ]}
+        />
         <section className="interview-session__question-card">
           <div className="interview-session__card-head">
             <span className="interview-session__card-icon">
               <img src={advisorPortrait} alt="" className={speaking ? 'is-speaking' : ''} />
             </span>
             <div>
-              <h2>{interviewerLabel} · AI 面试官</h2>
-              <p>{voiceKind === 'recording' ? '正在记录你的回答' : '经历类问题 · 建议用 STAR 法则作答'}</p>
+              <h2>模拟面试 · {position}</h2>
+              <p>{interviewerLabel} · 第 {questionIndex} 题 / 目标 {questionTarget} 题</p>
             </div>
             <span className="interview-session__voice-status">
               {speaking && <span className="interview-session__wave"><i /><i /><i /><i /><i /></span>}
               <span>{statusText}</span>
             </span>
           </div>
-          <p className="interview-session__question-text">「{lastInterviewerMsg || '等待面试官出题'}」</p>
+          <p className="interview-session__question-text">
+            <small>AI 面试官提问 · {AI_LABEL_COPY.INTERVIEW_SESSION}</small>
+            {lastInterviewerMsg || '等待面试官出题'}
+          </p>
           {previousQuestion && <p className="interview-session__previous-question"><b>上一题</b>{previousQuestion}</p>}
         </section>
-
+        {children}
+        <section className="iv-card">
+          <InterviewCardHead title="回答时可以这样组织" hint="只作本题提示" />
+          <InterviewSteps rows={[
+            ['背景', '先交代问题', '说明当时要解决什么。'],
+            ['行动', '说你做了什么', '突出你本人的关键工作。'],
+            ['结果', '只说能核实的', '数字和成果由你自己核对。'],
+          ]} />
+        </section>
+        <InterviewNotice>
+          提交后才会进入下一题。这次没发出去时，页面会留下原因，你可以再试一次。
+        </InterviewNotice>
         {(voiceHint || timeUp) && (
           <section className="interview-session__notice" role="status">
             <ShieldCheckIcon aria-hidden="true" />
             <div>
               {voiceHint && <p>{voiceHint}</p>}
-              {timeUp && phase !== 'finishing' && <p>练习时长已到，建议回答完当前问题后点击「结束面试」。</p>}
+              {timeUp && phase !== 'finishing' && <p>练习时长已到，回答完当前问题后点「结束本场练习」。</p>}
             </div>
           </section>
         )}
@@ -148,6 +138,7 @@ export function InterviewSessionPanels({
             </div>
           )}
         </div>
+        <InterviewRail />
       </div>
     </>
   )

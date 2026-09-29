@@ -1,12 +1,12 @@
 /* 「我的」主页 · 青序流光
- * 视觉真值：docs/design/kiosk-redesign-2026-08/30-my-profile.html
+ * 视觉真值：docs/design/kiosk-redesign-2026-08-v2/30-my-profile.html
  * 地基按钮 / 卡片 / 列表行不在这里重复定义。
  */
 
 .pf-page {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 8px;
 }
 
 .pf-idcard {
@@ -30,29 +30,32 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 38px;
+  font-size: var(--qx-fs-page);
   font-weight: 700;
 }
 
 .pf-idtx { flex: 1; min-width: 0; }
-.pf-idname { display: block; font-size: 30px; font-weight: 700; letter-spacing: 1px; }
+.pf-idname { display: block; font-size: var(--qx-fs-page); font-weight: 700; letter-spacing: 1px; }
 .pf-idsub {
   display: block;
   margin-top: 8px;
-  font-size: 19px;
+  font-size: var(--qx-fs-aux-lg);
   line-height: 1.45;
-  color: color-mix(in srgb, var(--qx-paper) 66%, transparent);
+  color: color-mix(in srgb, var(--qx-paper) 94%, transparent);
 }
 
 .pf-idbtn {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 60px;
   padding: 0 22px;
   border-radius: var(--qx-r);
   border: 1px solid color-mix(in srgb, var(--qx-paper) 34%, transparent);
   background: transparent;
   color: var(--qx-paper);
-  font-size: 20px;
+  font-size: var(--qx-fs-body);
   font-weight: 700;
 }
 
@@ -76,12 +79,12 @@
 .pf-todo-ic[data-tone='teal'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
 .pf-todo-ic[data-tone='wheat'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
 .pf-todo-tx { flex: 1; min-width: 0; }
-.pf-todo-t { display: block; font-size: 23px; font-weight: 700; }
-.pf-todo-d { display: block; margin-top: 5px; font-size: 19px; line-height: 1.4; color: var(--qx-ink-2); }
+.pf-todo-t { display: block; font-size: var(--qx-fs-sec); font-weight: 700; }
+.pf-todo-d { display: block; margin-top: 5px; font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink-2); }
 .pf-todo-meta {
   display: block;
   margin-top: 4px;
-  font-size: 19px;
+  font-size: var(--qx-fs-aux-lg);
   color: var(--qx-ink-2);
   line-height: 1.45;
 }
@@ -93,7 +96,7 @@
   border-radius: var(--qx-r);
   border: 1px solid var(--qx-line-2);
   background: var(--qx-paper);
-  font-size: 20px;
+  font-size: var(--qx-fs-body);
   font-weight: 700;
 }
 .pf-todo-btn--teal {
@@ -122,12 +125,12 @@
   font: inherit;
   cursor: pointer;
 }
-.pf-asset-t { font-size: 25px; font-weight: 700; }
-.pf-asset-d { font-size: 17px; color: var(--qx-ink-3); line-height: 1.5; }
+.pf-asset-t { font-size: var(--qx-fs-sec); font-weight: 700; }
+.pf-asset-d { font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-3); line-height: 1.5; }
 .pf-asset-n { margin-top: auto; display: flex; align-items: baseline; gap: 6px; }
-.pf-asset-num { font: 800 56px/1 var(--qx-mono); color: var(--qx-ink); }
-.pf-asset-num[data-unloaded] { color: var(--qx-ink-3); font-weight: 400; font-size: 40px; }
-.pf-asset-unit { font-size: 17px; color: var(--qx-ink-3); }
+.pf-asset-num { font: 800 var(--qx-fs-page)/1 var(--qx-mono); color: var(--qx-ink); }
+.pf-asset-num[data-unloaded] { color: var(--qx-ink-3); font-weight: 400; font-size: var(--qx-fs-page); }
+.pf-asset-unit { font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-3); }
 
 .pf-morelinks {
   display: flex;
@@ -146,7 +149,7 @@
   border-radius: var(--qx-r);
   background: var(--qx-surface);
   border: 1px solid var(--qx-line);
-  font-size: 19px;
+  font-size: var(--qx-fs-aux-lg);
   font-weight: 650;
   color: var(--qx-ink);
   text-align: left;
@@ -155,7 +158,7 @@
 .pf-mlink .qx-num,
 .pf-mlink .pf-asset-num {
   margin-left: auto;
-  font: 700 22px/1 var(--qx-mono);
+  font: 700 var(--qx-fs-body-lg)/1 var(--qx-mono);
   color: var(--qx-ink-3);
 }
 
@@ -165,8 +168,8 @@
   gap: 14px;
   margin-bottom: 2px;
 }
-.kp-session-records .kp-section-head .t { font-size: 25px; font-weight: 700; }
-.kp-session-records .kp-section-head .hint { margin-left: auto; font-size: 17px; color: var(--qx-ink-3); }
+.kp-session-records .kp-section-head .t { font-size: var(--qx-fs-sec); font-weight: 700; }
+.kp-session-records .kp-section-head .hint { margin-left: auto; font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-3); }
 .kp-session-row {
   display: flex;
   align-items: center;
@@ -186,7 +189,7 @@
 .pf-session-actions .qx-btn {
   min-height: var(--qx-tap-min);
   padding: 0 16px;
-  font-size: 18px;
+  font-size: var(--qx-fs-aux-lg);
 }
 
 .pf-note {
@@ -194,7 +197,7 @@
   border-radius: var(--qx-r);
   background: var(--qx-teal-soft);
   color: var(--qx-ink-2);
-  font-size: 18px;
+  font-size: var(--qx-fs-aux-lg);
   line-height: 1.55;
 }
 .pf-note b { color: var(--qx-ink); }
@@ -202,7 +205,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 20px;
+  font-size: var(--qx-fs-body);
   font-weight: 700;
   margin-bottom: 8px;
 }
@@ -215,7 +218,7 @@
   align-items: center;
   gap: 16px;
   color: var(--qx-ink-3);
-  font-size: 17px;
+  font-size: var(--qx-fs-aux-lg);
   line-height: 1.45;
 }
 .pf-truth b { color: var(--qx-ink-2); font-weight: 600; }
@@ -227,7 +230,7 @@
   background: transparent;
   border: 0;
   color: var(--qx-teal-d);
-  font-size: 17px;
+  font-size: var(--qx-fs-aux-lg);
   font-weight: 600;
 }
 
@@ -256,9 +259,40 @@
   border-radius: var(--qx-r);
   background: var(--qx-paper);
 }
-.pf-meta2 small { display: block; font-size: 16px; font-weight: 700; color: var(--qx-ink-3); }
-.pf-meta2 b { display: block; margin-top: 6px; font-size: 19px; line-height: 1.35; font-weight: 700; }
+.pf-meta2 small { display: block; font-size: var(--qx-fs-aux); font-weight: 700; color: var(--qx-ink-3); }
+.pf-meta2 b { display: block; margin-top: 6px; font-size: var(--qx-fs-aux-lg); line-height: 1.35; font-weight: 700; }
 
 @media (prefers-reduced-motion: reduce) {
   .pf-page, .pf-page * { animation: none !important; transition: none !important; }
+}
+
+/* 30 v2：身份卡只读，第一处操作从 y=500 以下开始。 */
+.pf-root .qx-pagehead { min-height: 80px; }
+.pf-root .qx-body { padding-top: 12px; }
+.pf-root .pf-idcard { min-height: 132px; margin-bottom: 0; }
+.pf-root .pf-idstat { flex: none; max-width: 200px; text-align: right; font-size: var(--qx-fs-aux-lg); }
+.pf-root .pf-page > * { flex-shrink: 0; }
+.pf-root .qx-card { padding: 16px 20px; }
+.pf-root .pf-todo { min-height: 80px; }
+.pf-root .pf-asset { min-height: 160px; padding: 18px 20px; }
+.pf-root .pf-morelinks { margin-top: 10px; }
+.pf-root .pf-mlink { min-height: 64px; }
+.pf-root .qx-row { min-height: 76px; padding-top: 10px; padding-bottom: 10px; }
+.pf-root .qx-ctabar .why { flex: 1; font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
+.pf-root .qx-ctabar .qx-btn { flex: none; }
+.pf-root .qx-ctabar .qx-btn[data-grow='1'] { flex: 1 1 auto; }
+.pf-root .pf-truth { margin: 0; }
+
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .pf-root .qx-body { padding: 0 16px; }
+  [data-kiosk-stage-fit='off'] .pf-root .qx-pagehead { margin: 14px 16px 0; min-height: 0; }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-idcard { flex-wrap: wrap; min-height: 0; margin-bottom: 0; padding: 18px; gap: 12px; }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-idstat { max-width: none; text-align: left; }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-avatar { width: 56px; height: 56px; }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-todo { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-grid3 { grid-template-columns: 1fr; }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-morelinks { flex-direction: column; }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-truth, [data-kiosk-stage-fit='off'] .pf-root .qx-ctabar { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .pf-root .qx-ctabar .why { flex-basis: 100%; }
+  [data-kiosk-stage-fit='off'] .pf-root .qx-sec-h, [data-kiosk-stage-fit='off'] .pf-root .kp-section-head { flex-wrap: wrap; }
 }

@@ -7,15 +7,21 @@
     "node": ">=22.13 <23"
   },
   "scripts": {
-    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs && pnpm run verify:api-contract && pnpm run verify:visual-scale && pnpm run verify:user-error && pnpm run verify:package-chain && pnpm run verify:package-helpers && pnpm run verify:page-lifecycle && pnpm run verify:empty-state",
+    "verify:static": "node scripts/verify-miniapp-static.mjs && pnpm run verify:review-scope && pnpm run verify:package-layout && node scripts/verify-pickup-qrcode.mjs && pnpm run verify:api-contract && pnpm run verify:visual-scale && pnpm run verify:user-error && pnpm run verify:package-chain && pnpm run verify:package-order-idempotency && pnpm run verify:order-submission-reconcile && pnpm run verify:package-helpers && pnpm run verify:page-lifecycle && pnpm run verify:price-confirmation && pnpm run verify:session-generation && pnpm run verify:empty-state",
+    "verify:review-scope": "node scripts/verify-review-scope.mjs",
+    "verify:package-layout": "node scripts/verify-package-layout.mjs",
     "verify:api-contract": "node scripts/verify-miniapp-api-contract.mjs",
     "contract:update": "node scripts/verify-miniapp-api-contract.mjs --write",
     "verify:visual-scale": "node scripts/verify-miniapp-visual-scale.mjs",
     "verify:user-error": "node scripts/verify-user-error-message.mjs",
     "verify:package-chain": "node scripts/verify-package-chain.mjs",
     "verify:empty-state": "node scripts/verify-empty-state-honesty.mjs",
+    "verify:package-order-idempotency": "node --test scripts/tests/package-order-idempotency.test.mjs",
+    "verify:order-submission-reconcile": "node --test scripts/tests/order-submission-reconcile.test.mjs",
     "verify:package-helpers": "node --test scripts/tests/package-order.test.mjs",
-    "verify:page-lifecycle": "node --test scripts/tests/page-lifecycle.test.mjs"
+    "verify:page-lifecycle": "node --test scripts/tests/page-lifecycle.test.mjs scripts/tests/kiosk-send-receipt.test.mjs scripts/tests/kiosk-login-confirm.test.mjs",
+    "verify:price-confirmation": "node --test scripts/tests/price-confirmation.test.mjs",
+    "verify:session-generation": "node --test scripts/tests/session-generation.test.mjs"
   },
   "main": "app.js",
   "keywords": [],

@@ -68,7 +68,7 @@ async function callLocalAgent<T>(
   endUserToken?: string | null,
 ): Promise<T> {
   if (!BRIDGE_TOKEN) {
-    throw new LocalAgentApiError('LOCAL_USB_BRIDGE_TOKEN_MISSING', '当前终端未配置 U 盘导入本地令牌', 0)
+    throw new LocalAgentApiError('LOCAL_USB_BRIDGE_TOKEN_MISSING', '这台机器还没配好 U 盘导入', 0)
   }
 
   let res: Response
@@ -84,7 +84,7 @@ async function callLocalAgent<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new LocalAgentApiError('LOCAL_AGENT_UNREACHABLE', '无法连接本机 Terminal Agent，请确认 Agent 正在运行', 0)
+    throw new LocalAgentApiError('LOCAL_AGENT_UNREACHABLE', '无法连接这台机器的本机程序，请确认本机程序正在运行', 0)
   }
 
   if (!res.ok) {

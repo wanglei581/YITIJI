@@ -32,7 +32,7 @@ export function resumeVerdict(task: PendingTask): ResumeVerdict {
     if (task.resume.kind !== 'payment') return { ok: false, why: '读不出该回到哪一步' }
     if (!task.resume.orderNo) return { ok: false, why: '缺这一单的订单号' }
     if (!(task.resume.amountCents > 0)) return { ok: false, why: '缺这一单的应付金额' }
-    if (!task.resume.paymentSessionToken) return { ok: false, why: '缺服务端签发的支付凭证' }
+    if (!task.resume.paymentSessionToken) return { ok: false, why: '缺少系统开出的支付凭证' }
     return { ok: true, dest: 'payment' }
   }
   if (task.payStatus === null) return { ok: true, dest: 'print-progress', legacy: true }
@@ -54,13 +54,13 @@ export function resumeRowCopy(task: PendingTask): { label: string; sub: string; 
     return { label: '支付处理中', sub: '支付正在处理，本页不判定成功或失败', tone: 'clay' }
   }
   if (task.status === 'pending' && task.payStatus === 'paid') {
-    return { label: '等待领取', sub: '已付款，等待终端领取这一单', tone: 'wheat' }
+    return { label: '等待领取', sub: '已付款，等待这台机器接收这一单', tone: 'wheat' }
   }
   if (task.status === 'pending' && task.payStatus === null) {
     return { label: '早期任务', sub: '这一单没有关联订单记录，继续会回到打印进度', tone: 'sage' }
   }
   if (task.status === 'claimed') {
-    return { label: '终端已领取', sub: '终端已领取任务，正在准备打印', tone: 'slate' }
+    return { label: '这台机器已接到', sub: '这台机器已接到这一单，正在准备打印', tone: 'slate' }
   }
   if (task.status === 'printing') {
     return { label: '正在出纸', sub: '打印机正在出纸，去进度页看还剩多少', tone: 'teal' }

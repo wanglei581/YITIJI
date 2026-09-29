@@ -315,6 +315,7 @@ export function prepareIsolatedDatabase(
           "contentTrustReviewedBy" TEXT,
           "contentTrustReviewedAt" DATETIME,
           "contentTrustReason" TEXT,
+          "verifiedOfficialDomainsJson" TEXT NOT NULL DEFAULT '[]',
           "archivedAt" DATETIME,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

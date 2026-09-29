@@ -1,111 +1,123 @@
-/* ── Voice call dialog shell — service-desk (fusion-youth) 色调 ── */
-.kassist-lightflow .assistant-voice-backdrop {
+/* ── 语音咨询对话框外壳（稿 05 的 voice-gate / connecting / live / mic-denied / voice-error）
+ *
+ * 仍是模态对话框：背后的工作台 inert。两种放法：
+ *   · 舞台模式（1080×1920）：不盖全屏，只占舱面以下的主体 + 输入坞 + 边界说明三行 ——
+ *     舱面标题与读数继续显示语音通道的真实相位，和稿里一样。
+ *   · 流式模式（手机 / 横屏桌面）：居中浮层，手机全屏（见 responsive）。
+ * 选择器用 .kassist.kassist-lightflow（0,3,0），压过 batch8 里旧版语音样式（0,2,0）。 */
+.kassist.kassist-lightflow .assistant-voice-backdrop {
   position: fixed;
   z-index: 120;
   inset: 0;
   display: grid;
   place-items: center;
   padding: 42px;
-  background: rgba(16, 48, 43, 0.62);
-  backdrop-filter: blur(6px);
+  background: rgb(11 36 30 / 62%);
+  backdrop-filter: blur(4px);
   animation: kassist-lightflow-voice-backdrop-in 180ms ease-out both;
 }
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-voice-backdrop {
+  position: relative;
+  z-index: 5;
+  inset: auto;
+  grid-row: 2 / -1;
+  grid-column: 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  min-height: 0;
+  padding: 0 var(--ck-gutter, 40px) 16px;
+  background: none;
+  backdrop-filter: none;
+}
 
-.kassist-lightflow .assistant-voice-dialog {
+.kassist.kassist-lightflow .assistant-voice-dialog {
   display: flex;
   flex-direction: column;
   width: min(940px, 100%);
   max-height: min(1720px, calc(100dvh - 84px));
   overflow: hidden;
-  border: 1px solid var(--k-line);
-  border-radius: 22px;
-  color: var(--k-ink);
-  background: var(--k-surface, var(--color-surface));
-  box-shadow: 0 28px 80px rgba(16, 48, 43, 0.28);
-  animation: kassist-lightflow-voice-dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  border: 1px solid var(--qx-line);
+  border-radius: 32px;
+  color: var(--qx-ink);
+  background: var(--qx-paper);
+  box-shadow: 0 24px 64px rgb(11 36 30 / 22%);
+  animation: kassist-lightflow-voice-dialog-in 240ms cubic-bezier(.22, 1, .36, 1) both;
+}
+[data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-voice-dialog {
+  flex: 1;
+  width: 100%;
+  max-height: none;
+  box-shadow: 0 18px 44px rgb(11 36 30 / 14%);
 }
 
-.kassist-lightflow .assistant-voice-header {
+.kassist.kassist-lightflow .assistant-voice-header {
   display: flex;
-  flex: 0 0 auto;
+  flex: none;
   align-items: flex-start;
-  justify-content: space-between;
-  padding: 34px 38px 28px;
-  border-bottom: 1px solid var(--k-line);
-  background: var(--k-paper, var(--color-canvas));
+  gap: 16px;
+  padding: 22px 26px 16px;
+  border-bottom: 1px solid var(--qx-line);
+  background: var(--qx-surface);
 }
-
-.kassist-lightflow .assistant-voice-header > div {
-  display: grid;
-  gap: 5px;
-}
-
-.kassist-lightflow .assistant-voice-header span {
-  color: var(--k-muted);
-  font-size: 14px;
+.kassist.kassist-lightflow .assistant-voice-header > div { display: grid; flex: 1; gap: 4px; min-width: 0; }
+.kassist.kassist-lightflow .assistant-voice-header span {
+  color: var(--qx-teal-d);
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 2px;
 }
-
-.kassist-lightflow .assistant-voice-header h2 {
+.kassist.kassist-lightflow .assistant-voice-header h2 {
   margin: 0;
-  color: var(--k-ink);
-  font-family: var(--font-serif, 'Noto Serif SC', serif);
-  font-size: 32px;
-  font-weight: 900;
-  letter-spacing: 0.02em;
+  color: var(--qx-ink);
+  font-family: var(--qx-serif);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
-
-.kassist-lightflow .assistant-voice-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  border: 1px solid var(--k-line);
-  border-radius: 50%;
-  color: var(--k-muted);
-  background: var(--k-surface, var(--color-surface));
+.kassist.kassist-lightflow .assistant-voice-header p { margin: 0; color: var(--qx-ink-3); font-size: 17px; }
+/* 数字人披露常驻页头（五态都在）：字号跟副标题走，颜色与字重略重，读得到但不抢标题。 */
+.kassist.kassist-lightflow .assistant-voice-header .assistant-voice-ai-disclosure { color: var(--qx-teal-d); font-weight: 600; }
+.kassist.kassist-lightflow .assistant-voice-close {
+  display: inline-grid;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 20px;
+  color: var(--qx-ink);
+  background: var(--qx-paper);
   cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
+.kassist.kassist-lightflow .assistant-voice-close svg { width: 26px; height: 26px; }
 
-.kassist-lightflow .assistant-voice-close svg {
-  width: 24px;
-  height: 24px;
-}
-
-.kassist-lightflow .assistant-voice-close:hover {
-  border-color: var(--k-teal);
-  color: var(--k-teal-deep);
-  transform: translateY(-1px);
-}
-
-.kassist-lightflow .assistant-voice-close:focus-visible,
-.kassist-lightflow .assistant-voice-choice:focus-visible,
-.kassist-lightflow .assistant-voice-control:focus-visible,
-.kassist-lightflow .assistant-voice-error-actions button:focus-visible,
-.kassist-lightflow .assistant-voice-resume:focus-visible {
-  outline: 4px solid rgba(31, 158, 134, 0.24);
-  outline-offset: 3px;
-}
-
-.kassist-lightflow .assistant-voice-stage {
+.kassist.kassist-lightflow .assistant-voice-stage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
   min-height: 0;
+  padding: 20px 26px;
   overflow-y: auto;
-  padding: 46px 52px 38px;
   overscroll-behavior: contain;
 }
 
-.kassist-lightflow .assistant-voice-loading {
+.kassist.kassist-lightflow .assistant-voice-dialog :is(button):focus-visible {
+  outline: 3px solid var(--qx-teal);
+  outline-offset: 3px;
+}
+.kassist.kassist-lightflow .assistant-voice-panel :is(button):focus-visible { outline-color: var(--qx-emerald); }
+
+.kassist.kassist-lightflow .assistant-voice-loading {
   min-width: 280px;
+  margin: auto;
   padding: 34px;
-  border: 1px solid var(--k-line);
-  border-radius: 18px;
-  color: var(--k-ink);
-  background: var(--k-surface, var(--color-surface));
-  box-shadow: 0 24px 60px rgba(16, 48, 43, 0.16);
-  font-size: 18px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  font-size: 20px;
   font-weight: 700;
   text-align: center;
 }
@@ -115,6 +127,6 @@
   to { opacity: 1; }
 }
 @keyframes kassist-lightflow-voice-dialog-in {
-  from { opacity: 0; transform: scale(.96) translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: none; }
 }

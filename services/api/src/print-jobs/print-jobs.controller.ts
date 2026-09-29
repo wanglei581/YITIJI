@@ -8,6 +8,7 @@
 //   GET   /print/jobs/:taskId  — Kiosk polls task status
 // ============================================================
 
+import { MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Param, Post, UseGuards } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
@@ -35,8 +36,12 @@ export class PrintJobsController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @UseGuards(TerminalIdentityGuard)
-  claimPickup(@Body() dto: ClaimPickupDto, @Headers('x-terminal-id') terminalId: string | undefined) {
-    return this.pickupOrders.claim(dto.code, terminalId)
+  claimPickup(
+    @Body() dto: ClaimPickupDto,
+    @Headers('x-terminal-id') terminalId: string | undefined,
+    @Ip() ip: string,
+  ) {
+    return this.pickupOrders.claim(dto.code, terminalId, ip || 'unknown')
   }
 
   @Post(':orderId/release')
@@ -56,6 +61,7 @@ export class PrintJobsController {
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @UseGuards(TerminalIdentityGuard)
+  @MaintenanceBlocked()
   async create(
     @Body() dto: CreatePrintJobDto,
     @Ip() ip: string,

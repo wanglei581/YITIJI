@@ -37,16 +37,10 @@ function isLocalAssistantSelector(selector) {
   if (!trimmed || trimmed.startsWith('@')) return true
   if (/^(?:from|to|\d+%(?:\s*,\s*\d+%)*)$/.test(trimmed)) return true
   if (trimmed.includes('.kassist')) return true
-  // verify-fusion-w3 requires this shared-frame padding neutralizer on the assistant shell CSS;
-  // it targets the page frame outside the .kassist root and must stay unscoped.
-  return (
-    trimmed.includes("[data-kiosk-presentation='fusion-youth']")
-    && trimmed.includes('.fusion-w3--assistant')
-    && trimmed.includes('.ui-kiosk-page-content')
-  )
+  return false
 }
 
-console.log('\n=== K2a AI 顾问青序 LightFlow 静态合同 ===')
+console.log('\n=== K2a AI 顾问青序 2.0 静态合同 ===')
 
 const packageJson = read('package.json')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
@@ -60,17 +54,18 @@ const assistantPage = read('src/pages/assistant/AssistantPage.tsx')
  */
 const assistantModule = [
   assistantPage,
+  read('src/pages/assistant/AssistantTaskPicker.tsx'),
   read('src/pages/assistant/AdvisorConversation.tsx'),
   read('src/pages/assistant/AdvisorTools.tsx'),
   read('src/pages/assistant/advisorScenes.ts'),
   read('src/pages/assistant/advisorProvider.ts'),
 ].join('\n')
-const assistantCssEntry = read('src/pages/assistant/assistant-inkpaper.css')
+const assistantCssEntry = read('src/pages/assistant/assistant-qingxu.css')
 const assistantCssPaths = [
-  'src/pages/assistant/assistant-lightflow-shell.css',
-  'src/pages/assistant/assistant-lightflow-call.css',
-  'src/pages/assistant/assistant-lightflow-chat.css',
-  'src/pages/assistant/assistant-lightflow-content.css',
+  'src/pages/assistant/assistant-qingxu.css',
+  'src/pages/assistant/assistant-qingxu-call.css',
+  'src/pages/assistant/assistant-qingxu-input.css',
+  'src/pages/assistant/assistant-qingxu-content.css',
 ]
 const assistantCssParts = assistantCssPaths.map((path) => ({ path, source: read(path) }))
 const assistantCss = [assistantCssEntry, ...assistantCssParts.map(({ source }) => source)].join('\n')
@@ -86,17 +81,24 @@ expectIncludes(kioskRoot, 'presentation="fusion-youth"', '服务台页壳全路�
 expect(!kioskRoot.includes('SERVICE_DESK_EXACT_ROUTES'), '服务台页壳已拆除精确路由白名单分叉')
 expect(!kioskRoot.includes("startsWith('/resume')"), '服务台页壳不宽泛匹配简历路径')
 
-expectIncludes(assistantPage, "import './assistant-inkpaper.css'", '助手页继续导入局部样式')
-expectIncludes(assistantPage, 'className="kassist kassist-lightflow"', '助手页使用局部 LightFlow 根命名空间')
-expectMatches(
+expectIncludes(assistantPage, "import './assistant-qingxu.css'", '助手页继续导入局部样式')
+expectIncludes(assistantPage, 'className="kassist kassist-qingxu"', '助手页使用局部 LightFlow 根命名空间')
+expectIncludes(
   assistantPage,
-  /<section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">[\s\S]*?<h1 id="assistant-page-title" className="kassist-sr-only">AI顾问<\/h1>/,
-  '页面名称仅以无障碍标题保留',
+  '<section className="kassist kassist-qingxu" aria-label="AI 顾问咨询工作台">',
+  '助手工作台区域保留可访问名称',
 )
-expect(
-  !/<h[1-6](?![^>]*kassist-sr-only)[^>]*>[\s\S]*?AI顾问[\s\S]*?<\/h[1-6]>/.test(assistantPage),
-  '左上角及视觉顶部不显示 AI顾问标题',
-)
+expect(!/<h1[\s>]/.test(assistantPage), '助手页不再自带第二个 h1（页面名由 QxPageFrame 顶部标题承担）')
+expect(!assistantModule.includes('kassist-sr-only">AI顾问'), '隐藏的重复 AI顾问 标题已移除')
+{
+  const frameStart = assistantPage.indexOf('<QxPageFrame')
+  const frameEnd = frameStart < 0 ? -1 : assistantPage.indexOf('\n    >\n', frameStart)
+  const frameProps = frameEnd < 0 ? '' : assistantPage.slice(frameStart, frameEnd)
+  expect(frameProps.includes('title="AI 顾问"'), '稿 05 页面名：QxPageFrame 可见标题为 AI 顾问')
+  expect(/aria-current="page">[\s\S]*?AI 顾问<\/button>/.test(frameProps), '稿 05 底栏：当前导航项可见文案为 AI 顾问')
+  expect(frameProps !== '' && !frameProps.includes('问小青'), '稿 05 已下线「问小青」称呼：页壳标题与底栏不再出现')
+}
+expect(!/>[^<>{}]*问小青[^<>{}]*</.test(assistantPage), '助手页 JSX 可见文案不再出现「问小青」')
 expect(!assistantPage.includes('ReferenceServiceNav'), '助手页移除首页服务分类导航')
 expect(!assistantPage.includes('lf-reference-'), '助手页移除首页 lf-reference 服务卡骨架')
 
@@ -113,7 +115,7 @@ for (const [token, label] of [
   ['className="assistant-quick-questions"', '输入区快捷问题'],
   ['className="assistant-tool-button assistant-voice-trigger"', '输入区语音入口'],
 ]) {
-  expectIncludes(assistantPage, token, `助手 4188 页面语法包含：${label}`)
+  expectIncludes(assistantModule, token, `助手 2.0 页面语法包含：${label}`)
 }
 
 for (const forbiddenToken of [
@@ -127,7 +129,7 @@ for (const forbiddenToken of [
   expect(!assistantPage.includes(forbiddenToken), `助手不保留第二服务面板或旧目录骨架：${forbiddenToken}`)
 }
 
-const taskGridIndex = assistantPage.indexOf('className="assistant-task-grid"')
+const taskGridIndex = assistantPage.indexOf('<AssistantTaskPicker')
 const conversationIndex = assistantPage.indexOf('className="assistant-conversation"')
 const composerIndex = assistantPage.indexOf('className="assistant-composer"')
 expect(
@@ -232,25 +234,25 @@ expectIncludes(
 )
 
 for (const token of [
-  '--sd-canvas',
-  '--sd-surface',
-  '--sd-text-strong',
-  '--sd-text',
-  '--sd-primary',
-  '--sd-line',
-  '--sd-control-min',
-  '--sd-primary-control-min',
+  '--qx-paper',
+  '--qx-surface',
+  '--qx-ink',
+  '--qx-ink-2',
+  '--qx-teal-d',
+  '--qx-line',
+  '--kassist-control-min',
+  '--kassist-primary-control-min',
 ]) {
   expectIncludes(assistantCss, token, `局部样式使用 ${token} 令牌`)
 }
-expectIncludes(assistantCss, '.kassist.kassist-lightflow {', '局部样式根绑定 kassist-lightflow')
+expectIncludes(assistantCss, '.kassist.kassist-qingxu {', '局部样式根绑定 kassist-qingxu')
 for (const [token, label] of [
-  ['.kassist.kassist-lightflow .assistant-workbench {', '980px 工作台样式'],
+  ['.kassist.kassist-qingxu .assistant-workbench {', '980px 工作台样式'],
   ['width: min(100%, 980px)', '原型 980px 内容轨'],
-  ['.kassist.kassist-lightflow .assistant-task-grid {', '任务网格样式'],
+  ['.kassist.kassist-qingxu .assistant-task-grid {', '任务网格样式'],
   ['grid-template-columns: repeat(2, minmax(0, 1fr))', '宽屏两列任务'],
-  ['.kassist.kassist-lightflow .assistant-conversation {', '开放式对话区样式'],
-  ['.kassist.kassist-lightflow .assistant-composer {', '独立输入卡样式'],
+  ['.kassist.kassist-qingxu .assistant-conversation {', '开放式对话区样式'],
+  ['.kassist.kassist-qingxu .assistant-composer {', '独立输入卡样式'],
   ['--kassist-control-min: 48px', '48px 常规触控目标'],
   ['--kassist-primary-control-min: 56px', '56px 主操作触控目标'],
   ['@media (max-width: 520px)', '窄屏断点'],
@@ -260,7 +262,7 @@ for (const [token, label] of [
 }
 expectMatches(
   assistantCss,
-  /@media \(max-width: 520px\)[\s\S]*?\.kassist\.kassist-lightflow \.assistant-task-grid\s*{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/,
+  /@media \(max-width: 520px\)[\s\S]*?\.kassist\.kassist-qingxu \.assistant-task-grid\s*{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/,
   '窄屏任务选择器回退为单列',
 )
 for (const forbiddenToken of [
@@ -279,17 +281,22 @@ for (const { path, source } of assistantCssParts) {
 }
 for (const path of assistantCssPaths) {
   const fileName = path.split('/').at(-1) ?? path
-  expectIncludes(assistantCssEntry, `@import './${fileName}';`, `聚合入口导入 ${fileName}`)
+  if (fileName === 'assistant-qingxu.css') {
+    expectIncludes(assistantPage, `import './${fileName}'`, `页面导入 ${fileName}`)
+  } else {
+    expectIncludes(assistantCssEntry, `@import './${fileName}';`, `聚合入口导入 ${fileName}`)
+  }
 }
 expect(!/(?:^|\n)\s*(?:html|body|:root)\b/m.test(assistantCss), '局部样式不覆写 html、body 或 :root')
 
-const selectors = [...assistantCss.matchAll(/(?:^|})\s*([^@}][^{]+)\{/g)]
+const cssWithoutComments = assistantCss.replace(/\/\*[\s\S]*?\*\//g, '')
+const selectors = [...cssWithoutComments.matchAll(/(?:^|})\s*([^@}][^{]+)\{/g)]
   .map((match) => match[1] ?? '')
   .filter((selector) => selector.trim())
 expect(selectors.every(isLocalAssistantSelector), '所有实际样式选择器均限定在 .kassist 命名空间')
 expect(
-  [...assistantCss.matchAll(/@keyframes\s+([\w-]+)/g)].every((match) => match[1]?.startsWith('kassist-lightflow-')),
-  '局部动效名称均使用 kassist-lightflow 前缀',
+  [...assistantCss.matchAll(/@keyframes\s+([\w-]+)/g)].every((match) => match[1]?.startsWith('kassist-qingxu-')),
+  '局部动效名称均使用 kassist-qingxu 前缀',
 )
 for (const legacyToken of [
   '#f4f1e8', '#efeadd', '#fffdf8', '#10302b', '#1f9e86', '#157a67', '#a9781f', '#7a5a86',
@@ -303,4 +310,4 @@ if (failures > 0) {
   process.exit(1)
 }
 
-console.log('\nALL PASS K2a AI 顾问青序 LightFlow 静态合同')
+console.log('\nALL PASS K2a AI 顾问青序 2.0 静态合同')

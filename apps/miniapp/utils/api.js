@@ -9,6 +9,13 @@ const mock = require('./mock-data');
 const N = require('./normalize');
 const uploadNames = require('./upload-name');
 const auth = require('./auth');
+// 幂等键的形状各由**铸它的那个模块**定义（两份都与服务端 IDEMPOTENCY_KEY_RE 同形：
+// 只认小写，因为 Order 的唯一键区分大小写）。这里只借来做本地校验，不在本文件再抄一份
+// 正则 —— 抄一份就会有一天对不上，而对不上的表现是一个必然 400 的请求被发出去，
+// 页面把它显示成一句「请稍后重试」，用户重试多少次都一样。
+const { KEY_RE: PRINT_ORDER_IDEMPOTENCY_KEY_RE } = require('./print-order-idempotency');
+const { KEY_RE: PACKAGE_IDEMPOTENCY_KEY_RE } = require('./package-order-idempotency');
+const { withQuotedAmount } = require('./price-confirmation');
 
 /**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
@@ -97,6 +104,22 @@ function mockUnavailable(what) {
   const e = new Error(`${what}需连接真实后端,当前为本地演示数据模式`);
   e.statusCode = 501;
   return e;
+}
+
+/**
+ * 建单 body:业务载荷 + 用户在屏幕上确认过的 quotedAmountCents(价格再确认,见
+ * utils/price-confirmation.js)。`opts.quotedAmountCents` 缺省 = 旧调用,body 原样。
+ * 追加在**副本**上:调用方那一份同时是幂等指纹的来源,指纹刻意不含金额。
+ *
+ * 给了却不是可提交的金额 → **同步抛出**,请求根本不发(不把一个必然 400 的金额送出去)。
+ * 这只可能是调用方的编程错误:两页都只从 price-confirmation.quotedAmount() 取值,
+ * 且都在 ensureKey().then 里调用,抛出会变成那条链上的一次普通失败,幂等键原样留着。
+ */
+function orderBody(data, opts) {
+  if (!opts || opts.quotedAmountCents === undefined) return data;
+  const body = withQuotedAmount(data, opts.quotedAmountCents);
+  if (!body) throw new Error('确认金额无效,请重新核价后再提交');
+  return body;
 }
 
 /** 简历类任务的匿名读取凭证 */
@@ -621,11 +644,20 @@ const api = {
    * 丢了就只能重新上传重新解析(等于重复扣一次模型费用),必须先落地再渲染。
    * @param {object} p { fileId, fileName, fileFormat, source, selectedDimensions?, targetContext? }
    */
-  parseResume(p) {
+  parseResume(p, headers) {
+    const intent = headers && headers['x-resume-parse-intent'];
+    const proof = headers && headers['x-resume-parse-proof'];
+    if (typeof intent !== 'string' || intent.length !== 43 || typeof proof !== 'string' || proof.length !== 43 || intent === proof) {
+      const error = new Error('缺少解析意图，已中止提交');
+      error.code = 'RESUME_PARSE_INTENT_MALFORMED';
+      error.statusCode = 400;
+      return Promise.reject(error);
+    }
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历诊断'));
     return request('/resume/parse', {
       method: 'POST',
       data: p,
+      header: { 'x-resume-parse-intent': intent, 'x-resume-parse-proof': proof },
       needAuth: true,
       timeout: config.aiTimeout,
     });
@@ -1459,21 +1491,27 @@ const api = {
    *
    * `opts.idempotencyKey` **必填**，且只走 Header `idempotency-key`：
    * 服务端 `assertMemberPrintOrderIdempotencyKey` 从 Header 取，缺了就 400
-   * `IDEMPOTENCY_KEY_REQUIRED`。放进 body 有两个后果：服务端根本读不到（照样 400），
+   * `IDEMPOTENCY_KEY_REQUIRED`、形状不对（含**大写**）400 `IDEMPOTENCY_KEY_INVALID`。
+   * 放进 body 有两个后果：服务端根本读不到（照样 400），
    * 而 `CreateMemberPrintOrderDto` 又会把这个多出来的字段判成非法参数。
    * 键从哪来、什么时候复用，见 utils/print-order-idempotency.js。
+   * `opts.quotedAmountCents`：屏幕上确认过的金额，进 body 副本（见 orderBody）；
+   * 与服务端重算对不上时 409 PRICE_CHANGED、不建单，判读见 utils/price-confirmation.js。
    */
   createCloudPrintOrder(data, opts) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('云打印预提交'));
     const idempotencyKey = opts && opts.idempotencyKey;
-    if (typeof idempotencyKey !== 'string' || !idempotencyKey) {
+    if (typeof idempotencyKey !== 'string' || !PRINT_ORDER_IDEMPOTENCY_KEY_RE.test(idempotencyKey)) {
       // 本地就挡下来，不把一个必然 400 的请求发出去 —— 那会让页面把
       // 「你少带了一个 Header」显示成「下单失败，请稍后重试」。
+      // 形状也一起判（判据就是铸键那个模块的 KEY_RE，不另抄一份）：大写 UUID 在服务端
+      // 是**另一个键**，它不会回放原单，只会 400；发出去等于把一次可解释的失败
+      // 换成一句「请稍后重试」。
       return Promise.reject(new Error('创建打印订单必须携带幂等键'));
     }
     return request('/me/print-orders', {
       method: 'POST',
-      data,
+      data: orderBody(data, opts),
       needAuth: true,
       header: { 'idempotency-key': idempotencyKey },
     });
@@ -1532,14 +1570,35 @@ const api = {
    * **不要传 filename / pageCount / totalAmount** —— DTO 注释写明「页数、金额与
    * 文件名全部由服务端查证，前端传值不作为事实」，让前端报页数报金额本身就是错的。
    *
+   * `opts.idempotencyKey` **必填**，且只走 Header `idempotency-key`：服务端
+   * `assertMemberPrintOrderIdempotencyKey` 从 Header 取，缺了就 400
+   * `IDEMPOTENCY_KEY_REQUIRED`、形状不对 400 `IDEMPOTENCY_KEY_INVALID`。放进 body 有
+   * 两个后果：服务端根本读不到（照样 400），而白名单 DTO 又会把这个多出来的字段判成
+   * 非法参数。同键 + 同指纹回放原单原码，同键 + 不同参数 409 `IDEMPOTENCY_KEY_REUSED`。
+   * 键从哪来、什么时候复用，见 utils/package-order-idempotency.js。
+   *
    * @param {object} data { terminalId, files: [{ fileId, pageRange? }], params: { colorMode, duplex, copies } }
+   * @param {{idempotencyKey:string, quotedAmountCents?:number}} opts quotedAmountCents 见 orderBody
    * @returns {Promise<{ orderId, orderNo, pickupCode, expiresAt, amountCents, payStatus,
    *                     pickupStatus, taskStatus, paymentSessionToken, items }>}
    *          注意没有 qrCodeUrl：服务端从不下发该字段，旧注释是错的。
    */
-  createPackageOrder(data) {
+  createPackageOrder(data, opts) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('材料包订单'));
-    return request('/orders/package', { method: 'POST', data, needAuth: true });
+    const idempotencyKey = opts && opts.idempotencyKey;
+    if (typeof idempotencyKey !== 'string' || !PACKAGE_IDEMPOTENCY_KEY_RE.test(idempotencyKey)) {
+      // 本地就挡下来，不把一个必然 400 的请求发出去 —— 那会让页面把
+      // 「你少带了一个 Header」显示成「创建订单失败，请稍后重试」。
+      // 形状也一起判：服务端对形状不对的键回 400 IDEMPOTENCY_KEY_INVALID，
+      // 而那同样只会被翻译成一句「请稍后重试」，用户重试多少次都一样。
+      return Promise.reject(new Error('创建材料包订单必须携带幂等键'));
+    }
+    return request('/orders/package', {
+      method: 'POST',
+      data: orderBody(data, opts),
+      needAuth: true,
+      header: { 'idempotency-key': idempotencyKey },
+    });
   },
 
   /**
@@ -1586,6 +1645,41 @@ const api = {
       data: { terminalId, lines, params },
       needAuth: false,
     }));
+  },
+
+  /**
+   * 核对一批本机留下的幂等键，在服务端那边到底落成了什么。
+   *
+   * **这是「未落定记录永不淘汰」那条规则唯一的出口。** 两条建单链都拒绝按本机的时间 /
+   * 年龄 / 4xx 去清一条未落定记录（清错一条 = 用户被收两次钱），于是名额攒满之后这台
+   * 设备就再也下不了单。服务端为此提供了一个按**本人**范围逐键作答的端点，答案只有三种：
+   * `created`（确有其单，带 orderId）、`processing`（处理租约还活着）、
+   * `not_created`（服务端**先立墓碑再回答**，此后带这个键的 POST 一律 409
+   * `IDEMPOTENCY_KEY_ABANDONED`，再也建不出订单）。
+   *
+   * 「先立墓碑再回答」这半句是整条链的安全前提：没有它，一个还在路上的 POST 会在
+   * 本机清掉记录之后才到达服务端，于是建出一张谁都不知道的订单。
+   *
+   * 一次最多 20 个键（服务端 DTO 是 `@ArrayMaxSize(20)`，超了整批 400）。
+   * 单件与材料包共用这一个端点，服务端按 ledger 里的 orderKind 分辨，前端不必分流。
+   * 键从哪来、哪一档才准清，见 utils/order-submission-reconcile.js。
+   *
+   * @param {Array<string>} keys 1..20 个幂等键
+   * @returns {Promise<{items: Array<{key, outcome, orderId?, orderKind?,
+   *          pickupStatus?, payStatus?, taskStatus?}>}>}
+   */
+  resolveOrderSubmissions(keys) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('下单记录核对'));
+    const list = Array.isArray(keys) ? keys.filter((k) => typeof k === 'string' && k) : [];
+    // 本地就挡下来：空批与超额都是必然 400，而页面只会把它显示成一句「请稍后重试」。
+    if (!list.length || list.length > 20) {
+      return Promise.reject(new Error('核对下单记录的数量不合法'));
+    }
+    return request('/me/print-orders/submissions/resolve', {
+      method: 'POST',
+      data: { keys: list },
+      needAuth: true,
+    });
   },
 
   /**

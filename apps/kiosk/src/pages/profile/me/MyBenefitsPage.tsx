@@ -1,7 +1,9 @@
+import { useMemberCursorPage } from './useMemberCursorPage'
+import { MemberLoadMore } from './MemberLoadMore'
 // 我的权益 — /me/benefits（本人，只读）。
 // 只展示 BenefitGrant 元数据；不接支付、不核销、不承诺补贴办理结果。
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { BenefitStatus, BenefitType, MemberBenefitItem } from '@ai-job-print/shared'
 import { FlagIcon, GiftIcon, PrinterIcon, SparklesIcon, BookOpenIcon } from 'lucide-react'
@@ -37,8 +39,8 @@ const SOURCE_LABEL: Record<MemberBenefitItem['sourceType'], string> = {
 
 function quantityLine(item: MemberBenefitItem): string {
   if (item.benefitType === 'subsidy_eligibility_hint') return '不适用 · 仅提供政策说明、材料清单与官方入口'
-  if (item.quantityTotal === null || item.quantityRemaining === null) return '一次性权益；说明与状态都以服务端返回为准'
-  return `总量 ${item.quantityTotal} · 剩余 ${item.quantityRemaining}；说明与状态都以服务端返回为准`
+  if (item.quantityTotal === null || item.quantityRemaining === null) return '一次性权益；说明与状态都以系统返回为准'
+  return `总量 ${item.quantityTotal} · 剩余 ${item.quantityRemaining}；说明与状态都以系统返回为准`
 }
 
 function validityLine(item: MemberBenefitItem): string {
@@ -53,28 +55,12 @@ type BenefitsUiState = 'signed-out' | 'loading' | 'error' | 'empty' | 'list'
 export function MyBenefitsPage() {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
-  const [items, setItems] = useState<MemberBenefitItem[]>([])
-  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [reloadKey, setReloadKey] = useState(0)
 
-  const load = useCallback(() => {
-    if (!isLoggedIn) {
-      setItems([])
-      setLoadState('ready')
-      return
-    }
-    setLoadState('loading')
-    getMyBenefits(getToken(), { pageSize: 50 })
-      .then((result) => {
-        setItems(result.items)
-        setLoadState('ready')
-      })
-      .catch(() => setLoadState('error'))
-  }, [isLoggedIn, getToken])
-
-  useEffect(() => {
-    load()
-  }, [load, reloadKey])
+  const token = getToken()
+  const fetchPage = useCallback((cursor?: string) => getMyBenefits(token, { pageSize: 50, cursor }), [token])
+  const pagination = useMemberCursorPage<MemberBenefitItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
+  const { items, state: loadState } = pagination
 
   const uiState: BenefitsUiState = !isLoggedIn
     ? 'signed-out'
@@ -90,7 +76,7 @@ export function MyBenefitsPage() {
     ? { tone: 'bad' as const, label: '权益台账这次没取到' }
     : uiState === 'loading'
       ? { tone: 'unknown' as const, label: '正在取你的权益台账' }
-      : { tone: 'unknown' as const, label: '权益与资格均由服务端判定' }
+      : { tone: 'unknown' as const, label: '权益与资格均由系统判定' }
 
   return (
     <div
@@ -101,7 +87,7 @@ export function MyBenefitsPage() {
     >
       <QxPageFrame
         title="我的权益"
-        subtitle="名称、有效期与可用状态都由服务端返回；是否收费以活动说明与现场核价为准。"
+        subtitle="名称、有效期与可用状态都由系统返回；是否收费以活动说明与现场核价为准。"
         /* 稿 31-benefits 原文：data-route="/profile" aria-label="返回我的"。 */
         back={{ label: '返回我的', onBack: () => navigate('/profile') }}
         status={status}
@@ -117,7 +103,7 @@ export function MyBenefitsPage() {
               <span>
                 <div className="qx-state-t">权益台账需要先登录</div>
                 <p className="qx-state-d">
-                  权益绑定在<b>你本人的账号</b>上。公共终端不会凭匿名会话显示任何人的权益，也不会替你领取。
+                  权益绑定在<b>你本人的账号</b>上。没登录时，这台机器不会显示任何人的权益，也不会替你领取。
                 </p>
               </span>
             </div>
@@ -156,7 +142,7 @@ export function MyBenefitsPage() {
             <>
               <div className="qx-sec-h">
                 <span className="t">权益台账</span>
-                <span className="hint">名称、额度与有效期都以服务端返回为准</span>
+                <span className="hint">名称、额度与有效期都以系统返回为准</span>
               </div>
               <ul className="bf-list" data-testid="benefits-list">
                 {items.map((item) => {
@@ -192,6 +178,7 @@ export function MyBenefitsPage() {
             <b>权益只对应本机服务与打印，不等于政府补贴已经发放。</b>
             政策资格提示只提供信息指引，具体办理与结果以官方平台为准。本机不代办、不收取额外费用。
           </p>
+          {isLoggedIn && loadState === 'ready' ? <MemberLoadMore {...pagination} /> : null}
         </div>
       </QxPageFrame>
     </div>
@@ -232,8 +219,8 @@ function LedgerRules() {
         <span className="hint">与本机是否有权益无关</span>
       </div>
       <div className="bf-rules">
-        <span className="bf-rule"><i /><span>是否符合条件：由服务端按主办方的官方规则逐条比对后返回，本机与小青都<b>不替你判定资格</b>。</span></span>
-        <span className="bf-rule"><i /><span>能不能用、还能不能再用：以<b>核销时服务端返回的结果</b>为准，本页不预判。</span></span>
+        <span className="bf-rule"><i /><span>是否符合条件：由系统按主办方的官方规则逐条比对后返回，本机与小青都<b>不替你判定资格</b>。</span></span>
+        <span className="bf-rule"><i /><span>能不能用、还能不能再用：以<b>使用时系统返回的结果</b>为准，本页不预判。</span></span>
         <span className="bf-rule" data-no="true"><i /><span>是否收费、收多少：以活动说明与现场公示价为准；补贴类只给说明与官方入口，<b>本机不代办</b>。</span></span>
       </div>
     </section>
@@ -243,7 +230,7 @@ function LedgerRules() {
 function ServiceAlts() {
   const navigate = useNavigate()
   const rows = [
-    { icon: PrinterIcon, title: '打印与扫描', desc: 'A4 黑白或彩色，价格以现场公示与服务端报价为准。', to: '/print-scan' },
+    { icon: PrinterIcon, title: '打印与扫描', desc: 'A4 黑白或彩色，价格以现场公示与系统报价为准。', to: '/print-scan' },
     { icon: SparklesIcon, title: 'AI 简历服务', desc: '诊断、优化、生成与材料工坊，都不需要权益。', to: '/resume-service' },
     { icon: BookOpenIcon, title: '就业政策与补贴指引', desc: '政策原文与官方申请入口，本机不代办、不收代办费。', to: '/renshi' },
   ]
@@ -304,7 +291,7 @@ function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: 
   }
   return (
     <>
-      <p className="why">列表只读；能否使用以核销时服务端的最新状态为准。</p>
+      <p className="why">列表只读；能否使用以使用时系统的最新状态为准。</p>
       <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/activities')}>
         看可参加的活动
       </button>

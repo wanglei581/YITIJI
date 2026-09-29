@@ -123,7 +123,9 @@ const jobDetail = read('src/pages/jobs/JobDetailPage.tsx')
 const offlineAgencies = read('src/pages/offline-agencies/OfflineAgenciesPage.tsx')
 const offlineAgencyDetail = read('src/pages/offline-agencies/OfflineAgencyDetailPage.tsx')
 const offlineJobDetail = read('src/pages/offline-agencies/OfflineJobDetailPage.tsx')
-const onlinePlatforms = read('src/pages/jobs/OnlinePlatformsPage.tsx')
+// 3.14：稿 45 的运行时宿主从 jobs/OnlinePlatformsPage.tsx（已停放、不注册路由）换成本机构官方渠道页。
+// 下面原先钉在旧页上的判据（青序壳、只给扫码出口、不说代投）原样改钉活页面，不钉停放的死代码。
+const officialChannels = read('src/pages/official-channels/OfficialChannelsPage.tsx')
 const fairCompanyDetail = read('src/pages/job-fairs/FairCompanyDetailPage.tsx')
 const offlineAgencyService = read('src/services/api/offlineAgencies.ts')
 const offlineAgencyBackendService = readFileSync(join(WORKSPACE_ROOT, OFFLINE_AGENCY_BACKEND_SERVICE), 'utf8')
@@ -182,7 +184,7 @@ check('offline agency list navigates to real detail route', () => {
   assert.match(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
 })
 check('offline agency presentation does not invent unavailable metrics or live status', () => {
-  // 青序 42 号稿：没有可核对的资质字段就不展示「已核验 / 正常收录」。
+  // 青序 42 号稿：没有可核对的资质项就不展示「已核验 / 正常收录」。
   // 仍禁止把服务端没有的距离、营业中、全部区域写进目录。
   assert.doesNotMatch(offlineAgencies, /distanceKm|按直线距离/)
   assert.doesNotMatch(offlineAgencies, /'营业中'|"营业中"/)
@@ -207,13 +209,14 @@ check('directory pages have left the V6 frame for QxPageFrame', () => {
   assert.doesNotMatch(companiesPage, /KioskPageFrame/, 'companies list has left the V6 frame')
   assert.match(companyDetail, /QxPageFrame/)
   assert.doesNotMatch(companyDetail, /KioskPageFrame/, 'company detail has left the V6 frame')
-  assert.match(onlinePlatforms, /QxPageFrame/)
-  assert.doesNotMatch(onlinePlatforms, /KioskPageFrame/, 'online platforms has left the V6 frame')
+  assert.match(officialChannels, /QxPageFrame/)
+  assert.doesNotMatch(officialChannels, /KioskPageFrame/, 'official channels (稿 45 宿主) stays on the Qingxu frame')
   assert.match(fairCompanyDetail, /QxPageFrame/)
   assert.doesNotMatch(fairCompanyDetail, /KioskPageFrame/, 'fair company detail has left the V6 frame')
   assert.match(kioskRoot, /['"]\/offline-agencies['"]/)
   assert.match(kioskRoot, /['"]\/companies['"]/)
   assert.match(kioskRoot, /['"]\/jobs\/online-platforms['"]/)
+  assert.match(kioskRoot, /['"]\/official-channels['"]/)
   assert.match(kioskRoot, /\/offline-agencies\//)
   assert.match(kioskRoot, /\/companies\//)
   assert.match(kioskRoot, /\/jobs\\\/\[\^\/\]\+\\\/offline/)
@@ -221,10 +224,15 @@ check('directory pages have left the V6 frame for QxPageFrame', () => {
   assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/jobs\//)
   assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/job-fairs\//)
 })
-check('online platforms keep directory-level CTA and never claim apply-on-device', () => {
-  assert.match(onlinePlatforms, /扫码打开来源平台/)
-  assert.doesNotMatch(onlinePlatforms, /一键全网分发|授权代投|同步投递|一键投递|立即投递/)
-  assert.doesNotMatch(onlinePlatforms, /扫码投递|去来源平台投递/)
+// 旧页的正向锚点是按钮文案「扫码打开来源平台」；新页不再有「先点再出码」这一步，出口就是二维码本身，
+// 正向锚点换成：二维码由 SourceUrlQr 按渠道网址生成 + 二维码下的来源说明逐字固定。反向判据一条不少，
+// 另加一条：页面里不得出现任何打开外部网页的写法（一体机只给二维码，不给可点的外链）。
+check('official channels keep scan-only exits and never claim apply-on-device', () => {
+  assert.match(officialChannels, /<SourceUrlQr value=\{item\.url\}/)
+  assert.ok(officialChannels.includes('`本渠道由${item.organizationName}提供，信息以其官网为准`'), 'caption must stay verbatim (中文排版，机构名两侧不留空格)')
+  assert.doesNotMatch(officialChannels, /一键全网分发|授权代投|同步投递|一键投递|立即投递/)
+  assert.doesNotMatch(officialChannels, /扫码投递|去来源平台投递/)
+  assert.doesNotMatch(officialChannels, /window\.open|location\.(?:assign|href|replace)|<a\s|href=/, 'kiosk must not open external pages')
 })
 check('fair company detail keeps source fail-closed apply CTAs and print backend files', () => {
   assert.match(fairCompanyDetail, /prepareFairCompanyPrint/)
@@ -252,14 +260,24 @@ check('fair source, mock-stat and print contracts remain intact', () => {
   assert.match(fairCompanyDetailSections, /min-h-12 min-w-12 rounded-lg p-2 transition-colors/, 'fair company view toggles keep 48px touch targets')
   assert.match(fairDetail, /external_appointment/)
   assert.match(fairDetail, /external_checkin_open/)
-  assert.match(fairDetail, /!stats\.isMockData/)
+  // 详情页必须**否定** isMockData 才能算「有真统计」。2026-09-20 起 stats 是子请求
+  // 结果对象的一个字段（statsResult.stats），所以放开变量名，但保留「取反 .isMockData」
+  // 这个核心判据——把 `!` 去掉、或改成 `stats.isMockData ? 真 : 假` 仍然会红。
+  assert.match(fairDetail, /![A-Za-z_$][\w$]*(?:\.[\w$]+)*\.isMockData/)
   assert.match(fairMaterials, /printable\.printFileUrl/)
   assert.doesNotMatch(fairMaterials, /fileUrl:\s*material\.fileUrl/)
-  assert.match(fairStats, /stats\.isMockData/)
+  // 页面写的是 `stats?.isMockData`（stats 可为 null），所以允许可选链。
+  assert.match(fairStats, /stats\??\.isMockData/)
 })
 
 // Phase 0 S0-A A1b：招聘会统计 Kiosk 消费面诚实化（nullable metrics）
-const fairDataScreen = read('src/pages/job-fairs/components/FairDataScreen.tsx')
+//
+// 2026-09-20 招聘会八屏迁入青序流光后，「详情页内嵌数据大屏」组件
+// （components/FairDataScreen.tsx）随四 Tab 壳一起退休，统计只剩
+// /job-fairs/:id/stats 一个页面消费。原先把两个文件名钉死的写法会在
+// 文件消失时直接 ENOENT 崩掉，而且第三个消费面长出来时它也发现不了。
+// 改成扫描 src/pages 下**所有**引用 FairLiveStatsDTO 的页面：谁渲染了可空字段，
+// 谁就必须自带显式 null 分支。这是收严不是放宽 —— 新消费面无需改门禁即被覆盖。
 const FAIR_STATS_NULLABLE_FIELDS = [
   'checkedInCompanies',
   'browseCount',
@@ -268,40 +286,46 @@ const FAIR_STATS_NULLABLE_FIELDS = [
   'checkinCount',
 ]
 
+/** src/pages 下引用 FairLiveStatsDTO 的页面与组件，[相对路径, 源码]。 */
+function fairStatsConsumers() {
+  return collectTsx(join(KIOSK_ROOT, 'src/pages'))
+    .map((path) => [relative(KIOSK_ROOT, path), readFileSync(path, 'utf8')])
+    .filter(([, source]) => source.includes('FairLiveStatsDTO'))
+}
+
+check('fair stats consumer scan actually sees the stats page', () => {
+  // 阳性对照：读数为 0 既可能是「真的没有消费面」，也可能是扫描根本没扫到。
+  // 没有这一条，下面两项会在扫描失效时静默全绿。
+  const paths = fairStatsConsumers().map(([rel]) => rel)
+  assert.ok(paths.length > 0, 'no FairLiveStatsDTO consumer found under src/pages')
+  assert.ok(
+    paths.includes('src/pages/job-fairs/FairStatsPage.tsx'),
+    `FairStatsPage must be among the stats consumers, got: ${paths.join(', ')}`,
+  )
+})
+
 check('fair stats kiosk surfaces reject misleading live/system-truth copy', () => {
-  assert.doesNotMatch(fairStats, /准实时数据|系统真实服务数据/)
-  assert.doesNotMatch(fairDataScreen, /准实时数据|系统真实服务数据/)
+  for (const [rel, source] of fairStatsConsumers()) {
+    assert.doesNotMatch(source, /准实时数据|系统真实服务数据/, `${rel} must not claim live/system-truth stats`)
+  }
 })
 
 check('fair stats nullable metrics have explicit null branches and are not rendered unconditionally', () => {
-  for (const field of FAIR_STATS_NULLABLE_FIELDS) {
-    assert.match(
-      fairStats,
-      new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
-      `FairStatsPage must guard ${field} with explicit != null / !== null`,
-    )
-  }
-  for (const field of ['browseCount', 'scanCount', 'printCount']) {
-    assert.match(
-      fairDataScreen,
-      new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
-      `FairDataScreen must guard ${field} with explicit != null / !== null`,
-    )
-  }
-  // 禁止无条件把可空字段当数字插值进 JSX（须先经 null 分支）
-  for (const field of FAIR_STATS_NULLABLE_FIELDS) {
-    assert.doesNotMatch(
-      fairStats,
-      new RegExp(`\\{stats\\.${field}\\}`),
-      `FairStatsPage must not unconditionally render {stats.${field}}`,
-    )
-  }
-  for (const field of ['browseCount', 'scanCount', 'printCount']) {
-    assert.doesNotMatch(
-      fairDataScreen,
-      new RegExp(`\\{stats\\.${field}\\}`),
-      `FairDataScreen must not unconditionally render {stats.${field}}`,
-    )
+  for (const [rel, source] of fairStatsConsumers()) {
+    for (const field of FAIR_STATS_NULLABLE_FIELDS) {
+      if (!source.includes(`stats.${field}`)) continue
+      assert.match(
+        source,
+        new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
+        `${rel} must guard ${field} with explicit != null / !== null`,
+      )
+      // 禁止无条件把可空字段当数字插值进 JSX（须先经 null 分支）
+      assert.doesNotMatch(
+        source,
+        new RegExp(`\\{stats\\.${field}\\}`),
+        `${rel} must not unconditionally render {stats.${field}}`,
+      )
+    }
   }
 })
 
@@ -396,6 +420,11 @@ check('policy builtin records remain server-safe', () => {
   assert.match(renshi, /if \(isBuiltin\(item\.id\)\) return/)
   assert.match(renshi, /if \(!isBuiltin\(item\.id\)\) recordExternalJump/)
 })
+check('renshi policy workspace uses the Qingxu frame', () => {
+  assert.match(renshi, /QxPageFrame/)
+  assert.doesNotMatch(renshi, /KioskPageFrame|KioskPageHeader/)
+  assert.match(kioskRoot, /['"]\/renshi['"]/)
+})
 check('legacy CSS entry remains a compatibility aggregator', () => {
   for (const marker of [
     "@import './styles/jobs-fairs-foundation.css'",
@@ -405,7 +434,8 @@ check('legacy CSS entry remains a compatibility aggregator', () => {
   ]) assert.ok(jobsCss.includes(marker), marker)
 })
 
-const w4Dirs = ['jobs', 'companies', 'offline-agencies', 'job-fairs', 'campus', 'smart-campus', 'renshi']
+// official-channels：稿 45 的宿主（3.14 从 jobs/ 迁出），招聘闭环禁词照样要扫到它。
+const w4Dirs = ['jobs', 'companies', 'offline-agencies', 'job-fairs', 'campus', 'smart-campus', 'renshi', 'official-channels']
 const w4Files = w4Dirs.flatMap((dir) => collectTsx(join(KIOSK_ROOT, 'src/pages', dir)))
   .concat([
     join(KIOSK_ROOT, 'src/pages/placeholders/CampusWelcomePage.tsx'),

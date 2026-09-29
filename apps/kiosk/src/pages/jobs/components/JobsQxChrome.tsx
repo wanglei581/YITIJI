@@ -30,7 +30,7 @@ export function JobsQxState({ error, onRetry }: { error: string | null; onRetry:
     return (
       <section className="qx-state qx-grow" data-tone="info" aria-live="polite">
         <span className="qx-state-ic"><SearchIcon aria-hidden="true" /></span>
-        <span><span className="qx-state-t">正在取岗位名单</span><span className="qx-state-d">真实字段返回前不显示示例岗位，也不沿用上一次列表。</span></span>
+        <span><span className="qx-state-t">正在取岗位名单</span><span className="qx-state-d">真实内容返回前不显示示例岗位，也不沿用上一次列表。</span></span>
       </section>
     )
   }

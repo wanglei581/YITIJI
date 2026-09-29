@@ -121,7 +121,7 @@ export function gateWhy(state: string): string[] {
     return ['没有拿到登录状态就不放行，而不是先放行再补检查。', '普通打印、扫描、格式转换不受影响。']
   }
   if (state === 'login-expired') {
-    return ['签名图不做跨会话保留，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
+    return ['签名图不留到下一次使用，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
   }
   if (state === 'terminal-missing') {
     return ['不假设「读不到就是可用」。', '请联系现场工作人员登记这台机器。']

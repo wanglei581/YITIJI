@@ -1,10 +1,11 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getDataSourceCapabilities } from './api'
 import { PartnerCapabilitiesContext, type PartnerCapabilitiesState } from './capabilities'
 
 /** 机构能力单次拉取 + 全控制台共享。语义与 fail-open 约定见 ./capabilities.ts。 */
 export function PartnerCapabilitiesProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<PartnerCapabilitiesState>({ status: 'loading', capabilities: null })
+  const [state, setState] = useState<Omit<PartnerCapabilitiesState, 'retry'>>({ status: 'loading', capabilities: null })
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let mounted = true
@@ -17,10 +18,16 @@ export function PartnerCapabilitiesProvider({ children }: { children: ReactNode 
         if (mounted) setState({ status: 'error', capabilities: null })
       })
     return () => { mounted = false }
+  }, [attempt])
+
+  const retry = useCallback(() => {
+    setState({ status: 'loading', capabilities: null })
+    setAttempt((n) => n + 1)
   }, [])
+  const value = useMemo(() => ({ ...state, retry }), [state, retry])
 
   return (
-    <PartnerCapabilitiesContext.Provider value={state}>
+    <PartnerCapabilitiesContext.Provider value={value}>
       {children}
     </PartnerCapabilitiesContext.Provider>
   )

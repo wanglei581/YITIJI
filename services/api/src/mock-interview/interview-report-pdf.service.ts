@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../common/pdf/aigc-pdf-metadata'
+import { stampAigcPageHeader } from '../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import type { InterviewQaExcerpt } from './interview-qa-excerpt'
 import type { InterviewReportPayload } from './mock-interview-llm.service'
@@ -11,8 +12,8 @@ import type { InterviewReportPayload } from './mock-interview-llm.service'
 // 找不到字体诚实报错，不输出乱码 PDF。报告内容不写日志。
 // ============================================================
 
-const LEVEL_LABEL: Record<string, string> = {
-  needs_work: '需要加强', pass: '基础达标', good: '表现良好', excellent: '表现突出',
+function neutralPositionFitText(value: string): string {
+  return value.replace(/岗位匹配度|岗位匹配|匹配度/g, '岗位要求对照')
 }
 
 /**
@@ -32,16 +33,16 @@ export class InterviewReportPdfService {
   private readonly logger = new Logger(InterviewReportPdfService.name)
 
   async render(
-    meta: { position: string; industry: string; interviewerLabel: string; date: string },
+    meta: { position: string; industry: string; interviewerLabel: string; date: string; contentId: string },
     report: InterviewReportPayload,
     qa?: { excerpts: InterviewQaExcerpt[]; includeAnswers: boolean },
   ): Promise<{ buffer: Buffer; pageCount: number }> {
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
-    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
     applyAigcPdfMetadata(doc, {
       title: 'AI 模拟面试练习报告',
       subject: 'AI 生成的模拟面试练习报告，仅供求职者本人练习复盘参考，不代表任何招聘结果，不参与企业筛选或面试邀约',
       kind: 'interview',
+      contentId: meta.contentId,
     })
     const ok = registerInterviewCjkFont(doc)
     if (!ok) {
@@ -63,12 +64,11 @@ export class InterviewReportPdfService {
     doc.fontSize(9).fillColor('#9ca3af').text('本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。')
 
     title('一、综合表现概览')
-    doc.fontSize(11).fillColor('#1d4ed8').text(`练习表现等级：${LEVEL_LABEL[report.overall.level] ?? report.overall.level}`)
     doc.fontSize(10.5).fillColor('#374151').text(report.overall.summary, { lineGap: 3 })
 
     const sections: Array<[string, string[]]> = [
       ['二、表达清晰度', report.expression],
-      ['三、岗位匹配度参考', report.positionFit],
+      ['三、和你填写的目标岗位要求对照', report.positionFit.map(neutralPositionFitText)],
       ['四、经历可信度与细节', report.credibility],
       ['五、专业能力表现', report.professional],
       ['六、沟通与应变能力', report.adaptability],
@@ -114,6 +114,7 @@ export class InterviewReportPdfService {
     }
 
     // pageCount 必须在 end() 之前读取（pdfkit 行为）
+    stampAigcPageHeader(doc)
     const pageCount = doc.bufferedPageRange().count
     doc.end()
     const buffer = await done

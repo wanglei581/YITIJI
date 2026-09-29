@@ -55,7 +55,7 @@ for (const [name, source] of [['PrintPreviewPage', preview]]) {
 expect(
   confirm.includes('restrictToAllowedPrintParams') &&
     confirm.includes('hasParamsBeyondCapability') &&
-    confirm.includes('参数已按本机已验证能力收口') &&
+    confirm.includes('彩色或双面本机暂未开通，已改回目前能打的参数') &&
     confirm.indexOf('restrictToAllowedPrintParams') < confirm.indexOf('quotePrintOrder('),
   'PrintConfirmPage 在报价前按本机能力收口，避免按未验证参数计价',
 )
@@ -124,26 +124,73 @@ expect(
 // 在 1080×1920 竖屏上被拉成与 A4 完全不成比例的长条。
 console.log('\n--- 预览框高度约束 ---')
 
-const previewBox = preview.match(/<div className="relative flex ([^"]*)rounded-xl border border-neutral-200 bg-neutral-50">/)
-expect(Boolean(previewBox), '预览容器仍是可被守卫定位的单一节点')
-expect(/max-h-\[/.test(previewBox[1]), `预览容器有 max-height 约束（实际 class：${previewBox[1].trim()}）`)
-expect(/min-h-\[/.test(previewBox[1]), '预览容器保留 min-height 下限')
+const previewPanel = read(kioskRoot, 'src/pages/print/components/PrintPreviewPanel.tsx')
+const deskCss = read(kioskRoot, 'src/pages/print/styles/print-desk-qx.css')
+const previewBox = deskCss.match(/\.qpd-preview-shell\s*\{([^}]+)\}/)
+expect(previewPanel.includes('className="qpd-preview-shell"') && Boolean(previewBox), '预览容器仍是可被守卫定位的单一节点')
+expect(/max-height:/.test(previewBox[1]), '预览容器有 max-height 约束')
+expect(/min-height:/.test(previewBox[1]), '预览容器保留 min-height 下限')
 expect(
-  /max-h-\[min\(\d+vh,\s*(\d+)px\)\]/.test(previewBox[1]),
+  /max-height:\s*min\(\d+vh,\s*(\d+)px\)/.test(previewBox[1]),
   '预览高度上限同时按视口与绝对像素封顶（矮屏不顶出视口，竖屏不超 A4 比例）',
 )
-const capPx = Number(previewBox[1].match(/max-h-\[min\(\d+vh,\s*(\d+)px\)\]/)[1])
-// 竖屏可用列宽 ≈ 1080 − 48(p-6) − 400(参数栏) − 24(gap) = 608px；A4 对应高 608×297/210 ≈ 860px
+const capPx = Number(previewBox[1].match(/max-height:\s*min\(\d+vh,\s*(\d+)px\)/)[1])
+// 2.0 稿 13：左列 352px，A4 高约 498px；图像与 canvas 在壳内等比缩放，不拉伸。
 expect(
-  capPx >= 780 && capPx <= 940,
-  `高度上限按 1080×1920 竖屏的 A4 比例取值（608px 宽 → ≈860px 高，实际 ${capPx}px）`,
+  capPx >= 440 && capPx <= 520,
+  `高度上限按 2.0 左列 A4 比例取值（352px 宽 → ≈498px 高，实际 ${capPx}px）`,
 )
-const img = preview.match(/<img[^>]*?className="([^"]*)"/s)
+const img = previewPanel.match(/<img[^>]*?className="([^"]*)"/s)
 expect(Boolean(img) && /max-h-full/.test(img[1]), '预览 <img> 有 max-h-full，不撑破容器')
 const pdfFrame = read(kioskRoot, 'src/pages/print/PdfPreviewFrame.tsx')
-expect(/<PdfPreviewFrame className="max-h-full"/.test(preview), '预览 PDF 把 max-h-full 传给 PdfPreviewFrame')
-expect(/createElement\('iframe'\)/.test(pdfFrame), 'PDF 预览仍使用 iframe')
-expect(/iframe\.className = className \?\? ''/.test(pdfFrame), 'PdfPreviewFrame 把 max-h-full 落到 iframe，不撑破容器')
-expect(/net::ERR_ABORTED/.test(pdfFrame) && /blob URL/.test(pdfFrame), 'PdfPreviewFrame 说明并处理卸载时的 PDF document abort')
+const pdfCanvas = read(kioskRoot, 'src/components/PdfCanvasPreview.tsx')
+expect(/<PdfPreviewFrame className="max-h-full"/.test(previewPanel), '预览 PDF 把 max-h-full 传给 PdfPreviewFrame')
+expect(/<PdfCanvasPreview[\s\S]*className=\{className\}/.test(pdfFrame), 'PdfPreviewFrame 把 max-h-full 落到画布预览根节点，不撑破容器')
+expect(!/createElement\(['"]iframe['"]\)/.test(pdfFrame) && !/<iframe/.test(pdfFrame), '打印预览不再创建 iframe')
+expect(!/<iframe/.test(pdfCanvas) && !/<embed/.test(pdfCanvas) && !/<object/.test(pdfCanvas) && !/window\.open/.test(pdfCanvas), '画布预览不把 PDF 当成文档打开')
+expect(/<canvas/.test(pdfCanvas), 'PDF 预览画到 canvas')
+expect(
+  /pdfjs-dist\/legacy\/build\/pdf\.min\.mjs\?url/.test(pdfCanvas) &&
+    /pdfjs-dist\/legacy\/build\/pdf\.worker\.min\.mjs\?url/.test(pdfCanvas) &&
+    /getDocument/.test(pdfCanvas),
+  '使用 pdfjs-dist 的 legacy 构建（本体与 worker 都只取 URL），并调用 getDocument',
+)
+// 依赖审计只看得见 package.json 里的 pdfjs-dist，看不见 unpdf 打包进去的那份 PDF.js。
+// 预览若退回 unpdf 自带的构建，GHSA-hq66-cqwq-w95j 这类漏洞就会从审计里消失。
+const kioskPackage = JSON.parse(read(kioskRoot, 'package.json'))
+expect(
+  !kioskPackage.dependencies?.unpdf && !kioskPackage.devDependencies?.unpdf && Boolean(kioskPackage.dependencies?.['pdfjs-dist']),
+  '一体机只依赖 pdfjs-dist 这一套 PDF.js，不再依赖 unpdf（审计看得见真正在跑的版本）',
+)
+expect(
+  /await importFetchedModule<unknown>\(pdfjsWorkerUrl\)\s*\n\s*return importFetchedModule<PdfjsNamespace>\(pdfjsModuleUrl\)/.test(pdfCanvas),
+  '先导入 worker 再导入本体：PDF.js 在主线程解析，不起 Worker、不需要 workerSrc',
+)
+expect(/wasmUrl:\s*pdfjsDataUrl\('wasm'\)/.test(pdfCanvas), '预览提供 wasm 解码器目录（扫描件常见的 JBIG2 / JPX 图）')
+expect(/cMapUrl:\s*pdfjsDataUrl\('cmaps'\)/.test(pdfCanvas) && /cMapPacked:\s*true/.test(pdfCanvas), '预览把预置 CMap 目录和 cMapPacked 交给 getDocument')
+expect(/standardFontDataUrl:\s*pdfjsDataUrl\('standard_fonts'\)/.test(pdfCanvas), '预览同时提供标准字体数据目录')
+expect(/pdfjs\/\$\{kind\}\//.test(pdfCanvas), 'CMap 与标准字体 URL 带尾斜杠')
+const cmapPlugin = read(kioskRoot, 'pdfjs-cmap-plugin.ts')
+const viteConfig = read(kioskRoot, 'vite.config.ts')
+expect(viteConfig.includes('pdfjsPresetAssets'), 'Vite 注册 CMap 静态资源插件')
+expect(cmapPlugin.includes("urlName: 'cmaps'") && cmapPlugin.includes('configureServer') && cmapPlugin.includes('generateBundle'), '开发服务器和生产构建都能提供 CMap 文件')
+expect(cmapPlugin.includes("urlName: 'wasm'") && cmapPlugin.includes("urlName: 'standard_fonts'"), '标准字体与 wasm 解码器也随 CMap 一起发布')
+expect(
+  /server\.middlewares\.use\(serveEngineRaw\(packageRoot\)\)/.test(cmapPlugin) &&
+    cmapPlugin.includes("'legacy/build/pdf.min.mjs'") &&
+    cmapPlugin.includes("'legacy/build/pdf.worker.min.mjs'"),
+  '开发服务器原样返回 PDF.js 两份构建（Vite 改写后注入的 /@vite/client 在 blob: 模块里解析不了）',
+)
+expect(!/cp\s+-r/.test(cmapPlugin) && cmapPlugin.includes('readFileSync') && cmapPlugin.includes('emitFile'), 'CMap 用 Node 读写复制，不调用 cp -r')
+const pdfjsImports = [...pdfCanvas.matchAll(/from ['"](pdfjs-dist[^'"]*)['"]/g)].map((match) => match[1])
+expect(
+  pdfjsImports.length === 2 && pdfjsImports.every((specifier) => specifier.endsWith('?url')) && !/require\(['"]pdfjs-dist['"]\)/.test(cmapPlugin),
+  'PDF.js 只以 ?url 引用，不把它的代码打进主包；CMap 插件只读数据目录',
+)
+expect(/createObjectURL/.test(pdfCanvas) && !/import\(\s*['"](?:unpdf|pdfjs-dist)/.test(pdfCanvas), 'PDF.js 用 fetch 下载、导入内存里的 blob，不发走网络的 script 请求')
+expect(/new AbortController\(/.test(pdfCanvas) && /\.destroy\(/.test(pdfCanvas) && /\.cancel\(/.test(pdfCanvas), '卸载时中止 fetch、销毁文档并取消 render task')
+expect(/devicePixelRatio/.test(pdfCanvas), '按 devicePixelRatio 取缩放，避免字迹发糊')
+expect(/正在准备预览/.test(pdfCanvas) && /预览没能生成，打印仍按原文件/.test(pdfCanvas) && /第 /.test(pdfCanvas) && /共 /.test(pdfCanvas), '加载、失败和页码都如实显示')
+expect(/net::ERR_ABORTED/.test(pdfFrame) && /blob URL/.test(pdfFrame), 'PdfPreviewFrame 说明并避免卸载时的 PDF document abort')
 
 console.log('\nALL PASS')

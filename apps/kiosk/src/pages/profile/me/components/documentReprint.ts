@@ -9,6 +9,30 @@ export function isDocumentReprintable(doc: { reprintable?: boolean; purpose?: st
   return doc.reprintable !== false
 }
 
+/**
+ * 与服务端建单隐私闸门同一份用途清单（services/api/src/print-jobs/pii-scan-gate.ts 的
+ * PII_SCAN_REQUIRED_PURPOSES）。生产强制 PRINT_REQUIRE_PII_SCAN=true：这些用途的**原件**
+ * 没做完隐私检查就建单会被拒，所以打印前要先走打印台材料检查（商用收口 P0-5）。
+ */
+const PRINT_PII_CHECK_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan'])
+
+type DocumentPrintRoutingInput = { purpose?: string | null; assetCategory?: string | null }
+
+/**
+ * 「我的文档」里这一份打印前要不要先做材料检查。判据与服务端闸门一致：派生 / 优化产物
+ * （AI 报告、转换件、脱敏副本、AI 简历）放行，直达报价确认页；闸门清单里的原件先去检查。
+ * 类别缺失按原件处理（fail-closed，与服务端「不是 derived/optimized 就要检查」同口径）。
+ */
+export function documentNeedsPrintMaterialCheck(doc: DocumentPrintRoutingInput): boolean {
+  if (doc.assetCategory === 'derived' || doc.assetCategory === 'optimized') return false
+  return PRINT_PII_CHECK_PURPOSES.has(doc.purpose ?? '')
+}
+
+/** 打印材料会话的 source：只决定材料检查页「返回选文件」回到简历打印还是文档打印。 */
+export function documentPrintSource(doc: DocumentPrintRoutingInput): 'resume' | 'document' {
+  return doc.purpose === 'resume_upload' || doc.purpose === 'resume_scan' ? 'resume' : 'document'
+}
+
 function displayableConversionMessage(error: unknown): string | undefined {
   if (!(error instanceof ApiHttpError)) return undefined
   const message = error.message?.trim()

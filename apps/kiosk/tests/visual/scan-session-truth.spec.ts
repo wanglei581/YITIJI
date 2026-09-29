@@ -149,7 +149,7 @@ test('scan start does not probe a nonexistent device endpoint and carries explic
   })
 
   await page.goto('/scan/start')
-  await expect(page.getByText('\u4e0b\u4e00\u6b65\u4f1a\u521b\u5efa\u771f\u5b9e\u626b\u63cf\u4f1a\u8bdd', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
   const next = page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ })
   await expect(next).toBeEnabled()
   expect(deviceRequests()).toBe(0)
@@ -268,7 +268,7 @@ test('a session that expires while visible is cancelled and can no longer contin
 
   await enterSettingsFromVisibleStart(page)
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
-  await expect(page.getByText('扫描会话已过期', { exact: true }).first()).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByText('这次扫描已过期', { exact: true }).first()).toBeVisible({ timeout: 5_000 })
   await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
   await expect.poll(cancelRequests).toBe(1)
   // 过期是确认之后才发生的事：这一场确认过一次，且只有那一次。
@@ -454,8 +454,8 @@ test('a revoked terminal session fails the creation closed and is not retried @k
   await enterSettingsFromVisibleStart(page)
   // 换票失败后还会向本机 Agent 要一张新引导票（默认配置里配了桥接令牌），
   // 连不上要等一次 4 秒超时才落到 fail-closed —— 这条断言要能等过那一段。
-  await expect(page.getByText('终端安全校验失败', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('终端安全校验失败，请联系现场工作人员', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('这台机器的安全校验没通过，请联系现场工作人员', { exact: false }).first()).toBeVisible()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   await page.waitForTimeout(500)
@@ -503,10 +503,10 @@ function seedScanWorkbenchStage(page: Page, stage: SeedStage): Promise<void> {
 
 /** 四个阶段各自的「已经落到这一屏」判据，避免还没渲染完就去点出口。 */
 const SCAN_STAGE_LANDMARK: Record<SeedStage, string> = {
-  start: '下一步会创建真实扫描会话',
+  start: '下一步会真实建立这次扫描',
   settings: '扫描任务已创建',
   progress: '等待打印机端扫描完成',
-  result: '服务端说已完成，但这次回执里没有可用文件',
+  result: '系统说已完成，但这次结果里没有可用文件',
 }
 
 /**
@@ -864,7 +864,7 @@ test('a terminal session that recovers after the abandoned task was revoked neve
 
   // 创建还在飞的那一刻终端身份被吊销：页面据此对用户宣告失败。
   await startTerminalSessionRefresh(page)
-  await expect(page.getByText('终端安全校验失败', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
   expect(await terminalSessionStateOf(page), '换票 401 且本机 Agent 取不到票时必须 fail-closed').toBe('failed')
 
   // 迟到的创建响应：任务撤掉、不回写本机登记（已有闸门，先确认它成立，后半段才谈得上）。
@@ -882,7 +882,7 @@ test('a terminal session that recovers after the abandoned task was revoked neve
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   // 2) 已经对用户说过的失败结论仍然在屏上：恢复的是终端身份，不是这一场扫描。
-  await expect(page.getByText('终端安全校验失败', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible()
   // 3) 作废的凭证不得写回本机登记 —— 写回去，下一次进 /scan 会复水到一个已被撤销的任务。
   const stored = await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '')
   expect(stored).not.toContain(SCAN_TASK_ID)
@@ -932,7 +932,7 @@ test('a create deferred by a terminal refresh still goes out once the new ticket
   await page.getByRole('button', { name: /下一步/ }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
   // 换票没出结果之前：不抢跑创建请求（抢跑只会拿回 401），也不谎称正在建扫描会话。
-  await expect(page.getByText('正在做终端安全校验', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('正在做这台机器的安全校验', { exact: true }).first()).toBeVisible()
   expect(createRequests(), '终端会话还在换票时不许发创建请求').toBe(0)
 
   openRefresh()
@@ -986,7 +986,7 @@ test('a definitive ack refusal revokes the session and offers a plain restart, n
   await enterSettingsFromVisibleStart(page)
 
   // ① 屏幕如实说这一场没拿到投递授权，并且**明说别去面板按开始**。
-  await expect(page.getByText('这次扫描会话没能取得投递授权', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('这次扫描没能取得投递授权', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(/现在请先别在面板上按开始/).first()).toBeVisible()
   await expectNoPanelGuidance(page)
 
@@ -1121,7 +1121,7 @@ test('the wait page tells the truth when the ack is definitively refused @kiosk'
   await page.goto('/scan?stage=progress')
 
   // ① 如实落一个失败结果，不在这一屏继续假装还在等文件。
-  await expect(page.getByText(/服务端没有给这一场投递授权/).first()).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText(/系统没有给这一场投递授权/).first()).toBeVisible({ timeout: 10_000 })
   // ② 这一屏绝不许再出现那句把人支到面板上的话。
   await expect(page.getByText(/请在打印机面板完成扫描/)).toHaveCount(0)
   // ③ 服务端那条任务被撤掉（localGiveUp），用的是本机登记里那份控制凭证。
@@ -1186,7 +1186,7 @@ test('a created session whose credentials never reach storage is revoked, never 
   await enterSettingsFromVisibleStart(page)
 
   // ① 如实说「本机没能记住」，并且这一屏是**结论**，不是还在加载。
-  await expect(page.getByText('本机没能记住这次扫描会话', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('本机没能记住这次扫描', { exact: true }).first()).toBeVisible()
   await expect(page.getByTestId('scan-live-not-durable-notice')).toBeVisible()
   await expect(page.getByText(/先别在面板上按开始/).first()).toBeVisible()
 
@@ -1222,6 +1222,6 @@ test('a created session whose credentials never reach storage is revoked, never 
   await expect(page.getByRole('button', { name: '再确认一次' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '安全返回扫描首页', exact: true })).toBeVisible()
   // 那颗禁用按钮也不许说「未创建扫描任务」：任务**建过**，随后被本页撤掉了。
-  await expect(page.getByRole('button', { name: '本机存储不可用，无法建会话', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '本机暂时存不下扫描记录，无法开始这次扫描', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: '未创建扫描任务' })).toHaveCount(0)
 })

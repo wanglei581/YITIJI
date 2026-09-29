@@ -94,7 +94,7 @@
 - 服务器部署源：`/srv/ai-job-print/DEPLOY_SOURCE.txt`
 - 最新回滚备份目录：`/srv/ai-job-print-prev-20260619030829`
 
-本轮先用 root 密码恢复服务器 `authorized_keys`，随后公钥登录验证通过：`hostname && echo SSH_OK` 返回 `instance-061dyczx` / `SSH_OK`。部署过程中发现并修复两个真实预生产问题：
+本轮先恢复服务器的公钥登录，随后登录验证通过（返回 `SSH_OK`；主机信息见运维私有记录）。部署过程中发现并修复两个真实预生产问题：
 
 - **pnpm frozen install 阻塞**：`pnpm-lock.yaml` 含 overrides，但根 `package.json` 缺少 `pnpm.overrides`；已补回并收紧为 exact overrides：`qs=6.15.2`、`@hono/node-server=2.0.4`、`uuid=14.0.0`，同时要求 `node>=20.19`；服务器 `pnpm install --frozen-lockfile` 通过。
 - **nginx `/api/v1` 反代缺失**：公网 `http://120.48.13.190/api/v1/health` 原先返回 Kiosk `index.html`；已备份 `/etc/nginx/sites-available/ai-job-print.bak-20260619020839` 并给 80/8081/8082 三个 server 添加 `/api/v1` → `127.0.0.1:3010/api/v1` 反代，`nginx -t` 与 reload 通过。

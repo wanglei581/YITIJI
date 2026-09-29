@@ -106,7 +106,10 @@ test('场馆导览只进入既有可打印材料页 @kiosk', async ({ page, api 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
   await materialsButton.click()
   await expect(page).toHaveURL(/\/job-fairs\/fair-001\/materials$/)
-  await expect(page.getByText('暂无可用活动资料')).toBeVisible()
+  // 2026-09-20 迁入青序流光后空态文案取自稿 28 的 materials:empty。
+  // 断言的能力没变：从「没有展位图」的那一屏点出纸出口，落到一个**诚实的空态**，
+  // 而不是一个伪造的资料列表。
+  await expect(page.getByTestId('fair-materials-empty')).toContainText('这场还没有可下载的物料')
 })
 
 test('场馆导览加载失败后可原页重试并进入诚实空态 @kiosk', async ({ page, api }) => {
@@ -114,13 +117,17 @@ test('场馆导览加载失败后可原页重试并进入诚实空态 @kiosk', a
   api.abort('GET', '/api/v1/job-fairs/fair-001/map', 'internetdisconnected')
 
   await page.goto('/job-fairs/fair-001/map')
-  await expect(page.getByText('加载失败，请稍后重试')).toBeVisible()
+  // 迁移后错误态改用稿 28 的 map:error 文案，重试键叫「重新加载」（原「重试」）。
+  // 能力不变且更严：错误态必须明说「这不代表主办方没有提供」，且出纸出口仍在底栏。
+  await expect(page.getByTestId('fair-map-error')).toContainText('展位信息没取到')
+  await expect(page.getByTestId('fair-map-error')).toContainText('不代表主办方没有提供展位图')
+  await expect(page.getByRole('button', { name: '查看可打印导览资料' })).toBeVisible()
 
   api.respond('GET', '/api/v1/job-fairs/fair-001/map', {
     status: 200,
     json: { success: true, data: { mapImageUrl: null, zones: [], booths: [] } },
   })
-  await page.getByRole('button', { name: '重试' }).click()
+  await page.getByRole('button', { name: '重新加载' }).click()
   await expect(page.getByText('暂无场馆导览数据')).toBeVisible()
 })
 
@@ -175,7 +182,7 @@ test('逐条对照手机断点无横向溢出且操作区换算合格 @mobile', 
   const stage = page.locator('.kiosk-stage')
   const transform = await stage.evaluate((element) => getComputedStyle(element).transform)
   const scale = transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
-  for (const name of [/^用改写$/, /^保留原文$/, /^下一条$/, /可采纳的全部采纳/, /其余保留原文/, /清空全部裁决/]) {
+  for (const name of [/^用改写$/, /^保留原文$/, /^下一条$/, /可采纳的全部采纳/, /其余保留原文/, /清空全部选择/]) {
     const box = await page.getByRole('button', { name }).boundingBox()
     expect(box).not.toBeNull()
     expect(box!.height / scale).toBeGreaterThanOrEqual(56)
@@ -189,7 +196,7 @@ test('对照页批量采纳跳过未确认事实且清空后回到待定 @kiosk'
   await page.getByRole('button', { name: '可采纳的全部采纳' }).click()
   await expect(page.getByText('已采纳 1 条；跳过 1 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。')).toBeVisible()
   await expect(page.getByRole('button', { name: '用改写' })).toBeDisabled()
-  await page.getByText('裁决草稿').click()
+  await page.getByText('选择草稿').click()
   await expect(page.getByText('项目成果 · 待定')).toBeVisible()
   await expect(page.getByText('团队协作 · 已采纳')).toBeVisible()
 
@@ -198,8 +205,8 @@ test('对照页批量采纳跳过未确认事实且清空后回到待定 @kiosk'
   await page.getByRole('button', { name: '用改写' }).click()
   await expect(page.getByRole('button', { name: '用改写' })).toHaveAttribute('aria-pressed', 'true')
 
-  await page.getByRole('button', { name: '清空全部裁决' }).click()
-  await expect(page.getByText('已清空全部裁决，连事实确认标记一起清掉 —— 回到刚读到建议时的样子。')).toBeVisible()
+  await page.getByRole('button', { name: '清空全部选择' }).click()
+  await expect(page.getByText('已清空全部选择，连事实确认标记一起清掉 —— 回到刚读到建议时的样子。')).toBeVisible()
   await expect(page.getByRole('button', { name: '用改写' })).toBeDisabled()
   await expect(page.getByRole('checkbox', { name: /5000/ })).not.toBeChecked()
   await expect(page.getByRole('checkbox', { name: /主导/ })).not.toBeChecked()
@@ -309,12 +316,22 @@ test('生成预览读回真实结果后导出 payload 正确 @kiosk', async ({ p
   await expect(page.getByText('未填写联系邮箱，招聘方可能无法联系你')).toBeVisible()
   await expect(page.getByTestId('resume-generate-preview-cta-refill')).toHaveText('回去改资料')
   await expect(page.getByTestId('resume-generate-preview-cta-export')).toHaveText('内容没问题，去导出')
+  const summary = page.getByLabel('个人简介')
+  await summary.fill('核对时改过的简介。')
   await page.screenshot({ path: test.info().outputPath('generate-preview-ready-1080x1920.png') })
+
+  await page.getByTestId('resume-generate-preview-cta-export').click()
+  await expect(page.getByRole('heading', { name: '选导出格式' })).toBeVisible()
+  await expect(page.getByTestId('resume-generate-preview-cta-confirm-export')).toHaveText('导出这一份')
+  await page.getByRole('button', { name: '返回预览' }).click()
+  await expect(page.getByRole('heading', { name: '生成结果' })).toBeVisible()
+  await expect(summary).toHaveValue('核对时改过的简介。')
+  await page.getByTestId('resume-generate-preview-cta-export').click()
 
   const exportRequest = page.waitForRequest((request) => (
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
   ))
-  await page.getByTestId('resume-generate-preview-cta-export').click()
+  await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
   for (const box of await page.getByRole('checkbox').all()) {
     await box.check()
   }

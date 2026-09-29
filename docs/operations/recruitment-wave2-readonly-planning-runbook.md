@@ -1,5 +1,7 @@
 # 招聘信息内容域 Wave 2 生产只读盘点与恢复库规划 Runbook
 
+> **托管 a 下停放（2026-09-26 标注）：** 本文涉及的岗位、招聘会、企业资料在我们云上暂停，代码保留；客户私有化部署（b）或取得人力资源服务许可证后再参考。现行口径见 docs/compliance/compliance-boundary.md §1.1。
+
 状态：完整生产只读盘点已于 2026-08-10 执行，结果为稳定快照下存在业务 blocker（`exit 2`）；未恢复生产备份、未写任何业务数据、未切换 reader/writer、未部署。
 
 本执行包包含四件严格分离的只读能力：廉价的 production legacy backfill 子集 probe、冻结方案第 6 节完整 production inventory + 公开 API ID 差集、受控恢复库上的 manifest-aware dry-run，以及五类治理证据的纯内存 proposed-governance 校验。子集 probe 仍不能产生 GO；完整盘点同时区分现网 `currentReader` 与冻结目标 `targetSafe`，不会把尚未切换的 Profile/Directory 接口伪装成空集合。执行包不包含 backfill writer，不识别 `--apply`、`--execute`、`--write`、`--fix`、`--seed` 或 `--commit`，也不授权备份下载、恢复、生产写入、数据库销毁、schema 收紧、reader 切换或发布。

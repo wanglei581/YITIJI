@@ -1,6 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { makePrintParams, type ResumeExportFormat } from '@ai-job-print/shared'
+import { makePrintParams, type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { rememberAssistantDraft } from '../../services/assistantDraft'
+import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { useAuth } from '../../auth/useAuth'
@@ -34,17 +37,24 @@ import { printFileSizeLabel, useOptimizeSession } from './components/resume-deli
 import {
   applyDecisionChanges,
   applyResumeDecisions,
+  applyResumeDecisionsWithStatus,
   moduleKeyOf,
   parseDecisionMap,
   toggleModuleDecision,
+  isModuleSwitchable,
+  moduleSwitchBlock,
+  type ResumeDecisionFailure,
   type ResumeModuleDecision,
 } from './components/resume-deliver/resumeDecisions'
 import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
 import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
 import './resume-optimize-qx.css'
 import './optimize-empty-state-qx.css'
+import './resume-r1-qx2.css'
+import './resume-optimize-overview-qx.css'
 
 type LeaveAction = () => void
+const OPTIMIZE_AI_DRAFT = '我想把简历中的一句经历换个改法。请先让我提供原句，只整理真实内容，不添加数字或成果。'
 
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
@@ -53,6 +63,8 @@ export function ResumeOptimizePage() {
   const consent = useResumeAiConsent()
   const state = location.state as Record<string, unknown> | null
   const query = useMemo(() => parseOptimizeQuery(location.search), [location.search])
+  const [workView, setWorkView] = useState<'overview' | 'editor'>(() => new URLSearchParams(location.search).get('screen') === 'editor' || state?.decisions ? 'editor' : 'overview')
+  const existingOnly = new URLSearchParams(location.search).get('saved') === '1' || new URLSearchParams(location.search).get('existingOnly') === '1' || state?.existingOnly === true
   const session = useMemo(() => readAiResumeSession(), [])
   const stateTaskId = typeof state?.taskId === 'string' ? state.taskId : undefined
   const taskId = stateTaskId ?? query.taskId ?? session?.taskId
@@ -75,13 +87,16 @@ export function ResumeOptimizePage() {
     adjustError, setAdjustError, factOpen, setFactOpen, savedToDocuments, setSavedToDocuments,
     decisions, setDecisions, draftAccepted, setDraftAccepted,
   } = useOptimizeSession(query.format, Boolean(token))
+  const [decisionIssues, setDecisionIssues] = useState<Record<string, string>>({})
+  const [baseResume, setBaseResume] = useState<GeneratedResume | null>(null)
 
   useBusyLock(exporting || printNavigating || Boolean(adjusting))
   const syntheticReady = query.capture || query.debug
   useOptimizeLoad({
     taskId, access, syntheticReady, requested: query.requested,
+    existingOnly,
     consentChecking: consent.checking, consentNeedsPrompt: consent.needsPrompt, consentReady: consent.ready, retryNonce,
-    setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume,
+    setLoading, setFailKind, setFailMsg, setModules, setOptimizedResume, setBaseResume,
     setTemplatesError, setResumeTemplates, setSelectedTemplateId,
   })
 
@@ -106,7 +121,8 @@ export function ResumeOptimizePage() {
   const resolved = resolveOptimizeView(query, live)
   const view = resolved.view
   const resume = optimizedResume
-  const assembled = resume ? applyResumeDecisions(resume, modules, decisions) : null
+  const assembledResult = resume ? applyResumeDecisionsWithStatus(resume, modules, decisions) : null
+  const assembled = assembledResult?.resume ?? null
   const unconfirmed = assembled ? detectUnconfirmedAdditions(assembled, modules) : []
   const facts = assembled ? extractConfirmableFacts(assembled) : []
   const exportBlocked = pricing.unavailable || pricing.chargedBlocked || !assembled || exporting
@@ -115,6 +131,18 @@ export function ResumeOptimizePage() {
   const choicePending = Boolean(token && draft.hasDraft && !draftAccepted && view === 'ready')
 
   const markEdited = () => { setIsDirty(true); setPreviewOpen(false); if (exported) setExported(null) }
+  const issueMessage = (failure: ResumeDecisionFailure) => {
+    const index = modules.findIndex((module, i) => moduleKeyOf(module, i) === failure.key)
+    const number = index + 1
+    return failure.reason === 'not-found'
+      ? `第 ${number} 条的改写在优化稿里找不到原句，这里没法替你换，请在编辑区里对照着改。`
+      : failure.reason === 'original-empty'
+      ? `第 ${number} 条是新加的一句，原文里没有对应的句子，这里没法替你换，请在编辑区里对照着改。`
+      : `第 ${number} 条那段文字在编辑区里已经变了，没法自动换，请在编辑区里对照着改。`
+  }
+  const setDecisionFailures = (failures: ResumeDecisionFailure[]) => {
+    setDecisionIssues(Object.fromEntries(failures.map((failure) => [failure.key, issueMessage(failure)])))
+  }
   const requestLeave = (action: LeaveAction) => {
     if (draft.unsaved || (isDirty && !exported && !token)) { setConfirmLeave(() => action); return }
     action()
@@ -125,16 +153,39 @@ export function ResumeOptimizePage() {
   const handleDecisionChange = (key: string, next: ResumeModuleDecision) => {
     const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
     if (index < 0 || !optimizedResume) return
-    setOptimizedResume(toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? 'optimized', next))
+    const result = toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? 'optimized', next, baseResume)
+    if (!result.applied) {
+      setDecisionFailures(result.reason ? [{ key, reason: result.reason }] : [])
+      return
+    }
+    setOptimizedResume(result.resume)
     setDecisions((prev) => ({ ...prev, [key]: next }))
+    setDecisionIssues((prev) => { const nextIssues = { ...prev }; delete nextIssues[key]; return nextIssues })
     markEdited()
   }
+  /** 总览的两个批量动作：全部用改写 / 全部保留原文。与逐条切换走同一个替换函数，结果一致。 */
+  const handleBatch = (next: ResumeModuleDecision) => {
+    if (!optimizedResume) return
+    const changes = modules.flatMap((module, index): Array<[string, ResumeModuleDecision]> => {
+      if (!isModuleSwitchable(baseResume, module)) return []
+      return [[moduleKeyOf(module, index), next]]
+    })
+    const applied = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
+    setOptimizedResume(applied.resume)
+    setDecisions(applied.decisions)
+    setDecisionFailures(applied.failures)
+    if (applied.failures.length < changes.length) markEdited()
+  }
+  const openCompare = (focusIndex?: number) => requestLeave(() => navigate('/resume/optimize/compare', {
+    state: { taskId, accessToken, decisions, existingOnly, ...(typeof focusIndex === 'number' ? { focusIndex } : {}) },
+  }))
   const compareReturn = useCompareDecisionsReturn({
     state, modules, optimizedResume, decisions, ready: editorOpen,
     apply: (changes) => {
       if (!optimizedResume) return
-      const next = applyDecisionChanges(optimizedResume, modules, decisions, changes)
-      setOptimizedResume(next.resume); setDecisions(next.decisions); markEdited()
+      const next = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
+      setOptimizedResume(next.resume); setDecisions(next.decisions); setDecisionFailures(next.failures)
+      if (next.failures.length < changes.length) markEdited()
     },
   })
   const handleContinueDraft = () => {
@@ -147,6 +198,7 @@ export function ResumeOptimizePage() {
     }
     setIsDirty(false)
     setDraftAccepted(true)
+    setWorkView('editor')
   }
 
   const runResumeExport = async (factsConfirmedAt: string) => {
@@ -190,7 +242,7 @@ export function ResumeOptimizePage() {
     const before = resume; setAdjusting(action); setAdjustError(null)
     try {
       const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access)
-      setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings ?? []); setExported(null); setIsDirty(true)
+      setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings?.length ? ['调整后的内容仍需你逐项核对，确认事实无误。'] : []); setExported(null); setIsDirty(true)
     } catch (err) {
       setAdjustError(userMessageOf(err, 'AI 调整失败，请稍后重试或继续手动编辑'))
     } finally { setAdjusting(null) }
@@ -202,14 +254,37 @@ export function ResumeOptimizePage() {
   }
 
   const navbar = <ResumeOptimizeNavbar />
+  // 稿 23：总览与编辑区是同一页的两屏，用按钮切换（稿里没有页签）。没有可对照的条目时直接进编辑区。
+  const showOverview = workView === 'overview' && modules.length > 0
 
   const ctabar = (
     <>
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => requestLeave(goToReport)}>返回报告</button>
-      {assembled && editorOpen && (
-        <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => { if (!exportBlocked) setFactOpen('resume') }}>
-          {exporting ? '正在生成文件…' : `确认优化版，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
-        </button>
+      <QxStepActions onPrev={() => requestLeave(goToReport)} prevLabel="返回报告">
+        <span className="qx-r1-ai-exit" onClickCapture={(event) => {
+          if (!isDirty) return
+          event.stopPropagation()
+          requestLeave(() => { rememberAssistantDraft(OPTIMIZE_AI_DRAFT); navigate('/assistant') })
+        }}><QxAiHelp label="问小青：这句还能怎么改 →" draft={OPTIMIZE_AI_DRAFT} /></span>
+      </QxStepActions>
+      {editorOpen && showOverview && (
+        <div className="qx-opt-cta">
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('editor')}>编辑并导出</button>
+          <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-optimize-primary" onClick={() => openCompare()}>
+            逐条处理这 {modules.length} 条<em aria-hidden="true">→</em>
+          </button>
+        </div>
+      )}
+      {assembled && editorOpen && !showOverview && (
+        <div className="qx-opt-cta">
+          {modules.length > 0 && (
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('overview')}>返回建议总览</button>
+          )}
+          {/* 导出的就是编辑区里的这一份：用户在编辑区亲手改过的段落以他改的为准，
+              不因为和某条「保留原文」的选择对不上就拦住导出。 */}
+          <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => { if (!exportBlocked) setFactOpen('resume') }}>
+            {exporting ? '正在生成文件…' : `确认优化版，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
+          </button>
+        </div>
       )}
     </>
   )
@@ -240,16 +315,22 @@ export function ResumeOptimizePage() {
   )
 
   return (
-    <QxPageFrame title="优化建议" subtitle="换模板出新稿 · 表达调整参考，只重组原文事实" ctabar={ctabar} navbar={navbar}>
+    <QxPageFrame title="简历优化建议" subtitle="建议只改表达，事实由你确认，随时可以保留原文。" back={{ label: '返回诊断报告', onBack: () => requestLeave(goToReport) }} status={{ tone: view === 'ready' ? 'ok' : 'unknown', label: view === 'ready' ? '逐条确认' : '等待优化建议' }} ctabar={ctabar} navbar={navbar}>
       <section
         data-kiosk-domain="resume"
         data-kiosk-screen="resume-optimize"
         className={`qx-resume-optimize ${confirmLeave ? 'overflow-hidden' : ''}`}
         data-optimize-state={view}
+        data-work-view={workView}
+        data-takeaway="新简历与修改清单"
         data-fallback={resolved.fallback ? '1' : undefined}
         data-synthetic={resolved.synthetic ? '1' : undefined}
       >
         <ResumeAigcBadge synthetic={resolved.synthetic} />
+        {/* 总览里原因写在对应那一条下面；编辑区（从对照页带回、或没有总览时）在这里集中说一次。 */}
+        {!showOverview && Object.values(decisionIssues).length > 0 && (
+          <div className="qx-opt-decision-status" role="status">{Object.values(decisionIssues).map((message) => <p key={message}>{message}</p>)}</div>
+        )}
         {stateBody}
         {view !== 'ready' && (
           <OptimizeEmptyState
@@ -265,12 +346,31 @@ export function ResumeOptimizePage() {
             choicePending={choicePending}
             draftUpdatedAt={draft.remoteDraft?.updatedAt}
             onContinue={handleContinueDraft}
-            onRestart={() => { setDecisions({}); draft.requestOverwrite(); setDraftAccepted(true) }}
+            onRestart={() => { setDecisions({}); draft.requestOverwrite(); setDraftAccepted(true); setWorkView('overview') }}
             saveStatus={draft.status}
             savedAt={draft.savedAt}
           />
         )}
-        {editorOpen && resume && assembled && (
+        {editorOpen && showOverview && (
+          <OptimizeOverview
+            modules={modules}
+            decisions={decisions}
+            switchBlocks={Object.fromEntries(modules.map((module, index) => [moduleKeyOf(module, index), moduleSwitchBlock(baseResume, module)]))}
+            synthetic={resolved.synthetic}
+            disabled={loading || exporting || Boolean(adjusting)}
+            decisionIssues={decisionIssues}
+            onDecisionChange={handleDecisionChange}
+            onBatch={handleBatch}
+            onCompare={openCompare}
+            onEditor={() => setWorkView('editor')}
+            onManual={() => requestLeave(() => navigate('/resume/generate'))}
+            onReport={() => requestLeave(goToReport)}
+          />
+        )}
+        {editorOpen && resume && assembled && !showOverview && modules.length === 0 && (
+          <p className="qx-opt-nomods" role="note">这份结果没有需要逐条对照的建议，下面直接是优化版全文，核对后导出。</p>
+        )}
+        {editorOpen && resume && assembled && !showOverview && (
           <OptimizeWorkArea
             resume={resume}
             modules={modules}
@@ -307,7 +407,7 @@ export function ResumeOptimizePage() {
             token={token}
             onDecisionChange={handleDecisionChange}
             onResumeChange={(next) => { markEdited(); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setOptimizedResume(next) }}
-            onCompare={() => requestLeave(() => navigate('/resume/optimize/compare', { state: { taskId, accessToken, decisions } }))}
+            onCompare={() => openCompare()}
             onAiAdjust={(action) => { void handleAiAdjust(action) }}
             onUndoAi={() => { setOptimizedResume(lastResumeBeforeAiAdjust!); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setExported(null); setIsDirty(true) }}
             onLayoutChange={handleLayoutChange}

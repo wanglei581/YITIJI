@@ -339,6 +339,8 @@ export interface AssistantChatRequest {
   sessionId?: string
   /** 百宝箱 / 助手入口传入的受控首方技能；为空时后端按消息兜底分类 */
   skill?: AssistantSkill
+  /** 缺省为 kiosk。miniapp 只返回小程序已注册页面的 actions，并收紧回复。 */
+  channel?: 'kiosk' | 'miniapp'
   /** 当前页面上下文（如当前模块、设备状态等） */
   context?: Record<string, unknown>
 }
@@ -574,8 +576,7 @@ export interface ResumeGenerateExportResponse {
 }
 
 // ── 2D 目标岗位定向优化 + 岗位匹配度参考 ─────────────────────────────────────
-// 合规:fitLevel 为参考等级(高/中/低),绝无百分比/匹配率/录用概率;投递引导
-// 「去来源平台投递」。matchPoints.evidence 经服务端防编造校验(必须出自简历原文)。
+// 合规:不输出等级或总评。matchPoints.evidence 经服务端防编造校验(必须出自简历原文)。
 
 export interface JobFitRequest {
   /** 简历解析任务 id(凭会员 token 或匿名 accessToken 读回原文) */
@@ -618,6 +619,7 @@ export interface JobFitResponse {
   status: 'completed' | 'failed'
   failReason?: string
   job?: JobFitJobInfo
+  /** 已停用，服务端不再返回。 */
   fitLevel?: 'reference_high' | 'reference_medium' | 'reference_low'
   summary?: string
   matchPoints?: Array<{ requirement?: string; point: string; evidence: string }>

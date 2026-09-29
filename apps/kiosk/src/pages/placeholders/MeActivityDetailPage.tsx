@@ -73,14 +73,14 @@ export default function MeActivityDetailPage() {
   const struct = (
     <>
       <QxMeStructRow icon={EyeIcon} title="这条记录的内容类型" desc="岗位 / 招聘会 / 政策 / 企业" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-detail-0" />
-      <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由服务端返回" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-detail-1" />
+      <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由系统返回" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-detail-1" />
       <QxMeStructRow icon={RouteIcon} title="回到原内容" desc="一步回到来源详情" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-detail-2" />
     </>
   )
 
   let inner: ReactNode
   if (!isLoggedIn) {
-    inner = <QxMeLoginBlock title="登录后查看本人记录" desc="游客模式不保存跨会话浏览记录，这条记录只对本人可见。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
+    inner = <QxMeLoginBlock title="登录后查看本人记录" desc="游客模式不把浏览记录留到下一次使用，这条记录只对本人可见。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
     inner = <QxMeLoadingBlock title="正在读取这条记录" />
   } else if (state === 'error') {
@@ -95,7 +95,7 @@ export default function MeActivityDetailPage() {
             <span className="qx-me-banner-p">记录可能已清理，或不属于当前登录账号。<b>本页不会拿别的记录顶替。</b></span>
           </span>
         </section>
-        <section className="qx-me-list qx-me-grow" aria-label="这条记录本应包含的字段">{struct}</section>
+        <section className="qx-me-list qx-me-grow" aria-label="这条记录本应包含的内容">{struct}</section>
         <QxMeGuide items={[['可能原因', '记录已被清理', '记录按各自留存期限清理'], ['也可能', '不属于当前账号', '记录只对本人可见'], ['下一步', '回列表重新选择', '列表里只显示本人记录']]} />
       </>
     )
@@ -110,7 +110,7 @@ export default function MeActivityDetailPage() {
             <p>{record.kind === 'browse' ? '浏览记录' : actionText} · 仅本人可见</p>
           </div>
         </section>
-        <section className="qx-me-list qx-me-grow" data-testid="member-records-detail-fields" aria-label="这条记录包含的字段">
+        <section className="qx-me-list qx-me-grow" data-testid="member-records-detail-fields" aria-label="这条记录包含的内容">
           <div className="qx-me-row" data-detail-field="0">
             <span className="qx-me-row-ico" aria-hidden="true"><EyeIcon size={28} /></span>
             <span className="qx-me-row-main">
@@ -131,7 +131,7 @@ export default function MeActivityDetailPage() {
             <span className="qx-me-row-ico" data-tone="wheat" aria-hidden="true"><ClockIcon size={28} /></span>
             <span className="qx-me-row-main">
               <span className="qx-me-row-title">记录时间</span>
-              <span className="qx-me-row-sub">由服务端返回，本机不本地留存明细</span>
+              <span className="qx-me-row-sub">由系统返回，这台机器上不留存明细</span>
             </span>
             <span className="qx-me-acts"><span className="qx-me-chip">{formatTime(item.createdAt)}</span></span>
           </div>

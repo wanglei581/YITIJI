@@ -432,6 +432,7 @@ export class SelfAssessmentService {
       dimensions: stored.dimensions,
       summary: stored.summary,
       appendixDisclaimer: undefined,
+      contentId: taskId,
     })
     const uploaded = await this.files.upload({
       buffer,
@@ -475,6 +476,7 @@ export class SelfAssessmentService {
     dimensions: SelfAssessmentDimensionResult[]
     summary: string | null
     appendixDisclaimer: string | undefined
+    contentId: string
   }): Promise<{ buffer: Buffer; pageCount: number }> {
     return this.pdf.render(meta)
   }

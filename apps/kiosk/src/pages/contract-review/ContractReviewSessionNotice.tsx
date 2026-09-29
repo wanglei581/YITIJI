@@ -3,7 +3,7 @@ import { Clock3Icon } from 'lucide-react'
 
 function remainingLabel(expiresAt: string, now: number): string {
   const remainingMs = Date.parse(expiresAt) - now
-  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return '本次会话已到期'
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return '这次办理已到期'
   const minutes = Math.max(1, Math.ceil(remainingMs / 60_000))
   if (minutes < 60) return `最长保留剩余约 ${minutes} 分钟`
   const hours = Math.floor(minutes / 60)

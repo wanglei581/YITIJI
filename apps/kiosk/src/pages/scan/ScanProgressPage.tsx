@@ -5,7 +5,11 @@ import type { ScanSessionFileView } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { cancelScanSession, getScanSessionStatus } from '../../services/api/scanTasks'
-import { revokeCreatedScanSession, revokeLiveScanSession } from './scanSessionRevoke'
+import {
+  noteScanTaskStatusFromServer,
+  revokeCreatedScanSession,
+  revokeLiveScanSession,
+} from './scanSessionRevoke'
 import {
   acknowledgeScanDelivery,
   SCAN_ACK_PENDING_NOTICE,
@@ -87,6 +91,11 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const [pollInFlight, setPollInFlight] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [polls, setPolls] = useState(0)
+  /**
+   * 服务端最近一次说的「仍在进行」是哪一种。只用来**转达**：matched 说明文件已经回到服务端、
+   * 还在处理，链路最后一段点亮；它不参与任何判定，也不会让这一屏提前出结果。
+   */
+  const [lastLiveStatus, setLastLiveStatus] = useState<'waiting' | 'matched' | null>(null)
   /**
    * 这一场在服务端拿到投递授权了没有（见 scanDeliveryAck）。
    *
@@ -205,6 +214,11 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       setPollInFlight(true)
       try {
         const status = await getScanSessionStatus(scanTaskId, controlToken, getToken())
+        /* 先记服务端这句话，再看本页还在不在、再据此改屏。终态是这条任务自己的事实，
+         * 与本页卸没卸载无关；而下面 cancelled 那一支会推进扫描代次，挂载时一起发出、
+         * 还没回话的那次确认随后落地时，靠这一笔认出「服务端已经结束了它」，
+         * 不再补发 DELETE（见 scanSessionRevoke 的 endedByServer）。 */
+        noteScanTaskStatusFromServer(scanTaskId, status.status)
         if (stopped) return
         setPolls((count) => count + 1)
         setError(null)
@@ -251,6 +265,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           returnToStart()
           return
         }
+        setLastLiveStatus(status.status === 'matched' ? 'matched' : 'waiting')
         scheduleNext()
       } catch (err) {
         if (!stopped) {
@@ -293,12 +308,20 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     cancellingRef.current = true
     setCancelling(true)
     try {
-      await cancelScanSession(scanTaskId, controlToken, getToken())
+      const cancelled = await cancelScanSession(scanTaskId, controlToken, getToken())
+      // 取消回执也是服务端说的终态：确认若还在路上，它回来时不许再补一次 DELETE。
+      noteScanTaskStatusFromServer(scanTaskId, cancelled.status)
       setBusyPhase('terminal')
       returnToStart()
     } catch (err) {
       const code = err instanceof ApiHttpError ? err.code : undefined
       if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
+        /* 这个码本身就是服务端报的终态：cancel() 两处都只在 status === 'completed' 时抛，
+         * 而 completed 是吸收态。所以在补查**之前**就记下 —— 补查拿不到回话时下面会
+         * 回到 start、推进代次，那次还在路上的确认落地时不许再为它补一发 DELETE。
+         * （SCAN_TASK_CANCEL_CONFLICT 不在此列：它可能来自 CAS 撞车，那时任务正是 matched，
+         * 还撤得掉，见 scanSessionRevoke 的 ScanRevokeVerdict 注释。） */
+        noteScanTaskStatusFromServer(scanTaskId, 'completed')
         try {
           const latest = await getScanSessionStatus(scanTaskId, controlToken, getToken())
           if (latest.status === 'completed' && latest.file) {
@@ -323,6 +346,19 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
    * 没确认之前这一屏不许出现「请在打印机面板完成扫描」那句话 —— 它是假的。 */
   const deliveryAcked = ackState === 'acked'
   const ackRetryable = ackState === 'retryable'
+  const matched = deliveryAcked && !error && lastLiveStatus === 'matched'
+  /* 稿 18：链路只在服务端亲口说「已匹配到回传文件」时点亮最后一段；其余时候前三段在哪本机看不见。 */
+  const chainHint = cancelling
+    ? '取消也可能来不及，以系统为准'
+    : !deliveryAcked
+      ? '授权到手之前，第一段也别开始'
+      : pollInFlight
+        ? '查询回来之前，这一屏不改判'
+        : error
+          ? '这次没问到，位置就是不知道'
+          : matched
+            ? '系统已匹配到回来的文件，停在最后一段'
+            : '系统还没说收到，前三段停在哪本机不知道'
   const workbenchState = cancelling
     ? 'cancelling'
     : !deliveryAcked
@@ -339,7 +375,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         ? { tone: 'warn' as const, label: '投递授权未确认' }
         : { tone: 'unknown' as const, label: '正在确认投递授权' }
       : pollInFlight
-        ? { tone: 'unknown' as const, label: '正在查询服务端' }
+        ? { tone: 'unknown' as const, label: '正在查询系统' }
         : error
           ? { tone: 'warn' as const, label: '查状态失败 · 不改判' }
           : { tone: 'unknown' as const, label: '等待文件回传' }
@@ -348,6 +384,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     <ScanWorkbenchShell
       page="scan-progress"
       state={workbenchState}
+      layout="spread"
       title={deliveryAcked ? '等待打印机端扫描完成' : '正在确认投递授权'}
       subtitle={deliveryAcked
         ? '请在打印机面板完成扫描到本机接收目录；本页每 3 秒自动检测结果'
@@ -358,13 +395,14 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         : [SCAN_ACK_PENDING_NOTICE]}
       ctabar={
         <ScanCta
+          reserveReason
           reason={
             cancelling
-              ? '正在等取消回执 —— 这一刻既不说已取消，也不说已完成'
+              ? '正在等取消结果 —— 这一刻既不说已取消，也不说已完成'
               : !deliveryAcked
-                ? '没拿到投递授权前别在面板上按开始 —— 这一刻扫出来的文件不会投到这一场'
+                ? '没拿到投递授权前别在面板上按开始 —— 这一刻扫出来的文件不会交到这一场'
                 : pollInFlight
-                  ? '正在等这次查询的回执 —— 这一刻不改判任务状态'
+                  ? '正在等这次查询的结果 —— 这一刻不改判任务状态'
                   : undefined
           }
         >
@@ -414,7 +452,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             : !deliveryAcked
               ? ackRetryable ? '还没确认这台机器能收这份文件' : '正在确认投递授权'
               : pollInFlight
-                ? '正在查询服务端'
+                ? '正在查询系统'
                 : error
                   ? '查状态失败，任务仍按进行中处理'
                   : '正在等文件回传'
@@ -424,64 +462,71 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           ? [
               { label: error ? '正在自动重试' : '正在自动检查', tone: error ? 'warn' : 'ok' },
               { label: `已查询 ${polls} 次` },
-              { label: '没有页级进度' },
+              matched ? { label: '系统：已匹配，仍在处理', tone: 'ok' as const } : { label: '没有页级进度' },
             ]
           : [
-              { label: '会话已建成', tone: 'ok' as const },
+              { label: '这次扫描已经建好', tone: 'ok' as const },
               { label: '投递授权未确认', tone: 'warn' as const },
             ]}
       >
         {!deliveryAcked && !cancelling ? (
           <p data-testid="scan-ack-pending-notice">
-            这一场<b>已经建成</b>，但服务端还没确认这台机器可以收它的文件。
-            没确认之前，面板上扫出来的东西<b>不会</b>投到这一场，所以<b>先别在面板上按开始</b>。
-            它也<b>不会</b>被别人收走：没确认的任务对谁都不可投递。
+            这一场<b>已经建好</b>，但系统还没确认这台机器可以收它的文件。
+            没确认之前，面板上扫出来的东西<b>不会</b>交到这一场，所以<b>先别在面板上按开始</b>。
+            它也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
             {ackRetryable ? '上一次确认没成，点右下角「再确认一次」重来。' : '确认通常就是一两秒。'}
           </p>
         ) : cancelling ? (
           <>
-            <p>本机正在请求服务端取消这次会话。<b>服务端没回之前，页面不说已取消</b> —— 取消成不成功由服务端定。</p>
-            <p>如果这一刻文件刚好投递完成，取消就会来不及，那时以服务端结果为准。</p>
+            <p>本机正在请系统取消这次扫描。<b>系统没回之前，页面不说已取消</b> —— 取消成不成功由系统定。</p>
+            <p>如果这一刻文件刚好交完，取消就会来不及，那时以系统结果为准。</p>
           </>
         ) : pollInFlight ? (
           <>
-            <p>本机正在问服务端：这次扫描现在是什么状态。<b>回执没回来之前，这一页不改任何判断</b>。</p>
-            <p>查询是一次纯读取：查多少次都不会重扫，服务端不做转换。</p>
+            <p>本机正在问系统：这次扫描现在是什么状态。<b>结果没回来之前，这一页不改任何判断</b>。</p>
+            <p>查询只是读一次：查多少次都不会重扫，系统不做转换。</p>
           </>
         ) : error ? (
           <>
-            <p>这一次查询没拿到服务端回执：<b>{error}</b>。</p>
+            <p>这一次查询没拿到系统返回的结果：<b>{error}</b>。</p>
             <p><b>查不到不等于扫描失败</b> —— 这一页不改判任务状态，还当它在进行中，下次继续查。</p>
           </>
         ) : (
           <>
-            <p>面板扫完之后，文件还要经过本机接收和投递才到服务端。<b>这中间没有可显示的张数</b>，所以这里只告诉你服务端最近一次说了什么、已经查过几次。</p>
-            <p><b>本机正在自动检查</b>：每隔几秒替你问一次服务端。想马上知道，点右下角「立即检查」就行。</p>
+            <p>面板扫完之后，文件还要经过本机接收和送交才到系统。<b>这中间没有可显示的张数</b>，所以这里只告诉你系统最近一次说了什么、已经查过几次。</p>
+            <p><b>本机正在自动检查</b>：每隔几秒替你问一次系统。想马上知道，点右下角「立即检查」就行。</p>
           </>
         )}
       </ScanStatusPanel>
-      <ScanSec no="01" title="链路走到哪一段" hint="不是百分比">
-        <ScanChain active={-1} />
+      <ScanSec no="01" title="流程走到哪一段" hint={chainHint}>
+        <ScanChain active={matched ? 3 : -1} />
       </ScanSec>
-      <div className="sw-grid2">
-        <ScanKvCard
-          title="任务信息"
-          rows={[
-            ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-            ['任务编号', scanTaskId ?? '未创建'],
-            ['开始等待', `已等待 ${elapsed}`],
-            ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-            ['保存策略', '按设备回传的原格式保存，服务端不做转换'],
-          ]}
-        />
-        <ScanNoteCard title="这一屏现在会做什么" foot="自动检查是一次纯读取：不会重扫，也不会改变服务端那边的任何东西。">
-          <ScanPlan items={[
-            '本机每隔几秒自动查一次，你什么都不用做。',
-            '想马上知道就点「立即检查」，它只是插一次队，不改变结果。',
-            '不想扫了就点「取消扫描」，取消成不成由服务端定。',
-          ]} />
-        </ScanNoteCard>
-      </div>
+      <ScanSec no="02" title="这次扫描与下一步" hint="这一屏现在能做什么">
+        <div className="sw-grid2">
+          <ScanKvCard
+            title="任务信息"
+            rows={[
+              ['扫描类型', SCAN_TYPE_LABELS[scanType]],
+              ['任务编号', scanTaskId ?? '未创建'],
+              ['开始等待', `已等待 ${elapsed}`],
+              ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
+              ['保存策略', '按设备回传的原格式保存，系统不做转换'],
+            ]}
+          />
+          <ScanNoteCard title="这一屏现在会做什么" foot="自动检查只是查一下状态：不会重扫，也不会改变系统里的任何东西。">
+            {/* 指路跟着主按钮走：没拿到投递授权时右下角是「再确认一次」，写「立即检查」就是指向一颗不存在的按钮。 */}
+            <ScanPlan items={deliveryAcked ? [
+              '本机每隔几秒自动查一次，你什么都不用做。',
+              '想马上知道就点「立即检查」，它只是插一次队，不改变结果。',
+              '不想扫了就点「取消扫描」，取消成不成由系统定。',
+            ] : [
+              '本机正在向系统确认：这台机器可以收这一场的文件。',
+              ackRetryable ? '上一次确认没成，点右下角「再确认一次」重来。' : '确认通常就是一两秒，不用你做任何事。',
+              '不想扫了就点「取消扫描」，取消成不成由系统定。',
+            ]} />
+          </ScanNoteCard>
+        </div>
+      </ScanSec>
     </ScanWorkbenchShell>
   )
 }

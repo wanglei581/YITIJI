@@ -17,6 +17,13 @@
  *   Admin 端点拒绝 sandbox；markPaidOnline 拒绝非白名单渠道；支付回调不改 PrintTask.status。
  * - fail-closed：sandbox 缺密钥 / 生产配 sandbox / 未知 Provider → 启动即拒绝；
  *   Provider 未配置 → ONLINE_PAYMENT_DISABLED，不伪装可支付。
+ * - createQrPayment 的任何 throw，包括看起来像 40004 的普通 Error，都保持互斥。
+ *   只有 queryPayment 的结构化 paid/closed/failed 才收敛。本轮场景在
+ *   scripts/support/payment-callback-race-cases.ts。
+ * - 渠道已受理但本地回填失败：留下 CHANNEL_ACCEPTED_UNCONFIRMED / created+空标识，
+ *   禁止第二笔出码，对账与 Admin opsAttention 可见；金额不对的签名回调不得补写 prepayId。
+ * - 待退款（refundReason=ONLINE_PAID_PENDING_REFUND）或已有 success PaymentAttempt 的
+ *   unpaid/paying/closed（含 claimed）单禁止再出码；paid 仍 ORDER_ALREADY_PAID。
  */
 import 'dotenv/config'
 import { randomBytes, randomUUID } from 'crypto'
@@ -24,11 +31,19 @@ import { AuditService } from '../src/audit/audit.service'
 import { BenefitRedemptionService } from '../src/benefit-redemption/benefit-redemption.service'
 import { assertProductionRuntimeGates } from '../src/config/production-runtime-gates'
 import { signFileUrl } from '../src/files/signing'
+import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-orders-readonly.service'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
+import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from '../src/payment/channel-accepted-signal'
+import { verifyPaymentCallbackRace } from './support/payment-callback-race-cases'
 import type { AdminMarkPaidDto } from '../src/payment/dto/order-action.dto'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
-import { ONLINE_PAID_PENDING_REFUND_REASON, OrderStatusService } from '../src/payment/order-status.service'
-import { createPaymentSessionToken } from '../src/payment/payment-session-token'
+import { ReconciliationService } from '../src/payment/reconciliation.service'
+import {
+  ONLINE_PAID_PENDING_REFUND_REASON,
+  PAID_UNFULFILLED_PENDING_REFUND_REASON,
+} from '../src/payment/pending-refund-signal'
+import { OrderStatusService } from '../src/payment/order-status.service'
+import { createPaymentSessionToken, paymentSessionTtlMs } from '../src/payment/payment-session-token'
 import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
@@ -43,6 +58,8 @@ import {
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { PAID_UNFULFILLED_FILE_AUDIT_ACTION } from '../src/terminals/claim-unprintable-file'
+import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
@@ -151,6 +168,7 @@ async function main(): Promise<void> {
   const grantIds: string[] = []
   const fixtureFileIds: string[] = []
   const fixtureStorageKeys: string[] = []
+  const extraTerminalIds: string[] = []
   let orderSeq = 0
 
   async function seedPdfFixture(label: string, pages: number): Promise<string> {
@@ -213,6 +231,7 @@ async function main(): Promise<void> {
     await prisma.auditLog.deleteMany({ where: { targetType: 'payment_attempt', targetId: { in: attempts.map((a) => a.id) } } })
     await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: allOrderIds } } })
     await prisma.auditLog.deleteMany({ where: { targetId: { in: taskIds }, action: 'print_job.create' } })
+    await prisma.refund.deleteMany({ where: { orderId: { in: allOrderIds } } })
     await prisma.paymentAttempt.deleteMany({ where: { orderId: { in: allOrderIds } } })
     await prisma.redemptionRecord.deleteMany({ where: { OR: [{ orderId: { in: allOrderIds } }, { endUserId }] } })
     await prisma.order.deleteMany({ where: { id: { in: allOrderIds } } })
@@ -220,7 +239,8 @@ async function main(): Promise<void> {
     await prisma.endUser.deleteMany({ where: { id: endUserId } })
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
-    await prisma.terminal.deleteMany({ where: { id: terminalId } })
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [terminalId, ...extraTerminalIds] } } })
+    await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, ...extraTerminalIds] } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
     for (const key of fixtureStorageKeys) {
       await storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
@@ -806,6 +826,7 @@ async function main(): Promise<void> {
       BAIDU_OCR_SECRET_KEY: 'x',
       AI_PROVIDER: 'llm',
       AI_LLM_API_KEY: 'x',
+      AIGC_CONTENT_PRODUCER: '示例信息技术有限公司',
       FILE_SIGNING_SECRET: 'a-strong-file-signing-secret-0123456789',
       SECRET_ENCRYPTION_KEY: 'a-strong-secret-encryption-key-01234567',
       PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
@@ -870,6 +891,87 @@ async function main(): Promise<void> {
       )
     }
 
+    const pendingClockClosedId = await makeOrder(210, 'unpaid')
+    await prisma.order.update({
+      where: { id: pendingClockClosedId },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: `hash_pending_clock_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+      },
+    })
+    await expectCode(
+      'markPaidOnline refuses unclaimed clock-expired pickup (ORDER_PICKUP_WINDOW_CLOSED)',
+      'ORDER_PICKUP_WINDOW_CLOSED',
+      () =>
+        orderStatus.markPaidOnline(pendingClockClosedId, {
+          channel: CHANNEL,
+          attemptId: 'pa_pending_clock',
+          channelTxnNo: `txn_pending_clock_${suffix}`,
+          late: false,
+        }),
+    )
+
+    const claimedLeaseId = await makeOrder(200, 'unpaid')
+    await prisma.order.update({
+      where: { id: claimedLeaseId },
+      data: {
+        pickupStatus: 'claimed',
+        pickupClaimedAt: new Date(),
+        pickupCodeHash: `hash_claimed_lease_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+        taskStatus: 'awaiting_payment',
+      },
+    })
+    const claimedLeasePaid = await orderStatus.markPaidOnline(claimedLeaseId, {
+      channel: CHANNEL,
+      attemptId: 'pa_claimed_lease',
+      channelTxnNo: `txn_claimed_lease_${suffix}`,
+      late: false,
+    })
+    if (claimedLeasePaid.payStatus !== 'paid' || claimedLeasePaid.paymentSource !== CHANNEL || claimedLeasePaid.pickupStatus !== 'claimed') {
+      fail(`claimed lease must still accept online payment: pay=${claimedLeasePaid.payStatus} source=${claimedLeasePaid.paymentSource} pickup=${claimedLeasePaid.pickupStatus}`)
+    }
+    pass('markPaidOnline accepts claimed kiosk lease after pickupCodeExpiresAt')
+
+    const expiredClaimedId = await makeOrder(190, 'unpaid')
+    await prisma.order.update({
+      where: { id: expiredClaimedId },
+      data: {
+        pickupStatus: 'claimed',
+        pickupClaimedAt: new Date(Date.now() - paymentSessionTtlMs() - 1000),
+        pickupCodeHash: `hash_claimed_expired_lease_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+        taskStatus: 'awaiting_payment',
+      },
+    })
+    await expectCode(
+      'markPaidOnline refuses claimed unpaid after kiosk lease TTL (ORDER_PICKUP_WINDOW_CLOSED)',
+      'ORDER_PICKUP_WINDOW_CLOSED',
+      () =>
+        orderStatus.markPaidOnline(expiredClaimedId, {
+          channel: CHANNEL,
+          attemptId: 'pa_claimed_expired_lease',
+          channelTxnNo: `txn_claimed_expired_lease_${suffix}`,
+          late: true,
+        }),
+    )
+    const expiredClaimed = await prisma.order.findUnique({ where: { id: expiredClaimedId } })
+    const expiredClaimedRefundAudit = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: expiredClaimedId },
+    })
+    if (
+      expiredClaimed?.payStatus === 'unpaid'
+      && expiredClaimed.refundReason === ONLINE_PAID_PENDING_REFUND_REASON
+      && expiredClaimedRefundAudit
+    ) {
+      pass('claimed unpaid past lease online late payment records ONLINE_PAID_PENDING_REFUND, does not turn paid')
+    } else {
+      fail(
+        `claimed-lease pending-refund mismatch: pay=${expiredClaimed?.payStatus} reason=${expiredClaimed?.refundReason} audit=${expiredClaimedRefundAudit?.payloadJson}`,
+      )
+    }
+
     const cancelledCloudId = await makeOrder(180, 'unpaid')
     await prisma.order.update({
       where: { id: cancelledCloudId },
@@ -903,6 +1005,173 @@ async function main(): Promise<void> {
     } else {
       fail(`ghost pickupCode minted: pay=${hashedPaid.payStatus} code=${hashedPaid.pickupCode}`)
     }
+    const hashedReplay = await orderStatus.markPaidOnline(hashedCloudId, {
+      channel: CHANNEL,
+      attemptId: 'pa_hashed_replay',
+      channelTxnNo: `txn_hashed_replay_${suffix}`,
+      late: true,
+    })
+    if (hashedReplay.payStatus !== 'paid' || hashedReplay.paymentSource !== CHANNEL) {
+      fail(`same-channel replay must stay paid: pay=${hashedReplay.payStatus} source=${hashedReplay.paymentSource}`)
+    }
+    pass('repeat markPaidOnline on a live paid order is idempotent')
+
+    type UpdateMany = typeof prisma.order.updateMany
+    const orderMut = prisma.order as unknown as { updateMany: UpdateMany }
+    async function withPaidWriteRace(orderId: string, mutate: () => Promise<void>): Promise<boolean> {
+      const originalUpdateMany = orderMut.updateMany.bind(prisma.order) as UpdateMany
+      let raced = false
+      orderMut.updateMany = (async (args: Parameters<UpdateMany>[0]) => {
+        const data = args?.data as { payStatus?: string } | undefined
+        const where = args?.where as { id?: string } | undefined
+        if (!raced && where?.id === orderId && data?.payStatus === 'paid') {
+          raced = true
+          await mutate()
+        }
+        return originalUpdateMany(args)
+      }) as UpdateMany
+      try {
+        await expectCode(
+          `markPaidOnline CAS 0 after race on ${orderId} (ORDER_PICKUP_WINDOW_CLOSED)`,
+          'ORDER_PICKUP_WINDOW_CLOSED',
+          () =>
+            orderStatus.markPaidOnline(orderId, {
+              channel: CHANNEL,
+              attemptId: `pa_race_${orderId.slice(-8)}`,
+              channelTxnNo: `txn_race_${orderId.slice(-8)}`,
+              late: true,
+            }),
+        )
+        return raced
+      } finally {
+        orderMut.updateMany = originalUpdateMany
+      }
+    }
+
+    const raceClosedId = await makeOrder(175, 'unpaid')
+    await prisma.order.update({
+      where: { id: raceClosedId },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: `hash_race_closed_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+    const racedClosed = await withPaidWriteRace(raceClosedId, async () => {
+      await prisma.order.update({
+        where: { id: raceClosedId },
+        data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
+      })
+    })
+    if (!racedClosed) fail('sweeper race must intercept the paid write, not skip it')
+    const raceClosedRow = await prisma.order.findUnique({ where: { id: raceClosedId } })
+    const raceClosedAudit = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: raceClosedId },
+    })
+    if (
+      raceClosedRow?.payStatus === 'closed'
+      && raceClosedRow.pickupStatus === 'expired'
+      && raceClosedRow.refundReason === ONLINE_PAID_PENDING_REFUND_REASON
+      && raceClosedAudit
+    ) {
+      pass('snapshot-open then sweeper expired+closed: CAS 0, does not turn paid, pending-refund')
+    } else {
+      fail(
+        `sweeper race mismatch: pay=${raceClosedRow?.payStatus} pickup=${raceClosedRow?.pickupStatus} reason=${raceClosedRow?.refundReason}`,
+      )
+    }
+
+    const raceLeaseId = await makeOrder(165, 'unpaid')
+    await prisma.order.update({
+      where: { id: raceLeaseId },
+      data: {
+        pickupStatus: 'claimed',
+        pickupClaimedAt: new Date(),
+        pickupCodeHash: `hash_race_lease_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+        taskStatus: 'awaiting_payment',
+      },
+    })
+    const racedLease = await withPaidWriteRace(raceLeaseId, async () => {
+      await prisma.order.update({
+        where: { id: raceLeaseId },
+        data: { pickupClaimedAt: new Date(Date.now() - paymentSessionTtlMs() - 1000) },
+      })
+    })
+    if (!racedLease) fail('claimed-lease TTL race must intercept the paid write')
+    const raceLeaseRow = await prisma.order.findUnique({ where: { id: raceLeaseId } })
+    const raceLeaseAudit = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: raceLeaseId },
+    })
+    if (
+      raceLeaseRow?.payStatus === 'unpaid'
+      && raceLeaseRow.pickupStatus === 'claimed'
+      && raceLeaseRow.refundReason === ONLINE_PAID_PENDING_REFUND_REASON
+      && raceLeaseAudit
+    ) {
+      pass('snapshot-live claimed then lease crosses TTL: CAS 0, not paid, pending-refund')
+    } else {
+      fail(
+        `lease TTL race mismatch: pay=${raceLeaseRow?.payStatus} pickup=${raceLeaseRow?.pickupStatus} reason=${raceLeaseRow?.refundReason}`,
+      )
+    }
+
+    async function withOfflinePaidWriteRace(orderId: string, mutate: () => Promise<void>): Promise<boolean> {
+      const originalUpdateMany = orderMut.updateMany.bind(prisma.order) as UpdateMany
+      let raced = false
+      orderMut.updateMany = (async (args: Parameters<UpdateMany>[0]) => {
+        const data = args?.data as { payStatus?: string } | undefined
+        const where = args?.where as { id?: string } | undefined
+        if (!raced && where?.id === orderId && data?.payStatus === 'paid') {
+          raced = true
+          await mutate()
+        }
+        return originalUpdateMany(args)
+      }) as UpdateMany
+      try {
+        await expectCode(
+          `offline markPaid CAS 0 after race on ${orderId} (ORDER_PICKUP_WINDOW_CLOSED)`,
+          'ORDER_PICKUP_WINDOW_CLOSED',
+          () => orderStatus.markPaid(orderId, { paymentSource: 'offline', operatorId: 'verify-offline-race' }),
+        )
+        return raced
+      } finally {
+        orderMut.updateMany = originalUpdateMany
+      }
+    }
+
+    const offlineRaceId = await makeOrder(155, 'unpaid')
+    await prisma.order.update({
+      where: { id: offlineRaceId },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: `hash_offline_race_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+    const racedOffline = await withOfflinePaidWriteRace(offlineRaceId, async () => {
+      await prisma.order.update({
+        where: { id: offlineRaceId },
+        data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
+      })
+    })
+    if (!racedOffline) fail('offline sweeper race must intercept the paid write, not skip it')
+    const offlineRaceRow = await prisma.order.findUnique({ where: { id: offlineRaceId } })
+    const offlinePendingRefund = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: offlineRaceId },
+    })
+    if (
+      offlineRaceRow?.payStatus === 'closed'
+      && offlineRaceRow.pickupStatus === 'expired'
+      && offlineRaceRow.paidAt == null
+      && !offlinePendingRefund
+    ) {
+      pass('offline markPaid snapshot-open then sweeper expired+closed: CAS 0, stays closed, no pending-refund')
+    } else {
+      fail(
+        `offline sweeper race mismatch: pay=${offlineRaceRow?.payStatus} pickup=${offlineRaceRow?.pickupStatus} paidAt=${offlineRaceRow?.paidAt?.toISOString() ?? 'null'} refundAudit=${Boolean(offlinePendingRefund)}`,
+      )
+    }
 
     // ── (14) API-08：关单后 claimed 回滚 pending，不再卡死 ──────────────────
     const claimedCloseId = await makeOrder(300, 'paying')
@@ -928,19 +1197,24 @@ async function main(): Promise<void> {
       )
     }
 
-    // ── (15) API-09：渠道出码抛错 → 尝试 failed、订单回 unpaid、503 ────────
+    // ── (15) 出码 throw 即使文案像 40004，也不能据此再出第二码 ──────────
     const qrFailId = await makeOrder(140, 'unpaid')
     const qrFailSession = await paymentSessionFor(qrFailId)
     const originalCreateQr = provider.createQrPayment.bind(provider)
+    let explicitQrCalls = 0
     provider.createQrPayment = async () => {
-      throw new Error('channel 5xx')
+      explicitQrCalls += 1
+      throw new Error('ALIPAY_CHANNEL_ERROR: 40004 ACQ.INVALID_PARAMETER')
     }
     try {
       let qrFailCode = 'RESOLVED'
+      let qrFailBody = ''
       try {
         await payment.createPayAttempt(qrFailId, qrFailSession)
       } catch (error) {
         qrFailCode = errorCode(error)
+        const exception = error as { getResponse?: () => unknown }
+        qrFailBody = JSON.stringify(typeof exception.getResponse === 'function' ? exception.getResponse() : error)
       }
       const qrFailOrder = await prisma.order.findUnique({ where: { id: qrFailId } })
       const qrFailAttempt = await prisma.paymentAttempt.findFirst({
@@ -948,19 +1222,990 @@ async function main(): Promise<void> {
         orderBy: { createdAt: 'desc' },
       })
       if (
-        qrFailCode.includes('PAY_CHANNEL_UNAVAILABLE') &&
-        qrFailOrder?.payStatus === 'unpaid' &&
-        qrFailAttempt?.status === 'failed'
+        qrFailCode.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+        qrFailBody.includes('支付结果尚未确认') &&
+        qrFailBody.includes('请勿重复支付') &&
+        !qrFailBody.includes('已受理') &&
+        !qrFailBody.includes('40004') &&
+        !qrFailBody.includes('ACQ.INVALID_PARAMETER') &&
+        qrFailOrder?.payStatus === 'paying' &&
+        qrFailAttempt &&
+        qrFailAttempt.status !== 'failed' &&
+        qrFailAttempt.status !== 'success'
       ) {
-        pass('channel QR throw marks attempt failed, order unpaid, and returns PAY_CHANNEL_UNAVAILABLE')
+        pass('plain QR error that looks like 40004 stays locked and does not claim the channel accepted')
       } else {
         fail(
-          `QR throw mismatch: code=${qrFailCode} pay=${qrFailOrder?.payStatus} attempt=${qrFailAttempt?.status}`,
+          `QR throw mismatch: code=${qrFailCode} body=${qrFailBody} pay=${qrFailOrder?.payStatus} attempt=${qrFailAttempt?.status}`,
         )
+      }
+      await expectCode(
+        'plain 40004-like QR error blocks a second QR (PAYMENT_ATTEMPT_PENDING)',
+        'PAYMENT_ATTEMPT_PENDING',
+        () => payment.createPayAttempt(qrFailId, qrFailSession),
+      )
+      const explicitAttempts = await prisma.paymentAttempt.count({ where: { orderId: qrFailId } })
+      if (explicitQrCalls === 1 && explicitAttempts === 1) {
+        pass('plain 40004-like QR error calls the provider once only')
+      } else {
+        fail(`plain 40004-like QR retry mismatch: calls=${explicitQrCalls} attempts=${explicitAttempts}`)
       }
     } finally {
       provider.createQrPayment = originalCreateQr
     }
+
+    // ── (16) 渠道已受理、本地回填失败：不得第二笔扣款，对账/Admin/回调必须看见 ─
+    const recon = new ReconciliationService(prisma)
+    const adminOrders = new AdminOrdersReadonlyService(prisma)
+    const attemptDelegate = prisma.paymentAttempt as unknown as {
+      update: (...args: unknown[]) => Promise<unknown>
+      updateMany: (...args: unknown[]) => Promise<unknown>
+    }
+    const originalAttemptUpdate = attemptDelegate.update.bind(attemptDelegate)
+    const originalAttemptUpdateMany = attemptDelegate.updateMany.bind(attemptDelegate)
+
+    const finalizeUnconfirmedId = await makeOrder(160, 'unpaid')
+    const finalizeUnconfirmedSession = await paymentSessionFor(finalizeUnconfirmedId)
+    let issuedQr: { prepayId: string; qrCodeContent: string } | null = null
+    let qrCreateCalls = 0
+    const originalCreateQrForUnconfirmed = provider.createQrPayment.bind(provider)
+    provider.createQrPayment = async (input) => {
+      qrCreateCalls += 1
+      issuedQr = await originalCreateQrForUnconfirmed(input)
+      return issuedQr
+    }
+    attemptDelegate.update = async (...args: unknown[]) => {
+      const data = (args[0] as { data?: { qrCodeContent?: string; status?: string } } | undefined)?.data
+      if (data?.qrCodeContent && data.status === 'pending') {
+        throw new Error('VERIFY_FORCED_FINALIZE_FAILURE')
+      }
+      return originalAttemptUpdate(...args)
+    }
+    attemptDelegate.updateMany = async (...args: unknown[]) => {
+      const data = (args[0] as { data?: { prepayId?: string; qrCodeContent?: string } } | undefined)?.data
+      if (data?.prepayId || data?.qrCodeContent) {
+        throw new Error('VERIFY_FORCED_IDENTIFIER_WRITE_FAILURE')
+      }
+      return originalAttemptUpdateMany(...args)
+    }
+    try {
+      let unconfirmedCode = 'RESOLVED'
+      let unconfirmedBody = ''
+      try {
+        await payment.createPayAttempt(finalizeUnconfirmedId, finalizeUnconfirmedSession)
+      } catch (error) {
+        unconfirmedCode = errorCode(error)
+        const exception = error as { getResponse?: () => unknown }
+        unconfirmedBody = JSON.stringify(typeof exception.getResponse === 'function' ? exception.getResponse() : error)
+      }
+      const unconfirmedOrder = await prisma.order.findUnique({ where: { id: finalizeUnconfirmedId } })
+      const unconfirmedAttempt = await prisma.paymentAttempt.findFirst({
+        where: { orderId: finalizeUnconfirmedId },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (
+        unconfirmedCode.includes('PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') &&
+        unconfirmedBody.includes('支付通道已受理') &&
+        !unconfirmedBody.includes('支付结果尚未确认') &&
+        unconfirmedOrder?.payStatus === 'paying' &&
+        unconfirmedAttempt &&
+        unconfirmedAttempt.status !== 'failed' &&
+        unconfirmedAttempt.status !== 'success' &&
+        (unconfirmedAttempt.failReason === CHANNEL_ACCEPTED_UNCONFIRMED_REASON
+          || (!unconfirmedAttempt.prepayId && !unconfirmedAttempt.qrCodeContent && !unconfirmedAttempt.channelTxnNo))
+      ) {
+        pass('QR channel success + local finalize failure keeps paying and a durable unconfirmed signal')
+      } else {
+        fail(
+          `unconfirmed QR mismatch: code=${unconfirmedCode} body=${unconfirmedBody} pay=${unconfirmedOrder?.payStatus} attempt=${JSON.stringify(unconfirmedAttempt)}`,
+        )
+      }
+      const attemptsBeforeRetry = await prisma.paymentAttempt.count({ where: { orderId: finalizeUnconfirmedId } })
+      await expectCode(
+        'unconfirmed QR blocks a second channel create (PAYMENT_ATTEMPT_PENDING)',
+        'PAYMENT_ATTEMPT_PENDING',
+        () => payment.createPayAttempt(finalizeUnconfirmedId, finalizeUnconfirmedSession),
+      )
+      const attemptsAfterRetry = await prisma.paymentAttempt.count({ where: { orderId: finalizeUnconfirmedId } })
+      if (attemptsBeforeRetry === 1 && attemptsAfterRetry === 1 && qrCreateCalls === 1) {
+        pass('retry after unconfirmed finalize does not create a second PaymentAttempt or call the provider again')
+      } else {
+        fail(`second attempt/provider: before=${attemptsBeforeRetry} after=${attemptsAfterRetry} qrCalls=${qrCreateCalls}`)
+      }
+
+      const reconReport = await recon.report({ nowMs: Date.now() })
+      const unconfirmedHit = reconReport.attention.unconfirmedCollections.some(
+        (row) => row.orderId === finalizeUnconfirmedId && row.code === CHANNEL_ACCEPTED_UNCONFIRMED_REASON,
+      )
+      if (unconfirmedHit && reconReport.summary.unconfirmedCollectionCount >= 1) {
+        pass('reconciliation attention lists CHANNEL_ACCEPTED_UNCONFIRMED (not paid)')
+      } else {
+        fail(`recon missed unconfirmed collection: ${JSON.stringify(reconReport.attention.unconfirmedCollections)}`)
+      }
+      const unconfirmedAudit = await prisma.auditLog.findFirst({
+        where: {
+          action: 'payment.channel_accepted_unconfirmed',
+          targetType: 'payment_attempt',
+          targetId: unconfirmedAttempt!.id,
+        },
+      })
+      if (unconfirmedAudit) {
+        pass('QR finalize failure writes payment.channel_accepted_unconfirmed audit')
+      } else {
+        fail('missing payment.channel_accepted_unconfirmed audit after QR finalize failure')
+      }
+      const adminHit = (await adminOrders.list({
+        opsAttention: true,
+        search: unconfirmedOrder?.orderNo,
+        page: 1,
+        pageSize: 10,
+      })).items[0]
+      if (
+        adminHit?.id === finalizeUnconfirmedId &&
+        adminHit.opsAttention === true &&
+        adminHit.opsAttentionCode === 'channel_accepted_unconfirmed' &&
+        adminHit.payStatus === 'paying' &&
+        adminHit.refundRequired === false
+      ) {
+        pass('admin opsAttention lists channel-accepted-unconfirmed without faking paid/refund')
+      } else {
+        fail(`admin missed unconfirmed: ${JSON.stringify(adminHit)}`)
+      }
+
+      attemptDelegate.update = originalAttemptUpdate
+      attemptDelegate.updateMany = originalAttemptUpdateMany
+
+      if (!issuedQr) fail('provider createQrPayment did not return identifiers')
+      const cbBadAmount = buildCallback({
+        payload: {
+          channel: CHANNEL,
+          attemptId: unconfirmedAttempt!.id,
+          prepayId: issuedQr.prepayId,
+          orderId: finalizeUnconfirmedId,
+          amountCents: 1,
+          result: 'success',
+          channelTxnNo: `sbx_txn_${suffix}_badamt`,
+        },
+      })
+      await expectCode(
+        'signed callback with wrong amount is rejected before binding prepayId (CALLBACK_AMOUNT_MISMATCH)',
+        'CALLBACK_AMOUNT_MISMATCH',
+        () => payment.processCallback(CHANNEL, cbBadAmount.rawBody, cbBadAmount.headers),
+      )
+      const afterBadAmount = await prisma.paymentAttempt.findUnique({ where: { id: unconfirmedAttempt!.id } })
+      if (afterBadAmount?.prepayId || afterBadAmount?.channelTxnNo) {
+        fail(`amount-mismatch callback must not bind identifiers: ${JSON.stringify(afterBadAmount)}`)
+      } else {
+        pass('amount-mismatch signed callback does not persist prepayId/channelTxnNo')
+      }
+      const cbUnconfirmed = buildCallback({
+        payload: {
+          channel: CHANNEL,
+          attemptId: unconfirmedAttempt!.id,
+          prepayId: issuedQr.prepayId,
+          orderId: finalizeUnconfirmedId,
+          amountCents: 160,
+          result: 'success',
+          channelTxnNo: `sbx_txn_${suffix}_unconfirmed`,
+        },
+      })
+      let resUnconfirmed: { ok: true; idempotent?: boolean }
+      try {
+        resUnconfirmed = await payment.processCallback(CHANNEL, cbUnconfirmed.rawBody, cbUnconfirmed.headers)
+      } catch (error) {
+        fail(`unconfirmed signed callback threw: ${errorCode(error)} ${(error as Error).message}`)
+      }
+      const paidUnconfirmed = await prisma.order.findUnique({ where: { id: finalizeUnconfirmedId } })
+      if (resUnconfirmed.ok && paidUnconfirmed?.payStatus === 'paid' && paidUnconfirmed.paymentSource === 'sandbox') {
+        pass('signed callback binds merchant order id when local prepayId was missing, then marks paid')
+      } else {
+        fail(`unconfirmed callback mismatch: ok=${resUnconfirmed.ok} pay=${paidUnconfirmed?.payStatus}`)
+      }
+    } finally {
+      attemptDelegate.update = originalAttemptUpdate
+      attemptDelegate.updateMany = originalAttemptUpdateMany
+      provider.createQrPayment = originalCreateQrForUnconfirmed
+    }
+
+    const codePayUnconfirmedId = await makeOrder(180, 'unpaid')
+    const codePayUnconfirmedSession = await paymentSessionFor(codePayUnconfirmedId)
+    let codePayCalls = 0
+    const originalCreateCode = provider.createCodePayment!.bind(provider)
+    provider.createCodePayment = async (input) => {
+      codePayCalls += 1
+      return originalCreateCode(input)
+    }
+    const orderDelegate = prisma.order as unknown as {
+      updateMany: (...args: unknown[]) => Promise<unknown>
+    }
+    const originalOrderUpdateMany = orderDelegate.updateMany.bind(orderDelegate)
+    attemptDelegate.update = async (...args: unknown[]) => {
+      const data = (args[0] as { data?: { prepayId?: string; qrCodeContent?: string; status?: string } } | undefined)?.data
+      if (data?.status === 'pending' && data.prepayId && !data.qrCodeContent) {
+        throw new Error('VERIFY_FORCED_CODEPAY_FINALIZE_FAILURE')
+      }
+      return originalAttemptUpdate(...args)
+    }
+    attemptDelegate.updateMany = async (...args: unknown[]) => {
+      const data = (args[0] as {
+        data?: { prepayId?: string; qrCodeContent?: string; status?: string; channelTxnNo?: string }
+      } | undefined)?.data
+      if (data?.prepayId || data?.qrCodeContent || data?.status === 'success' || data?.channelTxnNo) {
+        throw new Error('VERIFY_FORCED_CODEPAY_IDENTIFIER_WRITE_FAILURE')
+      }
+      return originalAttemptUpdateMany(...args)
+    }
+    orderDelegate.updateMany = async (...args: unknown[]) => {
+      const data = (args[0] as { data?: { payStatus?: string; paymentSource?: string } } | undefined)?.data
+      if (data?.payStatus === 'paid' || data?.paymentSource) {
+        throw new Error('VERIFY_FORCED_MARK_PAID_FAILURE')
+      }
+      return originalOrderUpdateMany(...args)
+    }
+    try {
+      const codePayResult = await payment.createCodePayAttempt(
+        codePayUnconfirmedId,
+        codePayUnconfirmedSession,
+        '123456789012345678',
+      )
+      const codePayOrder = await prisma.order.findUnique({ where: { id: codePayUnconfirmedId } })
+      const codePayAttempt = await prisma.paymentAttempt.findFirst({
+        where: { orderId: codePayUnconfirmedId },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (
+        codePayResult.status === 'paying' &&
+        codePayOrder?.payStatus === 'paying' &&
+        codePayAttempt &&
+        codePayAttempt.status !== 'failed' &&
+        codePayAttempt.status !== 'success' &&
+        (codePayAttempt.failReason === CHANNEL_ACCEPTED_UNCONFIRMED_REASON
+          || (!codePayAttempt.prepayId && !codePayAttempt.qrCodeContent && !codePayAttempt.channelTxnNo))
+      ) {
+        pass('code-pay channel success + local settle failure keeps paying and a durable unconfirmed signal')
+      } else {
+        fail(
+          `code-pay unconfirmed mismatch: result=${JSON.stringify(codePayResult)} pay=${codePayOrder?.payStatus} attempt=${JSON.stringify(codePayAttempt)}`,
+        )
+      }
+      const codePayAttempts = await prisma.paymentAttempt.count({ where: { orderId: codePayUnconfirmedId } })
+      await expectCode(
+        'code-pay unconfirmed blocks a second charge (PAYMENT_ATTEMPT_PENDING)',
+        'PAYMENT_ATTEMPT_PENDING',
+        () => payment.createCodePayAttempt(codePayUnconfirmedId, codePayUnconfirmedSession, '123456789012345678'),
+      )
+      const codePayAttemptsAfter = await prisma.paymentAttempt.count({ where: { orderId: codePayUnconfirmedId } })
+      if (codePayAttempts === 1 && codePayAttemptsAfter === 1 && codePayCalls === 1) {
+        pass('code-pay retry after settle failure does not create a second attempt or call the provider again')
+      } else {
+        fail(`code-pay second attempt: before=${codePayAttempts} after=${codePayAttemptsAfter} calls=${codePayCalls}`)
+      }
+      const codePayAudit = await prisma.auditLog.findFirst({
+        where: {
+          action: 'payment.channel_accepted_unconfirmed',
+          targetType: 'payment_attempt',
+          targetId: codePayAttempt!.id,
+        },
+      })
+      if (codePayAudit) {
+        pass('code-pay settle failure writes payment.channel_accepted_unconfirmed audit')
+      } else {
+        fail('missing payment.channel_accepted_unconfirmed audit after code-pay settle failure')
+      }
+      const codePayAdmin = (await adminOrders.list({
+        opsAttention: true,
+        search: codePayOrder?.orderNo,
+        page: 1,
+        pageSize: 10,
+      })).items[0]
+      if (
+        codePayAdmin?.id === codePayUnconfirmedId &&
+        codePayAdmin.opsAttentionCode === 'channel_accepted_unconfirmed' &&
+        codePayAdmin.payStatus === 'paying'
+      ) {
+        pass('admin opsAttention lists code-pay unconfirmed without faking paid')
+      } else {
+        fail(`admin missed code-pay unconfirmed: ${JSON.stringify(codePayAdmin)}`)
+      }
+    } finally {
+      attemptDelegate.update = originalAttemptUpdate
+      attemptDelegate.updateMany = originalAttemptUpdateMany
+      orderDelegate.updateMany = originalOrderUpdateMany
+      provider.createCodePayment = originalCreateCode
+    }
+
+    // ── (17) 历史 expired + 空标识：不得再向渠道下第二单 ────────────────
+    const legacyQrId = await makeOrder(90, 'unpaid')
+    const legacyQrSession = await paymentSessionFor(legacyQrId)
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: legacyQrId,
+        channel: CHANNEL,
+        amountCents: 90,
+        status: 'expired',
+        prepayId: null,
+        qrCodeContent: null,
+        channelTxnNo: null,
+        createdAt: new Date(Date.now() - 86_400_000),
+      },
+    })
+    let legacyQrCalls = 0
+    const originalCreateQrLegacy = provider.createQrPayment.bind(provider)
+    provider.createQrPayment = async (input) => {
+      legacyQrCalls += 1
+      return originalCreateQrLegacy(input)
+    }
+    try {
+      await expectCode(
+        'legacy expired empty-identifier QR attempt blocks a second channel create (PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED)',
+        'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED',
+        () => payment.createPayAttempt(legacyQrId, legacyQrSession),
+      )
+      const legacyQrAttempts = await prisma.paymentAttempt.count({ where: { orderId: legacyQrId } })
+      if (legacyQrAttempts === 1 && legacyQrCalls === 0) {
+        pass('legacy expired empty QR lock does not call the provider or mint a second attempt')
+      } else {
+        fail(`legacy QR second charge: attempts=${legacyQrAttempts} providerCalls=${legacyQrCalls}`)
+      }
+    } finally {
+      provider.createQrPayment = originalCreateQrLegacy
+    }
+
+    const legacyCodeId = await makeOrder(95, 'unpaid')
+    const legacyCodeSession = await paymentSessionFor(legacyCodeId)
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: legacyCodeId,
+        channel: CHANNEL,
+        amountCents: 95,
+        status: 'expired',
+        prepayId: null,
+        qrCodeContent: null,
+        channelTxnNo: null,
+        createdAt: new Date(Date.now() - 86_400_000),
+      },
+    })
+    let legacyCodeCalls = 0
+    const originalCreateCodeLegacy = provider.createCodePayment!.bind(provider)
+    provider.createCodePayment = async (input) => {
+      legacyCodeCalls += 1
+      return originalCreateCodeLegacy(input)
+    }
+    try {
+      await expectCode(
+        'legacy expired empty-identifier code-pay attempt blocks a second channel create (PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED)',
+        'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED',
+        () => payment.createCodePayAttempt(legacyCodeId, legacyCodeSession, '123456789012345678'),
+      )
+      const legacyCodeAttempts = await prisma.paymentAttempt.count({ where: { orderId: legacyCodeId } })
+      if (legacyCodeAttempts === 1 && legacyCodeCalls === 0) {
+        pass('legacy expired empty code-pay lock does not call the provider or mint a second attempt')
+      } else {
+        fail(`legacy code-pay second charge: attempts=${legacyCodeAttempts} providerCalls=${legacyCodeCalls}`)
+      }
+    } finally {
+      provider.createCodePayment = originalCreateCodeLegacy
+    }
+
+    // ── (18) 待退款 / 已成功尝试：禁止再向渠道下第二单 ──────────────────────
+    const AUTH_CODE = '123456789012345678'
+    let blockQrCalls = 0
+    let blockCodeCalls = 0
+    const originalCreateQrBlock = provider.createQrPayment.bind(provider)
+    const originalCreateCodeBlock = provider.createCodePayment!.bind(provider)
+    provider.createQrPayment = async (input) => {
+      blockQrCalls += 1
+      return originalCreateQrBlock(input)
+    }
+    provider.createCodePayment = async (input) => {
+      blockCodeCalls += 1
+      return originalCreateCodeBlock(input)
+    }
+    try {
+      type PickupStatus = 'pending' | 'claimed' | 'expired' | 'cancelled'
+      async function seedSettledBlock(opts: {
+        payStatus: 'unpaid' | 'paying' | 'closed'
+        pickupStatus: PickupStatus
+        refundReason: string | null
+        successAttempt: boolean
+        amountCents: number
+      }): Promise<{ orderId: string; session: string }> {
+        const orderId = await makeOrder(opts.amountCents, opts.payStatus)
+        const pickupClaimedAt =
+          opts.pickupStatus === 'claimed' ? new Date() : null
+        await prisma.order.update({
+          where: { id: orderId },
+          data: {
+            pickupStatus: opts.pickupStatus,
+            pickupClaimedAt,
+            pickupCodeHash: `hash_block_${suffix}_${orderSeq}`,
+            refundReason: opts.refundReason,
+          },
+        })
+        if (opts.successAttempt) {
+          await prisma.paymentAttempt.create({
+            data: {
+              orderId,
+              channel: CHANNEL,
+              amountCents: opts.amountCents,
+              status: 'success',
+              prepayId: `prepay_block_${orderSeq}`,
+              channelTxnNo: `txn_block_${suffix}_${orderSeq}`,
+            },
+          })
+        }
+        return { orderId, session: await paymentSessionFor(orderId) }
+      }
+
+      async function expectBlockedSecondCharge(
+        label: string,
+        orderId: string,
+        session: string,
+        kind: 'qr' | 'code',
+      ): Promise<void> {
+        const attemptsBefore = await prisma.paymentAttempt.count({ where: { orderId } })
+        const qrBefore = blockQrCalls
+        const codeBefore = blockCodeCalls
+        const run =
+          kind === 'qr'
+            ? () => payment.createPayAttempt(orderId, session)
+            : () => payment.createCodePayAttempt(orderId, session, AUTH_CODE)
+        await expectCode(
+          `${label} (${kind}) blocks with PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED`,
+          'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED',
+          run,
+        )
+        const attemptsAfter = await prisma.paymentAttempt.count({ where: { orderId } })
+        const qrDelta = blockQrCalls - qrBefore
+        const codeDelta = blockCodeCalls - codeBefore
+        if (attemptsAfter !== attemptsBefore || qrDelta !== 0 || codeDelta !== 0) {
+          fail(
+            `${label} (${kind}) second charge leaked: attempts ${attemptsBefore}→${attemptsAfter} qrDelta=${qrDelta} codeDelta=${codeDelta}`,
+          )
+        }
+        pass(`${label} (${kind}) does not call the provider or mint a second attempt`)
+      }
+
+      const settledCases: Array<{
+        label: string
+        payStatus: 'unpaid' | 'paying' | 'closed'
+        pickupStatus: PickupStatus
+        refundReason: string | null
+        successAttempt: boolean
+      }> = [
+        {
+          label: 'unpaid pending-refund without success attempt',
+          payStatus: 'unpaid',
+          pickupStatus: 'pending',
+          refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
+          successAttempt: false,
+        },
+        {
+          label: 'unpaid success attempt without refundReason',
+          payStatus: 'unpaid',
+          pickupStatus: 'pending',
+          refundReason: null,
+          successAttempt: true,
+        },
+        {
+          label: 'claimed unpaid pending-refund',
+          payStatus: 'unpaid',
+          pickupStatus: 'claimed',
+          refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
+          successAttempt: false,
+        },
+        {
+          label: 'claimed unpaid success attempt',
+          payStatus: 'unpaid',
+          pickupStatus: 'claimed',
+          refundReason: null,
+          successAttempt: true,
+        },
+        {
+          label: 'expired pickup unpaid pending-refund',
+          payStatus: 'unpaid',
+          pickupStatus: 'expired',
+          refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
+          successAttempt: false,
+        },
+        {
+          label: 'cancelled unpaid success attempt',
+          payStatus: 'unpaid',
+          pickupStatus: 'cancelled',
+          refundReason: null,
+          successAttempt: true,
+        },
+        {
+          label: 'paying pending-refund',
+          payStatus: 'paying',
+          pickupStatus: 'pending',
+          refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
+          successAttempt: false,
+        },
+        {
+          label: 'claimed paying success attempt',
+          payStatus: 'paying',
+          pickupStatus: 'claimed',
+          refundReason: null,
+          successAttempt: true,
+        },
+        {
+          label: 'closed pending-refund',
+          payStatus: 'closed',
+          pickupStatus: 'expired',
+          refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
+          successAttempt: false,
+        },
+        {
+          label: 'closed success attempt',
+          payStatus: 'closed',
+          pickupStatus: 'claimed',
+          refundReason: null,
+          successAttempt: true,
+        },
+      ]
+
+      for (const settled of settledCases) {
+        const seeded = await seedSettledBlock({
+          ...settled,
+          amountCents: 110,
+        })
+        await expectBlockedSecondCharge(settled.label, seeded.orderId, seeded.session, 'qr')
+        await expectBlockedSecondCharge(settled.label, seeded.orderId, seeded.session, 'code')
+      }
+
+      const claimedLiveId = await makeOrder(130, 'unpaid')
+      await prisma.order.update({
+        where: { id: claimedLiveId },
+        data: {
+          pickupStatus: 'claimed',
+          pickupClaimedAt: new Date(),
+          pickupCodeHash: `hash_claimed_live_${suffix}`,
+        },
+      })
+      const claimedLiveSession = await paymentSessionFor(claimedLiveId)
+      const claimedLiveView = await payment.createPayAttempt(claimedLiveId, claimedLiveSession)
+      if (claimedLiveView.status === 'pending' && claimedLiveView.qrCodeContent?.startsWith('sandboxpay://qr?')) {
+        pass('claimed unpaid live lease with no settled collection still issues the first QR')
+      } else {
+        fail(`claimed live first QR mismatch: ${JSON.stringify(claimedLiveView)}`)
+      }
+      const claimedLiveReuse = await payment.createPayAttempt(claimedLiveId, claimedLiveSession)
+      if (claimedLiveReuse.attemptId === claimedLiveView.attemptId) {
+        pass('claimed live open attempt is reused (not a second channel order)')
+      } else {
+        fail('claimed live reuse minted a second attempt')
+      }
+
+      const paidControlId = await makeOrder(140, 'paid')
+      await prisma.order.update({
+        where: { id: paidControlId },
+        data: { paymentSource: CHANNEL, paidAt: new Date() },
+      })
+      await prisma.paymentAttempt.create({
+        data: {
+          orderId: paidControlId,
+          channel: CHANNEL,
+          amountCents: 140,
+          status: 'success',
+          prepayId: `prepay_paid_${suffix}`,
+          channelTxnNo: `txn_paid_control_${suffix}`,
+        },
+      })
+      const paidControlSession = await paymentSessionFor(paidControlId)
+      await expectCode(
+        'paid order with success attempt still refuses new QR (ORDER_ALREADY_PAID)',
+        'ORDER_ALREADY_PAID',
+        () => payment.createPayAttempt(paidControlId, paidControlSession),
+      )
+      const paidStatus = await payment.getPayStatus(paidControlId, paidControlSession)
+      if (paidStatus.payStatus === 'paid' && paidStatus.attempt?.status === 'success') {
+        pass('paid idempotent pay-status query is unchanged')
+      } else {
+        fail(`paid pay-status regression: ${JSON.stringify(paidStatus)}`)
+      }
+
+      const refundedControlId = await makeOrder(150, 'refunded')
+      await prisma.order.update({
+        where: { id: refundedControlId },
+        data: { refundReason: '验证整单退款', refundedAt: new Date() },
+      })
+      await prisma.paymentAttempt.create({
+        data: {
+          orderId: refundedControlId,
+          channel: CHANNEL,
+          amountCents: 150,
+          status: 'success',
+          prepayId: `prepay_refunded_${suffix}`,
+          channelTxnNo: `txn_refunded_control_${suffix}`,
+        },
+      })
+      const refundedControlSession = await paymentSessionFor(refundedControlId)
+      await expectCode(
+        'refunded order with success attempt still refuses new QR (ORDER_INVALID_TRANSITION)',
+        'ORDER_INVALID_TRANSITION',
+        () => payment.createPayAttempt(refundedControlId, refundedControlSession),
+      )
+
+      const raceRefundId = await makeOrder(160, 'unpaid')
+      const raceRefundSession = await paymentSessionFor(raceRefundId)
+      const transactionHost = prisma as unknown as {
+        $transaction: (callback: (tx: unknown) => Promise<unknown>) => Promise<unknown>
+      }
+      const originalTransaction = transactionHost.$transaction
+      transactionHost.$transaction = async (callback) => {
+        await prisma.order.update({
+          where: { id: raceRefundId },
+          data: { refundReason: ONLINE_PAID_PENDING_REFUND_REASON },
+        })
+        return originalTransaction.call(prisma, callback)
+      }
+      try {
+        const attemptsBeforeRace = await prisma.paymentAttempt.count({ where: { orderId: raceRefundId } })
+        const qrBeforeRace = blockQrCalls
+        await expectCode(
+          'refundReason appearing after pre-check still blocks QR (PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED)',
+          'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED',
+          () => payment.createPayAttempt(raceRefundId, raceRefundSession),
+        )
+        const attemptsAfterRace = await prisma.paymentAttempt.count({ where: { orderId: raceRefundId } })
+        if (attemptsAfterRace !== attemptsBeforeRace || blockQrCalls !== qrBeforeRace) {
+          fail(`refundReason race leaked a second charge: attempts ${attemptsBeforeRace}→${attemptsAfterRace} qr=${blockQrCalls - qrBeforeRace}`)
+        }
+        pass('refundReason race does not call the provider or mint a second attempt')
+      } finally {
+        transactionHost.$transaction = originalTransaction
+      }
+
+      const raceSuccessId = await makeOrder(170, 'unpaid')
+      const raceSuccessSession = await paymentSessionFor(raceSuccessId)
+      transactionHost.$transaction = async (callback) => {
+        await prisma.paymentAttempt.create({
+          data: {
+            orderId: raceSuccessId,
+            channel: CHANNEL,
+            amountCents: 170,
+            status: 'success',
+            prepayId: `prepay_race_${suffix}`,
+            channelTxnNo: `txn_race_success_${suffix}`,
+          },
+        })
+        return originalTransaction.call(prisma, callback)
+      }
+      try {
+        const qrBeforeSuccessRace = blockQrCalls
+        await expectCode(
+          'success attempt appearing after pre-check still blocks QR (PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED)',
+          'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED',
+          () => payment.createPayAttempt(raceSuccessId, raceSuccessSession),
+        )
+        const leakedAttempts = await prisma.paymentAttempt.count({
+          where: { orderId: raceSuccessId, status: { not: 'success' } },
+        })
+        const injectedSuccess = await prisma.paymentAttempt.count({
+          where: { orderId: raceSuccessId, status: 'success' },
+        })
+        if (leakedAttempts !== 0 || injectedSuccess !== 1 || blockQrCalls !== qrBeforeSuccessRace) {
+          fail(
+            `success-attempt race leaked a second charge: leaked=${leakedAttempts} success=${injectedSuccess} qr=${blockQrCalls - qrBeforeSuccessRace}`,
+          )
+        }
+        const raceOrder = await prisma.order.findUnique({ where: { id: raceSuccessId } })
+        if (raceOrder?.payStatus !== 'unpaid') {
+          fail(`success-attempt race left payStatus=${raceOrder?.payStatus}, expected unpaid rollback`)
+        }
+        pass('success-attempt race does not call the provider or leave a paying reservation')
+      } finally {
+        transactionHost.$transaction = originalTransaction
+      }
+    } finally {
+      provider.createQrPayment = originalCreateQrBlock
+      provider.createCodePayment = originalCreateCodeBlock
+    }
+
+    // ── F-03 / F-04：付款后文件失效待退款；缺纸、断电、未确认不混进同一条 ──
+    {
+      const anomalyTerminalId = `t_f03_${suffix}`
+      const anomalyToken = randomBytes(16).toString('hex')
+      extraTerminalIds.push(anomalyTerminalId)
+      await prisma.terminal.create({
+        data: {
+          id: anomalyTerminalId,
+          terminalCode: `KSK-F03-${suffix}`,
+          agentToken: anomalyToken,
+          deviceFingerprint: 'verify-f03',
+        },
+      })
+      const agent = new TerminalAgentService(prisma, audit)
+      const claim = () => agent.claimTasks(anomalyTerminalId, { maxTasks: 1 }, `Bearer ${anomalyToken}`)
+
+      async function seedFile(label: string, file: { deletedAt?: Date | null; expiresAt?: Date | null }): Promise<string> {
+        const fileId = `f_f03_${suffix}_${label}`
+        await prisma.fileObject.create({
+          data: {
+            id: fileId,
+            storageKey: `verify/f03/${fileId}.pdf`,
+            filename: `${label}.pdf`,
+            mimeType: 'application/pdf',
+            sizeBytes: 128,
+            sha256: '',
+            purpose: 'print_source',
+            status: 'active',
+            deletedAt: file.deletedAt ?? null,
+            expiresAt: file.expiresAt ?? null,
+            bucket: LOCAL_BUCKET_SENTINEL,
+          },
+        })
+        fixtureFileIds.push(fileId)
+        return fileId
+      }
+
+      async function seedPaidTask(
+        label: string,
+        fileId: string | null,
+        task: { status?: string; createdAt?: Date; claimExpiry?: Date | null; endUserId?: string | null },
+      ): Promise<{ taskId: string; orderId: string }> {
+        const taskId = `pt_f03_${suffix}_${label}`
+        await prisma.printTask.create({
+          data: {
+            id: taskId,
+            terminalId: anomalyTerminalId,
+            endUserId: task.endUserId ?? null,
+            fileId,
+            fileUrl: fileId ? signFileUrl(fileId, 60_000).url : '/api/v1/files/legacy/content',
+            fileMd5: `sha-${label}`,
+            paramsJson: '{}',
+            status: task.status ?? 'pending',
+            createdAt: task.createdAt,
+            claimExpiry: task.claimExpiry ?? null,
+            claimedAt: task.status === 'claimed' || task.status === 'printing' ? new Date() : null,
+          },
+        })
+        taskIds.push(taskId)
+        const order = await prisma.order.create({
+          data: {
+            orderNo: `ORD-F03-${suffix}-${label}`,
+            type: 'print',
+            printTaskId: taskId,
+            terminalId: anomalyTerminalId,
+            endUserId: task.endUserId ?? null,
+            amountCents: 200,
+            payStatus: 'paid',
+            taskStatus: task.status ?? 'pending',
+            paymentSource: 'offline',
+            discountCents: 0,
+          },
+        })
+        orderIds.push(order.id)
+        return { taskId, orderId: order.id }
+      }
+
+      const expiredFile = await seedFile('expired', { expiresAt: new Date(Date.now() - 60_000) })
+      const liveFile = await seedFile('live', {})
+      const expired = await seedPaidTask('expired', expiredFile, { createdAt: new Date('2019-01-01T00:00:00.000Z') })
+      const live = await seedPaidTask('live', liveFile, { createdAt: new Date('2021-01-01T00:00:00.000Z') })
+      const firstClaim = await claim()
+      const expiredOrder = await prisma.order.findUnique({ where: { id: expired.orderId } })
+      const expiredTask = await prisma.printTask.findUnique({ where: { id: expired.taskId } })
+      const expiredRefunds = await prisma.refund.count({ where: { orderId: expired.orderId } })
+      const expiredAudits = await prisma.auditLog.count({
+        where: { action: PAID_UNFULFILLED_FILE_AUDIT_ACTION, targetId: expired.orderId },
+      })
+      if (
+        firstClaim.length === 1 &&
+        firstClaim[0]?.taskId === live.taskId &&
+        !firstClaim.some((row) => row.taskId === expired.taskId) &&
+        expiredOrder?.payStatus === 'paid' &&
+        expiredOrder.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON &&
+        expiredOrder.refundedAmountCents === 0 &&
+        expiredTask?.status === 'pending' &&
+        expiredRefunds === 0 &&
+        expiredAudits === 1
+      ) {
+        pass('F-03 expired file: claim skips it, marks paid-unfulfilled refund, prints the live task')
+      } else {
+        fail(`F-03 expired file mismatch ${JSON.stringify({ firstClaim, expiredOrder, expiredTask, expiredRefunds, expiredAudits })}`)
+      }
+      const secondClaim = await claim()
+      const expiredAuditsAgain = await prisma.auditLog.count({
+        where: { action: PAID_UNFULFILLED_FILE_AUDIT_ACTION, targetId: expired.orderId },
+      })
+      if (secondClaim.length === 0 && expiredAuditsAgain === 1) {
+        pass('F-03 repeat claim is idempotent and still does not print the expired file')
+      } else {
+        fail(`F-03 repeat claim mismatch claims=${secondClaim.length} audits=${expiredAuditsAgain}`)
+      }
+
+      const deletedFile = await seedFile('deleted', { deletedAt: new Date() })
+      const deleted = await seedPaidTask('deleted', deletedFile, { createdAt: new Date('2018-01-01T00:00:00.000Z') })
+      const deletedClaim = await claim()
+      const deletedOrder = await prisma.order.findUnique({ where: { id: deleted.orderId } })
+      if (
+        deletedClaim.length === 0 &&
+        deletedOrder?.payStatus === 'paid' &&
+        deletedOrder.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON &&
+        (await prisma.printTask.findUnique({ where: { id: deleted.taskId } }))?.status === 'pending'
+      ) {
+        pass('F-03 deleted file: claim does not print and marks the same refund signal')
+      } else {
+        fail(`F-03 deleted file mismatch ${JSON.stringify({ deletedClaim, deletedOrder })}`)
+      }
+
+      const raceFile = await seedFile('race', {})
+      const race = await seedPaidTask('race', raceFile, { createdAt: new Date('2017-01-01T00:00:00.000Z') })
+      const [raceA, raceB] = await Promise.all([claim(), claim()])
+      const raceWins = [raceA, raceB].filter((rows) => rows.some((row) => row.taskId === race.taskId))
+      const raceOrder = await prisma.order.findUnique({ where: { id: race.orderId } })
+      const raceTask = await prisma.printTask.findUnique({ where: { id: race.taskId } })
+      if (raceWins.length === 1 && raceTask?.status === 'claimed' && raceOrder?.refundReason == null && raceOrder?.payStatus === 'paid') {
+        pass('F-04 claim race: one winner, no refund mark')
+      } else {
+        fail(`F-04 claim race mismatch ${JSON.stringify({ raceA, raceB, raceTask, raceOrder })}`)
+      }
+
+      const paperFile = await seedFile('paper', {})
+      const paper = await seedPaidTask('paper', paperFile, { status: 'claimed', endUserId })
+      await agent.patchTaskStatus(paper.taskId, { status: 'failed', errorCode: 'PAPER_EMPTY' }, `Bearer ${anomalyToken}`, anomalyTerminalId)
+      const paperAfterFail = await prisma.printTask.findUnique({ where: { id: paper.taskId } })
+      const paperOrder = await prisma.order.findUnique({ where: { id: paper.orderId } })
+      const paperClaim = await claim()
+      if (
+        paperAfterFail?.status === 'failed' &&
+        paperAfterFail.errorCode === 'PAPER_EMPTY' &&
+        paperClaim.length === 0 &&
+        paperOrder?.payStatus === 'paid' &&
+        paperOrder.refundReason == null &&
+        paperOrder.taskStatus === 'failed'
+      ) {
+        pass('F-04 paper empty: failed, still paid, not auto-refunded, not auto-redispatched')
+      } else {
+        fail(`F-04 paper empty mismatch ${JSON.stringify({ paperAfterFail, paperOrder, paperClaim })}`)
+      }
+
+      const lostFile = await seedFile('lost', {})
+      const lost = await seedPaidTask('lost', lostFile, { status: 'claimed' })
+      await agent.patchTaskStatus(lost.taskId, { status: 'completed' }, `Bearer ${anomalyToken}`, anomalyTerminalId)
+      const lostLog = await prisma.printTaskStatusLog.findFirst({
+        where: { taskId: lost.taskId, errorCode: 'PRINTING_REPORT_LOST' },
+      })
+      const lostOrder = await prisma.order.findUnique({ where: { id: lost.orderId } })
+      if (lostLog && lostOrder?.payStatus === 'paid' && lostOrder.taskStatus === 'completed' && lostOrder.refundReason == null) {
+        pass('F-04 lost printing receipt: completed without a refund mark')
+      } else {
+        fail(`F-04 receipt lost mismatch ${JSON.stringify({ lostLog: Boolean(lostLog), lostOrder })}`)
+      }
+
+      const unconfirmedFile = await seedFile('unconfirmed', {})
+      const unconfirmed = await seedPaidTask('unconfirmed', unconfirmedFile, { status: 'claimed', endUserId })
+      await agent.patchTaskStatus(
+        unconfirmed.taskId,
+        { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+        `Bearer ${anomalyToken}`,
+        anomalyTerminalId,
+      )
+      try {
+        await printJobs.retryPaidFailedJob(unconfirmed.taskId, { endUserId })
+        fail('F-04 unconfirmed retry should be rejected')
+      } catch (error) {
+        if (errorCode(error) !== 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN') {
+          fail(`F-04 unconfirmed retry code ${errorCode(error)}`)
+        }
+      }
+      const unconfirmedOrder = await prisma.order.findUnique({ where: { id: unconfirmed.orderId } })
+      const unconfirmedTask = await prisma.printTask.findUnique({ where: { id: unconfirmed.taskId } })
+      if (
+        unconfirmedTask?.status === 'failed' &&
+        unconfirmedTask.errorCode === 'PRINT_JOB_UNCONFIRMED' &&
+        unconfirmedOrder?.payStatus === 'paid' &&
+        unconfirmedOrder.refundReason == null
+      ) {
+        pass('F-04 unconfirmed: stays failed and paid, no automatic refund')
+      } else {
+        fail(`F-04 unconfirmed mismatch ${JSON.stringify({ unconfirmedTask, unconfirmedOrder })}`)
+      }
+
+      const partialFile = await seedFile('partial', {})
+      const partial = await seedPaidTask('partial', partialFile, { status: 'claimed', endUserId })
+      await agent.patchTaskStatus(
+        partial.taskId,
+        { status: 'failed', errorCode: 'PARTIAL_OUTPUT' },
+        `Bearer ${anomalyToken}`,
+        anomalyTerminalId,
+      )
+      try {
+        await printJobs.retryPaidFailedJob(partial.taskId, { endUserId })
+        fail('F-04 partial retry should be rejected')
+      } catch (error) {
+        if (errorCode(error) !== 'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN') {
+          fail(`F-04 partial retry code ${errorCode(error)}`)
+        }
+      }
+      const partialOrder = await prisma.order.findUnique({ where: { id: partial.orderId } })
+      if (partialOrder?.payStatus === 'paid' && partialOrder.refundReason == null && partialOrder.taskStatus === 'failed') {
+        pass('F-04 partial output: manual only, no automatic full refund')
+      } else {
+        fail(`F-04 partial mismatch ${JSON.stringify(partialOrder)}`)
+      }
+
+      const powerFile = await seedFile('power', {})
+      const power = await seedPaidTask('power', powerFile, {
+        status: 'claimed',
+        claimExpiry: new Date(Date.now() - 60_000),
+      })
+      await agent.resetExpiredClaims()
+      const powerTask = await prisma.printTask.findUnique({ where: { id: power.taskId } })
+      const powerOrder = await prisma.order.findUnique({ where: { id: power.orderId } })
+      const powerAudits = await prisma.auditLog.count({
+        where: { action: 'print_job.timeout_unconfirmed', targetId: power.taskId },
+      })
+      const powerRefundAudits = await prisma.auditLog.count({
+        where: { action: PAID_UNFULFILLED_FILE_AUDIT_ACTION, targetId: power.orderId },
+      })
+      const powerClaim = await claim()
+      await agent.resetExpiredClaims()
+      const powerAuditsAgain = await prisma.auditLog.count({
+        where: { action: 'print_job.timeout_unconfirmed', targetId: power.taskId },
+      })
+      if (
+        powerTask?.status === 'failed' &&
+        powerTask.errorCode === 'PRINT_JOB_UNCONFIRMED' &&
+        powerOrder?.payStatus === 'paid' &&
+        powerOrder.taskStatus === 'failed' &&
+        powerOrder.refundReason == null &&
+        powerAudits === 1 &&
+        powerAuditsAgain === 1 &&
+        powerRefundAudits === 0 &&
+        powerClaim.every((row) => row.taskId !== power.taskId)
+      ) {
+        pass('F-04 power loss: PRINT_JOB_UNCONFIRMED, no file-unavailable refund, no automatic requeue')
+      } else {
+        fail(`F-04 power loss mismatch ${JSON.stringify({ powerTask, powerOrder, powerAudits, powerAuditsAgain, powerRefundAudits, powerClaim })}`)
+      }
+
+      const retried = await printJobs.retryPaidFailedJob(paper.taskId, { endUserId })
+      if (retried.status === 'pending' && (await prisma.order.findUnique({ where: { id: paper.orderId } }))?.refundReason == null) {
+        pass('F-04 paper empty can be retried by the user after it stays failed')
+      } else {
+        fail(`F-04 paper retry mismatch ${JSON.stringify(retried)}`)
+      }
+      await prisma.printTask.update({ where: { id: paper.taskId }, data: { status: 'failed', errorCode: 'PAPER_EMPTY' } })
+      await prisma.order.update({ where: { id: paper.orderId }, data: { taskStatus: 'failed' } })
+    }
+
+    await verifyPaymentCallbackRace({
+      prisma,
+      payment,
+      provider,
+      audit,
+      suffix,
+      channel: CHANNEL,
+      makeOrder,
+      paymentSessionFor,
+      buildCallback,
+      pass,
+      fail,
+      expectCode,
+    })
 
     console.log('\nAll payment-flow assertions passed.\n')
   } finally {

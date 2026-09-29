@@ -441,6 +441,8 @@ export interface ChatInput {
   message: string
   sessionId?: string
   skill?: AssistantSkill
+  /** 缺省 kiosk。miniapp 只返回已注册页面的 actions。 */
+  channel?: 'kiosk' | 'miniapp'
   context?: Record<string, unknown>
 }
 

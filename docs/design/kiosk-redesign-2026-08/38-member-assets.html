@@ -28,7 +28,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#6b857c;
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#526b62;
   --deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;
   --teal:#1f9e86;--teal2:#157a67;--tealsoft:#e0f2ec;
   --slate:#3f68b0;--slate2:#35608f;--slatesoft:#e6ecf7;
@@ -238,6 +238,7 @@ var ICO = {
   sign:'<path d="M3 19c3-1 4-6 7-6s3 4 6 3 3-4 5-4"/><path d="M14 4l3 3-7 7-3 1 1-3z"/>',
   spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
   card:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
+  qr:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M13.5 13.5h3.5v3.5h-3.5zM20.5 13.5v3.5M17 20.5h3.5M13.5 20.5h.01"/>',
   eye:'<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/>',
   up:'<path d="M12 20V5M6 11l6-6 6 6"/>',
   back:'<path d="M15 5l-7 7 7 7"/>',
@@ -445,7 +446,7 @@ function viewFor(kind, suffix, filter){
       ? stepRow(0,'up','','从手机或 U 盘添加文件','支持常见文档与图片，添加后可预览和打印','添加文件','12-file-source.html','/print/upload',SCREEN+'-start-upload')
         + stepRow(1,'scan','clay','扫描纸质材料','把纸质简历或证明扫成 PDF，留在我的文档里','去扫描','18-scan-workbench.html?state=setup','/scan/start',SCREEN+'-start-scan')
         + stepRow(2,'sign','teal','给已有文件签名盖章','在文件上放签名或印章后再打印','去签章','20-sign-stamp.html?state=placing','/print-scan/sign',SCREEN+'-start-sign')
-        + stepRow(3,'card','','用手机把文件传过来','在手机上打开传输页，文件直接落到这台机器','去传输','51-phone-relay.html','/print/phone-relay',SCREEN+'-start-relay')
+        + stepRow(3,'qr','','用职易达小程序扫码上传到这台机器','用职易达小程序扫屏幕上的码，在手机上选好文件上传，文件直接落到这台机器','去扫码','12-file-source.html?state=phone-generating','/print/upload',SCREEN+'-start-relay')
       : stepRow(0,'print','clay','发起一次打印','选文件、定参数、确认价格后建立订单','去打印','10-print-hub.html','/print-scan',SCREEN+'-start-print')
         + stepRow(1,'doc','','先从我的文档选文件','已保存的文件可以直接拿来打印','去文档',href('documents-ready'),'/me/documents',SCREEN+'-start-docs')
         + stepRow(2,'clock','teal','已经打过但没看到？','订单状态由服务端返回，可稍后重新加载',' 重新加载',href('orders-loading'),'/me/print-orders',SCREEN+'-start-reload')

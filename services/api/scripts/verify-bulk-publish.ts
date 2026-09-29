@@ -194,7 +194,16 @@ function buildFixture() {
     { id: 'org-a', name: '来源机构A', contentTrustStatus: 'active', archivedAt: null } as unknown as Row,
     { id: 'org-b', name: '来源机构B', contentTrustStatus: 'active', archivedAt: null } as unknown as Row,
   ])
-  const prisma = { job, jobFair, policyPost, organization } as unknown as PrismaService
+  const holds: Array<{ targetType: string; targetId: string }> = []
+  const recruitmentEmergencyHold = {
+    findFirst: async (args: { where: { targetType: string; targetId: string } }) =>
+      holds.find((row) => row.targetType === args.where.targetType && row.targetId === args.where.targetId) ?? null,
+    upsert: async () => ({ id: 'hold' }),
+  }
+  const recruitmentCircuitBreak = {
+    findFirst: async () => null,
+  }
+  const prisma = { job, jobFair, policyPost, organization, recruitmentEmergencyHold, recruitmentCircuitBreak } as unknown as PrismaService
 
   const adminSvc = new JobsAdminService(prisma, fakeAudit)
   const policiesSvc = new PoliciesService(prisma, fakeAudit)
@@ -208,7 +217,7 @@ function buildFixture() {
   } as unknown as JobsService
 
   const bulk = new BulkPublishService(prisma, jobsFacade, policiesSvc)
-  return { bulk, adminSvc, job }
+  return { bulk, adminSvc, job, holds }
 }
 
 async function main() {
@@ -370,6 +379,20 @@ async function main() {
     assert('空 id 列表被拒绝(BULK_IDS_REQUIRED)', empty === 'BULK_IDS_REQUIRED', `实际 ${empty}`)
 
     assert('preview 的 batchLimit 与服务端上限一致', (await bulk.previewBulkPublish({ kind: 'job' })).batchLimit === BULK_PUBLISH_MAX_BATCH)
+
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    let closed = ''
+    try {
+      await bulk.executeBulkPublish('job', ['j1'], user)
+    } catch (e) {
+      const resp = (e as { getResponse?: () => unknown }).getResponse?.() as { error?: { code?: string } }
+      closed = resp?.error?.code ?? ''
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+    }
+    assert('托管关闭时管理员批量发布被拒', closed === 'RECRUITMENT_HOSTING_DISABLED', `实际 ${closed}`)
   }
 
   // ── ⑧ 源码层:不存在第二条写路径 ──────────────────────────────────────────
@@ -406,6 +429,44 @@ async function main() {
       '政策公开查询仍要求 approved + published',
       /reviewStatus:\s*['"]approved['"]/.test(policySrc) && /publishStatus:\s*['"]published['"]/.test(policySrc),
     )
+  }
+
+  // ── ⑩ 紧急下架不能被批量发布复活；政策批量发布与开关无关 ────────────────
+  console.log('\n[10] 紧急下架整批拒绝，政策批量发布始终拒绝')
+  {
+    const { bulk, job, holds } = buildFixture()
+    holds.push({ targetType: 'job', targetId: 'j1' })
+    const before = job.rows.find((row) => row.id === 'j2')?.publishStatus
+    let code = ''
+    let blocked: string[] = []
+    try {
+      await bulk.executeBulkPublish('job', ['j1', 'j2'], user)
+    } catch (error) {
+      const response = (error as { getResponse?: () => { error?: { code?: string; blockedIds?: string[] } } }).getResponse?.()
+      code = response?.error?.code ?? ''
+      blocked = response?.error?.blockedIds ?? []
+    }
+    assert('10. 命中紧急下架时整批拒绝', code === 'EMERGENCY_TAKEDOWN_IRREVERSIBLE', `实际 ${code}`)
+    assert('10b. 响应列出被拦的 id', blocked.length === 1 && blocked[0] === 'j1', JSON.stringify(blocked))
+    assert('10c. 同批未下架的岗位没有被发出去', job.rows.find((row) => row.id === 'j2')?.publishStatus === before)
+
+    const expectPolicy = async (enabled: string, label: string) => {
+      const previous = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = enabled
+      let policyCode = ''
+      try {
+        await bulk.executeBulkPublish('policy', ['policy-1'], user)
+      } catch (error) {
+        const response = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+        policyCode = response?.error?.code ?? ''
+      } finally {
+        if (previous === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+        else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previous
+      }
+      assert(label, policyCode === 'ADMIN_POLICY_PUBLISH_DISABLED', `实际 ${policyCode}`)
+    }
+    await expectPolicy('true', '10d. 托管打开时政策批量发布仍拒绝')
+    await expectPolicy('false', '10e. 托管关闭时政策批量发布也是 ADMIN_POLICY_PUBLISH_DISABLED，不是托管错误')
   }
 
   // ── summary ──────────────────────────────────────────────────────────────

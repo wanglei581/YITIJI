@@ -1,7 +1,7 @@
 // ============================================================
 // PrintScanHomePage — 打印扫描 Hub（青序流光 10-print-hub）。
 //
-// 视觉真值：docs/design/kiosk-redesign-2026-08/10-print-hub.html
+// 视觉真值：docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html
 // 本文件只做容器：读真实状态、算每张卡能不能点，把结果交给 QxPrintHubView。
 //
 // ══ 两条独立的状态轴 ══
@@ -18,7 +18,7 @@ import {
   type PrintScanCapabilityKey,
   type PrintScanCapabilityStatus,
 } from '@ai-job-print/shared'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FilesIcon,
@@ -36,8 +36,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { getTerminalId, subscribeTerminalIdentity } from '../../services/api/screensaver'
 import {
   loadConfiguredCapabilities,
+  resolveCapabilityOverride,
   type CapabilitiesLoadResult,
   type ConfiguredCapabilityMap,
 } from '../../services/api/printScanCapabilities'
@@ -96,15 +98,25 @@ interface CapabilityDefinition {
 /**
  * 文档打印卡的描述行：彩色 / 双面只有在**本机**登记为 available 时才敢写进文案。
  * 未登记的机器上写「彩色、双面可选」= 谎报能力（CLAUDE.md §9「不伪造能力」）。
+ * 卡面描述按稿 10 的密度只留一行半；彩色 / 双面状态统一显示在「01 要办什么」的只读说明。
  */
 function describeDocPrint(map: ConfiguredCapabilityMap): string {
-  const on = (key: 'color_print' | 'duplex_print') => map[key]?.status === 'available'
-  const extras = [on('color_print') ? '彩色' : null, on('duplex_print') ? '双面' : null].filter(
-    (v): v is string => v !== null,
-  )
-  return extras.length > 0
-    ? `PDF、图片上传后设参数打印，A4 黑白 / ${extras.join(' / ')}可选`
-    : 'PDF、图片上传后设参数打印，A4 黑白（本机彩色 / 双面尚未通过真机验证）'
+  const extras = docPrintExtras(map)
+  return extras.on.length > 0
+    ? `选文件，检查后设参数；${extras.on.join(' / ')}可选`
+    : '选文件，检查后设参数'
+}
+
+function docPrintExtras(map: ConfiguredCapabilityMap): { on: string[]; off: string[] } {
+  const on: string[] = []
+  const off: string[] = []
+  for (const [key, label] of [
+    ['color_print', '彩色'],
+    ['duplex_print', '双面'],
+  ] as const) {
+    ;(map[key]?.status === 'available' ? on : off).push(label)
+  }
+  return { on, off }
 }
 
 const CAPABILITIES: readonly CapabilityDefinition[] = [
@@ -113,109 +125,110 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'doc',
     icon: FileTextIcon,
     title: '文档打印',
-    description: 'PDF、图片上传后设参数打印，A4 黑白',
+    description: '选文件，检查后设参数',
     to: '/print/upload?source=document&tab=file',
     aiRole: 'ai',
     needsMfp: true,
     available: true,
     iconTone: 'teal',
-    stateNote: 'A4 · 黑白单面',
+    // 运行时由 describeDocPrintFoot 按本机彩色 / 双面登记改写；这里是未登记时的口径。
+    stateNote: '带走：打印件',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '这台机器出不了纸。文件可以先传上来存着，换一台再打。',
+    mfpOffNote: '文件可以先传上来存着，换一台再打。',
   },
   {
     key: 'phone-upload',
     cap: 'phone',
     icon: SmartphoneIcon,
     title: '手机扫码上传',
-    description: '手机或其他联网设备扫码，把文件传到这台机器',
+    description: '扫码把手机文件传过来',
     to: '/print/upload?source=document&tab=qr&mode=transfer',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'slate',
-    stateNote: '不用登录 · 不占打印机',
-    mfpOffStateNote: '照常可用 · 这一步不经过打印机，传上来先存着',
+    stateNote: '带走：打印件',
+    mfpOffStateNote: '照常可用 · 传上来先存着',
   },
   {
     key: 'usb-import',
     cap: 'usb',
     icon: UsbIcon,
     title: 'U 盘导入打印',
-    description: '从 U 盘根目录选一份文件，导入后继续材料检查与打印。',
+    description: '从 U 盘选文件打印',
     to: '/print/upload?source=document&tab=usb&mode=transfer',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'slate',
-    stateNote: '本地网桥已实现 · Windows 真机未验收',
-    mfpOffStateNote: '照常可用 · 导入不经过打印机，传上来先存着',
+    stateNote: '带走：打印件',
+    mfpOffStateNote: '照常可用 · 导入后先存着',
   },
   {
     key: 'photo-print',
     cap: 'photo',
     icon: ImageIcon,
     title: '照片打印',
-    description: '照片上传后设参数打印，与文档同一条流程。',
+    description: '选照片，检查后设参数',
     to: '/print/upload?source=document&tab=file&category=photo',
     state: { category: 'photo' },
     aiRole: 'ai',
     needsMfp: true,
     available: true,
     iconTone: 'clay',
-    stateNote: '与文档打印同链路',
+    stateNote: '带走：照片打印件',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '照片走文档打印同一条出纸链路，那条停了，这条也出不了。',
+    mfpOffNote: '打印暂时不可用，请稍后再试。',
   },
   {
     key: 'scan',
     cap: 'scan',
     icon: ScanLineIcon,
     title: '材料扫描',
-    description: '纸质材料扫描后按设备回传格式保存，可打印、可做简历识别',
+    description: '到打印机面板扫描',
     to: '/scan',
     aiRole: 'ai',
     needsMfp: true,
     available: true,
     iconTone: 'slate',
-    stateNote: '面板手动扫描 · 无一键启动',
+    stateNote: '带走：扫描文件',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '打印和扫描是同一台机器，它出不了纸，扫描一起停。',
+    mfpOffNote: '扫描和打印是同一台机器，一起停。',
   },
   {
     key: 'convert',
     cap: 'convert',
     icon: LayersIcon,
     title: '格式转换',
-    description: '多张图片（最多 20 张）合并成一份 PDF，便于打印和存档',
+    description: '多张图片合成 PDF',
     to: '/print-scan/convert',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'teal',
-    stateNote: '最多 20 张 · 单张 ≤10MB',
-    mfpOffStateNote: '照常可用 · 合并不经过打印机，合完先存着',
+    stateNote: '带走：合并 PDF',
+    mfpOffStateNote: '照常可用 · 合完先存着',
   },
   {
     key: 'sign',
     cap: 'sign',
     icon: PenToolIcon,
     title: '签名盖章',
-    description: '在 PDF 上叠加签名 / 印章图片（版式合成，非 CA 电子签）',
+    description: '放入本人手写签名',
     to: '/print-scan/sign',
     aiRole: 'none',
     needsMfp: false,
     available: true,
     iconTone: 'clay',
-    stateNote: '图像合成，不是电子签名',
-    mfpOffStateNote: '照常可用 · 合成不经过打印机，出纸要换机',
+    stateNote: '带走：生成的新 PDF',
+    mfpOffStateNote: '照常可用 · 出纸要换机',
   },
   {
     key: 'id-photo',
     cap: 'idphoto',
     icon: UserSquareIcon,
     title: '证件照',
-    description: '本机尚未开放，先看说明和替代路径。',
+    description: '尚未开放，可查看说明',
     to: '/print-scan/feature/id-photo',
     aiRole: 'ai',
     needsMfp: false,
@@ -248,8 +261,9 @@ const ARRIVAL_CODE_ENTRY = {
   icon: TicketIcon,
   title: '到机码核销',
   description:
-    '手机上下过单拿到的 8 位数字到机码；早期发出的 10 位字母数字历史码同样能用。扫码或手输都行。不是付款后的取件凭证码',
+    '输入 8 位数字到机码（历史 10 位码也支持），核对订单后领取打印件。',
   to: '/print/pickup-claim',
+  emphasis: ['8 位数字到机码'],
 } as const
 
 const CARD_CAPABILITY_KEY: Partial<Record<string, PrintScanCapabilityKey>> = {
@@ -267,8 +281,8 @@ const CAPABILITY_STATUS_NOTES: Record<PrintScanCapabilityStatus, string | null> 
   available: null,
   testing: '测试中，暂未对用户开放',
   maintenance: '维护中，暂时不可用',
-  unsupported: '本终端不支持该能力',
-  not_verified: '待验收，暂未开放',
+  unsupported: '本机不支持此项服务',
+  not_verified: '本机暂未开通',
 }
 
 /** 反馈入口的 key。它不跳路由，而是就地打开匿名反馈弹层（见 handleQuickLink）。 */
@@ -279,14 +293,14 @@ const QUICK_LINKS: readonly (QxPrintQuickLinkView & { to?: string })[] = [
     key: 'documents',
     icon: FilesIcon,
     title: '我的文档',
-    description: '已上传 / 生成的文件',
+    description: '选文件，带走打印件',
     to: '/me/documents',
   },
   {
     key: 'print-orders',
     icon: PrinterIcon,
     title: '打印订单',
-    description: '任务状态与取件凭证码',
+    description: '查看订单与取件凭证码',
     to: '/me/print-orders',
   },
   {
@@ -296,6 +310,7 @@ const QUICK_LINKS: readonly (QxPrintQuickLinkView & { to?: string })[] = [
     icon: MessageSquareIcon,
     title: '反馈问题',
     description: '反馈打印或扫描问题，无需登录',
+    compact: true,
   },
 ]
 
@@ -309,6 +324,7 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 export function PrintScanHomePage() {
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
+  const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [capabilityLoad, setCapabilityLoad] = useState<
     CapabilitiesLoadResult | { status: 'loading'; map: ConfiguredCapabilityMap }
@@ -321,13 +337,23 @@ export function PrintScanHomePage() {
 
   useEffect(() => {
     let cancelled = false
-    void loadConfiguredCapabilities().then((result) => {
-      if (!cancelled) setCapabilityLoad(result)
+    let retryTimer: number | null = null
+    const load = () => void loadConfiguredCapabilities().then((result) => {
+      if (cancelled) return
+      setCapabilityLoad(result)
+      // Agent/能力配置可能晚于页面到达；失败态先对用户如实收口，后台短暂重试以便自动恢复。
+      if (result.status === 'error') {
+        retryTimer = window.setTimeout(() => {
+          if (!cancelled) load()
+        }, 5_000)
+      }
     })
+    load()
     return () => {
       cancelled = true
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
     }
-  }, [])
+  }, [terminalId])
 
   const probe = toProbeStatus(capabilityLoad)
   const confirmed = probe === 'ok'
@@ -341,20 +367,22 @@ export function PrintScanHomePage() {
         ? 'unavailable'
         : 'unknown'
 
-  const unavailableNote =
-    probe === 'loading' ? '正在确认本机服务配置' : '服务状态无法确认，请重新检测'
-
   const capabilities = useMemo(
     () =>
       CAPABILITIES.map((rawCapability) => {
         // 文档打印卡的彩色/双面表述按本机能力登记动态改写，其余卡原样。
         const capability =
           rawCapability.key === 'doc-print'
-            ? { ...rawCapability, description: describeDocPrint(capabilityLoad.map) }
+            ? {
+                ...rawCapability,
+                description: describeDocPrint(capabilityLoad.map),
+                stateNote: '带走：打印件',
+              }
             : rawCapability
         const capabilityKey = CARD_CAPABILITY_KEY[capability.key]
 
-        // ① 探测轴优先：读不到能力配置 → 七项一律不开（含证件照说明页）。
+        // ① 探测轴优先：读不到能力配置 → 八项一律不开（含证件照说明页）。
+        //    理由只写在徽标上一次；「重新检测 / 联系工作人员」在页顶状态块里，不在八张卡上各抄一遍。
         if (!confirmed && capabilityKey) {
           return {
             ...capability,
@@ -362,14 +390,15 @@ export function PrintScanHomePage() {
             to: '',
             state: undefined,
             stateNote: undefined,
-            note: unavailableNote,
+            note: undefined,
             unavailableBadge:
               probe === 'loading' ? '检查中' : '暂不开放任务 · 服务状态无法确认',
           }
         }
 
-        // ② 管理员后台的能力配置覆盖。
-        const override = capabilityKey ? capabilityLoad.map[capabilityKey] : undefined
+        // ② 管理员后台的能力配置覆盖。签名盖章这类默认拒绝的键：读取成功但没登记 =
+        //    本机暂未开通，按 not_verified 整卡停用（resolveCapabilityOverride），与服务端一致。
+        const override = capabilityKey ? resolveCapabilityOverride(capabilityLoad, capabilityKey) : undefined
         let resolved = capability
         if (override) {
           const available = canCreateFormalPrintScanTask(override.status)
@@ -379,10 +408,10 @@ export function PrintScanHomePage() {
             // 管理员关掉的项整卡停用（含证件照说明）。未配置的「尚未开放」说明页仍可进。
             to: available ? capability.to : '',
             state: available ? capability.state : undefined,
-            note: available
-              ? capability.note
-              : (override.note ?? CAPABILITY_STATUS_NOTES[override.status] ?? capability.note),
-            unavailableBadge: available ? capability.unavailableBadge : '暂不可用',
+            note: available ? capability.note : (override.note ?? undefined),
+            unavailableBadge: available
+              ? capability.unavailableBadge
+              : (CAPABILITY_STATUS_NOTES[override.status] ?? '暂不可用'),
           }
         }
 
@@ -405,12 +434,11 @@ export function PrintScanHomePage() {
         return resolved
       }),
     [
-      capabilityLoad.map,
+      capabilityLoad,
       confirmed,
       device.printerLabel,
       mfp,
       probe,
-      unavailableNote,
     ]
   )
 
@@ -429,6 +457,8 @@ export function PrintScanHomePage() {
     if (link?.to) navigate(link.to)
   }
 
+  // 只数管理员真配置过的行：签名盖章没登记是默认关，不是「被管理员关闭」，
+  // 不因它把整页切到 locked 态（那张卡已在 ② 里单独停用）。
   const locked =
     confirmed &&
     Object.values(capabilityLoad.map).some(
@@ -489,6 +519,7 @@ export function PrintScanHomePage() {
         onCapability={handleCapability}
         onArrivalCode={() => navigate(ARRIVAL_CODE_ENTRY.to)}
         onQuickLink={handleQuickLink}
+        onBack={() => navigate('/')}
       />
       <KioskFeedbackDialog
         open={feedbackOpen}

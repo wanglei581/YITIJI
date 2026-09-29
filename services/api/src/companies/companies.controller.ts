@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -11,6 +11,11 @@ import {
   AdminUpdateCompanyDto, PartnerImportCompaniesDto, PartnerUpdateCompanyDto,
 } from './dto/company.dto'
 import { PartnerUnpublishActionDto } from '../jobs/dto/publish.dto'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+  type KioskJobBoardRequest,
+} from '../terminals/kiosk-job-board.service'
 
 // ============================================================
 // 企业展示（CompanyProfile）：
@@ -37,7 +42,15 @@ import { PartnerUnpublishActionDto } from '../jobs/dto/publish.dto'
 
 @Controller()
 export class CompaniesController {
-  constructor(private readonly companies: CompaniesService) {}
+  constructor(
+    private readonly companies: CompaniesService,
+    private readonly jobBoard: KioskJobBoardService,
+  ) {}
+
+  /** 岗位板块关闭时，企业页不再带出岗位标题或来源链接。企业记录本身仍返回。 */
+  private async jobBoardOpen(req?: KioskJobBoardRequest): Promise<boolean> {
+    return (await this.jobBoard.resolve(kioskJobBoardTerminalRef(req ?? {}))).enabled
+  }
 
   // ── 公开（Kiosk）────────────────────────────────────────────────────────
 
@@ -53,10 +66,13 @@ export class CompaniesController {
     @Query('sourceKind') sourceKind?: string,
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
+    @Req() req?: KioskJobBoardRequest,
   ) {
+    const open = await this.jobBoardOpen(req)
     return ApiResponse.ok(await this.companies.listPublic(
       { keyword, province, city, district, companyType, industry, recruitType, sourceKind },
       parseMemberPageQuery(cursor, pageSize),
+      { includeJobTitles: open },
     ))
   }
 
@@ -87,13 +103,24 @@ export class CompaniesController {
     return ApiResponse.ok(await this.companies.getPublic(id))
   }
 
+  /**
+   * 企业详情里的岗位列表。岗位板块关闭时返回空列表，不返回 403。
+   * 这个列表是企业页的子区域，403 会让企业页变成失败态；空列表不带标题、来源链接或二维码内容。
+   * 企业不存在仍是 404。企业详情 GET /companies/:id 不受开关影响。
+   */
   @Get('companies/:id/jobs')
   async companyJobs(
     @Param('id') id: string,
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
+    @Req() req?: KioskJobBoardRequest,
   ) {
-    return ApiResponse.ok(await this.companies.listPublicJobs(id, parseMemberPageQuery(cursor, pageSize)))
+    const open = await this.jobBoardOpen(req)
+    return ApiResponse.ok(await this.companies.listPublicJobs(
+      id,
+      parseMemberPageQuery(cursor, pageSize),
+      { includeJobs: open },
+    ))
   }
 
   // ── Admin ────────────────────────────────────────────────────────────────

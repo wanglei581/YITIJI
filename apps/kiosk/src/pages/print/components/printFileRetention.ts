@@ -1,14 +1,22 @@
 import { formatDateTime } from '@ai-job-print/shared'
 
-/** 打印完成页文件保留说明。时间必须来自后端 expiresAt / deletedAt，前台不写死时长。 */
+/**
+ * 打印完成页文件保留说明。
+ * 时间只来自任务状态带回的到期时间或删除时间，这里不写死时长。
+ * 读不到时间就说读不到，不写具体日期。
+ */
+export const FILE_RETENTION_SEE_DOCUMENTS =
+  '具体时间以「我的 → 我的文档」里显示的为准。'
+export const FILE_RETENTION_NOT_PHYSICAL =
+  '这里说的删除，是从系统里删掉这份电子文件。'
 export const FILE_RETENTION_UNAVAILABLE =
-  '未能读取本次文件的保留期，保留期以后台策略为准'
+  '这次没有读到这份文件的删除时间，所以这里不写具体日期。'
 export const FILE_RETENTION_UNPARSED =
-  '未能解析本次文件的到期时间，保留期以后台策略为准'
+  '这份文件定了删除时间，但这次没有读出来，所以这里不写具体日期。'
 export const FILE_RETENTION_NO_EXPIRY =
-  '该文件未设置到期时间，保留期以后台策略为准'
-export const FILE_RETENTION_NOT_WIPED =
-  '这不是对存储介质的物理销毁。'
+  '这份文件还没有定下删除日期。'
+const FILE_RETENTION_AUTO_DELETE =
+  '这份文件会在保留期满后自动删除；具体时间以「我的 → 我的文档」里显示的为准。'
 
 export interface PrintFileRetentionInput {
   fileRetentionAvailable?: boolean
@@ -31,21 +39,25 @@ function formatWhen(value: string | null | undefined): string | null {
   return label.trim() ? label : null
 }
 
+function joinCopy(...parts: Array<string | null | undefined>): string {
+  return parts.filter((part): part is string => Boolean(part)).join('')
+}
+
 export function describePrintFileRetention(input: PrintFileRetentionInput): PrintFileRetentionCopy {
   if (input.fileDeletedAt) {
     const whenLabel = formatWhen(input.fileDeletedAt)
     const headline = whenLabel
-      ? `该文件已于 ${whenLabel} 按策略删除`
-      : '该文件已按策略删除（删除时间未能解析）'
+      ? `这份文件已于 ${whenLabel} 删除`
+      : '这份文件已经删除，删除时间暂时读不出来'
     const reason = input.fileDeleteReason?.trim()
       ? `删除原因：${input.fileDeleteReason.trim()}。`
       : ''
     const storage = input.fileStorageDeletedAt
-      ? '云端对象已删除。'
-      : '删除记录已登记，云端对象是否已清除以后台清理账本为准。'
+      ? '这份电子文件已经删掉。'
+      : '删除已经记下。文件是否已经清掉，以「我的 → 我的文档」里显示的为准。'
     return {
       headline,
-      detail: `${reason}${storage}${FILE_RETENTION_NOT_WIPED}`,
+      detail: joinCopy(reason, storage, FILE_RETENTION_NOT_PHYSICAL),
       whenLabel,
     }
   }
@@ -53,7 +65,7 @@ export function describePrintFileRetention(input: PrintFileRetentionInput): Prin
   if (input.fileRetentionAvailable !== true) {
     return {
       headline: FILE_RETENTION_UNAVAILABLE,
-      detail: `前台不会编造保留时长。${FILE_RETENTION_NOT_WIPED}`,
+      detail: joinCopy(FILE_RETENTION_SEE_DOCUMENTS, FILE_RETENTION_NOT_PHYSICAL),
       whenLabel: null,
     }
   }
@@ -63,28 +75,31 @@ export function describePrintFileRetention(input: PrintFileRetentionInput): Prin
     if (!whenLabel) {
       return {
         headline: FILE_RETENTION_UNPARSED,
-        detail: `后端返回了到期字段，但无法解析为有效时间。${FILE_RETENTION_NOT_WIPED}`,
+        detail: joinCopy(FILE_RETENTION_SEE_DOCUMENTS, FILE_RETENTION_NOT_PHYSICAL),
         whenLabel: null,
       }
     }
     return {
-      headline: `本次打印文件计划于 ${whenLabel} 按后台策略从云端删除`,
-      detail: `到期后由清理任务删除云端文件并保留删除记录。${FILE_RETENTION_NOT_WIPED}`,
+      headline: `这份文件计划在 ${whenLabel} 自动删除`,
+      detail: joinCopy(FILE_RETENTION_AUTO_DELETE, FILE_RETENTION_NOT_PHYSICAL),
       whenLabel,
     }
   }
 
   if (input.fileRetentionPolicy === 'long_term') {
     return {
-      headline: '本次文件为长期保存，不会按短期策略自动清理',
-      detail: `后端 expiresAt 为空，保存策略为长期保存。${FILE_RETENTION_NOT_WIPED}`,
+      headline: '这份文件按长期保存，不会按短期自动删除',
+      detail: joinCopy(
+        '这里没有短期删除日期。要看它还在不在，打开「我的 → 我的文档」。',
+        FILE_RETENTION_NOT_PHYSICAL,
+      ),
       whenLabel: null,
     }
   }
 
   return {
     headline: FILE_RETENTION_NO_EXPIRY,
-    detail: `后端未返回到期时间，也未标记为长期保存。${FILE_RETENTION_NOT_WIPED}`,
+    detail: joinCopy(FILE_RETENTION_SEE_DOCUMENTS, FILE_RETENTION_NOT_PHYSICAL),
     whenLabel: null,
   }
 }

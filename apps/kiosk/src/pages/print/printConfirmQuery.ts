@@ -1,3 +1,4 @@
+import { ALLOW_FIXTURES } from '../../utils/buildMode'
 // 报价确认页地址栏契约。
 //
 // 金额只认服务端 POST /orders/quote。地址栏里的取值不是报价、不是文件本身。
@@ -95,9 +96,9 @@ export function scanPrintConfirmQuery(search: string, hash: string, href: string
   let requestedState: string | null = null
 
   for (const [key, value] of pairs) {
-    if (key === 'debug' && value === '1') debug = true
+    if (ALLOW_FIXTURES && key === 'debug' && value === '1') debug = true
     if (key === 'flat' && value === '1') flat = true
-    if (key === 'capture' && value === '1') capture = true
+    if (ALLOW_FIXTURES && key === 'capture' && value === '1') capture = true
     if (key === 'state') requestedState = value
 
     if (!(QUERY_ALLOW as readonly string[]).includes(key)) {
@@ -137,7 +138,7 @@ export function invalidContextReason(scan: QueryScan): string {
   }
   if (scan.sensitive) {
     return (
-      '地址里带了本页没有登记的参数，其中有像凭证、签名链接那样的键名。' +
+      '地址里带了本页没有登记的参数，其中有像凭证、临时链接那样的名字。' +
       '本页只认来源、文件编号、页数、份数、单双面、颜色和页面状态这几个登记参数，其余一概不看、不显示，也不会带去下一步。' +
       '地址栏里那几个取值已经就地清掉了。'
     )

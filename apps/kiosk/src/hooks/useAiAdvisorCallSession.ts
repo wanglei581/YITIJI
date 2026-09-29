@@ -18,10 +18,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBusyLock } from '../contexts/KioskBusyContext'
 import { API_BASE_URL } from '../services/api/client'
 import { getTerminalId } from '../services/api/screensaver'
+import { terminalProtectedFetch } from '../services/terminalAuth'
 
 // 通知后端结束腾讯云 AI 会话（StopAIConversation），立即停止按分钟计费。
 //  - keepalive：保证在组件卸载 / 切走页面 / 关闭标签页时请求仍能发出
-//  - X-Terminal-Id：满足后端鉴权（缺失会 401，导致会话停不掉持续计费）
+//  - 只带 X-Terminal-Id 和停止能力令牌。停止接口不挂终端会话守卫，
+//    会话票过期或本机已清场时仍能把已经开着的计费会话停掉。
 // 纯函数、模块级：可在 cleanup、startCall 中途离开、pagehide 三处复用。
 function stopBackendTask(taskId: string, terminalId: string): void {
   if (!taskId || !terminalId) return
@@ -191,12 +193,14 @@ export function useAiAdvisorCallSession() {
       const isCurrentSession = () =>
         !destroyedRef.current && startedRef.current && sessionEpochRef.current === sessionEpoch
 
-      // 1. 后端启动 AI 会话 + 下发进房凭证（30s 超时，防止后端挂起永久等待）
+      // 1. 后端启动 AI 会话 + 下发进房凭证（30s 超时，防止后端挂起永久等待）。
+      //    terminalProtectedFetch 附上终端编号和终端会话票。创建接口由
+      //    TerminalIdentityGuard 把守，只带编号会被 401，不能开一场计费会话。
       const ac = new AbortController()
       const timeoutId = setTimeout(() => ac.abort(), 30_000)
       let res: Response
       try {
-        res = await fetch(`${API_BASE_URL}/trtc/session`, {
+        res = await terminalProtectedFetch(`${API_BASE_URL}/trtc/session`, {
           method:  'POST',
           headers: {
             'Content-Type': 'application/json',

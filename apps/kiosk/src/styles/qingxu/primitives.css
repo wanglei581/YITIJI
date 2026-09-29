@@ -15,7 +15,7 @@
   padding: 0 26px;
   border-radius: var(--qx-r);
   display: inline-flex; align-items: center; justify-content: center; gap: 11px;
-  font-family: var(--qx-sans); font-size: 24px; font-weight: 700;
+  font-family: var(--qx-sans); font-size: var(--qx-fs-btn); font-weight: 700;
   border: 1px solid var(--qx-line-2);
   background: var(--qx-surface); color: var(--qx-ink);
   cursor: pointer;
@@ -41,8 +41,8 @@
 
 /* ── 分区标题 ────────────────────────────────────────────────── */
 .qx-sec-h { display: flex; align-items: baseline; gap: 14px; margin-bottom: 2px; }
-.qx-sec-h .t { font-size: 25px; font-weight: 700; }
-.qx-sec-h .hint { margin-left: auto; font-size: 17px; color: var(--qx-ink-3); }
+.qx-sec-h .t { font-size: var(--qx-fs-sec); font-weight: 700; }
+.qx-sec-h .hint { margin-left: auto; font-size: var(--qx-fs-aux); color: var(--qx-ink-3); }
 
 /* ── 列表行 ─────────────────────────────────────────────────── */
 .qx-rows { border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); overflow: hidden; }
@@ -61,8 +61,8 @@
   display: flex; align-items: center; justify-content: center;
 }
 .qx-row-tx { flex: 1; min-width: 0; }
-.qx-row-t { display: block; font-size: 22px; font-weight: 700; }
-.qx-row-d { display: block; margin-top: 4px; font-size: 18px; line-height: 1.4; color: var(--qx-ink-3); }
+.qx-row-t { display: block; font-size: var(--qx-fs-body-lg); font-weight: 700; }
+.qx-row-d { display: block; margin-top: 4px; font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink-3); }
 .qx-row-go { flex: none; color: var(--qx-ink-3); }
 
 /* ── 占位：服务端还没返回的值 ─────────────────────────────────
@@ -88,8 +88,8 @@
 .qx-state[data-tone='error'] { border-color: var(--qx-cinnabar); }
 .qx-state[data-tone='error'] .qx-state-ic { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
 .qx-state[data-tone='info']  .qx-state-ic { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
-.qx-state-t { font-size: 24px; font-weight: 700; }
-.qx-state-d { margin-top: 6px; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.qx-state-t { font-size: var(--qx-fs-btn); font-weight: 700; }
+.qx-state-d { margin-top: 6px; font-size: var(--qx-fs-aux-lg); line-height: 1.5; color: var(--qx-ink-2); }
 
 /* ── 底部操作条 ─────────────────────────────────────────────── */
 .qx-ctabar {
@@ -97,7 +97,7 @@
   padding: 18px var(--qx-gutter);
   border-top: 1px solid var(--qx-line); background: var(--qx-surface);
 }
-.qx-ctabar .why { flex: 1; margin: 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.qx-ctabar .why { flex: 1; margin: 0; font-size: var(--qx-fs-aux); line-height: var(--qx-lh-body); color: var(--qx-ink-2); }
 
 /* ── 余量吸收 ─────────────────────────────────────────────────
  * 一体机是 1080×1920 定高屏，内容不足时底部会留一大片空白——这在
@@ -118,3 +118,31 @@
 /* 吸收块内部若是网格（如数字键盘），行高随之等分拉伸 */
 .qx-grow > .knp,
 .qx-grow .qx-grow-inner { flex: 1 1 auto; min-height: 0; }
+
+/* ── 每页底部「上一步 / 问小青」（v2 稿 .qx2-actions / .qx2-prev / .qx2-ai） ──
+ * 规则 7：每页保留本步的 AI 入口。它不带框、用正文字阶，可点区不低于 56。
+ * 组件见 components/qingxu/QxAiHelp.tsx。 */
+.qx-step-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 64px;
+}
+.qx-step-prev,
+.qx-ai-help {
+  display: inline-flex;
+  align-items: center;
+  min-height: 56px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font-size: var(--qx-fs-body);
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.qx-step-prev { color: var(--qx-ink-2); }
+.qx-ai-help { margin-left: auto; color: var(--qx-teal-d); text-align: right; }
+.qx-step-prev:focus-visible,
+.qx-ai-help:focus-visible { outline: 3px solid var(--qx-deep); outline-offset: 3px; }

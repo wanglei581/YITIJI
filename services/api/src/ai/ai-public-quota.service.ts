@@ -41,6 +41,7 @@
 import { HttpException, HttpStatus, Injectable, ServiceUnavailableException } from '@nestjs/common'
 import { createHash } from 'node:crypto'
 import { RedisService } from '../common/redis/redis.service'
+import { resumeParseIntentTtlMs } from './resume-parse-submission.service'
 
 /** 目前只有这两个端点没有任何配额，先把它们纳管。 */
 export type AiPublicOperation = 'assistant_chat' | 'resume_parse'
@@ -53,6 +54,31 @@ export interface AiPublicQuotaContext {
 
 export interface AiPublicQuotaTicket {
   keys: string[]
+}
+
+export interface ResumeParseQuotaOnceRequest {
+  intentId: string
+  markerTtlSeconds: number
+  context: AiPublicQuotaContext
+  now?: Date
+}
+
+export interface ResumeParseQuotaOnceReceipt {
+  outcome: 'charged' | 'replay'
+  day: string
+}
+
+export function resumeParseQuotaMarkerKey(intentId: string): string {
+  return `quota:ai_public:resume_parse:once:${intentId}`
+}
+
+export function resumeParseQuotaCounterKey(
+  dimension: 'member' | 'terminal' | 'ip',
+  value: string,
+  day: string,
+): string {
+  const hashed = createHash('sha256').update(value, 'utf8').digest('hex')
+  return `quota:ai_public:resume_parse:${dimension}:${hashed}:${day}`
 }
 
 /** 与 job-ai 一致：留 48 小时，跨自然日边界时旧 key 自然过期。 */
@@ -112,6 +138,42 @@ export class AiPublicQuotaService {
     await this.rollbackKeys(ticket.keys)
   }
 
+  /**
+   * resume_parse 意图的一次性计数。同 intentId 在 marker 存活期间只计一次。
+   * marker TTL 不会短于 resumeParseIntentTtlMs。没有退款，也不会重新放行 provider。
+   */
+  async consumeOnce(input: ResumeParseQuotaOnceRequest): Promise<ResumeParseQuotaOnceReceipt> {
+    const now = input.now ?? new Date()
+    const day = dayKeyAt(now)
+    const counters = this.resumeParseCounters(input.context, day)
+    if (!isIntentId(input.intentId) || !isPositiveInt(input.markerTtlSeconds) || counters.length === 0) {
+      throw quotaUnavailable()
+    }
+    const markerTtlSeconds = Math.max(input.markerTtlSeconds, Math.ceil(resumeParseIntentTtlMs() / 1000))
+    try {
+      const result = await this.redis.consumeQuotaOnce({
+        markerKey: resumeParseQuotaMarkerKey(input.intentId),
+        markerTtlSeconds,
+        markerValue: day,
+        counterTtlSeconds: DAILY_TTL_SECONDS,
+        counters,
+      })
+      if (result === 'rejected') throw quotaExceeded()
+      return { outcome: result === 'replay' ? 'replay' : 'charged', day }
+    } catch (error) {
+      if (error instanceof HttpException) throw error
+      throw quotaUnavailable()
+    }
+  }
+
+  private resumeParseCounters(input: AiPublicQuotaContext, day: string): { key: string; limit: number }[] {
+    return [
+      input.member ? { key: resumeParseQuotaCounterKey('member', input.member, day), limit: memberLimit('resume_parse') } : null,
+      input.terminal ? { key: resumeParseQuotaCounterKey('terminal', input.terminal, day), limit: terminalLimit('resume_parse') } : null,
+      input.ip ? { key: resumeParseQuotaCounterKey('ip', input.ip, day), limit: ipLimit('resume_parse') } : null,
+    ].filter((item): item is { key: string; limit: number } => item !== null)
+  }
+
   private key(
     operation: AiPublicOperation,
     dimension: 'member' | 'terminal' | 'ip',
@@ -154,7 +216,31 @@ function ipLimit(operation: AiPublicOperation): number {
 
 /** 自然日按 UTC+8 切分，与 job-ai-quota.service.ts 的 dayKey 完全一致。 */
 function dayKey(): string {
-  const now = new Date()
+  return dayKeyAt(new Date())
+}
+
+function dayKeyAt(now: Date): string {
   const chinaTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
   return chinaTime.toISOString().slice(0, 10)
+}
+
+function isIntentId(value: string): boolean {
+  return /^[a-f0-9]{64}$/.test(value)
+}
+
+function isPositiveInt(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0
+}
+
+function quotaExceeded(): HttpException {
+  return new HttpException(
+    { error: { code: 'AI_PUBLIC_QUOTA_EXCEEDED', message: '今日 AI 使用次数已达上限，请稍后再试' } },
+    HttpStatus.TOO_MANY_REQUESTS,
+  )
+}
+
+function quotaUnavailable(): ServiceUnavailableException {
+  return new ServiceUnavailableException({
+    error: { code: 'AI_PUBLIC_QUOTA_UNAVAILABLE', message: '配额服务暂时不可用，请稍后再试' },
+  })
 }

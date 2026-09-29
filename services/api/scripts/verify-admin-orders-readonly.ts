@@ -59,6 +59,7 @@ async function main(): Promise<void> {
       select: { id: true },
     })
     const taskIds = [...new Set([taskId, brokenTaskId, unconfirmedTaskId, printedTaskId, notPrintedTaskId, moneyTaskId, ...leftoverTasks.map((task) => task.id)])]
+    await prisma.paymentAttempt.deleteMany({ where: { order: { is: { orderNo: { startsWith: 'ORD-READ' } } } } })
     await prisma.order.deleteMany({
       where: { OR: [{ id: { in: [orderId, brokenOrderId, unconfirmedOrderId, printedOrderId, notPrintedOrderId, moneyOrderId] } }, { orderNo: { startsWith: 'ORD-READ' } }] },
     })
@@ -340,6 +341,108 @@ async function main(): Promise<void> {
       fail(`refundRequired 筛选必须只返回已标记待退款的已付款单：${JSON.stringify(markedPage)}`)
     }
     pass('refundRequired 筛选返回已标记待退款的已付款未出纸单')
+
+    const collectedOrderId = `ord_aor_coll_${suffix}`
+    const collectedOrderNo = `ORD-READ-C-${suffix.toUpperCase()}`
+    await prisma.order.create({
+      data: {
+        id: collectedOrderId,
+        orderNo: collectedOrderNo,
+        type: 'print',
+        terminalId,
+        amountCents: 330,
+        currency: 'CNY',
+        payStatus: 'closed',
+        taskStatus: 'expired',
+        pickupStatus: 'expired',
+        refundReason: 'ONLINE_PAID_PENDING_REFUND',
+        discountCents: 0,
+      },
+    })
+    const collectedItem = (await service.list({ search: collectedOrderNo, page: 1, pageSize: 10 })).items[0]
+    if (
+      collectedItem?.id !== collectedOrderId ||
+      collectedItem.payStatus !== 'closed' ||
+      collectedItem.refundRequired !== true ||
+      collectedItem.refundEligible !== true
+    ) {
+      fail(`迟到回调待退必须 refundRequired 且 payStatus 仍是 closed：${JSON.stringify(collectedItem)}`)
+    }
+    const collectedPage = await service.list({ refundRequired: true, search: collectedOrderNo, page: 1, pageSize: 10 })
+    if (collectedPage.pagination.total !== 1 || collectedPage.items[0]?.id !== collectedOrderId) {
+      fail(`refundRequired 筛选必须包含迟到回调待退单：${JSON.stringify(collectedPage)}`)
+    }
+    pass('refundRequired 筛选包含渠道已收款未转 paid 的待退单，且不伪装 payStatus=paid')
+
+    const refundingOrderId = `ord_aor_rf_${suffix}`
+    const refundingOrderNo = `ORD-READ-RF-${suffix.toUpperCase()}`
+    await prisma.order.create({
+      data: {
+        id: refundingOrderId,
+        orderNo: refundingOrderNo,
+        type: 'print',
+        terminalId,
+        amountCents: 220,
+        currency: 'CNY',
+        payStatus: 'refunding',
+        taskStatus: 'pending',
+        discountCents: 0,
+      },
+    })
+    const refundingItem = (await service.list({ search: refundingOrderNo, page: 1, pageSize: 10 })).items[0]
+    if (
+      refundingItem?.opsAttention !== true ||
+      refundingItem.opsAttentionCode !== 'refunding' ||
+      refundingItem.refundRequired !== false ||
+      refundingItem.payStatus !== 'refunding'
+    ) {
+      fail(`refunding 必须 opsAttention 可见且不得伪装 refundRequired：${JSON.stringify(refundingItem)}`)
+    }
+    const unconfirmedPayOrderId = `ord_aor_ucf_${suffix}`
+    const unconfirmedPayOrderNo = `ORD-READ-UCF-${suffix.toUpperCase()}`
+    await prisma.order.create({
+      data: {
+        id: unconfirmedPayOrderId,
+        orderNo: unconfirmedPayOrderNo,
+        type: 'print',
+        terminalId,
+        amountCents: 210,
+        currency: 'CNY',
+        payStatus: 'paying',
+        taskStatus: 'pending',
+        discountCents: 0,
+      },
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: unconfirmedPayOrderId,
+        channel: 'wechat',
+        amountCents: 210,
+        status: 'created',
+        createdAt: new Date(Date.now() - 60_000),
+      },
+    })
+    const unconfirmedPayItem = (await service.list({ search: unconfirmedPayOrderNo, page: 1, pageSize: 10 })).items[0]
+    if (
+      unconfirmedPayItem?.opsAttention !== true ||
+      unconfirmedPayItem.opsAttentionCode !== 'channel_accepted_unconfirmed' ||
+      unconfirmedPayItem.payStatus !== 'paying' ||
+      unconfirmedPayItem.refundRequired !== false
+    ) {
+      fail(`渠道已受理未确认必须 opsAttention 且不得伪装 paid：${JSON.stringify(unconfirmedPayItem)}`)
+    }
+    const attentionPage = await service.list({ opsAttention: true, page: 1, pageSize: 100 })
+    const attentionIds = new Set(attentionPage.items.map((row) => row.id))
+    if (
+      attentionIds.has(refundingOrderId)
+      && attentionIds.has(unconfirmedPayOrderId)
+      && attentionIds.has(collectedOrderId)
+      && !attentionIds.has(orderId)
+    ) {
+      pass('opsAttention 筛选覆盖退款中、渠道未确认、待退款，不含普通未支付单')
+    } else {
+      fail(`opsAttention 筛选 mismatch: ${JSON.stringify([...attentionIds])}`)
+    }
 
     const detail = await service.getById(orderId)
     if (

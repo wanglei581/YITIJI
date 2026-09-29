@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { JwtService } from '@nestjs/jwt'
 import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
@@ -15,6 +16,15 @@ import type { JobAiQuotaContext } from './job-ai-quota.service'
 
 import { resolveClientIp } from '../common/client-ip'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import {
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
+import {
+  KioskJobBoardService,
+  kioskJobBoardTerminalRef,
+  type KioskJobBoardRequest,
+} from '../terminals/kiosk-job-board.service'
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
   ip?: string
@@ -99,11 +109,19 @@ export class JobAiController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
+    private readonly jobBoard: KioskJobBoardService,
   ) {}
 
+  private assertJobBoard(req: ReqLike): Promise<void> {
+    return this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req as KioskJobBoardRequest))
+  }
+
   @Post('ai/recommendations')
+  @AiUse('generate')
   @PaidAiThrottle(6)
   async recommendations(@Body() dto: JobRecommendationsDto, @Req() req: ReqLike) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
+    await this.assertJobBoard(req)
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
     return ApiResponse.ok(await this.service.recommendations({
@@ -116,8 +134,11 @@ export class JobAiController {
   }
 
   @Post(':id/ai/explain')
+  @AiUse('generate')
   @PaidAiThrottle(10)
   async explain(@Param('id') id: string, @Req() req: ReqLike) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
+    await this.assertJobBoard(req)
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
     return ApiResponse.ok(await this.service.explainJob(id, requester, quota.terminal, quota))
@@ -125,7 +146,11 @@ export class JobAiController {
 
   @Post(':id/ai/match')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async match(@Param('id') id: string, @Body() dto: JobAiMatchDto, @Req() req: ReqLike) {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
+    await this.assertJobBoard(req)
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
     return ApiResponse.ok(await this.governed.matchForMember({
@@ -147,18 +172,29 @@ export class JobAiController {
 @Controller('me/job-ai-sessions')
 @UseGuards(EndUserAuthGuard)
 export class MemberJobAiSessionsController {
-  constructor(private readonly service: JobAiService) {}
+  constructor(
+    private readonly service: JobAiService,
+    private readonly jobBoard: KioskJobBoardService,
+  ) {}
 
   @Get()
+  @AiUse('read')
+
   async list(
     @CurrentEndUser() user: AuthedEndUser,
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
+    @Req() req?: KioskJobBoardRequest,
   ) {
+    if (!isRecruitmentContentHostingEnabled()) {
+      return ApiResponse.ok({ items: [], nextCursor: null, total: 0 })
+    }
+    await this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
     return ApiResponse.ok(await this.service.listMine(user.endUserId, parseMemberPageQuery(cursor, pageSize)))
   }
 
   @Delete(':id')
+  @AiUseExempt('删除本人记录或文件，不调模型；AI 暂停、维护期间也必须能删')
   async remove(@CurrentEndUser() user: AuthedEndUser, @Param('id') id: string) {
     return ApiResponse.ok(await this.service.deleteMine(user.endUserId, id))
   }

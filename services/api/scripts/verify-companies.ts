@@ -31,6 +31,7 @@ import { join } from 'path'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { CompaniesService } from '../src/companies/companies.service'
+import { RecruitmentEmergencyService } from '../src/recruitment-hosting/recruitment-emergency.service'
 import { ActivityService } from '../src/activity/activity.service'
 import { COMPANY_INDUSTRIES, COMPANY_SOURCE_KINDS, COMPANY_TYPES } from '../src/companies/companies.types'
 import {
@@ -442,6 +443,30 @@ async function main() {
       if (!content.includes('兼容') || !content.includes('诊断')) fail(`15. ${label} 应明确 /companies/filters 为兼容/诊断链路`)
     }
     pass('15. Admin/Partner 地区录入使用共享级联选择；/companies/filters 已标注兼容/诊断')
+
+    const emergency = new RecruitmentEmergencyService(prisma, audit)
+    await emergency.takedown('company', companyId, 'false_information', '验证企业下架', { userId: admin.userId, role: 'admin', orgId: null })
+    await expectStatus(companies.adminPublish(companyId, { publish: true }, admin), 403, '下架后管理员不能恢复')
+    pass('下架后管理员不能恢复')
+    const companyNotices = await prisma.partnerOrgNotice.count({ where: { orgId: orgA } })
+    if (companyNotices < 1) fail('企业下架通知未写出')
+    else pass('企业下架通知写出')
+    const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+    try {
+      const hidden = await companies.listPublic({}, PAGE)
+      if (hidden.items.length !== 0) fail('托管关闭时企业列表不是空')
+      else pass('托管关闭时企业列表返回空')
+      await expectStatus(companies.getPublic(companyId), 403, '托管关闭时企业详情拒绝')
+      pass('托管关闭时企业详情拒绝')
+      await expectStatus(companies.adminCreate({
+        sourceOrgId: orgA, externalId: `closed-${tag}`, sourceName: 'x', name: '关闭后不得建',
+      } as never, admin), 403, '托管关闭时管理员代建企业被拒')
+      pass('托管关闭时管理员代建企业被拒')
+    } finally {
+      if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+    }
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {

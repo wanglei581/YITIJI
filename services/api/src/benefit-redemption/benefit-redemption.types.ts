@@ -7,6 +7,8 @@
 // - subsidy_eligibility_hint 为 info-only 政策资格提示，绝不可核销。
 // ============================================================
 
+import type { PrismaTransactionClient } from '../prisma/prisma.service'
+
 /** 可核销的权益类型（对齐 BenefitType 中有额度的子集；subsidy_eligibility_hint 不可核销）。 */
 export const REDEEMABLE_BENEFIT_TYPES = ['coupon', 'free_quota', 'package_entitlement'] as const
 export type RedeemableBenefitType = (typeof REDEEMABLE_BENEFIT_TYPES)[number]
@@ -32,6 +34,11 @@ export interface RedeemBenefitParams {
   orderId?: string | null
   /** C5-4 order-linked：抵扣金额（分，>=0）写入 RedemptionRecord.amountCents；缺省 → 0（平台 credit 非资金）。 */
   amountCents?: number
+  /**
+   * 与本次核销同一数据库事务。新扣次和幂等回放都会调用。
+   * 抛错会回滚尚未提交的扣次。调用方用它把导出文件从 uploading 改成 active。
+   */
+  withinTransaction?: (tx: PrismaTransactionClient) => Promise<void>
 }
 
 /** 核销结果（内部返回；不含金额/凭证）。 */

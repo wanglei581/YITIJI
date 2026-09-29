@@ -387,7 +387,10 @@ class FakeRedis {
 
 class FakeCapabilities {
   status: 'available' | 'maintenance' = 'available'
-  async assertUserTaskAllowed(_terminalId: string, _capabilityKey: string): Promise<void> {
+  /** 记下每次按哪台终端、哪个能力键判定：D3 靠的是传对 signature_stamp，传错键门禁就被绕过。 */
+  readonly calls: Array<{ terminalId: string; capabilityKey: string }> = []
+  async assertUserTaskAllowed(terminalId: string, capabilityKey: string): Promise<void> {
+    this.calls.push({ terminalId, capabilityKey })
     if (this.status !== 'available') {
       throw new ForbiddenException({
         error: { code: 'CAPABILITY_UNAVAILABLE', message: '该终端当前不提供此服务，请咨询现场工作人员' },
@@ -1104,6 +1107,17 @@ async function main() {
       'CAPABILITY_UNAVAILABLE',
       'C2 能力维护态时 compose 拒绝',
     )
+    // D3（2026-09-28）：签名盖章默认关，服务端靠 assertUserTaskAllowed(终端, 'signature_stamp') 拦。
+    // 假能力服务不看键，上面两条只证明「调了」；这里钉住「按哪台终端、哪个键调的」。
+    assert.deepEqual(
+      capabilities.calls,
+      [
+        { terminalId: 't1', capabilityKey: 'signature_stamp' },
+        { terminalId: 't1', capabilityKey: 'signature_stamp' },
+      ],
+      'C2 inspect 与 compose 必须各按本终端的 signature_stamp 判定一次',
+    )
+    pass('C2 inspect 与 compose 各按本终端的 signature_stamp 判定能力')
   }
 
   // ══════════════════════════════════════════════════════════════════════

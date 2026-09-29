@@ -1,5 +1,7 @@
 # 校园招聘专区 · 产品设计方案
 
+> **托管 a 下停放（2026-09-26 标注）：** 本文涉及的岗位、招聘会、企业资料在我们云上暂停，代码保留；客户私有化部署（b）或取得人力资源服务许可证后再参考。现行口径见 docs/compliance/compliance-boundary.md §1.1。
+
 > 最后更新：2026-06-03
 > 状态：**方案已确认（方案 A），暂未开发**（用户确认范围/入口，暂不动代码）
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](./feature-scope.md) | [compliance-boundary.md](../compliance/compliance-boundary.md) | [next-tasks.md](../progress/next-tasks.md)

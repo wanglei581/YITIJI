@@ -1,0 +1,14 @@
+# Replace Ubuntu's /etc/logrotate.d/nginx with this file; do not install both.
+/var/log/nginx/*.log {
+  daily
+  rotate 180
+  compress
+  delaycompress
+  missingok
+  notifempty
+  create 0640 www-data adm
+  sharedscripts
+  postrotate
+    invoke-rc.d nginx rotate >/dev/null 2>&1 || true
+  endscript
+}

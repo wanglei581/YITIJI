@@ -13,7 +13,7 @@
     <view class="card" wx:if="{{!loggedIn}}">
       <view class="empty-slot">
         <view class="es-t">请先登录</view>
-        <view class="es-d">今日提醒按你的订单和收藏生成，登录后可查看。</view>
+        <view class="es-d">今日提醒按你的打印订单和平台通知生成，登录后可查看。</view>
         <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goLogin" role="button" aria-label="去登录">去登录</view>
       </view>
     </view>
@@ -31,8 +31,8 @@
     <view class="card" wx:elif="{{empty}}">
       <view class="empty-slot">
         <view class="es-t">今日无紧急待办</view>
-        <view class="es-d">没有即将过期的到机码或即将开始的招聘会</view>
-        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goJobs" role="button" aria-label="看岗位">看岗位</view>
+        <view class="es-d">没有即将过期的到机码，也没有新的平台通知</view>
+        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goPrint" role="button" aria-label="去打印">去打印</view>
       </view>
     </view>
 

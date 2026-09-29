@@ -1,3 +1,4 @@
+import { AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
@@ -42,11 +43,13 @@ export class JobMaterialsController {
   constructor(private readonly materials: JobMaterialsService) {}
 
   @Get('templates')
+  @AiUseExempt('求职材料按模板生成，不调模型')
   async templates(): Promise<ApiResponse<JobMaterialTemplateView[]>> {
     return ApiResponse.ok(await this.materials.listTemplates())
   }
 
   @Post('generate')
+  @AiUseExempt('求职材料按模板生成，不调模型')
   @UseGuards(EndUserAuthGuard)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async generate(

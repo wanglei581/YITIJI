@@ -76,7 +76,19 @@ const draftStore = read('services/api/src/ai/resume/resume-draft.store.ts')
 assert(draftStore.includes("KIND_OPTIMIZE_DRAFT = 'optimize_draft'"), '草稿 kind=optimize_draft 已约定')
 assert(draftStore.includes("KIND_OPTIMIZE_CONFIRMED = 'optimize_confirmed'"), '确认快照 kind=optimize_confirmed 已约定')
 assert(memberAssets.includes("HIDDEN_RESUME_RESULT_KINDS"), '列表不把草稿/确认快照单独成行')
-assert(memberAssets.includes("row.kind === 'parse' ? { endUserId, taskId: row.taskId }"), '删除 parse 按 taskId 级联草稿与确认快照')
+const parseCascadeWhere = '{ endUserId, taskId: row.taskId, kind: { not: RESUME_PARSE_INTENT_KIND } }'
+const cascadeHits = memberAssets.split(parseCascadeWhere).length - 1
+assert(cascadeHits >= 2, '删除 parse 按 taskId 级联草稿与确认快照（AI 记录与简历两条路径）')
+assert(
+  (memberAssets.split("data: { status: 'revoked' }").length - 1) >= 2,
+  '同 taskId 的 parse_intent 只撤销证明，不把草稿或确认快照留在删除范围外',
+)
+assert(!memberAssets.includes("not: 'optimize_draft'"), '级联删除不得排除 optimize_draft')
+assert(!memberAssets.includes("not: 'optimize_confirmed'"), '级联删除不得排除 optimize_confirmed')
+assert(
+  !memberAssets.includes("notIn: ['optimize_draft'") && !memberAssets.includes('notIn: ["optimize_draft"'),
+  '级联删除不得用 notIn 把草稿或确认快照排除',
+)
 assert(ai.includes('persistPayload') && ai.includes('optimize_confirmed'), '确认快照与草稿写入同一 AiResumeResult TTL 窗口')
 
 assert(interview.includes('const MEMBER_TTL_MS = 7 * 24 * 60 * 60 * 1000'), '会员模拟面试记录 TTL 代码为 7 天')

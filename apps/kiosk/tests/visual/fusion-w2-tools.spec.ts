@@ -2,11 +2,13 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
+import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 
 function collectRuntimeErrors(page: Page): string[] {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
   page.on('requestfailed', (request) => {
+    if (isAbortedPdfjsBlobImport(request)) return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`)
     }
@@ -74,7 +76,8 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   const entry = page.getByRole('button', { name: /到机码核销/ })
   await expect(entry).toBeVisible()
   // 两个码必须在卡面上被区分开，否则用户拿错码白跑一趟。
-  await expect(entry).toContainText('不是付款后的取件凭证码')
+  // 2.0 卡面用徽标「不是取件码」区分（稿 10），不再重复长句。
+  await expect(entry).toContainText('不是取件码')
   // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
   await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(8)
   await entry.click()
@@ -315,11 +318,14 @@ function registerMemberLogin(api: ApiRouter): void {
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of W2_MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of W2_MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
@@ -335,6 +341,71 @@ test('signature page fails closed for anonymous users @w2', async ({ page, api }
   await expectHealthy(page, errors, 'print-scan-sign')
   await page.getByTestId('sign-stamp-primary').click()
   await expect(page).toHaveURL(/\/login/)
+})
+
+// D3（2026-09-28）：签名盖章默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS，
+// 未配置即以 CAPABILITY_NOT_CONFIGURED 拒绝）。能力读取成功、但本机没有已配置的 signature_stamp 行时，
+// 已登录用户直接进签名页也必须停在「没有开放」，不给任何上传入口 —— 否则传完文件才被拒，
+// 页面还会把那次拒绝说成「PDF 读不开」。
+function capabilityRow(capabilityKey: string, status: string, configured: boolean) {
+  return { capabilityKey, status, note: null, configured, updatedAt: null }
+}
+
+const SIGNATURE_NEVER_ENABLED = [
+  { name: 'row absent', capabilities: [capabilityRow('document_print', 'available', true)] },
+  // 真实后端的形状：每个键都下发，没配置过的是 configured=false（listForTerminal）。
+  {
+    name: 'row configured=false',
+    capabilities: [
+      capabilityRow('document_print', 'available', true),
+      capabilityRow('signature_stamp', 'not_verified', false),
+    ],
+  },
+]
+
+async function expectSignatureNotOpen(page: Page, api: ApiRouter): Promise<void> {
+  await expect(page.locator('[data-testid="sign-stamp-state-capability-disabled"]')).toBeVisible()
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('没有开放签名盖章')
+  // 没有任何上传入口：选 PDF / 传签名图的卡片都不出现，页面上也没有带「上传」的按钮。
+  await expect(page.locator('[data-testid^="sign-stamp-pick-"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /上传/ })).toHaveCount(0)
+  expect(api.requestCount('POST', '/api/v1/files/kiosk-upload')).toBe(0)
+  expect(api.requestCount('POST', '/api/v1/print/sign/inspect')).toBe(0)
+}
+
+for (const variant of SIGNATURE_NEVER_ENABLED) {
+  test(`signature page stays closed on a terminal that never enabled it (${variant.name}) @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    registerMemberLogin(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+      status: 200,
+      json: { capabilities: variant.capabilities },
+    })
+
+    await loginThroughVisibleUi(page, '/print-scan/sign')
+    await expectSignatureNotOpen(page, api)
+    await expectHealthy(page, errors, 'print-scan-sign')
+  })
+}
+
+test('signature page retry after a failed capability read still refuses a terminal that never enabled it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  let capabilityReadOk = false
+  api.respondWith('GET', '/api/v1/terminals/KSK-001/capabilities', () =>
+    capabilityReadOk
+      ? { status: 200, json: { capabilities: [capabilityRow('document_print', 'available', true)] } }
+      : { status: 500, json: { error: { code: 'INTERNAL', message: 'boom' } } },
+  )
+
+  await loginThroughVisibleUi(page, '/print-scan/sign')
+  await expect(page.locator('[data-testid="sign-stamp-state-capability-error"]')).toBeVisible()
+  capabilityReadOk = true
+  await page.getByRole('button', { name: '重试读取', exact: true }).click()
+  await expectSignatureNotOpen(page, api)
+  await expectHealthy(page, errors, 'print-scan-sign')
 })
 
 test('signature inspect renders server pages and compose sends placement payload @w2', async ({ page, api }) => {
@@ -403,7 +474,8 @@ test('signature inspect renders server pages and compose sends placement payload
   })
 
   await loginThroughVisibleUi(page, '/print-scan/sign')
-  await expect(page.getByText('选要盖章的 PDF')).toBeVisible()
+  await expect(page.getByText('选要签名的 PDF')).toBeVisible()
+  await expect(page.getByRole('note')).toContainText('只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。')
   await page.locator('input[accept="application/pdf"]').setInputFiles({
     name: '就业协议.pdf',
     mimeType: 'application/pdf',
@@ -422,7 +494,7 @@ test('signature inspect renders server pages and compose sends placement payload
   await expect(page.getByRole('button', { name: '生成合成 PDF（请先确认授权）' })).toBeDisabled()
   await authorize.click()
   await page.getByRole('button', { name: '生成合成 PDF', exact: true }).click()
-  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('新的派生 PDF 已生成')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('新的 PDF 已生成')
   expect(composeBodies).toHaveLength(1)
   const payload = JSON.parse(composeBodies[0]) as {
     authorizationConfirmed: boolean
@@ -502,7 +574,7 @@ test('signature compose 429 shows rate-limited and does not silently retry @w2',
   await page.getByRole('button', { name: '生成合成 PDF', exact: true }).click()
   await expect(page.getByTestId('sign-stamp-fallback')).toContainText('提交太频繁了')
   await expect(page.locator('[data-testid="sign-stamp-state-rate-limited"]')).toBeVisible()
-  await expect(page.getByText('新的派生 PDF 已生成')).toHaveCount(0)
+  await expect(page.getByText('新的 PDF 已生成')).toHaveCount(0)
   expect(api.requestCount('POST', '/api/v1/print/sign/compose')).toBe(1)
   await expectHealthy(page, errors, 'print-scan-sign')
 })

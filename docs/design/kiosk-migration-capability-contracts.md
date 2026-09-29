@@ -62,7 +62,7 @@
 组件：`apps/kiosk/src/pages/placeholders/ErrorOfflinePage.tsx`
 - [ ] 出口：“联系工作人员” → `/help`，replace；连通性恢复后 → 安全的 `location.state.from`，否则 `/`，replace。
 - [ ] a11y：h1“网络连接中断”；h2“当前功能状态”；无额外 `aria-label`；重试按钮是原生 disabled。
-- [ ] 状态告知：每 10 秒和浏览器 `online` 事件重试；重试中按钮为“正在重试”；显示“最近检测 {timeLabel} · 每 10 秒自动重试，已重试 {attempts} 次”；恢复后才返回原页。
+- [ ] 状态告知：自动重试按 10 → 20 → 40 秒退避、封顶 60 秒，浏览器 `online` 事件立即重试并把间隔重置回 10 秒，「重新检测」始终立即执行；重试中按钮为“正在重试”；显示“最近检测 {timeLabel} · 已重试 {attempts} 次，约 {seconds} 秒后自动再试”；恢复后才返回原页。
 - [ ] 诚实披露：“打印机本机功能不受影响，恢复后将返回原页面继续。”；“U盘打印、扫描到 U盘为打印机自带功能，以现场设备实际提示为准。”
 卡点：五项功能影响状态不能被简化成笼统的“网络异常”。
 
@@ -138,9 +138,23 @@
 - [ ] 诚实披露：“输错可以改，不作废”；“这一步不收钱。”；“付款成功后系统才会创建打印任务，不会提前出纸。”
 卡点：8 位新码必须静默 250ms 后自动校验，避免把 10 位历史码前八位误认领。
 
+> **2026-09-20 迁移更新（五个服务台）：** 下面五节原先各自指向一个旧壳组件
+> （`ResumeServiceHubPage.tsx` / `JobsServiceHubPage.tsx` / `FairsServiceHubPage.tsx` /
+> `InterviewServiceHubPage.tsx` / `PolicyServiceHubPage.tsx`）。那五个文件已在
+> `5f432b72b` 证明零运行时引用后删除，五条路由共用青序流光的
+> `apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx`，内容来自机械抽取的
+> `serviceHubSpecs.ts`（抽自稿 16-service-hubs.html，由 `verify:service-entry-readiness`
+> 逐字节对账）。
+>
+> 各节的 a11y / 状态告知两行仍写着旧壳的形态（`KioskPageHeader` 的 h1、「在线服务已连接」、
+> 「等待服务」）。**新页不复刻这些措辞**：h1 取稿的标题句（如「把简历这件事，做得更清楚」），
+> 就绪态说「进入具体服务后再确认实时能力」而不是「已连接」，被拦的卡片不写「等待服务」
+> 而是各自说明原因（「AI能力当前不可用」「本机设备当前不可用」「正在确认在线服务」）。
+> **每节末尾的「卡点」与「诚实披露」是合规不变量，逐条仍然有效，不因换壳放宽。**
+
 ## /resume-service（稿 16-service-hubs）
 
-组件：`apps/kiosk/src/pages/resume/ResumeServiceHubPage.tsx`
+组件：`apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx`（`hub="resume"`）+ 规格 `serviceHubSpecs.ts`
 - [ ] 出口：顶栏“返回” → `/`。
 - [ ] a11y：`KioskPageHeader` 输出 h1“AI简历服务”；能力、快捷入口均为带可见标题的原生 button；“签约与权益”由 `aria-labelledby="contract-risk-title"` 关联标题。
 - [ ] 状态告知：在线状态条：检查中“正在确认在线服务”、可用“在线服务已连接”、不可用“在线服务暂不可用”；不可用时显示“重新检测”，在线依赖入口变为“等待服务”。
@@ -149,7 +163,7 @@
 
 ## /jobs-service（稿 16-service-hubs）
 
-组件：`apps/kiosk/src/pages/jobs/JobsServiceHubPage.tsx`
+组件：`apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx`（`hub="jobs"`）+ 规格 `serviceHubSpecs.ts`
 - [ ] 出口：顶栏“返回” → `/`。
 - [ ] a11y：`KioskPageHeader` 输出 h1“岗位信息”；能力和历史入口为带可见标题的原生 button。
 - [ ] 状态告知：复用在线状态条；依赖 API 的能力不可用时禁用并显示“等待服务”；历史区说明“登录后可查看历史”。
@@ -158,7 +172,7 @@
 
 ## /fairs-service（稿 16-service-hubs）
 
-组件：`apps/kiosk/src/pages/job-fairs/FairsServiceHubPage.tsx`
+组件：`apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx`（`hub="fairs"`）+ 规格 `serviceHubSpecs.ts`
 - [ ] 出口：顶栏“返回” → `/`。
 - [ ] a11y：`KioskPageHeader` 输出 h1“招聘会信息”；能力和快捷入口为带可见标题的原生 button。
 - [ ] 状态告知：复用在线状态条；不可用时能力和快捷入口禁用，显示“等待服务”；快捷区说明“登录后可查看历史记录”。
@@ -167,7 +181,7 @@
 
 ## /interview-service（稿 16-service-hubs）
 
-组件：`apps/kiosk/src/pages/interview/InterviewServiceHubPage.tsx`
+组件：`apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx`（`hub="interview"`）+ 规格 `serviceHubSpecs.ts`
 - [ ] 出口：顶栏“返回” → `/`。
 - [ ] a11y：`KioskPageHeader` 输出 h1“AI面试训练”；能力和快捷入口为带可见标题的原生 button。
 - [ ] 状态告知：复用在线状态条；只有 `requiresApi !== false` 的能力会被在线状态禁用；快捷区说明“登录后可查看历史记录”。
@@ -176,7 +190,7 @@
 
 ## /policy-service（稿 16-service-hubs）
 
-组件：`apps/kiosk/src/pages/policy/PolicyServiceHubPage.tsx`
+组件：`apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx`（`hub="policy"`）+ 规格 `serviceHubSpecs.ts`
 - [ ] 出口：顶栏“返回” → `/`。
 - [ ] a11y：`KioskPageHeader` 输出 h1“政策服务”；能力和快捷入口为带可见标题的原生 button。
 - [ ] 状态告知：复用在线状态条；依赖 API 的入口不可用时禁用并显示“等待服务”；快捷区说明“登录后可查看历史记录”。

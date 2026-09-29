@@ -1,0 +1,409 @@
+/* 岗位匹配参考（/resume/job-fit）· 青序流光。
+ *
+ * 稿：docs/design/kiosk-redesign-2026-08/46-resume-decision-workspace.html?screen=job-fit
+ *     （宿主 46 承接四条 route，本文件只覆盖 screen=job-fit 这一条）
+ *
+ * 作用域：全部选择器以 `.jfq-` 开头，且只在本页 import。
+ * 不碰 styles/resume-fusion-job-fit.css —— 那份还被 /resume/job-fit/actions 用着，
+ * 两套色系（墨青纸感 / 青序流光）不能在同一页相遇。
+ *
+ * 颜色一律取 tokens.css 的 --qx-*，不在这里另起一套色值。
+ */
+
+/* ── 分区 ───────────────────────────────────────────────────── */
+.jfq-sec { display: flex; flex-direction: column; gap: 14px; }
+/* 余量吸收块（.qx-grow）只该**吸收多余空白**，不该在内容超出时反过来被压扁。
+ * 共享层的 `.qx-grow` 带 `min-height: 0`，那是给可滚动子容器用的；本页把它挂在
+ * 「结果明细」这一节上，结果态内容一多就出现负余量，整节被压到只剩标题高度，
+ * 证据条目直接压到下一节「下一步建议」上面。这里恢复 min-height: auto：
+ * 本节保持自然高度，多出来的部分交给 .qx-scroll 滚动。 */
+.jfq-sec.qx-grow { min-height: auto; }
+.jfq-sec-head { display: flex; align-items: baseline; gap: 14px; }
+.jfq-sec-no {
+  flex: none; font-family: var(--qx-mono); font-size: 18px; font-weight: 700;
+  color: var(--qx-teal-d);
+}
+.jfq-sec-head h2 { margin: 0; font-size: 25px; font-weight: 700; }
+.jfq-sec-hint { margin-left: auto; font-size: 17px; color: var(--qx-ink-3); }
+.jfq-sec-copy { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+
+/* ── 输入槽位：位置画出来，值留空并显式标注 ────────────────────── */
+.jfq-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.jfq-slot {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface);
+}
+.jfq-slot small { font-size: 17px; color: var(--qx-ink-3); }
+.jfq-slot b { font-size: 21px; font-weight: 700; }
+.jfq-slot[data-fixed='true'] { border-color: var(--qx-teal-line); background: var(--qx-teal-soft); }
+.jfq-slot[data-fixed='true'] b { color: var(--qx-teal-d); }
+
+/* ── 逐项检查：缺哪一项写在脸上 ─────────────────────────────── */
+.jfq-checks { display: flex; flex-direction: column; gap: 12px; }
+.jfq-check {
+  display: flex; gap: 16px; align-items: flex-start;
+  padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface);
+}
+.jfq-check-ic {
+  flex: none; width: 52px; height: 52px; border-radius: var(--qx-r);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-muted-bg); color: var(--qx-muted-ink);
+  border: 1px solid var(--qx-muted-line);
+}
+.jfq-check[data-tone='ok'] .jfq-check-ic { background: var(--qx-teal-soft); color: var(--qx-teal-d); border-color: var(--qx-teal-line); }
+.jfq-check[data-tone='off'] .jfq-check-ic { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); border-color: var(--qx-cinnabar-line); }
+.jfq-check-tx { flex: 1; min-width: 0; }
+.jfq-check-tx b { display: block; font-size: 21px; font-weight: 700; }
+.jfq-check-tx p { margin: 4px 0 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-chip {
+  flex: none; align-self: flex-start;
+  padding: 5px 12px; border-radius: var(--qx-r-s);
+  font-size: 17px; font-weight: 700;
+  background: var(--qx-muted-bg); color: var(--qx-muted-ink);
+}
+.jfq-check[data-tone='ok'] .jfq-chip { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.jfq-check[data-tone='off'] .jfq-chip { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
+
+/* ── 非 AI 退路条 ───────────────────────────────────────────── */
+.jfq-kit { display: flex; flex-direction: column; gap: 10px; }
+.jfq-kit button {
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
+  min-height: var(--qx-tap-min); padding: 14px 18px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface); color: inherit; font: inherit; cursor: pointer;
+}
+.jfq-kit button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.jfq-kit-ic {
+  flex: none; width: 46px; height: 46px; border-radius: var(--qx-r);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-paper); border: 1px solid var(--qx-line); color: var(--qx-ink-2);
+}
+.jfq-kit b { display: block; font-size: 20px; font-weight: 700; }
+.jfq-kit small { display: block; margin-top: 2px; font-size: 17px; color: var(--qx-ink-3); }
+
+/* ── 等待：整体脉冲，没有进度条 / 百分比 / 预计时间 ────────────── */
+.jfq-wait {
+  display: flex; gap: 20px; align-items: flex-start;
+  padding: 24px; border: 1px solid var(--qx-teal-line); border-radius: var(--qx-r);
+  background: var(--qx-teal-soft);
+}
+.jfq-wait-ic {
+  flex: none; width: 64px; height: 64px; border-radius: var(--qx-r);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-surface); color: var(--qx-teal-d);
+}
+.jfq-wait b { font-size: 24px; font-weight: 700; }
+.jfq-wait p { margin: 6px 0 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.jfq-pulse { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 17px; color: var(--qx-teal-d); }
+.jfq-pulse i {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--qx-teal);
+  display: inline-block; animation: jfq-pulse 1.2s ease-in-out infinite;
+}
+.jfq-pulse i:nth-child(2) { animation-delay: .2s; }
+.jfq-pulse i:nth-child(3) { animation-delay: .4s; }
+@keyframes jfq-pulse { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .jfq-pulse i { animation: none; opacity: .7; } }
+
+/* ── 未返回占位：虚线框，不画骨架假内容 ──────────────────────── */
+.jfq-ghosts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.jfq-ghost {
+  padding: 16px 18px; border: 2px dashed var(--qx-line-2); border-radius: var(--qx-r);
+  background: transparent;
+}
+.jfq-ghost b { font-size: 20px; font-weight: 700; }
+.jfq-ghost p { margin: 6px 0 10px; font-size: 17px; line-height: 1.45; color: var(--qx-ink-3); }
+.jfq-ghost span { font-size: 16px; color: var(--qx-ink-3); }
+
+/* ── 当前判定条 ─────────────────────────────────────────────── */
+.jfq-verdict { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.jfq-verdict[data-cols='2'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.jfq-verdict > div {
+  padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface);
+}
+.jfq-verdict small { display: block; font-size: 17px; color: var(--qx-ink-3); }
+.jfq-verdict b { display: block; margin-top: 4px; font-size: 22px; font-weight: 700; }
+.jfq-verdict > div[data-tone='bad'] { border-color: var(--qx-cinnabar-line); background: var(--qx-cinnabar-soft); }
+.jfq-verdict > div[data-tone='bad'] b { color: var(--qx-cinnabar-d); }
+.jfq-verdict > div[data-tone='warn'] { border-color: var(--qx-line-2); background: var(--qx-wheat-soft); }
+.jfq-verdict > div[data-tone='warn'] b { color: var(--qx-wheat-d); }
+.jfq-verdict > div[data-tone='ok'] { border-color: var(--qx-teal-line); background: var(--qx-teal-soft); }
+.jfq-verdict > div[data-tone='ok'] b { color: var(--qx-teal-d); }
+
+/* ── 左判断右解释 / 步骤 / 否定 ─────────────────────────────── */
+.jfq-why { display: flex; flex-direction: column; gap: 10px; }
+.jfq-why > div { padding: 14px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
+.jfq-why-h {
+  display: inline-block; margin-right: 10px; padding: 3px 10px; border-radius: var(--qx-r-s);
+  font-size: 16px; background: var(--qx-slate-soft); color: var(--qx-slate-d);
+}
+.jfq-why b { font-size: 21px; font-weight: 700; }
+.jfq-why p { margin: 6px 0 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+
+.jfq-steps { display: flex; flex-direction: column; gap: 10px; }
+.jfq-step { display: flex; gap: 16px; align-items: flex-start; padding: 14px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
+.jfq-step-no {
+  flex: none; width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-deep); color: var(--qx-paper);
+  font-family: var(--qx-mono); font-size: 19px; font-weight: 700;
+}
+.jfq-step b { font-size: 21px; font-weight: 700; }
+.jfq-step p { margin: 4px 0 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+
+.jfq-nots { display: flex; flex-direction: column; gap: 8px; }
+.jfq-not {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-paper); font-size: 19px; color: var(--qx-ink-2);
+}
+.jfq-not svg { flex: none; color: var(--qx-cinnabar-d); }
+
+.jfq-list { display: flex; flex-direction: column; gap: 8px; }
+.jfq-list-row { display: flex; gap: 14px; align-items: flex-start; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-list-row i {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; font-style: normal;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d);
+  font-family: var(--qx-mono); font-size: 16px; font-weight: 700;
+}
+
+/* ── 当前停在哪一步 ─────────────────────────────────────────── */
+.jfq-trace { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.jfq-trace > div { padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
+.jfq-trace > div[data-now='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.jfq-trace small { display: block; font-size: 16px; color: var(--qx-ink-3); }
+.jfq-trace b { display: block; margin-top: 4px; font-size: 20px; font-weight: 700; }
+.jfq-trace p { margin: 6px 0 0; font-size: 17px; line-height: 1.4; color: var(--qx-ink-2); }
+.jfq-now-tag { display: inline-block; margin-top: 8px; font-size: 16px; font-weight: 700; color: var(--qx-teal-d); }
+
+/* ── 紧凑披露条 ─────────────────────────────────────────────── */
+.jfq-guard {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 14px 18px; border: 1px solid var(--qx-teal-line); border-radius: var(--qx-r);
+  background: var(--qx-teal-soft);
+}
+.jfq-guard svg { flex: none; color: var(--qx-teal-d); }
+.jfq-guard p { margin: 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-guard b { margin-right: 8px; color: var(--qx-teal-d); }
+
+/* ── 恢复路径卡 ─────────────────────────────────────────────── */
+.jfq-routes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.jfq-routes button {
+  display: flex; flex-direction: column; gap: 8px; text-align: left;
+  min-height: var(--qx-tap-min); padding: 18px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface); color: inherit; font: inherit; cursor: pointer;
+}
+.jfq-routes button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.jfq-routes b { font-size: 21px; font-weight: 700; }
+.jfq-routes p { margin: 0; flex: 1; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-route-go { font-size: 18px; font-weight: 700; color: var(--qx-teal-d); }
+
+/* ── 目标岗位二选一 ─────────────────────────────────────────── */
+.jfq-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.jfq-choice {
+  display: flex; flex-direction: column; gap: 8px; text-align: left;
+  min-height: var(--qx-tap-min); padding: 18px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface); color: inherit; font: inherit; cursor: pointer;
+}
+.jfq-choice[aria-pressed='true'] { border-color: var(--qx-teal); box-shadow: inset 3px 0 0 var(--qx-teal); background: var(--qx-teal-soft); }
+.jfq-choice:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.jfq-choice h3 { margin: 0; font-size: 22px; font-weight: 700; }
+.jfq-choice p { margin: 0; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-choice span { font-size: 16px; color: var(--qx-ink-3); }
+
+/* ── 搜索与表单 ─────────────────────────────────────────────── */
+.jfq-field { display: flex; flex-direction: column; gap: 8px; }
+.jfq-field > small { font-size: 17px; color: var(--qx-ink-3); }
+.jfq-input, .jfq-textarea {
+  width: 100%; min-height: var(--qx-btn-h);
+  padding: 0 18px; border: 1px solid var(--qx-line-2); border-radius: var(--qx-r);
+  background: var(--qx-surface); color: var(--qx-ink);
+  font-family: var(--qx-sans); font-size: 21px;
+}
+.jfq-textarea { min-height: 200px; padding: 16px 18px; line-height: 1.5; resize: none; }
+.jfq-input:focus-visible, .jfq-textarea:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 2px; }
+
+.jfq-joblist { display: flex; flex-direction: column; gap: 10px; }
+.jfq-job {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  min-height: 84px; padding: 14px 18px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface); color: inherit; font: inherit; cursor: pointer;
+}
+.jfq-job[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.jfq-job:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.jfq-job-tx { flex: 1; min-width: 0; }
+.jfq-job-tx b { display: block; font-size: 21px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jfq-job-tx small { display: block; margin-top: 3px; font-size: 17px; color: var(--qx-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jfq-job svg { flex: none; color: var(--qx-teal-d); }
+
+/* ── 结果：摘要 / 匹配依据 ──────────────────────────────────── */
+.jfq-summary { display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
+.jfq-summary-eyebrow { margin: 0; font-size: 17px; color: var(--qx-ink-3); }
+.jfq-summary-title { margin: 0; font-family: var(--qx-serif); font-size: 28px; font-weight: 700; }
+.jfq-summary-body { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.jfq-summary-disclaimer { margin: 0; font-size: 17px; color: var(--qx-ink-3); }
+
+.jfq-ev-stack { display: flex; flex-direction: column; gap: 10px; }
+.jfq-ev-item { padding: 14px 18px; border: 1px solid var(--qx-teal-line); border-radius: var(--qx-r); background: var(--qx-teal-soft); }
+.jfq-ev-item p { margin: 0; font-size: 20px; font-weight: 700; }
+.jfq-ev-item span { display: block; margin-top: 6px; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+/* 稿 46 的 evi 两栏：左「简历里已经写到的要求」，右「简历里还没体现的要求」。3.14 起不分档，两栏就是结果本身；
+   它是结果屏的余量吸收块（Sec grow），两栏随之等高拉伸。 */
+.jfq-evi { flex: 1 1 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.jfq-evi-col {
+  display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 16px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-paper);
+}
+.jfq-evi-h { display: flex; align-items: center; gap: 10px; }
+.jfq-evi-h b { font-size: 21px; font-weight: 700; }
+.jfq-evi-ic {
+  display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: var(--qx-r);
+  color: var(--qx-teal-d); background: var(--qx-teal-soft);
+}
+.jfq-evi-col[data-tone='warn'] .jfq-evi-ic { color: var(--qx-wheat-d); background: var(--qx-wheat-soft); }
+.jfq-ev-item[data-tone='warn'] { border-color: var(--qx-line-2); background: var(--qx-wheat-soft); }
+.jfq-kw-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.jfq-kw-label { font-size: 17px; color: var(--qx-ink-3); }
+.jfq-kw { padding: 5px 12px; border-radius: var(--qx-r-s); font-size: 17px; }
+.jfq-kw[data-tone='ok'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.jfq-kw[data-tone='warn'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
+
+/* ── 下一步建议 ─────────────────────────────────────────────── */
+.jfq-next { display: flex; flex-direction: column; gap: 10px; }
+.jfq-next button {
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
+  min-height: var(--qx-tap-min); padding: 14px 18px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface); color: inherit; font: inherit; cursor: pointer;
+}
+.jfq-next button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.jfq-next-no {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-deep); color: var(--qx-paper);
+  font-family: var(--qx-mono); font-size: 18px; font-weight: 700;
+}
+.jfq-next-t { flex: 1; min-width: 0; }
+.jfq-next-t b { display: block; font-size: 21px; font-weight: 700; }
+.jfq-next-t p { margin: 4px 0 0; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-next-go { flex: none; font-size: 22px; color: var(--qx-ink-3); }
+
+/* ── 页内提示 / 错误 ────────────────────────────────────────── */
+.jfq-notice { margin: 0; padding: 14px 18px; border-radius: var(--qx-r); font-size: 19px; line-height: 1.45; background: var(--qx-slate-soft); color: var(--qx-slate-d); }
+.jfq-alert { margin: 0; padding: 14px 18px; border-radius: var(--qx-r); font-size: 19px; line-height: 1.45; background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); border: 1px solid var(--qx-cinnabar-line); }
+
+/* ── 底部操作条注脚 ─────────────────────────────────────────────
+ * 操作条本身由 QxPageFrame 渲染成 `.qx-ctabar`（共享层），本页样式又必须
+ * 全部自作用域在 `.jfq-` 下，所以**不能**直接给操作条写 flex-wrap ——
+ * 只能从注脚这一侧把单行布局定下来：注脚吃掉剩余宽度，按钮保持自然宽度。
+ *
+ * 初版写成 `.jfq-ctabar { flex-wrap: wrap }` + `flex: 1 1 100%`，本意是让注脚
+ * 独占一行；但 DOM 上根本没有 `.jfq-ctabar` 这个类，两条规则一条都没命中，
+ * 于是 100% 的基准宽度把三个按钮挤成 111px，「打印报告」四个字竖排成四行。
+ */
+.jfq-cta-note { flex: 1 1 auto; min-width: 0; margin: 0; display: flex; gap: 10px; align-items: flex-start; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-cta-note svg { flex: none; color: var(--qx-wheat-d); }
+/* 按钮不参与压缩，也不允许在字间折行（27 寸竖屏上竖排文字等于不可读）。 */
+.jfq-cta-note ~ .qx-btn { flex: none; white-space: nowrap; }
+
+/* ── 授权弹窗 ───────────────────────────────────────────────── */
+.jfq-modal {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center; padding: 40px;
+  background: rgba(11, 36, 30, .55);
+}
+.jfq-modal-card {
+  width: 760px; max-width: 100%; max-height: 100%; overflow-y: auto;
+  padding: 32px; border-radius: var(--qx-r); background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.jfq-modal-card h2 { margin: 0; font-family: var(--qx-serif); font-size: 30px; font-weight: 700; }
+.jfq-modal-card p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.jfq-modal-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 6px; }
+
+/* ── 授权卡（匿名撤回 / 会员开启） ───────────────────────────── */
+.jfq-consent-card { display: flex; flex-direction: column; gap: 14px; }
+.jfq-consent-card p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+
+/* ── 1080 竖屏与窄屏 ───────────────────────────────────────── */
+@media (max-width: 1080px) {
+  .jfq-ghosts, .jfq-verdict, .jfq-trace, .jfq-routes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 390px) {
+  .jfq-slots, .jfq-choices, .jfq-ghosts, .jfq-verdict, .jfq-trace, .jfq-routes, .jfq-evi,
+  .jfq-modal-actions { grid-template-columns: minmax(0, 1fr); }
+  .jfq-modal { padding: 16px; }
+}
+
+/* ── 真实视口布局（手机 / 横屏电脑）──────────────────────────────
+ * 一体机竖屏走的是 1080×1920 定高舞台（KioskStageFit），本段**不参与**：
+ * 下面两条媒体查询在 1080×1920 下都不命中，稿 46 的版式一字不改。
+ *
+ * 为什么需要这一段：舞台缩放是等比的，390px 手机上整张稿被缩到 0.36 ——
+ * 返回键 23px、主操作 35px，正文小到读不了。缩放解决不了小屏，只能换布局。
+ * JobFitPage 的 useJobFitStage 在手机/横屏电脑上关掉缩放，这里接手排版。
+ *
+ * 作用域：全部挂在本页根 `.jfq-root` 下。共享层（.qx-topbar / .qx-ctabar …）
+ * 被 51 页共用，绝不能在这里裸改；套一层 .jfq-root 既满足「选择器必须以
+ * .jfq- 开头」的门禁，也保证改动不外溢到别的青序页面。
+ */
+.jfq-root { height: 100%; }
+
+/* 手机：断点与 KioskRoot 的 isCompactViewport 对齐（<=760px）。 */
+@media (max-width: 760px) {
+  /* 页面左右留白从 40px 收到 16px：40px 在 390px 屏上吃掉两成宽度。 */
+  .jfq-root { --qx-gutter: 16px; }
+
+  .jfq-root .qx-topbar { height: 60px; gap: 10px; }
+  .jfq-root .qx-topbar-brand { font-size: 17px; gap: 8px; }
+  .jfq-root .qx-topbar-mark { width: 30px; height: 30px; font-size: 17px; border-radius: var(--qx-r-s); }
+  .jfq-root .qx-topbar-sub { display: none; }
+  /* 返回键压到触控下限为止，不再往下压：它是一体机与手机唯一的「上一步」。 */
+  .jfq-root .qx-topbar-back { width: var(--qx-tap-min); height: var(--qx-tap-min); border-radius: 14px; }
+  .jfq-root .qx-topbar-back svg { width: 24px; height: 24px; }
+  /* 窄屏顶栏只有 60px：品牌三个字不许折行，状态胶囊可收缩并省略，
+   * 否则两者各占两行，顶栏看起来塞满（实测品牌 51px / 胶囊 39px）。 */
+  .jfq-root .qx-topbar-brand { white-space: nowrap; flex: none; }
+  .jfq-root .qx-pill { font-size: 13px; padding: 0 10px; min-height: 30px; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* 标题与说明改上下堆叠。共享层是 flex 行 + wrap，靠说明文字的 min-width:260px
+   * 触发换行；窄屏把 min-width 放开后它会被挤进标题右边的窄缝，整段竖排成
+   * 一列单字（实测 390px 下就是这样）。所以放开 min-width 必须同时改成列方向。 */
+  .jfq-root .qx-pagehead { margin-top: 12px; gap: 6px; flex-direction: column; align-items: stretch; }
+  .jfq-root .qx-pagehead h1 { font-size: 23px; letter-spacing: 0; gap: 10px; }
+  .jfq-root .qx-pagehead h1::before { width: 4px; height: 21px; }
+  .jfq-root .qx-pagehead p { min-width: 0; font-size: 15px; }
+
+  .jfq-root .qx-scroll { gap: 12px; padding-top: 12px; }
+
+  .jfq-root .qx-ctabar { flex-wrap: wrap; gap: 10px; padding: 12px var(--qx-gutter); }
+  /* 76/96px 的按钮在 844px 高的屏上太占版面；52px 仍高于 48px 触控下限。 */
+  .jfq-root .qx-btn { min-height: 52px; font-size: 17px; padding: 0 14px; gap: 8px; }
+  .jfq-root .qx-btn[data-variant='primary'] { min-height: 52px; }
+  .jfq-root .qx-btn svg { width: 18px; height: 18px; }
+  /* 窄屏让注脚独占一行，按钮才排得开；宽屏仍是注脚与按钮同一行。 */
+  .jfq-root .jfq-cta-note { flex: 1 1 100%; font-size: 14px; }
+  .jfq-root .jfq-cta-note ~ .qx-btn { flex: 1 1 auto; }
+
+  .jfq-root .qx-navbar { height: 60px; }
+  .jfq-root .qx-nav-item { font-size: 12px; gap: 2px; }
+  .jfq-root .qx-nav-item svg { width: 20px; height: 20px; }
+  .jfq-root .qx-nav-item[aria-current='page']::after { bottom: 6px; width: 20px; }
+
+  /* 本页自有组件：窄屏一律单列，正文字号跟着降一档。 */
+  .jfq-root .jfq-sec-head { flex-wrap: wrap; gap: 8px; }
+  .jfq-root .jfq-sec { gap: 10px; }
+}
+
+/* 横屏电脑：不拉伸成满屏大横条，按 1080 稿宽居中，其余留白。 */
+@media (min-width: 961px) and (orientation: landscape) {
+  .jfq-root { display: flex; justify-content: center; background: var(--qx-paper); }
+  .jfq-root .qx-stage { width: 100%; max-width: 1080px; }
+}

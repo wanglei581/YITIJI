@@ -36,6 +36,7 @@ import {
   MaterialCheckPresentation,
   type MaterialCheckStage,
 } from './components/MaterialCheckPresentation'
+import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
 import './styles/print-desk-qx.css'
 
 interface LocationState {
@@ -196,6 +197,8 @@ function isDemoTask(task: DocumentProcessTaskView | null): boolean {
  *   'mock'/'skeleton' 例外——它们由 isDemoTask 的"流程演示"徽标单独诚实标注。
  */
 function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string; tone: 'neutral' | 'warning' } | null {
+  // 还没有完成的扫描结果（检查进行中 / 尚未开始）不下任何结论，由进行中文案负责说明。
+  if (!task || task.status !== 'completed') return null
   const mode = task?.result?.['mode']
   if (mode === 'skipped_non_document') return { label: '该文件类型无需隐私扫描', tone: 'neutral' }
   if (mode === 'degraded') return { label: '内容扫描暂不可用，请人工确认文件不含敏感信息', tone: 'warning' }
@@ -213,6 +216,13 @@ function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string;
   if (mode === 'real') return null
   if (isDemoTask(task)) return null
   return { label: '本次隐私检查结果状态未知，请人工确认文件不含敏感信息', tone: 'warning' }
+}
+
+/** 显式重试时，已失败（或隐私扫描未完整覆盖）的缓存任务不再复用；pending/processing 与成功结果照常复用，避免重复建任务。 */
+function shouldRecreateOnRetry(task: DocumentProcessTaskView, kind: 'inspection' | 'normalize_a4' | 'pii_scan'): boolean {
+  if (task.status === 'failed') return true
+  if (kind === 'pii_scan' && task.status === 'completed') return piiScanModeCopy(task)?.tone === 'warning'
+  return false
 }
 
 export function PrintMaterialCheckPage({
@@ -252,6 +262,8 @@ export function PrintMaterialCheckPage({
   useBusyLock(isWorking)
   const presentationFindings = findings.map((finding) => ({
     id: finding.id,
+    type: finding.type,
+    pageNumber: finding.pageNumber,
     label: finding.label || finding.type,
     maskedSnippet: maskSnippet(finding.type, finding.snippet),
     suggestion: suggestionForFinding(finding),
@@ -272,10 +284,10 @@ export function PrintMaterialCheckPage({
     setSession(null)
   }
 
-  const runChecks = async () => {
+  const runChecks = async ({ retry = false }: { retry?: boolean } = {}) => {
     if (!file?.fileId) {
       setStage('error')
-      setError('缺少上传文件编号，请重新上传后再检查')
+      setError('暂时无法找到这份文件，请重新上传后再检查')
       return
     }
 
@@ -285,15 +297,21 @@ export function PrintMaterialCheckPage({
     setNormalizeTask(null)
     setPiiTask(null)
     setDecisions({})
+    // 新一轮检查一开始就作废上一轮的检查结论与遮挡结果（fail-closed）：结论只能由本轮 handleContinue 重新写入，
+    // 否则检查未完成时直接进 ?step=preview 会凭旧摘要放行。文件、来源与可复用的检查任务保持不变。
+    persistSession({ materialCheck: undefined, piiRedactTask: undefined })
 
     try {
       const token = getToken()
       const storedSession = session?.file.fileId === file.fileId ? session : null
       const storedInspection = storedSession?.inspectionTask
       let inspection: DocumentProcessTaskView
-      if (storedInspection?.id) {
-        const queried = await getMaterialTask(storedInspection.id, { token, accessToken: storedInspection.accessToken })
-        inspection = { ...queried, accessToken: queried.accessToken ?? storedInspection.accessToken }
+      const reusedInspection = storedInspection?.id
+        ? await getMaterialTask(storedInspection.id, { token, accessToken: storedInspection.accessToken })
+            .then((queried) => ({ ...queried, accessToken: queried.accessToken ?? storedInspection.accessToken }))
+        : null
+      if (reusedInspection && !(retry && shouldRecreateOnRetry(reusedInspection, 'inspection'))) {
+        inspection = reusedInspection
       } else {
         inspection = await createMaterialTask({
           kind: 'inspection',
@@ -311,9 +329,12 @@ export function PrintMaterialCheckPage({
       setStage('normalize_a4')
       const storedNormalize = storedSession?.normalizeTask
       let normalize: DocumentProcessTaskView
-      if (storedNormalize?.id) {
-        const queried = await getMaterialTask(storedNormalize.id, { token, accessToken: storedNormalize.accessToken })
-        normalize = { ...queried, accessToken: queried.accessToken ?? storedNormalize.accessToken }
+      const reusedNormalize = storedNormalize?.id
+        ? await getMaterialTask(storedNormalize.id, { token, accessToken: storedNormalize.accessToken })
+            .then((queried) => ({ ...queried, accessToken: queried.accessToken ?? storedNormalize.accessToken }))
+        : null
+      if (reusedNormalize && !(retry && shouldRecreateOnRetry(reusedNormalize, 'normalize_a4'))) {
+        normalize = reusedNormalize
       } else {
         normalize = await createMaterialTask({
           kind: 'normalize_a4',
@@ -330,9 +351,12 @@ export function PrintMaterialCheckPage({
       setStage('pii_scan')
       const storedPii = storedSession?.piiTask
       let pii: DocumentProcessTaskView
-      if (storedPii?.id) {
-        const queried = await getMaterialTask(storedPii.id, { token, accessToken: storedPii.accessToken })
-        pii = { ...queried, accessToken: queried.accessToken ?? storedPii.accessToken }
+      const reusedPii = storedPii?.id
+        ? await getMaterialTask(storedPii.id, { token, accessToken: storedPii.accessToken })
+            .then((queried) => ({ ...queried, accessToken: queried.accessToken ?? storedPii.accessToken }))
+        : null
+      if (reusedPii && !(retry && shouldRecreateOnRetry(reusedPii, 'pii_scan'))) {
+        pii = reusedPii
       } else {
         pii = await createMaterialTask({
           kind: 'pii_scan',
@@ -459,18 +483,20 @@ export function PrintMaterialCheckPage({
   if (!file) {
     return (
       <QxPageFrame
+        navbar={<PrintDeskNavbar />}
         back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
         title="材料检查"
         subtitle="先完成文件体检和隐私预检，再进入打印参数"
         status={{ tone: 'warn', label: '没有待处理的文件' }}
         ctabar={(
-          <>
+          <PrintDeskFooter step="check" onBack={() => navigate(uploadPath)}>
             <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print-scan')}>返回打印扫描</button>
             <p className="why">没有文件时不显示文件名、页数或检查结论，也不会产生订单。</p>
             <button className="qx-btn" data-variant="primary" type="button" onClick={() => navigate(uploadPath)}>去选文件</button>
-          </>
+          </PrintDeskFooter>
         )}
       >
+        <PrintDeskGuide step={1} title={<>这一页<em>没有文件</em>。</>} detail="先选好要打印的材料，再检查文件与个人信息。" />
         <div className="qpd-context-empty" data-w2-page="print-material-check" data-qx-state="missing-context">
           <div className="qx-state" data-tone="empty">
             <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
@@ -480,18 +506,44 @@ export function PrintMaterialCheckPage({
             </div>
           </div>
           <div className="qpd-empty-work qx-grow">
-            <section className="qpd-empty-sheet" aria-label="当前没有文件">
-              <AlertCircleIcon aria-hidden="true" />
-              <strong>当前文件：无</strong>
-              <span>没有文件名、没有页数、没有大小</span>
-            </section>
+            <div className="qpd-empty-left">
+              <section className="qpd-empty-sheet" aria-label="当前没有文件">
+                <AlertCircleIcon aria-hidden="true" />
+                <strong>当前文件：无</strong>
+                <span>没有文件名、没有页数、没有大小</span>
+              </section>
+              <section className="qx-card qpd-empty-proof">
+                <h3>这一屏不会显示什么</h3>
+                <ul>
+                  <li>文件名、文件大小</li>
+                  <li>页数、打印份数</li>
+                  <li>检查结论、隐私片段</li>
+                </ul>
+                <p>没有文件时以上内容一律不显示，也不会放示例文件。</p>
+              </section>
+            </div>
             <section className="qx-card">
               <div className="qx-sec-h"><span className="t">为什么会看到这一屏</span></div>
               <ul>
                 <li>从旧链接直接进入，没有完成选文件步骤。</li>
-                <li>公共终端的上一次办理已经结束或上下文已清除。</li>
+                <li>上一次办理已经结束，临时文件信息已清除。</li>
                 <li>本页不会用示例文件冒充真实待打印文件。</li>
               </ul>
+              <section className="qpd-empty-next">
+                <h3>下一步</h3>
+                <ul>
+                  <li>去选文件，把真实文件带入本次办理。</li>
+                  <li>返回材料检查，逐项完成文件体检和隐私检查。</li>
+                  <li>检查通过后进入预览参数，下一步核对价格。</li>
+                </ul>
+              </section>
+              <section className="qpd-empty-facts">
+                <h3>两条事实</h3>
+                <ul>
+                  <li>到这里为止<b>没有产生订单，也没有扣任何费用</b>。</li>
+                  <li>之前存过的文件在<b>「我的文档」</b>里；这一页本身不保存文件。</li>
+                </ul>
+              </section>
             </section>
           </div>
         </div>
@@ -500,8 +552,11 @@ export function PrintMaterialCheckPage({
   }
 
   const allFindingsDecided = findings.length === 0 || allDecided
+  const submitFailed = stage === 'review' && error !== null
   const status = stage === 'error'
     ? { tone: 'bad' as const, label: '材料检查失败 · 结果未知' }
+    : submitFailed
+      ? { tone: 'bad' as const, label: '遮挡处理未完成 · 请重试' }
     : isWorking
       ? { tone: 'warn' as const, label: stage === 'submitting' ? '正在生成遮挡文件' : '正在检查材料' }
       : requiresFormatReview
@@ -509,29 +564,37 @@ export function PrintMaterialCheckPage({
         : piiScanIncomplete
           ? { tone: 'bad' as const, label: '隐私检查未完整完成' }
           : !allFindingsDecided
-          ? { tone: 'warn' as const, label: `还有 ${findings.filter((finding) => decisions[finding.id] === 'pending').length} 处待裁决` }
+          ? { tone: 'warn' as const, label: `还有 ${findings.filter((finding) => decisions[finding.id] !== 'keep' && decisions[finding.id] !== 'redact').length} 处待确认` }
           : { tone: 'ok' as const, label: '材料检查完成' }
 
   // Legacy gate markers: PrintPageFrame, KioskActionBar, step={2}.
   // The route now renders QxPageFrame and its qx-ctabar; these names only document the replaced contract.
   return (
     <QxPageFrame
+      navbar={<PrintDeskNavbar />}
+      back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
       title="材料检查"
-      subtitle="第 2 步 / 共 4 步 · 检查格式、大小、页数与图片质量，并完成隐私裁决"
+      subtitle="第 2 步 / 共 4 步 · 检查格式、大小、页数与图片质量，并完成隐私选择"
       status={status}
       ctabar={(
-        <>
+        <PrintDeskFooter step="check" onBack={() => navigate(uploadPath)}>
           <button className="qx-btn" data-variant="ghost" type="button" disabled={isWorking} onClick={() => navigate(uploadPath)}>返回选文件</button>
           <p className="why">
             {stage === 'error'
               ? '检查结果未知，隐私预检不可跳过。请重试或返回重新选择文件。'
+              : isWorking
+                ? stage === 'submitting'
+                  ? '正在保存选择并生成遮挡文件，完成前不能进入预览。'
+                  : '正在检查材料，结果返回前不能进入预览，也不会自动放行。'
+              : submitFailed
+                ? '上次保存选择或遮挡处理没有完成，打印文件未更新。请再次点击继续重试。'
               : requiresFormatReview
                 ? '文件体检判定当前文件不能直接打印，请返回重新上传。'
                 : piiScanIncomplete
                   ? '隐私检查没有完整覆盖这份文件，不能继续。请重新检查或返回选择文件。'
                   : !allFindingsDecided
                   ? '每一处隐私片段都必须由你选择保留或遮挡。'
-                  : '继续后会保存选择，并按真实处理结果生成或选用打印文件。'}
+                  : '继续后会保存选择，并按处理结果准备打印文件。'}
           </p>
           <button
             className="qx-btn"
@@ -542,9 +605,13 @@ export function PrintMaterialCheckPage({
           >
             {stage === 'submitting' ? '保存选择中…' : requiresFormatReview ? '请重新上传文件' : '下一步：预览与参数'}
           </button>
-        </>
+        </PrintDeskFooter>
       )}
     >
+      <PrintDeskGuide step={2}
+        title={stage === 'error' ? <>检查<em>没做成</em>。</> : isWorking ? <>正在<em>读这份文件</em>。</> : findings.length > 0 ? <>有 {findings.length} 处<em>要你拿主意</em>。</> : <>先<em>看清楚</em>再出纸。</>}
+        detail={stage === 'error' ? '请重试检查，或返回选择其他文件。' : '检查格式、页数和个人信息，逐项确认后再设打印参数。'}
+      />
       <div className="qpd-check-page">
         <div className="qpd-check-intro" data-feature="文件预检">
           <strong>文件预检</strong>
@@ -553,6 +620,7 @@ export function PrintMaterialCheckPage({
         <MaterialCheckPresentation
           stage={stage}
           file={file}
+          token={getToken()}
           error={error}
           inspection={inspectionSummary ? {
             pageLabel: inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准',
@@ -564,12 +632,14 @@ export function PrintMaterialCheckPage({
             canNormalize: normalizeSummary.canNormalize,
             messages: normalizeSummary.messages.map((message) => message.text),
           } : null}
-          privacyModeWarning={piiModeCopy?.label ?? null}
+          privacyModeWarning={piiScanIncomplete ? piiModeCopy?.label ?? null : null}
+          privacyModeNotice={piiModeCopy && !piiScanIncomplete ? piiModeCopy.label : null}
           demoMode={isDemoTask(inspectionTask) || isDemoTask(piiTask)}
           findings={presentationFindings}
           requiresFormatReview={requiresFormatReview}
           isWorking={isWorking}
-          onRetry={() => void runChecks()}
+          onRetry={() => void runChecks({ retry: true })}
+          onBack={() => navigate(uploadPath)}
           onApplySuggested={applySuggestedDecisions}
           onKeepAll={keepAll}
           onDecision={setDecision}

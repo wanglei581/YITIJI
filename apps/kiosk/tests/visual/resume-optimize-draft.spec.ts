@@ -9,8 +9,10 @@ const W6_MEMBER_PHONE = '13800138000'
 const W6_MEMBER_CODE = '123456'
 const EMPTY_TASK_ID = 'optimize-empty-2099'
 const EMPTY_ACCESS_TOKEN = 'optimize-empty-access-token'
+const HONEST_SWITCH_TASK_ID = 'optimize-honest-switch-2099'
+const HONEST_SWITCH_ACCESS_TOKEN = 'optimize-honest-switch-access-token'
 const OPTIMIZE_PROTOTYPE = readFileSync(
-  new URL('../../../../docs/design/kiosk-redesign-2026-08/23-resume-optimize.html', import.meta.url),
+  new URL('../../../../docs/design/kiosk-redesign-2026-08-v2/23-resume-optimize.html', import.meta.url),
   'utf8',
 )
 
@@ -50,15 +52,18 @@ const DRAFT_RESUME = {
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of W6_MEMBER_PHONE) {
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of W6_MEMBER_CODE) {
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/resume/optimize' && url.searchParams.get('taskId') === TASK_ID)
 }
 
@@ -213,6 +218,84 @@ test('live empty optimize response keeps the zero-model fallback and sends the a
   await expect(page.getByText(MANUAL_STEPS[7], { exact: true })).toBeVisible()
   await page.locator('[data-kiosk-screen="resume-optimize"]').evaluate((element) => element.scrollTo({ top: 0 }))
   await page.screenshot({ path: test.info().outputPath('screenshots', 'runtime-resume-optimize-empty-1080x1920.png') })
+})
+
+async function openAnonymousOptimize(
+  page: Page,
+  api: Parameters<typeof registerW6Api>[0],
+  optimize: { providerName: string; modules: Array<{ title: string; before: string; after: string }> },
+): Promise<void> {
+  registerOptimizeShell(api)
+  api.respond('GET', `/api/v1/resume/records/${HONEST_SWITCH_TASK_ID}/optimize`, {
+    status: 200,
+    json: {
+      taskId: HONEST_SWITCH_TASK_ID,
+      status: 'completed',
+      ...optimize,
+      optimizedResume: {
+        ...OPTIMIZE_RESUME,
+        experience: [{ company: '示例公司', role: '前端开发', period: '2022-2024', description: '负责页面开发并完成上线。' }],
+      },
+    },
+  })
+  await page.addInitScript(({ taskId, accessToken }) => {
+    window.sessionStorage.setItem('ai-job-print:current-ai-resume', JSON.stringify({ taskId, accessToken }))
+  }, { taskId: HONEST_SWITCH_TASK_ID, accessToken: HONEST_SWITCH_ACCESS_TOKEN })
+  await page.goto('/resume/optimize')
+  await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+}
+
+async function textareaValues(page: Page): Promise<string[]> {
+  return page.locator('textarea').evaluateAll((areas) => areas.map((area) => (area as HTMLTextAreaElement).value))
+}
+
+// 服务端只校验 before 出自原文，不要求 after 原样写进优化稿；切换靠在正文里找 after。
+// 找不到时不能画开关、更不能在点了之后说「你在编辑区里改过」——用户什么都没改。
+test('改写没有原样写进优化稿的条目标为只能手改，能切换的照常切换 @kiosk', async ({ page, api }) => {
+  await openAnonymousOptimize(page, api, {
+    providerName: 'llm',
+    modules: [
+      { title: '第一条经历', before: '负责页面开发。', after: '负责页面开发并完成上线。' },
+      { title: '第二条经历', before: '参与项目协作。', after: '建议改为：推动项目协作。' },
+    ],
+  })
+  const rows = page.getByTestId('resume-optimize-list').locator('li')
+  const counts = page.getByTestId('resume-optimize-counts')
+  await expect(rows).toHaveCount(2)
+  await expect(rows.nth(0).getByRole('button', { name: '保留原文', exact: true })).toBeVisible()
+  await expect(rows.nth(1).getByTestId('resume-optimize-row-manual')).toHaveText('这条改写没有原样写进优化稿，这里没法切换；要用哪一版，请在编辑区里对照着改。')
+  expect(await rows.nth(1).getByRole('button', { name: /^(用改写|保留原文)$/ }).count()).toBe(0)
+  await expect(counts.locator('[data-d="optimized"] b')).toHaveText('1 / 1')
+  await expect(counts.locator('[data-d="manual"]')).toHaveText('只能手改1')
+
+  await rows.nth(0).getByRole('button', { name: '保留原文', exact: true }).click()
+  await expect(counts.locator('[data-d="original"] b')).toHaveText('1')
+  await expect(counts.locator('[data-d="optimized"] b')).toHaveText('0 / 1')
+  await expect(page.getByTestId('resume-optimize-batch').getByRole('button', { name: /全部保留原文/ })).toBeDisabled()
+  await page.getByTestId('resume-optimize-open-editor').click()
+  await expect(page.locator('textarea').first()).toBeVisible()
+  const values = await textareaValues(page)
+  expect(values.some((value) => value.includes('负责页面开发。'))).toBe(true)
+  expect(values.some((value) => value.includes('负责页面开发并完成上线。'))).toBe(false)
+  for (const blame of ['在编辑区里改过', '在编辑区里已经变了']) expect(await page.getByText(blame).count()).toBe(0)
+})
+
+test('一条都切换不了时（演示建议句）不画切换、计数与批量 @kiosk', async ({ page, api }) => {
+  await openAnonymousOptimize(page, api, {
+    providerName: 'mock',
+    modules: [
+      { title: '个人简介表达优化', before: '热爱工作，积极向上。', after: '建议改为具体可量化的表达。' },
+      { title: '项目经历表达优化', before: '参与了系统开发。', after: '建议改为具体职责加成果。' },
+    ],
+  })
+  const list = page.getByTestId('resume-optimize-list')
+  const counts = page.getByTestId('resume-optimize-counts')
+  await expect(list.getByTestId('resume-optimize-row-manual')).toHaveCount(2)
+  await expect(counts.locator('[data-d="manual"] b')).toHaveText('2')
+  await expect(page.getByText('上面这几条都没法在这里切换，要用哪一版，请在编辑区里对照着改')).toBeVisible()
+  expect(await list.getByRole('button', { name: /^(用改写|保留原文)$/ }).count()).toBe(0)
+  expect(await counts.locator('[data-d="optimized"], [data-d="original"]').count()).toBe(0)
+  expect(await page.getByTestId('resume-optimize-batch').count()).toBe(0)
 })
 
 test('all three fallback paths and the navbar perform real registered-route navigation @kiosk', async ({ page, api }) => {

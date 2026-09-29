@@ -1,5 +1,7 @@
 # AI求职打印服务终端 — 路线图更新方案（2026 Q3 – 2027 Q2）
 
+> **历史材料（2026-09-26 标注）：** 本文是 2026-06 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
+
 **日期**：2026-06-17
 **类型**：路线图更新
 **参与成员**：数析（Metric）× 2、瑞思（Reese）、竞析（Compa）、路径（Roadie）

@@ -22,7 +22,11 @@ import { plainToInstance } from 'class-transformer'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { PoliciesService } from '../src/policies/policies.service'
+import { PolicyEligibilityService } from '../src/policies/policy-eligibility.service'
 import { CreatePolicyPostDto, POLICY_AUDIENCES } from '../src/policies/dto/policy.dto'
+import { CommunityService } from '../src/community/community.service'
+import { MemberFavoritesService } from '../src/member-favorites/member-favorites.service'
+import { ActivityService } from '../src/activity/activity.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
@@ -94,6 +98,8 @@ async function main() {
   const admin: AuthedUser = { userId: adminRow.id, role: 'admin', orgId: null }
 
   const cleanup = async () => {
+    await prisma.partnerOrgNotice.deleteMany({ where: { orgId: { in: [orgA, orgB] } } }).catch(() => undefined)
+    await prisma.recruitmentEmergencyHold.deleteMany({ where: { orgId: { in: [orgA, orgB] } } }).catch(() => undefined)
     await prisma.policyPost.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } })
     await prisma.auditLog.deleteMany({ where: { actorId: { in: [partnerA.userId, partnerB.userId, admin.userId] } } })
     await prisma.user.deleteMany({ where: { id: { in: [partnerA.userId, partnerB.userId, admin.userId] } } })
@@ -131,15 +137,23 @@ async function main() {
     }
 
     // ── 4a. 未过审发布被拒 ─────────────────────────────────────────────────
-    await expectCode(() => svc.publishPolicy(guide.id, 'publish', admin), 'PUBLISH_REQUIRES_APPROVAL', '4a. 未过审发布 → PUBLISH_REQUIRES_APPROVAL')
-    await expectCode(() => svc.reviewPolicy(guide.id, 'reject', undefined, admin), 'REJECT_REASON_REQUIRED', '4b. reject 缺原因被拒')
+    await expectCode(() => svc.publishPolicy(guide.id, 'publish', admin), 'ADMIN_POLICY_PUBLISH_DISABLED', '4a-admin. 管理员发布被拒')
+    await expectCode(
+      () => svc.publishPolicy(guide.id, 'publish', partnerA, { responsibilityAcknowledged: true }),
+      'PUBLISH_REQUIRES_APPROVAL',
+      '4a. 未过审发布 → PUBLISH_REQUIRES_APPROVAL',
+    )
+    await expectCode(() => svc.reviewPolicy(guide.id, 'reject', undefined, partnerA), 'REJECT_REASON_REQUIRED', '4b. reject 缺原因被拒')
 
-    // ── 3. 审核 + 发布 → Kiosk 可见 + 过滤 ────────────────────────────────
+    // ── 3. 机构审核 + 发布确认 → Kiosk 可见 + 过滤 ─────────────────────────
     {
-      await svc.reviewPolicy(guide.id, 'approve', undefined, admin)
-      await svc.publishPolicy(guide.id, 'publish', admin)
-      await svc.reviewPolicy(noticePost.id, 'approve', undefined, admin)
-      await svc.publishPolicy(noticePost.id, 'publish', admin)
+      await svc.reviewPolicy(guide.id, 'approve', undefined, partnerA)
+      const published = await svc.publishPolicy(guide.id, 'publish', partnerA, { responsibilityAcknowledged: true })
+      if (published.publishConfirmedBy !== partnerA.userId || published.publishConfirmedContentVersion !== published.contentVersion) {
+        fail('3-ack. 发布确认没有记下确认人和版本号')
+      }
+      await svc.reviewPolicy(noticePost.id, 'approve', undefined, partnerA)
+      await svc.publishPolicy(noticePost.id, 'publish', partnerA, { responsibilityAcknowledged: true })
 
       const all = await svc.getPublishedPolicies()
       if (!all.data.some((p) => p.id === guide.id) || !all.data.some((p) => p.id === noticePost.id)) {
@@ -189,6 +203,17 @@ async function main() {
       }
       pass('8. 6 类审计动作齐全')
     }
+
+    await svc.reviewPolicy(guide.id, 'approve', undefined, partnerA)
+    await svc.publishPolicy(guide.id, 'unpublish', admin, { reasonCode: 'rights_complaint', reasonText: '权利投诉核验' })
+    await expectCode(
+      () => svc.publishPolicy(guide.id, 'publish', partnerA, { responsibilityAcknowledged: true }),
+      'EMERGENCY_TAKEDOWN_IRREVERSIBLE',
+      '下架后不能恢复',
+    )
+    const notices = await prisma.partnerOrgNotice.findMany({ where: { orgId: orgA } })
+    if (!notices.some((row) => row.kind === 'recruitment_emergency_takedown')) fail('政策下架通知未写出')
+    else pass('政策下架通知写出')
 
     {
       const unpaged = await svc.getPartnerPolicies(partnerA)
@@ -255,6 +280,216 @@ async function main() {
         fail('9d. 第二页未按 skip/take 切片')
       }
       pass('9d. 第二页 skip/take 生效')
+    }
+
+    // ── P1. 托管关闭时 recruitment 分类不能当政策旁路 ─────────────────────
+    {
+      const previousHosting = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      const eligibility = new PolicyEligibilityService(prisma, audit)
+      const community = new CommunityService(prisma, {
+        get: async () => null,
+        setEx: async () => 'OK',
+      } as never)
+      const favorites = new MemberFavoritesService(prisma)
+      const activity = new ActivityService(prisma)
+      const sourceName = `政策机构A_${suffix}`
+      try {
+        process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+        await expectCode(
+          () => svc.createPartnerPolicy({ kind: 'notice', title: `招聘旁路_${suffix}`, category: 'recruitment' }, partnerA),
+          'RECRUITMENT_HOSTING_DISABLED',
+          'P1a. 托管关闭时不能新建 recruitment 政策',
+        )
+        const stock = await prisma.policyPost.create({
+          data: {
+            sourceOrgId: orgA, sourceName, kind: 'notice', title: `存量招聘_${suffix}`,
+            category: 'recruitment', reviewStatus: 'approved', publishStatus: 'published',
+            externalUrl: 'https://jobs.example.com/list', content: '岗位与招聘会清单',
+            publishedDate: new Date('2099-01-02'),
+          },
+        })
+        const pendingStock = await prisma.policyPost.create({
+          data: {
+            sourceOrgId: orgA, sourceName, kind: 'notice', title: `待审招聘_${suffix}`,
+            category: 'recruitment', reviewStatus: 'pending', publishStatus: 'draft',
+          },
+        })
+        const stockGuide = await prisma.policyPost.create({
+          data: {
+            sourceOrgId: orgA, sourceName, kind: 'policy_guide', title: `扶持招聘_${suffix}`,
+            audience: 'graduate', category: 'recruitment', reviewStatus: 'approved', publishStatus: 'published',
+            publishedDate: new Date('2099-01-03'),
+          },
+        })
+        const normalGuide = await prisma.policyPost.create({
+          data: {
+            sourceOrgId: orgA, sourceName, kind: 'policy_guide', title: `扶持正常_${suffix}`,
+            audience: 'graduate', category: 'policy', reviewStatus: 'approved', publishStatus: 'published',
+            publishedDate: new Date('2099-01-04'),
+          },
+        })
+        await expectCode(
+          () => svc.updatePartnerPolicy(stock.id, { title: `改存量_${suffix}` }, partnerA),
+          'RECRUITMENT_HOSTING_DISABLED',
+          'P1b. 托管关闭时不能修改 recruitment 政策',
+        )
+        await expectCode(
+          () => svc.updatePartnerPolicy(stock.id, { category: 'notice' }, partnerA),
+          'RECRUITMENT_HOSTING_DISABLED',
+          'P1c. 托管关闭时不能把 recruitment 改成其他分类',
+        )
+        await expectCode(
+          () => svc.updatePartnerPolicy(normalGuide.id, { category: 'recruitment' }, partnerA),
+          'RECRUITMENT_HOSTING_DISABLED',
+          'P1d. 托管关闭时不能把普通政策改成 recruitment',
+        )
+        await expectCode(
+          () => svc.reviewPolicy(pendingStock.id, 'approve', undefined, partnerA),
+          'RECRUITMENT_HOSTING_DISABLED',
+          'P1e. 托管关闭时不能审核通过 recruitment 政策',
+        )
+        await expectCode(
+          () => svc.publishPolicy(stock.id, 'publish', partnerA, { responsibilityAcknowledged: true }),
+          'RECRUITMENT_HOSTING_DISABLED',
+          'P1f. 托管关闭时不能发布 recruitment 政策',
+        )
+        const hidden = await svc.getPublishedPolicies({ category: 'recruitment' })
+        if (hidden.data.some((row) => row.id === stock.id || row.id === stockGuide.id)) {
+          fail('P1g. 公开列表仍返回 recruitment 分类')
+        }
+        const visibleNormal = await svc.getPublishedPolicies()
+        if (!visibleNormal.data.some((row) => row.id === normalGuide.id)) fail('P1g. 普通政策被公开列表误伤')
+        if (visibleNormal.data.some((row) => row.hostingStock)) fail('P1g. 公开列表不应带 hostingStock')
+        await expectCode(() => svc.getPublishedPolicyById(stock.id), 'POLICY_NOT_FOUND', 'P1h. 公开详情不返回 recruitment')
+        const detail = await svc.getPublishedPolicyById(normalGuide.id)
+        if (detail.data.id !== normalGuide.id || detail.data.hostingStock) fail('P1h. 普通政策详情异常')
+        const checked = await eligibility.checkEligibility({ policyIds: [stockGuide.id, normalGuide.id] })
+        if (checked.items.some((item) => item.policyId === stockGuide.id)) fail('P1i. 条件核对仍返回 recruitment')
+        if (!checked.items.some((item) => item.policyId === normalGuide.id)) fail('P1i. 条件核对漏了普通政策')
+        pass('P1i. 公开列表、详情、条件核对排除 recruitment，普通政策仍在')
+        const feed = await community.list()
+        if (feed.items.some((item) => item.id === `policy:${stock.id}` || item.id === `policy:${stockGuide.id}`)) {
+          fail('P1j. 职业圈仍展示 recruitment 政策')
+        }
+        if (!feed.items.some((item) => item.id === `policy:${normalGuide.id}`)) fail('P1j. 职业圈漏了普通政策')
+        pass('P1j. 职业圈不展示 recruitment 政策')
+        await expectCode(
+          () => favorites.add('p1-nobody', { targetType: 'policy', targetId: stock.id }),
+          'FAVORITE_TARGET_NOT_FOUND',
+          'P1k. 收藏读取口不把 recruitment 当已发布',
+        )
+        await expectCode(
+          () => activity.recordBrowse('p1-nobody', 'policy', stock.id, null),
+          'ACTIVITY_TARGET_NOT_FOUND',
+          'P1l. 浏览记录读取口不把 recruitment 当已发布',
+        )
+        const partnerRows = await svc.getPartnerPolicies(partnerA)
+        if (!Array.isArray(partnerRows)) fail('P1m. 机构列表缺省应仍是数组')
+        const partnerStock = partnerRows.find((row) => row.id === stock.id)
+        if (!partnerStock || partnerStock.hostingStock !== true || partnerStock.title !== `存量招聘_${suffix}`) {
+          fail('P1m. 机构列表应看到存量且只多 hostingStock')
+        }
+        if (partnerRows.some((row) => row.id === normalGuide.id && row.hostingStock)) {
+          fail('P1m. 普通政策不应标 hostingStock')
+        }
+        const adminRows = await svc.getAllPolicySources()
+        if (!Array.isArray(adminRows)) fail('P1n. 管理员列表缺省应仍是数组')
+        const adminStock = adminRows.find((row) => row.id === stock.id)
+        if (!adminStock || adminStock.hostingStock !== true) fail('P1n. 管理员列表应看到存量并带 hostingStock')
+        pass('P1n. 机构和管理员列表保留存量，并带 hostingStock')
+
+        process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+        const opened = await svc.createPartnerPolicy(
+          { kind: 'notice', title: `b招聘_${suffix}`, category: 'recruitment' },
+          partnerA,
+        )
+        if (opened.category !== 'recruitment' || opened.hostingStock) fail('P1o. 托管打开时 recruitment 应能新建且不带存量标记')
+        await svc.reviewPolicy(opened.id, 'approve', undefined, partnerA)
+        const openedPublished = await svc.publishPolicy(opened.id, 'publish', partnerA, { responsibilityAcknowledged: true })
+        if (openedPublished.publishStatus !== 'published' || openedPublished.hostingStock) {
+          fail('P1o. 托管打开时 recruitment 应能发布且不带存量标记')
+        }
+        const openedList = await svc.getPublishedPolicies()
+        if (!openedList.data.some((row) => row.id === opened.id) || !openedList.data.some((row) => row.id === stock.id)) {
+          fail('P1o. 托管打开时已发布的 recruitment 应回到公开列表')
+        }
+        pass('P1o. 托管打开时 recruitment 分类读写与公开读取保持原样')
+      } finally {
+        if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+        else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+      }
+    }
+
+    // ── P2. 紧急下架与机构发布并发，不能留下「有 hold 且 published」────────
+    {
+      // 根客户端的 update 若在「改成 unpublished」之后让出事件循环，旧的两步下架会被发布插进来。
+      // 正确实现走事务客户端，不经过这次让出。
+      const policyWrites = prisma.policyPost as unknown as {
+        update: (args: { where: { id: string }; data: { publishStatus?: string } }) => Promise<unknown>
+      }
+      const originalPolicyUpdate = policyWrites.update.bind(policyWrites)
+      policyWrites.update = async (args) => {
+        const result = await originalPolicyUpdate(args)
+        if (args.data?.publishStatus === 'unpublished') {
+          await new Promise((resolve) => setTimeout(resolve, 20))
+        }
+        return result
+      }
+      const race = await svc.createPartnerPolicy(
+        { kind: 'notice', title: `并发下架_${suffix}`, category: 'notice' },
+        partnerA,
+      )
+      await svc.reviewPolicy(race.id, 'approve', undefined, partnerA)
+      const rounds = 40
+      for (let i = 0; i < rounds; i += 1) {
+        await prisma.recruitmentEmergencyHold.deleteMany({ where: { targetType: 'policy', targetId: race.id } })
+        await prisma.policyPost.update({
+          where: { id: race.id },
+          data: {
+            reviewStatus: 'approved',
+            publishStatus: 'draft',
+            publishConfirmedBy: null,
+            publishConfirmedAt: null,
+            publishConfirmedContentVersion: null,
+          },
+        })
+        await Promise.allSettled([
+          svc.publishPolicy(race.id, 'unpublish', admin, { reasonCode: 'illegal_content', reasonText: `并发下架第${i}次` }),
+          svc.publishPolicy(race.id, 'publish', partnerA, { responsibilityAcknowledged: true }),
+        ])
+        const row = await prisma.policyPost.findUnique({ where: { id: race.id } })
+        const hold = await prisma.recruitmentEmergencyHold.findFirst({
+          where: { targetType: 'policy', targetId: race.id },
+        })
+        if (hold && row?.publishStatus === 'published') {
+          fail(`P2. 第 ${i} 次并发后出现 hold 且 published`)
+        }
+        const listed = await svc.getPublishedPolicies()
+        if (hold && listed.data.some((item) => item.id === race.id)) {
+          fail(`P2. 第 ${i} 次并发后公开列表仍能读到有 hold 的政策`)
+        }
+      }
+      await prisma.policyPost.update({
+        where: { id: race.id },
+        data: { reviewStatus: 'approved', publishStatus: 'published' },
+      })
+      await prisma.recruitmentEmergencyHold.upsert({
+        where: { targetType_targetId: { targetType: 'policy', targetId: race.id } },
+        create: {
+          targetType: 'policy',
+          targetId: race.id,
+          orgId: orgA,
+          reasonCode: 'false_information',
+          reasonText: '纵深防御夹具',
+          actorId: admin.userId,
+        },
+        update: { reasonText: '纵深防御夹具' },
+      })
+      const planted = await svc.getPublishedPolicies()
+      if (planted.data.some((item) => item.id === race.id)) fail('P2. 直接写成有 hold 且 published 后，公开列表仍能读到')
+      await expectCode(() => svc.getPublishedPolicyById(race.id), 'POLICY_NOT_FOUND', 'P2. 有 hold 的政策详情不可读')
+      policyWrites.update = originalPolicyUpdate
+      pass(`P2. ${rounds} 次并发下架与发布没有出现 hold 且 published，公开读取也排除 hold`)
     }
 
     console.log('\n=== ALL PASS ===')

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import type { GeneratedResume } from '../interfaces/ai-provider.interface'
+import { AIGC_VISIBLE_FOOTER } from '../../common/pdf/aigc-label'
 
 // ============================================================
 // ResumeTextService — Wave 1 Task 5 简历 txt / markdown 渲染
@@ -14,8 +15,12 @@ import type { GeneratedResume } from '../interfaces/ai-provider.interface'
 
 @Injectable()
 export class ResumeTextService {
-  /** 渲染纯文本简历。分隔线 + 缩进组织,字段顺序同 docx/pdf。 */
-  renderTxt(resume: GeneratedResume): string {
+  /**
+   * 渲染纯文本简历。分隔线 + 缩进组织,字段顺序同 docx/pdf。
+   * visibleLabel 为真时在末尾加显式标识一行（C8，由调用方按 resumeExportShowsVisibleLabel 判定）；
+   * 缺省不加，输出与此前逐字一致。
+   */
+  renderTxt(resume: GeneratedResume, options?: { visibleLabel?: boolean }): string {
     const lines: string[] = []
     const divider = '='.repeat(40)
     const subDivider = '-'.repeat(40)
@@ -96,12 +101,13 @@ export class ResumeTextService {
       lines.pop()
     }
     lines.push(subDivider)
+    if (options?.visibleLabel) lines.push(AIGC_VISIBLE_FOOTER)
 
     return lines.join('\n')
   }
 
-  /** 渲染 Markdown 简历。# 姓名 / ## 段落标题 / - 列表项,字段顺序同 docx/pdf。 */
-  renderMarkdown(resume: GeneratedResume): string {
+  /** 渲染 Markdown 简历。# 姓名 / ## 段落标题 / - 列表项,字段顺序同 docx/pdf。visibleLabel 同 renderTxt。 */
+  renderMarkdown(resume: GeneratedResume, options?: { visibleLabel?: boolean }): string {
     const lines: string[] = []
 
     const name = resume.basic?.name?.trim()
@@ -185,6 +191,7 @@ export class ResumeTextService {
     while (lines.length > 0 && lines[lines.length - 1] === '') {
       lines.pop()
     }
+    if (options?.visibleLabel) lines.push('', '---', '', `*${AIGC_VISIBLE_FOOTER}*`)
 
     return lines.join('\n')
   }

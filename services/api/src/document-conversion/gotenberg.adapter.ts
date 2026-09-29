@@ -11,21 +11,23 @@ export class GotenbergConversionAdapter implements ConversionEngineAdapter {
 
   async probe(): Promise<{ available: boolean; reason?: string }> {
     if (!this.baseUrl) {
-      return { available: false, reason: '服务端未配置 GOTENBERG_URL' }
+      return { available: false, reason: 'Word 转 PDF 尚未准备好，请先另存为 PDF 上传。' }
     }
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
     try {
       const response = await fetch(new URL('/health', this.baseUrl), { signal: controller.signal })
+      // reason 会原样显示给用户（转换不可用时的提示），只写用户话；引擎名由 engine 字段区分。
       if (!response.ok) {
-        return { available: false, reason: `Gotenberg 健康检查失败 (${response.status})` }
+        return { available: false, reason: 'Word 转 PDF 暂时不可用，请联系工作人员；也可另存为 PDF 上传。' }
       }
+      // 适配器已连上，但容器内中文字体还没验证：按「字体未就绪」对用户说，暂不开放转换。
       return {
         available: false,
-        reason: 'Gotenberg 适配器骨架已连接，容器内 CJK 字体验证未完成，暂不开放转换',
+        reason: '转换所需的中文字体尚未准备好，请先另存为 PDF 上传。',
       }
     } catch {
-      return { available: false, reason: 'Gotenberg 健康检查失败' }
+      return { available: false, reason: 'Word 转 PDF 暂时不可用，请联系工作人员；也可另存为 PDF 上传。' }
     } finally {
       clearTimeout(timer)
     }

@@ -168,6 +168,7 @@ export class FairVisitPlanService {
         sourceName: stored.fair.sourceName,
         venue: stored.fair.venue,
         sourceUrl: stored.fair.sourceUrl,
+        contentId: taskId,
       },
       stored.payload,
     )
@@ -176,6 +177,8 @@ export class FairVisitPlanService {
       filename: `招聘会参会准备单.pdf`,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
+      // AI 生成的派生稿：生产隐私闸门按类别放行，否则直达报价页后建单被拒（商用收口 P0-5）。
+      assetCategory: 'derived',
       uploaderId: null,
       endUserId: parse.endUserId,
       createdBy: 'fair_visit_plan',

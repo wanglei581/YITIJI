@@ -1,198 +1,285 @@
-.k1-help-center {
-  color: var(--color-neutral-900);
-  background: transparent;
-  font-family: var(--font-sans);
+/* 帮助中心 /help · 青序流光 2.0 稿 06。选择器以 .k1-help-center 起头。 */
+.k1-help-center { width: 100%; height: 100%; min-height: 0; color: var(--qx-ink); background: var(--qx-paper); font-family: var(--qx-sans); }
+.k1-help-center[data-help-view='default'] .qx-pagehead,
+.k1-help-center[data-help-view='topic'] .qx-pagehead {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  height: auto;
+  gap: 12px;
+  margin: 14px var(--qx-gutter) 0;
+  padding: 28px 36px 22px;
+  border-radius: 32px;
+  color: var(--qx-paper);
+  background:
+    radial-gradient(420px 220px at 92% 0, color-mix(in srgb, var(--qx-emerald) 16%, transparent), transparent 70%),
+    linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep) 72%);
 }
-
-.k1-help-center > .ui-kiosk-page-content {
-  gap: 18px;
+.k1-help-center[data-help-view='default'] .qx-pagehead h1,
+.k1-help-center[data-help-view='topic'] .qx-pagehead h1 {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--qx-fs-page);
+  line-height: 1.25;
 }
-
-.k1-help-center .k1-help-filters {
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  gap: 10px;
-  overflow: visible;
-  padding-bottom: 2px;
-}
-
-.k1-help-center .k1-help-filters button {
-  min-height: 58px;
-  flex: 0 0 auto;
-  padding: 0 24px;
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 999px;
-  color: var(--color-neutral-500);
-  background: var(--color-surface);
-  font-size: 20px;
+.k1-help-center[data-help-view='default'] .qx-pagehead h1::before,
+.k1-help-center[data-help-view='topic'] .qx-pagehead h1::before { display: none; }
+.k1-help-center[data-help-view='default'] .qx-pagehead h1 em,
+.k1-help-center[data-help-view='topic'] .qx-pagehead h1 em { font-style: normal; color: var(--qx-emerald); }
+.k1-help-center .k1-help-eyebrow {
+  font-family: var(--qx-sans);
+  font-size: var(--qx-fs-aux-lg);
   font-weight: 600;
-}
-
-.k1-help-center .k1-help-filters button.is-active {
-  border-color: color-mix(in srgb, var(--color-primary-600) 48%, var(--color-neutral-200));
-  color: var(--color-primary-700);
-  background: var(--color-primary-100);
-}
-
-.k1-help-center .k1-help-scroll { overscroll-behavior: contain; scrollbar-gutter: stable; }
-
-.k1-help-center .k1-help-faq-list { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
-
-.k1-help-center .k1-help-row {
-  overflow: hidden;
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 14px;
-  background: var(--color-surface);
-  box-shadow: 0 3px 10px rgba(16, 48, 43, .04);
-}
-
-.k1-help-center .k1-help-row.is-open {
-  grid-column: 1 / -1;
-  border-color: color-mix(in srgb, var(--color-primary-600) 45%, var(--color-neutral-200));
-}
-
-.k1-help-center .k1-help-toggle { padding: 15px 18px; color: var(--color-neutral-900); background: transparent; }
-
-.k1-help-center .k1-help-toggle:hover,
-.k1-help-center .k1-help-toggle[aria-expanded='true'] { background: var(--color-surface); }
-
-.k1-help-center .k1-help-question-mark {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 12px;
-  color: var(--color-primary-700);
-  background: var(--color-primary-100);
-  font-family: var(--font-serif);
-  font-size: 24px;
-  font-weight: 900;
-}
-
-.k1-help-center .k1-help-category {
-  display: inline-flex;
-  margin-bottom: 8px;
-  padding: 3px 12px;
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 999px;
-  color: var(--color-neutral-500);
-  background: var(--color-canvas);
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.k1-help-center .k1-help-toggle strong {
-  display: block;
-  color: var(--color-neutral-900);
-  font-size: 21px;
-  line-height: 1.45;
-}
-
-.k1-help-center .k1-help-chevron { width: 26px; height: 26px; margin-top: 22px; color: var(--color-neutral-500); }
-
-.k1-help-center .k1-help-answer { padding: 0 76px 18px; }
-
-.k1-help-center .k1-help-answer > p {
-  margin: 0;
-  color: var(--color-neutral-500);
-  font-size: 19px;
-  line-height: 1.55;
-}
-
-.k1-help-center .k1-help-link {
-  min-height: 56px;
-  margin-top: 14px;
-  padding-inline: 24px;
-  border: 1px solid color-mix(in srgb, var(--color-primary-600) 45%, var(--color-neutral-200));
-  border-radius: 12px;
-  color: var(--color-primary-700);
-  background: var(--color-canvas);
-  font-size: 19px;
-  font-weight: 600;
-}
-
-.k1-help-center .k1-help-contact {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 22px;
-  margin-top: 12px;
-  padding: 20px 24px;
-  border: 1px solid var(--color-neutral-200);
-  border-top: 4px solid var(--color-clay);
-  border-radius: 18px;
-  background: var(--color-surface);
-}
-
-.k1-help-center .k1-help-contact > span {
-  display: grid;
-  width: 76px;
-  height: 76px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 18px;
-  color: var(--color-clay);
-  background: var(--color-clay-soft);
-}
-
-.k1-help-center .k1-help-contact > span svg { width: 40px; height: 40px; }
-
-.k1-help-center .k1-help-contact h2 {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: 26px;
-  font-weight: 700;
   letter-spacing: 1px;
+  color: color-mix(in srgb, var(--qx-paper) 90%, transparent);
 }
-
-.k1-help-center .k1-help-contact p {
-  margin: 6px 0 0;
-  color: var(--color-neutral-500);
-  font-size: 19px;
-  line-height: 1.5;
-}
-
-.k1-help-center .k1-help-contact aside {
+.k1-help-center[data-help-view='default'] .qx-pagehead h1,
+.k1-help-center[data-help-view='topic'] .qx-pagehead h1,
+.k1-help-center[data-help-view='default'] .qx-pagehead p,
+.k1-help-center[data-help-view='topic'] .qx-pagehead p {
+  width: 100%;
+  max-width: 100%;
   flex: 0 0 auto;
-  padding: 14px 26px;
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 14px;
-  background: var(--color-canvas);
-  text-align: center;
+  min-width: 0;
+}
+.k1-help-center[data-help-view='default'] .qx-pagehead p,
+.k1-help-center[data-help-view='topic'] .qx-pagehead p {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  color: color-mix(in srgb, var(--qx-paper) 88%, transparent);
+  font-size: var(--qx-fs-body);
+  line-height: var(--qx-lh-body);
+}
+.k1-help-center[data-help-view='default'] .qx-pagehead b,
+.k1-help-center[data-help-view='topic'] .qx-pagehead b { color: var(--qx-on-solid); font-weight: 600; }
+.k1-help-center .k1-help-hero-steps { display: flex; gap: 14px; }
+.k1-help-center .k1-help-hero-steps > span {
+  flex: 1;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--qx-paper) 35%, transparent);
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--qx-paper) 92%, transparent);
+}
+.k1-help-center .qx-pagehead .k1-help-hero-steps b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--qx-emerald);
+  font-family: var(--qx-serif);
+  font-size: var(--qx-fs-body);
 }
 
-.k1-help-center .k1-help-contact aside small { display: block; color: var(--color-neutral-500); font-size: 16px; }
+.k1-help-center .k1-help-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 14px; padding: 8px 0 20px; }
+.k1-help-center .k1-help-sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.k1-help-center .k1-help-sec-head h2 { display: flex; align-items: baseline; gap: 14px; margin: 0; font-size: var(--qx-fs-sec); font-weight: 700; }
+.k1-help-center .k1-help-sec-head h2 span,
+.k1-help-center .k1-help-sec-head small { color: var(--qx-teal-d); font-size: var(--qx-fs-aux-lg); font-weight: 700; }
+.k1-help-center .k1-help-sec-head small { margin-left: auto; color: var(--qx-ink-3); font-weight: 400; }
 
-.k1-help-center .k1-help-contact aside strong { display: block; margin-top: 5px; font-size: 22px; font-weight: 700; }
-
-.k1-help-center .k1-help-footer {
-  flex: 0 0 auto;
-  margin: 12px 0 0;
-  padding: 12px 18px;
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 14px;
-  color: var(--color-neutral-500);
-  background: var(--color-neutral-50);
-  font-size: 15px;
-  line-height: 1.5;
-  text-align: center;
+.k1-help-center .k1-help-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.k1-help-center .k1-help-filters button {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 132px;
+  padding: 18px 22px;
+  border: 1px solid var(--qx-line);
+  border-radius: 32px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  text-align: left;
+  cursor: pointer;
 }
+.k1-help-center .k1-help-cat-top { display: flex; align-items: center; gap: 14px; }
+.k1-help-center .k1-help-filters button strong { flex: 1; font-size: var(--qx-fs-sec); font-weight: 700; }
+.k1-help-center .k1-help-filters button small { color: var(--qx-ink-2); font-size: var(--qx-fs-aux-lg); line-height: 1.45; }
+.k1-help-center .k1-help-count { flex: none; padding: 4px 12px; border-radius: 12px; color: var(--qx-teal-d); background: var(--qx-teal-soft); font-size: var(--qx-fs-aux); font-weight: 700; }
+.k1-help-center .k1-help-cat-icon { display: grid; place-items: center; flex: none; width: 56px; height: 56px; border-radius: 18px; color: var(--qx-teal-d); background: var(--qx-teal-soft); }
+.k1-help-center .k1-help-cat-icon svg { width: 28px; height: 28px; }
+.k1-help-center .k1-help-filters button[data-tone='plum'] .k1-help-cat-icon { color: var(--qx-plum-d); background: var(--qx-plum-soft); }
+.k1-help-center .k1-help-filters button[data-tone='slate'] .k1-help-cat-icon { color: var(--qx-slate-d); background: var(--qx-slate-soft); }
+.k1-help-center .k1-help-filters button[data-tone='wheat'] .k1-help-cat-icon { color: var(--qx-wheat-d); background: var(--qx-wheat-soft); }
+.k1-help-center .k1-help-filters button:focus-visible,
+.k1-help-center .k1-help-toggle:focus-visible,
+.k1-help-center .k1-help-link:focus-visible,
+.k1-help-center .k1-help-actions button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 
-.k1-help-center .k1-help-footer a {
+.k1-help-center .k1-help-faq-list { display: flex; flex-direction: column; padding: 4px 28px; border: 1px solid var(--qx-line); border-radius: 32px; background: var(--qx-surface); }
+.k1-help-center .k1-help-row { border-bottom: 1px solid var(--qx-line); }
+.k1-help-center .k1-help-row:last-child { border-bottom: 0; }
+.k1-help-center .k1-help-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  min-height: 72px;
+  padding: 18px 0 0;
+  border: 0;
+  color: var(--qx-ink);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.k1-help-center .k1-help-question-mark { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; color: var(--qx-teal-d); background: var(--qx-teal-soft); font-size: var(--qx-fs-aux); font-weight: 700; }
+.k1-help-center .k1-help-toggle strong { font-size: var(--qx-fs-sec); font-weight: 700; line-height: 1.4; }
+.k1-help-center .k1-help-answer { padding: 8px 0 18px 54px; }
+.k1-help-center .k1-help-answer > p { margin: 0; color: var(--qx-ink-2); font-size: var(--qx-fs-body); line-height: 1.55; }
+.k1-help-center .k1-help-link {
   display: inline-flex;
-  min-height: 48px;
   align-items: center;
-  padding-inline: 8px;
+  gap: 8px;
+  min-height: var(--qx-btn-h);
+  padding: 0 22px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 20px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  font-size: var(--qx-fs-body-lg);
+  font-weight: 700;
+  cursor: pointer;
 }
+.k1-help-center .k1-help-link svg { width: 22px; height: 22px; }
+
+.k1-help-center .k1-help-steps,
+.k1-help-center .k1-help-people { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.k1-help-center .k1-help-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.k1-help-center .k1-help-people { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.k1-help-center .k1-help-steps li,
+.k1-help-center .k1-help-contact,
+.k1-help-center .k1-help-miss {
+  padding: 16px 18px;
+  border: 1px solid var(--qx-line);
+  border-radius: 32px;
+  background: var(--qx-surface);
+}
+.k1-help-center .k1-help-steps li { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; }
+.k1-help-center .k1-help-step-no { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 16px; color: var(--qx-emerald); background: var(--qx-deep); font-family: var(--qx-serif); font-size: var(--qx-fs-body-lg); font-weight: 700; }
+.k1-help-center .k1-help-steps strong,
+.k1-help-center .k1-help-contact h3,
+.k1-help-center .k1-help-miss h3 { font-size: var(--qx-fs-sec); font-weight: 700; line-height: 1.25; }
+.k1-help-center .k1-help-steps p,
+.k1-help-center .k1-help-contact p,
+.k1-help-center .k1-help-miss p { margin: 6px 0 0; color: var(--qx-ink-2); font-size: var(--qx-fs-body); line-height: 1.45; }
+.k1-help-center .k1-help-steps p { grid-column: 1 / -1; }
+.k1-help-center .k1-help-contact { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px 14px; align-content: start; }
+.k1-help-center .k1-help-contact h3,
+.k1-help-center .k1-help-contact p { grid-column: 2; }
+.k1-help-center .k1-help-contact .k1-help-cat-icon { grid-row: 1; grid-column: 1; }
+.k1-help-center .k1-help-contact h3 { grid-row: 1; margin: 0; align-self: center; }
+.k1-help-center .k1-help-note { color: var(--qx-cinnabar-d); font-weight: 700; }
+.k1-help-center .k1-help-miss { background: var(--qx-wheat-soft); border-color: var(--qx-line-2); }
+.k1-help-center .k1-help-miss h3 { display: flex; align-items: center; gap: 10px; margin: 0; }
+.k1-help-center .k1-help-miss svg { width: 28px; height: 28px; color: var(--qx-wheat-d); }
+
+.k1-help-center .qx-ctabar { flex-wrap: wrap; align-items: stretch; gap: 12px 16px; }
+.k1-help-center .k1-help-actions { flex: 1 1 100%; display: flex; gap: 16px; }
+.k1-help-center .k1-help-actions button,
+.k1-help-center .k1-help-actions .qx-ai-help {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--qx-btn-h);
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 24px;
+  color: var(--qx-ink);
+  background: var(--qx-surface);
+  font-size: var(--qx-fs-btn);
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+.k1-help-center .k1-help-actions .is-primary {
+  flex: 1.4;
+  border-color: var(--qx-deep);
+  color: var(--qx-emerald);
+  background: var(--qx-deep);
+}
+.k1-help-center .k1-help-truth { flex: 1 1 100%; display: flex; gap: 26px; }
+.k1-help-center .k1-help-truth div { flex: 1; color: var(--qx-ink-2); font-size: var(--qx-fs-aux-lg); line-height: 1.45; }
+.k1-help-center .k1-help-truth b { display: block; margin-bottom: 4px; color: var(--qx-ink); font-weight: 700; }
+.k1-help-center .k1-help-filing { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 4px 0 0; color: var(--qx-ink-3); font-size: var(--qx-fs-note); line-height: 1.5; text-align: center; }
+
+/* 余高分到区块之间（稿 06 的 9/28 做法：各区块竖向均匀拉开，空白不再堆在按钮条上面）：
+   每个分区标题与备案号行上方各分一份；放不下时 auto 归零，照常滚动。不加区块、不放大字。
+   「这里没答上你的问题」紧跟在「直接去办」后面，不单独分一份：两块之间再拉开，右半边就空成一片。 */
+.k1-help-center .k1-help-scroll > .k1-help-sec-head,
+.k1-help-center .k1-help-scroll > .k1-help-filing { margin-top: auto; }
+/* 分类照稿两列；七张（托管 a 多一张「我的记录」）时末张占满一行，不留空格子。 */
+.k1-help-center .k1-help-filters > button:nth-child(7):last-child { grid-column: 1 / -1; }
+.k1-help-center .k1-help-links { display: flex; flex-wrap: wrap; gap: 14px; }
+.k1-help-center .k1-help-miss { padding: 24px 28px; }
+.k1-help-center[data-help-view='topic'] .qx-pagehead { padding: 38px 48px; }
+.k1-help-center[data-help-view='topic'] .qx-pagehead p { max-width: 820px; text-wrap: pretty; }
+/* 没有这个分类 / 帮助没显示出来：页头照稿是一张提醒卡（麦色底、细边、大圆角），不是光秃秃一行标题。 */
+.k1-help-center[data-help-view='no-result'] .qx-pagehead,
+.k1-help-center[data-help-view='unavailable'] .qx-pagehead { flex-direction: column; align-items: stretch; gap: 12px; margin: 14px var(--qx-gutter) 0; padding: 32px 36px; border: 1px solid var(--qx-line-2); border-radius: 32px; background: var(--qx-wheat-soft); }
+.k1-help-center[data-help-view='no-result'] .qx-pagehead h1,
+.k1-help-center[data-help-view='unavailable'] .qx-pagehead h1 { font-family: var(--qx-sans); font-size: 30px; }
+.k1-help-center[data-help-view='no-result'] .qx-pagehead h1::before,
+.k1-help-center[data-help-view='unavailable'] .qx-pagehead h1::before { height: 28px; background: var(--qx-wheat-d); }
+.k1-help-center[data-help-view='no-result'] .qx-pagehead p,
+.k1-help-center[data-help-view='unavailable'] .qx-pagehead p { line-height: 1.62; text-wrap: pretty; }
+/* 默认态：两列四行分类、自助三步、找人两卡都要落在一屏里，卡片内边距收一档（字号不动）。 */
+.k1-help-center[data-help-view='default'] .k1-help-scroll { gap: 10px; padding: 6px 0 8px; }
+.k1-help-center[data-help-view='default'] .k1-help-filters { gap: 12px; }
+.k1-help-center[data-help-view='default'] .k1-help-filters > button { min-height: 120px; padding: 14px 20px; gap: 6px; }
+.k1-help-center[data-help-view='default'] .k1-help-steps li { padding: 14px 16px; }
+.k1-help-center[data-help-view='default'] .k1-help-contact { padding: 16px 18px; }
+.k1-help-center[data-help-view='default'] .k1-help-steps p,
+.k1-help-center[data-help-view='default'] .k1-help-contact p { margin-top: 4px; line-height: 1.4; }
+.k1-help-center[data-help-view='default'] .qx-pagehead { margin-top: 10px; padding: 18px 28px 14px; gap: 8px; }
+.k1-help-center[data-help-view='default'] .qx-pagehead p { gap: 8px; }
+/* 没有这个分类 / 帮助没显示出来：卡片按原稿的内边距与行距排舒展。 */
+.k1-help-center[data-help-view='no-result'] .k1-help-contact,
+.k1-help-center[data-help-view='unavailable'] .k1-help-contact { padding: 24px 26px; }
+.k1-help-center[data-help-view='no-result'] .k1-help-contact p,
+.k1-help-center[data-help-view='unavailable'] .k1-help-contact p { line-height: 1.55; }
+.k1-help-center[data-help-view='no-result'] .k1-help-filters { gap: 18px; }
+.k1-help-center[data-help-view='no-result'] .k1-help-filters > button { padding: 28px; gap: 12px; }
+/* 「按顺序试这三条」是先后顺序：排成三行，每行左边步骤名、右边做法。 */
+.k1-help-center[data-help-view='unavailable'] .k1-help-steps { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.k1-help-center[data-help-view='unavailable'] .k1-help-steps li { grid-template-columns: auto 244px minmax(0, 1fr); column-gap: 12px; padding: 26px 30px; }
+.k1-help-center[data-help-view='unavailable'] .k1-help-steps p { grid-column: auto; margin: 0 0 0 14px; line-height: 1.55; }
+.k1-help-center .k1-help-filing a { display: inline-flex; align-items: center; min-height: var(--qx-tap-min); color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 760px) {
-  .k1-help-center .k1-help-faq-list { grid-template-columns: 1fr; }
-  .k1-help-center .k1-help-row.is-open { grid-column: auto; }
-  .k1-help-center .k1-help-contact aside { display: none; }
+  .k1-help-center .qx-body { padding: 0 16px; }
+  .k1-help-center[data-help-view] .qx-pagehead { margin: 12px 16px 0; padding: 20px 16px; }
+  .k1-help-center .k1-help-hero-steps,
+  .k1-help-center .k1-help-filters,
+  .k1-help-center .k1-help-steps,
+  .k1-help-center .k1-help-people,
+  .k1-help-center .k1-help-truth,
+  .k1-help-center .k1-help-actions { flex-direction: column; display: flex; }
+  .k1-help-center .k1-help-filters,
+  .k1-help-center .k1-help-steps,
+  .k1-help-center .k1-help-people { display: grid; grid-template-columns: 1fr; }
+  .k1-help-center[data-help-view] .k1-help-filters > button { grid-column: auto; min-height: 88px; }
+  .k1-help-center[data-help-view='unavailable'] .k1-help-steps li { grid-template-columns: auto minmax(0, 1fr); padding: 16px 18px; }
+  .k1-help-center[data-help-view='unavailable'] .k1-help-steps p { grid-column: 1 / -1; margin: 6px 0 0; }
+  .k1-help-center .k1-help-actions button,
+  .k1-help-center .k1-help-actions .qx-ai-help { min-height: 56px; font-size: var(--qx-fs-body); }
+  .k1-help-center .k1-help-sec-head { flex-direction: column; align-items: flex-start; }
+  .k1-help-center .k1-help-sec-head small { margin-left: 0; }
+  /* 手机上头图和动作条（三颗按钮加两段说明）占的高度比 27 寸屏大得多，只让中间一格滚动时
+     它会被挤成零高，分类卡压在动作条下面点不到（2026-09-28 fusion-smoke 手机用例实测）。
+     改成整页一起滚：中间内容按自身高度排开，动作条排在内容后面，底部导航贴底。 */
+  .k1-help-center .qx-stage { overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: 96px; }
+  .k1-help-center .qx-pagehead,
+  .k1-help-center .qx-body,
+  .k1-help-center .qx-ctabar { flex: none; }
+  .k1-help-center .k1-help-scroll { flex: none; overflow: visible; }
+  .k1-help-center .qx-navbar { position: sticky; bottom: 0; z-index: 2; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .k1-help-center * { animation: none !important; transition: none !important; }
+  .k1-help-center, .k1-help-center * { animation: none !important; transition: none !important; }
 }

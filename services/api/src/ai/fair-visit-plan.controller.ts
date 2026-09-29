@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Post, Req } from '@nestjs/common'
+import { AiUse } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { RedisService } from '../common/redis/redis.service'
@@ -6,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { FairVisitPlanService } from './resume/fair-visit-plan.service'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
@@ -35,18 +37,27 @@ export class FairVisitPlanController {
 
   @Post(':taskId')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async generate(@Param('fairId') fairId: string, @Param('taskId') taskId: string, @Req() req: ReqLike) {
+    assertRecruitmentContentHostingEnabled()
     return this.service.generate(fairId, taskId, await this.requesterOf(req))
   }
 
   @Get(':taskId')
+  @AiUse('read')
+
   async latest(@Param('fairId') fairId: string, @Param('taskId') taskId: string, @Req() req: ReqLike) {
+    assertRecruitmentContentHostingEnabled()
     return this.service.getLatest(fairId, taskId, await this.requesterOf(req))
   }
 
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('export')
+
   async print(@Param('fairId') fairId: string, @Param('taskId') taskId: string, @Req() req: ReqLike) {
+    assertRecruitmentContentHostingEnabled()
     return this.service.printPlan(fairId, taskId, await this.requesterOf(req))
   }
 }

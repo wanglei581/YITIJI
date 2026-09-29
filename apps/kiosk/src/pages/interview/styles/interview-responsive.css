@@ -26,11 +26,9 @@
   .interview-setup__form > .grid,
   .interview-report__abilities,
   .interview-report__two-col,
-  .interview-setup__layout,
-  .interview-tips__cols {
+  .interview-setup__layout {
     grid-template-columns: 1fr;
   }
-  .interview-tips .interview-flow__scroll > :first-child,
   .interview-report__abilities > :last-child:nth-child(odd) { grid-column: auto; }
   .interview-session__progress-card {
     align-items: stretch;

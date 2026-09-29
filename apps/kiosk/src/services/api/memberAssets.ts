@@ -15,6 +15,7 @@ import type {
   MemberDocumentItem,
   MemberDeletedDocumentItem,
   MemberAiRecordItem,
+  MemberAiRecordPage,
   FileAccessUrlResponse,
   FileRetentionUpdateResponse,
   FileRetentionUpdateRequest,
@@ -137,13 +138,26 @@ export function getMyDeletedDocuments(
   return call<MemberAssetPage<MemberDeletedDocumentItem>>(`/me/documents/deleted${pageQuery(opts)}`, token)
 }
 
-/** AI 服务记录（本人，仅元数据；kind=parse/optimize/generate 如实区分）。未登录 / mock 模式返回空页。 */
+/** qa 游标是兼容扩展；旧接口缺少它时明确停止，避免反复追加第一页。 */
+export interface AiRecordsPage extends MemberAiRecordPage {
+  qaNextCursor: string | null
+  qaTotal: number
+}
+
+/** AI 服务记录与小青作业分别分页。 */
 export function getMyAiRecords(
   token: string | null | undefined,
-  opts?: MemberPageOpts,
-): Promise<MemberAssetPage<MemberAiRecordItem>> {
-  if (API_MODE !== 'http' || !token) return Promise.resolve(EMPTY_PAGE)
-  return call<unknown>(`/me/ai-records${pageQuery(opts)}`, token).then(normalizePage<MemberAiRecordItem>)
+  opts?: MemberPageOpts & { qaCursor?: string },
+): Promise<AiRecordsPage> {
+  if (API_MODE !== 'http' || !token) return Promise.resolve({ ...EMPTY_PAGE, qaRecords: [], qaNextCursor: null, qaTotal: 0 })
+  const query = new URLSearchParams(pageQuery(opts).slice(1))
+  if (opts?.qaCursor) query.set('qaCursor', opts.qaCursor)
+  return call<Partial<AiRecordsPage>>(`/me/ai-records?${query}`, token).then((raw) => ({
+    ...normalizePage<MemberAiRecordItem>(raw),
+    qaRecords: Array.isArray(raw.qaRecords) ? raw.qaRecords : [],
+    qaNextCursor: raw.qaNextCursor ?? null,
+    qaTotal: raw.qaTotal ?? raw.qaRecords?.length ?? 0,
+  }))
 }
 
 /**
@@ -155,6 +169,14 @@ export function deleteMyAiRecord(
   recordId: string,
 ): Promise<{ deleted: true; deletedCount: number }> {
   return call(`/me/ai-records/${encodeURIComponent(recordId)}`, token, 'DELETE')
+}
+
+export function deleteMyResume(token: string, recordId: string): Promise<{ deleted: true; deletedCount: number }> {
+  return call(`/me/resumes/${encodeURIComponent(recordId)}`, token, 'DELETE')
+}
+
+export function deleteMyQaRecord(token: string, artifactId: string): Promise<{ deleted: true }> {
+  return call(`/me/qa-records/${encodeURIComponent(artifactId)}`, token, 'DELETE')
 }
 
 /**

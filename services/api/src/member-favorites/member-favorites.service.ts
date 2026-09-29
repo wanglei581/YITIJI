@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import type { AddFavoriteInput, FavoriteTargetType, MemberFavoriteItem } from './member-favorites.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
 
 // ============================================================
 // 会员收藏服务（Phase C-2C）。
@@ -36,7 +37,7 @@ export class MemberFavoritesService {
       return fair?.title ?? null
     }
     const policy = await this.prisma.policyPost.findFirst({
-      where: { id: targetId, ...published },
+      where: await publicPolicyLookupWhere(this.prisma, { id: targetId, ...published }),
       select: { title: true },
     })
     return policy?.title ?? null
@@ -47,8 +48,17 @@ export class MemberFavoritesService {
     endUserId: string,
     page: MemberPageQuery,
     targetType?: FavoriteTargetType,
+    options?: { excludeTargetTypes?: FavoriteTargetType[] },
   ): Promise<{ items: MemberFavoriteItem[]; nextCursor: string | null; total: number }> {
-    const where = { endUserId, ...(targetType ? { targetType } : {}) }
+    const excluded = options?.excludeTargetTypes
+    const where = {
+      endUserId,
+      ...(targetType
+        ? { targetType }
+        : excluded && excluded.length > 0
+          ? { targetType: { notIn: excluded } }
+          : {}),
+    }
     const total = await this.prisma.favorite.count({ where })
     const rows = await this.prisma.favorite.findMany({
       where,

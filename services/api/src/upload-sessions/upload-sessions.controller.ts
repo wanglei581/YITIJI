@@ -1,3 +1,4 @@
+import { MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import {
   Body,
   Controller,
@@ -18,6 +19,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ApiResponse } from '../common/dto/api-response.dto'
+import { readClientDeclaration } from '../common/privacy/client-declaration'
 import { CreateUploadSessionDto, PhoneUploadSessionDto, ResolveUploadSceneDto } from './upload-sessions.dto'
 import {
   UploadSessionsService,
@@ -39,6 +41,7 @@ export class UploadSessionsController {
 
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @MaintenanceBlocked()
   async create(@Body() body: CreateUploadSessionDto, @Req() req: Request): Promise<ApiResponse<UploadSessionCreateResponse>> {
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.sessions.create({
@@ -85,8 +88,14 @@ export class UploadSessionsController {
     @Param('sessionId') sessionId: string,
     @Body() body: PhoneUploadSessionDto,
     @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
   ): Promise<ApiResponse<UploadSessionStatusResponse>> {
-    return ApiResponse.ok(await this.sessions.uploadFile({ sessionId, uploadToken: body.uploadToken, file }))
+    return ApiResponse.ok(await this.sessions.uploadFile({
+      sessionId,
+      uploadToken: body.uploadToken,
+      file,
+      clientDeclaration: readClientDeclaration(req.headers),
+    }))
   }
 
   @Post(':sessionId/confirm')

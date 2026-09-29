@@ -4,6 +4,10 @@
  * 这些值不是我挑的——40 张原型的 :root 逐字相同，这是它们的共识值，
  * 逐字抄过来，不做"顺手优化"。改这里等于改 51 页的视觉真值，先回去改原型。
  *
+ * 2026-09-27 青序流光 2.0（产品负责人裁决：在原稿上定向优化，不重做）：
+ *   颜色、圆角、字族不动；新增一组字阶令牌（比原稿约 +15%），规则见
+ *   docs/design/kiosk-redesign-2026-08-v2/README.md。
+ *
  * 为什么不复用 --print-* / --k-*：
  *   那条链是坏的。--print-line 等声明在 :root，但依赖的 --k-line 定义在后代
  *   元素 [data-visual-theme='service-desk'] 上，:root 查不到 → 整条声明作废 →
@@ -16,7 +20,9 @@
   --qx-surface:    #fffdf8;
   --qx-ink:        #10302b;
   --qx-ink-2:      #3d5a52;
-  --qx-ink-3:      #6b857c;
+  /* 辅助字。原稿 49 张用的是 #526b62（压在米纸上 5.7:1）；运行页此前写成 #6b857c
+     只有 3.9:1，过不了 4.5:1。这里改回原稿值，不是新挑的颜色。 */
+  --qx-ink-3:      #526b62;
   --qx-deep:       #0b241e;
   --qx-deep-2:     #123a30;
 
@@ -69,6 +75,20 @@
   --qx-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
   --qx-sans:  'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
   --qx-mono:  ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* 字阶（青序流光 2.0）。用户是年轻人到中年人，站立、视距 40–60cm：
+     比原稿约 +15%，不做大。小于 --qx-fs-aux 的字只留给备案号一类。
+     共享层（壳、基础件）一律引用这组令牌；页面迁移到 2.0 时同样引用，不再写死数字。 */
+  --qx-fs-note:        18px;   /* 备案号、法务小字 */
+  --qx-fs-aux:         20px;   /* 辅助说明、提示、徽标 */
+  --qx-fs-aux-lg:      21px;   /* 导航、状态胶囊 */
+  --qx-fs-body:        22px;   /* 正文 */
+  --qx-fs-body-lg:     24px;   /* 列表行标题、强调正文 */
+  --qx-fs-btn:         26px;   /* 按钮字 */
+  --qx-fs-sec:         28px;   /* 分区标题、卡片标题 */
+  --qx-fs-page:        36px;   /* 页标题 */
+  --qx-fs-greeting:    46px;   /* 小青问候 */
+  --qx-lh-body:        1.45;
 
   /* 触控尺寸：27 寸竖屏站立操作。CLAUDE.md §9 规定主按钮 ≥56px、可点区 ≥48px。
      这里给的是原型实测值，比底线更宽松，不要往下调。 */

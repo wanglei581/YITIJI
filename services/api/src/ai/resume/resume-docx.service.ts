@@ -1,12 +1,19 @@
 import { Injectable } from '@nestjs/common'
 import {
   Document,
+  Footer,
   HeadingLevel,
   Packer,
   Paragraph,
   TextRun,
 } from 'docx'
 import type { GeneratedResume } from '../interfaces/ai-provider.interface'
+import {
+  AIGC_VISIBLE_FOOTER,
+  buildAigcLabelJson,
+  requireAigcProduceId,
+  resumeExportShowsVisibleLabel,
+} from '../../common/pdf/aigc-label'
 
 // ============================================================
 // ResumeDocxService — Wave 1 Task 4 简历 Word(docx) 渲染
@@ -30,8 +37,12 @@ export interface RenderedResumeDocx {
 
 @Injectable()
 export class ResumeDocxService {
-  /** 渲染简历 docx。返回 buffer。 */
-  async render(resume: GeneratedResume): Promise<RenderedResumeDocx> {
+  /**
+   * 渲染简历 docx。RESUME_EXPORT_VISIBLE_LABEL 打开时，AI 导出每页页脚加显式标识（默认关）；
+   * 草稿永不加；不带标识选项开启且用户申请时去掉页脚，隐式标识始终保留。
+   * 非草稿写入 AIGC 自定义属性；草稿不是模型文字，不写 AIGC。
+   */
+  async render(resume: GeneratedResume, options?: { contentId?: string | null; draft?: boolean; unlabeled?: boolean }): Promise<RenderedResumeDocx> {
     const children: Paragraph[] = []
 
     // ── 头部:姓名 + 求职意向 + 联系方式 ─────────────────────────────
@@ -135,21 +146,38 @@ export class ResumeDocxService {
     }
 
     const generatedAt = new Date()
+    const draft = options?.draft === true
+    const produceId = draft ? '' : requireAigcProduceId(options?.contentId ?? '')
+    const showVisibleFooter = resumeExportShowsVisibleLabel({ draft, unlabeled: options?.unlabeled })
     const doc = new Document({
       title: `${resume.basic.name} 的简历`,
       creator: '青序 AI 求职服务',
-      subject: 'AI 优化稿，仅供参考，请自行核对',
-      description: 'AI 生成，仅供参考，请自行核对',
-      keywords: 'AIGC,resume',
-      customProperties: [
-        { name: 'AIGenerated', value: 'true' },
-        { name: 'ServiceProviderCode', value: 'zyd-resume-docx-v1' },
-        { name: 'GeneratedAt', value: generatedAt.toISOString() },
-      ],
+      subject: draft ? '用户本人填写的简历内容原样排版，未经 AI 润色' : 'AI 优化稿，仅供参考，请自行核对',
+      description: draft ? '未经 AI 润色的原样草稿' : 'AI 生成，仅供参考，请自行核对',
+      keywords: draft ? 'resume' : 'AIGC,resume',
+      customProperties: draft
+        ? [
+            { name: 'AIGenerated', value: 'false' },
+            { name: 'ServiceProviderCode', value: 'zyd-resume-draft-docx-v1' },
+            { name: 'GeneratedAt', value: generatedAt.toISOString() },
+          ]
+        : [
+            { name: 'AIGenerated', value: 'true' },
+            { name: 'ServiceProviderCode', value: 'zyd-resume-docx-v1' },
+            { name: 'GeneratedAt', value: generatedAt.toISOString() },
+            { name: 'AIGC', value: buildAigcLabelJson(produceId) },
+          ],
       sections: [
         {
           properties: {},
           children,
+          ...(showVisibleFooter ? {
+            footers: {
+              default: new Footer({
+                children: [new Paragraph({ alignment: 'center', children: [new TextRun({ text: AIGC_VISIBLE_FOOTER, color: '64748B', size: 16 })] })],
+              }),
+            },
+          } : {}),
         },
       ],
     })

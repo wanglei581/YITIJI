@@ -32,7 +32,7 @@
         <image class="qing-face" src="/assets/xiaoqing-avatar.jpg" mode="aspectFill" aria-hidden="true" />
         <view class="qing-copy">
           <view class="qing-name">小青 · AI 职业助手</view>
-          <view class="qing-say">问我：简历怎么改、岗位怎么选、政策怎么办</view>
+          <view class="qing-say">问我：简历怎么改、面试怎么准备、文件怎么打印</view>
         </view>
         <view class="qing-go"><text class="ficon i-right"></text></view>
       </view>
@@ -79,31 +79,7 @@
         <view class="print-go"><text class="ficon i-right"></text></view>
       </view>
 
-      <view class="section-head">
-        <text class="section-title">求职信息</text>
-        <text class="section-more text-action" bindtap="tapJobs" role="button" aria-label="查看更多求职信息">查看更多</text>
-      </view>
-      <view class="info-card">
-        <view
-          class="info-row tap"
-          wx:for="{{discoveryLinks}}"
-          wx:key="url"
-          hover-class="tap-press"
-          bindtap="tapService"
-          data-url="{{item.url}}"
-          role="button"
-          aria-label="{{item.title}}，{{item.desc}}"
-        >
-          <view class="info-icon soft-{{item.tone}}"><text class="ficon i-{{item.icon}}"></text></view>
-          <view class="info-copy">
-            <text class="info-title">{{item.title}}</text>
-            <text class="info-desc">{{item.desc}}</text>
-          </view>
-          <view class="info-arrow"><text class="ficon i-right"></text></view>
-        </view>
-      </view>
-
-      <view class="home-note">岗位与政策信息来自第三方或官方来源；AI 结果仅供参考。</view>
+      <view class="home-note">AI 生成的内容仅供参考，请核对后再使用。</view>
       <view class="tab-spacer"></view>
     </view>
   </scroll-view>

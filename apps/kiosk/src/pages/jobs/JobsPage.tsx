@@ -278,10 +278,10 @@ export function JobsPage() {
       title="岗位信息"
       subtitle="只展示已审核发布且在有效期内的第三方与官方岗位；来源要素不完整时仅保留只读详情。"
       status={facetLoading
-        ? { tone: 'unknown', label: '正在向服务端取岗位名单' }
+        ? { tone: 'unknown', label: '正在读取岗位名单' }
         : error
-          ? { tone: 'bad', label: '岗位接口这次没有返回' }
-          : { tone: 'ok', label: '岗位与来源信息来自服务端' }}
+          ? { tone: 'bad', label: '岗位名单这次没读到' }
+          : { tone: 'ok', label: '岗位与来源信息已读到' }}
       terminalLabel="就业服务大厅"
       navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
       ctabar={
@@ -290,7 +290,8 @@ export function JobsPage() {
           <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/offline-agencies')}>
             <StoreIcon aria-hidden="true" />线下招聘机构
           </button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/jobs/online-platforms')}>
+          {/* 3.14：原线上平台目录并入本机构官方渠道（b 版本在同一页另列「其他来源平台」）。 */}
+          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/official-channels')}>
             官方与合作平台目录
           </button>
         </>
@@ -313,7 +314,7 @@ export function JobsPage() {
       <KioskFilterPickerModal
         open={showFilterPicker}
         title="城市与行业筛选"
-        description="选项来自当前已同步的真实岗位；完整地区与行业字典将在数据接口升级后接入。"
+        description="选项来自当前已同步的真实岗位；更完整的地区与行业名单还没接上。"
         sections={[
           {
             id: 'city',
@@ -493,7 +494,7 @@ function formatJobAiError(err: unknown): string {
     if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
     if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return '岗位 AI 配额服务暂不可用，请联系现场工作人员确认服务状态。'
     if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
-    if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连接真实后端服务后使用。'
+    if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'
     return err.message
   }
   return userMessageOf(err, 'AI 辅助暂时不可用，请稍后重试。')

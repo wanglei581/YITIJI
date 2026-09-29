@@ -1,5 +1,6 @@
 import type { ApiRouter } from '../../fixtures/api-router'
 import { registerW4Api } from '../../fixtures/fusion-w4-api'
+import { RECRUITMENT_HOSTING_ON } from '../../fixtures/recruitment-hosting'
 
 const success = (data: unknown) => ({ success: true, data })
 
@@ -35,13 +36,21 @@ export function registerW6Api(api: ApiRouter): void {
         placements: ['toolbox'],
       }],
     },
+    // 路由扫描与旅程覆盖全部招聘类路由：服务端恒下发托管字段，这里按客户私有化部署（b）打开。
+    ...RECRUITMENT_HOSTING_ON,
     configVersion: 'w6-fixture',
     refreshIntervalMs: 300000,
     serverTime: '2026-07-24T08:00:00.000Z',
   })
 
   get('/api/v1/health', { success: true, data: { status: 'ok' } })
-  get('/api/v1/terminals/KSK-001/capabilities', { capabilities: [] })
+  // D3（2026-09-28）：签名盖章默认关，未登记即停用。本夹具代表按稿开通了全部服务的终端，
+  // 显式登记为可用，否则稿 10 默认态的签名卡会变成停用，稿件对照与证据截图都会对不上。
+  get('/api/v1/terminals/KSK-001/capabilities', {
+    capabilities: [
+      { capabilityKey: 'signature_stamp', status: 'available', note: null, configured: true, updatedAt: null },
+    ],
+  })
   get('/api/v1/terminals/KSK-001/smart-campus', {
     enabled: true,
     modules: { welcome: true, bigdata: false, luggage: true, panorama: true },

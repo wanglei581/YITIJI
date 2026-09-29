@@ -13,6 +13,7 @@ const check = (condition, message) => {
 
 const home = read('src/pages/home/HomePage.tsx')
 const viewOnly = read('src/pages/home/components/QxHomeView.tsx')
+const heroHeader = read('src/pages/home/components/HomeHeroHeader.tsx')
 const homeTile = read('src/pages/home/components/HomeTile.tsx')
 /* 2026-09-08：QxHomeView 超了文末的 320 行预算，把纯展示组件 HomeTile 拆了出去
  * （CLAUDE.md §8：500 行以上评估拆分；这里不调阈值，改代码）。
@@ -24,15 +25,23 @@ const fairHook = read('src/pages/home/hooks/useHomeJobFairHighlight.ts')
 const manifest = read('src/pages/home/homeV6Domains.ts')
 const css = [
   read('src/pages/home/styles/home-qx.css'),
+  read('src/pages/home/styles/home-qx-mobile.css'),
 ].join('\n')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 
 console.log('\n=== Kiosk 青序流光首页运行时合同 ===')
 
-check(home.includes('<QxPageFrame'), '首页使用青序流光 QxPageFrame')
+check(
+  home.includes('className="qx-stage"') &&
+    home.includes('data-qx-frame="true"') &&
+    home.includes('className="qx-navbar"') &&
+    viewOnly.includes('<HomeHeroHeader'),
+  '首页用专属青序舞台，品牌与状态在 Hero 内，底栏独立固定'
+)
 check(!home.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
 check(home.includes('<QxHomeView'), '容器与青序 presentation 已拆分')
 check(home.includes("import './styles/home-qx.css'"), '首页只导入青序页级样式')
+check(home.includes("import './styles/home-qx-mobile.css'"), '首页按顺序加载手机响应式样式')
 check(
   !home.includes('prototype-v1.css') &&
     !home.includes('kiosk-uplift.css') &&
@@ -199,17 +208,17 @@ check(
 )
 check(
   !view.includes('.filter((tile)') && !view.includes('visibleTiles'),
-  '智慧校园关闭时不从首页消失'
+  '主服务卡不靠 visibleTiles 过滤丢入口'
+)
+// 2026-09-28 稿 01：未开通的百宝箱 / 智慧校园不占首页（开通才显示）。
+// 断言从「关闭时仍可见并写原因」改成「确认开通才渲染，未开通不渲染成死按钮」；条数不减。
+check(
+  view.includes('campusReady ?') && view.includes('actionId="smart-campus"'),
+  '智慧校园确认开通后才渲染，并仍映射真实 action'
 )
 check(
-  view.includes('disabled={!campusReady}') &&
-    view.includes('需终端或机构授权后使用'),
-  '智慧校园默认 visible-but-disabled 并显示原因'
-)
-check(
-  view.includes('disabled={!toolboxReady}') &&
-    view.includes('本机尚未上架扩展服务'),
-  '百宝箱无配置时 visible-but-disabled 并显示原因'
+  view.includes('toolboxReady ?') && view.includes('actionId="toolbox"'),
+  '百宝箱确认开通后才渲染，并仍映射真实 action'
 )
 check(
   view.includes('disabled={disabled}') && view.includes('aria-describedby='),
@@ -244,8 +253,8 @@ check(
 )
 check(
   /\.qx-home-voice[\s\S]{0,220}min-height:\s*76px/.test(css) &&
-    /\.qx-home-quick button[\s\S]{0,180}min-height:\s*48px/.test(css),
-  '首页主按钮与快捷入口达到 56px / 48px 触控下限'
+    /\.qx-home-identity[\s\S]{0,220}min-height:\s*48px/.test(css),
+  '首页主按钮与身份入口达到 76px / 48px 触控下限'
 )
 check(
   /@media\s*\(max-width:\s*760px\)/.test(css) &&
@@ -263,8 +272,11 @@ check(
 check(!css.includes('.kpv1') && !css.includes('.v6-home'), '青序首页样式完全路由作用域化')
 
 check(
-  kioskRoot.includes('useTerminalDeviceStatus(true)') && home.includes('status={deviceStatus}'),
-  '青序顶栏继续使用真实设备状态'
+  kioskRoot.includes('useTerminalDeviceStatus(true)') &&
+    home.includes('deviceStatus={deviceStatus}') &&
+    heroHeader.includes('data-tone={deviceStatus.tone}') &&
+    heroHeader.includes('{deviceStatus.label}'),
+  '首页 Hero 内继续使用真实设备状态'
 )
 check(
   kioskRoot.includes('<KioskStageFit enabled={!usesFluidViewport}>') && kioskRoot.includes("'/'"),
@@ -274,7 +286,8 @@ check(
   home.split('\n').length < 120 &&
     viewOnly.split('\n').length < 320 &&
     homeTile.split('\n').length < 120 &&
-    css.split('\n').length < 300 &&
+    read('src/pages/home/styles/home-qx.css').split('\n').length < 300 &&
+    read('src/pages/home/styles/home-qx-mobile.css').split('\n').length < 120 &&
     fairHook.split('\n').length < 120 &&
     manifest.split('\n').length < 180,
   '运行时文件保持可维护体积'

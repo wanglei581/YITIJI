@@ -5,8 +5,12 @@ import { useAuth } from '../../../auth/useAuth'
 import { loginPathForCurrentLocation } from '../../../auth/returnPath'
 import { useBusyLock } from '../../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../../services/api/files'
-import { getTerminalId, isTerminalKiosk } from '../../../services/api/screensaver'
-import { loadConfiguredCapabilities } from '../../../services/api/printScanCapabilities'
+import { getTerminalId, isTerminalKiosk, useTerminalKiosk } from '../../../services/api/screensaver'
+import {
+  loadConfiguredCapabilities,
+  resolveCapabilityOverride,
+  type CapabilitiesLoadResult,
+} from '../../../services/api/printScanCapabilities'
 import { signCompose, signInspect } from '../../../services/api/printSign'
 import { errorCodeOf, userMessageOf } from '../../../services/api/userErrorMessage'
 import { savePrintMaterialSession } from '../../print/printMaterialSession'
@@ -47,6 +51,22 @@ export { AUTHORIZATION_LABEL }
 
 interface PresetDocumentState {
   presetDocument?: { fileId: string; fileAccessUrl: string; name: string; sizeBytes: number }
+}
+
+/**
+ * 能力拉取结果 → 本页的能力态。首次加载与「重试读取」共用这一个函数，两处不再各写一套。
+ *
+ * signature_stamp 属于默认拒绝的键（2026-09-28 D3）：读取成功却没有已配置的行，
+ * resolveCapabilityOverride 按 not_verified 给出，这里落到 disabled，与服务端
+ * 「未配置即拒绝」一致，用户进不了上传。skipped（演示 / mock）仍按可用、error 仍是 error。
+ */
+function capStatusOf(result: CapabilitiesLoadResult): CapStatus {
+  if (result.status === 'error') return 'error'
+  const override = resolveCapabilityOverride(result, 'signature_stamp')
+  if (!override) return 'ready'
+  if (override.status === 'maintenance') return 'maintenance'
+  if (canCreateFormalPrintScanTask(override.status)) return 'ready'
+  return 'disabled'
 }
 
 export function useSignStampFlow() {
@@ -100,18 +120,7 @@ export function useSignStampFlow() {
     let cancelled = false
     void loadConfiguredCapabilities().then((result) => {
       if (cancelled) return
-      if (result.status === 'error') {
-        setCap('error')
-        return
-      }
-      const override = result.map.signature_stamp
-      if (!override) {
-        setCap('ready')
-        return
-      }
-      if (override.status === 'maintenance') setCap('maintenance')
-      else if (canCreateFormalPrintScanTask(override.status)) setCap('ready')
-      else setCap('disabled')
+      setCap(capStatusOf(result))
     })
     return () => {
       cancelled = true
@@ -170,6 +179,7 @@ export function useSignStampFlow() {
   }, [])
 
   const handleLocalDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isTerminalKiosk()) return
     const selected = e.target.files?.[0]
     e.target.value = ''
     if (!selected) return
@@ -202,6 +212,7 @@ export function useSignStampFlow() {
   }
 
   const handleLocalStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isTerminalKiosk()) return
     const selected = e.target.files?.[0]
     e.target.value = ''
     if (!selected) return
@@ -390,11 +401,11 @@ export function useSignStampFlow() {
   const pill = pillOf(viewState, displayLive)
   const from = query.fromUnknown ? 'hub' : query.from
   const back = FROM_WHITELIST[from]
-  const localDisabled = isTerminalKiosk()
+  const localDisabled = useTerminalKiosk()
   const locked = isLockedPhase(displayLive.phase)
 
   const openLocal = (kind: 'document' | 'stamp') => {
-    if (localDisabled || synthetic) return
+    if (isTerminalKiosk() || synthetic) return
     if (kind === 'document') docInputRef.current?.click()
     else stampInputRef.current?.click()
   }
@@ -467,13 +478,7 @@ export function useSignStampFlow() {
     openLocal,
     retryCap: () => {
       setCap('loading')
-      void loadConfiguredCapabilities().then((result) => {
-        if (result.status === 'error') setCap('error')
-        else if (!result.map.signature_stamp) setCap('ready')
-        else if (result.map.signature_stamp.status === 'maintenance') setCap('maintenance')
-        else if (canCreateFormalPrintScanTask(result.map.signature_stamp.status)) setCap('ready')
-        else setCap('disabled')
-      })
+      void loadConfiguredCapabilities().then((result) => setCap(capStatusOf(result)))
     },
     goBack: () => navigate(back.path),
     goLogin: () => navigate(loginPathForCurrentLocation()),
@@ -519,22 +524,22 @@ function resolveCta(args: {
     return { primary: '正在生成…', primaryDisabled: true, reason: '这一次合成还没有回来，重复提交可能生成两份', action: 'none' }
   }
   if (live.phase === 'result-unknown') {
-    return { primary: '用同一次请求重试', primaryDisabled: synthetic, reason: null, action: 'retry' }
+    return { primary: '原样再试一次', primaryDisabled: synthetic, reason: null, action: 'retry' }
   }
   if (live.phase === 'known-failed' || live.phase === 'rate-limited' || live.phase === 'in-progress') {
-    return { primary: '重试生成', primaryDisabled: synthetic, reason: live.phase === 'rate-limited' ? '请稍候用同一次请求标识重试，不会静默再发' : null, action: 'retry' }
+    return { primary: '重试生成', primaryDisabled: synthetic, reason: live.phase === 'rate-limited' ? '请稍候用同一个标记再试，不会自己再发一次' : null, action: 'retry' }
   }
   if (live.phase === 'conflict') {
-    return { primary: '换一次新请求再生成', primaryDisabled: true, reason: '这个请求标识已绑定另一组参数，必须换一次新的请求，不能覆盖上一次', action: 'none' }
+    return { primary: '重新开始一次再生成', primaryDisabled: true, reason: '这个标记已经对应另一组页码、位置和大小，必须重新开始一次，不能覆盖上一次', action: 'none' }
   }
   if (!live.doc) {
     return { primary: '选好 PDF 再继续', primaryDisabled: true, reason: '还没有选文档，没有文档就没法选页码和位置', action: 'none' }
   }
   if (!live.stamp) {
-    return { primary: '传好签名 / 印章图再继续', primaryDisabled: true, reason: '还没有这次的签名 / 印章图片，没有图就没有可叠加的内容', action: 'none' }
+    return { primary: '传好本人手写签名图再继续', primaryDisabled: true, reason: '还没有这次的本人手写签名图片，没有图就没有可叠加的内容', action: 'none' }
   }
   if (live.placeErr) {
-    return { primary: '先改成有效页码', primaryDisabled: true, reason: '页码超出这份文档的范围，服务端会直接拒绝', action: 'none' }
+    return { primary: '先改成有效页码', primaryDisabled: true, reason: '页码超出这份文档的范围，系统会直接拒绝', action: 'none' }
   }
   if (!live.authorized) {
     return {

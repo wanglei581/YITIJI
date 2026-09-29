@@ -104,7 +104,9 @@ export class RecruitmentContentReadService {
       publishStatus?: string
       linkCheckStatus?: string
       organizationId?: string
+      OR?: Array<{ category: null } | { category: { not: string } }>
     } = {}
+    where.OR = [{ category: null }, { category: { not: 'official_channel' } }]
     if (query.reviewStatus) where.reviewStatus = query.reviewStatus
     if (query.publishStatus) where.publishStatus = query.publishStatus
     if (query.linkCheckStatus) where.linkCheckStatus = query.linkCheckStatus
@@ -123,8 +125,8 @@ export class RecruitmentContentReadService {
   }
 
   async getDirectory(id: string): Promise<DirectoryAdminView> {
-    const row = await this.prisma.onlinePlatformDirectory.findUnique({
-      where: { id },
+    const row = await this.prisma.onlinePlatformDirectory.findFirst({
+      where: { id, OR: [{ category: null }, { category: { not: 'official_channel' } }] },
       include: { organization: { select: { name: true, contentTrustStatus: true, archivedAt: true } } },
     })
     if (!row) this.notFound('RECRUITMENT_DIRECTORY_NOT_FOUND', '平台目录不存在')

@@ -73,6 +73,13 @@ assert.match(installer, /Assert-NotReparsePoint \$scanFolderItem/)
 assert.match(installer, /GetLeftPart\(\[System\.UriPartial\]::Authority\)/)
 assert.match(installer, /localApiAllowedOrigins\s+=\s+@\(\$effectiveLocalApiAllowedOrigins\)/)
 assert.match(installer, /Merge-LocalApiAllowedOrigins/)
+assert.match(installer, /AllowLocalDevelopmentOrigins/)
+assert.match(installer, /developmentOrigins = if \(\$AllowLocalDevelopmentOrigins\)/)
+assert.match(installer, /Set-EdgeKioskPolicies/)
+assert.match(installer, /LocalNetworkAccessAllowedForUrls/)
+assert.match(installer, /AudioCaptureAllowedUrls/)
+assert.match(installer, /AllowFileSelectionDialogs/)
+assert.match(installer, /New-ItemProperty[\s\S]{0,180}Name \"Bound\"/)
 assert.match(
   installer,
   /\$originCandidates[\s\S]{0,500}Where-Object\s*\{\s*-not \[string\]::IsNullOrWhiteSpace\(\$_\)\s*\}[\s\S]{0,300}Merge-LocalApiAllowedOrigins/,
@@ -132,6 +139,21 @@ assert.match(
   fieldEvidence,
   /WorkOffline/,
   'field evidence collector must capture Win32 WorkOffline',
+)
+assert.match(
+  fieldEvidence,
+  /agent\.pid/,
+  'field evidence collector must capture the diagnostic agent.pid path',
+)
+assert.doesNotMatch(
+  fieldEvidence,
+  /stale_lock_requires_operator/,
+  'field evidence collector must not prescribe PID stale-lock cleanup',
+)
+assert.doesNotMatch(
+  fieldEvidence,
+  /Remove-Item|\bUnlink(?:-Item)?\b|\bdel\s+-/i,
+  'field evidence collector must not auto-delete the instance lock',
 )
 
 // 闭合准入：配置字段只能逐个白名单回显（见 5.3-8 的 $parts 列表），

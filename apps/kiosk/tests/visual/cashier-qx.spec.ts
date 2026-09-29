@@ -94,6 +94,51 @@ test('cashier renders real channels and sends the selected channel in the pay pa
   expect(payPayload).toEqual({ channel: 'alipay' })
 })
 
+test('channel outcome unconfirmed must say do-not-repay, never claim acceptance or plain retry @w2', async ({ page, api }) => {
+  // 资金安全回归：POST /orders/:id/pay 回 503 + PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED。
+  // 该码含受理未知/回填失败两支，可能已扣款也可能没受理。屏上必须说结果未确认 + 请勿重复
+  // 支付 + 怎么核实；落 5xx 兜底「请稍后重试」等于在可能已扣款时教用户再付一次。
+  registerShell(api)
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
+  await routeExactJson(page, 'POST', `/api/v1/orders/${W2_ORDER.orderId}/pay`, async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        error: {
+          code: 'PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED',
+          message: '支付通道已受理，本地确认未完成。请勿重新支付，请联系工作人员核对渠道订单。',
+        },
+      }),
+    })
+  })
+
+  await page.goto('/print/cashier')
+  await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
+  // 单通道会被服务端唯一事实直接采用，页面落在 channel-selected 而不是 pending
+  // （多通道才需要用户先选通道）。
+  await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()
+  await page.getByRole('button', { name: '手机扫屏幕上的码' }).click()
+
+  const alert = page.getByRole('alert')
+  await expect(alert).toBeVisible()
+  const alertText = (await alert.innerText()).replace(/\s+/g, '')
+  // ① 说出请勿重复/重新支付并指向核实路径 —— 资金安全的全部要点
+  expect(alertText, '结果未确认时必须明说不要再付一次').toMatch(/请勿(重复|重新)支付/)
+  expect(alertText, '必须给出核实路径（现场工作人员 / 自查支付账单）').toMatch(/工作人员|支付账单/)
+  // ② 不得出现「请稍后重试」类措辞
+  expect(alertText, '结果未确认时不得出现通用重试话术').not.toContain('请稍后重试')
+  // ③ 不得断言「已受理」：本例 503 body 里正写着这句，页面照抄即红（固定文案不得漂移成透传）
+  expect(alertText, '结果未知时不得声称渠道已受理/已支付').not.toMatch(/已受理|已支付/)
+  // ④ 如实说出「未确认」这个状态，而不是只给动作
+  expect(alertText, '必须说清支付结果尚未确认').toMatch(/未确认|无法确认|结果未知/)
+  // ⑤ 整页同口径：任何位置都不得诱导重试（含通用 5xx 兜底句）
+  const pageText = (await page.locator('[data-w2-page="print-cashier"]').innerText()).replace(/\s+/g, '')
+  expect(pageText, '收银页任何位置都不得出现「请稍后重试」').not.toContain('请稍后重试')
+})
+
 test('cashier exposes a failed channel request and retries the real endpoint @w2', async ({ page, api }) => {
   registerShell(api)
   api.respondWith('GET', '/api/v1/payment/channels', (requestNumber: number) => requestNumber === 1
@@ -251,4 +296,28 @@ test('cashier 1080x1920 controls satisfy scaled hit targets and dispatch pointer
   }
 
   await page.screenshot({ path: '../../test-results/cashier-qx/runtime-channel-selected-1080x1920.png', fullPage: true })
+})
+
+test('cashier keeps channel, scan method and exit reachable at 390x844 @w2', async ({ page, api }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  registerShell(api)
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat', 'alipay'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
+
+  await page.goto('/print/cashier')
+  await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
+  await expect(page.locator('[data-qx-state="pending"]')).toBeVisible()
+  await page.getByRole('button', { name: '微信支付' }).click()
+  await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()
+  for (const name of ['手机扫屏幕上的码', '出示你的付款码', '退出支付']) {
+    const button = page.getByRole('button', { name: new RegExp(name) })
+    await button.scrollIntoViewIfNeeded()
+    await expect(button).toBeVisible()
+    const box = await button.boundingBox()
+    expect(box, `${name} must have a hit area`).not.toBeNull()
+    expect(box!.width, `${name} width`).toBeGreaterThanOrEqual(44)
+    expect(box!.height, `${name} height`).toBeGreaterThanOrEqual(44)
+  }
+  expect(await page.locator('.cashier-qx-route').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+  await page.screenshot({ path: '../../test-results/cashier-qx/runtime-channel-selected-390x844.png', fullPage: true })
 })

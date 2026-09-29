@@ -1,16 +1,21 @@
-import { AlertCircleIcon } from 'lucide-react'
+import { QxAiHelp, QxStepActions } from '../../../components/qingxu/QxAiHelp'
 import { InterviewShell } from '../InterviewShell'
 
 export function InterviewSessionInvalid({ onRestart }: { onRestart: () => void }) {
   return (
     <InterviewShell
       title={<>这一场练习<em>已经过期</em>。</>}
-      subtitle="会话过期由服务端判定。过期后不能续答，也不能把没答完的一场说成已完成。"
-      status={{ tone: 'bad', label: '会话已失效' }}
+      subtitle="这场练习是否过期，由当时的办理结果决定。过期后不能续答，也不能把没答完的一场说成已完成。"
+      status={{ tone: 'bad', label: '这场练习已过期' }}
       ctabar={
-        <button type="button" className="qx-btn" data-variant="primary" onClick={onRestart}>
-          重新开始练习
-        </button>
+        <div className="interview-qx-cta">
+          <QxStepActions>
+            <QxAiHelp label="问小青：练习过期了怎么办" draft="这场模拟面试已经过期。请告诉我怎样重新开始，不要替我创建练习。" />
+          </QxStepActions>
+          <button type="button" className="qx-btn" data-variant="primary" onClick={onRestart}>
+            重新创建练习
+          </button>
+        </div>
       }
     >
       <div
@@ -21,13 +26,12 @@ export function InterviewSessionInvalid({ onRestart }: { onRestart: () => void }
         data-visual-theme="service-desk"
         data-ux-density="touch"
       >
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-error-bg text-error-fg">
-          <AlertCircleIcon className="h-9 w-9" aria-hidden="true" />
-        </div>
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-neutral-900">会话已失效，请重新开始</h1>
-          <p className="mt-2 text-base text-neutral-500">没有有效会话时不能续答。刷新后若仍回到这一步，请重新创建练习。</p>
-        </div>
+        <section className="iv-card iv-empty is-bad">
+          <div>
+            <h2>这场练习已过期，需要重新开始</h2>
+            <p>公共终端上的这场练习有有效期。过期之后，旧的题目和还没提交的回答都不能继续使用。</p>
+          </div>
+        </section>
       </div>
     </InterviewShell>
   )

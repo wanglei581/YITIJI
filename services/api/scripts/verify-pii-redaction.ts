@@ -24,10 +24,10 @@ import { LOCAL_BUCKET_SENTINEL, LOCAL_REGION_SENTINEL } from '../src/storage/sto
 import { verifyFileSignature } from '../src/files/signing'
 import { buildRedactedPdf } from '../src/materials/pii-redaction.util'
 import type { OcrService } from '../src/ai/resume/ocr/ocr.service'
+import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import type { PiiBox } from '../src/materials/pii-scan.util'
 
 interface UnpdfApi {
-  getDocumentProxy(data: Uint8Array): Promise<unknown>
   extractText(pdf: unknown, options?: { mergePages?: boolean }): Promise<{ totalPages: number; text: string | string[] }>
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -113,7 +113,7 @@ async function buildTinyPng(): Promise<Buffer> {
 }
 
 async function extractAllText(pdfBytes: Buffer): Promise<string[]> {
-  const proxy = await unpdf.getDocumentProxy(new Uint8Array(pdfBytes))
+  const proxy = await openUnpdfDocument(new Uint8Array(pdfBytes))
   const extracted = await unpdf.extractText(proxy, { mergePages: false })
   return Array.isArray(extracted.text) ? extracted.text : [extracted.text ?? '']
 }

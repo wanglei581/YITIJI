@@ -64,6 +64,32 @@ function main(): void {
   assert(structured.body.error.code === 'VALIDATION_FAILED', 'structured error keeps code')
   assert(structured.body.error.message === '请求参数校验失败', 'structured error keeps message')
   assert(Array.isArray(structured.body.error.details) && structured.body.error.details[0] === 'fileUrl should not be empty', 'structured error keeps details')
+  assert(structured.body.error.memberFileRetained === undefined, 'ordinary structured errors do not gain memberFileRetained')
+
+  const retained = capture(new BadRequestException({
+    error: {
+      code: 'UPLOAD_SESSION_EXPIRED',
+      message: '二维码已过期,请重新生成',
+      memberFileRetained: true,
+      filename: 'secret.pdf',
+      fileId: 'file_secret',
+    },
+  }))
+  assert(retained.body.error.code === 'UPLOAD_SESSION_EXPIRED', 'retained expiry keeps the expired code')
+  assert(retained.body.error.memberFileRetained === true, 'retained expiry keeps the boolean marker')
+  assert(retained.body.error.filename === undefined, 'retained expiry drops filename')
+  assert(!JSON.stringify(retained.body).includes('secret'), 'retained expiry does not echo a filename')
+  assert(!JSON.stringify(retained.body).includes('file_secret'), 'retained expiry does not echo a file id')
+
+  const retainedString = capture(new BadRequestException({
+    error: {
+      code: 'UPLOAD_SESSION_EXPIRED',
+      message: '二维码已过期,请重新生成',
+      memberFileRetained: 'secret.pdf',
+    },
+  }))
+  assert(retainedString.body.error.memberFileRetained === undefined, 'a non-boolean marker is dropped')
+  assert(!JSON.stringify(retainedString.body).includes('secret'), 'a string marker cannot smuggle a filename')
 
   const shorthand = capture(new BadRequestException('PRICE_CONFIG_UNAVAILABLE'))
   assert(shorthand.statusCode === 400, 'shorthand BadRequest keeps HTTP 400')

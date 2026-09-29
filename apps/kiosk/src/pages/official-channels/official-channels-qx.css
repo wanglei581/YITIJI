@@ -1,0 +1,174 @@
+/* 本机构官方渠道（/official-channels，next-tasks 3.14）。
+ * 版式取稿 45 的目录行（.dw-plat）：图标字 · 名称与地址 · 右侧出口；出口从按钮换成可直接扫的二维码。
+ * 颜色只用 var(--qx-*)，选择器都以 .oc- 起头（或挂在 .oc-page 之下），不外溢到共享层。
+ *
+ * 1080×1920 定高舞台的余量（primitives.css .qx-grow 规则）：吸收余量的是整页容器 .dw-page.qx-grow，内容块都按内容高。
+ *   · 有渠道：「还不确定先看什么」贴底（margin-top:auto），空白在说明条与它之间；渠道多时整页滚动，卡片一律不被压扁。
+ *   · 没有渠道 / 读取失败：「可以先办这些」是紧凑行，空白留在行下面。 */
+.oc-page { --oc-qr: 200px; gap: 20px; }
+/* 渠道越少二维码越大：一张 320、两张 280、三张及以上 200（站着扫，280 在 27 寸竖屏上约 8.7 厘米见方）。 */
+.oc-page[data-density='comfortable'] { --oc-qr: 280px; }
+.oc-page[data-density='roomy'] { --oc-qr: 320px; }
+.oc-page > * { flex-shrink: 0; }
+.oc-assist { margin-top: auto; }
+/* 兜底去处（空态 / 失败态）：与招聘托管说明页（.rh-off-actions）同一套 qx-row、同一个行高——舞台上 128px。
+ * 稿 45 的兜底去处用的是会平分余量的 .dw-exitlist，只有三项时每项被拉到 400 多像素，成了一张张空卡。 */
+.oc-alt-rows .qx-row { min-height: 128px; }
+.oc-alt-rows .qx-row-ic { color: var(--qx-teal-d); background: var(--qx-teal-soft); border-color: transparent; }
+/* 共享的 .dw-stripitem span 连标题外层的 .si-tx 也染成三级灰，标题看起来像被禁用；本页把标题拉回正文色。 */
+.oc-page .dw-stripitem .si-tx { color: var(--qx-ink); }
+
+.oc-list { display: flex; flex-direction: column; gap: 18px; margin: 0; padding: 0; list-style: none; }
+.oc-card {
+  display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: 0 24px;
+  padding: 24px 28px; border: 1px solid var(--qx-line); border-radius: 32px; background: var(--qx-surface);
+}
+.oc-card-ic {
+  width: 92px; height: 92px; border-radius: 27px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--qx-serif); font-size: 36px; font-weight: 700;
+  color: var(--qx-teal-d); background: var(--qx-teal-soft);
+}
+.oc-card[data-channel-kind='legacy'] .oc-card-ic { color: var(--qx-slate-d); background: var(--qx-slate-soft); }
+.oc-card-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.oc-card-kicker { font-size: var(--qx-fs-aux); font-weight: 600; letter-spacing: 1px; color: var(--qx-ink-3); }
+.oc-card-name { margin: 0; font-size: var(--qx-fs-sec); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.oc-card-host { font-size: var(--qx-fs-body); color: var(--qx-ink-2); overflow-wrap: anywhere; }
+/* 来源说明放不下一行时只在「，」处断（keep-all：Chromium 实测不在汉字之间断），不把「为准」拆成孤字挂到下一行；
+ * 前半句自己就放不下（手机、机构名很长）才由 anywhere 兜底。 */
+.oc-caption {
+  margin: 10px 0 0; padding-top: 12px; border-top: 1px dashed var(--qx-line-2);
+  font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); color: var(--qx-ink-2);
+  word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty;
+}
+.oc-qr { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.oc-qr-code svg { display: block; width: var(--oc-qr); height: var(--oc-qr); }
+.oc-qr-hint { display: inline-flex; align-items: center; gap: 8px; font-size: var(--qx-fs-aux); font-weight: 600; color: var(--qx-teal-d); }
+.oc-page .dw-sec-h .t { font-size: var(--qx-fs-sec); }
+.oc-page .dw-sec-h .no,
+.oc-page .dw-sec-h .hint { font-size: var(--qx-fs-aux-lg); }
+/* 共享 .dw-stripitem span 是 17px，低于 --qx-fs-aux。这一区提到辅助字以上。 */
+.oc-page .oc-assist .dw-stripitem b { font-size: var(--qx-fs-btn); }
+.oc-page .oc-assist .dw-stripitem .si-tx > span {
+  font-size: var(--qx-fs-aux-lg);
+  line-height: 1.4;
+  color: var(--qx-ink-2);
+}
+.oc-ask {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 96px;
+  padding: 12px 18px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  background: var(--qx-surface);
+}
+.oc-ask-ic {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--qx-teal-d);
+  background: var(--qx-teal-soft);
+}
+.oc-ask-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.oc-page .oc-ask .qx-step-actions { min-height: 0; justify-content: flex-start; }
+.oc-page .oc-ask .qx-ai-help {
+  margin: 0;
+  padding: 0;
+  min-height: 48px;
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  font-size: var(--qx-fs-btn);
+  font-weight: 700;
+}
+.oc-ask-desc { font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink-2); }
+.qx-stage:has(.oc-page) > .qx-ctabar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding-top: 12px;
+  padding-bottom: 10px;
+}
+.oc-cta { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.oc-cta-btns { display: flex; gap: 14px; }
+.oc-cta-btns .qx-btn { flex: 1; min-height: var(--qx-btn-h); }
+.oc-cta-btns .qx-btn[data-variant='primary'] { flex: 1.6; min-height: var(--qx-btn-h-lg); }
+.oc-privacy { margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+.oc-privacy b { margin-right: 8px; color: var(--qx-ink); font-weight: 700; }
+.oc-steps { display: flex; gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
+.oc-steps li {
+  flex: 1; padding-top: 8px; border-top: 2px solid var(--qx-line);
+  font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink);
+}
+.oc-steps b { display: block; margin-bottom: 4px; font-family: var(--qx-serif); font-size: var(--qx-fs-btn); color: var(--qx-teal-d); line-height: 1.2; }
+.oc-page[data-density='roomy'] { --oc-qr: 460px; }
+.oc-page[data-density='roomy'] .oc-card {
+  grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 28px 36px 32px;
+}
+.oc-page[data-density='roomy'] .oc-card-main { align-items: center; }
+.oc-page[data-density='roomy'] .oc-card-ic { display: none; }
+
+/* 手机与窄桌面：舞台不缩放、按真实宽度排版（与 shell.css 同样只作用于 data-kiosk-stage-fit="off"）。
+ * 整页纵向滚动，二维码换到名称下面整行居中；触控目标仍 ≥48px，按钮 ≥56px。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) { --qx-gutter: 16px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-pagehead { margin-top: 12px; gap: 8px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-pagehead h1 { font-size: 26px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-pagehead p { flex-basis: 100%; min-width: 0; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) > .qx-ctabar { flex-wrap: wrap; gap: 8px 10px; padding: 10px var(--qx-gutter); }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) > .qx-ctabar .why { flex-basis: 100%; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) > .qx-ctabar .qx-btn { flex: 1 1 0; min-width: 0; min-height: 56px; padding: 0 12px; font-size: 18px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-navbar { height: 72px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-nav-item { gap: 2px; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.oc-page) .qx-nav-item svg { width: 24px; height: 24px; }
+
+  [data-kiosk-stage-fit='off'] .oc-page,
+  [data-kiosk-stage-fit='off'] .oc-page[data-density] { --oc-qr: 200px; gap: 14px; padding-top: 12px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-sec-h { flex-wrap: wrap; gap: 4px 10px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-sec-h .no { font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-sec-h .t { font-size: 21px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-sec-h .hint { flex-basis: 100%; margin-left: 0; text-align: left; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .oc-page .qx-state { gap: 12px; padding: 16px; }
+  [data-kiosk-stage-fit='off'] .oc-page .qx-state-ic { width: 44px; height: 44px; }
+  [data-kiosk-stage-fit='off'] .oc-page .qx-state-t { font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .oc-page .qx-state-d { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-noteline { min-height: 0; padding: 10px 14px; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-strip-t { font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem { min-height: 72px; padding: 12px 16px; gap: 14px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem .si-ic { width: 48px; height: 48px; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem b { font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .oc-page .dw-stripitem .si-tx span { margin-top: 4px; font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem b,
+  [data-kiosk-stage-fit='off'] .oc-page .oc-ask .qx-ai-help { font-size: 21px; }
+  [data-kiosk-stage-fit='off'] .oc-page .oc-assist .dw-stripitem .si-tx > span,
+  [data-kiosk-stage-fit='off'] .oc-ask-desc { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .oc-cta-btns { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .oc-privacy { font-size: 15px; }
+  /* 去处行在手机上收到 88px（与 .rh-off-actions 的手机档一致）。 */
+  [data-kiosk-stage-fit='off'] .oc-alt-rows .qx-row { min-height: 88px; gap: 12px; padding: 12px 14px; }
+  [data-kiosk-stage-fit='off'] .oc-alt-rows .qx-row-ic { width: 44px; height: 44px; }
+  [data-kiosk-stage-fit='off'] .oc-alt-rows .qx-row-t { font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .oc-alt-rows .qx-row-d { font-size: 15px; }
+
+  [data-kiosk-stage-fit='off'] .oc-list { gap: 12px; }
+  [data-kiosk-stage-fit='off'] .oc-card { grid-template-columns: 52px minmax(0, 1fr); align-items: start; gap: 14px; padding: 16px; border-radius: 22px; }
+  [data-kiosk-stage-fit='off'] .oc-card-ic { width: 52px; height: 52px; border-radius: 16px; font-size: 22px; }
+  [data-kiosk-stage-fit='off'] .oc-card-kicker { font-size: 13px; }
+  [data-kiosk-stage-fit='off'] .oc-card-name { font-size: 21px; }
+  [data-kiosk-stage-fit='off'] .oc-card-host { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .oc-caption { margin-top: 6px; padding-top: 8px; font-size: var(--qx-fs-aux); }
+  [data-kiosk-stage-fit='off'] .oc-qr { grid-column: 1 / -1; }
+  [data-kiosk-stage-fit='off'] .oc-qr-hint { font-size: var(--qx-fs-aux); }
+  [data-kiosk-stage-fit='off'] .oc-steps { flex-direction: column; }
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card {
+    grid-template-columns: 52px minmax(0, 1fr); justify-items: stretch; text-align: left; padding: 16px;
+  }
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-main { align-items: flex-start; }
+  [data-kiosk-stage-fit='off'] .oc-page[data-density='roomy'] .oc-card-ic { display: flex; }
+}

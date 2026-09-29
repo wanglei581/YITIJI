@@ -101,4 +101,6 @@ export interface MemberAiRecordPage {
   total: number
   nextCursor: string | null
   qaRecords: MemberQaRecordItem[]
+  qaNextCursor: string | null
+  qaTotal: number
 }

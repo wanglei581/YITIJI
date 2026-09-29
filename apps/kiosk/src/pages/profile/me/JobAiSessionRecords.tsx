@@ -5,7 +5,7 @@ import { formatTime } from '../assets/format'
 
 const OPERATION_META: Record<JobAiSessionListItem['session']['operation'], { label: string; hint: string; icon: KioskIconName; tone?: 'slate' | 'wheat' }> = {
   recommend: { label: '岗位 AI 推荐参考', hint: '基于本人简历与真实岗位生成', icon: 'sparkle' },
-  explain: { label: 'AI岗位解读', hint: '基于来源岗位字段生成', icon: 'briefcase', tone: 'slate' },
+  explain: { label: 'AI岗位解读', hint: '基于来源岗位上的内容生成', icon: 'briefcase', tone: 'slate' },
   match: { label: '岗位匹配参考', hint: '用本人简历做求职准备', icon: 'doc-check', tone: 'wheat' },
 }
 
@@ -36,7 +36,7 @@ export function JobAiSessionRecords({
   if (items.length === 0) return null
   return (
     <>
-      <div className="qx-me-legal">岗位 AI 参考记录 · 仅展示岗位 AI 会话元数据，不展示简历原文、提示词或模型原始输出。分析结果仅供参考</div>
+      <div className="qx-me-legal">岗位 AI 参考记录 · 只展示这次岗位解读的记录（时间、岗位名等），不展示简历原文、提示词或模型原始输出。分析结果仅供参考</div>
       {items.map((item) => {
         const meta = OPERATION_META[item.session.operation]
         const status = STATUS_META[item.session.status]

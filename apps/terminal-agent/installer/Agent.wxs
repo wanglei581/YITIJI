@@ -5,7 +5,26 @@
     Version="$(var.ProductVersion)"
     UpgradeCode="8B8F74AC-9B68-44B8-88E7-BEB906221919"
     Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer AI Job Print Agent is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer AI Job Print Agent is already installed." />
+    <!-- 真机-7（2026-09-28）：已绑定终端升级或修复后，恢复自动启动与失败重启策略，并尽力启动一次。
+         绑定标记由 install-production-agent.ps1 在绑定成功后写入；未绑定的新装机保持手动 + 停止。
+         只调用系统自带的 sc.exe、参数固定；启动失败不得让安装回滚（ServiceControl Start=install
+         在 Windows CI 上实测 1920 → 1603），所以四个动作一律 Return="ignore"。 -->
+    <Property Id="AGENTBOUND" Secure="yes">
+      <RegistrySearch Id="AgentBoundMarkerSearch" Root="HKLM" Key="SOFTWARE\AIJobPrint\Agent" Name="Bound" Type="raw" Bitness="always64" />
+    </Property>
+
+    <CustomAction Id="AgentServiceRestoreAutoStart" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; config aijobprintagent.exe start= auto" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="AgentServiceRestoreRecovery" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; failure aijobprintagent.exe reset= 86400 actions= restart/60000/restart/300000/&quot;&quot;/0" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="AgentServiceRestoreFailureFlag" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; failureflag aijobprintagent.exe 1" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="AgentServiceBestEffortStart" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; start aijobprintagent.exe" Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="AgentServiceRestoreAutoStart" After="StartServices" Condition="AGENTBOUND = &quot;#1&quot; AND NOT (REMOVE~=&quot;ALL&quot;)" />
+      <Custom Action="AgentServiceRestoreRecovery" After="AgentServiceRestoreAutoStart" Condition="AGENTBOUND = &quot;#1&quot; AND NOT (REMOVE~=&quot;ALL&quot;)" />
+      <Custom Action="AgentServiceRestoreFailureFlag" After="AgentServiceRestoreRecovery" Condition="AGENTBOUND = &quot;#1&quot; AND NOT (REMOVE~=&quot;ALL&quot;)" />
+      <Custom Action="AgentServiceBestEffortStart" After="AgentServiceRestoreFailureFlag" Condition="AGENTBOUND = &quot;#1&quot; AND NOT (REMOVE~=&quot;ALL&quot;)" />
+    </InstallExecuteSequence>
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <StandardDirectory Id="ProgramFiles64Folder">

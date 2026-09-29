@@ -45,7 +45,6 @@ export function QxPageFrame({
   title,
   subtitle,
   status,
-  terminalLabel,
   children,
   ctabar,
   navbar,
@@ -66,7 +65,8 @@ export function QxPageFrame({
           <span className="qx-topbar-mark">职</span>
           职易达
         </span>
-        {terminalLabel ? <span className="qx-topbar-sub">{terminalLabel}</span> : null}
+        {/* 2.0 顶栏只留品牌、状态胶囊与时钟（v2 README）；终端编号与「就业服务大厅」副标题不再上屏。
+            terminalLabel 仍接收，页面逐个迁 2.0 时再删调用处。 */}
         <span className="qx-topbar-spacer" />
         {/* 状态未知时显示「状态未知」而不是隐藏——公共终端上"没显示"会被读成"一切正常"。 */}
         <span className="qx-pill" data-tone={status?.tone ?? 'unknown'}>

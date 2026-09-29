@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Header, Headers, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { MaintenanceBlocked } from '../ai-access/ai-access.decorator'
+import { Body, Controller, Get, Header, Headers, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common'
 import type { MemberPendingTaskItem, MemberPrintOrderItem } from './member-print-orders.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
@@ -7,7 +8,9 @@ import { MemberPrintOrdersService } from './member-print-orders.service'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
+import { ResolveOrderSubmissionsDto } from './dto/resolve-order-submissions.dto'
 import { assertMemberPrintOrderIdempotencyKey, MemberPrintOrderCreateService } from './member-print-order-create.service'
+import { PickupCodeReissueService } from './pickup-code-reissue.service'
 
 /**
  * 会员「我的打印订单」接口（Phase C-2C 后续小步）。路由前缀 /api/v1/me/print-orders。
@@ -27,6 +30,7 @@ export class MemberPrintOrdersController {
   constructor(
     private readonly orders: MemberPrintOrdersService,
     private readonly cloudOrders: MemberPrintOrderCreateService,
+    private readonly reissueCodes: PickupCodeReissueService,
   ) {}
 
   /** 我的历史 PrintTask 订单列表（本人，只读；游标分页，pageSize 封顶 50）。 */
@@ -41,6 +45,7 @@ export class MemberPrintOrdersController {
 
   /** M2 第一片：创建 Order-only 待到机订单；不会提前创建 Agent 可领取的 PrintTask。 */
   @Post()
+  @MaintenanceBlocked()
   async create(
     @CurrentEndUser() user: AuthedEndUser,
     @Body() dto: CreateMemberPrintOrderDto,
@@ -48,6 +53,20 @@ export class MemberPrintOrdersController {
   ) {
     assertMemberPrintOrderIdempotencyKey(idempotencyKey)
     return ApiResponse.ok(await this.cloudOrders.create(user.endUserId, dto, idempotencyKey))
+  }
+
+  /**
+   * Owner-scoped batch resolve for print and package Idempotency-Key values.
+   * Static path must stay beside POST / so Nest does not treat `submissions` as an orderId.
+   */
+  @Post('submissions/resolve')
+  @HttpCode(200)
+  async resolveSubmissions(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Body() dto: ResolveOrderSubmissionsDto,
+  ) {
+    for (const key of dto.keys) assertMemberPrintOrderIdempotencyKey(key)
+    return ApiResponse.ok(await this.cloudOrders.resolveSubmissions(user.endUserId, dto.keys))
   }
 
   /** 小程序专用 Order-only 列表；与历史 PrintTask-first 列表分开，避免游标契约漂移。 */
@@ -59,6 +78,12 @@ export class MemberPrintOrdersController {
   @Get(':orderId')
   async detail(@CurrentEndUser() user: AuthedEndUser, @Param('orderId') orderId: string) {
     return ApiResponse.ok(await this.cloudOrders.detail(user.endUserId, orderId))
+  }
+
+  /** 作废当前到机码并重发。旧码立即失效；截止仍是付款起 7 天。 */
+  @Post(':orderId/reissue-pickup-code')
+  async reissuePickupCode(@CurrentEndUser() user: AuthedEndUser, @Param('orderId') orderId: string) {
+    return ApiResponse.ok(await this.reissueCodes.reissue(user.endUserId, orderId))
   }
 
   @Post(':orderId/cancel')

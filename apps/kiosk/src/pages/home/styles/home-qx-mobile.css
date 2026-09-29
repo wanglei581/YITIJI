@@ -1,0 +1,54 @@
+/* 青序首页 · 手机与窄桌面（≤760）。1080×1920 规则不在此处改。 */
+@media (max-width: 760px) {
+  .qx-home-host, .qx-home-host .qx-stage { min-height: 100dvh; }
+  .qx-home { overflow-y: auto; }
+  .qx-home-hero { height: auto; min-height: 0; margin-bottom: 16px; padding: 0 16px 12px; }
+  .qx-home-hero::after { bottom: -16px; height: 32px; }
+  .qx-home-host .qx-home-hero > .qx-home-hero-top { height: auto; min-height: 64px; gap: 10px; padding: 8px 0; }
+  .qx-home-host .qx-home-hero-top .qx-topbar-mark { width: 38px; height: 38px; font-size: var(--qx-fs-aux); }
+  .qx-home-host .qx-home-hero-top .qx-topbar-brand { font-size: var(--qx-fs-aux); line-height: 1.2; }
+  .qx-home-host .qx-home-hero-top :is(.qx-topbar-sub, .qx-topbar-spacer, .qx-home-clock) { display: none; }
+  .qx-home-host .qx-home-hero-top .qx-pill {
+    flex: 0 0 auto; max-width: 52%; min-height: 40px; margin-left: auto; padding: 4px 12px; gap: 6px;
+    font-size: var(--qx-fs-note); line-height: 1.25; white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+  }
+  .qx-home-host .qx-home-hero-top .qx-pill::before { flex: none; }
+  .qx-home-assistant { gap: 12px; margin-top: 4px; }
+  .qx-home-avatar { width: 56px; height: 56px; font-size: var(--qx-fs-page); }
+  .qx-home-assistant h2 { font-size: var(--qx-fs-body-lg); }
+  .qx-home-assistant span:last-child { font-size: var(--qx-fs-note); }
+  .qx-home-hero-law { font-size: var(--qx-fs-note); }
+
+  .qx-home-board { flex: none; min-height: auto; padding: 4px 16px 8px; }
+  .qx-home-voice { height: auto; min-height: 60px; margin-top: 8px; gap: 10px; padding: 8px 12px; font-size: var(--qx-fs-note); }
+  .qx-home-voice-icon { width: 40px; height: 40px; }
+  .qx-home-voice-icon svg { width: 22px; height: 22px; }
+  .qx-home-voice-tag, .qx-home-voice small { display: none; }
+  .qx-home-continue { margin-top: 8px; }
+  .qx-home-empty-context, .qx-home .continue { min-height: 0; gap: 10px; padding: 8px 10px; }
+  .qx-home .continue { grid-template-columns: 1fr; }
+  .qx-home .continue .btn { width: 100%; }
+  .qx-home-empty-context strong, .qx-home .continue strong { font-size: var(--qx-fs-note); }
+  .qx-home-empty-context small, .qx-home .continue p { font-size: var(--qx-fs-note); }
+
+  .qx-home-section-head { min-height: 0; padding: 8px 0; }
+  .qx-home-section-head h2 { font-size: var(--qx-fs-body-lg); }
+  .qx-home-section-head > div:first-child > span { display: none; }
+  .qx-home-section-actions { width: 100%; margin-left: 0; }
+  .qx-home-identity, .qx-home-device-link { flex: 1 1 auto; min-height: 48px; font-size: var(--qx-fs-note); }
+  .qx-home-tiles { flex: none; grid-template-columns: 1fr; grid-auto-rows: auto; gap: 10px; }
+  .qx-home-tile, .qx-home-tile[data-size='feature'], .qx-home-tile[data-action='policy-hub'], .qx-home-tile[data-span='full'] {
+    grid-column: auto; height: auto; min-height: 104px;
+  }
+  .qx-home-tile[data-size='feature'] .qx-home-tile-icon { top: 16px; right: 14px; bottom: auto; width: 48px; height: 48px; }
+  .qx-home-tile[data-size='feature'] .qx-home-tile-icon svg { width: 40px; height: 40px; }
+  .qx-home-tile[data-size='feature'] .qx-home-tile-badge { margin-right: 56px; }
+  .qx-home-tile > strong { font-size: var(--qx-fs-body-lg); }
+  .qx-home-tile[data-size='feature'] > strong { font-size: var(--qx-fs-sec); }
+  .qx-home-tile-desc, .qx-home-tile-status, .qx-home-tile-foot { font-size: var(--qx-fs-note); }
+  .qx-home-tile[data-size='feature'] .qx-home-tile-desc,
+  .qx-home-tile[data-size='feature'] .qx-home-tile-status { max-width: 100%; }
+  .qx-home-truth { padding: 8px 16px 4px; font-size: var(--qx-fs-note); }
+  .qx-home-host .qx-navbar { height: 84px; }
+  .qx-home-host .qx-nav-item { min-height: 48px; font-size: var(--qx-fs-note); }
+}

@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import type { DocumentProcessTaskView } from '../../src/services/api/materials'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
+import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 import { seedMaterialSession, setReactRouterState, writeMaterialSession, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
 
 const NOW = '2026-07-24T00:00:00.000Z'
@@ -23,6 +27,7 @@ function collectRuntimeErrors(page: Page, ignoredDocumentPath?: string): string[
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
   page.on('requestfailed', (request) => {
     if (request.resourceType() === 'document' && new URL(request.url()).pathname === ignoredDocumentPath) return
+    if (isAbortedPdfjsBlobImport(request)) return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`)
     }
@@ -346,6 +351,66 @@ test('pickup hid guidance is visible before any scan and both draft controls wor
   expect(errors).toEqual([])
 })
 
+test('pickup 问小青 hands one draft to the assistant: prefilled once, never sent by itself @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  // 顾问页挂载时读终端配置与语音能力；形状同 W3 基线，招聘托管按云上默认关闭。
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'w2-assistant-draft'),
+  })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+
+  await page.goto('/print/pickup-claim')
+  await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
+  await page.getByRole('button', { name: '问小青：到机码怎么找 →' }).click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  // 只填进输入框；发送会清空它，所以草稿还在就说明没有自动发出。
+  await expect(page.getByLabel('输入咨询问题')).toHaveValue('手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？')
+  expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
+
+  // 读过一次就没有了：回到到机码页，再从底栏进顾问页，输入框是空的。
+  await page.goBack()
+  await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
+  await page.locator('.qx-nav-item', { hasText: 'AI 顾问' }).first().click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
+  expect(errors).toEqual([])
+})
+
+for (const help of [
+  { path: '/print-scan', label: '问小青：怎么选打印方式 →', draft: '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。' },
+  { path: '/print/upload?source=document', label: '问小青：这份文件怎么检查 →', draft: '这份文件要怎么检查？检查会看哪些内容？' },
+  { path: '/print/desk?step=check', label: '问小青：保留和遮挡有什么区别 →', draft: '材料检查发现了个人信息片段，保留和遮挡有什么区别？' },
+  { path: '/print/desk?step=preview', label: '问小青：帮我选打印参数 →', draft: '帮我选打印参数：黑白还是彩色、单面还是双面？' },
+]) {
+  test(`M1 AI help hands off the current question once: ${help.path} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+    registerShell(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'w4-m1-assistant-draft') })
+    api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
+    if (help.path.endsWith('preview')) {
+      registerPrice(api)
+      const binary = new FusionW2BinaryRoute(page)
+      await binary.install()
+      await seedMaterialSession(page)
+    }
+    await page.goto(help.path)
+    await page.getByRole('button', { name: help.label, exact: true }).click()
+    await expect(page).toHaveURL(/\/assistant$/)
+    await expect(page.getByLabel('输入咨询问题')).toHaveValue(help.draft)
+    expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
+    await page.goto('/print/upload?source=document')
+    await page.locator('.qx-nav-item', { hasText: 'AI 顾问' }).first().click()
+    await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
+    expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
+    expect(errors).toEqual([])
+  })
+}
+
 test('pickup hid scan posts the claim payload and renders the server result @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -482,7 +547,7 @@ test('a terminal-session 401 on claim never replays the rejected session @w2', a
   await page.goto('/print/pickup-claim')
   await page.getByLabel('到机码输入框').pressSequentially('87654321', { delay: 5 })
 
-  await expect(page.getByRole('alert')).toHaveText(/终端安全校验失败/)
+  await expect(page.getByRole('alert')).toHaveText(/这台机器的安全校验没通过/)
   await expect(page.getByText('订单核验成功')).toHaveCount(0)
   // 恰好一次，且带的就是那张票：没有用旧票重放，也没有在续期失败后继续发请求。
   expect(claimSessions).toEqual([TERMINAL_SESSION_FIXTURE])
@@ -602,6 +667,110 @@ test('pickup claim during a normal session refresh waits for the new ticket @w2'
   expect(await terminalSessionStateOf(page)).toBe('ready')
   expect(errors).toEqual([])
 })
+
+// 401 续期被扣住时，人还在就重放并带上新票；人走了或隐私清场（含 BFCache）就不再重放，
+// 也不把上一单的订单号留在这块公共屏幕上。服务端那一次认领不取消、不回滚。
+const LIFECYCLE_ORDER_NO = 'LIFECYCLE-OLD-ORDER'
+
+function watchPostTokens(page: Page, path: string): string[] {
+  const tokens: string[] = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== path) return
+    tokens.push(request.headers()['x-terminal-session-token'] ?? '')
+  })
+  return tokens
+}
+
+/** 隐私清场会整页重载。这里只让 pageshow(persisted) 把 children 换成遮罩，截住那一次重载。 */
+async function freezeBfCachePrivacyClear(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const raf = window.requestAnimationFrame
+    const timeout = window.setTimeout
+    window.requestAnimationFrame = () => 0
+    window.setTimeout = ((callback: TimerHandler, delay?: number, ...args: unknown[]) =>
+      delay === 250 ? 0 : timeout(callback, delay, ...args)) as typeof window.setTimeout
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+    window.requestAnimationFrame = raf
+    window.setTimeout = timeout
+  })
+}
+
+async function waitForRotatedSession(page: Page): Promise<void> {
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('terminal_session_token_v1'))).toBe(TERMINAL_SESSION_ROTATED)
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+  }))
+}
+
+for (const scenario of ['active', 'leave', 'privacy'] as const) {
+  test(`pickup lifecycle claim refresh ${scenario} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    const refresh = holdTerminalRefresh(api)
+    const claimPath = '/api/v1/print/jobs/claim-pickup'
+    const claimTokens = watchPostTokens(page, claimPath)
+    page.on('request', (request) => {
+      if (request.method() !== 'POST') return
+      if (new URL(request.url()).pathname !== claimPath) return
+      expect(request.postDataJSON()).toEqual({ code: '12345678' })
+      expect(request.headers()['x-terminal-id']).toBe('KSK-001')
+    })
+    api.respondWith('POST', claimPath, (requestNumber) => (
+      requestNumber === 1
+        ? { status: 401, json: { error: { code: 'TERMINAL_SESSION_INVALID', message: 'Expired fixture' } } }
+        : {
+          status: 200,
+          json: {
+            released: false,
+            orderId: 'lifecycle-order',
+            orderNo: LIFECYCLE_ORDER_NO,
+            terminalId: 'KSK-001',
+            amountCents: 100,
+            priceLines: [],
+            paymentSessionToken: 'lifecycle-payment',
+          },
+        }
+    ))
+
+    try {
+      await page.goto('/print/pickup-claim')
+      await page.getByLabel('到机码输入框').pressSequentially('12345678', { delay: 5 })
+      await refresh.arrived
+      expect(api.requestCount('POST', claimPath)).toBe(1)
+      expect(claimTokens).toEqual([TERMINAL_SESSION_FIXTURE])
+
+      if (scenario === 'privacy') {
+        await freezeBfCachePrivacyClear(page)
+        await expect(page.getByTestId('session-guard-state-clearing')).toBeVisible()
+        await expect(page.getByLabel('到机码输入框')).toHaveCount(0)
+      } else if (scenario === 'leave') {
+        await page.getByRole('button', { name: '返回打印扫描', exact: true }).click()
+        await expect(page).toHaveURL(/\/print-scan$/)
+      }
+
+      const refreshed = page.waitForResponse('**/api/v1/terminals/session-token/refresh')
+      refresh.open()
+      await refreshed
+      if (scenario === 'active') {
+        await expect(page.getByText(LIFECYCLE_ORDER_NO)).toBeVisible()
+        expect(api.requestCount('POST', claimPath)).toBe(2)
+        expect(claimTokens).toEqual([TERMINAL_SESSION_FIXTURE, TERMINAL_SESSION_ROTATED])
+      } else {
+        await waitForRotatedSession(page)
+        expect(api.requestCount('POST', claimPath), '离页或清场后不得重放认领').toBe(1)
+        expect(claimTokens).toEqual([TERMINAL_SESSION_FIXTURE])
+        await expect(page.getByText(LIFECYCLE_ORDER_NO)).toHaveCount(0)
+        if (scenario === 'leave') await expect(page).toHaveURL(/\/print-scan$/)
+        else await expect(page.getByTestId('session-guard-state-clearing')).toBeVisible()
+      }
+      expect(api.requestCount('POST', '/api/v1/terminals/session-token/refresh')).toBe(1)
+      expect(errors).toEqual([])
+    } finally {
+      refresh.open()
+    }
+  })
+}
 
 function quoteResponseJson(opts?: { amountCents?: number; billablePages?: number; unitCents?: number }) {
   const billablePages = opts?.billablePages ?? 2
@@ -777,6 +946,9 @@ test('print intake keeps three upload sources and a separate scan CTA @w2', asyn
   await expect(primary).toBeVisible()
   await expect(primary).toBeDisabled()
   await expect(primary).toHaveText('下一步：材料检查')
+  await expect(page.getByRole('button', { name: '问小青：这份文件怎么检查 →' })).toBeVisible()
+  const firstSource = await page.locator('.fs-ch').first().boundingBox()
+  expect(firstSource!.y, '2.0 来源按钮位于顶部只读区之后').toBeGreaterThanOrEqual(500)
   await expectHealthy(page, errors, 'print-upload')
 
   await page.getByRole('button', { name: /扫描纸质原件|扫描原件/ }).click()
@@ -858,9 +1030,14 @@ test('material checks require a PII decision, create the redacted task, and carr
 
   await page.goto('/print/desk?step=check')
   await setReactRouterState(page, '/print/desk?step=check', { file: W2_FILE, source: 'document' })
-  await expect(page.getByText('发现 1 个需确认片段', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '有 1 处要你决定', exact: true })).toBeVisible()
+  await expect(page.locator('.qpd-finding-snippet')).toHaveText('第 1 页 · 138****8000')
+  await expect(page.locator('.qpd-decision-counts')).toContainText('已决定 0 / 1')
   await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeDisabled()
   await page.getByRole('button', { name: '遮挡', exact: true }).click()
+  await expect(page.locator('.qpd-decision-counts')).toContainText('已决定 1 / 1')
+  await expect(page.locator('.qpd-decision-counts')).toContainText('遮挡 1 处')
+  await expect(page.locator('.qpd-finding-decision')).toContainText('原文件不变')
   await page.getByRole('button', { name: '下一步：预览与参数' }).click()
   await page.waitForURL(/\/print\/desk\?step=preview/)
   await expect(page.getByTitle('w2-sample.pdf 预览')).toHaveAttribute('data-preview-src', '/w2-fixtures/sample-redacted.pdf')
@@ -882,6 +1059,11 @@ test('material check failure exposes its real retry action @w2', async ({ page, 
   await setReactRouterState(page, '/print/desk?step=check', { file: W2_FILE, source: 'document' })
   await expect(page.getByRole('heading', { name: '材料检查未完成' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重试检查' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '现在的事实' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '两条路' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /跳过/ })).toHaveCount(0)
+  await expect(page.locator('.qpd-summary')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-material-check')
 })
 
@@ -895,7 +1077,26 @@ test('direct preview restores the material session and completes the PDF respons
 
   await page.goto('/print/desk?step=preview')
   await expect(page.getByTitle(`${W2_FILE.name} 预览`)).toBeVisible()
-  await expect.poll(() => page.locator(`iframe[data-preview-src="${W2_FILE.fileUrl}"]`).count()).toBe(1)
+  const previewHost = page.locator(`[data-pdf-preview-host][data-preview-src="${W2_FILE.fileUrl}"]`)
+  await expect(previewHost).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect(previewHost.locator('canvas')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: '问小青：帮我选打印参数 →' })).toBeVisible()
+  await expect(page.locator('.qpd-guide button, .qpd-guide a')).toHaveCount(0)
+  await expect(page.locator('.qpd-param-stack > .qpd-param-card')).toHaveCount(4)
+  await expect(page.locator('.qpd-device-strip > div')).toHaveCount(4)
+  await page.getByRole('button', { name: '增加十份', exact: true }).click()
+  await expect(page.locator('.qpd-stepper output')).toHaveText('11 份')
+  await expect(page.getByRole('region', { name: '参数摘要' })).toContainText('11 份')
+  await page.getByRole('button', { name: '减少十份', exact: true }).click()
+  await expect(page.locator('.qpd-stepper output')).toHaveText('1 份')
+  await expect(page.getByRole('button', { name: '减少打印份数' })).toBeDisabled()
+  await page.getByRole('button', { name: '打开完整预览 · 逐页看清' }).click()
+  const dialog = page.getByRole('dialog', { name: `完整预览：${W2_FILE.name}` })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('[data-pdf-preview-host]')).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect(dialog.locator('canvas')).toHaveCount(1)
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
   binary.assertPdfCompleted()
   await expectHealthy(page, errors, 'print-preview')
 })
@@ -911,7 +1112,7 @@ test('direct preview without a completed PII summary is fail-closed @w2', async 
   await expect(preview).toHaveAttribute('data-qx-state', 'check-required')
   await expect(page.getByRole('heading', { name: '不能跳过隐私预检直接打印' })).toBeVisible()
   await expect(page.getByRole('button', { name: '完成材料检查' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '下一步：让服务端报价' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '下一步：核对价格' })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-preview')
 })
 
@@ -945,8 +1146,8 @@ test('preview rejects task ids without a trustworthy redaction result @w2', asyn
   })
 
   await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'check-required')
-  await expect(page.getByText('页面不会只凭任务编号伪造“已检查”。', { exact: false })).toBeVisible()
-  await expect(page.getByRole('button', { name: '下一步：让服务端报价' })).toHaveCount(0)
+  await expect(page.getByText('这份文件尚未完成材料检查，请检查后再继续。', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: '下一步：核对价格' })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-preview')
 })
 
@@ -986,11 +1187,12 @@ test('print parameter suggestions are advisory until applied and then flow to co
   })
 
   await page.goto('/print/desk?step=preview')
-  await expect(page.locator('.qpd-stepper output')).toHaveText('1')
+  // 2.0 份数步进器把单位写在读数里（稿 13：「1 份」）。
+  await expect(page.locator('.qpd-stepper output')).toHaveText('1 份')
   await expect(page.getByText('3 份', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '采用这些建议' }).click()
-  await expect(page.locator('.qpd-stepper output')).toHaveText('3')
-  await page.getByRole('button', { name: '下一步：让服务端报价' }).click()
+  await expect(page.locator('.qpd-stepper output')).toHaveText('3 份')
+  await page.getByRole('button', { name: '下一步：核对价格' }).click()
   await page.waitForURL('**/print/confirm')
   // 确认页摘要用 data-sum-row + <b class="v">，报价金额来自 POST /orders/quote。
   // 预览页才有「3 份」的 dd/strong；不能用它们冒充确认页断言。
@@ -1030,9 +1232,9 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   await page.goto('/print/desk?step=preview')
   const preview = page.locator('[data-w2-page="print-preview"]')
 
-  // 理由必须说「本机尚未通过真机验证」，不能说「不支持」—— 硬件确实支持，说不支持是谎报。
-  await expect(preview.getByText(/本机彩色打印尚未通过真机验证/)).toBeVisible()
-  await expect(preview.getByText(/本机自动双面尚未通过真机验证/)).toBeVisible()
+  // 理由须保留本机未开通的真值、使用用户文案，不能说「不支持」—— 硬件确实支持，说不支持是谎报。
+  await expect(preview.getByText(/本机彩色打印暂未开通/)).toBeVisible()
+  await expect(preview.getByText(/本机自动双面暂未开通/)).toBeVisible()
   await expect(preview.getByText(/不支持/)).toHaveCount(0)
 
   // 禁用态必须是**可聚焦的 aria-disabled**，不是原生 disabled ——
@@ -1077,7 +1279,7 @@ test('terminal verified for color and duplex can actually select them @w2', asyn
 
   const colorBtn = preview.getByRole('button', { name: '彩色', exact: true })
   await expect(colorBtn).not.toHaveAttribute('aria-disabled', 'true')
-  await expect(preview.getByText(/尚未通过真机验证/)).toHaveCount(0)
+  await expect(preview.getByText(/暂未开通/)).toHaveCount(0)
 
   await colorBtn.click()
   await expect(colorBtn).toHaveAttribute('data-selected', 'true')
@@ -1100,9 +1302,11 @@ test('retired params route redirects into preview with real printer fixtures @w2
 
   await page.goto('/print/params')
   await expect(page).toHaveURL(/\/print\/desk\?step=preview/)
-  const preview = page.locator('[data-w2-page="print-preview"]')
-  await expect(preview.getByText('已配置打印机', { exact: true })).toBeVisible()
-  await expect(preview.getByText('打印机在线', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-w2-page="print-preview"]')).toBeVisible()
+  // 2.0 把打印机卡并进页头的只读信息行（稿 13 顶部四格），它是 role=status，不在参数栅格里。
+  const deviceRow = page.getByRole('status').filter({ hasText: '纸张' })
+  await expect(deviceRow.getByText('已配置打印机', { exact: true })).toBeVisible()
+  await expect(deviceRow.getByText('打印机在线', { exact: true })).toBeVisible()
   await expectHealthy(page, errors, 'print-preview')
 })
 
@@ -1140,6 +1344,48 @@ test('preview stage survives reload from sessionStorage @w2', async ({ page, api
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'preview')
   await expectHealthy(page, errors, 'print-preview')
+})
+
+test('a new material check invalidates the previous summary so preview cannot authorize from it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+  registerShell(api)
+  registerPrice(api)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  // 新一轮检查停在体检进行中：结论不回来，上一轮的摘要也不能再替它放行。
+  const pendingInspection = (): DocumentProcessTaskView => ({ ...materialTask('inspection'), status: 'processing', result: null })
+  let inspectionCreated = false
+  await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+    const body = route.request().postDataJSON() as { kind?: string }
+    if (body.kind !== 'inspection') {
+      await route.abort('blockedbyclient')
+      return
+    }
+    inspectionCreated = true
+    await route.fulfill({ status: 201, json: { success: true, data: pendingInspection() } })
+  })
+  await routeExactJson(page, 'GET', '/api/v1/materials/tasks/w2-inspection', async (route) => {
+    await route.fulfill({ status: 200, json: { success: true, data: pendingInspection() } })
+  })
+
+  // 前提：带着上一轮完整摘要时，预览确实会放行 —— 否则下面的 check-required 证明不了任何事。
+  await page.goto('/print/desk?step=preview')
+  await writeMaterialSession(page)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'preview')
+
+  await page.goto('/print/desk?step=check')
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toHaveAttribute('data-qx-state', 'inspection')
+  await expect.poll(() => inspectionCreated).toBe(true)
+  const stored = await page.evaluate(() => JSON.parse(window.sessionStorage.getItem('ai-job-print:current-print-material-check') ?? 'null') as Record<string, unknown> | null)
+  expect(stored?.['file']).toMatchObject({ fileId: W2_FILE.fileId })
+  expect(stored).not.toHaveProperty('materialCheck')
+  expect(stored).not.toHaveProperty('piiRedactTask')
+
+  await page.goto('/print/desk?step=preview')
+  await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'check-required')
+  await expect(page.getByRole('heading', { name: '不能跳过隐私预检直接打印' })).toBeVisible()
+  expect(errors).toEqual([])
 })
 
 test('sensitive session clear returns the desk to empty without the previous file name @w2', async ({ page, api }) => {
@@ -1373,7 +1619,7 @@ test('Order-only release during a normal session refresh waits instead of failin
   // 钱已经收了。此刻释放必须等换票，而不是把一单已付款的活当场判成安全失败 ——
   // 那会让站在机器前的人看到「打印任务尚未建立」，以为钱付了纸不出。
   paid = true
-  await expect(page.locator('.qx-state-t', { hasText: '付款已由服务端确认' })).toBeVisible()
+  await expect(page.locator('.qx-state-t', { hasText: '付款成功' })).toBeVisible()
   await page.waitForTimeout(700)
   expect(
     api.requestCount('POST', `/api/v1/print/jobs/${W2_ORDER.orderId}/release`),
@@ -1425,7 +1671,7 @@ test('a terminal-session 401 on Order-only release fails as terminal security, n
   // 原样外抛（续期失败可能是 TypeError），这里就会变成「网络连接失败」——
   // 把一次安全失败说成网络问题，现场工作人员会照着去查网线。
   const alert = page.locator('.cashier-qx-error')
-  await expect(alert).toHaveText(/终端安全校验失败/)
+  await expect(alert).toHaveText(/这台机器的安全校验没通过/)
   await expect(alert).not.toHaveText(/网络连接失败/)
   await expect(page.locator('.qx-state-t', { hasText: '打印任务尚未建立' })).toBeVisible()
   await expect(page).toHaveURL(/\/print\/cashier$/)
@@ -1439,6 +1685,138 @@ test('a terminal-session 401 on Order-only release fails as terminal security, n
   ).toBe(1)
   expect(errors).toEqual([])
 })
+
+// Order-only：续期或 release 本身被扣住时，人还在就换票后释放并进入进度页；
+// 人走了或清场后，已发出的那一次释放照常落服务端（幂等、不取消），但不得再重放，
+// 也不得把上一位推进 /print/progress。
+for (const scenario of ['active-refresh', 'leave-refresh', 'leave-success', 'privacy-refresh'] as const) {
+  const leave = scenario !== 'active-refresh'
+  const lateSuccess = scenario === 'leave-success'
+  test(`pickup lifecycle release ${scenario} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    const releasePath = '/api/v1/print/jobs/lifecycle-order/release'
+    api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+    api.respond('GET', '/api/v1/orders/lifecycle-order/pay-status', {
+      status: 200,
+      json: {
+        orderId: 'lifecycle-order',
+        orderNo: 'LIFECYCLE-ORDER',
+        payStatus: 'paid',
+        paymentSource: 'wechat',
+        payChannel: 'wechat',
+        amountCents: 100,
+        paidAt: NOW,
+        pickupCode: null,
+        attempt: null,
+      },
+    })
+    api.respond('GET', '/api/v1/print/jobs/lifecycle-task', {
+      status: 200,
+      json: { taskId: 'lifecycle-task', status: 'pending' },
+    })
+    const refresh = holdTerminalRefresh(api)
+    let openRelease = (): void => undefined
+    const releaseGate = new Promise<void>((resolve) => { openRelease = resolve })
+    let markRelease = (): void => undefined
+    const releaseArrived = new Promise<void>((resolve) => { markRelease = resolve })
+    const releaseTokens = watchPostTokens(page, releasePath)
+    page.on('request', (request) => {
+      if (request.method() !== 'POST') return
+      if (new URL(request.url()).pathname !== releasePath) return
+      expect(request.headers()['x-terminal-id']).toBe('KSK-001')
+      expect(request.headers()['x-payment-session-token']).toBe('lifecycle-payment')
+    })
+    api.respondWith('POST', releasePath, async (requestNumber) => {
+      markRelease()
+      if (lateSuccess) {
+        await releaseGate
+        return {
+          status: 200,
+          json: {
+            released: true,
+            taskId: 'lifecycle-task',
+            orderId: 'lifecycle-order',
+            orderNo: 'LIFECYCLE-ORDER',
+            terminalId: 'KSK-001',
+            taskStatus: 'pending',
+            printTaskStatus: 'pending',
+            paymentSessionToken: 'lifecycle-payment',
+          },
+        }
+      }
+      if (requestNumber === 1) {
+        return { status: 401, json: { error: { code: 'TERMINAL_SESSION_INVALID', message: 'Expired fixture' } } }
+      }
+      return {
+        status: 200,
+        json: {
+          released: true,
+          taskId: 'lifecycle-task',
+          orderId: 'lifecycle-order',
+          orderNo: 'LIFECYCLE-ORDER',
+          terminalId: 'KSK-001',
+          taskStatus: 'pending',
+          printTaskStatus: 'pending',
+          paymentSessionToken: 'lifecycle-payment',
+        },
+      }
+    })
+
+    try {
+      await page.goto('/print/cashier')
+      await setReactRouterState(page, '/print/cashier', {
+        orderId: 'lifecycle-order',
+        orderNo: 'LIFECYCLE-ORDER',
+        amountCents: 100,
+        priceLines: [],
+        paymentSessionToken: 'lifecycle-payment',
+      })
+      await releaseArrived
+      expect(api.requestCount('POST', releasePath)).toBe(1)
+      expect(releaseTokens[0]).toBe(TERMINAL_SESSION_FIXTURE)
+      if (!lateSuccess) await refresh.arrived
+
+      if (scenario === 'privacy-refresh') {
+        await freezeBfCachePrivacyClear(page)
+        await expect(page.getByTestId('session-guard-state-clearing')).toBeVisible()
+        await expect(page.getByRole('button', { name: '返回我的打印订单', exact: true })).toHaveCount(0)
+      } else if (leave) {
+        await page.getByRole('button', { name: '返回我的打印订单', exact: true }).click()
+        await expect(page).not.toHaveURL(/\/print\/cashier/)
+      }
+
+      const settled = page.waitForResponse((response) => {
+        const path = new URL(response.url()).pathname
+        return path === (lateSuccess ? releasePath : '/api/v1/terminals/session-token/refresh')
+      })
+      if (lateSuccess) openRelease()
+      else refresh.open()
+      await settled
+
+      if (leave) {
+        if (!lateSuccess) await waitForRotatedSession(page)
+        else {
+          await page.evaluate(() => new Promise<void>((resolve) => {
+            window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+          }))
+        }
+        expect(api.requestCount('POST', releasePath), '离页或清场后不得重放释放').toBe(1)
+        expect(releaseTokens).toEqual([TERMINAL_SESSION_FIXTURE])
+        await expect(page).not.toHaveURL(/\/print\/progress/)
+      } else {
+        await expect(page).toHaveURL(/\/print\/progress/)
+        expect(api.requestCount('POST', releasePath)).toBe(2)
+        expect(releaseTokens).toEqual([TERMINAL_SESSION_FIXTURE, TERMINAL_SESSION_ROTATED])
+      }
+      expect(api.requestCount('POST', '/api/v1/terminals/session-token/refresh')).toBe(lateSuccess ? 0 : 1)
+      expect(errors).toEqual([])
+    } finally {
+      openRelease()
+      refresh.open()
+    }
+  })
+}
 
 test('print polling reaches done and pickup code comes from the paid response @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
@@ -1590,11 +1968,14 @@ function registerMemberLogin(api: ApiRouter): void {
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of W2_MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of W2_MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
@@ -1939,4 +2320,207 @@ test('print confirm fail-closes duplicate query keys and missing file context @w
   await expect(page.getByText('未找到文件信息')).toBeVisible()
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
+})
+
+function buildCanvasPreviewPdf(pageStreams: string[]): string {
+  const kids = pageStreams.map((_, index) => `${3 + index * 2} 0 R`).join(' ')
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    `2 0 obj\n<< /Type /Pages /Count ${pageStreams.length} /Kids [${kids}] >>\nendobj\n`,
+    ...pageStreams.flatMap((stream, index) => {
+      const pageId = 3 + index * 2
+      return [
+        `${pageId} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents ${pageId + 1} 0 R >>\nendobj\n`,
+        `${pageId + 1} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`,
+      ]
+    }),
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets: number[] = []
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(pdf, 'ascii'))
+    pdf += object
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii')
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (const offset of offsets) pdf += `${String(offset).padStart(10, '0')} 00000 n \n`
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+  return pdf
+}
+
+async function waitForCanvasInk(canvas: import('@playwright/test').Locator): Promise<{ dark: number; checksum: number }> {
+  let ink: { dark: number; checksum: number } | null = null
+  await expect.poll(async () => {
+    ink = await canvas.evaluate((node: HTMLCanvasElement) => {
+      const context = node.getContext('2d')
+      if (!context || node.width < 2 || node.height < 2) return null
+      const { data } = context.getImageData(0, 0, node.width, node.height)
+      let dark = 0
+      let checksum = 0
+      for (let index = 0; index < data.length; index += 32) {
+        const red = data[index] ?? 0
+        const green = data[index + 1] ?? 0
+        const blue = data[index + 2] ?? 0
+        if (red < 250 || green < 250 || blue < 250) dark += 1
+        checksum = (checksum + red + green * 3 + blue * 7) % 10000019
+      }
+      return { dark, checksum }
+    })
+    return ink?.dark ?? 0
+  }, { timeout: 15_000 }).toBeGreaterThan(0)
+  if (!ink) throw new Error('canvas ink missing')
+  return ink
+}
+
+test('print preview paints each PDF page on a canvas and leaves without ERR_ABORTED @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  const errors = collectRuntimeErrors(page)
+  const consoleAborts: string[] = []
+  page.on('console', (message) => {
+    if (message.text().includes('ERR_ABORTED')) consoleAborts.push(message.text())
+  })
+  registerShell(api)
+  registerPrice(api)
+  const pdfPath = '/pdf-canvas-fixtures/two-page.pdf'
+  await page.route(`**${pdfPath}`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: buildCanvasPreviewPdf(['0 0 0 rg\n30 30 40 140 re f\n', '0 0 0 rg\n130 30 40 140 re f\n']),
+  }))
+  const file = { ...W2_FILE, fileUrl: pdfPath, name: 'two-page.pdf', pages: 2 }
+  await page.addInitScript(({ key, value }) => {
+    window.sessionStorage.setItem(key, JSON.stringify(value))
+  }, {
+    key: 'ai-job-print:current-print-material-check',
+    value: {
+      file,
+      source: 'document',
+      materialCheck: {
+        inspectionTaskId: 'w2-inspection-001',
+        normalizeTaskId: 'w2-normalize-001',
+        piiTaskId: 'w2-pii-001',
+        piiRedactTaskId: 'w2-pii-redact-001',
+        checkedAt: '2026-07-24T00:00:00.000Z',
+        findingCount: 0,
+        redactedCount: 0,
+        keptCount: 0,
+        redaction: {
+          claim: 'nothing_to_redact',
+          redactedFileId: null,
+          appliedRedactedCount: 0,
+          failedNoPositionCount: 0,
+          keptCount: 0,
+          reverifyRemainingCount: null,
+          reverifyRan: false,
+        },
+        mode: 'checked',
+      },
+      printParams: W2_PRINT_PARAMS,
+      updatedAt: '2026-07-24T00:00:00.000Z',
+    },
+  })
+
+  await page.goto('/print/desk?step=preview')
+  const host = page.locator(`[data-pdf-preview-host][data-preview-src="${pdfPath}"]`)
+  await expect(host).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect.poll(() => host.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe('0')
+  await expect(host).toHaveAttribute('data-pdf-page', '1')
+  await expect(host).toHaveAttribute('data-pdf-page-count', '2')
+  await expect(host).toContainText('第 1 / 共 2 页')
+  await expect(page.locator('.qpd-preview-shell iframe, .qpd-preview-shell embed, .qpd-preview-shell object')).toHaveCount(0)
+  const canvas = host.locator('canvas')
+  const first = await waitForCanvasInk(canvas)
+
+  const painted = await host.getAttribute('data-pdf-render')
+  await host.getByRole('button', { name: '下一页' }).click()
+  await expect(host).toHaveAttribute('data-pdf-page', '2')
+  await expect(host).toContainText('第 2 / 共 2 页')
+  await expect.poll(() => host.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe(painted)
+  const second = await waitForCanvasInk(canvas)
+  expect(second.checksum, '第二页和第一页不是同一幅画面').not.toBe(first.checksum)
+
+  await page.goto('/print/upload?source=document')
+  await expect(page.locator('[data-w2-page="print-upload"]')).toBeVisible()
+  await expect(page.locator('[data-pdf-preview-host]')).toHaveCount(0)
+  expect(consoleAborts, '离开预览后控制台没有 ERR_ABORTED').toEqual([])
+  expect(errors.filter((item) => item.includes('ERR_ABORTED')), '离开预览后没有 document 级 ERR_ABORTED').toEqual([])
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('print preview paints preset-CMap Chinese text @w2', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  const errors = collectRuntimeErrors(page)
+  const cmapStatuses: number[] = []
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname.includes('/pdfjs/cmaps/')) cmapStatuses.push(response.status())
+  })
+  registerShell(api)
+  registerPrice(api)
+  const pdfPath = '/pdf-canvas-fixtures/zh-cmap.pdf'
+  const pdfBytes = readFileSync(fileURLToPath(new URL('../../../../services/api/fixtures/zh-cmap.pdf', import.meta.url)))
+  await page.route(`**${pdfPath}`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: pdfBytes,
+  }))
+  const file = { ...W2_FILE, fileUrl: pdfPath, name: 'zh-cmap.pdf', pages: 1 }
+  await page.addInitScript(({ key, value }) => {
+    window.sessionStorage.setItem(key, JSON.stringify(value))
+  }, {
+    key: 'ai-job-print:current-print-material-check',
+    value: {
+      file,
+      source: 'document',
+      materialCheck: {
+        inspectionTaskId: 'w2-inspection-001',
+        normalizeTaskId: 'w2-normalize-001',
+        piiTaskId: 'w2-pii-001',
+        piiRedactTaskId: 'w2-pii-redact-001',
+        checkedAt: '2026-07-24T00:00:00.000Z',
+        findingCount: 0,
+        redactedCount: 0,
+        keptCount: 0,
+        redaction: {
+          claim: 'nothing_to_redact',
+          redactedFileId: null,
+          appliedRedactedCount: 0,
+          failedNoPositionCount: 0,
+          keptCount: 0,
+          reverifyRemainingCount: null,
+          reverifyRan: false,
+        },
+        mode: 'checked',
+      },
+      printParams: W2_PRINT_PARAMS,
+      updatedAt: '2026-07-24T00:00:00.000Z',
+    },
+  })
+
+  await page.goto('/print/desk?step=preview')
+  const host = page.locator(`[data-pdf-preview-host][data-preview-src="${pdfPath}"]`)
+  await expect(host).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+  await expect.poll(() => host.getAttribute('data-pdf-render'), { timeout: 20_000 }).not.toBe('0')
+  const bands = await host.locator('canvas').evaluate((node: HTMLCanvasElement) => {
+    const context = node.getContext('2d')
+    if (!context || node.width < 2 || node.height < 2) return null
+    const { data, width, height } = context.getImageData(0, 0, node.width, node.height)
+    const count = (start: number, end: number) => {
+      const y0 = Math.floor(height * start)
+      const y1 = Math.floor(height * end)
+      let dark = 0
+      for (let y = y0; y < y1; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const index = (y * width + x) * 4
+          if ((data[index] ?? 255) < 160) dark += 1
+        }
+      }
+      return dark
+    }
+    return { zh: count(0.085, 0.135), ascii: count(0.15, 0.19) }
+  })
+  expect(bands?.zh ?? 0, '中文行区域要有深色像素').toBeGreaterThan(30)
+  expect(bands?.ascii ?? 0, '英文对照行也要画出来').toBeGreaterThan(10)
+  expect(cmapStatuses.length, 'CMap 按需请求，不打进首屏脚本').toBeGreaterThan(0)
+  expect(cmapStatuses.every((status) => status === 200), `CMap 请求状态 ${cmapStatuses.join(',')}`).toBe(true)
+  await expectHealthy(page, errors, 'print-preview')
 })

@@ -1,6 +1,71 @@
 /* 简历生成预览 · 青序流光。共用优化页交付样式，只补本页差异。 */
 @import './resume-optimize-qx.css';
 
+/* 稿 24 的页头是小青区，不再另放一套标题。 */
+.qx-stage:has(.qx-resume-generate) > .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.qx-stage:has(.qx-resume-generate) > .qx-ctabar { flex-wrap: wrap; }
+.qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-step-actions { flex: 1 0 100%; }
+
+.qx-resume-generate .rg-xq {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 16px;
+  padding: 18px 28px;
+  border-radius: 32px;
+  background: linear-gradient(158deg, var(--qx-deep-2) 0%, var(--qx-deep) 68%);
+  color: var(--qx-paper);
+}
+.qx-resume-generate .rg-xq-face {
+  flex: none;
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--qx-emerald) 40%, transparent);
+  background: color-mix(in srgb, var(--qx-emerald) 12%, transparent);
+  color: var(--qx-emerald);
+  font-family: var(--qx-serif);
+  font-size: 38px;
+  font-weight: 700;
+}
+.qx-resume-generate .rg-xq-main { flex: 1; min-width: 0; }
+.qx-resume-generate .rg-xq-eyebrow {
+  margin: 0 0 4px;
+  font-size: var(--qx-fs-aux);
+  letter-spacing: 2px;
+  color: color-mix(in srgb, var(--qx-paper) 88%, transparent);
+}
+.qx-resume-generate .rg-xq-ask {
+  margin: 0;
+  font-family: var(--qx-serif);
+  font-size: var(--qx-fs-greeting);
+  font-weight: 700;
+  line-height: 1.25;
+}
+.qx-resume-generate .rg-xq-doing {
+  margin: 8px 0 0;
+  font-size: var(--qx-fs-body);
+  line-height: var(--qx-lh-body);
+  color: color-mix(in srgb, var(--qx-paper) 86%, transparent);
+}
+.qx-resume-generate .rg-truth {
+  margin: 8px 0 0;
+  font-size: var(--qx-fs-aux);
+  line-height: 1.45;
+  color: var(--qx-ink-2);
+}
+
 .qx-resume-generate .qx-rd-hints {
   display: flex;
   flex-direction: column;
@@ -12,7 +77,7 @@
   border-radius: 14px;
   background: var(--qx-wheat-soft);
   color: var(--qx-wheat-d);
-  font-size: 16px;
+  font-size: var(--qx-fs-aux);
   font-weight: 700;
   line-height: 1.4;
 }
@@ -26,22 +91,22 @@
 .qx-resume-generate .qx-rd-label > span {
   display: block;
   margin-bottom: 8px;
-  font-size: 16px;
+  font-size: var(--qx-fs-body);
   font-weight: 700;
   color: var(--qx-ink-2);
 }
 .qx-resume-generate .qx-rd-field {
   width: 100%;
-  min-height: var(--qx-tap-min);
+  min-height: 74px;
   padding: 12px 16px;
   border: 1px solid var(--qx-line-2);
   border-radius: 14px;
   background: var(--qx-paper);
   color: var(--qx-ink);
   font: inherit;
-  font-size: 18px;
+  font-size: var(--qx-fs-body-lg);
 }
-.qx-resume-generate textarea.qx-rd-field { min-height: 88px; resize: none; }
+.qx-resume-generate textarea.qx-rd-field { min-height: 104px; resize: none; }
 .qx-resume-generate .qx-rd-field:focus {
   outline: 3px solid var(--qx-teal);
   outline-offset: 2px;
@@ -74,7 +139,7 @@
   background: transparent;
   color: var(--qx-ink-2);
   font: inherit;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -85,7 +150,7 @@
   min-height: var(--qx-tap-min);
   margin-bottom: 12px;
 }
-.qx-resume-generate .qx-rd-heading b { font-size: 20px; }
+.qx-resume-generate .qx-rd-heading b { font-size: var(--qx-fs-sec); }
 
 /* 本页单栏：覆盖 resume-optimize-qx.css 的双栏 grid，不改那份共享文件。 */
 .qx-resume-generate .qx-rd-work {
@@ -144,7 +209,7 @@
   color: var(--qx-paper);
 }
 .qx-resume-generate .qx-rd-lead b { display: block; font-size: 26px; line-height: 1.3; }
-.qx-resume-generate .qx-rd-lead p { margin: 6px 0 0; font-size: 17px; line-height: 1.5; opacity: .85; }
+.qx-resume-generate .qx-rd-lead p { margin: 6px 0 0; font-size: 22px; line-height: 1.5; opacity: .85; }
 .qx-resume-generate .qx-rd-lead em { font-style: normal; font-weight: 700; color: var(--qx-teal-soft); }
 
 .qx-resume-generate .qx-rd-notes {
@@ -153,8 +218,8 @@
   gap: 16px;
   margin-top: 20px;
 }
-.qx-resume-generate .qx-rd-notes .qx-card b { display: block; font-size: 19px; margin-bottom: 6px; }
-.qx-resume-generate .qx-rd-notes .qx-card p { margin: 0; font-size: 16px; line-height: 1.55; }
+.qx-resume-generate .qx-rd-notes .qx-card b { display: block; font-size: 24px; margin-bottom: 6px; }
+.qx-resume-generate .qx-rd-notes .qx-card p { margin: 0; font-size: 22px; line-height: 1.45; }
 
 .qx-resume-generate .qx-rd-selfcheck {
   margin: 18px 0 0;
@@ -162,7 +227,7 @@
   border-radius: 14px;
   background: var(--qx-wheat-soft);
   color: var(--qx-wheat-d);
-  font-size: 16px;
+  font-size: 22px;
   line-height: 1.5;
 }
 
@@ -173,19 +238,26 @@
   设计稿 input-basic 的表单卡是撑满可用高度、内部元素分散排布的。
   只在本页作用域内做，不动共享的 .qx-card。
 */
-.qx-resume-generate .qx-rd-main {
+/* 只作用于填写步。预览屏若套上同一条 flex:1 + min-height:0 + overflow，
+   简历卡会被压成一条空白（2026-09-28 并排图）。 */
+.qx-resume-generate[data-kiosk-screen="resume-generate"] .qx-rd-main {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
-.qx-resume-generate .qx-rd-main > .qx-card {
-  flex: 1;
+.qx-resume-generate[data-kiosk-screen="resume-generate"] .qx-rd-main > .qx-card {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   gap: 18px;
+  overflow-y: auto;
 }
-/* 字段区吃掉多余空间，说明卡与自查行自然沉到卡片下部 */
-.qx-resume-generate .qx-rd-main > .qx-card > .grid {
-  flex: 1;
+/* 标题和字段贴顶，说明卡压到卡片底部（稿 24 input-basic）；
+   余量只留在字段与说明之间一处，不再均摊成标题上下三道空隙。 */
+.qx-resume-generate[data-kiosk-screen="resume-generate"] .qx-rd-main > .qx-card > .qx-rd-notes { margin-top: auto; }
+.qx-resume-generate[data-kiosk-screen="resume-generate"] .qx-rd-main > .qx-card > .grid {
+  flex: none;
   align-content: start;
 }

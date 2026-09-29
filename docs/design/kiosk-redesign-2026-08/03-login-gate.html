@@ -22,28 +22,14 @@
          qr-loading | qr-ready | qr-expired | qr-confirmed | qr-error
          mode 与 state 冲突时（例如 ?mode=phone&state=qr-ready）**以状态前缀为准**：
          状态是页面真正在画的东西，tab 只是它的投影。?mode=qr 不带 state 时落到 qr-loading。
-  api:   POST /api/v1/member/auth/sms-code → 成功 { sent:true, cooldownSeconds=60, expiresInSeconds=300 }
+  api:   POST /member/sms-code → 成功 { sent:true, cooldownSeconds=60, expiresInSeconds=300 }
                                  SMS_SEND_FAILED(502) → 服务端把刚写入的验证码与冷却一起删掉，可立刻重试
                                  SMS_TOO_FREQUENT / IP / DEVICE / PROVIDER_RATE_LIMIT(429) → 稍后再试
                                  SMS_DAILY_LIMIT / PROVIDER_PHONE_DAILY_LIMIT(429)         → 明天再试
-         POST /api/v1/member/auth/login → SMS_CODE_INVALID / SMS_CODE_EXPIRED / SMS_CODE_LOCKED 三条不同下一步
-         扫码登录横跨两个服务，**不要写成同一个 base**（2026-09-02 对 memberQrLoginApi.ts +
-         terminal-agent/src/local-api/qr-login-server.ts + member-auth.controller.ts 核实）：
-         POST /local/qr-login/create → **Terminal Agent 本地网桥**（VITE_TERMINAL_AGENT_LOCAL_URL，
-                                       默认 http://127.0.0.1:9527，需 X-Local-Bridge-Token 头）
-                                       返回 { ticketId, qrUrl, expiresInSeconds, returnTo }，QR_TICKET_TTL=180 秒
-                                       （字段名是 qrUrl，不是 qrContent；Agent 内部代调后端
-                                        POST /api/v1/member/auth/qr/create，claimToken 只留在 Agent，不下发前端）
-         GET  /api/v1/member/auth/qr/:ticketId/status → **后端 API，不是本地网桥**（Agent 没有这条路由）
-                                       返回 { status, deviceLabel?, returnTo, expiresInSeconds }
-                                       status 只有 pending | confirmed 两个取值，**没有 expired**：
-                                       票据过期即 404 QR_LOGIN_NOT_FOUND，已被领取则 410 QR_LOGIN_ALREADY_CLAIMED，
-                                       所以本页的 qr-expired 态由错误码驱动，不是由 status 值驱动。
-                                       expiresInSeconds 是剩余值，不是 180。
-         POST /local/qr-login/claim  → **Terminal Agent 本地网桥**；一体机凭票据换登录态；
-                                       claim 会失败，失败后要求重扫
-                                       （后端另有 POST /api/v1/member/auth/qr/:ticketId/claim，
-                                        由 Agent 持 claimToken 代调，Kiosk 前端不直接打这条）
+         POST /member/login  → SMS_CODE_INVALID / SMS_CODE_EXPIRED / SMS_CODE_LOCKED 三条不同下一步
+         POST /local/qr-login/create → { ticketId, qrContent, expiresInSeconds }，QR_TICKET_TTL=180 秒
+         GET  /local/qr-login/status → pending | confirmed | expired（expiresInSeconds 是剩余值，不是 180）
+         POST /local/qr-login/claim  → 一体机凭票据换登录态；claim 会失败，失败后要求重扫
   fallback: 每个失败态都保留「改用另一种登录方式」「不登录继续」「返回首页」三条实体出口（≥56px）
   真实性:  静态页不生成可扫描二维码、不声称短信已发送、不声称已登录。
            手机确认只等于 confirmed，一体机还要 claim 成功才登录，因此本页没有「登录成功」屏。
@@ -61,13 +47,13 @@
    点输入框弹出、点遮罩收起；不调系统键盘，避免其设置入口造成 Kiosk 逃逸。 */
 #kbmask{position:absolute;inset:0;z-index:40;background:rgba(11,36,30,.18);display:none;}
 #kbmask.on{display:block;}
-#kbpad{position:absolute;left:0;right:0;bottom:0;z-index:41;transform:translateY(102%);
+#kbpad{position:absolute;left:0;right:0;bottom:0;z-index:41;transform:translateY(102%);visibility:hidden;
   transition:transform .22s cubic-bezier(.2,.8,.2,1);background:#fffdf8;
   border-top:1px solid #d4cdb6;border-radius:28px 28px 0 0;padding:22px 26px 26px;
   box-shadow:0 -14px 40px rgba(11,36,30,.14);}
-#kbpad.on{transform:translateY(0);}
+#kbpad.on{transform:translateY(0);visibility:visible;}
 #kbpad .kbhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-#kbpad .kbfor{font-size:19px;color:#6b857c;}
+#kbpad .kbfor{font-size:19px;color:#526b62;}
 #kbpad .kbfor b{color:#10302b;}
 #kbpad .kbdone{height:56px;padding:0 26px;border-radius:16px;border:1px solid #d4cdb6;
   background:#f5f2e9;font-size:20px;font-weight:700;color:#10302b;cursor:pointer;}
@@ -79,7 +65,7 @@
 #kbpad .kbk.fn{font-size:22px;font-weight:700;}
 #kbpad .kbk.del{background:#0b241e;color:#fff;border-color:#0b241e;}
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -96,7 +82,11 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
 a{color:inherit;text-decoration:none}
 button,input{font:inherit;color:inherit}
 button{border:0;background:none;cursor:pointer}
-a:focus-visible,button:focus-visible,input:focus-visible,[role=button]:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+/* 统一焦点环：3px 深墨环画在元素外侧的浅纸底上（对比 ≈14:1）；深底控件（选中 tab、
+   主 CTA、删除键）的环同样落在周围浅底上，所以一套颜色在明暗控件上都看得见。 */
+:focus-visible{outline:3px solid var(--deep)!important;outline-offset:3px!important}
+/* 贴着容器边缘的控件改画内侧环，避免环被裁掉后看不见 */
+#kbpad .kbdone:focus-visible,#kbpad .kbk:focus-visible{outline-offset:-5px!important}
 
 .topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
 .back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
@@ -136,6 +126,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,[role=button]:focus-vis
 .scrollarea::-webkit-scrollbar{width:10px}
 .scrollarea::-webkit-scrollbar-thumb{background:var(--line-2,#d4cdb6);border-radius:6px}
 .scrollarea::-webkit-scrollbar-track{background:transparent}
+/* 键盘弹起时滚动区自己让位：底部补白 + scroll-padding，聚焦的输入框不会落到键盘底下 */
+.scrollarea{scroll-padding:24px 0 28px}
+#stage.kbon .scrollarea{padding-bottom:200px;scroll-padding-bottom:210px}
+/* 正在输入的那一格浮到遮罩之上：聚焦控件不被固定层压住，点它也仍然点得到 */
+#stage.kbon #phone:focus,#stage.kbon #code:focus{position:relative;z-index:42}
 .sec{flex:none;padding:0 44px;margin-top:22px}
 .sec.last{margin-bottom:18px}
 .sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:14px}
@@ -220,6 +215,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,[role=button]:focus-vis
 .demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
 html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+.flat :focus-visible{outline:3px solid var(--deep)!important}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -715,24 +711,53 @@ if(q.get('flat')==='1')document.getElementById('stage').classList.add('flat');
    只做输入，不触发发码或登录；发码与登录仍由既有按钮与服务端决定。 */
 (function(){
   var pad=document.getElementById('kbpad'), mask=document.getElementById('kbmask'), forEl=document.getElementById('kbfor');
+  var stage=document.getElementById('stage');
   if(!pad||!mask) return;
   var target=null;
   var LABEL={phone:'手机号', code:'短信验证码'};
+  /* 舞台是 overflow:hidden 的定尺画布：任何把屏外元素滚进来的行为都会整页位移，
+     这里把它按死在 0，版式只由布局决定，不由焦点决定。 */
+  stage.addEventListener('scroll',function(){stage.scrollTop=0;stage.scrollLeft=0;});
+  /* 聚焦目标别落到键盘底下：只滚 .scrollarea 自己，不动舞台，也不改触控流程 */
+  function fitIntoView(el){
+    var sa=document.getElementById('scrollarea');
+    if(!sa||!el||!sa.contains(el))return;
+    var sr=sa.getBoundingClientRect();
+    var k=sa.clientHeight?sr.height/sa.clientHeight:1; // 舞台缩放比
+    if(!k)k=1;
+    var er=el.getBoundingClientRect();
+    var low=sr.bottom, high=sr.top+20*k;
+    if(pad.classList.contains('on')){
+      var pr=pad.getBoundingClientRect();
+      if(pr.top<low) low=pr.top;
+    }
+    low-=20*k;
+    if(er.bottom>low) sa.scrollTop+=(er.bottom-low)/k;
+    else if(er.top<high) sa.scrollTop-=(high-er.top)/k;
+  }
   function open(el){
     target=el;
     forEl.textContent=LABEL[el.id]||'数字';
-    pad.classList.add('on'); mask.classList.add('on');
+    pad.classList.add('on'); mask.classList.add('on'); stage.classList.add('kbon');
+    pad.removeAttribute('inert');
     pad.setAttribute('aria-hidden','false'); mask.setAttribute('aria-hidden','false');
+    fitIntoView(el);
   }
   function close(){
     target=null;
-    pad.classList.remove('on'); mask.classList.remove('on');
+    pad.classList.remove('on'); mask.classList.remove('on'); stage.classList.remove('kbon');
+    pad.setAttribute('inert','');
     pad.setAttribute('aria-hidden','true'); mask.setAttribute('aria-hidden','true');
   }
-  // 点输入框弹出（只对数字输入框；禁用/只读的不弹）
+  close(); // 初始即收起：收起的键盘不可聚焦，Tab 不会跑进屏外的按键
+  // 点输入框弹出（只对数字输入框；禁用/只读的不弹）；焦点离开输入框就收起，
+  // 保证「当前聚焦的控件」永远不会压在键盘或遮罩底下。
   document.addEventListener('focusin',function(e){
     var el=e.target;
-    if(el&&el.tagName==='INPUT'&&(el.id==='phone'||el.id==='code')&&!el.disabled&&!el.readOnly) open(el);
+    if(el&&el.tagName==='INPUT'&&(el.id==='phone'||el.id==='code')&&!el.disabled&&!el.readOnly){ open(el); return; }
+    if(pad.contains(el)) return;
+    if(pad.classList.contains('on')) close();
+    fitIntoView(el);
   });
   document.addEventListener('click',function(e){
     var el=e.target.closest&&e.target.closest('#phone,#code');

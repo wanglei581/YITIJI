@@ -16,6 +16,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -104,6 +105,62 @@ test('状态：used 是已付款交付打印，不能落到终态兜底分支', 
   // 终态仍然优先：出纸有结论时那就是用户最关心的事实。
   assert.equal(pkg.resolvePackageStatus({ pickupStatus: 'used', payStatus: 'paid', taskStatus: 'completed' }, NOW).key, 'done')
   assert.equal(pkg.resolvePackageStatus({ pickupStatus: 'used', payStatus: 'paid', taskStatus: 'failed' }, NOW).tone, 'danger')
+})
+
+/**
+ * terminalPackageReason 决定的不是"显示什么标签"，而是**能不能让用户就这一份材料包
+ * 再下一张单、再付一次钱**。所以它的默认值必须和 resolvePackageStatus 相反：
+ * 认不出来的状态一律当"还活着"。下面每一条都对着服务端的真实写入点。
+ */
+test('终态判据：服务端确实会写的五种终态，每一种都给得出一句能给用户看的原因', () => {
+  const reasons = [
+    { taskStatus: 'completed' },   // package-order-fulfillment.service.ts:43
+    { taskStatus: 'failed' },      // terminals-agent.service.ts:866
+    { taskStatus: 'abandoned' },   // admin-print-jobs-abandon.service.ts
+    { taskStatus: 'cancelled' },   // 管理端处置
+    { taskStatus: 'expired' },     // package-order.service.ts:310/314
+    { pickupStatus: 'cancelled' },
+    { pickupStatus: 'expired' },
+  ].map((order) => pkg.terminalPackageReason(order))
+  for (const reason of reasons) assert.ok(reason && typeof reason === 'string', '终态必须给得出原因')
+  // 原因是给用户看的一句话，不是状态码原样回显。
+  for (const reason of reasons) assert.ok(!/^[a-z_]+$/.test(reason), `不能把状态码当文案：${reason}`)
+})
+
+test('终态判据：still-live 的三种绝不能算终态（算进去 = 同一份材料包打两遍、收两次钱）', () => {
+  // pickup-order.service.ts:123 —— 一体机领走了这一单，用户正站在机器前付款。
+  // 它还是可逆的：online-payment.service.ts:800 关单时会把 claimed 退回 pending。
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'unpaid' }), '')
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'paid' }), '')
+  // pickup-order.service.ts:221 —— used 是和 taskStatus:'pending' + printTaskId 一起写的，
+  // 且 CAS 要求 payStatus:'paid'：钱已付、任务刚进队列。
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'used', taskStatus: 'pending', payStatus: 'paid' }), '')
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'used', taskStatus: 'printing', payStatus: 'paid' }), '')
+  // 刚建成，码还活着。
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'pending', taskStatus: 'pending_release', payStatus: 'unpaid' }), '')
+  // payStatus 单独 closed：online-payment.service.ts:799 关掉付款的同时把 claimed 退回
+  // pending，并注明"迟到回调若取件窗口仍开仍可入账履约"—— 码可能还活着。
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'pending', taskStatus: 'pending_release', payStatus: 'closed' }), '')
+  // 但 used 一旦走到真正的终态，就该算终态了（终态信号在 taskStatus 上）。
+  assert.ok(pkg.terminalPackageReason({ pickupStatus: 'used', taskStatus: 'completed', payStatus: 'paid' }))
+})
+
+test('终态判据：认不出来的状态 fail-closed，而 resolvePackageStatus 对同一个值是 done —— 两者默认值相反是有意的', () => {
+  const weird = { pickupStatus: 'quantum', taskStatus: 'schrodinger', payStatus: 'maybe' }
+  assert.equal(pkg.terminalPackageReason(weird), '', '将来新增的服务端状态不得被默认解释成"这单作废了"')
+  assert.equal(pkg.resolvePackageStatus(weird).key, 'done', '显示那一档仍然把它归到 done（原样回显，对显示是安全的）')
+  // 空 / 脏输入同样不得被当成终态。
+  for (const bad of [null, undefined, {}, { taskStatus: '' }, { taskStatus: 0 }, []]) {
+    assert.equal(pkg.terminalPackageReason(bad), '')
+  }
+})
+
+test('终态判据：本地时钟不参与 —— 到机码看着过期也要等服务端说 expired', () => {
+  // 服务端 detail 每次都先跑 expireIfNeeded 再回读；前端按本地时钟抢答，只会在时钟
+  // 不准时把一张还能用的码判死。注意 resolvePackageStatus（显示用）确实会看本地时间。
+  const looksExpired = { pickupStatus: 'pending', taskStatus: 'pending_release', expiresAt: new Date(NOW - 1000).toISOString() }
+  assert.equal(pkg.terminalPackageReason(looksExpired), '')
+  assert.equal(pkg.resolvePackageStatus(looksExpired, NOW).label, '到机码已过期')
 })
 
 test('状态：未登记的服务端状态原样回显，不编一个好看的标签', () => {
@@ -198,6 +255,9 @@ test('错误码 → 可执行的下一步：每条都不是「请稍后重试」
     // 真机验过后把 color_print / duplex_print 配成 available，所以恢复动作是换服务点。
     ['PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL', 'store'],
     ['PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL', 'store'],
+    // 打印机这一个部件出不了纸（离线 / 缺纸 / 故障）。与上面三类都不是一回事，
+    // 见下一条测试对 recover 取值的说明。
+    ['PRINTER_UNAVAILABLE', 'retry'],
   ]
   for (const [code, recover] of cases) {
     const shown = pkg.describePackageError({ code, statusCode: 400, message: '' }, '兜底句')
@@ -222,6 +282,35 @@ test('错误码：彩色/双面未在该机验过，必须说清是「这台机�
     assert.ok(shown.text.includes('服务点'), `${code} 的说明必须指向「换一个服务点」这个按钮真正会做的事`)
     assert.notEqual(shown.title, '操作未完成', `${code} 不得落到未知码兜底`)
   }
+})
+
+test('错误码：打印机出不了纸时说的是「可以处理完再来」，不是「请稍后重试」，也不吐机器码', () => {
+  // 服务端 terminals/printer-availability.ts 在报价与建单同口径 fail-closed：
+  // 最近 5 分钟没心跳 / 从未上报 / 心跳里的 printerStatus ∈ {offline, error, paper_empty}
+  // → 400 PRINTER_UNAVAILABLE。这个码此前在本表里**没有映射**，于是用户看到的是
+  // describePackageError 末尾那句「操作未完成 / 请稍后重试」——而三种成因里有两种
+  // （缺纸、卡纸故障）是现场工作人员当场就能处理的，处理完回来重新核价就能过。
+  const shown = pkg.describePackageError({ code: 'PRINTER_UNAVAILABLE', statusCode: 400, message: '' }, '创建订单失败，请稍后重试。')
+  assert.notEqual(shown.title, '操作未完成', '不得落到未知码兜底')
+  assert.notEqual(shown.text, '创建订单失败，请稍后重试。')
+  // recover 是 'retry'（按钮就在本页，文案「重新核价」），不是 'store'：
+  // CAPABILITY_* 要管理员登记、PRINT_TERMINAL_OFFLINE 是整台终端联系不上，那两类用户等不来；
+  // 这一条是终端在线、只是打印机此刻出不了纸，**可能**当场恢复。
+  assert.equal(shown.recover, 'retry')
+  assert.match(shown.text, /工作人员/, '必须说出那条唯一可执行的下一步')
+  assert.match(shown.text, /服务点/, '也要留一条走得通的退路（它也可能是真的坏了）')
+  // 不把机器码摊到用户脸上（user-error.js 的 fail-closed 只管服务端 message，
+  // 本表自己的中文同样不许夹带）。
+  assert.ok(!shown.title.includes('PRINTER_UNAVAILABLE') && !shown.text.includes('PRINTER_UNAVAILABLE'))
+
+  // 这个码**必须**真的是服务端会抛的那一个，且不在 message 透传白名单里 ——
+  // 服务端那句原文写的是「本机打印机…」，那是写给站在一体机前的人的；
+  // 透传到手机上，「本机」会被读成用户自己的手机。
+  const apiSrc = fs.readFileSync(path.join(MINIAPP, '../../services/api/src/terminals/printer-availability.ts'), 'utf8')
+  assert.match(apiSrc, /code: 'PRINTER_UNAVAILABLE'/, '服务端仍然抛这个码（改名了本表要跟着改）')
+  const userError = requireMiniapp('./user-error.js')
+  assert.ok(!userError.PASSTHROUGH_MESSAGE_CODES.includes('PRINTER_UNAVAILABLE'),
+    '不透传服务端原文（它面向一体机现场，「本机」在手机上会被读成用户自己的手机）')
 })
 
 test('错误码：401 单独成一类，去登录而不是重试', () => {

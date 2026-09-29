@@ -326,8 +326,9 @@ expectMatches(
   /\.p-iconbtn\s*\{[^}]*min-inline-size:\s*56px;[^}]*min-block-size:\s*56px;/,
   'Profile icon actions exceed the 48px secondary touch-target minimum',
 )
-expectIncludes(header, 'data-testid="profile-login"', 'ProfileHeader keeps the guest login control')
-expectIncludes(header, 'data-testid="profile-account"', 'ProfileHeader keeps the member account-settings control')
+expectIncludes(profile, 'data-testid="profile-login"', 'Profile 底部保留游客登录锚点')
+expectIncludes(profile, 'onClick={onLogin}', 'Profile 底部保留游客登录操作')
+expectIncludes(profile, 'data-testid="profile-account"', 'Profile 底部保留账号设置操作')
 const profileQxCss = read('src/pages/profile/styles/profile-qx.css')
 expectIncludes(profileQxCss, 'var(--qx-ink)', 'profile-qx.css consumes Qingxu tokens')
 expectIncludes(profileQxCss, '--qx-tap-min', 'profile-qx.css keeps the 48px touch floor')
@@ -370,7 +371,16 @@ for (const marker of [
 // presentation surfaces to the shared fusion frame. Keep this allowlist explicit so
 // unrelated member pages still fail closed.
 const allowedMeChanges = new Set([
+  // W3-a: 本人结果恢复与列表分页，不新增页面。
+  'apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx',
+  'apps/kiosk/src/pages/profile/me/QaRecords.tsx',
+  'apps/kiosk/src/pages/profile/me/aiRecordNavigation.ts',
+  'apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts',
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  // W4 L1：设置页拆分四步表单和确认框，CSS 仅限本页。
+  'apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx',
+  'apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx',
+  'apps/kiosk/src/pages/profile/me/styles/settings-qx2.css',
   'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MeListShell.tsx',
   'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',

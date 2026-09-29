@@ -10,6 +10,11 @@ import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { SaveVenueGuideDto } from './dto/venue-guide.dto'
 import { withPublicFairDemoExclusion } from './jobs-shared'
+import {
+  assertRecruitmentContentHostingEnabled,
+  isRecruitmentContentHostingEnabled,
+  recruitmentHostingDisabledException,
+} from '../recruitment-hosting/recruitment-hosting'
 
 // ============================================================
 // FairVenueGuideService — 场馆导览配置(Admin 写 / Kiosk 只读)
@@ -72,6 +77,7 @@ export class FairVenueGuideService {
    * - 绑定企业必须属于本招聘会,否则 COMPANY_NOT_IN_FAIR
    */
   async saveVenueGuide(fairId: string, dto: SaveVenueGuideDto, user: AuthedUser): Promise<FairVenueGuideDto> {
+    assertRecruitmentContentHostingEnabled()
     await this.assertFairExists(fairId)
 
     const codes = dto.halls.map((h) => h.hallCode.toUpperCase())
@@ -170,6 +176,7 @@ export class FairVenueGuideService {
   }
 
   async deleteVenueGuide(fairId: string, user: AuthedUser): Promise<{ success: true }> {
+    assertRecruitmentContentHostingEnabled()
     await this.assertFairExists(fairId)
     const guide = await this.prisma.fairVenueGuide.findUnique({ where: { jobFairId: fairId } })
     if (guide) {
@@ -181,6 +188,7 @@ export class FairVenueGuideService {
 
   /** Kiosk 公开读:招聘会须 approved+published;未配置导览 → data null(空态)。 */
   async getPublishedVenueGuide(fairId: string): Promise<{ data: FairVenueGuideDto | null }> {
+    if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     const fair = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },

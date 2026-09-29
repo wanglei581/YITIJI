@@ -1,3 +1,5 @@
+import { useMemberCursorPage } from './useMemberCursorPage'
+import { MemberLoadMore } from './MemberLoadMore'
 // 我的消息通知 — /me/notifications 与 /notifications。
 // 只展示设备 / 打印 / 文件 / 系统类消息；关联反馈仅跳到本人反馈页。
 // 成功态由服务端回执驱动，不乐观改已读。
@@ -60,9 +62,6 @@ function screenStateOf(opts: {
 export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { loginFrom?: string }) {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
-  const [items, setItems] = useState<MemberNotificationItem[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [state, setState] = useState<LoadState>('loading')
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -70,24 +69,11 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
 
   const canUseRemote = API_MODE === 'http' && Boolean(getToken())
 
-  const load = useCallback(() => {
-    if (!isLoggedIn) {
-      setItems([])
-      setUnreadCount(0)
-      setState('ready')
-      return
-    }
-    setState('loading')
-    getMyNotifications(getToken(), { pageSize: 50, unreadOnly })
-      .then((page) => {
-        setItems(page.items)
-        setUnreadCount(page.unreadCount)
-        setState('ready')
-      })
-      .catch(() => setState('error'))
-  }, [getToken, isLoggedIn, unreadOnly])
-
-  useEffect(() => { load() }, [load, reloadKey])
+  const token = getToken()
+  const fetchPage = useCallback((cursor?: string) => getMyNotifications(token, { pageSize: 50, cursor, unreadOnly }), [token, unreadOnly])
+  const pagination = useMemberCursorPage<MemberNotificationItem, Awaited<ReturnType<typeof getMyNotifications>>>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
+  const { items, state: state } = pagination
+  const unreadCount = pagination.page?.unreadCount ?? 0
 
   useEffect(() => {
     if (!toast) return
@@ -164,7 +150,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
           />
           <section className="qx-me-list qx-me-grow" data-testid="notifications-list" aria-label="登录后会出现的消息类型">
             {CAT_ORDER.map((cat) => <CategoryStructRow key={cat} cat={cat} mode="lock" />)}
-            <div className="qx-me-legal">登录只用来确认「是你本人」。<b>结束会话只清除本机登录态与临时会话信息</b>；服务端的订单、文件与消息按各自留存期限管理。</div>
+            <div className="qx-me-legal">登录只用来确认「是你本人」。<b>结束这次使用，只清除这台机器上的登录状态和临时使用记录</b>；系统里的订单、文件与消息按各自保存期限管理。</div>
           </section>
           <QxMeGuide items={[['隐私', '只对本人可见', '退出或超时后，本机不保留任何消息明细'], ['登录方式', '手机号 + 验证码', '也可以在登录页用手机扫码登录'], ['边界', '不推送广告', '消息只来自本机服务与系统公告']]} />
         </>
@@ -253,7 +239,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
         )}
         <QxMeGuide items={empty
           ? [['怎么产生', '服务状态有更新时', '打印、AI、文件与系统消息都会出现在这里'], ['刷新方式', '进入本页时读取', '本页没有实时推送，操作后会重新读取'], ['谁能看到', '只有本人', '退出后本机不留明细']]
-          : [['刷新方式', '进入本页时读取', '本页没有实时推送，完成一次操作后会重新读取'], ['已读与删除', '以服务端结果为准', '操作失败会明确提示，列表保持原样'], ['跳转边界', '只有关联反馈的那条消息可跳转', '其它消息与页面级按钮都不进反馈']]}
+          : [['刷新方式', '进入本页时读取', '本页没有实时推送，完成一次操作后会重新读取'], ['已读与删除', '以系统结果为准', '操作失败会明确提示，列表保持原样'], ['跳转边界', '只有关联反馈的那条消息可跳转', '其它消息与页面级按钮都不进反馈']]}
         />
       </>
     )
@@ -268,13 +254,14 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
       eyebrow="NOTIFICATIONS"
       ask={<>本人设备与服务消息，<em>都在这里</em>。</>}
       doing={busy
-        ? <>正在把操作发给服务端。<b>结果返回前列表保持原样</b>，本页不会提前显示成功。</>
+        ? <>正在把操作发给系统。<b>结果返回前列表保持原样</b>，本页不会提前显示成功。</>
         : <>只显示<b>本人的打印、AI、文件与系统消息</b>；本页没有实时推送。</>}
       truth="消息只对当前登录账号可见；本页不推送广告，也不代表来源平台的处理结果。"
       toast={toast}
       ctabar={ctabar}
     >
       {body}
+      {isLoggedIn && state === 'ready' ? <MemberLoadMore {...pagination} /> : null}
     </QxMePage>
   )
 }

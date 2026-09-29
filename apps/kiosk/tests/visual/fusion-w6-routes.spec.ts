@@ -143,9 +143,11 @@ const W6_MEMBER_CODE = '123456'
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of W6_MEMBER_PHONE) {
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of W6_MEMBER_CODE) {
@@ -155,7 +157,8 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
   const pendingTasksRequest = page.waitForRequest((request) =>
     request.method() === 'GET' && new URL(request.url()).pathname === '/api/v1/me/pending-tasks',
   )
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
 
   const request = await pendingTasksRequest
@@ -173,7 +176,8 @@ async function acceptRoute(page: Page, route: W6RouteCase, errors: string[]): Pr
   if (route.expectedPath) await expect(page).toHaveURL((url) => url.pathname === route.expectedPath)
 
   await expect(page.locator(route.marker).first(), `稳定 marker: ${route.marker}`).toBeVisible()
-  if (route.featureText) await expect(page.getByText(route.featureText, { exact: false }).first()).toBeVisible()
+  // 功能名要在屏幕上看得见；同名的无障碍页标题可以是视觉隐藏的，所以取第一个可见的那一处。
+  if (route.featureText) await expect(page.getByText(route.featureText, { exact: false }).filter({ visible: true }).first()).toBeVisible()
   if (route.longText) await expect(page.getByText(route.longText, { exact: true })).toBeVisible()
 
   await page.screenshot({ path: test.info().outputPath('routes', screenshotName(route)), fullPage: true })

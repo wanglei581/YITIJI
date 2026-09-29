@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from '@nestjs/common'
+import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
@@ -90,18 +91,23 @@ export class AdvisorController {
    * 这一页不给新结论，但已有内容照常可读可打印，其它功能不受影响。
    */
   @Get('availability')
+  @AiUse('read')
   availability() {
     return this.service.availability()
   }
 
   @Post('sessions')
   @PaidAiThrottle(10)
+  @AiUse('generate')
+
   async create(@Body() dto: CreateAdvisorSessionDto, @Req() req: ReqLike) {
     return this.service.createSession(dto.topic, await this.requesterOf(req))
   }
 
   /** 只读：刷新恢复 / 换设备继续。刻意不限流 —— AI 挂了也要能看到已有进度。 */
   @Get('sessions/:sessionId')
+  @AiUse('read')
+
   async get(@Param('sessionId') sessionId: string, @Req() req: ReqLike) {
     return this.service.getSession(sessionId, await this.requesterOf(req))
   }
@@ -109,6 +115,8 @@ export class AdvisorController {
   /** 判错了一键换型；已填输入槽不丢。 */
   @Patch('sessions/:sessionId/skill')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @AiUse('generate')
+
   async switchSkill(
     @Param('sessionId') sessionId: string,
     @Body() dto: SwitchSkillDto,
@@ -119,6 +127,7 @@ export class AdvisorController {
 
   /** 分次补充输入。不触发模型，所以限流宽松。 */
   @Post('sessions/:sessionId/slots')
+  @AiUseExempt('填写表单槽位，不调模型')
   @Throttle({ default: { ttl: 60_000, limit: 40 } })
   async fillSlot(
     @Param('sessionId') sessionId: string,
@@ -130,6 +139,7 @@ export class AdvisorController {
 
   /** 出活：按当前作业型生成产物并落库。必填项没答完时 400 并回报缺哪几项。 */
   @Post('sessions/:sessionId/run')
+  @AiUse('generate')
   @PaidAiThrottle(6)
   async run(@Param('sessionId') sessionId: string, @Req() req: ReqLike) {
     return this.service.run(sessionId, await this.requesterOf(req))
@@ -137,6 +147,7 @@ export class AdvisorController {
 
   /** 问答型追问：在同一会话上继续，不是每次从零。 */
   @Post('sessions/:sessionId/ask')
+  @AiUse('generate')
   @PaidAiThrottle(12)
   async ask(@Param('sessionId') sessionId: string, @Body() dto: AskDto, @Req() req: ReqLike) {
     return this.service.ask(sessionId, dto.question, await this.requesterOf(req))
@@ -144,12 +155,14 @@ export class AdvisorController {
 
   /** 钉住一条。这是问答型唯一会跨请求留下的动作。 */
   @Post('sessions/:sessionId/pins')
+  @AiUseExempt('收藏整理，不调模型')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async pin(@Param('sessionId') sessionId: string, @Body() dto: PinDto, @Req() req: ReqLike) {
     return this.service.pin(sessionId, dto, await this.requesterOf(req))
   }
 
   @Delete('sessions/:sessionId/pins/:pinId')
+  @AiUseExempt('收藏整理，不调模型')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async unpin(
     @Param('sessionId') sessionId: string,
@@ -165,6 +178,7 @@ export class AdvisorController {
    * 这条链路**不调模型**：AI 不可用时已生成的产物仍然打得出来（设计页硬要求）。
    */
   @Post('sessions/:sessionId/artifacts/:artifactId/print')
+  @AiUse('export')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async print(
     @Param('sessionId') sessionId: string,

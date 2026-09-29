@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { assertProductionRuntimeGates } from '../src/config/production-runtime-gates'
+import { AIGC_DEFAULT_PRODUCER } from '../src/common/pdf/aigc-label'
 import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
 
 type Env = Parameters<typeof assertProductionRuntimeGates>[0]
@@ -39,6 +40,7 @@ const PROD_OK: Env = {
   BAIDU_OCR_SECRET_KEY: 'baidu-secret-key',
   AI_PROVIDER: 'llm',
   AI_LLM_API_KEY: 'llm-api-key',
+  AIGC_CONTENT_PRODUCER: '示例信息技术有限公司',
   PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
   TERMINAL_ADMIN_SECRET: 'a-strong-terminal-admin-secret-01234567',
   TERMINAL_ACTION_TOKEN_SECRET: 'a-strong-terminal-action-secret-0123456',
@@ -371,6 +373,27 @@ function main(): void {
   expectAllowed(
     { ...PROD_OK, PRINT_SCAN_CAPABILITY_MODE: 'strict' },
     '生产环境允许显式声明 strict（未配置能力行 fail-closed）',
+  )
+
+  // GB 45438 隐式标识的内容制作方：生产不得空着，也不得回落到产品名
+  expectRejected(
+    { ...PROD_OK, AIGC_CONTENT_PRODUCER: undefined },
+    'PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING',
+    '生产环境拒绝未设置 AIGC_CONTENT_PRODUCER',
+  )
+  expectRejected(
+    { ...PROD_OK, AIGC_CONTENT_PRODUCER: '   ' },
+    'PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING',
+    '生产环境拒绝只有空白的 AIGC_CONTENT_PRODUCER',
+  )
+  expectRejected(
+    { ...PROD_OK, AIGC_CONTENT_PRODUCER: ` ${AIGC_DEFAULT_PRODUCER} ` },
+    'PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING',
+    '生产环境拒绝把产品名当 AIGC_CONTENT_PRODUCER',
+  )
+  expectAllowed(
+    { ...PROD_OK, AIGC_CONTENT_PRODUCER: '91370200MA3EXAMPLE' },
+    '生产环境允许用统一社会信用代码作 AIGC_CONTENT_PRODUCER',
   )
 
   // TRUST_PROXY_HOPS：生产必须显式跳数，禁止 true/false

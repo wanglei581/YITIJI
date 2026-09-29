@@ -1,4 +1,5 @@
 import type { ApiRouter } from './api-router'
+import { RECRUITMENT_HOSTING_ON } from './recruitment-hosting'
 
 interface WireFairPosition {
   id: string
@@ -121,6 +122,8 @@ export function w4TerminalConfig(options: W4ApiOptions = {}) {
       items: [],
     },
     toolbox: { enabled: false, items: [] },
+    // W4 覆盖岗位 / 招聘会 / 企业 / 校招 / 线下机构整域：服务端恒下发托管字段，这里按客户私有化部署（b）打开。
+    ...RECRUITMENT_HOSTING_ON,
     configVersion: 'w4-fixture',
     refreshIntervalMs: 300000,
     serverTime: '2026-07-24T08:00:00.000Z',
@@ -214,8 +217,27 @@ export function registerW4Api(api: ApiRouter, options: W4ApiOptions = {}): void 
   respond('/api/v1/job-fairs/fair-001/companies', { success: true, data: [fairCompany], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } })
   respond('/api/v1/job-fairs/fair-001/companies/fair-company-001', { success: true, data: fairCompany })
   respond('/api/v1/job-fairs/fair-001/zones', { success: true, data: [fairZone] })
+  // 2026-09-20 八屏迁入青序流光后新增的三条消费面：
+  //   · 详情页 subnav 要先问「这一项到底有没有数据」→ /materials
+  //   · 展位分布页（旧「场馆导览」Tab 的落点）→ /map + /venue-guide
+  // 夹具是 fail-closed 的（未登记的请求一律 abort 并在用例收尾时抛错），
+  // 所以少登记一条 = 用例红，而不是静默放过。
+  respond('/api/v1/job-fairs/fair-001/materials', { success: true, data: [], pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 } })
+  respond('/api/v1/job-fairs/fair-001/map', { success: true, data: { zones: [fairZone], booths: [] } })
+  respond('/api/v1/job-fairs/fair-001/venue-guide', { success: true, data: null })
   respond('/api/v1/job-fairs/fair-001/stats', { success: true, data: { fairId: 'fair-001', fairName: fair.name, totalCompanies: 1, checkedInCompanies: 0, totalPositions: 1, totalHeadcount: 2, browseCount: 0, scanCount: 0, printCount: 0, checkinCount: 0, zoneBreakdown: [], lastUpdated: '2026-07-24T08:00:00.000Z', seekerIntent: [], industryDistribution: [], dataSourceLabel: '来源数据 · 非实时', isMockData: true } })
   respond('/api/v1/terminals/KSK-001/config', w4TerminalConfig(options))
+  // 3.14 本机构官方渠道。W4 是客户私有化部署（b，托管打开）：机构自己的渠道之外，服务端另下发原平台目录。
+  // 全是示例域名：平台目录由服务端按客户数据下发，一体机里不再写死任何一家商业平台。
+  respond('/api/v1/terminals/KSK-001/official-channels', {
+    items: [
+      { name: '示例大学就业信息网', url: 'https://career.example.edu.cn/', displayOrder: 1, organizationName: '示例大学就业指导中心' },
+    ],
+    legacyPlatforms: [
+      { name: '示例招聘平台', url: 'https://jobs.example.com/', displayOrder: 1, organizationName: '示例招聘平台运营公司' },
+      { name: '示例人才网', url: 'https://talent.example.org/', displayOrder: 2, organizationName: '示例人才网运营公司' },
+    ],
+  })
   respond('/api/v1/terminals/KSK-001/screensaver', { enabled: false, idleTimeoutSec: 180, items: [] })
   respond('/api/v1/terminals/KSK-001/printer-status', { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true })
   respond('/api/v1/policies', { success: true, data: [{ id: 'policy-001', kind: 'policy_guide', title: '高校毕业生就业服务指引', summary: '请通过官方入口查看办理条件。', audience: 'graduate', sourceName: '青岛市人力资源和社会保障局', syncTime: '2026-07-24T08:00:00.000Z', externalUrl: 'https://hrss.example.gov.cn/policy/001' }] })

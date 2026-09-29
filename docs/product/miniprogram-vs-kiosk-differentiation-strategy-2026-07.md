@@ -1,5 +1,7 @@
 # 小程序 × 一体机 双渠道差异化商业方案（2026-07）
 
+> **方案快照（2026-09-26 标注）：** 本文写于 2026-07，功能实现以代码为准；与 2026-09-26「设备与软件供应方、托管 a」口径冲突的地方，以 docs/product/feature-scope.md 为准。
+
 > 本方案回答一个战略问题：**微信小程序如何与线下一体机（Kiosk）差异化，同时保留两者各自不可替代的价值。**
 > 结论由 Claude 独立分析 + Codex（analyzer 角色，商业战略视角）独立分析交叉得出，两方在核心判断上收敛一致。
 > 合规口径以 [docs/compliance/compliance-boundary.md](../compliance/compliance-boundary.md) 与 [CLAUDE.md](../../CLAUDE.md) 为准，本方案不突破任何红线。

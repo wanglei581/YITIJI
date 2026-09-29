@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>能力受控专区 · 职易达</title>
+<!--
+  宿主：能力受控共享工作台（一个宿主承接四条真实 route，不拆多份 HTML）
+  route: /toolbox                     screen=toolbox         —— 台账 038
+         /smart-campus                screen=campus          —— 台账 039
+         /smart-campus/welcome        screen=campus-welcome  —— 台账 040
+         /smart-campus/service/:key   screen=campus-service  —— 台账 042
+  为什么四条共用一个宿主：这四条全部经同一个能力边界（能力开关 + 本机编号一致才放行），
+         扩展项的启动语义（站内 / 外部 / 扫码）在生产里也是同一份共享代码，只有投放位置
+         不同。拆成两个宿主等于把同一个门禁卡、同一张磁贴、同一个启动层各画两遍。
+  screen/state: ?screen= 与 ?state= 都是**原型演示控制，不属于产品逻辑**。生产里这四条是
+         四条独立 route，服务页用路径参数带 key；这里把 key 编进 state 名，不新增第四个参数。
+         ?flat=1 关闭非必要动效，?debug=1 显示演示面板，?capture=1 固定时钟与循环动画相位。
+         静态页只切视图，不发任何请求、不推进业务、不生成 AI 结果。
+  文件： policy-campus-workspaces.js / .css = 与 48 / 49 共用的壳层（S9 已冻结，本批一个字节都不改）；
+         capability-zone-workspace.js / .css = 本宿主独有的视图、状态注册表与版式。
+
+  ── 真实 React 合同（本页按它落笔，不美化）────────────────────────────
+  能力边界（KioskCapabilityGuard）
+      读取本机配置后，只有「配置已就绪 + 能力已开启 + 本机编号存在且与本次一致」四条同时成立
+      才放行；否则整屏替换成一张能力卡：
+        · 读取中 → 「⋯⋯服务配置检查中」，**不渲染任何按钮**（本页照此画成无出口）；
+        · 其余   → 「本机暂未开启⋯⋯」+ 返回首页。
+      「没有开启」「本机编号缺失」「本机编号漂移」「读取失败」「配置畸形」五种真实原因
+      被同一个分支折叠成同一句话 —— 这是产品所有者选定的 fail-closed 口径，本页照做，
+      不另画一屏 error（代价见下方「真话边界」④）。
+  百宝箱（ToolboxZonePage）
+      放行时必然至少有一个可启动项（边界的判据里就含这一条），因此**不存在**「已开启但一项都没有」
+      的空屏；本页不画那一屏。磁贴按运营方设定的顺序排列；静态页将名称与说明明确标为
+      「字段演示」，不使用灰色槽位冒充真实已上架服务。
+  智慧校园首页（SmartCampusHomePage）
+      校园卡 / 一卡通 / 校园网三张自助服务卡不受任何子模块开关约束，校园总开关一开就出现；
+      迎新指引 / 行李帮运 / VR校园 三张按各自子模块开关显隐。
+      徽标只有两种句式：「可查看指引 N 项」与「可查看指引 N 项 · 已配置入口 M 项」，
+      N ≡ 卡片数、M ≡ 可启动的扩展项数，不得写成「本校已开通 X 项服务」。
+      校园大数据不出任何入口，只在页脚说明未开放。
+  迎新指引（SmartCampusWelcomePage）／服务指引（SmartCampusServicePage）
+      只做信息展示与指引，不在本机采集任何个人信息；子模块关闭时由子页门禁替换成
+      「本机暂未开启这项智慧校园服务」+ 返回智慧校园（注意出口是校园首页，不是首页）。
+      未知服务 key 由页面内兜底成「未找到该服务」—— 它不是门禁态，两者文案与图标必须能分开。
+      五种服务详情按各自任务组织：办卡材料打印、权限核对、网络排查、行李现场顺序、全景替代方式；
+      不再套同一份「通用类别 + 空地点 + 去迎新」模板。
+
+  ── 设计修正（与当前 React 的刻意差异，迁移时按本设计改）─────────────
+  ① 磁贴的可用性只由「原因常显」表达，不由徽标表达。现 React 用两套判据：可点与否看安全校验，
+     徽标看字段是否为空，于是会出现「灰掉、写着外部应用、却没有任何原因」的磁贴。
+     本页统一：不可用磁贴一律标注不可用并在磁贴内常显一句原因。
+  ② 服务指引页不写死办理地点与所需材料。现 React 把「校园卡服务中心 / 一卡通中心」
+     「初始密码（随录取材料发放）」等写进代码，本机对这所学校一无所知，这属于编造。
+     本页只列**通用类别**，并把办理地点与时间做成诚实空态，一律以学校官方通知为准。
+  ③ 迎新指引不深链到任何求职材料清单技能。那条技能的开场白与免责声明写死的是面试、
+     招聘会与入职场景，用在报到材料上会给出错框；本页只保留「第一份简历 · AI 诊断」这条
+     真实可交接的路径，且本页不预填、不预告结果。
+  ④ 读取中一屏没有超时也没有出口，是当前真实行为，本页照实画（任务区零可点元素）。
+     这条产品风险只记录在取证报告的边界说明里，不写成用户看得懂却帮不上忙的界面文字。
+
+  ── 真话边界（本页逐条自检）───────────────────────────────────────────
+  ① 扩展服务的名称、说明与目标以「配置字段演示」呈现，本机不预置任何示例第三方服务，也不替它们背书。
+  ② 校园内容一律是通用参考：不写具体学校名、院系名、楼栋位置、校历日期、初始密码，
+     不声称校方授权、校方审核或校方已开启，实际安排一律以学校官方通知为准。
+  ③ 计数只数页面上真实存在的东西：能查看的指引卡数、能启动的扩展项数，不写「已开通」。
+  ④ 「本机暂未开启」同时覆盖没开和没读到两种情况；运营到现场看到这一句时无法区分，
+     这是当前 fail-closed 口径的已知代价，已写进取证报告，不在界面上给「其实可用」的暗示。
+  ⑤ 无真实图源不留灰块：全景导览没有内容时整块换成诚实说明，不放占位图。
+  ⑥ 本页不判断能力是否开启、模块是否开启、扩展项是否可启动、目标是否可信、
+     学校是否真的提供该服务，也不判断打印是否完成 —— 这些只认本机配置与设备回流。
+
+  ai-mode: 矩阵目标态 AI-CONTEXT；**当前现状**：/toolbox、/smart-campus、
+           /smart-campus/service/:key 三条一律 AI-NONE —— 小青现有技能里没有任何一条
+           可用于百宝箱或校园办理，扩展项又是本系统未核验的第三方服务，
+           因此这三屏**不放任何 AI 控件**（连置灰的也不放），也不摆 AI 说明板。
+           /smart-campus/welcome 是本批唯一有真实 AI 能力可交接的一屏：确认 → 交接，
+           生成发生在简历来源选择页，本页零输入、零预填、零输出。
+           后续逐页迁移必须为适合 AI 的正常办理页补齐任务相关能力；加载、未开放、未知服务、
+           二维码、外部跳转与配置确认不放 AI，也不把全局「AI 顾问」计作页内增强。
+  ai-input: 三条 AI-NONE 屏不向模型发送任何内容（不发扩展项标题、说明、目标或本机清单）；
+           迎新页也不持有输入，用户到目标页自行提供本人简历。
+  ai-consent: 本批不索取任何 AI 授权；迎新页的真实授权在目标页按其既有契约取得。
+  ai-output: 本批零 AI 输出。不生成推荐、排序、优劣比较、材料清单、校历或办理建议。
+  ai-failure: 模型不可用或缺上下文时，本批四屏的主任务（选服务 / 看指引 / 打印）完全不受影响，
+           因为它们本来就不经过模型。
+  ai-fallback: 看磁贴与卡片、扫码、离场确认后前往、打印、去现场窗口或学校官方自助平台。
+  ai-persistence: 本批不产生 AI 记录。扩展项的启动动作按现有匿名口径上报，
+           不记录第三方页面的办理结果，也不上报目标地址。
+  验收范围：静态原型表现；不证明 React 接线、本机配置可读、扩展项真实上架、模块开关真实下发、
+           小青可用、二维码生成、打印、部署、Windows Agent 或奔图真机完成。
+-->
+<link rel="stylesheet" href="../kiosk-redesign-2026-08/policy-campus-workspaces.css">
+<link rel="stylesheet" href="../kiosk-redesign-2026-08/capability-zone-workspace.css">
+<!--
+青序流光 2.0 · 50 百宝箱 / 智慧校园（screen=toolbox，state=ready，四项扩展都在）
+规则 1：标题下加三步只读说明。磁贴在说明下面，返回键 64。校园各屏共用这一套字阶。
+规则 2：页标题 36，说明 21–22，磁贴标题 28，主按钮 26，导航 21。
+规则 3：带走的是「打开哪一项」；校园页带走通用办理说明，不假装学校已经办完。
+规则 4：不展示终端编号。演示面板默认不出现。
+规则 5：能力没开时的去处改成问小青，不放查看岗位。
+规则 7：百宝箱加「问小青这项怎么用」。迎新页原有的「第一份简历 · AI 诊断」保留。
+未改：颜色令牌、圆角、四条路线、能力开关、校园不写具体学校、三 Tab。
+原稿脚本复制为同目录 capability-zone-workspace.js。样式和壳层脚本仍引用原稿目录。
+9/28 留白：任务头去掉 300px 的空撑高，三步说明下面不再空一截（磁贴顶边由 y≈503 上移到 y≈435，说明和第一节之间留约 60px 正常节奏）；壳层四档不再用 min-height 把提示条、清单行、卡片撑成空盒，放大吃不完的余高平分到各区块上方；读取中照常显示本页就绪态已有的说明与问小青（同一段内容，不另写），骨架按四张磁贴 / 六张卡占住数据区；智慧校园开了六项指引时卡片排两列。
+-->
+<style id="qx2">
+.back{width:64px!important;height:64px!important}
+.logo-name{font-size:26px!important}
+.pill{font-size:21px!important}
+.taskhead{min-height:300px;align-content:flex-start;align-items:flex-start}
+.th-t{font-size:36px!important}
+.th-s{font-size:22px!important;line-height:1.5!important;color:var(--ink)!important;flex-basis:100%}
+.qx-steps{flex-basis:100%;margin-top:16px;display:flex;gap:14px;list-style:none;padding:8px 0 0}
+.qx-steps li{flex:1;padding-top:8px;border-top:2px solid var(--line);font-size:21px;line-height:1.35;color:var(--ink)}
+.qx-steps b{display:block;margin-bottom:4px;font-size:26px;font-family:"Songti SC","STSong","SimSun",serif;color:var(--teal-d)}
+.sec-label .t{font-size:30px!important}
+.sec-label .hint,.sec-label .no{font-size:21px!important}
+.captile>b,.capcard b,.svchead h2,.tp-head b,.emptybox b,.us-copy b,.extlayer h2{font-size:28px!important;line-height:1.3!important}
+.captile .ct-desc,.captile .ct-mode,.captile .ct-go,.captile .ct-badge,.capcard span.cc-desc,.capcard .cc-go,.svchead p,.tp-head small,.tp-grid span,.emptybox span,.us-copy small,.recovery-card b,.recovery-card small,.noteline,.exit b,.exit span,.rows>div,.rows>div>span,.state-p,.tabreason,.reason,.captile .reason{font-size:21px!important;line-height:1.45!important}
+.captiles{margin-top:24px}
+.btn{font-size:26px!important}
+.truth div{font-size:21px!important;line-height:1.45!important;color:var(--ink-2)!important}
+.nav-item .ni{font-size:21px!important}
+.demo-tab,.demo-panel{display:none!important}
+.qrslot>span,.us-state,.ctabar .why,.tp-grid i,.capcount,.qr-note{font-size:20px!important;line-height:1.35}
+.dsec li{font-size:20px!important;line-height:1.4}
+.dsec li .sn,.dsec li b,.dsec li i{font-size:20px!important;line-height:1.35}
+/* 9/28 留白（产品负责人：不留大片空白，也不把卡片撑成空盒）
+   1. 任务头去掉 300px 的空撑高；
+   2. 壳层四档照旧放大内边距与图标，但不再用 min-height 把提示条、清单行、卡片撑成空盒；字号守 2.0 字阶；
+   3. 余下的高度用 margin-top:auto 平分到每个区块上方，不再上下居中留两段空白。 */
+.taskhead{min-height:0!important;padding-bottom:0}
+.scroll.fit{justify-content:flex-start;gap:18px}
+.scroll.fit>.sec{margin-top:auto}
+.state-h{font-size:32px!important}
+#body-root .scroll[class*="fit-"] .state{padding:40px 44px}
+#body-root .scroll[class*="fit-"] .state-ic{width:72px;height:72px;border-radius:23px}
+#body-root .scroll .state-p{font-size:22px!important;line-height:1.6!important}
+#body-root .scroll .noteline{min-height:0;padding:20px 24px;align-items:center;font-size:22px!important}
+#body-root .scroll .dsec li{min-height:0;font-size:22px!important}
+#body-root .scroll .tp-grid>div{min-height:0}
+#body-root .scroll .tp-grid span{font-size:22px!important}
+#body-root .scroll .tp-head>div{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:10px 20px;flex-wrap:wrap}
+#body-root .scroll .captile{min-height:0}
+#body-root .scroll .capcard{min-height:0!important}
+#body-root .scroll .recovery-card{min-height:0}
+#body-root .scroll .recovery-card b{font-size:24px!important}
+#body-root .scroll .exit b{font-size:24px!important}
+#body-root .scroll .emptybox{min-height:0}
+#body-root .scroll .unavailable-strip{min-height:0!important}
+/* 内容最少的几屏（壳层判到 fit-3 / fit-4）：正文用到字阶上沿（23–24），卡片标题 28，
+   让余高先变成读得清的字，而不是框里的空地 */
+#body-root .scroll.fit-3 .state-p,#body-root .scroll.fit-4 .state-p{font-size:23px!important}
+#body-root .scroll.fit-3 .noteline,#body-root .scroll.fit-4 .noteline{font-size:23px!important}
+#body-root .scroll.fit-3 .dsec li,#body-root .scroll.fit-4 .dsec li{font-size:23px!important}
+#body-root .scroll.fit-3 .dsec>.dh,#body-root .scroll.fit-4 .dsec>.dh{font-size:24px!important}
+#body-root .scroll.fit-3 .tp-grid span,#body-root .scroll.fit-4 .tp-grid span{font-size:23px!important}
+#body-root .scroll.fit-3 .tp-head small,#body-root .scroll.fit-4 .tp-head small{font-size:22px!important}
+#body-root .scroll.fit-3 .recovery-card small,#body-root .scroll.fit-4 .recovery-card small{font-size:22px!important}
+#body-root .scroll.fit-3 .exit span,#body-root .scroll.fit-4 .exit span{font-size:22px!important}
+#body-root .scroll.fit-3 .capcard span.cc-desc,#body-root .scroll.fit-4 .capcard span.cc-desc{font-size:22px!important}
+#body-root .scroll.fit-3 .us-copy small,#body-root .scroll.fit-4 .us-copy small{font-size:22px!important}
+/* 首屏就是磁贴 / 卡片的几屏：第一排可点的磁贴顶边保持在 y≥500（2.0 规则 1：y<500 多数人够不着）。
+   原稿用任务头 300px 撑高达到这一点；这里去掉了撑高，改由这段上边距把第一节推到位（9/28 协调方收货时校正：40px 会把磁贴带到 y≈435）。 */
+.body[data-screen="toolbox-zone"]:is([data-state="ready"],[data-state="launch-qr"],[data-state="launch-external"]) .scroll,
+.body[data-screen="campus-zone"]:is([data-state="ready-extensions"],[data-state="launch-qr"],[data-state="launch-external"]) .scroll{padding-top:112px}
+/* 智慧校园首页开了六项指引时：卡片排两列三行（两栏配平），卡片按内容高 */
+.body[data-screen="campus-zone"][data-state="ready-modules"] .capcards{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 18px}
+.body[data-screen="campus-zone"][data-state="ready-modules"] .scroll .capcard{padding:32px 30px}
+/* 读取中：本机配置没读回来之前只有数据区在读，本页的说明与问小青照常显示（.qx50-frame 复用就绪态同一段内容，不另写）。 */
+.qx50-frame{display:none}
+#stage:has(#body-root[data-screen="toolbox-zone"][data-state="capability-loading"]) .qx50-frame[data-frame="toolbox"],
+#stage:has(#body-root[data-screen="campus-zone"][data-state="capability-loading"]) .qx50-frame[data-frame="campus"]{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:18px;padding-bottom:18px}
+#body-root[data-state="capability-loading"]{flex:0 0 auto}
+.qx50-frame>.sec{margin-top:auto}
+.qx50-frame .blk{padding:32px 30px}
+.qx50-frame .noteline{padding:20px 24px;align-items:center;font-size:22px!important}
+.qx50-frame .exit{min-height:0;padding:22px 26px}
+.qx50-frame .exit .eic{width:66px;height:66px;border-radius:21px}
+.qx50-frame .exit b{font-size:24px!important}
+.qx50-frame .unavailable-strip{padding:22px 26px}
+/* 骨架占住数据区的位置：百宝箱按四张磁贴画 2×2，智慧校园按六张卡画两行；占位条用看得见的浅褐，不画假文字 */
+#body-root[data-state="capability-loading"] .status-skeleton{gap:14px!important;margin-top:24px}
+#body-root[data-state="capability-loading"] .status-skeleton i,
+#body-root[data-state="capability-loading"] .status-skeleton::before,
+#body-root[data-screen="campus-zone"][data-state="capability-loading"] .status-skeleton::after{content:"";display:block;height:226px!important;border-radius:var(--r-lg);border:1px solid var(--line-2);
+  background:linear-gradient(var(--teal-soft) 0 0) 24px 24px/60px 60px no-repeat,
+    linear-gradient(#bdb49c 0 0) 24px 100px/58% 22px no-repeat,
+    linear-gradient(var(--line-2) 0 0) 24px 138px/74% 16px no-repeat,
+    linear-gradient(#bdb49c 0 0) 24px calc(100% - 38px)/34% 18px no-repeat,
+    var(--surface)!important}
+#body-root[data-screen="toolbox-zone"][data-state="capability-loading"] .status-skeleton{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+#body-root[data-screen="campus-zone"][data-state="capability-loading"] .status-skeleton{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+#body-root[data-screen="campus-zone"][data-state="capability-loading"] .status-skeleton::after{grid-column:span 2}
+</style>
+</head>
+<body data-host="capability">
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="back-link" href="01-home.html" data-route="/" aria-label="返回首页"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">—</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="taskhead" aria-labelledby="task-title">
+    <h1 class="th-t" id="task-title">百宝箱</h1>
+    <p class="th-s" id="task-sub">—</p>
+    <ol class="qx-steps"><li><b>1</b>先看清：留在本机、扫码，或离开</li><li><b>2</b>打开前会告诉你去哪里</li><li><b>3</b>拿不准就问小青</li></ol>
+  </section>
+
+  <div id="tabbar-host"></div>
+
+  <main class="body" id="body-root" data-screen="toolbox-zone" data-state="ready" data-testid="toolbox-zone-state-ready"></main>
+  <!-- 9/28 留白：读取中照常显示本页就绪态里已有的说明与出口（同一段内容，不另写），只有数据区显示读取中 -->
+  <div class="qx50-frame" data-frame="toolbox">
+    <section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">打开之前你会知道什么</span><span class="hint">按打开方式分开说</span></div><div class="blk"><div class="rows"><div><span>要去哪里</span><b>站内服务直接进入；外部和扫码服务先显示目标，由你确认</b></div><div><span>本机记录</span><b>只记下打开了哪一项、什么时候、在哪台机器上</b></div><div><span>第三方页面</span><b>你的输入与办理结果都不记录</b></div></div></div></section>
+    <section class="sec"><div class="noteline"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5.5M12 7.6h.01"></path></svg><span>外部服务与扫码服务由第三方提供，<b>本机只提供入口，不代办、也不替你确认结果。</b></span></div></section>
+    <section class="sec"><div class="sec-label"><span class="no serif">03</span><span class="t">拿不准就问小青</span><span class="hint">不代开第三方，也不代办</span></div><div class="strip"><a class="exit press" href="05-ai-cockpit.html" data-route="/assistant" data-testid="toolbox-zone-loading-ask-qx"><span class="eic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.4 9.4A2.6 2.6 0 0 1 14.6 10c0 1.7-2.6 2-2.6 3.6M12 17.2h.01"></path></svg></span><span class="etx"><b>问小青这项怎么用</b><span>只讲这一步怎么操作，不生成办理结果</span></span></a></div></section>
+  </div>
+  <div class="qx50-frame" data-frame="campus">
+    <section class="sec"><div class="unavailable-strip" data-testid="campus-zone-loading-bigdata"><span class="us-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20.5V10M10 20.5V4.5M16 20.5v-7M22 20.5H2"></path></svg></span><span class="us-copy"><b>校园大数据暂未开放</b><small>开放前不展示任何统计数据，本机也不自行估算</small></span><span class="us-state">无入口</span></div></section>
+    <section class="sec"><div class="noteline slate"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5.5M12 7.6h.01"></path></svg><span>本机提供通用指引；实际材料、地点与时间以学校官方通知为准。</span></div></section>
+  </div>
+
+  <div class="truth" data-disclaimer="true" data-testid="capability-truth">
+    <div><b>扩展服务与校园指引按本机配置展示</b>进入第三方服务前会先提示；本机不记录你在第三方页面的办理结果，校园办理一律以学校官方通知为准。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>
+</div>
+<script src="../kiosk-redesign-2026-08/policy-campus-workspaces.js"></script>
+<script src="capability-zone-workspace.js"></script>
+</body>
+</html>

@@ -23,6 +23,9 @@ import { TERMINAL_CLAIM_INTERVAL_MS } from '../common/throttler/terminal-throttl
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
+import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
+import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../payment/pending-refund-signal'
+import { parkOnePaidOrder, parkPaidOrdersWithUnprintableFiles } from './claim-unprintable-file'
 import { PackageOrderFulfillmentService } from '../member-print-orders/package-order-fulfillment.service'
 import { ContractReportPrintLifecycleService } from '../files/contract-report-print-lifecycle.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
@@ -416,7 +419,8 @@ export class TerminalAgentService implements OnModuleInit {
       return []
     }
 
-    const claimExpiry = new Date(Date.now() + 5 * 60 * 1000)
+    const now = new Date()
+    const claimExpiry = new Date(now.getTime() + 5 * 60 * 1000)
     const limit = Math.min(dto.maxTasks, 1) // Phase 8.2A: max 1 per cycle
 
     const results: ClaimTaskResponse[] = []
@@ -436,7 +440,31 @@ export class TerminalAgentService implements OnModuleInit {
     const claimableWhere = {
       status: 'pending' as const,
       terminalId,
-      order: { is: { payStatus: 'paid', taskStatus: 'pending' } },
+      order: {
+        is: {
+          payStatus: 'paid', taskStatus: 'pending',
+          // null 必须单独写：SQL 里 `<>` 不匹配 NULL，否则未标记的已付款单会领不走。
+          OR: [
+            { refundReason: null },
+            { refundReason: { not: PAID_UNFULFILLED_PENDING_REFUND_REASON } },
+          ],
+        },
+      },
+      // 已知不可用的现代文件不应卡住后面的合法任务；事务内仍会再次读取
+      // FileObject 做 fail-closed 检查，覆盖查询后到领取前的状态竞态。历史任务
+      // 没有 fileId，保留原来的 URL 路径与领取行为。
+      OR: [
+        { fileId: null },
+        {
+          file: {
+            is: {
+              status: 'active',
+              deletedAt: null,
+              OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+            },
+          },
+        },
+      ],
     }
 
     for (let i = 0; i < limit; i++) {
@@ -449,11 +477,26 @@ export class TerminalAgentService implements OnModuleInit {
             data: { lifecycleStatus: 'active' },
           })
           if (activeLock.count !== 1) return null
+          // 与领取同一事务：跳过失效文件时写下待退款标记。不建 Refund、不出纸。
+          await parkPaidOrdersWithUnprintableFiles(tx, terminalId, now)
           const task = await tx.printTask.findFirst({
             where: claimableWhere,
             orderBy: { createdAt: 'asc' },
           })
           if (!task) return null
+
+          // 任务进入队列后文件可能被隔离、删除或过期；重签 URL 前再做一次状态闸门。
+          // 无 fileId 的历史任务保留旧兼容路径，现代业务任务全部带 fileId。
+          if (task.fileId) {
+            const file = await tx.fileObject.findUnique({
+              where: { id: task.fileId },
+              select: { status: true, deletedAt: true, expiresAt: true },
+            })
+            if (!isPrintableFileRecord(file, now.getTime())) {
+              await parkOnePaidOrder(tx, task.id, now)
+              return null
+            }
+          }
 
           // 订单必须存在（claimableWhere 已要求），并以 CAS 再确认一次仍是 paid+pending：
           // findFirst 与 updateMany 之间存在退款/关单的时间窗，只靠前置查询会漏。

@@ -32,6 +32,8 @@ export type AuditAction =
   | 'smart_campus_config.update'
   | 'partner.smart_campus_config.update'
   | 'toolbox_config.update'
+  | 'kiosk_job_board.global_update'
+  | 'kiosk_job_board.terminal_update'
   | 'terminal.org.update'
   | 'terminal.profile.update'
   | 'resume.parse_submitted'
@@ -53,6 +55,11 @@ export type AuditAction =
   | 'organization.update'
   /** 内容信任标记（发布闸门的人工核验决策，见 src/common/content-trust.ts） */
   | 'organization.content_trust'
+  /** 管理员维护机构已核验官方域名。身份核验，不是渠道内容审核。 */
+  | 'organization.verified_domains_replace'
+  | 'official_channel.create'
+  | 'official_channel.update'
+  | 'official_channel.archive'
   | 'user.create'
   | 'user.disable'
   | 'system.login'
@@ -77,6 +84,7 @@ export type AuditTargetType =
   | 'system'
   | 'smart_campus_config'
   | 'toolbox_config'
+  | 'kiosk_job_board'
   | 'terminal'
   | 'print_task'
   | 'derived_alert'

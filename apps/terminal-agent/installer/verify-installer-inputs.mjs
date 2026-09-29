@@ -57,7 +57,7 @@ const scanWatcher = fs.readFileSync(path.join(root, '../src/agent/scan-watcher.t
 console.log('\n=== verify Windows Agent installer inputs ===')
 
 assert.equal(inputs.schemaVersion, 1)
-assert.equal(inputs.productVersion, '0.4.11')
+assert.equal(inputs.productVersion, '0.4.12')
 assert.equal(
   inputs.productVersion,
   agentPackage.version,
@@ -87,10 +87,85 @@ assert.match(project, /WixToolset\.Sdk\/4\.0\.6/)
 assert.match(wix, /Scope="perMachine"/)
 assert.match(wix, /Name="aijobprintagent\.exe"/)
 assert.match(wix, /Start="demand"/, 'unprovisioned service must remain Manual and stopped')
+assert.match(wix, /AllowSameVersionUpgrades="yes"/, 'same-version reinstall must be a MajorUpgrade')
+// 真机审查 2026-09-28：MSI 在安装时启动服务（ServiceControl Start="install"）会让启动失败拖垮整个安装
+// （CI 实测 Error 1920 → 1603 回滚）。已绑定终端升级后自启另立任务，用「失败则忽略」的尽力启动实现并在 Windows 上验证。
+assert.doesNotMatch(wix, /Start="install"/, 'MSI must not start the service during install: a start failure rolls back the whole install')
 assert.match(wix, /Account="LocalSystem"/)
 assert.match(wix, /Permanent="yes"/)
 assert.match(wix, /NeverOverwrite="yes"/)
-assert.doesNotMatch(wix, /CustomAction/i, 'MSI must not shell out to node-windows or provisioning code')
+const customActionElements = wix.match(/<CustomAction\b[^>]*\/>/g) ?? []
+// 数全所有写法：带内容的 <CustomAction>…</CustomAction>（内联脚本）不是自闭合，上面的匹配数不到，必须单独拦下。
+assert.equal((wix.match(/<CustomAction\b/g) ?? []).length, customActionElements.length, 'every CustomAction must be a self-closing element covered by the fixed-action rules')
+const customActionAttributes = (element) => {
+  const attributes = new Map()
+  for (const match of element.matchAll(/([A-Za-z][A-Za-z0-9]*)="([^"]*)"/g)) attributes.set(match[1], match[2])
+  return attributes
+}
+const customActions = customActionElements.map(customActionAttributes)
+const expectedCustomActionIds = [
+  'AgentServiceRestoreAutoStart',
+  'AgentServiceRestoreRecovery',
+  'AgentServiceRestoreFailureFlag',
+  'AgentServiceBestEffortStart',
+]
+assert.deepEqual(
+  customActions.map((attributes) => attributes.get('Id')),
+  expectedCustomActionIds,
+  'MSI CustomAction set must contain exactly the four fixed service recovery actions, in order',
+)
+for (const attributes of customActions) {
+  assert.deepEqual(
+    [...attributes.keys()].sort(),
+    ['Directory', 'ExeCommand', 'Execute', 'Id', 'Impersonate', 'Return'].sort(),
+    `CustomAction ${attributes.get('Id')} contains an unapproved attribute; MSI must not run provisioning code`,
+  )
+  assert.equal(attributes.get('Execute'), 'deferred', `CustomAction ${attributes.get('Id')} must be deferred`)
+  assert.equal(attributes.get('Impersonate'), 'no', `CustomAction ${attributes.get('Id')} must run elevated`)
+  assert.equal(attributes.get('Return'), 'ignore', `CustomAction ${attributes.get('Id')} must not make install fail on start error`)
+  const command = attributes.get('ExeCommand')
+  assert.match(command, /^&quot;\[System64Folder\]sc\.exe&quot; /, `CustomAction ${attributes.get('Id')} must call system sc.exe`)
+  assert.match(command, /\baijobprintagent\.exe\b/i, `CustomAction ${attributes.get('Id')} must target the Agent service`)
+  assert.doesNotMatch(command, /node|powershell|pwsh|\.ps1|\.js|\.cmd|\.bat|\.vbs|provision|cmd\.exe|msiexec/i, `CustomAction ${attributes.get('Id')} must not shell out to provisioning code`)
+}
+const actionSchedules = [...wix.matchAll(/<Custom\s+Action="([^"]+)"\s+After="([^"]+)"\s+Condition="([^"]+)"\s*\/>/g)]
+// 同理：Before 写法、扩展里现成的动作（如 QuietExec）的调度也是 <Custom>，都必须落在上面的固定格式里。
+assert.equal((wix.match(/<Custom\s/g) ?? []).length, actionSchedules.length, 'every <Custom> scheduling element must use the fixed After/Condition form checked below')
+assert.equal(actionSchedules.length, expectedCustomActionIds.length, 'all fixed CustomActions must be scheduled exactly once')
+for (let index = 0; index < expectedCustomActionIds.length; index += 1) {
+  const [id, after, condition] = actionSchedules[index].slice(1)
+  assert.equal(id, expectedCustomActionIds[index], `CustomAction ${expectedCustomActionIds[index]} must be scheduled in order`)
+  assert.equal(after, index === 0 ? 'StartServices' : expectedCustomActionIds[index - 1], `CustomAction ${id} has the wrong sequence predecessor`)
+  assert.match(condition, /AGENTBOUND = &quot;#1&quot;/, `CustomAction ${id} must require the bound marker`)
+  assert.match(condition, /NOT \(REMOVE~=&quot;ALL&quot;\)/, `CustomAction ${id} must be excluded during uninstall`)
+}
+const boundProperty = wix.match(/<Property\s+Id="AGENTBOUND"[\s\S]*?<\/Property>/)?.[0]
+assert.ok(boundProperty, 'AGENTBOUND property must search the binding marker')
+const boundSearch = boundProperty.match(/<RegistrySearch\b[^>]*\/>/)?.[0]
+assert.ok(boundSearch, 'AGENTBOUND property must contain a RegistrySearch')
+const boundSearchAttributes = customActionAttributes(boundSearch)
+for (const [name, value] of [['Root', 'HKLM'], ['Type', 'raw'], ['Bitness', 'always64'], ['Key', 'SOFTWARE\\AIJobPrint\\Agent'], ['Name', 'Bound']]) {
+  assert.equal(boundSearchAttributes.get(name), value, `AGENTBOUND RegistrySearch ${name} must match the production marker`)
+}
+const boundRegistryPath = productionInstaller.match(/\$boundRegistryPath\s*=\s*"HKLM:\\([^"\r\n]+)"/)?.[1]
+const boundName = productionInstaller.match(/New-ItemProperty\s+-LiteralPath\s+\$boundRegistryPath\s+-Name\s+"([^"]+)"\s+-Value\s+1\s+-PropertyType\s+DWord/)?.[1]
+assert.equal(boundRegistryPath, 'SOFTWARE\\AIJobPrint\\Agent', 'production binding marker path must remain parseable')
+assert.equal(boundSearchAttributes.get('Key'), boundRegistryPath, 'MSI marker key must match install-production-agent.ps1')
+assert.equal(boundName, 'Bound', 'production binding marker name must remain parseable')
+assert.equal(boundSearchAttributes.get('Name'), boundName, 'MSI marker value name must match install-production-agent.ps1')
+const autoStartCommand = customActions.find((attributes) => attributes.get('Id') === 'AgentServiceRestoreAutoStart').get('ExeCommand').replaceAll('&quot;', '"')
+assert.match(productionInstaller, /Set-Service[\s\S]*?-StartupType\s+Automatic/, 'binding must set the service to Automatic')
+assert.match(autoStartCommand, /\bconfig\s+aijobprintagent\.exe\s+start=\s+auto$/i, 'MSI must restore the same Automatic startup mode as binding')
+const recoveryCommand = customActions.find((attributes) => attributes.get('Id') === 'AgentServiceRestoreRecovery').get('ExeCommand').replaceAll('&quot;', '"')
+const failureFlagCommand = customActions.find((attributes) => attributes.get('Id') === 'AgentServiceRestoreFailureFlag').get('ExeCommand').replaceAll('&quot;', '"')
+const recoveryReset = productionInstaller.match(/Invoke-Sc\s+@\("failure",\s*\$ServiceName,\s*"reset=",\s*"([^"]+)"/)?.[1]
+const recoveryActions = productionInstaller.match(/'restart\/60000\/restart\/300000\/""\/0'/)?.[0]
+assert.equal(recoveryReset, '86400', 'MSI recovery reset period must match install-production-agent.ps1')
+assert.equal(recoveryActions, "'restart/60000/restart/300000/\"\"/0'", 'MSI recovery actions must match install-production-agent.ps1')
+assert.match(recoveryCommand, new RegExp(`reset=\\s+${recoveryReset}\\s+actions=\\s+${recoveryActions.slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'), 'MSI recovery command must match binding recovery policy')
+const failureFlag = productionInstaller.match(/Invoke-Sc\s+@\("failureflag",\s*\$ServiceName,\s*"([01])"/)?.[1]
+assert.equal(failureFlag, '1', 'binding failureflag value must remain parseable')
+assert.match(failureFlagCommand, new RegExp(`failureflag\\s+aijobprintagent\\.exe\\s+${failureFlag}$`, 'i'), 'MSI failureflag command must match binding policy')
 assert.match(project, /InstallerSourceRoot=\$\(MSBuildProjectDirectory\)/)
 assert.match(wix, /StandardDirectory Id="CommonAppDataFolder"/)
 assert.match(wix, /Name="Microsoft"[\s\S]*Name="Windows"[\s\S]*Name="Start Menu"[\s\S]*Name="Programs"/)
@@ -169,9 +244,10 @@ assert.doesNotMatch(kioskWatchdog, /\/local\/terminal-identity/, 'watchdog readi
 assert.match(kioskWatchdog, /local Agent is reachable again; restarting ticketless kiosk browser with a boot ticket/)
 assert.match(kioskWatchdog, /\$selfHealBootTicket = Test-AgentIdentityReady[\s\S]*\$bootTicket = \$selfHealBootTicket[\s\S]*Get-BootTicketUrl -BootTicket \$bootTicket/, 'self-heal must reuse the readiness ticket')
 assert.match(kioskWatchdog, /boot_ticket=/)
-assert.match(kioskWatchdog, /\$delays = @\(2, 5, 10, 20\)/)
+assert.match(kioskWatchdog, /\$delays = @\(2, 5, 10, 20, 20\)/)
+assert.match(kioskWatchdog, /kiosk_launch=1/)
 assert.match(kioskWatchdog, /-TimeoutSec 4/)
-assert.match(kioskWatchdog, /return \$Url/, 'boot-ticket failure must launch the kiosk fail-closed page without a ticket')
+assert.match(kioskWatchdog, /return \$launchUrl/, 'boot-ticket failure must launch the kiosk fail-closed page without a ticket')
 assert.doesNotMatch(kioskWatchdog, /agent\.token|agent-config\.json|BindCode|AgentToken/i)
 assert.match(kioskWatchdog, /--edge-kiosk-type=fullscreen/)
 assert.match(kioskWatchdog, /--no-first-run/)
@@ -206,6 +282,7 @@ assert.match(staging, /provisioning-runtime-security\.ps1/)
 assert.match(stagedPowerShellVerify, /0xEF[\s\S]*0xBB[\s\S]*0xBF/)
 assert.match(stagedPowerShellVerify, /System\.Management\.Automation\.Language\.Parser\]::ParseFile/)
 assert.match(stagedPowerShellVerify, /Merge-LocalApiAllowedOrigins/)
+assert.doesNotMatch(stagedPowerShellVerify, /localhost:5173|127\.0\.0\.1:5173/, 'staged production origin gate must not default to development origins')
 assert.match(stagedPowerShellVerify, /originMerge=executed/)
 assert.match(stagedPowerShellVerify, /aclRights=positive-negative/)
 assert.match(stagedPowerShellVerify, /ReadAndExecute/)
@@ -357,7 +434,7 @@ assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
 assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.4\.10"/)
-assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.11"/)
+assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.12"/)
 assert.match(upgradeLifecycle, /EXE upgrade lifecycle requires an unused ProgramData root/)
 assert.doesNotMatch(upgradeLifecycle, /Remove-Item -LiteralPath \$stateRoot/)
 const unusedStateGuard = upgradeLifecycle.indexOf('EXE upgrade lifecycle requires an unused ProgramData root')
@@ -373,6 +450,16 @@ assert.match(upgradeLifecycle, /Assert-PanelShortcut/)
 assert.match(upgradeLifecycle, /Assert-DesktopShortcut/)
 assert.match(upgradeLifecycle, /Assert-ControlCenterSmoke -ExpectedVersion \$PREDECESSOR_VERSION/)
 assert.match(upgradeLifecycle, /Assert-ControlCenterSmoke/)
+// 真机审查 2026-09-28：生产安装默认只放行一体机站点；Edge 整机策略放行本机访问与麦克风、禁用系统文件框。
+assert.match(productionInstaller, /AllowLocalDevelopmentOrigins/, 'development origins must be an explicit opt-in')
+assert.doesNotMatch(productionInstaller, /\+ @\("http:\/\/localhost:5173", "http:\/\/127\.0\.0\.1:5173"\)/, 'production install must not append development origins by default')
+for (const policy of ['LocalNetworkAccessAllowedForUrls', 'AudioCaptureAllowedUrls', 'AllowFileSelectionDialogs']) {
+  assert.ok(productionInstaller.includes(policy), `Edge kiosk policy ${policy} must be provisioned`)
+}
+assert.match(productionInstaller, /RemoveEdgeKioskPolicies/, 'Edge kiosk policies must be removable')
+assert.match(productionInstaller, /\$listKey = Join-Path \$edgePolicyPath \$policyName[\s\S]*-Name \(\[string\]\(\$index \+ 1\)\)/, 'Edge list policies are a subkey with numbered values, not suffixed values on the Edge key')
+assert.doesNotMatch(productionInstaller, /"\$policyName" \+ \(\$index \+ 1\)/, 'suffixed values such as AudioCaptureAllowedUrls1 are ignored by Edge')
+assert.match(productionInstaller, /Bound" -Value 1/, 'binding must record the upgrade marker the MSI searches for')
 assert.match(upgradeLifecycle, /localApiBridgeToken = "fixture-bridge-token-not-a-real-secret"/)
 assert.match(upgradeLifecycle, /WriteAllBytes\(\$tokenPath/)
 assert.match(upgradeLifecycle, /SQLite format 3/)
@@ -399,13 +486,18 @@ assert.match(workflow, /unsigned-msi-candidate:/, 'keep the existing required Wi
 assert.match(workflow, /unsigned-exe-upgrade:/, 'run upgrade lifecycle on an isolated Windows runner')
 assert.match(
   workflow,
-  /unsigned-msi-candidate:\s*needs: unsigned-exe-upgrade\s*if: \$\{\{ always\(\) \}\}/,
-  'the existing required Windows job must depend on the isolated upgrade lifecycle',
+  /unsigned-msi-candidate:\s*needs: \[unsigned-exe-upgrade, internal-signing-validation\]\s*if: \$\{\{ always\(\) \}\}/,
+  'the existing required Windows job must depend on the isolated upgrade lifecycle and internal signing validation',
 )
 assert.match(
   workflow,
   /if \("\$\{\{ needs\.unsigned-exe-upgrade\.result \}\}" -ne "success"\) \{\s*throw "Isolated EXE upgrade lifecycle did not pass"/,
   'the existing required Windows job must fail rather than skip when the isolated upgrade job fails',
+)
+assert.match(
+  workflow,
+  /if \("\$\{\{ needs\.internal-signing-validation\.result \}\}" -ne "success"\) \{\s*throw "Internal signing validation did not pass"/,
+  'the existing required Windows job must fail rather than skip when internal signing validation fails',
 )
 assert.match(
   workflow,

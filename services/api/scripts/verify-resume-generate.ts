@@ -237,7 +237,7 @@ async function main(): Promise<void> {
     pass('6b. 正确 token 可读;错 token / 无 token → AI_TASK_NOT_FOUND')
 
     // ── 7. PDF 导出(真实文件 + FileObject + 签名 URL)────────────────────
-    const exported = await ai.exportGeneratedResume(readBack.resume!, null)
+    const exported = await ai.exportGeneratedResume(readBack.resume!, null, null, 'pdf', undefined, undefined, false, { taskId: out.taskId })
     createdFileIds.push(exported.fileId)
     if (exported.pageCount < 1) fail('7. 页数异常')
     if (exported.filename.includes('13800000000')) fail('7. 文件名泄露手机号')
@@ -306,7 +306,7 @@ async function main(): Promise<void> {
     const resolvedSourceFileId = await ai.resolveExportSourceFileId(parsed.taskId, { endUserId: endUser.id, accessToken: null })
     if (resolvedSourceFileId !== source.fileId) fail(`7b. sourceFileId 推导失败: ${resolvedSourceFileId}`)
 
-    const memberExported = await ai.exportGeneratedResume(readBack.resume!, endUser.id, resolvedSourceFileId)
+    const memberExported = await ai.exportGeneratedResume(readBack.resume!, endUser.id, resolvedSourceFileId, 'pdf', undefined, undefined, false, { taskId: out.taskId })
     createdFileIds.push(memberExported.fileId)
     const memberExportRow = await prisma.fileObject.findUnique({ where: { id: memberExported.fileId } })
     if (!memberExportRow) fail('7b. 会员导出文件未落库')
@@ -360,7 +360,7 @@ async function main(): Promise<void> {
     if (crossUserSourceFileId !== null) fail(`7b. 他人源文件应回退 null,实际 ${crossUserSourceFileId}`)
     pass('7b+. 源文件不存在或归属不匹配时 sourceFileId 回退 null,不阻断导出')
 
-    const unlinkedExported = await ai.exportGeneratedResume(readBack.resume!, endUser.id, null)
+    const unlinkedExported = await ai.exportGeneratedResume(readBack.resume!, endUser.id, null, 'pdf', undefined, undefined, false, { taskId: out.taskId })
     createdFileIds.push(unlinkedExported.fileId)
     const unlinkedRow = await prisma.fileObject.findUnique({ where: { id: unlinkedExported.fileId } })
     if (!unlinkedRow) fail('7c. 未关联导出文件未落库')

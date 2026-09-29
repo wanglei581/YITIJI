@@ -150,7 +150,7 @@ async function verifyRuntime(): Promise<void> {
   const disabled = serviceWith(disabledFiles, source, null)
   await disabled.onModuleInit()
   assert.deepEqual(disabled.getCapabilities(), {
-    wordToPdf: false, engine: 'none', reason: '服务端未配置转换引擎', cjkFonts: true,
+    wordToPdf: false, engine: 'none', reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。', cjkFonts: true,
   })
   await assert.rejects(() => disabled.convertOwnedFile(source.id, { kind: 'member', endUserId: 'member-1' }), ServiceUnavailableException)
   pass('capabilities disabled 时返回明确 reason，转换 fail-closed')
@@ -164,7 +164,9 @@ async function verifyRuntime(): Promise<void> {
   assert.equal(converted.mimeType, 'application/pdf')
   assert.equal(converted.pageCount, 1)
   assert.equal(converted.engine, 'soffice')
-  assert.match(converted.warnings.join('\n'), /复杂版式可能有偏差，请预览核对/u)
+  // 这句会原样上屏：整句钉死，且不得再出现「转换引擎」一类工程说法。
+  assert.deepEqual(converted.warnings, ['转为 PDF 后，复杂版式可能有偏差，请预览核对'])
+  assert.doesNotMatch(converted.warnings.join('\n'), /转换引擎|服务端|接口/u)
   assert.equal(files.uploadedArgs?.assetCategory, 'derived')
   assert.equal(files.uploadedArgs?.sourceFileId, source.id)
   assert.equal(files.uploadedArgs?.createdBy, 'document_conversion')
@@ -241,7 +243,16 @@ async function verifyRuntime(): Promise<void> {
   const printPrisma = {
     fileObject: {
       findUnique: async ({ where }: { where: { id: string } }) => where.id === requestedFileId
-        ? { purpose: 'print_doc', sha256: 'b'.repeat(64), mimeType: DOCX_MIME, filename: 'source.docx', assetCategory: 'original' }
+        ? {
+            purpose: 'print_doc',
+            sha256: 'b'.repeat(64),
+            mimeType: DOCX_MIME,
+            filename: 'source.docx',
+            assetCategory: 'original',
+            status: 'active',
+            deletedAt: null,
+            expiresAt: null,
+          }
         : null,
     },
     fairMaterialPrintBridge: { findFirst: async () => null },

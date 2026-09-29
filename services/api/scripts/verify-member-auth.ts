@@ -307,6 +307,22 @@ async function main() {
     if (wrong.status === 401) pass('错误验证码 → 401')
     else fail(`错误验证码 → ${wrong.status} (expected 401)`)
 
+    // ── 5b. C4：要求协议已正式发布时，没有已发布版本就拒绝登录，且不消耗验证码 ──
+    // 走真实 HTTP 登录路径（不是只测判定函数）：本库没有已激活的协议，服务端回落草稿版本。
+    console.log('\n── 5b. C4 协议未正式发布 → 403，不消耗验证码 ──────────────────')
+    const savedLegalFlag = process.env['LEGAL_DOCS_REQUIRE_PUBLISHED']
+    process.env['LEGAL_DOCS_REQUIRE_PUBLISHED'] = 'true'
+    try {
+      const gated = await post('/auth/login', { phone: PHONE, code: code!, termsVersion: 'draft-pending-legal-review', privacyVersion: 'draft-pending-legal-review' })
+      if (gated.status === 403 && (gated.json.error as Json | undefined)?.code === 'LEGAL_DOCS_NOT_PUBLISHED') {
+        pass('协议未正式发布 + 要求生效 → 403 LEGAL_DOCS_NOT_PUBLISHED')
+      } else fail(`协议未发布时登录 → ${gated.status} ${JSON.stringify(gated.json)} (expected 403 LEGAL_DOCS_NOT_PUBLISHED)`)
+    } finally {
+      if (savedLegalFlag === undefined) delete process.env['LEGAL_DOCS_REQUIRE_PUBLISHED']
+      else process.env['LEGAL_DOCS_REQUIRE_PUBLISHED'] = savedLegalFlag
+    }
+    // 下面第 6 步用同一个验证码登录成功，即证明被 C4 拒绝的那次没有消耗验证码。
+
     // ── 6. 正确验证码登录 → 200 ───────────────────────────────────────────────
     console.log('\n── 6. 正确验证码登录 → 200 ────────────────────────────────────')
     const login = await post('/auth/login', { phone: PHONE, code: code! , termsVersion: 'draft-pending-legal-review', privacyVersion: 'draft-pending-legal-review' })

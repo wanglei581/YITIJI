@@ -22,12 +22,17 @@ const SERVICE_LABELS: Record<string, string> = {
   resume_export: '简历导出（每次）',
 }
 
+// 差异码 → 中文。码表唯一来源是 services/api/src/payment/reconciliation.service.ts
+// 里 push(discrepancies, 'CODE', …) 的全部取值；`verify:admin-billing-ui` 会从那份源码
+// 反解出码表，逐个比对本表 —— 新增差异码而漏配中文会直接判红，不会静默漏成裸码。
 const DISCREPANCY_LABELS: Record<string, string> = {
   PAID_WITHOUT_SUCCESS_ATTEMPT: '已支付但缺成功支付流水',
   REFUND_AMOUNT_MISMATCH: '退款额账实不符',
   ORDER_REFUNDED_WITHOUT_REFUND_ROW: '订单已退款但无退款记录',
   REFUND_SUCCESS_ORDER_NOT_REFUNDED: '有成功退款但订单未退款',
   STUCK_REFUNDING: '退款中超时未收敛',
+  ONLINE_COLLECTED_PENDING_REFUND: '渠道已收款但订单未转已支付（待退款）',
+  ORDER_EXTRA_COLLECTION_AFTER_REFUND: '已退款后又出现额外收款',
 }
 
 function yuan(cents: number): string {

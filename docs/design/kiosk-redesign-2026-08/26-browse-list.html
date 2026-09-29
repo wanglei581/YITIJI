@@ -54,7 +54,7 @@
 -->
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -71,7 +71,12 @@ html,body{height:100%;overflow:hidden;background:#e8e3d3;color:var(--ink);font-f
 .serif{font-family:"Songti SC","STSong","Noto Serif SC","SimSun",serif}
 a{color:inherit;text-decoration:none}button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 ul{list-style:none}
-:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+/* 统一焦点环：3px 深墨环，画在元素外侧的浅纸底上（对比 ≈14:1）。
+   .qinput / .filter-field input 自带 outline:none，用 !important 一次性收回来，
+   搜索框、筛选输入、岗位卡、分页与底栏动作共用同一套环。 */
+:focus-visible{outline:3px solid var(--deep)!important;outline-offset:3px!important}
+/* 贴着舞台底边或滚动容器边缘的控件改画内侧环，避免环被裁掉后看不见 */
+.nav-item:focus-visible,.row-link:focus-visible,.pick:focus-visible,.air-go:focus-visible{outline-offset:-5px!important}
 .press{transition:transform var(--dur) var(--ease),border-color var(--dur) ease,background-color var(--dur) ease}
 .press:active{transform:scale(.985)}
 
@@ -168,7 +173,8 @@ ul{list-style:none}
 .info.slate li{color:var(--slate-d)}.info.slate li::before{background:var(--slate)}
 
 /* 简历选择 */
-.picks{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:none}
+.picks{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:none;
+  scroll-padding:18px 0 22px;padding:2px 0 4px}
 .picks::-webkit-scrollbar{display:none}
 .pick{flex:none;width:100%;display:flex;align-items:center;gap:20px;padding:20px 24px;min-height:172px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);text-align:left}
 .pick[aria-checked=true]{border-color:var(--teal);background:var(--teal-soft)}
@@ -197,7 +203,8 @@ ul{list-style:none}
 .rcard-go{flex:none;min-height:56px;padding:0 20px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--paper);font-size:19px;font-weight:600;display:inline-flex;align-items:center;gap:8px}
 
 /* AI 推荐结果 */
-.ai-results{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:none}
+.ai-results{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:none;
+  scroll-padding:18px 0 22px;padding:2px 0 4px}
 .ai-results::-webkit-scrollbar{display:none}
 .ai-result{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:20px 24px;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px 20px}
 .air-title{font-size:25px;font-weight:700;line-height:1.35;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -222,15 +229,20 @@ ul{list-style:none}
 .lh-t{font-size:25px;font-weight:700}
 .lh-m{font-size:19px;color:var(--ink-3)}
 .sortbtn{margin-left:auto;min-height:52px;padding:0 20px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--surface);font-size:19px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:8px}
-.list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+/* 行距与行高：1080×1920 下这一屏要完整放下 5 条布局示例，
+   第 5 条不能被下方分页栏切一半。下面几个数是按真实几何量出来的：
+   行高 154 + 行距 10，5 行合计 816px，列表可视高 855px，余量 39px 兜住字体回退带来的行高差。
+   分页栏仍在列表下方独占一行，不覆盖任何一条岗位卡。 */
+.list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;scrollbar-width:none;
+  scroll-padding:18px 0 22px;padding:2px 0 4px}
 .list::-webkit-scrollbar{display:none}
 .row{flex:none;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
-.row-link{display:flex;align-items:center;gap:22px;padding:22px 24px;min-height:180px}
-.row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.row-link{display:flex;align-items:center;gap:22px;padding:16px 24px;min-height:150px}
+.row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .row-t{font-size:27px;font-weight:700;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .row-sub{display:flex;gap:8px 24px;flex-wrap:wrap;font-size:19px;color:var(--ink-2)}
 .row-sub span{display:inline-flex;align-items:center;gap:7px}
-.row-src{display:flex;gap:8px 18px;flex-wrap:wrap;font-size:17px;color:var(--slate-d);background:var(--slate-soft);border-radius:var(--r-xs);padding:9px 14px;align-self:flex-start}
+.row-src{display:flex;gap:8px 18px;flex-wrap:wrap;font-size:17px;color:var(--slate-d);background:var(--slate-soft);border-radius:var(--r-xs);padding:7px 14px;align-self:flex-start}
 .row-go{flex:none;min-height:64px;padding:0 26px;border-radius:var(--r-sm);background:var(--deep);color:var(--emerald);font-size:22px;font-weight:700;display:inline-flex;align-items:center;gap:9px}
 .row.blocked .row-go{background:var(--paper);border:1px solid var(--line-2);color:var(--ink-3)}
 .slot{display:inline-block;min-width:88px;border-bottom:2px dotted var(--line-2);color:var(--ink-3);font-weight:400}
@@ -324,9 +336,9 @@ html.flat *{animation:none!important;transition:none!important}
   </div>
 
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
 
   <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制面板">演示</button>
@@ -896,6 +908,11 @@ if(SUB[state])document.getElementById('task-sub').textContent=SUB[state];
 function tick(){var d=new Date();document.getElementById('clock').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 tick();setInterval(tick,20000);
 
+/* 舞台是 overflow:hidden 的定尺画布。焦点落到屏外元素时浏览器会滚动这个盒子，
+   整页版式跟着位移（首条内容被顶到筛选区底下）。这里把它按死在 0：
+   位置只由布局决定，滚动只发生在列表自己的滚动容器里。 */
+(function(){var st=document.getElementById('stage');if(!st)return;
+ st.addEventListener('scroll',function(){st.scrollTop=0;st.scrollLeft=0;});})();
 function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')';}
 fit();addEventListener('resize',fit);
 if(params.get('flat')==='1')document.documentElement.classList.add('flat');

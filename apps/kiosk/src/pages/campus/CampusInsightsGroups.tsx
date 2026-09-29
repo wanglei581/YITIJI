@@ -37,6 +37,7 @@ function formatPeriod(period: string): string {
 }
 
 function jobCountNote(group: CampusRecruitmentSourceGroup): string | undefined {
+  if (group.jobListingCount === null) return undefined
   if (group.jobListingCount === 0 && group.fairPositionCount === 0) return undefined
   return `校招岗位 ${group.jobListingCount.toLocaleString()} · 场内岗位 ${group.fairPositionCount.toLocaleString()}`
 }
@@ -60,12 +61,22 @@ export function CampusInsightsGroups({ data }: { data: CampusRecruitmentStatsDat
           <div className="jf-stat-grid">
             <MetricCard label="招聘会场次" value={group.fairCount} icon={LayersIcon} />
             <MetricCard label="参会企业" value={group.companyCount} icon={BuildingIcon} />
-            <MetricCard
-              label="在招岗位"
-              value={group.openJobCount}
-              note={jobCountNote(group)}
-              icon={BriefcaseIcon}
-            />
+            {/* 岗位板块关闭时服务端不返回岗位库计数（null），这里只报招聘会场内岗位，不拿合计反推。 */}
+            {group.openJobCount === null ? (
+              <MetricCard
+                label="场内岗位"
+                value={group.fairPositionCount}
+                note="只统计招聘会场内岗位"
+                icon={BriefcaseIcon}
+              />
+            ) : (
+              <MetricCard
+                label="在招岗位"
+                value={group.openJobCount}
+                note={jobCountNote(group)}
+                icon={BriefcaseIcon}
+              />
+            )}
             <MetricCard
               label="有场次的月份"
               value={group.timeDistribution.length}

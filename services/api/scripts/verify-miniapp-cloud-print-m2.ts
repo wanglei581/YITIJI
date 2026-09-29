@@ -448,6 +448,25 @@ async function main(): Promise<void> {
     }
     pass('未付款 Order-only 可取消且不会创建 PrintTask')
 
+    const closedPending = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
+    if (!closedPending.pickupCode) fail('closed-pending 用例需要先拿到到机码')
+    await prisma.order.update({
+      where: { id: closedPending.id },
+      data: { payStatus: 'closed', pickupStatus: 'pending' },
+    })
+    await expectCode(
+      () => pickup.claim(closedPending.pickupCode, terminalId),
+      'ORDER_PAYMENT_UNAVAILABLE',
+      'closed pending 认领必须在改 claimed 之前拒绝',
+    )
+    const closedPendingRow = await prisma.order.findUnique({ where: { id: closedPending.id } })
+    if (closedPendingRow?.pickupStatus !== 'pending' || closedPendingRow.payStatus !== 'closed') {
+      fail(`closed pending 被拒后必须仍 pending/closed，实际 ${closedPendingRow?.pickupStatus}/${closedPendingRow?.payStatus}`)
+    }
+    const closedCancelled = await memberOrders.cancel(userId, closedPending.id, { reason: 'closed pending still cancellable' })
+    if (closedCancelled.pickupStatus !== 'cancelled') fail('closed pending 被拒后必须仍可取消')
+    pass('closed pending 认领不改 claimed，仍可取消')
+
     // ── 预言机合并 ────────────────────────────────────────────────────────
     // 「码有效但不在这台机器」与「码根本不存在」必须**完全无法区分**。
     // 判据刻意不是「有没有抛错」（两者本来就都抛），而是逐字段比对真实响应：
@@ -609,10 +628,8 @@ async function main(): Promise<void> {
     pass('文件 TTL 收紧到机码 TTL，过期订单不会释放任务')
     redis.reset()
 
-    // ── §9 不伪造能力：对外的有效期必须是**真实生效值**，不是 PICKUP_TTL_MS ──
-    // 有效期上限已改为 7 天，但落库值是 min(7 天, 文件过期时间)。上面那个 1 小时
-    // 文件的订单，真实有效期就是 1 小时。若哪天有人「为了让 7 天生效」去掉夹取，
-    // 或前端改成按常量算倒计时，用户就会拿到「码还在、文件已被清理」的假承诺。
+    // ── §9 不伪造能力：对外的有效期必须是落库值。未付款单仍被源文件夹取；
+    // 付款后截止改成 paidAt+7 天，同时把源文件延长到该截止（不制造「码还在、文件没了」）。
     const expiringView = (await memberOrders.listCloud(userId))
       .find((row) => row.id === expiring.id) as { pickupCodeExpiresAt: string | null } | undefined
     const freshExpiring = await prisma.order.findUnique({ where: { id: expiring.id } })
@@ -625,14 +642,16 @@ async function main(): Promise<void> {
     }
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
     const mainOrder = await prisma.order.findUnique({ where: { id: created.id } })
-    const mainTtlMs = (mainOrder?.pickupCodeExpiresAt?.getTime() ?? 0) - mainOrder!.createdAt.getTime()
-    if (mainTtlMs >= sevenDaysMs) {
-      fail(
-        `源文件 30 小时后过期，取件码有效期却达到了 ${Math.round(mainTtlMs / 3600000)} 小时 —— ` +
-          'min(TTL, file.expiresAt) 夹取失效，会产生指向已清理文件的取件码',
-      )
+    if (!mainOrder?.paidAt || !mainOrder.pickupCodeExpiresAt) fail('付款后必须写下 paidAt 与到机码截止')
+    const anchored = mainOrder.pickupCodeExpiresAt.getTime() - mainOrder.paidAt.getTime()
+    if (Math.abs(anchored - sevenDaysMs) > 5_000) {
+      fail(`付款后到机码必须从 paidAt 起 7 天，实际偏差 ${anchored - sevenDaysMs}ms`)
     }
-    pass(`对外有效期 == 落库有效期，且被源文件夹取（本单实际 ${Math.round(mainTtlMs / 3600000)}h，远小于 7 天上限）`)
+    const mainFile = await prisma.fileObject.findUnique({ where: { id: fileId } })
+    if (!mainFile?.expiresAt || mainFile.expiresAt.getTime() + 1_000 < mainOrder.pickupCodeExpiresAt.getTime()) {
+      fail('付款后源文件有效期必须覆盖到机码截止，避免码还在、文件已清理')
+    }
+    pass('对外有效期 == 落库有效期；付款后到机码从 paidAt 起 7 天，源文件延长到同一截止')
 
     // ── 按终端失败锁定 ────────────────────────────────────────────────────
     redis.reset()
@@ -667,7 +686,10 @@ async function main(): Promise<void> {
     for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
       await captureHttpError(() => pickup.claim('00000000', terminalId))
     }
-    await pickup.claim(created.pickupCode, terminalId) // 真实用户成功一次
+    const clearFileId = `file_m2_clear_${suffix}`
+    await seedFile(clearFileId, '清零用文件', 'keep')
+    const clearOrder = await memberOrders.create(userId, { fileId: clearFileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
+    await pickup.claim(clearOrder.pickupCode!, terminalId)
     await captureHttpError(() => pickup.claim('00000004', terminalId))
     const afterSuccess = await captureHttpError(() => pickup.claim('00000005', terminalId))
     if (afterSuccess.code !== 'PICKUP_CODE_INVALID') {
@@ -678,14 +700,17 @@ async function main(): Promise<void> {
     // Redis 故障时放行：`REDIS_DEGRADED_IMPACT` 里 'terminal-agent-print': 'unaffected'
     // 是一条被门禁实际发请求核对的声明；锁定若在 Redis 挂掉时改为拒绝，那句话就成了假话，
     // 且所有人都取不到已付费的文件。
+    const degradedFileId = `file_m2_deg_${suffix}`
+    await seedFile(degradedFileId, '降级用文件', 'keep')
+    const degradedOrder = await memberOrders.create(userId, { fileId: degradedFileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
     redis.reset()
     redis.failing = true
     const degraded = await captureHttpError(() => pickup.claim('00000005', terminalId))
     if (degraded.code !== 'PICKUP_CODE_INVALID') {
       fail(`Redis 不可用时锁定必须放行（fail-open），实际 ${JSON.stringify(degraded)}`)
     }
-    const degradedReal = await pickup.claim(created.pickupCode, terminalId)
-    if (degradedReal.orderId !== created.id) fail('Redis 不可用时真实取件码仍必须能认领')
+    const degradedReal = await pickup.claim(degradedOrder.pickupCode!, terminalId)
+    if (degradedReal.orderId !== degradedOrder.id) fail('Redis 不可用时真实取件码仍必须能认领')
     redis.failing = false
     redis.reset()
     pass('Redis 不可用时锁定 fail-open，真实取件码仍可认领（不把纵深防线变成单点故障）')

@@ -13,6 +13,20 @@ export function deriveStandbyPhase(args: {
   return 'playing'
 }
 
+/**
+ * 轮播的下一条：跳过已加载失败的素材。全部失败时停在原处（页面据此显示「暂无宣传内容」）。
+ * 只有一条且可播时仍返回它自己，与原来的 (i + 1) % n 一致。
+ */
+export function nextPlayableIndex(items: ReadonlyArray<{ id: string }>, from: number, failed: ReadonlySet<string>): number {
+  if (items.length === 0) return 0
+  for (let step = 1; step <= items.length; step += 1) {
+    const next = (from + step) % items.length
+    const item = items[next]
+    if (item && !failed.has(item.id)) return next
+  }
+  return from
+}
+
 export function standbyShouldExitHome(phase: StandbyPhase): boolean {
   return phase === 'empty'
 }

@@ -276,10 +276,10 @@ export interface PartnerDataSourceCredentialRotationResult {
 /**
  * `GET /partner/data-sources/capabilities` 的响应契约。
  *
- * 权威实现是服务端 `services/api/src/jobs/partner-capabilities.ts` 的
- * PARTNER_CAPABILITY_MATRIX——**本接口只是它的形状声明，不是第二份规则**。
- * Partner 控制台按这里的布尔值决定入口是否可点/侧栏是否展示；服务端按同一份矩阵
- * 拒写。前端不得另写一份机构类型判断。
+ * 机构类型规则的权威实现是服务端 `services/api/src/jobs/partner-capabilities.ts` 的
+ * PARTNER_CAPABILITY_MATRIX——**不是第二份机构类型规则**。
+ * 招聘内容托管是部署级叠加：关闭时岗位、招聘会、企业与数据源导入的布尔位为 false，
+ * 政策位不变。Partner 控制台按这里的布尔值决定入口是否可点；前端不得另写机构类型判断。
  */
 export interface PartnerDataSourceCapabilities {
   orgType: string
@@ -301,6 +301,14 @@ export interface PartnerDataSourceCapabilities {
    * own_enterprise：企业来源方只能维护本企业（名称与机构名称一致）。
    */
   companyManageScope: 'unrestricted' | 'fair_associated' | 'own_enterprise'
+  /**
+   * 部署级招聘内容托管是否打开。服务端只读 `isRecruitmentContentHostingEnabled()`，
+   * 不看查询参数。关闭时 `canImportJobs` / `canImportFairs` / `canManageCompanies`
+   * 为 false（岗位、招聘会、企业，以及数据源里的岗位/招聘会导入）；
+   * `canManagePolicies` 与机构类型矩阵的其余字段保持原值。
+   * 隐藏数据源、同步日志整页请看本字段，不要只看 `allowedAccessModes`。
+   */
+  recruitmentHosting: boolean
 }
 
 // ============================================================

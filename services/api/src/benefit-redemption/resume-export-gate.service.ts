@@ -1,10 +1,17 @@
 import { createHash } from 'crypto'
-import { BadRequestException, Injectable } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import {
   ensureResumeExportPriceConfig,
   RESUME_EXPORT_SERVICE_KEY,
 } from '../payment/price-config.seed'
+import {
+  RESUME_EXPORT_STAGING_LOCK,
+  RESUME_EXPORT_STAGING_TTL_MS,
+  type FilePurpose,
+  type FileSensitiveLevel,
+} from '../files/file.types'
+import { defaultRetentionForUpload } from '../files/retention-policy'
 import { REDEEMABLE_BENEFIT_TYPES } from './benefit-redemption.types'
 import { BenefitRedemptionService } from './benefit-redemption.service'
 
@@ -34,6 +41,88 @@ export interface ResumeExportGateDecision {
 }
 
 const SERVICE_TYPE = 'resume_export' as const
+const STAGED_EXPORT_CREATORS = new Set(['ai_resume_generate', 'ai_resume_diagnosis_export'])
+
+export function resumeExportStagingExpiresAt(now = Date.now()): Date {
+  return new Date(now + RESUME_EXPORT_STAGING_TTL_MS)
+}
+
+function exportFileNotStaged(): ConflictException {
+  return new ConflictException({
+    error: { code: 'RESUME_EXPORT_FILE_NOT_STAGED', message: '收费导出文件尚未就绪' },
+  })
+}
+
+/**
+ * 在核销事务内把预写文件改成 active，并按正式保存策略恢复 expiresAt。
+ * 已经激活且归属本人的文件视为幂等回放，不再改写。
+ */
+export async function activateStagedResumeExportFiles(
+  tx: PrismaTransactionClient,
+  fileIds: readonly string[],
+  endUserId: string,
+): Promise<void> {
+  const unique = [...new Set(fileIds.filter((id) => id.trim()))]
+  if (unique.length === 0) throw exportFileNotStaged()
+  const now = new Date()
+  for (const fileId of unique) {
+    const row = await tx.fileObject.findUnique({ where: { id: fileId } })
+    if (!row || row.deletedAt || !STAGED_EXPORT_CREATORS.has(row.createdBy ?? '')) {
+      throw exportFileNotStaged()
+    }
+    if (
+      row.status === 'active' &&
+      row.endUserId === endUserId &&
+      row.ownerId === endUserId &&
+      row.retentionLockedReason == null
+    ) {
+      continue
+    }
+    if (
+      row.status !== 'uploading' ||
+      row.endUserId !== null ||
+      row.ownerId !== endUserId ||
+      row.ownerType !== 'user' ||
+      row.retentionLockedReason !== RESUME_EXPORT_STAGING_LOCK ||
+      !row.expiresAt ||
+      row.expiresAt.getTime() <= now.getTime()
+    ) {
+      throw exportFileNotStaged()
+    }
+    const retention = defaultRetentionForUpload({
+      purpose: row.purpose as FilePurpose,
+      sensitiveLevel: row.sensitiveLevel as FileSensitiveLevel,
+      ownerType: 'user',
+      endUserId,
+      now,
+    })
+    const updated = await tx.fileObject.updateMany({
+      where: {
+        id: fileId,
+        status: 'uploading',
+        deletedAt: null,
+        endUserId: null,
+        ownerId: endUserId,
+        ownerType: 'user',
+        retentionLockedReason: RESUME_EXPORT_STAGING_LOCK,
+        expiresAt: { gt: now },
+      },
+      data: {
+        status: 'active',
+        endUserId,
+        ownerType: 'user',
+        ownerId: endUserId,
+        expiresAt: retention.expiresAt,
+        retentionPolicy: retention.retentionPolicy,
+        retentionSetBy: retention.retentionSetBy,
+        retentionConsentAt: retention.retentionConsentAt,
+        retentionConsentVersion: retention.retentionConsentVersion,
+        retentionLockedReason: null,
+      },
+    })
+    if (updated.count !== 1) throw exportFileNotStaged()
+  }
+}
 
 export function hashResumeExportContent(resume: {
   basic: unknown
@@ -158,19 +247,29 @@ export class ResumeExportGateService {
     }
   }
 
-  /** 文件成功生成后再落账。生成失败不得调用。alreadyPaid / free 为 no-op。 */
-  async commitExportRedemption(decision: ResumeExportGateDecision): Promise<void> {
+  /**
+   * 文件成功生成后再落账。生成失败不得调用。alreadyPaid / free 为 no-op。
+   * 首次收费必须带上预写文件 id，激活和扣次在同一个事务里提交。
+   */
+  async commitExportRedemption(
+    decision: ResumeExportGateDecision,
+    stagedFileIds: readonly string[] = [],
+  ): Promise<void> {
     if (decision.mode !== 'charged' || decision.alreadyPaid) return
     if (!decision.endUserId || !decision.benefitGrantId || !decision.serviceRefId) {
       throw new BadRequestException({
         error: { code: 'RESUME_EXPORT_BENEFIT_REQUIRED', message: '本次导出需核销 1 次权益。' },
       })
     }
+    const fileIds = [...new Set(stagedFileIds.filter((id) => id.trim()))]
+    if (fileIds.length === 0) throw exportFileNotStaged()
+    const endUserId = decision.endUserId
     await this.redemption.redeem({
-      endUserId: decision.endUserId,
+      endUserId,
       benefitGrantId: decision.benefitGrantId,
       serviceType: SERVICE_TYPE,
       serviceRefId: decision.serviceRefId,
+      withinTransaction: (tx) => activateStagedResumeExportFiles(tx, fileIds, endUserId),
     })
   }
 

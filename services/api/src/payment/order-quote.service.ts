@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common'
 import { countPagesInRange } from '../print-jobs/page-range.util'
 import { PrintPageCountService } from '../print-jobs/print-page-count.service'
 import { assertVerifiedPrintParameters } from '../print-jobs/verified-print-parameters'
@@ -12,6 +12,36 @@ import type { PrintPriceQuote } from './payment.types'
 
 const DEFAULT_COPIES = 1
 const DEFAULT_COLOR_MODE = 'black_white' as const
+
+/**
+ * 409 PRICE_CHANGED：用户确认过的金额与服务端按 /orders/quote 同一套报价重算的金额不一致。
+ * 全局 HttpExceptionFilter 只透传 error.code / message / details(string[])，所以当前报价
+ * 以固定 `key=value` 串放进 details，不带 description 等运营自由文本：
+ *   currentAmountCents=<分>、billablePages=<页>、line=<serviceKey>:<unitCents>:<quantity>:<subtotalCents>
+ */
+export function priceChanged(quote: PrintPriceQuote): ConflictException {
+  return new ConflictException({
+    error: {
+      code: 'PRICE_CHANGED',
+      message: `价格已更新，当前应付 ${(quote.amountCents / 100).toFixed(2)} 元。本次未建单、未扣款，请核对新价格后再确认。`,
+      details: [
+        `currentAmountCents=${quote.amountCents}`,
+        `billablePages=${quote.billablePages}`,
+        ...quote.lines.map((line) => `line=${line.serviceKey}:${line.unitCents}:${line.quantity}:${line.subtotalCents}`),
+      ],
+    },
+  })
+}
+
+/** 多文件报价合计。页数相加、明细按行展开，与 quoteLines / POST /orders/quote 同一聚合。 */
+export function aggregatePrintPriceQuotes(quotes: readonly PrintPriceQuote[]): PrintPriceQuote {
+  return {
+    amountCents: quotes.reduce((sum, quote) => sum + quote.amountCents, 0),
+    billablePages: quotes.reduce((sum, quote) => sum + quote.billablePages, 0),
+    billingPageSource: quotes[0]!.billingPageSource,
+    lines: quotes.flatMap((quote) => quote.lines),
+  }
+}
 
 /**
  * P0-1 打印报价（支付域，不落库）。
@@ -50,13 +80,7 @@ export class OrderQuoteService {
   private async quoteLines(dto: QuotePrintOrderDto): Promise<PrintPriceQuote> {
     // 逐行报价后聚合；每行继续走真实页数识别与同一套价目，绝不按前端页数/金额合算。
     const quotes = await Promise.all(dto.lines!.map((line) => this.quoteOne(line.fileUrl, line.pageRange, dto)))
-    return {
-      amountCents: quotes.reduce((sum, quote) => sum + quote.amountCents, 0),
-      billablePages: quotes.reduce((sum, quote) => sum + quote.billablePages, 0),
-      // PrintPriceQuote 保持既有单值契约；混合来源的逐行事实仍由建单时 OrderItem 固化。
-      billingPageSource: quotes[0]!.billingPageSource,
-      lines: quotes.flatMap((quote) => quote.lines),
-    }
+    return aggregatePrintPriceQuotes(quotes)
   }
 
   private async quoteOne(fileUrl: string, pageRange: string | undefined, dto: QuotePrintOrderDto): Promise<PrintPriceQuote> {

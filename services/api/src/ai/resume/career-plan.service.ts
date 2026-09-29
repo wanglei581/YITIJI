@@ -16,6 +16,9 @@ import {
   type DegradedSelfAssessmentDimension,
 } from './career-plan-degraded'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
+import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
+import { storedJobFitUsesSystemJob } from './job-fit-hosting'
+import { sanitizeCareerPlanPayload } from './career-plan-payload-safety'
 
 // ============================================================
 // 2E 职业规划会话服务。
@@ -57,11 +60,61 @@ interface StoredCareerPlan {
   basedOn: {
     resume: true
     jobFit: string | null
+    /** 旧存档无此字段；旧 basedOn.jobFit 按系统岗位引用保守清理。 */
+    jobFitSource?: 'system' | 'manual' | null
     interview: string | null
     /** self_assessment 仅作可选上下文 hint，不参与签名门禁 / 校验 / 配额。 */
     selfAssessment: string | null
   }
   providerName: string
+}
+
+function scrubSystemJobTitle(value: string, title: string): string {
+  // An unmarked occupation in the person's own prose is not recruitment content.
+  // Only whole, explicitly marked references are changed, and short titles are left alone.
+  if (!title.trim() || title.length < 4) return value
+  const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return value
+    .replace(new RegExp(`([「“《])${escaped}([」”》])`, 'g'), '$1目标岗位$2')
+    .replace(new RegExp(`目标岗位[：:]\\s*${escaped}(?=$|[，。；;、\\s])`, 'g'), '目标岗位')
+}
+
+/** 去掉系统岗位标题，保留规划正文。basedOn.jobFit 清空，避免标题从依据栏漏出。 */
+export function redactCareerPlanSystemJobTitle(stored: StoredCareerPlan, title: string): StoredCareerPlan {
+  const safeStored = { ...stored, payload: sanitizeCareerPlanPayload(stored.payload) }
+  if (!safeStored.basedOn?.jobFit || safeStored.basedOn.jobFitSource === 'manual') return safeStored
+  const clean = (value: string | undefined) => scrubSystemJobTitle(value ?? '', title)
+  const cleanStructured = (value: string | undefined) => value === title && !!title.trim() ? '目标岗位' : clean(value)
+  const payload = safeStored.payload
+  const objects = <T extends object>(items: T[] | undefined): T[] => Array.isArray(items)
+    ? items.filter((item): item is T => !!item && typeof item === 'object' && !Array.isArray(item)) : []
+  return {
+    ...safeStored,
+    basedOn: { ...safeStored.basedOn, jobFit: null, jobFitSource: null },
+    payload: {
+      ...payload,
+      summary: clean(payload?.summary),
+      currentSnapshot: objects(payload?.currentSnapshot).map((item) => ({
+        ...item,
+        point: cleanStructured(item.point),
+        evidence: clean(item.evidence),
+      })),
+      directions: objects(payload?.directions).map((item) => ({
+        ...item,
+        title: cleanStructured(item.title),
+        why: clean(item.why),
+        firstStep: clean(item.firstStep),
+      })),
+      skillPlan: objects(payload?.skillPlan).map((item) => ({
+        ...item,
+        skill: cleanStructured(item.skill),
+        action: clean(item.action),
+        timeframe: clean(item.timeframe),
+      })),
+      actionChecklist: (Array.isArray(payload?.actionChecklist) ? payload.actionChecklist : [])
+        .filter((item): item is string => typeof item === 'string').map((item) => clean(item)),
+    },
+  }
 }
 
 @Injectable()
@@ -84,7 +137,12 @@ export class CareerPlanService {
     private readonly jobRequirementStats?: CareerPlanJobRequirementStatsPort,
   ) {}
 
-  async generate(taskId: string, requester: CareerPlanRequester) {
+  async generate(
+    taskId: string,
+    requester: CareerPlanRequester,
+    options?: { includeJobFitTitle?: boolean },
+  ) {
+    const includeJobFitTitle = options?.includeJobFitTitle !== false
     const parse = await this.loadAuthorizedParse(taskId, requester)
 
     // 简历原文重提（2B 模式；清理后诚实失败不调 LLM）
@@ -103,19 +161,21 @@ export class CareerPlanService {
 
     // 可选上下文（如实分层，绝不跨归属）：
     // 1) 同 taskId 的最近岗位匹配参考
-    let jobFitCtx: { jobTitle: string; fitLevel: string; gaps: string[] } | null = null
-    const jobFitRow = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
+    let jobFitCtx: { jobTitle: string; gaps: string[]; source: 'system' | 'manual' } | null = null
+    const jobFitRow = includeJobFitTitle
+      ? await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
+      : null
     if (jobFitRow && jobFitRow.expiresAt && jobFitRow.expiresAt.getTime() > Date.now()) {
       try {
         const stored = JSON.parse(jobFitRow.payloadJson) as {
           job?: { title?: string }
-          payload?: { fitLevel?: string; gapPoints?: Array<{ gap?: string }> }
+          payload?: { gapPoints?: Array<{ gap?: string }> }
         }
-        if (stored.job?.title && stored.payload?.fitLevel) {
+        if (stored.job?.title) {
           jobFitCtx = {
             jobTitle: stored.job.title,
-            fitLevel: stored.payload.fitLevel,
-            gaps: (stored.payload.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
+            gaps: (stored.payload?.gapPoints ?? []).map((g) => g.gap ?? '').filter(Boolean).slice(0, 3),
+            source: storedJobFitUsesSystemJob(jobFitRow.payloadJson) ? 'system' : 'manual',
           }
         }
       } catch { /* 损坏行按无上下文处理 */ }
@@ -162,6 +222,7 @@ export class CareerPlanService {
       basedOn: {
         resume: true,
         jobFit: jobFitCtx?.jobTitle ?? null,
+        jobFitSource: jobFitCtx?.source ?? null,
         interview: interviewCtx?.position ?? null,
         selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
       },
@@ -196,13 +257,14 @@ export class CareerPlanService {
   }
 
   /** 读回最近一次规划（刷新恢复 / 会员回看）。 */
-  async getLatest(taskId: string, requester: CareerPlanRequester) {
+  async getLatest(taskId: string, requester: CareerPlanRequester, options?: { jobBoardOpen?: boolean }) {
     await this.loadAuthorizedParse(taskId, requester)
     const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'career_plan' } } })
     if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
       throw new NotFoundException({ error: { code: 'CAREER_PLAN_NOT_FOUND', message: '暂无职业规划记录，请先生成' } })
     }
-    return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredCareerPlan)
+    const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
+    return this.toResponse(taskId, this.withoutSystemJobTitle(stored, options))
   }
 
   /**
@@ -219,13 +281,13 @@ export class CareerPlanService {
    *   用户在一台**打印终端**上一张纸也拿不走 —— 降级路径只做了一半。
    *   降级态本身不是错误状态，不该用 404 表达。
    */
-  async printPlan(taskId: string, requester: CareerPlanRequester) {
+  async printPlan(taskId: string, requester: CareerPlanRequester, options?: { jobBoardOpen?: boolean }) {
     const parse = await this.loadAuthorizedParse(taskId, requester)
     const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'career_plan' } } })
     const hasPlan = !!row && !!row.expiresAt && row.expiresAt.getTime() >= Date.now()
 
     const rendered = hasPlan
-      ? await this.renderAiPlanPdf(row!)
+      ? await this.renderAiPlanPdf(row!, taskId, options)
       : await this.renderDegradedPdf(parse, row ? 'expired' : 'never_generated')
 
     const uploaded = await this.files.upload({
@@ -233,6 +295,9 @@ export class CareerPlanService {
       filename: rendered.filename,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
+      // 服务端生成的派生稿（AI 版与降级版都是）：生产隐私闸门按类别放行，
+      // 否则一体机直达报价页后建单会被拒 PRINT_PII_SCAN_REQUIRED（商用收口 P0-5）。
+      assetCategory: 'derived',
       uploaderId: null,
       endUserId: parse.endUserId,
       createdBy: 'career_plan',
@@ -260,11 +325,22 @@ export class CareerPlanService {
     }
   }
 
+  /**
+   * 托管或终端板块关闭时，按规划自身保存的 basedOn 来源清理。
+   * 旧存档无来源字段时，只要有 basedOn.jobFit 就保守按系统引用清理。
+   */
+  private withoutSystemJobTitle(stored: StoredCareerPlan, options?: { jobBoardOpen?: boolean }): StoredCareerPlan {
+    if (isRecruitmentContentHostingEnabled() && options?.jobBoardOpen !== false) {
+      return { ...stored, payload: sanitizeCareerPlanPayload(stored.payload) }
+    }
+    return redactCareerPlanSystemJobTitle(stored, stored.basedOn?.jobFit ?? '')
+  }
+
   /** AI 版式。逻辑与改动前一致，只是抽成方法。 */
-  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }) {
-    const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
+  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }, taskId: string, options?: { jobBoardOpen?: boolean }) {
+    const stored = this.withoutSystemJobTitle(JSON.parse(row.payloadJson) as StoredCareerPlan, options)
     const { buffer, pageCount } = await this.pdf.render(
-      { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn },
+      { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn, contentId: taskId },
       stored.payload,
     )
     return { buffer, pageCount, filename: `职业规划建议单.pdf`, variant: 'ai' as const }

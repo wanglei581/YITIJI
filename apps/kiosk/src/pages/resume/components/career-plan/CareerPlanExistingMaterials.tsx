@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
 import type { MemberDocumentItem, MemberResumeItem } from '@ai-job-print/shared'
 import { FolderOpenIcon, Loader2Icon } from 'lucide-react'
 import { useAuth } from '../../../../auth/useAuth'
@@ -70,65 +69,58 @@ export function CareerPlanExistingMaterials() {
     <CareerPlanSection title="已有材料" Icon={FolderOpenIcon} column="materials">
       <div data-career-plan-materials-state={view}>
         {view === 'signed-out' ? (
-          <p className="career-plan-lightflow__materials-note">{SIGNED_OUT_COPY}</p>
+          <p className="rdq-note">{SIGNED_OUT_COPY}</p>
         ) : null}
 
         {view === 'loading' ? (
-          <p className="career-plan-lightflow__materials-note" role="status" aria-live="polite">
-            <Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" />
+          <p className="rdq-note" role="status" aria-live="polite">
+            <Loader2Icon className="rdq-spin" size={20} aria-hidden="true" />
             正在读取你已保存的材料
           </p>
         ) : null}
 
         {view === 'error' ? (
-          <div className="career-plan-lightflow__stack">
-            <p className="career-plan-lightflow__materials-note" role="alert">{ERROR_COPY}</p>
-            <div className="career-plan-lightflow__next-actions">
-              <Button
-                size="lg"
-                className="career-plan-lightflow__materials-exit"
+          <div className="rdq-stack">
+            <p className="jfq-alert" role="alert">{ERROR_COPY}</p>
+            <div className="rdq-actions">
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="teal"
                 onClick={() => setReloadKey((key) => key + 1)}
               >
                 重新读取材料
-              </Button>
-              <Button
-                size="lg"
-                variant="secondary"
-                className="career-plan-lightflow__materials-exit"
-                onClick={goDocuments}
-              >
+              </button>
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={goDocuments}>
                 去我的文档
-              </Button>
+              </button>
             </div>
           </div>
         ) : null}
 
         {view === 'ready' ? (
-          <div className="career-plan-lightflow__stack">
-            <p className="career-plan-lightflow__materials-note">{SOURCE_COPY}</p>
-            <p className="career-plan-lightflow__materials-counts">
+          <div className="rdq-stack">
+            <p className="rdq-note">{SOURCE_COPY}</p>
+            <p className="rdq-counts">
               已保存简历 {resumeTotal} 份
               {resumes.length > 0 ? `（${resumes.map((item) => resumeKindLabel(item.kind)).join('、')}）` : ''}
               ；已保存文档 {documentTotal} 份。
             </p>
             {documents.length > 0 ? (
-              <ul className="career-plan-lightflow__materials-files">
+              <ul className="rdq-files">
                 {documents.slice(0, 5).map((doc) => (
                   <li key={doc.id}>{doc.filename}</li>
                 ))}
               </ul>
             ) : null}
             {documentTotal > documents.length ? (
-              <p className="career-plan-lightflow__muted">其余文件在「我的文档」里查看。</p>
+              <p className="rdq-muted">其余文件在「我的文档」里查看。</p>
             ) : null}
-            <Button
-              size="lg"
-              variant="secondary"
-              className="career-plan-lightflow__materials-exit"
-              onClick={goDocuments}
-            >
-              去我的文档
-            </Button>
+            <div className="rdq-actions">
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={goDocuments}>
+                去我的文档
+              </button>
+            </div>
           </div>
         ) : null}
       </div>

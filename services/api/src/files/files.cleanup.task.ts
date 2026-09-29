@@ -31,8 +31,10 @@ export class FilesCleanupTask {
     if (!this.uploadSessions) return
     try {
       const result = await this.uploadSessions.cleanupExpiredSessions()
-      if (result.cleaned > 0 || result.skipped > 0) {
-        this.logger.log(`Upload session cleanup: cleaned=${result.cleaned} skipped=${result.skipped}`)
+      if (result.cleaned > 0 || result.skipped > 0 || result.failed > 0) {
+        this.logger.log(
+          `Upload session cleanup: cleaned=${result.cleaned} skipped=${result.skipped} failed=${result.failed}`,
+        )
       }
     } catch {
       // Redis 是软依赖；本轮不做半清理，下一分钟重试，不能拖垮 API 进程。

@@ -9,10 +9,16 @@ export function MaterialsTab({
   fairId,
   materials,
   onChanged,
+  readOnly = false,
+  onTakedown,
 }: {
   fairId: string
   materials: FairMaterialView[]
   onChanged: () => void
+  /** 托管关闭（我们云上默认）时只读：不渲染上传 / 发布 / 下架 / 编辑 / 删除，点了也只会 403。 */
+  readOnly?: boolean
+  /** 紧急下架（单向）。两种托管状态都提供。 */
+  onTakedown?: (material: FairMaterialView) => void
 }) {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -121,10 +127,12 @@ export function MaterialsTab({
       {error && !busyId && <InlineError message={error} />}
       <div className="flex items-center justify-between">
         <p className="text-sm text-neutral-600">{materials.length} 份资料(发布后在一体机"活动资料"页可见)</p>
-        <button onClick={openUpload} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
-          <UploadIcon className="h-3.5 w-3.5" />
-          上传资料
-        </button>
+        {!readOnly && (
+          <button onClick={openUpload} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
+            <UploadIcon className="h-3.5 w-3.5" />
+            上传资料
+          </button>
+        )}
       </div>
 
       <Card className="overflow-hidden p-0">
@@ -139,7 +147,7 @@ export function MaterialsTab({
             </thead>
             <tbody className="divide-y divide-neutral-900/[0.06]">
               {materials.length === 0 ? (
-                <tr><td colSpan={7} className="py-10 text-center text-xs text-neutral-400">暂无活动资料,点击右上角"上传资料"(支持 PDF / PNG / JPEG)</td></tr>
+                <tr><td colSpan={7} className="py-10 text-center text-xs text-neutral-400">{readOnly ? '暂无活动资料' : '暂无活动资料,点击右上角"上传资料"(支持 PDF / PNG / JPEG)'}</td></tr>
               ) : (
                 materials.map((m) => (
                   <tr key={m.id} className="hover:bg-neutral-50">
@@ -180,19 +188,32 @@ export function MaterialsTab({
                         ) : (
                           <span className="rounded px-2 py-1 text-xs text-neutral-300" title="mock 模式无真实文件">预览</span>
                         )}
-                        <button
-                          disabled={busyId === m.id}
-                          onClick={() => void togglePublish(m)}
-                          className={`rounded px-2 py-1 text-xs font-medium disabled:opacity-50 ${
-                            m.publishStatus === 'published' ? 'text-warning-fg hover:bg-warning-bg' : 'text-success-fg hover:bg-success-bg'
-                          }`}
-                        >
-                          {m.publishStatus === 'published' ? '下架' : '发布'}
-                        </button>
-                        <button onClick={() => openEdit(m)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">
-                          <PencilIcon className="h-3.5 w-3.5" />
-                        </button>
-                        <DangerDeleteButton onConfirm={() => void remove(m.id)} busy={busyId === m.id} />
+                        {!readOnly && (
+                          <>
+                            <button
+                              disabled={busyId === m.id}
+                              onClick={() => void togglePublish(m)}
+                              className={`rounded px-2 py-1 text-xs font-medium disabled:opacity-50 ${
+                                m.publishStatus === 'published' ? 'text-warning-fg hover:bg-warning-bg' : 'text-success-fg hover:bg-success-bg'
+                              }`}
+                            >
+                              {m.publishStatus === 'published' ? '下架' : '发布'}
+                            </button>
+                            <button onClick={() => openEdit(m)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">
+                              <PencilIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <DangerDeleteButton onConfirm={() => void remove(m.id)} busy={busyId === m.id} />
+                          </>
+                        )}
+                        {onTakedown && (
+                          <button
+                            type="button"
+                            onClick={() => onTakedown(m)}
+                            className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
+                          >
+                            紧急下架
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

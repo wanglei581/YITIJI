@@ -1,7 +1,9 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
+import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 
 const MEMBER_TOKEN = 'qx-profile-member-token'
 const MEMBER_PHONE = '13800138000'
@@ -11,6 +13,7 @@ function collectRuntimeErrors(page: Page): string[] {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
   page.on('requestfailed', (request) => {
+    if (isAbortedPdfjsBlobImport(request)) return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`)
     }
@@ -36,6 +39,7 @@ function registerShell(api: ApiRouter): void {
     json: {
       smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] },
       toolbox: { enabled: false, items: [] },
+      ...RECRUITMENT_HOSTING_ON,
       configVersion: 'qx-profile',
       refreshIntervalMs: 300000,
       serverTime: '2026-09-07T00:00:00.000Z',
@@ -80,11 +84,14 @@ function registerAssetCounts(api: ApiRouter, totals: Record<string, number>): vo
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
@@ -106,13 +113,18 @@ test('profile signed-out reads no member totals and keeps recruitment copy at ze
 
   await page.goto('/profile')
   await expect(page.getByTestId('profile-state-signed-out')).toBeVisible()
-  await expect(page.getByRole('button', { name: '手机号登录', exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('region', { name: '我的资产' })).toBeVisible()
+  await expect(page.locator('.qx-topbar button')).toHaveCount(1)
+  await expect(page.locator('.qx-topbar button')).toHaveAccessibleName('返回首页')
+  await expect(page.locator('.qx-step-prev')).toHaveText('返回首页')
+  await expect(page.getByRole('button', { name: '去登录', exact: true })).toHaveCount(2)
+  await expect(page.getByRole('region', { name: '我的资产' })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: '登录与不登录的分界' })).toBeVisible()
   await expect(page.getByText('这台机器是公共终端')).toBeVisible()
   await expectComplianceCopy(page)
   await assertNoHorizontalOverflow(page)
   await assertNoElementCrossesViewport(page)
-  await assertTapTargetPointerHit(page.getByRole('button', { name: '手机号登录', exact: true }).first())
+  await assertTapTargetPointerHit(page.getByTestId('profile-primary'))
+  await assertTapTargetPointerHit(page.locator('.pf-idbtn'))
   await page.screenshot({ path: test.info().outputPath('profile-signed-out.png'), fullPage: true })
   expect(errors).toEqual([])
 })
@@ -160,6 +172,11 @@ test('profile payment todo is driven by pending-tasks payload @w5-kiosk', async 
 
   const continueBtn = page.getByTestId('profile-resume')
   await expect(continueBtn).toHaveText('继续付款')
+  const idBox = await page.locator('.pf-idcard').boundingBox()
+  const btnBox = await continueBtn.boundingBox()
+  expect(btnBox && idBox && btnBox.y >= idBox.y + idBox.height - 1, '待办操作在身份卡下方').toBe(true)
+  expect(btnBox && idBox && btnBox.y <= idBox.y + idBox.height + 120, '待办操作贴着身份卡，中间不留空档').toBe(true)
+  expect(await page.locator('.pf-page').evaluate((el) => el.scrollHeight - el.clientHeight), '默认待办态首屏放得下').toBeLessThanOrEqual(1)
   await assertTapTargetPointerHit(continueBtn)
   await page.screenshot({ path: test.info().outputPath('profile-payment.png'), fullPage: true })
   expect(errors).toEqual([])

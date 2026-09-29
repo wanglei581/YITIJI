@@ -170,7 +170,7 @@ export function AiPlanPage() {
             <HomeIcon size={32} aria-hidden />首页
           </button>
           <button type="button" className="qx-nav-item" onClick={() => navigate('/assistant')} aria-current="page" data-testid="advisor-artifact-nav-advisor">
-            <SparklesIcon size={32} aria-hidden />问小青
+            <SparklesIcon size={32} aria-hidden />AI 顾问
           </button>
           <button type="button" className="qx-nav-item" onClick={() => navigate('/profile')} data-testid="advisor-artifact-nav-profile">
             <UserIcon size={32} aria-hidden />我的

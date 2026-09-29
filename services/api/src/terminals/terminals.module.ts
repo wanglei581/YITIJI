@@ -5,6 +5,8 @@ import { TerminalsController } from './terminals.controller'
 import { AdminTerminalsController } from './admin-terminals.controller'
 import { AdminPrintersController } from './admin-printers.controller'
 import { AdminToolboxController } from './admin-toolbox.controller'
+import { AdminKioskJobBoardController } from './admin-kiosk-job-board.controller'
+import { KioskJobBoardService } from './kiosk-job-board.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { TerminalAdminService } from './terminals-admin.service'
 import { TerminalsService } from './terminals.service'
@@ -18,15 +20,17 @@ import { AdminReleaseObservationController } from './admin-release-observation.c
 import { TerminalHeartbeatRetentionTask } from './terminal-heartbeat-retention.task'
 import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from './terminal-session.service'
 import { TerminalIdentityGuard } from './terminal-identity.guard'
+import { AiAccessModule } from '../ai-access/ai-access.module'
 
 @Module({
-  imports: [JwtVerifierModule, FilesModule],
+  imports: [JwtVerifierModule, FilesModule, AiAccessModule],
   controllers: [
     TerminalsController,
     AdminTerminalsController,
     AdminReleaseObservationController,
     AdminPrintersController,
     AdminToolboxController,
+    AdminKioskJobBoardController,
   ],
   providers: [
     TerminalAgentService,
@@ -37,6 +41,7 @@ import { TerminalIdentityGuard } from './terminal-identity.guard'
     TerminalAdminService,
     TerminalsService,
     TerminalToolboxService,
+    KioskJobBoardService,
     ToolboxGovernanceService,
     TerminalCapabilitiesService,
     TerminalHeartbeatRetentionTask,
@@ -48,6 +53,7 @@ import { TerminalIdentityGuard } from './terminal-identity.guard'
     TerminalAdminService,
     TerminalsService,
     TerminalToolboxService,
+    KioskJobBoardService,
     ToolboxGovernanceService,
     TerminalCapabilitiesService,
     TerminalSessionService,

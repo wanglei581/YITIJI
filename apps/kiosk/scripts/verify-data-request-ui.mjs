@@ -115,7 +115,7 @@ expectMatches(
 )
 expectIncludes(kioskSettings, '/me/privacy-requests', '账号设置入口链到隐私请求页')
 expectIncludes(kioskSettings, '账号注销和数据导出尚未开放', '设置页保持导出/注销未开放诚实句')
-expectIncludes(kioskSettings, '业务元数据清单', '设置页说明后台导出含业务元数据')
+expectIncludes(kioskSettings, '文件、订单等业务摘要清单', '设置页以用户话说明导出范围仍包含文件与订单摘要')
 expectAbsent(
   kioskPage,
   /全部个人数据已删除|清空账号|账号注销成功|已删除全部|删除您的简历|删除打印订单|仅限岗位 AI 咨询会话与授权/,

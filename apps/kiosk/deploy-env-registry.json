@@ -111,7 +111,7 @@
     {
       "name": "VITE_AMAP_KEY",
       "status": "pending-decision",
-      "reason": "招聘会详情页地图（JobFairDetailTabs.tsx / MapBlock.tsx）。未配置时地图块降级不渲染。是否采购并注入高德 key 属产品/成本决策，且 key 进前端包即公开，需先确认高德侧域名白名单与配额限制再裁决。当前不设 = 招聘会地图不显示。"
+      "reason": "招聘会展位导览地图（FairMapPage.tsx / components/MapBlock.tsx）。未配置时地图块降级不渲染。是否采购并注入高德 key 属产品/成本决策，且 key 进前端包即公开，需先确认高德侧域名白名单与配额限制再裁决。当前不设 = 招聘会地图不显示。"
     },
     {
       "name": "VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN",

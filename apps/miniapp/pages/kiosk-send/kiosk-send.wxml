@@ -37,7 +37,7 @@
       </view>
     </block>
 
-    <!-- 完成：允许接着传下一份 -->
+    <!-- 完成：一张码只收一份，回到一体机继续，不再发送 -->
     <block wx:elif="{{phase === 'done'}}">
       <view class="state-card">
         <text class="sc-icon ficon i-check"></text>
@@ -46,18 +46,27 @@
         <view class="sent-list">
           <view class="sent-item" wx:for="{{sent}}" wx:key="index">{{item.name}}</view>
         </view>
-        <button class="btn-secondary" bindtap="chooseAndSend">再传一份</button>
+        <button class="btn-secondary" bindtap="goBack">回一体机继续</button>
       </view>
     </block>
 
-    <!-- 失败 -->
+    <!-- 结果未知：可能已经到达，不能说已收到，也不能再传一次 -->
+    <block wx:elif="{{phase === 'unknown'}}">
+      <view class="state-card">
+        <view class="sc-title">结果还不确定</view>
+        <view class="sc-desc">{{errorMsg}}</view>
+        <button class="btn-secondary" bindtap="goBack">回一体机核对</button>
+      </view>
+    </block>
+
+    <!-- 失败：只有服务端明确拒收才给重试 -->
     <block wx:elif="{{phase === 'error'}}">
       <view class="state-card">
         <view class="sc-title">没能传过去</view>
         <view class="sc-desc">{{errorMsg}}</view>
-        <!-- scene 码是一次性的，兑换失败给重试只会再失败一次；此时唯一有效动作是回机器重扫 -->
-        <button wx:if="{{!sceneFailed}}" class="btn-primary" bindtap="retry">重试</button>
-        <view wx:else class="sc-desc">请回到一体机屏幕重新生成二维码</view>
+        <button wx:if="{{canRetry}}" class="btn-primary" bindtap="retry">重试</button>
+        <!-- scene 码是一次性的，兑换失败给重试只会再失败一次 -->
+        <view wx:elif="{{sceneFailed}}" class="sc-desc">请回到一体机屏幕重新生成二维码</view>
       </view>
     </block>
 

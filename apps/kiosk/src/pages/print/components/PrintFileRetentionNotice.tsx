@@ -10,13 +10,13 @@ export function PrintFileRetentionNotice({ retention }: { retention: PrintFileRe
       <p className="print-done-card-sub">{copy.detail}</p>
       {copy.whenLabel ? (
         <div className="print-done-i-row">
-          <span className="k">到期/删除时点</span>
+          <span className="k">删除时间</span>
           <span className="v" data-print-file-retention-when="true">{copy.whenLabel}</span>
         </div>
       ) : null}
       <p className="print-file-retention-note">
         <InfoIcon aria-hidden="true" />
-        公共一体机不会长期保存你的简历或证件复印件。具体时点以后端返回的过期字段为准。
+        公共一体机不会长期保存你的简历或证件复印件。
       </p>
     </div>
   )

@@ -34,7 +34,7 @@ const scanSettingsTeardown = read('src/pages/scan/scanSettingsTeardown.ts')
 /* 清场收尾闸本身：等服务端确认之前不许换人。这一轮 P1 的本体。 */
 const scanCleanupGate = read('src/pages/scan/scanCleanupGate.ts')
 const privacyGuard = read('src/auth/KioskPrivacyGuard.tsx')
-/* 清场遮罩自己的组件：它现在除了「正在清除本机会话」，还要如实说出收尾闸在等什么。 */
+/* 清场遮罩自己的组件：它现在除了「正在清除这台机器上的这次使用记录」，还要如实说出收尾闸在等什么。 */
 const clearingOverlay = read('src/auth/KioskClearingOverlay.tsx')
 
 assert.doesNotMatch(
@@ -44,8 +44,8 @@ assert.doesNotMatch(
 )
 assert.match(
   scanStart,
-  /\u4e0b\u4e00\u6b65\u4f1a\u521b\u5efa\u771f\u5b9e\u626b\u63cf\u4f1a\u8bdd/,
-  'scan start must explain that the real session is created on the next step',
+  /\u4e0b\u4e00\u6b65\u4f1a\u771f\u5b9e\u5efa\u7acb\u8fd9\u6b21\u626b\u63cf/,
+  'scan start must explain that the next step really creates this scan',
 )
 assert.match(
   scanStart,
@@ -207,8 +207,8 @@ assert.doesNotMatch(
 )
 assert.match(
   scanProgress,
-  /服务端不做转换/,
-  'progress must say the server stores the original bytes',
+  /系统不做转换/,
+  'progress must say the system stores the original bytes and does not convert them',
 )
 assert.doesNotMatch(
   scanResult,
@@ -918,7 +918,7 @@ assert.match(
  * 被谁收走，也就不敢开新的一场。 */
 assert.match(
   rescanRecovery,
-  /RESCAN_CHILD_LOST_FAILURE = \{\s*\n\s*title: '那次安全重扫的会话已经失效'/,
+  /RESCAN_CHILD_LOST_FAILURE = \{\s*\n\s*title: '那次安全重扫已经失效'/,
   'child 已提交但不可恢复要有自己的结论屏：它和「上一场根本没走到取件」'
     + '（从来没有任务）的成因正相反，混成一句就有一半的人读到假的诊断',
 )
@@ -1127,23 +1127,33 @@ assert.match(
  * sessionStorage 里 —— 里面有上一位的 live.controlToken 明文，以及 result.file
  * （文件名 + 那条签名内容链接）。下一位在这台机器上进 /scan，阶段直接从登记复水到
  * result，他看到的是上一位的扫描件。 */
+// 2026-09-28 商用收口 P0-5：打印出口的落点从 /print/confirm 改到 /print/material-check。
+// 扫描件是本人原件，生产强制 PRINT_REQUIRE_PII_SCAN=true，没做完隐私检查就建单会被拒；
+// 检查只在打印台材料检查里做。窗口从 200 放到 400 字符，是因为打印出口在离开前要先组文件、
+// 写打印材料会话（见下一条断言）；落点仍逐个钉死，放宽窗口不会让别的出口顶替这一处。
 for (const [handler, destination] of [
-  ['handlePrint', '/print/confirm'],
+  ['handlePrint', '/print/material-check'],
   ['handleDocuments', '/me/documents'],
   ['handleResumeAI', '/resume/parse'],
 ]) {
   assert.match(
     scanResult,
-    new RegExp(`const ${handler} = \\(\\) => \\{[\\s\\S]{0,200}?leaveScanFlow\\('${destination.replaceAll('/', '\\/')}'`),
+    new RegExp(`const ${handler} = \\(\\) => \\{[\\s\\S]{0,400}?leaveScanFlow\\('${destination.replaceAll('/', '\\/')}'`),
     `${handler}（落点 ${destination}）必须走 leaveScanFlow：撤服务端任务 → 清本机登记 → `
       + '再带着文件跳过去。裸 navigate 会把上一位的凭证与扫描件留在登记里给下一位复水',
   )
 }
 assert.match(
   scanResult,
-  /leaveScanFlow\('\/print\/confirm', \{\s*\n\s*state: \{/,
-  '清登记的同时必须把文件从路由 state 带过去：打印页读的是 location.state.file，'
-    + '不读扫描登记 —— 少了 state，清场就把这条去向弄断了',
+  /savePrintMaterialSession\(\{ file: printFile, source \}\)\s*\n\s*leaveScanFlow\('\/print\/material-check', \{\s*\n\s*state: \{ file: printFile, source \}/,
+  '清登记的同时必须把文件交给打印台：/print/material-check 会 replace 重定向到 /print/desk?step=check，'
+    + '重定向不转发路由 state，打印台只认打印材料会话 —— 所以离开之前先整份写会话，'
+    + '少了这一步或顺序反过来，清场就把这条去向弄断了',
+)
+assert.doesNotMatch(
+  scanResult,
+  /leaveScanFlow\('\/print\/confirm'/,
+  '扫描件是本人原件：生产隐私闸门要求先做完材料检查才建单，打印出口不得直达报价确认页',
 )
 assert.match(
   scanResult,
@@ -1200,8 +1210,8 @@ for (const destination of ['/print-scan', '/help', '/']) {
  * 等于服务端已经把授权消费掉了 —— 所以「已放行」只有它说得出口。 */
 assert.doesNotMatch(
   scanResult,
-  /服务端给的安全重扫放行|服务端已放行/,
-  '结果页不得替服务端下结论：这一刻它只有凭据，没有放行结果',
+  /服务端给的安全重扫放行|服务端已放行|系统已放行/,
+  '结果页不得说已经放行：这一刻它只有凭据，没有放行结果',
 )
 assert.match(
   scanResult,
@@ -1211,8 +1221,8 @@ assert.match(
 )
 assert.match(
   scanSettingsModel,
-  /rescanRequested\s*\n?\s*\? \['本次性质', '安全重扫：服务端已放行同一份材料再扫一次'\]/,
-  '「已放行」只许出现在创建成功之后的设置页：那一刻服务端确实已经消费掉那枚授权',
+  /rescanRequested\s*\n?\s*\? \['本次性质', '安全重扫：系统已放行同一份材料再扫一次'\]/,
+  '「已放行」只许出现在创建成功之后的设置页：那一刻系统确实已经用掉那一次放行',
 )
 assert.match(
   scanSettings,
@@ -1251,8 +1261,8 @@ assert.match(
 )
 assert.match(
   scanSettingsModel,
-  /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通会话：你已确认这一次不是安全同字节重扫'\]/,
-  '用户在 fail-closed 那一屏选的普通会话要记在屏幕上：否则下一屏看起来像是本页悄悄降级的',
+  /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通扫描：你已确认这一次不是免查重的重扫'\]/,
+  '用户在 fail-closed 那一屏选的普通扫描要记在屏幕上：否则下一屏看起来像是本页悄悄降级的',
 )
 
 /* ── 整页重载把内存里那份凭据抹掉之后：fail-closed（2026-09-14 第二轮） ────────
@@ -1286,8 +1296,8 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding\]\)/,
-  '五个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
+  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding, quietPeriodBlocked\]\)/,
+  '（2026-09-28 起多一个终端静默期标志 quietPeriodBlocked：倒计时结束、用户点「重新开始」时它变 false，同样要触发这条 effect。）五个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
     + '它们变 false，这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生。\n'
     + 'rescanRefusedByServer 这一位尤其容易被判成冗余 —— 服务端拒绝那条路径上'
     + 'rescanCredentialsLost 从头到尾都是 false，复位它不构成依赖变化。\n'
@@ -1443,7 +1453,7 @@ assert.doesNotMatch(
 )
 assert.match(
   rescanRecovery,
-  /本页不会替你改发一次普通重扫/,
+  /不会替你改成普通重扫|不会自动改用普通重扫/,
   '必须对用户明说不会自动降级 —— 降级本身不危险，但它会把用户支到面板前去扫一张'
     + '注定被去重拒收的纸',
 )
@@ -1766,7 +1776,7 @@ assert.match(
 )
 assert.match(
   scanSettingsView,
-  /liveNotDurable\s*\n?\s*\? '本机存储不可用，无法建会话'[\s\S]{0,300}?cleanupHolding \? '等本机收完上一场的尾' : '未创建扫描任务'/,
+  /liveNotDurable\s*\n?\s*\? '本机暂时存不下扫描记录，无法开始这次扫描'[\s\S]{0,300}?cleanupHolding \? '等本机收完上一场的尾' : '未创建扫描任务'/,
   '这一支上任务**建过**（随后被本页撤掉）：禁用按钮写死「未创建扫描任务」就是句假话，'
     + '必须按 liveNotDurable 分开说。\n'
     + '2026-09-15 再多一支：收尾闸挡住时本页**一个请求都没发**，'
@@ -1855,7 +1865,9 @@ assert.match(
  *     放宽任何一格，闸就从「等确认」退化成「等一会儿」。 */
 assert.match(
   scanRevoke,
-  /if \(res\.ok\) return \{ confirmed: true, reason: 'cancelled' \}/,
+  // 2026-09-26：块体里多了一句「记进 endedByServer」（确认之后才落地的投递确认不许再补发），
+  // 判据不变 —— 200 之后必须直接交出 confirmed: true / 'cancelled'，中间不许有别的分支。
+  /if \(res\.ok\) \{[^{}]{0,200}?return \{ confirmed: true, reason: 'cancelled' \}/,
   '200 = 服务端刚把它 CAS 成 cancelled',
 )
 assert.match(
@@ -1900,6 +1912,39 @@ assert.match(
   '没有截止时刻的那一支（半残响应）只许退回尽力而为，**不许按住**：\n'
     + '本机拿不出任何收敛依据，按住就成了一块永远不放行的黑屏。\n'
     + '退回去是安全的 —— 凭据没落进登记就永远不会 ACK，而租约只签已确认的行。',
+)
+
+/* F8b. 409 SCAN_TASK_CANCEL_CONFLICT：只凭第一次不许换人，而且**只许再问一次**（2026-09-26）。
+ *
+ * cancel() 在 CAS 撞车之后也回这个码，那一刻任务可能正是 matched —— 一次投递刚开始，文件正往
+ * 上一位的任务里写，那份纸可能正是下一位在面板上扫的。所以第一次 409 必须是 confirmed: false。
+ * 第二次的每一种回答都是确定的（理由写在 requestConfirmedScanRevoke 的 afterConflict 上），
+ * 所以上限就是一次：放宽成循环 / 交给退避，真是终态的任务会把这台机器按到自然过期；
+ * 去掉这一次，又回到「凭一句分不清的 409 就换人」。行为由 scan-cleanup-gate.test.mjs 跑，
+ * 这里钉形状，免得有人把它「顺手」改成循环。 */
+assert.match(
+  scanRevoke,
+  /if \(code === 'SCAN_TASK_CANCEL_CONFLICT'\) \{[^{}]{0,300}?if \(!options\.afterConflict\) return \{ confirmed: false, reason: 'conflict' \}[^{}]{0,300}?endedByServer\.add\(credentials\.scanTaskId\)\s*\n\s*return \{ confirmed: true, reason: 'already-terminal' \}/,
+  '第一次 409 只能是 confirmed: false / conflict；只有紧跟在它之后的那一问（afterConflict）才许把 409 当成终态并记下',
+)
+const attemptOnceStart = scanCleanupGate.indexOf('async function attemptOnce(')
+const attemptOnceEnd = scanCleanupGate.indexOf('\nfunction nextDelayMs(')
+assert.ok(attemptOnceStart > 0 && attemptOnceEnd > attemptOnceStart, '收尾闸必须还有 attemptOnce（一次尝试）这个单元')
+const attemptOnceBody = stripComments(scanCleanupGate.slice(attemptOnceStart, attemptOnceEnd))
+assert.match(
+  attemptOnceBody,
+  /if \(!verdict\.confirmed && verdict\.reason === 'conflict'\) \{[^{}]{0,200}?verdict = await requestConfirmedScanRevoke\(task, task\.identityToken, \{ afterConflict: true \}\)/,
+  '拿到 conflict 必须在同一次尝试里立刻再问一次，并且那一问要带 afterConflict —— 否则第二次 409 仍分不清',
+)
+assert.equal(
+  (stripComments(scanCleanupGate).match(/afterConflict: true/g) ?? []).length,
+  1,
+  '再问只许一次：多一处 afterConflict 就是多一次（或一个循环）',
+)
+assert.doesNotMatch(
+  attemptOnceBody,
+  /\bwhile \(|\bfor \(/,
+  '一次尝试里不许有循环：409 之后的那一问是有界的，别处的重试归退避表管',
 )
 
 /* F9. 三处 fail-closed 都要接在同一条闸上，少一处那一处就是缺口。 */

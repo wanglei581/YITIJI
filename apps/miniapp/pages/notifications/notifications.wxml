@@ -70,7 +70,7 @@
     <view class="empty-slot card" wx:else>
       <view class="es-ic"><text class="ficon i-bell"></text></view>
       <view class="es-t">暂无通知</view>
-      <view class="es-d">打印进度、招聘会提醒等消息会出现在这里</view>
+      <view class="es-d">打印进度、AI 服务等消息会出现在这里</view>
     </view>
 
   </view>

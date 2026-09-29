@@ -51,6 +51,6 @@ export function describeProviderLabel(providerLabel?: string): string {
 export function buildNonAiNotice(providerLabel?: string): string {
   return (
     `本机 AI 顾问还没有接上真实模型（当前服务标识：${describeProviderLabel(providerLabel)}）。`
-    + '后端返回的是未接模型时的预置话术，页面不会拿它冒充小青的回答，所以正文不予展示。'
+    + '这次读到的是还没接上模型时写好的示例话，页面不会拿它冒充小青的回答，所以正文不予展示。'
   )
 }

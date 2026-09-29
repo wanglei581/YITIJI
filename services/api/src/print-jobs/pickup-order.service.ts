@@ -1,8 +1,15 @@
 import crypto from 'crypto'
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { hashPickupCode } from '../common/pickup-code'
+import {
+  CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
+  claimedUnpaidExpiredLeaseWhere,
+  isLiveKioskPickupLease,
+  isPickupWindowClosed,
+} from '../payment/order-status.service'
+import { PICKUP_VALIDITY_FROM_PAYMENT_MS } from '../payment/pickup-validity'
 import { createPaymentSessionToken, verifyPaymentSessionToken } from '../payment/payment-session-token'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
@@ -15,6 +22,8 @@ import {
   isPickupClaimLocked,
   recordPickupClaimFailure,
 } from './pickup-claim-lockout'
+import { consumePickupClaimRate } from './pickup-claim-rate-limit'
+import { maskPickupFileName } from './pickup-file-mask'
 
 /**
  * 视为「钱已经在退回路上」的支付态：这三个态下不得出纸，也不得推进取件状态。
@@ -22,6 +31,10 @@ import {
  * 发起后到成功之间是 'refunding'，部分退款是 'partial_refunded'。
  */
 const REFUNDED_PAY_STATUSES = new Set(['refunding', 'partial_refunded', 'refunded'])
+const CLAIMABLE_PAY_STATUSES = ['unpaid', 'paying', 'paid'] as const
+
+/** 同一终端核销后这段时间内再输同一码，返回已放行视图，不再建任务。 */
+export const PICKUP_RELEASED_REPLAY_MS = 10 * 60 * 1000
 
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -50,10 +63,17 @@ export class PickupOrderService {
     error: { code: 'PICKUP_CODE_INVALID', message: '到机码无效或已过期' },
   } as const
 
-  async claim(codeInput: string, terminalRef: string | undefined) {
+  async claim(codeInput: string, terminalRef: string | undefined, source?: string) {
     const code = codeInput.trim().toUpperCase()
     const terminal = await this.requireTerminal(terminalRef)
 
+    // 限流在锁定之前：过期码不计入锁定，但仍占用终端与来源配额。
+    if (await consumePickupClaimRate(this.redis, terminal.id, source)) {
+      throw new HttpException(
+        { error: { code: 'PICKUP_CLAIM_RATE_LIMITED', message: '尝试过于频繁，请稍后再试' } },
+        HttpStatus.TOO_MANY_REQUESTS,
+      )
+    }
     // 锁定检查必须在查库之前：锁定的意义就是「不再为这台终端检查任何码」。
     if (await isPickupClaimLocked(this.redis, terminal.id)) {
       throw new ForbiddenException({
@@ -77,28 +97,8 @@ export class PickupOrderService {
       await this.noteClaimFailure(terminal.id, 'terminal_mismatch', order.id)
       throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     }
-    if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date()) {
-      await this.prisma.order.updateMany({
-        where: { id: order.id, pickupStatus: { in: ['pending', 'claimed'] }, printTaskId: null },
-        data: {
-          pickupStatus: 'expired',
-          taskStatus: 'expired',
-          payStatus: order.payStatus === 'unpaid' || order.payStatus === 'paying' ? 'closed' : order.payStatus,
-        },
-      })
-      throw new BadRequestException({ error: { code: 'PICKUP_CODE_EXPIRED', message: '到机码已过期，请在小程序重新下单' } })
-    }
-    // 走到这里说明用户手里拿的是一枚**属于本终端的真码**，即他是真实用户而非枚举者。
-    // 清零该终端的失败计数：这是「正常用户手误不受影响」那条约束的主要实现手段 ——
-    // 繁忙机器上成功远多于失败，计数攒不起来；纯枚举场景没有成功，计数会一路涨到阈值。
-    await clearPickupClaimFailures(this.redis, terminal.id)
-
-    // 已退款 / 退款中的订单：在任何状态写入之前拦住。
-    // 2026-09-07 产品裁决：「如果退款的话就不出文件」。此前这里没有退款判断，
-    // 一枚已退款订单的到机码仍会先被写成 pickupStatus='claimed' + taskStatus='awaiting_payment'，
-    // 然后才以 ORDER_PAYMENT_UNAVAILABLE「订单当前无法付款」报错 —— 既污染了订单状态
-    // （对账与待退款信号都会读到一个假的「已认领待付款」），也把「钱已退给你」
-    // 说成了「你付不了款」。用户是来取文件的，不是来付款的。
+    // 退款态必须先于关窗判断：claimed + refunding 不再算活租约，否则会先被写成
+    // PICKUP_CODE_EXPIRED，把「钱已退」说成「码过期」。
     if (REFUNDED_PAY_STATUSES.has(order.payStatus)) {
       throw new BadRequestException({
         error: {
@@ -107,21 +107,80 @@ export class PickupOrderService {
         },
       })
     }
-    if (order.pickupStatus === 'used' && order.printTaskId) return this.releasedView(order)
+    // 已核销：同一终端、核销后 10 分钟内再输同一码，把上次放行视图再交出去。
+    // 不建任务、不出纸、不改状态。其它终端或超过 10 分钟仍拒绝。不计入锁定。
+    if (order.pickupStatus === 'used' || order.printTaskId) {
+      return this.replayReleasedClaim(order, terminal.id)
+    }
+    const paymentWindowClosed = Boolean(
+      order.paidAt
+      && order.pickupCodeHash
+      && !isLiveKioskPickupLease(order)
+      && order.paidAt.getTime() + PICKUP_VALIDITY_FROM_PAYMENT_MS <= Date.now(),
+    )
+    // 未认领过期、付款已满 7 天，或 claimed 未付租约已过：落 expired 并拒绝。
+    // 活着的 claimed 租约（含已付）不算关窗，落到下面的幂等认领 / 付款 / release。
+    // pending 过期写只打 pending，避免并发认领后被误关；claimed 未付过期另走租约 CAS。
+    if (isPickupWindowClosed(order) || paymentWindowClosed) {
+      await this.prisma.order.updateMany({
+        where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
+        data: {
+          pickupStatus: 'expired',
+          taskStatus: 'expired',
+          payStatus: order.payStatus === 'unpaid' || order.payStatus === 'paying' ? 'closed' : order.payStatus,
+        },
+      })
+      await this.prisma.order.updateMany({
+        where: { id: order.id, ...claimedUnpaidExpiredLeaseWhere() },
+        data: { ...CLAIMED_UNPAID_LEASE_EXPIRE_DATA },
+      })
+      throw new BadRequestException({ error: { code: 'PICKUP_CODE_EXPIRED', message: '到机码已过期，请在小程序重新下单' } })
+    }
+    // 走到这里说明用户手里拿的是一枚**属于本终端的真码**，即他是真实用户而非枚举者。
+    // 清零该终端的失败计数：这是「正常用户手误不受影响」那条约束的主要实现手段 ——
+    // 繁忙机器上成功远多于失败，计数攒不起来；纯枚举场景没有成功，计数会一路涨到阈值。
+    await clearPickupClaimFailures(this.redis, terminal.id)
+
     if (!['pending', 'claimed'].includes(order.pickupStatus)) {
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '到机码当前不可使用' } })
     }
-    const firstItem = !order.sourceFileId
-      ? await this.prisma.orderItem.findFirst({ where: { orderId: order.id, seq: 0 }, orderBy: { seq: 'asc' } })
-      : null
-    await this.assertOrderFileReady(order, firstItem?.fileId)
+    this.assertPayStatusClaimable(order.payStatus)
+    const packageItems = !order.sourceFileId
+      ? await this.prisma.orderItem.findMany({ where: { orderId: order.id }, orderBy: { seq: 'asc' } })
+      : []
+    if (!order.sourceFileId && packageItems.length === 0) throw new BadRequestException('PRINT_FILE_NOT_FOUND')
+    if (order.sourceFileId) {
+      await this.assertOrderFileReady(order)
+    } else {
+      for (const item of packageItems) {
+        await this.assertOrderFileReady(order, item.fileId)
+      }
+    }
+    const firstItem = packageItems[0] ?? null
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'document_print')
 
     if (order.pickupStatus === 'pending') {
-      await this.prisma.order.updateMany({
-        where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
+      const claimed = await this.prisma.order.updateMany({
+        where: {
+          id: order.id,
+          pickupStatus: 'pending',
+          printTaskId: null,
+          pickupCodeHash: order.pickupCodeHash,
+          payStatus: { in: [...CLAIMABLE_PAY_STATUSES] },
+        },
         data: { pickupStatus: 'claimed', pickupClaimedAt: new Date(), taskStatus: 'awaiting_payment' },
       })
+      if (claimed.count !== 1) {
+        const raced = await this.prisma.order.findUnique({ where: { id: order.id } })
+        if (!raced) throw new NotFoundException('ORDER_NOT_FOUND')
+        if (raced.pickupCodeHash !== order.pickupCodeHash) {
+          throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
+        }
+        if (raced.pickupStatus === 'used' || raced.printTaskId) {
+          return this.replayReleasedClaim(raced, terminal.id)
+        }
+        if (raced.pickupStatus === 'pending') this.assertPayStatusClaimable(raced.payStatus)
+      }
     }
     const fresh = await this.prisma.order.findUnique({ where: { id: order.id } })
     if (!fresh) throw new NotFoundException('ORDER_NOT_FOUND')
@@ -248,6 +307,26 @@ export class PickupOrderService {
    * 有 `terminal_mismatch` 记录 = 用户走错机器（payload 里有 orderId，
    * 能直接查到该单绑的是哪台）；没有记录 = 码本身不存在（输错或已换单）。
    */
+  /**
+   * 响应丢失后的同机重试。只读已核销订单和它的打印任务，命中窗口就交回原视图。
+   */
+  private async replayReleasedClaim(order: OrderRecord, terminalId: string) {
+    const expired = new BadRequestException({
+      error: { code: 'PICKUP_CODE_ALREADY_USED', message: '这份到机码已经使用过，不能再次取件' },
+    })
+    if (order.terminalId !== terminalId || order.pickupStatus !== 'used' || !order.printTaskId) throw expired
+    const task = await this.prisma.printTask.findUnique({
+      where: { id: order.printTaskId },
+      select: { createdAt: true, terminalId: true },
+    })
+    if (!task || task.terminalId !== terminalId || Date.now() - task.createdAt.getTime() > PICKUP_RELEASED_REPLAY_MS) {
+      throw expired
+    }
+    const fresh = await this.prisma.order.findUnique({ where: { id: order.id } })
+    if (!fresh || fresh.pickupStatus !== 'used' || fresh.printTaskId !== order.printTaskId) throw expired
+    return this.releasedView(fresh)
+  }
+
   private async noteClaimFailure(
     terminalId: string,
     reason: 'code_not_found' | 'terminal_mismatch',
@@ -280,6 +359,19 @@ export class PickupOrderService {
     }
     if (latest.localTaskDatabaseAvailable === false) throw new ForbiddenException('PRINT_TERMINAL_DEGRADED')
     return terminal
+  }
+
+  private assertPayStatusClaimable(payStatus: string): void {
+    if ((CLAIMABLE_PAY_STATUSES as readonly string[]).includes(payStatus)) return
+    if (REFUNDED_PAY_STATUSES.has(payStatus)) {
+      throw new BadRequestException({
+        error: {
+          code: 'ORDER_REFUNDED',
+          message: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度。',
+        },
+      })
+    }
+    throw new BadRequestException({ error: { code: 'ORDER_PAYMENT_UNAVAILABLE', message: '订单当前无法付款' } })
   }
 
   private async assertOrderFileReady(order: { sourceFileId: string | null; endUserId: string | null }, itemFileId?: string) {
@@ -347,6 +439,8 @@ export class PickupOrderService {
       terminalId: order.terminalId,
       taskStatus: order.taskStatus,
       printTaskStatus: order.taskStatus,
+      fileName: maskPickupFileName(order.sourceFileName),
+      billablePages: order.billablePages,
       paymentSessionToken: this.paymentToken(order),
     }
   }

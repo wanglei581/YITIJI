@@ -3,7 +3,10 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const voice = require('../../utils/voice-recorder')
 
-// 后端 route 字符串 → 小程序页面路径映射（后端返回 actions[].route 时使用）
+// 后端 route 字符串 → 小程序页面路径映射（后端返回 actions[].route 时使用）。
+// 没有映射的 route 会被丢掉（见 _send 里的 .filter）：服务端给一体机的岗位、招聘会、
+// 人社专区三类卡片在小程序里不出现——对应页面已停放，
+// 小程序首发按非招聘类目提审（compliance-boundary.md §1.1）。
 const ROUTE_MAP = {
   '/resume/source':    '/pages/resume-upload/resume-upload',
   '/resume/report':    '/pages/resume-diagnose/resume-diagnose',
@@ -13,11 +16,12 @@ const ROUTE_MAP = {
   '/interview':        '/pages/interview-entry/interview-entry',
   '/print':            '/pages/print/print',
   '/print/upload':     '/pages/print-upload/print-upload',
-  '/jobs':             '/pages/jobs/jobs',
-  '/fairs':            '/pages/fairs/fairs',
-  '/policies':         '/pages/policies/policies',
   '/ai-records':       '/pages/ai-records/ai-records',
 }
+
+// Tab 页只能 switchTab 进，navigateTo 会直接失败（「打印」成为 Tab 后，
+// 开场卡片「怎么打印文件」和服务端 /print 卡片都会落到这里）。
+const TAB_PAGES = ['/pages/home/home', '/pages/ai/ai', '/pages/print/print', '/pages/me/me']
 
 function iconForRoute(route) {
   if (/resume|career|job-fit/.test(route)) return 'file-text'
@@ -40,14 +44,14 @@ Page({
       {
         id: 1,
         role: 'ai',
-        text: '你好，我是小青。简历优化、打印帮助、求职政策都可以问我。想从哪里开始？',
+        text: '你好，我是小青。简历怎么改、面试怎么准备、文件怎么打印，都可以问我。想从哪里开始？',
         cards: [
           { id: 'resume', icon: 'file-text', tone: 'plum', title: '诊断我的简历', sub: 'AI 分析并给出优化建议', url: '/pages/resume-upload/resume-upload' },
           { id: 'print',  icon: 'printer',   tone: 'teal', title: '怎么打印文件', sub: '上传、扫码或到店打印',  url: '/pages/print/print' },
         ],
       },
     ],
-    quickChips: ['简历怎么写更好', '求职补贴怎么领', '附近招聘会', '练习模拟面试'],
+    quickChips: ['简历怎么写更好', '面试前要准备什么', '怎么在手机上下单打印', '练习模拟面试'],
     inputText: '',
     sending: false,
     holding: false,
@@ -96,7 +100,9 @@ Page({
 
   tapCard(e) {
     const { url } = e.currentTarget.dataset
-    if (url) wx.navigateTo({ url })
+    if (!url) return
+    if (TAB_PAGES.includes(String(url).split('?')[0])) wx.switchTab({ url: String(url).split('?')[0] })
+    else wx.navigateTo({ url })
   },
 
   /** 滚动到底部（两值交替保证 scroll-top binding 每次都触发渲染） */

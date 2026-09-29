@@ -4,13 +4,15 @@
 // API_MODE=http → 真实后端 /admin/policy-sources/*
 // API_MODE=mock → 内存 mock(演示)
 //
-// 数据流:Partner 录入 → 本页审核/发布 → Kiosk 政策服务页展示。
+// 数据流(3.13 起):Partner 录入 → 机构自己审核、发布并确认发布责任 → Kiosk 政策服务页展示。
+// 管理员对政策只有查看与紧急下架(紧急下架走 recruitmentEmergency.ts),
+// 服务端对管理员的审核 / 发布一律回 403 ADMIN_POLICY_PUBLISH_DISABLED,
+// 所以本 service 刻意不再提供 reviewPolicy / publishPolicy。
 // 合规:info-only;不承诺补贴到账、不代申请。
 // ============================================================
 
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
-import type { ReviewAction, PublishAction } from './review-types'
 import type { AdminSourceListQuery, AdminSourcePage } from './types'
 import { isPagedSourceQuery, paginateAdminSourceRows, toAdminSourceQueryString } from './sourcePaging'
 
@@ -89,8 +91,6 @@ export interface PolicyEligibilityRuleRecord {
 
 export interface PoliciesAdminServiceInterface {
   getPolicySources(query?: AdminSourceListQuery): Promise<AdminPolicyRecord[] | AdminSourcePage<AdminPolicyRecord>>
-  reviewPolicy(id: string, action: ReviewAction, reason?: string): Promise<AdminPolicyRecord>
-  publishPolicy(id: string, action: PublishAction): Promise<AdminPolicyRecord>
   /** 问项字典(公开端点,无角色守卫):把规则里的服务端标识翻成中文名称 */
   getEligibilityQuestions(): Promise<PolicyEligibilityQuestionSet>
   /** 只读复核某条政策已录入的申领条件;空数组 = 确实没录,与请求失败必须区分 */
@@ -134,8 +134,6 @@ const httpAdapter: PoliciesAdminServiceInterface = {
       ? req<AdminSourcePage<AdminPolicyRecord>>('GET', path)
       : req<AdminPolicyRecord[]>('GET', path)
   },
-  reviewPolicy: (id, action, reason) => req<AdminPolicyRecord>('PATCH', `/admin/policy-sources/${id}/review`, { action, reason }),
-  publishPolicy: (id, action) => req<AdminPolicyRecord>('PATCH', `/admin/policy-sources/${id}/publish`, { action }),
   getEligibilityQuestions: () => req<PolicyEligibilityQuestionSet>('GET', '/policies/eligibility-questions'),
   getEligibilityRules: (policyId) =>
     req<PolicyEligibilityRuleRecord[]>('GET', `/admin/policy-sources/${policyId}/eligibility-rules`),
@@ -168,22 +166,6 @@ const mockAdapter: PoliciesAdminServiceInterface = {
     if (keyword) rows = rows.filter((r) => r.title.includes(keyword) || r.sourceName.includes(keyword))
     if (!isPagedSourceQuery(query)) return rows
     return paginateAdminSourceRows(rows, query ?? {})
-  },
-  async reviewPolicy(id, action, reason) {
-    const hit = mockPolicies.find((p) => p.id === id)
-    if (!hit) throw new ApiHttpError('POLICY_NOT_FOUND', '不存在', 404)
-    if (action === 'approve') { hit.reviewStatus = 'approved'; hit.publishStatus = 'draft'; hit.rejectReason = null }
-    else if (action === 'reject') { hit.reviewStatus = 'rejected'; hit.publishStatus = 'draft'; hit.rejectReason = reason ?? '' }
-    else hit.reviewStatus = 'reviewing'
-    hit.updatedAt = now()
-    return { ...hit }
-  },
-  async publishPolicy(id, action) {
-    const hit = mockPolicies.find((p) => p.id === id)
-    if (!hit) throw new ApiHttpError('POLICY_NOT_FOUND', '不存在', 404)
-    hit.publishStatus = action === 'publish' ? 'published' : 'unpublished'
-    hit.updatedAt = now()
-    return { ...hit }
   },
 
   // ── 申领条件在演示模式下**不提供**,而不是给一份假的 ──────────────────────

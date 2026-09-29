@@ -36,6 +36,7 @@ import { OrderStatusService } from '../src/payment/order-status.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
+import { ONLINE_PAID_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
 import { RefundService } from '../src/payment/refund.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { AlipayProvider, alipayTimestamp, buildAlipaySignBase } from '../src/payment/providers/alipay.provider'
@@ -692,6 +693,124 @@ async function main(): Promise<void> {
     } else {
       fail('offline refund regression')
     }
+
+    // ── (L1) 迟到回调：取件窗口已关 → attempt success、订单未 paid → canonical 退款 ──
+    async function makeLateCollected(label: string): Promise<{
+      orderId: string
+      orderNo: string
+      taskId: string
+      attemptId: string
+      amountCents: number
+    }> {
+      const printed = await printJobs.create(
+        { fileUrl: await seedPdfFixture(label, 2), fileMd5: `sha256-refundreal-${label}`, fileName: `${label}.pdf`, params: PRINT_PARAMS },
+        { endUserId: null, terminalId },
+      )
+      taskIds.push(printed.taskId)
+      const order = await prisma.order.findUnique({ where: { printTaskId: printed.taskId } })
+      if (!order || !printed.paymentSessionToken) fail(`makeLateCollected(${label}) setup failed`)
+      const attempt = await payment.createPayAttempt(order.id, printed.paymentSessionToken, 'wechat')
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          pickupStatus: 'expired',
+          pickupCodeHash: `hash_late_${label}_${suffix}`,
+          pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+        },
+      })
+      const cb = buildWechatCallback({
+        mchid: WX_MCHID,
+        appid: WX_APPID,
+        out_trade_no: attempt.attemptId,
+        transaction_id: `wxtxn_late_${randomBytes(8).toString('hex')}`,
+        trade_state: 'SUCCESS',
+        amount: { total: order.amountCents, currency: 'CNY' },
+        attach: JSON.stringify({ orderId: order.id }),
+      })
+      await payment.processCallback('wechat', cb.rawBody, cb.headers)
+      const after = await prisma.order.findUnique({ where: { id: order.id } })
+      const att = await prisma.paymentAttempt.findUnique({ where: { id: attempt.attemptId } })
+      if (after?.payStatus === 'paid' || after?.pickupCode) {
+        fail(`late callback must not mark paid or mint pickupCode: pay=${after?.payStatus} code=${after?.pickupCode}`)
+      }
+      if (after?.refundReason !== ONLINE_PAID_PENDING_REFUND_REASON || att?.status !== 'success') {
+        fail(`late callback pending-refund mismatch: reason=${after?.refundReason} attempt=${att?.status}`)
+      }
+      return {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        taskId: printed.taskId,
+        attemptId: attempt.attemptId,
+        amountCents: order.amountCents,
+      }
+    }
+
+    const L1 = await makeLateCollected('l1')
+    const l1RefundId = `wxrfd_late_${randomBytes(6).toString('hex')}`
+    wechatRefundCreateResponse = { body: { status: 'SUCCESS', refund_id: l1RefundId } }
+    lastWechatRefundCreate = null
+    const gatewayBeforeLate = gatewayRequestCount
+    const l1View = await refundService.refund(L1.orderId, { reason: '迟到回调待退', operatorId: 'verify-admin' })
+    const l1Order = await orderState(L1.orderId)
+    const l1Task = await prisma.printTask.findUnique({ where: { id: L1.taskId } })
+    if (
+      l1View.refund.status === 'success' &&
+      l1View.refund.channelRefundNo === l1RefundId &&
+      l1View.refund.amountCents === L1.amountCents &&
+      l1Order.payStatus === 'refunded' &&
+      l1Order.refundedAmountCents === L1.amountCents &&
+      l1Order.pickupCode == null &&
+      l1Order.paymentSource == null &&
+      l1Task?.status === 'pending' &&
+      gatewayRequestCount === gatewayBeforeLate + 1 &&
+      lastWechatRefundCreate?.['out_trade_no'] === L1.attemptId
+    ) {
+      pass('迟到回调 wechat：渠道退款一次 + Refund 成功 + 订单 refunded，无取件码、不改 PrintTask')
+    } else {
+      fail(`late wechat refund mismatch: ${JSON.stringify({ l1View, pay: l1Order.payStatus, task: l1Task?.status, payload: lastWechatRefundCreate })}`)
+    }
+    const l1Repeat = await refundService.refund(L1.orderId, { reason: '重复迟到回调退款' })
+    if (l1Repeat.idempotent && gatewayRequestCount === gatewayBeforeLate + 1 && (await auditCount('refund.created', L1.orderId)) === 1) {
+      pass('迟到回调退款重复请求幂等：不再打渠道')
+    } else {
+      fail('late wechat refund repeat not idempotent')
+    }
+
+    const L2 = await makeLateCollected('l2')
+    wechatRefundCreateResponse = { httpStatus: 400 }
+    await expectCode('迟到回调 wechat 明确拒绝 → REFUND_CHANNEL_FAILED', 'REFUND_CHANNEL_FAILED', () =>
+      refundService.refund(L2.orderId, { reason: '迟到回调待退' }),
+    )
+    const l2Failed = await orderState(L2.orderId)
+    if (l2Failed.payStatus === 'closed' && l2Failed.pickupCode == null && l2Failed.paymentSource == null) {
+      pass('迟到回调渠道拒绝：回滚 closed 而非 paid，无幽灵码')
+    } else {
+      fail(`late reject rollback wrong: pay=${l2Failed.payStatus} source=${l2Failed.paymentSource}`)
+    }
+    const l2RefundId = `wxrfd_late_retry_${randomBytes(6).toString('hex')}`
+    wechatRefundCreateResponse = { body: { status: 'SUCCESS', refund_id: l2RefundId } }
+    const l2Retry = await refundService.refund(L2.orderId, { reason: '迟到回调待退' })
+    if (l2Retry.refund.status === 'success' && (await orderState(L2.orderId)).payStatus === 'refunded') {
+      pass('迟到回调渠道拒绝后同号重试成功')
+    } else {
+      fail(`late retry failed: ${JSON.stringify(l2Retry)}`)
+    }
+    wechatRefundCreateResponse = {}
+
+    const L3 = await makeLateCollected('l3')
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: L3.orderId,
+        channel: 'wechat',
+        amountCents: L3.amountCents,
+        status: 'success',
+        prepayId: `pa_late_dup_${suffix}`,
+        channelTxnNo: `wxtxn_late_dup_${randomBytes(6).toString('hex')}`,
+      },
+    })
+    await expectCode('迟到回调双 success 尝试 → REFUND_SOURCE_AMBIGUOUS', 'REFUND_SOURCE_AMBIGUOUS', () =>
+      refundService.refund(L3.orderId, { reason: '双成功' }),
+    )
 
     console.log(`\n  ✅ verify:refund-real-channels 全部通过（${passCount} checks）\n`)
   } finally {

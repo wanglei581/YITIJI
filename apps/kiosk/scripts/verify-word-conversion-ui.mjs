@@ -11,7 +11,7 @@ const paths = {
   phone: join(kioskRoot, 'src/pages/upload/PhoneUploadPage.tsx'),
   printUpload: join(kioskRoot, 'src/pages/print/PrintUploadPage.tsx'),
   preview: join(kioskRoot, 'src/components/FileContentPreview.tsx'),
-  printPreview: join(kioskRoot, 'src/pages/print/PrintPreviewPage.tsx'),
+  printPreview: join(kioskRoot, 'src/pages/print/components/PrintPreviewPanel.tsx'),
   miniapp: join(repoRoot, 'apps/miniapp/pages/resume-upload/resume-upload.js'),
   miniappWxml: join(repoRoot, 'apps/miniapp/pages/resume-upload/resume-upload.wxml'),
   documentsPage: join(kioskRoot, 'src/pages/profile/me/MyDocumentsPage.tsx'),
@@ -55,8 +55,19 @@ function collectFailures(files) {
     printPreview: files.printPreview,
     miniapp: `${files.miniapp}\n${files.miniappWxml}`,
   })) {
-    check(content.includes('WORD_CONVERSION_UNAVAILABLE_COPY'), `${key}-reason: 能力关闭态必须显示 Word 转换未开放原因`)
+    check(['printPreview', 'resume'].includes(key) ? content.includes('Word 转换暂未开放，请另存为 PDF 再上传。') : content.includes('WORD_CONVERSION_UNAVAILABLE_COPY'), `${key}-reason: 能力关闭态必须显示 Word 转换未开放原因`)
   }
+  // 2.0 规则 4：未开放的事实必须常显，但内部 reason 不得原样读给用户。
+  check(!files.resume.includes('conversionCapabilities.reason'), 'resume-no-raw-reason: 简历上传不得显示内部转换原因串')
+  check(!files.printPreview.includes('capabilities.reason'), 'print-preview-no-raw-reason: 预览不得显示内部转换原因串')
+  check(!files.printUpload.includes('conversionCapabilities.reason'), 'print-upload-no-raw-reason: 上传与 aria 说明不得显示内部转换原因串')
+  check(!files.preview.includes('capabilities.reason'), 'file-preview-no-raw-reason: 文件预览关闭态不得拼接服务端原因')
+  check(!files.documentsConvert.includes('capabilities.reason'), 'documents-no-raw-reason: 我的文档关闭态不得拼接服务端原因')
+  check(
+    files.service.includes("WORD_CONVERSION_DISCLOSURE = '转为 PDF 后，复杂版式可能有偏差，请预览核对'"),
+    'conversion-user-disclosure: 版式偏差提示必须保留，并使用用户话',
+  )
+  check(files.printPreview.includes("previewKind === 'word' && capabilities.wordToPdf"), 'print-preview-word-gate: Word 预览仍须能力已开放')
   check(
     files.printUpload.includes('`${WORD_CONVERSION_UNAVAILABLE_COPY}；支持 PDF、JPG、PNG'),
     'print-upload-closed-copy: 本机打印上传关闭态必须明确改传 PDF/图片',

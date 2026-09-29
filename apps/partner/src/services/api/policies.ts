@@ -4,7 +4,11 @@
 // API_MODE=http → 真实后端 /partner/policies/*
 // API_MODE=mock → 内存 mock(演示)
 //
-// 数据流:本页录入/编辑(编辑强制回 pending 重审)→ Admin 审核/发布 → Kiosk 展示。
+// 数据流(3.13 起):本页录入/编辑(编辑强制回 pending 重审、内容版本 +1)
+//   → 本机构审核通过(PATCH /partner/policies/:id/review)
+//   → 本机构确认发布责任并发布(PATCH /partner/policies/:id/release,responsibilityAcknowledged=true;
+//     服务端审计记下确认人、时间与 contentVersion)→ Kiosk 展示。
+// 平台管理员对政策只保留紧急下架,不审核、不发布。
 // 合规:info-only;只做政策说明 + 官方入口,不承诺补贴到账、不代申请。
 // ============================================================
 
@@ -30,6 +34,12 @@ export interface PartnerPolicyRecord {
   reviewStatus: string
   publishStatus: string
   rejectReason: string | null
+  /** 内容版本，每次编辑 +1；发布确认记在这个版本上 */
+  contentVersion?: number
+  /** 最近一次发布确认（编辑后清空，重新发布再写） */
+  publishConfirmedBy?: string | null
+  publishConfirmedAt?: string | null
+  publishConfirmedContentVersion?: number | null
   syncTime: string
   updatedAt: string
 }
@@ -181,6 +191,13 @@ export interface PartnerPoliciesServiceInterface {
   updatePolicy(id: string, input: Partial<SavePolicyInput>): Promise<PartnerPolicyRecord>
   unpublishPolicy(id: string): Promise<PartnerPolicyRecord>
   deletePolicy(id: string): Promise<void>
+  /** 本机构审核通过（只接受 pending / reviewing；终态不可回退，改内容会自动回到待审核） */
+  approvePolicy(id: string): Promise<PartnerPolicyRecord>
+  /**
+   * 本机构发布。responsibilityAcknowledged 原样取自页面上的确认勾选，由服务端判：
+   * 不是 true 一律 400 POLICY_RESPONSIBILITY_ACK_REQUIRED，前端不替用户默认勾上。
+   */
+  releasePolicy(id: string, input: { responsibilityAcknowledged: boolean }): Promise<PartnerPolicyRecord>
   /** 问项字典（服务端下发，前端不得硬编码） */
   getEligibilityQuestions(): Promise<PolicyEligibilityQuestionSet>
   getEligibilityRules(policyId: string): Promise<PolicyEligibilityRuleRecord[]>
@@ -237,6 +254,9 @@ const httpAdapter: PartnerPoliciesServiceInterface = {
   deletePolicy: async (id) => {
     await req<{ success: boolean }>('DELETE', `/partner/policies/${id}`)
   },
+  approvePolicy: (id) => req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/review`, { action: 'approve' }),
+  releasePolicy: (id, input) =>
+    req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/release`, { responsibilityAcknowledged: input.responsibilityAcknowledged }),
   getEligibilityQuestions: () => req<PolicyEligibilityQuestionSet>('GET', '/policies/eligibility-questions'),
   getEligibilityRules: (policyId) =>
     req<PolicyEligibilityRuleRecord[]>('GET', `/partner/policies/${policyId}/eligibility-rules`),
@@ -255,13 +275,25 @@ const mockRows: PartnerPolicyRecord[] = [
     id: 'pp-mock-1', kind: 'notice', title: '关于就业服务月活动的通知(演示)',
     summary: '演示数据', category: 'notice', publishedDate: '2026-06-01',
     sourceOrgId: 'mock-org', sourceName: '测试机构',
-    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null, syncTime: now(), updatedAt: now(),
+    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: 'mock-partner-001', publishConfirmedAt: now(), publishConfirmedContentVersion: 1,
+    syncTime: now(), updatedAt: now(),
   },
   {
     id: 'pp-mock-2', kind: 'policy_guide', title: '高校毕业生就业补贴说明（演示）',
     summary: '演示数据', audience: 'graduate', publishedDate: '2026-06-01',
     sourceOrgId: 'mock-org', sourceName: '测试机构',
-    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null, syncTime: now(), updatedAt: now(),
+    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null,
+    contentVersion: 2, publishConfirmedBy: 'mock-partner-001', publishConfirmedAt: now(), publishConfirmedContentVersion: 2,
+    syncTime: now(), updatedAt: now(),
+  },
+  {
+    id: 'pp-mock-3', kind: 'notice', title: '关于就业见习岗位补贴申领的公告（演示）',
+    summary: '演示数据：待本机构审核', category: 'announcement', publishedDate: '2026-09-20',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'pending', publishStatus: 'draft', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: null, publishConfirmedAt: null, publishConfirmedContentVersion: null,
+    syncTime: now(), updatedAt: now(),
   },
 ]
 
@@ -286,7 +318,9 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
       audience: input.audience, category: input.category, externalUrl: input.externalUrl,
       publishedDate: input.publishedDate,
       sourceOrgId: 'mock-org', sourceName: '测试机构',
-      reviewStatus: 'pending', publishStatus: 'draft', rejectReason: null, syncTime: now(), updatedAt: now(),
+      reviewStatus: 'pending', publishStatus: 'draft', rejectReason: null,
+      contentVersion: 1, publishConfirmedBy: null, publishConfirmedAt: null, publishConfirmedContentVersion: null,
+      syncTime: now(), updatedAt: now(),
     }
     mockRows.unshift(created)
     return created
@@ -298,6 +332,11 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
     hit.reviewStatus = 'pending'
     hit.publishStatus = 'draft'
     hit.rejectReason = null
+    // 与服务端同一状态机：内容修订 → 版本 +1、发布确认作废
+    hit.contentVersion = (hit.contentVersion ?? 1) + 1
+    hit.publishConfirmedBy = null
+    hit.publishConfirmedAt = null
+    hit.publishConfirmedContentVersion = null
     hit.updatedAt = now()
     return { ...hit }
   },
@@ -310,6 +349,34 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
   async deletePolicy(id) {
     const idx = mockRows.findIndex((r) => r.id === id)
     if (idx >= 0) mockRows.splice(idx, 1)
+  },
+  async approvePolicy(id) {
+    const hit = mockRows.find((r) => r.id === id)
+    if (!hit) throw new ApiHttpError('POLICY_NOT_FOUND', '不存在', 404)
+    if (hit.reviewStatus === 'approved' || hit.reviewStatus === 'rejected') {
+      throw new ApiHttpError('INVALID_STATE_TRANSITION', `审核终态 ${hit.reviewStatus} 不可回退,需机构重新编辑提审`, 400)
+    }
+    hit.reviewStatus = 'approved'
+    hit.publishStatus = 'draft'
+    hit.rejectReason = null
+    hit.updatedAt = now()
+    return { ...hit }
+  },
+  async releasePolicy(id, input) {
+    const hit = mockRows.find((r) => r.id === id)
+    if (!hit) throw new ApiHttpError('POLICY_NOT_FOUND', '不存在', 404)
+    if (hit.reviewStatus !== 'approved') {
+      throw new ApiHttpError('PUBLISH_REQUIRES_APPROVAL', '未通过审核的政策内容不得发布', 400)
+    }
+    if (input.responsibilityAcknowledged !== true) {
+      throw new ApiHttpError('POLICY_RESPONSIBILITY_ACK_REQUIRED', '发布前必须确认对本条政策内容负责', 400)
+    }
+    hit.publishStatus = 'published'
+    hit.publishConfirmedBy = 'mock-partner-001'
+    hit.publishConfirmedAt = now()
+    hit.publishConfirmedContentVersion = hit.contentVersion ?? 1
+    hit.updatedAt = now()
+    return { ...hit }
   },
 
   // ── 申领条件在演示模式下**不提供**，而不是给一份假的 ────────────────────

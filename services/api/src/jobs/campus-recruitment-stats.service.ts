@@ -1,11 +1,13 @@
 // 校园招聘聚合：只读 Prisma + 纯函数。不调 AI，不写库。
 
 import { Injectable } from '@nestjs/common'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildPublishedJobWhere, withPublicFairDemoExclusion } from './jobs-shared'
 import {
   aggregateCampusRecruitmentStats,
   CAMPUS_FAIR_THEMES,
+  CAMPUS_RECRUITMENT_STATS_NOTES,
   CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT,
   type CampusFairRow,
   type CampusRecruitmentStatsData,
@@ -17,7 +19,18 @@ const CAMPUS_TITLE_HINTS = ['校园', '校招', '高校', '大学', '学院', '�
 export class CampusRecruitmentStatsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getStats(): Promise<CampusRecruitmentStatsData> {
+  async getStats(options?: { includeJobListings?: boolean }): Promise<CampusRecruitmentStatsData> {
+    if (!isRecruitmentContentHostingEnabled()) {
+      return {
+        groups: [],
+        reason: 'no_published_campus_records',
+        generatedAt: new Date().toISOString(),
+        truncated: false,
+        scanLimit: CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT,
+        notes: [...CAMPUS_RECRUITMENT_STATS_NOTES],
+      }
+    }
+    const includeJobListings = options?.includeJobListings !== false
     const jobWhere = buildPublishedJobWhere({ category: 'campus' })
     const fairWhere = withPublicFairDemoExclusion({
       reviewStatus: 'approved',
@@ -56,18 +69,20 @@ export class CampusRecruitmentStatsService {
         orderBy: [{ syncTime: 'desc' }, { id: 'asc' }],
         take: CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT,
       }),
-      this.prisma.job.findMany({
-        where: jobWhere,
-        select: {
-          sourceOrgId: true,
-          sourceName: true,
-          syncTime: true,
-        },
-        orderBy: [{ syncTime: 'desc' }, { id: 'asc' }],
-        take: CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT,
-      }),
+      includeJobListings
+        ? this.prisma.job.findMany({
+          where: jobWhere,
+          select: {
+            sourceOrgId: true,
+            sourceName: true,
+            syncTime: true,
+          },
+          orderBy: [{ syncTime: 'desc' }, { id: 'asc' }],
+          take: CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT,
+        })
+        : Promise.resolve([]),
       this.prisma.jobFair.count({ where: fairWhere }),
-      this.prisma.job.count({ where: jobWhere }),
+      includeJobListings ? this.prisma.job.count({ where: jobWhere }) : Promise.resolve(0),
     ])
 
     const fairRows: CampusFairRow[] = fairs.map((fair) => ({
@@ -92,8 +107,9 @@ export class CampusRecruitmentStatsService {
       generatedAt: new Date(),
       truncated:
         fairTotal > CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT
-        || jobTotal > CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT,
+        || (includeJobListings && jobTotal > CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT),
       scanLimit: CAMPUS_RECRUITMENT_STATS_SCAN_LIMIT,
+      includeJobListings,
     })
   }
 }

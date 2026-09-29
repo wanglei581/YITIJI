@@ -116,6 +116,7 @@
 | `/fairs-service` | FairsServiceHubPage | src/pages/job-fairs/FairsServiceHubPage.tsx | 恢复的招聘会信息服务中心聚合入口；无独立原型屏，预约仍前往来源平台 |
 | `/interview-service` | InterviewServiceHubPage | src/pages/interview/InterviewServiceHubPage.tsx | 恢复的 AI 面试训练服务中心聚合入口；无独立原型屏 |
 | `/policy-service` | PolicyServiceHubPage | src/pages/policy/PolicyServiceHubPage.tsx | 恢复的政策服务中心聚合入口；无独立原型屏，信息来源以官方发布为准 |
+| `/official-channels` | OfficialChannelsPage | src/pages/official-channels/OfficialChannelsPage.tsx | 2026-09-27（next-tasks 3.14）：本机构官方渠道二维码页，视觉取青序流光稿 45；75 屏原型无对应屏。旧 `/jobs/online-platforms` 重定向到这里 |
 | `/contract-review` | ContractReviewHomePage | src/pages/contract-review/ContractReviewHomePage.tsx | 合同审查入口；生产路由无独立迁移矩阵屏 |
 | `/contract-review/processing` | ContractReviewProcessingPage | src/pages/contract-review/ContractReviewProcessingPage.tsx | 合同审查处理中状态；生产路由无独立迁移矩阵屏 |
 | `/contract-review/result` | ContractReviewResultPage | src/pages/contract-review/ContractReviewResultPage.tsx | 合同审查结果状态；生产路由无独立迁移矩阵屏 |
@@ -324,6 +325,9 @@
 - `/print/scan-feature` → `/print-scan/feature/id-photo`
 - `/resume` → `/resume/source`
 - `/resume/upload` → `/resume/source`
+
+（2026-09-27 补记：上面「五条」是当时口径，现行重定向全集以 `apps/kiosk/tests/visual/route-manifest.ts` 的
+`compatibilityRedirects` 为准；其中 3.14 新增 `/jobs/online-platforms` → `/official-channels`。）
 
 ### 8.4 W6 本地候选验收结论（2026-07-24）
 

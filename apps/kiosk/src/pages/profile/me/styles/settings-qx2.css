@@ -1,0 +1,93 @@
+/* 30 v2：只作用于账号设置和换绑页，不改变其它会员页面。 */
+.settings-page { width: 100%; height: 100%; color: var(--qx-ink); }
+.settings-page .qx-pagehead { min-height: 80px; }
+.settings-body { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.settings-body > * { flex-shrink: 0; }
+.settings-identity {
+  display: flex; align-items: center; gap: 18px;
+  min-height: 0; margin: 0; padding: 16px 22px;
+  border-radius: var(--qx-r);
+  background: linear-gradient(135deg, var(--qx-deep-2), var(--qx-deep));
+  color: var(--qx-paper);
+}
+.settings-avatar {
+  flex: none; width: 72px; height: 72px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, var(--qx-emerald), var(--qx-teal));
+  color: var(--qx-deep);
+}
+.settings-idtx { flex: 1; min-width: 0; }
+.settings-identity b { display: block; margin: 0; font-size: var(--qx-fs-page); font-weight: 700; }
+.settings-idsub { display: block; margin-top: 4px; font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
+.settings-idstat { flex: none; text-align: right; font-size: var(--qx-fs-aux-lg); line-height: 1.35; white-space: nowrap; }
+.settings-page .qx-me-list { border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
+.settings-page .qx-me-row { display: flex; align-items: center; width: 100%; min-height: 96px; gap: 18px; padding: 14px 20px; border: 0; border-bottom: 1px solid var(--qx-line); background: transparent; text-align: left; color: inherit; }
+.settings-page .qx-me-row:last-child { border-bottom: 0; }
+.settings-page .qx-me-row-ico { flex: none; width: 56px; height: 56px; display: grid; place-items: center; color: var(--qx-teal-d); background: var(--qx-teal-soft); border-radius: var(--qx-r); }
+.settings-page .qx-me-row-main { flex: 1; min-width: 0; }
+.settings-page .qx-me-row-title { display: block; font-size: var(--qx-fs-btn); font-weight: 700; }
+.settings-page .qx-me-row-sub { display: block; margin-top: 4px; font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
+.settings-page .qx-me-row-head { display: flex; align-items: center; gap: 14px; }
+.settings-page .qx-me-row-go { flex: none; }
+.settings-page .qx-me-st, .settings-page .qx-me-pending { font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-3); }
+.settings-page .qx-me-legal { padding: 14px 20px; font-size: var(--qx-fs-aux-lg); }
+.settings-page .qx-me-settings-consent { display: flex; align-items: center; gap: 18px; padding: 18px 20px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
+.settings-page .qx-me-acts { display: flex; gap: 8px; flex-direction: column; }
+.settings-page .qx-me-small, .settings-resend button { min-height: 56px; padding: 0 18px; font-size: var(--qx-fs-body); border: 1px solid var(--qx-line-2); border-radius: var(--qx-r); color: var(--qx-teal-d); background: var(--qx-surface); }
+.settings-note { padding: 16px 20px; margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; background: var(--qx-teal-soft); border-radius: var(--qx-r); }
+.settings-note h2 { margin: 0 0 8px; font-size: var(--qx-fs-body-lg); }
+.settings-note p { margin: 0; }
+.settings-page .qx-ctabar .qx-btn { flex: 1; }
+.settings-page button:disabled { opacity: .55; cursor: default; }
+.settings-page button:focus-visible, .settings-confirm button:focus-visible { outline: 3px solid var(--qx-teal-d); outline-offset: -3px; }
+.settings-confirm { position: fixed; inset: 0; margin: auto; width: min(860px, 90vw); max-height: 85vh; padding: 32px; border: 1px solid var(--qx-line-2); border-radius: var(--qx-r); color: var(--qx-ink); background: var(--qx-surface); font-family: var(--qx-sans); }
+.settings-confirm::backdrop { background: rgb(11 36 30 / 50%); }
+.settings-confirm h2 { margin: 0 0 18px; font-size: var(--qx-fs-sec); }
+.settings-confirm p { font-size: var(--qx-fs-body); line-height: 1.45; }
+.settings-actions { display: flex; gap: 16px; margin-top: 24px; }
+.settings-actions .qx-btn { flex: 1; }
+.settings-error { padding: 14px 18px; background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); font-size: var(--qx-fs-aux-lg); line-height: 1.45; border-radius: var(--qx-r); overflow-wrap: anywhere; }
+.settings-rail { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; list-style: none; padding: 0; margin: 16px 0 0; }
+.settings-rail li { padding: 14px 15px; border: 1px solid var(--qx-line); background: var(--qx-surface); border-radius: var(--qx-r); }
+.settings-rail small, .settings-rail b { display: block; font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
+.settings-rail li[data-on='cur'] { background: var(--qx-deep); color: var(--qx-paper); }
+.settings-rail li[data-on='done'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.settings-rebind .qx-pagehead { min-height: 100px; }
+.settings-rebind .settings-identity { display: block; min-height: 112px; margin-bottom: 12px; padding: 18px 22px; }
+.settings-rebind .settings-identity span { display: block; font-size: var(--qx-fs-body); }
+.settings-rebind .settings-identity b { margin-top: 8px; }
+.settings-form h2, .settings-facts h2 { margin: 0 0 12px; font-size: var(--qx-fs-sec); }
+.settings-form p { font-size: var(--qx-fs-body); line-height: 1.45; }
+.settings-input { width: 100%; min-height: 76px; padding: 12px 18px; border: 1px solid var(--qx-line-2); border-radius: var(--qx-r); background: var(--qx-paper); font-size: var(--qx-fs-body-lg); color: var(--qx-ink); letter-spacing: 6px; }
+.settings-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.settings-pad button { min-height: 96px; border: 1px solid var(--qx-line-2); border-radius: var(--qx-r); background: var(--qx-paper); color: var(--qx-ink); font-size: var(--qx-fs-btn); font-weight: 700; }
+.settings-resend { display: flex; align-items: center; gap: 16px; margin-top: 14px; font-size: var(--qx-fs-aux-lg); }
+.settings-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.settings-facts h2 { grid-column: 1 / -1; }
+.settings-facts div { padding: 18px 20px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); font-size: var(--qx-fs-body); }
+.settings-facts b { display: block; margin-top: 8px; }
+@media (prefers-reduced-motion: reduce) { .settings-page * { animation: none !important; transition: none !important; } }
+
+.settings-help { margin: 0; padding: 0; border: 0; min-width: 0; }
+
+.settings-section-title { margin: 2px 2px 0; padding: 0; font-size: var(--qx-fs-sec); font-weight: 700; }
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .settings-page .qx-body { padding: 0 16px; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-pagehead { margin: 14px 16px 0; min-height: 0; gap: 8px; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-pagehead p { min-width: 0; flex-basis: 100%; }
+  [data-kiosk-stage-fit='off'] .settings-page .settings-identity { min-height: 0; margin-bottom: 0; padding: 18px; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-me-settings-consent { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-me-row-head { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-me-acts { flex-direction: row; flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-me-row { gap: 10px; padding: 14px 12px; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-me-row-ico { width: 48px; height: 48px; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-me-pending { max-width: 64px; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-ctabar { flex-wrap: wrap; padding: 12px 16px; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-ctabar .qx-btn { flex-basis: 100%; min-height: 56px; padding: 8px 12px; font-size: var(--qx-fs-body); }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-navbar { height: 88px; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-step-actions { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-ai-help { white-space: normal; text-align: left; }
+  [data-kiosk-stage-fit='off'] .settings-rail { grid-template-columns: 1fr 1fr; }
+  [data-kiosk-stage-fit='off'] .settings-resend { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .settings-pad button { min-height: 64px; }
+}

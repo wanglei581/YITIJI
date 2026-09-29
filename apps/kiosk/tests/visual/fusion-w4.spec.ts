@@ -68,11 +68,14 @@ async function expectOpenedComplianceSurface(scope: Locator): Promise<void> {
 async function loginForJobs(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
   for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '获取验证码', exact: true }).click()
   await page.getByRole('button', { name: '短信验证码', exact: true }).click()
   for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
@@ -378,21 +381,25 @@ test('companies 列表与详情保持来源导览 @w4', async ({ page, api }) =>
   await verifyPage(page, errors)
 })
 
-test('/jobs/online-platforms 只提供扫码打开来源平台 @w4', async ({ page, api }) => {
+// 3.14：线上平台目录并入本机构官方渠道。旧地址重定向；平台目录不再写死在前端，b 版本由服务端 legacyPlatforms 下发。
+// 守的东西没变——目录页只给「扫码去来源平台」，不出现任何代投 / 平台内投递说法；而且现在连可点的外链都没有，只有二维码。
+test('/jobs/online-platforms 重定向到本机构官方渠道，只给二维码不代投 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/jobs/online-platforms')
-  await expect(page.getByRole('heading', { name: '线上招聘平台' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /扫码打开来源平台/ })).toHaveCount(4)
-  await expect(page.getByText('一键投递')).toHaveCount(0)
-  await expect(page.getByText('立即投递')).toHaveCount(0)
-  await expect(page.getByText('一键全网分发')).toHaveCount(0)
-  await expect(page.getByText('授权代投')).toHaveCount(0)
-  await expect(page.getByText('同步投递')).toHaveCount(0)
-  await expect(page.getByText('扫码投递')).toHaveCount(0)
-  await page.getByRole('button', { name: /Boss直聘/ }).click()
-  await expect(page.getByText('www.zhipin.com')).toBeVisible()
-  await expect(page.locator('[data-testid="directory-qr-slot"]')).toBeVisible()
-  await page.screenshot({ path: test.info().outputPath('qx-b3-online-platforms-qr.png'), fullPage: true })
+  await page.waitForURL((url) => url.pathname === '/official-channels')
+  await expect(page.getByRole('heading', { level: 1, name: '本机构官方渠道' })).toBeVisible()
+  const org = page.getByTestId('official-channels-org')
+  const legacy = page.getByTestId('official-channels-legacy')
+  await expect(org.getByTestId('official-channel-card')).toHaveCount(1)
+  await expect(legacy.getByTestId('official-channel-card')).toHaveCount(2)
+  await expect(page.locator('[data-testid="official-channel-qr-code"] svg')).toHaveCount(3)
+  await expect(legacy.getByText('jobs.example.com', { exact: true })).toBeVisible()
+  await expect(legacy.getByText('本渠道由示例招聘平台运营公司提供，信息以其官网为准', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-qx-frame="true"] a[href]'), '一体机不打开外部网页：整页没有可点的链接').toHaveCount(0)
+  for (const word of ['一键投递', '立即投递', '一键全网分发', '授权代投', '同步投递', '扫码投递', '去来源平台投递']) {
+    await expect(page.getByText(word)).toHaveCount(0)
+  }
+  await page.screenshot({ path: test.info().outputPath('qx-b3-official-channels-b.png'), fullPage: true })
   await verifyPage(page, errors)
 })
 
@@ -418,8 +425,14 @@ test('/job-fairs 预约离开平台且 mock 统计为空 @w4', async ({ page, ap
   await expect(page.getByRole('button', { name: /扫码预约|去来源平台预约/ }).first()).toBeVisible()
   await expect(page.locator('iframe[src*="openstreetmap"]')).toHaveCount(0)
   await expect(page.getByText('暂无地图，请以场馆地址为准')).toBeVisible()
-  await page.getByRole('button', { name: '数据大屏' }).click()
-  await expect(page.getByText(/暂无真实统计/)).toBeVisible()
+  // 2026-09-20：详情页的「数据大屏」Tab 随四 Tab 壳退休，统计成了独立路由。
+  // 入口从 Tab 变成 subnav 的一行，但**判据不变**：夹具 isMockData=true，
+  // 这一路走完必须落到诚实空态，而不是把演示数字端上来。
+  const statsRow = page.getByTestId('fair-detail-stats')
+  await expect(statsRow).toContainText('主办方还没有回传统计')
+  await statsRow.click()
+  await expect(page).toHaveURL(/\/job-fairs\/fair-001\/stats$/)
+  await expect(page.getByTestId('fair-stats-empty')).toContainText('真实数据正在接入')
   await expect(page.getByText(/签到成功|确认签到/)).toHaveCount(0)
   await verifyPage(page, errors)
 })
@@ -702,7 +715,7 @@ test('/renshi 政策库为空时给出明确空态，内置指引不冒充库内
   const library = page.locator('[data-policy-section="library"]')
   const builtin = page.locator('[data-policy-section="builtin"]')
   await expect(library).toBeVisible()
-  await expect(library.getByText('政策库还没有内容')).toBeVisible()
+  await expect(library.getByText('政策库暂无内容')).toBeVisible()
   await expect(library.locator('.k8-policy-list-item')).toHaveCount(0)
   // 指引本身有真实价值（本机通用办事参考），保留但必须落在自己的分区里。
   await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
@@ -717,7 +730,7 @@ test('/renshi 库内政策与内置指引分区渲染 @w4', async ({ page, api }
   const builtin = page.locator('[data-policy-section="builtin"]')
   await expect(library.locator('.k8-policy-list-item')).toHaveCount(1)
   await expect(library.getByText('高校毕业生就业服务指引')).toBeVisible()
-  await expect(library.getByText('政策库还没有内容')).toHaveCount(0)
+  await expect(library.getByText('政策库暂无内容')).toHaveCount(0)
   await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
   await expect(builtin.getByText('高校毕业生就业服务指引')).toHaveCount(0)
   await verifyPage(page, errors)

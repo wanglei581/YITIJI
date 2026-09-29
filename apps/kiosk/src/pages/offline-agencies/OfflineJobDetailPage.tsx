@@ -127,7 +127,7 @@ export default function OfflineJobDetailPage() {
         ) : (
           <>
             <JobAntiFraudNotice />
-            <DirSec no="01" title="岗位概要" hint={incomplete ? '只显示已返回的字段' : '字段以来源机构发布为准'}>
+            <DirSec no="01" title="岗位概要" hint={incomplete ? '只显示已经读到的内容' : '内容以来源机构发布为准'}>
               <div className="dw-blk">
                 <div className="dw-row-t">
                   <h2>{job.title}</h2>
@@ -185,7 +185,7 @@ export default function OfflineJobDetailPage() {
                         ['机构名称', job.agencyName],
                         ['机构类型', job.agencyType],
                         ['营业时间', job.agencyHours || '以机构公示为准'],
-                        ['联系电话', job.agencyPhone || '请至前台咨询'],
+                        ['联系电话', job.agencyPhone || '请向门店工作人员咨询'],
                         ['服务项目', '以机构公示为准'],
                         ['机构地址', job.agencyAddress],
                         ['来源编号', job.externalId || SOURCE_ELEMENT_MISSING_TEXT],
@@ -194,7 +194,7 @@ export default function OfflineJobDetailPage() {
                         ['外部ID', job.externalId || SOURCE_ELEMENT_MISSING_TEXT],
                         ['外部投递链接', job.sourceUrl || SOURCE_ELEMENT_MISSING_TEXT],
                       ]} />
-                      <div className="dw-reason">数据来源说明：岗位与机构字段由来源机构发布并经管理员审核，本机只做展示，不改写、不补写。</div>
+                      <div className="dw-reason">数据来源说明：岗位与机构内容由来源机构发布并经管理员审核，本机只做展示，不改写、不补写。</div>
                     </div>
                     <div className="dw-blk">
                       <DirSteps items={[

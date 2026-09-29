@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>简历决策工作台 · 职易达</title>
+  <!--
+    宿主：简历决策工作台（一个宿主承接四条真实 route）
+    route: /resume/job-fit          screen=job-fit
+           /resume/job-fit/actions  screen=actions
+           /resume/career-plan      screen=career-plan
+           /resume/templates        screen=templates
+    state: 由 ?screen= 与 ?state= 共同表达；静态状态仅用于验收与原型演示，不请求 API、不推进业务完成。
+    api: JobFitPage / JobFitActionsPage / CareerPlanPage / ResumeTemplateLibraryPage 的真实 React 合同。
+    真话边界：无 taskId、本人授权、来源岗位或服务端返回时，一律不展示个人结果、岗位、企业、匹配分、打印件或完成状态。
+    fallback: 任何无法确认的 AI 或打印状态都保留返回/重试/材料准备的真实下一步；不伪造恢复时间或成功。
+    真话披露：底部 truth-bar 压成单行（本人使用 / 服务端状态 / 本机会话边界 + 使用说明入口），
+              不再用三列等权说明墙，也不在主内容区铺等权治理卡；主内容只放真实产品结构与诚实槽位。
+
+    原型控件可见性（demo-tab / demo-panel）：
+      - 只有 ?debug=1 才显示。JS 读到 debug=1 时设 <html data-debug="1">，
+        再移除下面的 hidden / disabled / aria-hidden 并绑定打开交互。
+      - 普通 state/screen/capture/flat URL 下三重兜底：HTML 的 hidden + disabled +
+        tabindex="-1" 防 JS 执行前闪现；CSS 的 html:not([data-debug="1"]) 段落钉死
+        零尺寸、不可见、不可点、不参与布局；JS 在非 debug 分支不绑定任何交互。
+      - 这两个元素带 data-proto-control="true"，供截图与验收脚本按属性排除。
+  -->
+  <link rel="stylesheet" href="../kiosk-redesign-2026-08/kimi-full-coverage-v2/design-system/kiosk-motion.css">
+  <link rel="stylesheet" href="../kiosk-redesign-2026-08/resume-decision-workspace.css">
+<!--
+青序流光 2.0 · 46 简历对照 / 职业规划（screen=job-fit，state=result-high，对照结果有内容）
+9/28 逐状态检查修压字
+规则 1：英雄区加三步只读说明。返回键仍在顶栏。主体超出时可滑动，底部按钮留在栏外。
+规则 2：页标题 36，说明 21–23，分区标题 30，主按钮 26，导航 21。
+规则 3：带走的是对照档位和下一步；职业规划带走能开始的一件事；模板页带走选定的版式。
+规则 4：英文眉题改成简历对照、行动清单、职业规划、简历模板。服务端、会话改成这次办理 / 实际记录。演示面板默认不出现。
+规则 5：岗位要求只由用户自己写或贴上，不从已发布岗位里选，也不跳到来源岗位列表。
+规则 7：对照本身是小青做的；「问 AI 顾问」保留。结果旁仍是三档参考，不写成已经录用。
+未改：颜色令牌、圆角、深绿英雄区、四条路线、三档不打分、三 Tab。
+原稿脚本复制为同目录 resume-decision-workspace.js，样式仍引用原稿目录。
+9/28 留白：三步说明挪到小青意图区底部通栏（数字与说明一行），区块内边距与间距收紧一档，对照结果三档、授权两态、填写要求、任务读不出来、行动清单、职业规划共 9 个状态连底部按钮都在一屏里（之前按钮被挤到屏外，要滑才看得到）；短条目清单、清单分组字段、行动清单四步、模板卡两栏配平；放不满的屏把余高平分到各区块上方；等待面板按卡片标题字阶排。无新增内容。
+9/29 定稿：简历对照按运行页（JobFitPage.tsx，9/26 起不分档）改：result-high / result-mid / result-low 三个状态键保留、画同一屏——对照概要（AI 生成 · 仅供参考，对照依据是你写的要求）、简历里已经写到 / 还没体现的要求、关键词覆盖、下一步建议，底部打印报告 / 换个岗位分析 / 优化简历；删去准备程度徽章、三档梯子和按档换色，概要卡统一青色。「岗位匹配 / 匹配参考 / 匹配结果」改叫「简历对照 / 对照结果」。要求只由本人填写或粘贴不变。上面「三档参考 / 带走的是对照档位」的旧说法以本行为准。
+-->
+<style id="qx2">
+.status{font-size:21px!important;max-width:680px;height:auto;min-height:54px;white-space:normal}
+.eyebrow{font-size:21px!important;letter-spacing:2px!important;color:rgba(242,239,228,.9)!important}
+.hero{min-height:250px}
+.hero h1{font-size:36px!important}
+.hero p{font-size:23px!important;color:rgba(242,239,228,.9)!important}
+.qx-steps{position:relative;z-index:1;display:flex;gap:14px;list-style:none;width:100%;margin:18px 0 0;padding:0}
+.qx-steps li{flex:1;padding-top:8px;border-top:2px solid rgba(242,239,228,.35);font-size:21px;line-height:1.35;color:rgba(242,239,228,.92)}
+.qx-steps b{display:block;margin-bottom:4px;font-family:"Songti SC","STSong","SimSun",serif;font-size:26px;color:#2ee6a8}
+.hero{flex-wrap:wrap}
+.hero-copy{flex:1;min-width:0}
+.section-head h2{font-size:30px!important}
+.section-head small,.section-head .no{font-size:20px!important}
+.copy,.check .ck-t p,.trace p,.why p,.route-card p,.wait p,.not,.ghost p,.step p,.disclose,.disclose-body li,.card p,.list-row,.notice,.rail p,.decision-flow p,.vc-main>p,.vc-risk,.guardline p,.evi-slot p,.em-note,.ns-t p,.wl-desc,.wl-field span,.pv-page p,.tip-t p,.act-note,.reason,.truth-bar p,.field b,.slot b,.em-row span{font-size:21px!important;line-height:1.45!important}
+.card h3,.check .ck-t b,.trace b,.route-card b,.wait b,.step b,.verdict b,.evi-h b,.evi-slot b,.ns-t b,.wl-top b,.tip-t b,.level,.vc-main>b{font-size:24px!important}
+.ns-no{font-size:20px!important}
+.btn{font-size:26px!important;min-height:72px}
+.navbar a{font-size:21px!important}
+.truth-bar .tb-help{font-size:21px!important}
+.brand{font-size:26px!important}
+.slot small,.trace small,.why .wy-h,.check .ck-s,.ghost .g-tag,.rail small,.decision-flow small,.vc-badge small,.tier-ladder span,.vc-main>small,.evi-slot .g-tag,.em-h small,.wl-chip,.wl-field small,.pv-head small,.pv-head b,.field small,.level span,.card .tag,.route-card .rc-go,.trace .now-tag,.kit small,.kit b,.wait .m-pulse span{font-size:20px!important}
+.workspace{overflow-y:auto}
+.demo-tab,.demo-panel{display:none!important}
+.verdict small,.template small,.rail b,.wl-no,.pv-page b,.meta .chip{font-size:20px!important;line-height:1.35}
+#workspace[data-screen="resume-decision-templates"] .meta{display:flex;gap:12px}
+#workspace[data-screen="resume-decision-templates"] .meta .chip{flex:1;min-width:0}
+#workspace[data-screen="resume-decision-templates"] .grid3{grid-template-columns:1fr}
+#workspace[data-screen="resume-decision-templates"] .template{min-height:0}
+#workspace[data-screen="resume-decision-templates"] .section.grow{flex:1 1 auto;min-height:min-content}
+#workspace[data-screen="resume-decision-templates"] .tpl-split{grid-template-columns:.86fr 1.14fr;min-height:min-content;align-items:stretch}
+#workspace[data-screen="resume-decision-templates"] .tpl-side{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:min-content}
+#workspace[data-screen="resume-decision-templates"] .tip-row{flex:none;min-height:auto;align-items:flex-start}
+#workspace[data-screen="resume-decision-templates"] .pv-body{min-height:0;overflow:hidden}
+#workspace[data-screen="resume-decision-templates"] .pv-page{aspect-ratio:auto;width:min(100%,220px);height:auto;max-height:100%}
+/* 对照结果和行动清单按内容往下排，标签不再压住上一段说明。 */
+.hero{min-height:0}
+.section{padding:12px 16px}
+.section.grow>.ghosts,
+.section.grow>.ghosts>*,
+.section.grow>.list,
+.section.grow>.list>*,
+.section.grow>.steps,
+.section.grow>.steps>*,
+.section.grow>.checks,
+.section.grow>.checks>*,
+.section.grow>.why,
+.section.grow>.why>*,
+.section.grow>.nots,
+.section.grow>.nots>*,
+.section.grow>.trace,
+.section.grow>.trace>*,
+.section.grow>.routes,
+.section.grow>.routes>*,
+.section.grow>.grid2,
+.section.grow>.grid2>*,
+.section.grow>.grid3,
+.section.grow>.grid3>*,
+.ghost,.ghosts,.wl-group,.wl-fields,.ns-row,.em-row,.evi-slot,.step{
+  height:auto!important;flex:0 0 auto!important;min-height:min-content!important;overflow:visible!important
+}
+.ghost .g-tag{margin-top:12px}
+.wl-fields{justify-content:flex-start;margin-top:8px}
+.em-row span{min-height:48px;height:auto}
+.section.grow{flex:0 0 auto!important;min-height:min-content!important;height:auto!important;overflow:visible!important}
+.workspace{display:flex;flex-direction:column;gap:12px}
+/* 9/28 留白（产品负责人：不留大片空白，也不把内容和底部按钮挤出屏幕）
+   1. 小青意图区：三步说明挪到意图区底部通栏，数字与说明排一行，意图区矮一截，正文多出一段；
+      区块内边距、区块间距收紧一档，结果页、授权页、填写要求页连底部按钮一屏放下；
+   2. 两栏配平：短条目（没有发生的事、清单分组字段、行动清单四步、模板卡）排两列，右半边不再空着；
+   3. 放不满的屏：余下的高度平分到各区块上方，不再全堆在底部按钮上面；卡片按内容高，不撑空盒。 */
+.hero{display:grid;grid-template-columns:96px minmax(0,1fr);column-gap:24px;row-gap:0;align-items:center;padding:22px 34px}
+.hero-copy{display:contents}
+.hero .xq{grid-column:1;grid-row:1 / span 3}
+.hero .eyebrow,.hero h1,.hero #hero-copy{grid-column:2;position:relative;z-index:1}
+.hero .qx-steps{grid-column:1 / -1;margin-top:14px}
+.hero .qx-steps li{display:flex;align-items:baseline;gap:10px}
+.hero .qx-steps b{display:inline;margin:0}
+.workspace{padding-top:14px;gap:10px}
+.workspace>.section{margin-top:auto}
+.section{padding:10px 16px}
+.section-head h2{line-height:1.25}
+.act-note{padding-top:10px}
+.actiondock .actionbar{padding:12px 0 14px}
+/* 结果页：结果明细与下一步建议收紧内边距 */
+.evi{margin-top:12px}
+.evi-col{padding:13px 15px}
+.evi-slot{padding:12px 16px}
+.evi-map{margin-top:10px}
+.nextsteps{margin-top:12px}
+.ns-row{min-height:72px;padding:8px 18px}
+.guardline{padding:9px 14px;margin-top:10px}
+/* 两栏配平 */
+.wl-fields{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.nots{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:11px}
+.nots>.not:first-child:nth-last-child(odd){grid-column:1 / -1}
+#workspace .nots>.not{min-height:80px!important}
+.list-row,.not{font-size:22px!important}
+.verdict>div{padding:18px 20px}
+#workspace[data-state="pick"]>.section:first-child{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:14px;align-items:start}
+#workspace[data-state="pick"]>.section:first-child>.section-head{grid-column:1 / -1}
+#workspace[data-state="pick"]>.section:first-child>.card{grid-column:1;grid-row:2 / span 2;margin-top:14px;min-height:0}
+#workspace[data-state="pick"]>.section:first-child>.field{grid-column:2}
+#workspace[data-screen="resume-decision-actions"][data-state="missing-task"] .steps{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+#workspace[data-screen="resume-decision-templates"] .template{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:22px;align-items:start}
+#workspace[data-screen="resume-decision-templates"] .template>*{grid-column:2}
+#workspace[data-screen="resume-decision-templates"] .template-art{grid-column:1;grid-row:1 / span 4;height:96px;margin:4px 0 0}
+#workspace[data-screen="resume-decision-templates"] .template-art i:first-child{height:96px}
+/* 等待态：等待面板是这一屏的主角，按卡片标题字阶排（图标 88、标题 28、正文 22） */
+.wait{padding:22px 24px}
+.wait .w-ic{width:88px;height:88px;border-radius:28px}
+.wait b{font-size:28px!important}
+.wait p{font-size:22px!important}
+/* 职业规划生成中 / 打印版生成中、模板读取失败：余高留在区块里面（间距放宽一档），区块之间不再拉开一大截；
+   打印版生成中的五条状态排两列（第一条通栏） */
+#workspace[data-screen="resume-decision-career-plan"][data-state="generating"] .wait,
+#workspace[data-screen="resume-decision-career-plan"][data-state="print-pending"] .wait{margin-top:24px}
+#workspace[data-screen="resume-decision-career-plan"][data-state="generating"] .wait{padding:30px 28px}
+#workspace[data-screen="resume-decision-templates"][data-state="error"] .nots{gap:16px;margin-top:20px}
+#workspace[data-screen="resume-decision-templates"][data-state="error"] .nots>.not{min-height:86px!important}
+#workspace[data-screen="resume-decision-career-plan"][data-state="generating"] .slots{margin-top:22px}
+#workspace[data-screen="resume-decision-career-plan"][data-state="generating"] .nots{gap:20px;margin-top:22px}
+#workspace[data-screen="resume-decision-career-plan"][data-state="generating"] .nots>.not{min-height:92px!important}
+#workspace[data-screen="resume-decision-career-plan"][data-state="print-pending"] .list{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:22px}
+#workspace[data-screen="resume-decision-career-plan"][data-state="print-pending"] .list>.list-row:first-child{grid-column:1 / -1}
+#workspace[data-screen="resume-decision-career-plan"][data-state="print-pending"] .list-row{min-height:84px!important;align-items:center}
+#workspace[data-screen="resume-decision-career-plan"][data-state="print-pending"] .ghosts{margin-top:22px}
+.verdict-card{border-left-color:var(--teal)}
+.verdict-card .vc-badge{background:var(--soft)}
+.verdict-card .vc-badge b{color:var(--teal2)}
+.vc-badge b+small{margin-top:10px;letter-spacing:0;font-weight:700;line-height:1.4}
+.verdict-card .vc-risk{background:var(--soft);color:var(--teal2)}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <header class="topbar">
+      <a class="back m-press" href="16-service-hubs.html?hub=resume" data-route="/resume-service" aria-label="返回简历服务">‹</a>
+      <div class="brand"><span class="brand-mark">职</span><span>职易达</span></div>
+      <div class="top-space"></div>
+      <div class="status"><i></i><span id="status-copy">以这次办理的结果为准</span></div>
+      <time id="clock" class="clock">--:--</time>
+    </header>
+
+    <section class="hero">
+      <div class="xq m-face-ring">青</div>
+      <div class="hero-copy">
+        <div id="eyebrow" class="eyebrow">简历对照</div>
+        <h1 id="hero-title">先把目标说清，<em>再决定下一步。</em></h1>
+        <p id="hero-copy">对照你自己写下的要求，或把职业方向拆成下一步。都只给你本人用。</p>
+        <ol class="qx-steps"><li><b>1</b>要求自己写，不从列表里选</li><li><b>2</b>小青对照你的简历</li><li><b>3</b>带走下一步，或去打印</li></ol>
+      </div>
+    </section>
+
+    <main id="workspace" class="workspace" data-screen="resume-decision-job-fit" data-state="missing-task" data-testid="resume-decision-job-fit-state-missing-task"></main>
+
+    <footer class="truth-bar" data-testid="resume-decision-truth">
+      <span class="tb-ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v6.2c0 4.4-3.1 7.6-7.5 8.8-4.4-1.2-7.5-4.4-7.5-8.8V6z"/></svg></span>
+      <p><b>只供本人准备</b>不提供给企业 · 结果以实际记录为准 · 结束这次办理会清除本机登录</p>
+      <a class="tb-help m-press" href="06-help.html" data-route="/help" data-testid="resume-decision-truth-help">使用说明</a>
+    </footer>
+    <nav class="navbar" aria-label="全局导航">
+      <a class="m-press" href="01-home.html" data-route="/">首页</a>
+      <a class="m-press" href="05-ai-cockpit.html" data-route="/assistant">AI 顾问</a>
+      <a class="m-press" href="30-my-profile.html" data-route="/profile">我的</a>
+    </nav>
+    <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制" aria-expanded="false" aria-controls="demo-panel" hidden aria-hidden="true" tabindex="-1" disabled>演示</button>
+    <aside class="demo-panel" id="demo-panel" data-proto-control="true" aria-label="原型演示控制" hidden aria-hidden="true" tabindex="-1"></aside>
+  </div>
+  <script src="resume-decision-workspace.js"></script>
+</body>
+</html>

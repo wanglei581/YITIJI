@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test'
+import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
 
 export type AbortErrorCode = Parameters<Route['abort']>[0]
 
@@ -34,7 +35,7 @@ export class ApiRouter {
     // 默认按「引擎未配置」应答，让所有既有用例保持 Word 入口置灰、不中断；需要开放态的用例自行 respond 覆盖。
     this.respond('GET', '/api/v1/document-conversion/capabilities', {
       status: 200,
-      json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: '服务端未配置转换引擎' } },
+      json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: 'Word 转 PDF 暂未开通，请另存为 PDF 上传。' } },
     })
     // 生成预览 / 优化页挂载时都会读模板列表。默认空列表，不伪造模板；需要模板的用例自行覆盖。
     this.respond('GET', '/api/v1/job-materials/templates', {
@@ -50,6 +51,21 @@ export class ApiRouter {
     this.respond('GET', '/api/v1/me/documents', {
       status: 200,
       json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+    })
+    // 3.13 招聘内容托管：首页、招聘类路由闸门、「我的」、简历对照、小青、登录与帮助页挂载时都读终端配置。
+    // 默认按「托管打开」（客户私有化部署 b，也就是今天的岗位 / 招聘会行为）应答，既有用例不因这条新请求中断；
+    // 托管关闭（我们云上的默认）的用例自行 respond RECRUITMENT_HOSTING_OFF 覆盖。
+    // 需要百宝箱 / 智慧校园开着、或者要数配置请求次数的用例，本来就各自登记了配置，会覆盖这一条。
+    this.respond('GET', '/api/v1/terminals/KSK-001/config', {
+      status: 200,
+      json: terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'api-router-default'),
+    })
+    // 3.14 本机构官方渠道：首页（「岗位与招聘会」磁贴）与 /official-channels 挂载时各读一次（同一缓存）。
+    // 默认按「本终端没有渠道」应答：首页不摆磁贴，既有用例的栅格与文案一概不变；
+    // 要看磁贴、渠道卡片或 b 版本「其他来源平台」的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/terminals/KSK-001/official-channels', {
+      status: 200,
+      json: { items: [], legacyPlatforms: [] },
     })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {

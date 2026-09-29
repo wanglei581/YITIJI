@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { registerW6Api } from './fixtures/fusion-w6-api'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
+import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 
 /**
  * 上线前自评估 §1.6 修复：真网络端到端断言。
@@ -67,6 +68,7 @@ function collectRuntimeErrors(page: Page): string[] {
     if (/http proxy error|ECONNREFUSED/i.test(message.text())) errors.push(`console: ${message.text()}`)
   })
   page.on('requestfailed', (request) => {
+    if (isAbortedPdfjsBlobImport(request)) return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} ${request.failure()?.errorText ?? 'unknown'}`)
     }
@@ -173,7 +175,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     await page.getByRole('button', { name: /生成 PDF 预览/ }).click()
     const dialog = page.getByRole('dialog', { name: 'self-assessment-001.pdf' })
     await expect(dialog).toBeVisible()
-    await expect(dialog.locator('[data-file-preview-kind="pdf"] iframe')).toHaveAttribute('src', '/self-assessment-fixtures/report.pdf')
+    await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/self-assessment-fixtures/report.pdf')
     await expect(dialog.getByText('手机扫码保存')).toBeVisible()
     expect(page.context().pages()).toHaveLength(pageCount)
     await page.getByRole('button', { name: '关闭文件预览' }).click()

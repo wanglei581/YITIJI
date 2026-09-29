@@ -251,8 +251,8 @@ async function main(): Promise<void> {
   mustHaveStringLiteralUnion(
     privacyTypes,
     'MemberAiConsentScope',
-    ['job_ai', 'contract_review', 'resume_ai'],
-    'MemberPrivacy consent scope 精确包含 job_ai / contract_review / resume_ai'
+    ['job_ai', 'contract_review', 'resume_ai', 'age_14_plus', 'voice_recording'],
+    'MemberPrivacy consent scope 精确包含 job_ai / contract_review / resume_ai / age_14_plus / voice_recording'
   )
 
   mustContain(

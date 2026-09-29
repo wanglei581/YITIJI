@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>设计总览 · 职易达</title>
+<title>服务导览 · 职易达</title>
 <style>
 :root{
-  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#526b62;
   --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
   --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
   --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
@@ -62,39 +62,60 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
 .xq-doing b{color:#fff;font-weight:600;}
 
 /* 主体滚动区 */
-.body{flex:1;overflow-y:auto;padding:24px 44px 0;display:flex;flex-direction:column;gap:24px;}
+.body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:24px 44px 32px;display:flex;flex-direction:column;gap:22px;}
 .body::-webkit-scrollbar{width:0;}
 
 /* 分组标题 */
-.group-label{display:flex;align-items:baseline;gap:16px;margin:8px 0 16px;}
+.group-label{display:flex;align-items:baseline;gap:14px;margin:6px 0 14px;flex-wrap:wrap;}
 .group-label .t{font-size:27px;font-weight:700;}
-.group-label .hint{font-size:18px;color:var(--ink-3);margin-left:auto;}
+.group-label .gh{font-size:17px;color:var(--ink-3);}
+.group-label .hint{font-size:17px;color:var(--ink-3);margin-left:auto;}
 
-/* 页面网格 */
-.page-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-.page-item{display:flex;align-items:center;gap:14px;padding:18px 20px;border-radius:var(--r-md);
-  background:var(--surface);border:1px solid var(--line);cursor:pointer;transition:all .2s;}
+/* 服务入口网格 */
+.page-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.page-item{display:flex;align-items:center;gap:14px;min-height:80px;padding:14px 18px;border-radius:var(--r-md);
+  background:var(--surface);border:1px solid var(--line);cursor:pointer;text-decoration:none;color:inherit;
+  transition:background .2s var(--ease),border-color .2s var(--ease);}
 .page-item:active{background:var(--teal-soft);border-color:var(--teal);}
+.page-item:focus-visible{outline:4px solid var(--teal);outline-offset:3px;border-color:var(--teal);}
+.page-item.is-here{background:var(--teal-soft);border-color:var(--teal);cursor:default;}
 .page-num{flex:none;width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;
-  font-size:20px;font-weight:700;background:var(--paper);border:1px solid var(--line);color:var(--ink-3);}
-.page-item.done .page-num{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);}
+  font-size:20px;font-weight:700;background:var(--paper);border:1px solid var(--line);color:var(--ink-3);
+  font-variant-numeric:tabular-nums;}
+.page-item.is-here .page-num{background:#fff;border-color:var(--teal);color:var(--teal-d);}
 .page-info{flex:1;min-width:0;}
-.page-name{font-size:19px;font-weight:600;margin-bottom:2px;}
-.page-desc{font-size:16px;color:var(--ink-3);}
-.page-status{flex:none;font-size:15px;font-weight:600;}
-.page-status.done{color:var(--teal-d);}
+.page-name{font-size:20px;font-weight:600;margin-bottom:3px;line-height:1.25;}
+.page-desc{font-size:16px;color:var(--ink-3);line-height:1.3;}
+.page-go{flex:none;font-size:26px;font-weight:600;color:var(--teal-d);line-height:1;}
+.page-item.is-here .page-go{font-size:16px;font-weight:600;}
+
+/* 末尾说明 */
+.tail-note{margin-top:4px;padding:22px 26px;border-radius:var(--r-md);background:rgba(11,36,30,.04);
+  border:1px dashed var(--line-2);font-size:19px;line-height:1.55;color:var(--ink-2);}
+.tail-note b{color:var(--ink);font-weight:600;}
+
+/* 继续向下提示：滚到底自动收起，不遮挡最后一条 */
+.scroll-cue{flex:none;margin:0 44px;height:0;overflow:visible;position:relative;}
+.scroll-cue::before{content:attr(data-x);}
+.scroll-cue{display:flex;align-items:center;justify-content:center;gap:8px;height:56px;margin:6px 44px 0;
+  border-radius:18px;background:var(--deep);color:#eefaf5;font-size:19px;font-weight:600;letter-spacing:.5px;}
+.scroll-cue.is-end{display:none;}
+.sc-arrow{font-size:22px;color:var(--emerald);animation:cuebob 1.6s var(--ease) infinite;}
+@keyframes cuebob{0%,100%{transform:translateY(-2px);}50%{transform:translateY(3px);}}
 
 /* 规矩条 */
-.rail{flex:none;margin:auto 44px 0;padding:18px 24px;border-radius:18px;
+/* 规矩条 */
+.rail{flex:none;margin:12px 44px 0;padding:16px 24px;border-radius:18px;
   background:rgba(11,36,30,.04);border:1px dashed var(--line-2);
   display:flex;align-items:center;justify-content:center;gap:20px;}
-.rail-item{display:flex;align-items:center;gap:8px;font-size:18px;color:var(--ink-3);}
+.rail-item{display:flex;align-items:center;gap:8px;font-size:17px;line-height:1.35;color:var(--ink-3);}
 .rail-item svg{width:18px;height:18px;opacity:.5;}
 
 /* 底部导航 */
 .navbar{flex:none;height:112px;display:flex;background:var(--surface);border-top:1px solid var(--line);}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
-  position:relative;cursor:pointer;}
+  position:relative;cursor:pointer;text-decoration:none;color:inherit;}
+.nav-item:focus-visible{outline:4px solid var(--teal);outline-offset:-6px;border-radius:16px;}
 .nav-item .ni{font-size:20px;color:var(--ink-3);font-weight:600;}
 .nav-item.on .ni{color:var(--teal-d);}
 .nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal);}
@@ -103,6 +124,8 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
 @media(prefers-reduced-motion:reduce){
   .dot.breathe{animation:none;}
   .xq-face::before{animation:none;opacity:.3;}
+  .sc-arrow{animation:none;}
+  *,*::before,*::after{animation:none!important;transition:none!important;}
 }
 </style>
 </head>
@@ -114,7 +137,7 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
   <div class="topbar">
     <div class="logo"><div class="logo-mark">职</div><div class="logo-name">职易达</div></div>
     <div class="sp"></div>
-    <div class="pill-status"><span class="dot breathe"></span>设计总览</div>
+    <div class="pill-status"><span class="dot breathe"></span>全部服务入口</div>
     <div class="clock" id="clock">--:--</div>
   </div>
 
@@ -123,120 +146,152 @@ html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft Ya
     <div class="xq-row">
       <div class="xq-face serif">青</div>
       <div class="xq-main">
-        <div class="xq-eyebrow">DESIGN INDEX</div>
-        <div class="xq-ask">全部 <em>36 页</em>，一页不落。</div>
-        <div class="xq-doing">按功能分组，点任何一页直接跳转。<b>绿色 = 已完成</b>，灰色 = 待做。</div>
+        <div class="xq-eyebrow">服务导览</div>
+        <div class="xq-ask">这台机器能办的事，<em>都在这里</em>。</div>
+        <div class="xq-doing">按用途分成九组，点一条直接进入。<b>共 50 个服务入口</b>，往下滑可以看完。</div>
       </div>
     </div>
   </div>
 
   <!-- 主体滚动区 -->
-  <div class="body">
+  <!-- 主体滚动区：全部服务入口 -->
+  <div class="body" id="body">
 
-    <!-- 全局层 -->
-    <div>
-      <div class="group-label"><span class="t">全局层</span><span class="hint">10 页</span></div>
+    <section class="group" aria-labelledby="grp-0">
+      <div class="group-label"><span class="t" id="grp-0">进入与账号</span><span class="gh">开机、首页、登录和继续办理</span><span class="hint">7 项</span></div>
       <div class="page-grid">
-        <div class="page-item done" onclick="location.href='00-standby.html'"><div class="page-num">00</div><div class="page-info"><div class="page-name">待机屏</div><div class="page-desc">宣传+唤醒</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='01-home.html'"><div class="page-num">01</div><div class="page-info"><div class="page-name">首页</div><div class="page-desc">AI 编排+服务入口</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='02-services.html'"><div class="page-num">02</div><div class="page-info"><div class="page-name">全部服务</div><div class="page-desc">8 大功能域</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='03-login-gate.html'"><div class="page-num">03</div><div class="page-info"><div class="page-name">登录门禁</div><div class="page-desc">三选一</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='04-session-guard.html'"><div class="page-num">04</div><div class="page-info"><div class="page-name">会话安全</div><div class="page-desc">六态管理</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='05-ai-cockpit.html'"><div class="page-num">05</div><div class="page-info"><div class="page-name">AI 顾问</div><div class="page-desc">AI 驾驶舱</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='06-help.html'"><div class="page-num">06</div><div class="page-info"><div class="page-name">帮助求助</div><div class="page-desc">操作指南</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='07-session-resume.html'"><div class="page-num">07</div><div class="page-info"><div class="page-name">会话续接</div><div class="page-desc">跨设备恢复</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='08-legal.html'"><div class="page-num">08</div><div class="page-info"><div class="page-name">法律协议</div><div class="page-desc">版本化同意</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='09-system-state.html'"><div class="page-num">09</div><div class="page-info"><div class="page-name">系统状态</div><div class="page-desc">硬件+网络</div></div><div class="page-status done">✓</div></div>
+        <a class="page-item" href="00-standby.html"><div class="page-num">00</div><div class="page-info"><div class="page-name">待机屏</div><div class="page-desc">没人用时的欢迎画面</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="01-home.html"><div class="page-num">01</div><div class="page-info"><div class="page-name">首页</div><div class="page-desc">常用服务和当前进度</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="02-services.html"><div class="page-num">02</div><div class="page-info"><div class="page-name">全部服务</div><div class="page-desc">按功能域分类的总入口</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="05-ai-cockpit.html"><div class="page-num">05</div><div class="page-info"><div class="page-name">AI 顾问</div><div class="page-desc">有问题先问它</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="03-login-gate.html"><div class="page-num">03</div><div class="page-info"><div class="page-name">登录</div><div class="page-desc">手机号或扫码，也可以不登录</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="04-session-guard.html"><div class="page-num">04</div><div class="page-info"><div class="page-name">会话安全</div><div class="page-desc">离开前清干净本机信息</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="07-session-resume.html"><div class="page-num">07</div><div class="page-info"><div class="page-name">继续没办完的事</div><div class="page-desc">接着上一次的打印任务</div></div><div class="page-go" aria-hidden="true">›</div></a>
       </div>
-    </div>
+    </section>
 
-    <!-- 打印链 -->
-    <div>
-      <div class="group-label"><span class="t">打印链</span><span class="hint">6 页</span></div>
+    <section class="group" aria-labelledby="grp-1">
+      <div class="group-label"><span class="t" id="grp-1">打印 · 扫描 · 取件</span><span class="gh">把文件送进来、印出来、取走</span><span class="hint">10 项</span></div>
       <div class="page-grid">
-        <div class="page-item done" onclick="location.href='10-print-hub.html'"><div class="page-num">10</div><div class="page-info"><div class="page-name">打印Hub</div><div class="page-desc">四通道入口</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='11-arrival-code.html'"><div class="page-num">11</div><div class="page-info"><div class="page-name">到机码</div><div class="page-desc">扫码传文件</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='12-file-source.html'"><div class="page-num">12</div><div class="page-info"><div class="page-name">文件来源</div><div class="page-desc">手机/U盘/扫码</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='13-print-desk.html'"><div class="page-num">13</div><div class="page-info"><div class="page-name">工作台</div><div class="page-desc">预览+参数</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='14-print-confirm.html'"><div class="page-num">14</div><div class="page-info"><div class="page-name">确认支付</div><div class="page-desc">报价+支付</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='15-print-fulfill.html'"><div class="page-num">15</div><div class="page-info"><div class="page-name">交付清空</div><div class="page-desc">出纸+取件</div></div><div class="page-status done">✓</div></div>
+        <a class="page-item" href="10-print-hub.html"><div class="page-num">10</div><div class="page-info"><div class="page-name">打印与扫描</div><div class="page-desc">四条进文件的路</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="11-arrival-code.html"><div class="page-num">11</div><div class="page-info"><div class="page-name">输入到机码</div><div class="page-desc">手机上下过单，来这里取号</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="12-file-source.html"><div class="page-num">12</div><div class="page-info"><div class="page-name">选择文件来源</div><div class="page-desc">手机扫码 / 本机 / U 盘 / 纸质扫描</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="13-print-desk.html"><div class="page-num">13</div><div class="page-info"><div class="page-name">材料检查与打印设置</div><div class="page-desc">份数、单双面、黑白彩色</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="14-print-confirm.html"><div class="page-num">14</div><div class="page-info"><div class="page-name">确认价格</div><div class="page-desc">印之前先看清楚多少钱</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="15-print-fulfill.html"><div class="page-num">15</div><div class="page-info"><div class="page-name">出纸与交付</div><div class="page-desc">从出纸口拿走你的文件</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="18-scan-workbench.html"><div class="page-num">18</div><div class="page-info"><div class="page-name">纸质材料扫描</div><div class="page-desc">纸变成 PDF</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="19-img2pdf.html"><div class="page-num">19</div><div class="page-info"><div class="page-name">图片转 PDF</div><div class="page-desc">照片拼成一份可打印文件</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="20-sign-stamp.html"><div class="page-num">20</div><div class="page-info"><div class="page-name">签名与盖章</div><div class="page-desc">在文件上放签名或印章位置</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="33-pickup-code.html"><div class="page-num">33</div><div class="page-info"><div class="page-name">取件码核销</div><div class="page-desc">输入 8 位码，直接拿件</div></div><div class="page-go" aria-hidden="true">›</div></a>
       </div>
-    </div>
+    </section>
 
-    <!-- 扫描加工 -->
-    <div>
-      <div class="group-label"><span class="t">扫描加工</span><span class="hint">3 页</span></div>
+    <section class="group" aria-labelledby="grp-2">
+      <div class="group-label"><span class="t" id="grp-2">简历与求职材料</span><span class="gh">从诊断到成稿，再到打印</span><span class="hint">6 项</span></div>
       <div class="page-grid">
-        <div class="page-item done" onclick="location.href='18-scan-workbench.html'"><div class="page-num">18</div><div class="page-info"><div class="page-name">扫描工作台</div><div class="page-desc">三态切换</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='19-img2pdf.html'"><div class="page-num">19</div><div class="page-info"><div class="page-name">图片转PDF</div><div class="page-desc">拼版+合成</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='20-sign-stamp.html'"><div class="page-num">20</div><div class="page-info"><div class="page-name">签名盖章</div><div class="page-desc">九宫格定位</div></div><div class="page-status done">✓</div></div>
+        <a class="page-item" href="21-resume-triage.html"><div class="page-num">21</div><div class="page-info"><div class="page-name">简历怎么来</div><div class="page-desc">上传、扫描，或者从零开始</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="22-resume-report.html"><div class="page-num">22</div><div class="page-info"><div class="page-name">简历诊断报告</div><div class="page-desc">问题在哪，先看结论</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="23-resume-optimize.html"><div class="page-num">23</div><div class="page-info"><div class="page-name">逐条优化建议</div><div class="page-desc">一条条改，改不改你说了算</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="24-resume-generate.html"><div class="page-num">24</div><div class="page-info"><div class="page-name">从零生成简历</div><div class="page-desc">说着填，边填边成形</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="25-material-workshop.html"><div class="page-num">25</div><div class="page-info"><div class="page-name">求职材料工坊</div><div class="page-desc">自荐信、登记表等常用材料</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="46-resume-decision-workspace.html"><div class="page-num">46</div><div class="page-info"><div class="page-name">简历决策工作台</div><div class="page-desc">几份简历放一起比</div></div><div class="page-go" aria-hidden="true">›</div></a>
       </div>
-    </div>
+    </section>
 
-    <!-- 简历域 -->
-    <div>
-      <div class="group-label"><span class="t">简历域</span><span class="hint">5 页</span></div>
+    <section class="group" aria-labelledby="grp-3">
+      <div class="group-label"><span class="t" id="grp-3">岗位与招聘会</span><span class="gh">来源平台发布的信息，本机只做浏览</span><span class="hint">7 项</span></div>
       <div class="page-grid">
-        <div class="page-item done" onclick="location.href='21-resume-triage.html'"><div class="page-num">21</div><div class="page-info"><div class="page-name">简历分诊</div><div class="page-desc">三情况选卡</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='22-resume-report.html'"><div class="page-num">22</div><div class="page-info"><div class="page-name">诊断报告</div><div class="page-desc">结论→详情</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='23-resume-optimize.html'"><div class="page-num">23</div><div class="page-info"><div class="page-name">逐条优化</div><div class="page-desc">采纳/保留/自己写</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='24-resume-generate.html'"><div class="page-num">24</div><div class="page-info"><div class="page-name">生成填槽</div><div class="page-desc">语音→结构化</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='25-material-workshop.html'"><div class="page-num">25</div><div class="page-info"><div class="page-name">材料工坊</div><div class="page-desc">勾选式购物车</div></div><div class="page-status done">✓</div></div>
+        <a class="page-item" href="26-browse-list.html"><div class="page-num">26</div><div class="page-info"><div class="page-name">岗位信息</div><div class="page-desc">按条件找岗位</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="27-browse-detail.html"><div class="page-num">27</div><div class="page-info"><div class="page-name">岗位详情</div><div class="page-desc">来源、时间和投递方式</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="28-jobfair-enhanced.html"><div class="page-num">28</div><div class="page-info"><div class="page-name">招聘会</div><div class="page-desc">场次、时间和入场方式</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="44-fair-company-detail.html"><div class="page-num">44</div><div class="page-info"><div class="page-name">招聘会参展企业</div><div class="page-desc">这场都有哪些企业</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="43-company-directory.html"><div class="page-num">43</div><div class="page-info"><div class="page-name">找企业</div><div class="page-desc">按行业和地区看企业</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="42-offline-agency-directory.html"><div class="page-num">42</div><div class="page-info"><div class="page-name">线下招聘机构</div><div class="page-desc">门店地址和服务项目</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="45-online-platform-directory.html"><div class="page-num">45</div><div class="page-info"><div class="page-name">线上招聘平台</div><div class="page-desc">扫码在手机上打开官网</div></div><div class="page-go" aria-hidden="true">›</div></a>
       </div>
-    </div>
+    </section>
 
-    <!-- 浏览与详情 -->
-    <div>
-      <div class="group-label"><span class="t">浏览与详情</span><span class="hint">3 页</span></div>
+    <section class="group" aria-labelledby="grp-4">
+      <div class="group-label"><span class="t" id="grp-4">面试与能力</span><span class="gh">练一练，也看看自己适合什么</span><span class="hint">3 项</span></div>
       <div class="page-grid">
-        <div class="page-item done" onclick="location.href='26-browse-list.html'"><div class="page-num">26</div><div class="page-info"><div class="page-name">岗位列表</div><div class="page-desc">三域共用骨架</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='27-browse-detail.html'"><div class="page-num">27</div><div class="page-info"><div class="page-name">岗位详情</div><div class="page-desc">来源三要素</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='28-jobfair-enhanced.html'"><div class="page-num">28</div><div class="page-info"><div class="page-name">招聘会作战台</div><div class="page-desc">四步办理单</div></div><div class="page-status done">✓</div></div>
+        <a class="page-item" href="29-interview-training.html"><div class="page-num">29</div><div class="page-info"><div class="page-name">模拟面试</div><div class="page-desc">设一场练习，练完给报告</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="34-self-assessment.html"><div class="page-num">34</div><div class="page-info"><div class="page-name">职业自我评估</div><div class="page-desc">答题后看方向建议</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="50-capability-zone-workspace.html"><div class="page-num">50</div><div class="page-info"><div class="page-name">能力受控专区</div><div class="page-desc">当前能力开到哪一步</div></div><div class="page-go" aria-hidden="true">›</div></a>
       </div>
-    </div>
+    </section>
 
-    <!-- 面试与我的 -->
-    <div>
-      <div class="group-label"><span class="t">面试与我的</span><span class="hint">6 页</span></div>
+    <section class="group" aria-labelledby="grp-5">
+      <div class="group-label"><span class="t" id="grp-5">政策 · 校园 · 签约</span><span class="gh">求职路上的其他帮助</span><span class="hint">3 项</span></div>
       <div class="page-grid">
-        <div class="page-item done" onclick="location.href='29-interview-training.html'"><div class="page-num">29</div><div class="page-info"><div class="page-name">面试训练</div><div class="page-desc">AI出题+报告</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='30-my-profile.html'"><div class="page-num">30</div><div class="page-info"><div class="page-name">我的</div><div class="page-desc">资产+继续办</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='31-benefits.html'"><div class="page-num">31</div><div class="page-info"><div class="page-name">权益活动</div><div class="page-desc">领券+我的权益</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='32-cashier.html'"><div class="page-num">32</div><div class="page-info"><div class="page-name">收银台</div><div class="page-desc">双通道支付</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='33-pickup-code.html'"><div class="page-num">33</div><div class="page-info"><div class="page-name">取件码核销</div><div class="page-desc">扫码/输入取件</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='34-self-assessment.html'"><div class="page-num">34</div><div class="page-info"><div class="page-name">自我测评</div><div class="page-desc">题库+报告</div></div><div class="page-status done">✓</div></div>
-        <div class="page-item done" onclick="location.href='35-notifications.html'"><div class="page-num">35</div><div class="page-info"><div class="page-name">通知中心</div><div class="page-desc">个人+系统</div></div><div class="page-status done">✓</div></div>
+        <a class="page-item" href="48-policy-workspace.html"><div class="page-num">48</div><div class="page-info"><div class="page-name">政策服务</div><div class="page-desc">补贴、落户等常见政策查询</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="49-campus-workspace.html"><div class="page-num">49</div><div class="page-info"><div class="page-name">校园招聘专区</div><div class="page-desc">应届和实习相关信息</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="47-contract-review-workspace.html"><div class="page-num">47</div><div class="page-info"><div class="page-name">签约风险提示</div><div class="page-desc">签之前先让 AI 读一遍</div></div><div class="page-go" aria-hidden="true">›</div></a>
       </div>
-    </div>
+    </section>
+
+    <section class="group" aria-labelledby="grp-6">
+      <div class="group-label"><span class="t" id="grp-6">付款与权益</span><span class="gh">该付多少，有没有优惠</span><span class="hint">3 项</span></div>
+      <div class="page-grid">
+        <a class="page-item" href="32-cashier.html"><div class="page-num">32</div><div class="page-info"><div class="page-name">收银台</div><div class="page-desc">微信或支付宝扫码付</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="37-pay-states.html"><div class="page-num">37</div><div class="page-info"><div class="page-name">支付结果</div><div class="page-desc">成功、失败、退款都写清楚</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="31-benefits.html"><div class="page-num">31</div><div class="page-info"><div class="page-name">权益与活动</div><div class="page-desc">可用的券和活动</div></div><div class="page-go" aria-hidden="true">›</div></a>
+      </div>
+    </section>
+
+    <section class="group" aria-labelledby="grp-7">
+      <div class="group-label"><span class="t" id="grp-7">我的</span><span class="gh">登录后才看得到的个人信息</span><span class="hint">7 项</span></div>
+      <div class="page-grid">
+        <a class="page-item" href="30-my-profile.html"><div class="page-num">30</div><div class="page-info"><div class="page-name">我的</div><div class="page-desc">个人中心总入口</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="38-member-assets.html"><div class="page-num">38</div><div class="page-info"><div class="page-name">我的文档与打印订单</div><div class="page-desc">存过的材料和下过的单</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="39-member-records.html"><div class="page-num">39</div><div class="page-info"><div class="page-name">我的简历 · 收藏 · 记录</div><div class="page-desc">收藏的岗位和 AI 记录</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="35-notifications.html"><div class="page-num">35</div><div class="page-info"><div class="page-name">消息通知</div><div class="page-desc">订单和系统提醒</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="40-member-feedback.html"><div class="page-num">40</div><div class="page-info"><div class="page-name">我的反馈</div><div class="page-desc">提过的问题和处理进度</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="41-member-privacy.html"><div class="page-num">41</div><div class="page-info"><div class="page-name">隐私与数据请求</div><div class="page-desc">导出或删除你的数据</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="08-legal.html"><div class="page-num">08</div><div class="page-info"><div class="page-name">协议与隐私政策</div><div class="page-desc">用户服务协议全文</div></div><div class="page-go" aria-hidden="true">›</div></a>
+      </div>
+    </section>
+
+    <section class="group" aria-labelledby="grp-8">
+      <div class="group-label"><span class="t" id="grp-8">帮助与机器状态</span><span class="gh">不会用、或者机器不对劲的时候</span><span class="hint">4 项</span></div>
+      <div class="page-grid">
+        <a class="page-item" href="06-help.html"><div class="page-num">06</div><div class="page-info"><div class="page-name">帮助与求助</div><div class="page-desc">操作指南和叫人</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="09-system-state.html"><div class="page-num">09</div><div class="page-info"><div class="page-name">这台机器的状态</div><div class="page-desc">打印机、网络等能不能用</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <a class="page-item" href="16-service-hubs.html"><div class="page-num">16</div><div class="page-info"><div class="page-name">服务中心</div><div class="page-desc">各功能域的分区入口</div></div><div class="page-go" aria-hidden="true">›</div></a>
+        <div class="page-item is-here" aria-current="page"><div class="page-num">36</div><div class="page-info"><div class="page-name">服务导览</div><div class="page-desc">你正在看这一页</div></div><div class="page-go">当前</div></div>
+      </div>
+    </section>
+
+    <div class="tail-note">已经到最后一组了。想找的服务不在上面，去<b>帮助与求助</b>，或者按屏幕上的求助按钮叫工作人员。</div>
 
   </div>
+  <div class="scroll-cue" id="scroll-cue" aria-hidden="true"><span class="sc-arrow">↓</span> 下面还有服务，手指往上滑</div>
 
-  <!-- 规矩条 -->
+  <!-- 底部说明条 -->
   <div class="rail">
     <div class="rail-item">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-      36 页全部完成
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      不登录也能用打印与扫描
     </div>
     <div class="rail-item">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-      2026-08-21
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      岗位与招聘会只做信息浏览，投递和预约在来源平台完成
     </div>
   </div>
 
   <!-- 底部导航 -->
   <div class="navbar">
-    <div class="nav-item" onclick="location.href='01-home.html'">
+    <a class="nav-item" href="01-home.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       <div class="ni">首页</div>
-    </div>
-    <div class="nav-item">
+    </a>
+    <a class="nav-item" href="05-ai-cockpit.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       <div class="ni">AI 顾问</div>
-    </div>
-    <div class="nav-item" onclick="location.href='30-my-profile.html'">
+    </a>
+    <a class="nav-item" href="30-my-profile.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       <div class="ni">我的</div>
-    </div>
+    </a>
   </div>
 
 </div>
@@ -258,6 +313,20 @@ function tick(){
     String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
 tick();setInterval(tick,10000);
+
+/* 继续向下提示：只反映真实滚动位置，滚到底就收起，不做自动滚动 */
+(function(){
+  var body=document.getElementById('body');
+  var cue=document.getElementById('scroll-cue');
+  if(!body||!cue) return;
+  function sync(){
+    var more=body.scrollHeight-body.clientHeight-body.scrollTop;
+    cue.classList.toggle('is-end', more<=8);
+  }
+  body.addEventListener('scroll',sync,{passive:true});
+  window.addEventListener('resize',sync);
+  sync();
+})();
 </script>
 </body>
 </html>

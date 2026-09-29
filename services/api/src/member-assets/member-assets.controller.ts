@@ -85,8 +85,9 @@ export class MemberAssetsController {
     @CurrentEndUser() user: AuthedEndUser,
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('qaCursor') qaCursor?: string,
   ): Promise<ApiResponse<MemberAiRecordPage>> {
-    return ApiResponse.ok(await this.assets.listAiRecords(user.endUserId, parseMemberPageQuery(cursor, pageSize)))
+    return ApiResponse.ok(await this.assets.listAiRecords(user.endUserId, parseMemberPageQuery(cursor, pageSize), parseMemberPageQuery(qaCursor, pageSize)))
   }
 
   /**
@@ -119,6 +120,22 @@ export class MemberAssetsController {
       requestId: req.requestId ?? null,
     })
     return ApiResponse.ok({ deleted: true, deletedCount: result.deletedCount })
+  }
+
+  /** 删除本人小青作业摘要；已导出的文件由「我的文档」单独管理。 */
+  @Delete('qa-records/:id')
+  async deleteQaRecord(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Param('id') id: string,
+    @Req() req: ReqLike,
+  ): Promise<ApiResponse<{ deleted: true }>> {
+    const result = await this.assets.deleteQaRecord(user.endUserId, id)
+    await this.audit.write({
+      actorId: null, actorRole: 'enduser', action: 'member.qa_record_delete',
+      targetType: 'advisor_artifact', targetId: id, payload: { endUserId: user.endUserId },
+      ipAddress: ipOf(req), userAgent: uaOf(req), requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok(result)
   }
 
   /**

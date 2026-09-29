@@ -1,0 +1,39 @@
+import { cn } from '../../lib/cn'
+import { screenCount } from '../ScreenPrimitives'
+
+/**
+ * 排行榜：名次 + 标题（一行，放不下省略）+ 类型标签 + 次数，下面一条比例细条。
+ * 标题比条形图的左栏长得多（内容标题、来源名称），这里给标题整行宽度。
+ * wide：放在宽而矮的底栏里时按列铺开（逐行读：1 2 3 / 4 5），不挤成一列。
+ * tall：放在高而窄的一整栏里时竖排、标题写全（最多折两行），各项均分栏高。
+ */
+
+export interface TwinRankItem {
+  key: string
+  title: string
+  tag?: string
+  value: number
+}
+
+export function TwinRankList({ items, emptyText, wide = false, tall = false }: { items: TwinRankItem[]; emptyText: string; wide?: boolean; tall?: boolean }) {
+  if (items.length === 0) return <p className="twin-empty">{emptyText}</p>
+  let max = 0
+  for (const item of items) if (item.value > max) max = item.value
+  return (
+    <ol className={cn('twin-rank', wide && 'is-wide', tall && 'is-tall')}>
+      {items.map((item, i) => (
+        <li key={item.key}>
+          <span className="twin-rank-no">{i + 1}</span>
+          <span className="twin-rank-t" title={item.title}>
+            {item.title}
+          </span>
+          {item.tag ? <span className="twin-rank-tag">{item.tag}</span> : <span />}
+          <b>{screenCount(item.value)}</b>
+          <span className="twin-rank-bar" aria-hidden="true">
+            <i style={{ width: `${max > 0 ? (item.value / max) * 100 : 0}%` }} />
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}

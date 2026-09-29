@@ -6,6 +6,8 @@
 //   API_MODE=http → screensaverHttpAdapter(真实 /terminals/:id/screensaver)
 // ============================================================
 
+import { useSyncExternalStore } from 'react'
+import { IS_E2E_BUILD } from '../../utils/buildMode'
 import type { KioskScreensaverPlaylist } from '@ai-job-print/shared'
 import { API_MODE } from './client'
 import { screensaverHttpAdapter } from './screensaverHttpAdapter'
@@ -17,6 +19,7 @@ const IDENTITY_TIMEOUT_MS = 2_000
 const IDENTITY_RETRY_DELAY_MS = 3_000
 const IDENTITY_MONITOR_DELAY_MS = 30_000
 const TERMINAL_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
+const KIOSK_LAUNCH_MARKER_KEY = 'kiosk_launch_marker_v1'
 
 interface LocalTerminalIdentity {
   terminalId: string
@@ -32,6 +35,25 @@ let resolvedIdentity: LocalTerminalIdentity | null = null
 let identityInitialization: Promise<void> | null = null
 let identityRetryTimer: number | null = null
 const identityListeners = new Set<() => void>()
+
+function captureKioskLaunchMarker(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const current = new URL(window.location.href)
+    const marked = current.searchParams.has('boot_ticket') || current.searchParams.get('kiosk_launch') === '1'
+    if (!marked) return window.sessionStorage.getItem(KIOSK_LAUNCH_MARKER_KEY) === '1'
+    window.sessionStorage.setItem(KIOSK_LAUNCH_MARKER_KEY, '1')
+    if (current.searchParams.has('kiosk_launch')) {
+      current.searchParams.delete('kiosk_launch')
+      window.history.replaceState(window.history.state, '', `${current.pathname}${current.search}${current.hash}`)
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+const HAS_KIOSK_LAUNCH_MARKER = captureKioskLaunchMarker()
 
 export interface ScreensaverServiceInterface {
   getPlaylist(terminalId: string): Promise<KioskScreensaverPlaylist>
@@ -146,7 +168,9 @@ export const getTerminalId = (): string => resolvedIdentity?.terminalId ?? ''
 // Playwright 套件用 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN 短路终端会话（API 全部路由 mock，无真实 Agent），
 // 同一变量也标记「这是 E2E 构建」：桌面验证链路（<input type=file>）只在 E2E 构建里保留；
 // 生产 / deploy 构建永不设置该变量（verify-runtime-terminal-identity 断言），一体机上入口不渲染。
-const IS_E2E_BUILD = Boolean(import.meta.env['VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN']?.trim())
-export const isTerminalKiosk = (): boolean => getTerminalId() !== '' && !IS_E2E_BUILD
+export const isTerminalKiosk = (): boolean => !IS_E2E_BUILD && (getTerminalId() !== '' || HAS_KIOSK_LAUNCH_MARKER)
 
 export const getTerminalCode = (): string => resolvedIdentity?.terminalCode ?? ''
+
+/** Agent 延迟启动时立即撤掉本机文件入口与外链。 */
+export const useTerminalKiosk = (): boolean => useSyncExternalStore(subscribeTerminalIdentity, isTerminalKiosk)

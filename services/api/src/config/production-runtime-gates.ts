@@ -10,6 +10,8 @@
  *   - SMS_PROVIDER 必须为 tencent，且腾讯短信生产参数齐全（生产不得日志打印验证码）
  *   - OCR_PROVIDER 必须为 baidu，且百度 OCR 生产参数齐全（生产不得关闭真实简历识别）
  *   - AI_PROVIDER 必须为 llm，且真实 LLM 密钥齐全（生产不得回退 mock / stub provider）
+ *   - AIGC_CONTENT_PRODUCER 必须显式设置且不是产品名（GB 45438 附录 E 的内容制作方是
+ *     服务提供者名称或编码；未设置时导出文件会回落到产品名）
  *   - FILE_SIGNING_SECRET / SECRET_ENCRYPTION_KEY / PAYMENT_SESSION_SECRET /
  *     TERMINAL_ADMIN_SECRET / TERMINAL_ACTION_TOKEN_SECRET 必须存在、
  *     长度 >= 32，且不得使用 .env.example 的样值前缀（dev- / test- / replace-with- 等）
@@ -32,6 +34,7 @@
  */
 import { assertRuntimeDatabaseAllowed } from '../prisma/create-client'
 import { probeCjkFont, type CjkFontProbeResult } from '../common/pdf/cjk-font'
+import { AIGC_DEFAULT_PRODUCER } from '../common/pdf/aigc-label'
 import { assertProductionTrustProxyHops } from './trust-proxy'
 
 export interface ProductionRuntimeEnv {
@@ -54,6 +57,7 @@ export interface ProductionRuntimeEnv {
   AI_PROVIDER?: string
   AI_LLM_API_KEY?: string
   TRTC_LLM_API_KEY?: string
+  AIGC_CONTENT_PRODUCER?: string
   PAYMENT_SESSION_SECRET?: string
   TERMINAL_ADMIN_SECRET?: string
   TERMINAL_ACTION_TOKEN_SECRET?: string
@@ -200,6 +204,16 @@ export function assertProductionRuntimeGates(
   if (!hasValue(env.AI_LLM_API_KEY) && !hasValue(env.TRTC_LLM_API_KEY)) {
     throw new Error(
       'PRODUCTION_LLM_CONFIG_MISSING: AI_PROVIDER=llm 时必须配置 AI_LLM_API_KEY 或 TRTC_LLM_API_KEY',
+    )
+  }
+
+  // 导出的 PDF / DOCX 把它写进隐式标识 ContentProducer。未设置时 aigc-label.ts 回落到
+  // 产品名，而产品名不是服务提供者。填公司全称还是统一社会信用代码由产品负责人定，
+  // 这里只拒绝空值和产品名。
+  const aigcProducer = env.AIGC_CONTENT_PRODUCER?.trim() ?? ''
+  if (!aigcProducer || aigcProducer === AIGC_DEFAULT_PRODUCER) {
+    throw new Error(
+      `PRODUCTION_AIGC_CONTENT_PRODUCER_MISSING: NODE_ENV=production 时必须把 AIGC_CONTENT_PRODUCER 设为公司全称或统一社会信用代码（不能为空，也不能是产品名「${AIGC_DEFAULT_PRODUCER}」）`,
     )
   }
 

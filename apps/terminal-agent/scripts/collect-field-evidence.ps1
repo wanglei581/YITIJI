@@ -271,6 +271,39 @@ function Get-ProgramDataAclStatus([string]$Path) {
   }
 }
 
+function Get-LockPathKind([string]$Path) {
+  try {
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    $isReparse = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+    if ($item.PSIsContainer) {
+      if ($isReparse) { return "junction" }
+      return "directory"
+    }
+    if ($isReparse) { return "symlink" }
+    return "regular_file"
+  } catch {
+    $presence = Get-PathPresenceStatus $Path
+    if ($presence -eq "missing") { return "missing" }
+    return "unavailable"
+  }
+}
+
+function Get-StrictLockPidParse([string]$Path) {
+  try {
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -gt 32) {
+      return [pscustomobject]@{ Status = "unproven"; ParsedPid = $null }
+    }
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+    if ($text -cmatch '^([1-9][0-9]{0,9})\n?$') {
+      return [pscustomobject]@{ Status = "strict_pid"; ParsedPid = [int64]$Matches[1] }
+    }
+    return [pscustomobject]@{ Status = "unproven"; ParsedPid = $null }
+  } catch {
+    return [pscustomobject]@{ Status = "unavailable"; ParsedPid = $null }
+  }
+}
+
 if (-not [string]::IsNullOrWhiteSpace($scriptRoot)) {
   $serviceIdentityPath = Join-Path $scriptRoot "service-identity.ps1"
   if (Test-Path -LiteralPath $serviceIdentityPath -PathType Leaf) {
@@ -503,6 +536,53 @@ Invoke-CheckedItem -Id "5.3-11" -Name "单实例进程数" -Body {
   $verdict = "FAIL"
   if ($count -eq 1) { $verdict = "PASS" }
   Add-EvidenceRow -Id "5.3-11" -Name "单实例进程数" -Value $value -Verdict $verdict
+}
+
+Invoke-CheckedItem -Id "5.3-11L" -Name "实例锁只读证据" -Body {
+  $programDataDir = Join-Path $env:ProgramData "AIJobPrintAgent"
+  $lockPath = Join-Path $programDataDir "agent.pid"
+  $kind = Get-LockPathKind $lockPath
+  $pidParse = "missing"
+  $parsedLockPid = $null
+  $mtime = "n/a"
+  $aclStatus = Get-ProgramDataAclStatus $lockPath
+  $tasklistExit = "not_run"
+  $tasklistResult = "not_run"
+  $serviceStateValue = "unknown"
+  if ($null -ne $script:ServiceCim) {
+    $serviceStateValue = [string]$script:ServiceCim.State
+  }
+  if ($kind -eq "regular_file") {
+    try {
+      $mtime = (Get-Item -LiteralPath $lockPath -Force -ErrorAction Stop).LastWriteTimeUtc.ToString("o")
+    } catch {
+      $mtime = "unavailable"
+    }
+    $parsed = Get-StrictLockPidParse $lockPath
+    $pidParse = [string]$parsed.Status
+    $parsedLockPid = $parsed.ParsedPid
+    if ($pidParse -eq "strict_pid" -and $null -ne $parsedLockPid) {
+      $tasklistExe = Join-Path $env:SystemRoot "System32\tasklist.exe"
+      try {
+        $output = & $tasklistExe /FI "PID eq $parsedLockPid" /FO CSV /NH 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        if ($null -eq $code -or $code -ne 0) {
+          $tasklistExit = $(if ($null -eq $code) { "unavailable" } else { [string]$code })
+          $tasklistResult = "unavailable"
+        } else {
+          $tasklistExit = [string]$code
+          $needle = ',"' + $parsedLockPid + '",'
+          $tasklistResult = $(if ($output.Contains($needle)) { "pid_listed" } else { "pid_not_listed" })
+        }
+      } catch {
+        $tasklistExit = "unavailable"
+        $tasklistResult = "unavailable"
+      }
+    }
+  }
+  $pidText = if ($null -eq $parsedLockPid) { "none" } else { [string]$parsedLockPid }
+  $value = "kind=$kind pidParse=$pidParse pid=$pidText mtimeUtc=$mtime acl=$aclStatus tasklistExit=$tasklistExit tasklist=$tasklistResult serviceState=$serviceStateValue hint=不要先删除 collectedAt=$([DateTimeOffset]::Now.ToString('yyyy-MM-ddTHH:mm:ssK'))"
+  Add-EvidenceRow -Id "5.3-11L" -Name "实例锁只读证据" -Value $value -Verdict "UNKNOWN"
 }
 
 Invoke-CheckedItem -Id "5.3-12" -Name "日志目录" -Body {

@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
+import { stampAigcPageHeader } from '../../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../../common/pdf/cjk-font'
 import type { JobFitPayload } from './llm-job-fit.service'
 
@@ -15,21 +16,31 @@ type JobFitReportMeta = {
     externalId: string | null
   }
   decisionSupport: JobFitPayload['decisionSupport'] | undefined
+  /** 对照任务号。岗位 id 不是生成记录，不能拿来顶替。 */
+  contentId: string
 }
 
-/** 岗位匹配决策报告：仅复述已验证的岗位匹配参考，不新增招聘判断或承诺。 */
+const PDF_DROP_TERMS = [
+  '建议投递', '适合投递', '胜任', '匹配度', '参考等级', '总评',
+  'reference_high', 'reference_medium', 'reference_low',
+] as const
+
+function cleanPdfText(text: string): string {
+  return PDF_DROP_TERMS.some((term) => text.includes(term)) ? '这一条已略去。' : text
+}
+
+/** 简历对照报告：只复述已核对的要求与简历原文，不印等级或投递引导。 */
 @Injectable()
 export class JobFitPdfService {
   private readonly logger = new Logger(JobFitPdfService.name)
 
   async render(meta: JobFitReportMeta, payload: JobFitPayload): Promise<{ buffer: Buffer; pageCount: number }> {
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
-    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
     applyAigcPdfMetadata(doc, {
-      title: 'AI 岗位匹配参考',
-      subject: 'AI 生成的岗位匹配参考，仅供求职者本人修改简历与准备投递参考，不代表招聘评估或录用结果',
+      title: '简历对照',
+      subject: 'AI 生成的简历与岗位要求对照，仅供求职者本人整理材料参考，不代表招聘评估或录用结果',
       kind: 'jobfit',
-      contentId: meta.job.id ?? null,
+      contentId: meta.contentId,
     })
     const fontReady = registerCjkFont(doc)
     if (!fontReady) {
@@ -50,7 +61,7 @@ export class JobFitPdfService {
     }
     const bullet = (text: string) => doc.fontSize(10.5).fillColor('#374151').text(`· ${text}`, { lineGap: 3 })
 
-    doc.fontSize(18).fillColor('#111827').text('岗位匹配决策报告')
+    doc.fontSize(18).fillColor('#111827').text('简历对照')
     doc.moveDown(0.3)
     doc.fontSize(10).fillColor('#6b7280').text(`生成时间：${meta.date} ｜ 目标岗位：${meta.job.title}`)
     if (meta.job.company) doc.fontSize(10).fillColor('#6b7280').text(`企业：${meta.job.company}`)
@@ -58,9 +69,8 @@ export class JobFitPdfService {
     doc.moveDown(0.2)
     doc.fontSize(9).fillColor('#9ca3af').text('本报告仅供本人参考，不构成任何就业、薪资或录用承诺；请仅基于本人真实经历准备材料，并以岗位来源平台信息为准。')
 
-    section('一、匹配参考总览')
-    doc.fontSize(10.5).fillColor('#374151').text(payload.summary, { lineGap: 3 })
-    doc.fontSize(10).fillColor('#6b7280').text(`参考等级：${this.fitLevelLabel(payload.fitLevel)}`)
+    section('一、对照概述')
+    doc.fontSize(10.5).fillColor('#374151').text(cleanPdfText(payload.summary), { lineGap: 3 })
 
     const breakdown = meta.decisionSupport?.requirementBreakdown
     if (breakdown) {
@@ -74,25 +84,25 @@ export class JobFitPdfService {
       breakdownLine('需要留意', breakdown.attention)
     }
 
-    section(breakdown ? '三、岗位要求与简历证据' : '二、岗位要求与简历证据')
+    section(breakdown ? '三、简历里已经写到的要求' : '二、简历里已经写到的要求')
     if (payload.matchPoints.length === 0) {
-      bullet('当前记录未提供可展示的匹配点，请以本人简历与岗位来源信息为准。')
+      bullet('当前记录未提供可展示的已写到要求，请以本人简历与岗位原文为准。')
     } else {
       payload.matchPoints.forEach((item) => {
-        if (item.requirement) doc.fontSize(9.5).fillColor('#9a5530').text(`· 岗位要求：${item.requirement}`, { lineGap: 2 })
-        doc.fontSize(10.5).fillColor('#111827').text(`· ${item.point}`, { lineGap: 2 })
-        doc.fontSize(9.5).fillColor('#6b7280').text(`   简历依据：${item.evidence}`, { lineGap: 4 })
+        if (item.requirement) doc.fontSize(9.5).fillColor('#9a5530').text(`· 岗位要求：${cleanPdfText(item.requirement)}`, { lineGap: 2 })
+        doc.fontSize(10.5).fillColor('#111827').text(`· ${cleanPdfText(item.point)}`, { lineGap: 2 })
+        doc.fontSize(9.5).fillColor('#6b7280').text(`   简历依据：${cleanPdfText(item.evidence)}`, { lineGap: 4 })
       })
     }
 
-    section(breakdown ? '四、待准备方向' : '三、待准备方向')
+    section(breakdown ? '四、简历里还没体现的要求' : '三、简历里还没体现的要求')
     if (payload.gapPoints.length === 0) {
-      bullet('当前记录未提供具体差距项，建议在来源平台核对岗位要求后再准备。')
+      bullet('当前记录未提供简历里还没写到的要求。')
     } else {
       payload.gapPoints.forEach((item) => {
-        if (item.requirement) doc.fontSize(9.5).fillColor('#9a5530').text(`· 岗位要求：${item.requirement}`, { lineGap: 2 })
-        doc.fontSize(10.5).fillColor('#111827').text(`· ${item.gap}`, { lineGap: 2 })
-        doc.fontSize(9.5).fillColor('#6b7280').text(`   建议：${item.suggestion}`, { lineGap: 4 })
+        if (item.requirement) doc.fontSize(9.5).fillColor('#9a5530').text(`· 岗位要求：${cleanPdfText(item.requirement)}`, { lineGap: 2 })
+        doc.fontSize(10.5).fillColor('#111827').text(`· ${cleanPdfText(item.gap)}`, { lineGap: 2 })
+        doc.fontSize(9.5).fillColor('#6b7280').text(`   建议：${cleanPdfText(item.suggestion)}`, { lineGap: 4 })
       })
     }
 
@@ -100,7 +110,7 @@ export class JobFitPdfService {
     if (payload.targetedSuggestions.length === 0) {
       bullet('当前记录未提供定向建议，请只补充可由本人真实经历支持的内容。')
     } else {
-      payload.targetedSuggestions.forEach(bullet)
+      payload.targetedSuggestions.forEach((item) => bullet(cleanPdfText(item)))
     }
 
     section(breakdown ? '六、岗位关键词参考' : '五、岗位关键词参考')
@@ -120,16 +130,11 @@ export class JobFitPdfService {
       doc.fontSize(9.5).fillColor('#6b7280').text(`来源链接：${meta.job.sourceUrl}`, { lineGap: 3 })
     }
 
+    stampAigcPageHeader(doc)
     const pageCount = doc.bufferedPageRange().count
     doc.end()
     const buffer = await done
     this.logger.log(`jobfit.pdf_ok bytes=${buffer.length} pages=${pageCount}`)
     return { buffer, pageCount }
-  }
-
-  private fitLevelLabel(level: JobFitPayload['fitLevel']): string {
-    if (level === 'reference_high') return '较高参考'
-    if (level === 'reference_low') return '较低参考'
-    return '中等参考'
   }
 }

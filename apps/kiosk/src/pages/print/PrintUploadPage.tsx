@@ -20,7 +20,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isTerminalKiosk } from '../../services/api/screensaver'
+import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
@@ -47,7 +47,6 @@ import {
   type PrintMaterialContentCategory,
   type PrintMaterialSource,
 } from './printMaterialSession'
-import { getTerminalCode } from '../../services/api/terminalConfig'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { FileSourceView } from './file-source/FileSourceView'
 import {
@@ -169,7 +168,7 @@ export function PrintUploadPage() {
   const wordOpenCopy = `支持 PDF、DOC、DOCX、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB；${WORD_CONVERSION_DISCLOSURE}`
 
   const initialTab: UploadTab = entryTab
-  const [tab, setTab] = useState<UploadTab>(initialTab)
+  const [selectedTab, setTab] = useState<UploadTab>(initialTab)
   const [channelActive, setChannelActive] = useState(isTransferMode || hasRequestedTab)
   const [file, setFile] = useState<UploadedFile | null>(null)
   const [fileOrigin, setFileOrigin] = useState<FileOrigin | null>(null)
@@ -192,7 +191,8 @@ export function PrintUploadPage() {
   const [usbPollKey, setUsbPollKey] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(false)
 
-  const showFileChannel = !isTerminalKiosk()
+  const showFileChannel = !useTerminalKiosk()
+  const tab = !showFileChannel && selectedTab === 'file' ? 'qr' : selectedTab
   const wordHint = wordConversionAvailable ? wordOpenCopy : wordClosedCopy
 
   useEffect(() => {
@@ -225,7 +225,7 @@ export function PrintUploadPage() {
           setUsbAgentOffline(false)
           setUsbReadFailed(true)
         }
-        setUsbError(userMessageOf(err, 'U 盘状态查询失败，请确认终端服务正在运行后重试'))
+        setUsbError(userMessageOf(err, '暂时无法读取 U 盘，请重试或联系工作人员'))
       }
     }
 
@@ -253,7 +253,7 @@ export function PrintUploadPage() {
 
   const handleQrUploaded = useCallback((uploaded: PhoneUploadedFile) => {
     if (!uploaded.fileUrl) {
-      setUploadError('文件签名链接生成失败，请刷新二维码重试')
+      setUploadError('暂时无法打开这份文件，请刷新二维码重试')
       return
     }
     setUploadError(null)
@@ -279,6 +279,7 @@ export function PrintUploadPage() {
   useBusyLock(uploading || usbUploading || phone.loading || phone.confirming || phone.cancelling)
 
   const uploadLocalFile = useCallback(async (selected: File) => {
+    if (isTerminalKiosk()) return
     const verdict = classifyLocalFile(selected, {
       acceptWord: wordConversionAvailable && !isPhotoEntry,
       photoOnly: Boolean(isPhotoEntry),
@@ -389,6 +390,7 @@ export function PrintUploadPage() {
   }
 
   const activateChannel = (key: UploadTab) => {
+    if (isTerminalKiosk() && key === 'file') return
     if (file) return
     setTab(key)
     setChannelActive(true)
@@ -413,7 +415,6 @@ export function PrintUploadPage() {
   }
 
   const exitPath = isTransferMode ? '/print-scan' : '/'
-  const terminalCode = getTerminalCode()
   const screen = deriveFileSourceScreen({
     channelActive,
     tab,
@@ -449,14 +450,14 @@ export function PrintUploadPage() {
     </span>
     {!wordConversionAvailable ? (
       <p id="print-word-conversion-reason" className="fs-hidden-input">
-        {conversionCapabilities.reason || '转换引擎未就绪；服务恢复并通过能力探测后会自动开放。'}
+        Word 转换暂未开放，请另存为 PDF 再上传。
       </p>
     ) : null}
     <FileSourceView
       screen={screen}
       pageTitle={pageTitle}
       pageSubtitle={pageSubtitle}
-      terminalLabel={terminalCode ? `就业服务大厅 · ${terminalCode}` : '就业服务大厅'}
+      terminalLabel=""
       status={qxStatusFromDevice(device)}
       isResumePrint={isResumePrint}
       showFileChannel={showFileChannel}
@@ -467,7 +468,7 @@ export function PrintUploadPage() {
       blockedName={blockedName}
       blockedMeta={blockedMeta}
       wordHint={wordHint}
-      conversionReason={conversionCapabilities.reason || null}
+      conversionReason={wordConversionAvailable ? null : 'Word 转换暂未开放，请另存为 PDF 再上传。'}
       usbFiles={usbFiles}
       usbSelected={usbSelected}
       usbDriveLabel={usbStatus?.driveLabel ?? null}
@@ -484,15 +485,20 @@ export function PrintUploadPage() {
       onFileInputChange={handleFileChange}
       onSelectChannel={activateChannel}
       onOpenPicker={() => {
+        if (isTerminalKiosk()) return
         setPickerCancelled(false)
         inputRef.current?.click()
       }}
       onRetryLocal={() => {
+        if (isTerminalKiosk()) return
         const pending = lastLocalFileRef.current
         if (pending) void uploadLocalFile(pending)
         else inputRef.current?.click()
       }}
       onNext={handleNext}
+      onHome={() => navigate('/')}
+      onAdvisor={() => navigate('/assistant')}
+      onProfile={() => navigate('/profile')}
       // 稿 12-file-source 的返回键 data-route="/print-scan"：回服务 Hub，
       // 不用 navigate(-1) —— 一体机上「上一步」是确定的业务落点，不是浏览器历史。
       onBack={() => navigate('/print-scan')}
@@ -511,7 +517,7 @@ export function PrintUploadPage() {
       onClosePreview={() => setPreviewOpen(false)}
       onReplace={() => {
         clearCurrentFile()
-        if (tab === 'file') window.setTimeout(() => inputRef.current?.click(), 0)
+        if (tab === 'file') window.setTimeout(() => { if (!isTerminalKiosk()) inputRef.current?.click() }, 0)
       }}
       onDelete={clearCurrentFile}
       onUsbSelect={(safeId) => void handleUsbFileSelect(safeId)}

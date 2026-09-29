@@ -7,9 +7,9 @@
  *   自我探索 / 面试报告 5 个 PDF 只有首页一行免责声明，metadata 里没有任何 AIGC 字段，
  *   简历 PDF 更是只有一个 Title。打印出去的纸质件事后无从判定是否 AI 生成。
  *
- * 本批次范围：**只加隐式 metadata，不加可见水印**。
- *   简历 PDF 是否加可见标识需产品裁决（用户要拿去投递），本脚本因此
- *   **不断言可见水印**，只断言元数据 —— 未来产品裁决后另加断言。
+ * 本脚本只断言隐式 metadata。简历的每页页脚显式标识（C8）由 RESUME_EXPORT_VISIBLE_LABEL
+ *   控制（默认关），「不带标识」申请由 RESUME_EXPORT_UNLABELED_OPTION 控制；两者的逐页
+ *   运行时断言在 verify:resume-export-label（本脚本的 npm 命令会接着跑它）。
  *
  * 覆盖：
  *   1. applyAigcPdfMetadata 写入的键与合同审查那套一致
@@ -77,12 +77,16 @@ function assertContains(src: string, pattern: string | RegExp, label: string) {
   }
   doc.end()
 
-  // contentId 不传时不得写空串（空 ContentId 是噪音）
-  const doc2 = new PDFDocument({ size: 'A4' })
-  applyAigcPdfMetadata(doc2, { title: 'T', subject: 'S', kind: 'unit' })
-  if ((doc2.info as unknown as Record<string, unknown>)['ContentId'] === undefined) pass('helper: 未传 contentId 时不写该键')
-  else fail('helper: 未传 contentId 时仍写了 ContentId')
-  doc2.end()
+  let rejected = false
+  try {
+    const doc2 = new PDFDocument({ size: 'A4' })
+    applyAigcPdfMetadata(doc2, { title: 'T', subject: 'S', kind: 'unit', contentId: '   ' })
+    doc2.end()
+  } catch (error) {
+    rejected = error instanceof Error && error.message.includes('ProduceID')
+  }
+  if (rejected) pass('helper: 空白 contentId 拒绝写入')
+  else fail('helper: 空白 contentId 仍被写成 AIGC')
 }
 
 // ─── 2–3. 真实渲染后的 buffer 里能读到标识 ──────────────────────────────────
@@ -100,6 +104,7 @@ async function renderAll(): Promise<Array<{ label: string; kind: string; buffer:
         date: '2026-08-16',
         job: { id: 'job-verify-1', title: '后端开发工程师', company: '某科技公司', sourceName: '来源平台', sourceUrl: null, externalId: 'ext-1' },
         decisionSupport: undefined,
+        contentId: 'task-jobfit-meta',
       },
       {
         fitLevel: 'reference_medium',
@@ -115,7 +120,7 @@ async function renderAll(): Promise<Array<{ label: string; kind: string; buffer:
     label: '职业规划建议',
     kind: 'careerplan',
     buffer: (await new CareerPlanPdfService().render(
-      { date: '2026-08-16', basedOn: { jobFit: null, interview: null } },
+      { date: '2026-08-16', basedOn: { jobFit: null, interview: null }, contentId: 'task-career-meta' },
       {
         summary: SAMPLE_TEXT,
         currentSnapshot: [{ point: '现状', evidence: '证据' }],
@@ -130,7 +135,7 @@ async function renderAll(): Promise<Array<{ label: string; kind: string; buffer:
     label: '招聘会参会准备单',
     kind: 'fairvisit',
     buffer: (await new FairVisitPlanPdfService().render(
-      { date: '2026-08-16', fairName: '示例招聘会', sourceName: '来源机构', venue: '示例会场', sourceUrl: 'https://example.com' },
+      { date: '2026-08-16', fairName: '示例招聘会', sourceName: '来源机构', venue: '示例会场', sourceUrl: 'https://example.com', contentId: 'task-fair-meta' },
       {
         summary: SAMPLE_TEXT,
         fairHighlights: ['看点一'],
@@ -149,6 +154,7 @@ async function renderAll(): Promise<Array<{ label: string; kind: string; buffer:
       date: '2026-08-16',
       dimensions: [{ key: 'interest', label: '兴趣偏好', strength: 3, note: SAMPLE_TEXT }] as never,
       summary: SAMPLE_TEXT,
+      contentId: 'task-self-meta',
     })).buffer,
   })
 
@@ -156,7 +162,7 @@ async function renderAll(): Promise<Array<{ label: string; kind: string; buffer:
     label: '模拟面试练习报告',
     kind: 'interview',
     buffer: (await new InterviewReportPdfService().render(
-      { position: '后端开发工程师', industry: '互联网', interviewerLabel: 'HR', date: '2026-08-16' },
+      { position: '后端开发工程师', industry: '互联网', interviewerLabel: 'HR', date: '2026-08-16', contentId: 'task-interview-meta' },
       {
         overall: { level: 'pass', summary: SAMPLE_TEXT },
         expression: ['表达要点一'],
@@ -184,7 +190,7 @@ async function renderAll(): Promise<Array<{ label: string; kind: string; buffer:
       projects: [],
       skills: [],
       certificates: [],
-    } as never)).buffer,
+    } as never, { contentId: 'task-resume-meta' })).buffer,
   })
 
   return out
@@ -247,9 +253,8 @@ for (const [rel, label] of services) {
   }
 }
 
-// 本批次刻意不加可见水印：如果哪天要加，应先有产品裁决再改本断言。
 const resumePdfSrc = read('src/ai/resume/resume-pdf.service.ts')
-assertContains(resumePdfSrc, '不加任何可见水印', '边界: 简历 PDF 明确记录「可见标识待产品裁决」')
+assertContains(resumePdfSrc, 'resumeExportShowsVisibleLabel(', '简历 PDF 页脚标识走统一开关判定（C8，运行时断言见 verify:resume-export-label）')
 
 // ─── 结果 ────────────────────────────────────────────────────────────────────
 

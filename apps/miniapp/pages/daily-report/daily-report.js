@@ -1,5 +1,9 @@
 // pages/daily-report/daily-report.js
-// 今日提醒：服务端规则清单。需登录；城市从岗位页 storage 读取，没有就不传。
+// 今日提醒：服务端规则清单。需登录。
+// 小程序首发只展示「到机码即将过期」和「平台通知」两类：服务端同一接口还会给
+// 一体机下发「即将开始的招聘会」「城市新增岗位」，那两类指向的页面已停放
+// （首发按非招聘类目提审，compliance-boundary.md §1.1），在 mapModule 里丢掉。
+// 原先按岗位页 storage 里的城市查询，也只服务于「新增岗位」，一并不再传。
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
@@ -7,19 +11,8 @@ const auth = require('../../utils/auth')
 const TAB_PATHS = {
   '/pages/home/home': true,
   '/pages/ai/ai': true,
-  '/pages/jobs/jobs': true,
+  '/pages/print/print': true,
   '/pages/me/me': true,
-}
-const CITY_KEYS = ['zyd_job_city', 'selectedCity', 'jobCity']
-
-function readStoredCity() {
-  for (let i = 0; i < CITY_KEYS.length; i += 1) {
-    try {
-      const value = wx.getStorageSync(CITY_KEYS[i])
-      if (typeof value === 'string' && value.trim()) return value.trim()
-    } catch (_) { /* storage 读失败视为没有城市 */ }
-  }
-  return ''
 }
 
 function openMiniappRoute(route) {
@@ -29,7 +22,11 @@ function openMiniappRoute(route) {
     wx.switchTab({ url: path })
     return
   }
-  wx.navigateTo({ url: route })
+  // route 由服务端下发：若指向本版本没有的页面（例如停放页），给一句说明，不做静默死按钮。
+  wx.navigateTo({
+    url: route,
+    fail() { wx.showToast({ title: '这个页面当前版本暂未开放', icon: 'none' }) },
+  })
 }
 
 function mapModule(mod) {
@@ -45,38 +42,7 @@ function mapModule(mod) {
     if (!rows.length) return null
     return { type: 'pickup_expiring', title: '到机码即将过期', summary: '', rows, actionLabel: '', route: '' }
   }
-  if (mod.type === 'fair_countdown') {
-    const rows = (mod.items || []).map((it) => ({
-      key: it.fairId,
-      title: it.title || '招聘会',
-      sub: it.daysLeft != null ? `还有 ${it.daysLeft} 天开始` : '',
-      actionLabel: '查看招聘会',
-      route: it.route || '',
-    })).filter((row) => row.route)
-    if (!rows.length) return null
-    return { type: 'fair_countdown', title: '即将开始的招聘会', summary: '', rows, actionLabel: '', route: '' }
-  }
-  if (mod.type === 'city_new') {
-    if (!mod.route) return null
-    const jobs = Number(mod.newJobs) || 0
-    const policies = Number(mod.newPolicies) || 0
-    const city = mod.city ? `${mod.city}` : ''
-    // 政策数是**平台全局**当日新增，不是这座城市的（PolicyPost 无城市字段，
-    // 服务端 daily-brief.service.ts:103 已注明如实统计全局）。因此两句必须分开写，
-    // 合成「深圳今日新增 12 个岗位、1 条政策」会把全局政策伪装成本地。
-    // （Antigravity 第 17 轮建议 3，Claude 裁决转前端文案）
-    return {
-      type: 'city_new',
-      title: '今日新增',
-      summary: '',
-      rows: [
-        { key: 'jobs', title: city ? `${city}新增岗位 ${jobs} 条` : `新增岗位 ${jobs} 条` },
-        { key: 'policies', title: `平台新增政策 ${policies} 条` },
-      ],
-      actionLabel: '看岗位',
-      route: mod.route,
-    }
-  }
+  // fair_countdown / city_new 不展示：见文件头注释。
   if (mod.type === 'broadcast' && mod.item && mod.item.route) {
     return {
       type: 'broadcast',
@@ -117,8 +83,7 @@ Page({
 
   _loadReport() {
     this.setData({ loading: true, error: '', empty: false })
-    const city = readStoredCity()
-    api.getDailyBrief(city ? { city } : {})
+    api.getDailyBrief({})
       .then((res) => {
         const modules = Array.isArray(res && res.modules)
           ? res.modules.map(mapModule).filter(Boolean)
@@ -150,8 +115,8 @@ Page({
     wx.navigateTo({ url: '/pages/launch/launch' })
   },
 
-  goJobs() {
-    wx.switchTab({ url: '/pages/jobs/jobs' })
+  goPrint() {
+    wx.switchTab({ url: '/pages/print/print' })
   },
 
   openRoute(e) {

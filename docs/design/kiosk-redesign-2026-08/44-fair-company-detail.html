@@ -31,6 +31,31 @@
   验收范围：静态原型表现；不证明 React 接线、API 可用、生产数据或打印真机链路
 -->
 <link rel="stylesheet" href="directory-workspaces.css">
+<style>
+/* ── 本页覆盖：只写在这一份宿主 HTML 里，不改共享样式表 ─────────────
+   可见焦点：公共触控终端也会接外接键盘与无障碍设备，Tab 到哪必须一眼看得见。
+   统一用「青 3px + 墨 3px」双色环：浅底输入框、浅底卡片和深色主按钮上都够对比。
+   只用 outline / box-shadow，不改盒模型、不位移、不新增任何持续动画。
+   触控目标沿用共享样式的 ≥48px，主行动按钮 ≥56px；这里只补焦点表现，不缩小任何热区。 */
+#stage a:focus-visible,
+#stage button:focus-visible,
+#stage input:focus-visible,
+#stage select:focus-visible,
+#stage textarea:focus-visible,
+#stage [tabindex]:focus-visible{
+  outline:3px solid var(--emerald);
+  outline-offset:2px;
+  box-shadow:0 0 0 6px var(--deep);
+  position:relative;
+  z-index:4;
+}
+/* 置灰控件也要能被 Tab 到并看清，但焦点色不得让它看起来像可用 */
+#stage [aria-disabled="true"]:focus-visible{
+  outline:3px solid var(--wheat-d);
+  outline-offset:2px;
+  box-shadow:0 0 0 6px var(--surface);
+}
+</style>
 </head>
 <body>
 <div id="stage">
@@ -53,9 +78,9 @@
     <div><b>隐私提示</b>结束会话或闲置超时清除本机登录态和临时会话信息；文件与订单按服务端留存期限管理。</div>
   </div>
   <nav class="navbar" aria-label="全局导航">
-    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
-    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
-    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#526b62" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
   </nav>
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
   <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>

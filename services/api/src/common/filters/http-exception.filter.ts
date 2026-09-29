@@ -86,6 +86,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let code = DEFAULT_ERROR_CODE
     let message: string = DEFAULT_ERROR_MESSAGE
     let details: string[] | undefined
+    let memberFileRetained = false
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -108,6 +109,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
           if (Array.isArray(err['details'])) {
             details = (err['details'] as unknown[]).filter((d): d is string => typeof d === 'string')
           }
+          // 只透传这一个布尔。其它未知字段（文件名、fileId、对象键）继续丢掉。
+          if (err['memberFileRetained'] === true) memberFileRetained = true
         } else if (typeof errField === 'string') {
           const bodyMessage = b['message']
           if (typeof bodyMessage === 'string' && isMachineErrorCode(bodyMessage)) {
@@ -178,7 +181,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const errorBody: ErrorResponseBody = {
       success: false,
-      error: details ? { code, message, details } : { code, message },
+      error: {
+        code,
+        message,
+        ...(details ? { details } : {}),
+        ...(memberFileRetained ? { memberFileRetained: true as const } : {}),
+      },
       requestId: request.requestId,
     }
     response.status(status).json(errorBody)

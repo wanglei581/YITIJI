@@ -33,6 +33,8 @@ import {
 import { PartnerAccountManager } from './PartnerAccountManager'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { OrgContentTrustPanel } from './OrgContentTrustPanel'
+import { OrgCircuitBreakPanel } from './OrgCircuitBreakPanel'
+import { OrgOfficialChannelSections } from './OrgOfficialChannelSections'
 import {
   ORG_CONTENT_TRUST_STATUSES,
   ORG_CONTENT_TRUST_STATUS_LABELS,
@@ -466,6 +468,9 @@ function OrgDetailDrawer({
             }}
           />
 
+          {/* 3.14 官方域名（入驻核验）+ 官方渠道（只读与紧急下架），与招聘内容托管开关无关 */}
+          <OrgOfficialChannelSections orgId={orgId ?? detail.id} orgName={detail.name} />
+
           <PartnerAccountManager
             orgId={orgId ?? detail.id}
             accounts={detail.accounts}
@@ -473,8 +478,17 @@ function OrgDetailDrawer({
             onChanged={onChanged}
           />
 
+          <OrgCircuitBreakPanel
+            orgId={orgId ?? detail.id}
+            orgName={detail.name}
+            onChanged={() => {
+              onChanged()
+              void load(false)
+            }}
+          />
+
           <p className="text-xs text-neutral-400">
-            机构信息编辑、账号操作均记录审计日志。停用机构后:机构账号无法登录、数据导入接口拒绝;已发布数据不自动下架,如需下架请到岗位/招聘会信息源逐条操作。
+            机构信息编辑、账号操作均记录审计日志。停用机构后:机构账号无法登录、数据导入接口拒绝;已发布数据不自动下架,如需下架请到各信息源页逐条紧急下架,紧急情况可用上方「按机构熔断」。
           </p>
         </div>
       )}
@@ -548,7 +562,7 @@ export default function PartnersPage() {
   return (
     <Page
       title="合作机构管理"
-      subtitle={`共 ${orgs.length} 家合作机构 — 机构档案 · 授权启停 · 内容可信 · 后台账号`}
+      subtitle={`共 ${orgs.length} 家合作机构 — 机构档案 · 授权启停 · 内容可信 · 官方域名与渠道 · 后台账号`}
       actions={
         <button
           onClick={() => setCreateOpen(true)}

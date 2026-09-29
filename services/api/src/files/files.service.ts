@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { createHash, randomUUID } from 'crypto'
@@ -26,9 +27,11 @@ import type {
   FileCleanupResponse,
   UploadIntentResponse,
 } from './file.types'
+import { RESUME_EXPORT_STAGING_LOCK, RESUME_EXPORT_STAGING_MAX_MS } from './file.types'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { UserRole } from '../common/decorators/roles.decorator'
 import { PrismaService } from '../prisma/prisma.service'
+import { assertJobFitPrintFileReadable } from '../ai/resume/job-fit-hosting'
 import { AuditService } from '../audit/audit.service'
 import { StorageService } from '../storage/storage.service'
 import { generateObjectKey, type FileOwnerType as ObjKeyOwnerType } from '../storage/object-key'
@@ -121,6 +124,17 @@ export class FilesService {
     validationMode?: UploadValidationMode
     /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
     expiresAtOverride?: Date
+    /**
+     * 收费导出预写：对象先落库为 uploading + 短寿命，会员列表和访问 URL 看不到。
+     * 核销事务提交时再激活并恢复正式保存期限。endUserId 在激活前不写入，
+     * 避免会员数据导出按 endUserId 把未付款文件列出来。
+     */
+    paidExportStaging?: { endUserId: string; expiresAt: Date }
+    /**
+     * 渲染前已经写进 AIGC.ProduceID 的编号。传入则作为 FileObject.id，
+     * 缺省时在这里生成。只接受 32 位十六进制，和对象键里的文件段一致。
+     */
+    id?: string
   }): Promise<FileUploadResponse> {
     if (args.purpose === 'member_data_export' || args.purpose === 'contract_review_report') {
       throw new BadRequestException({
@@ -162,10 +176,30 @@ export class FilesService {
       })
     }
 
+    const staging = args.paidExportStaging
+    if (staging) {
+      const expiresAtMs = staging.expiresAt?.getTime?.()
+      const now = Date.now()
+      if (
+        !staging.endUserId?.trim() ||
+        !Number.isFinite(expiresAtMs) ||
+        expiresAtMs <= now ||
+        expiresAtMs > now + RESUME_EXPORT_STAGING_MAX_MS
+      ) {
+        throw new BadRequestException({
+          error: { code: 'FILE_EXPIRY_INVALID', message: '文件到期时间无效' },
+        })
+      }
+    }
     const sensitiveLevel = this.resolveSensitiveLevel(args.purpose, args.sensitiveLevel)
-    const id = randomUUID().replace(/-/g, '')
+    const providedId = args.id?.trim() ?? ''
+    const id = providedId.length > 0 ? providedId : randomUUID().replace(/-/g, '')
+    if (!/^[0-9a-f]{32}$/.test(id)) {
+      throw new Error('FILE_ID_INVALID')
+    }
+    const ownerEndUserId = staging?.endUserId ?? args.endUserId ?? null
     const owner = deriveOwner({
-      endUserId: args.endUserId ?? null,
+      endUserId: ownerEndUserId,
       role: args.actorRole ?? null,
       uploaderId: args.uploaderId,
       orgId: args.actorOrgId ?? null,
@@ -174,7 +208,7 @@ export class FilesService {
       purpose: args.purpose,
       sensitiveLevel,
       ownerType: owner.ownerType,
-      endUserId: args.endUserId ?? null,
+      endUserId: ownerEndUserId,
     })
     const expiresAtOverride =
       args.purpose === 'contract_upload' ? undefined : args.expiresAtOverride
@@ -211,23 +245,24 @@ export class FilesService {
           sizeBytes: put.sizeBytes,
           sha256: put.sha256,
           uploaderId: args.uploaderId,
-          endUserId: args.endUserId ?? null,
+          endUserId: staging ? null : (args.endUserId ?? null),
           ownerType: owner.ownerType,
           ownerId: owner.ownerId,
           purpose: args.purpose,
           sensitiveLevel,
           visibility: 'private',
-          status: 'active',
+          status: staging ? 'uploading' : 'active',
           createdBy: args.createdBy ?? args.uploaderId ?? null,
           assetCategory: args.assetCategory ?? 'original',
           sourceFileId: args.sourceFileId ?? null,
-          expiresAt: expiresAtOverride ?? retention.expiresAt,
+          expiresAt: staging ? staging.expiresAt : (expiresAtOverride ?? retention.expiresAt),
           retentionPolicy: retention.retentionPolicy,
           retentionSetBy: retention.retentionSetBy,
           retentionConsentAt: retention.retentionConsentAt,
           retentionConsentVersion: retention.retentionConsentVersion,
-          retentionLockedReason:
-            args.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
+          retentionLockedReason: staging
+            ? RESUME_EXPORT_STAGING_LOCK
+            : (args.purpose === 'contract_upload' ? 'contract_review_session_only' : null),
         },
       })
     } catch (createError) {
@@ -240,36 +275,27 @@ export class FilesService {
       throw createError
     }
 
-    // FileObject 已是 active：此后签名/响应构造失败若直接抛出，会留下与任何
-    // 业务任务无关的活跃孤儿直到 TTL。必须走 systemDelete，才能复用 tombstone
-    // 先于对象删除、以及物理删除失败时的可重试账本（§11）。补偿失败不得替换
-    // 调用方看到的原始错误。
-    try {
-      const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
-      const signed = this.storage.getDownloadUrl(
-        {
-          objectKey: record.storageKey,
-          fileId: record.id,
-          filename: record.filename,
-          mimeType: record.mimeType,
-          ttlSeconds,
-          disposition: 'inline',
-        },
-        record.bucket
-      )
+    // 预写行还不是已购文件：不签发下载 URL。签名失败也不能 systemDelete，
+    // 否则会把尚未核销的对象提前抹掉；短 expiresAt 交给 cleanupExpired。
+    if (staging) {
       return {
         fileId: record.id,
         filename: record.filename,
         sizeBytes: record.sizeBytes,
         mimeType: record.mimeType,
         sha256: record.sha256,
-        signedUrl: signed.url,
-        signedUrlExpiresAt: this.ensureSignedExpiryWithinFileLifetime(
-          signed.expiresAt,
-          record.expiresAt
-        ).toISOString(),
+        signedUrl: '',
+        signedUrlExpiresAt: '',
         fileExpiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
       }
+    }
+
+    // FileObject 已是 active：此后签名/响应构造失败若直接抛出，会留下与任何
+    // 业务任务无关的活跃孤儿直到 TTL。必须走 systemDelete，才能复用 tombstone
+    // 先于对象删除、以及物理删除失败时的可重试账本（§11）。补偿失败不得替换
+    // 调用方看到的原始错误。
+    try {
+      return await this.signedUploadResponse(record)
     } catch (responseError) {
       try {
         await this.systemDelete(record.id, 'upload response failed, compensating orphaned file')
@@ -281,6 +307,53 @@ export class FilesService {
         )
       }
       throw responseError
+    }
+  }
+
+  /**
+   * 只为已经 active 的文件签发下载 URL。收费导出在核销事务提交后调用。
+   * 签名失败不得删除文件：此时权益可能已经扣过。
+   */
+  async signActiveDownload(fileId: string): Promise<FileUploadResponse> {
+    const record = await this.requireActive(fileId)
+    return this.signedUploadResponse(record)
+  }
+
+  private async signedUploadResponse(record: {
+    id: string
+    filename: string
+    sizeBytes: number
+    mimeType: string
+    sha256: string
+    storageKey: string
+    bucket: string
+    expiresAt: Date | null
+    purpose: string
+  }): Promise<FileUploadResponse> {
+    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
+    const signed = this.storage.getDownloadUrl(
+      {
+        objectKey: record.storageKey,
+        fileId: record.id,
+        filename: record.filename,
+        mimeType: record.mimeType,
+        ttlSeconds,
+        disposition: 'inline',
+      },
+      record.bucket,
+    )
+    return {
+      fileId: record.id,
+      filename: record.filename,
+      sizeBytes: record.sizeBytes,
+      mimeType: record.mimeType,
+      sha256: record.sha256,
+      signedUrl: signed.url,
+      signedUrlExpiresAt: this.ensureSignedExpiryWithinFileLifetime(
+        signed.expiresAt,
+        record.expiresAt,
+      ).toISOString(),
+      fileExpiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
     }
   }
 
@@ -418,6 +491,7 @@ export class FilesService {
    */
   async completeUpload(fileId: string, requester: FileRequester): Promise<CompleteUploadResponse> {
     const record = await this.requireAlive(fileId)
+    this.refuseResumeExportStaging(record)
     if (!canAccessFile(record, requester)) {
       throw new ForbiddenException({
         error: { code: 'FILE_ACCESS_DENIED', message: '无权确认此文件' },
@@ -504,6 +578,7 @@ export class FilesService {
    */
   async resolveRawUploadByteLimit(fileId: string): Promise<number> {
     const record = await this.requireAlive(fileId)
+    this.refuseResumeExportStaging(record)
     if (record.status !== 'uploading') this.throwFileAlreadyFinalized()
     return rawUploadByteLimitForPurpose(record.purpose)
   }
@@ -511,6 +586,7 @@ export class FilesService {
   /** 本地后端直传:接收原始 buffer 写入。只在 uploading 态落对象；finalize 交给 completeUpload。 */
   async writeRawUpload(fileId: string, buffer: Buffer): Promise<void> {
     const record = await this.requireAlive(fileId)
+    this.refuseResumeExportStaging(record)
     if (record.status !== 'uploading') this.throwFileAlreadyFinalized()
     const validation = validateUpload({
       purpose: record.purpose,
@@ -587,6 +663,7 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
 
     const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
@@ -638,6 +715,7 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
     const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
     const signed = this.storage.getDownloadUrl(
@@ -680,6 +758,7 @@ export class FilesService {
     ) {
       this.throwFileNotFound()
     }
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
@@ -703,15 +782,8 @@ export class FilesService {
     fileId: string,
     endUserId: string | null
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
-    const record = await this.requireActive(fileId)
-    const allowed = endUserId
-      ? record.endUserId === endUserId
-      : record.endUserId === null && record.ownerType === 'system'
-    if (!allowed) {
-      throw new NotFoundException({
-        error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
-      })
-    }
+    const record = await this.requireActiveForEndUser(fileId, endUserId)
+    await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
@@ -720,6 +792,49 @@ export class FilesService {
       filename: record.filename,
       purpose: record.purpose as FilePurpose,
     }
+  }
+
+  /**
+   * Confirms the caller can use this object before a paid parse.
+   * Does not return bytes and does not extract text. A wrong owner gets the
+   * same 404 as a missing row; the storage probe runs only after that check.
+   */
+  async assertContentAccessibleForEndUser(fileId: string, endUserId: string | null): Promise<void> {
+    const record = await this.requireActiveForEndUser(fileId, endUserId)
+    try {
+      const head = await this.storage.headObject(record.storageKey, record.bucket)
+      if (!head) this.throwFileNotFound()
+    } catch (error) {
+      if (error instanceof HttpException) throw error
+      this.rethrowStorageProbe(error)
+    }
+    try {
+      await this.assertContentIntegrity(record.id)
+    } catch (error) {
+      if (error instanceof HttpException) throw error
+      this.rethrowStorageProbe(error)
+    }
+  }
+
+  private assertJobFitFileReadable(record: { id: string; createdBy: string | null }): Promise<void> {
+    return assertJobFitPrintFileReadable(this.prisma as never, record)
+  }
+
+  private async requireActiveForEndUser(fileId: string, endUserId: string | null) {
+    const record = await this.requireActive(fileId)
+    const allowed = endUserId
+      ? record.endUserId === endUserId
+      : record.endUserId === null && record.ownerType === 'system'
+    if (!allowed) this.throwFileNotFound()
+    return record
+  }
+
+  /** Storage failures stay generic. The object key and backend error are not returned. */
+  private rethrowStorageProbe(error: unknown): never {
+    if (isStoredObjectMissing(error)) this.throwFileNotFound()
+    throw new ServiceUnavailableException({
+      error: { code: 'FILE_STORAGE_UNAVAILABLE', message: '文件暂时无法读取，请稍后重试' },
+    })
   }
 
   // ── 列表(admin)─────────────────────────────────────────────────────────
@@ -1387,10 +1502,22 @@ export class FilesService {
       error: { code: 'FILE_ALREADY_FINALIZED', message: '文件已确认，不能再覆盖上传' },
     })
   }
+
+  /** 收费导出预写不是直传意图。知道 fileId 也不能把它确认成已购文件。 */
+  private refuseResumeExportStaging(record: { retentionLockedReason: string | null }): void {
+    if (record.retentionLockedReason === RESUME_EXPORT_STAGING_LOCK) this.throwFileNotFound()
+  }
 }
 
 function digestFileId(fileId: string): string {
   return createHash('sha256').update(fileId).digest('hex').slice(0, 12)
+}
+
+function isStoredObjectMissing(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  if ((error as { code?: unknown }).code === 'ENOENT') return true
+  const message = error instanceof Error ? error.message : ''
+  return message.startsWith('COS_GET_FAILED: 404') || message.startsWith('COS_HEAD_FAILED: 404')
 }
 
 /** 归属判定。member 只能访问 endUserId 匹配;User 按角色 / 上传者 / 机构。 */

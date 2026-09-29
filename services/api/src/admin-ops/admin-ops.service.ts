@@ -5,6 +5,7 @@ import {
   resolveHandlingState,
   type AlertHandlingState,
   type AlertListView,
+  type DerivedAlertType,
 } from './derived-alert-identity'
 import { collectDerivedAlerts, type DerivedAlertCollection } from './derived-alerts'
 
@@ -40,7 +41,7 @@ export interface AdminAlertItem {
   id: string
   subjectKey: string
   episodeToken: string
-  type: 'terminal_offline' | 'printer_issue' | 'print_failed'
+  type: DerivedAlertType
   severity: 'error' | 'warning'
   title: string
   detail: string

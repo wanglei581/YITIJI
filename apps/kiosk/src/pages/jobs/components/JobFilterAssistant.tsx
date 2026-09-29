@@ -48,7 +48,7 @@ export function JobFilterAssistant({
             岗位筛选助手
           </div>
           <p className="mt-1 text-xs leading-relaxed text-neutral-500">
-            按职位、城市、行业、类型和来源机构筛选；筛选条件会进入后端真实查询，适配客户 API / Excel / Webhook 数据。
+            按职位、城市、行业、类型和来源机构筛选；这些条件会按真实岗位来查，不会拿示例岗位来凑。
           </p>
         </div>
         <Button size="sm" variant="secondary" className="shrink-0" onClick={onReset}>

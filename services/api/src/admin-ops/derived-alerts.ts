@@ -4,6 +4,8 @@ import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import {
   buildSubjectKey,
   offlineEpisodeToken,
+  paidPendingFileUnavailableEpisodeToken,
+  feedbackPendingEpisodeToken,
   printerIssueEpisodeToken,
   printFailedEpisodeToken,
   type DerivedAlertType,
@@ -75,6 +77,35 @@ type FailedTaskRow = {
   order: { payStatus: string } | null
 }
 
+type PaidPendingFileUnavailableTaskRow = {
+  id: string
+  fileId: string | null
+  updatedAt: Date
+  terminal: { terminalCode: string } | null
+  order: { payStatus: string } | null
+  file: {
+    status: string
+    deletedAt: Date | null
+    expiresAt: Date | null
+    updatedAt: Date
+  } | null
+}
+
+type PendingFeedbackSummary = { count: number; earliest: Date | null; latest: Date | null }
+
+/** C3：待处理的 AI 内容投诉（新提交或处理中）。只取条数与提交时间，不取正文与手机号。 */
+const PENDING_AI_CONTENT_FEEDBACK = { category: 'ai_content', status: { in: ['pending', 'processing'] } }
+
+/** 计数 + 最早、最新各一条：不全表拉取，积压或被刷单时也不拖垮整张告警列表。 */
+async function pendingAiContentFeedback(prisma: PrismaService): Promise<PendingFeedbackSummary> {
+  const [count, oldest, newest] = await Promise.all([
+    prisma.feedbackTicket.count({ where: PENDING_AI_CONTENT_FEEDBACK }),
+    prisma.feedbackTicket.findFirst({ where: PENDING_AI_CONTENT_FEEDBACK, orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
+    prisma.feedbackTicket.findFirst({ where: PENDING_AI_CONTENT_FEEDBACK, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+  ])
+  return { count, earliest: oldest?.createdAt ?? null, latest: newest?.createdAt ?? null }
+}
+
 const TERMINAL_SELECT = {
   id: true,
   terminalCode: true,
@@ -92,6 +123,15 @@ const FAILED_TASK_SELECT = {
   updatedAt: true,
   terminal: { select: { terminalCode: true } },
   order: { select: { payStatus: true } },
+} as const
+
+const PAID_PENDING_FILE_UNAVAILABLE_SELECT = {
+  id: true,
+  fileId: true,
+  updatedAt: true,
+  terminal: { select: { terminalCode: true } },
+  order: { select: { payStatus: true } },
+  file: { select: { status: true, deletedAt: true, expiresAt: true, updatedAt: true } },
 } as const
 
 /**
@@ -115,6 +155,30 @@ function failedTaskWhere(nowMs: number) {
       },
       // 已退款订单不再报警。退款路径写的是 Order.payStatus,不是 printOutcome。
       { NOT: { order: { payStatus: 'refunded' } } },
+    ],
+  }
+}
+
+/**
+ * 仅关注现代任务(fileId 非空)的已支付待处理单。历史 fileId=null 任务仍由兼容 claim 路径处理，
+ * 不能因为缺少新血缘字段就误报；有 fileId 但关联被 SetNull 清理的任务则必须可见。
+ */
+function paidPendingFileUnavailableWhere(now: Date) {
+  return {
+    status: 'pending',
+    order: { payStatus: 'paid' },
+    fileId: { not: null },
+    OR: [
+      { file: null },
+      {
+        file: {
+          OR: [
+            { status: { not: 'active' } },
+            { deletedAt: { not: null } },
+            { expiresAt: { lte: now } },
+          ],
+        },
+      },
     ],
   }
 }
@@ -181,6 +245,64 @@ function buildPrintFailedAlert(task: FailedTaskRow): DerivedAlert {
     detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${task.updatedAt.toISOString().slice(0, 16).replace('T', ' ')}`,
     terminalCode: task.terminal?.terminalCode ?? null,
     occurredAt: task.updatedAt.toISOString(),
+  }
+}
+
+function fileUnavailableReason(task: PaidPendingFileUnavailableTaskRow, nowMs: number): string | null {
+  if (task.fileId === null) return null
+  if (!task.file) return '关联文件记录缺失'
+  if (task.file.deletedAt) return '文件已删除'
+  if (task.file.expiresAt && task.file.expiresAt.getTime() <= nowMs) return '文件已过期'
+  if (task.file.status === 'uploading') return '文件仍在上传'
+  if (task.file.status === 'quarantined') return '文件处于隔离状态'
+  if (task.file.status !== 'active') return '文件不可用'
+  return null
+}
+
+/** 已支付待处理任务的文件不可用告警；不触碰退款或订单状态机。 */
+function buildPaidPendingFileUnavailableAlert(
+  task: PaidPendingFileUnavailableTaskRow,
+  nowMs: number,
+): DerivedAlert | null {
+  const reason = fileUnavailableReason(task, nowMs)
+  if (!reason || task.order?.payStatus !== 'paid' || task.fileId === null) return null
+
+  const observedAt = task.file?.updatedAt ?? task.updatedAt
+  const subjectKey = buildSubjectKey('paid_pending_file_unavailable', task.id)
+  return {
+    id: subjectKey,
+    subjectKey,
+    subjectId: task.id,
+    episodeToken: paidPendingFileUnavailableEpisodeToken({
+      status: task.file?.status ?? null,
+      deletedAt: task.file?.deletedAt ?? null,
+      expiresAt: task.file?.expiresAt ?? null,
+      observedAt,
+    }),
+    type: 'paid_pending_file_unavailable',
+    severity: 'error',
+    title: '已支付打印任务的文件不可用',
+    detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''}：${reason}`,
+    terminalCode: task.terminal?.terminalCode ?? null,
+    occurredAt: observedAt.toISOString(),
+  }
+}
+
+function buildPendingFeedbackAlert(summary: PendingFeedbackSummary): DerivedAlert | null {
+  if (!summary.earliest || !summary.latest || summary.count <= 0) return null
+  const subjectId = 'ai-content'
+  const subjectKey = buildSubjectKey('feedback_pending', subjectId)
+  return {
+    id: subjectKey,
+    subjectKey,
+    subjectId,
+    episodeToken: feedbackPendingEpisodeToken(summary.latest),
+    type: 'feedback_pending',
+    severity: 'warning',
+    title: '有待处理的 AI 内容投诉',
+    detail: `共 ${summary.count} 条，最早提交于 ${summary.earliest.toISOString().slice(0, 16).replace('T', ' ')}`,
+    terminalCode: null,
+    occurredAt: summary.earliest.toISOString(),
   }
 }
 
@@ -257,12 +379,29 @@ export async function collectDerivedAlerts(
     alerts.push(buildPrintFailedAlert(task))
   }
 
+  // 这类告警不设置物化上限：每一条已支付但无法履约的任务都必须对运营人员可见。
+  // 失败任务仍沿用既有 500 条上限，omitted/truncation 继续只描述 print_failed。
+  const unavailableTasks = (await prisma.printTask.findMany({
+    where: paidPendingFileUnavailableWhere(now),
+    select: PAID_PENDING_FILE_UNAVAILABLE_SELECT,
+    orderBy: { updatedAt: 'asc' },
+  })) as unknown as PaidPendingFileUnavailableTaskRow[]
+  for (const task of unavailableTasks) {
+    const alert = buildPaidPendingFileUnavailableAlert(task, nowMs)
+    if (alert) alerts.push(alert)
+  }
+
+  const feedbackAlert = buildPendingFeedbackAlert(await pendingAiContentFeedback(prisma))
+  if (feedbackAlert) alerts.push(feedbackAlert)
+
   alerts.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
   // count() 与 findMany 之间可能有新失败写入,omitted 用 max(0,…) 兜底,不出现负数。
   const omitted = Math.max(0, failedTotal - failedTasks.length)
   return {
     alerts,
-    firingTotal: terminalAlertCount + Math.max(failedTotal, failedTasks.length),
+    firingTotal: terminalAlertCount + Math.max(failedTotal, failedTasks.length) + unavailableTasks.reduce((count, task) => (
+      count + (buildPaidPendingFileUnavailableAlert(task, nowMs) ? 1 : 0)
+    ), 0) + (feedbackAlert ? 1 : 0),
     omitted,
     cap: PRINT_FAILED_LIST_CAP,
   }
@@ -292,6 +431,18 @@ export async function resolveDerivedAlert(
     })) as unknown as FailedTaskRow | null
     if (!task || task.order?.payStatus === 'refunded') return null
     return buildPrintFailedAlert(task)
+  }
+
+  if (type === 'paid_pending_file_unavailable') {
+    const task = (await prisma.printTask.findFirst({
+      where: { id: subjectId, ...paidPendingFileUnavailableWhere(now) },
+      select: PAID_PENDING_FILE_UNAVAILABLE_SELECT,
+    })) as unknown as PaidPendingFileUnavailableTaskRow | null
+    return task ? buildPaidPendingFileUnavailableAlert(task, nowMs) : null
+  }
+
+  if (type === 'feedback_pending') {
+    return buildPendingFeedbackAlert(await pendingAiContentFeedback(prisma))
   }
 
   const terminal = (await prisma.terminal.findUnique({

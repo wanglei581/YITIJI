@@ -121,7 +121,9 @@ async function verifyRuntimeShape() {
   ;(controller as unknown as { logService: unknown }).logService = {
     record: (entry: unknown) => { recordedLogs.push(entry) },
   }
-  const ok = await controller.transcribeResumeVoice({ buffer: wav } as Express.Multer.File)
+  // 转写接口按请求头识别可选的登录会员（成本记录要带 endUserId）；这里是匿名请求，不带 Authorization。
+  const anonymousReq = { headers: {} } as never
+  const ok = await controller.transcribeResumeVoice({ buffer: wav } as Express.Multer.File, anonymousReq)
   if (recordedLogs.length !== 1) fail('6d. 转写成功必须且只写一条 AI 服务记录')
   const recordedJson = JSON.stringify(recordedLogs[0])
   if (recordedJson.includes('真实转写文本')) fail('6e. AI 服务记录不得包含转写正文')
@@ -134,7 +136,7 @@ async function verifyRuntimeShape() {
   }
 
   try {
-    await controller.transcribeResumeVoice({ buffer: Buffer.from('NOPE') } as Express.Multer.File)
+    await controller.transcribeResumeVoice({ buffer: Buffer.from('NOPE') } as Express.Multer.File, anonymousReq)
     fail('6c. 非 WAV buffer 必须抛 INVALID_AUDIO_FORMAT')
   } catch (err) {
     const response = err instanceof BadRequestException ? err.getResponse() : null

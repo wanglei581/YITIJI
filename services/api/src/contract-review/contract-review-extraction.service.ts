@@ -4,6 +4,7 @@ import mammoth from 'mammoth'
 import { FilesService } from '../files/files.service'
 import type { OcrResult } from '../ai/resume/ocr/ocr-provider.interface'
 import { OcrService } from '../ai/resume/ocr/ocr.service'
+import { openUnpdfDocument } from '../common/pdf/pdfjs-document'
 import {
   openPdfForRender,
   type RenderedPdf,
@@ -22,7 +23,6 @@ interface PdfTextResult {
 }
 
 interface UnpdfApi {
-  getDocumentProxy(data: Uint8Array): Promise<PdfProxy>
   extractText(
     pdf: PdfProxy,
     options: { mergePages: false },
@@ -94,7 +94,7 @@ export interface ContractReviewExtractionRuntime {
 
 const DEFAULT_RUNTIME: ContractReviewExtractionRuntime = {
   extractDocxRawText: (input) => mammoth.extractRawText(input),
-  getDocumentProxy: (data) => unpdf.getDocumentProxy(data),
+  getDocumentProxy: (data) => openUnpdfDocument<PdfProxy>(data),
   extractPdfText: (pdf, options) => unpdf.extractText(pdf, options),
   openPdfForRender,
 }

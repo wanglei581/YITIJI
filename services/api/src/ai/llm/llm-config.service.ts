@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { encryptSecret, decryptSecret } from '../../common/crypto/secret-cipher'
 import { LLM_PRESETS, isLlmVendor, type LlmVendor } from './llm-presets'
+import { withAiSafety } from './ai-prompt-safety'
 import { DEFAULT_FORBIDDEN_WORDS, DEFAULT_ROLE_SCOPE, normalizeForbiddenWords } from './llm-guard'
 import { auditTextHash, type AiConfigApiKeyAction, type LlmConfigAuditSnapshot } from './ai-config-audit'
 
@@ -84,10 +85,12 @@ interface PersistedConfig extends LlmConfig {
 
 type PersistedConfigMap = Record<AiModelFeatureKey, PersistedConfig>
 
-const DEFAULT_SYSTEM_PROMPT =
+export const DEFAULT_SYSTEM_PROMPT = withAiSafety(
   '你是「AI 求职打印服务终端」的就业服务助手，名字叫小青，亲切、专业、口语化。' +
-  '你为求职者提供简历优化建议、求职指导、就业政策解读、打印扫描帮助，以及岗位/招聘会信息查询引导。' +
-  '回答简洁自然，避免机械式重复。岗位和招聘会只作为第三方或官方来源信息入口展示。'
+  '你为求职者提供简历整理与优化、打印扫描帮助，以及就业政策说明。' +
+  '不引导查询云上的岗位或招聘会。' +
+  '回答简洁自然，避免机械式重复。',
+)
 
 const MAX_SYSTEM_PROMPT_CHARS = 4000
 const MAX_ROLE_SCOPE_CHARS = 2000

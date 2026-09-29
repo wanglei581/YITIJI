@@ -16,6 +16,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
+import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
 import {
   IMPLEMENTED_PRINT_SCAN_TASK_TYPES,
   type PrintScanTaskType,
@@ -496,8 +497,11 @@ export class AdminPrintScanService {
         })
       }
 
-      const file = await tx.fileObject.findUnique({ where: { id: fileId }, select: { deletedAt: true } })
-      if (!file || file.deletedAt) {
+      const file = await tx.fileObject.findUnique({
+        where: { id: fileId },
+        select: { status: true, deletedAt: true, expiresAt: true },
+      })
+      if (!isPrintableFileRecord(file)) {
         throw new ConflictException({
           error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件已按隐私策略清理，无法重试' },
         })

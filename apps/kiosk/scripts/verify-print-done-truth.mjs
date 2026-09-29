@@ -72,8 +72,12 @@ const checks = [
   ['W6 直达完成页预期为无法确认', () => {
     assert.match(routeCasesSource, /pattern:\s*'\/print\/done'[\s\S]*?featureText:\s*'无法确认打印结果'/)
   }],
-  ['出纸后提醒取走纸张', () => {
-    assert.match(doneSource, /请取走纸张/)
+  ['出纸后提醒核对并取走', () => {
+    // 稿 15 completed 只留一句「都打好了，拿走前核一下」，不再并列「请取走文件 / 请取走纸张」。
+    assert.match(doneSource, /都打好了，拿走前核一下/)
+    assert.match(doneSource, /从出纸口取走/)
+    assert.doesNotMatch(doneRuntime, /请取走纸张/)
+    assert.doesNotMatch(doneRuntime, /请取走文件/)
   }],
   ['失败态给出带走二维码、订单号和补打入口', () => {
     assert.match(doneSource, /文件带走/)

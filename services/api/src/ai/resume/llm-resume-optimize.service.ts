@@ -1,4 +1,5 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { AiContentBlockedError } from '../llm/llm-guard'
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import type {
   GeneratedResume,
   ResumeOptimizeModule,
@@ -16,6 +17,7 @@ import {
   llmTimeoutMessage,
 } from '../llm/llm-http'
 import { containsForbiddenWord } from '../llm/llm-guard'
+import { withAiSafety } from '../llm/ai-prompt-safety'
 import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
@@ -72,7 +74,7 @@ const OPTIMIZE_GUARD_TERMS = [
   j('平台', '投递'),
 ]
 
-const OPTIMIZE_SYSTEM_PROMPT = [
+export const OPTIMIZE_SYSTEM_PROMPT = withAiSafety([
   '你是「AI 求职打印服务终端」的简历优化引擎。基于用户的简历原文与诊断报告,重组一份表达更好的优化版简历,并给出新旧对比。',
   '严格要求:',
   '1. 只输出一个 JSON 对象,不要任何解释、前后缀或代码块标记。',
@@ -83,12 +85,13 @@ const OPTIMIZE_SYSTEM_PROMPT = [
   '6. 不得输出任何录用、投递、面试邀约、Offer 或通过率类承诺;优化只是表达参考,由求职者本人决定是否采纳。',
   '7. 原文信息不足的部分,在对应字段留空即可,不要替用户补内容。',
   '8. 若收到"优化方向"提示(专业/学历/目标岗位/经验级别/求职场景),只能用于调整措辞重点与用词方向;不得据此新增、替换或"纠正"任何学校、公司、学历、证书、时间段等事实字段——事实字段仍必须逐字来自简历原文。',
-].join('\n')
+].join('\n'))
 
-const RETRY_HINT =
-  '上一次输出不符合要求。请严格只输出 JSON;resume 中的学校/公司/证书/联系方式必须逐字来自简历原文;modules 的 before 必须是原文连续片段。'
+export const OPTIMIZE_RETRY_HINT = withAiSafety(
+  '上一次输出不符合要求。请严格只输出 JSON;resume 中的学校/公司/证书/联系方式必须逐字来自简历原文;modules 的 before 必须是原文连续片段。',
+)
 
-const LAYOUT_ADJUST_SYSTEM_PROMPT = [
+export const LAYOUT_ADJUST_SYSTEM_PROMPT = withAiSafety([
   '你是「AI 求职打印服务终端」的简历排版与内容微调引擎。你只在用户已确认的结构化简历基础上做表达密度调整。',
   '严格要求:',
   '1. 只输出一个 JSON 对象,不要解释、前后缀或代码块标记。',
@@ -97,10 +100,11 @@ const LAYOUT_ADJUST_SYSTEM_PROMPT = [
   '4. 不得增加 education/experience/projects/skills/certificates 条目数量;信息不足时保留原字段或精简描述。',
   '5. action=condense 时压缩 summary/description 字数,保留原数字;action=reformat 时按排版参数调整措辞密度。',
   '6. 不得输出任何录用、投递、面试邀约、Offer 或通过率类承诺。',
-].join('\n')
+].join('\n'))
 
-const LAYOUT_ADJUST_RETRY_HINT =
-  '上一次输出不符合要求。请只输出 JSON;不得新增条目、事实字段或数字;不得包含录用/投递/面试承诺。'
+export const LAYOUT_ADJUST_RETRY_HINT = withAiSafety(
+  '上一次输出不符合要求。请只输出 JSON;不得新增条目、事实字段或数字;不得包含录用/投递/面试承诺。',
+)
 
 interface ChatMessage {
   role: 'system' | 'user'
@@ -220,10 +224,10 @@ export class LlmResumeOptimizeService {
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
-        attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: RETRY_HINT }]
+        attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: OPTIMIZE_RETRY_HINT }]
       const raw = await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
-        `llm:${cfg.vendor}:${cfg.model}`, onLlmCall,
+        `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, onLlmCall,
       )
       const result = this.parseAndValidate(raw, text, cfg.forbiddenWords)
       if (result) return restoreOptimizeResult(result, masked.restore)
@@ -299,7 +303,7 @@ export class LlmResumeOptimizeService {
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: LAYOUT_ADJUST_RETRY_HINT }]
       const raw = await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
-        `llm:${cfg.vendor}:${cfg.model}`, input.onLlmCall,
+        `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, input.onLlmCall,
       )
       const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume)
       if (result) {
@@ -325,6 +329,7 @@ export class LlmResumeOptimizeService {
     messages: ChatMessage[],
     /** AI-COST-TRUTH：真实厂商标识（`llm:<vendor>:<model>`）。**不含任何凭证**。 */
     providerLabel: string,
+    forbiddenWords: readonly string[],
     onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
@@ -338,9 +343,10 @@ export class LlmResumeOptimizeService {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
           body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
         },
-        { timeoutMs: LLM_LONG_TIMEOUT_MS },
+        { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_optimize', forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       if (error instanceof LlmBusyError) {
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
       }

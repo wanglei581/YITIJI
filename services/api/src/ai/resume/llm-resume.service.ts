@@ -1,4 +1,5 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { AiContentBlockedError } from '../llm/llm-guard'
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { RESUME_SCORING_DIMENSIONS } from '../interfaces/ai-provider.interface'
 import type {
   ResumePriority,
@@ -18,6 +19,7 @@ import {
 } from '../llm/llm-http'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { containsForbiddenWord } from '../llm/llm-guard'
+import { withAiSafety } from '../llm/ai-prompt-safety'
 import {
   RESUME_STRUCTURE_PROMPT_RULES,
   sanitizeContentBlocks,
@@ -92,7 +94,7 @@ const DIAGNOSIS_RULES: readonly string[] = [
   'JSON 形如：{"sections":[{"key":"basic","label":"基础信息完整度","score":8,"maxScore":10}],"suggestions":["..."],"riskNotes":["..."],"priorities":[{"focus":"...","reason":"..."}],"contentBlocks":[{"key":"experience","lines":["..."]}],"issues":[{"dim":"quantification","title":"...","evidence":[{"blockKey":"experience","quote":"..."}],"impact":"...","fixIt":"..."}]}。',
   `sections 必须且只能包含这 6 个维度（key 固定）：${DIAGNOSIS_DIMENSIONS.map((d) => `${d.key}(${d.label})`).join('、')}；每项 maxScore 固定为 10，score 为 0~10 的整数。`,
   'suggestions：3~6 条具体、可执行的中文改进建议，针对该简历真实内容。',
-  'riskNotes：0~5 条「简历文本表达风险」提醒，只针对文本表达问题（如经历时间线表述不连续、成果缺少量化描述、职责描述过于笼统、求职目标不够明确、联系方式缺失或格式不清）。严禁涉及年龄、性别、婚育、地域、学历歧视等敏感判断，严禁暗示录用或面试结果；无明显风险时给空数组 []。',
+  'riskNotes：0~5 条「简历文本表达风险」提醒，只针对文本表达问题（如经历时间线表述不连续、成果缺少量化描述、职责描述过于笼统、求职目标不够明确、联系方式缺失或格式不清）。不得基于性别、年龄、婚育、民族、户籍、健康状况作出区别对待或暗示。严禁暗示录用或面试结果；无明显风险时给空数组 []。',
   'priorities：2~4 条「修改优先级建议」，按重要性从高到低排序，每条形如 {"focus":"要先改什么","reason":"为什么"}。',
   '不得编造简历中不存在的经历、学历、技能或成果；信息不足时在 suggestions / riskNotes 中如实指出需补充。',
   '「岗位关键词覆盖」只评估简历文本是否覆盖常见岗位表达，不做任何匹配程度类结论或代投 / 推荐类结论。',
@@ -103,14 +105,15 @@ const DIAGNOSIS_RULES: readonly string[] = [
   ...RESUME_STRUCTURE_PROMPT_RULES,
 ]
 
-const DIAGNOSIS_SYSTEM_PROMPT = [
+export const DIAGNOSIS_SYSTEM_PROMPT = withAiSafety([
   '你是「AI 求职打印服务终端」的简历诊断引擎，只依据用户提供的简历文本做客观诊断。',
   '严格要求：',
   ...DIAGNOSIS_RULES.map((rule, index) => `${index + 1}. ${rule}`),
-].join('\n')
+].join('\n'))
 
-const RETRY_HINT =
-  '上次输出不是合法 JSON。请只返回一个符合要求的 JSON 对象，不要任何多余文字、解释或代码块标记。'
+export const DIAGNOSIS_RETRY_HINT = withAiSafety(
+  '上次输出不是合法 JSON。请只返回一个符合要求的 JSON 对象，不要任何多余文字、解释或代码块标记。',
+)
 
 export interface ResumeDiagnosisContext {
   selectedDimensions?: ResumeScoringDimensionKey[]
@@ -226,10 +229,10 @@ export class LlmResumeService {
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
-        attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: RETRY_HINT }]
+        attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: DIAGNOSIS_RETRY_HINT }]
       const raw = await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, DIAGNOSIS_TEMPERATURE, messages,
-        `llm:${cfg.vendor}:${cfg.model}`, context?.onLlmCall,
+        `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, context?.onLlmCall,
       )
       // 防编造校验基准是 text（**送出去的那一份**，已截断已遮盖），不是 extractedText。
       // 与 llm-job-fit / llm-resume-optimize 同一条不变量：引文必须能在模型看得到的
@@ -260,6 +263,7 @@ export class LlmResumeService {
      * 由调用方传入，因为 cfg 只在 diagnose 作用域内。**不含任何凭证**。
      */
     providerLabel: string,
+    forbiddenWords: readonly string[],
     onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
@@ -277,9 +281,10 @@ export class LlmResumeService {
           // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空 / JSON 诊断失败。
           body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
         },
-        { timeoutMs: LLM_LONG_TIMEOUT_MS },
+        { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_diagnosis', forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       // 不记请求/响应正文（可能回显简历文本），只抛明确错误。
       // 「忙」「超时」「连不上」三态各自独立成码，不合并 —— 合并等于放弃根因。
       if (error instanceof LlmBusyError) {

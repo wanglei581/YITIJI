@@ -1,0 +1,175 @@
+/* 简历决策工作台（宿主 46）· 行动清单 / 求职方案 / 版式参考 · 青序流光。
+ *
+ * 稿：docs/design/kiosk-redesign-2026-08/46-resume-decision-workspace.html
+ *     ?screen=actions / career-plan / templates
+ *
+ * 分工：sec / slots / checks / kit / waiting / ghosts / verdict / why / steps / nots /
+ * trace / guard / routes 这些通用件已在 job-fit-qx.css（.jfq-）里，本文件不重复；
+ * 这里只补另外三条 route 独有的呈现：分组清单、四栏规划、版式卡与预览。
+ * 窄屏壳层（顶栏 / 操作条 / 页头）的真实视口布局也沿用 job-fit-qx.css 的 .jfq-root 段。
+ *
+ * 作用域：全部选择器以 `.rdq-` 开头，且只在这三页 import。
+ * 颜色一律取 tokens.css 的 --qx-*，不在这里另起一套色值。
+ */
+
+/* ── 分组清单（行动清单三组 / 求职方案列内的条目）──────────────── */
+.rdq-groups { display: flex; flex-direction: column; gap: 14px; }
+.rdq-group {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 18px 20px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface); box-shadow: inset 4px 0 0 var(--qx-line-2);
+}
+.rdq-group[data-tone='urgent'] { box-shadow: inset 4px 0 0 var(--qx-cinnabar); }
+.rdq-group[data-tone='week'] { box-shadow: inset 4px 0 0 var(--qx-wheat-d); }
+.rdq-group[data-tone='print'] { box-shadow: inset 4px 0 0 var(--qx-teal); }
+.rdq-group-top { display: flex; align-items: center; gap: 12px; }
+.rdq-group-no {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-deep); color: var(--qx-paper);
+  font-family: var(--qx-mono); font-size: 18px; font-weight: 700;
+}
+.rdq-group-top > b { flex: 1; min-width: 0; font-size: 23px; font-weight: 700; }
+.rdq-group-chip {
+  flex: none; padding: 5px 12px; border-radius: var(--qx-r-s);
+  font-size: 17px; font-weight: 700; background: var(--qx-muted-bg); color: var(--qx-muted-ink);
+}
+.rdq-group-desc { margin: 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+
+.rdq-items { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.rdq-item { padding: 14px 16px; border-radius: var(--qx-r); background: var(--qx-paper); border: 1px solid var(--qx-line); }
+.rdq-item > b { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; line-height: 1.4; }
+.rdq-item > p { margin: 6px 0 0; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
+.rdq-item > small { display: block; margin-top: 6px; font-size: 17px; line-height: 1.45; color: var(--qx-ink-3); }
+.rdq-item-tag {
+  display: inline-block; padding: 3px 10px; border-radius: var(--qx-r-s);
+  font-size: 16px; font-weight: 700; background: var(--qx-teal-soft); color: var(--qx-teal-d);
+}
+
+.rdq-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.rdq-field { padding: 12px 14px; border-radius: var(--qx-r); border: 2px dashed var(--qx-line-2); }
+.rdq-field small { display: block; font-size: 16px; color: var(--qx-ink-3); }
+.rdq-field span { display: block; margin-top: 4px; font-size: 18px; line-height: 1.4; color: var(--qx-ink-2); }
+
+.rdq-checklist { margin: 0; padding-left: 28px; display: flex; flex-direction: column; gap: 8px; }
+.rdq-checklist li { font-size: 19px; line-height: 1.5; color: var(--qx-ink); }
+.rdq-muted { margin: 0; font-size: 17px; line-height: 1.5; color: var(--qx-ink-3); }
+
+/* ── 求职方案：四栏（CareerPlanSection）───────────────────────── */
+.rdq-col {
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 20px 22px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface);
+}
+.rdq-col-head { display: flex; align-items: center; gap: 12px; }
+.rdq-col-ic {
+  flex: none; width: 46px; height: 46px; border-radius: var(--qx-r);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d); border: 1px solid var(--qx-teal-line);
+}
+.rdq-col-ic svg { width: 24px; height: 24px; }
+.rdq-col-head h2 { margin: 0; font-size: 25px; font-weight: 700; }
+.rdq-direction { display: flex; gap: 14px; align-items: flex-start; }
+.rdq-direction > span {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--qx-deep); color: var(--qx-paper); font-family: var(--qx-mono); font-size: 18px; font-weight: 700;
+}
+.rdq-direction h3 { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 21px; font-weight: 700; }
+.rdq-direction p { margin: 6px 0 0; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
+
+.rdq-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.rdq-chip {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px;
+  border-radius: 999px; font-size: 17px; background: var(--qx-slate-soft); color: var(--qx-slate-d);
+}
+.rdq-guide-list { margin: 0; padding-left: 26px; display: flex; flex-direction: column; gap: 8px; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+
+/* 已有材料栏（CareerPlanExistingMaterials）。 */
+.rdq-note { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
+.rdq-counts { margin: 0; font-size: 19px; font-weight: 700; }
+.rdq-files { margin: 0; padding-left: 26px; font-size: 18px; line-height: 1.5; color: var(--qx-ink-2); }
+.rdq-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.rdq-spin { animation: rdq-spin 1s linear infinite; }
+@keyframes rdq-spin { to { transform: rotate(360deg); } }
+
+/* 置灰一律 aria-disabled（原生 disabled 会退出 Tab 序列、读屏跳过，触屏也读不到原因）。
+ * 共享层 .qx-btn 只给 :disabled 画了外观，这里补上 aria-disabled 的同一外观。 */
+.rdq-aria-btn[aria-disabled='true'] { opacity: .48; cursor: not-allowed; }
+
+/* AI 共享原语在本宿主里的字号对齐（原语 CSS 以旧壳 15–17px 为基准）。 */
+.rdq-stack, .rdq-ai { display: flex; flex-direction: column; gap: 12px; }
+.rdq-ai .kiosk-ev-legend { font-size: 17px; }
+.rdq-ai .kiosk-ai-disclaimer, .rdq-ai .kiosk-ai-conclusion { font-size: 18px; }
+
+/* ── 版式参考 ───────────────────────────────────────────────── */
+.rdq-filters { display: flex; flex-wrap: wrap; gap: 10px; }
+.rdq-filters button {
+  min-height: var(--qx-tap-min); padding: 0 22px; border-radius: 999px;
+  border: 1px solid var(--qx-line-2); background: var(--qx-surface); color: var(--qx-ink);
+  font: inherit; font-size: 19px; cursor: pointer;
+}
+.rdq-filters button[aria-pressed='true'] { background: var(--qx-deep); border-color: var(--qx-deep); color: var(--qx-paper); font-weight: 700; }
+.rdq-filters button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+
+.rdq-tpl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.rdq-tpl {
+  display: flex; flex-direction: column; gap: 8px; text-align: left;
+  min-height: var(--qx-tap-min); padding: 18px;
+  border: 1px solid var(--qx-line); border-radius: var(--qx-r);
+  background: var(--qx-surface); color: inherit; font: inherit; cursor: pointer;
+}
+.rdq-tpl[aria-pressed='true'] { border-color: var(--qx-teal); box-shadow: inset 3px 0 0 var(--qx-teal); background: var(--qx-teal-soft); }
+.rdq-tpl:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.rdq-tpl h3 { margin: 0; font-size: 22px; font-weight: 700; }
+.rdq-tpl p { margin: 0; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+.rdq-tpl small { font-size: 16px; line-height: 1.4; color: var(--qx-ink-3); }
+.rdq-tpl-state { margin-top: auto; font-size: 17px; font-weight: 700; color: var(--qx-teal-d); }
+/* 装饰性版式示意，不是预览图：只画「单栏 / 双栏」这一个来自服务端预设的事实。 */
+.rdq-tpl-art {
+  display: grid; gap: 6px; height: 108px; padding: 12px;
+  border-radius: var(--qx-r-s); background: var(--qx-paper); border: 1px solid var(--qx-line);
+}
+.rdq-tpl-art[data-columns='2'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.rdq-tpl-art i { display: block; border-radius: 3px; background: var(--qx-line); }
+.rdq-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.rdq-tags span { padding: 3px 10px; border-radius: var(--qx-r-s); font-size: 15px; background: var(--qx-muted-bg); color: var(--qx-muted-ink); }
+
+.rdq-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; }
+.rdq-preview {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 18px 20px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-paper);
+}
+.rdq-preview[data-selected='true'] { border-color: var(--qx-teal-line); }
+.rdq-preview-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.rdq-preview-head b { font-size: 21px; font-weight: 700; }
+.rdq-preview-head small { font-size: 17px; color: var(--qx-ink-3); }
+.rdq-sections { margin: 0; padding-left: 28px; display: flex; flex-direction: column; gap: 6px; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.rdq-tips { display: flex; flex-direction: column; gap: 10px; }
+.rdq-tip {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 14px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface);
+}
+.rdq-tip svg { flex: none; color: var(--qx-teal-d); }
+.rdq-tip b { display: block; font-size: 19px; font-weight: 700; }
+.rdq-tip p { margin: 4px 0 0; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+
+/* ── 1080 竖屏收窄 / 手机 / 超窄 ───────────────────────────────── */
+@media (max-width: 1080px) {
+  .rdq-tpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .rdq-fields, .rdq-tpl-grid, .rdq-split { grid-template-columns: minmax(0, 1fr); }
+  .rdq-group, .rdq-col { padding: 14px 16px; }
+  .rdq-group-top > b, .rdq-col-head h2 { font-size: 20px; }
+  .rdq-item > b, .rdq-direction h3, .rdq-tpl h3 { font-size: 18px; }
+  .rdq-item > p, .rdq-direction p, .rdq-checklist li, .rdq-guide-list, .rdq-note { font-size: 16px; }
+  .rdq-actions > .qx-btn { flex: 1 1 100%; }
+  .rdq-filters button { font-size: 16px; padding: 0 16px; }
+  /* 窄屏上徽章 + 长句的横排会把正文挤成一列窄条，改成徽章行内、正文顺排。 */
+  .rdq-ai .kiosk-ai-disclaimer, .rdq-ai .kiosk-ai-conclusion { display: block; }
+  .rdq-chip { border-radius: var(--qx-r-s); padding: 6px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rdq-spin { animation: none; }
+}

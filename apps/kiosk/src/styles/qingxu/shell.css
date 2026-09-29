@@ -42,22 +42,41 @@
   display: flex; align-items: center; justify-content: center;
   font-family: var(--qx-serif); font-size: 24px; font-weight: 700;
 }
-.qx-topbar-sub { font-size: 18px; opacity: .72; }
+.qx-topbar-sub { font-size: var(--qx-fs-aux); opacity: .72; }
 .qx-topbar-spacer { flex: 1; }
-.qx-topbar-clock { font-family: var(--qx-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
+.qx-topbar-clock { font-family: var(--qx-mono); font-size: var(--qx-fs-body-lg); font-variant-numeric: tabular-nums; }
+
+/* 内页顶栏是浅色纸面（原稿 51 张里内页无一例外：surface 底 + 一道细线，品牌章深底翠字）。
+   运行页此前把它画成了深色色带，和下面那张深色任务头叠成两层深色，是「看起来不像原稿」的第一眼来源。
+   首页不走这一条：它的顶行嵌在深色 hero 里（.qx-home-hero-top），保持深底。 */
+.qx-topbar:not(.qx-home-hero-top) {
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  border-bottom: 1px solid var(--qx-line);
+}
+.qx-topbar:not(.qx-home-hero-top) .qx-topbar-mark { background: var(--qx-deep); color: var(--qx-emerald); }
+.qx-topbar:not(.qx-home-hero-top) .qx-topbar-sub { opacity: 1; color: var(--qx-ink-3); }
 
 .qx-pill {
   display: inline-flex; align-items: center; gap: 8px;
   min-height: var(--qx-tap-min);
   padding: 0 18px; border-radius: 999px;
   background: rgb(255 255 255 / 10%);
-  font-size: 19px; font-weight: 650;
+  font-size: var(--qx-fs-aux-lg); font-weight: 650;
 }
 .qx-pill::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
 .qx-pill[data-tone='ok']      { color: var(--qx-emerald); }
 .qx-pill[data-tone='warn']    { color: var(--qx-on-deep-warn); }
 .qx-pill[data-tone='bad']     { color: var(--qx-on-deep-bad); }
 .qx-pill[data-tone='unknown'] { color: var(--qx-paper); opacity: .7; }
+
+/* 浅色顶栏上的状态胶囊：语义色本来就是为浅底设计的，这里直接用；
+   提亮版（--qx-on-deep-*）只留给深底。未知态不降透明度——浅底上再降就读不清了。 */
+.qx-topbar:not(.qx-home-hero-top) .qx-pill { border: 1px solid var(--qx-line-2); background: var(--qx-paper); }
+.qx-topbar:not(.qx-home-hero-top) .qx-pill[data-tone='ok']      { color: var(--qx-teal-d); background: var(--qx-teal-soft); border-color: var(--qx-teal-line); }
+.qx-topbar:not(.qx-home-hero-top) .qx-pill[data-tone='warn']    { color: var(--qx-wheat-d); background: var(--qx-wheat-soft); border-color: var(--qx-line-2); }
+.qx-topbar:not(.qx-home-hero-top) .qx-pill[data-tone='bad']     { color: var(--qx-cinnabar-d); background: var(--qx-cinnabar-soft); border-color: var(--qx-cinnabar-line); }
+.qx-topbar:not(.qx-home-hero-top) .qx-pill[data-tone='unknown'] { color: var(--qx-ink-2); opacity: 1; }
 
 /* ── 页头：分区名 + 一句话说明 ───────────────────────────────── */
 .qx-pagehead {
@@ -66,13 +85,13 @@
   display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
 }
 .qx-pagehead h1 {
-  margin: 0; font-family: var(--qx-serif); font-size: 38px; font-weight: 700;
+  margin: 0; font-family: var(--qx-serif); font-size: var(--qx-fs-page); font-weight: 700;
   letter-spacing: 1px; display: flex; align-items: center; gap: 14px;
 }
 .qx-pagehead h1::before {
   content: ''; width: 6px; height: 34px; border-radius: 3px; background: var(--qx-emerald);
 }
-.qx-pagehead p { flex: 1; min-width: 260px; margin: 0; font-size: 20px; line-height: 1.4; color: var(--qx-ink-2); }
+.qx-pagehead p { flex: 1; min-width: 260px; margin: 0; font-size: var(--qx-fs-body); line-height: 1.4; color: var(--qx-ink-2); }
 
 /* ── 正文与滚动区 ───────────────────────────────────────────── */
 .qx-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 var(--qx-gutter); }
@@ -85,8 +104,11 @@
 .qx-scroll::-webkit-scrollbar { display: none; }
 
 /* ── 底部导航：三个固定入口 ─────────────────────────────────── */
+/* 全部页面同一个高度，页面之间切换时底栏不跳。取 112px：v2 稿里用得最多的高度（首页、简历、
+   面试、我的等 15 张），比原来的 132px 给内容区多 20px。稿之间 104–128px 的差别是作图时为配平
+   各自内容留的，运行时以这里为准，页面不要再单独改底栏高度（手机宽度的规则另算）。 */
 .qx-navbar {
-  flex: none; height: 132px;
+  flex: none; height: 112px;
   display: flex; align-items: stretch;
   border-top: 1px solid var(--qx-line);
   background: var(--qx-surface);
@@ -94,7 +116,7 @@
 .qx-nav-item {
   flex: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  font-size: 20px; color: var(--qx-ink-3);
+  font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-3);
   border: 0; background: transparent; cursor: pointer;
 }
 .qx-nav-item[aria-current='page'] { color: var(--qx-teal-d); font-weight: 700; }
@@ -122,3 +144,24 @@
   cursor: pointer;
 }
 .qx-topbar-back:active { background: var(--qx-line); }
+
+/* ── 手机宽度下的顶栏 ─────────────────────────────────────────
+ * 只作用于**不缩放**的舞台（KioskStageFit 的 data-kiosk-stage-fit="off"，即 KioskRoot
+ * 在窄屏下按真实宽度排版）。缩放舞台里 .qx-topbar 永远是 1080 宽，媒体查询却按真实
+ * 视口求值——不加这层限定，390 下被缩放的整屏路由也会误吃到窄屏规则。
+ *
+ * 事故原样（2026-09-23 截图复核）：390 宽时顶栏按 1080 的尺寸排，「职易达」、服务名
+ * 与状态胶囊被挤成逐字竖排，胶囊文字被裁。修法：品牌不折行、副标题让位、返回键收到触控
+ * 下限 48px；状态胶囊**保留**（公共终端上"没显示"会被读成"一切正常"），可收窄折成两行。 */
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .qx-topbar { height: 72px; gap: 10px; padding: 0 14px; }
+  [data-kiosk-stage-fit='off'] .qx-topbar-back { width: var(--qx-tap-min); height: var(--qx-tap-min); margin-right: 0; border-radius: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-topbar-brand { flex: none; gap: 8px; font-size: 20px; white-space: nowrap; }
+  [data-kiosk-stage-fit='off'] .qx-topbar-mark { width: 36px; height: 36px; font-size: 19px; }
+  [data-kiosk-stage-fit='off'] .qx-topbar-sub,
+  [data-kiosk-stage-fit='off'] .qx-topbar-clock { display: none; }
+  /* 胶囊可以收窄、最多折成两行（服务台那种整句说明也放得下），但绝不被裁、不逐字竖排。
+   * 折行按词组断（keep-all）：默认的逐字断行会把「扫描件已交接 · 待确认」折成第二行只剩一个「认」。
+   * keep-all 只在空格、标点处断；一段没有空格、单行又放不下的长句才由 anywhere 兜底拆开，不溢出不裁字。 */
+  [data-kiosk-stage-fit='off'] .qx-pill { flex: 0 1 auto; min-width: 0; min-height: 40px; padding: 4px 12px; gap: 6px; font-size: 14px; line-height: 1.25; word-break: keep-all; overflow-wrap: anywhere; }
+}

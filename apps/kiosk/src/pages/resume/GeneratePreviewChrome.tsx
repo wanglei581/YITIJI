@@ -45,7 +45,7 @@ export function GeneratePreviewEmptyExits(props: { view: GeneratePreviewViewStat
   const rows: ReactNode[] = []
   if (props.view === 'session-lost' || props.view === 'preview-no-result') {
     rows.push(
-      <ExitRow key="mine" icon={I.book} title="打开我的简历" desc="登录之后，服务端留存期内的版本可以直接打开" to="/me/resumes" testid="resume-generate-preview-exit-mine" onNavigate={go} />,
+      <ExitRow key="mine" icon={I.book} title="打开我的简历" desc="登录之后，保存期限内的版本可以直接打开" to="/me/resumes" testid="resume-generate-preview-exit-mine" onNavigate={go} />,
     )
   }
   if (props.view === 'session-lost' || props.view === 'illegal') {
@@ -74,22 +74,45 @@ export function GeneratePreviewEmptyExits(props: { view: GeneratePreviewViewStat
 
 export function GeneratePreviewCta(props: {
   view: GeneratePreviewViewState
+  /** 选格式屏。核对屏走原来的「回去改资料 / 内容没问题，去导出」。 */
+  phase: 'preview' | 'export'
   showWorkspace: boolean
   exportBlocked: boolean
   exporting: boolean
+  canPrint: boolean
+  printNavigating: boolean
+  formatName: string
   canRetry: boolean
   onHome: () => void
   onSource: () => void
   onRefill: () => void
   onRetry: () => void
-  onExport: () => void
+  onOpenExport: () => void
+  onBackToPreview: () => void
+  onConfirmExport: () => void
+  onPrint: () => void
 }): ReactNode {
+  if (props.showWorkspace && props.phase === 'export') {
+    return (
+      <ExportPhaseCta
+        view={props.view}
+        exportBlocked={props.exportBlocked}
+        exporting={props.exporting}
+        canPrint={props.canPrint}
+        printNavigating={props.printNavigating}
+        formatName={props.formatName}
+        onBackToPreview={props.onBackToPreview}
+        onConfirmExport={props.onConfirmExport}
+        onPrint={props.onPrint}
+      />
+    )
+  }
   if (props.showWorkspace) {
     return (
       <>
         <button type="button" className="qx-btn" data-variant="ghost" data-route="/resume/generate" data-testid="resume-generate-preview-cta-refill" onClick={props.onRefill}>回去改资料</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-preview-cta-export" aria-disabled={props.exportBlocked || undefined} onClick={() => { if (!props.exportBlocked) props.onExport() }}>
-          {props.exporting ? '正在生成文件…' : '内容没问题，去导出'}
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-preview-cta-export" onClick={props.onOpenExport}>
+          内容没问题，去导出
         </button>
       </>
     )
@@ -133,6 +156,77 @@ export function GeneratePreviewCta(props: {
     <>
       <button type="button" className="qx-btn" data-variant="ghost" data-route="/" data-testid="resume-generate-preview-cta-home" onClick={props.onHome}>返回服务大厅</button>
       <button type="button" className="qx-btn" data-variant="primary" data-route="/resume/generate" data-testid="resume-generate-preview-cta-refill" onClick={props.onRefill}>重新填一份</button>
+    </>
+  )
+}
+
+function ExportPhaseCta(props: {
+  view: GeneratePreviewViewState
+  exportBlocked: boolean
+  exporting: boolean
+  canPrint: boolean
+  printNavigating: boolean
+  formatName: string
+  onBackToPreview: () => void
+  onConfirmExport: () => void
+  onPrint: () => void
+}): ReactNode {
+  const back = (
+    <button type="button" className="qx-btn" data-variant="ghost" data-testid="resume-generate-preview-cta-back-preview" onClick={props.onBackToPreview}>
+      回预览再看看
+    </button>
+  )
+  if (props.view === 'export-ready' && props.canPrint) {
+    return (
+      <>
+        {back}
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-preview-cta-print" aria-disabled={props.printNavigating || undefined} onClick={() => { if (!props.printNavigating) props.onPrint() }}>
+          {props.printNavigating ? '正在进入打印确认…' : '去打印确认'}
+        </button>
+      </>
+    )
+  }
+  if (props.view === 'export-ready' && !props.canPrint) {
+    return (
+      <>
+        {back}
+        <button type="button" className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="resume-generate-preview-cta-print">
+          {`${props.formatName} 暂不开放打印`}
+        </button>
+      </>
+    )
+  }
+  if (props.view === 'export-url-expired' && props.canPrint) {
+    return (
+      <>
+        <button type="button" className="qx-btn" data-variant="ghost" data-testid="resume-generate-preview-cta-confirm-export" aria-disabled={props.exportBlocked || undefined} onClick={() => { if (!props.exportBlocked) props.onConfirmExport() }}>
+          重新导出拿新链接
+        </button>
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-preview-cta-print" aria-disabled={props.printNavigating || undefined} onClick={() => { if (!props.printNavigating) props.onPrint() }}>
+          {props.printNavigating ? '正在进入打印确认…' : '去打印确认'}
+        </button>
+      </>
+    )
+  }
+  const label = props.exporting || props.view === 'export-exporting'
+    ? '正在生成文件…'
+    : props.view === 'export-failed' || props.view === 'export-url-expired' || props.view === 'export-print-unavailable'
+      ? '重新导出'
+      : '导出这一份'
+  const blocked = props.exportBlocked || props.exporting || props.view === 'export-exporting'
+  return (
+    <>
+      {back}
+      <button
+        type="button"
+        className="qx-btn"
+        data-variant="primary"
+        data-testid="resume-generate-preview-cta-confirm-export"
+        aria-disabled={blocked || undefined}
+        onClick={() => { if (!blocked) props.onConfirmExport() }}
+      >
+        {label}
+      </button>
     </>
   )
 }
