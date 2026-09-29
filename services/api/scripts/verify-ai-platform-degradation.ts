@@ -314,8 +314,12 @@ const SURFACE_PROBES: Record<string, SurfaceProbe> = {
       }
     },
   },
+  // print-scan / payment 的口径（有意为之，不要误读）：只发空请求体，返回 4xx（校验失败、验签失败、未登录）
+  // 也算「照常」。这只证明一件事——请求**没有被 AI 闸门拦下**、走到了后面的业务逻辑；并不证明打印能真下单、
+  // 支付回调能真入账。那两件事分别由 verify:print-jobs / verify:miniapp-cloud-print-m2 与 verify:payment-flow 实跑钉住。
+  // 本门禁要守的是「AI 没配时这两条链路不被连带关掉」，空请求体足够，且不会在验证库里留下订单。
   'print-scan': {
-    describe: '打印下单 POST /print/jobs 与打印前材料检查 POST /materials/tasks（@AiUseExempt）',
+    describe: '打印下单 POST /print/jobs 与打印前材料检查 POST /materials/tasks（@AiUseExempt；只证明没被 AI 闸门拦，见上方口径）',
     run: async (base) => {
       const print = await request(base, 'POST', '/print/jobs', {})
       const materials = await request(base, 'POST', '/materials/tasks', {})
@@ -326,7 +330,7 @@ const SURFACE_PROBES: Record<string, SurfaceProbe> = {
     },
   },
   payment: {
-    describe: '支付回调 POST /payment/callback/wechat',
+    describe: '支付回调 POST /payment/callback/wechat（空请求体，验签失败的 4xx 即算照常；只证明没被 AI 闸门拦）',
     run: async (base) => {
       const p = await request(base, 'POST', '/payment/callback/wechat', {})
       return { succeeded: workingNormally(p), detail: `→ ${p.status} ${p.code}` }
