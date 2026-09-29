@@ -34,7 +34,8 @@ import {
 } from '../../services/auth'
 import { LegalDocsModal, type LegalDocKind } from './LegalDocsModal'
 import { FirstAdminPasswordChangeModal } from './FirstAdminPasswordChangeModal'
-import { AgreementRow, ErrorBar, LoadingDots, useCountdown, useRipple } from './LoginBits'
+import { AgreementRow, ErrorBar, LoadingDots } from './LoginBits'
+import { useCountdown, useRipple } from './loginHooks'
 import { SecondFactorPanel } from './SecondFactorPanel'
 import type { AdminSecondFactorChallenge } from '../../services/auth/secondFactor'
 import './login.css'
@@ -185,11 +186,15 @@ export default function LoginPage() {
     } else if (r.ok && 'secondFactorRequired' in r) {
       raiseError('登录响应无效，请改用账号密码登录')
     } else if (r.ok) completeLogin(r.user, phone.trim())
-    else if (r.code === 'AUTH_ADMIN_SMS_LOGIN_REQUIRES_PASSWORD') {
-      // 开启短信第二步后，管理员入口只接受「账号密码 + 短信验证码」，切回密码登录并说明原因。
-      setMode('password')
-      raiseError(r.message || '管理员登录需要「账号密码 + 短信验证码」两步，请用账号密码登录')
-    } else raiseError(r.message || '登录失败')
+    else if (!switchToPasswordIfSmsOnlyRejected(r)) raiseError(r.message || '登录失败')
+  }
+
+  /** 开启短信第二步后，管理员入口只接受「账号密码 + 短信验证码」：发码与登录被拒时都切回密码登录并说明原因。 */
+  function switchToPasswordIfSmsOnlyRejected(r: { code: string; message: string }): boolean {
+    if (r.code !== 'AUTH_ADMIN_SMS_LOGIN_REQUIRES_PASSWORD') return false
+    setMode('password')
+    raiseError(r.message || '管理员登录需要「账号密码 + 短信验证码」两步，请用账号密码登录')
+    return true
   }
 
   async function sendCode() {
@@ -198,7 +203,7 @@ export default function LoginPage() {
     setError(null)
     const r = await sendLoginSmsCode(phone.trim())
     if (r.ok) smsCountdown.start(r.cooldownSeconds || 60)
-    else raiseError(r.message || '验证码发送失败')
+    else if (!switchToPasswordIfSmsOnlyRejected(r)) raiseError(r.message || '验证码发送失败')
   }
 
   async function startReset(e: FormEvent) {

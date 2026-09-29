@@ -115,7 +115,7 @@ export function SecondFactorPanel({ challenge, onSuccess, onRestart }: Props) {
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
-            placeholder="请输入 6 位数字验证码"
+            placeholder="6 位数字验证码"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
             autoFocus

@@ -180,8 +180,10 @@ const panel = read('src/routes/login/SecondFactorPanel.tsx')
 const sfSource = read('src/services/auth/secondFactor.ts')
 check('E1 密码登录的第二步分支接到 SecondFactorPanel',
   /'secondFactorRequired' in r\)\s*\{[\s\S]{0,120}setSecondFactor\(r\)/.test(page) && page.includes('<SecondFactorPanel'))
-check('E2 验证码登录被拒时切回密码登录并说明',
-  /AUTH_ADMIN_SMS_LOGIN_REQUIRES_PASSWORD[\s\S]{0,260}setMode\('password'\)/.test(page))
+check('E2 只用短信验证码登录被拒时切回密码登录并说明（判定函数）',
+  /function switchToPasswordIfSmsOnlyRejected[\s\S]{0,200}AUTH_ADMIN_SMS_LOGIN_REQUIRES_PASSWORD[\s\S]{0,80}setMode\('password'\)/.test(page))
+check('E2b 发码与短信登录两处都走这个判定',
+  (page.match(/!switchToPasswordIfSmsOnlyRejected\(r\)/g) ?? []).length === 2)
 check('E3 面板用真实接口（completeAdminSecondFactor / resendAdminSecondFactor）',
   panel.includes('completeAdminSecondFactor(challenge.challengeTicket, code)') && panel.includes('resendAdminSecondFactor(challenge.challengeTicket)'))
 check('E4 第二步凭证不进浏览器存储', !/localStorage|sessionStorage/.test(panel) && !/localStorage|sessionStorage/.test(sfSource))

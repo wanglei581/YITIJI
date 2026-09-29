@@ -11819,7 +11819,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 173,
+      "reachableFileCount": 176,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12602,7 +12602,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 178
+      "sourceFileCount": 181
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17595,6 +17595,11 @@
     "apps/admin/scripts/support/admin-phone-transfer-ui-contract.mjs": [
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs"
     ],
+    "apps/admin/scripts/support/auth-second-factor-module.mjs": [
+      "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/admin/scripts/verify-admin-login-second-factor.mjs",
+      "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs"
+    ],
     "apps/admin/scripts/verify-honest-placeholders.mjs": [
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
@@ -17697,8 +17702,12 @@
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/admin/src/routes/login/SecondFactorPanel.tsx": [
+      "apps/admin/scripts/verify-admin-login-second-factor.mjs"
+    ],
     "apps/admin/src/routes/login/index.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/admin/scripts/verify-admin-login-second-factor.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/admin/src/routes/offline-agencies/JobsDrawer.tsx": [
@@ -17935,8 +17944,12 @@
     ],
     "apps/admin/src/services/auth/index.ts": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/admin/scripts/verify-admin-login-second-factor.mjs",
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
+    ],
+    "apps/admin/src/services/auth/secondFactor.ts": [
+      "apps/admin/scripts/verify-admin-login-second-factor.mjs"
     ],
     "apps/kiosk/index.html": [
       "scripts/verify-compliance-copy.mjs"
@@ -25170,6 +25183,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/scripts/support/auth-second-factor-module.mjs",
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/account-settings/AdminInitialPhoneBindingCard.tsx",
           "apps/admin/src/routes/account-settings/PhoneBindingCard.tsx",
@@ -25329,6 +25343,28 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/scripts/support/auth-second-factor-module.mjs",
+          "apps/admin/src/routes/login/SecondFactorPanel.tsx",
+          "apps/admin/src/routes/login/index.tsx",
+          "apps/admin/src/services/auth/index.ts",
+          "apps/admin/src/services/auth/secondFactor.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-login-second-factor.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-login-second-factor"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "apps/admin/src/routes/offline-agencies"
         ],
@@ -25376,6 +25412,7 @@
         "dirs": [],
         "files": [
           "apps/admin/scripts/support/admin-phone-transfer-ui-contract.mjs",
+          "apps/admin/scripts/support/auth-second-factor-module.mjs",
           "apps/admin/src/routes/account-settings/AdminPhoneTransferCard.tsx",
           "apps/admin/src/routes/account-settings/index.tsx",
           "apps/admin/src/services/auth/index.ts"
