@@ -234,6 +234,11 @@
   - 供电禁令只标第 6 页。上一稿把整句禁令标成第 4、6、10 页。
 - **对照后保持的事实：** 电源键与休眠灯、16.8 kg、三档功耗、复印明暗度和纸张会留下、通风格栅页码、前盖与废粉瓶方位、真机核实清单 6 项、TWAIN/WIA、WMI 枚举。
 - **验证（本机命令，不代表现场或生产验收）：** `node scripts/generate-project-graph.mjs` 退出码 0（`docs/graph/` 0 个文件变化）；`node scripts/generate-project-graph.mjs --check`（即 `pnpm graph:check`）退出码 0。8 个改过的文档各跑 `node scripts/project-graph-query.mjs file <路径>`，退出码均为 0。点名门禁退出码均为 0：`pnpm --filter terminal-agent verify:print-scan-agent`、`pnpm --dir apps/terminal-agent verify:print-scan-agent`、`pnpm --filter ai-job-print-terminal verify:repository-integrity`、`pnpm --filter @ai-job-print/kiosk verify:profile-commercial-first-batch`、`pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home`、`pnpm --filter @ai-job-print/api verify:print-scan-first-release`、`verify:contract-review:preprod-readiness`、`verify:file-assets-trial-acceptance`、`verify:job-customer-sample-readiness`、`verify:job-info-ai-real-acceptance`、`verify:profile-commercial-first-batch-acceptance`、`verify:toolbox-ai-skill-intents`、`verify:toolbox-ai-skill-real-acceptance`、`verify:toolbox-governance-acceptance`、`verify:toolbox-preprod-acceptance`。依赖已在，未重装。
+## 2026-09-29：Agent 心跳把「无纸」报成 paper_empty（只修映射，对奔图无效）
+
+- **问题：** 合规窗口用模拟打印机测缺纸时发现，真 Agent 从不上报 `paper_empty`：`wmi.ts` 把 DetectedErrorState=4（无纸）并进了 `error`，类型里也没有这个值。服务端拦单集合、告警标签「打印机缺纸」和一体机缺纸视图早已认 `paper_empty`，却从真 Agent 那里永远走不到。
+- **修正：** 4→`paper_empty`，PrinterStatus 类型加 `paper_empty`，本机状态页加「打印机缺纸」标签。`verify-print-monitor-truth` 对照表同步，补 7/8→error；新增跨端值名约束：服务端拦单集合、告警标签、一体机 case 必须与 Agent 同名。反向变异 5 项全部报错。
+- **对奔图无效：** 奔图 CM2800ADN 驱动不写 DetectedErrorState（N3），真机缺纸仍只以作业超时的 `PRINT_JOB_UNCONFIRMED` 出现。是否让 Agent 走网口（SNMP）读缺纸，等发布当天 I 段缺纸时的只读探测读数再定（PR #1079）。低墨粉（5）本次不动，方案 B 记入 next-tasks P3。
 
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 

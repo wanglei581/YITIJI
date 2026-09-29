@@ -334,7 +334,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/hooks/useApiReadiness.ts` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/hooks/useKioskStageFit.ts` | `verify-kiosk-visual-unity.mjs` |
 | `apps/kiosk/src/hooks/useSmartCampusConfig.ts` | `verify-terminal-device-config.ts` |
-| `apps/kiosk/src/hooks/useTerminalDeviceStatus.ts` | `verify-device-status-honest.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-field-safety.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-service-entry-readiness.mjs` |
+| `apps/kiosk/src/hooks/useTerminalDeviceStatus.ts` | `verify-device-status-honest.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-field-safety.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-service-entry-readiness.mjs`<br/>`verify-print-monitor-truth.ts` |
 | `apps/kiosk/src/hooks/useToolboxConfig.ts` | `verify-home-toolbox-ui.mjs`<br/>`verify-terminal-device-config.ts` |
 | `apps/kiosk/src/index.css` | `verify-fusion-shell.mjs`<br/>`verify-kiosk-ai-primitives.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-service-desk-foundation.mjs` |
 | `apps/kiosk/src/layouts/KioskRoot.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-home.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-fusion-w4.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-shell-active-nav.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-p39-print-hub-fidelity.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-resume-report-qx.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
@@ -1995,7 +1995,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/admin-ops/admin-ops.controller.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-ops/admin-ops.service.ts` | `verify-admin-ops.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/admin-ops/derived-alert-identity.ts` | `verify-service-desk-dashboard-ui.mjs` |
-| `services/api/src/admin-ops/derived-alerts.ts` | `verify-admin-ops.ts` |
+| `services/api/src/admin-ops/derived-alerts.ts` | `verify-print-monitor-truth.ts`<br/>`verify-admin-ops.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts` | `verify-admin-order-filters.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts` | `verify-admin-order-filters.ts`<br/>`verify-admin-orders-readonly.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-payment-flow.ts` |
 | `services/api/src/admin-print-scan/admin-print-scan.service.ts` | `verify-admin-print-scan.ts`<br/>`verify-refund-idempotent.ts` |
@@ -2500,7 +2500,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/terminals/dto/record-toolbox-launch-event.dto.ts` | `verify-toolbox-launch-events.ts` |
 | `services/api/src/terminals/dto/save-toolbox-config.dto.ts` | `verify-terminal-device-config.ts` |
 | `services/api/src/terminals/kiosk-job-board.service.ts` | `verify-backend-p0-http.ts`<br/>`verify-job-fit.ts`<br/>`verify-kiosk-job-board-switch.ts` |
-| `services/api/src/terminals/printer-availability.ts` | `verify-admin-ops.ts` |
+| `services/api/src/terminals/printer-availability.ts` | `verify-print-monitor-truth.ts`<br/>`verify-admin-ops.ts` |
 | `services/api/src/terminals/printer-status.ts` | `verify-console-screen-snapshot.ts` |
 | `services/api/src/terminals/release-observation.service.ts` | `verify-release-observation-contract.mjs` |
 | `services/api/src/terminals/terminal-capabilities.service.ts` | `verify-pickup-claim-error-coverage.mjs`<br/>`verify-admin-fairs.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
