@@ -36,7 +36,7 @@ export function PeripheralDrawer({ terminal, onClose }: { terminal: AdminTermina
               </div>
               <div className="flex gap-2">
                 <dt className="w-16 shrink-0 text-neutral-500">处置建议</dt>
-                <dd className={item.advice ? 'font-medium text-warning-fg' : 'text-neutral-500'}>{item.advice ?? '无需处理'}</dd>
+                <dd className={item.advice ? 'font-medium text-warning-fg' : 'text-neutral-500'}>{item.advice ?? (item.badge === 'success' ? '无需处理' : '—')}</dd>
               </div>
             </dl>
           </section>

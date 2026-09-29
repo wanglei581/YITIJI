@@ -26,6 +26,55 @@ const PRINTER_ADVICE: Readonly<Record<string, string>> = {
   unknown: '驱动没有返回状态；持续出现时重启 Terminal Agent 或检查打印机驱动。',
 }
 
+/** 终端离线时，除 Agent 一项外都给这句：离线前的上报不代表现状，先恢复连接再看。 */
+export const OFFLINE_ITEM_ADVICE = '终端已离线，先恢复终端连接（见 Terminal Agent 一项），再看此项。'
+
+const WIRED_TEXT: Readonly<Record<string, string>> = { connected: '已连接', disconnected: '未连接', unknown: '未知' }
+const PRINTER_LINK_TEXT: Readonly<Record<string, string>> = {
+  reachable: '可达',
+  unreachable: '不可达',
+  not_network_printer: 'USB 连接（无网络链路）',
+  unknown: '未知',
+}
+
+function reportedText(value: string | null | undefined, words: Readonly<Record<string, string>>): string {
+  if (value === null || value === undefined) return '未上报'
+  return words[value] ?? `无法识别（${value}）`
+}
+
+/**
+ * 有线网络与打印机链路。只有「网线已连接」且「打印机可达或走 USB」才算正常；
+ * Agent 报 unknown 显示「未知」，旧 Agent 不上报（null）显示「未上报」，都用中性色，不当成正常。
+ */
+export function networkView(t: AdminTerminalRecord): { badge: BadgeTone; label: string; reason: string | null; advice: string | null } {
+  if (!t.online) return { badge: 'default', label: '未知', reason: null, advice: OFFLINE_ITEM_ADVICE }
+  if (t.wiredNetworkStatus === 'disconnected') {
+    return { badge: 'error', label: '有断开', reason: '一体机网线未连', advice: '检查一体机网线与交换机端口。' }
+  }
+  if (t.printerNetworkStatus === 'unreachable') {
+    return { badge: 'error', label: '有断开', reason: '一体机连不上打印机', advice: '检查打印机网线与地址，确认与一体机在同一网段。' }
+  }
+  const wiredOk = t.wiredNetworkStatus === 'connected'
+  const printerOk = t.printerNetworkStatus === 'reachable' || t.printerNetworkStatus === 'not_network_printer'
+  if (wiredOk && printerOk) {
+    return {
+      badge: 'success',
+      label: '正常',
+      reason: t.printerNetworkStatus === 'not_network_printer' ? '打印机走 USB，无网络链路' : null,
+      advice: null,
+    }
+  }
+  const neverReported = (t.wiredNetworkStatus ?? null) === null && (t.printerNetworkStatus ?? null) === null
+  return {
+    badge: 'default',
+    label: neverReported ? '未上报' : '未知',
+    reason: `网线：${reportedText(t.wiredNetworkStatus, WIRED_TEXT)}；打印机链路：${reportedText(t.printerNetworkStatus, PRINTER_LINK_TEXT)}`,
+    advice: neverReported
+      ? '这台 Agent 没有上报网络状态，确认 Agent 版本。'
+      : '网络状态未能判定；持续出现时到现场核对网线与打印机连接。',
+  }
+}
+
 export function isOfflineTerminal(t: AdminTerminalRecord): boolean {
   return !t.online
 }
@@ -66,6 +115,7 @@ export function peripheralItems(t: AdminTerminalRecord): PeripheralItem[] {
   const scan = scanInputView(t)
   const db = localDbView(t)
   const lowDisk = t.diskFreeGb !== null && t.diskFreeGb < LOW_DISK_GB
+  const network = networkView(t)
 
   const items: PeripheralItem[] = [
     {
@@ -77,9 +127,11 @@ export function peripheralItems(t: AdminTerminalRecord): PeripheralItem[] {
         ? `Agent 上报了无法识别的状态「${t.printerStatus}」`
         : null),
       observedAt: heartbeatAt,
-      advice: t.online && printer.badge !== 'success'
-        ? PRINTER_ADVICE[t.printerStatus ?? ''] ?? (t.printerStatus ? '状态无法识别，请到现场核对打印机面板。' : '这台 Agent 没有上报打印机状态，确认 Agent 版本。')
-        : null,
+      advice: !t.online
+        ? OFFLINE_ITEM_ADVICE
+        : printer.badge !== 'success'
+          ? PRINTER_ADVICE[t.printerStatus ?? ''] ?? (t.printerStatus ? '状态无法识别，请到现场核对打印机面板。' : '这台 Agent 没有上报打印机状态，确认 Agent 版本。')
+          : null,
     },
     {
       key: 'scan',
@@ -88,24 +140,20 @@ export function peripheralItems(t: AdminTerminalRecord): PeripheralItem[] {
       label: scan.label,
       reason: stale ?? scan.detail,
       observedAt: t.scanInputObservedAt ?? heartbeatAt,
-      advice: t.online && scan.badge === 'error'
-        ? `${scan.restart ? '需到现场重启 Agent 恢复（不支持远程解除）；' : ''}先核对扫描目录配置与共享权限。`
-        : null,
+      advice: !t.online
+        ? OFFLINE_ITEM_ADVICE
+        : scan.badge === 'error'
+          ? `${scan.restart ? '需到现场重启 Agent 恢复（不支持远程解除）；' : ''}先核对扫描目录配置与共享权限。`
+          : null,
     },
     {
       key: 'network',
       name: '有线网络与打印机链路',
-      badge: !t.online ? 'default' : hasNetworkIssue(t) ? 'error' : 'success',
-      label: !t.online ? '未知' : hasNetworkIssue(t) ? '有断开' : '正常',
-      reason: stale ?? (t.wiredNetworkStatus === 'disconnected'
-        ? '一体机网线未连'
-        : t.printerNetworkStatus === 'unreachable' ? '一体机连不上打印机' : null),
+      badge: network.badge,
+      label: network.label,
+      reason: stale ?? network.reason,
       observedAt: heartbeatAt,
-      advice: t.online && t.wiredNetworkStatus === 'disconnected'
-        ? '检查一体机网线与交换机端口。'
-        : t.online && t.printerNetworkStatus === 'unreachable'
-          ? '检查打印机网线与地址，确认与一体机在同一网段。'
-          : null,
+      advice: network.advice,
     },
     {
       key: 'local',
@@ -116,9 +164,11 @@ export function peripheralItems(t: AdminTerminalRecord): PeripheralItem[] {
         ? '本地任务库不可用，已暂停领取打印任务'
         : lowDisk ? `磁盘可用空间低于 ${LOW_DISK_GB} GB` : null),
       observedAt: heartbeatAt,
-      advice: t.online && t.localTaskDatabaseAvailable === false
-        ? '到现场重启 Terminal Agent；仍不可用请联系研发排查本地库文件。'
-        : t.online && lowDisk ? '清理本机扫描缓存与日志。' : null,
+      advice: !t.online
+        ? OFFLINE_ITEM_ADVICE
+        : t.localTaskDatabaseAvailable === false
+          ? '到现场重启 Terminal Agent；仍不可用请联系研发排查本地库文件。'
+          : lowDisk ? '清理本机扫描缓存与日志。' : null,
     },
     {
       key: 'agent',

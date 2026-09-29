@@ -96,9 +96,19 @@ export default function PeripheralsPage() {
   }
   const loading = status === 'loading' && terminals.length === 0
   const failed = status === 'error' && terminals.length === 0
+  // keep-last：刷新失败时保留上一份数据，但必须说清楚这不是最新状态。
+  const staleAfterError = status === 'error' && terminals.length > 0
 
   return (
     <>
+      {staleAfterError && (
+        <div role="alert" className="mb-3.5 flex flex-wrap items-center gap-3 rounded-[10px] border border-warning-fg/30 bg-warning-bg px-4 py-2.5 text-[13px] text-warning-fg">
+          <span className="flex-1">刷新失败，以下为上次成功获取的数据，不代表设备现状。</span>
+          <button type="button" onClick={() => void refresh()} className="min-h-[36px] rounded-[8px] border border-warning-fg/40 px-3 font-medium hover:bg-warning-fg/10">
+            重新获取
+          </button>
+        </div>
+      )}
       <div className="mb-3.5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <SummaryTile label="打印机异常" count={summary.printer} tone="error" />
         <SummaryTile label="扫描目录异常" count={summary.scan} tone="error" />
