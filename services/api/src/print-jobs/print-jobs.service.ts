@@ -25,7 +25,7 @@ import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
 import type { BillingPageSource } from './print-page-count.types'
-import { assertVerifiedPrintParameters } from './verified-print-parameters'
+import { assertPrintOrderSides, assertVerifiedPrintParameters } from './verified-print-parameters'
 import { DocumentConversionService } from '../document-conversion/document-conversion.service'
 import { WORD_MIME_TYPES } from '../document-conversion/document-conversion.types'
 import { assertPiiScanned } from './pii-scan-gate'
@@ -456,6 +456,8 @@ export class PrintJobsService {
     // 报价：金额只由 PricingService 依 PriceConfig 计算（**不信任前端 amount**）；无 active 价目 / 异常 → fail-closed。
     const copies = dto.params?.copies ?? DEFAULT_PARAMS.copies
     const colorMode: 'black_white' | 'color' = dto.params?.colorMode ?? 'black_white'
+    // 一体机直接建单不经过 OrderQuoteService，必须在这里单独拦。双面不把面数折半。
+    assertPrintOrderSides(billablePages * copies)
     const quote = await this.pricing.quotePrint({ billablePages, billingPageSource, copies, colorMode })
     // 动态价格二次确认：quotedAmountCents 只断言「用户确认的就是现在要收的」，金额仍取上面的 quote。
     // 必须在建 Order / PrintTask / 支付会话之前拒绝；字段缺省（旧客户端）照旧按服务端计价建单。

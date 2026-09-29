@@ -12,6 +12,7 @@ import {
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
+import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { formatRemainingSeconds, useRemainingSeconds } from '../../hooks/useCountdown'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { getPayStatus } from '../../services/print/paymentApi'
@@ -23,7 +24,7 @@ import {
 } from '../../services/print/printJobsApi'
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
-import { printUploadPathForSource, clearPrintMaterialSession, type PrintMaterialSource } from './printMaterialSession'
+import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { PrintAiHelp } from './components/PrintAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
@@ -123,7 +124,8 @@ function failVisual(errorCode?: string): 'paper-jam' | 'out-of-paper' | 'result-
 export function PrintDonePage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { getToken } = useAuth()
+  const { getToken, isLoggedIn } = useAuth()
+  const { endKioskUse } = useKioskSessionControl()
   const state = (location.state ?? {}) as PrintJobState
 
   const { file, params } = state
@@ -136,8 +138,7 @@ export function PrintDonePage() {
   const canReportIssue = taskId !== null
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [feeInfoOpen, setFeeInfoOpen] = useState(false)
-  const [wiped, setWiped] = useState(false)
-  const [wipeArmed, setWipeArmed] = useState(false)
+  const [endArmed, setEndArmed] = useState(false)
   const [idleLeft, setIdleLeft] = useState(60)
 
   const [verification, setVerification] = useState<PrintVerification | null>(null)
@@ -164,13 +165,15 @@ export function PrintDonePage() {
   const takeawayExpired = takeawayRemaining === 0
   const takeawayQrUrl = takeaway && !takeawayExpired ? toPublicQrUrl(takeaway.signedUrl) : null
 
-  const doWipe = useCallback(() => {
-    clearPrintMaterialSession()
-    setWiped(true)
-  }, [])
+  /* W-43（产品负责人 9/29）：完成页到点 = 真的结束这次使用。
+   * 以前到点只收起打印预览、账号还登录着，下一位走上来点「我的」就是上一位的文件和订单。
+   * 现在到点走统一的 endKioskUse：结束人次 → 清本机数据 → 退出登录 → 回首页。 */
+  const endOnTimeout = useCallback(() => {
+    endKioskUse('print_done_timeout')
+  }, [endKioskUse])
 
   useEffect(() => {
-    if (resultState !== 'completed' || wiped) return
+    if (resultState !== 'completed') return
     let n = 60
     setIdleLeft(60)
     const reset = () => {
@@ -185,7 +188,7 @@ export function PrintDonePage() {
       setIdleLeft(n)
       if (n <= 0) {
         window.clearInterval(timer)
-        doWipe()
+        endOnTimeout()
       }
     }, 1000)
     return () => {
@@ -193,7 +196,7 @@ export function PrintDonePage() {
       window.removeEventListener('pointerdown', onReset)
       window.removeEventListener('keydown', onReset)
     }
-  }, [doWipe, resultState, wiped])
+  }, [endOnTimeout, resultState])
 
   useEffect(() => {
     if (!taskId) {
@@ -334,27 +337,6 @@ export function PrintDonePage() {
     : amountCents != null
       ? `已付 ${formatCents(amountCents)}`
       : '订单保留'
-
-  if (wiped) {
-    return (
-      <QxPageFrame
-        title="这趟办完了"
-        subtitle="这次打印的预览已从这台机器收起，登录还在"
-        status={{ tone: 'ok', label: '预览已收起' }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/')}>
-            回首页
-          </button>
-        }
-        navbar={navbar}
-      >
-        <div data-w2-page="print-done" data-print-flow-step={6} className="qx-scroll pff-page">
-          <PrintDoneXq ask="这趟办完了。" doing={<>本机这次打印的文件预览已收起。账号还登录着，本人文档和订单仍可在「我的」里看到。离开前请点结束使用。</>} />
-        </div>
-      </QxPageFrame>
-    )
-  }
 
   if (feeInfoOpen) {
     return (
@@ -626,7 +608,7 @@ export function PrintDonePage() {
     )
   }
 
-  // 成功态才到这里：loading / unknown / failed / wiped / feeInfo 均已 return。
+  // 成功态才到这里：loading / unknown / failed / feeInfo 均已 return。
   // 以建单响应 hasEndUser 为准；本地 token 不能证明后端认了会话。事后登录也不会把这单追认回去。
   const hasEndUser = state.hasEndUser
 
@@ -654,14 +636,14 @@ export function PrintDonePage() {
             data-variant="danger"
             data-testid="print-fulfill-primary"
             onClick={() => {
-              if (wipeArmed) {
-                doWipe()
+              if (endArmed) {
+                endKioskUse('end_use')
                 return
               }
-              setWipeArmed(true)
+              setEndArmed(true)
             }}
           >
-            {wipeArmed ? '再按一次，确认收起这次预览' : '我拿走了，收起这次预览'}
+            {endArmed ? '再按一次，确认结束使用' : '我拿走了，结束使用'}
           </button>
         </>
       }
@@ -739,12 +721,16 @@ export function PrintDonePage() {
 
         <div className="pff-wipe" data-live="true">
           <div>
-            <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />一会儿收起这次预览</div>
-            <p className="pff-wipe-s">不再点屏幕后，这台机器上的本次打印预览会收起。账号不会因此退出。也可以现在就收起。</p>
+            <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />一会儿结束本次使用</div>
+            <p className="pff-wipe-s">
+              {isLoggedIn
+                ? '不再点屏幕，到点会结束本次使用并退出登录，本机这次的打印预览一并收起。也可以现在就结束。'
+                : '不再点屏幕，到点会结束本次使用，本机这次的打印预览一并收起。也可以现在就结束。'}
+            </p>
           </div>
           <div className="pff-wipe-n">
             <div className="n">{idleLeft}</div>
-            <div className="u">秒后收起预览</div>
+            <div className="u">秒后结束使用</div>
           </div>
         </div>
 

@@ -12804,7 +12804,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 629,
+      "reachableFileCount": 633,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13926,6 +13926,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyActivityPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -13970,6 +13971,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14002,6 +14004,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14032,6 +14035,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14064,6 +14068,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14096,6 +14101,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14127,6 +14133,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14158,6 +14165,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14189,6 +14197,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14219,6 +14228,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14258,6 +14268,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -14719,6 +14730,7 @@
           ],
           "file": "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "layout": [
+            "KioskHandoverGate",
             "KioskRoot",
             "KioskRuntimeRoot",
             "Outlet"
@@ -15795,7 +15807,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 722
+      "sourceFileCount": 726
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17818,6 +17830,7 @@
       "apps/kiosk/scripts/verify-job-ai-history-privacy-ui.mjs",
       "apps/kiosk/scripts/verify-job-ai-ui.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-member-login-dialog.mjs",
@@ -18457,6 +18470,7 @@
     "apps/kiosk/src/auth/AuthContext.tsx": [
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
@@ -18468,32 +18482,52 @@
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
+    "apps/kiosk/src/auth/KioskHandoverGate.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
+    ],
     "apps/kiosk/src/auth/KioskPrivacyGuard.tsx": [
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-kiosk-session-reporting.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-member-login-dialog.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
+      "apps/kiosk/scripts/verify-print-done-truth.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
     ],
     "apps/kiosk/src/auth/KioskSessionControlContext.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/auth/kioskClearScope.ts": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
+    "apps/kiosk/src/auth/kioskEndUse.ts": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
+      "apps/kiosk/scripts/verify-member-session-closure.mjs",
+      "apps/kiosk/scripts/verify-print-done-truth.mjs"
+    ],
+    "apps/kiosk/src/auth/kioskIdleTiming.ts": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
+    ],
+    "apps/kiosk/src/auth/kioskPresence.ts": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
     ],
     "apps/kiosk/src/auth/kioskSensitiveSession.ts": [
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/auth/memberSessionExpiryExit.ts": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/auth/returnPath.ts": [
@@ -18861,6 +18895,7 @@
       "apps/kiosk/scripts/verify-fusion-home.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
       "apps/kiosk/scripts/verify-member-login-dialog.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs",
@@ -18873,12 +18908,16 @@
     "apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx": [
       "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
+    "apps/kiosk/src/pages/home/components/HomeIdentityActions.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
+    ],
     "apps/kiosk/src/pages/home/components/HomeTile.tsx": [
       "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
     "apps/kiosk/src/pages/home/components/QxHomeView.tsx": [
       "apps/kiosk/scripts/verify-fusion-home.mjs",
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/pages/home/components/ToolboxLaunchModals.tsx": [
@@ -18917,7 +18956,8 @@
       "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
     "apps/kiosk/src/pages/home/styles/home-qx.css": [
-      "apps/kiosk/scripts/verify-fusion-home.mjs"
+      "apps/kiosk/scripts/verify-fusion-home.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
     ],
     "apps/kiosk/src/pages/interview/InterviewReportPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -19187,6 +19227,7 @@
     ],
     "apps/kiosk/src/pages/placeholders/SessionTimeoutPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx": [
@@ -19295,6 +19336,7 @@
     ],
     "apps/kiosk/src/pages/print/PrintDonePage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs",
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-print-done-truth.mjs",
@@ -19477,6 +19519,7 @@
     ],
     "apps/kiosk/src/pages/profile/ProfilePage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
@@ -19625,6 +19668,7 @@
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-job-ai-history-privacy-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
@@ -20332,6 +20376,7 @@
     "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
@@ -20460,6 +20505,7 @@
       "apps/kiosk/scripts/verify-jobfair-checkin.mjs",
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
@@ -20683,7 +20729,9 @@
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
-      "scripts/verify-no-raw-error-render.mjs"
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "apps/kiosk/src/services/assistantDraft.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
@@ -20738,6 +20786,7 @@
     "apps/kiosk/src/services/terminalAuth.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "apps/kiosk/scripts/verify-terminal-session-self-heal.mjs"
     ],
@@ -21436,6 +21485,9 @@
     "docs/design/kiosk-proto-2026-07/73-assistant-call.html": [
       "apps/kiosk/scripts/verify-visual-evidence-manifest.mjs"
     ],
+    "docs/design/kiosk-redesign-2026-08-v2/01-home.html": [
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
+    ],
     "docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html": [
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
@@ -21717,6 +21769,7 @@
     ],
     "packages/shared/src/types/print.ts": [
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
     ],
     "packages/shared/src/types/printScanCapability.ts": [
@@ -24128,7 +24181,9 @@
       "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pii-redaction.ts",
@@ -25483,6 +25538,7 @@
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "services/api/src/print-jobs/verified-print-parameters.ts": [
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
@@ -28246,6 +28302,48 @@
           "apps"
         ],
         "files": [
+          ".github/workflows/ci.yml",
+          "apps/kiosk/src/auth/AuthContext.tsx",
+          "apps/kiosk/src/auth/KioskHandoverGate.tsx",
+          "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
+          "apps/kiosk/src/auth/KioskSessionControlContext.tsx",
+          "apps/kiosk/src/auth/kioskClearScope.ts",
+          "apps/kiosk/src/auth/kioskEndUse.ts",
+          "apps/kiosk/src/auth/kioskIdleTiming.ts",
+          "apps/kiosk/src/auth/kioskPresence.ts",
+          "apps/kiosk/src/auth/kioskSensitiveSession.ts",
+          "apps/kiosk/src/auth/memberSessionExpiryExit.ts",
+          "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/kiosk/src/pages/home/components/HomeIdentityActions.tsx",
+          "apps/kiosk/src/pages/home/components/QxHomeView.tsx",
+          "apps/kiosk/src/pages/home/styles/home-qx.css",
+          "apps/kiosk/src/pages/placeholders/SessionTimeoutPage.tsx",
+          "apps/kiosk/src/pages/print/PrintDonePage.tsx",
+          "apps/kiosk/src/pages/profile/ProfilePage.tsx",
+          "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
+          "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
+          "apps/kiosk/src/routes/index.tsx",
+          "apps/kiosk/src/services/terminalAuth.ts",
+          "docs/design/kiosk-redesign-2026-08-v2/01-home.html"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-end-use"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
           "apps/kiosk/src/components/KioskFeedbackDialog.tsx",
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
@@ -28799,6 +28897,7 @@
           "apps/kiosk/src/auth/AuthContext.tsx",
           "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
           "apps/kiosk/src/auth/KioskSessionControlContext.tsx",
+          "apps/kiosk/src/auth/kioskEndUse.ts",
           "apps/kiosk/src/auth/memberSessionExpiryExit.ts",
           "apps/kiosk/src/auth/returnPath.ts",
           "apps/kiosk/src/pages/auth/LoginPage.tsx",
@@ -29008,6 +29107,7 @@
           "apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx",
           "apps/kiosk/src/pages/print/components/printFileRetention.ts",
           "apps/kiosk/src/pages/print/printConfirmModel.ts",
+          "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/print/localPrintWakeApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/kiosk/src/services/print/printJobsApi.ts"
@@ -29047,6 +29147,8 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
+          "apps/kiosk/src/auth/kioskEndUse.ts",
           "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
@@ -36993,15 +37095,18 @@
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
           "apps/kiosk/src/pages/print/pickupClaimModel.ts",
+          "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/miniapp/pages/print-pay/print-pay.js",
           "apps/miniapp/utils/api.js",
+          "packages/shared/src/types/print.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pickup-code.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.controller.ts",
           "services/api/src/payment/order-quote.service.ts",
@@ -37014,6 +37119,7 @@
           "services/api/src/print-jobs/print-jobs.controller.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/print-jobs/verified-print-parameters.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.interface.ts",
           "services/api/src/storage/storage.service.ts",
@@ -37312,6 +37418,7 @@
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/payment/order-status.service.ts",

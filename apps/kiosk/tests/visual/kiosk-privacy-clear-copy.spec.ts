@@ -1,71 +1,21 @@
 import type { Page } from '@playwright/test'
-import { mkdirSync } from 'node:fs'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
-import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { setReactRouterState, W2_FILE, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
+import {
+  allowLocalBootTicket,
+  loginThroughVisibleUi as loginWithPhone,
+  memberDocument,
+  PRIVACY_CLEAR_TASK_ID as TASK_ID,
+  registerPrivacyShell,
+  shotTo,
+} from './fixtures/privacy-clear-shell'
 
 const EVIDENCE_DIR = `${process.env.HOME}/.cache/walk0929/evidence/fix-privacy-clear`
 const MEMBER_PHONE = '13800138000'
-const MEMBER_CODE = '123456'
-const TASK_ID = 'privacy-clear-task-001'
-const BOOT_TICKET = 'a'.repeat(40)
 
 function registerShell(api: ApiRouter): void {
-  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
-    status: 200,
-    json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'privacy-clear-fixture'),
-  })
-  api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
-    status: 200,
-    json: { enabled: false, idleTimeoutSec: 180, items: [] },
-  })
-  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
-    status: 200,
-    json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
-  })
-  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
-    status: 200,
-    json: { capabilities: [] },
-  })
-  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
-  api.respond('GET', '/api/v1/jobs', {
-    status: 200,
-    json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
-  })
-  api.respond('GET', '/api/v1/job-fairs', {
-    status: 200,
-    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
-  })
-  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
-    status: 200,
-    json: { asrEnabled: false, ttsEnabled: false },
-  })
-  for (const docType of ['terms_of_service', 'privacy_policy']) {
-    api.respond('GET', `/api/v1/kiosk/legal/${docType}`, {
-      status: 200,
-      json: { success: true, data: { version: '2026-09-01', title: docType, status: 'active' } },
-    })
-  }
-  for (const endpoint of ['start', 'heartbeat', 'end']) {
-    api.respond('POST', `/api/v1/kiosk/session/${endpoint}`, {
-      status: 200,
-      json: { success: true },
-    })
-  }
-  api.respond('POST', '/api/v1/terminals/session-token', {
-    status: 200,
-    json: { sessionToken: 'privacy-clear-terminal-session-token' },
-  })
-  // 本页刷新后若 sessionStorage 里已有终端票，启动会先续这一张票。
-  api.respond('POST', '/api/v1/terminals/session-token/refresh', {
-    status: 200,
-    json: { sessionToken: 'privacy-clear-terminal-session-token' },
-  })
-  api.respond('POST', '/api/v1/member/auth/sms-code', {
-    status: 200,
-    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
-  })
+  registerPrivacyShell(api)
   api.respond('POST', '/api/v1/member/auth/login', {
     status: 200,
     json: {
@@ -76,111 +26,36 @@ function registerShell(api: ApiRouter): void {
       },
     },
   })
-  const emptyPage = { success: true, data: { items: [], nextCursor: null, total: 0 } }
-  for (const path of [
-    '/api/v1/me/favorites',
-    '/api/v1/me/print-orders',
-    '/api/v1/me/resumes',
-    '/api/v1/me/benefits',
-  ]) {
-    api.respond('GET', path, { status: 200, json: emptyPage })
-  }
-  api.respond('GET', '/api/v1/me/ai-records', {
-    status: 200,
-    json: {
-      success: true,
-      data: { items: [], nextCursor: null, total: 0, qaRecords: [], qaNextCursor: null, qaTotal: 0 },
-    },
-  })
-  api.respond('GET', '/api/v1/me/pending-tasks', {
-    status: 200,
-    json: { success: true, data: [] },
-  })
   api.respond('GET', '/api/v1/me/documents', {
     status: 200,
     json: {
       success: true,
-      data: {
-        items: [
-          {
-            id: 'doc-privacy',
-            filename: '上一位留下的简历.pdf',
-            mimeType: 'application/pdf',
-            sizeBytes: 245760,
-            purpose: 'print_doc',
-            sensitiveLevel: 'normal',
-            assetCategory: 'original',
-            retentionPolicy: 'months_3',
-            allowedRetentionPolicies: ['months_3', 'months_6', 'long_term'],
-            createdAt: '2026-09-01T08:00:00.000Z',
-            expiresAt: '2099-03-01T00:00:00.000Z',
-            downloadUrlPath: '/files/doc-privacy/download-url',
-            previewUrlPath: '/files/doc-privacy/preview-url',
-          },
-        ],
-        nextCursor: null,
-        total: 1,
-      },
+      data: { items: [memberDocument('doc-privacy', '上一位留下的简历.pdf')], nextCursor: null, total: 1 },
     },
-  })
-  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
-    status: 200,
-    json: { taskId: TASK_ID, status: 'completed', completedAt: '2026-09-29T00:00:00.000Z' },
-  })
-}
-
-async function allowLocalBootTicket(page: Page): Promise<void> {
-  await page.route('http://127.0.0.1:9527/local/terminal-boot-ticket', async (route) => {
-    const headers = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'X-Local-Bridge-Token, Accept, Content-Type',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    }
-    if (route.request().method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers })
-      return
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      headers,
-      body: JSON.stringify({ data: { bootTicket: BOOT_TICKET } }),
-    })
   })
 }
 
 async function shot(page: Page, name: string): Promise<void> {
-  mkdirSync(EVIDENCE_DIR, { recursive: true })
-  await page.screenshot({ path: `${EVIDENCE_DIR}/${name}`, fullPage: false })
-}
-
-async function expectThisMember(page: Page): Promise<void> {
-  await expect(page.getByTestId('home-identity')).toContainText('138****8000')
-}
-
-async function openDocumentsFromHome(page: Page): Promise<void> {
-  await page.getByTestId('home-identity').click()
-  await expect(page).toHaveURL(/\/profile$/)
-  await page.getByTestId('profile-asset-documents').click()
-  await expect(page).toHaveURL(/\/me\/documents$/)
+  await shotTo(EVIDENCE_DIR, page, name)
 }
 
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
-  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
-  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
-  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
-  for (const digit of MEMBER_PHONE) {
-    await page.getByRole('button', { name: digit, exact: true }).click()
-  }
-  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
-  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
-  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
-  for (const digit of MEMBER_CODE) {
-    await page.getByRole('button', { name: digit, exact: true }).click()
-  }
-  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
-  await page.getByRole('button', { name: '确认登录', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === returnTo)
+  await loginWithPhone(page, returnTo, MEMBER_PHONE)
+}
+
+// W-75（9/29）：首页登录态只说「有人登录着」，手机号（含打码）不上首页。
+async function expectThisMember(page: Page): Promise<void> {
+  await expect(page.getByTestId('home-identity')).toHaveText('有人登录着')
+  await expect(page.getByTestId('home-end-previous')).toBeVisible()
+  await expect(page.locator('body')).not.toContainText('138****8000')
+}
+
+async function openDocumentsFromHome(page: Page): Promise<void> {
+  // 进个人区走底部「我的」（首页不放「进入我的」直达入口）；刚操作过，不问「还是你吗？」。
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '我的' }).click()
+  await expect(page).toHaveURL(/\/profile$/)
+  await page.getByTestId('profile-asset-documents').click()
+  await expect(page).toHaveURL(/\/me\/documents$/)
 }
 
 test('W-42 clean home tells the truth about auto logout @privacy-clear', async ({ page, api }) => {
@@ -224,7 +99,7 @@ test('W-42 logged-in home and documents do not promise the previous person is go
   await shot(page, 'W-42-documents-logged-in-390.png')
 })
 
-test('W-43 print done puts the preview away and keeps the login @privacy-clear', async ({ page, api }) => {
+test('W-43 print done "我拿走了，结束使用" really ends the use and logs out @privacy-clear', async ({ page, api }) => {
   registerShell(api)
   await allowLocalBootTicket(page)
   await loginThroughVisibleUi(page, '/')
@@ -243,27 +118,26 @@ test('W-43 print done puts the preview away and keeps the login @privacy-clear',
     { taskId: TASK_ID, file: W2_FILE, params: W2_PRINT_PARAMS },
   )
 
-  await expect(page.getByText('一会儿收起这次预览')).toBeVisible()
-  await expect(page.getByText('账号不会因此退出')).toBeVisible()
-  await expect(page.getByText('秒后收起预览')).toBeVisible()
+  await expect(page.getByText('一会儿结束本次使用')).toBeVisible()
+  await expect(page.getByText(/到点会结束本次使用并退出登录/)).toBeVisible()
+  await expect(page.getByText('秒后结束使用')).toBeVisible()
   await expect(page.getByText('已清除')).toHaveCount(0)
   await expect(page.getByText('下一个人看不到')).toHaveCount(0)
   await expect(page.getByText('结束并清空')).toHaveCount(0)
-  await shot(page, 'W-43-print-done-before-wipe-1080.png')
+  await shot(page, 'W-43-print-done-before-end-1080.png')
 
-  const wipe = page.getByTestId('print-fulfill-primary')
-  await wipe.click()
-  await expect(wipe).toHaveText('再按一次，确认收起这次预览')
-  await wipe.click()
-  await expect(page.getByText('登录还在')).toBeVisible()
-  await expect(page.getByText('账号还登录着')).toBeVisible()
-  await expect(page.getByText('已清除')).toHaveCount(0)
-  await shot(page, 'W-43-print-done-wiped-1080.png')
+  const end = page.getByTestId('print-fulfill-primary')
+  await expect(end).toHaveText('我拿走了，结束使用')
+  await end.click()
+  await expect(end).toHaveText('再按一次，确认结束使用')
+  await end.click()
 
-  await page.getByRole('button', { name: '回首页' }).click()
+  // 真的结束：回首页、已退出登录，首页不再说有人登录着。
   await expect(page).toHaveURL(/\/$/)
-  await expectThisMember(page)
-  await shot(page, 'W-43-after-wipe-still-logged-in-1080.png')
+  await expect(page.getByRole('button', { name: '登录后查看本人记录' })).toBeVisible()
+  await expect(page.getByTestId('home-end-previous')).toHaveCount(0)
+  await expect(page.locator('body')).not.toContainText('138****8000')
+  await shot(page, 'W-43-after-end-logged-out-1080.png')
 })
 
 test('W-43 direct completed state still uses the honest wipe copy @privacy-clear', async ({ page, api }) => {
@@ -276,6 +150,8 @@ test('W-43 direct completed state still uses the honest wipe copy @privacy-clear
     params: W2_PRINT_PARAMS,
     source: 'document',
   })
-  await expect(page.getByText('一会儿收起这次预览')).toBeVisible()
+  await expect(page.getByText('一会儿结束本次使用')).toBeVisible()
+  // 没登录：如实只说结束本次使用，不说退出登录。
+  await expect(page.getByText(/到点会结束本次使用，本机这次的打印预览一并收起/)).toBeVisible()
   await expect(page.getByText('已清除')).toHaveCount(0)
 })

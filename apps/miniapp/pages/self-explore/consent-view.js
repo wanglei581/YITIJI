@@ -66,9 +66,21 @@ function toConsentView(res, docTypes) {
   }
 }
 
-/** 取不到说明时页面上的同意部分：全空、不就绪。 */
-function emptyConsentView() {
-  return toConsentView(null, null)
+/**
+ * 服务端答复了、但说明不全（比如服务端还是没下发条款的旧版本）：重试也不会好，
+ * 页面说「暂未开放」，不给重试。与下面「请求本身失败」分开。
+ */
+function answeredConsentView(res, docTypes) {
+  const view = toConsentView(res, docTypes)
+  view.consentUnavailable = !view.consentReady
+  return view
 }
 
-module.exports = { toConsentView, emptyConsentView }
+/** 请求失败、没拿到答复时页面上的同意部分：全空、不就绪，可以重试。 */
+function emptyConsentView() {
+  const view = toConsentView(null, null)
+  view.consentUnavailable = false
+  return view
+}
+
+module.exports = { toConsentView, answeredConsentView, emptyConsentView }
