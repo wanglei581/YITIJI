@@ -42,7 +42,9 @@ const PORT_B = 'C:\\Windows\\Temp\\aijob-residue-b.prn'
 const PORT_ZH = 'C:\\Windows\\Temp\\aijob-residue-zh.prn'
 const TASK_NAME = 'AIJobResidueOther'
 const USER_NAME = 'aijobqhold'
-const TEST_PASSWORD = 'Aijob-Queue-Hold-1a'
+// 不超过 14 位：更长的密码会让 `net user /add` 先问「是否继续」，CI 无人应答即失败（No valid response was provided）。
+const TEST_PASSWORD = 'Aq-Hold-1a#Zx9'
+if (TEST_PASSWORD.length > 14) throw new Error('fixture password must be at most 14 characters for net user /add')
 const HOLD_SOURCE = join(__dirname, '../src/agent/print-queue-hold.ts')
 const OWNER_ANCHOR = '$owned = $jobSid.Equals($currentSid)'
 const PAUSE_ANCHOR = "await applyPrinterQueueMethod({ printerName, method: 'Pause' })"
@@ -170,7 +172,8 @@ async function waitForJob(
   printerName: string,
   predicate: (job: PrintJobSnapshot) => boolean,
 ): Promise<PrintJobSnapshot> {
-  const deadline = Date.now() + 25_000
+  // 别的账号的作业由计划任务提交，新账号首次登录要建用户配置文件，25 秒在 CI 上不够稳。
+  const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
     const listed = await showQueueFailure('list', printerName, () => listConfiguredPrintJobs(printerName))
     const job = listed.jobs.find((entry) => predicate(entry))
