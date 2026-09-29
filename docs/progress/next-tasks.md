@@ -1,5 +1,11 @@
 # 下一步任务
 
+## 后端窗口待办（自我探索同意）
+
+已按合规裁定取消过渡期（服务端只收当前版本）。
+
+- **打开「四端同意版本一致」断言**：`services/api/src/ai/resume/__tests__/self-assessment-consent.test.ts` 里带 skip 的那条。负责人：后端窗口。触发条件：一体机（主执行窗口）与小程序（#1124）都已升到当前版本并用下发的 consentLinks、consentCheckboxLabel 渲染。
+
 ## 2026-09-29：候选写入方（本窗口）的活，按先后
 
 > 分工（总指挥 9/29 转达产品负责人拍板）：总指挥窗口调度与汇总、不推候选；**本窗口是候选 `claude/codex-task-history-progress-0de1dc` 与 #1042 的唯一写入方**，其它窗口（合规与运维、Windows 真机、小程序、两个后台、后端排雷与资金）开 PR 进候选，由本窗口按顺序普通合并。实现一律 Claude 子代理；Codex 只读取证、结论核实后才用；agy 纯推理反方评审。

@@ -2,6 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { installScanRevokeProbe, waitForAckConsumed } from '../fixtures/scan-revoke-probe'
+import { CURRENT_SELF_ASSESSMENT_CONSENT_VERSION } from '../fixtures/self-assessment-questions'
 
 const MEMBER_TOKEN = 'privacy-member-memory-token'
 const MEMBER_PHONE = '13800138000'
@@ -1286,7 +1287,7 @@ test('self-assessment leftover is wiped by the hard privacy deadline @privacy-ki
   const session = {
     answers: { collaboration: { 0: 'A' } },
     consent: { nonSensitive: true, sensitive: false },
-    consentVersion: 'sa-consent-v1.2026-08-16',
+    consentVersion: CURRENT_SELF_ASSESSMENT_CONSENT_VERSION,
     taskId: 'privacy-sa-task',
     result: {
       taskId: 'privacy-sa-task',
