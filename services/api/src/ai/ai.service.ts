@@ -21,7 +21,7 @@ import { ResumeTextService } from './resume/resume-text.service'
 import { resumeExportShowsVisibleLabel } from '../common/pdf/aigc-label'
 import type { ResumeExportFormat, ResumeLayoutAdjustAction } from './dto/resume-generate.dto'
 import { canAccessFile, FilesService } from '../files/files.service'
-import { signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { JobMaterialsService } from '../job-materials/job-materials.service'
@@ -918,7 +918,7 @@ export class AiService {
     // 打印链路只接受系统 HMAC content URL(signFileUrl),不接受 COS 下载 signedUrl。
     // 收费导出只在核销提交、文件变为 active 之后签发，避免未付款文件拿到可用链接。
     const access = stage ? await this.files.signActiveDownload(uploaded.fileId) : uploaded
-    const printFileUrl = signFileUrl(printFileId).url
+    const printFileUrl = signFileUrl(printFileId, PRINT_ARTIFACT_URL_TTL_MS).url
     if (charge?.taskId) {
       await this.persistConfirmedExportBestEffort({
         taskId: charge.taskId,

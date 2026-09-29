@@ -4,7 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
-import { signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { ResumeExtractionService } from '../ai/resume/resume-extraction.service'
 import { MockInterviewLlmService, type InterviewReportPayload, type NextQuestionOutput } from './mock-interview-llm.service'
 import {
@@ -493,7 +493,7 @@ export class MockInterviewService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
     }
   }
 
@@ -557,7 +557,7 @@ export class MockInterviewService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
       /** 恒 'degraded'：本单不含任何模型生成内容，前端据此如实提示用户。 */
       variant: 'degraded' as const,
       questionCount: questions.length,

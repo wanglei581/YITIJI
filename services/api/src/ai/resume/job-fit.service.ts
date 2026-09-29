@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
 import { FilesService } from '../../files/files.service'
-import { signFileUrl } from '../../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmJobFitService, type JobFitPayload, type JobFitTokenUsage } from './llm-job-fit.service'
 import { JobFitPdfService } from './job-fit-pdf.service'
@@ -271,7 +271,7 @@ export class JobFitService {
       filename: uploaded.filename,
       sizeBytes: uploaded.sizeBytes,
       pageCount,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
     }
   }
 

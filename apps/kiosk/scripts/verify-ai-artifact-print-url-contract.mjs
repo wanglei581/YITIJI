@@ -74,8 +74,8 @@ for (const [source, label] of [
   [interviewService, '模拟面试报告打印服务'],
   [materialsService, '求职材料生成服务'],
 ]) {
-  expectMatch(source, /import\s*\{\s*signFileUrl\s*\}\s*from\s*['"][^'"]+files\/signing['"]/, `${label}复用 signFileUrl`)
-  expectMatch(source, /printFileUrl:\s*signFileUrl\(uploaded\.fileId\)\.url/, `${label}响应返回内部 HMAC URL`)
+  expectMatch(source, /import\s*\{[^}]*\bsignFileUrl\b[^}]*\}\s*from\s*['"][^'"]+files\/signing['"]/, `${label}复用 signFileUrl`)
+  expectMatch(source, /printFileUrl:\s*signFileUrl\(uploaded\.fileId,\s*PRINT_ARTIFACT_URL_TTL_MS\)\.url/, `${label}响应返回内部 HMAC URL（30 分钟）`)
 }
 
 for (const [source, label, variable] of [
@@ -154,6 +154,36 @@ expectMatch(
 // 读屏跳过，用户读不到「为什么灰」（CLAUDE.md §9 / ai/AiTaskRegion.tsx 同一口径）。
 expectNoMatch(selfAssessment, /\sdisabled=\{/, '自我探索置灰不使用原生 disabled')
 expectMatch(selfAssessment, /aria-disabled=\{blocked \|\| undefined\}/, '自我探索置灰走 aria-disabled')
+
+// ── 产物打印链接有效期 30 分钟（9/29 主执行窗口提）────────────────────────────
+// 看完报告、改完参数再点打印常超过 5 分钟；默认 5 分钟会让确认页报「打印链接已过期」。
+// 与打印交接上下文、上传、图片转换的 30 分钟对齐。下载链接不在此列，仍走默认 5 分钟。
+const signingSource = read('services/api/src/files/signing.ts')
+expectMatch(signingSource, /export const PRINT_ARTIFACT_URL_TTL_MS = 30 \* 60 \* 1000\b/, 'signing.ts 定义产物打印链接有效期 30 分钟')
+const artifactPrintSites = [
+  ['services/api/src/advisor/advisor-artifact.service.ts', 'uploaded.fileId'],
+  ['services/api/src/document-conversion/document-conversion.service.ts', 'uploaded.fileId'],
+  ['services/api/src/ai/resume/self-assessment.service.ts', 'uploaded.fileId'],
+  ['services/api/src/ai/resume/appended-self-assessment.service.ts', 'uploaded.fileId'],
+  ['services/api/src/jobs/fair-company-print.service.ts', 'uploaded.fileId'],
+  ['services/api/src/ai/ai.service.ts', 'printFileId'],
+  ['services/api/src/ai/resume-report-export.controller.ts', 'access.fileId'],
+]
+for (const [file, arg] of artifactPrintSites) {
+  const escaped = arg.replace('.', '\\.')
+  expectMatch(read(file), new RegExp(`signFileUrl\\(${escaped},\\s*PRINT_ARTIFACT_URL_TTL_MS\\)\\.url`), `${path.basename(file)} 打印链接用 30 分钟`)
+}
+// 全量扫描：services/api/src 里任何「上传产物后直接签默认有效期的打印链接」都算回退。
+const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+  const full = path.join(dir, entry.name)
+  if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(full)
+  return entry.name.endsWith('.ts') ? [full] : []
+})
+const regressions = walk(path.join(repoRoot, 'services/api/src'))
+  .filter((file) => /printFileUrl:\s*signFileUrl\((?:uploaded\.fileId|printFileId|access\.fileId)\)/.test(fs.readFileSync(file, 'utf8')))
+  .map((file) => path.relative(repoRoot, file))
+if (regressions.length === 0) pass('services/api/src 没有产物打印链接退回默认 5 分钟')
+else fail(`产物打印链接退回默认有效期：${regressions.join(', ')}`)
 
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — AI / 求职产物打印 URL 契约未闭环`)

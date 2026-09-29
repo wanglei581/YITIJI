@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
-import { signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { AdvisorPdfService } from './advisor-pdf.service'
 import { ADVISOR_DISCLAIMER, COMPARE_LIMITS, SLOT_DRAFT_BLANK_POLICY } from './advisor-skills'
 import type { AdvisorArtifactPayload } from './advisor-artifact.types'
@@ -136,7 +136,7 @@ export class AdvisorArtifactService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
     }
   }
 

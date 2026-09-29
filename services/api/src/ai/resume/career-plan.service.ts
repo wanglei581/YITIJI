@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
 import { FilesService } from '../../files/files.service'
-import { signFileUrl } from '../../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmCareerPlanService, type CareerPlanPayload } from './llm-career-plan.service'
 import { CareerPlanPdfService } from './career-plan-pdf.service'
@@ -319,7 +319,7 @@ export class CareerPlanService {
       pageCount: rendered.pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
       /** 新增只读字段（加字段不改既有字段语义）：前端据此如实提示用户这次拿到的是哪一版。 */
       variant: rendered.variant,
     }
