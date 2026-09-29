@@ -12606,7 +12606,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 600,
+      "reachableFileCount": 608,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14496,16 +14496,6 @@
         {
           "component": "ProfilePage",
           "endpoints": [
-            "GET /job-fairs",
-            "GET /job-fairs/:param",
-            "GET /job-fairs/:param/companies/:param",
-            "GET /job-fairs/:param/map",
-            "GET /job-fairs/:param/materials",
-            "GET /job-fairs/:param/stats",
-            "GET /job-fairs/:param/venue-guide",
-            "GET /job-fairs/:param/zones",
-            "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url",
             "POST /me/favorites"
           ],
           "file": "apps/kiosk/src/pages/profile/ProfilePage.tsx",
@@ -14535,6 +14525,8 @@
           ],
           "path": "/renshi",
           "styles": [
+            "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
+            "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -15584,7 +15576,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 693
+      "sourceFileCount": 701
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18947,9 +18939,12 @@
     "apps/kiosk/src/pages/print/components/PickupHidGuide.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
+    "apps/kiosk/src/pages/print/components/PrintConfirmParts.tsx": [
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+    ],
     "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
@@ -18996,6 +18991,11 @@
     "apps/kiosk/src/pages/print/printDeskModel.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
+    "apps/kiosk/src/pages/print/printHandoffPolicy.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
     "apps/kiosk/src/pages/print/printMaterialSession.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs",
@@ -19022,6 +19022,9 @@
     ],
     "apps/kiosk/src/pages/print/styles/print-upload.css": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/print/usePrintConfirmHandoff.ts": [
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
     "apps/kiosk/src/pages/profile/ProfilePage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -19426,7 +19429,7 @@
     "apps/kiosk/src/pages/renshi/eligibilityOutcome.ts": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
-    "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css": [
+    "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/shared.ts": [
@@ -25909,6 +25912,7 @@
         "files": [
           "apps/kiosk/src/ai/aiOutage.ts",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
+          "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx",
@@ -26308,6 +26312,7 @@
           "apps/kiosk/src/pages/print/print-prototype.css",
           "apps/kiosk/src/pages/print/printConfirmQuery.ts",
           "apps/kiosk/src/pages/print/printDeskModel.ts",
+          "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/print/printMaterialSession.ts",
           "apps/kiosk/src/pages/print/styles/file-source-qx.css",
           "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
@@ -27631,7 +27636,7 @@
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/renshi/components.tsx",
           "apps/kiosk/src/pages/renshi/eligibilityOutcome.ts",
-          "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
+          "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
           "apps/kiosk/src/pages/renshi/shared.ts",
           "apps/kiosk/src/services/api/policy-eligibility.ts"
         ],
@@ -27684,7 +27689,7 @@
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
-          "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx",
+          "apps/kiosk/src/pages/print/components/PrintConfirmParts.tsx",
           "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx",
@@ -27790,8 +27795,10 @@
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
           "apps/kiosk/src/pages/print/PrintPrototypeLayout.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx",
           "apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx",
           "apps/kiosk/src/pages/print/styles/print-desk-qx.css",
+          "apps/kiosk/src/pages/print/usePrintConfirmHandoff.ts",
           "apps/kiosk/src/routes/index.tsx",
           "packages/shared/src/types/print.ts"
         ],
@@ -28708,6 +28715,7 @@
           "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
           "apps/kiosk/src/auth/kioskClearScope.ts",
           "apps/kiosk/src/auth/kioskSensitiveSession.ts",
+          "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",

@@ -7,11 +7,8 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import {
-  getAdvisorSession,
-  printAdvisorArtifact,
-  type AdvisorArtifactPrintResult,
-} from '../../services/api/advisor'
+import { getAdvisorSession, printAdvisorArtifact } from '../../services/api/advisor'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { ArtifactBody, AdvisorHero, EvidenceLegend } from './AdvisorArtifactPanels'
 import {
   copyFor,
@@ -40,6 +37,7 @@ function isNotFound(err: unknown): boolean {
 
 export function AiPlanPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const [search] = useSearchParams()
   const { getToken } = useAuth()
@@ -60,7 +58,6 @@ export function AiPlanPage() {
     sessionId && artifactId ? { sessionId, artifactId } : null,
   )
   const [printBusy, setPrintBusy] = useState(false)
-  const [printReceipt, setPrintReceipt] = useState<AdvisorArtifactPrintResult | null>(null)
   const [printError, setPrintError] = useState<string | null>(null)
   const printLock = useRef(false)
   const requestSeq = useRef(0)
@@ -70,7 +67,6 @@ export function AiPlanPage() {
     const seq = requestSeq.current + 1
     requestSeq.current = seq
     setViewState('loading')
-    setPrintReceipt(null)
     setPrintError(null)
     try {
       const session = parseSessionView(await getAdvisorSession(sessionId, {
@@ -143,7 +139,24 @@ export function AiPlanPage() {
         token: getToken(),
         accessToken,
       })
-      setPrintReceipt(printed)
+      if (!printed.printFileUrl) {
+        setPrintError('打印链接还没准备好，请稍后再试')
+        return
+      }
+      // F09：生成打印稿后直接进打印链（稿 52：先看价格再决定），和其他 AI 产物同一条路。
+      // 不再写「已保存到我的文档」：文件归属跟顾问会话走，游客时不属于任何人，本机说不准它存没存。
+      startPrint({
+        origin: 'advisor_artifact',
+        returnPath: window.location.pathname,
+        file: {
+          name: printed.filename,
+          size: printed.sizeBytes >= 1024 * 1024 ? `${(printed.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(printed.sizeBytes / 1024))} KB`,
+          pages: printed.pageCount > 0 ? printed.pageCount : null,
+          fileId: printed.fileId,
+          fileUrl: printed.printFileUrl,
+          mimeType: 'application/pdf',
+        },
+      })
     } catch (err) {
       if (isNotFound(err)) {
         setViewState('expired')
@@ -215,9 +228,6 @@ export function AiPlanPage() {
           ) : null}
           {derivedState === 'print-unavailable' ? (
             <p className="why">打印能力读不到，按钮先不放出来 —— 不做点了没反应的按钮。</p>
-          ) : null}
-          {printReceipt ? (
-            <p className="why">打印稿已生成，已保存到我的文档。还没有确认出纸。</p>
           ) : null}
           {printError ? <p className="why" role="status">{printError}</p> : null}
         </>

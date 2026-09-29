@@ -30,6 +30,7 @@ import { assistantMockFallbackReply, assistantReply } from './fusion-w3-states'
 import { writeScanWorkbenchSession } from './fusion-w2-state'
 import { w6RouteCases, type W6RouteCase } from './fusion-w6-route-cases'
 import { preparePrioritySeed, priorityPlan } from './qingxu-pair-seeds'
+import { policyPagesExtraPairs, policyPagesPlan, preparePolicyPages } from './qingxu-pair-policy-pages'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const PROTO_DIR = path.resolve(here, '../../../../../docs/design/kiosk-redesign-2026-08')
@@ -157,6 +158,8 @@ export type RuntimePlan =
   | { kind: 'login-error' }
   | { kind: 'assistant' }
   | { kind: 'priority' }
+  /** 45 本机构官方渠道、48 政策服务（qingxu-pair-policy-pages.ts）。 */
+  | { kind: 'policy-pages' }
 
 interface RawPair {
   screen: string
@@ -754,6 +757,8 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
   const targets: QingxuPairTarget[] = []
   for (const file of files) {
     const raw = enumerateFile(file)
+    // 稿里画不出、运行页真有的态（目前只登记 45）：配到最接近的稿态上并排看。
+    for (const extra of policyPagesExtraPairs(file)) raw.push({ ...extra, axis: 'state' })
     const byScreen = new Map<string, string[]>()
     for (const pair of raw) {
       const list = byScreen.get(pair.screen) ?? []
@@ -763,7 +768,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
     for (const pair of raw) {
       const siblings = byScreen.get(pair.screen) ?? [pair.state]
       const route = routeOf(file, pair)
-      const priority = priorityPlan(file, pair.screen, pair.state)
+      const priority = priorityPlan(file, pair.screen, pair.state) ?? policyPagesPlan(file, pair.screen, pair.state)
       const decided = priority
         ? { plan: priority.plan, reason: priority.reason, marker: priority.marker }
         : planOf(file, pair.screen, pair.state, siblings)
@@ -871,6 +876,11 @@ export async function prepareRuntime(page: Page, api: ApiRouter, target: QingxuP
   if (target.plan.kind === 'priority') {
     registerEvidenceShell(api)
     await preparePrioritySeed(page, api, target)
+    return
+  }
+  if (target.plan.kind === 'policy-pages') {
+    registerEvidenceShell(api)
+    await preparePolicyPages(page, api, target)
     return
   }
   if (target.plan.kind === 'fair') {

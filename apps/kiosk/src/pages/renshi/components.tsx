@@ -1,10 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import {
   CheckCircle2Icon,
   ChevronDownIcon,
   ClipboardListIcon,
   FileTextIcon,
+  InfoIcon,
+  PrinterIcon,
+  QrCodeIcon,
   ScaleIcon,
   ScrollTextIcon,
   ShieldCheckIcon,
@@ -66,6 +70,8 @@ export function OfficialEntryQrOverlay({ target, onClose }: { target: SourceQrTa
   }, [])
 
   const host = hostOf(target.url)
+  // 稿 48 的来源二维码弹层：标题一行，左边码、右边逐行核对信息，下面一句核对提醒，底部整行「关闭二维码」。
+  // 完整来源链接留在右边最后一行：用户照着核对目标域名，不另开网页。
   return (
     <div className="rq-qr-layer" onClick={onClose}>
       <div
@@ -76,21 +82,24 @@ export function OfficialEntryQrOverlay({ target, onClose }: { target: SourceQrTa
         aria-labelledby="rq-qr-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <button ref={closeRef} type="button" className="rq-qr-close" aria-label="关闭" onClick={onClose}>
-          <XIcon aria-hidden="true" />
-        </button>
-        <h2 id="rq-qr-title">扫码打开来源链接</h2>
-        <p className="rq-qr-subject">{target.title}</p>
-        <dl className="rq-qr-meta">
-          <div><dt>来源类型</dt><dd>{target.sourceKind}</dd></div>
-          <div><dt>来源说明</dt><dd>{target.sourceDetail}</dd></div>
-          <div><dt>目标域名</dt><dd>{host || '无法识别域名'}</dd></div>
-        </dl>
-        <div className="rq-qr-code"><SourceUrlQr value={target.url} size={220} /></div>
-        <p className="rq-qr-url">{target.url}</p>
+        <h2 id="rq-qr-title"><QrCodeIcon aria-hidden="true" />扫码打开来源链接</h2>
+        <div className="rq-qr-mid">
+          <div className="rq-qr-code"><SourceUrlQr value={target.url} size={300} /></div>
+          <dl className="rq-qr-meta">
+            <div><dt>本次对象</dt><dd>{target.title}</dd></div>
+            <div><dt>来源类型</dt><dd>{target.sourceKind}</dd></div>
+            <div><dt>来源说明</dt><dd>{target.sourceDetail}</dd></div>
+            <div><dt>目标域名</dt><dd>{host || '无法识别域名'}</dd></div>
+            <div><dt>来源链接</dt><dd className="rq-qr-url">{target.url}</dd></div>
+          </dl>
+        </div>
         <p className="rq-qr-note">
-          本系统没有核验过这个链接的官方性，也不代替你办理。请先核对机构和目标域名，确认无误再用手机扫码。
+          本系统<b>没有核验过</b>这个链接的官方性，也不代替你办理。请先核对机构和目标域名，确认无误再用手机扫码。
         </p>
+        <button ref={closeRef} type="button" className="qx-btn rq-qr-close" data-variant="primary" onClick={onClose}>
+          <XIcon aria-hidden="true" />
+          关闭二维码
+        </button>
       </div>
     </div>
   )
@@ -127,8 +136,8 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
 export function AudienceFilter({ value, onChange }: { value: AudienceKey; onChange: (k: AudienceKey) => void }) {
   return (
     <div className="rq-aud">
-      <p className="rq-aud-cap">先选你的情况<span>选择身份后筛出更相关的事项，通用事项始终展示</span></p>
-      <div className="rq-chips" role="group" aria-label="按身份筛选政策事项">
+      {/* 稿 48 这里只有一排身份筛选：「先选你的情况」那一行说明不上屏，筛选的用途写在组的无障碍名里。 */}
+      <div className="rq-chips" role="group" aria-label="按身份筛选政策事项，通用事项始终展示">
         {AUDIENCE_CHIPS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -177,7 +186,7 @@ export function EligibilityStepBar({ step }: { step: 1 | 2 }) {
 }
 
 export function SourceLine({ text }: { text: string }) {
-  return <p className="rq-srcline">{text}</p>
+  return <p className="rq-srcline"><InfoIcon aria-hidden="true" /><span>{text}</span></p>
 }
 
 function factText(value?: string | null): string {
@@ -191,24 +200,24 @@ function factDate(value?: string | null): string {
   return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : text
 }
 
-/** 展开条上的四枚来源小块。缺值写「—」，不拿别的字段填。 */
+/**
+ * 展开条上的来源小块：来源机构、同步时间、发布日期。缺值写「—」，不拿别的字段填。
+ * 发布方的外部编号是系统之间对账用的，用户用不上，不上屏（kiosk-runtime-engineering-words-2026-09-28）。
+ */
 export function SourceFacts({
   sourceName,
   syncTime,
-  externalId,
   publishedOn,
   dateLabel = '发布日期',
 }: {
   sourceName?: string | null
   syncTime?: string | null
-  externalId?: string | null
   publishedOn?: string | null
   dateLabel?: string
 }) {
   const cells: [string, string, boolean][] = [
     ['来源机构', factText(sourceName), true],
     ['同步时间', factDate(syncTime), false],
-    ['外部编号', factText(externalId), false],
     [dateLabel, factDate(publishedOn), false],
   ]
   return (
@@ -224,4 +233,73 @@ export function SourceFacts({
 
 export function CollapsedChevron() {
   return <ChevronDownIcon className="rq-caret" aria-hidden="true" />
+}
+
+export interface DeadEndExit {
+  key: string
+  icon: LucideIcon
+  title: string
+  desc: string
+  onClick: () => void
+}
+
+/**
+ * 读取中 / 读取失败 / 没有内容 / 做不了这几屏（稿 48 的 deadend）：
+ * 状态卡 → 「现在可以做什么」一列出口 → 一句就地说明。出口都不依赖这一次读取，
+ * 最后一条固定是上传自备材料打印（只处理用户自己带来的文件，本机随时可用）。
+ */
+export function RqDeadEnd({
+  tone,
+  icon: Icon,
+  title,
+  children,
+  exitsHint,
+  exits,
+  uploadDesc,
+  note,
+  noteTone = 'info',
+  testId,
+}: {
+  tone: 'info' | 'error' | 'empty' | 'warn'
+  icon: LucideIcon
+  title: string
+  children: ReactNode
+  exitsHint: string
+  exits: DeadEndExit[]
+  uploadDesc: string
+  note: ReactNode
+  noteTone?: 'info' | 'warn'
+  testId?: string
+}) {
+  const navigate = useNavigate()
+  return (
+    <div className="rq-deadend">
+      <div className="rq-state rq-state-lg" data-kind={tone} data-testid={testId}>
+        <b className="rq-state-h">
+          <span className="rq-state-ic" aria-hidden="true"><Icon /></span>
+          {title}
+        </b>
+        <p>{children}</p>
+      </div>
+      <section className="rq-sec rq-exits" aria-label="现在可以做什么">
+        <header className="rq-grp rq-grp-plain">
+          <b>现在可以做什么</b>
+          <span>{exitsHint}</span>
+        </header>
+        <div className="rq-strip rq-strip-stack">
+          {exits.map(({ key, icon: ExitIcon, title: exitTitle, desc, onClick }) => (
+            <button key={key} type="button" className="rq-exit" onClick={onClick}>
+              <ExitIcon aria-hidden="true" />
+              <span><b>{exitTitle}</b><small>{desc}</small></span>
+            </button>
+          ))}
+          <button type="button" className="rq-exit" onClick={() => navigate('/print/upload')}>
+            <PrinterIcon aria-hidden="true" />
+            <span><b>上传自备材料打印</b><small>{uploadDesc}</small></span>
+          </button>
+        </div>
+      </section>
+      <p className={noteTone === 'warn' ? 'rq-note rq-note-warn' : 'rq-note'}>{note}</p>
+    </div>
+  )
 }

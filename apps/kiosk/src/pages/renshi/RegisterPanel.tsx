@@ -8,11 +8,12 @@ export function RegisterPanel() {
           const Icon = item.icon
           return (
             <article key={item.key} className="rq-blk">
-              <header className="rq-blk-h">
+              {/* 稿 48 就业登记：标题与用途同一行，办理地点是一行「标签 · 值」。 */}
+              <header className="rq-blk-h rq-blk-h-inline">
                 <Icon aria-hidden="true" />
                 <span><b>{item.title}</b><small>{item.purpose}</small></span>
               </header>
-              <p className="rq-srcchip">办理地点 <b>{item.location}</b></p>
+              <p className="rq-kv"><span>办理地点</span><b>{item.location}</b></p>
               <section className="rq-dsec rq-dsec-cols">
                 <p className="rq-dsec-h">所需材料</p>
                 <ul>
