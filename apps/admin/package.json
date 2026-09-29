@@ -15,6 +15,7 @@
     "verify:admin-job-materials-ui": "node scripts/verify-admin-job-materials-ui.mjs",
     "verify:job-ai-ops-dashboard-ui": "node scripts/verify-job-ai-ops-dashboard-ui.mjs",
     "verify:admin-ai-access-ui": "node scripts/verify-admin-ai-access-ui.mjs",
+    "verify:admin-ai-usage-ui": "node scripts/verify-admin-ai-usage-ui.mjs",
     "verify:service-desk-dashboard-ui": "node scripts/verify-service-desk-dashboard-ui.mjs",
     "verify:data-request-ui": "node ../kiosk/scripts/verify-data-request-ui.mjs",
     "verify:admin-users-ui": "node scripts/verify-admin-users-ui.mjs",

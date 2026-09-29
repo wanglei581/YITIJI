@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1722 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1728 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -140,7 +140,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 121 个文件</summary>
+<summary><code>apps/admin/src/</code> — 127 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -153,7 +153,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/account-settings/PhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-phone-transfer-ui.mjs` |
 | `apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx` | `verify-admin-ai-access-ui.mjs` |
-| `apps/admin/src/routes/ai-services/index.tsx` | `verify-admin-ai-access-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs` |
+| `apps/admin/src/routes/ai-services/AiOperationCostTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/ai-services/AiUsagePanel.tsx` | `verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/ai-services/aiOperationLabels.ts` | `verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/ai-services/aiUsageDisplay.ts` | `verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/ai-services/index.tsx` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs` |
 | `apps/admin/src/routes/alerts/index.tsx` | `verify-feedback-sla.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/audit/index.tsx` | `verify-admin-partner-contact-phone-ui.mjs` |
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
@@ -245,6 +250,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/adminUsers.ts` | `verify-admin-users-ui.mjs` |
 | `apps/admin/src/services/api/aiAccess.ts` | `verify-admin-ai-access-ui.mjs` |
 | `apps/admin/src/services/api/aiUsage.ts` | `verify-job-ai-ops-dashboard-ui.mjs` |
+| `apps/admin/src/services/api/aiUsageDaily.ts` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/services/api/client.ts` | `verify-toolbox-review-ui.mjs`<br/>`verify-deploy-gates-in-sync.mjs` |
 | `apps/admin/src/services/api/companiesAdmin.ts` | `verify-companies.ts` |
 | `apps/admin/src/services/api/consoleScreen.ts` | `verify-console-screen-ui.mjs` |
@@ -262,7 +268,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/sourcePaging.ts` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/services/api/toolbox.ts` | `verify-toolbox-review-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
 | `apps/admin/src/services/api/types.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs`<br/>`verify-jobfair-checkin.ts`<br/>`verify-print-scan-first-release.ts` |
-| `apps/admin/src/services/api/userErrorMessage.ts` | `verify-admin-ai-access-ui.mjs` |
+| `apps/admin/src/services/api/userErrorMessage.ts` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/services/auth/index.ts` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-login-second-factor.mjs`<br/>`verify-admin-phone-transfer-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/services/auth/secondFactor.ts` | `verify-admin-login-second-factor.mjs` |
 
@@ -2177,14 +2183,14 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/self-assessment.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/resume/self-assessment.types.ts` | `verify-self-assessment-consent-source.mjs`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/self-assessment.controller.ts` | `verify-ai-access.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
-| `services/api/src/ai/usage/admin-ai-usage.controller.ts` | `verify-ai-usage-budget.ts` |
-| `services/api/src/ai/usage/ai-budget.service.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
+| `services/api/src/ai/usage/admin-ai-usage.controller.ts` | `verify-admin-ai-usage-ui.mjs`<br/>`verify-ai-usage-budget.ts` |
+| `services/api/src/ai/usage/ai-budget.service.ts` | `verify-admin-ai-usage-ui.mjs`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-pricing.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-request-context.middleware.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-usage-context.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-usage-meter.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-usage-retention.ts` | `verify-ai-usage-retention.ts`<br/>`verify-member-data-request-contract.ts` |
-| `services/api/src/ai/usage/ai-usage-summary.ts` | `verify-ai-usage-budget.ts` |
+| `services/api/src/ai/usage/ai-usage-summary.ts` | `verify-admin-ai-usage-ui.mjs`<br/>`verify-ai-usage-budget.ts` |
 | `services/api/src/ai/usage/ai-usage.module.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/app.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-contract-review-http.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-job-materials.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-upload-sessions-http.ts` |
 | `services/api/src/asr/asr.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-voice-generate.ts` |
