@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-29：两条慢门禁提速——Redis 降级与错误可观测性（分支 `claude/backend-hardening-20260929-gate-speedup`，叠在 #1135 上）
+
+- **时间花在哪（Grok 查、协调方核）：** 两条门禁都把 REDIS_URL 指到死端口起真实服务；ioredis 默认每条命令重试 20 次（约 10 秒到 40 秒），启动探测默认用满 5 秒，隐私调度注册默认用满 8 秒。
+- **改法：** 新增环境变量 `REDIS_MAX_RETRIES_PER_REQUEST`（0–20 的整数才生效；不设时仍是 `new Redis(url)`、ioredis 默认 20），**生产环境（NODE_ENV=production）一律忽略**（协调方加的保护，防误配后 Redis 一抖就失败）；两条门禁共用一组「门禁专用」环境（重试 0、已有的探测与调度上限配小）。断言、场景、死端口、真实子进程全部保留。
+- **验证：** 本机改前约 91 秒 / 46 秒，**改后 5 秒 / 3 秒**；变异「会员登录声明成不受影响」「5xx 不写错误日志」「去掉生产保护」全红；boot-resilience（仍走生产默认、含 15 秒存活等待）、internal-accounts、internal-login-real-redis、ai-platform-degradation、ci-gate-coverage 全绿。
+
 ## 2026-09-29：真 Redis 登录门禁加固与提速（#1122 跟进；分支 `claude/backend-hardening-20260929-ephemeral-redis-hardening`）
 
 - **问题（Codex 复核、总指挥核实）：** 临时 redis-server 起不来时，停进程只等 exit 事件，可能永远卡住；CI 取消或 SIGTERM 时没有统一清理；用的是共享 dev.db。另外这条门禁每次要真等 68 秒登录 IP 窗口，#1074 的 build-and-verify 跑满 31 分钟被 30 分钟时限截断，它是最后一根稻草。
