@@ -138,33 +138,33 @@ export default function AuditPage() {
       }
     >
       {/* 筛选栏 */}
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+      <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
+        <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
           动作
           <select
             value={action}
             onChange={(e) => { setAction(e.target.value); setPage(1) }}
-            className="h-9 w-44 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none sm:w-44"
           >
             {ACTION_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+        <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
           起始时间
           <input
             type="datetime-local"
             value={startAt}
             onChange={(e) => { setStartAt(e.target.value); setPage(1) }}
-            className="h-9 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+        <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
           结束时间
           <input
             type="datetime-local"
             value={endAt}
             onChange={(e) => { setEndAt(e.target.value); setPage(1) }}
-            className="h-9 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           />
         </label>
         {(action || startAt || endAt) && (

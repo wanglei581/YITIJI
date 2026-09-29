@@ -169,7 +169,7 @@ export default function PermissionsPage() {
           onClick={() => setBackupOpen(true)}
           disabled={backupDisabled}
           title={backupDisabled ? '已存在备用管理员账号；如需更换请先处理现有备用管理员' : undefined}
-          className="flex min-h-12 items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-12 max-w-full items-center gap-1.5 whitespace-normal rounded-lg bg-primary-600 px-3 py-2 text-left text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <PlusIcon className="h-4 w-4" aria-hidden />
           新建备用管理员
