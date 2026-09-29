@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1724 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1725 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1707,7 +1707,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/ui/src/</code> — 29 个文件</summary>
+<summary><code>packages/ui/src/</code> — 30 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1715,6 +1715,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/ui/src/components/Drawer.tsx` | `verify-admin-users-ui.mjs` |
 | `packages/ui/src/components/KioskPageFrame.tsx` | `verify-kiosk-visual-unity.mjs` |
 | `packages/ui/src/components/KioskTopbar.tsx` | `verify-kiosk-visual-unity.mjs` |
+| `packages/ui/src/components/consolePageList.ts` | `verify-datetime-honesty.mjs` |
 | `packages/ui/src/index.ts` | `verify-fusion-youth-foundation.mjs`<br/>`verify-service-desk-foundation.mjs` |
 | `packages/ui/src/layouts/AdminLayout.tsx` | `verify-service-desk-foundation.mjs` |
 | `packages/ui/src/layouts/KioskLayout.tsx` | `verify-fusion-shell.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-service-desk-foundation.mjs` |

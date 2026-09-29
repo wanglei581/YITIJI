@@ -21833,6 +21833,9 @@
     "packages/ui/src/components/KioskTopbar.tsx": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
+    "packages/ui/src/components/consolePageList.ts": [
+      "scripts/verify-datetime-honesty.mjs"
+    ],
     "packages/ui/src/index.ts": [
       "packages/ui/scripts/verify-fusion-youth-foundation.mjs",
       "packages/ui/scripts/verify-service-desk-foundation.mjs"
@@ -31751,6 +31754,7 @@
           "packages/shared/src/formatDateTime.ts",
           "packages/shared/src/formatNumber.ts",
           "packages/ui/src/components/ConsoleTable.tsx",
+          "packages/ui/src/components/consolePageList.ts",
           "services/api/src/jobs/jobs-shared.ts"
         ],
         "missing": []
