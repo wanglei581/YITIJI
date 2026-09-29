@@ -338,7 +338,7 @@ export const partnerMockAdapter = {
       accessMode,
       syncFreq: payload.syncFreq ?? 'manual',
       lastSyncTime: '刚刚', connStatus: accessMode === 'api' || accessMode === 'webhook' ? 'disabled' : 'connected', successCount: 0, failCount: 0,
-      description: payload.description ?? (accessMode === 'webhook' ? '等待外部系统推送岗位数据' : accessMode === 'api' ? '等待 API 连接测试' : '新建 Excel 数据源，导入批次待管理员审核'),
+      description: payload.description ?? (accessMode === 'webhook' ? '等待外部系统推送岗位数据' : accessMode === 'api' ? '等待 API 连接测试' : '新建 Excel 数据源，导入批次默认待审核'),
       credentialConfigured: Boolean(payload.credential) || accessMode === 'webhook',
       endpoint: payload.endpoint,
       webhookUrl: accessMode === 'webhook' ? `/api/v1/sync/webhook?source=${id}` : undefined,

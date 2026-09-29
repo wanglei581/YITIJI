@@ -1,3 +1,7 @@
+// 【停放，2026-09-29，next-tasks 3.15】源码保留，不注册、不打包：本文件不再被任何页面 import。
+// 原挂在 job-sources / fair-sources 页头（政策的批量发布 3.13 已取消）。托管 a 下本平台不代发招聘内容，
+// 前端不论托管开关一律不给；b 版本恢复时由 job-sources/index.tsx 与 fair-sources/index.tsx 引入并挂回页头 actions。
+// 注意：verify-admin-content-trust-ui.mjs 仍核对本文件的「内容可信」指路文案，恢复前后都要保持同源常量。
 // ============================================================
 // BulkPublishButton — 信息源批量发布(岗位 / 招聘会 / 政策共用)
 //

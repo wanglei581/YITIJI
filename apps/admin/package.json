@@ -21,7 +21,7 @@
     "verify:honest-placeholders": "node scripts/verify-honest-placeholders.mjs",
     "verify:console-screen-ui": "node scripts/verify-console-screen-ui.mjs",
     "test:e2e:screen": "node scripts/run-e2e.mjs --config=playwright.screen.config.ts",
-    "verify:source-publish-actions": "node scripts/verify-source-publish-actions.mjs && node scripts/verify-admin-content-trust-ui.mjs && pnpm run verify:admin-offline-agencies-ui",
+    "verify:source-publish-actions": "node scripts/verify-source-publish-actions.mjs && node scripts/verify-admin-content-trust-ui.mjs && node scripts/verify-admin-parked-recruitment-ui.mjs && pnpm run verify:admin-offline-agencies-ui",
     "verify:admin-offline-agencies-ui": "node scripts/verify-admin-offline-agencies-ui.mjs",
     "verify:toolbox-review-ui": "node scripts/verify-toolbox-review-ui.mjs",
     "verify:admin-terminal-bind-code-ui": "node scripts/verify-admin-terminal-bind-code-ui.mjs",
