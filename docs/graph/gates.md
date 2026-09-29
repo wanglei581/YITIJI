@@ -432,10 +432,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/home/components/ContinuePanel.tsx` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/home/components/HomeHeroHeader.tsx` | `verify-fusion-home.mjs` |
 | `apps/kiosk/src/pages/home/components/HomeTile.tsx` | `verify-fusion-home.mjs` |
-| `apps/kiosk/src/pages/home/components/QxHomeView.tsx` | `verify-fusion-home.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
+| `apps/kiosk/src/pages/home/components/QxHomeView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-home.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/home/components/ToolboxLaunchModals.tsx` | `verify-fusion-w5.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
 | `apps/kiosk/src/pages/home/components/kioskAppLaunch.ts` | `verify-fusion-w5.mjs`<br/>`verify-home-toolbox-ui.mjs`<br/>`verify-smart-campus-ui.mjs` |
-| `apps/kiosk/src/pages/home/homeDomainStatus.ts` | `verify-fusion-home.mjs` |
+| `apps/kiosk/src/pages/home/homeDomainStatus.ts` | `verify-device-status-honest.mjs`<br/>`verify-fusion-home.mjs` |
 | `apps/kiosk/src/pages/home/homeV6Domains.ts` | `verify-fusion-home.mjs`<br/>`verify-home-toolbox-ui.mjs` |
 | `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` | `verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/home/hooks/useHomeJobFairHighlight.ts` | `verify-fusion-home.mjs` |
@@ -506,7 +506,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print-scan/ConvertImagesPanels.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-p39-print-hub-fidelity.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
-| `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-feedback-entry.mjs`<br/>`verify-p39-print-hub-fidelity.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-service-entry-readiness.mjs`<br/>`verify-print-color-duplex-capability.ts` |
+| `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-feedback-entry.mjs`<br/>`verify-p39-print-hub-fidelity.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-service-entry-readiness.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/kiosk/src/pages/print-scan/SignStampPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-p39-print-hub-fidelity.mjs` |
 | `apps/kiosk/src/pages/print-scan/convert-images-model.ts` | `verify-fusion-w2-print-scan.mjs` |
@@ -528,7 +528,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/PrintPreviewPage.tsx` | `verify-device-status-honest.mjs`<br/>`verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-legal-retention-copy.mjs`<br/>`verify-pii-redaction-contract.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-confirm-honest.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/kiosk/src/pages/print/PrintProgressPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs`<br/>`verify-print-done-truth.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-wave3-print-aftercare.ts` |
 | `apps/kiosk/src/pages/print/PrintPrototypeLayout.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-parameter-capability.mjs` |
-| `apps/kiosk/src/pages/print/PrintUploadPage.tsx` | `verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-service-entry-readiness.mjs`<br/>`verify-word-conversion-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-file-display-truth.ts` |
+| `apps/kiosk/src/pages/print/PrintUploadPage.tsx` | `verify-device-status-honest.mjs`<br/>`verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-service-entry-readiness.mjs`<br/>`verify-word-conversion-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-file-display-truth.ts` |
 | `apps/kiosk/src/pages/print/cashierStatus.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-pickup-claim-error-coverage.mjs`<br/>`verify-payment-codepay.ts` |
 | `apps/kiosk/src/pages/print/components/MaterialCheckPresentation.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-pii-redaction-contract.mjs` |
 | `apps/kiosk/src/pages/print/components/PickupHidGuide.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-pickup-claim-error-coverage.mjs` |
@@ -541,7 +541,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/components/PrintProgressSections.tsx` | `verify-print-done-truth.mjs` |
 | `apps/kiosk/src/pages/print/components/printFileRetention.ts` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx` | `verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs` |
-| `apps/kiosk/src/pages/print/file-source/FileSourceView.tsx` | `verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
+| `apps/kiosk/src/pages/print/file-source/FileSourceView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/print/file-source/fileSourceModel.ts` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/pickupClaimModel.ts` | `verify-pickup-claim-error-coverage.mjs`<br/>`verify-miniapp-cloud-print-m2.ts` |
 | `apps/kiosk/src/pages/print/piiRedaction.ts` | `verify-pii-redaction-contract.mjs` |
