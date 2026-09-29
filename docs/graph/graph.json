@@ -21550,6 +21550,11 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-governed-job-fit.ts"
     ],
+    "services/api/scripts/preflight-legal-docs.mjs": [
+      "scripts/verify-deploy-gates-in-sync.mjs",
+      "scripts/verify-deploy-rollback.mjs",
+      "scripts/verify-legal-docs-preflight.mjs"
+    ],
     "services/api/scripts/preflight-production-gates.mjs": [
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs"
@@ -30062,6 +30067,7 @@
           "apps/admin/src/services/api/client.ts",
           "apps/kiosk/src/services/api/client.ts",
           "apps/partner/src/services/api/client.ts",
+          "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
           "services/api/src/config/production-runtime-gates.ts"
         ],
@@ -30082,6 +30088,7 @@
         "dirs": [],
         "files": [
           ".github/workflows/deploy.yml",
+          "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
           "services/api/src/config/production-runtime-gates.ts"
         ],
@@ -30112,6 +30119,24 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:fixture-time-bombs"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/preflight-legal-docs.mjs"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-legal-docs-preflight.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:legal-docs-preflight"
       ],
       "wired": true
     },
@@ -30716,6 +30741,20 @@
         "@ai-job-print/api::verify:d2-same-host-governance"
       ],
       "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "services/api/scripts/preflight-legal-docs.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {

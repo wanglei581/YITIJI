@@ -128,6 +128,14 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
   writeFileSync(join(checkout, 'VERSION'), 'new-release\n')
   writeFileSync(join(checkout, 'services/api/src/config/production-runtime-gates.ts'), 'PRINT_REQUIRE_PII_SCAN\nPRINT_REQUIRE_PRINTER_ONLINE\n')
   writeFileSync(join(checkout, 'services/api/scripts/preflight-production-gates.mjs'), 'process.exit(0)\n')
+  // 3d 法务文档预检的替身：记下调用参数；DRILL_LEGAL_PREFLIGHT=missing 时按「缺隐私政策」失败
+  writeFileSync(join(checkout, 'services/api/scripts/preflight-legal-docs.mjs'), [
+    "import { appendFileSync } from 'node:fs'",
+    "appendFileSync(process.env.DRILL_CALLS, `legal-preflight ${process.argv.slice(2).join(' ')}\\n`)",
+    "if (process.env.DRILL_LEGAL_PREFLIGHT === 'missing') { console.log('缺  隐私政策：没有已激活的版本'); process.exit(1) }",
+    "console.log('LEGAL DOCS PREFLIGHT OK: 3 docs')",
+    '',
+  ].join('\n'))
   if (pointerUnwritable) {
     // 让「写发布指针」这一步失败：同名目录会被 rsync 带进运行目录，cat > 目录必然失败
     mkdirSync(join(checkout, 'DEPLOY_SOURCE.txt'))
@@ -199,7 +207,7 @@ function runDeploy(box, extraEnv) {
   }
   const result = spawnSync('bash', [deployScript], { env, encoding: 'utf8' })
   const calls = existsSync(box.calls) ? readFileSync(box.calls, 'utf8') : ''
-  return { code: result.status, out: `${result.stdout}\n${result.stderr}`, pm2Restarts: (calls.match(/^pm2 restart /gm) ?? []).length }
+  return { code: result.status, out: `${result.stdout}\n${result.stderr}`, calls, pm2Restarts: (calls.match(/^pm2 restart /gm) ?? []).length }
 }
 
 const read = (path) => (existsSync(path) ? readFileSync(path, 'utf8').trim() : '(缺失)')
@@ -216,8 +224,11 @@ try {
   // 1. 就绪检查通过
   {
     const box = makeSandbox(); boxes.push(box)
-    const r = runDeploy(box, { DRILL_HEALTH: 'always' })
+    // 跳过变量写成 first-install 以外的值不算跳过：预检照常执行
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT: 'true' })
     check(r.code === 0, '场景 1：就绪检查通过时发布成功', `退出码 ${r.code}\n${r.out.slice(-800)}`)
+    check(r.calls.includes('legal-preflight --base-url http://drill.invalid/api/v1\n'),
+      '场景 1：3d 法务文档预检照常执行，地址由就绪检查地址推出（跳过变量不是 first-install 不算跳过）', r.calls)
     check(read(join(box.runtime, 'VERSION')) === 'new-release' && read(join(box.runtime, 'node_modules/marker')) === 'new',
       '场景 1：运行目录换成新版本（代码与依赖）')
     check(read(join(box.runtime, 'DEPLOY_SOURCE.txt')).includes(`source=origin/main@${box.sha}`), '场景 1：发布指针指向目标提交')
@@ -255,6 +266,23 @@ try {
     check(r.code === 0 && read(join(box.runtime, 'VERSION')) === 'new-release' && r.pm2Restarts === 1,
       '场景 5：就绪后写发布指针失败只告警，不回退、不重启', `退出码 ${r.code} VERSION=${read(join(box.runtime, 'VERSION'))} PM2 ${r.pm2Restarts} 次`)
     check(r.out.includes('DEPLOY_SOURCE.txt 写入失败'), '场景 5：告警写明发布指针没写上，需要人工补写')
+  }
+  // 6. 法务文档预检失败（缺隐私政策）→ 在备份之前中止，线上一样不动
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_LEGAL_PREFLIGHT: 'missing' })
+    check(r.code !== 0 && r.out.includes('法务文档预检失败'), '场景 6：缺法务文档时发布以失败结束并说明原因', `退出码 ${r.code}\n${r.out.slice(-600)}`)
+    check(!existsSync(box.backups) || readdirSync(box.backups).length === 0, '场景 6：没有做任何备份（中止在 pg_dump 之前）', readdirSync(box.backups).join(', '))
+    check(!r.calls.includes('db:pg:deploy') && r.pm2Restarts === 0, '场景 6：没有迁移、没有重启 PM2')
+    check(read(join(box.runtime, 'VERSION')) === 'old' && read(join(box.runtime, 'DEPLOY_SOURCE.txt')) === 'source=origin/main@previous-release',
+      '场景 6：运行目录与发布指针都保持发布前')
+  }
+  // 7. 新服务器首装：显式 first-install 跳过法务预检，日志里必须有告警
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_LEGAL_PREFLIGHT: 'missing', DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT: 'first-install' })
+    check(r.code === 0 && !r.calls.includes('legal-preflight'), '场景 7：first-install 时不调用法务预检、发布照常完成', `退出码 ${r.code}`)
+    check(r.out.includes('::warning::已跳过法务文档预检'), '场景 7：跳过时日志里有醒目告警')
   }
   // 4. 备份清理按组保留
   {
@@ -371,4 +399,4 @@ if (failures) {
   console.error(`\nverify:deploy-rollback：${failures} 项失败`)
   process.exit(1)
 }
-console.log('\nverify:deploy-rollback 通过（真跑发布脚本 5 个场景 + 静态目录 3 个场景）')
+console.log('\nverify:deploy-rollback 通过（真跑发布脚本 7 个场景 + 静态目录 3 个场景）')
