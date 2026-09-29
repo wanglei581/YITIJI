@@ -24,6 +24,7 @@ import { SELF_ASSESSMENT_CONSENT_VERSION } from './self-assessment.types'
 import { LlmSelfAssessmentService } from './llm-self-assessment.service'
 import { SelfAssessmentPdfService } from './self-assessment-pdf.service'
 import { scoreSelfAssessment } from './self-assessment-scoring'
+import { formatBeijingDate } from '../../common/beijing-display-time'
 import { AiLogService, AiUsageAccumulator } from '../ai-log.service'
 import {
   LLM_UNAVAILABLE_PROVIDER,
@@ -45,6 +46,11 @@ export interface AuditContext {
   ipAddress: string | null
   userAgent: string | null
   requestId: string | null
+}
+
+/** 自我探索报告印在纸上的日期。completedAt 存的是 UTC ISO，纸上按北京时间自然日。 */
+export function selfAssessmentReportDate(completedAtIso: string): string {
+  return formatBeijingDate(new Date(completedAtIso))
 }
 
 export const EMPTY_AUDIT_CONTEXT: AuditContext = {
@@ -460,7 +466,7 @@ export class SelfAssessmentService {
     }
     if (hasAiInterpretation(stored.dimensions, stored.summary)) await gates.aiContentExport?.()
     const { buffer, pageCount } = await this.renderReportForAppend({
-      date: stored.completedAt.slice(0, 10),
+      date: selfAssessmentReportDate(stored.completedAt),
       dimensions: stored.dimensions,
       summary: stored.summary,
       appendixDisclaimer: undefined,

@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { formatBeijingDate } from '../../common/beijing-display-time'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
 import type {
   OptimizeResumeOutput,
@@ -308,11 +309,11 @@ export class DiagnosisReportPdfService {
   }
 
   private dateLabel(date: Date): string {
-    return new Intl.DateTimeFormat('zh-CN', {
-      timeZone: 'Asia/Shanghai',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date)
+    return diagnosisReportDateLabel(date)
   }
+}
+
+/** 诊断报告纸上的生成日期。北京时间自然日。 */
+export function diagnosisReportDateLabel(date: Date): string {
+  return formatBeijingDate(date)
 }
