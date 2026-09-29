@@ -535,6 +535,11 @@ jobs:
           # Redis 故障时的鉴权语义 + 健康检查诚实性：撤销必须仍然生效、
           # 后台不得再全线 500、/health 的每一条影响面声明都要被实际请求核对。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:redis-degradation-truth
+          # 真 Redis 下的内部账号密码登录：正确密码拿到凭证并读到业务数据，
+          # 锁定计数在临时 redis-server 里，改密后旧凭证调业务接口被拒。
+          # 会拉起真实 src/main.ts；端口不用 41xx。短信第二步在门禁里显式关掉。
+          # 只挂 SQLite 作业：造数与登录语义不依赖 PostgreSQL 差异。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:internal-login-real-redis
           # 异常可运维性：5xx 必须留下带 requestId 的日志，且日志不得含 PII / 凭证。
           pnpm --filter @ai-job-print/api verify:error-observability
           # 订单筛选不得静默失效（未知筛选值必须 400，不能退化成返回全量）。
