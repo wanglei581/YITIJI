@@ -706,6 +706,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:advisor-work
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment-consent
+          # 自我探索：AI 被闸门拦下时打分照常、解读如实缺席、只有打分的文件不带 AIGC 标识（纯桩，不连库）
+          pnpm --filter @ai-job-print/api verify:self-assessment-ai-gate
           pnpm --filter @ai-job-print/api verify:launch-audit-p5
           # LLM 超时 + 全局并发闸门：派生式扫描所有 LLM 调用点都带 signal，
           # 并真跑证明「模型端卡住会超时」「闸门满了立刻拒绝」。
