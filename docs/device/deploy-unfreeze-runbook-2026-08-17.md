@@ -116,6 +116,19 @@ node services/api/scripts/preflight-production-gates.mjs \
 
 通过应打印 `PREFLIGHT OK: <n> gates`。不要把 `.env` 内容贴进聊天或 Actions 日志。
 
+**3d 法务文档预检（2026-09-29 起）。** 紧接 3c、同样在 `pg_dump` 之前：调本机正在运行的 API 的公开接口
+`GET /api/v1/kiosk/legal/{terms_of_service,privacy_policy,ai_disclaimer}`，三份都要有已激活、带发布时间的版本，
+缺一份就中止发布（线上未动）。原因：一体机与小程序正式版取不到已发布的协议就拦住登录，
+`LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对正式版前端不起作用。地址默认由就绪检查地址推出，可用 `DEPLOY_LEGAL_BASE_URL` 覆盖。
+只有新服务器首装、API 还没跑起来时，才设 `DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT=first-install` 跳过（日志会打告警，发布后立刻在后台激活三份）。
+手工复跑：
+
+```bash
+node services/api/scripts/preflight-legal-docs.mjs --base-url http://127.0.0.1:3010/api/v1
+```
+
+通过应打印 `LEGAL DOCS PREFLIGHT OK: 3 docs`；只打印类型与版本号，不打印正文。
+
 ### 2.1 确认服务器 Redis 在跑
 
 **为什么**：`deploy-api-release.sh` 第 8 步健康检查是 `grep -q '"status":"ok"'`。
@@ -265,8 +278,8 @@ main push -> CI 三个既有验证 job 通过 -> release-bundle job
 ```
 
 CI 使用 GitHub Secrets `BOS_RELEASE_ACCESS_KEY` 和 `BOS_RELEASE_SECRET_KEY`；生产机只从
-`/srv/ai-job-print-secrets/bos-release.env` 读取同名变量。该文件还包含
-`BOS_RELEASE_ENDPOINT=bj.bcebos.com` 与 `BOS_RELEASE_BUCKET=ai-job-print-release`，权限必须是 `0600`。
+`<服务器密钥目录>/bos-release.env` 读取同名变量。该文件还包含
+`BOS_RELEASE_ENDPOINT=bj.bcebos.com` 与 `BOS_RELEASE_BUCKET=<发布包存储桶>`，权限必须是 `0600`。
 密钥不经 SSH action `envs` 转发、不写入仓库，也不出现在 CI 日志。
 
 ### 首次启用

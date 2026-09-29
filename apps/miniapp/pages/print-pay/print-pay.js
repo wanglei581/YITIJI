@@ -752,7 +752,7 @@ Page({
           this._verifyCreatedOrder(mine.orderId)
           return
         }
-        const shown = reconcileEngine.describeReconcileResult(result, { submitLabel: '确认支付并打印' })
+        const shown = reconcileEngine.describeReconcileResult(result, { submitLabel: '提交并生成到机码' })
         // 'resubmit' = 名额腾出来了，下一步是用户自己再提交一次；本页把锁整个解开，
         // 主按钮随之回到可按状态。其余几档都还没有确定结论，继续锁着并给出重新核对。
         if (shown.recover === 'resubmit') {
@@ -933,7 +933,7 @@ Page({
       // 409 有三种成因，处置完全相反（见 classifySubmitConflict）。
       const conflict = reconcileEngine.classifySubmitConflict(err)
       if (conflict) {
-        const shown = reconcileEngine.describeSubmitConflict(conflict, { submitLabel: '确认支付并打印' })
+        const shown = reconcileEngine.describeSubmitConflict(conflict, { submitLabel: '提交并生成到机码' })
         // `abandoned` 是服务端亲口证明的 not_created：这个键再也建不出订单，本机这一格
         // 可以安全地换掉。**换键走 startNewOrder 那条已经收口过的路** —— 它会先
         // clearRecord 并读回来确认真的清掉了，清不掉就保持锁定。这里只负责把状态摆好。

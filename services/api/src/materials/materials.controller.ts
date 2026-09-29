@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Req } from '@nestjs/common'
-import { AiUse } from '../ai-access/ai-access.decorator'
+import { AiUse, AiUseExempt, MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -14,6 +14,8 @@ import type { DocumentProcessTaskView, MaterialsRequester } from './materials.ty
 import { PrintParamSuggestionService } from './print-param-suggestion.service'
 import type { PrintParamSuggestionView } from './print-param-suggestion.types'
 
+const MATERIAL_CHECK_EXEMPT_REASON = '打印前材料检查不调生成式模型，是原件打印必经；AI 暂停、登录档位与声明都不能挡打印'
+
 @Controller('materials')
 export class MaterialsController {
   constructor(
@@ -24,9 +26,16 @@ export class MaterialsController {
     private readonly prisma: PrismaService,
   ) {}
 
+  /**
+   * 打印前材料检查（体检 / 规整 / 隐私扫描 / 遮挡 / 合订），五种都不调生成式模型，是原件打印的必经一步。
+   * 此前标成 @AiUse('generate')，于是后台「AI 暂停」、登录档位（开始 AI 前登录）、14 周岁声明
+   * 任何一个打开，匿名用户的原件打印就一起停——违背「AI 挂了功能退化为手动」。现在显式豁免这三道闸，
+   * 只保留全机维护的拦截（与打印下单一致）。
+   */
   @Post('tasks')
   @PaidAiThrottle(30)
-  @AiUse('generate')
+  @AiUseExempt(MATERIAL_CHECK_EXEMPT_REASON)
+  @MaintenanceBlocked()
 
   async createTask(
     @Body() dto: CreateMaterialTaskDto,
@@ -68,9 +77,10 @@ export class MaterialsController {
     return ApiResponse.ok(await this.printParamSuggestions.suggestForInspectionTask(id, requester))
   }
 
+  /** 逐项保留 / 遮挡的本人裁决：同上，不调模型，打印必经；中途不受维护拦截（已开始的检查允许做完）。 */
   @Post('tasks/:id/pii-findings/decisions')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
-  @AiUse('generate')
+  @AiUseExempt(MATERIAL_CHECK_EXEMPT_REASON)
 
   async decidePiiFindings(
     @Param('id') id: string,

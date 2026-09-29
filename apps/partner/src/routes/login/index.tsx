@@ -288,23 +288,23 @@ export default function LoginPage() {
     <main className="clogin clogin--partner" ref={rootRef}>
       <aside className="c-left">
         <span className="deco-ring" />
-        <span className="vert">资料 · 数据 · 同步</span>
+        <span className="vert">资料 · 政策 · 渠道</span>
         <div className="c-brand">
           <div className="c-logo">
             <Building2Icon size={25} aria-hidden="true" />
           </div>
           <div>
-            <strong>AI求职打印一体机</strong>
-            <span>合作机构后台 · Partner Console</span>
+            <strong>职易达</strong>
+            <span>合作机构后台</span>
           </div>
         </div>
         <div className="c-tagline">
           <h1 className="serif">
-            你的岗位与招聘会，
+            政策与官方渠道，
             <br />
             从这里<em>走进终端</em>
           </h1>
-          <p>管理机构资料、岗位与招聘会信息、数据源接入与同步日志，审核通过后即在终端展示。</p>
+          <p>维护机构资料、官方渠道与政策公告，经本机构审核发布后在本机构的终端展示，也能查看终端运行情况。</p>
         </div>
         <div className="c-illus">
           <svg className="c-flow" viewBox="0 0 470 230" aria-hidden="true">
@@ -330,10 +330,10 @@ export default function LoginPage() {
             <span>
               <b>机构登录</b>
             </span>
-            <span>数据审核后在终端展示</span>
+            <span>内容由本机构审核发布</span>
           </div>
           <h2 className="serif">合作机构登录</h2>
-          <p className="sub">支持机构账号、已验证手机号或已验证邮箱登录，数据经审核后在终端展示</p>
+          <p className="sub">支持机构账号、已验证手机号或已验证邮箱登录</p>
 
           <div className="c-mode">
             <button
@@ -489,10 +489,10 @@ export default function LoginPage() {
 
           <div className="c-cardfoot">
             <span>无法登录？联系平台运营协助处理</span>
-            <span>仅管理岗位与招聘会等展示信息</span>
+            <span>只管理本机构的资料、政策与官方渠道</span>
           </div>
         </div>
-        <div className="c-legal">本后台不涉及简历接收与候选人管理 · © 2026 AI求职打印服务终端</div>
+        <div className="c-legal">本后台不涉及简历接收与候选人管理 · © 2026 职易达</div>
       </section>
 
       {resetOpen && (

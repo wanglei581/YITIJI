@@ -1,4 +1,4 @@
-import { MemberApiError, resolveMemberApiErrorMessage } from '../../services/auth/memberAuthApi'
+import { LEGAL_DOCS_NOT_PUBLISHED_COPY, MemberApiError, resolveMemberApiErrorMessage } from '../../services/auth/memberAuthApi'
 import { maskEmail, maskPhone } from '../../utils/maskPii'
 
 const CODE_COPY: Readonly<Record<string, string>> = {
@@ -35,6 +35,8 @@ export function accountDisplayMessage(message: string | null | undefined, fallba
 }
 
 export function accountErrorMessage(error: unknown, fallback: string): string {
+  // 协议未发布：一体机自己查出来的与服务端拒绝的，统一说同一句话，并告诉用户不登录能做什么。
+  if (error instanceof MemberApiError && error.code === 'LEGAL_DOCS_NOT_PUBLISHED') return LEGAL_DOCS_NOT_PUBLISHED_COPY
   const recovery = error instanceof MemberApiError ? CODE_COPY[error.code] ?? fallback : fallback
   return accountDisplayMessage(error instanceof Error ? error.message : resolveMemberApiErrorMessage(error, recovery), recovery)
 }

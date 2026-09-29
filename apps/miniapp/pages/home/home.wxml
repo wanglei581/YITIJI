@@ -22,6 +22,23 @@
         <text class="greet-sub">{{todayStr}} · 今天也向理想工作靠近一点</text>
       </view>
 
+      <!-- 待取件（两端打通）：手机上下的单，到一体机前凭到机码取。首页不显示码本身，码在取件页里现取。 -->
+      <view wx:if="{{pickupCount > 0}}" class="pickup-card">
+        <view class="pickup-main tap" hover-class="tap-press" bindtap="tapPickup" role="button" aria-label="待取件 {{pickupCount}} 单，查看到机码">
+          <view class="pickup-icon"><text class="ficon i-printer" aria-hidden="true"></text></view>
+          <view class="pickup-copy">
+            <text class="pickup-title">待取件 {{pickupCount}} 单</text>
+            <text class="pickup-sub">{{pickupNearest.outlet ? pickupNearest.outlet + ' · ' : ''}}最近一单{{pickupNearest.remain}}</text>
+          </view>
+          <view class="pickup-go">查看到机码</view>
+        </view>
+        <view class="pickup-more tap" hover-class="tap-press" bindtap="tapOrders" role="button" aria-label="全部打印订单">全部打印订单 ›</view>
+      </view>
+      <view wx:elif="{{latestOrderAt}}" class="pickup-latest tap" hover-class="tap-press" bindtap="tapOrders" role="button" aria-label="最近订单，查看出纸状态">
+        <text>最近订单 {{latestOrderAt}} · 查看出纸状态</text>
+        <text class="ficon i-right" aria-hidden="true"></text>
+      </view>
+
 
       <!-- 原为 320rpx 的落地页式 hero（大标题+描述+CTA+半身抠图）。
            那是营销页语言，占掉首屏三分之一却只承载一个入口。
@@ -52,7 +69,7 @@
 
       <view class="section-head">
         <text class="section-title">常用服务</text>
-        <text class="section-more text-action" bindtap="tapLifeCircle" role="button" aria-label="查看 AI 百宝箱">AI 百宝箱</text>
+        <text class="section-more text-action" bindtap="tapLifeCircle" role="button" aria-label="查看全部 AI 工具">全部 AI 工具</text>
       </view>
       <view class="service-grid">
         <view
@@ -79,7 +96,33 @@
         <view class="print-go"><text class="ficon i-right"></text></view>
       </view>
 
-      <view class="home-note">AI 生成的内容仅供参考，请核对后再使用。</view>
+      <!-- 到一体机前用得上的两件事（两端打通）：扫屏幕上的码登录或传文件；看快到期的到机码与平台通知。 -->
+      <view class="info-card" style="margin-top:22rpx">
+        <view class="info-row tap" hover-class="tap-press" bindtap="tapScanKiosk" role="button" aria-label="扫码连接一体机，扫屏幕上的码登录或把文件传过去">
+          <view class="info-icon soft-indigo"><text class="ficon i-scan"></text></view>
+          <view class="info-copy">
+            <text class="info-title">扫码连接一体机</text>
+            <text class="info-desc">扫屏幕上的码：登录，或把手机里的文件传过去</text>
+          </view>
+          <view class="info-arrow"><text class="ficon i-right"></text></view>
+        </view>
+        <view class="info-row tap" hover-class="tap-press" bindtap="tapDaily" role="button" aria-label="今日提醒，快到期的到机码和平台通知">
+          <view class="info-icon soft-amber"><text class="ficon i-bell"></text></view>
+          <view class="info-copy">
+            <text class="info-title">今日提醒</text>
+            <text class="info-desc">快到期的到机码和平台通知</text>
+          </view>
+          <view class="info-arrow"><text class="ficon i-right"></text></view>
+        </view>
+      </view>
+
+      <view class="home-note">AI 生成，仅供参考，请核对后再使用。</view>
+      <!-- 电子商务法第十五条：首页持续公示经营者信息（或指向它的链接）；AI 服务说明里公示模型名称与备案号（C1）。 -->
+      <view class="home-legal">
+        <text class="home-legal-link" bindtap="tapLegal" data-type="operator_info" role="link" aria-label="经营者信息">经营者信息</text>
+        <text class="home-legal-sep" aria-hidden="true">·</text>
+        <text class="home-legal-link" bindtap="tapLegal" data-type="ai_disclaimer" role="link" aria-label="AI 服务说明，所用模型与备案号">AI 服务说明</text>
+      </view>
       <view class="tab-spacer"></view>
     </view>
   </scroll-view>

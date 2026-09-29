@@ -48,6 +48,19 @@ const SHARED_USER_MESSAGES = {
   MEMBER_SESSION_EXPIRED: '登录已失效，请重新登录',
   AUTH_REQUIRED: '请先登录后再操作',
   VALIDATION_FAILED: '提交内容有误，请检查后重试',
+
+  // ── AI 使用门禁与合规（服务端 ai-access.service.ts、llm-guard.ts、legal-docs-published-guard.ts）──
+  // 这几句不透传服务端原话：LEGAL_DOCS_NOT_PUBLISHED 服务端写的是「请联系现场工作人员」，
+  // 那是对一体机说的，手机上没有现场工作人员；其余几句服务端是短句，这里补上下一步。
+  AI_LOGIN_REQUIRED: '用 AI 之前需要先用手机号登录',
+  AI_DECLARATION_REQUIRED: '年龄或录音确认没有记上，请稍后再试',
+  AI_PAUSED: 'AI 服务暂停中，打印等其他功能照常可以用',
+  MAINTENANCE_MODE: '系统维护中，请稍后再来',
+  AI_CONTENT_BLOCKED: 'AI 不能处理这段内容，请换个说法或修改后再试',
+  LEGAL_DOCS_NOT_PUBLISHED: '服务协议还没有正式发布，暂时不能登录',
+  // 小程序自己的两句（utils/ai-access.js 在用户选「未满」或「改用手打」时抛出）。
+  AI_AGE_NOT_DECLARED: '未满 14 周岁需要监护人同意后才能使用，小程序暂时办不了',
+  AI_VOICE_NOT_CONSENTED: '没有同意录音，这一步请改用文字输入',
 };
 
 /**

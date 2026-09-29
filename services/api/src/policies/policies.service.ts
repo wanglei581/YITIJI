@@ -74,6 +74,14 @@ export interface PolicyPostDto {
    * 不改已有字段。
    */
   hostingStock?: true
+  /**
+   * 平台紧急下架留痕（P-01）。只在机构自己的列表里带上，公开读取不带。
+   * 下架是单向的：这一条之后不能再发布。
+   */
+  emergencyTakedown?: boolean
+  emergencyReasonCode?: string | null
+  emergencyReasonText?: string | null
+  emergencyTakedownAt?: string | null
 }
 
 export interface AdminPolicySourceListParams {
@@ -243,7 +251,7 @@ export class PoliciesService {
         where,
         orderBy: { createdAt: 'desc' },
       })
-      return rows.map(mapPolicy)
+      return this.withEmergencyHolds(rows.map(mapPolicy), user.orgId)
     }
     const [total, rows] = await Promise.all([
       this.prisma.policyPost.count({ where }),
@@ -255,7 +263,7 @@ export class PoliciesService {
       }),
     ])
     return {
-      data: rows.map(mapPolicy),
+      data: await this.withEmergencyHolds(rows.map(mapPolicy), user.orgId),
       pagination: {
         page,
         pageSize,
@@ -263,6 +271,29 @@ export class PoliciesService {
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
       },
     }
+  }
+
+  /**
+   * P-01：机构列表要分得出「平台紧急下架」和「本机构自己下架」，两者 publishStatus 都是 unpublished。
+   * 只查本机构的下架记录（orgId + 本页 id 双重限定），别家机构的事由带不出来。
+   */
+  private async withEmergencyHolds(dtos: PolicyPostDto[], orgId: string): Promise<PolicyPostDto[]> {
+    if (dtos.length === 0) return dtos
+    const holds = await this.prisma.recruitmentEmergencyHold.findMany({
+      where: { orgId, targetType: 'policy', targetId: { in: dtos.map((d) => d.id) } },
+      select: { targetId: true, reasonCode: true, reasonText: true, createdAt: true },
+    })
+    const byTarget = new Map(holds.map((h) => [h.targetId, h]))
+    return dtos.map((d) => {
+      const hold = byTarget.get(d.id)
+      return {
+        ...d,
+        emergencyTakedown: hold !== undefined,
+        emergencyReasonCode: hold?.reasonCode ?? null,
+        emergencyReasonText: hold?.reasonText ?? null,
+        emergencyTakedownAt: hold ? hold.createdAt.toISOString() : null,
+      }
+    })
   }
 
   async createPartnerPolicy(dto: CreatePolicyPostDto, user: AuthedUser): Promise<PolicyPostDto> {

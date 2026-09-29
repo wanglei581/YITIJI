@@ -83,6 +83,29 @@ export class SmsLoginDto {
   portal!: 'admin' | 'partner'
 }
 
+/** 管理员登录第二步（P1-4）：密码通过后收到的一次性凭证 + 短信验证码。 */
+export class AdminSecondFactorVerifyDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(160)
+  challengeTicket!: string
+
+  @Matches(/^\d{6}$/, { message: '必须是 6 位数字验证码' })
+  code!: string
+}
+
+export class AdminSecondFactorResendDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(160)
+  challengeTicket!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  deviceId?: string
+}
+
 export class PasswordResetStartDto {
   @IsString()
   @MinLength(1)

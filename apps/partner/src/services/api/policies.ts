@@ -42,6 +42,19 @@ export interface PartnerPolicyRecord {
   publishConfirmedContentVersion?: number | null
   syncTime: string
   updatedAt: string
+  /**
+   * 平台紧急下架（P-01）。服务端只在本机构列表里带；单向不可恢复，这一条之后不能再发布。
+   * 与本机构自己下架（publishStatus=unpublished、无此标记）要分开显示。
+   */
+  emergencyTakedown?: boolean
+  emergencyReasonCode?: string | null
+  emergencyReasonText?: string | null
+  emergencyTakedownAt?: string | null
+}
+
+/** 平台紧急下架（P-01）。只认服务端给的标记，本机构自己下架不算。 */
+export function isPolicyEmergencyHeld(row: PartnerPolicyRecord): boolean {
+  return row.emergencyTakedown === true
 }
 
 export interface SavePolicyInput {
@@ -295,6 +308,16 @@ const mockRows: PartnerPolicyRecord[] = [
     contentVersion: 1, publishConfirmedBy: null, publishConfirmedAt: null, publishConfirmedContentVersion: null,
     syncTime: now(), updatedAt: now(),
   },
+  {
+    id: 'pp-mock-4', kind: 'notice', title: '关于技能培训补贴线上申领的通知（演示）',
+    summary: '演示数据：平台紧急下架', category: 'notice', publishedDate: '2026-09-10',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'approved', publishStatus: 'unpublished', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: 'mock-partner-001', publishConfirmedAt: now(), publishConfirmedContentVersion: 1,
+    syncTime: now(), updatedAt: now(),
+    emergencyTakedown: true, emergencyReasonCode: 'false_information',
+    emergencyReasonText: '申领入口链接指向非官方网站（演示）', emergencyTakedownAt: now(),
+  },
 ]
 
 const mockAdapter: PartnerPoliciesServiceInterface = {
@@ -370,6 +393,10 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
     }
     if (input.responsibilityAcknowledged !== true) {
       throw new ApiHttpError('POLICY_RESPONSIBILITY_ACK_REQUIRED', '发布前必须确认对本条政策内容负责', 400)
+    }
+    // 与服务端 assertNotEmergencyHeld 同一口径：紧急下架单向，不能再发布
+    if (hit.emergencyTakedown) {
+      throw new ApiHttpError('EMERGENCY_TAKEDOWN_IRREVERSIBLE', '该内容已紧急下架，不能恢复', 403)
     }
     hit.publishStatus = 'published'
     hit.publishConfirmedBy = 'mock-partner-001'
