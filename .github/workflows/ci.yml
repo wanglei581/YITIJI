@@ -853,6 +853,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:derivation-kind
           # P1-5 短信发送额度（全站每日总量 / 单终端每日上限、Redis 核不了即暂停）；内存 Redis，不连外网。
           pnpm --filter @ai-job-print/api verify:sms-budget
+          # 会员验证码出口限流：已验签终端按台计；受信出口默认关，只放宽 IP 这一层。内存 Redis。
+          pnpm --filter @ai-job-print/api verify:sms-egress-limits
           # P1-4 管理员登录加固（锁定失败关闭、来源地址名单、短信第二步）；写隔离库。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-login-hardening
           # 3.9 内部账号名册 + 备用管理员 + 服务器端应急启用：自建真实 SQLite 迁移临时库 + 真实 Redis + 进程内 HTTP。

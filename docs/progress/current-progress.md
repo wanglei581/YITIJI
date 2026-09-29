@@ -31,6 +31,11 @@
 - **做了什么（Grok 实现、协调方审，总指挥 9/29 拍板）：** 继 #1111 累计打印改口径后，趋势与单台今日页数也统一：只算真正出纸的任务，页数 = 计费页数 × 份数，按任务出纸完成时间（上海自然日）落日；付了款没出纸的不算。共用逻辑在 `console-screen.printed-pages.ts`。顺手按两个后台窗口的走查意见把注释与门禁说明改成界面用词（少于 5、数据量超出统计上限、服务人次）。
 - **验证：** `verify:console-screen-printed-visits` 42 条（新增跨午夜落日、单台乘份数）；Grok 两处变异、协调方抽 1 处（不乘份数）全红；snapshot、usage、admin console-screen-ui 与 api/admin/partner/ui/shared 类型检查全绿。
 - **交付单（两个后台）：** GovGrid 趋势说明、TwinTerminalBoard 说明两句要换成新口径，e2e 模拟数据的来源字符串同步（原文在 PR 说明里）。
+## 2026-09-29：会员验证码按已验签终端限流、受信出口默认关（分支 `claude/backend-hardening-20260929-sms-egress-limits`）
+
+- **问题：** 大厅多台一体机、招聘会现场同一 WiFi 的用户共用一个出口 IP，「同一 IP 每小时 20 条」会被一起用完。
+- **做法（Grok 实现、协调方审，总指挥裁定 A+B）：** A：带已验签终端身份的请求改为「每台终端每小时 30 条」（错误码 `SMS_TERMINAL_HOURLY_LIMIT`），不再计入 IP 桶，发码路由的每分钟 5 次也按终端计；单机每天 100 条、同一手机号冷却与每天 10 条、设备限额、全站短信额度全不变。B：受信出口地址段 `SMS_TRUSTED_EGRESS_CIDRS`，默认不配、只能用环境变量；IPv4 比 /24 宽、IPv6 比 /56 宽、上限超天花板（每小时 200、每分钟 30）一律拒绝启动并说人话；只放宽 IP 这一层；某段一小时用量到上限八成时发一次运维告警。运维手册 §2.2.1、.env.example 已写明。
+- **验证：** 新门禁 `verify:sms-egress-limits` 55 条（挂 CI）；协调方抽 2 处变异（放宽到 /8、终端请求也计入 IP 桶）全红；sms-budget、member-auth、member-auth-races、throttle-dimension、ai-throttle-dimension、boot-resilience、ai-platform-degradation 等 10 条与小程序契约全绿。解冲突时保留候选 main.ts 里「AI 配置缺失只登记降级」的写法，受信出口启动校验紧跟其后。
 
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
