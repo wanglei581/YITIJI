@@ -2,14 +2,14 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`106` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`107` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 106 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 107 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
 flowchart TD
-  EndUser["EndUser<br/><small>33 字段</small>"]
+  EndUser["EndUser<br/><small>34 字段</small>"]
   Organization["Organization<br/><small>27 字段</small>"]
   Terminal["Terminal<br/><small>27 字段</small>"]
   FileObject["FileObject<br/><small>48 字段</small>"]
@@ -69,6 +69,7 @@ flowchart TD
 | **AgentReleaseTarget** | 10 | ActiveReleaseObservationAssignment、AgentReleasePlan、Terminal、TerminalReleaseObservation | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **AiResumeResult** | 15 | EndUser | 14 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume-parse-submission.service.ts`<br/>… |
 | **AiServiceLog** | 13 | EndUser | 4 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
+| **AiUsageRecord** | 17 | EndUser | **无代码读写** |
 | **AlertDisposition** | 12 | — | 2 个文件<br/>`admin-ops/admin-alert-actions.service.ts`<br/>`admin-ops/admin-ops.service.ts` |
 | **AuditLog** | 12 | User | 21 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`ai/resume/job-fit-hosting.ts`<br/>`audit/audit.service.ts`<br/>… |
 | **BenefitActivity** | 19 | BenefitClaim、User | 2 个文件<br/>`benefit-activities/benefit-activities.service.ts`<br/>`community/community.service.ts` |
@@ -79,7 +80,7 @@ flowchart TD
 | **CompanyProfile** | 37 | Job、Organization | 6 个文件<br/>`activity/activity.service.ts`<br/>`companies/companies.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **ContractReviewTask** | 30 | EndUser | 7 个文件<br/>`contract-review/__tests__/contract-review-orchestrator.test.ts`<br/>`contract-review/contract-review-lifecycle.service.ts`<br/>`contract-review/contract-review-orchestrator.service.ts`<br/>… |
 | **DocumentProcessTask** | 19 | EndUser、FileObject、PiiFinding | 4 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`materials/materials.service.ts`<br/>`materials/pii-redaction.service.ts`<br/>… |
-| **EndUser** | 33 | AiResumeResult、AiServiceLog、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、PrintTask、ScanTask、UserAiConsent、UserDataRequest | 12 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
+| **EndUser** | 34 | AiResumeResult、AiServiceLog、AiUsageRecord、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、PrintTask、ScanTask、UserAiConsent、UserDataRequest | 12 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
 | **ExternalJumpLog** | 13 | EndUser | 6 个文件<br/>`activity/activity.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/resume/fair-visit-plan.service.ts`<br/>… |
 | **FairCompany** | 22 | FairCompanyPosition、FairVenueHallCompany、JobFair | 8 个文件<br/>`activity/activity.service.ts`<br/>`companies/companies.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **FairCompanyBooth** | 9 | — | **无代码读写** |
@@ -164,11 +165,12 @@ flowchart TD
 | **UserDataRequest** | 22 | EndUser | 6 个文件<br/>`member-privacy/member-data-export-download.service.ts`<br/>`member-privacy/member-data-export-reconciler.service.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserNotification** | 10 | — | **无代码读写** |
 
-## 没有任何代码读写的模型（9）
+## 没有任何代码读写的模型（10）
 
 > 注意：这里的判定只看 \`this.prisma.<model>.<op>\` 形式的调用。
 > 通过关系字段级联读写、raw SQL 或迁移脚本访问的模型不会被计入，**不能据此删表**。
 
+- `AiUsageRecord`
 - `FairCompanyBooth`
 - `FairCompanyPosition`
 - `FairVenueHallCompany`

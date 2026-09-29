@@ -886,6 +886,7 @@ model EndUser {
   broadcastReadStates BroadcastReadState[]
   jobAiSessions   JobAiSession[]
   aiServiceLogs   AiServiceLog[]
+  aiUsageRecords  AiUsageRecord[]
   aiConsents      UserAiConsent[]
   legalConsents   MemberLegalConsent[]
   dataRequests    UserDataRequest[]
@@ -1920,6 +1921,39 @@ model AiServiceLog {
 
   @@index([operation, createdAt])
   @@index([status, createdAt])
+  @@index([endUserId])
+}
+
+// P1-2a AI 逐次计量账：每次**真的发出**的大模型请求一行（白名单拒绝、并发闸门拒绝不记——没花钱）。
+// 额度（全局 / 单台终端 / 单个会员，按北京时间自然日）与将来收费、额度都以这本账为底座。
+// 与 AiServiceLog（每次「操作」一行、终端号取自请求头、给后台现有统计）语义不同，互不替代。
+// 只存元数据：绝不存正文、文件名、提示词。costCny 为 null = 取不到用量（不是 0），额度按保守单价计入。
+// terminalId 只记已验签（x-terminal-id + x-terminal-session-token）的终端；没验过为 null。
+model AiUsageRecord {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  /// 北京时间 YYYY-MM-DD，按日聚合与额度用
+  dayKey           String
+  featureKey       String
+  vendor           String
+  model            String?
+  /// ok / upstream_error / busy / timeout / network_error / aborted / blocked
+  status           String
+  httpStatus       Int?
+  promptTokens     Int?
+  completionTokens Int?
+  costCny          Float?
+  costMeasured     Boolean  @default(false)
+  terminalId       String?
+  terminalVerified Boolean  @default(false)
+  orgId            String?
+  endUserId        String?
+  endUser          EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+
+  @@index([dayKey])
+  @@index([dayKey, terminalId])
+  @@index([dayKey, endUserId])
+  @@index([orgId, dayKey])
   @@index([endUserId])
 }
 

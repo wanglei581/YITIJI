@@ -62,6 +62,7 @@ import { ScreensaverModule } from './screensaver/screensaver.module'
 import { ContractReviewHttpModule } from './contract-review/contract-review-http.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 import { ClientDeclarationMiddleware } from './common/privacy/client-declaration.middleware'
+import { AiRequestContextMiddleware } from './ai/usage/ai-request-context.middleware'
 import { RecruitmentContentModule } from './recruitment-content/recruitment-content.module'
 import { RecruitmentHostingModule } from './recruitment-hosting/recruitment-hosting.module'
 import { OfficialChannelsModule } from './official-channels/official-channels.module'
@@ -180,6 +181,7 @@ export class AppModule implements NestModule {
     // path-to-regexp v6+ 需要命名参数表达通配。
     // '*path' = 匹配任意路径并捕获到 params.path,
     // 等价于以前的裸 '*',且不再触发 LegacyRouteConverter 警告。
-    consumer.apply(RequestIdMiddleware, ClientDeclarationMiddleware).forRoutes('*path')
+    // AiRequestContextMiddleware：只放「调用方是谁」的惰性解析器，给 AI 额度与逐次计量用（P1-2a）。
+    consumer.apply(RequestIdMiddleware, ClientDeclarationMiddleware, AiRequestContextMiddleware).forRoutes('*path')
   }
 }

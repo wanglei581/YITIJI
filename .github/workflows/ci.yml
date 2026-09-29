@@ -703,6 +703,8 @@ jobs:
           # AI 类出站端点白名单（P1-3）：模型 / OCR / 语音 / 数字人 / 短信 / 合同审查，白名单外一个请求都不发。
           pnpm --filter @ai-job-print/api verify:ai-endpoint-allowlist
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
+          # P1-2a AI 逐次计量账 + 每日金额硬上限（全局 / 单台终端 / 单个会员）；写隔离库，不触网。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-budget
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:kiosk-session
@@ -964,6 +966,8 @@ jobs:
           # 并真跑证明「模型端卡住会超时」「闸门满了立刻拒绝」。
           pnpm --filter @ai-job-print/api verify:llm-timeout-concurrency
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
+          # AI 计量账（AiUsageRecord 新表迁移）与额度汇总的 groupBy 在 PG 上也要真跑一遍。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-budget
           # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask

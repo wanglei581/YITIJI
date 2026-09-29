@@ -16008,7 +16008,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 106,
+    "modelCount": 107,
     "models": [
       {
         "fieldCount": 7,
@@ -16162,6 +16162,14 @@
         ]
       },
       {
+        "fieldCount": 17,
+        "name": "AiUsageRecord",
+        "relations": [
+          "EndUser"
+        ],
+        "usedBy": []
+      },
+      {
         "fieldCount": 12,
         "name": "AlertDisposition",
         "relations": [],
@@ -16312,11 +16320,12 @@
         ]
       },
       {
-        "fieldCount": 33,
+        "fieldCount": 34,
         "name": "EndUser",
         "relations": [
           "AiResumeResult",
           "AiServiceLog",
+          "AiUsageRecord",
           "BenefitClaim",
           "BenefitGrant",
           "BroadcastReadState",
@@ -24596,6 +24605,7 @@
       "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
+      "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-deploy-data-safety-gate.ts",
       "services/api/scripts/verify-end-user-asset-ownership.ts",
@@ -32632,6 +32642,7 @@
           "services/api/src/contract-review/contract-review.queue.ts",
           "services/api/src/contract-review/contract-review.types.ts",
           "services/api/src/contract-review/dto/contract-review.dto.ts",
+          "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.module.ts"
         ],
         "missing": []

@@ -1,0 +1,124 @@
+// ============================================================================
+// 大模型价目（元 / 百万 tokens）与按 token 折算金额 —— 全仓唯一一份
+//
+// 为什么独立成文件：原先价目写在 ai-log.service.ts 的私有函数里，只有 AiServiceLog
+// 在用。P1-2a 的逐次计量账（AiUsageRecord）与每日金额上限也要按同一份价目折算；
+// 复制一份价目表，两本账就会各算各的。所以把价目抽成纯函数，两边共用：
+//   - ai-log.service.ts：AiServiceLog.estimatedCostCny（后台 AI 服务统计）
+//   - ai-usage-meter.ts：AiUsageRecord.costCny（额度与将来收费的计量底座）
+//
+// 三态语义（与 AI-COST-TRUTH 一致，不许改成 0）：
+//   - 返回数字：按实测 token 与下表价目折算的金额；
+//   - 返回 0：只给 mock / stub（压根不打上游，没花钱是事实）；
+//   - 返回 undefined：取不到用量、或定不了价 —— 调用方必须如实留空，绝不当 0。
+//
+// 价目核对（2026-09-29，官方页）：
+//   DeepSeek  https://api-docs.deepseek.com/zh-cn/quick_start/pricing
+//     deepseek-flash（旧名 deepseek-v4-flash 仍可调，按 Flash 计费）：
+//       输入（缓存未命中）空闲 1 / 高峰 2，输出 空闲 4 / 高峰 8
+//     deepseek-v4-pro：输入（缓存未命中）空闲 4.5 / 高峰 9，输出 空闲 13.5 / 高峰 27
+//     高峰 = 北京时间工作日 9:00-12:00、14:00-18:00。
+//     **一律按高峰价、缓存未命中价计**：宁可多算，不能少算（额度是防超支的闸）。
+//   阿里云百炼（中国内地）https://help.aliyun.com/zh/model-studio/model-pricing
+//     qwen-plus：输入 ≤128K 0.8 / ≤256K 2.4 / ≤1M 4.8；输出（非思考）2 / 20 / 48
+//       （思考模式输出 8 / 24 / 64；本仓调用不开思考，qwen-plus 默认也不开）
+//     qwen-max：输入 ≤32K 2.5 / ≤128K 4 / ≤256K 7；输出 10 / 16 / 28
+//     qwen-flash：输入 ≤128K 0.15 / ≤256K 0.6 / ≤1M 1.2；输出 1.5 / 6 / 12
+//     阶梯按单次请求的输入 token 数取档。
+//   认不出型号的：DeepSeek 按 V4-Pro、千问按 qwen-max，即「同厂最贵的一档」，同样宁多勿少。
+//   zhipu / openai 两行是旧值，未重新核对；它们不在默认出站白名单里，生产走不到。
+//
+// 价目改了要同步改这里的核对日期与链接；不要在别处再写一份。
+// ============================================================================
+
+export interface PricedTokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+export interface TokenRate {
+  /** 元 / 百万输入 tokens */
+  input: number
+  /** 元 / 百万输出 tokens */
+  output: number
+}
+
+interface Tier extends TokenRate {
+  /** 本档适用的单次输入 token 上限（含）。 */
+  maxPromptTokens: number
+}
+
+const K = 1_000
+
+const DEEPSEEK_FLASH_PEAK: TokenRate = { input: 2, output: 8 }
+const DEEPSEEK_PRO_PEAK: TokenRate = { input: 9, output: 27 }
+
+const QWEN_PLUS: Tier[] = [
+  { maxPromptTokens: 128 * K, input: 0.8, output: 2 },
+  { maxPromptTokens: 256 * K, input: 2.4, output: 20 },
+  { maxPromptTokens: Infinity, input: 4.8, output: 48 },
+]
+const QWEN_MAX: Tier[] = [
+  { maxPromptTokens: 32 * K, input: 2.5, output: 10 },
+  { maxPromptTokens: 128 * K, input: 4, output: 16 },
+  { maxPromptTokens: Infinity, input: 7, output: 28 },
+]
+const QWEN_FLASH: Tier[] = [
+  { maxPromptTokens: 128 * K, input: 0.15, output: 1.5 },
+  { maxPromptTokens: 256 * K, input: 0.6, output: 6 },
+  { maxPromptTokens: Infinity, input: 1.2, output: 12 },
+]
+
+function tierFor(tiers: Tier[], promptTokens: number): TokenRate {
+  return tiers.find((tier) => promptTokens <= tier.maxPromptTokens) ?? tiers[tiers.length - 1]!
+}
+
+/**
+ * 从厂商 + 型号标签定价。标签可以是 AiServiceLog 的 provider（`llm:deepseek:deepseek-v4-flash`），
+ * 也可以是计量账的 `deepseek:deepseek-v4-flash`；按子串匹配，大小写不敏感。
+ */
+export function rateFor(label: string, promptTokens: number): TokenRate | null {
+  const normalized = label.toLowerCase()
+  if (normalized.includes('deepseek')) {
+    return normalized.includes('flash') ? DEEPSEEK_FLASH_PEAK : DEEPSEEK_PRO_PEAK
+  }
+  if (normalized.includes('qwen')) {
+    if (normalized.includes('qwen-flash')) return tierFor(QWEN_FLASH, promptTokens)
+    if (normalized.includes('qwen-plus')) return tierFor(QWEN_PLUS, promptTokens)
+    return tierFor(QWEN_MAX, promptTokens)
+  }
+  if (normalized.includes('zhipu')) return { input: 5, output: 5 }
+  if (normalized.includes('openai')) return { input: 18, output: 54 }
+  return null
+}
+
+/**
+ * 按标签里的厂商 / 型号 + token 估算金额（元）。
+ *
+ * 返回 undefined = **未采集/无法定价**，调用方必须如实留空，绝不回落成 0。
+ * mock / stub 判定必须在「有没有 token」之前 —— 它们压根不打上游，0 是实测。
+ */
+export function estimateCostCny(label: string, usage: PricedTokenUsage | undefined): number | undefined {
+  const normalized = label.toLowerCase()
+  if (normalized.includes('mock') || normalized.includes('stub')) return 0
+  return priceTokens(normalized, usage)
+}
+
+/**
+ * 只按 token 定价，**没有** mock / stub 短路。
+ *
+ * 给逐次计量账用：走到计量的调用都是真的发出了 HTTP 请求，主机名里碰巧含 mock
+ * 也不能记成免费。取不到用量或定不了价返回 undefined。
+ */
+export function priceTokens(label: string, usage: PricedTokenUsage | undefined): number | undefined {
+  if (!usage || usage.totalTokens <= 0) return undefined
+  const rate = rateFor(label, usage.promptTokens)
+  if (!rate) return undefined
+  return roundMoney(((usage.promptTokens * rate.input) + (usage.completionTokens * rate.output)) / 1_000_000)
+}
+
+/** 金额保留 4 位小数（0.0001 元）。 */
+export function roundMoney(value: number): number {
+  return Math.round(value * 10_000) / 10_000
+}
