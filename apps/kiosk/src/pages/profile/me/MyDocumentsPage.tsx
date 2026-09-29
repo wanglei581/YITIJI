@@ -10,7 +10,6 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import type { FileRetentionPolicy, FileRetentionUpdateRequest, MemberDocumentItem } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import { ClockIcon, EyeIcon, FilesIcon, FileTextIcon, PenToolIcon, PrinterIcon, ScanLineIcon, Trash2Icon, UploadIcon } from 'lucide-react'
 import {
   deleteMyDocument,
@@ -22,7 +21,7 @@ import {
 import { useAuth } from '../../../auth/useAuth'
 import { FileContentPreview } from '../../../components/FileContentPreview'
 import { formatTime } from '../assets/format'
-import { savePrintMaterialSession } from '../../print/printMaterialSession'
+import { useStartPrintHandoff } from '../../print/usePrintHandoff'
 import { DocumentConvertAction } from './components/DocumentConvertAction'
 import {
   DOCUMENT_NOT_REPRINTABLE_COPY,
@@ -103,6 +102,7 @@ function documentForConvertedPdf(
 
 export function MyDocumentsPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { isLoggedIn, getToken } = useAuth()
   const [reloadKey, setReloadKey] = useState(0)
   const [hint, setHint] = useState<Hint | null>(null)
@@ -156,7 +156,11 @@ export function MyDocumentsPage() {
     }
   }
 
-  const print = async (doc: MemberDocumentItem) => {
+  /**
+   * @param convertedFrom 刚在本页把这份原件转成 PDF 时的原件。转换件在服务端是派生，
+   *   但装的是本人原件的内容：按原件过材料检查（9/29 产品负责人拍板）。
+   */
+  const print = async (doc: MemberDocumentItem, convertedFrom?: MemberDocumentItem) => {
     if (opening || printingId || signingId || busyId || retentionBusy || convertingId) return
     if (!isDocumentReprintable(doc)) {
       setHint({ tone: 'bad', text: DOCUMENT_NOT_REPRINTABLE_COPY })
@@ -176,20 +180,17 @@ export function MyDocumentsPage() {
         fileUrl: res.printFileUrl,
         mimeType: doc.mimeType,
       }
-      if (documentNeedsPrintMaterialCheck(doc)) {
-        // 本人原件：生产隐私闸门要求先做完隐私检查才建单，检查只在打印台材料检查里做。
-        // 写法与打印上传页相同：先整份写打印材料会话（旧检查结论、旧参数一并作废），再去检查。
-        const source = documentPrintSource(doc)
-        savePrintMaterialSession({ file, source })
-        navigate('/print/material-check', { state: { file, source } })
-      } else {
-        navigate('/print/confirm', {
-          state: {
-            file,
-            params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
-          },
-        })
-      }
+      // 本人原件：生产隐私闸门要求先做完隐私检查才建单，检查只在打印台材料检查里做；
+      // 派生产物（AI 报告、优化稿……）免检查，直达报价确认页。入口由 printHandoffPolicy 按 requiresCheck 定。
+      // 写法与打印上传页相同：先整份写打印交接上下文（旧检查结论、旧参数一并作废），跳转只带交接编号。
+      const requiresCheck = documentNeedsPrintMaterialCheck(doc, convertedFrom)
+      startPrint({
+        origin: 'my_documents',
+        requiresCheck,
+        source: documentPrintSource(convertedFrom ?? doc),
+        returnPath: '/me/documents',
+        file,
+      })
     } catch (error) {
       setHint({ tone: 'bad', text: userMessageOf(error, '打印链接生成失败，可能已到期或被清理') })
     } finally {
@@ -437,7 +438,7 @@ export function MyDocumentsPage() {
                   onError={(text) => setHint({ tone: 'bad', text })}
                   onBusyChange={(next) => setConvertingId(next ? doc.id : null)}
                   onPreview={(convertedId) => void open(documentForConvertedPdf(items, convertedId, doc))}
-                  onPrint={(convertedId) => void print(documentForConvertedPdf(items, convertedId, doc))}
+                  onPrint={(convertedId) => void print(documentForConvertedPdf(items, convertedId, doc), doc)}
                 />
               </article>
             )

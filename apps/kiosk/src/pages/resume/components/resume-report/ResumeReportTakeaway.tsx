@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { makePrintParams } from '@ai-job-print/shared'
 import type { ResumeReportExportKind, ResumeReportExportResponse } from '@ai-job-print/shared'
 import { FilePreviewDialog } from '../../../../components/FilePreviewDialog'
 import { useCountdown } from '../../../../hooks/useCountdown'
@@ -23,6 +22,7 @@ import {
   FIXTURE_PRICING_CHARGED,
   FIXTURE_PRICING_UNAVAILABLE,
 } from '../../resume-report-fixture'
+import { useStartPrintHandoff } from '../../../print/usePrintHandoff'
 
 function exportErrorMessage(err: unknown): string {
   const code = errorCodeOf(err)
@@ -92,6 +92,7 @@ export function ResumeReportTakeaway(props: {
   onJobFit: () => void
 }) {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const token = getToken()
   const guest = !token
@@ -164,17 +165,16 @@ export function ResumeReportTakeaway(props: {
   const handlePrint = () => {
     if (printNavigating || !exported?.printFileUrl) return
     setPrintNavigating(true)
-    navigate('/print/confirm', {
-      state: {
-        file: {
-          name: exported.filename,
-          size: formatFileSize(exported.sizeBytes),
-          pages: exported.pageCount,
-          fileId: exported.fileId,
-          fileUrl: exported.printFileUrl,
-          mimeType: 'application/pdf',
-        },
-        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+    startPrint({
+      origin: 'resume_report',
+      returnPath: window.location.pathname,
+      file: {
+        name: exported.filename,
+        size: formatFileSize(exported.sizeBytes),
+        pages: exported.pageCount,
+        fileId: exported.fileId,
+        fileUrl: exported.printFileUrl,
+        mimeType: 'application/pdf',
       },
     })
   }

@@ -22,7 +22,7 @@ type InterviewReportView = InterviewReportResponse & {
   qaExcerpts?: InterviewQaExcerpt[]
   includeAnswersInPrint?: boolean
 }
-import { AI_LABEL_COPY, makePrintParams } from '@ai-job-print/shared'
+import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -43,6 +43,7 @@ import {
   patchInterviewWorkbenchSession,
   readInterviewWorkbenchSession,
 } from './interviewWorkbenchSession'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
@@ -89,6 +90,7 @@ function Bullets({ items }: { items: string[] }) {
 
 export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
   const storedReport = readInterviewWorkbenchSession()?.report
@@ -132,17 +134,16 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
     try {
       const file = await printInterviewReport(data.sessionId, { token: getToken(), accessToken: state.accessToken })
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+      startPrint({
+        origin: 'interview_report',
+        returnPath: window.location.pathname,
+        file: {
+          name: file.filename,
+          size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
     } catch (err) {
