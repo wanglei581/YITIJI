@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common'
 import { Prisma } from '../generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import { FilesService } from '../files/files.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { signFileUrl } from '../files/signing'
@@ -240,8 +241,9 @@ function isScanRetryLineageConflict(e: unknown): boolean {
 
 function isScanRetryTransactionConflict(e: unknown): boolean {
   return (
-    e instanceof Prisma.PrismaClientKnownRequestError &&
-    ['P1008', 'P2028', 'P2034'].includes(e.code)
+    (e instanceof Prisma.PrismaClientKnownRequestError &&
+      ['P1008', 'P2028'].includes(e.code)) ||
+    isSerializationConflict(e)
   )
 }
 

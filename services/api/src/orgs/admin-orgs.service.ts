@@ -24,6 +24,7 @@ import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal
 import { RedisService } from '../common/redis/redis.service'
 import { tryRedis } from '../common/redis/redis-degradation'
 import { Prisma } from '../generated/prisma/client'
+import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import { PASSWORD_PROOF_STATE, passwordProofState } from '../auth/password-proof-state'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
 import {
@@ -804,7 +805,7 @@ export class AdminOrgsService {
       try {
         return await operation()
       } catch (error) {
-        const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
+        const retryable = isSerializationConflict(error)
         if (!retryable || attempt === 2) throw error
       }
     }

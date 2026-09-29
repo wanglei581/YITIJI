@@ -21775,6 +21775,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts",
@@ -21819,6 +21820,10 @@
     ],
     "services/api/scripts/support/recruitment-wave2-public-snapshot.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
+    ],
+    "services/api/scripts/support/serializable-race-barrier.ts": [
+      "services/api/scripts/verify-first-admin-bootstrap-postgres.ts",
+      "services/api/scripts/verify-pg-serialization-conflict-postgres.ts"
     ],
     "services/api/scripts/support/upload-session-verifier.ts": [
       "services/api/scripts/verify-upload-sessions-bind.ts",
@@ -22705,6 +22710,7 @@
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policies.ts",
@@ -22773,7 +22779,8 @@
     "services/api/src/auth/first-admin-bootstrap.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-first-admin-bootstrap-postgres.ts",
-      "services/api/scripts/verify-first-admin-bootstrap.ts"
+      "services/api/scripts/verify-first-admin-bootstrap.ts",
+      "services/api/scripts/verify-pg-serialization-conflict.ts"
     ],
     "services/api/src/auth/initial-phone-bind.service.ts": [
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -22806,7 +22813,8 @@
     ],
     "services/api/src/auth/partner-phone-rebind.service.ts": [
       "services/api/scripts/verify-partner-account-action-postgres.ts",
-      "services/api/scripts/verify-partner-account-action.ts"
+      "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-pg-serialization-conflict.ts"
     ],
     "services/api/src/auth/password-proof-state.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts"
@@ -23069,6 +23077,9 @@
     "services/api/src/common/pii/pii-masker.ts": [
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
+    "services/api/src/common/prisma/serialization-conflict.ts": [
+      "services/api/scripts/verify-pg-serialization-conflict.ts"
+    ],
     "services/api/src/common/privacy/client-declaration.ts": [
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
@@ -23119,6 +23130,7 @@
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
+      "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -24184,6 +24196,7 @@
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-report-export.ts"
     ],
@@ -24294,7 +24307,9 @@
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-org-self.ts",
-      "services/api/scripts/verify-partner-smart-campus.ts"
+      "services/api/scripts/verify-partner-smart-campus.ts",
+      "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
+      "services/api/scripts/verify-pg-serialization-conflict.ts"
     ],
     "services/api/src/orgs/dto/partner-account-action.dto.ts": [
       "services/api/scripts/verify-partner-account-action.ts"
@@ -24854,6 +24869,7 @@
       "services/api/scripts/verify-partner-stats-contract.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-pii-redaction.ts",
@@ -24985,6 +25001,7 @@
     "services/api/src/scan-tasks/scan-tasks.service.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-scan-quiet-period.ts",
       "services/api/scripts/verify-scan-tasks.ts"
     ],
@@ -25140,6 +25157,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/terminals/release-observation.service.ts": [
+      "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-release-observation-contract.mjs"
     ],
     "services/api/src/terminals/terminal-capabilities.service.ts": [
@@ -33763,6 +33781,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/serializable-race-barrier.ts",
           "services/api/src/auth/first-admin-bootstrap.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -36432,6 +36451,53 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:pdfjs-engine"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/serializable-race-barrier.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pg-serialization-conflict:postgres"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/auth/first-admin-bootstrap.ts",
+          "services/api/src/auth/partner-phone-rebind.service.ts",
+          "services/api/src/common/prisma/serialization-conflict.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pg-serialization-conflict.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pg-serialization-conflict"
       ],
       "wired": true
     },
