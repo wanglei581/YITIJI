@@ -1,5 +1,6 @@
 import { BadRequestException, Controller, Optional, Post, Put, Get, Header, Param, Body, Query, Req, ServiceUnavailableException, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
-import { AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
+import { AiManualPathWhen, AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
+import { RESUME_DRAFT_EXPORT_MANUAL_PATH } from './resume-draft-export-manual-path'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -169,7 +170,6 @@ export class AiController {
   @Post('resume/parse')
   @TerminalScopedThrottle(6) // 触发 LLM/OCR，与兄弟 LLM 路由同档；按台计数以免整个大厅共用 6 次
   @AiUse('generate')
-
   async submitResumeParse(
     @Body() dto: ResumeParseRequestDto,
     @Req() req: ReqLike,
@@ -540,13 +540,13 @@ export class AiController {
   @Post('resume/generate/export')
   @Throttle({ default: { ttl: 60_000, limit: 10 } }) // 服务端 PDF 渲染 + 对象存储写入,防滥用
   @AiUse('export')
-
+  @AiManualPathWhen(RESUME_DRAFT_EXPORT_MANUAL_PATH)
   async exportGeneratedResume(
     @Body() dto: ResumeGenerateExportDto,
     @Req() req: ReqLike,
   ) {
     const requester = await this.resolveAiResultRequester(req)
-    await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
+    if (dto.draft !== true) await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai') // 按原样导出不送模型，见 RESUME_DRAFT_EXPORT_MANUAL_PATH
     const { taskId, format, layout, templateId, draft, unlabeled, ...resume } = dto
     delete (resume as { benefitGrantId?: string }).benefitGrantId
     delete (resume as { factsConfirmedAt?: string }).factsConfirmedAt

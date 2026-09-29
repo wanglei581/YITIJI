@@ -14,7 +14,7 @@
  * 运行：pnpm --filter @ai-job-print/api verify:ai-access
  */
 import 'reflect-metadata'
-import { RequestMethod } from '@nestjs/common'
+import { ForbiddenException, RequestMethod } from '@nestjs/common'
 import { METHOD_METADATA, MODULE_METADATA } from '@nestjs/common/constants'
 import { APP_GUARD, NestFactory, Reflector } from '@nestjs/core'
 import { AiAccessModule } from '../src/ai-access/ai-access.module'
@@ -349,6 +349,45 @@ async function adminSwitch(): Promise<void> {
 }
 
 /** 真起完整 AppModule 发 HTTP：证明线上装配里守卫确实在拦（手动 new 守卫的测试测不出「没注册」）。 */
+/**
+ * 简历「按原样导出」（draft=true）是 AI 挂掉时的手动退路：不送模型，所以不查简历 AI 授权、不被 AI 闸门挡。
+ * draft=false（导出 AI 润色结果）照旧要授权、照旧过闸。只认严格布尔 true，其它一律照常过闸（失败关闭）。
+ */
+async function draftExportManualPath(): Promise<void> {
+  let config: AiAccessConfig = { ...OFF, paused: true }
+  const { service } = makeService()
+  ;(service as unknown as { getConfig: () => Promise<AiAccessConfig> }).getConfig = async () => config
+  const guard = new AiAccessGuard(reflector, service)
+  const exportWith = (body: unknown) => codeOf(() => guard.canActivate(contextFor(AiController as unknown as Ctor, 'exportGeneratedResume', { ...ANON, body })))
+  check('draft:AI 暂停时按原样导出照常放行（手动退路不跟着 AI 停）', (await exportWith({ draft: true })) === 'PASS')
+  check('draft:AI 暂停时导出 AI 润色结果（draft=false）照旧被拦', (await exportWith({ draft: false })) === 'AI_PAUSED')
+  check('draft:字符串 "true" 不算手动路径（只认严格布尔，失败关闭）', (await exportWith({ draft: 'true' })) === 'AI_PAUSED')
+  config = { ...OFF, loginGate: 'before_export' }
+  check('draft:登录档位「导出前登录」不挡按原样导出', (await exportWith({ draft: true })) === 'PASS')
+  check('draft:登录档位照旧挡 AI 导出', (await exportWith({ draft: false })) !== 'PASS')
+  config = { ...OFF, maintenance: true }
+  check('draft:维护模式照样拦按原样导出（设备维护停一切写操作）', (await exportWith({ draft: true })) === 'MAINTENANCE_MODE')
+
+  // 控制器：没有简历 AI 授权时，draft=true 照常导出、draft=false 403。
+  let consentCalls = 0
+  let exported = 0
+  const self = {
+    resolveAiResultRequester: async () => ({ endUserId: 'member-without-consent' }),
+    privacy: { requireActiveConsent: async () => { consentCalls += 1; throw new ForbiddenException({ error: { code: 'CONSENT_REQUIRED', message: '需要先同意' } }) } },
+    aiService: {
+      resolveExportSourceFileId: async () => null,
+      exportGeneratedResume: async () => { exported += 1; return { fileId: 'file-draft', pageCount: 1, sizeBytes: 10, printFileUrl: null } },
+    },
+    prisma: {},
+    audit: { write: async () => undefined, writeRequired: async () => 'audit-1' },
+  }
+  const handler = (AiController.prototype as unknown as { exportGeneratedResume: (dto: unknown, req: unknown) => Promise<unknown> }).exportGeneratedResume
+  const draftResult = await codeOf(() => handler.call(self, { draft: true, basics: { name: '张三' } }, { headers: {} }))
+  check('draft:没有简历 AI 授权，按原样导出照常完成（不查授权）', draftResult === 'PASS' && exported === 1 && consentCalls === 0, `code=${draftResult} exported=${exported} consentCalls=${consentCalls}`)
+  const aiResult = await codeOf(() => handler.call(self, { draft: false, basics: { name: '张三' } }, { headers: {} }))
+  check('draft:没有简历 AI 授权，导出 AI 润色结果 403（照旧要授权）', aiResult === 'CONSENT_REQUIRED' && exported === 1 && consentCalls === 1, `code=${aiResult}`)
+}
+
 async function realApp(): Promise<void> {
   const saved = process.env['MAINTENANCE_MODE']
   process.env['MAINTENANCE_MODE'] = 'on'
@@ -381,6 +420,7 @@ void (async () => {
     await guardOnRealRoutes()
     coverage()
     await adminSwitch()
+    await draftExportManualPath()
     await realApp()
   } catch (error) {
     fail('runtime', error instanceof Error ? error.stack ?? error.message : String(error))
