@@ -5,9 +5,7 @@ import {
   AlertTriangleIcon,
   ArrowRightIcon,
   BotIcon,
-  BriefcaseIcon,
   Building2Icon,
-  CalendarIcon,
   FileWarningIcon,
   FolderIcon,
   MessageSquareWarningIcon,
@@ -43,6 +41,8 @@ import {
   type AdminPrintTaskItem,
   type AdminPrintTaskPage,
 } from '../../services/api/adminOps'
+import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+import { recruitmentStockKpi, recruitmentStockTodo, type StockTodo } from './recruitmentStock'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -107,8 +107,6 @@ function initialBlock<V>(loading = true): BlockEntry<V> {
   return { value: null, error: null, loading }
 }
 
-const PENDING_STATUSES = new Set(['pending', 'reviewing'])
-
 const ACTION_LABELS: Record<string, string> = {
   'ai_resume_result.cleanup_expired': '清理过期 AI 简历结果',
   'data_source.create': '创建数据源',
@@ -162,10 +160,6 @@ function clockTime(iso: string): string {
   const time = Date.parse(iso)
   if (Number.isNaN(time)) return iso
   return new Date(time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-}
-
-function isPending(reviewStatus: string): boolean {
-  return PENDING_STATUSES.has(reviewStatus)
 }
 
 /** 非空平均值；全为空返回 null（诚实：无上报不显示均值）。 */
@@ -408,17 +402,9 @@ function RecentActivity({ logs }: { logs: AuditLogRecord[] }) {
 // ─── Data mapping（只对已加载成功的数据求值，失败块不进统计）──────────────
 
 interface LoadedSources {
-  jobSources: AdminJobSourceRecord[]
-  fairSources: AdminFairSourceRecord[]
+  /** 招聘类存量一行（3.15：不再有「待审核 / 去审核」，见 recruitmentStock.ts）；null = 不显示 */
+  recruitmentStock: StockTodo | null
   files: AdminFileRecord[]
-}
-
-function pendingJobCount(jobSources: AdminJobSourceRecord[]): number {
-  return jobSources.filter((source) => isPending(source.reviewStatus)).length
-}
-
-function pendingFairCount(fairSources: AdminFairSourceRecord[]): number {
-  return fairSources.filter((source) => isPending(source.reviewStatus)).length
 }
 
 function fileAttention(files: AdminFileRecord[]): { expired: number; sensitive: number } {
@@ -432,30 +418,9 @@ function fileAttention(files: AdminFileRecord[]): { expired: number; sensitive: 
 
 function buildTodoRows(loaded: LoadedSources): TodoRow[] {
   const rows: TodoRow[] = []
-  const pendingJobs = pendingJobCount(loaded.jobSources)
-  const pendingFairs = pendingFairCount(loaded.fairSources)
   const fileStats = fileAttention(loaded.files)
 
-  if (pendingJobs > 0) {
-    rows.push({
-      key: 'jobs',
-      icon: BriefcaseIcon,
-      title: `${pendingJobs} 条岗位信息待审核`,
-      sub: '来自岗位信息源 · 审核通过后才会在终端展示',
-      href: '/job-sources',
-      actionLabel: '去审核',
-    })
-  }
-  if (pendingFairs > 0) {
-    rows.push({
-      key: 'fairs',
-      icon: CalendarIcon,
-      title: `${pendingFairs} 条招聘会信息待审核`,
-      sub: '来自招聘会信息源 · 审核通过后才会在终端展示',
-      href: '/fair-sources',
-      actionLabel: '去审核',
-    })
-  }
+  if (loaded.recruitmentStock) rows.push(loaded.recruitmentStock)
   if (fileStats.expired > 0) {
     rows.push({
       key: 'files',
@@ -502,8 +467,11 @@ function buildAlertRows(alerts: AdminAlertItem[]): TodoRow[] {
     title: alert.title,
     sub: alert.type === 'paid_pending_file_unavailable'
       ? `已支付 · 需人工处置 · ${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`
-      : `${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`,
-    href: '/alerts',
+      // 意见反馈不挂在终端上，terminalCode 为空时不能写成「未知终端」
+      : alert.type === 'feedback_pending'
+        ? `意见反馈 · ${relTime(alert.occurredAt)}`
+        : `${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`,
+    href: alert.type === 'feedback_pending' ? '/member-feedback?category=ai_content' : '/alerts',
     actionLabel: '处理',
     warn: true,
   }))
@@ -528,6 +496,9 @@ const LOADERS: Record<BlockKey, () => Promise<unknown>> = {
 }
 
 export default function DashboardPage() {
+  // 只决定招聘类存量那两处的说法；读取中 / 读取失败按关闭处理（见 recruitmentStock.ts）
+  const hosting = useRecruitmentHosting()
+  const hostingOpen = hosting.status === 'ready' && hosting.enabled
   const [blocks, setBlocks] = useState<Partial<Record<BlockKey, BlockEntry>>>({})
   const [initialLoading, setInitialLoading] = useState(true)
 
@@ -595,6 +566,8 @@ export default function DashboardPage() {
   const toner = printers ? avgLevel(printers.map((printer) => printer.tonerLevel)) : null
   const paper = printers ? avgLevel(printers.map((printer) => printer.paperTrayLevel)) : null
   const fileStats = files ? fileAttention(files) : { expired: 0, sensitive: 0 }
+  const stockCounts = { hostingOpen, jobs: jobSources?.length ?? null, fairs: fairSources?.length ?? null }
+  const stockKpi = recruitmentStockKpi({ ...stockCounts, printers: printers ? { ready: readyPrinters, total: printerTotal } : null })
 
   const retry = (keys: BlockKey[]) => () => void loadBlocks(keys)
   const alertCount = alerts?.firingCount ?? 0
@@ -678,24 +651,14 @@ export default function DashboardPage() {
             onRetry={retry(['terminals'])}
           />
           <KpiCard
-            label="待审核数据"
-            icon={BriefcaseIcon}
-            value={String(
-              (jobSources !== null ? pendingJobCount(jobSources) : 0) +
-                (fairSources !== null ? pendingFairCount(fairSources) : 0),
-            )}
-            unit="条"
-            sub={(() => {
-              const parts: string[] = []
-              if (jobSources !== null) parts.push(`岗位 ${pendingJobCount(jobSources)}`)
-              if (fairSources !== null) parts.push(`招聘会 ${pendingFairCount(fairSources)}`)
-              return parts.join(' · ')
-            })()}
-            warn={jobSources !== null || fairSources !== null
-              ? pendingJobCount(jobSources ?? []) + pendingFairCount(fairSources ?? []) > 0
-              : false}
-            failed={jobSources === null || fairSources === null}
-            onRetry={retry(failedKeys(['jobSources', 'fairSources']))}
+            label={stockKpi.label}
+            icon={stockKpi.icon}
+            value={stockKpi.value}
+            unit={stockKpi.unit}
+            sub={stockKpi.sub}
+            warn={stockKpi.warn}
+            failed={stockKpi.failed}
+            onRetry={retry(failedKeys(stockKpi.retryKeys))}
           />
           <KpiCard
             label="待清理文件"
@@ -749,7 +712,7 @@ export default function DashboardPage() {
 
           {/* 右列 */}
           <div className="flex flex-col gap-4">
-            <SectionCard title="待办审核" action={<SectionLink href="/job-sources">全部</SectionLink>}>
+            <SectionCard title="待办事项">
               {(() => {
                 const failed = failedKeys(['jobSources', 'fairSources', 'files'])
                 if (jobSources === null && fairSources === null && files === null) {
@@ -759,8 +722,7 @@ export default function DashboardPage() {
                   return <BlockLoading />
                 }
                 const rows = buildTodoRows({
-                  jobSources: jobSources ?? [],
-                  fairSources: fairSources ?? [],
+                  recruitmentStock: recruitmentStockTodo(stockCounts),
                   files: files ?? [],
                 })
                 return (

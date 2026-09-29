@@ -440,7 +440,7 @@ export default function PrivacyRequestsPage() {
 
             {detail.requestType === 'delete' && (
               <div className="mt-4 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-2.5 text-[12.5px] text-warning-fg">
-                账号注销请求暂不开放操作（法务矩阵尚未签字）。如需处理，请联系法务团队后在后台手动操作。
+                账号注销请求暂不开放在线处理（法务矩阵尚未签字），本后台目前没有处理这类请求的入口。请联系法务团队确认处理方式。
               </div>
             )}
           </>
