@@ -27,7 +27,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type { FairVisitPlanResponse } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import { FileTextIcon, MapIcon, PrinterIcon, SparklesIcon, UsersIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -54,6 +53,7 @@ import {
   DirStrip,
   DirStripItem,
 } from '../../components/qingxu/directory/DirectoryBits'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 interface PageState {
   taskId?: string
@@ -96,6 +96,7 @@ const COPY = {
 
 export function FairVisitPlanPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const fairId = id ?? ''
@@ -189,17 +190,17 @@ export function FairVisitPlanPage() {
     try {
       const file = await printFairVisitPlan(fairId, taskId, { token: getToken(), accessToken })
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size: formatSize(file.sizeBytes),
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: file.pageCount > 1 ? 'double' : 'single', color: 'bw' }),
+      startPrint({
+        origin: 'fair_visit_plan',
+        returnPath: window.location.pathname,
+        paramsSuggestion: file.pageCount > 1 ? { duplex: 'duplex_long_edge' } : undefined,
+        file: {
+          name: file.filename,
+          size: formatSize(file.sizeBytes),
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
     } catch (err) {

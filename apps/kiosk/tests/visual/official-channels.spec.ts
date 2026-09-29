@@ -227,7 +227,7 @@ test('org terminal: each channel is a card with its own QR and the exact source 
   await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
   await expect(screenOf(page)).toHaveAttribute('data-state', 'items')
   await expect(page.getByRole('heading', { level: 1, name: '本机构官方渠道' })).toBeVisible()
-  await expect(page.locator('.qx-pagehead p')).toHaveText('扫码后在手机上打开本机构的官网或官方公众号。')
+  await expect(page.locator('.qx-pagehead p')).toHaveText('岗位和招聘会在机构官网办理。扫下面的码，在自己的手机上打开。')
   await expect(page.locator('.qx-pill')).toHaveText('2 个官方渠道')
   await expect(page.getByTestId('official-channels-org').locator('.dw-sec-h .t'), '分区标题写是哪一家机构').toHaveText(ORG)
   await expectChannelCards(page, 'org', ORG_SORTED)
@@ -254,6 +254,9 @@ test('the channels response may come in the success/data envelope too @w1-kiosk'
   await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
   await expect(screenOf(page)).toHaveAttribute('data-state', 'items')
   await expectChannelCards(page, 'org', [ORG_CHANNELS[0]!])
+  // 只有一张本机构渠道时照稿 45：码卡就是主角，不压机构名分区头（机构名在卡底来源说明里），问小青编 01。
+  await expect(page.getByTestId('official-channels-org').locator('.dw-sec-h')).toHaveCount(0)
+  await expect(page.getByTestId('official-channels-assist').locator('.dw-sec-h .no')).toHaveText('01')
 })
 
 test('a channel whose link is not http(s) gets no QR and no card @w1-kiosk', async ({ page, api }) => {
@@ -278,6 +281,8 @@ test('empty: says the terminal has no channel configured, not why, and offers wh
   await expect(empty.locator('.qx-state-t')).toHaveText('本终端暂未配置官方渠道')
   // 只说事实，不说原因（没绑机构、机构没录、被下架……一律不猜）。
   await expect(empty.locator('.qx-state-d')).toHaveText('可以先办下面这些事。')
+  // 页上没有码，页头就不能说「扫下面的码」。
+  await expect(page.locator('.qx-pagehead p')).toHaveText('岗位和招聘会在机构官网办理。本终端还没有配置可扫的官方渠道。')
   await expect(page.locator('.qx-pill')).toHaveText('暂未配置官方渠道')
   await expect(page.getByTestId('official-channel-card')).toHaveCount(0)
   const alternatives = page.getByTestId('official-channels-alternatives').locator('.qx-row-t')

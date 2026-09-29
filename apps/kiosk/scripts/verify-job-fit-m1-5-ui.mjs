@@ -93,8 +93,11 @@ expectMatches(jobFitApi, /\/resume\/job-fit\/\$\{encodeURIComponent\(taskId\)\}\
 expectIncludes(jobFitPage, 'printJobFit(taskId, { token: getToken(), accessToken })', '结果页使用当前会员或匿名凭证生成报告')
 expectMatches(jobFitPage, /if\s*\(\s*!file\.printFileUrl\s*\)\s*throw/, '内部打印 URL 缺失时诚实阻断')
 expectIncludes(jobFitPage, 'fileUrl: file.printFileUrl', '打印确认页只接收内部 printFileUrl')
-expectIncludes(jobFitPage, "navigate('/print/confirm'", '岗位匹配进入现有打印确认页')
-expectIncludes(jobFitPage, "makePrintParams({ copies: 1, duplex: 'single', color: 'bw' })", '岗位匹配复用统一打印参数')
+// 2026-09-29 商用收口 P0-5：进打印链改为先写打印交接上下文（startPrint / beginPrintHandoff），跳转只带交接编号；
+// 默认黑白单面不再由来源写死（参数在确认页与本机能力求交），所以原「navigate('/print/confirm'」「makePrintParams」两条换成 origin 断言。
+expectIncludes(jobFitPage, 'startPrint({', '岗位匹配写打印交接上下文后进入现有打印链')
+expectIncludes(jobFitPage, "origin: 'job_fit'", '岗位匹配按统一入口策略进入报价确认页（派生产物免检查）')
+expectIncludes(jobFitActionsPage, "origin: 'job_fit'", '行动页打印同样走打印交接上下文')
 expectAbsent(`${jobFitApi}\n${jobFitPage}`, /fileUrl:\s*file\.signedUrl|signedUrl/, '前端不把 signedUrl 交给打印任务')
 // 打印动作已随「怎么补」搬到行动页，因此这四条打印合同在行动页上原样重断一次。
 expectIncludes(jobFitActionsPage, 'printJobFit(taskId, { token: getToken(), accessToken })', '行动页使用当前会员或匿名凭证生成报告')

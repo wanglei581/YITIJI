@@ -48,8 +48,9 @@ for (const token of [
   'useBusyLock(generating || printing)',
   'if (!file.printFileUrl) throw new Error',
   'fileUrl: file.printFileUrl',
-  "navigate('/print/confirm'",
-  "makePrintParams({ copies: 1, duplex: 'single', color: 'bw' })",
+  // P0-5：写打印交接上下文后进打印链（跳转只带交接编号）
+  'startPrint({',
+  "origin: 'career_plan'",
 ]) {
   check(page.includes(token), `职业规划真实业务合同缺失：${token}`)
 }

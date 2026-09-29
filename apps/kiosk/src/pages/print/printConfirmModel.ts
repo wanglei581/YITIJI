@@ -1,6 +1,10 @@
-import { isRegisteredScreen, type PrintConfirmScreen } from './printConfirmQuery'
+import { isRegisteredScreen, type PrintConfirmScreen as RegisteredScreen } from './printConfirmQuery'
 
-export type { PrintConfirmScreen }
+/**
+ * 确认页的屏。地址栏能登记的只有 printConfirmQuery 那 8 个；`ordered`（这一份已经建过单）
+ * 只由交接上下文的建单标记进入，不能从地址栏指定。
+ */
+export type PrintConfirmScreen = RegisteredScreen | 'ordered'
 
 export const COLOR_MODE_LABEL: Record<string, string> = {
   black_white: '黑白',
@@ -25,9 +29,11 @@ export const PILL: Record<PrintConfirmScreen, { tone: 'ok' | 'warn' | 'bad' | 'u
   quoting: { tone: 'unknown', label: '正在计算本次费用' },
   quoted: { tone: 'ok', label: '报价已返回 · 请核对' },
   'quote-failed': { tone: 'bad', label: '报价失败 · 未建单' },
-  'capability-invalid-params': { tone: 'bad', label: '打印参数暂不可用' },
+  // 9/29 定稿（稿 14）：本机没开通的彩色 / 双面不再拦截，按能打的参数照常报价。状态键不改。
+  'capability-invalid-params': { tone: 'warn', label: '已按本机能用的参数报价' },
   'benefit-unverified': { tone: 'warn', label: '权益未核销 · 按原价' },
   'zero-amount': { tone: 'unknown', label: '零元单 · 仍须先建单' },
+  ordered: { tone: 'ok', label: '这一单已提交' },
 }
 
 /**
@@ -57,8 +63,8 @@ export const ASK: Record<PrintConfirmScreen, { title: readonly [string, string, 
     doing: '文件和参数已保留，本次没有创建订单。',
   },
   'capability-invalid-params': {
-    title: ['这些参数', '暂不可用', '。'],
-    doing: '请改为黑白、单面后重新获取报价。',
+    title: ['已按', '本机能用的参数', '报价。'],
+    doing: '本机暂未开通的项已改成能打的参数。价格以这组参数为准。',
   },
   'benefit-unverified': {
     title: ['核销没通过时', '按原价', '显示。'],
@@ -67,6 +73,10 @@ export const ASK: Record<PrintConfirmScreen, { title: readonly [string, string, 
   'zero-amount': {
     title: ['零元单', '也要先建单', '。'],
     doing: '确认后仍会创建打印订单，再进入打印流程。不存在不建单直接出纸的路径。',
+  },
+  ordered: {
+    title: ['这一单', '已经提交', '。'],
+    doing: '同一份文件不会再建第二单。要改参数或换文件，请重新发起打印。',
   },
 }
 
@@ -80,7 +90,14 @@ export function derivePrintConfirmScreen(input: {
   queryInvalid: boolean
   requestedState: string | null
   hasFile: boolean
-  paramsWereRestricted: boolean
+  /** 交接失效（归属不符、过期、被替换、写不进……）：不猜是哪一份。 */
+  handoffInvalid: boolean
+  /** 这一份交接已经建过单：只看状态，不能再建第二单。 */
+  ordered: boolean
+  /** 本机能力还在加载、而参数里有彩色或双面：先别报价。 */
+  waitingCapability: boolean
+  /** 参数已按本机能力改过（不拦截，按改后的参数报价并逐项说明）。 */
+  adjusted: boolean
   quote: QuoteView
   benefitsError: boolean
 }): PrintConfirmScreen {
@@ -88,11 +105,19 @@ export function derivePrintConfirmScreen(input: {
   if (input.requestedState !== null && input.requestedState !== '' && !isRegisteredScreen(input.requestedState)) {
     return 'invalid-context'
   }
+  if (input.handoffInvalid) return 'invalid-context'
   if (!input.hasFile) return 'missing-context'
-  if (input.paramsWereRestricted) return 'capability-invalid-params'
+  if (input.ordered) return 'ordered'
+  if (input.waitingCapability) return 'quoting'
   if (input.quote.status === 'loading' || input.quote.status === 'demo') return 'quoting'
   if (input.quote.status === 'unavailable') return 'quote-failed'
+  if (input.adjusted) return 'capability-invalid-params'
   if (input.quote.status === 'ready' && input.quote.amountCents === 0) return 'zero-amount'
   if (input.quote.status === 'ready' && input.benefitsError) return 'benefit-unverified'
   return 'quoted'
+}
+
+/** 哪些屏的主按钮能建单。参数被收口（capability-invalid-params）照常可点：用户按下就是对屏上价格的确认。 */
+export function confirmScreenAllowsOrder(screen: PrintConfirmScreen): boolean {
+  return screen === 'quoted' || screen === 'capability-invalid-params' || screen === 'zero-amount' || screen === 'benefit-unverified'
 }

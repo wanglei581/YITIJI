@@ -108,8 +108,10 @@ expectAbsent(page, /window\.open\(/, '我的文档不打开会逃逸公共终端
 // 默认黑白单面）一条没少，另加了「原件不许绕过检查」。
 expectMatches(
   page,
-  /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw[\s\S]*?fileId:\s*doc\.id,\s*\n\s*fileUrl:\s*res\.printFileUrl,\s*\n\s*mimeType:\s*doc\.mimeType[\s\S]*?if\s*\(documentNeedsPrintMaterialCheck\(doc\)\)\s*\{[\s\S]*?savePrintMaterialSession\(\{\s*file,\s*source\s*\}\)\s*\n\s*navigate\('\/print\/material-check',\s*\{\s*state:\s*\{\s*file,\s*source\s*\}\s*\}\)[\s\S]*?\}\s*else\s*\{\s*\n\s*navigate\('\/print\/confirm',\s*\{\s*\n\s*state:\s*\{\s*\n\s*file,\s*\n\s*params:\s*makePrintParams\(\{\s*copies:\s*1,\s*duplex:\s*'single',\s*color:\s*'bw'\s*\}\)/,
-  '打印文档只传内部 printFileUrl 并带 fileId：本人原件先整份写会话去材料检查，派生产物保留 /print/confirm state 结构和默认打印参数',
+  // 2026-09-29 P0-5：本人原件 / 派生产物的分流收进打印交接上下文（requiresCheck → printHandoffPolicy 定入口），
+  // 跳转只带交接编号；转换件按原件过材料检查（convertedFrom）。只传内部 printFileUrl、带 fileId 两条不变。
+  /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw[\s\S]*?fileId:\s*doc\.id,\s*\n\s*fileUrl:\s*res\.printFileUrl,\s*\n\s*mimeType:\s*doc\.mimeType[\s\S]*?const requiresCheck = documentNeedsPrintMaterialCheck\(doc, convertedFrom\)[\s\S]*?startPrint\(\{\s*\n\s*origin:\s*'my_documents',\s*\n\s*requiresCheck,/,
+  '打印文档只传内部 printFileUrl 并带 fileId：写打印交接上下文，本人原件（含原件转出的 PDF）先去材料检查，派生产物直达确认页',
 )
 {
   // 分流判据必须与服务端建单闸门同一份用途清单：服务端多管一种用途而这里没跟上，
