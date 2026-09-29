@@ -23,6 +23,7 @@ import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { adminPaperStatus, describePrinterFault, normalizeDiskFreeGb, toAdminPrinterStatus } from './admin-printer-status'
 import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
+import { terminalOrgBindingOnCreate, terminalOrgBindingWrite } from './terminal-org-binding'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
@@ -229,6 +230,7 @@ export class TerminalAdminService {
           displayName: cleanNullable(dto.displayName),
           locationLabel: cleanNullable(dto.locationLabel),
           orgId,
+          orgBoundAt: terminalOrgBindingOnCreate(orgId, new Date()),
         },
       })
       return {
@@ -352,7 +354,7 @@ export class TerminalAdminService {
     return { organizations }
   }
 
-  async assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult> {
+  async assignTerminalOrg(terminalId: string, orgId: string | null, now: Date = new Date()): Promise<AssignTerminalOrgResult> {
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
       select: { id: true, terminalCode: true, orgId: true },
@@ -378,7 +380,10 @@ export class TerminalAdminService {
     }
 
     const oldOrgId = terminal.orgId
-    await this.prisma.terminal.update({ where: { id: terminal.id }, data: { orgId } })
+    await this.prisma.terminal.update({
+      where: { id: terminal.id },
+      data: terminalOrgBindingWrite(oldOrgId, orgId, now),
+    })
 
     return {
       terminalId: terminal.terminalCode,

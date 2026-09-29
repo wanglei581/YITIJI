@@ -71,7 +71,7 @@ for (const healthy of ['ready', 'ok', 'idle']) {
   assert.equal(describePrinterFault(true, healthy), null, `${healthy} must not carry a fault`)
 }
 assert.equal(toAdminPrinterStatus(true, 'low_paper'), 'online')
-assert.equal(describePrinterFault(true, 'low_paper'), '纸张不足，请尽快补充 A4 纸张')
+assert.equal(describePrinterFault(true, 'low_paper'), '纸张不足，可打印、需补纸')
 assert.equal(adminPaperStatus('low_paper'), 'low')
 assert.equal(adminPaperStatus('paper_empty'), 'empty')
 assert.equal(adminPaperStatus('ready'), null)

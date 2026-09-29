@@ -92,7 +92,13 @@ function deviceCallouts(twin: TwinTerminalTwinLike, state: TwinState): TwinDevic
       key: 'printer',
       label: '打印机',
       value: `${p.errorLabel ?? PRINTER_TEXT[p.state]} · ${caps}`,
-      tone: p.state === 'error' ? 'err' : p.state === 'offline' ? 'err' : p.state === 'unknown' ? 'muted' : 'ok',
+      tone: p.state === 'error' || p.state === 'offline'
+        ? 'err'
+        : p.errorLabel
+          ? 'warn'
+          : p.state === 'unknown'
+            ? 'muted'
+            : 'ok',
     })
   } else {
     out.push(unavailableCallout('printer', '打印机', twin.printer.reason, '待接入'))

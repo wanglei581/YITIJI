@@ -20,7 +20,7 @@ export interface PeripheralItem {
 const PRINTER_ADVICE: Readonly<Record<string, string>> = {
   offline: '检查打印机电源、网线或 USB 线，确认驱动里的打印机名称与终端配置一致。',
   error: '到现场看打印机面板报错（卡纸、缺粉、盖板未关），处理后重新上电。',
-  low_paper: '补充 A4 纸。',
+  low_paper: '可打印，补充 A4 纸。',
   paper_empty: '补充 A4 纸。',
   not_found: '确认打印机驱动已安装，终端配置里的打印机名称与驱动一致。',
   unknown: '驱动没有返回状态；持续出现时重启 Terminal Agent 或检查打印机驱动。',

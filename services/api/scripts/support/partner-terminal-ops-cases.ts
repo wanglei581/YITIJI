@@ -20,7 +20,10 @@ import {
   summarizeFaults,
   summarizeOutput,
   suppressCount,
+  terminalOpsEffectiveFrom,
+  terminalOpsHeartbeatSeedRange,
 } from '../../src/orgs/partner-terminal-ops'
+import { verifyTerminalRebindIsolation } from './partner-terminal-rebind-cases'
 
 type Assert = (label: string, condition: boolean, detail?: string) => void
 
@@ -234,7 +237,42 @@ function verifyPure(assert: Assert): void {
   const unknownOnly = fold([[4, 'unknown'], [3, null], [2, 'unknown'], [1, 'ready']])
   assert('T3h. unknown / null 不开始故障段', unknownOnly.printerFaultCount === 0, JSON.stringify(unknownOnly))
   const lowPaper = fold([[4, 'low_paper'], [3, 'ready']])
-  assert('T3i. 非正常且非 unknown 的状态（如 low_paper）开始故障段，与数据大屏 isPrinterIssueStatus 同口径', lowPaper.printerFaultCount === 1)
+  assert(
+    'T3i. 纸张不足（仍可打印、需补纸）不开始故障段，也不算未恢复',
+    lowPaper.printerFaultCount === 0 && lowPaper.unrecovered === false,
+    JSON.stringify(lowPaper),
+  )
+  const lowPaperOnly = fold([[4, 'low_paper']])
+  assert(
+    'T3i1. 只有纸张不足：故障次数为 0，不算未恢复',
+    lowPaperOnly.printerFaultCount === 0 && lowPaperOnly.unrecovered === false,
+    JSON.stringify(lowPaperOnly),
+  )
+  const endedByLowPaper = fold([[6, 'error'], [4, 'low_paper']])
+  assert(
+    'T3i2. 纸张不足结束已有故障（打印机重新可打印），本身不再另计一次',
+    endedByLowPaper.printerFaultCount === 1 && endedByLowPaper.unrecovered === false && endedByLowPaper.printerFaultMinutes === 2,
+    JSON.stringify(endedByLowPaper),
+  )
+  const windowFrom = new Date('2026-09-01T00:00:00.000Z')
+  const boundLater = new Date('2026-09-20T00:00:00.000Z')
+  const boundEarlier = new Date('2026-08-01T00:00:00.000Z')
+  assert(
+    'T3m. 有效开始 = max(窗口开始, orgBoundAt)；orgBoundAt 为空按窗口开始（回填后不应再出现空值）',
+    terminalOpsEffectiveFrom(windowFrom, null).getTime() === windowFrom.getTime()
+      && terminalOpsEffectiveFrom(windowFrom, boundLater).getTime() === boundLater.getTime()
+      && terminalOpsEffectiveFrom(windowFrom, boundEarlier).getTime() === windowFrom.getTime(),
+  )
+  const legacySeed = terminalOpsHeartbeatSeedRange(windowFrom, null)
+  const earlierSeed = terminalOpsHeartbeatSeedRange(windowFrom, boundEarlier)
+  assert(
+    'T3n. 绑定不早于有效窗口时不取绑定前心跳做种子；更早的绑定只取绑定之后、窗口之前',
+    terminalOpsHeartbeatSeedRange(windowFrom, boundLater) === null
+      && legacySeed?.lt.getTime() === windowFrom.getTime()
+      && legacySeed.gte === undefined
+      && earlierSeed?.gte?.getTime() === boundEarlier.getTime()
+      && earlierSeed.lt.getTime() === windowFrom.getTime(),
+  )
 
   const seeded = fold([[710, 'ready']], { at: new Date(from.getTime() - 30 * MIN), printer: 'error' })
   // 窗口前 30 分钟有过心跳（打印机异常）→ 窗口起点到第一条窗口内心跳（+10 分钟）算离线与故障各 10 分钟；
@@ -479,6 +517,8 @@ export async function verifyTerminalOperations(
   } finally {
     await cleanup()
   }
+
+  await verifyTerminalRebindIsolation(assert, prisma)
 }
 
 function terminalOpsKeys(value: unknown): Set<string> {

@@ -29,6 +29,8 @@ import {
   HeartbeatFolder,
   assembleTerminalOperations,
   summarizeOutput,
+  terminalOpsEffectiveFrom,
+  terminalOpsHeartbeatSeedRange,
   type PartnerTerminalOperations,
   type TerminalOpsRaw,
 } from './partner-terminal-ops'
@@ -218,6 +220,8 @@ export class PartnerStatsService {
    * 本机构终端运营数据。窗口 = 上海自然日起点（近 7/30/90 天）到当前。
    * 终端集合只取 Terminal.orgId = 本机构；集合为空直接返回空结果，后续查询一条都不发，
    * 所以任何情况下都不会退化成全局查询。
+   * 每台终端只统计 max(窗口开始, orgBoundAt) 之后的打印、扫描和心跳，改绑前的数据不计入。
+   * 服务人次仍按 KioskSession.orgId 快照，不看 orgBoundAt。
    */
   async getTerminalOperations(
     orgId: PartnerOrgId,
@@ -229,31 +233,43 @@ export class PartnerStatsService {
     const terminals = await this.prisma.terminal.findMany({
       where: { orgId: scopedOrgId },
       orderBy: { terminalCode: 'asc' },
-      select: { id: true, terminalCode: true, displayName: true, locationLabel: true },
+      select: { id: true, terminalCode: true, displayName: true, locationLabel: true, orgBoundAt: true },
     })
     if (terminals.length === 0) {
       return assembleTerminalOperations({ period, from, now, rows: [], visitRecordingStarted: false })
     }
 
     const ids = terminals.map((terminal) => terminal.id)
-    const created = { gte: from, lte: now }
+    const since = (orgBoundAt: Date | null) => terminalOpsEffectiveFrom(from, orgBoundAt)
     const [printCreated, scanCreated, settled, visits, visitRecordingStarted] = await Promise.all([
       this.prisma.printTask.groupBy({
         by: ['terminalId'],
-        where: { terminalId: { in: ids }, createdAt: created },
+        where: {
+          OR: terminals.map((terminal) => ({
+            terminalId: terminal.id,
+            createdAt: { gte: since(terminal.orgBoundAt), lte: now },
+          })),
+        },
         _count: { _all: true },
       }),
       this.prisma.scanTask.groupBy({
         by: ['terminalId'],
-        where: { terminalId: { in: ids }, createdAt: created },
+        where: {
+          OR: terminals.map((terminal) => ({
+            terminalId: terminal.id,
+            createdAt: { gte: since(terminal.orgBoundAt), lte: now },
+          })),
+        },
         _count: { _all: true },
       }),
       this.prisma.printTask.groupBy({
         by: ['terminalId', 'status', 'printOutcome', 'errorCode'],
         where: {
-          terminalId: { in: ids },
           status: { in: ['completed', 'failed'] },
-          completedAt: created,
+          OR: terminals.map((terminal) => ({
+            terminalId: terminal.id,
+            completedAt: { gte: since(terminal.orgBoundAt), lte: now },
+          })),
         },
         _count: { _all: true },
       }),
@@ -276,7 +292,7 @@ export class PartnerStatsService {
             count: row._count._all,
           })),
       )
-      const folder = await this.foldHeartbeats(terminal.id, from, now)
+      const folder = await this.foldHeartbeats(terminal.id, from, terminal.orgBoundAt, now)
       rows.push({
         terminalCode: terminal.terminalCode,
         displayName: terminal.displayName,
@@ -292,19 +308,29 @@ export class PartnerStatsService {
     return assembleTerminalOperations({ period, from, now, rows, visitRecordingStarted })
   }
 
-  private async foldHeartbeats(terminalId: string, from: Date, now: Date): Promise<HeartbeatFolder> {
-    const [seed, printerSeed] = await Promise.all([
-      this.prisma.terminalHeartbeat.findFirst({
-        where: { terminalId, createdAt: { lt: from } },
-        orderBy: { createdAt: 'desc' },
-        select: { createdAt: true },
-      }),
-      this.prisma.terminalHeartbeat.findFirst({
-        where: { terminalId, createdAt: { lt: from }, printerStatus: { not: null, notIn: ['unknown'] } },
-        orderBy: { createdAt: 'desc' },
-        select: { printerStatus: true },
-      }),
-    ])
+  private async foldHeartbeats(
+    terminalId: string,
+    windowFrom: Date,
+    orgBoundAt: Date | null,
+    now: Date,
+  ): Promise<HeartbeatFolder> {
+    const from = terminalOpsEffectiveFrom(windowFrom, orgBoundAt)
+    const seedRange = terminalOpsHeartbeatSeedRange(windowFrom, orgBoundAt)
+    // 纸张不足也要读到：它不是故障种子。若跳过它去取更早的 error，会把已经能打印的故障重新打开。
+    const [seed, printerSeed] = seedRange
+      ? await Promise.all([
+        this.prisma.terminalHeartbeat.findFirst({
+          where: { terminalId, createdAt: seedRange },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        }),
+        this.prisma.terminalHeartbeat.findFirst({
+          where: { terminalId, createdAt: seedRange, printerStatus: { not: null, notIn: ['unknown'] } },
+          orderBy: { createdAt: 'desc' },
+          select: { printerStatus: true },
+        }),
+      ])
+      : [null, null]
     const folder = new HeartbeatFolder({
       from,
       now,

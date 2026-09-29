@@ -1,5 +1,5 @@
 import type { PrismaService } from '../prisma/prisma.service'
-import { HEALTHY_PRINTER_STATUS_VALUES, isHealthyPrinterStatus } from '../terminals/printer-status'
+import { HEALTHY_PRINTER_STATUS_VALUES, isHealthyPrinterStatus, isLowPaperWarning } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import {
   buildSubjectKey,
@@ -211,7 +211,10 @@ function buildTerminalAlert(
   }
 
   if (lastHeartbeat?.printerStatus && !isHealthyPrinterStatus(lastHeartbeat.printerStatus)) {
-    const label = PRINTER_STATUS_LABELS[lastHeartbeat.printerStatus] ?? `打印机状态异常(${lastHeartbeat.printerStatus})`
+    const lowPaper = isLowPaperWarning(lastHeartbeat.printerStatus)
+    const label = lowPaper
+      ? '纸张不足，可打印、需补纸'
+      : (PRINTER_STATUS_LABELS[lastHeartbeat.printerStatus] ?? `打印机状态异常(${lastHeartbeat.printerStatus})`)
     const subjectKey = buildSubjectKey('printer_issue', terminal.id)
     const healthyAt = lastHealthyAt ?? terminal.registeredAt
     return {
@@ -220,9 +223,11 @@ function buildTerminalAlert(
       subjectId: terminal.id,
       episodeToken: printerIssueEpisodeToken(lastHeartbeat.printerStatus, healthyAt),
       type: 'printer_issue',
-      severity: lastHeartbeat.printerStatus === 'paper_empty' ? 'warning' : 'error',
+      severity: lowPaper || lastHeartbeat.printerStatus === 'paper_empty' ? 'warning' : 'error',
       title: `终端 ${terminal.terminalCode} ${label}`,
-      detail: `终端在线,但最近心跳上报打印机状态为 ${lastHeartbeat.printerStatus}`,
+      detail: lowPaper
+        ? '终端在线，纸张不足，仍可打印，请补纸。'
+        : `终端在线,但最近心跳上报打印机状态为 ${lastHeartbeat.printerStatus}`,
       terminalCode: terminal.terminalCode,
       occurredAt: lastHeartbeat.createdAt.toISOString(),
     }

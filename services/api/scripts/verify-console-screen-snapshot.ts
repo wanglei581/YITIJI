@@ -442,7 +442,8 @@ function deriveTerminalTimelineQuadratic(input: TimelineSample): TimelineDeriveR
     const from = Math.max(at, windowStart)
     const to = Math.min(at + onlineWindowMs, nowMs)
     const status = heartbeat.printerStatus
-    const alert = Boolean(status) && status !== 'unknown' && !isHealthyPrinterStatus(status)
+    // 与 deriveTerminalTimeline 的 printerIssue 同口径：纸张不足仍可打印，不算故障段。
+    const alert = Boolean(status) && status !== 'unknown' && status !== 'low_paper' && !isHealthyPrinterStatus(status)
     segments = overlay(segments, from, to, alert ? 'alert' : 'idle')
   }
   for (const print of input.prints) {

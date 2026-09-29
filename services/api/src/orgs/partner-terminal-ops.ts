@@ -7,8 +7,7 @@
 // 任务 id、错误码或任何单据级字段。
 
 import { suppressTerminalTodayCount } from '../console-screen/console-screen.twin'
-import { isPrinterIssueStatus } from '../console-screen/console-screen.fleet'
-import { isHealthyPrinterStatus } from '../terminals/printer-status'
+import { isHealthyPrinterStatus, isLowPaperWarning, isPrinterFaultStatus } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import { SCREEN_MIN_AGGREGATE_SAMPLE, SCREEN_TIMEZONE } from '../console-screen/console-screen.types'
 import type { StatsPeriod } from './partner-stats.service'
@@ -18,6 +17,31 @@ export const TERMINAL_OPS_MIN_SAMPLE = SCREEN_MIN_AGGREGATE_SAMPLE
 
 /** 相邻两条心跳间隔超过它就算离线；与在线判定、后台终端列表同一个 5 分钟窗口。 */
 export const TERMINAL_OPS_OFFLINE_GAP_MS = TERMINAL_ONLINE_WINDOW_MS
+
+/**
+ * 这台终端在本机构名下、且落在统计窗口内的起点。
+ * orgBoundAt 为空而终端仍挂着机构：迁移回填之后不应出现（旧数据按审计或注册时间回填）。
+ * 出现时按窗口开始，避免把整段统计清成 0。
+ */
+export function terminalOpsEffectiveFrom(windowFrom: Date, orgBoundAt: Date | null): Date {
+  if (!orgBoundAt) return windowFrom
+  return orgBoundAt.getTime() > windowFrom.getTime() ? orgBoundAt : windowFrom
+}
+
+/**
+ * 窗口开始前用来判断跨窗口离线 / 故障是否还开着的心跳范围。
+ * 绑定时间不早于有效起点时返回 null：不能把上一机构的最后一条心跳当种子，
+ * 否则改绑后会把别人的离线或故障带进本机构。
+ */
+export function terminalOpsHeartbeatSeedRange(
+  windowFrom: Date,
+  orgBoundAt: Date | null,
+): { gte?: Date; lt: Date } | null {
+  const from = terminalOpsEffectiveFrom(windowFrom, orgBoundAt)
+  if (orgBoundAt && orgBoundAt.getTime() >= from.getTime()) return null
+  if (orgBoundAt) return { gte: orgBoundAt, lt: from }
+  return { lt: from }
+}
 
 export const AI_AVAILABILITY_UNAVAILABLE_REASON = 'ai_calls_not_attributed_to_terminal' as const
 
@@ -114,9 +138,10 @@ export function successRate(output: OutputRaw): number | null {
  *       最后一条之后超过 5 分钟仍没有心跳，算到当前、记为未恢复。
  *       窗口开始前最后一条心跳（seed）参与判断，所以跨窗口起点的离线也算得到；
  *       从未上报过的终端不推断离线（没装机和坏了分不开）。
- * 打印机故障：从第一条「异常」心跳开始，到其后第一条「正常」心跳结束；
+ * 打印机故障：从第一条故障心跳开始，到其后第一条「正常」或「纸张不足」心跳结束。
+ *       纸张不足仍可打印，是预警：不开始故障，但能结束已有故障（打印机重新可打印）。
  *       null / unknown 既不开始也不结束一段故障。
- * 所有时长都截到统计窗口 [from, now] 内。
+ * 所有时长都截到 [from, now]。调用方传入的 from 已是 max(统计窗口开始, orgBoundAt)。
  */
 export class HeartbeatFolder {
   private readonly from: number
@@ -140,7 +165,7 @@ export class HeartbeatFolder {
     this.now = input.now.getTime()
     this.offlineGapMs = input.offlineGapMs ?? TERMINAL_OPS_OFFLINE_GAP_MS
     this.lastAt = input.seedAt ? input.seedAt.getTime() : null
-    if (isPrinterIssueStatus(input.seedPrinterStatus)) this.printerFaultSince = this.from
+    if (isPrinterFaultStatus(input.seedPrinterStatus)) this.printerFaultSince = this.from
   }
 
   get lastHeartbeatAt(): Date | null {
@@ -161,9 +186,9 @@ export class HeartbeatFolder {
     this.lastAt = at
 
     const status = heartbeat.printerStatus
-    if (this.printerFaultSince === null && isPrinterIssueStatus(status)) {
+    if (this.printerFaultSince === null && isPrinterFaultStatus(status)) {
       this.printerFaultSince = at
-    } else if (this.printerFaultSince !== null && isHealthyPrinterStatus(status)) {
+    } else if (this.printerFaultSince !== null && (isHealthyPrinterStatus(status) || isLowPaperWarning(status))) {
       this.addSegment('printer', this.printerFaultSince, at)
       this.printerFaultSince = null
     }
