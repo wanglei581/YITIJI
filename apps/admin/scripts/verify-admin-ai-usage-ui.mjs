@@ -9,8 +9,10 @@
 //   C. 显示名与金额：null key → 「未关联终端 / 未关联机构」；已知功能 / 供应商 key 给中文名；
 //      认不出的 key 原样显示；金额两位小数带「元」。
 //   D. 面板真渲染：演示模式诚实空态；读取中 / 失败重试 / 正常三态；触顶告警引用服务端原话；
-//      四个页签；0 调用如实显示；未来日期不采纳。
+//      四个页签；0 调用如实显示；未来日期不采纳。失败只显示中文说明，不显示错误码。
 //   E. 纪律：面板源码不含「预计 / 估算 / 预测」；按钮可点区域 ≥48px；index.tsx 三个分支都挂面板。
+//   F. 返工：选中页签有 aria 选中态且是实色底白字；面板渲染结果无状态码 / 英文错误码 / 字段名；
+//      旧日志概览在 0 次调用时不显示 0% 成功率。
 //
 // Run: pnpm --filter @ai-job-print/admin verify:admin-ai-usage-ui
 
@@ -499,7 +501,7 @@ await check('D5 当天 0 调用：如实显示 0，不装作没查到', async ()
   assert.match(textOf(tree), /0\.00 元 \/ 100\.00 元/)
 })
 
-await check('D6 失败可重试：显示服务端说明与错误码，重试后恢复', async () => {
+await check('D6 失败可重试：只显示服务端中文说明，不显示错误码，重试后恢复', async () => {
   let attempt = 0
   const panel = mountPanel({
     get: () => {
@@ -511,7 +513,7 @@ await check('D6 失败可重试：显示服务端说明与错误码，重试后�
   })
   let tree = await panel.view.settle()
   assert.match(textOf(tree), /AI 用量读取失败：日期格式应为 YYYY-MM-DD/)
-  assert.match(textOf(tree), /AI_USAGE_DAY_INVALID/)
+  assert.doesNotMatch(textOf(tree), /AI_USAGE_DAY_INVALID/, '失败说明不能把英文错误码给运营看')
   act.click(buttons(tree, '重试')[0])
   panel.view.render() // 点击只改状态，要再渲染一次 effect 才会发出第二次请求
   assert.equal(panel.calls.length, 2)
@@ -616,6 +618,84 @@ await check('E4 新文件都在 300 行以内', () => {
 
 await check('E5 package.json 注册本门禁', () => {
   assert.match(read('package.json'), /"verify:admin-ai-usage-ui": "node scripts\/verify-admin-ai-usage-ui\.mjs"/)
+})
+
+// ─── F. 返工口径（渲染结果，不靠注释过关） ────────────────────────────────────
+const STATUS_CODE = /(?:^|[^0-9.])(?:503|500|403|401|400)(?![0-9])/
+const ERROR_CODE = /\b(?:AI|AUTH|HTTP)_[A-Z0-9_]+\b/
+const FIELD_NAME = /\b(?:chargedCostCny|unmeasuredCalls|measuredCostCny|terminalIds|globalCny|memberCount|unmeasuredCallCostCny|estimatedCostCny)\b/
+
+function assertOperatorFacing(text, where) {
+  assert.doesNotMatch(text, STATUS_CODE, `${where} 出现了 HTTP 状态码`)
+  assert.doesNotMatch(text, ERROR_CODE, `${where} 出现了英文错误码`)
+  assert.doesNotMatch(text, FIELD_NAME, `${where} 出现了字段名`)
+}
+
+await check('F1 选中页签有 aria 选中态，且是实色底白字（同页分段按钮），未选中不是这个底', async () => {
+  const panel = mountPanel({})
+  let tree = await panel.view.settle()
+  const selected = () => find(tree, (node) => node.type === 'button' && node.props.role === 'tab' && node.props['aria-selected'] === true)
+  const idle = () => find(tree, (node) => node.type === 'button' && node.props.role === 'tab' && node.props['aria-selected'] !== true)
+  assert.equal(selected().length, 1, '同一时刻只能有一个选中页签')
+  const on = selected()[0]
+  assert.equal(textOf(on.children).trim(), '按功能', '默认选中应按功能')
+  assert.match(String(on.props.className), /bg-primary-600/, '选中态要用实色 primary-600 底')
+  assert.match(String(on.props.className), /text-white/, '选中态要用白字')
+  assert.match(String(on.props.className), /appearance-none/, '选中态要去掉原生按钮外观，避免画成浅底浅字')
+  assert.doesNotMatch(String(on.props.className), /transition-colors/, '选中态不要颜色过渡，过渡中途会看起来像禁用')
+  assert.ok(idle().length >= 3, '未选中页签也要在')
+  for (const node of idle()) {
+    assert.equal(node.props['aria-selected'], false, `未选中页签「${textOf(node.children)}」的 aria-selected 必须是 false`)
+    assert.doesNotMatch(String(node.props.className), /bg-primary-600/, '未选中页签不能用选中底色')
+  }
+  act.click(tabs(tree, '按机构')[0])
+  tree = panel.view.render()
+  const org = selected()
+  assert.equal(org.length, 1)
+  assert.equal(textOf(org[0].children).trim(), '按机构')
+  assert.equal(org[0].props['aria-selected'], true)
+  assert.match(String(org[0].props.className), /bg-primary-600/)
+  assert.match(String(org[0].props.className), /text-white/)
+})
+
+await check('F2 面板渲染结果不含 HTTP 状态码、英文错误码、字段名；触顶保留服务端原话', async () => {
+  const summary = SAMPLE()
+  summary.day = '2026-09-29'
+  summary.reached = { global: true, terminalIds: ['kiosk-01'], memberCount: 1 }
+  const panel = mountPanel({ get: () => Promise.resolve(summary) })
+  const text = textOf(await panel.view.settle())
+  assert.ok(text.includes(EXHAUSTED_GLOBAL), '触顶仍要引用服务端原话')
+  assert.match(text, /会被拒绝，并提示「/)
+  assert.match(text, /AI简历优化/, '已知功能显示中文名')
+  assert.doesNotMatch(text, /resume_optimize/, '已知功能不要再附英文 key')
+  assert.match(text, /kiosk-01/, '终端号要保留')
+  assertOperatorFacing(text, '触顶面板')
+
+  const failed = mountPanel({
+    get: () => Promise.reject(new ApiHttpError('AI_USAGE_DAY_INVALID', '日期格式应为 YYYY-MM-DD', 400)),
+  })
+  const errorText = textOf(await failed.view.settle())
+  assert.match(errorText, /日期格式应为 YYYY-MM-DD/)
+  assertOperatorFacing(errorText, '读取失败')
+})
+
+await check('F3 旧日志概览：0 次调用不显示 0% 成功率，页面改叫按日志估算的成本', () => {
+  const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
+  assert.equal(display.logOverviewRate(0, 0), '—', '0 次调用不能显示 0% 成功率')
+  assert.equal(display.logOverviewRate(0, 100), '—')
+  assert.equal(display.logOverviewLatency(0, 0), '—', '0 次调用不能显示 0 ms')
+  assert.equal(display.logOverviewRate(4, 0), '0%', '有调用且全部失败时 0% 是真实结果')
+  assert.equal(display.logOverviewRate(4, 95), '95%')
+  assert.equal(display.logOverviewLatency(3, 120), '120 ms')
+  const index = read('src/routes/ai-services/index.tsx')
+  assert.match(index, /logOverviewRate\(/, '今日概览的成功率必须走 logOverviewRate')
+  assert.match(index, /logOverviewLatency\(/, '今日概览的平均响应时间必须走 logOverviewLatency')
+  assert.match(index, /今日暂无调用/)
+  assert.match(index, /label="按日志估算的成本"/)
+  assert.match(index, /和上面额度面板的「已计费金额」不是一回事/)
+  assert.doesNotMatch(index, /label="预估成本"/)
+  assert.doesNotMatch(index, /value=\{`\$\{successRate\}%`\}/)
+  assert.doesNotMatch(index, /value=\{`\$\{usage\.avgLatencyMs\} ms`\}/)
 })
 
 console.log(`\nALL PASS（${passed} 项）`)
