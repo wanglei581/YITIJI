@@ -878,9 +878,12 @@ function runOversizePg(sql) {
     return { skipped: true, out: '', note: `initdb 没成功，计数 SQL 没真跑：${(init.stderr || init.stdout || '').slice(0, 300)}` }
   }
   const port = 25000 + (process.pid % 20000)
+  // macOS 上 postmaster 没有 LC_ALL 会以「postmaster became multithreaded during startup」退出，
+  // 门禁随之假红；由门禁自己带上，不依赖跑的人的环境。
   const child = spawn(postgres, ['-D', data, '-k', sock, '-p', String(port), '-c', 'listen_addresses='], {
     detached: true,
     stdio: 'ignore',
+    env: { ...process.env, LC_ALL: 'C' },
   })
   child.unref()
   const stop = () => {
