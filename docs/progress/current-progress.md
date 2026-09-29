@@ -1,5 +1,7 @@
 # 当前开发进度
 
+> **2026-09-29 发布复核修复（候选，尚未发布，PR #1118）**：信号从备份一直挂到发布结束。备份阶段收到 HUP/INT/TERM 先删 partial，再以 128+信号号退出；回退陷阱生效后走和失败同一条运行目录恢复；健康检查通过后只退出、不回退。清 .env 临时文件的 EXIT trap 保留。`DEPLOY_MIN_FREE_FLOOR_MB`、`DEPLOY_MIN_FREE_MARGIN_MB`、`DEPLOY_BACKUP_KEEP` 和构建前的 `DEPLOY_MIN_FREE_BUILD_MB` 只接受 1–7 位十进制，保留数再限制 1–20，不合法回到默认。只有 partial 的组不占名额并删除；健康检查通过后写 `<stem>.ok`，无论 keep 多少都留下最新一组带 .ok 的完整备份，并且不会删到 0 组完整备份。server-cleanup 按同一套分组，dry-run 标出不完整组和最近一次成功发布。API 目录 du 失败按 3072MB 估算。full 构建前对部署目录和备份目录所在分区做只读 df，门槛默认 6144MB；10GB 仍由发布脚本在清理之后判断。SSH 脚本结束时删掉本次 `/tmp/release.bundle`。删不掉的备份组改为警告列出 stem；pm2-logrotate 只读打印 max_size、retain、compress。
+
 > **2026-09-29 发布磁盘门槛（候选，尚未发布）**：`deploy-api-release.sh` 的 0b 门槛改为 max(原公式 REQUIRED_MB, `DEPLOY_MIN_FREE_FLOOR_MB`)，下限默认 10240MB。不够时默认先 `pnpm store prune`，再调用已有的 `prune_old_backups` 把旧备份收到 `DEPLOY_BACKUP_KEEP`（默认 3）组，然后复判一次；`DEPLOY_PRE_GATE_SAFE_CLEANUP=false` 关掉这次清理。清理后仍不够就中止，并指向 Server Cleanup 工作流的 dry-run。full 发布在服务器安装依赖之前另做一次只读下限检查，那边不清理。pg_dump 与运行目录先写 `.partial`，成功后再改名。摘要打印前后可用空间，并只读检查 pm2-logrotate。server-cleanup 把 `.migrations.log` 算进同一组。deploy-precheck 额外报静态备份大小、组数、最老日期，以及 `/tmp/release.bundle` 是否还在。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。

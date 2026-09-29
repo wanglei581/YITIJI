@@ -146,6 +146,7 @@ jobs:
             umask "$PREVIOUS_UMASK"
             cleanup_control_plane_helper() {
               rm -f -- "$CONTROL_PLANE_HELPER"
+              rm -f -- /tmp/release.bundle
             }
             trap cleanup_control_plane_helper EXIT
             if [ -z "${CONTROL_PLANE_DEPLOY_HELPER_B64:-}" ] || [ -z "${CONTROL_PLANE_DEPLOY_HELPER_SHA256:-}" ]; then
@@ -228,17 +229,60 @@ jobs:
 
             if [ "$DEPLOY_SCOPE" = "full" ]; then
               echo "=== full 发布构建前磁盘检查（只读，不清理）==="
-              # 与 deploy-api-release.sh 0b 的下限同一默认值。这里只读 df，不清理。
-              # full 发布在进 API helper 之前就要 pnpm install 并构建三端，空间不够必须在那之前停。
-              FLOOR_MB="${DEPLOY_MIN_FREE_FLOOR_MB:-10240}"
-              case "$FLOOR_MB" in
-                ''|*[!0-9]*) FLOOR_MB=10240 ;;
-              esac
-              AVAIL_MB="$(df -Pm / 2>/dev/null | awk 'NR==2{print $4}' | tr -dc '0-9' || true)"
-              : "${AVAIL_MB:=0}"
-              echo "FULL_BUILD_DISK_AVAIL_MB=${AVAIL_MB} DEPLOY_MIN_FREE_FLOOR_MB=${FLOOR_MB}"
-              if [ "$AVAIL_MB" -lt "$FLOOR_MB" ]; then
-                echo "::error::构建前磁盘空间不足：可用 ${AVAIL_MB}MB < 下限 ${FLOOR_MB}MB。未安装依赖、未构建三端前端。请先跑工作流 Server Cleanup (backups / pnpm store / journal)，先 dry-run（输入 dry_run=true）。" >&2
+              # 只挡构建本身写满盘，默认 6144MB。10GB 发布门槛仍由发布脚本在清理之后判断，
+              # 可用空间落在两者之间时，发布脚本还能先做安全清理。
+              # 部署目录和备份目录不在同一分区时，两个都量，取较小的可用 MB。这里只读 df，不清理。
+              normalize_build_mb() {
+                local raw="$1" shown stripped
+                shown="$raw"
+                if [ "${#shown}" -gt 32 ]; then
+                  shown="${shown:0:32}..."
+                fi
+                case "$raw" in
+                  ''|*[!0-9]*|[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*)
+                    echo "::warning::DEPLOY_MIN_FREE_BUILD_MB=${shown} 不是 1 到 7 位数字，改用默认值 6144" >&2
+                    printf '%s' 6144
+                    return 0
+                    ;;
+                esac
+                stripped="${raw#"${raw%%[!0]*}"}"
+                if [ -z "$stripped" ]; then
+                  stripped=0
+                fi
+                printf '%s' "$((10#$stripped))"
+              }
+              disk_avail_of() {
+                local target="$1" avail
+                avail="$(df -Pm "$target" 2>/dev/null | awk 'NR==2 { print $4 }' | tr -dc '0-9' || true)"
+                avail="${avail:-0}"
+                avail="${avail#"${avail%%[!0]*}"}"
+                if [ -z "$avail" ]; then
+                  avail=0
+                fi
+                printf '%s' "$((10#$avail))"
+              }
+              disk_fs_of() {
+                df -Pm "$1" 2>/dev/null | awk 'NR==2 { print $1 }'
+              }
+              BUILD_MB="$(normalize_build_mb "${DEPLOY_MIN_FREE_BUILD_MB:-6144}")"
+              deploy_avail="$(disk_avail_of .)"
+              deploy_fs="$(disk_fs_of .)"
+              backup_target="${DEPLOY_BACKUP_ROOT:-/srv/ai-job-print-backups}"
+              while [ -n "$backup_target" ] && [ ! -e "$backup_target" ] && [ "$backup_target" != "/" ]; do
+                backup_target="$(dirname "$backup_target")"
+              done
+              backup_avail="$(disk_avail_of "$backup_target")"
+              backup_fs="$(disk_fs_of "$backup_target")"
+              if [ -n "$deploy_fs" ] && [ "$deploy_fs" = "$backup_fs" ]; then
+                AVAIL_MB="$deploy_avail"
+              elif [ "$deploy_avail" -le "$backup_avail" ]; then
+                AVAIL_MB="$deploy_avail"
+              else
+                AVAIL_MB="$backup_avail"
+              fi
+              echo "FULL_BUILD_DISK_AVAIL_MB=${AVAIL_MB} DEPLOY_MIN_FREE_BUILD_MB=${BUILD_MB} DEPLOY_DIR_AVAIL_MB=${deploy_avail} BACKUP_DIR_AVAIL_MB=${backup_avail}"
+              if [ "$AVAIL_MB" -lt "$BUILD_MB" ]; then
+                echo "::error::构建前磁盘空间不足：可用 ${AVAIL_MB}MB < 构建门槛 ${BUILD_MB}MB。未安装依赖、未构建三端前端。请先跑工作流 Server Cleanup (backups / pnpm store / journal)，先 dry-run（输入 dry_run=true）。" >&2
                 exit 1
               fi
               echo "构建前磁盘空间够用。"

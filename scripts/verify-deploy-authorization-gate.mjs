@@ -202,7 +202,12 @@ assert.ok(
   'full publish must check free disk and be able to exit before pnpm install and the three frontend builds'
 )
 const fullBuildDiskBlock = deployJob.slice(fullBuildDiskAt, pnpmInstallAt)
-assert.match(fullBuildDiskBlock, /DEPLOY_MIN_FREE_FLOOR_MB:-10240/)
+assert.match(fullBuildDiskBlock, /DEPLOY_MIN_FREE_BUILD_MB:-6144/)
+assert.doesNotMatch(
+  fullBuildDiskBlock,
+  /DEPLOY_MIN_FREE_FLOOR_MB:-10240/,
+  'pre-build gate must not reuse the 10GB release floor, or 6-10GB never reaches safe cleanup'
+)
 assert.match(
   fullBuildDiskBlock,
   /构建前磁盘空间不足[\s\S]{0,500}Server Cleanup \(backups \/ pnpm store \/ journal\)[\s\S]{0,120}dry_run=true[\s\S]{0,80}exit 1/

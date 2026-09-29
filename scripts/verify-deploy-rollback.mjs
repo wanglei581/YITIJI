@@ -15,7 +15,7 @@
 // macOS 本机跑时用 GNU coreutils（gdate/gchmod）和一个 find 替身补齐发布脚本里的 GNU 写法；
 // 缺少 gdate/gchmod 时整条门禁判失败而不是跳过 ——「没验证」不能算「验证通过」。
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync,
+  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -92,6 +92,11 @@ case "$*" in
     echo "// drill build" > "$DRILL_DEPLOY/services/api/dist/config/production-runtime-gates.js" ;;
   "install --frozen-lockfile")
     if [ "$PWD" = "$DRILL_RUNTIME" ]; then
+      if [ -n "\${DRILL_RUNTIME_INSTALL_SIGNAL:-}" ]; then
+        kill -s "$DRILL_RUNTIME_INSTALL_SIGNAL" "$PPID" 2>/dev/null || true
+        sleep 1
+        exit 1
+      fi
       mkdir -p node_modules && echo new > node_modules/marker
       # 与旧标记同长度、同修改时间：确定地复现「快速比对会跳过」的条件
       touch -r "$DRILL_MARKER_REF" node_modules/marker
@@ -114,7 +119,13 @@ fi
 if [ "\${DRILL_PG_DUMP_KILL:-}" = 1 ]; then
   [ -n "$out" ] && printf 'partial\\n' > "$out"
   kill -TERM "$PPID" 2>/dev/null || true
-  sleep 30
+  sleep 1
+  exit 1
+fi
+if [ -n "\${DRILL_PG_DUMP_SIGNAL:-}" ]; then
+  [ -n "$out" ] && printf 'partial\\n' > "$out"
+  kill -s "$DRILL_PG_DUMP_SIGNAL" "$PPID" 2>/dev/null || true
+  sleep 1
   exit 1
 fi
 printf 'drill-dump\\n' > "$out"
@@ -128,7 +139,14 @@ exit 0
 echo "pm2 $* COMMIT=\${COMMIT:-}" >> "$DRILL_CALLS"
 if [ "\${DRILL_PM2_LOGROTATE:-}" = installed ]; then
   case "$1" in
-    ls|conf) echo "pm2-logrotate online" ;;
+    ls) printf '%s\\n' "\${DRILL_PM2_LS_OUT:-pm2-logrotate online}" ;;
+    conf)
+      if [ -n "\${DRILL_PM2_CONF_OUT:-}" ]; then
+        printf '%s\\n' "$DRILL_PM2_CONF_OUT" | tr ';' '\\n'
+      else
+        echo "pm2-logrotate online"
+      fi
+      ;;
   esac
 fi
 exit 0
@@ -141,6 +159,20 @@ if [ "\${DRILL_CP_FAIL:-}" = 1 ]; then
   exit 1
 fi
 exec /bin/cp "$@"
+`)
+  writeExec(join(bin, 'rm'), `#!/usr/bin/env bash
+if [ -n "\${DRILL_RM_FAIL_SUBSTR:-}" ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      *"\${DRILL_RM_FAIL_SUBSTR}"*) echo "drill rm blocked" >&2; exit 1 ;;
+    esac
+  done
+fi
+exec /bin/rm "$@"
+`)
+  writeExec(join(bin, 'du'), `#!/usr/bin/env bash
+if [ "\${DRILL_DU_FAIL:-}" = 1 ]; then exit 1; fi
+exec /usr/bin/du "$@"
 `)
   writeExec(join(bin, 'df'), `#!/usr/bin/env bash
 low="\${DRILL_DF_AVAIL_MB:-999999}"
@@ -287,7 +319,7 @@ function runDeploy(box, extraEnv, options = {}) {
 
 const read = (path) => (existsSync(path) ? readFileSync(path, 'utf8').trim() : '(缺失)')
 const groupsOf = (backups) => {
-  const stems = new Set(readdirSync(backups).map((name) => name.replace(/\.(dump|runtime|migrations\.log)$/, '')))
+  const stems = new Set(readdirSync(backups).map((name) => name.replace(/\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/, '')))
   return [...stems].map((stem) => ({
     stem,
     complete: ['dump', 'runtime', 'migrations.log'].every((ext) => existsSync(join(backups, `${stem}.${ext}`))),
@@ -713,8 +745,321 @@ done
   for (const dir of fragmentDirs) rmSync(dir, { recursive: true, force: true })
 }
 
+// ── 复核 #1118：信号覆盖整个发布、数字校验、partial 不占名额、.ok 锚点、构建前 6144、失败也删 bundle ──
+check(!/trap - (HUP|INT|TERM)/.test(releaseText) && !releaseText.includes('trap - INT TERM'),
+  '发布脚本中途不执行 trap - 清掉 HUP/INT/TERM')
+check(
+  releaseText.includes("trap 'on_release_signal HUP' HUP") &&
+    releaseText.includes("trap 'on_release_signal INT' INT") &&
+    releaseText.includes("trap 'on_release_signal TERM' TERM"),
+  'HUP、INT、TERM 挂在同一个 on_release_signal 上',
+)
+check(releaseText.includes('trap cleanup_env_tmp EXIT'), '清 .env 临时文件的 EXIT trap 仍在')
+check(releaseText.includes('release_signal_phase=restore') && releaseText.includes('release_signal_phase=committed'),
+  '回退陷阱生效与健康检查通过后各有一个阶段标记')
+check(!releaseText.split('\n').some((line) => !line.trim().startsWith('#') && line.includes('pm2 ls |')),
+  'pm2 ls 先存进变量，不进管道')
+{
+  const buildDefaultAt = workflow.indexOf('DEPLOY_MIN_FREE_BUILD_MB:-6144')
+  const installAfterBuild = workflow.indexOf('pnpm install --frozen-lockfile', Math.max(buildDefaultAt, 0))
+  check(buildDefaultAt > 0 && installAfterBuild > buildDefaultAt,
+    '构建前门槛默认 6144，并且写在 pnpm install 之前')
+}
+
+const reviewBoxes = []
+const reviewDirs = []
+try {
+  {
+    const box = makeSandbox(); reviewBoxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_RUNTIME_INSTALL_SIGNAL: 'TERM' }, { timeout: 20000 })
+    const names = readdirSync(box.backups)
+    check(r.code === 143, '信号 1：回退陷阱生效后收到 TERM，退出码 143', `退出码 ${r.code} signal 片段\n${r.out.slice(-700)}`)
+    check(read(join(box.runtime, 'VERSION')) === 'old' && read(join(box.runtime, 'node_modules/marker')) === 'old',
+      '信号 1：运行目录回到发布前', `VERSION=${read(join(box.runtime, 'VERSION'))} marker=${read(join(box.runtime, 'node_modules/marker'))}`)
+    check(r.out.includes('开始把运行目录恢复') && r.out.includes('线上进程尚未重启'),
+      '信号 1：走 restore_runtime_and_exit，且 PM2 还没重启过', r.out.slice(-500))
+    check(r.pm2Restarts === 0 && !names.some((name) => name.endsWith('.ok')),
+      '信号 1：没有重启 PM2，也没有写成一次成功发布', `PM2 ${r.pm2Restarts} ${names.join(',')}`)
+  }
+  {
+    const box = makeSandbox(); reviewBoxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_PG_DUMP_SIGNAL: 'HUP' }, { timeout: 20000 })
+    const names = readdirSync(box.backups)
+    check(r.code === 129, '信号 2：备份阶段收到 HUP，退出码 129', `退出码 ${r.code}\n${r.out.slice(-500)}`)
+    check(!names.some((name) => name.includes('.partial') || name.endsWith('.dump') || name.endsWith('.ok')),
+      '信号 2：partial 已删，没有正式 dump，也没有成功标记', names.join(','))
+    check(r.out.includes('备份被中断，已删除不完整文件') && read(join(box.runtime, 'VERSION')) === 'old' && !r.out.includes('开始把运行目录恢复'),
+      '信号 2：只删不完整文件，运行目录还没进入回退阶段', r.out.slice(-400))
+  }
+  {
+    const box = makeSandbox(); reviewBoxes.push(box)
+    const r = runDeploy(box, {
+      DRILL_HEALTH: 'always',
+      DEPLOY_MIN_FREE_FLOOR_MB: '08',
+      DEPLOY_MIN_FREE_MARGIN_MB: '09',
+      DEPLOY_BACKUP_KEEP: '08',
+    })
+    const names = readdirSync(box.backups)
+    check(r.code === 0 && r.out.includes('FLOOR_MB=8 ') && r.out.includes('+ 9 安全边界') && r.out.includes('DEPLOY_BACKUP_KEEP=8'),
+      '数字 1：08 与 09 按十进制使用，保留数 8', `退出码 ${r.code}\n${r.out.match(/FLOOR_MB=\d+.*GATE_MB=\d+/)?.[0] ?? r.out.slice(-400)}`)
+    check(names.some((name) => name.endsWith('.ok') && name.includes(box.sha)),
+      '数字 1：这次成功发布写了 .ok', names.filter((name) => name.endsWith('.ok')).join(','))
+  }
+  {
+    const box = makeSandbox(); reviewBoxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DEPLOY_MIN_FREE_FLOOR_MB: '12345678' })
+    check(r.code === 0 && r.out.includes('FLOOR_MB=10240') && r.out.includes('DEPLOY_MIN_FREE_FLOOR_MB=12345678 不是 1 到 7 位数字'),
+      '数字 2：8 位下限被拒绝，回到 10240，空间够时发布继续', `退出码 ${r.code}\n${r.out.match(/FLOOR_MB=\d+/)?.[0] ?? ''} ${r.out.includes('::warning::')}`)
+  }
+  {
+    const box = makeSandbox(); reviewBoxes.push(box)
+    const huge = '12345678901234567890'
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DF_AVAIL_MB: '100', DEPLOY_MIN_FREE_FLOOR_MB: huge })
+    check(r.code !== 0 && !r.calls.includes('pg_dump') && r.out.includes('FLOOR_MB=10240') && r.out.includes('不是 1 到 7 位数字'),
+      '数字 3：20 位下限被拒绝；按默认 10240 判定空间不足并中止', `退出码 ${r.code}\n${r.out.slice(-500)}`)
+  }
+  {
+    const box = makeSandbox(); reviewBoxes.push(box)
+    const huge = '12345678901234567890'
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DEPLOY_MIN_FREE_MARGIN_MB: huge })
+    check(r.code === 0 && r.out.includes('+ 1024 安全边界') && r.out.includes('DEPLOY_MIN_FREE_MARGIN_MB=12345678901234567890 不是 1 到 7 位数字'),
+      '数字 4：超长安全边界回到 1024', `退出码 ${r.code}`)
+  }
+  for (const keep of ['0', '999999']) {
+    const box = makeSandbox({ oldGroups: 4 }); reviewBoxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DEPLOY_BACKUP_KEEP: keep })
+    const groups = groupsOf(box.backups)
+    check(r.code === 0 && groups.length === 3 && r.out.includes('DEPLOY_BACKUP_KEEP=3') && r.out.includes('超出 1-20'),
+      `数字 5：DEPLOY_BACKUP_KEEP=${keep} 回到 3，成功后仍留 3 组`, `退出码 ${r.code} 组数 ${groups.length}\n${r.out.match(/DEPLOY_BACKUP_KEEP=\d+/)?.[0] ?? ''}`)
+  }
+  {
+    const box = makeSandbox({ oldGroups: 1 }); reviewBoxes.push(box)
+    const partial = join(box.backups, 'pre-part-20260929T000000Z.dump.partial')
+    writeFileSync(partial, 'partial only\n')
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DF_AVAIL_MB: '100', DEPLOY_BACKUP_KEEP: '1' })
+    const names = readdirSync(box.backups)
+    check(r.code !== 0 && !r.calls.includes('pg_dump'),
+      '锚点 1：只有 partial 时发布仍因空间不足停在备份前', `退出码 ${r.code}`)
+    check(!names.some((name) => name.includes('.partial')) && names.some((name) => name === 'pre-old0-20260900T000000Z.dump') && existsSync(join(box.backups, 'pre-old0-20260900T000000Z.runtime')),
+      '锚点 1：partial 组被删，不占保留名额，完整组还在', names.join(','))
+  }
+  {
+    const box = makeSandbox({ oldGroups: 2 }); reviewBoxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DF_AVAIL_MB: '100', DEPLOY_BACKUP_KEEP: '1' })
+    const names = readdirSync(box.backups)
+    const dumps = names.filter((name) => name.endsWith('.dump'))
+    check(r.code !== 0 && dumps.length === 1 && dumps[0].includes('old1') && !names.some((name) => name.includes('old0')),
+      '锚点 2：没有任何 .ok 时按时间留最新 1 组，不会删到 0 组', names.join(','))
+  }
+  {
+    const box = makeSandbox({ oldGroups: 3 }); reviewBoxes.push(box)
+    const oldest = join(box.backups, 'pre-old0-20260900T000000Z')
+    writeFileSync(`${oldest}.ok`, 'ok\n')
+    const dumpStat = statSync(`${oldest}.dump`)
+    utimesSync(`${oldest}.ok`, dumpStat.atime, dumpStat.mtime)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DF_AVAIL_MB: '100', DEPLOY_BACKUP_KEEP: '1' })
+    const names = readdirSync(box.backups)
+    check(r.code !== 0 && !r.calls.includes('pg_dump'),
+      '锚点 3：keep=1 且空间不足时停在备份前', `退出码 ${r.code}`)
+    check(names.some((name) => name.includes('old2') && name.endsWith('.dump')) && names.some((name) => name.includes('old0') && name.endsWith('.dump')) && !names.some((name) => name.includes('old1')),
+      '锚点 3：最新完整组与带 .ok 的最旧完整组都留着，中间那组删掉', names.join(','))
+    check(existsSync(`${oldest}.ok`), '锚点 3：留下的成功标记还在')
+  }
+  {
+    const box = makeSandbox({ oldGroups: 4 }); reviewBoxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_RM_FAIL_SUBSTR: 'pre-old0-' })
+    const names = readdirSync(box.backups)
+    check(r.code === 0 && read(join(box.runtime, 'VERSION')) === 'new-release',
+      '清理 1：删不掉旧组时发布仍然成功', `退出码 ${r.code} VERSION=${read(join(box.runtime, 'VERSION'))}`)
+    check(r.out.includes('::warning::以下备份组没有删掉:') && r.out.includes('pre-old0-') && !r.out.includes('清理完成'),
+      '清理 1：警告列出没删掉的组，不打印清理完成', r.out.match(/以下备份组没有删掉:[^\n]*/)?.[0] ?? r.out.slice(-400))
+    check(names.some((name) => name.includes('pre-old0-') && name.endsWith('.dump')),
+      '清理 1：没删掉的那组还在', names.join(','))
+  }
+  {
+    const box = makeSandbox(); reviewBoxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DU_FAIL: '1' })
+    check(r.code === 0 && r.out.includes('api_dir=3072') && r.out.includes('::warning::无法统计 API 目录大小，按 3072MB 估算'),
+      '估算：API 目录 du 失败时按 3072MB，不按 1500', `退出码 ${r.code}\n${r.out.match(/api_dir=\d+/)?.[0] ?? ''}`)
+  }
+  {
+    const box = makeSandbox(); reviewBoxes.push(box)
+    const r = runDeploy(box, {
+      DRILL_HEALTH: 'always',
+      DRILL_PM2_LOGROTATE: 'installed',
+      DRILL_PM2_CONF_OUT: 'max_size: 50M;retain: 180;compress: true',
+    })
+    check(r.code === 0 && r.out.includes('PM2_LOGROTATE_MAX_SIZE=50M') && r.out.includes('PM2_LOGROTATE_RETAIN=180') && r.out.includes('PM2_LOGROTATE_COMPRESS=true'),
+      '摘要：pm2-logrotate 只读打出 max_size、retain、compress', r.out.match(/PM2_LOGROTATE_MAX_SIZE=\S+[\s\S]{0,80}/)?.[0] ?? r.out.slice(-300))
+  }
+  {
+    const box = makeSandbox(); reviewBoxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_PM2_LOGROTATE: 'installed', DRILL_PM2_CONF_OUT: 'unrelated: 1' })
+    check(r.code === 0 && r.out.includes('PM2_LOGROTATE_MAX_SIZE=unknown') && r.out.includes('PM2_LOGROTATE_RETAIN=unknown') && r.out.includes('PM2_LOGROTATE_COMPRESS=unknown'),
+      '摘要：读不到轮转配置时三个字段都是 unknown', r.out.match(/PM2_LOGROTATE_MAX_SIZE=\S+/)?.[0] ?? '')
+  }
+
+  const buildDisk = extractBetween(workflow, '=== full 发布构建前磁盘检查（只读，不清理）===', '=== 安装依赖 ===')
+  const buildDf = mkdtempSync(join(tmpdir(), 'build-df-'))
+  reviewDirs.push(buildDf)
+  writeExec(join(buildDf, 'df'), `#!/usr/bin/env bash
+target="\${!#}"
+case "\$target" in
+  *backups*)
+    fs="\${DRILL_DF_BACKUP_FS:-deployfs}"
+    avail="\${DRILL_DF_BACKUP_AVAIL_MB:-\${DRILL_DF_AVAIL_MB:-0}}"
+    ;;
+  *)
+    fs="\${DRILL_DF_DEPLOY_FS:-deployfs}"
+    avail="\${DRILL_DF_AVAIL_MB:-0}"
+    ;;
+esac
+printf '%s\\n' "Filesystem 1024-blocks Used Available Capacity Mounted on"
+printf '%s\\n' "\$fs 100000000 1000 \$avail 1% /"
+`)
+  const runBuild = (env) => {
+    const result = runFragment(buildDisk, { PATH: `${buildDf}:${process.env.PATH}`, ...env })
+    reviewDirs.push(result.dir)
+    return result
+  }
+  const pass7000 = runBuild({ DRILL_DF_AVAIL_MB: '7000' })
+  check(pass7000.code === 0 && pass7000.out.includes('构建前磁盘空间够用') && pass7000.out.includes('FULL_BUILD_DISK_AVAIL_MB=7000') && pass7000.out.includes('DEPLOY_MIN_FREE_BUILD_MB=6144'),
+    '构建前 1：可用 7000MB 高于 6144，检查通过', `退出码 ${pass7000.code}\n${pass7000.out}`)
+  const fail6000 = runBuild({ DRILL_DF_AVAIL_MB: '6000' })
+  check(fail6000.code !== 0 && fail6000.out.includes('构建前磁盘空间不足') && fail6000.out.includes('6144'),
+    '构建前 2：可用 6000MB 低于 6144，检查失败', `退出码 ${fail6000.code}\n${fail6000.out}`)
+  const backupProbe = join(buildDf, 'backups')
+  mkdirSync(backupProbe)
+  const splitFs = runBuild({
+    DEPLOY_BACKUP_ROOT: backupProbe,
+    DRILL_DF_AVAIL_MB: '8000',
+    DRILL_DF_BACKUP_AVAIL_MB: '5000',
+    DRILL_DF_DEPLOY_FS: 'deployfs',
+    DRILL_DF_BACKUP_FS: 'backupfs',
+  })
+  check(splitFs.code !== 0 && splitFs.out.includes('可用 5000MB') && splitFs.out.includes('DEPLOY_DIR_AVAIL_MB=8000') && splitFs.out.includes('BACKUP_DIR_AVAIL_MB=5000'),
+    '构建前 3：部署目录与备份目录不同分区时取较小可用空间', `退出码 ${splitFs.code}\n${splitFs.out}`)
+  const sameFs = runBuild({
+    DEPLOY_BACKUP_ROOT: backupProbe,
+    DRILL_DF_AVAIL_MB: '8000',
+    DRILL_DF_BACKUP_AVAIL_MB: '1000',
+    DRILL_DF_DEPLOY_FS: 'samefs',
+    DRILL_DF_BACKUP_FS: 'samefs',
+  })
+  check(sameFs.code === 0 && sameFs.out.includes('FULL_BUILD_DISK_AVAIL_MB=8000'),
+    '构建前 4：同一分区只看部署目录的可用空间', `退出码 ${sameFs.code}\n${sameFs.out}`)
+  const buildHuge = runBuild({ DRILL_DF_AVAIL_MB: '100', DEPLOY_MIN_FREE_BUILD_MB: '12345678901234567890' })
+  check(buildHuge.code !== 0 && buildHuge.out.includes('不是 1 到 7 位数字') && buildHuge.out.includes('6144'),
+    '构建前 5：超长构建门槛回到 6144，100MB 仍失败', `退出码 ${buildHuge.code}\n${buildHuge.out}`)
+  const build08 = runBuild({ DRILL_DF_AVAIL_MB: '50000', DEPLOY_MIN_FREE_BUILD_MB: '08' })
+  check(build08.code === 0 && build08.out.includes('DEPLOY_MIN_FREE_BUILD_MB=8 '),
+    '构建前 6：08 按十进制 8 使用', `退出码 ${build08.code}\n${build08.out}`)
+
+  const helperFn = extractBetween(workflow, 'cleanup_control_plane_helper() {', 'trap cleanup_control_plane_helper EXIT')
+  const bundlePath = '/tmp/release.bundle'
+  const bundleBackup = existsSync(bundlePath) ? readFileSync(bundlePath) : null
+  const helperPath = join(buildDf, 'control-plane-helper.sh')
+  writeFileSync(helperPath, 'helper\n')
+  try {
+    writeFileSync(bundlePath, 'drill bundle\n')
+    const bundleRun = runFragment(`${helperFn}\ntrap cleanup_control_plane_helper EXIT\nexit 1\n`, {
+      CONTROL_PLANE_HELPER: helperPath,
+    })
+    reviewDirs.push(bundleRun.dir)
+    check(bundleRun.code !== 0 && !existsSync(bundlePath),
+      'bundle：SSH 脚本以失败退出时，EXIT trap 仍删除 /tmp/release.bundle', `退出码 ${bundleRun.code} 还在=${existsSync(bundlePath)}\n${bundleRun.out}`)
+  } finally {
+    if (bundleBackup === null) rmSync(bundlePath, { force: true })
+    else writeFileSync(bundlePath, bundleBackup)
+  }
+
+  const cleanupBody = extractBetween(cleanupWorkflow, 'echo "=== 备份清单', 'echo "=== 清理后 ===')
+  const fillCleanup = (backupDir, { withOk = true, withPartial = true } = {}) => {
+    mkdirSync(backupDir, { recursive: true })
+    const put = (stem, iso, ok) => {
+      const stamp = new Date(iso)
+      writeFileSync(join(backupDir, `${stem}.dump`), 'dump\n')
+      mkdirSync(join(backupDir, `${stem}.runtime`))
+      writeFileSync(join(backupDir, `${stem}.migrations.log`), 'log\n')
+      for (const name of [`${stem}.dump`, `${stem}.runtime`, `${stem}.migrations.log`]) {
+        utimesSync(join(backupDir, name), stamp, stamp)
+      }
+      if (ok) {
+        writeFileSync(join(backupDir, `${stem}.ok`), 'ok\n')
+        utimesSync(join(backupDir, `${stem}.ok`), stamp, stamp)
+      }
+    }
+    put('pre-ok', '2026-01-02T00:00:00Z', withOk)
+    put('pre-mid', '2026-02-02T00:00:00Z', false)
+    put('pre-new', '2026-03-04T00:00:00Z', false)
+    if (withPartial) {
+      const partialName = join(backupDir, 'pre-part.dump.partial')
+      writeFileSync(partialName, 'partial\n')
+      const stamp = new Date('2026-04-04T00:00:00Z')
+      utimesSync(partialName, stamp, stamp)
+    }
+  }
+  const runCleanup = (backupDir, env) => {
+    const bin = mkdtempSync(join(tmpdir(), 'cleanup-bin-'))
+    reviewDirs.push(bin)
+    writeFindShim(bin)
+    writeExec(join(bin, 'awk'), `#!/usr/bin/env bash
+now="$(date +%s)"
+args=()
+for a in "$@"; do
+  args+=("\${a//systime()/\$now}")
+done
+exec /usr/bin/awk "\${args[@]}"
+`)
+    const result = runFragment(cleanupBody, {
+      PATH: `${bin}:/usr/bin:/bin`,
+      BK: backupDir,
+      PRUNE_PNPM: 'false',
+      VACUUM_JOURNAL: 'false',
+      ...env,
+    })
+    reviewDirs.push(result.dir)
+    return result
+  }
+  const cleanupKeep = join(buildDf, 'cleanup-keep')
+  fillCleanup(cleanupKeep)
+  const dry = runCleanup(cleanupKeep, { DRY_RUN: 'true', KEEP: '1' })
+  const keptLines = dry.out.split('\n').filter((line) => line.includes('[保留]'))
+  const dropLines = dry.out.split('\n').filter((line) => line.includes('[待删]'))
+  check(dry.code === 0 && dry.out.includes('RELEASE_GROUP_COUNT=4'),
+    '清理分组：partial 与 .ok 归进所属 stem，一共 4 组', `退出码 ${dry.code}\n${dry.out}`)
+  check(dropLines.some((line) => line.includes('不完整')) && keptLines.some((line) => line.includes('最近一次成功发布')) && keptLines.length === 2 && dropLines.length === 2,
+    '清理分组：dry-run 标出不完整组与最近一次成功发布，keep=1 仍多留一组成功发布', `保留 ${keptLines.length} 待删 ${dropLines.length}\n${dry.out}`)
+  const cleanupDelete = join(buildDf, 'cleanup-delete')
+  fillCleanup(cleanupDelete)
+  const deleted = runCleanup(cleanupDelete, { DRY_RUN: 'false', KEEP: '1' })
+  check(deleted.code === 0 && !existsSync(join(cleanupDelete, 'pre-part.dump.partial')) && !existsSync(join(cleanupDelete, 'pre-mid.dump')) && existsSync(join(cleanupDelete, 'pre-new.dump')) && existsSync(join(cleanupDelete, 'pre-ok.dump')) && existsSync(join(cleanupDelete, 'pre-ok.ok')) && existsSync(join(cleanupDelete, 'pre-ok.runtime')),
+    '清理分组：执行删除后 partial 与中间组消失，最新组与带 .ok 的组留下', `退出码 ${deleted.code} 剩下 ${readdirSync(cleanupDelete).join(',')}\n${deleted.out}`)
+  const cleanupPlain = join(buildDf, 'cleanup-plain')
+  fillCleanup(cleanupPlain, { withOk: false, withPartial: false })
+  const plain = runCleanup(cleanupPlain, { DRY_RUN: 'false', KEEP: '1' })
+  const plainDumps = readdirSync(cleanupPlain).filter((name) => name.endsWith('.dump'))
+  check(plain.code === 0 && plainDumps.length === 1 && plainDumps[0].includes('pre-new'),
+    '清理分组：没有任何 .ok 时至少留下 1 组完整备份', `剩下 ${plainDumps.join(',')}`)
+  const cleanupZero = join(buildDf, 'cleanup-zero')
+  fillCleanup(cleanupZero)
+  const zeroKeep = runCleanup(cleanupZero, { DRY_RUN: 'false', KEEP: '0' })
+  const zeroDumps = readdirSync(cleanupZero).filter((name) => name.endsWith('.dump'))
+  check(zeroKeep.code === 0 && zeroKeep.out.includes('超出 1-20') && zeroKeep.out.includes('PLAN_KEEP=3') && zeroDumps.length === 3 && !existsSync(join(cleanupZero, 'pre-part.dump.partial')),
+    '清理分组：KEEP=0 回到 3，三组完整备份都留，partial 删掉', `退出码 ${zeroKeep.code} dumps=${zeroDumps.join(',')} \n${zeroKeep.out}`)
+  const sizeLine = cleanupWorkflow.split('\n').map((line) => line.trim()).find((line) => line.startsWith('SZ="$(du -sm'))
+  const rmLine = cleanupWorkflow.split('\n').map((line) => line.trim()).find((line) => line.startsWith('rm -rf -- "$BK"'))
+  check(Boolean(sizeLine && rmLine && sizeLine.includes('.dump.partial') && sizeLine.includes('.ok') && rmLine.includes('.dump.partial') && rmLine.includes('.ok')),
+    '清理分组：大小统计和删除都包含 partial 与 .ok')
+} catch (error) {
+  fail(`复核场景无法运行：${error instanceof Error ? error.stack ?? error.message : String(error)}`)
+} finally {
+  for (const box of reviewBoxes) rmSync(box.dir, { recursive: true, force: true })
+  for (const dir of reviewDirs) rmSync(dir, { recursive: true, force: true })
+}
+
 if (failures) {
   console.error(`\nverify:deploy-rollback：${failures} 项失败`)
   process.exit(1)
 }
-console.log('\nverify:deploy-rollback 通过（真跑发布脚本 7 个场景 + 磁盘门槛与原子备份 + 静态目录 3 个场景 + 清理分组 / 构建前检查 / 预检）')
+console.log('\nverify:deploy-rollback 通过（真跑发布脚本 7 个场景 + 磁盘门槛与原子备份 + 静态目录 3 个场景 + 清理分组 / 构建前检查 / 预检 + 信号 / 数字 / 锚点 / bundle）')
