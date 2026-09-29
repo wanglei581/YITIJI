@@ -33,14 +33,14 @@ import {
   PrintFeeBoundaryBar,
   PrintOutOfPaperPanel,
 } from './components/PrintDoneSections'
-import { outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill } from './printProgressModel'
+import { doneTakeaway, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, publicOrderNo, reprintHint } from './printProgressModel'
 import { formatCents } from './cashierStatus'
 import './styles/print-fulfill-qx.css'
 
 interface PrintFile {
   name:     string
   size:     string
-  pages:    number
+  pages:    number | null
   fileUrl?: string
 }
 
@@ -130,7 +130,7 @@ export function PrintDonePage() {
   const taskId = typeof state.taskId === 'string' && state.taskId.trim() ? state.taskId.trim() : null
   const uploadPath = printUploadPathForSource(state.source)
   const amountCents = typeof state.amountCents === 'number' ? state.amountCents : null
-  const orderNo = typeof state.orderNo === 'string' ? state.orderNo : state.orderId ?? null
+  const displayOrderNo = publicOrderNo(typeof state.orderNo === 'string' ? state.orderNo : null)
   const idDocument = state.idDocument === true
 
   const canReportIssue = taskId !== null
@@ -289,10 +289,7 @@ export function PrintDonePage() {
     return () => { cancelled = true }
   }, [resultState, state.orderId, state.paymentSessionToken])
 
-  const totalFaces = file && params
-    ? file.pages * params.copies * (params.duplex === 'simplex' ? 1 : 2)
-    : null
-  const pageCount = file?.pages ?? null
+  const takeawayCopy = doneTakeaway(file ? { pages: file.pages } : null, params)
 
   const navbar = (
     <QxAppNavbar
@@ -332,7 +329,11 @@ export function PrintDonePage() {
     }
   }
 
-  const paidLabel = amountCents != null ? `已付 ${formatCents(amountCents)}` : '订单保留'
+  const paidLabel = amountCents === 0
+    ? '免费试运营，本单 0 元'
+    : amountCents != null
+      ? `已付 ${formatCents(amountCents)}`
+      : '订单保留'
 
   if (wiped) {
     return (
@@ -360,7 +361,7 @@ export function PrintDonePage() {
       <QxPageFrame
         title="费用与订单边界"
         subtitle="本页只展示订单的真实状态，不替你承诺结果"
-        status={{ tone: 'warn', label: orderNo ? `订单 ${orderNo}` : '状态未知' }}
+        status={{ tone: 'warn', label: displayOrderNo ? `订单 ${displayOrderNo}` : '状态未知' }}
         terminalLabel="就业服务大厅"
         ctabar={
           <>
@@ -381,13 +382,13 @@ export function PrintDonePage() {
             body={<>是否处理费用、处理多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
             facts={
               <>
-                {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}
+                {displayOrderNo ? <span>订单 <b>{displayOrderNo}</b></span> : null}
                 {amountCents != null ? <span>支付状态 <b>{paidLabel}</b></span> : <span>支付状态 <b>以订单为准</b></span>}
               </>
             }
           />
           <div className="qx-card">
-            <div className="pff-step"><span className="pff-step-no">1</span><span className="pff-step-txt">把<b>订单号 {orderNo ?? '（未读取到）'}</b> 和这台机器的位置告诉现场工作人员。</span></div>
+            <div className="pff-step"><span className="pff-step-no">1</span><span className="pff-step-txt">{displayOrderNo ? <>把<b>订单号 {displayOrderNo}</b> 和这台机器的位置告诉现场工作人员。</> : <>把这台机器的位置告诉现场工作人员，请他们核对这一单。</>}</span></div>
             <div className="pff-step"><span className="pff-step-no">2</span><span className="pff-step-txt">说明实际拿到了几页、哪几页没出，<b>已出的纸请一并带上</b>。</span></div>
             <div className="pff-step"><span className="pff-step-no">3</span><span className="pff-step-txt">由工作人员现场登记；<b>是否处理、处理多少，以核查结果为准</b>。</span></div>
           </div>
@@ -440,7 +441,7 @@ export function PrintDonePage() {
                 {isLoading
                   ? '核验完成后将显示真实结果或返回任务进度页'
                   : taskId
-                    ? `任务号 ${taskId} 暂时无法核验，请在打印订单中查看或联系工作人员`
+                    ? '暂时无法核验这一单，请在打印订单中查看或联系工作人员'
                     : '未找到打印任务上下文，请从打印入口重新开始'}
               </div>
             </div>
@@ -493,7 +494,7 @@ export function PrintDonePage() {
       // 稿 15 out-of-paper：小青区即页头 → 任务卡（单文件 + 缺纸说明 + 费用边界）→ 现场三步 → 底栏两出口。
       // 稿里「加纸后继续」「已出 1 份」在真实合同里都不成立，改写理由见 PrintOutOfPaperPanel 头注。
       const money = outOfPaperMoneyOf(takeaway, amountCents)
-      const faultOrderNo = takeaway?.orderNo ?? (typeof state.orderNo === 'string' ? state.orderNo : null)
+      const faultOrderNo = publicOrderNo(takeaway?.orderNo) ?? displayOrderNo
       return (
         <QxPageFrame
           back={{ label: '返回首页', onBack: () => navigate('/') }}
@@ -606,18 +607,17 @@ export function PrintDonePage() {
             </div>
             <p className="pff-issue-body">
               {isUnconfirmed
-                ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。系统不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留，请凭订单号联系现场工作人员核查处理。{taskId ? `（任务号 ${taskId}）` : null}</>
+                ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留，请联系现场工作人员核查处理。</>
                 : jam
                   ? <>请<b>不要自己打开机器或拽纸</b>。工作人员会取出卡纸并补打受影响的部分，已出的纸你先收好。</>
                   : failureReason}
             </p>
             {jam && failureReason ? <p className="pff-issue-body">{failureReason}</p> : null}
-            {isUnconfirmed ? <span className="pff-inbar-code">errorCode = PRINT_JOB_UNCONFIRMED</span> : null}
           </div>
 
-          {(state.orderId || takeaway?.orderNo) && (
-            <p className="pff-out-sub">订单号 {takeaway?.orderNo ?? state.orderId}</p>
-          )}
+          {(publicOrderNo(takeaway?.orderNo) ?? displayOrderNo) ? (
+            <p className="pff-out-sub">订单号 {publicOrderNo(takeaway?.orderNo) ?? displayOrderNo}</p>
+          ) : null}
           <p className="pff-out-sub">联系工作人员补打</p>
           {takeawayNotices}
         </div>
@@ -646,7 +646,7 @@ export function PrintDonePage() {
             onClick={() => navigate(uploadPath)}
           >
             再印一份
-            <small>重新选文件、核价并支付</small>
+            <small>{reprintHint(amountCents)}</small>
           </button>
           <button
             type="button"
@@ -676,14 +676,12 @@ export function PrintDonePage() {
             都打好了，拿走前核一下
           </div>
           <p className="pff-out-sub">
-            {totalFaces != null
-              ? `共 ${totalFaces} 面已全部打印，请在出纸口取走并核对页数`
-              : '文件已全部打印，请在出纸口取走'}
+            {takeawayCopy.facesLabel}
           </p>
           <div className="pff-step">
             <span className="pff-step-no">1</span>
             <span className="pff-step-txt">
-              从出纸口取走{pageCount != null ? <> <b>全部 {pageCount} 页</b></> : '全部纸张'}。
+              从出纸口取走 <b>{takeawayCopy.pagesLabel}</b>。
             </span>
           </div>
           <div className="pff-step">
@@ -732,13 +730,12 @@ export function PrintDonePage() {
           </div>
         )}
 
-        {(state.taskId || state.orderId) && (
+        {displayOrderNo ? (
           <div className="pff-meta">
-            {state.taskId  && <span className="pff-chip"><b>任务号</b> {state.taskId}</span>}
-            {state.orderId && <span className="pff-chip"><b>订单号</b> {state.orderId}</span>}
+            <span className="pff-chip"><b>订单号</b> {displayOrderNo}</span>
             <span className="pff-chip"><b>完成</b></span>
           </div>
-        )}
+        ) : null}
 
         <div className="pff-wipe" data-live="true">
           <div>
