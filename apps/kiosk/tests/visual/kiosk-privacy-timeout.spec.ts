@@ -357,7 +357,7 @@ test('member report hard-replaces a clean homepage after the privacy deadline @p
   expect(new URL(page.url()).pathname).toBe('/')
   expect(await readDocumentMarker(page)).toBeNull()
   // 断言意图是「清场后回到未登录态首页」，两条一起钉，互补：
-  // 1) 身份入口文案必须是未登录态（登录态为「…·进入我的」）—— 抓「其实还登着」。
+  // 1) 身份入口文案必须是未登录态（登录态为「有人登录着」）—— 抓「其实还登着」。
   //    青序流光把底栏「我的」两种状态都写成「我的」，担不起这个职责，
   //    所以 hero 里单列了 .qx-home-identity，本断言钉的是它。
   // 2) 问候语精确等于未登录态的时段问候（登录态为 `${displayName}，时段，我是小青`）
@@ -428,7 +428,7 @@ test('legal documents cannot suspend an authenticated kiosk privacy deadline @pr
   expect(await readDocumentMarker(page)).toBeNull()
   expect(requests.logoutAuthorization()).toEqual([`Bearer ${MEMBER_TOKEN}`])
   // 断言意图是「清场后回到未登录态首页」，两条一起钉，互补：
-  // 1) 身份入口文案必须是未登录态（登录态为「…·进入我的」）—— 抓「其实还登着」。
+  // 1) 身份入口文案必须是未登录态（登录态为「有人登录着」）—— 抓「其实还登着」。
   //    青序流光把底栏「我的」两种状态都写成「我的」，担不起这个职责，
   //    所以 hero 里单列了 .qx-home-identity，本断言钉的是它。
   // 2) 问候语精确等于未登录态的时段问候（登录态为 `${displayName}，时段，我是小青`）
@@ -645,7 +645,7 @@ test('an unknown terminal route remains inside the privacy guard @privacy-kiosk'
   expect(new URL(page.url()).pathname).toBe('/')
   expect(requests.logoutAuthorization()).toEqual([`Bearer ${MEMBER_TOKEN}`])
   // 断言意图是「清场后回到未登录态首页」，两条一起钉，互补：
-  // 1) 身份入口文案必须是未登录态（登录态为「…·进入我的」）—— 抓「其实还登着」。
+  // 1) 身份入口文案必须是未登录态（登录态为「有人登录着」）—— 抓「其实还登着」。
   //    青序流光把底栏「我的」两种状态都写成「我的」，担不起这个职责，
   //    所以 hero 里单列了 .qx-home-identity，本断言钉的是它。
   // 2) 问候语精确等于未登录态的时段问候（登录态为 `${displayName}，时段，我是小青`）
@@ -2023,7 +2023,7 @@ test('an expired member session waits for the confirmed cancel before leaving fo
 
   /* 这套件把隐私空闲压到了 3 秒（VITE_KIOSK_PRIVACY_IDLE_SEC=3）。本用例要观察的是
    * **401 这条出口**，所以观察窗口内持续制造活动，别让隐私硬清场插进来 —— 它会走
-   * clearSessionTo，自己登记一条重载出口，最后跳的是 '/' 而不是 '/login'，
+   * endKioskUse，自己登记一条重载出口，最后跳的是 '/' 而不是 '/login'，
    * 断言就测不到想测的东西了。 */
   const awake = setInterval(() => { void page.mouse.move(540, 960).catch(() => undefined) }, 700)
   try {

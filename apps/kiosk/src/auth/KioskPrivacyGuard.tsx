@@ -1,6 +1,6 @@
 import type { KioskScreensaverPlaylist } from '@ai-job-print/shared'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import {
   useScreensaverController,
   type ScreensaverWarningRequest,
@@ -20,7 +20,12 @@ import { useKioskBusy } from '../contexts/KioskBusyContext'
 import { useAuth } from './useAuth'
 import { useIdleLogout, type KioskIdleWarningRequest } from './useIdleLogout'
 import { endKioskVisit, useKioskSessionReporting } from './useKioskSessionReporting'
-import type { KioskVisitEndReason } from '../services/api/kioskSession'
+import {
+  runEndKioskUse,
+  type KioskClearReason,
+  type KioskEndUseOptions,
+  type KioskEndUseReason,
+} from './kioskEndUse'
 import '../pages/session-guard/styles/session-guard-qx.css'
 
 const DEFAULT_PRIVACY_IDLE_SEC = 300
@@ -263,7 +268,8 @@ function scheduleSanitizedDestination(
  * 恢复匿名 accessToken 或上一位会员页面。
  */
 export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation()
+  const { pathname, key: locationKey } = useLocation()
+  const navigationType = useNavigationType()
   const navigate = useNavigate()
   const { logout, isLoggedIn, guestMode, getToken } = useAuth()
   const kioskBusy = useKioskBusy()
@@ -297,7 +303,20 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     boundary !== null &&
     (historyState[PRIVACY_BOUNDARY_STATE_KEY] === boundary.token ||
       nestedBoundary?.token === boundary.token)
+  /* W-64：清场后落在干净入口（例如换号后的登录页），这一条 entry 的 idx 正好等于 minHistoryIndex。
+   * 页面在本次加载里用 replace 跳走（登录成功 → navigate(returnTo, { replace: true })）时，
+   * React Router 写的新 state 不带边界记号，旧判据会把它当成「边界之前的旧历史」立刻硬清场 ——
+   * 刚登进来的下一位被踢回游客首页。PUSH / REPLACE 是本页代码刚写出来的 entry，不可能是上一位的，
+   * 只有 POP（首次加载、刷新、前进后退）才需要判旧；判完再在下面把记号补到这条 entry 上，
+   * 之后后退回到它时照样认得出是边界之后的。
+   *
+   * 另一个坑：React Router 先写 window.history、再更新自己的 location，中间可能插进一次渲染 ——
+   * 这时 history 已经是新的（记号没了），路由还停在旧的 POP 上。只在两者对得上（key 相同）时判旧；
+   * 对不上说明正在导航，下一次渲染路由追上来再判。key 缺失时照旧判（fail-closed）。 */
+  const historyMatchesRoute = typeof historyState.key !== 'string' || historyState.key === locationKey
   const isStaleHistoryEntry =
+    historyMatchesRoute &&
+    navigationType === 'POP' &&
     boundary !== null &&
     !isSanitizedBoundaryEntry &&
     (historyIndex === null || historyIndex <= boundary.minHistoryIndex)
@@ -314,46 +333,52 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     return nextBoundary
   }, [])
 
-  const clearSessionFor = useCallback((destination: KioskSessionClearDestination, reason: KioskVisitEndReason) => {
+  /**
+   * 所有离场出口的唯一执行者：结束使用、换号、闲置到点、完成页到点、交接，以及守卫自己的兜底清场。
+   * 四步的内容与顺序只在 runEndKioskUse（kioskEndUse.ts）里写一次，这里只提供每一步怎么做。
+   */
+  const endKioskUse = useCallback((reason: KioskClearReason, options?: KioskEndUseOptions) => {
     if (!claimClearing('hard')) return
     returningWarningRef.current = false
-    // 服务人次：这一位用完了，结束当前使用周期（失败静默，不等网络）。
-    endKioskVisit(reason)
-
     // 先 fail-closed 阻断交互；本地敏感状态同步清除，不等待网络。
-    // 传当前令牌：清掉本地扫描会话之前要先撤掉服务端那个还活着的扫描任务，
-    // 否则下一位用户在面板上按下扫描，文件会投给刚刚被清掉的这一位。
     setClearing(true)
-    clearKioskSensitiveSession(getToken())
-    logout()
-    const nextBoundary = establishPrivacyBoundary()
-    pendingWarningRef.current = null
-    setWarning(null)
-
-    /* 留一帧让遮罩提交到 DOM，再新增干净 entry、截断 forward 并硬刷新 React 树。
-     * 页面不可见时 rAF 不会到，兜底定时器负责把这一步执行掉（否则永久黑屏）。
-     *
-     * 但这一步**必须等服务端收完尾**才能跑：整页重载会把本页所有还在飞的补偿逻辑
-     * 一起干掉 —— 包括「投递确认回来之后补一次撤销」。一次在路上丢了的 DELETE 加上
-     * 一次随后成功的 ACK，就会给服务端留下一条已确认、仍 waiting 的任务：
-     * 60 秒未确认回收器收不到它，Agent 的 current-lease 看得见它，它会一直可投递到
-     * 自然过期 —— 下一位在面板上按下扫描，文件投给已经走掉的上一位（scanCleanupGate）。
-     *
-     * hold() 在收尾已经结束时是同步的，所以「本来就没有扫描会话」那条最常见的路径
-     * 一帧都不会多等；真要等的时候，遮罩会如实说在等什么、试了几次、最迟等到什么时候。 */
-    hold(() => scheduleSanitizedDestination(nextBoundary, destination))
+    runEndKioskUse(reason, {
+      // 服务人次：这一位用完了，结束当前使用周期（失败静默，不等网络）。
+      endVisit: endKioskVisit,
+      // 传当前令牌：清掉本地扫描会话之前要先撤掉服务端那个还活着的扫描任务，
+      // 否则下一位用户在面板上按下扫描，文件会投给刚刚被清掉的这一位。
+      clearLocal: () => clearKioskSensitiveSession(getToken()),
+      logout: () => logout(),
+      leave: (destination) => {
+        const nextBoundary = establishPrivacyBoundary()
+        pendingWarningRef.current = null
+        setWarning(null)
+        /* 留一帧让遮罩提交到 DOM，再新增干净 entry、截断 forward 并硬刷新 React 树。
+         * 页面不可见时 rAF 不会到，兜底定时器负责把这一步执行掉（否则永久黑屏）。
+         *
+         * 但这一步**必须等服务端收完尾**才能跑：整页重载会把本页所有还在飞的补偿逻辑
+         * 一起干掉 —— 包括「投递确认回来之后补一次撤销」。一次在路上丢了的 DELETE 加上
+         * 一次随后成功的 ACK，就会给服务端留下一条已确认、仍 waiting 的任务：
+         * 60 秒未确认回收器收不到它，Agent 的 current-lease 看得见它，它会一直可投递到
+         * 自然过期 —— 下一位在面板上按下扫描，文件投给已经走掉的上一位（scanCleanupGate）。
+         *
+         * hold() 在收尾已经结束时是同步的，所以「本来就没有扫描会话」那条最常见的路径
+         * 一帧都不会多等；真要等的时候，遮罩会如实说在等什么、试了几次、最迟等到什么时候。 */
+        hold(() => scheduleSanitizedDestination(nextBoundary, destination))
+      },
+    }, options)
   }, [claimClearing, establishPrivacyBoundary, getToken, hold, logout])
 
-  /** 页面主动「结束使用」（我的 / 设置页换号、退出）。 */
-  const clearSessionTo = useCallback(
-    (destination: KioskSessionClearDestination) => clearSessionFor(destination, 'user_exit'),
-    [clearSessionFor],
+  /** 页面用的离场入口：只接受五种本人 / 到点原因，兜底清场不对页面开放。 */
+  const endKioskUseFromPage = useCallback(
+    (reason: KioskEndUseReason, options?: KioskEndUseOptions) => endKioskUse(reason, options),
+    [endKioskUse],
   )
 
   /** 默认原因是隐私兜底（旧历史项、BFCache 恢复、孤立的超时页）；空闲到点的调用点显式传 idle_timeout。 */
-  const hardClear = useCallback((reason: KioskVisitEndReason = 'privacy_clear') => {
-    clearSessionFor({ path: '/' }, reason)
-  }, [clearSessionFor])
+  const hardClear = useCallback((reason: KioskClearReason = 'privacy_fallback') => {
+    endKioskUse(reason)
+  }, [endKioskUse])
 
   const clearToScreensaver = useCallback((): void => {
     if (returningWarningRef.current) {
@@ -368,25 +393,29 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     }
     if (!claimClearing('screensaver')) return
     returningWarningRef.current = false
-    endKioskVisit('idle_timeout')
-
     setClearing(true)
-    // 同 hardClear：进屏保同样是「这一位用完了」，服务端扫描任务要跟着撤。
-    clearKioskSensitiveSession(getToken())
-    logout()
-    const nextBoundary = establishPrivacyBoundary()
-    pendingWarningRef.current = null
-    setWarning(null)
-    /* 和 hardClear 同一条硬规矩：进屏保也是「把机器交给下一位」——
-     * 屏保页一被触摸就唤醒成一台可用的机器，这一刻服务端那条扫描任务必须已经
-     * 收到确认。这条路径不重载，但它同样会把设置页拆掉（连同那段 ACK 补偿）。 */
-    hold(() => {
-      navigate('/screensaver', {
-        state: {
-          playlist,
-          privacyBoundary: nextBoundary,
-        },
-      })
+    // 进屏保同样是「这一位用完了」：同一套四步，只是最后一步落到屏保而不是首页。
+    runEndKioskUse('idle_timeout', {
+      endVisit: endKioskVisit,
+      // 同 endKioskUse：进屏保同样要撤服务端扫描任务。
+      clearLocal: () => clearKioskSensitiveSession(getToken()),
+      logout: () => logout(),
+      leave: () => {
+        const nextBoundary = establishPrivacyBoundary()
+        pendingWarningRef.current = null
+        setWarning(null)
+        /* 和 endKioskUse 同一条硬规矩：进屏保也是「把机器交给下一位」——
+         * 屏保页一被触摸就唤醒成一台可用的机器，这一刻服务端那条扫描任务必须已经
+         * 收到确认。这条路径不重载，但它同样会把设置页拆掉（连同那段 ACK 补偿）。 */
+        hold(() => {
+          navigate('/screensaver', {
+            state: {
+              playlist,
+              privacyBoundary: nextBoundary,
+            },
+          })
+        })
+      },
     })
   }, [claimClearing, establishPrivacyBoundary, getToken, hardClear, hold, logout, navigate])
 
@@ -499,8 +528,24 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
    */
   const hardClearFromWarning = useCallback((): void => {
     const pendingWarning = pendingWarningRef.current
-    hardClear(pendingWarning !== null && Date.now() >= pendingWarning.deadlineAt ? 'idle_timeout' : 'user_exit')
+    hardClear(pendingWarning !== null && Date.now() >= pendingWarning.deadlineAt ? 'idle_timeout' : 'end_use')
   }, [hardClear])
+
+  useLayoutEffect(() => {
+    const current = boundaryRef.current
+    if (current === null || navigationType === 'POP') return
+    const state = readHistoryState()
+    if (state.idx !== current.minHistoryIndex || state[PRIVACY_BOUNDARY_STATE_KEY] === current.token) return
+    // 本页刚 replace 出来的边界位 entry：补上边界记号（只有随机代次和时间，不含任何用户数据）。
+    window.history.replaceState(
+      {
+        ...state,
+        [PRIVACY_BOUNDARY_STATE_KEY]: current.token,
+        [PRIVACY_BOUNDARY_CREATED_AT_STATE_KEY]: current.createdAt,
+      },
+      '',
+    )
+  }, [locationKey, navigationType])
 
   useEffect(() => {
     if (!isStaleHistoryEntry) return
@@ -671,10 +716,10 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
       warning,
       continueSession,
       hardClear: hardClearFromWarning,
-      clearSessionTo,
+      endKioskUse: endKioskUseFromPage,
       clearToScreensaver,
     }),
-    [clearSessionTo, clearToScreensaver, continueSession, hardClearFromWarning, warning]
+    [clearToScreensaver, continueSession, endKioskUseFromPage, hardClearFromWarning, warning]
   )
 
   return (

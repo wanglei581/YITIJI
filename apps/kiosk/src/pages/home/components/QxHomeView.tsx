@@ -32,6 +32,7 @@ import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
 import { HomeHeroHeader, type HomeDeviceStatus } from './HomeHeroHeader'
+import { HomeIdentityActions } from './HomeIdentityActions'
 import { HomeTile } from './HomeTile'
 
 const ASSISTANT_VOICE_ENTRY = import.meta.env.VITE_USE_TRTC_CALL === 'true'
@@ -59,7 +60,6 @@ function capabilityMark(
 interface QxHomeViewProps {
   isLoggedIn: boolean
   guestMode: boolean
-  displayName: string
   device: TerminalDeviceStatusView
   toolbox: ToolboxCapabilityState
   campus: SmartCampusCapabilityState
@@ -72,6 +72,8 @@ interface QxHomeViewProps {
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
   onOpenDevice: () => void
+  /** 首页「结束上一位的使用」（W-75）：走 endKioskUse('handover')。 */
+  onEndPrevious: () => void
 }
 
 function fairCopy(state: QxHomeViewProps['jobFair']): {
@@ -121,7 +123,6 @@ export function QxHomeNavbar({ onAction }: Pick<QxHomeViewProps, 'onAction'>) {
 export function QxHomeView({
   isLoggedIn,
   guestMode,
-  displayName,
   device,
   toolbox,
   campus,
@@ -133,6 +134,7 @@ export function QxHomeView({
   continueSlot,
   onAction,
   onOpenDevice,
+  onEndPrevious,
 }: QxHomeViewProps) {
   const kiosk = useTerminalKiosk()
   const [now, setNow] = useState(() => new Date())
@@ -158,7 +160,8 @@ export function QxHomeView({
   const recruitmentOpen = recruitment.enabled
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
-  const hello = isLoggedIn && displayName ? `${displayName}，${greeting}` : greeting
+  // 首页是公共屏：登录着也不打招呼叫名字、不显示手机号（打码的也不显示）。W-75。
+  const hello = greeting
   const standbyNote = homeStandbyNote(
     { isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() },
     publicIdleLogoutLabel(),
@@ -216,21 +219,13 @@ export function QxHomeView({
           </div>
         </div>
 
-        <header className="qx-home-section-head">
+        <header className="qx-home-section-head" data-member={isLoggedIn ? 'true' : undefined}>
           <div>
             <h2 id="qx-home-services-title">直接办</h2>
             <span>每项最后都会给你一样东西</span>
           </div>
           <div className="qx-home-section-actions">
-            <button
-              type="button"
-              className="qx-home-identity"
-              data-testid="home-identity"
-              onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}
-            >
-              <UserIcon aria-hidden="true" />
-              <span>{isLoggedIn ? `${displayName || '本人'} · 进入我的` : '登录后查看本人记录'}</span>
-            </button>
+            <HomeIdentityActions isLoggedIn={isLoggedIn} onLogin={() => onAction('login')} onEndPrevious={onEndPrevious} />
             <button type="button" className="qx-home-device-link" data-testid="home-device-status" onClick={onOpenDevice}>
               设备状态
             </button>
