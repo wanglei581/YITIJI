@@ -196,9 +196,15 @@ foreach ($job in $raw) {
   }
   $idText = ''
   if ($null -ne $job.ID) { $idText = [string]$job.ID }
-  [void]$jobs.Add([pscustomobject]@{ id = $idText; owned = [bool]$owned; unreadable = [bool]$unreadable })
+  $ownedText = 'false'
+  if ($owned) { $ownedText = 'true' }
+  $unreadableText = 'false'
+  if ($unreadable) { $unreadableText = 'true' }
+  # 逐项拼 JSON。Windows PowerShell 5.1 对装着 PSCustomObject 的列表整体 ConvertTo-Json 会报
+  # Argument types do not match（队列里一有作业就失败，CI 真队列实测）。ConvertTo-Json 只用来转义单个字符串。
+  [void]$jobs.Add('{"id":' + (ConvertTo-Json -InputObject $idText -Compress) + ',"owned":' + $ownedText + ',"unreadable":' + $unreadableText + '}')
 }
-@{ jobs = @($jobs); unreadable = $skippedUnreadable } | ConvertTo-Json -Compress -Depth 4
+'{"jobs":[' + ($jobs -join ',') + '],"unreadable":' + [int]$skippedUnreadable + '}'
 `.trim()
 
 export const REMOVE_JOBS_SCRIPT = `
