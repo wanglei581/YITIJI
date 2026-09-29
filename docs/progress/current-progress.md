@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-09-29：1.8 P-1 转换件与签名件绕过打印前隐私检查（分支 `claude/backend-hardening-20260929-derivation-kind`，叠在 #1068 上）
+
+- **问题（协调方查主执行窗口问题时发现，旧代码上已复现）：** 打印前隐私检查闸门对 `derived` / `optimized` 整类豁免；图片转 PDF、Word 转 PDF、签名合成的产物内容就是用户材料，却在小程序单件订单、材料包、取件三处「必须已过隐私检查」前直接放行——身份证照片转 PDF 再下单就不经检查。
+- **修法（Claude 子代理实现、协调方审并在自己的工作目录应用）：** `FileObject` 加 `derivationKind`（`format_conversion` / `signature` / `pii_redaction` / `ai_generated`，SQLite 与 PG 两套迁移，存量为空）；18 个派生件上传点都写上来源。判断收成唯一纯函数 `materialCheckRequired()`：只豁免 AI 生成件与隐私遮挡件；转换件、签名件与原件一样按本件 sha256 要一条完成的检查，不完整时走 #1068 同一条本人确认（开关默认关，未改）；存量为空的除只可能由服务端生成的用途外一律要查（失败关闭，按总指挥口径）。「我的文档」列表加 `materialCheckRequired`，与闸门同源。
+- **验证：** 新门禁 `verify:derivation-kind` 39 条（进 CI 两作业）、`verify:pii-manual-confirm` 20 条；子代理 9 组变异全红、关联门禁 123 条通过。协调方把两个超 1000 行文件的行数收回到不高于改动前，独立复跑 15 条关联门禁与小程序契约全绿，抽 2 处变异（转换件加回豁免、存量空值按旧行为豁免）变红。
+- **影响与交付：** 一体机「我的文档」要改用 `materialCheckRequired` 决定走不走材料检查，**须与后端同一批发布**，否则转换件与存量 AI 简历会直达报价、在确认页被拒。存量 AI 简历（最长保存 90 天以上）上线后重打要先过材料检查——要不要免查待产品负责人看数量再定（只读统计 SQL 在 PR 正文）。
+- **待拍板 / 第二次发布：** 材料包与到机码两条只做了函数矩阵与同源检查，未起真实服务端到端；招聘会资料打印副本暂归 `ai_generated`（其用途不受闸门管，无行为影响）；`cover_letter` 是用户可传的高风险用途却不在受查用途里（范围外，已登记）。
+
 ## 2026-09-29：A-04 隐私检查不完整时的「本人确认」服务端留痕（分支 `claude/backend-hardening-20260929-pii-confirm`，叠在上一条之上）
 
 - **口径（主执行窗口采纳提案 B 及四个条件）：** 隐私扫描结论为 `partial`（页数截断）/ `degraded`（识别不可用）/ `unsupported_format` 时，不一刀切拒绝打印，由本人确认后继续，服务端留痕。新增 `POST /materials/tasks/:id/manual-confirmation`（body `{confirmed:true}`，与逐项裁决同鉴权），在该次扫描任务上记 `result.manualConfirmedAt`；重复确认 200 且时间不变，并发只写一次；审计 `material_task.pii_manual_confirmed` 只记任务号、mode、请求方类型、时间。

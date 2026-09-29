@@ -21696,6 +21696,7 @@
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-job-review.ts",
@@ -21727,6 +21728,7 @@
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/scripts/support/minimal-pdf.ts": [
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
@@ -22531,6 +22533,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
@@ -23174,6 +23177,7 @@
     ],
     "services/api/src/document-conversion/document-conversion.service.ts": [
       "services/api/scripts/verify-conversion-queue-bound.mjs",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-document-conversion.ts"
     ],
     "services/api/src/document-conversion/document-conversion.types.ts": [
@@ -23233,6 +23237,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-cos-files.ts",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
@@ -23285,6 +23290,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
@@ -23742,6 +23748,7 @@
       "services/api/scripts/verify-file-display-truth.ts"
     ],
     "services/api/src/materials/materials-manual-confirmation.service.ts": [
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts"
     ],
     "services/api/src/materials/materials.access.ts": [
@@ -23753,6 +23760,7 @@
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
     "services/api/src/materials/materials.service.ts": [
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-pdf-cmap.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
@@ -23792,6 +23800,7 @@
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan.ts",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
@@ -23924,6 +23933,7 @@
     "services/api/src/member-print-orders/member-print-order-create.service.ts": [
       "apps/miniapp/scripts/verify-package-chain.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -24423,6 +24433,7 @@
       "services/api/scripts/verify-print-conversion.ts"
     ],
     "services/api/src/print-conversion/print-conversion.service.ts": [
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-print-conversion.ts"
     ],
     "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts": [
@@ -24447,6 +24458,10 @@
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
+    ],
+    "services/api/src/print-jobs/material-check-policy.ts": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "services/api/scripts/verify-derivation-kind.ts"
     ],
     "services/api/src/print-jobs/page-range.util.ts": [
       "services/api/scripts/verify-pricing.ts"
@@ -24473,6 +24488,7 @@
       "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/src/print-jobs/pii-scan-gate.ts": [
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts"
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
@@ -24558,6 +24574,7 @@
     ],
     "services/api/src/print-sign/print-sign.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-print-sign.ts"
     ],
     "services/api/src/print-sign/print-sign.types.ts": [
@@ -24610,6 +24627,7 @@
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-deploy-data-safety-gate.ts",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-end-user-asset-ownership.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
@@ -24865,6 +24883,7 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
+      "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
@@ -28104,11 +28123,10 @@
           "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
           "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
-          "apps/kiosk/src/routes/index.tsx"
-        ],
-        "missing": [
+          "apps/kiosk/src/routes/index.tsx",
           "services/api/src/print-jobs/material-check-policy.ts"
-        ]
+        ],
+        "missing": []
       },
       "file": "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "helper": true,
@@ -32831,6 +32849,39 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:deploy-data-safety-gate"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/document-conversion/document-conversion.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/materials/materials-manual-confirmation.service.ts",
+          "services/api/src/materials/materials.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/print-conversion/print-conversion.service.ts",
+          "services/api/src/print-jobs/material-check-policy.ts",
+          "services/api/src/print-jobs/pii-scan-gate.ts",
+          "services/api/src/print-sign/print-sign.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-derivation-kind.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:derivation-kind"
       ],
       "wired": true
     },
