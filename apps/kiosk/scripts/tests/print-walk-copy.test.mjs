@@ -33,6 +33,10 @@ const progressUrl = transpile(join(kioskRoot, 'src/pages/print/printProgressMode
 })
 const paymentUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/paymentCopy.ts'))
 
+const httpStub = toDataUrl('export class ApiHttpError extends Error { constructor(status, code) { super(String(code)); this.status = status; this.code = code } }')
+const phoneUrl = transpile(join(kioskRoot, 'src/pages/upload/phoneUploadModel.ts'), {
+  '../../services/api/httpAdapter': httpStub,
+})
 const conversionStub = toDataUrl('export function isWordDocument() { return false }')
 const previewKindUrl = transpile(join(kioskRoot, 'src/pages/print/components/printPreviewKind.ts'), {
   '../../../services/api/documentConversion': conversionStub,
@@ -41,6 +45,7 @@ const previewKindUrl = transpile(join(kioskRoot, 'src/pages/print/components/pri
 const progress = await import(progressUrl)
 const payment = await import(paymentUrl)
 const previewKind = await import(previewKindUrl)
+const phone = await import(phoneUrl)
 const progressPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintProgressPage.tsx'), 'utf8')
 const materialPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintMaterialCheckPage.tsx'), 'utf8')
 const previewCanvas = readFileSync(join(kioskRoot, 'src/components/PdfCanvasPreview.tsx'), 'utf8')
@@ -195,4 +200,28 @@ test('W-93 加密 PDF 说明原因并重新选择，页数未识别本身不算�
   assert.match(materialPage, /onEncryptedPdf/)
   assert.match(previewCanvas, /onPasswordRequired/)
   assert.match(previewCanvas, /setPasswordBlocked\(true\)/)
+})
+
+test('W-94 手机上传不支持的格式说清是什么、为什么、怎么办', () => {
+  const cases = [
+    ['heic', 'HEIC 照片'],
+    ['wps', 'WPS 文字'],
+    ['et', 'WPS 表格'],
+    ['doc', 'Word 文档'],
+  ]
+  for (const [ext, name] of cases) {
+    const view = phone.uploadView('type-error', {
+      file: { name: `周建军材料.${ext}`, size: 37_000, ext, type: '' },
+      typeIssue: null,
+      unknownType: true,
+      chips: ['PDF', 'JPG', 'PNG'],
+    })
+    assert.match(view.fileNote.text, new RegExp(name))
+    assert.match(view.fileNote.text, /打不了/)
+    assert.match(view.fileNote.text, /PDF/)
+    assert.match(view.fileNote.text, /JPG/)
+    assert.match(view.fileNote.text, /没有发出去/)
+    assert.doesNotMatch(view.fileNote.text, /已收到/)
+    assert.equal(view.progress.right, '未发送')
+  }
 })
