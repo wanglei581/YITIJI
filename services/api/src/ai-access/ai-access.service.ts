@@ -5,6 +5,7 @@ import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { readClientDeclaration } from '../common/privacy/client-declaration'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
+import { aiPlatformBlockFor } from '../config/ai-platform-config'
 
 export type AiLoginGate = 'off' | 'before_export' | 'before_generate'
 export interface AiAccessConfig { loginGate: AiLoginGate; declarationEnforced: boolean; paused: boolean; maintenance: boolean }
@@ -73,6 +74,7 @@ export class AiAccessService {
     const current = config ?? await this.getConfig()
     if (current.maintenance && (maintenanceBlocked || (kind && kind !== 'read'))) throw new ServiceUnavailableException({ error: { code: 'MAINTENANCE_MODE', message: '设备维护中，请稍后再来' } })
     if (!kind || kind === 'read') return
+    const notConfigured = aiPlatformBlockFor(kind); if (notConfigured) throw new ServiceUnavailableException({ error: notConfigured }) // F-11 生产缺 AI 配置：如实 503，绝不回退 mock
     if (current.paused) throw new ServiceUnavailableException({ error: { code: 'AI_PAUSED', message: 'AI 服务暂停中，打印扫描照常' } })
     // 「开始 AI 前」是更严的一档，导出与打印同样要登录
     const needsLogin = (current.loginGate === 'before_generate' && (kind === 'generate' || kind === 'voice' || kind === 'export'))

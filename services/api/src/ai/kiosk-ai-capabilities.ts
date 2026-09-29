@@ -1,4 +1,5 @@
 import { AI_MODEL_FEATURES, type LlmConfigService, type LlmConfigView } from './llm/llm-config.service'
+import { evaluateAiPlatform, type AiPlatformState } from '../config/ai-platform-config'
 
 /** 契约源：packages/shared/src/types/ai.ts（KioskAiCapabilitiesResponse）。 */
 export type KioskAiCapabilityStatus = 'available' | 'degraded' | 'off'
@@ -20,7 +21,10 @@ function currentAiProvider(): string {
   return (process.env['AI_PROVIDER'] ?? 'mock').trim().toLowerCase() || 'mock'
 }
 
-function toItem(view: LlmConfigView, metaStatus: 'active' | 'planned'): KioskAiCapabilityItem {
+/** 图片 / 扫描件要走 OCR 的能力。OCR 未开通时只降级它，文字版简历照常。 */
+const OCR_DEPENDENT_FEATURES = new Set(['resume_diagnosis'])
+
+function toItem(view: LlmConfigView, metaStatus: 'active' | 'planned', platform: AiPlatformState): KioskAiCapabilityItem {
   const aiProvider = currentAiProvider()
   const base: Pick<KioskAiCapabilityItem, 'key'> = { key: view.featureKey }
 
@@ -34,6 +38,10 @@ function toItem(view: LlmConfigView, metaStatus: 'active' | 'planned'): KioskAiC
     return { ...base, status: 'available' }
   }
 
+  // 生产缺 AI 平台配置（F-11）：如实报不可用，一体机走既有的「AI 暂不可用」分支。
+  if (!platform.generationAvailable) {
+    return { ...base, status: 'off', reason: 'AI 服务暂未开通' }
+  }
   if (!view.enabled) {
     return { ...base, status: 'off', reason: '管理员已关闭该能力' }
   }
@@ -56,11 +64,15 @@ function toItem(view: LlmConfigView, metaStatus: 'active' | 'planned'): KioskAiC
       providerName: view.vendor,
     }
   }
+  if (!platform.ocrConfigured && OCR_DEPENDENT_FEATURES.has(view.featureKey)) {
+    return { ...base, status: 'degraded', reason: '图片和扫描版简历暂不能识别，文字版 PDF / Word 照常', providerName: view.vendor }
+  }
   return { ...base, status: 'available', providerName: view.vendor }
 }
 
 /** 只读 llm-config 视图。不解密 apiKey，不发任何出站请求。 */
 export function listKioskAiCapabilities(config: LlmConfigService): KioskAiCapabilitiesResponse {
-  const items = AI_MODEL_FEATURES.map((meta) => toItem(config.getView(meta.key), meta.status))
+  const platform = evaluateAiPlatform()
+  const items = AI_MODEL_FEATURES.map((meta) => toItem(config.getView(meta.key), meta.status, platform))
   return { items }
 }

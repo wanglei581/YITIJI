@@ -16,6 +16,7 @@ import { LLM_PRESETS, isLlmVendor, type LlmVendor } from './llm-presets'
 import { withAiSafety } from './ai-prompt-safety'
 import { DEFAULT_FORBIDDEN_WORDS, DEFAULT_ROLE_SCOPE, normalizeForbiddenWords } from './llm-guard'
 import { auditTextHash, type AiConfigApiKeyAction, type LlmConfigAuditSnapshot } from './ai-config-audit'
+import { evaluateAiPlatform } from '../../config/ai-platform-config'
 
 export interface LlmConfig {
   vendor:       LlmVendor
@@ -451,9 +452,10 @@ export class LlmConfigService {
     }
   }
 
+  /** 生产缺 AI 平台配置（F-11，见 config/ai-platform-config.ts）时一律未就绪，可用性接口据此如实报不可用。 */
   isReady(feature: AiModelFeatureKey = 'assistant_chat'): boolean {
     const cfg = this.cache[this.resolveFeature(feature)]
-    return cfg.enabled && Boolean(cfg.apiKeyEncrypted)
+    return cfg.enabled && Boolean(cfg.apiKeyEncrypted) && evaluateAiPlatform().generationAvailable
   }
 
   // ── 审计（安全空白补齐）──────────────────────────────────

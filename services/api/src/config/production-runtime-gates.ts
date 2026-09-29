@@ -284,4 +284,7 @@ export function assertProductionRuntimeGates(
       'PRODUCTION_TERMINAL_PLANNED_PROVISIONING_UNDECLARED: NODE_ENV=production 时 TERMINAL_PLANNED_PROVISIONING_ENABLED 必须显式为 true|false（滚动部署阶段必须保持 false，全实例升级后才切 true）',
     )
   }
+
+  // 走到这里说明非 AI 的底线全部满足。AI 类配置只评估、不拒启动（F-11）。
+  return { aiPlatform: evaluateAiPlatform(env) }
 }

@@ -19,9 +19,9 @@
  *      verify:deploy-gates-in-sync 按 `env.KEY !== 'true'` 形态机械扫描，AI 判定混进去会误导那道门禁。
  *
  * 非生产（开发 / CI）一律视为开通：CI 用 AI_PROVIDER=mock 跑大量门禁，行为不变。
- * 本文件是纯函数，不依赖 Nest，部署预检（preflight-production-gates.mjs 加载的 dist）也能直接用。
+ * 本文件只有纯函数，不依赖 Nest 注入，部署预检（preflight-production-gates.mjs 加载的 dist）也能直接用。
  */
-import { isCompliantAigcProducer } from '../common/pdf/aigc-label'
+import { AIGC_PRODUCER_MISSING_MESSAGE, isCompliantAigcProducer } from '../common/pdf/aigc-label'
 
 export interface AiPlatformEnv {
   NODE_ENV?: string
@@ -155,4 +155,61 @@ export function evaluateAiPlatform(env: AiPlatformEnv = process.env): AiPlatform
 /** 日志 / 部署预检用的一行摘要：只含问题码，逗号分隔。 */
 export function aiPlatformIssueCodes(state: AiPlatformState): string {
   return state.issues.map((issue) => issue.code).join(',')
+}
+
+// ── 请求期：AI 路由闸门、provider 选择 ───────────────────────────────────────────
+
+/** AI 未开通时 AI 路由的错误码。复用简历链已有、一体机与小程序都已识别的码，不新造。 */
+export const AI_PLATFORM_NOT_CONFIGURED_CODE = 'AI_PROVIDER_NOT_CONFIGURED'
+
+export const AI_GENERATION_NOT_CONFIGURED_MESSAGE =
+  'AI 服务暂未开通，本次没有生成结果；打印、扫描等其他功能照常'
+
+/** 与 ai-access.decorator.ts 的 AiUseKind 同义；这里不 import 装饰器文件，保持本文件无 Nest 依赖。 */
+export type AiPlatformUseKind = 'generate' | 'voice' | 'export' | 'read'
+
+/**
+ * 某一类 AI 使用在当前开通状态下是否要拒绝；返回错误体（放进 503 的 error），放行返回 null。
+ *
+ *   - read（看已有记录、能力列表）：永远放行；
+ *   - generate / voice：要调大模型，且多数生成当场落 AI 文件 → 需要 generationAvailable；
+ *   - export（把已有 AI 结果导出 / 打印成文件）：不调大模型，但文件要写隐式标识 → 只需要内容制作方。
+ *     所以只缺大模型密钥时，用户照样能把之前生成好的报告导出、打印。
+ * OCR 缺失不在这里拦：只影响图片 / 扫描件识别，由 OCR provider 如实返回 OCR_NOT_CONFIGURED。
+ */
+export function aiPlatformBlockFor(
+  kind: AiPlatformUseKind,
+  state: AiPlatformState = evaluateAiPlatform(),
+): { code: string; message: string } | null {
+  if (!state.enforced || kind === 'read') return null
+  if (kind === 'export') {
+    return state.aigcConfigured ? null : { code: AI_PLATFORM_NOT_CONFIGURED_CODE, message: AIGC_PRODUCER_MISSING_MESSAGE }
+  }
+  return state.generationAvailable
+    ? null
+    : { code: AI_PLATFORM_NOT_CONFIGURED_CODE, message: AI_GENERATION_NOT_CONFIGURED_MESSAGE }
+}
+
+/**
+ * AiService 选 provider 用的名字。
+ *   - 非生产：原样读 AI_PROVIDER（默认 mock），未知值照旧在构造时抛 AI_PROVIDER_INVALID；
+ *   - 生产：一律 llm。mock / stub 在生产永远不出结果；LlmResumeProvider 没有模型配置时
+ *     如实抛 AI_PROVIDER_NOT_CONFIGURED。也顺带让「生产填错 AI_PROVIDER」不再在依赖注入阶段把整站拖垮
+ *     （错值由 evaluateAiPlatform 记成 AI_PROVIDER_NOT_LLM，AI 路由在闸门处就 503）。
+ */
+export function resolveAiProviderName(env: AiPlatformEnv = process.env): string {
+  if (!aiPlatformEnforced(env)) return env.AI_PROVIDER ?? 'mock'
+  return 'llm'
+}
+
+/**
+ * OcrService 选 provider 用的名字。
+ *   - 非生产：原样读 OCR_PROVIDER（默认 disabled），未知值照旧抛 OCR_PROVIDER_INVALID；
+ *   - 生产：按与 evaluateAiPlatform 相同的规范化（去空白 + 小写）取值，认不出的一律 disabled
+ *     （图片 / 扫描件如实返回 OCR_NOT_CONFIGURED），不再让一个填错的 OCR 取值拖垮整站。
+ */
+export function resolveOcrProviderName(env: AiPlatformEnv = process.env): string {
+  if (!aiPlatformEnforced(env)) return env.OCR_PROVIDER ?? 'disabled'
+  const normalized = normalizeProviderSetting(env.OCR_PROVIDER)
+  return ECHOABLE_OCR_PROVIDERS.has(normalized) ? normalized : 'disabled'
 }
