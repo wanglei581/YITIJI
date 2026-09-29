@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-29：3.9 内部账号名册、备用管理员与服务器端应急启用（分支 `claude/backend-hardening-20260929-roster`）
+
+- **做了什么（Claude 子代理实现、协调方审）：** 管理员后台用的内部账号名册 `GET /admin/internal-accounts`（查询列白名单、只给脱敏手机号、已删除账号不出现）；管理员启停（本人密码确认，与合作机构账号操作共用「5 次 / 5 分钟」锁；Serializable 事务 + `tokenVersion+1`，旧登录下一次请求即 401；不能停自己；两人同时互停时至少留一个可用管理员）。备用管理员两步建号（票据 + 短信验证码，同一事务建号；建出来是停用状态、临时密码、全局最多一个，条件唯一索引兜底）。服务器端应急启用命令 `backup-admin:emergency-enable`：只许生产 + PostgreSQL、精确确认短语、必须写事由；两步走（先打印将启用的账号并签发 10 分钟确认码，不改任何账号；再带码执行），确认码绑定账号与 `tokenVersion`，不落库、不依赖 Redis；命令不接受账号参数。启用后走现有短信找回密码完成首次登录（开着 P1-4 第二步也能登）。运维手册 §4 追加「备用管理员应急启用」。
+- **验证：** 新门禁 `verify:internal-accounts` 80 条（CI SQLite）与 `verify:internal-accounts:postgres` 6 条（CI postgres-readiness；子代理本机 PG 16 实跑，并用生产模式实际跑过一次应急命令）；子代理 15 处反向变异全红。协调方把迁移时间戳从 180000 改到 183000（与 P1-2a 的迁移错开），在全新库独立复跑 9 条关联门禁与 ci-gate-coverage 全绿，抽 2 处变异（允许停掉最后一个管理员、启停不让旧登录失效）全红。
+- **顺带发现（未修，已登记）：** 用 `@prisma/adapter-pg` 时 PG 的 Serializable 冲突会抛成 `DriverAdapterError: TransactionWriteConflict`（`cause.originalCode=40001`）而不是 P2034；`orgs/admin-orgs.service.ts` 的 `withSerializableRetry` 与 `auth/first-admin-bootstrap.ts` 的 `isSerializationConflict` 只认 P2034，在 PG 上会把该重试的冲突当 500。本 PR 的新代码已按真 PG 行为识别。
+- **待产品负责人拍板：** 是否需要「撤销备用管理员」（现在换人只能软删，推荐下一期加，同样要本人密码）；临时密码状态的管理员一律不许做账号管理（推荐维持）。
+
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
