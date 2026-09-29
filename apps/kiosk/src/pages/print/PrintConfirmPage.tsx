@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeftIcon, LoaderIcon, PrinterIcon } from 'lucide-react'
-import type { MemberBenefitItem, PrintJobParams } from '@ai-job-print/shared'
+import { PRINT_MAX_SIDES_PER_ORDER, type MemberBenefitItem, type PrintJobParams } from '@ai-job-print/shared'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
@@ -25,6 +25,7 @@ import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
+import { countPagesInRange } from './pageRange'
 import { clearPrintMaterialSession, printUploadPathForSource, type PrintFileState } from './printMaterialSession'
 import { patchPrintHandoff } from './printHandoff'
 import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
@@ -160,6 +161,13 @@ export function PrintConfirmPage() {
     () => (API_MODE !== 'http' ? { status: 'demo' } : quoteState?.key === quoteKey ? quoteState.view : { status: 'loading' }),
     [quoteState, quoteKey],
   )
+  // 面数 = 计费页数 × 份数，双面不折算。页数还不知道时不在本机拦，等报价返回后再按错误码说明。
+  const rangedPages = file.pages === null ? null : countPagesInRange(params.pageRange, file.pages)
+  const printSides = rangedPages === null ? null : rangedPages * params.copies
+  const sidesOverLimit = printSides !== null && printSides > PRINT_MAX_SIDES_PER_ORDER
+  const sidesNotice = printSides === null
+    ? null
+    : `每单最多打印 ${PRINT_MAX_SIDES_PER_ORDER} 面（页数 × 份数），当前 ${printSides} 面`
   const [priceNotice, setPriceNotice] = useState<{ key: string; text: string } | null>(null)
   const activeNotice = priceNotice?.key === quoteKey ? priceNotice.text : null
   const inFlightRef = useRef(false)
@@ -174,6 +182,7 @@ export function PrintConfirmPage() {
     // 本机能力还在加载、参数里又有彩色或双面：先别报价（停在「正在计算本次费用」），也不闪拦截屏。
     // 建过单的只看状态，不再报价。
     if (waitingCapability || ordered || !hasFileContext) return
+    if (sidesOverLimit) return
     if (!file.fileUrl) {
       setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason: '打印文件尚未就绪，无法报价' } })
       return
@@ -190,9 +199,10 @@ export function PrintConfirmPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return
+        const code = errorCodeOf(err)
         const reason =
-          errorCodeOf(err) === 'PRINTER_UNAVAILABLE'
-            ? userMessageOf(err, '本机打印机当前不可用，请联系现场工作人员')
+          code === 'PRINTER_UNAVAILABLE' || code === 'PRINT_JOB_TOO_LARGE'
+            ? userMessageOf(err, '请稍后重试或联系现场工作人员')
             : '页数以实际结果为准，确认前不显示金额'
         setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason } })
       })
@@ -200,7 +210,7 @@ export function PrintConfirmPage() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- quoteKey 已编码最终文件与全部打印参数
-  }, [quoteKey, waitingCapability, ordered, hasFileContext, quoteNonce])
+  }, [quoteKey, waitingCapability, ordered, hasFileContext, quoteNonce, sidesOverLimit])
 
   useEffect(() => {
     if (!benefitCardEnabled) return
@@ -301,6 +311,7 @@ export function PrintConfirmPage() {
   })
 
   const confirmBlocked =
+    sidesOverLimit ||
     submitting ||
     abandoning ||
     printerBlocked ||
@@ -336,6 +347,10 @@ export function PrintConfirmPage() {
     }
     if (printerBlocked) {
       setSubmitError(printerBlockedReason)
+      return
+    }
+    if (sidesOverLimit) {
+      setSubmitError(sidesNotice)
       return
     }
     // 同一份交接只能建一单；交接失效时不猜是哪一份。
@@ -451,13 +466,14 @@ export function PrintConfirmPage() {
     })
   }
 
-  const costCalcLabel =
-    quote.status === 'ready'
+  const costCalcLabel = sidesOverLimit && sidesNotice
+    ? sidesNotice
+    : quote.status === 'ready'
       ? `${formatCents(quote.unitCents)}/页 × ${quote.quantity} 页`
       : quote.status === 'loading'
-        ? '正在核对页数与价目…'
+        ? (sidesNotice ?? '正在核对页数与价目…')
         : quote.status === 'demo'
-          ? '演示模式不显示金额'
+          ? (sidesNotice ?? '演示模式不显示金额')
           : quote.status === 'unavailable'
             ? quote.reason
             : '页数以实际结果为准，确认前不显示金额'
@@ -539,6 +555,8 @@ export function PrintConfirmPage() {
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>我的打印订单</button>
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(-1)}>回到这一单</button>
     </>
+  ) : sidesOverLimit ? (
+    <>{backButton()}{confirmButton('确认打印')}</>
   ) : screen === 'quoting' ? (
     <>{backButton()}{waitButton('获取报价后可继续')}</>
   ) : screen === 'quote-failed' ? (
@@ -635,7 +653,7 @@ export function PrintConfirmPage() {
         selfAssessment={selfAssessment}
         printNotes={printNotes}
         actions={actions}
-        submitError={submitError ?? activeNotice}
+        submitError={submitError ?? activeNotice ?? (sidesOverLimit ? sidesNotice : null)}
         // 回跳地址只放路由路径：不带文件编号、打印链接、交接编号，也不带当前查询串。
         onLogin={() => navigate(loginPathForPrintStep('confirm'))}
       />

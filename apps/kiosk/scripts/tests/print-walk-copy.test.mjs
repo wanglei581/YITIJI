@@ -33,8 +33,25 @@ const progressUrl = transpile(join(kioskRoot, 'src/pages/print/printProgressMode
 })
 const paymentUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/paymentCopy.ts'))
 
+const httpStub = toDataUrl('export class ApiHttpError extends Error { constructor(status, code) { super(String(code)); this.status = status; this.code = code } }')
+const phoneUrl = transpile(join(kioskRoot, 'src/pages/upload/phoneUploadModel.ts'), {
+  '../../services/api/httpAdapter': httpStub,
+})
+const conversionStub = toDataUrl('export function isWordDocument() { return false }')
+const previewKindUrl = transpile(join(kioskRoot, 'src/pages/print/components/printPreviewKind.ts'), {
+  '../../../services/api/documentConversion': conversionStub,
+})
+
 const progress = await import(progressUrl)
 const payment = await import(paymentUrl)
+const previewKind = await import(previewKindUrl)
+const phone = await import(phoneUrl)
+const progressPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintProgressPage.tsx'), 'utf8')
+const progressSections = readFileSync(join(kioskRoot, 'src/pages/print/components/PrintProgressSections.tsx'), 'utf8')
+const materialPage = readFileSync(join(kioskRoot, 'src/pages/print/PrintMaterialCheckPage.tsx'), 'utf8')
+const materialPresentation = readFileSync(join(kioskRoot, 'src/pages/print/components/MaterialCheckPresentation.tsx'), 'utf8')
+const previewCanvas = readFileSync(join(kioskRoot, 'src/components/PdfCanvasPreview.tsx'), 'utf8')
+const previewPanel = readFileSync(join(kioskRoot, 'src/pages/print/components/PrintPreviewPanel.tsx'), 'utf8')
 
 test('publicOrderNo 只接受 ORD- 号', () => {
   for (const fn of [progress.publicOrderNo, payment.publicOrderNo]) {
@@ -139,4 +156,99 @@ test('0 元实付写免费试运营，其余仍标未记录且不推算', () => 
 
   const missing = payment.netPaidDisplay({ amountCents: null })
   assert.equal(missing.value, '未记录')
+})
+
+const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
+const ENCRYPTED_COPY = '这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传'
+
+test('W-91 出纸中长时间没有新状态就换掉正在出纸', () => {
+  assert.equal(progress.PRINT_PROGRESS_QUIET_MS, 45_000)
+  assert.equal(progress.PRINT_PROGRESS_QUIET_COPY, QUIET_COPY)
+  const printing = { status: 'printing', errorCode: '', failureReasonForUser: '', completedAt: '' }
+  assert.equal(progress.progressStatusFingerprint(printing), progress.progressStatusFingerprint({ ...printing }))
+  assert.notEqual(progress.progressStatusFingerprint(printing), progress.progressStatusFingerprint({ ...printing, status: 'failed' }))
+  assert.match(progressPage, /PRINT_PROGRESS_QUIET_MS/)
+  assert.match(progressPage, /PRINT_PROGRESS_QUIET_COPY/)
+  assert.match(progressPage, /backendStatus === 'printing' && !progressQuiet/)
+  assert.match(progressPage, /progressQuiet\s*\?\s*<>\{PRINT_PROGRESS_QUIET_COPY\}<\/>/)
+})
+
+test('W-88 已知失败不再说排队', () => {
+  const reason = '打印机缺纸，请联系工作人员补纸'
+  const view = progress.progressFailurePresentation(reason)
+  assert.equal(view.headerTitle, '打印没有完成')
+  assert.equal(view.badge, '打印未完成')
+  assert.match(view.ask, /打印机缺纸/)
+  assert.match(view.wayOut, /重新打印/)
+  assert.doesNotMatch(view.wayOut, /打印机缺纸/)
+  assert.doesNotMatch(`${view.headerTitle}${view.badge}${view.ask}${view.doing}${view.wayOut}`, /排队|等待终端领取|正在出纸/)
+  const blank = progress.progressFailurePresentation('   ')
+  assert.match(blank.ask, /请联系现场工作人员/)
+  assert.doesNotMatch(blank.badge, /排队/)
+  assert.match(progressPage, /progressFailurePresentation/)
+  assert.match(progressPage, /failed && !isSim \? failureView\.badge/)
+  assert.match(progressPage, /hint=\{reprintHint\(amountCents\)\}/)
+  assert.match(progressPage, /PrintProgressFailureNote wayOut=\{failureView\.wayOut\}/)
+  assert.doesNotMatch(progressPage, /PrintProgressFailureNote[^/\n]*failureView\.ask/)
+  assert.match(progressSections, /data-testid="print-progress-failure"/)
+  assert.match(progressSections, /\{wayOut\}/)
+  assert.doesNotMatch(progressSections, /\{ask\}/)
+  assert.match(progressSections, /<p className="why">\{hint\}<\/p>/)
+  assert.match(progressSections, />\s*重新打印\s*</)
+  assert.match(progressSections, /查看订单/)
+  assert.match(progressSections, /联系工作人员/)
+  assert.doesNotMatch(progressSections, /重新打印[\s\S]{0,40}<small>/)
+})
+
+test('W-93 加密 PDF 说明原因并重新选择，页数未识别本身不算加密', () => {
+  assert.equal(previewKind.ENCRYPTED_PDF_BLOCK_COPY, ENCRYPTED_COPY)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['PDF_PAGE_COUNT_NOT_DETECTED']), false)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['SOURCE_FILE_BYTES_UNAVAILABLE']), false)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['PDF_ENCRYPTED']), true)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['encrypted']), true)
+  assert.equal(previewKind.inspectionSignalsEncrypted(['PII_REDACT_ENCRYPTED']), true)
+  assert.match(materialPage, /ENCRYPTED_PDF_BLOCK_COPY/)
+  assert.match(materialPage, /!encryptedPdf/)
+  assert.match(materialPage, /重新选择文件/)
+  assert.match(materialPage, /onEncryptedPdf/)
+  assert.match(materialPresentation, /encryptedPdf \? '打不开'/)
+  assert.deepEqual(previewKind.ENCRYPTED_PDF_UNLOCK_STEPS.map((step) => step.title), [
+    '在电脑上打开',
+    '另存为不带打开密码的 PDF',
+    '重新上传',
+  ])
+  assert.match(previewKind.ENCRYPTED_PDF_UNLOCK_STEPS.map((step) => step.body).join('\n'), /WPS 或 Acrobat/)
+  assert.match(materialPresentation, /ENCRYPTED_PDF_UNLOCK_STEPS/)
+  assert.match(materialPresentation, /props\.encryptedPdf \? null :/)
+  assert.match(materialPresentation, /normalization && !props\.encryptedPdf/)
+  assert.match(materialPresentation, /data-encrypted=\{props\.encryptedPdf \? 'true' : undefined\}/)
+  assert.match(previewPanel, /previewKind === 'word' \? \([\s\S]*Word 转换暂未开放，请另存为 PDF 再上传。/)
+  assert.match(previewPanel, /encrypted \? null :/)
+  assert.match(previewPanel, /这份 PDF 打不开，看不到页码/)
+  assert.match(previewCanvas, /onPasswordRequired/)
+  assert.match(previewCanvas, /setPasswordBlocked\(true\)/)
+})
+
+test('W-94 手机上传不支持的格式说清是什么、为什么、怎么办', () => {
+  const cases = [
+    ['heic', 'HEIC 照片'],
+    ['wps', 'WPS 文字'],
+    ['et', 'WPS 表格'],
+    ['doc', 'Word 文档'],
+  ]
+  for (const [ext, name] of cases) {
+    const view = phone.uploadView('type-error', {
+      file: { name: `周建军材料.${ext}`, size: 37_000, ext, type: '' },
+      typeIssue: null,
+      unknownType: true,
+      chips: ['PDF', 'JPG', 'PNG'],
+    })
+    assert.match(view.fileNote.text, new RegExp(name))
+    assert.match(view.fileNote.text, /打不了/)
+    assert.match(view.fileNote.text, /PDF/)
+    assert.match(view.fileNote.text, /JPG/)
+    assert.match(view.fileNote.text, /没有发出去/)
+    assert.doesNotMatch(view.fileNote.text, /已收到/)
+    assert.equal(view.progress.right, '未发送')
+  }
 })

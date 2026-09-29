@@ -238,6 +238,7 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
             <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-600">
               <p className="font-medium text-gray-700">Windows 一体机上推荐的安装命令</p>
               <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-[11px] text-gray-700">{installCommand}</pre>
+              <p className="mt-2 text-[11px] text-amber-800">请确认这是终端能访问到的服务地址。</p>
             </div>
             <div className="flex items-center justify-end gap-2 pt-1">
               <button

@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 · 首页：hero 缩到 400px 只放只读信息（规则 1）；「问小青」下移到 y=504 成为米纸区第一主操作，AI 卡片角标写能力词（规则 7）；AI 两张卡在上、打印通栏居中、政策与官方渠道在下（规则 5、7）；每张卡写「带走什么」（规则 3）；三处边界声明并成一处（规则 4）；补一行真实设备状态；字阶约 +15%（规则 2）；删除无 DOM 的死样式；对比度提到 4.5:1 以上（Grok 复核）。小程序码等真实码有了再加。
-     原稿：../kiosk-redesign-2026-08/01-home.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27 -->
+     原稿：../kiosk-redesign-2026-08/01-home.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27
+     2026-09-29 产品负责人同意（清场 P0，W-75）：补登录态 ?state=member —— 首页不显示手机号（打码的也不显示），
+     「直接办」一行只写「有人登录着」，加「结束上一位的使用」；进个人区走底部「我的」。其余不动。 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -130,6 +132,13 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:4px solid 
 .hero .date{font-size:20px;color:rgba(242,246,240,.88)}
 .all-services.more{margin-left:0}
 .badge{font-size:21px}
+/* 登录态（?state=member）：只说有人登录着，不说是谁；结束上一位的使用 */
+.who-in,.end-prev{display:none}
+.state-member .who-in{display:flex;align-items:center;gap:8px;margin-left:auto;min-height:56px;font-size:21px;font-weight:650;color:var(--ink)}
+.state-member .end-prev{display:flex;align-items:center;min-height:56px;padding:0 18px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--teal-d);font-size:21px;font-weight:650}
+.state-member .all-services{margin-left:0}
+.state-member .section-head>span{display:none}
+.state-member .section-head>*{flex:none;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -142,7 +151,7 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:4px solid 
   <div class="wave"></div>
   <section class="board">
     <a class="ask" href="05-ai-cockpit.html" aria-label="问小青，说一句你想办的事" data-testid="home-primary"><span class="mic"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg></span>问小青：说一句你想办的事<span class="tag">AI 数字人</span><small aria-hidden="true">→</small></a>
-        <div class="section-head"><h2>直接办</h2><span>每项最后都会给你一样东西</span><a class="all-services" href="09-system-state.html">设备状态</a><a class="all-services more" href="02-services.html">更多服务 →</a></div>
+        <div class="section-head"><h2>直接办</h2><span>每项最后都会给你一样东西</span><em class="who-in" role="status" style="font-style:normal"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg>有人登录着</em><a class="end-prev" href="01-home.html">结束上一位的使用</a><a class="all-services" href="09-system-state.html">设备状态</a><a class="all-services more" href="02-services.html">更多服务 →</a></div>
     <div class="tiles">
       <a class="tile" href="16-service-hubs.html?hub=resume" data-hub-link="resume"><span class="tile-head"><span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l4 4v14H7zM14 3v4h4"/></svg></span><span class="badge ai">AI 诊断改写</span></span><span class="name">改简历</span><span class="desc">上传或扫描，AI 逐句指出问题和改法，改不改你定</span><span class="foot">带走：新简历 →</span></a>
       <a class="tile" href="16-service-hubs.html?hub=interview" data-hub-link="interview"><span class="tile-head"><span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5.5h16V16H9.5L5 19.5z"/></svg></span><span class="badge ai">AI 模拟面试</span></span><span class="name">练面试</span><span class="desc">回答常见问题，当场看反馈，不做录用判断</span><span class="foot">带走：面试反馈 →</span></a>
@@ -166,7 +175,7 @@ function fit(){var k=Math.min(innerWidth/1080,innerHeight/1920),s=document.getEl
 if(new URLSearchParams(location.search).get('flat')==='1'||new URLSearchParams(location.search).get('capture')==='1'){
   document.getElementById('stage').classList.add('flat');
 }
-var root=document.getElementById('body-root'),requested=new URLSearchParams(location.search).get('state'),state=requested==='context'?'context':'no-context';root.dataset.state=state;root.dataset.testid='home-state-'+state;root.className='state-'+state;
+var root=document.getElementById('body-root'),requested=new URLSearchParams(location.search).get('state'),state=requested==='context'||requested==='member'?requested:'no-context';root.dataset.state=state;root.dataset.testid='home-state-'+state;root.className='state-'+state;
 var week=['周日','周一','周二','周三','周四','周五','周六'];function tick(){var d=new Date(),h=d.getHours(),g=h<6?'夜深了':h<11?'上午好':h<14?'中午好':h<18?'下午好':'晚上好';document.getElementById('greeting').textContent=g;document.getElementById('clock').textContent=String(h).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');document.getElementById('dateLine').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日 · '+week[d.getDay()]}tick();setInterval(tick,10000);
 </script>
 </body>

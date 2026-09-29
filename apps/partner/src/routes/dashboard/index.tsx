@@ -119,12 +119,12 @@ function MetricsGrid({
   const policyOnlyMetrics = [
     {
       label: '政策公告', value: data.policies.total,
-      note: `已发布 ${data.policies.published} · 待初审 ${data.policies.pending}`,
+      note: `已发布 ${data.policies.published}`,
       icon: ScrollTextIcon, iconClass: 'bg-success-bg text-success-fg', path: '/policy',
     },
     {
       label: '待审核政策', value: snapshot.pendingReviewPolicies,
-      note: snapshot.pendingReviewPolicies > 0 ? '含审核中，由本机构自行审核发布' : '当前无待审核',
+      note: snapshot.pendingReviewPolicies > 0 ? '由本机构自行审核发布' : '当前无待审核',
       icon: ClockIcon, iconClass: 'bg-warning-bg text-warning-fg', path: '/policy',
     },
   ]

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 
 import { FilePreviewPanel } from './PrintPreviewPanel'
+import { ENCRYPTED_PDF_UNLOCK_STEPS } from './printPreviewKind'
 import type { PrintFileState } from '../printMaterialSession'
 
 export type MaterialCheckStage =
@@ -44,6 +45,9 @@ export interface MaterialCheckPresentationProps {
   findings: readonly MaterialFindingPresentation[]
   requiresFormatReview: boolean
   isWorking: boolean
+  /** 预览认出打开密码。为真时不再把「重新检查」当成出路。 */
+  encryptedPdf?: boolean
+  onEncryptedPdf?: () => void
   onRetry: () => void
   onBack: () => void
   onApplySuggested: () => void
@@ -110,18 +114,22 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
         : '正在检查隐私片段'
 
   return (
-    <div className="qpd-check-grid" data-w2-page="print-material-check" data-qx-state={props.stage}>
+    <div className="qpd-check-grid" data-w2-page="print-material-check" data-qx-state={props.stage} data-encrypted={props.encryptedPdf ? 'true' : undefined}>
       <aside className="qpd-check-left">
-        <FilePreviewPanel file={props.file} token={props.token} />
-        <section className="qpd-options-note">
-          <h3>两个选项分别是什么意思</h3>
-          <p><b>保留：</b>这一处原样印在纸上。</p>
-          <p><b>遮挡：</b>另生成一份把这一处涂黑的文件，打印用这一份；你上传的原文件不变。下一步可以逐页核对遮挡结果。</p>
-        </section>
-        <div className="qpd-privacy-note">
-          <ShieldCheckIcon aria-hidden="true" />
-          <p>扫描件或图片可能交给第三方识别文字。右侧只显示部分字符，请结合文件预览核对。</p>
-        </div>
+        <FilePreviewPanel file={props.file} token={props.token} onEncrypted={props.onEncryptedPdf} />
+        {props.encryptedPdf ? null : (
+          <>
+            <section className="qpd-options-note">
+              <h3>两个选项分别是什么意思</h3>
+              <p><b>保留：</b>这一处原样印在纸上。</p>
+              <p><b>遮挡：</b>另生成一份把这一处涂黑的文件，打印用这一份；你上传的原文件不变。下一步可以逐页核对遮挡结果。</p>
+            </section>
+            <div className="qpd-privacy-note">
+              <ShieldCheckIcon aria-hidden="true" />
+              <p>扫描件或图片可能交给第三方识别文字。右侧只显示部分字符，请结合文件预览核对。</p>
+            </div>
+          </>
+        )}
       </aside>
 
       <section className="qpd-check-right" aria-live="polite">
@@ -170,7 +178,9 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
               <div>
                 <h2>{props.privacyModeWarning ?? props.privacyModeNotice ?? (props.findings.length > 0 ? `发现 ${props.findings.length} 个需确认片段` : '检查完成，请自行再核对')}</h2>
                 <p>
-                  {props.privacyModeWarning
+                  {props.encryptedPdf
+                    ? '预览打不开，也不能按这一份继续。请去掉密码后重新选择文件。'
+                    : props.privacyModeWarning
                     ? '扫描结果不完整，页面不会把它说成“没有隐私信息”。'
                     : props.privacyModeNotice
                       ? '本次没有做内容扫描，页面不会把它说成“没有隐私信息”，请结合预览自行确认。'
@@ -182,7 +192,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
               {props.demoMode ? <span>流程演示</span> : null}
             </section> : null}
 
-            {props.privacyModeWarning ? (
+            {props.privacyModeWarning && !props.encryptedPdf ? (
               <button className="qx-btn qpd-retry-scan" data-variant="danger" type="button" onClick={props.onRetry}>
                 重新检查隐私内容
               </button>
@@ -237,17 +247,17 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                 <p className="qpd-decision-status">{remaining > 0 ? `还有 ${remaining} 处等你决定` : '每一处都已决定，可以继续核对遮挡结果。'}</p>
               </>
             ) : null}
-            <div className="qpd-summary-grid">
+            <div className="qpd-summary-grid" data-single={props.encryptedPdf ? 'true' : undefined}>
               {props.inspection ? (
                 <Summary
                   title="文件体检"
                   detail={props.inspection.pageLabel}
-                  state={props.inspection.canPrint === true ? '可继续' : props.requiresFormatReview ? '需重新上传' : '请核对文件'}
-                  warning={props.requiresFormatReview}
+                  state={props.encryptedPdf ? '打不开' : props.inspection.canPrint === true ? '可继续' : props.requiresFormatReview ? '需重新上传' : '请核对文件'}
+                  warning={Boolean(props.encryptedPdf) || props.requiresFormatReview}
                   messages={props.inspection.messages}
                 />
               ) : null}
-              {props.normalization ? (
+              {props.normalization && !props.encryptedPdf ? (
                 <Summary
                   title="A4 版式评估"
                   detail={`目标纸张：${props.normalization.targetPaperSize}`}
@@ -257,6 +267,12 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                 />
               ) : null}
             </div>
+            {props.encryptedPdf ? ENCRYPTED_PDF_UNLOCK_STEPS.map((step, index) => (
+              <section className="qpd-options-note" key={step.title} aria-label={index === 0 ? '怎么去掉打开密码' : undefined}>
+                <h3>{index + 1}. {step.title}</h3>
+                <p>{step.body}</p>
+              </section>
+            )) : null}
 
           </div>
         ) : null}

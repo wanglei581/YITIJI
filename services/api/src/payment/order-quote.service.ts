@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common'
 import { countPagesInRange } from '../print-jobs/page-range.util'
 import { PrintPageCountService } from '../print-jobs/print-page-count.service'
-import { assertVerifiedPrintParameters } from '../print-jobs/verified-print-parameters'
+import { assertPrintOrderSides, assertVerifiedPrintParameters } from '../print-jobs/verified-print-parameters'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { assertTerminalPrinterAvailable, printerOnlineRequired } from '../terminals/printer-availability'
 import { requiredPrintCapabilityKeys } from '../terminals/terminal-capabilities.types'
@@ -80,6 +80,9 @@ export class OrderQuoteService {
   private async quoteLines(dto: QuotePrintOrderDto): Promise<PrintPriceQuote> {
     // 逐行报价后聚合；每行继续走真实页数识别与同一套价目，绝不按前端页数/金额合算。
     const quotes = await Promise.all(dto.lines!.map((line) => this.quoteOne(line.fileUrl, line.pageRange, dto)))
+    const copies = dto.params?.copies ?? DEFAULT_COPIES
+    // 单行各自不超过上限，加在一起仍可能超过。材料包报价走这里，不走逐行 quote()。
+    assertPrintOrderSides(quotes.reduce((sum, quote) => sum + quote.billablePages, 0) * copies)
     return aggregatePrintPriceQuotes(quotes)
   }
 
@@ -98,6 +101,8 @@ export class OrderQuoteService {
 
     const copies = dto.params?.copies ?? DEFAULT_COPIES
     const colorMode = dto.params?.colorMode ?? DEFAULT_COLOR_MODE
+    // 面数 = 计费页数 × 份数。双面、多页合一都不改这个数；计价之前拒绝，避免先给出付不起的价。
+    assertPrintOrderSides(billablePages * copies)
     return this.pricing.quotePrint({ billablePages, billingPageSource, copies, colorMode })
   }
 
