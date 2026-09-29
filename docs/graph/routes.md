@@ -310,7 +310,7 @@ flowchart LR
   app --> orders["/orders<br/>1 页 · 4 端点"]
   app --> partners["/partners<br/>1 页 · 31 端点"]
   app --> peripherals["/peripherals<br/>1 页 · 0 端点"]
-  app --> permissions["/permissions<br/>1 页 · 0 端点"]
+  app --> permissions["/permissions<br/>1 页 · 4 端点"]
   app --> policy_sources["/policy-sources<br/>1 页 · 21 端点"]
   app --> print_scan["/print-scan<br/>1 页 · 5 端点"]
   app --> printers["/printers<br/>1 页 · 0 端点"]
@@ -351,7 +351,7 @@ flowchart LR
 | `/orders` | OrdersPage | `apps/admin/src/routes/orders/index.tsx` | 4 | — |
 | `/partners` | PartnersPage | `apps/admin/src/routes/partners/index.tsx` | 31 | — |
 | `/peripherals` | Navigate | — _(重定向)_ | 0 | — |
-| `/permissions` | PermissionsPage | `apps/admin/src/routes/permissions/index.tsx` | 0 | — |
+| `/permissions` | PermissionsPage | `apps/admin/src/routes/permissions/index.tsx` | 4 | — |
 | `/policy-sources` | PolicySourcesPage | `apps/admin/src/routes/policy-sources/index.tsx` | 21 | — |
 | `/print-scan` | PrintScanOpsPage | `apps/admin/src/routes/print-scan/index.tsx` | 5 | — |
 | `/printers` | Navigate | — _(重定向)_ | 0 | — |
@@ -366,7 +366,7 @@ flowchart LR
 | `/users` | UsersPage | `apps/admin/src/routes/users/index.tsx` | 4 | — |
 
 <details>
-<summary>展开：每个路由触达的端点（27 个路由）</summary>
+<summary>展开：每个路由触达的端点（28 个路由）</summary>
 
 **`/`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/alerts`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/print-tasks`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`、`PUT /admin/orgs/:param/verified-official-domains`
 
@@ -407,6 +407,8 @@ flowchart LR
 **`/orders`** → `GET /admin/orders`、`GET /admin/orders/:param`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`
 
 **`/partners`** → `DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/import-batches`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`PUT /admin/orgs/:param/accounts/:param/email`、`PUT /admin/orgs/:param/verified-official-domains`
+
+**`/permissions`** → `GET /admin/internal-accounts`、`PATCH /admin/internal-accounts/:param/status`、`POST /admin/internal-accounts/backup-admin/start`、`POST /admin/internal-accounts/backup-admin/verify`
 
 **`/policy-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/policy-sources/:param/eligibility-rules`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`GET /policies/eligibility-questions`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`、`PUT /admin/orgs/:param/verified-official-domains`
 

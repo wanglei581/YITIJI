@@ -12051,7 +12051,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 180,
+      "reachableFileCount": 185,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12578,7 +12578,12 @@
         },
         {
           "component": "PermissionsPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /admin/internal-accounts",
+            "PATCH /admin/internal-accounts/:param/status",
+            "POST /admin/internal-accounts/backup-admin/start",
+            "POST /admin/internal-accounts/backup-admin/verify"
+          ],
           "file": "apps/admin/src/routes/permissions/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -12796,7 +12801,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 205
+      "sourceFileCount": 210
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -18047,8 +18052,21 @@
     "apps/admin/src/routes/peripherals/peripheralViews.ts": [
       "apps/admin/scripts/verify-admin-peripheral-views.mjs"
     ],
+    "apps/admin/src/routes/permissions/AccountStatusDialog.tsx": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
+    ],
+    "apps/admin/src/routes/permissions/AccountsTable.tsx": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
+    ],
+    "apps/admin/src/routes/permissions/BackupAdminDrawer.tsx": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
+    ],
     "apps/admin/src/routes/permissions/index.tsx": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs",
       "apps/admin/scripts/verify-honest-placeholders.mjs"
+    ],
+    "apps/admin/src/routes/permissions/presentation.ts": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
     ],
     "apps/admin/src/routes/policy-sources/index.tsx": [
       "apps/admin/scripts/verify-source-publish-actions.mjs",
@@ -18208,6 +18226,9 @@
     ],
     "apps/admin/src/services/api/files.ts": [
       "apps/admin/scripts/verify-admin-file-lifecycle.mjs"
+    ],
+    "apps/admin/src/services/api/internalAccounts.ts": [
+      "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
     ],
     "apps/admin/src/services/api/jobMaterials.ts": [
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs"
@@ -19386,7 +19407,8 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/pickupClaimModel.ts": [
-      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "apps/kiosk/src/pages/print/piiRedaction.ts": [
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs"
@@ -26267,6 +26289,29 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:admin-file-lifecycle-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/permissions/AccountStatusDialog.tsx",
+          "apps/admin/src/routes/permissions/AccountsTable.tsx",
+          "apps/admin/src/routes/permissions/BackupAdminDrawer.tsx",
+          "apps/admin/src/routes/permissions/index.tsx",
+          "apps/admin/src/routes/permissions/presentation.ts",
+          "apps/admin/src/services/api/internalAccounts.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-internal-accounts-ui"
       ],
       "wired": true
     },
@@ -36888,6 +36933,7 @@
         "files": [
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
+          "apps/kiosk/src/pages/print/pickupClaimModel.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/miniapp/pages/print-pay/print-pay.js",
           "apps/miniapp/utils/api.js",
