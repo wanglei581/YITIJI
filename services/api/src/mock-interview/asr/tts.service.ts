@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { tc3Sign } from '../../common/tencent/tc3'
+import { isAiEndpointAllowed, isTencentRegionAllowed } from '../../common/outbound/ai-endpoint-allowlist'
 
 // ============================================================
 // 2C+ 面试官语音播报（腾讯云 TTS TextToVoice，官方语音包）。
@@ -77,6 +78,12 @@ export class TtsService {
     return process.env['TENCENT_TTS_HOST'] ?? 'tts.tencentcloudapi.com'
   }
 
+  /** 合成请求实际要连的地址；本机 stub（verify 用）走 http，只在非生产放行。 */
+  private get endpoint(): string {
+    const insecure = this.host.startsWith('127.0.0.1') || this.host.startsWith('localhost') // verify stub 用
+    return `${insecure ? 'http' : 'https'}://${this.host}`
+  }
+
   get enabled(): boolean {
     const provider = (process.env['TTS_PROVIDER'] ?? 'tencent').trim().toLowerCase()
     return provider === 'tencent' && !!this.secretId && !!this.secretKey
@@ -89,6 +96,10 @@ export class TtsService {
     }
     const clean = text.trim().slice(0, 600)
     if (!clean) return { ok: false, errorMessage: '播报内容为空' }
+    // 出站白名单：地址不在单内就一段都不合成（前端照常降级本地播报）。
+    if (!isAiEndpointAllowed(this.endpoint, 'tts') || !isTencentRegionAllowed(process.env['TENCENT_TTS_REGION'] ?? 'ap-guangzhou', 'tts')) {
+      return { ok: false, errorMessage: '语音播报服务地址未通过核准，本次没有发出请求' }
+    }
     const t0 = Date.now()
     const segments = splitForTts(clean)
     const parts: Buffer[] = []
@@ -106,7 +117,6 @@ export class TtsService {
   }
 
   private async synthesizeSegment(text: string): Promise<Buffer | null> {
-    const insecure = this.host.startsWith('127.0.0.1') || this.host.startsWith('localhost') // verify stub 用
     const payload = JSON.stringify({
       Text: text,
       SessionId: randomUUID(),
@@ -118,7 +128,7 @@ export class TtsService {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), intEnv('TENCENT_TTS_TIMEOUT_MS', 15_000))
     try {
-      const res = await fetch(`${insecure ? 'http' : 'https'}://${this.host}`, {
+      const res = await fetch(this.endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

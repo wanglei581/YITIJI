@@ -104,6 +104,30 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /**
+   * 比较后替换：键仍存在、值仍与 expected 逐字相同、TTL 仍大于 0，才按剩余 TTL 写入 next。
+   * 用于「先读后写」的状态迁移（例如扫码登录 pending → confirmed），防两个并发写者后写覆盖前写。
+   */
+  async replaceExactWithCurrentTtl(key: string, expected: string, next: string): Promise<'missing' | 'changed' | 'updated'> {
+    const result = await this.client.eval(
+      `
+      local current = redis.call('GET', KEYS[1])
+      if not current then return 0 end
+      if current ~= ARGV[1] then return 2 end
+      local ttl = redis.call('TTL', KEYS[1])
+      if ttl <= 0 then return 0 end
+      redis.call('SET', KEYS[1], ARGV[2], 'EX', ttl)
+      return 1
+      `,
+      1,
+      key,
+      expected,
+      next,
+    )
+    const code = Number(result)
+    return code === 1 ? 'updated' : code === 2 ? 'changed' : 'missing'
+  }
+
+  /**
    * 同一次 Lua：锁值仍是调用方的、会话仍是 expectedStatus、文件身份符合 expectedFileId、键 TTL 仍大于 0，
    * 才按剩余 TTL 写入。expectedFileId 为空表示当前必须还没有文件。
    * expectedPhase 为 null 时不比较阶段；空字符串表示当前必须没有 bind。
@@ -636,6 +660,24 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /** INCR 并在首次出现时设置过期,返回自增后的值(用于滑动窗口计数)。 */
+  /**
+   * 计数减 1、不低于 0、保留原有效期（DECR 不动 TTL）；键不在返回 0，减到 0 时删键。原子（Lua）。
+   * 给取件失败计数「成功认领抵一次失败」用（1.8 P-2）。
+   */
+  async decrementFloorKeepTtl(key: string): Promise<number> {
+    const result = await this.client.eval(
+      `
+      local v = tonumber(redis.call('GET', KEYS[1]))
+      if not v then return 0 end
+      if v <= 1 then redis.call('DEL', KEYS[1]) return 0 end
+      return redis.call('DECR', KEYS[1])
+      `,
+      1,
+      key,
+    )
+    return Number(result)
+  }
+
   async incrWithTtl(key: string, ttlSeconds: number): Promise<number> {
     const result = await this.client.eval(
       `

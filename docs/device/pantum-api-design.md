@@ -1,8 +1,10 @@
 # Pantum 开放打印 API 集成设计
 
-> 版本：v1.0  
-> 创建时间：2026-05-27  
-> 状态：预留设计，Phase 8.1 不实现；Phase 8.2+ 视需求评估  
+> 版本：v1.1  
+> 创建时间：2026-05-27；v1.1 修订：2026-09-29  
+> 状态：预留设计，未实现；当前唯一打印路径是本地 Windows 驱动  
+> 依据：奔图提供的《开放打印能力》V1.0（厂家资料，标有保密要求；原件不入库，由产品负责人保管）。  
+> 本文只写我方实现需要的结论，不转载原文，不收录任何示例值。  
 > 关联文档：[windows-terminal-agent-design.md](./windows-terminal-agent-design.md) | [CLAUDE.md](../../CLAUDE.md)
 
 ---
@@ -13,11 +15,13 @@
 
 **Phase 8.1 主方案**：Windows Terminal Agent + 本地 Windows 驱动打印（`LocalAgentDispatchProvider`）。
 
-该机器**没有直接云打印能力**，云打印应采用：
+本机能不能经奔图云接收打印任务（即「开放打印能力」），**厂家尚未确认**：V1.0 文档没有列适用机型，也没有说明打印机怎样接入奔图云。确认之前，本地 Windows 驱动是唯一打印路径，云打印一律按下面的链路设计：
+
 ```
 云端任务队列 → Windows Agent 主动 claim → 本地驱动打印
 ```
-而不是假设打印机自己能云打印。
+
+另需注意：现场部署口径是打印机只走 USB、网口不接公网（见 pantum-cm2820adn.md 第七节）。如果开放 API 要求打印机自己联网，两者冲突，接入前要重新评估。
 
 ### 1.2 本文档的定位
 
@@ -33,92 +37,129 @@
 | 型号系列 | 奔图 CM2800/CM2820 系列彩色激光多功能一体机 |
 | Windows 驱动识别名称 | `Pantum CM2800ADN Series`（真机确认） |
 | 硬件能力 | 黑白打印 ✅ / 彩色打印 ✅ / 自动双面 ✅ / A4 ✅ / ADF 50页 ✅ |
-| 网络 | 有线网络（无 WiFi，无云端打印能力） |
+| 网络 | 有线网络（无 WiFi）；能否经奔图云接单未经厂家确认 |
 | 配置项（Agent） | `printerName`（`%ProgramData%\AIJobPrintAgent\agent-config.json`），禁止硬编码 |
 
 ---
 
-## 3. 签名算法
+## 3. 鉴权与签名
 
-> 来源：《开放打印能力.pdf》  
-> **注意：不是 HMAC，是 MD5**
+> 是 MD5，不是 HMAC。
 
 ```
 sign = md5Hex(body + "&nonce=" + nonce + "&timeStamp=" + timeStamp + "&" + appSecret).toUpperCase()
 ```
 
-| 参数 | 说明 |
-|------|------|
-| `body` | 请求体字符串（JSON 序列化后的 UTF-8 字节字符串） |
-| `nonce` | 随机字符串，每次请求唯一，必须防重放 |
-| `timeStamp` | Unix 时间戳（毫秒），建议服务端限制 ±5 分钟窗口 |
-| `appSecret` | 只保存在后端，**不得出现在前端、Kiosk、Agent** |
+| 项 | 要求 |
+|---|---|
+| 凭据 | appKey、appSecret 由奔图发放；只存服务端（环境变量或密钥管理）。Kiosk、Agent、前端、日志、响应体都不得出现 appSecret |
+| 请求头 | 每个请求带四个头：`appKey`、`timeStamp`、`nonce`、`sign`。名字就是这四个，没有 `X-` 前缀；appKey 不参与签名 |
+| timeStamp | Unix 时间，**单位秒**（10 位），不是毫秒 |
+| nonce | 32 位随机字符串，每个请求重新生成（例如 16 字节随机数转十六进制） |
+| body | **实际发出或收到的那串原始字节**。发请求时先序列化一次，签名和发送用同一个字符串；验回调时用框架保留的原始请求体（NestJS 要开 rawBody），不能把解析后的对象重新序列化再算——多一个空格签名就对不上 |
+| 方向 | 我方调用奔图、奔图回调我方，签名规则相同 |
+| Content-Type、编码 | 文档没写。先按 JSON、UTF-8 发送，接入时实测确认 |
+| 请求头大小写 | Node 收到的请求头名是小写（`appkey`、`timestamp`、`nonce`、`sign`），读回调头时按小写取 |
 
-### 请求 Header
-
-```
-Content-Type: application/json
-X-App-Key: <appKey>        ← appKey 放 Header，不参与签名
-```
-
-### 安全要求（服务端强制）
+### 我方加严（厂家文档没有要求，是我方安全策略）
 
 | 要求 | 说明 |
-|------|------|
-| appKey 位置 | Header `X-App-Key`，不参与签名 |
-| appSecret 保存 | **只保存在后端**；Kiosk / Agent / 前端不得持有 |
-| nonce 防重放 | 服务端记录已使用 nonce，相同 nonce 直接拒绝 |
-| timeStamp 窗口 | 建议拒绝超出 ±5 分钟的请求 |
-| 回调验签 | 接收奔图回调时必须用相同算法验签 |
-| 回调幂等 | 同一 taskId 相同状态回调重复处理不产生副作用 |
-| 日志脱敏 | appSecret、签名值不写入日志；只记录 taskId、状态码 |
+|---|---|
+| 时间窗 | 回调的 timeStamp 与服务器时间相差超过 ±5 分钟，直接拒收 |
+| 防重放 | nonce 在时间窗内去重（Redis），重复即拒 |
+| 比较方式 | 签名用常量时间比较 |
+| 日志脱敏 | appSecret、签名值不写日志；只记任务 ID、状态码、请求编号 |
+| 幂等 | 见 §5.2 |
 
 ---
 
 ## 4. 打印参数映射
 
-### 4.1 PrintJobParams → Pantum API printSetting
+> 协议取值的唯一来源是 `packages/shared/src/types/print.ts` 的 `PANTUM_API_*` 常量，本表只写映射规则。
+> duplex、collate、paperSize、paperType、feeder 五项，协议注明不同机型可选值不同；
+> CM2820ADN 实际支持哪些，待厂家确认或真机下单验证，确认前只用默认值。
 
-> 仅已确认的字段映射。**未确认字段禁止直接使用，必须等厂家确认后实现。**
+| 内部字段 | 开放 API 字段 | 映射规则 |
+|---|---|---|
+| `copies` | `printSetting.numOfCopies` | 直接传，1–99；省略时对方按 1 份 |
+| `colorMode: 'black_white'` | `printSetting.mode` | 传 `"bw"`（也是默认值） |
+| `colorMode: 'color'` | 无 | **V1.0 没有彩色取值。** 映射层必须拒单并说明原因，不得静默改成黑白出纸，也不得试探性地传 `"color"` |
+| `duplex` | `printSetting.duplex` | 三个内部值同名直传；协议另有两项手动双面，本项目不用（要人工翻面） |
+| `paperSize: 'A4'` | `printSetting.paperSize` | 传 `"A4"`（默认值）；协议另有 A5、Letter，本项目不放开 |
+| `pageRange` | `printSetting.range` | 自定义范围原样传；`'all'` 或未填时**不传**这个字段（文档没写不传的含义，按「全部页面」理解，接入时实测） |
+| `collate` / `paperType` / `feeder` | 同名 | 取值见 `PANTUM_API_*`；本机型子集确认前不传，用对方默认 |
+| `orientation` / `quality` / `scale` / `pagesPerSheet` | 无 | 协议没有这些字段。需要时在服务端生成打印用 PDF 时处理；做不到就拒单，不能假装已生效 |
 
-| PrintJobParams 字段 | Pantum API 字段 | 已确认映射值 | 备注 |
-|--------------------|----------------|-------------|------|
-| `colorMode: 'black_white'` | `printSetting.mode` | `"bw"` | ✅ 已确认（API 文档明确） |
-| `colorMode: 'color'` | `printSetting.mode` | ⚠️ **TODO** | 待奔图厂家确认，**禁止假设为 `"color"`** |
-| `copies` | `printSetting.copies` | 直接传递 | ✅ 已确认 |
-| `duplex: 'simplex'` | `printSetting.duplex` | ⚠️ 待确认 | |
-| `duplex: 'duplex_long_edge'` | `printSetting.duplex` | ⚠️ 待确认 | |
-| `duplex: 'duplex_short_edge'` | `printSetting.duplex` | ⚠️ 待确认 | |
-| `paperSize: 'A4'` | `printSetting.paperSize` | ⚠️ 待确认 | |
-| `orientation` | `printSetting.orientation` | ⚠️ 待确认 | |
-| `quality` | `printSetting.quality` | ⚠️ 待确认 | |
+### 4.1 文件字段
 
-> **"不同机型，可选值集合不一样"**（API 文档原文）。所有 ⚠️ 待确认字段在厂家确认前不得上线。
+| 字段 | 规则 |
+|---|---|
+| fileUrl | 地址列表。只有图片任务可以放多张；其它格式一个任务一个文件 |
+| fileType | 图片统一传 `image`；其它传真实扩展名 |
+| fileName | 图片统一传固定的「图片」字样；其它传原文件名 |
+| 支持格式 | doc、docx、ppt、pptx、xls、xlsx、txt、jpg、png、jpeg、bmp、pdf（OFD、TIFF 不在内） |
+| 可达性 | 地址必须能被奔图服务器直接下载，有效期要覆盖对方下载的时间。文档没说何时下载、大小上限，接入时确认 |
 
 ---
 
-## 5. 预留接口列表
+## 5. 接口
 
-以下接口为 `PantumCloudDispatchProvider` 未来实现时参考，**当前 Phase 8.1 不调用**。
+供将来实现 `PantumCloudDispatchProvider` 时参考，目前没有任何调用。
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `device/register` | POST | 设备注册 |
-| `print/createTask` | POST | 创建打印任务 |
-| `print/cancel` | POST | 取消打印任务 |
-| `device/status` | GET | 查询设备状态 |
-| `callback/deviceUnbind` | POST（回调） | 设备解绑通知 |
-| `callback/printStatus` | POST（回调） | 打印状态通知 |
+| 用途 | 方法与路径 | 我方传 | 对方返回（要点） |
+|---|---|---|---|
+| 设备注册 | POST `{serverUrl}/device/register` | pid、sn | 设备记录 |
+| 创建打印 | POST `{serverUrl}/print/createTask` | pid、sn、文件字段、printSetting（可选） | 任务 ID 与状态（创建成功为 101） |
+| 取消打印 | POST `{serverUrl}/print/cancel` | 任务 ID | 任务 ID 与状态（取消后为 103） |
+| 设备状态 | POST `{serverUrl}/device/status` | pid、sn | 是否在线、故障列表、耗材余量 |
+| 回调（奔图 → 我方） | POST 我方回调地址（**只有一个**） | —— | 靠消息里的 topic 区分：`deviceUnbind/{pid}/{sn}` 设备解绑，`printStatus/{pid}/{sn}` 打印状态 |
 
-### 5.1 打印状态码（回调）
+- 返回统一带 `success`、`code`、`data`。文档没有错误码表：以 `success` 判断成败，失败时把 `code` 原样记日志。
+- 文档没有「按任务查状态」的接口：任务状态只能从创建、取消的返回和回调里拿（兜底见 §5.2）。
 
-| 状态码 | 含义 | 对应 PrintTaskStatus |
-|--------|------|----------------------|
+### 5.1 回调处理
+
+- 先验签（§3），再解析。
+- 打印状态回调带任务 ID 和状态码；解绑回调带时间戳（字段名是小写 `timestamp`，单位秒，和请求头 `timeStamp` 不是一回事）。
+- 我方回执是 JSON：`code` 为 0 表示正常，非 0 表示异常；`message` 可写原因和请求编号。文档没说非 0 会不会重发，所以：验签通过并落库就回 0，重复消息也回 0；只有验签失败或我方临时故障才回非 0。
+
+### 5.2 状态码与状态机
+
+| 状态码 | 含义 | 内部状态 |
+|---|---|---|
 | 100 | 打印完成 | `completed` |
 | 101 | 创建打印 | `pending` |
 | 102 | 打印中 | `printing` |
 | 103 | 取消打印 | `cancelled` |
 | 104 | 打印错误 | `failed` |
+
+- 100、103、104 是终态。回调不带事件时间，可能乱序到达；终态之后再来 101、102 一律忽略。
+- 按「任务 ID + 状态码」去重，重复回调不产生任何副作用。
+- 104 不带原因：收到后查一次设备状态，把故障标题和处理办法写进告警；用户侧走打印失败救济流程。
+- 回调可能丢，又没有按任务查询的接口：超时仍未到终态的任务标成「结果未确认」，交人工核对，不自动判成功（与本地路径 `PRINT_JOB_UNCONFIRMED` 的口径一致）。
+
+### 5.3 任务 ID 必须按字符串处理
+
+文档把任务 ID 标成数字，但示例是 19 位整数，超出 JavaScript 能精确表示的范围（`Number.MAX_SAFE_INTEGER` 只有 16 位），其中一例还超出有符号 64 位整数上限。所以：
+
+- 从响应和回调里取 ID 时按字符串无损提取（支持大整数的 JSON 解析，或从原始文本取数字串），不能直接 `JSON.parse` 后使用；
+- 数据库用字符串列，不用 INT / BIGINT；
+- 调取消接口时把字符串原样写成 JSON 数字，不经过 JS number；
+- 验签用原始请求体（§3），与这里的解析互不影响。
+
+### 5.4 设备绑定与解绑
+
+- 每台打印机先用 `pid`（产品 ID，由奔图提供）+ `sn`（打印机序列号）注册。pid、sn 跟着终端存数据库，不放环境变量。
+- 打印机恢复出厂设置后，奔图会自动解绑并发解绑回调；之后打印等设备功能全部失效，必须重新注册。收到后：把该终端的云打印标成不可用、发告警、停止下发新任务，由管理员确认后重新注册。
+- 文档没有主动解绑接口，也没说重复注册是否幂等。
+
+### 5.5 合规提醒
+
+走开放 API，用户文件要由奔图云按链接下载再发给打印机，等于把用户文件交给第三方处理。上线前要：
+
+- 在隐私政策、与奔图的协议里写清楚委托处理、保存期限和删除方式；
+- 由合规决定身份证复印件等敏感件能不能走这条路；
+- 核对签名链接有效期（现在最长 30 分钟）够不够奔图下载。
 
 ---
 
@@ -139,22 +180,39 @@ X-App-Key: <appKey>        ← appKey 放 Header，不参与签名
   → 更新 print-tasks 状态
 ```
 
-> **重要**：两个路径可以并存，但 Phase 8.1 只实现主方案。  
-> 开放 API 路径需要等 `colorMode: 'color'` 的 Pantum API 取值确认后才能正式实现。
+> **重要**：两个路径可以并存，但 Phase 8.1 只实现主方案。
+> V1.0 协议只有黑白。开放 API 路径如果要做，只能先做黑白；彩色不在协议里，不是开工的前置条件。
+> 做不做、何时做，由产品负责人决定。
 
 ---
 
-## 7. 未解决问题（待厂家确认）
+## 7. 待厂家确认
 
-| # | 问题 | 影响范围 |
-|---|------|---------|
-| Q1 | **协议里到底有没有彩色？**（不是问「取值是多少」——V1.0 全文 color / 彩色 / cmyk 各 0 次，`mode` 只定义 `bw`，而且它是五个可选参数里唯一没写「不同机型可选值集合不一样」的。所以要问厂家的是：有无未公开取值、后续版本会不会补。**问错问题会得到错答案。**） | `PantumCloudDispatchProvider` colorMode 映射；拿到答复前走开放 API 一律不能彩色 |
-| Q2 | `duplex` 参数的可用值集合（simplex / long / short 对应什么字符串）？ | 双面打印参数映射 |
-| Q3 | A4 纸张的 `paperSize` 参数取值？ | 纸张参数映射 |
-| Q4 | `copies` 是否支持 1–99 范围？ | 份数上限 |
-| Q5 | `collate` 是否支持（逐份/逐页打印）？ | PrintJobParams 可选字段 collate |
-| Q6 | `paperType` 可用值集合（CM2800ADN 支持哪些纸张类型）？ | PrintJobParams 可选字段 paperType |
-| Q7 | `feeder` 可用值集合（CM2800ADN 是否有多纸盒）？ | PrintJobParams 可选字段 feeder |
+### 7.1 已由 V1.0 文档回答（关闭）
+
+| 原编号 | 问题 | 答案 |
+|---|---|---|
+| Q2 | duplex 取值 | 三个自动取值同名直传，另有两项手动双面；本机型子集并入新 Q4 |
+| Q3 | A4 的 paperSize 取值 | `"A4"`，且为默认值 |
+| Q4 | 份数范围 | `numOfCopies`，1–99，默认 1 |
+| Q5 | 是否支持逐份 | 协议支持；本机型是否支持并入新 Q4 |
+
+### 7.2 仍需厂家书面答复
+
+| # | 问题 | 影响 |
+|---|---|---|
+| Q1 | 彩色：V1.0 没有彩色取值。有没有未公开的取值？后续版本会不会补？ | 答复前开放 API 一律不能彩色 |
+| Q2 | 适用机型：CM2820ADN（驱动名 Pantum CM2800ADN Series）能不能注册？对应的 pid 是多少？ | 决定这条路是否存在 |
+| Q3 | 联网：打印机要不要自己连奔图云？要放行哪些出站地址和端口？打印机只接 USB 的现场能不能用？ | 与现场「打印机不接公网」口径是否冲突 |
+| Q4 | 本机型可用子集：duplex、collate、paperSize、paperType、feeder | 参数映射 |
+| Q5 | 环境：正式与测试的 serverUrl；有没有沙箱；测试凭据怎么申请 | 联调 |
+| Q6 | 回调：回调地址怎么登记、修改；回执非 0 或超时会不会重发、间隔和次数；有没有来源 IP 列表 | 回调可靠性 |
+| Q7 | 有没有按任务 ID 查状态的接口 | 回调丢失时怎么对账 |
+| Q8 | 任务 ID 的取值范围；能不能以字符串收发 | 精度 |
+| Q9 | 错误码表、调用频率限制 | 错误处理、限流 |
+| Q10 | 文件：何时下载、链接要保持多久、大小和页数上限、是否支持 https 和带签名参数的地址；奔图是否留存文件、留多久 | 签名链接有效期、合规 |
+| Q11 | 104 的失败原因从哪里拿；故障类型除「故障」外还有哪些 | 告警与用户提示 |
+| Q12 | 保密范围：公开代码仓库里能出现哪些协议细节 | 本仓库是公开的 |
 
 ---
 
@@ -163,3 +221,4 @@ X-App-Key: <appKey>        ← appKey 放 Header，不参与签名
 | 日期 | 内容 | 操作人 |
 |------|------|--------|
 | 2026-05-27 | v1.0 初稿：签名算法、PrintJobParams 映射、预留接口、未解决问题清单 | Claude Code |
+| 2026-09-29 | v1.1：按《开放打印能力》V1.0 逐页核对。更正时间戳单位、请求头名、份数字段名、设备状态方法、回调结构；删去协议里不存在的 orientation / quality 映射；补任务 ID 精度、签名原始字节、解绑流程、回执与状态机、合规提醒；关闭 Q2–Q5，重排待问清单 | —— |

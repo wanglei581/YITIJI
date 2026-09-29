@@ -340,7 +340,7 @@ export interface ScreenSnapshotMetrics {
   contentInventory?: ScreenMetric<ScreenContentInventoryValue>
   aiBreakdown24h?: ScreenMetric<ScreenAiBreakdownValue>
   printTrend14d?: ScreenMetric<ScreenPrintTrendValue>
-  visitCount?: ScreenMetric<never>
+  visitCount?: ScreenMetric<number>
   suppliesAndMap?: ScreenMetric<never>
   printInProgress?: ScreenMetric<ScreenPrintInProgressValue>
   printFailedToday?: ScreenMetric<ScreenPrintFailedTodayValue>
@@ -476,7 +476,7 @@ export interface ScreenPartnerTopContentValue {
 
 export interface ScreenUsageMetrics {
   channels?: ScreenMetric<ScreenUsageChannelsValue>
-  visits?: ScreenMetric<never>
+  visits?: ScreenMetric<number>
   services?: ScreenMetric<ScreenUsageServiceItem[]>
   outcomes?: ScreenMetric<ScreenUsageOutcomesValue>
   heat7d?: ScreenMetric<ScreenUsageHeatValue>

@@ -341,6 +341,7 @@ export class PrintSignService {
       uploaderId: null,
       endUserId: endUserId ?? undefined,
       assetCategory: 'derived',
+      derivationKind: 'signature',
       sourceFileId: args.document.fileId,
       createdBy: endUserId,
     })

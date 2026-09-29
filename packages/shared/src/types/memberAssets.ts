@@ -76,6 +76,11 @@ export interface MemberDocumentItem {
   downloadUrlPath: string
   /** 临时访问能力：换取短期签名预览 URL */
   previewUrlPath: string
+  /**
+   * true = 打印前要先过材料检查（隐私检查）。服务端与建单闸门用同一个判断函数算出；
+   * 前端只看它决定走不走材料检查，不要自己按 assetCategory / purpose 再推一遍。
+   */
+  materialCheckRequired: boolean
 }
 
 /** 删除记录里云端对象的可核验状态。unknown = 历史行未记账，不得说成已销毁。 */

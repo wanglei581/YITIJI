@@ -17,6 +17,7 @@ import type {
   MemberInterviewItem,
 } from '@ai-job-print/shared'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
 
 export interface InterviewAccess {
@@ -38,7 +39,7 @@ export class InterviewApiError extends Error {
 async function call<T>(path: string, access: InterviewAccess, init?: { method?: string; body?: unknown }): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
       method: init?.method ?? 'GET',
       headers: {
         Accept: 'application/json',
@@ -82,7 +83,7 @@ const MOCK_REPORT: InterviewReportResponse = {
   position: '演示岗位',
   industry: '通用',
   interviewerType: 'hr',
-  interviewerLabel: 'HR 初筛',
+  interviewerLabel: 'HR 面试',
   durationMin: 3,
   endedAt: null,
   report: {
@@ -203,7 +204,7 @@ export async function transcribeAnswer(sessionId: string, wav: Blob, access: Int
   form.append('audio', wav, 'answer.wav')
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/mock-interviews/${encodeURIComponent(sessionId)}/transcribe`, {
+    res = await terminalAttributedFetch(`${API_BASE_URL}/mock-interviews/${encodeURIComponent(sessionId)}/transcribe`, {
       method: 'POST',
       headers: {
         ...(access.token ? { Authorization: `Bearer ${access.token}` } : {}),

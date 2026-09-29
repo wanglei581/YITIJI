@@ -411,6 +411,8 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx',
   'apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx',
   'apps/kiosk/src/pages/profile/me/feedback/types.ts',
+  // 2026-09-29 走查 W-01：AI 内容投诉说明与答复天数（C3）。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts',
   'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',

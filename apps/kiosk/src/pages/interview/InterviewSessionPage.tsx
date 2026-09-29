@@ -23,7 +23,7 @@ import { speakInterview } from './session/speakInterview'
 import { useInterviewLivePersist } from './session/useInterviewLivePersist'
 import { InterviewShell } from './InterviewShell'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
-import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { INTERVIEW_AI_DOWN_HINT, INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
 import {
   patchInterviewWorkbenchSession,
   readInterviewWorkbenchSession,
@@ -32,11 +32,12 @@ import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { isAiOutage } from '../../ai/aiOutage'
 
 const advisorPortrait = '/assets/ai-advisor.png'
 
 const INTERVIEWER_LABEL: Record<string, string> = {
-  hr: 'HR 初筛',
+  hr: 'HR 面试',
   manager: '业务主管',
   tech: '技术面试官',
   campus: '校招面试官',
@@ -281,11 +282,11 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       setVoice({ kind: 'review', transcript: text, edited: text, durationSec })
     } catch (err) {
       const msg = userMessageOf(err, '语音转写失败')
-      if (msg.includes('未启用') || msg.includes('未配置')) {
+      if (!isAiOutage(err) && (msg.includes('未启用') || msg.includes('未配置'))) {
         fallbackToText(`${msg}，请使用文字输入完成练习`)
       } else {
         setVoice({ kind: 'idle' })
-        setError(`${msg}，可重新录音或改用文字输入`)
+        setError(isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : `${msg}，可重新录音或改用文字输入`)
       }
     }
   }
@@ -326,7 +327,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       setQuestionIndex(res.questionIndex)
       setPhase('answering')
     } catch (err) {
-      setError(userMessageOf(err, '提交失败，请重试'))
+      setError(isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '提交失败，请重试'))
       setPhase('answering')
     }
   }
@@ -348,7 +349,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       if (onGoStage) onGoStage('report')
       else navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
     } catch (err) {
-      setError(userMessageOf(err, '报告生成失败，请重试'))
+      setError(isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '报告生成失败，请重试'))
       setPhase(messages.some((m) => m.role === 'candidate' && !m.skipped) ? 'done_suggest' : 'answering')
     }
   }

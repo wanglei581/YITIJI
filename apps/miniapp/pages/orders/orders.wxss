@@ -117,6 +117,8 @@
   font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .oc-btns { display: flex; flex-wrap: wrap; gap: 14rpx; justify-content: flex-end; }
 /* 一体机历史任务的说明文字。不是按钮：它没有可点的去处，
@@ -173,7 +175,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin: 28rpx 4rpx 12rpx;
+  margin: 28rpx 16px 12rpx;
 }
 .sh-t { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
 .sh-n { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }

@@ -59,6 +59,12 @@ export interface BootSubsystemState {
   message: string
   /** 与 message 同义但可被门禁检验的结构化影响面声明；未声明时为 undefined。 */
   impact?: BootImpactDeclaration
+  /**
+   * 降级时是否让 readiness（`/health/ready`）失败。缺省视为 true。
+   * 只有「不影响核心链路、且一次漏配不该让发布被当成失败回退」的子系统才置 false
+   * （目前只有 AI 平台，F-11）；`/health` 照样如实列出它。
+   */
+  blocksReadiness?: boolean
   /** 进入当前状态的时间（ISO）。 */
   since: string
 }
@@ -168,13 +174,20 @@ class BootReadinessRegistry {
     this.states.set(subsystem, { subsystem, status: 'ok', code, message, since: new Date().toISOString() })
   }
 
-  markDegraded(subsystem: string, code: string, message: string, impact?: BootImpactDeclaration): void {
+  markDegraded(
+    subsystem: string,
+    code: string,
+    message: string,
+    impact?: BootImpactDeclaration,
+    options: { blocksReadiness?: boolean } = {},
+  ): void {
     this.states.set(subsystem, {
       subsystem,
       status: 'degraded',
       code,
       message,
       ...(impact ? { impact } : {}),
+      ...(options.blocksReadiness === false ? { blocksReadiness: false } : {}),
       since: new Date().toISOString(),
     })
   }
@@ -190,6 +203,11 @@ class BootReadinessRegistry {
 
   degraded(): BootSubsystemState[] {
     return this.snapshot().filter((s) => s.status === 'degraded')
+  }
+
+  /** 会让 readiness 失败的降级子系统（排除显式声明 blocksReadiness=false 的）。 */
+  readinessBlocking(): BootSubsystemState[] {
+    return this.degraded().filter((s) => s.blocksReadiness !== false)
   }
 
   hasDegraded(): boolean {
@@ -211,3 +229,4 @@ export const bootReadiness = new BootReadinessRegistry()
 export const REDIS_SUBSYSTEM = 'redis'
 export const DATABASE_SUBSYSTEM = 'database'
 export const MEMBER_PRIVACY_SCHEDULER_SUBSYSTEM = 'member-privacy-scheduler'
+export const AI_PLATFORM_SUBSYSTEM = 'ai-platform'

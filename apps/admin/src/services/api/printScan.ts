@@ -12,6 +12,9 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
+/** 默认关闭（未登记 = 拒绝）的能力键，唯一来源是 shared；服务端副本由门禁比对一致。 */
+export { DEFAULT_DENY_CAPABILITY_KEYS } from '@ai-job-print/shared'
+
 // ── 契约类型（源：services/api/src/admin-print-scan/admin-print-scan.types.ts
 //    与 packages/shared/src/types/printScanCapability.ts） ────────────────────
 
@@ -30,8 +33,10 @@ export type PrintScanTaskType =
  * 与 services/api/src/terminals/terminal-capabilities.types.ts —— 那两份的文件头只提到彼此，
  * 漏了这里）。改键必须三处同步；verify:print-color-duplex-capability 已把三份一起断言。
  *
- * color_print / duplex_print 是 fail-closed 键：未配置 = 拒绝，
- * 管理员必须在该终端真机验过彩色/双面出纸后才配成 available。
+ * 默认关闭（未登记 = 拒绝）的键不在这里另抄一份，直接用下方从 @ai-job-print/shared 转出的
+ * DEFAULT_DENY_CAPABILITY_KEYS：目前是 color_print / duplex_print（该终端真机验过彩色 / 双面
+ * 出纸才配成 available）和 signature_stamp（2026-09-28 D3：试点与新机器默认关，逐台开通）。
+ * 其余键未登记时由服务端 PRINT_SCAN_CAPABILITY_MODE 决定放行（managed）还是拒绝（strict）。
  */
 export type PrintScanCapabilityKey =
   | 'document_print'
@@ -228,6 +233,9 @@ const MOCK_CAPABILITIES: TerminalCapabilityView[] = [
   { capabilityKey: 'id_photo', status: 'not_verified', note: null, configured: false, updatedAt: null },
   { capabilityKey: 'format_convert', status: 'not_verified', note: null, configured: false, updatedAt: null },
   { capabilityKey: 'signature_stamp', status: 'not_verified', note: null, configured: false, updatedAt: null },
+  // 服务端 listForTerminal 对全部能力键都返回一行；mock 此前漏了这两项，设备能力表比真实环境少两行。
+  { capabilityKey: 'color_print', status: 'not_verified', note: null, configured: false, updatedAt: null },
+  { capabilityKey: 'duplex_print', status: 'not_verified', note: null, configured: false, updatedAt: null },
 ]
 
 const MOCK_PRINT_TASKS: AdminPrintScanTaskItem[] = [

@@ -4,7 +4,7 @@ import { FilesService } from '../../files/files.service'
 import type { FilePurpose } from '../../files/file.types'
 import { DocumentConversionService } from '../../document-conversion/document-conversion.service'
 import { OcrService } from './ocr/ocr.service'
-import { openUnpdfDocument } from '../../common/pdf/pdfjs-document'
+import { extractPdfText, openUnpdfDocument } from '../../common/pdf/pdfjs-document'
 import { openPdfForRender } from './ocr/pdf-page-renderer'
 import type {
   ResumeExtractionConfidence,
@@ -13,21 +13,6 @@ import type {
   ResumeExtractionResult,
   ResumeTextSource,
 } from './resume-extraction.types'
-
-/**
- * unpdf 提供 CJS 构建（package.json exports.require → dist/index.cjs）。
- * services/api 为 commonjs + node10 resolution（见 files/file.types.ts ESM-interop 说明），
- * 不读 exports 的 types 字段，故用 require + 本地最小类型签名规避类型解析问题。
- * 运行期 require('unpdf') 命中 CJS 构建，纯 JS、无原生绑定（Node 26 安全）。
- */
-interface UnpdfApi {
-  extractText(
-    pdf: unknown,
-    options?: { mergePages?: boolean },
-  ): Promise<{ totalPages: number; text: string | string[] }>
-}
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const unpdf = require('unpdf') as UnpdfApi
 
 /** 允许做简历提取的文件用途白名单（防借道读任意文件）。 */
 const RESUME_PURPOSES: readonly FilePurpose[] = ['resume_upload', 'resume_scan']
@@ -196,23 +181,28 @@ export class ResumeExtractionService {
       )
     }
     const declaredPageCount = (pdf as { numPages?: number }).numPages ?? 0
-    if (declaredPageCount > 0 && declaredPageCount <= MAX_BORN_DIGITAL_EXTRACT_PAGES) {
-      try {
-        const extracted = await unpdf.extractText(pdf, { mergePages: true })
-        pageCount = extracted.totalPages
-        rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
-      } catch {
-        return this.fail(
-          fileId,
-          'UNSUPPORTED_FILE_TYPE',
-          'PDF 解析失败，请确认文件未损坏后重试',
-          startedAt,
-        )
+    try {
+      if (declaredPageCount > 0 && declaredPageCount <= MAX_BORN_DIGITAL_EXTRACT_PAGES) {
+        try {
+          const extracted = await extractPdfText(pdf, { mergePages: true })
+          pageCount = extracted.totalPages
+          rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
+        } catch {
+          return this.fail(
+            fileId,
+            'UNSUPPORTED_FILE_TYPE',
+            'PDF 解析失败，请确认文件未损坏后重试',
+            startedAt,
+          )
+        }
+      } else {
+        // 声明页数为 0（无法判断）或超过上限：跳过无界的 extractText，
+        // rawText 保持 '' 会自动走下面 OCR 渲染兜底路径（该路径自带页数上限）。
+        pageCount = declaredPageCount
       }
-    } else {
-      // 声明页数为 0（无法判断）或超过上限：跳过无界的 extractText，
-      // rawText 保持 '' 会自动走下面 OCR 渲染兜底路径（该路径自带页数上限）。
-      pageCount = declaredPageCount
+    } finally {
+      // 文字层读完即释放（此前从不释放）；释放失败不影响抽取结果。
+      await (pdf as { destroy?: () => Promise<void> }).destroy?.().catch(() => undefined)
     }
     // 文字层为空 / 极少 → 扫描件：OCR 已配置则走受控页数渲染识别，否则明确失败（不编造）
     //

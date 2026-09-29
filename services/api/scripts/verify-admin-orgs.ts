@@ -16,6 +16,8 @@
  *       且审计 payload 内绝不出现明文密码。
  *   11. 机构类型矩阵:type → sceneTemplate → enabledModules 写路径硬约束;历史不合规数据
  *       grandfather,无关字段编辑 / 读取 / 登录 / 启停不被误伤。
+ *   12. 3.15 停放:企业来源方 / 招聘会主办方新建与「改成」一律 ORG_TYPE_PARKED;存量编辑其它字段照常,
+ *       改出停放类型按矩阵放行。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:admin-orgs
  */
@@ -378,54 +380,106 @@ async function main() {
         '10b. smart_campus 仅允许学校机构启用',
       )
 
+      // ── 3.15 停放：企业来源方 / 招聘会主办方不能新建、不能改成（ORG_TYPE_PARKED）──
+      // 原 10c / 10d 用这两类测「source-only 不得启用运营模块」（期望 ORG_TYPE_MATRIX_VIOLATION），
+      // 原 10e 断言这两类「仅空模块集可创建」（期望创建成功）。停放后新建一律 ORG_TYPE_PARKED；
+      // source-only 的矩阵约束改在存量机构上测（10e3），强度不降。
       await expectCode(
         () => svc.createOrg(
           {
-            name: `矩阵错误来源方_${suffix}`,
+            name: `停放来源方带模块_${suffix}`,
             type: 'enterprise_source',
             sceneTemplate: undefined,
             enabledModules: ['job_info'],
           },
           admin,
         ),
-        'ORG_TYPE_MATRIX_VIOLATION',
-        '10c. 企业数据来源方 source-only,不得启用运营模块',
+        'ORG_TYPE_PARKED',
+        '10c. 企业数据来源方已停放：带模块新建被拒（ORG_TYPE_PARKED）',
       )
 
       await expectCode(
         () => svc.createOrg(
           {
-            name: `矩阵错误招聘会方_${suffix}`,
+            name: `停放招聘会方带模块_${suffix}`,
             type: 'fair_organizer',
             sceneTemplate: undefined,
             enabledModules: ['job_fair'],
           },
           admin,
         ),
-        'ORG_TYPE_MATRIX_VIOLATION',
-        '10d. 招聘会主办方 source-only,不得启用前台招聘会模块',
+        'ORG_TYPE_PARKED',
+        '10d. 招聘会主办方已停放：带模块新建被拒（ORG_TYPE_PARKED）',
       )
 
-      const enterpriseSource = await svc.createOrg(
-        {
-          name: `矩阵合法来源方_${suffix}`,
-          type: 'enterprise_source',
-          sceneTemplate: undefined,
-          enabledModules: [],
-        },
+      for (const parkedType of ['enterprise_source', 'fair_organizer']) {
+        await expectCode(
+          () => svc.createOrg(
+            { name: `停放空模块_${parkedType}_${suffix}`, type: parkedType, sceneTemplate: undefined, enabledModules: [] },
+            admin,
+          ),
+          'ORG_TYPE_PARKED',
+          `10e. ${parkedType} 已停放：合法矩阵（空场景 + 空模块）新建也被拒`,
+        )
+      }
+      const leakedParked = await prisma.organization.count({ where: { name: { contains: `_${suffix}` }, type: { in: ['enterprise_source', 'fair_organizer'] } } })
+      if (leakedParked !== 0) fail(`10e. 停放类型被拒后不应落库，实际多出 ${leakedParked} 条`)
+      pass('10e. 停放类型新建被拒且未落库')
+
+      // 存量停放机构：编辑无关字段、原样回传自身类型照常；改成另一停放类型被拒；改出停放类型按矩阵放行
+      const parkedEnterpriseId = `vao_parked_ent_${suffix}`
+      const parkedFairId = `vao_parked_fair_${suffix}`
+      await prisma.organization.createMany({
+        data: [
+          { id: parkedEnterpriseId, name: `存量企业来源方_${suffix}`, type: 'enterprise_source', sceneTemplate: null, enabledModulesJson: '[]' },
+          { id: parkedFairId, name: `存量招聘会方_${suffix}`, type: 'fair_organizer', sceneTemplate: null, enabledModulesJson: '[]' },
+        ],
+      })
+      const keptEnterprise = await svc.updateOrg(
+        parkedEnterpriseId,
+        { name: `存量企业来源方改名_${suffix}`, type: 'enterprise_source', contact: '存量联系人', sceneTemplate: null, enabledModules: [] },
         admin,
       )
-      const fairOrganizer = await svc.createOrg(
-        {
-          name: `矩阵合法招聘会方_${suffix}`,
-          type: 'fair_organizer',
-          sceneTemplate: undefined,
-          enabledModules: [],
-        },
+      if (keptEnterprise.type !== 'enterprise_source' || keptEnterprise.contact !== '存量联系人' || keptEnterprise.name !== `存量企业来源方改名_${suffix}`) {
+        fail('10e1. 存量企业来源方编辑无关字段（原样回传类型）应照常保存')
+      }
+      const keptFair = await svc.updateOrg(parkedFairId, { contactPhone: '0532-00000000' }, admin)
+      if (keptFair.type !== 'fair_organizer' || keptFair.contactPhone !== '0532-00000000') fail('10e1. 存量招聘会主办方编辑联系电话应照常保存')
+      pass('10e1. 存量停放机构编辑其它字段照常（含前端原样回传自身类型）')
+
+      await expectCode(
+        () => svc.updateOrg(parkedEnterpriseId, { type: 'fair_organizer', sceneTemplate: null, enabledModules: [] }, admin),
+        'ORG_TYPE_PARKED',
+        '10e2. 存量企业来源方改成招聘会主办方被拒（ORG_TYPE_PARKED）',
+      )
+      await expectCode(
+        () => svc.updateOrg(parkedEnterpriseId, { enabledModules: ['job_info'] }, admin),
+        'ORG_TYPE_MATRIX_VIOLATION',
+        '10e3. 存量 source-only 机构启用运营模块仍按矩阵拒绝（原 10c / 10d 的矩阵约束）',
+      )
+      const movedOut = await svc.updateOrg(
+        parkedFairId,
+        { type: 'public_employment_service', sceneTemplate: 'public_employment', enabledModules: ['policy_service'] },
         admin,
       )
-      await prisma.organization.deleteMany({ where: { id: { in: [enterpriseSource.id, fairOrganizer.id] } } })
-      pass('10e. source-only 机构仅空模块集可创建')
+      if (movedOut.type !== 'public_employment_service') fail('10e4. 存量停放机构改出停放类型（按矩阵合法）应放行')
+      pass('10e4. 存量停放机构改成非停放类型按矩阵放行')
+
+      const activeOrg = await svc.createOrg(
+        { name: `改成停放类型_${suffix}`, type: 'public_employment_service', sceneTemplate: 'public_employment', enabledModules: ['policy_service'] },
+        admin,
+      )
+      for (const parkedType of ['enterprise_source', 'fair_organizer']) {
+        await expectCode(
+          () => svc.updateOrg(activeOrg.id, { type: parkedType, sceneTemplate: null, enabledModules: [] }, admin),
+          'ORG_TYPE_PARKED',
+          `10e5. 在用机构改成 ${parkedType} 被拒（ORG_TYPE_PARKED）`,
+        )
+      }
+      const unchanged = await prisma.organization.findUniqueOrThrow({ where: { id: activeOrg.id } })
+      if (unchanged.type !== 'public_employment_service') fail('10e5. 被拒后机构类型不应改变')
+      await prisma.organization.deleteMany({ where: { id: { in: [parkedEnterpriseId, parkedFairId, activeOrg.id] } } })
+      pass('10e5. 改成停放类型被拒且类型未变')
 
       const typeSwitchOrg = await svc.createOrg(
         {

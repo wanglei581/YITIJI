@@ -1,6 +1,9 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { genUserSig } from './usersig.util'
 import { callTencentApi } from './tencent-api.util'
+import { assertTrtcDelegatedEndpoints } from './trtc-delegated-endpoints'
+import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
+import { llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 import {
   DEFAULT_FORBIDDEN_WORDS,
@@ -8,6 +11,7 @@ import {
   buildGuardedSystemPrompt,
   normalizeForbiddenWords,
 } from '../ai/llm/llm-guard'
+import { deepseekThinkingOff } from '../ai/llm/deepseek-thinking'
 
 export const TRTC_DEFAULT_SYSTEM_PROMPT = withAiSafety(
   '你是一位专业、亲切的就业服务顾问，名字叫小青。' +
@@ -28,6 +32,43 @@ function envForbiddenWords(primaryName: string, fallbackName: string): string[] 
   const raw = process.env[primaryName] || process.env[fallbackName]
   if (!raw) return DEFAULT_FORBIDDEN_WORDS
   return normalizeForbiddenWords(raw.split(/[,，\n]/))
+}
+
+export interface TrtcLlmConfigInput {
+  llmType:      string
+  model:        string
+  apiKey:       string
+  apiUrl:       string
+  systemPrompt: string
+}
+
+/**
+ * 数字人「小青」发给腾讯云 StartAIConversation 的 LLMConfig（JSON 字符串）。
+ *
+ * - `overrideJson`（TRTC_LLM_CONFIG_JSON）非空时**原样**返回，不改写一个字节：
+ *   覆盖者自己负责带上关闭思考（.env.example 里写明了怎么带）。
+ * - 默认配置：DeepSeek 系模型加 `ExtraBody: { thinking: { type: 'disabled' } }`。
+ *   依据是腾讯云官方「大模型配置」页（https://cloud.tencent.com/document/product/647/115413，
+ *   页面更新 2025-09-09，2026-09-29 访问）：ExtraBody =「额外透传给大模型的参数，
+ *   例如关闭思考」，官方示例是千问的 `{"enable_thinking": false}`（千问该字段在请求体顶层），
+ *   据此推断 ExtraBody 的内容并进上游请求体顶层（官方没有明写合并方式，需真机对话核对一次）。
+ *   DeepSeek 的关闭写法与文字版各功能
+ *   共用 deepseekThinkingOff()，保证两边口径一致。
+ *   非 DeepSeek 模型不加 ExtraBody，配置与改动前逐字相同。
+ */
+export function buildTrtcLlmConfigJson(input: TrtcLlmConfigInput, overrideJson?: string): string {
+  if (overrideJson) return overrideJson
+  const thinkingOff = deepseekThinkingOff(input.model)
+  return JSON.stringify({
+    LLMType:      input.llmType,
+    Model:        input.model,
+    APIKey:       input.apiKey,
+    APIUrl:       input.apiUrl,
+    SystemPrompt: input.systemPrompt,
+    History:      5,
+    Streaming:    true,
+    ...(Object.keys(thinkingOff).length > 0 ? { ExtraBody: thinkingOff } : {}),
+  })
 }
 
 export interface StartSessionResult {
@@ -124,16 +165,11 @@ export class TrtcService {
       forbiddenWords: envForbiddenWords('TRTC_FORBIDDEN_WORDS', 'AI_ASSISTANT_FORBIDDEN_WORDS'),
     })
 
-    // LLMConfig（OpenAI 兼容协议，DeepSeek）
-    const llmConfig = process.env['TRTC_LLM_CONFIG_JSON'] || JSON.stringify({
-      LLMType:      llmType,
-      Model:        llmModel,
-      APIKey:       llmApiKey,
-      APIUrl:       llmApiUrl,
-      SystemPrompt: systemPrompt,
-      History:      5,
-      Streaming:    true,
-    })
+    // LLMConfig（OpenAI 兼容协议，DeepSeek；DeepSeek 系默认关闭思考，见 buildTrtcLlmConfigJson）
+    const llmConfig = buildTrtcLlmConfigJson(
+      { llmType, model: llmModel, apiKey: llmApiKey, apiUrl: llmApiUrl, systemPrompt },
+      process.env['TRTC_LLM_CONFIG_JSON'],
+    )
 
     // ── TTS 配置 ─────────────────────────────────────────────
     const ttsConfig = this.buildTtsConfig(secretId, cloudKey)
@@ -157,6 +193,8 @@ export class TrtcService {
     }
 
     try {
+      // 交给腾讯云代调的模型 / 语音合成地址先过出站白名单：不在单内就不调腾讯云、不建房。
+      assertTrtcDelegatedEndpoints(llmConfig, ttsConfig)
       const resp = await callTencentApi<{ TaskId: string }>({
         secretId, secretKey: cloudKey, region,
         action: 'StartAIConversation',
@@ -166,6 +204,8 @@ export class TrtcService {
       this.logger.log(`AI 会话已启动 room=${roomId} task=${resp.TaskId}`)
       return { sdkAppId, userId, userSig, roomId, taskId: resp.TaskId }
     } catch (err: unknown) {
+      // 地址未通过出站白名单（代调地址或腾讯云主机）：一个请求都没发，如实报 503，不报成 500。
+      if (err instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       const msg = err instanceof Error ? err.message : String(err)
       this.logger.error('StartAIConversation 失败', msg)
       throw new InternalServerErrorException(`启动 AI 对话失败: ${msg}`)
@@ -186,6 +226,8 @@ export class TrtcService {
       })
       this.logger.log(`AI 会话已结束 task=${taskId}`)
     } catch (err: unknown) {
+      // 腾讯云主机被移出出站白名单：请求没发出，重试也不会成功，不报成「请重试」。
+      if (err instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       const msg = err instanceof Error ? err.message : String(err)
       this.logger.warn(`StopAIConversation 失败: ${msg}`)
       throw new ServiceUnavailableException({

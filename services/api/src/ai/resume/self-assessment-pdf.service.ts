@@ -4,6 +4,10 @@
 // 合规：报告 PDF 首页显著免责声明；每张维度卡片底部固定合规文案。
 // 字体解析与 CareerPlan/Interview PDF 同源候选；找不到中文字体诚实报错。
 // 内容不写日志。
+//
+// 只有打分、没有 AI 解读（AI 被闸门拦下 / 模型调不通）时：这张纸上一个字都不是模型写的，
+// 不写 AIGC 标识、不印「AI 生成」页眉，写诚实元数据 AIGenerated='false'
+// （与 career-plan-degraded-pdf.service.ts 同一口径），标题写明「未含 AI 解读」。
 // ============================================================
 
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
@@ -12,6 +16,11 @@ import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
 import { AIGC_RULE_SCORE_NOTICE, AIGC_VISIBLE_HEADER, stampAigcPageHeader } from '../../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../../common/pdf/cjk-font'
 import type { SelfAssessmentDimensionResult } from './self-assessment.types'
+import { hasAiInterpretation } from './self-assessment-interpretation'
+
+/** 只有打分的版式：产物标识与 AI 版分开，便于事后区分两类文件。 */
+const RULE_ONLY_SERVICE_PROVIDER_CODE = 'zyd-selfassessment-rules-v1'
+export const RULE_ONLY_PDF_TITLE = '自我探索 · 倾向参考（未含 AI 解读）'
 
 @Injectable()
 export class SelfAssessmentPdfService {
@@ -25,13 +34,18 @@ export class SelfAssessmentPdfService {
     contentId: string
   }): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', bufferPages: true, margins: { top: 64, bottom: 56, left: 56, right: 56 } })
-    // 维度强度由规则打分得出，解读文字才是 AI 生成。文件级标识仍按含 AI 内容标注。
-    applyAigcPdfMetadata(doc, {
-      title: '自我探索 · 倾向参考',
-      subject: '规则打分 + AI 文字解读，仅供求职者本人参考，不构成心理测评、人格判定或就业结果结论',
-      kind: 'selfassessment',
-      contentId: meta.contentId,
-    })
+    const withAi = hasAiInterpretation(meta.dimensions, meta.summary)
+    // 维度强度由规则打分得出，解读文字才是 AI 生成。含解读时文件级标识按含 AI 内容标注。
+    if (withAi) {
+      applyAigcPdfMetadata(doc, {
+        title: '自我探索 · 倾向参考',
+        subject: '规则打分 + AI 文字解读，仅供求职者本人参考，不构成心理测评、人格判定或就业结果结论',
+        kind: 'selfassessment',
+        contentId: meta.contentId,
+      })
+    } else {
+      this.applyRuleOnlyMetadata(doc)
+    }
     const ok = registerCjkFont(doc)
     if (!ok) {
       doc.end()
@@ -43,7 +57,7 @@ export class SelfAssessmentPdfService {
     const done = new Promise<Buffer>((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))))
 
     // 封面 / 标题 + 显著免责声明
-    doc.fontSize(18).fillColor('#111827').text('自我探索 · 倾向参考')
+    doc.fontSize(18).fillColor('#111827').text(withAi ? '自我探索 · 倾向参考' : RULE_ONLY_PDF_TITLE)
     doc.moveDown(0.3)
     doc.fontSize(10).fillColor('#6b7280').text(`生成时间：${meta.date}  ｜  依据：本人作答（5 维度 × 5 题）`)
     doc.moveDown(0.2)
@@ -60,6 +74,15 @@ export class SelfAssessmentPdfService {
     doc.fontSize(10).fillColor('#92400e').text(AIGC_RULE_SCORE_NOTICE, { lineGap: 3 })
     for (const d of meta.dimensions) {
       doc.fontSize(11).fillColor('#1d4ed8').text(`${d.label}（强度 ${d.strength}/5）`, { lineGap: 3 })
+    }
+
+    if (!withAi) {
+      doc.moveDown(0.8)
+      doc.fontSize(10.5).fillColor('#6b7280').text(
+        '本次没有生成 AI 解读，本报告只有上面按规则计算的维度强度。',
+        { lineGap: 3 },
+      )
+      return this.finish(doc, done, false)
     }
 
     doc.moveDown(0.8)
@@ -85,11 +108,27 @@ export class SelfAssessmentPdfService {
       doc.fontSize(9).fillColor('#9ca3af').text('本解读仅描述本次作答的倾向，不构成能力评价或职业推荐。', { lineGap: 4 })
     }
 
-    stampAigcPageHeader(doc)
+    return this.finish(doc, done, true)
+  }
+
+  private async finish(doc: PDFKit.PDFDocument, done: Promise<Buffer>, withAi: boolean): Promise<{ buffer: Buffer; pageCount: number }> {
+    if (withAi) stampAigcPageHeader(doc)
     const pageCount = doc.bufferedPageRange().count
     doc.end()
     const buffer = await done
-    this.logger.log(`self_assessment.pdf_ok bytes=${buffer.length} pages=${pageCount}`)
+    this.logger.log(`self_assessment.pdf_ok bytes=${buffer.length} pages=${pageCount} ai=${withAi}`)
     return { buffer, pageCount }
+  }
+
+  private applyRuleOnlyMetadata(doc: { info: PDFKit.DocumentInfo }): void {
+    const generatedAt = new Date()
+    const info = doc.info as unknown as Record<string, string | Date>
+    info['Title'] = RULE_ONLY_PDF_TITLE
+    info['Author'] = '青序 AI 求职服务'
+    info['Subject'] = '按本人作答规则计算的维度强度，不含 AI 解读；仅供求职者本人参考，不构成心理测评、人格判定或就业结果结论'
+    info['CreationDate'] = generatedAt
+    info['AIGenerated'] = 'false'
+    info['ServiceProviderCode'] = RULE_ONLY_SERVICE_PROVIDER_CODE
+    info['GeneratedAt'] = generatedAt.toISOString()
   }
 }

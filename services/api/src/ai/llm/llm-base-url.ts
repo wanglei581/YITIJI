@@ -1,5 +1,36 @@
 import { BadRequestException } from '@nestjs/common'
 import * as net from 'net'
+import { evaluateAiEndpoint, isLoopbackHost, type AiEndpointRejectReason, type EnvLike } from '../../common/outbound/ai-endpoint-allowlist'
+
+const NOT_APPROVED_REASON_TEXT: Record<AiEndpointRejectReason, string> = {
+  host_not_allowed: '这个模型地址不在已核准的服务商名单里',
+  insecure_protocol: '模型地址必须以 https:// 开头',
+  loopback_in_production: '正式环境的模型地址不能指向本机',
+  invalid_url: '模型地址不是合法网址',
+  unverifiable: '看不出这个模型地址会连到哪里',
+  region_not_allowed: '服务地域不在境内名单里',
+}
+
+/**
+ * 模型地址必须在出站白名单里（common/outbound/ai-endpoint-allowlist.ts，与运行时
+ * llmFetchJson 用的是同一个判定函数）。后台「保存」与「连通性测试」都调它：
+ * 不在单内就拒绝 —— 不落盘、不发请求。
+ *
+ * 与下面的 assertPublicLlmBaseUrl 分开写：那个只管「内网 / 本机」，它的门禁
+ * （verify:ai-config 7i）钉住了「不做 DNS、字面公网名放行」；白名单是另一道、更严的闸。
+ */
+export function assertApprovedLlmBaseUrl(raw: string, action: '保存' | '测试'): void {
+  const verdict = evaluateAiEndpoint(raw.trim())
+  if (verdict.allowed) return
+  const reason = NOT_APPROVED_REASON_TEXT[verdict.reason ?? 'host_not_allowed']
+  const outcome = action === '保存' ? '未保存' : '未测试，也没有发出请求'
+  const hint = verdict.reason === 'host_not_allowed'
+    ? '。请改选已核准的服务商；需要新增服务商时，先完成备案核准，再请技术人员加入名单'
+    : ''
+  throw new BadRequestException({
+    error: { code: 'AI_BASE_URL_NOT_ALLOWED', message: `${reason}，${outcome}${hint}。` },
+  })
+}
 
 /**
  * 管理员配置的模型 baseURL 不得指向本机 / 内网 / 链路本地。
@@ -7,8 +38,12 @@ import * as net from 'net'
  * 连通性测试端点会再拦一次，防止环境变量里已有的内网地址被「测试」打到。
  *
  * 已知边界：不做 DNS，因此 `http://127.0.0.1.nip.io` 这类解析到内网的公网名会放行。
+ *
+ * 唯一例外：非生产环境放行回环地址（127.x、localhost、::1），与出站白名单同一口径、
+ * 同一个判定函数——走查与本地联调要在后台把模型地址配到本机的假大模型上。
+ * 生产（NODE_ENV=production）照旧拒绝；内网段、链路本地、0.0.0.0 在任何环境都拒绝。
  */
-export function assertPublicLlmBaseUrl(raw: string): void {
+export function assertPublicLlmBaseUrl(raw: string, env: EnvLike = process.env): void {
   const value = raw.trim()
   if (!value) {
     throw new BadRequestException({
@@ -28,6 +63,7 @@ export function assertPublicLlmBaseUrl(raw: string): void {
       error: { code: 'AI_BASE_URL_INVALID', message: '模型地址只允许 http 或 https' },
     })
   }
+  if (env['NODE_ENV'] !== 'production' && isLoopbackHost(normalizeLlmHost(parsed.hostname))) return
   if (isBlockedLlmHost(parsed.hostname)) {
     throw new BadRequestException({
       error: { code: 'AI_BASE_URL_PRIVATE', message: '模型地址不能指向本机或内网' },

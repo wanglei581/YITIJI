@@ -34,6 +34,8 @@ import { MockInterviewLlmService, type InterviewReportPayload } from '../src/moc
 import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
 import { InterviewReportPdfService } from '../src/mock-interview/interview-report-pdf.service'
 import { InterviewPracticeSheetPdfService } from '../src/mock-interview/interview-practice-sheet-pdf.service'
+import { INTERVIEW_PRACTICE_RESULT_DISCLAIMER } from '../src/mock-interview/interview-practice-sheet'
+import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import { AsrService } from '../src/mock-interview/asr/asr.service'
 import { TtsService, splitForTts } from '../src/mock-interview/asr/tts.service'
 import { AiLogService } from '../src/ai/ai-log.service'
@@ -93,6 +95,17 @@ const VALID_REPORT: InterviewReportPayload = {
   checklist: ['调研公司业务', '准备自我介绍', '准备 3 段经历', '准备反问问题', '确认路线设备'],
 }
 const reportJson = (over: Partial<InterviewReportPayload> = {}) => JSON.stringify({ ...VALID_REPORT, ...over })
+
+const unpdf = require('unpdf') as {
+  extractText: (pdf: unknown, options: { mergePages: boolean }) => Promise<{ text: string | string[] }>
+}
+
+async function pdfPlainText(buffer: Buffer): Promise<string> {
+  const doc = await openUnpdfDocument(new Uint8Array(buffer))
+  const extracted = await unpdf.extractText(doc, { mergePages: true })
+  const text = Array.isArray(extracted.text) ? extracted.text.join('\n') : extracted.text
+  return text.replace(/\s+/gu, '')
+}
 
 async function main() {
   const { server, url } = await startStub()
@@ -533,6 +546,11 @@ async function main() {
       )
       if (pageCount < 1) fail('11. pageCount 应 ≥1')
       if (buffer.slice(0, 4).toString() !== '%PDF') fail('11. 输出不是 PDF')
+      const reportText = await pdfPlainText(buffer)
+      if (!reportText.includes(INTERVIEW_PRACTICE_RESULT_DISCLAIMER)) fail('11. 报告 PDF 缺少固定免责说明')
+      for (const phrase of ['练习表现等级', '匹配度', '岗位匹配', '等级']) {
+        if (reportText.includes(phrase)) fail(`11. 报告 PDF 出现「${phrase}」`)
+      }
       const withAnswers = await pdf.render(
         { position: '前端开发工程师', industry: '互联网 / AI', interviewerLabel: '技术面试官', date: '2026-06-11', contentId: 'verify-mock-interview' },
         VALID_REPORT,
@@ -605,6 +623,8 @@ async function main() {
       const sheetPdf = uploads.at(-1)
       if (!sheetPdf) fail('15. 没有产生任何文件')
       if (sheetPdf.buffer.slice(0, 4).toString() !== '%PDF') fail('15. 输出不是 PDF')
+      const sheetText = await pdfPlainText(sheetPdf.buffer)
+      if (!sheetText.includes(INTERVIEW_PRACTICE_RESULT_DISCLAIMER)) fail('15. 题目单 PDF 缺少固定免责说明')
       // 不伪造：这张纸一个字都不是模型写的，元数据不得标成 AI 产物。
       // PDF info 字典里的值是**间接对象**（/AIGenerated 19 0 R），必须顺着引用去读，
       // 直接 grep '/AIGenerated (false)' 会永远断不到。

@@ -10,7 +10,7 @@ import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
 import { useAuth } from '../../auth/useAuth'
-import { AiTaskRegion, useAiTask } from '../../ai'
+import { AiTaskRegion, isAiOutage, useAiTask } from '../../ai'
 import { AssistantHoldToTalk } from './AssistantHoldToTalk'
 import { AssistantSessionSummaryBar } from './AssistantSessionSummaryBar'
 import type { AiAvailability, AiTaskFallback } from '../../ai'
@@ -39,6 +39,7 @@ import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecrui
 import { useAssistantDraftHandoff } from '../../services/assistantDraft'
 import { AssistantTaskPicker } from './AssistantTaskPicker'
 import { advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
+import { AI_CONTENT_COMPLAINT_ROUTE } from '../profile/me/feedback/aiComplaint'
 import './assistant-qingxu.css'
 
 const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
@@ -261,6 +262,17 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     } catch (error) {
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
+      // AI 能力级停用（暂停 / 当日额度已到 / 未配置）：重试这一轮不会变好。与「非 AI 回复」同样
+      // 锁住输入、转到不经过 AI 的四个入口；恢复后用户可点「重新检查 AI 顾问」再试。
+      if (isAiOutage(error)) {
+        setAiAvailability('unavailable')
+        setKeyboardOpen(false)
+        setMessages((current) => [
+          ...current,
+          { id: `err-${Date.now()}`, role: 'assistant', kind: 'error', text: advisorErrorMessage(error, 'AI 顾问现在停用，下面几项不经过 AI，照常能办。') },
+        ])
+        return
+      }
       setTurnFailed(true)
       setMessages((current) => [
         ...current,
@@ -648,6 +660,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
         <footer className="assistant-truth" data-disclaimer="true">
           <p>{toolboxScene?.disclaimer ?? `${AI_LABEL_COPY.BASE}，身份、付款、打印、政策资格和录用结果都不由 AI 决定。`}</p>
+          {/* AI 内容投诉入口（C3，走查 W-01）：稿 05/52 没画，只放一个低调文字入口。 */}
+          <button type="button" className="assistant-complaint-link" data-route={AI_CONTENT_COMPLAINT_ROUTE} onClick={() => navigate(AI_CONTENT_COMPLAINT_ROUTE)}>
+            对回答有异议？投诉 AI 内容
+          </button>
         </footer>
       </div>
 
