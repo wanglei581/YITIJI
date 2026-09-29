@@ -139,7 +139,7 @@ export function takeoverCopy(issue: Exclude<LinkIssue, null>) {
   if (issue === 'signature-blocked') {
     return {
       kind: 'warn' as const, icon: 'ban' as IconKey, head: '本人手写签名暂不支持手机上传',
-      body: '请回到「签名盖章」的原步骤查看可用方式；没有可用方式时，请联系工作人员。',
+      body: '请回到「签名」的原步骤查看可用方式；没有可用方式时，请联系工作人员。',
       facts: [
         ['为什么不可用', '手机上传当前只接受 **简历 / 打印文件 / 合同**，签名图片不在其中，系统不会为它开出上传链接。'],
         ['不是你的问题', '不是文件格式不对，也不是网络问题，换张图或换台手机都不会变。'],

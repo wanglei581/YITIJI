@@ -173,9 +173,19 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:print-cta-contrast
           pnpm --filter @ai-job-print/kiosk verify:print-done-truth
           pnpm --filter @ai-job-print/kiosk verify:print-entry-source-split
+          # 到机码认领失败码全覆盖：读服务端认领链路源码抽码（TypeScript AST，不 import），
+          # 真跑一体机码表模块；已用过 / 已退款等终态码不许叫人重试。
+          pnpm --filter @ai-job-print/kiosk verify:pickup-claim-error-coverage
+          # 服务人次上报（KioskSession 契约 v1）：接线 AST 取证 + 上报器单测真跑；
+          # 白名单对照服务端 kiosk-session.types.ts 源码文本，不 import、不连库。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-session-reporting
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
+          # AI 调用与会员发码必须经 terminalAttributedFetch 带终端会话票（服务端按已验签终端
+          # 计 AI 每日额度、短信每台上限）：terminalAuth.ts 编译后真跑取头与换票，另用
+          # TypeScript AST 扫 apps/kiosk/src 全部请求点。只读源码，不连库、不连网。
+          pnpm --filter @ai-job-print/kiosk verify:ai-requests-terminal-session
           pnpm --filter @ai-job-print/kiosk verify:scan-session-truth
           pnpm --filter @ai-job-print/kiosk verify:scan-quiet-period
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
