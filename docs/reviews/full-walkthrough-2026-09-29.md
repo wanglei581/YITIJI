@@ -128,7 +128,7 @@
 | W-17 | P1 | 一体机 | OCR 不可用时扫描件在材料检查页让「人工确认」却没有继续按钮（= 9/27 A-04 一体机半边；服务端本人确认 #1068 已备） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F4f-scan-04 | 主执行窗口 / Grok（G1 打印链，grok/kiosk-print-chain-walk-0929） | 正式构建已复现（Grok K1 209–212：黄条「内容扫描暂不可用，请人工确认」，下一步灰、页底「隐私检查没有完整覆盖这份文件，不能继续」）；G1 修复中 |
 | W-18 | P2 | 一体机 | `AI_ENDPOINT_NOT_ALLOWED` 时小青写「这一轮没连上，可以重试」、面试写「AI 服务本身是通的，可以直接再点一次」，与事实相反（人话码表 #1095 已补，页面分支待接） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F3-kiosk-01/02 | 后端窗口（#1095，谁新增错误码谁补人话）/ 待定 | 已派 |
 | W-19 | P1 | 一体机 | 短信额度满后主按钮仍是「重新获取验证码」：单台满应主推扫码登录，总量满应主推「不登录，继续使用」；另一体机发码不带终端头，单台上限实际不生效 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F2e/F2f | 主执行窗口（登录页，本窗口子代理改完短信退路后派）/ 待定 | 已认领 |
-| W-20 | P0 | 一体机 | 小青回显用户问题时手机号、邮箱打码，**身份证号原样显示在公共屏** | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F5c-03 | 走查窗口 / Claude 子代理 | 待本栈复现 |
+| W-20 | P0 | 一体机 | 小青回显用户问题时手机号、邮箱打码，**身份证号原样显示在公共屏** | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F5c-03 | 走查窗口 / Claude 子代理 | **正式构建已复现**（Grok K2 263：「你的问题」回显 `110101199001011234`、`138****0312`、`w***@example.com`；根因 `advisorUserCopy.ts:4-6` 只打码手机与邮箱） |
 | W-21 | P2 | 一体机 | 零元单确认页主按钮可见文字「确认并建单」，读屏名却是「确认并去付款……」（`PrintConfirmPage` primaryAccessible） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` | 主执行窗口 / Grok（G1 打印链，grok/kiosk-print-chain-walk-0929） | 修复中 |
 | W-22 | P2 | 一体机 | 诊断报告标题写「简历被读成七块」，正文写「共 5 块」 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F4c-demo-05 | 走查窗口 / Claude 子代理 | PR #1107 待合（Grok 实现、走查窗口审 diff；前后对比 `~/.cache/walk0929/evidence/fix-resume/`） |
 | W-23 | P2 | 一体机 | 打印完成页对模拟面试报告也提示「证件页水印」 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F7b-05 | 主执行窗口 / Grok（G1 打印链，grok/kiosk-print-chain-walk-0929） | 修复中 |
@@ -187,6 +187,10 @@
 | W-76 | P1 | 一体机 | 登录后用 U 盘导入打印：点「下一步：材料检查」变成空页「这一页没有文件」，看不到原因；三次都是 `POST /materials/tasks` 403 `MATERIAL_TASK_ACCESS_DENIED`。根因线索：本机程序导入 `print_doc` 时不转发会员令牌（真 Agent `qr-login-server.ts:350-412` 同样只对 `resume_upload` 转发），文件落成匿名，材料检查再以会员身份建任务被拒后清掉交接（`PrintMaterialCheckPage.tsx` 约 288–391）。同一账号改手机上传正常（F11 同链） | Grok K1 续跑，`~/.cache/walk0929/evidence/k1/` 101–246 215–224；requestId 2a8b2fe8… | 主执行窗口（打印链）+ Windows 窗口（Agent 转发令牌）/ Grok | 待派 |
 | W-77 | P2 | 一体机 | 卡纸完成页写「已出的纸你先收好」，实际这一单没出纸（缺纸页没这句）；U 盘里 PDF 与 docx 同在，列表只列 PDF、不说明 docx 为何不在；同一笔 ¥0 缺纸页「本次未收款」、卡纸/未确认/成功页「已付 ¥0.00」（并入 W-51） | Grok K1 续跑，`~/.cache/walk0929/evidence/k1/` 101–246 201、204、207、215、242 | 主执行窗口（打印链）/ Grok | 待派 |
 | W-78 | P2 | 管理员后台 | 告警中心正文里的失败时间用 UTC 截到分钟，比右侧卡片早 8 小时（`services/api/src/admin-ops/derived-alerts.ts` 约 245 行） | Grok K1 续跑，`~/.cache/walk0929/evidence/k1/` 101–246 202、205、208 | 后端窗口 / 待定 | 待派 |
+| W-79 | **P0** | 服务端 | 小青对话把用户原话**明文**送给大模型：手机号、身份证号、邮箱、姓名都未遮盖（`llm-chat.service.ts:317` 入会话、`324-327` 送出）；简历诊断与小青要点摘要已换占位符，简历对照、职业规划里姓名仍是明文。真实服务上线等于把个人信息发给第三方模型 | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl`（假大模型请求日志 #35、#52、#49、#50） | 后端窗口（#1085 送模型前遮盖补齐）/ 待定 | #1085 待合；合后复走 |
+| W-80 | P1 | 一体机 | 小青「保存本次要点」后作业页（/ai/plan）永远停在「正在读取这一趟的产物」：服务端已生成 1 页 PDF，但页面同一秒对 `GET /advisor/sessions/:id` 发了 445 次被 429——`AiPlanPage.tsx:49` 每次渲染重新解析导航里的要点对象，`65-120` 的读取效果把它当依赖、开头又把状态设回读取中，形成请求风暴 | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl` 264；api.log 22:03:26 `advisor.pdf_ok kind=qa_pins pages=1` | 走查窗口 / Grok | 待派 |
+| W-81 | P1 | 一体机 | 简历来源页手机二维码还在等人扫时，顶栏就是「接收中」，U 盘入口被禁用，要先点「取消」才能换（等待态也打开了 `sourceBusy`，`ResumeSourcePage.tsx:248,512`；与 W-14 同一忙碌锁，#1107 只修了卸载那一半） | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl` 113、220、229 | 走查窗口 / Grok | 待派 |
+| W-82 | P2 | 一体机 | 小青技能条标题带英文「JD」：「AI 简历 JD 匹配」「AI 岗位 JD 解读」；小青对话记录不进「AI 服务记录」（只有保存要点才有，F08 仍在） | Grok K2 收尾，`~/.cache/walk0929/evidence/k2/` 258–275；`fake-llm/requests.jsonl` 164、263 | 走查窗口 / 并入 W-53 文案批 | 待派 |
 
 ### 4.5 两端对账结果（9/29 晚）
 
