@@ -17598,9 +17598,13 @@
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts"
     ],
+    ".github/workflows/cleanup-stale-releases.yml": [
+      "scripts/verify-server-maintenance-workflows.mjs"
+    ],
     ".github/workflows/deploy-precheck.yml": [
       "scripts/verify-deploy-gates-in-sync.mjs",
-      "scripts/verify-deploy-rollback.mjs"
+      "scripts/verify-deploy-rollback.mjs",
+      "scripts/verify-server-maintenance-workflows.mjs"
     ],
     ".github/workflows/deploy.yml": [
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
@@ -30578,6 +30582,25 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:repository-integrity"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/cleanup-stale-releases.yml",
+          ".github/workflows/deploy-precheck.yml"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-server-maintenance-workflows.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:server-maintenance-workflows"
       ],
       "wired": true
     },

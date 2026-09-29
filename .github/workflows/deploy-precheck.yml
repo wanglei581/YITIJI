@@ -13,8 +13,9 @@ name: Deploy Precheck (read-only)
 #
 # 安全：仓库为 public，Actions 日志公开可读，
 # 允许输出：yes/no、数量、日期、版本号、证书目录名、终端编号、
-# 点名的残留目录名，以及第 6b 节的一级目录名。
-# 禁止输出：文件名、来源地址、请求内容、密钥、nginx -T、pm2 jlist、访问日志原文。
+# 点名的残留目录名、内存数字，以及第 6b 节的一级目录名。
+# 禁止输出：文件名、来源地址、请求内容、密钥、环境变量、启动参数、进程命令行、
+# nginx -T、pm2 jlist、访问日志原文。
 
 on:
   workflow_dispatch:
@@ -186,8 +187,9 @@ jobs:
             fi
 
             echo "=== 12. 运行时版本（只读）==="
-            # 只打版本号、数量、日期、域名目录名、终端编号，以及下面点名的残留目录名。
-            # 不打文件名、来源地址、请求内容、密钥，也不回显 nginx -T、pm2 jlist 或访问日志原文。
+            # 只打版本号、数量、日期、域名目录名、终端编号、内存数字，以及下面点名的残留目录名。
+            # 不打文件名、来源地址、请求内容、密钥、环境变量、启动参数、进程命令行，
+            # 也不回显 nginx -T、pm2 jlist 或访问日志原文。
             shopt -s nullglob
 
             MODE_AWK=$(cat <<'PRECHECK_MODE_AWK'
@@ -1106,6 +1108,170 @@ jobs:
               oldest="$(journalctl --output=short-iso 2>/dev/null | head -1 | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || true)"
             fi
             echo "JOURNAL_OLDEST_DATE=${oldest:-unknown}"
+
+            echo "=== 17. 内存占用（只读，只打数字）==="
+            api_name="${EXPECT_PM2:-ai-job-print-api}"
+            emit_api_unknown() {
+              echo "PM2_API_RSS_MB=unknown"
+              echo "PM2_API_HEAP_MB=unknown"
+              echo "PM2_API_RESTARTS=unknown"
+              echo "PM2_API_UPTIME_HOURS=unknown"
+            }
+            api_raw=""
+            if command -v pm2 >/dev/null 2>&1; then
+              api_raw="$(pm2 jlist 2>/dev/null || true)"
+            fi
+            api_parsed=""
+            if [ -n "$api_raw" ] && command -v python3 >/dev/null 2>&1; then
+              api_py="$(cat <<'PY'
+            import json, os, sys, time
+            
+            def num(v):
+                if isinstance(v, bool) or v is None:
+                    return None
+                if isinstance(v, (int, float)):
+                    return float(v)
+                if isinstance(v, str):
+                    try:
+                        return float(v.strip())
+                    except ValueError:
+                        return None
+                return None
+            
+            def emit(key, value):
+                sys.stdout.write(key + "=" + value + "\n")
+            
+            name = os.environ.get("PRECHECK_PM2_NAME") or "ai-job-print-api"
+            raw = sys.stdin.read()
+            start = raw.find("[")
+            end = raw.rfind("]")
+            data = None
+            if start >= 0 and end > start:
+                try:
+                    data = json.loads(raw[start:end + 1])
+                except ValueError:
+                    data = None
+            proc = None
+            if isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict) and item.get("name") == name:
+                        proc = item
+                        break
+            if not isinstance(proc, dict):
+                emit("PM2_API_RSS_MB", "unknown")
+                emit("PM2_API_HEAP_MB", "unknown")
+                emit("PM2_API_RESTARTS", "unknown")
+                emit("PM2_API_UPTIME_HOURS", "unknown")
+                raise SystemExit(0)
+            monit = proc.get("monit") if isinstance(proc.get("monit"), dict) else {}
+            penv = proc.get("pm2_env") if isinstance(proc.get("pm2_env"), dict) else {}
+            mem = num(monit.get("memory"))
+            if mem is None:
+                emit("PM2_API_RSS_MB", "unknown")
+            else:
+                emit("PM2_API_RSS_MB", str(int(mem // 1048576)))
+            axm = penv.get("axm_monitor") if isinstance(penv.get("axm_monitor"), dict) else {}
+            heap = axm.get("Heap Used")
+            hv = None
+            unit = ""
+            if isinstance(heap, dict):
+                hv = num(heap.get("value"))
+                if isinstance(heap.get("unit"), str):
+                    unit = heap.get("unit")
+            else:
+                hv = num(heap)
+                unit = "MiB"
+            if hv is None:
+                emit("PM2_API_HEAP_MB", "unknown")
+            else:
+                u = unit.strip().lower()
+                mb = None
+                if u in ("", "mib", "mb", "m"):
+                    mb = hv
+                elif u in ("kib", "kb", "k"):
+                    mb = hv / 1024.0
+                elif u in ("b", "byte", "bytes"):
+                    mb = hv / 1048576.0
+                elif u in ("gib", "gb", "g"):
+                    mb = hv * 1024.0
+                if mb is None:
+                    emit("PM2_API_HEAP_MB", "unknown")
+                else:
+                    emit("PM2_API_HEAP_MB", str(int(mb + 0.5)))
+            rt = penv.get("restart_time")
+            if isinstance(rt, bool) or not isinstance(rt, (int, float)):
+                emit("PM2_API_RESTARTS", "unknown")
+            else:
+                emit("PM2_API_RESTARTS", str(int(rt)))
+            up = num(penv.get("pm_uptime"))
+            now_ms = time.time() * 1000.0
+            if up is None or up < 1000000000:
+                emit("PM2_API_UPTIME_HOURS", "unknown")
+            else:
+                stamp = up if up >= 100000000000 else up * 1000.0
+                delta = now_ms - stamp
+                if delta < 0:
+                    emit("PM2_API_UPTIME_HOURS", "unknown")
+                else:
+                    emit("PM2_API_UPTIME_HOURS", str(int(delta // 3600000)))
+            PY
+            )"
+              api_parsed="$(printf '%s' "$api_raw" | PRECHECK_PM2_NAME="$api_name" python3 -c "$api_py" 2>/dev/null || true)"
+            fi
+            if printf '%s\n' "$api_parsed" | grep -q '^PM2_API_RSS_MB='; then
+              printf '%s\n' "$api_parsed"
+            else
+              emit_api_unknown
+            fi
+
+            if command -v free >/dev/null 2>&1; then
+              free_out="$(LC_ALL=C free -m 2>/dev/null || true)"
+              printf '%s\n' "$free_out" | awk '
+                NR == 1 && $0 ~ /available/ { has = 1 }
+                $1 == "Mem:" && $2 ~ /^[0-9]+$/ {
+                  total = $2
+                  if (has && NF >= 7 && $7 ~ /^[0-9]+$/) avail = $7
+                }
+                $1 == "Swap:" && $3 ~ /^[0-9]+$/ { swap = $3 }
+                END {
+                  if (total == "") print "MEM_TOTAL_MB=unknown"
+                  else print "MEM_TOTAL_MB=" total
+                  if (avail == "") print "MEM_AVAILABLE_MB=unknown"
+                  else print "MEM_AVAILABLE_MB=" avail
+                  if (swap == "") print "SWAP_USED_MB=unknown"
+                  else print "SWAP_USED_MB=" swap
+                }
+              '
+            else
+              echo "MEM_TOTAL_MB=unknown"
+              echo "MEM_AVAILABLE_MB=unknown"
+              echo "SWAP_USED_MB=unknown"
+            fi
+
+            if command -v redis-cli >/dev/null 2>&1; then
+              redis_info="$(redis-cli INFO memory 2>/dev/null || true)"
+              redis_human="$(printf '%s\n' "$redis_info" | awk -F: '$1 == "used_memory_human" { gsub(/^[ \t]+|[ \t\r]+$/, "", $2); print $2; exit }')"
+              case "$redis_human" in
+                ''|*[!0-9.KMGTPEBkmgtpeb]*) echo "REDIS_USED_MEMORY_HUMAN=unknown" ;;
+                *) echo "REDIS_USED_MEMORY_HUMAN=${redis_human}" ;;
+              esac
+            else
+              echo "REDIS_USED_MEMORY_HUMAN=unknown"
+            fi
+
+            if command -v ps >/dev/null 2>&1; then
+              if pg_rows="$(LC_ALL=C ps -eo rss=,comm= 2>/dev/null)"; then
+                pg_mb="$(printf '%s\n' "$pg_rows" | awk '
+                  $1 ~ /^[0-9]+$/ && ($2 == "postgres" || index($2, "postgres:") == 1) { s += $1 }
+                  END { printf "%d\n", int(s / 1024 + 0.5) }
+                ')"
+                echo "POSTGRES_RSS_MB=${pg_mb:-0}"
+              else
+                echo "POSTGRES_RSS_MB=unknown"
+              fi
+            else
+              echo "POSTGRES_RSS_MB=unknown"
+            fi
             echo "=== 完成：以上均为只读探测，未做任何修改 ==="
         env:
           EXPECT_DIR: /srv/ai-job-print

@@ -1,5 +1,7 @@
 # 当前开发进度
 
+> **2026-09-29 发布前只读盘点补项（候选，尚未发布）**：deploy-precheck 增加运行时版本（含 PM2 实际使用的 node，以及是否达到 22.13）、certbot 是否安装、续期定时器下次触发日期、站点证书到期日、终端 API 近 7 天按端口和终端编号的次数、/srv 下 7 个残留目录的体积、修改日期和是否被 pm2 或 nginx 引用，以及缓存、临时文件、日志、Redis、源码 git、apt、journal 的体积和 journal 最早日期。日志分不出端口时输出 indeterminate，不把没测到写成 0；443 上心跳为 0 时打警告。另报 PM2 里 API 进程的常驻内存、堆用量、重启次数和已运行小时，以及整机总内存、可用内存、swap 已用、Redis 内存用量和 PostgreSQL 进程常驻内存合计；这些只打数字，读不到写 unknown。cleanup-stale-releases 在原有 6 个目录之外，白名单再加 5 个已核对的残留目录（不含 node_modules 与 services）；被 pm2 或 nginx 引用的目录拒绝处理。所在分区可用低于 5120MB 时直接删除通过全部护栏的目录，否则仍先移到隔离区。门禁 `verify:server-maintenance-workflows` 用假命令真跑这些分支，已接进主 CI。
+
 > **2026-09-29 发布磁盘门槛（候选，尚未发布）**：`deploy-api-release.sh` 的 0b 门槛改为 max(原公式 REQUIRED_MB, `DEPLOY_MIN_FREE_FLOOR_MB`)，下限默认 10240MB。不够时默认先 `pnpm store prune`，再调用已有的 `prune_old_backups` 把旧备份收到 `DEPLOY_BACKUP_KEEP`（默认 3）组，然后复判一次；`DEPLOY_PRE_GATE_SAFE_CLEANUP=false` 关掉这次清理。清理后仍不够就中止，并指向 Server Cleanup 工作流的 dry-run。full 发布在服务器安装依赖之前另做一次只读下限检查，那边不清理。pg_dump 与运行目录先写 `.partial`，成功后再改名。摘要打印前后可用空间，并只读检查 pm2-logrotate。server-cleanup 把 `.migrations.log` 算进同一组。deploy-precheck 额外报静态备份大小、组数、最老日期，以及 `/tmp/release.bundle` 是否还在。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
