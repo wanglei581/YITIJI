@@ -22772,6 +22772,7 @@
     ],
     "services/api/src/common/filters/http-exception.filter.ts": [
       "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
@@ -31407,6 +31408,7 @@
           "services/api/src/app.module.ts",
           "services/api/src/assistant/daily-brief.controller.ts",
           "services/api/src/common/decorators/roles.decorator.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/common/health.controller.ts",
           "services/api/src/contract-review/contract-review.controller.ts",
