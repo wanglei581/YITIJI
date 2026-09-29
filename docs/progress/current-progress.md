@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-09-30：W-86 第三轮——重提作业按 attempt 关联，两条入口共用重试资格（分支 `grok/print-retry-attempt-0929`，提交 `705c1c433`）
+
+- **关联键：** 临时文件名、`correlationId`、WMI 队列匹配都带 attempt。attempt=0 仍是 `task_<taskId>.<ext>`，新名字仍能被开机清队列正则 `^task_[A-Za-z0-9_-]{1,128}(\.[A-Za-z0-9]+)$` 认出来。没有重做另一支的开机清队列。
+- **离线补报：** `pending_patches.printAttempt`（旧行默认 0），去重键和请求体都带 attempt。服务端在 attempt 小于当前 failed→pending 条数时回 409 `PRINT_STATUS_STALE_ATTEMPT`，不改任务状态。Agent 收到该码删掉这条补报，只记任务号。不带 attempt 的老 Agent 保持原样。门禁：attempt 0 的 failed 在 attempt 1 已领取/打印中之后被拒绝，状态不变，attempt 1 的 completed 仍能落地。
+- **共用资格：** `retryPaidFailedJob` 的前置抽到 `paid-reprint-eligibility.ts`，管理员 `retryPrintTask` 调用同一函数；管理员自己的终端退役、订单序列点、审计仍留在原处。门禁：管理员对「只出一部分」和未付款都拒绝；会员端原断言不变。
+- **测试注入：** 去掉 `task-runner.ts` 的全局打印桩 setter，改为 `ExecuteTaskDependencies` 注入打印命令和监控。生产调用不传，走真实实现。
+- **混合版本：** attempt>0 的重提派到老 Agent 仍不会出纸，不会双份出纸。发布顺序是先服务端、再 Agent 0.4.13。Agent 版本号仍是 0.4.12。
+- **本机已跑：** 变异在 `705c1c433` 之后做，做完 `git checkout` 还原。① 去掉落后比较 → `verify:print-jobs` 退出 1（8e2c 期望 `PRINT_STATUS_STALE_ATTEMPT` 但未抛）。② 管理员入口放行 `PARTIAL_OUTPUT` → `verify:admin-print-scan` 退出 1。还原后图谱重生成，`pnpm graph:check` 通过。`verify:miniapp-cloud-print-m2` 在基线 `90eb5a21c` 上就失败（一体机取件页已不再包含该门禁要找的 `result.released ? '/print/progress' : '/print/cashier'`），与本轮无关，未改。
+- **没在本机验证：** 真 Windows 打印机、真缺纸走查、GitHub CI 全量。
+
 ## 2026-09-29：缺纸后点「重新提交打印」能在同一台机器上再打（走查 W-86，分支 `grok/print-retry-attempt-0929`）
 
 - **问题：** 重提复用同一个打印任务号，只把 failed 改回 pending，并写一条 `kiosk_retry` 日志。Agent 本地按任务号判重，再次领到就只回报 failed、不打印，还不带原来的 `PAPER_EMPTY`，结果页从「打印机缺纸」变成笼统失败，重提按钮还在。

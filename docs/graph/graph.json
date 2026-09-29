@@ -17178,6 +17178,7 @@
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
+          "services/api/src/print-jobs/paid-reprint-eligibility.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
@@ -17398,6 +17399,7 @@
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/terminals/print-status-attempt.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -21179,7 +21181,11 @@
     ],
     "apps/terminal-agent/src/agent/offline-queue.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
+      "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-correlation.ts": [
+      "apps/terminal-agent/scripts/verify-print-retry-attempt.ts"
     ],
     "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts": [
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
@@ -21237,7 +21243,8 @@
       "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
     ],
     "apps/terminal-agent/src/agent/wmi.ts": [
-      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
+      "apps/terminal-agent/scripts/verify-print-retry-attempt.ts"
     ],
     "apps/terminal-agent/src/config.ts": [
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
@@ -25861,6 +25868,9 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
+    ],
+    "services/api/src/terminals/print-status-attempt.ts": [
+      "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/src/terminals/printer-availability.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
@@ -30826,8 +30836,11 @@
         "files": [
           "apps/terminal-agent/src/agent/auth-state.ts",
           "apps/terminal-agent/src/agent/db.ts",
+          "apps/terminal-agent/src/agent/offline-queue.ts",
+          "apps/terminal-agent/src/agent/print-correlation.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/types.ts",
+          "apps/terminal-agent/src/agent/wmi.ts",
           "apps/terminal-agent/src/printer/types.ts"
         ],
         "missing": []
@@ -38213,6 +38226,7 @@
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.interface.ts",
           "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/print-status-attempt.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
           "services/api/src/terminals/terminal-session.service.ts",
           "services/api/src/terminals/terminal-toolbox.service.ts",
