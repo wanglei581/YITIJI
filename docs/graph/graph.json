@@ -16739,7 +16739,7 @@
         ]
       },
       {
-        "fieldCount": 49,
+        "fieldCount": 50,
         "name": "FileObject",
         "relations": [
           "DocumentProcessTask",
@@ -23027,6 +23027,7 @@
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
@@ -23770,6 +23771,7 @@
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
     ],
     "services/api/src/files/file-page-count.util.ts": [
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-file-display-truth.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-print-sign.ts"
@@ -23813,6 +23815,7 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
@@ -24385,6 +24388,7 @@
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
@@ -24398,7 +24402,8 @@
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-assets/member-assets.types.ts": [
-      "services/api/scripts/verify-assess-isolation.ts"
+      "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-document-page-count.ts"
     ],
     "services/api/src/member-auth/dto/member-login.dto.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
@@ -25268,6 +25273,7 @@
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-deploy-data-safety-gate.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-end-user-asset-ownership.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
@@ -25531,6 +25537,7 @@
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
@@ -34041,6 +34048,30 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:document-conversion"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/file-page-count.util.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-assets/member-assets.types.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-document-page-count.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:document-page-count"
       ],
       "wired": true
     },

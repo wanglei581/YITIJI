@@ -57,6 +57,7 @@
     "verify:ai-persistence-consistency": "node -r @swc-node/register scripts/verify-ai-persistence-consistency.ts",
     "verify:resume-parse-intent": "tsx scripts/verify-resume-parse-submission.ts && tsx scripts/verify-resume-parse-quota-once.ts && tsx scripts/verify-resume-parse-intent-runner.ts && node -r @swc-node/register scripts/verify-resume-parse-intent-http.ts",
     "verify:member-assets": "node -r @swc-node/register scripts/verify-member-assets.ts && node -r @swc-node/register scripts/verify-member-qa-records.ts",
+    "verify:document-page-count": "node -r @swc-node/register scripts/verify-document-page-count.ts",
     "verify:member-favorites-benefits": "node -r @swc-node/register scripts/verify-member-favorites-benefits.ts",
     "verify:member-benefits-admin": "node -r @swc-node/register scripts/verify-member-benefits-admin.ts",
     "verify:benefit-activities": "node -r @swc-node/register scripts/verify-benefit-activities.ts",
