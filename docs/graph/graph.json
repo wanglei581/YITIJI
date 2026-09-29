@@ -17301,7 +17301,7 @@
         ]
       },
       {
-        "fieldCount": 27,
+        "fieldCount": 28,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
