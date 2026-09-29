@@ -131,7 +131,7 @@ function ProfileContent() {
             onLogin={goLogin}
             onHome={() => navigate('/')}
             onRetry={() => setReloadKey((key) => key + 1)}
-            onEnd={() => clearSessionTo({ path: '/profile' })}
+            onEnd={() => clearSessionTo({ path: '/' })}
             onSettings={() => navigate('/me/settings')}
             onHelp={() => navigate('/help')}
             onProgress={() => {

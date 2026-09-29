@@ -36,6 +36,7 @@ import {
   PHONE_DAILY_GATE_COPY,
   resolveLoginReturnTo,
   sendLimitedPrimaryLabel,
+  shouldKeepPhoneKeypadOnNumber,
   smsUnavailableCopy,
   type LoginGateMode,
   type LoginQrState,
@@ -126,6 +127,16 @@ export function LoginPage() {
   // 本机安全校验没过、换票也没换回来时，服务端原话带工程词会被过滤成「请稍后重试」——
   // 这一态恰恰不该叫人重试，按错误码说清走得通的那条路（其余三种发不了码的原因服务端给了人话，照旧显示）。
   const phoneDaily = isPhoneDailySmsCode(phoneLogin.errorCode)
+  const codeEntryOpen = phoneState === 'phone-code-sent' || phoneState === 'phone-code-invalid'
+  // 发码钩子在号码满 11 位时会把焦点拨到验证码。验证码还没发出，这里拨回手机号，
+  // 钩子在本组件里先注册，这一条写在它后面，同一轮里以这里为准。
+  useEffect(() => {
+    if (shouldKeepPhoneKeypadOnNumber({
+      codeOpen: codeEntryOpen,
+      phoneComplete: phoneLogin.phone.length === 11,
+      activeInput: phoneLogin.activeInput,
+    })) setPhoneLoginActiveInput('phone')
+  }, [codeEntryOpen, phoneLogin.activeInput, phoneLogin.phone.length, setPhoneLoginActiveInput])
   useEffect(() => {
     if (phoneDaily && phoneLogin.phone.length === 11) {
       limitedPhoneRef.current = phoneLogin.phone

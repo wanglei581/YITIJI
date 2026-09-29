@@ -237,7 +237,7 @@ for (const marker of [
   '<ProfileSessionRecords',
   "navigate('/me/settings')",
   "navigate('/print/preview'",
-  "clearSessionTo({ path: '/profile' })",
+  "clearSessionTo({ path: '/' })",
 ]) {
   expectIncludes(profile, marker, `ProfilePage preserves ${marker}`)
 }

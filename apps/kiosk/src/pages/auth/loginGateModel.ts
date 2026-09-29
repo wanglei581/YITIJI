@@ -273,6 +273,18 @@ export function sendLimitedPrimaryLabel(countdown: number): string {
   return countdown > 0 ? `${countdown} 秒后再获取` : '重新获取验证码'
 }
 
+/**
+ * 号码刚输满时，发码钩子会把焦点拨到验证码。验证码还没发出，这一下要拨回来，
+ * 否则键盘改口「短信验证码」，发码按钮被整页遮罩挡住。
+ */
+export function shouldKeepPhoneKeypadOnNumber(input: {
+  codeOpen: boolean
+  phoneComplete: boolean
+  activeInput: 'phone' | 'code'
+}): boolean {
+  return !input.codeOpen && input.phoneComplete && input.activeInput === 'code'
+}
+
 export interface QrFetchGuard {
   refreshing: boolean
   generation: number

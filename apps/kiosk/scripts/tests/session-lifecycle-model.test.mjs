@@ -124,6 +124,32 @@ test('W-19 machine quota, site quota, and this number do not share one sentence'
   assert.equal(m.derivePhoneGateState({ sendingCode: false, submitting: false, countdown: 0, notice: null, error: '请明天再试', errorCode: 'SMS_DAILY_LIMIT' }), 'phone-send-limited')
 })
 
+test('W-54 full number stays on the phone keypad until a code exists', async () => {
+  const m = await loadModule('src/pages/auth/loginGateModel.ts')
+  assert.equal(m.shouldKeepPhoneKeypadOnNumber({ codeOpen: false, phoneComplete: true, activeInput: 'code' }), true)
+  assert.equal(m.shouldKeepPhoneKeypadOnNumber({ codeOpen: true, phoneComplete: true, activeInput: 'code' }), false)
+  assert.equal(m.shouldKeepPhoneKeypadOnNumber({ codeOpen: false, phoneComplete: false, activeInput: 'code' }), false)
+
+  const login = readFileSync(join(kioskRoot, 'src/pages/auth/LoginPage.tsx'), 'utf8')
+  const fields = readFileSync(join(kioskRoot, 'src/pages/auth/components/LoginGatePhoneFields.tsx'), 'utf8')
+  const agreement = readFileSync(join(kioskRoot, 'src/pages/auth/components/MemberAgreement.tsx'), 'utf8')
+  const css = readFileSync(join(kioskRoot, 'src/pages/auth/styles/login-gate-qx.css'), 'utf8')
+  const profile = readFileSync(join(kioskRoot, 'src/pages/profile/ProfilePage.tsx'), 'utf8')
+  const settings = readFileSync(join(kioskRoot, 'src/pages/profile/me/MySettingsPage.tsx'), 'utf8')
+  const hookAt = login.indexOf('const phoneLogin = useMemberPhoneLogin(')
+  const keepAt = login.indexOf('shouldKeepPhoneKeypadOnNumber({')
+  assert.ok(hookAt >= 0 && keepAt > hookAt)
+  assert.match(fields, /codeFieldRef\.current\?\.focus\(\)/)
+  assert.match(fields, /className="lg-field lg-field-phone"/)
+  assert.match(agreement, /agreed \? <CheckIcon/)
+  assert.match(css, /\.lg-fields\s*\{[^}]*z-index:\s*50/)
+  assert.match(css, /\.k-agree:not\(\.checked\) \.box svg\s*\{[^}]*opacity:\s*0/)
+  assert.match(profile, /clearSessionTo\(\{ path: '\/' \}\)/)
+  assert.doesNotMatch(profile, /clearSessionTo\(\{ path: '\/profile' \}\)/)
+  assert.match(settings, /clearSessionTo\(\{ path: '\/' \}\)/)
+  assert.match(settings, /clearSessionTo\(\{ path: '\/login', state: \{ from: '\/profile' \} \}\)/)
+})
+
 test('login returnTo rejects unsafe query and does not echo it', async () => {
   const m = await loadModule('src/pages/auth/loginGateModel.ts')
   const isSafe = (p) => p.startsWith('/') && !p.startsWith('//') && !p.includes('\\') && p !== '/login'

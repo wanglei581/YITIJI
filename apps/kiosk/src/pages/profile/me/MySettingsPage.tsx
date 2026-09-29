@@ -131,10 +131,10 @@ export function MySettingsPage() {
     setClearError(null)
   }
 
-  // 退出登录：清空内存会话后回到「我的」（游客态）。
+  // 退出登录：清空内存会话后回到首页，与闲置清场同一目的地。
   const handleLogout = () => {
     setClearing(true); setClearError(null)
-    try { clearSessionTo({ path: '/profile' }) } catch {
+    try { clearSessionTo({ path: '/' }) } catch {
       setClearing(false); setClearError('本机登录尚未清除，请重试或联系工作人员。')
     }
   }

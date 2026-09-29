@@ -611,6 +611,38 @@ test('W-19 这个号码今天用完后不再写成重新获取验证码 @kiosk',
   await expect(page.getByTestId('login-gate-send')).toHaveText('获取验证码')
 })
 
+test('W-54 输满手机号不挡住发码，发码成功后验证码框获得焦点，未勾选没有对勾 @kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 17, expiresInSeconds: 91 } },
+  })
+  await page.goto('/login')
+  const box = page.locator('.k-agree-check .box')
+  await expect(box.locator('svg')).toHaveCount(0)
+  await expect(page.getByRole('checkbox', { name: /我已阅读并同意/ })).toHaveAttribute('aria-checked', 'false')
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await expect(box.locator('svg')).toHaveCount(1)
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13917825640') await page.getByRole('button', { name: digit, exact: true }).click()
+  const keypad = page.getByTestId('login-gate-keypad')
+  await expect(keypad).toHaveAttribute('data-keypad-target', 'phone')
+  await expect(page.getByText('正在输入：手机号', { exact: true })).toBeVisible()
+  const send = page.getByTestId('login-gate-send')
+  await expect(send).toHaveText('获取验证码')
+  await expect(send).toBeEnabled()
+  const hittable = await send.evaluate((el) => {
+    const rect = el.getBoundingClientRect()
+    const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+    return top === el || (top !== null && el.contains(top))
+  })
+  expect(hittable).toBe(true)
+  await send.click()
+  await expect(page.locator('#login-gate-code')).toBeFocused()
+  await expect(keypad).toHaveAttribute('data-keypad-target', 'code')
+  await expect(page.getByText('正在输入：短信验证码', { exact: true })).toBeVisible()
+})
+
 for (const [code, state] of [['SMS_CODE_INVALID', 'phone-code-invalid'], ['SMS_CODE_EXPIRED', 'phone-code-expired'], ['SMS_CODE_LOCKED', 'phone-code-locked']]) {
   test(`W4 verification recovery ${code} @kiosk`, async ({ page, api }) => {
     registerKioskShell(api)
