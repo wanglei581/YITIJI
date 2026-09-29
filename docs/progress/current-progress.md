@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-30：管理员重试被拒错误码改用 PRINT_RETRY_（接上一轮重试按钮）
+
+- 后台模拟接口里，未确认打印任务的重试拒绝码从 `PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN` 改为服务端正在使用的 `PRINT_RETRY_UNCONFIRMED_FORBIDDEN`。拒绝时给人看的那句中文没改。`apps/admin` 里没有别的旧前缀；错误文案表和 E2E 原先也不写这个旧码。
+- 门禁 `verify:admin-print-scan-ui` 增加一条：扫描 `apps/admin` 源码，旧前缀不得再出现。提交 `0dd65d426` 之后把旧码写回 `printScan.ts` 一处，门禁退出 1 并点名这个文件；删掉后退出 0。
+- `npx tsc --noEmit -p apps/admin` 通过。管理员 E2E 110 条通过。图谱重生成后没有文件变化，`pnpm graph:check` 通过。
+- 服务端仍保留管理员自己的 `PRINT_SCAN_RETRY_FILE_UNAVAILABLE`、`PRINT_SCAN_RETRY_TERMINAL_RETIRED`、`PRINT_SCAN_RETRY_TERMINAL_NOT_ACTIVE`。后台源码里本来就没有这三码。#1152 第五轮的两种新原因还没进本目录，待并入后补拍。
+
 ## 2026-09-30：管理员后台打印任务重试按钮事先显示能不能点
 
 - 打印扫描运维的任务列表和详情里，「重试」是否可点只看服务端 `retryBlockedReason`。有中文原因就置灰，并在按钮下直接写出这句话；值为空可以点；字段没下发时仍按原来的失败任务规则显示，页面不自己推断。页面写明后台不提供强制重打，需要补打请让用户另下新单。点重试被拒绝时继续显示服务端原文。
