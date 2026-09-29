@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1580 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1587 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -139,7 +139,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 92 个文件</summary>
+<summary><code>apps/admin/src/</code> — 98 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -151,7 +151,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/account-settings/PhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-phone-transfer-ui.mjs` |
 | `apps/admin/src/routes/ai-services/index.tsx` | `verify-job-ai-ops-dashboard-ui.mjs` |
-| `apps/admin/src/routes/alerts/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
+| `apps/admin/src/routes/alerts/index.tsx` | `verify-feedback-sla.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/components/BulkPublishButton.tsx` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/dashboard/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
@@ -165,9 +165,14 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`frontend.mjs` |
 | `apps/admin/src/routes/job-materials/index.tsx` | `verify-admin-job-materials-ui.mjs` |
 | `apps/admin/src/routes/job-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-job-content-screening.ts` |
+| `apps/admin/src/routes/legal-docs/LegalDocPreview.tsx` | `verify-legal-doc-version.ts` |
 | `apps/admin/src/routes/legal-docs/index.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-legal-doc-version.ts` |
+| `apps/admin/src/routes/legal-docs/legalDocRender.ts` | `verify-legal-doc-version.ts` |
 | `apps/admin/src/routes/login/LegalDocsModal.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/admin/src/routes/login/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/member-feedback/FeedbackSlaBadges.tsx` | `verify-feedback-sla.mjs` |
+| `apps/admin/src/routes/member-feedback/feedbackSla.ts` | `verify-feedback-sla.mjs` |
+| `apps/admin/src/routes/member-feedback/index.tsx` | `verify-feedback-sla.mjs` |
 | `apps/admin/src/routes/offline-agencies/JobsDrawer.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/orders/index.tsx` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
 | `apps/admin/src/routes/orders/orderHonestyCopy.ts` | `verify-admin-orders-readonly-ui.mjs` |
@@ -182,8 +187,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/peripherals/index.tsx` | `verify-honest-placeholders.mjs` |
 | `apps/admin/src/routes/permissions/index.tsx` | `verify-honest-placeholders.mjs` |
 | `apps/admin/src/routes/policy-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/print-scan/CapabilityCenter.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx` | `verify-admin-print-scan-ui.mjs` |
-| `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
+| `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs` |
 | `apps/admin/src/routes/printers/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-data-request-ui.mjs` |
 | `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-screen-ui.mjs` |
@@ -297,7 +303,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 492 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 493 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -454,6 +460,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/jobs/utils/sourceTrust.ts` | `verify-jobfair-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-legal-retention-copy.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/kiosk/src/pages/legal/legal-service-desk.css` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-k1-public-entry.mjs` |
+| `apps/kiosk/src/pages/legal/legalDocModel.ts` | `verify-legal-doc-version.ts` |
 | `apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/offline-agencies/OfflineAgenciesPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/kiosk/src/pages/offline-agencies/OfflineAgencyDetailPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-backend-p0-contracts.mjs` |
@@ -1982,7 +1989,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/admin-ops/admin-alert-push.service.ts` | `verify-alert-push.cjs` |
 | `services/api/src/admin-ops/admin-ops.controller.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-ops/admin-ops.service.ts` | `verify-admin-ops.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-console-screen-snapshot.ts` |
-| `services/api/src/admin-ops/derived-alert-identity.ts` | `verify-service-desk-dashboard-ui.mjs` |
+| `services/api/src/admin-ops/derived-alert-identity.ts` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-admin-ops.ts` |
 | `services/api/src/admin-ops/derived-alerts.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts` | `verify-admin-order-filters.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts` | `verify-admin-order-filters.ts`<br/>`verify-admin-orders-readonly.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-payment-flow.ts` |
@@ -2117,14 +2124,14 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/crypto/phone-identity.ts` | `verify-admin-phone-transfer.ts`<br/>`verify-admin-users.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts` |
 | `services/api/src/common/crypto/secret-cipher.ts` | `verify-content-pipeline-e2e.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-recruitment-emergency-scope.ts` |
 | `services/api/src/common/crypto/webhook-secret-strength.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-partner-source-capabilities.ts` |
-| `services/api/src/common/decorators/current-user.decorator.ts` | `verify-admin-fairs.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-users.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-job-review.ts`<br/>`verify-job-sync.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-data-export-files.ts`<br/>`verify-official-channels.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-excel-import.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-publish-expiry-completeness.ts`<br/>`verify-recruitment-emergency-scope.ts` |
-| `services/api/src/common/decorators/roles.decorator.ts` | `verify-admin-users.ts`<br/>`verify-ai-access.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-change-password.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-member-benefits-admin.ts` |
+| `services/api/src/common/decorators/current-user.decorator.ts` | `verify-admin-fairs.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-users.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-job-review.ts`<br/>`verify-job-sync.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-data-export-files.ts`<br/>`verify-official-channels.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-excel-import.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-publish-expiry-completeness.ts`<br/>`verify-recruitment-emergency-scope.ts` |
+| `services/api/src/common/decorators/roles.decorator.ts` | `verify-admin-users.ts`<br/>`verify-ai-access.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-change-password.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-benefits-admin.ts` |
 | `services/api/src/common/filters/http-exception.filter.ts` | `verify-admin-ops.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts`<br/>`verify-contract-review-http.ts`<br/>`verify-error-observability.ts`<br/>`verify-http-exception-filter.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-trtc-terminal-http.ts`<br/>`verify-upload-sessions-http.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/src/common/guards/end-user-auth.guard.ts` | `verify-ai-access.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-content-pipeline-e2e.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-assets.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-favorites-benefits.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-upload-sessions-http.ts` |
 | `services/api/src/common/guards/jwt-auth.guard.ts` | `verify-admin-ops.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-users.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-change-password.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-redis-degradation-truth.ts` |
 | `services/api/src/common/guards/member-closure-receipt.guard.ts` | `verify-member-account-status.ts` |
 | `services/api/src/common/guards/optional-end-user-auth.guard.ts` | `verify-benefit-activities.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-auth.ts` |
-| `services/api/src/common/guards/roles.guard.ts` | `verify-admin-ops.ts`<br/>`verify-admin-users.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-official-channels.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-recruitment-content-http.ts` |
+| `services/api/src/common/guards/roles.guard.ts` | `verify-admin-ops.ts`<br/>`verify-admin-users.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-official-channels.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-recruitment-content-http.ts` |
 | `services/api/src/common/health.controller.ts` | `verify-ai-access.ts`<br/>`verify-cjk-font.ts` |
 | `services/api/src/common/jwt-verifier.module.ts` | `verify-production-runtime-gates.ts`<br/>`verify-upload-sessions-http.ts` |
 | `services/api/src/common/middleware/request-id.middleware.ts` | `verify-error-observability.ts` |
