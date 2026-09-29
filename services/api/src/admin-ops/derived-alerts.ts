@@ -118,8 +118,17 @@ type PaidPendingFileUnavailableTaskRow = {
 
 type PendingFeedbackSummary = { count: number; earliest: Date | null; latest: Date | null }
 
-/** C3：待处理的 AI 内容投诉（新提交或处理中）。只取条数与提交时间，不取正文与手机号。 */
-const PENDING_AI_CONTENT_FEEDBACK = { category: 'ai_content', status: { in: ['pending', 'processing'] } }
+/**
+ * C3：待处理的 AI 内容投诉（新提交或处理中；以及旧数据里被标成「已回复」却没有任何管理员回复记录的）。
+ * 只取条数与提交时间，不取正文与手机号。
+ */
+const PENDING_AI_CONTENT_FEEDBACK = {
+  category: 'ai_content',
+  OR: [
+    { status: { in: ['pending', 'processing'] } },
+    { status: 'replied', replies: { none: { senderType: 'admin' } } },
+  ],
+}
 
 /** 计数 + 最早、最新各一条：不全表拉取，积压或被刷单时也不拖垮整张告警列表。 */
 async function pendingAiContentFeedback(prisma: PrismaService): Promise<PendingFeedbackSummary> {

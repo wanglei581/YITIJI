@@ -155,6 +155,9 @@ export interface SlaTicketInput {
   category: string
   status: string
   createdAt: string | Date
+  /** 是否已有管理员回复记录。状态是「已回复」但没有回复记录时照常计时（旧数据或被手动改过）。 */
+  hasAdminReply: boolean
+  submitterType?: string
 }
 
 /** 截止日的人话写法：10 月 12 日（周一）；跨年时带年份。 */
@@ -170,9 +173,12 @@ export function formatDeadlineDate(deadlineDate: string, now: Date): string {
  */
 export function aiComplaintSla(ticket: SlaTicketInput, now: Date = new Date()): AiComplaintSla | null {
   if (ticket.category !== 'ai_content') return null
-  if (ticket.status === 'replied') return { kind: 'stopped', label: '已回复，不再计时' }
+  if (ticket.status === 'replied' && ticket.hasAdminReply) {
+    return { kind: 'stopped', label: ticket.submitterType === 'anonymous_kiosk' ? '已记录处理结果，不再计时' : '已回复，不再计时' }
+  }
   if (ticket.status === 'closed') return { kind: 'stopped', label: '已关闭，不再计时' }
-  if (ticket.status !== 'pending' && ticket.status !== 'processing') return null
+  const repliedWithoutRecord = ticket.status === 'replied'
+  if (ticket.status !== 'pending' && ticket.status !== 'processing' && !repliedWithoutRecord) return null
 
   const deadline = aiComplaintDeadline(ticket.createdAt)
   const today = shanghaiDayIndex(now)
@@ -201,7 +207,8 @@ export function aiComplaintSla(ticket: SlaTicketInput, now: Date = new Date()): 
       : `（${deadline.estimatedYear} 年节假日安排未收录，按周一至周五估算）`
   const detailLabel =
     `答复时限：${formatDeadlineDate(deadline.deadlineDate, now)}前 · ` +
-    `${deadline.workdays} 个工作日，已扣除法定节假日${estimateNote}`
+    `${deadline.workdays} 个工作日，已扣除法定节假日${estimateNote}` +
+    (repliedWithoutRecord ? ' · 状态是「已回复」但没有回复记录，仍在计时' : '')
 
   return { kind: 'running', urgency, listLabel, detailLabel, deadline }
 }

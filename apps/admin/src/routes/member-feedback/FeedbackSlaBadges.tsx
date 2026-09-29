@@ -24,6 +24,8 @@ interface SlaTicket {
   category: FeedbackCategory
   status: FeedbackStatus
   createdAt: string
+  hasAdminReply: boolean
+  submitterType?: string
 }
 
 /** 列表项：分类标签始终显示；AI 内容投诉在计时时再加「剩 N 个工作日 / 今天到期 / 已超期」。 */

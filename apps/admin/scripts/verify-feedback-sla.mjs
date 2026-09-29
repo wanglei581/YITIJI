@@ -107,7 +107,7 @@ const deadlineOf = (iso) => sla.aiComplaintDeadline(iso)
   // 2027 年：安排未公布，按周一至周五估算。12/31（周四）提交：2027-01-01（周五）① 1/4② 1/5③ 1/6④ 1/7⑤
   const d = deadlineOf('2026-12-31T04:00:00.000Z')
   check(d.deadlineDate === '2027-01-07' && d.estimated === true && d.estimatedYear === 2027, '跨入 2027 年按周一至周五估算并打上估算标记', JSON.stringify(d))
-  const view = sla.aiComplaintSla({ category: 'ai_content', status: 'pending', createdAt: '2026-12-31T04:00:00.000Z' }, new Date('2026-12-31T05:00:00.000Z'))
+  const view = sla.aiComplaintSla({ category: 'ai_content', status: 'pending', createdAt: '2026-12-31T04:00:00.000Z', hasAdminReply: false }, new Date('2026-12-31T05:00:00.000Z'))
   check(
     view?.kind === 'running' && view.detailLabel.includes('2027 年节假日安排尚未公布，按周一至周五估算'),
     '详情说明写出「2027 年节假日安排尚未公布，按周一至周五估算」',
@@ -120,7 +120,7 @@ const deadlineOf = (iso) => sla.aiComplaintDeadline(iso)
 // ── 2. 状态与列表标签 ────────────────────────────────────────────────────────
 {
   const createdAt = '2026-09-29T02:00:00.000Z' // 截止 10/12
-  const at = (iso, status = 'pending') => sla.aiComplaintSla({ category: 'ai_content', status, createdAt }, new Date(iso))
+  const at = (iso, status = 'pending', extra = {}) => sla.aiComplaintSla({ category: 'ai_content', status, createdAt, hasAdminReply: false, ...extra }, new Date(iso))
 
   const first = at('2026-09-29T03:00:00.000Z')
   check(first?.kind === 'running' && first.listLabel === '剩 5 个工作日' && first.urgency === 'normal', '提交当天显示「剩 5 个工作日」', JSON.stringify(first))
@@ -137,12 +137,21 @@ const deadlineOf = (iso) => sla.aiComplaintDeadline(iso)
     detail && detail.kind === 'running' ? detail.detailLabel : JSON.stringify(detail),
   )
 
-  const replied = at('2026-10-20T03:00:00.000Z', 'replied')
+  const replied = at('2026-10-20T03:00:00.000Z', 'replied', { hasAdminReply: true })
   const closed = at('2026-10-20T03:00:00.000Z', 'closed')
-  check(replied?.kind === 'stopped' && replied.label.includes('不再计时'), '已回复不再计时（即使已过截止日也不报超期）', JSON.stringify(replied))
+  check(replied?.kind === 'stopped' && replied.label === '已回复，不再计时', '已回复且有回复记录：不再计时（即使已过截止日也不报超期）', JSON.stringify(replied))
+  // 状态被标成「已回复」却没有任何管理员回复记录：提交人什么都没收到，照常计时并写明原因。
+  const repliedNoRecord = at('2026-10-20T03:00:00.000Z', 'replied', { hasAdminReply: false })
+  check(
+    repliedNoRecord?.kind === 'running' && repliedNoRecord.urgency === 'overdue' && repliedNoRecord.detailLabel.includes('没有回复记录，仍在计时'),
+    '已回复但没有回复记录：仍计时、超期照报',
+    JSON.stringify(repliedNoRecord),
+  )
+  const anonymousRecorded = at('2026-10-20T03:00:00.000Z', 'replied', { hasAdminReply: true, submitterType: 'anonymous_kiosk' })
+  check(anonymousRecorded?.kind === 'stopped' && anonymousRecorded.label === '已记录处理结果，不再计时', '匿名单写的是「已记录处理结果」而不是「已回复」', JSON.stringify(anonymousRecorded))
   check(closed?.kind === 'stopped' && closed.label.includes('不再计时'), '已关闭不再计时', JSON.stringify(closed))
   for (const category of ['device', 'print', 'file_process', 'general']) {
-    const other = sla.aiComplaintSla({ category, status: 'pending', createdAt }, new Date('2026-10-20T03:00:00.000Z'))
+    const other = sla.aiComplaintSla({ category, status: 'pending', createdAt, hasAdminReply: false }, new Date('2026-10-20T03:00:00.000Z'))
     check(other === null, `「${category}」分类不计时`)
   }
 }
@@ -150,6 +159,11 @@ const deadlineOf = (iso) => sla.aiComplaintDeadline(iso)
 // ── 3. 页面接线（静态）──────────────────────────────────────────────────────
 {
   const page = read(PAGE)
+  check(
+    page.includes("hasAdminReply: detail.replies.some((reply) => reply.senderType === 'admin')") &&
+      /const needsReply = item\.value === 'replied'[\s\S]{0,400}disabled=\{needsReply\}/.test(page) && page.includes('{needsReply ? `${item.label}（先填写回复）` : item.label}'),
+    '详情按真实回复记录计时；没有回复记录时「已回复」不可手选',
+  )
   const badges = read(BADGES)
   check(
     /from '\.\/feedbackSla'/.test(badges) &&
@@ -158,7 +172,7 @@ const deadlineOf = (iso) => sla.aiComplaintDeadline(iso)
       badges.includes('sla.detailLabel') &&
       page.includes("import { DetailSla, FeedbackListChips } from './FeedbackSlaBadges'") &&
       page.includes('<FeedbackListChips item={item}') &&
-      page.includes('<DetailSla detail={detail} />'),
+      page.includes("<DetailSla detail={{ ...detail, hasAdminReply: detail.replies.some((reply) => reply.senderType === 'admin') }} />"),
     '意见反馈页列表与详情都用 feedbackSla 的结果渲染（不在页里另算一遍）',
   )
   check(

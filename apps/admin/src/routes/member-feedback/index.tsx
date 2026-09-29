@@ -358,13 +358,19 @@ export default function MemberFeedbackPage() {
                   onChange={(event) => void updateStatus(event.target.value as FeedbackStatus)}
                   className="h-10 rounded-lg border border-neutral-200 px-3 text-sm"
                 >
-                  {STATUSES.filter((item) => item.value !== 'all').map((item) => (
-                    <option key={item.value} value={item.value}>{item.label}</option>
-                  ))}
+                  {STATUSES.filter((item) => item.value !== 'all').map((item) => {
+                    // 「已回复」只能由写入回复带出；没有回复记录时不可手选（服务端同样拒绝，FEEDBACK_REPLY_REQUIRED）。
+                    const needsReply = item.value === 'replied' && detail.status !== 'replied' && !detail.replies.some((reply) => reply.senderType === 'admin')
+                    return (
+                      <option key={item.value} value={item.value} disabled={needsReply}>
+                        {needsReply ? `${item.label}（先填写回复）` : item.label}
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
 
-              <DetailSla detail={detail} />
+              <DetailSla detail={{ ...detail, hasAdminReply: detail.replies.some((reply) => reply.senderType === 'admin') }} />
 
               <div className="mt-4 rounded-lg border border-neutral-100 bg-neutral-50 p-4 text-sm leading-relaxed text-neutral-700">
                 {detail.content}

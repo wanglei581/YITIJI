@@ -41,6 +41,8 @@ export interface AdminFeedbackTicketItem {
   relatedScanTaskId: string | null
   /** 打印完成页满意度三档；null = 未评价。 */
   satisfaction: 'good' | 'fair' | 'bad' | null
+  /** 是否已有管理员回复（匿名单为处理记录）。AI 内容投诉只在「已回复且有回复记录」时停表。 */
+  hasAdminReply: boolean
 }
 
 export interface AdminFeedbackTicketDetail extends AdminFeedbackTicketItem {

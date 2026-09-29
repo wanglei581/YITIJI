@@ -58,11 +58,21 @@ function errorCode(err: unknown): string | undefined {
   return e.response?.error?.code ?? e.getResponse?.()?.error?.code ?? e.message
 }
 
-type FeedbackQuery = { where?: { category?: string; status?: { in?: string[] } }; orderBy?: { createdAt?: 'asc' | 'desc' } }
-function matchFeedback(rows: unknown[], args?: FeedbackQuery): Array<{ category: string; status: string; createdAt: Date }> {
-  return (rows as Array<{ category: string; status: string; createdAt: Date }>)
+type FeedbackStatusClause = { status?: string | { in?: string[] }; replies?: { none?: { senderType?: string } } }
+type FeedbackQuery = { where?: { category?: string; OR?: FeedbackStatusClause[] } & FeedbackStatusClause; orderBy?: { createdAt?: 'asc' | 'desc' } }
+type FeedbackRow = { category: string; status: string; createdAt: Date; hasAdminReply?: boolean }
+function matchStatusClause(row: FeedbackRow, clause: FeedbackStatusClause): boolean {
+  const status = clause.status
+  if (typeof status === 'string' && row.status !== status) return false
+  if (status && typeof status === 'object' && status.in && !status.in.includes(row.status)) return false
+  if (clause.replies?.none?.senderType === 'admin' && row.hasAdminReply) return false
+  return true
+}
+function matchFeedback(rows: unknown[], args?: FeedbackQuery): FeedbackRow[] {
+  return (rows as FeedbackRow[])
     .filter((row) => args?.where?.category === undefined || row.category === args.where.category)
-    .filter((row) => !args?.where?.status?.in || args.where.status.in.includes(row.status))
+    .filter((row) => matchStatusClause(row, args?.where ?? {}))
+    .filter((row) => !args?.where?.OR || args.where.OR.some((clause) => matchStatusClause(row, clause)))
 }
 
 function mockOpsPrisma(
@@ -184,7 +194,7 @@ async function verifyPrinterStatusLabelsAndShanghaiTime(): Promise<void> {
 }
 
 async function verifyPendingFeedbackAlert(): Promise<void> {
-  const feedbackRows: Array<{ createdAt: Date; category: string; status: string; contactPhoneEnc: string; content: string }> = [
+  const feedbackRows: Array<{ createdAt: Date; category: string; status: string; contactPhoneEnc: string; content: string; hasAdminReply?: boolean }> = [
     { createdAt: new Date('2026-09-28T08:00:00.000Z'), category: 'ai_content', status: 'pending', contactPhoneEnc: 'secret-phone', content: 'secret-content' },
     { createdAt: new Date('2026-09-28T08:01:00.000Z'), category: 'ai_content', status: 'processing', contactPhoneEnc: 'secret-phone-2', content: 'secret-content-2' },
     { createdAt: new Date('2026-09-28T07:00:00.000Z'), category: 'print', status: 'pending', contactPhoneEnc: '', content: '打印问题' },
@@ -201,15 +211,23 @@ async function verifyPendingFeedbackAlert(): Promise<void> {
   if (encoded.includes('secret-phone') || encoded.includes('secret-content')) fail('3c. 告警泄露手机号或投诉正文')
   // 提醒时机：答复较早的一条不换 episode（不打扰已确认的告警）；有新投诉进来才换（重新提醒）。
   feedbackRows[0].status = 'replied'
+  feedbackRows[0].hasAdminReply = true
   const afterOldAnswered = (await service.listDerivedAlerts()).data.find((item) => item.type === 'feedback_pending')
   if (!afterOldAnswered || afterOldAnswered.episodeToken !== alert?.episodeToken) fail('3c. 答复旧投诉不该让告警换 episode（会把已确认的告警重新弹出来）')
   feedbackRows.push({ createdAt: new Date('2026-09-28T09:00:00.000Z'), category: 'ai_content', status: 'pending', contactPhoneEnc: '', content: '新投诉' })
   const afterNew = (await service.listDerivedAlerts()).data.find((item) => item.type === 'feedback_pending')
   if (!afterNew || afterNew.episodeToken === alert?.episodeToken) fail('3c. 有新投诉进来告警没有换 episode（已确认的告警不会重新提醒）')
+  // 旧数据：状态被标成「已回复」却没有任何管理员回复记录 —— 提交人什么都没收到，告警不能消失。
   for (const row of feedbackRows) row.status = row.category === 'ai_content' ? 'replied' : row.status
+  const repliedWithoutRecord = (await service.listDerivedAlerts()).data.find((item) => item.type === 'feedback_pending')
+  // 此时 ai_content 共 4 条：第 1 条带回复记录；其余 3 条（含原先已关闭、被改成已回复的一条）都没有回复记录。
+  if (!repliedWithoutRecord || !repliedWithoutRecord.detail.includes('共 3 条')) {
+    fail(`3c. 标成已回复但没有回复记录的 AI 内容投诉必须仍算待处理，实际「${repliedWithoutRecord?.detail ?? '告警消失'}」`)
+  }
+  for (const row of feedbackRows) if (row.category === 'ai_content') row.hasAdminReply = true
   const after = await service.listDerivedAlerts()
   if (after.data.some((item) => item.type === 'feedback_pending')) fail('3c. AI 内容投诉都答复后派生告警未消失')
-  pass('3c. 只按待处理 AI 内容投诉派生告警（条数与最早时间，不全表拉取），新投诉才重新提醒，不含个人信息，答复后消失')
+  pass('3c. 只按待处理 AI 内容投诉派生告警（条数与最早时间，不全表拉取），新投诉才重新提醒，不含个人信息；有回复记录才消失，只改状态不消失')
 }
 
 async function verifyPaidPendingFileUnavailableAlert(): Promise<void> {
