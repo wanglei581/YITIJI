@@ -139,11 +139,11 @@ function PolicyResultCard({ item }: { item: EligibilityCheckItem }) {
   return (
     <article className="k8-elig-card">
       <h3>{item.title}</h3>
-      {/* 来源标识：来源机构与同步时间照原样露出。发布方的外部编号是系统之间对账用的，用户用不上，
-          不上屏（kiosk-runtime-engineering-words-2026-09-28）；它仍在返回数据里，不影响追溯。 */}
+      {/* 来源标识照最终版稿 48：来源机构 / 同步时间 / 外部编号三枚标签，外部编号缺失如实写「来源未提供」 */}
       <p className="k8-elig-card-src">
         <span className="k8-elig-chip k8-elig-chip-slate">来源机构 <b>{item.source.sourceName}</b></span>
         <span className="k8-elig-chip">同步时间 <b>{item.source.syncTime.slice(0, 10)}</b></span>
+        <span className="k8-elig-chip">外部编号 <b>{item.source.externalId ?? '来源未提供'}</b></span>
       </p>
       {/* 结论文案由服务端给定，前端不改写 */}
       <p className="k8-elig-card-overall">{item.overallLabel}</p>
