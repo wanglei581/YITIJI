@@ -12051,7 +12051,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 181,
+      "reachableFileCount": 184,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12801,7 +12801,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 206
+      "sourceFileCount": 211
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17886,6 +17886,7 @@
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/admin/src/lib/auditActionLabels.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/main.tsx": [
@@ -17914,6 +17915,9 @@
     "apps/admin/src/routes/alerts/index.tsx": [
       "apps/admin/scripts/verify-feedback-sla.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+    ],
+    "apps/admin/src/routes/audit/index.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
     ],
     "apps/admin/src/routes/billing/index.tsx": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
@@ -18022,9 +18026,11 @@
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
     ],
     "apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/routes/partners/PartnerAccountManager.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/routes/partners/contentTrustRules.ts": [
@@ -18038,10 +18044,17 @@
     "apps/admin/src/routes/partners/partner-account-action-steps/ActionCredentialSteps.tsx": [
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
+    "apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
+    ],
     "apps/admin/src/routes/partners/partner-account-action-steps/PhoneRebindSteps.tsx": [
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
+    "apps/admin/src/routes/partners/partnerContactPhoneEligibility.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
+    ],
     "apps/admin/src/routes/partners/usePartnerAccountAction.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx": [
@@ -18228,6 +18241,7 @@
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
     ],
     "apps/admin/src/services/api/orgsAdmin.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/services/api/policiesAdmin.ts": [
@@ -18236,6 +18250,9 @@
     "apps/admin/src/services/api/printScan.ts": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
+    ],
+    "apps/admin/src/services/api/registerPartnerContactPhone.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
     ],
     "apps/admin/src/services/api/screensaver.ts": [
       "services/api/scripts/verify-screensaver-content.ts"
@@ -26389,6 +26406,32 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:source-publish-actions"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/lib/auditActionLabels.ts",
+          "apps/admin/src/routes/audit/index.tsx",
+          "apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx",
+          "apps/admin/src/routes/partners/PartnerAccountManager.tsx",
+          "apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx",
+          "apps/admin/src/routes/partners/partnerContactPhoneEligibility.ts",
+          "apps/admin/src/routes/partners/usePartnerAccountAction.ts",
+          "apps/admin/src/services/api/orgsAdmin.ts",
+          "apps/admin/src/services/api/registerPartnerContactPhone.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-partner-contact-phone-ui"
       ],
       "wired": true
     },

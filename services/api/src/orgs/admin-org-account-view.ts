@@ -106,7 +106,7 @@ export function canRegisterContactPhone(account: {
 }): boolean {
   if (!account.enabled) return false
   if (account.passwordProofState !== PASSWORD_PROOF_STATE.TEMPORARY) return false
-  if (account.phoneVerifiedAt) return false
-  const noPhone = account.phoneHash == null || account.phoneHash === ''
-  return noPhone || account.phoneRegisteredByAdminAt != null
+  // 手机没经本人自证就可以登记：没填、管理员已登记、或建号时填了但未验证（W-03 走查 9/29 裁定）。
+  // 建号时填的号没经过任何核对、也不能用来登录或找回密码；用与确认函一致的号覆盖只会更严。
+  return !account.phoneVerifiedAt
 }

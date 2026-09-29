@@ -314,6 +314,8 @@ async function main(): Promise<void> {
   const phoneStamp = mobile(13)
   const phoneOwn = mobile(14)
   const phoneCreateOrg = mobile(15)
+  const phoneReplaceLetter = mobile(16)
+  const phoneReplaceTyped = mobile(17)
   const ip = `w03-${suffix}`
   const adminId = `adm-${suffix}`
   const lockAdminId = `lock-${suffix}`
@@ -333,6 +335,7 @@ async function main(): Promise<void> {
   const orgOwn = `org-own-${suffix}`
   const orgOther = `org-other-${suffix}`
   const orgLock = `org-lock-${suffix}`
+  const orgReplace = `org-replace-${suffix}`
   const accountA = `acct-a-${suffix}`
   const accountB = `acct-b-${suffix}`
   const rawRedis = new Redis(process.env['REDIS_URL'], { maxRetriesPerRequest: 1 })
@@ -380,6 +383,7 @@ async function main(): Promise<void> {
       { id: orgOwn, name: '自管资料机构', contactPhone: null },
       { id: orgOther, name: '别的机构', contactPhone: phoneA },
       { id: orgLock, name: '锁机构', contactPhone: phoneA },
+      { id: orgReplace, name: '建号填过手机机构', contactPhone: phoneReplaceLetter },
     ]
     await prisma.organization.createMany({
       data: orgRows.map((row) => ({ ...row, type: 'public_employment_service' })),
@@ -403,6 +407,10 @@ async function main(): Promise<void> {
           phoneHash: hashPhone(phoneCreated), phoneEnc: encryptPhone(phoneCreated),
         }),
         partner(`mis-${suffix}`, `partner-mis-${suffix}`, orgMismatch, tempHash),
+        // 走查 9/29：界面「新增账号」要求填手机，建出来是「临时密码 + 已填未验证的号」，这类也要能登记。
+        partner(`replace-${suffix}`, `partner-replace-${suffix}`, orgReplace, tempHash, {
+          phoneHash: hashPhone(phoneReplaceTyped), phoneEnc: encryptPhone(phoneReplaceTyped),
+        }),
         partner(`empty-${suffix}`, `partner-empty-${suffix}`, orgEmpty, tempHash),
         partner(`land-${suffix}`, `partner-land-${suffix}`, orgLandline, tempHash),
         partner(`cool-${suffix}`, `partner-cool-${suffix}`, orgCooldown, tempHash),
@@ -465,7 +473,7 @@ async function main(): Promise<void> {
     const detailBefore = await orgs.getOrgDetail(orgA)
     const flags = Object.fromEntries(detailBefore.accounts.map((account) => [account.id, account.canRegisterContactPhone]))
     ensure(flags[accountA] === true, '临时密码且未绑手机时可以显示登记手机号')
-    ensure(flags[`created-${suffix}`] === false, '创建账号时存过手机号、但不是这次登记的，不显示')
+    ensure(flags[`created-${suffix}`] === true, '建号时填了但未验证的手机号，也显示登记手机号（走查 9/29 裁定）')
     ensure(flags[`dis-${suffix}`] === undefined, '停用账号不在机构甲')
     const mismatchDetail = await orgs.getOrgDetail(orgMismatch)
     const mismatchFlags = Object.fromEntries(mismatchDetail.accounts.map((account) => [account.id, account.canRegisterContactPhone]))
@@ -545,9 +553,20 @@ async function main(): Promise<void> {
     )
     await expectHttp(
       () => register(registration, orgA, `created-${suffix}`, phoneCreated),
-      409, 'PARTNER_CONTACT_PHONE_NOT_ELIGIBLE', '这个账号现在不能登记手机号',
-      '创建时存过手机号、尚未按确认函登记的不能登记',
+      400, 'CONTACT_PHONE_MISMATCH', '手机号和机构确认函上登记的联系人手机不一致，请先核对机构资料',
+      '建号时填过手机的账号过了资格判断，但号码仍要和确认函一致',
     )
+    {
+      const replaced = await register(registration, orgReplace, `replace-${suffix}`, phoneReplaceLetter, { letter: 'QD-2026/REPLACE' })
+      ensure(replaced.phoneMasked === maskPhone(phoneReplaceLetter), '建号时填了未验证号：登记后换成确认函上的号')
+      const row = await prisma.user.findUniqueOrThrow({ where: { id: `replace-${suffix}` } })
+      ensure(row.phoneHash === hashPhone(phoneReplaceLetter) && row.phoneVerifiedAt === null && row.phoneRegisteredByAdminAt instanceof Date, '覆盖后仍是未自证、已登记状态')
+      const log = (await auditsFor(prisma, `replace-${suffix}`)).find((r) => r.action === 'partner_account.contact_phone_registered')
+      const payload = JSON.parse(log?.payloadJson ?? '{}') as { replacedUnverifiedPhone?: boolean; previousPhoneMasked?: string }
+      ensure(payload.replacedUnverifiedPhone === true && payload.previousPhoneMasked === maskPhone(phoneReplaceTyped), '审计记下覆盖了建号时填的未验证号（只记脱敏号）')
+      ensure(!(log?.payloadJson ?? '').includes(phoneReplaceTyped), '审计里没有旧号明文')
+      pass('建号时填了未验证手机的账号可按确认函登记，旧号只在审计里留脱敏')
+    }
     await expectHttp(
       () => register(registration, orgA, `missing-${suffix}`, phoneA),
       409, 'PARTNER_CONTACT_PHONE_NOT_ELIGIBLE', '这个账号现在不能登记手机号',
