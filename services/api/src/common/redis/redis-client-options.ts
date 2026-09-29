@@ -18,6 +18,8 @@ export const IOREDIS_DEFAULT_MAX_RETRIES_PER_REQUEST = 20
 export const REDIS_MAX_RETRIES_PER_REQUEST_ENV = 'REDIS_MAX_RETRIES_PER_REQUEST'
 
 export function redisClientOptions(env: NodeJS.ProcessEnv = process.env): RedisOptions {
+  // 生产一律忽略：这个变量只给验证把重试改小；生产误配会让 Redis 一抖动就直接失败。
+  if (env['NODE_ENV'] === 'production') return {}
   const raw = env[REDIS_MAX_RETRIES_PER_REQUEST_ENV]
   if (raw == null) return {}
   const trimmed = raw.trim()
@@ -49,6 +51,7 @@ export function redisRetryDefaultFacts(): RedisRetryDefaultFact[] {
     const empty = redisClientOptions({ [REDIS_MAX_RETRIES_PER_REQUEST_ENV]: '' })
     const garbage = redisClientOptions({ [REDIS_MAX_RETRIES_PER_REQUEST_ENV]: 'nope' })
     const tooHigh = redisClientOptions({ [REDIS_MAX_RETRIES_PER_REQUEST_ENV]: '21' })
+    const inProduction = redisClientOptions({ [REDIS_MAX_RETRIES_PER_REQUEST_ENV]: '0', NODE_ENV: 'production' })
     return [
       {
         name: '不设 REDIS_MAX_RETRIES_PER_REQUEST 时仍是 ioredis 默认 20，且不附加覆盖项',
@@ -67,6 +70,11 @@ export function redisRetryDefaultFacts(): RedisRetryDefaultFact[] {
         name: '非法值或大于 20 不覆盖默认',
         ok: Object.keys(garbage).length === 0 && Object.keys(tooHigh).length === 0,
         detail: `garbage=${JSON.stringify(garbage)} tooHigh=${JSON.stringify(tooHigh)}`,
+      },
+      {
+        name: '生产环境（NODE_ENV=production）一律忽略 REDIS_MAX_RETRIES_PER_REQUEST',
+        ok: Object.keys(inProduction).length === 0,
+        detail: `production=${JSON.stringify(inProduction)}`,
       },
     ]
   } finally {
