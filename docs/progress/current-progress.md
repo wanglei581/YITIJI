@@ -41,6 +41,13 @@
 - **修法：** 门禁不放宽。去掉该字段，后台只看服务端算好的 `canRegisterContactPhone` 与 `phoneRegisteredByAdminAt`；W-03 门禁改为断言不下发原始状态。两个后台窗口前端同步改读法。
 - **验证：** schema 门禁通过；反向变异「把 passwordProofState 放回响应」红在该断言；W-03、机构账号操作（含 otp/redis）、admin-orgs、admin-orgs-delete-schema、partner-org-self、internal-auth-phone 全绿。
 
+## 2026-09-29 夜：KSK-001 残留只读底子（Agent 0.4.11）与漏链 1、8 的代码核实
+
+- **真机只读（22:52，UU 远程，只数数量与时间，不列文件名）：** 开机 9/22 11:07 后未重启。Agent 临时目录只有 6/3、7/5 两件 `task_*` 旧遗留，`print_*.pdf` 0；扫描目录与 `_unclaimed` 0；`spool\PRINTERS` 0；用户 `%TEMP%` 与「下载」里的 PDF 0；`C:\Windows\SystemTemp` 18 个系统文件。一体机 Edge 由看门狗以 `--kiosk` + 独立 `--user-data-dir` 启动，**不带 inprivate 参数**（9/28 记录的「InPrivate」是推断，更正）；配置目录 452 MB 多为 Edge 自带组件，`Default\Cache` 6 个缓存块、`Local Storage` 最后写入 9/28 23:24。
+- **代码核实（Codex 只读分析为线索，协调方逐条对代码确认）：** ①图片转 PDF 的 `print_*.pdf` 开机不清理——`cleanupStaleTempPdfs` 定义了但没有调用点（W-85）；②租约到期一律「未确认」，服务端不自动重排、Agent 重启不重打，「系统自己把上一位的文件打出来」在代码里不存在；③但 Agent 从不清理 Windows 打印队列，主机断电后已进队列的作业可能开机续打，后台却显示「未确认」——推断，未实测，已报总指挥建议发布前处理；④「重新提交打印」沿用同一任务号，Agent 本地有记录就只回报 failed，同机重提很可能打不出（W-86，走查窗口先用模拟 Agent 复现）。
+- **空间与内存底子（23:3x 同一次只读）：** Agent 连续运行 180 小时，node 工作集 78 MB、峰值 84 MB，无内存上涨迹象；一体机 Edge 281 MB；可用内存 5.3 GB、C 盘剩余 130 GB。服务日志已按 10 MB 滚动、保留 5 个。**发现约 130 MB 早期遗留物**（都在 `C:\ProgramData\AIJobPrintAgent`，不在滚动范围内）：`agent-debug.log` 48 MB（6/9 后未再写）、`agent-out.log` 38 MB（6/2 后未再写）、`logs\AIJobPrintTerminalSetup.exe` 43 MB（0.4.8 旧安装包、未签名），以及 `scan-test-backup\` 里 1 个扫描件 PDF（9/10，可能含个人信息）。按规矩删除由产品负责人本人做；是否让安装包升级时顺带清掉这几类已知旧文件，交总指挥定。
+- **发布当天：** 现场验收单新增 R.5（用户走后残留、打印中强杀与拔电、重提能否出纸、缓存比对 W-87），一页纸改为约 110 分钟。
+
 ## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
 
 - **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
