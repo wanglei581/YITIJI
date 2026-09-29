@@ -3,8 +3,8 @@
 # Runner 读取本文件，远端不写临时脚本。禁止任何写操作。
 # 允许输出：yes/no、数量、日期、版本号、证书目录名、白名单内终端编号、
 # 点名的残留目录名、内存数字、/srv 下两级目录名、/root 合计 MB。
-# 禁止输出：文件名、来源地址、请求内容、密钥、环境变量、启动参数、进程命令行、
-# nginx -T、pm2 jlist、访问日志原文、/root 下的文件名。
+# 禁止输出：文件名、订单号、用户、来源地址、请求内容、密钥、环境变量、启动参数、进程命令行、
+# nginx -T、pm2 jlist、访问日志原文、/root 下的文件名、任何订单行内容。
 set -uo pipefail
 
 # PM2 在守护进程没起来时，任何子命令都会自己拉起守护进程并写 ~/.pm2。先看套接字。
@@ -160,6 +160,65 @@ echo "=== 9. 发布后验证：#553 隐私门控审计动作是否已注册 ==="
 CNT="$(sudo -n -u postgres psql -tAc \
   "SELECT count(*) FROM \"AuditLog\" WHERE action='print_job.pii_scan_bypassed';" 2>/dev/null || echo unknown)"
 echo "PII_BYPASS_AUDIT_ROWS=$CNT  （0 属正常：本次发布后尚无人建单）"
+
+echo "=== 9b. 已付款、未打印完、超过 100 面的订单（只读计数）==="
+# 只输出一行 OVERSIZE_PAID_UNFINISHED_ORDERS。失败、psql 不可用、结果不是纯数字都写 unknown。
+# 不打印订单号、用户、文件名、终端编号或任何行内容。
+# 上限变量与 PRINT_MAX_SIDES_PER_ORDER 同一口径：每单最多这么多面，超过才计数。
+# 终态取 services/api/src/terminals/terminals-agent.service.ts 的 TERMINAL_STATES
+# （completed / failed / cancelled）。面数按 printOrderSideCount：有订单行则各行
+# billablePages × copies 相加；没有行则用订单 billablePages × 参数里的 copies。
+# copies 先看整段是不是 {...} 且能通过 jsonb 校验，再要求 copies 是 JSON 数字里的正整数，
+# 否则按 1。坏 JSON 不让整条查询报错。billablePages 为空或小于 1 按 0 面。
+OVERSIZE_MAX_SIDES=100
+oversize_sql=$(cat <<SQL
+BEGIN READ ONLY;
+-- oversize-paid-unfinished-count
+SELECT count(*)::text
+FROM "Order" o
+LEFT JOIN LATERAL (
+  SELECT count(*) AS item_count,
+         COALESCE(SUM(i."billablePages"::numeric * i."copies"::numeric), 0) AS item_sides
+  FROM "OrderItem" i
+  WHERE i."orderId" = o.id
+) items ON true
+WHERE o."payStatus" = 'paid'
+  AND o."taskStatus" NOT IN ('completed', 'failed', 'cancelled')
+  AND (
+    CASE
+      WHEN items.item_count > 0 THEN items.item_sides
+      WHEN o."billablePages" IS NULL OR o."billablePages" < 1 THEN 0
+      ELSE o."billablePages"::numeric * (
+        CASE
+          WHEN o."printParamsJson" ~ '^[[:space:]]*\{(.|\\n)*\}[[:space:]]*\$'
+           AND pg_input_is_valid(o."printParamsJson", 'jsonb')
+          THEN
+            CASE
+              WHEN jsonb_typeof(o."printParamsJson"::jsonb) = 'object'
+               AND jsonb_typeof(o."printParamsJson"::jsonb -> 'copies') = 'number'
+               AND (o."printParamsJson"::jsonb ->> 'copies') ~ '^[1-9][0-9]*\$'
+              THEN (o."printParamsJson"::jsonb ->> 'copies')::numeric
+              ELSE 1
+            END
+          ELSE 1
+        END
+      )
+    END
+  ) > ${OVERSIZE_MAX_SIDES};
+ROLLBACK;
+SQL
+)
+oversize_rc=0
+# -q 去掉 BEGIN/ROLLBACK 的命令标签，否则成功时输出不是纯数字，会被收成 unknown。
+oversize_raw="$(printf '%s\n' "$oversize_sql" | sudo -n -u postgres psql -X -q -tA -v ON_ERROR_STOP=1 2>/dev/null)" || oversize_rc=$?
+oversize_raw="$(printf '%s' "$oversize_raw" | tr -d '[:space:]')"
+if [ "$oversize_rc" -ne 0 ]; then
+  echo "OVERSIZE_PAID_UNFINISHED_ORDERS=unknown"
+elif printf '%s' "$oversize_raw" | grep -Eq '^[0-9]+$'; then
+  echo "OVERSIZE_PAID_UNFINISHED_ORDERS=${oversize_raw}"
+else
+  echo "OVERSIZE_PAID_UNFINISHED_ORDERS=unknown"
+fi
 
 echo "=== 10. 运行版本与 main 是否一致 ==="
 if [ -f "$EXPECT_DIR/DEPLOY_SOURCE.txt" ]; then

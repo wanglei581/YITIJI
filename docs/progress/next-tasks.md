@@ -51,6 +51,7 @@
 **发布当天**
 1. 看一次 `/api/v1/health`，`data.degraded` 为空。
 2. 给现在的生产提交打标签，作回退锚点；候选合进 main 用普通合并，不 squash（P0-4）。
+   - 跑发布前预检（gh 触发的只读体检），看 `OVERSIZE_PAID_UNFINISHED_ORDERS`：是 0 才继续；大于 0 或 unknown 就先停，找总指挥，这些单由产品负责人人工处理后再升级 Agent。
 3. 把 `DEPLOY_API_ENABLED` 设为 true：main CI 通过后自动发布，或手动触发、范围选 full。发布期间停止往 main 合并。
 4. 部署日志里 SSH 步骤结束后，把 `DEPLOY_API_ENABLED` 改回 false。
 

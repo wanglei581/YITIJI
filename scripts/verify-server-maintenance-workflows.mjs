@@ -207,7 +207,45 @@ case "$*" in
   *) echo "2020-01-01T00:00:00+0000 oldest" ;;
 esac
 `)
-  writeExec(join(bin, 'sudo'), '#!/usr/bin/env bash\nexit 1\n')
+  writeExec(join(bin, 'psql'), `#!/usr/bin/env bash
+sql=\$(cat || true)
+if ! printf '%s' "\$sql" | grep -q 'oversize-paid-unfinished-count'; then
+  exit 1
+fi
+if [ -n "\${DRILL_PSQL_SQL_OUT:-}" ]; then
+  printf '%s' "\$sql" > "\${DRILL_PSQL_SQL_OUT}"
+fi
+if [ -n "\${DRILL_PSQL_ARGS_OUT:-}" ]; then
+  printf '%s\\n' "\$*" > "\${DRILL_PSQL_ARGS_OUT}"
+fi
+mode="\${DRILL_PSQL_MODE:-fail}"
+case "\$mode" in
+  number)
+    printf '%s\\n' "\${DRILL_PSQL_STDOUT:-0}"
+    exit 0
+    ;;
+  text)
+    printf '%s\\n' "\${DRILL_PSQL_STDOUT:-not-a-number}"
+    exit 0
+    ;;
+  *)
+    if [ -n "\${DRILL_PSQL_STDOUT:-}" ]; then
+      printf '%s\\n' "\${DRILL_PSQL_STDOUT}"
+    fi
+    if [ -n "\${DRILL_PSQL_STDERR:-}" ]; then
+      printf '%s\\n' "\${DRILL_PSQL_STDERR}" >&2
+    fi
+    exit 1
+    ;;
+esac
+`)
+  writeExec(join(bin, 'sudo'), `#!/usr/bin/env bash
+if [ "\$1" = "-n" ] && [ "\$2" = "-u" ] && [ "\$4" = "psql" ]; then
+  shift 4
+  exec psql "\$@"
+fi
+exit 1
+`)
   writeExec(join(bin, 'curl'), '#!/usr/bin/env bash\nexit 0\n')
   writeExec(join(bin, 'df'), '#!/usr/bin/env bash\nprintf "%s\\n" 100\n')
   writeExec(join(bin, 'du'), `#!/usr/bin/env bash
@@ -266,6 +304,10 @@ exit 0
     DRILL_NGINX_CONF: join(td, 'empty.conf'),
     ...extraEnv,
   }
+  if (extraEnv.DRILL_PSQL_MODE) {
+    env.DRILL_PSQL_SQL_OUT = join(td, 'psql-oversize.sql')
+    env.DRILL_PSQL_ARGS_OUT = join(td, 'psql-oversize.args')
+  }
   if (extraEnv && Object.prototype.hasOwnProperty.call(extraEnv, 'DRILL_NGINX_BODY')) {
     writeFileSync(env.DRILL_NGINX_CONF, extraEnv.DRILL_NGINX_BODY)
   } else if (!existsSync(env.DRILL_NGINX_CONF)) {
@@ -282,6 +324,8 @@ exit 0
   }
   return {
     td, home, shortHome, srv, tmp, live, syslog, pg, apt, redis, expect, backup, bin, pm2Log, pythonLog,
+    psqlSql: join(td, 'psql-oversize.sql'),
+    psqlArgs: join(td, 'psql-oversize.args'),
     created,
     code: result.status ?? 1,
     out: `${result.stdout ?? ''}\n${result.stderr ?? ''}`,
@@ -765,6 +809,166 @@ if (want('P-early')) {
     && /API_DIR_DEFAULT_OK=yes/.test(run.out) && /REDIS_REACHABLE=yes/.test(run.out) && /API_HEALTH_LOCAL=ok/.test(run.out)
     && !precheckSh.includes('mktemp'),
     'P-early 整份预检 1–11 节真的跑了，且没有新文件', `created=${run.created.join(',')} code=${run.code}\n${run.out.slice(0, 1500)}`)
+}
+
+// 假 psql 回显的订单号和文件名。预检输出里不能出现。
+const OVERSIZE_LEAK_ORDER = 'ord-leak-99188'
+const OVERSIZE_LEAK_FILE = 'secret-resume.pdf'
+const OVERSIZE_PG_EXPECT = '5'
+const OVERSIZE_DML = /\b(INSERT|UPDATE|DELETE|ALTER|DROP|TRUNCATE)\b/i
+const OVERSIZE_FIXTURE = `
+CREATE TABLE "Order" (
+  id text PRIMARY KEY,
+  "payStatus" text NOT NULL,
+  "taskStatus" text NOT NULL,
+  "billablePages" integer,
+  "printParamsJson" text NOT NULL
+);
+CREATE TABLE "OrderItem" (
+  id text PRIMARY KEY,
+  "orderId" text NOT NULL REFERENCES "Order"(id),
+  "billablePages" integer NOT NULL,
+  "copies" integer NOT NULL
+);
+INSERT INTO "Order" (id, "payStatus", "taskStatus", "billablePages", "printParamsJson") VALUES
+  ('${OVERSIZE_LEAK_ORDER}', 'paid', 'pending', NULL, '{"fileName":"${OVERSIZE_LEAK_FILE}","copies":9}'),
+  ('ord-no-items', 'paid', 'pending', 60, '{"copies": 2}'),
+  ('ord-bad-json', 'paid', 'printing', 10, '{not json "copies": 50, "fileName":"${OVERSIZE_LEAK_FILE}"}'),
+  ('ord-exact-100', 'paid', 'pending', 100, '{"copies":1}'),
+  ('ord-101', 'paid', 'claimed', 101, '{"copies":1}'),
+  ('ord-completed', 'paid', 'completed', 200, '{"copies":1}'),
+  ('ord-unpaid', 'unpaid', 'pending', 200, '{"copies":1}'),
+  ('ord-items-small', 'paid', 'pending', 500, '{"copies":9}'),
+  ('ord-null-pages', 'paid', 'pending', NULL, '{"copies":9}'),
+  ('ord-failed', 'paid', 'failed', 200, '{}'),
+  ('ord-cancelled', 'paid', 'cancelled', 200, '{}'),
+  ('ord-string-copies', 'paid', 'pending', 80, '{"copies":"9"}'),
+  ('ord-float-copies', 'paid', 'pending', 80, '{"copies":1.5}'),
+  ('ord-zero-copies', 'paid', 'pending', 101, '{"copies":0}'),
+  ('ord-missing-copies', 'paid', 'pending', 101, '{}');
+INSERT INTO "OrderItem" (id, "orderId", "billablePages", "copies") VALUES
+  ('item-a1', '${OVERSIZE_LEAK_ORDER}', 40, 2),
+  ('item-a2', '${OVERSIZE_LEAK_ORDER}', 21, 1),
+  ('item-h1', 'ord-items-small', 5, 2);
+`
+
+function psqlExec(psql, sock, port, args, input) {
+  return spawnSync(psql, ['-h', sock, '-p', String(port), '-U', 'postgres', '-d', 'postgres', ...args], {
+    encoding: 'utf8',
+    input,
+    env: { ...process.env, PGHOST: sock, PGPORT: String(port), PGUSER: 'postgres', PGDATABASE: 'postgres' },
+  })
+}
+
+function runOversizePg(sql) {
+  const initdb = commandPath('initdb')
+  const postgres = commandPath('postgres')
+  const psql = commandPath('psql')
+  const pgCtl = commandPath('pg_ctl')
+  if (!initdb || !postgres || !psql || !pgCtl) {
+    return { skipped: true, out: '', note: 'PATH 里没有 initdb、postgres、psql 或 pg_ctl，计数 SQL 没真跑' }
+  }
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'oversize-pg-')))
+  const data = join(dir, 'data')
+  const sock = join(dir, 'sock')
+  mkdirSync(sock)
+  const init = spawnSync(initdb, ['-D', data, '--username=postgres', '--auth=trust', '--no-sync', '--locale=C'], { encoding: 'utf8' })
+  if (init.status !== 0) {
+    rmSync(dir, { recursive: true, force: true })
+    return { skipped: true, out: '', note: `initdb 没成功，计数 SQL 没真跑：${(init.stderr || init.stdout || '').slice(0, 300)}` }
+  }
+  const port = 25000 + (process.pid % 20000)
+  const child = spawn(postgres, ['-D', data, '-k', sock, '-p', String(port), '-c', 'listen_addresses='], {
+    detached: true,
+    stdio: 'ignore',
+  })
+  child.unref()
+  const stop = () => {
+    spawnSync(pgCtl, ['-D', data, '-m', 'immediate', 'stop'], { encoding: 'utf8' })
+    try { process.kill(child.pid, 'SIGTERM') } catch { /* 已退出 */ }
+    rmSync(dir, { recursive: true, force: true })
+  }
+  let up = false
+  for (let i = 0; i < 50; i += 1) {
+    const ping = psqlExec(psql, sock, port, ['-tAc', 'SELECT 1'])
+    if (ping.status === 0 && (ping.stdout || '').trim() === '1') { up = true; break }
+    spawnSync('sleep', ['0.1'])
+  }
+  if (!up) {
+    stop()
+    return { skipped: false, out: '', note: '本机临时 PostgreSQL 没接受连接，计数 SQL 没跑完' }
+  }
+  const made = psqlExec(psql, sock, port, ['-v', 'ON_ERROR_STOP=1'], OVERSIZE_FIXTURE)
+  if (made.status !== 0) {
+    const detail = `${made.stdout || ''}\n${made.stderr || ''}`
+    stop()
+    return { skipped: false, out: detail, note: '临时库建表或灌数失败' }
+  }
+  const query = psqlExec(psql, sock, port, ['-X', '-q', '-tA', '-v', 'ON_ERROR_STOP=1'], sql)
+  const out = query.stdout || ''
+  const err = query.stderr || ''
+  stop()
+  if (query.status !== 0) return { skipped: false, out: `${out}\n${err}`, note: '计数查询失败' }
+  return { skipped: false, out, count: out.trim(), note: '' }
+}
+
+if (want('S-oversize-num', 'S-oversize-err', 'S-oversize-nan', 'S-oversize-leak', 'S-oversize-ro', 'S-oversize-pg')) {
+  const leakText = `${OVERSIZE_LEAK_ORDER}\n${OVERSIZE_LEAK_FILE}`
+  const numbered = runPrecheck({ DRILL_PSQL_MODE: 'number', DRILL_PSQL_STDOUT: '17' })
+  const failed = runPrecheck({
+    DRILL_PSQL_MODE: 'fail',
+    DRILL_PSQL_STDOUT: leakText,
+    DRILL_PSQL_STDERR: leakText,
+  })
+  const dirty = runPrecheck({ DRILL_PSQL_MODE: 'text', DRILL_PSQL_STDOUT: `nope\n${leakText}` })
+  const sql = existsSync(numbered.psqlSql) ? readFileSync(numbered.psqlSql, 'utf8') : ''
+  const args = existsSync(numbered.psqlArgs) ? readFileSync(numbered.psqlArgs, 'utf8') : ''
+  if (want('S-oversize-num')) check(
+    numbered.code === 0 && /^OVERSIZE_PAID_UNFINISHED_ORDERS=17$/m.test(numbered.out),
+    'S-oversize-num 假 psql 返回数字时原样输出该数字',
+    numbered.out,
+  )
+  if (want('S-oversize-err')) check(
+    failed.code === 0 && /^OVERSIZE_PAID_UNFINISHED_ORDERS=unknown$/m.test(failed.out),
+    'S-oversize-err 查询失败时输出 unknown',
+    failed.out,
+  )
+  if (want('S-oversize-nan')) check(
+    dirty.code === 0 && /^OVERSIZE_PAID_UNFINISHED_ORDERS=unknown$/m.test(dirty.out),
+    'S-oversize-nan 结果不是纯数字时输出 unknown',
+    dirty.out,
+  )
+  if (want('S-oversize-leak')) check(
+    !failed.out.includes(OVERSIZE_LEAK_ORDER) && !failed.out.includes(OVERSIZE_LEAK_FILE)
+      && !dirty.out.includes(OVERSIZE_LEAK_ORDER) && !dirty.out.includes(OVERSIZE_LEAK_FILE)
+      && !numbered.out.includes(OVERSIZE_LEAK_ORDER) && !numbered.out.includes(OVERSIZE_LEAK_FILE),
+    'S-oversize-leak 输出里没有假数据的订单号和文件名',
+    `${failed.out}\n---\n${dirty.out}`,
+  )
+  if (want('S-oversize-ro')) check(
+    sql.includes('BEGIN READ ONLY')
+      && !OVERSIZE_DML.test(sql)
+      && args.includes('-X') && args.includes('-q') && args.includes('-tA') && args.includes('ON_ERROR_STOP=1')
+      && precheckSh.includes('OVERSIZE_MAX_SIDES=100')
+      && precheckSh.includes('PRINT_MAX_SIDES_PER_ORDER')
+      && sql.includes('> 100'),
+    'S-oversize-ro 查询只读，上限变量指向 PRINT_MAX_SIDES_PER_ORDER',
+    `args=${args}\n${sql.slice(0, 500)}`,
+  )
+  if (want('S-oversize-pg')) {
+    const pg = runOversizePg(sql)
+    if (pg.skipped) {
+      console.log(`  NOTE S-oversize-pg ${pg.note}`)
+    } else {
+      check(
+        pg.count === OVERSIZE_PG_EXPECT
+          && !pg.out.includes(OVERSIZE_LEAK_ORDER)
+          && !pg.out.includes(OVERSIZE_LEAK_FILE),
+        `S-oversize-pg 临时 PostgreSQL 计数为 ${OVERSIZE_PG_EXPECT}`,
+        `${pg.note}\n${pg.out}`,
+      )
+    }
+  }
 }
 
 // —— 清理脚本 ——
