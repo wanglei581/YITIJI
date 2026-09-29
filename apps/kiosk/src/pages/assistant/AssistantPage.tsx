@@ -10,7 +10,7 @@ import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
 import { useAuth } from '../../auth/useAuth'
-import { AiTaskRegion, useAiTask } from '../../ai'
+import { AiTaskRegion, isAiOutage, useAiTask } from '../../ai'
 import { AssistantHoldToTalk } from './AssistantHoldToTalk'
 import { AssistantSessionSummaryBar } from './AssistantSessionSummaryBar'
 import type { AiAvailability, AiTaskFallback } from '../../ai'
@@ -262,6 +262,17 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     } catch (error) {
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
+      // AI 能力级停用（暂停 / 当日额度已到 / 未配置）：重试这一轮不会变好。与「非 AI 回复」同样
+      // 锁住输入、转到不经过 AI 的四个入口；恢复后用户可点「重新检查 AI 顾问」再试。
+      if (isAiOutage(error)) {
+        setAiAvailability('unavailable')
+        setKeyboardOpen(false)
+        setMessages((current) => [
+          ...current,
+          { id: `err-${Date.now()}`, role: 'assistant', kind: 'error', text: advisorErrorMessage(error, 'AI 顾问现在停用，下面几项不经过 AI，照常能办。') },
+        ])
+        return
+      }
       setTurnFailed(true)
       setMessages((current) => [
         ...current,

@@ -30,6 +30,12 @@
  * 隔离 SQLite + 进程内内存 Redis 桩(见 support/inmemory-redis-server.ts)。
  * 桩不实现 Lua ⇒ BullMQ 在它上面是失败的,因此 `api` 模式按仓库既有口径
  * (verify-job-sync.ts)用「确定性 fetch 边界」验 inline 路径,队列投递不在本门禁范围。
+ * 同理,桩上密码登录的失败次数预留(P1-4,Lua)必然失败关闭 —— 所以凭证不走
+ * `POST /auth/login`,而是直接签发内部令牌(见 harness 的 issueInternalToken)。
+ * 这张令牌只活 15 分钟;签完立即解码,对照 `auth.service.ts` 的 `issueLogin`
+ * 和 `auth.module.ts` 的 signOptions(aud、iss、sub、role、orgId、ver、jti)。
+ * 对不上就抛错,退出码不是 0。
+ * 登录链路本身由 verify:admin-login-hardening / verify:redis-degradation-truth 看守。
  *
  * Run: VERIFICATION_DATABASE_TARGET=isolated DATABASE_URL=file:./prisma/verify-e2e.db \
  *      pnpm verify:content-pipeline-e2e
@@ -38,7 +44,7 @@ import 'dotenv/config'
 import { createHmac, randomUUID } from 'node:crypto'
 import ExcelJS from 'exceljs'
 import {
-  assert, section, step, show, summary, login, unwrap, FIXTURE_PREFIX,
+  assert, section, step, show, summary, issueInternalToken, unwrap, FIXTURE_PREFIX,
   startHarness, type HarnessEnv, type Client, type HttpResult,
 } from './support/content-pipeline-harness'
 import { createFixtures, cleanupFixtures, type Fixtures } from './support/content-pipeline-fixtures'
@@ -456,10 +462,10 @@ async function main(): Promise<void> {
     f = await createFixtures(prisma, h.run)
     console.log(`  run=${h.run}  可信机构=${f.trustedOrgId}  未核验机构=${f.untrustedOrgId}`)
 
-    const adminToken = await login(h.http, f.adminUsername, f.password, 'admin')
-    const partnerToken = await login(h.http, f.partnerUsername, f.password, 'partner')
-    const ntPartnerToken = await login(h.http, f.untrustedPartnerUsername, f.password, 'partner')
-    console.log('  admin / partner / 未核验机构 partner 登录成功')
+    const adminToken = await issueInternalToken(h, f.adminUsername)
+    const partnerToken = await issueInternalToken(h, f.partnerUsername)
+    const ntPartnerToken = await issueInternalToken(h, f.untrustedPartnerUsername)
+    console.log('  admin / partner / 未核验机构 partner 内部令牌签发成功')
 
     // ── §1 岗位链路 ────────────────────────────────────────────────────────
     section('§1 岗位(Job)—— 六种接入方式各走一遍,再各自 审核 → 发布 → 前台可见')
