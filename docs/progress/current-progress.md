@@ -135,6 +135,9 @@
 - **门禁：** 新增 `verify-admin-parked-recruitment-ui.mjs`（挂在 `verify:source-publish-actions` 链上）；`verify-source-publish-actions`、`verify-admin-offline-agencies-ui`、`verify-backend-p0-contracts` 改为在停放文件上核对原契约并断言页面不引用停放文件；`verify:admin-orgs`、`verify:partner-source-capabilities`、`verify:companies`、`verify:partner-excel-import` 按新口径改钉（逐条旧→新见 PR）。浏览器用例 5 个随停放改写，另改 `fairs.spec` 为断言只读。变异 7 处全部变红。
 - **实现与收货：** Claude 子代理实现，协调方审服务端与关键页面 diff，在候选 `6f473f211` 上干净套用，补改一条浏览器用例。
 - **验证：** 两后台与 api `tsc`、lint 0 错误；管理员 22 条、机构 6 条 verify 与 API 21 条（托管打开，同 CI）通过，CI 覆盖、原样报错、合规文案通过；浏览器用例管理员 110（fairs 改后通过）、机构 69 通过；演示模式核对岗位信息源、工作台、侧栏与新建机构类型下拉。唯一红的是候选自带的 `verify-admin-ai-access-ui` A2（主执行窗口在修）。
+## 2026-09-29：P1-11 机构后台使用指南（写进现有文档）
+
+- 把 `docs/operations/content-ingestion-operator-guide.md`（原「托管 a 下的内容录入」，还停在 3.13/3.14 开发中的口径）扩写成《机构后台使用指南（托管 a）》，不新开手册：登录与账号、菜单一览、工作台与平台处置通知、机构资料与内容可信、本机构官方渠道、政策公告（含申领条件与平台紧急下架后的处理）、终端数据（试点签收指标的口径与导出）、数据大屏与数据统计、智慧校园、本平台不做的事、停下来联系本公司的情形，附管理员对应操作。菜单名与一体机入口名按合规与运维窗口「试点交付物包」的术语对照统一；写的是 #1057、#1065、#1076、#1080、#1082 合入后的界面，文首注明发布前以本机为准。两处引用它的链接文字同步改名。现场人员培训材料在交付物包里，不在本文。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 
