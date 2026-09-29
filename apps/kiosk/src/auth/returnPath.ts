@@ -12,3 +12,12 @@ export function loginPathForCurrentLocation(): string {
   const from = isSafeInternalPath(current) ? current : '/'
   return `/login?from=${encodeURIComponent(from)}`
 }
+
+/**
+ * 打印链上的「去登录」：回跳地址只放路由路径，不带当前查询串、文件编号、打印链接或交接编号。
+ * 回来之后由打印交接上下文决定是哪一份文件（归属、有效期当场核对）。
+ */
+export function loginPathForPrintStep(step: 'confirm' | 'preview'): string {
+  const from = step === 'confirm' ? '/print/confirm' : '/print/desk?step=preview'
+  return `/login?from=${encodeURIComponent(from)}`
+}

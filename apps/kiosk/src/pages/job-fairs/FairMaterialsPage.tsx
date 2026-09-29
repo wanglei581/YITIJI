@@ -21,7 +21,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { FairMaterialDTO, ExternalJobFairDTO, FairMaterialType } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
 import {
   BriefcaseIcon,
@@ -50,6 +49,7 @@ import {
   DirStrip,
   DirStripItem,
 } from '../../components/qingxu/directory/DirectoryBits'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 function formatSize(kb: number) {
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`
@@ -69,6 +69,7 @@ function MaterialIcon({ type }: { type: FairMaterialType }) {
 
 export function FairMaterialsPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { id } = useParams<{ id: string }>()
   const fairId = id ?? ''
 
@@ -107,21 +108,17 @@ export function FairMaterialsPage() {
     try {
       const printable = await prepareFairMaterialPrint(fairId, material.id)
       if (!printable.printFileUrl) throw new Error('打印链接未就绪')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: printable.filename,
-            size: formatSize(Math.max(1, Math.round(printable.sizeBytes / 1024))),
-            pages: printable.pageCount > 0 ? printable.pageCount : null,
-            fileId: printable.fileId,
-            fileUrl: printable.printFileUrl,
-            mimeType: printable.mimeType,
-          },
-          params: makePrintParams({
-            copies: 1,
-            duplex: printable.pageCount > 1 ? 'double' : 'single',
-            color: 'bw',
-          }),
+      startPrint({
+        origin: 'fair_material',
+        returnPath: window.location.pathname,
+        paramsSuggestion: printable.pageCount > 1 ? { duplex: 'duplex_long_edge' } : undefined,
+        file: {
+          name: printable.filename,
+          size: formatSize(Math.max(1, Math.round(printable.sizeBytes / 1024))),
+          pages: printable.pageCount > 0 ? printable.pageCount : null,
+          fileId: printable.fileId,
+          fileUrl: printable.printFileUrl,
+          mimeType: printable.mimeType,
         },
       })
     } catch (error) {

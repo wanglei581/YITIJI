@@ -30,7 +30,6 @@ import {
   UsbIcon,
   XIcon,
 } from 'lucide-react'
-import { makePrintParams } from '@ai-job-print/shared'
 import {
   AiTaskRegion,
   useAiTask,
@@ -52,6 +51,7 @@ import {
   patchInterviewWorkbenchSession,
   readInterviewWorkbenchSession,
 } from './interviewWorkbenchSession'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 type ResumeChannel = 'phone' | 'usb' | 'desktop'
 import './interview-service-desk.css'
@@ -110,6 +110,7 @@ function OptionButton({ active, onClick, children, className = '' }: { active: b
 
 export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const kiosk = useTerminalKiosk()
@@ -278,19 +279,18 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         accessToken: pendingSession.accessToken,
       })
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
-        state: {
-          file: {
-            name: file.filename,
-            size: file.sizeBytes >= 1024 * 1024
-              ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
-              : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
-            pages: file.pageCount,
-            fileId: file.fileId,
-            fileUrl: file.printFileUrl,
-            mimeType: 'application/pdf',
-          },
-          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+      startPrint({
+        origin: 'interview_practice',
+        returnPath: window.location.pathname,
+        file: {
+          name: file.filename,
+          size: file.sizeBytes >= 1024 * 1024
+            ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
+            : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+          pages: file.pageCount,
+          fileId: file.fileId,
+          fileUrl: file.printFileUrl,
+          mimeType: 'application/pdf',
         },
       })
     } catch (err) {

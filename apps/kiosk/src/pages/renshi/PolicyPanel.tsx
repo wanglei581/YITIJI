@@ -39,6 +39,8 @@ export function PolicyPanel({
   const { isFavorite, toggle: toggleFavorite } = useFavorites()
 
   const goHub = () => navigate('/policy-service')
+  // 选了身份时服务端只回这一身份与通用事项：这时一条都没有是筛选结果，不是政策库空（稿 48 的 filtered-empty）。
+  const libraryEmpty = libraryItems.length === 0 && audience === 'all'
   const visibleLibrary = useMemo(
     () => libraryItems.filter((item) => matchAudience(item, audience)),
     [libraryItems, audience],
@@ -123,7 +125,6 @@ export function PolicyPanel({
               <SourceFacts
                 sourceName={item.sourceName}
                 syncTime={item.syncTime}
-                externalId={item.externalId}
                 publishedOn={item.publishedDate}
               />
             ) : (
@@ -192,15 +193,15 @@ export function PolicyPanel({
           <b>政策库</b>
           <span>
             {visibleLibrary.length === 0
-              ? (libraryItems.length === 0 ? '本次没有读到条目' : '当前筛选无匹配')
+              ? (libraryEmpty ? '本次没有读到条目' : '当前筛选无匹配')
               : '读到的条目按下面的结构展示'}
           </span>
         </header>
         {visibleLibrary.length === 0 ? (
-          <div className="rq-state" data-kind={libraryItems.length === 0 ? 'empty' : 'filter'}>
-            <b>{libraryItems.length === 0 ? '政策库暂无内容' : '当前身份暂无匹配政策'}</b>
+          <div className="rq-state" data-kind={libraryEmpty ? 'empty' : 'filter'}>
+            <b>{libraryEmpty ? '政策库暂无内容' : '当前身份暂无匹配政策'}</b>
             <p>
-              {libraryItems.length === 0
+              {libraryEmpty
                 ? '这里只展示合作机构发布、管理员审核通过的政策。下方「通用办事指引」是本机整理的参考，不属于政策库。'
                 : '可切换身份或选择「全部」再看一次；这只是筛选结果，不代表库里没有政策。'}
             </p>

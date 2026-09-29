@@ -13,7 +13,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { JobMaterialDocumentTemplate, JobMaterialGenerateResponse, JobMaterialTemplateType } from '@ai-job-print/shared'
-import { makePrintParams } from '@ai-job-print/shared'
 import {
   AlertTriangleIcon, CheckCircle2Icon, ChevronRightIcon, ClockIcon, EyeIcon, FileTextIcon, FolderOpenIcon, InfoIcon, PenLineIcon, PrinterIcon, SparklesIcon,
 } from 'lucide-react'
@@ -29,6 +28,7 @@ import { fetchAccessUrl } from '../../services/api/memberAssets'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { API_MODE } from '../../services/api/client'
 import { clearJobMaterialDraft, readJobMaterialDraft, saveJobMaterialDraft, type JobMaterialDraftForm } from './jobMaterialDraft'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-materials-qx.css'
 
 const FILTERS = ['全部', '求职信', '感谢信', '作品集', '材料清单', '校招', '社招', '通用'] as const
@@ -174,6 +174,7 @@ function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
 
 export function JobMaterialLibraryPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const { isLoggedIn, getToken } = useAuth()
   const [templates, setTemplates] = useState<JobMaterialDocumentTemplate[]>([])
   const [filter, setFilter] = useState<Filter>('全部')
@@ -284,16 +285,17 @@ export function JobMaterialLibraryPage() {
 
   const printGenerated = (file: JobMaterialGenerateResponse) => {
     if (!file.printFileUrl) return
-    navigate('/print/confirm', {
-      state: {
-        file: {
-          name: file.filename,
-          size: formatBytes(file.sizeBytes),
-          pages: file.pageCount > 0 ? file.pageCount : null,
-          fileUrl: file.printFileUrl,
-          mimeType: file.mimeType,
-        },
-        params: makePrintParams({ copies: 1, duplex: file.pageCount > 1 ? 'double' : 'single', color: 'bw' }),
+    startPrint({
+      origin: 'job_material',
+      returnPath: window.location.pathname,
+      paramsSuggestion: file.pageCount > 1 ? { duplex: 'duplex_long_edge' } : undefined,
+      file: {
+        name: file.filename,
+        size: formatBytes(file.sizeBytes),
+        pages: file.pageCount > 0 ? file.pageCount : null,
+        fileId: file.fileId,
+        fileUrl: file.printFileUrl,
+        mimeType: file.mimeType,
       },
     })
   }
