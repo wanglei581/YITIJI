@@ -6,14 +6,15 @@ import { activeVersionOf, docTypeLabel, missingLoginConsentDocs } from './legalD
 
 /**
  * 顶部「上线就绪」：四类对外文档各自是否已发布，以及会员登录所需的两份协议是否就绪。
- * 「前台暂无展示位置」是 2026-09-29 按代码核实的现状：一体机 /legal 与小程序协议页只读
- * 用户服务协议与隐私政策，AI 服务说明、经营者信息发布后暂时没有页面展示。
+ * 展示位置按候选代码核实（2026-09-29 复核）：小程序首页页脚、AI 与助手页、反馈页、隐私页
+ * 都会打开 AI 服务说明与经营者信息（apps/miniapp/pages/home/home.wxml、ai.js、assistant.js、
+ * feedback.js、privacy.js → pages/legal/legal）。发布即生效，所以只发布定稿。
  */
 const READINESS_ITEMS: { docType: string; hint: string }[] = [
   { docType: 'terms_of_service', hint: '一体机、小程序协议页与登录勾选' },
   { docType: 'privacy_policy', hint: '一体机、小程序协议页与登录勾选' },
-  { docType: 'ai_disclaimer', hint: '前台暂无展示位置' },
-  { docType: 'operator_info', hint: '前台暂无展示位置' },
+  { docType: 'ai_disclaimer', hint: '小程序首页页脚、AI 与助手页；发布即上线' },
+  { docType: 'operator_info', hint: '小程序首页页脚、反馈与隐私页；发布即上线' },
 ]
 
 export function LegalReadinessCard({ rows }: { rows: LegalDocVersionView[] }) {

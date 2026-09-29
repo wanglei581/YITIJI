@@ -151,7 +151,7 @@ export function LegalDocDrawer({ existing, onCreated, onClose }: Props) {
               </label>
               <p className="mb-1.5 text-xs leading-relaxed text-neutral-500">
                 排版规则：空一行分段；以「#」开头，或以「第一条」「第一章」「一、」开头的短行（30 字以内、不以句号结尾）作章节标题；
-                不支持加粗、斜体和链接，这些符号会原样显示。下方预览按一体机的规则排版（小程序按行显示，只认「#」标题和「- 」列表）。
+                不支持加粗、斜体和链接，这些符号会原样显示。下方预览按一体机的规则排版，小程序用同一套分章规则。发布后一体机与小程序立即展示，请只发布定稿。
               </p>
               <textarea
                 id="content"
