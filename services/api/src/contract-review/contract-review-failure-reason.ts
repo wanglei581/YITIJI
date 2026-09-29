@@ -50,6 +50,9 @@ const FAILURE_REASONS: Readonly<Record<string, string>> = Object.freeze({
     'AI 合同分析服务当前不可用，请稍后再试。',
   CONTRACT_PROVIDER_NOT_ALLOWED:
     'AI 合同分析服务当前不可用，请稍后再试。',
+  // 出站白名单拒绝：请求根本没发出，合同内容没有外发；是配置问题，重试不会变好。
+  CONTRACT_PROVIDER_ENDPOINT_NOT_ALLOWED:
+    'AI 合同分析服务地址未通过核准，本次未发出请求，合同内容没有被发送。',
 
   // ── 回包不可用 ────────────────────────────────────────────────────────────
   CONTRACT_PROVIDER_RESPONSE_INVALID:

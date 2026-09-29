@@ -27,6 +27,8 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from './llm-http'
+import { llmEndpointNotAllowedError } from './llm-failure'
+import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWords, enforceForbiddenWords, safeRefusalReply } from './llm-guard'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from './ai-prompt-safety'
@@ -402,6 +404,8 @@ export class LlmChatService {
       )
     } catch (error) {
       if (error instanceof AiContentBlockedError) throw error
+      // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
+      if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       // 「AI 正忙」和「超时」都必须能和下面的 network_error 分开报：三者的处置完全不同
       // （加容量 / 查模型端 / 查网络）。糊成一个码就等于把根因抹掉。
       if (error instanceof LlmBusyError) {

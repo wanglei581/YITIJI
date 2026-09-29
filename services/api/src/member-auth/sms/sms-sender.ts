@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { maskPhone } from '../../common/crypto/phone-identity'
 import { tc3Sign } from '../../common/tencent/tc3'
+import { isAiEndpointAllowed } from '../../common/outbound/ai-endpoint-allowlist'
 
 export const SMS_SENDER = Symbol('SMS_SENDER')
 
@@ -121,6 +122,13 @@ export class TencentSmsSender implements SmsSender {
     const host = this.config.host
     // 本地 stub（127.0.0.1/localhost）走 http，便于无外网联调；真实腾讯云始终 https。
     const insecure = host.startsWith('127.0.0.1') || host.startsWith('localhost')
+    const endpoint = `${insecure ? 'http' : 'https'}://${host}`
+    // 出站白名单（与模型、语音同一张单）：手机号是个人信息，地址不在单内就不发。
+    // 本机 stub 的 http 只在非生产放行。providerCode 只用于服务端分类，不回给前端。
+    if (!isAiEndpointAllowed(endpoint, 'sms')) {
+      this.logger.error(`SMS 下发被拦 phone=${maskPhone(phone)} reason=endpoint_not_allowed`)
+      throw new SmsSendError('endpoint_not_allowed')
+    }
     // 腾讯云要求 E.164（带国家码）；大陆手机号补 +86，已带 + 则原样。
     const e164 = phone.startsWith('+') ? phone : `+86${phone}`
 
@@ -138,7 +146,7 @@ export class TencentSmsSender implements SmsSender {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), Number(process.env['TENCENT_SMS_TIMEOUT_MS']) || 10_000)
     try {
-      const res = await fetch(`${insecure ? 'http' : 'https'}://${host}`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

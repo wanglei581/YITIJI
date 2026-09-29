@@ -16,6 +16,7 @@ import { LLM_PRESETS, isLlmVendor, type LlmVendor } from './llm-presets'
 import { withAiSafety } from './ai-prompt-safety'
 import { DEFAULT_FORBIDDEN_WORDS, DEFAULT_ROLE_SCOPE, normalizeForbiddenWords } from './llm-guard'
 import { auditTextHash, type AiConfigApiKeyAction, type LlmConfigAuditSnapshot } from './ai-config-audit'
+import { assertApprovedLlmBaseUrl } from './llm-base-url'
 
 export interface LlmConfig {
   vendor:       LlmVendor
@@ -538,6 +539,11 @@ export class LlmConfigService {
     if (patch.apiKey !== undefined) {
       next.apiKeyEncrypted = patch.apiKey ? encryptSecret(patch.apiKey) : null
     }
+
+    // 落盘前核对「生效后」的模型地址是否在出站白名单里：显式改地址、切厂商时套用的
+    // 预设地址（MiniMax、鱼人不在默认单里）都要拦。判的是 next 而不是 patch，
+    // 否则「只传 vendor 不传 baseURL」就能把未核准的预设地址存进去。
+    assertApprovedLlmBaseUrl(next.baseURL, '保存')
 
     this.cache = { ...this.cache, [feature]: next }
     this.save()

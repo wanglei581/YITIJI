@@ -691,6 +691,8 @@ jobs:
           # LLM 超时 + 全局并发闸门：派生式扫描所有 LLM 调用点都带 signal，
           # 并真跑证明「模型端卡住会超时」「闸门满了立刻拒绝」。
           pnpm --filter @ai-job-print/api verify:llm-timeout-concurrency
+          # AI 类出站端点白名单（P1-3）：模型 / OCR / 语音 / 数字人 / 短信 / 合同审查，白名单外一个请求都不发。
+          pnpm --filter @ai-job-print/api verify:ai-endpoint-allowlist
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies

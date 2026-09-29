@@ -1,5 +1,35 @@
 import { BadRequestException } from '@nestjs/common'
 import * as net from 'net'
+import { evaluateAiEndpoint, type AiEndpointRejectReason } from '../../common/outbound/ai-endpoint-allowlist'
+
+const NOT_APPROVED_REASON_TEXT: Record<AiEndpointRejectReason, string> = {
+  host_not_allowed: '这个模型地址不在已核准的服务商名单里',
+  insecure_protocol: '模型地址必须以 https:// 开头',
+  loopback_in_production: '正式环境的模型地址不能指向本机',
+  invalid_url: '模型地址不是合法网址',
+  unverifiable: '看不出这个模型地址会连到哪里',
+}
+
+/**
+ * 模型地址必须在出站白名单里（common/outbound/ai-endpoint-allowlist.ts，与运行时
+ * llmFetchJson 用的是同一个判定函数）。后台「保存」与「连通性测试」都调它：
+ * 不在单内就拒绝 —— 不落盘、不发请求。
+ *
+ * 与下面的 assertPublicLlmBaseUrl 分开写：那个只管「内网 / 本机」，它的门禁
+ * （verify:ai-config 7i）钉住了「不做 DNS、字面公网名放行」；白名单是另一道、更严的闸。
+ */
+export function assertApprovedLlmBaseUrl(raw: string, action: '保存' | '测试'): void {
+  const verdict = evaluateAiEndpoint(raw.trim())
+  if (verdict.allowed) return
+  const reason = NOT_APPROVED_REASON_TEXT[verdict.reason ?? 'host_not_allowed']
+  const outcome = action === '保存' ? '未保存' : '未测试，也没有发出请求'
+  const hint = verdict.reason === 'host_not_allowed'
+    ? '。请改选已核准的服务商；需要新增服务商时，先完成备案核准，再请技术人员加入名单'
+    : ''
+  throw new BadRequestException({
+    error: { code: 'AI_BASE_URL_NOT_ALLOWED', message: `${reason}，${outcome}${hint}。` },
+  })
+}
 
 /**
  * 管理员配置的模型 baseURL 不得指向本机 / 内网 / 链路本地。

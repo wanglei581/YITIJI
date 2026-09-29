@@ -28,7 +28,7 @@ import { LlmChatService } from './llm-chat.service'
 import { LLM_PRESETS, isLlmVendor } from './llm-presets'
 import { buildAiConfigAuditPayload, didToggleEnabled } from './ai-config-audit'
 import { PaidAiThrottle } from '../../common/throttler/terminal-throttle'
-import { assertPublicLlmBaseUrl } from './llm-base-url'
+import { assertApprovedLlmBaseUrl, assertPublicLlmBaseUrl } from './llm-base-url'
 
 /**
  * 审计动作名。
@@ -180,6 +180,8 @@ export class AiConfigController {
   async test(@Body() body: TestAiConfigDto) {
     const feature = body.feature === undefined ? 'assistant_chat' : this.config.assertValidFeatureKey(body.feature)
     assertPublicLlmBaseUrl(this.config.getConfig(feature).baseURL)
+    // 出站白名单：存量配置（白名单收紧前存下的地址）也不许被「测试」打出去。
+    assertApprovedLlmBaseUrl(this.config.getConfig(feature).baseURL, '测试')
     return this.chat.test(feature)
   }
 }
@@ -228,6 +230,8 @@ export class AiConfigsController {
   async testOne(@Param('featureKey') featureKey: string) {
     const feature = this.config.assertValidFeatureKey(featureKey)
     assertPublicLlmBaseUrl(this.config.getConfig(feature).baseURL)
+    // 出站白名单：存量配置（白名单收紧前存下的地址）也不许被「测试」打出去。
+    assertApprovedLlmBaseUrl(this.config.getConfig(feature).baseURL, '测试')
     return this.chat.test(feature)
   }
 }

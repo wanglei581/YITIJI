@@ -5,6 +5,7 @@
 // SecretId / SecretKey 是腾讯云账号 API 密钥（CAM），只在服务端使用。
 
 import { createHash, createHmac } from 'node:crypto'
+import { assertAiEndpointAllowed } from '../common/outbound/ai-endpoint-allowlist'
 
 const HOST    = 'trtc.tencentcloudapi.com'
 const SERVICE = 'trtc'
@@ -30,6 +31,9 @@ interface TencentApiOptions {
 /** 调用腾讯云 TRTC API，自动完成 TC3 签名 */
 export async function callTencentApi<T = unknown>(opts: TencentApiOptions): Promise<T> {
   const { secretId, secretKey, region, action, payload } = opts
+  // 出站白名单：主机虽是写死的，也照样过一遍 —— 运维把腾讯云移出白名单时，
+  // 这里要跟着停，不能因为「写死」就成为唯一绕过名单的出站点。
+  assertAiEndpointAllowed(`https://${HOST}`, 'trtc')
 
   const timestamp = Math.floor(Date.now() / 1000)
   const date      = new Date(timestamp * 1000).toISOString().slice(0, 10) // YYYY-MM-DD (UTC)
