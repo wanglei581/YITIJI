@@ -19,6 +19,8 @@ export interface AdminOrgAccount {
   emailVerifiedAt: string | null
   emailVerifyMethod: string | null
   availableActionVerificationMethods: PartnerAccountVerificationMethod[]
+  /** 临时密码且手机尚未本人自证时，后台可以显示「登记手机号」。 */
+  contactPhoneRegistrationAvailable: boolean
   createdAt: string
 }
 
@@ -30,6 +32,7 @@ export const ADMIN_ORG_ACCOUNT_SELECT = {
   phoneHash: true,
   phoneEnc: true,
   phoneVerifiedAt: true,
+  phoneRegisteredByAdminAt: true,
   emailHash: true,
   emailEnc: true,
   emailVerifiedAt: true,
@@ -46,6 +49,7 @@ interface AdminOrgAccountRow {
   phoneHash: string | null
   phoneEnc: string | null
   phoneVerifiedAt: Date | null
+  phoneRegisteredByAdminAt: Date | null
   emailHash: string | null
   emailEnc: string | null
   emailVerifiedAt: Date | null
@@ -82,6 +86,21 @@ export function mapAdminOrgAccount(account: AdminOrgAccountRow): AdminOrgAccount
     emailVerifiedAt: account.emailVerifiedAt?.toISOString() ?? null,
     emailVerifyMethod: account.emailVerifyMethod,
     availableActionVerificationMethods: availableMethodsForAccount({ ...account, passwordProofState }),
+    contactPhoneRegistrationAvailable: contactPhoneRegistrationAvailable({ ...account, passwordProofState }),
     createdAt: account.createdAt.toISOString(),
   }
+}
+
+export function contactPhoneRegistrationAvailable(account: {
+  enabled: boolean
+  phoneHash: string | null
+  phoneVerifiedAt: Date | null
+  phoneRegisteredByAdminAt: Date | null
+  passwordProofState: string
+}): boolean {
+  if (!account.enabled) return false
+  if (account.passwordProofState !== PASSWORD_PROOF_STATE.TEMPORARY) return false
+  if (account.phoneVerifiedAt) return false
+  const noPhone = account.phoneHash == null || account.phoneHash === ''
+  return noPhone || account.phoneRegisteredByAdminAt != null
 }

@@ -121,6 +121,14 @@ export class BudgetedSmsSender implements SmsSender {
   ) {}
 
   async sendCode(phone: string, code: string, meta?: SmsSendMeta): Promise<void> {
+    await this.sendWithinBudget(() => this.inner.sendCode(phone, code, meta), meta)
+  }
+
+  async sendPartnerPhoneRegisteredNotice(phone: string, orgName: string, meta?: SmsSendMeta): Promise<void> {
+    await this.sendWithinBudget(() => this.inner.sendPartnerPhoneRegisteredNotice(phone, orgName, meta), meta)
+  }
+
+  private async sendWithinBudget(send: () => Promise<void>, meta?: SmsSendMeta): Promise<void> {
     const day = shanghaiDay(this.now())
     const reserved: string[] = []
     try {
@@ -137,7 +145,7 @@ export class BudgetedSmsSender implements SmsSender {
     }
 
     try {
-      await this.inner.sendCode(phone, code, meta)
+      await send()
     } catch (error) {
       if (isExplicitProviderRejection(error)) await this.release(reserved)
       throw error

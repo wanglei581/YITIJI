@@ -298,7 +298,7 @@ async function initFallbackDb(): Promise<void> {
   const client = createClient({ url: process.env['DATABASE_URL']! })
   try {
     await client.batch([
-      `CREATE TABLE "User" ("id" TEXT NOT NULL PRIMARY KEY, "username" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "name" TEXT NOT NULL, "role" TEXT NOT NULL, "orgId" TEXT, "phoneHash" TEXT, "phoneEnc" TEXT, "phoneVerifiedAt" DATETIME, "tokenVersion" INTEGER NOT NULL DEFAULT 0, "lastLoginAt" DATETIME, "enabled" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+      `CREATE TABLE "User" ("id" TEXT NOT NULL PRIMARY KEY, "username" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "name" TEXT NOT NULL, "role" TEXT NOT NULL, "orgId" TEXT, "phoneHash" TEXT, "phoneEnc" TEXT, "phoneVerifiedAt" DATETIME, "phoneRegisteredByAdminAt" DATETIME, "tokenVersion" INTEGER NOT NULL DEFAULT 0, "lastLoginAt" DATETIME, "enabled" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE UNIQUE INDEX "User_username_key" ON "User"("username")`,
       `CREATE UNIQUE INDEX "User_phoneHash_key" ON "User"("phoneHash")`,
       `CREATE INDEX "User_orgId_idx" ON "User"("orgId")`,

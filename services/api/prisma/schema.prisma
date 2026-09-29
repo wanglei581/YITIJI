@@ -667,6 +667,9 @@ model Organization {
   type       String
   contact    String?
   contactPhone String?
+  /// 联系人手机号最近一次实际变更的时间。空表示这列上线后还没改过。
+  /// 管理员为机构账号登记该手机号前要等满 24 小时，避免刚改完号码就自己收码。
+  contactPhoneChangedAt DateTime?
   sceneTemplate String?
   enabledModulesJson String @default("[]")
   enabled    Boolean  @default(true)
@@ -833,6 +836,8 @@ model User {
   phoneHash    String?       @unique
   phoneEnc     String?
   phoneVerifiedAt DateTime?
+  /// 管理员登记本手机号的时间。有值且 phoneVerifiedAt 为空：号码尚未经本人短信自证。
+  phoneRegisteredByAdminAt DateTime?
   emailHash    String?       @unique
   emailEnc     String?
   emailVerifiedAt DateTime?
