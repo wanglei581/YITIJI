@@ -1,6 +1,8 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { AI_ENABLED } = require('../../utils/build-variant')
+const { pagePath } = require('../../utils/page-path')
 
 const META = {
   print: { icon: 'printer', tone: 'teal', link: '查看打印订单' },
@@ -24,7 +26,7 @@ function toView(item) {
     time,
     icon: meta.icon,
     tone: meta.tone,
-    link: meta.link,
+    link: (!AI_ENABLED && type === 'ai') ? '' : meta.link,
     relatedType: item.relatedType,
     relatedId: item.relatedId,
   }
@@ -39,7 +41,8 @@ Page({
       { id: 'print', label: '打印' },
       { id: 'ai', label: 'AI' },
       { id: 'system', label: '系统' },
-    ],
+    ].filter((item) => AI_ENABLED || item.id !== 'ai'),
+    emptyHint: AI_ENABLED ? '打印进度、AI 服务等消息会出现在这里' : '打印进度等消息会出现在这里',
     all: [],
     nextCursor: null,
     loadingMore: false,
@@ -132,7 +135,7 @@ Page({
     if (!item) return
     this.tapItem(e)
     if (item.type === 'print') wx.navigateTo({ url: '/pages/orders/orders' })
-    if (item.type === 'ai') wx.navigateTo({ url: '/pages/ai-records/ai-records' })
+    if (item.type === 'ai' && AI_ENABLED) wx.navigateTo({ url: pagePath('ai-records') })
   },
 
   back() { wx.navigateBack({ delta: 1, fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },

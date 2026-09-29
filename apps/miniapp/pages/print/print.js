@@ -1,5 +1,8 @@
 // pages/print/print.js
 const app = getApp()
+const { AI_ENABLED } = require('../../utils/build-variant')
+const { pagePath } = require('../../utils/page-path')
+const { syncTabBar } = require('../../utils/tab-bar-index')
 
 // 底部「打印」Tab。原「求职」Tab 的位置在无人力资源服务许可证期间让给打印：
 // 小程序首发按非招聘类目提审（compliance-boundary.md §1.1），线上下单、到机码、
@@ -22,7 +25,7 @@ Page({
       { id: 'daily',    icon: 'file-text', accent: 'wheat', title: '今日提醒', desc: '即将过期的到机码和平台通知', flow: '登录后查看' },
       { id: 'bind',     icon: 'scan',      accent: 'teal',  title: '扫码登录一体机', desc: '用微信扫描一体机屏幕上的二维码，快速完成手机与终端绑定', flow: '扫一体机二维码 · 手机确认 · 终端已登录' },
       { id: 'usb',      icon: 'printer',   accent: 'slate', title: 'U盘打印指引', desc: '携带 U盘到一体机现场打印，查看操作步骤', flow: '插 U盘 · 一体机导入 · 出纸' },
-    ],
+    ].filter((item) => AI_ENABLED || item.id !== 'daily'),
   },
 
   onLoad() {
@@ -30,9 +33,7 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 2 })
-    }
+    syncTabBar(this, pagePath('print'))
   },
 
   tapPath(e) {
@@ -41,10 +42,11 @@ Page({
       docs:    '/pages/documents/documents',
       package: '/pages/package-create/package-create',
       orders:  '/pages/orders/orders',
-      daily:   '/pages/daily-report/daily-report',
+      daily:   pagePath('daily-report'),
       bind:    '/pages/kiosk-login/kiosk-login',
       usb:     '/pages/usb-import/usb-import',
     }
+    if (!AI_ENABLED && id === 'daily') return
     if (routes[id]) wx.navigateTo({ url: routes[id] })
   },
 

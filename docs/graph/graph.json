@@ -20322,7 +20322,9 @@
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
     "apps/miniapp/custom-tab-bar/index.js": [
-      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+      "apps/miniapp/scripts/make-review-variant.mjs",
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-review-variant.mjs"
     ],
     "apps/miniapp/pages/ai-records/ai-records.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
@@ -20439,14 +20441,36 @@
     "apps/miniapp/project.config.json": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/review-variants/variants.json": [
+      "apps/miniapp/scripts/make-review-variant.mjs",
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-package-layout.mjs",
+      "apps/miniapp/scripts/verify-review-variant.mjs",
+      "services/api/scripts/verify-miniapp-review-backend.ts"
+    ],
+    "apps/miniapp/scripts/make-review-variant.mjs": [
+      "apps/miniapp/scripts/verify-review-variant.mjs"
+    ],
     "apps/miniapp/scripts/privacy-api-inventory.json": [
-      "apps/miniapp/scripts/verify-package-layout.mjs"
+      "apps/miniapp/scripts/make-review-variant.mjs",
+      "apps/miniapp/scripts/verify-package-layout.mjs",
+      "apps/miniapp/scripts/verify-review-variant.mjs"
     ],
     "apps/miniapp/scripts/tests/page-lifecycle.test.mjs": [
       "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/scripts/verify-miniapp-static.mjs": [
-      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-review-variant.mjs"
+    ],
+    "apps/miniapp/scripts/verify-package-layout.mjs": [
+      "apps/miniapp/scripts/verify-review-variant.mjs"
+    ],
+    "apps/miniapp/scripts/verify-review-scope.mjs": [
+      "apps/miniapp/scripts/verify-review-variant.mjs"
+    ],
+    "apps/miniapp/scripts/verify-review-variant.mjs": [
+      "apps/miniapp/scripts/verify-review-variant.mjs"
     ],
     "apps/miniapp/utils/api.js": [
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
@@ -20457,6 +20481,13 @@
     ],
     "apps/miniapp/utils/auth.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
+    "apps/miniapp/utils/build-variant.js": [
+      "apps/miniapp/scripts/make-review-variant.mjs",
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-package-layout.mjs",
+      "apps/miniapp/scripts/verify-review-variant.mjs",
+      "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
     "apps/miniapp/utils/config.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
@@ -20490,6 +20521,10 @@
     "apps/miniapp/utils/storage.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
       "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
+    "apps/miniapp/utils/voice-recorder.js": [
+      "apps/miniapp/scripts/make-review-variant.mjs",
+      "apps/miniapp/scripts/verify-review-variant.mjs"
     ],
     "apps/partner/index.html": [
       "scripts/verify-compliance-copy.mjs"
@@ -29024,6 +29059,28 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/miniapp/custom-tab-bar/index.js",
+          "apps/miniapp/review-variants/variants.json",
+          "apps/miniapp/scripts/privacy-api-inventory.json",
+          "apps/miniapp/utils/build-variant.js",
+          "apps/miniapp/utils/voice-recorder.js"
+        ],
+        "missing": []
+      },
+      "file": "apps/miniapp/scripts/make-review-variant.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "@ai-job-print/miniapp",
+      "scriptNames": [
+        "@ai-job-print/miniapp::review-variant"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/miniapp/pages/fairs/fairs.js",
           "apps/miniapp/pages/policies/policies.js"
         ],
@@ -29091,9 +29148,11 @@
           "apps/miniapp/pages/self-explore/self-explore.js",
           "apps/miniapp/pages/settings/settings.js",
           "apps/miniapp/project.config.json",
+          "apps/miniapp/review-variants/variants.json",
           "apps/miniapp/scripts/verify-miniapp-static.mjs",
           "apps/miniapp/utils/api.js",
           "apps/miniapp/utils/auth.js",
+          "apps/miniapp/utils/build-variant.js",
           "apps/miniapp/utils/config.js",
           "apps/miniapp/utils/normalize.js",
           "apps/miniapp/utils/pickup-qrcode.js",
@@ -29104,7 +29163,7 @@
         "missing": []
       },
       "file": "apps/miniapp/scripts/verify-miniapp-static.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/miniapp",
       "scriptNames": [
@@ -29168,12 +29227,14 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/miniapp/scripts/privacy-api-inventory.json"
+          "apps/miniapp/review-variants/variants.json",
+          "apps/miniapp/scripts/privacy-api-inventory.json",
+          "apps/miniapp/utils/build-variant.js"
         ],
         "missing": []
       },
       "file": "apps/miniapp/scripts/verify-package-layout.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/miniapp",
       "scriptNames": [
@@ -29207,11 +29268,38 @@
         "missing": []
       },
       "file": "apps/miniapp/scripts/verify-review-scope.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/miniapp",
       "scriptNames": [
         "@ai-job-print/miniapp::verify:review-scope"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/miniapp/custom-tab-bar/index.js",
+          "apps/miniapp/review-variants/variants.json",
+          "apps/miniapp/scripts/make-review-variant.mjs",
+          "apps/miniapp/scripts/privacy-api-inventory.json",
+          "apps/miniapp/scripts/verify-miniapp-static.mjs",
+          "apps/miniapp/scripts/verify-package-layout.mjs",
+          "apps/miniapp/scripts/verify-review-scope.mjs",
+          "apps/miniapp/scripts/verify-review-variant.mjs",
+          "apps/miniapp/utils/build-variant.js",
+          "apps/miniapp/utils/voice-recorder.js"
+        ],
+        "missing": []
+      },
+      "file": "apps/miniapp/scripts/verify-review-variant.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/miniapp",
+      "scriptNames": [
+        "@ai-job-print/miniapp::verify:static"
       ],
       "wired": true
     },
@@ -35179,6 +35267,8 @@
         "dirs": [],
         "files": [
           "apps/miniapp/app.json",
+          "apps/miniapp/review-variants/variants.json",
+          "apps/miniapp/utils/build-variant.js",
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/ai/llm/assistant-channel.ts",
           "services/api/src/ai/resume/job-fit-pdf.service.ts",

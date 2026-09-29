@@ -1,5 +1,7 @@
 // pages/ai/ai.js
 const app = getApp()
+const { pagePath } = require('../../utils/page-path')
+const { syncTabBar } = require('../../utils/tab-bar-index')
 
 Page({
   data: {
@@ -86,9 +88,7 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 1 })
-    }
+    syncTabBar(this, pagePath('ai'))
   },
 
   tapEntry(e) {

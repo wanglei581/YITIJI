@@ -1,6 +1,15 @@
 # 当前开发进度
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
+
+## 2026-09-29：小程序不含 AI 的提审版（分支 `grok/miniapp-review-variant-noai`）
+
+- **口径：** 仓库提交的默认仍是完整版。`apps/miniapp/scripts/make-review-variant.mjs --variant no-ai` 就地收起 AI 页（源码保留，不注册，追加进 `project.config.json` 的 `packOptions.ignore`），`--variant full` 从 `review-variants/stash` 把关键文件逐字节还原。颜色、wxss、已有 `style=` 都没动。
+- **停放 17 页：** 指定的 16 个目录，加上 `daily-report`（`getDailyBrief` 带 `ai: generate`）。`print-upload`、`package-create`、`documents`、`kiosk-send` 虽有 `ai:` 标记，但是打印履约（上传、到机码），不停放。不含 AI 版麦克风从隐私清单去掉；主包里的 `utils/voice-recorder.js` 在该版本换成同名导出的空实现，完整版还原原文件。
+- **入口：** `utils/build-variant.js` 的 `AI_ENABLED` 为 false 时，首页、我的、帮助、关于、反馈、隐私、打印、今日提醒用 `wx:if` 或 JS 过滤收起 AI 入口。我的计数去掉「简历」这一项，不再请求简历列表。Tab 选中下标按当前页路径在 tabBar 列表里查。
+- **门禁：** `verify-review-variant.mjs` 串进小程序 `verify:static`。审核说明里「生成到机码」先摘掉再查「生成」。后端 `verify-miniapp-review-backend.ts` 只改页面集合那一处：常量必须等于完整版，当前 `app.json` 必须是子集。本机没生成 Prisma client，这条门禁没跑到断言。
+- **验证：** 小程序 static、review-scope、package-layout、review-variant、page-lifecycle 199 例、视觉刻度、仓库合规文案通过。临时副本里两条反向变异转红（no-ai 仍注册 `assistant`；审核说明写入「AI」），未提交。
+
 ## 2026-09-29：小程序全功能走查第一轮与修复（小程序窗口，本地全栈 + 模拟外部服务）
 
 - **怎么走的：** 开发者工具唯一主项目临时指向走查窗口的本地 API（候选 3841b823a，PostgreSQL），短信登录测试号 13800000501，逐页从入口走到结果并截图；到机码经一体机那一路核销。走完已改回配置（git status / diff 为空），问题全部报走查总表。

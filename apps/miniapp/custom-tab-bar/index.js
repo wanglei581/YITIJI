@@ -1,3 +1,5 @@
+const { selectedIndex } = require('../utils/tab-bar-index')
+
 Component({
   data: {
     selected: 0,
@@ -9,10 +11,13 @@ Component({
     ],
   },
   methods: {
+    selectedIndexFor(route) {
+      return selectedIndex(this.data.list, route)
+    },
     switchTab(e) {
-      const idx = e.currentTarget.dataset.index;
-      const path = this.data.list[idx].pagePath;
-      wx.switchTab({ url: path });
+      const idx = e.currentTarget.dataset.index
+      const path = this.data.list[idx].pagePath
+      wx.switchTab({ url: path })
     },
   },
-});
+})

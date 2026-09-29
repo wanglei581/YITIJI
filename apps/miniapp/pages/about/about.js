@@ -1,5 +1,6 @@
 // pages/about/about.js
 const app = getApp()
+const { AI_ENABLED } = require('../../utils/build-variant')
 
 // 四份文档都在后台「法务文档」发布，法务页按类型读取（C1）。
 const LEGAL_TYPES = {
@@ -16,10 +17,15 @@ Page({
       { id: 'terms',   title: '用户服务协议' },
       { id: 'privacy', title: '隐私政策' },
     ],
+    aiEnabled: AI_ENABLED,
+    slogan: AI_ENABLED ? 'AI 简历工具 · 文档打印服务' : '求职材料与文档打印服务',
+    notice: AI_ENABLED
+      ? '本平台提供 AI 简历工具与文档打印服务，不提供招聘信息、岗位投递或人力资源服务。AI 生成的内容仅供参考。'
+      : '本平台提供求职材料模板与文档打印服务，不提供招聘信息、岗位投递或人力资源服务。',
     links2: [
       { id: 'ai',       title: 'AI 服务说明', sub: '所用模型与备案号' },
       { id: 'operator', title: '经营者信息', sub: '名称、证照与联系方式' },
-    ],
+    ].filter(function(item) { return AI_ENABLED || item.id !== 'ai' }),
   },
 
   onLoad() {

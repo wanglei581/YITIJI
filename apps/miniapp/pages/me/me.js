@@ -2,6 +2,9 @@
 const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
+const { AI_ENABLED } = require('../../utils/build-variant')
+const { pagePath } = require('../../utils/page-path')
+const { syncTabBar } = require('../../utils/tab-bar-index')
 
 function countFromResult(res) {
   if (!res) return '—'
@@ -17,8 +20,30 @@ const STAT_DEFS = [
   { key: 'order',  label: '打印单', load: function() { return api.getMyPrintOrders({ pageSize: 1 }) } },
 ]
 
+// 不含 AI 版不展示、也不请求「简历」计数：我的简历页只装 AI 处理过的简历，已随该页停放。
+function activeStatDefs() {
+  return AI_ENABLED ? STAT_DEFS : STAT_DEFS.filter(function(d) { return d.key !== 'resume' })
+}
+
 function blankStats() {
-  return STAT_DEFS.map(function(d) { return { key: d.key, label: d.label, value: '—' } })
+  return activeStatDefs().map(function(d) { return { key: d.key, label: d.label, value: '—' } })
+}
+
+const ALL_ENTRIES = [
+  { id: 'resume',    icon: 'file-text', title: '我的简历',      sub: '本人上传与 AI 处理记录', accent: 'plum'  },
+  { id: 'docs',      icon: 'folder',    title: '我的文档',      sub: '可再次发起打印',       accent: 'teal'  },
+  { id: 'orders',    icon: 'printer',   title: '打印订单',      sub: '到机码与出纸状态',     accent: 'clay'  },
+  { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'cyan'  },
+  // 我的收藏 / 招聘会提醒 / 浏览与跳转记录只装岗位、招聘会、企业、政策四类内容，
+  // 「我的权益」首发不对 AI 收费、先收起：四页随岗位招聘会政策页一起停放
+  // （首发按非招聘类目提审，compliance-boundary.md §1.1）。
+  { id: 'feedback',  icon: 'comment',   title: '意见反馈与投诉', sub: '提交后可看处理进度',   accent: 'cyan'  },
+  { id: 'settings',  icon: 'setting',   title: '账号设置',      sub: '手机号、隐私与登录',   accent: 'slate' },
+]
+
+function visibleEntries() {
+  if (AI_ENABLED) return ALL_ENTRIES
+  return ALL_ENTRIES.filter(function(entry) { return entry.id !== 'resume' && entry.id !== 'ai' })
 }
 
 Page({
@@ -34,17 +59,8 @@ Page({
     // 概览计数：「—」= 还不知道（读取中或没读到），不写成 0。
     stats: blankStats(),
     statsFailed: false,
-    entries: [
-      { id: 'resume',    icon: 'file-text', title: '我的简历',      sub: '本人上传与 AI 处理记录', accent: 'plum'  },
-      { id: 'docs',      icon: 'folder',    title: '我的文档',      sub: '可再次发起打印',       accent: 'teal'  },
-      { id: 'orders',    icon: 'printer',   title: '打印订单',      sub: '到机码与出纸状态',     accent: 'clay'  },
-      { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'cyan'  },
-      // 我的收藏 / 招聘会提醒 / 浏览与跳转记录只装岗位、招聘会、企业、政策四类内容，
-      // 「我的权益」首发不对 AI 收费、先收起：四页随岗位招聘会政策页一起停放
-      // （首发按非招聘类目提审，compliance-boundary.md §1.1）。
-      { id: 'feedback',  icon: 'comment',   title: '意见反馈与投诉', sub: '提交后可看处理进度',   accent: 'cyan'  },
-      { id: 'settings',  icon: 'setting',   title: '账号设置',      sub: '手机号、隐私与登录',   accent: 'slate' },
-    ],
+    aiEnabled: AI_ENABLED,
+    entries: visibleEntries(),
   },
 
   onLoad() {
@@ -55,13 +71,11 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 3 })
-    }
+    syncTabBar(this, pagePath('me'))
     const loggedIn = auth.isLoggedIn()
     this.setData({ isLoggedIn: loggedIn, user: loggedIn ? auth.getUser() : null })
     if (loggedIn) {
-      this.loadStats(STAT_DEFS.map(function(d) { return d.key }))
+      this.loadStats(activeStatDefs().map(function(d) { return d.key }))
     } else {
       this._statsSeq = (this._statsSeq || 0) + 1
       this._failedStatKeys = []
@@ -76,7 +90,7 @@ Page({
     const seq = (this._statsSeq || 0) + 1
     this._statsSeq = seq
     const page = this
-    const wanted = STAT_DEFS.filter(function(d) { return keys.indexOf(d.key) >= 0 })
+    const wanted = activeStatDefs().filter(function(d) { return keys.indexOf(d.key) >= 0 })
     this.setData({ statsFailed: false })
     return Promise.all(wanted.map(function(d) {
       return d.load().then(
@@ -104,20 +118,21 @@ Page({
   retryStats() {
     const keys = this._failedStatKeys && this._failedStatKeys.length
       ? this._failedStatKeys
-      : STAT_DEFS.map(function(d) { return d.key })
+      : activeStatDefs().map(function(d) { return d.key })
     this.loadStats(keys)
   },
 
   tapEntry(e) {
     const id = e.currentTarget.dataset.id
     const routes = {
-      resume:     '/pages/resumes/resumes',
+      resume:     pagePath('resumes'),
       docs:       '/pages/documents/documents',
       orders:     '/pages/orders/orders',
-      ai:         '/pages/ai-records/ai-records',
+      ai:         pagePath('ai-records'),
       feedback:   '/pages/feedback/feedback',
       settings:   '/pages/settings/settings',
     }
+    if (!AI_ENABLED && (id === 'resume' || id === 'ai')) return
     if (routes[id]) wx.navigateTo({ url: routes[id] })
   },
 
