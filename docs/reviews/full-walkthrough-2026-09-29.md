@@ -108,6 +108,8 @@
 | W-33 | P1 | 小程序 | AI 记录分多条数据流，小程序疑漏读小青摘要、岗位 AI、后续模拟面试（`ai-records.js:151-166`、`api.js:1249`） | 总指挥转 Codex 两端核查（`~/.cache/claude-lanes/xend-0929/codex-xend.md`，候选 d75be0345） | 小程序窗口 / 小程序窗口 | 待复现 |
 | W-34 | P1 | 两端 | 打印订单两端来源不统一：一体机「我的打印订单」只读打印任务，手机下单未到机核销的单一体机看不到 | 总指挥转 Codex 两端核查（`~/.cache/claude-lanes/xend-0929/codex-xend.md`，候选 d75be0345）；小程序窗口 9/29 已报 | 主执行窗口（#1086 订单时间线） | 修复中 |
 | W-35 | 说明 | 一体机 | 一体机匿名反馈不挂账号，答复只能走会员路径——设计如此，写进帮助说明即可，不算缺陷 | 总指挥转 Codex 两端核查（`~/.cache/claude-lanes/xend-0929/codex-xend.md`，候选 d75be0345） | — | 不算缺陷 |
+| W-36 | **P0** | 小程序 | 登录会员在小程序用简历类 AI（上传解析 / 诊断 / 生成 / 语音说简历 / 优化 / 导出）一律「解析失败，请稍后重试」：服务端自 #794（9/06）起要求会员先有 `resume_ai` 授权（`ai.controller.ts:187/283/339/383/434/549` `requireActiveConsent`，403 `USER_AI_CONSENT_REQUIRED`），一体机有授权弹窗（`resumeAiConsent.ts`），小程序从没接；游客不受影响 | 小程序窗口实走（截图 31-resume-result）；走查 API 日志已核实 5:43:49 PM `requestId=57dfc1bb…` `POST /api/v1/resume/parse` 403 `USER_AI_CONSENT_REQUIRED` | 小程序窗口 / 小程序窗口（走查结束、TEST_BASE_URL 改回后修，修完同环境复走） | 已派 |
+| W-37 | P2 | 小程序 | 小青遇模型超时要转 45 秒才出「小青暂时无法回复」，中间没有「还在等」的提示 | 小程序窗口实走（21b-assistant-fault-after） | 小程序窗口 / 小程序窗口 | 已派 |
 
 ## 五、闭环矩阵
 
