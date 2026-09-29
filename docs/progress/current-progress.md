@@ -73,6 +73,11 @@
 - **修法：** 只在本次调用把 pending 变成 claimed 的那一次清零，每张单最多清零一次；会员本机领取照旧不清零。
 - **验证：** `verify:pickup-code-share` 加回归：旧代码上 27 次猜码后仍未锁（复现），修复后锁；首次认领真码仍清零（阳性对照，正常用户手误不受影响）。两处方向相反的变异（已认领也清零、首次认领也不清零）各自变红；print-jobs、member-order-timeline、miniapp-cloud-print-m2、package-order-fulfillment、payment-flow、member-print-orders 全绿。
 - **主执行窗口审查后补（9/29）：** 只在首次认领时清零仍不够——试点 0 元、会员建单没有频率或每日上限，「猜 9 次 + 新建一张单」可以一直交替。改为成功认领只给本机失败计数**抵一次**（减 1、不低于 0、保留有效期；Redis 用 Lua 原子执行，内存兜底同语义）：真用户输错一两次再输对照样被抵消，攻击每轮净增 8 次失败、第二轮就锁。门禁补「每轮换新单三轮内必锁」与真 Redis 直测 Lua；三处变异（改回整个清零、首次认领也不抵、Lua 丢有效期）全红。顺带发现并修掉一个测试隐患：五个门禁的 Redis 替身缺新方法时，`tryRedis` 失败会进全局 5 秒静默期，把随后的终端会话验签也跳过（timeline 门禁因此假红）——替身都按生产语义补齐。
+## 2026-09-29：「我的打印订单」列表行补订单号与出纸终端（分支 `claude/backend-hardening-20260929-print-orders-terminal`，叠在 #1086 上）
+
+- **问题（小程序走查转来）：** 手机单在一体机核销后，`GET /me/print-orders` 那一行不带订单号和终端名，小程序打不开订单详情、终端名只能兜底显示「打印服务终端」。
+- **契约（后端定、小程序已接）：** 每行加两个可选字段，只加不改：`orderId`（单件订单经 `Order.printTaskId` 关联本任务，材料包子任务取 `PrintTask.orderId`，一体机现场单为 null）、`terminal{id,displayName,locationLabel}`（与时间线接口同形，取不到为 null）。没改走 timeline：它为公共屏设计、不下发到机码明文，小程序改走它还得另取码。
+- **验证：** `verify:member-print-orders` 字段白名单登记两字段，并加两条：出纸终端带网点名与位置、没有终端 / 订单的行为 null；手机单派发的任务行带订单号。小程序契约一致。
 
 ## 2026-09-29：跨端订单时间线与会员本机领取（服务端，分支 `claude/backend-hardening-20260929-order-timeline`）
 

@@ -183,8 +183,12 @@ export class MemberPrintOrdersService {
         paramsJson: true,
         createdAt: true,
         completedAt: true,
+        orderId: true,
+        // 出纸 / 领取的那台机器：小程序对账要显示网点名（2026-09-29 契约，只加不改）。
+        terminal: { select: { id: true, displayName: true, locationLabel: true } },
         order: {
           select: {
+            id: true,
             amountCents: true,
             payStatus: true,
             paymentSource: true,
@@ -216,6 +220,9 @@ export class MemberPrintOrdersService {
         duplex: params.duplex,
         paperSize: params.paperSize,
         pageRange: params.pageRange,
+        // 单件订单经 Order.printTaskId 关联本任务；材料包子任务才在 PrintTask.orderId 上。
+        orderId: r.order?.id ?? r.orderId ?? null,
+        terminal: r.terminal ? { id: r.terminal.id, displayName: r.terminal.displayName ?? null, locationLabel: r.terminal.locationLabel ?? null } : null,
         ...memberOrderPaymentFields(r.order),
       }
     })
