@@ -57,9 +57,16 @@ const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 /** mock 模式（admin E2E 跑这个）下页面要标明演示口径，且不连真实用量。 */
 export const AI_USAGE_DAILY_DEMO: boolean = API_MODE !== 'http'
 
-/** 北京时间今天 YYYY-MM-DD。与服务端 beijingDayKey 同口径：固定 +8，中国无夏令时。 */
+/** 北京时间今天 YYYY-MM-DD，与服务端 beijingDayKey 同口径（不用 UTC 切片冒充墙钟，verify:datetime-honesty）。 */
+const SHANGHAI_DAY_FORMAT = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
 export function beijingTodayKey(now: Date = new Date()): string {
-  return new Date(now.getTime() + 8 * 3_600_000).toISOString().slice(0, 10)
+  return SHANGHAI_DAY_FORMAT.format(now)
 }
 
 /** 与服务端控制器同判法：YYYY-MM-DD 且是真实存在的日期。 */

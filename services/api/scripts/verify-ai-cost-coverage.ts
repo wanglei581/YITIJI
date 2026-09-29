@@ -306,7 +306,13 @@ assertContains(adminTypes, 'Record<AiOperation, number>', 'Admin types: byOperat
 
 // ─── 9. OPERATION_LABELS 覆盖新增操作 ────────────────────────────────────────
 
-const aiServicesRoute = readApps('admin/src/routes/ai-services/index.tsx')
+// 「AI 服务管理」页 2026-09-30 拆文件（#1143）：成本明细表与 operation 中文名表移到同目录两个文件。
+// 断言对象是这一页的全部源码，三者合并后逐条检查，不放松任何一条。
+const aiServicesRoute = [
+  'admin/src/routes/ai-services/index.tsx',
+  'admin/src/routes/ai-services/AiOperationCostTable.tsx',
+  'admin/src/routes/ai-services/aiOperationLabels.ts',
+].map((rel) => readApps(rel)).join('\n')
 for (const op of NEW_OPS) {
   assertContains(aiServicesRoute, op, `ai-services route: OPERATION_LABELS 覆盖 ${op}`)
 }
