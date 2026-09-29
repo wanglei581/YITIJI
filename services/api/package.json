@@ -271,7 +271,7 @@
     "verify:llm-timeout-concurrency": "node -r @swc-node/register scripts/verify-llm-timeout-concurrency.ts",
     "verify:ai-endpoint-allowlist": "node -r @swc-node/register scripts/verify-ai-endpoint-allowlist.ts",
     "verify:ai-cost-coverage": "node -r @swc-node/register scripts/verify-ai-cost-coverage.ts",
-    "verify:ai-usage-budget": "node -r @swc-node/register scripts/verify-ai-usage-budget.ts",
+    "verify:ai-usage-budget": "node -r @swc-node/register scripts/verify-ai-usage-budget.ts && node -r @swc-node/register scripts/verify-ai-usage-coverage.ts",
     "verify:assistant-provider-label": "node -r @swc-node/register scripts/verify-assistant-provider-label.ts",
     "verify:llm-input-pii-mask": "node -r @swc-node/register scripts/verify-llm-input-pii-mask.ts",
     "verify:ai-feature-keys": "node -r @swc-node/register scripts/verify-ai-feature-keys.ts",

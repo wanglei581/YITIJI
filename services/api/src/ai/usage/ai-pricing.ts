@@ -30,6 +30,13 @@
 //   认不出型号的：DeepSeek 按 V4-Pro、千问按 qwen-max，即「同厂最贵的一档」，同样宁多勿少。
 //
 // 非 token 计费的 AI 相关服务（本期**不计量**，只作价目记录与估算依据；接入计量时从这里取，不另写）：
+//   本期不计量 = 这四项（TRTC 数字人、语音识别 ASR、语音合成 TTS、OCR）不写 AiUsageRecord、不计入三档
+//   每日金额，只靠入口额度兜底：当天任一档（多半是被大模型花费）触顶后，挂在 @AiUse('voice') /
+//   @AiUse('generate') 入口上的它们一起被拦 —— TRTC 开会话 POST /trtc/session 是 voice 类，会被额度拦；
+//   ASR（简历语音、小青语音、面试转写）与 TTS（面试问题播报）是 voice 类；OCR 随简历解析、合同审查的
+//   generate 入口被拦。例外：打印前材料检查（@AiUseExempt，打印链路不许被 AI 额度卡住）里的 OCR 不受
+//   额度拦，只受该入口自己的限流。已经开着的数字人会话、已经发出的识别 / 合成不会被中途掐断，
+//   花多少也不进账。数字人对话里的大模型由腾讯云侧调用，不经本服务出站。
 //   百度 OCR 通用文字识别（高精度版）https://cloud.baidu.com/product-price/ocr.html
 //     按量后付费，按月成功调用量阶梯：≤5 万次 0.030 元/次，逐档降到 >100 万次 0.010 元/次。
 //   腾讯云语音合成（通用，精品音色）https://cloud.tencent.com/document/product/1073/34112

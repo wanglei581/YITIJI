@@ -69,6 +69,20 @@ export function lazyAiRequestContext(resolve: () => Promise<AiCallerIdentity>): 
   }
 }
 
+/**
+ * 队列作业（没有 HTTP 请求）里的调用方身份：只有作业自己知道的会员号，终端与机构如实为空。
+ *
+ * 为什么不能直接沿用「当前上下文」：BullMQ 的回调跑在 Redis 连接的事件里，而 ALS 会随
+ * 「谁先建的连接 / 谁先注册的回调」漏进来 —— 作业可能碰巧带着某个无关 HTTP 请求的会员与终端。
+ * 作业里的计量必须显式用这个上下文覆盖，账才记在任务属主名下，而不是记给碰巧的那个请求。
+ *
+ * 终端 / 机构为什么是 null：作业里没有终端会话令牌可验，按口径未验签一律不记（见文件头）。
+ */
+export function backgroundJobAiContext(endUserId: string | null): AiRequestContext {
+  const identity: AiCallerIdentity = { ...ANONYMOUS_AI_CALLER, endUserId }
+  return { identity: () => Promise.resolve({ ...identity }) }
+}
+
 /** 终端验签只需要这一个方法；用接口而不是类，避免 ai/ 反向 import terminals/。 */
 export interface TerminalSessionValidator {
   validate(terminalId: string | undefined, sessionToken: string | undefined): Promise<void>
