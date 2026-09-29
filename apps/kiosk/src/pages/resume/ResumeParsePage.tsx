@@ -13,7 +13,7 @@ import { resumeProcessCopy } from './resumeUserCopy'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
-import { aiErrorCodeOf, aiErrorMessageOf } from '../../ai'
+import { aiErrorCodeOf, aiErrorMessageOf, isAiOutage } from '../../ai'
 import {
   canonicalResumeParsePayload,
   classifyResumeParseTerminal,
@@ -124,9 +124,10 @@ export function ResumeParsePage() {
    * 只给**明确失败**用：结果未知留在本页，不转去报告页的失败屏。
    * 服务端给过编号时（2xx + status=failed，匿名还带一次性 accessToken）照样带上：只进路由 state
    * 与既有最小会话（aiResumeSession 只存 taskId + accessToken），不进地址栏。
+   * aiDown：AI 能力级停用（暂停 / 当日额度已到 / 未配置），失败屏不再给「重新解析」。
    */
   const navigateFail = useCallback(
-    (reason: string, task?: ParseTask) => {
+    (reason: string, task?: ParseTask, aiDown = false) => {
       if (task) {
         saveAiResumeSession(task)
         if (!anonymousAccessReady(task.taskId, task.accessToken, ownerRef.current === null)) {
@@ -139,7 +140,7 @@ export function ResumeParsePage() {
       }
       setOutcome('failed')
       failTimerRef.current = setTimeout(() => {
-        navigate('/resume/report', { state: { ...state, success: false, reason, ...(task ? { taskId: task.taskId, accessToken: task.accessToken } : {}) } })
+        navigate('/resume/report', { state: { ...state, success: false, reason, ...(aiDown ? { aiDown: true } : {}), ...(task ? { taskId: task.taskId, accessToken: task.accessToken } : {}) } })
       }, 700)
     },
     [navigate, state],
@@ -309,6 +310,16 @@ export function ResumeParsePage() {
       await acceptResult(result, ownerId, knownTaskId)
     } catch (err) {
       if (!samePerson(ownerId)) return
+      // AI 能力级停用（暂停 / 当日额度已到 / 未配置 / 演示模式）：服务端在调模型之前就拒了，
+      // 没有记账、没有任务，原样再试也不会变好。此前 503 落进下面的「结果未知」，页面叫人原样再试。
+      // 与公共额度 429 同样处理：只清对得上的本机意图，转明确失败屏 —— 那一屏有不用 AI 的出路
+      // （打印我上传的原件、自查清单），且不再给「重新解析」。
+      if (isAiOutage(err)) {
+        if (await dropHeldIntent(ownerId, '本机解析标识对不上，没有打开失败页，也没有另起一次解析。')) {
+          navigateFail(aiErrorMessageOf(err, 'AI 现在停用，暂时做不了简历诊断'), undefined, true)
+        }
+        return
+      }
       // 把真实原因带进失败态：演示模式要说「演示模式不提供简历解析与诊断」，
       // 一律改写成「服务暂时不可用」会让用户以为是网络问题、反复重试同一份文件。
       // 没拿到可信答复：留在本页如实说未知，不转失败屏，也不自动再提交。
