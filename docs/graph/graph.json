@@ -23718,7 +23718,6 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
-      "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-idempotency.ts"
     ],
     "services/api/src/common/pii/llm-input-mask.ts": [
@@ -25235,6 +25234,7 @@
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/payment/pickup-validity.ts": [
+      "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/payment/price-config.seed.ts": [
@@ -37295,7 +37295,6 @@
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
-          "services/api/src/common/pickup-code.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/payment/admin-order-actions.controller.ts",
@@ -37903,6 +37902,7 @@
           "services/api/src/payment/payment-provider.types.ts",
           "services/api/src/payment/payment-session-token.ts",
           "services/api/src/payment/pending-refund-signal.ts",
+          "services/api/src/payment/pickup-validity.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/payment/providers/sandbox-payment.provider.ts",
