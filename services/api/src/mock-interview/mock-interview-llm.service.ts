@@ -38,7 +38,7 @@ export function findBannedTerm(text: string): string | null {
 }
 
 const INTERVIEWER_STYLE: Record<string, string> = {
-  hr: 'HR 初筛面试官：关注自我介绍、求职动机、稳定性、薪资期望沟通方式。',
+  hr: 'HR 面试官：关注自我介绍、求职动机、稳定性、薪资期望沟通方式。',
   manager: '业务主管：关注过往经历、岗位理解、协作能力、执行落地能力。',
   tech: '技术面试官：关注专业技能、项目细节、问题解决思路，会就细节追问。',
   campus: '校招面试官：关注校园经历、学习能力、职业规划，语气友善。',

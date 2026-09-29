@@ -82,7 +82,7 @@ const MOCK_REPORT: InterviewReportResponse = {
   position: '演示岗位',
   industry: '通用',
   interviewerType: 'hr',
-  interviewerLabel: 'HR 初筛',
+  interviewerLabel: 'HR 面试',
   durationMin: 3,
   endedAt: null,
   report: {
