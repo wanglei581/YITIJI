@@ -344,22 +344,26 @@ test('A2b #1119 版本与更早版本一律 400，不落库、不写创建审计
   }
 })
 
-test('A3 未带版本号的提交如实记为 null，不被补写成当前版本', async () => {
+test('A3 缺版本号、空字符串、带首尾空格的当前版本一律 400，不落库（走真实 submit）', async () => {
   const { service, rows } = makeHarness()
-  // 现网 S2-7 前端只发两个布尔。这一条守的是最隐蔽的那个洞：
-  // 服务端「顺手」把当前版本号补上，等于凭空制造一份用户没做过的同意。
-  const res = await service.submit(anon, {
-    answers: answers(),
-    consent: { nonSensitive: true, sensitive: false },
-  })
-
-  assert.equal(res.consentVersion, null, '缺省版本必须记为 null')
-  assert.notEqual(res.consentVersion, CURRENT, '缺省版本绝不能被补写成当前版本')
-  assert.equal(res.consentCurrent, false, '未版本化同意不算「已同意当前说明」')
-  assert.equal(res.consentedAt, null)
-
-  const stored = JSON.parse(rows[0]!.payloadJson) as { consentVersion: string | null }
-  assert.equal(stored.consentVersion, null, '落库里也必须是 null，不能是当前版本')
+  const cases: Array<{ label: string; consent: { nonSensitive: boolean; sensitive: boolean; consentVersion?: string } }> = [
+    { label: '缺版本号', consent: { nonSensitive: true, sensitive: false } },
+    { label: '空字符串', consent: { nonSensitive: true, sensitive: false, consentVersion: '' } },
+    { label: '前后带空格的当前版本', consent: { nonSensitive: true, sensitive: false, consentVersion: ` ${CURRENT} ` } },
+    { label: '大小写不同的当前版本', consent: { nonSensitive: true, sensitive: false, consentVersion: CURRENT.toUpperCase() } },
+  ]
+  for (const c of cases) {
+    await assert.rejects(
+      () => service.submit(anon, { answers: answers(), consent: c.consent }),
+      (error: unknown) => {
+        const body = (error as { getResponse?: () => unknown }).getResponse?.() as { error?: { code?: string } } | undefined
+        assert.equal((error as { getStatus?: () => number }).getStatus?.(), 400, c.label)
+        assert.equal(body?.error?.code, 'SELF_ASSESSMENT_CONSENT_VERSION_STALE', c.label)
+        return true
+      },
+    )
+  }
+  assert.equal(rows.length, 0, '被拒的提交一条都不落库')
 })
 
 test('A4 回读旧版本记录时 consentCurrent=false（同意书改版后不继承）', async () => {

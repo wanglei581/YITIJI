@@ -154,15 +154,11 @@ export class SelfAssessmentService {
     }
 
     // ── 版本化同意门禁 ────────────────────────────────────────────────
-    // 只接受当前版本。已提交的其它版本一律 400，不改写成当前版本。
-    // 没有过渡期，也没有旧版本清单。
-    //
-    // 版本号**缺省**（旧客户端只发两个布尔）⇒ 如实记为 null「未版本化同意」，
-    // **不补写当前版本**。null 在 `isConsentCurrent()` 下判 false，
-    // 读回时 `consentCurrent:false`。拿这条结果再去做新的模型生成会被拒绝。
-    const suppliedVersion =
-      typeof input.consent.consentVersion === 'string' ? input.consent.consentVersion.trim() : ''
-    if (suppliedVersion && !isAcceptedSelfAssessmentConsentVersion(suppliedVersion)) {
+    // 只接受当前版本，原样逐字比对（不 trim、不大小写归一）。没有过渡期，也没有旧版本清单。
+    // 缺版本号、空字符串、带首尾空格、旧版本、未知版本一律 400（合规 9/29 终裁：年龄说明是法定告知前提，
+    // 必须证明用户看到的就是当前这一版）。
+    const suppliedVersion = input.consent.consentVersion
+    if (typeof suppliedVersion !== 'string' || !isAcceptedSelfAssessmentConsentVersion(suppliedVersion)) {
       throw new BadRequestException({
         error: {
           code: 'SELF_ASSESSMENT_CONSENT_VERSION_STALE',
@@ -170,7 +166,7 @@ export class SelfAssessmentService {
         },
       })
     }
-    const consentVersion: string | null = suppliedVersion || null
+    const consentVersion: string | null = suppliedVersion
     const consentedAt: string | null = consentVersion ? new Date().toISOString() : null
 
     const t0 = Date.now()
