@@ -86,6 +86,18 @@
 | W-11 | 已知限制 | 真机 | 缺纸只在模拟 Agent 与会写状态的驱动上成立：奔图驱动 `DetectedErrorState` 恒 0，真机缺纸最终是 `PRINT_JOB_UNCONFIRMED`，一体机显示「打印结果未确认」；`wmi.ts:127-128` 把 4 映射成 error | Windows 窗口 | Windows 窗口 | 已派 |
 | W-12 | P1 | 服务端 | 扫描指引用词与面板不一致（`scan-tasks.service.ts:177-193`「按『开始』」「扫描到网络 / SMB」，面板实际「扫描」按钮、「扫描到 SMB」）；面板复印设置会留给下一位（已知限制）；面板可出 TIFF/OFD 而 Agent 只认 pdf/jpg/png（待验） | 总指挥转奔图手册 | 后端窗口 | 已派 |
 | W-13 | P2 | 小程序 | 法务页顶栏标题过长时压到微信胶囊下面（「用户服务协议（走查测试版）」可复现）。另：经营者信息显示「暂未发布」，符合第一次发布只激活三份的配置，不算问题 | 小程序窗口实走 | 小程序窗口 | 已派 |
+| W-14 | P0 | 一体机 | 简历来源页手机扫码上传并确认后，「开始 AI 诊断」「更换文件」永久禁用，页头一直「接收中」：`UploadSessionQrPanel` 卸载时没调 `onBusyChange(false)`，`ResumeSourcePage` 的 phoneBusy 恒真；连带堵住职业规划 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F4c-demo-03* | Claude（一体机子代理） | 待本栈复现 |
+| W-15 | P1 | 一体机 | 扫码登录：先勾协议再切「扫码」永远停在「正在获取二维码」；先切再勾正常（dev 构建复现，正式构建待验） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F6a-02/03 | 主执行窗口（登录页） | 待本栈复现 |
+| W-16 | P1 | 一体机 | 一体机从不发 `x-age-14-plus`、没有 AI 使用声明入口：后台一开「使用声明强制」，一体机全部 AI 生成失败。第一次发布此开关关，但开之前必须先补一体机声明 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F8-kiosk-01/02 | 主执行窗口（AI 请求封装） | 已知，发布约束 |
+| W-17 | P1 | 一体机 | OCR 不可用时扫描件在材料检查页让「人工确认」却没有继续按钮（= 9/27 A-04 一体机半边；服务端本人确认 #1068 已备） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F4f-scan-04 | 主执行窗口（打印链） | 待本栈复现 |
+| W-18 | P2 | 一体机 | `AI_ENDPOINT_NOT_ALLOWED` 时小青写「这一轮没连上，可以重试」、面试写「AI 服务本身是通的，可以直接再点一次」，与事实相反（人话码表 #1095 已补，页面分支待接） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F3-kiosk-01/02 | 主执行窗口 | 已派 |
+| W-19 | P1 | 一体机 | 短信额度满后主按钮仍是「重新获取验证码」：单台满应主推扫码登录，总量满应主推「不登录，继续使用」；另一体机发码不带终端头，单台上限实际不生效 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F2e/F2f | 主执行窗口（登录页） | 已派 |
+| W-20 | P0 | 一体机 | 小青回显用户问题时手机号、邮箱打码，**身份证号原样显示在公共屏** | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F5c-03 | Claude（一体机子代理） | 待本栈复现 |
+| W-21 | P2 | 一体机 | 零元单确认页主按钮可见文字「确认并建单」，读屏名却是「确认并去付款……」（`PrintConfirmPage` primaryAccessible） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` | 主执行窗口（打印链） | 待本栈复现 |
+| W-22 | P2 | 一体机 | 诊断报告标题写「简历被读成七块」，正文写「共 5 块」 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F4c-demo-05 | Claude（一体机子代理） | 待本栈复现 |
+| W-23 | P2 | 一体机 | 打印完成页对模拟面试报告也提示「证件页水印」 | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` F7b-05 | 主执行窗口（打印链） | 待本栈复现 |
+| W-24 | P2 | 一体机 | dev 构建下 inspection、normalize_a4、pii_scan 各 POST 两次（正式构建待验，与「进手机扫码上传建两个会话」同类） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` | K1 路在正式构建上核实 | 待本栈复现 |
+| W-25 | P2 | 演示包 | 演示包网桥没有 `/local/qr-login/*`，扫码登录在演示环境走不通；`AI_PROVIDER=mock` 写死且清掉 AI_ 前缀变量，验不了真实诊断与白名单；起 API 的命令行含 `src/main.ts`，会被 `pkill -f` 误杀（走查栈的模拟 Agent 已实现 qr-login 两条，可回移） | 后端窗口子代理 F 走查，截图 `~/.cache/claude-lanes/bh-0929/evidence/` | 演示包归属窗口（合规与运维） | 已派 |
 
 ## 五、闭环矩阵
 
