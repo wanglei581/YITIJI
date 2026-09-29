@@ -4,20 +4,12 @@ const auth = require('../../utils/auth')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 const pickup = require('./pickup-summary')
 const { AI_ENABLED } = require('../../utils/build-variant')
-const { pagePath } = require('../../utils/page-path')
+const aiEntries = require('../../utils/ai-entries')
 const { syncTabBar } = require('../../utils/tab-bar-index')
 
-const PRIMARY_SERVICES = [
-  { title: '简历诊断', icon: 'file-search', tone: 'blue', url: pagePath('resume-diagnose') },
-  { title: '简历优化', icon: 'edit', tone: 'violet', url: pagePath('resume-optimize') },
-  { title: '模拟面试', icon: 'comment', tone: 'cyan', url: pagePath('interview-entry') },
-  // 原「创建材料包」指向未实现的材料包下单，改为已实现的职业规划。
-  { title: '职业规划', icon: 'compass', tone: 'orange', url: pagePath('career-plan') },
-]
-
 function tabPageSet() {
-  const pages = new Set([pagePath('home'), pagePath('print'), pagePath('me')])
-  if (AI_ENABLED) pages.add(pagePath('ai'))
+  const pages = new Set(['/pages/home/home', '/pages/print/print', '/pages/me/me'])
+  if (AI_ENABLED && aiEntries.aiTab) pages.add(aiEntries.aiTab)
   return pages
 }
 
@@ -55,9 +47,9 @@ Page({
     greetWord: '你好',
     todayStr: '',
     aiEnabled: AI_ENABLED,
-    assistantUrl: pagePath('assistant'),
-    voiceUrl: pagePath('resume-voice'),
-    primaryServices: AI_ENABLED ? PRIMARY_SERVICES : [],
+    assistantUrl: AI_ENABLED ? (aiEntries.assistantUrl || '') : '',
+    voiceUrl: AI_ENABLED ? (aiEntries.resumeVoiceUrl || '') : '',
+    primaryServices: AI_ENABLED ? aiEntries.PRIMARY_SERVICES : [],
     // 原「求职信息」区块（发现岗位 / 招聘会 / 就业政策）已随对应页面停放：
     // 无人力资源服务许可证期间小程序按非招聘类目提审，见 compliance-boundary.md §1.1。
 
@@ -81,7 +73,7 @@ Page({
   },
 
   onShow() {
-    syncTabBar(this, pagePath('home'))
+    syncTabBar(this, '/pages/home/home')
     this._guard.activate()
     this._refresh()
     this._loadPickup()
@@ -129,8 +121,8 @@ Page({
   },
 
   tapDaily() {
-    if (!AI_ENABLED) return
-    wx.navigateTo({ url: pagePath('daily-report') })
+    if (!AI_ENABLED || !aiEntries.dailyReportUrl) return
+    wx.navigateTo({ url: aiEntries.dailyReportUrl })
   },
 
   _refresh() {
@@ -157,8 +149,8 @@ Page({
   },
 
   tapLifeCircle() {
-    if (!AI_ENABLED) return
-    wx.switchTab({ url: pagePath('ai') })
+    if (!AI_ENABLED || !aiEntries.aiTab) return
+    wx.switchTab({ url: aiEntries.aiTab })
   },
 
   // 页脚两条法务文档：只放这两类，别的类型不从首页开。

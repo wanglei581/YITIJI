@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
+const aiEntries = require('../../utils/ai-entries')
 
 // 题型 → backend interviewerType；'case' 对应管理面试官
 const TYPE_MAP = { hr: 'hr', tech: 'tech', case: 'manager' }
@@ -65,7 +66,7 @@ Page({
         questionTarget: dto.questionTarget || 0,
         ts: Date.now(),
       })
-      const url = `/pages/interview-qa/interview-qa?sessionId=${dto.sessionId}`
+      const url = aiEntries.href(aiEntries.interviewQaUrl, 'sessionId=' + dto.sessionId)
       // 页面栈满 10 层时 navigateTo 会静默失败：面试已在服务端建好，用户却停在本页，
       // 再点一次又建一场（走查 9/29）。失败就用本页换过去，会话已落地，作答页读得到。
       wx.navigateTo({ url, fail: () => wx.redirectTo({ url }) })

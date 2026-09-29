@@ -80,6 +80,7 @@ test('full → no-ai → full 关键文件逐字节还原', () => {
     'scripts/privacy-api-inventory.json',
     'utils/voice-recorder.js',
     'utils/build-variant.js',
+    'utils/ai-entries.js',
   ]
   try {
     fs.cpSync(MINIAPP, tmp, {
@@ -101,6 +102,21 @@ test('full → no-ai → full 关键文件逐字节还原', () => {
     const switched = fs.readFileSync(path.join(tmp, 'utils/build-variant.js'), 'utf8')
     assert.match(switched, /VARIANT:\s*'no-ai'/)
     assert.match(switched, /AI_ENABLED:\s*false/)
+    const emptied = fs.readFileSync(path.join(tmp, 'utils/ai-entries.js'), 'utf8')
+    assert.equal(emptied.includes('/pages/'), false)
+    const grep = spawnSync('grep', [
+      '-rn',
+      '--exclude-dir=scripts',
+      '--exclude-dir=review-variants',
+      '--exclude-dir=node_modules',
+      '--exclude-dir=.git',
+      '--include=*.js',
+      '--include=*.wxml',
+      '/pages/\\(ai\\|assistant\\|resume-\\|interview-\\|career-plan\\|self-explore\\|job-fit\\|ai-records\\|resumes\\|daily-report\\)',
+      '.',
+    ], { cwd: tmp, encoding: 'utf8' })
+    assert.equal(grep.stdout, '')
+    assert.equal(grep.status, 1)
     const app = JSON.parse(fs.readFileSync(path.join(tmp, 'app.json'), 'utf8'))
     assert.equal(app.pages.includes('pages/ai/ai'), false)
     assert.equal((app.tabBar.list || []).length, 3)

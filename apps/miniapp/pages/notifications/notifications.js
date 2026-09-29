@@ -2,7 +2,7 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const { AI_ENABLED } = require('../../utils/build-variant')
-const { pagePath } = require('../../utils/page-path')
+const aiEntries = require('../../utils/ai-entries')
 
 const META = {
   print: { icon: 'printer', tone: 'teal', link: '查看打印订单' },
@@ -135,7 +135,7 @@ Page({
     if (!item) return
     this.tapItem(e)
     if (item.type === 'print') wx.navigateTo({ url: '/pages/orders/orders' })
-    if (item.type === 'ai' && AI_ENABLED) wx.navigateTo({ url: pagePath('ai-records') })
+    if (item.type === 'ai' && AI_ENABLED && aiEntries.aiRecordsUrl) wx.navigateTo({ url: aiEntries.aiRecordsUrl })
   },
 
   back() { wx.navigateBack({ delta: 1, fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },

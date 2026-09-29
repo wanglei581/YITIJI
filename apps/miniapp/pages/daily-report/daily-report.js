@@ -7,13 +7,14 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const aiEntries = require('../../utils/ai-entries')
 
 const TAB_PATHS = {
   '/pages/home/home': true,
-  '/pages/ai/ai': true,
   '/pages/print/print': true,
   '/pages/me/me': true,
 }
+if (aiEntries.aiTab) TAB_PATHS[aiEntries.aiTab] = true
 
 function openMiniappRoute(route) {
   if (!route) return
@@ -109,7 +110,7 @@ Page({
 
   retry() { this._loadReport() },
 
-  goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/ai/ai' }) } }) },
+  goBack() { wx.navigateBack({ fail() { if (aiEntries.aiTab) wx.switchTab({ url: aiEntries.aiTab }) } }) },
 
   goLogin() {
     wx.navigateTo({ url: '/pages/launch/launch' })
@@ -124,6 +125,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: '今日提醒', path: '/pages/daily-report/daily-report' }
+    return { title: '今日提醒', path: aiEntries.dailyReportUrl }
   },
 })

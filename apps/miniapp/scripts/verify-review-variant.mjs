@@ -6,6 +6,9 @@
  * (b) 临时副本里生成 no-ai，再跑 static / review-scope / package-layout 和本门禁的 (a)；
  *     然后 --variant full 还原，关键文件与副本原件逐字节相同。
  * (c) no-ai 已注册页面的 wxml/js 不写死指向 aiPages 的路由（复用 verify-review-scope 的扫描）。
+ *     另外：完整版里这些路由字面量只允许出现在 utils/ai-entries.js；
+ *     不含 AI 版把该文件换成空版本后，js/wxml（除 scripts/、review-variants/）里也没有。
+ *     全仓同样范围内不得出现 page-path，也不得用字符串拼接组装 /pages/ 路径。
  * (d) no-ai 审核说明不含「AI」「大模型」「生成」（「生成到机码」是到机取件用语，先摘掉再查）；
  *     full 审核说明含「AI 生成，仅供参考」。
  *
@@ -13,6 +16,7 @@
  */
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,7 +31,18 @@ const KEY_FILES = [
   'scripts/privacy-api-inventory.json',
   'utils/voice-recorder.js',
   'utils/build-variant.js',
+  'utils/ai-entries.js',
 ]
+
+const SKIP_WALK = new Set(['scripts', 'review-variants', 'node_modules', '.git', '.claude', 'miniprogram_npm'])
+const AI_ROUTE_RE = /\/pages\/(?:ai|assistant|resume-|interview-|career-plan|self-explore|job-fit|ai-records|resumes|daily-report)/
+const ASSEMBLY_RES = [
+  /page-path/,
+  /'\/pages\/'\s*\+/,
+  /"\/pages\/"\s*\+/,
+  /`\/pages\/\$\{/,
+]
+const TEXT_EXT = new Set(['.js', '.wxml', '.mjs', '.json', '.md', '.ts', '.wxss', '.wxs'])
 
 let pass = 0
 const fails = []
@@ -139,9 +154,7 @@ function checkTree(root) {
 
   const tabExpect = (spec.tabs || []).map((tab) => `${tab.pagePath}\t${tab.text}`)
   const tabActual = ((app.tabBar && app.tabBar.list) || []).map((tab) => `${tab.pagePath}\t${tab.text}`)
-  const bar = readAt(root, 'custom-tab-bar/index.js')
-  const barItems = [...bar.matchAll(/pagePath:\s*'([^']+)',\s*icon:\s*'([^']+)',\s*text:\s*'([^']+)'/g)]
-    .map((item) => `${item[1].replace(/^\/+/, '')}\t${item[3]}\t${item[2]}`)
+  const barItems = tabBarRows(root)
   const barExpect = (spec.tabs || []).map((tab) => `${tab.pagePath}\t${tab.text}\t${tab.icon}`)
   if (tabActual.join('|') !== tabExpect.join('|')) bad('app.json tabBar', tabActual.join(' | '))
   else if (barItems.join('|') !== barExpect.join('|')) bad('custom-tab-bar', barItems.join(' | '))
@@ -156,6 +169,147 @@ function checkTree(root) {
     if (hits.length) bad('no-ai 上传包不指向已收起页面', hits.join('；'))
     else ok('no-ai 上传包没有指向 aiPages 的写死路由')
   }
+
+  checkAiRoutes(root, variant.name, aiPages)
+}
+
+function relOf(root, abs) {
+  return path.relative(root, abs).split(path.sep).join('/')
+}
+
+function walkFiles(root) {
+  const out = []
+  function walk(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (SKIP_WALK.has(entry.name)) continue
+      const abs = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(abs)
+      else out.push(abs)
+    }
+  }
+  walk(root)
+  return out
+}
+
+function aiRouteLiteralHits(root) {
+  const hits = []
+  for (const abs of walkFiles(root)) {
+    const rel = relOf(root, abs)
+    if (rel === 'utils/ai-entries.js') continue
+    if (!rel.endsWith('.js') && !rel.endsWith('.wxml')) continue
+    if (AI_ROUTE_RE.test(fs.readFileSync(abs, 'utf8'))) hits.push(rel)
+  }
+  return hits
+}
+
+function pathAssemblyHits(root) {
+  const hits = []
+  for (const abs of walkFiles(root)) {
+    const rel = relOf(root, abs)
+    if (rel.includes('page-path')) {
+      hits.push(rel)
+      continue
+    }
+    if (!TEXT_EXT.has(path.extname(rel))) continue
+    const text = fs.readFileSync(abs, 'utf8')
+    if (ASSEMBLY_RES.some((re) => re.test(text))) hits.push(rel)
+  }
+  return hits
+}
+
+function loadEntries(file) {
+  return createRequire(file)(file)
+}
+
+function entryKeyProblems(fullFile, emptyFile) {
+  const full = loadEntries(fullFile)
+  const empty = loadEntries(emptyFile)
+  const problems = []
+  const fullKeys = Object.keys(full).sort()
+  const emptyKeys = Object.keys(empty).sort()
+  if (fullKeys.join('|') !== emptyKeys.join('|')) problems.push(`导出键不一致：${emptyKeys.join(',')}`)
+  for (const key of emptyKeys) {
+    const value = empty[key]
+    if (typeof value === 'function') continue
+    if (value === null || (Array.isArray(value) && value.length === 0)) continue
+    problems.push(`${key} 不是空值`)
+  }
+  if (fs.readFileSync(emptyFile, 'utf8').includes('/pages/')) problems.push('空版本含页面路径字面量')
+  return problems
+}
+
+function tabBarRows(root) {
+  const bar = readAt(root, 'custom-tab-bar/index.js')
+  let aiTab = ''
+  try {
+    aiTab = String(loadEntries(path.join(root, 'utils/ai-entries.js')).aiTab || '')
+  } catch {
+    aiTab = ''
+  }
+  return [...bar.matchAll(/pagePath:\s*(?:'([^']+)'|(aiTab)),\s*icon:\s*'([^']+)',\s*text:\s*'([^']+)'/g)]
+    .map((item) => {
+      const raw = item[1] || (item[2] ? aiTab : '')
+      return `${String(raw).replace(/^\/+/, '')}\t${item[4]}\t${item[3]}`
+    })
+}
+
+function checkAiRoutes(root, variantName, aiPages) {
+  const entriesPath = path.join(root, 'utils/ai-entries.js')
+  if (!fs.existsSync(entriesPath)) {
+    bad('AI 路由集中', '缺少 utils/ai-entries.js')
+    return
+  }
+  const entriesText = fs.readFileSync(entriesPath, 'utf8')
+  const hits = aiRouteLiteralHits(root)
+  const assembly = pathAssemblyHits(root)
+  if (assembly.length) bad('禁止拼接页面路径', assembly.join('；'))
+  else ok('没有 page-path，也没有拼接 /pages/ 路径')
+
+  if (variantName === 'full') {
+    const missing = aiPages.filter((name) => !entriesText.includes(`'/pages/${name}/${name}'`))
+    if (missing.length) bad('完整版 AI 路由在 ai-entries.js', `缺少 ${missing.join('、')}`)
+    else if (hits.length) bad('完整版页面不直写 AI 路由', hits.join('；'))
+    else ok('完整版 AI 路由只在 utils/ai-entries.js')
+  } else if (variantName === 'no-ai') {
+    const stashed = path.join(root, 'review-variants/stash/utils/ai-entries.js')
+    const problems = []
+    if (AI_ROUTE_RE.test(entriesText) || entriesText.includes('/pages/')) problems.push('ai-entries.js 仍有页面路径')
+    if (hits.length) problems.push(hits.join('；'))
+    if (fs.existsSync(stashed)) problems.push(...entryKeyProblems(stashed, entriesPath))
+    if (problems.length) bad('不含 AI 版没有 AI 路由字面量', problems.join('；'))
+    else ok('不含 AI 版 js/wxml 没有指向 aiPages 的路由字面量')
+  }
+}
+
+function copyMiniapp(dest) {
+  fs.cpSync(ROOT, dest, {
+    recursive: true,
+    filter: (src) => {
+      const base = path.basename(src)
+      return base !== 'node_modules' && base !== '.git' && base !== '.claude' && base !== 'miniprogram_npm'
+    },
+  })
+}
+
+function checkMutations() {
+  const leaked = fs.mkdtempSync(path.join(os.tmpdir(), 'miniapp-variant-leak-'))
+  const assembled = fs.mkdtempSync(path.join(os.tmpdir(), 'miniapp-variant-asm-'))
+  try {
+    copyMiniapp(leaked)
+    fs.appendFileSync(path.join(leaked, 'pages/home/home.js'), "\nconst leakedAiRoute = '/pages/assistant/assistant'\n")
+    const leakedHits = aiRouteLiteralHits(leaked)
+    if (!leakedHits.some((rel) => rel.endsWith('pages/home/home.js'))) bad('变异：页面里直写 AI 路由', '没有转红')
+    else ok('变异：页面里直写 /pages/assistant/assistant 时门禁转红')
+
+    copyMiniapp(assembled)
+    fs.writeFileSync(path.join(assembled, 'utils/page-path.js'), "function pagePath(name) {\n  return '/pages/' + name + '/' + name\n}\nmodule.exports = { pagePath }\n")
+    const assembledHits = pathAssemblyHits(assembled)
+    if (!assembledHits.length) bad('变异：拼接页面路径', '没有转红')
+    else ok('变异：page-path 拼接 /pages/ 时门禁转红')
+  } finally {
+    fs.rmSync(leaked, { recursive: true, force: true })
+    fs.rmSync(assembled, { recursive: true, force: true })
+  }
 }
 
 function runNode(cwd, args, env) {
@@ -166,13 +320,7 @@ function runNode(cwd, args, env) {
 function checkRoundTrip() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'miniapp-variant-'))
   try {
-    fs.cpSync(ROOT, tmp, {
-      recursive: true,
-      filter: (src) => {
-        const base = path.basename(src)
-        return base !== 'node_modules' && base !== '.git' && base !== '.claude' && base !== 'miniprogram_npm'
-      },
-    })
+    copyMiniapp(tmp)
     const before = KEY_FILES.map((rel) => fs.readFileSync(path.join(tmp, rel)))
     const env = { ...process.env, MINIAPP_REVIEW_VARIANT_INNER: '1' }
     const generated = runNode(tmp, ['scripts/make-review-variant.mjs', '--variant', 'no-ai'])
@@ -194,6 +342,15 @@ function checkRoundTrip() {
       }
     }
     ok('临时副本 no-ai：static、review-scope、package-layout、本门禁 (a)(c)(d) 通过')
+    const noAiEntries = path.join(tmp, 'utils/ai-entries.js')
+    const stashedEntries = path.join(tmp, 'review-variants/stash/utils/ai-entries.js')
+    const parity = entryKeyProblems(stashedEntries, noAiEntries)
+    const noAiHits = aiRouteLiteralHits(tmp)
+    if (parity.length || noAiHits.length) {
+      bad('临时副本 no-ai 的 AI 路由', [...parity, ...noAiHits].join('；'))
+      return
+    }
+    ok('临时副本 no-ai 的 ai-entries 与页面都没有 AI 路由字面量')
     const restored = runNode(tmp, ['scripts/make-review-variant.mjs', '--variant', 'full'])
     if (restored.status !== 0) {
       bad('临时副本还原 full', `${restored.stdout || ''}\n${restored.stderr || ''}`.trim().split('\n').slice(-20).join('\n'))
@@ -212,6 +369,7 @@ const definitions = JSON.parse(readAt(ROOT, 'review-variants/variants.json'))
 checkDefinitions(definitions)
 checkNotes(definitions)
 checkTree(ROOT)
+if (!INNER && fails.length === 0) checkMutations()
 if (!INNER && fails.length === 0) checkRoundTrip()
 
 console.log(`\n${pass} PASS / ${fails.length} FAIL（提审版本）`)

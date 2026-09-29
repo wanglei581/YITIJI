@@ -3,6 +3,7 @@ const api = require('../../utils/api')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
 const auth = require('../../utils/auth')
+const aiEntries = require('../../utils/ai-entries')
 
 /**
  * 职业规划参考。
@@ -199,7 +200,7 @@ Page({
   },
 
   tapUpload() {
-    wx.navigateTo({ url: '/pages/resume-upload/resume-upload' })
+    wx.navigateTo({ url: aiEntries.resumeUploadUrl })
   },
 
   /**
@@ -238,7 +239,7 @@ Page({
   onShareAppMessage() {
     return {
       title: 'AI 职业规划参考',
-      path: '/pages/career-plan/career-plan',
+      path: aiEntries.careerPlanUrl,
     }
   },
 })

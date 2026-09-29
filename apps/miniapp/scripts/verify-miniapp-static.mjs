@@ -88,9 +88,12 @@ if (appJson) {
 
   const barJs = read('custom-tab-bar/index.js')
   const normalizePath = (p) => p.replace(/^\/+/, '')
+  const aiTabNorm = String(require(path.join(ROOT, 'utils/ai-entries.js')).aiTab || '').replace(/^\/+/, '')
   const barListOk = expected.every(({ pagePath, text }) => {
     const target = normalizePath(pagePath)
-    return barJs.includes(`pagePath: '/${target}'`) && barJs.includes(`text: '${text}'`)
+    const literal = barJs.includes(`pagePath: '/${target}'`)
+    const viaAiTab = Boolean(aiTabNorm) && target === aiTabNorm && /pagePath:\s*aiTab\b/.test(barJs)
+    return (literal || viaAiTab) && barJs.includes(`text: '${text}'`)
   })
   if (barListOk) ok('custom-tab-bar 与 app.json 一致')
   else bad('custom-tab-bar 与 app.json 一致', 'pagePath/text 不匹配')
@@ -301,7 +304,16 @@ if (!fails.some((x) => x.startsWith('JS 跳转目标已注册'))) ok('JS 跳转�
     ok('AI 记录页未注册，跳过路由表检查')
   } else {
     const aiRecordsJs = read('pages/ai-records/ai-records.js')
-    const routes = [...aiRecordsJs.matchAll(/route:\s*'([^']*)'/g)].map((m) => m[1]).filter(Boolean)
+    const entriesSrc = read('utils/ai-entries.js')
+    const entryLiteral = (key) => {
+      const matched = entriesSrc.match(new RegExp(`const ${key} = '([^']*)'`))
+      return matched ? matched[1] : ''
+    }
+    const routes = []
+    for (const matched of aiRecordsJs.matchAll(/route:\s*(?:'([^']*)'|aiEntries\.([A-Za-z0-9_]+))/g)) {
+      const value = matched[1] || (matched[2] ? entryLiteral(matched[2]) : '')
+      if (value) routes.push(value)
+    }
     const dead = routes
       .map((t) => t.replace(/^\//, '').replace(/\/$/, ''))
       .filter((t) => !pagePathSet.has(t))
@@ -1005,12 +1017,21 @@ else bad('到机码撤下与轮询停机', 'claimed/PrintTask 阶段不得继续
 const aiRecordsJs = read('pages/ai-records/ai-records.js')
 const jobFitJs = read('pages/job-fit/job-fit.js')
 const careerPlanJs = read('pages/career-plan/career-plan.js')
+const reviewVariantName = createRequire(import.meta.url)(path.join(ROOT, 'utils/build-variant.js')).VARIANT
+const aiEntriesJs = read('utils/ai-entries.js')
+function aiEntryBound(key, literal) {
+  return reviewVariantName !== 'full' || aiEntriesJs.includes(`const ${key} = '${literal}'`)
+}
 if (
   apiJs.includes('deleteMyAiRecord(recordId)') &&
-  aiRecordsJs.includes("route: '/pages/resume-diagnose/resume-diagnose'") &&
-  aiRecordsJs.includes("route: '/pages/resume-optimize/resume-optimize'") &&
-  aiRecordsJs.includes("route: '/pages/job-fit/job-fit'") &&
-  aiRecordsJs.includes("route: '/pages/career-plan/career-plan'") &&
+  aiRecordsJs.includes('route: aiEntries.resumeDiagnoseUrl') &&
+  aiRecordsJs.includes('route: aiEntries.resumeOptimizeUrl') &&
+  aiRecordsJs.includes('route: aiEntries.jobFitUrl') &&
+  aiRecordsJs.includes('route: aiEntries.careerPlanUrl') &&
+  aiEntryBound('resumeDiagnoseUrl', '/pages/resume-diagnose/resume-diagnose') &&
+  aiEntryBound('resumeOptimizeUrl', '/pages/resume-optimize/resume-optimize') &&
+  aiEntryBound('jobFitUrl', '/pages/job-fit/job-fit') &&
+  aiEntryBound('careerPlanUrl', '/pages/career-plan/career-plan') &&
   aiRecordsJs.includes('api.deleteMyAiRecord(record.id)') &&
   aiRecordsJs.includes("key: 'interview'") &&
   aiRecordsJs.includes('getMyMockInterviews') &&
@@ -1746,7 +1767,8 @@ const apiAppendAtEnd = /module\.exports = api;\s*\/\/[\s\S]*?api\.appendSelfAsse
 const appendUsesInPagePicker = appendPrintJs.includes('api.getMyDocuments')
   && appendPrintJs.includes('resume_upload')
   && appendPrintJs.includes('resume_scan')
-  && appendPrintJs.includes("url: '/pages/resume-upload/resume-upload'")
+  && appendPrintJs.includes('url: aiEntries.resumeUploadUrl')
+  && aiEntryBound('resumeUploadUrl', '/pages/resume-upload/resume-upload')
   && appendPrintJs.includes('api.appendSelfAssessmentToResume(this.data.taskId, resumeFileId, this._token)')
   && appendPrintJs.includes('/pages/print-upload/print-upload?name=${name}&fileId=${encodeURIComponent(fileId)}&pages=${pages}')
   && !/\bgetOpenerEventChannel\b/.test(appendPrintJs)

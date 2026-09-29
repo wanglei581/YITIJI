@@ -1,7 +1,7 @@
 // pages/help/help.js
 const app = getApp()
 const { AI_ENABLED } = require('../../utils/build-variant')
-const { pagePath } = require('../../utils/page-path')
+const aiEntries = require('../../utils/ai-entries')
 
 const ALL_FAQS = [
       {
@@ -66,8 +66,8 @@ Page({
   },
 
   askAI() {
-    if (!AI_ENABLED) return
-    wx.switchTab({ url: pagePath('ai') })
+    if (!AI_ENABLED || !aiEntries.aiTab) return
+    wx.switchTab({ url: aiEntries.aiTab })
   },
 
   goFeedback() {

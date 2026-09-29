@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1605 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1607 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -864,7 +864,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/miniapp/pages/</code> — 35 个文件</summary>
+<summary><code>apps/miniapp/pages/</code> — 36 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -877,6 +877,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/pages/documents/documents.js` | `verify-word-conversion-ui.mjs`<br/>`verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/fairs/fairs.js` | `verify-empty-state-honesty.mjs` |
 | `apps/miniapp/pages/help/help.js` | `verify-miniapp-static.mjs` |
+| `apps/miniapp/pages/home/home.js` | `verify-review-variant.mjs` |
 | `apps/miniapp/pages/job-fit/job-fit.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/launch/launch.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/me/me.js` | `verify-miniapp-static.mjs` |
@@ -940,7 +941,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/miniapp/utils/</code> — 14 个文件</summary>
+<summary><code>apps/miniapp/utils/</code> — 15 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -953,6 +954,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/utils/package-order-idempotency.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/utils/package-order.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/utils/page-guard.js` | `verify-package-chain.mjs` |
+| `apps/miniapp/utils/page-path.js` | `verify-review-variant.mjs` |
 | `apps/miniapp/utils/pickup-qrcode.js` | `verify-miniapp-static.mjs`<br/>`verify-pickup-qrcode.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/miniapp/utils/print-order-idempotency.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/utils/request.js` | `verify-miniapp-static.mjs` |

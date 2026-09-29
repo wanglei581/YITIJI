@@ -3,6 +3,7 @@ const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 const voice = require('../../utils/voice-recorder')
 const { userMessageOf } = require('../../utils/user-error')
+const aiEntries = require('../../utils/ai-entries')
 
 Page({
   data: {
@@ -114,7 +115,7 @@ Page({
       omitPrintAnswers: this.data.omitPrintAnswers,
     })
     wx.redirectTo({
-      url: `/pages/interview-result/interview-result?sessionId=${this.data.sessionId}`,
+      url: aiEntries.href(aiEntries.interviewResultUrl, 'sessionId=' + this.data.sessionId),
     })
   },
   tapVoice() {

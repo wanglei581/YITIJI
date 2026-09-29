@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
+const aiEntries = require('../../utils/ai-entries')
 
 const LEVEL_MAP = {
   needs_work: { label: '需要加强', color: '#d88b0d' },
@@ -118,5 +119,5 @@ Page({
       this.setData({ printing: false })
     }
   },
-  tapRetry() { wx.navigateTo({ url: '/pages/interview-entry/interview-entry' }) },
+  tapRetry() { wx.navigateTo({ url: aiEntries.interviewEntryUrl }) },
 })

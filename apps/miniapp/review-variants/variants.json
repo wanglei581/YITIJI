@@ -3,6 +3,7 @@
     "full 是仓库默认。no-ai 由 scripts/make-review-variant.mjs --variant no-ai 就地生成，--variant full 按 stash 逐字节还原。",
     "aiPages 是 no-ai 要停放的页面目录：源码保留，不注册，追加进 project.config.json 的 packOptions.ignore。",
     "daily-report 不在最初名单里，但它调用 getDailyBrief（POST /assistant/daily-report，ai: generate），一并停放。",
+    "指向这些页的路由字面量只写在 utils/ai-entries.js。no-ai 把该文件整份换成空版本，full 按 stash 还原。",
     "print-upload、package-create、documents、kiosk-send 也调用带 ai: 标记的上传或打印隐私检查，但不停放：不含 AI 版的审核说明要保留上传文件、选择终端、生成到机码、到终端取件。"
   ],
   "full": {

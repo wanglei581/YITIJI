@@ -6,7 +6,8 @@
  *   node scripts/make-review-variant.mjs --variant full
  *
  * full 是仓库默认。切到 no-ai 前把关键文件原样收进 review-variants/stash，
- * 再只改页面注册、ignore 里的 aiPages、tab、隐私清单、录音实现和版本开关。
+ * 再只改页面注册、ignore 里的 aiPages、tab、隐私清单、录音实现、版本开关，
+ * 以及把 utils/ai-entries.js 整份换成空版本。
  * 再跑 --variant full 时按 stash 逐字节写回并删掉 stash。
  * 当前已经是目标版本时什么都不做（幂等）。
  */
@@ -23,6 +24,7 @@ const KEY_FILES = [
   'scripts/privacy-api-inventory.json',
   'utils/voice-recorder.js',
   'utils/build-variant.js',
+  'utils/ai-entries.js',
 ]
 
 const arg = process.argv.indexOf('--variant')
@@ -155,6 +157,38 @@ module.exports = { VARIANT: '${name}', AI_ENABLED: ${aiEnabled ? 'true' : 'false
 `)
 }
 
+function writeEmptyAiEntries() {
+  write('utils/ai-entries.js', `// 不含 AI 的提审版。路由为空，列表为空。完整版按 stash 还原本文件。
+function href() {
+  return ''
+}
+
+module.exports = {
+  href,
+  aiTab: null,
+  assistantUrl: null,
+  resumeBuildUrl: null,
+  resumeVoiceUrl: null,
+  resumeUploadUrl: null,
+  resumeDiagnoseUrl: null,
+  resumeOptimizeUrl: null,
+  resumeParseUrl: null,
+  interviewEntryUrl: null,
+  interviewQaUrl: null,
+  interviewResultUrl: null,
+  careerPlanUrl: null,
+  selfExploreUrl: null,
+  jobFitUrl: null,
+  aiRecordsUrl: null,
+  resumesUrl: null,
+  dailyReportUrl: null,
+  PRIMARY_SERVICES: [],
+  meEntries: [],
+  printDailyPath: null,
+}
+`)
+}
+
 const now = currentVariant()
 if (now === target) {
   console.log(`review variant already ${target}`)
@@ -175,6 +209,7 @@ if (target === 'no-ai') {
   applyPrivacy(spec.privacyCategories)
   applyVoiceStub()
   writeVariant('no-ai', false)
+  writeEmptyAiEntries()
   console.log('review variant: no-ai')
 } else {
   restoreOriginals()

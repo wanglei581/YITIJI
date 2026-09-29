@@ -7,6 +7,7 @@ const buildModel = require('../../utils/resume-build-model.js')
 const fileUrls = require('../../utils/file-url.js')
 const draft = require('./draft')
 const factCheck = require('./fact-check')
+const aiEntries = require('../../utils/ai-entries')
 
 const FORMATS = [
   { key: 'pdf', label: 'PDF', mimeType: 'application/pdf' },
@@ -257,7 +258,7 @@ Page({
 
   tapReupload() {
     wx.navigateTo({
-      url: '/pages/resume-parse/resume-parse',
+      url: aiEntries.resumeParseUrl,
       fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }),
     })
   },

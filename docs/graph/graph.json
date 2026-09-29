@@ -20354,6 +20354,9 @@
     "apps/miniapp/pages/help/help.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/pages/home/home.js": [
+      "apps/miniapp/scripts/verify-review-variant.mjs"
+    ],
     "apps/miniapp/pages/job-fit/job-fit.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
@@ -20506,6 +20509,9 @@
     ],
     "apps/miniapp/utils/page-guard.js": [
       "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
+    "apps/miniapp/utils/page-path.js": [
+      "apps/miniapp/scripts/verify-review-variant.mjs"
     ],
     "apps/miniapp/utils/pickup-qrcode.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -29282,6 +29288,7 @@
         "dirs": [],
         "files": [
           "apps/miniapp/custom-tab-bar/index.js",
+          "apps/miniapp/pages/home/home.js",
           "apps/miniapp/review-variants/variants.json",
           "apps/miniapp/scripts/make-review-variant.mjs",
           "apps/miniapp/scripts/privacy-api-inventory.json",
@@ -29290,6 +29297,7 @@
           "apps/miniapp/scripts/verify-review-scope.mjs",
           "apps/miniapp/scripts/verify-review-variant.mjs",
           "apps/miniapp/utils/build-variant.js",
+          "apps/miniapp/utils/page-path.js",
           "apps/miniapp/utils/voice-recorder.js"
         ],
         "missing": []
