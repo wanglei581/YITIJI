@@ -90,6 +90,8 @@ export type AdminPrintScanTaskItem =
       colorMode: 'black_white' | 'color' | null
       paperSize: string | null
       printOutcome: 'printed' | 'not_printed' | null
+      /** 服务端计算。null 可以重试；字符串是不能重试的原因。缺省表示旧后端，页面不自行推断。 */
+      retryBlockedReason?: string | null
     })
   | (AdminPrintScanTaskBase & { type: 'scan'; scanType: string; hasResultFile: boolean })
   | (AdminPrintScanTaskBase & { type: 'document_process'; kind: string; hasResultFile: boolean })
