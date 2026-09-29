@@ -529,6 +529,55 @@ check(
   '机构大屏页有 FRONTEND_HINT 归属说明',
 )
 
+// ── 16. 服务人次与累计打印口径（W-68 / W-69）────────────────────────────
+const govGrid = read('apps/admin/src/routes/screen/GovGrid.tsx')
+const partnerGrid = read('apps/partner/src/routes/screen/PartnerGrid.tsx')
+const partnerVisit = read('apps/partner/src/routes/screen/PartnerVisitStat.tsx')
+const adminUsage = read('apps/admin/src/routes/screen/UsageView.tsx')
+const partnerUsage = read('apps/partner/src/routes/screen/PartnerUsageView.tsx')
+const partnerUsageOff = read('apps/partner/src/routes/screen/PartnerUsageHostingOff.tsx')
+const twinBoard = read('packages/ui/src/screen/twin/TwinTerminalBoard.tsx')
+const primaryBlock = partnerLabels.slice(
+  partnerLabels.indexOf('export const PARTNER_PRIMARY_KEYS'),
+  partnerLabels.indexOf('export function buildPartnerGapEntries'),
+)
+check(/今日服务人次/.test(govGrid) && /是会话数，不是人数/.test(govGrid), '政务版有「今日服务人次」格，并注明是会话数不是人数')
+check(
+  /按出纸任务 × 份数计，双面时实际用纸更少/.test(govGrid),
+  '政务版累计打印注明按出纸任务乘以份数计，双面时实际用纸更少',
+)
+check(/screenCount\(g\.visitCount\.value\)/.test(govGrid), '政务版服务人次直接取下发的数，1–4 次也不在前端改写成「少于 5」')
+check(primaryBlock.includes("'visitCount'"), '机构主栅格键包含 visitCount，服务人次不会掉进归并')
+check(/<PartnerVisitStat\b/.test(partnerGrid) && /今日服务人次/.test(partnerVisit) && /会话数，不是人数/.test(partnerVisit), '机构总览渲染服务人次主栅格卡，并注明是会话数')
+check(/title:\s*'少于 5'/.test(copyBlock), '1–4 次的原因显示为「少于 5」，不显示原数')
+check(/short:\s*'暂时取不到'/.test(copyBlock), '源查询失败显示「暂时取不到」')
+check(/数据量超出统计上限，显示不全/.test(copyBlock), '统计行数超上限如实写「数据量超出统计上限，显示不全」')
+check(!/接入前不显示/.test(twinBoard), '单台孪生不再写服务人次接入前不显示')
+check(/少于 5/.test(twinBoard) && /暂时取不到/.test(twinBoard), '单台孪生说明里写明少于 5 与暂时取不到')
+for (const [name, source] of [
+  ['管理员服务调用', adminUsage],
+  ['机构信息使用', partnerUsage],
+  ['机构信息使用（托管关闭）', partnerUsageOff],
+]) {
+  check(!/访问人次/.test(source), `${name}不再把服务人次叫成访问人次`)
+  check(!/kiosk_session_unwritten/.test(source), `${name}不再把缺席的服务人次猜成会话未写入`)
+  check(!/as \{ value: unknown \}/.test(source), `${name}按数字类型取值，不再把契约当成 never`)
+}
+function stripStrings(source) {
+  return source
+    .replace(/`(?:\\[\s\S]|[^`])*`/g, '``')
+    .replace(/'(?:\\.|[^'\n])*'/g, "''")
+    .replace(/"(?:\\.|[^"\n])*"/g, '""')
+}
+// 原因码可以留在字符串里交给文案表翻译。可见文字是标签之间、花括号表达式之外的原文。
+const REASON_CODES = ['sample_below_threshold', 'source_query_failed', 'window_row_cap_exceeded', 'kiosk_session_unwritten']
+for (const file of screenFiles) {
+  const code = stripStrings(stripComments(file.source))
+  for (const reason of REASON_CODES) {
+    check(!new RegExp(`>[^<{]*${reason}`).test(code), `${file.path} 的可见文字不出现原因码 ${reason}`)
+  }
+}
+
 console.log(`\n${failures.length === 0 ? 'OK' : 'FAILED'} — ${failures.length} 条未通过`)
 if (failures.length > 0) {
   for (const item of failures) console.error(` - ${item}`)

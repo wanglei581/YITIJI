@@ -164,11 +164,11 @@ test.describe('partner screen · 托管关闭', () => {
     await open(page, '/screen/overview')
     const line = page.locator('.twin-gapline')
     await expect(line).toHaveCount(1)
-    await expect(line.locator('summary')).toHaveText('另有 13 项指标待补齐机构归属等数据后显示')
+    await expect(line.locator('summary')).toHaveText('另有 12 项指标待补齐机构归属等数据后显示')
     await expect(line.locator('.twin-pend').first()).toBeHidden()
     await line.locator('summary').click()
     const chips = line.locator('.twin-pend')
-    await expect(chips).toHaveCount(13)
+    await expect(chips).toHaveCount(12)
     await expect(chips.filter({ hasText: '打开来源平台入口' })).toHaveCount(0)
     await expect(panel(page, /^建设中的指标$/)).toHaveCount(0)
   })
@@ -288,9 +288,10 @@ test.describe('partner screen · 托管关闭', () => {
     await expect(page.locator('.tw3-big .c b')).toHaveText(['收藏', '打开来源平台入口'])
     await expect(page.locator('.twin-overlay.is-tl')).toContainText('本机构信息 → 政策公告 → 收藏 / 打开来源入口')
 
-    // 统计口径：访问人次是一条说明，不再挂「未接入」小牌子
+    // 统计口径：服务人次是一条说明。1–4 次写「少于 5」，不出现原数，也不挂小牌子
     const notes = panel(page, /^统计口径$/)
-    await expect(notes.locator('.twin-notes li').last()).toHaveText('访问人次暂未统计（一体机会话尚未记录）')
+    await expect(notes.locator('.twin-notes li').last()).toHaveText('服务人次少于 5（是会话数，不是人数）')
+    await expect(notes.locator('.twin-notes li').last()).not.toContainText(/[1-4]/)
     await expect(notes.locator('.twin-pend, .twin-kv')).toHaveCount(0)
 
     // 热门政策：竖排 Top 5，标题写全（第四条折成两行，不截断）

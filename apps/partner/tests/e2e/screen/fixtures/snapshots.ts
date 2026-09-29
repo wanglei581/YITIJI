@@ -161,7 +161,7 @@ function snapshotWith(fleet: ScreenFleetWallValue): ScreenSnapshot {
       aiCost24h: na('AiServiceLog', 'current', MISSING_ORG),
       alertsRealtime: na('derived-alerts', 'current', 'alerts_not_org_scoped'),
       sourceEntryOpensTop: na('ExternalJumpLog', 'current', 'missing_immutable_source_org_snapshot'),
-      visitCount: na('KioskSession', 'current', 'kiosk_session_unwritten'),
+      visitCount: ok('KioskSession.startedAt', 'shanghai-day', 86),
       suppliesAndMap: na('TerminalHeartbeat', 'current', 'no_consumable_or_geo_fields'),
       reviewSlaAndOrgDimension: na('ReviewDecision / Order.orgId / AiServiceLog.orgId', 'current', 'review_decision_unwritten'),
     },
@@ -197,6 +197,22 @@ export function partnerTruncated(): ScreenSnapshot {
     })
   }
   return snapshotWith(fleetFrom(cells, 640, 200))
+}
+
+/** 服务人次 1–4 次：主栅格写「少于 5」，不进归并，也不下发原数。 */
+export function partnerVisitBelowThreshold(): ScreenSnapshot {
+  const snapshot = partnerFull()
+  snapshot.metrics.visitCount = na('KioskSession.startedAt', 'shanghai-day', 'sample_below_threshold')
+  return snapshot
+}
+
+/** 服务人次本次取数失败：主栅格写「暂时取不到」。 */
+export function partnerVisitFailed(): ScreenSnapshot {
+  const snapshot = partnerFull()
+  snapshot.status = 'degraded'
+  snapshot.degraded = true
+  snapshot.metrics.visitCount = na('KioskSession.startedAt', 'shanghai-day', 'source_query_failed')
+  return snapshot
 }
 
 export function partnerDegraded(): ScreenSnapshot {
@@ -301,12 +317,12 @@ export function partnerUsage(range: string): ScreenUsageSnapshot {
           { type: 'company_profile', title: '广州某医疗器械有限公司', browse: 5 * k },
         ],
       }),
-      visits: na('KioskSession', safe, 'kiosk_session_unwritten'),
+      visits: na('KioskSession.startedAt', safe, 'sample_below_threshold'),
     },
   }
 }
 
-/** 访问人次本次取数失败：与默认的结构性「未接入」对照，屏上要写「暂时取不到」。 */
+/** 服务人次本次取数失败：与默认的「少于 5」对照，屏上要写「暂时取不到」。 */
 export function partnerUsageVisitsFailed(range: string): ScreenUsageSnapshot {
   const base = partnerUsage(range)
   base.status = 'degraded'
@@ -436,7 +452,7 @@ export function partnerTwin(id: string): ScreenTerminalTwin | null {
     }),
     scanner: ok('TerminalHeartbeat+ScanTask', 'current', { state: 'ready', label: null }),
     currentTask: ok('PrintTask.status', 'current', printing ? { pages: 6, colorMode: 'bw', startedAt: new Date(now - 30_000).toISOString() } : null),
-    today: { printPages: 22, printTasks: null, scans: null, failed: 0, visits: na('KioskSession', 'current', 'kiosk_session_unwritten') },
+    today: { printPages: 22, printTasks: null, scans: null, failed: 0, visits: na('KioskSession.startedAt', 'shanghai-day', 'sample_below_threshold') },
     consumables: na('TerminalHeartbeat', 'current', 'no_consumable_or_geo_fields'),
     timeline24h: ok('TerminalHeartbeat+PrintTask', '24h', [
       seg(24, 15, 'offline'),
