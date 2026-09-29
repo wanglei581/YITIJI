@@ -16,6 +16,7 @@ const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
 const { createPickupQrMatrix, PICKUP_CODE_RE } = require('../../utils/pickup-qrcode')
 const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
+const pickupActions = require('../../utils/pickup-actions')
 
 const QR_SIZE_PX = 180
 
@@ -32,6 +33,7 @@ Page({
     orderId: '',
     orderNo: '',
     pickupCode: '',
+    reissuing: false,
     fileCount: 0,
     expireTime: '',
     amountText: '',
@@ -365,21 +367,8 @@ Page({
       canvas.width = Math.round(size * pixelRatio)
       canvas.height = Math.round(size * pixelRatio)
       context.scale(pixelRatio, pixelRatio)
-      context.fillStyle = '#FFFFFF'
-      context.fillRect(0, 0, size, size)
-      const quietZone = 4
-      const cellSize = Math.floor(size / (matrix.length + quietZone * 2))
-      const drawSize = cellSize * (matrix.length + quietZone * 2)
-      const offset = Math.floor((size - drawSize) / 2)
-      context.fillStyle = '#15100C'
-      matrix.forEach((row, y) => row.forEach((dark, x) => {
-        if (dark) context.fillRect(
-          offset + (x + quietZone) * cellSize,
-          offset + (y + quietZone) * cellSize,
-          cellSize,
-          cellSize,
-        )
-      }))
+      // 与单件取件页、分享图共用同一份画法（utils/pickup-actions.js）。
+      pickupActions.paintQr(context, matrix, size)
       this.setData({ qrStatus: 'ready' })
     })
   },
@@ -436,6 +425,26 @@ Page({
     })
   },
 
-  // 不提供 onShareAppMessage：这页原本可以把「材料包创建成功」当作分享标题转发出去，
-  // 而收到的人打开的是一张没有任何订单支撑的成功页。到机码是取件凭证，不做分享。
+  // 仍然不提供 onShareAppMessage：转发页面卡片会把一张没有订单支撑的成功页发出去。
+  // 给代取人的是一张画好的取件图（码 + 二维码 + 有效期 + 怎么取），见 utils/pickup-actions.js。
+
+  shareCode() {
+    if (!this._codeRaw || !this.data.pickupCode) return
+    pickupActions.shareToProxy(this, { code: this._codeRaw, expiresText: this.data.expireTime })
+  },
+
+  reissueCode() {
+    if (!this._codeRaw || this.data.reissuing || !this.data.orderId) return
+    this.setData({ reissuing: true })
+    pickupActions.reissue(this.data.orderId)
+      .then((order) => {
+        this.setData({ reissuing: false })
+        // 新码、有效期、状态都以服务端重新读到的为准。
+        if (order) this.loadOrder()
+      }, (err) => {
+        this.setData({ reissuing: false })
+        wx.showModal({ title: '没有换码', content: err.message, showCancel: false })
+        this.loadOrder()
+      })
+  },
 })
