@@ -232,7 +232,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/jobMaterials.ts` | `verify-admin-job-materials-ui.mjs` |
 | `apps/admin/src/services/api/offlineAgenciesAdmin.ts` | `verify-admin-offline-agencies-ui.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/services/api/offlineAgencyGovernance.ts` | `verify-admin-offline-agencies-ui.mjs` |
-| `apps/admin/src/services/api/orgsAdmin.ts` | `verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/services/api/orgsAdmin.ts` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/services/api/policiesAdmin.ts` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/services/api/printScan.ts` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/services/api/registerPartnerContactPhone.ts` | `verify-admin-partner-contact-phone-ui.mjs` |

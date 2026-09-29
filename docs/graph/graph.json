@@ -17933,6 +17933,7 @@
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
     ],
     "apps/admin/src/services/api/orgsAdmin.ts": [
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/services/api/policiesAdmin.ts": [
@@ -25450,6 +25451,7 @@
           "apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx",
           "apps/admin/src/routes/partners/partnerContactPhoneEligibility.ts",
           "apps/admin/src/routes/partners/usePartnerAccountAction.ts",
+          "apps/admin/src/services/api/orgsAdmin.ts",
           "apps/admin/src/services/api/registerPartnerContactPhone.ts"
         ],
         "missing": []
