@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -447,6 +447,27 @@ check(
     !kioskActivitiesCtl.includes('return { id }'),
   'kiosk/activities 返回 501，不回显假活动',
 )
+
+// ── 审计 actorId 只放运营账号 ──────────────────────────────────────────────
+// AuditLog.actorId 外键指向运营 User：会员 ID 写进去在 PostgreSQL / SQLite 上都违反外键，
+// 被 AuditService.write 静默吞掉——会员动作就没有审计（print-jobs 带走链接与重试曾如此，2026-09-29 修）。
+// 会员动作一律 actorId: null、会员 ID 放 payload.endUserId。
+{
+  const srcRoot = resolve(repo, 'services/api/src')
+  const offenders = []
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'generated' || name === '__tests__') continue
+      const full = resolve(dir, name)
+      if (statSync(full).isDirectory()) { walk(full); continue }
+      if (!full.endsWith('.ts')) continue
+      const lines = readFileSync(full, 'utf8').split('\n')
+      lines.forEach((line, i) => { if (/\bactorId:\s*[\w.?]*endUserId\b/.test(line)) offenders.push(`${full.slice(srcRoot.length + 1)}:${i + 1}`) })
+    }
+  }
+  walk(srcRoot)
+  check(offenders.length === 0, `审计 actorId 不写会员 ID（外键指向运营账号，会被静默吞掉）${offenders.length ? '：' + offenders.join(', ') : ''}`)
+}
 
 if (failed > 0) {
   console.error(`\n${failed} backend P0 contract check(s) failed.\n`)
