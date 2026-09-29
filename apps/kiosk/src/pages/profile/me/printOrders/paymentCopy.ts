@@ -100,9 +100,30 @@ export function copiesDisplay(copies: MemberPrintOrderItem['copies'] | undefined
 }
 
 export function pageRangeDisplay(pageRange: MemberPrintOrderItem['pageRange'] | undefined): string {
-  if (typeof pageRange !== 'string' || pageRange.trim().length === 0) return UNRECORDED
+  if (typeof pageRange !== 'string' || pageRange.trim().length === 0) return '全部页'
   const trimmed = pageRange.trim()
-  return trimmed.toLowerCase() === 'all' ? '全部' : trimmed
+  return trimmed.toLowerCase() === 'all' ? '全部页' : trimmed
+}
+
+/** 给用户看的订单号只认 ORD-。任务 id 和空值都不显示。 */
+export function publicOrderNo(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return /^ORD-[A-Za-z0-9-]+$/.test(trimmed) ? trimmed : null
+}
+
+/**
+ * 实付：0 元是记下的真实金额，写成「0 元（免费试运营）」。
+ * 其余没有单独的实付字段，仍标未记录，不用应付减优惠来推算。
+ */
+export function netPaidDisplay(item: {
+  amountCents?: number | null
+  paymentSource?: string | null
+}): { value: string; hint?: string } {
+  if (item.amountCents === 0 || item.paymentSource === 'free') {
+    return { value: '0 元（免费试运营）' }
+  }
+  return { value: NET_PAID_UNRECORDED, hint: NET_PAID_UNRECORDED_HINT }
 }
 
 /**

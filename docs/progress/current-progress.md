@@ -324,6 +324,16 @@
 - **2.0 稿：** 2.0 冻结稿 29-interview-training.html 的「HR 初筛」改为「HR 面试」，产品负责人 9/29 同意；原因是合规窗口裁定「初筛」属招聘方筛选动作、列入禁词；只改字未改版式；FROZEN.json 已按冻结规则重写；原稿目录未改。
 - **练习单考查点：** 终面题「什么样的工作环境会让你待不下去？」的考查点会印在题目单 PDF 上（5 分钟、8 分钟档包含该题）。「匹配度、表述分寸」改为「与岗位要求的契合、表述分寸」。一体机页面和小程序不渲染这句考查点；报告 PDF 不使用题库考查点。
 - 小程序未改。
+> **2026-09-29 G1 一体机打印链走查（`grok/kiosk-print-chain-walk-0929`，未推送）**：报价为 0 时写「免费试运营，本单 0 元」，主按钮与读屏同为「确认并打印」。普通 PDF 完成页不再提示证件水印，只有证件件才提示（运行时并没有真正盖上这行水印）。到机码在出纸后再输入、服务端回已完成时，写「这一单已经打印完成」。完成页和进度页只显示 ORD- 订单号；「再印一份」在价目为 0 时写「免费试运营，不另收费」。0 元详单写「实付 0 元（免费试运营）」，没传页范围写「全部页」，份数按每份页数相乘；页数未知时写「全部纸张」，不写「共 0 面」。文字识别不可用时，材料检查可以点「我已确认，继续打印」进入预览。会员列表上的 ORD- 号要等 `GET /me/print-orders` 带回 `orderNo`；人工确认没有调用尚未合入候选的 A-04 留痕 #1068。
+
+> **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
+
+## 2026-09-29：G1 一体机打印链走查（W-44、W-21、W-23、W-45、W-46、W-51、W-17）
+
+- **范围：** 只改一体机打印链与「我的 → 打印订单」的可见说法和能走通的路径。分支 `grok/kiosk-print-chain-walk-0929`，基于候选 `3841b823a`，未推送。没有改登录页、AI 故障判定、打印扫描首页、隐私清场、小程序、设计稿、图谱产物和服务端。
+- **用户能看见的变化：** 0 元报价写「免费试运营，本单 0 元」，按钮是「确认并打印」（付费单仍是「确认并去付款」，看得见的字和读屏同一句）。普通 PDF 完成页不提证件水印；证件扫描件和「我的文档」里的证件用途才提示「仅供求职使用」。到机码再输入时按 `printTaskStatus` 分流，已完成写「这一单已经打印完成」。完成页、进度页和会员详单只显示 ORD- 号，没有就不显示，不显示内部任务号。0 元写「实付 0 元（免费试运营）」；页范围没传写「全部页」；2 页 × 3 份单面写成全部 6 页、共 6 张（6 面）；页数未知写「全部纸张」和「页数待识别」。文字识别不可用时出现「我已确认，继续打印」，点下去进入预览。
+- **验证：** kiosk `tsc --noEmit`、改动文件 eslint、`verify:print-confirm-honest`、`verify:print-done-truth`（含 `print-walk-copy`）、`verify:pickup-claim-error-coverage`、`verify:pii-redaction-contract`（含 `print-manual-ack`）、`verify:member-print-orders-ui`、`verify:profile-print-orders-inkpaper`、`verify:fusion-w2`、`verify:fusion-w5`、`verify:scan-session-truth`、`verify:profile-commercial-first-batch`、`verify:compliance-copy`、`verify:ci-gate-coverage`、`verify:repository-integrity`、`verify:wave3-print-aftercare` 通过。把对应旧说法改回去，上述门禁退出码为 1。正式 `vite build` + preview（47291）加路由夹具截图在本机 `~/.cache/walk0929/evidence/fix-print-chain/`，不进仓库。预览构建额外设了 `VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN`，否则确认页会停在安全校验。
+- **留给服务端：** `GET /me/print-orders` 目前不返回 `order.orderNo`，生产列表要等这个字段；A-04 留痕 #1068 未合入，前端这次没有调用；完成页的证件提示只是文字，打印文件上并没有盖水印。
 
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 

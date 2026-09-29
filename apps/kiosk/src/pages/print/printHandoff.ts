@@ -46,6 +46,8 @@ export interface PrintHandoffInput {
   /** 只对「我的文档」有意义：这一份要不要先做材料检查。 */
   requiresCheck?: boolean
   contentCategory?: PrintMaterialContentCategory
+  /** 证件扫描或证件用途才传 true。普通文件不传，完成页就不提水印。 */
+  idDocument?: boolean
 }
 
 export type PrintHandoffFailure = 'invalid_input' | 'storage_unavailable'
@@ -202,6 +204,7 @@ export function beginPrintHandoff(
     checkPolicy: policy.checkPolicy,
     paramsSuggestion: input.paramsSuggestion,
     contentCategory: input.contentCategory,
+    ...(input.idDocument === true ? { idDocument: true as const } : {}),
     updatedAt: iso(now),
   }
   if (!writeStoredPrintHandoff(context)) {
