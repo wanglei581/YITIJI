@@ -5,6 +5,7 @@
 - **做了什么（Grok 实现、协调方审）：** 合规窗口裁定：同意条款加「本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。」当前版本升到 `sa-consent-v1.2026-09-29`；服务端另收一份明确列出的旧版本清单 `SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS`（只有 `sa-consent-v1.2026-08-16`），清单外仍 400；落库存实际提交的版本号。`GET /resume/self-assessment/questions` 下发 `consentItems`（与版本配套的同一份条款）。匿名结果只按 `AI_RESUME_RESULT_TTL_HOURS` 短期保存（门禁断言 expiresAt 与 endUserId 为空），「匿名不留库」的错注释已改。#1112 后续：附加到简历改按 export 档过闸；整体合规拒答改为只回打分、不让用户重答。过渡期结束的待办已写进 next-tasks（触发条件：小程序带新条款的版本全量）。
 - **验证：** self-assessment-consent、self-assessment-ai-gate（106 条）、self-assessment、assess-isolation 全绿；协调方抽变异「旧版本移出清单」变红；shared、kiosk 类型检查与小程序契约通过。一体机那半（加条款、发新版本号）由主执行窗口同批合，小程序在它自己的 PR 里升版。
 
+- **合规终裁后改（9/29 晚）：** 不设过渡期，只收当前版本 `sa-consent-v2.2026-09-29`（勾选框文字也算同意内容，所以再升一版），旧版本一律 400；题目接口另下发 `consentLinks`（`{ label, legalDocType: 'privacy_policy', sectionTitle: '未满十四周岁未成年人个人信息处理规则' }`，前端选中标题包含它的一章，找不到停在开头；法务文档没有锚点 id）与确认式 `consentCheckboxLabel`。核实发现职业规划生成会把最近一次自我探索记分送进模型：同意不是当前版本时这次不纳入、规划照常生成（依据栏如实不写），不整单拒绝；查看、打印、降级纸不受影响。四端版本一致断言先 skip，待一体机与小程序升版后打开（已记 next-tasks）。Grok 起草到一半余额用完，协调方接手完成；变异（旧版本又被接受、旧同意记分送进模型、不下发链接）全红。
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
 - **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。
