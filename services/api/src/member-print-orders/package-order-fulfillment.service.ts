@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { ConflictException } from '@nestjs/common'
 import { signFileUrl } from '../files/signing'
 import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
+import { assertPrintOrderSides, printOrderSideCount } from '../print-jobs/verified-print-parameters'
 
 const CLAIM_FILE_URL_TTL_MS = 30 * 60 * 1000
 
@@ -54,6 +55,11 @@ export class PackageOrderFulfillmentService {
       throw new ConflictException({ error: { code: 'PACKAGE_FILE_UNAVAILABLE', message: '材料包下一份文件已不可打印' } })
     }
     const nextTaskId = `ptask_package_${crypto.randomBytes(8).toString('hex')}`
+    const sizedItems = await tx.orderItem.findMany({
+      where: { orderId: input.orderId },
+      select: { billablePages: true, copies: true },
+    })
+    assertPrintOrderSides(printOrderSideCount(sizedItems))
     await tx.printTask.create({
       data: {
         id: nextTaskId,
