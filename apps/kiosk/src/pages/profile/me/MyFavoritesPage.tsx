@@ -43,7 +43,7 @@ function getFavoriteTab(searchParams: URLSearchParams): FavoriteTab {
 function detailRoute(item: MemberFavoriteItem): string {
   if (item.targetType === 'job') return `/jobs/${item.targetId}`
   if (item.targetType === 'job_fair') return `/job-fairs/${item.targetId}`
-  return '/renshi?tab=policy'
+  return `/renshi?policy=${encodeURIComponent(item.targetId)}`
 }
 
 type LoadState = 'loading' | 'error' | 'ready'
@@ -99,7 +99,7 @@ export function MyFavoritesPage() {
           <QxMeStructRow icon={CalendarDaysIcon} title="招聘会收藏" desc="回到活动详情，预约以来源平台为准" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-favorites-1" />
         </>
       ) : null}
-      <QxMeStructRow icon={FileTextIcon} title="政策收藏" desc="对应政策页待建设，收藏仍会保留" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-favorites-2" />
+      <QxMeStructRow icon={FileTextIcon} title="政策收藏" desc="再打开这则政策说明" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-favorites-2" />
     </>
   )
   const minis = hostingOpen ? [`岗位 ${counts.job}`, `招聘会 ${counts.job_fair}`, `政策 ${counts.policy}`] : [`政策 ${counts.policy}`]
@@ -184,7 +184,7 @@ export function MyFavoritesPage() {
                 <div><b>招聘会收藏</b><span>查看活动详情；预约和签到以来源平台或现场规则为准。</span></div>
               </>
             ) : null}
-            <div><b>政策收藏</b><span>对应政策页待建设，当前保留收藏，不提供误导性的替代跳转。</span></div>
+            <div><b>政策收藏</b><span>再打开这则说明，办理仍以官方入口为准。</span></div>
           </div>
           <div className="qx-me-legal">{hostingOpen
             ? <>收藏只记录本人收藏行为；<b>投递与预约都在来源平台完成</b>，本机不代收简历，也不记录结果。</>

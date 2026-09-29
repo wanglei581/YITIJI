@@ -1,6 +1,7 @@
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import type { GeneratedResume, ResumeLayoutSettings, ResumeOptimizeModule } from '@ai-job-print/shared'
 import type { CSSProperties } from 'react'
+import { AiDeclarationNote } from '../../../../ai/AiDeclarationNote'
 import { OptimizedResumeEditor } from '../OptimizedResumeEditor'
 import { ResumeHtmlPreviewNote } from './ResumeAigcBadge'
 import { ResumeModuleDecisions } from './ResumeModuleDecisions'
@@ -59,6 +60,7 @@ export function OptimizeReadyBody(props: {
             {props.adjusting === 'reformat' ? '正在调整…' : 'AI 调整排版'}
           </button>
         </div>
+        <AiDeclarationNote />
         {props.lastResumeBeforeAiAdjust && (
           <button type="button" className="qx-btn" data-variant="teal" onClick={props.onUndoAi}>撤销 AI 调整</button>
         )}

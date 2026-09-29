@@ -736,7 +736,7 @@ async function main(): Promise<void> {
     const detailAfter = await orgs.getOrgDetail(orgA)
     ensure(detailAfter.accounts.find((account) => account.id === accountA)?.canRegisterContactPhone === true, '尚未自证时仍可显示登记手机号')
     const viewAfter = detailAfter.accounts.find((account) => account.id === accountA)
-    ensure(viewAfter?.passwordProofState === 'temporary' && typeof viewAfter.phoneRegisteredByAdminAt === 'string', '后台列表：已登记待自证时带 passwordProofState=temporary 与登记时间')
+    ensure(typeof viewAfter?.phoneRegisteredByAdminAt === 'string' && !('passwordProofState' in (viewAfter ?? {})), '后台列表：已登记待自证时带登记时间，不下发原始密码状态')
     const again = await register(registration, orgA, accountA, phoneA, { letter: 'QD-2026/092' })
     ensure(again.phoneMasked === maskPhone(phoneA), '同一个号码可以改登记')
     ensure((await auditsFor(prisma, accountA)).filter((row) => row.action === 'partner_account.contact_phone_registered').length === 2, '改登记再写一行审计')
@@ -770,7 +770,7 @@ async function main(): Promise<void> {
     const detailProved = await orgs.getOrgDetail(orgA)
     ensure(detailProved.accounts.find((account) => account.id === accountA)?.canRegisterContactPhone === false, '自证之后不再显示登记手机号')
     const viewProved = detailProved.accounts.find((account) => account.id === accountA)
-    ensure(viewProved?.passwordProofState === 'owner_managed' && viewProved.phoneRegisteredByAdminAt === null, '后台列表：自证后 passwordProofState=owner_managed、登记时间清空')
+    ensure(viewProved?.phoneRegisteredByAdminAt === null && viewProved.canRegisterContactPhone === false && !('passwordProofState' in (viewProved ?? {})), '后台列表：自证后登记时间清空、不能再登记，不下发原始密码状态')
     const challenge = await actions.createChallenge(admin, orgA, accountA, {
       action: 'delete_account', verifyMethod: 'password', adminCurrentPassword: ADMIN_PASSWORD,
     }, { ip })

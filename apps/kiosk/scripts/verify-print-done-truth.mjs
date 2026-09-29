@@ -72,12 +72,68 @@ const checks = [
   ['W6 直达完成页预期为无法确认', () => {
     assert.match(routeCasesSource, /pattern:\s*'\/print\/done'[\s\S]*?featureText:\s*'无法确认打印结果'/)
   }],
+  ['空闲后只收起本次预览，不说已经清场或退出登录', () => {
+    const wipe = doneRuntime.match(/const doWipe = useCallback\(\(\) => \{[\s\S]*?\}, \[\]\)/)
+    assert.ok(wipe, '完成页仍有 doWipe')
+    assert.match(wipe[0], /clearPrintMaterialSession\(\)/)
+    assert.doesNotMatch(wipe[0], /logout\s*\(/)
+    assert.match(doneRuntime, /setIdleLeft\(60\)/)
+    assert.match(doneRuntime, /登录还在/)
+    assert.match(doneRuntime, /账号还登录着/)
+    assert.match(doneRuntime, /收起这次预览/)
+    assert.match(doneRuntime, /账号不会因此退出/)
+    assert.doesNotMatch(
+      doneRuntime,
+      /隐私已清除|下一个人看不到|这次办理已清空|结束并清空|空闲超时自动清空|秒空闲后自动清空|已清除/,
+    )
+    }],
+  ['W-23 证件提醒只在证件件出现，且不声称文件上有水印（本机不盖水印）', () => {
+    assert.match(doneRuntime, /const idDocument = state\.idDocument === true/)
+    assert.match(doneRuntime, /\{idDocument \? \([\s\S]{0,280}原件和复印件一起带走/)
+    assert.match(doneRuntime, /idDocument \? '拿走前记得核一下页数，证件原件和复印件一起带走/)
+    // 服务端与 Agent 都没有加水印的实现：页面不得让用户去核对一个并不存在的水印。
+    assert.doesNotMatch(doneRuntime, /仅供求职使用」?\s*(<\/?b>)?\s*水印|页数和水印/)
+    assert.match(doneRuntime, /: '拿走前记得核一下页数，少页当场能处理。'/)
+    const handoff = read('src/pages/print/printHandoff.ts')
+    const confirm = read('src/pages/print/PrintConfirmPage.tsx')
+    const scan = read('src/pages/scan/ScanResultPage.tsx')
+    const documents = read('src/pages/profile/me/MyDocumentsPage.tsx')
+    assert.match(handoff, /input\.idDocument === true/)
+    assert.match(confirm, /idDocument:\s*handoff\.idDocument === true/)
+    assert.match(scan, /idDocument: scanType === 'id'/)
+    assert.match(documents, /doc\.purpose === 'id_scan'/)
+  }],
   ['出纸后提醒核对并取走', () => {
     // 稿 15 completed 只留一句「都打好了，拿走前核一下」，不再并列「请取走文件 / 请取走纸张」。
     assert.match(doneSource, /都打好了，拿走前核一下/)
     assert.match(doneSource, /从出纸口取走/)
     assert.doesNotMatch(doneRuntime, /请取走纸张/)
     assert.doesNotMatch(doneRuntime, /请取走文件/)
+  }],
+  ['W-46/W-51 完成页只显示 ORD- 号，取纸按份数，再印一份按价目', () => {
+    assert.match(doneRuntime, /displayOrderNo = publicOrderNo\(/)
+    assert.match(doneRuntime, /doneTakeaway\(/)
+    assert.match(doneRuntime, /reprintHint\(amountCents\)/)
+    assert.doesNotMatch(doneRuntime, /任务号/)
+    assert.doesNotMatch(doneRuntime, /不免费/)
+    assert.doesNotMatch(doneRuntime, /共 0 面/)
+    assert.doesNotMatch(doneRuntime, /errorCode = /)
+    assert.doesNotMatch(doneRuntime, /displayOrderNo[\s\S]{0,80}orderId/)
+    const progressRuntime = withoutComments(read('src/pages/print/PrintProgressPage.tsx'))
+    const progressSections = withoutComments(read('src/pages/print/components/PrintProgressSections.tsx'))
+    const doneSections = withoutComments(read('src/pages/print/components/PrintDoneSections.tsx'))
+    const model = read('src/pages/print/printProgressModel.ts')
+    assert.match(progressRuntime, /publicOrderNo\(/)
+    assert.match(progressRuntime, /reprintHint\(amountCents\)/)
+    assert.doesNotMatch(progressRuntime, /不免费/)
+    assert.doesNotMatch(progressRuntime, /任务号/)
+    assert.doesNotMatch(progressSections, /任务号/)
+    assert.match(doneSections, /shownOrderNo = publicOrderNo\(orderNo\)/)
+    assert.match(doneSections, /页数待识别/)
+    assert.doesNotMatch(doneSections, /\{file\.pages\} 页/)
+    assert.doesNotMatch(doneSections, /任务号/)
+    assert.match(model, /return '重新选文件后再确认。免费试运营，不另收费。'/)
+    assert.doesNotMatch(model, /不免费/)
   }],
   ['失败态给出带走二维码、订单号和补打入口', () => {
     assert.match(doneSource, /文件带走/)

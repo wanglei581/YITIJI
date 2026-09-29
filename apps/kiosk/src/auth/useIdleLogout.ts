@@ -2,7 +2,15 @@ import { useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useIdleTimer } from '../hooks/useIdleTimer'
 import { useKioskBusy } from '../contexts/KioskBusyContext'
+import {
+  RESULT_WARNING_SEC,
+  resolveLogoutIdleMs,
+  resolveResultIdleMs,
+  resolveWarningWindow,
+} from './kioskIdleTiming'
 import { useAuth } from './useAuth'
+
+export { RESULT_WARNING_SEC, resolveLogoutIdleMs, resolveResultIdleMs, resolveWarningWindow }
 
 export interface KioskIdleWarningRequest {
   deadlineAt: number
@@ -33,28 +41,9 @@ export interface KioskIdleWarningRequest {
  * 用户数据只清内存态 + sessionStorage；持久化 privacy boundary 仅含随机代次和 history idx，
  * 不包含 token、手机号、材料或其他用户数据。
  *
- * 阈值默认 180s，可经 VITE_KIOSK_LOGOUT_IDLE_SEC 覆盖。
- * 结果页（报告 / 优化 / 我的文档）默认 90s + 15s 可见预警，可经 VITE_KIOSK_RESULT_IDLE_SEC 覆盖。
+ * 时长在 kioskIdleTiming：普通页面默认 180 秒；结果页（报告 / 优化 / 我的文档）
+ * 默认 90 秒，其中最后 15 秒是可见预警，不另加。
  */
-const DEFAULT_LOGOUT_IDLE_SEC = 180
-const DEFAULT_RESULT_IDLE_SEC = 90
-const RESULT_WARNING_SEC = 15
-const MAX_BROWSER_TIMER_MS = 2_147_483_647
-// Keep at least 1s before the warning when the total idle window permits it.
-// The outer clamp below still prevents extending the configured privacy deadline.
-const MIN_TRIGGER_MS = 1_000
-
-function resolveLogoutIdleMs(): number {
-  const raw = Number(import.meta.env.VITE_KIOSK_LOGOUT_IDLE_SEC)
-  const sec = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_LOGOUT_IDLE_SEC
-  return sec * 1000
-}
-
-function resolveResultIdleMs(): number {
-  const raw = Number(import.meta.env.VITE_KIOSK_RESULT_IDLE_SEC)
-  const sec = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_RESULT_IDLE_SEC
-  return sec * 1000
-}
 
 export function isKioskResultIdlePath(pathname: string): boolean {
   return (
@@ -64,20 +53,6 @@ export function isKioskResultIdlePath(pathname: string): boolean {
     pathname === '/me/documents' ||
     pathname.startsWith('/me/documents/')
   )
-}
-
-export function resolveWarningWindow(
-  totalMs: number,
-  warningSec?: number,
-): { triggerMs: number; warningMs: number } {
-  const safeTotalMs =
-    Number.isFinite(totalMs) && totalMs > 0 && totalMs <= MAX_BROWSER_TIMER_MS ? totalMs : 1
-  const raw = warningSec !== undefined ? warningSec : Number(import.meta.env.VITE_KIOSK_SESSION_WARNING_SEC)
-  const configuredMs = (Number.isFinite(raw) && raw > 0 ? raw : 30) * 1000
-  // 触发延时 = min(safeTotalMs, max(MIN_TRIGGER_MS, safeTotalMs - configuredMs)):
-  // 外层 min 防止触发延时超过配置的总阈值,守住"triggerMs + warningMs === safeTotalMs"不变量。
-  const triggerMs = Math.min(safeTotalMs, Math.max(MIN_TRIGGER_MS, safeTotalMs - configuredMs))
-  return { triggerMs, warningMs: Math.max(0, safeTotalMs - triggerMs) }
 }
 
 export function useIdleLogout(

@@ -413,6 +413,7 @@ export function PrintConfirmPage() {
           priceLines:  created.priceLines,
           paymentSessionToken: created.paymentSessionToken,
           hasEndUser:  created.hasEndUser,
+          idDocument:  handoff.idDocument === true,
         }
         if (created.amountCents > 0 && created.payStatus !== 'paid') {
           navigate('/print/cashier', { state: nextState })
@@ -446,7 +447,7 @@ export function PrintConfirmPage() {
       clearPrintMaterialSession()
     }
     navigate('/print/progress', {
-      state: { ...(isContractReport ? {} : location.state), file, params, source },
+      state: { ...(isContractReport ? {} : location.state), file, params, source, idDocument: handoff.idDocument === true },
     })
   }
 
@@ -489,15 +490,9 @@ export function PrintConfirmPage() {
               ? '按以上设置打印风险提示报告'
               : appendEligible
                 ? '打印合并版（简历+自我探索）'
-                : screen === 'zero-amount'
-                  ? '确认并建单'
+                : quote.status === 'ready' && quote.amountCents === 0
+                  ? '确认并打印'
                   : '确认并去付款'
-
-  const primaryAccessible = reconfirmLabel ?? (isContractReport
-    ? '按以上设置打印风险提示报告'
-    : appendEligible
-      ? '打印合并版（简历+自我探索）'
-      : '确认并去付款 · 按以上设置打印原文件')
 
   // 稿 14 .cfm-act：动作收在 03 卡里（返回在左、主操作在右），不再挂在底部操作条上。
   const backLabel = isContractReport ? (abandoning ? '正在删除…' : '放弃打印') : '返回修改'
@@ -513,7 +508,7 @@ export function PrintConfirmPage() {
       className="qx-btn"
       data-variant="primary"
       disabled={confirmBlocked}
-      aria-label={primaryAccessible}
+      aria-label={label}
       onClick={() => void handleConfirm()}
     >
       {submitting ? <LoaderIcon size={24} aria-hidden="true" /> : <PrinterIcon size={24} aria-hidden="true" />}

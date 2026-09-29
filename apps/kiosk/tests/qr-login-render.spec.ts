@@ -149,6 +149,86 @@ test('扫码登录拿到真实票据后渲染可扫描 SVG @kiosk', async ({ pag
   expect(createCalls).toBe(1)
 })
 
+async function fulfillQrCreate(route: Route, createCalls: { n: number }, ticketId: string, failFirst = false): Promise<void> {
+  const request = route.request()
+  const origin = request.headers().origin ?? 'http://127.0.0.1:4177'
+  if (request.method() === 'OPTIONS') {
+    await route.fulfill({
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Local-Bridge-Token',
+        'Access-Control-Allow-Private-Network': 'true',
+      },
+    })
+    return
+  }
+  createCalls.n += 1
+  if (failFirst && createCalls.n === 1) {
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': origin },
+      body: JSON.stringify({ success: false, error: { code: 'QR_CREATE_FAILED', message: '请求失败（500）' } }),
+    })
+    return
+  }
+  await route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'Access-Control-Allow-Origin': origin },
+    body: JSON.stringify({
+      success: true,
+      data: {
+        ticketId,
+        qrUrl: `/member/qr-login?ticketId=${ticketId}`,
+        expiresInSeconds: 180,
+        returnTo: '/',
+      },
+    }),
+  })
+}
+
+test('W-15 先切到扫码再勾选协议也能拿到二维码 @kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respond('GET', `/api/v1/member/auth/qr/${TICKET_ID}/status`, {
+    status: 200,
+    json: { success: true, data: { status: 'pending', deviceLabel: '就业大厅 3 号机', returnTo: '/', expiresInSeconds: 180 } },
+  })
+  const createCalls = { n: 0 }
+  await page.route(LOCAL_QR_CREATE_URL, (route) => fulfillQrCreate(route, createCalls, TICKET_ID))
+  await page.goto('/login')
+  await page.getByRole('button', { name: '手机扫码登录', exact: true }).click()
+  await expect(page.getByText('等待你勾选协议', { exact: true })).toBeVisible()
+  expect(createCalls.n).toBe(0)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await expect(page.locator('.k-qrframe svg')).toBeVisible()
+  await expect(page.locator('.k-qrframe .k-qr-placeholder')).toHaveCount(0)
+  expect(createCalls.n).toBe(1)
+})
+
+test('W-15 二维码获取失败后可以重新生成 @kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respond('GET', `/api/v1/member/auth/qr/${TICKET_ID}/status`, {
+    status: 200,
+    json: { success: true, data: { status: 'pending', deviceLabel: '就业大厅 3 号机', returnTo: '/', expiresInSeconds: 180 } },
+  })
+  const createCalls = { n: 0 }
+  await page.route(LOCAL_QR_CREATE_URL, (route) => fulfillQrCreate(route, createCalls, TICKET_ID, true))
+  await page.goto('/login')
+  await page.getByRole('button', { name: '手机扫码登录', exact: true }).click()
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await expect(page.getByTestId('login-gate-state-qr-error')).toBeVisible()
+  await expect(page.getByText('二维码未能获取', { exact: true })).toBeVisible()
+  const retry = page.getByTestId('login-gate-primary')
+  await expect(retry).toHaveText('重新生成二维码')
+  await expect(retry).toBeEnabled()
+  await retry.click()
+  await expect(page.locator('.k-qrframe svg')).toBeVisible()
+  expect(createCalls.n).toBe(2)
+})
+
 test('手机号验证码按钮交互态可读且通用错误使用场景提示 @kiosk', async ({ page, api }, testInfo) => {
   registerKioskShell(api)
   let smsRequestCount = 0
@@ -491,6 +571,15 @@ for (const scenario of [
     await expect(page.getByRole('alert')).toContainText(scenario.expected)
     await expect(page.getByRole('alert')).not.toContainText(scenario.code)
     await expect(page.getByText('再试一次发码')).toHaveCount(0)
+    await expect(page.getByTestId('login-gate-send')).toHaveText('暂时不能发')
+    await expect(page.getByTestId('login-gate-send')).toBeDisabled()
+    await expect(page.getByText('获取验证码', { exact: true })).toHaveCount(0)
+    const head = page.locator('.qx-pagehead')
+    if (scenario.code === 'SMS_TERMINAL_DAILY_LIMIT') await expect(head).toContainText('这台机器今天的短信已经发完')
+    if (scenario.code === 'SMS_DAILY_TOTAL_LIMIT') {
+      await expect(head).toContainText('今天的短信验证码已经发完')
+      await expect(head).not.toContainText('这台机器')
+    }
     await expect(page.getByTestId('login-gate-anonymous')).toHaveText('不登录，继续使用')
     const primary = page.getByTestId('login-gate-primary')
     await expect(primary).toHaveText('改用扫码登录')
@@ -498,6 +587,61 @@ for (const scenario of [
     await expect(page.locator('[data-screen="login-gate"]')).toHaveAttribute('data-mode', 'qr')
   })
 }
+
+test('W-19 这个号码今天用完后不再写成重新获取验证码 @kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 429,
+    json: { success: false, error: { code: 'SMS_DAILY_LIMIT', message: 'SMS_DAILY_LIMIT' } },
+  })
+  await page.goto('/login')
+  await enterMemberPhone(page)
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByTestId('login-gate-send').click()
+  await expect(page.getByTestId('login-gate-state-phone-send-limited')).toBeVisible()
+  await expect(page.locator('.qx-pagehead')).toContainText('这个号码今天不能再收验证码')
+  await expect(page.getByRole('alert')).toContainText('这个号码今天的验证码次数已用完')
+  await expect(page.getByTestId('login-gate-send')).toHaveText('今天不能再发')
+  await expect(page.getByTestId('login-gate-send')).toBeDisabled()
+  await expect(page.getByTestId('login-gate-primary')).toHaveText('改用扫码登录')
+  await expect(page.getByTestId('login-gate-anonymous')).toHaveText('不登录，继续使用')
+  await expect(page.getByText('重新获取验证码', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  await page.getByRole('button', { name: '删除', exact: true }).click()
+  await expect(page.getByTestId('login-gate-send')).toHaveText('获取验证码')
+})
+
+test('W-54 输满手机号不挡住发码，发码成功后验证码框获得焦点，未勾选没有对勾 @kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 17, expiresInSeconds: 91 } },
+  })
+  await page.goto('/login')
+  const box = page.locator('.k-agree-check .box')
+  await expect(box.locator('svg')).toHaveCount(0)
+  await expect(page.getByRole('checkbox', { name: /我已阅读并同意/ })).toHaveAttribute('aria-checked', 'false')
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await expect(box.locator('svg')).toHaveCount(1)
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13917825640') await page.getByRole('button', { name: digit, exact: true }).click()
+  const keypad = page.getByTestId('login-gate-keypad')
+  await expect(keypad).toHaveAttribute('data-keypad-target', 'phone')
+  await expect(page.getByText('正在输入：手机号', { exact: true })).toBeVisible()
+  const send = page.getByTestId('login-gate-send')
+  await expect(send).toHaveText('获取验证码')
+  await expect(send).toBeEnabled()
+  const hittable = await send.evaluate((el) => {
+    const rect = el.getBoundingClientRect()
+    const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+    return top === el || (top !== null && el.contains(top))
+  })
+  expect(hittable).toBe(true)
+  await send.click()
+  await expect(page.locator('#login-gate-code')).toBeFocused()
+  await expect(keypad).toHaveAttribute('data-keypad-target', 'code')
+  await expect(page.getByText('正在输入：短信验证码', { exact: true })).toBeVisible()
+})
 
 for (const [code, state] of [['SMS_CODE_INVALID', 'phone-code-invalid'], ['SMS_CODE_EXPIRED', 'phone-code-expired'], ['SMS_CODE_LOCKED', 'phone-code-locked']]) {
   test(`W4 verification recovery ${code} @kiosk`, async ({ page, api }) => {

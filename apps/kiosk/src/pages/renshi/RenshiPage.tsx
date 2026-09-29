@@ -11,6 +11,8 @@ import { AUDIENCE_CHIPS, fromPublished, getInitialTab, type AudienceKey, type Po
 import { BUILTIN_GUIDES } from './builtinData'
 import { OfficialEntryQrOverlay, RqDeadEnd, SourceLine, TabBar, type DeadEndExit, type SourceQrTarget } from './components'
 import { PolicyPanel } from './PolicyPanel'
+import { PolicyFocusDeadEnd } from './policyFocus'
+import { usePolicyFocus } from './usePolicyFocus'
 import { EligibilityPanel, type EligibilityChrome } from './EligibilityPanel'
 import { SocialPanel } from './SocialPanel'
 import { RegisterPanel } from './RegisterPanel'
@@ -109,6 +111,32 @@ export function RenshiPage() {
   }, [audience])
 
   useEffect(() => { loadPolicies() }, [loadPolicies])
+
+  const focusId = (searchParams.get('policy') ?? '').trim() || null
+  const focus = usePolicyFocus({
+    focusId,
+    ready: policyState === 'ready',
+    guides,
+    notices,
+    setGuides,
+    setNotices,
+    setSearchParams,
+  })
+  const focusOnList = focus.phase !== 'idle' && (activeTab === 'policy' || activeTab === 'notice')
+  const leaveFocusedPolicy = () => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('policy')
+      return next
+    }, { replace: true })
+  }
+  const focusFrame = focus.phase === 'checking'
+    ? { subtitle: '正在打开你点的那一条，确认之前不显示别的政策。', status: { tone: 'unknown' as const, label: '正在打开' } }
+    : focus.phase === 'missing'
+      ? { subtitle: '这条现在打不开。可以看其他政策，或回到收藏。', status: { tone: 'warn' as const, label: '这条打不开' } }
+      : focus.phase === 'failed'
+        ? { subtitle: '这次没有打开。可以再试一次，或先看其他政策。', status: { tone: 'bad' as const, label: '这次没打开' } }
+        : null
 
   const libraryItems = useMemo<PolicyItem[]>(() => guides.map(fromPublished), [guides])
   const visibleLibraryCount = libraryItems.filter((item) => (
@@ -250,8 +278,8 @@ export function RenshiPage() {
     <QxPageFrame
       back={{ label: '返回政策服务', onBack: goHub }}
       title={TAB_TITLE[activeTab]}
-      subtitle={frame.subtitle}
-      status={frame.status}
+      subtitle={focusOnList && focusFrame ? focusFrame.subtitle : frame.subtitle}
+      status={focusOnList && focusFrame ? focusFrame.status : frame.status}
       ctabar={(
         <div className="rq-cta-stack">
           <div className="rq-cta-row" data-testid="renshi-ctabar">
@@ -323,16 +351,19 @@ export function RenshiPage() {
             <li><b>2</b>展开一条，看原文和材料</li>
             <li><b>3</b>扫码去来源页自己办</li>
           </ol>
-          {frame.source ? <SourceLine text={frame.source} /> : null}
+          {focusOnList ? null : frame.source ? <SourceLine text={frame.source} /> : null}
           <TabBar active={activeTab} onChange={setActiveTab} />
         </div>
         <div className="qx-scroll rq-scroll">
           {activeTab === 'policy' && (
-            policyState === 'loading' ? loadingDeadEnd : policyState === 'error' ? errorDeadEnd : (
+            policyState === 'loading' ? loadingDeadEnd : policyState === 'error' ? errorDeadEnd : focus.phase !== 'idle' ? (
+              <PolicyFocusDeadEnd phase={focus.phase} onOthers={leaveFocusedPolicy} onFavorites={() => navigate('/me/favorites')} onRetry={focus.retry} />
+            ) : (
               <PolicyPanel
                 libraryItems={libraryItems}
                 guideItems={BUILTIN_GUIDES}
                 audience={audience}
+                focusId={focusId}
                 onAudienceChange={setAudience}
                 onOpened={handlePolicyItemOpened}
                 onOfficialEntry={handlePolicyItemEntry}
@@ -343,8 +374,10 @@ export function RenshiPage() {
           )}
           {activeTab === 'eligibility' && <EligibilityPanel onChrome={setEligChrome} ctaHost={eligHost} onTab={setActiveTab} />}
           {activeTab === 'notice' && (
-            policyState === 'loading' ? loadingDeadEnd : policyState === 'error' ? errorDeadEnd : (
-              <NoticePanel notices={notices} onOpened={handleNoticeOpened} onOfficialEntry={handleNoticeEntry} onTab={setActiveTab} />
+            policyState === 'loading' ? loadingDeadEnd : policyState === 'error' ? errorDeadEnd : focus.phase !== 'idle' ? (
+              <PolicyFocusDeadEnd phase={focus.phase} onOthers={leaveFocusedPolicy} onFavorites={() => navigate('/me/favorites')} onRetry={focus.retry} />
+            ) : (
+              <NoticePanel notices={notices} focusId={focusId} onOpened={handleNoticeOpened} onOfficialEntry={handleNoticeEntry} onTab={setActiveTab} />
             )
           )}
           {activeTab === 'social' && <SocialPanel onOfficialEntry={setQrEntry} />}

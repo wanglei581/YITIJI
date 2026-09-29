@@ -64,27 +64,75 @@ export interface SelfAssessmentAnswerV1 {
  * 系统却按「已同意」放行。版本号的唯一作用，就是让「用户当初同意的那份说明」
  * 与「现在这份说明」可比：**不一致就必须重新确认，而不是静默继承**。
  *
- * 改动同意条目（kiosk `CONSENT_ITEMS`）任意一条**必须**同时提高本常量。
+ * 版本号、条款、链接、勾选框文字是配套的一组。改其中任意一项**必须**同时提高本常量。
+ * 服务端不再接受更早的版本号。
  *
- * 真源与镜像（三处必须逐字相等，由 `verify:self-assessment-consent` 门禁锁死）：
- *   1. 本常量（真源）；
- *   2. `services/api/src/ai/resume/self-assessment.types.ts`（服务端 CJS 副本，
- *      理由见该文件头注释：services/api 走 commonjs，packages/shared 是 ESM-only）；
- *   3. `apps/kiosk/src/pages/resume/selfAssessmentSession.ts` 的
- *      `SELF_ASSESSMENT_CONSENT_VERSION`（前端仍为独立声明；应改为从本包 import，
- *      属前端一行改动，不在后端批次内 —— 在门禁锁死前不得放任其漂移）。
+ * 当前版本的真源是本常量。服务端 CJS 镜像
+ * （`services/api/src/ai/resume/self-assessment.types.ts`）必须与它逐字相等
+ * （services/api 走 commonjs，本包是 ESM-only，不能直接 import）。
+ * 一体机与小程序展示的条款、链接、勾选框文字必须与下面这组常量逐字相同。
+ * 门禁：`verify:self-assessment-consent`。
  */
-export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v1.2026-08-16'
+export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v2.2026-09-29'
+
+/**
+ * 与 `SELF_ASSESSMENT_CONSENT_VERSION` 配套的条款原文，按展示顺序。
+ * 前 5 条是说明正文；最后一条是年龄说明。
+ */
+export const SELF_ASSESSMENT_CONSENT_ITEMS = [
+  '本工具基于本人作答提供倾向参考，不是临床 / 心理 / 人格诊断。',
+  '结果对本人可见，不向企业、合作机构、第三方推送。',
+  '作答后可在结果页一键撤回 / 物理删除；不留存本人答案原文。',
+  '本工具不评估「适合 / 不适合」任何岗位或职业，亦不构成能力证明。',
+  '5 段解读由 AI 生成（E3 · 仅供参考）；维度强度由固定权重算出，不经过 AI。',
+  '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。',
+] as const
+
+/**
+ * 同意页上的可点链接。`legalDocType` 必须是 `GET /kiosk/legal/:type` 已接受的类型。
+ * `sectionTitle`：页面打开隐私政策后，选中标题**包含**这串文字的那一章；找不到就停在开头，不报错。
+ * 法务文档是纯文本、没有锚点 id，所以按章节标题匹配（合规窗口 9/29 定）。
+ * 法务草稿里这一章固定为「六、未满十四周岁未成年人个人信息处理规则」；律师改了章节标题，这里必须同步改。
+ */
+export interface SelfAssessmentConsentLink {
+  label: string
+  legalDocType: 'privacy_policy'
+  sectionTitle: string
+}
+
+export const SELF_ASSESSMENT_CONSENT_LINKS: readonly SelfAssessmentConsentLink[] = [
+  {
+    label: '《隐私政策》中的未成年人个人信息处理规则',
+    legalDocType: 'privacy_policy',
+    sectionTitle: '未满十四周岁未成年人个人信息处理规则',
+  },
+]
+
+/** 勾选框文字也是同意内容。改这句话必须同时升 `SELF_ASSESSMENT_CONSENT_VERSION`。 */
+export const SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL =
+  '我已阅读上述说明和《隐私政策》中的未成年人个人信息处理规则，确认本人已满 14 周岁；未满 14 周岁的，已取得监护人同意并由监护人陪同。'
+
+/**
+ * 题目接口下发的形状。版本号、条款、链接、勾选框文字是同一份说明。
+ */
+export interface SelfAssessmentQuestionsResponse {
+  version: 'v1'
+  dimensions: SelfAssessmentDimensionV1[]
+  consentVersion: string
+  consentItems: string[]
+  consentLinks: SelfAssessmentConsentLink[]
+  consentCheckboxLabel: string
+}
 
 /**
  * 同意颗粒度：nonSensitive 必须勾选；sensitive 可选。
  *
- * `consentVersion` 为可选：现网前端（S2-7）只发两个布尔、不发版本号。
- * 服务端对三种情况的处置**互不相同**，且都不会把旧同意升级成新同意：
- *   - 版本号缺省      → 按「未版本化同意」如实记为 null，**不补写当前版本**；
+ * `consentVersion` 为可选：没带版本号的旧客户端只发两个布尔。
+ * 服务端不会把旧同意升级成新同意：
+ *   - 版本号缺省 → 按「未版本化同意」如实记为 null，**不补写当前版本**；
  *   - 版本号 = 当前版 → 记录该版本 + 勾选时刻；
- *   - 版本号 ≠ 当前版 → 直接拒绝（`SELF_ASSESSMENT_CONSENT_VERSION_STALE`），
- *                       要求重新确认，**不静默放行**。
+ *   - 其它任何已提交的版本 → 直接拒绝（`SELF_ASSESSMENT_CONSENT_VERSION_STALE`），
+ *     **不静默放行**。没有过渡期，也不再保留旧版本清单。
  */
 export interface SelfAssessmentConsent {
   nonSensitive: boolean
@@ -123,7 +171,11 @@ export interface SelfAssessmentPayload {
 export interface SelfAssessmentSubmitResponse {
   taskId: string
   status: 'completed' | 'rejected'
-  /** 命中合规词被整体拒绝时给出原因（前端引导用户重新作答）。 */
+  /**
+   * 模型调用抛错、这次提交没有完成时给出原因。
+   * 模型整体合规拒答不走这里：那时 status=completed，打分照常，
+   * aiUnavailableReason=COMPLIANCE_REJECT，不要求重新作答。
+   */
   failReason?: string
   /** 5 维度结果。 */
   dimensions: SelfAssessmentDimensionResult[]
@@ -158,7 +210,7 @@ export interface SelfAssessmentSubmitResponse {
    * 模型码：AI_NOT_CONFIGURED / AI_BUSY / AI_SELF_ASSESSMENT_TIMEOUT / AI_PROVIDER_* / AI_EMPTY_RESPONSE /
    * AI_CONTENT_BLOCKED / AI_ENDPOINT_NOT_ALLOWED / AI_UNAVAILABLE / AI_INTERPRETATION_UNPARSEABLE；
    * 说不出原因时 AI_INTERPRETATION_UNAVAILABLE；
-   * 整体合规拒答（status=rejected）为 COMPLIANCE_REJECT。
+   * 模型整体合规拒答为 COMPLIANCE_REJECT（此时 status=completed，打分照常，不要求重新作答）。
    */
   aiUnavailableReason?: string | null
 }

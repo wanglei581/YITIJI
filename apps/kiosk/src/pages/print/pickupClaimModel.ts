@@ -173,25 +173,66 @@ export interface ClaimSuccessCopy {
   cta: string
 }
 
+const FINISHED_PRINT_STATUSES = new Set(['completed', 'failed', 'cancelled', 'abandoned'])
+
 /**
- * 成功两条分支完全由服务端 released 决定，用户不能自选：
- * released=false —— 订单已认领、未付款，付款成功后才创建打印任务；
- * released=true  —— 已付（或免费）订单，认领时服务端已经释放出打印任务。
+ * 成功文案先看有没有放行打印，放行后再看打印状态：
+ * released=false —— 还没付款，去收银台；
+ * released=true 且已经打完 —— 如实说完成，给出路；
+ * 其余已放行 —— 还在队列或正在出纸，请留在出纸口旁。
  */
-export function claimSuccessCopy(released: boolean): ClaimSuccessCopy {
-  return released
-    ? {
-        title: '打印任务已释放',
-        line: '这笔订单已支付（或为免费订单），打印任务已进入队列，请留在出纸口旁。',
-        steps: ['订单已认领', '进入打印队列', '出纸后核对页数再离开'],
-        cta: '查看打印进度',
-      }
-    : {
-        title: '订单核验成功',
-        line: '这笔订单还没支付。付款成功后系统才会创建打印任务，不会提前出纸。',
-        steps: ['订单已认领', '去收银台现场支付', '支付完成开始打印'],
-        cta: '进入现场支付',
-      }
+export function claimSuccessCopy(released: boolean, printTaskStatus?: string | null): ClaimSuccessCopy {
+  if (!released) {
+    return {
+      title: '订单核验成功',
+      line: '这笔订单还没支付。付款成功后才会开始打印，不会提前出纸。',
+      steps: ['订单已核对', '去收银台现场支付', '支付完成开始打印'],
+      cta: '进入现场支付',
+    }
+  }
+  if (printTaskStatus === 'completed') {
+    return {
+      title: '这一单已经打印完成',
+      line: '这一单已经打印完成。请核对出纸口的纸张，核对后可以离开。',
+      steps: ['订单已核对', '打印已经完成', '核对后可以离开'],
+      cta: '查看打印结果',
+    }
+  }
+  if (printTaskStatus === 'failed' || printTaskStatus === 'cancelled' || printTaskStatus === 'abandoned') {
+    return {
+      title: '这一单没有打成',
+      line: '这一单没有打成。请联系现场工作人员，不要在出纸口空等。',
+      steps: ['订单已核对', '打印没有完成', '找工作人员处理'],
+      cta: '查看这一单',
+    }
+  }
+  if (printTaskStatus === 'printing') {
+    return {
+      title: '正在出纸',
+      line: '打印机正在出纸，请留在出纸口旁。',
+      steps: ['订单已核对', '正在出纸', '出完再核对页数'],
+      cta: '查看打印进度',
+    }
+  }
+  return {
+    title: '已进入打印队列',
+    line: '打印任务已进入队列，请留在出纸口旁。',
+    steps: ['订单已核对', '进入打印队列', '出纸后核对页数再离开'],
+    cta: '查看打印进度',
+  }
+}
+
+/** 认领成功后去哪一页。已完成不能再送去「请留在出纸口旁」的进度页。 */
+export function claimSuccessDestination(input: {
+  released: boolean
+  printTaskStatus?: string | null
+  taskId?: string | null
+}): '/print/cashier' | '/print/progress' | '/print/done' | '/me/print-orders' {
+  if (!input.released) return '/print/cashier'
+  if (FINISHED_PRINT_STATUSES.has(input.printTaskStatus ?? '')) {
+    return input.taskId ? '/print/done' : '/me/print-orders'
+  }
+  return '/print/progress'
 }
 
 /** 成功卡订单行的补充信息：只转述回执里真有的文件名与金额，缺哪项就省哪项。 */
