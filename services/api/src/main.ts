@@ -9,6 +9,7 @@ import { registerAiPlatformDegradation } from './common/boot/ai-platform-degrada
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { installBodyParsers } from './config/body-parsers'
 import { assertProductionRuntimeGates } from './config/production-runtime-gates'
+import { assertSmsTrustedEgressConfig } from './member-auth/sms/sms-egress-config'
 import { resolveTrustProxyHops } from './config/trust-proxy'
 
 // rawBody 捕获与 body parser 装配已抽到 config/body-parsers.ts（与 verify 脚本共用，
@@ -45,6 +46,9 @@ async function bootstrap(): Promise<void> {
   // AI 类配置（OCR / AI_PROVIDER / 大模型密钥 / AIGC 生产方）例外：缺了只把 AI 登记为降级（F-11），
   // /health 如实 degraded，AI 路由 503，打印、扫描、支付、两个后台照常。
   registerAiPlatformDegradation(assertProductionRuntimeGates().aiPlatform)
+  // 受信出口写错在任何环境都要拒绝启动，所以不能放进 assertProductionRuntimeGates
+  // （那个函数在非生产环境会直接返回）。
+  assertSmsTrustedEgressConfig()
 
   const { AppModule } = await import('./app.module')
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {

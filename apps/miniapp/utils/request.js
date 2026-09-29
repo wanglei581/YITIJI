@@ -103,7 +103,7 @@ function silentResignin(generation) {
 function request(path, options = {}) {
   // 带 ai 标记的请求先过声明 / 登录前置，前置里再回到这里发出（_aiRan 防止再绕一圈）。
   if (options.ai && aiRunner && !options._aiRan) {
-    return aiRunner(options.ai, () => request(path, Object.assign({}, options, { _aiRan: true })));
+    return aiRunner(options.ai, () => request(path, Object.assign({}, options, { _aiRan: true })), options);
   }
   // 出发时是谁,全程以此为准(见 utils/auth.js 的 sessionGeneration)。
   const generation = auth.sessionGeneration();
@@ -240,7 +240,7 @@ function unwrapEnvelope(body) {
  */
 function uploadFile(path, filePath, options = {}) {
   if (options.ai && aiRunner && !options._aiRan) {
-    return aiRunner(options.ai, () => uploadFile(path, filePath, Object.assign({}, options, { _aiRan: true })));
+    return aiRunner(options.ai, () => uploadFile(path, filePath, Object.assign({}, options, { _aiRan: true })), options);
   }
   // 与 request() 同一套代际校验:上传同样会在途中被登出/换号。
   const generation = auth.sessionGeneration();

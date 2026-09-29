@@ -260,6 +260,8 @@ class NoopSmsSender implements SmsSender {
     }
     this.sent.push({ phone, code })
   }
+
+  async sendPartnerPhoneRegisteredNotice(): Promise<void> {}
 }
 class RecordingAudit {
   readonly entries: Parameters<AuditService['write']>[0][] = []

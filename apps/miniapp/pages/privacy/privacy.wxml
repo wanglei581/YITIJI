@@ -37,7 +37,7 @@
     </view>
 
     <!-- C6：两项声明。登录着显示账号里的记录，没登录显示本机的。 -->
-    <view class="grp-label">年龄声明与录音同意</view>
+    <view class="grp-label">年龄声明与 AI 授权</view>
     <view class="pv-group">
       <view wx:if="{{consents.error}}" class="pv-item">
         <view class="pv-main"><view class="pv-s">{{consents.error}}</view></view>
@@ -55,6 +55,13 @@
             <view class="pv-s">{{consents.voice.text}}</view>
           </view>
           <text class="pv-act">{{consents.voice.on ? '撤回' : '查看'}}</text>
+        </view>
+        <view wx:if="{{consents.resume}}" class="pv-item tap" hover-class="tap-press" bindtap="tapResumeConsent" role="button" aria-label="简历 AI 授权，{{consents.resume.text}}">
+          <view class="pv-main">
+            <view class="pv-t">简历 AI 授权</view>
+            <view class="pv-s">{{consents.resume.text}}</view>
+          </view>
+          <text class="pv-act">{{consents.resume.on ? '撤回' : '查看'}}</text>
         </view>
       </block>
       <view wx:else class="pv-item"><view class="pv-main"><view class="pv-s">正在读取…</view></view></view>

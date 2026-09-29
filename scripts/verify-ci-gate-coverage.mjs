@@ -80,6 +80,9 @@ const REQUIRED_COMMANDS = [
   // /health 宣称「管理端不受影响」；所有 500 在服务端零痕迹。这两条都被
   // 「摘掉门禁就悄悄回归」的类型，因此钉进本文件。
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:redis-degradation-truth',
+  // 真 Redis 下的内部账号密码登录。只出现在作业脚本里还不够：
+  // 藏进聚合脚本后，B 段仍可能算「跑过」，但这条必须在 ci.yml 里逐字可见。
+  'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:internal-login-real-redis',
   'pnpm --filter @ai-job-print/api verify:error-observability',
   'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters',
 ]

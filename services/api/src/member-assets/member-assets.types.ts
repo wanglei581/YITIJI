@@ -42,6 +42,11 @@ export interface MemberDocumentItem {
   expiresAt: string | null
   downloadUrlPath: string
   previewUrlPath: string
+  /**
+   * 从文件内容识别出的页数。null 表示还没识别出来，不是 0 页。
+   * 调用方不得把 null 显示成 0，也不得改用本地估算。
+   */
+  pageCount: number | null
   /** false = 高敏报告等禁止进入打印链路，前端不得展示重新打印。 */
   reprintable: boolean
   /**

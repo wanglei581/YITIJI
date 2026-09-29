@@ -34,6 +34,29 @@ function intEnv(name: string, fallback: number): number {
   return Number.isInteger(n) && n > 0 ? n : fallback
 }
 
+/**
+ * 腾讯云语音合成密钥。专用变量优先，否则与数字人共用 TENCENT_SECRET_*。
+ * 在线探针必须调用这里，不能自己再写一套变量名。返回值是密钥，调用方不得打印。
+ */
+export function readTencentTtsSecretPair(): { secretId: string | undefined; secretKey: string | undefined } {
+  return {
+    secretId: process.env['TENCENT_TTS_SECRET_ID'] || process.env['TENCENT_SECRET_ID'],
+    secretKey: process.env['TENCENT_TTS_SECRET_KEY'] || process.env['TENCENT_SECRET_KEY'],
+  }
+}
+
+/** TextToVoice 的主机、签名用主机名、URL 与地域。与 synthesizeSegment 同一处。 */
+export function readTextToVoiceTarget(): { host: string; signHost: string; url: string; region: string } {
+  const host = process.env['TENCENT_TTS_HOST'] ?? 'tts.tencentcloudapi.com'
+  const insecure = host.startsWith('127.0.0.1') || host.startsWith('localhost')
+  return {
+    host,
+    signHost: host.split(':')[0] || host,
+    url: `${insecure ? 'http' : 'https'}://${host}`,
+    region: process.env['TENCENT_TTS_REGION'] ?? 'ap-guangzhou',
+  }
+}
+
 /** 按句切分（保留标点），超长句硬切；过滤空段。 */
 export function splitForTts(text: string): string[] {
   const sentences = text.replace(/\s+/g, ' ').split(/(?<=[。！？!?；;])/)
@@ -63,11 +86,11 @@ export class TtsService {
   private readonly logger = new Logger(TtsService.name)
 
   private get secretId(): string | undefined {
-    return process.env['TENCENT_TTS_SECRET_ID'] || process.env['TENCENT_SECRET_ID']
+    return readTencentTtsSecretPair().secretId
   }
 
   private get secretKey(): string | undefined {
-    return process.env['TENCENT_TTS_SECRET_KEY'] || process.env['TENCENT_SECRET_KEY']
+    return readTencentTtsSecretPair().secretKey
   }
 
   private get voiceType(): number {
@@ -117,6 +140,8 @@ export class TtsService {
   }
 
   private async synthesizeSegment(text: string): Promise<Buffer | null> {
+    const target = readTextToVoiceTarget()
+    const secrets = readTencentTtsSecretPair()
     const payload = JSON.stringify({
       Text: text,
       SessionId: randomUUID(),
@@ -133,17 +158,17 @@ export class TtsService {
         headers: {
           'Content-Type': 'application/json',
           Authorization: tc3Sign({
-            host: this.host.split(':')[0],
+            host: target.signHost,
             service: 'tts',
             payload,
             ts,
-            secretId: this.secretId!,
-            secretKey: this.secretKey!,
+            secretId: secrets.secretId!,
+            secretKey: secrets.secretKey!,
           }),
           'X-TC-Action': 'TextToVoice',
           'X-TC-Version': TTS_VERSION,
           'X-TC-Timestamp': String(ts),
-          'X-TC-Region': process.env['TENCENT_TTS_REGION'] ?? 'ap-guangzhou',
+          'X-TC-Region': target.region,
         },
         body: payload,
         signal: controller.signal,

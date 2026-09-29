@@ -69,6 +69,12 @@
           <text class="ficon i-right resume-arrow"></text>
         </view>
       </view>
+
+      <view class="list-state" wx:if="{{loadingMore}}">正在加载更多…</view>
+      <view class="list-state" wx:elif="{{loadMoreError}}">
+        <view class="state-retry tap" hover-class="tap-press" bindtap="retryLoadMore" role="button" aria-label="重新加载更多简历">加载更多失败，点此重试</view>
+      </view>
+      <view class="list-state" wx:elif="{{nextCursor}}">上拉加载更多</view>
     </block>
 
     <view class="empty-card" wx:else>

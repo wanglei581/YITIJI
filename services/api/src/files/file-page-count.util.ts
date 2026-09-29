@@ -105,3 +105,37 @@ async function countPdfPagesByParser(buffer: Buffer): Promise<ParserOutcome> {
 export function isSinglePageImage(mimeType: string): boolean {
   return mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/webp'
 }
+
+/**
+ * 对外页数。只接受已识别的正整数。
+ * 缺失、0、负数、小数都不是「0 页」，一律 null。
+ */
+export function exposeDocumentPageCount(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) return null
+  return value
+}
+
+/**
+ * 列表行上的页数。
+ * 行对象没有 pageCount（查询漏选）时返回 null。参数带上必有的 id，
+ * 这样去掉 select 仍能通过类型检查，门禁改为「有页数的文件没有返回真实页数」变红。
+ */
+export function listedDocumentPageCount(row: { id: string; pageCount?: number | null }): number | null {
+  if (!Object.prototype.hasOwnProperty.call(row, 'pageCount')) return null
+  return exposeDocumentPageCount(row.pageCount)
+}
+
+/**
+ * 落库用的页数。只看字节和已通过校验的类型，不读任何调用方申报的页数。
+ * 图片按 1 页；PDF 走权威解析；其余或解析失败为 null。失败不抛出。
+ */
+export async function recognizeStoredPageCount(buffer: Buffer, mimeType: string): Promise<number | null> {
+  try {
+    const mime = mimeType.split(';')[0]?.trim().toLowerCase() ?? ''
+    if (isSinglePageImage(mime)) return 1
+    if (mime !== 'application/pdf') return null
+    return exposeDocumentPageCount(await resolvePdfPageCount(buffer))
+  } catch {
+    return null
+  }
+}

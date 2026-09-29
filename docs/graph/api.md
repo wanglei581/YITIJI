@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`572` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`573` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -301,15 +301,15 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/screen/snapshot` | AdminScreenController.getAdminSnapshot | admin | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| GET | `/api/v1/admin/screen/terminals/:terminalId` | AdminScreenController.getAdminTerminalTwin | admin | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/admin/screen/snapshot` | AdminScreenController.getAdminSnapshot | admin | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/admin/screen/terminals/:terminalId` | AdminScreenController.getAdminTerminalTwin | admin | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 
 ## `services/api/src/console-screen/console-screen.partner.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/partner/screen/snapshot` | PartnerScreenController.getPartnerSnapshot | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
-| GET | `/api/v1/partner/screen/terminals/:terminalId` | PartnerScreenController.getPartnerTerminalTwin | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>Order<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/partner/screen/snapshot` | PartnerScreenController.getPartnerSnapshot | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
+| GET | `/api/v1/partner/screen/terminals/:terminalId` | PartnerScreenController.getPartnerTerminalTwin | partner | ConsoleScreenService | AiServiceLog<br/>AlertDisposition<br/>CompanyProfile<br/>ExternalJumpLog<br/>FairCompany<br/>FairMaterial<br/>FairZone<br/>Job<br/>JobFair<br/>KioskSession<br/>PolicyPost<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalCapability<br/>TerminalHeartbeat |
 
 ## `services/api/src/console-screen/console-screen.usage.controller.ts`
 
@@ -808,6 +808,7 @@
 | GET | `/api/v1/admin/orgs/:id` | AdminOrgsController.getOrgDetail | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |
 | PATCH | `/api/v1/admin/orgs/:id` | AdminOrgsController.updateOrg | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |
 | POST | `/api/v1/admin/orgs/:id/accounts` | AdminOrgsController.createAccount | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |
+| POST | `/api/v1/admin/orgs/:id/accounts/:accountId/contact-phone` | AdminOrgsController.registerContactPhone | admin | PartnerContactPhoneRegistrationService | AuditLog<br/>Organization<br/>User |
 | PUT | `/api/v1/admin/orgs/:id/accounts/:accountId/email` | AdminOrgsController.bindAccountEmail | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |
 | PATCH | `/api/v1/admin/orgs/:id/accounts/:accountId/password` | AdminOrgsController.resetAccountPassword | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |
 | PATCH | `/api/v1/admin/orgs/:id/accounts/:accountId/status` | AdminOrgsController.setAccountStatus | admin | AdminOrgsService | AuditLog<br/>Organization<br/>User |

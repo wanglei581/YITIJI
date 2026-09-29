@@ -53,6 +53,8 @@ export type AuditAction =
   | 'auth.phone_released_by_admin'
   | 'organization.create'
   | 'organization.update'
+  | 'partner_account.contact_phone_registered'
+  | 'partner_account.contact_phone_registration_reverted'
   /** 内容信任标记（发布闸门的人工核验决策，见 src/common/content-trust.ts） */
   | 'organization.content_trust'
   /** 管理员维护机构已核验官方域名。身份核验，不是渠道内容审核。 */

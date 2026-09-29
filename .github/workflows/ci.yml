@@ -535,6 +535,11 @@ jobs:
           # Redis 故障时的鉴权语义 + 健康检查诚实性：撤销必须仍然生效、
           # 后台不得再全线 500、/health 的每一条影响面声明都要被实际请求核对。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:redis-degradation-truth
+          # 真 Redis 下的内部账号密码登录：正确密码拿到凭证并读到业务数据，
+          # 锁定计数在临时 redis-server 里，改密后旧凭证调业务接口被拒。
+          # 会拉起真实 src/main.ts；端口不用 41xx。短信第二步在门禁里显式关掉。
+          # 只挂 SQLite 作业：造数与登录语义不依赖 PostgreSQL 差异。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:internal-login-real-redis
           # 异常可运维性：5xx 必须留下带 requestId 的日志，且日志不得含 PII / 凭证。
           pnpm --filter @ai-job-print/api verify:error-observability
           # 订单筛选不得静默失效（未知筛选值必须 400，不能退化成返回全量）。
@@ -677,6 +682,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-account-action:otp
           pnpm --filter @ai-job-print/api verify:partner-account-action:redis
           pnpm --filter @ai-job-print/api verify:partner-account-action
+          pnpm --filter @ai-job-print/api verify:partner-contact-phone-registration
           pnpm --filter @ai-job-print/api verify:resume-generate
           pnpm --filter @ai-job-print/api verify:resume-export-formats
           # 按原样导出的正文来源：带任务号只用留存原话；不带任务号拒照抄 AI 结果（会员 / 匿名一体机）
@@ -733,9 +739,17 @@ jobs:
           pnpm --filter @ai-job-print/api verify:llm-timeout-concurrency
           # AI 类出站端点白名单（P1-3）：模型 / OCR / 语音 / 数字人 / 短信 / 合同审查，白名单外一个请求都不发。
           pnpm --filter @ai-job-print/api verify:ai-endpoint-allowlist
+          # DeepSeek 思考模式统一关闭：派生式扫描所有 LLM 调用点的请求体都展开
+          # deepseekThinkingOff(model)，含官方推荐名 deepseek-flash 与 TRTC 小青的 LLMConfig。
+          pnpm --filter @ai-job-print/api verify:llm-thinking-off
+          # 思考模式在线探针的离线自检：缺密钥必须非 0，--allow-skip 才允许跳过且仍打印「未验证」，
+          # 输出不得含密钥。不触网。在线探针 probe:llm-thinking-live 本身不进 CI。
+          pnpm --filter @ai-job-print/api verify:llm-thinking-live-gate
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           # P1-2a AI 逐次计量账 + 每日金额硬上限（全局 / 单台终端 / 单个会员）；写隔离库，不触网。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-budget
+          # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:kiosk-session
@@ -821,6 +835,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:field-mapping
           pnpm --filter @ai-job-print/api verify:file-lifecycle-summary
           pnpm --filter @ai-job-print/api verify:member-assets
+          # 我的文档页数：SQLite 上证明新列返回真实页数，未识别为 null，字段不外溢。
+          pnpm --filter @ai-job-print/api verify:document-page-count
           pnpm --filter @ai-job-print/api verify:member-benefits-admin
           pnpm --filter @ai-job-print/api verify:member-favorites-benefits
           pnpm --filter @ai-job-print/api verify:job-content-screening
@@ -837,6 +853,8 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:derivation-kind
           # P1-5 短信发送额度（全站每日总量 / 单终端每日上限、Redis 核不了即暂停）；内存 Redis，不连外网。
           pnpm --filter @ai-job-print/api verify:sms-budget
+          # 会员验证码出口限流：已验签终端按台计；受信出口默认关，只放宽 IP 这一层。内存 Redis。
+          pnpm --filter @ai-job-print/api verify:sms-egress-limits
           # P1-4 管理员登录加固（锁定失败关闭、来源地址名单、短信第二步）；写隔离库。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-login-hardening
           # 3.9 内部账号名册 + 备用管理员 + 服务器端应急启用：自建真实 SQLite 迁移临时库 + 真实 Redis + 进程内 HTTP。
@@ -1021,6 +1039,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           # AI 计量账（AiUsageRecord 新表迁移）与额度汇总的 groupBy 在 PG 上也要真跑一遍。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-budget
+          # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
@@ -1076,6 +1096,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-step-up
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
+          # 我的文档页数：PostgreSQL 迁移后同一列、同一列表契约再跑一遍。
+          pnpm --filter @ai-job-print/api verify:document-page-count
           pnpm --filter @ai-job-print/api verify:member-data-request-contract
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
@@ -1143,6 +1165,7 @@ jobs:
           # DriverAdapterError（不是 P2034），重试逻辑必须认得出，不能变成 500。
           pnpm --filter @ai-job-print/api verify:pg-serialization-conflict
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-serialization-conflict:postgres
+          pnpm --filter @ai-job-print/api verify:partner-contact-phone-registration
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
           # KIOSK-DEBT 三处前端欠账。纯读 apps/kiosk 源码、不连库，

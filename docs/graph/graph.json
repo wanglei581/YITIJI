@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 572,
+    "endpointCount": 573,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -2865,6 +2865,26 @@
       },
       {
         "controller": "services/api/src/orgs/admin-orgs.controller.ts",
+        "handler": "AdminOrgsController.registerContactPhone",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "User"
+        ],
+        "path": "/api/v1/admin/orgs/:id/accounts/:accountId/contact-phone",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/orgs/partner-contact-phone-registration.service.ts"
+        ],
+        "services": [
+          "PartnerContactPhoneRegistrationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/orgs/admin-orgs.controller.ts",
         "handler": "AdminOrgsController.bindAccountEmail",
         "method": "PUT",
         "models": [
@@ -3848,7 +3868,6 @@
           "Job",
           "JobFair",
           "KioskSession",
-          "Order",
           "PolicyPost",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -3884,7 +3903,6 @@
           "Job",
           "JobFair",
           "KioskSession",
-          "Order",
           "PolicyPost",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10034,7 +10052,6 @@
           "Job",
           "JobFair",
           "KioskSession",
-          "Order",
           "PolicyPost",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10070,7 +10087,6 @@
           "Job",
           "JobFair",
           "KioskSession",
-          "Order",
           "PolicyPost",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -16201,7 +16217,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 107,
+    "modelCount": 108,
     "models": [
       {
         "fieldCount": 7,
@@ -16356,14 +16372,24 @@
         ]
       },
       {
-        "fieldCount": 17,
+        "fieldCount": 10,
+        "name": "AiUsageMonthlySummary",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/ai/usage/ai-usage-retention.ts"
+        ]
+      },
+      {
+        "fieldCount": 18,
         "name": "AiUsageRecord",
         "relations": [
           "EndUser"
         ],
         "usedBy": [
           "services/api/src/ai/usage/ai-budget.service.ts",
-          "services/api/src/ai/usage/ai-usage-summary.ts"
+          "services/api/src/ai/usage/ai-usage-retention.ts",
+          "services/api/src/ai/usage/ai-usage-summary.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
       {
@@ -16739,7 +16765,7 @@
         ]
       },
       {
-        "fieldCount": 49,
+        "fieldCount": 50,
         "name": "FileObject",
         "relations": [
           "DocumentProcessTask",
@@ -17133,8 +17159,6 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/assistant/daily-brief.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
-          "services/api/src/console-screen/console-screen.queries.ts",
-          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
@@ -17184,7 +17208,7 @@
         ]
       },
       {
-        "fieldCount": 27,
+        "fieldCount": 28,
         "name": "Organization",
         "relations": [
           "CompanyProfile",
@@ -17213,6 +17237,7 @@
           "services/api/src/orgs/admin-org-account-security.ts",
           "services/api/src/orgs/admin-org-content-trust.service.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/partner-contact-phone-registration.service.ts",
           "services/api/src/policies/policies.service.ts",
           "services/api/src/recruitment-content/recruitment-content-read.service.ts",
           "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
@@ -17679,7 +17704,7 @@
         ]
       },
       {
-        "fieldCount": 27,
+        "fieldCount": 28,
         "name": "User",
         "relations": [
           "AuditLog",
@@ -17698,6 +17723,7 @@
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
           "services/api/src/auth/admin-login-second-factor.ts",
           "services/api/src/auth/admin-phone-transfer.service.ts",
+          "services/api/src/auth/admin-registered-phone-reset.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/first-admin-bootstrap.ts",
           "services/api/src/auth/initial-phone-bind.service.ts",
@@ -17707,6 +17733,7 @@
           "services/api/src/common/health.controller.ts",
           "services/api/src/orgs/admin-org-account-security.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/partner-contact-phone-registration.service.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
@@ -21229,6 +21256,7 @@
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs"
     ],
     "docs/compliance/member-personal-data-retention.md": [
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-member-data-retention.ts"
     ],
@@ -21308,6 +21336,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "scripts/verify-repository-integrity.mjs",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
@@ -21422,7 +21451,8 @@
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
     "packages/shared/src/types/audit.ts": [
-      "services/api/scripts/verify-change-password.ts"
+      "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "packages/shared/src/types/campusRecruitmentStats.ts": [
       "services/api/scripts/verify-campus-recruitment-stats.ts"
@@ -21498,7 +21528,9 @@
       "services/api/scripts/verify-member-order-timeline.ts"
     ],
     "packages/shared/src/types/memberPrivacy.ts": [
-      "apps/kiosk/scripts/verify-data-request-ui.mjs"
+      "apps/kiosk/scripts/verify-data-request-ui.mjs",
+      "services/api/scripts/verify-ai-usage-retention.ts",
+      "services/api/scripts/verify-member-data-request-contract.ts"
     ],
     "packages/shared/src/types/mockInterview.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -21760,6 +21792,9 @@
     "services/api/prisma/migrations/20260925143000_add_terminal_area_geo/migration.sql": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
+    "services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
+      "services/api/scripts/verify-ai-usage-retention.ts"
+    ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
@@ -21806,9 +21841,13 @@
     "services/api/prisma/postgres/migrations/20260925143000_add_terminal_area_geo/migration.sql": [
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
+    "services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
+      "services/api/scripts/verify-ai-usage-retention.ts"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
       "services/api/scripts/verify-job-ai.ts",
@@ -21834,6 +21873,7 @@
     "services/api/prisma/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
@@ -22022,6 +22062,7 @@
     ],
     "services/api/scripts/support/boot-api-child.ts": [
       "services/api/scripts/verify-error-observability.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
     ],
     "services/api/scripts/support/content-pipeline-fixtures.ts": [
@@ -22029,6 +22070,9 @@
     ],
     "services/api/scripts/support/content-pipeline-harness.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts"
+    ],
+    "services/api/scripts/support/ephemeral-redis-server.ts": [
+      "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
     "services/api/scripts/support/inmemory-redis-server.ts": [
       "services/api/scripts/verify-upload-scene.ts"
@@ -22039,14 +22083,17 @@
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-console-screen-printed-visits.ts",
@@ -22057,6 +22104,7 @@
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-job-review.ts",
       "services/api/scripts/verify-jobfair-review.ts",
@@ -22441,6 +22489,7 @@
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
     "services/api/src/ai/ai-result.cleanup.task.ts": [
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-job-ai-backend.ts"
     ],
@@ -22570,6 +22619,9 @@
     "services/api/src/ai/llm/assistant-channel.ts": [
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
+    "services/api/src/ai/llm/deepseek-thinking.ts": [
+      "services/api/scripts/verify-llm-thinking-off.ts"
+    ],
     "services/api/src/ai/llm/llm-base-url.ts": [
       "services/api/scripts/verify-ai-config.ts"
     ],
@@ -22593,6 +22645,7 @@
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-llm-connectivity.ts",
+      "services/api/scripts/verify-llm-thinking-off.ts",
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
     "services/api/src/ai/llm/llm-failure.ts": [
@@ -22850,6 +22903,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/resume/resume-draft-source.service.ts": [
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
     "services/api/src/ai/resume/resume-draft.store.ts": [
@@ -22947,6 +23001,10 @@
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
+    "services/api/src/ai/usage/ai-usage-retention.ts": [
+      "services/api/scripts/verify-ai-usage-retention.ts",
+      "services/api/scripts/verify-member-data-request-contract.ts"
+    ],
     "services/api/src/ai/usage/ai-usage-summary.ts": [
       "services/api/scripts/verify-ai-usage-budget.ts"
     ],
@@ -23022,6 +23080,7 @@
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
@@ -23058,6 +23117,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
@@ -23101,7 +23161,8 @@
     ],
     "services/api/src/audit/audit.types.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
-      "services/api/scripts/verify-change-password.ts"
+      "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/auth/admin-initial-phone-bind.service.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts",
@@ -23109,6 +23170,9 @@
     ],
     "services/api/src/auth/admin-phone-transfer.service.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts"
+    ],
+    "services/api/src/auth/admin-registered-phone-reset.ts": [
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/auth/auth.controller.ts": [
       "services/api/scripts/verify-change-password.ts",
@@ -23127,6 +23191,7 @@
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts"
     ],
     "services/api/src/auth/dto/internal-auth.dto.ts": [
@@ -23157,6 +23222,7 @@
       "services/api/scripts/verify-partner-account-action-otp.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/src/auth/internal-otp.types.ts": [
@@ -23167,15 +23233,21 @@
     ],
     "services/api/src/auth/partner-account-action.service.ts": [
       "services/api/scripts/verify-partner-account-action-postgres.ts",
-      "services/api/scripts/verify-partner-account-action.ts"
+      "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/auth/partner-phone-rebind.service.ts": [
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts"
     ],
+    "services/api/src/auth/password-login-attempts.ts": [
+      "services/api/scripts/verify-internal-login-real-redis.ts"
+    ],
     "services/api/src/auth/password-proof-state.ts": [
-      "services/api/scripts/verify-admin-phone-transfer.ts"
+      "services/api/scripts/verify-admin-phone-transfer.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/benefit-activities/admin-benefit-activities.controller.ts": [
       "services/api/scripts/verify-benefit-activities.ts"
@@ -23250,10 +23322,13 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/src/common/crypto/secret-cipher.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts",
+      "services/api/scripts/verify-llm-thinking-live-gate.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
@@ -23282,6 +23357,7 @@
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-official-channels.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-excel-import.ts",
@@ -23465,13 +23541,15 @@
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-redis.ts",
-      "services/api/scripts/verify-partner-account-action.ts"
+      "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/common/redis/redis-degradation.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
@@ -23508,6 +23586,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
@@ -23569,6 +23648,7 @@
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
       "services/api/scripts/verify-cjk-font.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-production-real-services.ts",
@@ -23581,6 +23661,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.assemble.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.cache.ts": [
@@ -23610,7 +23691,8 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.printed-pages.ts": [
-      "services/api/scripts/verify-console-screen-printed-visits.ts"
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
+      "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.queries.ts": [
       "services/api/scripts/verify-console-screen-printed-visits.ts",
@@ -23624,6 +23706,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.twin.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/console-screen/console-screen.types.ts": [
@@ -23692,7 +23775,8 @@
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-contract-review-timeout.ts",
-      "services/api/scripts/verify-llm-input-pii-mask.ts"
+      "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-llm-thinking-off.ts"
     ],
     "services/api/src/contract-review/contract-review-report-pdf.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -23764,6 +23848,7 @@
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
     ],
     "services/api/src/files/file-page-count.util.ts": [
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-file-display-truth.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-print-sign.ts"
@@ -23807,6 +23892,7 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
@@ -23889,7 +23975,8 @@
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
-      "services/api/scripts/verify-llm-input-pii-mask.ts"
+      "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-llm-thinking-off.ts"
     ],
     "services/api/src/job-ai/job-ai-quota.service.ts": [
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -24318,6 +24405,9 @@
     "services/api/src/legal/legal.service.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "services/api/src/main.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
     "services/api/src/materials/image-print-quality.util.ts": [
       "services/api/scripts/verify-file-display-truth.ts"
     ],
@@ -24378,6 +24468,7 @@
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
@@ -24391,7 +24482,8 @@
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-assets/member-assets.types.ts": [
-      "services/api/scripts/verify-assess-isolation.ts"
+      "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-document-page-count.ts"
     ],
     "services/api/src/member-auth/dto/member-login.dto.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
@@ -24411,11 +24503,13 @@
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-auth.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-auth.service.ts": [
@@ -24424,7 +24518,8 @@
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-member-sms-provider-errors.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/src/member-auth/member-phone-rebind.service.ts": [
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
@@ -24447,7 +24542,18 @@
     ],
     "services/api/src/member-auth/sms/sms-budget.ts": [
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
+    "services/api/src/member-auth/sms/sms-code-throttle.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
+    "services/api/src/member-auth/sms/sms-egress-config.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
+    "services/api/src/member-auth/sms/sms-egress-limits.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/src/member-auth/sms/sms-sender.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
@@ -24456,6 +24562,7 @@
       "services/api/scripts/verify-member-sms-provider-errors.ts",
       "services/api/scripts/verify-member-step-up.helpers.ts",
       "services/api/scripts/verify-member-step-up.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-sms-budget.ts",
       "services/api/scripts/verify-sms-provider.ts",
       "services/api/scripts/verify-sms-send.ts"
@@ -24589,8 +24696,10 @@
     ],
     "services/api/src/member-privacy/member-data-export.mapper.ts": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-job-application-track.ts",
-      "services/api/scripts/verify-member-data-export.ts"
+      "services/api/scripts/verify-member-data-export.ts",
+      "services/api/scripts/verify-member-data-request-contract.ts"
     ],
     "services/api/src/member-privacy/member-data-export.service.ts": [
       "services/api/scripts/verify-member-data-export.ts"
@@ -24729,7 +24838,8 @@
       "services/api/scripts/verify-content-trust-publish-gate.ts"
     ],
     "services/api/src/orgs/admin-orgs.controller.ts": [
-      "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
+      "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/orgs/admin-orgs.service.ts": [
       "services/api/scripts/verify-admin-orgs-delete-concurrency.ts",
@@ -24739,11 +24849,15 @@
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts"
+    ],
+    "services/api/src/orgs/contact-phone-change.ts": [
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/orgs/dto/admin-org.dto.ts": [
       "services/api/scripts/verify-org-type-enum-sync.ts"
@@ -24751,8 +24865,14 @@
     "services/api/src/orgs/dto/partner-account-action.dto.ts": [
       "services/api/scripts/verify-partner-account-action.ts"
     ],
+    "services/api/src/orgs/dto/register-partner-contact-phone.dto.ts": [
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
+    ],
     "services/api/src/orgs/parked-org-types.ts": [
       "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+    ],
+    "services/api/src/orgs/partner-contact-phone-registration.service.ts": [
+      "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/orgs/partner-stats.controller.ts": [
       "services/api/scripts/verify-partner-stats-contract.ts"
@@ -25238,6 +25358,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
@@ -25261,6 +25382,7 @@
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-deploy-data-safety-gate.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-end-user-asset-ownership.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
@@ -25275,6 +25397,7 @@
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
+      "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-job-application-track.ts",
@@ -25320,6 +25443,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
@@ -25524,6 +25648,7 @@
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-document-page-count.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
@@ -25819,6 +25944,7 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-llm-thinking-off.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/upload-sessions/upload-scene.ts": [
@@ -32792,6 +32918,7 @@
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/llm/llm-http.ts",
+          "services/api/src/ai/resume/resume-draft-source.service.ts",
           "services/api/src/ai/usage/ai-budget.service.ts",
           "services/api/src/ai/usage/ai-pricing.ts",
           "services/api/src/ai/usage/ai-request-context.middleware.ts",
@@ -32817,6 +32944,35 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-usage-budget"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "docs/compliance/member-personal-data-retention.md",
+          "docs/progress/current-progress.md",
+          "packages/shared/src/types/memberPrivacy.ts",
+          "services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql",
+          "services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql",
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/ai-result.cleanup.task.ts",
+          "services/api/src/ai/usage/ai-usage-retention.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-usage-retention.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-usage-retention"
       ],
       "wired": true
     },
@@ -33499,11 +33655,13 @@
           "packages/shared/src/types/consoleScreen.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/console-screen/console-screen.assemble.ts",
           "services/api/src/console-screen/console-screen.cache.ts",
           "services/api/src/console-screen/console-screen.metric.ts",
           "services/api/src/console-screen/console-screen.printed-pages.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
+          "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.types.ts",
           "services/api/src/console-screen/console-screen.usage.service.ts",
           "services/api/src/console-screen/console-screen.visits.ts",
@@ -33549,6 +33707,7 @@
           "services/api/src/console-screen/console-screen.module.ts",
           "services/api/src/console-screen/console-screen.org.ts",
           "services/api/src/console-screen/console-screen.partner.controller.ts",
+          "services/api/src/console-screen/console-screen.printed-pages.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
           "services/api/src/console-screen/console-screen.timeline.ts",
@@ -34032,6 +34191,30 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:document-conversion"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/file-page-count.util.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-assets/member-assets.types.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-document-page-count.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:document-page-count"
       ],
       "wired": true
     },
@@ -34703,6 +34886,29 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:internal-auth-phone"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/ephemeral-redis-server.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/auth/password-login-attempts.ts",
+          "services/api/src/auth/password-proof-state.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-internal-login-real-redis.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:internal-login-real-redis"
       ],
       "wired": true
     },
@@ -35673,6 +35879,46 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/common/crypto/secret-cipher.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-llm-thinking-live-gate.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:llm-thinking-live-gate"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/llm/deepseek-thinking.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/contract-review/contract-review-provider.service.ts",
+          "services/api/src/job-ai/job-ai-llm.service.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-llm-thinking-off.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:llm-thinking-off"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
           "services/api/src/ai/ai-request-guard.ts",
           "services/api/src/ai/llm/llm-http.ts"
@@ -35958,13 +36204,16 @@
         "dirs": [],
         "files": [
           "packages/shared/src/types/member-privacy.ts",
+          "packages/shared/src/types/memberPrivacy.ts",
           "services/api/prisma/migrations/20260717130000_extend_user_data_requests/migration.sql",
           "services/api/prisma/migrations/20260717140000_complete_member_data_export/migration.sql",
           "services/api/prisma/postgres/migrations/20260717130000_extend_user_data_requests/migration.sql",
           "services/api/prisma/postgres/migrations/20260717140000_complete_member_data_export/migration.sql",
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
+          "services/api/src/ai/usage/ai-usage-retention.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
@@ -36904,6 +37153,46 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:partner-account-action"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "packages/shared/src/types/audit.ts",
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/audit/audit.types.ts",
+          "services/api/src/auth/admin-registered-phone-reset.ts",
+          "services/api/src/auth/auth.service.ts",
+          "services/api/src/auth/internal-otp.service.ts",
+          "services/api/src/auth/partner-account-action.service.ts",
+          "services/api/src/auth/password-proof-state.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/common/redis/partner-account-action-redis.service.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/member-auth/sms/sms-budget.ts",
+          "services/api/src/member-auth/sms/sms-sender.ts",
+          "services/api/src/orgs/admin-orgs.controller.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/contact-phone-change.ts",
+          "services/api/src/orgs/dto/register-partner-contact-phone.dto.ts",
+          "services/api/src/orgs/partner-contact-phone-registration.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-partner-contact-phone-registration.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:partner-contact-phone-registration"
       ],
       "wired": true
     },
@@ -39124,6 +39413,33 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:sms-budget"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/main.ts",
+          "services/api/src/member-auth/member-auth.controller.ts",
+          "services/api/src/member-auth/member-auth.module.ts",
+          "services/api/src/member-auth/member-auth.service.ts",
+          "services/api/src/member-auth/sms/sms-budget.ts",
+          "services/api/src/member-auth/sms/sms-code-throttle.ts",
+          "services/api/src/member-auth/sms/sms-egress-config.ts",
+          "services/api/src/member-auth/sms/sms-egress-limits.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-sms-egress-limits.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:sms-egress-limits"
       ],
       "wired": true
     },

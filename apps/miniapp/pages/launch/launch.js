@@ -172,8 +172,10 @@ Page({
       })
       .catch(err => {
         wx.hideLoading()
-        this.setData({ sending: false, codeHint: '' })
-        wx.showToast({ title: (err && err.message) || '发送失败，请稍后重试', icon: 'none' })
+        const reason = (err && err.message) || '发送失败，请稍后重试'
+        // 原因留在输入框下方：toast 一闪就没，被限流的人不知道要等多久（走查 9/29）。
+        this.setData({ sending: false, codeHint: reason })
+        wx.showToast({ title: reason, icon: 'none' })
       })
   },
 

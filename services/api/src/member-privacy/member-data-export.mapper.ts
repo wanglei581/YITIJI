@@ -19,6 +19,8 @@ export interface MemberDataExportEnvelope {
       jobSessions: JsonRecord[]
       mockInterviews: JsonRecord[]
     }
+    /** 本人 AI 用量：功能、时间、状态、金额。不含终端、机构、型号和别人的行。 */
+    aiUsage: JsonRecord[]
     printOrders: JsonRecord[]
     favorites: JsonRecord[]
     /** 本人自填的求职进度（§4.4A）。可导出、可删除，随账号注销一并清理。 */
@@ -69,6 +71,7 @@ export class MemberDataExportMapper {
       feedback,
       consents,
       requests,
+      aiUsage,
     ] = await Promise.all([
       this.prisma.endUser.findUnique({
         where: { id: input.endUserId },
@@ -289,6 +292,17 @@ export class MemberDataExportMapper {
         orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
         take,
       }),
+      this.prisma.aiUsageRecord.findMany({
+        where: { endUserId: input.endUserId },
+        select: {
+          featureKey: true,
+          createdAt: true,
+          status: true,
+          costCny: true,
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take,
+      }),
     ])
 
     for (const rows of [
@@ -306,6 +320,7 @@ export class MemberDataExportMapper {
       feedback,
       consents,
       requests,
+      aiUsage,
     ]) {
       this.assertWithinLimit(rows)
     }
@@ -322,6 +337,7 @@ export class MemberDataExportMapper {
           jobSessions: this.toJsonRecords(jobSessions),
           mockInterviews: this.toJsonRecords(mockInterviews),
         },
+        aiUsage: this.toJsonRecords(aiUsage),
         printOrders: this.toJsonRecords(printOrders),
         favorites: this.toJsonRecords(favorites),
         jobApplications: this.toJsonRecords(jobApplications),

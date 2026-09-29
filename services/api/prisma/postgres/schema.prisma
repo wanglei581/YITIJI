@@ -672,6 +672,9 @@ model Organization {
   type       String
   contact    String?
   contactPhone String?
+  /// 联系人手机号最近一次实际变更的时间。空表示这列上线后还没改过。
+  /// 管理员为机构账号登记该手机号前要等满 24 小时，避免刚改完号码就自己收码。
+  contactPhoneChangedAt DateTime?
   sceneTemplate String?
   enabledModulesJson String @default("[]")
   enabled    Boolean  @default(true)
@@ -838,6 +841,8 @@ model User {
   phoneHash    String?       @unique
   phoneEnc     String?
   phoneVerifiedAt DateTime?
+  /// 管理员登记本手机号的时间。有值且 phoneVerifiedAt 为空：号码尚未经本人短信自证。
+  phoneRegisteredByAdminAt DateTime?
   emailHash    String?       @unique
   emailEnc     String?
   emailVerifiedAt DateTime?
@@ -1175,6 +1180,10 @@ model FileObject {
   filename    String   // 原始文件名(originalName);绝不作为 objectKey
   mimeType    String
   sizeBytes   Int
+  // 从文件字节识别出的页数。可空且不设默认值。
+  // null = 还没识别（旧文件、Word、解析失败、直传尚未读到字节）。
+  // 不用 0 表示未知。列表只把正整数交出去，其余收成 null。不接受客户端申报的页数。
+  pageCount   Int?
   sha256      String   // 服务端直传路径就 buffer 计算;直传意图未知时为 ''
 
   // 业务关联 / 归属
@@ -1975,12 +1984,35 @@ model AiUsageRecord {
   orgId            String?
   endUserId        String?
   endUser          EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  /// 到期清理前已滚进月汇总的时间。空 = 还没汇总；未到期的行保持为空。
+  summarizedAt     DateTime?
 
   @@index([dayKey])
   @@index([dayKey, terminalId])
   @@index([dayKey, endUserId])
   @@index([orgId, dayKey])
   @@index([endUserId])
+  @@index([createdAt])
+}
+
+/// 按月费用汇总。只有金额和次数，不含会员、终端、机构或任何用户文本。
+/// 长期保留，不随明细到期删除。只汇总即将被删、且还没汇总过的 AiUsageRecord。
+/// model 用空字符串而不是 NULL，否则唯一索引在 SQLite 与 PostgreSQL 上都不把多行 NULL 收成同一键。
+model AiUsageMonthlySummary {
+  id               String   @id @default(cuid())
+  /// 北京时间 YYYY-MM
+  monthKey         String
+  featureKey       String
+  vendor           String
+  /// 空字符串 = 当时没取到型号。不用 NULL：两边的唯一索引都不把多个 NULL 当成同一键，重跑会插出多行。
+  model            String   @default("")
+  status           String
+  callCount        Int
+  measuredCostCny  Float    @default(0)
+  unmeasuredCount  Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  @@unique([monthKey, featureKey, vendor, model, status], map: "AiUsageMonthly_dims_key")
 }
 
 model UserAiConsent {

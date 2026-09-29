@@ -26,7 +26,7 @@ export function describePrinterFault(online: boolean, printerStatus: string | nu
   if (!online) return '终端离线，打印机状态未知'
   if (isHealthyPrinterStatus(printerStatus)) return null
   switch (printerStatus) {
-    case 'low_paper': return '纸张不足，可打印、需补纸'
+    case 'low_paper': return '纸张或墨粉不足，可打印、需补充'
     case 'paper_empty': return '纸盒已空，请补充 A4 纸张'
     case 'offline': return '打印机离线'
     case 'not_found': return '未检测到配置的打印机'
