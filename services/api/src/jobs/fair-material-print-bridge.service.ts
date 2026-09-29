@@ -72,6 +72,7 @@ export class FairMaterialPrintBridgeService {
         purpose: 'fair_material',
         uploaderId: null,
         assetCategory: 'derived',
+        derivationKind: 'ai_generated',
         createdBy: null,
         validationMode: 'intent',
         expiresAtOverride: expiresAt,

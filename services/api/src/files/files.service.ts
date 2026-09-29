@@ -45,12 +45,7 @@ import {
   type UploadValidationMode,
 } from './file-validation'
 import { sniffDeclaredMimeMismatch } from './content-sniff'
-import {
-  RetentionPolicyError,
-  allowedPoliciesForFile,
-  computeRetentionDecision,
-  defaultRetentionForUpload,
-} from './retention-policy'
+import { RetentionPolicyError, allowedPoliciesForFile, computeRetentionDecision, defaultRetentionForUpload } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
 import { parseContentFileId, signFileUrl } from './signing'
 import { assertFileContentIntegrity, DIRECT_UPLOAD_COMPLETE_ACTION } from './file-content-integrity'
@@ -116,6 +111,7 @@ export class FilesService {
     uploaderId: string | null
     endUserId?: string | null
     assetCategory?: FileAssetCategory
+    derivationKind?: import('../print-jobs/material-check-policy').DerivationKind // 派生件怎么来的（1.8 P-1）：derived / optimized 必传
     sourceFileId?: string | null
     actorRole?: UserRole | null
     actorOrgId?: string | null
@@ -254,6 +250,7 @@ export class FilesService {
           status: staging ? 'uploading' : 'active',
           createdBy: args.createdBy ?? args.uploaderId ?? null,
           assetCategory: args.assetCategory ?? 'original',
+          derivationKind: args.derivationKind ?? null,
           sourceFileId: args.sourceFileId ?? null,
           expiresAt: staging ? staging.expiresAt : (expiresAtOverride ?? retention.expiresAt),
           retentionPolicy: retention.retentionPolicy,

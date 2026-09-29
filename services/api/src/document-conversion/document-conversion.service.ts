@@ -211,6 +211,7 @@ export class DocumentConversionService implements OnModuleInit {
       uploaderId: source.uploaderId,
       endUserId: source.endUserId,
       assetCategory: 'derived',
+      derivationKind: 'format_conversion',
       sourceFileId: source.id,
       actorRole: role,
       actorOrgId: role === 'partner' ? source.ownerId : null,

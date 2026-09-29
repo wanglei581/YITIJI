@@ -116,6 +116,7 @@ export class ResumeReportExportController {
       uploaderId: null,
       endUserId: row.endUserId,
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       sourceFileId,
       createdBy: 'ai_resume_diagnosis_export',
       ...(stage ? { paidExportStaging: stage } : {}),

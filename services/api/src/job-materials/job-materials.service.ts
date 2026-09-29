@@ -256,6 +256,7 @@ export class JobMaterialsService {
       uploaderId: null,
       endUserId: ctx.endUserId,
       assetCategory: 'derived',
+      derivationKind: 'ai_generated',
       sourceFileId: null,
       actorRole: null,
       actorOrgId: null,

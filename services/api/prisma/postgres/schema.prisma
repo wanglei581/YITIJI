@@ -1217,6 +1217,12 @@ model FileObject {
   sourceFileId  String?
   sourceFile    FileObject? @relation("FileAssetDerivation", fields: [sourceFileId], references: [id], onDelete: SetNull)
   derivedFiles  FileObject[] @relation("FileAssetDerivation")
+  // 派生件是怎么来的(1.8 P-1)。只对 derived / optimized 有意义,原件为 null。
+  // 'format_conversion'(图片/Office 转 PDF)| 'signature'(签名合成)
+  // | 'pii_redaction'(隐私遮挡产物)| 'ai_generated'(AI 报告、简历导出等一切 AI / 系统生成件)。
+  // 打印前隐私检查只豁免 ai_generated / pii_redaction;存量 null 按「要检查」处理
+  // (判断函数见 src/print-jobs/material-check-policy.ts)。
+  derivationKind String?
   retentionPolicy String? // 'months_3' | 'months_6' | 'long_term' | 'system_short'
   retentionSetBy  String? // 'system' | 'user' | 'admin'
   retentionConsentAt DateTime?

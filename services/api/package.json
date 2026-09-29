@@ -44,6 +44,7 @@
     "verify:sms-provider": "node -r @swc-node/register scripts/verify-sms-provider.ts",
     "verify:sms-send": "node -r @swc-node/register scripts/verify-sms-send.ts",
     "verify:pii-manual-confirm": "node -r @swc-node/register scripts/verify-pii-manual-confirm.ts",
+    "verify:derivation-kind": "node -r @swc-node/register scripts/verify-derivation-kind.ts",
     "verify:sms-budget": "node -r @swc-node/register scripts/verify-sms-budget.ts",
     "verify:member-sms-provider-errors": "node -r @swc-node/register scripts/verify-member-sms-provider-errors.ts",
     "verify:member-auth": "node -r @swc-node/register scripts/verify-member-auth.ts",

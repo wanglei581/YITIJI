@@ -44,6 +44,11 @@ export interface MemberDocumentItem {
   previewUrlPath: string
   /** false = 高敏报告等禁止进入打印链路，前端不得展示重新打印。 */
   reprintable: boolean
+  /**
+   * true = 打印前要先过材料检查（隐私检查）。与建单闸门同一个判断函数
+   * （src/print-jobs/material-check-policy.ts），一体机只看它决定走不走材料检查。
+   */
+  materialCheckRequired: boolean
 }
 
 export type MemberDeletedDocumentStorageState = 'removed' | 'pending' | 'unknown'
