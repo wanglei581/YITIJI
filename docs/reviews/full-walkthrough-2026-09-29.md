@@ -142,8 +142,12 @@
 | W-67 | P2 | 运维文档 | 价目运维 SQL（`docs/operations/price-config-production.md`）用 `NOW()` 写 `updatedAt/effectiveFrom`：PostgreSQL 会话时区是上海时，存进去的是上海本地时间却被当 UTC 读，后台显示超前 8 小时（走查库价目「2026/9/29 23:07:37」而当时是 15:07）。生产若同样手工执行会让价目生效时间错 8 小时 | Grok K3 续跑，`~/.cache/walk0929/evidence/k3/` 101–189 158；运维 SQL 由走查窗口 15:07 按手册执行 | 后端窗口（与 W-02 一并）/ 待定 | 待派 |
 | W-68 | P1 | 管理员后台 | 数据大屏「累计打印 N 页」按已支付订单的 `billablePages` 求和、不乘份数，且把已支付未出纸的单也算进去（`console-screen.queries.ts:284-337`，按 paidAt、上海时区）；订单页按 createdAt 列全部订单——两处单位与口径不同。库里实测 18:15：大屏 12 页 = 10 单 billablePages 之和（含 1 单待取件），实际出纸 15 张（游客单 2 页 × 3 份等） | Codex B 旅程核查 `~/.cache/walk0929/codex/B-journeys.md`；走查窗口 psql 核对 Order/PrintTask | 后端窗口 + 两后台窗口 / 待定 | 已复现 |
 | W-69 | P1 | 两后台 | 服务人次：KioskSession 已真实写入（000d3bf81 一体机上报），但工作台仍返回 `unavailableMetric(... kioskSessionUnwritten)`（`console-screen.usage.service.ts:285-287`），机构页仍写「一体机会话尚未记录」（`PartnerUsageHostingOff.tsx:25-30`）；机构工作台打印/失败/AI/告警指标标不可用（`console-screen.assemble.ts:229-245`，与 P-04「13 项待补」同根） | Codex B 旅程核查 `~/.cache/walk0929/codex/B-journeys.md`；K3 截图「另有 13 项指标待补机构归属」 | 后端窗口 + 两后台窗口 / 待定 | 代码已核实，待页面复走 |
-| W-70 | 线索 | 一体机 | 「我的」首页顶部记录列表来自 `location.state` 与本地合成 ID（`ProfilePage.tsx:36-55,196-215`），真实数量另查接口——可能数字有、列表空（与 K1/K3「打印过仍写还没有留下记录」同现象）；打印按钮只丢文件跳预览（:100-106） | Codex B 旅程核查 `~/.cache/walk0929/codex/B-journeys.md` | 走查窗口 / Grok（先复现） | 待复现 |
+| W-70 | P2 | 一体机 | 「我的」首页顶部记录列表来自 `location.state` 与本地合成 ID（`ProfilePage.tsx:36-55,196-215`），真实数量另查接口——可能数字有、列表空（与 K1/K3「打印过仍写还没有留下记录」同现象）；打印按钮只丢文件跳预览（:100-106） | Codex B 旅程核查 `~/.cache/walk0929/codex/B-journeys.md` | 走查窗口 / Grok（先复现） | 已复现（Grok K4：上传文档后仍写「这一趟还没有留下记录」，根因 `ProfileSessionRecords.tsx:41`），并入 W-75 |
 | W-71 | 线索 | 小程序 | AI 记录页模拟面试只取 50 条不接 nextCursor（`ai-records.js:137-182`）；政策详情无收藏与材料（`policy-detail.wxml:24-93`，首发停放政策页，第一次发布不影响） | Codex B 旅程核查 `~/.cache/walk0929/codex/B-journeys.md` | 小程序窗口 / 小程序窗口 | 待复现 |
+| W-72 | P1 | 小程序 | 订单详情未核销时状态芯片显示英文 `pending_release`（列表同时是「待到机」）：`order-detail.js:91` `STATUS_MAP[status] \|\| status` 缺这一项，`order-detail.wxml:36` 直接画出 | Grok K4 跨端场景，`~/.cache/walk0929/evidence/k4/`；两单下单后详情字段 | 小程序窗口 / 小程序窗口 | 已派 |
+| W-73 | P1 | 一体机 | 另一端删掉文件后在材料检查页点「下一步」：停在检查页，同屏既写「保存隐私选择失败，请重试」又写「检查完成」「没有待处理的隐私片段」，文件名还在（没有出纸，未假装打印，但给的下一步是死循环重试）：`PrintMaterialCheckPage.tsx:491-492` 失败后仍停 review，`MaterialCheckPresentation.tsx:168-171` 无片段时仍写检查完成 | Grok K4 跨端场景，`~/.cache/walk0929/evidence/k4/` 017、018；`POST /api/v1/materials/tasks` 404 | 主执行窗口（打印链）/ Grok（G1 可并入） | 待派 |
+| W-74 | P2 | 一体机 | 跨端缓存失效：小程序删了文档，一体机「我的文档」不刷新仍显示「可用 3」和那一行，点「查看」才报失败（`MyDocumentsPage.tsx:152-153` catch 不看状态码也不刷新）；小程序取消收藏，一体机收藏行还在、点了进政策库（`MyFavoritesPage.tsx:43-46`，同 W-49）。反向（一体机删 → 小程序预览）服务端 404 `FILE_NOT_FOUND`，小程序显示笼统「预览失败」（码不在 `user-error.js` 白名单） | Grok K4 跨端场景，`~/.cache/walk0929/evidence/k4/` 009、011、012、014 | 走查窗口 / Grok（一体机半边）；小程序窗口（白名单） | 待派 |
+| W-75 | P2 | 一体机 | 不点「结束使用」直接回首页：下一位在首页、我的页看到上一位脱敏号「138****0463，晚上好」与「进入我的」，约 180 秒闲置后才清（文件名与问题原文不出现；与 W-42 同源，定级按「只露脱敏号」降为 P2）；「这一趟做过什么」只数简历、扫描、AI 记录（`ProfileSessionRecords.tsx:41`、`ProfilePage.tsx:207-210`），上传了文档仍写「还没有留下记录」（坐实 W-70） | Grok K4 跨端场景，`~/.cache/walk0929/evidence/k4/` 065、069 | 主执行窗口（清场 G2 可并入）/ Grok | 待派 |
 
 ### 4.5 两端对账结果（9/29 晚）
 
@@ -159,6 +163,10 @@
 
 订单管理 10 条（全部已支付 ¥0.00，第 1/1 页）：已完成 8 = 数据大屏「近 24 小时打印完成 8」；另 2 条小程序云打印待取件（对应 K4、K5 的手机下单）。大屏「累计打印 12 页」是页数。AI 服务：概览「今日累计」11 次、成功率 90.9%（1 次 ServiceUnavailableException），分能力「近 24 小时」同为 11；工作台稍后读到 13 次 92.3%（时间差，非口径差）。告警中心 1 条待处理（AI 内容投诉），打印失败/打印机异常/离线 0，与流水一致（打印机故障演练未开始）。机构 A：政策公告 3（已发布 1、待初审 1、待审核 1）、本机构在架 1、终端 WALK-001 在线、本机构告警 0；平台大屏在架 2（多的是机构 B 那条）。口径说明已写在页面上的：浏览跳转归因为空（日志无机构快照）、「打开来源平台」只计点击；另 13 项指标待补机构归属（P-04 仍在）。
 
+
+### 4.7b 跨端与退出残留（Grok K4）结论
+
+打印进度回流通：手机下单 → 一体机核销 → 打印中 → 完成，小程序详情逐步变中文「待取件 / 打印中 / 已完成」（未核销时英文见 W-72）。退出残留通：「结束使用」和闲置 180 秒清场后，localStorage / sessionStorage / cookie 只剩隐私边界键与终端会话令牌，不含手机号、文件名、问题原文；无 IndexedDB、无 service worker；下一位登录不串号。缺口在「不点结束」的清场前窗口（W-42、W-75）与跨端删除后的一体机旧列表（W-73、W-74）。
 
 ### 4.8 修复对定位与功能的影响（9/29 晚起每项必标）
 
