@@ -8,6 +8,7 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from './memberSessionEvents'
 
 // ── 错误类型 ──────────────────────────────────────────────────
@@ -67,6 +68,7 @@ async function call<T>(
   path: string,
   method: 'GET' | 'POST',
   options: { body?: unknown; token?: string; keepalive?: boolean } = {},
+  send: typeof fetch = fetch,
 ): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
@@ -74,7 +76,7 @@ async function call<T>(
 
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await send(`${API_BASE_URL}${path}`, {
       method,
       headers,
       credentials: 'include',
@@ -108,11 +110,15 @@ async function call<T>(
 /**
  * 发送手机验证码。
  * deviceId 用于短信频控的设备维度，可选。
+ *
+ * 经 terminalAttributedFetch 发出：一体机上带 x-terminal-id + x-terminal-session-token，
+ * 服务端据此按台计每日短信额度（带了终端编号却验不过签的会被 401 拒绝，届时换一次票重发）；
+ * 手机上的扫码确认页没有终端身份，照旧只按号码 / 网络计。
  */
 export function sendSmsCode(phone: string, deviceId?: string): Promise<SendCodeResult> {
   return call<SendCodeResult>('/member/auth/sms-code', 'POST', {
     body: deviceId ? { phone, deviceId } : { phone },
-  })
+  }, terminalAttributedFetch)
 }
 
 /**

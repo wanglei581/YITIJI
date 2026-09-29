@@ -11,6 +11,7 @@ export type LoginPhoneState =
   | 'phone-code-expired'
   | 'phone-code-locked'
   | 'phone-legal-unpublished'
+  | 'phone-sms-unavailable'
 
 export type LoginQrState =
   | 'qr-loading'
@@ -32,6 +33,7 @@ export const LOGIN_PHONE_STATES: readonly LoginPhoneState[] = [
   'phone-code-expired',
   'phone-code-locked',
   'phone-legal-unpublished',
+  'phone-sms-unavailable',
 ]
 
 export const LOGIN_QR_STATES: readonly LoginQrState[] = [
@@ -56,6 +58,28 @@ const SEND_LIMITED_CODES = new Set([
 
 export function isSendLimitedCode(code: string | null): boolean {
   return code !== null && SEND_LIMITED_CODES.has(code)
+}
+
+/**
+ * 发码失败里「换号、再等一会儿都没用，只能换登录方式」的几种。与 phone-send-limited 分开的理由：
+ * 那一态的主按钮是「再试一次发码」，限的是这个号码 / 这个网络，换号或等冷却确实能过；
+ * 这几种限的是这台机器或全站当天的发送量（或发送量核对不了），这台机器上怎么重试都发不出。
+ * 此时唯一走得通的是扫码登录 —— 二维码由本机取、在手机上确认，不经这台机器发短信。
+ *
+ *   SMS_TERMINAL_DAILY_LIMIT  这台机器今天发码到上限
+ *   SMS_DAILY_TOTAL_LIMIT     全站今天发码到上限（手机上用登录过的小程序确认，不用短信）
+ *   SMS_BUDGET_UNAVAILABLE    发送量核对不了，服务端先停发
+ *   TERMINAL_SESSION_INVALID  发码带了终端编号但这台机器的安全校验没过、换票也没换回来
+ */
+const SMS_UNAVAILABLE_CODES = new Set([
+  'SMS_TERMINAL_DAILY_LIMIT',
+  'SMS_DAILY_TOTAL_LIMIT',
+  'SMS_BUDGET_UNAVAILABLE',
+  'TERMINAL_SESSION_INVALID',
+])
+
+export function isSmsUnavailableCode(code: string | null | undefined): boolean {
+  return typeof code === 'string' && SMS_UNAVAILABLE_CODES.has(code)
 }
 
 export function classifyPhoneError(message: string | null): LoginPhoneState | null {
@@ -85,6 +109,7 @@ export function derivePhoneGateState(input: {
   if (input.errorCode === 'SMS_CODE_EXPIRED') return 'phone-code-expired'
   if (input.errorCode === 'SMS_CODE_INVALID') return 'phone-code-invalid'
   if (input.errorCode === 'SMS_SEND_FAILED') return 'phone-send-failed'
+  if (isSmsUnavailableCode(input.errorCode)) return 'phone-sms-unavailable'
   if (isSendLimitedCode(input.errorCode ?? null)) return 'phone-send-limited'
   const classified = classifyPhoneError(input.error)
   if (classified) return classified
@@ -150,6 +175,7 @@ export const LOGIN_GATE_PILL: Record<LoginGateState, { tone: 'ok' | 'warn' | 'ba
   'phone-code-expired': { tone: 'warn', label: '请获取新验证码' },
   'phone-code-locked': { tone: 'warn', label: '请重新验证' },
   'phone-legal-unpublished': { tone: 'warn', label: '暂时无法登录' },
+  'phone-sms-unavailable': { tone: 'warn', label: '请改用扫码登录' },
   'qr-loading': { tone: 'unknown', label: '等待二维码' },
   'qr-ready': { tone: 'ok', label: '请在手机上确认' },
   'qr-expired': { tone: 'warn', label: '请重新扫码' },
@@ -168,6 +194,7 @@ export const LOGIN_GATE_COPY: Record<LoginGateState, { title: string; sub: strin
   'phone-code-expired': { title: '需要重新获取验证码', sub: '旧码已经不能使用，请重新获取一条。' },
   'phone-code-locked': { title: '验证码尝试次数过多', sub: '这条验证码已作废，请获取新码后再验证。' },
   'phone-legal-unpublished': { title: '暂时无法登录', sub: '用户协议和隐私政策还没有正式发布。不登录也能打印和扫描。' },
+  'phone-sms-unavailable': { title: '短信验证码暂时发不出来', sub: '改用扫码登录，不用这台机器发短信。也可以不登录，继续使用公开服务。' },
   'qr-loading': { title: '扫码登录', sub: '勾选协议后即可获取二维码。' },
   'qr-ready': { title: '扫码登录', sub: '用手机扫码并确认，再回到这台机器继续办理。' },
   'qr-expired': { title: '二维码已过期', sub: '请在这台机器上重新生成，再用手机扫码。' },
