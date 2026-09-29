@@ -203,7 +203,7 @@ export function govFull(): ScreenSnapshot {
         '14d',
         trendDays([620, 780, 720, 1180, 1040, 1480, 1320, 1640, 1390, 1750, 1520, 1842, 1610, 1780]),
       ),
-      visitCount: na('KioskSession', 'current', 'kiosk_session_unwritten'),
+      visitCount: ok('KioskSession.startedAt', 'shanghai-day', 86),
       suppliesAndMap: na('TerminalHeartbeat', 'current', 'no_consumable_or_geo_fields'),
       // 9/26 起任务流与实时告警随政务快照下发，与运营版同一份结构
       taskFlow24h: ok('PrintTask/ScanTask.groupBy(status)', '24h', TASK_FLOW),
@@ -288,6 +288,7 @@ export function govEmpty(): ScreenSnapshot {
   base.metrics.printTrend14d = ok('Order.payStatus=paid,paidAt+billablePages', '14d', trendDays(Array.from({ length: 14 }, () => 0)))
   base.metrics.taskFlow24h = ok('PrintTask/ScanTask.groupBy(status)', '24h', { printByStatus: {}, scanByStatus: {} })
   base.metrics.alertsRealtime = ok('derived-alerts', 'current', { firingCount: 0, listedCount: 0, truncated: false, items: [] })
+  base.metrics.visitCount = ok('KioskSession.startedAt', 'shanghai-day', 0)
   return base
 }
 
@@ -471,7 +472,7 @@ export function usageSnapshot(range: string): ScreenUsageSnapshot {
     limits: { minAggregateSample: 5, recruitmentHosting: 'enabled' },
     metrics: {
       channels: ok('Order.channel', safe, { paidOrders: 415, kiosk: 290, miniapp: 118, unlabeled: 7, memberOrders: 158 }),
-      visits: na('KioskSession', safe, 'kiosk_session_unwritten'),
+      visits: na('KioskSession.startedAt', safe, 'sample_below_threshold'),
       services: ok('mixed', safe, [
         svc('jobs', 'info', 1246, 'members_only'),
         svc('fairs', 'info', 328, 'members_only'),
@@ -583,7 +584,7 @@ export function usageChannelsFailed(range: string): ScreenUsageSnapshot {
   return base
 }
 
-/** 访问人次本次取数失败（默认夹具里它是结构性的「未接入」）。 */
+/** 服务人次本次取数失败（默认夹具里 1–4 次只给「少于 5」，不下发原数）。 */
 export function usageVisitsFailed(range: string): ScreenUsageSnapshot {
   const base = usageSnapshot(range)
   base.status = 'degraded'
@@ -630,7 +631,7 @@ export function terminalTwin(id: string): ScreenTerminalTwin | null {
     }),
     scanner: ok('TerminalHeartbeat+ScanTask', 'current', { state: 'ready', label: null }),
     currentTask: ok('PrintTask.status', 'current', printing ? { pages: 12, colorMode: 'bw', startedAt: new Date(now - 40_000).toISOString() } : null),
-    today: { printPages: 36, printTasks: 18, scans: null, failed: null, visits: na('KioskSession', 'current', 'kiosk_session_unwritten') },
+    today: { printPages: 36, printTasks: 18, scans: null, failed: null, visits: na('KioskSession.startedAt', 'shanghai-day', 'sample_below_threshold') },
     consumables: na('TerminalHeartbeat', 'current', 'no_consumable_or_geo_fields'),
     timeline24h: ok('TerminalHeartbeat+PrintTask', '24h', [
       seg(24, 17, 'offline'),
@@ -644,6 +645,14 @@ export function terminalTwin(id: string): ScreenTerminalTwin | null {
       seg(0.02, 0, printing ? 'printing' : 'idle'),
     ]),
   }
+}
+
+/** 单台服务人次本次取数失败：磁贴写「暂时取不到」，不写原因码。 */
+export function terminalTwinVisitsFailed(id: string): ScreenTerminalTwin | null {
+  const twin = terminalTwin(id)
+  if (!twin) return null
+  twin.today.visits = na('KioskSession.startedAt', 'shanghai-day', 'source_query_failed')
+  return twin
 }
 
 /** 打印机状态本次取数失败：标注写「暂时取不到」（朱色），纸盒碳粉仍是结构性的「待接入」。 */

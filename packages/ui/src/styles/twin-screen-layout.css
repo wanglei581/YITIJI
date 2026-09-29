@@ -342,6 +342,15 @@
 [data-ops-screen='wall'] .twin-heat b { font-size: 13px; }
 [data-ops-screen='wall'] .twin-step b { font-size: 20px; }
 [data-ops-screen='wall'] .twin-step span { font-size: 13px; }
+/* 左上块加了服务人次与打印脚注后，舞台档收紧环和侧栏，才能仍放进 300 高的块位。 */
+[data-ops-screen='wall'] .twin-panel.is-dense { gap: 6px; padding: 12px 14px; }
+[data-ops-screen='wall'] .twin-panel.is-dense .twin-big { font-size: 36px; }
+[data-ops-screen='wall'] .twin-legend-col.is-tight { gap: 4px; }
+[data-ops-screen='wall'] .twin-legend-col.is-tight .twin-kv b { font-size: 22px; }
+[data-ops-screen='wall'] .twin-legend-col.is-tight .twin-cap { font-size: 13px; line-height: 1.3; }
+[data-ops-screen='wall'] .twin-panel.is-dense .twin-stat { padding: 4px 10px; }
+[data-ops-screen='wall'] .twin-panel.is-dense .twin-stat > span { font-size: 13px; }
+[data-ops-screen='wall'] .twin-panel.is-dense .twin-stat b { font-size: 22px; }
 
 /* ---------- 桌面档字阶（≥12px，60 厘米可读） ---------- */
 [data-ops-screen='desk'] .twin { font-size: 14px; }

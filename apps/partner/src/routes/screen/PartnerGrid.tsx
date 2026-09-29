@@ -29,6 +29,7 @@ import {
   type TwinState,
 } from '@ai-job-print/ui'
 import { buildPartnerGapEntries, countPartnerGapMetrics } from './metricLabels'
+import { PartnerVisitStat } from './PartnerVisitStat'
 import { OrgFleetWallPanel, OrgGapLine, OrgPolicyPanel } from './PartnerHostingOff'
 import { screenHref } from './screenTabs'
 import { TwinShell, TwinShellEmpty, snapshotMeta, usePartnerSnapshot, type ScreenChrome } from './screenView'
@@ -125,6 +126,9 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
   const orgScope = focus === null ? undefined : '全机构口径'
   // 托管关闭：告警没排满时下面说一句其余终端正常（台数已在左上，这里不再写数）
   const allClear = hostingOff && alerts.length > 0 && alerts.length < alertLimit && counts.ok + counts.pr > 0
+  const terminalMetric = g.terminalsOnline
+  const terminalOnline = terminalMetric?.available ? (focus === null ? terminalMetric.value.healthy : counts.ok + counts.pr) : null
+  const terminalTotal = terminalMetric?.available ? (focus === null ? terminalMetric.value.sampledCount : inView.length) : null
 
   const alertPanel = (
     <TwinMetricPanel
@@ -183,49 +187,53 @@ export function PartnerGrid({ chrome }: { chrome: ScreenChrome }) {
       variant={hostingOff ? 'org-overview' : undefined}
     >
       <TwinSlot slot="l1">
-        <TwinMetricPanel
+        <TwinPanel
+          className={chrome.presenting ? 'is-dense' : undefined}
           title={focus === null ? '本机构终端' : `${focus}终端`}
           sub="实时"
-          metric={g.terminalsOnline}
           source={
             '终端心跳投影，只统计登记在本机构名下的终端。' +
-            (g.terminalsOnline?.available
-              ? `最近 ${g.terminalsOnline.value.onlineWindowSeconds} 秒有心跳算在线。${screenFleetScopeNote(g.terminalsOnline.value, '本机构')}。`
+            (terminalMetric?.available
+              ? `最近 ${terminalMetric.value.onlineWindowSeconds} 秒有心跳算在线。${screenFleetScopeNote(terminalMetric.value, '本机构')}。`
               : '') +
-            (focus === null ? '「未上报」含已注册但从未上报心跳的终端。' : '按终端所在服务点位统计，由机队样本算出。')
+            (focus === null ? '「未上报」含已注册但从未上报心跳的终端。' : '按终端所在服务点位统计，由机队样本算出。') +
+            '今日服务人次按一体机会话开始时间计入上海自然日，不随点位筛选变化，是会话数，不是人数。'
           }
-          render={(value) => {
-            const online = focus === null ? value.healthy : counts.ok + counts.pr
-            const total = focus === null ? value.sampledCount : inView.length
-            return (
-              <>
-                <div className="twin-ring-row">
-                  <TwinRing value={online} total={total}>
-                    <span className="twin-big">{screenCount(online)}</span>
-                    <span className="twin-muted twin-ring-cap">正常 · 共 {screenCount(total)} 台</span>
-                  </TwinRing>
-                  <div className="twin-legend-col">
-                    {focus === null ? (
-                      <TwinLegend
-                        items={[
-                          { state: 'ok', label: `正常 ${value.healthy}` },
-                          { state: 'wa', label: `告警 ${value.degraded}` },
-                          { state: 'off', label: `离线 ${value.offline}` },
-                          { state: 'un', label: `未上报 ${value.unknown}` },
-                        ]}
-                      />
-                    ) : (
-                      <TwinStateLegend counts={counts} />
-                    )}
-                  </div>
-                </div>
-                <p className="twin-cap twin-push">
-                  只统计登记在本机构名下的终端{value.truncated ? `（显示前 ${screenCount(value.sampledCount)} 台，共 ${screenCount(value.matchedCount)} 台）` : ''}
-                </p>
-              </>
-            )
-          }}
-        />
+        >
+          {terminalMetric?.available && terminalOnline !== null && terminalTotal !== null ? (
+            <div className="twin-ring-row">
+              <TwinRing value={terminalOnline} total={terminalTotal} size={chrome.presenting ? 120 : 168}>
+                <span className="twin-big">{screenCount(terminalOnline)}</span>
+                <span className="twin-muted twin-ring-cap">正常 · 共 {screenCount(terminalTotal)} 台</span>
+              </TwinRing>
+              <div className="twin-legend-col">
+                {focus === null ? (
+                  <TwinLegend
+                    items={[
+                      { state: 'ok', label: `正常 ${terminalMetric.value.healthy}` },
+                      { state: 'wa', label: `告警 ${terminalMetric.value.degraded}` },
+                      { state: 'off', label: `离线 ${terminalMetric.value.offline}` },
+                      { state: 'un', label: `未上报 ${terminalMetric.value.unknown}` },
+                    ]}
+                  />
+                ) : (
+                  <TwinStateLegend counts={counts} />
+                )}
+              </div>
+            </div>
+          ) : (
+            <TwinUnavailable
+              reason={terminalMetric && terminalMetric.available === false ? terminalMetric.reason : SCREEN_UNAVAILABLE_REASON.sourceQueryFailed}
+              inline
+            />
+          )}
+          <PartnerVisitStat metric={g.visitCount} />
+          <p className="twin-cap">
+            {terminalMetric?.available && terminalMetric.value.truncated
+              ? `只统计登记在本机构名下的终端（显示前 ${screenCount(terminalMetric.value.sampledCount)} 台，共 ${screenCount(terminalMetric.value.matchedCount)} 台）`
+              : '只统计登记在本机构名下的终端'}
+          </p>
+        </TwinPanel>
       </TwinSlot>
 
       <TwinSlot slot="l2">

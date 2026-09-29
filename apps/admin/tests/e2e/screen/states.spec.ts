@@ -8,6 +8,7 @@ import {
   govStructuralGap,
   opsUnavailable,
   terminalTwinPrinterFailed,
+  terminalTwinVisitsFailed,
   usageChannelsFailed,
   usageVisitsFailed,
 } from './fixtures/snapshots'
@@ -62,6 +63,12 @@ test.describe('admin data screen states', () => {
     await expect(page.locator('.twin-panel')).toHaveCount(7)
     await expect(page.getByText('128,431')).toBeVisible()
     await expect(page.getByText('9,706')).toBeVisible()
+    const summary = panel(page, /^终端与服务$/)
+    await expect(summary.locator('.twin-kv', { hasText: '今日服务人次' }).locator('b')).toHaveText('86人次')
+    await expect(summary.locator('.twin-kv', { hasText: '今日服务人次' })).toContainText('是会话数，不是人数')
+    await expect(summary.locator('.twin-kv', { hasText: '累计打印' })).toContainText('按出纸任务 × 份数计，双面时实际用纸更少')
+    await expect(summary.locator('.twin-kv', { hasText: '累计打印' }).locator('b')).toHaveText('128,431页')
+    await expect(page.locator('[data-ops-screen]')).not.toContainText(/sample_below_threshold|source_query_failed|window_row_cap_exceeded|kiosk_session_unwritten/)
     await expect(page.getByText('来自 23 家来源机构')).toBeVisible()
     // 分色恒不可用：屏上不能编出黑白 / 彩色各多少页
     await expect(page.locator('[data-ops-screen]')).not.toContainText(/黑白|彩色/)
@@ -116,6 +123,8 @@ test.describe('admin data screen states', () => {
     await expect(shelf.locator('.twin-na, .twin-pend')).toHaveCount(0)
     const summary = panel(page, '终端与服务')
     await expect(summary.locator('.twin-kv', { hasText: '累计打印' }).locator('b')).toHaveText('0页')
+    await expect(summary.locator('.twin-kv', { hasText: '今日服务人次' }).locator('b')).toHaveText('0人次')
+    await expect(summary.locator('.twin-kv', { hasText: '今日服务人次' })).toContainText('是会话数，不是人数')
     await expect(summary.locator('.twin-kv', { hasText: 'AI 服务调用' }).locator('b')).toHaveText('0次')
     await expect(summary.locator('.twin-pend')).toHaveCount(0)
     // 近 14 日全是零：画真实的零线（今日 0），不是「未接入」
@@ -177,18 +186,39 @@ test.describe('admin data screen states', () => {
     }
   })
 
-  test('服务调用：访问人次磁贴按原因区分「未接入」与「暂时取不到」', async ({ page }) => {
+  test('服务调用：服务人次磁贴对 1–4 次写「少于 5」，取数失败写「暂时取不到」', async ({ page }) => {
     await serve(page, adminApi())
     await open(page, '/screen/usage')
-    const visits = tile(panel(page, /^下单渠道$/), '访问人次').locator('.twin-pend')
-    await expect(visits).toHaveText('未接入')
+    const tileBox = tile(panel(page, /^下单渠道$/), '服务人次')
+    const visits = tileBox.locator('.twin-pend')
+    await expect(visits).toHaveText('少于 5')
+    await expect(tileBox).not.toContainText(/[1-4]/)
     await expect(visits).not.toHaveClass(/\bis-failed\b/)
+    await expect(page.locator('[data-ops-screen]')).not.toContainText('sample_below_threshold')
 
     await serve(page, adminApi({ usage: usageVisitsFailed }))
     await page.reload()
     await expect(visits).toHaveText('暂时取不到')
     await expect(visits).toHaveClass(/\bis-failed\b/)
     await expect(visits).toHaveCSS('border-top-style', 'solid')
+    await expect(page.locator('[data-ops-screen]')).not.toContainText('source_query_failed')
+  })
+
+  test('终端孪生：服务人次 1–4 次写「少于 5」，取数失败写「暂时取不到」', async ({ page }) => {
+    await serve(page, adminApi())
+    await open(page, '/screen/terminal?id=t-gz-th-005')
+    const today = panel(page, /^今日服务$/)
+    const visits = tile(today, '服务人次')
+    await expect(visits.locator('.twin-pend')).toHaveText('少于 5')
+    await expect(visits).not.toContainText(/[1-4]/)
+    await expect(today).not.toContainText('接入前不显示')
+    await expect(page.locator('[data-ops-screen]')).not.toContainText('sample_below_threshold')
+
+    await serve(page, adminApi({ twin: terminalTwinVisitsFailed }))
+    await page.reload()
+    await expect(visits.locator('.twin-pend')).toHaveText('暂时取不到')
+    await expect(visits.locator('.twin-pend')).toHaveClass(/\bis-failed\b/)
+    await expect(page.locator('[data-ops-screen]')).not.toContainText('source_query_failed')
   })
 
   test('终端孪生：打印机状态取数失败写「暂时取不到」，纸盒碳粉的数据层缺口仍是「待接入」', async ({ page }) => {
