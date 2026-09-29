@@ -215,6 +215,10 @@ export class PickupOrderService {
         const raced = await this.prisma.order.findUnique({ where: { id: order.id } })
         if (!raced) throw new NotFoundException('ORDER_NOT_FOUND')
         if (raced.pickupCodeHash !== order.pickupCodeHash) {
+          // 到机码刚被重发：码入口照旧同文案防撞码；会员本机领取没输过码，说「这一单有变化」而不是「码无效」。
+          if (via === 'member_order') {
+            throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '这一单刚刚有变化，请刷新订单后再领取' } })
+          }
           throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
         }
         if (raced.pickupStatus === 'used' || raced.printTaskId) {
