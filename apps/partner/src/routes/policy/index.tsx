@@ -46,9 +46,9 @@ const PUBLISH_MAP: Record<string, { badge: 'success' | 'warning' | 'default'; la
 }
 const PARTNER_POLICIES_REFRESH_KEY = 'partner:policies'
 const PAGE_SIZE = 20
-const REVIEW_FILTERS = ['全部', '待审核', '审核中', '已通过', '已拒绝'] as const
+const REVIEW_FILTERS = ['全部', '待审核', '已通过', '已拒绝'] as const
 const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
-  全部: null, 待审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected',
+  全部: null, 待审核: 'pending', 已通过: 'approved', 已拒绝: 'rejected',
 }
 const FILTER_SELECTED_CLASS = 'border-primary-600 bg-primary-600 text-white'
 const FILTER_IDLE_CLASS = 'border-neutral-200 bg-surface text-neutral-700 hover:border-primary-600/40'
@@ -476,7 +476,7 @@ export default function PolicyPage() {
       )}
 
       <p className="mt-3 text-xs text-neutral-400">
-        政策内容为 info-only:仅政策说明、材料清单与来源链接;不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会在一体机「政策服务」页展示;平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
+        政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会在一体机「政策服务」页展示;平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
         政策扶持条目可另行录入「申领条件」:条件按政策原文逐条录入,一体机据此给出「相符 / 不符 / 无法判定」的机械比对结果,不做资格认定;未录入条件的政策不会出现任何判定结论。
       </p>
 

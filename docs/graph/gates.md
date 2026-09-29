@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1720 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1730 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -150,12 +150,13 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 114 个文件</summary>
+<summary><code>apps/admin/src/</code> — 121 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/admin/src/UnhandledRejectionBanner.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/layouts/AdminLayoutWrapper.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-content-trust-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-legal-doc-version.ts` |
+| `apps/admin/src/lib/auditActionLabels.ts` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/main.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/account-settings/AdminInitialPhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/AdminPhoneTransferCard.tsx` | `verify-admin-phone-transfer-ui.mjs` |
@@ -167,7 +168,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/audit/index.tsx` | `verify-admin-partner-contact-phone-ui.mjs` |
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/components/BulkPublishButton.tsx` | `verify-admin-content-trust-ui.mjs` |
-| `apps/admin/src/routes/dashboard/index.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
+| `apps/admin/src/routes/dashboard/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/devices/TerminalFleetOverview.tsx` | `verify-admin-device-fleet-overview-ui.mjs` |
 | `apps/admin/src/routes/devices/index.tsx` | `verify-admin-device-fleet-overview-ui.mjs` |
 | `apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx` | `verify-source-publish-actions.mjs` |
@@ -206,7 +207,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/peripherals/PeripheralDrawer.tsx` | `verify-admin-peripheral-views.mjs` |
 | `apps/admin/src/routes/peripherals/index.tsx` | `verify-admin-peripheral-views.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-honest-placeholders.mjs` |
 | `apps/admin/src/routes/peripherals/peripheralViews.ts` | `verify-admin-peripheral-views.mjs` |
-| `apps/admin/src/routes/permissions/index.tsx` | `verify-honest-placeholders.mjs` |
+| `apps/admin/src/routes/permissions/AccountStatusDialog.tsx` | `verify-admin-internal-accounts-ui.mjs` |
+| `apps/admin/src/routes/permissions/AccountsTable.tsx` | `verify-admin-internal-accounts-ui.mjs` |
+| `apps/admin/src/routes/permissions/BackupAdminDrawer.tsx` | `verify-admin-internal-accounts-ui.mjs` |
+| `apps/admin/src/routes/permissions/index.tsx` | `verify-admin-internal-accounts-ui.mjs`<br/>`verify-honest-placeholders.mjs` |
+| `apps/admin/src/routes/permissions/presentation.ts` | `verify-admin-internal-accounts-ui.mjs` |
 | `apps/admin/src/routes/policy-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/print-scan/CapabilityCenter.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx` | `verify-admin-print-scan-ui.mjs` |
@@ -214,6 +219,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/printers/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-data-request-ui.mjs` |
 | `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenTabs.ts` | `verify-console-screen-ui.mjs` |
@@ -254,6 +260,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/consoleScreen.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/services/api/devices.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/services/api/files.ts` | `verify-admin-file-lifecycle.mjs` |
+| `apps/admin/src/services/api/internalAccounts.ts` | `verify-admin-internal-accounts-ui.mjs` |
 | `apps/admin/src/services/api/jobMaterials.ts` | `verify-admin-job-materials-ui.mjs` |
 | `apps/admin/src/services/api/offlineAgenciesAdmin.ts` | `verify-admin-offline-agencies-ui.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/services/api/offlineAgencyGovernance.ts` | `verify-admin-offline-agencies-ui.mjs` |
@@ -1018,7 +1025,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 42 个文件</summary>
+<summary><code>apps/partner/src/</code> — 44 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1037,7 +1044,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/policy/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/profile/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/screen/PartnerGrid.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/PartnerUsageHostingOff.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/PartnerUsageView.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/PartnerVisitStat.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/metricLabels.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
@@ -1714,7 +1723,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/ui/src/</code> — 27 个文件</summary>
+<summary><code>packages/ui/src/</code> — 28 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1733,6 +1742,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/ui/src/screen/twin/TwinInfoFlow.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinPanel.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinShell.tsx` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/twin/TwinTerminalBoard.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/fusion-youth.css` | `verify-kiosk-visual-unity.mjs`<br/>`verify-fusion-youth-foundation.mjs` |
 | `packages/ui/src/styles/kiosk-components.css` | `verify-kiosk-visual-unity.mjs` |
 | `packages/ui/src/styles/kiosk-shell.css` | `verify-kiosk-visual-unity.mjs` |
@@ -2199,7 +2209,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/assistant/daily-brief.service.ts` | `verify-community-daily-brief.ts` |
 | `services/api/src/audit/audit.module.ts` | `verify-contract-review-http.ts`<br/>`verify-internal-accounts.ts` |
 | `services/api/src/audit/audit.service.ts` | `verify-activity-logs.ts`<br/>`verify-admin-billing.ts`<br/>`verify-admin-fairs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-orders-refund.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-admin-users.ts`<br/>`verify-advisor-work.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-audit-logs.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-benefit-redemption.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-career-plan.ts`<br/>`verify-change-password.ts`<br/>`verify-companies.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-cos-files.ts`<br/>`verify-demo-company-unpublish.ts`<br/>`verify-derivation-kind.ts`<br/>`verify-document-page-count.ts`<br/>`verify-external-video-e2e.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-internal-accounts-postgres.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-job-fit.ts`<br/>`verify-job-materials.ts`<br/>`verify-job-review.ts`<br/>`verify-job-sync.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-materials-processing.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-member-data-request-truth.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-mock-interview.ts`<br/>`verify-official-channels.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-print-jobs.ts`<br/>`verify-public-fair-demo-guard.ts`<br/>`verify-publish-expiry-completeness.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-recruitment-emergency-scope.ts`<br/>`verify-redemption-audit.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-scan-tasks.ts`<br/>`verify-screensaver-content.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
-| `services/api/src/audit/audit.types.ts` | `verify-assess-isolation.ts`<br/>`verify-change-password.ts`<br/>`verify-partner-contact-phone-registration.ts` |
+| `services/api/src/audit/audit.types.ts` | `verify-console-plain-copy.mjs`<br/>`verify-assess-isolation.ts`<br/>`verify-change-password.ts`<br/>`verify-partner-contact-phone-registration.ts` |
 | `services/api/src/auth/admin-initial-phone-bind.service.ts` | `verify-admin-phone-transfer.ts`<br/>`verify-internal-auth-phone.ts` |
 | `services/api/src/auth/admin-phone-transfer.service.ts` | `verify-admin-phone-transfer.ts` |
 | `services/api/src/auth/admin-registered-phone-reset.ts` | `verify-partner-contact-phone-registration.ts` |

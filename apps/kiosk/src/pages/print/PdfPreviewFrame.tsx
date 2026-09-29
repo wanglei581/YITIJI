@@ -16,6 +16,8 @@ export function PdfPreviewFrame({
   page,
   onPageChange,
   onReady,
+  passwordMessage,
+  onPasswordRequired,
 }: {
   src: string
   title: string
@@ -23,6 +25,8 @@ export function PdfPreviewFrame({
   page?: number
   onPageChange?: (page: number) => void
   onReady?: (info: { pageCount: number }) => void
+  passwordMessage?: string
+  onPasswordRequired?: () => void
 }) {
   return (
     <PdfCanvasPreview
@@ -33,6 +37,8 @@ export function PdfPreviewFrame({
       page={page}
       onPageChange={onPageChange}
       onReady={onReady}
+      passwordMessage={passwordMessage}
+      onPasswordRequired={onPasswordRequired}
     />
   )
 }

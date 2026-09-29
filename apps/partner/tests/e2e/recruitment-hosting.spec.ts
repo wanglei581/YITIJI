@@ -112,7 +112,7 @@ test.describe('托管关闭（我们云上默认）', () => {
     }
     await expect(page.getByRole('heading', { name: '同步概况' })).toHaveCount(0)
     await expect(page.getByRole('group', { name: '统计周期' })).toHaveCount(0)
-    await expect(page.getByText('暂无归因数据')).toBeVisible()
+    await expect(page.getByText('还不能按本机构统计，这里不显示这些数字')).toBeVisible()
     await shot(page, 'stats-hosting-off')
     await assertPageHonest(page, errors)
   })
