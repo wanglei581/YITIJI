@@ -18,7 +18,7 @@ import { assertPiiScanned } from './pii-scan-gate'
 import { assertFileContentIntegrity } from '../files/file-content-integrity'
 import { StorageService } from '../storage/storage.service'
 import {
-  clearPickupClaimFailures,
+  creditPickupClaimSuccess,
   isPickupClaimLocked,
   recordPickupClaimFailure,
 } from './pickup-claim-lockout'
@@ -139,8 +139,8 @@ export class PickupOrderService {
    * 两份判定迟早漂移，漂移的那一份就是能绕过退款或过期出纸的那一份。
    * 调用方负责先把单找出来、并按各自口径处理「单不属于本机」；下面那行只是兜底。
    *
-   * via 只影响两件事：到机码成功才清零本机失败计数（它证明手里是真码，会员入口不证明这一点，
-   * 否则登录用户可以拿自己的单反复清零、给枚举续命）；审计 payload 记下入口。
+   * via 只影响两件事：到机码成功才给本机失败计数抵一次（它证明手里是真码，会员入口不证明这一点，
+   * 否则登录用户可以拿自己的单反复抵扣、给枚举续命）；审计 payload 记下入口。
    */
   async settleClaim(order: OrderRecord, terminal: { id: string }, via: PickupClaimVia) {
     if (order.terminalId !== terminal.id) throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
@@ -207,10 +207,11 @@ export class PickupOrderService {
         data: { pickupStatus: 'claimed', pickupClaimedAt: new Date(), taskStatus: 'awaiting_payment' },
       })
       // 到机码入口**本次**把一枚属于本终端的真码从 pending 认领成 claimed：持码人是真实用户而非枚举者，
-      // 清零该终端的失败计数（「正常用户手误不受影响」的主要实现手段——繁忙机器上成功远多于失败）。
-      // 只在这一次清零（1.8 P-2）：已认领的活租约可同码幂等重领，若每次都清零，持一张自己的未付单
-      // （下单免费）就能夹在猜码中间无限清零，锁机形同虚设。每张单因此最多清零一次。
-      if (claimed.count === 1 && via === 'pickup_code') await clearPickupClaimFailures(this.redis, terminal.id)
+      // 给该终端的失败计数抵掉一次（「正常用户手误不受影响」的主要实现手段——繁忙机器上成功远多于失败）。
+      // 只在这一次、只抵一次（1.8 P-2）：已认领的活租约可同码幂等重领，若每次都清零，持一张自己的未付单
+      // （下单免费）就能夹在猜码中间无限清零；整个清零时每新建一张单也能换一次清零。抵一次后，
+      // 一张新单只换回一次猜码机会。
+      if (claimed.count === 1 && via === 'pickup_code') await creditPickupClaimSuccess(this.redis, terminal.id)
       if (claimed.count !== 1) {
         const raced = await this.prisma.order.findUnique({ where: { id: order.id } })
         if (!raced) throw new NotFoundException('ORDER_NOT_FOUND')
