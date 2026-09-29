@@ -17491,7 +17491,7 @@
         ]
       },
       {
-        "fieldCount": 28,
+        "fieldCount": 29,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -21507,6 +21507,7 @@
     ],
     "packages/shared/src/types/partner.ts": [
       "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+      "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-smart-campus.ts"
     ],
     "packages/shared/src/types/payment.ts": [
@@ -22051,6 +22052,7 @@
       "services/api/scripts/verify-console-screen-printed-visits.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
+      "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
@@ -22126,14 +22128,23 @@
     "services/api/scripts/support/recruitment-wave2-public-snapshot.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
     ],
+    "services/api/scripts/support/scan-panel-wording.ts": [
+      "services/api/scripts/verify-scan-tasks.ts"
+    ],
     "services/api/scripts/support/serializable-race-barrier.ts": [
       "services/api/scripts/verify-first-admin-bootstrap-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts"
+    ],
+    "services/api/scripts/support/sqlite-cli.ts": [
+      "services/api/scripts/verify-scan-tasks.ts"
     ],
     "services/api/scripts/support/upload-session-verifier.ts": [
       "services/api/scripts/verify-upload-sessions-bind.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts"
+    ],
+    "services/api/scripts/unpublish-demo-companies.ts": [
+      "services/api/scripts/verify-demo-company-unpublish.ts"
     ],
     "services/api/scripts/verify-admin-fairs.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -23009,6 +23020,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
+      "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
@@ -24253,7 +24265,8 @@
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
     "services/api/src/jobs/partner-capabilities.ts": [
-      "services/api/scripts/verify-backend-p0-contracts.mjs"
+      "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-org-type-enum-sync.ts"
     ],
     "services/api/src/jobs/partner-fairs.controller.ts": [
       "services/api/scripts/verify-multipart-field-nesting.ts",
@@ -24722,6 +24735,7 @@
       "services/api/scripts/verify-admin-orgs-delete-concurrency.ts",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-admin-orgs.ts",
+      "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
       "services/api/scripts/verify-partner-account-action.ts",
@@ -24730,6 +24744,9 @@
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts"
+    ],
+    "services/api/src/orgs/dto/admin-org.dto.ts": [
+      "services/api/scripts/verify-org-type-enum-sync.ts"
     ],
     "services/api/src/orgs/dto/partner-account-action.dto.ts": [
       "services/api/scripts/verify-partner-account-action.ts"
@@ -25241,6 +25258,7 @@
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-cos-files.ts",
+      "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-deploy-data-safety-gate.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-end-user-asset-ownership.ts",
@@ -33885,6 +33903,27 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/unpublish-demo-companies.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-demo-company-unpublish.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:demo-company-unpublish"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/prisma/seed-guard.ts"
         ],
         "missing": []
@@ -36626,6 +36665,27 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "packages/shared/src/types/partner.ts",
+          "services/api/src/jobs/partner-capabilities.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/dto/admin-org.dto.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-org-type-enum-sync.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:org-type-enum-sync"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
@@ -38944,6 +39004,8 @@
         "dirs": [],
         "files": [
           "services/api/scripts/scan-lease-contract.helper.ts",
+          "services/api/scripts/support/scan-panel-wording.ts",
+          "services/api/scripts/support/sqlite-cli.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/prisma/create-client.ts",

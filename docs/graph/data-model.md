@@ -11,7 +11,7 @@ ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 flowchart TD
   EndUser["EndUser<br/><small>34 字段</small>"]
   Organization["Organization<br/><small>27 字段</small>"]
-  Terminal["Terminal<br/><small>28 字段</small>"]
+  Terminal["Terminal<br/><small>29 字段</small>"]
   FileObject["FileObject<br/><small>49 字段</small>"]
   Job["Job<br/><small>47 字段</small>"]
   JobFair["JobFair<br/><small>39 字段</small>"]
@@ -146,7 +146,7 @@ flowchart TD
 | **ScreensaverContent** | 9 | — | **无代码读写** |
 | **SyncLog** | 15 | JobSource | 6 个文件<br/>`console-screen/console-screen.queries.ts`<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 3 个文件<br/>`assistant/daily-brief.service.ts`<br/>`community/community.service.ts`<br/>`member-notifications/member-notifications.service.ts` |
-| **Terminal** | 28 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 35 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>… |
+| **Terminal** | 29 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 35 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 2 个文件<br/>`console-screen/console-screen.twin.ts`<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
