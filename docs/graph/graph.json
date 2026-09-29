@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 562,
+    "endpointCount": 566,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -1811,6 +1811,82 @@
         ],
         "services": [
           "JobsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-internal-accounts/admin-internal-accounts.controller.ts",
+        "handler": "AdminInternalAccountsController.list",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "User"
+        ],
+        "path": "/api/v1/admin/internal-accounts",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-internal-accounts/admin-internal-accounts.service.ts"
+        ],
+        "services": [
+          "AdminInternalAccountsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-internal-accounts/admin-internal-accounts.controller.ts",
+        "handler": "AdminInternalAccountsController.setStatus",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "User"
+        ],
+        "path": "/api/v1/admin/internal-accounts/:id/status",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-internal-accounts/admin-internal-accounts.service.ts"
+        ],
+        "services": [
+          "AdminInternalAccountsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-internal-accounts/admin-internal-accounts.controller.ts",
+        "handler": "AdminInternalAccountsController.startBackupAdmin",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "User"
+        ],
+        "path": "/api/v1/admin/internal-accounts/backup-admin/start",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-internal-accounts/backup-admin-create.service.ts"
+        ],
+        "services": [
+          "BackupAdminCreateService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-internal-accounts/admin-internal-accounts.controller.ts",
+        "handler": "AdminInternalAccountsController.verifyBackupAdmin",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "User"
+        ],
+        "path": "/api/v1/admin/internal-accounts/backup-admin/verify",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-internal-accounts/backup-admin-create.service.ts"
+        ],
+        "services": [
+          "BackupAdminCreateService"
         ]
       },
       {
@@ -16169,6 +16245,7 @@
           "User"
         ],
         "usedBy": [
+          "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/ai/resume/job-fit-hosting.ts",
           "services/api/src/audit/audit.service.ts",
@@ -17459,6 +17536,10 @@
           "ReviewDecision"
         ],
         "usedBy": [
+          "services/api/src/admin-internal-accounts/admin-internal-accounts.service.ts",
+          "services/api/src/admin-internal-accounts/admin-step-up.ts",
+          "services/api/src/admin-internal-accounts/backup-admin-create.service.ts",
+          "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts",
           "services/api/src/admin-ops/admin-alert-actions.service.ts",
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
           "services/api/src/auth/admin-login-second-factor.ts",
@@ -21676,6 +21757,8 @@
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
+      "services/api/scripts/verify-internal-accounts-postgres.ts",
+      "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-job-review.ts",
       "services/api/scripts/verify-jobfair-review.ts",
@@ -21881,6 +21964,19 @@
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-policy-scope.ts"
+    ],
+    "services/api/src/admin-internal-accounts/admin-internal-accounts.module.ts": [
+      "services/api/scripts/verify-internal-accounts.ts"
+    ],
+    "services/api/src/admin-internal-accounts/admin-internal-accounts.service.ts": [
+      "services/api/scripts/verify-internal-accounts-postgres.ts",
+      "services/api/scripts/verify-internal-accounts.ts"
+    ],
+    "services/api/src/admin-internal-accounts/backup-admin-create.service.ts": [
+      "services/api/scripts/verify-internal-accounts-postgres.ts"
+    ],
+    "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts": [
+      "services/api/scripts/verify-internal-accounts.ts"
     ],
     "services/api/src/admin-ops/admin-alert-actions.service.ts": [
       "services/api/scripts/verify-admin-ops.ts"
@@ -22480,7 +22576,8 @@
       "services/api/scripts/verify-community-daily-brief.ts"
     ],
     "services/api/src/audit/audit.module.ts": [
-      "services/api/scripts/verify-contract-review-http.ts"
+      "services/api/scripts/verify-contract-review-http.ts",
+      "services/api/scripts/verify-internal-accounts.ts"
     ],
     "services/api/src/audit/audit.service.ts": [
       "services/api/scripts/verify-activity-logs.ts",
@@ -22516,6 +22613,8 @@
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-field-mapping-rule.ts",
+      "services/api/scripts/verify-internal-accounts-postgres.ts",
+      "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
@@ -22607,6 +22706,7 @@
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-first-admin-bootstrap.ts",
+      "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
       "services/api/scripts/verify-partner-email-login-alias.ts"
@@ -22633,6 +22733,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-partner-account-action-otp.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
@@ -22713,6 +22814,7 @@
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
+      "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -22781,6 +22883,7 @@
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-error-observability.ts",
       "services/api/scripts/verify-http-exception-filter.ts",
+      "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-auth.ts",
@@ -22863,7 +22966,8 @@
       "services/api/scripts/verify-upload-sessions-http.ts"
     ],
     "services/api/src/common/middleware/request-id.middleware.ts": [
-      "services/api/scripts/verify-error-observability.ts"
+      "services/api/scripts/verify-error-observability.ts",
+      "services/api/scripts/verify-internal-accounts.ts"
     ],
     "services/api/src/common/pdf/aigc-label.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -22907,6 +23011,8 @@
       "services/api/scripts/verify-member-data-export-download.ts"
     ],
     "services/api/src/common/redis/partner-account-action-redis.service.ts": [
+      "services/api/scripts/verify-internal-accounts-postgres.ts",
+      "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-redis.ts",
       "services/api/scripts/verify-partner-account-action.ts"
@@ -22921,6 +23027,9 @@
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
+    "services/api/src/common/redis/redis.module.ts": [
+      "services/api/scripts/verify-internal-accounts.ts"
+    ],
     "services/api/src/common/redis/redis.service.ts": [
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-admin-ops.ts",
@@ -22931,6 +23040,8 @@
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
+      "services/api/scripts/verify-internal-accounts-postgres.ts",
+      "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-auth.ts",
@@ -24540,6 +24651,7 @@
       "services/api/scripts/verify-scan-tasks.ts"
     ],
     "services/api/src/prisma/prisma.module.ts": [
+      "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
     "services/api/src/prisma/prisma.service.ts": [
@@ -24592,6 +24704,8 @@
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-first-admin-bootstrap-postgres.ts",
       "services/api/scripts/verify-first-admin-bootstrap.ts",
+      "services/api/scripts/verify-internal-accounts-postgres.ts",
+      "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
@@ -33409,6 +33523,63 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:import-review-reset"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-internal-accounts/admin-internal-accounts.service.ts",
+          "services/api/src/admin-internal-accounts/backup-admin-create.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/auth/internal-otp.service.ts",
+          "services/api/src/common/redis/partner-account-action-redis.service.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-internal-accounts-postgres.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:internal-accounts:postgres"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/admin-internal-accounts/admin-internal-accounts.module.ts",
+          "services/api/src/admin-internal-accounts/admin-internal-accounts.service.ts",
+          "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts",
+          "services/api/src/audit/audit.module.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/auth/auth.service.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/middleware/request-id.middleware.ts",
+          "services/api/src/common/redis/partner-account-action-redis.service.ts",
+          "services/api/src/common/redis/redis.module.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.module.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-internal-accounts.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:internal-accounts"
       ],
       "wired": true
     },
