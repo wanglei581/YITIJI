@@ -12800,7 +12800,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 611,
+      "reachableFileCount": 629,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15791,7 +15791,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 704
+      "sourceFileCount": 722
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18289,6 +18289,9 @@
     "apps/kiosk/scripts/tests/interview-workbench-model.test.mjs": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
+    "apps/kiosk/scripts/tests/mask-pii.test.mjs": [
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs"
+    ],
     "apps/kiosk/scripts/tests/scan-cleanup-gate.test.mjs": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
@@ -18379,6 +18382,12 @@
     "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs": [
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs"
     ],
+    "apps/kiosk/src/ai/AiDeclarationHost.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/ai/AiDeclarationNote.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
     "apps/kiosk/src/ai/AiEvidence.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
@@ -18386,8 +18395,32 @@
     "apps/kiosk/src/ai/AiTaskRegion.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
     ],
+    "apps/kiosk/src/ai/aiDeclarationCopy.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/ai/aiDeclarationErrors.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/ai/aiDeclarationGate.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/ai/aiDeclarationInstall.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/ai/aiDeclarationSession.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/ai/aiDeclarationVersions.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
     "apps/kiosk/src/ai/aiOutage.ts": [
-      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs"
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/ai/aiUseKindTable.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/ai/index.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
@@ -18430,6 +18463,7 @@
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
@@ -18479,6 +18513,9 @@
     "apps/kiosk/src/components/qingxu/QxAppNavbar.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
+    "apps/kiosk/src/favorites/localFavorites.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
@@ -18539,6 +18576,7 @@
     ],
     "apps/kiosk/src/layouts/KioskRuntimeRoot.tsx": [
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-scan-input-safety.mjs"
     ],
     "apps/kiosk/src/lib/capabilityReasons.ts": [
@@ -18555,6 +18593,7 @@
       "apps/kiosk/scripts/verify-jobfair-ui.mjs"
     ],
     "apps/kiosk/src/main.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
@@ -18572,7 +18611,8 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
     "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx": [
-      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
@@ -18588,6 +18628,7 @@
     "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx": [
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx": [
@@ -18599,6 +18640,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -18622,7 +18664,8 @@
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
     "apps/kiosk/src/pages/assistant/advisorUserCopy.ts": [
-      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs"
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs"
     ],
     "apps/kiosk/src/pages/assistant/assistant-advisor.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
@@ -18750,11 +18793,13 @@
     "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs"
     ],
     "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx": [
@@ -18770,7 +18815,8 @@
       "apps/kiosk/scripts/verify-contract-review-report-print.mjs"
     ],
     "apps/kiosk/src/pages/contract-review/contractReviewSession.ts": [
-      "apps/kiosk/scripts/verify-contract-review-session.mjs"
+      "apps/kiosk/scripts/verify-contract-review-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx": [
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
@@ -18869,6 +18915,7 @@
     "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
@@ -18890,7 +18937,14 @@
     "apps/kiosk/src/pages/interview/interview-service-desk.css": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
+    "apps/kiosk/src/pages/interview/interviewWorkbenchModel.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
     "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-mic-capability-truth.mjs"
     ],
@@ -18952,6 +19006,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
@@ -19035,8 +19090,12 @@
     "apps/kiosk/src/pages/jobs/components/JobDetailSections.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-job-ai-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "services/api/scripts/verify-job-headcount.ts"
+    ],
+    "apps/kiosk/src/pages/jobs/components/JobsQxChrome.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/jobs/components/ResumeSelectModal.tsx": [
       "apps/kiosk/scripts/verify-job-ai-ui.mjs"
@@ -19062,6 +19121,7 @@
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/pages/legal/legal-service-desk.css": [
@@ -19069,6 +19129,7 @@
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
     ],
     "apps/kiosk/src/pages/legal/legalDocModel.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx": [
@@ -19197,6 +19258,7 @@
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs",
       "apps/kiosk/scripts/verify-price-single-source.mjs",
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
+      "apps/kiosk/scripts/verify-print-done-truth.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "scripts/verify-no-raw-error-render.mjs",
@@ -19246,6 +19308,7 @@
     "apps/kiosk/src/pages/print/PrintProgressPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
+      "apps/kiosk/scripts/verify-print-done-truth.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "services/api/scripts/verify-wave3-print-aftercare.ts"
@@ -19284,10 +19347,12 @@
     ],
     "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx": [
-      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
+      "apps/kiosk/scripts/verify-print-done-truth.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
@@ -19299,6 +19364,9 @@
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/print/components/PrintProgressSections.tsx": [
+      "apps/kiosk/scripts/verify-print-done-truth.mjs"
     ],
     "apps/kiosk/src/pages/print/components/printFileRetention.ts": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
@@ -19328,11 +19396,18 @@
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
       "apps/kiosk/scripts/verify-print-cta-contrast.mjs"
     ],
+    "apps/kiosk/src/pages/print/printConfirmModel.ts": [
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+    ],
     "apps/kiosk/src/pages/print/printConfirmQuery.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/printDeskModel.ts": [
-      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-pii-redaction-contract.mjs"
+    ],
+    "apps/kiosk/src/pages/print/printHandoff.ts": [
+      "apps/kiosk/scripts/verify-print-done-truth.mjs"
     ],
     "apps/kiosk/src/pages/print/printHandoffPolicy.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -19341,8 +19416,12 @@
     ],
     "apps/kiosk/src/pages/print/printMaterialSession.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs"
+    ],
+    "apps/kiosk/src/pages/print/printProgressModel.ts": [
+      "apps/kiosk/scripts/verify-print-done-truth.mjs"
     ],
     "apps/kiosk/src/pages/print/printUsageEstimate.ts": [
       "apps/kiosk/scripts/verify-file-display-truth.mjs"
@@ -19460,6 +19539,7 @@
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-print-done-truth.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
@@ -19648,6 +19728,7 @@
     ],
     "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css": [
@@ -19789,6 +19870,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
@@ -19807,6 +19889,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
@@ -19823,6 +19906,7 @@
     "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
@@ -19844,6 +19928,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
+      "apps/kiosk/scripts/verify-resume-decisions.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
@@ -19866,7 +19951,9 @@
     "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
@@ -19882,14 +19969,17 @@
     "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "apps/kiosk/scripts/verify-w3a-ai-records.mjs",
       "services/api/scripts/verify-compliance.ts"
     ],
     "apps/kiosk/src/pages/resume/aiResumeSession.ts": [
-      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/DiagnosisDirectionForm.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -19912,6 +20002,7 @@
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx": [
@@ -19945,6 +20036,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx": [
@@ -19958,6 +20050,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx": [
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx": [
@@ -19965,7 +20058,8 @@
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
-      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -19983,6 +20077,7 @@
       "apps/kiosk/scripts/verify-resume-decisions.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts": [
+      "apps/kiosk/scripts/verify-resume-decisions.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts": [
@@ -20058,7 +20153,8 @@
     ],
     "apps/kiosk/src/pages/resume/jobMaterialDraft.ts": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
-      "apps/kiosk/scripts/verify-job-material-library-ui.mjs"
+      "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css": [
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
@@ -20105,6 +20201,13 @@
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
     ],
+    "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/selfAssessmentSession.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
+    ],
     "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
@@ -20120,6 +20223,9 @@
     "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
+    ],
     "apps/kiosk/src/pages/resume/useSelfAssessmentIdleExit.ts": [
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
@@ -20131,6 +20237,7 @@
     ],
     "apps/kiosk/src/pages/scan/ScanResultPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-done-truth.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx": [
@@ -20182,9 +20289,11 @@
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/scanWorkbenchModel.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/scanWorkbenchSession.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/styles/scan-fusion.css": [
@@ -20296,6 +20405,7 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts": [
@@ -20376,6 +20486,7 @@
     "apps/kiosk/src/services/api/careerPlan.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/api/client.ts": [
@@ -20397,7 +20508,8 @@
     ],
     "apps/kiosk/src/services/api/fairVisitPlan.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
-      "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs"
+      "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/services/api/filesHttpAdapter.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
@@ -20419,6 +20531,7 @@
     "apps/kiosk/src/services/api/interview.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/api/jobAi.ts": [
@@ -20440,6 +20553,7 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
@@ -20518,13 +20632,18 @@
     "apps/kiosk/src/services/api/selfAssessment.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-compliance.ts"
     ],
     "apps/kiosk/src/services/api/terminalConfig.ts": [
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
+    ],
+    "apps/kiosk/src/services/api/throwHttpError.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/services/api/toolboxLaunchEvents.ts": [
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
@@ -20538,6 +20657,9 @@
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/kiosk/src/services/assistantDraft.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/services/auth/legalConsentVersions.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
@@ -20583,8 +20705,12 @@
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts"
     ],
+    "apps/kiosk/src/services/resumeParseIntent.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
     "apps/kiosk/src/services/terminalAuth.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "apps/kiosk/scripts/verify-terminal-session-self-heal.mjs"
     ],
@@ -20600,12 +20726,16 @@
     "apps/kiosk/src/styles/prototype-v1.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
+    "apps/kiosk/src/styles/qingxu/primitives.css": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
     "apps/kiosk/src/styles/warm-professional-override.css": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
     "apps/kiosk/src/utils/maskPii.ts": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
+      "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
     ],
     "apps/kiosk/src/utils/micCapability.ts": [
@@ -22969,8 +23099,10 @@
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/resume/self-assessment.types.ts": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/self-assessment.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -23528,6 +23660,7 @@
       "services/api/scripts/verify-pg-serialization-conflict.ts"
     ],
     "services/api/src/common/privacy/client-declaration.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
     "services/api/src/common/recruitment-capability.ts": [
@@ -24728,6 +24861,7 @@
       "services/api/scripts/verify-member-data-export-download.ts"
     ],
     "services/api/src/member-privacy/member-privacy.service.ts": [
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -26830,6 +26964,8 @@
           "apps"
         ],
         "files": [
+          "apps/kiosk/src/ai/aiDeclarationCopy.ts",
+          "apps/kiosk/src/ai/aiDeclarationErrors.ts",
           "apps/kiosk/src/ai/aiOutage.ts",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx",
@@ -27898,6 +28034,74 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/ai/AiDeclarationHost.tsx",
+          "apps/kiosk/src/ai/AiDeclarationNote.tsx",
+          "apps/kiosk/src/ai/aiDeclarationCopy.ts",
+          "apps/kiosk/src/ai/aiDeclarationErrors.ts",
+          "apps/kiosk/src/ai/aiDeclarationGate.ts",
+          "apps/kiosk/src/ai/aiDeclarationInstall.ts",
+          "apps/kiosk/src/ai/aiDeclarationSession.ts",
+          "apps/kiosk/src/ai/aiDeclarationVersions.ts",
+          "apps/kiosk/src/ai/aiOutage.ts",
+          "apps/kiosk/src/ai/aiUseKindTable.ts",
+          "apps/kiosk/src/auth/kioskSensitiveSession.ts",
+          "apps/kiosk/src/favorites/localFavorites.ts",
+          "apps/kiosk/src/layouts/KioskRuntimeRoot.tsx",
+          "apps/kiosk/src/main.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx",
+          "apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx",
+          "apps/kiosk/src/pages/contract-review/contractReviewSession.ts",
+          "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
+          "apps/kiosk/src/pages/interview/interviewWorkbenchModel.ts",
+          "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",
+          "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
+          "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
+          "apps/kiosk/src/pages/jobs/components/JobDetailSections.tsx",
+          "apps/kiosk/src/pages/jobs/components/JobsQxChrome.tsx",
+          "apps/kiosk/src/pages/print/printMaterialSession.ts",
+          "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
+          "apps/kiosk/src/pages/resume/JobFitPage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
+          "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/aiResumeSession.ts",
+          "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx",
+          "apps/kiosk/src/pages/resume/jobMaterialDraft.ts",
+          "apps/kiosk/src/pages/resume/selfAssessmentSession.ts",
+          "apps/kiosk/src/pages/scan/scanWorkbenchModel.ts",
+          "apps/kiosk/src/pages/scan/scanWorkbenchSession.ts",
+          "apps/kiosk/src/services/api/careerPlan.ts",
+          "apps/kiosk/src/services/api/fairVisitPlan.ts",
+          "apps/kiosk/src/services/api/interview.ts",
+          "apps/kiosk/src/services/api/jobFit.ts",
+          "apps/kiosk/src/services/api/selfAssessment.ts",
+          "apps/kiosk/src/services/api/throwHttpError.ts",
+          "apps/kiosk/src/services/assistantDraft.ts",
+          "apps/kiosk/src/services/resumeParseIntent.ts",
+          "apps/kiosk/src/services/terminalAuth.ts",
+          "apps/kiosk/src/styles/qingxu/primitives.css",
+          "services/api/src/common/privacy/client-declaration.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-ai-declaration"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "apps",
           "apps/kiosk/src/pages/contract-review"
@@ -28641,6 +28845,7 @@
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/components/MaterialCheckPresentation.tsx",
           "apps/kiosk/src/pages/print/piiRedaction.ts",
+          "apps/kiosk/src/pages/print/printDeskModel.ts",
           "apps/kiosk/src/pages/print/printMaterialSession.ts",
           "packages/shared/src/types/complianceCopy.ts"
         ],
@@ -28719,10 +28924,12 @@
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
           "apps/kiosk/src/pages/print/components/PrintConfirmParts.tsx",
+          "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx",
           "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx",
           "apps/kiosk/src/pages/print/components/printFileRetention.ts",
+          "apps/kiosk/src/pages/print/printConfirmModel.ts",
           "apps/kiosk/src/services/print/localPrintWakeApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/kiosk/src/services/print/printJobsApi.ts"
@@ -28762,7 +28969,15 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
+          "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
+          "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx",
+          "apps/kiosk/src/pages/print/components/PrintProgressSections.tsx",
+          "apps/kiosk/src/pages/print/printHandoff.ts",
+          "apps/kiosk/src/pages/print/printProgressModel.ts",
+          "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-route-cases.ts",
           "apps/kiosk/tests/visual/print-done-truth.spec.ts"
         ],
@@ -29116,6 +29331,7 @@
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
+          "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx",
           "apps/kiosk/src/pages/profile/me/styles/member-records-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
           "apps/kiosk/src/pages/profile/me/useMemberCursorPage.ts",
@@ -29373,6 +29589,30 @@
       "asserts": {
         "absent": [],
         "dirs": [],
+        "files": [
+          "apps/kiosk/scripts/tests/mask-pii.test.mjs",
+          "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx",
+          "apps/kiosk/src/pages/assistant/advisorUserCopy.ts",
+          "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx",
+          "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
+          "apps/kiosk/src/utils/maskPii.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-public-screen-mask.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:public-screen-mask"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
         "files": [],
         "missing": []
       },
@@ -29493,7 +29733,9 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts"
+          "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts"
         ],
         "missing": []
       },
@@ -29626,6 +29868,7 @@
         "files": [
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportActions.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportChrome.tsx",
@@ -29800,6 +30043,31 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:screensaver-empty-shell"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
+          "apps/kiosk/src/pages/legal/legalDocModel.ts",
+          "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts",
+          "apps/kiosk/src/pages/resume/selfAssessmentSession.ts",
+          "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts",
+          "apps/kiosk/src/services/api/selfAssessment.ts",
+          "services/api/src/ai/resume/self-assessment.types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:self-assessment-consent-source"
       ],
       "wired": true
     },
@@ -39355,6 +39623,7 @@
           "services/api/src/ai/resume/self-assessment-questions.ts",
           "services/api/src/ai/resume/self-assessment-scoring.ts",
           "services/api/src/ai/resume/self-assessment.service.ts",
+          "services/api/src/ai/resume/self-assessment.types.ts",
           "services/api/src/ai/self-assessment.controller.ts",
           "services/api/src/common/pdf/aigc-label.ts",
           "services/api/src/common/pdf/pdfjs-document.ts"

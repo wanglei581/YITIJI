@@ -52,6 +52,8 @@ import {
   jobSubline,
   pagesPerCopy,
   paymentFactOf,
+  publicOrderNo,
+  reprintHint,
   paymentLead,
   paymentPill,
   stepIndex,
@@ -301,8 +303,8 @@ export function PrintProgressPage() {
 
   const file   = (state?.file  as PrintFileState | undefined) ?? null
   const params = (state?.params as PrintJobParams | undefined) ?? null
-  // 订单号只认运营单号；orderId 是内部 cuid，拿它冒充「订单号」工作人员也查不到。
-  const orderNo = typeof state?.orderNo === 'string' ? state.orderNo : null
+  // 订单号只认 ORD-。orderId、任务号都不拿来冒充。
+  const orderNo = publicOrderNo(typeof state?.orderNo === 'string' ? state.orderNo : null)
   const amountCents = typeof state?.amountCents === 'number' ? state.amountCents : null
   const payment = paymentFactOf(amountCents)
   const isFreeOrder = payment === 'free'
@@ -469,7 +471,7 @@ export function PrintProgressPage() {
     : backendStatus === 'printing'
       ? '还在打印，完成后才能结束清空'
       : '任务还没打完，完成后才能结束清空'
-  const idLine = [taskId ? `任务号 ${taskId}` : '', orderNo ? `订单号 ${orderNo}` : ''].filter(Boolean).join(' · ')
+  const idLine = orderNo ? `订单号 ${orderNo}` : ''
 
   const jobRow = <PrintJobRow fileName={fileName} subline={jobSubline(file, params)} idLine={idLine} state={jobState} />
 
@@ -509,7 +511,7 @@ export function PrintProgressPage() {
               onClick={() => navigate(uploadPath)}
             >
               再印一份
-              <small>重新选文件、核价并支付 · 不免费</small>
+              <small>{reprintHint(amountCents)}</small>
             </button>
             <button type="button" className="qx-btn pfp-end" data-variant="ghost" disabled aria-disabled="true">
               {endLabel}
@@ -696,13 +698,13 @@ export function PrintProgressPage() {
           <div className="pfp-card pfp-faq-card">
             <ul className="pfp-faq">
               <li><AlertTriangleIcon aria-hidden="true" /><p><b>打印机缺纸 / 卡纸</b>：别硬拉纸；打印机报告卡纸或缺纸后，本页会转到结果页说明原因。</p></li>
-              <li><ClockIcon aria-hidden="true" /><p><b>长时间无响应</b>：本机连续查 10 分钟仍无结果会提示，凭任务号找工作人员。</p></li>
+              <li><ClockIcon aria-hidden="true" /><p><b>长时间无响应</b>：本机连续查 10 分钟仍无结果会提示，请找现场工作人员核对。</p></li>
               <li><FileTextIcon aria-hidden="true" /><p><b>文件校验未通过</b>：上传可能中断或文件已变化，需返回重新上传。</p></li>
               <li>
                 <CreditCardIcon aria-hidden="true" />
                 <p>
                   {isFreeOrder
-                    ? <><b>打印失败</b>：本次未收款，任务记录已保存，工作人员可凭任务号核查。</>
+                    ? <><b>打印失败</b>：本次未收款，记录已保存，请找现场工作人员核对。</>
                     : payment === 'paid'
                       ? <><b>已支付但打印失败</b>：订单与支付记录都在，退款以工作人员核查为准。</>
                       : <><b>打印失败</b>：订单记录已保存，费用以工作人员核查结果为准。</>

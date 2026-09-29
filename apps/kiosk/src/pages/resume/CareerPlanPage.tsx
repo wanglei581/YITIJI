@@ -34,6 +34,7 @@ import {
   type AiAvailability,
   type AiTaskFallback,
 } from '../../ai'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import {
   CareerPlanApiError,
   generateCareerPlan,
@@ -50,6 +51,7 @@ import { readAiResumeSession } from './aiResumeSession'
 import { JobFitStage } from './JobFitPage'
 import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
 import { CareerPlanExistingMaterials } from './components/career-plan/CareerPlanExistingMaterials'
+import { CareerPlanSelfAssessmentExcluded } from './components/career-plan/CareerPlanSelfAssessmentExcluded'
 import { CareerPlanColumns, CareerPlanGenerateRegion, CareerPlanSelfCheck } from './components/career-plan/CareerPlanSection'
 import {
   CtaNote, Ghosts, Guardline, KitRows, ListRows, Nots, RouteCards, Sec, Slots, Steps, Verdict, Waiting,
@@ -356,13 +358,16 @@ export function CareerPlanPage() {
   )
   // 生成钮**无条件**渲染，不被 aiTask.canStart 包住（见 handleGenerate 顶部注释）。
   const generateButton = (
-    <Action
-      variant="primary"
-      busy={generating}
-      onClick={() => void handleGenerate()}
-      label={generating ? '正在生成…' : aiOutage ? (plan ? '重试生成' : '重试生成求职方案') : plan ? '重新生成' : '生成求职方案'}
-      icon={generating ? null : <ArrowRightIcon size={22} aria-hidden="true" />}
-    />
+    <span className="qx-ai-declaration-slot">
+      <Action
+        variant="primary"
+        busy={generating}
+        onClick={() => void handleGenerate()}
+        label={generating ? '正在生成…' : aiOutage ? (plan ? '重试生成' : '重试生成求职方案') : plan ? '重新生成' : '生成求职方案'}
+        icon={generating ? null : <ArrowRightIcon size={22} aria-hidden="true" />}
+      />
+      <AiDeclarationNote />
+    </span>
   )
 
   function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; body: ReactNode; cta: ReactNode } {
@@ -603,6 +608,7 @@ export function CareerPlanPage() {
               head="只供本人参考"
               body="本机不预测前景、不预测薪资、不说「三年后你能到什么岗」—— 那些本机没有依据。本机不代收简历、不代为投递；是否转方向、是否考证，由你自己决定。"
             />
+            <CareerPlanSelfAssessmentExcluded excluded={plan.selfAssessmentExcluded} onGo={goSelfAssessment} />
           </Sec>
 
           <CareerPlanExistingMaterials />

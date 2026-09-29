@@ -1,6 +1,6 @@
 import type { ResumeContentBlock, ResumeIssue, ResumeReport, ResumeContentBlockKey, ResumeScoringDimensionKey } from '@ai-job-print/shared'
 import { RESUME_CONTENT_BLOCKS } from '@ai-job-print/shared'
-import { blockLabel, dimLabel, evidenceLineSet, issuesOfBlock, sevOf } from '../../resume-report-model'
+import { blockLabel, dimLabel, displayResumeExcerpt, evidenceLineSet, issuesOfBlock, sevOf } from '../../resume-report-model'
 
 function Prov({ kind }: { kind: 'contract' | 'derived' | 'fixture' }) {
   return <span className="rrp-prov" data-p={kind} aria-hidden="true" />
@@ -32,7 +32,7 @@ export function IssueCard({
         {issue.evidence.map((ev, i) => (
           <span key={`${ev.blockKey}-${ev.lineIndex}-${i}`} className="rrp-ev">
             <span className="evsrc">{blockLabel(ev.blockKey)} 第 {ev.lineIndex + 1} 行原文</span>
-            <span className="evtx">{ev.quote}</span>
+            <span className="evtx">{displayResumeExcerpt(ev.quote)}</span>
           </span>
         ))}
       </div>
@@ -59,7 +59,7 @@ export function StructureZone({
   return (
     <section className="rrp-zone" data-testid="resume-report-zone" data-zone="structure">
       <div className="rrp-zh">
-        简历被读成了这七块
+        简历被读成了这 {shown.length} 块
         <span>共 {shown.length} 块 · 命中 {issues.length} 条问题 <Prov kind={fixture ? 'fixture' : 'contract'} /></span>
       </div>
       <div className="rrp-scroll" data-testid="resume-report-list">
@@ -78,7 +78,7 @@ export function StructureZone({
                 </span>
                 <span className="lines">
                   {block.lines.map((line, j) => (
-                    <span key={j} data-ev={marks.has(j) ? '1' : '0'}><i>{j + 1}</i> {line}</span>
+                    <span key={j} data-ev={marks.has(j) ? '1' : '0'}><i>{j + 1}</i> {displayResumeExcerpt(line)}</span>
                   ))}
                 </span>
               </span>

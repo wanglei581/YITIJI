@@ -661,12 +661,12 @@ export class PrintJobsService {
     }
     const signed = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
     await this.audit.write({
-      actorId: ctx.endUserId ?? null,
+      actorId: null, // AuditLog.actorId FK 指向运营 User：会员 ID 写进去会违反外键、被静默吞掉，改记 payload.endUserId
       actorRole: 'kiosk',
       action: 'print_job.takeaway_url',
       targetType: 'print_task',
       targetId: task.id,
-      payload: { orderId: order.id, orderNo: order.orderNo, fileId },
+      payload: { orderId: order.id, orderNo: order.orderNo, fileId, endUserId: ctx.endUserId ?? null },
       ipAddress: ctx.ipAddress ?? null,
       userAgent: ctx.userAgent ?? null,
     }).catch(() => undefined)
@@ -803,13 +803,13 @@ export class PrintJobsService {
     })
 
     await this.audit.write({
-      actorId: ctx.endUserId ?? null,
+      actorId: null, // 同上：会员 ID 记 payload.endUserId
       actorRole: 'kiosk',
       action: 'print_job.retry',
       targetType: 'print_task',
       targetId: task.id,
       payload: {
-        orderId: order.id,
+        endUserId: ctx.endUserId ?? null, orderId: order.id,
         orderNo: order.orderNo,
         amountCents: amountBefore,
         fromStatus: 'failed',

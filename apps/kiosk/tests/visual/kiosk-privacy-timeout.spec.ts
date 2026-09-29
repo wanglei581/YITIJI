@@ -2,6 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { installScanRevokeProbe, waitForAckConsumed } from '../fixtures/scan-revoke-probe'
+import { CURRENT_SELF_ASSESSMENT_CONSENT_VERSION } from '../fixtures/self-assessment-questions'
 
 const MEMBER_TOKEN = 'privacy-member-memory-token'
 const MEMBER_PHONE = '13800138000'
@@ -400,7 +401,8 @@ test('manual profile logout clears token-bearing cashier history @privacy-kiosk 
   await page.waitForURL((url) => url.pathname === '/profile')
 
   await page.getByRole('button', { name: '结束使用', exact: true }).click()
-  await expect(page.getByRole('button', { name: '去登录', exact: true })).toHaveCount(2)
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  await expect(page.getByTestId('qx-home')).toBeVisible()
   const requestCountAfterLogout = requests.paymentRequests().length
 
   for (const direction of ['back', 'forward'] as const) {
@@ -1285,7 +1287,7 @@ test('self-assessment leftover is wiped by the hard privacy deadline @privacy-ki
   const session = {
     answers: { collaboration: { 0: 'A' } },
     consent: { nonSensitive: true, sensitive: false },
-    consentVersion: 'sa-consent-v1.2026-08-16',
+    consentVersion: CURRENT_SELF_ASSESSMENT_CONSENT_VERSION,
     taskId: 'privacy-sa-task',
     result: {
       taskId: 'privacy-sa-task',

@@ -172,7 +172,7 @@ for (const marker of [
   "const goLogin = () => navigate('/login', { state: { from: location.pathname } })",
   "navigate('/me/settings')",
   "navigate('/print/preview'",
-  "clearSessionTo({ path: '/profile' })",
+  "clearSessionTo({ path: '/' })",
 ]) {
   expectIncludes(profile, marker, `ProfilePage preserves ${marker}`)
 }
