@@ -24,6 +24,7 @@ import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/q
 import type { LocalAgentPanelStatus } from './local-api/types'
 // Phase 8.1C additions
 import { acquireLock, releaseLock } from './agent/instance-lock'
+import { cleanupKnownLegacyResidue } from './agent/legacy-residue-cleanup'
 import { cleanupCrashLeftoverPrintTaskTemps } from './agent/print-task-temp-cleanup'
 import {
   agentProcessStartedAtMs,
@@ -74,18 +75,6 @@ program
     // ── Step 1: Single-instance lock ──────────────────────────────────────
     await acquireLock()
 
-    // ── Step 1b: Crash leftovers of Agent-owned print downloads ───────────
-    // Only after the exclusive lock: a live instance's in-flight task_* file
-    // must not be deleted by a second starter. Fail closed before claim/print.
-    try {
-      cleanupCrashLeftoverPrintTaskTemps()
-    } catch (error) {
-      err(
-        'AGENT_STARTUP_FAILED: leftover print task temp files could not be removed; refusing to claim new work.',
-      )
-      failStartup(error, 'AGENT_STARTUP_FAILED')
-    }
-
     // ── Step 2: Open SQLite (task state + offline PATCH queue) ────────────
     const db: AgentDatabase = openDatabase()
     const localTaskDatabaseAvailable = isDatabaseAvailable(db)
@@ -104,10 +93,24 @@ program
       failStartup(error, 'AGENT_PROFILE_REJECTED')
     }
 
-    // 上一进程若在「已恢复、还没再暂停」时崩溃，队列可能仍在跑。
-    // 先暂停，再删本账号在本次进程启动前提交的作业。清理不看 hold 开关。
-    // 非 Windows 两步都空转，不因此拒绝启动。
+    // 三项开机清理各自独立：任何一项抛错，另外两项仍执行。配置没加载成功时这三项都还没跑。
+    // W-85 失败仍拒绝领新任务，但走到拒绝时，队列清理和旧遗留清理都已经执行。
+    // 旧遗留是历史垃圾，删除失败只记日志，不拒绝启动。
+    let printTempCleanupError: unknown = null
     try {
+      cleanupCrashLeftoverPrintTaskTemps()
+    } catch (error) {
+      printTempCleanupError = error
+      err(
+        'AGENT_STARTUP_FAILED: leftover print task temp files could not be removed; refusing to claim new work after the other startup cleanups.',
+      )
+    }
+
+    let printQueueCleanupError: unknown = null
+    try {
+      // 上一进程若在「已恢复、还没再暂停」时崩溃，队列可能仍在跑。
+      // 先暂停，再删本账号在本次进程启动前提交的作业。清理不看 hold 开关。
+      // 非 Windows 两步都空转，不因此拒绝启动。
       if (config.holdPrinterQueueWhenIdle) {
         const paused = await pauseConfiguredPrinterQueue(config.printerName)
         if (!paused.skipped) log('print-queue-hold: idle queue paused')
@@ -117,11 +120,20 @@ program
         startedAtMs: agentProcessStartedAtMs(),
       })
     } catch (error) {
+      printQueueCleanupError = error
       err(
-        'AGENT_STARTUP_FAILED: printer queue could not be paused or leftover jobs removed; refusing to claim new work.',
+        'AGENT_STARTUP_FAILED: printer queue could not be paused or leftover jobs removed; refusing to claim new work after the other startup cleanups.',
       )
-      failStartup(error, 'AGENT_STARTUP_FAILED')
     }
+
+    try {
+      cleanupKnownLegacyResidue()
+    } catch {
+      err('legacy-residue-cleanup: failed; startup continues.')
+    }
+
+    if (printTempCleanupError) failStartup(printTempCleanupError, 'AGENT_STARTUP_FAILED')
+    if (printQueueCleanupError) failStartup(printQueueCleanupError, 'AGENT_STARTUP_FAILED')
 
     // Start the loopback API before cloud registration so the watchdog and
     // Kiosk can obtain identity immediately and receive retryable 503s while

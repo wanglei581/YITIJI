@@ -105,7 +105,7 @@
 1. **做什么**  
    用一台**按生产默认安装、没有加 `-KeepPrinterQueueUnpaused`** 的机器。打印机空闲、没有正在出纸时，拔掉主机电源再上电（或长按电源键超过 2 秒关机后再开）。等 Agent 服务起来。KSK-001 若按 R.2 加了 `-KeepPrinterQueueUnpaused`，队列不会被暂停，本步的「不自己出纸」在这台机器上不成立；要验这一条就临时去掉该开关重跑生产安装脚本，验完再加回去。**不要在正在出纸时拔电**——那一小段队列是恢复着的，打印服务可能在 Agent 起来之前把纸送出，本步不覆盖。暂停状态断电后是否还在，奔图驱动上尚未验证，以这次实测为准。
 2. **应该看到什么**  
-   拔电上电后，队列里的残留作业停在暂停状态，并被 Agent 清掉，不自己出纸。Agent 日志里出现 `print-queue-hold: idle queue paused`（来源：`apps/terminal-agent/src/index.ts:113`）。若确实删了作业，还有 `print-queue-cleanup: removed leftover print jobs (count=`（来源：`apps/terminal-agent/src/agent/print-queue-hold.ts:276`），只记数量、没有文档名。图片临时 PDF 若有残留，日志是 `print-temp-cleanup: removed leftover print task files (count=`（来源：`apps/terminal-agent/src/agent/print-task-temp-cleanup.ts:113`）。一体机首页徽章回到「打印机在线」（来源：`apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts:36`），不会因为队列暂停变成状态未知。
+   拔电上电后，队列里的残留作业停在暂停状态，并被 Agent 清掉，不自己出纸。Agent 日志里出现 `print-queue-hold: idle queue paused`（来源：`apps/terminal-agent/src/index.ts:116`）。若确实删了作业，还有 `print-queue-cleanup: removed leftover print jobs (count=`（来源：`apps/terminal-agent/src/agent/print-queue-hold.ts:276`），只记数量、没有文档名。图片临时 PDF 若有残留，日志是 `print-temp-cleanup: removed leftover print task files (count=`（来源：`apps/terminal-agent/src/agent/print-task-temp-cleanup.ts:113`）。一体机首页徽章回到「打印机在线」（来源：`apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts:36`），不会因为队列暂停变成状态未知。
 3. **看不到时属于哪一类**  
    ① 本机装机 / Agent。上电后纸自己出来，记发布阻塞，把时间和出了几张写进文末记录表。
 4. **现场立刻能做的补救**  

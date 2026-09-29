@@ -21122,6 +21122,7 @@
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
     ],
     "apps/terminal-agent/config/agent-config.example.json": [
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
     "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts": [
@@ -21155,6 +21156,7 @@
     "apps/terminal-agent/src/agent/config-manager.ts": [
       "apps/terminal-agent/scripts/verify-agent-config-resilience.mjs",
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
     "apps/terminal-agent/src/agent/db.ts": [
@@ -21175,12 +21177,19 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-singleton-process.mjs"
     ],
+    "apps/terminal-agent/src/agent/legacy-residue-cleanup.ts": [
+      "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
     "apps/terminal-agent/src/agent/network-diagnostics.ts": [
       "apps/terminal-agent/scripts/verify-network-diagnostics.ts"
     ],
     "apps/terminal-agent/src/agent/offline-queue.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-queue-hold.ts": [
+      "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
     ],
     "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts": [
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
@@ -21219,6 +21228,7 @@
     "apps/terminal-agent/src/agent/task-runner.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
@@ -21236,7 +21246,8 @@
       "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
     ],
     "apps/terminal-agent/src/agent/wmi.ts": [
-      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
+      "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts"
     ],
     "apps/terminal-agent/src/config.ts": [
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
@@ -21245,6 +21256,7 @@
       "apps/terminal-agent/scripts/verify-agent-config-resilience.mjs",
       "apps/terminal-agent/scripts/verify-agent-profile-guard.mjs",
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
@@ -30819,6 +30831,47 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/src/agent/print-queue-hold.ts",
+          "apps/terminal-agent/src/agent/wmi.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
+      "helper": false,
+      "inCi": false,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:print-queue-residue-windows"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/config/agent-config.example.json",
+          "apps/terminal-agent/src/agent/config-manager.ts",
+          "apps/terminal-agent/src/agent/print-queue-hold.ts",
+          "apps/terminal-agent/src/agent/task-runner.ts",
+          "apps/terminal-agent/src/index.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:print-queue-residue"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/terminal-agent/src/agent/db.ts",
           "apps/terminal-agent/src/agent/heartbeat.ts",
           "apps/terminal-agent/src/agent/instance-lock.ts",
@@ -31030,6 +31083,7 @@
           "apps/terminal-agent/src/agent/claim-rate-limit.ts",
           "apps/terminal-agent/src/agent/db.ts",
           "apps/terminal-agent/src/agent/dead-letter-operator.ts",
+          "apps/terminal-agent/src/agent/legacy-residue-cleanup.ts",
           "apps/terminal-agent/src/agent/offline-queue.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/types.ts",

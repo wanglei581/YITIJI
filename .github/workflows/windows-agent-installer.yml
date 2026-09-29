@@ -183,6 +183,13 @@ jobs:
           pnpm --filter ./apps/terminal-agent verify:print-queue-residue-windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Same pre-staging window. Junction case uses New-Item -ItemType Junction.
+      - name: Verify known legacy residue cleanup
+        shell: pwsh
+        run: |
+          pnpm --filter ./apps/terminal-agent verify:legacy-residue-cleanup
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build candidate upgrade fixture
         shell: powershell
         run: |

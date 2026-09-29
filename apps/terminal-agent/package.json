@@ -18,6 +18,7 @@
     "verify:task-reliability": "ts-node scripts/verify-task-reliability.ts",
     "verify:print-truth-hardening": "ts-node scripts/verify-print-truth-hardening.ts",
     "verify:print-monitor-truth": "ts-node scripts/verify-print-monitor-truth.ts",
+    "verify:legacy-residue-cleanup": "ts-node scripts/agent-crash-privacy.helper.ts",
     "verify:print-queue-residue": "ts-node scripts/verify-print-queue-residue.ts",
     "verify:print-queue-residue-windows": "ts-node scripts/verify-print-queue-residue-windows.ts",
     "verify:image-scale-truth": "ts-node scripts/verify-image-scale-truth.ts",
