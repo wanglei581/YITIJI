@@ -72,6 +72,21 @@ const checks = [
   ['W6 直达完成页预期为无法确认', () => {
     assert.match(routeCasesSource, /pattern:\s*'\/print\/done'[\s\S]*?featureText:\s*'无法确认打印结果'/)
   }],
+  ['W-23 证件水印只在证件件提示', () => {
+    assert.match(doneRuntime, /const idDocument = state\.idDocument === true/)
+    assert.match(doneRuntime, /\{idDocument \? \([\s\S]{0,280}仅供求职使用/)
+    assert.match(doneRuntime, /idDocument \? '拿走前记得核一下页数和水印/)
+    assert.match(doneRuntime, /: '拿走前记得核一下页数，少页当场能处理。'/)
+    const handoff = read('src/pages/print/printHandoff.ts')
+    const confirm = read('src/pages/print/PrintConfirmPage.tsx')
+    const scan = read('src/pages/scan/ScanResultPage.tsx')
+    const documents = read('src/pages/profile/me/MyDocumentsPage.tsx')
+    assert.match(handoff, /input\.idDocument === true/)
+    assert.match(confirm, /idDocument:\s*handoff\.idDocument === true/)
+    assert.match(scan, /idDocument: scanType === 'id'/)
+    assert.match(documents, /doc\.purpose === 'id_scan'/)
+    assert.doesNotMatch(doneRuntime, /证件页确认带[\s\S]{0,40}仅供求职使用[\s\S]{0,40}再离开。[\s\S]{0,80}证件页确认带/)
+  }],
   ['出纸后提醒核对并取走', () => {
     // 稿 15 completed 只留一句「都打好了，拿走前核一下」，不再并列「请取走文件 / 请取走纸张」。
     assert.match(doneSource, /都打好了，拿走前核一下/)

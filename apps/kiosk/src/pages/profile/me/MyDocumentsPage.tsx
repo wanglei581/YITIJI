@@ -190,6 +190,7 @@ export function MyDocumentsPage() {
         source: documentPrintSource(convertedFrom ?? doc),
         returnPath: '/me/documents',
         file,
+        idDocument: doc.purpose === 'id_scan' || convertedFrom?.purpose === 'id_scan',
       })
     } catch (error) {
       setHint({ tone: 'bad', text: userMessageOf(error, '打印链接生成失败，可能已到期或被清理') })

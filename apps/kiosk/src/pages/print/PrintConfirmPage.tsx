@@ -413,6 +413,7 @@ export function PrintConfirmPage() {
           priceLines:  created.priceLines,
           paymentSessionToken: created.paymentSessionToken,
           hasEndUser:  created.hasEndUser,
+          idDocument:  handoff.idDocument === true,
         }
         if (created.amountCents > 0 && created.payStatus !== 'paid') {
           navigate('/print/cashier', { state: nextState })
@@ -446,7 +447,7 @@ export function PrintConfirmPage() {
       clearPrintMaterialSession()
     }
     navigate('/print/progress', {
-      state: { ...(isContractReport ? {} : location.state), file, params, source },
+      state: { ...(isContractReport ? {} : location.state), file, params, source, idDocument: handoff.idDocument === true },
     })
   }
 

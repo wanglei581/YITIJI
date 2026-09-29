@@ -57,6 +57,8 @@ interface PrintJobState {
   source?:              PrintMaterialSource
   /** 建单响应的真信号；缺省（刷新 / 旧 state / 从别处进来）时整条提示不渲染。 */
   hasEndUser?:          boolean
+  /** 只有证件扫描或证件用途才为 true。缺省不提示水印。 */
+  idDocument?:          boolean
 }
 
 type PrintResultState = 'loading' | 'completed' | 'failed' | 'unknown'
@@ -129,6 +131,7 @@ export function PrintDonePage() {
   const uploadPath = printUploadPathForSource(state.source)
   const amountCents = typeof state.amountCents === 'number' ? state.amountCents : null
   const orderNo = typeof state.orderNo === 'string' ? state.orderNo : state.orderId ?? null
+  const idDocument = state.idDocument === true
 
   const canReportIssue = taskId !== null
   const [feedbackOpen, setFeedbackOpen] = useState(false)
@@ -665,7 +668,7 @@ export function PrintDonePage() {
       navbar={navbar}
     >
       <div data-w2-page="print-done" data-print-flow-step={6} data-pff-head="xq" data-testid="print-fulfill-state-completed" className="qx-scroll pff-page">
-        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing="拿走前记得核一下页数和水印，少页当场能处理。" />
+        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing={idDocument ? '拿走前记得核一下页数和水印，少页当场能处理。' : '拿走前记得核一下页数，少页当场能处理。'} />
 
         <div className="qx-card">
           <div className="pff-done-title" role="status">
@@ -687,10 +690,12 @@ export function PrintDonePage() {
             <span className="pff-step-no">2</span>
             <span className="pff-step-txt">当场核对<b>页数和清晰度</b>，少页、卡纸、印花了都能当场处理。</span>
           </div>
-          <div className="pff-step">
-            <span className="pff-step-no">3</span>
-            <span className="pff-step-txt">证件页确认带 <b>「仅供求职使用」水印</b>，再离开。</span>
-          </div>
+          {idDocument ? (
+            <div className="pff-step">
+              <span className="pff-step-no">3</span>
+              <span className="pff-step-txt">证件页确认带 <b>「仅供求职使用」水印</b>，再离开。</span>
+            </div>
+          ) : null}
           {pickupCode && (
             <div className="pff-pickup">
               <div>

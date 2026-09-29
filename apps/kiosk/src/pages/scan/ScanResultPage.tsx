@@ -276,7 +276,13 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
     if (!file) return
     const printFile = { fileId: file.fileId, fileUrl: file.fileUrl, name: file.name, size: file.size, pages: file.pages, mimeType: file.mimeType }
     const source: PrintMaterialSource = scanType === 'resume' ? 'resume' : 'document'
-    const target = printHandoffTarget(beginPrintHandoff({ origin: 'scan_result', file: printFile, source, returnPath: '/scan' }, printOwner))
+    const target = printHandoffTarget(beginPrintHandoff({
+      origin: 'scan_result',
+      file: printFile,
+      source,
+      returnPath: '/scan',
+      idDocument: scanType === 'id',
+    }, printOwner))
     leaveScanFlow(target.path, { state: target.state })
   }
 
