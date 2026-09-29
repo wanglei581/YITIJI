@@ -829,7 +829,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/partner/stats` | PartnerStatsQueryDto.getStats | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>PolicyPost<br/>SyncLog |
+| GET | `/api/v1/partner/stats` | PartnerStatsQueryDto.getStats | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalHeartbeat |
+| GET | `/api/v1/partner/terminal-operations` | PartnerStatsQueryDto.getTerminalOperations | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>PolicyPost<br/>PrintTask<br/>ScanTask<br/>SyncLog<br/>Terminal<br/>TerminalHeartbeat |
 
 ## `services/api/src/payment/admin-billing.controller.ts`
 

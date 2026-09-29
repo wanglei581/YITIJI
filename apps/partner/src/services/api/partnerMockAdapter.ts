@@ -1,5 +1,6 @@
 import { ROTATE_CREDENTIAL_CONFIRMATION, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
 import { ApiHttpError } from './client'
+import { escapeCsvCell } from '../../lib/csv'
 import { omitWebhookSecretOnce } from '../../routes/sources/omitWebhookSecretOnce'
 import type {
   ConnStatus,
@@ -98,10 +99,6 @@ const FAIR_TEMPLATE_HEADERS = [
   '参展企业数',
   '岗位数',
 ]
-
-function escapeCsvCell(value: string): string {
-  return `"${value.split('"').join('""')}"`
-}
 
 function downloadBlankTemplate(dataType: PartnerImportDataType): void {
   const headers = dataType === 'job' ? JOB_TEMPLATE_HEADERS : FAIR_TEMPLATE_HEADERS

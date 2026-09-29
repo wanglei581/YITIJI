@@ -6,6 +6,7 @@ import { Pagination } from '../components/DataTable'
 import { FilterChip } from '../components/FilterChip'
 import { API_MODE } from '../../services/api/client'
 import { getPrinters, type AdminPrinterRecord } from '../../services/api/devices'
+import { printerStatusView } from '../terminals/terminalStatusViews'
 
 const PRINTERS_REFRESH_KEY = 'admin:printers'
 
@@ -55,6 +56,20 @@ function formatPaperTrayLevel(level: number | null) {
   return (
     <span className="ml-1 text-xs tabular-nums text-neutral-500">({Math.round(level)}%)</span>
   )
+}
+
+/**
+ * 故障信息：服务端对正常状态给 null、对其余状态给中文说明。
+ * 纸张不足等「仍可打印」的提醒用警示色，不可打印才标红；正常显示「无」，不再把原始状态串标红。
+ */
+function FaultCell({ printer }: { printer: AdminPrinterRecord }) {
+  if (printer.fault) {
+    const tone = printer.status === 'online' ? 'text-warning-fg' : 'text-error-fg'
+    return <span className={`font-semibold ${tone}`}>{printer.fault}</span>
+  }
+  const view = printerStatusView(printer.printerStatus)
+  if (view.badge === 'success') return <span className="text-neutral-500">无</span>
+  return <span className="text-neutral-500">{view.label}</span>
 }
 
 function matchesSearch(p: AdminPrinterRecord, search: string): boolean {
@@ -233,12 +248,7 @@ export default function PrintersPage() {
                         {formatPaperTrayLevel(p.paperTrayLevel)}
                       </td>
                       <td className="px-4 py-3 text-xs">
-                        {p.fault
-                          ? <span className="font-semibold text-error-fg">{p.fault}</span>
-                          : p.printerStatus && p.printerStatus !== 'unknown'
-                            ? <span className="font-semibold text-error-fg">{p.printerStatus}</span>
-                            : <span className="text-neutral-400">未上报</span>
-                        }
+                        <FaultCell printer={p} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-neutral-500">{relativeTime(p.lastSyncAt)}</td>
                     </tr>
