@@ -405,7 +405,15 @@ async function main(): Promise<void> {
     ['1,0,False,3,8', 'error', 'error'],
     ['3,0,False,0,3', 'ready', 'ok'],
     ['4,0,False,1,8', 'ready', 'ok'],
-    ['1,0,False,131073,8', 'unknown', 'ok'],
+    ['1,0,False,131073,8', 'ready', 'ok'],
+    ['3,2,False,128,0', 'offline', 'offline'],
+    ['3,2,False,16,0', 'paper_empty', 'paper_empty'],
+    ['3,2,False,8,0', 'error', 'error'],
+    ['3,2,False,262144,0', 'error', 'error'],
+    ['3,2,False,4194304,0', 'error', 'error'],
+    ['3,2,False,0,7', 'offline', 'offline'],
+    ['3,2,False', 'ready', 'ok'],
+    ['6,0,False', 'unknown', 'ok'],
   ]
   for (const [input, expectedHeartbeat, expectedPreflight] of printerQueryCases) {
     try {
@@ -446,7 +454,91 @@ async function main(): Promise<void> {
     throw new Error(`print monitor truth failures:\n- ${failures.join('\n- ')}`)
   }
 
+  verifyPrinterStatusMutations()
   console.log('verify-print-monitor-truth: all assertions passed')
+}
+
+const statusMapPath = path.join(__dirname, '../src/agent/printer-status-map.ts')
+const PAUSE_READY_ANCHOR = 'if (pauseSignal && !leftoverFault) return \'ready\''
+const DETECTED_ERROR_CLEAR_ANCHOR = `    const masked = faultFromExtended(line)
+    if (masked) return masked
+    return 'ready'`
+const NO_EXTENSION_READY_ANCHOR = `    if (masked) return masked
+    return 'ready'`
+const NO_EXTENSION_UNKNOWN_ANCHOR = `  return 'unknown'
+}
+
+export function mapWin32PrinterQuery`
+
+const statusMapChild = `
+const { mapWin32PrinterQuery, mapWin32PrinterPreflight } = require('./src/agent/printer-status-map')
+const cases = [
+  ['1,0,False,131073,8', 'ready', 'ok'],
+  ['3,2,False,128,0', 'offline', 'offline'],
+  ['3,2,False,16,0', 'paper_empty', 'paper_empty'],
+  ['3,2,False', 'ready', 'ok'],
+  ['6,0,False', 'unknown', 'ok'],
+]
+for (const [input, heartbeat, preflight] of cases) {
+  if (mapWin32PrinterQuery(input) !== heartbeat) process.exit(1)
+  if (mapWin32PrinterPreflight(input) !== preflight) process.exit(1)
+}
+process.exit(0)
+`
+
+function verifyPrinterStatusMutations(): void {
+  const original = fs.readFileSync(statusMapPath, 'utf8')
+  const baseline = spawnSync(process.execPath, ['-r', 'ts-node/register/transpile-only', '-e', statusMapChild], {
+    cwd: path.join(__dirname, '..'),
+    encoding: 'utf8',
+    timeout: 60_000,
+    env: { ...process.env, TS_NODE_TRANSPILE_ONLY: '1' },
+  })
+  if (baseline.status !== 0) {
+    throw new Error(`status map baseline failed:\n${baseline.stdout ?? ''}\n${baseline.stderr ?? ''}`)
+  }
+  const mutations: Array<[string, string, string]> = [
+    [
+      'paused toner low',
+      PAUSE_READY_ANCHOR,
+      "if (pauseSignal && !leftoverFault && (state === null || (state & TONER_LOW_BIT) === 0)) return 'ready'",
+    ],
+    [
+      'detected error clear masks faults',
+      DETECTED_ERROR_CLEAR_ANCHOR,
+      "    return 'ready'",
+    ],
+    [
+      'no extension detected clear',
+      NO_EXTENSION_READY_ANCHOR,
+      `    if (masked) return masked
+    if (!extraFieldsPresent(line)) return 'unknown'
+    return 'ready'`,
+    ],
+    [
+      'no extension stays unknown',
+      NO_EXTENSION_UNKNOWN_ANCHOR,
+      `  return 'ready'
+}
+
+export function mapWin32PrinterQuery`,
+    ],
+  ]
+  for (const [label, from, to] of mutations) {
+    if (!original.includes(from)) throw new Error(`${label}: anchor missing`)
+    fs.writeFileSync(statusMapPath, original.replace(from, to))
+    try {
+      const result = spawnSync(process.execPath, ['-r', 'ts-node/register/transpile-only', '-e', statusMapChild], {
+        cwd: path.join(__dirname, '..'),
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: { ...process.env, TS_NODE_TRANSPILE_ONLY: '1' },
+      })
+      if (result.status === 0) throw new Error(`${label}: reversed mapping must fail`)
+    } finally {
+      fs.writeFileSync(statusMapPath, original)
+    }
+  }
 }
 
 main().catch((error: unknown) => {

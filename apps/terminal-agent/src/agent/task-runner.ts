@@ -42,7 +42,8 @@ import { createApiClient, createDirectHttpAgents, axiosErrorMessage, isUnauthori
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { print } from '../printer/print'
-import { pauseConfiguredPrinterQueue, resumeConfiguredPrinterQueue } from './print-queue-hold'
+import { cleanupStaleOwnPrintJobs, pauseConfiguredPrinterQueue, resumeConfiguredPrinterQueue } from './print-queue-hold'
+import { claimPrintTasksIfGateOpen, pauseQueueAfterTerminalState } from './print-dispatch-gate'
 import { monitorPrintJob } from './print-job-monitor'
 import { getPrinterPreflight, type PrinterPreflight } from './wmi'
 
@@ -473,9 +474,7 @@ export async function executeTask(
       return
     }
 
-    // 领取与监控串行：task-runner-control.ts 的 inFlight 同时只跑一轮，
-    // runClaimCycle 的 maxTasks 为 1，且 await executeTask 结束后才领下一单。
-    // 恢复只包住这一单的 print() 与队列监控，不会和下一单交错，也不必再等待。
+    // 领取与监控串行（inFlight，maxTasks 为 1）。恢复只包住这一单的 print() 与队列监控。
     if (config.holdPrinterQueueWhenIdle) {
       try {
         await resumeConfiguredPrinterQueue(printerName)
@@ -619,12 +618,10 @@ export async function executeTask(
     }
   } finally {
     if (releaseQueueAfterTerminalState) {
-      try {
+      await pauseQueueAfterTerminalState(async () => {
         const paused = await pauseConfiguredPrinterQueue(printerName)
         if (!paused.skipped) log('print-queue-hold: queue paused after terminal state')
-      } catch {
-        warn('print-queue-hold: queue could not be paused after terminal state')
-      }
+      })
     }
     // ── Always clean up temp file ─────────────────────────────────────────
     if (fs.existsSync(tempFilePath)) {
@@ -667,6 +664,25 @@ async function runClaimCycle(
     return
   }
 
+  await claimPrintTasksIfGateOpen(
+    {
+      holdEnabled: config.holdPrinterQueueWhenIdle === true,
+      pause: async () => {
+        await pauseConfiguredPrinterQueue(config.printerName)
+      },
+      cleanup: async () => {
+        await cleanupStaleOwnPrintJobs({ printerName: config.printerName })
+      },
+    },
+    () => claimConfiguredPrintTasks(config, db, activeTasks),
+  )
+}
+
+async function claimConfiguredPrintTasks(
+  config: AgentConfig,
+  db: AgentDatabase,
+  activeTasks: Set<string>,
+): Promise<void> {
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
   let tasks: ClaimTask[]
@@ -747,10 +763,7 @@ export interface TaskRunnerOptions {
   db: AgentDatabase
 }
 
-/**
- * Start the task claim polling loop and expose a best-effort immediate wake.
- * Interval ticks and wake requests share one full-lifecycle single-flight guard.
- */
+/** Start the claim loop. Interval ticks and wake requests share one single-flight guard. */
 export function startTaskRunner(options: TaskRunnerOptions): TaskRunnerControl {
   const { config, db } = options
   const interval = config.claimIntervalMs ?? 5_000

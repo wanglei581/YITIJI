@@ -33,10 +33,12 @@
  *   DetectedErrorState=6,7,8 (fatal errors)       → 'error'
  *   DetectedErrorState=3,5 (recoverable warnings)  → 'low_paper'
  *   DetectedErrorState=2 (No Error)               → 'ready'
+ *     若同时带了 PrinterState / ExtendedPrinterStatus 的离线、缺纸、卡纸、缺粉、开盖，
+ *     先报对应故障，不被「无错误」盖掉。没有这两列时仍直接就绪。
  *   DetectedErrorState=0 (CIM Unknown) + PrinterStatus 3/4/5 and not offline
  *                                                 → 'ready'    (Pantum never sets this field)
  *   PrinterState / ExtendedPrinterStatus 仅表示暂停（Extended=8 或 PAUSED 位），
- *   且没有离线、缺纸、故障、粉量低位                 → 'ready'
+ *   且没有离线、缺纸、故障位。粉量低（TONER_LOW）不拦截 → 'ready'
  *   DetectedErrorState=0 with any other PrinterStatus → 'unknown'
  *   Win32_Printer not found                       → 'error'    (distinct from query failure)
  *   query failure / unparseable                   → 'unknown'
@@ -115,13 +117,15 @@ function runPowerShell(script: string, stdin?: string, timeoutMs = 8_000): Promi
 // ── Printer status ────────────────────────────────────────────────────────────
 
 /**
- * 心跳与预检共用这一条探针。打印机名走 stdin，过滤条件里单引号成对转义。
+ * 心跳与预检共用这一条探针。打印机名走 stdin。
+ * 先取出 Win32_Printer，再按 Name -eq 比较，不把名字拼进 WQL -Filter。
  * 多读 PrinterState 与 ExtendedPrinterStatus，用来识别「只是被我们暂停」。
  */
 export function buildWin32PrinterProbeScript(): string {
   return (
     `$name = [Console]::In.ReadLine(); ` +
-    `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace("'", "''"))'" -ErrorAction SilentlyContinue; ` +
+    `$p = @(Get-CimInstance -ClassName Win32_Printer -ErrorAction SilentlyContinue) | ` +
+    `Where-Object { $_.Name -eq $name } | Select-Object -First 1; ` +
     `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline),$($p.PrinterState),$($p.ExtendedPrinterStatus)" } else { "not_found" }`
   )
 }

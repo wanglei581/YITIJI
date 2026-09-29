@@ -11,10 +11,10 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  accountsReferToSamePrincipal,
   cleanupStaleOwnPrintJobs,
   listConfiguredPrintJobs,
   pauseConfiguredPrinterQueue,
+  resolvePrintJobUserSid,
   resumeConfiguredPrinterQueue,
   type PrintJobSnapshot,
 } from '../src/agent/print-queue-hold'
@@ -28,8 +28,7 @@ const TASK_NAME = 'AIJobResidueOther'
 const USER_NAME = 'aijobqhold'
 const TEST_PASSWORD = 'Aijob-Queue-Hold-1a'
 const HOLD_SOURCE = join(__dirname, '../src/agent/print-queue-hold.ts')
-const TIME_ANCHOR = 'job.submittedAtMs < criteria.startedAtMs'
-const ACCOUNT_ANCHOR = 'accountsReferToSamePrincipal(job.user, account)'
+const OWNER_ANCHOR = '$owned = $jobSid.Equals($currentSid)'
 const PAUSE_ANCHOR = "await invokePrinterCimMethod(printerName, 'Pause')"
 
 function scrub(text: string): string {
@@ -63,16 +62,31 @@ function pauseSignal(line: string | null): boolean {
 
 async function waitForJob(
   printerName: string,
-  predicate: (job: PrintJobSnapshot, account: string) => boolean,
-): Promise<{ account: string; job: PrintJobSnapshot }> {
+  predicate: (job: PrintJobSnapshot) => boolean,
+): Promise<PrintJobSnapshot> {
   const deadline = Date.now() + 25_000
   while (Date.now() < deadline) {
     const listed = await listConfiguredPrintJobs(printerName)
-    const job = listed.jobs.find((entry) => predicate(entry, listed.account))
-    if (job) return { account: listed.account, job }
+    const job = listed.jobs.find((entry) => predicate(entry))
+    if (job) return job
     await sleep(500)
   }
   throw new Error(`print job did not appear on ${printerName}`)
+}
+
+async function verifySidResolution(): Promise<void> {
+  assert.equal((await resolvePrintJobUserSid('SYSTEM')).trim(), 'S-1-5-18')
+  assert.equal((await resolvePrintJobUserSid('NT AUTHORITY\\SYSTEM')).trim(), 'S-1-5-18')
+  assert.equal((await resolvePrintJobUserSid('system')).trim(), 'S-1-5-18')
+  const currentName = runPs('[System.Security.Principal.WindowsIdentity]::GetCurrent().Name').trim()
+  const currentSid = runPs('[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value').trim()
+  assert.equal((await resolvePrintJobUserSid(currentName)).trim(), currentSid)
+  const machine = runPs('[Environment]::MachineName').trim()
+  const machineSid = (await resolvePrintJobUserSid(`${machine}$`)).trim()
+  assert.match(machineSid, /^S-1-/)
+  assert.equal((await resolvePrintJobUserSid(`${machine}\\${machine}$`)).trim(), machineSid)
+  await assert.rejects(() => resolvePrintJobUserSid('   '))
+  await assert.rejects(() => resolvePrintJobUserSid('NoSuchPrintJobUser-xyz'))
 }
 
 function createPrinters(): void {
@@ -140,37 +154,32 @@ Remove-Item -LiteralPath '${PORT_A}','${PORT_B}','${join(tmpdir(), 'aijob-residu
 }
 
 async function runScenario(): Promise<void> {
+  await verifySidResolution()
   createPrinters()
   await pauseConfiguredPrinterQueue(PRINTER_A)
   await pauseConfiguredPrinterQueue(PRINTER_B)
   submitOtherAccountJob()
-  const other = await waitForJob(PRINTER_A, (job, account) => !accountsReferToSamePrincipal(job.user, account))
+  const other = await waitForJob(PRINTER_A, (job) => !job.ownedByCurrentProcess)
   submitOwnJob(PRINTER_A)
   submitOwnJob(PRINTER_B)
-  const jobA = await waitForJob(
-    PRINTER_A,
-    (job, account) => accountsReferToSamePrincipal(job.user, account) && job.id !== other.job.id,
-  )
-  const jobC = await waitForJob(PRINTER_B, (job, account) => accountsReferToSamePrincipal(job.user, account))
-  await sleep(2000)
-  const startedAtMs = Date.now()
-  await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A, startedAtMs })
+  const jobA = await waitForJob(PRINTER_A, (job) => job.ownedByCurrentProcess && job.id !== other.id)
+  const jobC = await waitForJob(PRINTER_B, (job) => job.ownedByCurrentProcess)
+  await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A })
   const afterCleanup = await listConfiguredPrintJobs(PRINTER_A)
-  assert.equal(afterCleanup.jobs.some((job) => job.id === jobA.job.id), false, 'job A must be removed')
-  assert.equal(afterCleanup.jobs.some((job) => job.id === other.job.id), true, 'other-account job must stay')
+  assert.equal(afterCleanup.jobs.some((job) => job.id === jobA.id), false, 'job A must be removed')
+  assert.equal(afterCleanup.jobs.some((job) => job.id === other.id), true, 'other-account job must stay')
   const onOtherPrinter = await listConfiguredPrintJobs(PRINTER_B)
-  assert.equal(onOtherPrinter.jobs.some((job) => job.id === jobC.job.id), true, 'job C on the other printer must stay')
+  assert.equal(onOtherPrinter.jobs.some((job) => job.id === jobC.id), true, 'job C on the other printer must stay')
 
   submitOwnJob(PRINTER_A)
   const jobB = await waitForJob(
     PRINTER_A,
-    (job, account) =>
-      accountsReferToSamePrincipal(job.user, account) && job.id !== jobA.job.id && job.id !== other.job.id,
+    (job) => job.ownedByCurrentProcess && job.id !== jobA.id && job.id !== other.id,
   )
-  await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A, startedAtMs })
+  await cleanupStaleOwnPrintJobs({ printerName: PRINTER_A })
   const kept = await listConfiguredPrintJobs(PRINTER_A)
-  assert.equal(kept.jobs.some((job) => job.id === jobB.job.id), true, 'job submitted after start must stay')
-  assert.equal(kept.jobs.some((job) => job.id === other.job.id), true, 'other-account job must still stay')
+  assert.equal(kept.jobs.some((job) => job.id === jobB.id), false, 'same-account job is removed without a time check')
+  assert.equal(kept.jobs.some((job) => job.id === other.id), true, 'other-account job must still stay')
 
   await resumeConfiguredPrinterQueue(PRINTER_A)
   const resumed = await queryWin32PrinterLine(PRINTER_A)
@@ -196,8 +205,7 @@ function runSelf(): ReturnType<typeof spawnSync> {
 async function verifyReverseMutations(): Promise<void> {
   const original = readFileSync(HOLD_SOURCE, 'utf8')
   const mutations: Array<[string, string, string]> = [
-    ['time', TIME_ANCHOR, 'true'],
-    ['account', ACCOUNT_ANCHOR, 'true'],
+    ['owner', OWNER_ANCHOR, '$owned = $true'],
     ['pause', PAUSE_ANCHOR, 'await Promise.resolve()'],
   ]
   for (const [label, from, to] of mutations) {

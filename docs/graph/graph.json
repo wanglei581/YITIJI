@@ -21191,6 +21191,7 @@
     "apps/terminal-agent/src/agent/heartbeat.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
@@ -21214,6 +21215,9 @@
     ],
     "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts": [
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
+    ],
+    "apps/terminal-agent/src/agent/printer-status-map.ts": [
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
     ],
     "apps/terminal-agent/src/agent/profile-guard.ts": [
       "apps/terminal-agent/scripts/verify-agent-profile-guard.mjs"
@@ -21268,7 +21272,8 @@
     ],
     "apps/terminal-agent/src/agent/wmi.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
-      "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts"
+      "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
     ],
     "apps/terminal-agent/src/config.ts": [
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
@@ -30880,6 +30885,7 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
+          "apps/terminal-agent/src/agent/printer-status-map.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/wmi.ts",
           "apps/terminal-agent/src/printer/image-to-pdf.ts",
@@ -30924,8 +30930,10 @@
         "files": [
           "apps/terminal-agent/config/agent-config.example.json",
           "apps/terminal-agent/src/agent/config-manager.ts",
+          "apps/terminal-agent/src/agent/heartbeat.ts",
           "apps/terminal-agent/src/agent/print-queue-hold.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
+          "apps/terminal-agent/src/agent/wmi.ts",
           "apps/terminal-agent/src/index.ts"
         ],
         "missing": []

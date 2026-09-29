@@ -1,18 +1,24 @@
 /**
- * 配置打印机的队列：空闲时暂停，开机清掉本账号在本次进程启动前提交的作业。
+ * 配置打印机的队列：空闲时暂停，开机清掉本进程账号留在这台打印机上的作业。
  *
  * 主机断电后 Windows 打印服务比 Agent 更早起来，会把 spool 里的作业重新送出。
  * 只在 Agent 起来之后再删，挡不住这一段。空闲时把队列暂停，下次开机先暂停再删。
- * 正在打印的那一小段队列是恢复状态，这个窗口里断电仍可能出纸，发布当天要在真机上看。
+ * 正在打印的那一小段队列是恢复状态，这个窗口里断电仍可能出纸。
  *
- * 账号不写死 SYSTEM。生产服务跑在 SYSTEM 下，测试机可能是别的账号。
- * 比较的是当前进程自己的 Windows 身份。一边带域名、另一边不带时，只按最后一段名字对齐。
- * 两边都带域名但不相同，不对齐。不把生产服务账号写进代码。
+ * 清理发生在拿到单实例锁之后、领任何任务之前。此刻属于本进程账号的作业
+ * 必然来自上一次进程，所以不比较提交时间。时间条件在主板时钟被重置或
+ * 时区换算出错时会漏删，而且没有额外保护。
  *
- * 领取是串行的：task-runner-control.ts 的 inFlight 同时只跑一轮，
- * runClaimCycle 的 maxTasks 为 1，而且要等 executeTask 结束才领下一单。
- * 恢复队列只包住当前这一单的打印和监控，不会和下一单交错。
+ * 账号比较只在 PowerShell 里按 SID 做：作业用户转成 SID，与
+ * WindowsIdentity.GetCurrent().User 比较。Get-PrintJob 可能给出
+ * SYSTEM、NT AUTHORITY\SYSTEM 或计算机账号（机器名$），这三种都要能转成 SID。
+ * 任何一个作业的用户读不出来或转不成 SID，整次清理失败，不静默跳过。
+ * 不把某个服务账号写进删除条件。
  *
+ * 打印机名从 stdin 传入。取出 Win32_Printer 后按 Name -eq 比较，
+ * 不把名字拼进 WQL 过滤字符串（反斜杠和引号会把过滤条件弄断）。
+ *
+ * 领取是串行的。恢复队列只包住当前这一单的打印和监控。
  * 日志只记数量和阶段，不记文档名、打印机名、账号。非 Windows 安全空转，不抛错。
  */
 
@@ -28,8 +34,8 @@ export class PrintQueueHoldError extends Error {
 
 export interface PrintJobSnapshot {
   id: number
-  user: string
-  submittedAtMs: number
+  /** PowerShell 已把作业用户解析成 SID，并与当前进程 SID 比较过。 */
+  ownedByCurrentProcess: boolean
 }
 
 export interface QueueHoldResult {
@@ -42,6 +48,72 @@ export interface QueueCleanupResult {
   skipped: boolean
 }
 
+const RESOLVE_PRINT_JOB_USER_SID = `
+function Resolve-PrintJobUserSid([string]$user) {
+  if ([string]::IsNullOrWhiteSpace($user)) { throw 'print job user is unreadable' }
+  $value = $user.Trim()
+  $folded = $value.ToLowerInvariant()
+  if ($folded -eq 'system' -or $folded -eq 'nt authority\\system' -or $folded -eq 'nt authority/system') {
+    return 'S-1-5-18'
+  }
+  $machine = [Environment]::MachineName
+  $bare = $value
+  $cut = [Math]::Max($value.LastIndexOf('\\'), $value.LastIndexOf('/'))
+  if ($cut -ge 0) { $bare = $value.Substring($cut + 1) }
+  $candidates = New-Object System.Collections.Generic.List[string]
+  [void]$candidates.Add($value)
+  $bareIsThisComputer = $bare.EndsWith('$') -and $bare.Length -gt 1 -and $bare.Substring(0, $bare.Length - 1).Equals($machine, [StringComparison]::OrdinalIgnoreCase)
+  if ($bareIsThisComputer) {
+    [void]$candidates.Add(('{0}\\{1}' -f $machine, $bare))
+    $domain = [Environment]::UserDomainName
+    if (-not [string]::IsNullOrWhiteSpace($domain)) {
+      [void]$candidates.Add(('{0}\\{1}' -f $domain, $bare))
+    }
+  }
+  foreach ($candidate in $candidates) {
+    try {
+      $account = New-Object System.Security.Principal.NTAccount($candidate)
+      $sid = $account.Translate([System.Security.Principal.SecurityIdentifier])
+      if ($null -ne $sid -and -not [string]::IsNullOrWhiteSpace([string]$sid.Value)) {
+        return [string]$sid.Value
+      }
+    } catch {}
+  }
+  try {
+    if (-not ('PrintJobSidLookup' -as [type])) {
+      Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class PrintJobSidLookup {
+  [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+  public static extern bool LookupAccountName(string systemName, string accountName, byte[] sid, ref int sidSize, StringBuilder domainName, ref int domainSize, out int use);
+  public static string Lookup(string account) {
+    int sidSize = 0;
+    int domainSize = 0;
+    int use;
+    LookupAccountName(null, account, null, ref sidSize, null, ref domainSize, out use);
+    byte[] sid = new byte[sidSize];
+    StringBuilder domain = new StringBuilder(Math.Max(domainSize, 1));
+    if (!LookupAccountName(null, account, sid, ref sidSize, domain, ref domainSize, out use)) {
+      throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+    }
+    return new System.Security.Principal.SecurityIdentifier(sid, 0).Value;
+  }
+}
+'@
+    }
+    foreach ($candidate in $candidates) {
+      try {
+        $lookedUp = [PrintJobSidLookup]::Lookup($candidate)
+        if (-not [string]::IsNullOrWhiteSpace($lookedUp)) { return $lookedUp }
+      } catch {}
+    }
+  } catch {}
+  throw 'print job user sid is unreadable'
+}
+`.trim()
+
 const CIM_METHOD_SCRIPT = `
 $ErrorActionPreference = 'Stop'
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
@@ -49,8 +121,9 @@ $name = [string]$payload.printerName
 $method = [string]$payload.method
 if ([string]::IsNullOrWhiteSpace($name)) { throw 'printer name missing' }
 if ($method -ne 'Pause' -and $method -ne 'Resume') { throw 'method rejected' }
-$escaped = $name.Replace("'", "''")
-$printer = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$escaped'" -ErrorAction Stop
+$printer = @(Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop) |
+  Where-Object { $_.Name -eq $name } |
+  Select-Object -First 1
 if (-not $printer) { throw 'printer not found' }
 $result = Invoke-CimMethod -InputObject $printer -MethodName $method
 if ($null -eq $result -or [int]$result.ReturnValue -ne 0) { throw 'cim method failed' }
@@ -59,31 +132,25 @@ if ($null -eq $result -or [int]$result.ReturnValue -ne 0) { throw 'cim method fa
 
 const LIST_JOBS_SCRIPT = `
 $ErrorActionPreference = 'Stop'
+${RESOLVE_PRINT_JOB_USER_SID}
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
 $name = [string]$payload.printerName
 if ([string]::IsNullOrWhiteSpace($name)) { throw 'printer name missing' }
-$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-$account = [string]$identity.Name
-$currentSid = [string]$identity.User.Value
-function Format-JobUser([string]$user) {
-  if ([string]::IsNullOrWhiteSpace($user)) { return '' }
-  try {
-    $sidType = [type][System.Security.Principal.SecurityIdentifier]
-    $sid = ([System.Security.Principal.NTAccount]$user).Translate($sidType).Value
-    if ($sid -eq $currentSid) { return $account }
-  } catch {}
-  return $user
+$currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+if ($null -eq $currentIdentity -or $null -eq $currentIdentity.User -or [string]::IsNullOrWhiteSpace([string]$currentIdentity.User.Value)) {
+  throw 'current process sid is unreadable'
 }
+$currentSid = $currentIdentity.User
 $raw = @(Get-PrintJob -PrinterName $name -ErrorAction Stop)
-$jobs = foreach ($job in $raw) {
-  $submitted = [DateTimeOffset]::new([datetime]$job.SubmittedTime).ToUnixTimeMilliseconds()
-  [pscustomobject]@{
-    id = [int]$job.ID
-    user = (Format-JobUser ([string]$job.UserName))
-    submittedAtMs = [int64]$submitted
-  }
+$jobs = New-Object System.Collections.Generic.List[object]
+foreach ($job in $raw) {
+  if ($null -eq $job) { continue }
+  $resolved = Resolve-PrintJobUserSid ([string]$job.UserName)
+  $jobSid = New-Object System.Security.Principal.SecurityIdentifier($resolved)
+  $owned = $jobSid.Equals($currentSid)
+  [void]$jobs.Add([pscustomobject]@{ id = [int]$job.ID; owned = [bool]$owned })
 }
-@{ account = $account; jobs = @($jobs) } | ConvertTo-Json -Compress -Depth 4
+@{ jobs = @($jobs) } | ConvertTo-Json -Compress -Depth 4
 `.trim()
 
 const REMOVE_JOBS_SCRIPT = `
@@ -152,52 +219,19 @@ async function invokePrinterCimMethod(printerName: string, method: 'Pause' | 'Re
   if (stdout !== 'ok') throw new PrintQueueHoldError('print queue command failed')
 }
 
-export function accountsReferToSamePrincipal(jobUser: string, agentAccount: string): boolean {
-  const left = jobUser.trim()
-  const right = agentAccount.trim()
-  if (!left || !right) return false
-  if (left.toLowerCase() === right.toLowerCase()) return true
-  const bare = (value: string) => {
-    const index = Math.max(value.lastIndexOf('\\'), value.lastIndexOf('/'))
-    return index >= 0 ? value.slice(index + 1) : value
-  }
-  const leftQualified = left.includes('\\') || left.includes('/')
-  const rightQualified = right.includes('\\') || right.includes('/')
-  if (leftQualified !== rightQualified && bare(left).toLowerCase() === bare(right).toLowerCase()) return true
-  return false
-}
-
-export function selectStaleOwnPrintJobIds(
-  jobs: PrintJobSnapshot[],
-  criteria: { account: string; startedAtMs: number },
-): number[] {
-  const account = criteria.account.trim()
-  if (!account || !Number.isFinite(criteria.startedAtMs)) {
-    throw new PrintQueueHoldError('stale print job criteria are incomplete')
-  }
+export function selectOwnPrintJobIds(jobs: PrintJobSnapshot[]): number[] {
   const ids: number[] = []
   for (const job of jobs) {
-    if (!Number.isInteger(job.id) || job.id <= 0) continue
-    if (!Number.isFinite(job.submittedAtMs)) {
-      throw new PrintQueueHoldError('print job submit time is unreadable')
+    if (typeof job.ownedByCurrentProcess !== 'boolean') {
+      throw new PrintQueueHoldError('print job user is unreadable')
     }
-    const owns = accountsReferToSamePrincipal(job.user, account)
-    const stale = job.submittedAtMs < criteria.startedAtMs
-    if (owns && stale) ids.push(job.id)
+    if (!Number.isInteger(job.id) || job.id <= 0) continue
+    if (job.ownedByCurrentProcess) ids.push(job.id)
   }
   return ids
 }
 
-function readSubmittedAtMs(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  throw new PrintQueueHoldError('print job submit time is unreadable')
-}
-
-export function parsePrintJobListOutput(raw: string): { account: string; jobs: PrintJobSnapshot[] } {
+export function parsePrintJobListOutput(raw: string): { jobs: PrintJobSnapshot[] } {
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
@@ -207,37 +241,36 @@ export function parsePrintJobListOutput(raw: string): { account: string; jobs: P
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new PrintQueueHoldError('print job list is unreadable')
   }
-  const record = parsed as { account?: unknown; jobs?: unknown }
-  const account = typeof record.account === 'string' ? record.account.trim() : ''
-  if (!account) throw new PrintQueueHoldError('print job list account is unreadable')
+  const record = parsed as { jobs?: unknown }
   const jobsRaw = record.jobs == null ? [] : Array.isArray(record.jobs) ? record.jobs : [record.jobs]
   const jobs: PrintJobSnapshot[] = []
   for (const entry of jobsRaw) {
     if (!entry || typeof entry !== 'object') {
-      throw new PrintQueueHoldError('print job submit time is unreadable')
+      throw new PrintQueueHoldError('print job user is unreadable')
     }
-    const job = entry as { id?: unknown; user?: unknown; submittedAtMs?: unknown }
+    const job = entry as { id?: unknown; owned?: unknown }
+    const owned = job.owned
+    if (typeof owned !== 'boolean') {
+      throw new PrintQueueHoldError('print job user is unreadable')
+    }
     const id = typeof job.id === 'number' ? job.id : Number(job.id)
-    const user = typeof job.user === 'string' ? job.user : ''
-    const submittedAtMs = readSubmittedAtMs(job.submittedAtMs)
     if (!Number.isInteger(id) || id <= 0) continue
-    jobs.push({ id, user, submittedAtMs })
+    jobs.push({ id, ownedByCurrentProcess: owned })
   }
-  return { account, jobs }
+  return { jobs }
 }
 
-export function agentProcessStartedAtMs(now = Date.now(), uptimeSec = process.uptime()): number {
-  return now - Math.round(uptimeSec * 1000)
-}
-
-export async function listConfiguredPrintJobs(
-  printerName: string,
-): Promise<{ account: string; jobs: PrintJobSnapshot[] }> {
+export async function listConfiguredPrintJobs(printerName: string): Promise<{ jobs: PrintJobSnapshot[] }> {
   const stdout = await runPowerShellOrThrow(
     LIST_JOBS_SCRIPT,
     JSON.stringify({ printerName: requirePrinterName(printerName) }),
   )
   return parsePrintJobListOutput(stdout)
+}
+
+export async function resolvePrintJobUserSid(user: string): Promise<string> {
+  const script = `$ErrorActionPreference = 'Stop'\n${RESOLVE_PRINT_JOB_USER_SID}\n$payload = [Console]::In.ReadToEnd() | ConvertFrom-Json\nResolve-PrintJobUserSid ([string]$payload.user)`
+  return runPowerShellOrThrow(script, JSON.stringify({ user }))
 }
 
 async function removePrintJobs(printerName: string, ids: number[]): Promise<void> {
@@ -263,14 +296,10 @@ export async function resumeConfiguredPrinterQueue(printerName: string): Promise
 
 export async function cleanupStaleOwnPrintJobs(options: {
   printerName: string
-  startedAtMs: number
 }): Promise<QueueCleanupResult> {
   if (process.platform !== 'win32') return { removed: 0, skipped: true }
   const listed = await listConfiguredPrintJobs(options.printerName)
-  const ids = selectStaleOwnPrintJobIds(listed.jobs, {
-    account: listed.account,
-    startedAtMs: options.startedAtMs,
-  })
+  const ids = selectOwnPrintJobIds(listed.jobs)
   if (ids.length === 0) return { removed: 0, skipped: false }
   await removePrintJobs(options.printerName, ids)
   log(`print-queue-cleanup: removed leftover print jobs (count=${ids.length})`)

@@ -27,10 +27,10 @@ import { acquireLock, releaseLock } from './agent/instance-lock'
 import { cleanupKnownLegacyResidue } from './agent/legacy-residue-cleanup'
 import { cleanupCrashLeftoverPrintTaskTemps } from './agent/print-task-temp-cleanup'
 import {
-  agentProcessStartedAtMs,
   cleanupStaleOwnPrintJobs,
   pauseConfiguredPrinterQueue,
 } from './agent/print-queue-hold'
+import { noteStartupPrintQueueFailure, pauseQueueOnProcessStop } from './agent/print-dispatch-gate'
 import { isDatabaseAvailable, openDatabase, type AgentDatabase } from './agent/db'
 import { startOfflineRetry } from './agent/offline-queue'
 import { startScanDeletionAuditReporter } from './agent/scan-deletion-audit-reporter'
@@ -94,7 +94,8 @@ program
     }
 
     // 三项开机清理各自独立：任何一项抛错，另外两项仍执行。配置没加载成功时这三项都还没跑。
-    // W-85 失败仍拒绝领新任务，但走到拒绝时，队列清理和旧遗留清理都已经执行。
+    // W-85 失败仍让进程退出。队列暂停或残留作业清理失败不退出：心跳、本机接口、扫描照常，
+    // 但打印领取闸门关上，直到后续领取周期重试成功。
     // 旧遗留是历史垃圾，删除失败只记日志，不拒绝启动。
     let printTempCleanupError: unknown = null
     try {
@@ -109,20 +110,17 @@ program
     let printQueueCleanupError: unknown = null
     try {
       // 上一进程若在「已恢复、还没再暂停」时崩溃，队列可能仍在跑。
-      // 先暂停，再删本账号在本次进程启动前提交的作业。清理不看 hold 开关。
+      // 先暂停，再删本进程账号留在这台打印机上的作业。清理不看提交时间，也不看 hold 开关。
       // 非 Windows 两步都空转，不因此拒绝启动。
       if (config.holdPrinterQueueWhenIdle) {
         const paused = await pauseConfiguredPrinterQueue(config.printerName)
         if (!paused.skipped) log('print-queue-hold: idle queue paused')
       }
-      await cleanupStaleOwnPrintJobs({
-        printerName: config.printerName,
-        startedAtMs: agentProcessStartedAtMs(),
-      })
+      await cleanupStaleOwnPrintJobs({ printerName: config.printerName })
     } catch (error) {
       printQueueCleanupError = error
       err(
-        'AGENT_STARTUP_FAILED: printer queue could not be paused or leftover jobs removed; refusing to claim new work after the other startup cleanups.',
+        'print-queue-hold: printer queue could not be paused or leftover jobs removed; print claims stay blocked until a later cycle recovers.',
       )
     }
 
@@ -133,7 +131,9 @@ program
     }
 
     if (printTempCleanupError) failStartup(printTempCleanupError, 'AGENT_STARTUP_FAILED')
-    if (printQueueCleanupError) failStartup(printQueueCleanupError, 'AGENT_STARTUP_FAILED')
+    if (printQueueCleanupError) {
+      noteStartupPrintQueueFailure()
+    }
 
     // Start the loopback API before cloud registration so the watchdog and
     // Kiosk can obtain identity immediately and receive retryable 503s while
@@ -235,16 +235,24 @@ program
     log('Agent running. Press Ctrl+C to stop.')
 
     // ── Graceful shutdown ─────────────────────────────────────────────────
+    let shuttingDown = false
     const shutdown = (signal: string) => {
+      if (shuttingDown) return
+      shuttingDown = true
       log(`Agent: received ${signal}, shutting down...`)
       if (heartbeatTimer) clearInterval(heartbeatTimer)
       taskRunner?.stop()
       clearInterval(offlineRetryTimer)
       clearInterval(scanDeletionAuditReporterTimer)
-      void qrLocalServer?.close()
-      void scanWatcherHandle?.stop()
-      releaseLock()
-      process.exit(0)
+      void pauseQueueOnProcessStop({
+        enabled: config.holdPrinterQueueWhenIdle === true,
+        pause: () => pauseConfiguredPrinterQueue(config.printerName),
+      }).finally(() => {
+        void qrLocalServer?.close()
+        void scanWatcherHandle?.stop()
+        releaseLock()
+        process.exit(0)
+      })
     }
     process.on('SIGINT', () => shutdown('SIGINT'))
     process.on('SIGTERM', () => shutdown('SIGTERM'))

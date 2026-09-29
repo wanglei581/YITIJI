@@ -5,8 +5,11 @@
  * 后两列可选：PrinterState,ExtendedPrinterStatus。没有后两列时，行为与加暂停之前一致。
  *
  * 空闲暂停会让队列停住。若因此 PrinterStatus 离开 3/4/5，旧映射会报 unknown，
- * 一体机就显示「状态未知」并不再接单。所以「只有暂停、没有故障」视为就绪。
- * 离线、缺纸、卡纸、开盖、缺粉等判断在这条放宽之前，暂停位盖不住它们。
+ * 一体机就显示「状态未知」并不再接单。所以「暂停、且没有故障位」视为就绪。
+ * 粉量低是耗材预警，不拦截：暂停且只有 TONER_LOW 仍报就绪。
+ * 有 PrinterState / ExtendedPrinterStatus 时，先看离线、缺纸、卡纸、缺粉、开盖，
+ * 再看 DetectedErrorState=2「无错误」，避免被「无错误」盖掉。
+ * 没有这两列时，行为与加扩展字段之前一致。
  */
 
 import type { PrinterStatus } from './types'
@@ -35,6 +38,7 @@ const ERROR_FAULT_BITS =
   USER_INTERVENTION_BIT |
   OUT_OF_MEMORY_BIT |
   DOOR_OPEN_BIT
+const READY_WHILE_PAUSED_BITS = PAUSE_BIT | TONER_LOW_BIT
 
 interface ParsedPrinterLine {
   printerStatusCode: number
@@ -72,23 +76,34 @@ function extraFieldsPresent(line: ParsedPrinterLine): boolean {
   return line.printerState !== null || line.extendedStatus !== null
 }
 
+function faultFromExtended(line: ParsedPrinterLine): PrinterStatus | null {
+  if (!extraFieldsPresent(line)) return null
+  const state = line.printerState
+  const extended = line.extendedStatus
+  if ((state !== null && (state & OFFLINE_BIT) !== 0) || extended === 7) return 'offline'
+  if (state !== null && (state & PAPER_FAULT_BITS) !== 0) return 'paper_empty'
+  if ((state !== null && (state & ERROR_FAULT_BITS) !== 0) || extended === 9 || extended === 11) {
+    return 'error'
+  }
+  return null
+}
+
 function heartbeatFromParsed(line: ParsedPrinterLine): PrinterStatus {
   if (line.workOffline) return 'offline'
   if (line.printerStatusCode === 7 || line.detectedError === 9) return 'offline'
   if (line.detectedError === 4) return 'paper_empty'
   if (line.detectedError === 6 || line.detectedError === 7 || line.detectedError === 8) return 'error'
   if (line.detectedError === 3 || line.detectedError === 5) return 'low_paper'
-  if (line.detectedError === 2) return 'ready'
 
-  if (extraFieldsPresent(line)) {
-    const state = line.printerState
-    const extended = line.extendedStatus
-    if ((state !== null && (state & OFFLINE_BIT) !== 0) || extended === 7) return 'offline'
-    if (state !== null && (state & PAPER_FAULT_BITS) !== 0) return 'paper_empty'
-    if ((state !== null && (state & ERROR_FAULT_BITS) !== 0) || extended === 9 || extended === 11) {
-      return 'error'
-    }
+  // DetectedErrorState=2 是「无错误」。有扩展字段时先看故障位，没有则直接就绪。
+  if (line.detectedError === 2) {
+    const masked = faultFromExtended(line)
+    if (masked) return masked
+    return 'ready'
   }
+
+  const extendedFault = faultFromExtended(line)
+  if (extendedFault) return extendedFault
 
   if (
     line.detectedError === 0 &&
@@ -97,13 +112,14 @@ function heartbeatFromParsed(line: ParsedPrinterLine): PrinterStatus {
     return 'ready'
   }
 
-  // DetectedErrorState 仍是 0，但 PrinterStatus 已经不是 3/4/5。
-  // 只有「暂停、且没有粉量低」才抬成就绪；没有后两列时保持 unknown。
+  // PrinterStatus 已经不是 3/4/5，DetectedErrorState 仍是 0。
+  // 暂停且没有故障位就报就绪。粉量低不算故障，不能因此变成 unknown。
   if (line.detectedError === 0 && extraFieldsPresent(line)) {
     const state = line.printerState
     const pauseSignal = line.extendedStatus === 8 || (state !== null && (state & PAUSE_BIT) !== 0)
-    const tonerLow = state !== null && (state & TONER_LOW_BIT) !== 0
-    if (pauseSignal && !tonerLow) return 'ready'
+    const leftover = state === null ? 0 : state & ~READY_WHILE_PAUSED_BITS
+    const leftoverFault = (leftover & (OFFLINE_BIT | PAPER_FAULT_BITS | ERROR_FAULT_BITS)) !== 0
+    if (pauseSignal && !leftoverFault) return 'ready'
   }
 
   return 'unknown'
