@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
+
+- **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。
+- **修法（Claude 子代理实现、协调方审）：** 服务端所有打开 PDF 的地方收到 `common/pdf/pdfjs-document.ts` 一个入口：加载 `pdfjs-dist/legacy/build/pdf.mjs`（6.3.289），低于 6.2.108 拒绝启用；经 unpdf 的 `definePDFJSModule` 交给 unpdf，核对 unpdf 确实采用；外壳强制 `enableScripting:false`、`isEvalSupported:false`、`enableXfa:false`。两处 6.x 兼容修复：配 `wasmUrl`（JBIG2 / CCITT / JPEG2000 改成 wasm 解码，不配黑白扫描件渲染成空白）、给文档补回 `destroy()`（6.x 删掉了它，合同审查拿它判文档有效）。简历文字层文档此前从不释放，顺带在读完后释放。
+- **注意：** 入口靠 Node ≥22.12 的 `require()` 加载 `.mjs`（根 `engines` 已要求 ≥22.13）；版本不够时 PDF 功能如实报「解析器不可用」，不会退回旧引擎——生产核对清单加一条「服务器 Node 版本 ≥22.13」。
+- **验证：** 新门禁 `verify:pdfjs-engine`（22 条，运行时经 diagnostics_channel 核对每次打开的引擎版本与安全选项、整进程只求值一份引擎、CCITT G4 样本真渲染）。协调方独立复跑：材料处理（含 C-15 中文 CMap）、隐私遮挡、简历抽取、页数（file-display-truth 56 条）、OCR、签名合成、报告导出、文档转换、图片转 PDF、职业规划降级、AIGC 标识全绿；合同审查单元 306 条里一条计时断言（脱敏模块，与 PDF 无关）在本机高负载下超时，单独重跑通过。变异：去掉 `definePDFJSModule` 版本断言红、去掉 `enableScripting:false` 选项断言红，另三处（isEvalSupported、wasmUrl、destroy）也各自变红。
+- **顺带：** `services/api/.env.example` 简历导出显式标识一句改为「产品负责人 9/29 定：上线保持 false；律师要求时再打开，走标识办法第九条」。
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 
 > **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
