@@ -18,7 +18,7 @@ import { PDFDocument } from 'pdf-lib'
 import { withBootTimeout } from '../common/boot/boot-readiness'
 import { FilesService } from '../files/files.service'
 import type { FilePurpose, FileSensitiveLevel } from '../files/file.types'
-import { signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { ConcurrencyLimiter } from './concurrency-limiter'
 import { setWordToPdfUploadAvailable } from './document-conversion-capability-state'
@@ -226,7 +226,7 @@ export class DocumentConversionService implements OnModuleInit {
       pageCount: converted.pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
       engine: converted.engine,
       warnings: converted.warnings,
       sha256: uploaded.sha256,
