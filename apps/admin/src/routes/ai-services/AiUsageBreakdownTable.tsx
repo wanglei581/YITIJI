@@ -21,8 +21,11 @@ const TABS: readonly Tab[] = [
   { dimension: 'org', label: '按机构' },
 ]
 
+// 选中态与同页「最近调用日志」分段按钮、FilterChip 相同：实色 primary-600 底 + 白字。
+// appearance-none 压过预检里 button 的原生外观，避免选中态被画成浅底浅字。
+// 不走颜色过渡：过渡中途的浅青底浅字会被看成禁用。
 const TAB_BTN =
-  'min-h-12 rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40'
+  'min-h-12 appearance-none rounded-lg border px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40'
 
 interface BreakdownProps {
   summary: AiUsageDailySummary
@@ -87,9 +90,6 @@ export function AiUsageBreakdownTable({ summary, tab, onTabChange }: BreakdownPr
                 <tr key={row.key ?? '__unassigned__'} className="hover:bg-neutral-50/50">
                   <td className="px-4 py-3 text-neutral-700">
                     {aiUsageKeyName(tab, row.key)}
-                    {row.key !== null && aiUsageKeyName(tab, row.key) !== row.key && (
-                      <span className="ml-1.5 font-mono text-xs text-neutral-400">{row.key}</span>
-                    )}
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-700">{row.calls}</td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-500">{row.unmeasuredCalls}</td>

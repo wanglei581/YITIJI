@@ -5,8 +5,9 @@
 //   - 只展示服务端给的数，不自行推算任何未来或缺失的数字；
 //   - 没数据如实显示（当天 0 调用就写 0 调用）；
 //   - 触顶后果照 services/api/src/ai/usage/ai-budget.service.ts 的真实行为写：
-//     只按北京时间今天判断。已花 ≥ 上限 → 新的生成 / 语音被拒（503 AI_BUDGET_EXHAUSTED）；
+//     只按北京时间今天判断。已花 ≥ 上限 → 新的生成 / 语音被拒，提示用服务端原话；
 //     只读、导出、删除、打印前材料检查不拦；打印、扫描照常。历史日期不据此拦截。
+//     给运营看的句子里不写状态码、英文错误码或字段名。
 //
 // mock 模式（admin E2E）不连真实用量，展示诚实空态，不造演示数字。
 // ============================================================
@@ -28,7 +29,7 @@ import type { AiUsageDimension } from './aiUsageDisplay'
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'error'; message: string; code?: string }
+  | { kind: 'error'; message: string }
   | { kind: 'ready'; summary: AiUsageDailySummary }
 
 type TabState = AiUsageDimension
@@ -49,7 +50,7 @@ const EXHAUSTED_USER_MESSAGE = {
 const UNAFFECTED = '查看已有结果、导出、删除与打印前材料检查不受影响；打印、扫描照常。'
 
 function liveRejectSentence(scope: keyof typeof EXHAUSTED_USER_MESSAGE, who: string): string {
-  return `${who}新的 AI 生成与语音请求会被拒绝（503，提示「${EXHAUSTED_USER_MESSAGE[scope]}」）；${UNAFFECTED}北京时间过了今天自动恢复，不需要人工处理。`
+  return `${who}新的 AI 生成与语音请求会被拒绝，并提示「${EXHAUSTED_USER_MESSAGE[scope]}」；${UNAFFECTED}北京时间过了今天自动恢复，不需要人工处理。`
 }
 
 function historicalReachedSentence(day: string): string {
@@ -77,7 +78,7 @@ export function AiUsagePanel() {
   useEffect(() => {
     if (AI_USAGE_DAILY_DEMO) return
     if (!isAiUsageDayKey(day)) {
-      setLoad({ kind: 'error', message: '日期格式应为 YYYY-MM-DD', code: 'AI_USAGE_DAY_INVALID' })
+      setLoad({ kind: 'error', message: '日期格式应为 YYYY-MM-DD' })
       return
     }
     let cancelled = false
@@ -87,11 +88,10 @@ export function AiUsagePanel() {
       (error: unknown) => {
         if (cancelled) return
         if (error instanceof ApiHttpError && error.status === 403) {
-          setLoad({ kind: 'error', message: '只有管理员可以查看 AI 用量与额度', code: error.code })
+          setLoad({ kind: 'error', message: '只有管理员可以查看 AI 用量与额度' })
           return
         }
-        const code = error instanceof ApiHttpError ? error.code : undefined
-        setLoad({ kind: 'error', message: userMessageOf(error, '请稍后重试'), code })
+        setLoad({ kind: 'error', message: userMessageOf(error, '请稍后重试') })
       },
     )
     return () => { cancelled = true }
@@ -107,9 +107,9 @@ export function AiUsagePanel() {
   const viewingToday = summary !== null && summary.day === todayKey
 
   return (
-    <section aria-labelledby="ai-usage-title" className="mb-6 min-w-0 max-w-full rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
+    <section aria-labelledby="ai-usage-title" className="mb-6 min-w-0 max-w-full rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm max-sm:-mx-7 max-sm:max-w-none max-sm:px-2">
       <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-full sm:basis-auto">
           <h2 id="ai-usage-title" className="flex flex-wrap items-center gap-2 text-[13px] font-bold text-neutral-700">
             <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
             AI 用量与额度
@@ -122,8 +122,8 @@ export function AiUsagePanel() {
           </p>
         </div>
         {!AI_USAGE_DAILY_DEMO && (
-          <div className="flex flex-wrap items-end gap-2">
-            <div>
+          <div className="flex w-full min-w-0 basis-full flex-col gap-2 sm:w-auto sm:basis-auto sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-0 w-full sm:w-auto">
               <label htmlFor="ai-usage-day" className="mb-1 block text-xs font-medium text-neutral-600">
                 日期（只能选今天及以前）
               </label>
@@ -134,14 +134,14 @@ export function AiUsagePanel() {
                 max={todayKey}
                 onChange={(event) => onDayChange(event.target.value)}
                 disabled={load.kind === 'loading'}
-                className="min-h-12 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-neutral-100"
+                className="box-border block min-h-12 w-full min-w-0 max-w-full appearance-none rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-neutral-100 sm:w-auto sm:px-3"
               />
             </div>
             <button
               type="button"
               onClick={() => setReloadSeq((n) => n + 1)}
               disabled={load.kind === 'loading'}
-              className={CONTROL_BTN}
+              className={`${CONTROL_BTN} w-full justify-center sm:w-auto`}
             >
               <RefreshCwIcon className="h-4 w-4" aria-hidden="true" />
               刷新
@@ -164,7 +164,6 @@ export function AiUsagePanel() {
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <p className="min-w-0 flex-1 rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg" role="alert">
             AI 用量读取失败：{load.message}
-            {load.code && <code className="ml-1.5 text-xs opacity-70">{load.code}</code>}
           </p>
           <button type="button" onClick={() => setReloadSeq((n) => n + 1)} className={CONTROL_BTN}>
             重试

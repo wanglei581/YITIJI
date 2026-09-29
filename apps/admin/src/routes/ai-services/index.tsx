@@ -31,6 +31,7 @@ import { AiAccessSwitchesPanel } from './AiAccessSwitchesPanel'
 import { AiUsagePanel } from './AiUsagePanel'
 import { AiOperationCostTable } from './AiOperationCostTable'
 import { OPERATION_LABELS } from './aiOperationLabels'
+import { logOverviewLatency, logOverviewRate } from './aiUsageDisplay'
 
 // ─── 常量映射 ─────────────────────────────────────────────────
 
@@ -215,13 +216,15 @@ export default function AiServicesPage() {
   }
 
   const successRate    = usage.successRate
+  const noCallsToday   = usage.totalCalls === 0
   const estimatedCost  = `¥${usage.estimatedCostCny.toFixed(2)}`
-  // 头部大数字必须自曝不完整：有未采集调用时它是下限，不是全部花费。
+  // 这张卡来自旧调用日志的 token 估算，和上面额度面板按计量账算出的「已计费金额」不是同一本账。
+  const logCostDistinction = '这是旧调用日志按 token 估算的金额，和上面额度面板的「已计费金额」不是一回事'
   const costNote       = usage.unmeasuredCalls > 0
-    ? `下限 · 另有 ${usage.unmeasuredCalls} 次调用未采集成本`
+    ? `下限 · 另有 ${usage.unmeasuredCalls} 次调用未采集成本。${logCostDistinction}`
     : usage.estimatedCostCny === 0
-      ? `${usage.providerName} 暂无已记录 token 成本`
-      : '基于 token 用量估算'
+      ? `${usage.providerName} 暂无已记录 token 成本。${logCostDistinction}`
+      : `基于 token 用量估算。${logCostDistinction}`
   const jobAiCalls = usage.byOperation.jobRecommend + usage.byOperation.jobExplain + usage.byOperation.jobMatch
   /** 岗位 AI 三项成本：只取已采集部分，并单独给出「未估算」笔数，不把未采集当 0。 */
   const jobAiOps: AiOperation[] = ['jobRecommend', 'jobExplain', 'jobMatch']
@@ -315,20 +318,20 @@ export default function AiServicesPage() {
           />
           <MetricCard
             label="成功率"
-            value={`${successRate}%`}
-            note={`${usage.successCount} 次成功 / ${usage.failCount} 次失败`}
+            value={logOverviewRate(usage.totalCalls, successRate)}
+            note={noCallsToday ? '今日暂无调用' : `${usage.successCount} 次成功 / ${usage.failCount} 次失败`}
             icon={CheckCircleIcon}
-            iconClass={successRate >= 95 ? 'text-success-fg bg-success-bg' : 'text-warning-fg bg-warning-bg'}
+            iconClass={noCallsToday ? 'text-neutral-500 bg-neutral-100' : successRate >= 95 ? 'text-success-fg bg-success-bg' : 'text-warning-fg bg-warning-bg'}
           />
           <MetricCard
             label="平均响应时间"
-            value={`${usage.avgLatencyMs} ms`}
-            note="仅计入成功请求"
+            value={logOverviewLatency(usage.totalCalls, usage.avgLatencyMs)}
+            note={noCallsToday ? '今日暂无调用' : '仅计入成功请求'}
             icon={ClockIcon}
-            iconClass="text-info-fg bg-info-bg"
+            iconClass={noCallsToday ? 'text-neutral-500 bg-neutral-100' : 'text-info-fg bg-info-bg'}
           />
           <MetricCard
-            label="预估成本"
+            label="按日志估算的成本"
             value={estimatedCost}
             note={costNote}
             icon={BanknoteIcon}

@@ -62,3 +62,19 @@ export function aiUsageKeyName(dimension: AiUsageDimension, key: string | null):
 export function formatCny(value: number): string {
   return `${value.toFixed(2)} 元`
 }
+
+/**
+ * 旧调用日志「今日概览」的成功率。
+ * 调用次数为 0 时没有分母，显示「—」，不要显示 0%。有调用且全部失败时 0% 是真实结果。
+ */
+export function logOverviewRate(totalCalls: number, successRate: number): string {
+  return totalCalls > 0 ? `${successRate}%` : '—'
+}
+
+/**
+ * 旧调用日志「今日概览」的平均响应时间。
+ * 调用次数为 0 时没有成功样本，显示「—」，不要显示 0 ms。
+ */
+export function logOverviewLatency(totalCalls: number, avgLatencyMs: number): string {
+  return totalCalls > 0 ? `${avgLatencyMs} ms` : '—'
+}
