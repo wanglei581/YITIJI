@@ -60,7 +60,7 @@ _（空）_
 | `apps/kiosk/scripts/verify-data-request-ui.mjs` | `apps/admin/src/routes/member-privacy/index.tsx`<br/>`apps/admin/src/services/api/memberPrivacyAdmin.ts` |
 | `apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs` | `src/pages/resume/ResumeExportPage.tsx` |
 | `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs` | `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs` |
-| `scripts/verify-ci-changed-scopes.mjs` | `apps/kiosk/src/b.tsx`<br/>`apps/miniapp/pages/index/index.js`<br/>`docs/a.md`<br/>`docs/progress/x.md`<br/>`services/api/src/c.service.ts` |
+| `scripts/verify-ci-changed-scopes.mjs` | `apps/kiosk/src/b.tsx`<br/>`apps/miniapp/pages/index/index.js`<br/>`docs/a.md`<br/>`docs/progress/x.md`<br/>`services/api/src/c.service.ts`<br/>`services/api/src/removed/deleted-prisma-caller.ts` |
 | `services/api/scripts/verify-legal-doc-version.ts` | `services/api/legalDocs.ts` |
 | `services/api/scripts/verify-policy-eligibility-authoring.ts` | `services/api/policies.ts` |
 | `services/api/scripts/verify-wave2-account-rebind.ts` | `services/auth/memberAuthApi.ts` |
@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1620 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1631 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -90,6 +90,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/requirements.md` | `verify-profile-commercial-first-batch.mjs` |
 | `.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/review.md` | `verify-profile-commercial-first-batch.mjs` |
 | `.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/task.json` | `verify-profile-commercial-first-batch.mjs` |
+
+</details>
+
+<details>
+<summary><code>.github/workflows/ci-full-label.yml/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `.github/workflows/ci-full-label.yml` | `verify-ci-changed-scopes.mjs` |
 
 </details>
 
@@ -262,6 +271,33 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
+<summary><code>apps/admin/tsconfig.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/admin/tsconfig.json` | `verify-ci-changed-scopes.mjs` |
+
+</details>
+
+<details>
+<summary><code>apps/admin/tsconfig.node.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/admin/tsconfig.node.json` | `verify-ci-changed-scopes.mjs` |
+
+</details>
+
+<details>
+<summary><code>apps/kiosk/deploy-env-registry.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/kiosk/deploy-env-registry.json` | `verify-ci-changed-scopes.mjs` |
+
+</details>
+
+<details>
 <summary><code>apps/kiosk/index.html/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
@@ -280,6 +316,15 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
+<summary><code>apps/kiosk/pdfjs-cmap-plugin.ts/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/kiosk/pdfjs-cmap-plugin.ts` | `verify-ci-changed-scopes.mjs` |
+
+</details>
+
+<details>
 <summary><code>apps/kiosk/playwright.w2.config.ts/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
@@ -289,7 +334,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/scripts/</code> — 45 个文件</summary>
+<summary><code>apps/kiosk/scripts/</code> — 46 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -297,6 +342,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/scripts/fixtures/qingxu-proto-geometry-baseline.json` | `verify-ci-changed-scopes.mjs` |
 | `apps/kiosk/scripts/lib/fusion-baseline-contract.mjs` | `verify-fusion-baseline.mjs`<br/>`verify-ci-changed-scopes.mjs` |
 | `apps/kiosk/scripts/lib/shell-chrome-contract.mjs` | `verify-fusion-shell.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-ci-changed-scopes.mjs` |
+| `apps/kiosk/scripts/lib/sweep-copy-guards.mjs` | `verify-ci-changed-scopes.mjs` |
 | `apps/kiosk/scripts/lib/visible-copy.mjs` | `verify-kiosk-ai-label-copy.mjs` |
 | `apps/kiosk/scripts/tests/boot-ticket-clears-sensitive-session.test.mjs` | `verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs` | `verify-resume-diagnosis-flow-ui.mjs` |
@@ -868,6 +914,24 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
+<summary><code>apps/kiosk/tsconfig.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/kiosk/tsconfig.json` | `verify-ci-changed-scopes.mjs` |
+
+</details>
+
+<details>
+<summary><code>apps/kiosk/tsconfig.node.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/kiosk/tsconfig.node.json` | `verify-ci-changed-scopes.mjs` |
+
+</details>
+
+<details>
 <summary><code>apps/kiosk/vite.config.ts/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
@@ -1074,6 +1138,24 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/partner/tests/e2e/login.spec.ts` | `verify-ci-changed-scopes.mjs` |
+
+</details>
+
+<details>
+<summary><code>apps/partner/tsconfig.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/partner/tsconfig.json` | `verify-ci-changed-scopes.mjs` |
+
+</details>
+
+<details>
+<summary><code>apps/partner/tsconfig.node.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/partner/tsconfig.node.json` | `verify-ci-changed-scopes.mjs` |
 
 </details>
 
@@ -1711,6 +1793,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/selfAssessment.ts` | `verify-compliance.ts` |
 | `packages/shared/src/types/toolboxMicroApp.ts` | `verify-toolbox-ai-skill-intents.ts`<br/>`verify-toolbox-micro-app-platform.ts` |
 | `packages/shared/src/types/uploadSession.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-contract-review-contract.ts` |
+
+</details>
+
+<details>
+<summary><code>packages/ui/scripts/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `packages/ui/scripts/verify-fusion-youth-foundation.mjs` | `verify-ci-changed-scopes.mjs` |
 
 </details>
 

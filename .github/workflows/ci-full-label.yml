@@ -1,7 +1,7 @@
 # 只在打上 full-ci 时调用 CI。
-# pull_request 的 labeled 不能按标签名过滤：若把 labeled 放进 ci.yml，
-# 任何标签都会新开一次运行，并取消同一 PR 上正在跑的 CI。
-# 这个工作流名字不同、也不设 concurrency，其它标签只跳过本作业，不碰正在跑的 CI。
+# pull_request 的 labeled 不能按标签名过滤，所以单独放在这个工作流里。
+# 其它标签跳过本作业；full-ci 标签的运行有自己的并发组，不取消普通 CI；
+# 之后再推送只取消同组的旧运行。
 name: CI full-ci label
 
 on:

@@ -17540,6 +17540,9 @@
     ".ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/task.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    ".github/workflows/ci-full-label.yml": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     ".github/workflows/ci.yml": [
       "apps/kiosk/scripts/verify-browser-spec-coverage.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
@@ -17950,12 +17953,24 @@
     "apps/admin/tests/e2e/login.spec.ts": [
       "scripts/verify-ci-changed-scopes.mjs"
     ],
+    "apps/admin/tsconfig.json": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/admin/tsconfig.node.json": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/deploy-env-registry.json": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "apps/kiosk/index.html": [
       "scripts/verify-compliance-copy.mjs"
     ],
     "apps/kiosk/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/pdfjs-cmap-plugin.ts": [
       "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/playwright.w2.config.ts": [
@@ -17975,6 +17990,9 @@
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/scripts/lib/sweep-copy-guards.mjs": [
       "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/kiosk/scripts/lib/visible-copy.mjs": [
@@ -20362,6 +20380,12 @@
     "apps/kiosk/tests/w1-a-build-mode.test.mjs": [
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
+    "apps/kiosk/tsconfig.json": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/kiosk/tsconfig.node.json": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
     "apps/kiosk/vite.config.ts": [
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
       "scripts/verify-ci-changed-scopes.mjs"
@@ -20696,6 +20720,12 @@
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
     ],
     "apps/partner/tests/e2e/login.spec.ts": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/partner/tsconfig.json": [
+      "scripts/verify-ci-changed-scopes.mjs"
+    ],
+    "apps/partner/tsconfig.node.json": [
       "scripts/verify-ci-changed-scopes.mjs"
     ],
     "apps/terminal-agent/config/agent-config.example.json": [
@@ -21257,6 +21287,9 @@
     "packages/shared/src/types/uploadSession.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-contract-review-contract.ts"
+    ],
+    "packages/ui/scripts/verify-fusion-youth-foundation.mjs": [
+      "scripts/verify-ci-changed-scopes.mjs"
     ],
     "packages/ui/src/components/Drawer.tsx": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
@@ -29953,7 +29986,7 @@
         "missing": []
       },
       "file": "packages/ui/scripts/verify-fusion-youth-foundation.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/ui",
       "scriptNames": [
@@ -30203,17 +30236,23 @@
           "docs/progress"
         ],
         "files": [
+          ".github/workflows/ci-full-label.yml",
           ".github/workflows/ci.yml",
           "apps/admin/package.json",
           "apps/admin/playwright.config.ts",
           "apps/admin/scripts/run-e2e.mjs",
           "apps/admin/src/routes/ai-services/index.tsx",
           "apps/admin/tests/e2e/login.spec.ts",
+          "apps/admin/tsconfig.json",
+          "apps/admin/tsconfig.node.json",
+          "apps/kiosk/deploy-env-registry.json",
           "apps/kiosk/package.json",
+          "apps/kiosk/pdfjs-cmap-plugin.ts",
           "apps/kiosk/playwright.w2.config.ts",
           "apps/kiosk/scripts/fixtures/qingxu-proto-geometry-baseline.json",
           "apps/kiosk/scripts/lib/fusion-baseline-contract.mjs",
           "apps/kiosk/scripts/lib/shell-chrome-contract.mjs",
+          "apps/kiosk/scripts/lib/sweep-copy-guards.mjs",
           "apps/kiosk/scripts/tests/fusion-baseline-contract.test.mjs",
           "apps/kiosk/scripts/tests/fusion-w6-contract.test.mjs",
           "apps/kiosk/scripts/verify-fusion-baseline.mjs",
@@ -30230,6 +30269,8 @@
           "apps/kiosk/scripts/verify-scan-input-safety.mjs",
           "apps/kiosk/src/pages/home/HomePage.tsx",
           "apps/kiosk/tests/visual/print-hub-qx.spec.ts",
+          "apps/kiosk/tsconfig.json",
+          "apps/kiosk/tsconfig.node.json",
           "apps/kiosk/vite.config.ts",
           "apps/miniapp/app.js",
           "apps/miniapp/package.json",
@@ -30238,6 +30279,8 @@
           "apps/partner/scripts/run-e2e.mjs",
           "apps/partner/src/App.tsx",
           "apps/partner/tests/e2e/login.spec.ts",
+          "apps/partner/tsconfig.json",
+          "apps/partner/tsconfig.node.json",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "docs/compliance/member-personal-data-retention.md",
           "docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html",
@@ -30245,6 +30288,7 @@
           "docs/operations/price-config-production.md",
           "docs/progress/next-tasks.md",
           "packages/shared/src/types/device.ts",
+          "packages/ui/scripts/verify-fusion-youth-foundation.mjs",
           "packages/ui/src/index.ts",
           "scripts/ci-changed-scopes.mjs",
           "scripts/ci/drop-unused-apt-sources.sh",
@@ -30263,7 +30307,8 @@
           "apps/miniapp/pages/index/index.js",
           "docs/a.md",
           "docs/progress/x.md",
-          "services/api/src/c.service.ts"
+          "services/api/src/c.service.ts",
+          "services/api/src/removed/deleted-prisma-caller.ts"
         ]
       },
       "file": "scripts/verify-ci-changed-scopes.mjs",

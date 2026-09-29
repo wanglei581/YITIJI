@@ -14,7 +14,8 @@
 // 可跳过范围的依据（2026-09-29 逐条查过作业里的门禁读哪些文件）：
 //   - browser 作业里读文档的只有稿件目录 docs/design/**；三套浏览器用例都不连真实服务端。
 //   - postgres 作业里读文档的只有下面 POSTGRES_DOC_TRIGGERS 两个文件；它独有的门禁不读前端源码。
-// 以后给这两个作业加门禁、而门禁要读新的目录时，必须同步改这里并补 verify:ci-changed-scopes 的用例。
+// 以后给这两个作业加门禁、而门禁要读新的目录时，必须同步改这里。
+// 浏览器作业实际执行的脚本，由 verify:ci-changed-scopes 从 ci.yml 展开后逐个核对，漏了会点名文件。
 // 根目录 package.json 与根目录 scripts 改了两个作业都跑（门禁头注释里的「根配置」）。
 //
 // 用法：node scripts/ci-changed-scopes.mjs --event <事件> [--base <基线 SHA> --head <HEAD SHA>]
@@ -61,7 +62,7 @@ const BROWSER_FULL = [
   /^apps\/kiosk\/scripts\/verify-fusion-(?:baseline|home|shell|w2-print-scan|w[3-6])\.mjs$/,
   /^apps\/kiosk\/scripts\/verify-(?:qingxu-proto-geometry|scan-input-safety|kiosk-feedback-entry)\.mjs$/,
   /^apps\/kiosk\/scripts\/tests\/fusion-(?:baseline|w6)-contract\.test\.mjs$/,
-  /^apps\/kiosk\/scripts\/lib\/(?:fusion-baseline-contract|shell-chrome-contract)\.mjs$/,
+  /^apps\/kiosk\/scripts\/lib\/(?:fusion-baseline-contract|shell-chrome-contract|sweep-copy-guards)\.mjs$/,
   /^apps\/kiosk\/scripts\/fixtures\/qingxu-proto-geometry-baseline\.json$/,
   /^apps\/(?:admin|partner)\/scripts\/run-e2e\.mjs$/,
   /^apps\/admin\/src\//,
@@ -73,6 +74,8 @@ const BROWSER_FULL = [
   /^apps\/[^/]+\/vite\.config\.ts$/,
   /^apps\/[^/]+\/index\.html$/,
   /^apps\/[^/]+\/public\//,
+  // 一体机、后台、机构后台根目录的文件都会进浏览器构建（tsconfig、vite 插件，以及以后的 tailwind / postcss）。
+  /^apps\/(?:kiosk|admin|partner)\/[^/]+$/,
   /^packages\//,
   /^\.github\/workflows\//,
   /^pnpm-lock\.yaml$/,
@@ -92,8 +95,8 @@ const POSTGRES_FULL = [
   /^package\.json$/,
   /^scripts\//,
 ]
-// this.prisma.model.findMany / prisma.model.count / prisma.$queryRaw。不匹配只把客户端传下去的文件。
-const PRISMA_QUERY_RE = /\bprisma\s*\.\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)?(?:findUnique|findFirst|findMany|create|createMany|update|updateMany|upsert|delete|deleteMany|count|aggregate|groupBy|\$queryRaw|\$executeRaw|\$transaction)\b/
+// this.prisma.model.findMany / prisma.$queryRaw / prisma.$queryRawUnsafe。不匹配只把客户端传下去的文件。
+export const PRISMA_QUERY_RE = /\bprisma\s*\.\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)?(?:findUnique|findFirst|findMany|create|createMany|update|updateMany|upsert|delete|deleteMany|count|aggregate|groupBy|\$queryRaw(?:Unsafe)?|\$executeRaw(?:Unsafe)?|\$transaction)\b/
 
 /** service / query 文件名之外、源码里实际发出 Prisma 查询的文件。测试不算。 */
 function nonServicePrismaQuery(file) {
@@ -107,7 +110,8 @@ function nonServicePrismaQuery(file) {
   try {
     text = readFileSync(abs, 'utf8')
   } catch {
-    return false
+    // 这支 PR 可能删掉了该文件，读不到仍按「要跑」处理（宁可多跑，不能漏跑）。
+    return true
   }
   return PRISMA_QUERY_RE.test(text)
 }

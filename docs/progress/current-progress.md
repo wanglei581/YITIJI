@@ -8,6 +8,7 @@
 - **PostgreSQL 作业：** `services/api/src` 里文件名不是 service / query、但源码发出 Prisma 查询的文件，以及 `services/api/scripts/**`、`services/api/package.json`，改了会跑。只把客户端传下去、自己不调用查询方法的文件（如 `ai.controller.ts`）仍不跑。
 - **标签：** `ci.yml` 不再监听 `labeled`。新增 `ci-full-label.yml`，只有标签名是 `full-ci` 才调用 CI。其它标签不新开运行，也不取消正在跑的 CI。
 - **验证：** `verify:repository-integrity`、`node scripts/verify-ci-changed-scopes.mjs`、`verify:ci-gate-coverage`、图谱重新生成后 `graph:check` 通过。每一类新规则都做了反向变异：删掉后自检变红，恢复后为绿。未推送。
+- **第二轮：** full-ci 标签调用 CI 时并发组加 `-full`，不再取消同一 PR 上普通 CI 的 `build-and-verify`。`verify:ci-changed-scopes` 从 `kiosk-browser-smoke` 展开实际执行的脚本和相对路径 import，漏进触发清单会点名文件；本轮补上 `sweep-copy-guards.mjs`。一体机、后台、机构后台根目录的文件（含 `tsconfig.json`、`pdfjs-cmap-plugin.ts`）都会跑浏览器作业；读不到的非 service 源码，以及 `$queryRawUnsafe` / `$executeRawUnsafe`，都会跑 PostgreSQL 作业。
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
 - **P-01（机构政策列表）：** 平台紧急下架的政策此前和机构自己下架的一样显示「已下架」，还给「编辑」「审核通过」「发布」（发布会被服务端以 `EMERGENCY_TAKEDOWN_IRREVERSIBLE` 拒绝，编辑后永远发不出去）。服务端 `getPartnerPolicies` 给本机构列表每行附上 `emergencyTakedown` / `emergencyReasonCode` / `emergencyReasonText` / `emergencyTakedownAt`（只按本机构 `orgId` 加本页 id 查 `RecruitmentEmergencyHold`，公开读取不带；改动前已告知后端窗口，对方同意并提了按机构过滤、跨机构断言两条，均照做）。机构后台对这类行显示「平台已紧急下架」、下方整行写事由、说明、下架时间与「已冻结」，只留删除；与官方渠道面板同一口径。门禁 `verify:policies` 加一段：被下架行带出事由、其余行为 false、A/B 两个机构互相看不到对方的事由、公开列表不带这几个字段；变异「不附下架信息」即红。演示模式补一条被下架的示例，演示发布与服务端同样拒绝。
