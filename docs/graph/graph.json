@@ -17598,6 +17598,10 @@
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts"
     ],
+    ".github/workflows/deploy-precheck.yml": [
+      "scripts/verify-deploy-gates-in-sync.mjs",
+      "scripts/verify-deploy-rollback.mjs"
+    ],
     ".github/workflows/deploy.yml": [
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
       "scripts/verify-ci-main-runs-complete.mjs",
@@ -17605,6 +17609,9 @@
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
       "scripts/verify-release-bundle.mjs"
+    ],
+    ".github/workflows/server-cleanup.yml": [
+      "scripts/verify-deploy-rollback.mjs"
     ],
     "apps/admin/index.html": [
       "scripts/verify-compliance-copy.mjs"
@@ -30338,6 +30345,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          ".github/workflows/deploy-precheck.yml",
           ".github/workflows/deploy.yml",
           "apps/admin/src/services/api/client.ts",
           "apps/kiosk/src/services/api/client.ts",
@@ -30362,7 +30370,9 @@
         "absent": [],
         "dirs": [],
         "files": [
+          ".github/workflows/deploy-precheck.yml",
           ".github/workflows/deploy.yml",
+          ".github/workflows/server-cleanup.yml",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
           "services/api/src/config/production-runtime-gates.ts"

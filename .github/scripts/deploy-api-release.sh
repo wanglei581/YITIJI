@@ -61,8 +61,10 @@ REQUIRED_PRODUCTION_GATES=(
 # 备份目录 8656MB → 4320MB。但每次发布仍新增约 1.1GB，不自动清理必然重演。
 #
 # 安全设计：
-# · 只在健康检查通过后调用（见步骤 9）。发布失败时保留全部备份 —— 那正是回滚锚点。
-# · 本次刚生成的一组、以及最新的一组，永不删除。
+# · 两处调用：0b 空间不够且允许发布前清理时，先把旧组收到保留数再复判；
+#   步骤 9 在健康检查通过后再收一次。发布失败不会跑步骤 9。
+# · 0b 若已经删过，删的只是超出保留数的更旧组；最近 DEPLOY_BACKUP_KEEP 组仍在。
+# · 本次刚生成的一组（current_stem）无论哪一处调用都不删除。最新的 keep 组也不删。
 # · 每次发布产生 <prefix>.dump、<prefix>.runtime 与 <prefix>.migrations.log，按 prefix 归组，
 #   不拆开算（迁移日志若单算一组，会占掉保留名额，把上一次发布的备份挤出去删掉）。
 # · 只操作 BACKUP_ROOT（DEPLOY_BACKUP_ROOT，默认 /srv/ai-job-print-backups），
@@ -128,7 +130,65 @@ prune_old_backups() {
     rm -rf -- "$BACKUP_ROOT/$stem.dump" "$BACKUP_ROOT/$stem.runtime" "$BACKUP_ROOT/$stem.migrations.log" 2>/dev/null || true
   done
 
-  echo "清理完成，备份目录当前占用 $(du -sm "$BACKUP_ROOT" 2>/dev/null | cut -f1)MB"
+  echo "清理完成，备份目录当前占用 $(du -sm "$BACKUP_ROOT" 2>/dev/null | cut -f1 || true)MB"
+}
+
+# 可用空间只认 df 的 Available 列，取不到就当 0，避免 set -u 或空串进算术比较。
+disk_avail_mb() {
+  local target="$1" avail
+  avail="$(df -Pm "$target" 2>/dev/null | awk 'NR==2{print $4}' | tr -dc '0-9' || true)"
+  printf '%s' "${avail:-0}"
+}
+
+print_disk_snapshot() {
+  local label="$1" root_avail backup_avail backup_used
+  root_avail="$(disk_avail_mb /)"
+  backup_avail="$(disk_avail_mb "$BACKUP_ROOT")"
+  backup_used="$(du -sm "$BACKUP_ROOT" 2>/dev/null | cut -f1 || true)"
+  backup_used="${backup_used:-0}"
+  echo "${label} ROOT_AVAIL_MB=${root_avail} BACKUP_AVAIL_MB=${backup_avail} BACKUP_USED_MB=${backup_used}"
+}
+
+# 只读：不安装、不 set。pm2 ls / pm2 conf 的输出里要能看到模块，
+# 且不能是 “not found” 这类否定句，否则没装也会被误判成已装。
+report_pm2_logrotate() {
+  local pm2_ls_out pm2_conf_out
+  if ! command -v pm2 >/dev/null 2>&1; then
+    echo "PM2_LOGROTATE=missing"
+    echo "::warning::pm2-logrotate 未安装。日志可能把磁盘写满。请运行 services/api/scripts/pm2-logrotate-setup.sh"
+    return 0
+  fi
+  pm2_ls_out="$(pm2 ls 2>/dev/null || true)"
+  pm2_conf_out="$(pm2 conf pm2-logrotate 2>/dev/null || true)"
+  if printf '%s\n%s\n' "$pm2_ls_out" "$pm2_conf_out" \
+    | grep -F 'pm2-logrotate' \
+    | grep -Eiv 'not found|not installed|does not exist|不存在|未安装' \
+    | grep -q 'pm2-logrotate'; then
+    echo "PM2_LOGROTATE=installed"
+  else
+    echo "PM2_LOGROTATE=missing"
+    echo "::warning::pm2-logrotate 未安装。日志可能把磁盘写满。请运行 services/api/scripts/pm2-logrotate-setup.sh"
+  fi
+}
+
+# 发布前只允许这两项。逐项打印可用 MB。当前这次发布的组由 prune_old_backups 保护。
+run_pre_gate_safe_cleanup() {
+  local before after
+  before="$(disk_avail_mb "$BACKUP_ROOT")"
+  echo "pnpm store prune 前可用 ${before}MB"
+  if command -v pnpm >/dev/null 2>&1; then
+    pnpm store prune || echo "::warning::pnpm store prune 失败，已跳过"
+  else
+    echo "pnpm 不可用，跳过 store prune"
+  fi
+  after="$(disk_avail_mb "$BACKUP_ROOT")"
+  echo "pnpm store prune 后可用 ${after}MB"
+
+  before="$(disk_avail_mb "$BACKUP_ROOT")"
+  echo "旧备份清理前可用 ${before}MB"
+  prune_old_backups || echo "::warning::备份清理失败，已跳过"
+  after="$(disk_avail_mb "$BACKUP_ROOT")"
+  echo "旧备份清理后可用 ${after}MB"
 }
 
 echo "=== 0. 校验源码位于目标提交 ==="
@@ -148,31 +208,61 @@ if [ -n "$MISSING_TARGET_GATES" ]; then
   exit 1
 fi
 
-echo "=== 0b. 磁盘空间闸门（必须在任何写操作之前）==="
-# 为什么放在这里：步骤 2 的 pg_dump 是本脚本第一次写盘。
-# 2026-08-09 真实事故是备份把 40GB 根分区撑到 100%，此时正在运行的 API 与
-# PostgreSQL 一并受影响。空间不足必须在**动任何东西之前**中止 ——
-# 把「发布到一半盘满」变成「发布没启动」，后者无害。
-#
-# 2026-08-17 实测：ROOT_TOTAL_GB=40 / ROOT_USED_PCT=88 / 备份盘可用 5GB，
-# 备份目录 4372MB（13 组，最老 46 天）——清理只在健康检查通过后跑，
-# 而连续三天没有发布成功过，所以它一直没执行。
+# 0b 之前先记一次盘，成功或中止的摘要都用这个数当 DISK_AVAIL_MB_BEFORE。
+# mkdir 只为了 du 有目录可量；真正的备份文件还没写。
 mkdir -p "$BACKUP_ROOT"
-AVAIL_MB="$(df -Pm "$BACKUP_ROOT" 2>/dev/null | awk 'NR==2{print $4}')"
-API_DIR_MB="$(du -sm "$API_DIR" 2>/dev/null | cut -f1)"
-: "${AVAIL_MB:=0}" ; : "${API_DIR_MB:=1500}"
-# 需要的空间 = 整目录备份 + PG dump（压缩后远小于目录，按目录量级留冗余）+ 1GB 安全边界
+print_disk_snapshot "DISK_SNAPSHOT_BEFORE"
+DISK_AVAIL_MB_BEFORE="$(disk_avail_mb "$BACKUP_ROOT")"
+
+echo "=== 0b. 磁盘空间闸门（必须在任何备份之前）==="
+# 为什么放在这里：步骤 2 的 pg_dump 是本脚本第一次写备份。
+# 2026-08-09 真实事故是备份把 40GB 根分区撑到 100%，此时正在运行的 API 与
+# PostgreSQL 一并受影响。空间不足必须在写备份之前停下来。
+#
+# 门槛 = max(原公式 REQUIRED_MB, DEPLOY_MIN_FREE_FLOOR_MB)。
+# 原公式只按 API 目录估，full 发布在进这个脚本之前还要装依赖、构建三端，
+# 所以另加一个下限，默认 10240MB（10GB）。不够时默认先做安全清理再判一次。
+API_DIR_MB="$(du -sm "$API_DIR" 2>/dev/null | cut -f1 || true)"
+: "${API_DIR_MB:=1500}"
+# 需要的空间 = 整目录备份 + PG dump（压缩后远小于目录，按目录量级留冗余）+ 安全边界
 NEED_MB=$(( API_DIR_MB + 1024 ))
 MARGIN_MB="${DEPLOY_MIN_FREE_MARGIN_MB:-1024}"
+case "$MARGIN_MB" in
+  ''|*[!0-9]*) MARGIN_MB=1024 ;;
+esac
 REQUIRED_MB=$(( NEED_MB + MARGIN_MB ))
-echo "DISK_AVAIL_MB=$AVAIL_MB REQUIRED_MB=$REQUIRED_MB (api_dir=${API_DIR_MB}MB + 1024 备份冗余 + ${MARGIN_MB} 安全边界)"
-if [ "$AVAIL_MB" -lt "$REQUIRED_MB" ]; then
-  echo "::error::磁盘空间不足，发布已中止 —— 未做任何修改（未备份、未迁移、未重启）。"
-  echo "可用 ${AVAIL_MB}MB < 需要 ${REQUIRED_MB}MB。"
-  echo "回收空间的常用手段（按收益排序，均可安全执行）："
-  echo "  1) pnpm store prune            # 清未被引用的包缓存，2026-08-17 实测约占 2663MB"
-  echo "  2) 手工清理 $BACKUP_ROOT 下较旧的备份组（保留最近 2-3 组即可）"
-  echo "  3) journalctl --vacuum-size=100M"
+FLOOR_MB="${DEPLOY_MIN_FREE_FLOOR_MB:-10240}"
+case "$FLOOR_MB" in
+  ''|*[!0-9]*) FLOOR_MB=10240 ;;
+esac
+if [ "$REQUIRED_MB" -ge "$FLOOR_MB" ]; then
+  GATE_MB="$REQUIRED_MB"
+else
+  GATE_MB="$FLOOR_MB"
+fi
+AVAIL_MB="$(disk_avail_mb "$BACKUP_ROOT")"
+echo "DISK_AVAIL_MB=${AVAIL_MB} REQUIRED_MB=${REQUIRED_MB} FLOOR_MB=${FLOOR_MB} GATE_MB=${GATE_MB} (api_dir=${API_DIR_MB}MB + 1024 备份冗余 + ${MARGIN_MB} 安全边界；门槛=max(REQUIRED_MB,FLOOR_MB))"
+if [ "$AVAIL_MB" -lt "$GATE_MB" ]; then
+  if [ "${DEPLOY_PRE_GATE_SAFE_CLEANUP:-true}" != "false" ]; then
+    echo "=== 0b-clean. 空间不足，先做安全清理再复判 ==="
+    run_pre_gate_safe_cleanup
+    AVAIL_MB="$(disk_avail_mb "$BACKUP_ROOT")"
+    echo "安全清理后 DISK_AVAIL_MB=${AVAIL_MB} GATE_MB=${GATE_MB}"
+  else
+    echo "DEPLOY_PRE_GATE_SAFE_CLEANUP=false，跳过发布前安全清理。"
+  fi
+fi
+if [ "$AVAIL_MB" -lt "$GATE_MB" ]; then
+  DISK_AVAIL_MB_AFTER="$AVAIL_MB"
+  print_disk_snapshot "DISK_SNAPSHOT_AFTER"
+  echo "DISK_AVAIL_MB_BEFORE=${DISK_AVAIL_MB_BEFORE} DISK_AVAIL_MB_AFTER=${DISK_AVAIL_MB_AFTER}"
+  echo "::error::磁盘空间不足，发布已中止 —— 未备份、未迁移、未重启。"
+  echo "可用 ${AVAIL_MB}MB < 门槛 ${GATE_MB}MB（现有公式 REQUIRED_MB=${REQUIRED_MB}，下限 FLOOR_MB=${FLOOR_MB}）。"
+  echo "发布前安全清理只做 pnpm store prune 和按 DEPLOY_BACKUP_KEEP 删除更旧的备份组；已执行或已关闭。清理后仍然不够。"
+  echo "剩下的手动手段："
+  echo "  1) 在 GitHub Actions 运行工作流 Server Cleanup (backups / pnpm store / journal)，先 dry-run（输入 dry_run=true，只列清单不删除）。"
+  echo "  2) 核对清单后再把 dry_run 设为 false。"
+  echo "  3) 由有权限的人保留最近 2 到 3 组备份，删掉更旧的组。"
   exit 1
 fi
 echo "磁盘空间充足，继续。"
@@ -223,12 +313,63 @@ elif ! node services/api/scripts/preflight-legal-docs.mjs --base-url "$LEGAL_BAS
 fi
 
 echo "=== 2. PostgreSQL 全库备份 + 可读校验 ==="
+# 先写 .partial，pg_restore -l 通过后再改成 .dump。失败或在此处被中断时删掉 .partial，
+# 不留半截文件。写法对齐 services/api/scripts/backup-postgres.sh。
 mkdir -p "$BACKUP_ROOT"
-pg_dump "$DBURL" -Fc -f "$BACKUP_PREFIX.dump"
-pg_restore -l "$BACKUP_PREFIX.dump" >/dev/null
+DUMP_PARTIAL="$BACKUP_PREFIX.dump.partial"
+RUNTIME_PARTIAL=""
+backup_partials_active=1
+cleanup_backup_partials() {
+  if [ "${backup_partials_active:-0}" != 1 ]; then
+    return 0
+  fi
+  if [ -n "${DUMP_PARTIAL:-}" ]; then
+    rm -f -- "$DUMP_PARTIAL"
+  fi
+  if [ -n "${RUNTIME_PARTIAL:-}" ]; then
+    rm -rf -- "$RUNTIME_PARTIAL"
+  fi
+}
+on_backup_signal() {
+  trap - INT TERM
+  cleanup_backup_partials
+  echo "::error::备份被中断，已删除不完整文件" >&2
+  exit 1
+}
+trap on_backup_signal INT TERM
+rm -f -- "$DUMP_PARTIAL"
+if ! pg_dump "$DBURL" -Fc -f "$DUMP_PARTIAL"; then
+  cleanup_backup_partials
+  echo "::error::pg_dump 失败，已删除不完整备份" >&2
+  exit 1
+fi
+if ! pg_restore -l "$DUMP_PARTIAL" >/dev/null; then
+  cleanup_backup_partials
+  echo "::error::备份可读校验失败，已删除不完整备份" >&2
+  exit 1
+fi
+if ! mv -f -- "$DUMP_PARTIAL" "$BACKUP_PREFIX.dump"; then
+  cleanup_backup_partials
+  echo "::error::备份改名失败，已删除不完整备份" >&2
+  exit 1
+fi
 
 echo "=== 3. 备份当前运行目录（回滚锚点）==="
-cp -a "$RUNTIME_ROOT" "$BACKUP_PREFIX.runtime"
+RUNTIME_PARTIAL="$BACKUP_PREFIX.runtime.partial"
+rm -rf -- "$RUNTIME_PARTIAL"
+if ! cp -a "$RUNTIME_ROOT" "$RUNTIME_PARTIAL"; then
+  cleanup_backup_partials
+  echo "::error::运行目录备份失败，已删除不完整备份" >&2
+  exit 1
+fi
+# 回退陷阱引用的是 $BACKUP_PREFIX.runtime。必须先改名成功，再武装陷阱。
+if ! mv -f -- "$RUNTIME_PARTIAL" "$BACKUP_PREFIX.runtime"; then
+  cleanup_backup_partials
+  echo "::error::运行目录备份改名失败，已删除不完整备份" >&2
+  exit 1
+fi
+backup_partials_active=0
+trap - INT TERM
 
 # ── 从这里起任何一步失败，都把运行目录恢复到上面的备份 ──────────────────────
 # 3b 改 .env、5 同步代码、6 装依赖与迁移、7 重启：哪一步失败，运行目录都已不是发布前的样子。
@@ -395,6 +536,11 @@ EOF
     echo "=== 9. 发布成功，清理历史备份 ==="
     # 清理失败不影响本次发布结果（发布已经成功），只记 warning。
     prune_old_backups || echo "::warning::备份清理失败，已跳过（不影响本次发布）"
+    echo "=== 10. 发布摘要（磁盘与 pm2 日志轮转，只读）==="
+    print_disk_snapshot "DISK_SNAPSHOT_AFTER"
+    DISK_AVAIL_MB_AFTER="$(disk_avail_mb "$BACKUP_ROOT")"
+    echo "DISK_AVAIL_MB_BEFORE=${DISK_AVAIL_MB_BEFORE} DISK_AVAIL_MB_AFTER=${DISK_AVAIL_MB_AFTER}"
+    report_pm2_logrotate
     exit 0
   fi
   sleep "$HEALTH_DELAY_SECONDS"

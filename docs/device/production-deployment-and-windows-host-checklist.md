@@ -200,7 +200,7 @@
 - [x] 磁盘空间、内存、CPU 满足预估访问量。
   **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：/dev/vda2 ext4 40G，已用 16G、剩 23G（41%）；内存 3.8Gi 总 / 1.0Gi 用；2 vCPU；load 0.00 0.02 0.02。
   **待取证（服务器只读）**：`df -hT; free -h; nproc; uptime`
-  （旁证、不足以下勾：deploy 磁盘闸门 `DISK_AVAIL_MB=20570`，只证明备份盘当时有约 20GiB 空闲。）
+  （旁证、不足以下勾：deploy 磁盘闸门 `DISK_AVAIL_MB=20570`，只证明备份盘当时有约 20GiB 空闲。代码门槛现为 max(原公式, `DEPLOY_MIN_FREE_FLOOR_MB`)，默认下限 10240MB，可用 `DEPLOY_PRE_GATE_SAFE_CLEANUP=false` 关闭发布前安全清理；这次改动尚未发布，本勾选仍只覆盖 2026-09-08 的实测。）
 - [x] 防火墙只开放必要端口：HTTP/HTTPS、必要管理端口；数据库/Redis 不对公网开放。
   **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：`ss -lntup` 实测：0.0.0.0 只有 80 / 443（nginx）与 22（sshd）；**PostgreSQL 5432 与 Redis 6379 均只绑 127.0.0.1，未对公网开放** —— 强于本条要求。
 - [x] Word → PDF 采用服务端 LibreOffice 或内网 Gotenberg；不在 Windows 一体机安装转换引擎，Terminal Agent 仍只接收 PDF / 图片。（**2026-09-07 生产已开通**：engine=soffice）

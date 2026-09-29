@@ -42,6 +42,16 @@ for (const [label, text] of [['deploy-api-release.sh', readFileSync(deployScript
   const hits = text.split('\n').map((line, i) => [i + 1, line]).filter(([, line]) => /\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7f]/.test(line))
   check(hits.length === 0, `${label}：变量后不紧跟非 ASCII 字符（一律写成 \${VAR}）`, hits.map(([n]) => `第 ${n} 行`).join('、'))
 }
+const releaseText = readFileSync(deployScript, 'utf8')
+check(!releaseText.includes('journalctl --vacuum'), '发布脚本不出现 journalctl --vacuum')
+check(
+  (releaseText.match(/rm -rf -- "\$BACKUP_ROOT\/\$stem\.dump"/g) ?? []).length === 1,
+  '旧备份只在 prune_old_backups 里删除一次，发布前清理复用该函数'
+)
+check(
+  releaseText.includes('[ "$stem" = "$current_stem" ]'),
+  'prune_old_backups 仍保护当前这次发布的组'
+)
 
 // ── 真跑发布脚本 ────────────────────────────────────────────────────────────────
 const isDarwin = process.platform === 'darwin'
@@ -52,10 +62,31 @@ function writeExec(path, body) {
   chmodSync(path, 0o755)
 }
 
+function writeFindShim(bin) {
+  writeExec(join(bin, 'find'), `#!/usr/bin/env python3
+import datetime, os, sys
+args = sys.argv[1:]
+if '-printf' not in args:
+    os.execv('/usr/bin/find', ['find'] + args)
+base, fmt = args[0], args[args.index('-printf') + 1]
+only_dirs = '-type' in args and args[args.index('-type') + 1] == 'd'
+for name in os.listdir(base):
+    path = os.path.join(base, name)
+    if only_dirs and not os.path.isdir(path):
+        continue
+    st = os.lstat(path)
+    day = datetime.datetime.fromtimestamp(st.st_mtime).strftime('%Y-%m-%d')
+    line = fmt.replace('%T@', '%.10f' % st.st_mtime).replace('%TY-%Tm-%Td', day).replace('%f', name).replace('%p', path)
+    sys.stdout.write(line.replace('\\\\t', '\\t').replace('\\\\n', '\\n'))
+`)
+}
+
 function makeShims(bin) {
   writeExec(join(bin, 'pnpm'), `#!/usr/bin/env bash
 echo "pnpm $* @ $PWD" >> "$DRILL_CALLS"
 case "$*" in
+  "store prune")
+    touch "$DRILL_DIR/pnpm-store-pruned" || true ;;
   *"--filter @ai-job-print/api build"*)
     mkdir -p "$DRILL_DEPLOY/services/api/dist/config"
     echo "// drill build" > "$DRILL_DEPLOY/services/api/dist/config/production-runtime-gates.js" ;;
@@ -74,11 +105,67 @@ esac
 exit 0
 `)
   writeExec(join(bin, 'pg_dump'), `#!/usr/bin/env bash
+echo "pg_dump $*" >> "$DRILL_CALLS"
 out=""; while [ $# -gt 0 ]; do [ "$1" = -f ] && out="$2"; shift; done
-echo drill-dump > "$out"
+if [ "\${DRILL_PG_DUMP_FAIL:-}" = 1 ]; then
+  [ -n "$out" ] && printf 'partial\\n' > "$out"
+  exit 1
+fi
+if [ "\${DRILL_PG_DUMP_KILL:-}" = 1 ]; then
+  [ -n "$out" ] && printf 'partial\\n' > "$out"
+  kill -TERM "$PPID" 2>/dev/null || true
+  sleep 30
+  exit 1
+fi
+printf 'drill-dump\\n' > "$out"
 `)
-  writeExec(join(bin, 'pg_restore'), '#!/usr/bin/env bash\nexit 0\n')
-  writeExec(join(bin, 'pm2'), '#!/usr/bin/env bash\necho "pm2 $* COMMIT=$COMMIT" >> "$DRILL_CALLS"\nexit 0\n')
+  writeExec(join(bin, 'pg_restore'), `#!/usr/bin/env bash
+echo "pg_restore $*" >> "$DRILL_CALLS"
+if [ "\${DRILL_PG_RESTORE_FAIL:-}" = 1 ]; then exit 1; fi
+exit 0
+`)
+  writeExec(join(bin, 'pm2'), `#!/usr/bin/env bash
+echo "pm2 $* COMMIT=\${COMMIT:-}" >> "$DRILL_CALLS"
+if [ "\${DRILL_PM2_LOGROTATE:-}" = installed ]; then
+  case "$1" in
+    ls|conf) echo "pm2-logrotate online" ;;
+  esac
+fi
+exit 0
+`)
+  writeExec(join(bin, 'cp'), `#!/usr/bin/env bash
+if [ "\${DRILL_CP_FAIL:-}" = 1 ]; then
+  dest="\${!#}"
+  mkdir -p "$dest"
+  echo incomplete > "$dest/partial.txt"
+  exit 1
+fi
+exec /bin/cp "$@"
+`)
+  writeExec(join(bin, 'df'), `#!/usr/bin/env bash
+low="\${DRILL_DF_AVAIL_MB:-999999}"
+after_pnpm="\${DRILL_DF_AVAIL_AFTER_PNPM_MB:-}"
+after_prune="\${DRILL_DF_AVAIL_AFTER_PRUNE_MB:-}"
+avail="$low"
+drill_dir="\${DRILL_DIR:-}"
+if [ -n "$after_pnpm" ] && [ -n "$drill_dir" ] && [ -f "$drill_dir/pnpm-store-pruned" ]; then
+  avail="$after_pnpm"
+fi
+bk="\${DEPLOY_BACKUP_ROOT:-}"
+if [ -n "$after_prune" ] && [ -n "$drill_dir" ] && [ -n "$bk" ] && [ -d "$bk" ]; then
+  base_file="$drill_dir/df-backup-baseline"
+  count="$(/usr/bin/find "$bk" -maxdepth 1 -name '*.dump' 2>/dev/null | /usr/bin/wc -l | tr -d ' ')"
+  if [ ! -f "$base_file" ]; then
+    printf '%s\\n' "$count" > "$base_file"
+  fi
+  base="$(cat "$base_file")"
+  if [ "$count" -lt "$base" ]; then
+    avail="$after_prune"
+  fi
+fi
+printf '%s\\n' "Filesystem 1024-blocks Used Available Capacity Mounted on"
+printf '%s\\n' "drill 100000000 1000 \${avail} 1% /"
+`)
   // 「哪个版本在跑」用运行目录里的 VERSION 表示：PM2 是桩，重启后读到的就是运行目录当前内容。
   writeExec(join(bin, 'curl'), `#!/usr/bin/env bash
 version="$(cat "$DRILL_RUNTIME/VERSION" 2>/dev/null)"
@@ -96,20 +183,7 @@ printf '{"success":true,"data":{"status":"ready"}}'
       writeExec(join(bin, name), `#!/usr/bin/env bash\nexec "${path}" "$@"\n`)
     }
     // 发布脚本只用到 find <dir> -maxdepth 1 -mindepth 1 [-type d] -printf <fmt>
-    writeExec(join(bin, 'find'), `#!/usr/bin/env python3
-import os, sys
-args = sys.argv[1:]
-if '-printf' not in args:
-    os.execv('/usr/bin/find', ['find'] + args)
-base, fmt = args[0], args[args.index('-printf') + 1]
-only_dirs = '-type' in args and args[args.index('-type') + 1] == 'd'
-for name in os.listdir(base):
-    path = os.path.join(base, name)
-    if only_dirs and not os.path.isdir(path):
-        continue
-    line = fmt.replace('%T@', '%.10f' % os.lstat(path).st_mtime).replace('%f', name).replace('%p', path)
-    sys.stdout.write(line.replace('\\\\t', '\\t').replace('\\\\n', '\\n'))
-`)
+    writeFindShim(bin)
   }
 }
 
@@ -177,7 +251,7 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
   return { dir, bin, checkout, runtime, backups, sha, calls: join(dir, 'calls.log'), markerRef: join(dir, 'marker-ref') }
 }
 
-function runDeploy(box, extraEnv) {
+function runDeploy(box, extraEnv, options = {}) {
   const env = {
     ...process.env,
     PATH: `${box.bin}:${process.env.PATH}`,
@@ -196,6 +270,7 @@ function runDeploy(box, extraEnv) {
     DEPLOY_HEALTH_DELAY_SECONDS: '0',
     DEPLOY_MIN_FREE_MARGIN_MB: '0',
     DEPLOY_BACKUP_KEEP: '3',
+    DRILL_DIR: box.dir,
     DRILL_CALLS: box.calls,
     DRILL_DEPLOY: box.checkout,
     DRILL_RUNTIME: box.runtime,
@@ -205,7 +280,7 @@ function runDeploy(box, extraEnv) {
     LANG: 'C',
     ...extraEnv,
   }
-  const result = spawnSync('bash', [deployScript], { env, encoding: 'utf8' })
+  const result = spawnSync('bash', [deployScript], { env, encoding: 'utf8', timeout: options.timeout })
   const calls = existsSync(box.calls) ? readFileSync(box.calls, 'utf8') : ''
   return { code: result.status, out: `${result.stdout}\n${result.stderr}`, calls, pm2Restarts: (calls.match(/^pm2 restart /gm) ?? []).length }
 }
@@ -233,6 +308,15 @@ try {
       '场景 1：运行目录换成新版本（代码与依赖）')
     check(read(join(box.runtime, 'DEPLOY_SOURCE.txt')).includes(`source=origin/main@${box.sha}`), '场景 1：发布指针指向目标提交')
     check(r.pm2Restarts === 1, '场景 1：PM2 只重启一次', `实际 ${r.pm2Restarts} 次`)
+    const names = readdirSync(box.backups)
+    const dumps = names.filter((name) => name.includes(box.sha) && name.endsWith('.dump'))
+    check(dumps.length === 1 && read(join(box.backups, dumps[0])) === 'drill-dump' && !names.some((name) => name.includes('.partial')),
+      '场景 1：成功后只有正式 .dump，没有 .partial', names.join(', '))
+    check(/DISK_AVAIL_MB_BEFORE=\d+ DISK_AVAIL_MB_AFTER=\d+/.test(r.out) && r.out.includes('DISK_SNAPSHOT_BEFORE') && r.out.includes('DISK_SNAPSHOT_AFTER') && r.out.includes('ROOT_AVAIL_MB=') && r.out.includes('BACKUP_USED_MB='),
+      '场景 1：开头和摘要都打印根分区、备份目录可用空间与备份目录占用', r.out.slice(-500))
+    check(r.out.includes('FLOOR_MB=10240'), '场景 1：空间下限默认 10240MB', r.out.match(/FLOOR_MB=\d+/)?.[0] ?? '')
+    check(r.out.includes('::warning::pm2-logrotate 未安装') && r.out.includes('services/api/scripts/pm2-logrotate-setup.sh') && !r.calls.includes('pm2 install'),
+      '场景 1：没装 pm2-logrotate 时只告警并指出安装脚本，不安装', r.out.slice(-400))
   }
   // 2. 就绪检查一直失败 → 恢复并重启回旧版
   {
@@ -294,6 +378,97 @@ try {
       '场景 4：按组保留最近 3 组，每组三件齐全', `剩下 ${JSON.stringify(groups)}`)
     check(kept.some((stem) => stem.includes(box.sha)) && kept.some((stem) => stem.includes('old3')) && kept.some((stem) => stem.includes('old2')),
       '场景 4：保留的是本次与最近两次，迁移日志没有单算一组挤掉上一次的备份', `保留 ${kept.join(', ')}`)
+  }
+  // 磁盘 a：空间不够 → 先清理 → 够了继续
+  {
+    const box = makeSandbox({ oldGroups: 5 }); boxes.push(box)
+    const r = runDeploy(box, {
+      DRILL_HEALTH: 'always',
+      DRILL_DF_AVAIL_MB: '100',
+      DRILL_DF_AVAIL_AFTER_PNPM_MB: '4000',
+      DRILL_DF_AVAIL_AFTER_PRUNE_MB: '20000',
+    })
+    check(r.code === 0, '磁盘 a：清理后空间够了，发布继续', `退出码 ${r.code}\n${r.out.slice(-800)}`)
+    check(r.calls.includes('pnpm store prune') && r.out.includes('pnpm store prune 前可用 100MB') && r.out.includes('pnpm store prune 后可用 4000MB'),
+      '磁盘 a：pnpm store prune 打印释放前后的可用 MB', r.out)
+    check(r.out.includes('旧备份清理前可用 4000MB') && r.out.includes('旧备份清理后可用 20000MB') && r.out.includes('DEPLOY_BACKUP_KEEP=3'),
+      '磁盘 a：复用 prune_old_backups，并打印清理前后的可用 MB')
+    check(r.out.includes('DISK_AVAIL_MB_BEFORE=100 DISK_AVAIL_MB_AFTER=20000'),
+      '磁盘 a：摘要里的前后可用 MB 是清理前与发布结束时的数', r.out.match(/DISK_AVAIL_MB_BEFORE=\d+ DISK_AVAIL_MB_AFTER=\d+/)?.[0] ?? '')
+  }
+  // 磁盘 b：清理后仍不够 → 中止，不写备份
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DF_AVAIL_MB: '100' })
+    check(r.code !== 0 && !r.calls.includes('pg_dump') && !r.calls.includes('install --frozen-lockfile'),
+      '磁盘 b：清理后仍不够就中止，且没有构建、没有 pg_dump', `退出码 ${r.code}\n${r.calls}`)
+    check(readdirSync(box.backups).length === 0 && !r.out.includes('.partial'),
+      '磁盘 b：未写任何备份', readdirSync(box.backups).join(', '))
+    check(r.out.includes('Server Cleanup (backups / pnpm store / journal)') && r.out.includes('dry_run=true') && r.out.includes('REQUIRED_MB=') && r.out.includes('FLOOR_MB=10240'),
+      '磁盘 b：报错同时打出公式门槛、10GB 下限，并指向 Server Cleanup 的 dry-run', r.out.slice(-700))
+    check(read(join(box.runtime, 'VERSION')) === 'old', '磁盘 b：运行目录保持发布前')
+  }
+  // 磁盘 c：API 目录很小，但可用低于 10GB 下限也中止
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DF_AVAIL_MB: '9000' })
+    const req = Number(r.out.match(/REQUIRED_MB=(\d+)/)?.[1])
+    const floor = Number(r.out.match(/FLOOR_MB=(\d+)/)?.[1])
+    const avail = Number(r.out.match(/可用 (\d+)MB/)?.[1])
+    check(r.code !== 0 && !r.calls.includes('pg_dump') && floor === 10240 && req < avail && avail < floor,
+      '磁盘 c：可用高于公式所需、低于 10GB 下限时仍中止', `退出码 ${r.code} avail=${avail} required=${req} floor=${floor}\n${r.out.slice(-500)}`)
+  }
+  // 磁盘 d：关掉发布前清理就直接中止，旧备份不动
+  {
+    const box = makeSandbox({ oldGroups: 4 }); boxes.push(box)
+    const before = readdirSync(box.backups).sort()
+    const r = runDeploy(box, {
+      DRILL_HEALTH: 'always',
+      DRILL_DF_AVAIL_MB: '100',
+      DEPLOY_PRE_GATE_SAFE_CLEANUP: 'false',
+    })
+    check(r.code !== 0 && r.out.includes('DEPLOY_PRE_GATE_SAFE_CLEANUP=false') && !r.calls.includes('pnpm store prune') && !r.calls.includes('pg_dump'),
+      '磁盘 d：DEPLOY_PRE_GATE_SAFE_CLEANUP=false 时不清理、直接中止', `退出码 ${r.code}\n${r.calls}`)
+    check(readdirSync(box.backups).sort().join() === before.join(),
+      '磁盘 d：旧备份一组都没删', readdirSync(box.backups).join(', '))
+  }
+  // 磁盘 f：pg_dump / pg_restore 失败不留 .partial；cp 失败不留 .runtime.partial
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_PG_DUMP_FAIL: '1' })
+    const names = readdirSync(box.backups)
+    check(r.code !== 0 && r.out.includes('pg_dump 失败，已删除不完整备份') && !names.some((name) => name.includes('.partial') || name.endsWith('.dump')),
+      '磁盘 f：pg_dump 失败不留 .partial，也没有正式 .dump', `退出码 ${r.code} ${names.join(', ')}\n${r.out.slice(-400)}`)
+  }
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_PG_RESTORE_FAIL: '1' })
+    const names = readdirSync(box.backups)
+    check(r.code !== 0 && r.out.includes('备份可读校验失败，已删除不完整备份') && !names.some((name) => name.includes('.partial') || name.endsWith('.dump')),
+      '磁盘 f：pg_restore -l 失败不留 .partial', `退出码 ${r.code} ${names.join(', ')}`)
+  }
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_PG_DUMP_KILL: '1' }, { timeout: 8000 })
+    const names = readdirSync(box.backups)
+    check(r.code !== 0 && !names.some((name) => name.includes('.partial') || (name.includes(box.sha) && name.endsWith('.dump'))),
+      '磁盘 f：pg_dump 过程中被中断不留 .partial', `退出码 ${r.code} signal=${r.code} ${names.join(', ')}\n${r.out.slice(-400)}`)
+  }
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_CP_FAIL: '1' })
+    const names = readdirSync(box.backups)
+    const dump = names.filter((name) => name.includes(box.sha) && name.endsWith('.dump'))
+    check(r.code !== 0 && r.out.includes('运行目录备份失败，已删除不完整备份') && dump.length === 1 && !names.some((name) => name.includes('.partial')) && !r.out.includes('开始把运行目录恢复'),
+      '磁盘 f：运行目录拷贝失败删掉 .runtime.partial，且回退陷阱尚未生效', `退出码 ${r.code} ${names.join(', ')}\n${r.out.slice(-500)}`)
+    check(read(join(box.runtime, 'VERSION')) === 'old' && r.pm2Restarts === 0, '磁盘 f：拷贝失败时运行目录未改、PM2 未重启')
+  }
+  // pm2-logrotate 已安装：只报告，不告警、不安装
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_PM2_LOGROTATE: 'installed' })
+    check(r.code === 0 && r.out.includes('PM2_LOGROTATE=installed') && !r.out.includes('::warning::pm2-logrotate 未安装') && !r.calls.includes('pm2 install'),
+      '摘要：pm2-logrotate 已安装时只读确认，不告警也不安装', r.out.slice(-400))
   }
 } catch (error) {
   fail(`演练无法运行：${error instanceof Error ? error.message : String(error)}`)
@@ -395,8 +570,151 @@ try {
   for (const box of staticBoxes) rmSync(box.dir, { recursive: true, force: true })
 }
 
+// ── 从 workflow 抽出真实片段再跑：分组、构建前闸门、预检输出都随源码变红 ─────────
+function extractBetween(text, startMarker, endMarker) {
+  const lines = text.split('\n')
+  const start = lines.findIndex((line) => line.includes(startMarker))
+  const end = lines.findIndex((line, index) => index > start && line.includes(endMarker))
+  if (start < 0 || end < 0) throw new Error(`找不到片段：${startMarker} → ${endMarker}`)
+  const block = lines.slice(start, end)
+  const indent = (block[0].match(/^\s*/) ?? [''])[0].length
+  return block.map((line) => line.slice(Math.min(indent, (line.match(/^\s*/) ?? [''])[0].length))).join('\n')
+}
+
+function runFragment(body, env) {
+  const dir = mkdtempSync(join(tmpdir(), 'fragment-drill-'))
+  const script = join(dir, 'fragment.sh')
+  writeFileSync(script, `#!/usr/bin/env bash\nset -euo pipefail\n${body}\n`)
+  chmodSync(script, 0o755)
+  const result = spawnSync('bash', [script], {
+    env: { ...process.env, LC_ALL: 'C', LANG: 'C', TZ: 'UTC', ...env },
+    encoding: 'utf8',
+  })
+  return { dir, code: result.status ?? 1, out: `${result.stdout ?? ''}\n${result.stderr ?? ''}` }
+}
+
+const cleanupWorkflow = readFileSync(join(root, '.github/workflows/server-cleanup.yml'), 'utf8')
+const precheckWorkflow = readFileSync(join(root, '.github/workflows/deploy-precheck.yml'), 'utf8')
+const fragmentDirs = []
+try {
+  const fullBuildAt = workflow.indexOf('=== full 发布构建前磁盘检查（只读，不清理）===')
+  const pnpmInstallAt = workflow.indexOf('pnpm install --frozen-lockfile')
+  const kioskBuildAt = workflow.indexOf('pnpm build:kiosk:production')
+  check(fullBuildAt > 0 && fullBuildAt < pnpmInstallAt && pnpmInstallAt < kioskBuildAt,
+    '磁盘 h：full 发布的构建前空间检查在 pnpm install 与三端构建之前')
+
+  const buildDisk = extractBetween(workflow, '=== full 发布构建前磁盘检查（只读，不清理）===', '=== 安装依赖 ===')
+  check(!buildDisk.includes('pnpm store prune') && !buildDisk.includes('journalctl'),
+    '磁盘 h：构建前检查片段里没有清理动作')
+  const dfBin = mkdtempSync(join(tmpdir(), 'df-shim-'))
+  fragmentDirs.push(dfBin)
+  writeExec(join(dfBin, 'df'), `#!/usr/bin/env bash
+avail="\${DRILL_DF_AVAIL_MB:-0}"
+printf '%s\\n' "Filesystem 1024-blocks Used Available Capacity Mounted on"
+printf '%s\\n' "drill 100000000 1000 \${avail} 1% /"
+`)
+  const lowDisk = runFragment(buildDisk, { PATH: `${dfBin}:${process.env.PATH}`, DRILL_DF_AVAIL_MB: '100' })
+  fragmentDirs.push(lowDisk.dir)
+  check(lowDisk.code !== 0 && lowDisk.out.includes('构建前磁盘空间不足') && lowDisk.out.includes('未安装依赖') && lowDisk.out.includes('Server Cleanup (backups / pnpm store / journal)') && lowDisk.out.includes('dry_run=true'),
+    '磁盘 h：可用低于 10GB 下限时，在任何构建之前失败并指向 Server Cleanup dry-run', `退出码 ${lowDisk.code}\n${lowDisk.out}`)
+  const okDisk = runFragment(buildDisk, { PATH: `${dfBin}:${process.env.PATH}`, DRILL_DF_AVAIL_MB: '50000' })
+  fragmentDirs.push(okDisk.dir)
+  check(okDisk.code === 0 && okDisk.out.includes('构建前磁盘空间够用') && okDisk.out.includes('FULL_BUILD_DISK_AVAIL_MB=50000'),
+    '磁盘 h：可用不低于下限时只打印结果并继续', `退出码 ${okDisk.code}\n${okDisk.out}`)
+
+  const groupDir = mkdtempSync(join(tmpdir(), 'cleanup-groups-'))
+  fragmentDirs.push(groupDir)
+  const backupDir = join(groupDir, 'bk')
+  mkdirSync(backupDir)
+  const findBin = join(groupDir, 'bin')
+  mkdirSync(findBin)
+  writeFindShim(findBin)
+  const touchGroup = (stem, when) => {
+    writeFileSync(join(backupDir, `${stem}.dump`), 'dump\n')
+    mkdirSync(join(backupDir, `${stem}.runtime`))
+    writeFileSync(join(backupDir, `${stem}.migrations.log`), 'migrations\n')
+    const stamp = new Date(when)
+    for (const name of [`${stem}.dump`, `${stem}.runtime`, `${stem}.migrations.log`]) {
+      utimesSync(join(backupDir, name), stamp, stamp)
+    }
+  }
+  touchGroup('pre-old', '2026-01-02T00:00:00Z')
+  touchGroup('pre-new', '2026-03-04T00:00:00Z')
+  const stemBlock = extractBetween(cleanupWorkflow, 'STEMS="$(find "$BK"', 'TOTAL="$(echo "$STEMS"')
+  const grouped = runFragment(`${stemBlock}\nprintf '%s\\n' "$STEMS"\n`, {
+    PATH: `${findBin}:/usr/bin:/bin`,
+    BK: backupDir,
+  })
+  fragmentDirs.push(grouped.dir)
+  const stems = grouped.out.trim().split('\n').filter(Boolean)
+  check(grouped.code === 0 && stems.length === 2 && stems[0] === 'pre-new' && stems[1] === 'pre-old' && stems.every((stem) => !stem.includes('migrations')),
+    '磁盘 g：.migrations.log 归进同一 stem，不单占一组', `退出码 ${grouped.code} stems=${stems.join(',')}\n${grouped.out}`)
+
+  const sizeLine = cleanupWorkflow.split('\n').map((line) => line.trim()).find((line) => line.startsWith('SZ="$(du -sm'))
+  if (!sizeLine) throw new Error('server-cleanup.yml 里找不到备份组大小统计')
+  const duBin = join(groupDir, 'du-bin')
+  mkdirSync(duBin)
+  const duLog = join(groupDir, 'du.log')
+  writeExec(join(duBin, 'du'), `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "${duLog}"
+for arg in "$@"; do
+  case "$arg" in
+    -*) ;;
+    *) printf '%s\\n' "1 $arg" ;;
+  esac
+done
+`)
+  const sized = runFragment(`stem=pre-old\n${sizeLine}\nprintf '%s\\n' "$SZ"\n`, {
+    PATH: `${duBin}:/usr/bin:/bin`,
+    BK: backupDir,
+  })
+  fragmentDirs.push(sized.dir)
+  const duArgs = existsSync(duLog) ? readFileSync(duLog, 'utf8') : ''
+  check(sized.code === 0 && duArgs.includes(`${backupDir}/pre-old.migrations.log`) && /^\d+$/.test(sized.out.trim()),
+    '磁盘 g：大小统计把 .migrations.log 算进这一组', `退出码 ${sized.code} du=${duArgs.trim()} SZ=${sized.out.trim()}`)
+
+  const rmLine = cleanupWorkflow.split('\n').map((line) => line.trim()).find((line) => line.startsWith('rm -rf -- "$BK"'))
+  if (!rmLine) throw new Error('server-cleanup.yml 里找不到备份组删除')
+  const removed = runFragment(`stem=pre-old\n${rmLine}\n`, { BK: backupDir, PATH: '/usr/bin:/bin' })
+  fragmentDirs.push(removed.dir)
+  check(removed.code === 0 && !existsSync(join(backupDir, 'pre-old.migrations.log')) && !existsSync(join(backupDir, 'pre-old.dump')) && existsSync(join(backupDir, 'pre-new.migrations.log')),
+    '磁盘 g：删除一组时连 .migrations.log 一起删，另一组保留', `退出码 ${removed.code} 剩下 ${readdirSync(backupDir).join(',')}`)
+
+  check(precheckWorkflow.includes('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"') && workflow.includes('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"'),
+    '预检：静态备份根目录与 deploy.yml 的默认值相同')
+  const precheckBlock = extractBetween(precheckWorkflow, '=== 11. 静态发布备份与残留 bundle（只读）===', '=== 完成：以上均为只读探测')
+    .replace('STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"', `STATIC_BACKUP_ROOT="${join(groupDir, 'static-backups')}"`)
+    .replaceAll('/tmp/release.bundle', join(groupDir, 'release.bundle'))
+  const staticRoot = join(groupDir, 'static-backups')
+  mkdirSync(staticRoot)
+  mkdirSync(join(staticRoot, '20260102T000000Z-old'))
+  mkdirSync(join(staticRoot, '20260304T000000Z-new'))
+  writeFileSync(join(staticRoot, '20260102T000000Z-old', 'blob'), Buffer.alloc(2 * 1024 * 1024, 1))
+  utimesSync(join(staticRoot, '20260102T000000Z-old'), new Date('2026-01-02T00:00:00Z'), new Date('2026-01-02T00:00:00Z'))
+  utimesSync(join(staticRoot, '20260304T000000Z-new'), new Date('2026-03-04T00:00:00Z'), new Date('2026-03-04T00:00:00Z'))
+  const bundlePath = join(groupDir, 'release.bundle')
+  writeFileSync(bundlePath, Buffer.alloc(2 * 1024 * 1024, 2))
+  const precheckHit = runFragment(precheckBlock, { PATH: `${findBin}:/usr/bin:/bin` })
+  fragmentDirs.push(precheckHit.dir)
+  const metric = (key) => precheckHit.out.match(new RegExp(`${key}=([^\\s]+)`))?.[1] ?? ''
+  check(precheckHit.code === 0 && Number(metric('STATIC_BACKUP_GROUP_COUNT')) === 2 && metric('STATIC_BACKUP_OLDEST_DATE') === '2026-01-02' && Number(metric('STATIC_BACKUP_SIZE_MB')) >= 1,
+    '预检：静态备份报出大小、组数和最老一组的日期', `退出码 ${precheckHit.code}\n${precheckHit.out}`)
+  check(metric('RELEASE_BUNDLE_PRESENT') === 'yes' && Number(metric('RELEASE_BUNDLE_SIZE_MB')) >= 1,
+    '预检：/tmp/release.bundle 存在时报出大小', precheckHit.out)
+  rmSync(bundlePath)
+  const precheckMiss = runFragment(precheckBlock, { PATH: `${findBin}:/usr/bin:/bin` })
+  fragmentDirs.push(precheckMiss.dir)
+  const missingBundle = (key) => precheckMiss.out.match(new RegExp(`${key}=([^\\s]+)`))?.[1] ?? ''
+  check(precheckMiss.code === 0 && missingBundle('RELEASE_BUNDLE_PRESENT') === 'no' && missingBundle('RELEASE_BUNDLE_SIZE_MB') === '0',
+    '预检：/tmp/release.bundle 不存在时报 no 且大小为 0', precheckMiss.out)
+} catch (error) {
+  fail(`磁盘分组、构建前检查或预检演练无法运行：${error instanceof Error ? error.message : String(error)}`)
+} finally {
+  for (const dir of fragmentDirs) rmSync(dir, { recursive: true, force: true })
+}
+
 if (failures) {
   console.error(`\nverify:deploy-rollback：${failures} 项失败`)
   process.exit(1)
 }
-console.log('\nverify:deploy-rollback 通过（真跑发布脚本 7 个场景 + 静态目录 3 个场景）')
+console.log('\nverify:deploy-rollback 通过（真跑发布脚本 7 个场景 + 磁盘门槛与原子备份 + 静态目录 3 个场景 + 清理分组 / 构建前检查 / 预检）')

@@ -160,6 +160,29 @@ jobs:
             if [ -f "$EXPECT_DIR/DEPLOY_SOURCE.txt" ]; then
               echo "DEPLOY_SOURCE_SHA8=$(sed -n 's/^source=origin\/main@\([0-9a-f]\{8\}\).*/\1/p' "$EXPECT_DIR/DEPLOY_SOURCE.txt" | head -1)"
             fi
+
+            echo "=== 11. 静态发布备份与残留 bundle（只读）==="
+            # 路径与 deploy.yml 的 STATIC_BACKUP_ROOT 默认值相同。只输出数量和日期，不打印文件名。
+            STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"
+            if [ -d "$STATIC_BACKUP_ROOT" ]; then
+              echo "STATIC_BACKUP_SIZE_MB=$(du -sm "$STATIC_BACKUP_ROOT" 2>/dev/null | cut -f1)"
+              echo "STATIC_BACKUP_GROUP_COUNT=$(find "$STATIC_BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+              OLDEST="$(find "$STATIC_BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %TY-%Tm-%Td\n' 2>/dev/null | sort -n | head -1 | awk '{print $2}')"
+              echo "STATIC_BACKUP_OLDEST_DATE=${OLDEST:-none}"
+            else
+              echo "STATIC_BACKUP_EXISTS=no"
+              echo "STATIC_BACKUP_SIZE_MB=0"
+              echo "STATIC_BACKUP_GROUP_COUNT=0"
+              echo "STATIC_BACKUP_OLDEST_DATE=none"
+            fi
+            if [ -f /tmp/release.bundle ]; then
+              echo "RELEASE_BUNDLE_PRESENT=yes"
+              echo "RELEASE_BUNDLE_SIZE_MB=$(du -sm /tmp/release.bundle 2>/dev/null | cut -f1)"
+            else
+              echo "RELEASE_BUNDLE_PRESENT=no"
+              echo "RELEASE_BUNDLE_SIZE_MB=0"
+            fi
+
             echo "=== 完成：以上均为只读探测，未做任何修改 ==="
         env:
           EXPECT_DIR: /srv/ai-job-print

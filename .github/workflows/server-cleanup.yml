@@ -65,11 +65,12 @@ jobs:
             fi
 
             echo "=== 备份清单（按发布分组，新→旧）==="
-            # 每次发布产生 <prefix>.dump 与 <prefix>.runtime，按 prefix 归组
+            # 每次发布产生 <prefix>.dump、<prefix>.runtime 与 <prefix>.migrations.log，按 prefix 归组。
+            # 迁移日志必须并进同一组，否则会单占一个保留名额，把上一组的 dump 挤出去删掉。
             STEMS="$(find "$BK" -maxdepth 1 -mindepth 1 -printf '%T@\t%p\n' \
                      | sort -rn \
                      | sed 's#.*/##' \
-                     | sed 's/\.\(dump\|runtime\)$//' \
+                     | sed -E 's/\.(dump|runtime|migrations\.log)$//' \
                      | awk '!seen[$0]++')"
             TOTAL="$(echo "$STEMS" | grep -c . || true)"
             echo "RELEASE_GROUP_COUNT=$TOTAL"
@@ -80,7 +81,7 @@ jobs:
             while IFS= read -r stem; do
               [ -z "$stem" ] && continue
               IDX=$((IDX+1))
-              SZ="$(du -sm "$BK"/"$stem"* 2>/dev/null | awk '{s+=$1} END{print s+0}')"
+              SZ="$(du -sm "$BK/$stem.dump" "$BK/$stem.runtime" "$BK/$stem.migrations.log" 2>/dev/null | awk '{s+=$1} END{print s+0}')"
               AGE="$(find "$BK" -maxdepth 1 -name "$stem*" -printf '%T@\n' 2>/dev/null | sort -rn | head -1 \
                      | awk '{print int((systime()-$1)/86400)}')"
               if [ "$IDX" -le "$KEEP" ]; then
@@ -105,7 +106,7 @@ jobs:
                 for stem in $DEL_LIST; do
                   # 双重保险：跳过保留名单中的任何 stem
                   case " $KEEP_LIST " in *" $stem "*) echo "  跳过（在保留名单）"; continue;; esac
-                  rm -rf -- "$BK"/"$stem".dump "$BK"/"$stem".runtime 2>/dev/null
+                  rm -rf -- "$BK"/"$stem".dump "$BK"/"$stem".runtime "$BK"/"$stem".migrations.log 2>/dev/null
                   echo "  已删除一组"
                 done
               fi

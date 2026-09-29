@@ -227,6 +227,22 @@ jobs:
             test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
             if [ "$DEPLOY_SCOPE" = "full" ]; then
+              echo "=== full 发布构建前磁盘检查（只读，不清理）==="
+              # 与 deploy-api-release.sh 0b 的下限同一默认值。这里只读 df，不清理。
+              # full 发布在进 API helper 之前就要 pnpm install 并构建三端，空间不够必须在那之前停。
+              FLOOR_MB="${DEPLOY_MIN_FREE_FLOOR_MB:-10240}"
+              case "$FLOOR_MB" in
+                ''|*[!0-9]*) FLOOR_MB=10240 ;;
+              esac
+              AVAIL_MB="$(df -Pm / 2>/dev/null | awk 'NR==2{print $4}' | tr -dc '0-9' || true)"
+              : "${AVAIL_MB:=0}"
+              echo "FULL_BUILD_DISK_AVAIL_MB=${AVAIL_MB} DEPLOY_MIN_FREE_FLOOR_MB=${FLOOR_MB}"
+              if [ "$AVAIL_MB" -lt "$FLOOR_MB" ]; then
+                echo "::error::构建前磁盘空间不足：可用 ${AVAIL_MB}MB < 下限 ${FLOOR_MB}MB。未安装依赖、未构建三端前端。请先跑工作流 Server Cleanup (backups / pnpm store / journal)，先 dry-run（输入 dry_run=true）。" >&2
+                exit 1
+              fi
+              echo "构建前磁盘空间够用。"
+
               echo "=== 安装依赖 ==="
               pnpm install --frozen-lockfile
 
