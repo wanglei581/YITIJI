@@ -27,6 +27,7 @@ import { Prisma } from '../generated/prisma/client'
 import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import { PASSWORD_PROOF_STATE, passwordProofState } from '../auth/password-proof-state'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
+import { isParkedOrgType, throwOrgTypeParked } from './parked-org-types'
 import {
   ADMIN_ORG_ACCOUNT_SELECT,
   mapAdminOrgAccount,
@@ -303,7 +304,7 @@ export class AdminOrgsService {
   async createOrg(dto: CreateOrgDto, admin: AuthedUser): Promise<AdminOrgDetail> {
     const enabledModules = this.sanitizeModules(dto.enabledModules)
     const sceneTemplate = dto.sceneTemplate ?? null
-    this.assertOrgTypeMatrix({ type: dto.type, sceneTemplate, enabledModules })
+    this.assertOrgTypeMatrix({ type: dto.type, sceneTemplate, enabledModules, typeIsNew: true })
 
     if (dto.account) {
       const exists = await this.prisma.user.findUnique({ where: { username: dto.account.username } })
@@ -384,8 +385,9 @@ export class AdminOrgsService {
     const nextModules = modulesChanged ? this.sanitizeModules(requestedModules) : currentModules
     const nextType = dto.type ?? current.type
     const nextSceneTemplate = dto.sceneTemplate !== undefined ? dto.sceneTemplate : current.sceneTemplate
+    const typeChanged = dto.type !== undefined && dto.type !== current.type
     const matrixFieldsChanged =
-      (dto.type !== undefined && dto.type !== current.type) ||
+      typeChanged ||
       (dto.sceneTemplate !== undefined && (dto.sceneTemplate ?? null) !== (current.sceneTemplate ?? null)) ||
       modulesChanged
     if (matrixFieldsChanged) {
@@ -393,6 +395,8 @@ export class AdminOrgsService {
         type: nextType,
         sceneTemplate: nextSceneTemplate ?? null,
         enabledModules: nextModules,
+        // 只有「改成」停放类型才拒；存量停放机构原样回传自己的类型（前端编辑抽屉就是这么送的）不算改。
+        typeIsNew: typeChanged,
       })
     }
     await this.prisma.$transaction(async (tx) => {
@@ -718,7 +722,13 @@ export class AdminOrgsService {
     return unique
   }
 
-  private assertOrgTypeMatrix(input: { type: string; sceneTemplate: string | null; enabledModules: string[] }): void {
+  private assertOrgTypeMatrix(input: {
+    type: string
+    sceneTemplate: string | null
+    enabledModules: string[]
+    /** 新建机构，或本次把类型改成了 type。只有这时才按停放清单拒绝。 */
+    typeIsNew: boolean
+  }): void {
     for (const moduleName of input.enabledModules) {
       if (PROHIBITED_MODULES.has(moduleName)) {
         throw new BadRequestException({
@@ -726,6 +736,9 @@ export class AdminOrgsService {
         })
       }
     }
+    // 3.15 停放：企业来源方 / 招聘会主办方不能新建、不能改成（见 parked-org-types.ts）。
+    // 放在招聘闭环模块之后、矩阵之前：闭环模块仍是最高优先级，停放类型不再往下给「矩阵不合法」这种误导的原因。
+    if (input.typeIsNew && isParkedOrgType(input.type)) throwOrgTypeParked(input.type)
     const rule = ORG_TYPE_MATRIX[input.type]
     if (!rule) {
       throw new BadRequestException({

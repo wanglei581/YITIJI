@@ -123,6 +123,18 @@
 - **实现与收货：** Claude 子代理在独立副本实现，协调方逐段审 diff，在候选 `56bd387f2` 上干净套用（不依赖 #1057）。
 - **验证：** admin、api `tsc --noEmit`，admin lint 0 错误；`verify:admin-print-scan-ui`、`verify:service-desk-dashboard-ui`、`verify:honest-placeholders`、`verify:feedback-sla`、`verify:legal-doc-version`（15 项）、`verify:admin-ops`、`verify:feedback-notifications`、`verify:kiosk-anonymous-feedback`、`verify:admin-print-scan`、`verify:print-color-duplex-capability`、`verify:print-sign`（111）、`verify:console-screen-snapshot`、`verify:audit-logs`、`verify:alert-push`、合规文案 / 时间诚实 / 原样报错 / CI 覆盖 / 仓库完整性、`graph:check`；变异 6 处（删调休上班日、起算日提前、删 low_paper 标题、时区偏移归零、审计动作改名、接口角色放开）全部变红。管理员浏览器用例 112、大屏 138 全过。浏览器实看：法务文档页（就绪卡、查看正文）、设备能力页（三态与签名开通确认）用演示模式；意见反馈页用本地真接口造了 5 条工单，核对「剩 5 / 剩 4 / 剩 1 个工作日」与跨中秋的截止日正确。
 - **记下的小问题：** 共用 Drawer 按 Esc 不关闭（原有行为）；设备能力说明里仍有门禁钉住的「fail-closed 口径」一词。
+## 2026-09-29：3.15 停放——管理员对招聘类内容只剩查看与紧急下架，停放两类机构，线下机构整页停放
+
+- **口径（总指挥 9/29 裁定）：** 前端不论托管开关一律停放（源码保留、不注册、不被引用、不写入）；管理员这些写接口的服务端行为（托管关闭时 403）本批不动，b 版本启动时再定管理员角色。
+- **管理员招聘类页面：** 岗位信息源、招聘会信息源去掉审核通过 / 拒绝 / 发布 / 下架与批量发布，只留查看与逐条紧急下架，原位置写「本平台不代审、不代发招聘内容；如有违法违规内容，请用紧急下架」，「待审核」筛选改「未审核」；招聘会管理去掉编辑基本信息与四个页签的写控件（只读，保留紧急下架）；企业展示去掉新增企业、保存、审核发布、关联与移除岗位（详情抽屉只读）；数据接入通道只留「按来源熔断」。
+- **线下机构整页停放：** 其中唯一属于入驻核验的「资质」只读能力迁到合作机构详情的新小节「资质核验」（按机构 id 读治理档案与资质，「查看资质材料」走会留痕的取证接口；生产没有资质登记入口，如实写「资质登记入口尚未开放」）；路由与侧栏移除，旧地址 `/offline-agencies` 转到合作机构页。
+- **停放两类机构：** 「企业数据来源」「招聘会主办方」不能新建、不能改成（服务端新错误码 `ORG_TYPE_PARKED`，存量机构编辑其它字段照常，招聘闭环模块仍最先拒）；机构能力矩阵里这两类的导入与企业资料写入置 false（托管打开也不放行）；终端绑定的拒绝在 #1080。两份停放清单（本批 `services/api/src/orgs/parked-org-types.ts`、#1080 `services/api/src/terminals/terminal-org-parking.ts`）两个 PR 都合入后统一成一份，由后合的那个做。
+- **工作台：** 托管关闭时不再出现「待审核数据」「待办审核」「去审核」（此前是指向没有审核按钮的页面的死链）；有招聘类存量时写「招聘类存量 N 条（托管关闭，不再审核）」并链到能紧急下架的页面；「AI 内容投诉」告警行显示「意见反馈」而不是「未知终端」，链到筛好的反馈列表。
+- **其它：** 企业资料移除岗位关联补托管闸（此前托管关闭也放行）；AI 大模型页在托管关闭时把岗位推荐、岗位解读、招聘会行程标成「托管关闭，不可用」；把管理员写成审核人的文案（信息源、招聘会、企业、导入记录、数据接入通道、政策申领条件抽屉、数据权利工单、内容可信面板）与机构端「管理员审核通过并重新发布后」「经平台审核上终端」等 19 处改成真实口径。
+- **停放文件（源码保留，没有任何页面引用）：** `apps/admin/src/routes/job-sources/JobSourceReviewActions.tsx`、`apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx`、`apps/admin/src/routes/fairs/components/CompaniesTabEditor.tsx`、`ZonesTabEditor.tsx`、`MaterialsTabEditor.tsx`、`apps/admin/src/routes/fairs/VenueGuideTabEditor.tsx`、`apps/admin/src/routes/companies/components/CompanyDetailDrawerEditor.tsx`、`apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx`，以及原地停放的 `apps/admin/src/routes/components/BulkPublishButton.tsx`、`fairs/components/EditFairDrawer.tsx`、`companies/components/CreateCompanyDrawer.tsx`、`ReviewPublishSection.tsx`、`LinkedJobsSection.tsx` 与 `apps/admin/src/routes/offline-agencies/` 整个目录；文件头都写明 b 版本恢复时由谁引入。
+- **门禁：** 新增 `verify-admin-parked-recruitment-ui.mjs`（挂在 `verify:source-publish-actions` 链上）；`verify-source-publish-actions`、`verify-admin-offline-agencies-ui`、`verify-backend-p0-contracts` 改为在停放文件上核对原契约并断言页面不引用停放文件；`verify:admin-orgs`、`verify:partner-source-capabilities`、`verify:companies`、`verify:partner-excel-import` 按新口径改钉（逐条旧→新见 PR）。浏览器用例 5 个随停放改写，另改 `fairs.spec` 为断言只读。变异 7 处全部变红。
+- **实现与收货：** Claude 子代理实现，协调方审服务端与关键页面 diff，在候选 `6f473f211` 上干净套用，补改一条浏览器用例。
+- **验证：** 两后台与 api `tsc`、lint 0 错误；管理员 22 条、机构 6 条 verify 与 API 21 条（托管打开，同 CI）通过，CI 覆盖、原样报错、合规文案通过；浏览器用例管理员 110（fairs 改后通过）、机构 69 通过；演示模式核对岗位信息源、工作台、侧栏与新建机构类型下拉。唯一红的是候选自带的 `verify-admin-ai-access-ui` A2（主执行窗口在修）。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 

@@ -33,6 +33,8 @@ const partnerJobsService = read('services/api/src/jobs/jobs-partner.service.ts')
 const syncAdminController = read('services/api/src/job-sync/job-sync.controller.ts')
 const syncAdminService = read('services/api/src/job-sync/job-sync.service.ts')
 const adminSourcesPage = read('apps/admin/src/routes/sync-sources/index.tsx')
+// 3.15 起启停 / 批量下架等写操作停放在这个文件（不被 import），契约断言跟着搬过来。
+const adminSourceWriteActions = read('apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx')
 
 check(
   containsAll(offlineClient, [
@@ -171,12 +173,18 @@ check(
   'Source disable, impact preview, and explicit bulk unpublish are separate audited operations',
 )
 check(
-  containsAll(adminSourcesPage, [
-    '停用通道不会自动下架既有内容',
+  // 原断言钉在页面上：「停用通道不会自动下架既有内容」+ 批量下架前先看影响。3.15 起这组写操作停放，
+  // 同一份契约改在停放文件上核对（恢复 b 版本时原样生效），页面则必须不再引入它。
+  containsAll(adminSourceWriteActions, [
+    '此操作与“停用来源”相互独立',
     'UNPUBLISH_SOURCE_CONTENT',
     'fetchSourceImpact',
-  ]),
-  'Admin source UI explains non-cascading disable and requires impact preview before bulk unpublish',
+  ]) &&
+    /const impact = await fetchSourceImpact\(s\.id\)[\s\S]*?window\.confirm\([\s\S]*?await unpublishSourceContent\(s\.id\)/.test(adminSourceWriteActions) &&
+    !/import[^\n]*SyncSourceWriteActions/.test(adminSourcesPage) &&
+    !adminSourcesPage.includes('unpublish-content') &&
+    adminSourcesPage.includes('不代为同步、启停或配置'),
+  'Admin source write actions (parked 3.15) keep non-cascading disable + impact preview before bulk unpublish; the page mounts none of them',
 )
 
 // ---------------------------------------------------------------------------
