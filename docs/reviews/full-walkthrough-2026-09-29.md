@@ -73,16 +73,16 @@
 
 | 编号 | 级别 | 端 | 问题 | 证据与根因 | 归属窗口 | 状态 |
 |---|---|---|---|---|---|---|
-| W-01 | P1 | 一体机 | 一体机没有可点的「AI 内容投诉」入口：词表有 `ai_content_complaint`，但打印完成页、打印扫描首页两个反馈子集都不含；「我的反馈」类别只有 4 类（`apps/kiosk/src/pages/profile/me/feedback/types.ts:4-9`，`services/api/memberFeedback.ts:11` 类型也没有）。小程序已有 | 代码核对 | Claude（一体机页面） | 新增 |
-| W-02 | P1 | 管理员后台 | 新生产库上后台建不出黑白/彩色打印价目：计费页只渲染已有行，服务端只自动补 `resume_export`（`admin-billing.service.ts:40`），不存在的行返回 `PRICE_CONFIG_NOT_FOUND`（:121）→ 报价失败。本地按 `docs/operations/price-config-production.md` 的 SQL 补齐 | UI 实操截图 setup/ 第 3 项 | 后台窗口 / 后端窗口 | 新增 |
-| W-03 | P1 | 机构后台 | 管理员新建的机构账号永远验证不了手机号：每次登录弹「手机号本人验证」，获取验证码 409 `ACCOUNT_PASSWORD_PROOF_NOT_READY`，只能「稍后验证」（`password-proof-state.ts:16`、`auth.service.ts:648-656`）；也不强制首登改密 | UI 实操截图 61–62、89–90 | 后端窗口 + 后台窗口 | 新增 |
-| W-04 | P2 | 管理员后台 | 从没连过的终端显示「最近心跳 刚刚」：心跳空时回落 `lastSeenAt`（`@updatedAt`，任何编辑都刷新）（`terminals/index.tsx:767`） | 截图 22、25 | 后台窗口 | 新增 |
-| W-05 | P2 | 管理员后台 | 绑定码兑换时 Agent 上报的名称覆盖管理员设的终端名（`terminal-credential-security.service.ts:248`） | 截图 60 | 后端窗口 | 新增 |
-| W-06 | P1 | 两后台 | 工程词与原始 ID 给运营看：工作台「最近操作」`policy.publish`、`terminal.bind_code.exchange`、账号 ID；「contentTrustStatus=active」；设备总览「F1/F2 CLOSED_MODE」；「fail-closed 口径」；机构端每页「不直接对应前端页面」；「info-only」；星号原样显示（`partners/index.tsx:725`）；AI 调用 0 次显示成功率 0% | 截图 58、107 等 | 后台窗口 | 新增 |
-| W-07 | P2 | 两后台 | 托管 a 下管理员导航仍有岗位/招聘会/企业/Excel 导入/数据接入；机构类型默认模块含岗位招聘会；法务类型名「AI 免责声明」与「AI 服务免责声明」两叫法；设备能力页仍叫「签名盖章」；保存成功无提示（机构档案、屏保终端配置） | UI 实操 | 后台窗口（A-10 已排期） | 新增 |
+| W-01 | P1 | 一体机 | 一体机没有可点的「AI 内容投诉」入口：词表有 `ai_content_complaint`，但打印完成页、打印扫描首页两个反馈子集都不含；「我的反馈」类别只有 4 类（`apps/kiosk/src/pages/profile/me/feedback/types.ts:4-9`，`services/api/memberFeedback.ts:11` 类型也没有）。小程序已有 | 代码核对 | Claude（一体机子代理） | 修复中（PR 进候选） |
+| W-02 | P1 | 管理员后台 | 新生产库上后台建不出黑白/彩色打印价目：计费页只渲染已有行，服务端只自动补 `resume_export`（`admin-billing.service.ts:40`），不存在的行返回 `PRICE_CONFIG_NOT_FOUND`（:121）→ 报价失败。本地按 `docs/operations/price-config-production.md` 的 SQL 补齐 | UI 实操截图 setup/ 第 3 项 | 后端窗口主责，后台窗口配前端 | 已派 |
+| W-03 | P1（优先） | 机构后台 | 管理员新建的机构账号永远验证不了手机号：每次登录弹「手机号本人验证」，获取验证码 409 `ACCOUNT_PASSWORD_PROOF_NOT_READY`，只能「稍后验证」（`password-proof-state.ts:16`、`auth.service.ts:648-656`）；也不强制首登改密 | UI 实操截图 61–62、89–90 | 后端窗口（优先；#1091 前核实管理员不受影响） | 已派 |
+| W-04 | P2 | 管理员后台 | 从没连过的终端显示「最近心跳 刚刚」：心跳空时回落 `lastSeenAt`（`@updatedAt`，任何编辑都刷新）（`terminals/index.tsx:767`） | 截图 22、25 | 后台窗口 + 后端窗口 | 已派 |
+| W-05 | P2 | 管理员后台 | 绑定码兑换时 Agent 上报的名称覆盖管理员设的终端名（`terminal-credential-security.service.ts:248`） | 截图 60 | 后端窗口 + 后台窗口 | 已派 |
+| W-06 | P1 | 两后台 | 工程词与原始 ID 给运营看：工作台「最近操作」`policy.publish`、`terminal.bind_code.exchange`、账号 ID；「contentTrustStatus=active」；设备总览「F1/F2 CLOSED_MODE」；「fail-closed 口径」；机构端每页「不直接对应前端页面」；「info-only」；星号原样显示（`partners/index.tsx:725`）；AI 调用 0 次显示成功率 0% | 截图 58、107 等 | 两后台窗口 | 已派 |
+| W-07 | P2 | 两后台 | 托管 a 下管理员导航仍有岗位/招聘会/企业/Excel 导入/数据接入；机构类型默认模块含岗位招聘会；法务类型名「AI 免责声明」与「AI 服务免责声明」两叫法；设备能力页仍叫「签名盖章」；保存成功无提示（机构档案、屏保终端配置） | UI 实操 | 两后台窗口 | 已派 |
 | W-08 | P2 | 一体机 | 读不到能力配置时的开发者口吻长文案（`printHubContent.ts:205-206`）；「签名盖章」用户可见约 22 行，2.0 定稿要求改「签名」 | 代码核对 | 主执行窗口定时间 | 已派 |
-| W-09 | 待拍板 | 一体机 | 小青「按办事入口开顾问作业」：2.0 定稿里没有这个入口（05 稿 :979 把顾问工作台标「还没开放」，52 稿无上游链接）；只有驾驶舱「入口方向」标签未实现（P2） | 设计稿核对 | 产品负责人 | 待拍板 |
-| W-10 | 待拍板 | 一体机 | F12 政策材料清单打印：2.0 冻结稿 48 没有此按钮；`PolicyPost` 没有结构化材料字段，只能印原文；要做需改冻结稿 + 新端点（参照 `fair-company-print.service.ts`）+ 打印交接新来源 | 设计稿与代码核对 | 产品负责人 | 待拍板 |
+| W-09 | 待拍板 | 一体机 | 小青「按办事入口开顾问作业」：2.0 定稿里没有这个入口（05 稿 :979 把顾问工作台标「还没开放」，52 稿无上游链接）；只有驾驶舱「入口方向」标签未实现（P2） | 设计稿核对 | 产品负责人（总指挥 9/29 转达） | 试点后再议：稿件冻结不新增入口，照旧走「小青对话 → 要点总结」 |
+| W-10 | 待拍板 | 一体机 | F12 政策材料清单打印：2.0 冻结稿 48 没有此按钮；`PolicyPost` 没有结构化材料字段，只能印原文；要做需改冻结稿 + 新端点（参照 `fair-company-print.service.ts`）+ 打印交接新来源 | 设计稿与代码核对 | 产品负责人（总指挥 9/29 转达） | 试点后再议：列入第二版；之前由机构把材料清单写在政策正文，一体机「上传自备材料打印」不变 |
 | W-11 | 已知限制 | 真机 | 缺纸只在模拟 Agent 与会写状态的驱动上成立：奔图驱动 `DetectedErrorState` 恒 0，真机缺纸最终是 `PRINT_JOB_UNCONFIRMED`，一体机显示「打印结果未确认」；`wmi.ts:127-128` 把 4 映射成 error | Windows 窗口 | Windows 窗口 | 已派 |
 | W-12 | P1 | 服务端 | 扫描指引用词与面板不一致（`scan-tasks.service.ts:177-193`「按『开始』」「扫描到网络 / SMB」，面板实际「扫描」按钮、「扫描到 SMB」）；面板复印设置会留给下一位（已知限制）；面板可出 TIFF/OFD 而 Agent 只认 pdf/jpg/png（待验） | 总指挥转奔图手册 | 后端窗口 | 已派 |
 
@@ -97,3 +97,13 @@
 ## 七、agy 反方评审的取舍
 
 （总表 v1 出来后）
+
+### 4.3 W-03 补充核对（9/29 晚，读代码）
+
+- 死锁链：管理员新建机构账号 `passwordProofState=TEMPORARY` → 机构自己改密后仍是 TEMPORARY（`password-proof-state.ts:16`）→ 首次绑手机 `initial-phone-bind.service.ts:48/:90` 先要求 OWNER_MANAGED，否则 409 → 只有绑定成功才在 `:107` 升为 OWNER_MANAGED。系统里没有「线下核验恢复」的操作路径，管理员侧提示「本系统不提供管理员绕过」。
+- 管理员账号：同一断言对 `role≠partner` 直接放行，管理员自改密后是 OWNER_MANAGED，读代码判断不受影响；已请后端窗口在 #1091 前实测一次（bootstrap 管理员首登改密后能否完成手机号绑定）。
+
+### 4.4 已知限制（不是缺陷，记录在案）
+
+- 面板复印的明暗度、纸张设置会留给下一位用户（奔图手册 p46），一体机清场管不到打印机面板；建议每日开门检查加一条「面板复印设置恢复默认」。
+- 面板复印不经过一体机与 Agent，后台看不到复印张数、不计费、不留记录；R4 已定对用户免费开放。
