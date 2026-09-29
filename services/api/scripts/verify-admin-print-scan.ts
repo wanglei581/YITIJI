@@ -683,13 +683,13 @@ async function main() {
       where: { id: inactiveTerminalId },
       data: { enabled: false },
     })
-    await expectRetryReason(inactiveTaskId, '终端不在 active 状态，不能重新排队', '未退役但未运行')
+    await expectRetryReason(inactiveTaskId, '终端当前不在运行状态，不能重新排队', '未退役但未运行')
     await expectHttpErrorCode(
       () => printScan.applyAction('print', inactiveTaskId, 'retry'),
       409,
       'PRINT_SCAN_RETRY_TERMINAL_NOT_ACTIVE',
       '未运行终端 failed 任务 retry → 409',
-      '终端不在 active 状态，不能重新排队',
+      '终端当前不在运行状态，不能重新排队',
     )
     pass('列表原因与管理员动作拒绝一致：退役、未运行、订单状态不是 failed')
 

@@ -8,7 +8,7 @@
  */
 
 export const ADMIN_RETRY_TERMINAL_RETIRED_MESSAGE = '终端已永久退役，不能重新排队'
-export const ADMIN_RETRY_TERMINAL_NOT_ACTIVE_MESSAGE = '终端不在 active 状态，不能重新排队'
+export const ADMIN_RETRY_TERMINAL_NOT_ACTIVE_MESSAGE = '终端当前不在运行状态，不能重新排队'
 export const ADMIN_RETRY_STATE_CHANGED_MESSAGE = '任务状态已变更，请刷新后重试'
 
 export function adminRetryBlockedReason(input: {
