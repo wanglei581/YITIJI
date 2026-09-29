@@ -144,7 +144,7 @@ export interface AdminTerminalRecord {
   orgType?: string | null
   registeredAt: string            // ISO
   lastSeenAt: string              // ISO
-  online: boolean                 // lastSeenAt 距今 < 3 分钟 = true
+  online: boolean                 // lastSeenAt 距今 < 5 分钟 = true（服务端 TERMINAL_ONLINE_WINDOW_MS）
   lastHeartbeatAt: string | null
   agentStatus: 'online' | 'offline' | 'error' | 'agent_degraded' | string | null
   localTaskDatabaseAvailable: boolean | null

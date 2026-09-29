@@ -25,7 +25,7 @@ import { fmtDisk, printerStatusView, scanInputView } from './terminalStatusViews
 const TABLE_COLS = 16
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
 
-// 在线/离线由 online 字段决定(契约 C1:lastSeenAt 距今 < 3 分钟)
+// 在线/离线由 online 字段决定(契约 C1:lastSeenAt 距今 < 5 分钟，服务端 TERMINAL_ONLINE_WINDOW_MS)
 const ONLINE_VIEW = { badge: 'success' as const, label: '在线' }
 const OFFLINE_VIEW = { badge: 'error' as const, label: '离线' }
 const DEGRADED_VIEW = { badge: 'warning' as const, label: '降级' }
