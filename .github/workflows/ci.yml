@@ -164,6 +164,7 @@ jobs:
           #    但没有任何 CI job 执行它们。全部只读取仓库源码/文档文本，
           #    不 import services/api/src、不碰 Prisma、不连 DB，故留在本步。
           pnpm --filter @ai-job-print/kiosk verify:advisor-provider-gate
+          pnpm --filter @ai-job-print/kiosk verify:public-screen-mask
           pnpm --filter @ai-job-print/kiosk verify:file-retention-ui
           pnpm --filter @ai-job-print/kiosk verify:home-narrow-visual-balance
           pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
