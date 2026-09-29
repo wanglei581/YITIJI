@@ -22023,17 +22023,21 @@
       "services/api/scripts/verify-ai-access.ts"
     ],
     "services/api/src/ai-access/ai-access.decorator.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai-access/ai-access.guard.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai-access/ai-access.module.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai-access/ai-access.service.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/ai-log.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
@@ -22087,7 +22091,8 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
-      "services/api/scripts/verify-governed-job-fit.ts"
+      "services/api/scripts/verify-governed-job-fit.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/ai.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
@@ -22275,7 +22280,8 @@
     ],
     "services/api/src/ai/resume/appended-self-assessment.service.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/resume/career-plan-degraded-pdf.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -22399,7 +22405,8 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
-      "services/api/scripts/verify-llm-input-pii-mask.ts"
+      "services/api/scripts/verify-llm-input-pii-mask.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/resume/ocr/baidu-ocr.provider.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts",
@@ -22479,19 +22486,23 @@
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-cjk-font.ts",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/resume/self-assessment-questions.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/resume/self-assessment-scoring.ts": [
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
       "services/api/scripts/verify-self-assessment.ts"
     ],
     "services/api/src/ai/resume/self-assessment.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/resume/self-assessment.types.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
@@ -22500,7 +22511,8 @@
     "services/api/src/ai/self-assessment.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-assess-isolation.ts",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/app.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -22920,7 +22932,8 @@
     "services/api/src/common/pdf/aigc-label.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-production-runtime-gates.ts",
-      "services/api/scripts/verify-resume-export-label.ts"
+      "services/api/scripts/verify-resume-export-label.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/common/pdf/aigc-pdf-metadata.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts"
@@ -22934,7 +22947,8 @@
       "services/api/scripts/verify-pdf-cmap.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-resume-export-label.ts",
-      "services/api/scripts/verify-resume-report-export.ts"
+      "services/api/scripts/verify-resume-report-export.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/common/pickup-code.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -37717,6 +37731,37 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:screensaver-content"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai-access/ai-access.decorator.ts",
+          "services/api/src/ai-access/ai-access.guard.ts",
+          "services/api/src/ai-access/ai-access.module.ts",
+          "services/api/src/ai-access/ai-access.service.ts",
+          "services/api/src/ai/ai.module.ts",
+          "services/api/src/ai/resume/appended-self-assessment.service.ts",
+          "services/api/src/ai/resume/llm-self-assessment.service.ts",
+          "services/api/src/ai/resume/self-assessment-pdf.service.ts",
+          "services/api/src/ai/resume/self-assessment-questions.ts",
+          "services/api/src/ai/resume/self-assessment-scoring.ts",
+          "services/api/src/ai/resume/self-assessment.service.ts",
+          "services/api/src/ai/self-assessment.controller.ts",
+          "services/api/src/common/pdf/aigc-label.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:self-assessment-ai-gate"
       ],
       "wired": true
     },

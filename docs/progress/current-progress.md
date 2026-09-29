@@ -4,6 +4,14 @@
 
 > **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
 
+## 2026-09-29：自我探索的维度打分与 AI 解读拆开（分支 `claude/backend-hardening-20260929-selfassess-scoring`）
+
+- **问题：** 自我探索提交、打印、附加到简历三个接口整体挂在 AI 闸门上。AI 暂停、额度用完、未开通、没做声明或没登录时，用户连不经过模型的维度打分都拿不到，违背「AI 是加速器不是前置条件」。
+- **修法（Claude 子代理实现、协调方审）：** 三个接口改为 `@AiUseExempt` + `@MaintenanceBlocked`，在接口里调同一个 `AiAccessService.enforce`。提交时闸门拦下，就不调模型、只回打分；响应新增 `interpretationAvailable` 与 `aiUnavailableReason`（只存错误码）。只含打分的报告打印、附加到简历时不经 AI 闸门、不写 AIGC 标识，标题标「未含 AI 解读」；含 AI 解读的记录照旧过闸。全机维护照旧拦。判定口径放进新文件 `self-assessment-interpretation.ts`（服务文件已到 500 行，现为 532 行）。
+- **验证：** 新门禁 `verify:self-assessment-ai-gate` 90 条，旧代码上红 12 条，已挂 CI。子代理做了 15 处反向变异，全部变红。子代理还在已合 #1088、#1094 的分支上，用真实闸门跑过额度用完与未开通两种情况。协调方在最新候选上复跑了 13 条关联门禁、ci-gate-coverage、repository-integrity、小程序接口契约，以及 api / shared / kiosk 类型检查，全部通过。
+- **前端：** 两端不改也能用：一体机和小程序本来就按 `providerName=llm_unavailable` 显示「AI 解读缺失」并保留打分。建议改为优先读 `interpretationAvailable`；闸门类原因码不要提示用户「重试」。交付单已发一体机与小程序窗口。
+- **待产品负责人拍板：** ①没做年满 14 周岁声明、没登录时也照常打分并保存记录（自我探索有自己的知情同意；推荐维持）；②附加接口含 AI 解读时仍按 generate 档过闸（它本身不调模型，推荐改为 export 档）；③整体合规拒答仍让用户重新作答（推荐下一包改成只回打分）。
+
 ## 2026-09-29：content-pipeline-e2e 自签令牌改为 15 分钟，并核对与登录签发一致（PR #1097，未合入）
 
 - **寿命：** `issueInternalToken` 的自签令牌从 `24h` 改为 `15m`。这条门禁是隔离 SQLite + 进程内内存 Redis 的一次 HTTP 链路，脚本里没有 sleep / 轮询；2026-09-29 本机整段实测 48 秒，15 分钟够用。生产登录仍是 `auth.module.ts` 的 `JWT_TTL`（24h）。
