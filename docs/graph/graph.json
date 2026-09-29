@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 562,
+    "endpointCount": 563,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -6923,6 +6923,25 @@
         ],
         "services": [
           "MaterialsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/materials/materials.controller.ts",
+        "handler": "MaterialsController.confirmManualCheck",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "DocumentProcessTask",
+          "FileObject",
+          "PiiFinding"
+        ],
+        "path": "/api/v1/materials/tasks/:id/manual-confirmation",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/materials/materials-manual-confirmation.service.ts"
+        ],
+        "services": [
+          "MaterialsManualConfirmationService"
         ]
       },
       {
@@ -16306,6 +16325,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/materials/materials-manual-confirmation.service.ts",
           "services/api/src/materials/materials.service.ts",
           "services/api/src/materials/pii-redaction.service.ts",
           "services/api/src/print-jobs/pii-scan-gate.ts"
@@ -21663,6 +21683,7 @@
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-partner-account-action.ts",
+      "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-sms-budget.ts"
     ],
     "services/api/scripts/support/isolated-verification-database.ts": [
@@ -21691,6 +21712,7 @@
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
+      "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts",
@@ -23716,6 +23738,12 @@
     "services/api/src/materials/image-print-quality.util.ts": [
       "services/api/scripts/verify-file-display-truth.ts"
     ],
+    "services/api/src/materials/materials-manual-confirmation.service.ts": [
+      "services/api/scripts/verify-pii-manual-confirm.ts"
+    ],
+    "services/api/src/materials/materials.access.ts": [
+      "services/api/scripts/verify-pii-manual-confirm.ts"
+    ],
     "services/api/src/materials/materials.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-material-task-token-transport.ts",
@@ -23724,6 +23752,7 @@
     "services/api/src/materials/materials.service.ts": [
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-pdf-cmap.ts",
+      "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
@@ -24441,7 +24470,8 @@
       "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/src/print-jobs/pii-scan-gate.ts": [
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "services/api/scripts/verify-pii-manual-confirm.ts"
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -24645,6 +24675,7 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
+      "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
@@ -36000,6 +36031,30 @@
       "package": "services/api",
       "scriptNames": [],
       "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/materials/materials-manual-confirmation.service.ts",
+          "services/api/src/materials/materials.access.ts",
+          "services/api/src/materials/materials.service.ts",
+          "services/api/src/print-jobs/pii-scan-gate.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pii-manual-confirm.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pii-manual-confirm"
+      ],
+      "wired": true
     },
     {
       "asserts": {
