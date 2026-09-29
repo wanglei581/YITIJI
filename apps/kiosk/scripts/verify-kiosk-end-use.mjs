@@ -70,6 +70,13 @@ check(
   '守卫里清本机与退出登录各只出现两次（都在 runEndKioskUse 的步骤里），没有半清的旁路',
 )
 check(!/clearSessionFor|clearSessionTo/.test(guard + code('src/auth/KioskSessionControlContext.tsx')), '旧的 clearSessionTo / clearSessionFor 已收掉，页面没有第二个入口')
+// W-64：换号后登录成功 replace 跳走，不能被当成「边界之前的旧历史」把下一位清回游客首页。
+check(
+  /const historyMatchesRoute = typeof historyState\.key !== 'string' \|\| historyState\.key === locationKey/.test(guard) &&
+    /const isStaleHistoryEntry =\s*historyMatchesRoute &&\s*navigationType === 'POP' &&/.test(guard) &&
+    /useLayoutEffect\(\(\) => \{[\s\S]{0,200}navigationType === 'POP'\) return[\s\S]{0,300}window\.history\.replaceState\(/.test(guard),
+  '换号后登录 replace 跳走不被判成旧历史（只在 POP 且路由与浏览器记录对上时判旧，并给新记录补边界记号）',
+)
 
 // 每个离场出口都经 endKioskUse。
 const exits = [
