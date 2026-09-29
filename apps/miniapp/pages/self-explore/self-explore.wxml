@@ -41,16 +41,22 @@
           <text class="ficon i-info cs-ic"></text>
           <text class="cs-title">知情同意说明</text>
         </view>
-        <view class="cs-list">
-          <view wx:for="{{consentItems}}" wx:key="*this" class="cs-item">
-            <text class="ficon i-check cs-dot"></text>
-            <text class="cs-text">{{item}}</text>
+        <!-- 条款与版本号都是服务端同一次响应下发的原值，页面不写死：写死会在同意书改版后
+             把「对旧说明的同意」当成「对新说明的同意」，而这正是版本号存在的唯一理由。 -->
+        <block wx:if="{{consentReady}}">
+          <view class="cs-list">
+            <view wx:for="{{consentItems}}" wx:key="*this" class="cs-item">
+              <text class="ficon i-check cs-dot"></text>
+              <text class="cs-text">{{item}}</text>
+            </view>
           </view>
+          <view class="cs-ver">同意说明版本：{{consentVersion}}</view>
+        </block>
+        <view wx:else class="list-state">
+          <view>同意说明没有取到，暂时不能开始作答。先看到完整说明才能同意，请稍后重试。</view>
+          <view class="state-retry tap" hover-class="tap-press" bindtap="reload"
+                role="button" aria-label="重新加载同意说明">重试</view>
         </view>
-        <!-- 版本号是服务端下发的原值。页面不写死：写死会在同意书改版后把「对旧说明的
-             同意」当成「对新说明的同意」，而这正是版本号存在的唯一理由。 -->
-        <view class="cs-ver" wx:if="{{consentVersion}}">同意说明版本：{{consentVersion}}</view>
-        <view class="cs-ver" wx:else>服务端未下发同意说明版本号，本次将记为「未版本化同意」。</view>
       </view>
 
       <view class="card card-inner rise-d3">
@@ -306,7 +312,7 @@
 
   <!-- ── 底部操作条 ── -->
   <view class="actionbar" wx:if="{{phase === 'consent'}}">
-    <view class="btn lg block primary tap {{agreeNonSensitive ? '' : 'disabled'}}" hover-class="tap-press"
+    <view class="btn lg block primary tap {{agreeNonSensitive && consentReady ? '' : 'disabled'}}" hover-class="tap-press"
           bindtap="startAsk" role="button" aria-label="同意并开始作答">同意并开始作答</view>
   </view>
 

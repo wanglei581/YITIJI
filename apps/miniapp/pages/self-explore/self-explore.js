@@ -36,25 +36,16 @@ const storage = require('../../utils/storage')
 /** 雷达图配色。canvas 读不到 CSS 变量，这里是 app.wxss 里 --teal 系与 --line 系的取值副本。 */
 
 /**
- * 知情同意条目。逐条对应服务端已实现的行为，用户勾的就是这几句原文。
- * 与一体机 apps/kiosk/src/pages/resume/selfAssessmentSession.ts 的 CONSENT_ITEMS 同源，
- * 另把「答案原文不入库、不送模型」这条数据流事实单独写出来 —— 那是用户决定要不要
- * 作答时唯一真正关心的一条，藏在「不留存」三个字里说不清楚。
- *
- * 版本号不写死在这里：consentVersion 一律用 questions 接口下发的值。写死会在
- * 同意书改版时静默失配（服务端会回 SELF_ASSESSMENT_CONSENT_VERSION_STALE）。
+ * 知情同意条款与版本号都不写在这里（9/29 裁定）：一律用 questions 接口同一次响应里的
+ * consentItems 与 consentVersion —— 两者是同一份说明，用户勾的就是那几句原文，
+ * 提交时带回的就是那一个版本号。页面自己写一份条款，改版时就会出现「看的是这份、
+ * 记的是那份」；写死版本号则会静默失配（服务端回 SELF_ASSESSMENT_CONSENT_VERSION_STALE）。
+ * 响应里缺条款或缺版本号时不能开始作答：没看到说明的同意不算同意。
  */
-const CONSENT_ITEMS = [
-  // 合规窗口 9/29 裁定，一字不差（匿名也能作答、结果短期保存，维持可用但写明年龄要求）。
-  '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。',
-  '本工具基于你本人的作答给出倾向参考，不是临床、心理或人格诊断。',
-  '结果只对你本人可见，不向企业、合作机构或任何第三方推送。',
-  '答案原文不入库、也不发给 AI：服务端只保存作答摘要（哈希）、五维强度与解读文字，发给模型的只有五个维度名与对应强度分值。',
-  '本工具不判断你是否胜任某个岗位或职业，也不构成能力证明。',
-  '五维强度由固定权重累加算出，不经过 AI；五段解读由 AI 生成，仅供参考。',
-  '作答后可在结果页撤回：服务端会删除该次结果，并留下一条删除审计记录。',
-]
-
+function toConsentItems(res) {
+  const raw = (res && Array.isArray(res.consentItems)) ? res.consentItems : []
+  return raw.map(trimmed).filter(Boolean)
+}
 
 function trimmed(v) {
   return typeof v === 'string' && v.trim() ? v.trim() : ''
@@ -85,8 +76,10 @@ Page({
     taskId: '',
 
     // ── 同意书 ──
-    consentItems: CONSENT_ITEMS,
+    consentItems: [],
     consentVersion: '',
+    /** 条款与版本号都从服务端拿到了，才允许开始作答。 */
+    consentReady: false,
     agreeNonSensitive: false,
     agreeSensitive: false,
     /** 题库里被标为敏感的题数，按下发的题目真值算，不写死。v1 实测 0 题。 */
@@ -205,7 +198,9 @@ Page({
         this.setData({
           phase: 'consent',
           dims: view.dims,
+          consentItems: view.consentItems,
           consentVersion: view.consentVersion,
+          consentReady: view.consentItems.length > 0 && !!view.consentVersion,
           sensitiveCount: view.sensitiveCount,
           totalCount: view.totalCount,
           requiredCount: view.requiredCount,
@@ -252,7 +247,11 @@ Page({
       })
       if (items.length) dims.push({ key: trimmed(d.key), label: trimmed(d.label) || trimmed(d.key), questions: items })
     })
-    return { dims, totalCount, requiredCount, sensitiveCount, consentVersion: trimmed(res && res.consentVersion) }
+    return {
+      dims, totalCount, requiredCount, sensitiveCount,
+      consentItems: toConsentItems(res),
+      consentVersion: trimmed(res && res.consentVersion),
+    }
   },
 
   reload() {
@@ -275,6 +274,8 @@ Page({
   },
 
   startAsk() {
+    // 说明没取到：页面上已有原因和重试，这里不放行。
+    if (!this.data.consentReady) return
     // 同意前不得进入答题：这不是表单校验，是服务端也会拒的合规闸门
     // （nonSensitive 为 false → SELF_ASSESSMENT_CONSENT_REQUIRED）。
     if (!this.data.agreeNonSensitive) {
