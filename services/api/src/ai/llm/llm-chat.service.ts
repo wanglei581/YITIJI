@@ -33,6 +33,7 @@ import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWor
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from './ai-prompt-safety'
 import { applyAssistantChannel, kioskChannelConstraint, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
+import { maskUserTextsForLlmText } from '../../common/pii/llm-input-mask'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -221,6 +222,32 @@ function safeLogValue(value: unknown, maxChars = 80): string {
     .slice(0, maxChars)
 }
 
+/**
+ * 送模型前遮盖用户说的话（本轮 + 历史），只遮高置信项：手机号 / 证件号 / 银行卡 / 邮箱 / 带标签的住址。
+ * **姓名不遮**（keepNames）：称呼被遮掉，对话就接不上了。
+ *
+ * 会话里存的是原话，只在发出去的那一刻遮 —— 二选一选这个，理由：
+ *   - 会话转写会交还给本人：「小青本次要点」（advisor/assistant-summary.service.ts）
+ *     拿它的第一句原话当记录标题存进本人的练习记录；存成遮盖后的，用户会在自己的记录里
+ *     看到「[手机号_1]」。那条链路送模型前自己会再遮一次，不受影响。
+ *   - 历史整体一起遮，占位符编号跨轮一致（第 1 轮和第 3 轮的同一个手机号都是 [手机号_1]），
+ *     模型仍能看懂「用户前后说的是同一个号码」。
+ * 小青自己的回复不遮：模型只见过遮盖后的文本，回复里不会有用户的原始号码。
+ */
+function maskUserTurnsForLlm(messages: readonly ChatMessage[]): ChatMessage[] {
+  const userIndexes: number[] = []
+  messages.forEach((message, index) => { if (message.role === 'user') userIndexes.push(index) })
+  if (userIndexes.length === 0) return messages.map((message) => ({ ...message }))
+  const masked = maskUserTextsForLlmText(
+    userIndexes.map((index) => messages[index]!.content),
+    'assistant_chat',
+    { keepNames: true },
+  )
+  const byIndex = new Map(userIndexes.map((messageIndex, i) => [messageIndex, masked[i] ?? ''] as const))
+  return messages.map((message, index) =>
+    byIndex.has(index) ? { role: message.role, content: byIndex.get(index)! } : { ...message })
+}
+
 function classifyIntent(message: string): AssistantIntent {
   for (const [re, intent] of INTENT_RULES) {
     if (re.test(message)) return intent
@@ -325,7 +352,7 @@ export class LlmChatService {
     const systemPrompt = channelConstraint ? `${guarded}\n\n${channelConstraint}` : guarded
     const payloadMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
-      ...session.messages.slice(-MAX_HISTORY),
+      ...maskUserTurnsForLlm(session.messages.slice(-MAX_HISTORY)),
     ]
 
     let rawReply: string
