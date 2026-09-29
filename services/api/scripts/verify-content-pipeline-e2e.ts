@@ -31,7 +31,10 @@
  * 桩不实现 Lua ⇒ BullMQ 在它上面是失败的,因此 `api` 模式按仓库既有口径
  * (verify-job-sync.ts)用「确定性 fetch 边界」验 inline 路径,队列投递不在本门禁范围。
  * 同理,桩上密码登录的失败次数预留(P1-4,Lua)必然失败关闭 —— 所以凭证不走
- * `POST /auth/login`,而是直接签发内部令牌(见 harness 的 issueInternalToken);
+ * `POST /auth/login`,而是直接签发内部令牌(见 harness 的 issueInternalToken)。
+ * 这张令牌只活 15 分钟;签完立即解码,对照 `auth.service.ts` 的 `issueLogin`
+ * 和 `auth.module.ts` 的 signOptions(aud、iss、sub、role、orgId、ver、jti)。
+ * 对不上就抛错,退出码不是 0。
  * 登录链路本身由 verify:admin-login-hardening / verify:redis-degradation-truth 看守。
  *
  * Run: VERIFICATION_DATABASE_TARGET=isolated DATABASE_URL=file:./prisma/verify-e2e.db \

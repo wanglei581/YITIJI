@@ -10,6 +10,11 @@ import bcrypt from 'bcryptjs'
 import { Redis } from 'ioredis'
 import { startInMemoryRedis, type InMemoryRedisServer } from './inmemory-redis-server'
 import { startVerificationApi, type VerificationApiServer } from './verification-api-server'
+import {
+  assertIssuedTokenMatchesIssueLogin,
+  HARNESS_INTERNAL_TOKEN_TTL,
+  readIssueLoginClaimContract,
+} from './internal-login-claim-contract'
 
 // ── 断言 harness ─────────────────────────────────────────────────────────────
 
@@ -197,19 +202,26 @@ export async function hashPassword(pw: string): Promise<string> {
  * 生产行为**,不该为测试削弱:登录的失败关闭由 verify:admin-login-hardening 和
  * verify:redis-degradation-truth 两条门禁看守;本门禁守的是内容管线。
  *
- * 签发口径与 `auth.service.ts::issueLogin` 相同(sub/role/orgId/ver/jti),secret
- * 取启动 API 前已就位的 `JWT_SECRET`(与 AuthModule 同源)——Guard 只用 JWT 认
- * 「这是谁」,角色/机构/可用性/ver 一律回源数据库(`common/auth/optional-internal-user.ts`),
- * 所以这里签的 token 与真实登录 token 走完全相同的校验路径。
+ * 签发字段与 `auth.service.ts::issueLogin` 相同(sub/role/orgId/ver/jti),secret
+ * 取启动 API 前已就位的 `JWT_SECRET`(与 AuthModule 同源)。寿命用
+ * `HARNESS_INTERNAL_TOKEN_TTL`(15 分钟,理由在 internal-login-claim-contract.ts),
+ * 不照抄生产的 24h。签完立刻解码,对照 issueLogin 的 sign() 和 AuthModule 的
+ * signOptions:aud / iss 有没有被多签出来,sub、role、orgId、ver、jti 有没有少、
+ * 名字有没有走样。对不上就抛错,调用方不能带着这张令牌继续跑。
+ *
+ * Guard 只用 JWT 认「这是谁」,角色/机构/可用性/ver 一律回源数据库
+ * (`common/auth/optional-internal-user.ts`)。
  *
  * 注意:不能 `app.get(JwtService)` —— AppModule 里十余个模块各自注册了带
  * `audience:'enduser'` 的 JwtModule,C 端会员 flavor 的实例会赢下默认令牌,签出的
  * token 被内部鉴权按 aud 双向隔离拒掉(实测 401)。因此按 verify-redis-degradation-truth
- * 的既有口径自己 new 一个同 secret 的 JwtService。
+ * 的既有口径自己 new 一个同 secret 的 JwtService。契约也不从这只默认实例读,
+ * 而从 AuthModule 的 signOptions 和 issueLogin 的源码读。
  */
 export async function issueInternalToken(h: HarnessEnv, username: string): Promise<string> {
   const secret = process.env['JWT_SECRET']
   if (!secret || secret.length < 16) throw new Error('JWT_SECRET 未配置或长度不足 16 字符')
+  const contract = readIssueLoginClaimContract()
   const { JwtService } = await import('@nestjs/jwt')
   const { PrismaService } = await import('../../src/prisma/prisma.service')
   const user = await h.api.app.get(PrismaService).user.findUnique({
@@ -217,12 +229,15 @@ export async function issueInternalToken(h: HarnessEnv, username: string): Promi
     select: { id: true, role: true, orgId: true, tokenVersion: true },
   })
   if (!user) throw new Error(`夹具用户不存在: ${username}`)
-  const jwt = new JwtService({ secret, signOptions: { expiresIn: '24h' } })
-  return jwt.sign({
+  const jwt = new JwtService({ secret, signOptions: { expiresIn: HARNESS_INTERNAL_TOKEN_TTL } })
+  const token = jwt.sign({
     sub: user.id,
     role: user.role,
     orgId: user.orgId,
     ver: user.tokenVersion,
     jti: randomUUID(),
   })
+  assertIssuedTokenMatchesIssueLogin(token, user, contract)
+  return token
 }
+
