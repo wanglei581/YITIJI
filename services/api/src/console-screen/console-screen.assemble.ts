@@ -35,7 +35,7 @@ import { PRINTED_PAGES_BY_COMPLETION_SOURCE, PRINTED_PAGES_SOURCE } from './cons
 
 const MISSING_ORG = SCREEN_UNAVAILABLE_REASON.missingOrgIdOnAiAndOrders
 
-/** 累计打印页数：出纸任务 × 份数。任务行超上限时如实「未计算」，不给算少了的数。 */
+/** 累计打印页数：出纸任务 × 份数。任务行超上限时如实标「数据量超出统计上限，显示不全」，不给算少了的数。 */
 function printedPagesMetric(loaded: Loaded<PrintCumulativeSlice>): ScreenMetric<ScreenPrintPagesValue> {
   if (!loaded.ok) return unavailableMetric(PRINTED_PAGES_SOURCE, 'cumulative', loaded.reason)
   const pages = loaded.value.pages

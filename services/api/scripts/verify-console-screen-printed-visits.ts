@@ -616,7 +616,7 @@ async function assertVisits(prisma: Prisma, screen: ConsoleScreenService, cache:
   const partnerAToday = await usage.getPartnerUsage(orgA, 'today', now)
   const partnerA7d = await usage.getPartnerUsage(orgA, '7d', now)
   const partnerBToday = await usage.getPartnerUsage(orgB, 'today', now)
-  assert('v6. 服务调用（管理员，今日）访问人次 = 12', isValue(adminToday.metrics.visits, 12), String(metricValue(adminToday.metrics.visits)))
+  assert('v6. 服务调用（管理员，今日）服务人次 = 12', isValue(adminToday.metrics.visits, 12), String(metricValue(adminToday.metrics.visits)))
   assert('v7. 服务调用（管理员，近 7 天）含昨日 = 16', isValue(admin7d.metrics.visits, 16), String(metricValue(admin7d.metrics.visits)))
   assert('v8. 服务调用（机构 A，今日）= 8', isValue(partnerAToday.metrics.visits, 8), String(metricValue(partnerAToday.metrics.visits)))
   assert('v9. 服务调用（机构 A，近 7 天）= 12', isValue(partnerA7d.metrics.visits, 12), String(metricValue(partnerA7d.metrics.visits)))

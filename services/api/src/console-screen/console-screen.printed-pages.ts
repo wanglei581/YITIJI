@@ -44,7 +44,7 @@ export const PRINTED_TASK_WHERE = {
   ],
 }
 
-/** 累计扫描的任务行上限。超过就不给数（按「行数超上限」如实未计算），不给算少了的累计。 */
+/** 累计扫描的任务行上限。超过就不给数（按「行数超上限」如实标「数据量超出统计上限，显示不全」），不给算少了的累计。 */
 export const PRINTED_PAGES_ROW_CAP = 200_000
 const PRINTED_PAGES_BATCH = 1_000
 const MAX_COPIES = 99
