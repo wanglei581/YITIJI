@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-30：紧急下架通知正文不再出现「。。」（分支 `claude/backend-hardening-20260930-notice-punct`）
+
+- 两个后台窗口走查：事由本身以句号结尾时，发给机构的紧急下架通知拼成「……事由：xxx。。此下架不能由管理员恢复」。新增 `emergencyReasonForSentence`（放在政策与招聘内容两处共用的 recruitment-hosting.ts），拼接前去掉事由末尾的句末标点再统一补「。」；库里的事由原文不变。verify:policies 改用以句号结尾的事由断言正文；变异「不去尾标点」变红；policies、recruitment-emergency-scope、official-channels、companies、job-review 全绿。历史通知不回改。
+
 ## 2026-09-30：打印每单最多 100 面（产品负责人拍板；分支 `claude/backend-hardening-20260929-print-max-100-sides`）
 
 - **为什么：** 原来一单没有上限（份数最多 99、页数不限），Agent 判断「打没打完」的超时只有 5 分钟，长单会被误判为未确认、下一位派单前清理时剩下的页被删掉；纸盒也只装 250 张。有了上限，Windows 窗口才能按最坏情况算超时（Agent 15 分钟、服务端 20 分钟）。试点免费期也防一单打几百页耗材。
