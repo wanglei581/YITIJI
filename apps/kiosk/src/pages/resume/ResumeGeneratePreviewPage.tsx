@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { makePrintParams } from '@ai-job-print/shared'
 import type {
   GeneratedResume,
   ResumeExportFormat,
@@ -29,6 +28,7 @@ import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './compone
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
 import { GeneratePreviewCta, GeneratePreviewEmptyExits, GeneratePreviewNavbar } from './GeneratePreviewChrome'
 import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
+import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-preview-qx.css'
 
@@ -63,6 +63,7 @@ function readPhase(state: unknown): 'preview' | 'export' | null {
 
 export function ResumeGeneratePreviewPage() {
   const navigate = useNavigate()
+  const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
   const query = useMemo(() => parseGeneratePreviewQuery(location.search), [location.search])
@@ -199,17 +200,16 @@ export function ResumeGeneratePreviewPage() {
     if (!exported?.printFileUrl) return
     if (exportFormat !== 'pdf') return
     setPrintNavigating(true)
-    navigate('/print/confirm', {
-      state: {
-        file: {
-          name: exported.filename,
-          size: exported.sizeBytes >= 1024 * 1024 ? `${(exported.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB`,
-          pages: exported.pageCount,
-          fileId: exported.fileId,
-          fileUrl: exported.printFileUrl,
-          mimeType: 'application/pdf',
-        },
-        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+    startPrint({
+      origin: 'resume_generate',
+      returnPath: window.location.pathname,
+      file: {
+        name: exported.filename,
+        size: exported.sizeBytes >= 1024 * 1024 ? `${(exported.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB`,
+        pages: exported.pageCount,
+        fileId: exported.fileId,
+        fileUrl: exported.printFileUrl,
+        mimeType: 'application/pdf',
       },
     })
   }
@@ -403,7 +403,7 @@ export function ResumeGeneratePreviewPage() {
           <ResumeFactConfirmDialog facts={facts} unconfirmed={unconfirmed} busy={exporting} onCancel={() => setFactOpen(false)} onConfirm={(at) => { void handleExport(at) }} />
         )}
         {previewOpen && exported?.signedUrl && (
-          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} onClose={() => setPreviewOpen(false)} />
+          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
       </section>
     </QxPageFrame>

@@ -13,7 +13,6 @@ import { ProfileAssetGrid } from './components/ProfileAssetGrid'
 import { ProfileContinueCard } from './components/ProfileContinueCard'
 import { ProfileHeader } from './components/ProfileHeader'
 import { ProfileSessionRecords } from './components/ProfileSessionRecords'
-import { savePrintMaterialSession } from '../print/printMaterialSession'
 import { QxMemberNavbar } from './components/QxMemberNavbar'
 import type { AIRecord, IncomingState, ResumeItem, ScanItem } from './profileTypes'
 import './styles/profile-qx.css'
@@ -98,13 +97,11 @@ function ProfileContent() {
   const headerDisplayName = (user?.nickname?.trim() || displayName || '会员账号').replace(/1\d{10}/g, maskPhone).replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, maskEmail)
   const headerPhoneMasked = accountPhoneDisplay(user?.phoneMasked ?? displayName)
   const goLogin = () => navigate('/login', { state: { from: location.pathname } })
+  // 「本次记录」里的条目只有文件名和大小，没有可打印的文件凭证（全仓也没有页面往这里传记录）。
+  // 打印交接只收带文件编号和打印链接的文件（商用收口 P0-5），所以这里如实回到选文件，不造一份空交接。
   const printFile = (file: { name: string; size: string; pages?: number }) => {
-    const next = { name: file.name, size: file.size, pages: file.pages ?? 1 }
-    // 必须落 sessionStorage：/print/preview 现在重定向到 /print/desk?step=preview，
-    // 打印台首屏从 readPrintMaterialSession() 复水。只传 route state 的话，
-    // 一体机看门狗自动 reload 之后文件就没了——那正是打印台合并要避免的死局。
-    savePrintMaterialSession({ file: next })
-    navigate('/print/preview', { state: { file: next } })
+    void file
+    navigate('/print/upload?source=document')
   }
 
   const uiState = deriveProfileState({
