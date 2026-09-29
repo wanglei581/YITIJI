@@ -48,7 +48,7 @@ const RETENTION_LABELS: Record<FileRetentionPolicy, string> = {
   system_short: '短期保存',
 }
 
-/** 允许跳转「签名盖章」的文档用途白名单——普通打印文档、简历、求职信等；不含高敏证件类。 */
+/** 允许跳转「签名」的文档用途白名单——普通打印文档、简历、求职信等；不含高敏证件类。 */
 const SIGNABLE_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan', 'cover_letter'])
 
 type SelectableRetentionPolicy = FileRetentionUpdateRequest['retentionPolicy']
@@ -217,7 +217,7 @@ export function MyDocumentsPage() {
         },
       })
     } catch (error) {
-      setHint({ tone: 'bad', text: userMessageOf(error, '打开签名盖章失败，文件可能已到期或被清理') })
+      setHint({ tone: 'bad', text: userMessageOf(error, '打开签名失败，文件可能已到期或被清理') })
     } finally {
       setSigningId(null)
     }
@@ -299,7 +299,7 @@ export function MyDocumentsPage() {
     <>
       <QxMeStructRow icon={FileTextIcon} title="文件名、格式与大小" desc="登录后上传、扫描或生成并保存的文件" mode={structMode} testid="member-assets-struct-documents-0" />
       <QxMeStructRow icon={ClockIcon} title="保存期限" desc="到期时间与可选的留存策略" mode={structMode} testid="member-assets-struct-documents-1" />
-      <QxMeStructRow icon={PrinterIcon} title="可以继续办的事" desc="查看、打印、签名盖章与删除" mode={structMode} testid="member-assets-struct-documents-2" />
+      <QxMeStructRow icon={PrinterIcon} title="可以继续办的事" desc="查看、打印、签名与删除" mode={structMode} testid="member-assets-struct-documents-2" />
     </>
   )
 
@@ -325,9 +325,9 @@ export function MyDocumentsPage() {
         <section className="qx-me-list qx-me-grow" aria-label="从这里开始添加文件">
           <QxMeStartRow icon={UploadIcon} title="从手机或 U 盘添加文件" desc="登录后上传的文件会出现在这里，之后可以预览和打印" label="添加文件" route="/print/upload" testid="member-assets-start-upload" onClick={() => navigate('/print/upload')} />
           <QxMeStartRow icon={ScanLineIcon} tone="slate" title="扫描纸质材料" desc="把纸质简历或证明扫成 PDF；未登录扫描件不会进入我的文档" label="去扫描" route="/scan" testid="member-assets-start-scan" onClick={() => navigate('/scan')} />
-          <div className="qx-me-legal">添加或扫描之后，可以回到这里继续预览、打印和签名盖章。</div>
+          <div className="qx-me-legal">添加或扫描之后，可以回到这里继续预览、打印和签名。</div>
         </section>
-        <QxMeGuide items={[['怎么产生', '登录后上传或扫描', '游客上传不会自动归入你的账号'], ['能做什么', '预览、打印、签名盖章', '从同一份文件继续办'], ['留存', '按系统的保存期限管理', '到期后无法恢复，需要请提前打印']]} />
+        <QxMeGuide items={[['怎么产生', '登录后上传或扫描', '游客上传不会自动归入你的账号'], ['能做什么', '预览、打印、签名', '从同一份文件继续办'], ['留存', '按系统的保存期限管理', '到期后无法恢复，需要请提前打印']]} />
       </>
     )
   } else {
@@ -393,7 +393,7 @@ export function MyDocumentsPage() {
                     {doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) && (
                       <button type="button" disabled={isAnyPending} onClick={() => void signStamp(doc)} title="在该文档上叠加本人手写签名图片" className="qx-me-small">
                         <PenToolIcon size={19} aria-hidden="true" />
-                        {signingId === doc.id ? '准备中' : '签名盖章'}
+                        {signingId === doc.id ? '准备中' : '签名'}
                       </button>
                     )}
                     <button
@@ -494,5 +494,5 @@ const DOING: Record<'login' | 'loading' | 'error' | 'empty' | 'ready', ReactNode
   loading: <>正在读取最新记录，<b>返回前一律显示「—」</b>。</>,
   error: <>列表这次没有更新，<b>重试不会重复创建记录</b>。</>,
   empty: <>还没有保存的文件。<b>先添加或扫描一份</b>，之后可以从这里继续办。</>,
-  ready: <>查看、打印和签名盖章，<b>从同一份文件继续</b>。</>,
+  ready: <>查看、打印和签名，<b>从同一份文件继续</b>。</>,
 }
