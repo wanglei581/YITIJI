@@ -28,6 +28,7 @@ import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-all
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import type { SelfAssessmentDimensionResult } from './self-assessment.types'
+import { INTERPRETATION_UNPARSEABLE_CODE, errorCodeOf } from './self-assessment-interpretation'
 
 export const SELF_ASSESSMENT_SYSTEM_PROMPT = withAiSafety(
   '你是「自我探索 · 倾向参考」工具的解读助手。' +
@@ -124,6 +125,8 @@ export interface LlmSelfAssessmentOutput {
   dimensions: SelfAssessmentDimensionResult[]
   summary: string | null
   providerName: string
+  /** 解读没生成出来的原因码（模型调不通 / 回包解析不出）；只存码，不带 message。 */
+  unavailableReason?: string
 }
 
 interface LlmParsedOutput {
@@ -150,6 +153,7 @@ export class LlmSelfAssessmentService {
         dimensions: input.scored.dimensions.map((d) => ({ ...d, note: null })),
         summary: null,
         providerName: 'llm_unavailable',
+        unavailableReason: errorCodeOf(err, 'AI_UNAVAILABLE'),
       }
     }
 
@@ -161,6 +165,7 @@ export class LlmSelfAssessmentService {
         dimensions: input.scored.dimensions.map((d) => ({ ...d, note: null })),
         summary: null,
         providerName,
+        unavailableReason: INTERPRETATION_UNPARSEABLE_CODE,
       }
     }
 
