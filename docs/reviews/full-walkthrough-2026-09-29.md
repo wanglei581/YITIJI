@@ -103,6 +103,11 @@
 | W-28 | P1 | 小程序 | 确认到机打印页说明写「到机确认前不会创建 Agent 可领取的 PrintTask」，工程用语 | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` 14-print-pay | 小程序窗口 / 小程序窗口 | 已派 |
 | W-29 | P3 | 小程序 | 同一步骤一会儿叫「门店」（页标题「选择门店」、步骤条「选门店」）一会儿叫「终端」（确认页「选终端」） | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` 13、14 | 小程序窗口 / 小程序窗口 | 已派 |
 | W-30 | P3 | 小程序 | Word 文件提示同一句话说两遍（本地文案 + 服务端 reason 拼接，`documents.js:61`） | 小程序窗口实走，截图 `~/.cache/walk0929/evidence/miniapp/` | 小程序窗口 / 小程序窗口 | 已派 |
+| W-31 | P2 | 服务端 + 小程序 | 「我的文档」接口不返回页数：`member-assets.service.ts:121-134` 的 select 没有 pageCount，且 `FileObject` 表本身没有页数列；小程序读 `item.pageCount`（`documents-helpers.js:55/:122`）恒为 0，显示「页数未知」，重新打印时页数也带 0（服务端报价会重算，金额不受影响） | 总指挥转 Codex 两端核查（`~/.cache/claude-lanes/xend-0929/codex-xend.md`，候选 d75be0345）；走查窗口已对代码核实，页面待小程序窗口复现 | 后端窗口（字段来源需定：检查结果里的页数）/ 待定 | 待复现 |
+| W-32 | P1 | 小程序 | 小程序简历页只取第一页 50 条、丢掉 nextCursor（`resumes.js:81`）；Codex 称权益页、反馈页同样（= 9/27 F13 的小程序半边） | 总指挥转 Codex 两端核查（`~/.cache/claude-lanes/xend-0929/codex-xend.md`，候选 d75be0345）；简历页已对代码核实 | 小程序窗口 / 小程序窗口 | 待复现 |
+| W-33 | P1 | 小程序 | AI 记录分多条数据流，小程序疑漏读小青摘要、岗位 AI、后续模拟面试（`ai-records.js:151-166`、`api.js:1249`） | 总指挥转 Codex 两端核查（`~/.cache/claude-lanes/xend-0929/codex-xend.md`，候选 d75be0345） | 小程序窗口 / 小程序窗口 | 待复现 |
+| W-34 | P1 | 两端 | 打印订单两端来源不统一：一体机「我的打印订单」只读打印任务，手机下单未到机核销的单一体机看不到 | 总指挥转 Codex 两端核查（`~/.cache/claude-lanes/xend-0929/codex-xend.md`，候选 d75be0345）；小程序窗口 9/29 已报 | 主执行窗口（#1086 订单时间线） | 修复中 |
+| W-35 | 说明 | 一体机 | 一体机匿名反馈不挂账号，答复只能走会员路径——设计如此，写进帮助说明即可，不算缺陷 | 总指挥转 Codex 两端核查（`~/.cache/claude-lanes/xend-0929/codex-xend.md`，候选 d75be0345） | — | 不算缺陷 |
 
 ## 五、闭环矩阵
 
