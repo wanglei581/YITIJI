@@ -4,6 +4,13 @@
 
 > **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。
 
+## 2026-09-29：一次性维护命令——下架库里残留的「（演示）」企业（分支 `claude/backend-hardening-20260929-demo-companies`）
+
+- **背景：** 生产 GET /api/v1/companies 仍公开 3 家名称与来源都带「（演示）」的企业（`scripts/prod-readonly-probe.mjs` 报 WARN）；seed-guard 只拦新写入，拦不住存量。
+- **做法（Claude 子代理实现、协调方审）：** `pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies`。默认 dry-run 只列清单；执行要带确认词与 2–200 字事由（确认词写错直接退出码 2、不连库）；只动 name 与 sourceName 都含全角「（演示）」的行，只改成下架、不删行；整批一个事务，每行写审计 `company.maintenance_unpublish`（actorRole system-cli）；重复执行无改动、无新审计；打印目标库主机与库名供核对，不打印凭据。运维手册 §4.1 写明两步执行与执行后巡检。**只交付，生产执行须经产品负责人授权、由发布流程执行。**
+- **验证：** 新门禁 `verify:demo-company-unpublish` 62 条（含半角标记、只带一处标记、真实企业的阳性对照），子代理 9 处反向变异全红、临时 PostgreSQL 手工演练通过；协调方复跑 7 条关联门禁全绿并抽 1 处变异（去掉来源条件）变红。
+- **没做（待定）：** 同一批种子还写了 6 个带「（演示）」的岗位和机构「市人社公共就业平台（演示）」，本命令不管；推荐先只读确认生产 GET /jobs 是否也公开，再按同一模式出岗位版。
+
 ## 2026-09-29：content-pipeline-e2e 自签令牌改为 15 分钟，并核对与登录签发一致（PR #1097，未合入）
 
 - **寿命：** `issueInternalToken` 的自签令牌从 `24h` 改为 `15m`。这条门禁是隔离 SQLite + 进程内内存 Redis 的一次 HTTP 链路，脚本里没有 sleep / 轮询；2026-09-29 本机整段实测 48 秒，15 分钟够用。生产登录仍是 `auth.module.ts` 的 `JWT_TTL`（24h）。

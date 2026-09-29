@@ -21727,6 +21727,7 @@
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts",
+      "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-isolated-verification-database.ts",
       "services/api/scripts/verify-job-review.ts",
@@ -21791,6 +21792,9 @@
       "services/api/scripts/verify-upload-sessions-bind.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts"
+    ],
+    "services/api/scripts/unpublish-demo-companies.ts": [
+      "services/api/scripts/verify-demo-company-unpublish.ts"
     ],
     "services/api/scripts/verify-admin-fairs.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -22561,6 +22565,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
+      "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
@@ -24637,6 +24642,7 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-cos-files.ts",
+      "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-deploy-data-safety-gate.ts",
       "services/api/scripts/verify-end-user-asset-ownership.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
@@ -32903,6 +32909,27 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:db-load-indexes"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/unpublish-demo-companies.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-demo-company-unpublish.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:demo-company-unpublish"
       ],
       "wired": true
     },
