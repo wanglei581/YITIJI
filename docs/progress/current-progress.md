@@ -1,6 +1,24 @@
 # 当前开发进度
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
+
+## 2026-09-29：奔图官方手册事实补进设备文档（分支 `glm/pantum-manual-facts-0929`）
+
+- **做了什么：** 以奔图 CM2800 系列用户指南 V1.4（公开资料）为依据，把手册事实补进设备文档；同一分支上另一窗口已完成第一步（`pantum-cm2820adn.md` §八「面板功能与规格」）。本条其余步骤只改 `docs/`，未动代码。出处统一写成「（奔图 CM2800 系列用户指南 V1.4 第 N 页，PDF 页码）」。
+  - **现场故障处置单**：§1 第 7 条写明电源键短按只进节能、按住超过 2 秒才关机、电源灯闪烁是休眠（第 23、25 页），约 1 分钟无任务自动休眠（第 10、90 页）；F4、F7-A 按此改关机步骤。每日开门检查把面板复印设置恢复默认（明暗度、纸张会留下，第 46 页）。前盖向下翻开换粉（第 61–64 页），废粉瓶从机身右侧取（第 22、65 页）。
+  - **现场验收脚本、打印机旁一页纸**：补同一套电源键规则；一页纸的卡纸卡写明位置图顺序，并写后盖定影区先冷却。
+  - **母盘清单 F 段**：净重改为 16.8 kg、打印功耗改为手册未列（第 90 页，只有关机 ≤0.50 W、休眠 ≤2.00 W、就绪 ≤25.00 W）。打印机直插接地墙插；延长线、多引线电源板、多引线扩展器、UPS 和内联浪涌保护器的禁令在第 6 页。插头伸手能拔是第 4 页，保护接地是第 6、10 页。多孔插排和 PDU 按多引线电源板处理，只给主机和屏幕。左侧与右后方通风格栅不贴挡（第 21、73–74 页），机顶不放东西、远离空调和通风管道（第 9 页）。前盖、右侧废粉瓶、后盖三处留操作空间。新增「给机柜厂家的要求」。
+  - **`pantum-cm2820adn.md` §八**：真机核实清单 6 项（U 盘直接打印、铭牌看 Wi-Fi、EWS 的 SNMP 与缺纸/卡纸邮件、身份证放置翻面、TIFF/OFD、复印设置能否自动恢复）；安装与供电安全按上面的页码拆开。
+  - **`windows-terminal-agent-design.md`**：WMI 两格按 `wmi.ts` 改正。离线是 `PrinterStatus=7`（不是 5）；缺纸是 `DetectedErrorState=4`（5 是 Low Toner）。这不是手册内容。
+  - **`next-tasks.md`**：P2 增加「屏幕一点即扫」（第 51 页写明符合 TWAIN/WIA），第一次发布之后做。
+- **对照用户指南原页后改正的地方：**
+  - 卡纸位置图顺序改为手册原文：标准出纸口、多功能进纸盒、标准进纸盒、文档进纸器（ADF）、后部盖门（第 70 页）。上一稿把后部盖门写在前面，并把第四处写成「自动输稿器」。
+  - 多功能进纸盒的取纸是打开前盖、用力向下推到底、取出卡纸、关前盖（第 75–76 页）。「纸张卡在手走纸盒中」是另一节，不在五处图里，也不是多功能进纸盒：抽出标准进纸盒，按左侧蓝色解锁按钮，抽出卡纸，向上按压金属板复位（第 73–74 页）。标准出纸口没有单独取纸步骤，不再写成「推断后一定开后盖」。
+  - 面板提示原文与第 82 页一致，词没有改：「进纸失败」「纸张设置不匹配」「打印机卡纸」；「碳粉盒未安装」「碳粉盒粉量不足」「碳粉盒不匹配」「碳粉盒寿命尽」；「废粉瓶容量将满」「废粉瓶容量满」「未检测到废粉瓶」。
+  - 供电禁令只标第 6 页。上一稿把整句禁令标成第 4、6、10 页。
+- **对照后保持的事实：** 电源键与休眠灯、16.8 kg、三档功耗、复印明暗度和纸张会留下、通风格栅页码、前盖与废粉瓶方位、真机核实清单 6 项、TWAIN/WIA、WMI 枚举。
+- **验证（本机命令，不代表现场或生产验收）：** `node scripts/generate-project-graph.mjs` 退出码 0（`docs/graph/` 0 个文件变化）；`node scripts/generate-project-graph.mjs --check`（即 `pnpm graph:check`）退出码 0。8 个改过的文档各跑 `node scripts/project-graph-query.mjs file <路径>`，退出码均为 0。点名门禁退出码均为 0：`pnpm --filter terminal-agent verify:print-scan-agent`、`pnpm --dir apps/terminal-agent verify:print-scan-agent`、`pnpm --filter ai-job-print-terminal verify:repository-integrity`、`pnpm --filter @ai-job-print/kiosk verify:profile-commercial-first-batch`、`pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home`、`pnpm --filter @ai-job-print/api verify:print-scan-first-release`、`verify:contract-review:preprod-readiness`、`verify:file-assets-trial-acceptance`、`verify:job-customer-sample-readiness`、`verify:job-info-ai-real-acceptance`、`verify:profile-commercial-first-batch-acceptance`、`verify:toolbox-ai-skill-intents`、`verify:toolbox-ai-skill-real-acceptance`、`verify:toolbox-governance-acceptance`、`verify:toolbox-preprod-acceptance`。依赖已在，未重装。
+
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）
 
 - **P-01（机构政策列表）：** 平台紧急下架的政策此前和机构自己下架的一样显示「已下架」，还给「编辑」「审核通过」「发布」（发布会被服务端以 `EMERGENCY_TAKEDOWN_IRREVERSIBLE` 拒绝，编辑后永远发不出去）。服务端 `getPartnerPolicies` 给本机构列表每行附上 `emergencyTakedown` / `emergencyReasonCode` / `emergencyReasonText` / `emergencyTakedownAt`（只按本机构 `orgId` 加本页 id 查 `RecruitmentEmergencyHold`，公开读取不带；改动前已告知后端窗口，对方同意并提了按机构过滤、跨机构断言两条，均照做）。机构后台对这类行显示「平台已紧急下架」、下方整行写事由、说明、下架时间与「已冻结」，只留删除；与官方渠道面板同一口径。门禁 `verify:policies` 加一段：被下架行带出事由、其余行为 false、A/B 两个机构互相看不到对方的事由、公开列表不带这几个字段；变异「不附下架信息」即红。演示模式补一条被下架的示例，演示发布与服务端同样拒绝。

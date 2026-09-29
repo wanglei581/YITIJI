@@ -658,8 +658,8 @@ Kiosk 轮询后端任务状态，completed 时展示"打印完成"页面
 |--------|----------------------|---------|
 | 打印机识别 | `Get-Printer -Name "Pantum CM2800ADN Series"` | 返回对象，不抛 error |
 | 活动打印任务 | `Get-PrintJob -PrinterName "Pantum CM2800ADN Series"` | 打印进行中时返回 1+ 行 |
-| 打印机离线状态 | WMI `Win32_Printer.PrinterStatus` | `5` = Offline；若不可识别 → `UNKNOWN_PRINTER_STATUS` |
-| 打印机缺纸状态 | WMI `Win32_Printer.DetectedErrorState` | `5` = OutOfPaper；若不可识别 → `UNKNOWN_PRINTER_STATUS` |
+| 打印机离线状态 | WMI `Win32_Printer.PrinterStatus` | `7` = Offline（`WorkOffline=True` 或 `DetectedErrorState=9` 同判离线；`3` = Idle）；若不可识别 → `UNKNOWN_PRINTER_STATUS` |
+| 打印机缺纸状态 | WMI `Win32_Printer.DetectedErrorState` | `4` = No Paper（本机型驱动已知不置该位，见 `wmi.ts` 注释 N3；`3` = Low Paper、`5` = Low Toner 映射 `low_paper`）；若不可识别 → `UNKNOWN_PRINTER_STATUS` |
 | 任务完成检测 | `Get-PrintJob` 返回空 + 无 error | 判定为 `completed` |
 | 任务失败检测 | `Win32_PrintJob.StatusMask` bit 8 (Error) | 判定为 `failed` |
 
