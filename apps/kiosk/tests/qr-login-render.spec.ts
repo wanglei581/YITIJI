@@ -467,6 +467,38 @@ for (const scenario of [
   })
 }
 
+// 这台机器 / 全站今天发不了码：重试无用，主按钮直接换到扫码登录；发码请求带终端会话票（按台计额度）。
+for (const scenario of [
+  { code: 'SMS_TERMINAL_DAILY_LIMIT', status: 429, message: '这台机器今天发出的短信验证码已达上限，请明天再试', expected: '这台机器今天发出的短信验证码已达上限' },
+  { code: 'SMS_DAILY_TOTAL_LIMIT', status: 429, message: '今天的短信验证码发送量已达上限，请明天再试', expected: '发送量已达上限' },
+  { code: 'SMS_BUDGET_UNAVAILABLE', status: 503, message: '短信发送量暂时无法核对，为防止验证码被滥发，先暂停发送，请稍后再试', expected: '暂时无法核对' },
+  { code: 'TERMINAL_SESSION_INVALID', status: 401, message: '终端安全会话无效', expected: '这台机器现在发不了验证码，请改用扫码登录' },
+]) {
+  test(`SMS unavailable on this machine ${scenario.code} → 改用扫码登录 @kiosk`, async ({ page, api }) => {
+    registerKioskShell(api)
+    api.respond('POST', '/api/v1/member/auth/sms-code', { status: scenario.status, json: { success: false, error: { code: scenario.code, message: scenario.message } } })
+    // 会话票被拒时 terminalAttributedFetch 会换一次票；换票同样被拒，页面落到扫码退路。
+    api.respond('POST', '/api/v1/terminals/session-token/refresh', { status: 401, json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } } })
+    await page.goto('/login')
+    await enterMemberPhone(page)
+    await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+    const sent = page.waitForRequest((request) => request.url().endsWith('/api/v1/member/auth/sms-code') && request.method() === 'POST')
+    await page.getByTestId('login-gate-send').click()
+    const headers = (await sent).headers()
+    expect(headers['x-terminal-id'], '发码按台计：带终端编号').toBeTruthy()
+    expect(headers['x-terminal-session-token'], '发码按台计：带终端会话票').toBeTruthy()
+    await expect(page.getByTestId('login-gate-state-phone-sms-unavailable')).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText(scenario.expected)
+    await expect(page.getByRole('alert')).not.toContainText(scenario.code)
+    await expect(page.getByText('再试一次发码')).toHaveCount(0)
+    await expect(page.getByTestId('login-gate-anonymous')).toHaveText('不登录，继续使用')
+    const primary = page.getByTestId('login-gate-primary')
+    await expect(primary).toHaveText('改用扫码登录')
+    await primary.click()
+    await expect(page.locator('[data-screen="login-gate"]')).toHaveAttribute('data-mode', 'qr')
+  })
+}
+
 for (const [code, state] of [['SMS_CODE_INVALID', 'phone-code-invalid'], ['SMS_CODE_EXPIRED', 'phone-code-expired'], ['SMS_CODE_LOCKED', 'phone-code-locked']]) {
   test(`W4 verification recovery ${code} @kiosk`, async ({ page, api }) => {
     registerKioskShell(api)
