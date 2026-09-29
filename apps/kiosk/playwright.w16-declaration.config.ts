@@ -12,17 +12,15 @@ process.env.no_proxy = mergedProxyBypass
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\.spec\.ts$/,
-  outputDir: '../../test-results/kiosk-fusion-w3',
+  testMatch: /w16-ai-declaration\.spec\.ts$/,
+  outputDir: '../../test-results/kiosk-w16-declaration',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI
-    ? [['line'], ['html', { outputFolder: '../../test-results/kiosk-fusion-w3-report', open: 'never' }]]
-    : 'list',
+  retries: 0,
+  workers: 1,
+  reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4183',
+    baseURL: 'http://127.0.0.1:47231',
     locale: 'zh-CN',
     timezoneId: 'Asia/Shanghai',
     colorScheme: 'light',
@@ -33,7 +31,9 @@ export default defineConfig({
   },
   projects: [{ name: 'kiosk-1080x1920', grep: /@w3-kiosk/, use: { viewport: { width: 1080, height: 1920 } } }],
   webServer: {
-    command: 'VITE_API_MODE=http VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4183 --strictPort',
-    url: 'http://127.0.0.1:4183', reuseExistingServer: false, timeout: 180_000,
+    command: 'VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_TERMINAL_ID=KSK-001 VITE_TERMINAL_AGENT_BRIDGE_TOKEN=ci-only-local-bridge-token-0123456789abcdef pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 47231 --strictPort',
+    url: 'http://127.0.0.1:47231',
+    reuseExistingServer: false,
+    timeout: 240_000,
   },
 })

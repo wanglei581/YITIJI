@@ -1,4 +1,5 @@
 import { Building2Icon, SearchIcon, SparklesIcon } from 'lucide-react'
+import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
 
 export function JobsQxAiEntry({ onStart }: { onStart: () => void }) {
   return (
@@ -8,7 +9,10 @@ export function JobsQxAiEntry({ onStart }: { onStart: () => void }) {
         <b>用我的简历智能推荐</b>
         <span>选择一份本人已完成诊断的简历，从当前真实岗位中给出参考等级和理由；不向企业共享简历。</span>
       </span>
-      <button type="button" className="qx-btn" data-variant="teal" onClick={onStart}>开始推荐</button>
+      <span className="qx-ai-declaration-slot">
+        <button type="button" className="qx-btn" data-variant="teal" onClick={onStart}>开始推荐</button>
+        <AiDeclarationNote />
+      </span>
     </section>
   )
 }

@@ -34,6 +34,7 @@ import {
   type AiAvailability,
   type AiTaskFallback,
 } from '../../ai'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import {
   CareerPlanApiError,
   generateCareerPlan,
@@ -356,13 +357,16 @@ export function CareerPlanPage() {
   )
   // 生成钮**无条件**渲染，不被 aiTask.canStart 包住（见 handleGenerate 顶部注释）。
   const generateButton = (
-    <Action
-      variant="primary"
-      busy={generating}
-      onClick={() => void handleGenerate()}
-      label={generating ? '正在生成…' : aiOutage ? (plan ? '重试生成' : '重试生成求职方案') : plan ? '重新生成' : '生成求职方案'}
-      icon={generating ? null : <ArrowRightIcon size={22} aria-hidden="true" />}
-    />
+    <span className="qx-ai-declaration-slot">
+      <Action
+        variant="primary"
+        busy={generating}
+        onClick={() => void handleGenerate()}
+        label={generating ? '正在生成…' : aiOutage ? (plan ? '重试生成' : '重试生成求职方案') : plan ? '重新生成' : '生成求职方案'}
+        icon={generating ? null : <ArrowRightIcon size={22} aria-hidden="true" />}
+      />
+      <AiDeclarationNote />
+    </span>
   )
 
   function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; body: ReactNode; cta: ReactNode } {
