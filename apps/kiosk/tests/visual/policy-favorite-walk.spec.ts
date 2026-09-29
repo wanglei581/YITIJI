@@ -99,6 +99,9 @@ function registerShell(api: ApiRouter): void {
   })
   api.respond('POST', '/api/v1/activity/browse', { status: 200, json: { success: true, data: { id: 'browse-1' } } })
   api.respond('POST', '/api/v1/terminals/session-token', { status: 200, json: { sessionToken: 'policy-walk-terminal-session' } })
+  // 正式构建没有测试用会话票。同一标签页里第二次整页打开时，已有票会走续期；
+  // 续期没夹具会被中断，页面停在校验中，政策说明出不来。
+  api.respond('POST', '/api/v1/terminals/session-token/refresh', { status: 200, json: { sessionToken: 'policy-walk-terminal-session' } })
   api.respond('POST', '/api/v1/kiosk/session/start', { status: 200, json: { success: true } })
   api.respond('POST', '/api/v1/kiosk/session/heartbeat', { status: 200, json: { success: true } })
   api.respond('POST', '/api/v1/kiosk/session/end', { status: 200, json: { success: true } })
