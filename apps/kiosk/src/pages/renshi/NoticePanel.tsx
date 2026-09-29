@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { isValidSourceUrl } from '../../lib/url'
 import type { PolicyPostView } from '../../services/api/policies'
@@ -11,17 +11,36 @@ const SRC_RULE = '来源入口由发布方提供，本系统未核验其官方�
 
 export function NoticePanel({
   notices,
+  focusId,
   onOpened,
   onOfficialEntry,
   onTab,
 }: {
   notices: PolicyPostView[]
+  /** 收藏或地址里点名的那一条。在公告里就展开它，不先展开第一条。 */
+  focusId?: string | null
   onOpened: (policy: PolicyPostView) => void
   onOfficialEntry: (policy: PolicyPostView, target: SourceQrTarget) => void
   onTab: (tab: TabKey) => void
 }) {
   const navigate = useNavigate()
-  const [expandedId, setExpandedId] = useState<string | null>(notices[0]?.id ?? null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [touched, setTouched] = useState(false)
+  const openedFocusRef = useRef<string | null>(null)
+  const focusHit = focusId && notices.some((item) => item.id === focusId) ? focusId : null
+  const openId = touched ? expandedId : (focusHit ?? notices[0]?.id ?? null)
+
+  useEffect(() => {
+    if (!focusHit || openId !== focusHit) return
+    if (openedFocusRef.current === focusHit) return
+    const item = notices.find((entry) => entry.id === focusHit)
+    if (!item) return
+    openedFocusRef.current = focusHit
+    onOpened(item)
+    if (!touched) {
+      document.querySelector(`[data-policy-id="${CSS.escape(focusHit)}"]`)?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [focusHit, notices, onOpened, openId, touched])
 
   if (notices.length === 0) {
     return (
@@ -47,16 +66,17 @@ export function NoticePanel({
     <div className="rq-list" data-testid="renshi-notice-list" data-count={notices.length}>
       {notices.map((notice) => {
         const meta = (notice.category && CATEGORY_META[notice.category]) || CATEGORY_META.notice
-        const open = expandedId === notice.id
+        const open = openId === notice.id
         const urlOk = Boolean(notice.externalUrl && isValidSourceUrl(notice.externalUrl))
         const urlMissing = !notice.externalUrl
         return (
-          <article key={notice.id} className={`k8-policy-list-item${open ? ' is-open' : ''}`}>
+          <article key={notice.id} className={`k8-policy-list-item${open ? ' is-open' : ''}`} data-policy-id={notice.id}>
             <button
               type="button"
               className="rq-item-main"
               aria-expanded={open}
               onClick={() => {
+                setTouched(true)
                 setExpandedId(open ? null : notice.id)
                 if (!open) onOpened(notice)
               }}

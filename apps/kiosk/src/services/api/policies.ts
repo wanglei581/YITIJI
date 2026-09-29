@@ -100,3 +100,30 @@ export async function getPublishedPolicies(params?: PolicyQueryParams): Promise<
   }
   return fetchPolicies(params)
 }
+
+/** 按条打开一条已发布政策。404 是找不到或已不在可查看范围；其它失败不冒充「没有这条」。 */
+export type PublishedPolicyLookup =
+  | { status: 'found'; policy: PolicyPostView }
+  | { status: 'missing' }
+  | { status: 'failed' }
+
+export async function getPublishedPolicy(id: string): Promise<PublishedPolicyLookup> {
+  const trimmed = id.trim()
+  if (!trimmed) return { status: 'missing' }
+  if (API_MODE !== 'http') {
+    const found = MOCK_POLICIES.find((item) => item.id === trimmed)
+    return found ? { status: 'found', policy: found } : { status: 'missing' }
+  }
+  try {
+    const res = await fetch(`${API_BASE_URL}/policies/${encodeURIComponent(trimmed)}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (res.status === 404) return { status: 'missing' }
+    if (!res.ok) return { status: 'failed' }
+    const body = (await res.json()) as { data?: PolicyPostView }
+    if (!body.data?.id) return { status: 'failed' }
+    return { status: 'found', policy: body.data }
+  } catch {
+    return { status: 'failed' }
+  }
+}
