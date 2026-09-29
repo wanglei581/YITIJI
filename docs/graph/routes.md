@@ -446,7 +446,7 @@ flowchart LR
   app --> sources["/sources<br/>1 页 · 21 端点"]
   app --> stats["/stats<br/>1 页 · 21 端点"]
   app --> sync_logs["/sync-logs<br/>1 页 · 21 端点"]
-  app --> terminals["/terminals<br/>1 页 · 0 端点"]
+  app --> terminals["/terminals<br/>1 页 · 1 端点"]
 ```
 
 | 路由 | 页面组件 | 页面文件 | 端点数 | 样式 |
@@ -465,10 +465,10 @@ flowchart LR
 | `/sources` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
 | `/stats` | StatsPage | `apps/partner/src/routes/stats/index.tsx` | 21 | — |
 | `/sync-logs` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
-| `/terminals` | TerminalsPage | `apps/partner/src/routes/terminals/index.tsx` | 0 | — |
+| `/terminals` | TerminalsPage | `apps/partner/src/routes/terminals/index.tsx` | 1 | — |
 
 <details>
-<summary>展开：每个路由触达的端点（10 个路由）</summary>
+<summary>展开：每个路由触达的端点（11 个路由）</summary>
 
 **`/`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/profile`、`PUT /partner/smart-campus/terminals/:param/config`
 
@@ -489,5 +489,7 @@ flowchart LR
 **`/stats`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/sync-logs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
+
+**`/terminals`** → `PUT /partner/profile`
 
 </details>

@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 562,
+    "endpointCount": 563,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -10017,7 +10017,11 @@
           "JobFair",
           "JobSource",
           "PolicyPost",
-          "SyncLog"
+          "PrintTask",
+          "ScanTask",
+          "SyncLog",
+          "Terminal",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/partner/stats",
         "roles": [
@@ -10057,6 +10061,33 @@
         ],
         "services": [
           "JobsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/orgs/partner-stats.controller.ts",
+        "handler": "PartnerStatsQueryDto.getTerminalOperations",
+        "method": "GET",
+        "models": [
+          "CompanyProfile",
+          "Job",
+          "JobFair",
+          "JobSource",
+          "PolicyPost",
+          "PrintTask",
+          "ScanTask",
+          "SyncLog",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/partner/terminal-operations",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/orgs/partner-stats.service.ts"
+        ],
+        "services": [
+          "PartnerStatsService"
         ]
       },
       {
@@ -11825,7 +11856,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 173,
+      "reachableFileCount": 176,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12608,7 +12639,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 178
+      "sourceFileCount": 181
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15607,7 +15638,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 70,
+      "reachableFileCount": 75,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16013,7 +16044,9 @@
         },
         {
           "component": "TerminalsPage",
-          "endpoints": [],
+          "endpoints": [
+            "PUT /partner/profile"
+          ],
           "file": "apps/partner/src/routes/terminals/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16023,7 +16056,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 71
+      "sourceFileCount": 76
     }
   },
   "dataModel": {
@@ -17149,6 +17182,7 @@
           "services/api/src/member-feedback/member-feedback.service.ts",
           "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
+          "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/refund.service.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
@@ -17257,6 +17291,7 @@
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
+          "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/scan-tasks/scan-task-reaper.task.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts"
@@ -17296,7 +17331,7 @@
         ]
       },
       {
-        "fieldCount": 27,
+        "fieldCount": 28,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -17327,6 +17362,7 @@
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/official-channels/official-channels.service.ts",
+          "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/policies/policy-scope.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
@@ -17386,6 +17422,7 @@
         "usedBy": [
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
+          "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/terminals/printer-availability.ts",
           "services/api/src/terminals/terminal-heartbeat-retention.task.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
@@ -17768,8 +17805,16 @@
     "apps/admin/src/routes/partners/usePartnerAccountAction.ts": [
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
+    "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx": [
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs"
+    ],
     "apps/admin/src/routes/peripherals/index.tsx": [
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs",
+      "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
       "apps/admin/scripts/verify-honest-placeholders.mjs"
+    ],
+    "apps/admin/src/routes/peripherals/peripheralViews.ts": [
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs"
     ],
     "apps/admin/src/routes/permissions/index.tsx": [
       "apps/admin/scripts/verify-honest-placeholders.mjs"
@@ -17831,6 +17876,10 @@
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
+    ],
+    "apps/admin/src/routes/terminals/terminalStatusViews.ts": [
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs",
+      "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs"
     ],
     "apps/admin/src/routes/toolbox/components/TerminalToolboxPanel.tsx": [
       "apps/admin/scripts/verify-toolbox-review-ui.mjs"
@@ -20546,7 +20595,12 @@
     ],
     "apps/partner/src/layouts/PartnerLayoutWrapper.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
+    ],
+    "apps/partner/src/lib/csv.ts": [
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/routes/Page.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
@@ -20641,10 +20695,24 @@
     "apps/partner/src/routes/sync-logs/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
+    "apps/partner/src/routes/terminals/TerminalOpsCards.tsx": [
+      "apps/admin/scripts/verify-honest-placeholders.mjs",
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
+    ],
+    "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx": [
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
+    ],
     "apps/partner/src/routes/terminals/index.tsx": [
       "apps/admin/scripts/verify-honest-placeholders.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
-      "apps/partner/scripts/verify-partner-stats-contract.mjs"
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
+    ],
+    "apps/partner/src/routes/terminals/terminalOpsFormat.ts": [
+      "apps/partner/scripts/verify-partner-stats-contract.mjs",
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/services/api/client.ts": [
       "apps/partner/scripts/verify-partner-relative-api-url.mjs",
@@ -20666,9 +20734,14 @@
     ],
     "apps/partner/src/services/api/partnerMockAdapter.ts": [
       "apps/partner/scripts/verify-excel-template-download-ui.mjs",
-      "apps/partner/scripts/verify-job-quality-dashboard-ui.mjs"
+      "apps/partner/scripts/verify-job-quality-dashboard-ui.mjs",
+      "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/services/api/stats.ts": [
+      "apps/partner/scripts/verify-partner-stats-contract.mjs"
+    ],
+    "apps/partner/src/services/api/terminalOps.ts": [
+      "apps/admin/scripts/verify-honest-placeholders.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/services/api/types.ts": [
@@ -21789,6 +21862,9 @@
     "services/api/scripts/support/partner-account-action-static-contract.ts": [
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts"
+    ],
+    "services/api/scripts/support/partner-terminal-ops-cases.ts": [
+      "services/api/scripts/verify-partner-stats-contract.ts"
     ],
     "services/api/scripts/support/payment-callback-race-cases.ts": [
       "services/api/scripts/verify-payment-flow.ts"
@@ -24973,6 +25049,9 @@
     "services/api/src/terminals/admin-kiosk-job-board.controller.ts": [
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
     ],
+    "services/api/src/terminals/admin-printer-status.ts": [
+      "services/api/scripts/verify-terminal-network-diagnostics.ts"
+    ],
     "services/api/src/terminals/admin-terminals.controller.ts": [
       "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
@@ -25459,6 +25538,27 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx",
+          "apps/admin/src/routes/peripherals/index.tsx",
+          "apps/admin/src/routes/peripherals/peripheralViews.ts",
+          "apps/admin/src/routes/terminals/terminalStatusViews.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-peripheral-views.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-peripheral-views"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/admin/scripts/support/admin-phone-transfer-ui-contract.mjs",
           "apps/admin/src/routes/account-settings/AdminPhoneTransferCard.tsx",
           "apps/admin/src/routes/account-settings/index.tsx",
@@ -25527,8 +25627,10 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/peripherals/index.tsx",
           "apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
+          "apps/admin/src/routes/terminals/terminalStatusViews.ts",
           "apps/admin/src/services/api/types.ts"
         ],
         "missing": []
@@ -25626,7 +25728,9 @@
           "apps/admin/src/routes/peripherals/index.tsx",
           "apps/admin/src/routes/permissions/index.tsx",
           "apps/partner/src/routes/account/index.tsx",
-          "apps/partner/src/routes/terminals/index.tsx"
+          "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
+          "apps/partner/src/routes/terminals/index.tsx",
+          "apps/partner/src/services/api/terminalOps.ts"
         ],
         "missing": []
       },
@@ -29447,11 +29551,18 @@
         "dirs": [],
         "files": [
           "apps/admin/scripts/verify-honest-placeholders.mjs",
+          "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
+          "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
           "apps/partner/src/routes/stats/index.tsx",
+          "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
+          "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
-          "apps/partner/src/services/api/stats.ts"
+          "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
+          "apps/partner/src/services/api/partnerMockAdapter.ts",
+          "apps/partner/src/services/api/stats.ts",
+          "apps/partner/src/services/api/terminalOps.ts"
         ],
         "missing": []
       },
@@ -29461,6 +29572,28 @@
       "package": "@ai-job-print/partner",
       "scriptNames": [
         "@ai-job-print/partner::verify:partner-stats-contract"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/partner/src/lib/csv.ts",
+          "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
+          "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
+          "apps/partner/src/routes/terminals/index.tsx",
+          "apps/partner/src/routes/terminals/terminalOpsFormat.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/partner",
+      "scriptNames": [
+        "@ai-job-print/partner::verify:partner-terminal-ops-honesty"
       ],
       "wired": true
     },
@@ -35978,6 +36111,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/partner-terminal-ops-cases.ts",
           "services/api/src/orgs/partner-stats.controller.ts",
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/prisma/prisma.service.ts"
@@ -37987,6 +38121,7 @@
         "files": [
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
+          "services/api/src/terminals/admin-printer-status.ts",
           "services/api/src/terminals/dto/heartbeat.dto.ts",
           "services/api/src/terminals/terminal-heartbeat-retention.task.ts",
           "services/api/src/terminals/terminals-admin.service.ts",

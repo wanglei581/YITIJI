@@ -23,6 +23,17 @@
 
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { requirePartnerOrgId, type PartnerOrgId } from '../console-screen/console-screen.org'
+import { countKioskVisitsByTerminal, hasKioskVisitsForOrg } from '../kiosk-session/kiosk-session.queries'
+import {
+  HeartbeatFolder,
+  assembleTerminalOperations,
+  summarizeOutput,
+  terminalOpsEffectiveFrom,
+  terminalOpsHeartbeatSeedRange,
+  type PartnerTerminalOperations,
+  type TerminalOpsRaw,
+} from './partner-terminal-ops'
 
 const TZ_OFFSET_MS = 8 * 60 * 60 * 1000 // Asia/Shanghai = UTC+8
 
@@ -48,10 +59,10 @@ function toShanghaiDay(date: Date): string {
   return new Date(date.getTime() + TZ_OFFSET_MS).toISOString().slice(0, 10)
 }
 
-function buildPeriodRange(p: StatsPeriod) {
+function buildPeriodRange(p: StatsPeriod, nowMs: number = Date.now()) {
   const days = periodDays(p)
   // 以上海时间"今天"0点为起始参考
-  const nowSh = new Date(Date.now() + TZ_OFFSET_MS)
+  const nowSh = new Date(nowMs + TZ_OFFSET_MS)
   nowSh.setUTCHours(0, 0, 0, 0)
   const todayUtcStart = new Date(nowSh.getTime() - TZ_OFFSET_MS)
 
@@ -82,11 +93,14 @@ function metric(cur: number, prev: number | null, compLabel: string) {
   }
 }
 
+/** 心跳按终端分批读取的批大小；90 天约 26 万条/台，边读边折叠，不整段进内存。 */
+export const TERMINAL_OPS_HEARTBEAT_BATCH = 2000
+
 @Injectable()
 export class PartnerStatsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getStats(orgId: string, period: StatsPeriod) {
+  async getStats(orgId: PartnerOrgId | string, period: StatsPeriod) {
     const { from, to, prevFrom, prevTo, label, compLabel } = buildPeriodRange(period)
     const days = periodDays(period)
 
@@ -200,5 +214,144 @@ export class PartnerStatsService {
       trend,
       statusDist: { success: curSuccess, partial: curPartial, failed: curFailed },
     }
+  }
+
+  /**
+   * 本机构终端运营数据。窗口 = 上海自然日起点（近 7/30/90 天）到当前。
+   * 终端集合只取 Terminal.orgId = 本机构；集合为空直接返回空结果，后续查询一条都不发，
+   * 所以任何情况下都不会退化成全局查询。
+   * 每台终端只统计 max(窗口开始, orgBoundAt) 之后的打印、扫描和心跳，改绑前的数据不计入。
+   * 服务人次仍按 KioskSession.orgId 快照，不看 orgBoundAt。
+   */
+  async getTerminalOperations(
+    orgId: PartnerOrgId,
+    period: StatsPeriod,
+    now: Date = new Date(),
+  ): Promise<PartnerTerminalOperations> {
+    const scopedOrgId = requirePartnerOrgId(orgId)
+    const { from } = buildPeriodRange(period, now.getTime())
+    const terminals = await this.prisma.terminal.findMany({
+      where: { orgId: scopedOrgId },
+      orderBy: { terminalCode: 'asc' },
+      select: { id: true, terminalCode: true, displayName: true, locationLabel: true, orgBoundAt: true },
+    })
+    if (terminals.length === 0) {
+      return assembleTerminalOperations({ period, from, now, rows: [], visitRecordingStarted: false })
+    }
+
+    const ids = terminals.map((terminal) => terminal.id)
+    const since = (orgBoundAt: Date | null) => terminalOpsEffectiveFrom(from, orgBoundAt)
+    const [printCreated, scanCreated, settled, visits, visitRecordingStarted] = await Promise.all([
+      this.prisma.printTask.groupBy({
+        by: ['terminalId'],
+        where: {
+          OR: terminals.map((terminal) => ({
+            terminalId: terminal.id,
+            createdAt: { gte: since(terminal.orgBoundAt), lte: now },
+          })),
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.scanTask.groupBy({
+        by: ['terminalId'],
+        where: {
+          OR: terminals.map((terminal) => ({
+            terminalId: terminal.id,
+            createdAt: { gte: since(terminal.orgBoundAt), lte: now },
+          })),
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.printTask.groupBy({
+        by: ['terminalId', 'status', 'printOutcome', 'errorCode'],
+        where: {
+          status: { in: ['completed', 'failed'] },
+          OR: terminals.map((terminal) => ({
+            terminalId: terminal.id,
+            completedAt: { gte: since(terminal.orgBoundAt), lte: now },
+          })),
+        },
+        _count: { _all: true },
+      }),
+      // 服务人次只数机构快照为本机构的会话，终端改绑前的历史不带过来
+      countKioskVisitsByTerminal(this.prisma, { orgId: scopedOrgId, terminalIds: ids, from, to: now }),
+      hasKioskVisitsForOrg(this.prisma, scopedOrgId),
+    ])
+
+    const rows: TerminalOpsRaw[] = []
+    for (const terminal of terminals) {
+      const printCount = printCreated.find((row) => row.terminalId === terminal.id)?._count._all ?? 0
+      const scanCount = scanCreated.find((row) => row.terminalId === terminal.id)?._count._all ?? 0
+      const output = summarizeOutput(
+        settled
+          .filter((row) => row.terminalId === terminal.id)
+          .map((row) => ({
+            status: row.status,
+            printOutcome: row.printOutcome,
+            errorCode: row.errorCode,
+            count: row._count._all,
+          })),
+      )
+      const folder = await this.foldHeartbeats(terminal.id, from, terminal.orgBoundAt, now)
+      rows.push({
+        terminalCode: terminal.terminalCode,
+        displayName: terminal.displayName,
+        locationLabel: terminal.locationLabel,
+        lastHeartbeatAt: folder.lastHeartbeatAt,
+        visitCount: visits.get(terminal.id) ?? 0,
+        serviceCount: printCount + scanCount,
+        output,
+        segments: folder.finish(),
+        reportedInWindow: folder.reportedInWindow,
+      })
+    }
+    return assembleTerminalOperations({ period, from, now, rows, visitRecordingStarted })
+  }
+
+  private async foldHeartbeats(
+    terminalId: string,
+    windowFrom: Date,
+    orgBoundAt: Date | null,
+    now: Date,
+  ): Promise<HeartbeatFolder> {
+    const from = terminalOpsEffectiveFrom(windowFrom, orgBoundAt)
+    const seedRange = terminalOpsHeartbeatSeedRange(windowFrom, orgBoundAt)
+    // 纸张不足也要读到：它不是故障种子。若跳过它去取更早的 error，会把已经能打印的故障重新打开。
+    const [seed, printerSeed] = seedRange
+      ? await Promise.all([
+        this.prisma.terminalHeartbeat.findFirst({
+          where: { terminalId, createdAt: seedRange },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        }),
+        this.prisma.terminalHeartbeat.findFirst({
+          where: { terminalId, createdAt: seedRange, printerStatus: { not: null, notIn: ['unknown'] } },
+          orderBy: { createdAt: 'desc' },
+          select: { printerStatus: true },
+        }),
+      ])
+      : [null, null]
+    const folder = new HeartbeatFolder({
+      from,
+      now,
+      seedAt: seed?.createdAt ?? null,
+      seedPrinterStatus: printerSeed?.printerStatus ?? null,
+    })
+    let cursor: string | null = null
+    for (;;) {
+      const batch: Array<{ id: string; createdAt: Date; printerStatus: string | null }> =
+        await this.prisma.terminalHeartbeat.findMany({
+          where: { terminalId, createdAt: { gte: from, lte: now } },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          take: TERMINAL_OPS_HEARTBEAT_BATCH,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+          // id 只用作分页游标；折叠只需要时间与打印机状态两列。
+          select: { id: true, createdAt: true, printerStatus: true },
+        })
+      for (const heartbeat of batch) folder.push(heartbeat)
+      if (batch.length < TERMINAL_OPS_HEARTBEAT_BATCH) break
+      cursor = batch[batch.length - 1]!.id
+    }
+    return folder
   }
 }

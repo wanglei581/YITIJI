@@ -142,6 +142,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-job-materials-ui
           pnpm --filter @ai-job-print/admin verify:toolbox-review-ui
           pnpm --filter @ai-job-print/admin verify:admin-terminal-bind-code-ui
+          pnpm --filter @ai-job-print/admin verify:admin-peripheral-views
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
           # D6/C6/C7 后台 AI 服务开关：适配器与面板在隔离进程里真跑，另读服务端
           # ai-access 源码对照路径、档位、事由上限与维护拦截清单；不连库、不起服务。
@@ -516,6 +517,7 @@ jobs:
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
           pnpm --filter @ai-job-print/partner verify:partner-relative-api-url
           pnpm --filter @ai-job-print/partner verify:partner-stats-contract
+          pnpm --filter @ai-job-print/partner verify:partner-terminal-ops-honesty
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
           pnpm --filter @ai-job-print/kiosk verify:jobfair-commercial-closure
           pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui

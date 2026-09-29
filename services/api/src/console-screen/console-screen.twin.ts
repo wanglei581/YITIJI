@@ -88,6 +88,9 @@ function printerState(input: {
   if (ageMs > ONLINE_WINDOW_MS) return { state: 'offline', errorLabel: null }
   const status = input.heartbeat.printerStatus
   if (status === 'offline') return { state: 'offline', errorLabel: null }
+  if (status === 'low_paper') {
+    return { state: 'ready', errorLabel: printerFaultTitle('low_paper') }
+  }
   if (isPrinterIssueStatus(status)) {
     return { state: 'error', errorLabel: printerFaultTitle(status as string) }
   }

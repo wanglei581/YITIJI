@@ -3,7 +3,7 @@ import {
   SCREEN_UNAVAILABLE_REASON,
   type ScreenTimelineState,
 } from './console-screen.types'
-import { isHealthyPrinterStatus } from '../terminals/printer-status'
+import { isPrinterFaultStatus } from '../terminals/printer-status'
 
 /**
  * 24 小时内心跳行上限。超过则整段时间轴不可用，不返回被截断的半截。
@@ -54,7 +54,8 @@ interface Seg {
 }
 
 function printerIssue(status: string | null): boolean {
-  return Boolean(status) && status !== 'unknown' && !isHealthyPrinterStatus(status)
+  // 纸张不足仍可打印，时间轴不标成故障段。
+  return isPrinterFaultStatus(status)
 }
 
 function overlay(segments: Seg[], from: number, to: number, state: ScreenTimelineState): Seg[] {

@@ -1,5 +1,26 @@
 # 当前开发进度
 
+## 2026-09-29：机构「终端数据」按绑定时间隔离（#1080）
+
+- **口径：** 终端从 A 改绑到 B 后，B 只看到这台终端在 B 名下期间的打印量、出纸成功率、扫描和心跳故障。A 时期的数据不进入 B 的合计，也不进逐台。服务人次仍按 `KioskSession.orgId` 快照，没有改。
+- **字段：** `Terminal.orgBoundAt`（当前 `orgId` 从何时生效；`orgId` 为空时也为空）。SQLite / PostgreSQL 各一份迁移 `20260929190000_terminal_org_bound_at`。已有绑定回填：审计 `terminal.org.update` 的 `newOrgId` 或 `terminal.asset.create_planned` 的 `orgId` 对得上当前机构时，取较晚的一条（`targetType=terminal`、`targetId=terminalCode`）；没有则用 `registeredAt`。对不上当前机构的审计不用。未绑定的终端保持空。
+- **写入：** 生产路径只有两处会改 `Terminal.orgId`：`createPlannedTerminal`（预创建时若带机构）和 `assignTerminalOrg`（绑定 / 改绑 / 解绑）。机构变化时写 `orgBoundAt = 现在`，解绑写空，机构没变不刷新。绑定码兑换、旧注册、机构启停、停放类型都不改 `orgId`。删机构时外键 `onDelete: SetNull` 会把 `orgId` 置空但不清 `orgBoundAt`；代码里没有删机构的路径。
+- **A 的查询语义：** `getTerminalOperations` 只列出当前 `orgId` 等于本机构的终端。改绑后这台终端不在 A 的结果里，不是一行全 0。
+- **纸张不足：** `low_paper` 统一为「可打印、需补纸」的预警。不计入机构端故障次数与时长，不算未恢复；能结束已经打开的故障段。管理员告警为警告而不是严重；大屏孪生打印机用预警色。`paper_empty`（缺纸、不可打印）仍是故障。
+- **门禁与检查（2026-09-29）：** `verify:partner-stats-contract` 在 `verify-rebind.db` 上 80 PASS / 0 FAIL（T3i/T3i1/T3i2、T3m/T3n、T5a–T5g）。先提交再做三处变异，门禁都退出 1：去掉有效开始时间（T3m、T5d、T5e）、改绑不写 `orgBoundAt`（T5a/T5b/T5d/T5e/T5f）、`low_paper` 算故障（T3i、T3i1、T5e）；变异已恢复。`db:pg:sync:check` 通过。api / admin / partner typecheck 通过。kiosk-session、terminal-network-diagnostics、admin-ops、console-screen-snapshot（130/0）、print-jobs 与 pickup-code-share，以及图谱列出的其余关联门禁通过。`verify:terminal-provisioning` 在 `prisma db push` 的库上失败：该库没有迁移里的 SQLite 触发器（触发器 0 条）；空库 `migrate deploy`（含本迁移）后再跑为 ALL PASS。`verify:recruitment-p1-schema --postgres-upgrade` 因未设置 `POSTGRES_UPGRADE_URL` 未跑，不带该参数的 schema 门禁通过。机构端 e2e 69 通过（端口 4175），管理员端 e2e 112 通过（端口 4174）。大屏孪生预警色没有另开浏览器点选，由 snapshot 门禁覆盖。
+
+## 2026-09-29：机构「终端数据」页做成试点签收指标，管理员「外设」页做成真实状态（P-04、P1-10、3.9 两个空页）
+
+- **机构端「终端数据」（`/terminals`，侧栏「数据与账号」组新加入口）：** 新接口 `GET /partner/terminal-operations?period=week|month|quarter`（与 `/partner/stats` 同一控制器；两个端点都改为未绑定机构即 403 `ORG_REQUIRED`，不再写 `user.orgId!`）。只统计 `Terminal.orgId` 为本机构的终端，没有终端时一条任务、心跳都不查。四项：**服务人次**（#1065 的一体机会话，只数机构快照为本机构的会话，终端改绑前的历史不带过来；会话记录上线前的时段没有数）；**打印扫描服务次数**（按任务计，页面写明「不等于人次」）；**出纸成功率**（分母为窗口内结束的打印任务，分子含工作人员核查「已出纸」的单，另列超时未确认数，取消与作废不计）；**AI 可用率**如实写「暂不能按本机构终端统计」（AI 调用还没有已验证的终端号，后端窗口在 P1-2 补，不拿全平台数代替）；**故障与恢复**由心跳折叠（相邻心跳间隔超过 5 分钟记离线，与告警中心「终端离线」同一口径；打印机从异常到重新正常记一次故障，「未知」不起止；未恢复算到当前）。计数 1–4 不给具体数字（与数据大屏单台口径一致），分母不足 5 不给比率。逐台表格可筛选、搜索，点行看明细；导出 CSV（前端导出已过白名单的数据，带统计窗口与口径说明）。演示模式有「演示数据」徽标，http 模式不出演示数据。
+- **管理员「外设」（`/devices?tab=peripherals`）：** 原空页改为按外设看的状态矩阵：打印机（状态与链路）、面板扫描到本机目录、有线网络、本地任务库与磁盘、Agent 版本与最后心跳；U 盘、扫码枪、摄像头、读卡器云端没有遥测，统一写「不上报」并说明只能按现场验收清单检查。离线终端各列一律写「终端离线」，不把最后一次上报当现状。可按机构、只看异常、只看离线筛选，点行看原因与处置建议。数据只来自现有 `GET /admin/terminals`。
+- **打印机状态词表：** Agent 真会上报的 `ready` 原先在打印机页显示成红字「ready」、终端页显示英文，`low_paper` 没有中文；现在正常状态不标红不出故障说明、纸张不足用警示色、认不出的原值写「未知状态」；磁盘查询失败（-1）不再显示「-1.0 GB」，写「未知」。
+- **3.15 终端绑定：** 可选机构去掉「企业数据来源」「招聘会主办方」两类停放类型，绑定与预创建设备都拒绝它们（`ORG_TYPE_PARKED`）；存量绑定不动，页面提示「该机构类型已停放，建议改绑」。
+- **门禁：** `verify:partner-stats-contract` 新增 T1–T4（A/B 机构互测隔离、`?orgId=` 与未知参数 400、未绑定 403、响应键全集与白名单递归比对、压制与分母门槛、核查已出纸计入、取消作废不计、重试只算一次、离线 / 恢复 / 未恢复 / 打印机故障段 / 未知不起止、心跳分批读、服务人次按快照计数）；前端门禁、诚实占位门禁随空页变成真功能改钉新事实；两条浏览器用例（机构终端数据、管理员外设）改为断言新页面的如实表达。变异 7 处（去掉机构过滤、分子不算核查已出纸、离线阈值改 1 分钟、磁盘不转空、正常状态不置空、绑定不拒停放类型、服务人次一律 0）全部变红。
+- **实现与收货：** Claude 子代理实现，协调方逐段审 diff、接上服务人次、补两条浏览器用例，在候选 `6f473f211` 上重建分支。
+- **验证：** admin / partner / api `tsc`，两后台 lint 0 错误；API 门禁 partner-stats-contract、kiosk-session、console-screen-snapshot / usage、device-fleet-overview、terminal-identity、terminal-device-config、partner-smart-campus、terminal-network-diagnostics、admin-ops、print-jobs、terminal-provisioning；admin 门禁 honest-placeholders、console-screen-ui、service-desk-dashboard-ui、terminal-network-diagnostics-ui、terminal-bind-code-ui、device-fleet-overview-ui；partner 门禁 stats-contract、refresh-safe、relative-api-url、excel-template-download-ui；CI 覆盖。浏览器用例：机构 69、机构大屏 136、管理员全套（改后重跑相关 41 条）通过。浏览器实看机构「终端数据」页（1440 宽，演示数据）；外设页内容已核对，版面截图因浏览器面板隐藏未取，留待走查补看。
+- **服务人次在一体机真上报之前显示「暂无」：** 响应加 `visitCount.recordingStarted`（本机构终端是否有过任何会话记录），没有时指标卡、表格、明细与导出都写「暂无」并说明原因，不显示 0（0 会被读成「没人来」）；门禁 T4k0 覆盖。
+- **口径（总指挥 9/29 定）：** 分母不小于 5 时照常给出纸成功率，即使分子 1–4 能由比率反推——这是机器运行指标、对不上人。前提三条由响应键白名单门禁守住：不出逐人明细、只有统计窗口级数字（设备的最后心跳时间除外）、不按个人属性拆分。
+
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 
 > **2026-09-29 一体机：AI 与短信补终端会话票、AI 停用退路（候选写入方）**：新增 `terminalAttributedFetch`（与 terminalProtectedFetch 同一份取头与换票，但无终端身份时照常请求，不因此让 AI 在手机/桌面消失），57 处 AI 请求点与发码请求都带 x-terminal-id + x-terminal-session-token，按已验签终端计每日额度（门禁 `verify:ai-requests-terminal-session`，AST 扫描 + 运行时换票）；登录页新增「短信验证码暂时发不出来」态（SMS_TERMINAL_DAILY_LIMIT / SMS_DAILY_TOTAL_LIMIT / SMS_BUDGET_UNAVAILABLE / 换票后仍无效），主按钮改用扫码登录；aiOutage 补 AI_PAUSED、AI_ENDPOINT_NOT_ALLOWED、AI_BUDGET_EXHAUSTED、AI_BUDGET_UNAVAILABLE，简历诊断、AI 顾问、自我探索、模拟面试、合同风险提示停用时不再引导重试、落到手动路径。本地独立 API 实测：发码按终端计数、伪造票 401、每台上限 1 时页面切扫码、AI_PAUSED 时无重试按钮。待后端：自我探索的维度打分被整个 AI 闸门拦下，应拆开。

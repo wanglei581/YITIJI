@@ -41,6 +41,9 @@ model Terminal {
   geoLng            Float?
   enabled           Boolean  @default(true)
   orgId             String?
+  /// 当前 orgId 从什么时候开始生效。orgId 为空时必须为空。
+  /// 机构端「终端数据」只统计这个时间之后的打印、扫描和心跳。
+  orgBoundAt        DateTime?
   org               Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
   registeredAt      DateTime @default(now())
   lastSeenAt        DateTime @updatedAt

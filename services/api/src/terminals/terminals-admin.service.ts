@@ -21,7 +21,9 @@ import { PrismaService } from '../prisma/prisma.service'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
-import { isHealthyPrinterStatus } from './printer-status'
+import { adminPaperStatus, describePrinterFault, normalizeDiskFreeGb, toAdminPrinterStatus } from './admin-printer-status'
+import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
+import { terminalOrgBindingOnCreate, terminalOrgBindingWrite } from './terminal-org-binding'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
@@ -61,6 +63,8 @@ export interface AdminTerminalView {
   hasActiveCredential: boolean
   orgId: string | null
   orgName: string | null
+  /** 所属机构类型；页面据此给停放类型（企业来源 / 招聘会主办方）的存量绑定提示改绑 */
+  orgType: string | null
   registeredAt: string
   lastSeenAt: string
   online: boolean
@@ -165,29 +169,6 @@ export interface AdminPrinterView {
   lastSyncAt: string | null
 }
 
-// ── Pure helpers ───────────────────────────────────────────────────────────────
-
-function toAdminPrinterStatus(online: boolean, printerStatus: string | null): AdminPrinterView['status'] {
-  if (!online) return 'offline'
-  if (!printerStatus || printerStatus === 'unknown') return 'offline'
-  if (isHealthyPrinterStatus(printerStatus)) return 'online'
-  return 'error'
-}
-
-function describePrinterFault(online: boolean, printerStatus: string | null): string | null {
-  if (!online) return '终端离线，打印机状态未知'
-  switch (printerStatus) {
-    case 'paper_empty': return '纸盒已空，请补充 A4 纸张'
-    case 'offline': return '打印机离线'
-    case 'not_found': return '未检测到配置的打印机'
-    case 'error': return '打印机故障，需人工处理'
-    case null:
-    case undefined:
-    case 'unknown': return '打印机状态未上报'
-    default: return null
-  }
-}
-
 // ── Service ────────────────────────────────────────────────────────────────────
 
 @Injectable()
@@ -224,7 +205,7 @@ export class TerminalAdminService {
     if (orgId) {
       const org = await this.prisma.organization.findUnique({
         where: { id: orgId },
-        select: { name: true, enabled: true },
+        select: { name: true, enabled: true, type: true },
       })
       if (!org) {
         throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
@@ -232,6 +213,7 @@ export class TerminalAdminService {
       if (!org.enabled) {
         throw new BadRequestException({ error: { code: 'ORG_DISABLED', message: '机构已停用，不能预创建设备' } })
       }
+      if (isParkedTerminalOrgType(org.type)) throw orgTypeParkedError()
       orgName = org.name
     }
 
@@ -248,6 +230,7 @@ export class TerminalAdminService {
           displayName: cleanNullable(dto.displayName),
           locationLabel: cleanNullable(dto.locationLabel),
           orgId,
+          orgBoundAt: terminalOrgBindingOnCreate(orgId, new Date()),
         },
       })
       return {
@@ -276,7 +259,7 @@ export class TerminalAdminService {
     const rows = await this.prisma.terminal.findMany({
       orderBy: { registeredAt: 'desc' },
       include: {
-        org: { select: { id: true, name: true } },
+        org: { select: { id: true, name: true, type: true } },
         credentials: {
           where: { revokedAt: null, expiresAt: { gt: new Date(now) } },
           take: 1,
@@ -336,6 +319,7 @@ export class TerminalAdminService {
         hasActiveCredential: t.credentials.length > 0,
         orgId: t.orgId,
         orgName: t.org?.name ?? null,
+        orgType: t.org?.type ?? null,
         registeredAt: t.registeredAt.toISOString(),
         lastSeenAt: lastSeen.toISOString(),
         online: !!lastHeartbeatAt && now - lastSeen.getTime() < TERMINAL_ONLINE_WINDOW_MS,
@@ -351,7 +335,7 @@ export class TerminalAdminService {
         scanInputObservedAt: hb?.scanInputObservedAt?.toISOString() ?? null,
         agentVersion: hb?.agentVersion ?? null,
         ipAddress: hb?.ipAddress ?? null,
-        diskFreeGb: hb?.diskFreeGb ?? null,
+        diskFreeGb: normalizeDiskFreeGb(hb?.diskFreeGb),
         releaseObservation: releaseTarget
           ? this.releases.toAdminObservation(releaseTarget)
           : null,
@@ -363,14 +347,14 @@ export class TerminalAdminService {
 
   async listOrganizationOptions(): Promise<{ organizations: AdminOrganizationOption[] }> {
     const organizations = await this.prisma.organization.findMany({
-      where: { enabled: true },
+      where: { enabled: true, type: { notIn: [...PARKED_TERMINAL_ORG_TYPES] } },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, type: true },
     })
     return { organizations }
   }
 
-  async assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult> {
+  async assignTerminalOrg(terminalId: string, orgId: string | null, now: Date = new Date()): Promise<AssignTerminalOrgResult> {
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
       select: { id: true, terminalCode: true, orgId: true },
@@ -383,7 +367,7 @@ export class TerminalAdminService {
     if (orgId !== null) {
       const org = await this.prisma.organization.findUnique({
         where: { id: orgId },
-        select: { id: true, name: true, enabled: true },
+        select: { id: true, name: true, enabled: true, type: true },
       })
       if (!org) {
         throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
@@ -391,11 +375,15 @@ export class TerminalAdminService {
       if (!org.enabled) {
         throw new BadRequestException({ error: { code: 'ORG_DISABLED', message: '机构已停用，不能绑定' } })
       }
+      if (isParkedTerminalOrgType(org.type)) throw orgTypeParkedError()
       orgName = org.name
     }
 
     const oldOrgId = terminal.orgId
-    await this.prisma.terminal.update({ where: { id: terminal.id }, data: { orgId } })
+    await this.prisma.terminal.update({
+      where: { id: terminal.id },
+      data: terminalOrgBindingWrite(oldOrgId, orgId, now),
+    })
 
     return {
       terminalId: terminal.terminalCode,
@@ -800,7 +788,7 @@ export class TerminalAdminService {
         currentTask: activeTask ? `${activeTask.id}（${activeTask.status}）` : null,
         tonerLevel: null,
         paperTrayLevel: null,
-        paperStatus: printerStatus === 'paper_empty' ? 'empty' : null,
+        paperStatus: adminPaperStatus(printerStatus),
         fault: describePrinterFault(online, printerStatus),
         lastHeartbeatAt: lastHeartbeatAt ? lastHeartbeatAt.toISOString() : null,
         lastSyncAt: lastHeartbeatAt ? lastHeartbeatAt.toISOString() : null,
