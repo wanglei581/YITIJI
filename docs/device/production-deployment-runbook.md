@@ -200,6 +200,34 @@ pnpm verify:demo-seed-guard
 
 生产和预生产均禁止执行 `db:seed*`。四个 seed 只服务可丢弃的本地开发/CI 数据库，会写入默认账号、演示终端和直接公开的岗位/招聘会/企业数据；其中企业 seed 会覆盖下架状态，场馆导览 seed 会先删除再重建配置。生产真实业务数据必须走现有 Admin / Partner 审核与发布闭环。
 
+### 4.1 下架库里残留的演示企业（第一次发布时跑一次）
+
+**什么时候跑**：第一次发布、迁移完成之后，且产品负责人已授权。背景：早期企业种子留在生产库里的 3 家企业，名称带「（演示）」、来源名是「市人社公共就业平台（演示）」，至今仍在公开的企业列表里；seed 保护只拦新写入，拦不住已经在库里的行。
+
+**判据与行为**：只动 `name` 与 `sourceName` **都**含全角「（演示）」的企业；只把 `publishStatus` 改成 `unpublished`，不删行、不改其它字段；每行一条审计（`company.maintenance_unpublish`，actorRole `system-cli`，与状态改动同一事务）；已是 `unpublished` 的行跳过，重复执行无改动、无新审计。命令没有 HTTP 入口。
+
+```bash
+cd services/api
+# DATABASE_URL 从受控生产环境读取，不把数据库口令写进命令历史
+
+# 第一步：dry-run（默认，不改库）。核对「目标数据库」一行是生产 PostgreSQL 的主机与库名；
+# 清单应只有那 3 家带「（演示）」的企业；末行是「将改 N 行 / 已下架 M 行」。
+pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies
+
+# 第二步：清单核对无误后，带确认词和事由（2–200 字，写进审计）执行。
+UNPUBLISH_DEMO_COMPANIES_CONFIRM=UNPUBLISH_DEMO_COMPANIES \
+UNPUBLISH_DEMO_COMPANIES_REASON='首次发布清理开发期演示企业（产品负责人授权）' \
+pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies
+```
+
+确认词写错，或确认词对但事由缺失、不在 2–200 字：命令不连库，退出码 2。执行输出的「已下架」清单与第一步 dry-run 清单对不上（行数或 id 不同）时停下，先人工核对，不要重复执行。
+
+执行后在仓库根目录跑只读巡检，`GET /api/v1/companies（企业 · 含演示数据检查）` 一行应为 PASS「无演示标记」，或 INFO「total=0」；仍是 WARN 就把它列出的名字报给产品负责人，不要自行扩大判据重跑：
+
+```bash
+node scripts/prod-readonly-probe.mjs
+```
+
 当前生产故障恢复沿用已存在且已轮换口令的管理员账号，**不得**运行首个管理员 bootstrap。只有迁移完成且只读查询确认 `User=0` 的真正全新 PostgreSQL 库，才可在双人复核后运行：
 
 运行前确认生产主机 NTP 已同步；执行窗口以生产主机时间为准。凭据目录所在磁盘必须启用静态加密，且不得被未加密备份、日志采集或制品归档收集。
