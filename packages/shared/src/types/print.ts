@@ -129,6 +129,15 @@ export type PrintScale = 'fit' | 'actual'
 export type PagesPerSheet = 1 | 2 | 4
 
 /**
+ * 一单最多打印的面数。面数 = 计费页数 × 份数；双面不折算（100 页双面仍是 100 面）。
+ *
+ * 真源在本常量。服务端是 CommonJS，不能 import 本 ESM 包，镜像在
+ * `services/api/src/print-jobs/verified-print-parameters.ts`，两份由门禁逐字锁定。
+ * Windows Agent（apps/terminal-agent）算认领超时时应从这里引用，不要再写一个数字。
+ */
+export const PRINT_MAX_SIDES_PER_ORDER = 100
+
+/**
  * Parameters for a single print job.
  *
  * 机型适用范围：奔图 CM2800ADN / CM2820ADN 系列（Windows 识别名称：Pantum CM2800ADN Series）
