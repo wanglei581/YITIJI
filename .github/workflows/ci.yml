@@ -379,6 +379,8 @@ jobs:
           pnpm run verify:scan-deletion-audit
           # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
           pnpm run verify:task-reliability
+          # 同一任务号按 attempt 重打：临时 SQLite + loopback HTTP + 打印桩，不碰 Windows 打印机。
+          pnpm run verify:print-retry-attempt
           # Real child processes race for the process-lifetime singleton (Unix socket here, named pipe on Windows).
           pnpm run verify:singleton-process
           # Field test day 1 (P0-9) evidence script: read-only, count-only, same singleton rule as the Agent.

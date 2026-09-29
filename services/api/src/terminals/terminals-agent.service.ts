@@ -101,6 +101,12 @@ export interface ClaimTaskResponse {
   mimeType?: string
   /** Order.billablePages；Agent 只用它放大出纸监控窗口（页数 × 份数），不参与计费。 */
   billablePages?: number
+  /**
+   * 同一任务号被允许重新打印的次数。等于状态日志里
+   * errorCode='kiosk_retry' 且 toStatus='pending' 的条数，缺省重提为 0。
+   * 老 Agent 忽略该字段，行为与改前相同。
+   */
+  attempt: number
 }
 
 // ── Bind code response types ───────────────────────────────────────────────────
@@ -546,6 +552,20 @@ export class TerminalAgentService implements OnModuleInit {
         typeof orderMeta?.billablePages === 'number' && orderMeta.billablePages > 0
           ? orderMeta.billablePages
           : undefined
+      // attempt 只由 kiosk_retry 日志条数决定，不改领取条件，也不改库结构。
+      // 该字符串必须与 print-jobs.service.ts 的 KIOSK_RETRY_LOG_CODE（第 132 行）一致。
+      //
+      // 不会重复出纸，也不会打给别人：attempt 只会因 retryPaidFailedJob 增加
+      // （print-jobs.service.ts 688–835）。它只允许任务已是 failed（710）、
+      // 不是 PRINT_JOB_UNCONFIRMED 也不是只出了一部分（715–725）、订单已付（726）、
+      // 且调用者能访问该订单（loadAccessiblePrintJob 854–873，否则 404）。
+      // 通过后才把同一任务改回 pending，并写一条 kiosk_retry 日志（800–802）。
+      // 已经 pending 且最后一条就是这次重提时直接返回，不再加日志（693–708），计数不变。
+      // 租约过期的 claimed / 卡住的 printing 由 resetExpiredClaims 写成
+      // failed+PRINT_JOB_UNCONFIRMED，不会回到 pending，因此不会抬高 attempt。
+      const attempt = await this.prisma.printTaskStatusLog.count({
+        where: { taskId: claimed.id, errorCode: 'kiosk_retry', toStatus: 'pending' },
+      })
       results.push({
         taskId: claimed.id,
         type: 'print',
@@ -559,6 +579,7 @@ export class TerminalAgentService implements OnModuleInit {
         createdAt: claimed.createdAt.toISOString(),
         ...(fileName ? { fileName } : {}),
         ...(mimeType ? { mimeType } : {}),
+        attempt,
       })
     }
 
@@ -616,13 +637,25 @@ export class TerminalAgentService implements OnModuleInit {
 
     const isTerminal = TERMINAL_STATES.includes(dto.status as TaskStatus)
 
+    // 重报 failed 且不带 errorCode 时，保留库里已有的错误码。
+    // 一体机重提会先把这一列清空（print-jobs.service.ts 约 790 行），那种情况要靠
+    // Agent 本地记住并带回，结果页才能仍显示「打印机缺纸」。这里保住的是本地行
+    // 没有码、但服务端行里还有码的回放，避免被冲成笼统失败。带了新码仍以新值为准。
+    // printing / completed 不带码时照旧写成 null。
+    const incomingErrorCode =
+      typeof dto.errorCode === 'string' && dto.errorCode.length > 0 ? dto.errorCode : undefined
+    const persistedErrorCode: string | null =
+      dto.status === 'failed' && incomingErrorCode === undefined
+        ? (preCheck.errorCode ?? null)
+        : (incomingErrorCode ?? null)
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (this.prisma.$transaction as any)(async (tx: any) => {
       const updated = await tx.printTask.updateMany({
         where: { id: taskId, status: preCheck.status, terminalId },
         data: {
           status: dto.status,
-          errorCode: dto.errorCode ?? null,
+          errorCode: persistedErrorCode,
           errorMessage: dto.errorMessage ?? null,
           completedAt: isTerminal ? new Date() : null,
         },
@@ -674,7 +707,7 @@ export class TerminalAgentService implements OnModuleInit {
           taskId,
           fromStatus: preCheck.status === 'claimed' && dto.status === 'completed' ? 'printing' : preCheck.status,
           toStatus: dto.status,
-          errorCode: dto.errorCode ?? null,
+          errorCode: persistedErrorCode,
         },
       })
       if (preCheck.orderId) {

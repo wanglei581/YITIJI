@@ -37,11 +37,11 @@ import crypto from 'crypto'
 import os from 'os'
 import axios from 'axios'
 import type { AgentConfig, ClaimTask, PatchStatusPayload, ReportableStatus } from './types'
-import type { PrintJobParams } from '../printer/types'
+import type { PrintJobParams, PrintResult } from '../printer/types'
 import { createApiClient, createDirectHttpAgents, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
-import { print } from '../printer/print'
+import { print as dispatchPrint } from '../printer/print'
 import {
   getPrinterPreflight,
   getPrintJobStatus,
@@ -54,7 +54,10 @@ import { log, warn, err } from '../logger'
 import {
   isTaskDone,
   getTaskLocalStatus,
+  getTaskLocalErrorCode,
   markTaskDone,
+  rememberTaskErrorCode,
+  bindPrintAttempt,
   enqueuePatch,
   isDatabaseAvailable,
   type AgentDatabase,
@@ -287,6 +290,47 @@ export function shouldAbortBeforePrint(): boolean {
   return isUnauthorized()
 }
 
+type PrintCommand = typeof dispatchPrint
+
+type ExecuteTaskMonitorOverride = {
+  platform?: NodeJS.Platform
+  queryStatus?: (
+    printerName: string,
+    taskId: string,
+  ) => Promise<{ status: PrintJobMonitorStatus; rawStatus?: string }>
+  sleep?: (ms: number) => Promise<void>
+  queryCompletionEvent?: (
+    printerName: string,
+    taskId: string,
+    dispatchedAtMs: number,
+  ) => Promise<boolean>
+}
+
+let printCommandOverride: PrintCommand | null = null
+let monitorDependencyOverride: ExecuteTaskMonitorOverride | null = null
+
+/**
+ * 测试缝：只替换打印命令和出纸监控依赖。生产路径为 null，仍走真实 print 与本机队列监控。
+ * 非 Windows 上真实监控会直接报未确认，门禁要在 macOS/Linux 上看到 completed 只能换掉这两处。
+ */
+export function __setExecuteTaskTestSeamsForTests(seams: {
+  printCommand?: PrintCommand | null
+  monitorDependencies?: ExecuteTaskMonitorOverride | null
+} | null): void {
+  printCommandOverride = seams?.printCommand ?? null
+  monitorDependencyOverride = seams?.monitorDependencies ?? null
+}
+
+async function print(
+  filePath: string,
+  printerName: string,
+  params?: Partial<PrintJobParams>,
+  options?: { correlationId?: string },
+): Promise<PrintResult> {
+  const command = printCommandOverride ?? dispatchPrint
+  return command(filePath, printerName, params, options)
+}
+
 // ── Task execution ────────────────────────────────────────────────────────────
 
 /**
@@ -317,16 +361,33 @@ export async function executeTask(
     return
   }
 
+  // 没收到 attempt 视为 0（老服务端）。后面省略 attempt 的本地读写都落在这一轮。
+  // 领取循环一次只执行一个任务，下一次 executeTask 会覆盖这个绑定。
+  //
+  // 只有 attempt 变大才重新下载、打印。同一 (任务号, attempt)：
+  // dispatching/spooled → 报 PRINT_JOB_UNCONFIRMED，不重打；
+  // completed → 重报 completed；failed → 重报 failed。
+  // attempt 只会因服务端 retryPaidFailedJob 增加（print-jobs.service.ts 688–835）：
+  // 已是 failed（710）、不是 PRINT_JOB_UNCONFIRMED 也不是只出了一部分（715–725）、
+  // 订单已付（726）、调用者能访问该订单（loadAccessiblePrintJob 854–873）。
+  // 通过后才把同一任务改回 pending 并写 kiosk_retry（800–802）。
+  // 已经 pending 的幂等重提不再加日志（693–708）。
+  // 租约过期的 claimed/printing 由 resetExpiredClaims 写成 failed+PRINT_JOB_UNCONFIRMED，
+  // 不会回到 pending，因此不会抬高 attempt，本机也不会把它当成允许重打。
+  bindPrintAttempt(db, task.attempt)
+
   // Define patch helper early so it's available in both Step 0 (spooled reconcile)
   // and the main execution path below.
-  const patch = (status: ReportableStatus, errorCode?: string, errorMessage?: string) =>
-    patchStatus(
+  const patch = (status: ReportableStatus, errorCode?: string, errorMessage?: string) => {
+    if (status === 'failed' && errorCode) rememberTaskErrorCode(db, task.taskId, errorCode)
+    return patchStatus(
       task.taskId,
       { status, ...(errorCode ? { errorCode } : {}), ...(errorMessage ? { errorMessage } : {}) },
       apiBaseUrl,
       agentToken,
       terminalId,
     )
+  }
 
   // ── Step 0: Idempotency check ─────────────────────────────────────────────
   if (isTaskDone(db, task.taskId)) {
@@ -351,8 +412,15 @@ export async function executeTask(
       if (!ok) enqueuePatch(db, task.taskId, { status: 'completed' })
     } else if (localStatus === 'failed') {
       log(`task ${task.taskId}: locally failed task was re-claimed; replaying terminal status`)
-      const ok = await patch('failed')
-      if (!ok) enqueuePatch(db, task.taskId, { status: 'failed' })
+      // 本地有 errorCode 就带回，避免重报把「打印机缺纸」冲成笼统失败。没有则不带。
+      const localError = getTaskLocalErrorCode(db, task.taskId)
+      const ok = await patch('failed', localError)
+      if (!ok) {
+        enqueuePatch(db, task.taskId, {
+          status: 'failed',
+          ...(localError ? { errorCode: localError } : {}),
+        })
+      }
     } else {
       const msg = `本地打印任务状态异常（${localStatus ?? 'unknown'}），为避免重复出纸已停止自动重试，请工作人员核查`
       warn(`task ${task.taskId}: unknown local state; refusing automatic print and reporting failed`)
@@ -521,7 +589,10 @@ export async function executeTask(
         task.taskId,
         monitorTimeoutMs,
         1_500,
-        { dispatchedAtMs: Date.parse(result.startedAt) },
+        {
+          dispatchedAtMs: Date.parse(result.startedAt),
+          ...(monitorDependencyOverride ?? {}),
+        },
       )
 
       // Log monitor warn regardless of failed/completed (covers Retained timeout detail).

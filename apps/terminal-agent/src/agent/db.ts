@@ -97,10 +97,13 @@ function getDbPath(): string {
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS print_tasks (
-  taskId      TEXT    PRIMARY KEY,
+  taskId      TEXT    NOT NULL,
+  attempt     INTEGER NOT NULL DEFAULT 0,
   status      TEXT    NOT NULL,
+  errorCode   TEXT,
   completedAt TEXT,
-  createdAt   TEXT    NOT NULL
+  createdAt   TEXT    NOT NULL,
+  PRIMARY KEY (taskId, attempt)
 );
 
 CREATE TABLE IF NOT EXISTS pending_patches (
@@ -169,6 +172,53 @@ function ensureColumn(db: SqliteDb, table: string, column: string, definition: s
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
 }
 
+/**
+ * 把旧的 print_tasks（主键只有 taskId）重建成 (taskId, attempt)。
+ * SQLite 不能改已有主键，ensureColumn 加列也去不掉旧主键，同一任务号的下一次
+ * 重提会插不进去。旧行一律记 attempt 0，一行不丢。
+ */
+function migratePrintTasks(db: SqliteDb): void {
+  const columns = db.prepare('PRAGMA table_info(print_tasks)').all()
+  if (columns.length === 0) return
+  const names = new Set(columns.map((row) => String(row['name'])))
+  const pkCols = columns
+    .filter((row) => Number(row['pk']) > 0)
+    .sort((a, b) => Number(a['pk']) - Number(b['pk']))
+    .map((row) => String(row['name']))
+  if (pkCols.join(',') === 'taskId,attempt' && names.has('errorCode')) return
+
+  const attemptExpr = names.has('attempt') ? 'COALESCE(attempt, 0)' : '0'
+  const errorExpr = names.has('errorCode') ? 'errorCode' : 'NULL'
+  db.exec('BEGIN')
+  try {
+    db.exec(`
+      DROP TABLE IF EXISTS print_tasks_v2;
+      CREATE TABLE print_tasks_v2 (
+        taskId      TEXT    NOT NULL,
+        attempt     INTEGER NOT NULL DEFAULT 0,
+        status      TEXT    NOT NULL,
+        errorCode   TEXT,
+        completedAt TEXT,
+        createdAt   TEXT    NOT NULL,
+        PRIMARY KEY (taskId, attempt)
+      );
+      INSERT INTO print_tasks_v2 (taskId, attempt, status, errorCode, completedAt, createdAt)
+      SELECT taskId, ${attemptExpr}, status, ${errorExpr}, completedAt, createdAt
+      FROM print_tasks;
+      DROP TABLE print_tasks;
+      ALTER TABLE print_tasks_v2 RENAME TO print_tasks;
+    `)
+    db.exec('COMMIT')
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK')
+    } catch {
+      // 事务可能还没开始
+    }
+    throw error
+  }
+}
+
 // ── Open ──────────────────────────────────────────────────────────────────────
 
 let activeDatabase: AgentDatabase = null
@@ -203,6 +253,7 @@ export function openDatabase(): AgentDatabase {
     ensureColumn(db, 'scan_deletion_audit', 'reportedAt', 'TEXT')
     ensureColumn(db, 'scan_deletion_audit', 'reportDeadLetterAt', 'TEXT')
     ensureColumn(db, 'scan_deletion_audit', 'reportErrorCode', 'TEXT')
+    migratePrintTasks(db)
     activeDatabase = db
     log('db: opened local task database')
     return db
@@ -257,38 +308,89 @@ export function isDatabaseAvailable(db: AgentDatabase): db is SqliteDb {
 // ── Task idempotency ──────────────────────────────────────────────────────────
 
 /**
- * Returns true if the task has already been marked done (completed or failed).
- * Always false when db is null.
+ * 一次 executeTask 里，省略 attempt 的读写都落在这次领取的 attempt 上。
+ * 领取循环一次只跑一个任务，下一次 executeTask 会覆盖。并发执行同一个 db 不受支持。
  */
-export function isTaskDone(db: AgentDatabase, taskId: string): boolean {
+const printAttemptByDb = new WeakMap<SqliteDb, number>()
+
+/** 缺失、非整数或负数都视为 0，兼容不带 attempt 的老服务端。 */
+export function normalizePrintAttempt(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return 0
+  return value
+}
+
+export function bindPrintAttempt(db: AgentDatabase, attempt: unknown): void {
+  if (!db) return
+  printAttemptByDb.set(db, normalizePrintAttempt(attempt))
+}
+
+function resolveAttempt(db: SqliteDb, attempt: number | undefined): number {
+  if (attempt !== undefined) return normalizePrintAttempt(attempt)
+  return printAttemptByDb.get(db) ?? 0
+}
+
+/**
+ * 同一 (任务号, attempt) 本地已有行即视为做过。任何状态都算，避免同一轮重打。
+ * db 为 null 时返回 false。
+ */
+export function isTaskDone(db: AgentDatabase, taskId: string, attempt?: number): boolean {
   if (!db) return false
-  const row = db.prepare('SELECT status FROM print_tasks WHERE taskId = ?').get(taskId)
+  const n = resolveAttempt(db, attempt)
+  const row = db.prepare('SELECT status FROM print_tasks WHERE taskId = ? AND attempt = ?').get(taskId, n)
   return row !== undefined
 }
 
 /**
- * Returns the locally-recorded status for a task, or undefined if not found.
+ * Returns the locally-recorded status for a (task, attempt), or undefined if not found.
  * Used by task-runner to distinguish 'spooled' (crash during monitoring) from
  * 'completed'/'failed' (fully processed).
  */
-export function getTaskLocalStatus(db: AgentDatabase, taskId: string): string | undefined {
+export function getTaskLocalStatus(db: AgentDatabase, taskId: string, attempt?: number): string | undefined {
   if (!db) return undefined
-  const row = db.prepare('SELECT status FROM print_tasks WHERE taskId = ?').get(taskId)
+  const n = resolveAttempt(db, attempt)
+  const row = db.prepare('SELECT status FROM print_tasks WHERE taskId = ? AND attempt = ?').get(taskId, n)
   return row ? (row['status'] as string) : undefined
 }
 
+/** 本地行里记住的失败码。空串与缺失都视为没有。 */
+export function getTaskLocalErrorCode(db: AgentDatabase, taskId: string, attempt?: number): string | undefined {
+  if (!db) return undefined
+  const n = resolveAttempt(db, attempt)
+  const row = db.prepare('SELECT errorCode FROM print_tasks WHERE taskId = ? AND attempt = ?').get(taskId, n)
+  const code = row?.['errorCode']
+  if (typeof code !== 'string' || code.length === 0) return undefined
+  return code
+}
+
+/** 行已存在时补上 errorCode。不改状态，避免后面的状态写入把缺纸码冲掉。 */
+export function rememberTaskErrorCode(
+  db: AgentDatabase,
+  taskId: string,
+  errorCode: string,
+  attempt?: number,
+): void {
+  if (!db) return
+  if (typeof errorCode !== 'string' || errorCode.length === 0) return
+  const n = resolveAttempt(db, attempt)
+  db.prepare('UPDATE print_tasks SET errorCode = ? WHERE taskId = ? AND attempt = ?').run(errorCode, taskId, n)
+}
+
 /**
- * Record a task's terminal status to prevent re-execution after restart.
+ * Record a task attempt's status so the same (taskId, attempt) is not printed again.
+ * 冲突时只更新 status / completedAt，不碰 errorCode：INSERT OR REPLACE 会把缺纸码清掉。
  * No-op when db is null.
  */
-export function markTaskDone(db: AgentDatabase, taskId: string, status: string): void {
+export function markTaskDone(db: AgentDatabase, taskId: string, status: string, attempt?: number): void {
   if (!db) return
+  const n = resolveAttempt(db, attempt)
   const now = new Date().toISOString()
-  db
-    .prepare(
-      'INSERT OR REPLACE INTO print_tasks (taskId, status, completedAt, createdAt) VALUES (?, ?, ?, ?)',
-    )
-    .run(taskId, status, now, now)
+  db.prepare(
+    `INSERT INTO print_tasks (taskId, attempt, status, completedAt, createdAt)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(taskId, attempt) DO UPDATE SET
+       status = excluded.status,
+       completedAt = excluded.completedAt`,
+  ).run(taskId, n, status, now, now)
 }
 
 // ── Expired scan deletion audit ───────────────────────────────────────────────

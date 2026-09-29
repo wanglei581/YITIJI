@@ -572,9 +572,15 @@ async function main() {
 
     await orderStatus.markPaid(created.orderId, { paymentSource: 'offline' })
     const claimed = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
-    if (claimed.length === 1 && claimed[0].taskId === created.taskId && claimed[0].claimedBy === terminalId && !!claimed[0].fileUrl) {
-      pass('3c. 线下收款入账后终端 claim：本终端 pending 任务被领取（返回 fileUrl + actionToken）')
-    } else fail(`3c. claim 异常: ${JSON.stringify(claimed.map((c) => c.taskId))}`)
+    if (
+      claimed.length === 1 &&
+      claimed[0].taskId === created.taskId &&
+      claimed[0].claimedBy === terminalId &&
+      !!claimed[0].fileUrl &&
+      claimed[0].attempt === 0
+    ) {
+      pass('3c. 线下收款入账后终端 claim：本终端 pending 任务被领取（返回 fileUrl + actionToken，attempt=0）')
+    } else fail(`3c. claim 异常: ${JSON.stringify(claimed.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
     const afterClaim = await prisma.printTask.findUnique({ where: { id: created.taskId } })
     if (afterClaim?.status === 'claimed' && afterClaim.terminalId === terminalId) {
       pass('3d. claim 后 DB 状态为 claimed 且目标终端保持不变')
@@ -656,8 +662,8 @@ async function main() {
       // 所以夹具按线下收款入账后再让 Agent 领取。
       await orderStatus.markPaid(failCreated.orderId, { paymentSource: 'offline' })
       const claim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
-      if (claim.length !== 1 || claim[0].taskId !== failCreated.taskId) {
-        fail(`7 预备(${label}) — 失败任务未被本终端 claim: ${JSON.stringify(claim.map((c) => c.taskId))}`)
+      if (claim.length !== 1 || claim[0].taskId !== failCreated.taskId || claim[0].attempt !== 0) {
+        fail(`7 预备(${label}) — 失败任务未被本终端 claim 或 attempt 不是 0: ${JSON.stringify(claim.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
       }
       await terminals.patchTaskStatus(
         failCreated.taskId,
@@ -875,8 +881,55 @@ async function main() {
       '8f. retry 越权 → 404',
     )
 
-    // retry 会把 knownFailId 放回 pending，且它的 createdAt 更早；
-    // 不先移出队列的话，后面 createClaimAndFail 会被它截走 claim。
+    const claimAttempt1 = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (
+      claimAttempt1.length === 1 &&
+      claimAttempt1[0].taskId === knownFailId &&
+      claimAttempt1[0].attempt === 1
+    ) {
+      pass('8e2. 重提后 claim 返回同一任务且 attempt=1')
+    } else {
+      fail(`8e2. attempt=1 异常: ${JSON.stringify(claimAttempt1.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
+    }
+
+    await prisma.printTask.update({
+      where: { id: knownFailId },
+      data: { errorCode: 'PAPER_EMPTY' },
+    })
+    await terminals.patchTaskStatus(knownFailId, { status: 'failed' }, `Bearer ${agentToken}`, terminalId)
+    const afterBareFail = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const bareFailLog = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: knownFailId, fromStatus: 'claimed', toStatus: 'failed' },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (
+      afterBareFail?.status === 'failed' &&
+      afterBareFail.errorCode === 'PAPER_EMPTY' &&
+      bareFailLog?.errorCode === 'PAPER_EMPTY'
+    ) {
+      pass('8e3. 重报 failed 且不带 errorCode 时任务 errorCode 仍是 PAPER_EMPTY')
+    } else {
+      fail(`8e3. errorCode 被冲掉: status=${afterBareFail?.status} task=${afterBareFail?.errorCode} log=${bareFailLog?.errorCode}`)
+    }
+
+    const retriedAfterPaper = await printJobs.retryPaidFailedJob(knownFailId, {
+      paymentSessionToken: await sessionFor(knownFailId),
+    })
+    if (retriedAfterPaper.taskId !== knownFailId || retriedAfterPaper.status !== 'pending') {
+      fail(`8e4 预备. 缺纸失败后重提未回到 pending: ${JSON.stringify(retriedAfterPaper)}`)
+    }
+    const claimAttempt2 = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (
+      claimAttempt2.length === 1 &&
+      claimAttempt2[0].taskId === knownFailId &&
+      claimAttempt2[0].attempt === 2
+    ) {
+      pass('8e4. 再次失败并重提后 claim 返回 attempt=2')
+    } else {
+      fail(`8e4. attempt=2 异常: ${JSON.stringify(claimAttempt2.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
+    }
+
+    // 第二次领取后任务是 claimed。createdAt 仍最早，一旦回到 pending 会截走后面的 claim，先移出队列。
     await prisma.printTask.update({
       where: { id: knownFailId },
       data: { status: 'cancelled' },
@@ -896,6 +949,18 @@ async function main() {
       async () => printJobs.retryPaidFailedJob(unconfirmedId, { paymentSessionToken: await sessionFor(unconfirmedId) }),
       'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
       '8g. PRINT_JOB_UNCONFIRMED 禁止重新提交',
+    )
+
+    const partialId = await createClaimAndFail(
+      '失败任务-只出一部分',
+      '2019-01-05T00:00:00.000Z',
+      'PARTIAL_OUTPUT',
+      RAW_SENSITIVE_MESSAGE,
+    )
+    await expectCode(
+      async () => printJobs.retryPaidFailedJob(partialId, { paymentSessionToken: await sessionFor(partialId) }),
+      'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN',
+      '8g2. 只出了一部分禁止重新提交',
     )
 
     const unpaid = await printJobs.create({

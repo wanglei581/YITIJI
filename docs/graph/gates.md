@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1699 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1700 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1068,15 +1068,15 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/src/</code> — 32 个文件</summary>
+<summary><code>apps/terminal-agent/src/</code> — 33 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/terminal-agent/src/agent/api-client.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-direct-http-agents.ts` |
-| `apps/terminal-agent/src/agent/auth-state.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-task-reliability.ts` |
+| `apps/terminal-agent/src/agent/auth-state.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-retry-attempt.ts`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/claim-rate-limit.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/config-manager.ts` | `verify-agent-config-resilience.mjs`<br/>`verify-agent-unauthorized.mjs`<br/>`verify-printer-config.mjs` |
-| `apps/terminal-agent/src/agent/db.ts` | `verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-task-reliability.ts` |
+| `apps/terminal-agent/src/agent/db.ts` | `verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/dead-letter-operator.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/heartbeat.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-local-qr-proxy.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-input-lockout-telemetry.ts` |
 | `apps/terminal-agent/src/agent/instance-lock.ts` | `verify-print-scan-agent.mjs`<br/>`verify-singleton-process.mjs` |
@@ -1092,8 +1092,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/scan-watcher.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-watcher.ts` |
 | `apps/terminal-agent/src/agent/startup-diagnostics.ts` | `verify-agent-config-resilience.mjs` |
 | `apps/terminal-agent/src/agent/task-runner-control.ts` | `verify-task-runner-wake.ts` |
-| `apps/terminal-agent/src/agent/task-runner.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-monitor-truth.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-printer-config.mjs`<br/>`verify-task-reliability.ts` |
-| `apps/terminal-agent/src/agent/types.ts` | `verify-local-print-wake.ts`<br/>`verify-local-qr-proxy.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-input-health.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-scan-watcher.ts`<br/>`verify-task-reliability.ts`<br/>`verify-usb-import-agent.ts` |
+| `apps/terminal-agent/src/agent/task-runner.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-monitor-truth.ts`<br/>`verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-printer-config.mjs`<br/>`verify-task-reliability.ts` |
+| `apps/terminal-agent/src/agent/types.ts` | `verify-local-print-wake.ts`<br/>`verify-local-qr-proxy.ts`<br/>`verify-print-retry-attempt.ts`<br/>`verify-print-scan-agent.mjs`<br/>`verify-scan-deletion-audit.ts`<br/>`verify-scan-input-health.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-scan-watcher.ts`<br/>`verify-task-reliability.ts`<br/>`verify-usb-import-agent.ts` |
 | `apps/terminal-agent/src/agent/wmi.ts` | `verify-print-monitor-truth.ts` |
 | `apps/terminal-agent/src/config.ts` | `verify-printer-config.mjs` |
 | `apps/terminal-agent/src/index.ts` | `verify-agent-config-resilience.mjs`<br/>`verify-agent-profile-guard.mjs`<br/>`verify-agent-unauthorized.mjs`<br/>`verify-print-scan-agent.mjs`<br/>`verify-printer-config.mjs`<br/>`verify-task-reliability.ts` |
@@ -1102,6 +1102,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/printer/image-to-pdf.ts` | `verify-image-scale-truth.ts`<br/>`verify-print-monitor-truth.ts` |
 | `apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts` | `verify-print-monitor-truth.ts` |
 | `apps/terminal-agent/src/printer/print.ts` | `verify-image-scale-truth.ts`<br/>`verify-printer-config.mjs` |
+| `apps/terminal-agent/src/printer/types.ts` | `verify-print-retry-attempt.ts` |
 | `apps/terminal-agent/src/runtime-version.ts` | `verify-local-qr-proxy.ts` |
 | `apps/terminal-agent/src/usb/usb-files.ts` | `verify-usb-import-agent.ts` |
 

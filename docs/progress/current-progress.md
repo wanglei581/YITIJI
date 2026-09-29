@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-09-29：缺纸后点「重新提交打印」能在同一台机器上再打（走查 W-86，分支 `grok/print-retry-attempt-0929`）
+
+- **问题：** 重提复用同一个打印任务号，只把 failed 改回 pending，并写一条 `kiosk_retry` 日志。Agent 本地按任务号判重，再次领到就只回报 failed、不打印，还不带原来的 `PAPER_EMPTY`，结果页从「打印机缺纸」变成笼统失败，重提按钮还在。
+- **修法：** 领取响应增加整数 `attempt`，等于该任务状态日志里 `errorCode='kiosk_retry'` 且 `toStatus='pending'` 的条数。不改库、不加迁移，服务端其它行为不因此改变。Agent 判重键改为任务号加 attempt，没收到视为 0。本地 SQLite 按现有迁移把主键改成 `(taskId, attempt)`，旧行记为 attempt 0，已有行不丢。同一对的语义不变：派发中报未确认、已完成重报完成、已失败重报失败并带回本地错误码。只有 attempt 变大才重新下载、打印。服务端对「重报 failed 且不带 errorCode」保留已有错误码。一体机仍用原来的 taskId，页面没改。Agent 版本号没动（仍是 0.4.12）。
+- **不会重复出纸，也不会打给别人：** attempt 只在 `retryPaidFailedJob` 写这条日志时增加。该函数只接受已付、状态为 failed、不是未确认也不是只出了一部分、且调用者能访问该订单的任务。租约过期的已领取或卡住的打印中由 `resetExpiredClaims` 写成 failed 加未确认，不会回到 pending。
+- **本机已跑：** `verify:print-retry-attempt`、`verify:print-jobs`（重提后 attempt 为 1、再重提为 2、未确认与只出一部分仍禁止、重报 failed 后错误码仍是 `PAPER_EMPTY`）、两边 `tsc --noEmit`、改动文件 eslint、`verify:repository-integrity`、`verify:ci-gate-coverage`、图谱 `--check`，以及断言改过文件的 Agent / API 门禁。新 worktree 里没有 `prisma/dev.db`、隔离库也没装计划终端触发器时，`verify:partner-smart-campus`、`verify:terminal-device-config`、`verify:terminal-provisioning` 第一次失败；按 CI 同样 `db push` 并装上两条 guard SQL 后重跑，退出码都是 0。
+- **没在本机验证：** 真 Windows 打印机、真缺纸走查、GitHub CI 全量。非 Windows 上要断言「重提后回报已完成」，门禁把出纸监控的平台和队列查询换成桩；生产路径这两处覆盖为空，仍走真实打印命令和本机队列监控。
+
 ## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
 
 - **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
