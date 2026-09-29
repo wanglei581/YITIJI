@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1592 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1600 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -139,7 +139,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 95 个文件</summary>
+<summary><code>apps/admin/src/</code> — 96 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -180,7 +180,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/partners/partner-account-action-steps/ActionCredentialSteps.tsx` | `verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/PhoneRebindSteps.tsx` | `verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/usePartnerAccountAction.ts` | `verify-partner-account-action-ui.mjs` |
-| `apps/admin/src/routes/peripherals/index.tsx` | `verify-honest-placeholders.mjs` |
+| `apps/admin/src/routes/peripherals/index.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-honest-placeholders.mjs` |
 | `apps/admin/src/routes/permissions/index.tsx` | `verify-honest-placeholders.mjs` |
 | `apps/admin/src/routes/policy-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx` | `verify-admin-print-scan-ui.mjs` |
@@ -199,6 +199,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/terminals/index.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-device-config.ts` |
+| `apps/admin/src/routes/terminals/terminalStatusViews.ts` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/toolbox/components/TerminalToolboxPanel.tsx` | `verify-toolbox-review-ui.mjs` |
 | `apps/admin/src/routes/toolbox/components/TerminalToolboxRow.tsx` | `verify-toolbox-review-ui.mjs`<br/>`verify-terminal-device-config.ts` |
 | `apps/admin/src/routes/toolbox/components/ToolboxAllowedHostPanel.tsx` | `verify-toolbox-review-ui.mjs` |
@@ -950,11 +951,12 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 37 个文件</summary>
+<summary><code>apps/partner/src/</code> — 42 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `apps/partner/src/layouts/PartnerLayoutWrapper.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
+| `apps/partner/src/layouts/PartnerLayoutWrapper.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
+| `apps/partner/src/lib/csv.ts` | `verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/Page.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/account/index.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/companies/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-companies.ts` |
@@ -981,14 +983,18 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/sources/omitWebhookSecretOnce.ts` | `verify-backend-p0-contracts.mjs` |
 | `apps/partner/src/routes/stats/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/sync-logs/index.tsx` | `verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/terminals/TerminalOpsCards.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-stats-contract.mjs` |
+| `apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx` | `verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/terminals/index.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
+| `apps/partner/src/routes/terminals/terminalOpsFormat.ts` | `verify-partner-stats-contract.mjs` |
 | `apps/partner/src/services/api/client.ts` | `verify-partner-relative-api-url.mjs`<br/>`verify-deploy-gates-in-sync.mjs` |
 | `apps/partner/src/services/api/consoleScreen.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/services/api/partnerCompanies.ts` | `verify-companies.ts` |
 | `apps/partner/src/services/api/partnerContent.ts` | `verify-excel-template-download-ui.mjs` |
 | `apps/partner/src/services/api/partnerHttpAdapter.ts` | `verify-excel-template-download-ui.mjs`<br/>`verify-job-quality-dashboard-ui.mjs`<br/>`verify-partner-relative-api-url.mjs` |
-| `apps/partner/src/services/api/partnerMockAdapter.ts` | `verify-excel-template-download-ui.mjs`<br/>`verify-job-quality-dashboard-ui.mjs` |
+| `apps/partner/src/services/api/partnerMockAdapter.ts` | `verify-excel-template-download-ui.mjs`<br/>`verify-job-quality-dashboard-ui.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/services/api/stats.ts` | `verify-partner-stats-contract.mjs` |
+| `apps/partner/src/services/api/terminalOps.ts` | `verify-honest-placeholders.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/services/api/types.ts` | `verify-job-quality-dashboard-ui.mjs`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-jobfair-checkin.ts` |
 | `apps/partner/src/services/auth/index.ts` | `verify-admin-account-settings-ui.mjs` |
 
@@ -1882,7 +1888,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 84 个文件</summary>
+<summary><code>services/api/scripts/</code> — 85 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1930,6 +1936,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/isolated-verification-database.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-order-filters.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts`<br/>`verify-file-cleanup-cas-ledger.ts`<br/>`verify-isolated-verification-database.ts`<br/>`verify-job-review.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-official-channels.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-jobs.ts`<br/>`verify-recruitment-emergency-scope.ts`<br/>`verify-recruitment-hosting-default-off.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/scripts/support/minimal-pdf.ts` | `verify-kiosk-cashier-ui.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/scripts/support/partner-account-action-static-contract.ts` | `verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts` |
+| `services/api/scripts/support/partner-terminal-ops-cases.ts` | `verify-partner-stats-contract.ts` |
 | `services/api/scripts/support/payment-callback-race-cases.ts` | `verify-payment-flow.ts` |
 | `services/api/scripts/support/recruitment-wave2-full-inventory.ts` | `verify-recruitment-wave2-full-inventory.ts` |
 | `services/api/scripts/support/recruitment-wave2-public-snapshot.ts` | `verify-recruitment-wave2-full-inventory.ts` |
@@ -1974,7 +1981,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 543 个文件</summary>
+<summary><code>services/api/src/</code> — 544 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2482,6 +2489,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/sync/sync.controller.ts` | `verify-ai-access.ts`<br/>`verify-backend-p0-contracts.mjs` |
 | `services/api/src/sync/sync.service.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-recruitment-emergency-scope.ts` |
 | `services/api/src/terminals/admin-kiosk-job-board.controller.ts` | `verify-kiosk-job-board-switch.ts` |
+| `services/api/src/terminals/admin-printer-status.ts` | `verify-terminal-network-diagnostics.ts` |
 | `services/api/src/terminals/admin-terminals.controller.ts` | `verify-console-screen-snapshot.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-provisioning.ts` |
 | `services/api/src/terminals/admin-toolbox.controller.ts` | `verify-terminal-device-config.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
 | `services/api/src/terminals/claim-unprintable-file.ts` | `verify-payment-flow.ts` |
