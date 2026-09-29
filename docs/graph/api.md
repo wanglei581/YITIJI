@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`562` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`563` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -544,6 +544,7 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/legal-doc-versions` | AdminLegalDocsController.list | admin | LegalService | AuditLog<br/>LegalDocVersion |
 | POST | `/api/v1/admin/legal-doc-versions` | AdminLegalDocsController.create | admin | LegalService | AuditLog<br/>LegalDocVersion |
+| GET | `/api/v1/admin/legal-doc-versions/:id` | AdminLegalDocsController.getOne | admin | LegalService | AuditLog<br/>LegalDocVersion |
 | PATCH | `/api/v1/admin/legal-doc-versions/:id/activate` | AdminLegalDocsController.activate | admin | LegalService | AuditLog<br/>LegalDocVersion |
 
 ## `services/api/src/legal/legal.controller.ts`

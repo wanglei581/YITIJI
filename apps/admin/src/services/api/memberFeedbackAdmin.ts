@@ -15,7 +15,8 @@ export interface FeedbackReplyItem {
 
 /**
  * 工单提交方类型。`anonymous_kiosk` 由一体机匿名反馈端点写入（PR #612），
- * 这类工单没有账号归属：不能回复、不能推通知，只能现场处置。
+ * 这类工单没有账号归属：不能推通知，用户也看不到后台写的内容；后台只能用回复接口
+ * 记录处理结果（服务端照常落库并把状态改为已回复）。
  */
 export type FeedbackSubmitterType = 'member' | 'anonymous_kiosk'
 
