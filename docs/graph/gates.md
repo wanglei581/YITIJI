@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1592 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1597 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -139,12 +139,12 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 95 个文件</summary>
+<summary><code>apps/admin/src/</code> — 99 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/admin/src/UnhandledRejectionBanner.tsx` | `verify-no-raw-error-render.mjs` |
-| `apps/admin/src/layouts/AdminLayoutWrapper.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-content-trust-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-legal-doc-version.ts` |
+| `apps/admin/src/layouts/AdminLayoutWrapper.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-content-trust-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/admin/src/main.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/account-settings/AdminInitialPhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/AdminPhoneTransferCard.tsx` | `verify-admin-phone-transfer-ui.mjs` |
@@ -158,13 +158,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/dashboard/index.tsx` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/devices/TerminalFleetOverview.tsx` | `verify-admin-device-fleet-overview-ui.mjs` |
 | `apps/admin/src/routes/devices/index.tsx` | `verify-admin-device-fleet-overview-ui.mjs` |
+| `apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/routes/fair-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-jobfair-checkin.ts` |
 | `apps/admin/src/routes/fairs/components/CompaniesTab.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/fairs/components/MaterialsTab.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/fairs/components/ZonesTab.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/import-batches/index.tsx` | `verify-source-publish-actions.mjs` |
-| `apps/admin/src/routes/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`frontend.mjs` |
+| `apps/admin/src/routes/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`frontend.mjs` |
 | `apps/admin/src/routes/job-materials/index.tsx` | `verify-admin-job-materials-ui.mjs` |
+| `apps/admin/src/routes/job-sources/JobSourceReviewActions.tsx` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/routes/job-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-job-content-screening.ts` |
 | `apps/admin/src/routes/legal-docs/index.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/admin/src/routes/login/LegalDocsModal.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-legal-doc-version.ts` |
@@ -173,10 +175,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/orders/index.tsx` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
 | `apps/admin/src/routes/orders/orderHonestyCopy.ts` | `verify-admin-orders-readonly-ui.mjs` |
 | `apps/admin/src/routes/partners/OrgContentTrustPanel.tsx` | `verify-admin-content-trust-ui.mjs` |
+| `apps/admin/src/routes/partners/OrgQualificationSection.tsx` | `verify-admin-offline-agencies-ui.mjs` |
 | `apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx` | `verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/PartnerAccountManager.tsx` | `verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/contentTrustRules.ts` | `verify-admin-content-trust-ui.mjs` |
-| `apps/admin/src/routes/partners/index.tsx` | `verify-admin-content-trust-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/partners/index.tsx` | `verify-admin-content-trust-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/ActionCredentialSteps.tsx` | `verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/PhoneRebindSteps.tsx` | `verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/usePartnerAccountAction.ts` | `verify-partner-account-action-ui.mjs` |
@@ -193,6 +196,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/screen/screenTabs.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screensaver/index.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx` | `verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/routes/sync-sources/index.tsx` | `verify-no-raw-error-render.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
@@ -1619,7 +1623,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/memberAssets.ts` | `verify-jobfair-checkin.ts` |
 | `packages/shared/src/types/memberPrivacy.ts` | `verify-data-request-ui.mjs` |
 | `packages/shared/src/types/mockInterview.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
-| `packages/shared/src/types/partner.ts` | `verify-partner-smart-campus.ts` |
+| `packages/shared/src/types/partner.ts` | `verify-admin-parked-recruitment-ui.mjs`<br/>`verify-partner-smart-campus.ts` |
 | `packages/shared/src/types/payment.ts` | `verify-price-single-source.mjs`<br/>`verify-admin-order-filters.ts` |
 | `packages/shared/src/types/print.ts` | `verify-print-parameter-capability.mjs`<br/>`verify-print-parameter-capability.ts` |
 | `packages/shared/src/types/printScanCapability.ts` | `verify-admin-print-scan.ts`<br/>`verify-print-color-duplex-capability.ts` |
@@ -1974,7 +1978,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 543 个文件</summary>
+<summary><code>services/api/src/</code> — 544 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2374,6 +2378,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/orgs/admin-orgs.controller.ts` | `verify-admin-content-trust-ui.mjs` |
 | `services/api/src/orgs/admin-orgs.service.ts` | `verify-admin-orgs-delete-concurrency.ts`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-smart-campus.ts` |
 | `services/api/src/orgs/dto/partner-account-action.dto.ts` | `verify-partner-account-action.ts` |
+| `services/api/src/orgs/parked-org-types.ts` | `verify-admin-parked-recruitment-ui.mjs` |
 | `services/api/src/orgs/partner-stats.controller.ts` | `verify-partner-stats-contract.ts` |
 | `services/api/src/orgs/partner-stats.service.ts` | `verify-partner-stats-contract.ts` |
 | `services/api/src/payment/admin-billing.controller.ts` | `verify-admin-billing.ts` |

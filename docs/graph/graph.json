@@ -11819,7 +11819,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 173,
+      "reachableFileCount": 165,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -11832,7 +11832,10 @@
             "GET /admin/alerts",
             "GET /admin/import-batches",
             "GET /admin/jobs/quality-summary",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/print-tasks",
+            "GET /admin/system/recruitment-hosting",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
@@ -11840,7 +11843,10 @@
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
-            "POST /files/cleanup-expired"
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
+            "POST /files/cleanup-expired",
+            "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/dashboard/index.tsx",
           "layout": [
@@ -11869,7 +11875,19 @@
         },
         {
           "component": "AiConfigPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /admin/import-batches",
+            "GET /admin/orgs/:param/official-channels",
+            "GET /admin/orgs/:param/verified-official-domains",
+            "GET /admin/system/recruitment-hosting",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
+            "POST /admin/recruitment-emergency/circuit-break",
+            "POST /admin/recruitment-emergency/takedown",
+            "PUT /admin/orgs/:param/verified-official-domains"
+          ],
           "file": "apps/admin/src/routes/ai-config/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -11967,17 +11985,10 @@
           "component": "CompaniesPage",
           "endpoints": [
             "DELETE /admin/companies/:param/jobs/:param",
-            "DELETE /admin/orgs/:param/accounts/:param",
-            "DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param",
-            "DELETE /admin/orgs/:param/accounts/:param/action-tickets/current",
-            "DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current",
             "GET /admin/companies",
             "GET /admin/companies/:param",
             "GET /admin/companies/:param/linkable-jobs",
             "GET /admin/import-batches",
-            "GET /admin/orgs",
-            "GET /admin/orgs/:param",
-            "GET /admin/orgs/:param/content-trust",
             "GET /admin/orgs/:param/official-channels",
             "GET /admin/orgs/:param/verified-official-domains",
             "GET /admin/system/recruitment-hosting",
@@ -11988,23 +11999,10 @@
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
-            "PATCH /admin/orgs/:param",
-            "PATCH /admin/orgs/:param/accounts/:param/password",
-            "PATCH /admin/orgs/:param/accounts/:param/status",
-            "PATCH /admin/orgs/:param/content-trust",
-            "PATCH /admin/orgs/:param/status",
             "POST /admin/companies",
             "POST /admin/companies/:param/jobs",
-            "POST /admin/orgs",
-            "POST /admin/orgs/:param/accounts",
-            "POST /admin/orgs/:param/accounts/:param/action-challenges",
-            "POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify",
-            "POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new",
-            "POST /admin/orgs/:param/accounts/:param/phone-rebind/start",
-            "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
-            "PUT /admin/orgs/:param/accounts/:param/email",
             "PUT /admin/orgs/:param/verified-official-domains"
           ],
           "file": "apps/admin/src/routes/companies/index.tsx",
@@ -12050,8 +12048,6 @@
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
-            "POST /admin/bulk-publish/execute",
-            "POST /admin/bulk-publish/preview",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
             "POST /files/cleanup-expired",
@@ -12189,8 +12185,6 @@
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
-            "POST /admin/bulk-publish/execute",
-            "POST /admin/bulk-publish/preview",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
             "POST /files/cleanup-expired",
@@ -12270,41 +12264,9 @@
           "wrappers": []
         },
         {
-          "component": "OfflineAgenciesPage",
-          "endpoints": [
-            "DELETE /admin/orgs/:param/accounts/:param",
-            "DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param",
-            "DELETE /admin/orgs/:param/accounts/:param/action-tickets/current",
-            "DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current",
-            "GET /admin/import-batches",
-            "GET /admin/orgs",
-            "GET /admin/orgs/:param",
-            "GET /admin/orgs/:param/content-trust",
-            "GET /admin/orgs/:param/official-channels",
-            "GET /admin/orgs/:param/verified-official-domains",
-            "GET /admin/system/recruitment-hosting",
-            "PATCH /admin/fair-sources/:param/publish",
-            "PATCH /admin/fair-sources/:param/review",
-            "PATCH /admin/job-sources/:param/publish",
-            "PATCH /admin/job-sources/:param/review",
-            "PATCH /admin/orgs/:param",
-            "PATCH /admin/orgs/:param/accounts/:param/password",
-            "PATCH /admin/orgs/:param/accounts/:param/status",
-            "PATCH /admin/orgs/:param/content-trust",
-            "PATCH /admin/orgs/:param/status",
-            "POST /admin/orgs",
-            "POST /admin/orgs/:param/accounts",
-            "POST /admin/orgs/:param/accounts/:param/action-challenges",
-            "POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify",
-            "POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new",
-            "POST /admin/orgs/:param/accounts/:param/phone-rebind/start",
-            "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
-            "POST /admin/recruitment-emergency/circuit-break",
-            "POST /admin/recruitment-emergency/takedown",
-            "PUT /admin/orgs/:param/accounts/:param/email",
-            "PUT /admin/orgs/:param/verified-official-domains"
-          ],
-          "file": "apps/admin/src/routes/offline-agencies/index.tsx",
+          "component": "Navigate",
+          "endpoints": [],
+          "file": null,
           "layout": [
             "AdminLayoutWrapper"
           ],
@@ -12602,7 +12564,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 178
+      "sourceFileCount": 190
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17614,6 +17576,7 @@
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs",
+      "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
@@ -17663,6 +17626,9 @@
     "apps/admin/src/routes/devices/index.tsx": [
       "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs"
     ],
+    "apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx": [
+      "apps/admin/scripts/verify-source-publish-actions.mjs"
+    ],
     "apps/admin/src/routes/fair-sources/index.tsx": [
       "apps/admin/scripts/verify-source-publish-actions.mjs",
       "scripts/verify-no-raw-error-render.mjs",
@@ -17684,6 +17650,7 @@
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs",
+      "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
@@ -17691,6 +17658,9 @@
     ],
     "apps/admin/src/routes/job-materials/index.tsx": [
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs"
+    ],
+    "apps/admin/src/routes/job-sources/JobSourceReviewActions.tsx": [
+      "apps/admin/scripts/verify-source-publish-actions.mjs"
     ],
     "apps/admin/src/routes/job-sources/index.tsx": [
       "apps/admin/scripts/verify-source-publish-actions.mjs",
@@ -17723,6 +17693,9 @@
     "apps/admin/src/routes/partners/OrgContentTrustPanel.tsx": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
     ],
+    "apps/admin/src/routes/partners/OrgQualificationSection.tsx": [
+      "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
+    ],
     "apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx": [
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
@@ -17734,6 +17707,7 @@
     ],
     "apps/admin/src/routes/partners/index.tsx": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
+      "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/admin/src/routes/partners/partner-account-action-steps/ActionCredentialSteps.tsx": [
@@ -17786,6 +17760,9 @@
     "apps/admin/src/routes/screensaver/index.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx": [
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "apps/admin/src/routes/sync-sources/index.tsx": [
       "scripts/verify-no-raw-error-render.mjs",
@@ -21133,6 +21110,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "packages/shared/src/types/partner.ts": [
+      "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
       "services/api/scripts/verify-partner-smart-campus.ts"
     ],
     "packages/shared/src/types/payment.ts": [
@@ -24093,6 +24071,9 @@
     "services/api/src/orgs/dto/partner-account-action.dto.ts": [
       "services/api/scripts/verify-partner-account-action.ts"
     ],
+    "services/api/src/orgs/parked-org-types.ts": [
+      "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+    ],
     "services/api/src/orgs/partner-stats.controller.ts": [
       "services/api/scripts/verify-partner-stats-contract.ts"
     ],
@@ -25330,6 +25311,10 @@
           "apps/admin/src/routes/offline-agencies"
         ],
         "files": [
+          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/routes/index.tsx",
+          "apps/admin/src/routes/partners/OrgQualificationSection.tsx",
+          "apps/admin/src/routes/partners/index.tsx",
           "apps/admin/src/services/api/offlineAgenciesAdmin.ts",
           "apps/admin/src/services/api/offlineAgencyGovernance.ts",
           "services/api/src/offline-agencies/dto/create-offline-agency.dto.ts",
@@ -25364,6 +25349,27 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:admin-orders-readonly-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps/admin/src/routes"
+        ],
+        "files": [
+          "packages/shared/src/types/partner.ts",
+          "services/api/src/orgs/parked-org-types.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:source-publish-actions"
       ],
       "wired": true
     },
@@ -25651,8 +25657,10 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx",
           "apps/admin/src/routes/fair-sources/index.tsx",
           "apps/admin/src/routes/import-batches/index.tsx",
+          "apps/admin/src/routes/job-sources/JobSourceReviewActions.tsx",
           "apps/admin/src/routes/job-sources/index.tsx",
           "apps/admin/src/routes/policy-sources/index.tsx",
           "apps/admin/src/services/api/adminHttpAdapter.ts",
@@ -31924,6 +31932,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx",
           "apps/admin/src/routes/sync-sources/index.tsx",
           "apps/admin/src/services/api/offlineAgenciesAdmin.ts",
           "apps/kiosk/src/pages/offline-agencies/OfflineAgenciesPage.tsx",
@@ -38385,6 +38394,248 @@
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/companies/components/CompanyDetailDrawerEditor.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "apps/admin/src/routes/companies/components/CompanyDetailDrawer.tsx",
+          "apps/admin/src/routes/companies/components/LinkedJobsSection.tsx",
+          "apps/admin/src/routes/companies/components/ReviewPublishSection.tsx",
+          "apps/admin/src/routes/companies/index.tsx",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/companies/components/CreateCompanyDrawer.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "apps/admin/src/routes/companies/index.tsx",
+          "docs/progress/current-progress.md",
+          "docs/reviews/engineering-scale-normalization-backlog.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/companies/components/LinkedJobsSection.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "docs/design/console-ai-os-2026-08/admin/companies.html",
+          "docs/design/console-ai-os-2026-08/mapping.html",
+          "docs/product/console-ai-upgrade-plan-2026-08.md",
+          "docs/progress/current-progress.md",
+          "docs/reviews/engineering-scale-normalization-backlog.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/companies/components/ReviewPublishSection.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "docs/api/console-ai-dev-spec-2026-08.md",
+          "docs/api/console-ai-dev-spec-codex-findings-2026-08.md",
+          "docs/design/console-ai-os-2026-08/admin/companies.html",
+          "docs/design/console-ai-os-2026-08/mapping.html",
+          "docs/design/console-ai-os-2026-08/partner/companies.html",
+          "docs/product/console-ai-upgrade-plan-2026-08.md",
+          "docs/progress/current-progress.md",
+          "docs/reviews/engineering-scale-normalization-backlog.md",
+          "docs/reviews/launch-audit-2026-09-05.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/components/BulkPublishButton.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
+          "apps/admin/scripts/verify-source-publish-actions.mjs",
+          "apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx",
+          "apps/admin/src/routes/fair-sources/index.tsx",
+          "apps/admin/src/routes/job-sources/JobSourceReviewActions.tsx",
+          "apps/admin/src/routes/job-sources/index.tsx",
+          "apps/admin/src/routes/partners/contentTrustRules.ts",
+          "docs/operations/seed-content-entry-checklist-2026-08.md",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-content-trust-ui.mjs、apps/admin/scripts/verify-source-publish-actions.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-source-publish-actions.mjs",
+          "apps/admin/src/routes/fair-sources/index.tsx",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-source-publish-actions.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/fairs/VenueGuideTabEditor.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "apps/admin/src/routes/fairs/VenueGuideTab.tsx",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/fairs/components/CompaniesTabEditor.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "apps/admin/src/routes/fairs/components/CompaniesTab.tsx",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/fairs/components/EditFairDrawer.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "apps/admin/src/routes/fairs/index.tsx",
+          "docs/progress/current-progress.md",
+          "docs/reviews/engineering-scale-normalization-backlog.md",
+          "docs/reviews/partner-capability-inventory-2026-09-02.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/fairs/components/MaterialsTabEditor.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "apps/admin/src/routes/fairs/components/MaterialsTab.tsx",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/fairs/components/ZonesTabEditor.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "apps/admin/src/routes/fairs/components/ZonesTab.tsx",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/job-sources/JobSourceReviewActions.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-source-publish-actions.mjs",
+          "apps/admin/src/routes/job-sources/index.tsx",
+          "apps/admin/tests/e2e/sources.spec.ts",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-source-publish-actions.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/offline-agencies/AgencyForm.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/offline-agencies/GovernanceDrawer.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
+          "apps/admin/src/routes/offline-agencies/AgencyForm.tsx",
+          "apps/admin/src/routes/partners/OrgQualificationSection.tsx",
+          "apps/admin/src/services/api/offlineAgencyGovernance.ts"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/offline-agencies/JobsDrawer.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
+          "docs/reviews/launch-audit-2026-09-05.md",
+          "scripts/verify-no-raw-error-render.mjs"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、scripts/verify-no-raw-error-render.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/offline-agencies/ReviewDialog.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/offline-agencies/index.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/src/routes/offline-agencies/AgencyForm.tsx",
+          "apps/admin/src/routes/offline-agencies/GovernanceDrawer.tsx",
+          "apps/admin/src/routes/offline-agencies/JobsDrawer.tsx",
+          "apps/admin/src/routes/offline-agencies/ReviewDialog.tsx"
+        ],
+        "risk": "medium",
+        "scope": "admin",
+        "why": "仍被其它文件提及：apps/admin/src/routes/offline-agencies/AgencyForm.tsx、apps/admin/src/routes/offline-agencies/GovernanceDrawer.tsx、apps/admin/src/routes/offline-agencies/JobsDrawer.tsx"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
         "kind": "test",
         "mentions": [
@@ -38405,12 +38656,56 @@
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+          "apps/admin/src/routes/sync-sources/index.tsx",
+          "apps/admin/src/routes/sync-sources/syncSourcesApi.ts",
+          "apps/admin/tests/e2e/import-sync.spec.ts",
+          "docs/progress/current-progress.md",
+          "services/api/scripts/verify-backend-p0-contracts.mjs"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/toolbox/toolboxActionState.test.ts",
         "kind": "test",
         "mentions": [],
         "risk": "low",
         "scope": "admin",
         "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/services/api/bulkPublish.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/src/routes/components/BulkPublishButton.tsx",
+          "docs/operations/seed-content-entry-checklist-2026-08.md",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "medium",
+        "scope": "admin",
+        "why": "仅被文档提及：docs/operations/seed-content-entry-checklist-2026-08.md、docs/progress/current-progress.md"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/services/api/offlineAgenciesAdmin.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
+          "apps/admin/src/routes/offline-agencies/AgencyForm.tsx",
+          "apps/admin/src/services/api/offlineAgencyGovernance.ts",
+          "docs/reviews/launch-audit-2026-09-05.md",
+          "services/api/scripts/verify-backend-p0-contracts.mjs"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
