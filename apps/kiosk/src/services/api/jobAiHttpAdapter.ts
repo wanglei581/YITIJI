@@ -8,6 +8,7 @@ import type {
 } from '@ai-job-print/shared'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { getTerminalId } from './screensaver'
+import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 
@@ -64,7 +65,7 @@ function authHeaders(token: string, withJsonBody = false): Record<string, string
 }
 
 async function post<T>(path: string, token: string, body: unknown = {}): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: authHeaders(token, true),
     credentials: 'include',
@@ -74,7 +75,7 @@ async function post<T>(path: string, token: string, body: unknown = {}): Promise
 }
 
 async function del<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
     method: 'DELETE',
     headers: authHeaders(token),
     credentials: 'include',
@@ -83,7 +84,7 @@ async function del<T>(path: string, token: string): Promise<T> {
 }
 
 async function get<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await terminalAttributedFetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
     headers: authHeaders(token),
     credentials: 'include',

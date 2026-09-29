@@ -30,6 +30,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { isAiOutage } from '../../ai/aiOutage'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import {
@@ -140,8 +141,11 @@ export function ContractReviewHomePage() {
         ownerMemberId: user?.id ?? null,
       })
       navigate('/contract-review/processing')
-    } catch {
-      setError('创建审查任务失败，请检查文件格式后重试')
+    } catch (err) {
+      // AI 停用（暂停 / 当日额度已到 / 未配置）不是文件的问题，换文件重试也不会变好。
+      setError(isAiOutage(err)
+        ? 'AI 现在停用，签约风险提示暂时做不了。合同原件可以到打印扫描里直接打印。'
+        : '创建审查任务失败，请检查文件格式后重试')
     } finally {
       setSubmitting(false)
     }
