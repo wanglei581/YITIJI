@@ -196,7 +196,10 @@ function checkNoVersionLiteral(text) {
 /** (c)：页面目录里不出现条款原文与勾选框原文，也没有本地条款数组。 */
 function checkNoLocalItems(text) {
   assert.ok(!text.includes(AGE_LINE), '年龄那一句不在页面源码里')
-  assert.doesNotMatch(text, /14 周岁/, '页面源码不写年龄条款或年龄确认')
+  // 只禁同意条款与勾选框里的原话片段。「年满 14 周岁声明」作为 AI 不可用的原因说明（#1112）
+  // 是另一回事，不属于同意内容，不能一并禁掉。
+  assert.doesNotMatch(text, /请在监护人同意并陪同下使用/, '页面源码不写年龄条款')
+  assert.doesNotMatch(text, /确认本人已满 ?14 ?周岁/, '页面源码不写勾选框里的年龄确认')
   assert.doesNotMatch(text, /未成年人个人信息处理规则/, '页面源码不写链接文字')
   assert.doesNotMatch(text, /我已阅读并同意上述说明/, '页面源码不写本地勾选框文字')
   assert.doesNotMatch(text, /\bCONSENT_ITEMS\b/, '没有本地条款数组')
@@ -281,6 +284,16 @@ test('变异 (b)：写死版本号 → 判红', () => {
 test('变异 (c)：年龄条款写回页面 → 判红', () => {
   const text = pageDirText((t) => t.replace('consentItems: [],', `consentItems: ['${AGE_LINE}'],`))
   assert.throws(() => checkNoLocalItems(text), (e) => e.code === 'ERR_ASSERTION')
+})
+
+test('变异 (c)：勾选框里的年龄确认写回页面 → 判红', () => {
+  const text = pageDirText((t) => t.replace("consentCheckboxLabel: '',", "consentCheckboxLabel: '确认本人已满 14 周岁',"))
+  assert.throws(() => checkNoLocalItems(text), (e) => e.code === 'ERR_ASSERTION')
+})
+
+test('(c) 阳性对照：AI 不可用原因里的「年满 14 周岁声明」不算条款', () => {
+  assert.ok(pageDirText().includes('年满 14 周岁声明'), '原因说明确实在页面源码里')
+  checkNoLocalItems(pageDirText())
 })
 
 test('变异 (c)：本地勾选框文字写回页面 → 判红', () => {
