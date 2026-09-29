@@ -52,12 +52,24 @@ for (const [name, source] of [['PrintPreviewPage', preview]]) {
   expect(source.includes('capability.duplex.reason'), `${name} 展示双面被禁用的真实原因`)
 }
 
+// 2026-09-29（商用收口 P0-5，稿 14 定稿）：确认页不再拦截，改为「参数与本机能力求交」：
+// 求交在报价之前（usePrintConfirmHandoff → negotiatePrintParams → restrictToAllowedPrintParams），
+// 能力还在加载时不报价（waiting），改过的项就地说明；那句原话保留在视图里。
+const confirmHandoff = read(kioskRoot, 'src/pages/print/usePrintConfirmHandoff.ts')
+const confirmView = read(kioskRoot, 'src/pages/print/components/PrintConfirmView.tsx')
+const negotiateBody = shared.slice(shared.indexOf('export function negotiatePrintParams'))
 expect(
-  confirm.includes('restrictToAllowedPrintParams') &&
-    confirm.includes('hasParamsBeyondCapability') &&
-    confirm.includes('彩色或双面本机暂未开通，已改回目前能打的参数') &&
-    confirm.indexOf('restrictToAllowedPrintParams') < confirm.indexOf('quotePrintOrder('),
-  'PrintConfirmPage 在报价前按本机能力收口，避免按未验证参数计价',
+  confirmHandoff.includes('negotiatePrintParams(incomingParams, capability)') &&
+    negotiateBody.includes('restrictToAllowedPrintParams(requested') &&
+    confirm.indexOf('usePrintConfirmHandoff(capability)') > -1 &&
+    confirm.indexOf('usePrintConfirmHandoff(capability)') < confirm.indexOf('quotePrintOrder(') &&
+    confirmView.includes('彩色或双面本机暂未开通，已改回目前能打的参数'),
+  'PrintConfirmPage 在报价前按本机能力求交，避免按未验证参数计价；改过的参数如实说明',
+)
+expect(
+  /if \(waitingCapability \|\| ordered \|\| !hasFileContext\) return/.test(confirm) &&
+    /capability\.loading && needsCapability/.test(negotiateBody),
+  'PrintConfirmPage 在本机能力加载完之前不按保守参数报价（不闪拦截屏、不报错价）',
 )
 expect(
   confirm.includes('terminalId: getTerminalId()'),

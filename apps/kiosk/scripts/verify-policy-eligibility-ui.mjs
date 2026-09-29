@@ -42,7 +42,8 @@ const results = read('src/pages/renshi/EligibilityResults.tsx')
 const page = read('src/pages/renshi/RenshiPage.tsx')
 const components = read('src/pages/renshi/components.tsx')
 const shared = read('src/pages/renshi/shared.ts')
-const css = read('src/pages/renshi/renshi-policy-fusion.css')
+// 条件核对的样式 9/29 从 renshi-policy-fusion.css 拆到 renshi-eligibility-qx.css（稿 48 最终版），F4 跟着读新文件。
+const css = read('src/pages/renshi/renshi-eligibility-qx.css')
 const packageJson = read('package.json')
 
 /**
@@ -269,7 +270,8 @@ const overreach = [/代为申报/, /帮你申领/, /保证通过/, /一定能领
   .filter((p) => p.test(panelCode + resultsCode + stripComments(outcomeSrc)))
 check(overreach.length === 0, `F3. 无代办 / 承诺审批结果的越界文案（命中：${overreach.length}）`)
 // 主按钮 ≥56px，可点区 ≥48px（1080×1920 竖屏触控）。
-const eligCss = css.slice(css.indexOf('.k8-elig {'))
+const eligStart = css.indexOf('\n.k8-elig {')
+const eligCss = eligStart >= 0 ? css.slice(eligStart) : ''
 const minHeights = [...eligCss.matchAll(/min-height:\s*(\d+)px/g)].map((m) => Number(m[1]))
 // 两条规则覆盖全部可点元素：.k8-elig-opt（选项 chip）与四个按钮共用的那条。
 check(

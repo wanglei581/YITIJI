@@ -13,6 +13,8 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const { isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 const { PICKUP_CODE_RE, createPickupQrMatrix, normalizePickupCode } = require('../../utils/pickup-qrcode')
+const pickupActions = require('../../utils/pickup-actions')
+const { parseAmountCents, formatCode, formatCountdown, resolveOrderState } = require('./pickup-state')
 
 const POLL_INTERVAL_MS = 3000
 const TERMINAL_STATES = new Set(['completed', 'failed', 'expired', 'cancelled', 'abandoned'])
@@ -30,60 +32,6 @@ const TERMINAL_STATES = new Set(['completed', 'failed', 'expired', 'cancelled', 
  * 不是「失败了几次」—— 后者会被一次成功的空响应重置，而我们要的是新鲜度。
  */
 const CODE_TRUST_WINDOW_MS = 15000
-
-function parseAmountCents(value) {
-  if (value === undefined || value === null || value === '') return null
-  const amountCents = Number(value)
-  return Number.isSafeInteger(amountCents) && amountCents >= 0 ? amountCents : null
-}
-
-function formatCode(raw) {
-  if (!raw) return ''
-  const value = String(raw).replace(/\s/g, '').toUpperCase()
-  const groups = value.match(/.{1,2}/g)
-  return groups ? groups.join('-') : ''
-}
-
-function formatCountdown(ms) {
-  if (ms <= 0) return '已过期'
-  const hours = Math.floor(ms / 3600000)
-  const minutes = Math.floor((ms % 3600000) / 60000)
-  return hours > 0 ? `${hours}小时${minutes}分钟后过期` : `${Math.max(1, minutes)}分钟后过期`
-}
-
-function resolveOrderState(order) {
-  const pickupStatus = String(order.pickupStatus || '')
-  const taskStatus = String(order.taskStatus || '')
-  const isFreeOrder = parseAmountCents(order.amountCents) === 0
-
-  if (pickupStatus === 'expired' || taskStatus === 'expired') {
-    return { key: 'expired', title: '到机码已过期', detail: '请返回打印订单重新发起打印。', showQr: false }
-  }
-  if (pickupStatus === 'cancelled' || taskStatus === 'cancelled') {
-    return { key: 'cancelled', title: '订单已取消', detail: '本次到机码已经失效。', showQr: false }
-  }
-  if (taskStatus === 'failed') {
-    return { key: 'failed', title: '打印失败', detail: '请查看终端提示，或联系现场工作人员处理。', showQr: false }
-  }
-  if (taskStatus === 'abandoned') {
-    return { key: 'abandoned', title: '打印任务已终止', detail: '请返回订单页重新发起，或联系现场工作人员处理。', showQr: false }
-  }
-  if (taskStatus === 'completed') {
-    return { key: 'completed', title: '打印已完成', detail: '请及时取走纸张并检查是否齐全。', showQr: false }
-  }
-  if (taskStatus === 'printing') {
-    return { key: 'printing', title: '正在打印', detail: '终端已经开始出纸，请在设备旁等候。', showQr: false }
-  }
-  if (pickupStatus === 'used' || taskStatus === 'pending' || taskStatus === 'claimed') {
-    return { key: 'queued', title: '已进入打印队列', detail: '终端已核销并创建打印任务，请等待出纸。', showQr: false }
-  }
-  if (pickupStatus === 'claimed' || taskStatus === 'awaiting_payment') {
-    return isFreeOrder
-      ? { key: 'awaiting_release', title: '已扫码，正在进入打印队列', detail: '免费试运营订单无需付款，请在终端旁等待。', showQr: false }
-      : { key: 'awaiting_payment', title: '已扫码，等待现场支付', detail: '请在一体机确认订单并完成现场支付。', showQr: false }
-  }
-  return { key: 'pending', title: '等待终端扫码', detail: '将二维码对准一体机扫码器，或手动输入到机码。', showQr: true }
-}
 
 /**
  * 服务端明确拒绝为当前这位确认归属（requireOwned 的 404）时给用户的话。
@@ -135,6 +83,9 @@ Page({
     qrSizePx: 216,
     qrStatus: 'loading',
     refreshing: false,
+    // 分享给代取人时写在图上的网点名，只取服务端订单详情里的 share.outletName。
+    outlet: '',
+    reissuing: false,
   },
 
   onLoad(opts) {
@@ -613,6 +564,7 @@ Page({
           showQr: status.showQr && hasCode,
           codeRaw: status.showQr && hasCode ? pickupCode : '',
           code: status.showQr && hasCode ? formatCode(pickupCode) : '',
+          outlet: (order.share && order.share.outletName) || '',
           expiresAt,
           // 码撤下时倒计时也必须跟着撤：它是这张码的说明文字，留着就是在替一张
           // 已经不显示（或已经被核销）的码继续宣称"还有效"。
@@ -735,22 +687,8 @@ Page({
       canvas.width = Math.round(size * pixelRatio)
       canvas.height = Math.round(size * pixelRatio)
       context.scale(pixelRatio, pixelRatio)
-      context.fillStyle = '#FFFFFF'
-      context.fillRect(0, 0, size, size)
-
-      const quietZone = 4
-      const cellSize = Math.floor(size / (matrix.length + quietZone * 2))
-      const drawSize = cellSize * (matrix.length + quietZone * 2)
-      const offset = Math.floor((size - drawSize) / 2)
-      context.fillStyle = '#15100C'
-      matrix.forEach((row, y) => row.forEach((dark, x) => {
-        if (dark) context.fillRect(
-          offset + (x + quietZone) * cellSize,
-          offset + (y + quietZone) * cellSize,
-          cellSize,
-          cellSize,
-        )
-      }))
+      // 与材料包到机码页、分享图共用同一份画法（utils/pickup-actions.js）。
+      pickupActions.paintQr(context, matrix, size)
       this.setData({ qrStatus: 'ready' })
     })
   },
@@ -807,6 +745,34 @@ Page({
     if (target === 'login') { wx.navigateTo({ url: '/pages/launch/launch' }); return }
     if (target === 'orders') { this.toOrders(); return }
     this.retry()
+  },
+
+  // ── 到机码三个动作（复制 / 分享给代取人 / 作废换新码），实现在 utils/pickup-actions.js ──
+
+  copyCode() {
+    if (this.data.showQr) pickupActions.copyCode(this.data.codeRaw)
+  },
+
+  shareCode() {
+    if (!this.data.showQr || !this.data.codeRaw) return
+    const at = this.data.expiresAt ? new Date(this.data.expiresAt) : null
+    const expiresText = at ? `${at.getMonth() + 1} 月 ${at.getDate()} 日 ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : ''
+    pickupActions.shareToProxy(this, { code: this.data.codeRaw, outlet: this.data.outlet, expiresText })
+  },
+
+  reissueCode() {
+    if (!this.data.showQr || this.data.reissuing || !this.data.orderId) return
+    this.setData({ reissuing: true })
+    pickupActions.reissue(this.data.orderId)
+      .then((order) => {
+        this.setData({ reissuing: false })
+        // 换没换成都以服务端为准：重新取一次订单，新码、有效期、状态都从那一次来。
+        if (order) this._refreshOrder(false)
+      }, (err) => {
+        this.setData({ reissuing: false })
+        wx.showModal({ title: '没有换码', content: err.message, showCancel: false })
+        this._refreshOrder(false)
+      })
   },
 
   toOrders() {

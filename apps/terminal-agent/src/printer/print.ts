@@ -21,9 +21,9 @@ import { log } from '../logger'
  *   .bmp / .tiff / .tif           → UNSUPPORTED_FILE_TYPE（Phase 8.1B+ 实现，需 sharp）
  *   其他扩展名                     → UNSUPPORTED_FILE_TYPE
  *
- * params 字段（Phase 8.1A 预留接口）：
- *   copies / colorMode / duplex / orientation 等参数在 Phase 8.1B 接入
- *   SumatraPDF -print-settings 时启用，当前版本不传给打印机。
+ * params 字段：copies / colorMode / duplex / orientation / scale / pageRange 经
+ *   print-with-pdf-to-printer.ts 的 mapParams 译成 SumatraPDF -print-settings 下发（PDF 与图片转出的
+ *   临时 PDF 都走这一条）；彩色与黑白都显式下发，不落到驱动默认值。pagesPerSheet / quality 仍不下发。
  */
 
 const PDF_EXTENSIONS = new Set(['.pdf'])

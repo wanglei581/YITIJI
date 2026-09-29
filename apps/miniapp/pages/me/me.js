@@ -100,6 +100,10 @@ Page({
     wx.navigateTo({ url: '/pages/notifications/notifications' })
   },
 
+  tapPrivacyPolicy() {
+    wx.navigateTo({ url: '/pages/legal/legal?type=privacy_policy' })
+  },
+
   onShareAppMessage() {
     return {
       title: '职易达 · 我的',

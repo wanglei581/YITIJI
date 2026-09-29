@@ -54,6 +54,9 @@ function resolveBaseUrl() {
 }
 
 const config = {
+  // develop | trial | release。登录前协议版本只在 release 严格（见 utils/api-legal-consent.js 的
+  // getLegalVersions）：开发版、体验版常连没有发布协议的测试库，照旧回落草稿版本号。
+  envVersion: readMiniProgramEnvVersion(),
   // 已备案域名,已在微信公众平台配置 request 合法域名。裸 IP 不可用,必须域名。
   baseUrl: resolveBaseUrl(),
   apiPrefix: '/api/v1',

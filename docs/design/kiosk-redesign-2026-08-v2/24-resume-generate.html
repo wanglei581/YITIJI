@@ -1357,7 +1357,7 @@ V['draft-exporting']=function(){
    {on:'done',t:'已填内容已经交给排版',x:'完成',d:'半空条目同样跳过，和提交生成的口径一致'},
    {on:'now',t:'系统排成 A4 黑白 PDF',x:'进行中',d:'文件名里会直接写「未经AI润色」'},
    {t:'拿到文件名、页数和链接',x:'下一步',d:'排完才有这些，现在都还不存在'},
-   {t:'扫码保存到手机，或去打印',x:'之后',d:'公共机器不落本机，要带走走手机'}
+   {t:'扫码保存到手机，或去打印',x:'之后',d:'公共终端不落本机，要带走走手机'}
   ],SCREEN+'-draft-steps')+
   '<p class="note"><span class="sq"></span><span>系统只做排版，<b>不调用任何模型</b>，所以 AI 没接通时这条路照样能走；文件还没生成完，现在<b>还不能下载，也不能打印</b>。排出来的是你的原话，<b>没有润色，也没有缺失提示</b>。</span></p>'+
   '</div></div>'+
@@ -1395,7 +1395,7 @@ V['draft-ready']=function(){
   '<div class="qh">把这一份带走<span>两条路：扫码存进手机，或者直接去打印</span></div>'+
   '<div class="take">'+takeaway('二维码由这次导出的<b>有时效的下载链接</b>渲染。',SCREEN+'-draft-qr-blocked')+
    '<div class="take-m">'+
-    '<p class="note"><span class="sq"></span><span>公共机器<b>不提供下载到本机</b>：要把这份带走，就用手机扫左边这张码。下载链接<b>有时效</b>，到期时间随这次导出由系统给出；打印走另一条系统链接，<b>两条各自计时</b>。过期不代表文件没了，重导一次就有新链接。</span></p>'+
+    '<p class="note"><span class="sq"></span><span>公共终端<b>不提供下载到本机</b>：要把这份带走，就用手机扫左边这张码。下载链接<b>有时效</b>，到期时间随这次导出由系统给出；打印走另一条系统链接，<b>两条各自计时</b>。过期不代表文件没了，重导一次就有新链接。</span></p>'+
     loginRow(SCREEN+'-draft-login')+
     orow({icon:'spark',t:'还是想要润色版',d:'内容没变，回去提交一次生成就行',go:'generating',tid:SCREEN+'-draft-ai'})+
     orow({icon:'pen',t:'再改改内容',d:'改完重导一次，草稿排的就是新的',go:'input-strengths',tid:SCREEN+'-draft-edit'})+
@@ -1703,7 +1703,7 @@ V['export-ready']=function(){
   '<div class="qh">把这一份带走<span>'+(f.printable?'两条路：扫码存进手机，或者直接去打印':'扫码存进手机；打印要换 PDF 那一份')+'</span></div>'+
   '<div class="take">'+takeaway('二维码由这次导出的<b>有时效的下载链接</b>渲染。',SCREEN+'-export-qr-blocked')+
    '<div class="take-m">'+
-    '<p class="note"><span class="sq"></span><span>公共机器<b>不提供下载到本机</b>：要把文件带走，就用手机扫左边这张码。到期时间随这次导出由系统给出。打印走<b>另一条系统链接</b>，<b>两条各自计时、互不牵连</b> —— 下载那条过期了照样能打印，<b>下载链接也进不了打印</b>。</span></p>'+
+    '<p class="note"><span class="sq"></span><span>公共终端<b>不提供下载到本机</b>：要把文件带走，就用手机扫左边这张码。到期时间随这次导出由系统给出。打印走<b>另一条系统链接</b>，<b>两条各自计时、互不牵连</b> —— 下载那条过期了照样能打印，<b>下载链接也进不了打印</b>。</span></p>'+
     loginRow(SCREEN+'-export-login')+
     orow({icon:'file',t:'再导一份别的格式',d:FMT==='pdf'?otherFmts(FMT)+' 供下载编辑，暂不开放打印':'换成 PDF 就能直接打印；'+otherFmts(FMT)+' 只供下载编辑',go:'export-chooser',tid:SCREEN+'-export-fmt'})+
     orow({icon:'refresh',t:'重新导出',d:'改过内容，或者链接过期了，都点这里',go:'export-exporting',tid:SCREEN+'-export-again'})+

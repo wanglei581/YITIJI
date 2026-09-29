@@ -107,7 +107,7 @@
 
       <view class="notice info ri-disc">
         <text class="ficon i-info n-ic"></text>
-        <text>以上复盘由 AI 生成，仅供个人练习参考，不代表任何招聘机构的评价标准。</text>
+        <text>AI 生成，仅供参考：以上复盘只用于你个人练习，不代表任何单位的评价标准。</text>
       </view>
 
     </block>

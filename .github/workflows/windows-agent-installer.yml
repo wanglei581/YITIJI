@@ -196,6 +196,39 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-secure-scan-reader.ps1 -InstallRoot apps/terminal-agent/installer/artifacts/staging
 
+      # Field scripts run straight from the repo, outside the installer payload: the staged-script parse
+      # above never sees them. Check UTF-8 BOM and Windows PowerShell 5.1 syntax for both, and run the
+      # field-day evidence script once read-only against a throwaway ProgramData (the real one must stay
+      # empty for the upgrade lifecycle below) with a valid instance-id, so the pipe listing actually runs.
+      - name: Parse and smoke-run field scripts with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $failed = $false
+          foreach ($path in @("apps/terminal-agent/scripts/diagnose-production-agent.ps1", "apps/terminal-agent/scripts/collect-field-day-evidence.ps1")) {
+            $full = (Resolve-Path -LiteralPath $path).Path
+            $bytes = [System.IO.File]::ReadAllBytes($full)
+            if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) { Write-Host "${path}: not UTF-8 with BOM"; $failed = $true }
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($full, [ref]$tokens, [ref]$errors)
+            foreach ($parseError in $errors) { Write-Host "${path}: line $($parseError.Extent.StartLineNumber): $($parseError.Message)"; $failed = $true }
+          }
+          if ($failed) { exit 1 }
+          $fakeProgramData = Join-Path $env:RUNNER_TEMP "field-day-programdata"
+          New-Item -ItemType Directory -Path (Join-Path $fakeProgramData "AIJobPrintAgent") -Force | Out-Null
+          [System.IO.File]::WriteAllText((Join-Path $fakeProgramData "AIJobPrintAgent\instance-id"), "0123456789abcdef0123456789abcdef`n")
+          $receipt = Join-Path $env:RUNNER_TEMP "field-day-evidence.md"
+          $env:ProgramData = $fakeProgramData
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/scripts/collect-field-day-evidence.ps1 -OutFile $receipt
+          if ($LASTEXITCODE -ne 0) { Write-Host "field-day evidence exited $LASTEXITCODE"; exit 1 }
+          $text = [System.IO.File]::ReadAllText($receipt)
+          Write-Host $text
+          foreach ($id in @("D1-1", "D1-2", "D1-3", "D1-4", "D1-5", "D1-6", "D1-7", "D2-0", "D2-1", "D2-2", "D2-3", "D2-4", "D2-5", "D2-6")) {
+            if ($text -notmatch ("\| " + [regex]::Escape($id) + " ")) { Write-Host "missing row $id"; $failed = $true }
+          }
+          if ($text -match "ERROR:") { Write-Host "a check threw on the runner"; $failed = $true }
+          if ($text -notmatch "instanceId=valid singletonPipePresent=False") { Write-Host "pipe listing did not run against the valid instance-id"; $failed = $true }
+          if ($failed) { exit 1 }
+
       - name: Freeze candidate identity
         shell: powershell
         run: |

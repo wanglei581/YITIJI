@@ -32,6 +32,10 @@ const KEYS = {
   // 尚未落定的简历解析意图（owner、解析材料标识、两个请求头、时间）。
   // 不存放简历原文。未落定记录不能被另一份材料或另一个账号覆盖。
   RESUME_PARSE_INTENT: 'zyd_resume_parse_intent',
+
+  // 本机记下的两项本人声明 { age_14_plus?: { version, at }, voice_recording?: { version, at } }。
+  // 只记「是否声明、哪一版文案、何时」，不记出生日期、手机号或录音。见 utils/ai-access.js。
+  AI_DECLARATIONS: 'zyd_ai_declarations',
 };
 
 function get(key, fallback = null) {

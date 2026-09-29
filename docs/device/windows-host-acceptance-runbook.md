@@ -15,7 +15,7 @@
 
 | 项 | 要求（来自设计文档 §8.1 / §8.7） |
 |---|---|
-| 操作系统 | Windows 10 x64 21H2+ 或 Windows 11 x64；时区 `Asia/Shanghai` |
+| 操作系统 | 按[母盘清单](windows-golden-image-and-install-checklist.md) A1：Windows 11 IoT 企业版 LTSC 2024（首选）/ Windows 11 专业版 25H2 及以后（兜底）/ Windows 10 IoT 企业版 LTSC 2021（兼容）；普通 Windows 10 已于 2025-10-14 停止支持，不合格；时区 `Asia/Shanghai` |
 | 打印机 | 奔图 CM2800ADN/CM2820ADN 系列驱动 V3.x+ 已装，USB 或有线网络连接 |
 | 浏览器 | Edge/Chrome，可进全屏 Kiosk 模式 |
 | .NET | Framework 4.8（Win10 预装，WIA 依赖） |

@@ -14,7 +14,7 @@
 | 平面 | 允许 | 禁止 |
 |------|------|------|
 | 本机 Colima / Docker 隔离容器 | 空 control root → Genesis `r1`；`r1→r2` health 失败只回 `r1`；收窄 env；缺失进程分类 | 挂载生产 `.env` / DB / Redis / COS；改宿主机 PM2 |
-| 生产主机 `120.48.13.190` | 只读确认 legacy PM2 仍为 `dist/main.js` | 安装 Docker（非本轮必需）、跑 `release:genesis`、故意造生产 health 故障 |
+| 生产主机 `<生产服务器 IP>` | 只读确认 legacy PM2 仍为 `dist/main.js` | 安装 Docker（非本轮必需）、跑 `release:genesis`、故意造生产 health 故障 |
 
 生产主机当前**未安装 Docker**。D2 在开发机 Colima（等价独立网络命名空间）完成；与「同物理机另起容器、不碰现网 PM2」目标一致。
 

@@ -124,7 +124,7 @@ check(
 )
 
 const report = read(pages[2])
-for (const token of ['printInterviewReport(', 'accessToken: state.accessToken', 'file.printFileUrl', 'fileUrl: file.printFileUrl', "throw new Error('打印链接未就绪，请稍后重试')", "navigate('/print/confirm'", "makePrintParams({ copies: 1, duplex: 'single', color: 'bw' })"]) {
+for (const token of ['printInterviewReport(', 'accessToken: state.accessToken', 'file.printFileUrl', 'fileUrl: file.printFileUrl', "throw new Error('打印链接未就绪，请稍后重试')", 'startPrint({', "origin: 'interview_report'"]) {
   check(report.includes(token), `${pages[2]} — Report 打印合同缺失：${token}`)
 }
 
