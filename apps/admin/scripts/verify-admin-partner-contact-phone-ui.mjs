@@ -284,7 +284,6 @@ function verifyEligibility() {
     phoneVerifiedAt: '2026-09-01T00:00:00.000Z',
     phoneMasked: '138****0000',
     availableActionVerificationMethods: ['password'],
-    passwordProofState: 'owner_managed',
     phoneRegisteredByAdminAt: null,
   }
   const serverSaysYes = offer({ ...signalsThatUsedToHide, canRegisterContactPhone: true })
@@ -297,7 +296,6 @@ function verifyEligibility() {
     phoneVerifiedAt: null,
     phoneMasked: null,
     availableActionVerificationMethods: [],
-    passwordProofState: 'temporary',
     canRegisterContactPhone: false,
   })
   expect(
@@ -309,7 +307,6 @@ function verifyEligibility() {
     phoneVerifiedAt: null,
     phoneMasked: null,
     availableActionVerificationMethods: [],
-    passwordProofState: 'temporary',
   })
   expect(missingFlag.visible === false && missingFlag.reason == null && missingFlag.label == null, '字段缺失时不显示按钮，也不写原因')
   const missingAll = offer({ enabled: true, phoneVerifiedAt: null })
@@ -319,7 +316,6 @@ function verifyEligibility() {
     enabled: true,
     phoneVerifiedAt: null,
     phoneMasked: '138****5678',
-    passwordProofState: 'temporary',
     phoneRegisteredByAdminAt: '2026-09-29T01:02:03.000Z',
     canRegisterContactPhone: true,
   })
@@ -332,7 +328,6 @@ function verifyEligibility() {
     enabled: true,
     phoneVerifiedAt: null,
     phoneMasked: '138****5678',
-    passwordProofState: 'temporary',
     phoneRegisteredByAdminAt: null,
     canRegisterContactPhone: true,
   }
@@ -351,19 +346,15 @@ function verifyEligibility() {
     enabled: true,
     phoneVerifiedAt: '2026-09-01T00:00:00.000Z',
     phoneMasked: '139****0001',
-    passwordProofState: 'owner_managed',
     canRegisterContactPhone: false,
   }
   const ownerVerified = offer(ownerVerifiedAccount)
-  expect(ownerVerified.visible === false && ownerVerified.reason === '已由本人设置密码并验证手机，无需登记', '本人设密且手机已验证时如实说明')
+  expect(ownerVerified.visible === false && ownerVerified.reason === '手机号已由机构本人验证，无需登记', '服务端拒绝且手机已由本人验证时如实说明')
   const ownerOnly = offer({ ...ownerVerifiedAccount, phoneVerifiedAt: null })
-  expect(ownerOnly.reason === '当前不符合登记条件', '只有本人设密、手机未验证时不声称已验证')
-  const verifiedOnly = offer({ ...ownerVerifiedAccount, passwordProofState: 'temporary' })
-  expect(verifiedOnly.reason === '当前不符合登记条件', '只有手机已验证、不是本人设密时不声称已设密')
+  expect(ownerOnly.reason === '当前不符合登记条件', '手机未验证时不声称已验证')
   const legacy = offer({
     enabled: true,
     phoneVerifiedAt: null,
-    passwordProofState: 'legacy',
     canRegisterContactPhone: false,
   })
   expect(legacy.visible === false && legacy.reason === '当前不符合登记条件', '其它不符合条件不猜测原因')
@@ -403,7 +394,9 @@ function verifyStatic() {
   expect(eligibilitySource.includes('已登记，待机构本人自证') && eligibilitySource.includes("重新登记"), '资格模块给出待自证状态与重新登记')
   expect(accountType.includes('phoneRegisteredByAdminAt?: string | null'), '账号类型包含 phoneRegisteredByAdminAt')
   expect(accountType.includes('canRegisterContactPhone?: boolean'), '账号类型包含 canRegisterContactPhone')
-  expect(accountType.includes("passwordProofState?: 'temporary' | 'owner_managed' | 'legacy' | null"), '账号类型包含 passwordProofState')
+  // #1139：后台账号响应不暴露原始密码状态，前端类型与资格判断都不许出现它。
+  expect(!/passwordProofState/.test(accountType), '账号类型不声明 passwordProofState')
+  expect(!/passwordProofState|owner_managed/.test(eligibilitySource), '资格判断不读 passwordProofState')
   expect(!accountType.includes('contactPhoneRegisteredAt'), '账号类型不再保留 contactPhoneRegisteredAt')
   expect(manager.includes('min-h-12') && steps.includes('min-h-12'), '按钮点击区域使用 min-h-12')
   expect(steps.includes(NOTICE), '弹层步骤含「管理员不能代收验证码」')

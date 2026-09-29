@@ -7,16 +7,13 @@ export const CONTACT_PHONE_REGISTER_LABEL = '登记手机号'
 export const CONTACT_PHONE_REREGISTER_LABEL = '重新登记'
 export const CONTACT_PHONE_PENDING_STATUS = '已登记，待机构本人自证'
 export const CONTACT_PHONE_DISABLED_REASON = '账号已停用'
-export const CONTACT_PHONE_OWNER_VERIFIED_REASON = '已由本人设置密码并验证手机，无需登记'
+export const CONTACT_PHONE_OWNER_VERIFIED_REASON = '手机号已由机构本人验证，无需登记'
 export const CONTACT_PHONE_INELIGIBLE_REASON = '当前不符合登记条件'
-
-export type PasswordProofState = 'temporary' | 'owner_managed' | 'legacy'
 
 export interface ContactPhoneAccountSignals {
   enabled: boolean
   phoneVerifiedAt?: string | null
   phoneMasked?: string | null
-  passwordProofState?: PasswordProofState | null
   phoneRegisteredByAdminAt?: string | null
   canRegisterContactPhone?: boolean
 }
@@ -70,8 +67,8 @@ function pendingFor(account: ContactPhoneAccountSignals): ContactPhonePending | 
 
 function deniedReason(account: ContactPhoneAccountSignals): string {
   if (account.enabled === false) return CONTACT_PHONE_DISABLED_REASON
-  const verified = nonEmpty(account.phoneVerifiedAt) !== null
-  if (account.passwordProofState === 'owner_managed' && verified) return CONTACT_PHONE_OWNER_VERIFIED_REASON
+  // 后台拿不到原始密码状态（#1139）：不能登记且手机已由本人验证，就是「已自证，无需登记」。
+  if (nonEmpty(account.phoneVerifiedAt) !== null) return CONTACT_PHONE_OWNER_VERIFIED_REASON
   return CONTACT_PHONE_INELIGIBLE_REASON
 }
 

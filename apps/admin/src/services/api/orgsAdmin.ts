@@ -43,10 +43,10 @@ export interface AdminOrgAccount {
   emailVerifyMethod: string | null
   availableActionVerificationMethods: PartnerAccountVerificationMethod[]
   /**
-   * 服务端账号列表下发。三个字段缺省表示这份响应还没有它们：
+   * 服务端账号列表下发（W-03）。字段缺省表示这份响应还没有它们：
    * 登记按钮不显示，前端不根据停用、手机验证或验证方式自行推断。
+   * 后台账号响应不暴露原始密码状态（后端 #1139），前端也不声明该字段。
    */
-  passwordProofState?: 'temporary' | 'owner_managed' | 'legacy' | null
   /** 非空表示管理员已登记联系人手机，机构本人尚未自证。 */
   phoneRegisteredByAdminAt?: string | null
   /** 服务端算好的登记资格。只有严格 true 才显示按钮。 */
