@@ -36,6 +36,10 @@
 - **问题：** 大厅多台一体机、招聘会现场同一 WiFi 的用户共用一个出口 IP，「同一 IP 每小时 20 条」会被一起用完。
 - **做法（Grok 实现、协调方审，总指挥裁定 A+B）：** A：带已验签终端身份的请求改为「每台终端每小时 30 条」（错误码 `SMS_TERMINAL_HOURLY_LIMIT`），不再计入 IP 桶，发码路由的每分钟 5 次也按终端计；单机每天 100 条、同一手机号冷却与每天 10 条、设备限额、全站短信额度全不变。B：受信出口地址段 `SMS_TRUSTED_EGRESS_CIDRS`，默认不配、只能用环境变量；IPv4 比 /24 宽、IPv6 比 /56 宽、上限超天花板（每小时 200、每分钟 30）一律拒绝启动并说人话；只放宽 IP 这一层；某段一小时用量到上限八成时发一次运维告警。运维手册 §2.2.1、.env.example 已写明。
 - **验证：** 新门禁 `verify:sms-egress-limits` 55 条（挂 CI）；协调方抽 2 处变异（放宽到 /8、终端请求也计入 IP 桶）全红；sms-budget、member-auth、member-auth-races、throttle-dimension、ai-throttle-dimension、boot-resilience、ai-platform-degradation 等 10 条与小程序契约全绿。解冲突时保留候选 main.ts 里「AI 配置缺失只登记降级」的写法，受信出口启动校验紧跟其后。
+## 2026-09-29：生产只读巡检的演示标记检查扩到所有公开列表（分支 `claude/backend-hardening-20260929-probe-demo-marker`）
+
+- **做了什么（Grok 实现、协调方审）：** `scripts/prod-readonly-probe.mjs` 原来只在企业列表查演示数据；现在岗位、招聘会、政策、线下机构四个公开列表的第一页（pageSize=50，均在后端上限内）也查，按各接口用户看得见的文字字段白名单找全角「（演示）」，命中 WARN 并列名。企业那一项的宽正则不变。总指挥 9/29 只读核过生产：岗位、招聘会、线下机构三处 total 都是 0，演示机构名只出现在 3 家演示企业的来源里，因此不另做岗位与机构的下架命令。
+- **验证：** `verify-prod-readonly-probe` 每个列表补带标记 / 不带标记（含宽正则会误判的阳性对照）/ 空列表三种夹具；两处反向变异变红；协调方复跑该门禁与 ci-gate-coverage 退出码 0。
 
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
