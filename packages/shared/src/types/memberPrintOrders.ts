@@ -73,6 +73,10 @@ export interface MemberPrintOrderItem {
    * 前端不得把内部原因码展示给顾客，也不得据此自行计算金额。
    */
   refundRequired?: boolean | null
+  /** 这一行对应的订单号（手机单核销后派发的任务有；一体机现场单为 null）。2026-09-29 小程序对账契约。 */
+  orderId?: string | null
+  /** 出纸 / 领取的那台机器；取不到为 null。与时间线接口的 terminal 同形。 */
+  terminal?: { id: string; displayName: string | null; locationLabel: string | null } | null
 }
 
 // ============================================================
