@@ -9,7 +9,8 @@
 - **门禁：** `verify:partner-stats-contract` 新增 T1–T4（A/B 机构互测隔离、`?orgId=` 与未知参数 400、未绑定 403、响应键全集与白名单递归比对、压制与分母门槛、核查已出纸计入、取消作废不计、重试只算一次、离线 / 恢复 / 未恢复 / 打印机故障段 / 未知不起止、心跳分批读、服务人次按快照计数）；前端门禁、诚实占位门禁随空页变成真功能改钉新事实；两条浏览器用例（机构终端数据、管理员外设）改为断言新页面的如实表达。变异 7 处（去掉机构过滤、分子不算核查已出纸、离线阈值改 1 分钟、磁盘不转空、正常状态不置空、绑定不拒停放类型、服务人次一律 0）全部变红。
 - **实现与收货：** Claude 子代理实现，协调方逐段审 diff、接上服务人次、补两条浏览器用例，在候选 `6f473f211` 上重建分支。
 - **验证：** admin / partner / api `tsc`，两后台 lint 0 错误；API 门禁 partner-stats-contract、kiosk-session、console-screen-snapshot / usage、device-fleet-overview、terminal-identity、terminal-device-config、partner-smart-campus、terminal-network-diagnostics、admin-ops、print-jobs、terminal-provisioning；admin 门禁 honest-placeholders、console-screen-ui、service-desk-dashboard-ui、terminal-network-diagnostics-ui、terminal-bind-code-ui、device-fleet-overview-ui；partner 门禁 stats-contract、refresh-safe、relative-api-url、excel-template-download-ui；CI 覆盖。浏览器用例：机构 69、机构大屏 136、管理员全套（改后重跑相关 41 条）通过。浏览器实看机构「终端数据」页（1440 宽，演示数据）；外设页内容已核对，版面截图因浏览器面板隐藏未取，留待走查补看。
-- **待定：** 分母不小于 5 时给出纸成功率，分子若是 1–4 能由比率反推——与规格字面一致，按运营需要保留，是否收紧请总指挥定。
+- **服务人次在一体机真上报之前显示「暂无」：** 响应加 `visitCount.recordingStarted`（本机构终端是否有过任何会话记录），没有时指标卡、表格、明细与导出都写「暂无」并说明原因，不显示 0（0 会被读成「没人来」）；门禁 T4k0 覆盖。
+- **口径（总指挥 9/29 定）：** 分母不小于 5 时照常给出纸成功率，即使分子 1–4 能由比率反推——这是机器运行指标、对不上人。前提三条由响应键白名单门禁守住：不出逐人明细、只有统计窗口级数字（设备的最后心跳时间除外）、不按个人属性拆分。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 ## 2026-09-29：两个后台收口第一批——机构政策分出「平台紧急下架」，两个登录页去掉托管 a 之前的说法（P-01、P-02、P-03）

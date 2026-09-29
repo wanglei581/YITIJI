@@ -11,6 +11,7 @@ import {
   runState,
   shanghaiDateTime,
   terminalName,
+  VISIT_NOT_STARTED,
 } from './terminalOpsFormat'
 
 function Item({ label, children }: { label: string; children: ReactNode }) {
@@ -35,10 +36,13 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function TerminalOpsDrawer({
   row,
   windowLabel,
+  visitRecordingStarted,
   onClose,
 }: {
   row: TerminalOpsRow | null
   windowLabel: string
+  /** 本机构终端是否已开始上报会话；还没开始时服务人次写「暂无」 */
+  visitRecordingStarted: boolean
   onClose: () => void
 }) {
   if (!row) return <Drawer open={false} onClose={onClose} title="终端详情"><div /></Drawer>
@@ -62,7 +66,7 @@ export function TerminalOpsDrawer({
         </Section>
 
         <Section title="服务人次" note={METRIC_NOTES.visit}>
-          <Item label="服务人次">{countText(row.visitCount)}</Item>
+          <Item label="服务人次">{visitRecordingStarted ? countText(row.visitCount) : VISIT_NOT_STARTED}</Item>
         </Section>
 
         <Section title="打印扫描服务" note={METRIC_NOTES.service}>

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Card } from '@ai-job-print/ui'
 import { ActivityIcon, BotIcon, PrinterIcon, UsersIcon, type LucideIcon } from 'lucide-react'
 import type { PartnerTerminalOpsView } from '../../services/api/terminalOps'
-import { METRIC_NOTES, countText, minutesText, rateText, unavailableReason } from './terminalOpsFormat'
+import { METRIC_NOTES, VISIT_NOT_STARTED_NOTE, countText, minutesText, rateText, unavailableReason, visitText } from './terminalOpsFormat'
 
 function MetricCard({
   icon: Icon,
@@ -44,7 +44,8 @@ export function TerminalOpsCards({ data }: { data: PartnerTerminalOpsView }) {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={UsersIcon} title="服务人次" tone="bg-info-bg text-info-fg" note={METRIC_NOTES.visit}>
-        <BigValue muted={totals.visitCount === null}>{countText(totals.visitCount)}</BigValue>
+        <BigValue muted={!data.visitCount.recordingStarted || totals.visitCount === null}>{visitText(data, totals.visitCount)}</BigValue>
+        {!data.visitCount.recordingStarted && <p className="text-xs text-neutral-500">{VISIT_NOT_STARTED_NOTE}</p>}
         <p>
           打印扫描服务次数 <strong className="tabular-nums text-neutral-900">{countText(totals.serviceCount)}</strong>
           <span className="text-xs text-neutral-500">（按任务计，不等于人次）</span>

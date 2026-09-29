@@ -16,6 +16,14 @@ export function unavailableReason(item: TerminalOpsUnavailable): string {
   return UNAVAILABLE_COPY[item.reason] ?? '暂不能统计。'
 }
 
+/** 一体机还没开始上报会话时，服务人次写「暂无」而不是 0（0 会被读成没人来）。 */
+export const VISIT_NOT_STARTED = '暂无'
+export const VISIT_NOT_STARTED_NOTE = '本机构终端还没有上报过使用会话（一体机上报功能上线后开始统计），所以暂无服务人次。'
+
+export function visitText(data: PartnerTerminalOpsView, value: number | null): string {
+  return data.visitCount.recordingStarted ? countText(value) : VISIT_NOT_STARTED
+}
+
 /** 服务端对 1–4 的计数给 null（防止对上具体某一单），页面照实说「少于 5」。 */
 export function countText(value: number | null): string {
   return value === null ? '少于 5' : value.toLocaleString('zh-CN')
@@ -122,7 +130,7 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
     row.locationLabel ?? '',
     RUN_STATE_VIEW[runState(row)].label,
     shanghaiDateTime(row.lastHeartbeatAt),
-    csvCount(row.visitCount),
+    data.visitCount.recordingStarted ? csvCount(row.visitCount) : VISIT_NOT_STARTED,
     csvCount(row.serviceCount),
     csvCount(row.output.printed),
     csvCount(row.output.settled),
@@ -141,7 +149,7 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
   const totals = data.totals
   const totalRow = [
     '合计', `${totals.terminalCount} 台`, '', `在线 ${totals.onlineTerminals} 台`, '',
-    csvCount(totals.visitCount), csvCount(totals.serviceCount), csvCount(totals.output.printed), csvCount(totals.output.settled),
+    data.visitCount.recordingStarted ? csvCount(totals.visitCount) : VISIT_NOT_STARTED, csvCount(totals.serviceCount), csvCount(totals.output.printed), csvCount(totals.output.settled),
     csvRate(totals.output), csvCount(totals.output.unconfirmed),
     totals.faults.offlineCount, totals.faults.offlineMinutes, totals.faults.printerFaultCount, totals.faults.printerFaultMinutes,
     totals.faults.recoveredCount, totals.faults.avgRecoveryMinutes ?? '', totals.faults.longestMinutes ?? '',
@@ -150,7 +158,7 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
   return buildCsv([
     ['统计窗口', `${windowText(data)}（${data.timezone}）`],
     ['数据来源', data.dataMode === 'demo' ? '演示数据（mock 模式，不是任何终端的真实情况）' : '本机构终端的真实记录'],
-    ['服务人次口径', METRIC_NOTES.visit],
+    ['服务人次口径', data.visitCount.recordingStarted ? METRIC_NOTES.visit : `${VISIT_NOT_STARTED_NOTE}${METRIC_NOTES.visit}`],
     ['AI 可用率', `暂不能按本机构终端统计：${unavailableReason(data.aiAvailability)}`],
     ['口径', METRIC_NOTES.sample],
     [],

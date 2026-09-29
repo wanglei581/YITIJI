@@ -79,7 +79,8 @@ export interface PartnerTerminalOpsResponse {
     faults: TerminalOpsFaultTotals
   }
   /** 服务人次按一体机会话统计；会话记录上线之前的时段没有数 */
-  visitCount: { available: true }
+  /** recordingStarted=false：本机构终端还没有任何会话记录（一体机上报尚未开始），页面显示「暂无」 */
+  visitCount: { available: true; recordingStarted: boolean }
   aiAvailability: TerminalOpsUnavailable
 }
 
@@ -154,7 +155,7 @@ function buildDemoTerminalOps(period: TerminalOpsPeriod): PartnerTerminalOpsView
       output: { printed: 63, settled: 66, successRate: 95.5, unconfirmed: null },
       faults: { offlineCount: 3, offlineMinutes: 187, printerFaultCount: 1, printerFaultMinutes: 18, recoveredCount: 3, avgRecoveryMinutes: 15, longestMinutes: 135 },
     },
-    visitCount: { available: true },
+    visitCount: { available: true, recordingStarted: true },
     aiAvailability: { available: false, reason: 'ai_calls_not_attributed_to_terminal' },
   }
 }

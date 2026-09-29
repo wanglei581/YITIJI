@@ -45,7 +45,7 @@ export const TERMINAL_OPS_KEY_PATHS = new Set<string>([
     .map((key) => `totals.${key}`),
   ...OUTPUT_KEYS.map((key) => `totals.output.${key}`),
   ...TOTAL_FAULT_KEYS.map((key) => `totals.faults.${key}`),
-  'visitCount', 'visitCount.available',
+  'visitCount', 'visitCount.available', 'visitCount.recordingStarted',
   'aiAvailability', 'aiAvailability.available', 'aiAvailability.reason',
 ])
 
@@ -315,7 +315,13 @@ export async function verifyTerminalOperations(
       })),
     })
 
-    const { from } = await service.getTerminalOperations(orgA, 'week', now).then((r) => ({ from: new Date(r.window.from) }))
+    const beforeVisits = await service.getTerminalOperations(orgA, 'week', now)
+    const from = new Date(beforeVisits.window.from)
+    assert(
+      'T4k0. 一体机还没上报过会话时 recordingStarted=false，服务人次按 0 计但页面据此显示「暂无」',
+      beforeVisits.visitCount.recordingStarted === false && beforeVisits.totals.visitCount === 0,
+      JSON.stringify(beforeVisits.visitCount),
+    )
     const task = (id: string, terminalId: string, data: Record<string, unknown>) => ({
       id: `pto_${id}_${suffix}`, terminalId, fileUrl: 'https://example.invalid/f.pdf', fileMd5: 'md5', createdAt: ago(120), ...data,
     })
@@ -440,7 +446,7 @@ export async function verifyTerminalOperations(
     )
     assert(
       'T4k. 服务人次按会话数：A1 6 次、A2 0、A3 2 次压制为 null、合计 8；快照属 B 与窗口外的不算；B 只看到自己的 5 次',
-      a.visitCount.available === true && a1?.visitCount === 6 && a2?.visitCount === 0 && a3?.visitCount === null
+      a.visitCount.available === true && a.visitCount.recordingStarted === true && a1?.visitCount === 6 && a2?.visitCount === 0 && a3?.visitCount === null
         && a.totals.visitCount === 8 && b.terminals[0]!.visitCount === 5 && b.totals.visitCount === 5,
       JSON.stringify({ a1: a1?.visitCount, a2: a2?.visitCount, a3: a3?.visitCount, total: a.totals.visitCount, b: b.totals.visitCount }),
     )

@@ -317,10 +317,11 @@ export interface PartnerTerminalOperations {
   terminals: PartnerTerminalOpsRow[]
   totals: PartnerTerminalOpsTotals
   /**
-   * 服务人次已可用（一体机会话真写入起开始有数，此前的窗口会偏少）。
-   * 逐台与合计的数字在 terminals[].visitCount / totals.visitCount。
+   * 服务人次（一体机会话真写入起开始有数，此前的窗口会偏少）。
+   * recordingStarted=false：本机构终端还没有任何会话记录（一体机上报尚未开始），
+   * 页面显示「暂无」而不是 0。逐台与合计的数字在 terminals[].visitCount / totals.visitCount。
    */
-  visitCount: { available: true }
+  visitCount: { available: true; recordingStarted: boolean }
   aiAvailability: { available: false; reason: typeof AI_AVAILABILITY_UNAVAILABLE_REASON }
 }
 
@@ -329,6 +330,7 @@ export function assembleTerminalOperations(input: {
   from: Date
   now: Date
   rows: readonly TerminalOpsRaw[]
+  visitRecordingStarted: boolean
 }): PartnerTerminalOperations {
   return {
     period: input.period,
@@ -338,7 +340,7 @@ export function assembleTerminalOperations(input: {
     minSample: TERMINAL_OPS_MIN_SAMPLE,
     terminals: input.rows.map((row) => projectTerminalRow(row, input.now)),
     totals: projectTotals(input.rows, input.now),
-    visitCount: { available: true },
+    visitCount: { available: true, recordingStarted: input.visitRecordingStarted },
     aiAvailability: { available: false, reason: AI_AVAILABILITY_UNAVAILABLE_REASON },
   }
 }

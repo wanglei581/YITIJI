@@ -24,7 +24,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { requirePartnerOrgId, type PartnerOrgId } from '../console-screen/console-screen.org'
-import { countKioskVisitsByTerminal } from '../kiosk-session/kiosk-session.queries'
+import { countKioskVisitsByTerminal, hasKioskVisitsForOrg } from '../kiosk-session/kiosk-session.queries'
 import {
   HeartbeatFolder,
   assembleTerminalOperations,
@@ -232,12 +232,12 @@ export class PartnerStatsService {
       select: { id: true, terminalCode: true, displayName: true, locationLabel: true },
     })
     if (terminals.length === 0) {
-      return assembleTerminalOperations({ period, from, now, rows: [] })
+      return assembleTerminalOperations({ period, from, now, rows: [], visitRecordingStarted: false })
     }
 
     const ids = terminals.map((terminal) => terminal.id)
     const created = { gte: from, lte: now }
-    const [printCreated, scanCreated, settled, visits] = await Promise.all([
+    const [printCreated, scanCreated, settled, visits, visitRecordingStarted] = await Promise.all([
       this.prisma.printTask.groupBy({
         by: ['terminalId'],
         where: { terminalId: { in: ids }, createdAt: created },
@@ -259,6 +259,7 @@ export class PartnerStatsService {
       }),
       // 服务人次只数机构快照为本机构的会话，终端改绑前的历史不带过来
       countKioskVisitsByTerminal(this.prisma, { orgId: scopedOrgId, terminalIds: ids, from, to: now }),
+      hasKioskVisitsForOrg(this.prisma, scopedOrgId),
     ])
 
     const rows: TerminalOpsRaw[] = []
@@ -288,7 +289,7 @@ export class PartnerStatsService {
         reportedInWindow: folder.reportedInWindow,
       })
     }
-    return assembleTerminalOperations({ period, from, now, rows })
+    return assembleTerminalOperations({ period, from, now, rows, visitRecordingStarted })
   }
 
   private async foldHeartbeats(terminalId: string, from: Date, now: Date): Promise<HeartbeatFolder> {

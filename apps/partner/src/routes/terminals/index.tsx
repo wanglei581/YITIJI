@@ -28,6 +28,7 @@ import {
   RUN_STATE_VIEW,
   buildTerminalOpsCsv,
   countText,
+  visitText,
   minutesText,
   rateText,
   relativeTime,
@@ -236,7 +237,7 @@ export default function TerminalsPage() {
                           <StatusBadge dot status={run.status} label={run.label} />
                           <p className="mt-1 text-[11px] text-neutral-500">{relativeTime(row.lastHeartbeatAt)}</p>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 tabular-nums">{countText(row.visitCount)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 tabular-nums">{visitText(data, row.visitCount)}</td>
                         <td className="whitespace-nowrap px-4 py-3 tabular-nums">{countText(row.serviceCount)}</td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <p className="font-semibold tabular-nums text-neutral-900">{rateText(row.output)}</p>
@@ -268,6 +269,7 @@ export default function TerminalsPage() {
       <TerminalOpsDrawer
         row={selected}
         windowLabel={data ? windowText(data) : ''}
+        visitRecordingStarted={data?.visitCount.recordingStarted ?? false}
         onClose={() => setSelectedCode(null)}
       />
     </Page>
