@@ -19,6 +19,8 @@ function toLinks(raw, docTypes) {
       label: trimmed(l && l.label),
       legalDocType: trimmed(l && l.legalDocType),
       anchor: trimmed(l && l.anchor),
+      // 章节标题原文：法务页先按它找章节（与一体机同一依据），找不到再按 anchor 兜底。
+      sectionTitle: trimmed(l && l.sectionTitle),
     }))
     .filter((l) => l.label && docTypes && Object.prototype.hasOwnProperty.call(docTypes, l.legalDocType))
 }

@@ -25,17 +25,26 @@ function headingOf(line) {
   return ''
 }
 
-// 章节锚点：其他页面用语义名链接到某一章（自我探索同意书 → 隐私政策「未成年人」专章）。
-// 按章节标题认，不按第几章：后台改章节顺序时链接不会指错地方。认不出就从头显示，不报错。
+// 章节定位：其他页面链接到某一章（自我探索同意书 → 隐私政策「未成年人」专章）。
+// 先按服务端随链接下发的章节标题找「标题包含它」的那一章（与一体机同一依据，律师改标题只改服务端）；
+// 找不到再按语义锚点兜底；都找不到就从头显示，不报错。按标题认、不按第几章：后台调章节顺序也不会指错。
 const ANCHOR_HEADINGS = {
   minors: /未成年/,
 }
 
-function anchorBlockKey(blocks, anchor) {
+function anchorBlockKey(blocks, anchor, section) {
+  const headings = blocks.filter(b => b.kind === 'heading')
+  const bySection = section ? headings.find(b => b.text.indexOf(section) >= 0) : null
+  if (bySection) return bySection.key
   const pattern = ANCHOR_HEADINGS[anchor]
-  if (!pattern) return ''
-  const hit = blocks.find(b => b.kind === 'heading' && pattern.test(b.text))
-  return hit ? hit.key : ''
+  const byAnchor = pattern ? headings.find(b => pattern.test(b.text)) : null
+  return byAnchor ? byAnchor.key : ''
+}
+
+// 页面参数可能仍是编码过的原样（小程序不保证替页面解码）；解不开就用原值。
+function decodeParam(v) {
+  if (typeof v !== 'string' || !v) return ''
+  try { return decodeURIComponent(v) } catch (e) { return v }
 }
 
 function parseBlocks(content) {
@@ -69,6 +78,7 @@ Page({
     const type = TYPES[options.type] ? options.type : 'terms_of_service'
     this._type = type
     this._anchor = options.anchor || ''
+    this._section = decodeParam(options.section)
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       title: TYPES[type],
@@ -84,7 +94,7 @@ Page({
           ? new Date(doc.publishedAt).toLocaleDateString('zh-CN')
           : ''
         const blocks = parseBlocks(doc.content)
-        const anchorKey = anchorBlockKey(blocks, this._anchor)
+        const anchorKey = anchorBlockKey(blocks, this._anchor, this._section)
         this.setData({
           title: doc.title || TYPES[this._type],
           version: doc.version || '',

@@ -37,13 +37,14 @@ function questionsFixture(extra) {
 // 勾选框文字与链接同样故意不是真值。
 const FIXTURE_LINK = '夹具规则链接'
 const FIXTURE_LABEL = `我已阅读夹具说明和${FIXTURE_LINK}，确认夹具事项。`
+const FIXTURE_SECTION = '夹具未成年专章标题'
 /** 条款、勾选框文字、链接、版本号齐全的响应；extra 覆盖其中某项（给 undefined 即缺这项）。 */
 function readyFixture(extra) {
   return questionsFixture(Object.assign({
     consentItems: FIXTURE_ITEMS,
     consentVersion: FIXTURE_VERSION,
     consentCheckboxLabel: FIXTURE_LABEL,
-    consentLinks: [{ label: FIXTURE_LINK, legalDocType: 'privacy_policy', anchor: 'minors' }],
+    consentLinks: [{ label: FIXTURE_LINK, legalDocType: 'privacy_policy', anchor: 'minors', sectionTitle: FIXTURE_SECTION }],
   }, extra))
 }
 
@@ -114,7 +115,7 @@ async function checkConsentLink(source) {
   assert.equal(page.data.extraLinks.length, 0, '链接文字在勾选框里，不另列')
   page.tapConsentLink({ currentTarget: { dataset: { i: linkPart.link } } })
   assert.equal(calls.nav.length, 1)
-  assert.equal(calls.nav[0], '/pages/legal/legal?type=privacy_policy&anchor=minors')
+  assert.equal(calls.nav[0], `/pages/legal/legal?type=privacy_policy&anchor=minors&section=${encodeURIComponent(FIXTURE_SECTION)}`)
   assert.equal(page.data.agreeNonSensitive, false, '点链接不顺带勾选')
 }
 
@@ -288,12 +289,14 @@ test('变异 (c)：本地勾选框文字写回页面 → 判红', () => {
 // ── 法务页章节锚点 ──
 const LEGAL_REL = 'pages/legal/legal.js'
 const LEGAL_SRC = fs.readFileSync(path.join(MINIAPP, LEGAL_REL), 'utf8')
+// 两章标题都含「未成年」：按章节标题要落到第六章，只按兜底会落到第三章 —— 这样才分得出用没用 section。
+const SECTION = '未满十四周岁未成年人个人信息处理规则'
 const PRIVACY_DOC = {
   title: '隐私政策', version: 'fixture-privacy-v1',
-  content: '第一章 总则\n正文一。\n第六章 未成年人个人信息处理规则\n正文六。\n第七章 联系我们\n正文七。',
+  content: `一、总则\n正文一。\n三、未成年人使用须知\n正文三。\n六、${SECTION}\n正文六。\n七、联系我们\n正文七。`,
 }
 
-async function checkLegalAnchor(source) {
+async function checkLegalAnchor(source, options, expected) {
   const scrolls = []
   const wx = { pageScrollTo: (o) => { scrolls.push(o.selector) }, navigateBack() {}, switchTab() {} }
   const modules = {
@@ -303,16 +306,47 @@ async function checkLegalAnchor(source) {
     },
   }
   const page = instantiate(loadPageDefinition(LEGAL_REL, { wx, modules, source }))
-  page.onLoad({ type: 'privacy_policy', anchor: 'minors' })
+  page.onLoad(Object.assign({ type: 'privacy_policy' }, options))
   await flush()
   assert.equal(page.data.state, 'ready')
-  const heading = Array.from(page.data.blocks).find((b) => b.kind === 'heading' && /未成年/.test(b.text))
-  assert.ok(heading, '夹具里有未成年人一章')
+  if (!expected) {
+    assert.equal(scrolls.length, 0, '认不出章节就从头显示')
+    return
+  }
+  const heading = Array.from(page.data.blocks).find((b) => b.kind === 'heading' && b.text === expected)
+  assert.ok(heading, `夹具里有「${expected}」一章，且被认成标题`)
   assert.equal(scrolls.length, 1, '打开后滚到锚点')
-  assert.equal(scrolls[0], `#${heading.key}`, '滚到的是未成年人那一章')
+  assert.equal(scrolls[0], `#${heading.key}`, `滚到的是「${expected}」`)
 }
 
-test('法务页：anchor=minors 滚到「未成年人」章节', () => checkLegalAnchor())
+// 带编码的 section，和自我探索页 navigateTo 拼出来的一样。
+const SECTION_OPTS = { anchor: 'minors', section: encodeURIComponent(SECTION) }
+
+test('法务页：先按下发的章节标题定位（与一体机同一依据）', () => checkLegalAnchor(undefined, SECTION_OPTS, `六、${SECTION}`))
+
+test('法务页：章节标题找不到时按「未成年」兜底', () => checkLegalAnchor(undefined, { anchor: 'minors', section: encodeURIComponent('不存在的标题') }, '三、未成年人使用须知'))
+
+test('法务页：锚点与标题都认不出时从头显示', () => checkLegalAnchor(undefined, { anchor: 'unknown' }, ''))
+
+test('法务页：只带章节标题（后端定稿形状，没有 anchor）且找不到 → 从头显示', () =>
+  checkLegalAnchor(undefined, { section: encodeURIComponent('不存在的标题') }, ''))
+
+test('自我探索：链接不带 anchor 时只拼 type 与 section', async () => {
+  const { page, calls } = makePage(readyFixture({
+    consentLinks: [{ label: FIXTURE_LINK, legalDocType: 'privacy_policy', sectionTitle: FIXTURE_SECTION }],
+  }))
+  page.onLoad({})
+  await flush()
+  const linkPart = Array.from(page.data.checkboxParts).find((p) => p.link >= 0)
+  page.tapConsentLink({ currentTarget: { dataset: { i: linkPart.link } } })
+  assert.equal(calls.nav[0], `/pages/legal/legal?type=privacy_policy&section=${encodeURIComponent(FIXTURE_SECTION)}`)
+})
+
+test('变异：法务页不看章节标题、只按兜底 → 判红', async () => {
+  const from = 'this._section = decodeParam(options.section)'
+  assert.ok(LEGAL_SRC.includes(from))
+  await assert.rejects(checkLegalAnchor(LEGAL_SRC.replace(from, "this._section = ''"), SECTION_OPTS, `六、${SECTION}`), (e) => e.code === 'ERR_ASSERTION')
+})
 
 test('法务页：章节标题带 id，滚动选择器能找到', () => {
   const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/legal/legal.wxml'), 'utf8')
@@ -322,5 +356,5 @@ test('法务页：章节标题带 id，滚动选择器能找到', () => {
 test('变异：法务页忽略锚点 → 判红', async () => {
   const from = "this._anchor = options.anchor || ''"
   assert.ok(LEGAL_SRC.includes(from))
-  await assert.rejects(checkLegalAnchor(LEGAL_SRC.replace(from, "this._anchor = ''")), (e) => e.code === 'ERR_ASSERTION')
+  await assert.rejects(checkLegalAnchor(LEGAL_SRC.replace(from, "this._anchor = ''"), { anchor: 'minors' }, '三、未成年人使用须知'), (e) => e.code === 'ERR_ASSERTION')
 })
