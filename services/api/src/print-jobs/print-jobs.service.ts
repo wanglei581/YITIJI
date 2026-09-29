@@ -14,7 +14,12 @@ import {
 import { priceChanged } from '../payment/order-quote.service'
 import { PricingService } from '../payment/pricing.service'
 import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
-import { paidReprintBlockReason, throwIfMemberReprintBlocked } from './paid-reprint-eligibility'
+import {
+  REPRINT_BLOCKED_MESSAGE,
+  latestHeartbeatAgentVersion,
+  paidReprintBlockReason,
+  throwIfMemberReprintBlocked,
+} from './paid-reprint-eligibility'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
@@ -681,7 +686,13 @@ export class PrintJobsService {
       orderNo: order.orderNo,
       payStatus: order.payStatus as OrderPayStatus,
       amountCents: order.amountCents,
-      canRetry: this.canRetryPaidFailedJob(task, order, file, task.terminal),
+      canRetry: this.canRetryPaidFailedJob(
+        task,
+        order,
+        file,
+        task.terminal,
+        await latestHeartbeatAgentVersion(this.prisma, task.terminalId),
+      ),
     }
   }
 
@@ -710,13 +721,16 @@ export class PrintJobsService {
     throwIfMemberReprintBlocked(paidReprintBlockReason({
       status: task.status,
       errorCode: task.errorCode,
+      hasOrder: true,
       payStatus: order.payStatus,
       file,
+      terminalId: task.terminalId,
+      agentVersion: await latestHeartbeatAgentVersion(this.prisma, task.terminalId),
     }))
     const fileId = task.fileId ?? file?.id
     if (!fileId) {
       throw new ConflictException({
-        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: REPRINT_BLOCKED_MESSAGE.file_unavailable },
       })
     }
     const { url: freshFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
@@ -741,7 +755,7 @@ export class PrintJobsService {
       })
       if (!isPrintableFileRecord(liveFile)) {
         throw new ConflictException({
-          error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+          error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: REPRINT_BLOCKED_MESSAGE.file_unavailable },
         })
       }
 
@@ -819,6 +833,7 @@ export class PrintJobsService {
     order: { payStatus: string; taskStatus: string },
     file: { status?: string | null; deletedAt?: Date | null; expiresAt?: Date | null } | null,
     terminal: { enabled: boolean; lifecycleStatus: string } | null,
+    agentVersion: string | null,
   ): boolean {
     if (task.fileId && !file) return false
     if (task.terminalId && (terminal?.enabled !== true || terminal.lifecycleStatus !== 'active')) return false
@@ -826,8 +841,11 @@ export class PrintJobsService {
     return paidReprintBlockReason({
       status: task.status,
       errorCode: task.errorCode,
+      hasOrder: true,
       payStatus: order.payStatus,
       file,
+      terminalId: task.terminalId,
+      agentVersion,
     }) === null
   }
 

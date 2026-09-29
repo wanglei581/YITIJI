@@ -1936,6 +1936,9 @@ async function main(): Promise<void> {
           deviceFingerprint: 'verify-f03',
         },
       })
+      await prisma.terminalHeartbeat.create({
+        data: { terminalId: anomalyTerminalId, agentVersion: '0.4.13-production' },
+      })
       const agent = new TerminalAgentService(prisma, audit)
       const claim = () => agent.claimTasks(anomalyTerminalId, { maxTasks: 1 }, `Bearer ${anomalyToken}`)
 

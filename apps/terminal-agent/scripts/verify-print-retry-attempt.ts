@@ -352,6 +352,31 @@ async function verifyRetryAttempt(): Promise<void> {
     assert.ok(logged.some((line) => line.includes(`INFO  ${oldRoundTask}\n`)))
     assert.equal(logged.some((line) => /PAPER_EMPTY|PRINTER_OFFLINE|attempt|\.pdf/i.test(line)), false)
     pass('落后补报移出队列，只记任务号，不进死信，新一轮补报仍在')
+
+    const onceTask = 'stale-once-task'
+    enqueuePatch(db, onceTask, { status: 'failed', errorCode: 'PAPER_EMPTY', attempt: 0 })
+    db.prepare('UPDATE pending_patches SET nextRetryAt = ? WHERE taskId = ?').run(
+      '2000-01-01T00:00:00.000Z',
+      onceTask,
+    )
+    const oncePatch = getPendingPatches(db).find((row) => row.taskId === onceTask)
+    assert.ok(oncePatch)
+    let staleSends = 0
+    await processPatch(oncePatch, agent, db, async () => {
+      staleSends += 1
+      throw { response: { status: 409, data: { error: { code: 'PRINT_STATUS_STALE_ATTEMPT' } } } }
+    })
+    const stillQueued = db.prepare('SELECT COUNT(*) AS count FROM pending_patches WHERE taskId = ?').get(onceTask) as { count: number }
+    assert.equal(Number(stillQueued.count), 0)
+    const secondWave = getPendingPatches(db).filter((row) => row.taskId === onceTask)
+    for (const row of secondWave) {
+      await processPatch(row, agent, db, async () => {
+        staleSends += 1
+      })
+    }
+    assert.equal(staleSends, 1)
+    assert.equal(secondWave.length, 0)
+    pass('收到 409 PRINT_STATUS_STALE_ATTEMPT 后该补报从 pending_patches 消失，且不会再发第二次')
   } finally {
     await server.close()
     db.close()

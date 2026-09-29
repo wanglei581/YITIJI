@@ -17,8 +17,15 @@ import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.se
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import {
+  ADMIN_UNPARSED_FILE_CODE,
+  ADMIN_UNPARSED_FILE_MESSAGE,
+  REPRINT_BLOCKED_CODE,
+  REPRINT_BLOCKED_MESSAGE,
+  adminPrintRetryBlockedReasons,
+  latestHeartbeatAgentVersion,
   loadPaidReprintBlock,
   paidReprintBlockReason,
+  parseSignedPrintFileId,
   throwIfAdminReprintBlocked,
 } from '../print-jobs/paid-reprint-eligibility'
 import {
@@ -55,16 +62,6 @@ const RETRY_FILE_URL_TTL_MS = 30 * 60 * 1000
 // 退款相关的 payStatus（含部分退款/退款中）：这些订单重试出纸会造成"退了钱还出纸"。
 const REFUND_PAY_STATUSES = ['refunding', 'partial_refunded', 'refunded'] as const
 const REFUND_PAY_STATUS_SET = new Set<string>(REFUND_PAY_STATUSES)
-
-/** 从我方 create 落库的签名 URL 中解析 fileId（仅路径解析；来源是本服务写入的可信值）。 */
-function parsePrintFileId(fileUrl: string): string | null {
-  try {
-    const u = new URL(fileUrl, 'http://internal.local')
-    return u.pathname.match(/\/files\/([^/]+)\/content$/)?.[1] ?? null
-  } catch {
-    return null
-  }
-}
 
 const ALL_TASK_TYPES: readonly PrintScanTaskType[] = [
   'print',
@@ -200,8 +197,10 @@ export class AdminPrintScanService {
           paramsJson: true,
           errorCode: true,
           printOutcome: true,
+          fileUrl: true,
           createdAt: true,
           updatedAt: true,
+          order: { select: { payStatus: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (params.page - 1) * params.pageSize,
@@ -210,6 +209,15 @@ export class AdminPrintScanService {
       this.prisma.printTask.count({ where }),
     ])
 
+    const retryReasons = await adminPrintRetryBlockedReasons(this.prisma, rows.map((row) => ({
+      id: row.id,
+      terminalId: row.terminalId,
+      status: row.status,
+      errorCode: row.errorCode,
+      fileUrl: row.fileUrl,
+      hasOrder: row.order != null,
+      payStatus: row.order?.payStatus ?? null,
+    })))
     const items: AdminPrintScanTaskItem[] = rows.map((row) => {
       const safe = parseSafePrintParams(row.paramsJson)
       return {
@@ -225,6 +233,7 @@ export class AdminPrintScanService {
         expiresAt: null,
         ...safe,
         printOutcome: row.printOutcome === 'printed' || row.printOutcome === 'not_printed' ? row.printOutcome : null,
+        retryBlockedReason: retryReasons.get(row.id) ?? null,
       }
     })
 
@@ -248,6 +257,7 @@ export class AdminPrintScanService {
         paramsJson: true,
         errorCode: true,
         printOutcome: true,
+        fileUrl: true,
         completedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -263,6 +273,15 @@ export class AdminPrintScanService {
     }
     const safe = parseSafePrintParams(row.paramsJson)
     const eligibility = await this.getCloseUnpaidEligibility(row.id)
+    const retryReasons = await adminPrintRetryBlockedReasons(this.prisma, [{
+      id: row.id,
+      terminalId: row.terminalId,
+      status: row.status,
+      errorCode: row.errorCode,
+      fileUrl: row.fileUrl,
+      hasOrder: row.order != null,
+      payStatus: row.order?.payStatus ?? null,
+    }])
     return {
       type: 'print',
       taskId: row.id,
@@ -287,6 +306,7 @@ export class AdminPrintScanService {
       closeUnpaidBlockReason: eligibility.reason,
       ...safe,
       printOutcome: row.printOutcome === 'printed' || row.printOutcome === 'not_printed' ? row.printOutcome : null,
+      retryBlockedReason: retryReasons.get(row.id) ?? null,
     }
   }
 
@@ -456,23 +476,19 @@ export class AdminPrintScanService {
     }
     // 与会员端同一套资格：失败、已付款、非退款、非未确认、非只出一部分、文件仍可打印。
     // 必须位于文件重签和任何事务写入之前，拒绝路径保持任务、订单和状态日志完全不变。
-    const fileId = parsePrintFileId(task.fileUrl)
+    const fileId = parseSignedPrintFileId(task.fileUrl)
     const previewFile = fileId
       ? await this.prisma.fileObject.findUnique({
           where: { id: fileId },
           select: { status: true, deletedAt: true, expiresAt: true },
         })
       : null
+    const agentVersion = await latestHeartbeatAgentVersion(this.prisma, task.terminalId)
     const blockReason = await loadPaidReprintBlock(this.prisma, task, fileId ? previewFile : null)
-    if (!fileId && blockReason === 'file_unavailable') {
-      throw new ConflictException({
-        error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件链接无法解析，无法重试' },
-      })
-    }
-    throwIfAdminReprintBlocked(blockReason)
+    throwIfAdminReprintBlocked(blockReason, { fileIdParsed: fileId != null })
     if (!fileId) {
       throw new ConflictException({
-        error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件链接无法解析，无法重试' },
+        error: { code: ADMIN_UNPARSED_FILE_CODE, message: ADMIN_UNPARSED_FILE_MESSAGE },
       })
     }
     const { url: freshFileUrl } = signFileUrl(fileId, RETRY_FILE_URL_TTL_MS)
@@ -514,8 +530,11 @@ export class AdminPrintScanService {
       throwIfAdminReprintBlocked(paidReprintBlockReason({
         status: liveTask?.status ?? '',
         errorCode: liveTask?.errorCode,
+        hasOrder: order != null,
         payStatus: order?.payStatus ?? null,
         file: liveFile,
+        terminalId: task.terminalId,
+        agentVersion,
       }))
 
       // 关联订单以 Order.taskStatus 作为共同状态序列点。先抢占 Order 的 failed→pending，
@@ -533,7 +552,7 @@ export class AdminPrintScanService {
           const freshOrder = await tx.order.findUnique({ where: { id: order.id }, select: { payStatus: true } })
           if (freshOrder && REFUND_PAY_STATUS_SET.has(freshOrder.payStatus)) {
             throw new ConflictException({
-              error: { code: 'PRINT_SCAN_RETRY_REFUNDED', message: '该任务的订单已退款或退款中，不能重试出纸' },
+              error: { code: REPRINT_BLOCKED_CODE.refunding, message: REPRINT_BLOCKED_MESSAGE.refunding },
             })
           }
           throw new ConflictException({
