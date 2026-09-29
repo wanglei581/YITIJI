@@ -20674,7 +20674,9 @@
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
-      "scripts/verify-no-raw-error-render.mjs"
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "apps/kiosk/src/services/assistantDraft.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
@@ -21696,6 +21698,7 @@
     ],
     "packages/shared/src/types/print.ts": [
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
     ],
     "packages/shared/src/types/printScanCapability.ts": [
@@ -24102,7 +24105,9 @@
       "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pii-redaction.ts",
@@ -25454,6 +25459,7 @@
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "services/api/src/print-jobs/verified-print-parameters.ts": [
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
@@ -28974,6 +28980,7 @@
           "apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx",
           "apps/kiosk/src/pages/print/components/printFileRetention.ts",
           "apps/kiosk/src/pages/print/printConfirmModel.ts",
+          "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/print/localPrintWakeApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/kiosk/src/services/print/printJobsApi.ts"
@@ -36933,15 +36940,18 @@
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
           "apps/kiosk/src/pages/print/pickupClaimModel.ts",
+          "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/miniapp/pages/print-pay/print-pay.js",
           "apps/miniapp/utils/api.js",
+          "packages/shared/src/types/print.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pickup-code.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.controller.ts",
           "services/api/src/payment/order-quote.service.ts",
@@ -36954,6 +36964,7 @@
           "services/api/src/print-jobs/print-jobs.controller.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/print-jobs/verified-print-parameters.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.interface.ts",
           "services/api/src/storage/storage.service.ts",
@@ -37252,6 +37263,7 @@
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/payment/order-status.service.ts",
