@@ -17,8 +17,10 @@
 //     deepseek-flash（旧名 deepseek-v4-flash 仍可调，按 Flash 计费）：
 //       输入（缓存未命中）空闲 1 / 高峰 2，输出 空闲 4 / 高峰 8
 //     deepseek-v4-pro：输入（缓存未命中）空闲 4.5 / 高峰 9，输出 空闲 13.5 / 高峰 27
-//     高峰 = 北京时间工作日 9:00-12:00、14:00-18:00。
+//     输入缓存命中：Flash 空闲 0.02 / 高峰 0.04；V4-Pro 空闲 0.15 / 高峰 0.30（本表不用，见下一行）。
+//     高峰 = 北京时间工作日 9:00-12:00、14:00-18:00；空闲时段半价。
 //     **一律按高峰价、缓存未命中价计**：宁可多算，不能少算（额度是防超支的闸）。
+//     思考模式：官方默认开启、effort 默认 high；本仓各调用点显式关闭（思考 tokens 按输出计费，且拉长等待）。
 //   阿里云百炼（中国内地）https://help.aliyun.com/zh/model-studio/model-pricing
 //     qwen-plus：输入 ≤128K 0.8 / ≤256K 2.4 / ≤1M 4.8；输出（非思考）2 / 20 / 48
 //       （思考模式输出 8 / 24 / 64；本仓调用不开思考，qwen-plus 默认也不开）
@@ -26,6 +28,17 @@
 //     qwen-flash：输入 ≤128K 0.15 / ≤256K 0.6 / ≤1M 1.2；输出 1.5 / 6 / 12
 //     阶梯按单次请求的输入 token 数取档。
 //   认不出型号的：DeepSeek 按 V4-Pro、千问按 qwen-max，即「同厂最贵的一档」，同样宁多勿少。
+//
+// 非 token 计费的 AI 相关服务（本期**不计量**，只作价目记录与估算依据；接入计量时从这里取，不另写）：
+//   百度 OCR 通用文字识别（高精度版）https://cloud.baidu.com/product-price/ocr.html
+//     按量后付费，按月成功调用量阶梯：≤5 万次 0.030 元/次，逐档降到 >100 万次 0.010 元/次。
+//   腾讯云语音合成（通用，精品音色）https://cloud.tencent.com/document/product/1073/34112
+//     0.3 元/万字符，无阶梯。
+//   腾讯云实时语音识别 https://cloud.tencent.com/document/product/1093/35686
+//     标准版按日时长阶梯：0–299 小时/日 3.20 元/小时起；大模型 2.0 版统一 1.0 元/小时。
+//   腾讯云 TRTC AI 实时对话 https://cloud.tencent.com/document/product/647/115755
+//     AI 对话服务费 0.01 元/分钟，另加音频通话时长 0.007 元/人/分钟（真人 + AI 两路即 0.014 元/分钟）。
+//   以上四项均于 2026-09-29 核对官方页。
 //   zhipu / openai 两行是旧值，未重新核对；它们不在默认出站白名单里，生产走不到。
 //
 // 价目改了要同步改这里的核对日期与链接；不要在别处再写一份。
@@ -52,6 +65,22 @@ interface Tier extends TokenRate {
 const K = 1_000
 
 const DEEPSEEK_FLASH_PEAK: TokenRate = { input: 2, output: 8 }
+
+/** 非 token 计费的 AI 相关服务单价（元），本期不计量，见文件头来源。 */
+export const NON_TOKEN_AI_PRICES = Object.freeze({
+  /** 百度 OCR 高精度版，首档（≤5 万次/月），元/次 */
+  baiduOcrAccurateFirstTierPerCall: 0.03,
+  /** 腾讯云语音合成精品音色，元/万字符 */
+  tencentTtsPremiumPer10kChars: 0.3,
+  /** 腾讯云实时语音识别标准版首档，元/小时 */
+  tencentAsrRealtimeStandardFirstTierPerHour: 3.2,
+  /** 腾讯云实时语音识别大模型 2.0 版，元/小时 */
+  tencentAsrRealtimeBigModelV2PerHour: 1.0,
+  /** TRTC AI 实时对话服务费，元/分钟 */
+  trtcAiConversationPerMinute: 0.01,
+  /** TRTC 音频通话时长，元/人/分钟 */
+  trtcAudioPerUserMinute: 0.007,
+})
 const DEEPSEEK_PRO_PEAK: TokenRate = { input: 9, output: 27 }
 
 const QWEN_PLUS: Tier[] = [
