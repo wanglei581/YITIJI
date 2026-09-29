@@ -136,7 +136,12 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
           >
             <div className="i2p-band-p">
               系统返回了合成结果：<b>{outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
-              {hasEndUser === false ? <b>你现在没登录，这份 PDF 不会进「我的文档」</b> : null}
+              {hasEndUser === false ? (
+                <>
+                  <b>你现在没登录，这份 PDF 不会进「我的文档」，转好之后再登录也存不进去。</b>
+                  不登录也能直接打印这份；想存进「我的文档」，要先登录，再回到这一页重新添加图片转换。
+                </>
+              ) : null}
               {recovered ? ' 没有生成第二份，只是重新签发了一条新的临时打印链接。' : null}
             </div>
           </Band>
