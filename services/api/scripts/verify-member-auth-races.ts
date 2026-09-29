@@ -178,6 +178,21 @@ async function main(): Promise<void> {
     check('领取成功后不能再领（410 QR_LOGIN_ALREADY_CLAIMED）', !third.ok && third.code === 'QR_LOGIN_ALREADY_CLAIMED', JSON.stringify(third))
   }
 
+  {
+    // 恢复本身失败（这里是同步抛错）时，调用方必须拿到原始错误，而不是恢复时的故障。
+    const redis = new TtlRedis()
+    await seedTicket(redis)
+    const memberAuth = {
+      verifySmsCodeForUser: async () => userA,
+      persistResolvedLegalConsent: async () => undefined,
+      issueLoginForUser: async () => { throw new Error('original issue failure') },
+    }
+    const service = new MemberQrLoginService(redis as never, memberAuth as never, terminals as never)
+    await service.confirm(ticketId, { phone: '13800000001', code: '000000' })
+    ;(redis as unknown as { setEx: unknown }).setEx = () => { throw new TypeError('restore exploded') }
+    const r = await outcome(() => service.claim(ticketId, claimToken, terminalId, 'Bearer terminal'))
+    check('恢复票据失败也不盖掉原始错误', !r.ok && r.message === 'original issue failure', JSON.stringify(r))
+  }
   console.log('\n[C-4] 换绑手机号：先踢会话再改库')
   const newPhone = '13700000003'
   const setupRebind = async (revokeFails: boolean) => {

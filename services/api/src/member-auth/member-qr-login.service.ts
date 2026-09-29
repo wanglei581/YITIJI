@@ -182,9 +182,18 @@ export class MemberQrLoginService {
     } catch (error) {
       // 票据已被原子取走并标记为已领取；落同意或签发失败时恢复票据、撤掉标记，
       // 否则用户重试只会看到「已被领取」、却从没拿到登录（1.8 排雷 C-5）。恢复给短有效期。
-      await this.redis.setEx(this.ticketKey(ticketId), QR_CLAIM_RETRY_TTL, raw).catch(() => undefined)
-      await this.redis.del(this.claimedKey(ticketId)).catch(() => undefined)
+      await this.restoreClaimedTicket(ticketId, raw)
       throw error
+    }
+  }
+
+  /** 恢复是尽力而为：恢复本身失败（含同步抛错）也绝不能盖掉调用方要如实返回的原始错误。 */
+  private async restoreClaimedTicket(ticketId: string, raw: string): Promise<void> {
+    try {
+      await this.redis.setEx(this.ticketKey(ticketId), QR_CLAIM_RETRY_TTL, raw)
+      await this.redis.del(this.claimedKey(ticketId))
+    } catch {
+      // 恢复不了就维持「已领取」，用户看到的是原始错误，重新扫码即可。
     }
   }
 
