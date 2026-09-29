@@ -130,6 +130,13 @@ export function UploadSessionQrPanel({
     onBusyChange?.(active || loading || confirming)
   }, [active, confirming, loading, onBusyChange])
 
+  // 确认后父页面会卸掉本面板。上面的 effect 只在依赖变化时上报，卸载时不会再跑，忙碌会一直留在父页面。
+  useEffect(() => {
+    return () => {
+      onBusyChange?.(false)
+    }
+  }, [onBusyChange])
+
   useEffect(() => {
     qrRef.current = qr
   }, [qr])

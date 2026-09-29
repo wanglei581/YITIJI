@@ -61,7 +61,12 @@ const FROZEN = new Map([
   // 按钮不可点（此前一次误触即丢弃已上传文件）。冻结契约不放宽，仍逐字节校验；新行为由
   // verify:resume-phone-upload-ui 的两条 AST 断言反向钉死。
   // 旧哈希 c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0'],
+  // 2026-09-29 重新冻结：确认使用这份简历后面板卸载，原先只在依赖变化时上报忙碌，
+  // 卸载不补 onBusyChange(false)，来源页一直停在「接收中」，开始诊断和更换文件一直不可点。
+  // 卸载时补报不忙。刷新仍先撤销旧会话，已上传时刷新按钮仍不可点。
+  // 冻结契约不放宽，仍逐字节校验。卸载清理由 verify:resume-phone-upload-ui 断言。
+  // 旧哈希 6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f'],
 ])
 
 function propertyName(node) {

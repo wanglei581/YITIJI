@@ -19505,6 +19505,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
+      "apps/kiosk/scripts/verify-resume-decisions.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
@@ -19625,7 +19626,8 @@
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
-      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -19643,6 +19645,7 @@
       "apps/kiosk/scripts/verify-resume-decisions.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts": [
+      "apps/kiosk/scripts/verify-resume-decisions.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts": [
@@ -28510,7 +28513,9 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts"
+          "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts"
         ],
         "missing": []
       },
@@ -28643,6 +28648,7 @@
         "files": [
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportActions.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportChrome.tsx",

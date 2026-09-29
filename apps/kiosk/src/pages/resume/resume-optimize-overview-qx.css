@@ -2,13 +2,30 @@
  * 尺寸取自稿的 qx2 覆盖层（卡标题 30、说明与列表 22、计数 28、按钮 26），颜色一律用青序令牌：
  * 用改写 = 青绿，保留原文 = 石板蓝，待确认事实 = 麦色。 */
 
+/* 稿 23：建议列表在卡片里滚，计数卡和「编辑与导出」卡留在滚动区外，壳层底部操作条不被长列表盖住。 */
 .qx-opt-overview {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
   padding-bottom: 12px;
+  overflow: hidden;
 }
 .qx-opt-overview > * { flex-shrink: 0; }
+.qx-opt-overview > .qx-opt-sec--list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.qx-opt-overview > .qx-opt-sec--list > .qx-opt-sec-h { flex: none; }
+.qx-opt-overview > .qx-opt-sec--list > .qx-opt-mods {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
 
 .qx-opt-sec {
   padding: 20px 26px;

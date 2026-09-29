@@ -17,6 +17,7 @@ import {
   parseReportSearch,
   REPORT_HEAD,
   REPORT_STATUS,
+  reportBlocksSubtitle,
   shouldSkipReportFetch,
   showsReportBody,
   targetSummary,
@@ -171,6 +172,9 @@ export function ResumeReportPage() {
         : null
   const displayReport = fixtureKind ? fixtureReport(fixtureKind) : report
   const displayIssues = displayReport?.issues ?? []
+  const reportSubtitle = viewState === 'report'
+    ? reportBlocksSubtitle(displayReport?.contentBlocks?.length ?? 0)
+    : REPORT_HEAD[viewState].sub
   const isFixture = Boolean(fixtureKind)
   const direction = targetContext ?? state.targetContext
   const summary = targetSummary(direction)
@@ -237,7 +241,7 @@ export function ResumeReportPage() {
     <QxPageFrame
       title="简历诊断报告"
       back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }}
-      subtitle={REPORT_HEAD[viewState].sub}
+      subtitle={reportSubtitle}
       status={REPORT_STATUS[viewState]}
       terminalLabel="就业服务大厅"
       navbar={nav}
@@ -270,7 +274,7 @@ export function ResumeReportPage() {
         className="qx-scroll rrp-page"
         data-flat={parsed.flat ? '1' : undefined}
       >
-        <ResumeReportHead viewState={viewState} />
+        <ResumeReportHead viewState={viewState} subtitle={viewState === 'report' ? reportSubtitle : undefined} />
         {isFixture ? (
           <div className="rrp-idbar" data-testid="resume-report-fixture">
             <span className="rrp-fx">合成演示</span>
