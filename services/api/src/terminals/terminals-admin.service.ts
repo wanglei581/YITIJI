@@ -64,6 +64,7 @@ export interface AdminTerminalView {
   registeredAt: string
   lastSeenAt: string
   online: boolean
+  /** 最近心跳；null = 从未心跳。lastSeenAt 在从未心跳时回落为注册时间，不能当心跳显示（W-04）。 */
   lastHeartbeatAt: string | null
   agentStatus: string | null
   localTaskDatabaseAvailable: boolean | null
@@ -313,7 +314,9 @@ export class TerminalAdminService {
 
     const terminals: AdminTerminalView[] = rows.map((t: (typeof rows)[number]) => {
       const hb = t.heartbeats[0]
-      const lastHeartbeatAt = hb?.createdAt ?? null
+      // W-04：终端上的心跳时间列（只在心跳时写，不受 90 天心跳表清理影响）与最新心跳行取较新者。
+      const hbAt = hb?.createdAt ?? null
+      const lastHeartbeatAt = t.lastHeartbeatAt && (!hbAt || t.lastHeartbeatAt > hbAt) ? t.lastHeartbeatAt : hbAt
       const lastSeen = lastHeartbeatAt ?? t.registeredAt
       // A newer draft must not visually hide an older active plan for the
       // same terminal. There can be at most one active plan by API policy.

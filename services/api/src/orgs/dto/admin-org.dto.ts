@@ -28,6 +28,8 @@ export const PARTNER_TYPES = [
   'licensed_hr_agency',
   'fair_organizer',
   'enterprise_source',
+  'gig_worker_home', // 零工之家
+  'employment_service_station', // 就业服务站
 ] as const
 
 export const SCENE_TEMPLATES = ['school', 'public_employment', 'licensed_hr_service'] as const

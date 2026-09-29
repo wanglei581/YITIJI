@@ -39,6 +39,9 @@ model Terminal {
   org               Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
   registeredAt      DateTime @default(now())
   lastSeenAt        DateTime @updatedAt
+  /// 最近一次 Agent 心跳写入的时间，只在心跳时写。null = 从未心跳。
+  /// 不能用 lastSeenAt 代替：它是 @updatedAt，后台改名、改点位等任何编辑都会刷新它。
+  lastHeartbeatAt   DateTime?
 
   heartbeats   TerminalHeartbeat[]
   printTasks   PrintTask[]
@@ -644,11 +647,12 @@ model Refund {
 //
 // type 取值同 packages/shared PartnerType:
 //   'school_employment_center' | 'public_employment_service' |
-//   'licensed_hr_agency' | 'fair_organizer' | 'enterprise_source'
+//   'licensed_hr_agency' | 'fair_organizer' | 'enterprise_source' |
+//   'gig_worker_home'（零工之家）| 'employment_service_station'（就业服务站）
 
 // type 取值 = shared PartnerType:
 //   'school_employment_center' | 'public_employment_service' | 'licensed_hr_agency'
-//   | 'fair_organizer' | 'enterprise_source'
+//   | 'fair_organizer' | 'enterprise_source' | 'gig_worker_home' | 'employment_service_station'
 // sceneTemplate 取值 = shared SceneTemplate('school' | 'public_employment' | 'licensed_hr_service')。
 // enabledModulesJson:JSON 数组,取值 = shared EnabledModule;招聘闭环模块(PROHIBITED_MODULES)
 //   服务端硬拒绝,任何配置都写不进来。

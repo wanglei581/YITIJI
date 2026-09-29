@@ -360,7 +360,7 @@ export class TerminalAgentService implements OnModuleInit {
       await this.writeWithMacConflictMapping(() =>
         this.prisma.terminal.update({
           where: { id: terminalId },
-          data: { ...profilePatch, lastSeenAt },
+          data: { ...profilePatch, lastSeenAt, lastHeartbeatAt: lastSeenAt },
         }),
       )
     } catch (error) {
@@ -372,7 +372,7 @@ export class TerminalAgentService implements OnModuleInit {
         this.logger.warn(`heartbeat ignored duplicated MAC address from terminal ${terminalId}`)
         await this.prisma.terminal.update({
           where: { id: terminalId },
-          data: { ...safeProfilePatch, lastSeenAt },
+          data: { ...safeProfilePatch, lastSeenAt, lastHeartbeatAt: lastSeenAt },
         })
       } else {
         throw error

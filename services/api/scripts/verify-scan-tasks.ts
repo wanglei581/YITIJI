@@ -54,6 +54,8 @@ import {
   runDeliverWithoutAckNegativeCase,
   runDeliverCasAckExpiryRaceCase,
 } from './scan-lease-contract.helper'
+import { assertSqliteCliWaitsForTransientLock, sqliteExecScript, sqliteQuery, waitForSqliteRelease } from './support/sqlite-cli'
+import { assertScanPanelWording } from './support/scan-panel-wording'
 
 function runPrisma(apiRoot: string, args: string[], env: NodeJS.ProcessEnv): void {
   execFileSync(
@@ -310,6 +312,7 @@ function assertSqliteDeliveryAckBackfill(apiRoot: string): void {
       ...process.env,
       DATABASE_URL: `file:${dbPath}`,
     })
+    waitForSqliteRelease(dbPath)
     sqliteQuery(
       dbPath,
       `
@@ -333,6 +336,7 @@ function assertSqliteDeliveryAckBackfill(apiRoot: string): void {
       ...process.env,
       DATABASE_URL: `file:${dbPath}`,
     })
+    waitForSqliteRelease(dbPath)
     assert.equal(
       sqliteQuery(dbPath, `SELECT COUNT(*) FROM pragma_table_info('ScanTask') WHERE name = 'deliveryAckedAt';`),
       '1',
@@ -575,12 +579,6 @@ function assertTerminalQuietPeriodContracts(apiRoot: string): void {
     'quiet period must only follow cancelled or expired tasks')
   assert.match(source, /const endedAt = recent\.updatedAt\.getTime\(\)/,
     'quiet period must start at server convergence time')
-}
-
-function sqliteQuery(databasePath: string, sql: string): string {
-  return execFileSync('sqlite3', ['-batch', '-noheader', '-separator', '|', databasePath, sql], {
-    encoding: 'utf8',
-  }).trim()
 }
 
 function postgresQuery(databaseUrl: string, sql: string): string {
@@ -1647,6 +1645,7 @@ function assertSqliteRetryHardeningUpgrade(apiRoot: string): void {
       ...process.env,
       DATABASE_URL: previousDbUrl,
     })
+    waitForSqliteRelease(previousDbPath)
     assert.equal(
       sqliteQuery(
         previousDbPath,
@@ -1664,21 +1663,20 @@ function assertSqliteRetryHardeningUpgrade(apiRoot: string): void {
       ...process.env,
       DATABASE_URL: `file:${cleanDbPath}`,
     })
+    waitForSqliteRelease(cleanDbPath)
     assertSqliteHardeningStructure(cleanDbPath, 'hardened', 'SQLite clean upgrade')
 
     for (const field of ['retryOfScanTaskId', 'retryConsumedByScanTaskId'] as const) {
       const duplicateDbPath = path.join(sandbox.root, `duplicate-${field}.db`)
       cpSync(previousDbPath, duplicateDbPath)
-      execFileSync('sqlite3', ['-bail', duplicateDbPath], {
-        input: retryUpgradeSeedSql(field),
-        stdio: ['pipe', 'pipe', 'pipe'],
-      })
+      sqliteExecScript(duplicateDbPath, retryUpgradeSeedSql(field))
       runPrismaExpectFailure(
         apiRoot,
         ['migrate', 'deploy', '--config', sandbox.configPath],
         { ...process.env, DATABASE_URL: `file:${duplicateDbPath}` },
         `SQLite duplicate ${field}`
       )
+      waitForSqliteRelease(duplicateDbPath)
       assertSqliteHardeningStructure(
         duplicateDbPath,
         'previous',
@@ -3277,6 +3275,7 @@ async function main(): Promise<void> {
     const created = await service.create(dto, null)
     assert.ok(created.scanTaskId)
     assert.equal(created.instructions.length > 0, true, 'instructions must be non-empty')
+    assertScanPanelWording(created.instructions)
 
     // B1-3: create() 铸造并返回明文 controlToken（24 random bytes = 48 hex chars），
     // DB 里只落它的 sha256 hash，绝不落明文。
@@ -3466,6 +3465,7 @@ async function main(): Promise<void> {
     const dbUrl = `file:${dbPath}`
 
     try {
+      await assertSqliteCliWaitsForTransientLock([__filename])
       assertSqliteRetryHardeningUpgrade(apiRoot)
       ensureSqliteFile(dbPath)
       runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
