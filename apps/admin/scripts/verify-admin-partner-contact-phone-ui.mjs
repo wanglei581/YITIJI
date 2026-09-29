@@ -431,10 +431,30 @@ function verifyStatic() {
   }
 }
 
+/**
+ * 「安全验证未就绪」提示：有了「登记手机号」之后，不能再说「只能走独立线下核验、本系统不提供管理员绕过」
+ * （登记正是线下核验之后的那一步）。按账号状态分三种说法，且可登记时写明管理员不能代收验证码。
+ */
+function verifyUnreadyHint() {
+  const manager = read('src/routes/partners/PartnerAccountManager.tsx')
+  expect(!manager.includes('本系统不提供管理员绕过'), '旧提示「本系统不提供管理员绕过」已去掉')
+  expect(!manager.includes('否则只能走独立线下核验'), '旧提示「否则只能走独立线下核验」已去掉')
+  expect(
+    /registration\.pending\s*\?\s*'已登记联系人手机，等机构本人在机构后台登录页点「忘记密码」完成自证。'/.test(manager),
+    '已登记待自证：提示等机构本人在登录页忘记密码完成自证',
+  )
+  expect(
+    /registration\.visible\s*\?\s*'该账号还没有可用的验证手机。请先线下核对机构盖章确认函，再用「登记手机号」登记联系人手机；[^']*管理员不能代收验证码。'/.test(manager),
+    '可登记：提示先核对确认函再登记，并写明管理员不能代收验证码',
+  )
+  expect(manager.includes('该账号安全验证未就绪，请由持有人用已验证的手机在机构后台登录页点「忘记密码」找回。'), '其它情况：请持有人用已验证手机找回')
+}
+
 console.log('\n=== Admin 登记机构联系人手机 UI verification ===')
 await verifyAdapter()
 verifyEligibility()
 verifyStatic()
+verifyUnreadyHint()
 
 if (failures.length > 0) {
   console.error(`\n  ${failures.length} FAIL`)
