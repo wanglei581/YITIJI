@@ -104,6 +104,11 @@
 - **做了什么：** 账号码表补 `REBIND_UNAVAILABLE`、`ACCOUNT_UNAVAILABLE` 与三个短信额度码（`SMS_DAILY_TOTAL_LIMIT`、`SMS_TERMINAL_DAILY_LIMIT`、`SMS_BUDGET_UNAVAILABLE`，都给出「或用手机扫码登录」的下一步）；共享码表补 `AI_ENDPOINT_NOT_ALLOWED`。换绑遇到 `REBIND_UNAVAILABLE`（503，手机号没改、登录仍有效）改为「从旧号重来」，不再让人重新登录核对。
 - **门禁：** 新增 `verify:backend-error-copy-coverage`（进 CI）：用语法树从服务端换绑与短信额度源码抽出全部错误码、真编译一体机模块逐个调用，必须拿到登记的话而不是兜底；AI 类码清单在服务端源码出现即要求有映射，所以未合入 PR（#1077、#1081、#1088）的码合入后自动纳入。临时取入这两个 PR 的服务端文件做阳性对照，新码都被检查到并通过。`fusion-w5` 换绑失败表加 `REBIND_UNAVAILABLE` 一行，真页面 7 条换绑用例全过。
 - **变异：** 删 `SMS_TERMINAL_DAILY_LIMIT` 文案、删 `ACCOUNT_UNAVAILABLE` 文案 → 覆盖门禁红；换绑 503 改回重新登录 → 真页面用例红（找不到「重新验证旧手机号」）。一体机 tsc、lint、runtime-error-boundary、pickup-claim-error-coverage、w4-login-profile-l1、no-raw-error-render、5 个相关 node 测试（56 条）全绿。
+## 2026-09-29：走查 W-02 新生产库建不出打印价目（分支 `claude/backend-hardening-20260929-price-config-defaults`）
+
+- **问题（全功能模拟走查发现）：** 全新库没有 `print_bw_page` / `print_color_page` 两行时，后台计费页只渲染已有行、改价接口对不存在的行回 `PRICE_CONFIG_NOT_FOUND`，运营在后台无从设价，只能照运维文档手写 SQL；否则报价一直失败。
+- **修法：** 计费页列表时补齐缺失的打印两档，**停用、单价 0、描述写明「未定价」**，已有行一律不动。没有照「简历导出」那样补成「启用 0 元」：打印一直是收费能力，缺价必须失败关闭，不能因为补了目录行就让新库默认免费出纸。试点免费由管理员在计费页设 0 元（须勾「确认 0 元」）并启用——一次有审计的显式动作。运维文档同步。
+- **验证：** `verify:admin-billing` 加一段（36 条全过）：缺行 → 报价失败关闭 → 列表补出停用未定价两行 → 仍失败关闭 → 不勾确认设 0 元被拒 → 确认后 0 元报价 → 再开计费页不覆盖已设价。三处变异（不补行、补行直接启用、补行覆盖已有价）各自变红；pricing、payment-flow、order、resume-export-formats、print-jobs 全绿。
 
 > **2026-09-29 C4 一体机一半（候选写入方）**：一体机正式生产构建（`PROD` 且非 E2E）取不到已发布的用户协议或隐私政策时不再回落草拟版本，登录页进入「暂时无法登录」并说明不登录也能打印和扫描；只是网络取不到时报网络错误，不冒充「未发布」；开发、单测、E2E 构建保留回落。服务端应急开关 `LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对一体机正式构建不再生效（有意，发布前 preflight 硬检查法务文档）。门禁 `verify-legal-doc-version` 的 C4 段改为断言上述分支（只对代码断言、去注释）；新单测 `verify:c4-legal-consent-versions` 进 CI。已知未做：获取验证码前不预检（短信仍会先发出）、扫码登录前端不预拦（服务端会拒）。
 
