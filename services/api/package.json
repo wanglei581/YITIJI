@@ -43,6 +43,7 @@
     "verify:field-mapping:http": "node -r @swc-node/register scripts/q1-http-e2e-field-mapping.ts",
     "verify:sms-provider": "node -r @swc-node/register scripts/verify-sms-provider.ts",
     "verify:sms-send": "node -r @swc-node/register scripts/verify-sms-send.ts",
+    "verify:pii-manual-confirm": "node -r @swc-node/register scripts/verify-pii-manual-confirm.ts",
     "verify:member-sms-provider-errors": "node -r @swc-node/register scripts/verify-member-sms-provider-errors.ts",
     "verify:member-auth": "node -r @swc-node/register scripts/verify-member-auth.ts",
     "verify:member-account-status": "node -r @swc-node/register scripts/verify-member-account-status.ts",

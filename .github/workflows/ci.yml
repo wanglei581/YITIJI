@@ -782,6 +782,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:package-order-fulfillment
           pnpm --filter @ai-job-print/api verify:sms-provider
           pnpm --filter @ai-job-print/api verify:sms-send
+          # A-04 隐私检查不完整时的本人确认留痕与建单开关（默认关）；写隔离库。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pii-manual-confirm
           pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-real-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-governance-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-launch-events
