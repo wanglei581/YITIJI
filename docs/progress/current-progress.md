@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-29：会员验证码按已验签终端限流、受信出口默认关（分支 `claude/backend-hardening-20260929-sms-egress-limits`）
+
+- **问题：** 大厅多台一体机、招聘会现场同一 WiFi 的用户共用一个出口 IP，「同一 IP 每小时 20 条」会被一起用完。
+- **做法（Grok 实现、协调方审，总指挥裁定 A+B）：** A：带已验签终端身份的请求改为「每台终端每小时 30 条」（错误码 `SMS_TERMINAL_HOURLY_LIMIT`），不再计入 IP 桶，发码路由的每分钟 5 次也按终端计；单机每天 100 条、同一手机号冷却与每天 10 条、设备限额、全站短信额度全不变。B：受信出口地址段 `SMS_TRUSTED_EGRESS_CIDRS`，默认不配、只能用环境变量；IPv4 比 /24 宽、IPv6 比 /56 宽、上限超天花板（每小时 200、每分钟 30）一律拒绝启动并说人话；只放宽 IP 这一层；某段一小时用量到上限八成时发一次运维告警。运维手册 §2.2.1、.env.example 已写明。
+- **验证：** 新门禁 `verify:sms-egress-limits` 55 条（挂 CI）；协调方抽 2 处变异（放宽到 /8、终端请求也计入 IP 桶）全红；sms-budget、member-auth、member-auth-races、throttle-dimension、ai-throttle-dimension、boot-resilience、ai-platform-degradation 等 10 条与小程序契约全绿。解冲突时保留候选 main.ts 里「AI 配置缺失只登记降级」的写法，受信出口启动校验紧跟其后。
+
 ## 2026-09-29：服务端 PDF.js 换成 6.3.289（CVE-2026-16633 高危，分支 `claude/backend-hardening-20260929-pdfjs`）
 
 - **问题：** 服务端经 unpdf 1.6.2 解析 PDF，它打包自带 PDF.js 5.6.205，落在 GHSA-hq66-cqwq-w95j（≥5.6.83、<6.2.108）范围内，且依赖审计看不见（打包在 unpdf 包里）。核实时更正一条转述：OCR 渲染与页数统计此前用的也是 unpdf 自带的 5.6.205，不是 pdfjs-dist 6.3.289（pdfjs-dist 当时只供 CMap 与字体数据）。

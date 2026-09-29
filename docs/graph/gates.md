@@ -68,7 +68,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1664 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1668 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1956,7 +1956,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/content-pipeline-fixtures.ts` | `verify-content-pipeline-e2e.ts` |
 | `services/api/scripts/support/content-pipeline-harness.ts` | `verify-content-pipeline-e2e.ts` |
 | `services/api/scripts/support/inmemory-redis-server.ts` | `verify-upload-scene.ts` |
-| `services/api/scripts/support/internal-auth-verify-harness.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-member-auth-races.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-pii-manual-confirm.ts`<br/>`verify-sms-budget.ts` |
+| `services/api/scripts/support/internal-auth-verify-harness.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-member-auth-races.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-pii-manual-confirm.ts`<br/>`verify-sms-budget.ts`<br/>`verify-sms-egress-limits.ts` |
 | `services/api/scripts/support/isolated-verification-database.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-order-filters.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts`<br/>`verify-demo-company-unpublish.ts`<br/>`verify-derivation-kind.ts`<br/>`verify-file-cleanup-cas-ledger.ts`<br/>`verify-internal-accounts-postgres.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-isolated-verification-database.ts`<br/>`verify-job-review.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-official-channels.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pii-manual-confirm.ts`<br/>`verify-print-jobs.ts`<br/>`verify-recruitment-emergency-scope.ts`<br/>`verify-recruitment-hosting-default-off.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/scripts/support/llm-pii-callsite-checks.ts` | `verify-llm-input-pii-mask.ts` |
 | `services/api/scripts/support/minimal-pdf.ts` | `verify-derivation-kind.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
@@ -2010,7 +2010,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 579 个文件</summary>
+<summary><code>services/api/src/</code> — 583 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2174,7 +2174,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/constants/internal-session.constants.ts` | `verify-file-internal-auth.ts` |
 | `services/api/src/common/content-trust.ts` | `verify-content-trust-publish-gate.ts` |
 | `services/api/src/common/crypto/email-identity.ts` | `verify-partner-email-login-alias.ts` |
-| `services/api/src/common/crypto/phone-identity.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-users.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth-races.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-sms-budget.ts` |
+| `services/api/src/common/crypto/phone-identity.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-users.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-anonymous-feedback.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth-races.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-step-up.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-sms-budget.ts`<br/>`verify-sms-egress-limits.ts` |
 | `services/api/src/common/crypto/secret-cipher.ts` | `verify-content-pipeline-e2e.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-recruitment-emergency-scope.ts` |
 | `services/api/src/common/crypto/webhook-secret-strength.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-partner-source-capabilities.ts` |
 | `services/api/src/common/decorators/current-user.decorator.ts` | `verify-admin-fairs.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-users.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-job-review.ts`<br/>`verify-job-sync.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-data-export-files.ts`<br/>`verify-official-channels.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-excel-import.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-publish-expiry-completeness.ts`<br/>`verify-recruitment-emergency-scope.ts` |
@@ -2350,6 +2350,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/legal/legal-constants.ts` | `verify-legal-doc-version.ts` |
 | `services/api/src/legal/legal.controller.ts` | `verify-ai-access.ts`<br/>`verify-legal-doc-version.ts` |
 | `services/api/src/legal/legal.service.ts` | `verify-legal-doc-version.ts` |
+| `services/api/src/main.ts` | `verify-sms-egress-limits.ts` |
 | `services/api/src/materials/image-print-quality.util.ts` | `verify-file-display-truth.ts` |
 | `services/api/src/materials/materials-manual-confirmation.service.ts` | `verify-derivation-kind.ts`<br/>`verify-pii-manual-confirm.ts` |
 | `services/api/src/materials/materials.access.ts` | `verify-pii-manual-confirm.ts` |
@@ -2369,14 +2370,17 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/member-auth/dto/member-step-up.dto.ts` | `verify-member-step-up.ts` |
 | `services/api/src/member-auth/dto/phone-rebind.dto.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/src/member-auth/legal-docs-published-guard.ts` | `verify-legal-doc-version.ts` |
-| `services/api/src/member-auth/member-auth.controller.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-access.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-step-up.ts`<br/>`verify-sms-budget.ts`<br/>`verify-wave2-account-rebind.ts` |
-| `services/api/src/member-auth/member-auth.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-sms-budget.ts`<br/>`verify-wave2-account-rebind.ts` |
-| `services/api/src/member-auth/member-auth.service.ts` | `verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-member-sms-provider-errors.ts`<br/>`verify-sms-budget.ts` |
+| `services/api/src/member-auth/member-auth.controller.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-access.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-step-up.ts`<br/>`verify-sms-budget.ts`<br/>`verify-sms-egress-limits.ts`<br/>`verify-wave2-account-rebind.ts` |
+| `services/api/src/member-auth/member-auth.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-sms-budget.ts`<br/>`verify-sms-egress-limits.ts`<br/>`verify-wave2-account-rebind.ts` |
+| `services/api/src/member-auth/member-auth.service.ts` | `verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-member-sms-provider-errors.ts`<br/>`verify-sms-budget.ts`<br/>`verify-sms-egress-limits.ts` |
 | `services/api/src/member-auth/member-phone-rebind.service.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-member-auth-races.ts`<br/>`verify-wave2-account-rebind.ts` |
 | `services/api/src/member-auth/member-qr-login.service.ts` | `verify-legal-doc-version.ts`<br/>`verify-member-auth-races.ts`<br/>`verify-member-auth.ts` |
 | `services/api/src/member-auth/member-step-up.service.ts` | `verify-member-step-up.ts` |
 | `services/api/src/member-auth/member-step-up.types.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-member-step-up.ts`<br/>`verify-wave2-account-rebind.ts` |
-| `services/api/src/member-auth/sms/sms-budget.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-sms-budget.ts` |
+| `services/api/src/member-auth/sms/sms-budget.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-sms-budget.ts`<br/>`verify-sms-egress-limits.ts` |
+| `services/api/src/member-auth/sms/sms-code-throttle.ts` | `verify-sms-egress-limits.ts` |
+| `services/api/src/member-auth/sms/sms-egress-config.ts` | `verify-sms-egress-limits.ts` |
+| `services/api/src/member-auth/sms/sms-egress-limits.ts` | `verify-sms-egress-limits.ts` |
 | `services/api/src/member-auth/sms/sms-sender.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-change-password.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-member-sms-provider-errors.ts`<br/>`verify-member-step-up.helpers.ts`<br/>`verify-member-step-up.ts`<br/>`verify-sms-budget.ts`<br/>`verify-sms-provider.ts`<br/>`verify-sms-send.ts` |
 | `services/api/src/member-benefits/admin-member-benefits.controller.ts` | `verify-member-benefits-admin.ts` |
 | `services/api/src/member-benefits/admin-member-benefits.service.ts` | `verify-member-benefits-admin.ts` |

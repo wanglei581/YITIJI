@@ -22040,7 +22040,8 @@
       "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
@@ -23255,7 +23256,8 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/src/common/crypto/secret-cipher.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts",
@@ -24325,6 +24327,9 @@
     "services/api/src/legal/legal.service.ts": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "services/api/src/main.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
     "services/api/src/materials/image-print-quality.util.ts": [
       "services/api/scripts/verify-file-display-truth.ts"
     ],
@@ -24418,11 +24423,13 @@
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-auth.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-auth.service.ts": [
@@ -24431,7 +24438,8 @@
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-member-sms-provider-errors.ts",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/src/member-auth/member-phone-rebind.service.ts": [
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
@@ -24454,7 +24462,17 @@
     ],
     "services/api/src/member-auth/sms/sms-budget.ts": [
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
-      "services/api/scripts/verify-sms-budget.ts"
+      "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
+    "services/api/src/member-auth/sms/sms-code-throttle.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
+    "services/api/src/member-auth/sms/sms-egress-config.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
+    ],
+    "services/api/src/member-auth/sms/sms-egress-limits.ts": [
+      "services/api/scripts/verify-sms-egress-limits.ts"
     ],
     "services/api/src/member-auth/sms/sms-sender.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
@@ -39155,6 +39173,33 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:sms-budget"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/main.ts",
+          "services/api/src/member-auth/member-auth.controller.ts",
+          "services/api/src/member-auth/member-auth.module.ts",
+          "services/api/src/member-auth/member-auth.service.ts",
+          "services/api/src/member-auth/sms/sms-budget.ts",
+          "services/api/src/member-auth/sms/sms-code-throttle.ts",
+          "services/api/src/member-auth/sms/sms-egress-config.ts",
+          "services/api/src/member-auth/sms/sms-egress-limits.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-sms-egress-limits.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:sms-egress-limits"
       ],
       "wired": true
     },
