@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!--
+- 9/29 定稿（最后一批）：第 2 步「手机扫码上传图片」卡改成灰色不可点，卡上写原因「签名图片暂不支持手机上传，请在本机上传」，本机上传照常可用。原因：服务端手机上传的用途里没有签名图片（稿 51 手机端同样写「签名暂不支持手机上传」），这张卡原先指向的是一条不存在的通道。下文「手机入口冻结面」是更早一轮对手机通道的约束，最终版以真实能力为准，那几段注释不再适用于这张签名卡；第 1 步「手机扫码上传 PDF」卡不动。状态键、data-testid 不改。
 - 9/29 定稿：签名只保留本人手写签名（产品负责人定，专家评审 #20 / P0-8）。屏上功能名「签名盖章」「签名 / 印章」一律改「签名」（标题、顶栏、英雄区眉题、各状态、按钮、步骤条）；「选一张印章图片」这类印章模式与说明删去或改成只讲签名，示例图片名、签好的 PDF 示例名去掉「印章 / 签章」，代表签名图的图标由印章换成笔；保留「只接受本人手写签名，不接受单位公章或圆形章」「不要拍公章或圆形章」「伪造印章或冒用他人签名违法」这类规则说明。文件名、路径、状态键、data-testid、id 都不改。
 - 9/28 用词：写稿人用语（原型、内部服务名、页面地址、请求标识）换成用户的话。
 - 9/28 用词：防重复提交的说法（标识、指纹、请求）换成用户的话，屏上不再显示编号。
@@ -971,9 +972,9 @@ function phoneDocPick(){
   href:'20-sign-stamp.html?state=pick-stamp',tid:'sign-stamp-pick-doc-phone'});
 }
 function phoneStampPick(){
- return pick({n:'手机扫码上传图片',ic:'phone',bg:'var(--slate-soft)',fg:'#35608f',
-  d:'用手机拍本人在白纸上的手写签名。确认后进入下一步。',f:'不要拍公章或圆形章',
-  href:'20-sign-stamp.html?state=placing',tid:'sign-stamp-pick-stamp-phone'});
+ return pick({n:'手机扫码上传图片',ic:'phone',bg:'var(--paper)',fg:'#526b62',
+  d:'签名图片暂不支持手机上传，请在本机上传。',f:'暂时用不了',
+  tid:'sign-stamp-pick-stamp-phone',disabled:true});
 }
 function checkCard(title,items,id){
  var li='';for(var i=0;i<items.length;i++)li+='<li><span class="sq"></span><span>'+items[i]+'</span></li>';
@@ -1079,7 +1080,7 @@ function askFor(phase){
  }
  if(M.stampErr)return ['这张图<em>没收下</em>。','原因在右边，<b>换一张就行</b>。'];
  if(M.stampStage==='uploading')return ['正在<em>传这张签名图</em>。','按高敏材料短期保留，<b>不进「我的文档」</b>。'];
- if(M.stampStage==='phone')return ['用<em>手机</em>传签名图。','手机上确认之后才进下一步，<b>这一页不替你确认</b>。'];
+ if(M.stampStage==='phone')return ['签名图<em>暂不支持</em>手机上传。','请在这台机器上选一张本人手写签名的图片，<b>这一页不替你确认</b>。'];
  if(M.derived)return ['接着叠<em>第二处</em>。','刚才那份签好的 PDF 成了新原文档，<b>签名图要重传</b>。'];
  if(M.docJustRead)return ['这份 PDF <em>读好了</em>。','接下来传<b>这次要用的</b>签名图片。'];
  return ['传一张<em>这次要用的</em>签名图。','只能这次新传，<b>不进「我的文档」，也不能复用历史</b>。'];
@@ -1244,8 +1245,8 @@ function statusFor(){
  if(M.stampStage==='uploading')return stateBlock('info','img','正在传这张签名图',
   '这张图按<b>高敏材料</b>处理：短期保留（约 1 小时），<b>不进「我的文档」</b>，这次办理结束即不可再用。','',
   [['单次上传'],['高敏 · 约 1 小时','warn'],['不进我的文档','warn']]);
- if(M.stampStage==='phone')return stateBlock('info','phone','用手机传签名图',
-  '用手机拍一张本人手写签名。<b>确认之后才会进入下一步</b>。这张图同样只在这次办理短期保留。','',
+ if(M.stampStage==='phone')return stateBlock('info','phone','签名图片暂不支持手机上传',
+  '手机上传的通道<b>还不收签名图片</b>。请回到上一步，在这台机器上选一张本人手写签名的图片。','',
   [['手机扫屏幕码'],['需你在手机上确认','warn'],['高敏 · 约 1 小时','warn']]);
  if(!M.doc)return stateBlock('info','pdf','先选一份要签名的 PDF',
   '把本人手写签名的<b>图片</b>叠到 PDF 的指定位置，生成<b>一份新的 PDF</b>。原文件不会被改写。','',

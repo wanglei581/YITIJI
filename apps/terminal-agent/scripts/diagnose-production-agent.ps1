@@ -1,4 +1,4 @@
-# AI Job Print Terminal — production Agent diagnostics
+﻿# AI Job Print Terminal — production Agent diagnostics
 #
 # This script is intentionally read-only. It reports local service/configuration
 # status without contacting the API, creating tasks, printing, or exposing secrets.
@@ -405,21 +405,48 @@ $tasklistExitCode = $null
 $tasklistResult = "not_run"
 $tasklistPidPresent = "not_run"
 $relatedAgentProcessCount = $null
-$lockClearanceEligibility = "not_eligible_lock_missing"
-$lockOperatorHint = "不要先删除. First verify the Agent service and lock PID. Non-regular paths (directory/junction/symlink) must stay untouched and be escalated."
+# 单实例由命名管道 \\.\pipe\AIJobPrintAgent-<instance-id> 保证，进程退出（含崩溃、断电）即由系统释放；
+# agent.pid 只剩诊断用途，不存在「人工清锁」这一步（2026-09-28 真机-8）。
+$lockOperatorHint = "agent.pid 只是诊断记录，任何情况下都不需要手工删除：单实例由命名管道保证，Agent 进程退出即由系统释放。服务起不来看 lastStartupDiagnosticCode：DUPLICATE_INSTANCE = 已有 Agent 在运行（singletonPipePresent=true）；INSTANCE_LOCK_UNAVAILABLE 且 instanceIdStatus=invalid = instance-id 被改动，先确认服务已停、无 Agent 进程，再上报处理。Non-regular paths (directory/junction/symlink) must stay untouched and be escalated."
+
+# 与 apps/terminal-agent/src/agent/instance-lock.ts 的 MACHINE_ID_RE 保持逐字一致（门禁核对）。
+$instanceIdPattern = '^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$'
+$instanceIdPath = Join-Path $ProgramDataDir "instance-id"
+$instanceIdStatus = "missing"
+$singletonPipePresent = "unknown"
+$instanceIdPresence = Get-PathPresenceStatus $instanceIdPath
+if ($instanceIdPresence -eq "unavailable") {
+  $instanceIdStatus = "unavailable"
+} elseif ($instanceIdPresence -ne "missing") {
+  try {
+    $instanceIdValue = ([System.IO.File]::ReadAllText($instanceIdPath)).Trim()
+    if ($instanceIdValue -cmatch $instanceIdPattern) {
+      $instanceIdStatus = "valid"
+      # 只列出管道名，不连接：连接会占用 Agent 的管道实例，诊断脚本不得触碰运行中的单实例。
+      try {
+        $pipeName = "AIJobPrintAgent-$instanceIdValue"
+        $pipes = @([System.IO.Directory]::GetFiles('\\.\pipe\') | ForEach-Object { Split-Path -Leaf $_ })
+        $singletonPipePresent = $(if ($pipes -contains $pipeName) { "true" } else { "false" })
+      } catch {
+        $singletonPipePresent = "unavailable"
+      }
+    } else {
+      $instanceIdStatus = "invalid"
+    }
+  } catch {
+    $instanceIdStatus = "unavailable"
+  }
+}
 
 if ($lockPathKind -eq "unavailable") {
   $lockPidParseStatus = "unavailable"
   $lockAclStatus = "unavailable"
-  $lockClearanceEligibility = "not_eligible_not_regular_file"
 } elseif ($lockPathKind -eq "missing") {
   $lockPidParseStatus = "missing"
   $lockAclStatus = "missing"
-  $lockClearanceEligibility = "not_eligible_lock_missing"
 } elseif ($lockPathKind -ne "regular_file") {
   $lockPidParseStatus = "not_regular"
   $lockAclStatus = Get-ProgramDataAclStatus $lockPath
-  $lockClearanceEligibility = "not_eligible_not_regular_file"
 } else {
   $lockAclStatus = Get-ProgramDataAclStatus $lockPath
   try {
@@ -431,32 +458,18 @@ if ($lockPathKind -eq "unavailable") {
   $parsedLock = Get-StrictLockPidParse $lockPath
   $lockPidParseStatus = [string]$parsedLock.Status
   $lockPid = $parsedLock.ParsedPid
-  if ($lockPidParseStatus -ne "strict_pid" -or $null -eq $lockPid) {
-    $lockClearanceEligibility = "not_eligible_unproven_pid"
-  } else {
+  # 只作诊断：记录的 PID 现在是否还在运行、是否有 Agent 相关进程。不据此给出任何清理建议。
+  if ($lockPidParseStatus -eq "strict_pid" -and $null -ne $lockPid) {
     $tasklist = Get-TasklistPidPresence ([int64]$lockPid)
     $tasklistExitCode = $tasklist.ExitCode
     $tasklistResult = [string]$tasklist.Result
     $tasklistPidPresent = [string]$tasklist.PidPresent
-    try {
-      $related = @(Get-Process -ErrorAction Stop | Where-Object { $_.ProcessName -like "*aijobprintagent*" })
-      $relatedAgentProcessCount = $related.Count
-    } catch {
-      $relatedAgentProcessCount = $null
-    }
-    if ($serviceExists -and $serviceState -ne "Stopped") {
-      $lockClearanceEligibility = "not_eligible_service_not_stopped"
-    } elseif ($tasklistPidPresent -eq "unavailable") {
-      $lockClearanceEligibility = "not_eligible_tasklist_unavailable"
-    } elseif ($tasklistPidPresent -eq "true") {
-      $lockClearanceEligibility = "not_eligible_live_pid"
-    } elseif ($null -eq $relatedAgentProcessCount) {
-      $lockClearanceEligibility = "not_eligible_related_process"
-    } elseif ($relatedAgentProcessCount -gt 0) {
-      $lockClearanceEligibility = "not_eligible_related_process"
-    } else {
-      $lockClearanceEligibility = "eligible_for_operator_review"
-    }
+  }
+  try {
+    $related = @(Get-Process -ErrorAction Stop | Where-Object { $_.ProcessName -like "*aijobprintagent*" })
+    $relatedAgentProcessCount = $related.Count
+  } catch {
+    $relatedAgentProcessCount = $null
   }
 }
 
@@ -502,6 +515,7 @@ if ($lockPathKind -eq "unavailable") {
   tasklistResult = $tasklistResult
   tasklistPidPresent = $tasklistPidPresent
   relatedAgentProcessCount = $relatedAgentProcessCount
-  lockClearanceEligibility = $lockClearanceEligibility
+  instanceIdStatus = $instanceIdStatus
+  singletonPipePresent = $singletonPipePresent
   lockOperatorHint = $lockOperatorHint
 }

@@ -17,7 +17,13 @@ export type SmsProvider = 'log' | 'tencent'
  *   服务端 env;③ 真号 E2E 验收。三者齐备后置 SMS_PROVIDER=tencent 即可真发。
  */
 export interface SmsSender {
-  sendCode(phone: string, code: string): Promise<void>
+  sendCode(phone: string, code: string, meta?: SmsSendMeta): Promise<void>
+}
+
+/** 发送上下文。只放额度计数要用的非个人信息（sms-budget.ts）。 */
+export interface SmsSendMeta {
+  /** 已验签的一体机终端编号；未验签或不是一体机发起时为空。 */
+  terminalId?: string | null
 }
 
 export class SmsSendError extends Error {

@@ -20,12 +20,55 @@
         </view>
         <text class="ficon i-right pv-go"></text>
       </view>
+      <view class="pv-item tap" hover-class="tap-press" bindtap="openPrivacyGuide" role="button" aria-label="小程序用户隐私保护指引">
+        <view class="pv-main">
+          <view class="pv-t">小程序用户隐私保护指引</view>
+          <view class="pv-s">微信里登记的那一份，与首次使用时弹出的一致</view>
+        </view>
+        <text class="ficon i-right pv-go"></text>
+      </view>
       <view class="pv-item tap" hover-class="tap-press" bindtap="toDocuments">
         <view class="pv-main">
           <view class="pv-t">我的文档与到期时间</view>
           <view class="pv-s">查看服务端返回的真实文件期限并可主动删除</view>
         </view>
         <text class="ficon i-right pv-go"></text>
+      </view>
+    </view>
+
+    <!-- C6：两项声明。登录着显示账号里的记录，没登录显示本机的。 -->
+    <view class="grp-label">年龄声明与录音同意</view>
+    <view class="pv-group">
+      <view wx:if="{{consents.error}}" class="pv-item">
+        <view class="pv-main"><view class="pv-s">{{consents.error}}</view></view>
+      </view>
+      <block wx:elif="{{consents.loaded}}">
+        <view class="pv-item">
+          <view class="pv-main">
+            <view class="pv-t">年满 14 周岁声明</view>
+            <view class="pv-s">{{consents.age.text}}</view>
+          </view>
+        </view>
+        <view class="pv-item tap" hover-class="tap-press" bindtap="tapVoiceConsent" role="button" aria-label="录音单独同意，{{consents.voice.text}}">
+          <view class="pv-main">
+            <view class="pv-t">录音单独同意</view>
+            <view class="pv-s">{{consents.voice.text}}</view>
+          </view>
+          <text class="pv-act">{{consents.voice.on ? '撤回' : '查看'}}</text>
+        </view>
+      </block>
+      <view wx:else class="pv-item"><view class="pv-main"><view class="pv-s">正在读取…</view></view></view>
+    </view>
+
+    <!-- 个人信息请求：不在意见反馈里开类别（C3），自助入口、联系方式、答复时限写在这里。 -->
+    <view class="grp-label">个人信息请求</view>
+    <view class="pr-card">
+      <view class="pr-line"><text class="pr-k">自己办</text><text class="pr-v">登录后在本页导出数据、撤回授权；在「我的文档」「我的简历」「AI 服务记录」里删除。</text></view>
+      <view class="pr-line"><text class="pr-k">办不了的</text><text class="pr-v">例如更正、注销账号：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。</text></view>
+      <view class="pr-line"><text class="pr-k">多久答复</text><text class="pr-v">核实是你本人后，{{privacyRequestDays}} 个工作日内处理；办不了的会告诉你理由。</text></view>
+      <view class="pr-acts">
+        <view class="pr-btn tap" hover-class="tap-press" bindtap="toFeedback" role="button" aria-label="去意见反馈">去意见反馈</view>
+        <view class="pr-btn tap" hover-class="tap-press" bindtap="toOperatorInfo" role="button" aria-label="查看经营者信息里的联系方式">经营者信息</view>
       </view>
     </view>
 
@@ -138,7 +181,7 @@
       导出包为本人相关元数据清单：账号摘要、文件清单、AI 服务记录摘要、打印订单、收藏、权益、浏览与外部跳转记录、通知、反馈、授权与历史请求；不含文件原文与简历正文全文，单个分区超过 500 条会导出失败。导出包由服务端生成后约 23 小时到期。
     </view>
     <view class="compliance-note">
-      简历、文件和 AI 结果只服务本人，不提供给任何企业或合作机构。
+      你的简历不会进入任何简历库，也不会提供给任何单位。个人信息怎么处理、交给哪些受托方，以<text class="pv-link" bindtap="toPolicy">《隐私政策》</text>为准。
     </view>
   </view>
 

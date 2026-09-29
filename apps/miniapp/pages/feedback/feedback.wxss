@@ -39,3 +39,9 @@
 .fb-reply-t { font-weight: 400; color: var(--muted); }
 .fb-reply-c { margin-top: 8rpx; line-height: 1.6; white-space: pre-wrap; }
 .close-btn { margin-top: 16rpx; min-height: 96rpx; min-width: 96rpx; }
+/* AI 内容投诉的说明：与表单同底色的浅提示条，不抢主按钮 */
+.fb-note { margin-top: 16rpx; padding: 16rpx 18rpx; border-radius: var(--r-sm); background: var(--teal-wash);
+  font-size: var(--fs-sm); color: var(--teal-deep); line-height: 1.6; }
+/* 次要去处（不登录时的联系方式 / 个人信息请求）：文字链，可点高度守 48px */
+.fb-alt { min-height: 96rpx; margin-top: 12rpx; padding: 0 12rpx; display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-sm); color: var(--teal-deep); text-align: center; }

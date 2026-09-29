@@ -13,7 +13,7 @@
 
 | 访问面 | 谁在用 | 临时方案 | 是否公网可信 |
 |---|---|---|---|
-| 一体机前台（`https://120.48.13.190`，Kiosk 浏览器） | 你自己的 Windows 一体机 | 私有 CA（mkcert） | 仅装了根证书的一体机上可信 |
+| 一体机前台（`https://<生产服务器 IP>`，Kiosk 浏览器） | 你自己的 Windows 一体机 | 私有 CA（mkcert） | 仅装了根证书的一体机上可信 |
 | 管理员/机构后台（`:8081` / `:8082`） | 任意浏览器 / 你的手机笔记本 | Cloudflare Tunnel（首选）或 sslip.io+LE | 公网任意浏览器可信 |
 
 ---
@@ -31,11 +31,11 @@ mkcert -install                       # 首次生成本地 CA
 mkcert -CAROOT                        # 记下 CA 目录，里面有 rootCA.pem（公开）与 rootCA-key.pem（私钥，勿外传）
 
 # 为公网 IP 签发叶证书（含 127.0.0.1/localhost 便于本地）
-mkcert 120.48.13.190 127.0.0.1 localhost
-# 产物：120.48.13.190+2.pem（证书）、120.48.13.190+2-key.pem（私钥）
+mkcert <生产服务器 IP> 127.0.0.1 localhost
+# 产物：<生产服务器 IP>+2.pem（证书）、<生产服务器 IP>+2-key.pem（私钥）
 sudo mkdir -p /etc/nginx/certs
-sudo cp 120.48.13.190+2.pem     /etc/nginx/certs/kiosk.pem
-sudo cp 120.48.13.190+2-key.pem /etc/nginx/certs/kiosk-key.pem
+sudo cp <生产服务器 IP>+2.pem     /etc/nginx/certs/kiosk.pem
+sudo cp <生产服务器 IP>+2-key.pem /etc/nginx/certs/kiosk-key.pem
 sudo chmod 600 /etc/nginx/certs/kiosk-key.pem
 ```
 
@@ -43,7 +43,7 @@ sudo chmod 600 /etc/nginx/certs/kiosk-key.pem
 ```nginx
 server {
     listen 443 ssl;
-    server_name 120.48.13.190;
+    server_name <生产服务器 IP>;
 
     ssl_certificate     /etc/nginx/certs/kiosk.pem;
     ssl_certificate_key /etc/nginx/certs/kiosk-key.pem;
@@ -58,7 +58,7 @@ server {
     }
 }
 # HTTP → HTTPS 跳转（可选，避免明文入口）
-server { listen 80; server_name 120.48.13.190; return 301 https://$host$request_uri; }
+server { listen 80; server_name <生产服务器 IP>; return 301 https://$host$request_uri; }
 ```
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
@@ -74,7 +74,7 @@ certutil -store Root | findstr /i mkcert
 > Kiosk 浏览器用 Edge/Chrome，读的是 Windows 系统信任库，导入后即生效（重启浏览器）。
 
 ### 4. 验证（阶段一 Done 标准）
-- 一体机浏览器访问 `https://120.48.13.190`：地址栏无证书告警、锁标正常。
+- 一体机浏览器访问 `https://<生产服务器 IP>`：地址栏无证书告警、锁标正常。
 - 未导入根证书的设备（如你手机）访问会告警 —— **这是预期**，公网可信见阶段二。
 
 ---
@@ -128,7 +128,7 @@ Kiosk 页面变 HTTPS 后调用本地 `http://127.0.0.1:<localApiPort>`（Termin
 > 周期最长（备案通常数周），**建议现在就并行启动**，别等临时方案跑起来才办。
 
 ```bash
-# 域名已备案并解析到 120.48.13.190 后：
+# 域名已备案并解析到 <生产服务器 IP> 后：
 certbot --nginx -d your-domain.com -d www.your-domain.com
 # certbot 自动改 nginx 并配置续期；随后：
 ```

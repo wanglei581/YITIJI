@@ -4,7 +4,28 @@
 
 const config = require('./config');
 const auth = require('./auth');
+const aiAccess = require('./ai-access');
 const { displayableServerMessage, SHARED_USER_MESSAGES } = require('./user-error');
+
+/**
+ * AI 请求的前后置（C6 声明 / C7 登录提示）。由 utils/api-legal-consent.js 在加载时注册：
+ * 它要写 /me/ai-consents，而那是 api 门面的事；本文件直接引用它会成环。
+ * 没注册时（单测只装本文件）带 ai 标记的请求照原样发出。
+ * 签名：(kind, send) => Promise，kind ∈ generate | voice | upload | export。
+ */
+let aiRunner = null;
+function configureAiRunner(runner) {
+  aiRunner = typeof runner === 'function' ? runner : null;
+}
+
+/**
+ * 不带会员令牌的请求附上本机已记下的声明头。带令牌的不附：服务端对会员只认
+ * /me/ai-consents，附了头会让在别处撤回的录音同意被本机一条旧记录绕过去。
+ */
+function withDeclarationHeaders(header) {
+  if (header.Authorization) return header;
+  return Object.assign({}, aiAccess.declarationHeaders(), header);
+}
 
 /**
  * 底层请求。仅在 config.USE_MOCK=false 时被 api 层调用。
@@ -80,6 +101,10 @@ function silentResignin(generation) {
  * 只重试一次;补签失败则清理本地会话并抛出原始 401,让页面走登录引导。
  */
 function request(path, options = {}) {
+  // 带 ai 标记的请求先过声明 / 登录前置，前置里再回到这里发出（_aiRan 防止再绕一圈）。
+  if (options.ai && aiRunner && !options._aiRan) {
+    return aiRunner(options.ai, () => request(path, Object.assign({}, options, { _aiRan: true })));
+  }
   // 出发时是谁,全程以此为准(见 utils/auth.js 的 sessionGeneration)。
   const generation = auth.sessionGeneration();
   return rawRequest(path, options).catch((err) => {
@@ -130,7 +155,7 @@ function rawRequest(path, options = {}) {
       url,
       method,
       data,
-      header: finalHeader,
+      header: withDeclarationHeaders(finalHeader),
       timeout: timeout || config.timeout,
       success(res) {
         const { statusCode } = res;
@@ -214,6 +239,9 @@ function unwrapEnvelope(body) {
  * JWT 30 分钟过期后若不补签,用户会直接看到「登录已失效」且丢失 error.code。
  */
 function uploadFile(path, filePath, options = {}) {
+  if (options.ai && aiRunner && !options._aiRan) {
+    return aiRunner(options.ai, () => uploadFile(path, filePath, Object.assign({}, options, { _aiRan: true })));
+  }
   // 与 request() 同一套代际校验:上传同样会在途中被登出/换号。
   const generation = auth.sessionGeneration();
   return rawUploadFile(path, filePath, options).catch((err) => {
@@ -254,7 +282,7 @@ function rawUploadFile(path, filePath, options = {}) {
       filePath,
       name,
       formData,
-      header: finalHeader,
+      header: withDeclarationHeaders(finalHeader),
       timeout: timeout || config.uploadTimeout || config.timeout,
       success(res) {
         const { statusCode } = res;
@@ -332,6 +360,9 @@ function extractError(body, statusCode) {
       const e = makeServerError(body.error.message, statusCode, body.error.code);
       const details = body.error.details;
       if (Array.isArray(details) && details.every((d) => typeof d === 'string')) e.details = details.slice();
+      // AI_DECLARATION_REQUIRED 用 missing 列出缺哪几项声明（ai-access.service.ts），同样只收整份字符串数组。
+      const missing = body.error.missing;
+      if (Array.isArray(missing) && missing.every((m) => typeof m === 'string')) e.missing = missing.slice();
       return e;
     }
     if (Array.isArray(body.message)) {
@@ -344,4 +375,4 @@ function extractError(body, statusCode) {
   return makeError('', statusCode);
 }
 
-module.exports = { request, uploadFile };
+module.exports = { request, uploadFile, configureAiRunner };

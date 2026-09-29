@@ -11,7 +11,7 @@
 
 ## 1. 设计原则
 
-- **统一私有桶**：所有业务文件落同一个私有桶 `yitiji-prod-private-1257025684`（region `ap-guangzhou`），
+- **统一私有桶**：所有业务文件落同一个私有桶 `<生产存储桶>`（region `ap-guangzhou`），
   **不按用户端 / 企业端 / 管理员端拆桶**，靠 `objectKey 前缀` + 数据库 `FileObject` 记录做分类与授权。
 - **可插拔后端**：`StorageService` 后面挂两个后端——本地 FS（`local`，dev 默认）与 COS（`cos`，生产），
   由 `FILE_STORAGE_DRIVER` 切换。切换 COS **不需要改任何业务代码**，现有上传 / 打印 / 文件管理流程透明受益。
@@ -32,7 +32,7 @@ FILE_STORAGE_DRIVER=cos
 # COS 凭证（仅服务端；来自腾讯云 CAM 访问密钥）
 TENCENT_COS_SECRET_ID=<server-only-secret>
 TENCENT_COS_SECRET_KEY=<server-only-secret>
-TENCENT_COS_BUCKET=yitiji-prod-private-1257025684
+TENCENT_COS_BUCKET=<生产存储桶>
 TENCENT_COS_REGION=ap-guangzhou
 # 签名 URL TTL（秒，≤1800）
 TENCENT_COS_SIGN_URL_EXPIRES_SECONDS=1800

@@ -133,6 +133,35 @@ if (deploySource.includes('--force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GA
   fail('预检命令必须引用 REQUIRED_PRODUCTION_GATES（与 3b 同一份清单）')
 }
 
+// 六 b、法务文档预检（2026-09-29 C4 口径）：正式版前端不再回落草稿协议，
+// LEGAL_DOCS_REQUIRE_PUBLISHED=false 对正式版无效，发布前必须确认三份法务文档已激活。
+// 失败同样要在 pg_dump 之前；跳过只认首装这一个值，并在日志里告警。
+const LEGAL_PREFLIGHT_SCRIPT = 'services/api/scripts/preflight-legal-docs.mjs'
+const legalPreflightPath = join(repoRoot, LEGAL_PREFLIGHT_SCRIPT)
+if (!existsSync(legalPreflightPath)) {
+  fail(`法务文档预检脚本 ${LEGAL_PREFLIGHT_SCRIPT} 不存在`)
+} else {
+  const legalSrc = readFileSync(legalPreflightPath, 'utf8')
+  for (const type of ['terms_of_service', 'privacy_policy', 'ai_disclaimer']) {
+    if (!legalSrc.includes(`'${type}'`)) fail(`法务文档预检没有核对 ${type}`)
+  }
+  if (/console\.(log|error)\([^)]*content/.test(legalSrc)) fail('法务文档预检不得打印文档正文')
+  else pass('法务文档预检脚本存在，核对三类文档且不打印正文')
+}
+const legalHeadingAt = deploySource.indexOf('=== 3d. 法务文档预检')
+const legalCmdAt = deploySource.indexOf('preflight-legal-docs.mjs --base-url')
+if (legalHeadingAt < 0 || legalCmdAt < 0) fail('部署脚本没有 3d 法务文档预检步骤或没有调用预检脚本')
+else if (pgDumpAt >= 0 && legalCmdAt < pgDumpAt) pass('3d 法务文档预检位于 pg_dump 之前（失败时线上未动）')
+else fail('3d 法务文档预检必须位于 pg_dump 之前')
+if (
+  deploySource.includes('if [ "${DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT:-}" = "first-install" ]; then') &&
+  /first-install[\s\S]{0,200}::warning::已跳过法务文档预检/.test(deploySource)
+) {
+  pass('法务文档预检只认 first-install 一个跳过值，并打告警')
+} else {
+  fail('法务文档预检的跳过必须只认 DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT=first-install，且打 ::warning:: 告警')
+}
+
 // 七、API-only 发布范围必须 fail-closed，且不得触碰三端静态资源。
 // 生产 API 与前端之间可能存在数日版本差；修复 API 契约时不能顺带把未经生产验收的
 // Kiosk/Admin/Partner 覆盖到 nginx。手动发布默认 API-only，自动 main CI 发布保持 full。

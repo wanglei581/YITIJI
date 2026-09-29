@@ -2,14 +2,14 @@
 
 > **历史材料（2026-09-26 标注）：** 本文是 2026-05 的方案或调研，不代表现状，不要据此施工。现行口径见 CLAUDE.md、docs/product/feature-scope.md 与 docs/compliance/compliance-boundary.md §1.1。
 >
-> 当前结论（2026-06-11 起）：Kiosk `/assistant` 已落地 TRTC 真人照片顾问「小青」+ 文字对话；早期轻量 3D / SVG 数字人引导员方案不再作为开发路线。数字人形象对外开放前，先完成本人授权与深度合成相关手续（compliance-boundary.md §1.2 C）。
+> 当前结论（2026-06-11 起）：Kiosk `/assistant` 已落地 TRTC 数字人顾问「小青」+ 文字对话；早期轻量 3D / SVG 数字人引导员方案不再作为开发路线。小青形象是数字人图片，不是真人照片（2026-09-29 产品负责人确认），不涉及本人肖像授权；「AI 数字人」标识已加。
 
 ## 0. 当前实现口径（2026-06）
 
 - 当前入口：Kiosk 底部导航「AI助手」Tab → `/assistant`。
 - 当前实现：`apps/kiosk/src/pages/assistant/AssistantPage.tsx` + `apps/kiosk/src/components/AiAdvisorCall.tsx`。
 - 当前能力：TRTC 对话式 AI 语音通话、字幕、文字对话、快捷入口、路由白名单、离开页面 stop 防持续计费。
-- 当前形象：真人照片顾问「小青」（`/assets/ai-advisor.png`）。
+- 当前形象：数字人图片「小青」（`/assets/ai-advisor.png`）。
 - 不再重做：Three.js / VRM / SVG 数字人引导员、旧 `DigitalHuman.tsx` 路线。
 
 以下内容是 2026-05 的早期方案记录，若与当前实现冲突，以 `docs/progress/current-progress.md` 与实际代码为准。

@@ -11,6 +11,7 @@
 .cs-item { display: flex; align-items: flex-start; gap: 12rpx; }
 .cs-dot { font-size: var(--fs-sm); color: var(--teal); margin-top: 6rpx; flex-shrink: 0; }
 .cs-text { flex: 1; font-size: var(--fs-base); line-height: 1.65; color: var(--ink-soft); }
+.cs-before { margin-top: 18rpx; padding: 14rpx 16rpx; border-radius: var(--r-sm); background: var(--teal-wash); font-size: var(--fs-sm); line-height: 1.6; color: var(--teal-deep); }
 
 .cbox { display: flex; align-items: flex-start; gap: 20rpx; min-height: 96rpx; padding: 12rpx 0; }
 .cb {

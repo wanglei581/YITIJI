@@ -438,7 +438,7 @@ flowchart LR
   app --> jobs["/jobs<br/>1 页 · 21 端点"]
   app --> login["/login<br/>1 页 · 0 端点"]
   app --> policy["/policy<br/>1 页 · 31 端点"]
-  app --> profile["/profile<br/>1 页 · 5 端点"]
+  app --> profile["/profile<br/>1 页 · 26 端点"]
   app --> screen["/screen<br/>2 页 · 0 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 21 端点"]
   app --> sources["/sources<br/>1 页 · 21 端点"]
@@ -456,7 +456,7 @@ flowchart LR
 | `/jobs` | RecruitmentHostingGate | `apps/partner/src/routes/RecruitmentHostingGate.tsx` | 21 | — |
 | `/login` | LoginPage | `apps/partner/src/routes/login/index.tsx` | 0 | 1 |
 | `/policy` | PolicyPage | `apps/partner/src/routes/policy/index.tsx` | 31 | — |
-| `/profile` | ProfilePage | `apps/partner/src/routes/profile/index.tsx` | 5 | — |
+| `/profile` | ProfilePage | `apps/partner/src/routes/profile/index.tsx` | 26 | — |
 | `/screen` | ScreenPage | `apps/partner/src/routes/screen/index.tsx` | 0 | — |
 | `/screen/:tab` | ScreenPage | `apps/partner/src/routes/screen/index.tsx` | 0 | — |
 | `/smart-campus` | SmartCampusPage | `apps/partner/src/routes/smart-campus/index.tsx` | 21 | — |
@@ -478,7 +478,7 @@ flowchart LR
 
 **`/policy`** → `DELETE /partner/policies/:param`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/policies/:param/eligibility-rules`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`GET /policies/eligibility-questions`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`PATCH /partner/policies/:param`、`PATCH /partner/policies/:param/publish`、`PATCH /partner/policies/:param/release`、`PATCH /partner/policies/:param/review`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`POST /partner/policies`、`POST /partner/policies/:param/eligibility-preview`、`PUT /partner/policies/:param/eligibility-rules`、`PUT /partner/smart-campus/terminals/:param/config`
 
-**`/profile`** → `DELETE /partner/official-channels/:param`、`GET /partner/official-channels`、`PATCH /partner/official-channels/:param`、`POST /partner/official-channels`、`PUT /partner/profile`
+**`/profile`** → `DELETE /partner/official-channels/:param`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/official-channels`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`PATCH /partner/official-channels/:param`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`POST /partner/official-channels`、`PUT /partner/profile`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/smart-campus`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
