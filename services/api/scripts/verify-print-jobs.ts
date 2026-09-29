@@ -301,6 +301,7 @@ async function main() {
   const fixtureStorageKeys = [storageKey, contractSourceStorageKey, contractReportStorageKey]
   const createdTaskIds: string[] = []
   const extraPrintTerminalIds: string[] = []
+  const extraEndUserIds: string[] = []
 
   async function cleanup() {
     if (createdTaskIds.length) {
@@ -313,6 +314,9 @@ async function main() {
     }
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [terminalId, ...extraPrintTerminalIds] } } })
     await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, ...extraPrintTerminalIds] } } })
+    if (extraEndUserIds.length) {
+      await prisma.endUser.deleteMany({ where: { id: { in: extraEndUserIds } } })
+    }
     // 计费接线后新增的真实 fixture / 价目清理。
     await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: fixtureFileIds } } })
     await prisma.auditLog.deleteMany({ where: { targetId: { in: fixtureFileIds } } })
@@ -1578,6 +1582,15 @@ async function main() {
         )
       }
     }
+    const noTerminalMemberId = `eu_vpj_noterm_${suffix}`
+    extraEndUserIds.push(noTerminalMemberId)
+    await prisma.endUser.create({
+      data: {
+        id: noTerminalMemberId,
+        phoneHash: `hash-${noTerminalMemberId}`,
+        phoneEnc: `enc-${noTerminalMemberId}`,
+      },
+    })
     const noTerminalJob = await printJobs.create({
       fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
       fileName: 'no-terminal.pdf',
@@ -1586,14 +1599,16 @@ async function main() {
     await orderStatus.markPaid(noTerminalJob.orderId, { paymentSource: 'offline' })
     await prisma.printTask.update({
       where: { id: noTerminalJob.taskId },
-      data: { status: 'failed', errorCode: 'PRINTER_OFFLINE', terminalId: null },
+      data: { status: 'failed', errorCode: 'PRINTER_OFFLINE', terminalId: null, endUserId: noTerminalMemberId },
     })
     await prisma.order.updateMany({
       where: { printTaskId: noTerminalJob.taskId },
       data: { taskStatus: 'failed' },
     })
+    // 付款会话绑的是建单时的终端。终端被清空后会话对不上，会先报任务不存在。
+    // 这里改走会员身份，确认共享资格函数本身拒绝没有终端的任务。
     await expectCode(
-      () => printJobs.retryPaidFailedJob(noTerminalJob.taskId, { paymentSessionToken: noTerminalJob.paymentSessionToken }),
+      () => printJobs.retryPaidFailedJob(noTerminalJob.taskId, { endUserId: noTerminalMemberId }),
       'PRINT_RETRY_AGENT_VERSION',
       '8r. 会员端没有终端不许重新提交',
       versionMessage,
