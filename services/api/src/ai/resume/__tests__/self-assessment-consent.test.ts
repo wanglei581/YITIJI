@@ -18,7 +18,7 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { BadRequestException } from '@nestjs/common'
 import { PDFDocument } from 'pdf-lib'
@@ -31,12 +31,24 @@ import {
   type SelfAssessmentSubmitInput,
 } from '../self-assessment.service'
 import { AppendedSelfAssessmentService } from '../appended-self-assessment.service'
+import { SelfAssessmentController } from '../../self-assessment.controller'
 import { SELF_ASSESSMENT_CONSENT_VERSION } from '../self-assessment.types'
 
 const repoRoot = resolve(__dirname, '../../../../../..')
 const CURRENT = SELF_ASSESSMENT_CONSENT_VERSION
-/** 一个「上一版同意书」的版本号。它必须永远打不开当前的门。 */
+/** 冻结的新版本。测试不得改用导入常量，否则把常量改回旧值时请求会跟着变绿。 */
+const NEW_VERSION = 'sa-consent-v1.2026-09-29'
+/** 清单里点名的那一个旧版本。删掉清单项之后，用它提交必须 400。 */
+const LEGACY_VERSION = 'sa-consent-v1.2026-08-16'
+const AGE_ITEM = '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。'
+/** 一个不在清单里的旧版本。它必须永远打不开门，即使看起来比清单项更早。 */
 const STALE = 'sa-consent-v0.2026-01-01'
+
+function resultTtlMs(): number {
+  const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
+  const hours = Number.isFinite(raw) && raw > 0 ? raw : 24
+  return hours * 60 * 60 * 1000
+}
 
 // ── mock 基础设施 ────────────────────────────────────────────────────
 
@@ -49,6 +61,7 @@ interface StoredRow {
   endUserId: string | null
   accessTokenHash: string | null
   expiresAt: Date
+  createdAt: Date
 }
 
 interface AuditEvent {
@@ -57,18 +70,23 @@ interface AuditEvent {
   payload: unknown
 }
 
-function makeHarness(opts: { resumePages?: number; reportPages?: number } = {}) {
+function makeHarness(opts: { resumePages?: number; reportPages?: number; llm?: 'ok' | 'rejected' | 'throw' } = {}) {
   const resumePages = opts.resumePages ?? 1
   const reportPages = opts.reportPages ?? 2
   const rows: StoredRow[] = []
   const audits: AuditEvent[] = []
+  const aiLogs: Array<Record<string, unknown>> = []
   const uploads: Array<{ fileId: string; filename: string; buffer: Buffer }> = []
   let uploadSeq = 0
 
   const prisma = {
     aiResumeResult: {
-      create: async ({ data }: { data: Omit<StoredRow, 'id'> }) => {
-        const row: StoredRow = { id: `row-${rows.length + 1}`, ...data }
+      create: async ({ data }: { data: Omit<StoredRow, 'id' | 'createdAt'> & { createdAt?: Date } }) => {
+        const row: StoredRow = {
+          id: `row-${rows.length + 1}`,
+          ...data,
+          createdAt: data.createdAt ?? new Date(),
+        }
         rows.push(row)
         return row
       },
@@ -112,16 +130,32 @@ function makeHarness(opts: { resumePages?: number; reportPages?: number } = {}) 
   }
 
   const llm = {
-    summarize: async ({ scored }: { scored: { dimensions: unknown[] } }) => ({
-      status: 'completed' as const,
-      dimensions: scored.dimensions,
-      summary: '解读摘要',
-      providerName: 'mock-llm',
-    }),
+    summarize: async (input: {
+      scored: { dimensions: unknown[] }
+      onLlmCall?: (meta: { provider: string; tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } }) => void
+    }) => {
+      if (opts.llm === 'throw') throw new Error('boom')
+      input.onLlmCall?.({ provider: 'mock-llm', tokenUsage: { promptTokens: 3, completionTokens: 2, totalTokens: 5 } })
+      if (opts.llm === 'rejected') {
+        return {
+          status: 'rejected' as const,
+          failReason: '本次解读未能生成合规结果，请重新作答或稍后重试',
+          dimensions: [],
+          summary: null,
+          providerName: 'mock-llm',
+        }
+      }
+      return {
+        status: 'completed' as const,
+        dimensions: input.scored.dimensions,
+        summary: '解读摘要',
+        providerName: 'mock-llm',
+      }
+    },
   }
 
   const pdf = { render: async () => ({ buffer: await makePdf(reportPages), pageCount: reportPages }) }
-  const log = { record: () => {} }
+  const log = { record: (row: Record<string, unknown>) => { aiLogs.push(row) } }
 
   const service = new SelfAssessmentService(
     prisma as never, llm as never, pdf as never, files as never, audit as never, log as never,
@@ -129,7 +163,7 @@ function makeHarness(opts: { resumePages?: number; reportPages?: number } = {}) 
   const appendService = new AppendedSelfAssessmentService(
     prisma as never, service, files as never, audit as never,
   )
-  return { service, appendService, rows, audits, uploads }
+  return { service, appendService, rows, audits, uploads, aiLogs }
 }
 
 async function makePdf(pages: number): Promise<Buffer> {
@@ -146,6 +180,44 @@ function answers(): SelfAssessmentSubmitInput['answers'] {
 }
 
 const anon = { endUserId: null, accessToken: null }
+
+function assertAnonymousShortRetention(row: StoredRow, label: string): void {
+  assert.equal(row.endUserId, null, `${label}：endUserId 必须为空`)
+  assert.ok(row.expiresAt.getTime() > row.createdAt.getTime(), `${label}：保存期必须为正`)
+  assert.ok(
+    row.expiresAt.getTime() <= row.createdAt.getTime() + resultTtlMs(),
+    `${label}：expiresAt 不得超过 createdAt + AI_RESUME_RESULT_TTL_HOURS`,
+  )
+  const payload = JSON.parse(row.payloadJson) as Record<string, unknown>
+  for (const key of ['terminalId', 'memberId', 'memberNo', 'endUserId', 'phone', 'answers']) {
+    assert.equal(Object.prototype.hasOwnProperty.call(payload, key), false, `${label}：payload 不得含 ${key}`)
+  }
+  assert.equal(JSON.stringify(payload).includes('long_term'), false, `${label}：不得进长期保存`)
+  assert.equal(JSON.stringify(payload).includes('months_6'), false, `${label}：不得进延长期限`)
+}
+
+function readConstStrings(src: string, name: string): string[] {
+  const matched = src.match(new RegExp(`(?:export\\s+)?const\\s+${name}\\b[\\s\\S]*?=\\s*\\[([\\s\\S]*?)\\n\\]`))
+  assert.ok(matched, `必须能读到 ${name}`)
+  const items = [...matched![1]!.matchAll(/'([^'\\]*)'/g)].map((item) => item[1]!)
+  assert.ok(items.length > 0, `${name} 不能是空数组`)
+  return items
+}
+
+function listMiniappSources(): string[] {
+  const root = resolve(repoRoot, 'apps/miniapp')
+  const out: string[] = []
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'node_modules' || name === 'dist' || name === 'miniprogram_npm') continue
+      const full = resolve(dir, name)
+      if (statSync(full).isDirectory()) walk(full)
+      else if (/\.(js|ts|json|wxml)$/.test(name)) out.push(full)
+    }
+  }
+  walk(root)
+  return out
+}
 
 // ════════════════════════════════════════════════════════════════════
 // A. 版本化同意
@@ -173,17 +245,61 @@ test('A1 持旧版本同意的提交被拒绝，而不是静默放行', async ()
   assert.equal(audits.length, 0, '旧版本同意不得产生 create 审计')
 })
 
-test('A2 旧版本同意不会被「就近升级」成当前版本', async () => {
-  const { service } = makeHarness()
-  // 反向证明：把当前版本号交进去可以通过 —— 说明 A1 的失败来自版本不符，
-  // 而不是别的什么原因（比如答案格式）让所有提交都失败。
+test('A1b 清单外的旧版本一律 400，不能因为「看起来更早」就收下', async () => {
+  const outsiders = [
+    'sa-consent-v1.2026-08-15',
+    'sa-consent-v1.2020-01-01',
+    'sa-consent-v1.2026-09-28',
+    'sa-consent-v1.2026-09-30',
+    `${LEGACY_VERSION}.1`,
+    LEGACY_VERSION.toUpperCase(),
+  ]
+  for (const version of outsiders) {
+    const { service, rows } = makeHarness()
+    await assert.rejects(
+      () => service.submit(anon, {
+        answers: answers(),
+        consent: { nonSensitive: true, sensitive: false, consentVersion: version },
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof BadRequestException)
+        assert.match(JSON.stringify(error.getResponse()), /SELF_ASSESSMENT_CONSENT_VERSION_STALE/)
+        return true
+      },
+      `${version} 不在清单里，必须 400`,
+    )
+    assert.equal(rows.length, 0, `${version} 不得落库`)
+  }
+})
+
+test('A2 新版本提交通过，并按新版本落库', async () => {
+  const { service, rows } = makeHarness()
   const ok = await service.submit(anon, {
     answers: answers(),
-    consent: { nonSensitive: true, sensitive: false, consentVersion: CURRENT },
+    consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION },
   })
-  assert.equal(ok.consentVersion, CURRENT)
+  assert.equal(ok.status, 'completed')
+  assert.equal(ok.consentVersion, NEW_VERSION)
   assert.equal(ok.consentCurrent, true)
-  assert.notEqual(ok.consentVersion, STALE, '不得把旧版本号原样存下来当成有效同意')
+  assert.equal(CURRENT, NEW_VERSION, '服务端当前版本常量必须等于冻结的新版本')
+  const stored = JSON.parse(rows[0]!.payloadJson) as { consentVersion: string }
+  assert.equal(stored.consentVersion, NEW_VERSION, '落库存的必须是实际提交的新版本')
+  assertAnonymousShortRetention(rows[0]!, '新版本匿名')
+})
+
+test('A2b 清单内旧版本通过，落库存旧版本号，不算已同意当前说明', async () => {
+  const { service, rows } = makeHarness()
+  const ok = await service.submit(anon, {
+    answers: answers(),
+    consent: { nonSensitive: true, sensitive: false, consentVersion: LEGACY_VERSION },
+  })
+  assert.equal(ok.status, 'completed')
+  assert.equal(ok.consentVersion, LEGACY_VERSION, '必须原样记下旧版本，不能升级成当前版本')
+  assert.notEqual(ok.consentVersion, NEW_VERSION)
+  assert.equal(ok.consentCurrent, false, '旧版本同意不算已同意当前说明')
+  const stored = JSON.parse(rows[0]!.payloadJson) as { consentVersion: string }
+  assert.equal(stored.consentVersion, LEGACY_VERSION)
+  assertAnonymousShortRetention(rows[0]!, '旧版本匿名')
 })
 
 test('A3 未带版本号的提交如实记为 null，不被补写成当前版本', async () => {
@@ -262,20 +378,125 @@ test('A5 版本判定是严格相等，不做前缀/大小写/子串兼容', () 
   }
 })
 
-test('A6 同意版本号三处逐字相等（单一真源，不多处硬编码）', () => {
+test('A6 当前版本 shared = 服务端 = 冻结新版本；一体机与小程序过渡期只能停在清单内旧版本', () => {
   const read = (p: string) => readFileSync(resolve(repoRoot, p), 'utf8')
   const pick = (src: string, file: string) => {
     const m = src.match(/SELF_ASSESSMENT_CONSENT_VERSION\s*=\s*'([^']+)'/)
     assert.ok(m, `${file} 必须声明 SELF_ASSESSMENT_CONSENT_VERSION`)
     return m![1]
   }
-  const shared = pick(read('packages/shared/src/types/selfAssessment.ts'), 'packages/shared')
-  const api = pick(read('services/api/src/ai/resume/self-assessment.types.ts'), 'services/api')
-  const kiosk = pick(read('apps/kiosk/src/pages/resume/selfAssessmentSession.ts'), 'apps/kiosk')
+  const sharedSrc = read('packages/shared/src/types/selfAssessment.ts')
+  const apiSrc = read('services/api/src/ai/resume/self-assessment.types.ts')
+  const kioskSrc = read('apps/kiosk/src/pages/resume/selfAssessmentSession.ts')
+  const shared = pick(sharedSrc, 'packages/shared')
+  const api = pick(apiSrc, 'services/api')
+  const kiosk = pick(kioskSrc, 'apps/kiosk')
 
+  assert.equal(shared, NEW_VERSION, 'shared 当前版本必须是冻结的新版本')
+  assert.equal(api, NEW_VERSION, '服务端当前版本必须是冻结的新版本')
   assert.equal(api, shared, '服务端 CJS 镜像与 packages/shared 真源必须逐字相等')
-  assert.equal(kiosk, shared, '前端同意版本号与 packages/shared 真源必须逐字相等')
-  assert.equal(shared, CURRENT)
+
+  const sharedItems = readConstStrings(sharedSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
+  const apiItems = readConstStrings(apiSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
+  assert.deepEqual(apiItems, sharedItems, '服务端条款必须与 shared 逐字相同')
+  assert.equal(sharedItems.at(-1), AGE_ITEM, '当前条款必须含年龄这一条')
+  assert.equal(sharedItems.length, 6)
+
+  const legacy = readConstStrings(apiSrc, 'SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS')
+  assert.deepEqual(legacy, [LEGACY_VERSION], '旧版本清单目前只能有点名的那一个，不能是范围')
+
+  // 一体机页面本批不改。它仍可以停在清单内的旧版本；一旦改成当前版本，条款必须与 shared 相同。
+  const kioskItems = readConstStrings(kioskSrc, 'CONSENT_ITEMS')
+  if (kiosk === NEW_VERSION) {
+    assert.deepEqual(kioskItems, sharedItems, '一体机改到当前版本时，条款必须与 shared 逐字相同')
+  } else {
+    assert.equal(kiosk, LEGACY_VERSION, '一体机版本只能是当前版本，或清单里那一个旧版本')
+    assert.deepEqual(kioskItems, sharedItems.slice(0, -1), '一体机仍用旧版本时，条款必须是加上年龄条之前的那 5 条')
+  }
+
+  const versionRe = /sa-consent-v\d+\.\d{4}-\d{2}-\d{2}/g
+  const miniappVersions = new Set<string>()
+  for (const file of listMiniappSources()) {
+    const text = readFileSync(file, 'utf8')
+    for (const hit of text.match(versionRe) ?? []) miniappVersions.add(hit)
+  }
+  for (const version of miniappVersions) {
+    assert.ok(
+      version === NEW_VERSION || version === LEGACY_VERSION,
+      `小程序写死的同意版本 ${version} 必须是当前版本或清单内旧版本`,
+    )
+  }
+})
+
+test('A8 题目接口下发的 consentItems 等于 shared 当前条款，且含年龄这一条', () => {
+  const controller = new SelfAssessmentController(
+    null as never, null as never, null as never, null as never, null as never, null as never,
+  )
+  const questions = controller.questions()
+  const sharedSrc = readFileSync(resolve(repoRoot, 'packages/shared/src/types/selfAssessment.ts'), 'utf8')
+  const sharedItems = readConstStrings(sharedSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
+  assert.equal(questions.consentVersion, NEW_VERSION)
+  assert.deepEqual([...questions.consentItems], sharedItems)
+  assert.ok(questions.consentItems.includes(AGE_ITEM), '下发条款必须含年龄这一条')
+})
+
+test('A9 模型整体拒答：会员落完成行，只回打分，审计记码', async () => {
+  const h = makeHarness({ llm: 'rejected' })
+  const res = await h.service.submit(
+    { endUserId: 'member-1', accessToken: null },
+    { answers: answers(), consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION } },
+  )
+  assert.equal(res.status, 'completed')
+  assert.equal(res.interpretationAvailable, false)
+  assert.equal(res.aiUnavailableReason, 'COMPLIANCE_REJECT')
+  assert.equal(res.failReason, undefined)
+  assert.equal(res.providerName, 'llm_unavailable')
+  assert.equal(res.summary, null)
+  assert.equal(res.dimensions.length, 5)
+  assert.ok(res.dimensions.every((d) => d.note === null && d.strength >= 0))
+  assert.equal(JSON.stringify(res).includes('请重新作答'), false)
+  assert.equal(h.rows.length, 1)
+  assert.equal(h.rows[0]!.status, 'completed')
+  assert.equal(h.rows[0]!.endUserId, 'member-1')
+  const stored = JSON.parse(h.rows[0]!.payloadJson) as { dimensions: unknown[]; aiUnavailableReason?: string }
+  assert.equal(stored.dimensions.length, 5, '不得改用模型返回的空维度')
+  assert.equal(stored.aiUnavailableReason, 'COMPLIANCE_REJECT')
+  const created = h.audits.find((a) => a.action === 'resume.self_assessment_create')
+  const payload = created?.payload as { status?: string; aiUnavailableReason?: string }
+  assert.equal(payload.status, 'completed')
+  assert.equal(payload.aiUnavailableReason, 'COMPLIANCE_REJECT')
+  assert.equal(h.aiLogs[0]?.['status'], 'failed')
+  assert.equal(h.aiLogs[0]?.['errorCode'], 'COMPLIANCE_REJECT')
+  const printed = await h.service.printReport(res.taskId, { endUserId: 'member-1', accessToken: null })
+  assert.match(printed.printFileUrl, /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]{64}$/)
+})
+
+test('A10 模型整体拒答：匿名按 TTL 短期保存，拿到打分和打印凭证', async () => {
+  const h = makeHarness({ llm: 'rejected' })
+  const res = await h.service.submit(anon, {
+    answers: answers(),
+    consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION },
+  })
+  assert.equal(res.status, 'completed')
+  assert.equal(res.aiUnavailableReason, 'COMPLIANCE_REJECT')
+  assert.equal(res.dimensions.length, 5)
+  assert.equal(typeof res.accessToken, 'string')
+  assert.notEqual(res.expiresAt, null)
+  assertAnonymousShortRetention(h.rows[0]!, '合规拒答匿名')
+  assert.equal(h.rows[0]!.status, 'completed')
+  const printed = await h.service.printReport(res.taskId, { endUserId: null, accessToken: res.accessToken! })
+  assert.ok(printed.printFileUrl)
+})
+
+test('A11 模型抛错仍是未完成，不伪装成合规拒答的打分结果', async () => {
+  const h = makeHarness({ llm: 'throw' })
+  const res = await h.service.submit(anon, {
+    answers: answers(),
+    consent: { nonSensitive: true, sensitive: false, consentVersion: NEW_VERSION },
+  })
+  assert.equal(res.status, 'rejected')
+  assert.equal(res.expiresAt, null)
+  assert.equal(res.accessToken, undefined)
 })
 
 test('A7 审计只记「同意了哪个版本」，不记作答内容', async () => {

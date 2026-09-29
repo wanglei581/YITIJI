@@ -48,10 +48,43 @@ export interface SelfAssessmentAnswerV1 {
 }
 
 /**
- * 知情同意版本号 —— 真源在 `packages/shared/src/types/selfAssessment.ts`，本行是 CJS 镜像。
- * 两处必须**逐字相等**，由 `verify:self-assessment-consent` 门禁锁死（连同 kiosk 那份）。
+ * 知情同意当前版本 —— 真源在 `packages/shared/src/types/selfAssessment.ts`，本行是 CJS 镜像。
+ * 两处必须逐字相等，由 `verify:self-assessment-consent` 锁死。
+ * 条款原文 `SELF_ASSESSMENT_CONSENT_ITEMS` 同样是那份数组的镜像。
  */
-export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v1.2026-08-16'
+export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v1.2026-09-29'
+
+/** 与当前版本配套的条款原文。改任一条必须同时升 `SELF_ASSESSMENT_CONSENT_VERSION`。 */
+export const SELF_ASSESSMENT_CONSENT_ITEMS = [
+  '本工具基于本人作答提供倾向参考，不是临床 / 心理 / 人格诊断。',
+  '结果对本人可见，不向企业、合作机构、第三方推送。',
+  '作答后可在结果页一键撤回 / 物理删除；不留存本人答案原文。',
+  '本工具不评估「适合 / 不适合」任何岗位或职业，亦不构成能力证明。',
+  '5 段解读由 AI 生成（E3 · 仅供参考）；维度强度由固定权重算出，不经过 AI。',
+  '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。',
+] as const
+
+/**
+ * 过渡期仍接受的旧同意版本。必须逐个写出来。
+ * 清空或删掉某一项之后，那个版本必须回到 400，不能改成「任何更早的版本都收」。
+ * 小程序带上新条款并全量之后，由后端窗口去掉这份清单。
+ */
+export const SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS = [
+  'sa-consent-v1.2026-08-16',
+] as const
+
+/** 当前版本，或清单里点名的旧版本。不是范围比较。 */
+export function isAcceptedSelfAssessmentConsentVersion(version: string): boolean {
+  if (version === SELF_ASSESSMENT_CONSENT_VERSION) return true
+  return (SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS as readonly string[]).includes(version)
+}
+
+export interface SelfAssessmentQuestionsResponse {
+  version: 'v1'
+  dimensions: SelfAssessmentDimensionV1[]
+  consentVersion: string
+  consentItems: string[]
+}
 
 export interface SelfAssessmentConsent {
   nonSensitive: boolean
@@ -105,7 +138,7 @@ export interface SelfAssessmentSubmitResponse {
    * 模型码：AI_NOT_CONFIGURED / AI_BUSY / AI_SELF_ASSESSMENT_TIMEOUT / AI_PROVIDER_* / AI_EMPTY_RESPONSE /
    * AI_CONTENT_BLOCKED / AI_ENDPOINT_NOT_ALLOWED / AI_UNAVAILABLE / AI_INTERPRETATION_UNPARSEABLE；
    * 说不出原因时 AI_INTERPRETATION_UNAVAILABLE；
-   * 整体合规拒答（status=rejected）为 COMPLIANCE_REJECT。
+   * 模型整体合规拒答为 COMPLIANCE_REJECT（此时 status=completed，打分照常，不要求重新作答）。
    */
   aiUnavailableReason?: string | null
 }

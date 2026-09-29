@@ -81,7 +81,13 @@ async function makePdf(pages: number): Promise<Buffer> {
 const jwt = new JwtService({ secret: 'verify-self-assessment-ai-gate-0123456789' })
 const OFF: AiAccessConfig = { loginGate: 'off', declarationEnforced: false, paused: false, maintenance: false }
 
-interface Row { id: string; taskId: string; kind: string; status: string; provider: string; payloadJson: string; endUserId: string | null; accessTokenHash: string | null; expiresAt: Date }
+interface Row { id: string; taskId: string; kind: string; status: string; provider: string; payloadJson: string; endUserId: string | null; accessTokenHash: string | null; expiresAt: Date; createdAt: Date }
+
+function resultTtlMs(): number {
+  const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
+  const hours = Number.isFinite(raw) && raw > 0 ? raw : 24
+  return hours * 60 * 60 * 1000
+}
 
 /** 未合入的两个闸门码，按合入后 enforce 里的作用范围模拟（见文件头）。 */
 type Simulated = 'AI_BUDGET_EXHAUSTED' | 'AI_PROVIDER_NOT_CONFIGURED' | null
@@ -90,7 +96,7 @@ const SIMULATED_KINDS: Record<Exclude<Simulated, null>, AiUseKind[]> = {
   AI_PROVIDER_NOT_CONFIGURED: ['generate', 'voice', 'export'], // P1-18：生成、语音与带 AIGC 标识的导出
 }
 
-function makeWorld(opts: { config?: AiAccessConfig; simulate?: Simulated; realLlmUnconfigured?: boolean } = {}) {
+function makeWorld(opts: { config?: AiAccessConfig; simulate?: Simulated; realLlmUnconfigured?: boolean; llm?: 'ok' | 'rejected' } = {}) {
   const rows: Row[] = []
   const audits: Array<{ action: string; payload: Record<string, unknown> }> = []
   const aiLogs: unknown[] = []
@@ -99,7 +105,11 @@ function makeWorld(opts: { config?: AiAccessConfig; simulate?: Simulated; realLl
 
   const prisma = {
     aiResumeResult: {
-      create: async ({ data }: { data: Omit<Row, 'id'> }) => { const row = { id: `row-${rows.length + 1}`, ...data }; rows.push(row); return row },
+      create: async ({ data }: { data: Omit<Row, 'id' | 'createdAt'> & { createdAt?: Date } }) => {
+        const row: Row = { id: `row-${rows.length + 1}`, ...data, createdAt: data.createdAt ?? new Date() }
+        rows.push(row)
+        return row
+      },
       findUnique: async ({ where }: { where: { taskId_kind: { taskId: string; kind: string } } }) =>
         rows.find((r) => r.taskId === where.taskId_kind.taskId && r.kind === where.taskId_kind.kind) ?? null,
       update: async ({ where, data }: { where: { id: string }; data: Partial<Row> }) => { const row = rows.find((r) => r.id === where.id); if (row) Object.assign(row, data); return row },
@@ -127,9 +137,13 @@ function makeWorld(opts: { config?: AiAccessConfig; simulate?: Simulated; realLl
         return { summarize: async (input: Parameters<typeof summarize>[0]) => { llmCalls += 1; return summarize(input) } }
       })()
     : {
-        summarize: async ({ scored }: { scored: { dimensions: Array<Record<string, unknown>> } }) => {
+        summarize: async (input: { scored: { dimensions: Array<Record<string, unknown>> }; onLlmCall?: (meta: { provider: string; tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } }) => void }) => {
           llmCalls += 1
-          return { status: 'completed' as const, dimensions: scored.dimensions.map((d) => ({ ...d, note: `${String(d['label'])}的陈述式解读` })), summary: '整体陈述式解读', providerName: 'deepseek' }
+          input.onLlmCall?.({ provider: 'deepseek', tokenUsage: { promptTokens: 4, completionTokens: 1, totalTokens: 5 } })
+          if (opts.llm === 'rejected') {
+            return { status: 'rejected' as const, failReason: '本次解读未能生成合规结果，请重新作答或稍后重试', dimensions: [], summary: null, providerName: 'deepseek' }
+          }
+          return { status: 'completed' as const, dimensions: input.scored.dimensions.map((d) => ({ ...d, note: `${String(d['label'])}的陈述式解读` })), summary: '整体陈述式解读', providerName: 'deepseek' }
         },
       }
 
@@ -139,17 +153,15 @@ function makeWorld(opts: { config?: AiAccessConfig; simulate?: Simulated; realLl
   const redis = new Proxy({}, { get: () => async () => null })
   const access = new AiAccessService(redis as never, { writeRequired: async () => 'a' } as never, jwt, prisma as never)
   let config = opts.config ?? OFF
+  let simulate: Simulated = opts.simulate ?? null
   ;(access as unknown as { getConfig: () => Promise<AiAccessConfig> }).getConfig = async () => config
-  if (opts.simulate) {
-    const code = opts.simulate
-    const realEnforce = access.enforce.bind(access)
-    access.enforce = async (kind, maintenanceBlocked, req, cfg) => {
-      const current = cfg ?? config
-      if (!current.maintenance && kind && SIMULATED_KINDS[code].includes(kind)) {
-        throw new ServiceUnavailableException({ error: { code, message: '模拟' } })
-      }
-      return realEnforce(kind, maintenanceBlocked, req, cfg)
+  const realEnforce = access.enforce.bind(access)
+  access.enforce = async (kind, maintenanceBlocked, req, cfg) => {
+    const current = cfg ?? config
+    if (simulate && !current.maintenance && kind && SIMULATED_KINDS[simulate].includes(kind)) {
+      throw new ServiceUnavailableException({ error: { code: simulate, message: '模拟' } })
     }
+    return realEnforce(kind, maintenanceBlocked, req, cfg)
   }
   const guard = new AiAccessGuard(new Reflector(), access)
   const Ctl = SelfAssessmentController as unknown as new (...args: unknown[]) => SelfAssessmentController
@@ -170,6 +182,7 @@ function makeWorld(opts: { config?: AiAccessConfig; simulate?: Simulated; realLl
     rows, audits, aiLogs, uploads, controller, call,
     llmCalls: () => llmCalls,
     setConfig: (next: AiAccessConfig) => { config = next },
+    setSimulate: (next: Simulated) => { simulate = next },
   }
 }
 
@@ -281,6 +294,19 @@ async function normalState(): Promise<void> {
     (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, { resumeFileId: 'resume-1' } as never, reader)))) === 'AI_PAUSED')
   check('正常记录·AI 暂停：读回照常', (await codeOf(() => w.call('latest', reader, () => w.controller.latest(r.taskId, reader)))) === 'PASS')
 
+  // 附加含 AI 解读时按 export 档：不花钱、不要求使用声明；导出前登录仍拦匿名。
+  w.setConfig(OFF)
+  w.setSimulate('AI_BUDGET_EXHAUSTED')
+  check('含 AI 解读的附加按 export：额度用完不拦',
+    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, { resumeFileId: 'resume-1' } as never, reader)))) === 'PASS')
+  w.setSimulate(null)
+  w.setConfig({ ...OFF, loginGate: 'before_export' })
+  check('含 AI 解读的附加按 export：导出前须登录时匿名被拦',
+    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, { resumeFileId: 'resume-1' } as never, reader)))) === 'AI_LOGIN_REQUIRED')
+  w.setConfig({ ...OFF, declarationEnforced: true })
+  check('含 AI 解读的附加按 export：使用声明不拦导出',
+    (await codeOf(() => w.call('appendToResume', reader, () => w.controller.appendToResume(r.taskId, { resumeFileId: 'resume-1' } as never, reader)))) === 'PASS')
+
   const nc = makeWorld({ simulate: 'AI_PROVIDER_NOT_CONFIGURED' })
   const ncRes = await nc.call('submit', req, () => nc.controller.submit(BODY as never, req)).catch(() => null) as SubmitResult | null
   if (ncRes) {
@@ -331,7 +357,50 @@ async function llmFailureAndLegacy(): Promise<void> {
   check('旧记录有解读：读回 interpretationAvailable=true、原因码 null', legacyAi.interpretationAvailable === true && legacyAi.aiUnavailableReason === null)
 }
 
-// ── 五、装配：AiModule 能注入 AiAccessService ─────────────────────────────────
+// ── 五、模型整体合规拒答：只回打分，匿名可打印 ────────────────────────────────
+async function complianceReject(): Promise<void> {
+  const w = makeWorld({ llm: 'rejected' })
+  const req = anonReq()
+  const r = await w.call('submit', req, () => w.controller.submit(BODY as never, req)) as SubmitResult
+  check('合规拒答：status=completed', r.status === 'completed', String(r.status))
+  check('合规拒答：5 维打分等于纯函数，不用模型返回的空维度', r.dimensions.length === 5
+    && r.dimensions.every((d, i) => d.key === EXPECTED[i]!.key && d.strength === EXPECTED[i]!.strength && d.note === null)
+    && r.summary === null)
+  check('合规拒答：interpretationAvailable=false、aiUnavailableReason=COMPLIANCE_REJECT',
+    r.interpretationAvailable === false && r.aiUnavailableReason === 'COMPLIANCE_REJECT',
+    `${String(r.interpretationAvailable)} / ${String(r.aiUnavailableReason)}`)
+  check('合规拒答：providerName=llm_unavailable', r.providerName === 'llm_unavailable', String(r.providerName))
+  check('合规拒答：不要求重新作答', r.failReason == null && !JSON.stringify(r).includes('请重新作答'))
+  check('合规拒答：模型被调用一次', w.llmCalls() === 1, String(w.llmCalls()))
+  const row = w.rows[0]
+  const ttlOk = !!row && (row.endUserId == null || row.endUserId === '')
+    && row.status === 'completed'
+    && row.expiresAt.getTime() > row.createdAt.getTime()
+    && row.expiresAt.getTime() <= row.createdAt.getTime() + resultTtlMs()
+  check('合规拒答：匿名行 endUserId 为空，且 expiresAt <= createdAt + TTL', ttlOk)
+  const payload = row ? JSON.parse(row.payloadJson) as Record<string, unknown> : {}
+  check('合规拒答：匿名 payload 不带终端号、会员号或答案原文',
+    !('terminalId' in payload) && !('memberId' in payload) && !('memberNo' in payload) && !('endUserId' in payload) && !('answers' in payload))
+  check('合规拒答：匿名拿到访问凭证', typeof r.accessToken === 'string')
+  const created = w.audits.find((a) => a.action === 'resume.self_assessment_create')
+  check('合规拒答：审计记 completed 与 COMPLIANCE_REJECT',
+    created?.payload['status'] === 'completed' && created?.payload['aiUnavailableReason'] === 'COMPLIANCE_REJECT')
+  const log = w.aiLogs[0] as { status?: string; errorCode?: string } | undefined
+  check('合规拒答：模型确已调用时 AI 账记失败与 COMPLIANCE_REJECT', log?.status === 'failed' && log?.errorCode === 'COMPLIANCE_REJECT',
+    JSON.stringify(log))
+  const reader = anonReq({ 'x-resume-access-token': String(r.accessToken) })
+  let printed: { printFileUrl?: string } | null = null
+  const printCode = await codeOf(async () => { printed = await w.call('print', reader, () => w.controller.print(r.taskId, reader)) })
+  check('合规拒答：打分能打印', printCode === 'PASS' && Boolean(printed?.printFileUrl), `实际 ${printCode}`)
+  const pdf = w.uploads.find((u) => u.filename.startsWith('self-assessment-'))
+  if (pdf) {
+    const text = await visibleText(pdf.buffer)
+    const line = squash(`${EXPECTED[0]!.label}（强度 ${EXPECTED[0]!.strength}/5）`)
+    check('合规拒答：打印件含维度强度', text.includes(line) && text.includes('未含AI解读'), line)
+  } else check('合规拒答：打印件已生成', false, '没有上传报告 PDF')
+}
+
+// ── 六、装配：AiModule 能注入 AiAccessService ─────────────────────────────────
 function wiring(): void {
   const imports = (Reflect.getMetadata(MODULE_METADATA.IMPORTS, AiModule) ?? []) as unknown[]
   check('装配：AiModule 导入 AiAccessModule（控制器要注入 AiAccessService）', imports.includes(AiAccessModule))
@@ -345,6 +414,7 @@ void (async () => {
     await normalState()
     await maintenance()
     await llmFailureAndLegacy()
+    await complianceReject()
     wiring()
   } catch (error) {
     failed += 1
