@@ -336,14 +336,14 @@ test('signature page fails closed for anonymous users @w2', async ({ page, api }
 
   await page.goto('/print-scan/sign')
   await expect(page.locator('[data-testid="sign-stamp-state-login-required"]')).toBeVisible()
-  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('先登录才能做签名盖章')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('先登录才能签名')
   await expect(page.locator('[data-w2-page="print-scan-sign"]')).toContainText('不提供 CA 电子签')
   await expectHealthy(page, errors, 'print-scan-sign')
   await page.getByTestId('sign-stamp-primary').click()
   await expect(page).toHaveURL(/\/login/)
 })
 
-// D3（2026-09-28）：签名盖章默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS，
+// D3（2026-09-28）：签名默认关，管理员逐台配成 available 才开（服务端 DEFAULT_DENY_CAPABILITY_KEYS，
 // 未配置即以 CAPABILITY_NOT_CONFIGURED 拒绝）。能力读取成功、但本机没有已配置的 signature_stamp 行时，
 // 已登录用户直接进签名页也必须停在「没有开放」，不给任何上传入口 —— 否则传完文件才被拒，
 // 页面还会把那次拒绝说成「PDF 读不开」。
@@ -365,7 +365,7 @@ const SIGNATURE_NEVER_ENABLED = [
 
 async function expectSignatureNotOpen(page: Page, api: ApiRouter): Promise<void> {
   await expect(page.locator('[data-testid="sign-stamp-state-capability-disabled"]')).toBeVisible()
-  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('没有开放签名盖章')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('这台机器没有开放签名')
   // 没有任何上传入口：选 PDF / 传签名图的卡片都不出现，页面上也没有带「上传」的按钮。
   await expect(page.locator('[data-testid^="sign-stamp-pick-"]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /上传/ })).toHaveCount(0)

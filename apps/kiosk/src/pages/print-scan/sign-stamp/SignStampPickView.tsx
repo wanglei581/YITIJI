@@ -183,7 +183,7 @@ export function SignStampPickView({
                 id="sign-stamp-doc-note"
                 title="U 盘为什么用不了"
                 items={[
-                  'U 盘导入能用来打印，但还没通到签名盖章这一步。',
+                  'U 盘导入能用来打印，但还没通到签名这一步。',
                   '先用上面三种方式选这份 PDF。',
                 ]}
               />
