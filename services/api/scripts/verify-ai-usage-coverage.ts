@@ -65,6 +65,7 @@ async function main(): Promise<void> {
   const { AiPublicQuotaService } = await import('../src/ai/ai-public-quota.service')
   const { MemberPrivacyService } = await import('../src/member-privacy/member-privacy.service')
   const { AssistantSummaryService } = await import('../src/advisor/assistant-summary.service')
+  const { ResumeDraftSourceService } = await import('../src/ai/resume/resume-draft-source.service')
 
   const runId = randomUUID().slice(0, 8)
   const baseDayMs = Date.UTC(2095, 0, 1) + Math.floor(Math.random() * 20_000) * 86_400_000
@@ -288,9 +289,12 @@ async function main(): Promise<void> {
         { provide: AiPublicQuotaService, useValue: {} },
         { provide: MemberPrivacyService, useValue: {} },
         { provide: AssistantSummaryService, useValue: {} },
+        // #1105 起 AiController 依赖草稿导出正文来源服务；本段只测转写接口，给空桩。
+        { provide: ResumeDraftSourceService, useValue: {} },
       ],
     })(ProbeModule)
-    const http = await NestFactory.create(ProbeModule, { logger: false })
+    // abortOnError: false —— 缺依赖时抛错进 main().catch 打出原因，而不是 Nest 默认的静默 process.exit(1)。
+    const http = await NestFactory.create(ProbeModule, { logger: false, abortOnError: false })
     await http.listen(0, '127.0.0.1')
     const address = http.getHttpServer().address() as { port: number }
 
