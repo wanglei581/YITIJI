@@ -276,6 +276,7 @@
     "verify:aigc-pdf-metadata": "node -r @swc-node/register scripts/verify-aigc-pdf-metadata.ts && pnpm run verify:ai-safety-aigc && pnpm run verify:resume-export-label",
     "verify:ai-safety-aigc": "node -r @swc-node/register scripts/verify-ai-safety-aigc.ts",
     "verify:resume-export-label": "node -r @swc-node/register scripts/verify-resume-export-label.ts",
+    "verify:resume-export-draft-source": "node -r @swc-node/register scripts/verify-resume-export-draft-source.ts",
     "verify:activity-logs": "node -r @swc-node/register scripts/verify-activity-logs.ts",
     "verify:member-data-retention": "node -r @swc-node/register scripts/verify-member-data-retention.ts",
     "verify:ai-user-text-retention": "node -r @swc-node/register scripts/verify-ai-user-text-retention.ts",

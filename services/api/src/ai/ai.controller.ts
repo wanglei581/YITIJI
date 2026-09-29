@@ -1,6 +1,7 @@
 import { BadRequestException, Controller, Optional, Post, Put, Get, Header, Param, Body, Query, Req, ServiceUnavailableException, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
 import { AiManualPathWhen, AiUse, AiUseExempt } from '../ai-access/ai-access.decorator'
 import { RESUME_DRAFT_EXPORT_MANUAL_PATH } from './resume-draft-export-manual-path'
+import { ResumeDraftSourceService } from './resume/resume-draft-source.service'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -145,6 +146,7 @@ export class AiController {
     private readonly publicQuota: AiPublicQuotaService,
     private readonly privacy: MemberPrivacyService,
     private readonly assistantSummary: AssistantSummaryService,
+    private readonly draftSource: ResumeDraftSourceService,
     @Optional() private readonly resumeParseIntent?: ResumeParseIntentRunner,
   ) {}
 
@@ -254,7 +256,6 @@ export class AiController {
    */
   @Get('resume/records/:taskId')
   @AiUse('read')
-
   async getResumeRecord(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -271,7 +272,6 @@ export class AiController {
   @Get('resume/records/:taskId/optimize')
   @Header('Cache-Control', 'no-store')
   @AiUse('generate')
-
   async getResumeOptimize(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -285,6 +285,7 @@ export class AiController {
     // 历史记录回看不懒生成，也不核销权益。
     if (existingOnly === '1') return this.aiService.getResumeOptimize(taskId, requester, true)
     const result = await this.aiService.getResumeOptimize(taskId, requester)
+    await this.draftSource.tagOptimizeTerminal(taskId, req)
 
     // 权益核销：仅当优化结果真实生成（completed）且显式传入 benefitGrantId 时才核销；
     // 核销要求登录会员（权益属本人），匿名传 grantId 直接拒绝。核销失败会抛出（AI 结果已落库，不浪费算力）。
@@ -424,7 +425,6 @@ export class AiController {
   @Post('resume/generate')
   @PaidAiThrottle(6)
   @AiUse('generate')
-
   async submitResumeGenerate(
     @Body() dto: ResumeGenerateRequestDto,
     @Req() req: ReqLike,
@@ -434,6 +434,7 @@ export class AiController {
       await this.privacy.requireActiveConsent(endUser.endUserId, 'resume_ai')
     }
     const result = await this.aiService.submitResumeGenerate(dto, endUser?.endUserId ?? null)
+    await this.draftSource.recordGenerateInput(result.taskId, dto, req) // 按原样导出只认这份原话，见 resume-draft-source.service.ts
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -459,7 +460,6 @@ export class AiController {
   /** 阶段2A — 读取生成结果(归属/令牌门禁同 parse)。 */
   @Get('resume/generate/:taskId')
   @AiUse('read')
-
   async getResumeGenerate(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
@@ -527,7 +527,6 @@ export class AiController {
   @Get('resume/export/pricing')
   @Header('Cache-Control', 'no-store')
   @AiUse('read')
-
   async getResumeExportPricing(@Req() req: ReqLike) {
     const requester = await this.resolveAiResultRequester(req)
     return this.aiService.getResumeExportPricing(requester.endUserId)
@@ -550,6 +549,7 @@ export class AiController {
     const { taskId, format, layout, templateId, draft, unlabeled, ...resume } = dto
     delete (resume as { benefitGrantId?: string }).benefitGrantId
     delete (resume as { factsConfirmedAt?: string }).factsConfirmedAt
+    const body = draft === true ? await this.draftSource.resolveDraftResume(resume, taskId, requester, req) : resume // 按原样导出不信客户端正文（A：取留存原话；B：拒照抄 AI）
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
     // C8：不带显式标识只对「开关已开 + 登录会员 + 已同意正式协议」放行，放行前先写必须成功的留痕。
     const unlabeledPlan = await prepareUnlabeledExport(
@@ -557,7 +557,7 @@ export class AiController {
       { requested: unlabeled === true, draft: draft === true, endUserId: requester.endUserId, taskId: taskId ?? null, format: format ?? 'pdf' },
       { ipAddress: ipOf(req), userAgent: uaOf(req), requestId: req.requestId ?? null },
     )
-    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt, unlabeled: unlabeledPlan.applied })
+    const result = await this.aiService.exportGeneratedResume(body, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt, unlabeled: unlabeledPlan.applied })
     const exportAudit = {
       actorId: null,
       actorRole: 'kiosk',

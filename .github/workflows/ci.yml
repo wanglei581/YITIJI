@@ -663,6 +663,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-account-action
           pnpm --filter @ai-job-print/api verify:resume-generate
           pnpm --filter @ai-job-print/api verify:resume-export-formats
+          # 按原样导出的正文来源：带任务号只用留存原话；不带任务号拒照抄 AI 结果（会员 / 匿名一体机）
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:resume-export-draft-source
           pnpm --filter @ai-job-print/api verify:resume-layout-export
           pnpm --filter @ai-job-print/api verify:resume-layout-adjust
           pnpm --filter @ai-job-print/api verify:resume-template-fill
@@ -957,6 +959,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:contract-review:timeout
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:admin-fairs
+          # 新增 AiResumeResult.terminalId 列（20260929210000）：PG 上同一门禁再跑一遍
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:resume-export-draft-source
           pnpm --filter @ai-job-print/api verify:resume-layout-export
           pnpm --filter @ai-job-print/api verify:resume-layout-adjust
           pnpm --filter @ai-job-print/api verify:resume-template-fill

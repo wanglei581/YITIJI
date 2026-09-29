@@ -1825,7 +1825,7 @@ model FieldMappingRule {
 model AiResumeResult {
   id         String   @id @default(cuid())
   taskId     String
-  kind       String   // 'parse' | 'optimize'
+  kind       String   // 'parse' | 'optimize' | 'generate' | 'generate_input'（生成时的原始填写）| ...
   status     String   // AiTaskStatus
   payloadJson String  @default("{}")
   provider   String
@@ -1847,11 +1847,15 @@ model AiResumeResult {
   // 迁移前历史行 expiresAt 为 null:读取路径与 cron 清理均按"已过期"处理
   // (不可读 + 会被删),不让无留存窗口的历史简历派生数据长期留存。
   expiresAt  DateTime?
+  // 生成 / 优化时已验签的一体机编号（x-terminal-id + x-terminal-session-token），网页、小程序为 null。
+  // 只供「按原样导出」核对匿名草稿是否照抄了本台本次使用里的 AI 结果；随本行同一 TTL 清理。
+  terminalId String?
 
   @@unique([taskId, kind])
   @@index([taskId])
   @@index([endUserId])
   @@index([expiresAt])
+  @@index([terminalId])
 }
 
 // ── Job AI 商用闭环底座 ─────────────────────────────────────────────────────

@@ -380,6 +380,8 @@ async function draftExportManualPath(): Promise<void> {
     },
     prisma: {},
     audit: { write: async () => undefined, writeRequired: async () => 'audit-1' },
+    // 正文来源核对（A/B）另由 verify:resume-export-draft-source 真调；这里只看授权与闸门。
+    draftSource: { resolveDraftResume: async (resume: unknown) => resume },
   }
   const handler = (AiController.prototype as unknown as { exportGeneratedResume: (dto: unknown, req: unknown) => Promise<unknown> }).exportGeneratedResume
   const draftResult = await codeOf(() => handler.call(self, { draft: true, basics: { name: '张三' } }, { headers: {} }))

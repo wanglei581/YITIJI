@@ -24,6 +24,8 @@ export interface ErrorResponseBody {
     details?: string[]
     /** 手机上传二维码已过期，但文件已经记在会员名下。只有 true，不带文件名。 */
     memberFileRetained?: true
+    /** 前端可用的下一步标识（小写蛇形），如 export_ai_labeled；只在拒绝时附带。 */
+    nextAction?: string
   }
   requestId?: string
 }
