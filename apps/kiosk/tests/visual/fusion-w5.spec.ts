@@ -1776,6 +1776,8 @@ for (const failure of [
   { code: 'REBIND_CODE_INVALID', status: 401, message: '新手机验证码不正确', recovery: 'restart' },
   { code: 'REBIND_CODE_EXPIRED', status: 401, message: '新手机验证码已过期，请重新获取', recovery: 'restart' },
   { code: 'REBIND_CODE_LOCKED', status: 401, message: '新手机验证码尝试次数过多，请重新获取', recovery: 'restart' },
+  // 1.8 C-4：服务端没能先清掉旧登录就整单不改（503）。手机号没变、登录仍有效，从旧号重来而不是重新登录。
+  { code: 'REBIND_UNAVAILABLE', status: 503, message: '暂时无法换绑手机号（登录状态没能安全清除），手机号没有改动，请稍后再试', recovery: 'restart' },
 ]) test(`settings: rebind ${failure.code} never replays a consumed old-phone proof @w5-kiosk`, async ({ page, api }) => {
   registerMemberLogin(api)
   registerAuthenticatedShell(api)

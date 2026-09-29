@@ -13,6 +13,7 @@ import { LEGAL_DRAFT_FALLBACK_VERSION } from '../legal/legal-constants'
 import { assertLegalDocsPublished, type ResolvedLegalVersions } from './legal-docs-published-guard'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { enforceMemberSmsHourlyLimit } from './sms/sms-egress-limits'
 import { SMS_SENDER, type SmsSender } from './sms/sms-sender'
 
 export type LegalConsentSource = 'sms_login' | 'qr_login' | 'wx_login'
@@ -32,7 +33,6 @@ const VERIFY_MAX_ATTEMPTS = 5 // 单码最多尝试次数(防 6 位码爆破)
 
 // ── 多维频控阈值 ────────────────────────────────────────────────
 const PHONE_DAILY_MAX = 10 // 单手机号每日
-const IP_HOURLY_MAX = 20 // 单 IP 每小时
 const DEVICE_HOURLY_MAX = 20 // 单设备每小时
 
 export interface SendCodeResult {
@@ -83,17 +83,15 @@ export class MemberAuthService {
       throw this.tooMany('SMS_TOO_FREQUENT', '验证码发送过于频繁,请 60 秒后再试')
     }
 
-    // 2) 多维频控:手机号(日)/ IP(时)/ 设备(时)。
+    // 2) 多维频控:手机号(日) / 网络(时) / 设备(时)。
+    // 网络这一层：已验签终端按台计，不占 IP 桶；没有终端时按 IP（受信出口只放宽 IP）。
     const day = this.dayBucket()
     const hour = this.hourBucket()
     const phoneDaily = await this.redis.incrWithTtl(this.k.phoneDaily(phoneHash, day), 86_400)
     if (phoneDaily > PHONE_DAILY_MAX) {
       throw this.tooMany('SMS_DAILY_LIMIT', '今日验证码请求次数过多,请明天再试')
     }
-    const ipHourly = await this.redis.incrWithTtl(this.k.ipHourly(ip, hour), 3_600)
-    if (ipHourly > IP_HOURLY_MAX) {
-      throw this.tooMany('SMS_IP_LIMIT', '当前网络请求过于频繁,请稍后再试')
-    }
+    await enforceMemberSmsHourlyLimit(this.redis, { ip, hour, terminalId })
     if (deviceId) {
       const deviceHourly = await this.redis.incrWithTtl(this.k.deviceHourly(deviceId, hour), 3_600)
       if (deviceHourly > DEVICE_HOURLY_MAX) {
@@ -335,7 +333,6 @@ export class MemberAuthService {
     attempt: (h: string) => `member:sms:attempt:${h}`,
     cooldown: (h: string) => `member:sms:cooldown:${h}`,
     phoneDaily: (h: string, day: string) => `member:sms:daily:${h}:${day}`,
-    ipHourly: (ip: string, hour: string) => `member:sms:ip:${ip}:${hour}`,
     deviceHourly: (d: string, hour: string) => `member:sms:device:${d}:${hour}`,
   }
 

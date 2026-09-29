@@ -30,6 +30,7 @@ import {
 } from './console-screen.metric'
 import { loadJumpRows } from './console-screen.queries'
 import { requirePartnerOrgId, type PartnerOrgId } from './console-screen.org'
+import { countAllVisits, countOrgVisits, visitMetric } from './console-screen.visits'
 import {
   USAGE_AI_REPORT_OPERATIONS,
   USAGE_EVENT_ROW_CAP,
@@ -114,13 +115,14 @@ export class ConsoleScreenUsageService {
     const span = usageWindow(range, now)
     const heatFrom = usageWindow('7d', now).from
     const pulseFrom = pulseWindowStart(now)
-    const [facts, heat, pulse, jumps] = await Promise.all([
+    const [facts, heat, pulse, jumps, visits] = await Promise.all([
       this.settle('usageFacts', () => loadAdminUsageFacts(this.prisma, span.from, span.to)),
       this.settle('usageHeat', () => loadUsageTimeline(this.prisma, heatFrom, now, rowCap)),
       this.settle('usagePulse', () => loadUsageTimeline(this.prisma, pulseFrom, now, rowCap)),
       this.settle('usageJumps', () => loadJumpRows(this.prisma, now)),
+      this.settle('usageVisits', () => countAllVisits(this.prisma, span.from, span.to)),
     ])
-    const status = snapshotLoadStatus([facts, heat, pulse, jumps].filter((part) => part.ok).length, 4)
+    const status = snapshotLoadStatus([facts, heat, pulse, jumps, visits].filter((part) => part.ok).length, 5)
     const metrics: ScreenUsageMetrics = {
       channels: this.fromFacts(facts, 'Order.payStatus=paid,paidAt', range, (value) => ({
         paidOrders: suppressSmallCount(value.channels.paidOrders),
@@ -129,7 +131,7 @@ export class ConsoleScreenUsageService {
         unlabeled: suppressSmallCount(value.channels.unlabeled),
         memberOrders: suppressSmallCount(value.channels.memberOrders),
       })),
-      visits: visitsMetric(),
+      visits: visitMetric(visits, range, true),
       services: this.fromFacts(facts, 'BrowseLog/AiServiceLog/PrintTask/ScanTask', range, (value) => (
         visibleUsageServiceNodes().map((node) => ({
           key: node.key,
@@ -190,7 +192,7 @@ export class ConsoleScreenUsageService {
       })),
     }
     return {
-      failed: [facts, heat, pulse, jumps].some((part) => !part.ok),
+      failed: [facts, heat, pulse, jumps, visits].some((part) => !part.ok),
       snapshot: this.envelope('admin', range, span, status, metrics),
     }
   }
@@ -202,9 +204,10 @@ export class ConsoleScreenUsageService {
     rowCap: number,
   ): Promise<CachedUsage> {
     const span = usageWindow(range, now)
-    const facts = await this.settle('partnerUsage', () => (
-      loadPartnerUsageFacts(this.prisma, orgId, span.from, span.to, rowCap)
-    ))
+    const [facts, visits] = await Promise.all([
+      this.settle('partnerUsage', () => loadPartnerUsageFacts(this.prisma, orgId, span.from, span.to, rowCap)),
+      this.settle('partnerVisits', () => countOrgVisits(this.prisma, orgId, span.from, span.to)),
+    ])
     const metrics: ScreenUsageMetrics = {
       partnerContent: this.fromFacts(facts, 'BrowseLog/Favorite/ExternalJumpLog join sourceOrgId', range, (value) => ({
         byType: value.byType
@@ -224,11 +227,11 @@ export class ConsoleScreenUsageService {
           .filter((item) => item.browse >= SCREEN_MIN_AGGREGATE_SAMPLE)
           .slice(0, 5),
       })),
-      visits: visitsMetric(),
+      visits: visitMetric(visits, range, true),
     }
-    const status = snapshotLoadStatus(facts.ok ? 1 : 0, 1)
+    const status = snapshotLoadStatus([facts, visits].filter((part) => part.ok).length, 2)
     return {
-      failed: !facts.ok,
+      failed: !facts.ok || !visits.ok,
       snapshot: this.envelope('partner', range, span, status, metrics),
     }
   }
@@ -280,10 +283,6 @@ export class ConsoleScreenUsageService {
 function visibleUsageServiceNodes() {
   if (recruitmentHostingLimit() === 'enabled') return USAGE_SERVICE_NODES
   return USAGE_SERVICE_NODES.filter((node) => node.key !== 'jobs' && node.key !== 'fairs' && node.key !== 'company')
-}
-
-function visitsMetric(): ScreenMetric<never> {
-  return unavailableMetric('KioskSession', 'current', SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten)
 }
 
 function unwrittenUpload(window: string): ScreenMetric<number> {

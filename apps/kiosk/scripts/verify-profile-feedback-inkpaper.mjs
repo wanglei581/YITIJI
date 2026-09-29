@@ -93,6 +93,15 @@ expectIncludes(types, "device', label: '设备使用'", '反馈分类保留设�
 expectIncludes(types, "print', label: '打印服务'", '反馈分类保留打印服务')
 expectIncludes(types, "file_process', label: '文件处理'", '反馈分类保留文件处理')
 expectIncludes(types, "general', label: '一般建议'", '反馈分类保留一般建议')
+expectIncludes(types, "ai_content', label: 'AI 内容投诉'", '反馈分类含 AI 内容投诉（C3，与服务端和小程序同口径）')
+expectMatches(types, /ai_content:\s*\{\s*label:\s*'AI 内容投诉'/, '反馈类别徽章能显示 AI 内容投诉')
+const aiComplaint = read('src/pages/profile/me/feedback/aiComplaint.ts')
+expectIncludes(aiComplaint, 'AI_COMPLAINT_REPLY_DAYS = 5', 'AI 内容投诉答复时限与制度 7 / 小程序一致（5 个工作日）')
+expectIncludes(aiComplaint, "'/me/feedback?category=ai_content'", 'AI 内容投诉入口指向反馈页并预选类别')
+expectIncludes(formPanel, 'AI_COMPLAINT_NOTE', '选中 AI 内容投诉时反馈表单显示投诉说明')
+expectIncludes(page, 'loginReturnTo', '游客从 AI 投诉入口进来，登录后回到同一分类')
+expectIncludes(read('src/pages/profile/me/MyAiRecordsPage.tsx'), 'AI_CONTENT_COMPLAINT_ROUTE', 'AI 服务记录页有 AI 内容投诉入口')
+expectIncludes(read('src/pages/assistant/AssistantPage.tsx'), 'AI_CONTENT_COMPLAINT_ROUTE', '小青页有 AI 内容投诉入口')
 expectIncludes(types, "pending: { label: '已提交'", '反馈状态保留已提交')
 expectIncludes(types, "processing: { label: '处理中'", '反馈状态保留处理中')
 expectIncludes(types, "replied: { label: '已回复'", '反馈状态保留已回复')
@@ -160,6 +169,11 @@ const forbiddenChanged = changedFiles.filter((file) =>
     'services/api/src/payment/payment-session-token.ts',
     'services/api/src/payment/payment.controller.ts',
     'services/api/src/print-jobs/print-jobs.service.ts',
+    // 2026-09-29 走查 W-01：AI 内容投诉在 AI 服务记录页与小青页各加一个文字入口，指向本页
+    // ?category=ai_content。入口只有一个按钮与一行样式，不改这两页的数据与流程。
+    'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
+    'apps/kiosk/src/pages/assistant/AssistantPage.tsx',
+    'apps/kiosk/src/pages/assistant/assistant-qingxu.css',
   ].includes(file) &&
   ([
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',

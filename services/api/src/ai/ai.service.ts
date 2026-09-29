@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException, Optional } from '@nestjs/common'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
-import type { AiProvider, AiProviderName, AssistantChatResult, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
-import { isLlmProviderLabel } from './interfaces/ai-provider.interface'
+import { isLlmProviderLabel, type AiProvider, type AiProviderName, type AssistantChatResult, type GeneratedResume, type GenerateResumeOutput, type ParseResumeInput, type ParseResumeOutput, type OptimizeResumeOutput, type ChatInput, type ResumeGenerateInput, type ResumeLayoutSettings } from './interfaces/ai-provider.interface'
+import { resolveAiProviderName } from '../config/ai-platform-config'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
 import { ClaudeProvider } from './providers/claude.provider.stub'
@@ -21,7 +21,7 @@ import { ResumeTextService } from './resume/resume-text.service'
 import { resumeExportShowsVisibleLabel } from '../common/pdf/aigc-label'
 import type { ResumeExportFormat, ResumeLayoutAdjustAction } from './dto/resume-generate.dto'
 import { canAccessFile, FilesService } from '../files/files.service'
-import { signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { JobMaterialsService } from '../job-materials/job-materials.service'
@@ -123,7 +123,7 @@ function hashAccessToken(token: string): string {
 }
 
 /** 恒定时间比较 token 与已存 hash，避免计时侧信道（对齐 materials 任务机制）。 */
-function verifyAccessToken(token: string | null, expectedHash: string): boolean {
+export function verifyAccessToken(token: string | null, expectedHash: string): boolean {
   if (!token) return false
   const actual = Buffer.from(hashAccessToken(token), 'hex')
   const expected = Buffer.from(expectedHash, 'hex')
@@ -163,7 +163,7 @@ export class AiService {
     @Optional() private readonly jobMaterials?: JobMaterialsService,
   ) {
     this.optimizeLock = new RedisInflightLock(redis)
-    const rawName = process.env['AI_PROVIDER'] ?? 'mock'
+    const rawName = resolveAiProviderName() // 生产恒为 llm：mock / stub 不在生产出结果（F-11）
     if (!(KNOWN_PROVIDERS as readonly string[]).includes(rawName)) {
       throw new InternalServerErrorException({
         error: {
@@ -881,7 +881,7 @@ export class AiService {
       purpose: 'resume_upload',
       uploaderId: null,
       endUserId,
-      assetCategory: 'optimized',
+      assetCategory: 'optimized', derivationKind: 'ai_generated',
       sourceFileId,
       createdBy: 'ai_resume_generate',
       ...(primaryFileId ? { id: primaryFileId } : {}),
@@ -900,7 +900,7 @@ export class AiService {
         purpose: 'resume_upload',
         uploaderId: null,
         endUserId,
-        assetCategory: 'optimized',
+        assetCategory: 'optimized', derivationKind: 'ai_generated',
         sourceFileId,
         createdBy: 'ai_resume_generate',
         ...(printCopyFileId ? { id: printCopyFileId } : {}),
@@ -918,7 +918,7 @@ export class AiService {
     // 打印链路只接受系统 HMAC content URL(signFileUrl),不接受 COS 下载 signedUrl。
     // 收费导出只在核销提交、文件变为 active 之后签发，避免未付款文件拿到可用链接。
     const access = stage ? await this.files.signActiveDownload(uploaded.fileId) : uploaded
-    const printFileUrl = signFileUrl(printFileId).url
+    const printFileUrl = signFileUrl(printFileId, PRINT_ARTIFACT_URL_TTL_MS).url
     if (charge?.taskId) {
       await this.persistConfirmedExportBestEffort({
         taskId: charge.taskId,

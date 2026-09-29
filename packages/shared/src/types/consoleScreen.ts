@@ -142,6 +142,7 @@ export interface ScreenTerminalTwin {
   currentTask: ScreenMetric<{ pages: number; colorMode: 'bw' | 'color' | null; startedAt: string | null } | null>
   today: {
     // 0 保留；大于 0 且小于 SCREEN_MIN_AGGREGATE_SAMPLE 为 null。管理员与机构同一口径。
+    // printPages 只计已出纸：计费页 × 份数，按 PrintTask.completedAt 落入上海自然日（与北京时间同一东八区）。
     printPages: number | null
     printTasks: number | null
     scans: number | null
@@ -188,6 +189,7 @@ export interface ScreenPrintTrendDay {
   pages: number
 }
 
+/** 近 14 个上海自然日。pages = 当日已出纸页数（计费页 × 份数），按 PrintTask.completedAt 落日。 */
 export interface ScreenPrintTrendValue {
   days: ScreenPrintTrendDay[]
   peak: ScreenPrintTrendDay | null
@@ -352,7 +354,7 @@ export interface ScreenSnapshotMetrics {
   contentInventory?: ScreenMetric<ScreenContentInventoryValue>
   aiBreakdown24h?: ScreenMetric<ScreenAiBreakdownValue>
   printTrend14d?: ScreenMetric<ScreenPrintTrendValue>
-  visitCount?: ScreenMetric<never>
+  visitCount?: ScreenMetric<number>
   suppliesAndMap?: ScreenMetric<never>
   printInProgress?: ScreenMetric<ScreenPrintInProgressValue>
   printFailedToday?: ScreenMetric<ScreenPrintFailedTodayValue>
@@ -488,7 +490,7 @@ export interface ScreenPartnerTopContentValue {
 
 export interface ScreenUsageMetrics {
   channels?: ScreenMetric<ScreenUsageChannelsValue>
-  visits?: ScreenMetric<never>
+  visits?: ScreenMetric<number>
   services?: ScreenMetric<ScreenUsageServiceItem[]>
   outcomes?: ScreenMetric<ScreenUsageOutcomesValue>
   heat7d?: ScreenMetric<ScreenUsageHeatValue>

@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react'
 import { KIcon } from '../../../../components/kiosk-icon'
 import type { FeedbackCategory } from '../../../../services/api/memberFeedback'
+import { AI_COMPLAINT_NOTE } from './aiComplaint'
 import { CATEGORY_OPTIONS, type FeedbackFormState } from './types'
 
 export function FeedbackFormPanel({
@@ -16,11 +17,12 @@ export function FeedbackFormPanel({
   onFormChange: Dispatch<SetStateAction<FeedbackFormState>>
   onSubmit: () => void
 }) {
+  const isAiComplaint = !relatedPrintTaskId && form.category === 'ai_content'
   return (
     <section className="qx-card" aria-label="提交反馈">
       <div className="qx-sec-h">
         <h2 className="t">提交反馈</h2>
-        <span className="hint">请描述设备、打印、文件处理或页面建议</span>
+        <span className="hint">请描述设备、打印、文件处理、页面建议或 AI 内容问题</span>
       </div>
 
       <div className="fb-field" style={{ marginTop: 14 }}>
@@ -41,6 +43,7 @@ export function FeedbackFormPanel({
           ))}
         </div>
         {relatedPrintTaskId ? <p className="fb-note">关联打印订单时固定为打印服务</p> : null}
+        {isAiComplaint ? <p className="fb-note" data-testid="member-feedback-ai-content-note">{AI_COMPLAINT_NOTE}</p> : null}
       </div>
 
       {relatedPrintTaskId ? (
@@ -80,7 +83,7 @@ export function FeedbackFormPanel({
           value={form.content}
           onChange={(event) => onFormChange((value) => ({ ...value, content: event.target.value }))}
           maxLength={500}
-          placeholder="请说明遇到的情况、发生页面或希望改进的地方"
+          placeholder={isAiComplaint ? '哪个 AI 功能、什么时间、哪段内容有问题（10–500 字）' : '请说明遇到的情况、发生页面或希望改进的地方'}
         />
       </label>
 

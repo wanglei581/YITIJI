@@ -187,11 +187,13 @@ function assertSourceContract(): void {
   const dto = stripComments(readSrc('src/console-screen/console-screen.dto.ts'))
   const service = stripComments(readSrc('src/console-screen/console-screen.service.ts'))
   const queries = stripComments(readSrc('src/console-screen/console-screen.queries.ts'))
+  const printedPages = stripComments(readSrc('src/console-screen/console-screen.printed-pages.ts'))
   const moduleDir = [
     'console-screen.admin.controller.ts',
     'console-screen.partner.controller.ts',
     'console-screen.service.ts',
     'console-screen.queries.ts',
+    'console-screen.printed-pages.ts',
     'console-screen.assemble.ts',
     'console-screen.cache.ts',
     'console-screen.dto.ts',
@@ -246,9 +248,10 @@ function assertSourceContract(): void {
     '1g. 聚合走 count/groupBy/aggregate，打印趋势与机队有 take 上限',
     /groupBy\(/.test(queries)
       && /aggregate\(/.test(queries)
-      && /take:\s*trendRowCap\s*\+\s*1/.test(queries)
-      && /trendRowCap \?\? PRINT_TREND_ROW_CAP/.test(queries)
-      && /orderBy:\s*\[\s*\{\s*paidAt:\s*'asc'\s*\},\s*\{\s*id:\s*'asc'\s*\}/.test(queries)
+      && /loadPrintedPagesTrend\(/.test(queries)
+      && /take:\s*rowCap\s*\+\s*1/.test(printedPages)
+      && /rowCap \?\? PRINT_TREND_ROW_CAP/.test(printedPages)
+      && /orderBy:\s*\[\s*\{\s*completedAt:\s*'asc'\s*\},\s*\{\s*id:\s*'asc'\s*\}/.test(printedPages)
       && /take:\s*FLEET_SAMPLE_TAKE/.test(queries)
       && /take:\s*JUMP_SOURCE_GROUP_TAKE/.test(queries)
       && /orderBy:\s*\{\s*_count:\s*\{\s*sourceName:\s*'desc'\s*\}/.test(queries)
@@ -334,14 +337,17 @@ function assertSourceContract(): void {
       && !/DROP INDEX/.test(pgIndexMigration),
   )
   assert(
-    '1o. 累计只计 paid 内容页，趋势按 paidAt，今日失败按状态日志 createdAt',
-    /payStatus:\s*'paid'/.test(queries)
-      && /select:\s*\{\s*paidAt:\s*true,\s*billablePages:\s*true/.test(queries)
+    '1o. 趋势与累计按出纸完成时间计页×份数，今日失败按状态日志 createdAt',
+    /loadPrintedPagesTrend\(/.test(queries)
+      && /loadPrintedPagesTotal\(/.test(queries)
       && /printTaskStatusLog\.count/.test(queries)
       && /toStatus:\s*'failed'/.test(queries)
       && !/status:\s*'failed',\s*updatedAt/.test(queries)
+      && !/select:\s*\{\s*paidAt:\s*true,\s*billablePages:\s*true/.test(queries)
       && !/select:\s*\{\s*createdAt:\s*true,\s*billablePages:\s*true/.test(queries)
-      && !/\bcopies\b/.test(queries)
+      && /completedAt:\s*\{\s*gte:\s*from,\s*lt:\s*to\s*\}/.test(printedPages)
+      && /taskCopies\(/.test(printedPages)
+      && /PRINTED_TASK_WHERE/.test(printedPages)
       && /PartnerOrgRequiredError/.test(service),
   )
   assert(
@@ -442,7 +448,8 @@ function deriveTerminalTimelineQuadratic(input: TimelineSample): TimelineDeriveR
     const from = Math.max(at, windowStart)
     const to = Math.min(at + onlineWindowMs, nowMs)
     const status = heartbeat.printerStatus
-    const alert = Boolean(status) && status !== 'unknown' && !isHealthyPrinterStatus(status)
+    // 与 deriveTerminalTimeline 的 printerIssue 同口径：纸张不足仍可打印，不算故障段。
+    const alert = Boolean(status) && status !== 'unknown' && status !== 'low_paper' && !isHealthyPrinterStatus(status)
     segments = overlay(segments, from, to, alert ? 'alert' : 'idle')
   }
   for (const print of input.prints) {
@@ -1285,8 +1292,8 @@ async function assertRecruitmentHostingContract(
         && dailyOff.days[0]?.browse === 6
         && dailyOff.days[0]?.sourceOpens === 6
         && partnerDiff === ''
-        && partnerUseOn.metrics.visits?.available === false
-        && partnerUseOn.metrics.visits.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten,
+        && partnerUseOn.metrics.visits?.available === true // 服务人次已接入（W-69）；本夹具没写会话 → 真 0
+        && partnerUseOn.metrics.visits.value === 0,
       `on=${JSON.stringify(dailyOn)} off=${JSON.stringify(dailyOff)} diff=${partnerDiff}`,
     )
   } finally {
@@ -1601,15 +1608,15 @@ async function assertServiceContract(): Promise<void> {
     const partnerB = await screen.getPartnerSnapshot(orgB)
 
     assert(
-      '3a. gov 含 visitCount 未接入，同时含任务流与告警',
-      Boolean(gov.metrics.visitCount && gov.metrics.visitCount.available === false && gov.metrics.alertsRealtime && gov.metrics.taskFlow24h),
+      '3a. gov 含 visitCount（已接入，W-69），同时含任务流与告警',
+      Boolean(gov.metrics.visitCount && gov.metrics.visitCount.available === true && gov.metrics.alertsRealtime && gov.metrics.taskFlow24h),
     )
     assert('3b. ops 含 alerts 且不含 visitCount', Boolean(ops.metrics.alertsRealtime && !ops.metrics.visitCount))
     assert(
-      '3c. 未接入不用 0 冒充',
-      gov.metrics.visitCount?.available === false
-        && gov.metrics.visitCount.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten
-        && !('value' in gov.metrics.visitCount),
+      '3c. 服务人次按今日会话计，本夹具没写会话就是真 0（不是未接入）',
+      gov.metrics.visitCount?.available === true
+        && gov.metrics.visitCount.window === 'shanghai-day'
+        && gov.metrics.visitCount.value === 0,
     )
     assert(
       '3d. Partner A 只看到本机构在架岗位 1，不含 B 的 2',
@@ -1701,9 +1708,9 @@ async function assertServiceContract(): Promise<void> {
     const yesterdayPages = trendDays.find((day) => day.date === yesterdayKey)?.pages
     const copiesProduct = 3 * 9 + 5 * 13 + 7 * 11
     assert(
-      '3h. 累计只计当前 paid 的内容页，不乘 copies，unpaid/refunded/paying 不计',
+      '3h. 累计按出纸任务×份数（W-68）：夹具里已付单都没出纸、唯一完成任务无订单页数 → 0，不是 paid 内容页 15',
       gov.metrics.printPagesCumulative?.available === true
-        && gov.metrics.printPagesCumulative.value.totalPages === 15
+        && gov.metrics.printPagesCumulative.value.totalPages === 0
         && gov.metrics.printPagesCumulative.value.totalPages !== copiesProduct
         && gov.metrics.printPagesCumulative.value.byColor.available === false,
       gov.metrics.printPagesCumulative?.available
@@ -1711,10 +1718,15 @@ async function assertServiceContract(): Promise<void> {
         : 'unavailable',
     )
     assert(
-      '3h2. 趋势按 paidAt 落入上海自然日，不按 createdAt',
+      '3h2. 趋势按 PrintTask.completedAt 的上海自然日；本夹具已付内容页今日 10、昨日 5 都没出纸，所以是 0',
       gov.metrics.printTrend14d?.available === true
-        && todayPages === 10
-        && yesterdayPages === 5,
+        && gov.metrics.printTrend14d.source.includes('completedAt')
+        && gov.metrics.printTrend14d.source.includes('copies')
+        && gov.metrics.printTrend14d.window === '14d'
+        && todayPages === 0
+        && yesterdayPages === 0
+        && todayPages !== 10
+        && yesterdayPages !== 5,
       `today=${String(todayPages)} yesterday=${String(yesterdayPages)} key=${todayKey}/${yesterdayKey}`,
     )
     assert(
@@ -1772,27 +1784,27 @@ async function assertServiceContract(): Promise<void> {
     const cumulative = await loadPrintCumulativeSlice(prisma, now)
     const cumulativeDays = cumulative.trend === 'capped' ? [] : cumulative.trend.days
     assert(
-      '3h5. 查询函数与快照口径一致：paid 内容页=15、今日失败日志=1',
+      '3h5. 查询函数与快照口径一致：出纸页=0、今日与昨日趋势页=0（已付内容页 10/5 没出纸）、今日失败日志=1',
       live.failedToday === 1
-        && cumulative.pages.totalPages === 15
+        && cumulative.pages !== 'capped' && cumulative.pages.totalPages === 0
         && cumulative.trend !== 'capped'
-        && cumulativeDays.some((day) => day.date === todayKey && day.pages === 10)
-        && cumulativeDays.some((day) => day.date === yesterdayKey && day.pages === 5),
+        && cumulativeDays.some((day) => day.date === todayKey && day.pages === 0)
+        && cumulativeDays.some((day) => day.date === yesterdayKey && day.pages === 0)
+        && !cumulativeDays.some((day) => day.pages === 10 || day.pages === 5),
     )
     const overflow = await loadPrintCumulativeSlice(prisma, now, { trendRowCap: 2 })
     const atCap = await loadPrintCumulativeSlice(prisma, now, { trendRowCap: 3 })
     const atCapDays = atCap.trend === 'capped' ? [] : atCap.trend.days
     assert(
-      '3h6. 趋势 take=cap+1 溢出则 capped，未溢出则仍按 paidAt 窗口可算',
-      overflow.trend === 'capped'
-        && overflow.pages.totalPages === 15
+      '3h6. 本夹具窗口内没有出纸任务，压低 trendRowCap 也不会变成 capped；真实行数上限见 printed-visits',
+      overflow.trend !== 'capped'
+        && overflow.pages !== 'capped' && overflow.pages.totalPages === 0
         && atCap.trend !== 'capped'
-        && atCap.pages.totalPages === 15
-        && atCapDays.some((day) => day.date === todayKey && day.pages === 10)
-        && atCapDays.some((day) => day.date === yesterdayKey && day.pages === 5),
-      overflow.trend === 'capped'
-        ? `overflow=capped atCapToday=${String(atCapDays.find((day) => day.date === todayKey)?.pages)}`
-        : 'overflow-not-capped',
+        && atCap.pages !== 'capped' && atCap.pages.totalPages === 0
+        && atCapDays.some((day) => day.date === todayKey && day.pages === 0)
+        && atCapDays.some((day) => day.date === yesterdayKey && day.pages === 0)
+        && !atCapDays.some((day) => day.pages === 10 || day.pages === 5),
+      `overflow=${overflow.trend === 'capped' ? 'capped' : 'open'} today=${String(atCapDays.find((day) => day.date === todayKey)?.pages)} yesterday=${String(atCapDays.find((day) => day.date === yesterdayKey)?.pages)}`,
     )
     assert(
       '3i. 窗口、登录展示 LIMIT、freshness 写在响应里',
@@ -2081,7 +2093,7 @@ async function assertTwinCases(
   const adminText = JSON.stringify(adminTwin)
   const current = adminTwin.currentTask.available ? adminTwin.currentTask.value : undefined
   assert(
-    '5d. 管理员孪生给出设备块，今日按上海日，访问和耗材不可用，且不含文件名',
+    '5d. 管理员孪生给出设备块，今日打印页数只计已出纸（本夹具已付内容页 10 但没出纸，所以是 0），服务人次无会话为 0，耗材不可用，且不含文件名',
     adminTwin.audience === 'admin'
       && adminTwin.terminal.id === ids.termA
       && adminTwin.terminal.areaLabel === '天河区'
@@ -2102,13 +2114,13 @@ async function assertTwinCases(
       && current?.pages === 6
       && current?.colorMode === 'bw'
       && current?.startedAt === storedTask?.claimedAt?.toISOString()
-      && adminTwin.today.printPages === 10
+      && adminTwin.today.printPages === 0
+      && adminTwin.today.printPages !== 10
       && adminTwin.today.printTasks === null
       && adminTwin.today.scans === 0
       && adminTwin.today.failed === null
-      && adminTwin.today.visits.available === false
-      && adminTwin.today.visits.reason === SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten
-      && !('value' in adminTwin.today.visits)
+      && adminTwin.today.visits.available === true
+      && adminTwin.today.visits.value === 0
       && adminTwin.consumables.available === false
       && adminTwin.consumables.reason === SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo
       && !('value' in adminTwin.consumables)
@@ -2134,7 +2146,8 @@ async function assertTwinCases(
     '5f. 机构 A 可读自己的终端孪生，当日计数与管理员同一口径',
     partnerTwin.audience === 'partner'
       && partnerTwin.terminal.id === ids.termA
-      && partnerTwin.today.printPages === 10
+      && partnerTwin.today.printPages === 0
+      && partnerTwin.today.printPages !== 10
       && partnerTwin.today.printTasks === null
       && partnerTwin.today.scans === 0
       && partnerTwin.today.failed === null
@@ -2543,11 +2556,12 @@ async function assertTwinCases(
   const adminBound = await screen.getAdminTerminalTwin(boundId)
   const partnerBound = await screen.getPartnerTerminalTwin(ids.orgA, boundId)
   assert(
-    '5w. 终端当日计数覆盖 0、1、4、5：管理员与机构相同',
+    '5w. 终端当日计数：扫描 0、失败 1 次与打印任务 4 笔都少于 5、打印页数因没有出纸完成时间是 0；管理员与机构相同',
     adminBound.today.scans === 0
       && adminBound.today.failed === null
       && adminBound.today.printTasks === null
-      && adminBound.today.printPages === 5
+      && adminBound.today.printPages === 0
+      && adminBound.today.printPages !== 5
       && partnerBound.today.scans === adminBound.today.scans
       && partnerBound.today.failed === adminBound.today.failed
       && partnerBound.today.printTasks === adminBound.today.printTasks

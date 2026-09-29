@@ -128,6 +128,15 @@ export const COMPLIANCE_COPY = {
 
   /** Kiosk 合同审查分析中（确认提取结果弹窗）的结果性质说明。出处同上，表二 ContractReviewProcessingPage 行。 */
   KIOSK_CONTRACT_REVIEW_PROCESSING: '本次结果仅作风险提示，请自行核对原文',
+
+  /**
+   * 模拟面试练习结果固定免责（2026-09-29 合规窗口）。
+   * 一体机报告页、练习单 PDF、面试报告 PDF 都显示这一句，不折叠、不加字。
+   * 设置页不使用本句。服务端不能 import 本包，逐字镜像在
+   * services/api/src/mock-interview/interview-practice-sheet.ts。
+   */
+  INTERVIEW_PRACTICE_RESULT_DISCLAIMER:
+    '模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。',
 } as const
 
 export type ComplianceCopyKey = keyof typeof COMPLIANCE_COPY
@@ -170,6 +179,11 @@ export type AiLabelCopyKey = keyof typeof AI_LABEL_COPY
  * 2026-08-01 收敛:此前 CLAUDE.md §2(5 词)、compliance-boundary.md §三(含「投递简历」)、
  * role-boundary.md §7(含「一键报名」)与本常量互不一致,现合并为 7 项并以本常量为准。
  *
+ * 2026-09-29 合规窗口再加「初筛」「岗位匹配度参考」（模拟面试口径）。
+ * 「平台不做初筛」仍由既有 NEGATED 标记「不做」在回看窗口内放行，不新增豁免、不改判定。
+ * 「基本合格」「练习表现等级」本轮不加：小程序里还有，等那边改完由合规窗口补。
+ * 现为 9 项。
+ *
  * 消费方:`scripts/verify-compliance-copy.mjs`(CI 门禁)。该脚本用**文本解析**读取本块,
  * 不是 `import` —— `packages/shared` 只导出裸 TS(无 dist / 无 build),门禁在纯 `node` 下运行。
  * 因此改动本块的**格式**(而非内容)会让门禁 fail-closed 报错,这是刻意设计:
@@ -183,6 +197,8 @@ export const COMPLIANCE_FORBIDDEN_TERMS = [
   '企业收简历',
   '候选人管理',
   '一键报名',
+  '初筛',
+  '岗位匹配度参考',
 ] as const
 
 /**
@@ -216,6 +232,8 @@ export const COMPLIANCE_FORBIDDEN_TERM_PATTERNS: readonly RegExp[] = [
   /企业收简历/,
   /候选人管理/,
   /一键报名/,
+  /初筛/,
+  /岗位匹配度参考/,
 ]
 
 /**

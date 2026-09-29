@@ -16,6 +16,9 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
+import { deepseekThinkingOff } from '../llm/deepseek-thinking'
+import { llmEndpointNotAllowedError } from '../llm/llm-failure'
+import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
@@ -341,12 +344,14 @@ export class LlmResumeOptimizeService {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
+          body: JSON.stringify({ model, messages, temperature, stream: false, ...deepseekThinkingOff(model) }),
         },
         { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_optimize', forbiddenWords } },
       )
     } catch (error) {
       if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
+      if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
       }

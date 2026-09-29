@@ -20,6 +20,7 @@ import { PartnerAccountActionRedisService } from '../common/redis/partner-accoun
 import { RedisService } from '../common/redis/redis.service'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { Prisma } from '../generated/prisma/client'
+import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import { PrismaService } from '../prisma/prisma.service'
 import { InternalOtpService } from './internal-otp.service'
 import {
@@ -401,7 +402,7 @@ export class PartnerPhoneRebindService {
       try {
         return await operation()
       } catch (error) {
-        const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
+        const retryable = isSerializationConflict(error)
         if (!retryable || attempt === 2) throw error
       }
     }

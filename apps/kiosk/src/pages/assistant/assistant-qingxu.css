@@ -76,7 +76,8 @@
 .kassist .aat-body small { display: none; }
 .kassist .assistant-cockpit-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; display: flex; flex-direction: column; gap: 18px; padding: 2px 4px 12px; scroll-padding: 16px; }
 .kassist .assistant-cockpit-body > * { flex-shrink: 0; }
-.kassist .assistant-truth { flex: none; font-size: var(--qx-fs-aux); color: var(--qx-ink-2); }
+.kassist .assistant-truth { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; font-size: var(--qx-fs-aux); color: var(--qx-ink-2); }
+.kassist .assistant-complaint-link { flex: none; min-height: 48px; padding: 0 4px; border: 0; background: none; color: var(--qx-teal-d); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
 .kassist .assistant-workbench[data-kb-open] { padding-bottom: calc(var(--kassist-kb-h) - 132px + 20px); }
 .kassist .assistant-workbench[data-kb-open] .assistant-cockpit { display: none; }
 /* 屏幕键盘打开时暂让阅读区滚动；收起后恢复所有信息。 */

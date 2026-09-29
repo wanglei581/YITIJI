@@ -124,7 +124,11 @@ export class MemberFeedbackService {
     const [rows, total] = await Promise.all([
       this.prisma.feedbackTicket.findMany({
         where,
-        include: { endUser: { select: { phoneEnc: true, nickname: true } } },
+        include: {
+          endUser: { select: { phoneEnc: true, nickname: true } },
+          // 只取有没有管理员回复（最多 1 条 id），答复时限据此停表，不把回复正文带进列表。
+          replies: { where: { senderType: 'admin' }, select: { id: true, senderType: true }, take: 1 },
+        },
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),
@@ -225,6 +229,16 @@ export class MemberFeedbackService {
       include: { endUser: { select: { phoneEnc: true, nickname: true } } },
     })
     if (!ticket) throw new NotFoundException({ error: { code: 'FEEDBACK_NOT_FOUND', message: '反馈记录不存在' } })
+    // 「已回复」只能由真实写入的管理员回复带出（addAdminReply）；手动改成已回复会让答复时限停表、
+    // 告警消失，而提交人什么都没收到（C3 五个工作日时限）。
+    if (status === 'replied' && ticket.status !== 'replied') {
+      const adminReply = await this.prisma.feedbackReply.findFirst({ where: { ticketId: id, senderType: 'admin' }, select: { id: true } })
+      if (!adminReply) {
+        throw new ConflictException({
+          error: { code: 'FEEDBACK_REPLY_REQUIRED', message: '还没有回复记录，不能标为「已回复」；请先填写回复内容，保存后状态会自动变为已回复' },
+        })
+      }
+    }
     await this.prisma.feedbackTicket.update({ where: { id }, data: { status } })
     await this.audit.write({
       actorId: admin.userId,
@@ -330,9 +344,11 @@ export class MemberFeedbackService {
     relatedScanTaskId: string | null
     satisfaction: string | null
     endUser: { phoneEnc: string; nickname: string | null } | null
+    replies?: { senderType: string }[]
   }): AdminFeedbackTicketItem {
     return {
       ...this.toMemberItem(row),
+      hasAdminReply: (row.replies ?? []).some((reply) => reply.senderType === 'admin'),
       // 匿名一体机工单没有 endUser 关联行：手机号 / 昵称一律 null，不编造占位值。
       submitterType: row.submitterType as AdminFeedbackTicketItem['submitterType'],
       endUserId: row.endUserId,

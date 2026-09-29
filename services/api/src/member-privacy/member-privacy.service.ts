@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
+import { isSerializationConflict } from '../common/prisma/serialization-conflict'
 import type { MemberAiConsentScope, MemberAiConsentStatus } from './member-privacy.types'
 
 export const CURRENT_JOB_AI_CONSENT_VERSION = '20260701'
@@ -73,15 +74,6 @@ export class SerializableTransactionRetryExhaustedError extends Error {
   }
 }
 
-export function isPrismaSerializationConflict(error: unknown): boolean {
-  return Boolean(
-    error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      (error as { code?: unknown }).code === 'P2034'
-  )
-}
-
 /**
  * PostgreSQL uses true Serializable transactions. Prisma's SQLite adapter does not expose a
  * portable isolationLevel option, so local SQLite verification deliberately omits that option.
@@ -97,7 +89,7 @@ export async function runSerializableTransaction<R>(
         ? await prisma.$transaction(operation, { isolationLevel: 'Serializable' })
         : await prisma.$transaction(operation)
     } catch (error) {
-      if (!isPrismaSerializationConflict(error)) throw error
+      if (!isSerializationConflict(error)) throw error
       if (attempt === SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS) {
         throw new SerializableTransactionRetryExhaustedError()
       }

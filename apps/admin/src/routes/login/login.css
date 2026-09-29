@@ -642,6 +642,16 @@
   flex: 0 0 auto;
 }
 
+/* 短信第二步：有效期提示与「返回重新输入账号密码」同一行 */
+.clogin .c-2fa-expiry {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.clogin .c-2fa .c-forgot {
+  min-height: 48px;
+}
+
 /* 协议行 */
 .clogin .c-agree {
   display: flex;

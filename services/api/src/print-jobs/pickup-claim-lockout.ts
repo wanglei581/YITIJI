@@ -19,7 +19,7 @@
  *
  * 2. **正常用户手误几次不受影响**：
  *    - 阈值 10 次失败 / 10 分钟窗口。8 位码手输错 10 次本身已属异常。
- *    - **成功认领会清零计数**（`clearOnSuccess`）。这一条是关键：
+ *    - **成功认领抵掉一次失败**（每张单只在首次 pending→claimed 时抵一次，1.8 P-2；不再整个清零）。这一条是关键：
  *      繁忙机器上成功远多于失败，计数根本攒不起来；而纯枚举场景没有成功，
  *      计数会一路涨到阈值。用「有没有成功」把真实用户和枚举者分开，
  *      比单纯调高阈值精确得多。
@@ -42,7 +42,7 @@
 import { Logger } from '@nestjs/common'
 import { tryRedis } from '../common/redis/redis-degradation'
 import type { RedisService } from '../common/redis/redis.service'
-import { memoryDelete, memoryHas, memoryIncrement, memorySet } from './pickup-claim-memory'
+import { memoryDecrement, memoryHas, memoryIncrement, memorySet } from './pickup-claim-memory'
 
 /** 失败计数滑动窗口（秒）。 */
 export const PICKUP_LOCKOUT_WINDOW_SECONDS = 10 * 60
@@ -105,12 +105,16 @@ export async function recordPickupClaimFailure(redis: RedisService, terminalId: 
 }
 
 /**
- * 认领成功后清零失败计数。
+ * 认领成功后给本机失败计数**抵掉一次**（减 1，不低于 0；1.8 P-2）。
  *
  * 这是「正常用户不受影响」那条约束的主要实现手段，不是可选优化：
  * 没有它，繁忙机器上零散的手误会日积月累撞上阈值。
+ * 为什么不整个清零：一张自己的单（试点期 0 元、建单无上限）就能换一次清零，
+ * 「猜 9 次 + 新建一张单」可以一直交替，锁机形同虚设。抵一次失败后，一张新单只换回一次猜码机会，
+ * 攻击收益被压到与「多建一张单」同阶；而用户输错一两次再输对，照样被抵消。
+ * 调用方只在本次把 pending 认领成 claimed 的那一次调用（每张单最多抵一次）。
  */
-export async function clearPickupClaimFailures(redis: RedisService, terminalId: string): Promise<void> {
-  const attempt = await tryRedis('pickup-claim-fail-clear', () => redis.del(failureKey(terminalId)), logger)
-  if (!attempt.ok) memoryDelete(failureKey(terminalId))
+export async function creditPickupClaimSuccess(redis: RedisService, terminalId: string): Promise<void> {
+  const attempt = await tryRedis('pickup-claim-fail-credit', () => redis.decrementFloorKeepTtl(failureKey(terminalId)), logger)
+  if (!attempt.ok) memoryDecrement(failureKey(terminalId))
 }

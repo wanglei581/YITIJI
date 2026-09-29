@@ -188,10 +188,10 @@ const MOCK_TERMINAL_PROFILE: Record<string, UpdateTerminalProfileResult> = {
 const MOCK_PLANNED_TERMINALS: PlannedTerminalCreated[] = []
 const MOCK_TERMINAL_LIFECYCLE: Record<string, { status: TerminalLifecycleStatus; version: number }> = {}
 const MOCK_TERMINAL_CREDENTIAL_STATE: Record<string, { generation: number; active: boolean }> = {}
-function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null } {
+function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null; orgType: string | null } {
   const orgId = MOCK_TERMINAL_ORG[terminalCode] ?? null
-  const orgName = orgId ? (MOCK_ORG_OPTIONS.find((o) => o.id === orgId)?.name ?? null) : null
-  return { orgId, orgName }
+  const org = orgId ? MOCK_ORG_OPTIONS.find((o) => o.id === orgId) : undefined
+  return { orgId, orgName: org?.name ?? null, orgType: org?.type ?? null }
 }
 
 // ─── Mutable module-level state (survives re-renders, reset on page reload) ───

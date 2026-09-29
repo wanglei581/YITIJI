@@ -190,9 +190,10 @@ function main() {
 
   const { assertProductionRuntimeGates, source } = loadGates()
   const restore = overlayProcessEnv(parsed)
+  let report
   try {
     // 不传第二参：字体探测用真实 probeCjkFont()（读本机字体 + 已 overlay 的 RESUME_PDF_FONT_PATH）。
-    assertProductionRuntimeGates(parsed)
+    report = assertProductionRuntimeGates(parsed)
   } catch (error) {
     restore()
     const message = error instanceof Error ? error.message : String(error)
@@ -200,6 +201,12 @@ function main() {
   }
   restore()
 
+  // AI 类配置缺失不拦发布（F-11，产品负责人 2026-09-29 批准）：只在发布日志里打告警，
+  // 发布后 /health 为 degraded、AI 路由 503，打印与支付照常。只打问题码，不打取值。
+  const aiIssues = (report?.aiPlatform?.issues ?? []).map((issue) => issue.code)
+  if (aiIssues.length > 0) {
+    console.log(`::warning::PREFLIGHT AI_PLATFORM_DEGRADED: AI 服务将以未开通状态上线（${aiIssues.join(',')}）；打印、扫描、支付不受影响`)
+  }
   const n = countGateCodes(source)
   console.log(`PREFLIGHT OK: ${n > 0 ? n : 1} gates`)
 }

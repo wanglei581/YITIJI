@@ -10,6 +10,17 @@ const auth = require('../../utils/auth')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
 
+// 没有 AI 解读时说清为什么、要不要再试（后端 #1112 的 aiUnavailableReason）。
+// 闸门类重试没用，不提示重试；声明 / 登录缺失要先补再重新作答。
+const AI_GATE_REASONS = ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_PROVIDER_NOT_CONFIGURED', 'AI_ACCESS_CHECK_FAILED']
+function aiReasonText(code) {
+  if (!code) return 'AI 解读服务本次不可用，五段文字解读没有生成。'
+  if (AI_GATE_REASONS.indexOf(code) >= 0) return 'AI 解读当前没有开放，这次只有五维强度，重新作答也不会有文字解读。'
+  if (code === 'AI_DECLARATION_REQUIRED') return '还没有完成年满 14 周岁声明，所以没有 AI 解读。完成声明后重新作答，可以看到 AI 解读。'
+  if (code === 'AI_LOGIN_REQUIRED') return '按规定登录后才能生成 AI 解读。登录后重新作答，可以看到 AI 解读。'
+  return 'AI 解读服务本次不可用，五段文字解读没有生成。'
+}
+
 /**
  * 自我探索 · 倾向参考。
  *
@@ -45,6 +56,8 @@ const storage = require('../../utils/storage')
  * 同意书改版时静默失配（服务端会回 SELF_ASSESSMENT_CONSENT_VERSION_STALE）。
  */
 const CONSENT_ITEMS = [
+  // 合规窗口 9/29 裁定，一字不差（匿名也能作答、结果短期保存，维持可用但写明年龄要求）。
+  '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。',
   '本工具基于你本人的作答给出倾向参考，不是临床、心理或人格诊断。',
   '结果只对你本人可见，不向企业、合作机构或任何第三方推送。',
   '答案原文不入库、也不发给 AI：服务端只保存作答摘要（哈希）、五维强度与解读文字，发给模型的只有五个维度名与对应强度分值。',
@@ -529,8 +542,12 @@ Page({
       status,
       failReason: trimmed(res && res.failReason),
       summary: trimmed(res && res.summary),
-      // 服务端明说模型这次调不通时才是 llm_unavailable，不拿它猜别的失败原因
-      providerUnavailable: !!(res && res.providerName === 'llm_unavailable'),
+      // 有没有 AI 解读：优先读服务端的 interpretationAvailable（后端 #1112 起有）；
+      // 没有这个字段的旧服务端，退回「providerName 明说 llm_unavailable」。不拿别的失败猜。
+      providerUnavailable: res && typeof res.interpretationAvailable === 'boolean'
+        ? !res.interpretationAvailable
+        : !!(res && res.providerName === 'llm_unavailable'),
+      aiReasonText: aiReasonText(res && res.aiUnavailableReason),
       noteCount: dims.filter((d) => d.note).length,
       consentVersion: trimmed(res && res.consentVersion),
       consentedAt: N.dateTime(res && res.consentedAt) || '',

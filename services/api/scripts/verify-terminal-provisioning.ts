@@ -237,8 +237,11 @@ async function main(): Promise<void> {
       bindCode: bind.bindCode,
       deviceFingerprint: `activated-${suffix}`,
       agentVersion: 'verify-terminal-provisioning',
+      displayName: 'DESKTOP-AGENT-REPORTED',
     })
     const commissioning = await prisma.terminal.findUniqueOrThrow({ where: { id: planned.id } })
+    // W-05：管理员预建时起的名字是给运营看的，Agent 装机上报的机器名不能把它盖掉。
+    assert(commissioning.displayName === 'Gate 0 planned verifier', 'bind-code exchange keeps the Admin-given displayName (W-05)')
     assert(commissioning.lifecycleStatus === 'commissioning', 'bind-code activation moves planned asset to commissioning')
     assert(!commissioning.agentToken.startsWith('planned$'), 'activation replaces planned placeholder')
     assert(exchanged.generation === 1 && commissioning.credentialGeneration === 1, 'first activation issues generation 1')
@@ -249,6 +252,10 @@ async function main(): Promise<void> {
     const listed = adminView.terminals.find((terminal) => terminal.id === planned.id)
     assert(listed?.lifecycleStatus === 'commissioning', 'Admin list exposes lifecycle status')
     assert(listed.online === false, 'terminal without heartbeat is never reported online')
+    // W-04：从未心跳的终端，「最近心跳」必须是 null（页面显示「从未」），后台编辑也不能把它变成「刚刚」。
+    await service.updateTerminalProfile(planned.id, { locationLabel: 'isolated verification (edited)' })
+    const editedListed = (await service.listTerminalsForAdmin()).terminals.find((terminal) => terminal.id === planned.id)
+    assert(editedListed?.lastHeartbeatAt === null, 'never-heartbeated terminal reports lastHeartbeatAt null even after an Admin edit (W-04)')
 
     const heartbeatAck = await service.heartbeat(
       planned.id,
@@ -274,6 +281,14 @@ async function main(): Promise<void> {
     const activeAdminView = await service.listTerminalsForAdmin()
     const activeListed = activeAdminView.terminals.find((terminal) => terminal.id === planned.id)
     assert(activeListed?.online === true, 'successful heartbeat reports the activated terminal online')
+    assert(activated.lastHeartbeatAt instanceof Date, 'heartbeat records Terminal.lastHeartbeatAt (W-04)')
+    // 心跳表 90 天清理后，「最近心跳」仍要从终端列读到，不能退回「从未」。
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: planned.id } })
+    const prunedListed = (await service.listTerminalsForAdmin()).terminals.find((terminal) => terminal.id === planned.id)
+    assert(
+      prunedListed?.lastHeartbeatAt === activated.lastHeartbeatAt.toISOString(),
+      'Admin list keeps lastHeartbeatAt from the terminal column after heartbeat rows are pruned (W-04)',
+    )
 
     const activeCode = `ACTIVE-${suffix}`
     const active = await prisma.terminal.create({
@@ -379,8 +394,10 @@ async function main(): Promise<void> {
     const replacement = await service.exchangeBindCode({
       bindCode: activeBind.bindCode,
       deviceFingerprint: `active-rebind-${suffix}`,
+      displayName: '  Agent 上报的名字  ',
     })
     const reboundActive = await prisma.terminal.findUniqueOrThrow({ where: { id: active.id } })
+    assert(reboundActive.displayName === 'Agent 上报的名字', 'bind-code exchange fills displayName from the Agent when the terminal has none (W-05)')
     assert(reboundActive.lifecycleStatus === 'maintenance', 'replacement bind preserves maintenance until explicit recommission')
     await expectRejected(
       () => service.assertAgentAuthorized(active.id, `Bearer active-placeholder-${suffix}`),

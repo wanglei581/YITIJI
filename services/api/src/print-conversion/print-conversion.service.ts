@@ -267,6 +267,7 @@ export class PrintConversionService {
       uploaderId: null,
       endUserId: endUserId ?? undefined,
       assetCategory: 'derived',
+      derivationKind: 'format_conversion',
       sourceFileId: null,
       createdBy: endUserId,
     })

@@ -41,9 +41,15 @@ model Terminal {
   geoLng            Float?
   enabled           Boolean  @default(true)
   orgId             String?
+  /// 当前 orgId 从什么时候开始生效。orgId 为空时必须为空。
+  /// 机构端「终端数据」只统计这个时间之后的打印、扫描和心跳。
+  orgBoundAt        DateTime?
   org               Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
   registeredAt      DateTime @default(now())
   lastSeenAt        DateTime @updatedAt
+  /// 最近一次 Agent 心跳写入的时间，只在心跳时写。null = 从未心跳。
+  /// 不能用 lastSeenAt 代替：它是 @updatedAt，后台改名、改点位等任何编辑都会刷新它。
+  lastHeartbeatAt   DateTime?
 
   heartbeats   TerminalHeartbeat[]
   printTasks   PrintTask[]
@@ -649,11 +655,12 @@ model Refund {
 //
 // type 取值同 packages/shared PartnerType:
 //   'school_employment_center' | 'public_employment_service' |
-//   'licensed_hr_agency' | 'fair_organizer' | 'enterprise_source'
+//   'licensed_hr_agency' | 'fair_organizer' | 'enterprise_source' |
+//   'gig_worker_home'（零工之家）| 'employment_service_station'（就业服务站）
 
 // type 取值 = shared PartnerType:
 //   'school_employment_center' | 'public_employment_service' | 'licensed_hr_agency'
-//   | 'fair_organizer' | 'enterprise_source'
+//   | 'fair_organizer' | 'enterprise_source' | 'gig_worker_home' | 'employment_service_station'
 // sceneTemplate 取值 = shared SceneTemplate('school' | 'public_employment' | 'licensed_hr_service')。
 // enabledModulesJson:JSON 数组,取值 = shared EnabledModule;招聘闭环模块(PROHIBITED_MODULES)
 //   服务端硬拒绝,任何配置都写不进来。
@@ -665,6 +672,9 @@ model Organization {
   type       String
   contact    String?
   contactPhone String?
+  /// 联系人手机号最近一次实际变更的时间。空表示这列上线后还没改过。
+  /// 管理员为机构账号登记该手机号前要等满 24 小时，避免刚改完号码就自己收码。
+  contactPhoneChangedAt DateTime?
   sceneTemplate String?
   enabledModulesJson String @default("[]")
   enabled    Boolean  @default(true)
@@ -831,6 +841,8 @@ model User {
   phoneHash    String?       @unique
   phoneEnc     String?
   phoneVerifiedAt DateTime?
+  /// 管理员登记本手机号的时间。有值且 phoneVerifiedAt 为空：号码尚未经本人短信自证。
+  phoneRegisteredByAdminAt DateTime?
   emailHash    String?       @unique
   emailEnc     String?
   emailVerifiedAt DateTime?
@@ -840,6 +852,10 @@ model User {
   lastLoginAt  DateTime?
   enabled      Boolean       @default(true)
   deletedAt    DateTime?
+  /// 备用管理员（3.9）：主管理员在后台建号（手机号建号时验证、随机不可知临时密码、默认停用），
+  /// 主账号登不上时由服务器端应急命令启用。全局最多 1 个未删除的备用管理员：
+  /// 条件唯一索引 "User_single_backup_admin"（只在两套迁移里，schema 语法表达不了 WHERE）。
+  isBackupAdmin Boolean      @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -891,6 +907,7 @@ model EndUser {
   broadcastReadStates BroadcastReadState[]
   jobAiSessions   JobAiSession[]
   aiServiceLogs   AiServiceLog[]
+  aiUsageRecords  AiUsageRecord[]
   aiConsents      UserAiConsent[]
   legalConsents   MemberLegalConsent[]
   dataRequests    UserDataRequest[]
@@ -1163,6 +1180,10 @@ model FileObject {
   filename    String   // 原始文件名(originalName);绝不作为 objectKey
   mimeType    String
   sizeBytes   Int
+  // 从文件字节识别出的页数。可空且不设默认值。
+  // null = 还没识别（旧文件、Word、解析失败、直传尚未读到字节）。
+  // 不用 0 表示未知。列表只把正整数交出去，其余收成 null。不接受客户端申报的页数。
+  pageCount   Int?
   sha256      String   // 服务端直传路径就 buffer 计算;直传意图未知时为 ''
 
   // 业务关联 / 归属
@@ -1216,6 +1237,12 @@ model FileObject {
   sourceFileId  String?
   sourceFile    FileObject? @relation("FileAssetDerivation", fields: [sourceFileId], references: [id], onDelete: SetNull)
   derivedFiles  FileObject[] @relation("FileAssetDerivation")
+  // 派生件是怎么来的(1.8 P-1)。只对 derived / optimized 有意义,原件为 null。
+  // 'format_conversion'(图片/Office 转 PDF)| 'signature'(签名合成)
+  // | 'pii_redaction'(隐私遮挡产物)| 'ai_generated'(AI 报告、简历导出等一切 AI / 系统生成件)。
+  // 打印前隐私检查只豁免 ai_generated / pii_redaction;存量 null 按「要检查」处理
+  // (判断函数见 src/print-jobs/material-check-policy.ts)。
+  derivationKind String?
   retentionPolicy String? // 'months_3' | 'months_6' | 'long_term' | 'system_short'
   retentionSetBy  String? // 'system' | 'user' | 'admin'
   retentionConsentAt DateTime?
@@ -1830,7 +1857,7 @@ model FieldMappingRule {
 model AiResumeResult {
   id         String   @id @default(cuid())
   taskId     String
-  kind       String   // 'parse' | 'optimize'
+  kind       String   // 'parse' | 'optimize' | 'generate' | 'generate_input'（生成时的原始填写）| ...
   status     String   // AiTaskStatus
   payloadJson String  @default("{}")
   provider   String
@@ -1852,11 +1879,15 @@ model AiResumeResult {
   // 迁移前历史行 expiresAt 为 null:读取路径与 cron 清理均按"已过期"处理
   // (不可读 + 会被删),不让无留存窗口的历史简历派生数据长期留存。
   expiresAt  DateTime?
+  // 生成 / 优化时已验签的一体机编号（x-terminal-id + x-terminal-session-token），网页、小程序为 null。
+  // 只供「按原样导出」核对匿名草稿是否照抄了本台本次使用里的 AI 结果；随本行同一 TTL 清理。
+  terminalId String?
 
   @@unique([taskId, kind])
   @@index([taskId])
   @@index([endUserId])
   @@index([expiresAt])
+  @@index([terminalId])
 }
 
 // ── Job AI 商用闭环底座 ─────────────────────────────────────────────────────
@@ -1926,6 +1957,62 @@ model AiServiceLog {
   @@index([operation, createdAt])
   @@index([status, createdAt])
   @@index([endUserId])
+}
+
+// P1-2a AI 逐次计量账：每次**真的发出**的大模型请求一行（白名单拒绝、并发闸门拒绝不记——没花钱）。
+// 额度（全局 / 单台终端 / 单个会员，按北京时间自然日）与将来收费、额度都以这本账为底座。
+// 与 AiServiceLog（每次「操作」一行、终端号取自请求头、给后台现有统计）语义不同，互不替代。
+// 只存元数据：绝不存正文、文件名、提示词。costCny 为 null = 取不到用量（不是 0），额度按保守单价计入。
+// terminalId 只记已验签（x-terminal-id + x-terminal-session-token）的终端；没验过为 null。
+model AiUsageRecord {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  /// 北京时间 YYYY-MM-DD，按日聚合与额度用
+  dayKey           String
+  featureKey       String
+  vendor           String
+  model            String?
+  /// ok / upstream_error / busy / timeout / network_error / aborted / blocked
+  status           String
+  httpStatus       Int?
+  promptTokens     Int?
+  completionTokens Int?
+  costCny          Float?
+  costMeasured     Boolean  @default(false)
+  terminalId       String?
+  terminalVerified Boolean  @default(false)
+  orgId            String?
+  endUserId        String?
+  endUser          EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  /// 到期清理前已滚进月汇总的时间。空 = 还没汇总；未到期的行保持为空。
+  summarizedAt     DateTime?
+
+  @@index([dayKey])
+  @@index([dayKey, terminalId])
+  @@index([dayKey, endUserId])
+  @@index([orgId, dayKey])
+  @@index([endUserId])
+  @@index([createdAt])
+}
+
+/// 按月费用汇总。只有金额和次数，不含会员、终端、机构或任何用户文本。
+/// 长期保留，不随明细到期删除。只汇总即将被删、且还没汇总过的 AiUsageRecord。
+/// model 用空字符串而不是 NULL，否则唯一索引在 SQLite 与 PostgreSQL 上都不把多行 NULL 收成同一键。
+model AiUsageMonthlySummary {
+  id               String   @id @default(cuid())
+  /// 北京时间 YYYY-MM
+  monthKey         String
+  featureKey       String
+  vendor           String
+  /// 空字符串 = 当时没取到型号。不用 NULL：两边的唯一索引都不把多个 NULL 当成同一键，重跑会插出多行。
+  model            String   @default("")
+  status           String
+  callCount        Int
+  measuredCostCny  Float    @default(0)
+  unmeasuredCount  Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  @@unique([monthKey, featureKey, vendor, model, status], map: "AiUsageMonthly_dims_key")
 }
 
 model UserAiConsent {

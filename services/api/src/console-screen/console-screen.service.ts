@@ -17,7 +17,7 @@ import {
   type Loaded,
 } from './console-screen.assemble'
 import { ScreenSnapshotCache } from './console-screen.cache'
-import { ALERT_LIST_LIMIT, screenLimits, screenWindowMeta, snapshotLoadStatus } from './console-screen.metric'
+import { ALERT_LIST_LIMIT, screenLimits, screenWindowMeta, shanghaiDayStart, snapshotLoadStatus } from './console-screen.metric'
 import {
   loadAdminFleet,
   loadAiSlice,
@@ -31,6 +31,7 @@ import {
 } from './console-screen.queries'
 import { PartnerOrgRequiredError, requirePartnerOrgId } from './console-screen.org'
 import { loadTerminalTwin, terminalTwinNotFound } from './console-screen.twin'
+import { countAllVisits, countOrgVisits } from './console-screen.visits'
 
 @Injectable()
 export class ConsoleScreenService {
@@ -59,6 +60,7 @@ export class ConsoleScreenService {
       sync: counts.value.sync,
       jumps: counts.value.jumps,
       fairs: counts.value.fairs,
+      visits: counts.value.visits,
       alerts: alerts.value,
     })
     const loadFlags = [
@@ -69,6 +71,7 @@ export class ConsoleScreenService {
       counts.value.sync.ok,
       counts.value.jumps.ok,
       counts.value.fairs.ok,
+      counts.value.visits.ok,
       cumulative.value.ok,
       alerts.value.ok,
     ]
@@ -118,12 +121,13 @@ export class ConsoleScreenService {
         () => this.settle('partnerFleet', () => loadPartnerFleet(this.prisma, now, scopedOrgId)),
       ),
       this.cache.getOrLoad(`partner:${scopedOrgId}:counts`, SCREEN_CACHE_TTL_SECONDS.counts, async () => {
-        const [content, sync, fairs] = await Promise.all([
+        const [content, sync, fairs, visits] = await Promise.all([
           this.settle('partnerContent', () => loadContentSlice(this.prisma, now, scopedOrgId)),
           this.settle('partnerSync', () => loadSyncSlice(this.prisma, now, scopedOrgId)),
           this.settle('partnerFairs', () => loadFairSlice(this.prisma, now, scopedOrgId)),
+          this.settle('partnerVisits', () => countOrgVisits(this.prisma, scopedOrgId, shanghaiDayStart(now), now)),
         ])
-        return { content, sync, fairs }
+        return { content, sync, fairs, visits }
       }),
     ])
     const all = assemblePartnerMetrics({
@@ -131,12 +135,14 @@ export class ConsoleScreenService {
       content: counts.value.content,
       sync: counts.value.sync,
       fairs: counts.value.fairs,
+      visits: counts.value.visits,
     })
     const loadFlags = [
       realtime.value.ok,
       counts.value.content.ok,
       counts.value.sync.ok,
       counts.value.fairs.ok,
+      counts.value.visits.ok,
     ]
     const okCount = loadFlags.filter(Boolean).length
     const status = snapshotLoadStatus(okCount, loadFlags.length)
@@ -219,13 +225,14 @@ export class ConsoleScreenService {
   }
 
   private async loadAdminCounts(now: Date) {
-    const [content, ai, sync, jumps, fairs] = await Promise.all([
+    const [content, ai, sync, jumps, fairs, visits] = await Promise.all([
       this.settle('adminContent', () => loadContentSlice(this.prisma, now)),
       this.settle('adminAi', () => loadAiSlice(this.prisma, now)),
       this.settle('adminSync', () => loadSyncSlice(this.prisma, now)),
       this.settle('adminJumps', () => loadJumpRows(this.prisma, now)),
       this.settle('adminFairs', () => loadFairSlice(this.prisma, now)),
+      this.settle('adminVisits', () => countAllVisits(this.prisma, shanghaiDayStart(now), now)),
     ])
-    return { content, ai, sync, jumps, fairs }
+    return { content, ai, sync, jumps, fairs, visits }
   }
 }

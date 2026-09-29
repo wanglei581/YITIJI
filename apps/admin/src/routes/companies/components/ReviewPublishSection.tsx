@@ -1,10 +1,13 @@
+// 【停放，2026-09-29，next-tasks 3.15】源码保留，不打包：只被停放的 CompanyDetailDrawerEditor.tsx 引用，
+// 页面挂载的只读 CompanyDetailDrawer 不再用它。本节是管理员对企业资料的「审核通过 / 拒绝 / 发布 / 下架」，
+// 托管 a 下本平台不代审、不代发、不代改；b 版本随 CompanyDetailDrawerEditor 一起恢复。
 import { useState } from 'react'
 import { Card, StatusBadge } from '@ai-job-print/ui'
 import { Field, GhostButton, InlineError, InlineSuccess, PrimaryButton } from '../../../components/form'
 import { PUBLISH_BADGE, REVIEW_BADGE, errMsg, inputCls } from './shared'
 import { companiesAdminService, type AdminCompanyDetail } from '../../../services/api/companiesAdmin'
 
-/** readOnly：托管关闭（我们云上默认）时只显示状态，不给审核 / 发布 / 下架（点了也只会 403）。 */
+/** readOnly：只显示状态，不给审核 / 发布 / 下架（服务端对这些接口在托管关闭时回 403）。 */
 export function ReviewPublishSection({ detail, onMutated, readOnly = false }: { detail: AdminCompanyDetail; onMutated: () => void; readOnly?: boolean }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

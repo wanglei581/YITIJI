@@ -54,5 +54,5 @@ assert.match(schema, /model ActiveReleaseObservationAssignment[\s\S]*targetId\s+
 assert.match(service, /dto\.action === 'activate'[\s\S]*tx\.terminal\.findMany\([\s\S]*lifecycleStatus: true[\s\S]*RELEASE_TARGET_INELIGIBLE/)
 assert.match(service, /return this\.prisma\.\$transaction\(async \(tx\) => \{\n      \/\/ Re-check eligibility/)
 assert.match(service, /existing && existing\.observedAt > observedAt/)
-assert.match(service, /code === 'P2034'/)
+assert.match(service, /isUniqueConstraintError\(error\) \|\| isSerializationConflict\(error\)/)
 console.log('RELEASE_OBSERVATION_CONTRACT_PASS')

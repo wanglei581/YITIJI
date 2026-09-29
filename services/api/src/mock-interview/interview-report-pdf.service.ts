@@ -4,6 +4,7 @@ import { applyAigcPdfMetadata } from '../common/pdf/aigc-pdf-metadata'
 import { stampAigcPageHeader } from '../common/pdf/aigc-label'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import type { InterviewQaExcerpt } from './interview-qa-excerpt'
+import { INTERVIEW_PRACTICE_RESULT_DISCLAIMER } from './interview-practice-sheet'
 import type { InterviewReportPayload } from './mock-interview-llm.service'
 
 // ============================================================
@@ -62,6 +63,7 @@ export class InterviewReportPdfService {
     doc.fontSize(10).fillColor('#6b7280').text(`目标岗位：${meta.position} ｜ 行业：${meta.industry} ｜ 面试官：${meta.interviewerLabel} ｜ 练习时间：${meta.date}`)
     doc.moveDown(0.2)
     doc.fontSize(9).fillColor('#9ca3af').text('本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。')
+    doc.fontSize(9).fillColor('#9ca3af').text(INTERVIEW_PRACTICE_RESULT_DISCLAIMER)
 
     title('一、综合表现概览')
     doc.fontSize(10.5).fillColor('#374151').text(report.overall.summary, { lineGap: 3 })

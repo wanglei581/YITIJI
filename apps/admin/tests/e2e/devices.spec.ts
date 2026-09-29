@@ -25,8 +25,13 @@ test.describe('设备 / 终端 / 打印机（mock 口径）', () => {
       await expectDialogAndDismiss(page, () => disable.click(), /确定停用终端/)
     }
 
+    // 外设页（3.9）：按外设看的状态矩阵；云端没有遥测的四类外设如实写「不上报」，离线终端不冒充正常
     await page.getByRole('button', { name: '外设' }).click()
-    await expect(page.getByText('本阶段不开放外设独立管理')).toBeVisible()
+    await expect(page.getByText('打印机异常', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^U 盘/).first()).toBeVisible()
+    await expect(page.getByText('不上报').first()).toBeVisible()
+    await expect(page.getByText(/Terminal Agent 目前不向云端上报它们的状态/)).toBeVisible()
+    await expect(page.getByText('终端离线').first()).toBeVisible()
 
     await page.getByRole('button', { name: '打印机' }).click()
     await expect(page.getByText('张)')).toHaveCount(0)

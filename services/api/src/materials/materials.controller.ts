@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Req } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common'
 import { AiUse, AiUseExempt, MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
@@ -9,6 +9,8 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateMaterialTaskDto } from './dto/create-material-task.dto'
 import { DecidePiiFindingsDto } from './dto/decide-pii-findings.dto'
+import { ConfirmManualCheckDto } from './dto/confirm-manual-check.dto'
+import { MaterialsManualConfirmationService } from './materials-manual-confirmation.service'
 import { MaterialsService } from './materials.service'
 import type { DocumentProcessTaskView, MaterialsRequester } from './materials.types'
 import { PrintParamSuggestionService } from './print-param-suggestion.service'
@@ -24,6 +26,7 @@ export class MaterialsController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
+    private readonly manualConfirmation: MaterialsManualConfirmationService,
   ) {}
 
   /**
@@ -89,6 +92,23 @@ export class MaterialsController {
   ): Promise<ApiResponse<DocumentProcessTaskView>> {
     const requester = await this.resolveRequester(req)
     return ApiResponse.ok(await this.materials.decidePiiFindings(id, dto, requester))
+  }
+
+  /**
+   * 隐私检查没有完整覆盖（partial / degraded / unsupported_format）时的本人确认（A-04）。
+   * 与逐项裁决同鉴权；重复确认幂等。建单是否要求这一步由 PRINT_PII_MANUAL_CONFIRM_ENFORCED 决定。
+   */
+  @Post('tasks/:id/manual-confirmation')
+  @HttpCode(200)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  @AiUseExempt(MATERIAL_CHECK_EXEMPT_REASON)
+  async confirmManualCheck(
+    @Param('id') id: string,
+    @Body() _dto: ConfirmManualCheckDto,
+    @Req() req: ReqLike,
+  ): Promise<ApiResponse<DocumentProcessTaskView>> {
+    const requester = await this.resolveRequester(req)
+    return ApiResponse.ok(await this.manualConfirmation.confirm(id, requester))
   }
 
   private async resolveRequester(req: ReqLike): Promise<MaterialsRequester> {
