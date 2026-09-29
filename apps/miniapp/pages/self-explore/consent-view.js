@@ -49,7 +49,9 @@ function splitLabel(label, links) {
  */
 function toConsentView(res, docTypes) {
   const items = (res && Array.isArray(res.consentItems) ? res.consentItems : []).map(trimmed).filter(Boolean)
-  const version = trimmed(res && res.consentVersion)
+  // 版本号原样保留、原样提交：服务端要求与下发值逐字相等（#1119），这里不 trim、不拼接。
+  // 只在判断「有没有」时看去掉空白后是否为空。
+  const version = res && typeof res.consentVersion === 'string' ? res.consentVersion : ''
   const checkboxLabel = trimmed(res && res.consentCheckboxLabel)
   const links = toLinks(res && res.consentLinks, docTypes)
   const split = splitLabel(checkboxLabel, links)
@@ -60,7 +62,7 @@ function toConsentView(res, docTypes) {
     consentLinks: links,
     checkboxParts: split.parts,
     extraLinks: split.extraLinks,
-    consentReady: items.length > 0 && !!version && !!checkboxLabel,
+    consentReady: items.length > 0 && !!trimmed(version) && !!checkboxLabel,
   }
 }
 

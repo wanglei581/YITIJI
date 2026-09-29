@@ -374,10 +374,44 @@ test('版本号缺失或全是空白：不就绪', () => checkBlankVersionNotRea
 test('版本号空白：页面置灰、进不了答题', () => checkMissingBlocks({ consentVersion: '   ' }))
 
 test('变异：就绪判断不看版本号 → 判红', () => {
-  const from = 'items.length > 0 && !!version && !!checkboxLabel'
+  const from = 'items.length > 0 && !!trimmed(version) && !!checkboxLabel'
   assert.ok(CONSENT_VIEW_SRC.includes(from))
   const cv = compileConsentView(CONSENT_VIEW_SRC.replace(from, 'items.length > 0 && !!checkboxLabel'))
   assert.throws(() => checkBlankVersionNotReady(cv), (e) => e.code === 'ERR_ASSERTION')
+})
+
+test('变异：只判「非空串」不去空白（空格版本号也放行）→ 判红', () => {
+  const from = 'items.length > 0 && !!trimmed(version) && !!checkboxLabel'
+  const cv = compileConsentView(CONSENT_VIEW_SRC.replace(from, 'items.length > 0 && !!version && !!checkboxLabel'))
+  assert.throws(() => checkBlankVersionNotReady(cv), (e) => e.code === 'ERR_ASSERTION')
+})
+
+// 服务端要求提交的版本号与下发值逐字相等（#1119）：页面不 trim、不拼接，原样带回。
+// 夹具故意带首尾空白：只有原样保留才能对上；一旦 trim，提交值就和下发值不一样了。
+const VERBATIM_VERSION = ' fixture-consent-v11 '
+function checkVersionVerbatim(cv) {
+  const view = cv.toConsentView(readyFixture({ consentVersion: VERBATIM_VERSION }), DOC_TYPES)
+  assert.equal(view.consentVersion, VERBATIM_VERSION, '版本号原样保留')
+}
+
+test('版本号原样保留，不 trim', () => checkVersionVerbatim(compileConsentView(CONSENT_VIEW_SRC)))
+
+test('版本号原样提交', async () => {
+  const { page, calls } = makePage(readyFixture({ consentVersion: VERBATIM_VERSION }))
+  page.onLoad({})
+  await flush()
+  page.toggleNonSensitive()
+  page.startAsk()
+  page.tapChoice({ currentTarget: { dataset: { g: 0, q: 0, c: 'a' } } })
+  page.submit()
+  assert.equal(calls.submit[0].consentVersion, VERBATIM_VERSION)
+})
+
+test('变异：版本号被 trim → 判红', () => {
+  const from = "const version = res && typeof res.consentVersion === 'string' ? res.consentVersion : ''"
+  assert.ok(CONSENT_VIEW_SRC.includes(from))
+  const cv = compileConsentView(CONSENT_VIEW_SRC.replace(from, 'const version = trimmed(res && res.consentVersion)'))
+  assert.throws(() => checkVersionVerbatim(cv), (e) => e.code === 'ERR_ASSERTION')
 })
 
 /**
