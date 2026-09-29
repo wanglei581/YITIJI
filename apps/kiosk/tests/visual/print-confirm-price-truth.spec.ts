@@ -26,7 +26,14 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
-import { W2_FILE, W2_ORDER, W2_PRINT_PARAMS, setReactRouterState } from './fixtures/fusion-w2-state'
+import { W2_FILE, W2_ORDER, W2_PRINT_PARAMS, writePrintHandoff } from './fixtures/fusion-w2-state'
+
+/** 打印交接统一（P0-5）后确认页只认打印交接上下文：写一份 v2 上下文再重载（跳转临时状态里的文件一律不看）。 */
+async function openConfirmWith(page: Page, printParams: Record<string, unknown>): Promise<void> {
+  await page.goto('/print/confirm')
+  await writePrintHandoff(page, { printParams, materialCheck: null })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+}
 
 const NOW = '2026-08-18T00:00:00.000Z'
 
@@ -126,12 +133,7 @@ test('print confirm shows the same color mode it prices (color) @kiosk', async (
   const seen: { colorMode?: string } = {}
   await routePricingQuote(page, W2_FILE.pages, seen)
 
-  await page.goto('/print/confirm')
-  await setReactRouterState(page, '/print/confirm', {
-    file: W2_FILE,
-    params: { ...W2_PRINT_PARAMS, colorMode: 'color' },
-    source: 'document',
-  })
+  await openConfirmWith(page, { ...W2_PRINT_PARAMS, colorMode: 'color' })
 
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
   await expect(page.locator('[data-cost-calc]')).toHaveText(
@@ -150,7 +152,8 @@ test('print confirm shows the same color mode it prices (color) @kiosk', async (
   expect(pageErrors).toEqual([])
 })
 
-test('print confirm blocks unverified color instead of quoting it @kiosk', async ({ page, api }) => {
+// 9/29 定稿（稿 14）：本机没开通彩色时不再拦截，按黑白报价、主按钮可点；绝不按彩色报价。
+test('print confirm falls back to black-and-white and never quotes unverified color @kiosk', async ({ page, api }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
 
@@ -158,20 +161,17 @@ test('print confirm blocks unverified color instead of quoting it @kiosk', async
   const seen: { colorMode?: string } = {}
   await routePricingQuote(page, W2_FILE.pages, seen)
 
-  await page.goto('/print/confirm')
-  await setReactRouterState(page, '/print/confirm', {
-    file: W2_FILE,
-    params: { ...W2_PRINT_PARAMS, colorMode: 'color' },
-    source: 'document',
-  })
+  await openConfirmWith(page, { ...W2_PRINT_PARAMS, colorMode: 'color' })
 
   await expect(page.locator('[data-testid="print-confirm-state-capability-invalid-params"]')).toBeVisible()
-  await expect(summaryValue(page, '色彩模式')).toContainText('彩色')
-  await expect(summaryValue(page, '色彩模式')).toContainText('暂不可用')
+  await expect(summaryValue(page, '色彩模式')).toContainText('彩色本机暂未开通')
+  await expect(page.locator('[data-sum-row="色彩模式"]')).toContainText('已按黑白报价')
   await expect(page.locator('[data-sum-row="本次产物"]')).toHaveAttribute('data-file-id', W2_FILE.fileId)
   await expect(summaryValue(page, '本次产物')).toHaveText('打印件')
-  await expect(page.getByText('金额暂不可用')).toBeVisible()
-  expect(seen.colorMode).toBeUndefined()
+  await expect(page.locator('[data-cost-calc]')).toHaveText(`${yuan(UNIT_CENTS.black_white)}/页 × ${W2_FILE.pages} 页`)
+  expect(seen.colorMode).toBe('black_white')
+  await expect(page.getByText('金额暂不可用')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /确认并去付款/ })).toBeEnabled()
   expect(pageErrors).toEqual([])
 })
 
@@ -283,7 +283,8 @@ async function openConfirm(page: Page, selfAssessment = false): Promise<void> {
       window.sessionStorage.setItem('self_assessment_session_v1', JSON.stringify({ taskId, accessToken: 'sa-access-fixture' }))
     }, SA_TASK_ID)
   }
-  await setReactRouterState(page, '/print/confirm', { file: W2_FILE, params: W2_PRINT_PARAMS, source: 'document' })
+  await writePrintHandoff(page, { printParams: W2_PRINT_PARAMS, materialCheck: null })
+  await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
 }
 

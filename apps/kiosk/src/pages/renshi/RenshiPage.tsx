@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { PrinterIcon } from 'lucide-react'
+import { AlertTriangleIcon, InfoIcon, PrinterIcon, ScaleIcon, ShieldCheckIcon } from 'lucide-react'
 import { getPublishedPolicies, type PolicyPostView, type PublishedPoliciesResult } from '../../services/api/policies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { fromPublished, getInitialTab, type AudienceKey, type PolicyItem, type TabKey } from './shared'
+import { AUDIENCE_CHIPS, fromPublished, getInitialTab, type AudienceKey, type PolicyItem, type TabKey } from './shared'
 import { BUILTIN_GUIDES } from './builtinData'
-import { OfficialEntryQrOverlay, SourceLine, TabBar, type SourceQrTarget } from './components'
+import { OfficialEntryQrOverlay, RqDeadEnd, SourceLine, TabBar, type DeadEndExit, type SourceQrTarget } from './components'
 import { PolicyPanel } from './PolicyPanel'
 import { EligibilityPanel, type EligibilityChrome } from './EligibilityPanel'
 import { SocialPanel } from './SocialPanel'
 import { RegisterPanel } from './RegisterPanel'
 import { NoticePanel } from './NoticePanel'
 import './renshi-policy-fusion.css'
+import './renshi-eligibility-qx.css'
+import './renshi-narrow-qx.css'
 
 const TAB_TITLE: Record<TabKey, string> = {
   policy: '就业政策',
@@ -112,6 +114,9 @@ export function RenshiPage() {
   const visibleLibraryCount = libraryItems.filter((item) => (
     audience === 'all' || item.audiences.includes(audience) || item.audiences.includes('general')
   )).length
+  // 选了身份时服务端只回这一身份与通用事项：一条都没有是筛选结果，不是政策库空（稿 48 的 filtered-empty）。
+  const libraryEmpty = libraryItems.length === 0 && audience === 'all'
+  const audienceLabel = AUDIENCE_CHIPS.find((chip) => chip.key === audience)?.label ?? ''
 
   const describeSources = (rows: PolicyPostView[]) => {
     const names = [...new Set(rows.map((row) => row.sourceName).filter(Boolean))].slice(0, 2).join('、')
@@ -127,9 +132,11 @@ export function RenshiPage() {
   const noticeTruncated = noticeTotal > notices.length
     ? `已发布公告共 ${noticeTotal} 条，这一页显示 ${notices.length} 条`
     : ''
-  const policySourceLine = libraryItems.length === 0
+  const policySourceLine = libraryEmpty
     ? `政策库暂无已发布政策；下方「通用办事指引」是本机整理的参考${guideTruncated ? `。${guideTruncated}` : ''}`
-    : `政策库${describeSources(guides)}；「通用办事指引」是本机整理的参考${guideTruncated ? `。${guideTruncated}` : ''}`
+    : visibleLibraryCount === 0
+      ? `当前按「${audienceLabel}」筛选：政策库没有命中，下方指引仍可查看`
+      : `政策库${describeSources(guides)}；「通用办事指引」是本机整理的参考${guideTruncated ? `。${guideTruncated}` : ''}`
   const noticeSourceLine = notices.length === 0
     ? null
     : `政策公告${describeSources(notices)}${noticeTruncated ? `。${noticeTruncated}` : ''}`
@@ -137,7 +144,7 @@ export function RenshiPage() {
   const policyPill = (): Pill => {
     if (policyState === 'loading') return { tone: 'unknown', label: '正在读取政策' }
     if (policyState === 'error') return { tone: 'bad', label: '政策读取失败' }
-    if (libraryItems.length === 0) return { tone: 'warn', label: '政策库暂无内容' }
+    if (libraryEmpty) return { tone: 'warn', label: '政策库暂无内容' }
     if (visibleLibraryCount === 0) return { tone: 'warn', label: '筛选后无匹配' }
     return { tone: 'unknown', label: '政策库与办事指引' }
   }
@@ -193,7 +200,7 @@ export function RenshiPage() {
         ? '这次读取失败，本页不显示任何条目，也不猜政策库是空还是有。'
         : policyState === 'loading'
           ? '政策与公告一起读取，读回来之前不显示任何条目。'
-          : libraryItems.length === 0
+          : libraryEmpty
             ? '政策库当前为空；下方指引是本机整理的参考，不用来冒充政策库有内容。'
             : visibleLibraryCount === 0
               ? '按身份筛选后政策库没有命中；这是筛选结果，不是库里没有政策。'
@@ -205,6 +212,39 @@ export function RenshiPage() {
 
   const goHub = () => navigate('/policy-service')
   const readFailed = policyState === 'error' && (activeTab === 'policy' || activeTab === 'notice')
+
+  // 稿 48 的死路屏：政策与公告同一次读取，读取中 / 读取失败时两个分区给同一屏；三条出口都不等这次读取。
+  const offReadExits = (hint: string): DeadEndExit[] => [
+    { key: 'eligibility', icon: ScaleIcon, title: '去条件核对', desc: hint, onClick: () => setActiveTab('eligibility') },
+    { key: 'social', icon: ShieldCheckIcon, title: '看社保指南', desc: '本机内置内容', onClick: () => setActiveTab('social') },
+  ]
+  const loadingDeadEnd = (
+    <RqDeadEnd
+      tone="info"
+      icon={InfoIcon}
+      title="正在读取政策与公告"
+      exitsHint="这三条都不等政策读取"
+      exits={offReadExits('不等这次读取')}
+      uploadDesc="本机随时可用"
+      note="社保指南与就业登记是本机内置内容，随时可看；政策与公告读回来会自动出现在这一屏。"
+    >
+      读回来之前不显示条数、标题与来源，也不会拿上一次的内容顶替。
+    </RqDeadEnd>
+  )
+  const errorDeadEnd = (
+    <RqDeadEnd
+      tone="error"
+      icon={AlertTriangleIcon}
+      title="政策与公告这次没读到"
+      exitsHint="这三条都不依赖这次读取"
+      exits={offReadExits('不受这次失败影响')}
+      uploadDesc="本机随时可用"
+      note="重试会留在政策服务里重新读取一次，不会把你送回首页，也不会显示上一次的内容。"
+      noteTone="warn"
+    >
+      这次读取没有成功，所以本页不显示任何条目。这不等于政策库是空的：库里确实没有内容时会另有一屏说明。
+    </RqDeadEnd>
+  )
 
   return (
     <QxPageFrame
@@ -288,15 +328,7 @@ export function RenshiPage() {
         </div>
         <div className="qx-scroll rq-scroll">
           {activeTab === 'policy' && (
-            policyState === 'loading' ? (
-              <div className="rq-state" data-kind="info"><b>正在读取政策与公告</b><p>社保指南和就业登记是本机整理的，可以先切到上面的分区看。</p></div>
-            ) : policyState === 'error' ? (
-              <div className="rq-state" data-kind="error">
-                <b>政策与公告这次没读到</b>
-                <p>这次读取没有成功，所以本页不显示任何条目。这不等于政策库是空的。</p>
-                <button type="button" className="rq-retry" onClick={loadPolicies}>重新读取</button>
-              </div>
-            ) : (
+            policyState === 'loading' ? loadingDeadEnd : policyState === 'error' ? errorDeadEnd : (
               <PolicyPanel
                 libraryItems={libraryItems}
                 guideItems={BUILTIN_GUIDES}
@@ -309,18 +341,10 @@ export function RenshiPage() {
               />
             )
           )}
-          {activeTab === 'eligibility' && <EligibilityPanel onChrome={setEligChrome} ctaHost={eligHost} />}
+          {activeTab === 'eligibility' && <EligibilityPanel onChrome={setEligChrome} ctaHost={eligHost} onTab={setActiveTab} />}
           {activeTab === 'notice' && (
-            policyState === 'loading' ? (
-              <div className="rq-state" data-kind="info"><b>正在读取政策与公告</b><p>社保指南和就业登记是本机整理的，可以先切到上面的分区看。</p></div>
-            ) : policyState === 'error' ? (
-              <div className="rq-state" data-kind="error">
-                <b>政策与公告这次没读到</b>
-                <p>这次读取没有成功，所以本页不显示任何公告。这不等于没有公告。</p>
-                <button type="button" className="rq-retry" onClick={loadPolicies}>重新读取</button>
-              </div>
-            ) : (
-              <NoticePanel notices={notices} onOpened={handleNoticeOpened} onOfficialEntry={handleNoticeEntry} />
+            policyState === 'loading' ? loadingDeadEnd : policyState === 'error' ? errorDeadEnd : (
+              <NoticePanel notices={notices} onOpened={handleNoticeOpened} onOfficialEntry={handleNoticeEntry} onTab={setActiveTab} />
             )
           )}
           {activeTab === 'social' && <SocialPanel onOfficialEntry={setQrEntry} />}

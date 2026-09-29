@@ -14,7 +14,8 @@ export default defineConfig({
   testDir: './tests',
   // cashier-qx 的 5 条用例打的就是 @w2，却一直不在这条 testMatch 里，而默认 config 的 kiosk project 只吃 @kiosk ——
   // 于是它**哪个套件都跑不到**（2026-09-08 实测）。归位到这里。
-  testMatch: /(?:fusion-w2-(?:print|scan|tools)|print-hub-qx|print-fulfill-qx|cashier-qx|pickup-claim-receipt)\.spec\.ts$/,
+  // print-handoff：商用收口 P0-5 第二、三批的打印交接回归（H1–H7），同属打印链，归 W2。
+  testMatch: /(?:fusion-w2-(?:print|scan|tools)|print-hub-qx|print-fulfill-qx|cashier-qx|pickup-claim-receipt|print-handoff)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-fusion-w2',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

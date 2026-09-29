@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangleIcon,
   FileTextIcon,
   SparklesIcon,
 } from 'lucide-react'
 import {
-  hasUnverifiedPrintParams,
   VERIFIED_PRINT_PARAMETER_PROFILE,
   type ColorMode,
   type DuplexMode,
@@ -26,14 +25,9 @@ import {
   type PrintParamSuggestionView,
 } from '../../services/api/materials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import {
-  patchPrintMaterialSession,
-  printUploadPathForSource,
-  readPrintMaterialSession,
-  type MaterialCheckSummary,
-  type PrintMaterialSource,
-  type PrintFileState,
-} from './printMaterialSession'
+import { printUploadPathForSource, type PrintFileState } from './printMaterialSession'
+import { patchPrintHandoff, type PrintHandoffContext } from './printHandoff'
+import { usePreviewPrintParams } from './usePreviewPrintParams'
 import { computePrintUsageEstimate } from './printUsageEstimate'
 import { countPagesInRange } from './pageRange'
 import { materialRedactionBadge } from './piiRedaction'
@@ -44,12 +38,6 @@ import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/P
 import './styles/print-desk-qx.css'
 
 type PrintFile = PrintFileState
-
-interface LocationState {
-  file: PrintFile
-  materialCheck?: MaterialCheckSummary
-  source?: PrintMaterialSource
-}
 
 type SuggestionState =
   | { status: 'idle' | 'loading'; data: null; message: string | null }
@@ -134,27 +122,32 @@ function suggestionValueLabel(item: PrintParamSuggestionItem): string {
 }
 
 export function PrintPreviewPage({
+  handoff = null,
+  problem = null,
   onBackToCheck,
 }: {
+  /** 打印台读好的交接上下文（唯一的文件身份来源）；null = 这一页没有文件。 */
+  handoff?: PrintHandoffContext | null
+  /** 交接失效时的一句人话；不回显旧文件的任何信息。 */
+  problem?: string | null
   onBackToCheck?: () => void
 } = {}) {
   const navigate = useNavigate()
-  const location = useLocation()
   const { getToken } = useAuth()
-  const locationState = location.state as LocationState | null
-  const restoredSession = useMemo(() => readPrintMaterialSession(), [])
 
   const emptyFile: PrintFile = { name: '', size: '', pages: null }
-  const file = restoredSession?.file ?? locationState?.file ?? emptyFile
-  const materialCheck = restoredSession?.materialCheck ?? locationState?.materialCheck
+  const file = handoff?.file ?? emptyFile
+  const materialCheck = handoff?.materialCheck
   const redactionBadge = materialRedactionBadge(materialCheck?.redaction)
-  const restoredPrintParams = restoredSession?.printParams
-  const restoredParamsWereRestricted = restoredPrintParams ? hasUnverifiedPrintParams(restoredPrintParams) : false
-  const source = restoredSession?.source ?? locationState?.source
+  const source = handoff?.source
   const uploadPath = printUploadPathForSource(source)
-  const hasFile = Boolean(restoredSession?.file || locationState?.file)
-  const privacyGate = privacyPreviewGate(materialCheck, file)
-  const materialCheckComplete = isPrintDeskPreviewAuthorized(materialCheck, file)
+  const hasFile = Boolean(handoff)
+  // 免检查的来源（AI 报告、优化稿、求职材料……服务端建单闸门本来就放行）直接进参数页。
+  const exempt = handoff?.checkPolicy === 'exempt'
+  const privacyGate = exempt ? { kind: 'ready' as const, confirmationLabel: null } : privacyPreviewGate(materialCheck, file)
+  const materialCheckComplete = exempt || isPrintDeskPreviewAuthorized(materialCheck, file)
+  const backToPrevious = () => (handoff?.returnPath ? navigate(handoff.returnPath) : navigate(-1))
+  const [handoffError, setHandoffError] = useState<string | null>(null)
 
   const {
     printerName,
@@ -168,28 +161,16 @@ export function PrintPreviewPage({
   const capability = usePrintParamCapability()
   const colorReason = (capability.color.reason ?? '').replace(/尚未通过真机验证|未验证/g, '暂未开通')
   const duplexReason = (capability.duplex.reason ?? '').replace(/尚未通过真机验证|未验证/g, '暂未开通')
-  const [copies, setCopies] = useState(restoredPrintParams?.copies ?? 1)
-  const [colorMode, setColorMode] = useState<ColorMode>(VERIFIED_PRINT_PARAMETER_PROFILE.colorMode)
-  const [duplex, setDuplex] = useState<DuplexMode>(VERIFIED_PRINT_PARAMETER_PROFILE.duplex)
-  const [orientation, setOrientation] = useState<PrintOrientation>(restoredPrintParams?.orientation ?? 'auto')
-  const [scale, setScale] = useState<PrintScale>(restoredPrintParams?.scale ?? 'fit')
-  const [pageRange, setPageRange] = useState<'all' | 'custom'>(
-    restoredPrintParams?.pageRange && restoredPrintParams.pageRange !== 'all' ? 'custom' : 'all',
-  )
+  const {
+    copies, setCopies, colorMode, setColorMode, duplex, setDuplex, orientation, setOrientation,
+    scale, setScale, pageRange, setPageRange, customRange, setCustomRange, capabilityNote,
+  } = usePreviewPrintParams(handoff, capability)
   const quality: PrintQuality = 'standard'
   const pagesPerSheet = VERIFIED_PRINT_PARAMETER_PROFILE.pagesPerSheet
-  const [customRange, setCustomRange] = useState(
-    restoredPrintParams?.pageRange && restoredPrintParams.pageRange !== 'all' ? restoredPrintParams.pageRange : '',
-  )
   const [rangeError, setRangeError] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<SuggestionState>({ status: 'idle', data: null, message: null })
   const [suggestionApplied, setSuggestionApplied] = useState(false)
   const [privacyConfirmed, setPrivacyConfirmed] = useState(privacyGate.kind === 'ready')
-
-  useEffect(() => {
-    if (!capability.color.allowed && colorMode !== 'black_white') setColorMode('black_white')
-    if (!capability.duplex.allowed && duplex !== 'simplex') setDuplex('simplex')
-  }, [capability.color.allowed, capability.duplex.allowed, colorMode, duplex])
 
   useEffect(() => {
     const taskId = materialCheck?.inspectionTaskId
@@ -198,7 +179,7 @@ export function PrintPreviewPage({
     setSuggestion({ status: 'loading', data: null, message: null })
     void getPrintParamSuggestions(taskId, {
       token: getToken(),
-      accessToken: restoredSession?.inspectionTask?.accessToken,
+      accessToken: handoff?.inspectionTask?.accessToken,
     }).then((result) => {
       if (cancelled) return
       if (result.available) setSuggestion({ status: 'ready', data: result, message: null })
@@ -211,7 +192,18 @@ export function PrintPreviewPage({
       if (!cancelled) setSuggestion({ status: 'error', data: null, message: userMessageOf(error, '参数建议读取失败，请手动设置。') })
     })
     return () => { cancelled = true }
-  }, [getToken, materialCheck?.inspectionTaskId, materialCheckComplete, restoredSession?.inspectionTask?.accessToken])
+  }, [getToken, materialCheck?.inspectionTaskId, materialCheckComplete, handoff?.inspectionTask?.accessToken])
+
+  // 参数一改就写回交接上下文（页码范围写得不对时先不写）：看门狗刷新、去报价再回来都还是这一组。
+  const contextId = handoff?.contextId
+  const rangeForStore = pageRange === 'all' ? undefined : customRange.trim() || undefined
+  const rangeStorable = pageRange === 'all' || file.pages === null || countPagesInRange(customRange, file.pages) !== null
+  useEffect(() => {
+    if (!contextId || !materialCheckComplete || !rangeStorable) return
+    patchPrintHandoff(contextId, {
+      printParams: { copies, colorMode, duplex, paperSize: 'A4', pageRange: rangeForStore, orientation, quality: 'standard', scale, pagesPerSheet },
+    })
+  }, [contextId, materialCheckComplete, rangeStorable, copies, colorMode, duplex, rangeForStore, orientation, scale, pagesPerSheet])
 
   const warnings = useMemo(() => {
     const next: Array<{ id: string; level: 'error' | 'warn'; text: string }> = []
@@ -288,11 +280,13 @@ export function PrintPreviewPage({
             : { ...materialCheck.redaction, previewConfirmedAt: new Date().toISOString() },
         }
       : materialCheck
-    {
-      const materialCheck = materialCheckForNext
-      patchPrintMaterialSession({ file, materialCheck, printParams: params })
-      navigate('/print/confirm', { state: { file, params, materialCheck, source } })
+    // 只带交接编号去报价确认页；文件、参数、检查结论都在上下文里。
+    const saved = contextId ? patchPrintHandoff(contextId, { file, materialCheck: materialCheckForNext, printParams: params }) : null
+    if (!saved) {
+      setHandoffError('这一单已失效，请重新发起。')
+      return
     }
+    navigate('/print/confirm', { state: { printContextId: saved.contextId } })
   }
 
   if (!hasFile) {
@@ -315,7 +309,7 @@ export function PrintPreviewPage({
         <div className="qpd-context-empty" data-w2-page="print-preview" data-qx-state="missing-context">
           <div className="qx-state" data-tone="empty">
             <span className="qx-state-ic"><AlertTriangleIcon aria-hidden="true" /></span>
-            <div><h2 className="qx-state-t">这一页没有待处理的文件</h2><p className="qx-state-d">请从选文件步骤开始，完成材料检查后再设置打印参数。</p></div>
+            <div><h2 className="qx-state-t">这一页没有待处理的文件</h2><p className="qx-state-d" data-print-handoff-problem={problem ? 'true' : undefined}>{problem ?? '请从选文件步骤开始，完成材料检查后再设置打印参数。'}</p></div>
           </div>
           <div className="qpd-empty-work qx-grow">
             <section className="qpd-empty-sheet"><FileTextIcon /><strong>当前文件：无</strong><span>没有预览、页数或打印参数</span></section>
@@ -347,7 +341,7 @@ export function PrintPreviewPage({
                   onBackToCheck()
                   return
                 }
-                navigate(canRunCheck ? '/print/material-check' : uploadPath, canRunCheck ? { state: { file, source } } : undefined)
+                navigate(canRunCheck ? '/print/desk?step=check' : uploadPath)
               }}
             >
               {canRunCheck ? '完成材料检查' : '重新选择文件'}
@@ -396,16 +390,14 @@ export function PrintPreviewPage({
       subtitle="第 3 步 / 共 4 步 · 逐页核对文件，再确认份数、颜色、单双面和页范围"
       status={status}
       ctabar={(
-        <PrintDeskFooter onBack={() => onBackToCheck ? onBackToCheck() : navigate('/print/desk?step=check')}>
-          <button className="qx-btn" data-variant="ghost" type="button" onClick={() => {
-            if (onBackToCheck) {
-              onBackToCheck()
-              return
-            }
-            navigate('/print/material-check', { state: { file, source } })
-          }}>返回材料检查</button>
+        <PrintDeskFooter onBack={() => exempt ? backToPrevious() : onBackToCheck ? onBackToCheck() : navigate('/print/desk?step=check')}>
+          {exempt ? (
+            <button className="qx-btn" data-variant="ghost" type="button" onClick={backToPrevious}>回到上一步</button>
+          ) : (
+            <button className="qx-btn" data-variant="ghost" type="button" onClick={() => onBackToCheck ? onBackToCheck() : navigate('/print/desk?step=check')}>返回材料检查</button>
+          )}
           <p className="why">
-            {unsupported
+            {handoffError ? handoffError : unsupported
               ? '当前文件类型不能直接预览打印，请返回重新选择文件。'
               : privacyGate.kind === 'confirm' && !privacyConfirmed
                 ? '请先逐页核对预览并确认隐私处理结果。'
@@ -432,8 +424,10 @@ export function PrintPreviewPage({
         <section className="qpd-preview-left">
           <FilePreviewPanel file={file} token={getToken()} caption={`${directionLabel} · A4 · ${scaleLabel} · ${duplexLabel(duplex)}`}>
             <span className="qpd-redaction-badge" data-tone={redactionBadge?.tone ?? 'warning'}>
-              {materialCheck?.mode === 'demo' ? '材料检查流程演示完成' : '材料检查已完成'}
-              {redactionBadge ? ` · ${redactionBadge.text}` : ' · 遮挡结果未知，请自行核对预览'}
+              {exempt
+                ? '系统生成的文件，不需要材料检查 · 请自行核对预览'
+                : <>{materialCheck?.mode === 'demo' ? '材料检查流程演示完成' : '材料检查已完成'}
+                  {redactionBadge ? ` · ${redactionBadge.text}` : ' · 遮挡结果未知，请自行核对预览'}</>}
             </span>
           </FilePreviewPanel>
           {privacyGate.kind === 'confirm' ? (
@@ -484,7 +478,7 @@ export function PrintPreviewPage({
             <section className="qpd-param-card">
               <div className="qpd-param-row"><span className="qpd-card-label">颜色与单双面</span><ToggleGroup options={COLOR_MODE_OPTIONS} value={colorMode} onChange={(value) => setColorMode(value as ColorMode)} disabled={!capability.color.allowed} disabledReason={colorReason} describedById="print-color-capability-note" /></div>
               <ToggleGroup options={DUPLEX_OPTIONS} value={duplex} onChange={(value) => setDuplex(value as DuplexMode)} disabled={!capability.duplex.allowed} disabledReason={duplexReason} describedById="print-duplex-capability-note" />
-              <p id="print-color-capability-note" className="qpd-param-note">{capability.color.allowed ? '彩色价格在下一步核对' : colorReason}{restoredParamsWereRestricted ? '；已恢复为本机可用的打印设置' : ''}</p>
+              <p id="print-color-capability-note" className="qpd-param-note">{capability.color.allowed ? '彩色价格在下一步核对' : colorReason}{capabilityNote ? `；${capabilityNote}` : ''}</p>
               <p id="print-duplex-capability-note" className="qpd-param-note">{capability.duplex.allowed ? '双面按内容页计费，用纸更省' : duplexReason}</p>
             </section>
             <section className="qpd-param-card">

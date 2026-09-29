@@ -213,6 +213,12 @@ const socialEntryLabels = [...builtinData.matchAll(/entryLabel:\s*'([^']+)'/g)].
 const policyHonest = countHonestUploadButtons(policyPanel)
 const registerRoutes = countUploadRoutes(registerPanel)
 const socialRoutes = countUploadRoutes(socialPanel)
+// 稿 48 最终版（9/29）新增两处，同一个诚实正则：公告展开条里一颗（公告本身不提供下载），
+// 以及死路屏 RqDeadEnd 的最后一条出口（读取中 / 读取失败 / 没有内容时本机仍能办的事）。
+const noticeHonest = countHonestUploadButtons(noticePanel)
+const noticeRoutes = countUploadRoutes(noticePanel)
+const deadEndHonest = countHonestUploadButtons(components)
+const deadEndRoutes = countUploadRoutes(components)
 const socialStripped = stripNonVisibleComments(socialPanel)
 const pageHonest = countHonestUploadButtons(page)
 const pageRoutes = countUploadRoutes(page)
@@ -237,11 +243,15 @@ const honestPanelEntries =
   barWhys.every((text) => page.includes(text)) &&
   socialEntryLabels.length > 0 &&
   socialEntryLabels.every((label) => label.includes('扫码') || label === '上传自备材料打印') &&
-  uploadRouteCount === 6
+  noticeHonest === 1 &&
+  noticeRoutes === 1 &&
+  deadEndHonest === 1 &&
+  deadEndRoutes === 1 &&
+  uploadRouteCount === 8
 if (misleadingPrintLabels.every((label) => !allRenshi.includes(label)) && honestPanelEntries) {
   pass('I2. 保留的通用打印入口明确要求用户上传自备材料')
 } else {
-  fail(`I2. /print/upload 入口必须使用「上传自备材料打印」等诚实文案（政策展开 ${policyHonest}，底栏 ${pageHonest}，登记路由 ${registerRoutes}，社保路由 ${socialRoutes}，合计 ${uploadRouteCount}）`)
+  fail(`I2. /print/upload 入口必须使用「上传自备材料打印」等诚实文案（政策展开 ${policyHonest}，底栏 ${pageHonest}，登记路由 ${registerRoutes}，社保路由 ${socialRoutes}，公告展开 ${noticeHonest}/${noticeRoutes}，死路屏 ${deadEndHonest}/${deadEndRoutes}，合计 ${uploadRouteCount}）`)
 }
 const miswiredUploadFixture = `<button onClick={() => navigate('/print/upload')}>直接打印{/* 上传自备材料打印 */}</button>`
 if (!hasHonestUploadButton(miswiredUploadFixture)) {
