@@ -16,6 +16,7 @@
  *       AiAccessService 的额度依赖是必注入（未标 @Optional）。
  *
  * 不触网（fetch 注入），不连 Redis（桩）。
+ * 同名 npm 脚本随后串联跑第二段 verify-ai-usage-coverage.ts：[F] 合同审查计量、[G] multipart 上传后身份上下文。
  * 运行：VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-budget
  */
 import 'reflect-metadata'

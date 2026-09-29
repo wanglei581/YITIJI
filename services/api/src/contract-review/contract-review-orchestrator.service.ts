@@ -25,6 +25,7 @@ import {
 import type { ContractReviewStatus } from './contract-review.types'
 import { assertContractReviewTaskId } from './contract-review.queue'
 import { AiLogService, aiErrorCodeOf } from '../ai/ai-log.service'
+import { backgroundJobAiContext, runWithAiRequestContext } from '../ai/usage/ai-usage-context'
 
 export const CONTRACT_REVIEW_PROVIDER_RUNTIME = Symbol('CONTRACT_REVIEW_PROVIDER_RUNTIME')
 export const CONTRACT_REVIEW_ORCHESTRATOR_CLOCK = Symbol('CONTRACT_REVIEW_ORCHESTRATOR_CLOCK')
@@ -286,7 +287,14 @@ export class ContractReviewOrchestratorService {
   ): Promise<ContractProviderReviewOutput> {
     const startedAt = Date.now()
     try {
-      const reviewed = await this.provider.reviewWithIdentity(input)
+      // P1-2a 逐次计量（transport 里落 AiUsageRecord）要知道「这笔账算谁的」。队列作业没有 HTTP 请求：
+      // 会员取任务属主，终端 / 机构取不到，如实为 null；并且显式覆盖掉可能从别的请求漏进来的上下文。
+      // 因此合同审查的花费计入全站与属主会员额度，不计入单机额度；它在入口（创建 / 确认，
+      // @AiUse('generate')）按当时请求的身份查过一次额度，作业里不再查（半途失败比超一点更糟）。
+      const reviewed = await runWithAiRequestContext(
+        backgroundJobAiContext(endUserId),
+        () => this.provider.reviewWithIdentity(input),
+      )
       this.aiLog.record({
         taskId: null,
         provider: contractProviderLabel(reviewed.identity),

@@ -1,8 +1,10 @@
 // ============================================================================
 // AI 逐次计量：每次**真的发出**的大模型请求，落 AiUsageRecord 一行
 //
-// 为什么独立成文件：ai/llm/llm-http.ts 是全站 LLM 调用的唯一出口，后面 P1-2b（主备切换）
+// 为什么独立成文件：ai/llm/llm-http.ts 是全站 LLM 调用的主出口，后面 P1-2b（主备切换）
 // 还要改它；那里只留「开始 / 收到响应 / 结束」几行调用，计量逻辑全在这里。
+// 另一个出口是合同审查（contract-review-provider.service.ts 的 StrictFetchContractProviderTransport），
+// 它不经 llmFetchJson，同样只在 send 里调这几行。
 //
 // 记什么（只有元数据）：功能、厂商（按请求 URL 主机映射）、型号（请求体 model）、状态、
 // HTTP 状态码、tokens、折算金额、已验签终端、终端所属机构、会员。
