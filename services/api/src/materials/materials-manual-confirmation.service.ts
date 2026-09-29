@@ -49,23 +49,29 @@ export class MaterialsManualConfirmationService {
     const current = parseObject(row?.resultJson ?? null)
     const confirmedAt = new Date().toISOString()
     // 以读到的原值做比较再写：两次并发确认只有一次写入，另一次读回已有的确认时间。
-    const updated = await this.prisma.documentProcessTask.updateMany({
-      where: { id: taskId, resultJson: row?.resultJson ?? null },
-      data: { resultJson: JSON.stringify({ ...current, manualConfirmedAt: confirmedAt }) },
+    // 状态更新与审计同一事务、审计必须写成（writeRequired）：审计写不进就整体回滚、不算确认——
+    // 这条确认是「隐私检查不完整也放行打印」的唯一依据，不能没有留痕。actorId 外键指向运营账号，会员 ID 记 payload。
+    const updatedCount = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.documentProcessTask.updateMany({
+        where: { id: taskId, resultJson: row?.resultJson ?? null },
+        data: { resultJson: JSON.stringify({ ...current, manualConfirmedAt: confirmedAt }) },
+      })
+      if (updated.count === 0) return 0
+      await this.audit.writeRequired(tx, {
+        actorId: null,
+        actorRole: requester.kind === 'member' ? 'member' : 'anonymous',
+        action: 'material_task.pii_manual_confirmed',
+        targetType: 'document_process_task',
+        targetId: taskId,
+        payload: { mode, requesterKind: requester.kind, endUserId: requester.endUserId ?? null, confirmedAt },
+      })
+      return updated.count
     })
-    if (updated.count === 0) {
+    if (updatedCount === 0) {
       const again = await this.materials.getTask(taskId, requester)
       if (typeof again.result?.['manualConfirmedAt'] === 'string') return again
       throw new ConflictException({ error: { code: 'MATERIAL_TASK_CHANGED', message: '检查结果刚刚有变化，请重新打开后再确认' } })
     }
-    await this.audit.write({
-      actorId: null,
-      actorRole: requester.kind === 'member' ? 'member' : 'anonymous',
-      action: 'material_task.pii_manual_confirmed',
-      targetType: 'document_process_task',
-      targetId: taskId,
-      payload: { mode, requesterKind: requester.kind, confirmedAt },
-    })
     return this.materials.getTask(taskId, requester)
   }
 }
