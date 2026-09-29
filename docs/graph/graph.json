@@ -11760,7 +11760,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 171,
+      "reachableFileCount": 173,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12543,7 +12543,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 176
+      "sourceFileCount": 178
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17550,7 +17550,11 @@
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs"
     ],
+    "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx": [
+      "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
+    ],
     "apps/admin/src/routes/ai-services/index.tsx": [
+      "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/alerts/index.tsx": [
@@ -17787,6 +17791,9 @@
     "apps/admin/src/services/api/adminUsers.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
+    "apps/admin/src/services/api/aiAccess.ts": [
+      "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
+    ],
     "apps/admin/src/services/api/aiUsage.ts": [
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
     ],
@@ -17844,6 +17851,9 @@
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs",
       "services/api/scripts/verify-jobfair-checkin.ts",
       "services/api/scripts/verify-print-scan-first-release.ts"
+    ],
+    "apps/admin/src/services/api/userErrorMessage.ts": [
+      "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
     ],
     "apps/admin/src/services/auth/index.ts": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
@@ -21858,6 +21868,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts"
     ],
     "services/api/src/ai-access/admin-ai-access.controller.ts": [
+      "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "services/api/scripts/verify-ai-access.ts"
     ],
     "services/api/src/ai-access/ai-access.decorator.ts": [
@@ -21870,6 +21881,7 @@
       "services/api/scripts/verify-ai-access.ts"
     ],
     "services/api/src/ai-access/ai-access.service.ts": [
+      "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "services/api/scripts/verify-ai-access.ts"
     ],
     "services/api/src/ai/ai-log.service.ts": [
@@ -25035,6 +25047,31 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:admin-account-settings-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx",
+          "apps/admin/src/routes/ai-services/index.tsx",
+          "apps/admin/src/services/api/aiAccess.ts",
+          "apps/admin/src/services/api/userErrorMessage.ts",
+          "services/api/src/ai-access/admin-ai-access.controller.ts",
+          "services/api/src/ai-access/ai-access.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-ai-access-ui"
       ],
       "wired": true
     },

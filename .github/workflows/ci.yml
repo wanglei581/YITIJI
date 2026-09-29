@@ -141,6 +141,9 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:toolbox-review-ui
           pnpm --filter @ai-job-print/admin verify:admin-terminal-bind-code-ui
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
+          # D6/C6/C7 后台 AI 服务开关：适配器与面板在隔离进程里真跑，另读服务端
+          # ai-access 源码对照路径、档位、事由上限与维护拦截清单；不连库、不起服务。
+          pnpm --filter @ai-job-print/admin verify:admin-ai-access-ui
           pnpm --filter @ai-job-print/partner verify:partner-refresh-safe
           # S1 前端 AI 原语合同（#618）。纯读 apps/kiosk 源码，不碰 Prisma，
           # 因此可以留在这一步；四个 api 侧的 AI 门禁见下方 Verify suites。
