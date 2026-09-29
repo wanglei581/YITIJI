@@ -363,7 +363,7 @@ async function main(): Promise<void> {
       const limitsSrc = readFileSync(path.resolve(__dirname, '../src/member-auth/sms/sms-egress-limits.ts'), 'utf8')
       const mainSrc = readFileSync(path.resolve(__dirname, '../src/main.ts'), 'utf8')
       check('默认出口调用 deliverOpsAlert', limitsSrc.includes('await deliverOpsAlert('))
-      check('启动校验紧挨在生产闸门后面', /assertProductionRuntimeGates\(\)\n {2}assertSmsTrustedEgressConfig\(\)/.test(mainSrc))
+      check('启动校验紧挨在生产闸门后面', /assertProductionRuntimeGates\(\)[^\n]*\n(?:[ \t]*\/\/[^\n]*\n)*[ \t]*assertSmsTrustedEgressConfig\(\)/.test(mainSrc))
       const previousWebhook = process.env['ALERT_WEBHOOK_URL']
       const previousFetch = globalThis.fetch
       const bodies: string[] = []
