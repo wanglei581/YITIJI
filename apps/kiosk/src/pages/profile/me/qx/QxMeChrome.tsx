@@ -164,7 +164,7 @@ export function QxMePage({
 
         {children}
 
-        <p className="qx-me-truth"><b>本人可见</b>{truth}</p>
+        <p className="qx-me-truth"><b>本人可见</b><span>{truth}</span></p>
       </div>
     </QxPageFrame>
   )
