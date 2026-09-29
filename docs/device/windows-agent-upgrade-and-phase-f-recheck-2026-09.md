@@ -98,7 +98,7 @@ sc.exe qc aijobprintagent.exe
 - [ ] 从 Mac 只读旁证（本机 `*.sslip.io` 被劫持，公网一律 `--resolve`）：
 
   ```bash
-  curl -s --resolve zyidai.cn:443:120.48.13.190 https://zyidai.cn/api/v1/terminals/t_ksk_001/printer-status
+  curl -s --resolve zyidai.cn:443:<生产服务器 IP> https://zyidai.cn/api/v1/terminals/t_ksk_001/printer-status
   ```
 
   期望 `isOnline=true`，`lastSeenAt` 为当前时间，`printerStatus=ready`。

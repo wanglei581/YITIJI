@@ -82,4 +82,4 @@
 - 7c `WINDOWS_FIELD_RECHECK`：**远程 Phase R 已复检**；**现场 Phase F 部分通过（F4 待补）**——见 [windows-field-recheck-phase-f-runbook.md](./windows-field-recheck-phase-f-runbook.md) 回执表 + [p0-auth-pack-windows-field-recheck.md](./p0-auth-pack-windows-field-recheck.md)
   - R（2026-07-25）：`printer-status` → `ready` + `isOnline=true`；近 30min 心跳多条；active PrintTask=0；`TerminalCapability` 0 行
   - F（2026-07-25 回执）：F1/F2/F3/F5/F6 ✅；F4 ⏭（文件选择器未收 PDF，未建单）；配置在仓库 `apps/terminal-agent/config/agent-config.json`（非 ProgramData）。**不得宣称 §五全部通过**
-- 提醒：`/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt` 若仍在，请用户 SSH 取密后 `shred -u`
+- 提醒：`<服务器上的口令轮换输出文件>+0800.txt` 若仍在，请用户 SSH 取密后 `shred -u`

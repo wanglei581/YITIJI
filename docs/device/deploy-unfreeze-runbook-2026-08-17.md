@@ -265,8 +265,8 @@ main push -> CI 三个既有验证 job 通过 -> release-bundle job
 ```
 
 CI 使用 GitHub Secrets `BOS_RELEASE_ACCESS_KEY` 和 `BOS_RELEASE_SECRET_KEY`；生产机只从
-`/srv/ai-job-print-secrets/bos-release.env` 读取同名变量。该文件还包含
-`BOS_RELEASE_ENDPOINT=bj.bcebos.com` 与 `BOS_RELEASE_BUCKET=ai-job-print-release`，权限必须是 `0600`。
+`<服务器密钥目录>/bos-release.env` 读取同名变量。该文件还包含
+`BOS_RELEASE_ENDPOINT=bj.bcebos.com` 与 `BOS_RELEASE_BUCKET=<发布包存储桶>`，权限必须是 `0600`。
 密钥不经 SSH action `envs` 转发、不写入仓库，也不出现在 CI 日志。
 
 ### 首次启用
