@@ -79,6 +79,16 @@ function canCancelCloudOrder(item) {
     && item.pickupStatus === 'pending'
 }
 
+// 出纸 / 领取的那台机器。后端 9/29 契约给打印历史行补 terminal { displayName, locationLabel }；
+// 没有时照旧回落到其他名字字段，最后是「打印服务终端」。
+function terminalLabel(item) {
+  const t = item.terminal
+  if (t && typeof t === 'object' && t.displayName) {
+    return t.locationLabel ? `${t.displayName} · ${t.locationLabel}` : t.displayName
+  }
+  return item.terminalDisplayName || item.terminalName || item.storeName || item.locationLabel || '打印服务终端'
+}
+
 // 后端 item → UI 展示对象
 function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
@@ -96,8 +106,11 @@ function toUiItem(item) {
     // prisma.order，拿 PrintTask.id 去打必回 PRINT_ORDER_NOT_FOUND。
     // 所以「订单详情」只能对 Order 行开放；这个判别位和下面到机码那行用的是同一个。
     cloudOrder:  !item.status,
+    // 能打开「订单详情」的 Order id：Order 行就是自己的 id；PrintTask 行（手机下单、到机核销后）
+    // 服务端补了 orderId 就用它（后端 9/29 契约：字段可选，没上线前按 null 处理）。
+    detailId:    !item.status ? item.id : (item.orderId || ''),
     orderNo:     item.orderNo || item.id,
-    store:       item.terminalDisplayName || item.terminalName || item.storeName || item.locationLabel || '打印服务终端',
+    store:       terminalLabel(item),
     title:       item.fileName || '打印文件',
     spec:        buildSpec(item),
     price:       formatPrice(amountCents),
@@ -431,9 +444,9 @@ Page({
   detail(e) {
     const item = this.data.filtered.find(o => o.id === e.currentTarget.dataset.id)
     if (!item) return
-    // 兜一道：一体机任务没有线上详情，点了只会 404。按钮本身已按 cloudOrder 隐藏。
-    if (!item.cloudOrder) return
-    wx.navigateTo({ url: `/pages/order-detail/order-detail?orderId=${encodeURIComponent(item.id)}` })
+    // 兜一道：没有 Order id 的打印历史行没有线上详情，点了只会 404。按钮本身已按 detailId 隐藏。
+    if (!item.detailId) return
+    wx.navigateTo({ url: `/pages/order-detail/order-detail?orderId=${encodeURIComponent(item.detailId)}` })
   },
 
   cancelOrder(e) {

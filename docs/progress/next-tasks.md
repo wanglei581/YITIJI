@@ -213,6 +213,7 @@
 - **待真机与实跑：** 对照工具 `apps/miniapp/tools/cross-end-member-parity.mjs` 连本地全栈或试点测试会员跑一次；分享图与作废重发、年龄与录音声明在两台真机各走一遍（4.3）。
 - **第二版：** 求职进度页（只许本人手填，`/me/job-applications`，同一 PR 给 `MINIAPP_REGISTERED_PAGES` 加一行）。
 - **录音同意里的服务商：** 按法务试运行版写「腾讯云」，前提是生产 `ASR_PROVIDER=tencent`；律师定稿或生产改用百度时同步改 `utils/ai-access.js` 的 `VOICE_CONSENT_ITEMS`。
+- **竞品补缺（9/29 14:30 产品负责人「全部按推荐」，调研页 https://claude.ai/artifact/TzX4Azu7yAyaegZjD5VVPA）：** 第 12 件「我的」计数失败可重试已做（current-progress 同日条目）。**首次发布后开工** A1 订阅消息（出纸完成、取件码快过期；动工前产品负责人先在公众平台确认「工具 > 办公」下有可用模板）、A2 技能名片（打印前没留联系方式要提示）、A3「发给微信好友」发 PDF（`wx.downloadFile` + `wx.shareFileMessage`，不支持时退回预览菜单）。**待办不动工：** 第 10 件只做简历照片本地裁剪、不做纸质证件照；第 11 件退役军人经历转换放「次做」，先定提示语与拦截词；第 13 件不做简历分享链接。约束照旧：小程序不出现 AI 价格，也不引导去一体机购买（运营规范 §5.13）；以后在小程序收打印费，要先加非管控类目，且打印与 AI 不同单付款。
 ## 2026-09-29：后端排雷窗口（P1 安全与资金防线、1.8 / 3.7 排雷）
 
 - **已开 PR（P1-4、P1-5）：** 见 current-progress 同日条目。**上线开关顺序：** 先确认每个启用中的管理员账号已绑定并验证手机号 → 管理后台登录页接好第二步（两个后台窗口已做，分支 `claude/consoles-admin-2fa-20260929`，合入并发布后才算接好）→ 再开 `ADMIN_LOGIN_SECOND_FACTOR=sms`；`ADMIN_IP_ALLOWLIST` 按办公网络出口配置，依赖 `TRUST_PROXY_HOPS` 取真实来源地址。短信三档额度默认值（500 / 200 / 100）待产品负责人确认。
