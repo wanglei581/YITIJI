@@ -47,6 +47,14 @@ function toConsentItems(res) {
   return raw.map(trimmed).filter(Boolean)
 }
 
+/** 服务端说同意版本不是当前版本时的提示（合规窗口 9/29 裁定原文）。 */
+const STALE_TIP = '说明已更新，请重新确认。已答的题会保留。'
+
+/** 题目集指纹：维度 key + 题号。用来判断旧答案还能不能套到新拉的题上。 */
+function questionSignature(dims) {
+  return (dims || []).map((d) => `${d.key}:${d.questions.map((q) => q.idx).join(',')}`).join('|')
+}
+
 function trimmed(v) {
   return typeof v === 'string' && v.trim() ? v.trim() : ''
 }
@@ -254,7 +262,40 @@ Page({
     }
   },
 
+  /**
+   * 只重新拉条款与版本号，不动已答的题；勾选清零，要用户对新说明重新确认。
+   * 题目集若也变了（维度或题号对不上），旧答案不能套到新题上，这时整套重来。
+   */
+  _refreshConsent(tip) {
+    const seq = ++this._seq
+    const reset = { phase: 'consent', agreeNonSensitive: false, agreeSensitive: false, consentTip: tip || '' }
+    api.getSelfAssessmentQuestions()
+      .then((res) => {
+        if (this._gone || seq !== this._seq) return
+        const view = this._toQuestionsView(res)
+        if (questionSignature(view.dims) !== questionSignature(this.data.dims)) {
+          this.setData({ agreeNonSensitive: false, agreeSensitive: false, consentTip: tip || '' })
+          this._loadQuestions()
+          return
+        }
+        this.setData(Object.assign(reset, {
+          consentItems: view.consentItems,
+          consentVersion: view.consentVersion,
+          consentReady: view.consentItems.length > 0 && !!view.consentVersion,
+        }))
+      })
+      .catch(() => {
+        if (this._gone || seq !== this._seq) return
+        this.setData(Object.assign(reset, { consentItems: [], consentVersion: '', consentReady: false }))
+      })
+  },
+
   reload() {
+    // 同意页上的「重试」：题已经在手里（可能还答了），只补拉说明。
+    if (this.data.phase === 'consent' && this.data.dims.length) {
+      this._refreshConsent(this.data.consentTip)
+      return
+    }
     if (this.data.historyMode && this.data.taskId) {
       this.setData({ phase: 'loading', errMsg: '' })
       this._loadExisting(this.data.taskId)
@@ -282,7 +323,10 @@ Page({
       wx.showToast({ title: '请先勾选第一项同意', icon: 'none', duration: 2000 })
       return
     }
-    this.setData({ phase: 'ask', groupIdx: 0, isLastGroup: this.data.dims.length === 1, consentTip: '' })
+    // 重新确认说明回来、题都答完了：直接落在最后一组，点提交即可，不用再翻一遍。
+    const last = this.data.dims.length - 1
+    const groupIdx = (this.data.answeredCount > 0 && this.data.submitReady) ? last : 0
+    this.setData({ phase: 'ask', groupIdx, isLastGroup: groupIdx === last, consentTip: '' })
     wx.pageScrollTo({ scrollTop: 0, duration: 200 })
   },
 
@@ -399,13 +443,9 @@ Page({
         if (this._gone || seq !== this._seq) return
         // 同意书已改版：服务端拒绝用旧版本的同意放行，页面必须请用户重新读一遍，
         // 不能把旧勾选当成对新说明的同意。
+        // 已答的题保留（9/29 合规裁定）：换的是说明，不是题。
         if (err && err.code === 'SELF_ASSESSMENT_CONSENT_VERSION_STALE') {
-          this.setData({
-            agreeNonSensitive: false,
-            agreeSensitive: false,
-            consentTip: (err && err.message) || '知情同意说明已更新，请重新阅读并确认后再提交',
-          })
-          this._loadQuestions()
+          this._refreshConsent(STALE_TIP)
           return
         }
         this.setData({ phase: 'ask' })
