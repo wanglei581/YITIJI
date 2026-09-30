@@ -1,106 +1,59 @@
-import { formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
+import { formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { useEffect, useMemo, useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
-import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
-import { MonitorIcon, RefreshCwIcon, PencilIcon, CheckIcon, XIcon, Building2Icon, SearchIcon, KeyRoundIcon, PlusIcon } from 'lucide-react'
-import { Pagination, useTableState } from '../components/DataTable'
+import { Card, ConsoleTable, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
+import { PlusIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
+import { useTableState } from '../components/DataTable'
 import { FilterChip } from '../components/FilterChip'
 import { API_MODE } from '../../services/api/client'
 import {
-  getTerminals,
-  getOrgOptions,
   assignTerminalOrg,
-  updateTerminalProfile,
-  type AdminTerminalRecord,
+  getOrgOptions,
+  getTerminals,
   type AdminOrganizationOption,
+  type AdminTerminalRecord,
+  type EmergencyRevokeTerminalResult,
   type TerminalLifecycleStatus,
+  type UpdateTerminalLifecycleResult,
   type UpdateTerminalProfileInput,
+  updateTerminalProfile,
 } from '../../services/api/devices'
-import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
 import { CreatePlannedTerminalDialog } from './CreatePlannedTerminalDialog'
-import { TerminalLifecycleActions } from './TerminalLifecycleActions'
-import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
-import { ReleaseObservationPanel } from './ReleaseObservationPanel'
-import { fmtDisk, printerStatusView, scanInputView } from './terminalStatusViews'
+import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
+import { TerminalDetailDrawer } from './TerminalDetailDrawer'
+import { lifecycleView } from './terminalStatusViews'
 
-const TABLE_COLS = 16
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
-
-// 在线/离线由 online 字段决定(契约 C1:lastSeenAt 距今 < 5 分钟，服务端 TERMINAL_ONLINE_WINDOW_MS)
-const ONLINE_VIEW = { badge: 'success' as const, label: '在线' }
-const OFFLINE_VIEW = { badge: 'error' as const, label: '离线' }
-const DEGRADED_VIEW = { badge: 'warning' as const, label: '降级' }
-
 const FILTERS = ['全部', '在线', '离线'] as const
+type Notice = { type: 'success' | 'error'; text: string }
 
-/** 托管 a（3.15）停放的机构类型：服务端已拒绝新绑定（ORG_TYPE_PARKED），存量绑定在这里提示改绑。 */
-const PARKED_ORG_TYPES = new Set(['enterprise_source', 'fair_organizer'])
-function isParkedOrgType(type: string | null | undefined): boolean {
-  return typeof type === 'string' && PARKED_ORG_TYPES.has(type)
-}
-
-function heartbeatText(iso: string | null): string {
-  if (!iso) return '从未连接'
-  return relativeTime(iso)
-}
-
-function relativeTime(iso: string | null): string {
-  if (!iso) return '从未'
-  return formatRelativeTime(iso)
-}
-
-function runtimeStatusView(t: AdminTerminalRecord) {
-  if (!t.online) return { ...OFFLINE_VIEW, detail: null }
-  if (t.agentStatus === 'agent_degraded' || t.localTaskDatabaseAvailable === false) {
-    return { ...DEGRADED_VIEW, detail: '本地任务库不可用，已暂停领取打印任务' }
+function runtimeStatusView(terminal: AdminTerminalRecord) {
+  if (!terminal.online) return { badge: 'error' as const, label: '离线', detail: null }
+  if (terminal.agentStatus === 'agent_degraded' || terminal.localTaskDatabaseAvailable === false) {
+    return { badge: 'warning' as const, label: '降级', detail: '本地任务库不可用，已暂停领取打印任务' }
   }
-  return { ...ONLINE_VIEW, detail: null }
+  return { badge: 'success' as const, label: '在线', detail: null }
 }
-
-function releaseObservationView(t: AdminTerminalRecord) {
-  const observation = t.releaseObservation
-  if (!observation) return { badge: 'default' as const, label: '无计划', detail: null }
-  const labels = {
-    draft: '草稿',
-    paused: '已暂停',
-    expired: '观察结束',
-    not_seen: '尚未看到',
-    unverified: '版本未验证',
-    current: '版本匹配（未验包）',
-    mismatch: '版本不匹配',
-    stale: '心跳陈旧',
-  } as const
-  const badge = observation.state === 'current'
-    ? 'success' as const
-    : observation.state === 'mismatch' || observation.state === 'stale'
-      ? 'warning' as const
-      : 'default' as const
-  return { badge, label: labels[observation.state], detail: observation.targetVersion }
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TerminalsPage() {
   const [filter, setFilter] = useState<string>('全部')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
-
-  // 终端机构归属编辑态
   const [orgOptions, setOrgOptions] = useState<AdminOrganizationOption[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editValue, setEditValue] = useState<string>('') // '' = 未绑定/解绑
+  const [editValue, setEditValue] = useState('')
   const [saving, setSaving] = useState(false)
   const [profileEditingId, setProfileEditingId] = useState<string | null>(null)
   const [profileDraft, setProfileDraft] = useState<UpdateTerminalProfileInput>({})
   const [profileSaving, setProfileSaving] = useState(false)
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
   const [lifecycleSavingId, setLifecycleSavingId] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  // 一次性绑定码弹窗状态；生成/倒计时/复制逻辑在 TerminalBindCodeDialog 内部。
+  const [notice, setNotice] = useState<Notice | null>(null)
   const [bindCodeTerminal, setBindCodeTerminal] = useState<AdminTerminalRecord | null>(null)
   const [creatingPlannedTerminal, setCreatingPlannedTerminal] = useState(false)
+  const [orgLoadError, setOrgLoadError] = useState<string | null>(null)
   const [localOrgPatch, setLocalOrgPatch] = useState<Record<string, { orgId: string | null; orgName: string | null }>>({})
   const [localProfilePatch, setLocalProfilePatch] = useState<Record<string, UpdateTerminalProfileInput>>({})
-  const [orgLoadError, setOrgLoadError] = useState<string | null>(null)
   const [localLifecyclePatch, setLocalLifecyclePatch] = useState<Record<string, {
     status: TerminalLifecycleStatus
     version: number
@@ -108,26 +61,14 @@ export default function TerminalsPage() {
     hasActiveCredential?: boolean
   }>>({})
 
-  const {
-    data: terminalData,
-    status,
-    refresh,
-  } = useRefreshable(
-    TERMINALS_REFRESH_KEY,
-    getTerminals,
-    {
-      intervalMs: 30_000,
-      merge: (current, incoming) => {
-        const terminals = mergeById<AdminTerminalRecord>((item) => item.id)(
-          current?.terminals,
-          incoming.terminals,
-        )
-        if (current && terminals === current.terminals) return current
-        return { terminals }
-      },
-      failPolicy: 'keep-last',
+  const { data: terminalData, status, refresh } = useRefreshable(TERMINALS_REFRESH_KEY, getTerminals, {
+    intervalMs: 30_000,
+    merge: (current, incoming) => {
+      const terminals = mergeById<AdminTerminalRecord>((item) => item.id)(current?.terminals, incoming.terminals)
+      return current && terminals === current.terminals ? current : { terminals }
     },
-  )
+    failPolicy: 'keep-last',
+  })
 
   useInteractionLock(
     editingId !== null || saving || profileEditingId !== null || profileSaving || statusSavingId !== null || lifecycleSavingId !== null || creatingPlannedTerminal,
@@ -135,55 +76,36 @@ export default function TerminalsPage() {
     'hard',
   )
 
-  function openBindCodeModal(t: AdminTerminalRecord) {
-    const canCreateBindCode = t.lifecycleStatus === 'planned' || t.lifecycleStatus === 'maintenance'
-    if (statusSavingId !== null || lifecycleSavingId !== null || !t.enabled || !canCreateBindCode) return
-    setBindCodeTerminal(t)
-    setNotice(null)
-  }
-  function closeBindCodeModal() {
-    setBindCodeTerminal(null)
-  }
-
   const terminals = useMemo(
     () => (terminalData?.terminals ?? []).map((terminal) => {
-      const orgPatch = localOrgPatch[terminal.id]
-      const profilePatch = localProfilePatch[terminal.id]
       const lifecyclePatch = localLifecyclePatch[terminal.id]
       return {
         ...terminal,
-        ...orgPatch,
-        ...profilePatch,
+        ...localOrgPatch[terminal.id],
+        ...localProfilePatch[terminal.id],
         ...(lifecyclePatch ? {
           lifecycleStatus: lifecyclePatch.status,
           lifecycleVersion: lifecyclePatch.version,
-          ...(lifecyclePatch.credentialGeneration === undefined
-            ? {}
-            : { credentialGeneration: lifecyclePatch.credentialGeneration }),
-          ...(lifecyclePatch.hasActiveCredential === undefined
-            ? {}
-            : { hasActiveCredential: lifecyclePatch.hasActiveCredential }),
+          ...(lifecyclePatch.credentialGeneration === undefined ? {} : { credentialGeneration: lifecyclePatch.credentialGeneration }),
+          ...(lifecyclePatch.hasActiveCredential === undefined ? {} : { hasActiveCredential: lifecyclePatch.hasActiveCredential }),
         } : {}),
       }
     }),
     [localLifecyclePatch, localOrgPatch, localProfilePatch, terminalData?.terminals],
   )
-
+  const selected = terminals.find((terminal) => terminal.id === selectedId) ?? null
   const loading = status === 'loading' && terminals.length === 0
-  const error = status === 'error' && terminals.length === 0
+  const failed = status === 'error' && terminals.length === 0
 
-  // 机构下拉选项（绑定用）。失败不阻断页面，仍可解绑。
   useEffect(() => {
-    getOrgOptions().then((r) => setOrgOptions(r.organizations)).catch(() => {
-      setOrgLoadError('机构列表加载失败，请刷新页面重试')
-    })
+    getOrgOptions().then((response) => setOrgOptions(response.organizations)).catch(() => setOrgLoadError('机构列表加载失败，请刷新页面重试'))
   }, [])
 
   useEffect(() => {
     if (!terminalData) return
     setLocalOrgPatch((current) => {
-      let changed = false
       const next = { ...current }
+      let changed = false
       for (const terminal of terminalData.terminals) {
         const patch = next[terminal.id]
         if (patch && patch.orgId === terminal.orgId && patch.orgName === terminal.orgName) {
@@ -195,66 +117,18 @@ export default function TerminalsPage() {
     })
   }, [terminalData])
 
-  function startEdit(t: AdminTerminalRecord) {
-    if (statusSavingId !== null) return
-    setEditingId(t.id)
-    setEditValue(t.orgId ?? '')
-    setProfileEditingId(null)
+  function openBindCodeModal(terminal: AdminTerminalRecord) {
+    const canCreate = terminal.lifecycleStatus === 'planned' || terminal.lifecycleStatus === 'maintenance'
+    if (statusSavingId !== null || lifecycleSavingId !== null || !terminal.enabled || !canCreate) return
+    setBindCodeTerminal(terminal)
     setNotice(null)
-  }
-  function cancelEdit() {
-    setEditingId(null)
-    setEditValue('')
-  }
-  async function saveEdit(t: AdminTerminalRecord) {
-    setSaving(true)
-    setNotice(null)
-    try {
-      const orgId = editValue === '' ? null : editValue
-      const res = await assignTerminalOrg(t.terminalCode, orgId)
-      setLocalOrgPatch((current) => ({
-        ...current,
-        [t.id]: { orgId: res.newOrgId, orgName: res.orgName },
-      }))
-      setEditingId(null)
-      setEditValue('')
-      void refresh()
-        .catch(() => undefined)
-        .then(() => refresh())
-        .then(() => {
-          setLocalOrgPatch((current) => {
-            if (!current[t.id]) return current
-            const next = { ...current }
-            delete next[t.id]
-            return next
-          })
-        })
-        .catch(() => {
-          /* keep optimistic patch until a later successful refresh reconciles */
-        })
-      setNotice({
-        type: 'success',
-        text: res.newOrgId
-          ? `已绑定终端 ${t.terminalCode} → ${res.orgName ?? res.newOrgId}（保存成功，Kiosk 下一轮拉取后生效）`
-          : `已解绑终端 ${t.terminalCode}（保存成功）`,
-      })
-    } catch (e) {
-      setNotice({ type: 'error', text: e instanceof Error ? e.message : '保存失败，请稍后重试' })
-    } finally {
-      setSaving(false)
-    }
   }
 
-  function startProfileEdit(t: AdminTerminalRecord) {
+  function startProfileEdit(terminal: AdminTerminalRecord) {
     if (statusSavingId !== null) return
-    setProfileEditingId(t.id)
+    setProfileEditingId(terminal.id)
     setEditingId(null)
-    setProfileDraft({
-      displayName: t.displayName ?? '',
-      macAddress: t.macAddress ?? '',
-      locationLabel: t.locationLabel ?? '',
-      enabled: t.enabled,
-    })
+    setProfileDraft({ displayName: terminal.displayName ?? '', macAddress: terminal.macAddress ?? '', locationLabel: terminal.locationLabel ?? '', enabled: terminal.enabled })
     setNotice(null)
   }
 
@@ -263,7 +137,7 @@ export default function TerminalsPage() {
     setProfileDraft({})
   }
 
-  async function saveProfile(t: AdminTerminalRecord) {
+  async function saveProfile(terminal: AdminTerminalRecord) {
     setProfileSaving(true)
     setNotice(null)
     try {
@@ -273,506 +147,113 @@ export default function TerminalsPage() {
         locationLabel: profileDraft.locationLabel === '' ? null : profileDraft.locationLabel,
         enabled: profileDraft.enabled ?? true,
       }
-      const res = await updateTerminalProfile(t.terminalCode, payload)
-      setLocalProfilePatch((current) => ({
-        ...current,
-        [t.id]: {
-          displayName: res.displayName,
-          macAddress: res.macAddress,
-          locationLabel: res.locationLabel,
-          enabled: res.enabled,
-        },
-      }))
-      setProfileEditingId(null)
-      setProfileDraft({})
+      const result = await updateTerminalProfile(terminal.terminalCode, payload)
+      setLocalProfilePatch((current) => ({ ...current, [terminal.id]: { displayName: result.displayName, macAddress: result.macAddress, locationLabel: result.locationLabel, enabled: result.enabled } }))
+      cancelProfileEdit()
       void refresh().catch(() => undefined)
-      setNotice({ type: 'success', text: `已更新终端 ${t.terminalCode} 的设备档案，Kiosk 下一轮配置刷新后生效` })
-    } catch (e) {
-      setNotice({ type: 'error', text: e instanceof Error ? e.message : '设备档案保存失败，请稍后重试' })
+      setNotice({ type: 'success', text: `已更新终端 ${terminal.terminalCode} 的设备档案，一体机下一轮配置刷新后生效` })
+    } catch (error) {
+      setNotice({ type: 'error', text: error instanceof Error ? error.message : '设备档案保存失败，请稍后重试' })
     } finally {
       setProfileSaving(false)
     }
   }
 
-  async function toggleTerminalStatus(t: AdminTerminalRecord) {
-    const nextEnabled = !t.enabled
-    if (!nextEnabled && !window.confirm(`确定停用终端 ${t.terminalCode}？停用后该终端的 Kiosk 敏感模块会在下一轮配置刷新后关闭。`)) {
-      return
-    }
+  function startOrgEdit(terminal: AdminTerminalRecord) {
+    if (statusSavingId !== null) return
+    setEditingId(terminal.id)
+    setEditValue(terminal.orgId ?? '')
+    setProfileEditingId(null)
+    setNotice(null)
+  }
 
-    setStatusSavingId(t.id)
+  function cancelOrgEdit() {
+    setEditingId(null)
+    setEditValue('')
+  }
+
+  async function saveOrg(terminal: AdminTerminalRecord) {
+    setSaving(true)
     setNotice(null)
     try {
-      const res = await updateTerminalProfile(t.terminalCode, { enabled: nextEnabled })
-      setLocalProfilePatch((current) => ({
-        ...current,
-        [t.id]: {
-          ...current[t.id],
-          displayName: res.displayName,
-          macAddress: res.macAddress,
-          locationLabel: res.locationLabel,
-          enabled: res.enabled,
-        },
-      }))
+      const result = await assignTerminalOrg(terminal.terminalCode, editValue === '' ? null : editValue)
+      setLocalOrgPatch((current) => ({ ...current, [terminal.id]: { orgId: result.newOrgId, orgName: result.orgName } }))
+      cancelOrgEdit()
       void refresh().catch(() => undefined)
-      setNotice({
-        type: 'success',
-        text: `已${res.enabled ? '启用' : '停用'}终端 ${t.terminalCode}，Kiosk 下一轮配置刷新后生效`,
-      })
-    } catch (e) {
-      setNotice({ type: 'error', text: e instanceof Error ? e.message : '终端状态更新失败，请稍后重试' })
+      setNotice({ type: 'success', text: result.newOrgId ? `已绑定终端 ${terminal.terminalCode} → ${result.orgName ?? result.newOrgId}（保存成功，一体机下一轮拉取后生效）` : `已解绑终端 ${terminal.terminalCode}（保存成功）` })
+    } catch (error) {
+      setNotice({ type: 'error', text: error instanceof Error ? error.message : '保存失败，请稍后重试' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function toggleStatus(terminal: AdminTerminalRecord) {
+    const nextEnabled = !terminal.enabled
+    if (!nextEnabled && !window.confirm(`确定停用终端 ${terminal.terminalCode}？停用后一体机敏感模块会在下一轮配置刷新后关闭。`)) return
+    setStatusSavingId(terminal.id)
+    setNotice(null)
+    try {
+      const result = await updateTerminalProfile(terminal.terminalCode, { enabled: nextEnabled })
+      setLocalProfilePatch((current) => ({ ...current, [terminal.id]: { ...current[terminal.id], displayName: result.displayName, macAddress: result.macAddress, locationLabel: result.locationLabel, enabled: result.enabled } }))
+      void refresh().catch(() => undefined)
+      setNotice({ type: 'success', text: `已${result.enabled ? '启用' : '停用'}终端 ${terminal.terminalCode}，一体机下一轮配置刷新后生效` })
+    } catch (error) {
+      setNotice({ type: 'error', text: error instanceof Error ? error.message : '终端状态更新失败，请稍后重试' })
     } finally {
       setStatusSavingId(null)
     }
   }
 
-  const byStatus = filter === '全部'
-    ? terminals
-    : terminals.filter((t) => (filter === '在线' ? t.online : !t.online))
-
-  const searched = search.trim()
-    ? byStatus.filter((t) =>
-        t.terminalCode.toLowerCase().includes(search.toLowerCase()) ||
-        (t.displayName ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        (t.macAddress ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        (t.locationLabel ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        (t.ipAddress ?? '').includes(search) ||
-        (t.agentVersion ?? '').toLowerCase().includes(search.toLowerCase())
-      )
-    : byStatus
-
-  const total = searched.length
-  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
-
-  const counts = {
-    全部: terminals.length,
-    在线: terminals.filter((t) => t.online).length,
-    离线: terminals.filter((t) => !t.online).length,
+  function handleLifecycleUpdated(terminal: AdminTerminalRecord, result: UpdateTerminalLifecycleResult | EmergencyRevokeTerminalResult) {
+    setLocalLifecyclePatch((current) => ({ ...current, [terminal.id]: { status: result.newStatus, version: result.lifecycleVersion, ...('credentialGeneration' in result ? { credentialGeneration: result.credentialGeneration, hasActiveCredential: false } : {}) } }))
+    void refresh().then(() => setLocalLifecyclePatch((current) => { if (!current[terminal.id]) return current; const next = { ...current }; delete next[terminal.id]; return next })).catch(() => undefined)
   }
+
+  const filtered = useMemo(() => {
+    const lower = search.trim().toLowerCase()
+    return terminals.filter((terminal) => {
+      if (filter !== '全部' && (filter === '在线' ? !terminal.online : terminal.online)) return false
+      if (!lower) return true
+      return [terminal.terminalCode, terminal.displayName, terminal.macAddress, terminal.locationLabel, terminal.ipAddress, terminal.agentVersion].some((value) => value?.toLowerCase().includes(lower))
+    })
+  }, [filter, search, terminals])
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const counts = { 全部: terminals.length, 在线: terminals.filter((terminal) => terminal.online).length, 离线: terminals.filter((terminal) => !terminal.online).length }
+
+  function closeDetail() {
+    setSelectedId(null)
+    setEditingId(null)
+    setEditValue('')
+    setProfileEditingId(null)
+    setProfileDraft({})
+  }
+
+  const columns: ConsoleColumn<AdminTerminalRecord>[] = [
+    { id: 'terminal', header: '终端', truncate: true, title: (t) => `${t.terminalCode} · ${t.displayName ?? '未命名终端'} · ${t.locationLabel ?? '未设置摆放位置'}`, cell: (t) => <div><p className="truncate font-semibold text-neutral-900">{t.displayName || '未命名终端'}</p><p className="truncate text-xs text-neutral-500"><span className="font-mono">{t.terminalCode}</span> · {t.locationLabel || '未设置摆放位置'}</p></div> },
+    { id: 'org', header: '所属机构', truncate: true, cell: (t) => <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-info-bg px-2 py-0.5 text-xs text-info-fg"><span className="truncate">{t.orgName ?? '未绑定'}</span></span> },
+    { id: 'runtime', header: '运行状态', cell: (t) => { const view = runtimeStatusView(t); return <div><StatusBadge dot status={view.badge} label={view.label} /><p className="mt-1 text-[11px] text-neutral-500" title={t.lastHeartbeatAt ? formatDateTime(t.lastHeartbeatAt) : undefined}>{t.lastHeartbeatAt ? formatRelativeTime(t.lastHeartbeatAt) : '从未连接'}</p>{view.detail && <p className="mt-1 text-[11px] text-warning-fg">{view.detail}</p>}</div> } },
+    { id: 'lifecycle', header: '启停与生命周期', cell: (t) => { const view = lifecycleView(t.lifecycleStatus); return <div className="flex flex-wrap gap-1.5"><StatusBadge dot status={t.enabled ? 'success' : 'error'} label={t.enabled ? '启用' : '停用'} /><StatusBadge dot status={view.badge} label={view.label} /></div> } },
+    { id: 'actions', header: '操作', sticky: true, align: 'right', cell: (t) => <button type="button" onClick={() => setSelectedId(t.id)} className="inline-flex h-8 items-center rounded-md bg-primary-600 px-3 text-xs font-semibold text-white hover:bg-primary-700" aria-label={`管理 ${t.terminalCode}`}>管理</button> },
+  ]
 
   return (
     <>
-      {/* 工具条：搜索 + 状态 chips + 刷新 */}
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-        <div className="flex h-[34px] min-w-[280px] items-center gap-2 rounded-[9px] border border-neutral-900/10 bg-surface px-3">
-          <SearchIcon className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索编号、设备名、MAC、位置、IP..."
-            className="min-w-0 flex-1 bg-transparent text-[13px] text-neutral-900 outline-none placeholder:text-neutral-500"
-          />
-        </div>
-        {FILTERS.map((f) => (
-          <FilterChip
-            key={f}
-            active={filter === f}
-            label={f}
-            count={counts[f]}
-            onClick={() => { setFilter(f); setPage(1) }}
-          />
-        ))}
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-[12.5px] text-neutral-500">共 {total} 台终端</span>
-          <button type="button" onClick={() => { setCreatingPlannedTerminal(true); setNotice(null) }} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] bg-primary-600 px-3 text-xs font-bold text-white transition-colors hover:bg-primary-700">
-            <PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />预创建设备
-          </button>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 transition-colors hover:bg-neutral-50"
-          >
-            <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />刷新
-          </button>
-        </div>
+        <div className="flex h-[34px] min-w-[280px] items-center gap-2 rounded-[9px] border border-neutral-900/10 bg-surface px-3"><SearchIcon className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索编号、设备名、MAC、位置、IP..." className="min-w-0 flex-1 bg-transparent text-[13px] text-neutral-900 outline-none placeholder:text-neutral-500" /></div>
+        {FILTERS.map((item) => <FilterChip key={item} active={filter === item} label={item} count={counts[item]} onClick={() => { setFilter(item); setPage(1) }} />)}
+        <div className="ml-auto flex items-center gap-2"><span className="text-[12.5px] text-neutral-500">共 {filtered.length} 台终端</span><button type="button" onClick={() => { setCreatingPlannedTerminal(true); setNotice(null) }} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] bg-primary-600 px-3 text-xs font-bold text-white hover:bg-primary-700"><PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />预创建设备</button><button type="button" onClick={() => void refresh()} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50"><RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />刷新</button></div>
       </div>
-
-      {/* 归属保存提示 */}
-      {notice && (
-        <div
-          className={`mb-3 rounded-[9px] border px-4 py-3 text-sm ${
-            notice.type === 'success'
-              ? 'border-success/20 bg-success-bg text-success-fg'
-              : 'border-error/20 bg-error-bg text-error-fg'
-          }`}
-        >
-          {notice.text}
-        </div>
-      )}
-
-      {/* 表格 */}
+      {notice && <div className={`mb-3 rounded-[9px] border px-4 py-3 text-sm ${notice.type === 'success' ? 'border-success/20 bg-success-bg text-success-fg' : 'border-error/20 bg-error-bg text-error-fg'}`}>{notice.text}</div>}
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[13px]">
-            <thead>
-              <tr>
-                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '生命周期', '运行状态', '链路诊断', '打印机状态', '扫描输入', '最近心跳', 'Agent 版本', '更新观察', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-3 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-900/[0.06]">
-              {loading ? (
-                [0, 1, 2, 3, 4].map((i) => (
-                  <tr key={i}>
-                    {Array.from({ length: TABLE_COLS }).map((_, j) => (
-                      <td key={j} className="px-3 py-4"><div className="h-3 w-3/4 animate-pulse rounded bg-neutral-100" /></td>
-                    ))}
-                  </tr>
-                ))
-              ) : error ? (
-                <tr>
-                  <td colSpan={TABLE_COLS}>
-                    <div className="flex flex-col items-center gap-3 py-12">
-                      <p className="text-sm text-neutral-500">终端数据加载失败,请稍后重试</p>
-                      <button onClick={() => void refresh()} className="rounded-[9px] bg-primary-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-primary-700">重试</button>
-                    </div>
-                  </td>
-                </tr>
-              ) : paginated.length === 0 ? (
-                <tr>
-                  <td colSpan={TABLE_COLS}>
-                    <EmptyState title={search ? '未找到匹配的终端' : '该分类暂无终端'} description={search ? '请尝试其他关键词' : undefined} icon={MonitorIcon} className="py-12" />
-                  </td>
-                </tr>
-              ) : (
-                paginated.map((t) => {
-                  const runtimeView = runtimeStatusView(t)
-                  const printerView = printerStatusView(t.printerStatus ?? null)
-                  const releaseView = releaseObservationView(t)
-                  const scanInput = scanInputView(t)
-                  const canCreateBindCode = t.lifecycleStatus === 'planned' || t.lifecycleStatus === 'maintenance'
-                  const bindCodeTitle = !t.enabled
-                    ? '停用终端不可生成绑定码'
-                    : t.lifecycleStatus === 'active'
-                      ? '换机前请先进入维护，确认停止领取新任务后再生成绑定码'
-                      : canCreateBindCode
-                        ? t.lifecycleStatus === 'planned' ? '生成首次安装绑定码' : '生成换机绑定码'
-                        : `当前状态 ${t.lifecycleStatus} 不允许生成绑定码`
-                  return (
-                    <tr key={t.id} className="hover:bg-neutral-50">
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-700">
-                        {t.terminalCode}
-                        {t.lifecycleStatus === 'planned' ? <span className="ml-2 rounded bg-warning-bg px-1.5 py-0.5 font-sans text-[10px] font-bold text-warning-fg">待安装</span> : null}
-                        {t.lifecycleStatus === 'commissioning' ? <span className="ml-2 rounded bg-primary-50 px-1.5 py-0.5 font-sans text-[10px] font-bold text-primary-700">安装中</span> : null}
-                      </td>
-                      <td className="min-w-[260px] px-4 py-3 text-xs">
-                        {profileEditingId === t.id ? (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-2 gap-2">
-                              <input
-                                value={profileDraft.displayName ?? ''}
-                                onChange={(e) => setProfileDraft((d) => ({ ...d, displayName: e.target.value }))}
-                                disabled={profileSaving}
-                                placeholder="设备名称"
-                                className="h-7 rounded-md border border-neutral-200 px-2 text-xs text-neutral-700 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
-                              />
-                              <input
-                                value={profileDraft.macAddress ?? ''}
-                                onChange={(e) => setProfileDraft((d) => ({ ...d, macAddress: e.target.value }))}
-                                disabled={profileSaving}
-                                placeholder="MAC 地址"
-                                className="h-7 rounded-md border border-neutral-200 px-2 font-mono text-xs text-neutral-700 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
-                              />
-                            </div>
-                            <input
-                              value={profileDraft.locationLabel ?? ''}
-                              onChange={(e) => setProfileDraft((d) => ({ ...d, locationLabel: e.target.value }))}
-                              disabled={profileSaving}
-                              placeholder="摆放位置"
-                              className="h-7 w-full rounded-md border border-neutral-200 px-2 text-xs text-neutral-700 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
-                            />
-                            <div className="flex items-center justify-between gap-2">
-                              <label className="inline-flex items-center gap-1.5 text-xs text-neutral-500">
-                                <input
-                                  type="checkbox"
-                                  checked={profileDraft.enabled ?? true}
-                                  onChange={(e) => setProfileDraft((d) => ({ ...d, enabled: e.target.checked }))}
-                                  disabled={profileSaving || t.lifecycleStatus === 'retired'}
-                                  className="h-3.5 w-3.5 rounded border-neutral-300 text-primary-600"
-                                />
-                                启用终端
-                              </label>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => saveProfile(t)}
-                                  disabled={profileSaving}
-                                  title="保存设备档案"
-                                  aria-label="保存设备档案"
-                                  className="flex h-7 w-7 items-center justify-center rounded-md bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
-                                >
-                                  <CheckIcon className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={cancelProfileEdit}
-                                  disabled={profileSaving}
-                                  title="取消"
-                                  aria-label="取消"
-                                  className="flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-50"
-                                >
-                                  <XIcon className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-neutral-900">{t.displayName || '未命名终端'}</p>
-                              <p className="mt-0.5 max-w-[220px] truncate text-neutral-500">{t.locationLabel || '未设置摆放位置'}</p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => openBindCodeModal(t)}
-                                disabled={statusSavingId !== null || lifecycleSavingId !== null || !t.enabled || !canCreateBindCode}
-                                title={bindCodeTitle}
-                                aria-label={`为 ${t.terminalCode} 生成一次性绑定码`}
-                                className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-primary-200 bg-primary-50 px-2 text-xs font-medium text-primary-700 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <KeyRoundIcon className="h-3.5 w-3.5" />
-                                生成绑定码
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => startProfileEdit(t)}
-                                disabled={statusSavingId !== null}
-                                title="编辑设备档案"
-                                aria-label={`编辑 ${t.terminalCode} 设备档案`}
-                                className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 bg-surface px-2 text-xs font-medium text-neutral-600 hover:border-primary-600/40 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <PencilIcon className="h-3.5 w-3.5" />
-                                编辑档案
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.macAddress ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs">
-                        {editingId === t.id ? (
-                          <div className="flex flex-col gap-1">
-                            {orgLoadError && (
-                              <p className="text-xs text-error-fg">{orgLoadError}</p>
-                            )}
-                            <div className="flex items-center gap-1.5">
-                            <select
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              disabled={saving}
-                              className="h-7 max-w-[180px] rounded-md border border-neutral-200 bg-surface px-2 text-xs text-neutral-700 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
-                              aria-label={`设置 ${t.terminalCode} 所属机构`}
-                            >
-                              <option value="">未绑定（解绑）</option>
-                              {/* 当前归属不在可选列表里（停放类型或已停用）：照实显示，不让下拉框悄悄落到「解绑」 */}
-                              {t.orgId && !orgOptions.some((o) => o.id === t.orgId) && (
-                                <option value={t.orgId} disabled>
-                                  {t.orgName ?? t.orgId}{isParkedOrgType(t.orgType) ? '（类型已停放，请改绑）' : '（当前不可选）'}
-                                </option>
-                              )}
-                              {orgOptions.map((o) => (
-                                <option key={o.id} value={o.id}>{o.name}</option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => saveEdit(t)}
-                              disabled={saving}
-                              title="保存归属"
-                              aria-label="保存归属"
-                              className="flex h-7 w-7 items-center justify-center rounded-md bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
-                            >
-                              <CheckIcon className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={cancelEdit}
-                              disabled={saving}
-                              title="取消"
-                              aria-label="取消"
-                              className="flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-50"
-                            >
-                              <XIcon className="h-3.5 w-3.5" />
-                            </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            {t.orgName ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-info-bg px-2 py-0.5 text-info-fg">
-                                <Building2Icon className="h-3 w-3" />{t.orgName}
-                              </span>
-                            ) : (
-                              <span className="text-neutral-500">未绑定</span>
-                            )}
-                            {isParkedOrgType(t.orgType) && (
-                              <span className="rounded bg-warning-bg px-1.5 py-0.5 text-[11px] font-bold text-warning-fg" title="企业来源与招聘会主办方两类机构已停放，不再绑定终端；现有绑定保留，建议改绑到运营机构">
-                                该机构类型已停放，建议改绑
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => startEdit(t)}
-                              disabled={statusSavingId !== null}
-                              title="编辑所属机构"
-                              aria-label={`编辑 ${t.terminalCode} 所属机构`}
-                              className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 bg-surface px-2 text-xs font-medium text-neutral-600 hover:border-primary-600/40 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <PencilIcon className="h-3.5 w-3.5" />
-                              {t.orgName ? '更改机构' : '绑定机构'}
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <StatusBadge dot status={t.enabled ? 'success' : 'error'} label={t.enabled ? '启用' : '停用'} />
-                          <button
-                            type="button"
-                            onClick={() => toggleTerminalStatus(t)}
-                            disabled={statusSavingId !== null || profileSaving || saving || profileEditingId === t.id || editingId === t.id || t.lifecycleStatus === 'retired'}
-                            aria-label={`${t.enabled ? '停用' : '启用'} ${t.terminalCode}`}
-                            className={`inline-flex h-7 items-center whitespace-nowrap rounded-md border px-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
-                              t.enabled
-                                ? 'border-error/20 bg-surface text-error-fg hover:bg-error-bg'
-                                : 'border-success/20 bg-surface text-success-fg hover:bg-success-bg'
-                            }`}
-                          >
-                            {statusSavingId === t.id
-                              ? '保存中'
-                              : profileEditingId === t.id || editingId === t.id
-                                ? '编辑中'
-                                : t.enabled ? '停用' : '启用'}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <TerminalLifecycleActions
-                          terminal={t}
-                          disabled={statusSavingId !== null || lifecycleSavingId !== null || profileSaving || saving || profileEditingId === t.id || editingId === t.id}
-                          onBusyChange={(busy) => setLifecycleSavingId(busy ? t.id : null)}
-                          onUpdated={(result) => {
-                            setLocalLifecyclePatch((current) => ({
-                              ...current,
-                              [t.id]: {
-                                status: result.newStatus,
-                                version: result.lifecycleVersion,
-                                ...('credentialGeneration' in result
-                                  ? {
-                                      credentialGeneration: result.credentialGeneration,
-                                      hasActiveCredential: false,
-                                    }
-                                  : {}),
-                              },
-                            }))
-                            void refresh()
-                              .then(() => setLocalLifecyclePatch((current) => {
-                                if (!current[t.id]) return current
-                                const next = { ...current }
-                                delete next[t.id]
-                                return next
-                              }))
-                              .catch(() => undefined)
-                          }}
-                          onConflict={() => { void refresh().catch(() => undefined) }}
-                          onNotice={setNotice}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1">
-                          <StatusBadge dot status={runtimeView.badge} label={runtimeView.label} />
-                          {runtimeView.detail && (
-                            <span className="text-xs text-warning-fg">{runtimeView.detail}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <TerminalNetworkDiagnostics
-                          online={t.online}
-                          wiredNetworkStatus={t.wiredNetworkStatus}
-                          printerNetworkStatus={t.printerNetworkStatus}
-                        />
-                      </td>
-                      <td className="px-4 py-3"><StatusBadge dot status={printerView.badge} label={printerView.label} /></td>
-                      {/* 扫描输入闸门：只呈现，不提供远程解除。锁死时必须同时看得见
-                          「为什么」和「什么时候」，否则运维只知道坏了、不知道该不该跑一趟。 */}
-                      <td className="px-4 py-3" data-testid="terminal-scan-input">
-                        <div className="flex flex-col gap-1" aria-label="只读扫描输入闸门状态">
-                          <StatusBadge dot status={scanInput.badge} label={scanInput.label} />
-                          {scanInput.detail && (
-                            <span className="text-xs text-warning-fg">{scanInput.detail}</span>
-                          )}
-                          {scanInput.restart && (
-                            <span className="text-xs text-warning-fg">需重启 Agent 恢复（不支持远程解除）</span>
-                          )}
-                          {t.scanInputObservedAt && (
-                            <span className="text-[11px] text-neutral-500" title={formatDateTime(t.scanInputObservedAt)}>{relativeTime(t.scanInputObservedAt)}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500" title={t.lastHeartbeatAt ? formatDateTime(t.lastHeartbeatAt) : undefined}>{heartbeatText(t.lastHeartbeatAt)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.agentVersion ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1">
-                          <StatusBadge dot status={releaseView.badge} label={releaseView.label} />
-                          {releaseView.detail && <span className="font-mono text-[11px] text-neutral-500">目标 {releaseView.detail}</span>}
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.ipAddress ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{fmtDisk(t.diskFreeGb)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500" title={t.registeredAt ? formatDateTime(t.registeredAt) : undefined}>{t.registeredAt ? formatDate(t.registeredAt) : '—'}</td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
+        <ConsoleTable items={paginated} columns={columns} loading={loading} error={failed ? { title: '终端数据加载失败', message: '请稍后重试', onRetry: () => void refresh() } : null} empty={{ title: search ? '未找到匹配的终端' : '该分类暂无终端', description: search ? '请尝试其他关键词' : undefined }} page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} scrollX={false} />
       </Card>
-
-      <p className="mt-3 text-xs text-neutral-500">
-        终端在线状态、链路诊断、打印机状态、扫描输入、版本、IP、磁盘均来自 Windows Terminal Agent 的心跳上报；链路诊断不展示 WiFi 名称、密码、网关或打印机地址
-        {API_MODE !== 'http' && '（当前为 mock 演示数据，归属变更不写数据库）'}
-      </p>
-      <p className="mt-1 text-xs text-neutral-500">
-        「扫描输入」会在目录身份变化、读取失败或监听器异常时锁死，
-        保证上一位的扫描件不会给到下一位。锁死之后<b>只能到现场重启 Agent 恢复，后台不提供远程解除</b>。
-        显示「未上报」表示这台 Agent 还没报这一组字段（旧版本或尚未接入），不等于正常。
-      </p>
-      <p className="mt-1 text-xs text-neutral-500">
-        「所属机构」决定该终端归哪所学校；学校账号在合作机构后台只能配置归属本校的智慧校园开关。绑定/解绑仅管理员可操作，变更写入审计日志。
-      </p>
-      <p className="mt-1 text-xs text-neutral-500">
-        「设备档案」用于商用部署的机器识别和权限绑定；MAC 地址建议由 Terminal Agent 上报，也可由管理员人工校正。停用终端后，Kiosk 统一配置会关闭敏感模块。
-      </p>
-      <ReleaseObservationPanel terminals={terminals} onNotice={setNotice} />
-      <p className="mt-1 text-xs text-neutral-500">
-        「更新观察」只显示终端是否看到已指定的版本计划。本阶段不会下载、安装或控制 Windows 服务；未签名和内部自签名制品均不能作为正式发布结论。
-      </p>
-
-      {bindCodeTerminal ? (
-        <TerminalBindCodeDialog
-          terminal={bindCodeTerminal}
-          onClose={closeBindCodeModal}
-          onNotice={setNotice}
-        />
-      ) : null}
-      {creatingPlannedTerminal ? (
-        <CreatePlannedTerminalDialog
-          organizations={orgOptions}
-          onClose={() => setCreatingPlannedTerminal(false)}
-          onCreated={(terminalCode) => {
-            setCreatingPlannedTerminal(false)
-            setNotice({ type: 'success', text: `已预创建设备 ${terminalCode}；请在设备列表中生成一次性绑定码完成安装。` })
-            void refresh()
-          }}
-          onError={(message) => setNotice({ type: 'error', text: message })}
-        />
-      ) : null}
+      <p className="mt-3 text-xs text-neutral-500">终端在线状态、链路诊断、打印机状态、扫描输入、版本、IP、磁盘均来自终端程序（Terminal Agent）的定时上报；链路诊断不展示 WiFi 名称、密码、网关或打印机地址{API_MODE !== 'http' && '（当前为 mock 演示数据，归属变更不写数据库）'}</p>
+      <p className="mt-1 text-xs text-neutral-500">「扫描输入」锁死后只能到现场重启终端程序恢复，后台不提供远程解除；显示「未上报」表示这台终端还没报这一组字段，不等于正常。</p>
+      <p className="mt-1 text-xs text-neutral-500">「所属机构」决定该终端归属；学校账号在合作机构后台只能配置归属本校的智慧校园开关。绑定/解绑仅管理员可操作，变更写入审计日志。</p>
+      <TerminalDetailDrawer terminal={selected} allTerminals={terminals} organizations={orgOptions} orgLoadError={orgLoadError} editingOrg={selected ? editingId === selected.id : false} editOrgValue={editValue} savingOrg={saving} profileEditing={selected ? profileEditingId === selected.id : false} profileDraft={profileDraft} profileSaving={profileSaving} statusSaving={selected ? statusSavingId === selected.id : false} lifecycleSaving={selected ? lifecycleSavingId === selected.id : false} onClose={closeDetail} onOpenBindCode={openBindCodeModal} onStartProfileEdit={startProfileEdit} onCancelProfileEdit={cancelProfileEdit} onSaveProfile={(terminal) => void saveProfile(terminal)} onProfileDraftChange={(patch) => setProfileDraft((current) => ({ ...current, ...patch }))} onStartOrgEdit={startOrgEdit} onCancelOrgEdit={cancelOrgEdit} onSaveOrg={(terminal) => void saveOrg(terminal)} onOrgChange={setEditValue} onToggleStatus={(terminal) => void toggleStatus(terminal)} onLifecycleBusy={(busy) => setLifecycleSavingId(busy && selected ? selected.id : null)} onLifecycleUpdated={(result) => { if (selected) handleLifecycleUpdated(selected, result) }} onLifecycleConflict={() => { void refresh().catch(() => undefined) }} onNotice={setNotice} />
+      {bindCodeTerminal && <TerminalBindCodeDialog terminal={bindCodeTerminal} onClose={() => setBindCodeTerminal(null)} onNotice={setNotice} />}
+      {creatingPlannedTerminal && <CreatePlannedTerminalDialog organizations={orgOptions} onClose={() => setCreatingPlannedTerminal(false)} onCreated={(code) => { setCreatingPlannedTerminal(false); setNotice({ type: 'success', text: `已预创建设备 ${code}；请在设备列表中生成一次性绑定码完成安装。` }); void refresh() }} onError={(message) => setNotice({ type: 'error', text: message })} />}
     </>
   )
 }

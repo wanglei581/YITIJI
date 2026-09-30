@@ -130,14 +130,13 @@ export default function SmartCampusPage() {
   useEffect(load, [])
 
   return (
-    <Page title="智慧校园" subtitle="按终端开启智慧校园及各子模块；开启后该机器前端首页出现智慧校园入口。">
+    <Page title="智慧校园" subtitle="配置本校终端上「智慧校园」模块的显示开关。">
       <div className="space-y-5">
         {/* 合规提示 */}
         <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-bg/70 px-4 py-3">
           <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
           <p className="text-xs leading-relaxed text-warning-fg">
-            一期由平台运营代配置。<span className="font-semibold">校园大数据</span>需先取得学校书面授权 + 数据处理协议，且只接聚合脱敏统计，
-            本期前端仅为占位、不展示真实数据（详见合规边界 §九）。未开启任何子模块时无法启用。
+            只能配置归属本校的终端；保存后一体机首页按开关显示或隐藏「智慧校园」。<span className="font-semibold">迎新内容 / 使用统计</span>暂未开放，<span className="font-semibold">校园大数据</span>暂不开放。未开启任何子模块时无法启用。
           </p>
         </div>
 

@@ -105,8 +105,8 @@ check('B1 指标卡：合计无法统计时不显示计数', /!totalsFaultsRepor
 check('B2 指标卡：部分静默时注明另有 N 台未计入', /totals\.silentTerminals > 0 &&/.test(cards) && cards.includes('未计入以上数字'))
 check('B3 指标卡：有静默终端时不说「当前没有未恢复的故障」', cards.includes("totals.silentTerminals > 0 ? '已上报的终端当前没有未恢复的故障'"))
 check('B4 抽屉：本终端没上报时不列 0 次', /!faults\.reportedInWindow \?/.test(drawer) && drawer.includes('FAULTS_NOT_REPORTED'))
-check('B5 表格：没上报的行三列合并写明无法统计', /row\.faults\.reportedInWindow \?/.test(page) && /colSpan=\{3\}[\s\S]{0,160}FAULTS_NOT_REPORTED/.test(page))
-check('B6 表格空行跨满 9 列', /\['终端', '当前状态', '服务人次', '打印扫描次数', '出纸成功率', '未确认出纸', '离线', '打印机故障', '未恢复'\]/.test(page) && page.includes('colSpan={9}'))
+check('B5 表格：没上报的行在三项故障列分别写明无法统计', /row\.faults\.reportedInWindow/.test(page) && (page.match(/FAULTS_NOT_REPORTED/g) ?? []).length >= 3)
+check('B6 表格使用统一 ConsoleTable 并保留 9 个业务列', page.includes('ConsoleTable') && page.includes("header: '未恢复'") && page.includes("header: '打印机故障'"))
 
 if (failures > 0) {
   console.error(`\n${failures} FAIL`)

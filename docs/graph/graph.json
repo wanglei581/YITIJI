@@ -12047,7 +12047,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 195,
+      "reachableFileCount": 192,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12690,13 +12690,8 @@
             "GET /admin/ad-assets",
             "GET /admin/ad-playlists",
             "GET /admin/ai-posters/status",
-            "GET /admin/import-batches",
             "GET /admin/screensaver/terminals",
             "PATCH /admin/ad-assets/:param",
-            "PATCH /admin/fair-sources/:param/publish",
-            "PATCH /admin/fair-sources/:param/review",
-            "PATCH /admin/job-sources/:param/publish",
-            "PATCH /admin/job-sources/:param/review",
             "POST /admin/ad-assets/external-video",
             "POST /admin/ad-playlists",
             "PUT /admin/ad-playlists/:param",
@@ -17966,10 +17961,12 @@
       "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/admin/src/routes/devices/TerminalFleetOverview.tsx": [
-      "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs"
+      "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/devices/index.tsx": [
-      "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs"
+      "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx": [
       "apps/admin/scripts/verify-source-publish-actions.mjs"
@@ -18093,16 +18090,19 @@
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
     "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx": [
-      "apps/admin/scripts/verify-admin-peripheral-views.mjs"
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/peripherals/index.tsx": [
       "apps/admin/scripts/verify-admin-peripheral-views.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-honest-placeholders.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/admin/src/routes/peripherals/peripheralViews.ts": [
-      "apps/admin/scripts/verify-admin-peripheral-views.mjs"
+      "apps/admin/scripts/verify-admin-peripheral-views.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/permissions/AccountStatusDialog.tsx": [
       "apps/admin/scripts/verify-admin-internal-accounts-ui.mjs"
@@ -18135,6 +18135,7 @@
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/printers/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
@@ -18160,8 +18161,12 @@
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/admin/src/routes/screensaver/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/admin/src/routes/smart-campus/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
@@ -18173,11 +18178,15 @@
     "apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs"
     ],
+    "apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs"
     ],
     "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx": [
-      "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs"
+      "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx": [
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs"
@@ -18185,6 +18194,7 @@
     "apps/admin/src/routes/terminals/index.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "scripts/verify-datetime-honesty.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
@@ -21121,6 +21131,7 @@
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/routes/Page.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
@@ -21193,6 +21204,7 @@
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/partner/src/routes/smart-campus/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/sources/ExcelImportModal.tsx": [
@@ -21229,6 +21241,7 @@
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/routes/terminals/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-honest-placeholders.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs",
@@ -21883,9 +21896,6 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-contract-review-contract.ts"
     ],
-    "packages/ui/src/components/ConsoleTable.tsx": [
-      "scripts/verify-datetime-honesty.mjs"
-    ],
     "packages/ui/src/components/Drawer.tsx": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
@@ -21894,9 +21904,6 @@
     ],
     "packages/ui/src/components/KioskTopbar.tsx": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
-    ],
-    "packages/ui/src/components/consolePageList.ts": [
-      "scripts/verify-datetime-honesty.mjs"
     ],
     "packages/ui/src/index.ts": [
       "packages/ui/scripts/verify-fusion-youth-foundation.mjs",
@@ -26749,7 +26756,9 @@
           "apps/admin/src/services/api/devices.ts",
           "apps/admin/src/services/api/types.ts"
         ],
-        "missing": []
+        "missing": [
+          "src/routes/terminals/TerminalDetailDrawer.tsx"
+        ]
       },
       "file": "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
       "helper": false,
@@ -26771,7 +26780,9 @@
           "apps/admin/src/routes/terminals/terminalStatusViews.ts",
           "apps/admin/src/services/api/types.ts"
         ],
-        "missing": []
+        "missing": [
+          "src/routes/terminals/TerminalDetailDrawer.tsx"
+        ]
       },
       "file": "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
       "helper": false,
@@ -26814,9 +26825,28 @@
         ],
         "files": [
           "apps/admin/src/lib/auditActionLabels.ts",
+          "apps/admin/src/routes/devices/TerminalFleetOverview.tsx",
+          "apps/admin/src/routes/devices/index.tsx",
+          "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx",
+          "apps/admin/src/routes/peripherals/index.tsx",
+          "apps/admin/src/routes/peripherals/peripheralViews.ts",
+          "apps/admin/src/routes/printers/index.tsx",
+          "apps/admin/src/routes/screensaver/index.tsx",
+          "apps/admin/src/routes/smart-campus/index.tsx",
+          "apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx",
+          "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx",
+          "apps/admin/src/routes/terminals/index.tsx",
+          "apps/partner/src/routes/Page.tsx",
+          "apps/partner/src/routes/smart-campus/index.tsx",
+          "apps/partner/src/routes/terminals/index.tsx",
           "services/api/src/audit/audit.types.ts"
         ],
-        "missing": []
+        "missing": [
+          "src/routes/screensaver/AssetsTab.tsx",
+          "src/routes/screensaver/PlaylistsTab.tsx",
+          "src/routes/screensaver/TerminalsTab.tsx",
+          "src/routes/terminals/TerminalDetailDrawer.tsx"
+        ]
       },
       "file": "apps/admin/scripts/verify-console-plain-copy.mjs",
       "helper": false,
@@ -31922,8 +31952,6 @@
           "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
           "packages/shared/src/formatDateTime.ts",
           "packages/shared/src/formatNumber.ts",
-          "packages/ui/src/components/ConsoleTable.tsx",
-          "packages/ui/src/components/consolePageList.ts",
           "services/api/src/jobs/jobs-shared.ts"
         ],
         "missing": []
@@ -41209,6 +41237,17 @@
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/screensaver/terminalConfigState.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/src/routes/screensaver/terminalConfigState.test.ts"
+        ],
+        "risk": "medium",
+        "scope": "admin",
+        "why": "仍被其它文件提及：apps/admin/src/routes/screensaver/terminalConfigState.test.ts"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx",
         "kind": "component",
         "mentions": [
@@ -41222,6 +41261,31 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-console-plain-copy.mjs"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-console-plain-copy.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
+          "apps/admin/scripts/verify-console-plain-copy.mjs",
+          "docs/device/onsite-acceptance-runsheet-2026-09.md",
+          "docs/product/console-ai-upgrade-plan-2026-08.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs、apps/admin/scripts/verify-console-plain-copy.mjs"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",

@@ -41,8 +41,8 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 77 |
-| **medium** | 只被文档或其它文件提及 | 28 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 79 |
+| **medium** | 只被文档或其它文件提及 | 29 |
 | **low** | 全仓零提及 | 94 |
 
 
@@ -186,13 +186,14 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## medium — 只被文档或其它文件提及（28）
+## medium — 只被文档或其它文件提及（29）
 
-### 页面/组件（11）
+### 页面/组件（12）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/admin/src/routes/offline-agencies/index.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/admin/src/routes/offline-agencies/AgencyForm.tsx、apps/admin/src/routes/offline-agencies/GovernanceDrawer.tsx、apps/admin/src/routes/offline-agencies/JobsDrawer.tsx |
+| `apps/admin/src/routes/screensaver/terminalConfigState.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被其它文件提及：apps/admin/src/routes/screensaver/terminalConfigState.test.ts |
 | `apps/admin/src/services/api/bulkPublish.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/operations/seed-content-entry-checklist-2026-08.md、docs/progress/current-progress.md |
 | `apps/kiosk/src/App.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/legacy-capability-inventory-2026-08-16.md |
 | `apps/kiosk/src/components/AiDriverBanner.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/kiosk-resume-context-ai-assist-audit-2026-08-06.md |
@@ -229,9 +230,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（77）
+## high — 仍被 CI / 门禁 / 包脚本引用（79）
 
-### 页面/组件（34）
+### 页面/组件（36）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -253,6 +254,8 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/admin/src/routes/offline-agencies/JobsDrawer.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、scripts/verify-no-raw-error-render.mjs |
 | `apps/admin/src/routes/offline-agencies/ReviewDialog.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs |
 | `apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs |
+| `apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-console-plain-copy.mjs |
+| `apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs、apps/admin/scripts/verify-console-plain-copy.mjs |
 | `apps/admin/src/services/api/offlineAgenciesAdmin.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs |
 | `apps/kiosk/src/components/ComingSoonNotice.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs |
 | `apps/kiosk/src/components/KioskDeviceStatusPills.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-device-status-honest.mjs |

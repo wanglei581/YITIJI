@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const page = readFileSync(join(root, 'src/routes/terminals/index.tsx'), 'utf8')
+const detail = readFileSync(join(root, 'src/routes/terminals/TerminalDetailDrawer.tsx'), 'utf8')
+const terminalUi = `${page}\n${detail}`
 const componentPath = join(root, 'src/routes/terminals/TerminalNetworkDiagnostics.tsx')
 const component = existsSync(componentPath) ? readFileSync(componentPath, 'utf8') : ''
 const types = readFileSync(join(root, 'src/services/api/types.ts'), 'utf8')
@@ -15,8 +17,8 @@ const views = readFileSync(join(root, 'src/routes/terminals/terminalStatusViews.
 const peripherals = readFileSync(join(root, 'src/routes/peripherals/index.tsx'), 'utf8')
 
 assert.ok(component, 'network diagnostics component is missing')
-assert.match(page, /TerminalNetworkDiagnostics/)
-assert.match(page, /链路诊断/)
+assert.match(terminalUi, /TerminalNetworkDiagnostics/)
+assert.match(terminalUi, /链路诊断/)
 assert.match(component, /云端已连/)
 assert.match(component, /网线已连/)
 assert.match(component, /打印机可达/)
@@ -24,7 +26,7 @@ assert.match(component, /aria-label="只读网络链路诊断"/)
 assert.match(component, /online \? wiredStatus\(wiredNetworkStatus\) : 'unknown'/)
 assert.match(component, /online \? printerStatus\(printerNetworkStatus\) : 'unknown'/)
 assert.doesNotMatch(component, /(?:密码|SSID|网关|printerHostAddress|ipAddress|localApiBridgeToken|agentToken|bindCode)/)
-assert.doesNotMatch(page, /(?:updateNetwork|saveWifi|configureAdapter|setNetIPAddress)/)
+assert.doesNotMatch(terminalUi, /(?:updateNetwork|saveWifi|configureAdapter|setNetIPAddress)/)
 assert.match(types, /wiredNetworkStatus/)
 assert.match(types, /printerNetworkStatus/)
 
@@ -49,34 +51,34 @@ assert.match(types, /scanInputObservedAt/, 'AdminTerminalRecord must carry scanI
 // 所以它能钉住的是「这一列存在、取值来自记录、状态分得开、没有远程解除入口」，
 // 钉不住「某个分支被改成了死代码」——那种改法字面量还在，文本门禁必然看不出来。
 // 这一列目前没有可执行覆盖（admin 侧没有终端页的浏览器用例），这是已知边界。
-assert.match(page, /'扫描输入'/, 'the terminals table must have a 扫描输入 column')
+assert.match(terminalUi, /'扫描输入'|>扫描输入</, 'the terminal detail drawer must expose 扫描输入')
 assert.match(views, /export function scanInputView/, 'the shared vocabulary must derive a scan-input view')
 assert.match(
-  page,
+  terminalUi,
   /import \{[^}]*\bscanInputView\b[^}]*\} from '\.\/terminalStatusViews'/,
   'the terminals page must take scanInputView from the shared vocabulary',
 )
-assert.match(page, /const scanInput = scanInputView\(t\)/, 'the scan-input view must be computed per row')
+assert.match(terminalUi, /const scan = scanInputView\(terminal\)/, 'the scan-input view must be computed for the selected terminal')
 // 算出来之后必须真的进 DOM：只算不渲染，运维照样什么都看不到。
 assert.match(
-  page,
-  /data-testid="terminal-scan-input"[\s\S]{0,600}?StatusBadge dot status=\{scanInput\.badge\} label=\{scanInput\.label\}/,
-  'the computed scan-input view must actually be rendered in that column',
+  terminalUi,
+  /data-testid="terminal-scan-input"[\s\S]{0,600}?StatusBadge dot status=\{scan\.badge\} label=\{scan\.label\}/,
+  'the computed scan-input view must actually be rendered in the detail drawer',
 )
-assert.match(page, /\{scanInput\.detail &&/, 'the lockout reason must be rendered next to the badge')
-assert.match(page, /\{scanInput\.restart &&/, 'restart_required must be rendered next to the badge')
-assert.match(page, /\{t\.scanInputObservedAt &&/, 'the observation time must be rendered next to the badge')
+assert.match(terminalUi, /\{scan\.detail &&/, 'the lockout reason must be rendered next to the badge')
+assert.match(terminalUi, /\{scan\.restart &&/, 'restart_required must be rendered next to the badge')
+assert.match(terminalUi, /scanInputObservedAt &&/, 'the observation time must be rendered next to the badge')
 assert.match(views, /t\.scanInputHealth/)
 assert.match(views, /t\.scanInputAction/)
 assert.match(views, /t\.scanInputReason/)
-assert.match(page, /t\.scanInputObservedAt/)
+assert.match(terminalUi, /scanInputObservedAt/)
 
 // 三种状态必须分得开，且缺数据时说「未上报」而不是「正常」——
 // 把没测到说成健康，正是这条遥测要防的事。
 assert.match(views, /'已锁死'/, 'locked_out must be rendered as a distinct state')
 assert.match(views, /'未上报'/, 'missing telemetry must read as 未上报, never as healthy')
 assert.match(views, /restart_required/, 'restart_required must be distinguishable')
-assert.match(page, /需重启 Agent 恢复（不支持远程解除）/)
+assert.match(terminalUi, /需重启终端程序（Terminal Agent）恢复（不支持远程解除）/)
 assert.match(views, /badge: 'error' as const,\s*\n\s*label: '已锁死'/, 'locked_out must not render as a neutral badge')
 
 // 原因码走白名单中文表（枚举，不是自由文本），未知码原样显示，不拼接任意载荷。
@@ -84,7 +86,7 @@ assert.match(views, /SCAN_INPUT_REASON_LABELS/, 'reason codes must go through an
 for (const reason of ['root_identity_changed', 'watcher_error', 'readdir_failed', 'startup_incomplete']) {
   assert.match(views, new RegExp(`\\b${reason}\\b`), `reason code ${reason} must have a label`)
 }
-for (const [name, source] of [['terminals page', page], ['shared vocabulary', views], ['peripherals page', peripherals]]) {
+for (const [name, source] of [['terminals page', terminalUi], ['shared vocabulary', views], ['peripherals page', peripherals]]) {
   assert.doesNotMatch(
     source,
     /dangerouslySetInnerHTML|scanInputPayload|scanInputRaw|JSON\.stringify\(t\)/,

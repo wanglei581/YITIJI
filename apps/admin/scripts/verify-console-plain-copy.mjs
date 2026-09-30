@@ -74,6 +74,38 @@ for (const file of scanRoots.flatMap((dir) => walkTsx(dir))) {
 }
 if (failures.length === 0) console.log('  PASS 管理员与合作机构页面的可见文案没有工程词或 Markdown 星号')
 
+console.log('\n=== 终端与设备批次 W-06 文案 ===')
+const batchFiles = [
+  join(adminRoot, 'src/routes/devices/index.tsx'),
+  join(adminRoot, 'src/routes/devices/TerminalFleetOverview.tsx'),
+  join(adminRoot, 'src/routes/terminals/index.tsx'),
+  join(adminRoot, 'src/routes/terminals/TerminalDetailDrawer.tsx'),
+  join(adminRoot, 'src/routes/terminals/TerminalLifecycleActions.tsx'),
+  join(adminRoot, 'src/routes/terminals/ReleaseObservationPanel.tsx'),
+  join(adminRoot, 'src/routes/printers/index.tsx'),
+  join(adminRoot, 'src/routes/peripherals/index.tsx'),
+  join(adminRoot, 'src/routes/peripherals/PeripheralDrawer.tsx'),
+  join(adminRoot, 'src/routes/peripherals/peripheralViews.ts'),
+  join(adminRoot, 'src/routes/screensaver/index.tsx'),
+  join(adminRoot, 'src/routes/screensaver/AssetsTab.tsx'),
+  join(adminRoot, 'src/routes/screensaver/PlaylistsTab.tsx'),
+  join(adminRoot, 'src/routes/screensaver/TerminalsTab.tsx'),
+  join(adminRoot, 'src/routes/smart-campus/index.tsx'),
+  join(repoRoot, 'apps/partner/src/routes/terminals/index.tsx'),
+  join(repoRoot, 'apps/partner/src/routes/smart-campus/index.tsx'),
+  join(repoRoot, 'apps/partner/src/routes/Page.tsx'),
+]
+const batchForbidden = ['Terminal Agent 心跳上报', 'printerStatus', 'orgId', 'Kiosk']
+for (const file of batchFiles) {
+  const source = readFileSync(file, 'utf8')
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const visible = literalTexts(sourceFile).map(({ value }) => value).join('\n')
+  for (const token of batchForbidden) {
+    if (visible.includes(token)) fail(`${relative(repoRoot, file)} 可见文案仍含「${token}」`)
+  }
+}
+if (!failures.length) console.log('  PASS 本批页面可见文案没有 Terminal Agent 心跳上报 / printerStatus / orgId / Kiosk')
+
 console.log('\n=== 审计动作中文名 ===')
 const auditTypes = readFileSync(auditTypesPath, 'utf8')
 const actionBlock = auditTypes.slice(

@@ -28,7 +28,7 @@ export default function DevicesPage() {
   }
 
   return (
-    <Page title="设备管理" subtitle="终端 / 打印机 / 外设统一管理 · 状态每 30 秒由 Terminal Agent 心跳上报">
+    <Page title="设备管理" subtitle="终端、打印机、外设统一管理 · 状态每 30 秒自动更新">
       {/* 原型下划线式 Tab */}
       <div className="mb-4 flex gap-1 border-b-[1.6px] border-neutral-900/[0.06]">
         {TABS.map(({ key, label, icon: Icon }) => {

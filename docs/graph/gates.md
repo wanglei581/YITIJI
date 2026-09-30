@@ -51,13 +51,16 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 断言了不存在的路径（6）
+## 断言了不存在的路径（9）
 
 门禁里写着某个仓库路径，但该路径在 git 里不存在。可能是文件被移动/删除后门禁
 没跟着改 —— 这类断言往往已经恒真或恒假，需要人确认。
 
 | 门禁脚本 | 找不到的路径 |
 | --- | --- |
+| `apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs` | `src/routes/terminals/TerminalDetailDrawer.tsx` |
+| `apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs` | `src/routes/terminals/TerminalDetailDrawer.tsx` |
+| `apps/admin/scripts/verify-console-plain-copy.mjs` | `src/routes/screensaver/AssetsTab.tsx`<br/>`src/routes/screensaver/PlaylistsTab.tsx`<br/>`src/routes/screensaver/TerminalsTab.tsx`<br/>`src/routes/terminals/TerminalDetailDrawer.tsx` |
 | `apps/kiosk/scripts/verify-data-request-ui.mjs` | `apps/admin/src/routes/member-privacy/index.tsx`<br/>`apps/admin/src/services/api/memberPrivacyAdmin.ts` |
 | `apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs` | `src/pages/resume/ResumeExportPage.tsx` |
 | `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs` | `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs` |
@@ -150,7 +153,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 127 个文件</summary>
+<summary><code>apps/admin/src/</code> — 129 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -174,8 +177,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/components/BulkPublishButton.tsx` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/dashboard/index.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
-| `apps/admin/src/routes/devices/TerminalFleetOverview.tsx` | `verify-admin-device-fleet-overview-ui.mjs` |
-| `apps/admin/src/routes/devices/index.tsx` | `verify-admin-device-fleet-overview-ui.mjs` |
+| `apps/admin/src/routes/devices/TerminalFleetOverview.tsx` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/devices/index.tsx` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/routes/fair-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-jobfair-checkin.ts` |
 | `apps/admin/src/routes/fairs/components/CompaniesTab.tsx` | `verify-no-raw-error-render.mjs` |
@@ -209,9 +212,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/partners/partner-account-action-steps/PhoneRebindSteps.tsx` | `verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/partnerContactPhoneEligibility.ts` | `verify-admin-partner-contact-phone-ui.mjs` |
 | `apps/admin/src/routes/partners/usePartnerAccountAction.ts` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
-| `apps/admin/src/routes/peripherals/PeripheralDrawer.tsx` | `verify-admin-peripheral-views.mjs` |
-| `apps/admin/src/routes/peripherals/index.tsx` | `verify-admin-peripheral-views.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-honest-placeholders.mjs`<br/>`verify-datetime-honesty.mjs` |
-| `apps/admin/src/routes/peripherals/peripheralViews.ts` | `verify-admin-peripheral-views.mjs` |
+| `apps/admin/src/routes/peripherals/PeripheralDrawer.tsx` | `verify-admin-peripheral-views.mjs`<br/>`verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/peripherals/index.tsx` | `verify-admin-peripheral-views.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-honest-placeholders.mjs`<br/>`verify-datetime-honesty.mjs` |
+| `apps/admin/src/routes/peripherals/peripheralViews.ts` | `verify-admin-peripheral-views.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/permissions/AccountStatusDialog.tsx` | `verify-admin-internal-accounts-ui.mjs` |
 | `apps/admin/src/routes/permissions/AccountsTable.tsx` | `verify-admin-internal-accounts-ui.mjs` |
 | `apps/admin/src/routes/permissions/BackupAdminDrawer.tsx` | `verify-admin-internal-accounts-ui.mjs` |
@@ -221,7 +224,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/print-scan/CapabilityCenter.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx` | `verify-admin-print-scan-ui.mjs` |
 | `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs` |
-| `apps/admin/src/routes/printers/index.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
+| `apps/admin/src/routes/printers/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-data-request-ui.mjs` |
 | `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-screen-ui.mjs` |
@@ -229,14 +232,16 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenTabs.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
-| `apps/admin/src/routes/screensaver/index.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/screensaver/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/smart-campus/index.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx` | `verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/routes/sync-sources/index.tsx` | `verify-no-raw-error-render.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
+| `apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
-| `apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
+| `apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
-| `apps/admin/src/routes/terminals/index.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-datetime-honesty.mjs`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-device-config.ts` |
+| `apps/admin/src/routes/terminals/index.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-datetime-honesty.mjs`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-device-config.ts` |
 | `apps/admin/src/routes/terminals/terminalStatusViews.ts` | `verify-admin-peripheral-views.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/toolbox/components/TerminalToolboxPanel.tsx` | `verify-toolbox-review-ui.mjs` |
 | `apps/admin/src/routes/toolbox/components/TerminalToolboxRow.tsx` | `verify-toolbox-review-ui.mjs`<br/>`verify-terminal-device-config.ts` |
@@ -1038,7 +1043,7 @@ node scripts/project-graph-query.mjs file <路径>
 | --- | --- |
 | `apps/partner/src/layouts/PartnerLayoutWrapper.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
 | `apps/partner/src/lib/csv.ts` | `verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
-| `apps/partner/src/routes/Page.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/Page.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/account/index.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/companies/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-companies.ts` |
 | `apps/partner/src/routes/dashboard/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
@@ -1059,7 +1064,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenTabs.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
-| `apps/partner/src/routes/smart-campus/index.tsx` | `verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/smart-campus/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/sources/ExcelImportModal.tsx` | `verify-excel-template-download-ui.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-job-headcount.ts`<br/>`verify-partner-excel-import.ts` |
 | `apps/partner/src/routes/sources/RotateCredentialDrawer.tsx` | `verify-backend-p0-contracts.mjs` |
 | `apps/partner/src/routes/sources/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-backend-p0-contracts.mjs` |
@@ -1068,7 +1073,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/sync-logs/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/terminals/TerminalOpsCards.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
 | `apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx` | `verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
-| `apps/partner/src/routes/terminals/index.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
+| `apps/partner/src/routes/terminals/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
 | `apps/partner/src/routes/terminals/terminalOpsFormat.ts` | `verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/partner/src/services/api/client.ts` | `verify-partner-relative-api-url.mjs`<br/>`verify-deploy-gates-in-sync.mjs` |
 | `apps/partner/src/services/api/consoleScreen.ts` | `verify-console-screen-ui.mjs` |
@@ -1731,15 +1736,13 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/ui/src/</code> — 30 个文件</summary>
+<summary><code>packages/ui/src/</code> — 28 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `packages/ui/src/components/ConsoleTable.tsx` | `verify-datetime-honesty.mjs` |
 | `packages/ui/src/components/Drawer.tsx` | `verify-admin-users-ui.mjs` |
 | `packages/ui/src/components/KioskPageFrame.tsx` | `verify-kiosk-visual-unity.mjs` |
 | `packages/ui/src/components/KioskTopbar.tsx` | `verify-kiosk-visual-unity.mjs` |
-| `packages/ui/src/components/consolePageList.ts` | `verify-datetime-honesty.mjs` |
 | `packages/ui/src/index.ts` | `verify-fusion-youth-foundation.mjs`<br/>`verify-service-desk-foundation.mjs` |
 | `packages/ui/src/layouts/AdminLayout.tsx` | `verify-service-desk-foundation.mjs` |
 | `packages/ui/src/layouts/KioskLayout.tsx` | `verify-fusion-shell.mjs`<br/>`verify-kiosk-visual-unity.mjs`<br/>`verify-service-desk-foundation.mjs` |

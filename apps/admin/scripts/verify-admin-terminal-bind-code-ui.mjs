@@ -22,6 +22,7 @@ function fail(message) {
 
 const required = [
   'src/routes/terminals/index.tsx',
+  'src/routes/terminals/TerminalDetailDrawer.tsx',
   'src/routes/terminals/TerminalBindCodeDialog.tsx',
   'src/routes/terminals/CreatePlannedTerminalDialog.tsx',
   'src/routes/terminals/TerminalLifecycleActions.tsx',
@@ -40,6 +41,8 @@ for (const rel of required) {
 }
 
 const { 'src/routes/terminals/index.tsx': page } = loaded
+const terminalDetail = loaded['src/routes/terminals/TerminalDetailDrawer.tsx']
+const terminalUi = `${page}\n${terminalDetail}`
 const { 'src/routes/terminals/TerminalBindCodeDialog.tsx': dialog } = loaded
 const { 'src/routes/terminals/CreatePlannedTerminalDialog.tsx': plannedDialog } = loaded
 const { 'src/routes/terminals/TerminalLifecycleActions.tsx': lifecycleActions } = loaded
@@ -80,10 +83,10 @@ if (
 }
 
 if (
-  page.includes('生成绑定码') &&
-  page.includes('openBindCodeModal') &&
-  page.includes('bindCodeTerminal') &&
-  page.includes('TerminalBindCodeDialog')
+  terminalUi.includes('生成绑定码') &&
+  terminalUi.includes('openBindCodeModal') &&
+  terminalUi.includes('bindCodeTerminal') &&
+  terminalUi.includes('TerminalBindCodeDialog')
 ) {
   pass('终端页含「生成绑定码」按钮和弹窗状态')
 } else {
@@ -155,8 +158,8 @@ for (const token of suspect) {
 pass('页面对 plaintext bindCode 没有出现日志或审计旁路')
 
 if (
-  page.includes('预创建设备') &&
-  page.includes('CreatePlannedTerminalDialog') &&
+  terminalUi.includes('预创建设备') &&
+  terminalUi.includes('CreatePlannedTerminalDialog') &&
   plannedDialog.includes('createPlannedTerminal') &&
   plannedDialog.includes('这里只创建设备资产，不签发凭证') &&
   plannedDialog.includes('role="alert"') &&
@@ -171,9 +174,9 @@ if (
 }
 
 if (
-  page.includes('TerminalLifecycleActions') &&
-  page.includes("t.lifecycleStatus === 'planned' || t.lifecycleStatus === 'maintenance'") &&
-  page.includes('换机前请先进入维护') &&
+  terminalUi.includes('TerminalLifecycleActions') &&
+  terminalUi.includes("terminal.lifecycleStatus === 'planned' || terminal.lifecycleStatus === 'maintenance'") &&
+  terminalUi.includes('换机前请先进入维护') &&
   lifecycleActions.includes('updateTerminalLifecycle') &&
   lifecycleActions.includes('进入维护') &&
   lifecycleActions.includes('恢复运行') &&
