@@ -27,6 +27,19 @@ import type { BillingPageSource } from '../print-jobs/print-page-count.types'
 // - 空列表返回 []，不伪造订单数量。
 // ============================================================
 
+/**
+ * 失败行可给手机看的失败码白名单（2026-09-30 小程序交付单）。只给码、不给 errorMessage：
+ * 那几句是写给一体机现场的（例如「请联系工作人员补纸后重试」），用户事后在手机上看会误解；
+ * 小程序按码自己配说法。白名单外的内部码（下载校验、本地状态等）一律给 null。
+ */
+const MEMBER_VISIBLE_FAILURE_CODES = new Set([
+  'PAPER_EMPTY',
+  'PRINTER_ERROR',
+  'PRINTER_OFFLINE',
+  'PRINT_JOB_UNCONFIRMED',
+  'PARTIAL_OUTPUT',
+])
+
 type DuplexMode = 'simplex' | 'duplex_long_edge' | 'duplex_short_edge'
 
 type ParsedParams = {
@@ -186,11 +199,15 @@ export class MemberPrintOrdersService {
         createdAt: true,
         completedAt: true,
         orderId: true,
+        // 只用来派生 failureCode（白名单内的码），不原样回传。
+        errorCode: true,
         // 出纸 / 领取的那台机器：小程序对账要显示网点名（2026-09-29 契约，只加不改）。
         terminal: { select: { id: true, displayName: true, locationLabel: true } },
         order: {
           select: {
             id: true,
+            // 任务上没记终端时用订单上的终端兜底显示网点名。
+            terminalId: true,
             amountCents: true,
             payStatus: true,
             paymentSource: true,
@@ -210,7 +227,17 @@ export class MemberPrintOrdersService {
       },
       ...memberPageArgs(page),
     })
+    const fallbackTerminalIds = [...new Set(rows
+      .filter((r) => !r.terminal && r.order?.terminalId)
+      .map((r) => r.order!.terminalId as string))]
+    const fallbackTerminals = fallbackTerminalIds.length
+      ? new Map((await this.prisma.terminal.findMany({
+          where: { id: { in: fallbackTerminalIds } },
+          select: { id: true, displayName: true, locationLabel: true },
+        })).map((t) => [t.id, t]))
+      : new Map<string, { id: string; displayName: string | null; locationLabel: string | null }>()
     return buildMemberPage(rows, page, total, (r) => {
+      const terminal = r.terminal ?? (r.order?.terminalId ? fallbackTerminals.get(r.order.terminalId) ?? null : null)
       const params = parseSafeParams(r.paramsJson)
       return {
         id: r.id,
@@ -225,7 +252,8 @@ export class MemberPrintOrdersService {
         pageRange: params.pageRange,
         // 单件订单经 Order.printTaskId 关联本任务；材料包子任务才在 PrintTask.orderId 上。
         orderId: r.order?.id ?? r.orderId ?? null,
-        terminal: r.terminal ? { id: r.terminal.id, displayName: r.terminal.displayName ?? null, locationLabel: r.terminal.locationLabel ?? null } : null,
+        terminal: terminal ? { id: terminal.id, displayName: terminal.displayName ?? null, locationLabel: terminal.locationLabel ?? null } : null,
+        failureCode: r.status === 'failed' && r.errorCode && MEMBER_VISIBLE_FAILURE_CODES.has(r.errorCode) ? r.errorCode : null,
         ...memberOrderPaymentFields(r.order),
       }
     })
