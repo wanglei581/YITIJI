@@ -15,6 +15,11 @@
   - 自我探索允许勾选「监护人同意并陪同」，勾选证明不了监护关系，给了两个改法待定；
   - 导出简历不印可见 AI 字样是否满足标识办法，列为待律师确认第一条。
 - **验证：** `verify:compliance-copy`、`verify:cos-lifecycle-policy`、`verify:member-data-retention`、`verify:ai-user-text-retention` 通过；`verify:ai-usage-retention` 要连隔离库，本机没跑，它对留存矩阵只做包含检查，新增一行不影响。
+## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
+
+- 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
+- 改法：`pnpm-workspace.yaml` 三条 brace-expansion 覆盖从 1.1.18 / 2.1.4 / 5.0.9 上调到修复版 1.1.20 / 2.1.6 / 5.0.11，`scripts/verify-dependency-security.mjs` 的期望常量同步，锁文件只变 brace-expansion 三个版本。没有新增豁免。
+- 验证：干净安装后 `verify:dependency-security` ALL PASS（full / prod 高危与严重均为 0），repository-integrity、ci-gate-coverage、kiosk `tsc -b` 通过。
 
 ## 2026-09-30：带文字层的 PDF 简历按行保留结构（走查 W-95；分支 `claude/backend-hardening-20260929-w95-pdf-lines`）
 
