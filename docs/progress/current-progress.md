@@ -6,6 +6,12 @@
 - **修法（Codex 起草、协调方审改）：** 新增 `resume-structure.ts`，放姓名识别（只看原文开头 3 行）、经历候选行识别（工作 / 实习 / 项目 / 校园四类标题，以及「单位 + 时间段」行）和一句提示词规则。优化提示词第 5 条改为逐条覆盖每段可识别的经历；模型没回姓名或回了原文里没有的姓名时，用原文开头识别出的姓名，识别不到就留空，不阻断建议。诊断报告把已经摘到的「单位 + 时间段」原文行移到对应的经历块，只移动已有的行，不补模型没摘的行。
 - **协调方删掉的一段：** Codex 原稿在模型漏掉某段经历时，由服务端自己拼一条「请在不新增事实的前提下，按动作和结果重新组织这段经历：…」当作建议补进去，并把模型摘的片段扩成整行。前者是服务端编的建议、不是 AI 给的，后者让「原文」和「建议」对不上，违反「不伪造能力」，两处都删了。所以模型真漏掉的经历这一版不会补出来，只靠提示词要求模型覆盖。
 - **验证：** verify:resume-optimize 新增 W-97 五组夹具（三种真实排版、缺姓名、模型编造姓名）与提示词静态断言；verify:resume-diagnosis-context 新增标题前经历行纠偏断言。四处反向变异全红：姓名识别失效、提示词规则丢失、报告纠偏去掉、姓名不核对原文。按图谱与全文搜索跑 9 条关联门禁（含 api tsc、AI 成本覆盖、功能位拆键、PII 遮盖、AI 标识）全绿。
+## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
+
+- 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
+- 改法：`pnpm-workspace.yaml` 三条 brace-expansion 覆盖从 1.1.18 / 2.1.4 / 5.0.9 上调到修复版 1.1.20 / 2.1.6 / 5.0.11，`scripts/verify-dependency-security.mjs` 的期望常量同步，锁文件只变 brace-expansion 三个版本。没有新增豁免。
+- 验证：干净安装后 `verify:dependency-security` ALL PASS（full / prod 高危与严重均为 0），repository-integrity、ci-gate-coverage、kiosk `tsc -b` 通过。
+
 ## 2026-09-30：带文字层的 PDF 简历按行保留结构（走查 W-95；分支 `claude/backend-hardening-20260929-w95-pdf-lines`）
 
 - **问题：** resume-extraction.service.ts 用 unpdf 的 `mergePages`，把全部换行压成空格，Word 导出的 PDF 简历（应届生最常见的格式）被读成一整块，段落、条目、时间线都分不出来，诊断质量受损。

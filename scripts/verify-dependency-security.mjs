@@ -25,10 +25,12 @@ const INTERMEDIATE_BRACE_EXPANSION = 'GHSA-rgw5-rvv9-x895'
 const FRONTENDS = ['admin', 'kiosk', 'partner']
 // No local patches required: upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH.
 const REQUIRED_BRACE_PATCHES = {}
+// 2026-09-30：GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p（无界递归栈耗尽）修在 1.1.20 / 2.1.6 / 5.0.11，
+// 钉子上调到这三个版本；这两条不走下面的「已修复豁免」，由 audit 阶段直接判定。
 const REQUIRED_BRACE_OVERRIDES = {
-  'brace-expansion@1.1.14': '1.1.18',
-  'brace-expansion@2.1.1': '2.1.4',
-  'brace-expansion@5.0.6': '5.0.9',
+  'brace-expansion@1.1.14': '1.1.20',
+  'brace-expansion@2.1.1': '2.1.6',
+  'brace-expansion@5.0.6': '5.0.11',
 }
 const REQUIRED_PNPM_VERSION = '11.2.2'
 const REQUIRED_JS_YAML_VERSION = '4.3.2'
@@ -532,7 +534,7 @@ assertBracePatchesDeclared()
 assertBracePatchesEffective()
 console.log(
   'OK: brace-expansion overrides declared and effective at runtime ' +
-    '(upstream 1.1.18/2.1.4/5.0.9 carry EXPANSION_MAX_LENGTH)——是否安全由下面的 audit 阶段判定'
+    '(pinned 1.1.20/2.1.6/5.0.11; upstream >=1.1.18/2.1.4/5.0.9 carry EXPANSION_MAX_LENGTH)——是否安全由下面的 audit 阶段判定'
 )
 assertJsYamlRuntime()
 console.log(
