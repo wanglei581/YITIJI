@@ -61,13 +61,17 @@ function formatPaperTrayLevel(level: number | null) {
 /**
  * 故障信息：服务端对正常状态给 null、对其余状态给中文说明。
  * 纸张不足等「仍可打印」的提醒用警示色，不可打印才标红；正常显示「无」，不再把原始状态串标红。
+ * 开机清理 / 暂停队列失败服务端告警文案另 PR 前仍可能写成「无法识别」，这里用词表中文并标红。
  */
 function FaultCell({ printer }: { printer: AdminPrinterRecord }) {
+  const view = printerStatusView(printer.printerStatus)
+  if (printer.printerStatus === 'queue_cleanup_failed' || printer.printerStatus === 'queue_pause_failed') {
+    return <span className="font-semibold text-error-fg">{view.label}</span>
+  }
   if (printer.fault) {
     const tone = printer.status === 'online' ? 'text-warning-fg' : 'text-error-fg'
     return <span className={`font-semibold ${tone}`}>{printer.fault}</span>
   }
-  const view = printerStatusView(printer.printerStatus)
   if (view.badge === 'success') return <span className="text-neutral-500">无</span>
   return <span className="text-neutral-500">{view.label}</span>
 }

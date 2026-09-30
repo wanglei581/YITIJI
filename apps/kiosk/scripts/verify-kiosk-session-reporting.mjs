@@ -5,7 +5,8 @@
  *
  * 这里钉的是「挂在哪儿」，全部用 TypeScript AST 取证，不读注释：
  *   1. KioskPrivacyGuard 调 useKioskSessionReporting(pathname)；
- *      硬清场（clearSessionFor）与进屏保清场（clearToScreensaver）都在 hold(...) 之前 endKioskVisit；
+ *      硬清场（endKioskUse）与进屏保清场（clearToScreensaver）都经 runEndKioskUse，endVisit 接 endKioskVisit，
+ *      hold(...) 只在最后一步 leave 里；
  *      交给超时提醒页的 hardClear 是包过一层的（按钮 onClick 不能把点击事件当原因传进来）。
  *   2. 接线文件在演示模式与浏览器测试构建里关闭上报；请求走终端身份封装、带 keepalive。
  *   3. 全仓一体机源码只有接线文件拼 /kiosk/session/ 地址 —— 不许在页面里散落调用。
@@ -67,25 +68,39 @@ function callsIn(sf, node) {
     else pass('KioskPrivacyGuard 挂了 useKioskSessionReporting(pathname)')
   }
 
+  /* 2026-09-29（统一清场）：四步（结束人次 → 清本机 → 退出登录 → 离开）的顺序只写在
+   * kioskEndUse.ts 的 runEndKioskUse 里（scripts/tests/kiosk-end-use.test.mjs 真跑断言顺序）。
+   * 守卫里每条清场路径都必须调 runEndKioskUse，把 endVisit 接到 endKioskVisit，
+   * 并且「整页重载 / 进屏保」只能写在最后一步 leave 里的 hold(...) 中。 */
+  const stepProp = (call, prop) => {
+    const obj = call.arguments[1]
+    if (!obj || !ts.isObjectLiteralExpression(obj)) return null
+    return obj.properties.find((p) => p.name?.getText(sf) === prop) ?? null
+  }
   for (const [name, reasonRule] of [
-    ['clearSessionFor', (arg) => arg === 'reason'],
+    ['endKioskUse', (arg) => arg === 'reason'],
     ['clearToScreensaver', (arg) => arg === "'idle_timeout'"],
   ]) {
     const fn = declaredFunction(sf, name)
     if (!fn) { fail(`${rel}: 找不到清场函数 ${name}`); continue }
-    const calls = callsIn(sf, fn)
-    const end = calls.find((c) => c.callee === 'endKioskVisit')
-    const hold = calls.find((c) => c.callee === 'hold')
-    if (!end) fail(`${name} 清场时没有 endKioskVisit：这一次使用永远不会被记为结束`)
-    else if (!reasonRule(end.arg0)) fail(`${name} 的 endKioskVisit 原因不对：${end.arg0}`)
-    else if (!hold || end.pos > hold.pos) fail(`${name} 的 endKioskVisit 必须在 hold(...) 之前（整页重载前发出）`)
-    else pass(`${name} 清场先 endKioskVisit(${end.arg0}) 再交接`)
+    let run = null
+    walk(fn, (n) => { if (!run && ts.isCallExpression(n) && n.expression.getText(sf) === 'runEndKioskUse') run = n })
+    if (!run) { fail(`${name} 没有经 runEndKioskUse 清场：这一次使用可能不会被记为结束`); continue }
+    const reason = run.arguments[0]?.getText(sf) ?? ''
+    const endVisit = stepProp(run, 'endVisit')
+    const leave = stepProp(run, 'leave')
+    if (!reasonRule(reason)) fail(`${name} 的结束原因不对：${reason}`)
+    else if (!endVisit || !ts.isPropertyAssignment(endVisit) || endVisit.initializer.getText(sf) !== 'endKioskVisit') {
+      fail(`${name} 的 endVisit 没有接到 endKioskVisit：这一次使用永远不会被记为结束`)
+    } else if (!leave || !callsIn(sf, leave).some((c) => c.callee === 'hold')) {
+      fail(`${name} 的整页重载 / 进屏保必须写在 leave 里、经 hold(...)（在结束人次之后）`)
+    } else pass(`${name} 经 runEndKioskUse(${reason})：先 endKioskVisit，最后才 hold 交接`)
   }
 
-  // 公开的清场出口都经 clearSessionFor，不能绕过它另起一条不上报的清场。
-  for (const name of ['clearSessionTo', 'hardClear']) {
+  // 公开的清场出口都经 endKioskUse，不能绕过它另起一条不上报的清场。
+  for (const name of ['endKioskUseFromPage', 'hardClear']) {
     const fn = declaredFunction(sf, name)
-    if (!fn || !callsIn(sf, fn).some((c) => c.callee === 'clearSessionFor')) fail(`${name} 没有经 clearSessionFor 清场`)
+    if (!fn || !callsIn(sf, fn).some((c) => c.callee === 'endKioskUse')) fail(`${name} 没有经 endKioskUse 清场`)
   }
 
   let ctxHardClear = null

@@ -51,6 +51,7 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   AI_RATE_LIMITED: '当前使用的人较多，请稍后再试',
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
+  PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印',
   MEMBER_AUTH_REQUIRED: '登录状态已失效，请重新登录后重试',
   MEMBER_MISSING_TOKEN: '登录状态已失效，请重新登录后重试',
   MEMBER_SESSION_EXPIRED: '登录状态已失效，请重新登录后重试',

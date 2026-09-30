@@ -95,6 +95,8 @@ Page({
     extraLinks: [],
     /** 条款、勾选框文字、版本号都从服务端拿到了，才允许开始作答。 */
     consentReady: false,
+    /** 服务端答复了但没下发完整说明：说「暂未开放」、不给重试（重试不会好）。请求失败时为 false，照常给重试。 */
+    consentUnavailable: false,
     agreeNonSensitive: false,
     agreeSensitive: false,
     /** 题库里被标为敏感的题数，按下发的题目真值算，不写死。v1 实测 0 题。 */
@@ -261,7 +263,7 @@ Page({
     })
     return {
       dims, totalCount, requiredCount, sensitiveCount,
-      consent: consentView.toConsentView(res, api.LEGAL_DOC_TITLES),
+      consent: consentView.answeredConsentView(res, api.LEGAL_DOC_TITLES),
     }
   },
 

@@ -535,3 +535,69 @@ test('入口打开自我探索', () => {
   page.goSelfExplore()
   assert.deepEqual(nav, ['/pages/self-explore/self-explore'])
 })
+
+// ── 两种「没拿到说明」要分开说（总指挥 9/30）：服务端答复了但没下发条款（例如还是旧版服务端）
+//    → 「自我探索暂未开放，其他功能照常使用」，不给重试；请求本身失败 → 保持「请重试」。──
+
+// 旧版服务端的真实形状（9/30 只读探生产）：只有 version / dimensions / consentVersion。
+const OLD_SERVER = questionsFixture({ consentVersion: 'fixture-old-server-v1' })
+
+function checkAnsweredVsFailed(cv) {
+  const answered = cv.answeredConsentView(OLD_SERVER, DOC_TYPES)
+  assert.equal(answered.consentReady, false)
+  assert.equal(answered.consentUnavailable, true, '服务端答复了但没条款 → 暂未开放')
+  const ready = cv.answeredConsentView(readyFixture(), DOC_TYPES)
+  assert.equal(ready.consentUnavailable, false, '阳性对照：条款齐全时不是暂未开放')
+  const failed = cv.emptyConsentView()
+  assert.equal(failed.consentReady, false)
+  assert.equal(failed.consentUnavailable, false, '请求失败 → 不是暂未开放，照常给重试')
+}
+
+test('两种没拿到说明：答复了没条款 vs 请求失败', () => checkAnsweredVsFailed(compileConsentView(CONSENT_VIEW_SRC)))
+
+test('变异：答复了没条款也当成可重试 → 判红', () => {
+  const from = 'view.consentUnavailable = !view.consentReady'
+  assert.ok(CONSENT_VIEW_SRC.includes(from))
+  const cv = compileConsentView(CONSENT_VIEW_SRC.replace(from, 'view.consentUnavailable = false'))
+  assert.throws(() => checkAnsweredVsFailed(cv), (e) => e.code === 'ERR_ASSERTION')
+})
+
+test('变异：请求失败也说暂未开放 → 判红', () => {
+  const from = 'view.consentUnavailable = false\n  return view'
+  assert.ok(CONSENT_VIEW_SRC.includes(from))
+  const cv = compileConsentView(CONSENT_VIEW_SRC.replace(from, 'view.consentUnavailable = true\n  return view'))
+  assert.throws(() => checkAnsweredVsFailed(cv), (e) => e.code === 'ERR_ASSERTION')
+})
+
+test('页面：旧版服务端 → 暂未开放、进不了答题', async () => {
+  const { page, calls } = makePage(OLD_SERVER)
+  page.onLoad({})
+  await flush()
+  assert.equal(page.data.phase, 'consent')
+  assert.equal(page.data.consentUnavailable, true)
+  page.toggleNonSensitive()
+  page.startAsk()
+  assert.equal(page.data.phase, 'consent')
+  assert.equal(calls.submit.length, 0)
+})
+
+test('页面：补拉说明时请求失败 → 不是暂未开放（照常给重试）', async () => {
+  const { page } = makePage([readyFixture(), new Error('网络异常')])
+  page.onLoad({})
+  await flush()
+  page.reload()
+  await flush()
+  assert.equal(page.data.consentReady, false)
+  assert.equal(page.data.consentUnavailable, false)
+})
+
+test('模板：暂未开放那一块是原话、没有重试键；请求失败那一块有重试键', () => {
+  const unavailable = WXML.match(/<view wx:elif="\{\{consentUnavailable\}\}"[^>]*>([\s\S]*?)<\/view>\s*<\/view>/)
+  assert.ok(unavailable, '有按 consentUnavailable 显示的块')
+  assert.ok(unavailable[1].includes('自我探索暂未开放，其他功能照常使用'))
+  assert.ok(!/state-retry|bindtap/.test(unavailable[1]), '暂未开放不给重试')
+  const failed = WXML.slice(WXML.indexOf('wx:elif="{{consentUnavailable}}"'))
+  const elseAt = failed.indexOf('<view wx:else class="list-state">')
+  assert.ok(elseAt > 0, '请求失败的块紧跟在后面')
+  assert.match(failed.slice(elseAt, elseAt + 400), /请重试[\s\S]*bindtap="reload"/, '请求失败照常给重试')
+})

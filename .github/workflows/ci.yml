@@ -145,6 +145,9 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-terminal-bind-code-ui
           pnpm --filter @ai-job-print/admin verify:admin-peripheral-views
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
+          pnpm --filter @ai-job-print/admin verify:admin-ai-usage-ui
+          pnpm --filter @ai-job-print/admin verify:console-plain-copy
+          pnpm --filter @ai-job-print/admin verify:admin-internal-accounts-ui
           pnpm --filter @ai-job-print/admin verify:admin-partner-contact-phone-ui
           pnpm --filter @ai-job-print/admin verify:admin-login-second-factor
           # D6/C6/C7 后台 AI 服务开关：适配器与面板在隔离进程里真跑，另读服务端
@@ -185,6 +188,9 @@ jobs:
           # 服务人次上报（KioskSession 契约 v1）：接线 AST 取证 + 上报器单测真跑；
           # 白名单对照服务端 kiosk-session.types.ts 源码文本，不 import、不连库。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-session-reporting
+          # 统一清场（隐私 P0，W-42/W-43/W-75/W-64/B-12）：所有离场出口经 endKioskUse、首页登录态不露个人信息、
+          # 个人资产页进门前 30 秒「还是你吗？」。源码文本断言 + 四步顺序与 30 秒判据单测真跑，不连网。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-end-use
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
@@ -519,6 +525,8 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-state
+          # 屏保终端配置与百宝箱动作的状态单测（此前没挂进 CI；清理批准单第 3 条：模块仍在用，补进 CI 而不删）
+          pnpm --filter @ai-job-print/admin test:admin-state-units
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/admin verify:data-request-ui
           pnpm --filter @ai-job-print/admin verify:admin-users-ui
@@ -1275,6 +1283,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:w6
           pnpm --filter @ai-job-print/kiosk test:browser:privacy
           pnpm --filter @ai-job-print/kiosk test:browser:warning
+          # 统一清场（W-42/W-43/W-75/W-64）正式构建走查：隐私硬截止保持默认，用本页时钟走 30 秒 / 60 秒 / 3 分钟出口。
+          pnpm --filter @ai-job-print/kiosk test:browser:privacy-clear
           pnpm --filter @ai-job-print/kiosk test:browser:contract-review
           pnpm --filter @ai-job-print/kiosk test:browser:scan-safety
           pnpm --filter @ai-job-print/kiosk test:browser:mic-capability

@@ -79,6 +79,9 @@ console.log('\nD. 透传白名单')
   const e = await errorOf(400, { success: false, error: { code: 'PRINT_TERMINAL_OFFLINE', message: '目标终端当前离线，请稍后重试' } })
   assert(e.message === '目标终端当前离线，请稍后重试', 'PRINT_TERMINAL_OFFLINE 保留服务端中文')
   assert(PASSTHROUGH_MESSAGE_CODES.length > 0, '透传白名单非空')
+  // 每单超过 100 面（#1146）：用户要知道「分几单打」，不能落到兜底的「服务端暂时无法核定页数和金额」
+  const big = await errorOf(400, { success: false, error: { code: 'PRINT_JOB_TOO_LARGE', message: '每单最多打印 100 面，请分几单打印' } })
+  assert(big.message === '每单最多打印 100 面，请分几单打印', `PRINT_JOB_TOO_LARGE 保留服务端中文（实际「${big.message || '(空→页面兜底句)'}」）`)
 }
 
 // E. 共享技术码给统一中文

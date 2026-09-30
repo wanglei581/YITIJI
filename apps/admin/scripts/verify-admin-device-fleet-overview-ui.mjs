@@ -106,7 +106,7 @@ verify('overview links back to the existing terminal and configuration pages', (
 })
 
 verify('overview remains read-only and excludes sensitive or future-scope capabilities', () => {
-  assert.ok(source.component.includes('F1/F2 CLOSED_MODE'))
+  assert.ok(source.component.includes('本页只做查看；远程操作暂未开放。'))
   assert.doesNotMatch(
     source.component,
     /\b(?:id|orgId|macAddress|ipAddress|deviceFingerprint|bindCode|agentToken|codeHash|printerStatus|localTaskDatabaseAvailable|diskFreeGb|capabilities|files?|printTask|scanTask|endUser)\b/,
