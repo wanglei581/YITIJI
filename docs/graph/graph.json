@@ -25627,6 +25627,7 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -39887,6 +39888,7 @@
           "services/api/src/files/files.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.service.ts"
         ],
