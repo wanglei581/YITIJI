@@ -121,7 +121,8 @@
   font-size: 46px; color: var(--qx-emerald);
   font-family: var(--qx-serif);
 }
-.ss-xq-eyebrow { font-size: 18px; letter-spacing: 5px; color: color-mix(in srgb, var(--qx-paper) 50%, transparent); margin-bottom: 8px; }
+/* 眉题 2026-09-30 换成中文「签名」，字号、字距、颜色照稿 20 v2 覆盖块。 */
+.ss-xq-eyebrow { font-size: var(--qx-fs-aux-lg); letter-spacing: 2px; color: color-mix(in srgb, var(--qx-paper) 90%, transparent); margin-bottom: 8px; }
 .ss-xq-ask { font-size: 38px; line-height: 1.3; font-weight: 700; letter-spacing: 1px; font-family: var(--qx-serif); }
 .ss-xq-ask em { font-style: normal; color: var(--qx-emerald); }
 .ss-xq-doing { margin-top: 10px; font-size: 21px; line-height: 1.55; color: color-mix(in srgb, var(--qx-paper) 72%, transparent); }

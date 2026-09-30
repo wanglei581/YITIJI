@@ -113,7 +113,7 @@ export function SignStampPickView({
             青
           </div>
           <div>
-            <div className="ss-xq-eyebrow">SIGN &amp; STAMP</div>
+            <div className="ss-xq-eyebrow">签名</div>
             <div className="ss-xq-ask">{ask[0]}</div>
             <div className="ss-xq-doing">{ask[1]}</div>
           </div>

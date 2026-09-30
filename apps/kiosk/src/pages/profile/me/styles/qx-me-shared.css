@@ -65,9 +65,11 @@
   font-size: 40px;
 }
 .qx-me-xq-eyebrow {
-  font-size: 17px;
-  letter-spacing: 5px;
-  color: color-mix(in srgb, var(--qx-paper) 50%, transparent);
+  /* 眉题 2026-09-30 换成中文（稿 35/38/39：消息通知、我的文档和订单、我的简历……），
+     字号、字距、颜色照稿 v2 覆盖块。 */
+  font-size: var(--qx-fs-aux-lg);
+  letter-spacing: 1px;
+  color: color-mix(in srgb, var(--qx-paper) 92%, transparent);
   margin-bottom: 7px;
 }
 .qx-me-xq-ask {
