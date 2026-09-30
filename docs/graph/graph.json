@@ -23146,6 +23146,9 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
+    "services/api/src/ai/resume/llm-resume-evidence.ts": [
+      "services/api/scripts/verify-resume-diagnosis-context.ts"
+    ],
     "services/api/src/ai/resume/llm-resume-generate.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -23254,6 +23257,9 @@
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
+    ],
+    "services/api/src/ai/resume/resume-structure.ts": [
+      "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/src/ai/resume/resume-text.service.ts": [
       "services/api/scripts/verify-resume-draft-versions.ts",
@@ -39500,6 +39506,7 @@
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/dto/resume-parse.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume/llm-resume-evidence.ts",
           "services/api/src/ai/resume/llm-resume.service.ts"
         ],
         "missing": []
@@ -39755,6 +39762,7 @@
           "services/api/src/ai/resume/llm-resume-optimize.service.ts",
           "services/api/src/ai/resume/llm-resume.service.ts",
           "services/api/src/ai/resume/resume-pdf.service.ts",
+          "services/api/src/ai/resume/resume-structure.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/prisma/prisma.service.ts",

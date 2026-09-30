@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1740 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1742 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2085,7 +2085,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 589 个文件</summary>
+<summary><code>services/api/src/</code> — 591 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2181,6 +2181,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/llm-career-plan.service.ts` | `verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-career-plan.ts`<br/>`verify-llm-input-pii-mask.ts` |
 | `services/api/src/ai/resume/llm-fair-visit-plan.service.ts` | `verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-fair-visit-plan.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-llm-input-pii-mask.ts` |
 | `services/api/src/ai/resume/llm-job-fit.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-fit.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-miniapp-review-backend.ts` |
+| `services/api/src/ai/resume/llm-resume-evidence.ts` | `verify-resume-diagnosis-context.ts` |
 | `services/api/src/ai/resume/llm-resume-generate.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-optimize.ts` |
 | `services/api/src/ai/resume/llm-resume-optimize.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-optimize.ts` |
 | `services/api/src/ai/resume/llm-resume.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-real-resume-diagnosis.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-optimize.ts` |
@@ -2196,6 +2197,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/resume-extraction.service.ts` | `verify-document-conversion.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-ocr-baidu-live.ts`<br/>`verify-ocr-baidu.ts`<br/>`verify-pdfjs-engine.ts`<br/>`verify-resume-extraction.ts` |
 | `services/api/src/ai/resume/resume-fact-match.ts` | `verify-resume-draft-versions.ts` |
 | `services/api/src/ai/resume/resume-pdf.service.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-aigc-pdf-metadata.ts`<br/>`verify-cjk-font.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-template-fill.ts` |
+| `services/api/src/ai/resume/resume-structure.ts` | `verify-resume-optimize.ts` |
 | `services/api/src/ai/resume/resume-text.service.ts` | `verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-template-fill.ts` |
 | `services/api/src/ai/resume/resume-unlabeled-export.ts` | `verify-resume-export-label.ts` |
 | `services/api/src/ai/resume/self-assessment-pdf.service.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-aigc-pdf-metadata.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-cjk-font.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
