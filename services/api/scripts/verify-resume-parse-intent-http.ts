@@ -98,7 +98,16 @@ function makeController() {
       },
     },
     redis: { get: async (key: string) => (key === 'member:session:sid-1' ? 'member-1' : null) },
-    prisma: { endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) } },
+    prisma: {
+      endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) },
+      terminal: { findUnique: async ({ where }: { where: { id: string } }) => (where.id === 'terminal-1' ? { orgId: null } : null) },
+    },
+    // 公共额度只认验签的终端：只有 terminal-1 带对的会话令牌才算本终端池。
+    terminalSessions: {
+      validate: async (terminalId: string, sessionToken: string) => {
+        if (terminalId !== 'terminal-1' || sessionToken !== 'terminal-1-session') throw new Error('invalid terminal session')
+      },
+    },
     publicQuota: {
       consume: async () => {
         calls.consume += 1
@@ -161,7 +170,7 @@ async function main(): Promise<void> {
   pass('missing intent headers keep the legacy quota path')
 
   const keyed = makeController()
-  const keyedResult = await keyed.controller.submitResumeParse(dto, request({ ...headers, 'x-terminal-id': 'terminal-1' }))
+  const keyedResult = await keyed.controller.submitResumeParse(dto, request({ ...headers, 'x-terminal-id': 'terminal-1', 'x-terminal-session-token': 'terminal-1-session' }))
   assert.equal(keyedResult.taskId, 'intent-task')
   assert.equal(keyed.calls.runner, 1)
   assert.equal(keyed.calls.consume, 0)
@@ -173,6 +182,15 @@ async function main(): Promise<void> {
   assert.equal(args[3], intent)
   assert.equal(args[4], proof)
   pass('valid intent headers call the runner and skip legacy quota')
+
+  // 只带请求头、没有终端会话令牌（或令牌不对）的终端号不许单开终端池，只按 IP（与会员）计。
+  for (const forged of [{ 'x-terminal-id': 'terminal-1' }, { 'x-terminal-id': 'terminal-2', 'x-terminal-session-token': 'terminal-1-session' }]) {
+    const unsigned = makeController()
+    await unsigned.controller.submitResumeParse(dto, request({ ...headers, ...forged }))
+    const unsignedArgs = unsigned.runnerArgs[0] as [typeof dto, string | null, AiPublicQuotaContext, string, string]
+    assert.deepEqual(unsignedArgs[2], { member: null, terminal: null, ip: '203.0.113.8' })
+  }
+  pass('unsigned or mismatched terminal ids fall back to the IP pool (no per-terminal pool)')
 
   for (const bad of [
     { 'x-resume-parse-intent': intent },

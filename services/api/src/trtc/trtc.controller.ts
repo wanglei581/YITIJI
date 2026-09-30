@@ -10,7 +10,8 @@ import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
 // 对外 taskId 是每会话随机停止能力令牌，Redis 值才是真实腾讯 TaskId。
 // 同厅终端即使 IP/UA 相同，也无法猜到或复用其他会话的停止令牌。
 const OWNER_KEY_PREFIX = 'trtc:owner:'
-const OWNER_TTL_SECONDS = 24 * 60 * 60
+// 单次会话上限最多 30 分钟（TRTC_MAX_SESSION_MINUTES 1–30），且服务端到点自行停止；停止令牌 30 分钟足够。
+const OWNER_TTL_SECONDS = 30 * 60
 
 @Controller('trtc')
 // 严格限流：每 IP 每分钟最多 5 次，防止匿名方无限触发腾讯云计费接口。
