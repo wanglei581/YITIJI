@@ -35,13 +35,13 @@ import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_COMPACT } from '../../lib/fileName'
 import { API_MODE } from '../../services/api/client'
-import { getPrintJobStatus, type BackendJobStatus } from '../../services/print/printJobsApi'
+import { getPrintJobStatus, type BackendJobStatus, type PrintJobStatusResult } from '../../services/print/printJobsApi'
 import { wakeLocalPrintQueue } from '../../services/print/localPrintWakeApi'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
 import { formatCents } from './cashierStatus'
-import { PrintJobRow, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
+import { PrintJobRow, PrintProgressFailureActions, PrintProgressFailureNote, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
 import './styles/print-fulfill-qx.css'
 import {
   FAIL_REASONS,
@@ -52,8 +52,14 @@ import {
   jobSubline,
   pagesPerCopy,
   paymentFactOf,
+  publicOrderNo,
+  reprintHint,
   paymentLead,
   paymentPill,
+  PRINT_PROGRESS_QUIET_COPY,
+  PRINT_PROGRESS_QUIET_MS,
+  progressFailurePresentation,
+  progressStatusFingerprint,
   stepIndex,
   tlItemClass,
   type Step,
@@ -140,6 +146,8 @@ export function PrintProgressPage() {
   const [backendStatus, setBackendStatus] = useState<BackendJobStatus | null>(null)
   const backendStatusRef = useRef<BackendJobStatus | null>(null)
   const [failed, setFailed]     = useState(false)
+  const [knownFailure, setKnownFailure] = useState<string | null>(null)
+  const [progressQuiet, setProgressQuiet] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
   const [simDone, setSimDone]   = useState(false)
   const [statusReadError, setStatusReadError] = useState(false)
@@ -158,7 +166,9 @@ export function PrintProgressPage() {
 
   const navigateFail = useCallback(
     (reason: string) => {
+      setKnownFailure(reason)
       setFailed(true)
+      setProgressQuiet(false)
       if (isSim) {
         setSimDone(true)
         return
@@ -226,7 +236,27 @@ export function PrintProgressPage() {
     // 每一轮轮询自带停止标记：重新查询 / 离页时，上一轮在飞的请求回来也不再改页面。
     let stopped = false
     pollFailsRef.current = 0
+    const fingerprintRef = { current: '' }
+    let quietTimer: ReturnType<typeof setTimeout> | null = null
+    const clearQuietTimer = () => {
+      if (quietTimer) clearTimeout(quietTimer)
+      quietTimer = null
+    }
+    // 重新查询从零计时：上一段静默不沿用。
+    setProgressQuiet(false)
     if (backendStatusRef.current === null) setCurrent('queuing')
+
+    const noteProgress = (result: PrintJobStatusResult) => {
+      const fingerprint = progressStatusFingerprint(result)
+      if (fingerprint === fingerprintRef.current) return
+      fingerprintRef.current = fingerprint
+      clearQuietTimer()
+      setProgressQuiet(false)
+      if (result.status !== 'printing') return
+      quietTimer = setTimeout(() => {
+        if (!stopped) setProgressQuiet(true)
+      }, PRINT_PROGRESS_QUIET_MS)
+    }
 
     if (wakeRequestedTaskIdRef.current !== taskId) {
       wakeRequestedTaskIdRef.current = taskId
@@ -238,6 +268,7 @@ export function PrintProgressPage() {
       try {
         const result = await getPrintJobStatus(taskId)
         if (stopped) return
+        noteProgress(result)
 
         if (result.status === 'completed') {
           stopped = true
@@ -291,6 +322,7 @@ export function PrintProgressPage() {
 
     return () => {
       stopped = true
+      clearQuietTimer()
       clearInterval(timer)
       if (timeoutTimer) clearTimeout(timeoutTimer)
     }
@@ -298,11 +330,13 @@ export function PrintProgressPage() {
 
   const currentIdx = stepIndex(current)
   const realStatus = realStatusPresentation(backendStatus)
+  const failureView = progressFailurePresentation(knownFailure ?? '')
+  const showFailure = failed && !isSim
 
   const file   = (state?.file  as PrintFileState | undefined) ?? null
   const params = (state?.params as PrintJobParams | undefined) ?? null
-  // 订单号只认运营单号；orderId 是内部 cuid，拿它冒充「订单号」工作人员也查不到。
-  const orderNo = typeof state?.orderNo === 'string' ? state.orderNo : null
+  // 订单号只认 ORD-。orderId、任务号都不拿来冒充。
+  const orderNo = publicOrderNo(typeof state?.orderNo === 'string' ? state.orderNo : null)
   const amountCents = typeof state?.amountCents === 'number' ? state.amountCents : null
   const payment = paymentFactOf(amountCents)
   const isFreeOrder = payment === 'free'
@@ -328,7 +362,9 @@ export function PrintProgressPage() {
   const frameStatus = timedOut
     ? { tone: 'warn' as const, label: timeoutPill }
     : failed
-      ? { tone: 'bad' as const, label: isSim ? '演示失败' : '处理出错' }
+      ? { tone: 'bad' as const, label: isSim ? '演示失败' : failureView.badge }
+      : progressQuiet
+        ? { tone: 'warn' as const, label: isFreeOrder ? '本次未收款 · 进度未更新' : '进度未更新' }
       : backendStatus == null && useRealApi
         ? { tone: 'unknown' as const, label: '状态未知' }
         : { tone: 'ok' as const, label: pillLabel }
@@ -406,19 +442,23 @@ export function PrintProgressPage() {
     },
     {
       key: 'queue',
-      label: isSim ? '排队等待演示' : realStatus.queueLabel,
+      label: isSim ? '排队等待演示' : showFailure ? failureView.badge : realStatus.queueLabel,
       desc: isSim
         ? '演示：终端未接收、未校验'
-        : realStatus.queueDesc,
+        : showFailure
+          ? failureView.ask
+          : realStatus.queueDesc,
     },
     {
       key: 'print',
       label: isSim ? '打印演示' : '打印中',
       desc: isSim
         ? '演示：未出纸，无真实打印动作'
-        : backendStatus === 'printing'
-          ? '打印机正在出纸，请在出纸口等候'
-          : '终端开始打印后才会出纸',
+        : progressQuiet
+          ? PRINT_PROGRESS_QUIET_COPY
+          : backendStatus === 'printing'
+            ? '打印机正在出纸，请在出纸口等候'
+            : '终端开始打印后才会出纸',
     },
     {
       key: 'pickup',
@@ -431,7 +471,11 @@ export function PrintProgressPage() {
 
   const stageHeading = isSim
     ? (simDone ? '演示流程已结束' : '流程演示中')
-    : realStatus.stageTitle
+    : showFailure
+      ? failureView.headerTitle
+      : progressQuiet
+        ? PRINT_PROGRESS_QUIET_COPY
+        : realStatus.stageTitle
   const stageLine = isSim
     ? (simDone ? '未真实打印，可返回首页或重新上传' : '仅演示进度步骤，未建单、未支付、未出纸')
     : realStatus.stageSubtitle
@@ -443,15 +487,21 @@ export function PrintProgressPage() {
     ? (simDone ? <>演示流程已结束，<em>未真实打印</em>。</> : <>流程演示中，<em>不会出纸</em>。</>)
     : timedOut
       ? <>暂时<em>查不到</em>打印结果。</>
-      : failed
-        ? <>打印遇到问题，<em>正在核对结果</em>。</>
+      : showFailure
+        ? <>{failureView.ask}</>
+        : progressQuiet
+          ? <>{PRINT_PROGRESS_QUIET_COPY}</>
         : <>{paymentLead(payment)}<em>{realStatus.askPhase}</em>。</>
   const askDoing = isSim
     ? (simDone ? '未真实打印，未创建打印任务' : '当前为演示模式，不会建单、支付或出纸')
     : timedOut
       ? '这不代表成功或失败，只是本机暂时没拿到最新状态。'
-      : failed
-        ? '马上转到结果页，按已经登记的原因说明下一步。'
+      : showFailure
+        ? failureView.doing
+        : progressQuiet
+          ? '这一句只说明进度没有再更新，不代表已经打完，也不代表已经失败。'
+        : failed
+          ? '马上转到结果页，按已经登记的原因说明下一步。'
         : backendStatus === 'printing'
           ? `${copiesText}你可以先在旁边等，不用贴着机器。`
           : realStatus.headerSubtitle
@@ -461,22 +511,26 @@ export function PrintProgressPage() {
     ? { tone: simDone ? 'wait' : 'doing', label: simDone ? '演示结束' : '演示中' }
     : timedOut
       ? { tone: 'wait', label: '状态查询中' }
-      : failed
-        ? { tone: 'err', label: '出错' }
-        : { tone: backendStatus === 'printing' ? 'doing' : 'wait', label: realStatus.badge }
+      : showFailure
+        ? { tone: 'err' as const, label: failureView.badge }
+        : progressQuiet
+          ? { tone: 'wait' as const, label: '进度未更新' }
+        : failed
+          ? { tone: 'err' as const, label: '出错' }
+        : { tone: backendStatus === 'printing' ? 'doing' as const : 'wait' as const, label: realStatus.badge }
   const endLabel = failed
     ? '正在核对结果，暂不能结束清空'
     : backendStatus === 'printing'
       ? '还在打印，完成后才能结束清空'
       : '任务还没打完，完成后才能结束清空'
-  const idLine = [taskId ? `任务号 ${taskId}` : '', orderNo ? `订单号 ${orderNo}` : ''].filter(Boolean).join(' · ')
+  const idLine = orderNo ? `订单号 ${orderNo}` : ''
 
   const jobRow = <PrintJobRow fileName={fileName} subline={jobSubline(file, params)} idLine={idLine} state={jobState} />
 
   return (
     <QxPageFrame
       back={{ label: '返回首页', onBack: () => navigate('/') }}
-      title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : timedOut ? '暂时查不到打印结果' : realStatus.headerTitle}
+      title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : timedOut ? '暂时查不到打印结果' : showFailure ? failureView.headerTitle : progressQuiet ? '暂时没有新的打印进度' : realStatus.headerTitle}
       status={frameStatus}
       terminalLabel="就业服务大厅"
       ctabar={
@@ -499,6 +553,13 @@ export function PrintProgressPage() {
               联系工作人员
             </button>
           </>
+        ) : showFailure ? (
+          <PrintProgressFailureActions
+            hint={reprintHint(amountCents)}
+            onHelp={() => navigate('/help')}
+            onOrders={() => navigate('/me/print-orders')}
+            onReprint={() => navigate(uploadPath)}
+          />
         ) : (
           <>
             <button
@@ -509,7 +570,7 @@ export function PrintProgressPage() {
               onClick={() => navigate(uploadPath)}
             >
               再印一份
-              <small>重新选文件、核价并支付 · 不免费</small>
+              <small>{reprintHint(amountCents)}</small>
             </button>
             <button type="button" className="qx-btn pfp-end" data-variant="ghost" disabled aria-disabled="true">
               {endLabel}
@@ -524,6 +585,7 @@ export function PrintProgressPage() {
       data-pff-head="xq"
       data-screen="print-fulfill"
       data-state={view}
+      data-progress-quiet={progressQuiet ? 'true' : undefined}
       data-testid={timedOut ? 'print-fulfill-state-client-status-timeout' : failed ? 'print-fulfill-state-failed' : 'print-fulfill-state-printing'}
       className="qx-scroll pff-page pfp-page"
     >
@@ -585,7 +647,7 @@ export function PrintProgressPage() {
                           : isDone || (isSim && simDone)
                             ? (isSim ? '演示结束' : '完成')
                             : isActive
-                              ? (useRealApi ? realStatus.activeHint : '演示中…')
+                              ? (showFailure ? '打印未完成' : progressQuiet ? '进度未更新' : useRealApi ? realStatus.activeHint : '演示中…')
                               : '未开始'}
                       </span>
                     </span>
@@ -606,17 +668,7 @@ export function PrintProgressPage() {
                 </div>
               </div>
             )}
-            {failed && !isSim && (
-              <div className="pff-inbar" data-tone="bad">
-                <div className="pff-inbar-h">
-                  <span className="pff-inbar-ic"><AlertCircleIcon aria-hidden="true" /></span>
-                  <span>
-                    打印遇到问题
-                    <small>正在转到结果页，按已经登记的原因说明</small>
-                  </span>
-                </div>
-              </div>
-            )}
+            {showFailure ? <PrintProgressFailureNote wayOut={failureView.wayOut} /> : null}
           </div>
         </section>
       )}
@@ -652,7 +704,7 @@ export function PrintProgressPage() {
           </div>
           <div className="pff-out-main">
             <div className="pff-out-status">
-              {backendStatus === 'printing' ? (
+              {backendStatus === 'printing' && !progressQuiet ? (
                 <span className="pff-pulse"><i /><i /><i />正在出纸</span>
               ) : (
                 stageHeading
@@ -662,8 +714,10 @@ export function PrintProgressPage() {
             </div>
             <div className="pff-out-sub">
               {/* 出纸中时标题已经在说「正在出纸」，副文案只讲取纸位置（稿 .out-sub），不再复述阶段。 */}
-              {isSim || backendStatus !== 'printing' ? <>{stageLine}。</> : null}
-              {!isSim && (backendStatus === 'printing'
+              {progressQuiet || isSim || backendStatus !== 'printing' ? <>{progressQuiet ? null : <>{stageLine}。</>}</> : null}
+              {!isSim && (progressQuiet
+                ? null
+                : backendStatus === 'printing'
                 ? <>纸从<b>打印机出纸口</b>出来，出来一张拿一张也行，全部打完一起拿也行。</>
                 : <>开始出纸后，纸从<b>打印机出纸口</b>出来。</>)}
             </div>
@@ -696,13 +750,13 @@ export function PrintProgressPage() {
           <div className="pfp-card pfp-faq-card">
             <ul className="pfp-faq">
               <li><AlertTriangleIcon aria-hidden="true" /><p><b>打印机缺纸 / 卡纸</b>：别硬拉纸；打印机报告卡纸或缺纸后，本页会转到结果页说明原因。</p></li>
-              <li><ClockIcon aria-hidden="true" /><p><b>长时间无响应</b>：本机连续查 10 分钟仍无结果会提示，凭任务号找工作人员。</p></li>
+              <li><ClockIcon aria-hidden="true" /><p><b>长时间没有新进度</b>：如果停在出纸又没有新消息，请看出纸口或找现场工作人员。查了很久仍没有最终结果时，本页也会另外提示。</p></li>
               <li><FileTextIcon aria-hidden="true" /><p><b>文件校验未通过</b>：上传可能中断或文件已变化，需返回重新上传。</p></li>
               <li>
                 <CreditCardIcon aria-hidden="true" />
                 <p>
                   {isFreeOrder
-                    ? <><b>打印失败</b>：本次未收款，任务记录已保存，工作人员可凭任务号核查。</>
+                    ? <><b>打印失败</b>：本次未收款，记录已保存，请找现场工作人员核对。</>
                     : payment === 'paid'
                       ? <><b>已支付但打印失败</b>：订单与支付记录都在，退款以工作人员核查为准。</>
                       : <><b>打印失败</b>：订单记录已保存，费用以工作人员核查结果为准。</>
@@ -738,7 +792,7 @@ export function PrintProgressPage() {
       )}
 
       <span className="pfp-live" role="status" aria-live="polite">
-        {isSim ? (simDone ? '演示已结束' : '演示进行中') : timedOut ? '状态查询超时' : realStatus.badge}
+        {isSim ? (simDone ? '演示已结束' : '演示进行中') : timedOut ? '状态查询超时' : failed && !isSim ? failureView.badge : progressQuiet ? '进度未更新' : realStatus.badge}
       </span>
 
       {import.meta.env.DEV && canSimulate && !failed && (

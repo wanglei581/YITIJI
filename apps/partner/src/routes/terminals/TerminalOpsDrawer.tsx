@@ -61,7 +61,9 @@ export function TerminalOpsDrawer({
 
         <Section title="当前状态">
           <Item label="最后心跳">
-            {row.lastHeartbeatAt ? `${shanghaiDateTime(row.lastHeartbeatAt)}（${relativeTime(row.lastHeartbeatAt)}）` : '从未上报'}
+            <span title={row.lastHeartbeatAt ? `发生时间 ${shanghaiDateTime(row.lastHeartbeatAt)}` : undefined}>
+              {row.lastHeartbeatAt ? `${shanghaiDateTime(row.lastHeartbeatAt)}（${relativeTime(row.lastHeartbeatAt)}）` : '从未上报'}
+            </span>
           </Item>
           <Item label="统计期内有上报">{faults.reportedInWindow ? '有' : '一次都没有'}</Item>
         </Section>

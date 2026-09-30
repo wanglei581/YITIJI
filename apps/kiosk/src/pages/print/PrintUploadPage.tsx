@@ -157,13 +157,15 @@ export function PrintUploadPage() {
       : isPhotoEntry
         ? '照片打印'
         : '文档打印'
-  const pageSubtitle = !isDocumentPrint
-    ? '从我的简历或上传一份简历进入打印'
-    : isTransferMode
-      ? TRANSFER_COPY[entryTab].subtitle
-      : isPhotoEntry
-        ? '照片上传后设参数打印，与文档打印同一条流程'
-        : '通用文档、求职材料或图片上传后打印'
+  const pageSubtitle = device.printerNotice
+    ? device.printerNotice
+    : !isDocumentPrint
+      ? '从我的简历或上传一份简历进入打印'
+      : isTransferMode
+        ? TRANSFER_COPY[entryTab].subtitle
+        : isPhotoEntry
+          ? '照片上传后设参数打印，与文档打印同一条流程'
+          : '通用文档、求职材料或图片上传后打印'
 
   const wordClosedCopy = `${WORD_CONVERSION_UNAVAILABLE_COPY}；支持 PDF、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB${source === 'resume' ? '，适合已有电子简历直接打印' : '，上传后将先做材料检查'}`
   const wordOpenCopy = `支持 PDF、DOC、DOCX、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB；${WORD_CONVERSION_DISCLOSURE}`
@@ -459,6 +461,7 @@ export function PrintUploadPage() {
       pageSubtitle={pageSubtitle}
       terminalLabel=""
       status={qxStatusFromDevice(device)}
+      orderPausedNotice={device.printerNotice}
       isResumePrint={isResumePrint}
       showFileChannel={showFileChannel}
       showScan={!isResumePrint}

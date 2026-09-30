@@ -4,7 +4,7 @@
   "note": "青序流光 2.0 最终版。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md、STATUS.md 不在冻结范围。",
   "files": {
     "00-standby.html": "f3a0dd5cdd58c8a6e75647ed8ab50f2f2738937b091b73c06a382dd78e44a131",
-    "01-home.html": "46cfeb9c5a02de8e84e89e88df62398b91a69f6d0a07527fb134c6a049ff8b80",
+    "01-home.html": "655626b98b498e22fa6b53205779539f7172defd8efaa0b15fd89c5173a50dbf",
     "02-services.html": "639da7915b581760d8368bf71a306b2b187149cc987daeec12c6ea00e09d6007",
     "03-login-gate.html": "3e286298af6bd7ddb11274a4f927b18e2ffaacf09528e52ebad2d7f397e1b150",
     "04-session-guard.html": "e3645b9b64619bc445f332caeb7328686c6ca904deb0f8256cb6afdd3df2c521",

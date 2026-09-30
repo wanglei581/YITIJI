@@ -4,18 +4,66 @@
 // 只收 PrintProgressPage 已经算好的真值：不发请求、不轮询、不判定任务状态。
 //   PrintJobRow              任务卡首行（文件名 / 参数 / 任务号·订单号 / 状态签），printing 与超时两态共用
 //   PrintStatusTimeoutPanel  client-status-timeout 态正文：查询超时只是没拿到状态，不改服务端、不猜结果
+//   PrintProgressFailureNote 已知失败的红条：只写出路，原因留在顶栏和步骤卡
+//   PrintProgressFailureActions 失败底栏：说明行在按钮上方，「重新打印」单独一行字
 //
 // 状态签文案、超时判定、轮询与跳转仍在页面里，门禁按页面文件取证。
 // ============================================================
 
 import type { ReactNode } from 'react'
-import { AlertTriangleIcon, FileTextIcon, WalletIcon } from 'lucide-react'
+import { AlertCircleIcon, AlertTriangleIcon, FileTextIcon, WalletIcon } from 'lucide-react'
 import { formatCents } from '../cashierStatus'
 import type { PaymentFact } from '../printProgressModel'
 
 export interface PrintJobState {
   tone: 'doing' | 'wait' | 'err'
   label: string
+}
+
+/** 红条不重复失败原因，只留下面三个按钮的一句出路。 */
+export function PrintProgressFailureNote({ wayOut }: { wayOut: string }) {
+  return (
+    <div className="pff-inbar" data-tone="bad" data-testid="print-progress-failure">
+      <div className="pff-inbar-h">
+        <span className="pff-inbar-ic"><AlertCircleIcon aria-hidden="true" /></span>
+        <span>{wayOut}</span>
+      </div>
+    </div>
+  )
+}
+
+/** 失败底栏。价目说明独占一行，主按钮只写「重新打印」。 */
+export function PrintProgressFailureActions({
+  hint,
+  onHelp,
+  onOrders,
+  onReprint,
+}: {
+  hint: string
+  onHelp: () => void
+  onOrders: () => void
+  onReprint: () => void
+}) {
+  return (
+    <>
+      <p className="why">{hint}</p>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>
+        联系工作人员
+      </button>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={onOrders}>
+        查看订单
+      </button>
+      <button
+        type="button"
+        className="qx-btn"
+        data-variant="primary"
+        data-testid="print-fulfill-reprint"
+        onClick={onReprint}
+      >
+        重新打印
+      </button>
+    </>
+  )
 }
 
 export function PrintJobRow({ fileName, subline, idLine, state }: {
@@ -38,11 +86,12 @@ export function PrintJobRow({ fileName, subline, idLine, state }: {
   )
 }
 
-export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo, taskId }: {
+export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo }: {
   jobRow: ReactNode
   payment: PaymentFact
   amountCents: number | null
   orderNo: string | null
+  /** 调用方仍传入，页面不再把内部任务号展示给用户。 */
   taskId: string | null
 }) {
   const isFreeOrder = payment === 'free'
@@ -91,7 +140,6 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo,
             </p>
             <div className="pff-inbar-kv">
               {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}
-              {taskId ? <span>任务号 <b>{taskId}</b></span> : null}
               {payment === 'paid' && amountCents != null ? <span>支付状态 <b>已支付 {formatCents(amountCents)}</b></span> : null}
               {isFreeOrder ? <span>支付状态 <b>本次未收款</b></span> : null}
             </div>
@@ -116,7 +164,9 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo,
           <div className="pff-step">
             <span className="pff-step-no">3</span>
             <span className="pff-step-txt">
-              还是查不到就把<b>{orderNo ? `订单号 ${orderNo}` : `任务号 ${taskId ?? ''}`}</b>告诉工作人员，后台能直接查到这一单。
+              {orderNo
+                ? <>还是查不到就把<b>订单号 {orderNo}</b>和这台机器的位置告诉现场工作人员。</>
+                : <>还是查不到就把这台机器的位置告诉现场工作人员，请他们核对这一单。</>}
             </span>
           </div>
         </div>

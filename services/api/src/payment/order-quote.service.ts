@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common'
 import { countPagesInRange } from '../print-jobs/page-range.util'
 import { PrintPageCountService } from '../print-jobs/print-page-count.service'
-import { assertVerifiedPrintParameters } from '../print-jobs/verified-print-parameters'
+import { assertPrintOrderSides, assertVerifiedPrintParameters } from '../print-jobs/verified-print-parameters'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { assertTerminalPrinterAvailable, printerOnlineRequired } from '../terminals/printer-availability'
 import { requiredPrintCapabilityKeys } from '../terminals/terminal-capabilities.types'
@@ -80,6 +80,9 @@ export class OrderQuoteService {
   private async quoteLines(dto: QuotePrintOrderDto): Promise<PrintPriceQuote> {
     // 逐行报价后聚合；每行继续走真实页数识别与同一套价目，绝不按前端页数/金额合算。
     const quotes = await Promise.all(dto.lines!.map((line) => this.quoteOne(line.fileUrl, line.pageRange, dto)))
+    const copies = dto.params?.copies ?? DEFAULT_COPIES
+    // 单行各自不超过上限，加在一起仍可能超过。材料包报价走这里，不走逐行 quote()。
+    assertPrintOrderSides(quotes.reduce((sum, quote) => sum + quote.billablePages, 0) * copies)
     return aggregatePrintPriceQuotes(quotes)
   }
 
@@ -98,6 +101,8 @@ export class OrderQuoteService {
 
     const copies = dto.params?.copies ?? DEFAULT_COPIES
     const colorMode = dto.params?.colorMode ?? DEFAULT_COLOR_MODE
+    // 面数 = 计费页数 × 份数。双面、多页合一都不改这个数；计价之前拒绝，避免先给出付不起的价。
+    assertPrintOrderSides(billablePages * copies)
     return this.pricing.quotePrint({ billablePages, billingPageSource, copies, colorMode })
   }
 
@@ -135,15 +140,16 @@ export class OrderQuoteService {
   }
 
   /**
-   * PRT-03：报价与建单同口径——打印机离线 / 缺纸 / 故障时不给报价，避免用户走到收银台才失败。
+   * PRT-03：报价与建单同口径。离线 / 缺纸 / 故障看开关；
+   * queue_cleanup_failed / queue_pause_failed 不看开关，有心跳就拦。
    * 只在请求带 terminalId 时判定（黑白单面的历史调用方可不带终端，此时由建单再拦）。
    */
   private async assertTerminalPrinterReady(terminalRef: string | undefined): Promise<void> {
-    // 开关关闭时不触碰数据库：报价夹具（verify:miniapp-cloud-print-m2 等）以不带 prisma 的
-    // 桩构造本服务，黑白单面路径此前也从不查库。
-    if (!printerOnlineRequired()) return
     const ref = terminalRef?.trim()
     if (!ref) return
+    // 历史夹具（verify:miniapp-cloud-print-m2 等）不注入 prisma，读不到心跳。
+    // 开关关闭时与「没有这条心跳」一样放行。开关打开时仍往下查，缺 prisma 会失败，不另开旁路。
+    if (typeof this.prisma?.terminal?.findFirst !== 'function' && !printerOnlineRequired()) return
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: ref }, { terminalCode: ref }] },
       select: { id: true },

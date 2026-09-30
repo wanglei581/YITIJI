@@ -23,6 +23,8 @@ import type { RecruitmentHostingState } from '../../../hooks/useRecruitmentHosti
 import type { SmartCampusCapabilityState } from '../../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../../hooks/useTerminalDeviceStatus'
 import type { ToolboxCapabilityState } from '../../../hooks/useToolboxConfig'
+import { hasKioskSensitiveSession } from '../../../auth/kioskSensitiveSession'
+import { homeStandbyNote, publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import { rememberAssistantDraft } from '../../../services/assistantDraft'
 import { useTerminalKiosk } from '../../../services/api/screensaver'
 import type { HomeV6ActionId } from '../homeV6Domains'
@@ -30,16 +32,11 @@ import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
 import { HomeHeroHeader, type HomeDeviceStatus } from './HomeHeroHeader'
+import { HomeIdentityActions } from './HomeIdentityActions'
 import { HomeTile } from './HomeTile'
 
 const ASSISTANT_VOICE_ENTRY = import.meta.env.VITE_USE_TRTC_CALL === 'true'
 const HOME_ASK_DRAFT = '我想办一件事，请告诉我从哪一项开始。'
-
-function idleLogoutMinutes(): number {
-  const raw = Number(import.meta.env.VITE_KIOSK_LOGOUT_IDLE_SEC)
-  const sec = Number.isFinite(raw) && raw > 0 ? raw : 180
-  return Math.max(1, Math.round(sec / 60))
-}
 
 function greetingWord(date: Date): string {
   const hour = date.getHours()
@@ -62,7 +59,7 @@ function capabilityMark(
 
 interface QxHomeViewProps {
   isLoggedIn: boolean
-  displayName: string
+  guestMode: boolean
   device: TerminalDeviceStatusView
   toolbox: ToolboxCapabilityState
   campus: SmartCampusCapabilityState
@@ -75,6 +72,8 @@ interface QxHomeViewProps {
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
   onOpenDevice: () => void
+  /** 首页「结束上一位的使用」（W-75）：走 endKioskUse('handover')。 */
+  onEndPrevious: () => void
 }
 
 function fairCopy(state: QxHomeViewProps['jobFair']): {
@@ -123,7 +122,7 @@ export function QxHomeNavbar({ onAction }: Pick<QxHomeViewProps, 'onAction'>) {
 
 export function QxHomeView({
   isLoggedIn,
-  displayName,
+  guestMode,
   device,
   toolbox,
   campus,
@@ -135,6 +134,7 @@ export function QxHomeView({
   continueSlot,
   onAction,
   onOpenDevice,
+  onEndPrevious,
 }: QxHomeViewProps) {
   const kiosk = useTerminalKiosk()
   const [now, setNow] = useState(() => new Date())
@@ -148,6 +148,7 @@ export function QxHomeView({
     deviceLoading: device.loading,
     deviceReady: device.printerReady,
     deviceLabel: device.printerLabel,
+    deviceNotice: device.printerNotice,
   })
   const fair = fairCopy(jobFair)
   const job = jobCopy(jobs)
@@ -160,7 +161,12 @@ export function QxHomeView({
   const recruitmentOpen = recruitment.enabled
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
-  const hello = isLoggedIn && displayName ? `${displayName}，${greeting}` : greeting
+  // 首页是公共屏：登录着也不打招呼叫名字、不显示手机号（打码的也不显示）。W-75。
+  const hello = greeting
+  const standbyNote = homeStandbyNote(
+    { isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() },
+    publicIdleLogoutLabel(),
+  )
 
   return (
     <div
@@ -209,26 +215,18 @@ export function QxHomeView({
             <span className="qx-home-context-icon" aria-hidden="true"><HistoryIcon /></span>
             <span>
               <strong>这台机器上没有待继续的办理</strong>
-              <small>从下面选一项重新开始，不会显示上一位使用者的资料</small>
+              <small>{standbyNote}</small>
             </span>
           </div>
         </div>
 
-        <header className="qx-home-section-head">
+        <header className="qx-home-section-head" data-member={isLoggedIn ? 'true' : undefined}>
           <div>
             <h2 id="qx-home-services-title">直接办</h2>
             <span>每项最后都会给你一样东西</span>
           </div>
           <div className="qx-home-section-actions">
-            <button
-              type="button"
-              className="qx-home-identity"
-              data-testid="home-identity"
-              onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}
-            >
-              <UserIcon aria-hidden="true" />
-              <span>{isLoggedIn ? `${displayName || '本人'} · 进入我的` : '登录后查看本人记录'}</span>
-            </button>
+            <HomeIdentityActions isLoggedIn={isLoggedIn} onLogin={() => onAction('login')} onEndPrevious={onEndPrevious} />
             <button type="button" className="qx-home-device-link" data-testid="home-device-status" onClick={onOpenDevice}>
               设备状态
             </button>
@@ -278,7 +276,7 @@ export function QxHomeView({
               </button>
             )}
           </>) : null}
-          <HomeTile actionId="policy-hub" title="查政策" description="补贴、社保怎么办，要带哪些材料，以官方发布为准" foot="带走：材料清单" badge="官方发布" icon={LandmarkIcon} tone="slate" onAction={onAction} />
+          <HomeTile actionId="policy-hub" title="查政策" description="补贴、社保怎么办，要带哪些材料，以官方发布为准" foot="查看政策说明" badge="官方发布" icon={LandmarkIcon} tone="slate" onAction={onAction} />
           {channelsTile ? (
             <HomeTile actionId="official-channels" title="机构官方渠道" description={`本机有 ${officialChannelCount} 个渠道，扫码到机构官网`} foot="扫码前往" badge="机构提供" icon={QrCodeIcon} tone="slate" onAction={onAction} />
           ) : null}
@@ -300,7 +298,9 @@ export function QxHomeView({
             <span aria-hidden="true">·</span>
             {kiosk ? <span>鲁公网安备37021402007308号</span> : (<a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer noopener">鲁公网安备37021402007308号</a>)}
             <span aria-hidden="true">·</span>
-            <span>离开 {idleLogoutMinutes()} 分钟自动退出登录</span>
+            <span>离开 {publicIdleLogoutLabel()} 无操作自动退出登录</span>
+            <span aria-hidden="true">·</span>
+            <span>打开本人文档、诊断报告或优化结果后 {resultIdleLogoutLabel()} 无操作自动退出</span>
           </p>
         </div>
       </footer>

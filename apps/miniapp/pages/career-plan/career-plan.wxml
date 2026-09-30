@@ -100,6 +100,12 @@
         <view wx:if="{{plan.basedOnInterview}}" class="chip teal">模拟面试（{{plan.interviewName}}）</view>
       </view>
       <view wx:if="{{!plan.basedOnJobFit && !plan.basedOnInterview}}" class="cb-hint">本次只参考了简历,未结合简历对照或面试记录。</view>
+      <!-- 自我探索因说明更新没纳入时如实说，并给重新确认的入口（服务端 selfAssessmentExcluded） -->
+      <block wx:if="{{plan.selfAssessmentOutdated}}">
+        <view class="cb-hint">你之前的自我探索结果因说明已更新，这次没有纳入；重新确认说明后可以纳入。</view>
+        <view class="text-action tap cb-link" hover-class="tap-press" bindtap="goSelfExplore"
+              role="button" aria-label="去自我探索重新确认说明">去自我探索重新确认</view>
+      </block>
     </view>
 
     <view wx:if="{{plan.summary}}" class="card">

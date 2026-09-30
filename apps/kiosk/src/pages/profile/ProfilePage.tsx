@@ -28,7 +28,7 @@ function ProfileContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isLoggedIn, displayName, getToken } = useAuth()
-  const { clearSessionTo } = useKioskSessionControl()
+  const { endKioskUse } = useKioskSessionControl()
   const incoming = (location.state ?? {}) as IncomingState
   const [reloadKey, setReloadKey] = useState(0)
   const assetOverview = useMemberAssetCounts(isLoggedIn, getToken, reloadKey)
@@ -131,7 +131,7 @@ function ProfileContent() {
             onLogin={goLogin}
             onHome={() => navigate('/')}
             onRetry={() => setReloadKey((key) => key + 1)}
-            onEnd={() => clearSessionTo({ path: '/profile' })}
+            onEnd={() => endKioskUse('end_use')}
             onSettings={() => navigate('/me/settings')}
             onHelp={() => navigate('/help')}
             onProgress={() => {

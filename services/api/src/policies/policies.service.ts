@@ -19,6 +19,7 @@ import {
   ADMIN_POLICY_PUBLISH_DISABLED_CODE,
   assertEmergencyReason,
   assertNotEmergencyHeld,
+  emergencyReasonForSentence,
   isRecruitmentContentHostingEnabled,
   POLICY_RESPONSIBILITY_ACK_REQUIRED_CODE,
 } from '../recruitment-hosting/recruitment-hosting'
@@ -522,7 +523,7 @@ export class PoliciesService {
               orgId: post.sourceOrgId,
               kind: 'recruitment_emergency_takedown',
               title: '政策已紧急下架',
-              body: `「${post.title}」已紧急下架。事由：${reason.reasonText}。此下架不能由管理员恢复。`,
+              body: `「${post.title}」已紧急下架。事由：${emergencyReasonForSentence(reason.reasonText)}。此下架不能由管理员恢复。`,
               payloadJson: JSON.stringify({ targetType: 'policy', targetId: id, reasonCode: reason.reasonCode }),
             },
           })

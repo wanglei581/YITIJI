@@ -122,18 +122,22 @@ export function FeeLines({ rows }: { rows: Array<{ label: string; value: string;
   )
 }
 
-export function CouponUnavailable() {
+export function CouponUnavailable({ free = false }: { free?: boolean }) {
   return (
     <div className="pcf-coupon-wrap">
       <div className="pcf-coupon" data-coupon="unavailable" data-testid="print-confirm-coupon">
         <span className="c-ic"><TicketIcon size={24} aria-hidden="true" /></span>
         <span className="c-m">
-          <b>本单暂无可使用优惠券</b>
-          <span>优惠券功能尚未接通：系统还没有下发券面值与适用范围，本机不替你预判，也不试算抵扣。</span>
+          <b>{free ? '这次免费，不用优惠券' : '这台机器暂时不能用优惠券'}</b>
+          <span>
+            {free
+              ? '免费试运营，本单 0 元，不需要券。'
+              : '价格以这一单的报价为准，这里不会改价。'}
+          </span>
         </span>
         <span className="c-tag">不使用优惠券</span>
       </div>
-      <p className="pcf-coupon-why">本机只展示、不试算、不抵扣，你的券不会因此被扣掉。</p>
+      <p className="pcf-coupon-why">这里不扣券，也不会改这一单的价格。</p>
     </div>
   )
 }
@@ -217,7 +221,7 @@ export function ConfirmCard({
     <div className="pcf-cfm" data-tone={tone}>
       {flow ? (
         <ol className="pcf-flow" aria-label="确认之后会发生什么">
-          <li className="cs on"><b>创建订单</b><span>点确认才建单</span></li>
+          <li className="cs on"><b>确认这一单</b><span>点确认才下单</span></li>
           <li className="ar" aria-hidden="true"><ChevronRightIcon size={20} /></li>
           <li className="cs"><b>完成付款</b><span>付款成功才排队</span></li>
           <li className="ar" aria-hidden="true"><ChevronRightIcon size={20} /></li>

@@ -23,6 +23,11 @@ assert.match(scanPanel, /useRef\(false\)/)
 assert.match(scanPanel, /const refreshingRef = useRef\(false\)/)
 assert.match(scanPanel, /if \(refreshingRef\.current\) return/)
 assert.match(scanPanel, /refreshingRef\.current = true[\s\S]*finally \{[\s\S]*refreshingRef\.current = false/)
+assert.match(
+  scanPanel,
+  /cancelQrFetch\(\{[\s\S]*?requestGeneration\.current = cancelled\.generation[\s\S]*?refreshingRef\.current = cancelled\.refreshing/,
+  'W-15：面板卸下时放开取码锁，不能只把代数加一',
+)
 assert.match(scanPanel, /claimingRef\.current = true/)
 assert.match(scanPanel, /if \(claimingRef\.current\) return/)
 assert.match(scanPanel, /claimingRef\.current = true[\s\S]*claimQrLoginViaLocalAgent/)

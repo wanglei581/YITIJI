@@ -80,7 +80,10 @@ expectContains(credentialSteps, 'adminPassword.length === 0', '管理员当前�
 expectContains(steps, '目标机构账号当前密码', '必须明确区分目标账号密码')
 
 expectContains(manager, 'availableActionVerificationMethods.length === 0', '空方法账号必须禁用安全操作')
-expectContains(manager, '独立线下核验', '空方法账号必须说明线下核验且无管理员绕过')
+// W-03 之后「线下核验」落到了「核对机构盖章确认函 → 登记手机号 → 机构本人忘记密码自证」这条路径；
+// 本意不变：说明走线下核验，且管理员不能绕过本人验证（不能代收验证码）。
+expectContains(manager, '线下核对机构盖章确认函', '空方法账号必须说明先线下核对机构确认函')
+expectContains(manager, '管理员不能代收验证码', '空方法账号必须说明管理员不能绕过本人验证')
 expectContains(manager, '换绑手机号', '现有账号列表必须提供换绑入口')
 expectContains(manager, '删除账号', '账号行危险按钮必须明确写删除账号')
 expectContains(steps, '确认删除账号', '最终危险按钮必须明确写确认删除账号')

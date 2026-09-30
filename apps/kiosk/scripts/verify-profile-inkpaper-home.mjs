@@ -237,7 +237,8 @@ for (const marker of [
   '<ProfileSessionRecords',
   "navigate('/me/settings')",
   "navigate('/print/preview'",
-  "clearSessionTo({ path: '/profile' })",
+  // 2026-09-29 统一清场：「结束使用」走 endKioskUse，回首页由它统一决定。
+  "endKioskUse('end_use')",
 ]) {
   expectIncludes(profile, marker, `ProfilePage preserves ${marker}`)
 }
@@ -338,7 +339,9 @@ expectAbsent(detailCss, /\.kprofile|\.khome|\.kassistant|\.kcampus/, '明细页 
 expectIncludes(favoritesPage, 'loginFrom="/me/favorites"', '我的收藏保留登录回跳来源')
 expectIncludes(favoritesPage, 'return `/jobs/${item.targetId}`', '我的收藏保留岗位详情跳转')
 expectIncludes(favoritesPage, 'return `/job-fairs/${item.targetId}`', '我的收藏保留招聘会详情跳转')
-expectIncludes(favoritesPage, "return '/renshi?tab=policy'", '我的收藏保留政策入口跳转')
+expectIncludes(favoritesPage, 'return `/renshi?policy=${encodeURIComponent(item.targetId)}`', '我的收藏打开对应的那条政策')
+expectAbsent(favoritesPage, /return '\/renshi\?tab=policy'/, '我的收藏不再只跳到政策列表')
+expectAbsent(favoritesPage, /对应政策页待建设/, '我的收藏不再写政策页待建设')
 expectIncludes(favoritesPage, '还没有收藏', '我的收藏保留空态标题')
 expectIncludes(favoritesPage, '在岗位 / 招聘会 / 政策详情页点收藏', '我的收藏保留空态说明')
 

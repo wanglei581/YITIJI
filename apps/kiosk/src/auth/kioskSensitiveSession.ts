@@ -24,6 +24,8 @@ import {
   clearContractReviewSession,
   hasContractReviewSession,
 } from '../pages/contract-review/contractReviewSession'
+import { clearAiDeclarationSession } from '../ai/aiDeclarationSession'
+import { AI_DECLARATION_SESSION_KEY } from '../ai/aiDeclarationVersions'
 
 /**
  * 清场会真正清掉的 sessionStorage 键。
@@ -41,6 +43,7 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   INTERVIEW_WORKBENCH_SESSION_KEY,
   SCAN_WORKBENCH_SESSION_KEY,
   ASSISTANT_DRAFT_KEY,
+  AI_DECLARATION_SESSION_KEY,
 ] as const
 
 /**
@@ -62,6 +65,7 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
  * 重载会把补偿逻辑连同执行环境一起杀掉，那正是 2026-09-15 那条 P1 的成因。
  */
 export function clearKioskSensitiveSession(outgoingMemberToken?: string | null): void {
+  clearAiDeclarationSession()
   clearContractReviewSession()
   clearPrintMaterialSession()
   clearAiResumeSession()

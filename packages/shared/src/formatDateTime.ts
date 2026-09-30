@@ -16,7 +16,10 @@ export type DateTimeDisplayStyle =
   | 'time'
   | 'zh-date'
   | 'zh-datetime'
+  | 'zh-date-weekday'
   | 'month-day'
+
+const WEEKDAY_ZH = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const
 
 export interface ShanghaiWallParts {
   year: number
@@ -25,6 +28,7 @@ export interface ShanghaiWallParts {
   hour: number
   minute: number
   second: number
+  weekday: (typeof WEEKDAY_ZH)[number]
   dateKey: string
 }
 
@@ -85,6 +89,7 @@ export function shanghaiParts(instant: Date): ShanghaiWallParts {
     hour,
     minute,
     second,
+    weekday: WEEKDAY_ZH[shifted.getUTCDay()],
     dateKey: `${year}-${pad(month)}-${pad(day)}`,
   }
 }
@@ -103,6 +108,8 @@ function renderParts(parts: ShanghaiWallParts, style: DateTimeDisplayStyle): str
       return `${pad(parts.month)}-${pad(parts.day)}`
     case 'zh-date':
       return `${parts.year}年${parts.month}月${parts.day}日`
+    case 'zh-date-weekday':
+      return `${parts.year}年${parts.month}月${parts.day}日 ${parts.weekday}`
     case 'zh-datetime':
       return `${parts.year}年${parts.month}月${parts.day}日 ${pad(parts.hour)}:${pad(parts.minute)}`
     case 'datetime':
@@ -150,6 +157,27 @@ export function toDatetimeLocalValue(value: string | Date | null | undefined): s
   if (!instant) return ''
   const parts = shanghaiParts(instant)
   return `${parts.dateKey}T${pad(parts.hour)}:${pad(parts.minute)}`
+}
+
+/**
+ * 相对时间。无效值走 fallback；未来时间不写成负数，改展示完整北京时间。
+ * 悬停全文仍由调用方把 title 设为 formatDateTime。
+ */
+export function formatRelativeTime(
+  value: string | Date | null | undefined,
+  now: Date = new Date(),
+  fallback = '—',
+): string {
+  const instant = parseInstant(value)
+  if (!instant) return fallback
+  const diff = now.getTime() - instant.getTime()
+  if (diff < 0) return formatDateTime(instant)
+  if (diff < 60_000) return '刚刚'
+  const minutes = Math.floor(diff / 60_000)
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  return `${Math.floor(hours / 24)} 天前`
 }
 
 /** 把 datetime-local 墙钟按 Asia/Shanghai 解释成 ISO（含 Z）。 */

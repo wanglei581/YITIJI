@@ -138,7 +138,8 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   const taskCard = outOfPaper.getByTestId('print-fulfill-list')
   await expect(taskCard).toContainText(W2_FILE.name)
   await expect(taskCard).toContainText('缺纸中断')
-  await expect(taskCard).toContainText(`任务号 ${W2_ORDER.taskId}`)
+  await expect(taskCard).not.toContainText(W2_ORDER.taskId)
+  await expect(taskCard).not.toContainText('任务号')
   await expect(taskCard.getByTestId('print-fulfill-fallback')).toContainText('打印机缺纸')
   await expect(taskCard).toContainText('费用与订单边界')
   // takeaway-url 404：订单号与金额退回进页时带来的真值，不编退款状态。
@@ -183,7 +184,7 @@ test('PAPER_EMPTY with server canRetry offers whole-file resubmit and server ord
       mimeType: 'application/pdf',
       sizeBytes: 128,
       orderId: W2_ORDER.orderId,
-      orderNo: 'SRV-ORDER-777',
+      orderNo: 'ORD-20260929-SRV777',
       payStatus: 'paid',
       amountCents: 350,
       canRetry: true,
@@ -197,7 +198,7 @@ test('PAPER_EMPTY with server canRetry offers whole-file resubmit and server ord
   await expect(outOfPaper).toBeVisible()
   // 带走接口回了订单：订单号与金额以服务端为准，不用进页时带来的值。
   await expect(page.locator('.qx-pill')).toHaveText('已付 ¥3.50 · 缺纸')
-  await expect(outOfPaper.locator('.pff-inbar-kv')).toContainText('订单 SRV-ORDER-777')
+  await expect(outOfPaper.locator('.pff-inbar-kv')).toContainText('订单 ORD-20260929-SRV777')
   await expect(outOfPaper.locator('.pff-inbar-kv')).toContainText('支付状态 已付 ¥3.50')
   await expect(outOfPaper).not.toContainText(W2_ORDER.orderNo)
   // canRetry 为真才出现重打出口，且说清是整份重打、不再收费，不是「续打剩下的」。
@@ -293,7 +294,7 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   expect(errors).toEqual([])
 })
 
-test('completed done renders pickup code from pay-status and never invents it @w2', async ({ page, api }) => {
+test('completed done says the paper is already out and never renders a pickup code @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
@@ -326,7 +327,9 @@ test('completed done renders pickup code from pay-status and never invents it @w
   await expect(page.getByText('请取走文件', { exact: true })).toHaveCount(0)
   await expect(page.getByText('少了页、印花了、对内容有疑问？')).toBeInViewport()
   await expect(page.getByRole('button', { name: '问小青：取纸或异常怎么办 →' })).toBeInViewport()
-  await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toBeVisible()
+  await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
+  await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('取件码', { exact: true })).toHaveCount(0)
   await expect(page.getByText('已打印', { exact: true })).toHaveCount(0)
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-completed.png'), fullPage: true })

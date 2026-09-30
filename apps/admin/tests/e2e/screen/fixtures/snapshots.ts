@@ -43,6 +43,14 @@ export function na<T = never>(source: string, window: string, reason: string): S
   return { available: false, source, window, reason }
 }
 
+/** 与服务端 PRINTED_PAGES_SOURCE 逐字一致。 */
+const PRINTED_PAGES_SOURCE =
+  'PrintTask(completed|printOutcome=printed) × copies; OrderItem/Order.billablePages'
+
+/** 与服务端 PRINTED_PAGES_BY_COMPLETION_SOURCE 逐字一致。 */
+const PRINTED_PAGES_TREND_SOURCE =
+  'PrintTask.completedAt(completed|printOutcome=printed) × copies; OrderItem/Order.billablePages'
+
 export const WINDOW: ScreenSnapshotWindow = {
   timezone: 'Asia/Shanghai',
   onlineWindowSeconds: 180,
@@ -177,7 +185,7 @@ export function govFull(): ScreenSnapshot {
     metrics: {
       terminalsOnline: ok('Terminal+TerminalHeartbeat / device-fleet', '180s', f),
       fleetWall: ok('Terminal+TerminalHeartbeat / device-fleet', '180s', f),
-      printPagesCumulative: ok('Order.payStatus=paid,billablePages', 'cumulative', {
+      printPagesCumulative: ok(PRINTED_PAGES_SOURCE, 'cumulative', {
         totalPages: 128431,
         byColor: na('Order.itemsJson', 'cumulative', 'color_split_not_indexed'),
       }),
@@ -199,11 +207,11 @@ export function govFull(): ScreenSnapshot {
         totalCalls: 671,
       }),
       printTrend14d: ok(
-        'Order.payStatus=paid,paidAt+billablePages',
+        PRINTED_PAGES_TREND_SOURCE,
         '14d',
         trendDays([620, 780, 720, 1180, 1040, 1480, 1320, 1640, 1390, 1750, 1520, 1842, 1610, 1780]),
       ),
-      visitCount: na('KioskSession', 'current', 'kiosk_session_unwritten'),
+      visitCount: ok('KioskSession.startedAt', 'shanghai-day', 86),
       suppliesAndMap: na('TerminalHeartbeat', 'current', 'no_consumable_or_geo_fields'),
       // 9/26 起任务流与实时告警随政务快照下发，与运营版同一份结构
       taskFlow24h: ok('PrintTask/ScanTask.groupBy(status)', '24h', TASK_FLOW),
@@ -268,7 +276,7 @@ export function govEmpty(): ScreenSnapshot {
   const emptyFleet = fleetFromCells([], 0, 0)
   base.metrics.terminalsOnline = ok('Terminal+TerminalHeartbeat / device-fleet', '180s', emptyFleet)
   base.metrics.fleetWall = ok('Terminal+TerminalHeartbeat / device-fleet', '180s', emptyFleet)
-  base.metrics.printPagesCumulative = ok('Order.payStatus=paid,billablePages', 'cumulative', {
+  base.metrics.printPagesCumulative = ok(PRINTED_PAGES_SOURCE, 'cumulative', {
     totalPages: 0,
     byColor: na('Order.itemsJson', 'cumulative', 'color_split_not_indexed'),
   })
@@ -285,9 +293,10 @@ export function govEmpty(): ScreenSnapshot {
     companiesPending: 0,
   })
   base.metrics.aiBreakdown24h = ok('AiServiceLog.groupBy(operation,status)', '24h', { byOperation: {}, failedCalls: 0, totalCalls: 0 })
-  base.metrics.printTrend14d = ok('Order.payStatus=paid,paidAt+billablePages', '14d', trendDays(Array.from({ length: 14 }, () => 0)))
+  base.metrics.printTrend14d = ok(PRINTED_PAGES_TREND_SOURCE, '14d', trendDays(Array.from({ length: 14 }, () => 0)))
   base.metrics.taskFlow24h = ok('PrintTask/ScanTask.groupBy(status)', '24h', { printByStatus: {}, scanByStatus: {} })
   base.metrics.alertsRealtime = ok('derived-alerts', 'current', { firingCount: 0, listedCount: 0, truncated: false, items: [] })
+  base.metrics.visitCount = ok('KioskSession.startedAt', 'shanghai-day', 0)
   return base
 }
 
@@ -314,9 +323,9 @@ export function govDegraded(): ScreenSnapshot {
   const base = govFull()
   base.status = 'degraded'
   base.degraded = true
-  base.metrics.printPagesCumulative = na('Order.payStatus=paid,billablePages', 'cumulative', 'source_query_failed')
+  base.metrics.printPagesCumulative = na(PRINTED_PAGES_SOURCE, 'cumulative', 'source_query_failed')
   base.metrics.aiBreakdown24h = na('AiServiceLog.groupBy(operation,status)', '24h', 'source_query_failed')
-  base.metrics.printTrend14d = na('Order.payStatus=paid,paidAt+billablePages', '14d', 'source_query_failed')
+  base.metrics.printTrend14d = na(PRINTED_PAGES_TREND_SOURCE, '14d', 'source_query_failed')
   return base
 }
 
@@ -351,7 +360,7 @@ function allFailed(snapshot: ScreenSnapshot): ScreenSnapshot {
  */
 export function govStructuralGap(): ScreenSnapshot {
   const base = govFull()
-  base.metrics.printPagesCumulative = na('Order.payStatus=paid,billablePages', 'cumulative', 'missing_org_id_on_ai_and_orders')
+  base.metrics.printPagesCumulative = na(PRINTED_PAGES_SOURCE, 'cumulative', 'missing_org_id_on_ai_and_orders')
   return base
 }
 
@@ -471,7 +480,7 @@ export function usageSnapshot(range: string): ScreenUsageSnapshot {
     limits: { minAggregateSample: 5, recruitmentHosting: 'enabled' },
     metrics: {
       channels: ok('Order.channel', safe, { paidOrders: 415, kiosk: 290, miniapp: 118, unlabeled: 7, memberOrders: 158 }),
-      visits: na('KioskSession', safe, 'kiosk_session_unwritten'),
+      visits: na('KioskSession.startedAt', safe, 'sample_below_threshold'),
       services: ok('mixed', safe, [
         svc('jobs', 'info', 1246, 'members_only'),
         svc('fairs', 'info', 328, 'members_only'),
@@ -583,7 +592,7 @@ export function usageChannelsFailed(range: string): ScreenUsageSnapshot {
   return base
 }
 
-/** 访问人次本次取数失败（默认夹具里它是结构性的「未接入」）。 */
+/** 服务人次本次取数失败（默认夹具里 1–4 次只给「少于 5」，不下发原数）。 */
 export function usageVisitsFailed(range: string): ScreenUsageSnapshot {
   const base = usageSnapshot(range)
   base.status = 'degraded'
@@ -630,7 +639,7 @@ export function terminalTwin(id: string): ScreenTerminalTwin | null {
     }),
     scanner: ok('TerminalHeartbeat+ScanTask', 'current', { state: 'ready', label: null }),
     currentTask: ok('PrintTask.status', 'current', printing ? { pages: 12, colorMode: 'bw', startedAt: new Date(now - 40_000).toISOString() } : null),
-    today: { printPages: 36, printTasks: 18, scans: null, failed: null, visits: na('KioskSession', 'current', 'kiosk_session_unwritten') },
+    today: { printPages: 36, printTasks: 18, scans: null, failed: null, visits: na('KioskSession.startedAt', 'shanghai-day', 'sample_below_threshold') },
     consumables: na('TerminalHeartbeat', 'current', 'no_consumable_or_geo_fields'),
     timeline24h: ok('TerminalHeartbeat+PrintTask', '24h', [
       seg(24, 17, 'offline'),
@@ -644,6 +653,14 @@ export function terminalTwin(id: string): ScreenTerminalTwin | null {
       seg(0.02, 0, printing ? 'printing' : 'idle'),
     ]),
   }
+}
+
+/** 单台服务人次本次取数失败：磁贴写「暂时取不到」，不写原因码。 */
+export function terminalTwinVisitsFailed(id: string): ScreenTerminalTwin | null {
+  const twin = terminalTwin(id)
+  if (!twin) return null
+  twin.today.visits = na('KioskSession.startedAt', 'shanghai-day', 'source_query_failed')
+  return twin
 }
 
 /** 打印机状态本次取数失败：标注写「暂时取不到」（朱色），纸盒碳粉仍是结构性的「待接入」。 */

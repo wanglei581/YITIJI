@@ -49,7 +49,7 @@ export interface StatsBucket {
  * 当前恒为 `available: false`：`BrowseLog` / `ExternalJumpLog` 两张行为日志表
  * 都没有 `sourceOrgId` 字段，无法按机构归因。可以用 targetId 反查
  * `Job.sourceOrgId`，但那是**当前**归属而非不可变快照——内容换来源机构后
- * 历史统计会漂移，因此刻意不做。前端据此显示「暂无归因数据」，
+ * 历史统计会漂移，因此刻意不做。前端据此写明还不能按本机构统计、这里不显示这些数字，
  * 不得回退成估算值或演示漏斗。
  */
 export interface StatsAttribution {

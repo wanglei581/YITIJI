@@ -33,7 +33,8 @@ export const PRINT_FAILED_LIST_CAP = 500
 
 /**
  * 心跳 printerStatus → 告警标题。取值来源：Terminal Agent 上报 ready|offline|error|low_paper|unknown
- * （apps/terminal-agent/src/agent/wmi.ts mapWin32PrinterQuery），外加历史心跳里的 paper_empty / not_found。
+ * （apps/terminal-agent/src/agent/wmi.ts mapWin32PrinterQuery），外加历史心跳里的 paper_empty / not_found，
+ * 以及队列闸门的 queue_cleanup_failed / queue_pause_failed。告警按最近心跳实时派生，恢复后不再出现。
  * ready / idle / ok 由 isHealthyPrinterStatus 判为健康，根本不会走到这里。
  *
  * - low_paper：WMI DetectedErrorState 3（纸少）或 5（墨粉少）都映射到它 —— Agent 分不开，
@@ -50,6 +51,8 @@ const PRINTER_STATUS_LABELS: Record<string, string> = {
   error: '打印机故障',
   not_found: '打印机未找到',
   unknown: '打印机状态读取不到',
+  queue_cleanup_failed: '开机清理失败，暂停接打印单',
+  queue_pause_failed: '暂停队列失败，暂停接打印单',
 }
 
 /** 只是提醒、还能出纸的打印机状态；其余非健康状态按 error。 */
@@ -270,6 +273,31 @@ function buildTerminalAlert(
   return null
 }
 
+/**
+ * 打印失败错误码 → 后台告警标题用的中文原因。标题只放中文，错误码放进明细，
+ * 方便排障时照码检索；未登记的错误码标题只写「打印任务失败」。
+ */
+const PRINT_FAILED_ALERT_REASONS: Record<string, string> = {
+  DOWNLOAD_HASH_MISMATCH: '文件校验未通过',
+  PRINTER_NOT_FOUND: '找不到打印机',
+  PRINTER_OFFLINE: '打印机离线',
+  PAPER_EMPTY: '缺纸',
+  PRINTER_ERROR: '打印机故障或卡纸',
+  PRINT_JOB_UNCONFIRMED: '出纸未确认',
+  PARTIAL_OUTPUT: '只打出了一部分',
+  PRINT_TIMEOUT: '打印超时',
+  PRINT_COMMAND_FAILED: '打印命令执行失败',
+  UNSUPPORTED_FILE_TYPE: '文件格式不支持',
+  FILE_NOT_FOUND: '打印文件已失效',
+}
+
+function printFailedAlertTitle(errorCode: string | null): string {
+  const reason = errorCode && Object.prototype.hasOwnProperty.call(PRINT_FAILED_ALERT_REASONS, errorCode)
+    ? PRINT_FAILED_ALERT_REASONS[errorCode]
+    : null
+  return reason ? `打印任务失败：${reason}` : '打印任务失败'
+}
+
 /** 打印失败告警的唯一构造入口。 */
 function buildPrintFailedAlert(task: FailedTaskRow): DerivedAlert {
   const subjectKey = buildSubjectKey('print_failed', task.id)
@@ -280,8 +308,8 @@ function buildPrintFailedAlert(task: FailedTaskRow): DerivedAlert {
     episodeToken: printFailedEpisodeToken(task.id),
     type: 'print_failed',
     severity: 'warning',
-    title: `打印任务失败${task.errorCode ? `(${task.errorCode})` : ''}`,
-    detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${formatShanghaiMinute(task.updatedAt)}`,
+    title: printFailedAlertTitle(task.errorCode),
+    detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${formatShanghaiMinute(task.updatedAt)}${task.errorCode ? ` · 错误码 ${task.errorCode}` : ''}`,
     terminalCode: task.terminal?.terminalCode ?? null,
     occurredAt: task.updatedAt.toISOString(),
   }

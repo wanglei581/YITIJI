@@ -445,11 +445,12 @@ test('H7 after 结束使用 the print desk shows only the empty state @w2', asyn
 
   await page.getByRole('button', { name: '我的', exact: true }).first().click()
   await page.waitForURL((url) => url.pathname === '/profile')
-  // 结束使用 = 同步清场 + 登出，再整页重载回「我的」（游客态）。等重载落定，别和它抢。
+  // 结束使用 = 同步清场 + 登出，再整页重载回首页（与闲置清场同一目的地）。等重载落定，别和它抢。
   const reloaded = page.waitForEvent('load')
   await page.getByTestId('profile-primary').click()
   await reloaded
-  await expect(page).toHaveURL(/\/profile$/)
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  await expect(page.getByTestId('qx-home')).toBeVisible()
   await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-print-material-check'))).toBeNull()
 
   // 清场立了隐私边界：地址栏直接打开的旧历史项会被当成边界之前的条目送回首页，

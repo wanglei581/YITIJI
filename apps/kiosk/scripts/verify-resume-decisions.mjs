@@ -45,4 +45,9 @@ assert.equal(onceInField.experience[0].description, 'hello there')
 assert.equal(replaceResumeText(sample, '', 'x'), sample)
 assert.equal(replaceResumeText(sample, 'hello', 'hello'), sample)
 
+const hook = readFileSync(new URL('../src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts', import.meta.url), 'utf8')
+assert.match(hook, /compareDecisionChanges\(/, 'compare return must include a chosen rewrite that is not already in the draft')
+const page = readFileSync(new URL('../src/pages/resume/ResumeOptimizePage.tsx', import.meta.url), 'utf8')
+assert.match(page, /第 \$\{number\} 条改写没能自动放进稿里，请在编辑区手动改。/, 'unplaced rewrite tells the user to edit by hand')
+
 console.log('PASS replaceResumeText first-hit only')

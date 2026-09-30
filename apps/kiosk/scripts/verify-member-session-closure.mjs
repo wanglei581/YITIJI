@@ -390,14 +390,20 @@ assert(
   'SessionResumePage 只把后端恢复动作映射到支付/打印两个固定站内路由，并诚实区分 pending/claimed/printing',
 )
 
+// 2026-09-29 统一清场：页面只调 endKioskUse(reason)，目的地由 kioskEndUse.endUseDestination 统一定
+// （end_use / handover / 到点 → 首页，switch_account → 登录页），不再让页面自己传目的地。
+const kioskEndUse = read('src/auth/kioskEndUse.ts')
 assert(
-  kioskSessionControl.includes('clearSessionTo') &&
+  kioskSessionControl.includes('endKioskUse: (reason: KioskEndUseReason') &&
+    !kioskSessionControl.includes('clearSessionTo') &&
     kioskSessionControl.includes("path: '/' | '/profile'") &&
     kioskSessionControl.includes("path: '/login'") &&
     kioskPrivacyGuard.includes('pushSanitizedDestination') &&
     kioskPrivacyGuard.includes('establishPrivacyBoundary()') &&
-    /clearSessionTo\(\{\s*path:\s*'\/profile'\s*\}\)/s.test(profilePage),
-  'Profile 手动退出统一建立隐私 history boundary，不再直接清会话后留下 token-bearing 历史',
+    /if \(reason === 'switch_account'\)[\s\S]{0,300}path: '\/login'[\s\S]{0,200}return \{ path: '\/' \}/.test(kioskEndUse) &&
+    /endKioskUse\('end_use'\)/.test(profilePage) &&
+    !/clearSessionTo|\blogout\s*\(/.test(profilePage),
+  'Profile 结束使用走 endKioskUse 回到首页，与闲置清场同一目的地，并走隐私 history boundary',
 )
 
 // 清场后跳回干净入口这一步，不能只挂在 requestAnimationFrame 上。
@@ -426,11 +432,12 @@ const settingsLogout = extractConstFunction(mySettingsPage, 'handleLogout')
 const settingsSwitch = extractConstFunction(mySettingsPage, 'handleSwitch')
 const settingsRebindDone = extractConstFunction(mySettingsPage, 'handleRebindDone')
 assert(
-  /clearSessionTo\(\{\s*path:\s*'\/profile'\s*\}\)/s.test(settingsLogout) &&
-    /clearSessionTo\(\{\s*path:\s*'\/login',\s*state:\s*\{\s*from:\s*'\/profile'\s*\}\s*\}\)/s.test(settingsSwitch) &&
-    /clearSessionTo\(\{[\s\S]*path:\s*'\/login',[\s\S]*from:\s*'\/profile'[\s\S]*hint:\s*'换绑成功，请用新手机号登录'/s.test(settingsRebindDone) &&
-    !/\blogout\s*\(/.test(settingsLogout + settingsSwitch + settingsRebindDone),
-  'MySettings 退出、切换账号、换绑完成均走同一隐私边界，并保留 /profile 与 /login 目的地语义',
+  /endKioskUse\('end_use'\)/.test(settingsLogout) &&
+    /endKioskUse\('switch_account'\)/.test(settingsSwitch) &&
+    /endKioskUse\('switch_account',\s*\{\s*loginHint:\s*'换绑成功，请用新手机号登录'\s*\}\)/.test(settingsRebindDone) &&
+    /onRecheck=\{\(\) => endKioskUse\('switch_account'/.test(mySettingsPage) &&
+    !/clearSessionTo|\blogout\s*\(/.test(mySettingsPage),
+  'MySettings 退出回到首页，切换账号与换绑到登录页（W-64 先完整清场再进登录），全部走 endKioskUse',
 )
 
 const phoneRebindPanel = read('src/pages/profile/me/components/PhoneRebindPanel.tsx')

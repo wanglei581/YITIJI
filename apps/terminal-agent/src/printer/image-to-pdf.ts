@@ -278,29 +278,3 @@ export function cleanupTempPdf(tempPdfPath: string): void {
   }
 }
 
-/**
- * 清理临时目录中超过 1 小时的残留 PDF 文件。
- * 在 Agent 启动时调用，兜底清理意外残留。
- */
-export function cleanupStaleTempPdfs(): void {
-  const tempDir = getTempDir()
-  if (!fs.existsSync(tempDir)) return
-
-  const oneHourAgo = Date.now() - 60 * 60 * 1000
-  try {
-    const files = fs.readdirSync(tempDir)
-    for (const file of files) {
-      if (!file.startsWith('print_') || !file.endsWith('.pdf')) continue
-      const filePath = path.join(tempDir, file)
-      const stat = fs.statSync(filePath)
-      if (stat.mtimeMs < oneHourAgo) {
-        fs.unlinkSync(filePath)
-        log(`cleanupStaleTempPdfs: 已清理过期残留文件 ${file}`)
-      }
-    }
-  } catch (e) {
-    warn(
-      `cleanupStaleTempPdfs: 清理失败（忽略）— ${e instanceof Error ? e.message : String(e)}`,
-    )
-  }
-}

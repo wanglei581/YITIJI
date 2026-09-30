@@ -19,7 +19,7 @@ import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
 import type { BillingPageSource } from './print-page-count.types'
-import { assertVerifiedPrintParameters } from './verified-print-parameters'
+import { assertPrintOrderSides, assertVerifiedPrintParameters } from './verified-print-parameters'
 import { DocumentConversionService } from '../document-conversion/document-conversion.service'
 import { WORD_MIME_TYPES } from '../document-conversion/document-conversion.types'
 import { assertPiiScanned } from './pii-scan-gate'
@@ -405,7 +405,7 @@ export class PrintJobsService {
     // Task 10 服务端能力门禁：管理员把该终端 document_print 配为非 available 时
     // 拒绝创建（未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(targetTerminalId, 'document_print')
-    // PRT-03：打印机离线 / 缺纸 / 故障时不建单、不收款（PRINT_REQUIRE_PRINTER_ONLINE=true 生效，生产必开）。
+    // PRT-03：离线 / 缺纸 / 故障在开关打开时不建单。队列闸门两个状态无论开关开没开都不建单。
     await assertTerminalPrinterAvailable(this.prisma, targetTerminalId)
 
     // 打印参数门禁第 1 层（全局产品边界）：N-up 恒拒；彩色/双面在此层放行。
@@ -450,6 +450,8 @@ export class PrintJobsService {
     // 报价：金额只由 PricingService 依 PriceConfig 计算（**不信任前端 amount**）；无 active 价目 / 异常 → fail-closed。
     const copies = dto.params?.copies ?? DEFAULT_PARAMS.copies
     const colorMode: 'black_white' | 'color' = dto.params?.colorMode ?? 'black_white'
+    // 一体机直接建单不经过 OrderQuoteService，必须在这里单独拦。双面不把面数折半。
+    assertPrintOrderSides(billablePages * copies)
     const quote = await this.pricing.quotePrint({ billablePages, billingPageSource, copies, colorMode })
     // 动态价格二次确认：quotedAmountCents 只断言「用户确认的就是现在要收的」，金额仍取上面的 quote。
     // 必须在建 Order / PrintTask / 支付会话之前拒绝；字段缺省（旧客户端）照旧按服务端计价建单。
@@ -522,7 +524,7 @@ export class PrintJobsService {
       return { task, order }
     })
 
-    // 免费单（报价为 0，如 0 价项）：经状态机置 paid + paymentSource=free + paidAt + pickupCode + 审计，
+    // 免费单（报价为 0，如 0 价项）：经状态机置 paid + paymentSource=free + paidAt + 审计，不铸取件码。
     // 不伪造真实收款；付费单保持 unpaid + paymentSource=null。
     if (quote.amountCents === 0) {
       await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
@@ -661,12 +663,12 @@ export class PrintJobsService {
     }
     const signed = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
     await this.audit.write({
-      actorId: ctx.endUserId ?? null,
+      actorId: null, // AuditLog.actorId FK 指向运营 User：会员 ID 写进去会违反外键、被静默吞掉，改记 payload.endUserId
       actorRole: 'kiosk',
       action: 'print_job.takeaway_url',
       targetType: 'print_task',
       targetId: task.id,
-      payload: { orderId: order.id, orderNo: order.orderNo, fileId },
+      payload: { orderId: order.id, orderNo: order.orderNo, fileId, endUserId: ctx.endUserId ?? null },
       ipAddress: ctx.ipAddress ?? null,
       userAgent: ctx.userAgent ?? null,
     }).catch(() => undefined)
@@ -803,13 +805,13 @@ export class PrintJobsService {
     })
 
     await this.audit.write({
-      actorId: ctx.endUserId ?? null,
+      actorId: null, // 同上：会员 ID 记 payload.endUserId
       actorRole: 'kiosk',
       action: 'print_job.retry',
       targetType: 'print_task',
       targetId: task.id,
       payload: {
-        orderId: order.id,
+        endUserId: ctx.endUserId ?? null, orderId: order.id,
         orderNo: order.orderNo,
         amountCents: amountBefore,
         fromStatus: 'failed',

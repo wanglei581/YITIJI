@@ -1440,7 +1440,7 @@ test('paid print-job amount routes confirmation to cashier @w2', async ({ page, 
 
   await page.goto('/print/confirm')
   await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /按以上设置打印原文件/ }).click()
+  await page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ }).click()
   await page.waitForURL('**/print/cashier')
   await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(W2_ORDER.paymentSessionToken)).toHaveCount(0)
@@ -1823,7 +1823,7 @@ for (const scenario of ['active-refresh', 'leave-refresh', 'leave-success', 'pri
   })
 }
 
-test('print polling reaches done and pickup code comes from the paid response @w2', async ({ page, api }) => {
+test('print polling reaches done and does not show a pickup code @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   let polls = 0
@@ -1840,7 +1840,8 @@ test('print polling reaches done and pickup code comes from the paid response @w
   await page.goto('/print/progress')
   await setReactRouterState(page, '/print/progress', cashierState)
   await page.waitForURL('**/print/done', { timeout: 10_000 })
-  await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toBeVisible()
+  await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
+  await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-done')
 })
 
@@ -2082,7 +2083,7 @@ test('benefit card reports 价目拉不到 when the quote fails and shows no amo
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新报价' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /按以上设置打印原文件/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2301,7 +2302,7 @@ test('print confirm create-job payload matches the quoted file and params @w2', 
   await seedMaterialSession(page)
   await page.goto('/print/confirm')
   await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
-  await page.getByRole('button', { name: /按以上设置打印原文件/ }).click()
+  await page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ }).click()
   await page.waitForURL('**/print/cashier')
   expect(jobBody?.fileUrl).toBe(W2_FILE.fileUrl)
   expect(jobBody?.fileName).toBe(W2_FILE.name)
