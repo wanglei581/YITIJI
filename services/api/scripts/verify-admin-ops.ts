@@ -499,6 +499,9 @@ async function main() {
       if (!printerIssue || printerIssue.severity !== 'warning') fail('3. 缺少打印机缺纸告警(warning)')
       const printFailed = data.find((a) => a.id === `print_failed:${taskFailed}`)
       if (!printFailed) fail('3. 缺少打印失败告警')
+      // W-101：标题只放中文原因，错误码进明细。
+      if (printFailed.title !== '打印任务失败：打印机离线') fail(`3. 打印失败告警标题应为中文原因，实际「${printFailed.title}」`)
+      if (!printFailed.detail.includes('错误码 PRINTER_OFFLINE')) fail(`3. 错误码应保留在明细里，实际「${printFailed.detail}」`)
       if (data.some((a) => a.id === `print_failed:${taskVerified}`)) fail('3. 已核查任务不得再进失败告警')
       if (data.some((a) => a.terminalCode === `VOP-ON-${suffix}` && a.type !== 'print_failed')) {
         fail('3. 在线正常终端不应产生终端/打印机告警')
