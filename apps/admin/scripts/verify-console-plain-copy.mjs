@@ -155,12 +155,7 @@ function hooks(values) {
 }
 const nums = runFile('packages/shared/src/formatNumber.ts')
 const shared = { ...nums, formatDateTime: () => '2026-09-30 12:00' }
-const kioskErrors = runFile('apps/kiosk/src/pages/print/printProgressModel.ts', {
-  './cashierStatus': {}, './pageRange': {},
-})
-const errors = runFile('apps/admin/src/lib/printErrorText.ts', {
-  '../../../kiosk/src/pages/print/printProgressModel': kioskErrors,
-})
+const errors = runFile('apps/admin/src/lib/printErrorText.ts')
 const display = runFile('apps/admin/src/routes/orders/orderDisplay.ts', { '@ai-job-print/shared': shared })
 const honesty = runFile('apps/admin/src/routes/orders/orderHonestyCopy.ts')
 const cols = runFile('apps/admin/src/routes/orders/orderColumns.tsx', {
@@ -243,6 +238,22 @@ for (const dir of ['orders', 'print-scan', 'billing', 'files', 'job-materials', 
   }
 }
 if (failures.length === 0) console.log('  PASS 第二批原组件 / 列定义：可见文案无工程词、打印原因中文、0 元如实、任务编号在详情')
+
+console.log('\n=== 打印错误原因与服务端告警同一口径 ===')
+{
+  const mapSrc = readFileSync(join(repoRoot, 'apps/admin/src/lib/printErrorText.ts'), 'utf8')
+  if (/kiosk\//.test(mapSrc.replace(/^\s*\/\/.*$/gm, ''))) fail('后台打印错误原因不得引用一体机源码')
+  const serverSrc = readFileSync(join(repoRoot, 'services/api/src/admin-ops/derived-alerts.ts'), 'utf8')
+  const block = serverSrc.match(/const PRINT_FAILED_ALERT_REASONS[^{]*\{([\s\S]*?)\n\}/)
+  if (!block) fail('找不到服务端 PRINT_FAILED_ALERT_REASONS，门禁需要跟着更新')
+  const serverCodes = block ? [...block[1].matchAll(/^\s*([A-Za-z_]+):/gm)].map((m) => m[1]) : []
+  if (serverCodes.length < 5) fail(`服务端错误码只解析出 ${serverCodes.length} 个，解析规则可能失效`)
+  for (const code of serverCodes) {
+    const text = errors.printErrorText(code)
+    if (text === '打印失败（未归类）' || text.includes(code)) fail(`后台缺少服务端已登记错误码的中文原因：${code}`)
+  }
+  if (failures.length === 0) console.log(`  PASS 服务端登记的 ${serverCodes.length} 个错误码后台都有中文原因，且不引用一体机源码`)
+}
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} 项未通过`)

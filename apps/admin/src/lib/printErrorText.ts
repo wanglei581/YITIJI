@@ -1,9 +1,25 @@
-// 复用一体机已有纯展示 helper，不修改打印状态和接口；仅补齐它尚未登记的两个码。
-import { errorCodeToMessage } from '../../../kiosk/src/pages/print/printProgressModel'
+// 打印失败错误码 → 后台给运营看的中文原因。
+// 口径与服务端告警标题同一份（services/api/src/admin-ops/derived-alerts.ts 的 PRINT_FAILED_ALERT_REASONS），
+// 门禁 verify-console-plain-copy 会逐个核对：服务端登记过的码这里必须都有。
+// 不引用一体机的 errorCodeToMessage：那是给现场用户看的句子，而且会把一体机打印页的模块拖进后台。
+const PRINT_ERROR_REASONS: Record<string, string> = {
+  DOWNLOAD_HASH_MISMATCH: '文件校验未通过',
+  PRINTER_NOT_FOUND: '找不到打印机',
+  PRINTER_OFFLINE: '打印机离线',
+  PAPER_EMPTY: '缺纸',
+  PRINTER_ERROR: '打印机故障或卡纸',
+  PRINT_JOB_UNCONFIRMED: '出纸未确认',
+  PARTIAL_OUTPUT: '只打出了一部分',
+  PRINT_TIMEOUT: '打印超时',
+  PRINT_COMMAND_FAILED: '打印命令执行失败',
+  UNSUPPORTED_FILE_TYPE: '文件格式不支持',
+  FILE_NOT_FOUND: '打印文件已失效',
+  printer_jam: '打印机卡纸',
+}
 
 export function printErrorText(code: string | null | undefined): string {
   if (!code) return '—'
-  if (code === 'printer_jam') return '打印机卡纸，请联系工作人员处理'
-  if (code === 'PARTIAL_OUTPUT') return '打印输出不完整，请核查现场出纸情况'
-  return errorCodeToMessage(code) ?? '打印失败（未归类）'
+  return Object.prototype.hasOwnProperty.call(PRINT_ERROR_REASONS, code)
+    ? PRINT_ERROR_REASONS[code]
+    : '打印失败（未归类）'
 }
