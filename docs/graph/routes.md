@@ -328,7 +328,7 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | `/` | DashboardPage | `apps/admin/src/routes/dashboard/index.tsx` | 21 | — |
 | `/account-settings` | AccountSettingsPage | `apps/admin/src/routes/account-settings/index.tsx` | 5 | — |
-| `/ai-config` | AiConfigPage | `apps/admin/src/routes/ai-config/index.tsx` | 11 | — |
+| `/ai-config` | AiConfigPage | `apps/admin/src/routes/ai-config/index.tsx` | 11 | 1 |
 | `/ai-services` | AiServicesPage | `apps/admin/src/routes/ai-services/index.tsx` | 13 | — |
 | `/alerts` | AlertsPage | `apps/admin/src/routes/alerts/index.tsx` | 2 | — |
 | `/audit` | AuditPage | `apps/admin/src/routes/audit/index.tsx` | 5 | — |
