@@ -17224,6 +17224,7 @@
           "User"
         ],
         "usedBy": [
+          "services/api/src/ai/usage/ai-usage-summary.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/partner-account-action.service.ts",
           "services/api/src/auth/partner-phone-rebind.service.ts",
@@ -17538,6 +17539,7 @@
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/ai/usage/ai-usage-summary.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
@@ -20245,6 +20247,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts": [
+      "apps/kiosk/scripts/verify-resume-decisions.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts": [
@@ -23349,6 +23352,7 @@
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
+      "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
@@ -23946,6 +23950,7 @@
       "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-resume-export-label.ts",
+      "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
@@ -30274,6 +30279,7 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts"
         ],
@@ -40016,7 +40022,9 @@
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/dto/resume-generate.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
-          "services/api/src/ai/resume/llm-resume-optimize.service.ts"
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/resume-pdf.service.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts"
         ],
         "missing": []
       },
