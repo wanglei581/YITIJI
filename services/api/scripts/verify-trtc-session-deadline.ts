@@ -128,7 +128,7 @@ async function main() {
 }
 async function verifyRealRedis() {
   assert.equal(process.env.VERIFICATION_DATABASE_TARGET, 'isolated')
-  assert.equal(process.env.REDIS_URL, 'redis://127.0.0.1:4397', '只允许本任务隔离 Redis')
+  assert.match(process.env.REDIS_URL ?? '', /^redis:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/\d+)?$/, '只允许本机隔离 Redis（CI 的 redis 服务或本地临时实例）')
   const redis = new Redis(process.env.REDIS_URL, { lazyConnect: true, connectTimeout: 1500, maxRetriesPerRequest: 0, retryStrategy: () => null })
   redis.on('error', () => undefined)
   const registry = new TrtcSessionRegistry(redis)
@@ -148,7 +148,21 @@ async function verifyRealRedis() {
     assert.equal(stopped, 1, '真实 Redis Lua 的幂等停止')
     assert.ok(await redis.ttl(`trtc:deadline:session:${sessionId}`) > 0, '停止后仅保留一天幂等记录')
     assert.ok(!(await registry.due(record.expiresAt)).some(item => item.sessionId === sessionId))
-    console.log('PASS TRTC 真 Redis Lua：原子预写、截止不续期、幂等停止、索引清理')
+    // 孤儿索引：记录已不在的索引项会在扫描时被清掉。
+    const orphanId = `verify-orphan-${randomUUID()}`
+    await redis.zadd('trtc:deadline:index', 1, orphanId)
+    await registry.due(Date.now())
+    assert.equal(await redis.zscore('trtc:deadline:index', orphanId), null, '孤儿索引被清理')
+    // 抢锁失败（另一方正在停）：直接返回、不调停止、不抛错。
+    const busyId = `verify-busy-${randomUUID()}`
+    await registry.reserve({ ...record, sessionId: busyId, taskId: null })
+    await redis.set(`trtc:deadline:session:${busyId}:lock`, 'other', 'PX', 30_000)
+    let busyStops = 0
+    await registry.finish(busyId, async () => { busyStops++ })
+    assert.equal(busyStops, 0, '锁被占时不重复停止')
+    await redis.del(`trtc:deadline:session:${busyId}`, `trtc:deadline:session:${busyId}:lock`)
+    await redis.zrem('trtc:deadline:index', busyId)
+    console.log('PASS TRTC 真 Redis Lua：原子预写、截止不续期、幂等停止、索引清理、孤儿索引清理、抢锁不重复停')
   } finally {
     if (redis.status === 'ready') {
       await redis.del(`trtc:deadline:session:${sessionId}`, `trtc:deadline:task:${taskId}`, `trtc:deadline:session:${sessionId}:lock`)

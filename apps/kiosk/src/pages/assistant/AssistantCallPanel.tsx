@@ -64,8 +64,12 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
     return () => window.clearTimeout(focusTimer)
   }, [call.phase])
 
+  // 到点转文字只做一次：父组件回调引用变化或清理期间又来一条字幕，都不能再插一遍提示。
+  const expiredHandledRef = useRef(false)
   useEffect(() => {
-    if (call.phase === 'expired') onSwitchToText(call.subtitle || '')
+    if (call.phase !== 'expired' || expiredHandledRef.current) return
+    expiredHandledRef.current = true
+    onSwitchToText(call.subtitle || '')
   }, [call.phase, call.subtitle, onSwitchToText])
 
   const runExit = useCallback(async (afterEnd: () => void) => {

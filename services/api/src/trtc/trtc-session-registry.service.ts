@@ -1,4 +1,4 @@
-import { Inject, Injectable, ServiceUnavailableException } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { randomUUID } from 'node:crypto'
 import type { Redis } from 'ioredis'
 import { REDIS_CLIENT } from '../common/redis/redis.service'
@@ -52,6 +52,9 @@ export class TrtcSessionRegistry {
   async due(now: number): Promise<TrtcSessionRecord[]> {
     const ids = await this.redis.zrangebyscore(INDEX, '-inf', now, 'LIMIT', 0, 100)
     const records = await Promise.all(ids.map(id => this.redis.get(recordKey(id))))
+    // 记录已不在（被逐出或误删）的索引项要清掉，否则攒满 100 个会把后面真正到期的会话挡在扫描窗口外。
+    const orphans = ids.filter((_, index) => records[index] === null)
+    if (orphans.length > 0) await this.redis.zrem(INDEX, ...orphans)
     return records.filter((raw): raw is string => raw !== null).map(raw => JSON.parse(raw) as TrtcSessionRecord)
   }
 
@@ -60,9 +63,9 @@ export class TrtcSessionRegistry {
   async finish(sessionId: string, stop: (record: TrtcSessionRecord) => Promise<void>): Promise<void> {
     const lockKey = `${recordKey(sessionId)}:lock`
     const token = randomUUID()
-    if (await this.redis.set(lockKey, token, 'PX', 30_000, 'NX') !== 'OK') {
-      throw new ServiceUnavailableException('语音会话正在结束，请稍后重试')
-    }
+    // 锁被占：另一个实例或用户挂断正在停同一会话。直接返回，不报 503、不触发重试；
+    // 那一方停失败时会自己推迟重试，截止记录仍在索引里。
+    if (await this.redis.set(lockKey, token, 'PX', 30_000, 'NX') !== 'OK') return
     try {
       const raw = await this.redis.get(recordKey(sessionId))
       if (!raw) throw new Error('Missing TRTC deadline record')

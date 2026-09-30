@@ -165,7 +165,7 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
     if (!sdkAppId || !secretKey) {
       throw new InternalServerErrorException('TRTC 应用凭证未配置')
     }
-    return { sdkAppId, userId, userSig: genUserSig(sdkAppId, secretKey, userId, readTrtcMaxSessionSeconds() + 30) }
+    return { sdkAppId, userId, userSig: genUserSig(sdkAppId, secretKey, userId) }
   }
 
   private buildTtsConfig(secretId: string, cloudKey: string): string {
@@ -215,8 +215,8 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
     const maxSessionSeconds = readTrtcMaxSessionSeconds()
     const roomId       = `kiosk_${sessionId}`
     const botUserId    = `ai_bot_${sessionId}`
-    const userSig      = genUserSig(sdkAppId, secretKey, userId, maxSessionSeconds + 30)
-    const botUserSig   = genUserSig(sdkAppId, secretKey, botUserId, maxSessionSeconds + 30)
+    const userSig      = genUserSig(sdkAppId, secretKey, userId)
+    const botUserSig   = genUserSig(sdkAppId, secretKey, botUserId)
 
     // ── LLM 配置 ─────────────────────────────────────────────
     const llmApiKey = process.env['TRTC_LLM_API_KEY']

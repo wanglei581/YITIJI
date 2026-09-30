@@ -118,7 +118,8 @@ async function resolveVerifiedTerminal(headers: HeaderBag, deps: AiCallerResolve
     if (!terminal) return { terminalId: null, terminalVerified: false, orgId: null }
     orgId = terminal.orgId ?? null
   } catch {
-    return { terminalId: null, terminalVerified: false, orgId: null }
+    // 会话令牌已验签通过，只是查机构失败：终端身份仍算已验签（否则数据库一抖动，整厅终端都会挤进同一个出口 IP 池）。
+    orgId = null
   }
   return { terminalId, terminalVerified: true, orgId }
 }
