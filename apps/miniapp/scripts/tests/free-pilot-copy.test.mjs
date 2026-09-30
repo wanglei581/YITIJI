@@ -39,6 +39,11 @@ const WXML_TEXT_ALLOW = {
   'pages/print-pay/print-pay.wxml': ['价格已更新'],
 }
 
+// 值里含钱字眼的 data 字段：模板里引用它们也必须挂在 PAID_GUARD 的真分支下
+const MONEY_VARS = {
+  'pages/package-confirm/package-confirm.wxml': ['onsiteNotice', 'noCancelNotice'],
+}
+
 /** 从 `?` 之后找同一层的 `:`（跳过字符串、括号和嵌套三元）。 */
 function matchColon(expr, q) {
   let depth = 0
@@ -109,6 +114,15 @@ function wxmlViolations(rel) {
         out.push(`${rel}:${lineOf(src, m.index)} 钱字眼不在「${guard || '（本页不许出现）'}」的真分支里：${l[0]}`)
       }
     }
+    for (const name of MONEY_VARS[rel] || []) {
+      const ref = new RegExp(`\\b${name}\\b`, 'g')
+      let r
+      while ((r = ref.exec(expr))) {
+        if (!insidePaidBranch(expr, r.index, guard)) {
+          out.push(`${rel}:${lineOf(src, m.index)} 含钱字眼的字段 ${name} 不在「${guard}」的真分支里`)
+        }
+      }
+    }
     last = m.index + m[0].length
   }
   checkText(src.slice(last), last)
@@ -175,6 +189,8 @@ test('材料包免费时的两句说明不含钱字眼', () => {
     assert.ok(s.length > 10)
     assert.doesNotMatch(s, MONEY)
   }
+  // MONEY_VARS 登记的两句收费说明确实含钱字眼（登记没过期）
+  for (const s of [pkg.PACKAGE_ONSITE_NOTICE, pkg.PACKAGE_NO_CANCEL_NOTICE]) assert.match(s, MONEY)
 })
 
 test('判据自检：guard 真分支放行，假分支、正文、换了条件都要报', () => {
