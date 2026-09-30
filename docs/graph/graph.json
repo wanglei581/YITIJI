@@ -7653,7 +7653,8 @@
         "method": "GET",
         "models": [
           "Order",
-          "PrintTask"
+          "PrintTask",
+          "Terminal"
         ],
         "path": "/api/v1/me/print-orders",
         "roles": [],
@@ -17566,6 +17567,7 @@
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
