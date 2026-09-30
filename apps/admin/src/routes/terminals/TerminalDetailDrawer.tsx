@@ -9,6 +9,7 @@ import type {
   UpdateTerminalLifecycleResult,
   UpdateTerminalProfileInput,
 } from '../../services/api/devices'
+import { isParkedOrgType } from '../partners/orgTypeOptions'
 import { ReleaseObservationPanel } from './ReleaseObservationPanel'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
@@ -34,6 +35,19 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
   )
 }
 
+function OfflineReportedStatus({ originalLabel, observedAt }: { originalLabel: string | null; observedAt: string | null }) {
+  return (
+    <div className="space-y-1">
+      <StatusBadge dot status="default" label="终端离线" />
+      {originalLabel && (
+        <p className="text-[11px] text-neutral-500" title={observedAt ? formatDateTime(observedAt) : undefined}>
+          离线前最后一次上报：{originalLabel}{observedAt ? `（${formatRelativeTime(observedAt)}）` : ''}
+        </p>
+      )}
+    </div>
+  )
+}
+
 const RELEASE_LABEL: Record<string, string> = {
   draft: '草稿',
   paused: '已暂停',
@@ -44,8 +58,6 @@ const RELEASE_LABEL: Record<string, string> = {
   mismatch: '版本不匹配',
   stale: '心跳陈旧',
 }
-
-const PARKED_ORG_TYPES = new Set(['enterprise_source', 'fair_organizer'])
 
 export interface TerminalDetailDrawerProps {
   terminal: AdminTerminalRecord | null
@@ -159,7 +171,7 @@ export function TerminalDetailDrawer({
               <div className="flex gap-2">
                 <select value={editOrgValue} onChange={(e) => onOrgChange(e.target.value)} disabled={savingOrg} className="h-9 min-w-0 flex-1 rounded-md border border-neutral-200 bg-surface px-2 text-sm" aria-label={`设置 ${terminal.terminalCode} 所属机构`}>
                   <option value="">未绑定（解绑）</option>
-                  {terminal.orgId && !organizations.some((item) => item.id === terminal.orgId) && <option value={terminal.orgId} disabled>{terminal.orgName ?? terminal.orgId}（当前不可选）</option>}
+                  {terminal.orgId && !organizations.some((item) => item.id === terminal.orgId) && <option value={terminal.orgId} disabled>{terminal.orgName ?? terminal.orgId}{isParkedOrgType(terminal.orgType) ? '（类型已停放，请改绑）' : '（当前不可选）'}</option>}
                   {organizations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
                 <Button size="sm" onClick={() => onSaveOrg(terminal)} disabled={savingOrg} aria-label="保存归属"><CheckIcon className="h-4 w-4" /></Button>
@@ -169,7 +181,7 @@ export function TerminalDetailDrawer({
           ) : (
             <>
               <DetailRow label="当前机构"><span className="inline-flex items-center gap-1 rounded-full bg-info-bg px-2 py-0.5 text-info-fg"><Building2Icon className="h-3 w-3" />{terminal.orgName ?? '未绑定'}</span></DetailRow>
-              {terminal.orgType && PARKED_ORG_TYPES.has(terminal.orgType) && <p className="text-xs text-warning-fg">该机构类型已停放，建议改绑到运营机构。</p>}
+              {isParkedOrgType(terminal.orgType) && <p className="text-xs text-warning-fg">该机构类型已停放，建议改绑到运营机构。</p>}
               <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => onStartOrgEdit(terminal)} disabled={statusSaving}>{terminal.orgName ? '更改机构' : '绑定机构'}</Button></div>
             </>
           )}
@@ -181,8 +193,8 @@ export function TerminalDetailDrawer({
           <DetailRow label="IP 地址"><span className="font-mono text-xs">{terminal.ipAddress ?? '未上报'}</span></DetailRow>
           <DetailRow label="磁盘可用">{fmtDisk(terminal.diskFreeGb)}</DetailRow>
           <div><p className="mb-1 text-xs text-neutral-500">链路诊断</p><TerminalNetworkDiagnostics online={terminal.online} wiredNetworkStatus={terminal.wiredNetworkStatus} printerNetworkStatus={terminal.printerNetworkStatus} /></div>
-          <DetailRow label="打印机状态"><StatusBadge dot status={printer.badge} label={printer.label} /></DetailRow>
-          <div data-testid="terminal-scan-input"><p className="mb-1 text-xs text-neutral-500">扫描输入</p><div className="space-y-1"><StatusBadge dot status={scan.badge} label={scan.label} />{scan.detail && <p className="text-xs text-warning-fg">{scan.detail}</p>}{scan.restart && <p className="text-xs text-warning-fg">需重启终端程序（Terminal Agent）恢复（不支持远程解除）</p>}{terminal.scanInputObservedAt && <p className="text-[11px] text-neutral-500" title={formatDateTime(terminal.scanInputObservedAt)}>{formatRelativeTime(terminal.scanInputObservedAt)}</p>}</div></div>
+          <DetailRow label="打印机状态">{terminal.online ? <StatusBadge dot status={printer.badge} label={printer.label} /> : <OfflineReportedStatus originalLabel={terminal.printerStatus ? printer.label : null} observedAt={terminal.lastHeartbeatAt} />}</DetailRow>
+          <div data-testid="terminal-scan-input"><p className="mb-1 text-xs text-neutral-500">扫描输入</p><div className="space-y-1">{terminal.online ? <><StatusBadge dot status={scan.badge} label={scan.label} />{scan.detail && <p className="text-xs text-warning-fg">{scan.detail}</p>}{scan.restart && <p className="text-xs text-warning-fg">需重启终端程序（Terminal Agent）恢复（不支持远程解除）</p>}{terminal.scanInputObservedAt && <p className="text-[11px] text-neutral-500" title={formatDateTime(terminal.scanInputObservedAt)}>{formatRelativeTime(terminal.scanInputObservedAt)}</p>}</> : <OfflineReportedStatus originalLabel={terminal.scanInputHealth ? scan.label : null} observedAt={terminal.scanInputObservedAt ?? terminal.lastHeartbeatAt} />}</div></div>
         </Section>
 
         <Section title="生命周期与启停">

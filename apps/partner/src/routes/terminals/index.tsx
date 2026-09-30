@@ -142,9 +142,9 @@ export default function TerminalsPage() {
     { id: 'service', header: '打印扫描次数', align: 'right', cell: (row) => countText(row.serviceCount) },
     { id: 'rate', header: '出纸成功率', align: 'right', cell: (row) => <div><p className="font-semibold tabular-nums text-neutral-900">{rateText(row.output)}</p><p className="text-[11px] text-neutral-500">{countText(row.output.printed)} / {countText(row.output.settled)}</p></div> },
     { id: 'unconfirmed', header: '未确认出纸', align: 'right', cell: (row) => countText(row.output.unconfirmed) },
-    { id: 'offline', header: '离线', align: 'right', cell: (row) => row.faults.reportedInWindow ? `${row.faults.offlineCount} 次 · ${minutesText(row.faults.offlineMinutes)}` : <span className="text-xs text-neutral-500">{FAULTS_NOT_REPORTED}</span> },
-    { id: 'printerFault', header: '打印机故障', align: 'right', cell: (row) => row.faults.reportedInWindow ? `${row.faults.printerFaultCount} 次 · ${minutesText(row.faults.printerFaultMinutes)}` : <span className="text-xs text-neutral-500">{FAULTS_NOT_REPORTED}</span> },
-    { id: 'unrecovered', header: '未恢复', align: 'right', cell: (row) => row.faults.reportedInWindow ? (row.faults.unrecovered ? <span className="font-semibold text-error-fg">未恢复</span> : <span className="text-neutral-500">无</span>) : <span className="text-xs text-neutral-500">{FAULTS_NOT_REPORTED}</span> },
+    { id: 'offline', header: '离线', align: 'right', cell: (row) => row.faults.reportedInWindow ? `${row.faults.offlineCount} 次 · ${minutesText(row.faults.offlineMinutes)}` : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
+    { id: 'printerFault', header: '打印机故障', align: 'right', cell: (row) => row.faults.reportedInWindow ? `${row.faults.printerFaultCount} 次 · ${minutesText(row.faults.printerFaultMinutes)}` : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
+    { id: 'unrecovered', header: '未恢复', align: 'right', cell: (row) => row.faults.reportedInWindow ? (row.faults.unrecovered ? <span className="font-semibold text-error-fg">未恢复</span> : <span className="text-neutral-500">无</span>) : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
   ]
 
   return (

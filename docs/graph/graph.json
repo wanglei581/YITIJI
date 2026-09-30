@@ -12047,7 +12047,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 192,
+      "reachableFileCount": 201,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12690,8 +12690,13 @@
             "GET /admin/ad-assets",
             "GET /admin/ad-playlists",
             "GET /admin/ai-posters/status",
+            "GET /admin/import-batches",
             "GET /admin/screensaver/terminals",
             "PATCH /admin/ad-assets/:param",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "POST /admin/ad-assets/external-video",
             "POST /admin/ad-playlists",
             "PUT /admin/ad-playlists/:param",
@@ -12797,7 +12802,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 220
+      "sourceFileCount": 226
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -18160,6 +18165,16 @@
     "apps/admin/src/routes/screen/screenView.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
+    "apps/admin/src/routes/screensaver/AssetsTab.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/screensaver/PlaylistsTab.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+    ],
+    "apps/admin/src/routes/screensaver/TerminalsTab.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/routes/screensaver/index.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
@@ -18183,6 +18198,11 @@
     ],
     "apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs"
+    ],
+    "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx": [
+      "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
+      "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
@@ -21993,6 +22013,9 @@
     ],
     "scripts/generate-project-graph.mjs": [
       "scripts/project-graph/orphans.mjs"
+    ],
+    "scripts/lib/verify-datetime-pagination.mjs": [
+      "scripts/verify-datetime-honesty.mjs"
     ],
     "scripts/mock-server-contract-bindings.json": [
       "scripts/verify-mock-server-contract.mjs"
@@ -26749,6 +26772,7 @@
         "files": [
           "apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx",
           "apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx",
+          "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx",
           "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
           "apps/admin/src/services/api/adminHttpAdapter.ts",
@@ -26756,9 +26780,7 @@
           "apps/admin/src/services/api/devices.ts",
           "apps/admin/src/services/api/types.ts"
         ],
-        "missing": [
-          "src/routes/terminals/TerminalDetailDrawer.tsx"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
       "helper": false,
@@ -26775,14 +26797,13 @@
         "dirs": [],
         "files": [
           "apps/admin/src/routes/peripherals/index.tsx",
+          "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx",
           "apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
           "apps/admin/src/routes/terminals/terminalStatusViews.ts",
           "apps/admin/src/services/api/types.ts"
         ],
-        "missing": [
-          "src/routes/terminals/TerminalDetailDrawer.tsx"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
       "helper": false,
@@ -26831,9 +26852,13 @@
           "apps/admin/src/routes/peripherals/index.tsx",
           "apps/admin/src/routes/peripherals/peripheralViews.ts",
           "apps/admin/src/routes/printers/index.tsx",
+          "apps/admin/src/routes/screensaver/AssetsTab.tsx",
+          "apps/admin/src/routes/screensaver/PlaylistsTab.tsx",
+          "apps/admin/src/routes/screensaver/TerminalsTab.tsx",
           "apps/admin/src/routes/screensaver/index.tsx",
           "apps/admin/src/routes/smart-campus/index.tsx",
           "apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx",
+          "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx",
           "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
           "apps/partner/src/routes/Page.tsx",
@@ -26841,12 +26866,7 @@
           "apps/partner/src/routes/terminals/index.tsx",
           "services/api/src/audit/audit.types.ts"
         ],
-        "missing": [
-          "src/routes/screensaver/AssetsTab.tsx",
-          "src/routes/screensaver/PlaylistsTab.tsx",
-          "src/routes/screensaver/TerminalsTab.tsx",
-          "src/routes/terminals/TerminalDetailDrawer.tsx"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-console-plain-copy.mjs",
       "helper": false,
@@ -27036,6 +27056,7 @@
           "apps/admin/src/routes/legal-docs/index.tsx",
           "apps/admin/src/routes/login/LegalDocsModal.tsx",
           "apps/admin/src/routes/printers/index.tsx",
+          "apps/admin/src/routes/screensaver/PlaylistsTab.tsx",
           "apps/admin/src/routes/screensaver/index.tsx",
           "apps/admin/src/services/api/adminOps.ts",
           "services/api/src/admin-ops/derived-alert-identity.ts"
@@ -31952,6 +31973,7 @@
           "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
           "packages/shared/src/formatDateTime.ts",
           "packages/shared/src/formatNumber.ts",
+          "scripts/lib/verify-datetime-pagination.mjs",
           "services/api/src/jobs/jobs-shared.ts"
         ],
         "missing": []
@@ -41237,17 +41259,6 @@
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/admin/src/routes/screensaver/terminalConfigState.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/admin/src/routes/screensaver/terminalConfigState.test.ts"
-        ],
-        "risk": "medium",
-        "scope": "admin",
-        "why": "仍被其它文件提及：apps/admin/src/routes/screensaver/terminalConfigState.test.ts"
-      },
-      {
-        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx",
         "kind": "component",
         "mentions": [
@@ -41261,31 +41272,6 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs"
-      },
-      {
-        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx",
-        "kind": "component",
-        "mentions": [
-          "apps/admin/scripts/verify-console-plain-copy.mjs"
-        ],
-        "risk": "high",
-        "scope": "admin",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-console-plain-copy.mjs"
-      },
-      {
-        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx",
-        "kind": "component",
-        "mentions": [
-          "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
-          "apps/admin/scripts/verify-console-plain-copy.mjs",
-          "docs/device/onsite-acceptance-runsheet-2026-09.md",
-          "docs/product/console-ai-upgrade-plan-2026-08.md"
-        ],
-        "risk": "high",
-        "scope": "admin",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs、apps/admin/scripts/verify-console-plain-copy.mjs"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",

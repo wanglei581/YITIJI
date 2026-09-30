@@ -51,16 +51,13 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 断言了不存在的路径（9）
+## 断言了不存在的路径（6）
 
 门禁里写着某个仓库路径，但该路径在 git 里不存在。可能是文件被移动/删除后门禁
 没跟着改 —— 这类断言往往已经恒真或恒假，需要人确认。
 
 | 门禁脚本 | 找不到的路径 |
 | --- | --- |
-| `apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs` | `src/routes/terminals/TerminalDetailDrawer.tsx` |
-| `apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs` | `src/routes/terminals/TerminalDetailDrawer.tsx` |
-| `apps/admin/scripts/verify-console-plain-copy.mjs` | `src/routes/screensaver/AssetsTab.tsx`<br/>`src/routes/screensaver/PlaylistsTab.tsx`<br/>`src/routes/screensaver/TerminalsTab.tsx`<br/>`src/routes/terminals/TerminalDetailDrawer.tsx` |
 | `apps/kiosk/scripts/verify-data-request-ui.mjs` | `apps/admin/src/routes/member-privacy/index.tsx`<br/>`apps/admin/src/services/api/memberPrivacyAdmin.ts` |
 | `apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs` | `src/pages/resume/ResumeExportPage.tsx` |
 | `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs` | `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs` |
@@ -72,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1740 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1745 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -153,7 +150,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 129 个文件</summary>
+<summary><code>apps/admin/src/</code> — 133 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -232,6 +229,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenTabs.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screensaver/AssetsTab.tsx` | `verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/screensaver/PlaylistsTab.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
+| `apps/admin/src/routes/screensaver/TerminalsTab.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/screensaver/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/smart-campus/index.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx` | `verify-backend-p0-contracts.mjs` |
@@ -239,6 +239,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
+| `apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/terminals/index.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-datetime-honesty.mjs`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-device-config.ts` |
@@ -1795,6 +1796,15 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `scripts/generate-project-graph.mjs` | `orphans.mjs` |
+
+</details>
+
+<details>
+<summary><code>scripts/lib/verify-datetime-pagination.mjs/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `scripts/lib/verify-datetime-pagination.mjs` | `verify-datetime-honesty.mjs` |
 
 </details>
 

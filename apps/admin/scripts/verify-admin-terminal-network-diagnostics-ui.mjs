@@ -73,6 +73,21 @@ assert.match(views, /t\.scanInputAction/)
 assert.match(views, /t\.scanInputReason/)
 assert.match(terminalUi, /scanInputObservedAt/)
 
+// 终端离线时，打印机与扫描输入只能显示中性的「终端离线」；若有离线前上报，
+// 必须把原标签与相对时间放在小字里，并用完整北京时间作为悬停值，不能把旧值继续写成「正常」。
+assert.match(detail, /function OfflineReportedStatus\(/)
+assert.match(detail, /status="default" label="终端离线"/)
+assert.match(detail, /离线前最后一次上报：/)
+assert.match(detail, /formatRelativeTime\(observedAt\)/)
+assert.match(detail, /title=\{observedAt \? formatDateTime\(observedAt\) : undefined\}/)
+assert.match(detail, /terminal\.online \? <StatusBadge dot status=\{printer\.badge\}/)
+assert.match(detail, /terminal\.online \? <><StatusBadge dot status=\{scan\.badge\}/)
+assert.match(detail, /import \{[^}]*\bisParkedOrgType\b[^}]*\} from '\.\.\/partners\/orgTypeOptions'/)
+assert.match(detail, /isParkedOrgType\(terminal\.orgType\)/)
+assert.match(detail, /类型已停放，请改绑/)
+assert.match(detail, /当前不可选/)
+assert.doesNotMatch(detail, /const PARKED_ORG_TYPES\s*=/)
+
 // 三种状态必须分得开，且缺数据时说「未上报」而不是「正常」——
 // 把没测到说成健康，正是这条遥测要防的事。
 assert.match(views, /'已锁死'/, 'locked_out must be rendered as a distinct state')

@@ -35,7 +35,10 @@ test.describe('设备 / 终端 / 打印机（mock 口径）', () => {
     await expect(page.getByText('打印机异常', { exact: true })).toBeVisible()
     await expect(page.getByText(/^U 盘/).first()).toBeVisible()
     await expect(page.getByText('不上报').first()).toBeVisible()
-    await expect(page.getByText(/终端程序（Terminal Agent）目前不向云端上报它们的状态/)).toBeVisible()
+    const peripheralFootnote = page.getByText(/U 盘、扫码枪、摄像头、读卡器由一体机本地使用/)
+    await expect(peripheralFootnote).toBeVisible()
+    await expect(peripheralFootnote).toContainText('当前不会向云端上报状态')
+    await expect(peripheralFootnote).toContainText('后台看不到好坏')
     await expect(page.getByText('终端离线').first()).toBeVisible()
 
     await page.getByRole('button', { name: '打印机' }).click()

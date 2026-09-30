@@ -105,8 +105,15 @@ check('B1 指标卡：合计无法统计时不显示计数', /!totalsFaultsRepor
 check('B2 指标卡：部分静默时注明另有 N 台未计入', /totals\.silentTerminals > 0 &&/.test(cards) && cards.includes('未计入以上数字'))
 check('B3 指标卡：有静默终端时不说「当前没有未恢复的故障」', cards.includes("totals.silentTerminals > 0 ? '已上报的终端当前没有未恢复的故障'"))
 check('B4 抽屉：本终端没上报时不列 0 次', /!faults\.reportedInWindow \?/.test(drawer) && drawer.includes('FAULTS_NOT_REPORTED'))
-check('B5 表格：没上报的行在三项故障列分别写明无法统计', /row\.faults\.reportedInWindow/.test(page) && (page.match(/FAULTS_NOT_REPORTED/g) ?? []).length >= 3)
-check('B6 表格使用统一 ConsoleTable 并保留 9 个业务列', page.includes('ConsoleTable') && page.includes("header: '未恢复'") && page.includes("header: '打印机故障'"))
+for (const [id, heading] of [['offline', '离线'], ['printerFault', '打印机故障'], ['unrecovered', '未恢复']]) {
+  const line = page.split('\n').find((source) => source.includes(`id: '${id}'`)) ?? ''
+  check(`B5 ${heading}：未上报时显示短词并以 title 保留完整说明`,
+    line.includes('title={FAULTS_NOT_REPORTED}>无法统计</span>'), line)
+}
+for (const heading of ['终端', '当前状态', '服务人次', '打印扫描次数', '出纸成功率', '未确认出纸', '离线', '打印机故障', '未恢复']) {
+  check(`B6 业务列「${heading}」存在`, page.includes(`header: '${heading}'`))
+}
+check('B6 表格使用统一 ConsoleTable', page.includes('ConsoleTable'))
 
 if (failures > 0) {
   console.error(`\n${failures} FAIL`)

@@ -316,7 +316,7 @@ flowchart LR
   app --> printers["/printers<br/>1 页 · 0 端点"]
   app --> privacy_requests["/privacy-requests<br/>1 页 · 0 端点"]
   app --> screen["/screen<br/>2 页 · 0 端点"]
-  app --> screensaver["/screensaver<br/>1 页 · 11 端点"]
+  app --> screensaver["/screensaver<br/>1 页 · 16 端点"]
   app --> smart_campus["/smart-campus<br/>1 页 · 2 端点"]
   app --> sync_sources["/sync-sources<br/>1 页 · 11 端点"]
   app --> terminals["/terminals<br/>1 页 · 0 端点"]
@@ -358,7 +358,7 @@ flowchart LR
 | `/privacy-requests` | PrivacyRequestsPage | `apps/admin/src/routes/privacy-requests/index.tsx` | 0 | — |
 | `/screen` | ScreenPage | `apps/admin/src/routes/screen/index.tsx` | 0 | — |
 | `/screen/:tab` | ScreenPage | `apps/admin/src/routes/screen/index.tsx` | 0 | — |
-| `/screensaver` | ScreensaverPage | `apps/admin/src/routes/screensaver/index.tsx` | 11 | — |
+| `/screensaver` | ScreensaverPage | `apps/admin/src/routes/screensaver/index.tsx` | 16 | — |
 | `/smart-campus` | SmartCampusPage | `apps/admin/src/routes/smart-campus/index.tsx` | 2 | — |
 | `/sync-sources` | SyncSourcesPage | `apps/admin/src/routes/sync-sources/index.tsx` | 11 | — |
 | `/terminals` | Navigate | — _(重定向)_ | 0 | — |
@@ -414,7 +414,7 @@ flowchart LR
 
 **`/print-scan`** → `GET /admin/import-batches`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`
 
-**`/screensaver`** → `DELETE /admin/ad-assets/:param`、`DELETE /admin/ad-playlists/:param`、`GET /admin/ad-assets`、`GET /admin/ad-playlists`、`GET /admin/ai-posters/status`、`GET /admin/screensaver/terminals`、`PATCH /admin/ad-assets/:param`、`POST /admin/ad-assets/external-video`、`POST /admin/ad-playlists`、`PUT /admin/ad-playlists/:param`、`PUT /admin/terminals/:param/screensaver-config`
+**`/screensaver`** → `DELETE /admin/ad-assets/:param`、`DELETE /admin/ad-playlists/:param`、`GET /admin/ad-assets`、`GET /admin/ad-playlists`、`GET /admin/ai-posters/status`、`GET /admin/import-batches`、`GET /admin/screensaver/terminals`、`PATCH /admin/ad-assets/:param`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/ad-assets/external-video`、`POST /admin/ad-playlists`、`PUT /admin/ad-playlists/:param`、`PUT /admin/terminals/:param/screensaver-config`
 
 **`/smart-campus`** → `GET /admin/smart-campus/terminals`、`PUT /admin/terminals/:param/smart-campus-config`
 

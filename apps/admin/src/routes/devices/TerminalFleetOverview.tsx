@@ -28,7 +28,7 @@ const HEALTH_REASON: Record<DeviceFleetHealthReason, string> = {
   agent_reported_degraded: '终端程序上报降级状态',
   agent_reported_offline: '终端程序上报离线状态',
   agent_reported_error: '终端程序上报错误或未知状态',
-  heartbeat_stale: '心跳已超过 180 秒',
+  heartbeat_stale: '超过 180 秒无心跳',
   never_reported: '从未上报心跳',
 }
 
@@ -69,12 +69,12 @@ function configStatus(config: FleetConfig): string {
 function ConfigCell({ config, detail, to }: { config: FleetConfig; detail: string | null; to: string }) {
   return (
     <div className="space-y-1">
-      <p className={config.state === 'conflict' ? 'font-semibold text-error-fg' : 'font-semibold text-neutral-700'}>
+      <p className={`whitespace-nowrap font-semibold ${config.state === 'conflict' ? 'text-error-fg' : 'text-neutral-700'}`}>
         {configStatus(config)}
       </p>
       {detail && <p className="text-[11px] text-neutral-500">{detail}</p>}
-      <Link className="text-[11px] font-semibold text-primary-700 hover:underline" to={to}>
-        查看配置页
+      <Link className="whitespace-nowrap text-[11px] font-semibold text-primary-700 hover:underline" to={to}>
+        去配置
       </Link>
     </div>
   )
@@ -232,7 +232,7 @@ export default function TerminalFleetOverview() {
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge dot status={health.badge} label={row.enabled ? health.label : `已停用 · ${health.label}`} />
-                        <p className="mt-1 text-[11px] text-neutral-500">{HEALTH_REASON[row.healthReason]}</p>
+                        <p className="mt-1 whitespace-nowrap text-[11px] text-neutral-500">{HEALTH_REASON[row.healthReason]}</p>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <p className="font-mono text-xs text-neutral-700">{row.agentVersion ?? '未上报'}</p>
