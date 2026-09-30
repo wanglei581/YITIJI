@@ -18963,6 +18963,7 @@
       "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
     "apps/kiosk/src/pages/home/components/QxHomeView.tsx": [
+      "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-home.mjs",
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
@@ -18979,6 +18980,7 @@
       "apps/kiosk/scripts/verify-smart-campus-ui.mjs"
     ],
     "apps/kiosk/src/pages/home/homeDomainStatus.ts": [
+      "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
     "apps/kiosk/src/pages/home/homeV6Domains.ts": [
@@ -19299,6 +19301,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx": [
+      "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs",
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs",
@@ -19434,6 +19437,7 @@
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
     "apps/kiosk/src/pages/print/PrintUploadPage.tsx": [
+      "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
@@ -19493,6 +19497,7 @@
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs"
     ],
     "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx": [
+      "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
@@ -27522,8 +27527,13 @@
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/kiosk/src/pages/home/components/QxHomeView.tsx",
+          "apps/kiosk/src/pages/home/homeDomainStatus.ts",
+          "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
+          "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
           "apps/kiosk/src/styles/warm-professional-override.css"
         ],
         "missing": []
