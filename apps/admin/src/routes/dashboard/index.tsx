@@ -635,7 +635,7 @@ export default function DashboardPage() {
             icon={BotIcon}
             value={aiUsage !== null ? String(aiUsage.totalCalls) : '0'}
             unit="次"
-            sub={aiUsage === null ? '' : aiUsage.totalCalls === 0 ? '今日暂无调用' : `成功率 ${aiUsage.successRate}%`}
+            sub={aiUsage === null ? '' : aiUsage.totalCalls === 0 ? '近 24 小时暂无调用' : `近 24 小时 · 成功率 ${aiUsage.successRate}%`}
             warn={aiUsage !== null && aiUsage.failCount > 0}
             failed={aiUsage === null}
             onRetry={retry(['aiUsage'])}

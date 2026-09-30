@@ -61,6 +61,9 @@
 - 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
 - 改法：`pnpm-workspace.yaml` 三条 brace-expansion 覆盖从 1.1.18 / 2.1.4 / 5.0.9 上调到修复版 1.1.20 / 2.1.6 / 5.0.11，`scripts/verify-dependency-security.mjs` 的期望常量同步，锁文件只变 brace-expansion 三个版本。没有新增豁免。
 - 验证：干净安装后 `verify:dependency-security` ALL PASS（full / prod 高危与严重均为 0），repository-integrity、ci-gate-coverage、kiosk `tsc -b` 通过。
+## 2026-09-30：AI 调用概览按实际统计窗口写「近 24 小时」（W-101 优先项）
+
+管理员后台「AI 服务管理」的概览卡片和工作台「AI 调用」卡片读的是同一个接口，服务端按滚动 24 小时统计，不是北京时间自然日；页面却写「今日概览 / 今日累计 / 今日暂无调用」，走查实测页面 104 次、上海今日 40 次，对不上。文字改成「近 24 小时」，工作台成功率前标出统计窗口；按自然日计费的额度面板「今日已计费金额」本来就是自然日，不动。门禁 `verify-admin-ai-usage-ui` 改为钉住新口径，改回旧文字会红。
 
 ## 2026-09-30：带文字层的 PDF 简历按行保留结构（走查 W-95；分支 `claude/backend-hardening-20260929-w95-pdf-lines`）
 
