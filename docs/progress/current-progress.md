@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-09-30：后台打印失败告警标题只放中文原因、AI 配置说明改成管理员看得懂的话（W-101；分支 `claude/backend-hardening-20260930-w101-alert-title-ai-notes`）
+
+- **问题：** 两后台走查：告警中心打印失败标题写成「打印任务失败(PAPER_EMPTY)」，把内部错误码直接放在标题里；「AI 配置」页每个功能的说明里露出源码文件名（如 llm-job-fit.service.ts）、原样的 `**不调用大模型**`、⚠️ 和「运行链路消费」「System Prompt」等内部说法。
+- **修法（协调方实现）：** `derived-alerts.ts` 按错误码给中文原因（缺纸、打印机离线、出纸未确认、只打出了一部分等 11 个），标题为「打印任务失败：缺纸」，未登记的码只写「打印任务失败」；错误码挪到明细末尾「· 错误码 PAPER_EMPTY」，排障仍能照码检索。`llm-config.service.ts` 15 条功能说明全部改写成中文白话，意思不变（沿用关系、系统提示词由服务端固定、打印参数预填不调用大模型、本项停用会连带哪些功能）。不改接口字段、不改前端。
+- **验证：** verify:admin-ops 新增标题与明细断言；verify:ai-feature-keys 新增「说明不含文件名、Markdown 与内部术语」断言。反向变异四处全红（标题带回错误码、明细丢错误码、说明带回文件名、带回加粗）。按图谱与全文搜索跑 16 条关联门禁与 api / admin typecheck 全绿；llm-connectivity 是真连厂商的只读探针，不在 CI，本机功能位未启用报 FEATURE_DISABLED，与本改动无关。
+- **留给两后台窗口：** 前端 `apps/admin/src/routes/ai-config/index.tsx:205` 还有一句「已接入功能会被运行链路消费；planned 功能可先保存配置…」，属于前端文案，本分支没动。
 ## 2026-09-30：带文字层的 PDF 简历按行保留结构（走查 W-95；分支 `claude/backend-hardening-20260929-w95-pdf-lines`）
 
 - **问题：** resume-extraction.service.ts 用 unpdf 的 `mergePages`，把全部换行压成空格，Word 导出的 PDF 简历（应届生最常见的格式）被读成一整块，段落、条目、时间线都分不出来，诊断质量受损。
