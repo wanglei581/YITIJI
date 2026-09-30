@@ -11,7 +11,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDateTime } from '@ai-job-print/shared'
-import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
+import { ConsoleTable, Drawer, EmptyState, LoadingState, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
+import { printErrorText } from '../../lib/printErrorText'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
 import { PrinterIcon, RefreshCwIcon, SlidersHorizontalIcon, WalletIcon } from 'lucide-react'
@@ -104,6 +105,47 @@ function taskSummary(item: AdminPrintScanTaskItem): string {
   return `处理类型：${item.kind}${item.hasResultFile ? ' · 已产出文件' : ''}`
 }
 
+interface RetryColumn {
+  /** 正在重试的任务编号（忙碌时同一行按钮显示处理中）。 */
+  busyTaskId: string | null
+  onRetry: (item: AdminPrintScanTaskItem) => void
+}
+
+function taskColumns(openDetail: (item: AdminPrintScanTaskItem) => Promise<void>, retry: RetryColumn | null): ConsoleColumn<AdminPrintScanTaskItem>[] {
+  const columns: ConsoleColumn<AdminPrintScanTaskItem>[] = [
+    { id: 'task', header: '任务', headerClassName: 'w-[24%]', truncate: true, title: taskSummary,
+      cell: (item) => <button type="button" title={`任务编号：${item.taskId}\n${taskSummary(item)}`}
+        aria-label={`查看打印任务 ${item.taskId}`} onClick={() => void openDetail(item)}
+        className="block w-full max-w-64 truncate text-left font-semibold text-primary-700 hover:underline">{taskSummary(item)}</button> },
+    { id: 'terminal', header: '终端', headerClassName: 'w-[10%]', cellClassName: 'whitespace-nowrap', cell: (item) => item.terminalCode ?? '—' },
+    { id: 'owner', header: '归属', headerClassName: 'w-[6%]', cellClassName: 'whitespace-nowrap', cell: (item) => OWNER_LABELS[item.ownerType] },
+    { id: 'status', header: '状态', headerClassName: 'w-[10%]', cellClassName: 'whitespace-nowrap', cell: (item) => {
+      const meta = TASK_STATUS_MAP[item.status] ?? { badge: 'default' as const, label: '未归类' }
+      return <StatusBadge status={meta.badge} label={meta.label} />
+    } },
+    { id: 'error', header: '失败原因', headerClassName: 'w-[14%]', truncate: true,
+      title: (item) => item.errorCode ? `${printErrorText(item.errorCode, item.type)}（${item.errorCode}）` : undefined,
+      cell: (item) => printErrorText(item.errorCode, item.type) },
+    { id: 'created', header: '创建时间', headerClassName: 'w-[18%]', cellClassName: 'whitespace-nowrap tabular-nums', cell: (item) => fmt(item.createdAt) },
+    { id: 'expires', header: '过期时间', headerClassName: 'w-[18%]', cellClassName: 'whitespace-nowrap tabular-nums', cell: (item) => fmt(item.expiresAt) },
+  ]
+  if (!retry) return columns
+  // 打印任务列表的「重试」列：能不能点由服务端 retryBlockedReason 事先决定（W-86），不能点时写明原因。
+  return [...columns, {
+    id: 'retry', header: '重试', headerClassName: 'w-[12%]', sticky: true,
+    cell: (item) => item.type === 'print' ? (
+      <PrintRetryButton
+        retryBlockedReason={item.retryBlockedReason}
+        legacyVisible={false}
+        busy={retry.busyTaskId === item.taskId}
+        onRetry={() => retry.onRetry(item)}
+        label="重试"
+        layout="list"
+      />
+    ) : null,
+  }]
+}
+
 // ─── 页面 ─────────────────────────────────────────────────────────────────────
 
 type Section = 'tasks' | 'capabilities' | 'commercial'
@@ -134,6 +176,7 @@ function TaskCenter() {
   const [taskType, setTaskType] = useState<PrintScanTaskType>('print')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [data, setData] = useState<AdminPrintScanTaskPage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -147,7 +190,7 @@ function TaskCenter() {
   const implemented = TASK_TYPE_TABS.find((t) => t.value === taskType)?.implemented ?? false
 
   // 请求序号防竞态：快速切换类型/筛选时，旧的慢响应不得覆盖新状态。
-  const queryKey = [taskType, status, String(page)].join('\u0000')
+  const queryKey = [taskType, status, String(page), String(pageSize)].join('\u0000')
   const queryKeyRef = useRef(queryKey)
   queryKeyRef.current = queryKey
   const loadSeq = useRef(0)
@@ -157,7 +200,7 @@ function TaskCenter() {
     setLoading(true)
     setError(null)
     try {
-      const result = await adminPrintScanService.listTasks({ type: taskType, status: status || undefined, page, pageSize: 20 })
+      const result = await adminPrintScanService.listTasks({ type: taskType, status: status || undefined, page, pageSize })
       if (seq !== loadSeq.current || queryKeyRef.current !== requestQueryKey) return 'stale'
       setData(result)
       return 'success'
@@ -168,7 +211,7 @@ function TaskCenter() {
     } finally {
       if (seq === loadSeq.current) setLoading(false)
     }
-  }, [taskType, status, page, queryKey])
+  }, [taskType, status, page, pageSize, queryKey])
 
   useEffect(() => {
     void load()
@@ -302,82 +345,15 @@ function TaskCenter() {
       {!implemented ? (
         <EmptyState
           title="该任务类型尚未上线"
-          description="没有对应的数据模型与真实任务，本页不展示占位数据。能力上线后此处自动出现真实任务。"
+          description="该能力尚未开放，目前没有可查看的真实任务。"
         />
-      ) : loading ? (
-        <LoadingState text="正在加载任务" />
-      ) : error ? (
-        <ErrorState title="任务加载失败" message={error} onRetry={() => void load()} />
-      ) : !data || data.items.length === 0 ? (
-        <EmptyState title="暂无任务" description="当前筛选条件下没有任务记录。" />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-900/10 bg-surface">
-          <table className="w-full min-w-[980px] text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-neutral-900/10 bg-neutral-50/90 text-[12px] text-neutral-500">
-                <th className="px-4 py-2.5 font-bold">任务</th>
-                <th className="px-4 py-2.5 font-bold">终端</th>
-                <th className="px-4 py-2.5 font-bold">归属</th>
-                <th className="px-4 py-2.5 font-bold">状态</th>
-                <th className="px-4 py-2.5 font-bold">错误码</th>
-                <th className="px-4 py-2.5 font-bold">创建时间</th>
-                <th className="px-4 py-2.5 font-bold">过期时间</th>
-                {taskType === 'print' && <th className="px-4 py-2.5 font-bold">重试</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => {
-                const statusMeta = TASK_STATUS_MAP[item.status] ?? { badge: 'default' as const, label: item.status }
-                return (
-                  <tr
-                    key={item.taskId}
-                    onClick={() => void openDetail(item)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(item) } }}
-                    tabIndex={0}
-                    aria-label={`查看打印任务 ${item.taskId}`}
-                    className="cursor-pointer border-b border-neutral-900/5 last:border-b-0 hover:bg-primary-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="font-bold text-neutral-800">{taskSummary(item)}</div>
-                      <div className="text-[11px] text-neutral-400">{item.taskId}</div>
-                    </td>
-                    <td className="px-4 py-2.5 text-neutral-600">{item.terminalCode ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-neutral-600">{OWNER_LABELS[item.ownerType]}</td>
-                    <td className="px-4 py-2.5"><StatusBadge status={statusMeta.badge} label={statusMeta.label} /></td>
-                    <td className="px-4 py-2.5 text-neutral-500">{item.errorCode ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-neutral-500">{fmt(item.createdAt)}</td>
-                    <td className="px-4 py-2.5 text-neutral-500">{fmt(item.expiresAt)}</td>
-                    {taskType === 'print' && (
-                      <td
-                        className="px-4 py-2.5 align-top"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      >
-                        {item.type === 'print' && (
-                          <PrintRetryButton
-                            retryBlockedReason={item.retryBlockedReason}
-                            legacyVisible={false}
-                            busy={actionBusy && actionTaskId === item.taskId}
-                            onRetry={() => void applyAction('retry', item)}
-                            label="重试"
-                            layout="list"
-                          />
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <div className="flex items-center justify-between border-t border-neutral-900/10 px-4 py-2.5 text-[12px] text-neutral-500">
-            <span>共 {data.pagination.total} 条 · 第 {data.pagination.page}/{Math.max(1, data.pagination.totalPages)} 页</span>
-            <span className="flex gap-2">
-              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="font-bold text-primary-700 disabled:text-neutral-300">上一页</button>
-              <button type="button" disabled={page >= data.pagination.totalPages} onClick={() => setPage((p) => p + 1)} className="font-bold text-primary-700 disabled:text-neutral-300">下一页</button>
-            </span>
-          </div>
-        </div>
+        <ConsoleTable items={data?.items ?? []} columns={taskColumns(openDetail, taskType === 'print' ? { busyTaskId: actionBusy ? actionTaskId : null, onRetry: (item) => void applyAction('retry', item) } : null)}
+          loading={loading} error={error ? { title: '任务加载失败', message: error, onRetry: () => void load() } : null}
+          empty={{ title: '暂无任务', description: '当前筛选条件下没有任务记录。' }}
+          page={page} pageSize={pageSize} total={data?.pagination.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize}
+          className="overflow-hidden rounded-xl border border-neutral-900/10 bg-surface [&_table]:table-fixed [&_th]:px-2 [&_td]:px-2 [&_td]:text-xs"
+        />
       )}
 
       <Drawer open={detailOpen} onClose={() => setDetailOpen(false)} title="任务详情">
@@ -417,12 +393,12 @@ function TaskDetailBody({
   const closeUnpaidBlockReason = detail.type === 'print' ? detail.closeUnpaidBlockReason : null
 
   const rows: [string, React.ReactNode][] = [
-    ['任务 ID', detail.taskId],
+    ['任务编号', detail.taskId],
     ['类型', TASK_TYPE_TABS.find((t) => t.value === detail.type)?.label ?? detail.type],
     ['状态', <StatusBadge key="s" status={statusMeta.badge} label={statusMeta.label} />],
     ['终端', detail.terminalCode ?? '—'],
     ['归属', OWNER_LABELS[detail.ownerType]],
-    ['错误码', detail.errorCode ?? '—'],
+    ['失败原因', <span key="error" title={detail.errorCode ?? undefined}>{printErrorText(detail.errorCode, detail.type)}</span>],
     ['创建时间', fmt(detail.createdAt)],
     ['更新时间', fmt(detail.updatedAt)],
   ]
@@ -460,7 +436,7 @@ function TaskDetailBody({
             {detail.statusLogs.map((log, i) => (
               <li key={i}>
                 {fmt(log.createdAt)} · {log.fromStatus} → {log.toStatus}
-                {log.errorCode ? `（${log.errorCode}）` : ''}
+                {log.errorCode && <span title={log.errorCode}>（{printErrorText(log.errorCode, detail.type)}）</span>}
               </li>
             ))}
           </ul>
@@ -568,9 +544,9 @@ function CommercialControls() {
         ))}
       </div>
       <div className="rounded-xl border border-dashed border-neutral-900/15 bg-surface/60 p-4 text-[12.5px] leading-relaxed text-neutral-500">
-        <span className="font-bold text-neutral-700">尚未建设（如实标注，不做占位闭环）：</span>
-        补贴标签（无数据模型）与退款异常处置工作流（当前仅有退款记录三态与对账差异清单，见计费页）。
-        如需上线，须先立项数据模型与流程设计，不在本页伪造配置项。
+        <span className="font-bold text-neutral-700">尚未建设：</span>
+        补贴标签与退款异常处置流程尚未建设。现有退款记录和账本差异可在计费页查看。
+        目前请通过现有计费与权益入口管理。
       </div>
     </div>
   )

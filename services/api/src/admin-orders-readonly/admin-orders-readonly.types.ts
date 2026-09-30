@@ -17,6 +17,8 @@ export interface AdminOrderReadonlyItem {
   userLabel: string
   terminalCode: string | null
   amountCents: number
+  /** 订单原始计费内容页数，不含份数；多文件为各文件选中页数之和。 */
+  billablePages: number | null
   currency: string
   /** 下单渠道：kiosk | miniapp_cloud；null = 存量单无法可靠判定，前端显示「未标注」 */
   channel: string | null

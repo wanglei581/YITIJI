@@ -58,6 +58,12 @@
 - 产品负责人拍板：该页没有 2.0 稿、没有前端入口且与首页内容重复，现停放 `/smart-campus/freshman-insights`。页面源码保留在 `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx`，不注册路由，也不进入 Kiosk 构建入口。
 - 连带收口：移除 `apps/kiosk/src/routes/index.tsx` 的页面 import/注册；从 `apps/kiosk/tests/visual/route-manifest.ts`、`fusion-w6-route-cases.ts`、W4/W6 路由清单和 verify 脚本移除运行时路由；`verify-smart-campus-ui.mjs` 改为断言源码保留但路由不存在；W4/W6 Playwright 用例改为断言直达显示「页面不存在」；`services/api/src/terminals/terminal-toolbox.service.ts` 百宝箱目标白名单移除该地址。
 - 正式文档 `docs/decisions/2026-06-17-smart-campus-jobfair-delivery-rules.md` 已改为如实描述「已停放，源码保留」。Kiosk/API typecheck、改动文件 eslint、W2/W3/W4/W5/W6、fusion baseline/shell、视觉证据、百宝箱 API、CI 覆盖、仓库完整性、合规文案和图谱生成 `--check` 均通过；Vite 生产构建通过且产物不含迎新服务导览文案。W4/W6 浏览器用例因沙箱禁止 preview 绑定 127.0.0.1 端口未能启动；把注册临时加回的变异使 smart-campus-ui、fusion-w4、fusion-w6 均以退出码 1 变红。
+## 2026-09-30：两个后台 UI 优化第 2 批（订单、打印扫描、计费、文件、材料库、导入记录）+ W-105 订单计费页数
+
+- **排版**：订单页 947 行拆成主文件 + 列定义 / 显示 / 详情 / 收退款 / 出纸核查等子文件，列表 8 列（订单号与终端编号不截断，渠道并入用户列，操作固定右侧），收款、退款、废弃、出纸核查的确认与禁用条件原样保留在详情抽屉；打印扫描运维文件名截断、编号与时间不折行，任务编号挪进悬停与详情；订单与打印扫描两页换成统一分页器（10/20/50/100）；文件管理 12 列压到 8 列 + 详情抽屉，账号 ID 挪进悬停，空值统一「—」；材料库与导入记录改用统一表格外壳。
+- **用词与诚实**：错误码在列表与详情显示中文原因（后台自己的对照表 `apps/admin/src/lib/printErrorText.ts`，与服务端告警标题同一口径，门禁核对服务端登记的码后台都有；扫描单未登记码写「扫描失败（未归类）」）；「Terminal Agent 回报落库」「匿名(Kiosk)」「渠道账单 diff」等改人话；计费页价目键名只在悬停，未登记价目在确认框里写「未登记价目（键名）」。
+- **W-105**：管理员订单只读接口（`services/api/src/admin-orders-readonly/`）列表项与详情加只读 `billablePages`，直接取 `Order.billablePages` 原值。口径（按写入代码核对）：内容页数、不含份数；一体机单写报价原值，小程序多文件单是各文件所选页数之和；份数只在金额里另乘；双面不折算。前端：列表金额下「N 页」，份数 > 1 时「N 页 × M 份」；详情「计费页数」；为 null 不显示页数。订单级没记页范围时，前端分不出单文件（= 全部页面）与多文件打包单，所以页范围写「未单独记录（见计费页数）」，不写「全部页面」。
+- **验证**：admin / shared / api typecheck；图谱关联门禁与全文引用门禁全过（含需要本机端口与 Redis 的 6 条 API 门禁）；管理员后台 E2E 默认与大屏全过；变异：去掉服务端映射、null 显示成 0 页、多文件说成全部页面、扫描失败说成打印失败、服务端登记码后台缺中文，均转红。
 
 ## 2026-09-30：W-86 第五轮——锁序统一为 PrintTask → Order，超前补报与同一终态清理分开（分支 `grok/print-retry-attempt-0929`，提交 `bda0b4979`）
 
