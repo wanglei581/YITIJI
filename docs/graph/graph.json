@@ -18202,7 +18202,8 @@
     "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "services/api/scripts/verify-terminal-device-config.ts"
     ],
     "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
@@ -40321,6 +40322,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
           "apps/admin/src/routes/toolbox/components/TerminalToolboxRow.tsx",
           "apps/admin/src/routes/toolbox/constants.ts",

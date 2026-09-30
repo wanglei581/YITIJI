@@ -239,7 +239,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
-| `apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-terminal-device-config.ts` |
 | `apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/terminals/index.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-datetime-honesty.mjs`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-device-config.ts` |
