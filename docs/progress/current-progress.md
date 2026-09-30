@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-30：W-106 管理员后台列表「每页条数」切换失效修复
+
+走查实测：文件管理、日志审计、各信息源、设备管理、合作机构管理、Excel 导入记录选「每页 10 条」后弹回 20、不发请求。原因是公共分页状态 `useTableState` 用 react-router 的函数式 `setSearchParams`，同一次点击里页面先改条数、再把页码设回 1、分页器又补一次页码 1，三次写都基于渲染时的旧参数，最后一次把条数冲掉；Excel 导入记录更是直接丢弃所选条数。修法：`useTableState` 用 ref 在最新参数上累加同一事件内的写入（签名不变，所有使用它的页面一次修好）；Excel 导入记录改为真正切换条数并回第 1 页（默认 20，15 不在下拉档位里）；分页器「共 N 条」加千分位。其它 `setSearchParams` 用法逐个核对，都是单次写入。日志审计 E2E 新增用例：选 10 后地址栏、下拉、页码与行数都对，翻到第 2 页再选 50 回到第 1 页。
+
 ## 2026-09-30：W-86 第五轮——锁序统一为 PrintTask → Order，超前补报与同一终态清理分开（分支 `grok/print-retry-attempt-0929`，提交 `bda0b4979`）
 
 - **锁序。** 全系统先锁 PrintTask 再动 Order。唯一行锁是 `print-status-attempt.ts` 的 `lockPrintTaskRow`（56–58 行，一句不改 `updatedAt` 的 `UPDATE "PrintTask"`）。状态补报经 `readLockedPrintStatusAttempt` 先调它。会员 `retryPaidFailedJob` 与管理员 `retryPrintTask` 在事务开头调用同一函数，然后再做 Order 的 CAS 和 PrintTask 更新。不许再写第二句同样的 SQL。

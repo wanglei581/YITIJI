@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom'
+import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { ConsolePager, ConsoleTable, type ConsoleColumn, type ConsoleTableError } from '@ai-job-print/ui'
 
@@ -81,12 +82,22 @@ export function DataTable<T>({ items, empty, renderRow, renderHeader, columns, l
 // eslint-disable-next-line react-refresh/only-export-components
 export function useTableState(defaultPageSize = 20) {
   const [searchParams, setSearchParams] = useSearchParams()
+  const latestParams = useRef(searchParams)
+  // 跟随当前地址（含前进 / 后退）；同一事件的连续写入则先同步到 ref。
+  latestParams.current = searchParams
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const rawPageSize = parseInt(searchParams.get('pageSize') ?? String(defaultPageSize), 10)
   const pageSize = [10, 20, 50, 100].includes(rawPageSize) ? rawPageSize : defaultPageSize
   const search = searchParams.get('search') ?? ''
-  const setPage = (p: number) => { setSearchParams((prev: URLSearchParams) => { const n = new URLSearchParams(prev); n.set('page', String(p)); return n }) }
-  const setPageSize = (s: number) => { setSearchParams((prev: URLSearchParams) => { const n = new URLSearchParams(prev); n.set('pageSize', String(s)); n.set('page', '1'); return n }) }
-  const setSearch = (v: string) => { setSearchParams((prev: URLSearchParams) => { const n = new URLSearchParams(prev); n.set('search', v); n.set('page', '1'); return n }) }
+  const updateParams = (update: (next: URLSearchParams) => void) => {
+    // react-router 的函数式 setSearchParams 不会累积同一事件内的更新。
+    const next = new URLSearchParams(latestParams.current)
+    update(next)
+    latestParams.current = next
+    setSearchParams(next)
+  }
+  const setPage = (p: number) => updateParams((next) => { next.set('page', String(p)) })
+  const setPageSize = (s: number) => updateParams((next) => { next.set('pageSize', String(s)); next.set('page', '1') })
+  const setSearch = (v: string) => updateParams((next) => { next.set('search', v); next.set('page', '1') })
   return { page, pageSize, search, setPage, setPageSize, setSearch }
 }
