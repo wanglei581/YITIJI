@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict'
+import ts from 'typescript'
 import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
@@ -80,6 +82,85 @@ check(session.includes('InterviewSessionPanels'), '会话页未使用 InterviewS
 check(session.includes('InterviewAnswerDock'), '会话页未使用 InterviewAnswerDock')
 
 const setup = read(pages[0])
+// W-107 同类：执行设置页真实状态与开始函数，预选或漏校验必须变红。
+const setupAst = ts.createSourceFile('InterviewSetupPage.tsx', setup, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+function sourceNode(ast, name) {
+  let found
+  function visit(node) {
+    if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name?.getText(ast) === name) found = node
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.ok(found, `找不到真实源码节点 ${name}`)
+  return ts.isVariableDeclaration(found) ? found.initializer.getText(ast) : found.getText(ast)
+}
+const executable = (source) => ts.transpileModule(source, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+}).outputText
+try {
+  const initial = new Function('useState', 'setupDraft', 'DEFAULT_EMPLOYMENT_INDUSTRY', executable(`return [
+    ${sourceNode(setupAst, '[industry, setIndustry]')},
+    ${sourceNode(setupAst, '[experience, setExperience]')},
+    ${sourceNode(setupAst, '[position, setPosition]')},
+  ].map(([value]) => value);`))
+  assert.deepEqual(initial((value) => [value], undefined, '信息传输、软件和信息技术服务业'), ['', '', ''], '行业、经验、岗位均不预选')
+  const sessionSource = read('src/pages/interview/interviewWorkbenchSession.ts')
+  const sessionAst = ts.createSourceFile('interviewWorkbenchSession.ts', sessionSource, ts.ScriptTarget.Latest, true)
+  const parseDraft = new Function(executable(`${sourceNode(sessionAst, 'isRecord')}
+    ${sourceNode(sessionAst, 'parseSetupDraft')}
+    return parseSetupDraft;`))()
+  const draft = { interviewerType: 'hr', industry: '制造业', position: '机械工程师', experience: 'y3_5', difficulty: 'standard', duration: 5 }
+  const legacy = parseDraft(draft)
+  assert.equal(legacy.industry, '', '旧草稿不能恢复无法证明由本人选择的行业')
+  assert.equal(legacy.experience, '', '旧草稿不能恢复无法证明由本人选择的经验')
+  const selected = parseDraft({ ...draft, directionSelectionVersion: 1 })
+  assert.deepEqual(initial((value) => [value], selected), ['制造业', 'y3_5', '机械工程师'], '本人选项返回后保留')
+  assert.equal(parseDraft({ ...draft, directionSelectionVersion: 1, experience: '' }).experience, '', '空经验草稿不会回填应届')
+  assert.equal(parseDraft({ ...draft, directionSelectionVersion: 1, experience: 'unknown' }).experience, '', '非法经验不能代本人提交')
+  assert.ok(setup.includes('directionSelectionVersion: 1'), '持久化本人选项版本')
+  const clearIndustry = setup.match(/onClear=\{([^\n]+)\}/)?.[1]
+  let clearedIndustry
+  new Function('setIndustry', 'DEFAULT_EMPLOYMENT_INDUSTRY', executable(`return (${clearIndustry})();`))((value) => { clearedIndustry = value }, '信息传输、软件和信息技术服务业')
+  assert.equal(clearedIndustry, '', '清空行业不能回填 IT')
+  assert.ok(setup.includes("{industry || '尚未选择'}"), '未选行业如实显示')
+  assert.ok(setup.includes('请本人填写目标岗位、选择行业和经验后再开始'), '必须选的方向在开始前说明')
+  const start = new Function('context', executable(`const {
+    position, industry, experience, interviewerType, difficulty, duration, resumeFile,
+    setError, setCreating, setAiOutage, setStartFailed, getToken, createInterview,
+    setPendingSession, startInterview, setProbed, patchInterviewWorkbenchSession, onGoStage,
+  } = context; return ${sourceNode(setupAst, 'handleStart')};`))
+  const noop = () => {}
+  async function runStart(values) {
+    const requests = []
+    const errors = []
+    const context = {
+      ...draft, duration: 5, resumeFile: null,
+      setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop,
+      setStartFailed: noop, getToken: noop, setPendingSession: noop, setProbed: noop,
+      patchInterviewWorkbenchSession: noop, onGoStage: noop,
+      createInterview: async (input) => { requests.push(input); return { sessionId: 'real-handle', questionTarget: 6 } },
+      startInterview: async () => { requests.push('start'); return { question: '问题' } },
+      ...values,
+    }
+    await start(context)()
+    return { requests, errors }
+  }
+  for (const [values, expected] of [
+    [{ position: '', industry: '', experience: '' }, '目标岗位'],
+    [{ industry: '' }, '行业'],
+    [{ industry: '   ' }, '行业'],
+    [{ experience: '' }, '经验'],
+  ]) {
+    const result = await runStart(values)
+    assert.deepEqual(result.requests, [], `缺少${expected}不能创建或开始`)
+    assert.ok(result.errors.at(-1)?.includes(expected), `缺少${expected}提示本人填写或选择`)
+  }
+  const result = await runStart({ position: '  机械工程师  ' })
+  assert.deepEqual(result.requests, [{ interviewerType: 'hr', industry: '制造业', position: '机械工程师', experience: 'y3_5', difficulty: 'standard', durationMin: 5 }, 'start'], '本人选项原样创建后再开始')
+  check(true, '模拟面试不预选与本人选择校验')
+} catch (error) {
+  check(false, `模拟面试不预选与本人选择校验：${error.message}`)
+}
 check(setup.indexOf('createInterview(') < setup.indexOf('startInterview('), '创建与启动面试顺序被改变')
 for (const token of [
   'kioskUploadFile',

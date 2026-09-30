@@ -5,6 +5,7 @@ import { assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointe
 import { setReactRouterState, writeScanWorkbenchSession, SCAN_WORKBENCH_SESSION_KEY, W2_FILE } from './fixtures/fusion-w2-state'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
+import { chooseGenericResumeDirection } from './fixtures/direction-selection'
 
 const SCAN_TASK_ID = 'w2-scan-001'
 const CONTROL_TOKEN = 'w2-scan-control'
@@ -657,6 +658,7 @@ test('resume scan return keeps the file and an unresolved parse never auto-posts
   await expect(scanBlock).toBeVisible()
 
   // 再次进入仍是同一份扫描件；第一次结果未知时，不能自动再发一次 AI 请求。
+  await chooseGenericResumeDirection(page)
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('**/resume/parse')
   await expect(page.getByRole('button', { name: '原样再试一次' })).toBeVisible()

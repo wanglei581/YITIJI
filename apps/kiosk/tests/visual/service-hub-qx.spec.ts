@@ -10,6 +10,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
+import { expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
 
 const PRINTER_STATUS = '/api/v1/terminals/KSK-001/printer-status'
 
@@ -326,4 +327,12 @@ test('阳性对照：在线服务就绪时，同一个按钮真的会进入 setu
   await start.click()
   await page.waitForURL((url) => url.searchParams.get('stage') === 'setup')
   await expect(page.locator('[data-interview-workbench]')).toHaveAttribute('data-interview-stage', 'setup')
+  await expectInterviewDirectionUnselected(page)
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await expect(dialog.getByText('当前：尚未选择', { exact: true })).toBeVisible()
+  await expect(dialog.getByRole('button', { pressed: true })).toHaveCount(0)
+  await dialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
 })

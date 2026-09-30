@@ -18678,7 +18678,8 @@
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs"
     ],
     "apps/kiosk/src/components/PdfCanvasPreview.tsx": [
-      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/components/hid-guard/KioskHidScanGuard.tsx": [
       "apps/kiosk/scripts/verify-scan-input-safety.mjs"
@@ -19136,7 +19137,8 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts": [
-      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
@@ -19575,6 +19577,9 @@
     ],
     "apps/kiosk/src/pages/print/components/printFileRetention.ts": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+    ],
+    "apps/kiosk/src/pages/print/components/printPreviewKind.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx": [
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
@@ -29148,6 +29153,7 @@
           "apps/kiosk/src/pages/interview/InterviewTipsPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx",
           "apps/kiosk/src/pages/interview/interview-service-desk.css",
+          "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
           "apps/kiosk/src/pages/interview/session/types.ts",
@@ -30343,6 +30349,8 @@
         "files": [
           "apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs",
           "apps/kiosk/src/components/FileContentPreview.tsx",
+          "apps/kiosk/src/components/PdfCanvasPreview.tsx",
+          "apps/kiosk/src/pages/print/components/printPreviewKind.ts",
           "apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
