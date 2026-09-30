@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-09-30：后台 AI 当日用量给终端编号与机构名（两后台窗口需求；分支 `claude/backend-hardening-20260930-ai-usage-names`）
+
+- **问题：** `GET /admin/ai-usage/daily` 的终端桶、机构桶与触顶终端只给数据库主键，后台只能显示「终端（尾号 xxxxxx）」，运营认不出是哪台。
+- **修法：** `ai-usage-summary.ts` 终端桶加只读 `terminalCode`、机构桶加只读 `orgName`，从 Terminal / Organization 表查，不推算；终端或机构已删除、或本来就没有时给 null（后台照旧显示尾号）。`reached` 保留 `terminalIds`，另加同序的 `terminals: [{ terminalId, terminalCode }]`。功能、厂商桶字段不变；不含会员号的白名单不变。后台类型文件由两后台窗口接。
+- **验证：** verify:ai-usage-budget 门禁夹具的终端编号改成与主键不同的 `KSK-…`、机构名改成真实感名称，加一条已删终端与已删机构的用量行；新增 6 条断言（各桶字段白名单、给编号不是主键、已删为 null 且金额照计、机构名、触顶带编号）。反向变异三处全红：编号用主键、已删终端拿主键兜底、机构名恒空。admin-ai-usage-ui、ai-cost-coverage、api tsc 全绿。
 ## 2026-09-30：W-106 管理员后台列表「每页条数」切换失效修复
 
 走查实测：文件管理、日志审计、各信息源、设备管理、合作机构管理、Excel 导入记录选「每页 10 条」后弹回 20、不发请求。原因是公共分页状态 `useTableState` 用 react-router 的函数式 `setSearchParams`，同一次点击里页面先改条数、再把页码设回 1、分页器又补一次页码 1，三次写都基于渲染时的旧参数，最后一次把条数冲掉；Excel 导入记录更是直接丢弃所选条数。修法：`useTableState` 用 ref 在最新参数上累加同一事件内的写入（签名不变，所有使用它的页面一次修好）；Excel 导入记录改为真正切换条数并回第 1 页（默认 20，15 不在下拉档位里）；分页器「共 N 条」加千分位。其它 `setSearchParams` 用法逐个核对，都是单次写入。日志审计 E2E 新增用例：选 10 后地址栏、下拉、页码与行数都对，翻到第 2 页再选 50 回到第 1 页。
