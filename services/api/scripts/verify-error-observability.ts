@@ -23,6 +23,7 @@ import 'reflect-metadata'
 import 'dotenv/config'
 import { BadRequestException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common'
 import { bootApp, probe, unusedLoopbackPort } from './support/boot-api-child'
+import { deadRedisGateEnv } from './support/dead-redis-gate-env'
 
 let failures = 0
 let checks = 0
@@ -228,7 +229,7 @@ async function verifyEndToEnd(): Promise<void> {
   console.log('\n[D] 端到端：真实 5xx 的 requestId 必须真的能在服务端日志里查到')
 
   const deadRedisPort = await unusedLoopbackPort()
-  const app = await bootApp({ REDIS_URL: `redis://127.0.0.1:${deadRedisPort}` }, 120_000)
+  const app = await bootApp(deadRedisGateEnv(`redis://127.0.0.1:${deadRedisPort}`), 120_000)
   try {
     check('测试实例已启动', app.listening, `exitCode=${app.child.exitCode}`)
     if (!app.listening) return
@@ -246,10 +247,10 @@ async function verifyEndToEnd(): Promise<void> {
     check('5xx 响应体带 requestId', requestId.length > 0)
     if (!requestId) return
 
-    // 日志是异步写的，给一点时间落盘。
+    // 日志先于响应体写出，stdout 到达父进程仍可能晚一个节拍。50ms 一轮，最多 1 秒。
     let log = ''
     for (let i = 0; i < 20 && !log.includes(requestId); i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 250))
+      await new Promise((resolve) => setTimeout(resolve, 50))
       log = app.output()
     }
     check('服务端日志里能按 requestId 查到这次失败（此前实测 0 次命中）',

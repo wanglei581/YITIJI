@@ -22443,6 +22443,10 @@
     "services/api/scripts/support/content-pipeline-harness.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
+    "services/api/scripts/support/dead-redis-gate-env.ts": [
+      "services/api/scripts/verify-error-observability.ts",
+      "services/api/scripts/verify-redis-degradation-truth.ts"
+    ],
     "services/api/scripts/support/ephemeral-redis-self-check.ts": [
       "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
@@ -23953,6 +23957,9 @@
       "services/api/scripts/verify-partner-account-action-redis.ts",
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
+    ],
+    "services/api/src/common/redis/redis-client-options.ts": [
+      "services/api/scripts/verify-redis-degradation-truth.ts"
     ],
     "services/api/src/common/redis/redis-degradation.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
@@ -35157,6 +35164,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/dead-redis-gate-env.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/middleware/request-id.middleware.ts"
         ],
@@ -39571,9 +39579,11 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/dead-redis-gate-env.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/common/boot/boot-readiness.ts",
           "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/redis/redis-client-options.ts",
           "services/api/src/common/redis/redis-degradation.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/prisma/prisma.service.ts"
