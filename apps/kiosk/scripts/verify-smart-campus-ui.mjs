@@ -2,11 +2,11 @@
  * 智慧校园 · bigdata 严格冻结 / 前台无假数据 守卫。
  *
  * 背景:智慧校园报到统计仍严格冻结——既不在首页/专区列出 bigdata 入口,也不渲染
- * mock / 示例统计。直达 /smart-campus/freshman-insights 改为「迎新服务导览」,
- * 只链本机已有真实能力。本脚本把这些约束钉死为断言。
+ * mock / 示例统计。/smart-campus/freshman-insights 已停放（见 current-progress），
+ * 页面源码保留但不注册路由。本脚本把这些约束钉死为断言。
  *
  * 检查维度:
- *   A. /smart-campus/freshman-insights 页面:迎新服务导览,只链已有真实能力,不含任何 mock / 示例统计。
+ *   A. /smart-campus/freshman-insights 已停放:路由与 import 不存在,源码保留且不含任何 mock / 示例统计。
  *   B. mock 聚合数据服务 freshmanInsights.ts 已物理删除。
  *   C. 智慧校园专区(SmartCampusHomePage)不再列出 bigdata 入口(无 freshman-insights 链接)。
  *   D. 首页(HomePage)智慧校园横排不再列出 bigdata 入口(无 freshman-insights 链接)。
@@ -64,17 +64,27 @@ function mustNotExist(rel, label) {
 
 console.log('\n=== 智慧校园 bigdata 冻结 / 前台无假数据验证 ===')
 
-// ── A. freshman-insights 直达页:迎新服务导览,无任何 mock/示例统计 ──────────
+// ── A. freshman-insights 已停放:路由与 import 不存在,源码保留 ──────────────
 const FRESHMAN_PAGE = 'src/pages/smart-campus/FreshmanInsightsPage.tsx'
 mustContain(
   FRESHMAN_PAGE,
+  ['FreshmanInsightsPage'],
+  'A1 freshman-insights 已停放但页面源码保留（见 current-progress）',
+)
+mustNotContain(
+  'src/routes/index.tsx',
+  ["path: 'smart-campus/freshman-insights'", "from '../pages/smart-campus/FreshmanInsightsPage'"],
+  'A2 freshman-insights 已停放，路由不存在且不进入路由 import（见 current-progress）',
+)
+mustContain(
+  FRESHMAN_PAGE,
   ['迎新服务导览', '返回智慧校园', '本平台没有迎新报到数据', '/print/upload', '/resume-service', "to: '/campus'", '/policy-service', '/me/documents'],
-  'A1 freshman-insights 为迎新服务导览并指向已有真实能力',
+  'A3 停放源码仍保留原有真实能力说明',
 )
 mustNotContain(
   FRESHMAN_PAGE,
   ['getFreshmanInsights', 'MOCK_FRESHMAN', 'isMock', '示例数据', 'topMajors', 'ageDistribution', 'conic-gradient', '校园大数据', '聚合统计', '报到人数', '院系分布', '/smart-campus/service/'],
-  'A2 freshman-insights 不含 mock 统计,也不链智慧校园占位办理页',
+  'A4 停放源码不含 mock 统计,也不链智慧校园占位办理页',
 )
 
 // ── B. mock 聚合数据服务已删除 ──────────────────────────────────────────────
@@ -241,15 +251,14 @@ const toolboxRoutes = capabilityRoutes.filter((route) => route.path === 'toolbox
 const expectedPatterns = [
   'smart-campus',
   'smart-campus/welcome',
-  'smart-campus/freshman-insights',
   'smart-campus/service/:key',
 ]
 if (
-  smartRoutes.length === 4 &&
+  smartRoutes.length === 3 &&
   expectedPatterns.every((path) => smartRoutes.some((route) => route.path === path)) &&
   smartRoutes.every((route) => route.ancestors.some((element) => element.includes('SmartCampusCapabilityBoundary')))
 ) {
-  pass('G7 四个智慧校园路由 pattern 全是 SmartCampusCapabilityBoundary 后代且无重复旁路')
+  pass('G7 三个智慧校园路由 pattern 全是 SmartCampusCapabilityBoundary 后代且 freshman-insights 已停放（见 current-progress）')
 } else {
   fail(`G7 智慧校园路由门禁 AST 不成立: ${JSON.stringify(smartRoutes)}`)
 }

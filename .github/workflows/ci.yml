@@ -109,6 +109,7 @@ jobs:
           pnpm verify:deploy-gates-in-sync
           # 真跑发布脚本的回退演练（P0-3）：就绪失败 / 迁移失败都要把运行目录恢复到发布前，备份按组保留
           pnpm verify:deploy-rollback
+          pnpm verify:server-maintenance-workflows
           # 发布前法务文档预检（3d，C4 口径）：本地起服务模拟线上接口，缺一份、读不到、超时都必须失败
           pnpm verify:legal-docs-preflight
           pnpm verify:ci-main-runs-complete

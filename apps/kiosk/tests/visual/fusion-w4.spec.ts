@@ -18,7 +18,6 @@ async function verifyPage(page: Page, errors: string[]): Promise<void> {
 const SMART_CAMPUS_URLS = [
   ['/smart-campus', '迎新指引'],
   ['/smart-campus/welcome', '迎新流程'],
-  ['/smart-campus/freshman-insights', '迎新服务导览'],
   ['/smart-campus/service/campus-card', '校园卡办理'],
   ['/smart-campus/service/all-in-one', '一卡通开通'],
   ['/smart-campus/service/campus-network', '校园网开通'],
@@ -477,9 +476,17 @@ test('/campus 与 /smart-campus 语义独立 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/campus')
   await expect(page.getByText(/校园招聘专区/).first()).toBeVisible()
+  await page.goto('/smart-campus')
+  await expect(page.getByRole('heading', { name: '智慧校园', exact: true })).toBeVisible()
+  await verifyPage(page, errors)
+})
+
+test('/smart-campus/freshman-insights 已停放，路由不存在 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/smart-campus/freshman-insights')
-  await expect(page.getByText('迎新服务导览')).toBeVisible()
-  await expect(page.getByText(/本平台没有迎新报到数据/)).toBeVisible()
+  await expect(page.locator('[data-kiosk-screen="route-error"]')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '页面不存在', exact: true })).toBeVisible()
+  await expect(page.getByText('当前入口可能已经调整，请返回首页重新选择服务。')).toBeVisible()
   await verifyPage(page, errors)
 })
 
@@ -522,7 +529,7 @@ test('smart-campus disabled 诚实为空 @w4', async ({ page, api }) => {
   await verifyPage(page, errors)
 })
 
-test('smart-campus 总关闭时 8 条具体 URL 全部 fail-closed @w4', async ({ page, api }) => {
+test('smart-campus 总关闭时 7 条具体 URL 全部 fail-closed @w4', async ({ page, api }) => {
   registerW4Api(api, { smartCampusEnabled: false })
   for (const [url, forbiddenText] of SMART_CAMPUS_URLS) {
     const before = api.requestCount('GET', '/api/v1/terminals/KSK-001/config')
@@ -629,8 +636,6 @@ test('smart-campus 子模块关闭不能从深链绕过 @w4', async ({ page, api
   }
   await page.goto('/smart-campus/service/campus-card')
   await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
-  await page.goto('/smart-campus/freshman-insights')
-  await expect(page.getByText('迎新服务导览')).toBeVisible()
 })
 
 // MSC-07（2026-09-07）：5 分钟定时刷新不再先置 loading 卸载子页（用户填到一半会丢状态）；

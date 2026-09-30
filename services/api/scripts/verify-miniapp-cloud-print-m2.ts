@@ -385,7 +385,7 @@ async function main(): Promise<void> {
       data: { id, terminalCode: code, agentToken: `token-${id}`, deviceFingerprint: `fp-${id}`, displayName: `终端 ${code}`, locationLabel: '验证点' },
     })
     await prisma.terminalHeartbeat.create({
-      data: { terminalId: id, status: 'online', localTaskDatabaseAvailable: true, createdAt: new Date() },
+      data: { terminalId: id, status: 'online', localTaskDatabaseAvailable: true, agentVersion: '0.4.13', createdAt: new Date() },
     })
     await prisma.terminalCapability.create({
       data: { terminalId: id, capabilityKey: 'document_print', status: 'available' },

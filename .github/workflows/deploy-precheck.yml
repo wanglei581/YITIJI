@@ -11,8 +11,12 @@ name: Deploy Precheck (read-only)
 #   /srv/ai-job-print  与  ai-job-print-api
 # 本工作流即验证这两个默认值是否成立。
 #
-# 安全：仓库为 public，Actions 日志公开可读，
-# 因此**只输出 yes/no 与数量级信息，不打印任何路径、进程名、版本串或环境变量**。
+# 远端脚本在 .github/scripts/deploy-precheck.sh。Runner 读仓库文件后送到远端执行，
+# 远端不再写临时脚本。dry-run（本工作流本身就是只读）因此零写入。
+# 允许输出：yes/no、数量、日期、版本号、证书目录名、白名单内终端编号、
+# 点名的残留目录名、内存数字、/srv 下两级目录名、/root 合计 MB。
+# 禁止输出：文件名、来源地址、请求内容、密钥、环境变量、启动参数、进程命令行、
+# nginx -T、pm2 jlist、访问日志原文、/root 下的文件名。
 
 on:
   workflow_dispatch:
@@ -22,146 +26,21 @@ jobs:
     name: Verify deploy defaults match server
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout precheck script
+        uses: actions/checkout@v4
+
       - name: Read-only probe via SSH
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          EXPECT_DIR: /srv/ai-job-print
+          EXPECT_PM2: ai-job-print-api
+          EXPECT_BACKUP: /srv/ai-job-print-backups
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
-          # du -xsm /* 在 35GB 盘上要几分钟，3m 会把整个探测截断（2026-08-17 实测两次）
+          # du -xsm /* 在根分区上要几分钟，3m 会把整个探测截断（2026-08-17 实测两次）
           command_timeout: 20m
           envs: EXPECT_DIR,EXPECT_PM2,EXPECT_BACKUP
-          script: |
-            set -uo pipefail
-
-            echo "=== 1. 部署脚本默认的 API 目录是否存在 ==="
-            if [ -d "$EXPECT_DIR" ]; then
-              echo "API_DIR_DEFAULT_OK=yes"
-            else
-              echo "API_DIR_DEFAULT_OK=no  （需配置 secret DEPLOY_API_DIR）"
-            fi
-
-            echo "=== 2. 该目录下是否有 DEPLOY_SOURCE.txt（发布脚本依赖它做版本一致性校验）==="
-            if [ -f "$EXPECT_DIR/DEPLOY_SOURCE.txt" ]; then
-              echo "DEPLOY_SOURCE_PRESENT=yes"
-            else
-              echo "DEPLOY_SOURCE_PRESENT=no  （首次受控发布会创建）"
-            fi
-
-            echo "=== 3. 默认 PM2 进程名是否存在 ==="
-            if command -v pm2 >/dev/null 2>&1; then
-              echo "PM2_INSTALLED=yes"
-              if pm2 jlist 2>/dev/null | grep -q "\"name\":\"$EXPECT_PM2\""; then
-                echo "PM2_NAME_DEFAULT_OK=yes"
-              else
-                echo "PM2_NAME_DEFAULT_OK=no  （需配置 secret DEPLOY_PM2_NAME）"
-                echo "PM2_PROCESS_COUNT=$(pm2 jlist 2>/dev/null | grep -o '"name":' | wc -l | tr -d ' ')"
-              fi
-            else
-              echo "PM2_INSTALLED=no  （API 可能不是用 PM2 托管，需确认托管方式）"
-            fi
-
-            echo "=== 4. 备份盘可用空间（仅输出 GiB 数量级）==="
-            BK_PARENT="$(dirname "$EXPECT_BACKUP")"
-            AVAIL_GB="$(df -BG --output=avail "$BK_PARENT" 2>/dev/null | tail -n1 | tr -dc '0-9')"
-            if [ -n "$AVAIL_GB" ]; then
-              echo "BACKUP_DISK_AVAIL_GB=$AVAIL_GB"
-            else
-              echo "BACKUP_DISK_AVAIL_GB=unknown"
-            fi
-
-            echo "=== 5. API 健康检查端点当前是否可达（本机回环）==="
-            if curl -fsS -m 5 http://127.0.0.1:3010/api/v1/health >/dev/null 2>&1; then
-              echo "API_HEALTH_LOCAL=ok"
-            else
-              echo "API_HEALTH_LOCAL=unreachable  （端口或路径可能与默认不同）"
-            fi
-
-            echo "=== 6. 磁盘占用盘点（只输出数量级，用于判断清理目标）==="
-            # 首轮探测发现备份盘仅剩 1 GiB。发布脚本第一步就是 PG 全库备份、
-            # 第二步备份整个运行目录，空间不足会在备份阶段写满盘，
-            # 波及正在运行的 API 与 PostgreSQL。故先盘点占用分布再决定清理。
-            echo "ROOT_TOTAL_GB=$(df -BG --output=size / 2>/dev/null | tail -n1 | tr -dc '0-9')"
-            echo "ROOT_USED_PCT=$(df --output=pcent / 2>/dev/null | tail -n1 | tr -dc '0-9')"
-
-            if [ -d "$EXPECT_BACKUP" ]; then
-              echo "BACKUP_ROOT_SIZE_MB=$(du -sm "$EXPECT_BACKUP" 2>/dev/null | cut -f1)"
-              echo "BACKUP_FILE_COUNT=$(find "$EXPECT_BACKUP" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ')"
-              echo "BACKUP_DIR_COUNT=$(find "$EXPECT_BACKUP" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
-              echo "BACKUP_OLDEST_DAYS=$(find "$EXPECT_BACKUP" -maxdepth 1 -mindepth 1 -printf '%T@\n' 2>/dev/null | sort -n | head -1 | awk '{print int((systime()-$1)/86400)}')"
-            else
-              echo "BACKUP_ROOT_EXISTS=no"
-            fi
-
-            echo "API_DIR_SIZE_MB=$(du -sm "$EXPECT_DIR" 2>/dev/null | cut -f1)"
-            echo "API_NODE_MODULES_MB=$(du -sm "$EXPECT_DIR/node_modules" 2>/dev/null | cut -f1)"
-            echo "PNPM_STORE_MB=$(du -sm ~/.local/share/pnpm/store 2>/dev/null | cut -f1)"
-            echo "PM2_LOGS_MB=$(du -sm ~/.pm2/logs 2>/dev/null | cut -f1)"
-            echo "NGINX_LOGS_MB=$(du -sm /var/log/nginx 2>/dev/null | cut -f1)"
-            echo "JOURNAL_MB=$(journalctl --disk-usage 2>/dev/null | grep -o '[0-9.]*[MG]' | head -1)"
-
-            echo "=== 6b. 磁盘去向分解（回答「88% 用在哪」）==="
-            # 已测项加起来约 8.5GB，而已用约 35GB —— 差的约 27GB 在这里定位。
-            # 只输出目录名与 MB，不输出文件名（本仓库为 public，Actions 日志公开可读）。
-            # 注意：不要跑 `find /` 全盘扫描 —— 2026-08-17 试过一次，35GB 盘上直接把
-            # drone-ssh 的 command_timeout 跑爆，整个探测无输出。du 一级目录已足够定位。
-            echo "--- / 下一级目录（MB，降序前 12）---"
-            du -xsm /* 2>/dev/null | sort -rn | head -12 | awk '{printf "  %-24s %s MB\n", $2, $1}'
-            echo "--- /var 下（MB，降序前 6）---"
-            du -xsm /var/* 2>/dev/null | sort -rn | head -6 | awk '{printf "  %-24s %s MB\n", $2, $1}'
-            echo "--- /srv 下两级（MB，降序前 15）——19.75GB 的去向 ---"
-            du -xsm /srv/*/* /srv/* 2>/dev/null | sort -rn | awk '!seen[$2]++' | head -15 | awk '{printf "  %-40s %s MB\n", $2, $1}'
-            echo "--- /root 下（MB，降序前 8）---"
-            du -xsm /***/* /***/.[!.]* 2>/dev/null | sort -rn | head -8 | awk '{printf "  %-32s %s MB\n", $2, $1}'
-
-            echo "=== 7. 本次发布需要的空间量级 ==="
-            # 注意：这条 SQL 含括号，务必用单引号包住并先赋值再 echo。
-            # 之前写成 `$(... -tAc \"SELECT pg_database_size(current_database())...\")` 嵌在双引号里，
-            # bash 在**解析期**就看到裸的 `(` 而报 `syntax error near unexpected token '('` ——
-            # 语法错误发生在解析阶段，整个脚本一行都不会执行，九个检查项全部无输出。
-            # 这就是本工作流此前从未产出过任何结果的原因。
-            PG_DB_SIZE_MB="$(sudo -n -u postgres psql -tAc 'SELECT pg_database_size(current_database())/1024/1024;' 2>/dev/null | tr -d ' ')"
-            echo "PG_DB_SIZE_MB=${PG_DB_SIZE_MB:-unknown（无免密 sudo，可忽略）}"
-
-            echo "=== 7b. Redis 可达性（发布前置条件，缺它会在健康检查阶段炸）==="
-            # 为什么必须查：deploy-api-release.sh 第 8 步健康检查是 grep '"status":"ok"'，
-            # 而当前代码在 Redis 降级时返回 "degraded"。若重启那一刻 Redis 不可达，
-            # 健康检查会连续失败然后 deploy 报错 —— 但此时迁移已执行、rsync 已完成、
-            # PM2 已重启新代码。结果是「一份部署失败的日志」配「一个已经换成新版本的生产环境」。
-            if command -v redis-cli >/dev/null 2>&1; then
-              if [ "$(redis-cli ping 2>/dev/null)" = "PONG" ]; then
-                echo "REDIS_REACHABLE=yes"
-              else
-                echo "REDIS_REACHABLE=no  （发布会在健康检查阶段失败，且此时迁移已执行）"
-              fi
-            else
-              echo "REDIS_REACHABLE=unknown  （本机无 redis-cli，需另行确认）"
-            fi
-
-            echo "=== 8. 发布后验证：资金门禁不得退回可关闭的部署开关 ==="
-            # 原先这里 grep 启动日志里的 PRINT_REQUIRE_PAID_BEFORE_CLAIM 告警。该开关
-            # 及其告警已删除：claim 无条件只领已付款订单，写死在 claimableWhere 与事务
-            # 内 CAS 两层。继续 grep 会恒打 "no" 并被误读成「日志轮转了」。
-            # 现在改为反向检查：运行目录的 .env 里不该再出现这个已废弃的变量。
-            if [ -f "$EXPECT_DIR/.env" ] && grep -q "^[[:space:]]*PRINT_REQUIRE_PAID_BEFORE_CLAIM=" "$EXPECT_DIR/.env"; then
-              echo "PAID_GATE_DEAD_ENV_PRESENT=yes  （该变量已废弃且不再生效，建议从 .env 移除以免误导运维）"
-            else
-              echo "PAID_GATE_DEAD_ENV_PRESENT=no  （符合预期：门控已写死在代码里）"
-            fi
-
-            echo "=== 9. 发布后验证：#553 隐私门控审计动作是否已注册 ==="
-            # 只查审计表里是否出现过该 action，不打印任何 payload
-            CNT="$(sudo -n -u postgres psql -tAc \
-              "SELECT count(*) FROM \"AuditLog\" WHERE action='print_job.pii_scan_bypassed';" 2>/dev/null || echo unknown)"
-            echo "PII_BYPASS_AUDIT_ROWS=$CNT  （0 属正常：本次发布后尚无人建单）"
-
-            echo "=== 10. 运行版本与 main 是否一致 ==="
-            if [ -f "$EXPECT_DIR/DEPLOY_SOURCE.txt" ]; then
-              echo "DEPLOY_SOURCE_SHA8=$(sed -n 's/^source=origin\/main@\([0-9a-f]\{8\}\).*/\1/p' "$EXPECT_DIR/DEPLOY_SOURCE.txt" | head -1)"
-            fi
-            echo "=== 完成：以上均为只读探测，未做任何修改 ==="
-        env:
-          EXPECT_DIR: /srv/ai-job-print
-          EXPECT_PM2: ai-job-print-api
-          EXPECT_BACKUP: /srv/ai-job-print-backups
+          script_path: .github/scripts/deploy-precheck.sh
