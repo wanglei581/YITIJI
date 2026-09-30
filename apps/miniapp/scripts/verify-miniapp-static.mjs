@@ -969,7 +969,7 @@ if (
   printPayWxml.includes('免费试运营：到机核验后直接进入打印队列') &&
   pickupJs.includes("key: 'awaiting_release'") &&
   pickupJs.includes('parseAmountCents(order.amountCents) === 0') &&
-  pickupWxml.includes('核销后无需付款，直接等待进入打印队列') &&
+  pickupWxml.includes('核销后直接进入打印队列') &&
   ordersJs.includes("label: '正在进入队列'") &&
   ordersJs.includes('const amountCents = parseAmountCents(item.amountCents)') &&
   // 2026-09-15：取件页的免费判定改为**只**来自服务端金额。此前这里要求 orders.js

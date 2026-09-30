@@ -32,6 +32,9 @@ const PAID_GUARD = {
   'pages/package-create/package-create.wxml': null,
   'pages/package-confirm/package-confirm.wxml': "quoteState === 'ready' && !quoteFree",
   'pages/package-code/package-code.wxml': 'paidOrder',
+  // 取件页与订单列表的金额来自服务端订单本身（建单时就定了），渲染时金额总是已知
+  'pages/print-pickup/print-pickup.wxml': '!isFreeOrder',
+  'pages/orders/orders.wxml': 'item.amountCents > 0',
 }
 
 // 模板正文里允许的钱字眼：只有服务端 409 PRICE_CHANGED（价目真的变了）才会渲染。
@@ -140,6 +143,12 @@ const JS_ALLOW = {
   // _storedAmountNote：原单 0 元时提前 return ''，这句只在原单金额大于 0 时拼出来
   'pages/package-confirm/package-confirm.js': ['原订单金额：'],
   'pages/package-code/package-code.js': [],
+  // awaiting_payment 只在 isFreeOrder 为假（服务端金额不是 0）时返回
+  'pages/print-pickup/pickup-state.js': ['等待现场支付', '完成现场支付'],
+  'pages/print-pickup/print-pickup.js': [],
+  // 待现场支付：amountCents 不是 0 的分支；待付款：0 元单建单即记已付，走不到；'¥'：formatPrice 0 元走「免费」；
+  // 取消弹窗：canCancel 只给 unpaid + pending 的云打印单，0 元单是已付
+  'pages/orders/orders.js': ['待现场支付', '待付款', '¥', '确定取消这张未付款订单'],
 }
 
 /** 取 JS 里的字符串字面量（跳过注释）。模板字符串按整段取。 */
