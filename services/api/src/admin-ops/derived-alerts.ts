@@ -33,7 +33,8 @@ export const PRINT_FAILED_LIST_CAP = 500
 
 /**
  * 心跳 printerStatus → 告警标题。取值来源：Terminal Agent 上报 ready|offline|error|low_paper|unknown
- * （apps/terminal-agent/src/agent/wmi.ts mapWin32PrinterQuery），外加历史心跳里的 paper_empty / not_found。
+ * （apps/terminal-agent/src/agent/wmi.ts mapWin32PrinterQuery），外加历史心跳里的 paper_empty / not_found，
+ * 以及队列闸门的 queue_cleanup_failed / queue_pause_failed。告警按最近心跳实时派生，恢复后不再出现。
  * ready / idle / ok 由 isHealthyPrinterStatus 判为健康，根本不会走到这里。
  *
  * - low_paper：WMI DetectedErrorState 3（纸少）或 5（墨粉少）都映射到它 —— Agent 分不开，
@@ -50,6 +51,8 @@ const PRINTER_STATUS_LABELS: Record<string, string> = {
   error: '打印机故障',
   not_found: '打印机未找到',
   unknown: '打印机状态读取不到',
+  queue_cleanup_failed: '开机清理失败，暂停接打印单',
+  queue_pause_failed: '暂停队列失败，暂停接打印单',
 }
 
 /** 只是提醒、还能出纸的打印机状态；其余非健康状态按 error。 */

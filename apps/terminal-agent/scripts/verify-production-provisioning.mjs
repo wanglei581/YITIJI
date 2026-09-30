@@ -91,6 +91,12 @@ assert.match(installer, /provisioning-runtime-security\.ps1/)
 assert.doesNotMatch(installer, /FileSystemRights\]::Modify\s+-bor/, 'composite Modify includes read bits and must not be used as a dangerous-rights mask')
 assert.match(installer, /config\.scanWatchFolder = \$effectiveScanWatchFolder/)
 assert.match(installer, /config\.localApiBridgeToken = \$effectiveBridgeToken/)
+assert.match(installer, /\[switch\]\$KeepPrinterQueueUnpaused/)
+assert.match(
+  installer,
+  /holdPrinterQueueWhenIdle = -not \[bool\]\$KeepPrinterQueueUnpaused/,
+  'production installer must pause the idle queue unless the work-PC switch is set',
+)
 assert.doesNotMatch(installer, /ReadAllText\(\$configPath\)/, 'existing config must only be read through the ACL-checked preservation path')
 assert.doesNotMatch(installer, /Write-(?:Host|Output)[^\r\n]*(?:effectiveBridgeToken|secureBridgeToken|effectiveBindCode|secureBindCode)/i)
 
