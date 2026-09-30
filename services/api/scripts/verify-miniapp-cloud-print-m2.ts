@@ -25,6 +25,7 @@ import { PrintPageCountService } from '../src/print-jobs/print-page-count.servic
 import { PrismaService } from '../src/prisma/prisma.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
+import { MaterialsService } from '../src/materials/materials.service'
 import { setPrintScanCapabilityModeForTest, TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { signFileUrl } from '../src/files/signing'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
@@ -606,19 +607,20 @@ async function main(): Promise<void> {
     }
     pass('已退款 / 退款中 / 部分退款的到机码一律 ORDER_REFUNDED 拒绝，且不写坏订单状态、不建打印任务')
 
-    await prisma.documentProcessTask.updateMany({
-      where: { sourceFileId: fileId, kind: 'pii_scan' },
-      data: { paramsJson: JSON.stringify({ sourceSha256: 'c'.repeat(64) }) },
-    })
-    await expectCode(
-      () => pickup.claim(created.pickupCode, terminalId),
-      'PII_SCAN_STALE',
-      'RES-1 pickup-order sha256 不一致 → 409 PII_SCAN_STALE',
-    )
-    await prisma.documentProcessTask.updateMany({
-      where: { sourceFileId: fileId, kind: 'pii_scan' },
-      data: { paramsJson: JSON.stringify({ sourceSha256: sourceSha }) },
-    })
+    // 隐私检查任务只留 24 小时，到机码可以留 7 天。清理跑过之后，认领和放行都不得再要求任务还在。
+    // 真跑一次生产清理：把时钟拨到 25 小时后调 MaterialsService.cleanupExpired()（它只用到数据库）。
+    const scansBefore = await prisma.documentProcessTask.count({ where: { sourceFileId: fileId, kind: 'pii_scan' } })
+    const cleanup = await new MaterialsService(prisma, {} as never, {} as never, {} as never)
+      .cleanupExpired(new Date(Date.now() + 25 * 60 * 60 * 1000))
+    const scansAfter = await prisma.documentProcessTask.count({ where: { sourceFileId: fileId, kind: 'pii_scan' } })
+    if (scansBefore < 1 || scansAfter !== 0 || cleanup.deletedTasks < 1) {
+      fail(`25 小时后的真实清理必须删掉这份文件的隐私检查任务：before=${scansBefore} after=${scansAfter}`)
+    }
+    const claimedAfterCleanup = await pickup.claim(created.pickupCode, terminalId)
+    if (claimedAfterCleanup.released !== false || claimedAfterCleanup.orderId !== created.id) {
+      fail('隐私检查记录被清理后，到机认领仍必须成功')
+    }
+    pass('隐私检查记录被清理后，云打印到机认领仍成功')
 
     await expectCode(
       () => pickup.release(created.id, terminalId, claimed.paymentSessionToken),
@@ -673,6 +675,15 @@ async function main(): Promise<void> {
       '非 owner 会员不得签发带走 URL',
     )
 
+    // 后面的建单仍要一份完成的检查。放行已经在任务被删掉之后通过，这里只是把夹具补回去。
+    const restoredScan = await prisma.documentProcessTask.create({
+      data: {
+        kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: fileId,
+        endUserId: userId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        paramsJson: JSON.stringify({ sourceSha256: sourceSha }),
+      },
+    })
+    await prisma.piiFinding.create({ data: { taskId: restoredScan.id, type: 'phone', label: '手机号', action: 'keep' } })
     const concurrent = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
     const concurrentClaim = await pickup.claim(concurrent.pickupCode, terminalId)
     await orderStatus.markPaid(concurrent.id, { paymentSource: 'offline', operatorId: 'verify-kiosk' })

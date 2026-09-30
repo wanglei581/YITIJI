@@ -10496,11 +10496,9 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "DocumentProcessTask",
           "FileObject",
           "Order",
           "OrderItem",
-          "PiiFinding",
           "PrintTask",
           "Terminal",
           "TerminalCapability"
@@ -10598,11 +10596,9 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "DocumentProcessTask",
           "FileObject",
           "Order",
           "OrderItem",
-          "PiiFinding",
           "PrintTask",
           "Terminal",
           "TerminalCapability"
@@ -24217,6 +24213,7 @@
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -24737,6 +24734,7 @@
     "services/api/src/materials/materials.service.ts": [
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-materials-processing.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-pdf-cmap.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
@@ -37294,6 +37292,7 @@
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/files/signing.ts",
+          "services/api/src/materials/materials.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.controller.ts",
           "services/api/src/payment/order-quote.service.ts",
@@ -37604,6 +37603,7 @@
           "services/api/scripts/support/minimal-pdf.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/payment/order-quote.service.ts",
