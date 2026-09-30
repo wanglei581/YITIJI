@@ -141,17 +141,17 @@ export function DiagnosisDirectionForm({
           id="qx-rt-exp"
           label="经验级别"
           disabled={genericDiagnosis}
-          options={RESUME_TARGET_EXPERIENCE_OPTIONS.map((item) => ({ value: item, label: item }))}
-          value={targetExperience}
-          onChange={(value) => onTargetExperienceChange(value as ResumeTargetContext['experience'])}
+          options={[{ value: '', label: '暂不指定' }, ...RESUME_TARGET_EXPERIENCE_OPTIONS.map((item) => ({ value: item, label: item }))]}
+          value={targetExperience ?? ''}
+          onChange={(value) => onTargetExperienceChange(value ? value as ResumeTargetContext['experience'] : undefined)}
         />
         <ChipGroup
           id="qx-rt-scene"
           label="求职场景"
           disabled={genericDiagnosis}
-          options={RESUME_TARGET_SCENE_OPTIONS.map((item) => ({ value: item, label: item }))}
-          value={targetScene}
-          onChange={(value) => onTargetSceneChange(value as ResumeTargetContext['scene'])}
+          options={[{ value: '', label: '暂不指定' }, ...RESUME_TARGET_SCENE_OPTIONS.map((item) => ({ value: item, label: item }))]}
+          value={targetScene ?? ''}
+          onChange={(value) => onTargetSceneChange(value ? value as ResumeTargetContext['scene'] : undefined)}
         />
 
         <button

@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1767 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1778 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -177,13 +177,14 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 136 个文件</summary>
+<summary><code>apps/admin/src/</code> — 146 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/admin/src/UnhandledRejectionBanner.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/layouts/AdminLayoutWrapper.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-content-trust-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/admin/src/lib/auditActionLabels.ts` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
+| `apps/admin/src/lib/printErrorText.ts` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/main.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/account-settings/AdminInitialPhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/AdminPhoneTransferCard.tsx` | `verify-admin-phone-transfer-ui.mjs` |
@@ -200,7 +201,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/ai-services/index.tsx` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs` |
 | `apps/admin/src/routes/alerts/index.tsx` | `verify-feedback-sla.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/audit/index.tsx` | `verify-admin-partner-contact-phone-ui.mjs` |
-| `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
+| `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/components/BulkPublishButton.tsx` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/dashboard/index.tsx` | `verify-admin-ai-usage-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/devices/TerminalFleetOverview.tsx` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
@@ -210,6 +211,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/fairs/components/CompaniesTab.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/fairs/components/MaterialsTab.tsx` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/fairs/components/ZonesTab.tsx` | `verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/files/FileTable.tsx` | `verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/files/fileMeta.ts` | `verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/files/retentionMeta.ts` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/import-batches/index.tsx` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/routes/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-billing-ui.mjs`<br/>`verify-admin-job-materials-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-admin-print-scan-ui.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`frontend.mjs` |
 | `apps/admin/src/routes/job-materials/index.tsx` | `verify-admin-job-materials-ui.mjs` |
@@ -225,8 +229,14 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/member-feedback/feedbackSla.ts` | `verify-feedback-sla.mjs` |
 | `apps/admin/src/routes/member-feedback/index.tsx` | `verify-feedback-sla.mjs` |
 | `apps/admin/src/routes/offline-agencies/JobsDrawer.tsx` | `verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/orders/OrderAftercare.tsx` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
+| `apps/admin/src/routes/orders/OrderDetailDrawer.tsx` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
+| `apps/admin/src/routes/orders/OrderPaymentActions.tsx` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
 | `apps/admin/src/routes/orders/index.tsx` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
-| `apps/admin/src/routes/orders/orderHonestyCopy.ts` | `verify-admin-orders-readonly-ui.mjs` |
+| `apps/admin/src/routes/orders/orderColumns.tsx` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/orders/orderDisplay.ts` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
+| `apps/admin/src/routes/orders/orderHonestyCopy.ts` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/orders/useOrderDetail.ts` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
 | `apps/admin/src/routes/partners/OrgContentTrustPanel.tsx` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/partners/OrgQualificationSection.tsx` | `verify-admin-offline-agencies-ui.mjs` |
 | `apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
@@ -250,7 +260,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/print-scan/CapabilityCenter.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx` | `verify-admin-print-scan-ui.mjs` |
 | `apps/admin/src/routes/print-scan/PrintRetryButton.tsx` | `verify-admin-print-scan-ui.mjs` |
-| `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs` |
+| `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/printers/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-data-request-ui.mjs` |
 | `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-screen-ui.mjs` |
@@ -380,7 +390,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 531 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 532 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -416,7 +426,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/components/FilePreviewDialog.tsx` | `verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/components/KioskDeviceStatusPills.tsx` | `verify-device-status-honest.mjs` |
 | `apps/kiosk/src/components/KioskFeedbackDialog.tsx` | `verify-kiosk-feedback-entry.mjs` |
-| `apps/kiosk/src/components/PdfCanvasPreview.tsx` | `verify-print-parameter-capability.mjs` |
+| `apps/kiosk/src/components/PdfCanvasPreview.tsx` | `verify-print-parameter-capability.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/components/hid-guard/KioskHidScanGuard.tsx` | `verify-scan-input-safety.mjs` |
 | `apps/kiosk/src/components/hid-guard/hidBurstDetector.ts` | `verify-scan-input-safety.mjs` |
 | `apps/kiosk/src/components/kiosk-shell/KioskAppTopbar.tsx` | `verify-runtime-terminal-identity.mjs` |
@@ -515,7 +525,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/interview-service-desk.css` | `verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/interviewWorkbenchModel.ts` | `verify-kiosk-ai-declaration.mjs` |
-| `apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts` | `verify-kiosk-ai-declaration.mjs` |
+| `apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-mic-capability-truth.mjs` |
 | `apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx` | `verify-kiosk-ai-label-copy.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/session/types.ts` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
@@ -605,6 +615,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx` | `verify-file-display-truth.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintProgressSections.tsx` | `verify-print-done-truth.mjs` |
 | `apps/kiosk/src/pages/print/components/printFileRetention.ts` | `verify-print-confirm-honest.mjs` |
+| `apps/kiosk/src/pages/print/components/printPreviewKind.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx` | `verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs` |
 | `apps/kiosk/src/pages/print/file-source/FileSourceView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/print/file-source/fileSourceModel.ts` | `verify-fusion-w2-print-scan.mjs` |
@@ -797,7 +808,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/scan/ScanProgressPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/scan/ScanResultPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-done-truth.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanSettingsPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-no-raw-error-render.mjs` |
-| `apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx` | `verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs` |
+| `apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-quiet-period.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanStartPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanWorkbenchChrome.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
@@ -2164,7 +2175,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/admin-ops/admin-ops.controller.ts` | `verify-admin-ops.ts` |
 | `services/api/src/admin-ops/admin-ops.service.ts` | `verify-admin-ops.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/admin-ops/derived-alert-identity.ts` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-admin-ops.ts` |
-| `services/api/src/admin-ops/derived-alerts.ts` | `verify-print-monitor-truth.ts`<br/>`verify-admin-ops.ts`<br/>`verify-beijing-display-time.ts`<br/>`verify-queue-dispatch-printer-status.ts` |
+| `services/api/src/admin-ops/derived-alerts.ts` | `verify-console-plain-copy.mjs`<br/>`verify-print-monitor-truth.ts`<br/>`verify-admin-ops.ts`<br/>`verify-beijing-display-time.ts`<br/>`verify-queue-dispatch-printer-status.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts` | `verify-admin-order-filters.ts` |
 | `services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts` | `verify-admin-order-filters.ts`<br/>`verify-admin-orders-readonly.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-payment-flow.ts` |
 | `services/api/src/admin-print-scan/admin-print-scan.service.ts` | `verify-admin-print-scan.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-retry-lock-postgres.ts`<br/>`verify-refund-idempotent.ts` |

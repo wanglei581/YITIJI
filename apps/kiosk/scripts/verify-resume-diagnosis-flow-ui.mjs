@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict'
+import ts from 'typescript'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -452,6 +454,110 @@ for (const stateName of ['no-context', 'loading', 'ready', 'empty', 'read-error'
 for (const stateName of ['preview-no-result', 'preview-loading', 'preview-failed', 'preview-ready', 'preview-hints', 'preview-editing', 'export-chooser', 'export-exporting', 'export-failed', 'export-ready', 'export-url-expired', 'export-print-unavailable', 'session-lost', 'illegal']) {
   assertIncludes(generatePreview, `'${stateName}'`, `generate preview view state ${stateName} is registered`)
 }
+
+// W-107 / W-108：执行真实源码片段，覆盖默认提交、密码识别和失败屏出路。
+function sourceNode(text, name) {
+  const ast = ts.createSourceFile('fixture.tsx', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let found
+  function visit(node) {
+    if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name?.getText(ast) === name) found = node
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.ok(found, `source node ${name} exists`)
+  return ts.isVariableDeclaration(found) ? `const ${found.getText(ast)};` : found.getText(ast)
+}
+function executable(text) {
+  return ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React } }).outputText
+}
+const targetNames = ['genericDiagnosis', 'targetIndustry', 'targetJob', 'targetExperience', 'targetScene', 'targetMajor', 'targetDegree']
+// 解构声明的 name 是整个 [value, setter]，按完整源码名称查找。
+const targetSetters = ['setGenericDiagnosis', 'setTargetIndustry', 'setTargetJob', 'setTargetExperience', 'setTargetScene', 'setTargetMajor', 'setTargetDegree']
+const targetSource = targetNames.map((name, i) => sourceNode(source, `[${name}, ${targetSetters[i]}]`)).join('\n')
+const buildTarget = new Function('useState', executable(`${targetSource}\n${sourceNode(source, 'buildTargetContext')}\nreturn { values: [targetIndustry, targetExperience, targetScene], target: buildTargetContext() };`))
+assert.deepEqual(buildTarget((value) => [value]).values, ['', undefined, undefined], 'W-107 行业、经验、求职场景均不预选')
+assert.deepEqual(buildTarget((value) => [value]).target, { skipped: true }, 'W-107 不选方向按通用标准提交')
+let targetIndex = 0
+const chosen = [false, '制造业', '理货员', '5年以上', '社招', '', '']
+assert.deepEqual(buildTarget(() => [chosen[targetIndex++]]).target, {
+  industry: '制造业', targetJob: '理货员', experience: '5年以上', scene: '社招', major: undefined, degree: undefined, skipped: false,
+}, 'W-107 本人选择原样参与诊断')
+assertIncludes(source, '没选方向，按通用标准看', 'W-107 页面如实说明未选方向')
+assertIncludes(source, 'selectedDimensions: buildTargetContext().skipped ? [] : selectedDimensions', 'W-107 通用诊断不带默认重点')
+
+const pdfSource = read('src/components/PdfCanvasPreview.tsx')
+const pdfModule = { exports: {} }
+let passwordFixture = false
+let brokenFixture = false
+let destroyCount = 0
+const loadPdfjs = async () => ({ getDocument: () => {
+  let reject
+  const task = { destroyed: false, promise: new Promise((resolve, fail) => {
+    reject = fail
+    queueMicrotask(() => {
+      if (passwordFixture) task.onPassword?.()
+      else if (brokenFixture) fail(new Error('invalid PDF'))
+      else resolve({ numPages: 1 })
+    })
+  }), destroy: async () => { destroyCount++; task.destroyed = true; reject(new Error('destroyed')) } }
+  return task
+} })
+new Function('exports', 'loadPdfjs', 'pdfjsDataUrl', 'fetch', executable([
+  sourceNode(pdfSource, 'createPdfLoadingTask'), sourceNode(pdfSource, 'checkPdfOpeningPassword'),
+].join('\n')))(pdfModule.exports, loadPdfjs, () => '/pdfjs/', async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }))
+passwordFixture = true
+assert.equal(await pdfModule.exports.checkPdfOpeningPassword('/original.pdf', new AbortController().signal), true, 'W-108 共用 PDF.js 打开密码回调认出加密')
+passwordFixture = false
+assert.equal(await pdfModule.exports.checkPdfOpeningPassword('/ordinary.pdf', new AbortController().signal), false, 'W-108 普通 PDF 不算加密')
+brokenFixture = true
+await assert.rejects(pdfModule.exports.checkPdfOpeningPassword('/broken.pdf', new AbortController().signal), /invalid PDF/, 'W-108 普通损坏保持普通失败')
+assert.equal(destroyCount, 4, 'W-108 密码、普通、损坏核查均释放 PDF 任务')
+assertIncludes(pdfSource, 'const loadingTask = await createPdfLoadingTask(bytes,', 'W-108 预览与诊断复用打开密码识别')
+assertIncludes(report, 'checkPdfOpeningPassword(failedPdfUrl, controller.signal)', 'W-108 失败页实际核查原件')
+assertIncludes(report, "inspectionSignalsEncrypted([state.failureCode ?? '', reason ?? '', recoveredFail ?? ''])", 'W-108 同时识别服务端明确错误码')
+assertIncludes(parse, "undefined, false, aiErrorCodeOf(err))", 'W-108 错误码从解析页传到报告页')
+
+// 执行真实失败 CTA 的分支，避免仅凭新文案存在就通过。
+const renderFailCta = new Function('encryptedPdf', 'checkingPassword', 'state', 'React', 'stepActions', 'navigate', 'handleRetry', 'intent', executable(`${sourceNode(report, 'failCta')}\n${sourceNode(report, 'fileFailureCta')}\nreturn fileFailureCta;`))
+const React = { createElement: (type, props, ...children) => ({ type, props, children }), Fragment: 'fragment' }
+function labels(node) { return typeof node === 'string' ? node : node?.children?.map(labels).join('') ?? '' }
+let destination
+const encryptedCta = renderFailCta(true, false, {}, React, null, (...args) => { destination = args }, () => { throw new Error('encrypted retry') }, 'optimize')
+assert.equal(labels(encryptedCta), '重新选择文件', 'W-108 加密文件只给重新选择文件')
+encryptedCta.props.onClick()
+assert.deepEqual(destination, ['/resume/source?intent=optimize', { replace: true }], 'W-108 换文件保留优化意图')
+assert.match(labels(renderFailCta(false, false, {}, React, null, () => {}, () => {}, 'diagnose')), /重新解析/, 'W-108 非加密失败保留重新解析')
+assertIncludes(report, '!encryptedPdf && !checkingPassword && <ResumeDiagnosisFailExits', 'W-108 加密或尚未核查时不显示打印原件等出路')
+assertIncludes(report, 'encryptedPdf ? <p>{ENCRYPTED_PDF_BLOCK_COPY}。</p>', 'W-108 加密失败显示打印链的密码原句')
+const printKindSource = read('src/pages/print/components/printPreviewKind.ts')
+const printKindModule = { exports: {} }
+new Function('exports', executable([
+  sourceNode(printKindSource, 'ENCRYPTED_PDF_BLOCK_COPY'),
+  sourceNode(printKindSource, 'ENCRYPTED_PDF_CODES'),
+  sourceNode(printKindSource, 'inspectionSignalsEncrypted'),
+].join('\n')))(printKindModule.exports)
+for (const code of ['PDF_ENCRYPTED', 'PII_REDACT_ENCRYPTED', 'encrypted']) {
+  assert.equal(printKindModule.exports.inspectionSignalsEncrypted([code]), true, `W-108 识别明确加密码 ${code}`)
+}
+assert.equal(printKindModule.exports.inspectionSignalsEncrypted(['PDF_PAGE_COUNT_NOT_DETECTED', 'UNSUPPORTED_FILE_TYPE']), false, 'W-108 普通错误码不冒充加密')
+class ApiHttpError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code } }
+const errorOutcome = new Function('aiErrorCodeOf', 'inspectionSignalsEncrypted', 'ApiHttpError', executable(`${sourceNode(parse, 'NO_REPLY_CODES')}\n${sourceNode(parse, 'parseErrorOutcome')}\nreturn parseErrorOutcome;`))((error) => error.code, printKindModule.exports.inspectionSignalsEncrypted, ApiHttpError)
+assert.equal(errorOutcome(new ApiHttpError(400, 'PDF_ENCRYPTED')), 'failed', 'W-108 明确加密码进入失败屏')
+assert.equal(errorOutcome(new ApiHttpError(500, 'PDF_ENCRYPTED')), 'failed', 'W-108 有明确加密码时不误留在未知结果屏')
+assert.equal(errorOutcome(new ApiHttpError(500, 'UNSUPPORTED_FILE_TYPE')), 'unknown', 'W-108 普通 5xx 继续保持结果未知边界')
+
+// 密码文案常量的 declaration 节点不含 export，用同一源码求值。
+const passwordCopy = new Function(executable(`${sourceNode(printKindSource, 'ENCRYPTED_PDF_BLOCK_COPY')}\nreturn ENCRYPTED_PDF_BLOCK_COPY;`))()
+const renderFailure = new Function('encryptedPdf', 'checkingPassword', 'React', 'QxPageFrame', 'navigate', 'REPORT_STATUS', 'nav', 'fileFailureCta', 'ResumeReportHead', 'ENCRYPTED_PDF_BLOCK_COPY', 'resumeUserReason', 'ResumeDiagnosisFailExits', 'state', executable(`${sourceNode(report, 'failView')}\nreturn failView('PDF 解析失败，请确认文件未损坏后重试');`))
+const failedTree = (encrypted, checking = false) => renderFailure(encrypted, checking, React, 'frame', () => {}, {}, null, null, 'head', passwordCopy, (reason) => reason, 'original-exits', { file: { name: 'resume.pdf' }, fileId: 'original' })
+function hasOriginalExits(node) { return node?.type === 'original-exits' || Boolean(node?.children?.some(hasOriginalExits)) }
+assert.match(labels(failedTree(true)), /这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传。/, 'W-108 实际失败正文显示准确密码原因')
+assert.equal(hasOriginalExits(failedTree(true)), false, 'W-108 实际加密失败屏不渲染打印原件')
+assert.equal(hasOriginalExits(failedTree(false, true)), false, 'W-108 确认密码前不渲染打印原件')
+assert.equal(hasOriginalExits(failedTree(false)), true, 'W-108 普通失败仍渲染原来出路')
+assert.match(labels(failedTree(false)), /PDF 解析失败，请确认文件未损坏后重试/, 'W-108 普通失败保留原来原因')
+assertIncludes(report, 'ctabar={fileFailureCta}', 'W-108 页面实际渲染选择文件 CTA')
+console.log('PASS W-107 未预选与通用提交 / W-108 加密识别与真实出路')
 
 const factsTest = join(dirname(fileURLToPath(import.meta.url)), 'tests/export-generated-resume-facts.test.mjs')
 const factsRun = spawnSync(process.execPath, ['--test', factsTest], { stdio: 'inherit' })

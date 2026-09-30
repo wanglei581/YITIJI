@@ -109,7 +109,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           ? ['不创建平台任务', '文件只在你的 U 盘', '暂未开通']
           : blocked
             ? undefined
-            : ['这台机器的接收目录已由管理员配好，面板上直接选就行，不用你填任何地址。']
+            : ['面板上的扫描入口已准备好，直接按提示操作，不用你填写地址。']
       }
       ctabar={
         usbPanel ? (
@@ -174,7 +174,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
     >
       {usbPanel ? (
         <>
-          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过屏幕上的扫描流程" grow>
+          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过屏幕上的扫描流程">
             <div className="sw-grid2">
               <ScanNoteCard
                 title="面板上怎么做"
@@ -202,7 +202,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           </ScanSec>
           <ScanSec no="02" title="完成之后怎么继续" hint="U 盘里的文件要重新导入才能在本机办理">
             <div className="sw-grid2">
-              <ScanNoteCard title="要打印或继续加工" foot="能不能从 U 盘导入，仍以这台机器的本机程序是否连上为准。">
+              <ScanNoteCard title="要打印或继续加工" foot="能不能从 U 盘导入，以这台机器屏幕上的提示为准。">
                 <p>回到打印扫描，选择<b>U 盘导入</b>。本机只读取你再次选中的文件，不会自动扫描整个 U 盘。</p>
               </ScanNoteCard>
               <ScanNoteCard title="面板没有这个选项" foot="本页不假设所有奔图固件都提供相同菜单。">
@@ -263,11 +263,11 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
         </>
       ) : (
         <>
-          <ScanSec no="01" title="要扫什么" hint={`扫描服务 · 已选「${SCAN_TYPE_LABELS[selected]}」`}>
-            <ScanTypeCards selected={selected} onPick={setSelected} />
-          </ScanSec>
-          <ScanSec no="02" title="这个流程是这样" hint="四段都走完，文件才到你手上">
+          <ScanSec no="01" title="这个流程是这样" hint="四段都走完，文件才到你手上">
             <ScanChain active={-1} />
+          </ScanSec>
+          <ScanSec no="02" title="要扫什么" hint={`扫描服务 · 已选「${SCAN_TYPE_LABELS[selected]}」`}>
+            <ScanTypeCards selected={selected} onPick={setSelected} />
           </ScanSec>
           <ScanSec no="03" title="动手之前先看两件事" grow>
             <div className="sw-grid2">

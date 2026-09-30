@@ -14,7 +14,7 @@
     <view class="line done"></view>
     <view class="st on"><text class="n">3</text><text class="nl">到机码</text></view>
     <view class="line"></view>
-    <view class="st"><text class="n">4</text><text class="nl">{{isFreeOrder ? '现场打印' : '机端支付'}}</text></view>
+    <view class="st"><text class="n">4</text><text class="nl">{{quoteState === 'ready' && !isFreeOrder ? '机端支付' : (isFreeOrder ? '现场打印' : '到机完成')}}</text></view>
   </view>
 
   <view class="section-t rise-d2">选定终端</view>
@@ -22,7 +22,7 @@
     <view class="sm-ic a-teal"><text class="ficon i-location"></text></view>
     <view class="sm-main">
       <view class="sm-name">{{storeName || '未选择终端'}}</view>
-      <view class="sm-sub">{{isFreeOrder ? '免费试运营：到机核验后直接进入打印队列' : '到机核验后再进入现场支付与打印'}}</view>
+      <view class="sm-sub">{{quoteState === 'ready' && !isFreeOrder ? '到机核验后再进入现场支付与打印' : (isFreeOrder ? '免费试运营：到机核验后直接进入打印队列' : '到机核验后进入打印')}}</view>
     </view>
   </view>
 
@@ -31,13 +31,13 @@
     <view wx:for="{{files}}" wx:key="name" class="order-file">
       <view class="of-ic a-teal"><text class="ficon i-file-text"></text></view>
       <view class="of-main"><view class="of-name">{{item.name}}</view><view class="of-desc">{{colorLabel}} · {{duplexLabel}} · {{pageCountLabel}} · ×{{copiesLabel}}</view></view>
-      <view class="of-price">{{item.price === '—' || item.price === '免费' ? item.price : '¥' + item.price}}</view>
+      <view class="of-price">{{quoteState === 'ready' && !isFreeOrder ? '¥' + item.price : item.price}}</view>
     </view>
   </view>
 
-  <view class="section-t rise-d4">费用（服务端核定）</view>
+  <view class="section-t rise-d4">{{quoteState === 'ready' && !isFreeOrder ? '费用（服务端核定）' : '页数核定'}}</view>
   <view class="card flat fee rise-d4">
-    <view class="fee-row total"><text>{{isFreeOrder ? '免费试运营' : (quoteState === 'ready' ? '服务端核定金额' : '金额待服务端核定')}}</text><text class="amt">{{isFreeOrder ? '免费' : (quoteState === 'ready' ? '¥' + fee.total : '—')}}</text></view>
+    <view class="fee-row total"><text>{{quoteState === 'ready' && !isFreeOrder ? '服务端核定金额' : (isFreeOrder ? '免费试运营' : '页数待服务端核定')}}</text><text class="amt">{{quoteState === 'ready' && !isFreeOrder ? '¥' + fee.total : (isFreeOrder ? '免费' : '—')}}</text></view>
     <!-- 报价拿不到时**不本地补一个数字**：只说清楚，并给一条可执行的重试。
          提交要等到服务端核定出金额之后才放行（建单会带上这个用户确认过的金额）。 -->
     <view class="fee-row quote-fail" wx:if="{{quoteState === 'error'}}">
@@ -46,9 +46,9 @@
            认不出人时「重新核价」是个死循环：再点一次还是同一条 fail-closed，
            真正有效的下一步是重新登录。 -->
       <view wx:if="{{quoteRecover === 'login'}}" class="qf-login tap" hover-class="tap-press" bindtap="toLogin" role="button">去登录</view>
-      <view wx:else class="qf-retry tap" hover-class="tap-press" bindtap="retryQuote" role="button">重新核价</view>
+      <view wx:else class="qf-retry tap" hover-class="tap-press" bindtap="retryQuote" role="button">重新核定</view>
     </view>
-    <view class="fee-row" wx:elif="{{quoteState === 'loading'}}"><text class="qf-text">正在向服务端核定页数与金额…</text></view>
+    <view class="fee-row" wx:elif="{{quoteState === 'loading'}}"><text class="qf-text">正在向服务端核定页数…</text></view>
   </view>
 
   <!-- 价格已更新：服务端拒绝了按旧金额建单（没建单、没扣款），上面的金额已换成服务端当前价格。
@@ -87,7 +87,7 @@
 </view>
 
 <view class="actionbar">
-  <view class="ab-price"><text class="ab-label">{{isFreeOrder ? '免费试运营' : (quoteState === 'ready' ? '到机应付' : '金额待核定')}}</text><text class="ab-amt">{{isFreeOrder ? '免费' : (quoteState === 'ready' ? '¥' + fee.total : '—')}}</text></view>
+  <view class="ab-price"><text class="ab-label">{{quoteState === 'ready' && !isFreeOrder ? '到机应付' : (isFreeOrder ? '免费试运营' : '页数待核定')}}</text><text class="ab-amt">{{quoteState === 'ready' && !isFreeOrder ? '¥' + fee.total : (isFreeOrder ? '免费' : '—')}}</text></view>
   <!-- 订单建成后按钮永久变灰。服务端现在按 (endUserId, idempotency-key) 回放，
        再点一次不会多出一张单；但页面仍必须变灰 —— 让一个已经下过单的人反复点
        「提交」本身就是在骗他，而且那次回放对他毫无意义。 -->

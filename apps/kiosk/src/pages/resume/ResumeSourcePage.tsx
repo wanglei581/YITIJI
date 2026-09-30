@@ -18,7 +18,6 @@ import {
   UsbIcon,
 } from 'lucide-react'
 import {
-  DEFAULT_EMPLOYMENT_INDUSTRY,
   RESUME_SCORING_DIMENSIONS,
   type ResumeScoringDimensionKey,
   type ResumeTargetContext,
@@ -237,12 +236,12 @@ export function ResumeSourcePage() {
   const [error, setError] = useState<string | null>(null)
   // 上一次上传没拿到可信答复（稿 21 upload-unknown）；只有用户主动换文件 / 换来源才清掉。
   const [uploadUnknown, setUploadUnknown] = useState(false)
-  const [genericDiagnosis, setGenericDiagnosis] = useState(false)
+  const [genericDiagnosis, setGenericDiagnosis] = useState(true)
   const [selectedDimensions, setSelectedDimensions] = useState<ResumeScoringDimensionKey[]>(DEFAULT_SELECTED_DIMENSIONS)
-  const [targetIndustry, setTargetIndustry] = useState(DEFAULT_EMPLOYMENT_INDUSTRY)
+  const [targetIndustry, setTargetIndustry] = useState('')
   const [targetJob, setTargetJob] = useState('')
-  const [targetExperience, setTargetExperience] = useState<ResumeTargetContext['experience']>('应届')
-  const [targetScene, setTargetScene] = useState<ResumeTargetContext['scene']>('校招')
+  const [targetExperience, setTargetExperience] = useState<ResumeTargetContext['experience']>(undefined)
+  const [targetScene, setTargetScene] = useState<ResumeTargetContext['scene']>(undefined)
   // 目标维度补充(可选):专业与学历,仅用于本人简历表达诊断/优化重点参考
   const [targetMajor, setTargetMajor] = useState('')
   const [targetDegree, setTargetDegree] = useState('')
@@ -259,9 +258,9 @@ export function ResumeSourcePage() {
   }
 
   const buildTargetContext = (): ResumeTargetContext => {
-    if (genericDiagnosis) return { skipped: true }
+    if (genericDiagnosis || ![targetIndustry, targetJob.trim(), targetExperience, targetScene, targetMajor.trim(), targetDegree.trim()].some(Boolean)) return { skipped: true }
     return {
-      industry: targetIndustry,
+      industry: targetIndustry || undefined,
       targetJob: targetJob.trim() || undefined,
       experience: targetExperience,
       scene: targetScene,
@@ -384,7 +383,7 @@ export function ResumeSourcePage() {
           mimeType: uploadedFile.mimeType,
         },
         fileId: uploadedFile.fileId,
-        selectedDimensions: genericDiagnosis ? [] : selectedDimensions,
+        selectedDimensions: buildTargetContext().skipped ? [] : selectedDimensions,
         targetContext: buildTargetContext(),
       },
     })
@@ -611,7 +610,8 @@ export function ResumeSourcePage() {
           </div>
 
           <aside className="qx-rt-side">
-            {uploadedFile && <ResumeSourceSummary generic={genericDiagnosis} dimensions={selectedDimensions} target={buildTargetContext()} intent={intent} />}
+            {buildTargetContext().skipped && <p className="qx-rt-hint">没选方向，按通用标准看</p>}
+            {uploadedFile && <ResumeSourceSummary generic={buildTargetContext().skipped === true} dimensions={selectedDimensions} target={buildTargetContext()} intent={intent} />}
             <details className="qx-rt-settings">
               <summary>改诊断方向 <span>选重点、目标与背景</span></summary>
             <div className="qx-rt-direction">

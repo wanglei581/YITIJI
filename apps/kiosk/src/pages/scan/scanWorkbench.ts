@@ -1,9 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  CloudIcon,
   CreditCardIcon,
   FileTextIcon,
-  FolderIcon,
   MonitorIcon,
   ScanLineIcon,
 } from 'lucide-react'
@@ -54,16 +52,15 @@ export const SCAN_TYPE_OPTIONS: ScanTypeOption[] = [
 ]
 
 export const SCAN_CHAIN = [
-  { title: '在面板扫描', copy: '放好纸，按开始', who: '你在打印机上按', icon: FileTextIcon },
-  { title: '本机接收', copy: '落到共享目录', who: '奔图 → 共享目录', icon: FolderIcon },
-  { title: '本地投递', copy: '自动送去保存', who: '这台机器的本机程序', icon: MonitorIcon },
-  { title: '系统保存', copy: '按回传原格式保存', who: '系统', icon: CloudIcon },
+  { title: '放好纸', copy: '把原稿放进扫描区', who: '你在打印机上操作', icon: FileTextIcon },
+  { title: '面板上按扫描', copy: '按屏幕上的开始键', who: '你在打印机上操作', icon: ScanLineIcon },
+  { title: '回到这台机器', copy: '文件回来后在这里确认', who: '这台屏幕自动等待', icon: MonitorIcon },
 ] as const
 
 export const SCAN_TRUTH = [
-  { title: '流程', body: '奔图面板手动扫描 → 本机接收 → 本地投递 → 系统保存，四段都走完才有文件。' },
-  { title: '不画什么', body: '没有页级扫描进度与逐张计数，也不展示具体硬件故障原因。' },
-  { title: '留存与费用', body: '留存按文件类型与系统的保存规则管理；价格只在打印流程里由系统报价给出。' },
+  { title: '怎么做', body: '放好纸 → 面板上按扫描 → 回到这台机器等文件。' },
+  { title: '不显示什么', body: '没有页级扫描进度与逐张计数，也不猜具体硬件故障原因。' },
+  { title: '文件和费用', body: '文件按类型与保存规则管理；价格只在打印流程里由系统报价给出。' },
 ] as const
 
 export interface ScanAsk {
@@ -136,7 +133,7 @@ export const SCAN_ASK = {
   'waiting-delivery': {
     text: '正在等文件回来。',
     em: '等文件回来',
-    doing: '我每隔几秒自动问一次系统。面板、共享目录、本机投递这三段我都看不见，只能转达系统那一头的结果。',
+    doing: '我每隔几秒自动问一次系统。面板上的扫描结果回来前，这里只转达系统给出的结果。',
   },
   polling: {
     text: '正在问系统。',

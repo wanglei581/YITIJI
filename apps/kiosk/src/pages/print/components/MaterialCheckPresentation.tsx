@@ -267,6 +267,16 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                 />
               ) : null}
             </div>
+            {!props.encryptedPdf ? (
+              <section className="qpd-options-note qpd-next-note">
+                <h3>下一步做什么</h3>
+                <ul>
+                  <li>{props.privacyModeWarning ? '这次没有完整检查文件，请自行核对原件并确认检查说明。' : props.privacyModeNotice ? '按本页检查说明继续人工核对原件。' : remaining > 0 ? '每一处都要由你选择保留或遮挡，选完才能继续。' : props.findings.length > 0 ? '核对刚才的选择；选了遮挡的，下一步逐页核对处理后的文件。' : '检查没有发现待决定片段，仍请逐页核对原件。'}</li>
+                  <li>确认版面、份数和页范围，再看这台机器的能力与状态。</li>
+                  <li>报价由下一步的系统给出，在那之前不产生任何费用。</li>
+                </ul>
+              </section>
+            ) : null}
             {props.encryptedPdf ? ENCRYPTED_PDF_UNLOCK_STEPS.map((step, index) => (
               <section className="qpd-options-note" key={step.title} aria-label={index === 0 ? '怎么去掉打开密码' : undefined}>
                 <h3>{index + 1}. {step.title}</h3>

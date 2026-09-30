@@ -223,7 +223,8 @@ test('success renders only server instructions and creates and cancels once in S
   await expect(page.getByText('\u670d\u52a1\u7aef\u6307\u5f15\uff1a\u7b2c\u4e00\u6b65', { exact: true })).toBeVisible()
   await expect(page.getByText('\u670d\u52a1\u7aef\u6307\u5f15\uff1a\u7b2c\u4e8c\u6b65', { exact: true })).toBeVisible()
   await expect(page.getByText('\u653e\u597d\u539f\u4ef6', { exact: true })).toHaveCount(0)
-  await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toBeVisible()
+  // 内部任务号不上屏（v2 README 规则 4，B 批 9/30 起扫描页不再显示）；建成由下一行「扫描任务已创建」与 createRequests 证明。
+  await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   await expect(page.getByText('\u626b\u63cf\u4efb\u52a1\u5df2\u521b\u5efa', { exact: true })).toBeVisible()
   expect(createRequests()).toBe(1)
   // 建成不等于可投递：编号和服务端指引上屏之前，本机必须已经拿到投递授权。
