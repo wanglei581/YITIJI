@@ -23390,6 +23390,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-usage-context.ts": [
+      "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -26374,6 +26375,9 @@
     "services/api/src/trtc/tencent-api.util.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
+    "services/api/src/trtc/trtc-session-registry.service.ts": [
+      "services/api/scripts/verify-trtc-session-deadline.ts"
+    ],
     "services/api/src/trtc/trtc.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
@@ -26387,6 +26391,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
+      "services/api/scripts/verify-trtc-session-deadline.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/upload-sessions/upload-scene.ts": [
@@ -33619,6 +33624,7 @@
           "services/api/src/ai/ai-public-quota.service.ts",
           "services/api/src/ai/ai-request-guard.ts",
           "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
           "services/api/src/common/redis/redis.service.ts"
         ],
         "missing": []
@@ -40911,6 +40917,25 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-trtc-ownership.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:trtc-ownership"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/trtc/trtc-session-registry.service.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-trtc-session-deadline.ts",
       "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
