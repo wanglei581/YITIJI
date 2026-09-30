@@ -5,6 +5,12 @@
 - **问题：** 小程序「我的打印订单」失败单只能显示「打印失败」，也缺网点名（任务上没记终端的行）。
 - **做法：** GET /me/print-orders 行新增可选 `failureCode`：只在 status=failed 时给，只给面向用户的白名单码（PAPER_EMPTY、PRINTER_ERROR、PRINTER_OFFLINE、PRINT_JOB_UNCONFIRMED、PARTIAL_OUTPUT），内部码与非失败行为 null；**不给 errorMessage 原文**（那是写给一体机现场的）。原有「不透出 errorCode / errorMessage」的禁止规则不变。任务上没记终端时用订单上的终端兜底给网点名。shared 类型同步。
 - **验证：** verify:member-print-orders 补失败码白名单、内部码为 null、无原文、终端兜底四项；变异「白名单放开」「去掉终端兜底」均变红；member-order-timeline、cloud-print-m2、backend-p0-contracts、shared/kiosk tsc、小程序契约全绿。
+## 2026-09-30：简历优化按经历段落逐条给建议、姓名从原文开头补回（走查 W-97；分支 `claude/backend-hardening-20260930-w97-resume-sections`）
+
+- **问题：** 走查三份真实排版的简历：标题写在经历下面、单位和时间段分栏排、项目和实习单列一段时，逐条建议只从「工作经历」标题下取，常常只出一条；模型不回姓名时报告里姓名为空；诊断报告把标题前的「单位 + 时间段」行归到基础信息里。
+- **修法（Codex 起草、协调方审改）：** 新增 `resume-structure.ts`，放姓名识别（只看原文开头 3 行）、经历候选行识别（工作 / 实习 / 项目 / 校园四类标题，以及「单位 + 时间段」行）和一句提示词规则。优化提示词第 5 条改为逐条覆盖每段可识别的经历；模型没回姓名或回了原文里没有的姓名时，用原文开头识别出的姓名，识别不到就留空，不阻断建议。诊断报告把已经摘到的「单位 + 时间段」原文行移到对应的经历块，只移动已有的行，不补模型没摘的行。
+- **协调方删掉的一段：** Codex 原稿在模型漏掉某段经历时，由服务端自己拼一条「请在不新增事实的前提下，按动作和结果重新组织这段经历：…」当作建议补进去，并把模型摘的片段扩成整行。前者是服务端编的建议、不是 AI 给的，后者让「原文」和「建议」对不上，违反「不伪造能力」，两处都删了。所以模型真漏掉的经历这一版不会补出来，只靠提示词要求模型覆盖。
+- **验证：** verify:resume-optimize 新增 W-97 五组夹具（三种真实排版、缺姓名、模型编造姓名）与提示词静态断言；verify:resume-diagnosis-context 新增标题前经历行纠偏断言。四处反向变异全红：姓名识别失效、提示词规则丢失、报告纠偏去掉、姓名不核对原文。按图谱与全文搜索跑 9 条关联门禁（含 api tsc、AI 成本覆盖、功能位拆键、PII 遮盖、AI 标识）全绿。
 ## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
 
 - 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
