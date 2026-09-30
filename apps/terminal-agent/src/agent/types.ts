@@ -234,6 +234,12 @@ export interface ClaimTask {
    * 只用于把出纸监控窗口按 页数 × 份数 放大，不参与任何计费或校验。
    */
   billablePages?: number
+  /**
+   * 服务端允许的重提次数。缺省视为 0（老服务端不带这个字段）。
+   * 只和 taskId 一起做本地判重，不参与计费。
+   * attempt>0 在老 Agent 上仍按 0 处理，不会再次出纸。发布顺序是先服务端、再 Agent 0.4.13。
+   */
+  attempt?: number
 }
 
 // ── Status PATCH ──────────────────────────────────────────────────────────────
@@ -244,6 +250,11 @@ export interface PatchStatusPayload {
   status: ReportableStatus
   errorCode?: string
   errorMessage?: string
+  /**
+   * 这一轮打印的 attempt。缺省按 0 入队。服务端见到小于当前 attempt 的补报会拒绝。
+   * 老 Agent 不带此字段，服务端保持原有状态机。
+   */
+  attempt?: number
 }
 
 export interface PatchStatusResponse {
