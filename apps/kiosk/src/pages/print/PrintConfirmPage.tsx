@@ -204,10 +204,10 @@ export function PrintConfirmPage() {
         if (cancelled) return
         const code = errorCodeOf(err)
         const reason =
-          code === 'PRINTER_UNAVAILABLE' || code === 'PRINT_JOB_TOO_LARGE'
+          code === 'PRINTER_UNAVAILABLE' || code === 'PRINT_JOB_TOO_LARGE' || code === 'PRINT_TERMINAL_QUEUE_HALTED'
             ? userMessageOf(err, '请稍后重试或联系现场工作人员')
             : '页数以实际结果为准，确认前不显示金额'
-        setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason } })
+        setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason, code } })
       })
     return () => {
       cancelled = true

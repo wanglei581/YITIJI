@@ -1,4 +1,5 @@
 import { formatBeijingMinute } from '../common/beijing-display-time'
+import { describePrinterFault } from '../terminals/admin-printer-status'
 import type { PrismaService } from '../prisma/prisma.service'
 import { HEALTHY_PRINTER_STATUS_VALUES, isHealthyPrinterStatus, isLowPaperWarning } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
@@ -277,7 +278,7 @@ function buildTerminalAlert(
       title: `终端 ${terminal.terminalCode} ${label}`,
       detail: lowPaper
         ? '终端在线，打印机报纸张或墨粉不足（本机分不清是哪一样），仍可打印，请检查并补充。'
-        : `终端在线,但最近心跳上报打印机状态为 ${lastHeartbeat.printerStatus}`,
+        : `终端在线，${describePrinterFault(true, lastHeartbeat.printerStatus)}`,
       terminalCode: terminal.terminalCode,
       occurredAt: lastHeartbeat.createdAt.toISOString(),
     }

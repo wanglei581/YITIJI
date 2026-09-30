@@ -325,10 +325,10 @@ export function PrintConfirmView(props: Props) {
             ) : null}
             {screen === 'quote-failed' ? (
               <div className="pcf-grid2">
-                <div className="pcf-pgrp">
+                {quote.status === 'unavailable' && quote.code === 'PRINT_TERMINAL_QUEUE_HALTED' ? null : <div className="pcf-pgrp">
                   <h4>可能的原因</h4>
                   <Plan items={['本机与系统之间网络中断。', '参数里有本机暂未开通的项，系统直接拒绝报价。']} />
-                </div>
+                </div>}
                 <div className="pcf-pgrp">
                   <h4>这一趟保留了什么</h4>
                   <p>文件、参数和这一步的上下文都还在。<b>本次没有创建订单，也不会扣款。</b></p>

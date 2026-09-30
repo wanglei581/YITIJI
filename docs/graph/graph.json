@@ -25038,7 +25038,8 @@
     ],
     "services/api/src/member-print-orders/member-order-claim-here.service.ts": [
       "services/api/scripts/verify-member-order-timeline.ts",
-      "services/api/scripts/verify-member-print-order-idempotency-http.ts"
+      "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "services/api/src/member-print-orders/member-order-timeline.service.ts": [
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -26181,6 +26182,7 @@
       "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/src/terminals/printer-availability.ts": [
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts"
@@ -29313,6 +29315,7 @@
           "services/api/src/files/file-content-integrity.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/pii-scan-gate.ts",
+          "services/api/src/terminals/printer-availability.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ],
         "missing": []
@@ -37569,6 +37572,7 @@
           "services/api/src/files/files.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/materials/materials.service.ts",
+          "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.controller.ts",
           "services/api/src/payment/order-quote.service.ts",

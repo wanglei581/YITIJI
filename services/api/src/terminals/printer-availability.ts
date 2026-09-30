@@ -67,6 +67,21 @@ function isQueueDispatchHalted(availability: PrinterAvailability): boolean {
 }
 
 /**
+ * 取件场景的拒绝原话。到机单绑定这台终端，「换一台终端」对取件人是错的；
+ * 到机码入口说码没作废，会员「在这台机器领取」入口手里没有码，只说订单没受影响。
+ */
+const PICKUP_SCENE_MESSAGES: Partial<Record<'order' | 'pickup' | 'claim_here', { halted: string; unavailable: string }>> = {
+  pickup: {
+    halted: '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员',
+    unavailable: '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员',
+  },
+  claim_here: {
+    halted: '这台终端暂停接打印单，你的订单没有受影响，请稍后再在这台终端领取，或找现场工作人员',
+    unavailable: '这台终端的打印机暂不可用，你的订单没有受影响，请稍后再在这台终端领取，或找现场工作人员',
+  },
+}
+
+/**
  * 队列闸门抛 400 PRINT_TERMINAL_QUEUE_HALTED。
  * 其余不可用状态在开关打开时抛 400 PRINTER_UNAVAILABLE，两句旧文案一个字不改。
  * 不透出心跳时间戳或内部状态串。
@@ -75,12 +90,13 @@ export async function assertTerminalPrinterAvailable(
   prisma: PrismaService,
   terminalId: string,
   env: NodeJS.ProcessEnv = process.env,
+  scene: 'order' | 'pickup' | 'claim_here' = 'order',
 ): Promise<void> {
   const availability = await readPrinterAvailability(prisma, terminalId)
   // 先看闸门，再看开关。这两个状态表示 Agent 已经停领，不能被开关放行。
   if (isQueueDispatchHalted(availability)) {
     throw new BadRequestException({
-      error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message: QUEUE_DISPATCH_HALTED_MESSAGE },
+      error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message: PICKUP_SCENE_MESSAGES[scene]?.halted ?? QUEUE_DISPATCH_HALTED_MESSAGE },
     })
   }
   if (!printerOnlineRequired(env)) return
@@ -90,6 +106,6 @@ export async function assertTerminalPrinterAvailable(
       ? '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请联系工作人员'
       : '本机打印服务暂未就绪，暂不能下单，请稍后再试或联系工作人员'
   throw new BadRequestException({
-    error: { code: 'PRINTER_UNAVAILABLE', message },
+    error: { code: 'PRINTER_UNAVAILABLE', message: PICKUP_SCENE_MESSAGES[scene]?.unavailable ?? message },
   })
 }

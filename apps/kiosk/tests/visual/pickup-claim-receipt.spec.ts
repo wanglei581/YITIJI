@@ -54,3 +54,29 @@ for (const scenario of [
     }
   })
 }
+
+for (const printerCode of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']) {
+  test(`pickup ${printerCode} clears input and retries the same code after recovery @w2`, async ({ page, api }) => {
+    api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
+    api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', { status: 200, json: { printerStatus: 'ready', isOnline: true, paperLevel: 'sufficient' } })
+    const message = printerCode === 'PRINT_TERMINAL_QUEUE_HALTED'
+      ? '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+      : '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+    const submitted: string[] = []
+    await page.route('**/api/v1/print/jobs/claim-pickup', async route => {
+      submitted.push((route.request().postDataJSON() as { code: string }).code)
+      await route.fulfill({ status: submitted.length === 1 ? 400 : 200, contentType: 'application/json', body: JSON.stringify(submitted.length === 1
+        ? { error: { code: printerCode, message } }
+        : { released: false, orderId: 'gate-order', orderNo: 'ORD-GATE', terminalId: 'KSK-001', amountCents: 100, paymentSessionToken: 'gate-payment-session' }) })
+    })
+    await page.goto('/print/pickup-claim')
+    await page.getByLabel('到机码输入框').fill('28491703')
+    await expect(page.getByTestId('arrival-code-state-failed')).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText(message)
+    // 输入框清空：扫码枪再扫不会接在旧码后面拼出错码；「重试校验」用失败时记下的原码重发。
+    await expect(page.getByLabel('到机码输入框')).toHaveValue('')
+    await page.getByRole('button', { name: '重试校验' }).click()
+    await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
+    expect(submitted).toEqual(['28491703', '28491703'])
+  })
+}
