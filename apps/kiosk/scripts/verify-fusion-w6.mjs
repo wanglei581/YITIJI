@@ -210,7 +210,7 @@ const WAVE_ROUTES = new Map([
     '/job-fairs/:id/companies', '/job-fairs/:id/companies/:companyId',
     '/job-fairs/:id/map', '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
     '/job-fairs/:id/stats', '/fairs-service', '/campus', '/campus/welcome', '/campus/freshman-insights',
-    '/smart-campus', '/smart-campus/welcome', '/smart-campus/freshman-insights',
+    '/smart-campus', '/smart-campus/welcome',
     '/smart-campus/service/:key', '/renshi', '/jobs/online-platforms', '/jobs-service',
     // 3.14：稿 45 的宿主换成本机构官方渠道，/jobs/online-platforms 留作重定向，两条都归 W4。
     '/official-channels',
@@ -256,6 +256,15 @@ check('router matches frozen route manifest', () => {
     assert.equal(route.redirect.to, target, `${path} target`)
     assert.equal(route.redirect.replace, true, `${path} must replace history`)
   }
+})
+
+check('parked smart-campus freshman-insights route is absent while source remains', () => {
+  const routeSource = readKiosk('src/routes/index.tsx')
+  const sourcePage = readKiosk('src/pages/smart-campus/FreshmanInsightsPage.tsx')
+  assert.ok(!manifest.paths.includes('/smart-campus/freshman-insights'), 'parked route must not remain in route-manifest.ts')
+  assert.doesNotMatch(routeSource, /path:\s*'smart-campus\/freshman-insights'/)
+  assert.doesNotMatch(routeSource, /pages\/smart-campus\/FreshmanInsightsPage/)
+  assert.match(sourcePage, /FreshmanInsightsPage/)
 })
 
 check('wave ownership', () => {
@@ -543,6 +552,7 @@ check('W6 browser collection contract', () => {
   assert.match(config, /name: 'mobile-390x844', grep: \/@w6-mobile\$\//, 'mobile project must own only @w6-mobile tests')
   assert.match(routes, /pattern: '\/resume\/career-plan'[\s\S]*featureText: '求职方案'/, 'career-plan W6 路由面必须断言求职方案')
   assert.match(spec, /\/resume\/career-plan mobile breakpoint @w6-mobile/, 'career-plan 必须有 390×844 断点')
+  assert.match(spec, /\/smart-campus\/freshman-insights 已停放，路由不存在 @w6-kiosk/, '停放的 freshman-insights 必须断言直达路由不存在')
 })
 
 check('W6 legal and long-text fixture', () => {

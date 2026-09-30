@@ -10,7 +10,7 @@ export const productionRoutePatterns = [
   '/me/privacy-requests',
   '/help', '/activities', '/activities/:id', '/renshi', '/campus',
   '/campus/welcome', '/campus/freshman-insights', '/toolbox', '/smart-campus',
-  '/smart-campus/welcome', '/smart-campus/freshman-insights',
+  '/smart-campus/welcome',
   '/smart-campus/service/:key', '/print-scan', '/print-scan/feature/:key',
   '/print-scan/convert', '/print-scan/sign', '/print/scan-convert',
   '/print/scan-sign', '/print/scan-feature', '/print/upload',
@@ -44,7 +44,7 @@ export const productionRoutePatterns = [
   '/contract-review/processing',
   '/contract-review/result',
   '/policy-service',
-] as const // 110 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels)
+] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels；2026-09-30 停放 smart-campus/freshman-insights)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',

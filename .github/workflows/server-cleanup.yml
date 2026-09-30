@@ -14,7 +14,8 @@ name: Server Cleanup (backups / pnpm store / journal)
 #
 # 安全设计：
 #   · dry_run 默认 true，必须显式传 false 才真删
-#   · 备份按「保留最近 N 份发布」清理，N 默认 3，且**永不删最新的一份**
+#   · 备份按发布分组保留最近 N 组（默认 3）。不完整组不占名额。
+#     最新一组带 .ok 的完整备份必留；至少留 1 组完整备份。
 #   · 只操作 /srv/ai-job-print-backups，路径写死，不接受外部输入
 #   · 仓库为 public、Actions 日志公开 —— 只输出序号/大小/天数，不打印完整路径与文件名
 
@@ -37,6 +38,12 @@ on:
         description: '同时把 journal 压到 200M'
         type: boolean
         default: true
+
+# 与生产发布共用并发组：发布正在写备份时，清理在队列里等，不并发删。
+# 不取消进行中的发布或清理。cleanup-stale-releases.yml 需要同样的组，由另一路改。
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
 jobs:
   cleanup:
@@ -65,31 +72,115 @@ jobs:
             fi
 
             echo "=== 备份清单（按发布分组，新→旧）==="
-            # 每次发布产生 <prefix>.dump 与 <prefix>.runtime，按 prefix 归组
+            # .dump / .runtime / .migrations.log / .dump.partial / .runtime.partial / .ok 都归到同一个 stem。
+            # 迁移日志、partial 和成功标记都不能单占保留名额。只有 partial、没有完整
+            # .dump+.runtime 的组不占名额，清理时删掉。最新一组带 .ok 的完整组必留。
+            # 整个目录一个 .ok 都没有时，按时间留最新 keep 组，但仍至少留 1 组完整组。
+            KEEP_RAW="${KEEP:-3}"
+            case "$KEEP_RAW" in
+              ''|*[!0-9]*|[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*)
+                echo "::warning::KEEP=${KEEP_RAW} 不是 1 到 7 位数字，改用 3"
+                KEEP=3
+                ;;
+              *)
+                KEEP_STRIPPED="${KEEP_RAW#"${KEEP_RAW%%[!0]*}"}"
+                [ -n "$KEEP_STRIPPED" ] || KEEP_STRIPPED=0
+                KEEP="$((10#$KEEP_STRIPPED))"
+                if [ "$KEEP" -lt 1 ] || [ "$KEEP" -gt 20 ]; then
+                  echo "::warning::KEEP=${KEEP_RAW} 超出 1-20，改用 3"
+                  KEEP=3
+                fi
+                ;;
+            esac
+            # 只认 .dump / .runtime / .migrations.log / .dump.partial / .runtime.partial / .ok。
+            # 其他文件不计组、不尝试删除。
             STEMS="$(find "$BK" -maxdepth 1 -mindepth 1 -printf '%T@\t%p\n' \
                      | sort -rn \
                      | sed 's#.*/##' \
-                     | sed 's/\.\(dump\|runtime\)$//' \
-                     | awk '!seen[$0]++')"
+                     | awk '
+                         /\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/ {
+                           sub(/\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/, "")
+                           if ($0 != "" && !seen[$0]++) print
+                         }
+                       ')"
             TOTAL="$(echo "$STEMS" | grep -c . || true)"
             echo "RELEASE_GROUP_COUNT=$TOTAL"
 
-            IDX=0
+            COMPLETE_LIST=""
+            PARTIAL_LIST=""
+            OK_ANCHOR=""
+            ANY_OK=0
+            for ok_file in "$BK"/*.ok; do
+              if [ -f "$ok_file" ]; then
+                ANY_OK=1
+                break
+              fi
+            done
+            while IFS= read -r stem; do
+              [ -z "$stem" ] && continue
+              if [ -f "$BK/$stem.dump" ] && [ -d "$BK/$stem.runtime" ]; then
+                COMPLETE_LIST="$COMPLETE_LIST $stem"
+                if [ -z "$OK_ANCHOR" ] && [ -f "$BK/$stem.ok" ]; then
+                  OK_ANCHOR="$stem"
+                fi
+              else
+                PARTIAL_LIST="$PARTIAL_LIST $stem"
+              fi
+            done <<< "$STEMS"
+
             KEEP_LIST=""
+            KEPT_N=0
+            for stem in $COMPLETE_LIST; do
+              if [ "$KEPT_N" -lt "$KEEP" ]; then
+                KEEP_LIST="$KEEP_LIST $stem"
+                KEPT_N=$((KEPT_N + 1))
+              fi
+            done
+            if [ "$ANY_OK" = 1 ] && [ -n "$OK_ANCHOR" ]; then
+              case " $KEEP_LIST " in
+                *" $OK_ANCHOR "*) ;;
+                *) KEEP_LIST="$KEEP_LIST $OK_ANCHOR" ;;
+              esac
+            fi
+            if [ -n "$COMPLETE_LIST" ]; then
+              COMPLETE_KEPT=0
+              for stem in $COMPLETE_LIST; do
+                case " $KEEP_LIST " in
+                  *" $stem "*) COMPLETE_KEPT=1; break ;;
+                esac
+              done
+              if [ "$COMPLETE_KEPT" = 0 ]; then
+                newest_complete="${COMPLETE_LIST# }"
+                newest_complete="${newest_complete%% *}"
+                KEEP_LIST="$KEEP_LIST $newest_complete"
+              fi
+            fi
             DEL_LIST=""
+            for stem in $COMPLETE_LIST $PARTIAL_LIST; do
+              case " $KEEP_LIST " in
+                *" $stem "*) ;;
+                *) DEL_LIST="$DEL_LIST $stem" ;;
+              esac
+            done
+
+            IDX=0
             while IFS= read -r stem; do
               [ -z "$stem" ] && continue
               IDX=$((IDX+1))
-              SZ="$(du -sm "$BK"/"$stem"* 2>/dev/null | awk '{s+=$1} END{print s+0}')"
-              AGE="$(find "$BK" -maxdepth 1 -name "$stem*" -printf '%T@\n' 2>/dev/null | sort -rn | head -1 \
-                     | awk '{print int((systime()-$1)/86400)}')"
-              if [ "$IDX" -le "$KEEP" ]; then
-                echo "  [保留] #$IDX  ${SZ}MB  ${AGE}天前"
-                KEEP_LIST="$KEEP_LIST $stem"
+              SZ="$(du -sm "$BK/$stem.dump" "$BK/$stem.runtime" "$BK/$stem.migrations.log" "$BK/$stem.dump.partial" "$BK/$stem.runtime.partial" "$BK/$stem.ok" 2>/dev/null | awk '{s+=$1} END{print s+0}' || true)"
+              AGE="$(find "$BK" -maxdepth 1 -name "$stem*" -printf '%T@\n' 2>/dev/null | sort -rn | awk 'NR==1{n=$1} END{if (n=="") print 0; else print int((systime()-n)/86400)}')"
+              MARK=""
+              if [ -f "$BK/$stem.dump" ] && [ -d "$BK/$stem.runtime" ]; then
+                if [ "$stem" = "$OK_ANCHOR" ]; then
+                  MARK="最近一次成功发布前的快照（回退锚点）"
+                fi
               else
-                echo "  [待删] #$IDX  ${SZ}MB  ${AGE}天前"
-                DEL_LIST="$DEL_LIST $stem"
+                MARK="不完整"
               fi
+              case " $KEEP_LIST " in
+                *" $stem "*) echo "  [保留] #${IDX}  ${SZ}MB  ${AGE}天前  ${MARK}" ;;
+                *) echo "  [待删] #${IDX}  ${SZ}MB  ${AGE}天前  ${MARK}" ;;
+              esac
             done <<< "$STEMS"
 
             DEL_COUNT="$(echo $DEL_LIST | wc -w | tr -d ' ')"
@@ -98,15 +189,19 @@ jobs:
             if [ "$DRY_RUN" = "true" ]; then
               echo "=== DRY-RUN：以上仅为计划，未删除任何文件 ==="
             else
-              if [ "$IDX" -le "$KEEP" ]; then
+              if [ "$DEL_COUNT" -eq 0 ]; then
                 echo "备份份数未超过保留数，无需删除"
               else
-                echo "=== 执行删除（永不删最新一份）==="
+                echo "=== 执行删除（保留最近一次成功发布前的快照（回退锚点），且至少留一组完整备份）==="
                 for stem in $DEL_LIST; do
                   # 双重保险：跳过保留名单中的任何 stem
                   case " $KEEP_LIST " in *" $stem "*) echo "  跳过（在保留名单）"; continue;; esac
-                  rm -rf -- "$BK"/"$stem".dump "$BK"/"$stem".runtime 2>/dev/null
-                  echo "  已删除一组"
+                  rm -rf -- "$BK"/"$stem".dump "$BK"/"$stem".runtime "$BK"/"$stem".migrations.log "$BK"/"$stem".dump.partial "$BK"/"$stem".runtime.partial "$BK"/"$stem".ok 2>/dev/null || true
+                  if [ -e "$BK/$stem.dump" ] || [ -e "$BK/$stem.runtime" ] || [ -e "$BK/$stem.migrations.log" ] || [ -e "$BK/$stem.dump.partial" ] || [ -e "$BK/$stem.runtime.partial" ] || [ -e "$BK/$stem.ok" ]; then
+                    echo "::warning::没有删掉的备份组:${stem}"
+                  else
+                    echo "  已删除一组"
+                  fi
                 done
               fi
             fi

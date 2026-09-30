@@ -35,8 +35,6 @@ const DATA_TYPE_FILTER_MAP: Record<string, 'job' | 'fair' | null> = {
   全部: null, 岗位: 'job', 招聘会: 'fair',
 }
 
-const PAGE_SIZE = 15
-
 function fmtDate(iso: string | null): string {
   return formatDateTime(iso)
 }
@@ -54,6 +52,7 @@ export default function ImportBatchesPage() {
   const [statusFlt,   setStatusFlt]   = useState('全部')
   const [typeFlt,     setTypeFlt]     = useState('全部')
   const [page,        setPage]        = useState(1)
+  const [pageSize,    setPageSize]    = useState(20)
   // 本页本来只读（没有导入 / 确认 / 撤回按钮）。托管关闭时如实说明导入已停止，
   // 处置入口在两个信息源页（逐条紧急下架）与数据接入通道（按来源熔断）；这里不做按批次的批量下架。
   const hosting = useRecruitmentHosting()
@@ -97,7 +96,7 @@ export default function ImportBatchesPage() {
     : byType
 
   const total  = searched.length
-  const paged  = searched.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const paged  = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const counts: Record<string, number> = {
     全部:   batches.length,
@@ -197,7 +196,8 @@ export default function ImportBatchesPage() {
         <ConsoleTable items={paged} columns={columns} loading={loading}
           error={error ? { message: '加载失败，请重试', onRetry: () => setReloadKey((key) => key + 1) } : null}
           empty={{ title: '暂无导入记录', description: search ? `未找到包含"${search}"的导入批次` : '当前筛选条件下没有导入记录' }}
-          total={total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          total={total} page={page} pageSize={pageSize} onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
       </Card>
 
       {footnote && <p className="mt-3 text-xs text-neutral-400">{footnote}</p>}
