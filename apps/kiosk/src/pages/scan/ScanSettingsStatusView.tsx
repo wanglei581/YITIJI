@@ -390,7 +390,6 @@ export function ScanSettingsStatusView({
  */
 export interface ScanSettingsSessionFactsProps {
   scanType: ScanType
-  scanTaskId: string
   countdown: string
   rescanRequested: boolean
   plainRestartChosen: boolean
@@ -399,7 +398,6 @@ export interface ScanSettingsSessionFactsProps {
 
 export function ScanSettingsSessionFacts({
   scanType,
-  scanTaskId,
   countdown,
   rescanRequested,
   plainRestartChosen,
@@ -414,7 +412,6 @@ export function ScanSettingsSessionFacts({
           title="任务信息"
           rows={[
             ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-            ['任务编号', scanTaskId],
             ['剩余时间', countdown],
             ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
             ...(natureRow ? [natureRow] : []),

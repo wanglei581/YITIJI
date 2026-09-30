@@ -693,13 +693,12 @@
 .pfp-card .pff-inbar-b { margin: 12px 0 0; }
 .pfp-card .pff-inbar-b b { color: var(--qx-ink); }
 
-/* 出纸口（稿 .out-card）：位置引导，不代表进度。它吸收本屏余量，状态越少越舒展。 */
-.pfp-page > .pfp-out { flex: 1 0 auto; border-radius: 32px; padding: 24px 34px; gap: 32px; }
-.pfp-page > .pfp-out { align-items: stretch; min-height: 300px; }
+/* 出纸口（稿 .out-card）：位置引导，不代表进度。说明按自然高度顺排。 */
+.pfp-page > .pfp-out { flex: none; border-radius: 32px; padding: 24px 34px; gap: 32px; }
+.pfp-page > .pfp-out { align-items: flex-start; }
 .pfp-page > .pfp-out .pff-out-main {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   padding: 6px 0 4px;
 }
 .pfp-page .pff-out-stage { width: 200px; height: 220px; }

@@ -61,6 +61,8 @@ function registerScanCapability(
 }
 
 async function expectHealthy(page: Page, errors: string[]): Promise<void> {
+  await expect(page.getByText('任务编号', { exact: true })).toHaveCount(0)
+  await expect(page.locator('body')).not.toContainText(SCAN_TASK_ID)
   const path = new URL(page.url()).pathname
   if (path === '/scan' || path.startsWith('/scan/')) {
     await expect(page.locator('[data-qx-frame="true"]').first()).toBeVisible()
@@ -1034,7 +1036,10 @@ test('sensitive session clear returns the workbench to start without the previou
 
   await seedScanLive(page)
   await page.goto('/scan?stage=progress')
-  await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toBeVisible()
+  await expect(page.getByText('任务信息', { exact: true })).toBeVisible()
+  await expect(page.getByText('任务编号', { exact: true })).toHaveCount(0)
+  await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
+  expect(await page.evaluate(() => JSON.parse(window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '{}').live?.scanTaskId)).toBe(SCAN_TASK_ID)
 
   await page.evaluate((key) => {
     window.sessionStorage.removeItem(key)

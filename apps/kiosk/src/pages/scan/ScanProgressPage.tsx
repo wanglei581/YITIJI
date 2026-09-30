@@ -507,7 +507,6 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             title="任务信息"
             rows={[
               ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-              ['任务编号', scanTaskId ?? '未创建'],
               ['开始等待', `已等待 ${elapsed}`],
               ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
               ['保存策略', '按设备回传的原格式保存，系统不做转换'],
