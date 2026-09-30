@@ -356,7 +356,7 @@ export default function CompaniesPage() {
         </div>
       </div>
 
-      <CompaniesTable rows={filtered} openEdit={openEdit} setConfirmUnpublish={setConfirmUnpublish} />
+      <CompaniesTable hasAny={companies.length > 0} rows={filtered} openEdit={openEdit} setConfirmUnpublish={setConfirmUnpublish} />
 
       <p className="mt-3 text-xs text-neutral-400">
         本后台仅维护来源机构的企业展示资料和本机构岗位的展示性关联，不在本系统内接收求职者简历，不参与招聘闭环。求职者一律通过「去来源平台投递/扫码投递」跳转外部渠道。

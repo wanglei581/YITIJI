@@ -2,7 +2,7 @@
 // AI 用量分组表：按功能 / 按供应商 / 按终端 / 按机构 四个页签
 //
 // 数据全部来自服务端 GET /admin/ai-usage/daily 的四个桶数组：
-//   - key 为 null：终端维度显示「未关联终端」、机构维度显示「未关联机构」
+//   - key 为 null：终端维度显示「无已验签终端」、机构维度显示「无机构」
 //     （服务端口径：无已验签终端 / 无所属机构的调用）。
 //   - 金额两列分开：实测金额（只含按 token 实测折算的）与已计费金额
 //     （实测 + 未计量 × 保守单价，即计入额度的口径），保留两位小数带「元」。
@@ -102,7 +102,7 @@ export function AiUsageBreakdownTable({ summary, tab, onTabChange }: BreakdownPr
         </table>
       </div>
       <p className="mt-2 text-[11.5px] leading-relaxed text-neutral-400">
-        已计费金额 = 实测金额 + 未计量次数 × 保守单价 {formatCny(summary.limits.unmeasuredCallCostCny)}/次。「未关联终端」= 这次调用没有已验签终端（没带终端身份，或验签没通过，终端号不入账）。「未关联机构」= 没写入机构：未验签的调用不记机构，已验签但终端当时不属于任何机构的也记在这里。
+        已计费金额 = 实测金额 + 未计量次数 × 保守单价 {formatCny(summary.limits.unmeasuredCallCostCny)}/次。「无已验签终端」= 这次调用没有已验签终端（没带终端身份，或验签没通过，终端号不入账）。「无机构」= 没写入机构：未验签的调用不记机构，已验签但终端当时不属于任何机构的也记在这里。
       </p>
     </div>
   )

@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
+import assert from 'node:assert/strict'
 
 const routes = [
   {
@@ -137,6 +139,25 @@ for (const route of subtitlePages) {
     }
   }
 }
+
+// 企业页本地筛选：子表须接收全量是否存在，不能用筛选后 rows.length 区分空态。
+const companies = readFileSync(fileURLToPath(new URL('../src/routes/companies/index.tsx', import.meta.url)), 'utf8')
+assert.ok(companies.includes('hasAny={companies.length > 0}'), '企业表必须从全量 rows 接收 hasAny')
+const companyTable = readFileSync(fileURLToPath(new URL('../src/routes/companies/CompaniesTable.tsx', import.meta.url)), 'utf8')
+const ast = ts.createSourceFile('CompaniesTable.tsx', companyTable, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+let emptyTitle
+function visitEmpty(node) {
+  if (ts.isJsxAttribute(node) && node.name.getText(ast) === 'empty') {
+    emptyTitle = node.initializer.expression.properties.find((p) => p.name?.getText(ast) === 'title').initializer.getText(ast)
+  }
+  ts.forEachChild(node, visitEmpty)
+}
+visitEmpty(ast)
+assert.ok(emptyTitle, '企业表必须提供空态标题')
+const titleOf = new Function('hasAny', 'rows', `return (${emptyTitle})`)
+assert.equal(titleOf(false, []), '暂无匹配的企业资料')
+assert.equal(titleOf(true, []), '当前筛选条件下无企业', '全量有企业但筛选为零时必须说明筛选无结果')
+console.log('PASS 企业表两种空态：全量无数据 / 全量有数据但筛选为零')
 
 if (failed) process.exit(1)
 console.log('verify:partner-refresh-safe passed')

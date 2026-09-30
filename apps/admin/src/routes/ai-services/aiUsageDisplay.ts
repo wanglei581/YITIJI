@@ -2,10 +2,10 @@
 // 「AI 用量与额度」面板（#1088）的显示名映射与金额格式化
 //
 // 只服务 AiUsagePanel / AiUsageBreakdownTable：
-//   - 功能 key / 供应商 key → 中文名，null key → 「未关联终端 / 未关联机构」。
+//   - 功能 key / 供应商 key → 中文名，null key → 「无已验签终端 / 无机构」。
 //   - AI 服务日志旧表的 operation 常量在 aiOperationLabels.ts，别混进来。
 //
-// 功能与厂商的未知 key 保留原值；终端与机构只有 ID 时显示未命名，ID 由调用方悬停保留。
+// 功能与厂商的未知 key 保留原值；终端与机构只有数据库 ID 时显示尾号（末 6 位，短 ID 原样），ID 由调用方悬停保留。
 // 功能 key 取值与服务端 llm-config.service.ts 的功能位 key 同源
 //（assistant_chat / resume_optimize / …），另有两个不在功能位表里的
 //（assistant_summary、unknown）。
@@ -43,16 +43,16 @@ export const AI_USAGE_VENDOR_LABELS: Readonly<Record<string, string>> = {
 }
 
 /** 终端维度下 key 为 null = 无已验签终端（服务端 ai-usage-summary.ts 注释口径）。 */
-export const UNASSIGNED_TERMINAL_LABEL = '未关联终端'
+export const UNASSIGNED_TERMINAL_LABEL = '无已验签终端'
 /** 机构维度下 key 为 null = 无所属机构。 */
-export const UNASSIGNED_ORG_LABEL = '未关联机构'
+export const UNASSIGNED_ORG_LABEL = '无机构'
 
 export type AiUsageDimension = 'feature' | 'vendor' | 'terminal' | 'org'
 
-/** 维度显示名：功能/厂商用已有映射；终端/机构无名称时给诚实空态，null 是未关联。 */
+/** 维度显示名：功能/厂商用已有映射；终端/机构无名称时显示 ID 尾号，null 是未关联。 */
 export function aiUsageKeyName(dimension: AiUsageDimension, key: string | null): string {
-  if (dimension === 'terminal') return key === null ? UNASSIGNED_TERMINAL_LABEL : '未命名终端'
-  if (dimension === 'org') return key === null ? UNASSIGNED_ORG_LABEL : '未命名机构'
+  if (dimension === 'terminal') return key === null ? UNASSIGNED_TERMINAL_LABEL : `终端（尾号 ${key.slice(-6)}）`
+  if (dimension === 'org') return key === null ? UNASSIGNED_ORG_LABEL : `机构（尾号 ${key.slice(-6)}）`
   const labels = dimension === 'feature' ? AI_USAGE_FEATURE_LABELS : AI_USAGE_VENDOR_LABELS
   if (key === null) return '—'
   return labels[key] ?? key

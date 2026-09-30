@@ -95,9 +95,15 @@ export function AiLogsTable({
       id: 'operation',
       header: '服务类型',
       cell: (log) => (
-        <span title={`任务编号：${log.taskId} · ${log.operation}`}>
+        <div title={`任务编号：${log.taskId} · ${log.operation}`}>
           {OPERATION_LABELS[log.operation] ?? '其他 AI 功能'}
-        </span>
+          <details className="mt-1 text-xs text-neutral-500">
+            <summary className="cursor-pointer">任务详情</summary>
+            <label className="mt-1 block">任务编号
+              <input aria-label="任务编号（可选择复制）" readOnly value={log.taskId} onFocus={(event) => event.currentTarget.select()} className="mt-1 w-full rounded border border-neutral-200 px-2 py-1 font-mono" />
+            </label>
+          </details>
+        </div>
       ),
     },
     {
@@ -194,8 +200,8 @@ export function AiLogsTable({
           loading={logsLoading}
           error={logsError ? { title: '调用日志加载失败', message: logsError } : null}
           empty={{
-            title: '该筛选条件下没有调用记录',
-            description: '已按条件查询全部记录，请调整筛选条件。',
+            title: '该筛选条件下没有调用记录（已按条件查全库，不是只翻了最近 100 条）',
+            description: '请调整筛选条件。',
           }}
           page={Math.floor(logsOffset / LOGS_PAGE_SIZE) + 1}
           pageSize={LOGS_PAGE_SIZE}

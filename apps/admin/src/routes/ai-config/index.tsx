@@ -11,6 +11,7 @@
 // 合规：API Key 只存服务端，前端不回显（仅显示"已配置"）。
 // ============================================================
 
+import './ai-config.css'
 import { useCallback, useEffect, useState } from 'react'
 import { Card, Button, LoadingState, ErrorState } from '@ai-job-print/ui'
 import { CheckCircle2Icon, XCircleIcon, KeyRoundIcon, SparklesIcon, ShieldCheckIcon } from 'lucide-react'
@@ -207,7 +208,7 @@ export default function AiConfigPage() {
             <p className="text-sm font-medium text-neutral-900">功能配置</p>
             <p className="mt-1 text-xs text-neutral-500">已接入的功能保存后生效；标为「未接入」的功能可以先保存配置，接入前不影响一体机。</p>
           </div>
-          <div className="grid auto-rows-fr gap-3 md:grid-cols-2 min-[1400px]:grid-cols-3 min-[1800px]:grid-cols-4">
+          <div className="ai-feature-grid grid gap-3">
             {features.map((feature) => {
               const featureConfig = configs?.[feature.key]
               const configured = Boolean(featureConfig?.enabled && featureConfig.apiKeyConfigured)

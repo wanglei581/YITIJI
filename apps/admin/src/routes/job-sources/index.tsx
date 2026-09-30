@@ -138,7 +138,11 @@ export default function JobSourcesPage() {
     { id: 'col5', header: '薪资', cellClassName: 'whitespace-nowrap  text-xs text-neutral-600', cell: (s) => s.salary },
     { id: 'col6', header: '同步时间', cellClassName: 'whitespace-nowrap  text-xs text-neutral-400', cell: (s) => formatDateTime(s.syncTime) },
     { id: 'col7', header: '审核状态', cellClassName: '', cell: (s) => <><StatusBadge dot status={REVIEW_MAP[s.reviewStatus].badge}  label={REVIEW_MAP[s.reviewStatus].label}  /></> },
-    { id: 'col8', header: '发布状态', cellClassName: '', cell: (s) => <><StatusBadge dot status={PUBLISH_MAP[s.publishStatus].badge} label={PUBLISH_MAP[s.publishStatus].label} /></> },
+    { id: 'col8', header: '发布状态', cellClassName: '', cell: (s) => {
+      // expired 由后端按 validThrough 派生，不是 publishStatus 的枚举值。
+      const publish = s.expired ? { badge: 'default' as const, label: '已发布 · 已过期' } : PUBLISH_MAP[s.publishStatus]
+      return <StatusBadge dot status={publish.badge} label={publish.label} />
+    } },
     { id: 'col9', header: '操作', sticky: true, cellClassName: 'whitespace-nowrap', cell: (s) => <><div className="flex gap-2">
                           <button type="button" onClick={() => setViewing(s)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看</button>
                           <button

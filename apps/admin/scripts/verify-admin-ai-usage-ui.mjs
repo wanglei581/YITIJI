@@ -6,7 +6,7 @@
 //      服务端改了这里先红，免得面板说明与真实行为脱节。
 //   B. aiUsageDaily.ts 适配器：请求路径与 day 参数；不合法日期不发请求；401 跳登录；
 //      403 / 400 的错误码与服务端中文 message 原样带回；响应形状不对不当成功；mock 不造假数。
-//   C. 显示名与金额：null key → 「未关联终端 / 未关联机构」；已知功能 / 供应商 key 给中文名；
+//   C. 显示名与金额：null key → 「无已验签终端 / 无机构」；已知功能 / 供应商 key 给中文名；
 //      认不出的 key 原样显示；金额两位小数带「元」。
 //   D. 面板真渲染：演示模式诚实空态；读取中 / 失败重试 / 正常三态；触顶告警引用服务端原话；
 //      四个页签；0 调用如实显示；未来日期不采纳。失败只显示中文说明，不显示错误码。
@@ -237,12 +237,15 @@ await check('B6 mock：标演示、不发请求、直接拒绝（不造假数）
 })
 
 // ─── C. 显示名与金额（真跑 aiUsageDisplay.ts） ────────────────────────────────
-await check('C1 null key 显示「未关联终端 / 未关联机构」；已知 key 给中文名；认不出原样显示', () => {
+await check('C1 null key 显示「无已验签终端 / 无机构」；已知 key 给中文名；认不出原样显示', () => {
   const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
-  assert.equal(display.aiUsageKeyName('terminal', null), '未关联终端')
-  assert.equal(display.aiUsageKeyName('org', null), '未关联机构')
-  assert.equal(display.aiUsageKeyName('terminal', 't_09fd'), '未命名终端')
-  assert.equal(display.aiUsageKeyName('org', 'org_6349'), '未命名机构')
+  assert.equal(display.aiUsageKeyName('terminal', null), '无已验签终端')
+  assert.equal(display.aiUsageKeyName('org', null), '无机构')
+  assert.equal(display.aiUsageKeyName('terminal', 't_09fd'), '终端（尾号 t_09fd）')
+  assert.equal(display.aiUsageKeyName('org', 'org_6349'), '机构（尾号 g_6349）')
+  assert.equal(display.aiUsageKeyName('terminal', 'ab'), '终端（尾号 ab）', '短 ID 全文显示，不补零')
+  assert.equal(display.aiUsageKeyName('org', 'cd'), '机构（尾号 cd）')
+  assert.notEqual(display.aiUsageKeyName('terminal', 'db-primary-123456'), display.aiUsageKeyName('terminal', 'db-primary-654321'))
   assert.equal(display.aiUsageKeyName('feature', 'resume_optimize'), 'AI简历优化')
   assert.equal(display.aiUsageKeyName('feature', 'assistant_chat'), 'AI助手对话')
   assert.equal(display.aiUsageKeyName('feature', 'unknown'), '未知功能')
@@ -258,6 +261,15 @@ await check('C2 金额两位小数带「元」', () => {
   assert.equal(display.formatCny(0.05), '0.05 元')
   assert.equal(display.formatCny(0), '0.00 元')
   assert.equal(display.formatCny(123.456), '123.46 元')
+})
+
+await check('C4 未登记失败原因显示各自码值，已登记原因保持中文', () => {
+  const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
+  const { aiLogReason } = load('src/routes/ai-services/aiLogDisplay.ts', { './aiUsageDisplay': display })
+  assert.equal(aiLogReason('NEW_FAILURE_A'), '未归类失败（NEW_FAILURE_A）')
+  assert.equal(aiLogReason('NEW_FAILURE_B'), '未归类失败（NEW_FAILURE_B）')
+  assert.notEqual(aiLogReason('NEW_FAILURE_A'), aiLogReason('NEW_FAILURE_B'))
+  assert.equal(aiLogReason('AI_PROVIDER_ERROR'), '模型厂商服务异常')
 })
 
 // ─── D. 面板真渲染（最小 hooks 运行时） ───────────────────────────────────────
@@ -438,7 +450,7 @@ await check('D3 查看北京时间今天且触顶：全局醒目标红并照服�
   assert.ok(alert.includes(EXHAUSTED_GLOBAL), `后果必须引用服务端原话「${EXHAUSTED_GLOBAL}」`)
   assert.match(alert, /这台机器今天的 AI 服务额度已用完/, '单终端触顶要引用终端档原话')
   assert.match(alert, /你今天的 AI 服务额度已用完/, '会员触顶要引用会员档原话')
-  assert.match(alert, /未命名终端、未命名终端/, '接口只给 ID 时不编造终端名')
+  assert.match(alert, /终端（尾号 osk-01）、终端（尾号 osk-02）/, '两台终端必须显示各自的末 6 位')
   assert.doesNotMatch(alert, /kiosk-0[12]/, '终端 ID 不在正文展示')
   for (const id of ['kiosk-01', 'kiosk-02']) assert.ok(find(tree, (node) => node.props.title === id).length > 0, `触顶终端 ${id} 必须保留悬停原值`)
   assert.match(alert, /3 人/, '已到会员上限的只给人数')
@@ -456,7 +468,7 @@ await check('D3b 历史日期触顶：列出终端与人数，但不把「现在
   assert.match(text, /历史日期 2026-09-28/)
   assert.match(text, /不会据此拒绝现在的新请求/)
   assert.doesNotMatch(text, /新的 AI 生成与语音请求会被拒绝/, '历史日期的账不能写成闸门正在拒绝新请求')
-  assert.match(text, /未命名终端/)
+  assert.match(text, /终端（尾号 osk-01）/)
   assert.ok(find(await panel.view.settle(), (node) => node.props.title === 'kiosk-01').length > 0, '历史触顶终端在悬停保留 ID')
   assert.match(text, /2 人/)
   assert.doesNotMatch(text, /均未触顶/)
@@ -475,8 +487,11 @@ await check('D3c 今天只触到单终端：不能写成三档都没满', async 
   assert.doesNotMatch(text, /你今天的 AI 服务额度已用完/)
 })
 
-await check('D4 四个页签：功能 / 供应商给中文名，终端 / 机构的 null key 给「未关联」', async () => {
-  const panel = mountPanel({})
+await check('D4 四个页签：功能 / 供应商给中文名，终端 / 机构的 null key 给「无已验签终端 / 无机构」', async () => {
+  const sample = SAMPLE()
+  sample.byTerminal.push({ ...sample.byTerminal[1], key: 'kiosk-02' })
+  sample.byOrg.push({ ...sample.byOrg[0], key: 'org-primary-123456' })
+  const panel = mountPanel({ get: () => Promise.resolve(sample) })
   let tree = await panel.view.settle()
   assert.match(textOf(tree), /AI简历优化/, '功能页签要显示中文名')
   assert.match(textOf(tree), /已计费金额（计入额度）/)
@@ -485,13 +500,17 @@ await check('D4 四个页签：功能 / 供应商给中文名，终端 / 机构�
   assert.match(textOf(tree), /DeepSeek/)
   act.click(tabs(tree, '按终端')[0])
   tree = panel.view.render()
-  assert.match(textOf(tree), /未关联终端/)
-  assert.match(textOf(tree), /未命名终端/)
-  assert.ok(find(tree, (node) => node.props.title === 'kiosk-01').length > 0, '按终端列表保留 ID 悬停')
+  assert.match(textOf(tree), /无已验签终端/)
+  assert.match(textOf(tree), /终端（尾号 osk-01）/)
+  for (const id of ['kiosk-01', 'kiosk-02']) {
+    const cells = find(tree, (node) => node.props.title === id)
+    assert.ok(cells.some((node) => textOf(node.children) === `终端（尾号 ${id.slice(-6)}）`), `按终端列表 ${id} 的真实尾号及完整 title 必须同在一格`)
+  }
   assert.doesNotMatch(textOf(tree), /kiosk-01/)
   act.click(tabs(tree, '按机构')[0])
   tree = panel.view.render()
-  assert.match(textOf(tree), /未关联机构/)
+  assert.match(textOf(tree), /无机构/)
+  assert.ok(find(tree, (node) => node.props.title === 'org-primary-123456').some((node) => textOf(node.children) === '机构（尾号 123456）'))
 })
 
 await check('D5 当天 0 调用：如实显示 0，不装作没查到', async () => {
@@ -678,7 +697,7 @@ await check('F2 面板渲染结果不含 HTTP 状态码、英文错误码、字�
   assert.match(text, /会被拒绝，并提示「/)
   assert.match(text, /AI简历优化/, '已知功能显示中文名')
   assert.doesNotMatch(text, /resume_optimize/, '已知功能不要再附英文 key')
-  assert.match(text, /未命名终端/, '只有 ID 时给诚实名称空态')
+  assert.match(text, /终端（尾号 osk-01）/, '只有 ID 时显示真实尾号')
   assert.ok(find(await panel.view.settle(), (node) => node.props.title === 'kiosk-01').length > 0, '终端 ID 在悬停保留')
   assert.doesNotMatch(text, /kiosk-01/, '正文不直接露出终端 ID')
   assertOperatorFacing(text, '触顶面板')

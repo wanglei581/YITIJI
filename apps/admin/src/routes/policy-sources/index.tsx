@@ -110,14 +110,15 @@ export default function PolicySourcesPage() {
 
   const baseColumns: ConsoleColumn<AdminPolicyRecord>[] = [
     { id: 'source', header: '来源机构', headerClassName: 'w-[11%]', truncate: true, cell: (r) => r.sourceName },
-    { id: 'kind', header: '类型', headerClassName: 'w-[7%]', cell: (r) => <span className={`whitespace-nowrap text-xs ${r.kind === 'policy_guide' ? 'text-info-fg' : 'text-purple-600'}`}>{KIND_LABELS[r.kind] ?? r.kind}</span> },
+    { id: 'kind', header: '类型', headerClassName: 'w-[6%]', cell: (r) => <span className={`whitespace-nowrap text-xs ${r.kind === 'policy_guide' ? 'text-info-fg' : 'text-purple-600'}`}>{KIND_LABELS[r.kind] ?? r.kind}</span> },
     { id: 'title', header: '标题', headerClassName: 'w-[24%]', cell: (r) => <div title={[r.title, r.summary, r.reviewStatus === 'rejected' && r.rejectReason ? `拒绝原因:${r.rejectReason}` : ''].filter(Boolean).join('\n')}>
       <p className={`${r.reviewStatus === 'rejected' && r.rejectReason ? 'line-clamp-1' : 'line-clamp-2'} break-words font-medium text-neutral-800`}>{r.title}</p>
+      {r.summary && <p className="line-clamp-1 text-xs text-neutral-500">{r.summary}</p>}
       {r.reviewStatus === 'rejected' && r.rejectReason && <p className="truncate text-xs text-error-fg">拒绝原因:{r.rejectReason}</p>}
     </div> },
-    { id: 'group', header: '分组/标签', headerClassName: 'w-[8%]', truncate: true, cell: (r) => r.kind === 'policy_guide' ? (r.audience ? AUDIENCE_LABELS[r.audience] ?? r.audience : '—') : (r.category ? CATEGORY_LABELS[r.category] ?? r.category : '—') },
+    { id: 'group', header: '分组/标签', headerClassName: 'w-[7%]', truncate: true, cell: (r) => r.kind === 'policy_guide' ? (r.audience ? AUDIENCE_LABELS[r.audience] ?? r.audience : '—') : (r.category ? CATEGORY_LABELS[r.category] ?? r.category : '—') },
     { id: 'date', header: '展示日期', headerClassName: 'w-[10%]', cellClassName: 'whitespace-nowrap text-[11px]', cell: (r) => r.publishedDate ?? '—' },
-    { id: 'time', header: '提交时间', headerClassName: 'w-[12%]', cellClassName: 'text-[11px]', cell: (r) => <span title={formatDateTime(r.syncTime)}>{formatDateTime(r.syncTime)}</span> },
+    { id: 'time', header: '提交时间', headerClassName: 'w-[14%]', cellClassName: 'whitespace-nowrap text-[11px]', cell: (r) => <span title={formatDateTime(r.syncTime)}>{formatDateTime(r.syncTime)}</span> },
     { id: 'review', header: '审核状态', headerClassName: 'w-[9%]', cell: (r) => <StatusBadge className="px-2 text-[11px]" dot status={(REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending).badge} label={(REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending).label} /> },
     { id: 'publish', header: '发布状态', headerClassName: 'w-[9%]', cell: (r) => <StatusBadge className="px-2 text-[11px]" dot status={(PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft).badge} label={(PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft).label} /> },
     { id: 'actions', header: '操作', headerClassName: 'w-[10%]', sticky: true, cell: (r) => <div className="flex flex-col items-start gap-0.5">

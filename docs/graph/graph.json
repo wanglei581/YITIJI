@@ -17949,6 +17949,9 @@
     "apps/admin/src/routes/ai-services/AiUsagePanel.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
+    "apps/admin/src/routes/ai-services/aiLogDisplay.ts": [
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+    ],
     "apps/admin/src/routes/ai-services/aiOperationLabels.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
@@ -21187,6 +21190,9 @@
       "apps/admin/scripts/verify-honest-placeholders.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
+    ],
+    "apps/partner/src/routes/companies/CompaniesTable.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/companies/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
@@ -26530,6 +26536,7 @@
           "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsagePanel.tsx",
+          "apps/admin/src/routes/ai-services/aiLogDisplay.ts",
           "apps/admin/src/routes/ai-services/aiOperationLabels.ts",
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "apps/admin/src/routes/ai-services/index.tsx",
@@ -31082,6 +31089,7 @@
         "files": [
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/account/index.tsx",
+          "apps/partner/src/routes/companies/CompaniesTable.tsx",
           "apps/partner/src/routes/companies/index.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
           "apps/partner/src/routes/fairs/index.tsx",

@@ -42,6 +42,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import vm from 'node:vm'
+import assert from 'node:assert/strict'
 
 const adminRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(adminRoot, '..', '..')
@@ -241,6 +243,33 @@ for (const { path, kind, api } of pages) {
 }
 
 const jobSources = readFileSync(join(adminRoot, 'src/routes/job-sources/index.tsx'), 'utf8')
+// 过期由后端单独派生：真正执行页面发布列的 cell，防止仅检查枚举漏掉 expired。
+{
+  const ast = ts.createSourceFile('jobs.tsx', jobSources, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let publishMap
+  let publishCell
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'PUBLISH_MAP') publishMap = node.initializer.getText(ast)
+    if (ts.isObjectLiteralExpression(node)) {
+      const props = new Map(node.properties.filter(ts.isPropertyAssignment).map((p) => [p.name.getText(ast), p.initializer]))
+      if (props.get('header')?.text === '发布状态') publishCell = props.get('cell')?.getText(ast)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.ok(publishMap && publishCell, '必须找到实际发布列与映射')
+  const output = ts.transpileModule(`const PUBLISH_MAP = ${publishMap}; const StatusBadge = 'badge'; const cell = ${publishCell}; module.exports = cell;`, {
+    fileName: 'cell.tsx', compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText
+  const module = { exports: {} }
+  const jsx = (type, props) => ({ type, props })
+  vm.runInNewContext(output, { module, exports: module.exports, require: () => ({ jsx, jsxs: jsx }) })
+  const labelOf = (node) => node.props.label ?? labelOf(node.props.children)
+  assert.equal(labelOf(module.exports({ expired: true, publishStatus: 'published' })), '已发布 · 已过期', '过期行必须显示已发布 · 已过期')
+  assert.equal(labelOf(module.exports({ expired: false, publishStatus: 'published' })), '已发布')
+  pass('岗位信息源真实发布列：过期行显示「已发布 · 已过期」，未过期仍为已发布')
+}
+
 const fairSources = readFileSync(join(adminRoot, 'src/routes/fair-sources/index.tsx'), 'utf8')
 const policySources = readFileSync(join(adminRoot, 'src/routes/policy-sources/index.tsx'), 'utf8')
 const importBatches = readFileSync(join(adminRoot, 'src/routes/import-batches/index.tsx'), 'utf8')

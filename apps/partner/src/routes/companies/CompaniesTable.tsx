@@ -44,11 +44,12 @@ function fmtTime(iso: string): string {
 
 interface Props {
   rows: PartnerCompanyRecord[]
+  hasAny: boolean
   openEdit: (row: PartnerCompanyRecord) => void
   setConfirmUnpublish: (row: PartnerCompanyRecord) => void
 }
 
-export function CompaniesTable({ rows, openEdit, setConfirmUnpublish }: Props) {
+export function CompaniesTable({ rows, hasAny, openEdit, setConfirmUnpublish }: Props) {
   const columns: ConsoleColumn<PartnerCompanyRecord>[] = [
     {
       id: 'col0',
@@ -169,7 +170,7 @@ export function CompaniesTable({ rows, openEdit, setConfirmUnpublish }: Props) {
         items={rows}
         columns={columns}
         empty={{
-          title: rows.length === 0 ? '暂无匹配的企业资料' : '当前筛选条件下无企业',
+          title: hasAny ? '当前筛选条件下无企业' : '暂无匹配的企业资料',
           description: '可调整审核状态；新增企业仍从右上角录入本机构来源的展示信息。',
         }}
         page={1}

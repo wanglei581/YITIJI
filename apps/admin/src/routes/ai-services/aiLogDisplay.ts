@@ -1,6 +1,6 @@
 import { AI_USAGE_VENDOR_LABELS } from './aiUsageDisplay'
 
-/** 日志仅有错误码，不附带中文 message；未知码不猜测原因，原值留在悬停。 */
+/** 日志仅有错误码，不附带中文 message；未知码显示未归类及码值；已登记码的原值留在悬停。 */
 const REASONS: Readonly<Record<string, string>> = {
   ServiceUnavailableException: 'AI 服务暂时不可用',
   AI_PROVIDER_ERROR: '模型厂商服务异常',
@@ -18,7 +18,7 @@ const REASONS: Readonly<Record<string, string>> = {
 }
 
 export function aiLogReason(code: string): string {
-  return REASONS[code] ?? '调用失败，请联系运维查看原因'
+  return REASONS[code] ?? `未归类失败（${code}）`
 }
 
 /** 服务端日志格式 llm:厂商:模型；仅重排已知结构，原串由调用方保留在 title。 */
