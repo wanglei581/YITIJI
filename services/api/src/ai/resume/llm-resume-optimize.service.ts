@@ -24,6 +24,7 @@ import { withAiSafety } from '../llm/ai-prompt-safety'
 import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
+import { canonicalResumeSourceLine, detectResumeName, extractResumeExperienceCandidates, normalizeResumeStructureText, RESUME_STRUCTURE_PROMPT_RULE } from './resume-structure'
 
 // ============================================================
 // LlmResumeOptimizeService — 阶段2B 真实简历优化(单轮、结构化 JSON,OpenAI 兼容)
@@ -84,7 +85,7 @@ export const OPTIMIZE_SYSTEM_PROMPT = withAiSafety([
   '2. JSON 形如:{"resume":{"basic":{"name":"","phone":"","email":"","city":""},"intention":{"position":"","city":""},"summary":"","education":[{"school":"","major":"","degree":"","period":"","description":""}],"experience":[{"company":"","role":"","period":"","description":""}],"projects":[{"name":"","role":"","description":""}],"skills":[""],"certificates":[""]},"modules":[{"title":"","before":"","after":""}]}。',
   '3. 红线:resume 中的所有事实信息(姓名、学校、专业、学历、公司、职务、项目名、证书、电话、邮箱、时间段、数字)必须直接来自简历原文;原文没有的信息一律不写(留空字符串或空数组),绝不推测、绝不编造。',
   '4. 只优化"表达":把原文中的职责/成果描述改写得更具体、动词开头、突出成果;原文中的数字必须原样保留,不得新增原文没有的数字。',
-  '5. modules 为 2~8 条新旧对比:before 必须是简历原文中真实存在的连续片段(逐字摘录,不要改写),after 是对应的优化表达。',
+  `5. modules 按可识别的经历条数输出（至少1条、最多8条）：before 必须是简历原文中真实存在的连续片段(逐字摘录,不要改写),after 是对应的优化表达；逐条覆盖每一条可识别的公司/单位+时间段经历，以及项目、实习、校园经历，不能只从「工作经历」标题下取。${RESUME_STRUCTURE_PROMPT_RULE}`,
   '6. 不得输出任何录用、投递、面试邀约、Offer 或通过率类承诺;优化只是表达参考,由求职者本人决定是否采纳。',
   '7. 原文信息不足的部分,在对应字段留空即可,不要替用户补内容。',
   '8. 若收到"优化方向"提示(专业/学历/目标岗位/经验级别/求职场景),只能用于调整措辞重点与用词方向;不得据此新增、替换或"纠正"任何学校、公司、学历、证书、时间段等事实字段——事实字段仍必须逐字来自简历原文。',
@@ -423,7 +424,8 @@ export class LlmResumeOptimizeService {
     if (summary === null) return null
 
     // basic:姓名/电话/邮箱必须出现在原文(电话邮箱被改一个数字都不行),否则置空
-    const name = typeof basicRaw['name'] === 'string' ? basicRaw['name'].trim().slice(0, 50) : ''
+    const nameRaw = typeof basicRaw['name'] === 'string' ? basicRaw['name'].trim().slice(0, 50) : ''
+    const name = nameRaw && inText(nameRaw) ? nameRaw : detectResumeName(originalText)
     const phone = typeof basicRaw['phone'] === 'string' ? basicRaw['phone'].trim().slice(0, 30) : ''
     const email = typeof basicRaw['email'] === 'string' ? basicRaw['email'].trim().slice(0, 100) : ''
     const basic = {
@@ -497,6 +499,7 @@ export class LlmResumeOptimizeService {
 
     // 对比模块:before 必须真实摘自原文,否则丢弃该条(不因稻草人对比废整单)
     const modules: ResumeOptimizeModule[] = []
+    const sourceCandidates = extractResumeExperienceCandidates(originalText)
     for (const item of asArray(obj['modules'], MAX_MODULES)) {
       const title = strOf(item, 'title', 60)
       const before = strOf(item, 'before', MAX_MODULE_TEXT_CHARS)
@@ -505,7 +508,25 @@ export class LlmResumeOptimizeService {
       if (!title || !before || !after) continue
       if (before.length < MIN_BEFORE_CHARS) continue
       if (!normText.includes(normalizeResumeFactText(before))) continue
-      modules.push({ title, before, after })
+      const canonicalBefore = canonicalResumeSourceLine(before, sourceCandidates) ?? before
+      modules.push({ title, before: canonicalBefore, after })
+    }
+    // 模型可能漏掉一条标题前或分栏经历。对已从原文确定识别、但没有对应
+    // 对比模块的行，退化成「只改表达」的人工核对提示：不添加任何事实，
+    // 也不因单条漏回而让优化页再次显示「没有逐条建议」。
+    const coveredSources = new Set(modules.map((module) => normalizeResumeStructureText(
+      canonicalResumeSourceLine(module.before, sourceCandidates) ?? module.before,
+    )))
+    for (const candidate of sourceCandidates) {
+      if (modules.length >= MAX_MODULES) break
+      const source = normalizeResumeStructureText(candidate.line)
+      if (!source || coveredSources.has(source)) continue
+      modules.push({
+        title: '经历表达建议',
+        before: candidate.line,
+        after: `请在不新增事实的前提下，按动作和结果重新组织这段经历：${candidate.line}`,
+      })
+      coveredSources.add(source)
     }
 
     const optimizedResume: GeneratedResume = {
