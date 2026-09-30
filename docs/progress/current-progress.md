@@ -19,6 +19,19 @@
 > **2026-09-30 发布复核第二轮（候选，尚未发布，PR #1118）**：Actions 取消后远端收到的是 SIGPIPE。发布脚本在步骤 0 之前就挂上 HUP/INT/TERM/PIPE。pre 阶段只以 128+信号号退出。处理函数一进来先忽略后续信号，再把输出改到 `${BACKUP_ROOT}/release-signal-*.log`（目录不可写就退到 `/tmp`），然后再清理或回退。回退一开始 `trap ''` 并 `set +e`，途中再来的信号不重入，命令失败也不被 errexit 打断。健康检查通过后先屏蔽信号，再写 `DEPLOY_SOURCE.txt` 和 `.ok`。`.ok` 称为最近一次成功发布前的快照（回退锚点）。分组只认 `.dump`、`.runtime`、`.migrations.log`、`.dump.partial`、`.runtime.partial`、`.ok`。full 构建前用 `DEPLOY_MIN_FREE_FLOOR_MB` 默认 10240，取部署目录和备份目录里较小的可用空间；不够先 `pnpm store prune` 再判，仍不够就在安装依赖之前停。`server-cleanup.yml` 与发布共用并发组 `production-deploy`（`cancel-in-progress: false`）。控制面 SSH 在 HUP/INT/TERM/PIPE 上也会删 `/tmp/release.bundle`。没有改 `request_pty`。`cleanup-stale-releases.yml` 的同一并发组待另一路加。本机 `verify-deploy-rollback`、`verify-deploy-gates-in-sync`、`verify-deploy-authorization-gate`、`bash -n`、`verify-repository-integrity`、`verify-ci-gate-coverage` 与图谱 `--check` 退出码均为 0。七条新断言各做一次反向变异：改坏退出 1，恢复退出 0。
 
 > **2026-09-29 发布磁盘门槛（候选，尚未发布）**：`deploy-api-release.sh` 的 0b 门槛改为 max(原公式 REQUIRED_MB, `DEPLOY_MIN_FREE_FLOOR_MB`)，下限默认 10240MB。不够时默认先 `pnpm store prune`，再调用已有的 `prune_old_backups` 把旧备份收到 `DEPLOY_BACKUP_KEEP`（默认 3）组，然后复判一次；`DEPLOY_PRE_GATE_SAFE_CLEANUP=false` 关掉这次清理。清理后仍不够就中止，并指向 Server Cleanup 工作流的 dry-run。full 发布在服务器安装依赖之前另做一次只读下限检查，那边不清理。pg_dump 与运行目录先写 `.partial`，成功后再改名。摘要打印前后可用空间，并只读检查 pm2-logrotate。server-cleanup 把 `.migrations.log` 算进同一组。deploy-precheck 额外报静态备份大小、组数、最老日期，以及 `/tmp/release.bundle` 是否还在。
+## 2026-09-30：PR #1180 未注册地址的错误分类修复（本地工作区）
+
+- 范围：只修停放地址直达应显示「页面不存在」的产品缺陷；基线 `codex/park-freshman-insights-0930@1fa80662561c3e41edf5743a4b7881411b66b44a`。文件预算 5 个：Kiosk 路由、错误页、现有 runtime-error-boundary verify、current-progress、next-tasks；不新增页面、数据模型、服务或依赖，不改岗位/简历/文件/打印业务、生产配置、数据库、密钥或硬件链路。仅修复既有路由兜底语义，方案审查确认无需跨层契约或拆分；feature-scope/compliance-boundary 无范围变化。
+- 根因：停放后地址匹配 `src/routes/index.tsx` 的 `*` 普通 element，而非 errorElement；`useRouteError()` 没有错误对象，`KioskRouteErrorPage` 原判定只认 Response 404，因此误显示「页面暂时无法显示」。未知地址的祖先只有非视觉运行时根与 Outlet，没有进入 KioskRoot、SmartCampusCapabilityBoundary 或 RecruitmentHostingBoundary；只请求 screensaver 与此链路一致。W4/W6 配置使用相同构建变量，W6 复用 registerW4Api；两者智慧校园总开关都为 true，W6 的百宝箱开关/额外夹具不影响这条路由。当前源码不能解释所述 W6 CI 成功，需协调方核对那次运行 SHA 与用例执行记录。
+- 修法：仅 `*` element 传 `notFound`，错误页把显式未找到与真实 Response 404 合并判定；已注册路由的 errorElement 不传该标记，普通 Error/500 仍显示恢复指引。没有修改或删除 W4/W6 Playwright 断言，也没有补 API 夹具。
+- 验证：现有 `verify-kiosk-runtime-error-boundary.mjs` 增加真实 Router 与错误页的本地服务端渲染回归（只替换视觉组件），修复前复现原错误标题、修复后通过；覆盖停放/未知地址、真实路由树匹配、已注册页面正常/404/非 404。kiosk `tsc -b`、改动文件 eslint（TS/TSX 用仓库配置，mjs 额外用 ESLint recommended + Node globals）、fusion-w4、fusion-w6、smart-campus-ui、ci-gate-coverage、repository-integrity 均通过。未启动本地服务、未运行 Playwright、未安装依赖；浏览器结果由协调方重跑，不能据此声明 CI/设备/生产验收通过。
+- 交付：`git add` 被沙箱阻止创建共享 Git 元数据中的 `index.lock`（Operation not permitted），五个文件保留为未暂存工作区改动，协调方代提交；HEAD 未改变。
+
+## 2026-09-30：停放 `/smart-campus/freshman-insights`（不是删除）
+
+- 产品负责人拍板：该页没有 2.0 稿、没有前端入口且与首页内容重复，现停放 `/smart-campus/freshman-insights`。页面源码保留在 `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx`，不注册路由，也不进入 Kiosk 构建入口。
+- 连带收口：移除 `apps/kiosk/src/routes/index.tsx` 的页面 import/注册；从 `apps/kiosk/tests/visual/route-manifest.ts`、`fusion-w6-route-cases.ts`、W4/W6 路由清单和 verify 脚本移除运行时路由；`verify-smart-campus-ui.mjs` 改为断言源码保留但路由不存在；W4/W6 Playwright 用例改为断言直达显示「页面不存在」；`services/api/src/terminals/terminal-toolbox.service.ts` 百宝箱目标白名单移除该地址。
+- 正式文档 `docs/decisions/2026-06-17-smart-campus-jobfair-delivery-rules.md` 已改为如实描述「已停放，源码保留」。Kiosk/API typecheck、改动文件 eslint、W2/W3/W4/W5/W6、fusion baseline/shell、视觉证据、百宝箱 API、CI 覆盖、仓库完整性、合规文案和图谱生成 `--check` 均通过；Vite 生产构建通过且产物不含迎新服务导览文案。W4/W6 浏览器用例因沙箱禁止 preview 绑定 127.0.0.1 端口未能启动；把注册临时加回的变异使 smart-campus-ui、fusion-w4、fusion-w6 均以退出码 1 变红。
 
 ## 2026-09-30：W-86 第五轮——锁序统一为 PrintTask → Order，超前补报与同一终态清理分开（分支 `grok/print-retry-attempt-0929`，提交 `bda0b4979`）
 

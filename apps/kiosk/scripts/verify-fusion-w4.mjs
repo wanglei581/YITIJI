@@ -14,7 +14,7 @@ const W4_ROUTES = [
   '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
   '/job-fairs/:id/stats', '/campus', '/campus/welcome',
   '/campus/freshman-insights', '/smart-campus', '/smart-campus/welcome',
-  '/smart-campus/freshman-insights', '/smart-campus/service/:key', '/renshi',
+  '/smart-campus/service/:key', '/renshi',
   '/jobs/online-platforms',
 ]
 
@@ -109,10 +109,10 @@ function interfaceShape(sourceText, interfaceName) {
 
 console.log('\n=== Kiosk Fusion W4 contract ===')
 
-check('exact 25-route ownership', () => {
+check('exact 24-route ownership', () => {
   const owned = collectRoutePaths()
-  assert.equal(owned.length, 25)
-  assert.equal(new Set(owned).size, 25)
+  assert.equal(owned.length, 24)
+  assert.equal(new Set(owned).size, 24)
   assert.deepEqual([...owned].sort(), [...W4_ROUTES].sort())
   assert.ok(!owned.includes('/notifications'))
 })
@@ -143,6 +143,7 @@ const campusWelcome = read('src/pages/placeholders/CampusWelcomePage.tsx')
 const campusInsights = read('src/pages/campus/FreshmanInsightsPage.tsx')
 const smartHome = read('src/pages/smart-campus/SmartCampusHomePage.tsx')
 const smartInsights = read('src/pages/smart-campus/FreshmanInsightsPage.tsx')
+const routesSource = read('src/routes/index.tsx')
 const renshi = read('src/pages/renshi/RenshiPage.tsx')
 const jobsCss = read('src/pages/jobs-fairs-prototype.css')
 const jobsListQxCss = read('src/pages/jobs/styles/jobs-list-qx.css')
@@ -363,11 +364,14 @@ check('campus and smart-campus stay honest and distinct', () => {
   assert.match(campusInsights, /不会展示示例数据/)
   assert.match(campusInsights, /查看招聘会/)
   assert.doesNotMatch(campusInsights, /一键投递|立即投递|平台投递|候选人管理|录用率|签约率/)
-  assert.match(read('src/routes/index.tsx'), /pages\/campus\/FreshmanInsightsPage/)
+  assert.match(routesSource, /pages\/campus\/FreshmanInsightsPage/)
   assert.doesNotMatch(
-    read('src/routes/index.tsx'),
+    routesSource,
     /path:\s*'campus\/freshman-insights'[\s\S]{0,220}placeholders\/FreshmanInsightsPage/,
   )
+  assert.doesNotMatch(routesSource, /path:\s*'smart-campus\/freshman-insights'/)
+  assert.doesNotMatch(routesSource, /pages\/smart-campus\/FreshmanInsightsPage/)
+  assert.match(smartInsights, /FreshmanInsightsPage/)
   assert.match(smartHome, /ToolboxLaunchModals/)
   assert.match(smartHome, /placement="smart_campus"/)
   assert.match(smartInsights, /迎新服务导览/)
