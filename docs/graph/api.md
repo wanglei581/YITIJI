@@ -681,7 +681,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | — | — |
-| GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | MemberPrintOrdersService | Order<br/>PrintTask |
+| GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | MemberPrintOrdersService | Order<br/>PrintTask<br/>Terminal |
 | POST | `/api/v1/me/print-orders` | MemberPrintOrdersController.create | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>OrderSubmissionLedger<br/>Terminal<br/>TerminalCapability |

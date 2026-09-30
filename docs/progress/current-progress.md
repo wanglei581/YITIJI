@@ -12,6 +12,30 @@
 - **没改的三条。** 心跳 `groupBy`：`TerminalHeartbeat` 已有 `@@index([terminalId, createdAt])`（`schema.prisma` 267 行，postgres schema 272 行），列表每页一次可接受；没有心跳就判版本过旧是有意的。无订单任务的 CAS 是 `admin-print-scan.service.ts` 591–606 行 `printTask.updateMany({ where: { id, status: 'failed' } })`，条数不是 1 即 409。新 Agent 打老后端会因 `main.ts` 98 行 `forbidNonWhitelisted` 得到 400；发布顺序仍是先后端后 Agent（现场脚本 R.1→R.2），不改代码。Agent 版本仍是 `package.json` 的 0.4.12，不带 v 前缀。
 - **本机已跑（隔离 SQLite，库文件在 `~/.cache/claude-lanes/print-retry-0929/verify-w86-r5-*.db`）：** `services/api` 的 `tsc --noEmit` 退出 0。`verify:print-jobs`（含 `verify:pickup-code-share`）、`verify:admin-print-scan`、`verify:contract-review:print-lifecycle`（6 条）、`verify:terminal-status-idempotency`、`verify:refund-idempotent`、`verify:payment-flow`、`verify:member-order-timeline` 退出 0。`verify:print-retry-attempt` 退出 0。改动文件 eslint 退出 0。变异在 `bda0b4979` 之后做，每条退出 1，随后 `git checkout` 还原：把 `FUTURE` 当 `STALE` 删掉；去掉超前补报的次数上限；去掉快速路径的 `cleanupTerminalTask`；去掉退役原因；去掉订单状态原因；重试轮次缺 attempt 当成老 Agent 放行；把会员重试的行锁挪到 Order CAS 之后。
 - **没在本机跑：** `verify:print-retry-lock:postgres`。本机 `pg_isready -h 127.0.0.1 -p 5432` 无响应，没有启动用户的数据库。脚本只挂在 postgres-readiness，要求 `DATABASE_URL` 是 PostgreSQL。会员重提和管理员重试同时打同一单时，不得出现 40P01，也不得两边都成功。以 CI 为准。真 Windows 打印机和 GitHub CI 全量也没在本机跑。图谱已按代码重生成，`pnpm graph:check` 通过；`verify:repository-integrity` 通过。没有 push。
+## 2026-09-30：「我的打印订单」失败行给失败原因码、补网点名（小程序交付单；分支 `claude/backend-hardening-20260930-order-failure-code`）
+
+- **问题：** 小程序「我的打印订单」失败单只能显示「打印失败」，也缺网点名（任务上没记终端的行）。
+- **做法：** GET /me/print-orders 行新增可选 `failureCode`：只在 status=failed 时给，只给面向用户的白名单码（PAPER_EMPTY、PRINTER_ERROR、PRINTER_OFFLINE、PRINT_JOB_UNCONFIRMED、PARTIAL_OUTPUT），内部码与非失败行为 null；**不给 errorMessage 原文**（那是写给一体机现场的）。原有「不透出 errorCode / errorMessage」的禁止规则不变。任务上没记终端时用订单上的终端兜底给网点名。shared 类型同步。
+- **验证：** verify:member-print-orders 补失败码白名单、内部码为 null、无原文、终端兜底四项；变异「白名单放开」「去掉终端兜底」均变红；member-order-timeline、cloud-print-m2、backend-p0-contracts、shared/kiosk tsc、小程序契约全绿。
+## 2026-09-30：简历优化按经历段落逐条给建议、姓名从原文开头补回（走查 W-97；分支 `claude/backend-hardening-20260930-w97-resume-sections`）
+
+- **问题：** 走查三份真实排版的简历：标题写在经历下面、单位和时间段分栏排、项目和实习单列一段时，逐条建议只从「工作经历」标题下取，常常只出一条；模型不回姓名时报告里姓名为空；诊断报告把标题前的「单位 + 时间段」行归到基础信息里。
+- **修法（Codex 起草、协调方审改）：** 新增 `resume-structure.ts`，放姓名识别（只看原文开头 3 行）、经历候选行识别（工作 / 实习 / 项目 / 校园四类标题，以及「单位 + 时间段」行）和一句提示词规则。优化提示词第 5 条改为逐条覆盖每段可识别的经历；模型没回姓名或回了原文里没有的姓名时，用原文开头识别出的姓名，识别不到就留空，不阻断建议。诊断报告把已经摘到的「单位 + 时间段」原文行移到对应的经历块，只移动已有的行，不补模型没摘的行。
+- **协调方删掉的一段：** Codex 原稿在模型漏掉某段经历时，由服务端自己拼一条「请在不新增事实的前提下，按动作和结果重新组织这段经历：…」当作建议补进去，并把模型摘的片段扩成整行。前者是服务端编的建议、不是 AI 给的，后者让「原文」和「建议」对不上，违反「不伪造能力」，两处都删了。所以模型真漏掉的经历这一版不会补出来，只靠提示词要求模型覆盖。
+- **验证：** verify:resume-optimize 新增 W-97 五组夹具（三种真实排版、缺姓名、模型编造姓名）与提示词静态断言；verify:resume-diagnosis-context 新增标题前经历行纠偏断言。四处反向变异全红：姓名识别失效、提示词规则丢失、报告纠偏去掉、姓名不核对原文。按图谱与全文搜索跑 9 条关联门禁（含 api tsc、AI 成本覆盖、功能位拆键、PII 遮盖、AI 标识）全绿。
+## 2026-09-30：后台打印失败告警标题只放中文原因、AI 配置说明改成管理员看得懂的话（W-101；分支 `claude/backend-hardening-20260930-w101-alert-title-ai-notes`）
+
+- **问题：** 两后台走查：告警中心打印失败标题写成「打印任务失败(PAPER_EMPTY)」，把内部错误码直接放在标题里；「AI 配置」页每个功能的说明里露出源码文件名（如 llm-job-fit.service.ts）、原样的 `**不调用大模型**`、⚠️ 和「运行链路消费」「System Prompt」等内部说法。
+- **修法（协调方实现）：** `derived-alerts.ts` 按错误码给中文原因（缺纸、打印机离线、出纸未确认、只打出了一部分等 11 个），标题为「打印任务失败：缺纸」，未登记的码只写「打印任务失败」；错误码挪到明细末尾「· 错误码 PAPER_EMPTY」，排障仍能照码检索。`llm-config.service.ts` 15 条功能说明全部改写成中文白话，意思不变（沿用关系、系统提示词由服务端固定、打印参数预填不调用大模型、本项停用会连带哪些功能）。不改接口字段、不改前端。
+- **验证：** verify:admin-ops 新增标题与明细断言；verify:ai-feature-keys 新增「说明不含文件名、Markdown 与内部术语」断言。反向变异四处全红（标题带回错误码、明细丢错误码、说明带回文件名、带回加粗）。按图谱与全文搜索跑 16 条关联门禁与 api / admin typecheck 全绿；llm-connectivity 是真连厂商的只读探针，不在 CI，本机功能位未启用报 FEATURE_DISABLED，与本改动无关。
+- **留给两后台窗口：** 前端 `apps/admin/src/routes/ai-config/index.tsx:205` 还有一句「已接入功能会被运行链路消费；planned 功能可先保存配置…」，属于前端文案，本分支没动。
+## 2026-09-30：诊断报告导出不再多出空白页、页数前后一致（走查 W-103）；微信乱码文件名还原范围放宽（W-94 遗留；分支 `claude/backend-hardening-20260930-w103-report-pages`）
+
+- **W-103 问题：** 诊断报告和修改清单导出打印时，报价页文件行写「共 2 页」、计费和出纸却是 4 页，完成页让用户核对「全部 2 页」。
+- **根因（协调方复现）：** 正文排完后逐页补写页眉页脚，页脚位置低于下边距，PDFKit 每写一次页脚就自动新开一页，多出来的页只有页脚；回传的页数是写页脚之前数的。所以不只是数字说错，每份报告还多吐空白纸。
+- **修法（Codex 实现、协调方审）：** 写页眉页脚时临时把下边距清零再恢复（合同审阅报告与 AIGC 标识已是这个写法）；回传页数改为从最终 PDF 读出的实际页数。报价与计费本来就按文件实际页数重算，改后三处都是同一个数。其余 10 个生成 PDF 的服务逐个排查过，没有同样问题。
+- **W-94 遗留：** 手机或一体机上传时，UTF-8 文件名被误按 Latin-1 解码的还原条件原来是「还原后含汉字」，所以全角括号、日文、韩文、emoji 这类名字保持乱码。改为「还原后含 U+00FF 以上字符」；`Ã©.pdf`、`résumé.pdf` 这类合法西文名仍原样保留（现有门禁钉着）。
+- **验证：** verify:resume-report-export 用一份像真的多页报告（诊断报告与修改清单两种），断言回传页数、PDF 实际页数、文件记录页数、计费页数四者相等，每页都有正文、页脚「第 N / M 页」的 M 等于页数；verify:kiosk-upload-print-contract 加五个非汉字文件名用例。反向变异四处全红：页脚不清零下边距、页数改回写页脚前的计数、页脚总页数写错、文件名恢复「含汉字」条件。
 ## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
 
 - 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。

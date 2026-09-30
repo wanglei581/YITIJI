@@ -49,7 +49,8 @@ import { AiService } from '../src/ai/ai.service'
 import { LlmResumeProvider } from '../src/ai/providers/llm.provider'
 import { LlmResumeService } from '../src/ai/resume/llm-resume.service'
 import { LlmResumeGenerateService } from '../src/ai/resume/llm-resume-generate.service'
-import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
+import { LlmResumeOptimizeService, OPTIMIZE_SYSTEM_PROMPT } from '../src/ai/resume/llm-resume-optimize.service'
+import { RESUME_STRUCTURE_PROMPT_RULE } from '../src/ai/resume/resume-structure'
 import { ResumePdfService } from '../src/ai/resume/resume-pdf.service'
 import { RedisInflightLock } from '../src/ai/redis-inflight-lock'
 
@@ -90,9 +91,123 @@ type StubEntry =
   | { kind: 'raw'; content: string }
   /** 优化回包:必须由桩收到的 prompt 派生 */
   | { kind: 'optimize'; mutate?: StubMutate }
+  /** 版式夹具回包：模块逐条来自夹具原文，验证真实服务端清洗链。 */
+  | { kind: 'fixture'; fixture: ResumeFixture }
+
+type ResumeFixture = {
+  id: string
+  text: string
+  expectedName: string
+  expectedModuleLines: string[]
+  rawModuleBeforeLines?: string[]
+  output: Record<string, unknown>
+}
 
 const rawReply = (content: string): StubEntry => ({ kind: 'raw', content })
 const optimizeReply = (mutate?: StubMutate): StubEntry => ({ kind: 'optimize', mutate })
+
+/** W-97：三种真实排版 + 一个缺姓名变体；不使用「测试用户1」之类占位内容。 */
+const RESUME_FIXTURES: ResumeFixture[] = [
+  {
+    id: 'A',
+    text: '欧阳春梅\n女，54 岁。超市理货做了十几年，现在想转成仓管或收货。\n青岛金沙滩某商贸有限公司，2011 年到 2025 年，理货、收货都干过。\n2025 年 8 月岗位没了。\n工作经历\n照片见附件。女儿说微信里有证件照，这个 PDF 里没嵌进去。\n手机（已隐去）。青岛市示例路602号（虚构）。',
+    expectedName: '欧阳春梅',
+    expectedModuleLines: ['青岛金沙滩某商贸有限公司，2011 年到 2025 年，理货、收货都干过。'],
+    rawModuleBeforeLines: ['青岛金沙滩某商贸有限公司'],
+    output: {
+      // 模型没有「姓名：」前缀时故意不回 name，门禁必须靠服务端行首识别补回。
+      basic: { name: '' },
+      intention: { position: '仓管或收货', city: '' },
+      summary: '有超市理货和收货经历，想转做仓管或收货。',
+      education: [],
+      experience: [{ company: '青岛金沙滩某商贸有限公司', role: '理货、收货', period: '2011 年到 2025 年', description: '理货、收货都干过。' }],
+      projects: [], skills: [], certificates: [],
+    },
+  },
+  {
+    id: 'B',
+    text: '林知夏\n应届生，目标是做产品运营。\n教育经历\n青岛大学 新闻学 本科 2022.09-2026.06\n项目经历\n校园服务小程序 2025.03 - 2025.06，负责需求整理和内容运营。\n实习经历\n海川科技有限公司 2025年7月—2025年9月，产品运营实习生。',
+    expectedName: '林知夏',
+    expectedModuleLines: [
+      '校园服务小程序 2025.03 - 2025.06，负责需求整理和内容运营。',
+      '海川科技有限公司 2025年7月—2025年9月，产品运营实习生。',
+    ],
+    rawModuleBeforeLines: ['校园服务小程序', '海川科技有限公司'],
+    output: {
+      basic: { name: '' },
+      intention: { position: '产品运营', city: '' },
+      summary: '新闻学应届生，有校园项目和产品运营实习经历。',
+      education: [{ school: '青岛大学', major: '新闻学', degree: '本科', period: '2022.09-2026.06', description: '' }],
+      experience: [{ company: '海川科技有限公司', role: '产品运营实习生', period: '2025年7月—2025年9月', description: '参与产品运营。' }],
+      projects: [{ name: '校园服务小程序', role: '项目成员', description: '负责需求整理和内容运营。' }],
+      skills: [], certificates: [],
+    },
+  },
+  {
+    id: 'C',
+    text: '赵明远\n青岛智造有限公司                 2020.09 - 2024.06\n海岳物流有限公司                 2024.07—至今\n工作经历\n负责仓储系统维护和收货安排。',
+    expectedName: '赵明远',
+    expectedModuleLines: [
+      '青岛智造有限公司                 2020.09 - 2024.06',
+      '海岳物流有限公司                 2024.07—至今',
+    ],
+    rawModuleBeforeLines: ['青岛智造有限公司', '海岳物流有限公司'],
+    output: {
+      basic: { name: '' },
+      intention: { position: '仓储管理', city: '' },
+      summary: '有两段仓储相关工作经历。',
+      education: [],
+      experience: [
+        { company: '青岛智造有限公司', role: '仓储管理', period: '2020.09 - 2024.06', description: '负责仓储系统维护和收货安排。' },
+        { company: '海岳物流有限公司', role: '仓储管理', period: '2024.07—至今', description: '负责仓储系统维护和收货安排。' },
+      ],
+      projects: [], skills: [], certificates: [],
+    },
+  },
+  {
+    id: 'C-no-name',
+    text: '目标岗位：仓储管理\n青岛智造有限公司                 2020.09 - 2024.06\n海岳物流有限公司                 2024.07—至今\n工作经历\n负责仓储系统维护和收货安排。',
+    expectedName: '',
+    expectedModuleLines: [
+      '青岛智造有限公司                 2020.09 - 2024.06',
+      '海岳物流有限公司                 2024.07—至今',
+    ],
+    rawModuleBeforeLines: ['青岛智造有限公司', '海岳物流有限公司'],
+    output: {
+      basic: { name: '' },
+      intention: { position: '仓储管理', city: '' },
+      summary: '有两段仓储相关工作经历。',
+      education: [],
+      experience: [
+        { company: '青岛智造有限公司', role: '仓储管理', period: '2020.09 - 2024.06', description: '负责仓储系统维护和收货安排。' },
+        { company: '海岳物流有限公司', role: '仓储管理', period: '2024.07—至今', description: '负责仓储系统维护和收货安排。' },
+      ],
+      projects: [], skills: [], certificates: [],
+    },
+  },
+  {
+    // 模型回了一个原文里没有的姓名：不能照抄，改用原文开头识别出的姓名。
+    id: 'C-fake-name',
+    text: '赵明远\n青岛智造有限公司                 2020.09 - 2024.06\n海岳物流有限公司                 2024.07—至今\n工作经历\n负责仓储系统维护和收货安排。',
+    expectedName: '赵明远',
+    expectedModuleLines: ['青岛智造有限公司                 2020.09 - 2024.06'],
+    rawModuleBeforeLines: ['青岛智造有限公司'],
+    output: {
+      basic: { name: '李卫国' },
+      intention: { position: '仓储管理', city: '' },
+      summary: '有两段仓储相关工作经历。',
+      education: [],
+      experience: [
+        { company: '青岛智造有限公司', role: '仓储管理', period: '2020.09 - 2024.06', description: '负责仓储系统维护和收货安排。' },
+      ],
+      projects: [], skills: [], certificates: [],
+    },
+  },
+]
+
+function fixtureReply(fixture: ResumeFixture): StubEntry {
+  return { kind: 'fixture', fixture }
+}
 
 let responseQueue: StubEntry[] = []
 let llmCallCount = 0
@@ -224,6 +339,18 @@ function buildOptimize(prompt: string, mut?: StubMutate): string | null {
   return JSON.stringify(o)
 }
 
+function buildFixtureOptimize(fixture: ResumeFixture): string {
+  const beforeLines = fixture.rawModuleBeforeLines ?? fixture.expectedModuleLines
+  return JSON.stringify({
+    resume: fixture.output,
+    modules: beforeLines.map((line, index) => ({
+      title: `第${index + 1}段经历表达建议`,
+      before: line,
+      after: `把这段原文按动作和结果重新组织：${line}`,
+    })),
+  })
+}
+
 async function main(): Promise<void> {
   console.log('\n=== 阶段2B AI 简历优化真实化验证 ===')
   await verifyRedisInflightLock()
@@ -249,6 +376,16 @@ async function main(): Promise<void> {
       let content: string | null
       if (entry.kind === 'raw') {
         content = entry.content
+      } else if (entry.kind === 'fixture') {
+        let prompt = ''
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as {
+            messages?: Array<{ role?: string; content?: string }>
+          }
+          prompt = body.messages?.find((m) => m.role === 'user')?.content ?? ''
+        } catch { /* 下面按「取不到 prompt」统一处理 */ }
+        if (!prompt.includes(entry.fixture.text)) return reject(`夹具${entry.fixture.id}未出现在实际送模型文本中`)
+        content = buildFixtureOptimize(entry.fixture)
       } else {
         let prompt = ''
         try {
@@ -432,6 +569,53 @@ async function main(): Promise<void> {
         if (errCode(e) !== 'AI_TASK_NOT_FOUND') fail(`6c. 期望 AI_TASK_NOT_FOUND,实际 ${errCode(e)}`)
       }
       pass('6c. 会员优化路径按 parse 行 endUserId 提取原文,他人会员被拒')
+    }
+
+    // ── W-97. 三种真实排版：姓名、跨标题/分栏经历和项目/实习逐条覆盖 ────────
+    for (const fixture of RESUME_FIXTURES) {
+      const fileId = `file_opt_w97_${fixture.id.replace(/[^A-Za-z0-9]/g, '').toLowerCase()}_${suffix}`
+      extractionByFileId.set(fileId, {
+        ok: true,
+        fileId,
+        text: fixture.text,
+        textSource: 'pdf_text',
+        confidence: 'high',
+        charCount: fixture.text.length,
+      })
+      const { taskId, accessToken } = await submitParse(ai, fileId)
+      setResponses([fixtureReply(fixture)])
+      const opt = await ai.getResumeOptimize(taskId, { endUserId: null, accessToken })
+      assertStubHealthy()
+      if (opt.status !== 'completed' || !opt.optimizedResume) fail(`W-97 ${fixture.id}. 优化未完成: ${opt.failReason}`)
+      const name = opt.optimizedResume.basic.name
+      const modules = opt.modules ?? []
+      if (name !== fixture.expectedName) {
+        fail(`W-97 ${fixture.id}. 姓名应为「${fixture.expectedName}」，实际「${name}」`)
+      }
+      if (modules.length < fixture.expectedModuleLines.length) {
+        fail(`W-97 ${fixture.id}. 逐条建议应至少 ${fixture.expectedModuleLines.length} 条，实际 ${modules.length}`)
+      }
+      for (const line of fixture.expectedModuleLines) {
+        // 模型常只摘公司名或项目名当 before；原文片段落在这一行里即算覆盖，服务端不改写 before。
+        if (!modules.some((module) => module.before.trim() !== '' && line.includes(module.before))) {
+          fail(`W-97 ${fixture.id}. 未覆盖经历原文行「${line}」`)
+        }
+      }
+      if (fixture.expectedName === '') {
+        if (!opt.optimizedResume.basic.name && modules.length >= fixture.expectedModuleLines.length) {
+          pass(`W-97 ${fixture.id}. 识别不到姓名仍照常生成逐条建议，姓名留空`)
+        } else {
+          fail(`W-97 ${fixture.id}. 识别不到姓名时不应阻断建议，name=${name}, modules=${modules.length}`)
+        }
+      } else {
+        pass(`W-97 ${fixture.id}. 姓名「${name}」正确，逐条建议 ${modules.length} 条（预期至少 ${fixture.expectedModuleLines.length}）`)
+      }
+      extractionByFileId.delete(fileId)
+    }
+    if (OPTIMIZE_SYSTEM_PROMPT.includes(RESUME_STRUCTURE_PROMPT_RULE)) {
+      pass('W-97 系统提示词带上经历段落归类规则（工作 / 实习 / 项目 / 校园）')
+    } else {
+      fail('W-97 系统提示词缺少经历段落归类规则')
     }
 
     // ── 2b. 编造学校 → 重试仍坏 → 诚实失败,且失败不缓存 ───────────────────

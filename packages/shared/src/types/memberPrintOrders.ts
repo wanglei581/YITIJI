@@ -82,6 +82,12 @@ export interface MemberPrintOrderItem {
   orderId?: string | null
   /** 出纸 / 领取的那台机器；取不到为 null。与时间线接口的 terminal 同形。 */
   terminal?: { id: string; displayName: string | null; locationLabel: string | null } | null
+  /**
+   * 失败原因码（2026-09-30）：只在 status=failed 时给，只给面向用户的白名单码
+   * PAPER_EMPTY / PRINTER_ERROR / PRINTER_OFFLINE / PRINT_JOB_UNCONFIRMED / PARTIAL_OUTPUT，其余为 null。
+   * 不给 errorMessage 原文（那是写给一体机现场的）；前端按码配用户说法。
+   */
+  failureCode?: 'PAPER_EMPTY' | 'PRINTER_ERROR' | 'PRINTER_OFFLINE' | 'PRINT_JOB_UNCONFIRMED' | 'PARTIAL_OUTPUT' | null
 }
 
 // ============================================================
