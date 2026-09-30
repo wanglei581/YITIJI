@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatDateTime } from '@ai-job-print/shared'
-import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
+import { Card, ConsoleTable, StatusBadge, LoadingState, type ConsoleColumn } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { ScrollTextIcon } from 'lucide-react'
 import { policiesAdminService, type AdminPolicyRecord } from '../../services/api/policiesAdmin'
 import type { AdminSourcePage, ReviewStatus } from '../../services/api'
 import { requireAdminSourcePage } from '../../services/api/sourcePaging'
-import { Pagination, useTableState } from '../components/DataTable'
+import { useTableState } from '../components/DataTable'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
@@ -108,6 +108,25 @@ export default function PolicySourcesPage() {
     )
   }
 
+  const baseColumns: ConsoleColumn<AdminPolicyRecord>[] = [
+    { id: 'source', header: '来源机构', headerClassName: 'w-[11%]', truncate: true, cell: (r) => r.sourceName },
+    { id: 'kind', header: '类型', headerClassName: 'w-[7%]', cell: (r) => <span className={`whitespace-nowrap text-xs ${r.kind === 'policy_guide' ? 'text-info-fg' : 'text-purple-600'}`}>{KIND_LABELS[r.kind] ?? r.kind}</span> },
+    { id: 'title', header: '标题', headerClassName: 'w-[24%]', cell: (r) => <div title={[r.title, r.summary, r.reviewStatus === 'rejected' && r.rejectReason ? `拒绝原因:${r.rejectReason}` : ''].filter(Boolean).join('\n')}>
+      <p className={`${r.reviewStatus === 'rejected' && r.rejectReason ? 'line-clamp-1' : 'line-clamp-2'} break-words font-medium text-neutral-800`}>{r.title}</p>
+      {r.reviewStatus === 'rejected' && r.rejectReason && <p className="truncate text-xs text-error-fg">拒绝原因:{r.rejectReason}</p>}
+    </div> },
+    { id: 'group', header: '分组/标签', headerClassName: 'w-[8%]', truncate: true, cell: (r) => r.kind === 'policy_guide' ? (r.audience ? AUDIENCE_LABELS[r.audience] ?? r.audience : '—') : (r.category ? CATEGORY_LABELS[r.category] ?? r.category : '—') },
+    { id: 'date', header: '展示日期', headerClassName: 'w-[10%]', cellClassName: 'whitespace-nowrap text-[11px]', cell: (r) => r.publishedDate ?? '—' },
+    { id: 'time', header: '提交时间', headerClassName: 'w-[12%]', cellClassName: 'text-[11px]', cell: (r) => <span title={formatDateTime(r.syncTime)}>{formatDateTime(r.syncTime)}</span> },
+    { id: 'review', header: '审核状态', headerClassName: 'w-[9%]', cell: (r) => <StatusBadge className="px-2 text-[11px]" dot status={(REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending).badge} label={(REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending).label} /> },
+    { id: 'publish', header: '发布状态', headerClassName: 'w-[9%]', cell: (r) => <StatusBadge className="px-2 text-[11px]" dot status={(PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft).badge} label={(PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft).label} /> },
+    { id: 'actions', header: '操作', headerClassName: 'w-[10%]', sticky: true, cell: (r) => <div className="flex flex-col items-start gap-0.5">
+      <button type="button" className="whitespace-nowrap rounded px-1 py-0.5 text-xs font-medium text-primary-600 hover:bg-primary-50" onClick={() => setRulesFor(r)}>查看申领条件</button>
+      <button type="button" className="whitespace-nowrap rounded px-1 py-0.5 text-xs font-medium text-error-fg hover:bg-error-bg" onClick={() => setTakedown({ targetType: 'policy', targetId: r.id, title: r.title, orgName: r.sourceName })}>紧急下架</button>
+    </div> },
+  ]
+  const columns = baseColumns.map((column) => ({ ...column, headerClassName: `${column.headerClassName} !px-2`, cellClassName: `${column.cellClassName ?? ''} !px-2 text-xs` }))
+
   return (
     <Page title="政策信息源" subtitle={SUBTITLE}>
       <div role="status" className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-3 text-sm text-info-fg">
@@ -135,83 +154,12 @@ export default function PolicySourcesPage() {
         </div>
       </div>
 
-      {/* 表格 */}
+      {/* 固定列宽在 1280 下给标题留出两行空间；全文与摘要保留在悬停。 */}
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                {['来源机构', '类型', '标题', '分组/标签', '展示日期', '提交时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-900/[0.06]">
-              {records.length === 0 ? (
-                <tr>
-                  <td colSpan={9}>
-                    <EmptyState
-                      title={search ? '未找到匹配的政策内容' : '暂无政策内容'}
-                      description={search ? '请尝试其他关键词' : '政策内容由合作机构在机构后台「政策公告」中提交'}
-                      icon={ScrollTextIcon}
-                      className="py-12"
-                    />
-                  </td>
-                </tr>
-              ) : (
-                records.map((r) => {
-                  const review  = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
-                  const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
-                  return (
-                    <tr key={r.id} className="hover:bg-neutral-50">
-                      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-neutral-700">{r.sourceName}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span className={`rounded px-2 py-0.5 text-xs font-medium ${r.kind === 'policy_guide' ? 'bg-info-bg text-info-fg' : 'bg-purple-50 text-purple-600'}`}>
-                          {KIND_LABELS[r.kind] ?? r.kind}
-                        </span>
-                      </td>
-                      <td className="max-w-80 px-4 py-3">
-                        <p className="font-medium text-neutral-800">{r.title}</p>
-                        {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-neutral-400">{r.summary}</p>}
-                        {r.reviewStatus === 'rejected' && r.rejectReason && (
-                          <p className="mt-0.5 text-xs text-error-fg">拒绝原因:{r.rejectReason}</p>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        {r.kind === 'policy_guide'
-                          ? (r.audience ? AUDIENCE_LABELS[r.audience] ?? r.audience : '—')
-                          : (r.category ? CATEGORY_LABELS[r.category] ?? r.category : '—')}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{r.publishedDate ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(r.syncTime)}</td>
-                      <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
-                      <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            className="whitespace-nowrap rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                            onClick={() => setRulesFor(r)}
-                          >
-                            查看申领条件
-                          </button>
-                          <button
-                            type="button"
-                            className="whitespace-nowrap rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
-                            onClick={() => setTakedown({ targetType: 'policy', targetId: r.id, title: r.title, orgName: r.sourceName })}
-                          >
-                            紧急下架
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
+        <ConsoleTable items={records} columns={columns} scrollX={false} className="[&_table]:table-fixed"
+          empty={{ title: search ? '未找到匹配的政策内容' : '暂无政策内容', description: search ? '请尝试其他关键词' : '政策内容由合作机构在机构后台「政策公告」中提交' }}
+          page={page} pageSize={pageSize} total={total} onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">

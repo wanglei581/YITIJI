@@ -41,6 +41,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const adminRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(adminRoot, '..', '..')
@@ -281,9 +282,19 @@ for (const [name, source, fetchName] of [
   if (source.includes('.slice((page - 1) * pageSize') || source.includes('const total = searched.length')) {
     fail(`ADM-C15: ${name} 不得再对全集做本地 slice / 用筛选长度当 total`)
   }
-  if (!source.includes('<Pagination total={total}')) {
-    fail(`ADM-C15: ${name} 分页控件必须把服务端 total 传给 Pagination`)
+  const ast = ts.createSourceFile(`${name}.tsx`, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let table = null
+  function visit(node) {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'ConsoleTable') table = node
+    ts.forEachChild(node, visit)
   }
+  visit(ast)
+  const attrs = new Map(table?.attributes.properties.filter(ts.isJsxAttribute).map((attr) => [attr.name.getText(ast), attr.initializer?.expression?.getText(ast)]) ?? [])
+  for (const [attr, value] of [['total', 'total'], ['page', 'page'], ['pageSize', 'pageSize'], ['onPageChange', 'setPage'], ['columns', 'columns']]) {
+    if (attrs.get(attr) !== value) fail(`ADM-C15: ${name} ConsoleTable 的 ${attr} 必须接 ${value}`)
+  }
+  if (!source.includes("header: '操作'") || !source.includes('紧急下架')) fail(`ADM-C15: ${name} 必须有可见的操作列与紧急下架`)
+
   if (!source.includes('setTotal(pageData.total)') && !source.includes('setTotal(data.total)')) {
     fail(`ADM-C15: ${name} 必须把服务端 total 写入分页控件`)
   }

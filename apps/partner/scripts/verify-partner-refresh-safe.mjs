@@ -30,7 +30,6 @@ const requiredTokens = [
   'intervalMs: 60_000',
   "failPolicy: 'keep-last'",
   'pageSize: PAGE_SIZE',
-  'ListPagination',
   'setPage(1)',
 ]
 
@@ -59,6 +58,14 @@ let failed = false
 for (const route of routes) {
   const filePath = fileURLToPath(new URL(route.file, import.meta.url))
   const text = readFileSync(filePath, 'utf8')
+  const tableName = { jobs: 'JobsTable', fairs: 'FairsTable', policy: 'PolicyTable' }[route.name]
+  const tableText = readFileSync(fileURLToPath(new URL(`../src/routes/${route.name}/${tableName}.tsx`, import.meta.url)), 'utf8')
+  for (const token of [`<${tableName}`, 'page={page}', 'total={total}', 'onPageChange={setPage}']) {
+    if (!text.includes(token)) { console.error(`${route.name} 缺少服务端分页传入 ${token}`); failed = true }
+  }
+  for (const token of ['<ConsoleTable', 'page={page}', 'pageSize={20}', 'total={total}', 'onPageChange={onPageChange}', '当前筛选条件下无']) {
+    if (!tableText.includes(token)) { console.error(`${route.name} 公共表格缺少 ${token}`); failed = true }
+  }
   const missing = [route.key, route.hint, ...requiredTokens].filter((token) => !text.includes(token))
   for (const token of missing) {
     console.error(`${route.name} refresh integration missing token: ${token}`)

@@ -88,7 +88,7 @@ export function AiUsageBreakdownTable({ summary, tab, onTabChange }: BreakdownPr
             ) : (
               rows.map((row) => (
                 <tr key={row.key ?? '__unassigned__'} className="hover:bg-neutral-50/50">
-                  <td className="px-4 py-3 text-neutral-700">
+                  <td className="px-4 py-3 text-neutral-700" title={row.key ?? undefined}>
                     {aiUsageKeyName(tab, row.key)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-700">{row.calls}</td>

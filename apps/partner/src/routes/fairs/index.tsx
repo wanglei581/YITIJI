@@ -1,18 +1,16 @@
+import { FairsTable } from './FairsTable'
 import { useEffect, useState } from 'react'
 import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
-import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
-import { FRONTEND_HINT, ListPagination, Page, withFrontendHint } from '../Page'
+import { Button, Drawer, LoadingState } from '@ai-job-print/ui'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { CalendarIcon, PlusIcon } from 'lucide-react'
-import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
+import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
 import type {
   PartnerFairRecord,
   JobFairStatus,
-  ReviewStatus,
-  PublishStatus,
   UpdatePartnerFairInput,
 } from '../../services/api'
 import { getPartnerFairs, importPartnerFairs, unpublishPartnerFair, updatePartnerFair } from '../../services/api'
-import { RejectReason } from '../../components/RejectReason'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import { useCapability } from '../../services/capabilities'
 import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
@@ -21,26 +19,6 @@ import { FairSubresourcesDrawer } from './components/FairSubresourcesDrawer'
 
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
-
-const FAIR_STATUS_MAP: Record<JobFairStatus, { style: string; label: string }> = {
-  upcoming: { style: 'bg-info-bg text-info-fg',   label: '未开始' },
-  ongoing:  { style: 'bg-success-bg text-success-fg', label: '进行中' },
-  ended:    { style: 'bg-neutral-100 text-neutral-500',  label: '已结束' },
-}
-
-const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' | 'error'; label: string }> = {
-  pending:   { badge: 'warning', label: '待审核' },
-  reviewing: { badge: 'info',    label: '审核中' },
-  approved:  { badge: 'success', label: '已通过' },
-  rejected:  { badge: 'error',   label: '已拒绝' },
-}
-
-const PUBLISH_MAP: Record<PublishStatus, { badge: 'success' | 'warning' | 'default'; label: string }> = {
-  draft:       { badge: 'warning', label: '待发布' },
-  published:   { badge: 'success', label: '已发布' },
-  unpublished: { badge: 'default', label: '已下架' },
-  expired:     { badge: 'default', label: '已过期' },
-}
 
 const STATUS_FILTERS = ['全部', '未开始', '进行中', '已结束'] as const
 const STATUS_FILTER_MAP: Record<string, JobFairStatus | null> = {
@@ -157,7 +135,6 @@ export default function FairsPage() {
 
   const fairs = data?.data ?? []
   const total = data?.pagination.total ?? 0
-  const totalPages = data?.pagination.totalPages ?? 1
   const loading = status === 'idle' || (status === 'loading' && fairs.length === 0)
   const error = status === 'error' && fairs.length === 0
 
@@ -320,93 +297,7 @@ export default function FairsPage() {
         ))}
       </div>
 
-      {/* 表格 */}
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                {['外部编号', '招聘会名称', '主办方', '时间', '地点', '会议状态', '来源预约链接', '来源签到链接', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-900/[0.06]">
-              {fairs.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="py-12 text-center text-sm text-neutral-400">
-                    <CalendarIcon className="mx-auto mb-2 h-8 w-8 text-neutral-200" />
-                    当前筛选条件下无招聘会
-                  </td>
-                </tr>
-              ) : (
-                fairs.map((f) => {
-                  const fs      = FAIR_STATUS_MAP[f.status]
-                  const review  = REVIEW_MAP[f.reviewStatus]
-                  const publish = PUBLISH_MAP[f.publishStatus]
-                  return (
-                    <tr key={f.id} className="hover:bg-neutral-50">
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">{f.externalId}</td>
-                      <td className="px-4 py-3 font-medium text-neutral-800">{f.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{f.organizer}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        <div>{formatDateTime(f.startTime)}</div>
-                        <div className="text-neutral-300">至 {formatDateTime(f.endTime)}</div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-neutral-500">{f.venue}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded px-2 py-0.5 text-xs font-medium ${fs.style}`}>{fs.label}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-primary-600">
-                        <a href={f.sourceUrl} target="_blank" rel="noreferrer" className="hover:underline">
-                          查看来源
-                        </a>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
-                        {f.checkinUrl ? (
-                          <a href={f.checkinUrl} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">
-                            查看签到源
-                          </a>
-                        ) : (
-                          <span className="text-neutral-300">未配置</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(f.syncTime)}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge dot status={review.badge}  label={review.label}  />
-                        <RejectReason reviewStatus={f.reviewStatus} reason={f.rejectReason} />
-                      </td>
-                      <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex gap-2">
-                          <button
-                            className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                            onClick={() => openEdit(f)}
-                          >
-                            编辑
-                          </button>
-                          <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50" onClick={() => setConfiguring(f)}>配置</button>
-                          {f.publishStatus === 'published' && (
-                            <button
-                              disabled={busyId === f.id}
-                              className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                              onClick={() => setConfirmUnpublish(f)}
-                            >
-                              {busyId === f.id ? '处理中…' : '下架'}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+      <FairsTable rows={fairs} openEdit={openEdit} setConfirmUnpublish={setConfirmUnpublish} page={page} total={total} onPageChange={setPage} busyId={busyId} setConfiguring={setConfiguring} />
 
       <p className="mt-3 text-xs text-neutral-400">
         本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的招聘会回到待审核;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示；活动资料由合作机构上传，发布入口同样尚未开放。

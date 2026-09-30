@@ -15818,7 +15818,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 76,
+      "reachableFileCount": 74,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -21186,8 +21186,7 @@
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/routes/companies/index.tsx": [
-      "apps/partner/scripts/verify-partner-refresh-safe.mjs",
-      "services/api/scripts/verify-companies.ts"
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/dashboard/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
@@ -21214,6 +21213,9 @@
     ],
     "apps/partner/src/routes/login/index.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+    ],
+    "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/partner/src/routes/policy/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
@@ -21793,10 +21795,12 @@
       "apps/admin/scripts/verify-refresh-safe.mjs"
     ],
     "packages/shared/src/formatDateTime.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
     "packages/shared/src/formatNumber.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
     "packages/shared/src/index.ts": [
@@ -21811,6 +21815,9 @@
     ],
     "packages/shared/src/pickupCode.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
+    "packages/shared/src/types/admin.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "packages/shared/src/types/adminUsers.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs",
@@ -21952,6 +21959,9 @@
     "packages/shared/src/types/uploadSession.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-contract-review-contract.ts"
+    ],
+    "packages/ui/package.json": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "packages/ui/src/components/Drawer.tsx": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
@@ -26929,7 +26939,8 @@
       "asserts": {
         "absent": [],
         "dirs": [
-          "apps"
+          "apps",
+          "apps/admin/src/routes"
         ],
         "files": [
           "apps/admin/src/lib/auditActionLabels.ts",
@@ -26949,11 +26960,18 @@
           "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
           "apps/partner/src/routes/Page.tsx",
+          "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx",
           "apps/partner/src/routes/smart-campus/index.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
+          "packages/shared/src/formatDateTime.ts",
+          "packages/shared/src/formatNumber.ts",
+          "packages/shared/src/types/admin.ts",
+          "packages/ui/package.json",
           "services/api/src/audit/audit.types.ts"
         ],
-        "missing": []
+        "missing": [
+          "src/routes/ai-services/AiLogsTable.tsx"
+        ]
       },
       "file": "apps/admin/scripts/verify-console-plain-copy.mjs",
       "helper": false,
@@ -31162,7 +31180,9 @@
           "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
           "apps/partner/src/routes/jobs/index.tsx"
         ],
-        "missing": []
+        "missing": [
+          "src/routes/jobs/JobsTable.tsx"
+        ]
       },
       "file": "apps/partner/scripts/verify-service-desk-jobs-ui.mjs",
       "helper": false,
@@ -34496,7 +34516,6 @@
         "files": [
           "apps/admin/src/services/api/companiesAdmin.ts",
           "apps/kiosk/src/services/api/companies.ts",
-          "apps/partner/src/routes/companies/index.tsx",
           "apps/partner/src/services/api/partnerCompanies.ts",
           "packages/shared/src/index.ts",
           "packages/shared/src/types/company.ts",
@@ -42802,6 +42821,28 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+      },
+      {
+        "detail": "不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/partner/src/components/RejectReason.tsx",
+        "kind": "component",
+        "mentions": [
+          "docs/reviews/launch-audit-2026-09-05.md"
+        ],
+        "risk": "medium",
+        "scope": "partner",
+        "why": "仅被文档提及：docs/reviews/launch-audit-2026-09-05.md"
+      },
+      {
+        "detail": "不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/admin/scripts/verify-console-plain-copy.mjs"
+        ],
+        "risk": "high",
+        "scope": "partner",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-console-plain-copy.mjs"
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",

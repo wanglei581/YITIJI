@@ -5,7 +5,7 @@
 //   - 功能 key / 供应商 key → 中文名，null key → 「未关联终端 / 未关联机构」。
 //   - AI 服务日志旧表的 operation 常量在 aiOperationLabels.ts，别混进来。
 //
-// 中文名映射只做「已知 key → 中文名」；认不出的 key 原样显示，绝不编造。
+// 功能与厂商的未知 key 保留原值；终端与机构只有 ID 时显示未命名，ID 由调用方悬停保留。
 // 功能 key 取值与服务端 llm-config.service.ts 的功能位 key 同源
 //（assistant_chat / resume_optimize / …），另有两个不在功能位表里的
 //（assistant_summary、unknown）。
@@ -49,10 +49,10 @@ export const UNASSIGNED_ORG_LABEL = '未关联机构'
 
 export type AiUsageDimension = 'feature' | 'vendor' | 'terminal' | 'org'
 
-/** 维度显示名：已知 key 给中文名，认不出原样显示，null 给「未关联」口径。 */
+/** 维度显示名：功能/厂商用已有映射；终端/机构无名称时给诚实空态，null 是未关联。 */
 export function aiUsageKeyName(dimension: AiUsageDimension, key: string | null): string {
-  if (dimension === 'terminal') return key === null ? UNASSIGNED_TERMINAL_LABEL : key
-  if (dimension === 'org') return key === null ? UNASSIGNED_ORG_LABEL : key
+  if (dimension === 'terminal') return key === null ? UNASSIGNED_TERMINAL_LABEL : '未命名终端'
+  if (dimension === 'org') return key === null ? UNASSIGNED_ORG_LABEL : '未命名机构'
   const labels = dimension === 'feature' ? AI_USAGE_FEATURE_LABELS : AI_USAGE_VENDOR_LABELS
   if (key === null) return '—'
   return labels[key] ?? key
