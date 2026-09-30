@@ -153,7 +153,7 @@ test.describe('订单管理（mock 口径：有页数单与未记录页数单）
     const pageRange = page.getByText('页范围', { exact: true }).locator('..')
     await expect(pageRange).toContainText('未单独记录（见计费页数）')
     await expect(page.getByText('计费页数', { exact: true }).locator('..')).toContainText('4 页')
-    await page.getByRole('button', { name: '关闭' }).click()
+    await page.getByRole('button', { name: '关闭', exact: true }).click()
     await page.getByRole('button', { name: '订单 ORD-20260625-UNRECORDED 详情' }).click()
     await expect(page.getByText('计费页数', { exact: true }).locator('..')).toContainText('—')
     await expect(page.getByText('页范围', { exact: true }).locator('..')).toContainText('未记录')
