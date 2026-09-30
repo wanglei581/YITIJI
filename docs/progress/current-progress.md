@@ -16,6 +16,39 @@
 
 - **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
 - **P1 `verify-feedback-notifications` 自建库过时：** 不设 `DATABASE_URL` 时它手抄建表语句，User 表缺 `passwordProofState`，一跑就报列不存在（CI 走 `DATABASE_URL` 所以没暴露，已复现）。改为按当前 schema `prisma db push`，以后 schema 加列不会再过时；设与不设 `DATABASE_URL` 两种都全绿，临时库照旧清理。
+## 2026-09-30：W-106 管理员后台列表「每页条数」切换失效修复
+
+走查实测：文件管理、日志审计、各信息源、设备管理、合作机构管理、Excel 导入记录选「每页 10 条」后弹回 20、不发请求。原因是公共分页状态 `useTableState` 用 react-router 的函数式 `setSearchParams`，同一次点击里页面先改条数、再把页码设回 1、分页器又补一次页码 1，三次写都基于渲染时的旧参数，最后一次把条数冲掉；Excel 导入记录更是直接丢弃所选条数。修法：`useTableState` 用 ref 在最新参数上累加同一事件内的写入（签名不变，所有使用它的页面一次修好）；Excel 导入记录改为真正切换条数并回第 1 页（默认 20，15 不在下拉档位里）；分页器「共 N 条」加千分位。其它 `setSearchParams` 用法逐个核对，都是单次写入。日志审计 E2E 新增用例：选 10 后地址栏、下拉、页码与行数都对，翻到第 2 页再选 50 回到第 1 页。
+## 2026-09-30：产品负责人拍板——岗位与招聘会 7 页的处置（托管 a 与私有部署 b）
+
+- **决定（产品负责人 9/30 原话「按你建议的来，先记文档，稿推到签约前」）：**
+  1. 稿 26 岗位列表、27 岗位详情、28 招聘会、42 线下招聘机构、43 找企业、44 招聘会参展企业、49 校园招聘专区这 7 页**保留**（停放，不删除）。我们云上（托管 a，含 12/1–12/14 自营试点）只显示「暂时不开放」，不请求、不存任何岗位数据。现状已满足：候选上这些路由在托管闸门里，直达显示 `RecruitmentHostingOffPage`「本终端未开放……」。
+  2. **自营点位入口维持现状**：首页不放岗位、招聘会入口，也不新增灰色入口（运行时没有单独的「全部服务」页，首页即服务目录；新增入口等于在我们云上加岗位入口，要先问律师）。
+  3. **卖给机构（私有部署 b 或机构自己的云账号）时整页打开**，以机构名义展示；我们只做设备与软件供应、按维保协议技术维护，不碰招聘内容。
+  4. **推到第一家机构签约前再做的三件事**：① 7 页的 2.0 完整态稿（解冻最终版、产品负责人看稿后加入）；② 运行页照稿改（托管 a 显示暂时不开放，b 整页打开）；③ Terminal Agent 分两路上报——设备运维数据（打印机缺纸、离线、故障）回我们的维保后台、不含用户和岗位信息，业务数据只去机构系统。
+- **同日另两条（52 页对齐表末拍板）：** 稿 33 与稿 11 共用取件页，按运行页现有流程，稿 33 只作排版参考；`/smart-campus/freshman-insights` 停放（PR #1180）。
+- **待律师确认：** 机构云账号模式下我方远程运维的边界；自营点位是否可放公共就业服务平台（如 24365、山东公共招聘网）官方入口二维码；「暂时不开放」相关文案。另建议向青岛人社书面咨询一体机展示能否按《人力资源市场暂行条例》第十八条备案处理。
+> **2026-09-30 超大在途订单只读计数（候选，尚未发布）**：发布前预检第 9b 节增加 `OVERSIZE_PAID_UNFINISHED_ORDERS`。只读统计已付款、`taskStatus` 不在 `completed` / `failed` / `cancelled`（`terminals-agent.service.ts` 的 `TERMINAL_STATES`）、面数大于 `OVERSIZE_MAX_SIDES`（100，与 `PRINT_MAX_SIDES_PER_ORDER` 同一口径）的订单。面数按 `printOrderSideCount` 在 SQL 里复算。没有订单行时，`copies` 不解析 JSON：整段必须是一层对象，再用 `substring(... from ...)` 取 `"copies"` 后 1 到 4 位正整数，取不到按 1。字符串、小数、0、负数、超过 4 位、坏 JSON 都是 1。查询里不再调用 `pg_input_is_valid`（PostgreSQL 16 才有），也不用 14 之后才有的函数；旧版本上这条查询失败会变成 `unknown`，发布当天会被误拦。查询失败、psql 不可用或结果不是纯数字时写 `unknown`，不输出订单内容。`psql -X -q -tA` 包在 `BEGIN READ ONLY` / `ROLLBACK` 里，`-q` 去掉命令标签，否则成功结果不是纯数字。第一次发布当天清单第 2 步要求先看这个数：0 才继续，大于 0 或 unknown 先停。本机临时 PostgreSQL 16.15 上 15 笔样例计数仍为 5。`abandoned` 和 `expired` 不在这组终态里，已付款且超过 100 面时也会被计进去。未上生产。
+
+> **2026-09-30 发布前只读盘点补项（候选，尚未发布）**：deploy-precheck 与 cleanup-stale-releases 的远端脚本分别在 `.github/scripts/deploy-precheck.sh`、`.github/scripts/cleanup-stale-releases.sh`。两个工作流先 checkout，再用 appleboy/ssh-action v1.2.5（提交 `0ff4204d59e8e51228ff73bce53f80d53301dee2`）的 `script_path` 把仓库文件送到远端，不再 base64 内联，远端也不再写临时脚本。`deploy.yml` 与 `server-cleanup.yml` 仍用 ssh-action v1.0.3。预检完整覆盖 1–17 节：运行时版本（PM2 实际 node，达到 22.13 才算 yes，读不到写 unknown）、certbot、证书到期日、终端 API 近 7 天按端口计数（awk 内聚合，终端编号过白名单，单文件最多 200 万行）、/srv 下 7 个残留目录、缓存与日志体积、API 内存四项（node 解析 pm2 jlist，不依赖 python3）。/root 只报合计 MB。pm2 的 rpc.sock 不是套接字时不调用 pm2。清理与 `deploy.yml` 共用并发组 `production-deploy`。健康检查只认 `GET /api/v1/health` 里 `success===true` 且 `data.status==="ok"`。mount、find、ps、readlink、运行中的 nginx、有套接字的 pm2 任一失败都拒绝该目录；引用路径先规范化并双向判断，结果留在当前 shell，删除前清掉再查；命中只跳过该目录。purge 只允许隔离区下一层时间戳目录。隔离区若是软链、跨文件系统、删除后路径仍在，或 `du -sm` 与 `du -xsm` 相差超过 1MB，execute 都拒绝。白名单仍不含 node_modules 与 services。门禁真跑这些分支。deploy-precheck.sh 按本任务放在这一个文件，现 1287 行，超过仓库千行线，这次不另拆。未上生产。
+
+> **2026-09-30 发布复核第二轮（候选，尚未发布，PR #1118）**：Actions 取消后远端收到的是 SIGPIPE。发布脚本在步骤 0 之前就挂上 HUP/INT/TERM/PIPE。pre 阶段只以 128+信号号退出。处理函数一进来先忽略后续信号，再把输出改到 `${BACKUP_ROOT}/release-signal-*.log`（目录不可写就退到 `/tmp`），然后再清理或回退。回退一开始 `trap ''` 并 `set +e`，途中再来的信号不重入，命令失败也不被 errexit 打断。健康检查通过后先屏蔽信号，再写 `DEPLOY_SOURCE.txt` 和 `.ok`。`.ok` 称为最近一次成功发布前的快照（回退锚点）。分组只认 `.dump`、`.runtime`、`.migrations.log`、`.dump.partial`、`.runtime.partial`、`.ok`。full 构建前用 `DEPLOY_MIN_FREE_FLOOR_MB` 默认 10240，取部署目录和备份目录里较小的可用空间；不够先 `pnpm store prune` 再判，仍不够就在安装依赖之前停。`server-cleanup.yml` 与发布共用并发组 `production-deploy`（`cancel-in-progress: false`）。控制面 SSH 在 HUP/INT/TERM/PIPE 上也会删 `/tmp/release.bundle`。没有改 `request_pty`。`cleanup-stale-releases.yml` 的同一并发组待另一路加。本机 `verify-deploy-rollback`、`verify-deploy-gates-in-sync`、`verify-deploy-authorization-gate`、`bash -n`、`verify-repository-integrity`、`verify-ci-gate-coverage` 与图谱 `--check` 退出码均为 0。七条新断言各做一次反向变异：改坏退出 1，恢复退出 0。
+
+> **2026-09-29 发布磁盘门槛（候选，尚未发布）**：`deploy-api-release.sh` 的 0b 门槛改为 max(原公式 REQUIRED_MB, `DEPLOY_MIN_FREE_FLOOR_MB`)，下限默认 10240MB。不够时默认先 `pnpm store prune`，再调用已有的 `prune_old_backups` 把旧备份收到 `DEPLOY_BACKUP_KEEP`（默认 3）组，然后复判一次；`DEPLOY_PRE_GATE_SAFE_CLEANUP=false` 关掉这次清理。清理后仍不够就中止，并指向 Server Cleanup 工作流的 dry-run。full 发布在服务器安装依赖之前另做一次只读下限检查，那边不清理。pg_dump 与运行目录先写 `.partial`，成功后再改名。摘要打印前后可用空间，并只读检查 pm2-logrotate。server-cleanup 把 `.migrations.log` 算进同一组。deploy-precheck 额外报静态备份大小、组数、最老日期，以及 `/tmp/release.bundle` 是否还在。
+## 2026-09-30：PR #1180 未注册地址的错误分类修复（本地工作区）
+
+- 范围：只修停放地址直达应显示「页面不存在」的产品缺陷；基线 `codex/park-freshman-insights-0930@1fa80662561c3e41edf5743a4b7881411b66b44a`。文件预算 5 个：Kiosk 路由、错误页、现有 runtime-error-boundary verify、current-progress、next-tasks；不新增页面、数据模型、服务或依赖，不改岗位/简历/文件/打印业务、生产配置、数据库、密钥或硬件链路。仅修复既有路由兜底语义，方案审查确认无需跨层契约或拆分；feature-scope/compliance-boundary 无范围变化。
+- 根因：停放后地址匹配 `src/routes/index.tsx` 的 `*` 普通 element，而非 errorElement；`useRouteError()` 没有错误对象，`KioskRouteErrorPage` 原判定只认 Response 404，因此误显示「页面暂时无法显示」。未知地址的祖先只有非视觉运行时根与 Outlet，没有进入 KioskRoot、SmartCampusCapabilityBoundary 或 RecruitmentHostingBoundary；只请求 screensaver 与此链路一致。W4/W6 配置使用相同构建变量，W6 复用 registerW4Api；两者智慧校园总开关都为 true，W6 的百宝箱开关/额外夹具不影响这条路由。当前源码不能解释所述 W6 CI 成功，需协调方核对那次运行 SHA 与用例执行记录。
+- 修法：仅 `*` element 传 `notFound`，错误页把显式未找到与真实 Response 404 合并判定；已注册路由的 errorElement 不传该标记，普通 Error/500 仍显示恢复指引。没有修改或删除 W4/W6 Playwright 断言，也没有补 API 夹具。
+- 验证：现有 `verify-kiosk-runtime-error-boundary.mjs` 增加真实 Router 与错误页的本地服务端渲染回归（只替换视觉组件），修复前复现原错误标题、修复后通过；覆盖停放/未知地址、真实路由树匹配、已注册页面正常/404/非 404。kiosk `tsc -b`、改动文件 eslint（TS/TSX 用仓库配置，mjs 额外用 ESLint recommended + Node globals）、fusion-w4、fusion-w6、smart-campus-ui、ci-gate-coverage、repository-integrity 均通过。未启动本地服务、未运行 Playwright、未安装依赖；浏览器结果由协调方重跑，不能据此声明 CI/设备/生产验收通过。
+- 交付：`git add` 被沙箱阻止创建共享 Git 元数据中的 `index.lock`（Operation not permitted），五个文件保留为未暂存工作区改动，协调方代提交；HEAD 未改变。
+
+## 2026-09-30：停放 `/smart-campus/freshman-insights`（不是删除）
+
+- 产品负责人拍板：该页没有 2.0 稿、没有前端入口且与首页内容重复，现停放 `/smart-campus/freshman-insights`。页面源码保留在 `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx`，不注册路由，也不进入 Kiosk 构建入口。
+- 连带收口：移除 `apps/kiosk/src/routes/index.tsx` 的页面 import/注册；从 `apps/kiosk/tests/visual/route-manifest.ts`、`fusion-w6-route-cases.ts`、W4/W6 路由清单和 verify 脚本移除运行时路由；`verify-smart-campus-ui.mjs` 改为断言源码保留但路由不存在；W4/W6 Playwright 用例改为断言直达显示「页面不存在」；`services/api/src/terminals/terminal-toolbox.service.ts` 百宝箱目标白名单移除该地址。
+- 正式文档 `docs/decisions/2026-06-17-smart-campus-jobfair-delivery-rules.md` 已改为如实描述「已停放，源码保留」。Kiosk/API typecheck、改动文件 eslint、W2/W3/W4/W5/W6、fusion baseline/shell、视觉证据、百宝箱 API、CI 覆盖、仓库完整性、合规文案和图谱生成 `--check` 均通过；Vite 生产构建通过且产物不含迎新服务导览文案。W4/W6 浏览器用例因沙箱禁止 preview 绑定 127.0.0.1 端口未能启动；把注册临时加回的变异使 smart-campus-ui、fusion-w4、fusion-w6 均以退出码 1 变红。
+
 ## 2026-09-30：W-86 第五轮——锁序统一为 PrintTask → Order，超前补报与同一终态清理分开（分支 `grok/print-retry-attempt-0929`，提交 `bda0b4979`）
 
 - **锁序。** 全系统先锁 PrintTask 再动 Order。唯一行锁是 `print-status-attempt.ts` 的 `lockPrintTaskRow`（56–58 行，一句不改 `updatedAt` 的 `UPDATE "PrintTask"`）。状态补报经 `readLockedPrintStatusAttempt` 先调它。会员 `retryPaidFailedJob` 与管理员 `retryPrintTask` 在事务开头调用同一函数，然后再做 Order 的 CAS 和 PrintTask 更新。不许再写第二句同样的 SQL。

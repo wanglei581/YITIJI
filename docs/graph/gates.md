@@ -103,11 +103,38 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
+<summary><code>.github/workflows/cleanup-stale-releases.yml/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `.github/workflows/cleanup-stale-releases.yml` | `verify-server-maintenance-workflows.mjs` |
+
+</details>
+
+<details>
+<summary><code>.github/workflows/deploy-precheck.yml/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `.github/workflows/deploy-precheck.yml` | `verify-server-maintenance-workflows.mjs` |
+
+</details>
+
+<details>
 <summary><code>.github/workflows/deploy.yml/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/deploy.yml` | `verify-deploy-vite-env-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-deploy-authorization-gate.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-release-bundle.mjs` |
+| `.github/workflows/deploy.yml` | `verify-deploy-vite-env-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-deploy-authorization-gate.mjs`<br/>`verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-release-bundle.mjs`<br/>`verify-server-maintenance-workflows.mjs` |
+
+</details>
+
+<details>
+<summary><code>.github/workflows/server-cleanup.yml/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `.github/workflows/server-cleanup.yml` | `verify-deploy-rollback.mjs`<br/>`verify-server-maintenance-workflows.mjs` |
 
 </details>
 
@@ -798,7 +825,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/session-resume/SessionResumePage.tsx` | `verify-member-session-closure.mjs`<br/>`verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-resume/SessionResumeView.tsx` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-resume/sessionResumeModel.ts` | `verify-member-session-closure.mjs`<br/>`verify-qx-session-lifecycle.mjs` |
-| `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-smart-campus-ui.mjs` |
+| `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-smart-campus-ui.mjs` |
 | `apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx` | `verify-smart-campus-ui.mjs` |
 | `apps/kiosk/src/pages/smart-campus/SmartCampusHomePage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-smart-campus-ui.mjs` |
 | `apps/kiosk/src/pages/smart-campus/SmartCampusServicePage.tsx` | `verify-smart-campus-ui.mjs` |
