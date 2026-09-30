@@ -5,6 +5,7 @@
  */
 
 import { getPrintJobStatus, hasPrintServiceCompletionEvent, type PrintJobMonitorStatus } from './wmi'
+import { printSpoolStem } from './print-correlation'
 
 export interface MonitorOutcome {
   failed: boolean
@@ -23,6 +24,8 @@ interface MonitorDependencies {
   sleep?: (ms: number) => Promise<void>
   now?: () => number
   dispatchedAtMs?: number
+  /** 缺省按 0。大于 0 时队列查询键带 _a<attempt>，只认这一轮的作业。 */
+  attempt?: number
   queryCompletionEvent?: (
     printerName: string,
     taskId: string,
@@ -44,7 +47,7 @@ interface MonitorDependencies {
  *   - Non-Windows cannot provide spooler evidence and therefore fails closed.
  *
  * @param printerName     Windows printer name (from config)
- * @param taskId          Task ID — matched against DocumentName via "*taskId*"
+ * @param taskId          Task ID。attempt 为 0 时按 "*taskId*" 匹配；更大的 attempt 用 taskId_aN 作边界匹配
  * @param timeoutMs       Maximum monitoring wall time (default 30 000 ms)
  * @param pollIntervalMs  Time between polls (default 1 500 ms)
  */
@@ -60,6 +63,7 @@ export async function monitorPrintJob(
   const wait = dependencies.sleep ?? sleep
   const now = dependencies.now ?? Date.now
   const queryCompletionEvent = dependencies.queryCompletionEvent ?? hasPrintServiceCompletionEvent
+  const spoolKey = printSpoolStem(taskId, dependencies.attempt ?? 0)
 
   if (platform !== 'win32') {
     return unconfirmedOutcome(
@@ -89,7 +93,7 @@ export async function monitorPrintJob(
   while (now() < deadline) {
     await wait(pollIntervalMs)
 
-    const { status, rawStatus } = await queryStatus(printerName, taskId)
+    const { status, rawStatus } = await queryStatus(printerName, spoolKey)
 
     switch (status) {
       case 'paper_empty':
@@ -128,7 +132,7 @@ export async function monitorPrintJob(
         seenRetainedOnce = true
         notFoundCount = 0
         paperEmptyCount = 0
-        if (!paperEmptySeen && await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+        if (!paperEmptySeen && await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
         }
         break
@@ -154,7 +158,7 @@ export async function monitorPrintJob(
             'the job disappeared after a paper-empty signal; completion cannot be confirmed',
           )
         }
-        if (await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+        if (await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
         }
         if (activeJobSeenOnce) {
@@ -177,7 +181,7 @@ export async function monitorPrintJob(
       case 'unknown':
         // Get-PrintJob can fail independently of the Operational event log.
         // Preserve fail-closed behaviour but accept an exact post-dispatch 307.
-        if (!paperEmptySeen && await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+        if (!paperEmptySeen && await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
         }
         paperEmptyCount = 0

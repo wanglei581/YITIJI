@@ -72,7 +72,7 @@ test('forged success cannot override pending or failed backend status @kiosk', a
 
 // `PRINT_JOB_UNCONFIRMED` 的全部含义是「派发已开始，但重启后无法确认纸出没出」。
 // 整条链路都按「无法确认」处理：Agent 拒绝断言 completed，服务端在任何写入之前拒绝重排
-// 以防重复出纸（PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN），Admin 只引导人工核查。
+// 以防重复出纸（PRINT_RETRY_UNCONFIRMED_FORBIDDEN），Admin 只引导人工核查。
 // 唯独用户终态页此前把它和普通失败混成一屏，副标题写「打印任务已由服务端确认失败」——
 // 服务端恰恰没有确认任何事。两个方向都会害人：纸真出来了，用户以为失败去要退款；
 // 纸没出来，他也拿不到「系统承认不确定、请找人核查」这个说法。
