@@ -27,7 +27,7 @@
   white-space: nowrap;
 }
 .sw-scroll[data-layout='stack'] { justify-content: flex-start; }
-.sw-scroll[data-layout='spread'] { justify-content: space-between; }
+.sw-scroll[data-layout='spread'] { justify-content: flex-start; }
 .sw-scroll .sw-chain { flex: none; min-height: 206px; }
 
 /* ── 小青横幅 ──────────────────────────────────────────────── */
@@ -665,11 +665,21 @@
 
 /* ── 状态屏的排法（稿 18 `.body.spread`）────────────────────────
  * 建会话 / 等授权 / 等回传 / 没扫成这些屏，内容本来就比一屏少。旧排法把余量整片
- * 堆在正文底下，27 寸竖屏上像页面没做完。稿的做法：卡片按内容收住，余量摊进
- * 「当前状态 → 链路位置 → 下一步」几段之间；卡片里的字阶跟着放大一档。
- * 内容多于一屏时 space-between 退化成从顶部排，照常滚动，不会有够不着的内容。 */
-.sw-scroll[data-layout='spread'] { justify-content: space-between; gap: 22px; }
-.sw-scroll[data-layout='spread'] .sw-pgrp { padding: 22px 26px; }
+ * 堆在正文底下，27 寸竖屏上像页面没做完。第二轮把区块按固定间距顺排，
+ * 下一步说明卡承接余量，保持既有字阶；内容超过一屏时照常滚动。 */
+.sw-scroll[data-layout='spread'] { justify-content: flex-start; gap: 22px; }
+.sw-scroll[data-layout='spread'] .sw-pgrp { padding: 22px 26px; display: flex; flex-direction: column; justify-content: space-between; min-height: 240px; }
+.sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) { flex: 1; display: flex; flex-direction: column; }
+.sw-scroll[data-layout='spread'] > .sw-sec > .sw-grid2 { flex: 1; align-items: stretch; }
+.sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) .sw-pgrp { min-height: 320px; }
+.sw-scroll[data-layout='stack']:has(.sw-panel) .sw-sec.is-grow { flex: none; }
+.sw-scroll[data-layout='stack'] > .sw-sec.is-grow > .sw-grid2 { flex: 1; }
+.sw-scroll[data-layout='stack']:has(.sw-panel) > .sw-sec:last-child { flex: 1; }
+.sw-scroll[data-layout='stack']:has(.sw-panel) > .sw-sec:last-child .sw-grid2 { min-height: 260px; }
+@media (max-width: 760px) {
+  .sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) { flex: none; }
+  .sw-scroll[data-layout='spread'] .sw-pgrp, .sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) .sw-pgrp { min-height: 0; }
+}
 .sw-scroll[data-layout='spread'] .sw-pgrp h4 { font-size: 23px; }
 .sw-scroll[data-layout='spread'] .sw-note-body { font-size: 20px; line-height: 1.6; }
 .sw-scroll[data-layout='spread'] .sw-plan li { font-size: 20px; line-height: 1.5; }

@@ -218,8 +218,17 @@
   gap: 20px;
 }
 .qpd-check-right, .qpd-preview-right { display: flex; flex-direction: column; }
-.qpd-check-right > .qpd-review, .qpd-preview-right > * { flex: 1 1 auto; min-height: 0; }
-.qpd-preview-shell { height: 600px; max-height: min(64vh, 620px); }
+.qpd-check-right > .qpd-review { flex: 1 0 auto; min-height: 0; }
+.qpd-preview-right > * { flex: none; }
+.qpd-preview-right .qpd-param-stack { flex: 1; justify-content: space-between; gap: 14px; }
+.qpd-check-right .qpd-review > .qpd-options-note { flex: 1; display: flex; flex-direction: column; justify-content: space-between; min-height: 180px; }
+.qpd-check-right .qpd-next-note ul { margin: 20px 0 0; padding-left: 24px; font-size: var(--qx-fs-body); line-height: 1.6; }
+.qpd-check-right .qpd-next-note li + li { margin-top: 18px; }
+.qpd-device-strip > div[data-unavailable='true'] { background: var(--qx-paper); border-style: dashed; }
+.qpd-device-strip > div[data-unavailable='true'] strong { color: var(--qx-wheat-d); }
+.qpd-check-intro { min-height: 76px; padding: 12px 0; }
+.qpd-check-left .qpd-preview-shell { height: 600px; max-height: min(64vh, 620px); }
+.qpd-preview-left .qpd-preview-shell { height: 450px; max-height: 450px; }
 .qpd-context-empty, .qpd-guard { justify-content: flex-start; }
 .qpd-context-empty .qpd-empty-work, .qpd-guard .qpd-guard-work { flex: 1 1 auto; min-height: 360px; }
 .qpd-context-empty .qpd-empty-sheet, .qpd-guard .qpd-file-sheet { min-height: 360px; }
@@ -227,7 +236,7 @@
 .qpd-guard .qpd-guard-work > .qx-card { display: flex; flex-direction: column; justify-content: space-between; }
 @media (max-width: 760px) {
   .qpd-check-grid, .qpd-preview-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-  .qpd-preview-shell { height: 440px; max-height: none; }
+  .qpd-check-left .qpd-preview-shell, .qpd-preview-left .qpd-preview-shell { height: 440px; max-height: none; }
   .qpd-context-empty .qpd-empty-work, .qpd-guard .qpd-guard-work { min-height: 0; }
   .qpd-context-empty .qpd-empty-sheet, .qpd-guard .qpd-file-sheet { min-height: 280px; }
 }

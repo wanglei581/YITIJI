@@ -174,7 +174,7 @@ export function NowFileCard({
   previewLabel?: string
 }) {
   return (
-    <div className="qx-card qx-grow" data-testid="file-source-file-card" data-live="true">
+    <div className="qx-card qx-grow fs-file-work" data-testid="file-source-file-card" data-live="true">
       <div className="fs-now">
         <span className="fs-now-ic"><FileTextIcon size={38} aria-hidden="true" /></span>
         <span className="fs-now-m">
@@ -207,7 +207,7 @@ export function NowFileCard({
         <FileSourceNote>页数、可打印性和敏感信息检查在<b>下一步（材料检查）</b>做，这一页不预告结论。</FileSourceNote>
       </div>
       <FileSourceSteps
-        title="下一步「材料检查」会做什么"
+        title="检查后再打印"
         items={['识别页数，判断这份能不能按当前参数打。', '扫一遍敏感信息，提示你要不要遮挡。', '都过了才进打印参数设置。']}
       />
     </div>
@@ -217,7 +217,7 @@ export function NowFileCard({
 const CHANNEL_COPY: Record<UploadTab, { name: string; desc: string; limit: string; tone: 'clay' | 'teal' | 'slate' }> = {
   file: {
     name: '本机选文件',
-    desc: '从电脑的文件窗口选一份，选好后开始上传。',
+    desc: '在这台机器上弹出文件窗口，自己翻着挑一份。公共屏幕上翻自己的文件不方便，一般先用手机扫码。',
     limit: 'PDF / JPG / PNG · 单份 ≤ 15MB',
     tone: 'clay',
   },
@@ -264,7 +264,7 @@ export function ChannelGrid({
               ? '暂时无法读取 · 可以重试'
               : copy.limit
         const note =
-          key === 'file' ? '电脑文件' : key === 'qr' ? '一体机首选' : usbMode === 'unavailable' ? '暂未开通' : undefined
+          key === 'file' ? '备用通道' : key === 'qr' ? '一体机首选' : usbMode === 'unavailable' ? '暂未开通' : undefined
         const Icon = key === 'file' ? FolderIcon : key === 'qr' ? SmartphoneIcon : UsbIcon
         return (
           <button
@@ -284,7 +284,7 @@ export function ChannelGrid({
             <span className="fs-ch-n">
               <span>{copy.name}</span>
               {key === 'qr' ? <span className="fs-tag">一体机首选</span> : null}
-              {key === 'file' ? <span className="fs-tag mut">电脑文件</span> : null}
+              {key === 'file' ? <span className="fs-tag mut">备用通道</span> : null}
               {disabled && note ? <span className="fs-tag mut">{note}</span> : null}
             </span>
             <span className="fs-ch-d">{desc}</span>
@@ -342,13 +342,18 @@ export function PhoneQrSlot({
   loading,
   failed,
   expiresLabel,
+  inactive = false,
 }: {
   qrUrl: string | null
   loading: boolean
   failed: boolean
   expiresLabel: string
+  inactive?: boolean
 }) {
-  if (qrUrl && !loading) {
+  if (inactive) {
+    return <div className="fs-qr-blank"><InfoIcon size={38} aria-hidden="true" /><strong>这张上传码已失效</strong><span>旧码不再接收文件，请重新出一张码。</span></div>
+  }
+  if (qrUrl) {
     return (
       <div className="fs-qr-live" data-testid="file-source-qr">
         <QRCodeSVG value={qrUrl} size={396} level="M" marginSize={1} />

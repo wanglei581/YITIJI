@@ -290,3 +290,12 @@
   .pcf-truth { flex-direction: column; gap: 6px; font-size: 13px; }
   .pcf-alert { font-size: 14px; padding: 10px 12px; }
 }
+
+/* B 第二轮：报价中仍展示真实报价，不照错态参考图伪造交接失败。 */
+.pcf-page[data-state='quoting'] .pcf-xq { min-height: 168px; }
+.pcf-page[data-state='quoting'] .pcf-sec { gap: 18px; }
+.pcf-page[data-state='quoting'] .pcf-sec:has(.pcf-fee) { flex: 1 0 auto; }
+.pcf-page[data-state='quoting'] .pcf-fee { flex: 1; min-height: 300px; }
+@media (max-width: 760px) {
+  .pcf-page[data-state='quoting'] .pcf-xq, .pcf-page[data-state='quoting'] .pcf-fee { min-height: 0; }
+}

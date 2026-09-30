@@ -174,7 +174,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
     >
       {usbPanel ? (
         <>
-          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过屏幕上的扫描流程" grow>
+          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过屏幕上的扫描流程">
             <div className="sw-grid2">
               <ScanNoteCard
                 title="面板上怎么做"
@@ -263,11 +263,11 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
         </>
       ) : (
         <>
-          <ScanSec no="01" title="要扫什么" hint={`扫描服务 · 已选「${SCAN_TYPE_LABELS[selected]}」`}>
-            <ScanTypeCards selected={selected} onPick={setSelected} />
-          </ScanSec>
-          <ScanSec no="02" title="这个流程是这样" hint="四段都走完，文件才到你手上">
+          <ScanSec no="01" title="这个流程是这样" hint="四段都走完，文件才到你手上">
             <ScanChain active={-1} />
+          </ScanSec>
+          <ScanSec no="02" title="要扫什么" hint={`扫描服务 · 已选「${SCAN_TYPE_LABELS[selected]}」`}>
+            <ScanTypeCards selected={selected} onPick={setSelected} />
           </ScanSec>
           <ScanSec no="03" title="动手之前先看两件事" grow>
             <div className="sw-grid2">

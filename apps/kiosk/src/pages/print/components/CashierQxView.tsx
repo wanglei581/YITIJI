@@ -269,6 +269,8 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
     if (props.file.pages !== null && props.file.pages !== undefined) parts.push(`${props.file.pages} 页`)
     if (props.params?.copies) parts.push(`${props.params.copies} 份`)
     rows.push(['内容', parts.join(' · ')])
+  } else {
+    rows.push(['内容', '尚未取得文件信息，请到订单详情核对'])
   }
   if (props.params) {
     const params = [
@@ -277,6 +279,8 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
       DUPLEX_LABEL[props.params.duplex] ?? null,
     ].filter(Boolean)
     if (params.length > 0) rows.push(['参数', params.join(' · ')])
+  } else {
+    rows.push(['参数', '尚未取得参数信息，请到订单详情核对'])
   }
   if (props.channelLabel && !props.rows.some(([key]) => key === '支付通道')) rows.push(['支付通道', props.channelLabel])
   rows.push(...props.rows)

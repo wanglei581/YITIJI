@@ -690,7 +690,7 @@ export function PrintMaterialCheckPage({
       )}
     >
       <PrintDeskGuide step={2}
-        title={encryptedPdf ? <>这份 PDF <em>打不开</em>。</> : stage === 'error' ? <>检查<em>没做成</em>。</> : isWorking ? <>正在<em>读这份文件</em>。</> : findings.length > 0 ? <>有 {findings.length} 处<em>要你拿主意</em>。</> : <>先<em>看清楚</em>再出纸。</>}
+        title={encryptedPdf ? <>这份 PDF <em>打不开</em>。</> : stage === 'error' ? <>检查<em>没做成</em>。</> : isWorking ? <>正在<em>读这份文件</em>。</> : piiScanIncomplete ? <>检查没有<em>覆盖完整</em>。</> : findings.length > 0 && allFindingsDecided ? <>每一处都<em>决定完了</em>。</> : findings.length > 0 && presentationFindings.some((finding) => finding.selected !== 'pending') ? <>还剩 {presentationFindings.filter((finding) => finding.selected === 'pending').length} 处<em>没决定</em>。</> : findings.length > 0 ? <>有 {findings.length} 处<em>要你拿主意</em>。</> : <>没有<em>待决定的片段</em>。</>}
         detail={encryptedPdf ? ENCRYPTED_PDF_BLOCK_COPY : stage === 'error' ? '请重试检查，或返回选择其他文件。' : '检查格式、页数和个人信息，逐项确认后再设打印参数。'}
       />
       <div className="qpd-check-page">
