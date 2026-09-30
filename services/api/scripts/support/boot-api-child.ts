@@ -80,10 +80,10 @@ export interface HttpProbeResult {
 export async function probe(
   port: number,
   path: string,
-  init: { method?: string; token?: string; body?: unknown; timeoutMs?: number } = {},
+  init: { method?: string; token?: string; body?: unknown; timeoutMs?: number; headers?: Record<string, string> } = {},
 ): Promise<HttpProbeResult> {
   const started = Date.now()
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  const headers: Record<string, string> = { Accept: 'application/json', ...(init.headers ?? {}) }
   if (init.token) headers['Authorization'] = `Bearer ${init.token}`
   if (init.body !== undefined) headers['Content-Type'] = 'application/json'
   const controller = new AbortController()
