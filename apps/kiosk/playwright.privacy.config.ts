@@ -12,7 +12,7 @@ process.env.no_proxy = mergedProxyBypass
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /kiosk-privacy-timeout\.spec\.ts$/,
+  testMatch: /kiosk-privacy-(timeout|clear-copy)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-privacy-timeout',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
@@ -30,6 +30,12 @@ export default defineConfig({
     video: 'off',
   },
   projects: [
+    {
+      // W-42 / W-43 清场文案的真实断言（kiosk-privacy-clear-copy.spec.ts，走查修复随带的用例）
+      name: 'kiosk-privacy-clear-1080x1920',
+      grep: /@privacy-clear/,
+      use: { viewport: { width: 1080, height: 1920 } },
+    },
     {
       name: 'kiosk-privacy-1080x1920',
       grep: /@privacy-kiosk/,

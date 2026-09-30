@@ -29,7 +29,7 @@ import { UsageAiPanel, UsageAiQualityPanel, UsagePolicyPanel } from './UsageHost
  * 服务调用：系统里每一类服务被用了多少次，按渠道、时段、步骤、AI 功能与模型拆开。
  *
  * 口径（与后端统计接口一致，面板角标与口径说明里逐条写明）：
- *   - 只统计系统已经记下来的行为；访问人次、匿名浏览、上传与检查计数尚未记录，如实标「待接入」。
+ *   - 只统计系统已经记下来的行为；服务人次是一体机会话数，不是人数，少于 5 次不显示具体数字。匿名浏览、上传与检查计数尚未记录，如实标「待接入」。
  *   - 任何分组少于 5 次一律显示「少于 5」（服务端已置空），不补数、不估算。
  *   - 岗位、招聘会、政策、企业的浏览与外跳只含登录会员；外跳是「打开来源平台入口」，不是投递结果。
  *   - 渠道拆分只来自已付款订单（订单才有渠道字段），不是全部调用的渠道。
@@ -59,12 +59,13 @@ function weekdayOf(date: string): string {
   return WEEKDAY[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
 }
 
-/** 访问人次三态：已接入给数，未接入给原因；契约里它现在是 never，接入后类型会随之放开。 */
+/** 服务人次：有数写数；没下发或取不到时走原因表，不把 1–4 次补成具体数字。 */
 function visitsTile(metric: ScreenUsageSnapshot['metrics']['visits']): TwinTileItem {
-  if (!metric) return { label: '访问人次', unavailableReason: 'kiosk_session_unwritten' }
-  if (metric.available === false) return { label: '访问人次', unavailableReason: metric.reason }
-  const value = (metric as { value: unknown }).value
-  return typeof value === 'number' ? { value: twinSmall(value), unit: '人次', label: '访问人次' } : { label: '访问人次', unavailableReason: 'source_query_failed' }
+  const label = '服务人次'
+  if (!metric || metric.available === false) {
+    return { label, unavailableReason: metric && metric.available === false ? metric.reason : 'source_query_failed' }
+  }
+  return { value: screenCount(metric.value), unit: '人次', label }
 }
 
 function percent(value: number | null): string {

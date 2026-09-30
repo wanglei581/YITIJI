@@ -1,9 +1,8 @@
-import { maskEmail, maskPhone } from '../../utils/maskPii'
+import { maskPii } from '../../utils/maskPii'
 
 /** 只用于展示；请求与保存始终使用原值。 */
 export function advisorDisplayText(text: string): string {
-  return text.replace(/(?<!\d)1\d{10}(?!\d)/g, maskPhone)
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, maskEmail)
+  return maskPii(text)
 }
 
 /** 用户话保持原意；只有空值、工程信息、原始错误码退回本步提示。 */

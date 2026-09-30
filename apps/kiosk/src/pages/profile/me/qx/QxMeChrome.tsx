@@ -164,7 +164,7 @@ export function QxMePage({
 
         {children}
 
-        <p className="qx-me-truth"><b>本人可见</b>{truth}</p>
+        <p className="qx-me-truth"><b>本人可见</b><span>{truth}</span></p>
       </div>
     </QxPageFrame>
   )
@@ -302,7 +302,7 @@ export const QX_ME_GUIDE = {
   ],
   loading: [
     ['读取范围', '只读当前账号', '不会展示其他账号的数据'],
-    ['显示规则', '不闪回旧记录', '上一位用户的内容不会残留在屏幕上'],
+    ['显示规则', '先显示「—」', '离开前请点结束使用，否则一段时间无操作后才会自动退出'],
     ['失败怎么办', '保留重试入口', '读取失败不会改动任何已有数据'],
   ],
   error: [

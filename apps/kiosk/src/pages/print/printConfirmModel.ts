@@ -32,7 +32,7 @@ export const PILL: Record<PrintConfirmScreen, { tone: 'ok' | 'warn' | 'bad' | 'u
   // 9/29 定稿（稿 14）：本机没开通的彩色 / 双面不再拦截，按能打的参数照常报价。状态键不改。
   'capability-invalid-params': { tone: 'warn', label: '已按本机能用的参数报价' },
   'benefit-unverified': { tone: 'warn', label: '权益未核销 · 按原价' },
-  'zero-amount': { tone: 'unknown', label: '零元单 · 仍须先建单' },
+  'zero-amount': { tone: 'ok', label: '免费试运营 · 本单 0 元' },
   ordered: { tone: 'ok', label: '这一单已提交' },
 }
 
@@ -56,7 +56,7 @@ export const ASK: Record<PrintConfirmScreen, { title: readonly [string, string, 
   },
   quoted: {
     title: ['这笔', '多少钱', '，以实际结果为准。'],
-    doing: '金额和计费页数都以实际结果为准。本机不估价、不打折、不替你承诺优惠。',
+    doing: '金额和计费页数都以这一单的报价为准。优惠券不在这一页抵扣。',
   },
   'quote-failed': {
     title: ['暂时', '无法获取报价', '。'],
@@ -71,8 +71,8 @@ export const ASK: Record<PrintConfirmScreen, { title: readonly [string, string, 
     doing: '本机不会先按抵扣后的价格显示。没核销过就按原价走。',
   },
   'zero-amount': {
-    title: ['零元单', '也要先建单', '。'],
-    doing: '确认后仍会创建打印订单，再进入打印流程。不存在不建单直接出纸的路径。',
+    title: ['免费试运营，', '本单 0 元', '。'],
+    doing: '这次不用付款。确认后直接开始打印，纸从出纸口出来。',
   },
   ordered: {
     title: ['这一单', '已经提交', '。'],

@@ -81,6 +81,10 @@
 .qpd-result p { margin: 10px 0 0; font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); color: var(--qx-ink-2); }
 .qpd-result > span { font-size: var(--qx-fs-aux); }
 .qpd-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.qpd-summary-grid[data-single='true'] { grid-template-columns: minmax(0, 1fr); }
+.qpd-check-grid[data-encrypted='true'] .qpd-check-right { display: flex; flex-direction: column; }
+.qpd-check-grid[data-encrypted='true'] .qpd-review { flex: 1 1 auto; min-height: 0; justify-content: space-between; }
+.qpd-check-grid[data-encrypted='true'] .qpd-review > * { flex-shrink: 0; }
 .qpd-summary { padding: 16px; border: 1px solid var(--qx-line); border-radius: 20px; background: var(--qx-surface); }
 .qpd-summary > div { display: flex; flex-direction: column; gap: 8px; }
 .qpd-summary strong { font-size: var(--qx-fs-body-lg); }

@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { CareerPlanResponse, CareerPlanPrintResponse } from '@ai-job-print/shared'
+import { rethrowAiDeclaration } from '../../ai/aiDeclarationErrors'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
@@ -39,7 +40,8 @@ async function call<T>(path: string, access: CareerPlanAccess, init?: { method?:
       },
       credentials: 'include',
     })
-  } catch {
+  } catch (err) {
+    rethrowAiDeclaration(err)
     throw new CareerPlanApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
   if (!res.ok) {

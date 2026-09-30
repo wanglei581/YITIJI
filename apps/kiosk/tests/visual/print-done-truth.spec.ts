@@ -199,7 +199,9 @@ test('same-page task switch hides the previous task and pickup code immediately 
     orderId,
     paymentSessionToken: 'truth-payment-session',
   })
-  await expect(page.getByText('OLD-PICKUP-001', { exact: true })).toBeVisible()
+  await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
+  await expect(page.getByText('OLD-PICKUP-001', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('取件码', { exact: true })).toHaveCount(0)
 
   await page.evaluate((nextState) => {
     const browserState = {
@@ -213,6 +215,7 @@ test('same-page task switch hides the previous task and pickup code immediately 
 
   await expect(page.getByText('新任务已确认失败', { exact: true })).toBeVisible()
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('已在本机出纸', { exact: true })).toHaveCount(0)
   await expect(page.getByText('OLD-PICKUP-001', { exact: true })).toHaveCount(0)
 })
 

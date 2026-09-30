@@ -438,6 +438,14 @@
 .qx-stage:has([data-w2-page='print-done']) .qx-ctabar .qx-btn[data-variant='danger'] {
   flex: 1.4 1 320px;
 }
+/* 失败态：价目说明独占按钮上方一行，主按钮文字保持一行，不缩小字号。 */
+.qx-stage:has([data-w2-page='print-progress'][data-state='failed']) .qx-ctabar .why {
+  flex: 1 1 100%;
+  order: -1;
+}
+.qx-stage:has([data-w2-page='print-progress'][data-state='failed']) .qx-ctabar .qx-btn {
+  white-space: nowrap;
+}
 
 /* 完成页沿用的文件保留 / 删除记录卡：换青序令牌，不碰冻结业务组件 */
 .print-done-card {

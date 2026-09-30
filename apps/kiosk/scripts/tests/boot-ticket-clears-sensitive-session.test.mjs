@@ -139,7 +139,12 @@ export function isScanType(value) {
   const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}\n// ${seed}\n`
     .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
   const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
+  const declarationVersions = toDataUrl(`${transpile('src/ai/aiDeclarationVersions.ts')}\n// ${seed}\n`)
+  const declarationSessionCode = `${transpile('src/ai/aiDeclarationSession.ts')}\n// ${seed}\n`
+    .replaceAll("from './aiDeclarationVersions'", `from '${declarationVersions}'`)
   const sensitiveCode = `${transpile('src/auth/kioskSensitiveSession.ts')}\n// ${seed}\n`
+    .replaceAll("from '../ai/aiDeclarationSession'", `from '${toDataUrl(declarationSessionCode)}'`)
+    .replaceAll("from '../ai/aiDeclarationVersions'", `from '${declarationVersions}'`)
     .replaceAll("from '../pages/print/printMaterialSession'", `from '${leaf('src/pages/print/printMaterialSession.ts')}'`)
     .replaceAll("from '../pages/resume/aiResumeSession'", `from '${leaf('src/pages/resume/aiResumeSession.ts')}'`)
     .replaceAll("from '../services/resumeParseIntent'", `from '${leaf('src/services/resumeParseIntent.ts')}'`)

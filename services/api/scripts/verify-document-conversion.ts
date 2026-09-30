@@ -261,6 +261,8 @@ async function verifyRuntime(): Promise<void> {
     terminal: {
       findFirst: async () => ({ id: 'terminal-1', enabled: true, lifecycleStatus: 'active' }),
     },
+    // 建单总会读最新心跳（队列闸门不看在线开关）。无心跳 → 不合闸，开关关着即放行。
+    terminalHeartbeat: { findFirst: async () => null },
     $transaction: async (work: (tx: Record<string, unknown>) => Promise<unknown>) => work({
       terminal: { updateMany: async () => ({ count: 1 }) },
       printTask: {

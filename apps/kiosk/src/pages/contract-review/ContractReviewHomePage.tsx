@@ -29,6 +29,8 @@ import {
   UploadIcon,
   XIcon,
 } from 'lucide-react'
+import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
+import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useAuth } from '../../auth/useAuth'
 import { isAiOutage } from '../../ai/aiOutage'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -142,6 +144,11 @@ export function ContractReviewHomePage() {
       })
       navigate('/contract-review/processing')
     } catch (err) {
+      const declined = aiDeclarationDeclineMessage(err)
+      if (declined) {
+        setError(declined)
+        return
+      }
       // AI 停用（暂停 / 当日额度已到 / 未配置）不是文件的问题，换文件重试也不会变好。
       setError(isAiOutage(err)
         ? 'AI 现在停用，签约风险提示暂时做不了。合同原件可以到打印扫描里直接打印。'
@@ -169,6 +176,7 @@ export function ContractReviewHomePage() {
           }
           footer={
             <KioskActionBar>
+              <div className="qx-ai-declaration-slot" style={{ width: '100%' }}>
               <Button
                 size="lg"
                 className="w-full"
@@ -187,6 +195,8 @@ export function ContractReviewHomePage() {
                   </>
                 )}
               </Button>
+              <AiDeclarationNote />
+              </div>
             </KioskActionBar>
           }
         >

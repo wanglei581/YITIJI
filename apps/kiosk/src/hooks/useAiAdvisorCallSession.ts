@@ -19,6 +19,8 @@ import { useBusyLock } from '../contexts/KioskBusyContext'
 import { API_BASE_URL } from '../services/api/client'
 import { getTerminalId } from '../services/api/screensaver'
 import { terminalProtectedFetch } from '../services/terminalAuth'
+import { prepareAiDeclaration } from '../ai/aiDeclarationGate'
+import { aiDeclarationDeclineMessage } from '../ai/aiDeclarationErrors'
 
 // 通知后端结束腾讯云 AI 会话（StopAIConversation），立即停止按分钟计费。
 //  - keepalive：保证在组件卸载 / 切走页面 / 关闭标签页时请求仍能发出
@@ -96,6 +98,7 @@ export function useAiAdvisorCallSession() {
   const taskTerminalIdRef = useRef<string>('')
   const destroyedRef  = useRef(false)
   const startedRef    = useRef(false) // 防重复进房
+  const preparingRef  = useRef(false) // 声明还没点完，先别写成「正在连接」
   const sessionEpochRef = useRef(0)
   const remoteAudioUsersRef = useRef<Set<string>>(new Set())
   const autoplayResumeRef   = useRef<(() => Promise<void>) | null>(null)
@@ -177,13 +180,32 @@ export function useAiAdvisorCallSession() {
 
   // ── 启动通话（用户点击后调用，满足自动播放策略）──────────
   const startCall = useCallback(async () => {
-    if (startedRef.current) return
+    if (startedRef.current || preparingRef.current) return
     const terminalId = getTerminalId()
     if (!terminalId) {
       setErrMsg('当前设备身份不可用，请联系现场工作人员')
       setPhase('error')
       return
     }
+    preparingRef.current = true
+    try {
+      await prepareAiDeclaration(`${API_BASE_URL}/trtc/session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Terminal-Id': terminalId,
+        },
+        body: JSON.stringify({}),
+      })
+    } catch (err: unknown) {
+      preparingRef.current = false
+      if (aiDeclarationDeclineMessage(err)) return
+      setErrMsg(err instanceof Error ? err.message : '这次语音没有开始')
+      setPhase('error')
+      return
+    }
+    preparingRef.current = false
+    if (startedRef.current || destroyedRef.current) return
     startedRef.current = true
     const sessionEpoch = sessionEpochRef.current + 1
     sessionEpochRef.current = sessionEpoch
@@ -331,6 +353,11 @@ export function useAiAdvisorCallSession() {
       setAiState('speaking') // AI 先播欢迎语
     } catch (err: unknown) {
       if (destroyedRef.current || !startedRef.current || sessionEpochRef.current !== sessionEpoch) return
+      if (aiDeclarationDeclineMessage(err)) {
+        startedRef.current = false
+        setPhase('gate')
+        return
+      }
       await failCall(err instanceof Error ? err.message : String(err))
     }
   }, [failCall, restoreRemoteAudio])

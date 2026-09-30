@@ -15,6 +15,19 @@ import {
   contentTrustSubmitBlock,
   type OrgContentTrustStatus,
 } from '../../routes/partners/contentTrustRules'
+import {
+  registerPartnerContactPhone as postPartnerContactPhone,
+  type RegisterPartnerContactPhoneInput,
+  type RegisterPartnerContactPhoneResponse,
+} from './registerPartnerContactPhone'
+
+export {
+  registerPartnerContactPhone,
+  contactPhoneRegistrationFieldError,
+  type RegisterPartnerContactPhoneInput,
+  type RegisterPartnerContactPhoneResponse,
+  type RegisterPartnerContactPhoneResult,
+} from './registerPartnerContactPhone'
 
 // ─── 类型(契约 = services/api AdminOrgsService 返回形状)───────────────────
 
@@ -29,6 +42,15 @@ export interface AdminOrgAccount {
   emailVerifiedAt: string | null
   emailVerifyMethod: string | null
   availableActionVerificationMethods: PartnerAccountVerificationMethod[]
+  /**
+   * 服务端账号列表下发（W-03）。字段缺省表示这份响应还没有它们：
+   * 登记按钮不显示，前端不根据停用、手机验证或验证方式自行推断。
+   * 后台账号响应不暴露原始密码状态（后端 #1139），前端也不声明该字段。
+   */
+  /** 非空表示管理员已登记联系人手机，机构本人尚未自证。 */
+  phoneRegisteredByAdminAt?: string | null
+  /** 服务端算好的登记资格。只有严格 true 才显示按钮。 */
+  canRegisterContactPhone?: boolean
   createdAt: string
 }
 
@@ -196,6 +218,11 @@ export interface OrgsAdminServiceInterface {
     signal?: AbortSignal,
   ): Promise<void>
   revokePhoneRebindTicket(orgId: string, accountId: string, rebindTicket: string): Promise<void>
+  registerPartnerContactPhone(
+    orgId: string,
+    accountId: string,
+    body: RegisterPartnerContactPhoneInput,
+  ): Promise<RegisterPartnerContactPhoneResponse>
 }
 
 // ─── HTTP adapter ─────────────────────────────────────────────────────────────
@@ -312,6 +339,7 @@ const httpAdapter: OrgsAdminServiceInterface = {
       headers: { 'X-Phone-Rebind-Ticket': rebindTicket },
     })
   },
+  registerPartnerContactPhone: (orgId, accountId, body) => postPartnerContactPhone(orgId, accountId, body),
 }
 
 // ─── Mock adapter(内存可变,演示用)─────────────────────────────────────────
@@ -614,6 +642,7 @@ const mockAdapter: OrgsAdminServiceInterface = {
     const ticket = mockRebindTickets.get(rebindTicket)
     if (ticket?.orgId === orgId && ticket.accountId === accountId) mockRebindTickets.delete(rebindTicket)
   },
+  registerPartnerContactPhone: (orgId, accountId, body) => postPartnerContactPhone(orgId, accountId, body),
 }
 
 // ─── Facade ───────────────────────────────────────────────────────────────────
