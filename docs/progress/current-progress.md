@@ -17,6 +17,11 @@
 - **做了什么（Grok 实现、协调方审，合规运维窗口要求）：** `scripts/prod-readonly-probe.mjs` 法务文档补查 `ai_disclaimer`（未激活即 FAIL，与发布流程 3d 预检三份一起查对齐）；新增 `--strict`：岗位、招聘会、企业公开条数非 0 或任何列表出现演示标记都 FAIL、退出码非 0；不带时行为逐字不变。发布清单与运维手册里的发布后核对命令改成 `--strict`，须在演示企业用 #1115 下架之后跑。
 - **验证：** verify-prod-readonly-probe 补 ai_disclaimer 未激活、--strict 企业数 1 与全 0 等夹具；Grok 两处、协调方抽 1 处（去掉 ai_disclaimer）变异全红；ci-gate-coverage 通过。
 
+## 2026-09-29：会员取件链接与重试审计在真 PostgreSQL 上被门禁覆盖（分支 `claude/backend-hardening-20260929-member-print-audit-pg`，叠在 #1110 上）
+
+- **缺口（Codex 复核、总指挥核实）：** #1110 修的是「会员号写进审计 actorId、PG 外键拒绝、被 AuditService 静默吞掉」，但原门禁跑在 SQLite 上，SQLite 不校验这条外键，测不出来；重试场景也没有运行断言。
+- **补法（Grok 实现、协调方审）：** 新门禁 `verify:member-print-audit:postgres`（只挂 postgres-readiness）：真 PG 上走真实 PrintJobsService，取件链接与重试各一次，断言各落一行审计、actorId 为空、payload.endUserId 为会员号；阳性对照用旧写法直接写审计，PG 必须抛外键错误。SQLite 的 verify:miniapp-cloud-print-m2 补重试审计断言。只加门禁，不改服务代码。
+- **验证：** Grok 本机临时 PG16 跑 5/5，两处变异（取件 actorId 改回会员号、删重试审计）全红；协调方复跑 m2、backend-p0-contracts、ci-gate-coverage 全绿，抽 1 处变异（重试审计动作名错）变红。
 ## 2026-09-30：「我的打印订单」失败行给失败原因码、补网点名（小程序交付单；分支 `claude/backend-hardening-20260930-order-failure-code`）
 
 - **问题：** 小程序「我的打印订单」失败单只能显示「打印失败」，也缺网点名（任务上没记终端的行）。
