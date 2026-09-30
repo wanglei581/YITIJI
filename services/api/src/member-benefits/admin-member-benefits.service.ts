@@ -126,7 +126,7 @@ export class AdminMemberBenefitsService {
       throw new NotFoundException({ error: { code: 'BENEFIT_NOT_FOUND', message: '权益记录不存在' } })
     }
     if (current.status !== 'active') {
-      throw new ConflictException({ error: { code: 'BENEFIT_NOT_ACTIVE', message: '只有 active 状态的权益可以撤销' } })
+      throw new ConflictException({ error: { code: 'BENEFIT_NOT_ACTIVE', message: '只有「可用」状态的权益可以撤销' } })
     }
     const updated = await this.prisma.benefitGrant.update({
       where: { id },

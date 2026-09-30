@@ -14,7 +14,7 @@
 // 内容排行 / 时段与点位分布 —— `BrowseLog` 与 `ExternalJumpLog` 都没有
 // `sourceOrgId` 字段，按机构归因无从算起。用 targetId 反查 Job.sourceOrgId
 // 只能拿到**当前**归属、不是不可变快照，内容换来源机构后历史会漂移，
-// 因此不做该 join，也不给估算值。归因区块如实显示「暂无归因数据」。
+// 因此不做该 join，也不给估算值。归因区块写明还不能按本机构统计、这里不显示这些数字。
 //
 // 合规（CLAUDE.md §2 / §9）：
 //   - 统计口径只有浏览、外部跳转、打印、AI 调用；
@@ -211,37 +211,14 @@ function StatusDistCard({ dist }: { dist: PartnerStatsResponse['statusDist'] }) 
 
 // ─── 归因不可用说明（不伪造漏斗）──────────────────────────────────────────
 
-function AttributionNotice({
-  attribution,
-}: {
-  attribution: PartnerStatsResponse['attribution']
-}) {
+function AttributionNotice() {
   return (
     <Card className="border-neutral-300 bg-neutral-50/60 p-5">
       <div className="flex gap-3">
         <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
-        <div className="min-w-0 space-y-2 text-sm text-neutral-600">
-          <p className="font-bold text-neutral-800">暂无归因数据</p>
-          <p>
-            列表曝光、详情浏览、打开来源平台、资料打印这四项，以及由它们组成的转化漏斗、
-            内容排行、时段与点位分布，<strong>当前都算不出来</strong>——
-            终端的浏览与外部跳转日志里没有记录内容归属的机构快照，
-            无法把某一次浏览安全地算到本机构名下。
-          </p>
-          <p>
-            用内容 ID 反查当前来源机构在技术上可行，但那不是不可变快照：
-            内容之后换了来源机构，历史统计就会跟着变。
-            <strong>本页宁可留空，也不给一个会漂移的漏斗。</strong>
-          </p>
-          <p className="text-xs text-neutral-500">
-            归因能力落地后，任一分组样本不足 {attribution.minSampleThreshold} 条时将显示「样本不足」而非数字，
-            只提供机构级聚合，不提供求职者个人明细。
-          </p>
-          <p className="text-xs text-neutral-500">
-            口径说明：本平台不做平台内投递，「打开来源平台」只统计点击外部入口的次数，
-            不代表投递结果，系统也不记录办理结果。
-          </p>
-        </div>
+        <p className="min-w-0 text-sm text-neutral-600">
+          浏览、打开来源入口和资料打印还不能按本机构统计，这里不显示这些数字。在架内容是打开页面时的最新情况；本平台不做平台内投递，打开来源入口也不代表投递结果，也不列出求职者个人。
+        </p>
       </div>
     </Card>
   )
@@ -389,7 +366,7 @@ export default function StatsPage() {
                   <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
                   <h2 className="text-[13px] font-bold text-neutral-700">同步概况</h2>
                   <span className="text-[11.5px] text-neutral-400">
-                    {data.period.label}（{data.period.from} ~ {data.period.to}）· 时区 {data.timezone}
+                    {data.period.label}（{data.period.from} ~ {data.period.to}），打开页面即是这一段的最新数字
                   </span>
                 </div>
 
@@ -421,18 +398,16 @@ export default function StatsPage() {
           )}
 
           {/* 归因 —— 恒不可用，如实说明，不承诺效果 */}
-          <section aria-label="浏览与跳转归因">
+          <section aria-label="浏览与跳转">
             <div className="mb-2.5 flex items-center gap-2">
               <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-neutral-300" aria-hidden="true" />
-              <h2 className="text-[13px] font-bold text-neutral-700">浏览与跳转归因</h2>
+              <h2 className="text-[13px] font-bold text-neutral-700">浏览与跳转</h2>
             </div>
-            <AttributionNotice attribution={data.attribution} />
+            <AttributionNotice />
           </section>
 
           <p className="text-xs text-neutral-400">
-            本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。
-            统计只覆盖浏览、外部跳转、打印与 AI 调用，且只提供机构级聚合。
-            本机构终端的打印扫描服务次数、出纸成功率与故障恢复见
+            本后台不接收求职者简历。在架数字是打开页面时的最新情况。打印扫描的服务次数见
             <Link to="/terminals" className="mx-0.5 font-semibold text-primary-600 hover:underline">终端数据</Link>。
           </p>
         </div>

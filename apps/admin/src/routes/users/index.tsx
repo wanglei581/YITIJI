@@ -1,8 +1,9 @@
-import type {
-  AdminUserListItem,
-  AdminUserListResult,
-  AdminUserListQuery,
-  AdminUserStatusChangeResult,
+import {
+  formatDateTime,
+  type AdminUserListItem,
+  type AdminUserListResult,
+  type AdminUserListQuery,
+  type AdminUserStatusChangeResult,
 } from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState } from '@ai-job-print/ui'
 import { RefreshCwIcon, SearchIcon } from 'lucide-react'
@@ -18,7 +19,6 @@ import {
   canDisableUser,
   canRestoreUser,
   EMPTY_USER_FILTERS,
-  formatUserDateTime,
   hasUserFilters,
   USER_STATUS_LABELS,
   userDisplayName,
@@ -274,8 +274,8 @@ export default function UsersPage() {
                     <td className="px-4 py-3 font-medium text-neutral-900">{userDisplayName(user)}</td>
                     <td className="px-4 py-3 font-mono text-xs">{user.maskedPhone}</td>
                     <td className="px-4 py-3"><StatusPill status={user.status} /></td>
-                    <td className="px-4 py-3">{user.lastLoginAt ? formatUserDateTime(user.lastLoginAt) : '暂无登录记录'}</td>
-                    <td className="px-4 py-3">{formatUserDateTime(user.createdAt)}</td>
+                    <td className="px-4 py-3" title={user.lastLoginAt ? formatDateTime(user.lastLoginAt) : undefined}>{user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '暂无登录记录'}</td>
+                    <td className="px-4 py-3" title={formatDateTime(user.createdAt)}>{formatDateTime(user.createdAt)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button

@@ -1,3 +1,5 @@
+import { formatDateTime } from '@ai-job-print/shared'
+
 // ============================================================
 // 机构详情抽屉 ·「资质核验」（只读 + 取证留痕）
 //
@@ -74,8 +76,7 @@ const dash = <span className="text-neutral-300">—</span>
 
 function fmt(value: string | null): React.ReactNode {
   if (!value) return dash
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  return formatDateTime(value, { fallback: value })
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {

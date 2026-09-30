@@ -120,6 +120,12 @@ function requireOptionalString(value: unknown, field: string): string | undefine
   throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
 }
 
+function requireOptionalBoolean(value: unknown, field: string): boolean {
+  if (value === undefined) return false
+  if (typeof value === 'boolean') return value
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
 function requireOptionalStringArray(value: unknown, field: string): string[] | undefined {
   if (value === undefined) return undefined
   if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) {
@@ -144,6 +150,10 @@ function validateConfigShape(config: AgentConfig): AgentConfig {
     apiBaseUrl: requireNonEmpty(config.apiBaseUrl, 'apiBaseUrl'),
     terminalCode: requireNonEmpty(config.terminalCode, 'terminalCode'),
     printerName: requireNonEmpty(config.printerName, 'printerName'),
+    holdPrinterQueueWhenIdle: requireOptionalBoolean(
+      config.holdPrinterQueueWhenIdle,
+      'holdPrinterQueueWhenIdle',
+    ),
     agentVersion: requireNonEmpty(config.agentVersion, 'agentVersion'),
     heartbeatIntervalMs: requireOptionalPositiveInteger(config.heartbeatIntervalMs, 'heartbeatIntervalMs'),
     claimIntervalMs: requireOptionalPositiveInteger(config.claimIntervalMs, 'claimIntervalMs'),

@@ -325,6 +325,10 @@ test('错误码：终端暂停接打印单时显示服务端原话，按钮是�
   const userError = requireMiniapp('./user-error.js')
   assert.ok(userError.PASSTHROUGH_MESSAGE_CODES.includes('PRINT_TERMINAL_QUEUE_HALTED'))
   assert.ok(!userError.PASSTHROUGH_MESSAGE_CODES.includes('PRINTER_UNAVAILABLE'))
+  // 服务端真的抛这个码、说的就是这句（#1150）；服务端改名或改字，本表要跟着改。
+  const apiSrc = fs.readFileSync(path.join(MINIAPP, '../../services/api/src/terminals/printer-availability.ts'), 'utf8')
+  assert.match(apiSrc, /code: 'PRINT_TERMINAL_QUEUE_HALTED'/)
+  assert.ok(apiSrc.includes(`'${HALTED}'`), '服务端文案与本测试逐字一致')
 })
 
 test('错误码：401 单独成一类，去登录而不是重试', () => {

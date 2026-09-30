@@ -784,7 +784,9 @@ export class RefundService {
     channel: string
     amountCents: number
   }> {
-    if (order.pickupCode) throw new BadRequestException('REFUND_SOURCE_AMBIGUOUS')
+    // 「这单已被别的方式记为已付」的信号：旧单会铸明文取件码；W-45 起现打现取不再铸码，
+    // 所以同时看付款时间与付款来源（markPaid 必写这两个），任一有值即来源不清、失败关闭。
+    if (order.pickupCode || order.paidAt || order.paymentSource) throw new BadRequestException('REFUND_SOURCE_AMBIGUOUS')
     if (order.discountCents !== 0) throw new BadRequestException('REFUND_AMOUNT_BASIS_UNSUPPORTED')
     const successAttempts = await this.prisma.paymentAttempt.findMany({
       where: { orderId: order.id, status: 'success' },

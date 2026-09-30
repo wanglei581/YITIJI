@@ -6,6 +6,7 @@ import {
   ORG_CONTENT_TRUST_UNSET_LABEL,
   PROHIBITED_MODULES,
   SCENE_TEMPLATE_LABELS,
+  formatDate,
   formatDateTime,
   isOrgContentPublishable,
   type OrgContentTrustStatus,
@@ -170,7 +171,7 @@ export default function ProfilePage() {
                 </div>
               }
             />
-            <Row label="接入时间" value={profile.createdAt.slice(0, 10)} />
+            <Row label="接入时间" value={formatDate(profile.createdAt)} />
           </div>
         </Card>
 
@@ -226,7 +227,7 @@ export default function ProfilePage() {
               <div>
                 <p className="font-semibold text-error-fg">当前状态：已归档（禁止发布）</p>
                 <p className="mt-1 leading-relaxed text-neutral-600">
-                  当前机构处于已归档状态。根据平台发布安全闸门（fail-closed），已归档机构即使内容信任为可信，其内容也一律禁止发布上屏，终端用户不可见。
+                  当前机构已归档。已归档机构的内容一律不能在终端展示，即使内容信任为可信也不行。
                 </p>
               </div>
             </div>
@@ -238,7 +239,7 @@ export default function ProfilePage() {
               <div>
                 <p className="font-semibold text-warning-fg">当前状态：待核验（暂不可发布）</p>
                 <p className="mt-1 leading-relaxed text-neutral-600">
-                  机构内容信任尚未完成平台核验。根据平台发布安全闸门（fail-closed），在此状态下，<strong>即使单条{contentKinds}已通过审核，也无法在终端发布上屏，终端用户暂不可见</strong>。
+                  机构内容信任尚未完成平台核验。尚未完成核验时，<strong>即使单条{contentKinds}已通过审核，也不能在终端展示</strong>。
                 </p>
               </div>
             </div>
@@ -274,7 +275,7 @@ export default function ProfilePage() {
               <div>
                 <p className="font-semibold text-neutral-800">当前状态：未标记（暂不可发布）</p>
                 <p className="mt-1 leading-relaxed text-neutral-600">
-                  机构尚未标记内容信任状态。根据平台发布安全闸门（fail-closed），未标记机构的内容一律禁止发布，即使单条内容审核通过也不会在终端展示。
+                  机构尚未标记内容信任状态。未标记核验状态时，内容一律不能在终端展示，即使单条内容审核通过也不会出现。
                 </p>
               </div>
             </div>

@@ -20,6 +20,7 @@ import {
   TwinSlot,
   TwinTiles,
   TwinUnavailable,
+  screenCount,
   twinInfoTotalParts,
   twinSmall,
   type TwinBarItem,
@@ -95,23 +96,20 @@ function barsOf(rows: TypeRow[], pick: (row: TypeRow) => number | null, tone: Tw
   return { items, small }
 }
 
-/** 访问人次三态：已接入给数，未接入给原因；契约里它现在是 never，接入后类型会随之放开。 */
+/** 服务人次：有数写数；没下发或取不到时走原因表，不把 1–4 次补成具体数字。 */
 function VisitsValue({ metric }: { metric: ScreenUsageSnapshot['metrics']['visits'] }) {
-  const reason = !metric ? 'kiosk_session_unwritten' : metric.available === false ? metric.reason : null
-  // 数据层缺口写「未接入」、取数失败写「暂时取不到」，由原因表决定，不在这里手写
-  if (reason !== null) return <TwinUnavailable reason={reason} inline />
-  const value = (metric as { value: unknown }).value
-  return typeof value === 'number' ? (
+  if (!metric || metric.available === false) {
+    return <TwinUnavailable reason={metric && metric.available === false ? metric.reason : 'source_query_failed'} inline />
+  }
+  return (
     <b>
-      {twinSmall(value)}
+      {screenCount(metric.value)}
       <span className="twin-unit">人次</span>
     </b>
-  ) : (
-    <TwinUnavailable reason="source_query_failed" inline />
   )
 }
 
-/** 统计口径（托管开启时在左下）。托管关闭的那一版在 PartnerUsageHostingOff.tsx：访问人次写成一条说明。 */
+/** 统计口径（托管开启时在左下）。托管关闭的那一版在 PartnerUsageHostingOff.tsx：服务人次写成一条说明。 */
 function NotesPanel({ visits }: { visits: ScreenUsageSnapshot['metrics']['visits'] }) {
   return (
     <TwinPanel title="统计口径" sub="本页数字怎么来的" source={MEMBERS_NOTE}>
@@ -122,7 +120,7 @@ function NotesPanel({ visits }: { visits: ScreenUsageSnapshot['metrics']['visits
         <li>打开来源平台入口不是投递或预约结果，本平台不收简历、不代投递</li>
       </ul>
       <div className="twin-kv twin-push">
-        <span>访问人次</span>
+        <span>服务人次<span className="twin-muted"> · 会话数，不是人数</span></span>
         <VisitsValue metric={visits} />
       </div>
     </TwinPanel>

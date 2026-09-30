@@ -1,3 +1,5 @@
+import { formatDateTime } from '@ai-job-print/shared'
+
 // ============================================================
 // 机构详情抽屉里的「内容可信」小节 —— 发布闸门的**唯一人工入口**在后台的落地。
 //
@@ -58,8 +60,15 @@ function statusTone(status: string | null): 'success' | 'warning' | 'error' | 'd
 
 function fmtTime(iso: string | null): string {
   if (!iso) return '—'
-  const d = new Date(iso)
-  return Number.isFinite(d.getTime()) ? d.toLocaleString('zh-CN', { hour12: false }) : iso
+  return formatDateTime(iso, { fallback: iso })
+}
+
+function reviewerText(reviewedBy: string | null): string {
+  if (!reviewedBy) return '—'
+  const me = getUser()
+  const name = me && me.id === reviewedBy ? me.name.trim() : ''
+  if (name && !/^c[a-z0-9]{20,}$/i.test(name) && name !== reviewedBy) return name
+  return '平台管理员'
 }
 
 function errMsg(e: unknown): string {
@@ -176,20 +185,13 @@ export function OrgContentTrustPanel({ orgId, onChanged }: { orgId: string; onCh
           </p>
 
           <div className="space-y-1.5">
-            <Row label="当前状态">
-              {statusLabel(trust.contentTrustStatus)}
-              <span className="ml-1.5 font-mono text-[11px] text-neutral-400">
-                contentTrustStatus={trust.contentTrustStatus ?? 'null'}
-              </span>
-            </Row>
+            <Row label="当前状态">{statusLabel(trust.contentTrustStatus)}</Row>
             <Row label="核验人">
-              {trust.contentTrustReviewedBy ? (
-                <span className="font-mono text-[11px]">{trust.contentTrustReviewedBy}</span>
-              ) : (
-                '—'
-              )}
+              {reviewerText(trust.contentTrustReviewedBy)}
               {trust.contentTrustReviewedBy && (
-                <span className="ml-1.5 text-neutral-400">(管理员账号 ID,系统不回显姓名)</span>
+                <a href="/audit" className="ml-2 text-primary-700 underline">
+                  在日志审计中查看
+                </a>
               )}
             </Row>
             <Row label="核验时间">{fmtTime(trust.contentTrustReviewedAt)}</Row>
@@ -198,8 +200,8 @@ export function OrgContentTrustPanel({ orgId, onChanged }: { orgId: string; onCh
 
           {archived && (
             <p className="rounded bg-error-bg px-3 py-2 text-xs text-error-fg">
-              该机构已归档。<strong>归档状态下即使标记为「{ORG_CONTENT_TRUST_STATUS_LABELS.active}」,其内容仍然发布不出去</strong>
-              ,服务端会直接拒绝这次标记(ORG_ARCHIVED)。
+              该机构已归档。<strong>归档后即使标记为「{ORG_CONTENT_TRUST_STATUS_LABELS.active}」,其内容仍然不能在终端展示</strong>
+              ,这次标记也会被拒绝。
               本后台<strong>没有取消归档的功能</strong>;如确需恢复这家机构的内容,请联系平台技术支持处理,完成后再回来核验。
             </p>
           )}
@@ -221,7 +223,7 @@ export function OrgContentTrustPanel({ orgId, onChanged }: { orgId: string; onCh
                   >
                     {ORG_CONTENT_TRUST_STATUSES.map((s) => (
                       <option key={s} value={s}>
-                        {ORG_CONTENT_TRUST_STATUS_LABELS[s]}({s})
+                        {ORG_CONTENT_TRUST_STATUS_LABELS[s]}
                       </option>
                     ))}
                   </select>

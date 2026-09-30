@@ -29,7 +29,7 @@ const PUBLISH_MAP: Record<string, { badge: 'success' | 'warning' | 'default'; la
 
 const KIND_LABELS: Record<string, string> = { policy_guide: '政策扶持', notice: '政策公告' }
 const AUDIENCE_LABELS: Record<string, string> = {
-  graduate: '应届毕业生', flexible: '灵活就业', migrant: '返乡务工', hardship: '困难群体', startup: '创业扶持', general: '通用',
+  graduate: '应届高校毕业生', flexible: '灵活就业人员', migrant: '返乡务工人员', hardship: '困难群体就业援助', startup: '创业扶持', general: '通用',
 }
 const CATEGORY_LABELS: Record<string, string> = {
   policy: '政策', announcement: '公告', notice: '通知', recruitment: '招募',
@@ -215,7 +215,7 @@ export default function PolicySourcesPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
-        政策内容为 info-only:仅政策说明、材料清单与官方入口;不承诺补贴到账、不代申请。发布机构审核通过并确认发布责任后在一体机「政策服务」页展示,所有操作记录审计日志。
+        政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。发布机构审核通过并确认发布责任后在一体机「政策服务」页展示,所有操作记录审计日志。
         「查看申领条件」为只读复核:条件由来源机构在合作机构后台录入,本页不改条件。
       </p>
 

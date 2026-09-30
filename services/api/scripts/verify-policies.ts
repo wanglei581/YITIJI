@@ -205,15 +205,19 @@ async function main() {
     }
 
     await svc.reviewPolicy(guide.id, 'approve', undefined, partnerA)
-    await svc.publishPolicy(guide.id, 'unpublish', admin, { reasonCode: 'rights_complaint', reasonText: '权利投诉核验' })
+    // 事由以句号结尾：通知正文不得拼出「。。」（两个后台窗口走查 9/30）。
+    await svc.publishPolicy(guide.id, 'unpublish', admin, { reasonCode: 'rights_complaint', reasonText: '权利投诉核验。' })
     await expectCode(
       () => svc.publishPolicy(guide.id, 'publish', partnerA, { responsibilityAcknowledged: true }),
       'EMERGENCY_TAKEDOWN_IRREVERSIBLE',
       '下架后不能恢复',
     )
     const notices = await prisma.partnerOrgNotice.findMany({ where: { orgId: orgA } })
-    if (!notices.some((row) => row.kind === 'recruitment_emergency_takedown')) fail('政策下架通知未写出')
-    else pass('政策下架通知写出')
+    const takedownNotice = notices.find((row) => row.kind === 'recruitment_emergency_takedown')
+    if (!takedownNotice) fail('政策下架通知未写出')
+    else if (takedownNotice.body.includes('。。') || !takedownNotice.body.includes('事由：权利投诉核验。此下架不能由管理员恢复。')) {
+      fail(`政策下架通知正文标点不对：${takedownNotice.body}`)
+    } else pass('政策下架通知写出，事由以句号结尾时正文不重复句号')
 
     // P-01：机构列表分得出「平台紧急下架」，且只看得到本机构的下架事由
     {
@@ -230,7 +234,7 @@ async function main() {
       if (!('data' in aList)) fail('P-01. 带分页的机构列表形状不对')
       const heldRow = aList.data.find((p) => p.id === guide.id)
       if (!heldRow || heldRow.emergencyTakedown !== true || heldRow.emergencyReasonCode !== 'rights_complaint'
-        || heldRow.emergencyReasonText !== '权利投诉核验' || !heldRow.emergencyTakedownAt) {
+        || heldRow.emergencyReasonText !== '权利投诉核验。' || !heldRow.emergencyTakedownAt) {
         fail(`P-01. 被紧急下架的政策在机构列表里没有带出下架事由：${JSON.stringify(heldRow)}`)
       }
       if (aList.data.some((p) => p.id !== guide.id && p.emergencyTakedown !== false)) {

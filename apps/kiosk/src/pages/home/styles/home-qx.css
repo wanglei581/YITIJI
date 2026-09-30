@@ -91,12 +91,17 @@
 .qx-home-section-head h2 { margin: 0; font-family: var(--qx-serif); font-size: var(--qx-fs-page); font-weight: 900; letter-spacing: 2px; }
 .qx-home-section-head span { color: var(--qx-ink-3); font-size: var(--qx-fs-aux-lg); }
 .qx-home-section-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+/* 登录态（稿 01 ?state=member）：一行放不下副标题，收起它，「有人登录着」和「结束上一位的使用」不折行。 */
+.qx-home-section-head[data-member='true'] > div:first-child > span { display: none; }
+.qx-home-section-head[data-member='true'] .qx-home-section-actions > * { white-space: nowrap; }
 .qx-home-identity, .qx-home-device-link {
   min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 0 14px; border: 1px solid var(--qx-line); border-radius: 12px; color: var(--qx-teal-d);
   background: var(--qx-surface); font-size: var(--qx-fs-aux-lg); font-weight: 650; cursor: pointer;
 }
 .qx-home-identity svg { width: 22px; height: 22px; flex: none; }
+/* 登录态只是一句状态，不可点；可点的是旁边的「结束上一位的使用」。 */
+.qx-home-identity[data-kind='status'] { cursor: default; color: var(--qx-ink); background: transparent; }
 
 .qx-home-tiles {
   flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
