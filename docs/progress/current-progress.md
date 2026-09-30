@@ -22,6 +22,12 @@
 - **缺口（Codex 复核、总指挥核实）：** #1110 修的是「会员号写进审计 actorId、PG 外键拒绝、被 AuditService 静默吞掉」，但原门禁跑在 SQLite 上，SQLite 不校验这条外键，测不出来；重试场景也没有运行断言。
 - **补法（Grok 实现、协调方审）：** 新门禁 `verify:member-print-audit:postgres`（只挂 postgres-readiness）：真 PG 上走真实 PrintJobsService，取件链接与重试各一次，断言各落一行审计、actorId 为空、payload.endUserId 为会员号；阳性对照用旧写法直接写审计，PG 必须抛外键错误。SQLite 的 verify:miniapp-cloud-print-m2 补重试审计断言。只加门禁，不改服务代码。
 - **验证：** Grok 本机临时 PG16 跑 5/5，两处变异（取件 actorId 改回会员号、删重试审计）全红；协调方复跑 m2、backend-p0-contracts、ci-gate-coverage 全绿，抽 1 处变异（重试审计动作名错）变红。
+## 2026-09-29：给人看的时间一律按北京时间（走查 W-78、W-67；分支 `claude/backend-hardening-20260929-display-time-shanghai`）
+
+- **问题：** 告警正文里的时间是 UTC，比北京时间早 8 小时，运维会误判事件先后（W-78）；招聘会企业打印页脚用服务器本地时钟，服务器在 UTC 时同样早 8 小时；价目应急 SQL 用了裸 `NOW()`，时区不对（W-67）。
+- **修法（Grok 实现、协调方审）：** 新增共用函数 `common/beijing-display-time.ts`（Asia/Shanghai），告警中心正文、合同审查报告、诊断报告、模拟面试报告与练习单、自我探索、岗位匹配参考、职业规划、参会准备单、顾问产物、招聘会企业打印页脚、批量发布失败原因、岗位与招聘会「同步于」说明、早报日期、诊断导出文件名都改走它。**存库、接口里的 ISO 时间、去重键、日志、额度与统计的分桶键一律保持 UTC 不动。** 价目应急 SQL 两套库都写明 UTC 墙钟，文档两处提醒「不要照抄 NOW()」，门禁钉住不许再出现裸 NOW()。
+- **验证：** 新门禁 `verify:beijing-display-time` 21 条（固定 UTC 16:30 必须显示为北京 次日 00:30），变异「时区改回 UTC」21 条全红；协调方在候选上复跑 23 条相关门禁（出纸服务、告警、批量发布、早报、价目、日期诚实性等）与 api tsc 全绿。
+
 ## 2026-09-30：「我的打印订单」失败行给失败原因码、补网点名（小程序交付单；分支 `claude/backend-hardening-20260930-order-failure-code`）
 
 - **问题：** 小程序「我的打印订单」失败单只能显示「打印失败」，也缺网点名（任务上没记终端的行）。

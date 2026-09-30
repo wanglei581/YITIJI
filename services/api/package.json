@@ -230,6 +230,7 @@
     "maintenance:unpublish-demo-companies": "node -r @swc-node/register scripts/unpublish-demo-companies.ts",
     "verify:demo-company-unpublish": "node -r @swc-node/register scripts/verify-demo-company-unpublish.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
+    "verify:beijing-display-time": "node -r @swc-node/register scripts/verify-beijing-display-time.ts",
     "verify:console-screen-snapshot": "node -r @swc-node/register scripts/verify-console-screen-snapshot.ts",
     "verify:console-screen-usage": "node -r @swc-node/register scripts/verify-console-screen-usage.ts",
     "verify:console-screen-printed-visits": "node -r @swc-node/register scripts/verify-console-screen-printed-visits.ts",

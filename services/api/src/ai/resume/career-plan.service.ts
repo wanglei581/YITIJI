@@ -18,8 +18,14 @@ import {
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
 import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
 import { storedJobFitUsesSystemJob } from './job-fit-hosting'
+import { formatBeijingDate } from '../../common/beijing-display-time'
 import { sanitizeCareerPlanPayload } from './career-plan-payload-safety'
 import { selfAssessmentForNewAi, type SelfAssessmentExclusion } from './self-assessment-consent-reconfirm'
+
+/** 职业规划建议单印在纸上的日期。 */
+export function careerPlanReportDate(at: Date): string {
+  return formatBeijingDate(at)
+}
 
 // ============================================================
 // 2E 职业规划会话服务。
@@ -348,7 +354,7 @@ export class CareerPlanService {
   private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }, taskId: string, options?: { jobBoardOpen?: boolean }) {
     const stored = this.withoutSystemJobTitle(JSON.parse(row.payloadJson) as StoredCareerPlan, options)
     const { buffer, pageCount } = await this.pdf.render(
-      { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn, contentId: taskId },
+      { date: careerPlanReportDate(row.updatedAt), basedOn: stored.basedOn, contentId: taskId },
       stored.payload,
     )
     return { buffer, pageCount, filename: `职业规划建议单.pdf`, variant: 'ai' as const }
@@ -366,7 +372,7 @@ export class CareerPlanService {
     why: 'never_generated' | 'expired',
   ) {
     const content: DegradedCareerPlanContent = {
-      date: new Date().toISOString().slice(0, 10),
+      date: careerPlanReportDate(new Date()),
       reason: {
         text: why === 'expired'
           ? '此前生成的 AI 规划建议已按隐私留存策略到期清理，本次没有可打印的 AI 内容。'

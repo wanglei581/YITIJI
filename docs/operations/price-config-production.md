@@ -54,11 +54,16 @@ ORDER BY "serviceKey";
 
 ## 显式 upsert（人工执行）
 
-将下列金额换成运营拍板值（单位：分。例：1.00 元/页 = `100`）。PostgreSQL：
+将下列金额换成运营拍板值（单位：分。例：1.00 元/页 = `100`）。
+
+**不要照抄 NOW()。** `PriceConfig` 的时间列在 PostgreSQL 里是不带时区的 `TIMESTAMP(3)`，程序按 UTC 读出再显示成北京时间。会话时区如果是上海，不带时区的当前时间写进去的是上海墙钟，后台会超前 8 小时。下面两段分别把 UTC 墙钟写进对应数据库。
+
+PostgreSQL：
 
 ```sql
 -- FREE_MODE：两行 unitCents 均写 0
 -- 有人值守 / live：写运营拍板正价（勿用开发默认 20/50，除非运营明确采用）
+-- 时间写 UTC 墙钟，与会话时区无关。
 
 INSERT INTO "PriceConfig" (
   "id", "serviceKey", "unitCents", "unit", "active", "effectiveFrom", "description", "createdAt", "updatedAt"
@@ -68,17 +73,17 @@ INSERT INTO "PriceConfig" (
   0,  -- ← 换成拍板分价
   'page',
   true,
-  NOW(),
+  (NOW() AT TIME ZONE 'UTC'),
   '黑白打印每页（运营价）',
-  NOW(),
-  NOW()
+  (NOW() AT TIME ZONE 'UTC'),
+  (NOW() AT TIME ZONE 'UTC')
 )
 ON CONFLICT ("serviceKey") DO UPDATE SET
   "unitCents" = EXCLUDED."unitCents",
   "unit" = 'page',
   "active" = true,
   "description" = EXCLUDED."description",
-  "updatedAt" = NOW();
+  "updatedAt" = (NOW() AT TIME ZONE 'UTC');
 
 INSERT INTO "PriceConfig" (
   "id", "serviceKey", "unitCents", "unit", "active", "effectiveFrom", "description", "createdAt", "updatedAt"
@@ -88,20 +93,66 @@ INSERT INTO "PriceConfig" (
   0,  -- ← 换成拍板分价
   'page',
   true,
-  NOW(),
+  (NOW() AT TIME ZONE 'UTC'),
   '彩色打印每页（运营价）',
-  NOW(),
-  NOW()
+  (NOW() AT TIME ZONE 'UTC'),
+  (NOW() AT TIME ZONE 'UTC')
 )
 ON CONFLICT ("serviceKey") DO UPDATE SET
   "unitCents" = EXCLUDED."unitCents",
   "unit" = 'page',
   "active" = true,
   "description" = EXCLUDED."description",
-  "updatedAt" = NOW();
+  "updatedAt" = (NOW() AT TIME ZONE 'UTC');
 ```
 
-说明：`id` 仅在**首次插入**时使用；若行已存在，`ON CONFLICT` 只更新价目字段，不会改已有 `id`。`effectiveFrom` 写入 `NOW()` 仅作审计备注，**计价逻辑不读它**。
+SQLite（开发库。这个引擎没有同名的当前时间函数，用下面的 UTC 文本）：
+
+```sql
+-- 带 Z 的 UTC 文本，和 Prisma 写入 SQLite 的 DateTime 一致。
+
+INSERT INTO "PriceConfig" (
+  "id", "serviceKey", "unitCents", "unit", "active", "effectiveFrom", "description", "createdAt", "updatedAt"
+) VALUES (
+  'pc_ops_print_bw_page',
+  'print_bw_page',
+  0,  -- ← 换成拍板分价
+  'page',
+  true,
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+  '黑白打印每页（运营价）',
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+)
+ON CONFLICT ("serviceKey") DO UPDATE SET
+  "unitCents" = EXCLUDED."unitCents",
+  "unit" = 'page',
+  "active" = true,
+  "description" = EXCLUDED."description",
+  "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+
+INSERT INTO "PriceConfig" (
+  "id", "serviceKey", "unitCents", "unit", "active", "effectiveFrom", "description", "createdAt", "updatedAt"
+) VALUES (
+  'pc_ops_print_color_page',
+  'print_color_page',
+  0,  -- ← 换成拍板分价
+  'page',
+  true,
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+  '彩色打印每页（运营价）',
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+)
+ON CONFLICT ("serviceKey") DO UPDATE SET
+  "unitCents" = EXCLUDED."unitCents",
+  "unit" = 'page',
+  "active" = true,
+  "description" = EXCLUDED."description",
+  "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+```
+
+说明：`id` 仅在**首次插入**时使用；若行已存在，`ON CONFLICT` 只更新价目字段，不会改已有 `id`。`effectiveFrom` 写入当前 UTC 时刻仅作审计备注，**计价逻辑不读它**。不要照抄 NOW()。
 
 写入后立刻再跑一遍「写入前只读核对」SQL，确认 `unitCents` / `active` 与拍板一致。
 
