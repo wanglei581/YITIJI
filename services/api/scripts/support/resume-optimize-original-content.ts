@@ -64,6 +64,19 @@ export async function verifyOriginalContent(): Promise<void> {
       pass('W-OPT-LOSS (f). 完整输出一次成功，不新增保持原文条目')
     }
     {
+      // 标题后面只有杂句、前面没有同类事实条目：杂句不能变成一条「工作经历」去触发重试或被补回。
+      const junk = ['周禾青', '工作经历', '照片见附件，证件照在微信里。', '教育经历', schoolLine].join('\n')
+      const onlySchool = { sections: [], suggestions: [], contentBlocks: [
+        { key: 'education', label: '教育经历', lines: [schoolLine] },
+      ] } as unknown as ResumeReport
+      const out = await run(junk, [reply({ ...complete(), basic: { name: '周禾青' }, experience: [], projects: [], skills: [], certificates: [] })], onlySchool)
+      if (Number(llmCallCount) !== 1 || out.optimizedResume.experience.length !== 0
+        || out.modules.some((m) => m.title.includes('保持原文'))) {
+        fail('W-OPT-LOSS (h). 标题后的杂句不得新建经历条目、触发重试或被补回')
+      }
+      pass('W-OPT-LOSS (h). 标题后只有杂句时不新建条目，一次成功')
+    }
+    {
       const out = await run(source, [reply(omitEducation()), reply(complete())])
       if (Number(llmCallCount) !== 2 || !sentMessages[1]?.some((m) => m.role === 'system'
         && m.content?.includes('教育经历') && m.content.includes(schoolLine))) {
