@@ -69,7 +69,6 @@ import { SmartCampusHomePage } from '../pages/smart-campus/SmartCampusHomePage'
 import { SmartCampusGuard } from '../pages/smart-campus/SmartCampusGuard'
 import { SmartCampusWelcomePage } from '../pages/smart-campus/SmartCampusWelcomePage'
 import { SmartCampusServicePage } from '../pages/smart-campus/SmartCampusServicePage'
-import { FreshmanInsightsPage } from '../pages/smart-campus/FreshmanInsightsPage'
 import { KioskRouteErrorPage } from '../pages/errors/KioskRouteErrorPage'
 import {
   SmartCampusCapabilityBoundary,
@@ -200,7 +199,6 @@ export const kioskRouter = createBrowserRouter([
         children: [
           { path: 'smart-campus', element: <SmartCampusHomePage /> },
           { path: 'smart-campus/welcome', element: <SmartCampusGuard module="welcome"><SmartCampusWelcomePage /></SmartCampusGuard> },
-          { path: 'smart-campus/freshman-insights', element: <SmartCampusGuard><FreshmanInsightsPage /></SmartCampusGuard> },
           { path: 'smart-campus/service/:key', element: <SmartCampusGuard><SmartCampusServicePage /></SmartCampusGuard> },
         ],
       },
