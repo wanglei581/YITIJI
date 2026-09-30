@@ -164,7 +164,7 @@ assert.deepEqual(
   // 唯一的值导入是 ApiHttpError，用等价的本地类替掉即可独立加载（其余是纯逻辑）。
   const standalone = source.replace(
     /^import \{ ApiHttpError \} from '\.\/httpAdapter'$/m,
-    'class ApiHttpError extends Error {\n'
+    'export class ApiHttpError extends Error {\n'
       + '  constructor(code, message, status) { super(message); this.code = code; this.status = status }\n'
       + '}',
   )
@@ -174,8 +174,9 @@ assert.deepEqual(
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText
   const mod = await import(`data:text/javascript;base64,${Buffer.from(js, 'utf8').toString('base64')}`)
-  const { userMessageOf } = mod
+  const { userMessageOf, ApiHttpError } = mod
   assert.equal(typeof userMessageOf, 'function', 'userMessageOf 必须被导出')
+  assert.equal(typeof ApiHttpError, 'function', '测试桩必须导出 ApiHttpError，否则无法构造带服务端原文的错误')
 
   const FALLBACK = '导出失败，请稍后重试'
   // 这四条是用户实际会撞到的技术串，一条都不许显示出去。
@@ -210,6 +211,39 @@ assert.deepEqual(
     assert.notEqual(text, FALLBACK, `${code} 必须有自己的文案`)
     assert.match(text, hint, `${code} 文案须含下一步`)
   }
+  // PRINT_TERMINAL_QUEUE_HALTED（#1150 方案 A，只此一个新码）：
+  // 合格中文原话原样显示。兜底句与拍板原话相同，只断言那一句时拿掉白名单仍会绿，
+  // 所以再钉一条不同的合格中文（#1150 现文「本机…」），证明不是固定覆盖。
+  // 英文堆栈或路径、以及空原话，回退一体机自己的那句，不落到调用方兜底。
+  // PRINTER_UNAVAILABLE 不放行：带「本机暂停接打印单…」时仍是原来的固定文案。
+  const PRINTER_FIXED = '打印机当前不可用（离线、缺纸或故障），请稍后再试或联系现场工作人员'
+  const QUEUE_HALTED_FALLBACK = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
+  const QUEUE_HALTED_SERVER = '本机暂停接打印单，暂不能下单，请稍后再试或换一台终端'
+  assert.equal(
+    userMessageOf(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', QUEUE_HALTED_FALLBACK, 400), FALLBACK),
+    QUEUE_HALTED_FALLBACK,
+    '新码带拍板那句时必须原样显示',
+  )
+  assert.equal(
+    userMessageOf(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', QUEUE_HALTED_SERVER, 400), FALLBACK),
+    QUEUE_HALTED_SERVER,
+    '新码带另一句合格中文时必须原样显示，不能被兜底句盖住',
+  )
+  const leakedPath = 'Error: ENOENT\n    at Queue.pause (C:\\\\Windows\\\\System32\\\\spool\\\\PRINTERS:12:3)'
+  const leaked = userMessageOf(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', leakedPath, 400), FALLBACK)
+  assert.equal(leaked, QUEUE_HALTED_FALLBACK, '英文堆栈或路径不得透传，须回退到一体机兜底句')
+  assert.notEqual(leaked, leakedPath)
+  assert.notEqual(leaked, FALLBACK)
+  const missing = userMessageOf(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', '   ', 400), FALLBACK)
+  assert.equal(missing, QUEUE_HALTED_FALLBACK, '原话缺失时回退到一体机兜底句')
+  assert.notEqual(missing, FALLBACK)
+  const printerShown = userMessageOf(new ApiHttpError('PRINTER_UNAVAILABLE', QUEUE_HALTED_SERVER, 400), FALLBACK)
+  assert.equal(printerShown, PRINTER_FIXED, 'PRINTER_UNAVAILABLE 不得透传「本机暂停接打印单」')
+  assert.notEqual(printerShown, QUEUE_HALTED_SERVER)
+  assert.notEqual(printerShown, QUEUE_HALTED_FALLBACK)
+  const otherCode = userMessageOf(new ApiHttpError('RATE_LIMITED', QUEUE_HALTED_SERVER, 429), FALLBACK)
+  assert.equal(otherCode, '当前使用的人较多，请稍后再试', '非透传码不得显示服务端原话')
+  assert.notEqual(otherCode, QUEUE_HALTED_SERVER)
   class ProbeTypeError extends TypeError {}
   const networkText = userMessageOf(new ProbeTypeError('Failed to fetch'), FALLBACK)
   assert.notEqual(networkText, FALLBACK, 'TypeError 断网必须映射中文，不得透传 Failed to fetch')

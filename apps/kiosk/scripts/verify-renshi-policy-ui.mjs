@@ -26,6 +26,7 @@ const pass = (msg) => console.log(`  PASS ${msg}`)
 const fail = (msg) => { console.error(`  FAIL ${msg}`); failed++ }
 
 const page = read('src/pages/renshi/RenshiPage.tsx')
+const focusHook = read('src/pages/renshi/usePolicyFocus.ts')
 const shared = read('src/pages/renshi/shared.ts')
 const builtinData = read('src/pages/renshi/builtinData.ts')
 const policyPanel = read('src/pages/renshi/PolicyPanel.tsx')
@@ -213,8 +214,8 @@ const socialEntryLabels = [...builtinData.matchAll(/entryLabel:\s*'([^']+)'/g)].
 const policyHonest = countHonestUploadButtons(policyPanel)
 const registerRoutes = countUploadRoutes(registerPanel)
 const socialRoutes = countUploadRoutes(socialPanel)
-// 稿 48 最终版（9/29）新增两处，同一个诚实正则：公告展开条里一颗（公告本身不提供下载），
-// 以及死路屏 RqDeadEnd 的最后一条出口（读取中 / 读取失败 / 没有内容时本机仍能办的事）。
+// 稿 48 最终版（9/29）的诚实入口还在：内置指引展开条、社保指南、就业登记、死路屏仍直接去上传页。
+// W-90：政策库条目和公告在点「上传自备材料打印」之前要先按条确认还在，不能带着已撤下的条目进上传页。
 const noticeHonest = countHonestUploadButtons(noticePanel)
 const noticeRoutes = countUploadRoutes(noticePanel)
 const deadEndHonest = countHonestUploadButtons(components)
@@ -223,10 +224,20 @@ const socialStripped = stripNonVisibleComments(socialPanel)
 const pageHonest = countHonestUploadButtons(page)
 const pageRoutes = countUploadRoutes(page)
 const uploadRouteCount = (allRenshi.match(/navigate\('\/print\/upload'\)/g) ?? []).length
-// 底栏是新调用点：就业政策、社保指南、就业登记、政策公告各一颗，和展开条用同一个正则。
-// 就业登记原来滚在内容底部的那颗收到底栏（同一句诚实文案，不另起一个更松的匹配）。
-// 社保卡里没有线上入口的两项仍是一颗小按钮，文案走 entryLabel，正则不放宽。
-// 政策展开条仍保留一颗。四处底栏各自写 onClick，不合成一个函数。
+const policyGuarded = (policyPanel.match(/onClick=\{\(\) => onUpload\(item\.id\)\}/g) ?? []).length
+const noticeGuarded = (noticePanel.match(/onClick=\{\(\) => onUpload\(notice\.id\)\}/g) ?? []).length
+const pageGuarded = (page.match(/onClick=\{\(\) => uploadOwn\(uploadTarget\)\}/g) ?? []).length
+const between = (source, start, end) => {
+  const from = source.indexOf(start)
+  const to = source.indexOf(end, from + start.length)
+  return from >= 0 && to > from ? source.slice(from, to) : ''
+}
+const uploadBody = between(page, 'async function uploadOwn', 'async function openPublishedSource')
+const sourceBody = between(page, 'async function openPublishedSource', 'const handlePolicyItemOpened')
+const confirmBeforeNavigate = uploadBody.indexOf('guard.confirm(') >= 0
+  && uploadBody.indexOf("navigate('/print/upload')") > uploadBody.indexOf('guard.confirm(')
+const confirmBeforeQr = sourceBody.indexOf('guard.confirm(') >= 0
+  && sourceBody.indexOf('setQrEntry(') > sourceBody.indexOf('guard.confirm(')
 const barWhys = [
   '政策与指引只做说明；需要纸质件请上传你自己的材料。',
   '社保材料请自行准备，本机只负责打印。',
@@ -235,23 +246,30 @@ const barWhys = [
 ]
 const honestPanelEntries =
   policyHonest === 1 &&
+  policyGuarded === 1 &&
   registerRoutes === 0 &&
   socialRoutes === 1 &&
   socialUploadButtonPattern.test(socialStripped) &&
-  pageHonest === 4 &&
-  pageRoutes === 4 &&
+  pageHonest === 2 &&
+  pageRoutes === 3 &&
+  pageGuarded === 2 &&
   barWhys.every((text) => page.includes(text)) &&
   socialEntryLabels.length > 0 &&
   socialEntryLabels.every((label) => label.includes('扫码') || label === '上传自备材料打印') &&
-  noticeHonest === 1 &&
-  noticeRoutes === 1 &&
+  noticeHonest === 0 &&
+  noticeRoutes === 0 &&
+  noticeGuarded === 1 &&
   deadEndHonest === 1 &&
   deadEndRoutes === 1 &&
-  uploadRouteCount === 8
+  uploadRouteCount === 6 &&
+  confirmBeforeNavigate &&
+  confirmBeforeQr &&
+  focusHook.includes('这条政策已经撤下，不再提供来源入口') &&
+  page.includes('data-testid="renshi-policy-action"')
 if (misleadingPrintLabels.every((label) => !allRenshi.includes(label)) && honestPanelEntries) {
-  pass('I2. 保留的通用打印入口明确要求用户上传自备材料')
+  pass('I2. 保留的通用打印入口明确要求用户上传自备材料，政策与公告打开前先确认还在')
 } else {
-  fail(`I2. /print/upload 入口必须使用「上传自备材料打印」等诚实文案（政策展开 ${policyHonest}，底栏 ${pageHonest}，登记路由 ${registerRoutes}，社保路由 ${socialRoutes}，公告展开 ${noticeHonest}/${noticeRoutes}，死路屏 ${deadEndHonest}/${deadEndRoutes}，合计 ${uploadRouteCount}）`)
+  fail(`I2. /print/upload 入口必须使用「上传自备材料打印」等诚实文案，且政策/公告先确认再进入（政策展开 ${policyHonest}/预检 ${policyGuarded}，底栏诚实 ${pageHonest}/预检 ${pageGuarded}，登记路由 ${registerRoutes}，社保路由 ${socialRoutes}，公告展开 ${noticeHonest}/${noticeRoutes}/预检 ${noticeGuarded}，死路屏 ${deadEndHonest}/${deadEndRoutes}，合计 ${uploadRouteCount}，上传预检 ${confirmBeforeNavigate}，来源预检 ${confirmBeforeQr}）`)
 }
 const miswiredUploadFixture = `<button onClick={() => navigate('/print/upload')}>直接打印{/* 上传自备材料打印 */}</button>`
 if (!hasHonestUploadButton(miswiredUploadFixture)) {

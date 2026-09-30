@@ -17,7 +17,7 @@ export function PageHeader({ title, subtitle, actions, className, size = 'defaul
         {/* 标题字体走 --font-heading 间接层：引入 inkpaper.css 的后台显示宋体，Kiosk 未定义该变量时回退继承字体 */}
         <h1 className={cn(
           'font-bold text-neutral-900 [font-family:var(--font-heading,inherit)]',
-          size === 'large' ? 'text-2xl' : 'text-[1.25rem] leading-snug',
+          size === 'large' ? 'text-2xl' : 'text-xl leading-snug',
         )}>
           {title}
         </h1>

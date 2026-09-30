@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatDateTime } from '@ai-job-print/shared'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { getTerminals, type AdminTerminalRecord } from '../../services/api/devices'
+import { printerStatusView } from '../terminals/terminalStatusViews'
 import {
   adminPrintScanService,
   DEFAULT_DENY_CAPABILITY_KEYS,
@@ -33,6 +34,13 @@ const CAPABILITY_LABELS: Record<PrintScanCapabilityKey, string> = {
   // 再配成「可用」才对用户放开。配错的代价是用户按彩色付费拿到黑白纸。
   color_print: '彩色打印（需真机验证）',
   duplex_print: '自动双面（需真机验证）',
+}
+
+function PrinterHeartbeatText({ status }: { status: string | null }) {
+  if (!status) return <>状态未知</>
+  const view = printerStatusView(status)
+  const tone = view.badge === 'error' ? 'font-semibold text-error-fg' : view.badge === 'warning' ? 'font-semibold text-warning-fg' : undefined
+  return <span className={tone}>{view.label}</span>
 }
 
 const CAPABILITY_STATUS_OPTIONS: { value: PrintScanCapabilityStatus; label: string }[] = [
@@ -209,15 +217,14 @@ export function CapabilityCenter() {
           <span className="text-[12px] text-neutral-500">
             Agent {selected.agentVersion ?? '版本未知'} ·{' '}
             {selected.online ? (selected.agentStatus === 'agent_degraded' ? 'Agent 降级' : '在线') : '离线'} · 打印机{' '}
-            {selected.printerStatus ?? '状态未知'}
+            <PrinterHeartbeatText status={selected.printerStatus} />
             {selected.localTaskDatabaseAvailable === false ? ' · 本地任务库不可用' : ''}
           </span>
         )}
       </div>
 
       <p className="text-[12px] leading-relaxed text-neutral-500">
-        fail-closed 口径：只有「可用」状态对普通用户开放正式任务；「测试中」仅运维语境可见；其余状态一律在
-        一体机上不可用。彩色、自动双面、签名三项未登记即关闭，一体机显示「暂未开通」；其余能力未登记时按服务器部署设置处理
+        只有标为「可用」的能力对用户开放；「测试中」只给运维使用；没有登记的能力一律不开放。彩色、自动双面、签名三项未登记即关闭，一体机显示「暂未开通」；其余能力未登记时按服务器部署设置处理
         （常规设置下照常开放，严格设置下关闭）。登记后以此处为准，每次保存都记入操作审计。
       </p>
 
@@ -238,7 +245,7 @@ export function CapabilityCenter() {
               </tr>
             </thead>
             <tbody>
-              {capabilities.map((cap) =>
+              {capabilities.filter((cap) => cap.capabilityKey !== 'cloud_upload').map((cap) =>
                 cap.capabilityKey === 'signature_stamp' ? (
                   <SignatureCapabilityRow key={cap.capabilityKey} cap={cap} saving={savingKey === cap.capabilityKey} onSave={save} />
                 ) : (

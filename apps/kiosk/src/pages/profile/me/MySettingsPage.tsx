@@ -80,7 +80,7 @@ function SettingsRow({
 export function MySettingsPage() {
   const navigate = useNavigate()
   const { user, isLoggedIn, getToken } = useAuth()
-  const { clearSessionTo } = useKioskSessionControl()
+  const { endKioskUse } = useKioskSessionControl()
   const [confirm, setConfirm] = useState<'logout' | 'switch' | 'revokeJobAi' | null>(null)
   const [showRebind, setShowRebind] = useState(false)
   const [jobAi, setJobAi] = useState<JobAiConsent>('idle')
@@ -131,28 +131,25 @@ export function MySettingsPage() {
     setClearError(null)
   }
 
-  // 退出登录：清空内存会话后回到首页，与闲置清场同一目的地。
+  // 退出登录：走统一的结束使用，回到首页，与闲置清场同一目的地。
   const handleLogout = () => {
     setClearing(true); setClearError(null)
-    try { clearSessionTo({ path: '/' }) } catch {
+    try { endKioskUse('end_use') } catch {
       setClearing(false); setClearError('本机登录尚未清除，请重试或联系工作人员。')
     }
   }
 
-  // 切换账号：退出当前账号 → 直达登录页用另一手机号登录。先 logout 清空内存会话，避免数据串号。
+  // 切换账号（W-64）：先把上一位完整清掉（人次、本机数据、登录），再进登录页用另一手机号登录。
   const handleSwitch = () => {
     setClearing(true); setClearError(null)
-    try { clearSessionTo({ path: '/login', state: { from: '/profile' } }) } catch {
+    try { endKioskUse('switch_account') } catch {
       setClearing(false); setClearError('还不能切换账号，请重试或联系工作人员。')
     }
   }
 
   // 换绑成功：旧会话已由后端踢出，前端清除内存会话并跳转登录页。
   const handleRebindDone = () => {
-    clearSessionTo({
-      path: '/login',
-      state: { from: '/profile', hint: '换绑成功，请用新手机号登录' },
-    })
+    endKioskUse('switch_account', { loginHint: '换绑成功，请用新手机号登录' })
   }
 
   const handleRevokeJobAiConsent = async () => {
@@ -179,7 +176,7 @@ export function MySettingsPage() {
 
   if (showRebind && isLoggedIn && getToken()) return (
     <PhoneRebindPanel phoneMasked={phoneMasked} token={getToken()!} onDone={handleRebindDone}
-      onRecheck={() => clearSessionTo({ path: '/login', state: { from: '/profile', hint: '请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。' } })}
+      onRecheck={() => endKioskUse('switch_account', { loginHint: '请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。' })}
       onCancel={() => setShowRebind(false)} />
   )
   const ctabar = <>

@@ -25,6 +25,7 @@
 //   3. 弹窗被拦截时提示重试，重试同样会重新请求、重新留痕。
 // ============================================================
 
+import { formatDateTime } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState } from 'react'
 import { Drawer, StatusBadge } from '@ai-job-print/ui'
 import { AlertTriangleIcon, ExternalLinkIcon, FileTextIcon, RefreshCwIcon } from 'lucide-react'
@@ -92,8 +93,7 @@ const dash = <span className="text-neutral-300">—</span>
 
 function fmt(value: string | null): React.ReactNode {
   if (!value) return dash
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  return formatDateTime(value, { fallback: value })
 }
 
 // ─── 小组件 ───────────────────────────────────────────────────────────────────

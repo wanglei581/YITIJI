@@ -417,17 +417,21 @@ export function PrintScanHomePage() {
           }
         }
 
-        // ③ MFP 轴：确定出不了纸时，停掉 needsMfp 的项。读不到状态不算离线。
+        // ③ MFP 轴：确定出不了纸、或打印闸门合上时，停掉 needsMfp 的项。读不到状态不算离线。
+        // 闸门合上沿用同一套停用卡，短标题和说明改成暂停接单，不说成缺纸或离线。
         if (mfp === 'unavailable') {
           if (resolved.needsMfp) {
+            const orderPaused = Boolean(device.printerNotice)
             return {
               ...resolved,
               available: false,
               to: '',
               state: undefined,
               stateNote: undefined,
-              note: resolved.mfpOffNote ?? resolved.note,
-              unavailableBadge: resolved.mfpOffBadge ?? `暂停 · ${device.printerLabel}`,
+              note: orderPaused ? device.printerNotice : (resolved.mfpOffNote ?? resolved.note),
+              unavailableBadge: orderPaused
+                ? device.printerLabel
+                : (resolved.mfpOffBadge ?? `暂停 · ${device.printerLabel}`),
             }
           }
           return { ...resolved, stateNote: resolved.mfpOffStateNote ?? resolved.stateNote }
@@ -439,6 +443,7 @@ export function PrintScanHomePage() {
       capabilityLoad,
       confirmed,
       device.printerLabel,
+      device.printerNotice,
       mfp,
       probe,
     ]
@@ -478,7 +483,7 @@ export function PrintScanHomePage() {
     <QxPageFrame
       back={{ label: '返回首页', onBack: () => navigate('/') }}
       title="打印扫描服务"
-      status={pill}
+      status={device.printerNotice ? { tone: 'bad', label: device.printerLabel } : pill}
       terminalLabel="就业服务大厅"
       navbar={
         <PrintHubNavbar
@@ -492,6 +497,11 @@ export function PrintScanHomePage() {
         hubState={hubState}
         probe={probe}
         mfp={mfp}
+        orderPaused={
+          hubState === 'device-off' && device.printerNotice
+            ? { label: device.printerLabel, notice: device.printerNotice }
+            : undefined
+        }
         colorDuplexLabel={colorDuplexChip(
           capabilityLoad.map.color_print?.status === 'available',
           capabilityLoad.map.duplex_print?.status === 'available',
@@ -511,10 +521,12 @@ export function PrintScanHomePage() {
         }))}
         arrivalCode={{
           ...ARRIVAL_CODE_ENTRY,
-          stateNote: arrivalCodeStateNote(probe, mfp),
+          stateNote: probe === 'ok' && device.printerNotice
+            ? device.printerNotice
+            : arrivalCodeStateNote(probe, mfp),
         }}
         quickLinks={QUICK_LINKS}
-        capabilityGroupHint={capabilityGroupHint(probe, mfp, locked)}
+        capabilityGroupHint={device.printerNotice ? device.printerLabel : capabilityGroupHint(probe, mfp, locked)}
         recordsGroupHint={recordsGroupHint()}
         notices={[
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE,

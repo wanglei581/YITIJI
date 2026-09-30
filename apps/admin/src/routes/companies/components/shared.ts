@@ -1,4 +1,4 @@
-import { COMPANY_INDUSTRIES, COMPANY_TYPES, formatDateTime, isMunicipality, resolveRegionSelection } from '@ai-job-print/shared'
+import { COMPANY_INDUSTRIES, COMPANY_TYPES, formatDate, formatDateTime, isMunicipality, resolveRegionSelection } from '@ai-job-print/shared'
 import { type AdminCompanyDetail, type CompanyFieldsInput } from '../../../services/api/companiesAdmin'
 
 // companies 路由内多个子组件与主页共享的展示常量、标签工具与表单逻辑。
@@ -132,7 +132,7 @@ export function detailToForm(d: AdminCompanyDetail): CompanyFormState {
     companyType: d.companyType ?? '',
     industry: d.industry ?? '',
     scale: d.scale ?? '',
-    foundedAt: d.foundedAt ? d.foundedAt.slice(0, 10) : '',
+    foundedAt: d.foundedAt ? formatDate(d.foundedAt, '') : '',
     province,
     city: province && isMunicipality(province) ? '' : region.city ?? '',
     district: region.district ?? '',

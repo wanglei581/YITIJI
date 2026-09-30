@@ -34,6 +34,11 @@ interface UploadSessionQrPanelProps {
   confirmLabel?: string
   onUploaded: (file: PhoneUploadedFile) => void
   onBusyChange?: (busy: boolean) => void
+  /**
+   * session：二维码还在（含等人扫）即报忙。
+   * received：没收到文件不算忙；手机已传上或正在确认才报忙。
+   */
+  busyWhen?: 'session' | 'received'
 }
 
 interface QrState {
@@ -112,6 +117,7 @@ export function UploadSessionQrPanel({
   confirmLabel = '确认使用这份简历',
   onUploaded,
   onBusyChange,
+  busyWhen = 'session',
 }: UploadSessionQrPanelProps) {
   const { getToken, isLoggedIn } = useAuth()
   const pollFailuresRef = useRef(0)
@@ -127,8 +133,9 @@ export function UploadSessionQrPanel({
   const active = Boolean(qr && status?.status !== 'confirmed' && status?.status !== 'cancelled' && status?.status !== 'expired')
 
   useEffect(() => {
-    onBusyChange?.(active || loading || confirming)
-  }, [active, confirming, loading, onBusyChange])
+    const received = status?.status === 'uploaded' || confirming
+    onBusyChange?.(busyWhen === 'received' ? received : active || loading || confirming)
+  }, [active, busyWhen, confirming, loading, onBusyChange, status?.status])
 
   // 确认后父页面会卸掉本面板。上面的 effect 只在依赖变化时上报，卸载时不会再跑，忙碌会一直留在父页面。
   useEffect(() => {

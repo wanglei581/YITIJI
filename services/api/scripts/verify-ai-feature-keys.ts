@@ -224,6 +224,12 @@ function main() {
 try {
   console.log('\n=== S0-3 AI 功能位拆键验证（风险 R3）===')
   main()
+  // W-101：后台「AI 配置」页直接显示 runtimeNote，不得出现源码文件名、Markdown 标记或内部术语。
+  const leaky = AI_MODEL_FEATURES.filter((f) =>
+    /[A-Za-z0-9_-]+\.(?:ts|js|tsx)\b|\*\*|⚠️|System Prompt|运行链路/.test(f.runtimeNote),
+  )
+  if (leaky.length === 0) pass(`W-101 ${AI_MODEL_FEATURES.length} 条功能说明都是面向管理员的中文，不含文件名与 Markdown`)
+  else fail(`W-101 功能说明含文件名或 Markdown：${leaky.map((f) => f.key).join('、')}`)
 } catch (error) {
   fail(`验证异常: ${error instanceof Error ? error.stack ?? error.message : String(error)}`)
 } finally {

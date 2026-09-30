@@ -43,6 +43,9 @@ import { trackedFiles } from './project-graph/repo.mjs'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const workflowPath = join(repoRoot, '.github/workflows/ci.yml')
+// 只在 Windows runner 上才能建队列的门禁挂在 windows-agent-installer.yml，不进 ci.yml。
+// 执行闭包要把这份 workflow 算进去，否则该脚本会被当成没接线。A 段的逐字清单仍只看 ci.yml。
+const windowsAgentWorkflowPath = join(repoRoot, '.github/workflows/windows-agent-installer.yml')
 const exemptionsPath = join(repoRoot, 'scripts/ci-gate-exemptions.json')
 
 // ---------------------------------------------------------------------------
@@ -280,17 +283,22 @@ function expand(pkg, scriptName, reason) {
   }
 }
 
-const steps = parseWorkflowSteps(workflowText)
-for (const step of steps) {
-  const cwdPackage = step.workingDirectory
-    ? resolvePackage(step.workingDirectory)
-    : packagesByDir.get('.')
-  for (const command of step.commands) {
-    for (const invocation of parseScriptInvocations(command, cwdPackage)) {
-      expand(invocation.pkg, invocation.scriptName, `ci.yml 直接执行`)
+function collectExecuted(text, reason) {
+  for (const step of parseWorkflowSteps(text)) {
+    const cwdPackage = step.workingDirectory
+      ? resolvePackage(step.workingDirectory)
+      : packagesByDir.get('.')
+    for (const command of step.commands) {
+      for (const invocation of parseScriptInvocations(command, cwdPackage)) {
+        expand(invocation.pkg, invocation.scriptName, reason)
+      }
     }
   }
 }
+
+const steps = parseWorkflowSteps(workflowText)
+collectExecuted(workflowText, 'ci.yml 直接执行')
+collectExecuted(readFileSync(windowsAgentWorkflowPath, 'utf8'), 'windows-agent-installer.yml 直接执行')
 
 // 有些门禁 CI 不走脚本名、直接跑同一条命令体（例如根包
 // verify:deploy-authorization-gate 在 ci.yml 里写成 node scripts/...mjs）。

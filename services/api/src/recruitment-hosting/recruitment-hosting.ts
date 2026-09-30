@@ -69,6 +69,11 @@ export function assertEmergencyReason(reasonCode: string | undefined, reasonText
   return { reasonCode: code as EmergencyReasonCode, reasonText: text.slice(0, 200) }
 }
 
+/** 拼进通知正文用：去掉事由末尾的句末标点，由调用方统一补「。」，避免出现「。。」。库里的事由原文不变。 */
+export function emergencyReasonForSentence(reasonText: string): string {
+  return reasonText.trim().replace(/[。．.！!？?；;]+$/u, '')
+}
+
 type HoldDelegate = {
   findFirst?: (args: { where: { targetType: string; targetId: string } }) => Promise<{ id: string } | null>
 }

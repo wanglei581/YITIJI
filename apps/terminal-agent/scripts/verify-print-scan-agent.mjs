@@ -83,8 +83,8 @@ mustNotContain(
 
 mustContain(
   tempCleanup,
-  ['lstatSync', 'task_[A-Za-z0-9_-]', 'PrintTaskTempCleanupError'],
-  'print-task temp cleanup must lstat eligible task_* files and fail closed on removal errors',
+  ['lstatSync', 'task_[A-Za-z0-9_-]', 'PRINT_IMAGE_TEMP_PDF_NAME', 'PrintTaskTempCleanupError'],
+  'print-task temp cleanup must lstat eligible task_* and print_ image temps and fail closed on removal errors',
 )
 
 if (/\bstatSync\s*\(/.test(tempCleanup)) {
