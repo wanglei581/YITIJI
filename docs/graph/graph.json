@@ -12806,7 +12806,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 633,
+      "reachableFileCount": 632,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15704,33 +15704,6 @@
           "path": "/smart-campus",
           "styles": [],
           "wrappers": []
-        },
-        {
-          "component": "SmartCampusGuard",
-          "endpoints": [
-            "GET /job-fairs",
-            "GET /job-fairs/:param",
-            "GET /job-fairs/:param/companies/:param",
-            "GET /job-fairs/:param/map",
-            "GET /job-fairs/:param/materials",
-            "GET /job-fairs/:param/stats",
-            "GET /job-fairs/:param/venue-guide",
-            "GET /job-fairs/:param/zones",
-            "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
-          ],
-          "file": "apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx",
-          "layout": [
-            "KioskRoot",
-            "KioskRuntimeRoot",
-            "Outlet",
-            "SmartCampusCapabilityBoundary"
-          ],
-          "path": "/smart-campus/freshman-insights",
-          "styles": [],
-          "wrappers": [
-            "FreshmanInsightsPage"
-          ]
         },
         {
           "component": "SmartCampusGuard",
@@ -20486,6 +20459,7 @@
     ],
     "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
+      "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "apps/kiosk/scripts/verify-smart-campus-ui.mjs"
     ],
     "apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx": [
@@ -27975,6 +27949,7 @@
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-api.ts",
@@ -42504,6 +42479,26 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w4.mjs",
+          "apps/kiosk/scripts/verify-fusion-w6.mjs",
+          "apps/kiosk/scripts/verify-smart-campus-ui.mjs",
+          "docs/decisions/2026-06-17-smart-campus-jobfair-delivery-rules.md",
+          "docs/design/kiosk-proto-2026-07-migration-matrix.md",
+          "docs/design/kiosk-v6-migration-matrix.md",
+          "docs/progress/current-progress.md",
+          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
+          "docs/reviews/result-layer-2026-09-06-packets.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs、apps/kiosk/scripts/verify-fusion-w6.mjs、apps/kiosk/scripts/verify-smart-campus-ui.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

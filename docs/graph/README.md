@@ -33,7 +33,7 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
-| kiosk | `apps/kiosk` | 90 | 726 | 633 |
+| kiosk | `apps/kiosk` | 89 | 726 | 632 |
 | admin | `apps/admin` | 38 | 220 | 195 |
 | partner | `apps/partner` | 15 | 77 | 76 |
 
@@ -48,7 +48,7 @@ node scripts/project-graph-query.mjs model PrintTask
 | └ **无脚本名，从未被执行** | 0 |
 | 被至少一条门禁断言的文件 | 1740 |
 | 孤儿候选 · protected（不得删） | 4 |
-| 孤儿候选 · high（仍被 CI/门禁引用） | 77 |
+| 孤儿候选 · high（仍被 CI/门禁引用） | 78 |
 | 孤儿候选 · medium（仅文档提及） | 28 |
 | 孤儿候选 · low（全仓零提及） | 94 |
 
@@ -67,7 +67,7 @@ node scripts/project-graph-query.mjs model PrintTask
 
 ```mermaid
 flowchart LR
-  kiosk["apps/kiosk<br/>一体机前台<br/>90 路由"]
+  kiosk["apps/kiosk<br/>一体机前台<br/>89 路由"]
   admin["apps/admin<br/>管理员后台<br/>38 路由"]
   partner["apps/partner<br/>合作机构后台<br/>15 路由"]
   api["services/api<br/>NestJS<br/>573 端点"]
