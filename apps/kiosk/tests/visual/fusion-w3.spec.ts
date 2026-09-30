@@ -2080,8 +2080,11 @@ test('assistant voice deadline warns then preserves text conversation @w3-kiosk'
   await input.fill('我想整理简历')
   await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
   await expect(page.locator('[data-message-kind="ai"]')).toBeVisible()
-  const before = await transcript.innerText()
+  const beforeTurn = (await page.locator('[data-message-kind="ai"]').first().textContent())?.trim() ?? ''
+  expect(beforeTurn.length).toBeGreaterThan(0)
   await input.fill('继续帮我整理简历')
+  // 虚拟键盘的遮罩会挡住工具栏，先收起键盘再点语音咨询（与本文件其余用例同一做法）。
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '语音咨询', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
   await dialog.getByRole('button', { name: /直接语音通话/ }).click()
@@ -2091,7 +2094,10 @@ test('assistant voice deadline warns then preserves text conversation @w3-kiosk'
   await page.clock.fastForward(60_000)
   await expect(dialog).toHaveCount(0)
   await expect(transcript).toContainText('语音通话已到本次上限，已为你转成文字对话，可以继续问')
-  await expect(transcript).toContainText(before)
+  // 语音前的文字对话原样保留（用户这一句 + 小青的回答），到点提示只出现一次。
+  await expect(transcript).toContainText('我想整理简历')
+  await expect(transcript).toContainText(beforeTurn)
+  await expect(transcript.getByText('语音通话已到本次上限，已为你转成文字对话，可以继续问')).toHaveCount(1)
   await expect(transcript).toContainText('可以先说说你最想解决的问题。')
   await expect(input).toHaveValue('继续帮我整理简历')
   await expect(input).toBeEnabled()
