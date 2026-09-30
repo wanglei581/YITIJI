@@ -107,6 +107,7 @@ export interface DeviceFleetOverview {
  * 打印机状态(取自最近一条 heartbeat 上报)。
  * Agent 当前真实上报 ready / offline / error / low_paper / unknown；
  * ok / idle 为历史正常值，paper_empty / not_found 为早期约定、仅兼容存量心跳。
+ * queue_cleanup_failed / queue_pause_failed 为 Agent 0.4.13 起上报：开机清理或暂停队列失败，主动停接打印单。
  */
 export type TerminalPrinterStatus =
   | 'ready'
@@ -118,6 +119,8 @@ export type TerminalPrinterStatus =
   | 'error'
   | 'not_found'
   | 'unknown'
+  | 'queue_cleanup_failed'
+  | 'queue_pause_failed'
 
 export type TerminalLifecycleStatus =
   | 'planned'

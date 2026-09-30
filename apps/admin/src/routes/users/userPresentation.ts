@@ -22,15 +22,6 @@ export const ACTIVITY_TYPE_LABELS: Record<AdminUserActivityType, string> = {
   external_jump: '外部跳转',
 }
 
-const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
-
 export function userDisplayName(user: Pick<AdminUserListItem, 'nickname'>): string {
   return user.nickname?.trim() || '未设置昵称'
 }
@@ -55,12 +46,6 @@ export const USER_STATUS_LABELS: Record<AdminUserListItem['status'], string> = {
   disabled: '已停用',
   closing: '注销中',
   anonymized: '已注销',
-}
-
-export function formatUserDateTime(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : DATE_TIME_FORMATTER.format(date)
 }
 
 function toLocalBoundary(value: string, endOfDay: boolean): string | undefined {

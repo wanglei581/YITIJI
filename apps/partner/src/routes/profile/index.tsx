@@ -6,6 +6,7 @@ import {
   ORG_CONTENT_TRUST_UNSET_LABEL,
   PROHIBITED_MODULES,
   SCENE_TEMPLATE_LABELS,
+  formatDate,
   formatDateTime,
   isOrgContentPublishable,
   type OrgContentTrustStatus,
@@ -170,7 +171,7 @@ export default function ProfilePage() {
                 </div>
               }
             />
-            <Row label="接入时间" value={profile.createdAt.slice(0, 10)} />
+            <Row label="接入时间" value={formatDate(profile.createdAt)} />
           </div>
         </Card>
 

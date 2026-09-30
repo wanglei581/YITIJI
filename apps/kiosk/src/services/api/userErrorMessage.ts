@@ -68,6 +68,9 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   TERMINAL_SESSION_RETRYABLE: '这台机器正在做安全校验，请稍候',
   ONLINE_PAYMENT_DISABLED: '本机暂未开通线上支付，请改用其他支付方式或联系现场工作人员',
   PRINTER_UNAVAILABLE: '打印机当前不可用（离线、缺纸或故障），请稍后再试或联系现场工作人员',
+  // #1150 方案 A：只给「终端队列闸门停领」用的新码，不占用上面的 PRINTER_UNAVAILABLE。
+  // 原话通过透传形状检查就原样显示；缺失或不像人话时回退这句。
+  PRINT_TERMINAL_QUEUE_HALTED: '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端',
   SCAN_TERMINAL_BUSY: '本机正在扫描中，请等待当前任务完成后再试',
   SCAN_TERMINAL_DISABLED: '本机扫描功能已停用，请联系现场工作人员',
   SCAN_SESSION_EXPIRED: '这次扫描已过期，请返回重新开始',
@@ -115,17 +118,31 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
  * 而真实原因可能是「合成图片尺寸不受支持」—— 重试永远不会成功，正确动作是换一张图。
  * 这不只是 helpfulness 损失，是把用户导向一个无效操作。
  *
+ * `PRINT_TERMINAL_QUEUE_HALTED` 也在这张表里，且只加这一个码（#1150 方案 A：
+ * 终端队列闸门停领专用新码。本分支不合入那份服务端改动。开工时该码尚未出现在
+ * #1150 的 services/api/src，码名按拍板登记）。服务端把这句写成给一体机前求职者看的话，
+ * 原文可能与下面的固定句不完全相同，固定覆盖会把原话吞掉。
+ * 它同时留在 SHARED_USER_MESSAGES：原话缺失，或通不过下面的形状检查，就回退到
+ * 「这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端」。
+ * `PRINTER_UNAVAILABLE` 不进这张表，固定文案一个字不改。
+ *
  * 加码进这张表的判据（三条都要满足）：
  * 1. 该码的服务端 message 由业务代码显式写成面向求职者的中文，不是异常串或运维提示
  *    （反例见本文件顶部那条「请配置 JOB_MATERIAL_PDF_FONT_PATH」）；
  * 2. message 不含内部状态：路径、SQL、堆栈、配置项名、内部 ID；
  * 3. 有门禁或浏览器用例钉住前两条。CONVERT_FAILED 由
  *    fusion-w2-tools.spec.ts「conversion page renders a server conversion error
- *    without fabricating output」钉住。
+ *    without fabricating output」钉住。PRINT_TERMINAL_QUEUE_HALTED 由
+ *    verify-kiosk-runtime-error-boundary.mjs 钉住：合格中文原话原样显示，
+ *    英文堆栈或路径回退固定文案，PRINTER_UNAVAILABLE 仍不透传。
  *
  * 未登记的码一律仍走调用方兜底句 —— 对披露 fail-closed 的默认没有变。
+ * userMessageOf 先看这张表、再看固定码表：两张表都有的码，原话合格用原话，不合格才用固定文案。
  */
-const PASSTHROUGH_MESSAGE_CODES: ReadonlySet<string> = new Set(['CONVERT_FAILED'])
+const PASSTHROUGH_MESSAGE_CODES: ReadonlySet<string> = new Set([
+  'CONVERT_FAILED',
+  'PRINT_TERMINAL_QUEUE_HALTED',
+])
 
 /**
  * 透传前的最后一道形状检查。不是判据（判据是上面那三条 + 逐码登记），
@@ -158,11 +175,13 @@ export function errorCodeOf(error: unknown): string | undefined {
  */
 export function userMessageOf(error: unknown, fallback: string): string {
   const code = errorCodeOf(error)
-  if (code && code in SHARED_USER_MESSAGES) return SHARED_USER_MESSAGES[code] as string
+  // 透传先于固定覆盖。目前只有 PRINT_TERMINAL_QUEUE_HALTED 两张表都在：
+  // 原话过形状检查就显示原话，否则落到下面的固定文案。没进透传表的码行为不变。
   if (code && PASSTHROUGH_MESSAGE_CODES.has(code)) {
     const serverMessage = displayableServerMessage(error)
     if (serverMessage) return serverMessage
   }
+  if (code && code in SHARED_USER_MESSAGES) return SHARED_USER_MESSAGES[code] as string
   // 浏览器 fetch 失败是 TypeError。普通 Error('Failed to fetch') 仍走兜底——
   // verify-kiosk-runtime-error-boundary 钉死不得按 message 文本猜测。
   if (error instanceof TypeError) return SHARED_USER_MESSAGES.NETWORK_ERROR as string

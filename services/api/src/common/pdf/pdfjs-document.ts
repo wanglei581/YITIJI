@@ -93,6 +93,17 @@ interface PdfjsModule {
   getDocument(params: Record<string, unknown>): PdfjsLoadingTask
 }
 
+/** unpdf.extractTextItems 的一项。坐标原点在页面左下角。 */
+export interface PdfTextItem {
+  str: string
+  x: number
+  y: number
+  width: number
+  height: number
+  fontSize: number
+  hasEOL: boolean
+}
+
 interface UnpdfApi {
   definePDFJSModule(pdfjs: () => Promise<unknown>): Promise<void>
   getResolvedPDFJS(): Promise<PdfjsModule>
@@ -100,6 +111,7 @@ interface UnpdfApi {
     pdf: unknown,
     options?: { mergePages?: boolean },
   ): Promise<{ totalPages: number; text: string | string[] }>
+  extractTextItems(pdf: unknown): Promise<{ totalPages: number; items: PdfTextItem[][] }>
 }
 
 const getDocumentChannel = channel(PDFJS_GET_DOCUMENT_CHANNEL)
@@ -244,4 +256,16 @@ export async function extractPdfText(
   await ensurePdfjsEngine()
   const unpdf = nodeRequire('unpdf') as UnpdfApi
   return unpdf.extractText(pdf, options)
+}
+
+/**
+ * 逐页文字项（str / x / y / hasEOL）。与 extractPdfText 一样现取 unpdf，
+ * 简历抽取用它自己断行；合同等仍走 extractPdfText。
+ */
+export async function extractPdfTextItems(
+  pdf: unknown,
+): Promise<{ totalPages: number; items: PdfTextItem[][] }> {
+  await ensurePdfjsEngine()
+  const unpdf = nodeRequire('unpdf') as UnpdfApi
+  return unpdf.extractTextItems(pdf)
 }

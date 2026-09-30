@@ -1823,7 +1823,7 @@ for (const scenario of ['active-refresh', 'leave-refresh', 'leave-success', 'pri
   })
 }
 
-test('print polling reaches done and pickup code comes from the paid response @w2', async ({ page, api }) => {
+test('print polling reaches done and does not show a pickup code @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   let polls = 0
@@ -1840,7 +1840,8 @@ test('print polling reaches done and pickup code comes from the paid response @w
   await page.goto('/print/progress')
   await setReactRouterState(page, '/print/progress', cashierState)
   await page.waitForURL('**/print/done', { timeout: 10_000 })
-  await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toBeVisible()
+  await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
+  await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-done')
 })
 

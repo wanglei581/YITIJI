@@ -14,6 +14,7 @@
 // 状态：读取中（不下结论）/ 有渠道 / 没有渠道（不说原因，给本机照常能办的事）/ 读取失败（可重试）。
 // 本机没有终端身份按「没有渠道」处理（useOfficialChannels），不当成错误。
 
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotIcon, ChevronRightIcon, LandmarkIcon, MessageCircleIcon, PrinterIcon, QrCodeIcon, RouteIcon } from 'lucide-react'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
@@ -45,7 +46,21 @@ function hostOf(url: string): string {
   }
 }
 
-function ChannelCard({ item, kind }: { item: OfficialChannelItem; kind: ChannelKind }) {
+function channelKey(item: OfficialChannelItem): string {
+  return `${item.url}|${item.name}`
+}
+
+function ChannelCard({
+  item,
+  kind,
+  busy,
+  onRecheck,
+}: {
+  item: OfficialChannelItem
+  kind: ChannelKind
+  busy: boolean
+  onRecheck: (item: OfficialChannelItem) => void
+}) {
   const host = hostOf(item.url)
   return (
     <li className="oc-card" data-testid="official-channel-card" data-channel-kind={kind}>
@@ -65,16 +80,47 @@ function ChannelCard({ item, kind }: { item: OfficialChannelItem; kind: ChannelK
         </figcaption>
       </figure>
       <p className="oc-caption">{`本渠道由${item.organizationName}提供，信息以其官网为准`}</p>
+      <button
+        type="button"
+        className="oc-card-check"
+        data-testid="official-channel-recheck"
+        aria-label={`核对「${item.name}」还能不能扫`}
+        aria-busy={busy}
+        onClick={() => onRecheck(item)}
+      />
     </li>
   )
 }
 
-function ChannelList({ items, kind }: { items: readonly OfficialChannelItem[]; kind: ChannelKind }) {
+function ChannelList({
+  items,
+  kind,
+  busyKey,
+  onRecheck,
+}: {
+  items: readonly OfficialChannelItem[]
+  kind: ChannelKind
+  busyKey: string | null
+  onRecheck: (item: OfficialChannelItem) => void
+}) {
   return (
     <ul className="oc-list">
-      {items.map((item) => <ChannelCard key={`${item.url}|${item.name}`} item={item} kind={kind} />)}
+      {items.map((item) => (
+        <ChannelCard
+          key={channelKey(item)}
+          item={item}
+          kind={kind}
+          busy={busyKey === channelKey(item)}
+          onRecheck={onRecheck}
+        />
+      ))}
     </ul>
   )
+}
+
+function withdrawnCopy(names: string[]): string {
+  const quoted = names.map((name) => `「${name}」`).join('、')
+  return `${quoted}已经撤下，不再提供二维码。`
 }
 
 const CHANNEL_ASK_DRAFT = '这个二维码怎么用？请只说明用手机打开的步骤，不要生成岗位。'
@@ -169,13 +215,50 @@ function ChannelBar({
 
 export function OfficialChannelsPage() {
   const navigate = useNavigate()
-  const channels = useOfficialChannels()
+  const channels = useOfficialChannels({ fresh: true })
   const hosting = useRecruitmentHosting()
   const home = () => navigate('/')
+  const [note, setNote] = useState<string | null>(null)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const seen = useRef<OfficialChannelItem[] | null>(null)
+  const checking = useRef(false)
 
   const items = channels.status === 'ready' ? channels.items : []
   // b 版本的原平台目录：服务端只在托管打开时下发；这里再兜一层，托管没读到「打开」就一条都不列。
   const legacy = channels.status === 'ready' && hosting.enabled ? channels.legacyPlatforms : []
+  const shown = hosting.status === 'ready' ? [...items, ...legacy] : null
+
+  const shownKey = shown?.map(channelKey).join('\n') ?? ''
+  useEffect(() => {
+    if (!shown) return
+    const prior = seen.current
+    seen.current = shown
+    if (!prior) return
+    const gone = prior.filter((old) => !shown.some((row) => row.url === old.url && row.name === old.name))
+    if (gone.length === 0) {
+      setNote((current) => (current?.includes('已经撤下') ? null : current))
+      return
+    }
+    setNote(withdrawnCopy(gone.map((row) => row.name)))
+    // shownKey 变了才比较；shown 与这一键同一轮渲染出来。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownKey])
+
+  const recheckCard = (item: OfficialChannelItem) => {
+    if (checking.current) return
+    checking.current = true
+    setBusyKey(channelKey(item))
+    setNote('正在确认这条渠道还在不在')
+    void channels.recheck().then((next) => {
+      checking.current = false
+      setBusyKey(null)
+      if (!next) {
+        setNote('这次没有确认这些渠道还在，请再点一次。')
+        return
+      }
+      setNote((current) => (current === '正在确认这条渠道还在不在' ? null : current))
+    })
+  }
   const view: View = channels.status === 'ready' ? (items.length > 0 ? 'items' : 'empty') : channels.status
   // 1080 舞台上卡片越少、二维码越大（尺寸由 CSS 按 data-density 取；手机宽度统一回落）。
   const cardCount = items.length + legacy.length
@@ -229,6 +312,7 @@ export function OfficialChannelsPage() {
       ctabar={<ChannelBar view={view} onHome={home} onRetry={channels.retry} />}
     >
       <div className="dw-page qx-grow oc-page" data-kiosk-screen="official-channels" data-state={view} data-density={density}>
+        {note ? <p className="oc-withdrawn" data-testid="official-channel-withdrawn" role="status">{note}</p> : null}
         {hasCards ? (
           <ol className="oc-steps" aria-label="怎么用这些二维码">
             <li><b>1</b>用手机对准下面的二维码。</li>
@@ -265,7 +349,7 @@ export function OfficialChannelsPage() {
                 <span className="t">{items[0]?.organizationName}</span>
               </div>
             )}
-            <ChannelList items={items} kind="org" />
+            <ChannelList items={items} kind="org" busyKey={busyKey} onRecheck={recheckCard} />
           </section>
         ) : null}
         {legacy.length > 0 ? (
@@ -275,7 +359,7 @@ export function OfficialChannelsPage() {
               <span className="t">其他来源平台</span>
               <span className="hint">扫码后在该平台自行浏览</span>
             </div>
-            <ChannelList items={legacy} kind="legacy" />
+            <ChannelList items={legacy} kind="legacy" busyKey={busyKey} onRecheck={recheckCard} />
           </section>
         ) : null}
         {view === 'items' ? null : <div className="oc-alt oc-push">{alternatives}</div>}

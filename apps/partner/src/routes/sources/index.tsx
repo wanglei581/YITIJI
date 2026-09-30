@@ -676,7 +676,7 @@ export default function SourcesPage() {
               </p>
               {webhookGuide.credentialRotatedAt && (
                 <p className="mt-1.5 text-neutral-400">
-                  最近一次密钥下发/轮换:{new Date(webhookGuide.credentialRotatedAt).toLocaleString('zh-CN')}
+                  最近一次密钥下发/轮换：{formatDateTime(webhookGuide.credentialRotatedAt)}
                 </p>
               )}
             </div>

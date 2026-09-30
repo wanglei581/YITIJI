@@ -116,6 +116,7 @@
     "verify:scan-deletion-audit-reporting": "node -r @swc-node/register scripts/verify-scan-deletion-audit-reporting.ts",
     "maintenance:backfill-terminal-credentials": "node -r @swc-node/register scripts/backfill-terminal-credentials.ts",
     "verify:terminal-test-print-seed-guard": "node -r @swc-node/register scripts/verify-terminal-test-print-seed-guard.ts",
+    "verify:queue-dispatch-printer-status": "node -r @swc-node/register scripts/verify-queue-dispatch-printer-status.ts",
     "verify:demo-seed-guard": "node -r @swc-node/register scripts/verify-demo-seed-guard.ts",
     "bootstrap:first-admin": "node -r @swc-node/register scripts/bootstrap-first-admin.ts",
     "backup-admin:emergency-enable": "node -r @swc-node/register scripts/enable-backup-admin.ts",
