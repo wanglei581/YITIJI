@@ -12,6 +12,12 @@
 - **没改的三条。** 心跳 `groupBy`：`TerminalHeartbeat` 已有 `@@index([terminalId, createdAt])`（`schema.prisma` 267 行，postgres schema 272 行），列表每页一次可接受；没有心跳就判版本过旧是有意的。无订单任务的 CAS 是 `admin-print-scan.service.ts` 591–606 行 `printTask.updateMany({ where: { id, status: 'failed' } })`，条数不是 1 即 409。新 Agent 打老后端会因 `main.ts` 98 行 `forbidNonWhitelisted` 得到 400；发布顺序仍是先后端后 Agent（现场脚本 R.1→R.2），不改代码。Agent 版本仍是 `package.json` 的 0.4.12，不带 v 前缀。
 - **本机已跑（隔离 SQLite，库文件在 `~/.cache/claude-lanes/print-retry-0929/verify-w86-r5-*.db`）：** `services/api` 的 `tsc --noEmit` 退出 0。`verify:print-jobs`（含 `verify:pickup-code-share`）、`verify:admin-print-scan`、`verify:contract-review:print-lifecycle`（6 条）、`verify:terminal-status-idempotency`、`verify:refund-idempotent`、`verify:payment-flow`、`verify:member-order-timeline` 退出 0。`verify:print-retry-attempt` 退出 0。改动文件 eslint 退出 0。变异在 `bda0b4979` 之后做，每条退出 1，随后 `git checkout` 还原：把 `FUTURE` 当 `STALE` 删掉；去掉超前补报的次数上限；去掉快速路径的 `cleanupTerminalTask`；去掉退役原因；去掉订单状态原因；重试轮次缺 attempt 当成老 Agent 放行；把会员重试的行锁挪到 Order CAS 之后。
 - **没在本机跑：** `verify:print-retry-lock:postgres`。本机 `pg_isready -h 127.0.0.1 -p 5432` 无响应，没有启动用户的数据库。脚本只挂在 postgres-readiness，要求 `DATABASE_URL` 是 PostgreSQL。会员重提和管理员重试同时打同一单时，不得出现 40P01，也不得两边都成功。以 CI 为准。真 Windows 打印机和 GitHub CI 全量也没在本机跑。图谱已按代码重生成，`pnpm graph:check` 通过；`verify:repository-integrity` 通过。没有 push。
+## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
+
+- 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
+- 改法：`pnpm-workspace.yaml` 三条 brace-expansion 覆盖从 1.1.18 / 2.1.4 / 5.0.9 上调到修复版 1.1.20 / 2.1.6 / 5.0.11，`scripts/verify-dependency-security.mjs` 的期望常量同步，锁文件只变 brace-expansion 三个版本。没有新增豁免。
+- 验证：干净安装后 `verify:dependency-security` ALL PASS（full / prod 高危与严重均为 0），repository-integrity、ci-gate-coverage、kiosk `tsc -b` 通过。
+
 ## 2026-09-30：带文字层的 PDF 简历按行保留结构（走查 W-95；分支 `claude/backend-hardening-20260929-w95-pdf-lines`）
 
 - **问题：** resume-extraction.service.ts 用 unpdf 的 `mergePages`，把全部换行压成空格，Word 导出的 PDF 简历（应届生最常见的格式）被读成一整块，段落、条目、时间线都分不出来，诊断质量受损。
