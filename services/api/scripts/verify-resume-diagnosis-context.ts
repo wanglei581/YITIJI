@@ -18,6 +18,7 @@ import { plainToInstance } from 'class-transformer'
 import { Logger } from '@nestjs/common'
 import { ResumeParseRequestDto } from '../src/ai/dto/resume-parse.dto'
 import { LlmResumeService } from '../src/ai/resume/llm-resume.service'
+import { sanitizeContentBlocks } from '../src/ai/resume/llm-resume-evidence'
 import {
   RESUME_SCORING_DIMENSIONS,
   type ResumeReport,
@@ -109,6 +110,18 @@ async function main(): Promise<void> {
     fileFormat: 'pdf',
     source: 'upload',
   })).length === 0, '1d. 旧 4 字段请求仍兼容')
+
+  // W-97：模型按视觉块回包时，标题前的单位+时间段仍按原文语义落入经历块。
+  const w97CompanyLine = '青岛金沙滩某商贸有限公司，2011 年到 2025 年，理货、收货都干过。'
+  const w97Blocks = sanitizeContentBlocks([
+    { key: 'basic', lines: ['欧阳春梅', w97CompanyLine] },
+    { key: 'experience', lines: ['照片见附件。'] },
+  ], `欧阳春梅\n${w97CompanyLine}\n工作经历\n照片见附件。`)
+  assert(
+    !w97Blocks.find((block) => block.key === 'basic')?.lines.includes(w97CompanyLine) &&
+      w97Blocks.find((block) => block.key === 'experience')?.lines.includes(w97CompanyLine),
+    '1e. 标题前单位+时间段行从基础信息纠偏到工作经历，且未改变原文',
+  )
 
   let capturedPrompt = ''
   const server = createServer((req, res) => {
