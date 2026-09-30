@@ -353,7 +353,8 @@ export const kioskRouter = createBrowserRouter([
       },
         ],
       },
-      { path: '*', element: <KioskRouteErrorPage /> },
+      // * 是正常匹配的兜底路由，useRouteError 没有 404 错误对象；显式标记未知地址。
+      { path: '*', element: <KioskRouteErrorPage notFound /> },
         ],
       },
     ],
