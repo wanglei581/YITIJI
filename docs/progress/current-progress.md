@@ -16,6 +16,12 @@
 
 - **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
 - **P1 `verify-feedback-notifications` 自建库过时：** 不设 `DATABASE_URL` 时它手抄建表语句，User 表缺 `passwordProofState`，一跑就报列不存在（CI 走 `DATABASE_URL` 所以没暴露，已复现）。改为按当前 schema `prisma db push`，以后 schema 加列不会再过时；设与不设 `DATABASE_URL` 两种都全绿，临时库照旧清理。
+## 2026-09-29：给人看的时间一律按北京时间（走查 W-78、W-67；分支 `claude/backend-hardening-20260929-display-time-shanghai`）
+
+- **问题：** 告警正文里的时间是 UTC，比北京时间早 8 小时，运维会误判事件先后（W-78）；招聘会企业打印页脚用服务器本地时钟，服务器在 UTC 时同样早 8 小时；价目应急 SQL 用了裸 `NOW()`，时区不对（W-67）。
+- **修法（Grok 实现、协调方审）：** 新增共用函数 `common/beijing-display-time.ts`（Asia/Shanghai），告警中心正文、合同审查报告、诊断报告、模拟面试报告与练习单、自我探索、岗位匹配参考、职业规划、参会准备单、顾问产物、招聘会企业打印页脚、批量发布失败原因、岗位与招聘会「同步于」说明、早报日期、诊断导出文件名都改走它。**存库、接口里的 ISO 时间、去重键、日志、额度与统计的分桶键一律保持 UTC 不动。** 价目应急 SQL 两套库都写明 UTC 墙钟，文档两处提醒「不要照抄 NOW()」，门禁钉住不许再出现裸 NOW()。
+- **验证：** 新门禁 `verify:beijing-display-time` 21 条（固定 UTC 16:30 必须显示为北京 次日 00:30），变异「时区改回 UTC」21 条全红；协调方在候选上复跑 23 条相关门禁（出纸服务、告警、批量发布、早报、价目、日期诚实性等）与 api tsc 全绿。
+
 ## 2026-09-29：小程序「我的文档」页数恒为 0——文件表加识别页数列（分支 `claude/backend-hardening-20260929-doc-pagecount`）
 
 - **根因：** `FileObject` 原来没有页数列，`GET /me/documents` 的 select 也没选，字段缺失传到小程序被收成 0。

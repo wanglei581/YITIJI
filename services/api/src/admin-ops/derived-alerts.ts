@@ -1,3 +1,4 @@
+import { formatBeijingMinute } from '../common/beijing-display-time'
 import type { PrismaService } from '../prisma/prisma.service'
 import { HEALTHY_PRINTER_STATUS_VALUES, isHealthyPrinterStatus, isLowPaperWarning } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
@@ -56,11 +57,21 @@ const PRINTER_STATUS_LABELS: Record<string, string> = {
 const PRINTER_WARNING_STATUSES = new Set(['paper_empty', 'low_paper'])
 
 /**
- * 告警文案里的时间一律按上海时间写（与后台页面 formatDateTime 同一时区）。
+ * 告警文案里的时间一律按北京时间写（与后台页面 formatDateTime 同一时区）。
  * 只影响给人看的 detail 文案；occurredAt、episodeToken、去重键仍用 UTC 时刻，不受影响。
  */
 export function formatShanghaiMinute(date: Date): string {
-  return new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 16).replace('T', ' ')
+  return formatBeijingMinute(date)
+}
+
+/** 打印失败告警正文。时刻只出现在这句话里，occurredAt 仍是 UTC。 */
+export function printFailedAlertDetail(task: {
+  id: string
+  terminalCode: string | null
+  updatedAt: Date
+}): string {
+  const terminal = task.terminalCode ? ` · 终端 ${task.terminalCode}` : ''
+  return `任务 ${task.id}${terminal},失败于 ${formatShanghaiMinute(task.updatedAt)}`
 }
 
 export interface DerivedAlert {
@@ -281,7 +292,11 @@ function buildPrintFailedAlert(task: FailedTaskRow): DerivedAlert {
     type: 'print_failed',
     severity: 'warning',
     title: `打印任务失败${task.errorCode ? `(${task.errorCode})` : ''}`,
-    detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${formatShanghaiMinute(task.updatedAt)}`,
+    detail: printFailedAlertDetail({
+      id: task.id,
+      terminalCode: task.terminal?.terminalCode ?? null,
+      updatedAt: task.updatedAt,
+    }),
     terminalCode: task.terminal?.terminalCode ?? null,
     occurredAt: task.updatedAt.toISOString(),
   }
