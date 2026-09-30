@@ -106,6 +106,18 @@ check('session guard continue is fail-closed and clearing overlay still blocks',
   assert.doesNotMatch(files.sessionPage, /onClick=\{canContinue \? continueSession : hardClear\}/)
 })
 
+check('session guard names the source page instead of printing its route (v2 rule 4)', () => {
+  // 2026-09-30 A 批：「继续后回到/interview」把路由直接露在屏上。正文和按钮读屏名都只能从
+  // sessionGuardSourceName 取页面名，不许再把 sourcePath 本身渲染出来。
+  assert.doesNotMatch(files.sessionView, /<b>\{sourcePath\}<\/b>/)
+  assert.match(files.sessionView, /继续后回到 \{sourceKnown \? <b>\{sessionGuardSourceName\(sourcePath\)\}<\/b>/)
+  assert.doesNotMatch(files.sessionPage, /回到 \$\{sourcePath\}/)
+  assert.match(files.sessionPage, /回到\$\{sessionGuardSourceName\(sourcePath\)\}/)
+  assert.match(files.sessionModel, /export function sessionGuardSourceName\(/)
+  assert.match(files.sessionModel, /path\.startsWith\('\/interview'\)\) return '练面试'/)
+  assert.match(files.sessionModel, /return '刚才那一页'/)
+})
+
 check('clearing overlay tells the truth while it waits for the server, and stays touchable', () => {
   /* 收尾闸按住换人时，这块遮罩是用户唯一能看到的东西。它要回答三件事：
      我的东西清了没有、这机器为什么不让我用、还要多久。少任何一件，

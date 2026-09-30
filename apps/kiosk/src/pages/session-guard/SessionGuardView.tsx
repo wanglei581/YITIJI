@@ -1,4 +1,4 @@
-import { SESSION_GUARD_ASKS, sessionGuardClears, type SessionGuardState } from './sessionGuardModel'
+import { SESSION_GUARD_ASKS, sessionGuardClears, sessionGuardSourceName, type SessionGuardState } from './sessionGuardModel'
 
 export function SessionGuardView({
   state,
@@ -52,7 +52,8 @@ export function SessionGuardView({
           <p className="sg-copy">{copy}</p>
           {state === 'warning' ? (
             <div className="sg-from">
-              继续后回到 {sourceKnown ? <b>{sourcePath}</b> : <b>首页</b>}
+              {/* 屏上只写页面名，不写路径（稿 v2 规则 4）；名字统一由 sessionGuardSourceName 给。 */}
+              继续后回到 {sourceKnown ? <b>{sessionGuardSourceName(sourcePath)}</b> : <b>首页</b>}
               {sourceKnown ? null : '（这次读不到可用的来源页，所以回到首页）'}
             </div>
           ) : null}

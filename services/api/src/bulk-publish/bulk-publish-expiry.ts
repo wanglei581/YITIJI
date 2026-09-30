@@ -26,6 +26,7 @@
 //   历史招聘会补录、有效期填错需要先发布再修正等场景仍然可做。
 // ============================================================
 
+import { formatBeijingDate } from '../common/beijing-display-time'
 import type { Prisma } from '../generated/prisma/client'
 import { jobValidityWhere, jobExpiredWhere, isJobExpired } from '../jobs/job-validity'
 import { buildFairStatusWhere } from '../jobs/jobs-shared'
@@ -98,7 +99,7 @@ export function isBulkPublishExpired(
 /** 人话原因,直接展示给运营(逐条失败明细里的 errorMessage)。 */
 export function bulkPublishExpiredMessage(kind: BulkPublishKind, row: Record<string, unknown> | undefined): string {
   const field = kind === 'job' ? row?.validThrough : row?.endAt
-  const when = field instanceof Date ? field.toISOString().slice(0, 10) : '未知日期'
+  const when = field instanceof Date ? formatBeijingDate(field) : '未知日期'
   const what = kind === 'job' ? `该岗位有效期已于 ${when} 截止` : `该招聘会已于 ${when} 结束`
   return `${what},批量发布不复活过期内容。如确需上线请核对来源数据后单条发布。`
 }

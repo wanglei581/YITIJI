@@ -58,13 +58,13 @@ const STATUS_META: Record<MemberAiRecordItem['status'], { label: string; tone?: 
   failed: { label: '失败', tone: 'bad' },
 }
 
-function shortTaskId(taskId: string): string {
-  return taskId.length > 10 ? `${taskId.slice(0, 6)}...${taskId.slice(-4)}` : taskId
-}
-
+/**
+ * 行内说明只写时间与留存期。2026-09-30 A 批：原来写「模型名 · 任务 编号 · 时间」，
+ * 模型名（如 demo / llm）和任务编号都是工程信息，稿 39 只显示名称和状态（v2 规则 4）。
+ */
 function metaLine(item: MemberAiRecordItem): string {
   const expires = item.expiresAt ? ` · 留存至 ${formatTime(item.expiresAt)}` : ''
-  return `${item.provider} · 任务 ${shortTaskId(item.taskId)} · ${formatTime(item.createdAt)}${expires}`
+  return `${formatTime(item.createdAt)}${expires}`
 }
 
 function shouldDisplayJobAiSession(
@@ -407,7 +407,7 @@ export function MyAiRecordsPage() {
       view="ai-records"
       screen="member-list"
       screenState={`ai-records-${uiState}`}
-      eyebrow="AI SERVICE RECORDS"
+      eyebrow="AI 服务记录"
       ask={<>AI 帮你做过什么，<em>一条不落</em>。</>}
       doing={<>只展示<b>服务记录</b>，不展示简历原文、诊断正文或模型原始输出。</>}
       truth="删除后不可恢复；删除简历诊断记录会同时删除这份简历的优化稿、简历对照、职业规划及相关 AI 分析记录。"

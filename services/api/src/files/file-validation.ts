@@ -255,7 +255,7 @@ export function validateUpload(args: {
 
 /**
  * Multer/Busboy 可能把浏览器 multipart 里的 UTF-8 文件名按 Latin-1 解码。
- * 只还原能严格往返、且恢复结果含汉字的名称，避免改写合法的 Latin-1 文件名。
+ * 只还原能严格往返、且恢复结果含至少一个大于 U+00FF 的码点的名称，避免改写合法的 Latin-1 文件名。
  * 一体机本机上传和手机扫码上传共用这一条，收据上的文件名才是用户选的那一份。
  */
 export function restoreMultipartUtf8Filename(filename: string): string {
@@ -265,5 +265,5 @@ export function restoreMultipartUtf8Filename(filename: string): string {
   const bytes = Buffer.from(filename, 'latin1')
   const restored = bytes.toString('utf8')
   if (restored.includes('\uFFFD') || !Buffer.from(restored, 'utf8').equals(bytes)) return filename
-  return /\p{Script=Han}/u.test(restored) ? restored : filename
+  return Array.from(restored).some((character) => character.codePointAt(0)! > 0xff) ? restored : filename
 }

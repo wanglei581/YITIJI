@@ -216,7 +216,7 @@ export default function AiServicesPage() {
   }
 
   const successRate    = usage.successRate
-  const noCallsToday   = usage.totalCalls === 0
+  const noCallsIn24h   = usage.totalCalls === 0
   const estimatedCost  = `¥${usage.estimatedCostCny.toFixed(2)}`
   // 这张卡来自旧调用日志的 token 估算，和上面额度面板按计量账算出的「已计费金额」不是同一本账。
   const logCostDistinction = '这是旧调用日志按 token 估算的金额，和上面额度面板的「已计费金额」不是一回事'
@@ -303,32 +303,32 @@ export default function AiServicesPage() {
         )}
       </section>
 
-      {/* ── 今日概览指标 ─────────────────────────────── */}
-      <section aria-label="今日 AI 服务概览">
+      {/* ── 近 24 小时概览指标（服务端按滚动 24 小时统计，不是北京时间自然日） ── */}
+      <section aria-label="近 24 小时 AI 服务概览">
         <div className="mb-3 flex items-center gap-2">
           <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-          <h2 className="text-[13px] font-bold text-neutral-700">今日概览</h2>
+          <h2 className="text-[13px] font-bold text-neutral-700">近 24 小时概览</h2>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricCard
             label="AI 调用总次数"
             value={usage.totalCalls}
-            note="今日累计"
+            note="近 24 小时累计"
             icon={BotIcon}
           />
           <MetricCard
             label="成功率"
             value={logOverviewRate(usage.totalCalls, successRate)}
-            note={noCallsToday ? '今日暂无调用' : `${usage.successCount} 次成功 / ${usage.failCount} 次失败`}
+            note={noCallsIn24h ? '近 24 小时暂无调用' : `${usage.successCount} 次成功 / ${usage.failCount} 次失败`}
             icon={CheckCircleIcon}
-            iconClass={noCallsToday ? 'text-neutral-500 bg-neutral-100' : successRate >= 95 ? 'text-success-fg bg-success-bg' : 'text-warning-fg bg-warning-bg'}
+            iconClass={noCallsIn24h ? 'text-neutral-500 bg-neutral-100' : successRate >= 95 ? 'text-success-fg bg-success-bg' : 'text-warning-fg bg-warning-bg'}
           />
           <MetricCard
             label="平均响应时间"
             value={logOverviewLatency(usage.totalCalls, usage.avgLatencyMs)}
-            note={noCallsToday ? '今日暂无调用' : '仅计入成功请求'}
+            note={noCallsIn24h ? '近 24 小时暂无调用' : '仅计入成功请求'}
             icon={ClockIcon}
-            iconClass={noCallsToday ? 'text-neutral-500 bg-neutral-100' : 'text-info-fg bg-info-bg'}
+            iconClass={noCallsIn24h ? 'text-neutral-500 bg-neutral-100' : 'text-info-fg bg-info-bg'}
           />
           <MetricCard
             label="按日志估算的成本"

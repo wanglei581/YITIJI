@@ -106,10 +106,11 @@ function main(): void {
     'PRINT_REQUIRE_PAID_BEFORE_CLAIM must not exist: 出纸付费门控不得退回可关闭的部署开关',
   )
 
+  // 切片终点在 findFirst(claimableWhere) 之后。领取返回已改成把 attempt 贴回本批任务。
   const claimGate = section(
     terminals,
     'const claimableWhere = {',
-    'return results',
+    'return claimedPayloads.map',
     'TerminalsService claim gate query',
   )
   check(
@@ -205,6 +206,17 @@ function main(): void {
       && /FREE_MODE/.test(priceOpsDoc),
     'ops doc covers production price upsert + seed ban + FREE_MODE',
     'docs/operations/price-config-production.md must document seed ban and explicit upsert',
+  )
+  const priceSqlWithoutUtcClock = priceOpsDoc
+    .split("NOW() AT TIME ZONE 'UTC'").join('')
+    .split('不要照抄 NOW()').join('')
+  check(
+    !priceSqlWithoutUtcClock.includes('NOW()')
+      && priceOpsDoc.includes("NOW() AT TIME ZONE 'UTC'")
+      && priceOpsDoc.includes("strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+      && priceOpsDoc.includes('不要照抄 NOW()'),
+    'ops price SQL writes UTC wall clock for PostgreSQL and SQLite, and warns not to copy NOW()',
+    'price-config-production.md must not leave a bare NOW(); PostgreSQL uses NOW() AT TIME ZONE UTC, SQLite uses strftime UTC, and the doc says 不要照抄 NOW()',
   )
 
   if (failures > 0) {

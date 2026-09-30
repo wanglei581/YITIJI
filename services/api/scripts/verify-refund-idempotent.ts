@@ -304,7 +304,7 @@ async function main(): Promise<void> {
       () => refundService.refund(oPrinting, { refundNo: failedRefundNo, reason: '同号重开' }))
 
     // ── (7) retry ↔ refund 竞态：Order 是共同状态序列点，退款态不可出纸 ─────
-    await terminals.heartbeat(terminalId, { status: 'online', printerStatus: 'ok', localTaskDatabaseAvailable: true, agentVersion: 'verify-refund' }, `Bearer ${agentToken}`)
+    await terminals.heartbeat(terminalId, { status: 'online', printerStatus: 'ok', localTaskDatabaseAvailable: true, agentVersion: '0.4.13-production' }, `Bearer ${agentToken}`)
     const retryRefundRace = await printJobs.create(
       { fileUrl: await seedPdf('retry-refund-race'), fileName: 'retry-refund-race.pdf', params: { copies: 1, colorMode: 'black_white' } },
       { terminalId },
@@ -325,7 +325,7 @@ async function main(): Promise<void> {
     const retryWon = retryRaceResult.status === 'fulfilled'
     const retryRejectedForRefund =
       retryRaceResult.status === 'rejected' &&
-      nestErrorCode(retryRaceResult.reason) === 'PRINT_SCAN_RETRY_REFUNDED'
+      nestErrorCode(retryRaceResult.reason) === 'PRINT_RETRY_REFUNDED'
     assert(
       refundRaceResult.status === 'fulfilled' && (retryWon || retryRejectedForRefund),
       '7a. retry/refund 并行只接受安全线性化结果（retry 成功或因退款拒绝）',

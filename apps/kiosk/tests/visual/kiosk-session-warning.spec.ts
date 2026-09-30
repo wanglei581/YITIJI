@@ -203,6 +203,11 @@ test('ordinary idle warns before clearing and can resume the previous route', as
 
   await expectWarningWithinThreeSeconds(page)
   await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
+  // 屏上只写页面名，不写路径（稿 v2 规则 4）：来源 /interview 读作「练面试」，按钮读屏名同源。
+  const from = page.locator('.sg-from')
+  await expect(from).toContainText('继续后回到 练面试')
+  await expect(from).not.toContainText('/')
+  await expect(page.getByRole('button', { name: '我还在，继续使用，回到练面试', exact: true })).toBeVisible()
   await page.getByRole('button', { name: /我还在，继续使用/ }).click()
 
   await expect(page).toHaveURL(/\/interview\?stage=tips/)

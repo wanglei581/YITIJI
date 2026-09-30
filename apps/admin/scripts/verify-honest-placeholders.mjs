@@ -32,7 +32,7 @@ const repoRoot = join(adminRoot, '..', '..')
 const targets = [
   {
     path: join(adminRoot, 'src/routes/peripherals/index.tsx'),
-    must: ['getTerminals', '不上报', '终端离线', '后台不提供远程解除', 'Terminal Agent'],
+    must: ['getTerminals', '不上报', '终端离线', '后台不提供远程解除', '终端程序'],
     mustNot: ['unlockScanInput', 'resetScanInput', 'clearScanLockout', 'overrideScanInput', 'forceScanInput', 'Math.random'],
   },
   {

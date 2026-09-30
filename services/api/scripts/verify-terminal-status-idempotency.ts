@@ -41,6 +41,9 @@ async function main(): Promise<void> {
         status: currentStatus,
       }),
     },
+    printTaskStatusLog: {
+      groupBy: async () => [],
+    },
     $transaction: async () => {
       transactionCalls += 1
       throw new Error('terminal-state replays must be decided before opening a write transaction')
@@ -152,8 +155,12 @@ async function main(): Promise<void> {
         status: 'printing',
       }),
     },
+    printTaskStatusLog: {
+      groupBy: async () => [],
+    },
     $transaction: async (run: (tx: unknown) => Promise<void>) =>
       run({
+        $executeRaw: async () => 0,
         printTask: {
           updateMany: async () => {
             concurrentWriteAttempts += 1
@@ -163,9 +170,13 @@ async function main(): Promise<void> {
             id: 'task-terminal-status-race',
             terminalId: 'terminal-owner',
             status: concurrentStatus,
+            errorCode: null,
+            orderId: null,
+            endUserId: null,
           }),
         },
         printTaskStatusLog: {
+          groupBy: async () => [],
           create: async () => {
             concurrentSideEffects += 1
           },
@@ -221,7 +232,11 @@ async function main(): Promise<void> {
     409,
     'an unexpected active-state race must require a fresh report'
   )
-  assert.equal(concurrentWriteAttempts, 3, 'each race case must use the guarded CAS exactly once')
+  assert.equal(
+    concurrentWriteAttempts,
+    1,
+    'a locked terminal state is decided without another write; only a still-active lost CAS uses updateMany',
+  )
   assert.equal(
     concurrentSideEffects,
     0,

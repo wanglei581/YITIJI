@@ -61,7 +61,8 @@
   font-size: 38px;
   color: var(--qx-emerald);
 }
-.i2p-xq-eyebrow { font-size: 16px; letter-spacing: 5px; color: color-mix(in srgb, var(--qx-paper) 50%, transparent); margin-bottom: 6px; }
+/* 眉题 2026-09-30 换成中文「图片转 PDF」，字号、字距、颜色照稿 19 v2 覆盖块。 */
+.i2p-xq-eyebrow { font-size: var(--qx-fs-aux-lg); letter-spacing: 2px; color: color-mix(in srgb, var(--qx-paper) 90%, transparent); margin-bottom: 6px; }
 .i2p-xq-ask { font-family: var(--qx-serif); font-size: 34px; line-height: 1.28; font-weight: 700; }
 .i2p-xq-ask em { font-style: normal; color: var(--qx-emerald); }
 .i2p-xq-doing { margin-top: 8px; font-size: 20px; line-height: 1.5; color: color-mix(in srgb, var(--qx-paper) 74%, transparent); }

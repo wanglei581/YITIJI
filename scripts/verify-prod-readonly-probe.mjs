@@ -57,6 +57,7 @@ for (const needle of [
   '/api/v1/kiosk/offline-agencies',
   '/kiosk/legal/privacy_policy',
   '/kiosk/legal/terms_of_service',
+  '/kiosk/legal/ai_disclaimer',
   '/kiosk/legal/unknown_type',
   '/terminals/session-token',
   '/admin/alerts',
@@ -100,7 +101,14 @@ function pageEnvelope(data, total) {
 }
 
 function jobsPayload(mode) {
-  if (mode === 'lists_empty') return pageEnvelope([], 0)
+  // 这几种夹具要单独看企业条数或政策标记，岗位必须是 0，避免 --strict 被岗位条数带着 FAIL。
+  if (
+    mode === 'lists_empty'
+    || mode === 'recruitment_zero'
+    || mode === 'companies_one'
+    || mode === 'companies_one_demo'
+    || mode === 'policy_demo_only'
+  ) return pageEnvelope([], 0)
   if (mode === 'demo_all') {
     return pageEnvelope([
       {
@@ -152,7 +160,14 @@ function fairsPayload(mode) {
 }
 
 function policiesPayload(mode) {
-  if (mode === 'lists_empty') return pageEnvelope([], 0)
+  if (mode === 'lists_empty' || mode === 'recruitment_zero') return pageEnvelope([], 0)
+  if (mode === 'policy_demo_only') {
+    // 只在政策摘要里放全角「（演示）」。岗位、招聘会、企业在这个夹具里是 0 条，
+    // 所以 --strict 若把这一行判成 FAIL，只能是演示标记，不是条数。
+    return pageEnvelope([
+      { id: 'p1', title: '灵活就业补贴', summary: '灵活就业补贴说明（演示）', sourceName: '市人社' },
+    ], 1)
+  }
   if (mode === 'demo_all') {
     // 标记只在 summary：列表上看得见的摘要必须进白名单。
     return pageEnvelope([
@@ -260,15 +275,23 @@ function handle(req, res) {
     return
   }
   if (req.method === 'GET' && path === '/api/v1/companies') {
-    const items = mutation === 'companies_demo'
+    if (mutation === 'recruitment_zero' || mutation === 'policy_demo_only') {
+      send(res, 200, { data: { items: [] }, pagination: { page: 1, pageSize: 50, total: 0, totalPages: 0 } })
+      return
+    }
+    const items = mutation === 'companies_demo' || mutation === 'companies_one_demo'
       ? [
           { id: 'c1', name: '未来智造科技有限公司（演示）', sourceName: '市人社公共就业平台（演示）' },
-          { id: 'c2', name: '正常企业股份有限公司', sourceName: '市人社公共就业平台' },
+          ...(mutation === 'companies_one_demo'
+            ? []
+            : [{ id: 'c2', name: '正常企业股份有限公司', sourceName: '市人社公共就业平台' }]),
         ]
-      : [
-          { id: 'c1', name: '正常企业股份有限公司', sourceName: '市人社公共就业平台' },
-          { id: 'c2', name: '另一家正常企业', sourceName: '市人社公共就业平台' },
-        ]
+      : mutation === 'companies_one'
+        ? [{ id: 'c1', name: '正常企业股份有限公司', sourceName: '市人社公共就业平台' }]
+        : [
+            { id: 'c1', name: '正常企业股份有限公司', sourceName: '市人社公共就业平台' },
+            { id: 'c2', name: '另一家正常企业', sourceName: '市人社公共就业平台' },
+          ]
     send(res, 200, { data: { items }, pagination: { page: 1, pageSize: 50, total: items.length, totalPages: 1 } })
     return
   }
@@ -278,6 +301,18 @@ function handle(req, res) {
   }
   if (req.method === 'GET' && path === '/api/v1/kiosk/legal/terms_of_service') {
     send(res, 200, { success: true, data: { id: 'doc-tos', docType: 'terms_of_service', version: '1', title: '服务条款', content: '正文' } })
+    return
+  }
+  if (req.method === 'GET' && path === '/api/v1/kiosk/legal/ai_disclaimer') {
+    // 未激活：LegalService.getActive 返回 null，控制器仍 200 且 data 为 null（不是 404）。
+    if (mutation === 'ai_disclaimer_off') {
+      send(res, 200, { success: true, data: null })
+      return
+    }
+    send(res, 200, {
+      success: true,
+      data: { id: 'doc-ai', docType: 'ai_disclaimer', version: '1', title: 'AI 服务说明', content: '正文' },
+    })
     return
   }
   if (req.method === 'GET' && path === '/api/v1/kiosk/legal/unknown_type') {
@@ -384,6 +419,9 @@ try {
     if (help.stdout) process.stdout.write(help.stdout)
     if (help.stderr) process.stderr.write(help.stderr)
   }
+  if (/--strict/.test(help.stdout) && /非 0/.test(help.stdout) && /演示/.test(help.stdout)) {
+    pass('--help 写明 --strict：条数非 0 与演示标记')
+  } else fail('--help 未写明 --strict（岗位/招聘会/企业条数非 0，以及演示标记，都要 FAIL）')
 
   console.log('\n=== 本地桩：合规响应 ===')
   mutation = 'ok'
@@ -416,6 +454,11 @@ try {
   }
   if (!/expect-sha=deadbeef/.test(happyTable.stdout || '')) fail('未打印 --expect-sha')
   else pass('报告头含 expect-sha')
+  const aiLine = expectLine(happyTable.stdout, '/kiosk/legal/ai_disclaimer', 'PASS', '已激活的 ai_disclaimer 为 PASS')
+  if (aiLine.includes('200 且 data 非空')) pass('ai_disclaimer PASS 说明与另外两份相同')
+  else fail(`ai_disclaimer 通过说明必须与另外两份相同: ${aiLine.trim() || '(该行未出现)'}`)
+  if (seenPaths.includes('/api/v1/kiosk/legal/ai_disclaimer')) pass('实际请求了 /api/v1/kiosk/legal/ai_disclaimer')
+  else fail('未请求 /api/v1/kiosk/legal/ai_disclaimer')
 
   const happyJson = await runProbe(port, ['--json'])
   expectExit(happyJson, 0, '合规桩 --json')
@@ -527,6 +570,73 @@ try {
   const bareLine = expectLine(bare.stdout, '/kiosk/offline-agencies', 'WARN', '裸数组线下机构为 WARN')
   if (bareLine.includes('槐荫街道职介（演示）')) pass('裸数组 WARN 点名了机构')
   else fail(`裸数组 WARN 必须点名。实际: ${bareLine.trim() || '(该行未出现)'}`)
+
+  console.log('\n=== ai_disclaimer 未激活（200 且 data=null）必须 FAIL ===')
+  // LegalController 对合法类型一律 200，未激活时 data 为 null，不是 404。
+  // 判据与 privacy_policy / terms_of_service 相同：200 且 data 非空，否则 FAIL。
+  mutation = 'ai_disclaimer_off'
+  const aiOff = await runProbe(port)
+  process.stdout.write(aiOff.stdout || '')
+  expectExit(aiOff, 1, 'ai_disclaimer 未激活')
+  const aiOffLine = expectLine(aiOff.stdout, '/kiosk/legal/ai_disclaimer', 'FAIL', '表中 ai_disclaimer 未激活为 FAIL')
+  if (aiOffLine.includes('data 为空')) pass('未激活时按 data 为空 FAIL（不是把 200 当成通过）')
+  else fail(`未激活必须因 data 为空 FAIL。实际: ${aiOffLine.trim() || '(该行未出现)'}`)
+
+  console.log('\n=== --strict：企业 1 条且无演示标记必须 FAIL，退出码非 0 ===')
+  // 岗位、招聘会在这个夹具里是 0。企业这一行若被改成 PASS，退出码会回到 0。
+  mutation = 'companies_one'
+  const strictOne = await runProbe(port, ['--strict'])
+  process.stdout.write(strictOne.stdout || '')
+  expectExit(strictOne, 1, '--strict 企业数为 1')
+  const strictOneLine = expectLine(strictOne.stdout, '/api/v1/companies', 'FAIL', '--strict 下企业数为 1 为 FAIL')
+  if (/\sFAIL\s/.test(strictOneLine) && strictOneLine.includes('total=1')) pass('--strict 企业 FAIL 写明 total=1')
+  else fail(`--strict 企业 FAIL 必须写明条数。实际: ${strictOneLine.trim() || '(该行未出现)'}`)
+  if (/FAIL 1\b/.test(strictOne.stdout || '')) pass('--strict 企业数为 1 时只有这一条 FAIL')
+  else fail('企业数为 1 的 FAIL 必须是唯一失败项，否则退出码不是被这一条拉红的')
+
+  console.log('\n=== --strict：岗位、招聘会、企业都是 0 且没有演示标记时 PASS ===')
+  mutation = 'recruitment_zero'
+  const strictZero = await runProbe(port, ['--strict'])
+  process.stdout.write(strictZero.stdout || '')
+  expectExit(strictZero, 0, '--strict 三项为 0')
+  for (const [needle, label] of [
+    ['/api/v1/jobs?', '岗位'],
+    ['/api/v1/job-fairs', '招聘会'],
+    ['/api/v1/companies', '企业'],
+  ]) {
+    const line = expectLine(strictZero.stdout, needle, 'PASS', `--strict 下${label} total=0 为 PASS`)
+    if (line.includes('total=0') && line.includes('无演示标记')) pass(`--strict ${label} PASS 写明 total=0 且无演示标记`)
+    else fail(`--strict ${label} PASS 说明不对: ${line.trim() || '(该行未出现)'}`)
+  }
+  if (/FAIL 0\b/.test(strictZero.stdout || '')) pass('--strict 三项为 0 时 FAIL 计数为 0')
+  else fail('--strict 三项为 0 且无演示标记时不得有 FAIL')
+
+  console.log('\n=== --strict：政策里的全角「（演示）」必须 FAIL（条数规则不管政策） ===')
+  mutation = 'policy_demo_only'
+  const strictPolicy = await runProbe(port, ['--strict'])
+  process.stdout.write(strictPolicy.stdout || '')
+  expectExit(strictPolicy, 1, '--strict 政策演示标记')
+  const strictPolicyLine = expectLine(strictPolicy.stdout, '/api/v1/policies', 'FAIL', '--strict 下政策演示标记为 FAIL')
+  if (strictPolicyLine.includes('灵活就业补贴说明（演示）')) pass('--strict 政策 FAIL 点名了摘要')
+  else fail(`--strict 政策 FAIL 必须点名。实际: ${strictPolicyLine.trim() || '(该行未出现)'}`)
+
+  console.log('\n=== 不带 --strict：企业数为 1 仍是原来的 PASS / WARN，退出码 0 ===')
+  // 无标记的 1 条原来就是 PASS「无演示标记」（条数本身不报）。
+  // 带演示标记的 1 条原来就是 WARN，退出码仍是 0。total=0 才是 INFO，见上面的空列表用例。
+  mutation = 'companies_one'
+  const looseOne = await runProbe(port)
+  expectExit(looseOne, 0, '不带 --strict 企业数为 1 不改变退出码')
+  const looseOneLine = expectLine(looseOne.stdout, '/api/v1/companies', 'PASS', '不带 --strict 企业 1 条无标记仍为 PASS')
+  if (looseOneLine.includes('total=1，无演示标记')) pass('不带 --strict 的企业 PASS 说明与原来逐字一致')
+  else fail(`不带 --strict 时企业 1 条无标记必须仍是「total=1，无演示标记」。实际: ${looseOneLine.trim() || '(该行未出现)'}`)
+
+  mutation = 'companies_one_demo'
+  const looseDemo = await runProbe(port)
+  process.stdout.write(looseDemo.stdout || '')
+  expectExit(looseDemo, 0, '不带 --strict 企业 1 条带标记不改变退出码')
+  const looseDemoLine = expectLine(looseDemo.stdout, '/api/v1/companies', 'WARN', '不带 --strict 企业 1 条带标记仍为 WARN')
+  if (looseDemoLine.includes('未来智造科技有限公司')) pass('不带 --strict 的 WARN 仍点名企业')
+  else fail(`不带 --strict 时带标记的企业必须仍 WARN 并点名。实际: ${looseDemoLine.trim() || '(该行未出现)'}`)
 
   console.log('\n=== 恢复后合规桩 ===')
   mutation = 'ok'
