@@ -172,16 +172,51 @@ assert.match(
 const releasePiiGateOffset = releaseScript.indexOf(
   'if [ "${PRINT_REQUIRE_PII_SCAN:-}" != "true" ]; then'
 )
-const runtimeBackupOffset = releaseScript.indexOf('cp -a "$RUNTIME_ROOT" "$BACKUP_PREFIX.runtime"')
+const dumpMvOffset = releaseScript.indexOf('mv -f -- "$DUMP_PARTIAL" "$BACKUP_PREFIX.dump"')
+const runtimeCopyOffset = releaseScript.indexOf('cp -a "$RUNTIME_ROOT" "$RUNTIME_PARTIAL"')
+const runtimeMvOffset = releaseScript.indexOf('mv -f -- "$RUNTIME_PARTIAL" "$BACKUP_PREFIX.runtime"')
+const restoreTrapOffset = releaseScript.indexOf("trap 'restore_runtime_and_exit")
 const persistPiiGateOffset = releaseScript.indexOf('ENV_FILE="$API_DIR/.env"')
 const migrationOffset = releaseScript.indexOf('pnpm db:pg:deploy')
 assert.ok(
-  releasePiiGateOffset < runtimeBackupOffset,
+  releasePiiGateOffset < runtimeCopyOffset,
   'release PII gate must fail before backup/migration'
 )
 assert.ok(
-  runtimeBackupOffset < persistPiiGateOffset && persistPiiGateOffset < migrationOffset,
+  dumpMvOffset > 0 &&
+    runtimeCopyOffset > dumpMvOffset &&
+    runtimeMvOffset > runtimeCopyOffset &&
+    restoreTrapOffset > runtimeMvOffset,
+  'partial dump and runtime copies must be renamed before the rollback trap is armed'
+)
+assert.ok(
+  runtimeMvOffset < persistPiiGateOffset && persistPiiGateOffset < migrationOffset,
   'persistent PII gate must be written after the rollback backup and before migration'
+)
+
+const fullBuildDiskAt = deployJob.indexOf('=== full 发布构建前磁盘检查 ===')
+const pnpmInstallAt = deployJob.indexOf('pnpm install --frozen-lockfile')
+const kioskBuildAt = deployJob.indexOf('pnpm build:kiosk:production')
+assert.ok(
+  fullBuildDiskAt > 0 && fullBuildDiskAt < pnpmInstallAt && pnpmInstallAt < kioskBuildAt,
+  'full publish must check free disk and be able to exit before pnpm install and the three frontend builds'
+)
+const fullBuildDiskBlock = deployJob.slice(fullBuildDiskAt, pnpmInstallAt)
+assert.match(fullBuildDiskBlock, /DEPLOY_MIN_FREE_FLOOR_MB:-10240/)
+assert.doesNotMatch(
+  fullBuildDiskBlock,
+  /DEPLOY_MIN_FREE_BUILD_MB/,
+  'pre-build gate uses the same 10GB floor as the release script'
+)
+assert.match(fullBuildDiskBlock, /pnpm store prune/)
+assert.match(
+  fullBuildDiskBlock,
+  /构建前磁盘空间不足[\s\S]{0,800}dry_run=false、keep=3、prune_pnpm=true、vacuum_journal=false[\s\S]{0,40}exit 1/
+)
+assert.doesNotMatch(
+  fullBuildDiskBlock,
+  /journalctl/,
+  'the pre-build disk check may prune the pnpm store, not the journal'
 )
 assert.match(
   releaseScript,

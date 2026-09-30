@@ -184,6 +184,7 @@
    - 约多久：10 分钟。
    - 怎么判断成了：巡检里 `GET /api/v1/health` 一行是 `PASS status=ok db=postgres degraded=[]`，`GET /api/v1/health/ready` 一行是 `PASS 200`；`git ls-remote --tags origin prod-before-release1` 能看到标签，指向的提交与 `DEPLOY_SOURCE.txt` 一致（9/29 已知线上是 `50483cd2…`）。
    - 失败了怎么办：health 不是 PASS（有 `degraded`、数据库不是 postgres、ready 不是 200），今天不发布，把巡检输出交总指挥；`DEPLOY_SOURCE.txt` 读不到，也先停下，不要猜提交号。
+   - 超大在途订单：GitHub Actions 跑一次 `Deploy Precheck (read-only)`（只读，我们可以代跑），看 `OVERSIZE_PAID_UNFINISHED_ORDERS`：是 `0` 才继续；大于 0 或 `unknown` 就先停，找总指挥，这些订单由产品负责人人工处理后再升级 Agent（每单 100 面上限与 Agent 0.4.13 的超时按 100 面算，见 #1146；只输出数量，不输出订单号、用户或文件名）。
 
 3. **把候选合进 main（P0-4：普通合并，不 squash），等 main CI 跑完**
    - 合并前先核对：候选分支 `claude/codex-task-history-progress-0de1dc` 处于保护状态（禁止删除、禁止强推）。仓库开着「合并后自动删分支」，候选没有保护的话，合并 #1074 会把它删掉。查法：`gh api repos/wanglei581/YITIJI/branches/claude/codex-task-history-progress-0de1dc/protection -q '{del:.allow_deletions.enabled,force:.allow_force_pushes.enabled}'`，应输出 `{"del":false,"force":false}`（9/30 实测如此）；或看 Settings → Branches 里候选那条规则。不是这个结果就先停，找总指挥。
