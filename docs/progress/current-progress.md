@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-09-30：W-105 订单计费页数（Codex 本地候选）
+
+总指挥授权本窗口在 `codex/consoles-ui-batch2-20260930`、基线 `f42e39ce092e1d1d2cc72ed726a843e28e9d6d3b` 补订单核对所缺的只读字段。方案复用现有列表、详情、类型与门禁，文件预算为 12 个现有文件（含契约绑定、E2E 与本进度），图谱产物按需重生成；无新增入口、页面、数据模型、服务或依赖，不改报价/建单/支付逻辑、文件内容、生产配置、密钥或硬件链路，不涉及岗位与招聘会，也不调整产品/合规范围或下一步任务。实际 `AdminOrderReadonlyItem/Detail` 声明在服务端 `admin-orders-readonly.types.ts` 与管理员 `adminOrdersReadonly.ts`，`packages/shared` 没有对应类型；字段加在 Item，由 Detail 继承，两端同步并接入 mock↔服务端契约绑定。
+
+口径以写入代码为准：`print-jobs.service.ts` 与 `member-print-order-create.service.ts` 写 `quote.billablePages`；`order-quote.service.ts` 按文件选中范围计内容页，`package-order.service.ts` 写各文件选中页数之和，均不含份数。`pricing.service.ts` 仅在计费数量/金额中另乘 copies；双面不折算页数，多页合一当前仍被 `verified-print-parameters.ts` 拒绝。本次只从 Order 选取并透传原值，不推算或重算。列表金额下显示「N 页」，已有 copies > 1 时显示「N 页 × M 份」；null/缺字段不显示页数。详情「计费页数」为「N 页」或「—」；无指定页范围且有页数时为「全部页面（N 页）」，两者皆无为「未记录」，指定范围沿用原解析。
+
+本地管理员/shared/API typecheck、全部改动代码 eslint、服务端数字/null 原值断言、真实列/详情组件渲染断言与 mock 契约通过。按逐文件图谱和全文引用扫描执行 57 个关联脚本，51 个退出 0；其余 6 个因沙箱本地网络 EPERM 未完整通过：`verify-console-screen-snapshot`、`verify-member-print-order-idempotency-http`、`verify-package-order-idempotency-http`、`verify-queue-dispatch-printer-status`、`verify-print-jobs` 的 HTTP 段、`verify-pickup-code-share` 的真实 Redis 段。所有库验证均用 `/private/tmp` 隔离 SQLite。管理员订单 E2E 和引用页数的一体机 6 个浏览器用例文件已尝试，构建成功但 preview 监听端口被 EPERM 拒绝，未取得实际浏览器/截图、真机或生产验收。三次变异（null 显示 0 页、移除服务端映射、无页数仍写全部页面）各退出 1，随后逐字节恢复、文件哈希与 git diff --stat 与变异前一致，原门禁重跑通过。图谱重生成与 graph:check 退出 0（产物无变化）。改动留在工作区，未提交、未 push、未切分支、未部署；网络相关检查须由协调方在允许监听/Redis 的环境补验。
+
+
 ## 2026-09-30：后台 UI 第 2 批（订单、打印、文件与计费；Codex 本地候选）
 
 r2 返工基于协调方已提交的 `bb4f456b94668c3c67a72cdecdb9af1486012143`：订单编号/终端编号取消截断与折行，渠道合到用户列下方，两页通过 ConsoleTable/ConsolePager 接入 10/20/50/100 每页条数；文件身份列加宽、空值统一为 —，扫描未知失败码按类型展示，未登记价目带实际键名，材料总数恢复列表长度兜底，门禁按真实渲染文件补齐，计费 E2E 改用 mock 实有的黑白价目。W-105 只读核对确认：Order.billablePages 在库模型中存在，但 admin 订单列表/详情响应类型、orderSelect 与 toItem 均未返回它，故第 2 条按返工单暂停，不增加虚构页数或「全部页面」；需后端交付字段后再接，未修改 services/api/src。管理员 typecheck、改动文件 eslint、指定门禁及图谱关联门禁退出 0，API 退款与彩色双面门禁仅用 /private/tmp 隔离 SQLite；1/2/5/8 的六次变异退出 1，逐字节恢复且 git diff --stat 均与变异前一致（第 2 条验证的是缺字段时禁止编造页数，不代表页数展示已实现）。已查阅协调方 after 截图及 W-105 详情截图，r2 改后截图和浏览器 E2E 未执行，由协调方核验 1280/1440/1920 编号完整、分页选项与多行说明确认；订单/打印扫描主文件仍为 178/495 行，两个 W-106 公共文件未修改，改动留在工作区、未提交、未部署。

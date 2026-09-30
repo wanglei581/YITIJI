@@ -143,7 +143,11 @@ if (
   page.includes('label="份数"') &&
   page.includes('label="页范围"') &&
   page.includes('duplexText(detail.print?.duplex)') &&
-  page.includes('pageRangeText(detail.print?.pageRange)') &&
+  page.includes('pageRangeText(detail.print?.pageRange, detail.billablePages, Boolean(detail.printTaskId))') &&
+  page.includes('label="计费页数"') &&
+  page.includes('billablePagesText(detail.billablePages)') &&
+  page.includes('orderPagesText(order.billablePages, order.copies)') &&
+  service.includes('billablePages: number | null') &&
   !page.includes('label="打印参数"')
 ) {
   pass('订单详情逐项展示打印参数，缺值走 helper（未记录），不再合成一行把缺项吃掉')

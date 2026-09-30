@@ -156,8 +156,8 @@ function hooks(values) {
 const nums = runFile('packages/shared/src/formatNumber.ts')
 const shared = { ...nums, formatDateTime: () => '2026-09-30 12:00' }
 const errors = runFile('apps/admin/src/lib/printErrorText.ts')
-const display = runFile('apps/admin/src/routes/orders/orderDisplay.ts', { '@ai-job-print/shared': shared })
 const honesty = runFile('apps/admin/src/routes/orders/orderHonestyCopy.ts')
+const display = runFile('apps/admin/src/routes/orders/orderDisplay.ts', { '@ai-job-print/shared': shared, './orderHonestyCopy': honesty })
 const cols = runFile('apps/admin/src/routes/orders/orderColumns.tsx', {
   '@ai-job-print/ui': ui, '../../lib/printErrorText': errors, './orderDisplay': display, './orderHonestyCopy': honesty,
 }).orderColumns(() => {})
@@ -192,10 +192,32 @@ const scanOrder = { type: 'scan', ownerType: 'anonymous', userLabel: '游客', a
 const scanListText = textOf(cols.map((column) => column.cell(scanOrder)))
 const scanDetailText = textOf(drawer.OrderDetailDrawer({ controls: { detailState: 'ready', detail: scanOrder } }))
 if (!scanListText.includes('扫描失败（未归类）') || !scanDetailText.includes('扫描失败（未归类）') || scanListText.includes('打印失败') || scanDetailText.includes('打印失败')) fail('扫描订单列表、详情和流转记录不得说成打印失败')
-// W-105：当前只读接口未返回计费页数；缺字段时不得把页范围或页数推算成完整记录。
+// W-105：执行真实列与详情组件，覆盖有页数、null、缺字段和指定范围。
 const noPageDetail = { ...scanOrder, type: 'print', errorCode: null, statusLogs: [], print: { pageRange: null } }
-const noPageText = textOf(drawer.OrderDetailDrawer({ controls: { detailState: 'ready', detail: noPageDetail } }))
-if (honesty.pageRangeText(null) !== '未记录' || /全部页面|\d+\s*页/.test(noPageText)) fail('缺页范围和计费页数字段时不得编造全部页面或页数')
+const amountColumn = cols.find((column) => column.id === 'amount')
+function detailText(detail) {
+  return textOf(drawer.OrderDetailDrawer({ controls: { detailState: 'ready', detail } }))
+}
+for (const billablePages of [null, undefined]) {
+  const order = { ...noPageDetail, billablePages, copies: 2 }
+  if (/\d+\s*页/.test(textOf(amountColumn.cell(order)))) fail('缺计费页数时列表不得显示 0 页或推算页数')
+  const visible = detailText(order)
+  if (!visible.includes('计费页数 —') || !visible.includes('页范围 未记录') || visible.includes('全部页面')) fail('缺页范围和计费页数时详情必须写 — / 未记录')
+}
+for (const [copies, expected] of [[null, '4 页'], [1, '4 页'], [2, '4 页 × 2 份']]) {
+  const visible = textOf(amountColumn.cell({ ...noPageDetail, billablePages: 4, copies }))
+  if (!visible.includes(expected) || (copies !== 2 && visible.includes('×'))) fail('列表内容页数与份数必须分别展示')
+}
+const counted = { ...noPageDetail, printTaskId: 'ptask_single', billablePages: 4, copies: 2 }
+if (!detailText(counted).includes('计费页数 4 页') || !detailText(counted).includes('页范围 全部页面（4 页）')) fail('单任务订单有计费页数且未指定范围时必须显示全部页面（4 页）')
+// 多文件订单（无单一打印任务）的 billablePages 是各文件所选页数之和，不能说成「全部页面」。
+const packaged = { ...noPageDetail, printTaskId: null, billablePages: 7, copies: 1 }
+if (!detailText(packaged).includes('页范围 各文件合计 7 页') || detailText(packaged).includes('全部页面')) fail('多文件订单不得写成全部页面，应写各文件合计 N 页')
+for (const billablePages of [4, null]) {
+  if (!detailText({ ...counted, billablePages, print: { pageRange: '1-2' } }).includes('页范围 1-2')) fail('指定页范围不得被计费页数覆盖')
+}
+if (display.pageRangeText('  ', 4, true) !== '全部页面（4 页）' || display.pageRangeText('all', 4, true) !== '全部' || display.pageRangeText(null, 4, false) !== '各文件合计 4 页') fail('空白与 all 页范围必须保留既有解析口径，多文件写各文件合计')
+console.log('  PASS W-105 原值页数 / 份数 / null / 未记录 / 全部页面 / 指定范围真实组件展示')
 if (display.orderUserText({ ownerType: 'member', userLabel: '13812345678' }).includes('13812345678')) fail('用户不得显示完整手机号')
 const common = { '@ai-job-print/ui': ui, '@ai-job-print/shared': shared, '../Page': { Page: (p) => [p.title, p.subtitle, p.children] },
   '../components/FilterChip': { FilterChip: () => null }, 'lucide-react': {} }

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { openAuthed, settleAdminPage } from './helpers/open'
 
-test.describe('订单管理（mock 口径：一条演示未支付单）', () => {
+test.describe('订单管理（mock 口径：有页数单与未记录页数单）', () => {
   test('筛选、打开详情、取消收款与退款入口', async ({ page }) => {
     const guards = await openAuthed(page, '/orders')
     await settleAdminPage(page, guards)
@@ -141,6 +141,8 @@ test.describe('订单管理（mock 口径：一条演示未支付单）', () => 
       expect(await page.locator('table').evaluate((el) => el.scrollWidth - el.parentElement!.clientWidth)).toBeLessThanOrEqual(1)
     }
     await expect(page.locator('tbody')).toContainText('¥0.00（免费）')
+    await expect(page.locator('tbody tr').first().locator('td').nth(4)).toContainText('4 页 × 2 份')
+    await expect(page.locator('tbody tr').nth(1).locator('td').nth(4)).not.toContainText('页')
     const pageSize = page.getByRole('combobox')
     await expect(pageSize.locator('option')).toHaveText(['10', '20', '50', '100'])
     await pageSize.selectOption('50')
@@ -149,8 +151,12 @@ test.describe('订单管理（mock 口径：一条演示未支付单）', () => 
     await page.getByRole('button', { name: '订单 ORD-20260625-MOCKREAD 详情' }).click()
     await expect(page.getByText('文件名', { exact: true }).last()).toBeVisible()
     const pageRange = page.getByText('页范围', { exact: true }).locator('..')
-    await expect(pageRange).toContainText('未记录')
-    await expect(pageRange).not.toContainText('全部页面')
+    await expect(pageRange).toContainText('全部页面（4 页）')
+    await expect(page.getByText('计费页数', { exact: true }).locator('..')).toContainText('4 页')
+    await page.getByRole('button', { name: '关闭' }).click()
+    await page.getByRole('button', { name: '订单 ORD-20260625-UNRECORDED 详情' }).click()
+    await expect(page.getByText('计费页数', { exact: true }).locator('..')).toContainText('—')
+    await expect(page.getByText('页范围', { exact: true }).locator('..')).toContainText('未记录')
   })
 
 })

@@ -1,7 +1,7 @@
 import { StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
 import type { AdminOrderReadonlyItem } from '../../services/api/adminOrdersReadonly'
 import { printErrorText } from '../../lib/printErrorText'
-import { amountText, channelText, orderUserText, PAY_STATUS_MAP, STATUS_MAP } from './orderDisplay'
+import { amountText, channelText, orderPagesText, orderUserText, PAY_STATUS_MAP, STATUS_MAP } from './orderDisplay'
 import { opsAttentionText } from './orderHonestyCopy'
 
 export function orderColumns(openDetail: (id: string) => Promise<void>): ConsoleColumn<AdminOrderReadonlyItem>[] {
@@ -21,7 +21,12 @@ export function orderColumns(openDetail: (id: string) => Promise<void>): Console
     </> },
     { id: 'terminal', header: '终端', cellClassName: 'whitespace-nowrap', headerClassName: 'w-[10%]', cell: (order) => order.terminalCode ?? '—' },
     { id: 'amount', header: '金额', align: 'right', headerClassName: 'w-[14%]',
-      cell: (order) => <span className="whitespace-nowrap">{amountText(order.amountCents, order.currency)}</span> },
+      cell: (order) => <>
+        <span className="whitespace-nowrap">{amountText(order.amountCents, order.currency)}</span>
+        {orderPagesText(order.billablePages, order.copies) !== null && (
+          <span className="mt-1 block whitespace-nowrap text-[11px] text-neutral-500">{orderPagesText(order.billablePages, order.copies)}</span>
+        )}
+      </> },
     { id: 'payment', header: '支付状态', headerClassName: 'w-[10%]', cell: (order) => {
       const pay = PAY_STATUS_MAP[order.payStatus] ?? { badge: 'default' as const, label: '未归类' }
       return <><StatusBadge dot status={pay.badge} label={pay.label} />

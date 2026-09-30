@@ -1,4 +1,5 @@
 import { formatDateTime, formatYuan } from '@ai-job-print/shared'
+import { pageRangeText as recordedPageRangeText } from './orderHonestyCopy'
 import type { AdminOrderMarkPaidSource } from '../../services/api/adminOrdersReadonly'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
@@ -118,4 +119,28 @@ export function orderUserText(order: { ownerType: string; userLabel: string }): 
   const identity = OWNER_LABELS[order.ownerType] ?? '身份未记录'
   const label = order.userLabel.trim().replace(/1[3-9]\d{9}/g, (phone) => `尾号${phone.slice(-4)}`)
   return !label || label === identity ? identity : `${identity} · ${label}`
+}
+
+/** Order.billablePages 原值：内容页数，不含份数；缺值不伪装成 0 页。 */
+export function billablePagesText(pages: number | null | undefined): string | null {
+  return typeof pages === 'number' ? `${pages} 页` : null
+}
+
+export function orderPagesText(pages: number | null | undefined, copies: number | null | undefined): string | null {
+  const text = billablePagesText(pages)
+  if (text === null) return null
+  return typeof copies === 'number' && copies > 1 ? `${text} × ${copies} 份` : text
+}
+
+/**
+ * 页范围。没有记录页范围、但有计费页数时：
+ * - 单个打印任务的订单（printTaskId 有值）：一体机报价就是「全部页面」，写「全部页面（N 页）」；
+ * - 多文件订单（小程序打包下单，订单上没有单一任务和页范围，billablePages 是各文件所选页数之和）：
+ *   不能说成「全部页面」，写「各文件合计 N 页」。
+ */
+export function pageRangeText(value: string | null | undefined, pages: number | null | undefined, singleTask: boolean): string {
+  if (typeof value === 'string' && value.trim()) return recordedPageRangeText(value)
+  const text = billablePagesText(pages)
+  if (text === null) return '未记录'
+  return singleTask ? `全部页面（${text}）` : `各文件合计 ${text}`
 }
