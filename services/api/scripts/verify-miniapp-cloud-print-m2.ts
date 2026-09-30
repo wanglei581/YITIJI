@@ -938,9 +938,14 @@ async function main(): Promise<void> {
         const response = await captureHttpError(() => scenario.member
           ? claimHere.claimHere(userId, gateOrder.id, terminalId, undefined)
           : pickup.claim(gateOrder.pickupCode!, terminalId))
-        const expectedMessage = scenario.code === 'PRINT_TERMINAL_QUEUE_HALTED'
-          ? '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
-          : '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+        // 会员「在这台机器领取」手里没有码，不能说「到机码没有作废」。
+        const expectedMessage = scenario.member
+          ? (scenario.code === 'PRINT_TERMINAL_QUEUE_HALTED'
+            ? '这台终端暂停接打印单，你的订单没有受影响，请稍后再在这台终端领取，或找现场工作人员'
+            : '这台终端的打印机暂不可用，你的订单没有受影响，请稍后再在这台终端领取，或找现场工作人员')
+          : (scenario.code === 'PRINT_TERMINAL_QUEUE_HALTED'
+            ? '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+            : '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员')
         const after = await prisma.order.findUniqueOrThrow({ where: { id: gateOrder.id } })
         if (!response.thrown || response.status !== 400 || response.code !== scenario.code || response.message !== expectedMessage
           || JSON.stringify(before) !== JSON.stringify(after) || after.pickupStatus !== 'pending'
@@ -950,7 +955,10 @@ async function main(): Promise<void> {
           console.error(`  FAIL W-112 ${label}: rejection=${JSON.stringify(response)}, pickupStatus=${after.pickupStatus}`)
         } else pass(`W-112 ${label}: 拒绝原话、订单不变、不建任务、不写成功审计、不增锁定计数`)
         await setPrinter('ready')
-        const recovered = await pickup.claim(gateOrder.pickupCode!, terminalId)
+        // 恢复走同一个入口：会员场景用 claimHere，到机码场景用 claim。
+        const recovered = scenario.member
+          ? await claimHere.claimHere(userId, gateOrder.id, terminalId, undefined)
+          : await pickup.claim(gateOrder.pickupCode!, terminalId)
         const recoveredRow = await prisma.order.findUniqueOrThrow({ where: { id: gateOrder.id } })
         if (!recovered.released || !('taskId' in recovered) || !recovered.taskId || recoveredRow.pickupStatus !== 'used') fail(`${label}: 恢复后同码不能取件`)
         if (recovered.billablePages !== 2 || recovered.params?.copies !== 2 || recovered.params?.colorMode !== 'black_white' || recovered.params?.duplex !== 'simplex') fail(`${label}: 核销回执摘要不正确`)

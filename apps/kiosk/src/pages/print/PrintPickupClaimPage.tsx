@@ -211,8 +211,9 @@ export function PrintPickupClaimPage() {
     } catch (err) {
       if (staleSignal?.aborted) return
       claimLockRef.current = false
+      // 一律清空输入框：重试用 failure.code；保留原码时扫码枪再扫会接在后面，拼出错码计入锁定。
+      setCode('')
       const kind = classifyClaimFailure(err)
-      if (kind !== 'printer') setCode('')
       setFailure({ kind, code: submittedCode })
       // 文案按取件场景逐码登记（pickupClaimModel）；已用过 / 已退款这类终态码不许说「重试」。
       setErrorMsg(pickupClaimMessage(err))

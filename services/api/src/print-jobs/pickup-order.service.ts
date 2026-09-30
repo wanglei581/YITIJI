@@ -196,7 +196,7 @@ export class PickupOrderService {
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'document_print')
     // 打印机检查放在过期、状态、文件、能力判定之后、任何写库之前：
     // 过期码仍先说「已过期」，不能被说成「到机码没有作废」；被拒时不认领、不建任务、不计输错。
-    await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, 'pickup')
+    await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, via === 'member_order' ? 'claim_here' : 'pickup')
 
     if (order.pickupStatus === 'pending') {
       const claimed = await this.prisma.order.updateMany({
@@ -282,7 +282,7 @@ export class PickupOrderService {
     await this.assertOrderFileReady(order, firstItem?.fileId)
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'document_print')
     // 认领后付款期间打印闸门可能合上：放行（建任务）前再查一次，拒绝时订单保持已认领、可稍后重放。
-    await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, 'pickup')
+    await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, via === 'member_order' ? 'claim_here' : 'pickup')
 
     const sourceFileId = firstItem?.fileId ?? order.sourceFileId!
     const signed = signFileUrl(sourceFileId, SIGNED_URL_TTL_MS)
