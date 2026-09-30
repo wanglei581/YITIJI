@@ -189,6 +189,7 @@ const RESUME_FIXTURES: ResumeFixture[] = [
   },
   {
     // 模型回了一个原文里没有的姓名：不能照抄，改用原文开头识别出的姓名。
+    // 经历两段都回齐：本用例只测姓名；缺经历会按 W-OPT-LOSS 触发点名重试，那是另一组用例的事。
     id: 'C-fake-name',
     text: '赵明远\n青岛智造有限公司                 2020.09 - 2024.06\n海岳物流有限公司                 2024.07—至今\n工作经历\n负责仓储系统维护和收货安排。',
     expectedName: '赵明远',
@@ -201,6 +202,7 @@ const RESUME_FIXTURES: ResumeFixture[] = [
       education: [],
       experience: [
         { company: '青岛智造有限公司', role: '仓储管理', period: '2020.09 - 2024.06', description: '负责仓储系统维护和收货安排。' },
+        { company: '海岳物流有限公司', role: '仓储管理', period: '2024.07—至今', description: '负责收货安排。' },
       ],
       projects: [], skills: [], certificates: [],
     },

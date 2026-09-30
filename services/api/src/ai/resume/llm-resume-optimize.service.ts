@@ -251,7 +251,7 @@ export class LlmResumeOptimizeService {
       if (result) {
         const restored = restoreOptimizeResult(result, masked.restore)
         const missing = missingOriginalEntries(restored.optimizedResume, baseline)
-        if (attempt === 2 || missing.length === 0 || result.identityCorrected) {
+        if (attempt === 2 || missing.length === 0) {
           return preserveOriginalEntries(restored, [...missing, ...baseline.filter((entry) => entry.overflow)], baseline)
         }
         firstValid = restored
@@ -417,7 +417,7 @@ export class LlmResumeOptimizeService {
 
   // ── 解析 + 防编造校验 ───────────────────────────────────────────────────────
 
-  private parseAndValidate(raw: string, originalText: string, forbiddenWords: string[]): (OptimizeResult & { identityCorrected: boolean }) | null {
+  private parseAndValidate(raw: string, originalText: string, forbiddenWords: string[]): OptimizeResult | null {
     const jsonStr = extractJson(raw)
     if (!jsonStr) return null
     let parsed: unknown
@@ -542,7 +542,7 @@ export class LlmResumeOptimizeService {
       basic, intention, summary, education, experience, projects, skills, certificates,
     }
     // 姓名已被确定性纠正时直接保留合法内容并补回遗漏，不再让模型修复身份。
-    return { optimizedResume, modules, identityCorrected: !!nameRaw && !inText(nameRaw) }
+    return { optimizedResume, modules }
   }
 
   private parseLayoutAdjustAndValidate(
