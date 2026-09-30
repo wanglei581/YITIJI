@@ -5,7 +5,7 @@
  * - 建单落 itemsJson 计费明细快照（只存 PricingService 输出，不引入商品体系）。
  * - 出码：attempt pending + sandboxpay:// 动态码 + 订单 paying + 超时时间；重复出码幂等复用。
  * - 回调成功：验签 + 防重放 + 全字段匹配 + 金额一致 → paid + paymentSource=sandbox +
- *   payChannel + pickupCode + 审计 order.mark_paid_online（late 标记可审计）。
+ *   payChannel + 现场单两列取件码都空 + 审计 order.mark_paid_online（late 标记可审计）。
  * - 幂等：同流水号重放不重复入账/审计；同 nonce 重放 401；过期 timestamp 401；
  *   错签名 / 篡改报文 / 跨路径签名复用 401；金额篡改 400 且订单不动。
  * - 伪造回调不可能入账：attemptId 不存在 / prepayId / orderId 不匹配一律拒绝，
@@ -43,6 +43,7 @@ import {
   PAID_UNFULFILLED_PENDING_REFUND_REASON,
 } from '../src/payment/pending-refund-signal'
 import { OrderStatusService } from '../src/payment/order-status.service'
+import { PICKUP_VALIDITY_FROM_PAYMENT_MS } from '../src/payment/pickup-validity'
 import { createPaymentSessionToken, paymentSessionTtlMs } from '../src/payment/payment-session-token'
 import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
@@ -497,11 +498,12 @@ async function main(): Promise<void> {
       paidA.payChannel === 'sandbox' &&
       paidA.paidBy === 'online_callback' &&
       paidA.paidAt &&
-      paidA.pickupCode &&
+      paidA.pickupCode == null &&
+      paidA.pickupCodeHash == null &&
       attemptADone?.status === 'success' &&
       attemptADone.channelTxnNo === txnA
     ) {
-      pass('valid signed callback credits order: paid + paymentSource=sandbox + payChannel + pickupCode + txn backfill')
+      pass('valid signed callback credits order: paid + paymentSource=sandbox + payChannel + no pickup code + txn backfill')
     } else {
       fail(`success callback state mismatch: order=${JSON.stringify(paidA)} attempt=${JSON.stringify(attemptADone)}`)
     }
@@ -525,8 +527,8 @@ async function main(): Promise<void> {
       payment.getPayStatus(orderA.id, wrongPaymentSession),
     )
     const statusViewA = await payment.getPayStatus(orderA.id, paymentSessionA)
-    if (statusViewA.payStatus === 'paid' && statusViewA.pickupCode === paidA.pickupCode && statusViewA.attempt?.status === 'success') {
-      pass('pay-status view exposes paid state and gated pickupCode')
+    if (statusViewA.payStatus === 'paid' && statusViewA.pickupCode === null && statusViewA.attempt?.status === 'success') {
+      pass('pay-status view exposes paid state and no pickup code for an on-site order')
     } else {
       fail(`pay-status view mismatch: ${JSON.stringify(statusViewA)}`)
     }
@@ -730,8 +732,8 @@ async function main(): Promise<void> {
       )
     }
     const offlinePaid = await orderStatus.markPaid(orderFId, { paymentSource: 'offline', operatorId: 'verify' })
-    if (offlinePaid.payStatus === 'paid' && offlinePaid.paymentSource === 'offline' && offlinePaid.pickupCode) {
-      pass('offline markPaid path is unchanged (unpaid→paid + pickupCode)')
+    if (offlinePaid.payStatus === 'paid' && offlinePaid.paymentSource === 'offline' && offlinePaid.pickupCode == null && offlinePaid.pickupCodeHash == null) {
+      pass('offline markPaid path leaves both pickup columns null on an on-site order')
     } else {
       fail(`offline markPaid regression: ${JSON.stringify(offlinePaid)}`)
     }
@@ -990,9 +992,17 @@ async function main(): Promise<void> {
     )
 
     const hashedCloudId = await makeOrder(160, 'unpaid')
+    const liveHash = `hash_live_${suffix}`
+    const liveEnc = `enc_live_${suffix}`
+    const shortExpiry = new Date(Date.now() + 60 * 60 * 1000)
     await prisma.order.update({
       where: { id: hashedCloudId },
-      data: { pickupStatus: 'pending', pickupCodeHash: `hash_live_${suffix}` },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: liveHash,
+        pickupCodeEnc: liveEnc,
+        pickupCodeExpiresAt: shortExpiry,
+      },
     })
     const hashedPaid = await orderStatus.markPaidOnline(hashedCloudId, {
       channel: CHANNEL,
@@ -1000,10 +1010,47 @@ async function main(): Promise<void> {
       channelTxnNo: `txn_hashed_${suffix}`,
       late: false,
     })
-    if (hashedPaid.payStatus === 'paid' && hashedPaid.pickupCode == null) {
-      pass('cloud print markPaidOnline does not mint a ghost plaintext pickupCode')
+    const hashedSpan = hashedPaid.paidAt && hashedPaid.pickupCodeExpiresAt
+      ? hashedPaid.pickupCodeExpiresAt.getTime() - hashedPaid.paidAt.getTime()
+      : null
+    if (
+      hashedPaid.payStatus === 'paid' &&
+      hashedPaid.pickupCode == null &&
+      hashedPaid.pickupCodeHash === liveHash &&
+      hashedPaid.pickupCodeEnc === liveEnc &&
+      hashedSpan === PICKUP_VALIDITY_FROM_PAYMENT_MS &&
+      hashedPaid.pickupCodeExpiresAt?.getTime() !== shortExpiry.getTime()
+    ) {
+      pass('cloud print markPaidOnline keeps hash and ciphertext, anchors 7 days from payment, mints no plaintext')
     } else {
-      fail(`ghost pickupCode minted: pay=${hashedPaid.payStatus} code=${hashedPaid.pickupCode}`)
+      fail(`cloud pickup window mismatch: pay=${hashedPaid.payStatus} code=${hashedPaid.pickupCode} hash=${hashedPaid.pickupCodeHash} enc=${hashedPaid.pickupCodeEnc} span=${hashedSpan}`)
+    }
+    const offlineHashedId = await makeOrder(170, 'unpaid')
+    const offlineHash = `hash_offline_live_${suffix}`
+    const offlineEnc = `enc_offline_live_${suffix}`
+    await prisma.order.update({
+      where: { id: offlineHashedId },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: offlineHash,
+        pickupCodeEnc: offlineEnc,
+        pickupCodeExpiresAt: shortExpiry,
+      },
+    })
+    const offlineHashed = await orderStatus.markPaid(offlineHashedId, { paymentSource: 'offline', operatorId: 'verify' })
+    const offlineSpan = offlineHashed.paidAt && offlineHashed.pickupCodeExpiresAt
+      ? offlineHashed.pickupCodeExpiresAt.getTime() - offlineHashed.paidAt.getTime()
+      : null
+    if (
+      offlineHashed.payStatus === 'paid' &&
+      offlineHashed.pickupCode == null &&
+      offlineHashed.pickupCodeHash === offlineHash &&
+      offlineHashed.pickupCodeEnc === offlineEnc &&
+      offlineSpan === PICKUP_VALIDITY_FROM_PAYMENT_MS
+    ) {
+      pass('cloud print markPaid keeps hash and ciphertext and anchors 7 days from payment')
+    } else {
+      fail(`offline cloud pickup window mismatch: pay=${offlineHashed.payStatus} code=${offlineHashed.pickupCode} span=${offlineSpan}`)
     }
     const hashedReplay = await orderStatus.markPaidOnline(hashedCloudId, {
       channel: CHANNEL,

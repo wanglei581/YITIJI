@@ -31,6 +31,7 @@ import { __setUnauthorizedMarkerPathForTests } from '../src/agent/auth-state'
 import type { AgentConfig, ClaimTask } from '../src/agent/types'
 import {
   runInstanceLockHardeningTests,
+  runKnownLegacyResidueCleanupTests,
   runPrintTaskTempCleanupTests,
 } from './agent-crash-privacy.helper'
 
@@ -715,6 +716,15 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
   }
 }
 
+function verifyKnownLegacyResidueCleanup(): void {
+  const source = readFileSync(join(__dirname, '../src/agent/legacy-residue-cleanup.ts'), 'utf8')
+  assert.match(source, /cleanupKnownLegacyResidue/)
+  assert.match(source, /agent-debug\.log/)
+  assert.match(source, /AIJobPrintTerminalSetup\.exe/)
+  assert.match(source, /scan-test-backup/)
+  runKnownLegacyResidueCleanupTests()
+}
+
 async function main(): Promise<void> {
   const cases: Array<[string, () => void | Promise<void>]> = [
     ['claim rate-limit pause computation', verifyClaimPauseComputation],
@@ -728,6 +738,7 @@ async function main(): Promise<void> {
     ['dead-letter operator workflow', verifyDeadLetterOperatorWorkflow],
     ['instance-lock exclusive create and successor-safe release', runInstanceLockHardeningTests],
     ['print-task crash leftover temp cleanup', runPrintTaskTempCleanupTests],
+    ['known legacy residue cleanup', verifyKnownLegacyResidueCleanup],
   ]
   const failures: string[] = []
   for (const [name, verify] of cases) {

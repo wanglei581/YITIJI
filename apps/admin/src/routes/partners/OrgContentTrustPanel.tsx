@@ -1,3 +1,5 @@
+import { formatDateTime } from '@ai-job-print/shared'
+
 // ============================================================
 // 机构详情抽屉里的「内容可信」小节 —— 发布闸门的**唯一人工入口**在后台的落地。
 //
@@ -58,8 +60,7 @@ function statusTone(status: string | null): 'success' | 'warning' | 'error' | 'd
 
 function fmtTime(iso: string | null): string {
   if (!iso) return '—'
-  const d = new Date(iso)
-  return Number.isFinite(d.getTime()) ? d.toLocaleString('zh-CN', { hour12: false }) : iso
+  return formatDateTime(iso, { fallback: iso })
 }
 
 function reviewerText(reviewedBy: string | null): string {

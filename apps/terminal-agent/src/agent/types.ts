@@ -107,6 +107,12 @@ export interface AgentConfig {
    */
   printerName: string
   /**
+   * 空闲时暂停本机配置打印机的 Windows 队列。代码默认 false。
+   * 生产安装脚本默认写 true。兼作工作电脑的机器用 -KeepPrinterQueueUnpaused 关掉，
+   * 因为暂停队列也会挡住这台电脑上别的程序打印。
+   */
+  holdPrinterQueueWhenIdle?: boolean
+  /**
    * 打印机"扫描到 SMB/FTP 共享目录"对应的本地可访问路径（映射盘符或 UNC 路径）。
    * 显式配置，不给默认值；未配置时扫描监听整体不启动，不影响其余 Agent 功能。
    */
@@ -151,7 +157,15 @@ export interface AgentConfig {
 // ── Heartbeat ────────────────────────────────────────────────────────────────
 
 export type TerminalStatus = 'online' | 'offline' | 'error' | 'agent_degraded'
-export type PrinterStatus = 'ready' | 'offline' | 'error' | 'low_paper' | 'paper_empty' | 'unknown'
+export type PrinterStatus =
+  | 'ready'
+  | 'offline'
+  | 'error'
+  | 'low_paper'
+  | 'paper_empty'
+  | 'unknown'
+  | 'queue_cleanup_failed'
+  | 'queue_pause_failed'
 
 export interface HeartbeatPayload {
   status: TerminalStatus

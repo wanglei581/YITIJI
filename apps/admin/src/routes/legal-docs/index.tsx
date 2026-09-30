@@ -7,6 +7,7 @@ import { LegalDocViewDrawer } from './LegalDocViewDrawer'
 import { LegalReadinessCard } from './LegalReadinessCard'
 import { DOC_TYPE_LABELS, DOC_TYPE_ORDER, activateConfirmText, docTypeLabel } from './legalDocMeta'
 import { legalDocsService, type LegalDocVersionView } from '../../services/api/legalDocs'
+import { formatDateTime } from '@ai-job-print/shared'
 
 // ─── 常量 ───────────────────────────────────────────────────────────────────
 
@@ -16,14 +17,7 @@ const TAB_OPTIONS: { key: string | undefined; label: string }[] = [
 ]
 
 function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(iso)
 }
 
 /** 被新版取代的已发布版本仍带 publishedAt，不得标成「草稿」。 */

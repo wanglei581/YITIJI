@@ -76,9 +76,12 @@ const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed', 'cancelled']
 
 class PrintTaskClaimRaceError extends Error {}
 
-// API-03：claim 时重签文件 URL 的有效期。Agent 单任务最长路径（下载重试 + 预检 + 打印 +
-// 监控）不到 15 分钟，30 分钟与建单时的 PRINT_JOB_FILE_URL_TTL_MS 同口径。
+// API-03：claim 时重签文件 URL 的有效期。Agent 出纸监控封顶 15 分钟，再加上下载重试，
+// 仍低于这里的 30 分钟，与建单时的 PRINT_JOB_FILE_URL_TTL_MS 同口径。
 const CLAIM_FILE_URL_TTL_MS = 30 * 60 * 1000
+
+/** printing 仍未结束时，服务端改判未确认的时限。必须大于 Agent 出纸监控封顶（15 分钟）。 */
+export const PRINTING_UNCONFIRMED_TIMEOUT_MS = 20 * 60 * 1000
 
 // AGT-01（2026-09-05 拍板）：Agent 的 printing 上报只是信息性中间态，网络抖动时
 // 可能丢失而纸已经出来。claimed → completed 必须被接受，否则真出纸会被记成
@@ -966,7 +969,7 @@ export class TerminalAgentService implements OnModuleInit {
 
   async resetExpiredClaims(): Promise<void> {
     const now = new Date()
-    const printingTimeout = new Date(now.getTime() - 10 * 60 * 1000)
+    const printingTimeout = new Date(now.getTime() - PRINTING_UNCONFIRMED_TIMEOUT_MS)
 
     const { claimedCount, printingCount, terminalTaskIds } = await this.prisma.$transaction(async (tx) => {
       const candidates = await tx.printTask.findMany({

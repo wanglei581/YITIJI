@@ -199,14 +199,14 @@ expectMatches(
 )
 expectMatches(
   doneSrc,
-  /getPayStatus\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/,
-  'PrintDonePage 查询取件码时携带 paymentSessionToken',
+  /已在本机出纸/,
+  'PrintDonePage 现打现取完成只说已在本机出纸',
 )
-expectMatches(
-  doneSrc,
-  /error:\s*'取件凭证暂时无法读取，请联系工作人员核验订单'/,
-  'PrintDonePage 取件码查询失败时显式提示工作人员核验，不静默隐藏',
-)
+if (/getPayStatus|取件凭证暂时无法读取|取件码/.test(doneSrc)) {
+  fail('PrintDonePage 不再查询或展示取件码，也不把缺码说成需要工作人员核验')
+} else {
+  pass('PrintDonePage 不再查询或展示取件码')
+}
 
 // 8) P0-1：确认页 / 预览页不得硬编码单价；确认页改读后端报价。
 const PREVIEW = 'src/pages/print/PrintPreviewPage.tsx'

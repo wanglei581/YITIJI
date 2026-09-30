@@ -1,3 +1,4 @@
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card } from '@ai-job-print/ui'
 import { ClockIcon, FileClockIcon, ShieldCheckIcon, TimerResetIcon } from 'lucide-react'
 import type { AdminFileLifecycleSummary } from '../../services/api'
@@ -53,7 +54,7 @@ export function RetentionSummary({ summary }: { summary: AdminFileLifecycleSumma
       </div>
       <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-500">
         <span className="font-medium text-neutral-600">策略分布：</span>{policyText || '暂无文件'}
-        <span className="ml-3 text-neutral-400">统计时间 {new Date(summary.generatedAt).toLocaleString()}</span>
+        <span className="ml-3 text-neutral-400" title={formatDateTime(summary.generatedAt)}>统计时间 {formatDateTime(summary.generatedAt)}</span>
       </div>
     </div>
   )

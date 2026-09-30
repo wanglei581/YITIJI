@@ -97,7 +97,8 @@ expectMatches(paymentApi, /createPayAttempt\(input:\s*PaymentSessionInput\b/, 'c
 expectMatches(paymentApi, /getPayStatus\(input:\s*PaymentSessionInput\)/, 'getPayStatus 仍强制使用 PaymentSessionInput')
 expectMatches(cashier, /createPayAttempt\(\{\s*orderId,\s*paymentSessionToken\s*,\s*channel\s*\}\)/, 'PrintCashierPage 出码仍带 paymentSessionToken')
 expectMatches(cashier, /getPayStatus\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/, 'PrintCashierPage 轮询仍带 paymentSessionToken')
-expectMatches(done, /getPayStatus\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/, 'PrintDonePage 取件码查询仍带 paymentSessionToken')
+expectMatches(done, /已在本机出纸/, 'PrintDonePage 现打现取完成只说已在本机出纸')
+expectAbsent(done, /getPayStatus|取件码|取件凭证暂时无法读取/, 'PrintDonePage 不再查询或展示取件码')
 
 expectIncludes(packageJson, '"verify:profile-commercial-first-batch"', 'package.json 注册 profile-commercial-first-batch 守卫')
 expectIncludes(ci, 'verify:profile-commercial-first-batch', 'CI Verify suites 接入 profile-commercial-first-batch 守卫')

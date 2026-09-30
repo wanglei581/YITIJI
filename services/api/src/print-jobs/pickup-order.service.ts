@@ -14,7 +14,6 @@ import { createPaymentSessionToken, verifyPaymentSessionToken } from '../payment
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
-import { assertPiiScanned } from './pii-scan-gate'
 import { assertFileContentIntegrity } from '../files/file-content-integrity'
 import { StorageService } from '../storage/storage.service'
 import {
@@ -433,21 +432,15 @@ export class PickupOrderService {
     if (!fileId) throw new BadRequestException('PRINT_FILE_NOT_FOUND')
     const file = await this.prisma.fileObject.findFirst({
       where: { id: fileId, endUserId: order.endUserId, deletedAt: null },
-      select: { status: true, expiresAt: true, purpose: true },
+      select: { status: true, expiresAt: true },
     })
     if (!file || file.status !== 'active' || (file.expiresAt && file.expiresAt <= new Date())) {
       throw new BadRequestException({ error: { code: 'PRINT_FILE_EXPIRED', message: '打印文件已失效，请重新上传' } })
     }
+    // 不再复查隐私检查任务。云打印单和材料包建单时已经强制检查完成、没有待确认项，并绑上文件摘要；
+    // 检查记录 24 小时就会清掉，到机码可以留 7 天，取件人在一体机上补不了这一步。
+    // 摘要建成后不再改写，所以这里只复核内容没被换过。一体机直接打印不走这里。
     await assertFileContentIntegrity({ prisma: this.prisma, storage: this.storage, fileId })
-    if (['print_doc', 'resume_upload', 'resume_scan'].includes(file.purpose)) {
-      await assertPiiScanned({
-        prisma: this.prisma,
-        fileId,
-        requireCompleted: true,
-        missingMessage: '打印隐私检查尚未完成',
-        pendingMessage: '打印隐私检查尚未完成',
-      })
-    }
   }
 
   private requirePaymentSession(order: OrderRecord, token: string | undefined) {

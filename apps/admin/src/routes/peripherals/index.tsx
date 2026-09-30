@@ -5,6 +5,7 @@
 // 本页只读：不做外设配置，也不提供任何远程解除扫描锁死的入口。
 // U 盘、扫码枪、摄像头、读卡器云端没有遥测，统一写「不上报」，不伪造状态。
 
+import { formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { useMemo, useState } from 'react'
 import { mergeById, useRefreshable } from '@ai-job-print/refresh'
 import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
@@ -30,14 +31,7 @@ const COLUMNS = ['终端', '打印机', '面板扫描到本机目录', '有线�
 
 function relativeTime(iso: string | null): string {
   if (!iso) return '从未上报'
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return '—'
-  const diffMin = Math.floor((Date.now() - t) / 60_000)
-  if (diffMin < 1) return '刚刚'
-  if (diffMin < 60) return `${diffMin} 分钟前`
-  const hours = Math.floor(diffMin / 60)
-  if (hours < 24) return `${hours} 小时前`
-  return `${Math.floor(hours / 24)} 天前`
+  return formatRelativeTime(iso)
 }
 
 function SummaryTile({ label, count, tone }: { label: string; count: number; tone: 'error' | 'warning' | 'neutral' }) {
@@ -231,7 +225,7 @@ export default function PeripheralsPage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-xs">
                       <p className="font-mono text-neutral-700">{t.agentVersion ?? '版本未上报'}</p>
-                      <p className={t.online ? 'text-neutral-500' : 'font-semibold text-error-fg'}>
+                      <p className={t.online ? 'text-neutral-500' : 'font-semibold text-error-fg'} title={t.lastHeartbeatAt ? formatDateTime(t.lastHeartbeatAt) : undefined}>
                         {t.online ? relativeTime(t.lastHeartbeatAt) : `离线 · ${relativeTime(t.lastHeartbeatAt)}`}
                       </p>
                     </td>

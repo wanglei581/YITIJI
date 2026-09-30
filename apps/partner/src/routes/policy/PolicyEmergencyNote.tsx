@@ -1,4 +1,4 @@
-import { RECRUITMENT_EMERGENCY_REASON_LABELS, type RecruitmentEmergencyReasonCode } from '@ai-job-print/shared'
+import { formatDateTime, RECRUITMENT_EMERGENCY_REASON_LABELS, type RecruitmentEmergencyReasonCode } from '@ai-job-print/shared'
 import { LockIcon } from 'lucide-react'
 import type { PartnerPolicyRecord } from '../../services/api/policies'
 
@@ -9,9 +9,8 @@ function reasonLabel(code: string | null | undefined): string {
 
 function fmtTime(iso: string | null | undefined): string | null {
   if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleString('zh-CN', { hour12: false })
+  const formatted = formatDateTime(iso, { fallback: '' })
+  return formatted || null
 }
 
 /**

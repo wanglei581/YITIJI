@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangleIcon, InfoIcon, PrinterIcon, ScaleIcon, ShieldCheckIcon } from 'lucide-react'
 import { getPublishedPolicies, type PolicyPostView, type PublishedPoliciesResult } from '../../services/api/policies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
+import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
@@ -12,7 +13,7 @@ import { BUILTIN_GUIDES } from './builtinData'
 import { OfficialEntryQrOverlay, RqDeadEnd, SourceLine, TabBar, type DeadEndExit, type SourceQrTarget } from './components'
 import { PolicyPanel } from './PolicyPanel'
 import { PolicyFocusDeadEnd } from './policyFocus'
-import { usePolicyFocus } from './usePolicyFocus'
+import { usePolicyActionGuard, usePolicyFocus } from './usePolicyFocus'
 import { EligibilityPanel, type EligibilityChrome } from './EligibilityPanel'
 import { SocialPanel } from './SocialPanel'
 import { RegisterPanel } from './RegisterPanel'
@@ -57,32 +58,14 @@ export function RenshiPage() {
     setSearchParams(next, { replace: true })
   }
 
-  const isBuiltin = (id: string) => id.startsWith('builtin-')
-  const handlePolicyItemOpened = (item: PolicyItem) => {
-    if (isBuiltin(item.id)) return
-    recordBrowse(getToken(), 'policy', item.id)
-  }
-  const handlePolicyItemEntry = (item: PolicyItem, target: SourceQrTarget) => {
-    if (!item.officialUrl) return
-    if (!isBuiltin(item.id)) recordExternalJump(getToken(), 'policy', item.id, 'external_open')
-    setQrEntry(target)
-  }
-  const handleNoticeOpened = (policy: PolicyPostView) => {
-    recordBrowse(getToken(), 'policy', policy.id)
-  }
-  const handleNoticeEntry = (policy: PolicyPostView, target: SourceQrTarget) => {
-    if (!policy.externalUrl) return
-    recordExternalJump(getToken(), 'policy', policy.id, 'external_open')
-    setQrEntry(target)
-  }
-
   const [guides, setGuides] = useState<PolicyPostView[]>([])
   const [guideTotal, setGuideTotal] = useState(0)
   const [notices, setNotices] = useState<PolicyPostView[]>([])
   const [noticeTotal, setNoticeTotal] = useState(0)
   const [policyState, setPolicyState] = useState<'loading' | 'error' | 'ready'>('loading')
+  const withdrawnIds = useRef(new Set<string>())
 
-  const loadPolicies = useCallback(() => {
+  const loadPolicies = useCallback((mode: 'block' | 'quiet' = 'block') => {
     const mergePolicyResults = (chunks: PublishedPoliciesResult[]): PublishedPoliciesResult => {
       const byId = new Map<string, PolicyPostView>()
       let total = 0
@@ -92,7 +75,8 @@ export function RenshiPage() {
       }
       return { items: [...byId.values()], total }
     }
-    setPolicyState('loading')
+    if (mode !== 'quiet') setPolicyState('loading')
+    const keep = (items: PolicyPostView[]) => items.filter((item) => !withdrawnIds.current.has(item.id))
     const guideReq = audience === 'all'
       ? getPublishedPolicies({ kind: 'policy_guide' })
       : Promise.all([
@@ -101,16 +85,20 @@ export function RenshiPage() {
         ]).then((chunks) => mergePolicyResults(chunks))
     Promise.all([guideReq, getPublishedPolicies({ kind: 'notice' })])
       .then(([guideRes, noticeRes]) => {
-        setGuides(guideRes.items)
-        setGuideTotal(guideRes.total)
-        setNotices(noticeRes.items)
-        setNoticeTotal(noticeRes.total)
+        const nextGuides = keep(guideRes.items)
+        const nextNotices = keep(noticeRes.items)
+        setGuides(nextGuides)
+        setGuideTotal(Math.max(0, guideRes.total - (guideRes.items.length - nextGuides.length)))
+        setNotices(nextNotices)
+        setNoticeTotal(Math.max(0, noticeRes.total - (noticeRes.items.length - nextNotices.length)))
         setPolicyState('ready')
       })
-      .catch(() => setPolicyState('error'))
+      .catch(() => {
+        if (mode !== 'quiet') setPolicyState('error')
+      })
   }, [audience])
 
-  useEffect(() => { loadPolicies() }, [loadPolicies])
+  useEffect(() => { loadPolicies('block') }, [loadPolicies])
 
   const focusId = (searchParams.get('policy') ?? '').trim() || null
   const focus = usePolicyFocus({
@@ -122,6 +110,58 @@ export function RenshiPage() {
     setNotices,
     setSearchParams,
   })
+  const reloadQuiet = useCallback(() => { loadPolicies('quiet') }, [loadPolicies])
+  const guard = usePolicyActionGuard({
+    focusId,
+    setGuides,
+    setNotices,
+    setSearchParams,
+    reloadQuiet,
+    withdrawnIds,
+  })
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const uploadTarget = focus.phase === 'idle' ? activeId : null
+
+  async function uploadOwn(id: string | null) {
+    const result = await guard.confirm(id)
+    if (result.kind === 'blocked') return
+    navigate('/print/upload')
+  }
+  async function openPublishedSource(
+    item: { id: string; title: string; sourceName: string },
+    target: SourceQrTarget,
+  ) {
+    const result = await guard.confirm(item.id)
+    if (result.kind !== 'ready') return
+    const url = result.policy.externalUrl?.trim() ?? ''
+    if (!url || !isValidSourceUrl(url)) return
+    if (!isBuiltin(item.id)) recordExternalJump(getToken(), 'policy', item.id, 'external_open')
+    setQrEntry({
+      title: result.policy.title || item.title,
+      url,
+      sourceKind: target.sourceKind,
+      sourceDetail: result.policy.sourceName || item.sourceName,
+    })
+  }
+  const isBuiltin = (id: string) => id.startsWith('builtin-')
+  const handlePolicyItemOpened = (item: PolicyItem) => {
+    if (isBuiltin(item.id)) return
+    recordBrowse(getToken(), 'policy', item.id)
+  }
+  const handlePolicyItemEntry = (item: PolicyItem, target: SourceQrTarget) => {
+    if (isBuiltin(item.id)) {
+      if (!item.officialUrl || !isValidSourceUrl(item.officialUrl)) return
+      setQrEntry(target)
+      return
+    }
+    void openPublishedSource({ id: item.id, title: item.title, sourceName: item.sourceName }, target)
+  }
+  const handleNoticeOpened = (policy: PolicyPostView) => {
+    recordBrowse(getToken(), 'policy', policy.id)
+  }
+  const handleNoticeEntry = (policy: PolicyPostView, target: SourceQrTarget) => {
+    void openPublishedSource({ id: policy.id, title: policy.title, sourceName: policy.sourceName }, target)
+  }
   const focusOnList = focus.phase !== 'idle' && (activeTab === 'policy' || activeTab === 'notice')
   const leaveFocusedPolicy = () => {
     setSearchParams((prev) => {
@@ -287,12 +327,12 @@ export function RenshiPage() {
               <div ref={setEligHost} className="rq-cta-host" />
             ) : readFailed ? (
               <>
-                <button type="button" className="qx-btn" data-variant="primary" onClick={loadPolicies}>重新读取</button>
+                <button type="button" className="qx-btn" data-variant="primary" onClick={() => loadPolicies('block')}>重新读取</button>
                 <span className="why">重试会先回到读取中，本机不把「点了重试」直接显示成读取成功。</span>
               </>
             ) : activeTab === 'policy' ? (
               <>
-                <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
+                <button type="button" className="qx-btn" data-variant="primary" data-upload-target={uploadTarget ?? ''} onClick={() => uploadOwn(uploadTarget)}>
                   <PrinterIcon aria-hidden="true" />
                   上传自备材料打印
                 </button>
@@ -320,7 +360,7 @@ export function RenshiPage() {
               </>
             ) : (
               <>
-                <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
+                <button type="button" className="qx-btn" data-variant="primary" data-upload-target={uploadTarget ?? ''} onClick={() => uploadOwn(uploadTarget)}>
                   <PrinterIcon aria-hidden="true" />
                   上传自备材料打印
                 </button>
@@ -355,6 +395,11 @@ export function RenshiPage() {
           <TabBar active={activeTab} onChange={setActiveTab} />
         </div>
         <div className="qx-scroll rq-scroll">
+          {guard.message && focus.phase === 'idle' && (activeTab === 'policy' || activeTab === 'notice') ? (
+            <p className="rq-note rq-note-warn" role="status" data-testid="renshi-policy-action" data-action-phase={guard.phase}>
+              {guard.message}
+            </p>
+          ) : null}
           {activeTab === 'policy' && (
             policyState === 'loading' ? loadingDeadEnd : policyState === 'error' ? errorDeadEnd : focus.phase !== 'idle' ? (
               <PolicyFocusDeadEnd phase={focus.phase} onOthers={leaveFocusedPolicy} onFavorites={() => navigate('/me/favorites')} onRetry={focus.retry} />
@@ -364,8 +409,14 @@ export function RenshiPage() {
                 guideItems={BUILTIN_GUIDES}
                 audience={audience}
                 focusId={focusId}
-                onAudienceChange={setAudience}
+                suppressAutoOpen={guard.suppressAutoOpen}
+                onAudienceChange={(key) => {
+                  guard.release()
+                  setAudience(key)
+                }}
                 onOpened={handlePolicyItemOpened}
+                onActiveId={setActiveId}
+                onUpload={(id) => { void uploadOwn(id) }}
                 onOfficialEntry={handlePolicyItemEntry}
                 aiLabel={AI_LABEL}
                 aiDraft={AI_DRAFT.policy}
@@ -377,7 +428,16 @@ export function RenshiPage() {
             policyState === 'loading' ? loadingDeadEnd : policyState === 'error' ? errorDeadEnd : focus.phase !== 'idle' ? (
               <PolicyFocusDeadEnd phase={focus.phase} onOthers={leaveFocusedPolicy} onFavorites={() => navigate('/me/favorites')} onRetry={focus.retry} />
             ) : (
-              <NoticePanel notices={notices} focusId={focusId} onOpened={handleNoticeOpened} onOfficialEntry={handleNoticeEntry} onTab={setActiveTab} />
+              <NoticePanel
+                notices={notices}
+                focusId={focusId}
+                suppressAutoOpen={guard.suppressAutoOpen}
+                onOpened={handleNoticeOpened}
+                onActiveId={setActiveId}
+                onUpload={(id) => { void uploadOwn(id) }}
+                onOfficialEntry={handleNoticeEntry}
+                onTab={setActiveTab}
+              />
             )
           )}
           {activeTab === 'social' && <SocialPanel onOfficialEntry={setQrEntry} />}

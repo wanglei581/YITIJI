@@ -426,10 +426,10 @@ async function main(): Promise<void> {
     return { orderId: order.id, taskId: printed.taskId, token: printed.paymentSessionToken, amountCents: order.amountCents }
   }
 
-  async function orderState(orderId: string): Promise<{ payStatus: string; paymentSource: string | null; payChannel: string | null; pickupCode: string | null }> {
+  async function orderState(orderId: string): Promise<{ payStatus: string; paymentSource: string | null; payChannel: string | null; pickupCode: string | null; pickupCodeHash: string | null }> {
     const o = await prisma.order.findUnique({ where: { id: orderId } })
     if (!o) fail('order missing')
-    return { payStatus: o.payStatus, paymentSource: o.paymentSource, payChannel: o.payChannel, pickupCode: o.pickupCode }
+    return { payStatus: o.payStatus, paymentSource: o.paymentSource, payChannel: o.payChannel, pickupCode: o.pickupCode, pickupCodeHash: o.pickupCodeHash }
   }
 
   async function taskStatus(taskId: string): Promise<string> {
@@ -748,9 +748,10 @@ async function main(): Promise<void> {
       paidA.payStatus === 'paid' &&
       paidA.paymentSource === 'wechat' &&
       paidA.payChannel === 'wechat' &&
-      Boolean(paidA.pickupCode)
+      paidA.pickupCode == null &&
+      paidA.pickupCodeHash == null
     ) {
-      pass('wechat 成功回调：paid + paymentSource=wechat + payChannel + pickupCode')
+      pass('wechat 成功回调：paid + paymentSource=wechat + payChannel，现打现取不铸取件码')
     } else {
       fail(`wechat success mishandled: ${JSON.stringify(paidA)}`)
     }
@@ -849,9 +850,11 @@ async function main(): Promise<void> {
       aliOkRes.ack?.contentType === 'text/plain' &&
       paidB.payStatus === 'paid' &&
       paidB.paymentSource === 'alipay' &&
+      paidB.pickupCode == null &&
+      paidB.pickupCodeHash == null &&
       (await taskStatus(B.taskId)) === 'pending'
     ) {
-      pass('alipay TRADE_SUCCESS：paid + paymentSource=alipay + ack=success + PrintTask 不受影响')
+      pass('alipay TRADE_SUCCESS：paid + paymentSource=alipay + 不铸取件码 + ack=success + PrintTask 不受影响')
     } else {
       fail(`alipay success mishandled: ${JSON.stringify({ aliOkRes, paidB })}`)
     }

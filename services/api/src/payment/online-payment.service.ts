@@ -133,7 +133,7 @@ export interface PayStatusView {
   payChannel: string | null
   amountCents: number
   paidAt: string | null
-  /** 仅 paid 且按 pickupCodeVisibleFor 可见时返回。 */
+  /** 有哈希且按 pickupCodeVisibleFor 可见时才返回。现场单没有哈希，不下发。 */
   pickupCode: string | null
   attempt: {
     attemptId: string
@@ -549,7 +549,7 @@ export class OnlinePaymentService {
       payChannel: order.payChannel,
       amountCents: order.amountCents,
       paidAt: order.paidAt?.toISOString() ?? null,
-      pickupCode: visible ? order.pickupCode : null,
+      pickupCode: visible && order.pickupCodeHash ? order.pickupCode : null,
       attempt: latest
         ? {
             attemptId: latest.id,
