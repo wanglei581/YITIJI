@@ -511,7 +511,15 @@ assert.match(
 )
 
 const printUploadPage = read('src/pages/print/PrintUploadPage.tsx')
-const printUploadView = read('src/pages/print/file-source/FileSourceView.tsx')
+// 2026-09-30：青序 2.0 终版 12 把各通道正文从 FileSourceView 拆到同目录的 *Body / Parts 文件
+// （View 已 700+ 行）。「视图」按整个视图层算：壳层 + 各通道正文 + 版式积木，断言一条不删。
+const printUploadView = [
+  'src/pages/print/file-source/FileSourceView.tsx',
+  'src/pages/print/file-source/FileSourceLocalBody.tsx',
+  'src/pages/print/file-source/FileSourcePhoneBody.tsx',
+  'src/pages/print/file-source/FileSourceUsbBody.tsx',
+  'src/pages/print/file-source/FileSourceParts.tsx',
+].map(read).join('\n')
 const printUploadBits = read('src/pages/print/file-source/FileSourceBits.tsx')
 const printUpload = `${printUploadPage}\n${printUploadView}\n${printUploadBits}`
 assert.match(

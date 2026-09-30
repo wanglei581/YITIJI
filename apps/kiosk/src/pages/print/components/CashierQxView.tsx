@@ -78,8 +78,10 @@ export function CashierQxView(props: CashierQxViewProps) {
   }
   const copy = copyFor(state, ctx)
   const instrument = INSTRUMENT_STATES.has(state)
-  // 解释卡放在较矮的那一栏（稿 32 的做法）：付款码读取卡比右栏矮，所以 pending-scan 放左栏。
-  const noteInPaycol = !instrument || state === 'pending-scan'
+  // 解释卡放在较矮的那一栏（稿 32 的做法）：付款码读取卡、停止显示的码都比右栏矮，所以这两态放左栏。
+  const noteInPaycol = !instrument || state === 'pending-scan' || state === 'display-expired-reconciling'
+  // 到账进度占了通栏之后，左栏只剩核实入口：金额卡跟到左栏，右栏只放订单信息，两栏配平。
+  const amountInPaycol = state === 'awaiting-code-confirmation' || state === 'pending-verification'
   const pickersEnabled = PICKERS_ENABLED.has(state) && !props.selectionLocked
   const activeMethod = props.displayedPaymentMethod
     ?? (props.snapshot?.attempt ? (props.snapshot.attempt.qrCodeContent === null ? 'code' : 'qr') : null)
@@ -111,27 +113,40 @@ export function CashierQxView(props: CashierQxViewProps) {
           note={pickerNote(state, free, props.channels.length)}
         />
 
-        <section className="cashier-qx-state" data-kind={copy.kind}>
-          <h2 className="cashier-qx-state-h">
+        {/* 稿 32：屏上收款码、出示付款码两态没有状态块 —— 付款列本身就是这一屏要说的话，
+            小青意图带与底部事实说明条已经讲了「以实际结果为准、请勿重复付款」。 */}
+        {state === 'pending-qr' || state === 'pending-scan' ? null : state === 'display-expired-reconciling' ? (
+          // 稿 32：到期核验态顶部只有一句横幅；完整解释在下面的「请勿重复付款」块，不在这里讲第二遍。
+          <p className="cashier-qx-bignote" role="status">
             {copy.icon}
-            <span className="qx-state-t">{copy.title}</span>
-          </h2>
-          {copy.paras.map((para, index) => <p key={index} className="cashier-qx-p">{para}</p>)}
-          {copy.chips.length > 0 ? (
-            <div className="cashier-qx-chips">
-              {copy.chips.map(([tone, text]) => <span key={text} className="cashier-qx-chip" data-tone={tone}>{text}</span>)}
-            </div>
-          ) : null}
-        </section>
+            <span className="qx-state-t">正在确认付款结果，请勿重复支付。</span>
+          </p>
+        ) : (
+          <section className="cashier-qx-state" data-kind={copy.kind}>
+            <h2 className="cashier-qx-state-h">
+              {copy.icon}
+              <span className="qx-state-t">{copy.title}</span>
+            </h2>
+            {copy.paras.map((para, index) => <p key={index} className="cashier-qx-p">{para}</p>)}
+            {copy.chips.length > 0 ? (
+              <div className="cashier-qx-chips">
+                {copy.chips.map(([tone, text]) => <span key={text} className="cashier-qx-chip" data-tone={tone}>{text}</span>)}
+              </div>
+            ) : null}
+          </section>
+        )}
+
+        {state === 'awaiting-code-confirmation' || state === 'pending-verification' ? <ProgressSteps state={state} /> : null}
 
         {state === 'no-order' ? null : (
           <section className="cashier-qx-paywrap">
             <div className="cashier-qx-paycol">
               {instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
+              {instrument && amountInPaycol ? <AmountCard {...props} free={free} /> : null}
               {noteInPaycol ? <SideNote state={state} ctx={ctx} /> : null}
             </div>
             <div className="cashier-qx-side">
-              {instrument ? <AmountCard {...props} free={free} /> : null}
+              {instrument && !amountInPaycol ? <AmountCard {...props} free={free} /> : null}
               <OrderInfo {...props} channelLabel={label} rows={copy.rows} />
               {noteInPaycol ? null : <SideNote state={state} ctx={ctx} />}
             </div>
@@ -299,16 +314,13 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
 /** 付款列：真实屏上码 / 扫码器读付款码 / 已失效的码，全部由 CashierPaymentPanel 按服务端快照渲染。 */
 function Instrument(props: CashierQxViewProps & { ctx: CopyContext }) {
   const { state } = props
-  const waiting = state === 'awaiting-code-confirmation' || state === 'pending-verification'
   return (
     <>
-      {waiting ? <ProgressSteps state={state} /> : null}
       <div className={`cashier-qx-instrument${state === 'pending-scan' ? ' cashier-qx-hid' : ''}`} data-live={state === 'pending-qr' || state === 'pending-scan' ? 'true' : undefined}>
         <CashierPaymentPanel
           titleShownByPage
           terminalTitle={TERMINAL_CARD[state]?.[0]}
           terminalDescription={TERMINAL_CARD[state]?.[1]}
-          terminalActionShownByPage={state === 'expired' || state === 'attempt-failed'}
           paymentMethod={props.paymentMethod}
           attemptPaymentMethod={props.snapshot?.attempt?.qrCodeContent === null ? 'code' : props.snapshot?.attempt ? 'qr' : null}
           snapshot={props.snapshot}
@@ -333,7 +345,7 @@ function Instrument(props: CashierQxViewProps & { ctx: CopyContext }) {
   )
 }
 
-/** 到账进度（稿 37 confirming）。三步的状态只由「已有支付尝试、尚未 paid」这两个服务端事实推出。 */
+/** 到账进度（稿 37 confirming，9/28 改成通栏横条）。三步的状态只由「已有支付尝试、尚未 paid」这两个服务端事实推出。 */
 function ProgressSteps({ state }: { state: CashierQxState }) {
   const steps = [
     { title: '付款码已提交', desc: '这次付款已经送出去了', status: 'done', text: '已提交' },
@@ -346,7 +358,7 @@ function ProgressSteps({ state }: { state: CashierQxState }) {
     { title: '确认已付后才出纸', desc: '只有确认已付才会创建打印任务', status: 'todo', text: '未开始' },
   ] as const
   return (
-    <section className="cashier-qx-group" aria-label="到账进度">
+    <section className="cashier-qx-group cashier-qx-progress" aria-label="到账进度">
       <h3>到账进度</h3>
       <ol className="cashier-qx-steps">
         {steps.map((step, index) => (
@@ -392,11 +404,12 @@ function SideNote({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
   )
 }
 
-/** 收尾卡（稿 32 closerScan / closerCard）：吸收竖屏余量，只放判定依据与三条通用动作。 */
+/** 稿 32 的收尾位：通用的「接下来怎么办 / 付款提示」收尾卡稿里已整块隐藏（9/28 留白，内容与顶部三步、
+ *  底部事实说明条重复），所以这里只留两种真有话要说的：没有订单时的空状态，收款码到期核验时的「请勿重复付款」。 */
 function Closure({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
   if (state === 'no-order') {
     return (
-      <section className="cashier-qx-closure qx-grow" aria-label="没有订单上下文">
+      <section className="cashier-qx-closure" data-closure="no-order" aria-label="没有订单上下文">
         <div className="cashier-qx-empty">
           <span className="cashier-qx-empty-ic"><FileXIcon aria-hidden="true" /></span>
           <span>没有订单上下文。<br /><b>这里不显示金额，也不出码 —— 出一张扫不通的码只会让你白扫。</b></span>
@@ -406,38 +419,17 @@ function Closure({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
   }
   if (state === 'display-expired-reconciling') {
     return (
-      <section className="cashier-qx-state cashier-qx-closure qx-grow" data-kind="warn" aria-label="请勿重复付款">
+      <section className="cashier-qx-state cashier-qx-closure" data-closure="reconciling" data-kind="warn" aria-label="请勿重复付款">
         <h2 className="cashier-qx-state-h"><AlertTriangleIcon aria-hidden="true" />请勿重复付款</h2>
         <p className="cashier-qx-p">结果未确认前再次付款，可能产生重复扣款。仍未更新时请查看{ctx.label || '支付'}账单。</p>
-        <div className="cashier-qx-chips" style={{ marginTop: 'auto' }}>
+        <div className="cashier-qx-chips">
           <span className="cashier-qx-chip" data-tone="warn">正在确认</span>
           <span className="cashier-qx-chip" data-tone="bad">勿重复支付</span>
         </div>
       </section>
     )
   }
-  const scan = state === 'pending-qr' || state === 'pending-scan'
-  const basis = scan
-    ? state === 'pending-qr'
-      ? '支付尝试已经创建。请勿切换方式、重复付款或重新下单。'
-      : '读满十八位并提交后才会向支付平台发起；在那之前仍可改回屏幕上的码或更换通道。'
-    : state === 'free-order' || state === 'release-failed'
-      ? '本次只恢复或创建打印任务，不进入收款流程。'
-      : state === 'paid'
-        ? '付款已经确认；接下来去打印进度页查看出纸。'
-        : '请按页面提示处理；支付结果长时间未更新时，先查看支付账单。'
-  const flow = scan
-    ? [['1. 核对金额', '只认当前订单返回的实际金额。'], ['2. 只操作一次', '请勿重复扫码或重复出示手机付款码。'], ['3. 等待结果确认', '付款码不会完整显示或保存在这台机器上。']]
-    : [['1. 看清本页结果', '先确认是等待、成功、失败、关闭还是退款。'], ['2. 不重复付款', '结果异常或长时间未更新时，先查看支付账单。'], ['3. 按底部按钮继续', '当前可用的处理动作已经放在屏幕下方。']]
-  return (
-    <section className="cashier-qx-closure qx-grow" aria-label={scan ? '付款提示' : '接下来怎么办'}>
-      <h2>{scan ? '付款提示' : '接下来怎么办'}</h2>
-      <p className="cashier-qx-p">{basis}</p>
-      <ol className="cashier-qx-flow">
-        {flow.map(([title, desc]) => <li key={title}><b>{title}</b><span>{desc}</span></li>)}
-      </ol>
-    </section>
-  )
+  return null
 }
 
 /* ── 底部：禁用原因 / 操作条 / 事实说明条（稿 32 .cta-reason + .ctabar + .truth）── */

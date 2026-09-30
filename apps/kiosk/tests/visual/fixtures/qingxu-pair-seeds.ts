@@ -8,7 +8,7 @@ import {
   registerMemberLogin,
   seedPrintFlow,
 } from './kiosk-p1-evidence-capture-api'
-import { seedPrintHandoff, setReactRouterState, W2_FILE, W2_MATERIAL_CHECK, W2_ORDER, writeScanWorkbenchSession } from './fusion-w2-state'
+import { seedPrintHandoff, setReactRouterState, W2_FILE, W2_MATERIAL_CHECK, W2_ORDER, W2_PRINT_PARAMS, writeScanWorkbenchSession } from './fusion-w2-state'
 import type { QingxuPairTarget, RuntimePlan } from './qingxu-pair-targets'
 
 export interface PriorityPlan {
@@ -386,7 +386,16 @@ async function openCashier(page: Page, api: ApiRouter, state: string): Promise<v
     amountCents: state === 'free-order' ? 0 : W2_ORDER.amountCents,
     paymentSessionToken: state === 'session-expired' ? undefined : W2_ORDER.paymentSessionToken,
     source: 'document',
-    priceLines: [],
+    // 真实流程从确认页带着文件、参数和价目明细进来；空着的话订单信息只剩三行，看起来像坏了。
+    file: W2_FILE,
+    params: W2_PRINT_PARAMS,
+    priceLines: [{
+      serviceKey: 'print_bw_page',
+      description: '黑白打印',
+      unitCents: state === 'free-order' ? 0 : W2_ORDER.amountCents / W2_FILE.pages,
+      quantity: W2_FILE.pages,
+      subtotalCents: state === 'free-order' ? 0 : W2_ORDER.amountCents,
+    }],
   }
   if (state === 'channel-loading') {
     api.respondWith('GET', '/api/v1/payment/channels', () => hang())
@@ -407,7 +416,8 @@ async function openCashier(page: Page, api: ApiRouter, state: string): Promise<v
     expiresAt,
   })
   let snapshot = payBody('unpaid')
-  if (state === 'pending-qr') snapshot = payBody('paying', attempt('pending', 'weixin://pair-qr', LATER))
+  // 真实收款码几分钟就到期；给 2099 年会让倒计时显示成几千万分钟。
+  if (state === 'pending-qr') snapshot = payBody('paying', attempt('pending', 'weixin://pair-qr', new Date(Date.now() + 280_000).toISOString()))
   if (state === 'display-expired-reconciling') snapshot = payBody('paying', attempt('pending', 'weixin://pair-qr', '2000-01-01T00:00:00.000Z'))
   if (state === 'expired') snapshot = payBody('paying', attempt('expired', 'weixin://pair-qr', '2000-01-01T00:00:00.000Z'))
   if (state === 'pending-verification') snapshot = payBody('paying', attempt('expired', null, null))
@@ -507,8 +517,8 @@ async function openFulfill(page: Page, api: ApiRouter, state: string): Promise<v
 function uploadFileView() {
   return {
     fileId: 'pair-phone-file',
-    filename: '手机简历.pdf',
-    sizeBytes: 12000,
+    filename: '求职简历-陈思远.pdf',
+    sizeBytes: 1_677_722,
     mimeType: 'application/pdf',
     sha256: 'b'.repeat(64),
     fileExpiresAt: LATER,
@@ -560,7 +570,8 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
         : state === 'phone-cancelled' ? 'cancelled'
           : state === 'phone-expired' ? 'expired'
             : 'pending'
-    installUpload(api, status, state === 'phone-expired' ? '2000-01-01T00:00:00.000Z' : LATER)
+    // 上传码到期时间按真实口径给「现在 + 10 分钟」：给 2099 年会让屏幕上的剩余时间变成几千万分钟。
+    installUpload(api, status, state === 'phone-expired' ? '2000-01-01T00:00:00.000Z' : new Date(Date.now() + 10 * 60_000).toISOString())
     if (state === 'phone-generating') api.respondWith('POST', '/api/v1/upload-sessions', () => hang())
     if (state === 'phone-gen-failed') {
       api.respond('POST', '/api/v1/upload-sessions', { status: 500, json: { error: { code: 'UPLOAD_SESSION_FAILED', message: '二维码生成失败' } } })
@@ -586,13 +597,17 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
         const present = state !== 'usb-wait'
         await json(route, state === 'usb-read-failed' ? 500 : 200, state === 'usb-read-failed'
           ? { error: { code: 'USB_READ_FAILED', message: '读盘失败' } }
-          : { success: true, data: { present, driveLabel: present ? 'PAIRUSB' : null } })
+          : { success: true, data: { present, driveLabel: present ? 'KINGSTON 32G' : null } })
         return
       }
       if (path === '/local/usb/files' && method === 'GET') {
         if (state === 'usb-detecting') { await hang(); return }
-        const files = state === 'usb-empty' ? [] : [{ safeId: 'safe-1', filename: '简历.pdf', extension: 'pdf', sizeBytes: 12000 }]
-        await json(route, 200, { success: true, data: { present: true, driveLabel: 'PAIRUSB', files } })
+        const files = state === 'usb-empty' ? [] : [
+          { safeId: 'safe-1', filename: '个人简历-陈思远.pdf', extension: 'pdf', sizeBytes: 2_516_582 },
+          { safeId: 'safe-2', filename: '证件照-白底.jpg', extension: 'jpg', sizeBytes: 798_720 },
+          { safeId: 'safe-3', filename: '英语四级成绩单.pdf', extension: 'pdf', sizeBytes: 1_205_862 },
+        ]
+        await json(route, 200, { success: true, data: { present: true, driveLabel: 'KINGSTON 32G', files } })
         return
       }
       if (path === '/local/usb/upload' && method === 'POST') {
@@ -607,7 +622,7 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
         }
         await json(route, 200, {
           success: true,
-          data: { fileId: 'pair-usb-file', filename: '简历.pdf', sizeBytes: 12000, mimeType: 'application/pdf', sha256: 'd'.repeat(64), fileUrl: '/api/v1/files/pair-usb-file/content', fileUrlExpiresAt: LATER },
+          data: { fileId: 'pair-usb-file', filename: '个人简历-陈思远.pdf', sizeBytes: 2_516_582, mimeType: 'application/pdf', sha256: 'd'.repeat(64), fileUrl: '/api/v1/files/pair-usb-file/content', fileUrlExpiresAt: LATER },
         })
         return
       }
@@ -621,8 +636,8 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
   if (state === 'local-ready') {
     api.respond('POST', '/api/v1/files/kiosk-upload', envelope({
       fileId: 'pair-local-file',
-      filename: 'sample.pdf',
-      sizeBytes: 128,
+      filename: '求职简历-陈思远.pdf',
+      sizeBytes: 1_843_200,
       mimeType: 'application/pdf',
       sha256: 'c'.repeat(64),
       signedUrl: '/w2-fixtures/sample-visible.pdf',
@@ -647,17 +662,14 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
         node.dispatchEvent(new Event('change', { bubbles: true }))
       })
     } else if (state === 'local-rejected') {
-      await input.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') })
+      await input.setInputFiles({ name: '面试准备笔记.txt', mimeType: 'text/plain', buffer: Buffer.alloc(3_584, 0x61) })
     } else if (state === 'local-unreadable') {
-      await input.setInputFiles({ name: 'empty.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(0) })
+      await input.setInputFiles({ name: '扫描件_0912.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(0) })
     } else if (state === 'local-oversize') {
-      const oversize = '/tmp/qx-pair-oversize.pdf'
-      if (!fs.existsSync(oversize) || fs.statSync(oversize).size <= 15 * 1024 * 1024) {
-        fs.writeFileSync(oversize, Buffer.alloc(15 * 1024 * 1024 + 1, 0x25))
-      }
-      await input.setInputFiles(oversize)
+      // 18.6MB 的扫描件：超过本机 15MB 上限。直接给内存里的内容，不往系统临时目录写文件。
+      await input.setInputFiles({ name: '身份证正反面.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(19_503_513, 0x25) })
     } else {
-      await input.setInputFiles({ name: 'sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.1\n') })
+      await input.setInputFiles({ name: '求职简历-陈思远.pdf', mimeType: 'application/pdf', buffer: Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(1_843_191, 0x20)]) })
     }
   }
   await see(page, `[data-testid="file-source-state-${state}"]`)
@@ -721,7 +733,7 @@ async function openScan(page: Page, api: ApiRouter, state: string): Promise<void
     await page.goto('/scan?stage=start', { waitUntil: 'domcontentloaded' })
     await writeScanWorkbenchSession(page, { stage: 'progress', scanType: 'resume', live })
     await page.goto('/scan?stage=progress', { waitUntil: 'domcontentloaded' })
-    if (state === 'cancelling') await page.getByRole('button', { name: '取消扫描' }).click()
+    if (state === 'cancelling') await page.getByRole('button', { name: '取消这次扫描' }).click()
     await see(page, `[data-state="${state}"]`)
     return
   }

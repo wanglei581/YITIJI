@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
@@ -7,7 +6,6 @@ import {
   FolderIcon,
   HelpCircleIcon,
   InfoIcon,
-  Loader2Icon,
   ScanLineIcon,
   SmartphoneIcon,
   UsbIcon,
@@ -17,12 +15,12 @@ import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/file
 import type { FileSourceScreen, UploadTab } from './fileSourceModel'
 import { FILE_SOURCE_ASK, fileSourceEyebrow } from './fileSourceModel'
 
-export function FileSourceHero({ screen, isResume }: { screen: FileSourceScreen; isResume: boolean }) {
+export function FileSourceHero({ screen, isResume, doing: doingOverride }: { screen: FileSourceScreen; isResume: boolean; doing?: string }) {
   const ask = FILE_SOURCE_ASK[screen]
   const doing =
     isResume && screen === 'source-chooser'
-      ? '上传已有简历，检查后带走打印件。'
-      : ask.doing
+      ? '这里只是把简历文件搬进来打印，不做 AI 诊断 —— 诊断在简历服务那条线上。'
+      : doingOverride ?? ask.doing
   return (
     <section className="fs-hero" data-testid="file-source-hero">
       <div className="fs-hero-row">
@@ -81,17 +79,17 @@ export function FileSourceNote({ children }: { children: ReactNode }) {
   )
 }
 
-export function FileSourceSteps({ title, items }: { title?: string; items: string[] }) {
+export function FileSourceSteps({ title, items, row }: { title?: string; items: ReactNode[]; row?: boolean }) {
   return (
     <div>
       {title ? (
-        <div className="fs-sec-h" style={{ marginBottom: 8 }}>
-          <span className="t" style={{ fontSize: 'var(--qx-fs-body-lg)' }}>{title}</span>
+        <div className="fs-sec-h fs-steps-h">
+          <span className="t">{title}</span>
         </div>
       ) : null}
-      <ol className="fs-steps">
+      <ol className={`fs-steps${row ? ' row' : ''}`}>
         {items.map((item, index) => (
-          <li key={item}>
+          <li key={index}>
             <span className="n">{index + 1}</span>
             <span>{item}</span>
           </li>
@@ -174,7 +172,8 @@ export function NowFileCard({
   previewLabel?: string
 }) {
   return (
-    <div className="qx-card qx-grow" data-testid="file-source-file-card" data-live="true">
+    <section className="fs-sec qx-grow">
+    <div className="qx-card fs-gcard" data-testid="file-source-file-card" data-live="true">
       <div className="fs-now">
         <span className="fs-now-ic"><FileTextIcon size={38} aria-hidden="true" /></span>
         <span className="fs-now-m">
@@ -192,9 +191,8 @@ export function NowFileCard({
       </div>
       <button
         type="button"
-        className="qx-btn"
+        className="qx-btn fs-pvopen"
         data-variant="ghost"
-        style={{ width: '100%', marginTop: 16 }}
         onClick={onPreview}
         data-testid="file-source-preview-open"
         aria-label={`打开完整预览：${name}`}
@@ -202,15 +200,17 @@ export function NowFileCard({
         {previewLabel}
       </button>
       <div className="fs-hr" />
-      <FileSourceNote>本次办理<b>只带这一份</b>。需要打印其他材料时，完成这一份后再选择。</FileSourceNote>
-      <div style={{ marginTop: 10 }}>
-        <FileSourceNote>页数、可打印性和敏感信息检查在<b>下一步（材料检查）</b>做，这一页不预告结论。</FileSourceNote>
+      <div className="fs-notes">
+        <FileSourceNote>本次打印<b>只用这一份</b>，其他文件可稍后再办。</FileSourceNote>
+        <FileSourceNote>下一步做<b>文档识别与隐私预检</b>，再决定怎样打印。</FileSourceNote>
       </div>
       <FileSourceSteps
-        title="下一步「材料检查」会做什么"
-        items={['识别页数，判断这份能不能按当前参数打。', '扫一遍敏感信息，提示你要不要遮挡。', '都过了才进打印参数设置。']}
+        title="检查后再打印"
+        items={['识别文件页数。', '提示可能需要遮挡的隐私内容。', '核对参数与价格，带走打印件。']}
+        row
       />
     </div>
+    </section>
   )
 }
 
@@ -229,7 +229,7 @@ const CHANNEL_COPY: Record<UploadTab, { name: string; desc: string; limit: strin
   },
   usb: {
     name: 'U 盘导入',
-    desc: '插右侧 USB 口，本地服务列出根目录里的文件，你在屏幕上选。',
+    desc: '把 U 盘插右侧 USB 口，屏幕上会列出盘里的文件，直接选。',
     limit: 'PDF / JPG / PNG · 单份 ≤ 15MB',
     tone: 'slate',
   },
@@ -253,15 +253,15 @@ export function ChannelGrid({
         const disabled = key === 'usb' && usbMode !== 'ok'
         const desc =
           key === 'usb' && usbMode === 'unavailable'
-            ? '本机暂未开通 U 盘导入，请改用手机上传。'
+            ? '这台机器没有开通 U 盘导入，所以这条通道不能用。'
             : key === 'usb' && usbMode === 'offline'
-              ? '暂时无法读取 U 盘，可以重新连接或改用手机上传。'
+              ? '这台机器读 U 盘的功能装好了，但此刻没连上。和「没开通」不是一回事。'
               : copy.desc
         const limit =
           key === 'usb' && usbMode === 'unavailable'
-            ? '本机暂未开通'
+            ? '本机没开通 · 重试也没用'
             : key === 'usb' && usbMode === 'offline'
-              ? '暂时无法读取 · 可以重试'
+              ? '暂时没连上 · 可以重试'
               : copy.limit
         const note =
           key === 'file' ? '电脑文件' : key === 'qr' ? '一体机首选' : usbMode === 'unavailable' ? '暂未开通' : undefined
@@ -310,13 +310,13 @@ export function ExistingSourceLinks({
       <div className="fs-sec-h">
         <span className="no">02</span>
         <span className="t">文件不在手机或 U 盘？</span>
-        <span className="hint">继续准备材料</span>
+        <span className="hint">{showScan ? '两条真实入口' : '一条真实入口'}</span>
       </div>
       <div className="fs-split">
         {showScan ? (
           <button type="button" className="fs-mini" onClick={onScan} data-testid="file-source-scan-source" aria-label="扫描纸质原件">
             <h4><ScanLineIcon size={22} aria-hidden="true" /><span>扫描纸质原件</span></h4>
-            <p>先开始扫描办理，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；网页不能远程启动扫描仪。</p>
+            <p>先开始这次扫描，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；屏幕上启动不了扫描仪。</p>
           </button>
         ) : null}
         <button type="button" className="fs-mini" onClick={onDocuments} data-testid="file-source-member-source" aria-label="从我的文档或最近打印文件选择">
@@ -330,53 +330,23 @@ export function ExistingSourceLinks({
 
 export function HelpMini({ onHelp, text }: { onHelp: () => void; text: string }) {
   return (
-    <button type="button" className="fs-mini" onClick={onHelp} data-testid="file-source-help-link" aria-label="联系工作人员">
-      <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>卡住了？找人帮忙</span></h4>
-      <p>{text}</p>
-    </button>
+    <section className="fs-sec">
+      <button type="button" className="fs-mini" onClick={onHelp} data-testid="file-source-help-link" aria-label="联系工作人员">
+        <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>卡住了？找人帮忙</span></h4>
+        <p>{text}</p>
+      </button>
+    </section>
   )
 }
 
-export function PhoneQrSlot({
-  qrUrl,
-  loading,
-  failed,
-  expiresLabel,
-}: {
-  qrUrl: string | null
-  loading: boolean
-  failed: boolean
-  expiresLabel: string
-}) {
-  if (qrUrl && !loading) {
-    return (
-      <div className="fs-qr-live" data-testid="file-source-qr">
-        <QRCodeSVG value={qrUrl} size={396} level="M" marginSize={1} />
-        <span>
-          {expiresLabel
-            ? `二维码有效期 ${expiresLabel}，文件最大 10MB。`
-            : '文件最大 10MB，请上传后回到这里确认。'}
-        </span>
+/** 稿里那种不带动作的小说明卡（「想换一条来源？」「手机那边可以关了」）。 */
+export function InfoMini({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <section className="fs-sec">
+      <div className="fs-mini" data-static="true">
+        <h4>{icon}<span>{title}</span></h4>
+        <p>{children}</p>
       </div>
-    )
-  }
-  return (
-    <div className="fs-qr-blank" data-testid="file-source-qr">
-      {loading ? <Loader2Icon size={36} aria-hidden="true" /> : null}
-      <strong>{failed ? '码没出来' : '码还没出来'}</strong>
-      <span>
-        {failed
-          ? '请重新生成二维码，或换一种上传方式。'
-          : '正在准备上传二维码，请稍候。'}
-      </span>
-    </div>
-  )
-}
-
-export function FileSourceTruth() {
-  return (
-    <div className="fs-truth" data-testid="file-source-truth">
-      <p>结束办理或闲置超时会清除本机临时信息；已上传文件按留存期限管理。</p>
-    </div>
+    </section>
   )
 }

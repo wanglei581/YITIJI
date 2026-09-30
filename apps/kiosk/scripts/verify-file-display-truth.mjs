@@ -104,6 +104,11 @@ const uploadModule = [
   uploadSrc,
   read('src/pages/print/file-source/FileSourceView.tsx'),
   read('src/pages/print/file-source/FileSourceBits.tsx'),
+  // 2026-09-30 终版 12：各通道正文拆到同目录（U 盘列表、被挡文件、手机待确认文件、当前文件都在里面）
+  read('src/pages/print/file-source/FileSourceLocalBody.tsx'),
+  read('src/pages/print/file-source/FileSourcePhoneBody.tsx'),
+  read('src/pages/print/file-source/FileSourceUsbBody.tsx'),
+  read('src/pages/print/file-source/FileSourceParts.tsx'),
   read('src/pages/print/components/PrintPreviewPanel.tsx'),
 ].join('\n')
 const fmtMatch = uploadSrc.match(/function formatBytes\(bytes: number\): string \{([\s\S]*?)\n\}/)

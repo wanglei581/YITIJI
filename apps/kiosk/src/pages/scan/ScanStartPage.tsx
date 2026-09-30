@@ -16,7 +16,7 @@ import {
   ScanTypeCards,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
-import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import { patchScanWorkbenchSession, readScanWorkbenchSession } from './scanWorkbenchSession'
 
@@ -27,7 +27,7 @@ const CAPABILITY_STATUS_NOTES: Record<string, string> = {
   testing: '测试中，暂未对用户开放',
   maintenance: '维护中，暂时不可用',
   unsupported: '本终端不支持该能力',
-  not_verified: '待验收，暂未开放',
+  not_verified: '还在确认中，暂未开放',
 }
 
 function resolveGate(scanCap: ConfiguredCapability | undefined, loadStatus: 'ok' | 'skipped' | 'error'): ScanGate {
@@ -88,7 +88,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           ? { tone: 'bad' as const, label: '扫描能力暂未开放' }
           : gate === 'unknown'
             ? { tone: 'unknown' as const, label: '能力状态暂不可用' }
-            : { tone: 'ok' as const, label: '可创建扫描任务 · 需面板操作' }
+            : { tone: 'ok' as const, label: '第 1 步 · 选扫描类型' }
 
   const subtitle = usbPanel
     ? '这是打印机自己的独立能力，不经过屏幕上的扫描流程'
@@ -104,13 +104,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       subtitle={subtitle}
       status={status}
       layout={blocked ? 'spread' : 'stack'}
-      facts={
-        usbPanel
-          ? ['不创建平台任务', '文件只在你的 U 盘', '暂未开通']
-          : blocked
-            ? undefined
-            : ['面板上的扫描入口已准备好，直接按提示操作，不用你填写地址。']
-      }
+      facts={usbPanel || blocked ? undefined : ['这台机器的接收目录已由管理员配好，面板上直接选就行，不用你填任何地址。']}
       ctabar={
         usbPanel ? (
           <ScanCta>
@@ -166,7 +160,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                 navigate('/scan?stage=settings', { state: { scanType: selected } })
               }}
             >
-              下一步 · 建立这次扫描
+              开始这次扫描
             </button>
           </ScanCta>
         )
@@ -175,13 +169,13 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       {usbPanel ? (
         <>
           <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过屏幕上的扫描流程" grow>
-            <div className="sw-grid2">
+            <div className="sw-grid2 is-even">
               <ScanNoteCard
                 title="面板上怎么做"
-                foot="具体菜单名称、可选格式和 USB 接口位置以现场奔图面板为准。"
+                foot="具体菜单名称、可选格式和 USB 插口位置以现场奔图面板为准。"
               >
                 <ScanPlan items={[
-                  '把 U 盘插到打印机支持的 USB 接口。',
+                  '把 U 盘插到打印机支持的 USB 插口。',
                   '在奔图操作面板打开「扫描」，选择「扫描到 U 盘」。',
                   '按面板提示选择文件格式与保存位置，再开始扫描。',
                   '完成后先按面板提示安全结束，再拔出 U 盘。',
@@ -201,8 +195,8 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
             </div>
           </ScanSec>
           <ScanSec no="02" title="完成之后怎么继续" hint="U 盘里的文件要重新导入才能在本机办理">
-            <div className="sw-grid2">
-              <ScanNoteCard title="要打印或继续加工" foot="能不能从 U 盘导入，以这台机器屏幕上的提示为准。">
+            <div className="sw-grid2 is-even">
+              <ScanNoteCard title="要打印或继续加工" foot="导入时以这台机器当时的状态为准。">
                 <p>回到打印扫描，选择<b>U 盘导入</b>。本机只读取你再次选中的文件，不会自动扫描整个 U 盘。</p>
               </ScanNoteCard>
               <ScanNoteCard title="面板没有这个选项" foot="本页不假设所有奔图固件都提供相同菜单。">
@@ -231,7 +225,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
             </p>
           </ScanStatusPanel>
           <ScanSec no="01" title="下一步" hint="扫描之外的路照常可用">
-            <div className="sw-grid2">
+            <div className="sw-grid2 is-even">
               <ScanNoteCard title="你现在还能做什么">
                 <ScanPlan items={[
                   '上传文件打印：手机 / U 盘里的现成文件仍可打印。',
@@ -263,29 +257,25 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
         </>
       ) : (
         <>
-          <ScanSec no="01" title="要扫什么" hint={`扫描服务 · 已选「${SCAN_TYPE_LABELS[selected]}」`}>
-            <ScanTypeCards selected={selected} onPick={setSelected} />
-          </ScanSec>
-          <ScanSec no="02" title="这个流程是这样" hint="四段都走完，文件才到你手上">
+          <ScanSec no="01" title="就这三步" hint="放纸，在打印机面板上按扫描，文件回到这台机器">
             <ScanChain active={-1} />
           </ScanSec>
-          <ScanSec no="03" title="动手之前先看两件事" grow>
-            <div className="sw-grid2">
-              <ScanNoteCard
-                title="为什么屏幕上没有「开始扫描」"
-                foot="合同类材料的扫描从「合同审阅」工作台发起，本屏不重复开口子。"
-              >
-                <p>这台一体机的扫描<b>只能在奔图自己的操作面板上启动</b>，网页不能远程驱动扫描仪。本机负责建立这次扫描、转达系统给出的操作说明、等文件回来。</p>
-                <p>所以这一屏不会有「一键扫描」，也不会有扫到第几张的进度。</p>
+          <ScanSec no="02" title="要扫什么" hint="先选类型，再开始这次扫描">
+            <ScanTypeCards selected={selected} onPick={setSelected} />
+          </ScanSec>
+          <ScanSec no="03" title="动手之前">
+            <div className="sw-grid2 is-even">
+              <ScanNoteCard title="为什么屏幕上没有「开始扫描」" foot="这一页只扫简历、证件和普通文档。">
+                <p>扫描要在<b>打印机自己的面板上按</b>。这一页不能远程开始，也不显示扫到第几张。</p>
               </ScanNoteCard>
               <ScanNoteCard
-                title="扫完之后这份文件能干什么"
-                foot="费用以办理时系统报价与现场规则为准。未登录扫描件不会进入「我的文档」。"
+                title="扫完这份文件能带走什么"
+                foot="彩色和双面这一页不设，到打印那一步看实际显示。"
               >
                 <ScanPlan items={[
-                  '简历扫描件可以进 AI 识别，做诊断与优化。',
-                  '拿去打印：到打印流程重新选定，由系统报价后出纸。',
-                  '留存按文件类型与系统的规则；本屏无登录步骤，匿名件不进「我的文档」。',
+                  '简历可以接着做 AI 识别。',
+                  '拿去打印时，再看实际价格。',
+                  '未登录扫描件不会进入「我的文档」。',
                 ]} />
               </ScanNoteCard>
             </div>

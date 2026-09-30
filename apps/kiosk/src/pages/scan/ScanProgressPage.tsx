@@ -18,18 +18,16 @@ import {
 } from './scanDeliveryAck'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
+import { formatLabelFromMime } from './scanOutputFormat'
 import {
   ScanChain,
   ScanCta,
-  ScanKvCard,
-  ScanNoteCard,
-  ScanPlan,
   ScanSec,
   ScanStatusPanel,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
-import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { ScanProgressNextCards } from './ScanProgressNextCards'
+import { SCAN_CHAIN_LAST, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import {
   patchScanWorkbenchSession,
@@ -347,7 +345,8 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const deliveryAcked = ackState === 'acked'
   const ackRetryable = ackState === 'retryable'
   const matched = deliveryAcked && !error && lastLiveStatus === 'matched'
-  /* 稿 18：只有系统确认收到文件时才显示完成，不替用户猜中间状态。 */
+  /* 稿 18「你现在做到哪一步」：只有系统说「已匹配到回传文件」时才点亮最后一步，
+   * 其余时候面板那两步做到哪本机看不见，三步都不点亮。 */
   const chainHint = cancelling
     ? '取消也可能来不及，以系统为准'
     : !deliveryAcked
@@ -355,10 +354,10 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       : pollInFlight
         ? '查询回来之前，这一屏不改判'
         : error
-          ? '这次没问到，继续等待下一次查询'
+          ? '这次没问到，位置就是不知道'
           : matched
-            ? '系统已收到文件，可以回来确认'
-            : '系统还没收到文件，继续等待'
+            ? '系统已收到文件，还在处理'
+            : '系统还没说收到，面板那两步做到哪本机看不见'
   const workbenchState = cancelling
     ? 'cancelling'
     : !deliveryAcked
@@ -390,9 +389,11 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         ? '请在打印机面板完成扫描；本页每 3 秒自动检测结果'
         : '还没确认这台机器可以收这一场的文件；确认之前请先别在面板上按开始'}
       status={status}
-      facts={deliveryAcked
-        ? ['面板扫完就回到这台屏幕：本机每隔几秒自动查一次，有结果会自动切过去。']
-        : [SCAN_ACK_PENDING_NOTICE]}
+      facts={!deliveryAcked
+        ? [SCAN_ACK_PENDING_NOTICE]
+        : !cancelling && !pollInFlight && !error
+          ? ['面板扫完就回到这台屏幕：本机每隔几秒自动查一次，有结果会自动切过去。']
+          : undefined}
       ctabar={
         <ScanCta
           reserveReason
@@ -414,7 +415,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             onClick={() => void handleCancel()}
           >
             <XCircleIcon aria-hidden />
-            取消扫描
+            取消这次扫描
           </button>
           {/* 没拿到投递授权时主行动不是「立即检查」——查多少次都不会让它变得可投递。
               这一屏能做的只有再确认一次，所以主行动换成它。 */}
@@ -426,7 +427,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
               disabled={cancelling || pollInFlight}
               onClick={() => pollNowRef.current()}
             >
-              立即检查
+              {cancelling ? '等取消结果' : '立即检查'}
             </button>
           ) : (
             <button
@@ -458,16 +459,23 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
                   : '正在等文件回传'
         }
         breathe={!error && !ackRetryable}
-        chips={deliveryAcked
-          ? [
-              { label: error ? '正在自动重试' : '正在自动检查', tone: error ? 'warn' : 'ok' },
-              { label: `已查询 ${polls} 次` },
-              matched ? { label: '系统：已匹配，仍在处理', tone: 'ok' as const } : { label: '没有页级进度' },
-            ]
-          : [
-              { label: '这次扫描已经建好', tone: 'ok' as const },
-              { label: '投递授权未确认', tone: 'warn' as const },
-            ]}
+        chips={cancelling
+          ? [{ label: '取消结果没到', tone: 'warn' as const }, { label: '不提前下结论' }]
+          : !deliveryAcked
+            ? [
+                { label: '这次扫描已经建好', tone: 'ok' as const },
+                { label: '投递授权未确认', tone: 'warn' as const },
+              ]
+            : pollInFlight
+              ? [{ label: `第 ${polls + 1} 次查询 · 本机自动检查`, tone: 'ok' as const }, { label: '结果没到，不改判' }]
+              : error
+                ? [{ label: `连续未知 ${pollFailsRef.current} 次`, tone: 'warn' as const }, { label: `已查询 ${polls} 次` }, { label: '正在自动重试' }]
+                : [
+                    { label: '正在自动检查', tone: 'ok' as const },
+                    { label: `已查询 ${polls} 次` },
+                    { label: `已等待 ${elapsed}` },
+                    matched ? { label: '系统：已匹配，仍在处理', tone: 'ok' as const } : { label: '没有页级进度' },
+                  ]}
       >
         {!deliveryAcked && !cancelling ? (
           <p data-testid="scan-ack-pending-notice">
@@ -478,8 +486,8 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           </p>
         ) : cancelling ? (
           <>
-            <p>本机正在请系统取消这次扫描。<b>系统没回之前，页面不说已取消</b> —— 取消成不成功由系统定。</p>
-            <p>如果这一刻文件刚好交完，取消就会来不及，那时以系统结果为准。</p>
+            <p>本机正在请求系统取消这次办理。<b>系统没回之前，页面不说已取消</b> —— 取消成不成功由系统定。</p>
+            <p>如果这一刻文件刚好投递完成，取消就会来不及，那时以系统结果为准。</p>
           </>
         ) : pollInFlight ? (
           <>
@@ -488,44 +496,24 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           </>
         ) : error ? (
           <>
-            <p>这一次查询没拿到系统返回的结果：<b>{error}</b>。</p>
+            <p>这一次查询没拿到办理结果：<b>{error}</b>。</p>
             <p><b>查不到不等于扫描失败</b> —— 这一页不改判任务状态，还当它在进行中，下次继续查。</p>
           </>
         ) : (
           <>
-            <p>面板扫完之后，文件会回到这台机器。<b>这中间没有可显示的张数</b>，所以这里只告诉你系统最近一次说了什么、已经查过几次。</p>
-            <p><b>本机正在自动检查</b>：每隔几秒替你问一次系统。想马上知道，点右下角「立即检查」就行。</p>
+            <p>面板扫完之后，文件还要经过本机接收和投递才到系统。<b>这中间没有可显示的张数</b>，所以这里只告诉你系统最近一次说了什么、已经查过几次。</p>
+            <p><b>本机正在自动检查</b>：每隔几秒替你问一次系统，有结果会自动切到对应的那一屏。想马上知道，点右下角「立即检查」就行。</p>
           </>
         )}
       </ScanStatusPanel>
-      <ScanSec no="01" title="流程走到哪一段" hint={chainHint}>
-        <ScanChain active={matched ? 3 : -1} />
+      <ScanSec no="01" title={deliveryAcked && !pollInFlight && !error && !cancelling ? '做到哪一步' : '你现在做到哪一步'} hint={chainHint}>
+        <ScanChain active={matched ? SCAN_CHAIN_LAST : -1} />
       </ScanSec>
-      <ScanSec no="02" title="这次扫描与下一步" hint="这一屏现在能做什么">
-        <div className="sw-grid2">
-          <ScanKvCard
-            title="任务信息"
-            rows={[
-              ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-              ['任务编号', scanTaskId ?? '未创建'],
-              ['开始等待', `已等待 ${elapsed}`],
-              ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-              ['保存策略', '按设备回传的原格式保存，系统不做转换'],
-            ]}
-          />
-          <ScanNoteCard title="这一屏现在会做什么" foot="自动检查只是查一下状态：不会重扫，也不会改变系统里的任何东西。">
-            {/* 指路跟着主按钮走：没拿到投递授权时右下角是「再确认一次」，写「立即检查」就是指向一颗不存在的按钮。 */}
-            <ScanPlan items={deliveryAcked ? [
-              '本机每隔几秒自动查一次，你什么都不用做。',
-              '想马上知道就点「立即检查」，它只是插一次队，不改变结果。',
-              '不想扫了就点「取消扫描」，取消成不成由系统定。',
-            ] : [
-              '本机正在向系统确认：这台机器可以收这一场的文件。',
-              ackRetryable ? '上一次确认没成，点右下角「再确认一次」重来。' : '确认通常就是一两秒，不用你做任何事。',
-              '不想扫了就点「取消扫描」，取消成不成由系统定。',
-            ]} />
-          </ScanNoteCard>
-        </div>
+      <ScanSec no="02" title="下一步" hint="这一屏现在能做什么">
+        <ScanProgressNextCards
+          state={cancelling ? 'cancelling' : !deliveryAcked ? 'awaiting-ack' : pollInFlight ? 'polling' : error ? 'poll-failed' : 'waiting-delivery'}
+          ackRetryable={ackRetryable}
+        />
       </ScanSec>
     </ScanWorkbenchShell>
   )

@@ -1,6 +1,6 @@
 import type { ReactNode, Ref } from 'react'
 import { PrintAiHelp } from '../components/PrintAiHelp'
-import { FileTextIcon, SparklesIcon } from 'lucide-react'
+import { SparklesIcon } from 'lucide-react'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
 import { PrintFilePreviewModal } from '../components/PrintPreviewPanel'
@@ -12,20 +12,10 @@ import {
   type PhoneSessionView,
   type UploadTab,
 } from './fileSourceModel'
-import {
-  ChannelGrid,
-  ExistingSourceLinks,
-  FileRow,
-  FileSourceHero,
-  FileSourceNote,
-  FileSourceReason,
-  FileSourceStatus,
-  FileSourceSteps,
-  FileSourceTruth,
-  HelpMini,
-  NowFileCard,
-  PhoneQrSlot,
-} from './FileSourceBits'
+import { FileSourceHero, FileSourceReason, FileSourceStatus } from './FileSourceBits'
+import { ChooserBody, LocalBody, ReadyBody } from './FileSourceLocalBody'
+import { PhoneBody } from './FileSourcePhoneBody'
+import { UsbBody } from './FileSourceUsbBody'
 import '../styles/file-source-qx.css'
 
 export interface FileSourceViewProps {
@@ -87,20 +77,32 @@ export interface FileSourceViewProps {
   onPhoneRetryStatus: () => void
 }
 
+/** 各通道正文拿到的东西：页面 props 加上几项由本壳层算好的派生值。 */
+export type FileSourceBodyProps = FileSourceViewProps & {
+  channelKeys: UploadTab[]
+  fromLabel: string
+  /** 本机通道此刻收的格式（照片入口只收图片；Word 转换开着时多收 DOC / DOCX）。 */
+  formats: string
+  wordAccepted: boolean
+}
+
 function primaryLabel(screen: FileSourceScreen, isResume: boolean): string {
   if (screen === 'unknown') return '回到来源选择'
-  if (screen === 'local-guide' || screen === 'local-cancelled') return '打开文件窗口'
+  if (screen === 'local-guide') return '打开文件窗口'
+  if (screen === 'local-cancelled') return '再打开一次文件窗口'
   if (screen === 'local-rejected' || screen === 'local-oversize' || screen === 'local-unreadable') return '回窗口再挑一份'
   if (screen === 'local-upload-failed') return '重试上传'
-  if (screen === 'phone-gen-failed' || screen === 'phone-expired' || screen === 'phone-cancelled') return '重新出一张码'
+  if (screen === 'phone-gen-failed') return '重新生成二维码'
+  if (screen === 'phone-expired' || screen === 'phone-cancelled') return '重新出一张码'
   if (screen === 'phone-status-unknown') return '再查一次状态'
   if (screen === 'phone-uploaded') return '确认使用这份文件'
   if (screen === 'phone-confirm-failed') return '重试确认'
   if (screen === 'phone-cancel-failed') return '重试取消'
   if (screen === 'usb-unavailable') return '改用手机扫码上传'
-  if (screen === 'usb-agent-offline') return '重新连接 U 盘'
+  if (screen === 'usb-agent-offline') return '重试读 U 盘'
   if (screen === 'usb-wait') return '我插好了，去读一次'
   if (screen === 'usb-empty' || screen === 'usb-read-failed' || screen === 'usb-safeid-expired' || screen === 'usb-import-failed') {
+    if (screen === 'usb-import-failed') return '重新读盘再选一次'
     return screen === 'usb-empty' ? '换个 U 盘再读一次' : '重新读一次 U 盘'
   }
   if (screen === 'usb-selected') return '导入这一份'
@@ -136,30 +138,59 @@ function primaryEnabled(screen: FileSourceScreen): boolean {
   )
 }
 
-function disabledReason(screen: FileSourceScreen): string | null {
-  if (primaryEnabled(screen) && FILE_SOURCE_HAS_FILE.has(screen)) return null
-  if (FILE_SOURCE_HAS_FILE.has(screen)) return null
-  if (screen === 'local-uploading') return '上传结果还没确认，材料检查按住不放'
-  if (screen === 'phone-generating' || screen === 'phone-ready' || screen === 'phone-waiting') return '还没有文件上来，材料检查按住不放'
-  if (screen === 'phone-uploading') return '文件还在路上，材料检查按住不放'
-  if (screen === 'phone-confirming') return '确认结果还没回来，材料检查按住不放'
-  if (screen === 'phone-cancel-requesting') return '取消结果还没回来，材料检查按住不放'
-  if (screen === 'usb-detecting') return '还在读盘，材料检查按住不放'
-  if (screen === 'usb-list') return '还没选定文件，材料检查按住不放'
-  if (screen === 'usb-importing') return '导入结果还没确认，材料检查按住不放'
-  if (screen === 'source-chooser' || screen === 'missing-file') return '这一步还没有文件，先用上面任一通道把文件搬进来'
-  if (primaryEnabled(screen)) return null
-  return '这一步还没有文件，材料检查按住不放'
+/**
+ * 稿 reasonLine：底部按钮上方那一行，说清「下一步：材料检查」为什么还按住。
+ * 手里已有当前文件的三态没有这行。按钮本身可点（例如「打开文件窗口」）时也照稿显示——
+ * 它说的是材料检查，不是这颗按钮。
+ */
+const FILE_SOURCE_REASON: Record<FileSourceScreen, string | null> = {
+  'source-chooser': '还没有文件，所以「下一步：材料检查」暂时按住不放；先用上面任一通道搬一份进来',
+  'missing-file': '本次办理里没有文件，材料检查按住不放',
+  unknown: '先回到来源选择，再往下走',
+  'local-guide': '还没选文件，材料检查按住不放',
+  'local-picking': '还没选定文件，材料检查按住不放',
+  'local-cancelled': '这一步还没有文件，材料检查按住不放',
+  'local-rejected': '这一份没被收下，当前文件还是空的',
+  'local-oversize': '这一份没被收下，当前文件还是空的',
+  'local-unreadable': '这一份没被收下，当前文件还是空的',
+  'local-uploading': '上传结果还没确认，材料检查按住不放',
+  'local-upload-failed': '上传失败，当前文件仍然是空的',
+  'local-ready': null,
+  'phone-generating': '码还没出来，材料检查按住不放',
+  'phone-gen-failed': '上传码还没出来，材料检查按住不放',
+  'phone-ready': '还没有文件上来，材料检查按住不放',
+  'phone-waiting': '还没有文件上来，材料检查按住不放',
+  'phone-uploading': '文件还在路上，材料检查按住不放',
+  'phone-status-unknown': '状态未知，材料检查按住不放',
+  'phone-expired': '码已过期且没有当前文件，材料检查按住不放',
+  'phone-uploaded': '还没确认，材料检查按住不放',
+  'phone-confirming': '确认结果还没回来，材料检查按住不放',
+  'phone-confirm-failed': '确认失败，当前文件仍然是空的',
+  'phone-confirmed': null,
+  'phone-cancel-requesting': '取消结果还没回来，材料检查按住不放',
+  'phone-cancel-failed': '这一份还没确认，材料检查按住不放',
+  'phone-cancelled': '这一步还没有文件，材料检查按住不放',
+  'usb-unavailable': '这一步还没有文件，材料检查按住不放',
+  'usb-agent-offline': '这一步还没有文件，材料检查按住不放',
+  'usb-wait': '还没检测到 U 盘，材料检查按住不放',
+  'usb-detecting': '还在读盘，材料检查按住不放',
+  'usb-empty': 'U 盘里没有可用文件，材料检查按住不放',
+  'usb-list': '还没选定文件，材料检查按住不放',
+  'usb-read-failed': '这次没读出文件，材料检查按住不放',
+  'usb-selected': '还没导入，材料检查按住不放',
+  'usb-safeid-expired': '这一份已失效，需要重新读 U 盘再选',
+  'usb-importing': '导入结果还没确认，材料检查按住不放',
+  'usb-import-failed': '导入失败，当前文件仍然是空的',
+  'usb-ready': null,
 }
 
 export function FileSourceView(props: FileSourceViewProps) {
   const {
     screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, isResumePrint,
-    showFileChannel, showScan, tab, usbMode, currentFile, blockedName, blockedMeta,
-    wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
+    showFileChannel, tab, currentFile, usbDriveLabel,
     previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
-    onHelp, onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
-    onUsbSelect, onUsbImport, onUsbRescan, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
+    onHelp, onResumes, onClosePreview,
+    onUsbImport, onUsbRescan, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
     onPhoneRetryStatus, onFileInputChange, inputRef, printAccept, photoOnly,
   } = props
 
@@ -229,7 +260,7 @@ export function FileSourceView(props: FileSourceViewProps) {
   } else if (screen === 'phone-ready') {
     secondary = ghost('刷新二维码', onPhoneRefresh, 'file-source-refresh')
   } else if (screen === 'phone-waiting' || screen === 'phone-uploading' || screen === 'phone-uploaded' || screen === 'phone-confirming') {
-    secondary = ghost('取消这次上传', onPhoneCancel, 'file-source-cancel')
+    secondary = ghost('取消这次手机上传', onPhoneCancel, 'file-source-cancel')
   } else if (screen === 'phone-status-unknown' || screen === 'phone-confirm-failed') {
     secondary = ghost('重新出一张码', onPhoneRefresh, 'file-source-refresh')
   } else if (screen === 'phone-expired' || screen === 'usb-agent-offline' || screen === 'usb-safeid-expired' || screen === 'usb-import-failed') {
@@ -253,7 +284,7 @@ export function FileSourceView(props: FileSourceViewProps) {
   }
 
   const enabled = primaryEnabled(screen)
-  const reason = disabledReason(screen)
+  const reason = FILE_SOURCE_REASON[screen]
   const ctabar = previewOpen ? undefined : (
     <div className="fs-bottom"><div className="print-upload-footer" data-testid="file-source-ctabar">
       {secondary}
@@ -277,373 +308,23 @@ export function FileSourceView(props: FileSourceViewProps) {
     </div>
   )
 
-  const switchRow = (
-    <section className="fs-sec" data-testid="file-source-switch">
-      <div className="fs-sec-h">
-        <span className="no">02</span>
-        <span className="t">换一条通道也行</span>
-        <span className="hint">当前：{tab === 'file' ? '本机选文件' : tab === 'qr' ? '手机扫码上传' : 'U 盘导入'}</span>
-      </div>
-      <ChannelGrid keys={channelKeys} active={tab} usbMode={usbMode} onSelect={onSelectChannel} />
-    </section>
-  )
-
-  const phonePanel = (
-    <div className="fs-phone-slot">
-      <PhoneQrSlot
-        qrUrl={qrUrl}
-        loading={phone.loading}
-        failed={screen === 'phone-gen-failed'}
-        expiresLabel={expiresLabel}
-      />
-    </div>
-  )
-
-  let body: ReactNode
-  switch (screen) {
-    case 'source-chooser':
-    case 'missing-file':
-    case 'unknown':
-      body = (
-        <>
-          <section className="fs-sec">
-            <div className="fs-sec-h">
-              <span className="no">01</span>
-              <span className="t">{screen === 'unknown' ? '从头选一条通道' : screen === 'missing-file' ? '重新选一条通道' : '文件从哪来'}</span>
-              <span className="hint">{screen === 'source-chooser' ? '选一条，下面跟着换' : '选择适合你的方式'}</span>
-            </div>
-            <ChannelGrid keys={channelKeys} active={null} usbMode={usbMode} onSelect={onSelectChannel} />
-          </section>
-          <ExistingSourceLinks showScan={showScan} onScan={onScan} onDocuments={onDocuments} />
-          {screen === 'source-chooser' ? (
-            <section className="fs-sec">
-              <div className="fs-split">
-                <div className="fs-mini" data-static="true">
-                  <h4>第三方网盘尚未接入</h4>
-                  <p>本机不做百度网盘 / 微信文件的授权登录 —— 公共终端上登录你的网盘账号不安全。<b>但你自己存过的材料一直在</b>：登录后从「我的文档」直接选，不用重传。</p>
-                </div>
-                <div className="fs-mini" data-static="true">
-                  <h4>两个上限不一样</h4>
-                  <p>手机上传单份 <b>≤ 10MB</b>；本机选和 U 盘导入单份 <b>≤ 15MB</b>。Word 是否可收由本机转换能力决定，能力关闭时请另存为 PDF。</p>
-                </div>
-              </div>
-            </section>
-          ) : null}
-          <section className="fs-sec qx-grow">
-            <div className="qx-card" style={{ flex: 1 }}>
-              <div className="fs-sec-h">
-                <span className="t" style={{ fontSize: 'var(--qx-fs-body-lg)' }}>当前文件</span>
-                <span className="hint">0 份</span>
-              </div>
-              <FileSourceNote>还没有文件。选择一种方式上传，收到后文件名会出现在这里。</FileSourceNote>
-              <FileSourceSteps title="搬进来之后" items={['检查文件格式和大小。', '文件名和大小显示在这一栏。', '下一步「材料检查」才会亮起来。']} />
-              <FileSourceNote><b>没有文件就进不了材料检查</b>，所以下一步先按住不放。</FileSourceNote>
-            </div>
-          </section>
-        </>
-      )
-      break
-    case 'local-guide':
-    case 'local-picking':
-    case 'local-cancelled':
-      body = (
-        <>
-          <FileSourceStatus kind="plain" title={screen === 'local-cancelled' ? '你取消了文件窗口' : '从电脑中选一份文件'}>
-            <div className="fs-status-p">
-              {screen === 'local-cancelled'
-                ? '这一屏只对应一种情况：系统文件窗口被关掉，上传还没开始。所以这一步还是没有文件，也没有产生任何上传。'
-                : '点下方按钮，打开文件窗口选择一份文件；选好后会开始上传。'}
-            </div>
-          </FileSourceStatus>
-          <section className="fs-sec qx-grow">
-            <div className="qx-card" style={{ flex: 1 }}>
-              <FileSourceSteps
-                title="点下面这一下会发生什么"
-                items={['浏览器弹出系统文件窗口，你挑一份文件。', '选中即上传，并检查格式和大小。', '收到后，文件名出现在「当前文件」里。']}
-              />
-              <div className="fs-notes" style={{ marginTop: 14 }}>
-                <FileSourceNote>{wordHint}</FileSourceNote>
-                <FileSourceNote>关掉这个系统窗口不会上传任何东西，也不会改变本次办理里已经有的当前文件。</FileSourceNote>
-              </div>
-            </div>
-          </section>
-          {switchRow}
-        </>
-      )
-      break
-    case 'local-rejected':
-    case 'local-oversize':
-    case 'local-unreadable':
-      body = (
-        <>
-          <FileSourceStatus
-            kind={screen === 'local-oversize' ? 'warn' : 'error'}
-            title={screen === 'local-rejected' ? '这份格式不收' : screen === 'local-oversize' ? '这份超过 15MB' : '这份读不出来'}
-            chips={[{ tone: 'bad', label: screen === 'local-oversize' ? '本机 / U 盘 ≤ 15MB' : '未上传' }]}
-          >
-            <div className="fs-status-p">
-              {screen === 'local-rejected'
-                ? '支持 PDF、JPG、PNG；Word 需本机开通转换。这一份未能上传。'
-                : screen === 'local-oversize'
-                  ? '本机与 U 盘通道单份上限 15MB，这一份没有被上传。'
-                  : '文件为空或者大小取不到，不会硬着头皮上传一份连大小都读不出的东西。'}
-            </div>
-          </FileSourceStatus>
-          <section className="fs-sec qx-grow">
-            <div className="qx-card" style={{ flex: 1 }}>
-              {blockedName ? (
-                <FileRow name={blockedName} meta={blockedMeta ?? ''} tag={screen === 'local-oversize' ? '超过 15MB' : screen === 'local-rejected' ? '格式不收' : '读不出来'} tagTone="bad" bad testId="file-source-blocked-file" />
-              ) : null}
-              <div className="fs-empty">
-                <span className="fs-empty-ic"><FileTextIcon size={38} aria-hidden="true" /></span>
-                <span>当前文件仍然是<b>空的</b>。<br />回到窗口再挑一份合规的就能接着走。</span>
-              </div>
-            </div>
-          </section>
-        </>
-      )
-      break
-    case 'local-uploading':
-    case 'local-upload-failed':
-      body = (
-        <>
-          <FileSourceStatus
-            kind={screen === 'local-uploading' ? 'info' : 'error'}
-            title={screen === 'local-uploading' ? '正在上传，请稍候' : '上传没成功'}
-            pulsing={screen === 'local-uploading'}
-            chips={
-              screen === 'local-uploading'
-                ? [{ label: '没有可确认的百分比' }, { tone: 'warn', label: '本页无取消动作' }]
-                : [{ tone: 'bad', label: '尚未收到' }]
-            }
-          >
-            <div className="fs-status-p">
-              {screen === 'local-uploading'
-                ? '正在上传这份文件，请稍候。完成前无法继续材料检查。'
-                : '还没有收到这一份文件。可以重试刚才选择的文件。'}
-            </div>
-          </FileSourceStatus>
-          <section className="fs-sec qx-grow">
-            <div className="qx-card" style={{ flex: 1 }}>
-              {blockedName ? (
-                <FileRow
-                  name={blockedName}
-                  meta={blockedMeta ?? ''}
-                  tag={screen === 'local-uploading' ? '正在上传' : '上传失败'}
-                  tagTone={screen === 'local-uploading' ? 'doing' : 'bad'}
-                  bad={screen !== 'local-uploading'}
-                  testId={screen === 'local-uploading' ? 'file-source-uploading-file' : 'file-source-failed-file'}
-                />
-              ) : null}
-              <div className="fs-empty">
-                <span>收到文件之前，<b>当前文件仍然是空的</b>。</span>
-              </div>
-            </div>
-          </section>
-          {screen === 'local-uploading' ? <HelpMini onHelp={onHelp} text="上传一直不结束，或者反复失败，可以叫工作人员来看一眼。" /> : null}
-        </>
-      )
-      break
-    case 'local-ready':
-    case 'usb-ready':
-    case 'phone-confirmed':
-      body = currentFile ? (
-        <>
-          <FileSourceStatus kind="info" title={screen === 'usb-ready' ? '导入完成，可以拔 U 盘了' : screen === 'phone-confirmed' ? '已确认，这就是本次办理要打的文件' : '先核对这份文件'} chips={[{ tone: 'ok', label: '已收到文件' }]}>
-            <div className="fs-status-p">打开预览，看清每一页有没有选错。一次办理一份，需要换文件可以在下面更换。</div>
-          </FileSourceStatus>
-          <NowFileCard
-            name={currentFile.name}
-            meta={currentFile.size}
-            from={fromLabel}
-            onPreview={onPreview}
-            onReplace={onReplace}
-            onDelete={onDelete}
-          />
-        </>
-      ) : null
-      break
-    case 'phone-generating':
-    case 'phone-gen-failed':
-    case 'phone-ready':
-    case 'phone-waiting':
-    case 'phone-uploading':
-    case 'phone-status-unknown':
-    case 'phone-expired':
-    case 'phone-uploaded':
-    case 'phone-confirming':
-    case 'phone-confirm-failed':
-    case 'phone-cancel-requesting':
-    case 'phone-cancel-failed':
-    case 'phone-cancelled':
-      body = (
-        <>
-          <FileSourceStatus
-            kind={
-              screen === 'phone-gen-failed' || screen === 'phone-confirm-failed' || screen === 'phone-cancel-failed'
-                ? 'error'
-                : screen === 'phone-expired' || screen === 'phone-status-unknown'
-                  ? 'warn'
-                  : screen.includes('upload') || screen.includes('confirm')
-                    ? 'info'
-                    : 'plain'
-            }
-            title={FILE_SOURCE_STATUS_TITLE[screen]}
-            pulsing={/generating|waiting|uploading|confirming|requesting/.test(screen)}
-            chips={phone.status ? [{ label: phoneStatusLabel(phone.status) }] : undefined}
-          >
-            <div className="fs-status-p">
-              {screen === 'phone-uploaded'
-                ? '请核对文件名和大小；在这台机器上确认后，才能继续材料检查。'
-                : screen === 'phone-cancel-failed'
-                  ? '取消未成功，旧二维码可能仍有效。可以重试取消，或确认使用这份文件。'
-                  : FILE_SOURCE_ASK_FALLBACK[screen]}
-            </div>
-          </FileSourceStatus>
-          {screen === 'phone-cancelled' ? (
-            <section className="fs-sec">
-              <div className="fs-sec-h"><span className="no">01</span><span className="t">接着走哪条</span></div>
-              <ChannelGrid keys={channelKeys} active="qr" usbMode={usbMode} onSelect={onSelectChannel} />
-            </section>
-          ) : null}
-          <section className="fs-sec qx-grow">
-            <div className="qx-card" style={{ flex: 1 }}>
-              {phone.pendingName ? (
-                <FileRow
-                  name={phone.pendingName}
-                  meta={`${phone.pendingSize ?? ''} · 手机扫码上传`}
-                  tag={screen === 'phone-uploaded' ? '待确认' : screen === 'phone-confirm-failed' ? '确认失败' : screen === 'phone-cancel-failed' ? '仍待确认' : '处理中'}
-                  tagTone={screen === 'phone-confirm-failed' ? 'bad' : 'doing'}
-                  testId="file-source-phone-file"
-                />
-              ) : null}
-              {phonePanel}
-            </div>
-          </section>
-          {screen === 'phone-generating' || screen === 'phone-gen-failed' ? switchRow : null}
-        </>
-      )
-      break
-    case 'usb-unavailable':
-    case 'usb-agent-offline':
-    case 'usb-wait':
-    case 'usb-detecting':
-    case 'usb-empty':
-    case 'usb-read-failed':
-      body = (
-        <>
-          <FileSourceStatus
-            kind={screen === 'usb-unavailable' ? 'lock' : screen === 'usb-agent-offline' || screen === 'usb-read-failed' ? 'error' : screen === 'usb-empty' ? 'warn' : 'plain'}
-            title={
-              screen === 'usb-unavailable' ? '这台机器没接通 U 盘导入'
-                : screen === 'usb-agent-offline' ? '暂时无法读取 U 盘'
-                  : screen === 'usb-wait' ? '把 U 盘插进右侧 USB 口'
-                    : screen === 'usb-detecting' ? '正在读 U 盘'
-                      : screen === 'usb-empty' ? '这个 U 盘里没有能用的文件'
-                        : '读 U 盘失败'
-            }
-            pulsing={screen === 'usb-detecting'}
-          >
-            <div className="fs-status-p">
-              {screen === 'usb-unavailable'
-                ? '本机暂未开通 U 盘导入，请改用手机上传或联系工作人员。'
-                : screen === 'usb-agent-offline'
-                  ? '暂时无法读取 U 盘。可以重新连接，或改用手机上传。'
-                  : screen === 'usb-wait'
-                    ? '还没有检测到 U 盘。插上之后本地服务会列出根目录里能打印的文件。本机不会自动读整盘，也不进子文件夹。'
-                    : screen === 'usb-detecting'
-                      ? '本地服务在列根目录。不画进度条——读盘这件事没有可确认的百分比。读完之前不显示任何文件名。'
-                      : screen === 'usb-empty'
-                        ? '根目录里没有找到 PDF / JPG / PNG。常见原因：简历是 DOCX、文件放在子文件夹里、或者单份超过 15MB。'
-                        : '本地服务连上了，但这次没能列出文件。本机不显示上一次的列表。'}
-            </div>
-          </FileSourceStatus>
-          {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (
-            <section className="fs-sec">
-              <ChannelGrid keys={channelKeys} active={null} usbMode={usbMode} onSelect={onSelectChannel} />
-            </section>
-          ) : (
-            <section className="fs-sec qx-grow">
-              <div className="qx-card" style={{ flex: 1 }}>
-                <FileSourceSteps
-                  title="插上之后会发生什么"
-                  items={['检测已插入的 U 盘。', '列出根目录里可打印的 PDF / JPG / PNG。', '选择一份文件，再点「导入这一份」。']}
-                />
-                <div style={{ marginTop: 14 }}>
-                  <FileSourceNote>网页不直接访问磁盘，也拿不到你盘上的绝对路径。</FileSourceNote>
-                </div>
-              </div>
-            </section>
-          )}
-          {screen === 'usb-wait' ? switchRow : null}
-        </>
-      )
-      break
-    case 'usb-list':
-    case 'usb-selected':
-    case 'usb-safeid-expired':
-    case 'usb-importing':
-    case 'usb-import-failed':
-      body = (
-        <>
-          <FileSourceStatus
-            kind={screen === 'usb-import-failed' || screen === 'usb-safeid-expired' ? (screen === 'usb-import-failed' ? 'error' : 'warn') : screen === 'usb-importing' ? 'info' : 'plain'}
-            title={
-              screen === 'usb-selected' ? '选中了这一份，还没导入'
-                : screen === 'usb-safeid-expired' ? '请重新选择这份文件'
-                  : screen === 'usb-importing' ? '正在从 U 盘导入'
-                    : screen === 'usb-import-failed' ? '这一份没导进来'
-                      : 'U 盘根目录'
-            }
-            pulsing={screen === 'usb-importing'}
-          >
-            <div className="fs-status-p">
-              {screen === 'usb-selected'
-                ? '只导入这一份，U 盘上其它文件不会被读走。导入完成前它还不是当前文件。'
-                : screen === 'usb-importing'
-                  ? '正在导入选中的文件，请暂时不要拔出 U 盘。'
-                  : '重新读盘后，请从最新列表选择要打印的文件。'}
-            </div>
-          </FileSourceStatus>
-          <section className="fs-sec qx-grow">
-            <div className="qx-card" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              {screen === 'usb-list' && usbFiles
-                ? usbFiles.map((item) => (
-                    <FileRow
-                      key={item.safeId}
-                      name={item.filename}
-                      meta={formatBytes(item.sizeBytes)}
-                      tag="选这份"
-                      tagTone="pickable"
-                      on={usbSelected?.safeId === item.safeId}
-                      onClick={() => onUsbSelect(item.safeId)}
-                      testId={`file-source-usb-file-${item.safeId}`}
-                    />
-                  ))
-                : null}
-              {usbSelected && screen !== 'usb-list' ? (
-                <FileRow
-                  name={usbSelected.filename}
-                  meta={`${formatBytes(usbSelected.sizeBytes)}${usbDriveLabel ? ` · ${usbDriveLabel}` : ''}`}
-                  tag={screen === 'usb-importing' ? '导入中' : screen === 'usb-import-failed' ? '导入失败' : screen === 'usb-safeid-expired' ? '需要重选' : '已选中'}
-                  tagTone={screen === 'usb-importing' ? 'doing' : screen === 'usb-selected' ? 'ok' : 'bad'}
-                  bad={screen !== 'usb-selected' && screen !== 'usb-importing'}
-                  on={screen === 'usb-selected'}
-                  dim={screen === 'usb-safeid-expired'}
-                  testId="file-source-selected-file"
-                />
-              ) : null}
-              <div style={{ marginTop: 12 }}>
-                <FileSourceNote>只列根目录里能打印的文件。超过上限的不列。子文件夹里的东西不在这里。</FileSourceNote>
-              </div>
-            </div>
-          </section>
-        </>
-      )
-      break
-    default:
-      body = null
-  }
+  const wordAccepted = props.conversionReason === null
+  const formats = photoOnly ? 'JPG / PNG' : wordAccepted ? 'PDF / Word / JPG / PNG' : 'PDF / JPG / PNG'
+  const bodyProps: FileSourceBodyProps = { ...props, channelKeys, fromLabel, formats, wordAccepted }
+  const prefix = screen.split('-')[0]
+  const body: ReactNode = FILE_SOURCE_HAS_FILE.has(screen)
+    ? <ReadyBody {...bodyProps} />
+    : prefix === 'local'
+      ? <LocalBody {...bodyProps} />
+      : prefix === 'phone'
+        ? <PhoneBody {...bodyProps} />
+        : prefix === 'usb'
+          ? <UsbBody {...bodyProps} />
+          : <ChooserBody {...bodyProps} />
+  const heroDoing =
+    screen === 'source-chooser' && !showFileChannel
+      ? '手机、U 盘、纸质扫描都能进来；登录后还能直接用「我的文档」里存过的材料。第三方网盘不接入。'
+      : undefined
 
   return (
     <QxPageFrame
@@ -673,10 +354,7 @@ export function FileSourceView(props: FileSourceViewProps) {
         data-state={screen}
         data-testid={`file-source-state-${screen}`}
       >
-        <FileSourceHero screen={screen} isResume={isResumePrint} />
-        <div className="fs-flow" aria-label="打印流程">
-          <span aria-current="step">1 选文件</span><span>2 材料检查</span><span>3 预览与参数</span><span>4 核对价格</span>
-        </div>
+        <FileSourceHero screen={screen} isResume={isResumePrint} doing={heroDoing} />
         {orderPausedNotice ? (
           <FileSourceStatus kind="warn" title={status.label}>
             {orderPausedNotice}
@@ -690,43 +368,10 @@ export function FileSourceView(props: FileSourceViewProps) {
         ) : null}
         {body}
         {reason && !previewOpen ? <FileSourceReason>{reason}</FileSourceReason> : null}
-        <FileSourceTruth />
         {previewOpen && currentFile ? (
           <PrintFilePreviewModal file={currentFile} token={previewToken} onClose={onClosePreview} />
         ) : null}
       </div>
     </QxPageFrame>
   )
-}
-
-function phoneStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    pending: '等待手机上传', uploading: '手机正在上传', uploaded: '已上传，待确认',
-    confirmed: '已确认文件', expired: '二维码已过期', cancelled: '上传已取消',
-  }
-  return labels[status] ?? '上传状态待确认'
-}
-
-const FILE_SOURCE_STATUS_TITLE: Record<string, string> = {
-  'phone-generating': '正在生成上传二维码', 'phone-gen-failed': '二维码没生成出来',
-  'phone-ready': '用手机扫描下方二维码', 'phone-waiting': '正在等待手机上传',
-  'phone-uploading': '手机正在上传', 'phone-status-unknown': '暂时查不到上传状态',
-  'phone-expired': '这张上传码过期了', 'phone-uploaded': '手机传上来一份，等你确认',
-  'phone-confirming': '正在确认这份文件', 'phone-confirm-failed': '确认失败',
-  'phone-cancel-requesting': '正在取消这次上传', 'phone-cancel-failed': '这次上传没能取消',
-  'phone-cancelled': '这次上传已取消',
-}
-
-const FILE_SOURCE_ASK_FALLBACK: Record<string, string> = {
-  'phone-generating': '二维码生成后，用手机相机或微信扫一扫打开上传页。',
-  'phone-gen-failed': '还没有收到文件，可以重新生成二维码或换一种上传方式。',
-  'phone-ready': '扫码选文件并上传；收到后，这里会出现文件名，请回来确认。',
-  'phone-waiting': '手机上传完成后，这里会出现文件名。扫描二维码本身不会改变文件状态。',
-  'phone-uploading': '请保持手机上传页面打开，传完后回来确认文件。',
-  'phone-status-unknown': '暂时查不到结果，不代表二维码已经过期。可以重试查询或重新生成。',
-  'phone-expired': '旧二维码不再接收文件。请重新生成二维码，再次上传。',
-  'phone-confirming': '正在确认使用这份文件，完成后才能继续材料检查。',
-  'phone-confirm-failed': '文件尚未进入本次办理。请重试确认，或重新生成二维码上传。',
-  'phone-cancel-requesting': '取消结果尚未返回，请稍候。',
-  'phone-cancelled': '旧二维码已失效。可以重新生成二维码，或换一种上传方式。',
 }

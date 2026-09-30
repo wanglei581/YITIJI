@@ -1,10 +1,11 @@
 import { type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
+import { type LucideIcon } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { useAuth } from '../../auth/useAuth'
 import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
+import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { clearScanWorkbenchSession } from './scanWorkbenchSession'
 import {
@@ -16,6 +17,7 @@ import {
   type ScanWorkbenchState,
 } from './scanWorkbench'
 import './styles/scan-workbench-qx.css'
+import './styles/scan-workbench-v2-qx.css'
 import './styles/scan-workbench-compact-qx.css'
 
 export function scanTerminalLabel(): string {
@@ -31,6 +33,7 @@ export function ScanWorkbenchShell({
   ctabar,
   facts,
   layout = 'stack',
+  onLeave,
   children,
 }: {
   page: 'scan-start' | 'scan-settings' | 'scan-progress' | 'scan-result'
@@ -46,6 +49,11 @@ export function ScanWorkbenchShell({
    * 不在正文底下留一整片空白，也不靠拉伸说明卡去填高度。
    */
   layout?: 'stack' | 'spread'
+  /**
+   * 底部「返回打印扫描 / 问小青」两个出口也是离开整条流程。结果页传它自己那条
+   * leaveScanFlow（replace 历史条目，理由见 ScanResultPage）；其余阶段用本壳那一条。
+   */
+  onLeave?: (destination: string) => void
   children: ReactNode
 }) {
   const navigate = useNavigate()
@@ -68,6 +76,7 @@ export function ScanWorkbenchShell({
     clearScanWorkbenchSession()
     navigate(destination)
   }
+  const leave = onLeave ?? leaveScanFlow
   return (
     <QxPageFrame
       /* 稿 18-scan-workbench 原文：data-route="/print-scan" aria-label="返回打印扫描"。
@@ -80,7 +89,12 @@ export function ScanWorkbenchShell({
       subtitle={subtitle}
       status={status}
       terminalLabel={scanTerminalLabel()}
-      ctabar={ctabar}
+      ctabar={
+        <div className="sw-ctabar-stack">
+          {ctabar}
+          <ScanAiRow onLeave={leave} />
+        </div>
+      }
       navbar={
         /* 底栏三项也是「离开整条扫描流程」，不是页内切换：走同一条 leaveScanFlow，
          *  只有落点不同。任何一个改回裸 navigate，这一屏就又会留下孤儿任务。 */
@@ -125,6 +139,7 @@ export function ScanHero({
       <div className="sw-xq-row">
         <div className="sw-xq-face" aria-hidden="true">青</div>
         <div className="sw-xq-main">
+          <div className="sw-xq-eyebrow">材料扫描</div>
           <h2 className="sw-xq-ask">
             {i < 0 ? (
               ask
@@ -150,23 +165,49 @@ export function ScanHero({
   )
 }
 
+/** 稿 18「就这三步」：三张等宽卡，点亮的那一步是深底；active 超出范围时一步都不点亮。 */
 export function ScanChain({ active }: { active: number }) {
   return (
     <div className="sw-chain" data-testid="scan-workbench-chain">
       {SCAN_CHAIN.map((step, index) => {
         const Icon = step.icon
         return (
-          <div key={step.title} className="sw-chain-wrap">
-            {index > 0 ? <span className="sw-chain-arrow" aria-hidden="true"><ChevronRightIcon size={20} /></span> : null}
-            <div className={`sw-link${active === index ? ' is-on' : ''}`}>
-              <span className="sw-link-ic"><Icon size={24} aria-hidden /></span>
-              <b>{step.title}</b>
-              <span className="sw-link-c">{step.copy}</span>
-              <span className="sw-link-who">{step.who}</span>
-            </div>
+          <div key={step.title} className={`sw-link${active === index ? ' is-on' : ''}`}>
+            <span className="sw-link-ic"><Icon size={24} aria-hidden /></span>
+            <b>{step.title}</b>
+            <span className="sw-link-c">{step.copy}</span>
+            <span className="sw-link-who">第 {index + 1} 步</span>
           </div>
         )
       })}
+    </div>
+  )
+}
+
+const SCAN_ASSISTANT_DRAFT = '我想扫描一份纸质材料。请告诉我怎么放纸，以及要在打印机面板上按哪里。'
+
+/**
+ * 稿 18 每一屏底部那一排：「返回打印扫描」和「问小青：扫描要怎么按」。
+ * 两个都是离开整条扫描流程，走调用方给的 onLeave（撤服务端 → 清本机登记 → 走人）；
+ * 问小青先把一句问题留给顾问页预填，发不发由用户在顾问页决定。
+ */
+export function ScanAiRow({ onLeave }: { onLeave: (destination: string) => void }) {
+  return (
+    <div className="qx-step-actions sw-airow">
+      <button type="button" className="qx-step-prev" onClick={() => onLeave('/print-scan')}>
+        返回打印扫描
+      </button>
+      <button
+        type="button"
+        className="qx-ai-help"
+        data-testid="scan-workbench-ask-xiaoqing"
+        onClick={() => {
+          rememberAssistantDraft(SCAN_ASSISTANT_DRAFT)
+          onLeave('/assistant')
+        }}
+      >
+        问小青：扫描要怎么按 →
+      </button>
     </div>
   )
 }
@@ -242,9 +283,9 @@ export function ScanNoteCard({
   )
 }
 
-export function ScanPlan({ items }: { items: readonly string[] }) {
+export function ScanPlan({ items, className }: { items: readonly string[]; className?: string }) {
   return (
-    <ul className="sw-plan">
+    <ul className={className ? `sw-plan ${className}` : 'sw-plan'}>
       {items.map((item) => (
         <li key={item}><span className="sw-sq" aria-hidden="true" /><span>{item}</span></li>
       ))}

@@ -472,7 +472,7 @@ export function PrintCashierPage() {
   // 改参数的唯一出口：本单创建过支付尝试后只能重新下单（稿 32 paramsBackCta），没创建过才回确认页。
   const paramsBack = attemptSeen
     ? { label: '改参数需重新下单', icon: <FilePlus2Icon aria-hidden="true" />, run: () => navigate(uploadPath) }
-    : { label: '返回确认页', icon: <XCircleIcon aria-hidden="true" />, run: () => navigate('/print/confirm', { state }) }
+    : { label: '返回改参数', icon: <XCircleIcon aria-hidden="true" />, run: () => navigate('/print/confirm', { state }) }
 
   const secondaryAction = (() => {
     if (['no-order', 'free-order', 'refunding', 'partial-refunded', 'refunded', 'paid', 'pending-qr'].includes(qxState)) {

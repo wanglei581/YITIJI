@@ -81,8 +81,10 @@ const PAY_CHANNEL_STATES = [
   'channel-selected', 'pending-scan', 'pending-qr', 'awaiting-code-confirmation', 'pending-verification',
   'display-expired-reconciling', 'expired', 'attempt-failed', 'release-failed',
 ]
-// 14 的报价态现在由并排夹具提供真实交接上下文与报价请求，允许 capture=1 进入运行页状态。
-const NO_CAPTURE_FILES = new Set<string>()
+// 稿 14 的地址白名单不认 capture：一带 capture=1，8 个状态全落到「交接内容未通过核对」那一屏，
+// 审计与并排截图查到的其实都是同一屏（9/29 定稿 A 实测；9/30 B 批复验仍如此）。14 的稿只带 flat 与 state。
+// 这条只管稿那一侧的地址；运行页的报价态由 qingxu-pair-seeds 的夹具造，跟它无关。
+const NO_CAPTURE_FILES = new Set(['14-print-confirm.html'])
 function withoutCaptureFor(file: string, query: string): string {
   if (!NO_CAPTURE_FILES.has(file) || !query.startsWith('?')) return query
   const params = new URLSearchParams(query.slice(1))

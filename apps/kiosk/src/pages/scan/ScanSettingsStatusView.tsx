@@ -1,12 +1,9 @@
-import { ClockIcon } from 'lucide-react'
 import { SCAN_ACK_PENDING_NOTICE, type ScanAckState } from './scanDeliveryAck'
-import { SCAN_OUTPUT_FORMAT_PENDING } from './scanOutputFormat'
 import type { SessionFailure } from './scanRescanRecovery'
 import { sessionNatureRow, type SessionPhase } from './scanSettingsModel'
 import {
   ScanChain,
   ScanCta,
-  ScanKvCard,
   ScanNoteCard,
   ScanPlan,
   ScanSec,
@@ -118,14 +115,14 @@ export function ScanSettingsStatusView({
     : phase === 'invalid'
       ? '未创建扫描任务'
       : phase === 'loading'
-        ? '正在创建扫描任务'
+        ? '正在开始这次扫描'
         : failure?.title ?? '扫描任务未创建'
   const description = awaitingAck
     ? failure?.description ?? SCAN_ACK_PENDING_NOTICE
     : phase === 'invalid'
       ? '当前页面没有来自扫描首页的合法类型信息，本次不会发起创建请求。'
       : phase === 'loading'
-        ? '正在等系统建好这次扫描，成功前不会显示任务信息或操作指引。'
+        ? '本机正在准备这次扫描。准备好了之前，任务编号和面板指引都不显示 —— 显示了你也用不上，反而会照着一个不存在的编号去机器上操作。'
         : failure?.description ?? '这次没有可用的扫描。'
   const status = awaitingAck
     ? ackRetryable
@@ -138,27 +135,27 @@ export function ScanSettingsStatusView({
           // 重放期间也不能那么说 —— 会话可能早就建成了，丢的只是那一次回话。
           label: replayingLostCreate
             ? '正在确认上一次请求'
-            : terminalSession === 'checking' ? '正在做这台机器的安全校验' : '正在建立这次扫描',
+            : terminalSession === 'checking' ? '正在做这台机器的安全校验' : '正在开始这次扫描',
         }
       : phase === 'expired'
         ? { tone: 'warn' as const, label: '这次扫描已过期' }
         /* 没发过请求就不许说「创建失败」：这一屏等的是上一场的收尾回执。 */
         : cleanupHolding
           ? { tone: 'warn' as const, label: '正在收上一场的尾' }
-          : { tone: 'bad' as const, label: '这次扫描没建好' }
-  /* 稿 18 状态屏骨架：当前状态 → 链路位置 → 下一步。这几屏一律还没有一段开始（链路不点亮），
-   * 标题只说「卡在哪」—— 不写百分比，也不暗示哪一段已经在动。 */
+          : { tone: 'bad' as const, label: '这次没准备好' }
+  /* 稿 18 状态屏骨架：当前状态 → 就这三步做到哪 → 下一步。这几屏一律还没有一步开始（三步都不点亮），
+   * 标题只说「卡在哪」—— 不写百分比，也不暗示哪一步已经在动。 */
   const chainHead: readonly [string, string] = awaitingAck
     ? ['这次扫描已经建好，还差投递授权', '授权确认前，请先不要按开始']
     : cleanupHolding
-      ? ['还在收上一场的尾', '这一场的四段都还没开始']
+      ? ['还在收上一场的尾', '这一场的三步都还没开始']
       : phase === 'loading'
-        ? ['这次扫描建好才算迈出第一步', '这四段一段都还没开始']
+        ? ['准备好了才算迈出第一步', '这三步一步都还没开始']
         : phase === 'expired'
-          ? ['流程停在哪', '文件没有挂到这次扫描']
+          ? ['停在哪一步', '文件没有挂到这次办理']
           : phase === 'invalid'
-            ? ['这次扫描还没建好', '这四段一段都还没开始']
-            : ['现在卡在建立这次扫描', '扫描还没开始']
+            ? ['这次扫描还没建好', '这三步一步都还没开始']
+            : ['现在卡在开始这次扫描这一步', '第一步还没开始']
 
   return (
     <ScanWorkbenchShell
@@ -181,7 +178,7 @@ export function ScanSettingsStatusView({
           }
         >
           <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
-            安全返回扫描首页
+            返回选类型
           </button>
           {/* 四条分支。awaiting-ack 排在最前面：这一屏上「再试一次安全重扫」「重新开始
               一次扫描」都是错的主行动 —— 会话已经建成了，缺的只是那一次确认，
@@ -228,7 +225,7 @@ export function ScanSettingsStatusView({
               aria-disabled="true"
             >
               {phase === 'loading'
-                ? '等系统返回这次扫描'
+                ? '等准备好'
                 /* 这一支上任务**建过**（随后被本页撤掉），说「未创建」就是句假话。 */
                 : liveNotDurable
                   ? '本机暂时存不下扫描记录，无法开始这次扫描'
@@ -261,7 +258,7 @@ export function ScanSettingsStatusView({
                   {
                     label: replayingLostCreate
                       ? '正在确认上一次请求'
-                      : terminalSession === 'checking' ? '正在做这台机器的安全校验' : '正在等系统回应',
+                      : terminalSession === 'checking' ? '正在做这台机器的安全校验' : '正在等系统回话',
                   },
                   { label: scanType ? `选中类型：${SCAN_TYPE_LABELS[scanType]}` : '未选择类型' },
                 ]
@@ -273,6 +270,11 @@ export function ScanSettingsStatusView({
       >
         <p>{description}</p>
         {phase === 'loading' && !awaitingAck ? <p>这一步不碰扫描仪，也不会替你启动任何硬件。</p> : null}
+        {/* 稿 18 create-failed 第二段：只在「真没建成」那一支说。建过又撤掉（liveNotDurable）、
+            过期、没合法类型、等上一场收尾，这几支各有自己的一句，不套这一段。 */}
+        {!awaitingAck && phase === 'error' && !cleanupHolding && !liveNotDurable ? (
+          <p>所以现在没有任务编号，也没有面板指引。这次办理是认领回传文件的凭据，没有它，扫出来的文件到了系统也挂不上。</p>
+        ) : null}
         {/* 没拿到投递授权的窗口必须说出「现在扫也不会进这一场」。不说的话用户看到
             「扫描任务已创建」就转身去按开始，而服务端此刻还不肯把文件投给这一场。 */}
         {awaitingAck ? (
@@ -315,7 +317,7 @@ export function ScanSettingsStatusView({
       </ScanSec>
       <ScanSec no="02" title="下一步" hint="这一屏现在能做什么">
         {awaitingAck ? (
-          <div className="sw-grid2">
+          <div className="sw-grid2 is-even">
             <ScanNoteCard
               title="本机正在做什么"
               foot="再确认几次都不会多建一场，也不会延长有效期。"
@@ -333,21 +335,21 @@ export function ScanSettingsStatusView({
             </ScanNoteCard>
           </div>
         ) : phase === 'loading' ? (
-          <div className="sw-grid2">
-            <ScanNoteCard title="这次扫描建好之后会出现什么" foot="这三样都由系统给出，本机一样都编不出来。">
+          <div className="sw-grid2 is-even">
+            <ScanNoteCard title="准备好了之后会出现什么" foot="这三样都由系统给出，本机一样都编不出来。">
               <ScanPlan items={[
-                '系统给出的任务编号，用来认领待会儿回来的文件。',
-                '按扫描类型写好的面板操作说明，本机原样转达。',
-                '一份只留在当前页面里的控制凭证，用来查询和取消。',
+                '系统发的任务编号，用来认领待会儿回传的文件。',
+                '按扫描类型定制的面板操作指引，本机原样转达。',
+                '一枚只留在当前页面里的临时凭证，用来查询和取消。',
               ]} />
             </ScanNoteCard>
             <ScanNoteCard title="这一刻你可以做什么" foot="这一刻页面还没有任何结论可写。">
-              <p>把要扫的纸先整理好、订书钉取掉，<b>但先别在面板上按开始</b> —— 这次扫描还没建好，这时候扫出来的文件没人接收。</p>
-              <p>等待通常就是一两秒。一直转，多半是这台机器到系统的网络有问题。</p>
+              <p>把要扫的纸先整理好、订书钉取掉，<b>但先别在面板上按开始</b> —— 这次办理还没建成，这时候扫出来的文件没人认领。</p>
+              <p>等待通常就是一两秒。一直转，多半是本机到系统的网络有问题。</p>
             </ScanNoteCard>
           </div>
         ) : (
-          <div className="sw-grid2">
+          <div className="sw-grid2 is-even">
             {/* 这句落款分两种写法，因为它在两种屏上说的是两件事。
                 本页刚刚**确实**用同一份凭据重放过（配对重扫的未知态才会），
                 这时还挂着「本页不会自动重发」就是当场自打嘴巴 —— 用户据此以为
@@ -363,13 +365,14 @@ export function ScanSettingsStatusView({
               <ScanPlan items={[
                 rescanRetryable
                   ? '点右下角「再试一次安全重扫」：同一份材料的授权还在手上。'
-                  : '返回扫描首页，从选择类型重新走一遍。',
-                '连续失败就别在面板上扫了，扫了也没有这次扫描来接收。',
+                  : '点左下角「返回选类型」，从选择类型重新走一遍。',
+                '连续失败就别在面板上扫了，扫了也没有这次办理认领。',
                 '叫工作人员看一眼这台机器到系统的网络。',
               ]} />
             </ScanNoteCard>
             <ScanNoteCard title="为什么不给你一个编号" foot="这一屏的空白是有意的，不是还没加载完。">
-              <p>编号是系统给出的，本机编不出来。<b>硬编一个给你看，你就会照着它去面板上操作</b>，扫出来的文件也没人接收。</p>
+              <p>编号是系统发的，本机编不出来。<b>硬编一个给你看，你就会照着它去面板上操作</b>，扫出来的文件也没人认领。</p>
+              <p>所以这一屏宁可空着，也不给一个用不了的号。</p>
             </ScanNoteCard>
           </div>
         )}
@@ -390,7 +393,6 @@ export function ScanSettingsStatusView({
  */
 export interface ScanSettingsSessionFactsProps {
   scanType: ScanType
-  scanTaskId: string
   countdown: string
   rescanRequested: boolean
   plainRestartChosen: boolean
@@ -399,7 +401,6 @@ export interface ScanSettingsSessionFactsProps {
 
 export function ScanSettingsSessionFacts({
   scanType,
-  scanTaskId,
   countdown,
   rescanRequested,
   plainRestartChosen,
@@ -407,28 +408,31 @@ export function ScanSettingsSessionFacts({
 }: ScanSettingsSessionFactsProps) {
   // 「本次性质」那一行（四种互斥情况与各自的理由见 scanSettingsModel）。
   const natureRow = sessionNatureRow({ rescanRequested, plainRestartChosen, restoredFromStorage })
+  /* 稿 18「03 按完面板之后」：两张说明卡。任务编号不上屏（公共大屏，编号只给系统认领文件用），
+   * 扫描类型已在第 01 段的指引里写明；剩余时间和「本次性质」留在卡里，都是真实值。 */
   return (
-    <ScanSec no="03" title="这次扫描">
-      <div className="sw-grid2">
-        <ScanKvCard
-          title="任务信息"
-          rows={[
-            ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-            ['任务编号', scanTaskId],
-            ['剩余时间', countdown],
-            ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-            ...(natureRow ? [natureRow] : []),
-            ['控制凭证', '不显示在屏幕上、不放进链接；只留在当前页面里，换人清场会清掉'],
-          ]}
-        />
-        <ScanNoteCard title="按完面板之后" foot={<><ClockIcon size={16} aria-hidden /> 任务剩余 {countdown}。只在这一次有效。点击返回会取消这个还没确认的任务。</>}>
+    <ScanSec no="03" title="按完面板之后" hint="这一屏只剩右下角那一下">
+      <div className="sw-grid2 is-even">
+        <ScanNoteCard title="回到这台屏幕点右下角" foot={`这次办理只在这一次有效，还剩 ${countdown}。`}>
           <ScanPlan items={[
             ...(rescanRequested
               ? ['把刚才那份原件照原样放回去 —— 这一次系统认它，不会当成重复件拒掉。']
               : []),
-            '点「我已操作，开始等待」。',
+            '点「我在面板扫完了，去等文件」。',
             '进了等待页本机就每隔几秒自动查一次，你不用一直点。',
             '文件回来之前不显示扫到第几张：这个流程里没有这种信息。',
+          ]} />
+        </ScanNoteCard>
+        <ScanNoteCard
+          title="两个「取消」不是一回事"
+          foot={natureRow
+            ? <span className="sw-inline-kv"><span>{natureRow[0]}</span><b>{natureRow[1]}</b></span>
+            : `这次是「${SCAN_TYPE_LABELS[scanType]}」。按你真正想要的那一个，别把两件事当成一件。`}
+        >
+          <ScanPlan items={[
+            '左下角「取消，换类型」会撤掉这个还没开始等的任务，回到选类型。',
+            '已经进了等待页，要取消就点那里的「取消这次扫描」，成不成由系统确认。',
+            '这次办理还在系统活着的时候，别在面板上重复扫。',
           ]} />
         </ScanNoteCard>
       </div>

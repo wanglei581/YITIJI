@@ -767,27 +767,27 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       ctabar={
         <ScanCta>
           <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
-            返回（取消任务）
+            取消，换类型
           </button>
           <button type="button" className="qx-btn" data-variant="primary" disabled={starting} onClick={handleConfirm}>
-            {starting ? '正在进入等待…' : '我已操作，开始等待'}
+            {starting ? '正在进入等待…' : '我在面板扫完了，去等文件'}
           </button>
         </ScanCta>
       }
     >
-      <ScanSec no="01" title="照着做：全在机器面板上" hint="以下是系统给的原文，本机不改写" grow>
+      <ScanSec no="01" title="照着做：全在机器面板上" hint="系统给出原文，本机不改写">
         <ScanPanelMock
           instructions={instructions.map((instruction) => instruction)}
           scanLabel={SCAN_TYPE_LABELS[scanType]}
         />
       </ScanSec>
-      <ScanSec no="02" title="现在能做什么" hint="按系统结果继续">
-        <ScanChain active={0} />
+      <ScanSec no="02" title="现在在这一步" hint="做到哪一步，不是完成百分比">
+        <ScanChain active={1} />
       </ScanSec>
       {/* 「这次会话」整张卡是纯展示，已搬去 ScanSettingsStatusView。restoredFromStorage 必须喂
           **挂载那一刻**那个 ref：每帧重算会把一个刚在本页建成的会话说成「本页重载过」。 */}
       <ScanSettingsSessionFacts
-        scanType={scanType} scanTaskId={scanTaskId} countdown={countdown}
+        scanType={scanType} countdown={countdown}
         rescanRequested={rescanRequested} plainRestartChosen={plainRestartChosen}
         restoredFromStorage={restoredFromStorageRef.current}
       />

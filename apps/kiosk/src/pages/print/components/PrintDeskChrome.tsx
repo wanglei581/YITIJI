@@ -16,9 +16,9 @@ export function PrintDeskGuide({ step, title, detail }: {
         <div><h2>{title}</h2><p>{detail}</p></div>
       </div>
       <ol aria-label="打印流程">
-        {['选文件', '材料检查', '预览与参数', '核对价格'].map((label, index) => (
-          <li key={label} aria-current={index + 1 === step ? 'step' : undefined}>
-            <span>{index + 1}</span>{label}
+        {['选文件', '材料检查', '预览与参数', '报价确认'].map((label, index) => (
+          <li key={label} aria-current={index + 1 === step ? 'step' : undefined} data-done={index + 1 < step ? 'true' : undefined}>
+            <i aria-hidden="true" /><span className="qpd-sr">第 {index + 1} 步：</span>{label}
           </li>
         ))}
       </ol>
@@ -26,11 +26,21 @@ export function PrintDeskGuide({ step, title, detail }: {
   )
 }
 
-/** 草稿交给现有顾问页，用户确认后自行发送。 */
-export function PrintDeskFooter({ children, onBack, step = 'preview' }: { children: ReactNode; onBack: () => void; step?: 'check' | 'preview' }) {
+/** 草稿交给现有顾问页，用户确认后自行发送。稿 13 三个按钮：回退 / 查看我的文档 / 下一步。 */
+export function PrintDeskFooter({ children, onBack, step = 'preview', docsDisabled = false }: {
+  children: ReactNode
+  onBack: () => void
+  step?: 'check' | 'preview'
+  /** 检查进行中与回退按钮一起停用，免得半途离开。 */
+  docsDisabled?: boolean
+}) {
+  const navigate = useNavigate()
   return (
     <div className="qpd-bottom">
-      <div className="qpd-cta">{children}</div>
+      <div className="qpd-cta">
+        {children}
+        <button className="qx-btn qpd-docs" data-variant="ghost" type="button" disabled={docsDisabled} onClick={() => navigate('/me/documents')}>查看我的文档</button>
+      </div>
       <div className="qpd-actions">
         <button type="button" onClick={onBack}>上一步</button>
         <PrintAiHelp

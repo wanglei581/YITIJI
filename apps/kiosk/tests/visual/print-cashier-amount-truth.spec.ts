@@ -138,7 +138,9 @@ for (const scenario of [
     await openCashier(page)
     if (scenario.issue) {
       await page.getByRole('button', { name: '屏上收款码' }).click()
-      await expect(page.getByText('请扫码支付', { exact: true })).toBeVisible()
+      // 稿 32 的屏上收款码态没有状态块：认这一屏靠状态标记与收款码标题。
+      await expect(page.locator('[data-qx-state="pending-qr"]')).toBeVisible()
+      await expect(page.locator('.cashier-qr-title')).toContainText('扫码支付')
       // ① 该通道实际将要收取的金额（观测值，来自出码响应）。
       expect(seen.chargeCents).toBe(W2_ORDER.amountCents)
     }
@@ -177,7 +179,9 @@ test('cashier discloses that the sandbox test channel takes no real money @kiosk
 
   await openCashier(page)
   await page.getByRole('button', { name: '屏上收款码' }).click()
-  await expect(page.getByText('请扫码支付', { exact: true })).toBeVisible()
+  // 稿 32 的屏上收款码态没有状态块：认这一屏靠状态标记与收款码标题。
+  await expect(page.locator('[data-qx-state="pending-qr"]')).toBeVisible()
+  await expect(page.locator('.cashier-qr-title')).toContainText('扫码支付')
 
   // 即便在 sandbox，这个数也不是「示例金额」——sandbox 只是不真收款，不是「金额是编的」。
   const visibleText = await cashierPage(page).innerText()

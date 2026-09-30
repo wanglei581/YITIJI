@@ -200,7 +200,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
         rows: [['支付状态', c.locked ? '上一次尝试已结束，本次尚未重新出码' : '尚未发起'], ['下一步', '选择一个支付通道']],
         ask: c.locked
           ? [<>这一单<em>再付一次</em>。</>, <>上一次尝试已经结束。<b>金额沿用这一单已建订单的结果</b>，通道和扫码方式可以重新选。</>]
-          : [<>先选<em>支付通道</em>。</>, `本机已启用${c.enabledNames}。选完再选扫码方式，创建尝试前都可以改。`],
+          : [<>先选<em>怎么付</em>。</>, `可以用${c.enabledNames}。然后再选：你扫屏幕上的码，或这台机器扫你的付款码。付没付成，以到账结果为准。`],
       }
     case 'channel-selected':
       return {
@@ -270,7 +270,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
             ],
             chips: [['ok', '订单已建立'], [undefined, '免费试运营'], ['warn', '打印任务待恢复']],
             rows: [['收款情况', '免费试运营 · 本次未收款'], ['打印任务', '尚未建立']],
-            ask: [<>这一单<em>免费试运营</em>，任务没建成。</>, '本次未收款。这里只重试创建同一打印任务，不会向你收款。'],
+            ask: [<>这一单<em>本来就没收钱</em>，任务没建成。</>, '本次未收款。这里只重试创建同一打印任务，不会向你收款。'],
           }
         : {
             kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '付款已确认，打印任务尚未建立',
@@ -414,15 +414,15 @@ export function cashierQxPill(state: CashierQxState, opts: { locked: boolean; fr
   return { tone, label }
 }
 
-/** 付款列放「支付工具」（屏上码 / 扫码器 / 已失效的码）的状态；其余状态付款列放金额卡。 */
+/** 付款列放「支付工具」（屏上码 / 扫码器 / 到账进度与核实入口 / 停止显示的码）的状态；其余状态付款列放金额卡。
+ *  收款码已过期、旧尝试已失败两态照稿 32 走终态骨架（金额在左、订单在右）：状态块已经把「旧码不能再付、订单还在」
+ *  讲清，再叠一张「已失效的码」卡只是同一句话讲第二遍，还会把订单信息挤出屏幕。 */
 export const INSTRUMENT_STATES: ReadonlySet<CashierQxState> = new Set([
   'pending-qr',
   'pending-scan',
   'awaiting-code-confirmation',
   'pending-verification',
   'display-expired-reconciling',
-  'expired',
-  'attempt-failed',
 ])
 /** 两层选择条上用哪一种扫码方式（稿 32 MODE）：已有尝试时以服务端尝试为准。 */
 export const PICKERS_ENABLED: ReadonlySet<CashierQxState> = new Set(['pending', 'channel-selected', 'pending-scan'])
@@ -438,9 +438,7 @@ export function pickerNote(state: CashierQxState, free: boolean, channelCount: n
 
 /** 付款列里那张「已经不能用的码 / 尝试」卡：页面状态块讲结论，这张卡只讲这张码本身。 */
 export const TERMINAL_CARD: Partial<Record<CashierQxState, readonly [string, string]>> = {
-  expired: ['这张收款码已失效', '已经确认这张码不能再付款，屏幕上不再显示可扫的码。重新出码沿用本单金额。'],
   'display-expired-reconciling': ['收款码已停止显示', '显示有效期已到，屏幕上不再显示这张码；渠道是否已经关单仍在核实，确认前请勿重复支付。'],
-  'attempt-failed': ['上一次支付尝试已结束', '已经确认这次尝试已失败，旧码不能再扣款。'],
 }
 
 export function channelLabelOf(key: string | null | undefined): string {

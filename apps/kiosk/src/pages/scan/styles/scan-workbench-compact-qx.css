@@ -106,3 +106,15 @@
   [data-kiosk-stage-fit='off'] .sw-scroll[data-layout='spread'] .sw-plan li { font-size: 15px; }
   [data-kiosk-stage-fit='off'] .sw-scroll[data-layout='spread'] .sw-foot { font-size: 14px; }
 }
+
+/* 2.0：三步卡改成三列栅格、操作条下加了「返回打印扫描 / 问小青」一排（scan-workbench-v2-qx.css）；
+ * 手机宽度三步卡单列、卡高按内容，底部那一排按手机字阶。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .sw-chain { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  [data-kiosk-stage-fit='off'] .sw-link { min-height: 0; padding: 12px 14px; }
+  [data-kiosk-stage-fit='off'] .sw-ty-chips .sw-mini { font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .sw-chip { min-height: var(--qx-tap-min); font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .sw-airow { min-height: 48px; gap: 10px; }
+  [data-kiosk-stage-fit='off'] .sw-airow :is(.qx-step-prev, .qx-ai-help) { min-height: var(--qx-tap-min); font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .sw-plan.is-two-col { grid-template-columns: minmax(0, 1fr); }
+}

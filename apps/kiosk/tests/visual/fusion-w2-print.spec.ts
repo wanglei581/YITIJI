@@ -1464,7 +1464,9 @@ test('cashier renders a pending QR without exposing its session token @w2', asyn
   await page.goto('/print/cashier')
   await setReactRouterState(page, '/print/cashier', cashierState)
   await page.getByRole('button', { name: '手机扫屏幕上的码' }).click()
-  await expect(page.locator('.qx-state-t', { hasText: '请扫码支付' })).toBeVisible()
+  // 稿 32 的屏上收款码态没有状态块：认这一屏靠状态标记与收款码标题。
+  await expect(page.locator('[data-qx-state="pending-qr"]')).toBeVisible()
+  await expect(page.locator('.cashier-qr-title')).toHaveText('请使用微信支付扫码支付')
   await expect(page.locator('svg').filter({ has: page.locator('path') })).not.toHaveCount(0)
   await expect(page.getByText(W2_ORDER.paymentSessionToken)).toHaveCount(0)
   // 稿 32-cashier 把出码等待态的主按钮定为「刷新付款结果」（稿内 5 次），

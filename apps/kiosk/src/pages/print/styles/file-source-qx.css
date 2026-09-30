@@ -8,8 +8,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 20px 0 18px;
+  gap: 14px;
+  padding: 14px 0 10px;
 }
 
 /* 稿 12 顶栏之后直接是深色 FILE SOURCE hero，没有「文档打印 / 通用文档…」这一行页头；
@@ -287,14 +287,6 @@
   font-size: var(--qx-fs-aux-lg); font-weight: 600; color: var(--qx-wheat-d);
   min-height: var(--qx-tap-min);
 }
-.fs-truth {
-  display: flex; gap: 18px;
-  padding-top: 8px;
-  border-top: 1px solid var(--qx-line);
-  font-size: var(--qx-fs-aux); line-height: 1.45; color: var(--qx-ink-3);
-}
-.fs-truth b { color: var(--qx-ink-2); font-weight: 600; }
-.fs-truth div { flex: 1; }
 
 .fs-dot {
   width: 16px; height: 16px; border-radius: 50%;
@@ -365,35 +357,6 @@
 .fs-preview-close:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 .fs-preview-body { flex: 1; min-height: 0; background: var(--qx-deep); }
 
-.fs-phone-slot { min-height: 280px; }
-.fs-qr-blank,
-.fs-qr-live {
-  min-height: 280px;
-  border-radius: 26px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  text-align: center;
-  padding: 24px;
-}
-.fs-qr-blank {
-  border: 1px dashed var(--qx-line-2);
-  color: var(--qx-ink-3);
-}
-.fs-qr-blank strong { font-size: var(--qx-fs-body); color: var(--qx-ink-2); }
-.fs-qr-live {
-  border: 1px solid var(--qx-line-2);
-  background: var(--qx-paper);
-  gap: 16px;
-}
-.fs-qr-live span {
-  font-size: var(--qx-fs-aux);
-  line-height: 1.45;
-  color: var(--qx-ink-3);
-}
-
 .fs-hidden-input {
   position: absolute;
   width: 1px; height: 1px;
@@ -463,7 +426,6 @@
   .fs-mini { padding: 16px 18px; border-radius: 20px; }
   .fs-mini h4 { font-size: var(--qx-fs-aux); gap: 8px; line-height: 1.3; }
   .fs-mini p { margin-top: 6px; font-size: var(--qx-fs-body); line-height: 1.5; }
-  .fs-truth { flex-direction: column; gap: 8px; font-size: var(--qx-fs-aux); line-height: 1.5; }
 
   .fs-note { gap: 10px; font-size: var(--qx-fs-body); line-height: 1.55; }
   .fs-note .sq { margin-top: 8px; }
@@ -501,14 +463,6 @@
   .fs-reason { font-size: var(--qx-fs-aux); line-height: 1.45; }
   .fs-hr { margin: 12px 0; }
 
-  .fs-phone-slot,
-  .fs-qr-blank,
-  .fs-qr-live { min-height: 220px; }
-  .fs-qr-blank,
-  .fs-qr-live { padding: 18px; border-radius: 20px; }
-  .fs-qr-blank strong { font-size: var(--qx-fs-aux); }
-  .fs-qr-live span { font-size: var(--qx-fs-aux); }
-
   /* 余量吸收块：手机下按内容撑开，由 .qx-scroll 负责滚动，不再被压成 0 盖住后面的说明 */
   .fs-page .qx-grow { flex: none; min-height: auto; }
 
@@ -536,47 +490,146 @@
   .print-upload-footer .qx-btn[data-variant='primary'] { min-height: 60px; font-size: var(--qx-fs-aux); }
 }
 
-/* 2.0：只读步骤留在上方，来源、文件操作均从工作区开始。 */
-.fs-flow { flex: none; min-height: 128px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--qx-ink-3); font-size: var(--qx-fs-body); }
-.fs-flow [aria-current] { color: var(--qx-teal-d); font-weight: 700; }
+/* 2.0 通用收口（稿 qx2 段）：底部两行。稿里页脚那条留存说明是隐藏的（.truth{display:none}），
+ * 这一句已在上一页「打印扫描」写明，本页不再重复占一行。 */
 .fs-page > *, .fs-page .qx-grow { flex-shrink: 0; }
-.fs-page .qx-grow { flex: none; min-height: auto; }
 .fs-page .qx-card { border-radius: 32px; }
-.fs-page [data-testid='file-source-file-card'] { display: flex; flex-direction: column; gap: 16px; padding: 28px 30px; }
-.fs-page [data-testid='file-source-file-card'] .fs-hr { margin: 0; }
-.fs-page .fs-now-m { flex-basis: 450px; }
-.fs-page .fs-now-act { margin-left: auto; }
-.fs-page .fs-sbtn { min-height: 64px; }
 .fs-bottom { width: 100%; }
 .fs-actions { display: flex; justify-content: space-between; gap: 16px; padding-top: 8px; }
 .fs-actions button { min-height: 64px; padding: 8px 0; border: 0; background: transparent; color: var(--qx-teal-d); font-size: var(--qx-fs-body); font-weight: 600; cursor: pointer; }
-.fs-truth { display: block; font-size: var(--qx-fs-aux); }
-.fs-truth p { margin: 0; }
 .fs-preview-body [data-pdf-preview-host] nav { flex-wrap: wrap; }
 .fs-preview-body :is(button, nav span, p) { font-size: var(--qx-fs-body); }
+
+/* ── 终版 12 排满一屏（稿 9/28「留白」段） ─────────────────────────
+ * 主卡（.fs-gcard）吸收本屏余量，卡里几组内容平分余量；三步说明排成一行三列；
+ * 列表行、当前文件卡、二维码在字阶内排舒展。字号只用现有令牌，一个没放大。 */
+.fs-status-p { margin-top: 10px; line-height: 1.45; }
+.fs-mini h4 { font-size: var(--qx-fs-body-lg); }
+.fs-mini p { line-height: 1.45; }
+.fs-note, .fs-notes { line-height: 1.45; }
+.fs-note > span:last-child, .fs-steps li > span:last-child { text-wrap: balance; }
+
+.fs-page > .fs-sec.qx-grow { flex: 1 0 auto; min-height: auto; }
+.fs-gcard {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 14px;
+  padding: 22px 30px;
+}
+.fs-gcard.spread { justify-content: space-between; }
+.fs-gcard.list { justify-content: flex-start; gap: 0; }
+.fs-gcard-h { margin-bottom: 10px; }
+.fs-gcard-h .t, .fs-steps-h .t { font-size: var(--qx-fs-body-lg); }
+.fs-steps-h { margin-bottom: 8px; }
+.fs-gcard-body { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: space-evenly; gap: 14px; }
+.fs-flist { display: flex; flex-direction: column; gap: 10px; }
+
+.fs-steps.row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 28px; row-gap: 8px; }
+.fs-steps.row li { gap: 12px; }
+.fs-steps.row .n { width: 34px; height: 34px; border-radius: 11px; }
+.fs-notes.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+.fs-notes.two > :nth-child(3) { grid-column: 1 / -1; }
+
+.fs-frow { min-height: 108px; padding: 18px 20px; gap: 20px; }
+.fs-f-ic { width: 64px; height: 64px; }
+.fs-f-tag { min-height: 56px; }
+.fs-empty { padding: 22px 0; }
+
+/* 当前文件卡：文件行在上，预览按钮、分隔线、说明与三步往下平分余量。 */
+.fs-gcard[data-testid='file-source-file-card'] { justify-content: flex-start; gap: 16px; padding: 28px 30px; }
+.fs-gcard[data-testid='file-source-file-card'] > .fs-pvopen,
+.fs-gcard[data-testid='file-source-file-card'] > .fs-hr,
+.fs-gcard[data-testid='file-source-file-card'] > div:last-child { margin-top: auto; }
+.fs-gcard[data-testid='file-source-file-card'] > .fs-hr { margin-bottom: 0; }
+.fs-gcard[data-testid='file-source-file-card'] .fs-now-ic { width: 104px; height: 104px; border-radius: 30px; }
+.fs-gcard[data-testid='file-source-file-card'] .fs-now-ic svg { width: 48px; height: 48px; }
+.fs-pvopen { width: 100%; min-height: 88px; }
+.fs-page .fs-now-m { flex-basis: 450px; }
+.fs-page .fs-now-act { margin-left: auto; }
+.fs-page .fs-sbtn { min-height: 64px; }
+
+/* 定高 1080×1920：底部操作条比稿多一档主按钮高度（壳层 96px），正文这边收一点内边距把余量还回来。 */
+.qx-stage:has(.fs-page) > .qx-ctabar { padding-top: 12px; padding-bottom: 6px; }
+.fs-actions { padding-top: 4px; }
+.fs-status { padding: 24px 30px; }
+.fs-page .fs-ch { padding: 20px 22px 18px; }
+.fs-page .fs-ch-ic { margin-bottom: 8px; }
+
+/* 来源选择：说明卡被挤短，分区间距收紧，三步已是一行三列。 */
+.fs-page[data-state='source-chooser'] { gap: 12px; }
+.fs-page[data-state='source-chooser'] .fs-sec { gap: 10px; }
+.fs-page[data-state='source-chooser'] .fs-mini { padding: 16px 22px; }
+.fs-page[data-state='source-chooser'] .fs-mini p { margin-top: 6px; }
+.fs-page[data-state='source-chooser'] .fs-chooser-now { padding: 18px 30px; }
+.fs-chooser-now { justify-content: flex-start; gap: 10px; }
+
+/* 二维码（稿 qr-wrap）：左码右说明，码 440 见方；这几态各区块均分余量，码卡不拉高。 */
+.fs-qr-wrap { display: flex; gap: 34px; align-items: center; }
+.fs-qr {
+  flex: none;
+  position: relative;
+  width: 440px;
+  height: 440px;
+  padding: 22px;
+  border-radius: 26px;
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fs-qr:not(.blank) svg { width: 100%; height: auto; }
+.fs-qr.dim svg path:last-of-type { fill: var(--qx-ink-3); }
+.fs-qr-mask {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 14px 8px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--qx-paper) 94%, transparent);
+  text-align: center;
+  font-size: var(--qx-fs-body);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--qx-ink-2);
+}
+.fs-qr.blank { border-style: dashed; flex-direction: column; gap: 16px; color: var(--qx-ink-3); text-align: center; }
+.fs-qb-t { font-size: var(--qx-fs-body-lg); font-weight: 700; line-height: 1.4; color: var(--qx-ink-2); }
+.fs-qb-s { font-size: var(--qx-fs-body); line-height: 1.45; padding: 0 10px; }
+.fs-qr-side {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0;
+}
+.fs-qr-side h3 { margin: 0 0 14px; font-size: var(--qx-fs-sec); font-weight: 700; line-height: 1.3; }
+.fs-qr-foot { margin-top: 12px; }
+.fs-page:has(.fs-qr-wrap) { justify-content: space-between; }
+.fs-page:has(.fs-qr-wrap) > .fs-sec.qx-grow { flex: none; }
+
 @media (max-width: 760px) {
   .fs-hero { min-height: 0; }
-  .fs-flow { min-height: 80px; flex-wrap: wrap; }
   .fs-page .fs-now-m { flex-basis: 160px; }
   .fs-actions { flex-wrap: wrap; }
-}
-
-/* 终版 12：运行页沿用同一张工作区，不再额外占一条重复流程带。
- * 来源卡、当前文件和二维码按稿的留白比例展开；真实状态与操作仍由 JSX 决定。 */
-.fs-page .fs-flow { display: none; }
-.fs-page .fs-ch { min-height: 260px; }
-.fs-page .fs-now { min-height: 156px; }
-.fs-page .fs-phone-slot,
-.fs-page .fs-qr-blank,
-.fs-page .fs-qr-live { min-height: 440px; }
-.fs-page .fs-qr-live svg { width: min(396px, 100%); height: auto; }
-.fs-page .fs-sec.qx-grow > .qx-card { min-height: 248px; }
-@media (max-width: 760px) {
-  .fs-page .fs-ch { min-height: 0; }
-  .fs-page .fs-now { min-height: 0; }
-  .fs-page .fs-phone-slot,
-  .fs-page .fs-qr-blank,
-  .fs-page .fs-qr-live { min-height: 220px; }
-  .fs-page .fs-qr-live svg { width: min(300px, 100%); }
-  .fs-page .fs-sec.qx-grow > .qx-card { min-height: 0; }
+  .fs-page > .fs-sec.qx-grow, .fs-gcard { flex: none; }
+  .fs-gcard { padding: 18px; }
+  .fs-steps.row, .fs-notes.two { grid-template-columns: minmax(0, 1fr); }
+  .fs-frow { min-height: 72px; padding: 12px; gap: 12px; }
+  .fs-f-ic { width: 44px; height: 44px; }
+  .fs-f-tag { min-height: 48px; }
+  .fs-gcard[data-testid='file-source-file-card'] { padding: 18px; }
+  .fs-gcard[data-testid='file-source-file-card'] .fs-now-ic { width: 56px; height: 56px; border-radius: 18px; }
+  .fs-pvopen { min-height: 56px; }
+  .fs-qr-wrap { flex-direction: column; align-items: stretch; gap: 16px; }
+  .fs-qr { width: min(300px, 100%); height: auto; aspect-ratio: 1; align-self: center; padding: 14px; }
+  .fs-qr-side h3 { font-size: var(--qx-fs-body-lg); }
+  .fs-page:has(.fs-qr-wrap) { justify-content: flex-start; }
 }

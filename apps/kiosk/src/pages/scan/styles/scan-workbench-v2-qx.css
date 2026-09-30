@@ -1,0 +1,113 @@
+/* 扫描工作台 · 青序流光 2.0（稿 docs/design/kiosk-redesign-2026-08-v2/18-scan-workbench.html）
+ * 主样式 scan-workbench-qx.css 已过 700 行，2.0 的字阶与版式覆盖放在这里；在主样式之后、
+ * 紧凑样式（scan-workbench-compact-qx.css）之前引入 —— 手机宽度的收紧规则仍由紧凑样式说了算。
+ * 字号一律取 --qx-fs-* 令牌，不比稿大。
+ */
+
+/* ── 小青横幅（稿 .xq）──────────────────────────────────────── */
+.sw-xq-eyebrow {
+  font-size: var(--qx-fs-aux-lg);
+  letter-spacing: 2px;
+  color: color-mix(in srgb, var(--qx-paper) 90%, transparent);
+}
+.sw-xq-ask { font-size: var(--qx-fs-page); line-height: 1.35; }
+.sw-xq-doing {
+  font-size: var(--qx-fs-body);
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--qx-paper) 90%, transparent);
+}
+.sw-xq-facts span { font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
+
+/* ── 分区标题（稿 .sec-label）──────────────────────────────── */
+.sw-no { font-size: var(--qx-fs-body); }
+.sw-sec-h .t { font-size: var(--qx-fs-sec); }
+.sw-sec-h .hint { font-size: var(--qx-fs-aux-lg); }
+
+/* ── 就这三步（稿 .chain：三张等宽卡，没有箭头）──────────────── */
+.sw-scroll .sw-chain,
+.sw-chain {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  min-height: 0;
+}
+.sw-link { min-height: 180px; padding: 16px 18px; border-radius: 24px; gap: 6px; }
+.sw-link-ic { width: 44px; height: 44px; }
+.sw-link b { font-size: var(--qx-fs-body-lg); line-height: 1.3; }
+.sw-link-c { font-size: var(--qx-fs-aux); line-height: 1.35; }
+.sw-link-who { font-size: var(--qx-fs-aux); line-height: 1.35; padding: 4px 10px; }
+
+/* ── 类型卡（稿 .ty）──────────────────────────────────────── */
+.sw-ty { min-height: 300px; padding: 18px 20px 16px; }
+.sw-ty-n { font-size: var(--qx-fs-sec); }
+.sw-ty-d { font-size: var(--qx-fs-body); line-height: 1.4; }
+.sw-mini { font-size: var(--qx-fs-aux); }
+
+/* ── 说明卡 / 清单（稿 .pgrp / .plan）──────────────────────── */
+.sw-pgrp h4,
+.sw-scroll[data-layout='spread'] .sw-pgrp h4 { font-size: var(--qx-fs-btn); }
+.sw-note-body,
+.sw-plan li,
+.sw-scroll[data-layout='spread'] .sw-note-body,
+.sw-scroll[data-layout='spread'] .sw-plan li { font-size: var(--qx-fs-body); line-height: 1.45; }
+.sw-foot,
+.sw-scroll[data-layout='spread'] .sw-foot { font-size: var(--qx-fs-aux); }
+.sw-kv > div { font-size: var(--qx-fs-body); }
+.sw-kv > div > span:first-child { width: 150px; }
+/* 两列说明卡等高：稿里并排两张卡底边齐平。 */
+.sw-grid2.is-even { align-items: stretch; }
+.sw-grid2.is-even > .sw-pgrp .sw-foot { margin-top: auto; }
+.sw-grid2.is-even > .sw-pgrp .sw-note-body + .sw-foot,
+.sw-grid2.is-even > .sw-pgrp .sw-plan + .sw-foot { margin-top: auto; }
+.sw-pgrp > .sw-note-body { flex: 1; }
+.sw-pgrp .sw-foot { margin-top: 14px; }
+
+/* 满宽说明卡里的清单排两列（稿 failed 屏「本机不会替系统补话」）。 */
+.sw-plan.is-two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; }
+
+/* 卡片里的一行小字 key-value（「本次性质」这类只在特定情况下出现的一行）。 */
+.sw-inline-kv { display: flex; gap: 12px; }
+.sw-inline-kv > span:first-child { flex: none; color: var(--qx-ink-3); }
+
+/* ── 状态卡（稿 .state）──────────────────────────────────── */
+.sw-state-h { font-size: var(--qx-fs-sec); }
+.sw-state-hero .sw-state-h { font-size: calc(var(--qx-fs-page) - 2px); }
+.sw-state-p,
+.sw-state-hero .sw-state-p { font-size: var(--qx-fs-body); line-height: 1.5; }
+.sw-state-hero { padding: 28px 34px; }
+.sw-chip,
+.sw-state-hero .sw-chip { font-size: var(--qx-fs-aux); min-height: 52px; }
+
+/* ── 面板示意（稿 .panel）──────────────────────────────────── */
+.sw-mfp-screen { font-size: var(--qx-fs-aux-lg); }
+.sw-mfp-cap,
+.sw-psrc { font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
+.sw-pstep-t { font-size: var(--qx-fs-body); }
+
+/* ── 结果出口 / 预览头 ─────────────────────────────────────── */
+.sw-pvh-2 { font-size: var(--qx-fs-aux); }
+.sw-exit small { font-size: var(--qx-fs-aux); line-height: 1.35; }
+.sw-offtag { font-size: var(--qx-fs-aux); }
+.sw-preview-cap { font-size: var(--qx-fs-aux); }
+
+/* ── 起点底部三列（稿 .truth）与操作条 ─────────────────────── */
+.sw-truth div { font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+.sw-cta-reason { font-size: var(--qx-fs-aux-lg); }
+.sw-cta-wrap[data-reserve-reason='true'] {
+  min-height: calc(var(--qx-btn-h-lg) + var(--qx-fs-aux-lg) * 1.3 + 8px);
+}
+.sw-note-actions { flex-wrap: wrap; }
+.sw-note-actions .qx-btn { white-space: normal; }
+
+/* 操作条下面那一排「返回打印扫描 / 问小青」（稿 .qx-airow）。 */
+.sw-ctabar-stack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.qx-stage:has(.sw-page) .qx-ctabar { padding-bottom: 6px; }
+.sw-airow { min-height: 56px; }
+.sw-airow .qx-step-prev { color: var(--qx-teal-d); }
+.sw-stack { display: flex; flex-direction: column; gap: 12px; }

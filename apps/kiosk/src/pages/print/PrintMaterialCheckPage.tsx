@@ -40,6 +40,7 @@ import {
 } from './components/MaterialCheckPresentation'
 import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
 import { manualOriginalPrintCheck } from './printDeskModel'
+import { checkDeskCopy } from './printDeskCopy'
 import './styles/print-desk-qx.css'
 
 /** 检查途中这一份交接已被替换或失效：迟到的结果一律不写，当场停下。 */
@@ -256,6 +257,7 @@ export function PrintMaterialCheckPage({
   const [decisions, setDecisions] = useState<Record<string, PiiFindingAction>>({})
   const [error, setError] = useState<string | null>(null)
   const [encryptedByPreview, setEncryptedByPreview] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   useEffect(() => { setEncryptedByPreview(false) }, [file?.fileId])
 
   const findings = piiTask?.piiFindings ?? []
@@ -306,6 +308,7 @@ export function PrintMaterialCheckPage({
     }
 
     setStage('inspection')
+    setRetrying(retry)
     setError(null)
     setInspectionTask(null)
     setNormalizeTask(null)
@@ -618,23 +621,12 @@ export function PrintMaterialCheckPage({
     )
   }
 
-  const allFindingsDecided = findings.length === 0 || allDecided
+  const remaining = findings.filter((finding) => decisions[finding.id] !== 'keep' && decisions[finding.id] !== 'redact').length
   const submitFailed = stage === 'review' && error !== null
-  const status = encryptedPdf
-    ? { tone: 'bad' as const, label: '这份 PDF 打不开' }
-    : stage === 'error'
-    ? { tone: 'bad' as const, label: '材料检查失败 · 结果未知' }
-    : submitFailed
-      ? { tone: 'bad' as const, label: '遮挡处理未完成 · 请重试' }
-    : isWorking
-      ? { tone: 'warn' as const, label: stage === 'submitting' ? '正在生成遮挡文件' : '正在检查材料' }
-      : requiresFormatReview
-        ? { tone: 'bad' as const, label: '文件需要重新上传' }
-        : piiScanIncomplete
-          ? { tone: 'warn' as const, label: '请你确认后按原件继续' }
-          : !allFindingsDecided
-          ? { tone: 'warn' as const, label: `还有 ${findings.filter((finding) => decisions[finding.id] !== 'keep' && decisions[finding.id] !== 'redact').length} 处待确认` }
-          : { tone: 'ok' as const, label: '材料检查完成' }
+  const copy = checkDeskCopy({
+    encryptedPdf, stage, isWorking, retrying, submitFailed, requiresFormatReview, piiScanIncomplete,
+    scanSkipped: Boolean(piiModeCopy && !piiScanIncomplete), findingCount: findings.length, remaining,
+  })
 
   // Legacy gate markers: PrintPageFrame, KioskActionBar, step={2}.
   // The route now renders QxPageFrame and its qx-ctabar; these names only document the replaced contract.
@@ -644,31 +636,11 @@ export function PrintMaterialCheckPage({
       back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
       title="材料检查"
       subtitle="第 2 步 / 共 4 步 · 检查格式、大小、页数与图片质量，并完成隐私选择"
-      status={status}
+      status={copy.status}
       ctabar={(
-        <PrintDeskFooter step="check" onBack={() => navigate(uploadPath)}>
+        <PrintDeskFooter step="check" onBack={() => navigate(uploadPath)} docsDisabled={isWorking}>
           <button className="qx-btn" data-variant="ghost" type="button" disabled={isWorking} onClick={() => navigate(uploadPath)}>返回选文件</button>
-          <p className="why">
-            {encryptedPdf
-              ? ENCRYPTED_PDF_BLOCK_COPY
-              : stage === 'error'
-              ? '检查结果未知，隐私预检不可跳过。请重试或返回重新选择文件。'
-              : isWorking
-                ? stage === 'submitting'
-                  ? '正在保存选择并生成遮挡文件，完成前不能进入预览。'
-                  : '正在检查材料，结果返回前不能进入预览，也不会自动放行。'
-              : submitFailed
-                ? '上次保存选择或遮挡处理没有完成，打印文件未更新。请再次点击继续重试。'
-              : requiresFormatReview
-                ? '文件体检判定当前文件不能直接打印，请返回重新上传。'
-                : piiScanIncomplete
-                  ? (allFindingsDecided
-                    ? '文字识别这次没覆盖这份文件。确认后按原件继续，本机不会生成遮挡文件。'
-                    : '每一处已经标出的内容都要先选择保留或遮挡，然后再确认按原件继续。')
-                  : !allFindingsDecided
-                  ? '每一处隐私片段都必须由你选择保留或遮挡。'
-                  : '继续后会保存选择，并按处理结果准备打印文件。'}
-          </p>
+          <p className="why">{copy.why}</p>
           <button
             className="qx-btn"
             data-variant="primary"
@@ -689,10 +661,7 @@ export function PrintMaterialCheckPage({
         </PrintDeskFooter>
       )}
     >
-      <PrintDeskGuide step={2}
-        title={encryptedPdf ? <>这份 PDF <em>打不开</em>。</> : stage === 'error' ? <>检查<em>没做成</em>。</> : isWorking ? <>正在<em>读这份文件</em>。</> : findings.length > 0 ? <>有 {findings.length} 处<em>要你拿主意</em>。</> : <>先<em>看清楚</em>再出纸。</>}
-        detail={encryptedPdf ? ENCRYPTED_PDF_BLOCK_COPY : stage === 'error' ? '请重试检查，或返回选择其他文件。' : '检查格式、页数和个人信息，逐项确认后再设打印参数。'}
-      />
+      <PrintDeskGuide step={2} title={copy.title} detail={copy.detail} />
       <div className="qpd-check-page">
         <div className="qpd-check-intro" data-feature="文件预检">
           <strong>文件预检</strong>
@@ -721,6 +690,7 @@ export function PrintMaterialCheckPage({
           findings={presentationFindings}
           requiresFormatReview={requiresFormatReview}
           isWorking={isWorking}
+          retrying={retrying}
           onRetry={() => void runChecks({ retry: true })}
           onBack={() => navigate(uploadPath)}
           onApplySuggested={applySuggestedDecisions}
