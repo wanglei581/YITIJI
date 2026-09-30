@@ -74,6 +74,10 @@ async function main(): Promise<void> {
         lifecycleStatus: 'active',
       },
     })
+    // 重提打印要求终端心跳 agentVersion ≥ 0.4.13（#1152 的版本门槛）；不带版本号会被 409 挡下。
+    await prisma.terminalHeartbeat.create({
+      data: { terminalId, status: 'online', localTaskDatabaseAvailable: true, agentVersion: '0.4.13', createdAt: new Date() },
+    })
     await prisma.fileObject.create({
       data: {
         id: fileId,
@@ -156,6 +160,7 @@ async function main(): Promise<void> {
     await prisma.order.deleteMany({ where: { id: orderId } })
     await prisma.printTask.deleteMany({ where: { id: taskId } })
     await prisma.fileObject.deleteMany({ where: { id: fileId } })
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
     await prisma.endUser.deleteMany({ where: { id: memberId } })
     await prisma.onModuleDestroy()

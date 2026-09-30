@@ -12813,7 +12813,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 633,
+      "reachableFileCount": 632,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15733,33 +15733,6 @@
             "Outlet",
             "SmartCampusCapabilityBoundary"
           ],
-          "path": "/smart-campus/freshman-insights",
-          "styles": [],
-          "wrappers": [
-            "FreshmanInsightsPage"
-          ]
-        },
-        {
-          "component": "SmartCampusGuard",
-          "endpoints": [
-            "GET /job-fairs",
-            "GET /job-fairs/:param",
-            "GET /job-fairs/:param/companies/:param",
-            "GET /job-fairs/:param/map",
-            "GET /job-fairs/:param/materials",
-            "GET /job-fairs/:param/stats",
-            "GET /job-fairs/:param/venue-guide",
-            "GET /job-fairs/:param/zones",
-            "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
-          ],
-          "file": "apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx",
-          "layout": [
-            "KioskRoot",
-            "KioskRuntimeRoot",
-            "Outlet",
-            "SmartCampusCapabilityBoundary"
-          ],
           "path": "/smart-campus/service/:key",
           "styles": [],
           "wrappers": [
@@ -17871,13 +17844,24 @@
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts"
     ],
+    ".github/workflows/cleanup-stale-releases.yml": [
+      "scripts/verify-server-maintenance-workflows.mjs"
+    ],
+    ".github/workflows/deploy-precheck.yml": [
+      "scripts/verify-server-maintenance-workflows.mjs"
+    ],
     ".github/workflows/deploy.yml": [
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-deploy-authorization-gate.mjs",
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs",
-      "scripts/verify-release-bundle.mjs"
+      "scripts/verify-release-bundle.mjs",
+      "scripts/verify-server-maintenance-workflows.mjs"
+    ],
+    ".github/workflows/server-cleanup.yml": [
+      "scripts/verify-deploy-rollback.mjs",
+      "scripts/verify-server-maintenance-workflows.mjs"
     ],
     ".github/workflows/windows-agent-installer.yml": [
       "scripts/verify-ci-gate-coverage.mjs"
@@ -20549,6 +20533,7 @@
     ],
     "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
+      "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "apps/kiosk/scripts/verify-smart-campus-ui.mjs"
     ],
     "apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx": [
@@ -22482,6 +22467,13 @@
     "services/api/scripts/support/content-pipeline-harness.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
+    "services/api/scripts/support/dead-redis-gate-env.ts": [
+      "services/api/scripts/verify-error-observability.ts",
+      "services/api/scripts/verify-redis-degradation-truth.ts"
+    ],
+    "services/api/scripts/support/ephemeral-redis-self-check.ts": [
+      "services/api/scripts/verify-internal-login-real-redis.ts"
+    ],
     "services/api/scripts/support/ephemeral-redis-server.ts": [
       "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
@@ -23990,6 +23982,9 @@
       "services/api/scripts/verify-partner-account-action.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
+    "services/api/src/common/redis/redis-client-options.ts": [
+      "services/api/scripts/verify-redis-degradation-truth.ts"
+    ],
     "services/api/src/common/redis/redis-degradation.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-orgs.ts",
@@ -25077,7 +25072,8 @@
     ],
     "services/api/src/member-print-orders/member-order-claim-here.service.ts": [
       "services/api/scripts/verify-member-order-timeline.ts",
-      "services/api/scripts/verify-member-print-order-idempotency-http.ts"
+      "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "services/api/src/member-print-orders/member-order-timeline.service.ts": [
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -26220,6 +26216,7 @@
       "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/src/terminals/printer-availability.ts": [
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts"
@@ -28152,6 +28149,7 @@
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "apps/kiosk/src/pages/home/HomePage.tsx",
+          "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-api.ts",
@@ -29359,6 +29357,7 @@
           "services/api/src/files/file-content-integrity.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/pii-scan-gate.ts",
+          "services/api/src/terminals/printer-availability.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ],
         "missing": []
@@ -32206,6 +32205,7 @@
         "dirs": [],
         "files": [
           ".github/workflows/deploy.yml",
+          ".github/workflows/server-cleanup.yml",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
           "services/api/src/config/production-runtime-gates.ts"
@@ -32411,6 +32411,27 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:repository-integrity"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/cleanup-stale-releases.yml",
+          ".github/workflows/deploy-precheck.yml",
+          ".github/workflows/deploy.yml",
+          ".github/workflows/server-cleanup.yml"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-server-maintenance-workflows.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:server-maintenance-workflows"
       ],
       "wired": true
     },
@@ -35176,6 +35197,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/dead-redis-gate-env.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/middleware/request-id.middleware.ts"
         ],
@@ -35829,6 +35851,7 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/ephemeral-redis-self-check.ts",
           "services/api/scripts/support/ephemeral-redis-server.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/auth/password-login-attempts.ts",
@@ -37594,6 +37617,7 @@
           "services/api/src/files/files.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/materials/materials.service.ts",
+          "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.controller.ts",
           "services/api/src/payment/order-quote.service.ts",
@@ -39588,9 +39612,11 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/dead-redis-gate-env.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/common/boot/boot-readiness.ts",
           "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/redis/redis-client-options.ts",
           "services/api/src/common/redis/redis-degradation.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/prisma/prisma.service.ts"
@@ -42796,6 +42822,26 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w4.mjs",
+          "apps/kiosk/scripts/verify-fusion-w6.mjs",
+          "apps/kiosk/scripts/verify-smart-campus-ui.mjs",
+          "docs/decisions/2026-06-17-smart-campus-jobfair-delivery-rules.md",
+          "docs/design/kiosk-proto-2026-07-migration-matrix.md",
+          "docs/design/kiosk-v6-migration-matrix.md",
+          "docs/progress/current-progress.md",
+          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
+          "docs/reviews/result-layer-2026-09-06-packets.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs、apps/kiosk/scripts/verify-fusion-w6.mjs、apps/kiosk/scripts/verify-smart-campus-ui.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

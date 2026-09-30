@@ -1,5 +1,25 @@
 # 下一步任务
 
+## 2026-09-30：走查复核新登记（候选 353b680d0，本地 rc 栈；均不阻塞第三次小步更新）
+
+后端（后端排雷窗口认领；证据 `~/.cache/walk0929/evidence/k14/`）：
+- **W-104** 诊断报告 PDF「四、内容结构摘录」把本人姓名、电话、邮箱印成「[劳动者_1]」「[手机号_1]」「[邮箱_1]」（`diagnosis-report-pdf.service.ts` 203–212；contentBlocks 只许逐字引用脱敏后原文，`llm-resume.service.ts` 384，真模型同样）。导出时还原本人原文，或不印摘录。证据 print/049-printed-p2.png。
+- **W-109** 扫描 / 图片简历诊断与优化各 OCR 一遍（48 页件 3 页×2 = 6 次），接真百度费用翻倍。
+- **W-110** 48 页扫描件只 OCR 前 3 页，页面只说「部分图片文字需要本人复核」，没说只读了 3 页。
+- **W-111** Word 简历进不了 AI 诊断：服务端 resume_upload 收 docx/doc 且有 mammoth，手机上传页按三种用途格式交集只放 PDF/JPG/PNG（模拟 U 盘同），拒收文案是打印口径。先查是哪条规则拦的再判。证据 resume/031–036。
+- **W-97 补充** 带「·」的少数民族姓名补不回（`resume-structure.ts` detectResumeName 只认 2–4 个连续汉字）；Mac 苹方导出 PDF 的康熙部首码位（U+2Fxx）未做 NFKC 归一化，姓名、标题、经历识别全部落空。
+
+一体机（候选写入方已派 Codex）：
+- **W-107** AI 简历诊断目标方向默认预选「信息传输、软件和信息技术服务业 · 应届 · 校招」（`ResumeSourcePage.tsx` 242–244）→ 不预选。
+- **W-108** 加密 PDF 诊断时只说「PDF 解析失败」，给的「重新解析」「打印原件」都走不通 → 说清是打开密码，只给「重新选择文件」。证据 resume/043–044。
+
+## 2026-09-30：第一家机构签约前必须完成（产品负责人 9/30 拍板，详见 current-progress 同日条目）
+
+1. 补 7 张 2.0 完整态稿：26、27、28、42、43、44、49（每张「暂时不开放」与机构部署完整态两个状态），解冻最终版，产品负责人看稿同意后加入 `docs/design/kiosk-redesign-2026-08-v2/`。
+2. 运行页照稿改：托管 a 显示「暂时不开放」、不发岗位请求；私有部署 b 整页打开，以机构名义署名。
+3. Terminal Agent 设备运维数据分两路上报：硬件状态回我方维保后台（不含用户、订单、岗位），业务数据只去机构系统。
+4. 律师确认：机构云账号模式远程运维边界、自营点位公共就业平台入口码、「暂时不开放」文案；向青岛人社书面咨询一体机展示的备案口径。
+
 ## 后端窗口待办（自我探索同意）
 
 已按合规裁定取消过渡期（服务端只收当前版本）。
@@ -164,6 +184,7 @@
    - 约多久：10 分钟。
    - 怎么判断成了：巡检里 `GET /api/v1/health` 一行是 `PASS status=ok db=postgres degraded=[]`，`GET /api/v1/health/ready` 一行是 `PASS 200`；`git ls-remote --tags origin prod-before-release1` 能看到标签，指向的提交与 `DEPLOY_SOURCE.txt` 一致（9/29 已知线上是 `50483cd2…`）。
    - 失败了怎么办：health 不是 PASS（有 `degraded`、数据库不是 postgres、ready 不是 200），今天不发布，把巡检输出交总指挥；`DEPLOY_SOURCE.txt` 读不到，也先停下，不要猜提交号。
+   - 超大在途订单：GitHub Actions 跑一次 `Deploy Precheck (read-only)`（只读，我们可以代跑），看 `OVERSIZE_PAID_UNFINISHED_ORDERS`：是 `0` 才继续；大于 0 或 `unknown` 就先停，找总指挥，这些订单由产品负责人人工处理后再升级 Agent（每单 100 面上限与 Agent 0.4.13 的超时按 100 面算，见 #1146；只输出数量，不输出订单号、用户或文件名）。
 
 3. **把候选合进 main（P0-4：普通合并，不 squash），等 main CI 跑完**
    - 合并前先核对：候选分支 `claude/codex-task-history-progress-0de1dc` 处于保护状态（禁止删除、禁止强推）。仓库开着「合并后自动删分支」，候选没有保护的话，合并 #1074 会把它删掉。查法：`gh api repos/wanglei581/YITIJI/branches/claude/codex-task-history-progress-0de1dc/protection -q '{del:.allow_deletions.enabled,force:.allow_force_pushes.enabled}'`，应输出 `{"del":false,"force":false}`（9/30 实测如此）；或看 Settings → Branches 里候选那条规则。不是这个结果就先停，找总指挥。

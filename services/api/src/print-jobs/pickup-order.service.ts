@@ -15,6 +15,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { assertFileContentIntegrity } from '../files/file-content-integrity'
+import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
 import { StorageService } from '../storage/storage.service'
 import {
   creditPickupClaimSuccess,
@@ -193,6 +194,9 @@ export class PickupOrderService {
     }
     const firstItem = packageItems[0] ?? null
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'document_print')
+    // 打印机检查放在过期、状态、文件、能力判定之后、任何写库之前：
+    // 过期码仍先说「已过期」，不能被说成「到机码没有作废」；被拒时不认领、不建任务、不计输错。
+    await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, via === 'member_order' ? 'claim_here' : 'pickup')
 
     if (order.pickupStatus === 'pending') {
       const claimed = await this.prisma.order.updateMany({
@@ -250,6 +254,8 @@ export class PickupOrderService {
       terminalId: terminal.id,
       amountCents: fresh.amountCents,
       priceLines: this.priceLines(fresh.itemsJson),
+      billablePages: fresh.billablePages,
+      ...this.printSummary(fresh),
       fileName: fresh.sourceFileName ?? (firstItem ? `材料包第${firstItem.seq + 1}份` : null),
       paymentSessionToken: this.paymentToken(fresh),
     }
@@ -275,6 +281,8 @@ export class PickupOrderService {
     if (!order.sourceFileId && !firstItem) throw new BadRequestException('PRINT_FILE_NOT_FOUND')
     await this.assertOrderFileReady(order, firstItem?.fileId)
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'document_print')
+    // 认领后付款期间打印闸门可能合上：放行（建任务）前再查一次，拒绝时订单保持已认领、可稍后重放。
+    await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, via === 'member_order' ? 'claim_here' : 'pickup')
 
     const sourceFileId = firstItem?.fileId ?? order.sourceFileId!
     const signed = signFileUrl(sourceFileId, SIGNED_URL_TTL_MS)
@@ -477,6 +485,21 @@ export class PickupOrderService {
     try { const parsed = JSON.parse(itemsJson); return Array.isArray(parsed) ? parsed : [] } catch { return [] }
   }
 
+  /** 只回订单里能确认的打印参数；不补默认值、不扩大文件名披露。 */
+  private printSummary(order: OrderRecord) {
+    let stored: Record<string, unknown> = {}
+    try {
+      const parsed: unknown = JSON.parse(order.printParamsJson)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) stored = parsed as Record<string, unknown>
+    } catch { /* 旧单缺参数时省略摘要字段。 */ }
+    const params = {
+      ...(typeof stored.copies === 'number' && Number.isInteger(stored.copies) && stored.copies > 0 ? { copies: stored.copies } : {}),
+      ...(stored.colorMode === 'color' || stored.colorMode === 'black_white' ? { colorMode: stored.colorMode } : {}),
+      ...(['simplex', 'duplex_long_edge', 'duplex_short_edge'].includes(String(stored.duplex)) ? { duplex: stored.duplex as string } : {}),
+    }
+    return Object.keys(params).length ? { params } : {}
+  }
+
   private releasedView(order: OrderRecord) {
     return {
       released: true,
@@ -488,6 +511,7 @@ export class PickupOrderService {
       printTaskStatus: order.taskStatus,
       fileName: maskPickupFileName(order.sourceFileName),
       billablePages: order.billablePages,
+      ...this.printSummary(order),
       paymentSessionToken: this.paymentToken(order),
     }
   }
