@@ -18,6 +18,9 @@
 - **问题：** 隐私检查任务只保存 24 小时（materials TASK_TTL_HOURS），每小时清理一次、不分匿名与会员；到机码有效 7 天，而到机放行又要求检查任务还在。付款后隔天取件、清理已跑过的云打印单与材料包单都会被「打印隐私检查尚未完成」拦住，取件人在一体机上补不了。走查窗口与小程序窗口分别查到，结论一致。
 - **修法（协调方定口径、Grok 实现）：** 到机放行不再调用 assertPiiScanned，信任建单时那道无条件强制检查（requireCompleted=true、无待确认项、绑定文件 sha256）；放行时仍做文件存在、未过期与内容完整性校验。不延长检查记录保存期（其中有识别出的个人信息片段）。动手前核实四条前提均成立：会到机放行的只有云打印单文件与材料包两处建单且都无条件检查；FileObject.sha256 建成后不再改写；放行仍跑完整性校验；这两处检查不受环境开关控制。
 - **验证：** cloud-print-m2 改为**真跑一次 25 小时后的生产清理**（MaterialsService.cleanupExpired）后认领仍成功；材料包清理后放行成功、内容被改仍拒；变异「放行恢复要求检查任务」「建单不做检查」均变红；13 条关联门禁全绿。没有新建或删除文件。
+## 2026-09-30：紧急下架通知正文不再出现「。。」（分支 `claude/backend-hardening-20260930-notice-punct`）
+
+- 两个后台窗口走查：事由本身以句号结尾时，发给机构的紧急下架通知拼成「……事由：xxx。。此下架不能由管理员恢复」。新增 `emergencyReasonForSentence`（放在政策与招聘内容两处共用的 recruitment-hosting.ts），拼接前去掉事由末尾的句末标点再统一补「。」；库里的事由原文不变。verify:policies 改用以句号结尾的事由断言正文；变异「不去尾标点」变红；policies、recruitment-emergency-scope、official-channels、companies、job-review 全绿。历史通知不回改。
 
 ## 2026-09-30：打印每单最多 100 面（产品负责人拍板；分支 `claude/backend-hardening-20260929-print-max-100-sides`）
 

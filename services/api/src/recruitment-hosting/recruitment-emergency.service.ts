@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import {
   assertEmergencyReason,
+  emergencyReasonForSentence,
   type EmergencyReasonCode,
 } from './recruitment-hosting'
 import { officialChannelLinkKey } from '../official-channels/registrable-domain'
@@ -352,7 +353,7 @@ export class RecruitmentEmergencyService {
           orgId: row.orgId,
           kind: 'recruitment_emergency_takedown',
           title: `${TARGET_LABEL[targetType]}已紧急下架`,
-          body: `「${row.title}」已由平台紧急下架。事由：${reason.reasonText}。此下架不能由管理员恢复。`,
+          body: `「${row.title}」已由平台紧急下架。事由：${emergencyReasonForSentence(reason.reasonText)}。此下架不能由管理员恢复。`,
           payloadJson: JSON.stringify({
             targetType,
             targetId: row.id,
