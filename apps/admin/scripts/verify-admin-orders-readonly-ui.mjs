@@ -18,7 +18,16 @@ function fail(message) {
 console.log('\n=== Admin orders read-only UI verification ===')
 
 if (!existsSync(servicePath)) fail('adminOrdersReadonly service is missing')
-const page = readFileSync(pagePath, 'utf8')
+const orderSources = ['apps/admin/src/routes/orders/index.tsx', 'apps/admin/src/routes/orders/useOrderDetail.ts', 'apps/admin/src/routes/orders/orderDisplay.ts', 'apps/admin/src/routes/orders/orderColumns.tsx', 'apps/admin/src/routes/orders/OrderDetailDrawer.tsx', 'apps/admin/src/routes/orders/OrderAftercare.tsx', 'apps/admin/src/routes/orders/OrderPaymentActions.tsx']
+const page = orderSources.map((file) => readFileSync(join(root, '../..', file), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')).join('\n')
+const index = readFileSync(pagePath, 'utf8')
+for (const component of ['OrderDetailDrawer', 'useOrderDetail', 'orderColumns']) {
+  if (!index.includes(`${component}(`) && !index.includes(`<${component} `)) fail(`订单页必须实际调用 ${component}`)
+}
+for (const component of ['OrderAftercare', 'OrderPaymentActions']) {
+  if (!page.includes(`<${component} controls={controls}`)) fail(`详情必须实际渲染 ${component}`)
+}
 const service = readFileSync(servicePath, 'utf8')
 const honestyCopy = readFileSync(honestyCopyPath, 'utf8')
 

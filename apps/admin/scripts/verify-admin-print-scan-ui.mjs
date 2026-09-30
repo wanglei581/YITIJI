@@ -90,7 +90,7 @@ if (page.includes('未上线') && page.includes('implemented: false')) {
 } else {
   fail('page must mark photo/copy/material_pack/format_conversion/signature_stamp as 未上线')
 }
-if (page.includes('该任务类型尚未上线') && page.includes('不展示占位数据')) {
+if (page.includes('该任务类型尚未上线') && page.includes('该能力尚未开放，目前没有可查看的真实任务。')) {
   pass('unimplemented types render an honest empty state, not fabricated rows')
 } else {
   fail('unimplemented types must render an honest empty state')

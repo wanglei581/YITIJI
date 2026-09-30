@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Card, ComplianceBanner, EmptyState, LoadingState } from '@ai-job-print/ui'
-import type { JobMaterialAdminSummary } from '@ai-job-print/shared'
-import { FileTextIcon, LayoutTemplateIcon, PlusIcon, RefreshCwIcon } from 'lucide-react'
+import { Card, ComplianceBanner, ConsoleTable, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
+import { formatCount, type JobMaterialAdminSummary } from '@ai-job-print/shared'
+import { PlusIcon, RefreshCwIcon } from 'lucide-react'
 import { Page } from '../Page'
 import {
   getJobMaterialAdminSummary,
@@ -13,11 +13,9 @@ import {
 import { JOB_MATERIAL_TYPE_LABELS } from './constants'
 import { TemplateDrawer } from './TemplateDrawer'
 
-function statLabel(value: number): string {
-  return Number.isFinite(value) ? String(value) : '0'
-}
-
 export default function JobMaterialsPage() {
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [templates, setTemplates] = useState<JobMaterialTemplateAdminRow[]>([])
   const [summary, setSummary] = useState<JobMaterialAdminSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -82,6 +80,21 @@ export default function JobMaterialsPage() {
     }
   }
 
+  const columns: ConsoleColumn<JobMaterialTemplateAdminRow>[] = [
+    { id: 'template', header: '模板', truncate: true, title: (template) => `${template.title}\n${template.description ?? ''}`,
+      cell: (template) => <><div className="truncate font-semibold text-neutral-900">{template.title}</div><div className="mt-1 truncate text-xs text-neutral-500">{template.description}</div></> },
+    { id: 'type', header: '类型', cellClassName: 'whitespace-nowrap', cell: (template) => JOB_MATERIAL_TYPE_LABELS[template.type] },
+    { id: 'status', header: '状态', cell: (template) => <StatusBadge status={template.status === 'published' ? 'success' : 'default'} label={template.status === 'published' ? '已发布' : '已停用'} /> },
+    { id: 'count', header: '生成次数', align: 'right', cell: (template) => formatCount(generatedByTemplate.get(template.id)) },
+    { id: 'actions', header: '操作', sticky: true, align: 'right', cell: (template) => <div className="flex justify-end gap-2">
+      <button type="button" onClick={() => openEdit(template)} className="rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">编辑</button>
+      <button type="button" disabled={publishBusyId === template.id} onClick={() => handlePublishToggle(template)}
+        className="rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-semibold text-primary-700 disabled:opacity-60">
+        {publishBusyId === template.id ? '处理中…' : template.status === 'published' ? '下架' : '发布'}
+      </button>
+    </div> },
+  ]
+
   return (
     <Page title="求职材料库" subtitle="内置与运营模板、发布控制与生成统计">
       <ComplianceBanner tone="info" title="模板可编辑，生成统计与文件只读">
@@ -93,25 +106,25 @@ export default function JobMaterialsPage() {
         <Card className="p-5">
           <p className="text-xs font-semibold text-neutral-500">模板总数</p>
           <p className="mt-2 text-3xl font-bold text-neutral-950">
-            {statLabel(summary?.templateCount ?? templates.length)}
+            {formatCount(summary?.templateCount)}
           </p>
         </Card>
         <Card className="p-5">
           <p className="text-xs font-semibold text-neutral-500">已发布模板</p>
           <p className="mt-2 text-3xl font-bold text-neutral-950">
-            {statLabel(summary?.publishedTemplateCount ?? 0)}
+            {formatCount(summary?.publishedTemplateCount)}
           </p>
         </Card>
         <Card className="p-5">
           <p className="text-xs font-semibold text-neutral-500">生成文件数</p>
           <p className="mt-2 text-3xl font-bold text-neutral-950">
-            {statLabel(summary?.generatedFileCount ?? 0)}
+            {formatCount(summary?.generatedFileCount)}
           </p>
         </Card>
         <Card className="p-5">
           <p className="text-xs font-semibold text-neutral-500">有效文件数</p>
           <p className="mt-2 text-3xl font-bold text-neutral-950">
-            {statLabel(summary?.activeGeneratedFileCount ?? 0)}
+            {formatCount(summary?.activeGeneratedFileCount)}
           </p>
         </Card>
       </div>
@@ -138,92 +151,11 @@ export default function JobMaterialsPage() {
         </div>
       </div>
 
-      {error && (
-        <Card className="mt-4 border-error/30 bg-error-bg p-4 text-sm text-error-fg">{error}</Card>
-      )}
-
       <Card className="mt-3 overflow-hidden p-0">
-        {loading ? (
-          <LoadingState text="加载中…" className="py-8" />
-        ) : templates.length === 0 ? (
-          <EmptyState icon={LayoutTemplateIcon} title="暂无模板" className="p-8" />
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-xs font-semibold text-neutral-500">
-              <tr>
-                <th className="px-4 py-3">模板</th>
-                <th className="px-4 py-3">类型</th>
-                <th className="px-4 py-3">状态</th>
-                <th className="px-4 py-3 text-right">生成次数</th>
-                <th className="px-4 py-3 text-right">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {templates.map((template) => {
-                const busy = publishBusyId === template.id
-                return (
-                  <tr key={template.id} className="border-t border-neutral-100">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-info-bg">
-                          <FileTextIcon className="h-4 w-4 text-info-fg" aria-hidden="true" />
-                        </span>
-                        <span>
-                          <span className="block font-semibold text-neutral-900">
-                            {template.title}
-                          </span>
-                          <span className="mt-0.5 block text-xs text-neutral-500">
-                            {template.description}
-                          </span>
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-neutral-600">
-                      {JOB_MATERIAL_TYPE_LABELS[template.type]}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                          template.status === 'published'
-                            ? 'bg-success-bg text-success-fg'
-                            : 'bg-neutral-100 text-neutral-600'
-                        }`}
-                      >
-                        {template.status === 'published' ? '已发布' : '已停用'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-neutral-900">
-                      {generatedByTemplate.get(template.id) ?? 0}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(template)}
-                          className="rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                        >
-                          编辑
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => handlePublishToggle(template)}
-                          className={`rounded-md px-2.5 py-1 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
-                            template.status === 'published'
-                              ? 'border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                              : 'bg-primary-600 text-white hover:bg-primary-700'
-                          }`}
-                        >
-                          {busy ? '处理中…' : template.status === 'published' ? '下架' : '发布'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
+        <ConsoleTable items={templates.slice((page - 1) * pageSize, page * pageSize)} columns={columns}
+          loading={loading} error={error ? { message: error, onRetry: () => setReloadKey((key) => key + 1) } : null}
+          empty={{ title: '暂无模板' }} page={page} pageSize={pageSize} total={templates.length}
+          onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
       </Card>
 
       <Card className="mt-5 p-5">
@@ -232,7 +164,7 @@ export default function JobMaterialsPage() {
           {(summary?.last7DaysGenerated ?? []).map((item) => (
             <div key={item.date} className="rounded-lg bg-neutral-50 p-3 text-center">
               <p className="text-xs text-neutral-500">{item.date.slice(5)}</p>
-              <p className="mt-1 text-lg font-bold text-neutral-900">{item.count}</p>
+              <p className="mt-1 text-lg font-bold text-neutral-900">{formatCount(item.count)}</p>
             </div>
           ))}
         </div>

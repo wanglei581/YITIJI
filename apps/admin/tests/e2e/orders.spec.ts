@@ -8,11 +8,14 @@ test.describe('订单管理（mock 口径：一条演示未支付单）', () => 
     await expect(page.getByRole('heading', { name: '订单管理' })).toBeVisible()
 
     await page.getByRole('button', { name: '已完成' }).click()
-    await expect(page.getByText('ORD-20260625-MOCKREAD')).toBeVisible()
+    await expect(page.getByRole('button', { name: '查看订单 ORD-20260625-MOCKREAD', exact: true })).toBeVisible()
     await page.getByRole('button', { name: '全部' }).first().click()
 
-    await page.getByRole('row', { name: /查看订单 ORD-20260625-MOCKREAD/ }).click()
-    await expect(page.getByText('订单详情')).toBeVisible()
+    await page.getByRole('button', { name: '查看订单 ORD-20260625-MOCKREAD', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '订单详情 · ORD-20260625-MOCKREAD' })).toBeVisible()
+    await expect(page.getByText('取件码过期时间', { exact: true })).toBeVisible()
+    await expect(page.getByText('创建时间', { exact: true })).toBeVisible()
+    await expect(page.getByText('失败原因', { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: '确认收款' }).click()
     await expect(page.getByText('确认已在线下收到现金？')).toBeVisible()
@@ -109,4 +112,16 @@ test.describe('订单管理（mock 口径：一条演示未支付单）', () => 
     // 点完仍是正常列表页：无未捕获异常、无英文技术串。
     await settleAdminPage(page, guards)
   })
+  test('1280 宽保留九个关键列、详情入口与免费金额', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    const guards = await openAuthed(page, '/orders')
+    await settleAdminPage(page, guards)
+    await expect(page.locator('thead th')).toHaveText(['订单号', '文件名', '用户', '渠道', '终端', '金额', '支付状态', '任务状态', '操作'])
+    await expect(page.getByRole('button', { name: '订单 ORD-20260625-MOCKREAD 详情' })).toBeInViewport()
+    await expect(page.locator('tbody')).toContainText('¥0.00（免费）')
+    expect(await page.locator('table').evaluate((el) => el.scrollWidth - el.parentElement!.clientWidth)).toBeLessThanOrEqual(1)
+    await page.getByRole('button', { name: '订单 ORD-20260625-MOCKREAD 详情' }).click()
+    await expect(page.getByText('文件名', { exact: true }).last()).toBeVisible()
+  })
+
 })

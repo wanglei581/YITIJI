@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-09-30：后台 UI 第 2 批（订单、打印、文件与计费；Codex 本地候选）
+
+基于 `677cffefdb75edd82d18e50d6e50a21d48014e0f`，仅在 `codex/consoles-ui-batch2-20260930` 的独立 worktree 调整六个既有管理员页面，无新增页面或路由，未修改 API 业务代码、接口、生产数据或硬件链路。订单列表收为九列，取件与创建时间移入既有详情，错误码改中文原因并在悬停保留原码；文件列表收为八列，来源、策略来源、同意时间/版本等移入同页详情抽屉，查看文件、手动删除与全部确认流程保留，账号 ID 只在悬停核对。订单主文件由 947 行减至 178 行，打印扫描主文件由 522 行减至 495 行，新增七个辅助文件均不超过 300 行，任务/材料/导入列表复用 ConsoleTable，免费金额仍显示 ¥0.00（免费），价目说明改为多行输入且保存与二次确认保持原逻辑。管理员 typecheck、改动文件 eslint、时间/合规/原始错误/后台页面门禁及图谱一致性检查均退出 0；退款与彩色双面关联门禁只在 `/private/tmp` 隔离 SQLite 上验证，两个可见文案/裸码变异均退出 1，逐字节恢复后门禁退出 0、diff stat 恢复一致。改前截图已查阅，浏览器截图与 E2E 尚未执行（此 worktree 缺少 Playwright 可执行文件且任务限定不启动服务），1280/1440 宽表格、长文件名、错误原因悬停、详情字段及计费多行说明须由协调方验收；`verify:file-assets-trial-acceptance` 退出 1，原因是冻结 Gate 2 候选门禁拒绝本批七个未跟踪源码文件，未放宽该门禁，交由协调方纳入 Git 后按候选冻结规则复核并重生成图谱（本次图谱按 Git 已跟踪文件计算，七个新辅助文件暂未进入该集合）；改动留在工作区，未提交、未部署。
+
 ## 2026-09-30：W-86 第五轮——锁序统一为 PrintTask → Order，超前补报与同一终态清理分开（分支 `grok/print-retry-attempt-0929`，提交 `bda0b4979`）
 
 - **锁序。** 全系统先锁 PrintTask 再动 Order。唯一行锁是 `print-status-attempt.ts` 的 `lockPrintTaskRow`（56–58 行，一句不改 `updatedAt` 的 `UPDATE "PrintTask"`）。状态补报经 `readLockedPrintStatusAttempt` 先调它。会员 `retryPaidFailedJob` 与管理员 `retryPrintTask` 在事务开头调用同一函数，然后再做 Order 的 CAS 和 PrintTask 更新。不许再写第二句同样的 SQL。

@@ -41,20 +41,30 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 77 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 79 |
 | **medium** | 只被文档或其它文件提及 | 28 |
 | **low** | 全仓零提及 | 94 |
 
 
 ──────────────────────────────────────────────────────────────────────
 
-## ⚠ 自相矛盾的门禁（1）
+## ⚠ 自相矛盾的门禁（2）
 
 同一个路径，一条门禁断言它**必须存在**，另一条断言它**必须不存在**。
 
 **这不只是「该删一条」。** 它说明这两条门禁的作者互相不知道对方存在——
 是流程信号，不是代码信号。而且因为其中一条通常没接线，矛盾不会以 CI 红的
 形式暴露，只会在某天有人把它接上时才炸。
+
+### `apps/admin/src/routes/orders/useOrderDetail.ts`
+
+该路径在仓库中**不存在**。
+
+| 断言方向 | 门禁 | 是否会执行 |
+| --- | --- | --- |
+| 必须存在 | `scripts/verify-no-raw-error-render.mjs` | CI 会跑 |
+| 必须存在 | `services/api/scripts/verify-api20-manual-refund.ts` | CI 会跑 |
+| 必须不存在 | `apps/admin/scripts/verify-admin-orders-readonly-ui.mjs` | CI 会跑 |
 
 ### `src/pages/resume/ResumeExportPage.tsx`
 
@@ -229,9 +239,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（77）
+## high — 仍被 CI / 门禁 / 包脚本引用（79）
 
-### 页面/组件（34）
+### 页面/组件（36）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -252,7 +262,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/admin/src/routes/offline-agencies/GovernanceDrawer.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs |
 | `apps/admin/src/routes/offline-agencies/JobsDrawer.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、scripts/verify-no-raw-error-render.mjs |
 | `apps/admin/src/routes/offline-agencies/ReviewDialog.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs |
+| `apps/admin/src/routes/orders/orderHonestyCopy.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-orders-readonly-ui.mjs、apps/admin/scripts/verify-console-plain-copy.mjs |
 | `apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs |
+| `apps/admin/src/services/api/adminPrintJobs.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-orders-readonly-ui.mjs |
 | `apps/admin/src/services/api/offlineAgenciesAdmin.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs |
 | `apps/kiosk/src/components/ComingSoonNotice.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs |
 | `apps/kiosk/src/components/KioskDeviceStatusPills.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-device-status-honest.mjs |

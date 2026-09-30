@@ -64,8 +64,8 @@ if (page.includes('并非「免费」') || page.includes('不可下单')) {
 } else {
   fail('停用语义未诚实说明')
 }
-if (page.includes('渠道账单 diff 需在部署期')) {
-  pass('对账页明示渠道账单 diff 属部署期（不夸大本地对账为全量对账）')
+if (page.includes('渠道账单仍需使用真实商户账单另行核对。')) {
+  pass('对账页明示渠道账单需使用真实商户账单另行核对（不夸大本地对账为全量对账）')
 } else {
   fail('对账页缺渠道账单边界说明')
 }

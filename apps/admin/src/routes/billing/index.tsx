@@ -6,7 +6,7 @@
 //
 // 合规：无任何支付凭证字段；改价前二次确认；停用价目会使对应报价 fail-closed，
 // 页面明示此语义（非「免费」）。
-import { formatDateTime } from '@ai-job-print/shared'
+import { formatDateTime, formatYuan, formatCount } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState } from 'react'
 import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { CheckIcon, RefreshCwIcon, XIcon } from 'lucide-react'
@@ -31,13 +31,13 @@ const DISCREPANCY_LABELS: Record<string, string> = {
   REFUND_AMOUNT_MISMATCH: '退款额账实不符',
   ORDER_REFUNDED_WITHOUT_REFUND_ROW: '订单已退款但无退款记录',
   REFUND_SUCCESS_ORDER_NOT_REFUNDED: '有成功退款但订单未退款',
-  STUCK_REFUNDING: '退款中超时未收敛',
+  STUCK_REFUNDING: '退款处理中超时，请核查',
   ONLINE_COLLECTED_PENDING_REFUND: '渠道已收款但订单未转已支付（待退款）',
   ORDER_EXTRA_COLLECTION_AFTER_REFUND: '已退款后又出现额外收款',
 }
 
 function yuan(cents: number): string {
-  return `¥${(cents / 100).toFixed(2)}`
+  return formatYuan(cents / 100)
 }
 
 function PriceConfigSection() {
@@ -76,7 +76,7 @@ function PriceConfigSection() {
           ? '\n0 元 = 当前免费，不扣权益。'
           : '\n0 元 = 免费打印，将跳过收银。')
         : ''
-      if (!window.confirm(`确认将「${SERVICE_LABELS[serviceKey] ?? serviceKey}」单价改为 ¥${(unitCents / 100).toFixed(2)}？${zeroPriceNote}\n改价即时对全端生效并记入审计。`)) return
+      if (!window.confirm(`确认将「${SERVICE_LABELS[serviceKey] ?? '其他价目'}」单价改为 ¥${(unitCents / 100).toFixed(2)}？${zeroPriceNote}\n改价即时对全端生效并记入审计。`)) return
       setSaving(serviceKey)
       setError(null)
       try {
@@ -111,7 +111,7 @@ function PriceConfigSection() {
       const oldLabel = currentDescription || '（空）'
       const newLabel = nextDescription || '（空）'
       if (!window.confirm(
-        `确认更新「${SERVICE_LABELS[item.serviceKey] ?? item.serviceKey}」说明？\n旧说明：${oldLabel}\n新说明：${newLabel}\n只更新说明，不修改单价与启停状态，操作记入审计。`,
+        `确认更新「${SERVICE_LABELS[item.serviceKey] ?? '其他价目'}」说明？\n旧说明：${oldLabel}\n新说明：${newLabel}\n只更新说明，不修改单价与启停状态，操作记入审计。`,
       )) return
       setSaving(item.serviceKey)
       setError(null)
@@ -160,16 +160,16 @@ function PriceConfigSection() {
 
   return (
     <Card className="p-0">
-      {error && <div className="border-b border-error/20 bg-error-bg px-5 py-3 text-sm text-error-fg">{error}</div>}
-      <table className="w-full text-sm">
+      {error && <div className="border-b border-error/20 bg-error-bg px-3 py-3 text-sm text-error-fg">{error}</div>}
+      <table className="w-full table-fixed text-sm">
         <thead>
           <tr className="border-b border-neutral-900/10 bg-neutral-50/80 text-left text-[11.5px] text-neutral-500">
-            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">价目项</th>
-            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">单价（元）</th>
-            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">说明</th>
-            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">状态</th>
-            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">更新时间</th>
-            <th className="px-5 py-2.5 text-right font-bold tracking-[0.04em]">操作</th>
+            <th className="px-3 py-2.5 font-bold tracking-[0.04em] w-[18%]">价目项</th>
+            <th className="px-3 py-2.5 font-bold tracking-[0.04em] w-[13%]">单价（元）</th>
+            <th className="px-3 py-2.5 font-bold tracking-[0.04em] w-[27%]">说明</th>
+            <th className="px-3 py-2.5 font-bold tracking-[0.04em] w-[9%]">状态</th>
+            <th className="px-3 py-2.5 font-bold tracking-[0.04em] w-[17%]">更新时间</th>
+            <th className="px-3 py-2.5 text-right font-bold tracking-[0.04em] w-[16%]">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -181,11 +181,10 @@ function PriceConfigSection() {
             const busy = saving === item.serviceKey
             return (
               <tr key={item.serviceKey} className="border-b border-neutral-50">
-                <td className="px-5 py-3">
-                  <div className="font-medium text-neutral-900">{SERVICE_LABELS[item.serviceKey] ?? item.serviceKey}</div>
-                  <div className="text-xs text-neutral-400">{item.serviceKey}</div>
+                <td className="px-3 py-3">
+                  <div title={item.serviceKey} className="font-medium text-neutral-900">{SERVICE_LABELS[item.serviceKey] ?? '其他价目'}</div>
                 </td>
-                <td className="px-5 py-3">
+                <td className="px-3 py-3">
                   <input
                     type="number"
                     min="0"
@@ -193,29 +192,29 @@ function PriceConfigSection() {
                     value={editVal ?? (item.unitCents / 100).toFixed(2)}
                     disabled={busy}
                     onChange={(e) => setEditing((prev) => ({ ...prev, [item.serviceKey]: e.target.value }))}
-                    className="w-28 rounded-md border border-neutral-200 px-2 py-1 text-sm"
+                    className="w-full max-w-28 rounded-md border border-neutral-200 px-2 py-1 text-sm"
                   />
                 </td>
-                <td className="px-5 py-3">
-                  <input
-                    type="text"
+                <td className="px-3 py-3">
+                  <textarea
+                    rows={3}
                     maxLength={200}
-                    aria-label={`${SERVICE_LABELS[item.serviceKey] ?? item.serviceKey}说明`}
+                    aria-label={`${SERVICE_LABELS[item.serviceKey] ?? '其他价目'}说明`}
                     value={descriptionEditVal ?? currentDescription}
                     disabled={busy}
                     onChange={(e) => setDescriptionEditing((prev) => ({
                       ...prev,
                       [item.serviceKey]: e.target.value,
                     }))}
-                    className="w-full min-w-72 rounded-md border border-neutral-200 px-2 py-1 text-sm"
+                    className="w-full min-w-0 resize-y rounded-md border border-neutral-200 px-2 py-1 text-sm"
                   />
                 </td>
-                <td className="px-5 py-3">
+                <td className="px-3 py-3">
                   <StatusBadge status={item.active ? 'success' : 'default'} label={item.active ? '启用' : '停用'} />
                 </td>
-                <td className="px-5 py-3 text-xs text-neutral-400" title={formatDateTime(item.updatedAt)}>{formatDateTime(item.updatedAt)}</td>
-                <td className="px-5 py-3 text-right">
-                  <div className="flex justify-end gap-2">
+                <td className="px-3 py-3 whitespace-nowrap text-xs text-neutral-400" title={formatDateTime(item.updatedAt)}>{formatDateTime(item.updatedAt)}</td>
+                <td className="px-3 py-3 text-right">
+                  <div className="flex flex-wrap justify-end gap-2">
                     {descriptionChanged && (
                       <button
                         onClick={() => void saveDescription(item)}
@@ -294,7 +293,7 @@ function ReconciliationSection() {
           ['应收合计', yuan(s.grossPaidCents), `${s.paidOrderCount} 单`],
           ['退款合计', yuan(s.refundedCents), `${s.refundedOrderCount} 单`],
           ['净额', yuan(s.netCents), '应收 − 退款'],
-          ['退款中', String(s.refundingCount), '待收敛'],
+          ['退款中', formatCount(s.refundingCount), '待确认退款结果'],
         ].map(([label, value, hint]) => (
           <Card key={label} className="p-4">
             <div className="text-xs text-neutral-500">{label}</div>
@@ -305,30 +304,30 @@ function ReconciliationSection() {
       </div>
 
       <Card className="p-0">
-        <div className="border-b border-neutral-100 px-5 py-3 text-sm font-medium text-neutral-700">
+        <div className="border-b border-neutral-100 px-3 py-3 text-sm font-medium text-neutral-700">
           账本差异（{report.discrepancies.length}）
         </div>
         {report.discrepancies.length === 0 ? (
           <div className="px-5 py-8">
-            <EmptyState title="账本自洽" description="未发现账本差异；渠道账单 diff 需在部署期用真实商户账单核对。" />
+            <EmptyState title="未发现账本差异" description="未发现账本差异；渠道账单仍需使用真实商户账单另行核对。" />
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-neutral-900/10 bg-neutral-50/80 text-left text-[11.5px] text-neutral-500">
-                <th className="px-5 py-2.5 font-bold tracking-[0.04em]">差异类型</th>
-                <th className="px-5 py-2.5 font-bold tracking-[0.04em]">订单号</th>
-                <th className="px-5 py-2.5 font-bold tracking-[0.04em]">明细</th>
+                <th className="px-3 py-2.5 font-bold tracking-[0.04em]">差异类型</th>
+                <th className="px-3 py-2.5 font-bold tracking-[0.04em]">订单号</th>
+                <th className="px-3 py-2.5 font-bold tracking-[0.04em]">明细</th>
               </tr>
             </thead>
             <tbody>
               {report.discrepancies.map((d, i) => (
                 <tr key={`${d.orderId}-${i}`} className="border-b border-neutral-50">
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3">
                     <StatusBadge status="warning" label={DISCREPANCY_LABELS[d.code] ?? d.code} />
                   </td>
-                  <td className="px-5 py-3 font-mono text-xs text-neutral-600">{d.orderNo}</td>
-                  <td className="px-5 py-3 text-xs text-neutral-500">{JSON.stringify(d.detail)}</td>
+                  <td className="px-3 py-3 font-mono text-xs text-neutral-600">{d.orderNo}</td>
+                  <td className="px-3 py-3 text-xs text-neutral-500">{JSON.stringify(d.detail)}</td>
                 </tr>
               ))}
             </tbody>
@@ -348,7 +347,7 @@ function ReconciliationSection() {
 export default function BillingPage() {
   const [tab, setTab] = useState<'price' | 'reconciliation'>('price')
   return (
-    <Page title="计费与对账" subtitle="打印价目与简历导出管理（唯一合法改价路径，改价即时生效并记审计）。resume_export 对应一体机 / 小程序简历优化页的导出按钮；停用后导出不可用，并非免费。">
+    <Page title="计费与对账" subtitle="打印价目与简历导出管理（唯一合法改价路径，改价即时生效并记审计）。简历导出价目用于一体机 / 小程序简历优化页的导出按钮；停用后导出不可用，并非免费。">
       <div className="mb-4 flex gap-2">
         {(
           [

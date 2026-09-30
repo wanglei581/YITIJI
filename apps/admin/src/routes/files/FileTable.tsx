@@ -1,17 +1,8 @@
+import { useState } from 'react'
 import { formatDateTime } from '@ai-job-print/shared'
-import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
-import { FolderIcon } from 'lucide-react'
-import { Pagination } from '../components/DataTable'
-import type { ViewFile } from './fileMeta'
-import {
-  CLEAN_MAP,
-} from './fileMeta'
-import {
-  assetCategoryLabel,
-  ownerTypeLabel,
-  retentionPolicyLabel,
-  retentionSetByLabel,
-} from './retentionMeta'
+import { Card, ConsoleTable, Drawer, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
+import { CLEAN_MAP, type ViewFile } from './fileMeta'
+import { assetCategoryLabel, ownerTypeLabel, retentionPolicyLabel, retentionSetByLabel } from './retentionMeta'
 
 interface FileTableProps {
   loading: boolean
@@ -29,106 +20,63 @@ interface FileTableProps {
   onPageSizeChange: (pageSize: number) => void
 }
 
-export function FileTable({
-  loading,
-  error,
-  search,
-  files,
-  total,
-  page,
-  pageSize,
-  busyId,
-  onRetry,
-  onView,
-  onDelete,
-  onPageChange,
-  onPageSizeChange,
-}: FileTableProps) {
-  const headers = ['文件名', '类型', '用户', '来源', '大小', '敏感级别', '保存策略', '策略来源', '同意时间', '清理状态', '操作']
-  return (
-    <Card className="overflow-hidden p-0">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr>
-              {headers.map((h) => (
-                <th key={h} className="sticky top-0 whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500 backdrop-blur-sm">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-900/[0.06]">
-            {loading ? (
-              [0, 1, 2, 3, 4].map((i) => (
-                <tr key={i}>
-                  {Array.from({ length: headers.length }).map((_, j) => (
-                    <td key={j} className="px-4 py-4"><div className="h-3 w-3/4 animate-pulse rounded bg-neutral-100" /></td>
-                  ))}
-                </tr>
-              ))
-            ) : error ? (
-              <tr>
-                <td colSpan={headers.length}>
-                  <div className="flex flex-col items-center gap-3 py-12">
-                    <p className="text-sm text-neutral-400">文件数据加载失败，请稍后重试</p>
-                    <button onClick={onRetry} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">重试</button>
-                  </div>
-                </td>
-              </tr>
-            ) : files.length === 0 ? (
-              <tr>
-                <td colSpan={headers.length}>
-                  <EmptyState title={search ? '未找到匹配的文件' : '当前筛选条件下无文件'} description={search ? '请尝试其他关键词' : undefined} icon={FolderIcon} className="py-12" />
-                </td>
-              </tr>
-            ) : (
-              files.map((v) => {
-                const clean = CLEAN_MAP[v.clean]
-                const isAlive = v.clean !== 'cleaned'
-                const rowBusy = busyId === v.raw.id
-                return (
-                  <tr key={v.raw.id} className={`hover:bg-neutral-50 ${v.clean === 'cleaned' ? 'opacity-50' : ''}`}>
-                    <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-neutral-700" title={v.name}>{v.name}</td>
-                    <td className="whitespace-nowrap px-4 py-3"><span className={`rounded px-2 py-0.5 text-xs font-medium ${v.typeStyle}`}>{v.typeLabel}</span></td>
-                    <td className="max-w-[140px] truncate whitespace-nowrap px-4 py-3 text-xs text-neutral-600" title={v.user}>{v.user}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{v.source}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{v.size}</td>
-                    <td className="px-4 py-3"><StatusBadge dot status={v.sensitiveBadge} label={v.sensitiveLabel} /></td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
-                      <div className="font-medium">{retentionPolicyLabel(v.raw.retentionPolicy)}</div>
-                      <div className="text-neutral-400">{assetCategoryLabel(v.raw.assetCategory)} · {ownerTypeLabel(v.raw.ownerType)}</div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                      {retentionSetByLabel(v.raw.retentionSetBy)}
-                      {v.raw.retentionLockedReason && <div className="mt-1 text-error-fg">{v.raw.retentionLockedReason}</div>}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                      {formatDateTime(v.raw.retentionConsentAt, { fallback: '-' })}
-                      {v.raw.retentionConsentVersion && <div className="mt-1 text-neutral-400">{v.raw.retentionConsentVersion}</div>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge dot status={clean.badge} label={clean.label} />
-                      <div className="mt-1 whitespace-nowrap text-xs text-neutral-400">{v.cleanPolicy}</div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex gap-2">
-                        {isAlive ? (
-                          <>
-                            <button disabled={rowBusy} onClick={() => onView(v.raw.id)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:opacity-40">查看文件</button>
-                            <button disabled={rowBusy} onClick={() => onDelete(v.raw.id, v.name)} className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-40">手动删除</button>
-                          </>
-                        ) : (
-                          <span className="px-2 py-1 text-xs text-neutral-300">已清理</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
+export function FileTable({ loading, error, search, files, total, page, pageSize, busyId, onRetry, onView, onDelete, onPageChange, onPageSizeChange }: FileTableProps) {
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const detail = files.find((v) => v.raw.id === detailId)
+  const columns: ConsoleColumn<ViewFile>[] = [
+    { id: 'file', header: '文件名', headerClassName: 'w-[21%]', truncate: true, title: (v) => v.name,
+      cell: (v) => <button type="button" title={v.name} onClick={() => setDetailId(v.raw.id)}
+        className="block w-full truncate text-left font-medium text-primary-700 hover:underline">{v.name}</button> },
+    { id: 'type', header: '类型', headerClassName: 'w-[9%]', cell: (v) => <span className={`whitespace-nowrap rounded px-1 py-0.5 text-xs ${v.typeStyle}`}>{v.typeLabel}</span> },
+    { id: 'user', header: '用户', headerClassName: 'w-[10%]', truncate: true,
+      title: (v) => v.raw.endUserId ?? v.raw.uploaderId ?? undefined, cell: (v) => v.user },
+    { id: 'size', header: '大小', align: 'right', headerClassName: 'w-[7%]', cellClassName: 'whitespace-nowrap', cell: (v) => v.size },
+    { id: 'sensitive', header: '敏感级别', headerClassName: 'w-[9%]', cell: (v) => <StatusBadge dot status={v.sensitiveBadge} label={v.sensitiveLabel} /> },
+    { id: 'retention', header: '保存策略', headerClassName: 'w-[10%]', cellClassName: 'whitespace-nowrap', cell: (v) => retentionPolicyLabel(v.raw.retentionPolicy) },
+    { id: 'clean', header: '清理状态', headerClassName: 'w-[13%]', cell: (v) => <>
+      <StatusBadge dot status={CLEAN_MAP[v.clean].badge} label={CLEAN_MAP[v.clean].label} />
+      <div title={v.cleanPolicy} className="mt-1 truncate text-[11px] text-neutral-500">{v.cleanPolicy}</div>
+    </> },
+    { id: 'actions', header: '操作', sticky: true, align: 'right', headerClassName: 'w-[21%]', cell: (v) => (
+      <div className="flex flex-wrap justify-end gap-x-2 gap-y-1 text-xs">
+        <button type="button" onClick={() => setDetailId(v.raw.id)} className="text-primary-600 hover:underline">详情</button>
+        {v.clean !== 'cleaned' ? <>
+          <button type="button" disabled={busyId === v.raw.id} onClick={() => onView(v.raw.id)} className="whitespace-nowrap text-primary-600 hover:underline disabled:opacity-40">查看文件</button>
+          <button type="button" disabled={busyId === v.raw.id} onClick={() => onDelete(v.raw.id, v.name)} className="whitespace-nowrap text-error-fg hover:underline disabled:opacity-40">手动删除</button>
+        </> : <span className="text-neutral-400">已清理</span>}
       </div>
-      <Pagination total={total} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-    </Card>
+    ) },
+  ]
+  return (
+    <>
+      <Card className="overflow-hidden p-0">
+        <ConsoleTable items={files} columns={columns} loading={loading}
+          error={error ? { message: '文件数据加载失败，请稍后重试', onRetry } : null}
+          empty={{ title: search ? '未找到匹配的文件' : '当前筛选条件下无文件', description: search ? '请尝试其他关键词' : undefined }}
+          page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange}
+          rowClassName={(v) => v.clean === 'cleaned' ? 'opacity-50' : undefined}
+          className="[&_table]:table-fixed [&_th]:px-2 [&_td]:px-2 [&_td]:text-xs"
+        />
+      </Card>
+      <Drawer open={!!detail} onClose={() => setDetailId(null)} title="文件详情">
+        {detail && <dl className="space-y-3 py-4">
+          {fileDetails(detail).map(([label, value]) => <div key={label} className="grid grid-cols-[100px_1fr] gap-3 text-sm">
+            <dt className="text-neutral-500">{label}</dt><dd className="min-w-0 break-words text-neutral-800">{value}</dd>
+          </div>)}
+        </dl>}
+      </Drawer>
+    </>
   )
+}
+
+function fileDetails(v: ViewFile): [string, string][] {
+  return [
+    ['文件名', v.name], ['类型', v.typeLabel], ['用户', v.user], ['来源', v.source], ['大小', v.size],
+    ['敏感级别', v.sensitiveLabel], ['保存策略', retentionPolicyLabel(v.raw.retentionPolicy)],
+    ['文件类别', assetCategoryLabel(v.raw.assetCategory)], ['归属', ownerTypeLabel(v.raw.ownerType)],
+    ['策略来源', retentionSetByLabel(v.raw.retentionSetBy)], ['锁定原因', v.raw.retentionLockedReason ?? '未记录'],
+    ['同意时间', formatDateTime(v.raw.retentionConsentAt, { fallback: '-' })],
+    ['同意版本', v.raw.retentionConsentVersion ?? '未记录'], ['清理状态', CLEAN_MAP[v.clean].label],
+    ['清理规则', v.cleanPolicy], ['上传时间', v.createdAt], ['到期时间', v.expiresAt],
+  ]
 }
