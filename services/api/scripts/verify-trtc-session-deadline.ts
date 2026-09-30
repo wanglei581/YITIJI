@@ -127,7 +127,7 @@ async function main() {
   }
 }
 async function verifyRealRedis() {
-  assert.equal(process.env.VERIFICATION_DATABASE_TARGET, 'isolated')
+  // 这一段只碰 Redis、不碰数据库；CI 这一步不带 VERIFICATION_DATABASE_TARGET，只校验 Redis 是本机隔离实例。
   assert.match(process.env.REDIS_URL ?? '', /^redis:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/\d+)?$/, '只允许本机隔离 Redis（CI 的 redis 服务或本地临时实例）')
   const redis = new Redis(process.env.REDIS_URL, { lazyConnect: true, connectTimeout: 1500, maxRetriesPerRequest: 0, retryStrategy: () => null })
   redis.on('error', () => undefined)
