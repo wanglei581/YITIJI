@@ -163,6 +163,16 @@ const checks = [
     assert.match(doneSource, /retryPrintJob/)
     assert.doesNotMatch(doneRuntime, /const\s+handleRetry/)
   }],
+  ['W-114 重提版本门槛给求职者下一步，提示在固定按钮栏', () => {
+    assert.match(doneRuntime, /errorCodeOf\(err\) === 'PRINT_RETRY_AGENT_VERSION'\s*\? '这台机器的打印程序需要升级后才能重新提交，请找现场工作人员'/)
+    const retryActions = doneRuntime.slice(doneRuntime.indexOf('const retryButton ='), doneRuntime.indexOf('const takeawayNotices ='))
+    const takeawayNotices = doneRuntime.slice(doneRuntime.indexOf('const takeawayNotices ='), doneRuntime.indexOf("if (visual === 'out-of-paper')"))
+    assert.match(retryActions, /retryError &&[\s\S]*role="alert"[\s\S]*flex: '1 1 100%'[\s\S]*order: -1[\s\S]*\{retryError\}/)
+    assert.doesNotMatch(takeawayNotices, /retryError/)
+    assert.equal((doneRuntime.match(/\{retryButton\}/g) ?? []).length, 2, '普通失败与缺纸失败都使用同一按钮栏提示')
+    assert.match(browserSpecSource, /old agent retry rejection stays beside the actions in the first viewport/)
+    assert.match(browserSpecSource, /toBeInViewport\(\{ ratio: 1 \}\)/)
+  }],
 ]
 
 let failures = 0

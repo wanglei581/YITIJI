@@ -71,11 +71,12 @@
   font-family: var(--qx-serif);
   font-size: 40px;
 }
+/* 眉题 2026-09-30 换成中文「自我探索」，字号、字距、颜色照稿 34 v2 覆盖块。 */
 .sa-xq-eyebrow {
   margin-bottom: 7px;
-  font-size: 17px;
-  letter-spacing: 5px;
-  color: color-mix(in srgb, var(--qx-paper) 55%, transparent);
+  font-size: var(--qx-fs-aux-lg);
+  letter-spacing: 2px;
+  color: color-mix(in srgb, var(--qx-paper) 90%, transparent);
 }
 .sa-xq-ask { margin: 0; font-family: var(--qx-serif); font-size: 35px; line-height: 1.28; font-weight: 800; }
 .sa-xq-ask em { font-style: normal; color: var(--qx-emerald); }

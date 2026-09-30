@@ -9,6 +9,54 @@
 - **验证：** 现有 `verify-resume-diagnosis-flow-ui.mjs` 增补源码执行断言，覆盖未预选、通用提交、本人选项、密码回调、普通/损坏 PDF 与失败 CTA；首轮通过。两次恢复旧行为的变异都退出 1：W-107 由「行业、经验、求职场景均不预选」断言拦住；W-108 由「加密文件只给重新选择文件」断言拦住。变异均已恢复修复版。kiosk `tsc -b` 退出 0；6 个改动源码/门禁文件 eslint 退出 0（共用 PDF 预览新增非组件导出有 1 条 Fast Refresh 开发提示，无错误）。图谱点名的 16 个 kiosk 门禁退出 0（含简历流程的报告/decisions/单测闭包）；关联两份进度文档的 11 个 API 门禁退出 0。API 复用已有 `.pnpm/node_modules`，留存门禁用当前 schema 在临时目录生成客户端和隔离 SQLite，66 条检查通过，临时产物已删除，未写 API 目录。`verify:compliance-copy`（含其 3 项闭包）、`verify:ci-gate-coverage`、`verify:repository-integrity` 退出 0；未安装依赖。
 - **提交状态：** `git add` 退出 128，沙箱拒绝创建共享 Git 元数据中的 `index.lock`。未暂存、未提交；8 个文件保留在本工作区，由协调方代提交。
 - **证据边界：** 仅本地源码/门禁验证，未运行 Playwright、真机、CI 或生产发布；Playwright 由协调方跑。
+## 2026-09-29：两条慢门禁提速——Redis 降级与错误可观测性（分支 `claude/backend-hardening-20260929-gate-speedup`，叠在 #1135 上）
+
+- **时间花在哪（Grok 查、协调方核）：** 两条门禁都把 REDIS_URL 指到死端口起真实服务；ioredis 默认每条命令重试 20 次（约 10 秒到 40 秒），启动探测默认用满 5 秒，隐私调度注册默认用满 8 秒。
+- **改法：** 新增环境变量 `REDIS_MAX_RETRIES_PER_REQUEST`（0–20 的整数才生效；不设时仍是 `new Redis(url)`、ioredis 默认 20），**生产环境（NODE_ENV=production）一律忽略**（协调方加的保护，防误配后 Redis 一抖就失败）；两条门禁共用一组「门禁专用」环境（重试 0、已有的探测与调度上限配小）。断言、场景、死端口、真实子进程全部保留。
+- **验证：** 本机改前约 91 秒 / 46 秒，**改后 5 秒 / 3 秒**；变异「会员登录声明成不受影响」「5xx 不写错误日志」「去掉生产保护」全红；boot-resilience（仍走生产默认、含 15 秒存活等待）、internal-accounts、internal-login-real-redis、ai-platform-degradation、ci-gate-coverage 全绿。
+
+## 2026-09-29：真 Redis 登录门禁加固与提速（#1122 跟进；分支 `claude/backend-hardening-20260929-ephemeral-redis-hardening`）
+
+- **问题（Codex 复核、总指挥核实）：** 临时 redis-server 起不来时，停进程只等 exit 事件，可能永远卡住；CI 取消或 SIGTERM 时没有统一清理；用的是共享 dev.db。另外这条门禁每次要真等 68 秒登录 IP 窗口，#1074 的 build-and-verify 跑满 31 分钟被 30 分钟时限截断，它是最后一根稻草。
+- **修法：** Grok 实现加固：启停同时听 error / exit / close，10 秒超时后 SIGKILL；exit、SIGINT、SIGTERM、uncaughtException 上登记可重复调用的清理；每次自建临时 SQLite；新增 7 条自检（缺 redis-server 二进制 15 秒内失败、忽略 SIGTERM 的子进程会被停掉等）。协调方提速：子进程开 `TRUST_PROXY_HOPS=1`，每次登录带不同的 X-Forwarded-For，路由 IP 限流插不进来，按账号计、存在 Redis 的密码锁定照样生效，不再真等窗口。
+- **验证：** 25/25；**本机改前约 72 秒、改后 7 秒**；变异「锁定阈值改 100」变红（换 IP 后仍在测账号锁定），Grok 两处变异（去 error 监听、去超时）不卡住、非 0 退出；redis-degradation-truth、ai-platform-degradation、error-observability、ci-gate-coverage 全绿。另记一笔：redis-degradation-truth 本机 91 秒，是下一个可提速的门禁。
+
+## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
+
+- **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
+- **P1 `verify-feedback-notifications` 自建库过时：** 不设 `DATABASE_URL` 时它手抄建表语句，User 表缺 `passwordProofState`，一跑就报列不存在（CI 走 `DATABASE_URL` 所以没暴露，已复现）。改为按当前 schema `prisma db push`，以后 schema 加列不会再过时；设与不设 `DATABASE_URL` 两种都全绿，临时库照旧清理。
+## 2026-09-30：W-106 管理员后台列表「每页条数」切换失效修复
+
+走查实测：文件管理、日志审计、各信息源、设备管理、合作机构管理、Excel 导入记录选「每页 10 条」后弹回 20、不发请求。原因是公共分页状态 `useTableState` 用 react-router 的函数式 `setSearchParams`，同一次点击里页面先改条数、再把页码设回 1、分页器又补一次页码 1，三次写都基于渲染时的旧参数，最后一次把条数冲掉；Excel 导入记录更是直接丢弃所选条数。修法：`useTableState` 用 ref 在最新参数上累加同一事件内的写入（签名不变，所有使用它的页面一次修好）；Excel 导入记录改为真正切换条数并回第 1 页（默认 20，15 不在下拉档位里）；分页器「共 N 条」加千分位。其它 `setSearchParams` 用法逐个核对，都是单次写入。日志审计 E2E 新增用例：选 10 后地址栏、下拉、页码与行数都对，翻到第 2 页再选 50 回到第 1 页。
+## 2026-09-30：产品负责人拍板——岗位与招聘会 7 页的处置（托管 a 与私有部署 b）
+
+- **决定（产品负责人 9/30 原话「按你建议的来，先记文档，稿推到签约前」）：**
+  1. 稿 26 岗位列表、27 岗位详情、28 招聘会、42 线下招聘机构、43 找企业、44 招聘会参展企业、49 校园招聘专区这 7 页**保留**（停放，不删除）。我们云上（托管 a，含 12/1–12/14 自营试点）只显示「暂时不开放」，不请求、不存任何岗位数据。现状已满足：候选上这些路由在托管闸门里，直达显示 `RecruitmentHostingOffPage`「本终端未开放……」。
+  2. **自营点位入口维持现状**：首页不放岗位、招聘会入口，也不新增灰色入口（运行时没有单独的「全部服务」页，首页即服务目录；新增入口等于在我们云上加岗位入口，要先问律师）。
+  3. **卖给机构（私有部署 b 或机构自己的云账号）时整页打开**，以机构名义展示；我们只做设备与软件供应、按维保协议技术维护，不碰招聘内容。
+  4. **推到第一家机构签约前再做的三件事**：① 7 页的 2.0 完整态稿（解冻最终版、产品负责人看稿后加入）；② 运行页照稿改（托管 a 显示暂时不开放，b 整页打开）；③ Terminal Agent 分两路上报——设备运维数据（打印机缺纸、离线、故障）回我们的维保后台、不含用户和岗位信息，业务数据只去机构系统。
+- **同日另两条（52 页对齐表末拍板）：** 稿 33 与稿 11 共用取件页，按运行页现有流程，稿 33 只作排版参考；`/smart-campus/freshman-insights` 停放（PR #1180）。
+- **待律师确认：** 机构云账号模式下我方远程运维的边界；自营点位是否可放公共就业服务平台（如 24365、山东公共招聘网）官方入口二维码；「暂时不开放」相关文案。另建议向青岛人社书面咨询一体机展示能否按《人力资源市场暂行条例》第十八条备案处理。
+> **2026-09-30 超大在途订单只读计数（候选，尚未发布）**：发布前预检第 9b 节增加 `OVERSIZE_PAID_UNFINISHED_ORDERS`。只读统计已付款、`taskStatus` 不在 `completed` / `failed` / `cancelled`（`terminals-agent.service.ts` 的 `TERMINAL_STATES`）、面数大于 `OVERSIZE_MAX_SIDES`（100，与 `PRINT_MAX_SIDES_PER_ORDER` 同一口径）的订单。面数按 `printOrderSideCount` 在 SQL 里复算。没有订单行时，`copies` 不解析 JSON：整段必须是一层对象，再用 `substring(... from ...)` 取 `"copies"` 后 1 到 4 位正整数，取不到按 1。字符串、小数、0、负数、超过 4 位、坏 JSON 都是 1。查询里不再调用 `pg_input_is_valid`（PostgreSQL 16 才有），也不用 14 之后才有的函数；旧版本上这条查询失败会变成 `unknown`，发布当天会被误拦。查询失败、psql 不可用或结果不是纯数字时写 `unknown`，不输出订单内容。`psql -X -q -tA` 包在 `BEGIN READ ONLY` / `ROLLBACK` 里，`-q` 去掉命令标签，否则成功结果不是纯数字。第一次发布当天清单第 2 步要求先看这个数：0 才继续，大于 0 或 unknown 先停。本机临时 PostgreSQL 16.15 上 15 笔样例计数仍为 5。`abandoned` 和 `expired` 不在这组终态里，已付款且超过 100 面时也会被计进去。未上生产。
+
+> **2026-09-30 发布前只读盘点补项（候选，尚未发布）**：deploy-precheck 与 cleanup-stale-releases 的远端脚本分别在 `.github/scripts/deploy-precheck.sh`、`.github/scripts/cleanup-stale-releases.sh`。两个工作流先 checkout，再用 appleboy/ssh-action v1.2.5（提交 `0ff4204d59e8e51228ff73bce53f80d53301dee2`）的 `script_path` 把仓库文件送到远端，不再 base64 内联，远端也不再写临时脚本。`deploy.yml` 与 `server-cleanup.yml` 仍用 ssh-action v1.0.3。预检完整覆盖 1–17 节：运行时版本（PM2 实际 node，达到 22.13 才算 yes，读不到写 unknown）、certbot、证书到期日、终端 API 近 7 天按端口计数（awk 内聚合，终端编号过白名单，单文件最多 200 万行）、/srv 下 7 个残留目录、缓存与日志体积、API 内存四项（node 解析 pm2 jlist，不依赖 python3）。/root 只报合计 MB。pm2 的 rpc.sock 不是套接字时不调用 pm2。清理与 `deploy.yml` 共用并发组 `production-deploy`。健康检查只认 `GET /api/v1/health` 里 `success===true` 且 `data.status==="ok"`。mount、find、ps、readlink、运行中的 nginx、有套接字的 pm2 任一失败都拒绝该目录；引用路径先规范化并双向判断，结果留在当前 shell，删除前清掉再查；命中只跳过该目录。purge 只允许隔离区下一层时间戳目录。隔离区若是软链、跨文件系统、删除后路径仍在，或 `du -sm` 与 `du -xsm` 相差超过 1MB，execute 都拒绝。白名单仍不含 node_modules 与 services。门禁真跑这些分支。deploy-precheck.sh 按本任务放在这一个文件，现 1287 行，超过仓库千行线，这次不另拆。未上生产。
+
+> **2026-09-30 发布复核第二轮（候选，尚未发布，PR #1118）**：Actions 取消后远端收到的是 SIGPIPE。发布脚本在步骤 0 之前就挂上 HUP/INT/TERM/PIPE。pre 阶段只以 128+信号号退出。处理函数一进来先忽略后续信号，再把输出改到 `${BACKUP_ROOT}/release-signal-*.log`（目录不可写就退到 `/tmp`），然后再清理或回退。回退一开始 `trap ''` 并 `set +e`，途中再来的信号不重入，命令失败也不被 errexit 打断。健康检查通过后先屏蔽信号，再写 `DEPLOY_SOURCE.txt` 和 `.ok`。`.ok` 称为最近一次成功发布前的快照（回退锚点）。分组只认 `.dump`、`.runtime`、`.migrations.log`、`.dump.partial`、`.runtime.partial`、`.ok`。full 构建前用 `DEPLOY_MIN_FREE_FLOOR_MB` 默认 10240，取部署目录和备份目录里较小的可用空间；不够先 `pnpm store prune` 再判，仍不够就在安装依赖之前停。`server-cleanup.yml` 与发布共用并发组 `production-deploy`（`cancel-in-progress: false`）。控制面 SSH 在 HUP/INT/TERM/PIPE 上也会删 `/tmp/release.bundle`。没有改 `request_pty`。`cleanup-stale-releases.yml` 的同一并发组待另一路加。本机 `verify-deploy-rollback`、`verify-deploy-gates-in-sync`、`verify-deploy-authorization-gate`、`bash -n`、`verify-repository-integrity`、`verify-ci-gate-coverage` 与图谱 `--check` 退出码均为 0。七条新断言各做一次反向变异：改坏退出 1，恢复退出 0。
+
+> **2026-09-29 发布磁盘门槛（候选，尚未发布）**：`deploy-api-release.sh` 的 0b 门槛改为 max(原公式 REQUIRED_MB, `DEPLOY_MIN_FREE_FLOOR_MB`)，下限默认 10240MB。不够时默认先 `pnpm store prune`，再调用已有的 `prune_old_backups` 把旧备份收到 `DEPLOY_BACKUP_KEEP`（默认 3）组，然后复判一次；`DEPLOY_PRE_GATE_SAFE_CLEANUP=false` 关掉这次清理。清理后仍不够就中止，并指向 Server Cleanup 工作流的 dry-run。full 发布在服务器安装依赖之前另做一次只读下限检查，那边不清理。pg_dump 与运行目录先写 `.partial`，成功后再改名。摘要打印前后可用空间，并只读检查 pm2-logrotate。server-cleanup 把 `.migrations.log` 算进同一组。deploy-precheck 额外报静态备份大小、组数、最老日期，以及 `/tmp/release.bundle` 是否还在。
+## 2026-09-30：PR #1180 未注册地址的错误分类修复（本地工作区）
+
+- 范围：只修停放地址直达应显示「页面不存在」的产品缺陷；基线 `codex/park-freshman-insights-0930@1fa80662561c3e41edf5743a4b7881411b66b44a`。文件预算 5 个：Kiosk 路由、错误页、现有 runtime-error-boundary verify、current-progress、next-tasks；不新增页面、数据模型、服务或依赖，不改岗位/简历/文件/打印业务、生产配置、数据库、密钥或硬件链路。仅修复既有路由兜底语义，方案审查确认无需跨层契约或拆分；feature-scope/compliance-boundary 无范围变化。
+- 根因：停放后地址匹配 `src/routes/index.tsx` 的 `*` 普通 element，而非 errorElement；`useRouteError()` 没有错误对象，`KioskRouteErrorPage` 原判定只认 Response 404，因此误显示「页面暂时无法显示」。未知地址的祖先只有非视觉运行时根与 Outlet，没有进入 KioskRoot、SmartCampusCapabilityBoundary 或 RecruitmentHostingBoundary；只请求 screensaver 与此链路一致。W4/W6 配置使用相同构建变量，W6 复用 registerW4Api；两者智慧校园总开关都为 true，W6 的百宝箱开关/额外夹具不影响这条路由。当前源码不能解释所述 W6 CI 成功，需协调方核对那次运行 SHA 与用例执行记录。
+- 修法：仅 `*` element 传 `notFound`，错误页把显式未找到与真实 Response 404 合并判定；已注册路由的 errorElement 不传该标记，普通 Error/500 仍显示恢复指引。没有修改或删除 W4/W6 Playwright 断言，也没有补 API 夹具。
+- 验证：现有 `verify-kiosk-runtime-error-boundary.mjs` 增加真实 Router 与错误页的本地服务端渲染回归（只替换视觉组件），修复前复现原错误标题、修复后通过；覆盖停放/未知地址、真实路由树匹配、已注册页面正常/404/非 404。kiosk `tsc -b`、改动文件 eslint（TS/TSX 用仓库配置，mjs 额外用 ESLint recommended + Node globals）、fusion-w4、fusion-w6、smart-campus-ui、ci-gate-coverage、repository-integrity 均通过。未启动本地服务、未运行 Playwright、未安装依赖；浏览器结果由协调方重跑，不能据此声明 CI/设备/生产验收通过。
+- 交付：`git add` 被沙箱阻止创建共享 Git 元数据中的 `index.lock`（Operation not permitted），五个文件保留为未暂存工作区改动，协调方代提交；HEAD 未改变。
+
+## 2026-09-30：停放 `/smart-campus/freshman-insights`（不是删除）
+
+- 产品负责人拍板：该页没有 2.0 稿、没有前端入口且与首页内容重复，现停放 `/smart-campus/freshman-insights`。页面源码保留在 `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx`，不注册路由，也不进入 Kiosk 构建入口。
+- 连带收口：移除 `apps/kiosk/src/routes/index.tsx` 的页面 import/注册；从 `apps/kiosk/tests/visual/route-manifest.ts`、`fusion-w6-route-cases.ts`、W4/W6 路由清单和 verify 脚本移除运行时路由；`verify-smart-campus-ui.mjs` 改为断言源码保留但路由不存在；W4/W6 Playwright 用例改为断言直达显示「页面不存在」；`services/api/src/terminals/terminal-toolbox.service.ts` 百宝箱目标白名单移除该地址。
+- 正式文档 `docs/decisions/2026-06-17-smart-campus-jobfair-delivery-rules.md` 已改为如实描述「已停放，源码保留」。Kiosk/API typecheck、改动文件 eslint、W2/W3/W4/W5/W6、fusion baseline/shell、视觉证据、百宝箱 API、CI 覆盖、仓库完整性、合规文案和图谱生成 `--check` 均通过；Vite 生产构建通过且产物不含迎新服务导览文案。W4/W6 浏览器用例因沙箱禁止 preview 绑定 127.0.0.1 端口未能启动；把注册临时加回的变异使 smart-campus-ui、fusion-w4、fusion-w6 均以退出码 1 变红。
 
 ## 2026-09-30：W-86 第五轮——锁序统一为 PrintTask → Order，超前补报与同一终态清理分开（分支 `grok/print-retry-attempt-0929`，提交 `bda0b4979`）
 
@@ -22,6 +70,22 @@
 - **没改的三条。** 心跳 `groupBy`：`TerminalHeartbeat` 已有 `@@index([terminalId, createdAt])`（`schema.prisma` 267 行，postgres schema 272 行），列表每页一次可接受；没有心跳就判版本过旧是有意的。无订单任务的 CAS 是 `admin-print-scan.service.ts` 591–606 行 `printTask.updateMany({ where: { id, status: 'failed' } })`，条数不是 1 即 409。新 Agent 打老后端会因 `main.ts` 98 行 `forbidNonWhitelisted` 得到 400；发布顺序仍是先后端后 Agent（现场脚本 R.1→R.2），不改代码。Agent 版本仍是 `package.json` 的 0.4.12，不带 v 前缀。
 - **本机已跑（隔离 SQLite，库文件在 `~/.cache/claude-lanes/print-retry-0929/verify-w86-r5-*.db`）：** `services/api` 的 `tsc --noEmit` 退出 0。`verify:print-jobs`（含 `verify:pickup-code-share`）、`verify:admin-print-scan`、`verify:contract-review:print-lifecycle`（6 条）、`verify:terminal-status-idempotency`、`verify:refund-idempotent`、`verify:payment-flow`、`verify:member-order-timeline` 退出 0。`verify:print-retry-attempt` 退出 0。改动文件 eslint 退出 0。变异在 `bda0b4979` 之后做，每条退出 1，随后 `git checkout` 还原：把 `FUTURE` 当 `STALE` 删掉；去掉超前补报的次数上限；去掉快速路径的 `cleanupTerminalTask`；去掉退役原因；去掉订单状态原因；重试轮次缺 attempt 当成老 Agent 放行；把会员重试的行锁挪到 Order CAS 之后。
 - **没在本机跑：** `verify:print-retry-lock:postgres`。本机 `pg_isready -h 127.0.0.1 -p 5432` 无响应，没有启动用户的数据库。脚本只挂在 postgres-readiness，要求 `DATABASE_URL` 是 PostgreSQL。会员重提和管理员重试同时打同一单时，不得出现 40P01，也不得两边都成功。以 CI 为准。真 Windows 打印机和 GitHub CI 全量也没在本机跑。图谱已按代码重生成，`pnpm graph:check` 通过；`verify:repository-integrity` 通过。没有 push。
+## 2026-09-29：生产只读巡检补 AI 服务说明、加 --strict 发布后核对（分支 `claude/backend-hardening-20260929-probe-strict-ai-disclaimer`）
+
+- **做了什么（Grok 实现、协调方审，合规运维窗口要求）：** `scripts/prod-readonly-probe.mjs` 法务文档补查 `ai_disclaimer`（未激活即 FAIL，与发布流程 3d 预检三份一起查对齐）；新增 `--strict`：岗位、招聘会、企业公开条数非 0 或任何列表出现演示标记都 FAIL、退出码非 0；不带时行为逐字不变。发布清单与运维手册里的发布后核对命令改成 `--strict`，须在演示企业用 #1115 下架之后跑。
+- **验证：** verify-prod-readonly-probe 补 ai_disclaimer 未激活、--strict 企业数 1 与全 0 等夹具；Grok 两处、协调方抽 1 处（去掉 ai_disclaimer）变异全红；ci-gate-coverage 通过。
+
+## 2026-09-29：会员取件链接与重试审计在真 PostgreSQL 上被门禁覆盖（分支 `claude/backend-hardening-20260929-member-print-audit-pg`，叠在 #1110 上）
+
+- **缺口（Codex 复核、总指挥核实）：** #1110 修的是「会员号写进审计 actorId、PG 外键拒绝、被 AuditService 静默吞掉」，但原门禁跑在 SQLite 上，SQLite 不校验这条外键，测不出来；重试场景也没有运行断言。
+- **补法（Grok 实现、协调方审）：** 新门禁 `verify:member-print-audit:postgres`（只挂 postgres-readiness）：真 PG 上走真实 PrintJobsService，取件链接与重试各一次，断言各落一行审计、actorId 为空、payload.endUserId 为会员号；阳性对照用旧写法直接写审计，PG 必须抛外键错误。SQLite 的 verify:miniapp-cloud-print-m2 补重试审计断言。只加门禁，不改服务代码。
+- **验证：** Grok 本机临时 PG16 跑 5/5，两处变异（取件 actorId 改回会员号、删重试审计）全红；协调方复跑 m2、backend-p0-contracts、ci-gate-coverage 全绿，抽 1 处变异（重试审计动作名错）变红。
+## 2026-09-29：给人看的时间一律按北京时间（走查 W-78、W-67；分支 `claude/backend-hardening-20260929-display-time-shanghai`）
+
+- **问题：** 告警正文里的时间是 UTC，比北京时间早 8 小时，运维会误判事件先后（W-78）；招聘会企业打印页脚用服务器本地时钟，服务器在 UTC 时同样早 8 小时；价目应急 SQL 用了裸 `NOW()`，时区不对（W-67）。
+- **修法（Grok 实现、协调方审）：** 新增共用函数 `common/beijing-display-time.ts`（Asia/Shanghai），告警中心正文、合同审查报告、诊断报告、模拟面试报告与练习单、自我探索、岗位匹配参考、职业规划、参会准备单、顾问产物、招聘会企业打印页脚、批量发布失败原因、岗位与招聘会「同步于」说明、早报日期、诊断导出文件名都改走它。**存库、接口里的 ISO 时间、去重键、日志、额度与统计的分桶键一律保持 UTC 不动。** 价目应急 SQL 两套库都写明 UTC 墙钟，文档两处提醒「不要照抄 NOW()」，门禁钉住不许再出现裸 NOW()。
+- **验证：** 新门禁 `verify:beijing-display-time` 21 条（固定 UTC 16:30 必须显示为北京 次日 00:30），变异「时区改回 UTC」21 条全红；协调方在候选上复跑 23 条相关门禁（出纸服务、告警、批量发布、早报、价目、日期诚实性等）与 api tsc 全绿。
+
 ## 2026-09-30：「我的打印订单」失败行给失败原因码、补网点名（小程序交付单；分支 `claude/backend-hardening-20260930-order-failure-code`）
 
 - **问题：** 小程序「我的打印订单」失败单只能显示「打印失败」，也缺网点名（任务上没记终端的行）。
@@ -46,11 +110,49 @@
 - **修法（Codex 实现、协调方审）：** 写页眉页脚时临时把下边距清零再恢复（合同审阅报告与 AIGC 标识已是这个写法）；回传页数改为从最终 PDF 读出的实际页数。报价与计费本来就按文件实际页数重算，改后三处都是同一个数。其余 10 个生成 PDF 的服务逐个排查过，没有同样问题。
 - **W-94 遗留：** 手机或一体机上传时，UTF-8 文件名被误按 Latin-1 解码的还原条件原来是「还原后含汉字」，所以全角括号、日文、韩文、emoji 这类名字保持乱码。改为「还原后含 U+00FF 以上字符」；`Ã©.pdf`、`résumé.pdf` 这类合法西文名仍原样保留（现有门禁钉着）。
 - **验证：** verify:resume-report-export 用一份像真的多页报告（诊断报告与修改清单两种），断言回传页数、PDF 实际页数、文件记录页数、计费页数四者相等，每页都有正文、页脚「第 N / M 页」的 M 等于页数；verify:kiosk-upload-print-contract 加五个非汉字文件名用例。反向变异四处全红：页脚不清零下边距、页数改回写页脚前的计数、页脚总页数写错、文件名恢复「含汉字」条件。
+## 2026-09-30：管理员后台打印任务「重试」按钮事先显示能不能点（W-86 前端，对接后端 #1152）
+
+- 「打印扫描运维」页列表与详情的「重试」只看服务端 `retryBlockedReason`：有值则置灰并把原因直接写在按钮下（未付款、已退款、结果未确认、已部分出纸、文件已过期、终端打印程序低于 0.4.13、终端已永久退役、终端当前不在运行状态、任务状态已变更等，文案与服务端拒绝时逐字一致）；null 可点；字段缺失时保持旧行为。页面写一次「后台不提供强制重打；需要补打请让用户另下新单。」管理员重试被拒错误码随服务端改为 `PRINT_RETRY_*`，门禁断言后台源码不再出现旧前缀。
+- 本地真实后端（#1152 第四、五轮）逐一造数据走查，各原因列表与详情均置灰并显示原因、可重试任务正常重新排队；截图在 `~/.cache`（不进仓库）。Grok 实现，Claude 审。
+## 2026-09-30：青序 2.0 A 批——一体机运行页合规文案（分支 `claude/qx-align-a-copy-0930`）
+
+- **范围：** 只改用户可见文字和眉题样式（字号、字距、颜色照稿 v2 覆盖块），不动功能、接口、数据。依据 v2 README 规则 4（工程词、英文眉题不上屏）、规则 5（托管 a 口径）。18 归 B 批，未动。
+- **英文眉题 → 中文（照同号稿）：** 08「TERMS OF SERVICE / PRIVACY POLICY」→「你和这台机器 / 你的信息」；19「IMAGES TO PDF」→「图片转 PDF」；20「SIGN & STAMP」→「签名」；34「SELF ASSESSMENT」→「自我探索」；35「NOTIFICATIONS」→「消息通知」；38「MY FILES & ORDERS」→「我的文档和订单」；39「MY RESUMES / MY FAVORITES / AI SERVICE RECORDS / MY ACTIVITY / ACTIVITY DETAIL」→「我的简历 / 我的收藏 / AI 服务记录 / 我的足迹 / 记录详情」；40「MY FEEDBACK」→「意见反馈」。
+- **工程词：** 04「继续后回到/interview」改写页面名（「继续后回到 练面试」），按钮读屏名同源，路由→页面名统一由 `sessionGuardModel.sessionGuardSourceName` 给（照稿 04 的对照表）；20 示例条「演示 固定原型数据，不是真实用户文件」→「示例 示例文件，不是哪位用户的文件」，顶部能力标签「能力已开放 / 能力读取中 / 终端未登记……」→「可以签名 / 正在确认 / 这台还没登记……」，示例态按钮原因「合成演示」→「这是示例」；34 步骤标「E2 / E3」→「记分 / 解读」；39 页签副标题「服务元数据」→「名称和状态」，简历与 AI 记录行不再显示模型名（demo / llm）和任务编号，模拟面试说明去掉「元数据」；41 去掉「元数据」「step-up」「后台」「外跳」（改共享会员端文案 `packages/shared/src/types/memberPrivacy.ts` 的范围横幅、类型名与说明，管理端专用 ADMIN_* 未动）。
+- **托管 a 残留：** 09 第 8 项「岗位与招聘会信息」→「机构官方渠道」；41「撤回岗位 AI 授权」→「撤回 AI 使用授权」（与稿 41、账号设置页同名）。撤回项保留，依据：撤回的是 job_ai 授权，托管 a 下 `/resume/job-fit` 手填岗位要求那条路仍要这项授权（`governed-job-fit.service` 的 requireActiveConsent，用例「hosting off: job fit keeps only the manual path」）。
+- **门禁与用例：** verify:data-request-ui 同步新文案并新增会员端文案反向断言；verify:fusion-w5 新增 A 批断言（眉题、示例条、页签、模型名与任务编号、机器状态第 8 项）；verify-qx-session-lifecycle 新增「不露路由」断言；profile-qx、kiosk-session-warning 用例同步。变异 12 处（改回旧文案）对应门禁全部转红。
+- **没改的：** 41 页底部约 580px 留白、各页版式差异（页头、底部问小青等）属后续版式批次；页头右上的终端编号来自共享页框，不在本批。
+
+## 2026-09-30：法务全套第一批——个人信息保护影响评估、数据总表、同意与撤回说明（分支 `claude/legal-set-c1-c3-0930`，只改文档）
+
+- **做了什么：** 产品负责人要求补齐商用法务文件（总目录 24 份，15 份试点前必需，总目录与排期不进仓库）。第一批三份内部底稿进仓库，都是供律师审阅的草案：
+  - `docs/compliance/personal-info-impact-assessment.md`：影响评估，覆盖公共终端（含扫描原件与出纸盘遗留、本机缓存与磁盘）、AI、未成年人、自动化决策、委托处理、生成式 AI 合规；
+  - `docs/compliance/data-inventory-and-retention.md`：数据分类与保存期限总表；
+  - `docs/compliance/consent-and-withdrawal.md`：同意记录与撤回机制。
+  每份分「可直接用」与「待律师确认的点」。
+- **怎么做的：** Grok 起草；Codex 逐条对候选 `25dbe6181` 的代码核「已做到」、对官方原文核法条；agy 做反方审查；协调方裁定并统稿。修正了 5 处事实错误，例如自我探索是清空内容、留下记录，不是删除整行；厂商是后台可改的产品口径，不是代码保证。另补了自动化决策、委托处理、物理风险三节。
+- **核过的原文：** 网络日志不少于六个月在《网络安全法》（2025-10-28 修正）第二十三条第三项；网信办 2026-09-14 公告要求调用已备案模型的应用向地方网信办登记，上线后公示模型名称及备案号或上线编号。顺带把 `docs/product/recruitment-closure-license-gated-plan-2026-09.md` 里的旧条号「第二十一条」改为第二十三条第三项。
+- **两份现有保存期限文件不合并：** `member-personal-data-retention.md`、`file-retention-and-cos-lifecycle.md` 被 4 条门禁直接读取，保留为明细，只在标题下加一行指向总表。
+- **发现的缺口（待报总指挥，本 PR 不改代码）：**
+  - 线上注销返回「账号注销暂未开放」，又没有带审计的人工注销工具，试点前要补；
+  - 自我探索允许勾选「监护人同意并陪同」，勾选证明不了监护关系，给了两个改法待定；
+  - 导出简历不印可见 AI 字样是否满足标识办法，列为待律师确认第一条。
+- **验证：** `verify:compliance-copy`、`verify:cos-lifecycle-policy`、`verify:member-data-retention`、`verify:ai-user-text-retention` 通过；`verify:ai-usage-retention` 要连隔离库，本机没跑，它对留存矩阵只做包含检查，新增一行不影响。
 ## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
 
 - 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
 - 改法：`pnpm-workspace.yaml` 三条 brace-expansion 覆盖从 1.1.18 / 2.1.4 / 5.0.9 上调到修复版 1.1.20 / 2.1.6 / 5.0.11，`scripts/verify-dependency-security.mjs` 的期望常量同步，锁文件只变 brace-expansion 三个版本。没有新增豁免。
 - 验证：干净安装后 `verify:dependency-security` ALL PASS（full / prod 高危与严重均为 0），repository-integrity、ci-gate-coverage、kiosk `tsc -b` 通过。
+## 2026-09-30：AI 调用概览按实际统计窗口写「近 24 小时」（W-101 优先项）
+
+管理员后台「AI 服务管理」的概览卡片和工作台「AI 调用」卡片读的是同一个接口，服务端按滚动 24 小时统计，不是北京时间自然日；页面却写「今日概览 / 今日累计 / 今日暂无调用」，走查实测页面 104 次、上海今日 40 次，对不上。文字改成「近 24 小时」，工作台成功率前标出统计窗口；按自然日计费的额度面板「今日已计费金额」本来就是自然日，不动。门禁 `verify-admin-ai-usage-ui` 改为钉住新口径，改回旧文字会红。
+## 2026-09-30：返工单 r3 第 1 批（Codex 本轮收口）
+
+终端发布观察面板已放回表格下方、详情抽屉复用页面 notice 并将绑定码状态改为中文生命周期标签，三处表格恢复卡片内横向滚动，管理员智慧校园文案、扫描输入门禁与宣传屏素材刷新错误提示同步修正并补上对应静态/E2E 断言。
+
+## 2026-09-30：后台终端与设备 UI 第 1 批（Codex 实现）
+
+管理员终端页收口为五列并将次要信息、全部运维动作移入现有详情抽屉；设备总览、打印机、外设和机构端终端数据统一了表格外壳、状态标签与数量显示。终端离线时详情抽屉的打印机状态和扫描输入不再显示「正常」，只显示中性离线状态并标注离线前最后一次上报。宣传屏按素材库、播放方案、终端配置拆分子组件，并把原生文件选择框改为中文按钮和已选文件名；两后台智慧校园说明改为只说明本校终端开关及尚未开放的模块。同步把日期门禁的分页与日期切片解析抽成已接线模块，更新相关静态门禁和终端抽屉 E2E 入口；类型检查、静态门禁已在本地通过，四套浏览器 E2E 已启动但沙箱禁止监听本地端口，需在可监听环境复跑。
 
 ## 2026-09-30：带文字层的 PDF 简历按行保留结构（走查 W-95；分支 `claude/backend-hardening-20260929-w95-pdf-lines`）
 
@@ -244,10 +346,6 @@ Agent 0.4.13 会在心跳里上报 `queue_cleanup_failed` 与 `queue_pause_faile
 - **空间与内存底子（23:3x 同一次只读）：** Agent 连续运行 180 小时，node 工作集 78 MB、峰值 84 MB，无内存上涨迹象；一体机 Edge 281 MB；可用内存 5.3 GB、C 盘剩余 130 GB。服务日志已按 10 MB 滚动、保留 5 个。**发现约 130 MB 早期遗留物**（都在 `C:\ProgramData\AIJobPrintAgent`，不在滚动范围内）：`agent-debug.log` 48 MB（6/9 后未再写）、`agent-out.log` 38 MB（6/2 后未再写）、`logs\AIJobPrintTerminalSetup.exe` 43 MB（0.4.8 旧安装包、未签名），以及 `scan-test-backup\` 里 1 个扫描件 PDF（9/10，可能含个人信息）。按规矩删除由产品负责人本人做；是否让安装包升级时顺带清掉这几类已知旧文件，交总指挥定。
 - **发布当天：** 现场验收单新增 R.5（用户走后残留、打印中强杀与拔电、重提能否出纸、缓存比对 W-87），一页纸改为约 110 分钟。
 
-## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
-
-- **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
-- **P1 `verify-feedback-notifications` 自建库过时：** 不设 `DATABASE_URL` 时它手抄建表语句，User 表缺 `passwordProofState`，一跑就报列不存在（CI 走 `DATABASE_URL` 所以没暴露，已复现）。改为按当前 schema `prisma db push`，以后 schema 加列不会再过时；设与不设 `DATABASE_URL` 两种都全绿，临时库照旧清理。
 ## 2026-09-29：自我探索同意条款加年龄一条与版本过渡、条款由服务端下发（分支 `claude/backend-hardening-20260929-selfassess-consent`）
 
 - **做了什么（Grok 实现、协调方审）：** 合规窗口裁定：同意条款加「本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。」当前版本升到 `sa-consent-v1.2026-09-29`；服务端另收一份明确列出的旧版本清单 `SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS`（只有 `sa-consent-v1.2026-08-16`），清单外仍 400；落库存实际提交的版本号。`GET /resume/self-assessment/questions` 下发 `consentItems`（与版本配套的同一份条款）。匿名结果只按 `AI_RESUME_RESULT_TTL_HOURS` 短期保存（门禁断言 expiresAt 与 endUserId 为空），「匿名不留库」的错注释已改。#1112 后续：附加到简历改按 export 档过闸；整体合规拒答改为只回打分、不让用户重答。过渡期结束的待办已写进 next-tasks（触发条件：小程序带新条款的版本全量）。

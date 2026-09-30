@@ -242,6 +242,16 @@ for (const route of w6MobileCases) {
   })
 }
 
+test('/smart-campus/freshman-insights 已停放，路由不存在 @w6-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerW6Api(api)
+  await page.goto('/smart-campus/freshman-insights')
+  await expect(page.locator('[data-kiosk-screen="route-error"]')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '页面不存在', exact: true })).toBeVisible()
+  await expect(page.getByText('当前入口可能已经调整，请返回首页重新选择服务。')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
 test('/resume/optimize/compare mobile breakpoint @w6-mobile', async ({ page, api }) => {
   const route = w6KioskCases.find(({ pattern }) => pattern === '/resume/optimize/compare')
   if (!route) throw new Error('W6 compare route case is missing')

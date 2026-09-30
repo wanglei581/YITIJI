@@ -14,7 +14,7 @@ import { API_MODE } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { formatRemainingSeconds, useRemainingSeconds } from '../../hooks/useCountdown'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import {
   getPrintJobStatus,
   issuePrintJobTakeawayUrl,
@@ -46,7 +46,7 @@ interface PrintFile {
 
 interface PrintJobState {
   file?:                PrintFile
-  params?:              PrintJobParams
+  params?:              Partial<PrintJobParams>
   returnUrl?:           string
   returnLabel?:         string
   taskId?:              string
@@ -54,6 +54,7 @@ interface PrintJobState {
   orderNo?:             string
   amountCents?:         number
   paymentSessionToken?: string
+  pickupSource?:        boolean
   source?:              PrintMaterialSource
   /** 建单响应的真信号；缺省（刷新 / 旧 state / 从别处进来）时整条提示不渲染。 */
   hasEndUser?:          boolean
@@ -293,7 +294,9 @@ export function PrintDonePage() {
         state: { ...((location.state ?? {}) as object), taskId },
       })
     } catch (err: unknown) {
-      setRetryError(userMessageOf(err, '重新提交失败，请联系工作人员补打'))
+      setRetryError(errorCodeOf(err) === 'PRINT_RETRY_AGENT_VERSION'
+        ? '这台机器的打印程序需要升级后才能重新提交，请找现场工作人员'
+        : userMessageOf(err, '重新提交失败，请联系工作人员补打'))
       setRetrying(false)
     }
   }
@@ -405,15 +408,22 @@ export function PrintDonePage() {
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeedbackOpen(true)}>反馈问题</button>
     ) : null
     const retryButton = takeaway?.canRetry && !isUnconfirmed ? (
-      <button
-        type="button"
-        className="qx-btn"
-        data-variant="teal"
-        disabled={retrying}
-        onClick={() => { void handleResubmitPrint() }}
-      >
-        {retrying ? '正在重新提交…' : '重新提交打印'}
-      </button>
+      <>
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="teal"
+          disabled={retrying}
+          onClick={() => { void handleResubmitPrint() }}
+        >
+          {retrying ? '正在重新提交…' : '重新提交打印'}
+        </button>
+        {retryError && (
+          <p role="alert" className="qx-state-d" style={{ flex: '1 1 100%', order: -1, margin: 0 }}>
+            {retryError}
+          </p>
+        )}
+      </>
     ) : null
     const takeawayNotices = (
       <>
@@ -434,7 +444,6 @@ export function PrintDonePage() {
           <p role="status">带走链接已过期，请联系工作人员补打</p>
         )}
         {takeawayError && <p role="status">{takeawayError}</p>}
-        {retryError && <p role="status">{retryError}</p>}
       </>
     )
 
@@ -586,7 +595,7 @@ export function PrintDonePage() {
       terminalLabel="就业服务大厅"
       ctabar={
         <>
-          <button
+          {state.pickupSource ? <p>要再打一份请在手机上重新下单</p> : <button
             type="button"
             className="qx-btn pff-again"
             data-variant="ghost"
@@ -595,7 +604,7 @@ export function PrintDonePage() {
           >
             再印一份
             <small>{reprintHint(amountCents)}</small>
-          </button>
+          </button>}
           <button
             type="button"
             className="qx-btn"

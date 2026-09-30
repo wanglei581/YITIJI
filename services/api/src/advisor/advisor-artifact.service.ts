@@ -3,7 +3,13 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
+import { formatBeijingDate } from '../common/beijing-display-time'
 import { AdvisorPdfService } from './advisor-pdf.service'
+
+/** 小青产物印在纸上的日期。 */
+export function advisorArtifactReportDate(updatedAt: Date): string {
+  return formatBeijingDate(updatedAt)
+}
 import { ADVISOR_DISCLAIMER, COMPARE_LIMITS, SLOT_DRAFT_BLANK_POLICY } from './advisor-skills'
 import type { AdvisorArtifactPayload } from './advisor-artifact.types'
 
@@ -100,7 +106,7 @@ export class AdvisorArtifactService {
     const row = await this.getOwned(artifactId, sessionId)
     const payload = JSON.parse(row.payloadJson) as AdvisorArtifactPayload
     const { buffer, pageCount } = await this.pdf.render(
-      { date: new Date(row.updatedAt).toISOString().slice(0, 10), providerLabel: row.provider, contentId: artifactId },
+      { date: advisorArtifactReportDate(row.updatedAt), providerLabel: row.provider, contentId: artifactId },
       payload,
     )
     const uploaded = await this.files.upload({

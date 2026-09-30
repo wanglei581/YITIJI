@@ -41,7 +41,8 @@ type QxMeTab = { key: QxMeView; label: string; hint: string; to: string }
 const RECORD_VIEWS: QxMeTab[] = [
   { key: 'resumes', label: '简历', hint: '诊断与生成', to: '/me/resumes' },
   { key: 'favorites', label: '收藏', hint: '岗位·招聘会·政策', to: '/me/favorites' },
-  { key: 'ai-records', label: 'AI记录', hint: '服务元数据', to: '/me/ai-records' },
+  // 稿 39：页签副标题写「名称和状态」，不写「元数据」（v2 规则 4，2026-09-30 A 批）。
+  { key: 'ai-records', label: 'AI记录', hint: '名称和状态', to: '/me/ai-records' },
   { key: 'activity', label: '足迹', hint: '浏览·跳转·进度', to: '/me/activity' },
 ]
 

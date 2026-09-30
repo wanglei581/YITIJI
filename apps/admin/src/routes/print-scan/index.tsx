@@ -17,6 +17,7 @@ import { FilterChip } from '../components/FilterChip'
 import { PrinterIcon, RefreshCwIcon, SlidersHorizontalIcon, WalletIcon } from 'lucide-react'
 import { CapabilityCenter } from './CapabilityCenter'
 import { CloseUnpaidPrintTaskForm } from './CloseUnpaidPrintTaskForm'
+import { PrintRetryButton } from './PrintRetryButton'
 import {
   adminPrintScanService,
   type AdminPrintScanTaskDetail,
@@ -139,7 +140,9 @@ function TaskCenter() {
   const [detail, setDetail] = useState<AdminPrintScanTaskDetail | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [actionBusy, setActionBusy] = useState(false)
+  const [actionTaskId, setActionTaskId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionErrorScope, setActionErrorScope] = useState<'list' | 'detail'>('detail')
 
   const implemented = TASK_TYPE_TABS.find((t) => t.value === taskType)?.implemented ?? false
 
@@ -177,6 +180,7 @@ function TaskCenter() {
     setDetailOpen(true)
     setDetail(null)
     setActionError(null)
+    setActionErrorScope('detail')
     try {
       const result = await adminPrintScanService.getTaskDetail(item.type, item.taskId)
       if (seq === detailSeq.current) setDetail(result)
@@ -185,29 +189,41 @@ function TaskCenter() {
     }
   }
 
-  const applyAction = async (action: 'retry' | 'cancel') => {
-    if (!detail || actionBusy) return
+  const applyAction = async (
+    action: 'retry' | 'cancel',
+    target?: { type: AdminPrintScanTaskDetail['type']; taskId: string },
+  ) => {
+    const subject = target ?? (detail ? { type: detail.type, taskId: detail.taskId } : null)
+    if (!subject || actionBusy) return
+    const fromDetail = !target
     const confirmText = action === 'retry' ? '确认将该失败任务重新排队打印？' : '确认取消该等待中的扫描任务？'
     if (!window.confirm(confirmText)) return
     const actionQueryKey = queryKeyRef.current
     setActionBusy(true)
+    setActionTaskId(subject.taskId)
     setActionError(null)
+    setActionErrorScope(fromDetail ? 'detail' : 'list')
     try {
-      await adminPrintScanService.applyTaskAction(detail.type, detail.taskId, action)
+      await adminPrintScanService.applyTaskAction(subject.type, subject.taskId, action)
     } catch (e) {
       if (actionQueryKey === queryKeyRef.current) {
         setActionError(e instanceof Error ? e.message : '操作失败')
       }
       setActionBusy(false)
+      setActionTaskId(null)
       return
     }
     // 动作已在服务端执行成功；仅仍处在原查询条件时才刷新。stale 表示用户已切换筛选，
     // 不应以旧闭包覆盖新列表，也不应误报刷新失败。
     try {
-      const refreshedDetail = await adminPrintScanService.getTaskDetail(detail.type, detail.taskId)
+      if (detail && detail.taskId === subject.taskId && detail.type === subject.type) {
+        const refreshedDetail = await adminPrintScanService.getTaskDetail(subject.type, subject.taskId)
+        if (actionQueryKey !== queryKeyRef.current) return
+        setDetail(refreshedDetail)
+      }
       if (actionQueryKey !== queryKeyRef.current) return
-      setDetail(refreshedDetail)
       const refreshResult = await load()
+      if (actionQueryKey !== queryKeyRef.current) return
       if (refreshResult === 'failed') {
         setActionError('操作已执行成功，但页面刷新失败，请手动刷新查看最新状态')
       }
@@ -217,6 +233,7 @@ function TaskCenter() {
       }
     } finally {
       setActionBusy(false)
+      setActionTaskId(null)
     }
   }
 
@@ -272,6 +289,16 @@ function TaskCenter() {
         </div>
       )}
 
+      {implemented && taskType === 'print' && (
+        <p className="text-[12px] leading-relaxed text-neutral-500">
+          后台不提供强制重打；需要补打请让用户另下新单。
+        </p>
+      )}
+
+      {actionError && actionErrorScope === 'list' && (
+        <div role="alert" className="rounded-lg bg-error-bg px-3 py-2 text-[12.5px] font-bold text-error-text">{actionError}</div>
+      )}
+
       {!implemented ? (
         <EmptyState
           title="该任务类型尚未上线"
@@ -285,7 +312,7 @@ function TaskCenter() {
         <EmptyState title="暂无任务" description="当前筛选条件下没有任务记录。" />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-neutral-900/10 bg-surface">
-          <table className="w-full min-w-[760px] text-left text-[13px]">
+          <table className="w-full min-w-[980px] text-left text-[13px]">
             <thead>
               <tr className="border-b border-neutral-900/10 bg-neutral-50/90 text-[12px] text-neutral-500">
                 <th className="px-4 py-2.5 font-bold">任务</th>
@@ -295,6 +322,7 @@ function TaskCenter() {
                 <th className="px-4 py-2.5 font-bold">错误码</th>
                 <th className="px-4 py-2.5 font-bold">创建时间</th>
                 <th className="px-4 py-2.5 font-bold">过期时间</th>
+                {taskType === 'print' && <th className="px-4 py-2.5 font-bold">重试</th>}
               </tr>
             </thead>
             <tbody>
@@ -319,6 +347,24 @@ function TaskCenter() {
                     <td className="px-4 py-2.5 text-neutral-500">{item.errorCode ?? '—'}</td>
                     <td className="px-4 py-2.5 text-neutral-500">{fmt(item.createdAt)}</td>
                     <td className="px-4 py-2.5 text-neutral-500">{fmt(item.expiresAt)}</td>
+                    {taskType === 'print' && (
+                      <td
+                        className="px-4 py-2.5 align-top"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        {item.type === 'print' && (
+                          <PrintRetryButton
+                            retryBlockedReason={item.retryBlockedReason}
+                            legacyVisible={false}
+                            busy={actionBusy && actionTaskId === item.taskId}
+                            onRetry={() => void applyAction('retry', item)}
+                            label="重试"
+                            layout="list"
+                          />
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })}
@@ -336,8 +382,15 @@ function TaskCenter() {
 
       <Drawer open={detailOpen} onClose={() => setDetailOpen(false)} title="任务详情">
         {!detail && !actionError && <LoadingState text="正在加载详情" />}
-        {actionError && <div className="mb-3 rounded-lg bg-error-bg px-3 py-2 text-[12.5px] font-bold text-error-text">{actionError}</div>}
-        {detail && <TaskDetailBody detail={detail} busy={actionBusy} onAction={applyAction} onCloseUnpaid={refreshAfterCloseUnpaid} />}
+        {actionError && actionErrorScope === 'detail' && <div role="alert" className="mb-3 rounded-lg bg-error-bg px-3 py-2 text-[12.5px] font-bold text-error-text">{actionError}</div>}
+        {detail && (
+          <TaskDetailBody
+            detail={detail}
+            busy={actionBusy && actionTaskId === detail.taskId}
+            onAction={(action) => void applyAction(action)}
+            onCloseUnpaid={refreshAfterCloseUnpaid}
+          />
+        )}
       </Drawer>
     </div>
   )
@@ -358,6 +411,8 @@ function TaskDetailBody({
   const isUnconfirmed = detail.type === 'print' && detail.errorCode === 'PRINT_JOB_UNCONFIRMED'
   const needsManualCheck = isUnconfirmed && detail.type === 'print' && !detail.printOutcome
   const canRetry = detail.type === 'print' && detail.status === 'failed' && !isUnconfirmed
+  const retryFieldPresent = detail.type === 'print' && detail.retryBlockedReason !== undefined
+  const showRetry = retryFieldPresent || canRetry
   const canCancel = detail.type === 'scan' && detail.status === 'waiting'
   const closeUnpaidBlockReason = detail.type === 'print' ? detail.closeUnpaidBlockReason : null
 
@@ -430,17 +485,17 @@ function TaskDetailBody({
         </p>
       )}
 
-      {(canRetry || canCancel) && (
+      {(showRetry || canCancel) && (
         <div className="border-t border-neutral-900/10 pt-3">
-          {canRetry && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onAction('retry')}
-              className="h-10 w-full rounded-lg bg-primary-700 text-[13px] font-bold text-white disabled:opacity-50"
-            >
-              {busy ? '处理中…' : '重试该失败任务（重新排队到原终端）'}
-            </button>
+          {showRetry && detail.type === 'print' && (
+            <PrintRetryButton
+              retryBlockedReason={detail.retryBlockedReason}
+              legacyVisible={canRetry}
+              busy={busy}
+              onRetry={() => onAction('retry')}
+              label="重试该失败任务（重新排队到原终端）"
+              layout="detail"
+            />
           )}
           {canCancel && (
             <button

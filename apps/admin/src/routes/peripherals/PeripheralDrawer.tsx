@@ -44,7 +44,7 @@ export function PeripheralDrawer({ terminal, onClose }: { terminal: AdminTermina
         <section className="rounded-[10px] border border-dashed border-neutral-900/[0.12] px-4 py-3 text-xs text-neutral-500">
           <h3 className="text-[13px] font-bold text-neutral-700">{UNREPORTED_PERIPHERALS.join('、')}</h3>
           <p className="mt-1 leading-relaxed">
-            不上报：这四类由一体机本地使用，Terminal Agent 目前不向云端上报它们的状态，后台看不到好坏，
+            不上报：这四类由一体机本地使用，终端程序（Terminal Agent）目前不向云端上报它们的状态，后台看不到好坏，
             只能按外设现场验收清单到现场检查。
           </p>
         </section>

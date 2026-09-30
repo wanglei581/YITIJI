@@ -73,20 +73,24 @@ node scripts/prod-readonly-probe.mjs
 node scripts/prod-readonly-probe.mjs --host <生产服务器 IP> --domains zyidai.cn,admin.zyidai.cn,partner.zyidai.cn
 node scripts/prod-readonly-probe.mjs --expect-sha <本次发布 SHA 前缀>
 node scripts/prod-readonly-probe.mjs --json
+# 发布后核对：必须在演示企业用 #1115 下架之后跑。下架前公开列表里还有演示企业，退出码会非 0。
+node scripts/prod-readonly-probe.mjs --strict
 ```
 
 `--expect-sha` 只打印在报告头，请人工与服务器 `DEPLOY_SOURCE.txt` 核对。`--scheme http` / `--port` 仅供本地桩，CI 门禁 `pnpm verify:prod-readonly-probe` 不连生产。
 
-有 FAIL 退出码 1，WARN / INFO 仍为 0。公开列表 `total=0` 是 INFO（内容录入是负责人的事），不是 FAIL。岗位、招聘会、政策、线下机构取第一页（`pageSize=50`），用户看得见的名称、标题、来源名、机构名里出现全角「（演示）」则 WARN 并列出前 3 个名字，没有则 PASS 并注明「无演示标记」；企业列表仍用宽匹配（演示|示例|测试数据|demo|sample），不收窄。线下机构若返回空数组，按 0 条记 INFO。
+有 FAIL 退出码 1，WARN / INFO 仍为 0。不带 `--strict` 时，公开列表 `total=0` 是 INFO（内容录入是负责人的事），不是 FAIL。岗位、招聘会、政策、线下机构取第一页（`pageSize=50`），用户看得见的名称、标题、来源名、机构名里出现全角「（演示）」则 WARN 并列出前 3 个名字，没有则 PASS 并注明「无演示标记」；企业列表仍用宽匹配（演示|示例|测试数据|demo|sample），不收窄。线下机构若返回空数组，按 0 条记 INFO。
+
+发布后核对加上 `--strict`（演示企业已用 #1115 下架之后）：岗位、招聘会、企业三条数非 0 即 FAIL，这三项为 0 且无演示标记则为 PASS；上面五个公开列表里任一处出现演示标记也从 WARN 改为 FAIL，退出码非 0。政策与线下机构的条数本身不要求为 0。
 
 | 项 | 判定 |
 |---|---|
 | `GET /api/v1/health` | 200 且 `data.status=ok`、`data.db=postgres`、`degraded=[]`；否则 FAIL，打印原文前 200 字 |
 | `GET /api/v1/health/ready` | 200 |
 | 三域名 `GET /` | 200，抽出 `assets/index-*.js` hash；同一 hash 出现在两个域名上 WARN（打到了默认 vhost） |
-| `GET /api/v1/jobs?pageSize=50`、`/job-fairs`、`/policies`、`/kiosk/offline-agencies` | 取 `pagination.total`、`total` 或数组长度；0 为 INFO。名称类字段含全角「（演示）」为 WARN，否则 PASS（无演示标记） |
-| `GET /api/v1/companies?pageSize=50` | 条数规则同上；演示标记用宽匹配（演示\|示例\|测试数据\|demo\|sample），命中 WARN |
-| `GET /api/v1/kiosk/legal/privacy_policy`、`/terms_of_service` | 200 且 `data` 非空 |
+| `GET /api/v1/jobs?pageSize=50`、`/job-fairs`、`/policies`、`/kiosk/offline-agencies` | 取 `pagination.total`、`total` 或数组长度；不带 `--strict` 时 0 为 INFO。名称类字段含全角「（演示）」不带 `--strict` 为 WARN，否则 PASS（无演示标记）。`--strict` 下岗位、招聘会条数非 0 为 FAIL，为 0 且无标记为 PASS；四个列表的演示标记一律 FAIL |
+| `GET /api/v1/companies?pageSize=50` | 不带 `--strict` 时条数规则同上；演示标记用宽匹配（演示\|示例\|测试数据\|demo\|sample），命中 WARN。`--strict` 下条数非 0 或命中宽正则都 FAIL |
+| `GET /api/v1/kiosk/legal/privacy_policy`、`/terms_of_service`、`/ai_disclaimer` | 200 且 `data` 非空。`ai_disclaimer` 未激活时接口仍是 200、`data` 为 null，按 data 为空 FAIL |
 | `GET /api/v1/kiosk/legal/unknown_type` | **400**（#835） |
 | `POST /api/v1/terminals/session-token` 空体 | **400**（存在，非 404；#833） |
 | `GET /api/v1/admin/alerts?limit=5` 无鉴权 | **401**（#841 端点存在且受保护） |
