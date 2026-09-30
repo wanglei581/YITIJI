@@ -43,7 +43,7 @@ function hmacSha256(
  * @param userId     用户 ID
  * @param expire     有效期（秒），默认 300 秒（5 分钟）
  *                   Kiosk 公共终端场景：短 TTL 防止 UserSig 被截获后长期复用。
- *                   如果 AI 会话超过 5 分钟，前端应在到期前重新请求 session 端点。
+ *                   会话凭证由服务端限定为本次上限 + 30 秒；不提供续期，再开须重新走创建门禁。
  */
 export function genUserSig(
   sdkAppId: number,

@@ -115,9 +115,10 @@ async function resolveVerifiedTerminal(headers: HeaderBag, deps: AiCallerResolve
   let orgId: string | null = null
   try {
     const terminal = await deps.prisma.terminal.findUnique({ where: { id: terminalId }, select: { orgId: true } })
-    orgId = terminal?.orgId ?? null
+    if (!terminal) return { terminalId: null, terminalVerified: false, orgId: null }
+    orgId = terminal.orgId ?? null
   } catch {
-    orgId = null
+    return { terminalId: null, terminalVerified: false, orgId: null }
   }
   return { terminalId, terminalVerified: true, orgId }
 }
