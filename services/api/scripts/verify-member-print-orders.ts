@@ -258,7 +258,29 @@ async function main() {
       if (okTerminal && a1?.terminal === null && a1?.orderId === null) pass('小程序对账：出纸终端带网点名与位置；没有终端 / 订单的行为 null')
       else fail(`订单行终端 / 订单号不对：a1=${JSON.stringify({ t: a1?.terminal, o: a1?.orderId })} a2=${JSON.stringify(a2?.terminal)}`)
     }
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents', 'refundRequired', 'orderId', 'terminal'])
+    // 失败原因（2026-09-30 小程序交付单）：失败行只给白名单内的 failureCode，不给 errorMessage；
+    // 白名单外的内部码与非失败行一律 null。任务上没记终端时，用订单上的终端兜底显示网点名。
+    {
+      const findA = async (id: string) => (await orders.list(userA, defaultPage)).items.find((x) => x.id === id) as Record<string, unknown> | undefined
+      await prisma.printTask.update({ where: { id: t('a_bad') }, data: { errorCode: 'PAPER_EMPTY', errorMessage: '请联系工作人员补纸后重试' } })
+      const paper = await findA(t('a_bad'))
+      const paperOk = paper?.['failureCode'] === 'PAPER_EMPTY' && !JSON.stringify(paper).includes('补纸') && !('errorMessage' in (paper ?? {})) && !('errorCode' in (paper ?? {}))
+      await prisma.printTask.update({ where: { id: t('a_bad') }, data: { errorCode: 'DOWNLOAD_HASH_MISMATCH', errorMessage: '内部校验细节' } })
+      const internal = await findA(t('a_bad'))
+      const done = await findA(t('a2'))
+      if (paperOk && internal?.['failureCode'] === null && done?.['failureCode'] === null) {
+        pass('失败行只给白名单失败码（PAPER_EMPTY），不给 errorMessage 原文；内部码与非失败行为 null')
+      } else fail(`失败码不对：paper=${JSON.stringify(paper)} internal=${JSON.stringify(internal?.['failureCode'])} done=${JSON.stringify(done?.['failureCode'])}`)
+      const fbOrderNo = `ORD-FB-${suffix}`.slice(0, 40)
+      await prisma.order.create({ data: { orderNo: fbOrderNo, type: 'print', printTaskId: t('a_bad'), endUserId: userA, terminalId: orderTerminalId, amountCents: 0, billablePages: 1, billingPageSource: 'pdf_lightweight_scan', payStatus: 'paid', paymentSource: 'free', taskStatus: 'failed', discountCents: 0, refundedAmountCents: 0 } })
+      const fb = await findA(t('a_bad'))
+      await prisma.order.deleteMany({ where: { orderNo: fbOrderNo } })
+      await prisma.printTask.update({ where: { id: t('a_bad') }, data: { errorCode: null, errorMessage: null } })
+      if (JSON.stringify(fb?.['terminal']) === JSON.stringify({ id: orderTerminalId, displayName: '市民中心打印终端', locationLabel: '市民中心一楼' })) {
+        pass('任务上没记终端时，用订单上的终端兜底显示网点名')
+      } else fail(`终端兜底不对：${JSON.stringify(fb?.['terminal'])}`)
+    }
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents', 'refundRequired', 'orderId', 'terminal', 'failureCode'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {
