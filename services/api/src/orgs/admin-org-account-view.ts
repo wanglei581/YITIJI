@@ -19,11 +19,12 @@ export interface AdminOrgAccount {
   emailVerifiedAt: string | null
   emailVerifyMethod: string | null
   availableActionVerificationMethods: PartnerAccountVerificationMethod[]
-  /** 密码状态：temporary=管理员给的临时密码；owner_managed=本人自管；legacy=历史账号。 */
-  passwordProofState: PasswordProofState
   /** 非空 = 管理员已按确认函登记手机号，机构本人还没用「忘记密码」自证。 */
   phoneRegisteredByAdminAt: string | null
-  /** 服务端按登记接口同一套资格规则算好；后台按钮只看它，不自行推断。 */
+  /**
+   * 服务端按登记接口同一套资格规则算好；后台按钮只看它，不自行推断。
+   * 原始密码状态（passwordProofState）是内部状态，不下发（verify:partner-account-action:schema 钉住）。
+   */
   canRegisterContactPhone: boolean
   createdAt: string
 }
@@ -90,7 +91,6 @@ export function mapAdminOrgAccount(account: AdminOrgAccountRow): AdminOrgAccount
     emailVerifiedAt: account.emailVerifiedAt?.toISOString() ?? null,
     emailVerifyMethod: account.emailVerifyMethod,
     availableActionVerificationMethods: availableMethodsForAccount({ ...account, passwordProofState }),
-    passwordProofState,
     phoneRegisteredByAdminAt: account.phoneRegisteredByAdminAt?.toISOString() ?? null,
     canRegisterContactPhone: canRegisterContactPhone({ ...account, passwordProofState }),
     createdAt: account.createdAt.toISOString(),
@@ -106,7 +106,7 @@ export function canRegisterContactPhone(account: {
 }): boolean {
   if (!account.enabled) return false
   if (account.passwordProofState !== PASSWORD_PROOF_STATE.TEMPORARY) return false
-  if (account.phoneVerifiedAt) return false
-  const noPhone = account.phoneHash == null || account.phoneHash === ''
-  return noPhone || account.phoneRegisteredByAdminAt != null
+  // 手机没经本人自证就可以登记：没填、管理员已登记、或建号时填了但未验证（W-03 走查 9/29 裁定）。
+  // 建号时填的号没经过任何核对、也不能用来登录或找回密码；用与确认函一致的号覆盖只会更严。
+  return !account.phoneVerifiedAt
 }

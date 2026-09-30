@@ -67,6 +67,8 @@ interface QxPrintHubViewProps {
   hubState: HubPageState
   probe: ProbeStatus
   mfp: MfpStatus
+  /** 打印闸门合上：沿用 device-off 的停用样式，只换短标题和说明。 */
+  orderPaused?: { label: string; notice: string }
   colorDuplexLabel: string
   capabilities: readonly QxPrintCapabilityView[]
   arrivalCode: QxPrintArrivalCodeView
@@ -84,8 +86,16 @@ interface QxPrintHubViewProps {
 
 export const PrintHubNavbar = QxAppNavbar
 
-export function PrintHubHero({ state, doing }: { state: HubUiState; doing: ReactNode }) {
-  const ask = HUB_ASK[state]
+export function PrintHubHero({
+  state,
+  doing,
+  askText,
+}: {
+  state: HubUiState
+  doing: ReactNode
+  askText?: { text: string; em: string }
+}) {
+  const ask = askText ?? HUB_ASK[state]
   const i = ask.text.indexOf(ask.em)
   return (
     <section className="ph-xq" data-state={state}>
@@ -253,8 +263,10 @@ function hubDoing(state: HubPageState): ReactNode {
 
 function HubBanner({
   hubState,
+  orderPaused,
 }: {
   hubState: HubPageState
+  orderPaused?: { label: string; notice: string }
 }) {
   switch (hubState) {
     case 'capability-loading':
@@ -296,11 +308,13 @@ function HubBanner({
         <PrintHubState
           kind="warn"
           icon={<InfoIcon size={28} />}
-          heading="打印扫描一体机离线 —— 要出纸的停了，其余照常"
+          heading={orderPaused ? orderPaused.label : '打印扫描一体机离线 —— 要出纸的停了，其余照常'}
           testId="print-hub-fallback"
         >
           <p className="ph-state-p">
-            打印机当前<b>无法连接</b>。手机扫码上传、格式转换、签名仍可使用。
+            {orderPaused ? orderPaused.notice : (
+              <>打印机当前<b>无法连接</b>。手机扫码上传、格式转换、签名仍可使用。</>
+            )}
           </p>
         </PrintHubState>
       )
@@ -329,6 +343,7 @@ export function QxPrintHubView({
   capabilityGroupHint,
   recordsGroupHint,
   notices,
+  orderPaused,
   onRetry,
   onHelp,
   onCapability,
@@ -349,11 +364,15 @@ export function QxPrintHubView({
       data-state={hubState}
       data-testid={`print-hub-state-${hubState}`}
     >
-      <PrintHubHero state={hubState} doing={hubDoing(hubState)} />
+      <PrintHubHero
+        state={hubState}
+        doing={orderPaused ? orderPaused.label : hubDoing(hubState)}
+        askText={orderPaused ? { text: orderPaused.notice, em: '暂时不可用' } : undefined}
+      />
 
       {showBanner ? (
         <section className="ph-fallback" key={hubState}>
-          <HubBanner hubState={hubState} />
+          <HubBanner hubState={hubState} orderPaused={orderPaused} />
         </section>
       ) : null}
 

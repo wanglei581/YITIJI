@@ -423,6 +423,71 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   expect(errors).toEqual([])
 })
 
+const PAUSE_LABEL = '暂停接单'
+const PAUSE_NOTICE = '打印机暂时不可用，请联系现场工作人员'
+
+function registerQueueGate(api: ApiRouter, printerStatus: string): void {
+  registerShell(api, { isOnline: true, printerStatus })
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+  })
+}
+
+async function shot(page: Page, name: string): Promise<void> {
+  const dir = process.env.G8_EVIDENCE_DIR
+  if (!dir) return
+  await page.screenshot({ path: `${dir}/${name}.png` })
+}
+
+// 打印闸门合上：要出纸的入口停用，短标题「暂停接单」，说明给现场工作人员。
+// 不经过打印机的入口（格式转换）照旧可点。删掉 map 里的 case 会掉进「状态未知」，这两条变红。
+for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
+  test(`print entry pauses new orders when heartbeat is ${status} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerQueueGate(api, status)
+
+    await page.goto('/')
+    const printTile = page.locator('[data-action="print-hub"]')
+    await expect(printTile).toHaveAttribute('data-panel-state', 'error')
+    await expect(printTile.getByText(PAUSE_LABEL, { exact: true })).toBeVisible()
+    await expect(printTile.getByText(PAUSE_NOTICE, { exact: true })).toBeVisible()
+    await shot(page, `G8-${status}-home`)
+
+    await page.goto('/print-scan')
+    await expect(page.locator('[data-testid="print-hub-state-device-off"]')).toBeVisible()
+    const docPrint = page.getByTestId('print-hub-cap-doc-print')
+    await expect(docPrint).toBeDisabled()
+    await expect(docPrint).toContainText(PAUSE_LABEL)
+    await expect(docPrint).toContainText(PAUSE_NOTICE)
+    await expect(page.getByTestId('print-hub-cap-photo-print')).toBeDisabled()
+    await expect(page.getByTestId('print-hub-cap-scan')).toBeDisabled()
+    await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
+    await expect(page.getByTestId('print-hub-fallback')).toContainText(PAUSE_LABEL)
+    await expect(page.getByTestId('print-hub-fallback')).toContainText(PAUSE_NOTICE)
+    await expect(page.getByText('打印扫描一体机离线')).toHaveCount(0)
+    await docPrint.click({ force: true })
+    await expect(page).toHaveURL(/\/print-scan$/)
+    await shot(page, `G8-${status}-print-hub`)
+
+    await page.goto('/print/upload?source=document&tab=file')
+    await expect(page.getByText(PAUSE_LABEL, { exact: true }).first()).toBeVisible()
+    await expect(page.getByText(PAUSE_NOTICE, { exact: true }).first()).toBeVisible()
+    await shot(page, `G8-${status}-upload`)
+
+    await expectNoForgedReady(page)
+    expect(errors).toEqual([])
+  })
+}
+
 test('unknown feature page lists the copy guide as the second known explanation @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)

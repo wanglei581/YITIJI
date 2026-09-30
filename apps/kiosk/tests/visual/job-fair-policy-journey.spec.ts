@@ -178,6 +178,12 @@ function seedPolicies(api: ApiRouter): void {
     status: 200,
     json: { success: true, data: [policy], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } },
   })
+  // W-90：打开来源入口前按条读一次。返回和列表同一条，仍在架。
+  // getPublishedPolicy 只认 { data: { id, ... } }；没有这条会被 ApiRouter 判成未处理。
+  api.respond('GET', '/api/v1/policies/policy-001', {
+    status: 200,
+    json: { success: true, data: policy },
+  })
 }
 
 test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {

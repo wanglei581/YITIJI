@@ -130,10 +130,22 @@ const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   kiosk:   '终端用户',
 }
 
+function narrowSidebar(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+  return window.matchMedia('(max-width: 767px)').matches
+}
+
 export function AdminLayoutWrapper() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [collapsed, setCollapsed] = useState(false)
+  // 390 一类窄屏默认收起侧栏，避免 240px 侧栏把内容区挤到无法换行。
+  const [collapsed, setCollapsed] = useState(narrowSidebar)
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const onChange = () => setCollapsed(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
   const [user, setUser] = useState<AuthedUser | null>(() => getUser())
   const [authChecked, setAuthChecked] = useState(false)
   // 通知角标 = 未处理的派生告警数（默认 view=open）；加载失败显示 0,不显示假数字

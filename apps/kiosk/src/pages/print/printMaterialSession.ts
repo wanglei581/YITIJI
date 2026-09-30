@@ -109,6 +109,8 @@ export interface PrintMaterialSession {
   paramsSuggestion?: Partial<PrintJobParams>
   /** 来自入口页面传递的内容类别提示（目前只有 'photo'）；仅作为审计字段随 pii_scan 请求持久化，不影响是否真实扫描。 */
   contentCategory?: PrintMaterialContentCategory
+  /** 只有证件扫描或证件用途为 true。缺省就不是证件件。 */
+  idDocument?: true
   inspectionTask?: StoredMaterialTask
   normalizeTask?: StoredMaterialTask
   piiTask?: StoredMaterialTask
@@ -242,6 +244,7 @@ function sanitizeSession(next: PrintMaterialSession): PrintMaterialSession {
     checkPolicy: next.checkPolicy === 'exempt' ? 'exempt' : 'required',
     paramsSuggestion: next.paramsSuggestion,
     contentCategory: next.contentCategory,
+    ...(next.idDocument === true ? { idDocument: true as const } : {}),
     inspectionTask: toStoredMaterialTask(next.inspectionTask),
     normalizeTask: toStoredMaterialTask(next.normalizeTask),
     piiTask: toStoredMaterialTask(next.piiTask),

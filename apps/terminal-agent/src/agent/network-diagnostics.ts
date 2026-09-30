@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import { warn } from '../logger'
+import { POWERSHELL_STDIN_UTF8 } from './wql-literal'
 
 export type WiredNetworkStatus = 'connected' | 'disconnected' | 'unknown'
 export type PrinterNetworkStatus = 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown'
@@ -63,7 +64,8 @@ const WIRED_ADAPTER_SCRIPT = [
 
 // Printer name is received through stdin. The script intentionally returns only an enum:
 // it never returns the printer host, port, SSID, gateway, interface name, or any credential.
-const PRINTER_NETWORK_SCRIPT = [
+export const PRINTER_NETWORK_SCRIPT = [
+  `${POWERSHELL_STDIN_UTF8};`,
   '$name = [Console]::In.ReadLine();',
   '$printer = Get-Printer -Name $name -ErrorAction SilentlyContinue;',
   "if ($null -eq $printer) { 'unknown'; exit }",

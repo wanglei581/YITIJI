@@ -1,3 +1,4 @@
+import { formatDateTime } from '@ai-job-print/shared'
 import { useEffect, useState, useCallback } from 'react'
 import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
@@ -126,7 +127,7 @@ export default function SyncSourcesPage() {
                         {FREQ_LABELS[s.syncFreq] ?? s.syncFreq}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        {s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString('zh-CN') : '从未'}
+                        {s.lastSyncAt ? formatDateTime(s.lastSyncAt, { fallback: '从未' }) : '从未'}
                       </td>
                       <td className="px-4 py-3">
                         {s.archived ? (

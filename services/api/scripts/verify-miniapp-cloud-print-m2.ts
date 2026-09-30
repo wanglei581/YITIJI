@@ -25,7 +25,9 @@ import { PrintPageCountService } from '../src/print-jobs/print-page-count.servic
 import { PrismaService } from '../src/prisma/prisma.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
+import { MaterialsService } from '../src/materials/materials.service'
 import { setPrintScanCapabilityModeForTest, TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
+import { signFileUrl } from '../src/files/signing'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { buildRealPdf } from './support/minimal-pdf'
 
@@ -73,6 +75,58 @@ async function captureHttpError(
     const body = typeof ex.getResponse === 'function' ? ex.getResponse() : null
     const err = (body as { error?: { code?: string; message?: string } } | null)?.error
     return { thrown: true, status, code: err?.code ?? null, message: err?.message ?? null }
+  }
+}
+
+const PRINT_SIDE_LIMIT_MESSAGE = '每单最多打印 100 面，请分几单打印'
+
+async function expectTooLarge(action: () => Promise<unknown>, sides: number, label: string): Promise<void> {
+  let thrown: unknown
+  try { await action() } catch (error) { thrown = error }
+  if (!thrown) fail(`${label}: 超过 100 面必须拒绝`)
+  const ex = thrown as { getStatus?: () => number; getResponse?: () => unknown }
+  const status = typeof ex.getStatus === 'function' ? ex.getStatus() : null
+  const body = typeof ex.getResponse === 'function' ? ex.getResponse() : null
+  const err = (body as { error?: { code?: string; message?: string; details?: unknown } } | null)?.error
+  if (status !== 400 || err?.code !== 'PRINT_JOB_TOO_LARGE') {
+    fail(`${label}: 期望 400 PRINT_JOB_TOO_LARGE，实际 status=${status} body=${JSON.stringify(body)}`)
+  }
+  if (err?.message !== PRINT_SIDE_LIMIT_MESSAGE) {
+    fail(`${label}: 文案必须逐字是「${PRINT_SIDE_LIMIT_MESSAGE}」，实际「${err?.message ?? ''}」`)
+  }
+  const details = err?.details
+  const expectedDetails = [String(sides), '100']
+  if (!Array.isArray(details) || details.length !== 2 || details[0] !== expectedDetails[0] || details[1] !== expectedDetails[1]
+    || details.some((item) => typeof item !== 'string')) {
+    fail(`${label}: details 必须是 ${JSON.stringify(expectedDetails)}，实际 ${JSON.stringify(details)}`)
+  }
+  pass(label)
+}
+
+function assertSideLimitConstants(): void {
+  const literal = 'export const PRINT_MAX_SIDES_PER_ORDER = 100'
+  const shared = readFileSync(path.join(repoRoot, 'packages/shared/src/types/print.ts'), 'utf8')
+  const server = readFileSync(path.join(apiRoot, 'src/print-jobs/verified-print-parameters.ts'), 'utf8')
+  if (!shared.includes(literal) || !server.includes(literal)) {
+    fail(`共享常量与服务端镜像必须逐字包含「${literal}」`)
+  }
+  const kiosk = readFileSync(path.join(repoRoot, 'apps/kiosk/src/services/api/userErrorMessage.ts'), 'utf8')
+  if (!kiosk.includes(`PRINT_JOB_TOO_LARGE: '${PRINT_SIDE_LIMIT_MESSAGE}'`)) {
+    fail('一体机错误码表必须用同一句人话登记 PRINT_JOB_TOO_LARGE')
+  }
+  pass('PRINT_MAX_SIDES_PER_ORDER 共享与服务端逐字一致，一体机人话已登记')
+}
+
+function sideLimitParams(copies: number, duplex: 'simplex' | 'duplex_long_edge' = 'simplex') {
+  return {
+    copies,
+    colorMode: 'black_white' as const,
+    duplex,
+    paperSize: 'A4' as const,
+    orientation: 'auto' as const,
+    quality: 'standard' as const,
+    scale: 'fit' as const,
+    pagesPerSheet: 1 as const,
   }
 }
 
@@ -159,6 +213,7 @@ function assertCrossSurfaceWiring(): void {
   const miniappApi = readFileSync(path.join(repoRoot, 'apps/miniapp/utils/api.js'), 'utf8')
   const miniappPay = readFileSync(path.join(repoRoot, 'apps/miniapp/pages/print-pay/print-pay.js'), 'utf8')
   const kioskClaim = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx'), 'utf8')
+  const kioskClaimModel = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/pickupClaimModel.ts'), 'utf8')
   const kioskCashier = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/PrintCashierPage.tsx'), 'utf8')
   const kioskPaymentApi = readFileSync(path.join(repoRoot, 'apps/kiosk/src/services/print/paymentApi.ts'), 'utf8')
 
@@ -198,7 +253,11 @@ function assertCrossSurfaceWiring(): void {
     ],
     [memberController.includes("@Headers('idempotency-key')"), '建单读取 Idempotency-Key 请求头'],
     [memberController.includes('assertMemberPrintOrderIdempotencyKey(idempotencyKey)'), 'controller 在进 service 前校验幂等键'],
-    [kioskClaim.includes("result.released ? '/print/progress' : '/print/cashier'") && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],
+    // W-45 起分流收进 pickupClaimModel.claimSuccessDestination：未放行进收银；已放行进进度，已打完的进完成页（不再说还在排队）。
+    [kioskClaim.includes('claimSuccessDestination(result)')
+      && /if \(!input\.released\) return '\/print\/cashier'/.test(kioskClaimModel)
+      && /return '\/print\/progress'/.test(kioskClaimModel)
+      && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],
     [kioskCashier.includes('releasePickupOrder') && kioskCashier.includes('if (!state.taskId && orderId && paymentSessionToken)'), 'Kiosk 付款后才触发 Order-only release'],
     [kioskPaymentApi.includes("/print/jobs/${encodeURIComponent(input.orderId)}/release") && kioskPaymentApi.includes("'x-terminal-id': terminalId"), 'Kiosk release 请求携带终端与支付会话绑定'],
   ]
@@ -294,6 +353,7 @@ function assertPickupCodeSpecInvariant(): void {
 
 async function main(): Promise<void> {
   console.log('\n=== 小程序云打印 M2 第一片专项验证 ===')
+  assertSideLimitConstants()
   assertPickupCodeSpecInvariant()
   assertCrossSurfaceWiring()
   cleanupDb()
@@ -306,7 +366,7 @@ async function main(): Promise<void> {
   const orderStatus = new OrderStatusService(prisma, audit)
   const pageCount = new PrintPageCountService(prisma, storage)
   const pricing = new PricingService(prisma)
-  const quote = new OrderQuoteService(pageCount, pricing)
+  const quote = new OrderQuoteService(pageCount, pricing, capabilities, prisma)
   const files = new FilesService(prisma, audit, storage)
   const memberOrders = new MemberPrintOrderCreateService(prisma, quote, capabilities, orderStatus, audit)
   const redis = new FakeRedis()
@@ -331,9 +391,9 @@ async function main(): Promise<void> {
       data: { terminalId: id, capabilityKey: 'document_print', status: 'available' },
     })
   }
-  async function seedFile(id: string, label: string, piiAction: 'keep' | 'pending', expiresInMs = 30 * 60 * 60 * 1000): Promise<void> {
+  async function seedFile(id: string, label: string, piiAction: 'keep' | 'pending', expiresInMs = 30 * 60 * 60 * 1000, pageCount = 2): Promise<void> {
     const storageKey = `verify/miniapp-m2/${id}.pdf`
-    const pdf = buildRealPdf(2)
+    const pdf = buildRealPdf(pageCount)
     await storage.putObject(storageKey, pdf, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     storageKeys.push(storageKey)
     await prisma.fileObject.create({
@@ -547,19 +607,20 @@ async function main(): Promise<void> {
     }
     pass('已退款 / 退款中 / 部分退款的到机码一律 ORDER_REFUNDED 拒绝，且不写坏订单状态、不建打印任务')
 
-    await prisma.documentProcessTask.updateMany({
-      where: { sourceFileId: fileId, kind: 'pii_scan' },
-      data: { paramsJson: JSON.stringify({ sourceSha256: 'c'.repeat(64) }) },
-    })
-    await expectCode(
-      () => pickup.claim(created.pickupCode, terminalId),
-      'PII_SCAN_STALE',
-      'RES-1 pickup-order sha256 不一致 → 409 PII_SCAN_STALE',
-    )
-    await prisma.documentProcessTask.updateMany({
-      where: { sourceFileId: fileId, kind: 'pii_scan' },
-      data: { paramsJson: JSON.stringify({ sourceSha256: sourceSha }) },
-    })
+    // 隐私检查任务只留 24 小时，到机码可以留 7 天。清理跑过之后，认领和放行都不得再要求任务还在。
+    // 真跑一次生产清理：把时钟拨到 25 小时后调 MaterialsService.cleanupExpired()（它只用到数据库）。
+    const scansBefore = await prisma.documentProcessTask.count({ where: { sourceFileId: fileId, kind: 'pii_scan' } })
+    const cleanup = await new MaterialsService(prisma, {} as never, {} as never, {} as never)
+      .cleanupExpired(new Date(Date.now() + 25 * 60 * 60 * 1000))
+    const scansAfter = await prisma.documentProcessTask.count({ where: { sourceFileId: fileId, kind: 'pii_scan' } })
+    if (scansBefore < 1 || scansAfter !== 0 || cleanup.deletedTasks < 1) {
+      fail(`25 小时后的真实清理必须删掉这份文件的隐私检查任务：before=${scansBefore} after=${scansAfter}`)
+    }
+    const claimedAfterCleanup = await pickup.claim(created.pickupCode, terminalId)
+    if (claimedAfterCleanup.released !== false || claimedAfterCleanup.orderId !== created.id) {
+      fail('隐私检查记录被清理后，到机认领仍必须成功')
+    }
+    pass('隐私检查记录被清理后，云打印到机认领仍成功')
 
     await expectCode(
       () => pickup.release(created.id, terminalId, claimed.paymentSessionToken),
@@ -641,6 +702,15 @@ async function main(): Promise<void> {
       '非 owner 会员不得签发带走 URL',
     )
 
+    // 后面的建单仍要一份完成的检查。放行已经在任务被删掉之后通过，这里只是把夹具补回去。
+    const restoredScan = await prisma.documentProcessTask.create({
+      data: {
+        kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: fileId,
+        endUserId: userId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        paramsJson: JSON.stringify({ sourceSha256: sourceSha }),
+      },
+    })
+    await prisma.piiFinding.create({ data: { taskId: restoredScan.id, type: 'phone', label: '手机号', action: 'keep' } })
     const concurrent = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
     const concurrentClaim = await pickup.claim(concurrent.pickupCode, terminalId)
     await orderStatus.markPaid(concurrent.id, { paymentSource: 'offline', operatorId: 'verify-kiosk' })
@@ -758,6 +828,81 @@ async function main(): Promise<void> {
     redis.failing = false
     redis.reset()
     pass('Redis 不可用时锁定 fail-open，真实取件码仍可认领（不把纵深防线变成单点故障）')
+
+    await prisma.terminalHeartbeat.create({
+      data: { terminalId, status: 'online', localTaskDatabaseAvailable: true, createdAt: new Date() },
+    })
+    await capabilities.upsert(terminalId, 'duplex_print', 'available', undefined, 'verify-side-limit')
+    const file100 = `file_m2_p100_${suffix}`
+    const file101 = `file_m2_p101_${suffix}`
+    const file34 = `file_m2_p34_${suffix}`
+    await seedFile(file100, '一百页', 'keep', 30 * 60 * 60 * 1000, 100)
+    await seedFile(file101, '一百零一页', 'keep', 30 * 60 * 60 * 1000, 101)
+    await seedFile(file34, '三十四页', 'keep', 30 * 60 * 60 * 1000, 34)
+    const urlOf = (id: string) => signFileUrl(id, 30 * 60 * 1000).url
+
+    const quoted100 = await quote.quote({ fileUrl: urlOf(file100), terminalId, params: sideLimitParams(1) })
+    if (quoted100.billablePages !== 100) fail(`100 面报价必须按 100 页通过，实际页数 ${quoted100.billablePages}`)
+    pass('100 面单文件报价通过')
+    const created100 = await memberOrders.create(
+      userId,
+      { fileId: file100, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+      randomUUID(),
+    )
+    if (!created100.id) fail('100 面单文件建单必须通过')
+    pass('100 面单文件建单通过')
+
+    await expectTooLarge(
+      () => quote.quote({ fileUrl: urlOf(file101), terminalId, params: sideLimitParams(1) }),
+      101,
+      '101 面单文件报价拒绝',
+    )
+    await expectTooLarge(
+      () => memberOrders.create(userId, { fileId: file101, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID()),
+      101,
+      '101 面单文件建单拒绝',
+    )
+    await expectTooLarge(
+      () => quote.quote({ fileUrl: urlOf(file34), terminalId, params: sideLimitParams(3) }),
+      102,
+      '34 页 × 3 份报价拒绝',
+    )
+    await expectTooLarge(
+      () => memberOrders.create(userId, { fileId: file34, terminalId, copies: 3, colorMode: 'black_white', duplex: 'simplex' }, randomUUID()),
+      102,
+      '34 页 × 3 份建单拒绝',
+    )
+
+    const duplex100 = await quote.quote({ fileUrl: urlOf(file100), terminalId, params: sideLimitParams(1, 'duplex_long_edge') })
+    if (duplex100.billablePages !== 100) fail(`100 页双面仍是 100 面，实际页数 ${duplex100.billablePages}`)
+    pass('100 页双面报价通过（面数不因双面折半）')
+    await expectTooLarge(
+      () => quote.quote({ fileUrl: urlOf(file101), terminalId, params: sideLimitParams(1, 'duplex_long_edge') }),
+      101,
+      '101 页双面报价拒绝（面数不因双面折半）',
+    )
+    await expectTooLarge(
+      () => memberOrders.create(userId, { fileId: file101, terminalId, copies: 1, colorMode: 'black_white', duplex: 'duplex_long_edge' }, randomUUID()),
+      101,
+      '101 页双面建单拒绝',
+    )
+
+    const direct100 = await printJobs.create(
+      { fileUrl: urlOf(file100), params: sideLimitParams(1) },
+      { terminalId, endUserId: userId },
+    )
+    if (!direct100.orderId) fail('一体机直接打印 100 面必须通过')
+    pass('一体机直接打印 100 面通过')
+    await expectTooLarge(
+      () => printJobs.create({ fileUrl: urlOf(file101), params: sideLimitParams(1) }, { terminalId, endUserId: userId }),
+      101,
+      '一体机直接打印 101 面拒绝',
+    )
+    await expectTooLarge(
+      () => printJobs.create({ fileUrl: urlOf(file34), params: sideLimitParams(3) }, { terminalId, endUserId: userId }),
+      102,
+      '一体机直接打印 34 页 × 3 份拒绝',
+    )
 
   } finally {
     setPrintScanCapabilityModeForTest(null)

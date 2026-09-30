@@ -12,9 +12,9 @@ import {
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
+import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { formatRemainingSeconds, useRemainingSeconds } from '../../hooks/useCountdown'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { getPayStatus } from '../../services/print/paymentApi'
 import {
   getPrintJobStatus,
   issuePrintJobTakeawayUrl,
@@ -23,7 +23,7 @@ import {
 } from '../../services/print/printJobsApi'
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
-import { printUploadPathForSource, clearPrintMaterialSession, type PrintMaterialSource } from './printMaterialSession'
+import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { PrintAiHelp } from './components/PrintAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
@@ -33,14 +33,14 @@ import {
   PrintFeeBoundaryBar,
   PrintOutOfPaperPanel,
 } from './components/PrintDoneSections'
-import { outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill } from './printProgressModel'
+import { doneTakeaway, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, publicOrderNo, reprintHint } from './printProgressModel'
 import { formatCents } from './cashierStatus'
 import './styles/print-fulfill-qx.css'
 
 interface PrintFile {
   name:     string
   size:     string
-  pages:    number
+  pages:    number | null
   fileUrl?: string
 }
 
@@ -57,6 +57,8 @@ interface PrintJobState {
   source?:              PrintMaterialSource
   /** 建单响应的真信号；缺省（刷新 / 旧 state / 从别处进来）时整条提示不渲染。 */
   hasEndUser?:          boolean
+  /** 只有证件扫描或证件用途才为 true。缺省不提示水印。 */
+  idDocument?:          boolean
 }
 
 type PrintResultState = 'loading' | 'completed' | 'failed' | 'unknown'
@@ -103,12 +105,6 @@ function toPublicQrUrl(signedUrl: string): string {
   return `${window.location.origin}${signedUrl.startsWith('/') ? signedUrl : `/${signedUrl}`}`
 }
 
-interface PickupLookup {
-  orderId: string
-  code: string | null
-  error: string | null
-}
-
 const ACTIVE_PRINT_STATUSES = ['pending', 'claimed', 'printing'] as const
 
 function failVisual(errorCode?: string): 'paper-jam' | 'out-of-paper' | 'result-unconfirmed' | 'failed' {
@@ -121,20 +117,21 @@ function failVisual(errorCode?: string): 'paper-jam' | 'out-of-paper' | 'result-
 export function PrintDonePage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { getToken } = useAuth()
+  const { getToken, isLoggedIn } = useAuth()
+  const { endKioskUse } = useKioskSessionControl()
   const state = (location.state ?? {}) as PrintJobState
 
   const { file, params } = state
   const taskId = typeof state.taskId === 'string' && state.taskId.trim() ? state.taskId.trim() : null
   const uploadPath = printUploadPathForSource(state.source)
   const amountCents = typeof state.amountCents === 'number' ? state.amountCents : null
-  const orderNo = typeof state.orderNo === 'string' ? state.orderNo : state.orderId ?? null
+  const displayOrderNo = publicOrderNo(typeof state.orderNo === 'string' ? state.orderNo : null)
+  const idDocument = state.idDocument === true
 
   const canReportIssue = taskId !== null
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [feeInfoOpen, setFeeInfoOpen] = useState(false)
-  const [wiped, setWiped] = useState(false)
-  const [wipeArmed, setWipeArmed] = useState(false)
+  const [endArmed, setEndArmed] = useState(false)
   const [idleLeft, setIdleLeft] = useState(60)
 
   const [verification, setVerification] = useState<PrintVerification | null>(null)
@@ -150,9 +147,6 @@ export function PrintDonePage() {
     verification?.taskId === taskId && verification.errorCode === PRINT_JOB_UNCONFIRMED
   const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : resultState
 
-  const [pickupLookup, setPickupLookup] = useState<PickupLookup | null>(null)
-  const pickupCode = state.orderId && pickupLookup?.orderId === state.orderId ? pickupLookup.code : null
-  const pickupCodeError = state.orderId && pickupLookup?.orderId === state.orderId ? pickupLookup.error : null
   const [takeaway, setTakeaway] = useState<PrintJobTakeawayUrl | null>(null)
   const [takeawayError, setTakeawayError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
@@ -161,13 +155,15 @@ export function PrintDonePage() {
   const takeawayExpired = takeawayRemaining === 0
   const takeawayQrUrl = takeaway && !takeawayExpired ? toPublicQrUrl(takeaway.signedUrl) : null
 
-  const doWipe = useCallback(() => {
-    clearPrintMaterialSession()
-    setWiped(true)
-  }, [])
+  /* W-43（产品负责人 9/29）：完成页到点 = 真的结束这次使用。
+   * 以前到点只收起打印预览、账号还登录着，下一位走上来点「我的」就是上一位的文件和订单。
+   * 现在到点走统一的 endKioskUse：结束人次 → 清本机数据 → 退出登录 → 回首页。 */
+  const endOnTimeout = useCallback(() => {
+    endKioskUse('print_done_timeout')
+  }, [endKioskUse])
 
   useEffect(() => {
-    if (resultState !== 'completed' || wiped) return
+    if (resultState !== 'completed') return
     let n = 60
     setIdleLeft(60)
     const reset = () => {
@@ -182,7 +178,7 @@ export function PrintDonePage() {
       setIdleLeft(n)
       if (n <= 0) {
         window.clearInterval(timer)
-        doWipe()
+        endOnTimeout()
       }
     }, 1000)
     return () => {
@@ -190,7 +186,7 @@ export function PrintDonePage() {
       window.removeEventListener('pointerdown', onReset)
       window.removeEventListener('keydown', onReset)
     }
-  }, [doWipe, resultState, wiped])
+  }, [endOnTimeout, resultState])
 
   useEffect(() => {
     if (!taskId) {
@@ -262,34 +258,7 @@ export function PrintDonePage() {
     return () => { cancelled = true }
   }, [getToken, resultState, state.paymentSessionToken, taskId])
 
-  useEffect(() => {
-    if (resultState !== 'completed' || API_MODE !== 'http' || !state.orderId || !state.paymentSessionToken) {
-      setPickupLookup(null)
-      return
-    }
-    const orderId = state.orderId
-    const paymentSessionToken = state.paymentSessionToken
-    let cancelled = false
-    setPickupLookup(null)
-    void (async () => {
-      try {
-        const s = await getPayStatus({ orderId, paymentSessionToken })
-        if (!cancelled) {
-          setPickupLookup({ orderId, code: s.pickupCode, error: null })
-        }
-      } catch {
-        if (!cancelled) {
-          setPickupLookup({ orderId, code: null, error: '取件凭证暂时无法读取，请联系工作人员核验订单' })
-        }
-      }
-    })()
-    return () => { cancelled = true }
-  }, [resultState, state.orderId, state.paymentSessionToken])
-
-  const totalFaces = file && params
-    ? file.pages * params.copies * (params.duplex === 'simplex' ? 1 : 2)
-    : null
-  const pageCount = file?.pages ?? null
+  const takeawayCopy = doneTakeaway(file ? { pages: file.pages } : null, params)
 
   const navbar = (
     <QxAppNavbar
@@ -329,35 +298,18 @@ export function PrintDonePage() {
     }
   }
 
-  const paidLabel = amountCents != null ? `已付 ${formatCents(amountCents)}` : '订单保留'
-
-  if (wiped) {
-    return (
-      <QxPageFrame
-        title="这趟办完了"
-        subtitle="本机上的本次打印文件预览和记录已清除"
-        status={{ tone: 'ok', label: '这次办理已清空' }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/')}>
-            回首页
-          </button>
-        }
-        navbar={navbar}
-      >
-        <div data-w2-page="print-done" data-print-flow-step={6} className="qx-scroll pff-page">
-          <PrintDoneXq ask="这趟办完了。" doing={<>本机上的本次打印文件预览和记录<b>已清除</b>。愿你求职顺利，下次再见。</>} />
-        </div>
-      </QxPageFrame>
-    )
-  }
+  const paidLabel = amountCents === 0
+    ? '免费试运营，本单 0 元'
+    : amountCents != null
+      ? `已付 ${formatCents(amountCents)}`
+      : '订单保留'
 
   if (feeInfoOpen) {
     return (
       <QxPageFrame
         title="费用与订单边界"
         subtitle="本页只展示订单的真实状态，不替你承诺结果"
-        status={{ tone: 'warn', label: orderNo ? `订单 ${orderNo}` : '状态未知' }}
+        status={{ tone: 'warn', label: displayOrderNo ? `订单 ${displayOrderNo}` : '状态未知' }}
         terminalLabel="就业服务大厅"
         ctabar={
           <>
@@ -378,13 +330,13 @@ export function PrintDonePage() {
             body={<>是否处理费用、处理多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
             facts={
               <>
-                {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}
+                {displayOrderNo ? <span>订单 <b>{displayOrderNo}</b></span> : null}
                 {amountCents != null ? <span>支付状态 <b>{paidLabel}</b></span> : <span>支付状态 <b>以订单为准</b></span>}
               </>
             }
           />
           <div className="qx-card">
-            <div className="pff-step"><span className="pff-step-no">1</span><span className="pff-step-txt">把<b>订单号 {orderNo ?? '（未读取到）'}</b> 和这台机器的位置告诉现场工作人员。</span></div>
+            <div className="pff-step"><span className="pff-step-no">1</span><span className="pff-step-txt">{displayOrderNo ? <>把<b>订单号 {displayOrderNo}</b> 和这台机器的位置告诉现场工作人员。</> : <>把这台机器的位置告诉现场工作人员，请他们核对这一单。</>}</span></div>
             <div className="pff-step"><span className="pff-step-no">2</span><span className="pff-step-txt">说明实际拿到了几页、哪几页没出，<b>已出的纸请一并带上</b>。</span></div>
             <div className="pff-step"><span className="pff-step-no">3</span><span className="pff-step-txt">由工作人员现场登记；<b>是否处理、处理多少，以核查结果为准</b>。</span></div>
           </div>
@@ -437,7 +389,7 @@ export function PrintDonePage() {
                 {isLoading
                   ? '核验完成后将显示真实结果或返回任务进度页'
                   : taskId
-                    ? `任务号 ${taskId} 暂时无法核验，请在打印订单中查看或联系工作人员`
+                    ? '暂时无法核验这一单，请在打印订单中查看或联系工作人员'
                     : '未找到打印任务上下文，请从打印入口重新开始'}
               </div>
             </div>
@@ -490,7 +442,7 @@ export function PrintDonePage() {
       // 稿 15 out-of-paper：小青区即页头 → 任务卡（单文件 + 缺纸说明 + 费用边界）→ 现场三步 → 底栏两出口。
       // 稿里「加纸后继续」「已出 1 份」在真实合同里都不成立，改写理由见 PrintOutOfPaperPanel 头注。
       const money = outOfPaperMoneyOf(takeaway, amountCents)
-      const faultOrderNo = takeaway?.orderNo ?? (typeof state.orderNo === 'string' ? state.orderNo : null)
+      const faultOrderNo = publicOrderNo(takeaway?.orderNo) ?? displayOrderNo
       return (
         <QxPageFrame
           back={{ label: '返回首页', onBack: () => navigate('/') }}
@@ -603,18 +555,17 @@ export function PrintDonePage() {
             </div>
             <p className="pff-issue-body">
               {isUnconfirmed
-                ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。系统不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留，请凭订单号联系现场工作人员核查处理。{taskId ? `（任务号 ${taskId}）` : null}</>
+                ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留，请联系现场工作人员核查处理。</>
                 : jam
                   ? <>请<b>不要自己打开机器或拽纸</b>。工作人员会取出卡纸并补打受影响的部分，已出的纸你先收好。</>
                   : failureReason}
             </p>
             {jam && failureReason ? <p className="pff-issue-body">{failureReason}</p> : null}
-            {isUnconfirmed ? <span className="pff-inbar-code">errorCode = PRINT_JOB_UNCONFIRMED</span> : null}
           </div>
 
-          {(state.orderId || takeaway?.orderNo) && (
-            <p className="pff-out-sub">订单号 {takeaway?.orderNo ?? state.orderId}</p>
-          )}
+          {(publicOrderNo(takeaway?.orderNo) ?? displayOrderNo) ? (
+            <p className="pff-out-sub">订单号 {publicOrderNo(takeaway?.orderNo) ?? displayOrderNo}</p>
+          ) : null}
           <p className="pff-out-sub">联系工作人员补打</p>
           {takeawayNotices}
         </div>
@@ -623,7 +574,7 @@ export function PrintDonePage() {
     )
   }
 
-  // 成功态才到这里：loading / unknown / failed / wiped / feeInfo 均已 return。
+  // 成功态才到这里：loading / unknown / failed / feeInfo 均已 return。
   // 以建单响应 hasEndUser 为准；本地 token 不能证明后端认了会话。事后登录也不会把这单追认回去。
   const hasEndUser = state.hasEndUser
 
@@ -643,7 +594,7 @@ export function PrintDonePage() {
             onClick={() => navigate(uploadPath)}
           >
             再印一份
-            <small>重新选文件、核价并支付</small>
+            <small>{reprintHint(amountCents)}</small>
           </button>
           <button
             type="button"
@@ -651,21 +602,21 @@ export function PrintDonePage() {
             data-variant="danger"
             data-testid="print-fulfill-primary"
             onClick={() => {
-              if (wipeArmed) {
-                doWipe()
+              if (endArmed) {
+                endKioskUse('end_use')
                 return
               }
-              setWipeArmed(true)
+              setEndArmed(true)
             }}
           >
-            {wipeArmed ? '再按一次，确认清空这台机器上的数据' : '我拿走了，结束并清空'}
+            {endArmed ? '再按一次，确认结束使用' : '我拿走了，结束使用'}
           </button>
         </>
       }
       navbar={navbar}
     >
       <div data-w2-page="print-done" data-print-flow-step={6} data-pff-head="xq" data-testid="print-fulfill-state-completed" className="qx-scroll pff-page">
-        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing="拿走前记得核一下页数和水印，少页当场能处理。" />
+        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing={idDocument ? '拿走前记得核一下页数，证件原件和复印件一起带走。' : '拿走前记得核一下页数，少页当场能处理。'} />
 
         <div className="qx-card">
           <div className="pff-done-title" role="status">
@@ -673,45 +624,25 @@ export function PrintDonePage() {
             都打好了，拿走前核一下
           </div>
           <p className="pff-out-sub">
-            {totalFaces != null
-              ? `共 ${totalFaces} 面已全部打印，请在出纸口取走并核对页数`
-              : '文件已全部打印，请在出纸口取走'}
+            {takeawayCopy.facesLabel}
           </p>
           <div className="pff-step">
             <span className="pff-step-no">1</span>
             <span className="pff-step-txt">
-              从出纸口取走{pageCount != null ? <> <b>全部 {pageCount} 页</b></> : '全部纸张'}。
+              从出纸口取走 <b>{takeawayCopy.pagesLabel}</b>。
             </span>
           </div>
           <div className="pff-step">
             <span className="pff-step-no">2</span>
             <span className="pff-step-txt">当场核对<b>页数和清晰度</b>，少页、卡纸、印花了都能当场处理。</span>
           </div>
-          <div className="pff-step">
-            <span className="pff-step-no">3</span>
-            <span className="pff-step-txt">证件页确认带 <b>「仅供求职使用」水印</b>，再离开。</span>
-          </div>
-          {pickupCode && (
-            <div className="pff-pickup">
-              <div>
-                <div className="pff-pickup-t">取件码</div>
-                <div className="pff-pickup-s">有效期以手机订单为准。领取时核对文件和页数，请勿拍照外传。</div>
-              </div>
-              <div className="pff-pickup-code" aria-label={`取件码 ${pickupCode}`}>
-                {/^\d{8}$/.test(pickupCode)
-                  ? pickupCode.split('').map((digit, index) => <span key={index}>{digit}</span>)
-                  : pickupCode}
-              </div>
+          {idDocument ? (
+            <div className="pff-step">
+              <span className="pff-step-no">3</span>
+              <span className="pff-step-txt">证件<b>原件和复印件一起带走</b>，别留在机器旁；复印件只用于本人求职等正当用途。</span>
             </div>
-          )}
-          {pickupCodeError && (
-            <div className="print-pickup">
-              <div className="print-pickup-error">
-                <AlertCircleIcon style={{ display: 'inline', width: 16, height: 16, marginRight: 6, verticalAlign: 'middle' }} aria-hidden="true" />
-                {pickupCodeError}
-              </div>
-            </div>
-          )}
+          ) : null}
+          <p className="pff-out-sub">已在本机出纸</p>
         </div>
 
         {typeof hasEndUser === 'boolean' && (
@@ -727,22 +658,25 @@ export function PrintDonePage() {
           </div>
         )}
 
-        {(state.taskId || state.orderId) && (
+        {displayOrderNo ? (
           <div className="pff-meta">
-            {state.taskId  && <span className="pff-chip"><b>任务号</b> {state.taskId}</span>}
-            {state.orderId && <span className="pff-chip"><b>订单号</b> {state.orderId}</span>}
+            <span className="pff-chip"><b>订单号</b> {displayOrderNo}</span>
             <span className="pff-chip"><b>完成</b></span>
           </div>
-        )}
+        ) : null}
 
         <div className="pff-wipe" data-live="true">
           <div>
-            <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />空闲超时自动清空</div>
-            <p className="pff-wipe-s">你不再操作这台机器后，本机上的文件预览和记录会被清除，下一个人看不到。也可以现在手动清。</p>
+            <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />一会儿结束本次使用</div>
+            <p className="pff-wipe-s">
+              {isLoggedIn
+                ? '不再点屏幕，到点会结束本次使用并退出登录，本机这次的打印预览一并收起。也可以现在就结束。'
+                : '不再点屏幕，到点会结束本次使用，本机这次的打印预览一并收起。也可以现在就结束。'}
+            </p>
           </div>
           <div className="pff-wipe-n">
             <div className="n">{idleLeft}</div>
-            <div className="u">秒空闲后自动清空</div>
+            <div className="u">秒后结束使用</div>
           </div>
         </div>
 

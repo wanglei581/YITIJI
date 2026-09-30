@@ -6,8 +6,8 @@
 // - 答案原文不入库：payloadJson.persist 仅含 answersHash + dimensions + summary + note；
 //   答案原文在评分后立即丢弃（不写日志 / 不送 LLM prompt / 不写监控）。
 // - LLM 仅生成自然语言解读（note / summary），禁用"适合 / 不适合 / 推荐岗位"等指令性词。
-// - 命中 LLM 合规词 → 丢弃该条 note；命中"适合 / 不适合"级 → 整体拒答。
-// - 仅本人 / 匿名 token 持有者可访问；匿名结果不留库（仅会话状态）。
+// - 命中 LLM 合规词 → 丢弃该条 note；模型整体拒答时只回打分，原因码 COMPLIANCE_REJECT，不要求重新作答。
+// - 仅本人 / 匿名 token 持有者可访问；匿名结果按 TTL 短期保存，不存答案原文。
 // - 撤回 = 物理删除 answersHash / 维度 / summary；保留行用于删除审计。
 // - 打印文件名带 -self-assessment 前缀；不进分享用途的 FileObject。
 // ============================================================
@@ -20,7 +20,7 @@ import { FilesService } from '../../files/files.service'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { SELF_ASSESSMENT_QUESTIONS_V1 } from './self-assessment-questions'
 import type { SelfAssessmentAnswerV1, SelfAssessmentDimensionResult } from './self-assessment.types'
-import { SELF_ASSESSMENT_CONSENT_VERSION } from './self-assessment.types'
+import { isAcceptedSelfAssessmentConsentVersion, SELF_ASSESSMENT_CONSENT_VERSION } from './self-assessment.types'
 import { LlmSelfAssessmentService } from './llm-self-assessment.service'
 import { SelfAssessmentPdfService } from './self-assessment-pdf.service'
 import { scoreSelfAssessment } from './self-assessment-scoring'
@@ -154,16 +154,11 @@ export class SelfAssessmentService {
     }
 
     // ── 版本化同意门禁 ────────────────────────────────────────────────
-    // 客户端**显式**带上一个非当前版本 ⇒ 它同意的是另一份说明，直接拒绝并要求
-    // 重新确认。这里绝不能「就近升级成当前版本」放行 —— 那正是把旧同意当成
-    // 新同意的实现方式。
-    //
-    // 版本号**缺省**（现网 S2-7 前端只发两个布尔）⇒ 如实记为 null「未版本化同意」，
-    // 同样**不补写当前版本**。null 在 `isConsentCurrent()` 下判 false，
-    // 读回时 `consentCurrent:false`，前端据此请用户重新确认。
-    const suppliedVersion =
-      typeof input.consent.consentVersion === 'string' ? input.consent.consentVersion.trim() : ''
-    if (suppliedVersion && suppliedVersion !== SELF_ASSESSMENT_CONSENT_VERSION) {
+    // 只接受当前版本，原样逐字比对（不 trim、不大小写归一）。没有过渡期，也没有旧版本清单。
+    // 缺版本号、空字符串、带首尾空格、旧版本、未知版本一律 400（合规 9/29 终裁：年龄说明是法定告知前提，
+    // 必须证明用户看到的就是当前这一版）。
+    const suppliedVersion = input.consent.consentVersion
+    if (typeof suppliedVersion !== 'string' || !isAcceptedSelfAssessmentConsentVersion(suppliedVersion)) {
       throw new BadRequestException({
         error: {
           code: 'SELF_ASSESSMENT_CONSENT_VERSION_STALE',
@@ -171,7 +166,7 @@ export class SelfAssessmentService {
         },
       })
     }
-    const consentVersion: string | null = suppliedVersion || null
+    const consentVersion: string | null = suppliedVersion
     const consentedAt: string | null = consentVersion ? new Date().toISOString() : null
 
     const t0 = Date.now()
@@ -198,6 +193,8 @@ export class SelfAssessmentService {
     let overallRejectReason: string | null = null
     let llmErrorCode: string | undefined
     let aiUnavailableReason: string | null = null
+    // 模型回 status=rejected：打分照常完成，不把用户赶回重答。与抛错路径分开。
+    let complianceRejected = false
 
     // selfAssessment 是**付费**的 token 计费调用。此前这里不收集 token usage，
     // 落账恒为「无 token」，estimateCostCny 返回 undefined → 库里 estimatedCostCny=null，
@@ -218,8 +215,12 @@ export class SelfAssessmentService {
           onLlmCall: usage.add,
         })
         if (llmResult.status === 'rejected') {
-          overallRejectReason = llmResult.failReason ?? 'LLM 解读命中合规词'
+          dimensions = scored.dimensions.map((d) => ({ ...d, note: null }))
+          summary = null
+          providerName = LLM_UNAVAILABLE_PROVIDER
+          aiUnavailableReason = 'COMPLIANCE_REJECT'
           llmErrorCode = 'COMPLIANCE_REJECT'
+          complianceRejected = true
         } else {
           dimensions = llmResult.dimensions
           summary = llmResult.summary
@@ -240,13 +241,13 @@ export class SelfAssessmentService {
         provider: usage.provider ?? providerName ?? 'llm',
         operation: 'selfAssessment',
         latencyMs: Date.now() - t0,
-        status: overallRejectReason ? 'failed' : 'success',
+        status: overallRejectReason || complianceRejected ? 'failed' : 'success',
         tokenUsage: usage.tokenUsage,
         ...(llmErrorCode ? { errorCode: llmErrorCode } : {}),
       })
     }
 
-    // 4) 落库（仅会员：endUserId 归属；匿名不留库，会话由 token 持有）
+    // 4) 落库（会员归属本人；匿名结果按 TTL 短期保存，不存答案原文）
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
     const completedAt = new Date().toISOString()
 
@@ -263,10 +264,8 @@ export class SelfAssessmentService {
     }
 
     if (!overallRejectReason) {
-      // §1.3: 匿名用户的 self-assessment 也落 aiResumeResult(用 accessTokenHash 持有),
-      //       这样 MyAiRecords(本人 endUserId 查询)能正确反映;匿名用户升级到本人后还能
-      //       据 taskId 回溯。会话级持久:同 parse 类的匿名模式。
-      //       拒答场景保留最小行(answersHash + 拒答状态 + accessTokenHash),方便未来查阅。
+      // 匿名结果按 TTL 短期保存（accessTokenHash 持有），不存答案原文。
+      // 模型抛错不走这里。整体合规拒答走这里：打分落完成行。
       await this.prisma.aiResumeResult.create({
         data: {
           taskId,
@@ -280,7 +279,7 @@ export class SelfAssessmentService {
         },
       })
     } else if (isAnonymous && accessToken) {
-      // 拒答也保留最小行,用于未来本人端"拒答历史"展示;带 accessTokenHash 满足 read 校验。
+      // 模型抛错时匿名保留最小拒答行。整体合规拒答不进这个分支。
       const rejectedMinimal: StoredSelfAssessment = {
         version: 'v1',
         answersHash: scored.answersHash,
@@ -360,7 +359,7 @@ export class SelfAssessmentService {
     }
   }
 
-  /** 读回本人历史结果（仅会员；匿名不留库）。 */
+  /** 读回本人或持有匿名凭证的结果（匿名结果按 TTL 短期保存，不存答案原文）。 */
   async getLatest(
     taskId: string,
     requester: SelfAssessmentRequester,

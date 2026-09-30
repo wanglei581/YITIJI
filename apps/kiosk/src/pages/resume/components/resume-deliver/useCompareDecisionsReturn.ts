@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GeneratedResume, ResumeOptimizeModule } from '@ai-job-print/shared'
-import { moduleKeyOf, parseDecisionMap, type ResumeDecisionMap, type ResumeModuleDecision } from './resumeDecisions'
+import { compareDecisionChanges, parseDecisionMap, type ResumeDecisionMap, type ResumeModuleDecision } from './resumeDecisions'
 
 export type CompareApplyPending = {
   count: number
@@ -43,12 +43,7 @@ export function useCompareDecisionsReturn(opts: {
       promptedRef.current = true
       return
     }
-    const changes: Array<[string, ResumeModuleDecision]> = []
-    modules.forEach((module, index) => {
-      const key = moduleKeyOf(module, index)
-      const next = incoming[key]
-      if (next && (decisions[key] ?? 'optimized') !== next) changes.push([key, next])
-    })
+    const changes = compareDecisionChanges(optimizedResume, modules, decisions, incoming)
     promptedRef.current = true
     setPending({ count, customCount, changes })
   }, [state, ready, optimizedResume, modules, decisions])

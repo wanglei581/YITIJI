@@ -1,10 +1,10 @@
-import type { AdminUserActivityItem, AdminUserDetailResult } from '@ai-job-print/shared'
+import { formatDateTime, type AdminUserActivityItem, type AdminUserDetailResult } from '@ai-job-print/shared'
 import { Card, Drawer, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { XIcon } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { ApiHttpError } from '../../services/api/client'
 import { getDetail } from '../../services/api/adminUsers'
-import { ACTIVITY_TYPE_LABELS, formatUserDateTime } from './userPresentation'
+import { ACTIVITY_TYPE_LABELS } from './userPresentation'
 
 interface UserDetailDrawerProps {
   endUserId: string | null
@@ -37,7 +37,7 @@ function ActivityCard({ activity }: { activity: AdminUserActivityItem }) {
     <li className="rounded-lg border border-neutral-100 p-3">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-semibold text-neutral-800">{ACTIVITY_TYPE_LABELS[activity.type]}</span>
-        <time className="text-xs text-neutral-400">{formatUserDateTime(activity.occurredAt)}</time>
+        <time className="text-xs text-neutral-400" dateTime={activity.occurredAt} title={formatDateTime(activity.occurredAt)}>{formatDateTime(activity.occurredAt)}</time>
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
         <DetailField label="类别" value={activity.category ?? '—'} />
@@ -184,9 +184,9 @@ export function UserDetailDrawer({ endUserId, onClose, onMissing }: UserDetailDr
                 <DetailField label="昵称" value={detail.user.nickname?.trim() || '未设置昵称'} />
                 <DetailField label="手机号" value={detail.user.maskedPhone} />
                 <DetailField label="账号状态" value={detail.user.enabled ? '正常' : '已停用'} />
-                <DetailField label="最近登录" value={detail.user.lastLoginAt ? formatUserDateTime(detail.user.lastLoginAt) : '暂无登录记录'} />
-                <DetailField label="注册时间" value={formatUserDateTime(detail.user.createdAt)} />
-                <DetailField label="更新时间" value={formatUserDateTime(detail.user.updatedAt)} />
+                <DetailField label="最近登录" value={detail.user.lastLoginAt ? formatDateTime(detail.user.lastLoginAt) : '暂无登录记录'} />
+                <DetailField label="注册时间" value={formatDateTime(detail.user.createdAt)} />
+                <DetailField label="更新时间" value={formatDateTime(detail.user.updatedAt)} />
               </dl>
             </Card>
 

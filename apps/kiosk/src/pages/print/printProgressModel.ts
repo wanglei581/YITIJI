@@ -63,6 +63,48 @@ export function expectedSheets(file: FilePages, params: Partial<PrintJobParams> 
   return `${sheetsPerCopy * copies} 张（${facesPerCopy * copies} 面）`
 }
 
+/** 给用户看的订单号只认 ORD-。内部编号、空串都不显示。 */
+export function publicOrderNo(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return /^ORD-[A-Za-z0-9-]+$/.test(trimmed) ? trimmed : null
+}
+
+/** 「再印一份」的说明跟真实价目走。0 元写免费试运营，不知道价格就不说要付款。 */
+export function reprintHint(amountCents: number | null | undefined): string {
+  if (amountCents === 0) return '重新选文件后再确认。免费试运营，不另收费。'
+  if (typeof amountCents === 'number' && Number.isFinite(amountCents) && amountCents > 0) {
+    return '重新选文件、核对价格后再付款。'
+  }
+  return '重新选文件后再确认价格。'
+}
+
+/**
+ * 完成页取纸说明。页数未知时不写「共 0 面」；份数乘进总页数。
+ * 面数沿用 expectedSheets：双面不会把页数再乘 2。
+ */
+export function doneTakeaway(
+  file: FilePages,
+  params: Partial<PrintJobParams> | null | undefined,
+): { pagesLabel: string; facesLabel: string } {
+  const pages = pagesPerCopy(file, params)
+  const copies = params?.copies && params.copies >= 1 ? params.copies : 1
+  if (pages == null || pages < 1) {
+    return {
+      pagesLabel: '全部纸张',
+      facesLabel: '请在出纸口取走并核对页数',
+    }
+  }
+  const totalPages = pages * copies
+  const sheets = expectedSheets(file, params)
+  return {
+    pagesLabel: copies > 1 ? `全部 ${totalPages} 页（${pages} 页 × ${copies} 份）` : `全部 ${totalPages} 页`,
+    facesLabel: sheets
+      ? `共 ${sheets}已全部打印，请在出纸口取走并核对页数`
+      : `共 ${totalPages} 面已全部打印，请在出纸口取走并核对页数`,
+  }
+}
+
 /**
  * 这一单的收款事实，只认进页时带来的 amountCents：
  * 确认页只把 0 元单或已付单送进本页，收银页只在 paid 后送进来；
@@ -167,4 +209,49 @@ export const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)
 export function backendStatusToStep(status: BackendJobStatus): Step {
   if (status === 'printing') return 'printing'
   return 'queuing'
+}
+
+/**
+ * 出纸中若这么久没有新的任务状态，就不再说「正在出纸」。
+ * 终端心跳默认 30 秒。晚一次心跳仍可能是同一条「正在出纸」，所以留到一个半心跳（45 秒）。
+ * 超过这个时间，页面没有新的进度可说。不把这一单改成失败：大约 10 分钟后的收口在服务端。
+ */
+export const PRINT_PROGRESS_QUIET_MS = 45_000
+
+export const PRINT_PROGRESS_QUIET_COPY =
+  '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
+
+/** 同一份回报不算「新状态」。状态、失败原因或完成时间变了才重新计时。 */
+export function progressStatusFingerprint(result: {
+  status?: string
+  errorCode?: string
+  failureReasonForUser?: string
+  completedAt?: string | null
+}): string {
+  return [
+    result.status ?? '',
+    result.errorCode ?? '',
+    result.failureReasonForUser ?? '',
+    result.completedAt ?? '',
+  ].join('\u001f')
+}
+
+/** 已经知道失败之后的进度页文案。不再套用排队或「等待领取」。
+ *  ask 只放顶栏和出错的那一步；红条只用 wayOut，不再把原因写第三遍。
+ */
+export function progressFailurePresentation(reason: string): {
+  headerTitle: string
+  badge: string
+  ask: string
+  doing: string
+  wayOut: string
+} {
+  const text = reason.trim()
+  return {
+    headerTitle: '打印没有完成',
+    badge: '打印未完成',
+    ask: text || '打印没有完成，请联系现场工作人员核对。',
+    doing: '可以联系现场工作人员，查看打印订单，或重新选文件再印。',
+    wayOut: '请用下面的按钮联系工作人员、查看订单，或重新打印。',
+  }
 }

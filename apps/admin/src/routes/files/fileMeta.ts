@@ -1,3 +1,4 @@
+import { formatDateTime } from '@ai-job-print/shared'
 import type {
   AdminFilePurpose,
   AdminFileRecord,
@@ -43,14 +44,6 @@ export function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
   return `${(n / 1024 / 1024).toFixed(1)} MB`
-}
-
-export function fmtDate(iso: string | null, fallback = '-'): string {
-  if (iso === null) return fallback
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  const p = (x: number) => String(x).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 export function cleanStatusOf(f: AdminFileRecord, now: number): CleanStatus {
@@ -99,8 +92,8 @@ export function toViewFile(f: AdminFileRecord, now: number): ViewFile {
     sensitive: sens.key,
     sensitiveBadge: sens.badge,
     sensitiveLabel: sens.label,
-    createdAt: fmtDate(f.createdAt),
-    expiresAt: fmtDate(f.expiresAt, '长期保存'),
+    createdAt: formatDateTime(f.createdAt, { fallback: '-' }),
+    expiresAt: formatDateTime(f.expiresAt, { fallback: '长期保存' }),
     clean,
     cleanPolicy: cleanPolicyOf(f, clean),
   }

@@ -57,7 +57,7 @@ const scanWatcher = fs.readFileSync(path.join(root, '../src/agent/scan-watcher.t
 console.log('\n=== verify Windows Agent installer inputs ===')
 
 assert.equal(inputs.schemaVersion, 1)
-assert.equal(inputs.productVersion, '0.4.12')
+assert.equal(inputs.productVersion, '0.4.13')
 assert.equal(
   inputs.productVersion,
   agentPackage.version,
@@ -366,7 +366,7 @@ assert.equal(
 assert.match(workspace, /overrides:/, 'workspace security overrides must remain enabled')
 assert.match(
   workspace,
-  /brace-expansion@2\.1\.1:\s*2\.1\.4/,
+  /brace-expansion@2\.1\.1:\s*2\.1\.6/,
   'brace-expansion security fix must remain pinned',
 )
 assert.match(staging, /node-windows must not be present in the MSI runtime/)
@@ -434,7 +434,7 @@ assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
 assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.4\.10"/)
-assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.12"/)
+assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.13"/)
 assert.match(upgradeLifecycle, /EXE upgrade lifecycle requires an unused ProgramData root/)
 assert.doesNotMatch(upgradeLifecycle, /Remove-Item -LiteralPath \$stateRoot/)
 const unusedStateGuard = upgradeLifecycle.indexOf('EXE upgrade lifecycle requires an unused ProgramData root')

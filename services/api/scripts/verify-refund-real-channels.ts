@@ -812,6 +812,13 @@ async function main(): Promise<void> {
       refundService.refund(L3.orderId, { reason: '双成功' }),
     )
 
+    // W-45 起现打现取付款不再铸明文码：「已被别的方式记为已付」只能靠 paidAt / paymentSource 识别。
+    const L4 = await makeLateCollected('l4')
+    await prisma.order.update({ where: { id: L4.orderId }, data: { paidAt: new Date(), paymentSource: 'offline' } })
+    await expectCode('迟到回调但已被别的方式记为已付（无明文码）→ REFUND_SOURCE_AMBIGUOUS', 'REFUND_SOURCE_AMBIGUOUS', () =>
+      refundService.refund(L4.orderId, { reason: '来源不清' }),
+    )
+
     console.log(`\n  ✅ verify:refund-real-channels 全部通过（${passCount} checks）\n`)
   } finally {
     await cleanup()

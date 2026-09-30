@@ -19,6 +19,11 @@ import type { BillingPageSource, OrderPayStatus, PaymentSource } from './payment
 export interface MemberPrintOrderItem {
   /** PrintTask id */
   id: string
+  /**
+   * 运营订单号（ORD-…）。列表接口还没带回时缺省。
+   * 前端只显示 ORD- 号，不用任务 id 代替。
+   */
+  orderNo?: string | null
   /** 任务状态：pending / claimed / printing / completed / failed / cancelled */
   status: PrintTaskStatus
   /** 原始文件名（落在 paramsJson 内；未提供时为 null，不编造） */
@@ -46,7 +51,7 @@ export interface MemberPrintOrderItem {
   paperSize: string | null
   /**
    * 页范围（来自 paramsJson）。省略或空串为 null。
-   * `'all'` 表示下单时写明了全部页面；缺失不得显示成「全部」。
+   * `'all'`、空值在一体机详单上显示「全部页」；写明了范围就原样显示。
    */
   pageRange: string | null
   // ── 支付字段（P0a 支付域，无 live 网关；可选以保持向后兼容）：关联 Order 才有值；历史无 Order 一律 null ──
@@ -77,6 +82,12 @@ export interface MemberPrintOrderItem {
   orderId?: string | null
   /** 出纸 / 领取的那台机器；取不到为 null。与时间线接口的 terminal 同形。 */
   terminal?: { id: string; displayName: string | null; locationLabel: string | null } | null
+  /**
+   * 失败原因码（2026-09-30）：只在 status=failed 时给，只给面向用户的白名单码
+   * PAPER_EMPTY / PRINTER_ERROR / PRINTER_OFFLINE / PRINT_JOB_UNCONFIRMED / PARTIAL_OUTPUT，其余为 null。
+   * 不给 errorMessage 原文（那是写给一体机现场的）；前端按码配用户说法。
+   */
+  failureCode?: 'PAPER_EMPTY' | 'PRINTER_ERROR' | 'PRINTER_OFFLINE' | 'PRINT_JOB_UNCONFIRMED' | 'PARTIAL_OUTPUT' | null
 }
 
 // ============================================================

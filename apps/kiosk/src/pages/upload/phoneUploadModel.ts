@@ -60,6 +60,31 @@ export function extLabel(ext: string): string {
   if (ext === 'jpeg') return 'JPG'
   return ext ? ext.toUpperCase() : '未知格式'
 }
+
+/** 本机打印不收的格式：点名是什么、为什么打不了、转成 PDF 或 JPG 再传。 */
+const PRINT_FORMAT_REFUSAL: Readonly<Record<string, { what: string; why: string }>> = {
+  heic: { what: 'HEIC 照片', why: '这是手机相册常用的照片格式，这台机器打不了' },
+  heif: { what: 'HEIF 照片', why: '这是手机相册常用的照片格式，这台机器打不了' },
+  wps: { what: 'WPS 文字（.wps）', why: '这是 WPS 文字的专用格式，这台机器打不了' },
+  et: { what: 'WPS 表格（.et）', why: '这是 WPS 表格的专用格式，这台机器打不了' },
+  doc: { what: 'Word 文档（.doc）', why: '这是旧版 Word 文档，这台机器现在打不了' },
+  docx: { what: 'Word 文档（.docx）', why: '这是 Word 文档，这台机器现在打不了' },
+}
+
+export function refusedFormatCopy(file: PickedFile | null): string {
+  const byExt = file ? PRINT_FORMAT_REFUSAL[file.ext] : undefined
+  const byMime = file?.type === 'image/heic' || file?.type === 'image/heif'
+    ? PRINT_FORMAT_REFUSAL.heic
+    : file?.type === 'application/msword'
+      ? PRINT_FORMAT_REFUSAL.doc
+      : file?.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ? PRINT_FORMAT_REFUSAL.docx
+        : undefined
+  const picked = byExt ?? byMime
+  const what = picked?.what ?? (file ? extLabel(file.ext) : '未知格式')
+  const why = picked?.why ?? '这台机器现在只能打 PDF、JPG 和 PNG，这一份打不了'
+  return `这一份是 **${what}**。${why}。请在手机或电脑上转成 **PDF** 或 **JPG** 后再传。这一份没有发出去。`
+}
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
@@ -206,14 +231,14 @@ export function uploadView(state: Exclude<UploadState, 'success'>, ctx: { file: 
     case 'too-large':
       return failed('文件太大，未上传', '体积是在手机上就拦下的，系统没有收到这份文件。', `这个文件 **${file ? formatSize(file.size) : ''}**，超过单个 **10MB** 的上限，没有发出去。请压缩后再选一次。`)
     case 'type-error':
-      return failed('格式不支持，未上传', `系统还没有告诉本页这次上传的真实用途，所以只放行 ${chips.join(' / ')} 这几种通用格式；要传别的格式请回一体机按那一步的说明操作。`,
-        `这份${file ? extLabel(file.ext) : '文件'}不在本页现在能发送的格式里，没有发出去。`, true)
+      return failed('格式不支持，未上传', `这一份没有发出去。请在手机或电脑上转成 PDF 或 JPG 后再传。本页现在只放行 ${chips.join(' / ')}。`,
+        refusedFormatCopy(file), true)
     case 'content-type-error': {
       const label = file?.type ? MIME_LABEL[file.type] ?? '另一种格式' : '另一种格式'
-      return failed('文件类型不匹配，未上传', '这是手机端的预检，不能代替系统检查；请换一个文件，或用原始格式重新导出一次。',
+      return failed('文件类型不匹配，未上传', '这是手机端的预检，不能代替系统检查；请换一个文件，或转成 PDF、JPG 后再传。',
         ctx.typeIssue === 'mismatch'
-          ? `这个文件的后缀是 **.${file?.ext ?? ''}**，手机却把它认成了**${label}**。两者对不上，系统会因此拒收，本页先拦下了。`
-          : `手机把这个文件认成了**${label}**，不在本页现在能发送的格式里，没有把它发出去。`, true)
+          ? `这个文件的后缀是 **.${file?.ext ?? ''}**，手机却把它认成了**${label}**。两者对不上，本页先拦下了，没有发出去。`
+          : refusedFormatCopy(file), true)
     }
     case 'service-error':
       return {

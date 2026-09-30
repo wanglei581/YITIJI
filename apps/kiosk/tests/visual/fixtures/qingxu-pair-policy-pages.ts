@@ -120,20 +120,40 @@ function page200(data: unknown[]) {
 
 type PolicyReply = 'hang' | 'error' | { guides: unknown[]; notices: unknown[] }
 
+/** 列表，或按条读取。条件核对是另外两条，仍交给 ApiRouter。 */
+function isPolicyRead(url: URL): boolean {
+  if (url.pathname === '/api/v1/policies') return true
+  const detail = url.pathname.match(/^\/api\/v1\/policies\/([^/]+)$/)
+  if (!detail) return false
+  return detail[1] !== 'eligibility-questions' && detail[1] !== 'eligibility-check'
+}
+
 /**
  * GET /policies 按 kind 分开答：政策库条目只回 policy_guide，公告只回 notice。
  * 带 audience 时和服务端一样只回这一身份的条目（页面选了身份会另发一次 audience=general，一并照此答）。
+ * GET /policies/:id 回列表里同一条（仍在架）。点来源码前会按条读一次，没这条就会被判成未处理。
  */
 async function routePolicies(page: Page, reply: PolicyReply): Promise<void> {
-  await page.route((url) => url.pathname === '/api/v1/policies', async (route: Route) => {
+  await page.route((url) => isPolicyRead(url), async (route: Route) => {
     if (reply === 'hang') return
     if (reply === 'error') {
       await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'policy service down' } }) })
       return
     }
-    const query = new URL(route.request().url()).searchParams
-    const audience = query.get('audience')
-    const rows = query.get('kind') === 'notice' ? reply.notices : reply.guides
+    const requestUrl = new URL(route.request().url())
+    const detail = requestUrl.pathname.match(/^\/api\/v1\/policies\/([^/]+)$/)
+    if (detail) {
+      const id = decodeURIComponent(detail[1] ?? '')
+      const found = [...reply.guides, ...reply.notices].find((row) => (row as { id?: string }).id === id)
+      if (!found) {
+        await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: { code: 'POLICY_NOT_FOUND' } }) })
+        return
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: found }) })
+      return
+    }
+    const audience = requestUrl.searchParams.get('audience')
+    const rows = requestUrl.searchParams.get('kind') === 'notice' ? reply.notices : reply.guides
     const data = audience ? rows.filter((row) => (row as { audience?: string }).audience === audience) : rows
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(page200(data)) })
   })

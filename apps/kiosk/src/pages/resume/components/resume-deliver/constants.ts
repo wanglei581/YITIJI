@@ -49,7 +49,8 @@ export const GENERATE_FIXTURE_STATES = new Set<GeneratePreviewViewState>([
   'export-print-unavailable',
 ])
 
-export const TASK_ID_RE = /^[A-Za-z0-9_-]{1,24}$/
+/** 与诊断报告页同一上限：简历任务号最长 64 位，只允许安全字符。 */
+export const TASK_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 /** 优化页与生成预览页常驻的 AI 可见标识（审计表一「简历优化对照（屏）」，next-tasks 3.5c）。 */
 export const AIGC_SCREEN_MARK = AI_LABEL_COPY.RESUME_OPTIMIZE
 export const HTML_PREVIEW_NOTE = '示意，非打印稿'

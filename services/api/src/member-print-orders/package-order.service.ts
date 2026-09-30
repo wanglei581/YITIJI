@@ -25,6 +25,7 @@ import {
   releaseOrderSubmissionLease,
 } from './order-submission-ledger'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
+import { assertPrintOrderSides } from '../print-jobs/verified-print-parameters'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
 const PICKUP_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -168,6 +169,8 @@ export class PackageOrderService {
         billingPageSource: quote.billingPageSource,
       })
     }
+    // 逐份 quote() 只看单文件。50 面 + 51 面各自能过，整单仍要按合计拦住。
+    assertPrintOrderSides(items.reduce((total, item) => total + item.billablePages, 0) * params.copies)
 
     const priced = lineQuotes.length > 0 ? aggregatePrintPriceQuotes(lineQuotes) : null
     const amountCents = priced?.amountCents ?? items.reduce((total, item) => total + item.amountCents, 0)

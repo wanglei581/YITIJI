@@ -45,17 +45,15 @@ export class AdminOrderActionsController {
     // 只读订单视图也早已裁掉它。此前本端点把整行原样 res.json()，等于让密文进入
     // 管理员浏览器、DevTools 与任何记录响应体的反代日志。
     //
-    // pickupCode 保留：一体机现场单的取件凭证码由 markPaid 现铸，运营就是要把它
-    // 念给用户，这是线下收款模式的必要产出。而小程序云打印单的真码存在
-    // pickupCodeHash/Enc 里、只在用户手机上解密显示，本服务已不再为这类单另铸码
-    // （见 order-status.service.ts 的 mintPickupCode），此处恒为 null —— 正好避免
-    // 运营念出一枚无法认领的幽灵码。
+    // 没有 pickupCodeHash 的现场单不发取件码：纸已在这台机器上出。
+    // 历史行上可能还留着认领不了的明文，这里也不下发。
+    // 有哈希的云打印单真码在密文里，本端点不回那一列。
     return {
       id: order.id,
       payStatus: order.payStatus,
       paymentSource: order.paymentSource,
       paidAt: order.paidAt,
-      pickupCode: order.pickupCode,
+      pickupCode: order.pickupCodeHash ? order.pickupCode : null,
     }
   }
 

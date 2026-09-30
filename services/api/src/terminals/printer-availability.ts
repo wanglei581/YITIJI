@@ -8,10 +8,12 @@
 //   - 最近一条心跳超过 PRINTER_ONLINE_WINDOW_MS（5 分钟，与 Admin 终端列表 /
 //     派生告警同窗口）或从未上报 → 视为离线。
 //   - 心跳的 printerStatus 落在 UNAVAILABLE_PRINTER_STATUSES → 视为不可用。
-//   - 判定 fail-closed；只在 PRINT_REQUIRE_PRINTER_ONLINE=true 时生效，
+//   - offline / error / paper_empty 只在 PRINT_REQUIRE_PRINTER_ONLINE=true 时拦截。
 //     生产启动门禁要求它必须为 true（见 production-runtime-gates.ts）。
 //     默认关闭是为了让本地与 CI 的隔离夹具（没有 Agent 心跳）继续跑，不是为了
 //     给生产留旁路。
+//   - queue_cleanup_failed / queue_pause_failed 不看这个开关。Agent 已经停领打印单，
+//     开关关掉也要拦报价和建单，否则一体机和小程序仍会下单付款，单子挂着打不出来。
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 
@@ -19,9 +21,15 @@ import type { PrismaService } from '../prisma/prisma.service'
 export const TERMINAL_ONLINE_WINDOW_MS = 5 * 60 * 1000
 export const PRINTER_ONLINE_WINDOW_MS = TERMINAL_ONLINE_WINDOW_MS
 
-/** Agent 心跳 printerStatus 枚举里，明确不能出纸的取值。unknown 不在其中：
+/** Agent 心跳 printerStatus 里，明确不能出纸的取值。unknown 不在其中：
  *  驱动查询失败或未配置时是 unknown，由 Kiosk 端 fail-closed 展示，这里不重复拦。 */
-export const UNAVAILABLE_PRINTER_STATUSES = new Set(['offline', 'error', 'paper_empty'])
+export const UNAVAILABLE_PRINTER_STATUSES = new Set(['offline', 'error', 'paper_empty', 'queue_cleanup_failed', 'queue_pause_failed'])
+
+/** Agent 已确定停领打印单。这两个值不看 PRINT_REQUIRE_PRINTER_ONLINE。 */
+export const QUEUE_DISPATCH_HALTED_STATUSES = new Set(['queue_cleanup_failed', 'queue_pause_failed'])
+
+/** 不说「本机」：小程序里会被读成用户自己的手机。 */
+export const QUEUE_DISPATCH_HALTED_MESSAGE = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
 
 export function printerOnlineRequired(env: NodeJS.ProcessEnv = process.env): boolean {
   return env['PRINT_REQUIRE_PRINTER_ONLINE'] === 'true'
@@ -51,8 +59,16 @@ export async function readPrinterAvailability(
   return { available: true, printerStatus: latest.printerStatus, lastSeenAt: latest.createdAt }
 }
 
+function isQueueDispatchHalted(availability: PrinterAvailability): boolean {
+  return !availability.available
+    && availability.reason === 'printer_unavailable'
+    && availability.printerStatus !== null
+    && QUEUE_DISPATCH_HALTED_STATUSES.has(availability.printerStatus)
+}
+
 /**
- * 打印机不可用时抛 400 PRINTER_UNAVAILABLE。文案面向一体机用户（会被前端直接展示），
+ * 队列闸门抛 400 PRINT_TERMINAL_QUEUE_HALTED。
+ * 其余不可用状态在开关打开时抛 400 PRINTER_UNAVAILABLE，两句旧文案一个字不改。
  * 不透出心跳时间戳或内部状态串。
  */
 export async function assertTerminalPrinterAvailable(
@@ -60,8 +76,14 @@ export async function assertTerminalPrinterAvailable(
   terminalId: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
-  if (!printerOnlineRequired(env)) return
   const availability = await readPrinterAvailability(prisma, terminalId)
+  // 先看闸门，再看开关。这两个状态表示 Agent 已经停领，不能被开关放行。
+  if (isQueueDispatchHalted(availability)) {
+    throw new BadRequestException({
+      error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message: QUEUE_DISPATCH_HALTED_MESSAGE },
+    })
+  }
+  if (!printerOnlineRequired(env)) return
   if (availability.available) return
   const message =
     availability.reason === 'printer_unavailable'
