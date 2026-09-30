@@ -205,7 +205,8 @@ Page({
 
   /** 自我探索因说明更新没纳入：去自我探索按新说明重新确认（页面栈满时退回 redirectTo）。 */
   goSelfExplore() {
-    const url = '/pages/self-explore/self-explore'
+    // AI 页路由只写在 utils/ai-entries.js（提审版整份换成空版本，见 #1114）
+    const url = aiEntries.selfExploreUrl
     wx.navigateTo({ url, fail: () => wx.redirectTo({ url }) })
   },
 
