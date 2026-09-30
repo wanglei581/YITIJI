@@ -19985,6 +19985,9 @@
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
+    "apps/kiosk/src/pages/renshi/usePolicyFocus.ts": [
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/CareerPlanPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -30065,7 +30068,8 @@
           "apps/kiosk/src/pages/renshi/SocialPanel.tsx",
           "apps/kiosk/src/pages/renshi/builtinData.ts",
           "apps/kiosk/src/pages/renshi/components.tsx",
-          "apps/kiosk/src/pages/renshi/shared.ts"
+          "apps/kiosk/src/pages/renshi/shared.ts",
+          "apps/kiosk/src/pages/renshi/usePolicyFocus.ts"
         ],
         "missing": []
       },
