@@ -154,6 +154,7 @@
    - 失败了怎么办：health 不是 PASS（有 `degraded`、数据库不是 postgres、ready 不是 200），今天不发布，把巡检输出交总指挥；`DEPLOY_SOURCE.txt` 读不到，也先停下，不要猜提交号。
 
 3. **把候选合进 main（P0-4：普通合并，不 squash），等 main CI 跑完**
+   - 合并前先核对：候选分支 `claude/codex-task-history-progress-0de1dc` 处于保护状态（禁止删除、禁止强推）。仓库开着「合并后自动删分支」，候选没有保护的话，合并 #1074 会把它删掉。查法：`gh api repos/wanglei581/YITIJI/branches/claude/codex-task-history-progress-0de1dc/protection -q '{del:.allow_deletions.enabled,force:.allow_force_pushes.enabled}'`，应输出 `{"del":false,"force":false}`（9/30 实测如此）；或看 Settings → Branches 里候选那条规则。不是这个结果就先停，找总指挥。
    - 做什么：打开 PR #1074，合并按钮右侧下拉选「Create a merge commit」，再点确认（命令行等价：`gh pr merge 1074 --merge`）。不要选 Squash 或 Rebase。
    - 在哪：GitHub PR #1074 页面；之后看 Actions → CI → main。
    - 约多久：合并 2 分钟；main CI 9/08 那次成功运行约 37 分钟，最长受作业超时限制（浏览器冒烟作业 70 分钟，`ci.yml:1199`）。
@@ -190,6 +191,11 @@
    - 怎么判断成了：总指挥回执已记录；各窗口知道冻结已解除。
 
    解除冻结之后（同日或次日，不挡解除冻结）：真机现场按现场验收单 **R.2–R.5** 做——产品负责人本人升级 Agent 到 0.4.13 或更高（含假脱机残留修复与旧遗留开机清理；装 0.4.12 不算过）并重跑生产安装脚本，再按其中的打印、扫描、到机码、缺纸与卡纸、到场一页纸，以及用户走后本机残留、打印中强杀与拔电、重新提交能否出纸逐项验收。
+
+   **Agent 升到 0.4.13 之前，那台终端不对外开放「重新提交打印」（9/30，Windows 真机路与后端窗口提出）。** W-86「缺纸后重新提交打印」的修复要服务端和 Agent 0.4.13 配合：老 Agent（0.4.11 / 0.4.12）配新服务端时，重新提交仍不出纸；老 Agent 离线补报不带本轮编号，同机重提时可能把新一轮误标成失败，用户再点就可能重复出纸。顺序是服务端先发，解除冻结后再升 Agent。现在没有按 Agent 版本关掉这个按钮的开关——一体机只看服务端下发的 `canRetry`，服务端算它时不看 Agent 版本（`services/api/src/print-jobs/print-jobs.service.ts` 的 `canRetryPaidFailedJob`）——所以先按现场规则执行：
+   - 升级之前，这台终端出现缺纸或卡纸失败，由驻点人员处理，不让用户点「重新提交打印」：按现场故障处置单 F1 / F2 补纸或清卡纸，没拿到可用印件的按《试点合规制度》制度 6 第 3 项退未完成部分，请用户重新下单。
+   - 解除条件：后台终端页看到这台终端上报的 Agent 版本为 0.4.13 或更高，并按 R.2 验过一次缺纸后重新提交能正常出纸。
+   - 已建议后端：`canRetry` 在该终端最近一次心跳的 Agent 版本低于 0.4.13 时返回 false；做了以后本条改为核对项。
 
 **发布后核对**（按顺序做；只读探针可以由我们按域名代跑，服务器上的命令由产品负责人执行）
 1. **服务器上的版本**：`sed -n 1,3p /srv/ai-job-print/DEPLOY_SOURCE.txt`，第一行是 `source=origin/main@<合并提交>`，第三行 `ci_run=<第 3 步的 CI 运行号>`。
