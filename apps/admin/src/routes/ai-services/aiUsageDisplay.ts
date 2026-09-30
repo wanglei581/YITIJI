@@ -64,7 +64,7 @@ export function formatCny(value: number): string {
 }
 
 /**
- * 旧调用日志「今日概览」的成功率。
+ * 旧调用日志「近 24 小时概览」的成功率。
  * 调用次数为 0 时没有分母，显示「—」，不要显示 0%。有调用且全部失败时 0% 是真实结果。
  */
 export function logOverviewRate(totalCalls: number, successRate: number): string {
@@ -72,7 +72,7 @@ export function logOverviewRate(totalCalls: number, successRate: number): string
 }
 
 /**
- * 旧调用日志「今日概览」的平均响应时间。
+ * 旧调用日志「近 24 小时概览」的平均响应时间。
  * 调用次数为 0 时没有成功样本，显示「—」，不要显示 0 ms。
  */
 export function logOverviewLatency(totalCalls: number, avgLatencyMs: number): string {

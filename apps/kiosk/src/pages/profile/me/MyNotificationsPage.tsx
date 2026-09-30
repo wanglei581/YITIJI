@@ -251,7 +251,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
       view="notifications"
       screen="member-list"
       screenState={uiState}
-      eyebrow="NOTIFICATIONS"
+      eyebrow="消息通知"
       ask={<>本人设备与服务消息，<em>都在这里</em>。</>}
       doing={busy
         ? <>正在把操作发给系统。<b>结果返回前列表保持原样</b>，本页不会提前显示成功。</>

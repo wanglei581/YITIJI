@@ -106,10 +106,11 @@ function main(): void {
     'PRINT_REQUIRE_PAID_BEFORE_CLAIM must not exist: 出纸付费门控不得退回可关闭的部署开关',
   )
 
+  // 切片终点在 findFirst(claimableWhere) 之后。领取返回已改成把 attempt 贴回本批任务。
   const claimGate = section(
     terminals,
     'const claimableWhere = {',
-    'return results',
+    'return claimedPayloads.map',
     'TerminalsService claim gate query',
   )
   check(
