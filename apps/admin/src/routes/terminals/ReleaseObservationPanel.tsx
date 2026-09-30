@@ -126,7 +126,7 @@ export function ReleaseObservationPanel({
                 <label key={terminal.id} className="flex items-center gap-2 border border-neutral-200 px-2 py-2 text-xs text-neutral-700">
                   <input type="checkbox" checked={selectedIds.includes(terminal.id)} onChange={() => toggleTerminal(terminal.id)} />
                   <span className="font-mono">{terminal.terminalCode}</span>
-                  <span className="truncate text-neutral-500">{terminal.agentVersion ?? '心跳版本未知'}</span>
+                  <span className="truncate text-neutral-500">终端程序版本：{terminal.agentVersion ?? '未上报'}</span>
                 </label>
               ))}
             </div>

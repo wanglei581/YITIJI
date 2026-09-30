@@ -393,4 +393,44 @@ assert.doesNotMatch(benefitsPageQx, /立即支付|去支付|确认核销|核销�
 assert.doesNotMatch(feedbackPageQx, /一键投递|立即投递|平台投递|投递简历/, 'MyFeedbackPage stays inside the recruitment copy whitelist')
 assert.doesNotMatch(privacyPageQx, /全部个人数据已删除|账号注销成功/, 'MyPrivacyRequestsPage does not claim account deletion')
 
+/* 2026-09-30 青序 2.0 A 批（合规文案）：稿 v2 README 规则 4 / 规则 5。
+ * 眉题一律中文、照同号稿写；屏上不出现「原型」「元数据」、模型名与任务编号；
+ * 机器状态第 8 项按托管 a 叫「机构官方渠道」。18（SCAN VIA PANEL）归 B 批，不在此列。 */
+const A_BATCH_EYEBROWS = [
+  ['src/pages/legal/LegalDocPage.tsx', ["eyebrow: '你和这台机器'", "eyebrow: '你的信息'"]],
+  ['src/pages/print-scan/ConvertImagesView.tsx', ['>图片转 PDF<']],
+  ['src/pages/print-scan/sign-stamp/SignStampPickView.tsx', ['>签名<']],
+  ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '自我探索'"]],
+  ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="消息通知"']],
+  ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的文档和订单"']],
+  ['src/pages/profile/me/MyPrintOrdersPage.tsx', ['eyebrow="我的文档和订单"']],
+  ['src/pages/profile/me/MyResumesPage.tsx', ['eyebrow="我的简历"']],
+  ['src/pages/profile/me/MyFavoritesPage.tsx', ['eyebrow="我的收藏"']],
+  ['src/pages/profile/me/MyAiRecordsPage.tsx', ['eyebrow="AI 服务记录"']],
+  ['src/pages/profile/me/MyActivityPage.tsx', ['eyebrow="我的足迹"']],
+  ['src/pages/placeholders/MeActivityDetailPage.tsx', ['eyebrow="记录详情"']],
+  ['src/pages/profile/me/MyFeedbackPage.tsx', ['>意见反馈<']],
+]
+for (const [path, expected] of A_BATCH_EYEBROWS) {
+  const source = read(path)
+  for (const snippet of expected) assert.ok(source.includes(snippet), `${path} eyebrow follows the v2 draft: ${snippet}`)
+  assert.doesNotMatch(
+    source,
+    /(eyebrow[=:]\s*["'`]|eyebrow["'`]?>|SA_EYEBROW = ')[A-Z][A-Z &;]{3,}/,
+    `${path} has no English eyebrow`,
+  )
+}
+assert.doesNotMatch(read('src/pages/print-scan/SignStampPage.tsx'), /固定原型数据|<b>演示<\/b>/, 'sign page sample bar says 示例, never 原型/演示')
+assert.doesNotMatch(read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'), /合成演示/, 'sign page CTA reasons do not say 合成演示')
+assert.doesNotMatch(qxMeChrome, /服务元数据/, 'member record tab hint does not say 元数据')
+assert.doesNotMatch(read('src/pages/profile/me/MockInterviewRecords.tsx'), /元数据/, 'mock interview legal line does not say 元数据')
+for (const path of ['src/pages/profile/me/MyResumesPage.tsx', 'src/pages/profile/me/MyAiRecordsPage.tsx', 'src/pages/profile/me/JobAiSessionRecords.tsx']) {
+  const source = read(path)
+  assert.doesNotMatch(source, /\$\{item(\.session)?\.provider/, `${path} does not print the model/provider name`)
+  assert.doesNotMatch(source, /任务 \$\{|简历任务 \$\{/, `${path} does not print the task id`)
+}
+const errorOfflineSrc = read('src/pages/placeholders/ErrorOfflinePage.tsx')
+assert.match(errorOfflineSrc, /key: 'jobs'[^\n]*name: '机构官方渠道'/, 'system state item 8 is 机构官方渠道 (hosting a)')
+assert.doesNotMatch(errorOfflineSrc, /name: '岗位与招聘会信息'|AI、岗位信息没有/, 'system state no longer lists recruitment info')
+
 console.log('ALL PASS fusion W5 route, boundary, and presentation contract')

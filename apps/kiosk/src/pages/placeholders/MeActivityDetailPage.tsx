@@ -186,7 +186,7 @@ export default function MeActivityDetailPage() {
       view="activity-detail"
       screen="activity-detail"
       screenState={`activity-detail-${uiState}`}
-      eyebrow="ACTIVITY DETAIL"
+      eyebrow="记录详情"
       ask={<>这条记录，<em>只说明它自己</em>。</>}
       doing={<>记录里只有<b>内容类型与时间</b>，没有来源平台的处理结果。</>}
       truth="投递 / 预约结果以来源平台为准，本系统不记录也不参与。"

@@ -138,6 +138,18 @@
 
 **发布当天（定稿，9/29 按 `.github/workflows/deploy.yml`、`.github/workflows/ci.yml`、`.github/scripts/deploy-api-release.sh` 逐步核过；每一步都由产品负责人本人操作）**
 
+**发布后核对**（只读探针可以由我们按域名代跑）
+- `/api/v1/health/ready` 正常；一体机、两个后台打开的都是新版本。
+- 会员能登录，协议显示的是新版本号。
+- **演示企业下架（#1115 随本次发布上线后，产品负责人授权执行；只下架、不删行）**：步骤见运维手册 §4.1。
+  1. 在生产运行目录先跑 `pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies`（默认 dry-run，不改库），核对输出里的「目标数据库」是生产库，清单里只有那 3 家带「（演示）」的企业。
+  2. 产品负责人授权后，带确认词和事由执行：`UNPUBLISH_DEMO_COMPANIES_CONFIRM=UNPUBLISH_DEMO_COMPANIES UNPUBLISH_DEMO_COMPANIES_REASON='首次发布清理开发期演示企业（产品负责人授权）' pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies`（事由 2–200 字；确认词或事由不对时命令不连库、退出码 2）。「已下架」的 id 要和第 1 步清单逐一对上，对不上就停下人工核对，不要重复执行。
+  3. 执行后跑 `node scripts/prod-readonly-probe.mjs --strict`。发布后核对用 `--strict`，并且要在本步演示企业用 #1115 下架之后跑（下架前那几家仍在公开列表里，退出码会非 0）。通过时岗位、招聘会、企业三行都是 PASS（total=0，无演示标记）；任一公开列表有演示标记也是 FAIL。9/29 只读核过：生产岗位、招聘会都是 0 条，线下机构列表为空，都没有演示标记，所以只处理企业。
+- 企业、岗位、招聘会的公开接口都返回 0 条（托管关闭）。
+- 一体机打印首页的签名盖章卡显示「本机暂未开通」。
+- 告警推送通了：比如让测试终端离线几分钟，看群里是否收到。
+- 第二天确认第一份自动备份成功（备份目录里的 `LAST_SUCCESS` 更新了）。
+- 在新后台新增并激活第四份法务文档「经营者信息」。
 前提：上面「发布前」第 1–6 条都已完成，#1074 的三条必需检查是绿的、页面显示可以合并。本定稿走「合并后手动触发发布」这条路：开关在 main CI 跑完之后才打开，所以合并时自动触发的那次发布一定是 skipped，发布目标就是你手填的那个 CI 运行号对应的提交，不会被别的提交抢先。
 
 1. **冻结 main**
@@ -1874,7 +1886,8 @@ Grok 文档子审查已完成并确认文档陈旧，API/Agent 子审查仍为 `
 第 1 条和第 2 条谁先做，取决于是否接受带空板块提审 —— 这是产品决策，不是工程判断。
 
 另有一条**内容清理**：找企业板块线上 3 条全是「（演示）」数据且会原样显示给用户
-（`scripts/prod-readonly-probe.mjs` 现在会报 WARN 并点名是哪几家）。上线前替换或下架。
+（`scripts/prod-readonly-probe.mjs` 不带 `--strict` 时会报 WARN 并点名是哪几家）。上线前替换或下架。
+发布后核对改跑 `node scripts/prod-readonly-probe.mjs --strict`，并且要在演示企业用 #1115 下架之后跑。
 
 ### 真机验收（BL-03a / BL-03b）
 

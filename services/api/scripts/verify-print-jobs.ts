@@ -20,6 +20,8 @@
  */
 import 'dotenv/config'
 import { createHash, createHmac, randomBytes } from 'crypto'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { BadRequestException, Module, UnauthorizedException, ValidationPipe, type ValidationError } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
@@ -65,11 +67,122 @@ function fixtureFileSignature(fileId: string, expiresAtMs: number): string {
 }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
 
-function errCode(e: unknown): string | undefined {
+function sliceBetween(source: string, startMarker: string, endMarker: string): string {
+  const start = source.indexOf(startMarker)
+  const end = source.indexOf(endMarker, start + startMarker.length)
+  return start >= 0 && end > start ? source.slice(start, end) : ''
+}
+
+/** attempt 必须在领取循环之后按 taskId 一次 groupBy，条件只有 failed→pending。 */
+function assertReprintAttemptQueryShape(): void {
+  const source = readFileSync(join(__dirname, '../src/terminals/terminals-agent.service.ts'), 'utf8')
+  const attemptSource = readFileSync(join(__dirname, '../src/terminals/print-status-attempt.ts'), 'utf8')
+  const memberSource = readFileSync(join(__dirname, '../src/print-jobs/print-jobs.service.ts'), 'utf8')
+  const adminSource = readFileSync(join(__dirname, '../src/admin-print-scan/admin-print-scan.service.ts'), 'utf8')
+  const lockSql = 'UPDATE "PrintTask" SET "errorMessage" = "errorMessage"'
+  const fnStart = attemptSource.indexOf('export async function reprintAttemptsByTaskId')
+  const fnEnd = attemptSource.indexOf('export async function lockPrintTaskRow')
+  const fn = fnStart >= 0 && fnEnd > fnStart ? attemptSource.slice(fnStart, fnEnd) : ''
+  const lockFn = sliceBetween(attemptSource, 'export async function lockPrintTaskRow', 'export async function readLockedPrintStatusAttempt')
+  const reader = attemptSource.slice(attemptSource.indexOf('export async function readLockedPrintStatusAttempt'))
+  const claimStart = source.indexOf('async claimTasks(')
+  const claimEnd = source.indexOf('async patchTaskStatus(')
+  const claim = claimStart >= 0 && claimEnd > claimStart ? source.slice(claimStart, claimEnd) : ''
+  const loopAt = claim.indexOf('for (let i = 0; i < limit; i++)')
+  const callAt = claim.indexOf('reprintAttemptsByTaskId(')
+  const patch = sliceBetween(source, 'async patchTaskStatus(', 'async validateTerminalToken(')
+  const ownedAt = patch.indexOf("code: 'TASK_NOT_OWNED'")
+  const earlyAt = patch.indexOf('!attemptUsable && TERMINAL_STATES.includes(')
+  const fastCountAt = earlyAt < 0 ? -1 : patch.indexOf('reprintAttemptsByTaskId(', earlyAt)
+  const fastZeroAt = fastCountAt < 0 ? -1 : patch.indexOf('currentAttempt === 0', fastCountAt)
+  const fastCleanupAt = fastZeroAt < 0 ? -1 : patch.indexOf('cleanupTerminalTask(', fastZeroAt)
+  const fastReturnAt = fastCleanupAt < 0 ? -1 : patch.indexOf('return { acknowledged: true }', fastCleanupAt)
+  const txAt = patch.indexOf('this.prisma.$transaction')
+  const freshAt = patch.indexOf('readLockedPrintStatusAttempt(')
+  const terminalAt = freshAt < 0 ? -1 : patch.indexOf('TERMINAL_STATES.includes(', freshAt)
+  const updateAt = patch.indexOf('printTask.updateMany(')
+  const advanceAt = patch.indexOf('packageOrderFulfillment.advance')
+  const readerCountAt = reader.indexOf('reprintAttemptsByTaskId(')
+  const readerZeroAt = reader.indexOf('current === 0')
+  const readerAboveAt = reader.indexOf('current > 0')
+  const readerFutureAt = reader.indexOf('attempt > current')
+  const readerFutureCodeAt = reader.indexOf('PRINT_STATUS_FUTURE_ATTEMPT')
+  const readerStaleAt = reader.indexOf('attempt < current')
+  const memberRetry = sliceBetween(memberSource, 'async retryPaidFailedJob(', 'private canRetryPaidFailedJob(')
+  const adminRetry = sliceBetween(adminSource, 'private async retryPrintTask(', 'private async listScanTasks(')
+  const sqlHits = attemptSource.split(lockSql).length - 1
+  const retryLockOrderOk = [memberRetry, adminRetry].every((retry) => {
+    const transactionAt = retry.indexOf('$transaction')
+    const lockAt = retry.indexOf('lockPrintTaskRow(')
+    const versionAt = retry.indexOf('latestHeartbeatAgentVersion(')
+    const orderAt = retry.indexOf('order.updateMany(')
+    const taskAt = retry.indexOf('printTask.updateMany(')
+    return transactionAt >= 0
+      && lockAt > transactionAt
+      && versionAt > lockAt
+      && orderAt > lockAt
+      && taskAt > orderAt
+      && retry.indexOf('latestHeartbeatAgentVersion(') === versionAt
+      && !retry.includes(lockSql)
+  })
+  if (
+    !fn.includes('printTaskStatusLog.groupBy')
+    || !fn.includes("fromStatus: 'failed'")
+    || !fn.includes("toStatus: 'pending'")
+    || !fn.includes('taskId: { in: taskIds }')
+    || /errorCode\s*:/.test(fn)
+    || fn.includes('.count(')
+    || sqlHits !== 1
+    || !lockFn.includes(lockSql)
+    || !reader.includes('lockPrintTaskRow(')
+    || reader.includes(lockSql)
+    || readerCountAt < 0
+    || readerZeroAt < readerCountAt
+    || readerAboveAt < readerZeroAt
+    || !reader.includes("'missing'")
+    || !reader.includes("'invalid'")
+    || readerFutureAt < readerAboveAt
+    || readerFutureCodeAt < readerFutureAt
+    || readerStaleAt < readerFutureCodeAt
+    || !reader.includes('PRINT_STATUS_STALE_ATTEMPT')
+    || loopAt < 0
+    || callAt < loopAt
+    || claim.includes('printTaskStatusLog.count')
+    || ownedAt < 0
+    || earlyAt < ownedAt
+    || fastCountAt < earlyAt
+    || fastZeroAt < fastCountAt
+    || fastCleanupAt < fastZeroAt
+    || fastReturnAt < fastCleanupAt
+    || txAt < fastReturnAt
+    || freshAt < txAt
+    || terminalAt < freshAt
+    || updateAt < terminalAt
+    || advanceAt < freshAt
+    || !patch.includes('PRINT_STATUS_FUTURE_ATTEMPT')
+    || !patch.includes('PRINT_STATUS_STALE_ATTEMPT')
+    || !patch.includes('mismatch.code')
+    || source.includes(lockSql)
+    || memberSource.includes(lockSql)
+    || adminSource.includes(lockSql)
+    || !retryLockOrderOk
+    || !memberRetry.includes("payStatus: 'paid'")
+    || !memberRetry.includes('amountCents: amountBefore')
+  ) {
+    fail('attempt 必须在领取循环之后按 taskId 一次 groupBy，且只数 fromStatus=failed、toStatus=pending；PrintTask 行锁只有 lockPrintTaskRow 一处，补报和两条重试都先锁 PrintTask 再动 Order，并在锁后的同一事务里读心跳版本；第 0 轮缺 attempt 仍在事务外决定且同一终态会清理，重试轮次缺 attempt 按落后拒绝，超前与落后使用不同错误码')
+  }
+  pass('attempt 计数：领取循环之后一次 groupBy(taskId)，不按 errorCode 过滤；锁序统一为 PrintTask → Order，超前与落后分开拒绝')
+}
+
+function errBody(e: unknown): { code?: string; message?: string } | undefined {
   const ex = e as { getResponse?: () => unknown; response?: unknown }
   const resp = (typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response) as
-    | { error?: { code?: string } } | undefined
-  return resp?.error?.code
+    | { error?: { code?: string; message?: string } } | undefined
+  return resp?.error
+}
+
+function errCode(e: unknown): string | undefined {
+  return errBody(e)?.code
 }
 
 function thrownCode(e: unknown): string | undefined {
@@ -125,14 +238,14 @@ async function claimWhileSoftDeleteCommits(
   }
 }
 
-async function expectCode(fn: () => Promise<unknown>, code: string, label: string): Promise<void> {
+async function expectCode(fn: () => Promise<unknown>, code: string, label: string, message?: string): Promise<void> {
   try {
     await fn()
     fail(`${label} — 期望抛 ${code}，但未抛`)
   } catch (e) {
-    const c = errCode(e)
-    if (c === code) pass(label)
-    else fail(`${label} — 期望 ${code}，实际: ${c ?? (e as Error).message}`)
+    const body = errBody(e)
+    if (body?.code === code && (message === undefined || body.message === message)) pass(label)
+    else fail(`${label} — 期望 ${code}${message ? ` / ${message}` : ''}，实际: ${body?.code ?? (e as Error).message} / ${body?.message ?? ''}`)
   }
 }
 
@@ -210,6 +323,7 @@ async function main() {
   const { TerminalsService } = await import('../src/terminals/terminals.service')
 
   console.log('\n=== 打印链路 service 级 E2E 验证（P1-B 守门）===')
+  assertReprintAttemptQueryShape()
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
@@ -248,6 +362,8 @@ async function main() {
   const fixtureFileIds = [fileId, contractSourceFileId, contractReportFileId]
   const fixtureStorageKeys = [storageKey, contractSourceStorageKey, contractReportStorageKey]
   const createdTaskIds: string[] = []
+  const extraPrintTerminalIds: string[] = []
+  const extraEndUserIds: string[] = []
 
   async function cleanup() {
     if (createdTaskIds.length) {
@@ -258,8 +374,11 @@ async function main() {
       await prisma.auditLog.deleteMany({ where: { targetType: 'print_task', targetId: { in: createdTaskIds } } })
       await prisma.printTask.deleteMany({ where: { id: { in: createdTaskIds } } })
     }
-    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
-    await prisma.terminal.deleteMany({ where: { id: terminalId } })
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [terminalId, ...extraPrintTerminalIds] } } })
+    await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, ...extraPrintTerminalIds] } } })
+    if (extraEndUserIds.length) {
+      await prisma.endUser.deleteMany({ where: { id: { in: extraEndUserIds } } })
+    }
     // 计费接线后新增的真实 fixture / 价目清理。
     await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: fixtureFileIds } } })
     await prisma.auditLog.deleteMany({ where: { targetId: { in: fixtureFileIds } } })
@@ -558,7 +677,7 @@ async function main() {
         status: 'online',
         printerStatus: 'ok',
         localTaskDatabaseAvailable: true,
-        agentVersion: 'verify-agent',
+        agentVersion: '0.4.13-production',
       },
       `Bearer ${agentToken}`,
     )
@@ -572,9 +691,15 @@ async function main() {
 
     await orderStatus.markPaid(created.orderId, { paymentSource: 'offline' })
     const claimed = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
-    if (claimed.length === 1 && claimed[0].taskId === created.taskId && claimed[0].claimedBy === terminalId && !!claimed[0].fileUrl) {
-      pass('3c. 线下收款入账后终端 claim：本终端 pending 任务被领取（返回 fileUrl + actionToken）')
-    } else fail(`3c. claim 异常: ${JSON.stringify(claimed.map((c) => c.taskId))}`)
+    if (
+      claimed.length === 1 &&
+      claimed[0].taskId === created.taskId &&
+      claimed[0].claimedBy === terminalId &&
+      !!claimed[0].fileUrl &&
+      claimed[0].attempt === 0
+    ) {
+      pass('3c. 线下收款入账后终端 claim：本终端 pending 任务被领取（返回 fileUrl + actionToken，attempt=0）')
+    } else fail(`3c. claim 异常: ${JSON.stringify(claimed.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
     const afterClaim = await prisma.printTask.findUnique({ where: { id: created.taskId } })
     if (afterClaim?.status === 'claimed' && afterClaim.terminalId === terminalId) {
       pass('3d. claim 后 DB 状态为 claimed 且目标终端保持不变')
@@ -656,8 +781,8 @@ async function main() {
       // 所以夹具按线下收款入账后再让 Agent 领取。
       await orderStatus.markPaid(failCreated.orderId, { paymentSource: 'offline' })
       const claim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
-      if (claim.length !== 1 || claim[0].taskId !== failCreated.taskId) {
-        fail(`7 预备(${label}) — 失败任务未被本终端 claim: ${JSON.stringify(claim.map((c) => c.taskId))}`)
+      if (claim.length !== 1 || claim[0].taskId !== failCreated.taskId || claim[0].attempt !== 0) {
+        fail(`7 预备(${label}) — 失败任务未被本终端 claim 或 attempt 不是 0: ${JSON.stringify(claim.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
       }
       await terminals.patchTaskStatus(
         failCreated.taskId,
@@ -875,8 +1000,211 @@ async function main() {
       '8f. retry 越权 → 404',
     )
 
-    // retry 会把 knownFailId 放回 pending，且它的 createdAt 更早；
-    // 不先移出队列的话，后面 createClaimAndFail 会被它截走 claim。
+    const claimAttempt1 = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (
+      claimAttempt1.length === 1 &&
+      claimAttempt1[0].taskId === knownFailId &&
+      claimAttempt1[0].attempt === 1
+    ) {
+      pass('8e2. 一体机重提后 claim 返回同一任务且 attempt=1')
+    } else {
+      fail(`8e2. attempt=1 异常: ${JSON.stringify(claimAttempt1.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
+    }
+
+    await terminals.patchTaskStatus(
+      knownFailId,
+      { status: 'printing', attempt: 1 },
+      `Bearer ${agentToken}`,
+      terminalId,
+    )
+    const beforeStale = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const staleLogCount = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
+    await expectCode(
+      () => terminals.patchTaskStatus(
+        knownFailId,
+        { status: 'failed', errorCode: 'PAPER_EMPTY', attempt: 0 },
+        `Bearer ${agentToken}`,
+        terminalId,
+      ),
+      'PRINT_STATUS_STALE_ATTEMPT',
+      '8e2c. attempt 0 的 failed 在 attempt 1 已 printing 后被拒绝',
+    )
+    const afterStale = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const staleLogCountAfter = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
+    const staleMeta = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: knownFailId, errorCode: 'PRINT_STATUS_STALE_ATTEMPT req=0 cur=1' },
+    })
+    if (
+      afterStale?.status !== 'printing'
+      || afterStale.status !== beforeStale?.status
+      || afterStale.errorCode !== beforeStale?.errorCode
+      || staleLogCountAfter !== staleLogCount + 1
+      || staleMeta?.fromStatus !== 'printing'
+      || staleMeta.toStatus !== 'printing'
+    ) {
+      fail(`8e2c. 落后补报改动了任务或没留下元数据日志: before=${beforeStale?.status}/${beforeStale?.errorCode} after=${afterStale?.status}/${afterStale?.errorCode} logs=${staleLogCount}->${staleLogCountAfter} meta=${staleMeta?.errorCode}`)
+    }
+    const aheadLogCount = staleLogCountAfter
+    await expectCode(
+      () => terminals.patchTaskStatus(
+        knownFailId,
+        { status: 'failed', errorCode: 'PAPER_EMPTY', attempt: 2 },
+        `Bearer ${agentToken}`,
+        terminalId,
+      ),
+      'PRINT_STATUS_FUTURE_ATTEMPT',
+      '8e2d. attempt 大于当前值按超前拒绝，不记成落后',
+      '状态回传的轮次超前于服务端记录，已忽略',
+    )
+    const afterAhead = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const aheadMeta = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: knownFailId, errorCode: 'PRINT_STATUS_FUTURE_ATTEMPT req=2 cur=1' },
+    })
+    const aheadLogCountAfter = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
+    if (
+      afterAhead?.status !== 'printing'
+      || afterAhead.errorCode !== afterStale?.errorCode
+      || !aheadMeta
+      || aheadLogCountAfter !== aheadLogCount + 1
+    ) {
+      fail(`8e2d. 超前补报未被拦住: status=${afterAhead?.status} logs=${aheadLogCount}->${aheadLogCountAfter}`)
+    }
+    await terminals.patchTaskStatus(
+      knownFailId,
+      { status: 'completed', attempt: 1 },
+      `Bearer ${agentToken}`,
+      terminalId,
+    )
+    const afterFreshComplete = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    if (afterFreshComplete?.status !== 'completed') {
+      fail(`8e2c. attempt 1 的 completed 未落库: ${afterFreshComplete?.status}`)
+    }
+    pass('8e2c. 落后 failed 被拒且状态不变，本轮 completed 仍能落库')
+
+    // 领取响应丢失后再领：任务回到 pending，但不写新的 failed→pending。
+    await prisma.printTask.update({
+      where: { id: knownFailId },
+      data: { status: 'pending', claimedAt: null, claimExpiry: null, completedAt: null },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: knownFailId },
+      data: { taskStatus: 'pending' },
+    })
+    const claimSameAttempt = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    const sameAttemptLogs = await prisma.printTaskStatusLog.count({
+      where: { taskId: knownFailId, fromStatus: 'failed', toStatus: 'pending' },
+    })
+    if (
+      claimSameAttempt.length === 1 &&
+      claimSameAttempt[0].taskId === knownFailId &&
+      claimSameAttempt[0].attempt === claimAttempt1[0].attempt &&
+      claimSameAttempt[0].attempt === sameAttemptLogs &&
+      claimSameAttempt[0].attempt === 1 &&
+      claimSameAttempt[0].fileUrl.includes('/files/') &&
+      claimSameAttempt[0].fileUrl.includes('sig=') &&
+      claimSameAttempt[0].actionToken.length > 0
+    ) {
+      pass('8e2b. 未经新的 failed→pending，连续两次领取的 attempt 相同，签名链接仍在')
+    } else {
+      fail(`8e2b. 同一 attempt 被改写: ${JSON.stringify({
+        first: claimAttempt1[0]?.attempt,
+        second: claimSameAttempt.map((c) => ({ taskId: c.taskId, attempt: c.attempt })),
+        logs: sameAttemptLogs,
+      })}`)
+    }
+
+    await prisma.printTask.update({
+      where: { id: knownFailId },
+      data: { errorCode: 'PAPER_EMPTY' },
+    })
+    await terminals.patchTaskStatus(
+      knownFailId,
+      { status: 'failed', errorCode: '', attempt: 1 },
+      `Bearer ${agentToken}`,
+      terminalId,
+    )
+    const afterBareFail = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const bareFailLog = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: knownFailId, fromStatus: 'claimed', toStatus: 'failed' },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (
+      afterBareFail?.status === 'failed' &&
+      afterBareFail.errorCode === 'PAPER_EMPTY' &&
+      bareFailLog?.errorCode === 'PAPER_EMPTY'
+    ) {
+      pass('8e3. 重报 failed 且 errorCode 为空串时任务 errorCode 仍是 PAPER_EMPTY')
+    } else {
+      fail(`8e3. errorCode 被冲掉: status=${afterBareFail?.status} task=${afterBareFail?.errorCode} log=${bareFailLog?.errorCode}`)
+    }
+
+    const missingBefore = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const missingLogCount = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
+    await expectCode(
+      () => terminals.patchTaskStatus(
+        knownFailId,
+        { status: 'failed', errorCode: 'PAPER_EMPTY' },
+        `Bearer ${agentToken}`,
+        terminalId,
+      ),
+      'PRINT_STATUS_STALE_ATTEMPT',
+      '8e3b. 重试轮次里缺 attempt 按落后拒绝',
+      '状态回传属于更早的一次打印，已忽略',
+    )
+    const afterMissing = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    const missingMeta = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: knownFailId, errorCode: 'PRINT_STATUS_STALE_ATTEMPT req=missing cur=1' },
+    })
+    const missingLogCountAfter = await prisma.printTaskStatusLog.count({ where: { taskId: knownFailId } })
+    if (
+      afterMissing?.status !== 'failed'
+      || afterMissing.errorCode !== 'PAPER_EMPTY'
+      || afterMissing.status !== missingBefore?.status
+      || afterMissing.errorCode !== missingBefore?.errorCode
+      || !missingMeta
+      || missingMeta.fromStatus !== 'failed'
+      || missingMeta.toStatus !== 'failed'
+      || missingLogCountAfter !== missingLogCount + 1
+    ) {
+      fail(`8e3b. 缺 attempt 改动了任务或没留下元数据日志: status=${afterMissing?.status} code=${afterMissing?.errorCode} meta=${missingMeta?.errorCode}`)
+    }
+    await expectCode(
+      () => terminals.patchTaskStatus(
+        knownFailId,
+        { status: 'failed', errorCode: 'PAPER_EMPTY', attempt: -1 },
+        `Bearer ${agentToken}`,
+        terminalId,
+      ),
+      'PRINT_STATUS_STALE_ATTEMPT',
+      '8e3c. 重试轮次里非法 attempt 按落后拒绝',
+    )
+    const invalidMeta = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: knownFailId, errorCode: 'PRINT_STATUS_STALE_ATTEMPT req=invalid cur=1' },
+    })
+    const afterInvalid = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    if (afterInvalid?.status !== 'failed' || afterInvalid.errorCode !== 'PAPER_EMPTY' || !invalidMeta) {
+      fail(`8e3c. 非法 attempt 未被按落后拒绝: status=${afterInvalid?.status} meta=${invalidMeta?.errorCode}`)
+    }
+    pass('8e3b. 重试轮次缺 attempt 或 attempt 非法时按落后拒绝，状态不变')
+
+    const retriedAfterPaper = await printJobs.retryPaidFailedJob(knownFailId, {
+      paymentSessionToken: await sessionFor(knownFailId),
+    })
+    if (retriedAfterPaper.taskId !== knownFailId || retriedAfterPaper.status !== 'pending') {
+      fail(`8e4 预备. 缺纸失败后重提未回到 pending: ${JSON.stringify(retriedAfterPaper)}`)
+    }
+    const claimAttempt2 = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (
+      claimAttempt2.length === 1 &&
+      claimAttempt2[0].taskId === knownFailId &&
+      claimAttempt2[0].attempt === 2
+    ) {
+      pass('8e4. 再次失败并重提后 claim 返回 attempt=2')
+    } else {
+      fail(`8e4. attempt=2 异常: ${JSON.stringify(claimAttempt2.map((c) => ({ taskId: c.taskId, attempt: c.attempt })))}`)
+    }
+
+    // 第二次领取后任务是 claimed。createdAt 仍最早，一旦回到 pending 会截走后面的 claim，先移出队列。
     await prisma.printTask.update({
       where: { id: knownFailId },
       data: { status: 'cancelled' },
@@ -885,6 +1213,42 @@ async function main() {
       where: { printTaskId: knownFailId },
       data: { taskStatus: 'cancelled' },
     })
+
+    const overwriteCreated = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileMd5: 'sha256-vpj-overwrite',
+      fileName: '新失败原因.pdf',
+    }, { terminalId })
+    createdTaskIds.push(overwriteCreated.taskId)
+    await prisma.printTask.update({
+      where: { id: overwriteCreated.taskId },
+      data: { createdAt: new Date('2018-06-01T00:00:00.000Z') },
+    })
+    await orderStatus.markPaid(overwriteCreated.orderId, { paymentSource: 'offline' })
+    const overwriteClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (overwriteClaim.length !== 1 || overwriteClaim[0].taskId !== overwriteCreated.taskId) {
+      fail(`8e5 预备. 未领到覆盖用例: ${JSON.stringify(overwriteClaim.map((c) => c.taskId))}`)
+    }
+    await prisma.printTask.update({
+      where: { id: overwriteCreated.taskId },
+      data: { errorCode: 'PAPER_EMPTY' },
+    })
+    await terminals.patchTaskStatus(
+      overwriteCreated.taskId,
+      { status: 'failed', errorCode: 'PRINTER_OFFLINE', errorMessage: 'printer offline after paper empty' },
+      `Bearer ${agentToken}`,
+      terminalId,
+    )
+    const overwritten = await prisma.printTask.findUnique({ where: { id: overwriteCreated.taskId } })
+    const overwriteLog = await prisma.printTaskStatusLog.findFirst({
+      where: { taskId: overwriteCreated.taskId, toStatus: 'failed' },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (overwritten?.status === 'failed' && overwritten.errorCode === 'PRINTER_OFFLINE' && overwriteLog?.errorCode === 'PRINTER_OFFLINE') {
+      pass('8e5. 新传入非空 errorCode 覆盖原值（PAPER_EMPTY → PRINTER_OFFLINE）')
+    } else {
+      fail(`8e5. 新错误码没写进去: task=${overwritten?.errorCode} log=${overwriteLog?.errorCode}`)
+    }
 
     const unconfirmedId = await createClaimAndFail(
       '失败任务-无法确认',
@@ -896,6 +1260,20 @@ async function main() {
       async () => printJobs.retryPaidFailedJob(unconfirmedId, { paymentSessionToken: await sessionFor(unconfirmedId) }),
       'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
       '8g. PRINT_JOB_UNCONFIRMED 禁止重新提交',
+      '打印结果未确认，不能重新提交，请联系工作人员核查',
+    )
+
+    const partialId = await createClaimAndFail(
+      '失败任务-只出一部分',
+      '2019-01-05T00:00:00.000Z',
+      'PARTIAL_OUTPUT',
+      RAW_SENSITIVE_MESSAGE,
+    )
+    await expectCode(
+      async () => printJobs.retryPaidFailedJob(partialId, { paymentSessionToken: await sessionFor(partialId) }),
+      'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN',
+      '8g2. 只出了一部分禁止重新提交',
+      '这单已经出了一部分纸，不能整单重打；需要补打请另下新单',
     )
 
     const unpaid = await printJobs.create({
@@ -910,6 +1288,7 @@ async function main() {
       () => printJobs.retryPaidFailedJob(unpaid.taskId, { paymentSessionToken: unpaid.paymentSessionToken }),
       'PRINT_RETRY_NOT_PAID',
       '8h. 未支付失败单不能重新提交',
+      '订单未付款，不能重试出纸',
     )
 
     const unpaidTakeaway = await printJobs.issueTakeawayUrl(unpaid.taskId, {
@@ -1159,6 +1538,7 @@ async function main() {
       () => printJobs.retryPaidFailedJob(legacyJob.taskId, { paymentSessionToken: legacyToken }),
       'PRINT_RETRY_FILE_UNAVAILABLE',
       '8m. 历史空 fileId 在文件删除后拒绝重试',
+      '打印文件已过期或已清理，不能重新提交',
     )
     await prisma.printTask.update({ where: { id: legacyJob.taskId }, data: { status: 'cancelled' } })
     await prisma.order.updateMany({ where: { printTaskId: legacyJob.taskId }, data: { taskStatus: 'cancelled' } })
@@ -1219,6 +1599,132 @@ async function main() {
     }
     await prisma.printTask.update({ where: { id: disabledRetry.taskId }, data: { status: 'cancelled' } })
     await prisma.order.updateMany({ where: { printTaskId: disabledRetry.taskId }, data: { taskStatus: 'cancelled' } })
+
+    const notFailed = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileName: 'not-failed.pdf',
+    }, { terminalId })
+    createdTaskIds.push(notFailed.taskId)
+    await orderStatus.markPaid(notFailed.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({ where: { id: notFailed.taskId }, data: { status: 'printing' } })
+    await prisma.order.updateMany({ where: { printTaskId: notFailed.taskId }, data: { taskStatus: 'printing' } })
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(notFailed.taskId, { paymentSessionToken: notFailed.paymentSessionToken }),
+      'PRINT_RETRY_INVALID_STATE',
+      '8p. 状态不是 failed 不能重新提交',
+      '只有失败的打印任务可以重新提交',
+    )
+    await prisma.printTask.update({ where: { id: notFailed.taskId }, data: { status: 'cancelled' } })
+    await prisma.order.updateMany({ where: { printTaskId: notFailed.taskId }, data: { taskStatus: 'cancelled' } })
+
+    const refundedJob = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileName: 'refunded.pdf',
+    }, { terminalId })
+    createdTaskIds.push(refundedJob.taskId)
+    await orderStatus.markPaid(refundedJob.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: refundedJob.taskId },
+      data: { status: 'failed', errorCode: 'PRINTER_OFFLINE' },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: refundedJob.taskId },
+      data: { taskStatus: 'failed', payStatus: 'refunded' },
+    })
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(refundedJob.taskId, { paymentSessionToken: refundedJob.paymentSessionToken }),
+      'PRINT_RETRY_REFUNDED',
+      '8q. 已退款不能重新提交',
+      '这单已退款或正在退款，不能重新提交',
+    )
+
+    const versionTerminalId = `term_vpj_ver_${suffix}`
+    extraPrintTerminalIds.push(versionTerminalId)
+    await prisma.terminal.create({
+      data: {
+        id: versionTerminalId,
+        terminalCode: `VPJ-VER-${suffix}`,
+        agentToken: `tok_vpj_ver_${suffix}`,
+        deviceFingerprint: `fp-ver-${suffix}`,
+      },
+    })
+    const versionMessage = '这台终端的打印程序版本过旧，升级到 0.4.13 后才能重新提交'
+    const versionCases: Array<{ label: string; version: string | null; allow: boolean }> = [
+      { label: '0.4.12', version: '0.4.12', allow: false },
+      { label: '0.4.13', version: '0.4.13', allow: true },
+      { label: '0.4.13-production', version: '0.4.13-production', allow: true },
+      { label: '0.5.0', version: '0.5.0', allow: true },
+      { label: '0.4.9', version: '0.4.9', allow: false },
+      { label: '没有版本', version: null, allow: false },
+      { label: 'abc', version: 'abc', allow: false },
+    ]
+    for (const versionCase of versionCases) {
+      await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: versionTerminalId } })
+      if (versionCase.version !== null) {
+        await prisma.terminalHeartbeat.create({
+          data: { terminalId: versionTerminalId, agentVersion: versionCase.version },
+        })
+      }
+      const job = await printJobs.create({
+        fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+        fileName: `version-${versionCase.label}.pdf`,
+      }, { terminalId: versionTerminalId })
+      createdTaskIds.push(job.taskId)
+      await orderStatus.markPaid(job.orderId, { paymentSource: 'offline' })
+      await prisma.printTask.update({
+        where: { id: job.taskId },
+        data: { status: 'failed', errorCode: 'PRINTER_OFFLINE' },
+      })
+      await prisma.order.updateMany({
+        where: { printTaskId: job.taskId },
+        data: { taskStatus: 'failed' },
+      })
+      if (versionCase.allow) {
+        const retriedVersion = await printJobs.retryPaidFailedJob(job.taskId, {
+          paymentSessionToken: job.paymentSessionToken,
+        })
+        if (retriedVersion.status !== 'pending') fail(`8r. ${versionCase.label} 应允许重新提交`)
+        pass(`8r. 会员端 ${versionCase.label} 允许重新提交`)
+      } else {
+        await expectCode(
+          () => printJobs.retryPaidFailedJob(job.taskId, { paymentSessionToken: job.paymentSessionToken }),
+          'PRINT_RETRY_AGENT_VERSION',
+          `8r. 会员端 ${versionCase.label} 不许重新提交`,
+          versionMessage,
+        )
+      }
+    }
+    const noTerminalMemberId = `eu_vpj_noterm_${suffix}`
+    extraEndUserIds.push(noTerminalMemberId)
+    await prisma.endUser.create({
+      data: {
+        id: noTerminalMemberId,
+        phoneHash: `hash-${noTerminalMemberId}`,
+        phoneEnc: `enc-${noTerminalMemberId}`,
+      },
+    })
+    const noTerminalJob = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileName: 'no-terminal.pdf',
+    }, { terminalId: versionTerminalId })
+    createdTaskIds.push(noTerminalJob.taskId)
+    await orderStatus.markPaid(noTerminalJob.orderId, { paymentSource: 'offline' })
+    await prisma.printTask.update({
+      where: { id: noTerminalJob.taskId },
+      data: { status: 'failed', errorCode: 'PRINTER_OFFLINE', terminalId: null, endUserId: noTerminalMemberId },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: noTerminalJob.taskId },
+      data: { taskStatus: 'failed' },
+    })
+    // 付款会话绑的是建单时的终端。终端被清空后会话对不上，会先报任务不存在。
+    // 这里改走会员身份，确认共享资格函数本身拒绝没有终端的任务。
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(noTerminalJob.taskId, { endUserId: noTerminalMemberId }),
+      'PRINT_RETRY_AGENT_VERSION',
+      '8r. 会员端没有终端不许重新提交',
+      versionMessage,
+    )
 
     // ── 9. 动态价格二次确认 ────────────────────────────────────────────
     // 夹具文件 1 页 × 2 份黑白 → 应付 = 单价 × 2。quotedAmountCents 只作一致性断言：

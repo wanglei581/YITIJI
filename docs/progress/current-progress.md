@@ -10,6 +10,28 @@
 
 - **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
 - **P1 `verify-feedback-notifications` 自建库过时：** 不设 `DATABASE_URL` 时它手抄建表语句，User 表缺 `passwordProofState`，一跑就报列不存在（CI 走 `DATABASE_URL` 所以没暴露，已复现）。改为按当前 schema `prisma db push`，以后 schema 加列不会再过时；设与不设 `DATABASE_URL` 两种都全绿，临时库照旧清理。
+## 2026-09-30：W-86 第五轮——锁序统一为 PrintTask → Order，超前补报与同一终态清理分开（分支 `grok/print-retry-attempt-0929`，提交 `bda0b4979`）
+
+- **锁序。** 全系统先锁 PrintTask 再动 Order。唯一行锁是 `print-status-attempt.ts` 的 `lockPrintTaskRow`（56–58 行，一句不改 `updatedAt` 的 `UPDATE "PrintTask"`）。状态补报经 `readLockedPrintStatusAttempt` 先调它。会员 `retryPaidFailedJob` 与管理员 `retryPrintTask` 在事务开头调用同一函数，然后再做 Order 的 CAS 和 PrintTask 更新。不许再写第二句同样的 SQL。
+- **退款 CAS 仍在。** agy 说会员重试事务内漏判退款，核对后不成立，没有改语义。`print-jobs.service.ts` 779–792 行 `tx.order.updateMany({ where: { id, taskStatus: 'failed', payStatus: 'paid', amountCents: amountBefore } })` 就是退款条件：并发把订单打成退款后更新条数为 0，事务回滚。
+- **超前和落后分开。** 请求 attempt 大于当前值回 409 `PRINT_STATUS_FUTURE_ATTEMPT`，小于当前值仍是 `PRINT_STATUS_STALE_ATTEMPT`。都不改任务状态，只写同状态元数据日志。Agent 收到 `FUTURE` 不删补报，沿用离线队列退避；`MAX_ATTEMPTS` 仍是 10，超过后进死信，日志只有任务号。只有 `STALE` 删除。
+- **重试轮次里缺 attempt。** `current > 0` 时，请求缺 attempt 或 attempt 非法，按 `PRINT_STATUS_STALE_ATTEMPT` 拒绝（日志 `req=missing` / `req=invalid`）。`current === 0` 仍兼容老 Agent。事务外的快速路径在 `current > 0` 时不再提前返回。第 0 轮同一终态仍不进写事务；这里和锁之间有一段极短的空窗，幂等门禁不许第 0 轮打开事务，所以不能在那条路径上加锁。
+- **同一终态清理补回。** 不带 attempt、第 0 轮、状态相同的快速返回，在 `return { acknowledged: true }` 之前重新调用 `cleanupTerminalTask`。带 attempt 的同终态重放没有事务外快速返回，事务提交后的清理还在。
+- **版本在锁之后读。** 两条重试入口的事务外预检用 `skipAgentVersion: true`。锁住 PrintTask 之后、同一事务里读最新心跳再判定。带走链接和 `canRetry` 仍在事务外读版本，那两条不改状态。
+- **管理员原因与动作一致。** 列表和详情在共享原因之后，再看终端已退役、终端不在运行状态、有订单但 `Order.taskStatus` 不是 failed。人话与动作拒绝逐字相同：「终端已永久退役，不能重新排队」「终端不在 active 状态，不能重新排队」「任务状态已变更，请刷新后重试」。这三项在 `admin-print-retry-block.ts`，不进会员共用的资格函数。共享检查用 `PRINT_RETRY_*`，管理员独有检查用 `PRINT_SCAN_RETRY_*`。
+- **没改的三条。** 心跳 `groupBy`：`TerminalHeartbeat` 已有 `@@index([terminalId, createdAt])`（`schema.prisma` 267 行，postgres schema 272 行），列表每页一次可接受；没有心跳就判版本过旧是有意的。无订单任务的 CAS 是 `admin-print-scan.service.ts` 591–606 行 `printTask.updateMany({ where: { id, status: 'failed' } })`，条数不是 1 即 409。新 Agent 打老后端会因 `main.ts` 98 行 `forbidNonWhitelisted` 得到 400；发布顺序仍是先后端后 Agent（现场脚本 R.1→R.2），不改代码。Agent 版本仍是 `package.json` 的 0.4.12，不带 v 前缀。
+- **本机已跑（隔离 SQLite，库文件在 `~/.cache/claude-lanes/print-retry-0929/verify-w86-r5-*.db`）：** `services/api` 的 `tsc --noEmit` 退出 0。`verify:print-jobs`（含 `verify:pickup-code-share`）、`verify:admin-print-scan`、`verify:contract-review:print-lifecycle`（6 条）、`verify:terminal-status-idempotency`、`verify:refund-idempotent`、`verify:payment-flow`、`verify:member-order-timeline` 退出 0。`verify:print-retry-attempt` 退出 0。改动文件 eslint 退出 0。变异在 `bda0b4979` 之后做，每条退出 1，随后 `git checkout` 还原：把 `FUTURE` 当 `STALE` 删掉；去掉超前补报的次数上限；去掉快速路径的 `cleanupTerminalTask`；去掉退役原因；去掉订单状态原因；重试轮次缺 attempt 当成老 Agent 放行；把会员重试的行锁挪到 Order CAS 之后。
+- **没在本机跑：** `verify:print-retry-lock:postgres`。本机 `pg_isready -h 127.0.0.1 -p 5432` 无响应，没有启动用户的数据库。脚本只挂在 postgres-readiness，要求 `DATABASE_URL` 是 PostgreSQL。会员重提和管理员重试同时打同一单时，不得出现 40P01，也不得两边都成功。以 CI 为准。真 Windows 打印机和 GitHub CI 全量也没在本机跑。图谱已按代码重生成，`pnpm graph:check` 通过；`verify:repository-integrity` 通过。没有 push。
+## 2026-09-29：生产只读巡检补 AI 服务说明、加 --strict 发布后核对（分支 `claude/backend-hardening-20260929-probe-strict-ai-disclaimer`）
+
+- **做了什么（Grok 实现、协调方审，合规运维窗口要求）：** `scripts/prod-readonly-probe.mjs` 法务文档补查 `ai_disclaimer`（未激活即 FAIL，与发布流程 3d 预检三份一起查对齐）；新增 `--strict`：岗位、招聘会、企业公开条数非 0 或任何列表出现演示标记都 FAIL、退出码非 0；不带时行为逐字不变。发布清单与运维手册里的发布后核对命令改成 `--strict`，须在演示企业用 #1115 下架之后跑。
+- **验证：** verify-prod-readonly-probe 补 ai_disclaimer 未激活、--strict 企业数 1 与全 0 等夹具；Grok 两处、协调方抽 1 处（去掉 ai_disclaimer）变异全红；ci-gate-coverage 通过。
+
+## 2026-09-29：会员取件链接与重试审计在真 PostgreSQL 上被门禁覆盖（分支 `claude/backend-hardening-20260929-member-print-audit-pg`，叠在 #1110 上）
+
+- **缺口（Codex 复核、总指挥核实）：** #1110 修的是「会员号写进审计 actorId、PG 外键拒绝、被 AuditService 静默吞掉」，但原门禁跑在 SQLite 上，SQLite 不校验这条外键，测不出来；重试场景也没有运行断言。
+- **补法（Grok 实现、协调方审）：** 新门禁 `verify:member-print-audit:postgres`（只挂 postgres-readiness）：真 PG 上走真实 PrintJobsService，取件链接与重试各一次，断言各落一行审计、actorId 为空、payload.endUserId 为会员号；阳性对照用旧写法直接写审计，PG 必须抛外键错误。SQLite 的 verify:miniapp-cloud-print-m2 补重试审计断言。只加门禁，不改服务代码。
+- **验证：** Grok 本机临时 PG16 跑 5/5，两处变异（取件 actorId 改回会员号、删重试审计）全红；协调方复跑 m2、backend-p0-contracts、ci-gate-coverage 全绿，抽 1 处变异（重试审计动作名错）变红。
 ## 2026-09-29：给人看的时间一律按北京时间（走查 W-78、W-67；分支 `claude/backend-hardening-20260929-display-time-shanghai`）
 
 - **问题：** 告警正文里的时间是 UTC，比北京时间早 8 小时，运维会误判事件先后（W-78）；招聘会企业打印页脚用服务器本地时钟，服务器在 UTC 时同样早 8 小时；价目应急 SQL 用了裸 `NOW()`，时区不对（W-67）。
@@ -40,11 +62,49 @@
 - **修法（Codex 实现、协调方审）：** 写页眉页脚时临时把下边距清零再恢复（合同审阅报告与 AIGC 标识已是这个写法）；回传页数改为从最终 PDF 读出的实际页数。报价与计费本来就按文件实际页数重算，改后三处都是同一个数。其余 10 个生成 PDF 的服务逐个排查过，没有同样问题。
 - **W-94 遗留：** 手机或一体机上传时，UTF-8 文件名被误按 Latin-1 解码的还原条件原来是「还原后含汉字」，所以全角括号、日文、韩文、emoji 这类名字保持乱码。改为「还原后含 U+00FF 以上字符」；`Ã©.pdf`、`résumé.pdf` 这类合法西文名仍原样保留（现有门禁钉着）。
 - **验证：** verify:resume-report-export 用一份像真的多页报告（诊断报告与修改清单两种），断言回传页数、PDF 实际页数、文件记录页数、计费页数四者相等，每页都有正文、页脚「第 N / M 页」的 M 等于页数；verify:kiosk-upload-print-contract 加五个非汉字文件名用例。反向变异四处全红：页脚不清零下边距、页数改回写页脚前的计数、页脚总页数写错、文件名恢复「含汉字」条件。
+## 2026-09-30：管理员后台打印任务「重试」按钮事先显示能不能点（W-86 前端，对接后端 #1152）
+
+- 「打印扫描运维」页列表与详情的「重试」只看服务端 `retryBlockedReason`：有值则置灰并把原因直接写在按钮下（未付款、已退款、结果未确认、已部分出纸、文件已过期、终端打印程序低于 0.4.13、终端已永久退役、终端当前不在运行状态、任务状态已变更等，文案与服务端拒绝时逐字一致）；null 可点；字段缺失时保持旧行为。页面写一次「后台不提供强制重打；需要补打请让用户另下新单。」管理员重试被拒错误码随服务端改为 `PRINT_RETRY_*`，门禁断言后台源码不再出现旧前缀。
+- 本地真实后端（#1152 第四、五轮）逐一造数据走查，各原因列表与详情均置灰并显示原因、可重试任务正常重新排队；截图在 `~/.cache`（不进仓库）。Grok 实现，Claude 审。
+## 2026-09-30：青序 2.0 A 批——一体机运行页合规文案（分支 `claude/qx-align-a-copy-0930`）
+
+- **范围：** 只改用户可见文字和眉题样式（字号、字距、颜色照稿 v2 覆盖块），不动功能、接口、数据。依据 v2 README 规则 4（工程词、英文眉题不上屏）、规则 5（托管 a 口径）。18 归 B 批，未动。
+- **英文眉题 → 中文（照同号稿）：** 08「TERMS OF SERVICE / PRIVACY POLICY」→「你和这台机器 / 你的信息」；19「IMAGES TO PDF」→「图片转 PDF」；20「SIGN & STAMP」→「签名」；34「SELF ASSESSMENT」→「自我探索」；35「NOTIFICATIONS」→「消息通知」；38「MY FILES & ORDERS」→「我的文档和订单」；39「MY RESUMES / MY FAVORITES / AI SERVICE RECORDS / MY ACTIVITY / ACTIVITY DETAIL」→「我的简历 / 我的收藏 / AI 服务记录 / 我的足迹 / 记录详情」；40「MY FEEDBACK」→「意见反馈」。
+- **工程词：** 04「继续后回到/interview」改写页面名（「继续后回到 练面试」），按钮读屏名同源，路由→页面名统一由 `sessionGuardModel.sessionGuardSourceName` 给（照稿 04 的对照表）；20 示例条「演示 固定原型数据，不是真实用户文件」→「示例 示例文件，不是哪位用户的文件」，顶部能力标签「能力已开放 / 能力读取中 / 终端未登记……」→「可以签名 / 正在确认 / 这台还没登记……」，示例态按钮原因「合成演示」→「这是示例」；34 步骤标「E2 / E3」→「记分 / 解读」；39 页签副标题「服务元数据」→「名称和状态」，简历与 AI 记录行不再显示模型名（demo / llm）和任务编号，模拟面试说明去掉「元数据」；41 去掉「元数据」「step-up」「后台」「外跳」（改共享会员端文案 `packages/shared/src/types/memberPrivacy.ts` 的范围横幅、类型名与说明，管理端专用 ADMIN_* 未动）。
+- **托管 a 残留：** 09 第 8 项「岗位与招聘会信息」→「机构官方渠道」；41「撤回岗位 AI 授权」→「撤回 AI 使用授权」（与稿 41、账号设置页同名）。撤回项保留，依据：撤回的是 job_ai 授权，托管 a 下 `/resume/job-fit` 手填岗位要求那条路仍要这项授权（`governed-job-fit.service` 的 requireActiveConsent，用例「hosting off: job fit keeps only the manual path」）。
+- **门禁与用例：** verify:data-request-ui 同步新文案并新增会员端文案反向断言；verify:fusion-w5 新增 A 批断言（眉题、示例条、页签、模型名与任务编号、机器状态第 8 项）；verify-qx-session-lifecycle 新增「不露路由」断言；profile-qx、kiosk-session-warning 用例同步。变异 12 处（改回旧文案）对应门禁全部转红。
+- **没改的：** 41 页底部约 580px 留白、各页版式差异（页头、底部问小青等）属后续版式批次；页头右上的终端编号来自共享页框，不在本批。
+
+## 2026-09-30：法务全套第一批——个人信息保护影响评估、数据总表、同意与撤回说明（分支 `claude/legal-set-c1-c3-0930`，只改文档）
+
+- **做了什么：** 产品负责人要求补齐商用法务文件（总目录 24 份，15 份试点前必需，总目录与排期不进仓库）。第一批三份内部底稿进仓库，都是供律师审阅的草案：
+  - `docs/compliance/personal-info-impact-assessment.md`：影响评估，覆盖公共终端（含扫描原件与出纸盘遗留、本机缓存与磁盘）、AI、未成年人、自动化决策、委托处理、生成式 AI 合规；
+  - `docs/compliance/data-inventory-and-retention.md`：数据分类与保存期限总表；
+  - `docs/compliance/consent-and-withdrawal.md`：同意记录与撤回机制。
+  每份分「可直接用」与「待律师确认的点」。
+- **怎么做的：** Grok 起草；Codex 逐条对候选 `25dbe6181` 的代码核「已做到」、对官方原文核法条；agy 做反方审查；协调方裁定并统稿。修正了 5 处事实错误，例如自我探索是清空内容、留下记录，不是删除整行；厂商是后台可改的产品口径，不是代码保证。另补了自动化决策、委托处理、物理风险三节。
+- **核过的原文：** 网络日志不少于六个月在《网络安全法》（2025-10-28 修正）第二十三条第三项；网信办 2026-09-14 公告要求调用已备案模型的应用向地方网信办登记，上线后公示模型名称及备案号或上线编号。顺带把 `docs/product/recruitment-closure-license-gated-plan-2026-09.md` 里的旧条号「第二十一条」改为第二十三条第三项。
+- **两份现有保存期限文件不合并：** `member-personal-data-retention.md`、`file-retention-and-cos-lifecycle.md` 被 4 条门禁直接读取，保留为明细，只在标题下加一行指向总表。
+- **发现的缺口（待报总指挥，本 PR 不改代码）：**
+  - 线上注销返回「账号注销暂未开放」，又没有带审计的人工注销工具，试点前要补；
+  - 自我探索允许勾选「监护人同意并陪同」，勾选证明不了监护关系，给了两个改法待定；
+  - 导出简历不印可见 AI 字样是否满足标识办法，列为待律师确认第一条。
+- **验证：** `verify:compliance-copy`、`verify:cos-lifecycle-policy`、`verify:member-data-retention`、`verify:ai-user-text-retention` 通过；`verify:ai-usage-retention` 要连隔离库，本机没跑，它对留存矩阵只做包含检查，新增一行不影响。
 ## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
 
 - 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
 - 改法：`pnpm-workspace.yaml` 三条 brace-expansion 覆盖从 1.1.18 / 2.1.4 / 5.0.9 上调到修复版 1.1.20 / 2.1.6 / 5.0.11，`scripts/verify-dependency-security.mjs` 的期望常量同步，锁文件只变 brace-expansion 三个版本。没有新增豁免。
 - 验证：干净安装后 `verify:dependency-security` ALL PASS（full / prod 高危与严重均为 0），repository-integrity、ci-gate-coverage、kiosk `tsc -b` 通过。
+## 2026-09-30：AI 调用概览按实际统计窗口写「近 24 小时」（W-101 优先项）
+
+管理员后台「AI 服务管理」的概览卡片和工作台「AI 调用」卡片读的是同一个接口，服务端按滚动 24 小时统计，不是北京时间自然日；页面却写「今日概览 / 今日累计 / 今日暂无调用」，走查实测页面 104 次、上海今日 40 次，对不上。文字改成「近 24 小时」，工作台成功率前标出统计窗口；按自然日计费的额度面板「今日已计费金额」本来就是自然日，不动。门禁 `verify-admin-ai-usage-ui` 改为钉住新口径，改回旧文字会红。
+## 2026-09-30：返工单 r3 第 1 批（Codex 本轮收口）
+
+终端发布观察面板已放回表格下方、详情抽屉复用页面 notice 并将绑定码状态改为中文生命周期标签，三处表格恢复卡片内横向滚动，管理员智慧校园文案、扫描输入门禁与宣传屏素材刷新错误提示同步修正并补上对应静态/E2E 断言。
+
+## 2026-09-30：后台终端与设备 UI 第 1 批（Codex 实现）
+
+管理员终端页收口为五列并将次要信息、全部运维动作移入现有详情抽屉；设备总览、打印机、外设和机构端终端数据统一了表格外壳、状态标签与数量显示。终端离线时详情抽屉的打印机状态和扫描输入不再显示「正常」，只显示中性离线状态并标注离线前最后一次上报。宣传屏按素材库、播放方案、终端配置拆分子组件，并把原生文件选择框改为中文按钮和已选文件名；两后台智慧校园说明改为只说明本校终端开关及尚未开放的模块。同步把日期门禁的分页与日期切片解析抽成已接线模块，更新相关静态门禁和终端抽屉 E2E 入口；类型检查、静态门禁已在本地通过，四套浏览器 E2E 已启动但沙箱禁止监听本地端口，需在可监听环境复跑。
 
 ## 2026-09-30：带文字层的 PDF 简历按行保留结构（走查 W-95；分支 `claude/backend-hardening-20260929-w95-pdf-lines`）
 
@@ -200,6 +260,37 @@ Agent 0.4.13 会在心跳里上报 `queue_cleanup_failed` 与 `queue_pause_faile
 - **修法：** 门禁不放宽。去掉该字段，后台只看服务端算好的 `canRegisterContactPhone` 与 `phoneRegisteredByAdminAt`；W-03 门禁改为断言不下发原始状态。两个后台窗口前端同步改读法。
 - **验证：** schema 门禁通过；反向变异「把 passwordProofState 放回响应」红在该断言；W-03、机构账号操作（含 otp/redis）、admin-orgs、admin-orgs-delete-schema、partner-org-self、internal-auth-phone 全绿。
 
+## 2026-09-30：W-86 第四轮——重试资格补付款与版本门槛，落后补报在事务内双向拒绝（分支 `grok/print-retry-attempt-0929`，提交 `ac0c10b65`、`829171130`、`eb2a3c998`）
+
+- **有订单才看付款。** 试点 0 元单落库后就是 `payStatus='paid'`：`order-status.service.ts` 206–207 规定 `paymentSource='free'` 且金额不是 0 就拒绝，231–234 的 CAS 写成 `paid`；一体机免费单在 `print-jobs.service.ts` 530–533 走 `markPaid({ paymentSource: 'free' })`；会员云打印在 `member-print-order-create.service.ts` 322–323 同样置 paid，376 行用 `amountCents===0 && payStatus==='paid' && paymentSource==='free'` 识别免费单；套餐在 `package-order.service.ts` 241、335。没有另设 free 付款状态。没有订单的自检或内部任务不套付款和退款条件，管理员仍可重试。
+- **只出一部分。** 会员端和管理员端都拒绝，人话都是「这单已经出了一部分纸，不能整单重打；需要补打请另下新单」。管理员后台不开放强制重打。
+- **同一句人话。** 未付、退款、未确认、只出一部分、文件过期、状态不是失败、终端版本不够，两条入口的错误码和人话一致。管理员原有的终端退役、订单序列点、审计保留。解析不出文件链接仍是管理员自己的 `PRINT_SCAN_RETRY_FILE_UNAVAILABLE`。
+- **落后补报。** 当前 attempt 与状态写入在同一个事务里：先锁住 PrintTask 行，再用和领取相同的 `reprintAttemptsByTaskId`（只数 failed→pending，不按 errorCode 过滤）。请求的 attempt 小于或大于当前值都回 409 `PRINT_STATUS_STALE_ATTEMPT`，事务内写一条同状态日志，只记任务号、请求的 attempt、当前 attempt，不计入重提次数。不带 attempt 的老 Agent 保持原样，同一终态的回放仍在打开写事务之前决定。
+- **按钮原因。** 管理员打印任务列表和详情增加 `retryBlockedReason`，由同一个资格函数算出。null 表示可以重试，否则与拒绝人话相同。没有改 `apps/admin`。后台窗口若仍按旧错误码显示，需要另接。
+- **版本门槛。** 任务所属终端最近一次心跳的 `agentVersion` 低于 0.4.13、读不到、格式不合法，或任务没有终端，都不许重试。比较取开头的主.次.修订逐段比数字，后缀忽略。人话：「这台终端的打印程序版本过旧，升级到 0.4.13 后才能重新提交」。Agent 版本号仍是 0.4.12，本轮没有改版本号，也没有 push。
+- **两种老 Agent：** 老 Agent 加上新服务端的重提，现在被版本门槛挡住，不会派单。老 Agent 离线补报不带 attempt，不会串到新一轮，因为 attempt≥1 的重提不会再派给老 Agent。不带 attempt 的同机重提竞态还在；现场应先升级 Agent 再开放重提。发布清单不由本窗口写。
+- **本机已跑（隔离 SQLite `file:~/.cache/claude-lanes/print-retry-0929/verify-w86-r3.db`）：** `verify:print-jobs`、`verify:pickup-code-share`、`verify:admin-print-scan`、`verify:refund-idempotent`、`verify:payment-flow`、`verify:member-order-timeline`、`verify:terminal-status-idempotency` 退出 0；`verify:print-retry-attempt` 退出 0。`verify:miniapp-cloud-print-m2` 退出 1，与基线 `90eb5a21c` 相同（一体机取件页已不再包含 `result.released ? '/print/progress' : '/print/cashier'`），未改。变异在提交之后做，每条退出 1，随后 `git checkout` 还原：管理员放行 PARTIAL_OUTPUT；去掉落后比较（8e2c 未抛）；计数改成只数 kiosk_retry；落后补报不删队列；attempt 大于当前值时放行；版本比较方向写反（0.4.12 被放行）；改成字符串比较（0.4.9 被放行）。图谱已重生成，`pnpm graph:check` 通过。
+- **没在本机验证：** 真 Windows 打印机、真缺纸、GitHub CI 全量。PR #1131 的 PostgreSQL 审计脚本不在本分支和 `origin/main`，只在 `claude/backend-hardening-20260929-member-print-audit-pg`；本机 PostgreSQL 16 服务未启动，5432 无监听，Docker 也不可用，没有启动用户本机的数据库，也没有把那份脚本拣进本分支。
+
+## 2026-09-30：W-86 第三轮——重提作业按 attempt 关联，两条入口共用重试资格（分支 `grok/print-retry-attempt-0929`，提交 `705c1c433`）
+
+- **关联键：** 临时文件名、`correlationId`、WMI 队列匹配都带 attempt。attempt=0 仍是 `task_<taskId>.<ext>`，新名字仍能被开机清队列正则 `^task_[A-Za-z0-9_-]{1,128}(\.[A-Za-z0-9]+)$` 认出来。没有重做另一支的开机清队列。
+- **离线补报：** `pending_patches.printAttempt`（旧行默认 0），去重键和请求体都带 attempt。服务端在 attempt 小于当前 failed→pending 条数时回 409 `PRINT_STATUS_STALE_ATTEMPT`，不改任务状态。Agent 收到该码删掉这条补报，只记任务号。不带 attempt 的老 Agent 保持原样。门禁：attempt 0 的 failed 在 attempt 1 已领取/打印中之后被拒绝，状态不变，attempt 1 的 completed 仍能落地。
+- **共用资格：** `retryPaidFailedJob` 的前置抽到 `paid-reprint-eligibility.ts`，管理员 `retryPrintTask` 调用同一函数；管理员自己的终端退役、订单序列点、审计仍留在原处。门禁：管理员对「只出一部分」和未付款都拒绝；会员端原断言不变。
+- **测试注入：** 去掉 `task-runner.ts` 的全局打印桩 setter，改为 `ExecuteTaskDependencies` 注入打印命令和监控。生产调用不传，走真实实现。
+- **混合版本：** attempt>0 的重提派到老 Agent 仍不会出纸，不会双份出纸。发布顺序是先服务端、再 Agent 0.4.13。Agent 版本号仍是 0.4.12。
+- **本机已跑：** 变异在 `705c1c433` 之后做，做完 `git checkout` 还原。① 去掉落后比较 → `verify:print-jobs` 退出 1（8e2c 期望 `PRINT_STATUS_STALE_ATTEMPT` 但未抛）。② 管理员入口放行 `PARTIAL_OUTPUT` → `verify:admin-print-scan` 退出 1。还原后图谱重生成，`pnpm graph:check` 通过。`verify:miniapp-cloud-print-m2` 在基线 `90eb5a21c` 上就失败（一体机取件页已不再包含该门禁要找的 `result.released ? '/print/progress' : '/print/cashier'`），与本轮无关，未改。
+- **没在本机验证：** 真 Windows 打印机、真缺纸走查、GitHub CI 全量。
+
+## 2026-09-29：缺纸后点「重新提交打印」能在同一台机器上再打（走查 W-86，分支 `grok/print-retry-attempt-0929`）
+
+- **问题：** 重提复用同一个打印任务号，只把 failed 改回 pending，并写一条 `kiosk_retry` 日志。Agent 本地按任务号判重，再次领到就只回报 failed、不打印，还不带原来的 `PAPER_EMPTY`，结果页从「打印机缺纸」变成笼统失败，重提按钮还在。
+- **修法（2026-09-30 按后端预审改了计数口径，提交 `33a1c1200`）：** 领取响应的 `attempt` 等于该任务 `PrintTaskStatusLog` 里 `fromStatus='failed'` 且 `toStatus='pending'` 的条数。一体机重试（日志码 `kiosk_retry`）和管理员重试（日志码 `admin_retry`）都计入。一批任务在领取循环之后一次 `groupBy(taskId)`，条件以 taskId 开头，走现有 `@@index([taskId, createdAt])`。同一任务没有新的 failed→pending 时，连续两次领取的 attempt 相同。服务端 PATCH：新传入的 errorCode 为空（缺省或空串）且目标状态是 failed 时保留原值；非空就覆盖。printing / completed 不带码时写成 null。Agent 判重键是任务号加 attempt，没收到视为 0。本地 SQLite 主键 `(taskId, attempt)`，旧行记为 attempt 0。同一对：派发中报未确认、已完成重报完成、已失败重报失败并带回本地错误码。attempt 变大才重新下载、打印。Agent 重报可以带本地错误码，以服务端这条规则为准。一体机仍用原来的 taskId，页面没改。Agent 版本号仍是 0.4.12。不改库、不加迁移。
+- **全文搜索：** 生产代码里把 PrintTask 从 failed 改回 pending 的只有 `PrintJobsService.retryPaidFailedJob` 和 `AdminPrintScanService.retryPrintTask`，两处都写了这条状态日志。`seedPrintTask` 仅在 `NODE_ENV=development` 且 `ENABLE_TEST_PRINT_TASK_SEED=true` 时把 `ptask_seed_001` upsert 成 pending，不写日志；它的 `terminalId` 为 null，领取查询带终端过滤，领不走。测试夹具 `services/api/scripts/support/partner-terminal-ops-cases.ts` 直接 `updateMany`，不走运行时。没有第三处生产路径，所以没有停手。
+- **回到 pending 时的 errorCode：** 两条重试都把任务行的 `errorCode` / `errorMessage` 写成 null。`getStatus` 读任务行，不读历史日志。回到 pending 后一体机不再按这一行显示缺纸。之后成功回传 `completed` 且不带非空错误码时，列写成 null。旧的 `PAPER_EMPTY` 留在 failed 那条状态日志里，管理员详情的 `statusLogs` 仍能看到。当前这两条路径上，成功之后界面不会还挂着旧的「缺纸」。这次没有改展示。
+- **重提前置条件保持原样：** 未确认、只出一部分、归属校验、退款和过期文件的拒绝都没动。attempt 只加在 claim 返回里。门禁同时断言 `fileUrl` 仍含 `/files/` 与 `sig=`，`actionToken` 仍在。
+- **本机已跑（隔离 SQLite `file:/tmp/verify-w86-print.db`，按 CI `db push` 并装上两条终端 guard SQL）：** API 与 terminal-agent `tsc --noEmit`、改动文件 eslint、`verify:print-jobs`（8e2 attempt=1、8e2b 连续两次相同且等于日志条数、8e3 空串保留 `PAPER_EMPTY`、8e4 attempt=2、8e5 `PRINTER_OFFLINE` 覆盖、8g/8g2 未确认与只出一部分仍禁止）、`verify:admin-print-scan`（管理员重试后 claim attempt=1 且等于 failed→pending 日志条数）、`verify:print-retry-attempt`（一体机重试与管理员重试都在 attempt 加一后再次调用打印桩，同一 attempt 再领不打印）。图谱列出的、以及全文搜到会读 `terminals-agent.service.ts` / `task-runner.ts` 的门禁逐条退出 0：`verify:admin-ops`、`verify:console-screen-snapshot`、`verify:kiosk-cashier-ui`、`verify:legacy-pending-print-task-disposition`、`verify:order`、`verify:package-order-fulfillment`、`verify:partner-smart-campus`、`verify:payment-flow`、`verify:payment-real-channels`、`verify:print-rollout-config`、`verify:print-scan-first-release`、`verify:refund-idempotent`、`verify:scan-deletion-audit-reporting`、`verify:scan-input-lockout-telemetry`、`verify:terminal-bind-code`、`verify:terminal-credentials`、`verify:terminal-device-config`、`verify:terminal-network-diagnostics`、`verify:terminal-provisioning`、`verify:terminal-status-idempotency`、`verify:terminal-test-print-seed-guard`、`verify:boot-resilience`、`verify:production-runtime-gates`、`verify:agent-unauthorized`、`verify:print-monitor-truth`、`verify:print-scan-agent`、`verify:print-truth-hardening`、`verify:printer-config`、`verify:task-reliability`。`verify:print-rollout-config` 第一次红，是因为切片终点还写着旧的 `return results`；改成 `return claimedPayloads.map` 后退出 0，付费门控断言仍在。变异在 `33a1c1200` 之后做，每条做完都 `git checkout` 恢复，再跑这三条门禁退出 0：① groupBy 加回 `errorCode='kiosk_retry'` → `verify:admin-print-scan` 退出 1（日志 1 条，claim attempt 0）；② failed 回传一律用新传入值、空则写成 null → `verify:print-jobs` 8e3 退出 1（task=null，log=null）；③ failed 且原错误码非空就一直留着 → 8e5 退出 1（仍是 `PAPER_EMPTY`）；④ Agent 固定 `bindPrintAttempt(db, 0)` → `verify:print-retry-attempt` 退出 1（attempt 加一后没有再调打印桩）；⑤ groupBy 改成按 taskId 逐条 `count` → `verify:print-jobs` 形状断言退出 1；⑥ 日志条数没变时第二次领取把 attempt 加一 → 8e2 通过，8e2b 退出 1（第一次 1、第二次 2、日志仍是 1）。图谱已重生成，`pnpm graph:check` 通过。
+- **没在本机验证：** 真 Windows 打印机、真缺纸走查、GitHub CI 全量。非 Windows 上要断言「重提后回报已完成」，门禁把出纸监控的平台和队列查询换成桩；生产路径这两处覆盖为空，仍走真实打印命令和本机队列监控。
 ## 2026-09-29 夜：KSK-001 残留只读底子（Agent 0.4.11）与漏链 1、8 的代码核实
 
 - **真机只读（22:52，UU 远程，只数数量与时间，不列文件名）：** 开机 9/22 11:07 后未重启。Agent 临时目录只有 6/3、7/5 两件 `task_*` 旧遗留，`print_*.pdf` 0；扫描目录与 `_unclaimed` 0；`spool\PRINTERS` 0；用户 `%TEMP%` 与「下载」里的 PDF 0；`C:\Windows\SystemTemp` 18 个系统文件。一体机 Edge 由看门狗以 `--kiosk` + 独立 `--user-data-dir` 启动，**不带 inprivate 参数**（9/28 记录的「InPrivate」是推断，更正）；配置目录 452 MB 多为 Edge 自带组件，`Default\Cache` 6 个缓存块、`Local Storage` 最后写入 9/28 23:24。

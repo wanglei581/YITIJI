@@ -41,14 +41,14 @@ import type { PrintJobParams } from '../printer/types'
 import { createApiClient, createDirectHttpAgents, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
-import { print } from '../printer/print'
+import { print as dispatchPrint } from '../printer/print'
 import { cleanupStaleOwnPrintJobs, pauseConfiguredPrinterQueue, resumeConfiguredPrinterQueue } from './print-queue-hold'
 import { claimPrintTasksIfGateOpen, preparePrinterForDispatch, settlePrinterAfterTerminal } from './print-dispatch-gate'
 import { computeMonitorTimeoutMs } from './print-monitor-timeout'
 
 export { computeMonitorTimeoutMs }
 import { monitorPrintJob } from './print-job-monitor'
-import { getPrinterPreflight, type PrinterPreflight } from './wmi'
+import { getPrinterPreflight, type PrinterPreflight, type PrintJobMonitorStatus } from './wmi'
 
 export { monitorPrintJob }
 export type { MonitorOutcome } from './print-job-monitor'
@@ -57,11 +57,17 @@ import { log, warn, err } from '../logger'
 import {
   isTaskDone,
   getTaskLocalStatus,
+  getTaskLocalErrorCode,
   markTaskDone,
+  rememberTaskErrorCode,
+  bindPrintAttempt,
+  normalizePrintAttempt,
   enqueuePatch,
   isDatabaseAvailable,
   type AgentDatabase,
 } from './db'
+import { printSpoolStem, printTempFileName } from './print-correlation'
+import { isStalePrintAttemptError } from './offline-queue'
 import { createTaskRunnerControl, type TaskRunnerControl } from './task-runner-control'
 
 // ── Temp directory ────────────────────────────────────────────────────────────
@@ -265,6 +271,11 @@ export async function patchStatus(
       err(`task ${taskId}: PATCH status=${payload.status} unauthorized — printing stopped (re-bind required)`)
       return false
     }
+    if (isStalePrintAttemptError(e)) {
+      // 落后补报已被服务端忽略。只记任务号，不当失败重试，也不再入队。
+      log(taskId)
+      return true
+    }
     warn(
       `task ${taskId}: PATCH status=${payload.status} failed — ${axiosErrorMessage(e)}` +
         ' (will retry via offline-queue if status is terminal)',
@@ -276,6 +287,28 @@ export async function patchStatus(
 /** Testable fail-closed gate used immediately before invoking the printer. */
 export function shouldAbortBeforePrint(): boolean {
   return isUnauthorized()
+}
+
+type PrintCommand = typeof dispatchPrint
+
+type ExecuteTaskMonitorOverride = {
+  platform?: NodeJS.Platform
+  queryStatus?: (
+    printerName: string,
+    taskId: string,
+  ) => Promise<{ status: PrintJobMonitorStatus; rawStatus?: string }>
+  sleep?: (ms: number) => Promise<void>
+  queryCompletionEvent?: (
+    printerName: string,
+    taskId: string,
+    dispatchedAtMs: number,
+  ) => Promise<boolean>
+}
+
+/** 生产调用不传时走真实打印命令和本机队列监控。门禁通过这个参数注入桩。 */
+export interface ExecuteTaskDependencies {
+  printCommand?: PrintCommand
+  monitorDependencies?: ExecuteTaskMonitorOverride
 }
 
 // ── Task execution ────────────────────────────────────────────────────────────
@@ -293,6 +326,7 @@ export async function executeTask(
   task: ClaimTask,
   config: AgentConfig,
   db: AgentDatabase,
+  dependencies?: ExecuteTaskDependencies,
 ): Promise<void> {
   const { terminalId, agentToken, apiBaseUrl, printerName } = config
   if (!terminalId || !agentToken) {
@@ -308,18 +342,39 @@ export async function executeTask(
     return
   }
 
+  // 没收到 attempt 视为 0（老服务端）。后面省略 attempt 的本地读写都落在这一轮。
+  // 领取循环一次只执行一个任务，下一次 executeTask 会覆盖这个绑定。
+  //
+  // 只有 attempt 变大才重新下载、打印。同一 (任务号, attempt)：
+  // dispatching/spooled → 报 PRINT_JOB_UNCONFIRMED，不重打；
+  // completed → 重报 completed；failed → 重报 failed，本地有错误码就带回。
+  // attempt 由服务端按 failed→pending 的状态日志计数，一体机重试和管理员重试都会加。
+  // 重报时带上的 errorCode 以服务端规则为准：空则保留原值，非空则覆盖。
+  bindPrintAttempt(db, task.attempt)
+  const spoolAttempt = normalizePrintAttempt(task.attempt)
+  const print = dependencies?.printCommand ?? dispatchPrint
+
   // Define patch helper early so it's available in both Step 0 (spooled reconcile)
-  // and the main execution path below.
+  // and the main execution path below. 补报一律带上这一轮 attempt。
   let terminalOutcome: 'failed' | 'completed' | 'open' = 'open'
   const patch = (status: ReportableStatus, errorCode?: string, errorMessage?: string) => {
     if (status === 'failed' || status === 'completed') terminalOutcome = status
+    if (status === 'failed' && errorCode) rememberTaskErrorCode(db, task.taskId, errorCode)
     return patchStatus(
       task.taskId,
-      { status, ...(errorCode ? { errorCode } : {}), ...(errorMessage ? { errorMessage } : {}) },
+      {
+        status,
+        attempt: spoolAttempt,
+        ...(errorCode ? { errorCode } : {}),
+        ...(errorMessage ? { errorMessage } : {}),
+      },
       apiBaseUrl,
       agentToken,
       terminalId,
     )
+  }
+  const queue = (payload: PatchStatusPayload) => {
+    enqueuePatch(db, task.taskId, { ...payload, attempt: spoolAttempt })
   }
 
   // ── Step 0: Idempotency check ─────────────────────────────────────────────
@@ -338,21 +393,28 @@ export async function executeTask(
       )
       markTaskDone(db, task.taskId, 'failed')
       const ok = await patch('failed', 'PRINT_JOB_UNCONFIRMED', msg)
-      if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', errorMessage: msg })
+      if (!ok) queue( { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', errorMessage: msg })
     } else if (localStatus === 'completed') {
       log(`task ${task.taskId}: locally completed task was re-claimed; replaying terminal status`)
       const ok = await patch('completed')
-      if (!ok) enqueuePatch(db, task.taskId, { status: 'completed' })
+      if (!ok) queue( { status: 'completed' })
     } else if (localStatus === 'failed') {
       log(`task ${task.taskId}: locally failed task was re-claimed; replaying terminal status`)
-      const ok = await patch('failed')
-      if (!ok) enqueuePatch(db, task.taskId, { status: 'failed' })
+      // 本地有 errorCode 就带回，避免重报把「打印机缺纸」冲成笼统失败。没有则不带。
+      const localError = getTaskLocalErrorCode(db, task.taskId)
+      const ok = await patch('failed', localError)
+      if (!ok) {
+        queue( {
+          status: 'failed',
+          ...(localError ? { errorCode: localError } : {}),
+        })
+      }
     } else {
       const msg = `本地打印任务状态异常（${localStatus ?? 'unknown'}），为避免重复出纸已停止自动重试，请工作人员核查`
       warn(`task ${task.taskId}: unknown local state; refusing automatic print and reporting failed`)
       markTaskDone(db, task.taskId, 'failed')
       const ok = await patch('failed', 'LOCAL_TASK_STATE_UNKNOWN', msg)
-      if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'LOCAL_TASK_STATE_UNKNOWN', errorMessage: msg })
+      if (!ok) queue( { status: 'failed', errorCode: 'LOCAL_TASK_STATE_UNKNOWN', errorMessage: msg })
     }
     await settlePrinterAfterTerminal({
       outcome: terminalOutcome,
@@ -364,7 +426,8 @@ export async function executeTask(
   }
 
   const ext = inferTaskExt(task)
-  const tempFilePath = path.join(getTempDir(), `task_${task.taskId}${ext}`)
+  const correlationId = printSpoolStem(task.taskId, spoolAttempt)
+  const tempFilePath = path.join(getTempDir(), printTempFileName(task.taskId, spoolAttempt, ext))
   // 只有 resume 成功才在终态再暂停。恢复失败时队列仍是暂停的，并合上 queue_pause_failed，下一轮不再领单。
   let releaseQueueAfterTerminalState = false
 
@@ -387,7 +450,7 @@ export async function executeTask(
       err(`task ${task.taskId}: download failed — ${e instanceof Error ? e.message : String(e)}`)
       markTaskDone(db, task.taskId, 'failed')
       const ok = await patch('failed', 'PRINT_COMMAND_FAILED', `Download failed: ${e instanceof Error ? e.message : String(e)}`)
-      if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED', errorMessage: `Download failed` })
+      if (!ok) queue( { status: 'failed', errorCode: 'PRINT_COMMAND_FAILED', errorMessage: `Download failed` })
       return
     }
     log(`task ${task.taskId}: downloaded (${(fs.statSync(tempFilePath).size / 1024).toFixed(1)} KB)`)
@@ -403,7 +466,7 @@ export async function executeTask(
           'DOWNLOAD_HASH_MISMATCH',
           `文件校验失败（SHA-256 不一致）：expected=${task.fileMd5}, got=${actual}`,
         )
-        if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'DOWNLOAD_HASH_MISMATCH' })
+        if (!ok) queue( { status: 'failed', errorCode: 'DOWNLOAD_HASH_MISMATCH' })
         return
       }
       log(`task ${task.taskId}: 文件哈希校验通过 (SHA-256) ✓`)
@@ -422,7 +485,7 @@ export async function executeTask(
       markTaskDone(db, task.taskId, 'failed')
       const ok = await patch('failed', preflightErr.errorCode, preflightErr.errorMessage)
       if (!ok) {
-        enqueuePatch(db, task.taskId, {
+        queue( {
           status: 'failed',
           errorCode: preflightErr.errorCode,
           errorMessage: preflightErr.errorMessage,
@@ -462,7 +525,7 @@ export async function executeTask(
       const ok = await patch('failed', 'LOCAL_TASK_STATE_PERSIST_FAILED', msg)
       if (!ok) {
         try {
-          enqueuePatch(db, task.taskId, {
+          queue( {
             status: 'failed',
             errorCode: 'LOCAL_TASK_STATE_PERSIST_FAILED',
             errorMessage: msg,
@@ -501,7 +564,7 @@ export async function executeTask(
       tempFilePath,
       resolvedPrinter,
       task.params as Partial<PrintJobParams>,
-      { correlationId: task.taskId },
+      { correlationId },
     )
 
     // ── Step 5+6: Record outcome + PATCH terminal status ──────────────────
@@ -546,7 +609,11 @@ export async function executeTask(
         task.taskId,
         monitorTimeoutMs,
         1_500,
-        { dispatchedAtMs: Date.parse(result.startedAt) },
+        {
+          ...(dependencies?.monitorDependencies ?? {}),
+          dispatchedAtMs: Date.parse(result.startedAt),
+          attempt: spoolAttempt,
+        },
       )
 
       // Log monitor warn regardless of failed/completed (covers Retained timeout detail).
@@ -566,7 +633,7 @@ export async function executeTask(
         }
         const ok = await patch('failed', monitorOutcome.errorCode, monitorOutcome.errorMessage)
         if (!ok) {
-          enqueuePatch(db, task.taskId, {
+          queue( {
             status: 'failed',
             errorCode: monitorOutcome.errorCode,
             errorMessage: monitorOutcome.errorMessage,
@@ -583,7 +650,7 @@ export async function executeTask(
         }
         const ok = await patch('completed')
         if (!ok) {
-          enqueuePatch(db, task.taskId, { status: 'completed' })
+          queue( { status: 'completed' })
         }
       }
     } else {
@@ -605,7 +672,7 @@ export async function executeTask(
         result.errorMessage,
       )
       if (!ok) {
-        enqueuePatch(db, task.taskId, {
+        queue( {
           status: 'failed',
           errorCode: result.errorCode ?? 'PRINT_COMMAND_FAILED',
           errorMessage: result.errorMessage,

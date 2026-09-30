@@ -239,10 +239,10 @@ pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies
 
 确认词写错，或确认词对但事由缺失、不在 2–200 字：命令不连库，退出码 2。执行输出的「已下架」清单与第一步 dry-run 清单对不上（行数或 id 不同）时停下，先人工核对，不要重复执行。
 
-执行后在仓库根目录跑只读巡检，`GET /api/v1/companies（企业 · 含演示数据检查）` 一行应为 PASS「无演示标记」，或 INFO「total=0」；仍是 WARN 就把它列出的名字报给产品负责人，不要自行扩大判据重跑：
+执行后在仓库根目录跑只读巡检。发布后核对用 `--strict`，并且要在上面这次演示企业下架（#1115）完成之后再跑：下架前那几家仍在公开列表里，`--strict` 会因企业条数非 0、且带演示标记而 FAIL，退出码非 0。`--strict` 下岗位、招聘会、企业三条数只要不是 0 就 FAIL；五个公开列表里任一处出现演示标记也 FAIL（企业仍用宽正则，岗位、招聘会、政策、线下机构仍认全角「（演示）」）。通过时这三行都是 PASS（total=0，无演示标记）。仍是 FAIL 就把说明里的名字报给产品负责人，不要自行扩大判据重跑。不带 `--strict` 的日常巡检不变：条数 0 是 INFO，演示标记是 WARN。
 
 ```bash
-node scripts/prod-readonly-probe.mjs
+node scripts/prod-readonly-probe.mjs --strict
 ```
 
 当前生产故障恢复沿用已存在且已轮换口令的管理员账号，**不得**运行首个管理员 bootstrap。只有迁移完成且只读查询确认 `User=0` 的真正全新 PostgreSQL 库，才可在双人复核后运行：

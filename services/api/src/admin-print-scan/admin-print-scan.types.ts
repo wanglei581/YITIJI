@@ -33,6 +33,8 @@ export type AdminPrintScanTaskItem =
       colorMode: 'black_white' | 'color' | null
       paperSize: string | null
       printOutcome: 'printed' | 'not_printed' | null
+      /** null 表示可以重试；否则与拒绝时的人话相同。由共享资格函数算出。 */
+      retryBlockedReason: string | null
     })
   | (AdminPrintScanTaskBase & {
       type: 'scan'

@@ -67,7 +67,8 @@ const CAPS: { key: string; glyph: GlyphName; tone: string; name: string; dep: st
   { key: 'usb', glyph: 'usb', tone: 'wheat', name: 'U 盘读取', dep: '插盘后由这台机器读取；这条能力暂未开通' },
   { key: 'pay', glyph: 'gauge', tone: 'clay', name: '付款', dep: '没有单独的检测口，到收银台真付一次才知道' },
   { key: 'ai', glyph: 'spark', tone: 'plum', name: 'AI 服务', dep: '没有单独的检测口，用到哪个 AI 功能时当场确认' },
-  { key: 'jobs', glyph: 'briefcase', tone: 'slate', name: '岗位与招聘会信息', dep: '打开列表时分别确认；能连上不等于现在有内容' },
+  // 稿 09 规则 5（托管 a）：这一项叫「机构官方渠道」，不在我们云上做招聘入口。key 不改，判定仍是「随请求确认」。
+  { key: 'jobs', glyph: 'briefcase', tone: 'slate', name: '机构官方渠道', dep: '渠道页打得开打不开，打开时再确认；能连上不等于现在有内容' },
 ]
 
 type Verdict = [label: string, tone: Tone]
@@ -260,7 +261,7 @@ export default function ErrorOfflinePage() {
     checking: {
       glyph: 'radar', label: '正在检测本机状态',
       title: <>正在<em>检测</em></>,
-      copy: <>先检测<b>联网、这台机器的本机程序和打印机</b>这三项；扫描件存放、U 盘、付款、AI、岗位信息没有单独的检测口，照实写成未检测或随请求确认。</>,
+      copy: <>先检测<b>联网、这台机器的本机程序和打印机</b>这三项；扫描件存放、U 盘、付款、AI、机构官方渠道没有单独的检测口，照实写成未检测或随请求确认。</>,
       note: <>检测<b>不会打断</b>你已经创建的打印任务</>,
     },
     partial: {

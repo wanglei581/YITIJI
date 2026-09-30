@@ -90,6 +90,8 @@ export type AdminPrintScanTaskItem =
       colorMode: 'black_white' | 'color' | null
       paperSize: string | null
       printOutcome: 'printed' | 'not_printed' | null
+      /** 服务端计算。null 可以重试；字符串是不能重试的原因。缺省表示旧后端，页面不自行推断。 */
+      retryBlockedReason?: string | null
     })
   | (AdminPrintScanTaskBase & { type: 'scan'; scanType: string; hasResultFile: boolean })
   | (AdminPrintScanTaskBase & { type: 'document_process'; kind: string; hasResultFile: boolean })
@@ -286,7 +288,7 @@ const mockAdapter: AdminPrintScanServiceInterface = {
     if (item.status !== 'failed') throw new ApiHttpError('PRINT_SCAN_ACTION_INVALID_STATE', '仅失败状态的打印任务可以重试', 409)
     if (item.errorCode === 'PRINT_JOB_UNCONFIRMED') {
       throw new ApiHttpError(
-        'PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN',
+        'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
         '打印结果未确认，禁止重新排队；请前往订单管理核查并按需退款',
         409,
       )

@@ -222,7 +222,7 @@ export function MyFeedbackPage() {
       >
         <div className="qx-scroll qx-grow fb-page">
           <section className="fb-xq">
-            <div className="fb-xq-eyebrow">MY FEEDBACK</div>
+            <div className="fb-xq-eyebrow">意见反馈</div>
             <h2 className="fb-xq-ask">设备和服务哪里不顺，<em>直接告诉我们</em>。</h2>
             <p className="fb-xq-doing">登录后提交的是<b>本人工单</b>，可以查看进度、追加描述和关闭。</p>
           </section>

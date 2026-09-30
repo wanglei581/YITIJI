@@ -374,6 +374,10 @@ const PACKAGE_ERROR_COPY = {
   // 前的人的；用户此刻在手机上，"本机"会被读成他的手机。该码不在 user-error.js 的
   // PASSTHROUGH 白名单里，request.js 会把 message 清空，于是这里这句中文真正生效。
   PRINTER_UNAVAILABLE: { title: '该服务点打印机暂时出不了纸', text: '这台一体机的打印机当前离线、缺纸或故障，服务端不会受理材料包。缺纸或卡纸现场工作人员处理后，回到这一页重新核价就能继续；也可以换一个服务点。', recover: 'retry' },
+  // 终端的打印队列闸门合上、Agent 已停领（#1150）。和上一条不是一回事：这不是缺纸卡纸，
+  // 现场处理不了、重新核价也不会过，用户能做的是换一个服务点。服务端原话不带「本机」，
+  // 已进 PASSTHROUGH，text 优先用它；这里的 text 只在服务端没给原话时兜底。
+  PRINT_TERMINAL_QUEUE_HALTED: { title: '这台终端暂停接打印单', text: '这台终端暂时不接打印单，服务端不会受理材料包。请换一个服务点，或稍后再试。', recover: 'store' },
   PRICE_CONFIG_UNAVAILABLE: { title: '打印价目未配置', text: '服务端还没有配置打印价目，无法核定金额，因此不能下单。这需要运营方在后台配置，请稍后再试。', recover: 'none' },
   PRINT_PII_SCAN_REQUIRED: { title: '请先完成隐私检查', text: '材料包里有文件还没做完打印隐私检查。回到上一步逐个完成后再下单。', recover: 'privacy' },
   PII_SCAN_STALE: { title: '文件在检查后又变了', text: '有文件在隐私检查之后被改动过，需要重新检查一次。', recover: 'privacy' },
