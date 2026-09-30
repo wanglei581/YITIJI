@@ -192,6 +192,14 @@ async function main(): Promise<void> {
   }
   pass('unsigned or mismatched terminal ids fall back to the IP pool (no per-terminal pool)')
 
+  // 会话令牌验签通过、只是查机构时数据库抖动：终端仍算已验签，不把整厅终端挤进同一个出口 IP 池。
+  const dbBlip = makeController()
+  ;(dbBlip.controller as unknown as { prisma: { terminal: { findUnique: () => Promise<never> } } }).prisma.terminal.findUnique = async () => { throw new Error('db blip') }
+  await dbBlip.controller.submitResumeParse(dto, request({ ...headers, 'x-terminal-id': 'terminal-1', 'x-terminal-session-token': 'terminal-1-session' }))
+  const dbBlipArgs = dbBlip.runnerArgs[0] as [typeof dto, string | null, AiPublicQuotaContext, string, string]
+  assert.deepEqual(dbBlipArgs[2], { member: null, terminal: 'terminal-1', ip: '203.0.113.8' })
+  pass('a verified terminal stays in its own pool when the org lookup fails')
+
   for (const bad of [
     { 'x-resume-parse-intent': intent },
     { 'x-resume-parse-proof': proof },

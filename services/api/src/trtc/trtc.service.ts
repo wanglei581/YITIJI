@@ -88,6 +88,11 @@ export interface StartSessionResult {
   expiresAt: string
 }
 
+/** UserSig 只在进房时校验：保持原来的 5 分钟短 TTL，上限配得更短时再跟着收紧（上限 + 30 秒）。 */
+function trtcUserSigTtlSeconds(): number {
+  return Math.min(300, readTrtcMaxSessionSeconds() + 30)
+}
+
 @Injectable()
 export class TrtcService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TrtcService.name)
@@ -165,7 +170,7 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
     if (!sdkAppId || !secretKey) {
       throw new InternalServerErrorException('TRTC 应用凭证未配置')
     }
-    return { sdkAppId, userId, userSig: genUserSig(sdkAppId, secretKey, userId) }
+    return { sdkAppId, userId, userSig: genUserSig(sdkAppId, secretKey, userId, trtcUserSigTtlSeconds()) }
   }
 
   private buildTtsConfig(secretId: string, cloudKey: string): string {
@@ -215,8 +220,8 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
     const maxSessionSeconds = readTrtcMaxSessionSeconds()
     const roomId       = `kiosk_${sessionId}`
     const botUserId    = `ai_bot_${sessionId}`
-    const userSig      = genUserSig(sdkAppId, secretKey, userId)
-    const botUserSig   = genUserSig(sdkAppId, secretKey, botUserId)
+    const userSig      = genUserSig(sdkAppId, secretKey, userId, trtcUserSigTtlSeconds())
+    const botUserSig   = genUserSig(sdkAppId, secretKey, botUserId, trtcUserSigTtlSeconds())
 
     // ── LLM 配置 ─────────────────────────────────────────────
     const llmApiKey = process.env['TRTC_LLM_API_KEY']
