@@ -185,6 +185,24 @@ const RESUME_FIXTURES: ResumeFixture[] = [
       projects: [], skills: [], certificates: [],
     },
   },
+  {
+    // 模型回了一个原文里没有的姓名：不能照抄，改用原文开头识别出的姓名。
+    id: 'C-fake-name',
+    text: '赵明远\n青岛智造有限公司                 2020.09 - 2024.06\n海岳物流有限公司                 2024.07—至今\n工作经历\n负责仓储系统维护和收货安排。',
+    expectedName: '赵明远',
+    expectedModuleLines: ['青岛智造有限公司                 2020.09 - 2024.06'],
+    rawModuleBeforeLines: ['青岛智造有限公司'],
+    output: {
+      basic: { name: '李卫国' },
+      intention: { position: '仓储管理', city: '' },
+      summary: '有两段仓储相关工作经历。',
+      education: [],
+      experience: [
+        { company: '青岛智造有限公司', role: '仓储管理', period: '2020.09 - 2024.06', description: '负责仓储系统维护和收货安排。' },
+      ],
+      projects: [], skills: [], certificates: [],
+    },
+  },
 ]
 
 function fixtureReply(fixture: ResumeFixture): StubEntry {
