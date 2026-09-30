@@ -327,7 +327,7 @@
 - 改完必跑：API 类型检查与 lint，`verify:resume-extraction`、`verify:resume-report-export`、`verify:document-conversion`、`verify:file-display-truth`、`verify:materials-processing`、`verify:pii-redaction`、`verify:print-sign`、`verify:contract-review:units`，再补一个用真实 unpdf 的合同 PDF 冒烟；锁文件变了跑根目录 `verify:dependency-security`。
 ## 2026-09-29：小程序余项（小程序窗口）
 
-- **提审前产品负责人在公众平台做的事**（清单已交总指挥）：用户隐私保护指引按 `apps/miniapp/scripts/privacy-api-inventory.json` 五类填；类目工具 > 办公；备案（0.11）；后台「法务文档」发布四份文档（先发布再部署，C4）；request / uploadFile / downloadFile 合法域名。
+- **提审前产品负责人在公众平台做的事**（清单已交总指挥）：用户隐私保护指引按 `apps/miniapp/scripts/privacy-api-inventory.json` 五类填；类目工具 > 办公；备案（0.11）；后台「法务文档」发布四份文档（先发布再部署，C4）；request / uploadFile / downloadFile 合法域名；**发布前确认生产价目两行都是 0**（`GET /api/v1/print/price-config` 里 `print_bw_page`、`print_color_page` 的 `unitCents` 都为 0。不为 0 时打印链路会照常显示金额，违反 9/30「首版不出现任何价格或购买引导」；代码不硬拦，留给以后正式收费）。
 - **交主执行窗口：** 一体机「我的打印订单」补读 `/me/print-orders/cloud` 与 `/orders/package`（手机上下的单在一体机上看不到，见 current-progress 同日条目）。
 - **交后端窗口（已转）：** 全局异常过滤器丢掉 `AI_DECLARATION_REQUIRED` 的 `missing`，建议放进 `details`；小程序两处都读，已兼容。
 - **待真机与实跑：** 对照工具 `apps/miniapp/tools/cross-end-member-parity.mjs` 连本地全栈或试点测试会员跑一次；分享图与作废重发、年龄与录音声明在两台真机各走一遍（4.3）。

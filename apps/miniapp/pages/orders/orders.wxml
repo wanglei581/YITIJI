@@ -82,7 +82,7 @@
               <text class="pm-v">{{item.orderNo}}</text>
             </view>
             <view class="pm-row">
-              <text class="pm-k">金额</text>
+              <text class="pm-k">{{item.amountCents > 0 ? '金额' : '本次打印'}}</text>
               <text class="pm-v">{{item.amountText}}</text>
             </view>
             <view class="pm-row" wx:if="{{item.expiresText}}">

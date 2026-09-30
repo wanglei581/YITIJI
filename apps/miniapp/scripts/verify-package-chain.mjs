@@ -321,7 +321,7 @@ console.log('\n⑥ 六态齐全：loading / empty / error / 未登录 / 分页 /
     ['orders.wxml', ordersWxml, ['正在加载材料包订单', 'pkgState === \'error\'', '还没有材料包订单', '请先登录小程序', 'pkgLoadingMore']],
     ['package-create.wxml', createWxml, ['正在读取我的文件', 'docState === \'error\'', '还没有可放进材料包的文件', '请先登录小程序', 'docLoadingMore']],
     ['store-select.wxml', storeWxml, ['正在读取服务点', 'state === \'error\'', '本机尚未接入可用服务点', '没有可下单的材料包']],
-    ['package-confirm.wxml', confirmWxml, ['正在向服务端核定页数与金额', 'quoteState === \'error\'', '没有可确认的材料包', '请先登录小程序']],
+    ['package-confirm.wxml', confirmWxml, ['正在向服务端核定页数','quoteState === \'error\'', '没有可确认的材料包', '请先登录小程序']],
     ['package-code.wxml', codeWxml, ['正在向服务端核对订单', 'loadErrorTitle', '没有可用的到机码']],
   ]
   for (const [name, src, needles] of sixStates) {
