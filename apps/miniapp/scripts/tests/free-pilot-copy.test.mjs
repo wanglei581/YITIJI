@@ -190,6 +190,18 @@ test('判据自检：guard 真分支放行，假分支、正文、换了条件�
   assert.equal(insidePaidBranch(e4, e4.indexOf("'—'"), g), false)
 })
 
+test('打印参数页：没选文件时底栏只剩「请先选择文件」按钮', () => {
+  const src = read('pages/print-upload/print-upload.wxml')
+  const bar = src.slice(src.indexOf('<view class="actionbar">'))
+  const label = bar.match(/class="ab-label">\{\{([\s\S]*?)\}\}</)[1]
+  const dashIf = bar.match(/wx:(?:if|elif)="\{\{([^}]*)\}\}" class="ab-amt pending"/)[1]
+  const run = (expr, data) => new Function(...Object.keys(data), `return (${expr})`)(...Object.values(data))
+  const idle = { priceStatus: 'idle', amountCents: null, hasFile: false }
+  assert.equal(run(label, idle), '')
+  assert.equal(Boolean(run(dashIf, idle)), false)
+  assert.match(bar, /\{\{!hasFile \? '请先选择文件'/)
+})
+
 test('材料包状态：0 元订单各状态都不提付款，大于 0 的原样说付款', () => {
   const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
   const pkg = requireMiniapp('../utils/package-order.js')

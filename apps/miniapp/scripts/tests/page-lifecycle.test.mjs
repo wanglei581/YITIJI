@@ -344,6 +344,20 @@ test('package-code：请求在途时 onHide，迟到的响应不得把到机码�
   assert.ok(!JSON.stringify(page.data).includes('87654321'))
 })
 
+test('package-code：只有服务端给出大于 0 的金额才说付款（试点免费不提钱）', async () => {
+  for (const [amountCents, paid] of [[200, true], [0, false], [undefined, false]]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const api = { getPackageOrder: () => Promise.resolve({ ...A_PACKAGE, amountCents }) }
+    const page = makePage('pages/package-code/package-code.js', { auth, api, wx })
+    page.onLoad({ orderId: 'pkg-A' })
+    page.onShow()
+    await flush()
+    assert.equal(page.data.ready, true)
+    assert.equal(page.data.paidOrder, paid, `amountCents=${amountCents}`)
+  }
+})
+
 test('package-code：请求在途时 onUnload，迟到的响应同样不得复活凭证', async () => {
   const auth = createAuth('A')
   const wx = createWx()
