@@ -951,9 +951,10 @@ else bad('打印报价竞态保护', '递增请求序号和 loading 状态必须
 
 if (
   printUploadJs.includes('amountCents=${encodeURIComponent(amountCents)}') &&
-  printUploadWxml.includes("amountCents === 0 ? '免费试运营' : '精确报价'") &&
+  // 2026-09-30：价目为 0 时不出现钱的字眼，付费分支改挂在「已报出大于 0 的金额」下（free-pilot-copy.test.mjs）
+  printUploadWxml.includes("amountCents > 0 ? '精确报价' : (priceStatus === 'ready' ? '免费试运营'") &&
   printStoreJs.includes('isFreeOrder: hasAmount && amountCents === 0') &&
-  printStoreWxml.includes("isFreeOrder ? '现场打印' : '机端支付'") &&
+  printStoreWxml.includes("q.total && !isFreeOrder ? '机端支付' : (isFreeOrder ? '现场打印'") &&
   // 2026-09-15（第二轮）：支付页的免费判定同样改为**只**来自服务端。
   // 此前这里要求 print-store 把 amountCents 透传进 print-pay 的 URL，而它与文件名
   // 走的是同一条 URL —— 求职材料的文件名里常写着本人姓名，金额是本人订单状态，

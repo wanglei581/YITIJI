@@ -90,7 +90,7 @@ Page({
       })
       .catch(() => {
         // 单价展示失败不冒充正式价格；精确报价仍独立走 /orders/quote。
-        this.setData({ priceLabels: { bw: '以服务端报价为准', color: '暂未开放' } })
+        this.setData({ priceLabels: { bw: '以核定结果为准', color: '暂未开放' } })
       })
   },
 
@@ -123,7 +123,7 @@ Page({
           const amountCents = Number(quote && quote.amountCents)
           const billablePages = Number(quote && quote.billablePages)
           if (!Number.isSafeInteger(amountCents) || amountCents < 0 || !Number.isSafeInteger(billablePages) || billablePages < 1) {
-            throw new Error('服务端报价缺少有效页数或金额')
+            throw new Error('服务端核定结果不完整，请重试')
           }
           this.setData({
             priceStatus: 'ready',
@@ -139,7 +139,7 @@ Page({
           if (seq !== this._quoteSeq) return
           this.setData({
             priceStatus: 'unavailable',
-            priceError: (err && err.message) || '服务端暂时无法核定页数和金额',
+            priceError: (err && err.message) || '服务端暂时无法核定页数',
             total: '—',
             amountCents: null,
             hasPageCount: false,
@@ -158,7 +158,7 @@ Page({
     if (e.currentTarget.dataset.v !== 'bw') {
       wx.showModal({
         title: '彩色打印暂不可选',
-        content: '门店一体机硬件支持彩色，但驱动侧的彩色参数尚未完成 Windows 真机出纸验收。在验收通过前放开，可能出现按彩色计价、实际却出黑白的情况，所以本期只开放黑白。',
+        content: '门店一体机硬件支持彩色，但驱动侧的彩色参数尚未完成 Windows 真机出纸验收。在验收通过前放开，可能出现选了彩色、实际却出黑白的情况，所以本期只开放黑白。',
         showCancel: false,
         confirmText: '知道了',
       })
@@ -171,7 +171,7 @@ Page({
     if (e.currentTarget.dataset.v !== 'single') {
       wx.showModal({
         title: '双面打印暂不可选',
-        content: '一体机支持自动双面，但双面参数要经打印驱动 DEVMODE 下发，尚未完成真机验收。在验收通过前放开，可能出现按双面计费却打成单面的情况，所以本期只开放单面。',
+        content: '一体机支持自动双面，但双面参数要经打印驱动 DEVMODE 下发，尚未完成真机验收。在验收通过前放开，可能出现选了双面却打成单面的情况，所以本期只开放单面。',
         showCancel: false,
         confirmText: '知道了',
       })
@@ -208,7 +208,7 @@ Page({
     }
     if (this.data.priceStatus !== 'ready' || !this.data.hasPageCount) {
       wx.showToast({
-        title: this.data.priceStatus === 'loading' ? '服务端正在核定页数和金额' : '报价暂不可用，请稍后重试',
+        title: this.data.priceStatus === 'loading' ? '服务端正在核定页数' : '页数暂时无法核定，请稍后重试',
         icon: 'none',
       })
       return false
