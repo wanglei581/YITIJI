@@ -19,7 +19,8 @@ test.describe('AI 服务 / 配置（mock 口径）', () => {
     expect(await taskId.evaluate((input: HTMLInputElement) => input.selectionEnd! - input.selectionStart!)).toBe((await taskId.inputValue()).length)
     const quality = page.getByRole('region', { name: '岗位来源质量' })
     await expect(quality.getByText('部分缺失 / 信息不足', { exact: true })).toBeVisible()
-    await expect(logs.locator('tbody').getByText('简历解析', { exact: true }).first()).toBeVisible()
+    // 服务类型单元格里还包着可展开的「任务编号」，按单元格的可访问名称找，不按整段文字精确匹配。
+    await expect(logs.locator('tbody').getByRole('cell', { name: '简历解析', exact: true }).first()).toBeVisible()
   })
 
   test('AI 用量与额度：mock 模式显示诚实空态，不出现金额或次数', async ({ page }) => {
