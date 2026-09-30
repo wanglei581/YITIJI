@@ -18,6 +18,7 @@ import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { FilesService } from '../files/files.service'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
+import { formatBeijingDate } from '../common/beijing-display-time'
 import { resumeExportStagingExpiresAt } from '../benefit-redemption/resume-export-gate.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AiService, type AiResultRequester } from './ai.service'
@@ -26,6 +27,11 @@ import {
   DiagnosisReportPdfService,
   type ResumeReportExportKind,
 } from './resume/diagnosis-report-pdf.service'
+
+/** 导出文件名里的日期。没有姓名时用北京时间自然日，避免跨日仍写 UTC 的前一天。 */
+export function resumeReportFilenameDate(generatedAt: Date): string {
+  return formatBeijingDate(generatedAt).replace(/-/g, '')
+}
 
 interface ReqLike {
   headers: Record<string, string | string[] | undefined>
@@ -196,11 +202,7 @@ export class ResumeReportExportController {
   private filename(kind: ResumeReportExportKind, optimize: OptimizeResumeOutput | null, generatedAt: Date): string {
     const rawName = optimize?.optimizedResume?.basic.name
     const safeName = rawName?.replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20)
-    const parts = new Intl.DateTimeFormat('zh-CN', {
-      timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).formatToParts(generatedAt)
-    const datePart = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
-    const suffix = safeName || `${datePart('year')}${datePart('month')}${datePart('day')}`
+    const suffix = safeName || resumeReportFilenameDate(generatedAt)
     return `${kind === 'diagnosis_report' ? 'AI诊断报告' : '修改清单'}_${suffix}.pdf`
   }
 

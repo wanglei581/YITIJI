@@ -624,6 +624,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
+          # 给人看的时间按北京时间（W-78）。不连库。
+          pnpm --filter @ai-job-print/api verify:beijing-display-time
           pnpm --filter @ai-job-print/api verify:console-screen-snapshot
           # 服务调用 / 信息使用：会 import src，必须在 Prisma client 生成之后。
           pnpm --filter @ai-job-print/api verify:console-screen-usage

@@ -20,6 +20,7 @@
 
 import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
+import { formatBeijingMinute } from '../common/beijing-display-time'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import { FilesService } from '../files/files.service'
 import { PrismaService } from '../prisma/prisma.service'
@@ -340,7 +341,7 @@ export class FairCompanyPrintService {
     doc.moveDown(0.8)
     doc.moveTo(MARGIN, doc.y).lineTo(PAGE.width - MARGIN, doc.y).strokeColor(LINE).lineWidth(0.6).stroke()
     doc.moveDown(0.5)
-    doc.fillColor(MUTED).fontSize(9).text(`打印时间：${formatDateTime(new Date())}`, MARGIN, doc.y, { width: CONTENT_W })
+    doc.fillColor(MUTED).fontSize(9).text(`打印时间：${formatFairCompanyPrintTime(new Date())}`, MARGIN, doc.y, { width: CONTENT_W })
     if (company.sourceUrl) {
       doc.fillColor(MUTED).fontSize(9).text(`来源链接：${company.sourceUrl}`, MARGIN, doc.y, { width: CONTENT_W })
     }
@@ -409,7 +410,7 @@ function safePdfFilename(name: string): string {
   return `${trimmed || '企业资料'}.pdf`
 }
 
-function formatDateTime(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+/** 企业资料页脚的打印时间。按北京时间写，不跟服务器所在时区走。 */
+export function formatFairCompanyPrintTime(date: Date): string {
+  return formatBeijingMinute(date)
 }

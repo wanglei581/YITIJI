@@ -7,7 +7,13 @@ import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { FairVisitPlanPdfService } from './fair-visit-plan-pdf.service'
 import { LlmFairVisitPlanService, type FairVisitPlanContext, type FairVisitPlanMode, type FairVisitPlanPayload } from './llm-fair-visit-plan.service'
+import { formatBeijingDate } from '../../common/beijing-display-time'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
+
+/** 参会准备单印在纸上的日期。 */
+export function fairVisitPlanReportDate(updatedAt: Date): string {
+  return formatBeijingDate(updatedAt)
+}
 
 const RESULT_TTL_HOURS = (() => {
   const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
@@ -163,7 +169,7 @@ export class FairVisitPlanService {
     this.assertModeStillValid(stored)
     const { buffer, pageCount } = await this.pdf.render(
       {
-        date: new Date(row.updatedAt).toISOString().slice(0, 10),
+        date: fairVisitPlanReportDate(row.updatedAt),
         fairName: stored.fair.title,
         sourceName: stored.fair.sourceName,
         venue: stored.fair.venue,
