@@ -12052,7 +12052,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 193,
+      "reachableFileCount": 202,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12807,7 +12807,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 220
+      "sourceFileCount": 227
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17917,6 +17917,9 @@
       "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
+    "apps/admin/src/lib/printErrorText.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/main.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -18067,14 +18070,42 @@
     "apps/admin/src/routes/offline-agencies/JobsDrawer.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/admin/src/routes/orders/OrderAftercare.tsx": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
+    ],
+    "apps/admin/src/routes/orders/OrderDetailDrawer.tsx": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
+    ],
+    "apps/admin/src/routes/orders/OrderPaymentActions.tsx": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
+    ],
     "apps/admin/src/routes/orders/index.tsx": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
+    "apps/admin/src/routes/orders/orderColumns.tsx": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/orders/orderDisplay.ts": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/routes/orders/orderHonestyCopy.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/orders/useOrderDetail.ts": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
     ],
     "apps/admin/src/routes/partners/OrgContentTrustPanel.tsx": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
@@ -19566,7 +19597,6 @@
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs"
     ],
     "apps/kiosk/src/pages/print/printProgressModel.ts": [
-      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/kiosk/scripts/verify-print-done-truth.mjs"
     ],
     "apps/kiosk/src/pages/print/printUsageEstimate.ts": [
@@ -22728,6 +22758,7 @@
       "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts"
@@ -26367,16 +26398,6 @@
   "gateContradictions": [
     {
       "forbiddenBy": [
-        "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs"
-      ],
-      "requiredBy": [
-        "scripts/verify-no-raw-error-render.mjs",
-        "services/api/scripts/verify-api20-manual-refund.ts"
-      ],
-      "target": "apps/admin/src/routes/orders/useOrderDetail.ts"
-    },
-    {
-      "forbiddenBy": [
         "apps/kiosk/scripts/verify-fusion-w3.mjs",
         "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
       ],
@@ -26670,25 +26691,23 @@
     },
     {
       "asserts": {
-        "absent": [
-          "apps/admin/src/routes/orders/useOrderDetail.ts"
-        ],
+        "absent": [],
         "dirs": [
           "apps"
         ],
         "files": [
-          "apps/admin/src/routes/orders/index.tsx",
-          "apps/admin/src/routes/orders/orderHonestyCopy.ts",
-          "apps/admin/src/services/api/adminOrdersReadonly.ts",
-          "apps/admin/src/services/api/adminPrintJobs.ts"
-        ],
-        "missing": [
           "apps/admin/src/routes/orders/OrderAftercare.tsx",
           "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
           "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
+          "apps/admin/src/routes/orders/index.tsx",
           "apps/admin/src/routes/orders/orderColumns.tsx",
-          "apps/admin/src/routes/orders/orderDisplay.ts"
-        ]
+          "apps/admin/src/routes/orders/orderDisplay.ts",
+          "apps/admin/src/routes/orders/orderHonestyCopy.ts",
+          "apps/admin/src/routes/orders/useOrderDetail.ts",
+          "apps/admin/src/services/api/adminOrdersReadonly.ts",
+          "apps/admin/src/services/api/adminPrintJobs.ts"
+        ],
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
       "helper": false,
@@ -26892,21 +26911,20 @@
         ],
         "files": [
           "apps/admin/src/lib/auditActionLabels.ts",
+          "apps/admin/src/lib/printErrorText.ts",
           "apps/admin/src/routes/billing/index.tsx",
           "apps/admin/src/routes/files/FileTable.tsx",
           "apps/admin/src/routes/files/fileMeta.ts",
           "apps/admin/src/routes/files/retentionMeta.ts",
+          "apps/admin/src/routes/orders/orderColumns.tsx",
+          "apps/admin/src/routes/orders/orderDisplay.ts",
           "apps/admin/src/routes/orders/orderHonestyCopy.ts",
           "apps/admin/src/routes/print-scan/index.tsx",
-          "apps/kiosk/src/pages/print/printProgressModel.ts",
           "packages/shared/src/formatNumber.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/audit/audit.types.ts"
         ],
-        "missing": [
-          "apps/admin/src/lib/printErrorText.ts",
-          "apps/admin/src/routes/orders/orderColumns.tsx",
-          "apps/admin/src/routes/orders/orderDisplay.ts"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-console-plain-copy.mjs",
       "helper": false,
@@ -32218,7 +32236,11 @@
           "apps/admin/src/routes/job-sources/index.tsx",
           "apps/admin/src/routes/login/index.tsx",
           "apps/admin/src/routes/offline-agencies/JobsDrawer.tsx",
+          "apps/admin/src/routes/orders/OrderAftercare.tsx",
+          "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
+          "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
           "apps/admin/src/routes/orders/index.tsx",
+          "apps/admin/src/routes/orders/useOrderDetail.ts",
           "apps/admin/src/routes/partners/index.tsx",
           "apps/admin/src/routes/policy-sources/index.tsx",
           "apps/admin/src/routes/screensaver/index.tsx",
@@ -32256,12 +32278,7 @@
           "apps/kiosk/src/services/print/printJobsApi.ts",
           "apps/partner/src/routes/sources/index.tsx"
         ],
-        "missing": [
-          "apps/admin/src/routes/orders/OrderAftercare.tsx",
-          "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
-          "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
-          "apps/admin/src/routes/orders/useOrderDetail.ts"
-        ]
+        "missing": []
       },
       "file": "scripts/verify-no-raw-error-render.mjs",
       "helper": false,
@@ -33873,7 +33890,11 @@
           "services"
         ],
         "files": [
+          "apps/admin/src/routes/orders/OrderAftercare.tsx",
+          "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
+          "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
           "apps/admin/src/routes/orders/index.tsx",
+          "apps/admin/src/routes/orders/useOrderDetail.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/payment/admin-order-actions.controller.ts",
@@ -33885,12 +33906,7 @@
           "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
-        "missing": [
-          "apps/admin/src/routes/orders/OrderAftercare.tsx",
-          "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
-          "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
-          "apps/admin/src/routes/orders/useOrderDetail.ts"
-        ]
+        "missing": []
       },
       "file": "services/api/scripts/verify-api20-manual-refund.ts",
       "helper": false,
@@ -41342,18 +41358,6 @@
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/admin/src/routes/orders/orderHonestyCopy.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-          "apps/admin/scripts/verify-console-plain-copy.mjs"
-        ],
-        "risk": "high",
-        "scope": "admin",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-orders-readonly-ui.mjs、apps/admin/scripts/verify-console-plain-copy.mjs"
-      },
-      {
-        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
         "kind": "test",
         "mentions": [
@@ -41402,17 +41406,6 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
-      },
-      {
-        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/admin/src/services/api/adminPrintJobs.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs"
-        ],
-        "risk": "high",
-        "scope": "admin",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-orders-readonly-ui.mjs"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
