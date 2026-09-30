@@ -6,6 +6,12 @@
 - **修法（协调方实现）：** `derived-alerts.ts` 按错误码给中文原因（缺纸、打印机离线、出纸未确认、只打出了一部分等 11 个），标题为「打印任务失败：缺纸」，未登记的码只写「打印任务失败」；错误码挪到明细末尾「· 错误码 PAPER_EMPTY」，排障仍能照码检索。`llm-config.service.ts` 15 条功能说明全部改写成中文白话，意思不变（沿用关系、系统提示词由服务端固定、打印参数预填不调用大模型、本项停用会连带哪些功能）。不改接口字段、不改前端。
 - **验证：** verify:admin-ops 新增标题与明细断言；verify:ai-feature-keys 新增「说明不含文件名、Markdown 与内部术语」断言。反向变异四处全红（标题带回错误码、明细丢错误码、说明带回文件名、带回加粗）。按图谱与全文搜索跑 16 条关联门禁与 api / admin typecheck 全绿；llm-connectivity 是真连厂商的只读探针，不在 CI，本机功能位未启用报 FEATURE_DISABLED，与本改动无关。
 - **留给两后台窗口：** 前端 `apps/admin/src/routes/ai-config/index.tsx:205` 还有一句「已接入功能会被运行链路消费；planned 功能可先保存配置…」，属于前端文案，本分支没动。
+## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
+
+- 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
+- 改法：`pnpm-workspace.yaml` 三条 brace-expansion 覆盖从 1.1.18 / 2.1.4 / 5.0.9 上调到修复版 1.1.20 / 2.1.6 / 5.0.11，`scripts/verify-dependency-security.mjs` 的期望常量同步，锁文件只变 brace-expansion 三个版本。没有新增豁免。
+- 验证：干净安装后 `verify:dependency-security` ALL PASS（full / prod 高危与严重均为 0），repository-integrity、ci-gate-coverage、kiosk `tsc -b` 通过。
+
 ## 2026-09-30：带文字层的 PDF 简历按行保留结构（走查 W-95；分支 `claude/backend-hardening-20260929-w95-pdf-lines`）
 
 - **问题：** resume-extraction.service.ts 用 unpdf 的 `mergePages`，把全部换行压成空格，Word 导出的 PDF 简历（应届生最常见的格式）被读成一整块，段落、条目、时间线都分不出来，诊断质量受损。

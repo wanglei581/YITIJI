@@ -366,7 +366,7 @@ assert.equal(
 assert.match(workspace, /overrides:/, 'workspace security overrides must remain enabled')
 assert.match(
   workspace,
-  /brace-expansion@2\.1\.1:\s*2\.1\.4/,
+  /brace-expansion@2\.1\.1:\s*2\.1\.6/,
   'brace-expansion security fix must remain pinned',
 )
 assert.match(staging, /node-windows must not be present in the MSI runtime/)
