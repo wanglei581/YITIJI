@@ -20,7 +20,7 @@ export default function OrdersPage() {
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const pageSize = 20
+  const [pageSize, setPageSize] = useState(20)
 
   const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${refundRequiredFilter}:${opsAttentionFilter}:${search}:${page}:${pageSize}`
 
@@ -167,7 +167,7 @@ export default function OrdersPage() {
         <ConsoleTable items={items} columns={orderColumns(controls.openDetail)}
           loading={state === 'loading'} error={state === 'error' ? { onRetry: () => void refresh() } : null}
           empty={{ title: '暂无订单', description: '一体机创建打印订单后会出现在这里' }}
-          page={page} pageSize={pageSize} total={total} onPageChange={setPage}
+          page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize}
           className="[&_table]:table-fixed [&_th]:px-2 [&_td]:px-2 [&_td]:text-xs"
         />
       </section>

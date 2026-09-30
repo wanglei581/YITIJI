@@ -18077,6 +18077,7 @@
     ],
     "apps/admin/src/routes/orders/OrderDetailDrawer.tsx": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
@@ -18092,11 +18093,14 @@
     ],
     "apps/admin/src/routes/orders/orderColumns.tsx": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/admin/src/routes/orders/orderDisplay.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
     ],
     "apps/admin/src/routes/orders/orderHonestyCopy.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
@@ -26916,6 +26920,7 @@
           "apps/admin/src/routes/files/FileTable.tsx",
           "apps/admin/src/routes/files/fileMeta.ts",
           "apps/admin/src/routes/files/retentionMeta.ts",
+          "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
           "apps/admin/src/routes/orders/orderColumns.tsx",
           "apps/admin/src/routes/orders/orderDisplay.ts",
           "apps/admin/src/routes/orders/orderHonestyCopy.ts",
@@ -32240,6 +32245,8 @@
           "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
           "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
           "apps/admin/src/routes/orders/index.tsx",
+          "apps/admin/src/routes/orders/orderColumns.tsx",
+          "apps/admin/src/routes/orders/orderDisplay.ts",
           "apps/admin/src/routes/orders/useOrderDetail.ts",
           "apps/admin/src/routes/partners/index.tsx",
           "apps/admin/src/routes/policy-sources/index.tsx",
@@ -33894,6 +33901,7 @@
           "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
           "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
           "apps/admin/src/routes/orders/index.tsx",
+          "apps/admin/src/routes/orders/orderDisplay.ts",
           "apps/admin/src/routes/orders/useOrderDetail.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/audit/audit.service.ts",

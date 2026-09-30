@@ -24,11 +24,11 @@ export function FileTable({ loading, error, search, files, total, page, pageSize
   const [detailId, setDetailId] = useState<string | null>(null)
   const detail = files.find((v) => v.raw.id === detailId)
   const columns: ConsoleColumn<ViewFile>[] = [
-    { id: 'file', header: '文件名', headerClassName: 'w-[21%]', truncate: true, title: (v) => v.name,
+    { id: 'file', header: '文件名', headerClassName: 'w-[19%]', truncate: true, title: (v) => v.name,
       cell: (v) => <button type="button" title={v.name} onClick={() => setDetailId(v.raw.id)}
         className="block w-full truncate text-left font-medium text-primary-700 hover:underline">{v.name}</button> },
     { id: 'type', header: '类型', headerClassName: 'w-[9%]', cell: (v) => <span className={`whitespace-nowrap rounded px-1 py-0.5 text-xs ${v.typeStyle}`}>{v.typeLabel}</span> },
-    { id: 'user', header: '用户', headerClassName: 'w-[10%]', truncate: true,
+    { id: 'user', header: '用户', headerClassName: 'w-[12%]', cellClassName: 'whitespace-nowrap',
       title: (v) => v.raw.endUserId ?? v.raw.uploaderId ?? undefined, cell: (v) => v.user },
     { id: 'size', header: '大小', align: 'right', headerClassName: 'w-[7%]', cellClassName: 'whitespace-nowrap', cell: (v) => v.size },
     { id: 'sensitive', header: '敏感级别', headerClassName: 'w-[9%]', cell: (v) => <StatusBadge dot status={v.sensitiveBadge} label={v.sensitiveLabel} /> },
@@ -74,9 +74,9 @@ function fileDetails(v: ViewFile): [string, string][] {
     ['文件名', v.name], ['类型', v.typeLabel], ['用户', v.user], ['来源', v.source], ['大小', v.size],
     ['敏感级别', v.sensitiveLabel], ['保存策略', retentionPolicyLabel(v.raw.retentionPolicy)],
     ['文件类别', assetCategoryLabel(v.raw.assetCategory)], ['归属', ownerTypeLabel(v.raw.ownerType)],
-    ['策略来源', retentionSetByLabel(v.raw.retentionSetBy)], ['锁定原因', v.raw.retentionLockedReason ?? '未记录'],
-    ['同意时间', formatDateTime(v.raw.retentionConsentAt, { fallback: '-' })],
-    ['同意版本', v.raw.retentionConsentVersion ?? '未记录'], ['清理状态', CLEAN_MAP[v.clean].label],
+    ['策略来源', retentionSetByLabel(v.raw.retentionSetBy)], ['锁定原因', v.raw.retentionLockedReason ?? '—'],
+    ['同意时间', formatDateTime(v.raw.retentionConsentAt, { fallback: '—' })],
+    ['同意版本', v.raw.retentionConsentVersion ?? '—'], ['清理状态', CLEAN_MAP[v.clean].label],
     ['清理规则', v.cleanPolicy], ['上传时间', v.createdAt], ['到期时间', v.expiresAt],
   ]
 }

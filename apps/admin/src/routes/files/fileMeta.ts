@@ -92,7 +92,7 @@ export function toViewFile(f: AdminFileRecord, now: number): ViewFile {
     sensitive: sens.key,
     sensitiveBadge: sens.badge,
     sensitiveLabel: sens.label,
-    createdAt: formatDateTime(f.createdAt, { fallback: '-' }),
+    createdAt: formatDateTime(f.createdAt, { fallback: '—' }),
     expiresAt: formatDateTime(f.expiresAt, { fallback: '长期保存' }),
     clean,
     cleanPolicy: cleanPolicyOf(f, clean),

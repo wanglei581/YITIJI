@@ -22,6 +22,13 @@ const page = existsSync(pagePath) ? readFileSync(pagePath, 'utf8') : ''
 const service = existsSync(servicePath) ? readFileSync(servicePath, 'utf8') : ''
 const routes = readFileSync(routesPath, 'utf8')
 const nav = readFileSync(navPath, 'utf8')
+if (page.includes('其他价目') ||
+    !page.includes('SERVICE_LABELS[serviceKey] ?? `未登记价目（${serviceKey}）`') ||
+    (page.match(/SERVICE_LABELS\[item\.serviceKey\] \?\? `未登记价目（\$\{item\.serviceKey\}）`/g) ?? []).length !== 3) {
+  fail('未登记价目的表格、说明标签与改价/改说明确认必须显示实际键名')
+} else {
+  pass('未登记价目按实际键名显示，运营可核对确认项')
+}
 
 // service：只调既有端点，无支付凭证字段
 if (

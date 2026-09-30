@@ -117,8 +117,8 @@ function taskColumns(openDetail: (item: AdminPrintScanTaskItem) => Promise<void>
       return <StatusBadge status={meta.badge} label={meta.label} />
     } },
     { id: 'error', header: '失败原因', headerClassName: 'w-[14%]', truncate: true,
-      title: (item) => item.errorCode ? `${printErrorText(item.errorCode)}（${item.errorCode}）` : undefined,
-      cell: (item) => printErrorText(item.errorCode) },
+      title: (item) => item.errorCode ? `${printErrorText(item.errorCode, item.type)}（${item.errorCode}）` : undefined,
+      cell: (item) => printErrorText(item.errorCode, item.type) },
     { id: 'created', header: '创建时间', headerClassName: 'w-[18%]', cellClassName: 'whitespace-nowrap tabular-nums', cell: (item) => fmt(item.createdAt) },
     { id: 'expires', header: '过期时间', headerClassName: 'w-[18%]', cellClassName: 'whitespace-nowrap tabular-nums', cell: (item) => fmt(item.expiresAt) },
   ]
@@ -154,6 +154,7 @@ function TaskCenter() {
   const [taskType, setTaskType] = useState<PrintScanTaskType>('print')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [data, setData] = useState<AdminPrintScanTaskPage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -161,11 +162,10 @@ function TaskCenter() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [actionBusy, setActionBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
-
   const implemented = TASK_TYPE_TABS.find((t) => t.value === taskType)?.implemented ?? false
 
   // 请求序号防竞态：快速切换类型/筛选时，旧的慢响应不得覆盖新状态。
-  const queryKey = [taskType, status, String(page)].join('\u0000')
+  const queryKey = [taskType, status, String(page), String(pageSize)].join('\u0000')
   const queryKeyRef = useRef(queryKey)
   queryKeyRef.current = queryKey
   const loadSeq = useRef(0)
@@ -175,7 +175,7 @@ function TaskCenter() {
     setLoading(true)
     setError(null)
     try {
-      const result = await adminPrintScanService.listTasks({ type: taskType, status: status || undefined, page, pageSize: 20 })
+      const result = await adminPrintScanService.listTasks({ type: taskType, status: status || undefined, page, pageSize })
       if (seq !== loadSeq.current || queryKeyRef.current !== requestQueryKey) return 'stale'
       setData(result)
       return 'success'
@@ -186,7 +186,7 @@ function TaskCenter() {
     } finally {
       if (seq === loadSeq.current) setLoading(false)
     }
-  }, [taskType, status, page, queryKey])
+  }, [taskType, status, page, pageSize, queryKey])
 
   useEffect(() => {
     void load()
@@ -302,7 +302,7 @@ function TaskCenter() {
         <ConsoleTable items={data?.items ?? []} columns={taskColumns(openDetail)}
           loading={loading} error={error ? { title: '任务加载失败', message: error, onRetry: () => void load() } : null}
           empty={{ title: '暂无任务', description: '当前筛选条件下没有任务记录。' }}
-          page={page} pageSize={20} total={data?.pagination.total ?? 0} onPageChange={setPage}
+          page={page} pageSize={pageSize} total={data?.pagination.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize}
           className="overflow-hidden rounded-xl border border-neutral-900/10 bg-surface [&_table]:table-fixed [&_th]:px-2 [&_td]:px-2 [&_td]:text-xs"
         />
       )}
@@ -340,7 +340,7 @@ function TaskDetailBody({
     ['状态', <StatusBadge key="s" status={statusMeta.badge} label={statusMeta.label} />],
     ['终端', detail.terminalCode ?? '—'],
     ['归属', OWNER_LABELS[detail.ownerType]],
-    ['失败原因', <span key="error" title={detail.errorCode ?? undefined}>{printErrorText(detail.errorCode)}</span>],
+    ['失败原因', <span key="error" title={detail.errorCode ?? undefined}>{printErrorText(detail.errorCode, detail.type)}</span>],
     ['创建时间', fmt(detail.createdAt)],
     ['更新时间', fmt(detail.updatedAt)],
   ]
@@ -378,7 +378,7 @@ function TaskDetailBody({
             {detail.statusLogs.map((log, i) => (
               <li key={i}>
                 {fmt(log.createdAt)} · {log.fromStatus} → {log.toStatus}
-                {log.errorCode && <span title={log.errorCode}>（{printErrorText(log.errorCode)}）</span>}
+                {log.errorCode && <span title={log.errorCode}>（{printErrorText(log.errorCode, detail.type)}）</span>}
               </li>
             ))}
           </ul>

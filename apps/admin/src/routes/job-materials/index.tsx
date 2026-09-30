@@ -106,7 +106,7 @@ export default function JobMaterialsPage() {
         <Card className="p-5">
           <p className="text-xs font-semibold text-neutral-500">模板总数</p>
           <p className="mt-2 text-3xl font-bold text-neutral-950">
-            {formatCount(summary?.templateCount)}
+            {formatCount(summary?.templateCount ?? templates.length)}
           </p>
         </Card>
         <Card className="p-5">

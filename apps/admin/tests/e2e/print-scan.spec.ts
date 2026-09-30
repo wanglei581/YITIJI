@@ -15,6 +15,14 @@ test.describe('打印扫描运维（mock 口径）', () => {
 
     await page.getByRole('button', { name: '任务中心' }).click()
     await expect(page.getByRole('button', { name: /打印/ }).first()).toBeVisible()
+    const pageSize = page.getByRole('combobox')
+    await expect(pageSize.locator('option')).toHaveText(['10', '20', '50', '100'])
+    await pageSize.selectOption('100')
+    await settleAdminPage(page, guards)
+    await expect(pageSize).toHaveValue('100')
+    await page.getByRole('button', { name: '扫描', exact: true }).click()
+    await settleAdminPage(page, guards)
+    await expect(pageSize).toHaveValue('100')
   })
   test('任务编号仅在悬停或详情可见，失败原因使用中文', async ({ page }) => {
     const guards = await openAuthed(page, '/print-scan')

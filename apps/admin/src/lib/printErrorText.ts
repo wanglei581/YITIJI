@@ -17,9 +17,9 @@ const PRINT_ERROR_REASONS: Record<string, string> = {
   printer_jam: '打印机卡纸',
 }
 
-export function printErrorText(code: string | null | undefined): string {
+export function printErrorText(code: string | null | undefined, orderType?: string): string {
   if (!code) return '—'
   return Object.prototype.hasOwnProperty.call(PRINT_ERROR_REASONS, code)
     ? PRINT_ERROR_REASONS[code]
-    : '打印失败（未归类）'
+    : orderType === 'scan' ? '扫描失败（未归类）' : '打印失败（未归类）'
 }

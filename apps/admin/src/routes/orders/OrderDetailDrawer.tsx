@@ -23,7 +23,7 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               <Info label="取件" value={pickupText(detail)} />
               <Info label="取件码过期时间" value={fmt(detail.pickupCodeExpiresAt)} />
               <Info label="创建时间" value={fmt(detail.createdAt)} />
-              <Info label="失败原因" value={printErrorText(detail.errorCode)} title={detail.errorCode ?? undefined} />
+              <Info label="失败原因" value={printErrorText(detail.errorCode, detail.type)} title={detail.errorCode ?? undefined} />
               <Info label="下单金额" value={amountText(detail.amountCents, detail.currency)} />
               <Info label="优惠/权益抵扣" value={recordedCentsText(detail.discountCents, detail.currency)} />
               <Info label="已退款" value={recordedCentsText(detail.refundedAmountCents, detail.currency)} />
@@ -62,7 +62,7 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
                     <span className="font-semibold">
                       {STATUS_MAP[log.fromStatus]?.label ?? log.fromStatus} → {STATUS_MAP[log.toStatus]?.label ?? log.toStatus}
                     </span>
-                    {log.errorCode ? <span title={log.errorCode} className="ml-2 text-error-fg">{printErrorText(log.errorCode)}</span> : null}
+                    {log.errorCode ? <span title={log.errorCode} className="ml-2 text-error-fg">{printErrorText(log.errorCode, detail.type)}</span> : null}
                     <span className="ml-2 tabular-nums text-neutral-500">{fmt(log.createdAt)}</span>
                   </div>
                 ))}

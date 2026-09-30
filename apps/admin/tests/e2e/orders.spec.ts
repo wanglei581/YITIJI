@@ -112,16 +112,45 @@ test.describe('订单管理（mock 口径：一条演示未支付单）', () => 
     // 点完仍是正常列表页：无未捕获异常、无英文技术串。
     await settleAdminPage(page, guards)
   })
-  test('1280 宽保留九个关键列、详情入口与免费金额', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 900 })
+  test('1280/1440/1920 宽编号完整，渠道合在用户列，详情入口可见', async ({ page }) => {
     const guards = await openAuthed(page, '/orders')
     await settleAdminPage(page, guards)
-    await expect(page.locator('thead th')).toHaveText(['订单号', '文件名', '用户', '渠道', '终端', '金额', '支付状态', '任务状态', '操作'])
-    await expect(page.getByRole('button', { name: '订单 ORD-20260625-MOCKREAD 详情' })).toBeInViewport()
+    for (const width of [1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(page.locator('thead th')).toHaveText(['订单号', '文件名', '用户', '终端', '金额', '支付状态', '任务状态', '操作'])
+      const row = page.locator('tbody tr').first()
+      for (const index of [0, 3]) {
+        const cell = row.locator('td').nth(index)
+        const layout = await cell.evaluate((el) => {
+          const content = el.querySelector('button') ?? el.firstElementChild!
+          const style = getComputedStyle(content)
+          return { overflow: content.scrollWidth - content.clientWidth, height: content.getBoundingClientRect().height,
+            lineHeight: parseFloat(style.lineHeight), whiteSpace: style.whiteSpace, textOverflow: style.textOverflow,
+            cellOverflow: el.scrollWidth - el.clientWidth }
+        })
+        expect(layout.overflow, `${width} 下关键编号被裁切`).toBeLessThanOrEqual(1)
+        expect(layout.cellOverflow, `${width} 下关键编号挤出单元格`).toBeLessThanOrEqual(1)
+        expect(layout.whiteSpace).toBe('nowrap')
+        expect(layout.textOverflow).not.toBe('ellipsis')
+        expect(layout.height).toBeLessThanOrEqual(layout.lineHeight + 1)
+      }
+      await expect(row.locator('td').nth(0)).toHaveText('ORD-20260625-MOCKREAD')
+      await expect(row.locator('td').nth(3)).toHaveText('KSK-001')
+      await expect(row.locator('td').nth(2)).toContainText('未标注')
+      await expect(page.getByRole('button', { name: '订单 ORD-20260625-MOCKREAD 详情' })).toBeInViewport()
+      expect(await page.locator('table').evaluate((el) => el.scrollWidth - el.parentElement!.clientWidth)).toBeLessThanOrEqual(1)
+    }
     await expect(page.locator('tbody')).toContainText('¥0.00（免费）')
-    expect(await page.locator('table').evaluate((el) => el.scrollWidth - el.parentElement!.clientWidth)).toBeLessThanOrEqual(1)
+    const pageSize = page.getByRole('combobox')
+    await expect(pageSize.locator('option')).toHaveText(['10', '20', '50', '100'])
+    await pageSize.selectOption('50')
+    await settleAdminPage(page, guards)
+    await expect(pageSize).toHaveValue('50')
     await page.getByRole('button', { name: '订单 ORD-20260625-MOCKREAD 详情' }).click()
     await expect(page.getByText('文件名', { exact: true }).last()).toBeVisible()
+    const pageRange = page.getByText('页范围', { exact: true }).locator('..')
+    await expect(pageRange).toContainText('未记录')
+    await expect(pageRange).not.toContainText('全部页面')
   })
 
 })

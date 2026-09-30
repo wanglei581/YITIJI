@@ -76,7 +76,7 @@ function PriceConfigSection() {
           ? '\n0 元 = 当前免费，不扣权益。'
           : '\n0 元 = 免费打印，将跳过收银。')
         : ''
-      if (!window.confirm(`确认将「${SERVICE_LABELS[serviceKey] ?? '其他价目'}」单价改为 ¥${(unitCents / 100).toFixed(2)}？${zeroPriceNote}\n改价即时对全端生效并记入审计。`)) return
+      if (!window.confirm(`确认将「${SERVICE_LABELS[serviceKey] ?? `未登记价目（${serviceKey}）`}」单价改为 ¥${(unitCents / 100).toFixed(2)}？${zeroPriceNote}\n改价即时对全端生效并记入审计。`)) return
       setSaving(serviceKey)
       setError(null)
       try {
@@ -111,7 +111,7 @@ function PriceConfigSection() {
       const oldLabel = currentDescription || '（空）'
       const newLabel = nextDescription || '（空）'
       if (!window.confirm(
-        `确认更新「${SERVICE_LABELS[item.serviceKey] ?? '其他价目'}」说明？\n旧说明：${oldLabel}\n新说明：${newLabel}\n只更新说明，不修改单价与启停状态，操作记入审计。`,
+        `确认更新「${SERVICE_LABELS[item.serviceKey] ?? `未登记价目（${item.serviceKey}）`}」说明？\n旧说明：${oldLabel}\n新说明：${newLabel}\n只更新说明，不修改单价与启停状态，操作记入审计。`,
       )) return
       setSaving(item.serviceKey)
       setError(null)
@@ -182,7 +182,7 @@ function PriceConfigSection() {
             return (
               <tr key={item.serviceKey} className="border-b border-neutral-50">
                 <td className="px-3 py-3">
-                  <div title={item.serviceKey} className="font-medium text-neutral-900">{SERVICE_LABELS[item.serviceKey] ?? '其他价目'}</div>
+                  <div title={item.serviceKey} className="font-medium text-neutral-900">{SERVICE_LABELS[item.serviceKey] ?? `未登记价目（${item.serviceKey}）`}</div>
                 </td>
                 <td className="px-3 py-3">
                   <input
@@ -199,7 +199,7 @@ function PriceConfigSection() {
                   <textarea
                     rows={3}
                     maxLength={200}
-                    aria-label={`${SERVICE_LABELS[item.serviceKey] ?? '其他价目'}说明`}
+                    aria-label={`${SERVICE_LABELS[item.serviceKey] ?? `未登记价目（${item.serviceKey}）`}说明`}
                     value={descriptionEditVal ?? currentDescription}
                     disabled={busy}
                     onChange={(e) => setDescriptionEditing((prev) => ({

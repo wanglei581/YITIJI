@@ -161,6 +161,12 @@ const honesty = runFile('apps/admin/src/routes/orders/orderHonestyCopy.ts')
 const cols = runFile('apps/admin/src/routes/orders/orderColumns.tsx', {
   '@ai-job-print/ui': ui, '../../lib/printErrorText': errors, './orderDisplay': display, './orderHonestyCopy': honesty,
 }).orderColumns(() => {})
+for (const id of ['order', 'terminal']) {
+  const column = cols.find((c) => c.id === id)
+  const cell = column?.cell({ orderNo: 'ORD-20260930-962BD6AB', terminalCode: 'WALK-001' })
+  if (!column || column.truncate || !column.cellClassName?.includes('whitespace-nowrap') || /truncate|line-clamp|break-/.test(cell?.props?.className ?? '')) fail(`订单${id}编号必须完整且不折行`)
+}
+if (cols.length !== 8 || cols.some((c) => c.id === 'channel') || !textOf(cols.find((c) => c.id === 'user')?.cell({ ownerType: 'anonymous', userLabel: '游客', channel: 'kiosk' })).includes('一体机现场')) fail('渠道必须合在用户列，保留八列')
 const forbiddenBatchCopy = ['Terminal Agent 回报落库', 'resume_export', 'print_bw_page', 'print_color_page', '匿名(Kiosk)', 'diff']
 function cleanText(where, tree) {
   const visible = textOf(tree)
@@ -174,6 +180,22 @@ for (const code of ['PRINTER_ERROR', 'PRINT_JOB_UNCONFIRMED', 'PAPER_EMPTY', 'pr
   if (!visible.includes('¥0.00（免费）') || visible.includes('游客 · 游客')) fail('订单免费金额 / 身份文案不正确')
 }
 if (errors.printErrorText('UNKNOWN_PRINT_CODE') !== '打印失败（未归类）') fail('未知打印码必须显示未归类')
+if (errors.printErrorText('UNKNOWN_SCAN_CODE', 'scan') !== '扫描失败（未归类）') fail('未知扫描码必须显示扫描失败（未归类）')
+for (const code of ['PRINTER_ERROR', 'PAPER_EMPTY', 'printer_jam']) {
+  if (errors.printErrorText(code, 'scan') !== errors.printErrorText(code)) fail(`已登记原因不得随订单类型变化：${code}`)
+}
+const drawer = runFile('apps/admin/src/routes/orders/OrderDetailDrawer.tsx', {
+  '@ai-job-print/ui': ui, './orderDisplay': display, './orderHonestyCopy': honesty, '../../lib/printErrorText': errors,
+  './OrderAftercare': { OrderAftercare: () => null }, './OrderPaymentActions': { OrderPaymentActions: () => null },
+})
+const scanOrder = { type: 'scan', ownerType: 'anonymous', userLabel: '游客', amountCents: 0, currency: 'CNY', payStatus: 'paid', taskStatus: 'failed', errorCode: 'UNKNOWN_SCAN_CODE', statusLogs: [{ errorCode: 'UNKNOWN_SCAN_CODE' }], print: null }
+const scanListText = textOf(cols.map((column) => column.cell(scanOrder)))
+const scanDetailText = textOf(drawer.OrderDetailDrawer({ controls: { detailState: 'ready', detail: scanOrder } }))
+if (!scanListText.includes('扫描失败（未归类）') || !scanDetailText.includes('扫描失败（未归类）') || scanListText.includes('打印失败') || scanDetailText.includes('打印失败')) fail('扫描订单列表、详情和流转记录不得说成打印失败')
+// W-105：当前只读接口未返回计费页数；缺字段时不得把页范围或页数推算成完整记录。
+const noPageDetail = { ...scanOrder, type: 'print', errorCode: null, statusLogs: [], print: { pageRange: null } }
+const noPageText = textOf(drawer.OrderDetailDrawer({ controls: { detailState: 'ready', detail: noPageDetail } }))
+if (honesty.pageRangeText(null) !== '未记录' || /全部页面|\d+\s*页/.test(noPageText)) fail('缺页范围和计费页数字段时不得编造全部页面或页数')
 if (display.orderUserText({ ownerType: 'member', userLabel: '13812345678' }).includes('13812345678')) fail('用户不得显示完整手机号')
 const common = { '@ai-job-print/ui': ui, '@ai-job-print/shared': shared, '../Page': { Page: (p) => [p.title, p.subtitle, p.children] },
   '../components/FilterChip': { FilterChip: () => null }, 'lucide-react': {} }
@@ -203,6 +225,11 @@ for (const code of ['PRINTER_ERROR', 'PRINT_JOB_UNCONFIRMED', 'PAPER_EMPTY', 'pr
   if (visible.includes(code) || visible.includes(item.taskId) || !visible.includes(errors.printErrorText(code))) fail(`打印列表裸露编号或错误码 ${code}`)
   const detailText = cleanText('打印任务详情', print.TaskDetailBody({ detail: item }))
   if (detailText.includes(code) || !detailText.includes('任务编号') || !detailText.includes(errors.printErrorText(code))) fail(`任务详情未翻译 ${code}`)
+}
+const scanTask = { type: 'scan', status: 'failed', ownerType: 'anonymous', errorCode: 'UNKNOWN_SCAN_CODE', statusLogs: [{ errorCode: 'UNKNOWN_SCAN_CODE' }] }
+for (const tree of [print.taskColumns(() => {}).map((column) => column.cell(scanTask)), print.TaskDetailBody({ detail: scanTask })]) {
+  const visible = textOf(tree)
+  if (!visible.includes('扫描失败（未归类）') || visible.includes('打印失败')) fail('扫描运维列表、详情和流转记录不得说成打印失败')
 }
 cleanText('商业化控制', print.CommercialControls())
 const fileMeta = runFile('apps/admin/src/routes/files/fileMeta.ts', { '@ai-job-print/shared': shared })
