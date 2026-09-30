@@ -23,7 +23,7 @@ import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeAigcBadge } from './components/resume-deliver/ResumeAigcBadge'
 import { OptimizeWorkArea } from './components/resume-deliver/OptimizeWorkArea'
 import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
-import { optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
+import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
 import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
 import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOptimizeLeaveDialog'
@@ -219,7 +219,7 @@ export function ResumeOptimizePage() {
       setExported(result); setExportKind('resume'); setExportVersion((n) => n + 1); setIsDirty(false); setSavedToDocuments(undefined)
       if (result.signedUrl && exportFormat === 'pdf') setPreviewOpen(true)
     } catch (err) {
-      setExportError(userMessageOf(err, '导出失败，请稍后重试'))
+      setExportError(optimizeExportErrorMessage(err))
     } finally { setExporting(false); setFactOpen(null) }
   }
 
