@@ -10,7 +10,6 @@ import type {
   UpdateTerminalProfileInput,
 } from '../../services/api/devices'
 import { isParkedOrgType } from '../partners/orgTypeOptions'
-import { ReleaseObservationPanel } from './ReleaseObservationPanel'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
 import { fmtDisk, lifecycleView, printerStatusView, scanInputView } from './terminalStatusViews'
@@ -61,9 +60,9 @@ const RELEASE_LABEL: Record<string, string> = {
 
 export interface TerminalDetailDrawerProps {
   terminal: AdminTerminalRecord | null
-  allTerminals: AdminTerminalRecord[]
   organizations: AdminOrganizationOption[]
   orgLoadError: string | null
+  notice: Notice | null
   editingOrg: boolean
   editOrgValue: string
   savingOrg: boolean
@@ -91,9 +90,9 @@ export interface TerminalDetailDrawerProps {
 
 export function TerminalDetailDrawer({
   terminal,
-  allTerminals,
   organizations,
   orgLoadError,
+  notice,
   editingOrg,
   editOrgValue,
   savingOrg,
@@ -133,11 +132,12 @@ export function TerminalDetailDrawer({
       ? '换机前请先进入维护，确认停止领取新任务后再生成绑定码'
       : canCreateBindCode
         ? terminal.lifecycleStatus === 'planned' ? '生成首次安装绑定码' : '生成换机绑定码'
-        : `当前状态 ${terminal.lifecycleStatus} 不允许生成绑定码`
+        : `当前状态 ${lifecycle.label} 不允许生成绑定码`
 
   return (
     <Drawer open onClose={onClose} title={`${terminal.displayName || terminal.terminalCode} · 终端详情`} size="lg">
       <div className="space-y-3">
+        {notice && <div className={`rounded-[9px] border px-4 py-3 text-sm ${notice.type === 'success' ? 'border-success/20 bg-success-bg text-success-fg' : 'border-error/20 bg-error-bg text-error-fg'}`}>{notice.text}</div>}
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge dot status={runtime.badge} label={runtime.label} />
           <StatusBadge dot status={terminal.enabled ? 'success' : 'error'} label={terminal.enabled ? '启用' : '停用'} />
@@ -208,7 +208,6 @@ export function TerminalDetailDrawer({
           <DetailRow label="注册时间"><span title={formatDateTime(terminal.registeredAt)}>{formatDate(terminal.registeredAt)}</span></DetailRow>
         </Section>
 
-        <ReleaseObservationPanel terminals={allTerminals} onNotice={onNotice} />
       </div>
     </Drawer>
   )

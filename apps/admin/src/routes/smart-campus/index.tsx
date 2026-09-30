@@ -130,13 +130,13 @@ export default function SmartCampusPage() {
   useEffect(load, [])
 
   return (
-    <Page title="智慧校园" subtitle="配置本校终端上「智慧校园」模块的显示开关。">
+    <Page title="智慧校园" subtitle="按终端配置「智慧校园」模块的显示开关。">
       <div className="space-y-5">
         {/* 合规提示 */}
         <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-bg/70 px-4 py-3">
           <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
           <p className="text-xs leading-relaxed text-warning-fg">
-            只能配置归属本校的终端；保存后一体机首页按开关显示或隐藏「智慧校园」。<span className="font-semibold">迎新内容 / 使用统计</span>暂未开放，<span className="font-semibold">校园大数据</span>暂不开放。未开启任何子模块时无法启用。
+            管理员按终端配置「智慧校园」模块的显示开关；保存后一体机首页按开关显示或隐藏「智慧校园」。学校账号在机构后台只能配置本校终端。<span className="font-semibold">迎新内容 / 使用统计</span>暂未开放，<span className="font-semibold">校园大数据</span>暂不开放。未开启任何子模块时无法启用。
           </p>
         </div>
 

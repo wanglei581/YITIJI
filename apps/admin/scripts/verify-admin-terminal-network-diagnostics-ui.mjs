@@ -67,7 +67,7 @@ assert.match(
 )
 assert.match(terminalUi, /\{scan\.detail &&/, 'the lockout reason must be rendered next to the badge')
 assert.match(terminalUi, /\{scan\.restart &&/, 'restart_required must be rendered next to the badge')
-assert.match(terminalUi, /scanInputObservedAt &&/, 'the observation time must be rendered next to the badge')
+assert.match(terminalUi, /terminal\.scanInputObservedAt &&/, 'the observation time must be rendered next to the badge')
 assert.match(views, /t\.scanInputHealth/)
 assert.match(views, /t\.scanInputAction/)
 assert.match(views, /t\.scanInputReason/)

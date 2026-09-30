@@ -106,6 +106,19 @@ for (const file of batchFiles) {
 }
 if (!failures.length) console.log('  PASS 本批页面可见文案没有 Terminal Agent 心跳上报 / printerStatus / orgId / Kiosk')
 
+console.log('\n=== 智慧校园管理员视角文案 ===')
+const adminSmartCampus = readFileSync(join(adminRoot, 'src/routes/smart-campus/index.tsx'), 'utf8')
+for (const phrase of [
+  '按终端配置「智慧校园」模块的显示开关。',
+  '保存后一体机首页按开关显示或隐藏「智慧校园」',
+  '学校账号在机构后台只能配置本校终端',
+  '迎新内容 / 使用统计',
+  '校园大数据',
+]) {
+  if (!adminSmartCampus.includes(phrase)) fail(`管理员智慧校园页缺少正向文案「${phrase}」`)
+}
+if (!failures.length) console.log('  PASS 智慧校园文案明确管理员按终端配置，并保留学校账号与未开放模块说明')
+
 console.log('\n=== 审计动作中文名 ===')
 const auditTypes = readFileSync(auditTypesPath, 'utf8')
 const actionBlock = auditTypes.slice(

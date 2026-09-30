@@ -27,6 +27,7 @@ export function AssetsTab() {
   const [extError, setExtError] = useState<string | null>(null)
 
   const reload = useCallback(() => {
+    setListError(null)
     setLoading(true)
     screensaverService
       .listAssets()

@@ -93,6 +93,26 @@ if (
   fail('admin terminals page must contain 生成绑定码 entry + modal state')
 }
 
+if (
+  page.includes("import { ReleaseObservationPanel } from './ReleaseObservationPanel'") &&
+  page.includes('<ReleaseObservationPanel terminals={terminals} onNotice={setNotice} />') &&
+  !terminalDetail.includes('ReleaseObservationPanel')
+) {
+  pass('发布观察面板留在终端页表格下方，详情抽屉不承载面板')
+} else {
+  fail('release observation panel must render below the terminals table, not inside the detail drawer')
+}
+
+if (
+  terminalDetail.includes('lifecycleView(terminal.lifecycleStatus)') &&
+  terminalDetail.includes('当前状态 ${lifecycle.label} 不允许生成绑定码') &&
+  !terminalDetail.includes('当前状态 ${terminal.lifecycleStatus} 不允许生成绑定码')
+) {
+  pass('绑定码说明使用生命周期中文标签，不直接露出原始状态值')
+} else {
+  fail('bind-code explanation must use lifecycleView label and never expose terminal.lifecycleStatus directly')
+}
+
 // 安装命令必须用 `-PromptForBindCode` 交互输入，**不得把绑定码拼进命令行**。
 //
 // 本仓已有口径，不是偏好：docs/device/production-agent-onboarding.md:14 原文
