@@ -1232,7 +1232,8 @@ test('a lost create response is recovered into exactly one live session @scan-sa
   )
   expect(live.live?.scanTaskId).toBe(childId)
   // 屏幕上那个编号也必须是它 —— 用户拿着这个号去认领待会儿回传的文件。
-  await expect(page.getByText(childId, { exact: true })).toBeVisible()
+  // 内部任务号不上屏（v2 README 规则 4，B 批 9/30 起扫描页不再显示）；找回同一会话已由上面的 live.scanTaskId 与 childIds 证明。
+  await expect(page.getByText(childId, { exact: true })).toHaveCount(0)
   // ⑥ 这一场的性质是「安全重扫」：服务端认了那一对，同一张纸可以原样放回去。
   await expect(page.getByText('安全重扫：系统已放行同一份材料再扫一次')).toBeVisible()
 

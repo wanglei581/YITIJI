@@ -78,10 +78,10 @@
 .pcf-rev-grid > div.off > em { font-style: normal; font-size: 24px; font-weight: 700; line-height: 1.3; color: var(--qx-wheat-d); }
 
 /* ── 02 费用明细（稿 .fee / .amount-card / .lines） ─────────────── */
-.pcf-fee { display: flex; gap: 18px; align-items: stretch; }
+.pcf-fee { display: flex; gap: 18px; align-items: flex-start; }
 .pcf-amount {
   flex: none; width: 432px; position: relative; overflow: hidden; border-radius: 32px; padding: 22px 32px; color: var(--qx-paper);
-  background: linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep)); display: flex; flex-direction: column; justify-content: center;
+  background: linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep)); display: flex; flex-direction: column;
 }
 .pcf-amount::after {
   content: ''; position: absolute; right: -110px; bottom: -130px; width: 340px; height: 340px; border-radius: 50%;
@@ -97,7 +97,7 @@
 .pcf-amount-src b { color: var(--qx-paper); font-weight: 600; }
 .pcf-lines {
   flex: 1; min-width: 0; background: var(--qx-surface); border: 1px solid var(--qx-line); border-radius: 24px; padding: 2px 26px;
-  display: flex; flex-direction: column; justify-content: center;
+  display: flex; flex-direction: column;
 }
 .pcf-line { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--qx-line); font-size: var(--qx-fs-body-lg); }
 .pcf-line:last-child { border-bottom: 0; }
@@ -247,7 +247,7 @@
   .pcf-rev-grid > div > span { font-size: 13px; }
   .pcf-rev-grid > div > b { font-size: 17px; }
   .pcf-rev-grid > div > b.id { font-size: 14px; }
-  .pcf-fee { flex-direction: column; gap: 10px; }
+  .pcf-fee { flex-direction: column; align-items: stretch; gap: 10px; }
   .pcf-amount { width: auto; border-radius: 20px; padding: 16px 18px; }
   .pcf-amount-lb { font-size: 14px; }
   .pcf-amount-row .cur { font-size: 24px; }
@@ -289,4 +289,11 @@
   .pcf-act .qx-btn { flex: none; width: 100%; min-height: 60px; border-radius: 16px; font-size: 18px; white-space: normal; }
   .pcf-truth { flex-direction: column; gap: 6px; font-size: 13px; }
   .pcf-alert { font-size: 14px; padding: 10px 12px; }
+}
+
+/* B 第二轮：报价中仍展示真实报价，不照错态参考图伪造交接失败。 */
+.pcf-page[data-state='quoting'] .pcf-xq { min-height: 168px; }
+.pcf-page[data-state='quoting'] .pcf-sec { gap: 18px; }
+@media (max-width: 760px) {
+  .pcf-page[data-state='quoting'] .pcf-xq, .pcf-page[data-state='quoting'] .pcf-fee { min-height: 0; }
 }

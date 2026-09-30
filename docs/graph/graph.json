@@ -20464,6 +20464,7 @@
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-scan-quiet-period.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
@@ -27962,6 +27963,7 @@
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx",
           "apps/kiosk/src/pages/scan/ScanStartPage.tsx",
           "apps/kiosk/src/pages/scan/ScanWorkbenchChrome.tsx",
           "apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx",
