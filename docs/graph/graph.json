@@ -7653,7 +7653,8 @@
         "method": "GET",
         "models": [
           "Order",
-          "PrintTask"
+          "PrintTask",
+          "Terminal"
         ],
         "path": "/api/v1/me/print-orders",
         "roles": [],
@@ -17566,6 +17567,7 @@
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
@@ -23147,6 +23149,9 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
+    "services/api/src/ai/resume/llm-resume-evidence.ts": [
+      "services/api/scripts/verify-resume-diagnosis-context.ts"
+    ],
     "services/api/src/ai/resume/llm-resume-generate.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -23255,6 +23260,9 @@
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
+    ],
+    "services/api/src/ai/resume/resume-structure.ts": [
+      "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/src/ai/resume/resume-text.service.ts": [
       "services/api/scripts/verify-resume-draft-versions.ts",
@@ -25628,6 +25636,7 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -39502,6 +39511,7 @@
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/dto/resume-parse.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume/llm-resume-evidence.ts",
           "services/api/src/ai/resume/llm-resume.service.ts"
         ],
         "missing": []
@@ -39757,6 +39767,7 @@
           "services/api/src/ai/resume/llm-resume-optimize.service.ts",
           "services/api/src/ai/resume/llm-resume.service.ts",
           "services/api/src/ai/resume/resume-pdf.service.ts",
+          "services/api/src/ai/resume/resume-structure.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -39889,6 +39900,7 @@
           "services/api/src/files/files.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.service.ts"
         ],

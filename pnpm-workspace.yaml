@@ -94,9 +94,11 @@ overrides:
   # brace-expansion: GHSA-mh99-v99m-4gvg + GHSA-rgw5-rvv9-x895
   # upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH (CVE-2026-14257 backport);
   # local patches are no longer needed. Direct overrides (pnpm does not chain resolutions).
-  brace-expansion@1.1.14: 1.1.18
-  brace-expansion@2.1.1: 2.1.4
-  brace-expansion@5.0.6: 5.0.9
+  # 2026-09-30：GHSA-qhr7-859c-m2p7 + GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 /
+  # parseCommaParts 无界递归栈耗尽）修在 1.1.20 / 2.1.6 / 5.0.11，钉子随之上调。
+  brace-expansion@1.1.14: 1.1.20
+  brace-expansion@2.1.1: 2.1.6
+  brace-expansion@5.0.6: 5.0.11
   # deepmerge-ts: GHSA-ggr8-5vv4-36mx（HIGH，2026-08-17T13:32Z 发布）
   # 合并递归对象图时栈耗尽；影响 <8.0.0，首个修复版 8.0.0。
   # 传递自 @prisma/config@7.8.0，它精确锁 7.1.5，所以只能靠 override 抬版本。

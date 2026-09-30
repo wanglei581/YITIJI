@@ -273,6 +273,31 @@ function buildTerminalAlert(
   return null
 }
 
+/**
+ * 打印失败错误码 → 后台告警标题用的中文原因。标题只放中文，错误码放进明细，
+ * 方便排障时照码检索；未登记的错误码标题只写「打印任务失败」。
+ */
+const PRINT_FAILED_ALERT_REASONS: Record<string, string> = {
+  DOWNLOAD_HASH_MISMATCH: '文件校验未通过',
+  PRINTER_NOT_FOUND: '找不到打印机',
+  PRINTER_OFFLINE: '打印机离线',
+  PAPER_EMPTY: '缺纸',
+  PRINTER_ERROR: '打印机故障或卡纸',
+  PRINT_JOB_UNCONFIRMED: '出纸未确认',
+  PARTIAL_OUTPUT: '只打出了一部分',
+  PRINT_TIMEOUT: '打印超时',
+  PRINT_COMMAND_FAILED: '打印命令执行失败',
+  UNSUPPORTED_FILE_TYPE: '文件格式不支持',
+  FILE_NOT_FOUND: '打印文件已失效',
+}
+
+function printFailedAlertTitle(errorCode: string | null): string {
+  const reason = errorCode && Object.prototype.hasOwnProperty.call(PRINT_FAILED_ALERT_REASONS, errorCode)
+    ? PRINT_FAILED_ALERT_REASONS[errorCode]
+    : null
+  return reason ? `打印任务失败：${reason}` : '打印任务失败'
+}
+
 /** 打印失败告警的唯一构造入口。 */
 function buildPrintFailedAlert(task: FailedTaskRow): DerivedAlert {
   const subjectKey = buildSubjectKey('print_failed', task.id)
@@ -283,8 +308,8 @@ function buildPrintFailedAlert(task: FailedTaskRow): DerivedAlert {
     episodeToken: printFailedEpisodeToken(task.id),
     type: 'print_failed',
     severity: 'warning',
-    title: `打印任务失败${task.errorCode ? `(${task.errorCode})` : ''}`,
-    detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${formatShanghaiMinute(task.updatedAt)}`,
+    title: printFailedAlertTitle(task.errorCode),
+    detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${formatShanghaiMinute(task.updatedAt)}${task.errorCode ? ` · 错误码 ${task.errorCode}` : ''}`,
     terminalCode: task.terminal?.terminalCode ?? null,
     occurredAt: task.updatedAt.toISOString(),
   }

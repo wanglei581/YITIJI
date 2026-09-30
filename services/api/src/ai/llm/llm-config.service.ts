@@ -105,7 +105,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI助手对话',
     status: 'active',
     description: '用于前台 AI助手文字对话。',
-    runtimeNote: '已被 AI 助手运行链路消费。',
+    runtimeNote: '已在 AI 助手对话中使用。',
     allowCustomSystemPrompt: true,
   },
   {
@@ -113,7 +113,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI简历诊断',
     status: 'active',
     description: '用于上传简历后的 AI 诊断报告，仅供求职者本人修改简历参考，不代表投递、面试或录用结果。',
-    runtimeNote: '已被 AI 简历诊断运行链路消费；诊断结构化 System Prompt 由服务端强制，管理员自定义 System Prompt v1 不参与诊断。',
+    runtimeNote: '已在 AI 简历诊断中使用。诊断用的系统提示词由服务端固定，这里自定义的系统提示词对诊断不起作用。',
     allowCustomSystemPrompt: false,
   },
   {
@@ -121,7 +121,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI简历生成',
     status: 'active',
     description: '用于引导式表单生成简历。AI 只润色用户提供的信息，不编造学历、证书、公司或项目经历。',
-    runtimeNote: '已被 AI 简历生成运行链路消费；生成结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与生成。',
+    runtimeNote: '已在 AI 简历生成中使用。生成用的系统提示词由服务端固定（防止编造），这里自定义的系统提示词对生成不起作用。',
     allowCustomSystemPrompt: false,
   },
   // ⚠️ 共用键治理记录（2026-07-31 登记 → 2026-08-16 S0-3 拆键）
@@ -151,7 +151,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI简历优化',
     status: 'active',
     description: '用于基于简历原文与诊断报告生成优化版简历与新旧对比。AI 只优化表达，不编造经历；事实信息须出现在简历原文中。',
-    runtimeNote: '已被 AI 简历优化 / 简历版式调整运行链路消费；优化结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与优化。⚠️ 岗位匹配 / 职业规划 / 招聘会拜访计划 / 自我探索解读 / 岗位推荐 / 岗位解释 已拆为独立功能位，未单独配置时仍继承本键：本键停用或改错凭证会连带影响这些「继承中」的能力，单独配置过的能力不受影响。',
+    runtimeNote: '已在 AI 简历优化和简历版式调整中使用。优化用的系统提示词由服务端固定（防止编造），这里自定义的系统提示词对优化不起作用。注意：岗位匹配、职业规划、招聘会拜访计划、自我探索解读、岗位推荐、岗位解读已拆成独立功能，没有单独配置时仍沿用本项；本项停用或凭证填错，会连带影响这些沿用中的功能，单独配置过的不受影响。',
     allowCustomSystemPrompt: false,
   },
   // ── S0-3 拆出的 6 个独立功能位（默认继承 resume_optimize，行为不变）──────────
@@ -160,7 +160,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI岗位匹配参考',
     status: 'active',
     description: '用于简历与目标岗位的匹配参考。只做排序与解释，不代表投递、面试或录用结果，也不替求职者做裁决。',
-    runtimeNote: '已被岗位匹配运行链路消费（llm-job-fit.service.ts）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    runtimeNote: '已在岗位匹配中使用。系统提示词由服务端固定。没有单独配置时沿用「AI简历优化」。',
     allowCustomSystemPrompt: false,
     inheritsFrom: 'resume_optimize',
   },
@@ -169,7 +169,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI职业规划建议',
     status: 'active',
     description: '用于基于简历生成职业方向与技能计划建议，仅供求职者本人参考。',
-    runtimeNote: '已被职业规划运行链路消费（llm-career-plan.service.ts）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    runtimeNote: '已在职业规划中使用。系统提示词由服务端固定。没有单独配置时沿用「AI简历优化」。',
     allowCustomSystemPrompt: false,
     inheritsFrom: 'resume_optimize',
   },
@@ -178,7 +178,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI招聘会拜访计划',
     status: 'active',
     description: '用于基于简历与招聘会参展信息生成参会准备单。招聘会仍只作为第三方/官方来源信息入口，不做平台内预约或投递。',
-    runtimeNote: '已被招聘会拜访计划运行链路消费（llm-fair-visit-plan.service.ts）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    runtimeNote: '已在招聘会拜访计划中使用。系统提示词由服务端固定。没有单独配置时沿用「AI简历优化」。',
     allowCustomSystemPrompt: false,
     inheritsFrom: 'resume_optimize',
   },
@@ -187,7 +187,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI自我探索解读',
     status: 'active',
     description: '用于对自我探索问卷的规则打分结果做文字解读。打分本身是纯函数，不依赖模型；本功能位只影响解读文字。',
-    runtimeNote: '已被自我探索解读运行链路消费（llm-self-assessment.service.ts）；本键不可用时解读为 null，问卷打分与主流程不受影响。未单独配置时继承「AI简历优化」。',
+    runtimeNote: '已在自我探索解读中使用。本项不可用时只是不出解读，问卷打分和其他步骤不受影响。没有单独配置时沿用「AI简历优化」。',
     allowCustomSystemPrompt: false,
     inheritsFrom: 'resume_optimize',
   },
@@ -196,7 +196,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI岗位推荐排序',
     status: 'active',
     description: '用于对第三方来源岗位列表做收敛排序与理由说明。AI 只排序与解释，不自动裁决、不代替求职者投递。',
-    runtimeNote: '已被岗位推荐运行链路消费（job-ai-llm.service.ts jobRecommend）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    runtimeNote: '已在岗位推荐中使用。系统提示词由服务端固定。没有单独配置时沿用「AI简历优化」。',
     allowCustomSystemPrompt: false,
     inheritsFrom: 'resume_optimize',
   },
@@ -205,7 +205,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI岗位解读',
     status: 'active',
     description: '用于把第三方来源岗位正文拆解为职责 / 硬性要求 / 加分项 / 准备建议，仅供求职者理解岗位信息。',
-    runtimeNote: '已被岗位解读运行链路消费（job-ai-llm.service.ts jobExplain）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    runtimeNote: '已在岗位解读中使用。系统提示词由服务端固定。没有单独配置时沿用「AI简历优化」。',
     allowCustomSystemPrompt: false,
     inheritsFrom: 'resume_optimize',
   },
@@ -216,8 +216,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     status: 'active',
     description:
       '用于顾问作业面（/ai/plan）的判型、问答、成稿与逐条比对。AI 只排序与解释，不替求职者做投递或预约决定；成稿不编造用户未提供的数字、公司名、时间与证书。',
-    runtimeNote:
-      '已被顾问作业面运行链路消费（advisor/llm-advisor.service.ts）；结构化 System Prompt 与防编造校验由服务端强制。未单独配置时继承「AI助手对话」——本能力与 P25 顾问同源，故不挂在「AI简历优化」下（S0-3 拆键后不再往那个键上加新能力）。本键不可用时作业面停在当前进度，已钉住与已生成的产物仍可查、可打印。',
+    runtimeNote: '已在顾问作业面中使用。系统提示词和防编造校验由服务端固定。没有单独配置时沿用「AI助手对话」（它和 AI 顾问同源，所以不挂在「AI简历优化」下）。本项不可用时作业面停在当前进度，已固定和已生成的内容仍可查看、可打印。',
     allowCustomSystemPrompt: false,
     inheritsFrom: 'assistant_chat',
   },
@@ -236,8 +235,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     status: 'active',
     description:
       '用于文件上传体检完成后，预填打印参数（份数 / 黑白彩色 / 单双面 / 每页张数）并给出每项依据。只建议不裁决，用户可改；不参与核价、收银与出纸判定。',
-    runtimeNote:
-      '已被打印参数预填运行链路消费（materials/print-param-suggestion.service.ts）。⚠️ 本能力是确定性规则推导，**不调用大模型**：厂商 / 模型 / API Key / 温度 / System Prompt 对它无效，只有「启用」开关生效。关闭后前台会明确显示「预填不可用，四项都需要你自己设」，打印流程不受影响。',
+    runtimeNote: '已在打印参数预填中使用。本功能按规则推算，不调用大模型：厂商、模型、API Key、温度、系统提示词对它都不起作用，只有「启用」开关生效。关闭后前台会明确显示「预填不可用，四项都需要你自己设」，打印流程不受影响。',
     allowCustomSystemPrompt: false,
   },
   {
@@ -245,7 +243,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI模拟面试',
     status: 'active',
     description: '用于求职者本人的对话式模拟面试练习与练习报告。仅供本人参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。',
-    runtimeNote: '已被 2C 模拟面试运行链路消费；面试官与报告结构化 System Prompt 由服务端强制，管理员自定义 System Prompt 不参与。',
+    runtimeNote: '已在 AI 模拟面试中使用。面试官和报告用的系统提示词由服务端固定，这里自定义的系统提示词不起作用。',
     allowCustomSystemPrompt: false,
   },
   {
@@ -253,7 +251,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI数字人引导',
     status: 'planned',
     description: '后续接入。用于一体机前台数字人引导与操作说明。',
-    runtimeNote: '后续接入，当前尚未被运行链路消费。',
+    runtimeNote: '后续接入，目前还没有功能在用。',
     allowCustomSystemPrompt: true,
   },
   {
@@ -261,7 +259,7 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     label: 'AI海报生成',
     status: 'planned',
     description: '后续接入。用于待机宣传屏 AI 海报草稿生成。',
-    runtimeNote: '独立配置待建设，当前宣传屏 AI 文生图仍为 disabled stub。',
+    runtimeNote: '独立配置还在建设中，目前待机宣传屏的 AI 生成图片处于关闭状态。',
     allowCustomSystemPrompt: true,
   },
 ]
