@@ -213,10 +213,6 @@ Agent 0.4.13 会在心跳里上报 `queue_cleanup_failed` 与 `queue_pause_faile
 - **空间与内存底子（23:3x 同一次只读）：** Agent 连续运行 180 小时，node 工作集 78 MB、峰值 84 MB，无内存上涨迹象；一体机 Edge 281 MB；可用内存 5.3 GB、C 盘剩余 130 GB。服务日志已按 10 MB 滚动、保留 5 个。**发现约 130 MB 早期遗留物**（都在 `C:\ProgramData\AIJobPrintAgent`，不在滚动范围内）：`agent-debug.log` 48 MB（6/9 后未再写）、`agent-out.log` 38 MB（6/2 后未再写）、`logs\AIJobPrintTerminalSetup.exe` 43 MB（0.4.8 旧安装包、未签名），以及 `scan-test-backup\` 里 1 个扫描件 PDF（9/10，可能含个人信息）。按规矩删除由产品负责人本人做；是否让安装包升级时顺带清掉这几类已知旧文件，交总指挥定。
 - **发布当天：** 现场验收单新增 R.5（用户走后残留、打印中强杀与拔电、重提能否出纸、缓存比对 W-87），一页纸改为约 110 分钟。
 
-## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
-
-- **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
-- **P1 `verify-feedback-notifications` 自建库过时：** 不设 `DATABASE_URL` 时它手抄建表语句，User 表缺 `passwordProofState`，一跑就报列不存在（CI 走 `DATABASE_URL` 所以没暴露，已复现）。改为按当前 schema `prisma db push`，以后 schema 加列不会再过时；设与不设 `DATABASE_URL` 两种都全绿，临时库照旧清理。
 ## 2026-09-29：自我探索同意条款加年龄一条与版本过渡、条款由服务端下发（分支 `claude/backend-hardening-20260929-selfassess-consent`）
 
 - **做了什么（Grok 实现、协调方审）：** 合规窗口裁定：同意条款加「本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。」当前版本升到 `sa-consent-v1.2026-09-29`；服务端另收一份明确列出的旧版本清单 `SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS`（只有 `sa-consent-v1.2026-08-16`），清单外仍 400；落库存实际提交的版本号。`GET /resume/self-assessment/questions` 下发 `consentItems`（与版本配套的同一份条款）。匿名结果只按 `AI_RESUME_RESULT_TTL_HOURS` 短期保存（门禁断言 expiresAt 与 endUserId 为空），「匿名不留库」的错注释已改。#1112 后续：附加到简历改按 export 档过闸；整体合规拒答改为只回打分、不让用户重答。过渡期结束的待办已写进 next-tasks（触发条件：小程序带新条款的版本全量）。
