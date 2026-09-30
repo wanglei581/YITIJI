@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
-import { formatDateTime } from '@ai-job-print/shared'
+import { formatDate, formatDateTime } from '@ai-job-print/shared'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { FRONTEND_HINT, ListPagination, Page, withFrontendHint } from '../Page'
 import { BriefcaseIcon, PlusIcon } from 'lucide-react'
@@ -222,7 +222,7 @@ export default function JobsPage() {
       salaryMin: j.salaryMin != null ? String(j.salaryMin) : '',
       salaryMax: j.salaryMax != null ? String(j.salaryMax) : '',
       salaryUnit: j.salaryUnit ?? '',
-      validThrough: j.validThrough ? j.validThrough.slice(0, 10) : '',
+      validThrough: j.validThrough ? formatDate(j.validThrough, '') : '',
       headcount: j.headcount != null ? String(j.headcount) : '',
     })
     setFormError(null)

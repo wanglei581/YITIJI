@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { isValidSourceUrl } from '../../lib/url'
 import type { PolicyPostView } from '../../services/api/policies'
 import { policyPublishedOn } from './policyFacts'
@@ -12,23 +11,39 @@ const SRC_RULE = '来源入口由发布方提供，本系统未核验其官方�
 export function NoticePanel({
   notices,
   focusId,
+  suppressAutoOpen = false,
   onOpened,
+  onActiveId,
+  onUpload,
   onOfficialEntry,
   onTab,
 }: {
   notices: PolicyPostView[]
   /** 收藏或地址里点名的那一条。在公告里就展开它，不先展开第一条。 */
   focusId?: string | null
+  /** 刚撤下一条时，不要改去展开下一条。 */
+  suppressAutoOpen?: boolean
   onOpened: (policy: PolicyPostView) => void
+  onActiveId: (id: string | null) => void
+  onUpload: (id: string) => void
   onOfficialEntry: (policy: PolicyPostView, target: SourceQrTarget) => void
   onTab: (tab: TabKey) => void
 }) {
-  const navigate = useNavigate()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
   const openedFocusRef = useRef<string | null>(null)
   const focusHit = focusId && notices.some((item) => item.id === focusId) ? focusId : null
-  const openId = touched ? expandedId : (focusHit ?? notices[0]?.id ?? null)
+  const stillThere = (id: string | null) => Boolean(id && notices.some((item) => item.id === id))
+  const openId = touched
+    ? (stillThere(expandedId) ? expandedId : null)
+    : suppressAutoOpen
+      ? focusHit
+      : (focusHit ?? notices[0]?.id ?? null)
+
+  useEffect(() => {
+    onActiveId(openId)
+    return () => onActiveId(null)
+  }, [onActiveId, openId])
 
   useEffect(() => {
     if (!focusHit || openId !== focusHit) return
@@ -133,7 +148,7 @@ export function NoticePanel({
                     </button>
                   )}
                   {/* 稿 48 公告展开条：来源二维码旁边一格上传自备材料打印（公告本身不提供下载）。 */}
-                  <button type="button" className="rq-exit" onClick={() => navigate('/print/upload')}>
+                  <button type="button" className="rq-exit" onClick={() => onUpload(notice.id)}>
                     <PrinterIcon aria-hidden="true" />
                     <span><b>上传自备材料打印</b><small>本机只打印你自己带来的文件</small></span>
                   </button>

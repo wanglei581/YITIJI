@@ -203,6 +203,12 @@ Page({
     wx.navigateTo({ url: aiEntries.resumeUploadUrl })
   },
 
+  /** 自我探索因说明更新没纳入：去自我探索按新说明重新确认（页面栈满时退回 redirectTo）。 */
+  goSelfExplore() {
+    const url = '/pages/self-explore/self-explore'
+    wx.navigateTo({ url, fail: () => wx.redirectTo({ url }) })
+  },
+
   /**
    * 生成建议单 PDF 交给打印流程。
    * 服务端这一步已把文件落到「我的文档」(purpose:'print_doc'),所以不再需要单独的

@@ -294,7 +294,7 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   expect(errors).toEqual([])
 })
 
-test('completed done renders pickup code from pay-status and never invents it @w2', async ({ page, api }) => {
+test('completed done says the paper is already out and never renders a pickup code @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
@@ -327,7 +327,9 @@ test('completed done renders pickup code from pay-status and never invents it @w
   await expect(page.getByText('请取走文件', { exact: true })).toHaveCount(0)
   await expect(page.getByText('少了页、印花了、对内容有疑问？')).toBeInViewport()
   await expect(page.getByRole('button', { name: '问小青：取纸或异常怎么办 →' })).toBeInViewport()
-  await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toBeVisible()
+  await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
+  await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('取件码', { exact: true })).toHaveCount(0)
   await expect(page.getByText('已打印', { exact: true })).toHaveCount(0)
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-completed.png'), fullPage: true })

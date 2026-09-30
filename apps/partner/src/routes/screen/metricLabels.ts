@@ -4,8 +4,8 @@ import type { ScreenGapEntry } from '@ai-job-print/ui'
 /**
  * 合作机构侧的指标中文名，以及「未接入指标归并」的计算。
  *
- * 契约给机构下发 21 个指标，其中只有 7 个能按机构切分（终端、在架岗位、内容归集、
- * 待审、同步成功率、招聘会结构、机队墙）。剩下 14 个**必须如实告诉机构没有**，
+ * 契约给机构下发 21 个指标，其中 8 个能按机构切分（终端、服务人次、在架岗位、内容归集、
+ * 待审、同步成功率、招聘会结构、机队墙）。剩下 13 个**必须如实告诉机构没有**，
  * 但不能铺 14 张一模一样的虚线卡 —— 那不是诚实，是噪音：屏看起来像坏的，
  * 6 种不同成因还被压成同一个视觉。
  *
@@ -42,6 +42,7 @@ export const PARTNER_METRIC_LABELS: Readonly<Record<ScreenMetricKey, string>> = 
 /** 主栅格里已经单独出卡的指标，不再进归并面板。 */
 export const PARTNER_PRIMARY_KEYS: readonly ScreenMetricKey[] = [
   'terminalsOnline',
+  'visitCount',
   'fleetWall',
   'jobsOnShelf',
   'contentInventory',

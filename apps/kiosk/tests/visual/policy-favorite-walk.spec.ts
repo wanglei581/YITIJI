@@ -58,6 +58,12 @@ const BROKEN: PolicyFixture = {
 const NOTICE_LIST: PolicyFixture = {
   ...SRC, id: 'notice-listed', kind: 'notice', title: '就业服务窗口调整通知',
   summary: '列表里的公告。', category: 'notice', publishedDate: '2026-06-11',
+  externalUrl: 'https://hrss.example.gov.cn/notice-window',
+}
+const NOTICE_NEXT: PolicyFixture = {
+  ...SRC, id: 'notice-next', kind: 'notice', title: '职业技能培训开班通知',
+  summary: '另一条公告，用来确认撤下后不会自动展开。', category: 'notice', publishedDate: '2026-08-18',
+  externalUrl: 'https://hrss.example.gov.cn/notice-next',
 }
 const NOTICE_LATE: PolicyFixture = {
   ...SRC, id: 'notice-late', kind: 'notice', title: '窗口时间调整通知',
@@ -66,7 +72,7 @@ const NOTICE_LATE: PolicyFixture = {
 }
 
 const GUIDE_LIST = [OTHER, FAV, DATED]
-const NOTICE_FEED = [NOTICE_LIST]
+const NOTICE_FEED = [NOTICE_LIST, NOTICE_NEXT]
 
 function shot(page: Page, name: string) {
   const dir = process.env.WALK_FIX_DIR
@@ -130,6 +136,8 @@ async function stubBootTicket(page: Page): Promise<void> {
 interface PolicyRouteState {
   broken: boolean
   holdSlow: Promise<void> | null
+  withdrawn?: Set<string>
+  failDetail?: Set<string>
 }
 
 function isPolicyRequest(url: URL): boolean {
@@ -138,19 +146,19 @@ function isPolicyRequest(url: URL): boolean {
 }
 
 async function routePolicies(page: Page, state: PolicyRouteState): Promise<void> {
-  const byId = new Map<string, PolicyFixture>([OTHER, FAV, DATED, SLOW, BROKEN, NOTICE_LIST, NOTICE_LATE].map((item) => [item.id, item]))
+  const byId = new Map<string, PolicyFixture>([OTHER, FAV, DATED, SLOW, BROKEN, NOTICE_LIST, NOTICE_NEXT, NOTICE_LATE].map((item) => [item.id, item]))
   await page.route(isPolicyRequest, async (route) => {
     const url = new URL(route.request().url())
     const detail = url.pathname.match(/^\/api\/v1\/policies\/([^/]+)$/)
     if (detail) {
       const id = decodeURIComponent(detail[1] ?? '')
       if (id === 'policy-slow' && state.holdSlow) await state.holdSlow
-      if (id === 'policy-broken' && state.broken) {
+      if ((id === 'policy-broken' && state.broken) || state.failDetail?.has(id)) {
         await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: { code: 'UPSTREAM' } }) })
         return
       }
       const found = byId.get(id)
-      if (!found) {
+      if (!found || state.withdrawn?.has(id)) {
         await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: { code: 'POLICY_NOT_FOUND' } }) })
         return
       }
@@ -158,7 +166,8 @@ async function routePolicies(page: Page, state: PolicyRouteState): Promise<void>
       return
     }
     const kind = url.searchParams.get('kind')
-    const items = kind === 'notice' ? NOTICE_FEED : kind === 'policy_guide' ? GUIDE_LIST : []
+    const feed = kind === 'notice' ? NOTICE_FEED : kind === 'policy_guide' ? GUIDE_LIST : []
+    const items = feed.filter((item) => !state.withdrawn?.has(item.id))
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -187,7 +196,7 @@ test.beforeEach(async ({ page, api }) => {
 })
 
 test('查政策磁贴写查看政策说明，不再写带走材料清单 @kiosk', async ({ page }) => {
-  const state: PolicyRouteState = { broken: false, holdSlow: null }
+  const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set(), failDetail: new Set() }
   await routePolicies(page, state)
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const tile = page.locator('[data-action="policy-hub"]')
@@ -304,4 +313,70 @@ test('不在列表里的公告按条打开，发布时间用确认发布时间 @
   await expect(opened.locator('.rq-facts')).toContainText('发布时间')
   await expect(opened.locator('.rq-facts')).toContainText('2026-07-15')
   await expect(page.locator('[data-policy-id="notice-listed"]')).not.toHaveClass(/is-open/)
+})
+
+test('已展开的政策被撤下后，点来源码不再打开，并回到列表 @kiosk', async ({ page }) => {
+  const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set() }
+  await routePolicies(page, state)
+  await page.goto('/renshi', { waitUntil: 'domcontentloaded' })
+  const fav = page.locator('[data-policy-id="policy-fav"]')
+  await expect(fav).toBeVisible()
+  await fav.getByRole('button', { name: /高校毕业生求职创业补贴/ }).click()
+  await expect(fav).toHaveClass(/is-open/)
+  state.withdrawn?.add('policy-fav')
+  await fav.getByRole('button', { name: /扫码打开来源链接/ }).click()
+  const note = page.getByTestId('renshi-policy-action')
+  await expect(note).toHaveAttribute('data-action-phase', 'withdrawn')
+  await expect(note).toHaveText('这条政策已经撤下，不再提供来源入口')
+  await expect(page.getByRole('heading', { name: '扫码打开来源链接' })).toHaveCount(0)
+  await expect(page).toHaveURL(/\/renshi$/)
+  await expect(page.locator('[data-policy-id="policy-fav"]')).toHaveCount(0)
+  await expect(page.locator('[data-policy-id="policy-other"]')).not.toHaveClass(/is-open/)
+  await expect(page.getByText('接口')).toHaveCount(0)
+  await shot(page, 'W-90-policy-source-withdrawn.png')
+})
+
+test('已展开的公告被撤下后，上传自备材料留在这一页并说明 @kiosk', async ({ page }) => {
+  const state: PolicyRouteState = { broken: false, holdSlow: null, withdrawn: new Set() }
+  await routePolicies(page, state)
+  await page.goto('/renshi?tab=notice', { waitUntil: 'domcontentloaded' })
+  const listed = page.locator('[data-policy-id="notice-listed"]')
+  await expect(listed).toHaveClass(/is-open/)
+  const upload = page.getByTestId('renshi-ctabar').getByRole('button', { name: '上传自备材料打印' })
+  await expect(upload).toHaveAttribute('data-upload-target', 'notice-listed')
+  state.withdrawn?.add('notice-listed')
+  await upload.click()
+  await expect(page).toHaveURL(/\/renshi/)
+  await expect(page).not.toHaveURL(/\/print\/upload/)
+  await expect(page.getByText('这条政策已经撤下，不再提供来源入口', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-policy-id="notice-listed"]')).toHaveCount(0)
+  await expect(page.locator('[data-policy-id="notice-next"]')).not.toHaveClass(/is-open/)
+  await shot(page, 'W-90-notice-upload-withdrawn.png')
+})
+
+test('还在的公告可以进入上传自备材料 @kiosk', async ({ page }) => {
+  const state: PolicyRouteState = { broken: false, holdSlow: null }
+  await routePolicies(page, state)
+  await page.goto('/renshi?tab=notice', { waitUntil: 'domcontentloaded' })
+  const upload = page.getByTestId('renshi-ctabar').getByRole('button', { name: '上传自备材料打印' })
+  await expect(upload).toHaveAttribute('data-upload-target', 'notice-listed')
+  await upload.click()
+  await page.waitForURL((url) => url.pathname === '/print/upload')
+  await expect(page.getByText('怎么进来')).toBeVisible()
+  await expect(page.getByText('选文件').first()).toBeVisible()
+  await shot(page, 'W-90-upload-entry-open.png')
+})
+
+test('这次没确认政策还在时不说已经撤下，也不打开来源码 @kiosk', async ({ page }) => {
+  const state: PolicyRouteState = { broken: false, holdSlow: null, failDetail: new Set(['policy-fav']) }
+  await routePolicies(page, state)
+  await page.goto('/renshi', { waitUntil: 'domcontentloaded' })
+  const fav = page.locator('[data-policy-id="policy-fav"]')
+  await fav.getByRole('button', { name: /高校毕业生求职创业补贴/ }).click()
+  await expect(fav).toHaveClass(/is-open/)
+  await fav.getByRole('button', { name: /扫码打开来源链接/ }).click()
+  await expect(page.getByText('这次没有确认这条还在，先不打开来源入口。', { exact: true })).toBeVisible()
+  await expect(page.getByText('这条政策已经撤下，不再提供来源入口')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '扫码打开来源链接' })).toHaveCount(0)
+  await expect(fav).toHaveClass(/is-open/)
 })

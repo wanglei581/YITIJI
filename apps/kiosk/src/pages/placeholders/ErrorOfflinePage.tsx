@@ -134,7 +134,8 @@ async function readPrinterStatus(signal: AbortSignal): Promise<PrinterReading> {
     const verdict: Verdict = raw === 'offline' ? ['离线', 'bad']
       : raw === 'paper_empty' ? ['缺纸', 'bad']
         : raw === 'error' ? ['异常', 'bad']
-          : ['没读到', 'warn']
+          : (raw === 'queue_cleanup_failed' || raw === 'queue_pause_failed') ? ['暂停接单', 'bad']
+            : ['没读到', 'warn']
     return { heartbeatOnline, ready: false, verdict }
   } catch {
     return UNREAD

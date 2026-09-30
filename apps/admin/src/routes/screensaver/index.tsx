@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Card, ComplianceBanner, EmptyState, StatusBadge } from '@ai-job-print/ui'
 import {
   EyeIcon,
@@ -24,7 +24,14 @@ import {
   type ScreensaverTerminalView,
 } from '../../services/api/screensaver'
 import { API_BASE_URL } from '../../services/api/client'
-import { saveScreensaverTerminalForm, screensaverTerminalFormState } from './terminalConfigState'
+import { getTerminals } from '../../services/api/devices'
+import {
+  indexScreensaverTerminalPlaces,
+  saveScreensaverTerminalForm,
+  screensaverTerminalFormState,
+  screensaverTerminalHeading,
+  type ScreensaverTerminalPlace,
+} from './terminalConfigState'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 
 type Tab = 'assets' | 'playlists' | 'terminals'
@@ -703,24 +710,37 @@ function PlaylistEditor({
 function TerminalsTab() {
   const [terminals, setTerminals] = useState<ScreensaverTerminalView[]>([])
   const [playlists, setPlaylists] = useState<AdPlaylistView[]>([])
+  const [places, setPlaces] = useState<Map<string, ScreensaverTerminalPlace>>(new Map())
+  const [generation, setGeneration] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const reload = useCallback(() => {
-    setLoading(true)
-    Promise.all([screensaverService.listTerminals(), screensaverService.listPlaylists()])
-      .then(([ts, pl]) => {
+  const reload = useCallback((silent = false) => {
+    if (!silent) setLoading(true)
+    Promise.all([
+      screensaverService.listTerminals(),
+      screensaverService.listPlaylists(),
+      getTerminals().then((res) => res.terminals).catch(() => []),
+    ])
+      .then(([ts, pl, devices]) => {
         setTerminals(ts)
         setPlaylists(pl)
+        setPlaces(indexScreensaverTerminalPlaces(devices))
+        setError(null)
+        setGeneration((current) => current + 1)
       })
-      .catch((e) => setError(userMessageOf(e, '加载失败，请稍后重试')))
-      .finally(() => setLoading(false))
+      .catch((e) => {
+        if (!silent) setError(userMessageOf(e, '加载失败，请稍后重试'))
+      })
+      .finally(() => {
+        if (!silent) setLoading(false)
+      })
   }, [])
 
-  useEffect(reload, [reload])
+  useEffect(() => { reload() }, [reload])
 
-  if (loading) return <p className="text-sm text-neutral-400">加载中…</p>
-  if (error) return <p className="text-sm text-error">{error}</p>
+  if (loading && terminals.length === 0) return <p className="text-sm text-neutral-400">加载中…</p>
+  if (error && terminals.length === 0) return <p className="text-sm text-error">{error}</p>
   if (terminals.length === 0) {
     return <EmptyState title="暂无终端" description="终端注册后会出现在这里，可单独配置待机宣传屏。" />
   }
@@ -728,7 +748,14 @@ function TerminalsTab() {
   return (
     <div className="space-y-3">
       {terminals.map((t) => (
-        <TerminalConfigRow key={t.terminalId} terminal={t} playlists={playlists} onSaved={reload} />
+        <TerminalConfigRow
+          key={t.terminalId}
+          terminal={t}
+          playlists={playlists}
+          place={places.get(t.terminalCode ?? '') ?? places.get(t.terminalId)}
+          reloadGeneration={generation}
+          onSaved={() => reload(true)}
+        />
       ))}
     </div>
   )
@@ -737,10 +764,14 @@ function TerminalsTab() {
 function TerminalConfigRow({
   terminal,
   playlists,
+  place,
+  reloadGeneration,
   onSaved,
 }: {
   terminal: ScreensaverTerminalView
   playlists: AdPlaylistView[]
+  place: ScreensaverTerminalPlace | undefined
+  reloadGeneration: number
   onSaved: () => void
 }) {
   const cfg = terminal.config
@@ -750,6 +781,21 @@ function TerminalConfigRow({
   const [playlistId, setPlaylistId] = useState(initialState.playlistId)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const seenGeneration = useRef(reloadGeneration)
+  const heading = screensaverTerminalHeading(terminal, place)
+
+  useEffect(() => {
+    if (reloadGeneration === seenGeneration.current) return
+    seenGeneration.current = reloadGeneration
+    if (msg !== '已保存') return
+    const server = screensaverTerminalFormState(terminal.config)
+    const same = server.enabled === enabled && server.timeout === timeout && server.playlistId === playlistId
+    if (same) return
+    setEnabled(server.enabled)
+    setTimeoutSec(server.timeout)
+    setPlaylistId(server.playlistId)
+    setMsg(null)
+  }, [reloadGeneration, terminal.config, msg, enabled, timeout, playlistId])
 
   const save = useCallback(async () => {
     setSaving(true)
@@ -779,7 +825,8 @@ function TerminalConfigRow({
       <div className="flex items-center gap-2">
         <MonitorIcon className="h-5 w-5 text-neutral-400" aria-hidden="true" />
         <div>
-          <p className="font-medium text-neutral-800">{terminal.terminalCode ?? terminal.terminalId}</p>
+          <p className="font-medium text-neutral-800">{heading.title}</p>
+          {heading.subtitle && <p className="text-xs text-neutral-500">{heading.subtitle}</p>}
           <StatusBadge dot status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
         </div>
       </div>

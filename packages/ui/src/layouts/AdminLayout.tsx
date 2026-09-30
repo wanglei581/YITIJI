@@ -98,7 +98,7 @@ export function AdminLayout({
             ? <div className="shrink-0">{appLogo}</div>
             : (
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-gradient-to-br from-[#fdfbf4] to-[#dff2ea]">
-                <span className="text-[13px] font-extrabold leading-none text-primary-700">AI</span>
+                <span className="text-sm font-extrabold leading-none text-primary-700">AI</span>
               </div>
             )
           }
@@ -188,7 +188,7 @@ export function AdminLayout({
             {!collapsed && (
               <div className="min-w-0">
                 {userName && (
-                  <p className="truncate text-[13px] font-semibold text-white">{userName}</p>
+                  <p className="truncate text-sm font-semibold text-white">{userName}</p>
                 )}
                 {userRole && (
                   <p className="mt-0.5 truncate text-[11px] text-white/60">{userRole}</p>
@@ -217,7 +217,7 @@ export function AdminLayout({
       </aside>
 
       {/* ── Main area ──────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
         <header className="ui-admin-topbar flex h-[60px] shrink-0 items-center justify-between border-b border-neutral-900/[0.06] bg-surface px-7">
@@ -288,7 +288,7 @@ export function AdminLayout({
         </header>
 
         {/* Page content — scrollable */}
-        <main className="ui-admin-content flex-1 overflow-y-auto px-7 pb-8 pt-6">
+        <main className="ui-admin-content min-w-0 flex-1 overflow-y-auto px-7 pb-8 pt-6">
           <div className="mx-auto w-full max-w-[1400px]">
             {children}
           </div>
