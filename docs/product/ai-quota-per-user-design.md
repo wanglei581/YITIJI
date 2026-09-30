@@ -1,0 +1,132 @@
+# AI 按人额度设计（2026-09-30）
+
+> 依据：产品负责人 2026-09-30 拍板四项（先登录、沿用默认次数、用完不收费、先补三个漏洞再做整套）。
+> 取证：Codex 只读核查与 agy 反方意见（本机 `~/.cache/claude-lanes/ai-quota-0930/`，不进仓库）。
+> agy 把《互联网信息服务深度合成管理规定》第九条引成「不得向未认证者提供一切生成服务」是误引，
+> 实名要求以 [compliance-boundary.md](../compliance/compliance-boundary.md) 为准。
+> 第一步「三个漏洞」由走查窗口在做（公共按次额度改认已验签终端、TRTC 单次通话时长上限、小程序登记 AI 预算错误码），
+> 本设计建在它之上，**第一步合进候选之前不开工**，免得撞同一批文件。
+
+## 一、要解决什么
+
+今天的 AI 限额有两层，各管一半：
+
+- **按金额**：全站每天 100 元、每台已验签终端 30 元、每个会员 5 元（`ai/usage/ai-budget.service.ts`）。这是花钱封顶，对用户不可见，也不能按人调。
+- **按次数**：只有小青对话（会员 80 次/天）和简历解析（会员 20 次/天）两个入口有，存在 Redis 计数里（`ai/ai-public-quota.service.ts`）。其余几十个会调模型的入口没有次数限制；用户看不到还剩几次；机构想给某个人多加几次也没有办法。
+
+要做到：
+
+1. 每个登录用户每天有固定的免费次数，三个桶：**简历类 20 次、小青 80 轮、模拟面试 5 场**（沿用现有默认，试点两周后按实际用量调）。
+2. 机构可以给某个人额外加次数（有数量、有效期、可撤销），走现有的权益账本，不另起一套。
+3. 用完**不收费、不出现购买引导**：提示「今天的 AI 次数用完了，明天 0 点恢复」，AI 这一步退回「模板 + 填空」，打印扫描照常。
+4. 本人在一体机和小程序上看得到还剩几次、什么时候恢复。
+5. 游客额度开关做好但**默认 0**（`AI_LOGIN_GATE=before_generate` 保持）；以后网信办答复宽松再开。
+6. 付费只留接口，不做链路。
+
+金额封顶**继续保留**，作为独立的安全闸：次数还有剩，全站或本机当天花到上限照样停 AI。
+
+## 二、「1 次」怎么算（统一口径）
+
+一次 = 用户视角里的**一件事**，不是一次模型调用。内部重试、多轮出题、报告生成都不重复扣。
+
+| 桶 | 算一次的事 | 操作号（同号不重复扣） |
+|---|---|---|
+| 简历类 `ai_resume` | 简历诊断（上传解析 + 诊断报告）、简历优化、AI 生成简历、事实核对、版式调整、职业规划、岗位匹配参考、招聘会拜访计划、自我探索解读、岗位推荐 / 岗位解读 / 岗位匹配、合同审查、顾问作业面一次成稿 | 各自的 taskId / sessionId + 操作名 |
+| 小青 `ai_assistant` | 小青一轮问答（**语音转写 + 随后的文字回答合起来算一轮**）、会话小结、顾问作业面一次追问 | 客户端每轮生成的 turnId；语音与文字带同一个 turnId |
+| 模拟面试 `ai_interview` | 一场模拟面试（创建即算，场内出题、作答转写、音频、报告都不再扣） | interview sessionId |
+
+**不计次**：只读、导出、打印、保存草稿、删除本人数据、规则评分与模板材料、打印前材料检查（非模型）、结束 TRTC 会话。TRTC 开会话本身不单独扣次，它的成本由第一步的单次通话时长上限和金额封顶管；会话里每一轮问答照小青计。
+
+每日早报（`assistant/daily-report`）如果是全站共享内容就不按人计次，实现时核实；如果是按人生成则归小青桶。
+
+上表的归桶是本设计的推荐默认，**有三处请总指挥确认**（见第七节）。
+
+## 三、数据模型（SQLite 与 PostgreSQL 两套迁移）
+
+### 3.1 每日免费额度：`AiQuotaDaily`
+
+```
+AiQuotaDaily {
+  endUserId  String
+  bucket     String   // ai_resume | ai_assistant | ai_interview
+  day        String   // 北京时间 YYYY-MM-DD，与现有 dayKey 一致
+  used       Int      @default(0)
+  @@id([endUserId, bucket, day])
+}
+```
+
+用数据库条件更新做原子预占：`updateMany where used < limit set used = used + 1`，受影响行数为 0 即用完。两种库行为一致，不依赖 Redis（Redis 挂了时会员额度仍能正确判断；游客与 IP 天花板继续在 Redis 里，失败关闭照旧）。
+
+### 3.2 机构加的次数：扩展 `BenefitGrant`
+
+- `benefitType` 新增 `ai_quota`；新增可空列 `serviceKey`（取值同桶名）。
+- 数量、有效期、状态、撤销全部沿用现有字段和后台发放接口；`ai_quota` 必须带 `serviceKey` 和 1–9999 的数量。
+- 共享契约 `packages/shared/src/types/memberBenefits.ts` 与 API 本地副本同步加类型。
+
+### 3.3 预占记录：`AiQuotaReservation`
+
+```
+AiQuotaReservation {
+  id           String   @id @default(cuid())
+  operationKey String   @unique   // hash(bucket + 操作号)，重放不重扣
+  endUserId    String?
+  terminalId   String?            // 游客池时记已验签终端
+  bucket       String
+  source       String             // daily | grant | guest
+  day          String
+  benefitGrantId String?          // source=grant 时
+  status       String             // reserved | committed | released
+  reservedAt   DateTime @default(now())
+  settledAt    DateTime?
+  @@index([endUserId, bucket, day])
+  @@index([status, reservedAt])
+}
+```
+
+生命周期：
+
+1. **预占**（调用模型之前）：先查 `operationKey`，已有 reserved / committed 直接放行（重放不重扣）；否则按「当日免费 → 机构加的次数（最早到期的先用）」顺序原子扣一次，写 reserved。
+2. **完成**：模型结果交到用户手里 → committed；source=grant 时同事务写一条 `RedemptionRecord`（`serviceType = bucket`，`serviceRefId = operationKey`），沿用现有核销账本，不建第二套。
+3. **归还**：模型失败、被拒、超时且确认用户没拿到结果 → released，并把当日计数或权益余量加回去。
+4. **兜底**：reserved 超过 15 分钟没结算的，定时任务一律按「归还」处理（宁可少扣，不多扣），写审计。
+
+金额封顶（`AiBudgetService`）照旧在预占之前检查；两道闸都过才调模型。
+
+## 四、接口
+
+- `GET /me/ai-quota`（登录本人）：三个桶各返回 `{ bucket, dailyLimit, dailyUsed, dailyRemaining, extraRemaining, extraEarliestExpiry, resetsAt }`。`resetsAt` 是下一个北京时间 0 点的 ISO 时间。
+- `GET /kiosk/ai-quota`（已验签终端，未登录时）：返回游客池余量；开关为 0 时返回 `guestEnabled: false`，前端显示「登录后可用 AI」。
+- 用完时统一错误码 `AI_QUOTA_EXHAUSTED`（HTTP 429），带 `bucket` 与 `resetsAt`；与金额封顶的 `AI_BUDGET_EXHAUSTED` 分开，前端文案不同（一个是「你今天的次数」，一个是「今天 AI 服务暂停」）。
+- 管理员：现有 `POST /admin/member-benefits` 支持 `benefitType=ai_quota` + `serviceKey`；「AI 服务管理」用量接口加三个桶当日总用量、用完人数、游客池开关与每台默认值。
+
+现有 `ai-public-quota` 的会员维度（小青 80、解析 20）由新服务接管，不再双重计数；终端与 IP 维度保留为防刷天花板。
+
+## 五、前端（只在现有页面上加）
+
+- **管理员后台**：「会员权益」页发放表单加「AI 次数」类型和桶选择；「AI 服务管理」用量面板加三个桶的当日用量与游客池设置。不新建菜单、不新建页。
+- **一体机**：简历服务入口、小青页、模拟面试入口显示「今天还能用 N 次，明天 0 点恢复」；登录后「我的权益」同步显示机构加的次数与到期日。用完时 AI 按钮换成「用模板填写」，已输入的内容保留，打印扫描不受影响。
+- **小程序**：「AI 工具」页和诊断、面试、小青操作区加一行余量文字；**颜色与风格不改**，只用现有样式类；不出现价格、购买、充值、会员等字样。
+
+## 六、实施分四个任务包（Codex 实现，agy 反方评审，Claude 审 diff、跑门禁、做变异）
+
+| 包 | 内容 | 主要文件 | 门禁 |
+|---|---|---|---|
+| Q1 账本与服务 | 两个新表 + `BenefitGrant.serviceKey` 两套迁移；`AiQuotaService`（预占 / 完成 / 归还 / 兜底清扫）；共享类型 | `prisma/schema*.prisma`、两套 migrations、`ai/quota/*`、`member-benefits` 类型与发放校验、`benefit-redemption` 用途校验 | 新门禁 `verify:ai-quota`：账号隔离、一体机与小程序合并计数、跨日、有效期、撤销、最后一次并发只成功一个、失败归还、超时兜底、重放不重扣、Redis 挂掉会员额度照常 |
+| Q2 接入全部入口 | 第二节表里每个生成 / 语音入口接预占与结算；小青语音 + 文字共用 turnId；面试整场一次；`ai-public-quota` 会员维度改由新服务承担 | `ai/ai.controller.ts`、`mock-interview/*`、`advisor/*`、`contract-review/*`、`job-ai/*`、各 plan / fit controller | 扩展门禁：静态扫描所有 `@AiUse('generate'|'voice')` 路由，每一条要么接了额度、要么在「不计次」白名单里写明理由；新增入口不登记即红 |
+| Q3 余量接口与后台 | `GET /me/ai-quota`、`GET /kiosk/ai-quota`；管理员发放 `ai_quota`；用量面板三桶统计与游客池设置 | `ai/quota/*.controller.ts`、`member-benefits` 发放、`admin` 两个现有页 | 余量与实际扣减一致；非本人读不到；后台只在现有页 |
+| Q4 两端显示与用完退化 | 一体机三处入口与「我的权益」；小程序「AI 工具」页与三个操作区；`AI_QUOTA_EXHAUSTED` 文案与退回模板 | `apps/kiosk` 对应页、`apps/miniapp/pages/ai/*`、`utils/user-error.js` | 用完时手动路径可达、输入保留；小程序样式不变检查；无价格 / 购买字样检查 |
+
+估算 10–15 人日（后端与迁移 5–7，后台 1–2，两端 2–3，联调与真实页面验证 2–3），10 月内完成、试点前上线。Q1 合进候选后 Q2、Q3 可并行；Q4 等 Q3 的接口合入。
+
+## 七、请总指挥确认的三处
+
+1. **合同审查、顾问作业面、岗位推荐三类归「简历类」桶**（推荐）。另一个选项是单开第四个桶，但产品负责人拍的是三个桶，不宜再加。
+2. **额度用尽后先用机构加的次数，再拒绝**（推荐）；反过来「先用机构加的」会让机构发的次数在用户还有免费额度时就被消耗掉。
+3. **结果不明时按「归还」处理**（推荐，宁可少扣）：模型已调用但因超时没能交给用户的，不扣次数；金额封顶照样记账，所以不会造成超支。
+
+## 八、不做的事
+
+- 不做任何面向求职者的付费、充值、购买、会员字样与链路（公共就业点位对求职者免费；网上收费要增值电信许可；小程序卖虚拟服务要接微信虚拟支付）。付费只保留「额度来源」这一抽象，以后有许可再接。
+- 不改游客登录要求（D1 保持）；游客池开关默认 0。
+- 不动金额封顶的阈值和逻辑。
+- 不新建后台页、不改小程序颜色与风格。
