@@ -391,6 +391,8 @@ jobs:
           pnpm run verify:scan-deletion-audit
           # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
           pnpm run verify:task-reliability
+          # 同一任务号按 attempt 重打：临时 SQLite + loopback HTTP + 打印桩，不碰 Windows 打印机。
+          pnpm run verify:print-retry-attempt
           # Real child processes race for the process-lifetime singleton (Unix socket here, named pipe on Windows).
           pnpm run verify:singleton-process
           # Field test day 1 (P0-9) evidence script: read-only, count-only, same singleton rule as the Agent.
@@ -401,6 +403,8 @@ jobs:
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
           pnpm run verify:print-monitor-truth
+          # 解析 Get-PrintJob 输出并按本进程 SID 筛选。不建打印机。
+          pnpm run verify:print-queue-residue
           # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
           pnpm run verify:image-scale-truth
           pnpm run verify:network-diagnostics
@@ -416,6 +420,10 @@ jobs:
           # F0.5 仅观察边界：静态确认 Agent 没有下载、安装、服务控制或任何
           # 制品身份回传能力；不触发 Windows API、打印机或本地 Agent。
           pnpm run verify:release-observation-boundary
+
+      - name: Verify queue dispatch printer status
+        working-directory: services/api
+        run: pnpm run verify:queue-dispatch-printer-status
 
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
@@ -1131,6 +1139,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:error-observability
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
+          # 会员重提与管理员重试同时打同一单：统一锁序后不得 40P01，也不得两边都成功。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-retry-lock:postgres
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting

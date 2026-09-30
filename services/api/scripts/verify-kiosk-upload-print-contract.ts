@@ -30,7 +30,8 @@ function fail(msg: string): never {
   process.exit(1)
 }
 function ok(cond: boolean, msg: string) {
-  cond ? pass(msg) : fail(msg)
+  if (cond) pass(msg)
+  else fail(msg)
 }
 
 async function main() {
@@ -115,6 +116,10 @@ async function main() {
   const latin1DecodedUtf8Filename = Buffer.from(expectedChineseFilename, 'utf8').toString('latin1')
   ok(await uploadKioskFilename(latin1DecodedUtf8Filename) === expectedChineseFilename, 'UTF-8/Latin-1 乱码的中文文件名恢复后才落库并回传')
   ok(await uploadKioskFilename(expectedChineseFilename) === expectedChineseFilename, '已正确解码的中文文件名保持不变')
+  for (const expectedFilename of ['（1）.pdf', 'レジュメ.pdf', '이력서.pdf', '📄简历.pdf', '【终版】.pdf']) {
+    const latin1Decoded = Buffer.from(expectedFilename, 'utf8').toString('latin1')
+    ok(await uploadKioskFilename(latin1Decoded) === expectedFilename, `UTF-8/Latin-1 乱码的非汉字文件名恢复：${expectedFilename}`)
+  }
   ok(await uploadKioskFilename('résumé.pdf') === 'résumé.pdf', '合法 Latin-1 文件名不被误解码')
   ok(await uploadKioskFilename('Ã©.pdf') === 'Ã©.pdf', '可构成 UTF-8 字节的非中文 Latin-1 文件名不被误解码')
 

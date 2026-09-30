@@ -15,7 +15,6 @@ import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { formatRemainingSeconds, useRemainingSeconds } from '../../hooks/useCountdown'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { getPayStatus } from '../../services/print/paymentApi'
 import {
   getPrintJobStatus,
   issuePrintJobTakeawayUrl,
@@ -91,7 +90,7 @@ function fileRetentionFromStatus(result: PrintJobStatusResult) {
 /**
  * Agent 在派发已开始、但重启后无法确认纸到底出没出时上报的码
  * （`terminal-agent/src/agent/task-runner.ts`）。整条链路对它的口径都是「**无法确认**」：
- * 服务端在任何写入之前拒绝重排以防重复出纸（`PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN`），
+ * 服务端在任何写入之前拒绝重排以防重复出纸（`PRINT_RETRY_UNCONFIRMED_FORBIDDEN`），
  * Admin 也只引导人工核查后决定处理费用。
  *
  * 唯独本页此前把它和普通失败混在一起，标题写「打印失败」、副标题写
@@ -104,12 +103,6 @@ const PRINT_JOB_UNCONFIRMED = 'PRINT_JOB_UNCONFIRMED'
 function toPublicQrUrl(signedUrl: string): string {
   if (/^https?:\/\//i.test(signedUrl)) return signedUrl
   return `${window.location.origin}${signedUrl.startsWith('/') ? signedUrl : `/${signedUrl}`}`
-}
-
-interface PickupLookup {
-  orderId: string
-  code: string | null
-  error: string | null
 }
 
 const ACTIVE_PRINT_STATUSES = ['pending', 'claimed', 'printing'] as const
@@ -154,9 +147,6 @@ export function PrintDonePage() {
     verification?.taskId === taskId && verification.errorCode === PRINT_JOB_UNCONFIRMED
   const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : resultState
 
-  const [pickupLookup, setPickupLookup] = useState<PickupLookup | null>(null)
-  const pickupCode = state.orderId && pickupLookup?.orderId === state.orderId ? pickupLookup.code : null
-  const pickupCodeError = state.orderId && pickupLookup?.orderId === state.orderId ? pickupLookup.error : null
   const [takeaway, setTakeaway] = useState<PrintJobTakeawayUrl | null>(null)
   const [takeawayError, setTakeawayError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
@@ -267,30 +257,6 @@ export function PrintDonePage() {
       })
     return () => { cancelled = true }
   }, [getToken, resultState, state.paymentSessionToken, taskId])
-
-  useEffect(() => {
-    if (resultState !== 'completed' || API_MODE !== 'http' || !state.orderId || !state.paymentSessionToken) {
-      setPickupLookup(null)
-      return
-    }
-    const orderId = state.orderId
-    const paymentSessionToken = state.paymentSessionToken
-    let cancelled = false
-    setPickupLookup(null)
-    void (async () => {
-      try {
-        const s = await getPayStatus({ orderId, paymentSessionToken })
-        if (!cancelled) {
-          setPickupLookup({ orderId, code: s.pickupCode, error: null })
-        }
-      } catch {
-        if (!cancelled) {
-          setPickupLookup({ orderId, code: null, error: '取件凭证暂时无法读取，请联系工作人员核验订单' })
-        }
-      }
-    })()
-    return () => { cancelled = true }
-  }, [resultState, state.orderId, state.paymentSessionToken])
 
   const takeawayCopy = doneTakeaway(file ? { pages: file.pages } : null, params)
 
@@ -676,27 +642,7 @@ export function PrintDonePage() {
               <span className="pff-step-txt">证件<b>原件和复印件一起带走</b>，别留在机器旁；复印件只用于本人求职等正当用途。</span>
             </div>
           ) : null}
-          {pickupCode && (
-            <div className="pff-pickup">
-              <div>
-                <div className="pff-pickup-t">取件码</div>
-                <div className="pff-pickup-s">有效期以手机订单为准。领取时核对文件和页数，请勿拍照外传。</div>
-              </div>
-              <div className="pff-pickup-code" aria-label={`取件码 ${pickupCode}`}>
-                {/^\d{8}$/.test(pickupCode)
-                  ? pickupCode.split('').map((digit, index) => <span key={index}>{digit}</span>)
-                  : pickupCode}
-              </div>
-            </div>
-          )}
-          {pickupCodeError && (
-            <div className="print-pickup">
-              <div className="print-pickup-error">
-                <AlertCircleIcon style={{ display: 'inline', width: 16, height: 16, marginRight: 6, verticalAlign: 'middle' }} aria-hidden="true" />
-                {pickupCodeError}
-              </div>
-            </div>
-          )}
+          <p className="pff-out-sub">已在本机出纸</p>
         </div>
 
         {typeof hasEndUser === 'boolean' && (

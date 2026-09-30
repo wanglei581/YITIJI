@@ -586,8 +586,8 @@ async function main(): Promise<void> {
     }
     const k2 = get('kiosk_task', K2)
     const k8 = get('kiosk_task', K8)
-    check(diffs.length === 0 && typeof k2.pickupCode === 'string' && k2.pickupCode.length > 0 && k8.pickupCode === null,
-      '一体机任务的支付字段与取件凭证码和旧 /me/print-orders 逐字段一致（已付未完成给码，已完成不给）', diffs.join(';'))
+    check(diffs.length === 0 && k2.pickupCode === null && k8.pickupCode === null,
+      '一体机任务的支付字段和旧 /me/print-orders 逐字段一致（现打现取没有哈希，已付也不下发取件码）', diffs.join(';'))
 
     // status / kind 过滤
     const buckets: Record<string, Set<string>> = {}

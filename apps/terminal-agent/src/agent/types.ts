@@ -107,6 +107,12 @@ export interface AgentConfig {
    */
   printerName: string
   /**
+   * 空闲时暂停本机配置打印机的 Windows 队列。代码默认 false。
+   * 生产安装脚本默认写 true。兼作工作电脑的机器用 -KeepPrinterQueueUnpaused 关掉，
+   * 因为暂停队列也会挡住这台电脑上别的程序打印。
+   */
+  holdPrinterQueueWhenIdle?: boolean
+  /**
    * 打印机"扫描到 SMB/FTP 共享目录"对应的本地可访问路径（映射盘符或 UNC 路径）。
    * 显式配置，不给默认值；未配置时扫描监听整体不启动，不影响其余 Agent 功能。
    */
@@ -151,7 +157,15 @@ export interface AgentConfig {
 // ── Heartbeat ────────────────────────────────────────────────────────────────
 
 export type TerminalStatus = 'online' | 'offline' | 'error' | 'agent_degraded'
-export type PrinterStatus = 'ready' | 'offline' | 'error' | 'low_paper' | 'paper_empty' | 'unknown'
+export type PrinterStatus =
+  | 'ready'
+  | 'offline'
+  | 'error'
+  | 'low_paper'
+  | 'paper_empty'
+  | 'unknown'
+  | 'queue_cleanup_failed'
+  | 'queue_pause_failed'
 
 export interface HeartbeatPayload {
   status: TerminalStatus
@@ -220,6 +234,12 @@ export interface ClaimTask {
    * 只用于把出纸监控窗口按 页数 × 份数 放大，不参与任何计费或校验。
    */
   billablePages?: number
+  /**
+   * 服务端允许的重提次数。缺省视为 0（老服务端不带这个字段）。
+   * 只和 taskId 一起做本地判重，不参与计费。
+   * attempt>0 在老 Agent 上仍按 0 处理，不会再次出纸。发布顺序是先服务端、再 Agent 0.4.13。
+   */
+  attempt?: number
 }
 
 // ── Status PATCH ──────────────────────────────────────────────────────────────
@@ -230,6 +250,11 @@ export interface PatchStatusPayload {
   status: ReportableStatus
   errorCode?: string
   errorMessage?: string
+  /**
+   * 这一轮打印的 attempt。缺省按 0 入队。服务端见到小于当前 attempt 的补报会拒绝。
+   * 老 Agent 不带此字段，服务端保持原有状态机。
+   */
+  attempt?: number
 }
 
 export interface PatchStatusResponse {

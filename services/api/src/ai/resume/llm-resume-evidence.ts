@@ -7,6 +7,7 @@ import type {
   ResumeScoringDimensionKey,
 } from '../interfaces/ai-provider.interface'
 import { containsForbiddenWord } from '../llm/llm-guard'
+import { extractResumeExperienceCandidates } from './resume-structure'
 
 // ============================================================
 // 简历诊断「内容结构 + 问题证据」清洗器（S25 报告页主视觉的服务端一侧）
@@ -100,6 +101,7 @@ export const RESUME_STRUCTURE_PROMPT_RULES: readonly string[] = [
     + '不得推断招聘方的决定，不得涉及是否通过筛选、是否获得面试或录用等结果。',
   'issues[].fixIt 只给可执行的改写动作，不得替用户编造经历、数字或成果。',
   '不要输出 issues[].id 或严重度字段：id 由服务端分配，严重度由服务端按维度得分机械分档，写了也会被忽略。',
+  '内容块归类以原文语义为准，不以视觉位置或标题前后为准：含公司/单位/组织与时间段的整行即使出现在「工作经历」标题前，也必须放进 experience；项目、实习、校园经历分别放入 project 或 experience，不能只看块名漏掉条目。',
 ]
 
 /**
@@ -142,6 +144,32 @@ export function sanitizeContentBlocks(value: unknown, maskedText: string): Resum
       if (lines.length >= MAX_BLOCK_LINES) break
     }
     if (lines.length > 0) linesByKey.set(blockKey, lines)
+  }
+
+  // 文字层 PDF 的模型回包有时仍按视觉块归类。对已经回配到某个块的
+  // 「组织 + 时间段」整行做一次确定性纠偏：只移动原文已有的行，不把模型
+  // 没摘出的行凭空补进报告；这样标题前的经历不会继续躺在基础信息里。
+  for (const candidate of extractResumeExperienceCandidates(maskedText)) {
+    const candidateLine = cleanLine(candidate.line, MAX_LINE_CHARS)
+    if (!candidateLine) continue
+    const needle = normalizeForMatch(candidateLine)
+    const source = [...linesByKey.entries()].find(([, lines]) =>
+      lines.some((line) => normalizeForMatch(line) === needle),
+    )
+    if (!source) continue
+    const targetKey = candidate.block
+    const target = linesByKey.get(targetKey) ?? []
+    // 目标块已经达到上限时保留模型原归类，避免纠偏过程把一行静默删掉。
+    if (source[0] !== targetKey && target.length >= MAX_BLOCK_LINES) continue
+    if (source[0] !== targetKey) {
+      const remaining = source[1].filter((line) => normalizeForMatch(line) !== needle)
+      if (remaining.length > 0) linesByKey.set(source[0], remaining)
+      else linesByKey.delete(source[0])
+    }
+    if (!target.some((line) => normalizeForMatch(line) === needle) && target.length < MAX_BLOCK_LINES) {
+      target.push(candidateLine)
+      linesByKey.set(targetKey, target)
+    }
   }
 
   // 按 canonical 顺序与 canonical label 输出，不用模型给的顺序/文案。

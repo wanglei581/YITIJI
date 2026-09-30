@@ -32,11 +32,13 @@ export function printDomainStatus(input: {
   deviceLoading: boolean
   deviceReady: boolean
   deviceLabel: string
+  /** 暂停接单时的一句说明；没有则沿用缺纸/离线的范围说明。 */
+  deviceNotice?: string
 }): HomeDomainStatus {
   if (input.deviceLoading) return { note: '正在确认打印机状态' }
   if (input.deviceReady) return {}
   return {
-    note: `${input.deviceLabel} · 上传与文件加工仍可用，出纸与扫描暂停`,
+    note: input.deviceNotice ?? `${input.deviceLabel} · 上传与文件加工仍可用，出纸与扫描暂停`,
     unavailableActions: new Set<HomeV6ActionId>(['scan-paper']),
   }
 }

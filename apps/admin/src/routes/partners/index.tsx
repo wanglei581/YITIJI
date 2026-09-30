@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { PartnerType, SceneTemplate } from '@ai-job-print/shared'
+import { formatDate, formatDateTime, type PartnerType, type SceneTemplate } from '@ai-job-print/shared'
 import {
   MODULE_LABELS,
   ORG_TYPE_SCENE_TEMPLATE,
@@ -724,7 +724,7 @@ export default function PartnersPage() {
                         <td className="px-4 py-3 text-center text-neutral-700">{o.counts.sources}</td>
                         {showRecruitment && <td className="px-4 py-3 text-center text-neutral-700">{o.counts.jobs}</td>}
                         {showRecruitment && <td className="px-4 py-3 text-center text-neutral-700">{o.counts.fairs}</td>}
-                        <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{o.createdAt.slice(0, 10)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400" title={formatDateTime(o.createdAt)}>{formatDate(o.createdAt)}</td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex items-center gap-1.5">
                             <button

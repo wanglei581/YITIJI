@@ -140,15 +140,16 @@ export class OrderQuoteService {
   }
 
   /**
-   * PRT-03：报价与建单同口径——打印机离线 / 缺纸 / 故障时不给报价，避免用户走到收银台才失败。
+   * PRT-03：报价与建单同口径。离线 / 缺纸 / 故障看开关；
+   * queue_cleanup_failed / queue_pause_failed 不看开关，有心跳就拦。
    * 只在请求带 terminalId 时判定（黑白单面的历史调用方可不带终端，此时由建单再拦）。
    */
   private async assertTerminalPrinterReady(terminalRef: string | undefined): Promise<void> {
-    // 开关关闭时不触碰数据库：报价夹具（verify:miniapp-cloud-print-m2 等）以不带 prisma 的
-    // 桩构造本服务，黑白单面路径此前也从不查库。
-    if (!printerOnlineRequired()) return
     const ref = terminalRef?.trim()
     if (!ref) return
+    // 历史夹具（verify:miniapp-cloud-print-m2 等）不注入 prisma，读不到心跳。
+    // 开关关闭时与「没有这条心跳」一样放行。开关打开时仍往下查，缺 prisma 会失败，不另开旁路。
+    if (typeof this.prisma?.terminal?.findFirst !== 'function' && !printerOnlineRequired()) return
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: ref }, { terminalCode: ref }] },
       select: { id: true },

@@ -66,8 +66,11 @@ const checks = [
   }],
   ['无持久化来源的满意度控件已移除', () => {
     assert.doesNotMatch(doneSource, /满意度评分|setRating|print-done-rate-chip/)
-    assert.match(doneSource, /pickupLookup\?\.orderId === state\.orderId/)
+    assert.match(doneSource, /已在本机出纸/)
+    assert.doesNotMatch(doneRuntime, /getPayStatus|pickupLookup|取件凭证暂时无法读取|取件码/)
     assert.match(browserSpecSource, /same-page task switch hides the previous task and pickup code immediately/)
+    assert.match(browserSpecSource, /已在本机出纸/)
+    assert.match(browserSpecSource, /OLD-PICKUP-001/)
   }],
   ['W6 直达完成页预期为无法确认', () => {
     assert.match(routeCasesSource, /pattern:\s*'\/print\/done'[\s\S]*?featureText:\s*'无法确认打印结果'/)

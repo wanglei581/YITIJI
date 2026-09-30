@@ -6,11 +6,11 @@
  *     priceLines 计费明细 / billablePages / billingPageSource / paymentSessionToken；
  *     免费单 amountCents=0 且 payStatus=paid。
  *  2. **出纸付费门控（无条件）**：付费单未支付时 claim **不下发**、任务保持 pending。
- *  3. 沙箱模拟支付成功 → 订单 paid + pickupCode → 同一任务变为可 claim（出纸放行）。
+ *  3. 沙箱模拟支付成功 → 订单 paid 且两列取件码都空 → 同一任务变为可 claim（出纸放行）。
  *  4. 无关联 Order 的孤儿任务**不可** claim（没有支付依据不得出纸）。
  *  5. 免费单（amountCents=0，已 paid+free）可 claim；免费单出码被拒（PAY_NOT_REQUIRED）。
  *  6. 旧开关 PRINT_REQUIRE_PAID_BEFORE_CLAIM 已删除：即使塞回 false 也不再有任何效果。
- *  7. pay-status 取件码可见性：paid 才回 pickupCode；未支付一律 null。
+ *  7. pay-status：现打现取已付也不回取件码；未支付一律 null。
  *  8. P0-1 报价：POST /orders/quote 同口径 service 不落库；报价金额 == 建单金额；
  *     pageRange 计费与超收修复一致；外部 fileUrl fail-closed。
  *
@@ -185,7 +185,7 @@ async function main(): Promise<void> {
     assert(claimUnpaid.length === 0, '2a. 门控开启：未支付付费单 claim 不下发任务')
     assert(paidTaskAfter?.status === 'pending', '2b. 未支付任务保持 pending（未被领取出纸）')
 
-    // ── (3) 沙箱模拟支付成功 → paid + pickupCode → 同一任务可 claim ─────────
+    // ── (3) 沙箱模拟支付成功 → paid 且不铸取件码 → 同一任务可 claim ─────────
     await expectCode('3a. 缺失 paymentSessionToken 时拒绝出码', 'PAYMENT_SESSION_REQUIRED', () => payment.createPayAttempt(paid.orderId, ''))
     const wrongPaymentSession = createPaymentSessionToken({
       orderId: paid.orderId,
@@ -204,7 +204,7 @@ async function main(): Promise<void> {
     await payment.simulateSandboxCallback({ attemptId: attempt.attemptId, result: 'success' })
     const orderPaid = await prisma.order.findUnique({ where: { id: paid.orderId } })
     assert(orderPaid?.payStatus === 'paid' && orderPaid.paymentSource === 'sandbox', '3e. 模拟支付成功 → 订单 paid（paymentSource=sandbox）')
-    assert(typeof orderPaid?.pickupCode === 'string' && (orderPaid?.pickupCode?.length ?? 0) > 0, '3f. paid 后生成取件码 pickupCode')
+    assert(orderPaid?.pickupCode == null && orderPaid?.pickupCodeHash == null, '3f. 现打现取付款后 pickupCode 与 pickupCodeHash 都为空')
     // 支付回调不改 PrintTask.status（解耦）。
     const paidTaskStillPending = await prisma.printTask.findUnique({ where: { id: paid.taskId } })
     assert(paidTaskStillPending?.status === 'pending', '3g. 支付回调不改 PrintTask.status（仍 pending，未被支付域触碰）')
@@ -243,6 +243,8 @@ async function main(): Promise<void> {
     await backdate(free.taskId)
     const claimFree = await claimOne()
     assert(claimFree.length === 1 && claimFree[0].taskId === free.taskId, '5c. 免费单（已 paid+free）门控开启下可 claim')
+    const freeRow = await prisma.order.findUnique({ where: { id: free.orderId } })
+    assert(freeRow?.pickupCode == null && freeRow?.pickupCodeHash == null, '5d. 免费现打现取付款后两列取件码都为空')
     await prisma.priceConfig.update({
       where: { serviceKey: 'print_bw_page' },
       data: { unitCents: 20, active: true, description: '黑白打印' },
@@ -266,7 +268,7 @@ async function main(): Promise<void> {
     // ── (7) pay-status 取件码可见性 ────────────────────────────────────────
     await expectCode('7a. 缺失 paymentSessionToken 时拒绝查支付状态', 'PAYMENT_SESSION_REQUIRED', () => payment.getPayStatus(paid.orderId, ''))
     const paidStatus = await payment.getPayStatus(paid.orderId, paid.paymentSessionToken)
-    assert(paidStatus.payStatus === 'paid' && typeof paidStatus.pickupCode === 'string' && (paidStatus.pickupCode?.length ?? 0) > 0, '7b. paid 订单 pay-status 返回 pickupCode')
+    assert(paidStatus.payStatus === 'paid' && paidStatus.pickupCode === null, '7b. 现打现取已付订单 pay-status 不下发取件码')
     const unpaid = await printJobs.create(
       { fileUrl: await seedPdf('unpaid', 1), fileMd5: 'sha256-cash-unpaid', fileName: '未支付.pdf', params: { copies: 1, colorMode: 'black_white' } },
       { terminalId },

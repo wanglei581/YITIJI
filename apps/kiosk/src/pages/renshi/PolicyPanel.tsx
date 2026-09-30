@@ -25,8 +25,11 @@ export function PolicyPanel({
   guideItems,
   audience,
   focusId,
+  suppressAutoOpen = false,
   onAudienceChange,
   onOpened,
+  onActiveId,
+  onUpload,
   onOfficialEntry,
   aiLabel,
   aiDraft,
@@ -36,8 +39,12 @@ export function PolicyPanel({
   audience: AudienceKey
   /** 收藏或地址里点名的那一条。在列表里就展开它，不先展开第一条。 */
   focusId?: string | null
+  /** 刚撤下一条时，不要改去展开下一条。 */
+  suppressAutoOpen?: boolean
   onAudienceChange: (k: AudienceKey) => void
   onOpened: (item: PolicyItem) => void
+  onActiveId: (id: string | null) => void
+  onUpload: (id: string) => void
   onOfficialEntry: (item: PolicyItem, target: SourceQrTarget) => void
   aiLabel: string
   aiDraft: string
@@ -46,7 +53,13 @@ export function PolicyPanel({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
   const openedIdRef = useRef<string | null>(null)
+  const audienceSeen = useRef(audience)
   const { isFavorite, toggle: toggleFavorite } = useFavorites()
+  if (audienceSeen.current !== audience) {
+    audienceSeen.current = audience
+    setTouched(false)
+    setExpandedId(null)
+  }
 
   const goHub = () => navigate('/policy-service')
   // 选了身份时服务端只回这一身份与通用事项：这时一条都没有是筛选结果，不是政策库空（稿 48 的 filtered-empty）。
@@ -62,14 +75,22 @@ export function PolicyPanel({
   const selectable = useMemo(() => [...visibleLibrary, ...visibleGuides], [visibleLibrary, visibleGuides])
   const fallbackId = selectable[0]?.id ?? null
   const focusHit = focusId && selectable.some((item) => item.id === focusId) ? focusId : null
+  const stillThere = (id: string | null) => Boolean(id && selectable.some((item) => item.id === id))
   const openId = touched
-    ? (expandedId && selectable.some((item) => item.id === expandedId) ? expandedId : expandedId === null ? null : fallbackId)
-    : (focusHit ?? fallbackId)
+    ? (stillThere(expandedId) ? expandedId : null)
+    : suppressAutoOpen
+      ? focusHit
+      : (focusHit ?? fallbackId)
 
   useEffect(() => {
     if (touched || !focusHit || openId !== focusHit) return
     document.querySelector(`[data-policy-id="${CSS.escape(focusHit)}"]`)?.scrollIntoView({ block: 'nearest' })
   }, [focusHit, openId, touched])
+
+  useEffect(() => {
+    onActiveId(openId)
+    return () => onActiveId(null)
+  }, [onActiveId, openId])
 
   useEffect(() => {
     const item = selectable.find((entry) => entry.id === openId)
@@ -185,10 +206,17 @@ export function PolicyPanel({
                   </span>
                 </button>
               )}
-              <button type="button" className="rq-exit" onClick={() => navigate('/print/upload')}>
-                <PrinterIcon aria-hidden="true" />
-                <span><b>上传自备材料打印</b><small>本机只打印你自己带来的文件</small></span>
-              </button>
+              {kind === 'builtin' ? (
+                <button type="button" className="rq-exit" onClick={() => navigate('/print/upload')}>
+                  <PrinterIcon aria-hidden="true" />
+                  <span><b>上传自备材料打印</b><small>本机只打印你自己带来的文件</small></span>
+                </button>
+              ) : (
+                <button type="button" className="rq-exit" onClick={() => onUpload(item.id)}>
+                  <PrinterIcon aria-hidden="true" />
+                  <span><b>上传自备材料打印</b><small>本机只打印你自己带来的文件</small></span>
+                </button>
+              )}
             </div>
             {!urlOk && (
               <p id={`rq-src-why-${item.id}`} className="rq-why">

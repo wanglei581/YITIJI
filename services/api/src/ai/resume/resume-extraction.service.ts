@@ -4,7 +4,7 @@ import { FilesService } from '../../files/files.service'
 import type { FilePurpose } from '../../files/file.types'
 import { DocumentConversionService } from '../../document-conversion/document-conversion.service'
 import { OcrService } from './ocr/ocr.service'
-import { extractPdfText, openUnpdfDocument } from '../../common/pdf/pdfjs-document'
+import { extractPdfTextItems, openUnpdfDocument, type PdfTextItem } from '../../common/pdf/pdfjs-document'
 import { openPdfForRender } from './ocr/pdf-page-renderer'
 import type {
   ResumeExtractionConfidence,
@@ -41,6 +41,64 @@ const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp']
 const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp']
 
 type FileKind = 'docx' | 'doc' | 'pdf' | 'image' | 'unknown'
+
+/**
+ * 同一行的判定：基线 y 相差不超过字号的这个比例。
+ * Word 导出的行距通常大于字号，同一行里的左右两栏（姓名与时间）y 几乎相同。
+ */
+const SAME_LINE_Y_RATIO = 0.45
+
+function lineYTolerance(item: PdfTextItem): number {
+  const size = item.fontSize > 0 ? item.fontSize : item.height > 0 ? item.height : 12
+  return Math.max(size * SAME_LINE_Y_RATIO, 1)
+}
+
+/** 同一行按 x 从左到右拼接，不在项与项之间另加空格（PDF.js 若已给出空格项，会留在 str 里）。 */
+function concatLine(items: readonly PdfTextItem[]): string {
+  return [...items].sort((a, b) => a.x - b.x || a.y - b.y).map((item) => item.str).join('')
+}
+
+/**
+ * 把一页的文字项收成按行文本。
+ * 断行看两件事：基线 y 跳变，或该项 hasEOL（Word 绝对定位时，换行常常是一个空的 hasEOL 项）。
+ * 空的 hasEOL 只用来结束上一行，自己不占一行。
+ */
+function assembleResumePdfPage(items: readonly PdfTextItem[]): string {
+  const lines: string[] = []
+  let buf: PdfTextItem[] = []
+  let anchorY = 0
+  let tolerance = 1
+
+  const flush = (): void => {
+    if (buf.length === 0) return
+    lines.push(concatLine(buf))
+    buf = []
+  }
+
+  for (const item of items) {
+    if (typeof item.str !== 'string') continue
+    if (buf.length > 0 && Math.abs(item.y - anchorY) > Math.max(tolerance, lineYTolerance(item))) flush()
+    if (item.str === '' && item.hasEOL) {
+      flush()
+      continue
+    }
+    if (buf.length === 0) {
+      anchorY = item.y
+      tolerance = lineYTolerance(item)
+    } else {
+      tolerance = Math.max(tolerance, lineYTolerance(item))
+    }
+    buf.push(item)
+    if (item.hasEOL) flush()
+  }
+  flush()
+  return lines.join('\n')
+}
+
+/** 页与页之间也用换行接上。空白折叠仍由 clean() 做。 */
+function assembleResumePdfLines(pages: readonly PdfTextItem[][]): string {
+  return pages.map(assembleResumePdfPage).join('\n')
+}
 
 /**
  * 简历文件文字提取 service（Phase 1A）。
@@ -184,9 +242,11 @@ export class ResumeExtractionService {
     try {
       if (declaredPageCount > 0 && declaredPageCount <= MAX_BORN_DIGITAL_EXTRACT_PAGES) {
         try {
-          const extracted = await extractPdfText(pdf, { mergePages: true })
+          // mergePages 会把所有换行压成空格。Word 导出的简历靠 y / hasEOL 断行，
+          // 同一行的多项按 x 拼接，页与页、行与行之间保留换行。
+          const extracted = await extractPdfTextItems(pdf)
           pageCount = extracted.totalPages
-          rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
+          rawText = assembleResumePdfLines(extracted.items)
         } catch {
           return this.fail(
             fileId,

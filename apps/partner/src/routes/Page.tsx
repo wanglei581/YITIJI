@@ -1,6 +1,8 @@
 import { type ReactNode } from 'react'
-import { PageHeader } from '@ai-job-print/ui'
+import { ConsolePager, PageHeader } from '@ai-job-print/ui'
 import { API_MODE } from '../services/api/client'
+
+const DEMO_NOTICE = '当前是演示数据，没有连上真实后台。页面上的内容和操作不会保存。'
 
 interface PageProps {
   title: string
@@ -34,44 +36,38 @@ export function ListPagination({
   totalPages,
   total,
   onPageChange,
+  pageSize,
+  onPageSizeChange,
 }: {
   page: number
   totalPages: number
   total: number
   onPageChange: (page: number) => void
+  pageSize?: number
+  onPageSizeChange?: (size: number) => void
 }) {
+  const pages = Math.max(1, totalPages)
+  const size = pageSize ?? Math.max(1, pages > 0 && total > 0 ? Math.ceil(total / pages) : 20)
   return (
-    <div className="mt-3 flex items-center justify-between text-xs text-neutral-500">
-      <p>共 {total} 条 · 第 {page} / {totalPages} 页</p>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => onPageChange(Math.max(1, page - 1))}
-          className="rounded border border-neutral-200 px-3 py-1.5 disabled:opacity-40"
-        >
-          上一页
-        </button>
-        <button
-          type="button"
-          disabled={page >= totalPages}
-          onClick={() => onPageChange(page + 1)}
-          className="rounded border border-neutral-200 px-3 py-1.5 disabled:opacity-40"
-        >
-          下一页
-        </button>
-      </div>
-    </div>
+    <ConsolePager
+      page={page}
+      pageSize={size}
+      total={total}
+      totalPages={pages}
+      onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
+      className="mt-3"
+    />
   )
 }
 
 export function Page({ title, subtitle, actions, children }: PageProps) {
   return (
-    <div>
-      <PageHeader title={title} subtitle={subtitle} actions={actions} />
+    <div className="min-w-0">
+      <PageHeader className="min-w-0 flex-wrap items-start gap-3" title={title} subtitle={subtitle} actions={actions} />
       {API_MODE !== 'http' && (
         <div className="mt-4 rounded-lg border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-warning-fg">
-          当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。联调真实后端请配置 VITE_API_MODE=http 与 VITE_API_BASE_URL。
+          {DEMO_NOTICE}
         </div>
       )}
       <div className="mt-6">{children}</div>

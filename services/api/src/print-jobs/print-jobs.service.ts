@@ -14,7 +14,13 @@ import {
 import { priceChanged } from '../payment/order-quote.service'
 import { PricingService } from '../payment/pricing.service'
 import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
-import { forbidsAutomaticReprint, PARTIAL_OUTPUT_ERROR_CODE } from './paid-anomaly-disposition'
+import {
+  REPRINT_BLOCKED_MESSAGE,
+  latestHeartbeatAgentVersion,
+  paidReprintBlockReason,
+  throwIfMemberReprintBlocked,
+} from './paid-reprint-eligibility'
+import { lockPrintTaskRow } from '../terminals/print-status-attempt'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
@@ -405,7 +411,7 @@ export class PrintJobsService {
     // Task 10 服务端能力门禁：管理员把该终端 document_print 配为非 available 时
     // 拒绝创建（未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(targetTerminalId, 'document_print')
-    // PRT-03：打印机离线 / 缺纸 / 故障时不建单、不收款（PRINT_REQUIRE_PRINTER_ONLINE=true 生效，生产必开）。
+    // PRT-03：离线 / 缺纸 / 故障在开关打开时不建单。队列闸门两个状态无论开关开没开都不建单。
     await assertTerminalPrinterAvailable(this.prisma, targetTerminalId)
 
     // 打印参数门禁第 1 层（全局产品边界）：N-up 恒拒；彩色/双面在此层放行。
@@ -524,7 +530,7 @@ export class PrintJobsService {
       return { task, order }
     })
 
-    // 免费单（报价为 0，如 0 价项）：经状态机置 paid + paymentSource=free + paidAt + pickupCode + 审计，
+    // 免费单（报价为 0，如 0 价项）：经状态机置 paid + paymentSource=free + paidAt + 审计，不铸取件码。
     // 不伪造真实收款；付费单保持 unpaid + paymentSource=null。
     if (quote.amountCents === 0) {
       await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
@@ -683,7 +689,13 @@ export class PrintJobsService {
       orderNo: order.orderNo,
       payStatus: order.payStatus as OrderPayStatus,
       amountCents: order.amountCents,
-      canRetry: this.canRetryPaidFailedJob(task, order, file, task.terminal),
+      canRetry: this.canRetryPaidFailedJob(
+        task,
+        order,
+        file,
+        task.terminal,
+        await latestHeartbeatAgentVersion(this.prisma, task.terminalId),
+      ),
     }
   }
 
@@ -709,42 +721,41 @@ export class PrintJobsService {
         }
       }
     }
-    if (task.status !== 'failed') {
-      throw new ConflictException({
-        error: { code: 'PRINT_RETRY_INVALID_STATE', message: '仅失败的打印任务可以重新提交' },
-      })
-    }
-    if (forbidsAutomaticReprint(task.errorCode)) {
-      const partial = task.errorCode === PARTIAL_OUTPUT_ERROR_CODE
-      throw new ConflictException({
-        error: {
-          code: partial ? 'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN' : 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
-          message: partial
-            ? '只出了一部分，不能自动重打或自动退款，请联系工作人员'
-            : '打印结果未确认，不能重新提交，请联系工作人员核查',
-        },
-      })
-    }
-    if (order.payStatus !== 'paid') {
-      throw new ConflictException({
-        error: { code: 'PRINT_RETRY_NOT_PAID', message: '未完成支付的打印任务不能重新提交' },
-      })
-    }
-    if (!isPrintableFileRecord(file)) {
-      throw new ConflictException({
-        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
-      })
-    }
-    const fileId = task.fileId ?? file.id
+    throwIfMemberReprintBlocked(paidReprintBlockReason({
+      status: task.status,
+      errorCode: task.errorCode,
+      hasOrder: true,
+      payStatus: order.payStatus,
+      file,
+      terminalId: task.terminalId,
+      skipAgentVersion: true,
+    }))
+    const fileId = task.fileId ?? file?.id
     if (!fileId) {
       throw new ConflictException({
-        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: REPRINT_BLOCKED_MESSAGE.file_unavailable },
       })
     }
     const { url: freshFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
     const amountBefore = order.amountCents
 
     await this.prisma.$transaction(async (tx) => {
+      await lockPrintTaskRow(tx, task.id)
+      const liveTask = await tx.printTask.findUnique({
+        where: { id: task.id },
+        select: { status: true, errorCode: true, terminalId: true },
+      })
+      const agentVersion = await latestHeartbeatAgentVersion(tx, liveTask?.terminalId ?? task.terminalId)
+      throwIfMemberReprintBlocked(paidReprintBlockReason({
+        status: liveTask?.status ?? '',
+        errorCode: liveTask?.errorCode,
+        hasOrder: true,
+        payStatus: order.payStatus,
+        file,
+        terminalId: liveTask?.terminalId ?? task.terminalId,
+        agentVersion,
+      }))
+
       const activeTerminalLock = task.terminalId
         ? await tx.terminal.updateMany({
             where: { id: task.terminalId, enabled: true, lifecycleStatus: 'active' },
@@ -763,7 +774,7 @@ export class PrintJobsService {
       })
       if (!isPrintableFileRecord(liveFile)) {
         throw new ConflictException({
-          error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+          error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: REPRINT_BLOCKED_MESSAGE.file_unavailable },
         })
       }
 
@@ -841,16 +852,20 @@ export class PrintJobsService {
     order: { payStatus: string; taskStatus: string },
     file: { status?: string | null; deletedAt?: Date | null; expiresAt?: Date | null } | null,
     terminal: { enabled: boolean; lifecycleStatus: string } | null,
+    agentVersion: string | null,
   ): boolean {
     if (task.fileId && !file) return false
     if (task.terminalId && (terminal?.enabled !== true || terminal.lifecycleStatus !== 'active')) return false
-    return (
-      task.status === 'failed' &&
-      order.payStatus === 'paid' &&
-      order.taskStatus === 'failed' &&
-      !forbidsAutomaticReprint(task.errorCode) &&
-      isPrintableFileRecord(file)
-    )
+    if (order.taskStatus !== 'failed') return false
+    return paidReprintBlockReason({
+      status: task.status,
+      errorCode: task.errorCode,
+      hasOrder: true,
+      payStatus: order.payStatus,
+      file,
+      terminalId: task.terminalId,
+      agentVersion,
+    }) === null
   }
 
   private async loadAccessiblePrintJob(taskId: string, ctx: PrintJobAccessContext) {

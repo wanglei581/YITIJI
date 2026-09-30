@@ -35,6 +35,11 @@ export interface TerminalDeviceStatusView {
   printerName: string
   /** 顶栏/徽标文案（中文）。 */
   printerLabel: string
+  /**
+   * 打印入口停用时的一句说明。只有打印闸门合上（暂停接单）才有。
+   * 缺纸、离线仍用各页原有说明，不借这句。
+   */
+  printerNotice?: string
   networkLabel: string
   /** 兼容旧 DeviceStatus 联合；展示请用 printerLabel。 */
   deviceStatus: DeviceStatus
@@ -74,7 +79,10 @@ export function normalizePrinterStatusRaw(raw: string | null | undefined): strin
 export function mapTerminalPrinterStatus(input: {
   heartbeatOnline: boolean
   printerStatus: string | null | undefined
-}): Pick<TerminalDeviceStatusView, 'kind' | 'printerReady' | 'printer' | 'printerLabel' | 'deviceStatus'> {
+}): Pick<
+  TerminalDeviceStatusView,
+  'kind' | 'printerReady' | 'printer' | 'printerLabel' | 'printerNotice' | 'deviceStatus'
+> {
   if (!input.heartbeatOnline) {
     return {
       kind: 'offline',
@@ -142,6 +150,23 @@ export function mapTerminalPrinterStatus(input: {
         printer: { isOnline: false, hasPaper: true, tonerLevels: { ...ZERO_TONER }, errorCode: 'offline' },
         printerLabel: '打印机离线',
         deviceStatus: 'offline',
+      }
+    case 'queue_cleanup_failed':
+    case 'queue_pause_failed':
+      // 打印闸门合上：服务端拦单。kind 仍用已有的 error，不新增种类。
+      // 说明不放进 printerLabel（那是入口短标题「暂停接单」），用可选的 printerNotice。
+      return {
+        kind: 'error',
+        printerReady: false,
+        printer: {
+          isOnline: true,
+          hasPaper: true,
+          tonerLevels: { ...ZERO_TONER },
+          errorCode: 'queueGate',
+        },
+        printerLabel: '暂停接单',
+        printerNotice: '打印机暂时不可用，请联系现场工作人员',
+        deviceStatus: 'error',
       }
     default:
       // null / unknown / 未识别取值 → 状态未知（fail-closed，绝不 default 成在线）

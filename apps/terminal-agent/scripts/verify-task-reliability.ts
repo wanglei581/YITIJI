@@ -31,6 +31,7 @@ import { __setUnauthorizedMarkerPathForTests } from '../src/agent/auth-state'
 import type { AgentConfig, ClaimTask } from '../src/agent/types'
 import {
   runInstanceLockHardeningTests,
+  runKnownLegacyResidueCleanupTests,
   runPrintTaskTempCleanupTests,
 } from './agent-crash-privacy.helper'
 
@@ -204,6 +205,7 @@ function pendingPatch(attempts: number): PendingPatch {
     manualReplayAttempts: 0,
     lastManualReplayAt: null,
     manualReplayErrorCode: null,
+    printAttempt: 0,
   }
 }
 
@@ -249,8 +251,13 @@ function verifyDispatchIntentIsDurableBeforePrinterInvocation(): void {
   assert.ok(printInvocation > dispatchPersist, 'dispatching must be durable before the physical printer invocation')
   assert.match(
     source,
-    /const result = await print\([\s\S]*?\{ correlationId: task\.taskId \},[\s\S]*?\)/,
-    'the physical print call must propagate taskId for image spooler correlation',
+    /const correlationId = printSpoolStem\(task\.taskId, spoolAttempt\)/,
+    'print correlation must include the current attempt',
+  )
+  assert.match(
+    source,
+    /const result = await print\(\s*tempFilePath,[\s\S]*?\{ correlationId \}/,
+    'the physical print call must propagate the attempt-scoped correlation id',
   )
   assert.match(
     source,
@@ -387,6 +394,7 @@ async function verifyRealDatabaseMigrationAndTerminalReplay(): Promise<void> {
       'manualReplayAttempts',
       'lastManualReplayAt',
       'manualReplayErrorCode',
+      'printAttempt',
     ]) {
       assert.ok(columns.includes(column), `legacy local DB must add ${column}`)
     }
@@ -506,7 +514,7 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
     const replayed = await replayDeadLetter(db, successId, operatorConfig)
     assert.deepEqual(replayed, { outcome: 'archived', errorCode: null })
     assert.equal(server.requests.length, 1)
-    assert.deepEqual(server.requests[0]?.body, { status: 'completed' })
+    assert.deepEqual(server.requests[0]?.body, { status: 'completed', attempt: 0 })
     assert.equal(listDeadLetters(db).some((row) => row.id === successId), false)
     assert.equal(showDeadLetter(db, successId).resolution, 'replayed')
     const replayedStorage = storedSensitiveFields(successId)
@@ -708,6 +716,15 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
   }
 }
 
+function verifyKnownLegacyResidueCleanup(): void {
+  const source = readFileSync(join(__dirname, '../src/agent/legacy-residue-cleanup.ts'), 'utf8')
+  assert.match(source, /cleanupKnownLegacyResidue/)
+  assert.match(source, /agent-debug\.log/)
+  assert.match(source, /AIJobPrintTerminalSetup\.exe/)
+  assert.match(source, /scan-test-backup/)
+  runKnownLegacyResidueCleanupTests()
+}
+
 async function main(): Promise<void> {
   const cases: Array<[string, () => void | Promise<void>]> = [
     ['claim rate-limit pause computation', verifyClaimPauseComputation],
@@ -721,6 +738,7 @@ async function main(): Promise<void> {
     ['dead-letter operator workflow', verifyDeadLetterOperatorWorkflow],
     ['instance-lock exclusive create and successor-safe release', runInstanceLockHardeningTests],
     ['print-task crash leftover temp cleanup', runPrintTaskTempCleanupTests],
+    ['known legacy residue cleanup', verifyKnownLegacyResidueCleanup],
   ]
   const failures: string[] = []
   for (const [name, verify] of cases) {

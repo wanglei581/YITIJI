@@ -8,6 +8,7 @@
 //   · 首页只在读到「托管关闭」且至少有一个渠道时，在岗位 / 招聘会那一行摆一张「岗位与招聘会」；
 //     读取中、失败、为空都不摆，也不先闪出来再收回；托管打开（b）时首页照旧；
 //   · 旧地址 /jobs/online-platforms 两种状态都落到本页，不被招聘内容托管闸门接走。
+import { mkdirSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QRCodeSVG } from 'qrcode.react'
@@ -544,6 +545,44 @@ test('home: hosting on keeps the job and fair tiles, even when the org has chann
 })
 
 // ── 手机宽度 ─────────────────────────────────────────────────────────────
+
+test('taken-down channel drops its QR when the card is checked again @w1-kiosk @w90', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  const kept = ORG_CHANNELS[1]!
+  const removed = ORG_CHANNELS[0]!
+  api.respondWith('GET', CHANNELS, (requestNumber) => (requestNumber === 1
+    ? { status: 200, json: { items: ORG_CHANNELS, legacyPlatforms: [] } }
+    : { status: 200, json: { items: [kept], legacyPlatforms: [] } }))
+  await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
+  await expect(screenOf(page)).toHaveAttribute('data-state', 'items')
+  await expectChannelCards(page, 'org', ORG_SORTED)
+  await page.locator('[data-testid="official-channel-card"]').filter({ hasText: kept.name }).getByTestId('official-channel-recheck').click()
+  const note = page.getByTestId('official-channel-withdrawn')
+  await expect(note).toHaveText(`「${removed.name}」已经撤下，不再提供二维码。`)
+  await expect(page.getByTestId('official-channel-card')).toHaveCount(1)
+  await expect(page.getByTestId('official-channel-card').filter({ hasText: removed.name })).toHaveCount(0)
+  await expect(page.getByTestId('official-channel-qr')).toHaveCount(1)
+  await expect(page.locator('[data-qx-frame="true"] a[href]')).toHaveCount(0)
+  const dir = process.env.WALK_FIX_DIR
+  if (dir) {
+    mkdirSync(dir, { recursive: true })
+    await page.screenshot({ path: `${dir}/W-90-channel-qr-withdrawn.png` })
+  }
+})
+
+test('a failed channel recheck keeps the QR and does not claim it was withdrawn @w1-kiosk @w90', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  const only = ORG_CHANNELS[1]!
+  api.respondWith('GET', CHANNELS, (requestNumber) => (requestNumber === 1
+    ? { status: 200, json: { items: [only], legacyPlatforms: [] } }
+    : { status: 503, json: { success: false, error: { code: 'UPSTREAM' } } }))
+  await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('heading', { level: 2, name: only.name })).toBeVisible()
+  await page.getByTestId('official-channel-recheck').click()
+  await expect(page.getByTestId('official-channel-withdrawn')).toHaveText('这次没有确认这些渠道还在，请再点一次。')
+  await expect(page.getByText('已经撤下')).toHaveCount(0)
+  await expect(page.getByTestId('official-channel-qr')).toHaveCount(1)
+})
 
 test('phone 390x844: the channels page stacks without overflow and keeps touch targets @w1-mobile', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)

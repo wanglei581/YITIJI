@@ -11,7 +11,7 @@ import type { Command } from 'commander'
 import { err } from '../logger'
 import { createApiClient, NO_RETRY_CONFIG } from './api-client'
 import { isUnauthorized, markUnauthorized } from './auth-state'
-import { openDatabase, type AgentDatabase, type PendingPatch } from './db'
+import { normalizePrintAttempt, openDatabase, type AgentDatabase, type PendingPatch } from './db'
 import { isAgentStartupError, loadConfig } from './config-manager'
 import { assertAgentProfileAllowsApiBaseUrl } from './profile-guard'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
@@ -135,7 +135,7 @@ function selectDeadLetter(db: Exclude<AgentDatabase, null>, id: number): Pending
     .prepare(
       `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
             deadLetterAt, deadLetterReason, operatorConfirmedAt, resolvedAt, resolution,
-            manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode
+            manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode, printAttempt
      FROM pending_patches WHERE id = ? AND deadLetterAt IS NOT NULL`
     )
     .get(id) as unknown as PendingPatch | undefined
@@ -201,7 +201,7 @@ export function listDeadLetters(db: AgentDatabase): SafeDeadLetterView[] {
     .prepare(
       `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
             deadLetterAt, deadLetterReason, operatorConfirmedAt, resolvedAt, resolution,
-            manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode
+            manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode, printAttempt
      FROM pending_patches
      WHERE deadLetterAt IS NOT NULL AND resolvedAt IS NULL
      ORDER BY deadLetterAt ASC`
@@ -327,7 +327,10 @@ export async function replayDeadLetter(
     recordAction(live, id, 'replay_attempt', 'started', null, attemptAt)
   })
 
-  const payload: Record<string, string> = { status: row.status }
+  const payload: Record<string, string | number> = {
+    status: row.status,
+    attempt: normalizePrintAttempt(row.printAttempt),
+  }
   if (row.status === 'failed' && row.errorCode && SAFE_MACHINE_CODE.test(row.errorCode)) {
     payload['errorCode'] = row.errorCode
   }
