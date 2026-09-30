@@ -65,6 +65,21 @@
 - **门禁与用例：** verify:data-request-ui 同步新文案并新增会员端文案反向断言；verify:fusion-w5 新增 A 批断言（眉题、示例条、页签、模型名与任务编号、机器状态第 8 项）；verify-qx-session-lifecycle 新增「不露路由」断言；profile-qx、kiosk-session-warning 用例同步。变异 12 处（改回旧文案）对应门禁全部转红。
 - **没改的：** 41 页底部约 580px 留白、各页版式差异（页头、底部问小青等）属后续版式批次；页头右上的终端编号来自共享页框，不在本批。
 
+## 2026-09-30：法务全套第一批——个人信息保护影响评估、数据总表、同意与撤回说明（分支 `claude/legal-set-c1-c3-0930`，只改文档）
+
+- **做了什么：** 产品负责人要求补齐商用法务文件（总目录 24 份，15 份试点前必需，总目录与排期不进仓库）。第一批三份内部底稿进仓库，都是供律师审阅的草案：
+  - `docs/compliance/personal-info-impact-assessment.md`：影响评估，覆盖公共终端（含扫描原件与出纸盘遗留、本机缓存与磁盘）、AI、未成年人、自动化决策、委托处理、生成式 AI 合规；
+  - `docs/compliance/data-inventory-and-retention.md`：数据分类与保存期限总表；
+  - `docs/compliance/consent-and-withdrawal.md`：同意记录与撤回机制。
+  每份分「可直接用」与「待律师确认的点」。
+- **怎么做的：** Grok 起草；Codex 逐条对候选 `25dbe6181` 的代码核「已做到」、对官方原文核法条；agy 做反方审查；协调方裁定并统稿。修正了 5 处事实错误，例如自我探索是清空内容、留下记录，不是删除整行；厂商是后台可改的产品口径，不是代码保证。另补了自动化决策、委托处理、物理风险三节。
+- **核过的原文：** 网络日志不少于六个月在《网络安全法》（2025-10-28 修正）第二十三条第三项；网信办 2026-09-14 公告要求调用已备案模型的应用向地方网信办登记，上线后公示模型名称及备案号或上线编号。顺带把 `docs/product/recruitment-closure-license-gated-plan-2026-09.md` 里的旧条号「第二十一条」改为第二十三条第三项。
+- **两份现有保存期限文件不合并：** `member-personal-data-retention.md`、`file-retention-and-cos-lifecycle.md` 被 4 条门禁直接读取，保留为明细，只在标题下加一行指向总表。
+- **发现的缺口（待报总指挥，本 PR 不改代码）：**
+  - 线上注销返回「账号注销暂未开放」，又没有带审计的人工注销工具，试点前要补；
+  - 自我探索允许勾选「监护人同意并陪同」，勾选证明不了监护关系，给了两个改法待定；
+  - 导出简历不印可见 AI 字样是否满足标识办法，列为待律师确认第一条。
+- **验证：** `verify:compliance-copy`、`verify:cos-lifecycle-policy`、`verify:member-data-retention`、`verify:ai-user-text-retention` 通过；`verify:ai-usage-retention` 要连隔离库，本机没跑，它对留存矩阵只做包含检查，新增一行不影响。
 ## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
 
 - 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
