@@ -11,7 +11,7 @@
 
 import { formatDateTime } from '@ai-job-print/shared'
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
+import { Button, Card, ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
 import { DownloadIcon, MonitorIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import {
@@ -135,6 +135,17 @@ export default function TerminalsPage() {
 
   const ready = state === 'ready' && data
   const hasTerminals = Boolean(ready && data.terminals.length > 0)
+  const columns: ConsoleColumn<TerminalOpsRow>[] = [
+    { id: 'terminal', header: '终端', truncate: true, title: (row) => `${terminalName(row)} · ${row.terminalCode}`, cell: (row) => <button type="button" onClick={() => setSelectedCode(row.terminalCode)} className="block max-w-full text-left"><p className="truncate font-semibold text-neutral-900">{terminalName(row)}</p><p className="mt-0.5 truncate text-xs text-neutral-500"><span className="font-mono">{row.terminalCode}</span>{row.locationLabel ? ` · ${row.locationLabel}` : ''}</p></button> },
+    { id: 'status', header: '当前状态', cell: (row) => { const run = RUN_STATE_VIEW[runState(row)]; return <div><StatusBadge dot status={run.status} label={run.label} /><p className="mt-1 text-[11px] text-neutral-500" title={row.lastHeartbeatAt ? formatDateTime(row.lastHeartbeatAt) : undefined}>{relativeTime(row.lastHeartbeatAt)}</p></div> } },
+    { id: 'visits', header: '服务人次', align: 'right', cell: (row) => visitText(data!, row.visitCount) },
+    { id: 'service', header: '打印扫描次数', align: 'right', cell: (row) => countText(row.serviceCount) },
+    { id: 'rate', header: '出纸成功率', align: 'right', cell: (row) => <div><p className="font-semibold tabular-nums text-neutral-900">{rateText(row.output)}</p><p className="text-[11px] text-neutral-500">{countText(row.output.printed)} / {countText(row.output.settled)}</p></div> },
+    { id: 'unconfirmed', header: '未确认出纸', align: 'right', cell: (row) => countText(row.output.unconfirmed) },
+    { id: 'offline', header: '离线', align: 'right', cell: (row) => row.faults.reportedInWindow ? `${row.faults.offlineCount} 次 · ${minutesText(row.faults.offlineMinutes)}` : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
+    { id: 'printerFault', header: '打印机故障', align: 'right', cell: (row) => row.faults.reportedInWindow ? `${row.faults.printerFaultCount} 次 · ${minutesText(row.faults.printerFaultMinutes)}` : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
+    { id: 'unrecovered', header: '未恢复', align: 'right', cell: (row) => row.faults.reportedInWindow ? (row.faults.unrecovered ? <span className="font-semibold text-error-fg">未恢复</span> : <span className="text-neutral-500">无</span>) : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
+  ]
 
   return (
     <Page
@@ -201,72 +212,7 @@ export default function TerminalsPage() {
               ))}
               <span className="ml-auto text-xs text-neutral-500">点一行查看这台终端的明细</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[13px]">
-                <thead>
-                  <tr>
-                    {['终端', '当前状态', '服务人次', '打印扫描次数', '出纸成功率', '未确认出纸', '离线', '打印机故障', '未恢复'].map((h) => (
-                      <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-900/[0.06]">
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-sm text-neutral-500">
-                        没有符合条件的终端，换个筛选或关键词试试
-                      </td>
-                    </tr>
-                  ) : rows.map((row) => {
-                    const run = RUN_STATE_VIEW[runState(row)]
-                    return (
-                      <tr
-                        key={row.terminalCode}
-                        tabIndex={0}
-                        onClick={() => setSelectedCode(row.terminalCode)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedCode(row.terminalCode) } }}
-                        className="cursor-pointer transition-colors hover:bg-neutral-50 focus:bg-primary-50/50 focus:outline-none"
-                        aria-label={`查看 ${terminalName(row)} 的明细`}
-                      >
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-neutral-900">{terminalName(row)}</p>
-                          <p className="mt-0.5 text-xs text-neutral-500">
-                            <span className="font-mono">{row.terminalCode}</span>
-                            {row.locationLabel ? ` · ${row.locationLabel}` : ''}
-                          </p>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3">
-                          <StatusBadge dot status={run.status} label={run.label} />
-                          <p className="mt-1 text-[11px] text-neutral-500" title={row.lastHeartbeatAt ? formatDateTime(row.lastHeartbeatAt) : undefined}>{relativeTime(row.lastHeartbeatAt)}</p>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 tabular-nums">{visitText(data, row.visitCount)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 tabular-nums">{countText(row.serviceCount)}</td>
-                        <td className="whitespace-nowrap px-4 py-3">
-                          <p className="font-semibold tabular-nums text-neutral-900">{rateText(row.output)}</p>
-                          <p className="text-[11px] text-neutral-500">{countText(row.output.printed)} / {countText(row.output.settled)}</p>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 tabular-nums">{countText(row.output.unconfirmed)}</td>
-                        {row.faults.reportedInWindow ? (
-                          <>
-                            <td className="whitespace-nowrap px-4 py-3 text-xs">{row.faults.offlineCount} 次 · {minutesText(row.faults.offlineMinutes)}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-xs">{row.faults.printerFaultCount} 次 · {minutesText(row.faults.printerFaultMinutes)}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-xs">
-                              {row.faults.unrecovered
-                                ? <span className="font-semibold text-error-fg">未恢复</span>
-                                : <span className="text-neutral-500">无</span>}
-                            </td>
-                          </>
-                        ) : (
-                          <td colSpan={3} className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                            {FAULTS_NOT_REPORTED}
-                          </td>
-                        )}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ConsoleTable items={rows} columns={columns} empty={{ title: '没有符合条件的终端', description: '换个筛选或关键词试试' }} page={1} pageSize={rows.length || 1} total={rows.length} onPageChange={() => undefined} />
           </Card>
 
           <p className="text-xs leading-relaxed text-neutral-500">

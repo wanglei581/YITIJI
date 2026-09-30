@@ -19,6 +19,22 @@
 - **没改的三条。** 心跳 `groupBy`：`TerminalHeartbeat` 已有 `@@index([terminalId, createdAt])`（`schema.prisma` 267 行，postgres schema 272 行），列表每页一次可接受；没有心跳就判版本过旧是有意的。无订单任务的 CAS 是 `admin-print-scan.service.ts` 591–606 行 `printTask.updateMany({ where: { id, status: 'failed' } })`，条数不是 1 即 409。新 Agent 打老后端会因 `main.ts` 98 行 `forbidNonWhitelisted` 得到 400；发布顺序仍是先后端后 Agent（现场脚本 R.1→R.2），不改代码。Agent 版本仍是 `package.json` 的 0.4.12，不带 v 前缀。
 - **本机已跑（隔离 SQLite，库文件在 `~/.cache/claude-lanes/print-retry-0929/verify-w86-r5-*.db`）：** `services/api` 的 `tsc --noEmit` 退出 0。`verify:print-jobs`（含 `verify:pickup-code-share`）、`verify:admin-print-scan`、`verify:contract-review:print-lifecycle`（6 条）、`verify:terminal-status-idempotency`、`verify:refund-idempotent`、`verify:payment-flow`、`verify:member-order-timeline` 退出 0。`verify:print-retry-attempt` 退出 0。改动文件 eslint 退出 0。变异在 `bda0b4979` 之后做，每条退出 1，随后 `git checkout` 还原：把 `FUTURE` 当 `STALE` 删掉；去掉超前补报的次数上限；去掉快速路径的 `cleanupTerminalTask`；去掉退役原因；去掉订单状态原因；重试轮次缺 attempt 当成老 Agent 放行；把会员重试的行锁挪到 Order CAS 之后。
 - **没在本机跑：** `verify:print-retry-lock:postgres`。本机 `pg_isready -h 127.0.0.1 -p 5432` 无响应，没有启动用户的数据库。脚本只挂在 postgres-readiness，要求 `DATABASE_URL` 是 PostgreSQL。会员重提和管理员重试同时打同一单时，不得出现 40P01，也不得两边都成功。以 CI 为准。真 Windows 打印机和 GitHub CI 全量也没在本机跑。图谱已按代码重生成，`pnpm graph:check` 通过；`verify:repository-integrity` 通过。没有 push。
+## 2026-09-29：生产只读巡检补 AI 服务说明、加 --strict 发布后核对（分支 `claude/backend-hardening-20260929-probe-strict-ai-disclaimer`）
+
+- **做了什么（Grok 实现、协调方审，合规运维窗口要求）：** `scripts/prod-readonly-probe.mjs` 法务文档补查 `ai_disclaimer`（未激活即 FAIL，与发布流程 3d 预检三份一起查对齐）；新增 `--strict`：岗位、招聘会、企业公开条数非 0 或任何列表出现演示标记都 FAIL、退出码非 0；不带时行为逐字不变。发布清单与运维手册里的发布后核对命令改成 `--strict`，须在演示企业用 #1115 下架之后跑。
+- **验证：** verify-prod-readonly-probe 补 ai_disclaimer 未激活、--strict 企业数 1 与全 0 等夹具；Grok 两处、协调方抽 1 处（去掉 ai_disclaimer）变异全红；ci-gate-coverage 通过。
+
+## 2026-09-29：会员取件链接与重试审计在真 PostgreSQL 上被门禁覆盖（分支 `claude/backend-hardening-20260929-member-print-audit-pg`，叠在 #1110 上）
+
+- **缺口（Codex 复核、总指挥核实）：** #1110 修的是「会员号写进审计 actorId、PG 外键拒绝、被 AuditService 静默吞掉」，但原门禁跑在 SQLite 上，SQLite 不校验这条外键，测不出来；重试场景也没有运行断言。
+- **补法（Grok 实现、协调方审）：** 新门禁 `verify:member-print-audit:postgres`（只挂 postgres-readiness）：真 PG 上走真实 PrintJobsService，取件链接与重试各一次，断言各落一行审计、actorId 为空、payload.endUserId 为会员号；阳性对照用旧写法直接写审计，PG 必须抛外键错误。SQLite 的 verify:miniapp-cloud-print-m2 补重试审计断言。只加门禁，不改服务代码。
+- **验证：** Grok 本机临时 PG16 跑 5/5，两处变异（取件 actorId 改回会员号、删重试审计）全红；协调方复跑 m2、backend-p0-contracts、ci-gate-coverage 全绿，抽 1 处变异（重试审计动作名错）变红。
+## 2026-09-29：给人看的时间一律按北京时间（走查 W-78、W-67；分支 `claude/backend-hardening-20260929-display-time-shanghai`）
+
+- **问题：** 告警正文里的时间是 UTC，比北京时间早 8 小时，运维会误判事件先后（W-78）；招聘会企业打印页脚用服务器本地时钟，服务器在 UTC 时同样早 8 小时；价目应急 SQL 用了裸 `NOW()`，时区不对（W-67）。
+- **修法（Grok 实现、协调方审）：** 新增共用函数 `common/beijing-display-time.ts`（Asia/Shanghai），告警中心正文、合同审查报告、诊断报告、模拟面试报告与练习单、自我探索、岗位匹配参考、职业规划、参会准备单、顾问产物、招聘会企业打印页脚、批量发布失败原因、岗位与招聘会「同步于」说明、早报日期、诊断导出文件名都改走它。**存库、接口里的 ISO 时间、去重键、日志、额度与统计的分桶键一律保持 UTC 不动。** 价目应急 SQL 两套库都写明 UTC 墙钟，文档两处提醒「不要照抄 NOW()」，门禁钉住不许再出现裸 NOW()。
+- **验证：** 新门禁 `verify:beijing-display-time` 21 条（固定 UTC 16:30 必须显示为北京 次日 00:30），变异「时区改回 UTC」21 条全红；协调方在候选上复跑 23 条相关门禁（出纸服务、告警、批量发布、早报、价目、日期诚实性等）与 api tsc 全绿。
+
 ## 2026-09-30：「我的打印订单」失败行给失败原因码、补网点名（小程序交付单；分支 `claude/backend-hardening-20260930-order-failure-code`）
 
 - **问题：** 小程序「我的打印订单」失败单只能显示「打印失败」，也缺网点名（任务上没记终端的行）。
@@ -43,11 +59,49 @@
 - **修法（Codex 实现、协调方审）：** 写页眉页脚时临时把下边距清零再恢复（合同审阅报告与 AIGC 标识已是这个写法）；回传页数改为从最终 PDF 读出的实际页数。报价与计费本来就按文件实际页数重算，改后三处都是同一个数。其余 10 个生成 PDF 的服务逐个排查过，没有同样问题。
 - **W-94 遗留：** 手机或一体机上传时，UTF-8 文件名被误按 Latin-1 解码的还原条件原来是「还原后含汉字」，所以全角括号、日文、韩文、emoji 这类名字保持乱码。改为「还原后含 U+00FF 以上字符」；`Ã©.pdf`、`résumé.pdf` 这类合法西文名仍原样保留（现有门禁钉着）。
 - **验证：** verify:resume-report-export 用一份像真的多页报告（诊断报告与修改清单两种），断言回传页数、PDF 实际页数、文件记录页数、计费页数四者相等，每页都有正文、页脚「第 N / M 页」的 M 等于页数；verify:kiosk-upload-print-contract 加五个非汉字文件名用例。反向变异四处全红：页脚不清零下边距、页数改回写页脚前的计数、页脚总页数写错、文件名恢复「含汉字」条件。
+## 2026-09-30：管理员后台打印任务「重试」按钮事先显示能不能点（W-86 前端，对接后端 #1152）
+
+- 「打印扫描运维」页列表与详情的「重试」只看服务端 `retryBlockedReason`：有值则置灰并把原因直接写在按钮下（未付款、已退款、结果未确认、已部分出纸、文件已过期、终端打印程序低于 0.4.13、终端已永久退役、终端当前不在运行状态、任务状态已变更等，文案与服务端拒绝时逐字一致）；null 可点；字段缺失时保持旧行为。页面写一次「后台不提供强制重打；需要补打请让用户另下新单。」管理员重试被拒错误码随服务端改为 `PRINT_RETRY_*`，门禁断言后台源码不再出现旧前缀。
+- 本地真实后端（#1152 第四、五轮）逐一造数据走查，各原因列表与详情均置灰并显示原因、可重试任务正常重新排队；截图在 `~/.cache`（不进仓库）。Grok 实现，Claude 审。
+## 2026-09-30：青序 2.0 A 批——一体机运行页合规文案（分支 `claude/qx-align-a-copy-0930`）
+
+- **范围：** 只改用户可见文字和眉题样式（字号、字距、颜色照稿 v2 覆盖块），不动功能、接口、数据。依据 v2 README 规则 4（工程词、英文眉题不上屏）、规则 5（托管 a 口径）。18 归 B 批，未动。
+- **英文眉题 → 中文（照同号稿）：** 08「TERMS OF SERVICE / PRIVACY POLICY」→「你和这台机器 / 你的信息」；19「IMAGES TO PDF」→「图片转 PDF」；20「SIGN & STAMP」→「签名」；34「SELF ASSESSMENT」→「自我探索」；35「NOTIFICATIONS」→「消息通知」；38「MY FILES & ORDERS」→「我的文档和订单」；39「MY RESUMES / MY FAVORITES / AI SERVICE RECORDS / MY ACTIVITY / ACTIVITY DETAIL」→「我的简历 / 我的收藏 / AI 服务记录 / 我的足迹 / 记录详情」；40「MY FEEDBACK」→「意见反馈」。
+- **工程词：** 04「继续后回到/interview」改写页面名（「继续后回到 练面试」），按钮读屏名同源，路由→页面名统一由 `sessionGuardModel.sessionGuardSourceName` 给（照稿 04 的对照表）；20 示例条「演示 固定原型数据，不是真实用户文件」→「示例 示例文件，不是哪位用户的文件」，顶部能力标签「能力已开放 / 能力读取中 / 终端未登记……」→「可以签名 / 正在确认 / 这台还没登记……」，示例态按钮原因「合成演示」→「这是示例」；34 步骤标「E2 / E3」→「记分 / 解读」；39 页签副标题「服务元数据」→「名称和状态」，简历与 AI 记录行不再显示模型名（demo / llm）和任务编号，模拟面试说明去掉「元数据」；41 去掉「元数据」「step-up」「后台」「外跳」（改共享会员端文案 `packages/shared/src/types/memberPrivacy.ts` 的范围横幅、类型名与说明，管理端专用 ADMIN_* 未动）。
+- **托管 a 残留：** 09 第 8 项「岗位与招聘会信息」→「机构官方渠道」；41「撤回岗位 AI 授权」→「撤回 AI 使用授权」（与稿 41、账号设置页同名）。撤回项保留，依据：撤回的是 job_ai 授权，托管 a 下 `/resume/job-fit` 手填岗位要求那条路仍要这项授权（`governed-job-fit.service` 的 requireActiveConsent，用例「hosting off: job fit keeps only the manual path」）。
+- **门禁与用例：** verify:data-request-ui 同步新文案并新增会员端文案反向断言；verify:fusion-w5 新增 A 批断言（眉题、示例条、页签、模型名与任务编号、机器状态第 8 项）；verify-qx-session-lifecycle 新增「不露路由」断言；profile-qx、kiosk-session-warning 用例同步。变异 12 处（改回旧文案）对应门禁全部转红。
+- **没改的：** 41 页底部约 580px 留白、各页版式差异（页头、底部问小青等）属后续版式批次；页头右上的终端编号来自共享页框，不在本批。
+
+## 2026-09-30：法务全套第一批——个人信息保护影响评估、数据总表、同意与撤回说明（分支 `claude/legal-set-c1-c3-0930`，只改文档）
+
+- **做了什么：** 产品负责人要求补齐商用法务文件（总目录 24 份，15 份试点前必需，总目录与排期不进仓库）。第一批三份内部底稿进仓库，都是供律师审阅的草案：
+  - `docs/compliance/personal-info-impact-assessment.md`：影响评估，覆盖公共终端（含扫描原件与出纸盘遗留、本机缓存与磁盘）、AI、未成年人、自动化决策、委托处理、生成式 AI 合规；
+  - `docs/compliance/data-inventory-and-retention.md`：数据分类与保存期限总表；
+  - `docs/compliance/consent-and-withdrawal.md`：同意记录与撤回机制。
+  每份分「可直接用」与「待律师确认的点」。
+- **怎么做的：** Grok 起草；Codex 逐条对候选 `25dbe6181` 的代码核「已做到」、对官方原文核法条；agy 做反方审查；协调方裁定并统稿。修正了 5 处事实错误，例如自我探索是清空内容、留下记录，不是删除整行；厂商是后台可改的产品口径，不是代码保证。另补了自动化决策、委托处理、物理风险三节。
+- **核过的原文：** 网络日志不少于六个月在《网络安全法》（2025-10-28 修正）第二十三条第三项；网信办 2026-09-14 公告要求调用已备案模型的应用向地方网信办登记，上线后公示模型名称及备案号或上线编号。顺带把 `docs/product/recruitment-closure-license-gated-plan-2026-09.md` 里的旧条号「第二十一条」改为第二十三条第三项。
+- **两份现有保存期限文件不合并：** `member-personal-data-retention.md`、`file-retention-and-cos-lifecycle.md` 被 4 条门禁直接读取，保留为明细，只在标题下加一行指向总表。
+- **发现的缺口（待报总指挥，本 PR 不改代码）：**
+  - 线上注销返回「账号注销暂未开放」，又没有带审计的人工注销工具，试点前要补；
+  - 自我探索允许勾选「监护人同意并陪同」，勾选证明不了监护关系，给了两个改法待定；
+  - 导出简历不印可见 AI 字样是否满足标识办法，列为待律师确认第一条。
+- **验证：** `verify:compliance-copy`、`verify:cos-lifecycle-policy`、`verify:member-data-retention`、`verify:ai-user-text-retention` 通过；`verify:ai-usage-retention` 要连隔离库，本机没跑，它对留存矩阵只做包含检查，新增一行不影响。
 ## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
 
 - 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
 - 改法：`pnpm-workspace.yaml` 三条 brace-expansion 覆盖从 1.1.18 / 2.1.4 / 5.0.9 上调到修复版 1.1.20 / 2.1.6 / 5.0.11，`scripts/verify-dependency-security.mjs` 的期望常量同步，锁文件只变 brace-expansion 三个版本。没有新增豁免。
 - 验证：干净安装后 `verify:dependency-security` ALL PASS（full / prod 高危与严重均为 0），repository-integrity、ci-gate-coverage、kiosk `tsc -b` 通过。
+## 2026-09-30：AI 调用概览按实际统计窗口写「近 24 小时」（W-101 优先项）
+
+管理员后台「AI 服务管理」的概览卡片和工作台「AI 调用」卡片读的是同一个接口，服务端按滚动 24 小时统计，不是北京时间自然日；页面却写「今日概览 / 今日累计 / 今日暂无调用」，走查实测页面 104 次、上海今日 40 次，对不上。文字改成「近 24 小时」，工作台成功率前标出统计窗口；按自然日计费的额度面板「今日已计费金额」本来就是自然日，不动。门禁 `verify-admin-ai-usage-ui` 改为钉住新口径，改回旧文字会红。
+## 2026-09-30：返工单 r3 第 1 批（Codex 本轮收口）
+
+终端发布观察面板已放回表格下方、详情抽屉复用页面 notice 并将绑定码状态改为中文生命周期标签，三处表格恢复卡片内横向滚动，管理员智慧校园文案、扫描输入门禁与宣传屏素材刷新错误提示同步修正并补上对应静态/E2E 断言。
+
+## 2026-09-30：后台终端与设备 UI 第 1 批（Codex 实现）
+
+管理员终端页收口为五列并将次要信息、全部运维动作移入现有详情抽屉；设备总览、打印机、外设和机构端终端数据统一了表格外壳、状态标签与数量显示。终端离线时详情抽屉的打印机状态和扫描输入不再显示「正常」，只显示中性离线状态并标注离线前最后一次上报。宣传屏按素材库、播放方案、终端配置拆分子组件，并把原生文件选择框改为中文按钮和已选文件名；两后台智慧校园说明改为只说明本校终端开关及尚未开放的模块。同步把日期门禁的分页与日期切片解析抽成已接线模块，更新相关静态门禁和终端抽屉 E2E 入口；类型检查、静态门禁已在本地通过，四套浏览器 E2E 已启动但沙箱禁止监听本地端口，需在可监听环境复跑。
 
 ## 2026-09-30：带文字层的 PDF 简历按行保留结构（走查 W-95；分支 `claude/backend-hardening-20260929-w95-pdf-lines`）
 

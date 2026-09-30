@@ -30,14 +30,13 @@ const STATUS_META: Record<MemberResumeItem['status'], { label: string; tone?: 'w
   failed: { label: '失败', tone: 'bad' },
 }
 
-function shortTaskId(taskId: string | null | undefined): string {
-  if (!taskId) return '未知任务'
-  return taskId.length > 10 ? `${taskId.slice(0, 6)}...${taskId.slice(-4)}` : taskId
-}
-
+/**
+ * 行内说明只写时间与留存期。2026-09-30 A 批：原来写「模型名 · 任务 编号 · 时间」，
+ * 模型名（如 demo / llm）和任务编号都是工程信息，稿 39 只显示名称和状态（v2 规则 4）。
+ */
 function metaLine(item: MemberResumeItem): string {
   const expires = item.expiresAt ? ` · 留存至 ${formatTime(item.expiresAt)}` : ''
-  return `${item.provider} · 任务 ${shortTaskId(item.taskId)} · ${formatTime(item.createdAt)}${expires}`
+  return `${formatTime(item.createdAt)}${expires}`
 }
 
 function isActionable(item: MemberResumeItem): boolean {
@@ -140,7 +139,7 @@ export function MyResumesPage() {
             const actionable = isActionable(item)
             const disabledReason = recordUnavailableReason(item) ?? ''
             const isParse = item.kind === 'parse'
-            const taskLabel = shortTaskId(item.taskId)
+            const taskLabel = formatTime(item.createdAt)
             return (
               <div key={item.id} className="qx-me-row" data-flag={item.status === 'failed' ? 'true' : undefined} data-record-status={item.status} data-record-kind={item.kind}>
                 <span className="qx-me-row-ico" data-tone={isParse ? undefined : 'plum'} aria-hidden="true">
@@ -160,13 +159,13 @@ export function MyResumesPage() {
                 <span className="qx-me-acts">
                   {isParse ? (
                     <>
-                      <SmallAct label="查看报告" disabled={!actionable} reason={disabledReason} aria={`查看简历任务 ${taskLabel} 的诊断报告`} onClick={() => openReport(item.taskId)} primary />
-                      <SmallAct label={item.optimized ? '查看优化版' : '继续优化'} disabled={!actionable} reason={disabledReason} aria={`${item.optimized ? '查看' : '继续生成'}简历任务 ${taskLabel} 的优化版`} onClick={() => openOptimize(item.taskId, item.optimized)} />
+                      <SmallAct label="查看报告" disabled={!actionable} reason={disabledReason} aria={`查看 ${taskLabel} 这份简历的诊断报告`} onClick={() => openReport(item.taskId)} primary />
+                      <SmallAct label={item.optimized ? '查看优化版' : '继续优化'} disabled={!actionable} reason={disabledReason} aria={`${item.optimized ? '查看' : '继续生成'} ${taskLabel} 这份简历的优化版`} onClick={() => openOptimize(item.taskId, item.optimized)} />
                       <SmallAct label="简历对照" disabled={!actionable} reason={disabledReason} aria={`用这份简历做简历对照`} onClick={() => openJobFit(item)} />
                     </>
                   ) : (
                     <>
-                      <SmallAct label="查看并打印" disabled={!actionable} reason={disabledReason} aria={`查看并打印 AI 生成简历任务 ${taskLabel}`} onClick={() => openGenerate(item.taskId)} primary />
+                      <SmallAct label="查看并打印" disabled={!actionable} reason={disabledReason} aria={`查看并打印 ${taskLabel} 这份 AI 生成简历`} onClick={() => openGenerate(item.taskId)} primary />
                       <SmallAct label="简历对照" disabled reason="生成简历请先导出再上传诊断" aria="用这份简历做简历对照" onClick={() => {}} />
                     </>
                   )}
@@ -193,7 +192,7 @@ export function MyResumesPage() {
       view="resumes"
       screen="member-list"
       screenState={`resumes-${uiState}`}
-      eyebrow="MY RESUMES"
+      eyebrow="我的简历"
       ask={<>你的简历，<em>都在这里</em>。</>}
       doing={<>只显示<b>本人简历服务记录</b>，不展示简历原文或诊断正文。</>}
       truth="只展示本人简历记录；原始简历短留存，到期后无法恢复，不向企业提供或投递。"

@@ -1,8 +1,14 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
+import { formatBeijingDateTime } from '../common/beijing-display-time'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import { buildAigcLabelJson, requireAigcProduceId, stampAigcPageHeader } from '../common/pdf/aigc-label'
 import type { ContractReviewFinding, ContractReviewResult } from './contract-review.types'
+
+/** 纸上那一行生成时间。PDF 信息字典里的 GeneratedAt 仍是 UTC，不走这里。 */
+export function contractReviewGeneratedAtLine(generatedAt: Date): string {
+  return `生成时间：${formatBeijingDateTime(generatedAt)}  ｜  AI 生成`
+}
 
 const PRIORITY_LABEL: Record<ContractReviewFinding['priority'], string> = {
   priority_check: '优先核对',
@@ -48,9 +54,7 @@ export class ContractReviewReportPdfService {
 
     doc.fontSize(20).fillColor('#0f172a').text('AI 签约风险提示')
     doc.moveDown(0.35)
-    doc.fontSize(9.5).fillColor('#475569').text(
-      `生成时间：${args.generatedAt.toISOString().replace('T', ' ').slice(0, 19)} UTC  ｜  AI 生成`,
-    )
+    doc.fontSize(9.5).fillColor('#475569').text(contractReviewGeneratedAtLine(args.generatedAt))
     doc.moveDown(0.5)
     this.notice(doc)
 

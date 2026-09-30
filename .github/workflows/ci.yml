@@ -646,6 +646,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
+          # 给人看的时间按北京时间（W-78）。不连库。
+          pnpm --filter @ai-job-print/api verify:beijing-display-time
           pnpm --filter @ai-job-print/api verify:console-screen-snapshot
           # 服务调用 / 信息使用：会 import src，必须在 Prisma client 生成之后。
           pnpm --filter @ai-job-print/api verify:console-screen-usage
@@ -1162,6 +1164,9 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders
+          # 会员取件链接与重试的审计在真 PostgreSQL 上落库：actorId 为空、payload.endUserId 为会员号；
+          # 旧写法（actorId 写会员号）直接插入必须抛外键错误。SQLite 门禁测不到这条外键。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-audit:postgres
           # 跨端订单时间线 + 会员本机领取：三路归并翻页不重不漏、过滤与 total 同口径、到机码明文不下发、
           # claim-here 与到机码入口共用同一段核销判定。含排序与 count，PG 侧同样跑。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-order-timeline

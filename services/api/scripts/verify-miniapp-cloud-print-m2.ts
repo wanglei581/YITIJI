@@ -385,7 +385,7 @@ async function main(): Promise<void> {
       data: { id, terminalCode: code, agentToken: `token-${id}`, deviceFingerprint: `fp-${id}`, displayName: `终端 ${code}`, locationLabel: '验证点' },
     })
     await prisma.terminalHeartbeat.create({
-      data: { terminalId: id, status: 'online', localTaskDatabaseAvailable: true, createdAt: new Date() },
+      data: { terminalId: id, status: 'online', localTaskDatabaseAvailable: true, agentVersion: '0.4.13', createdAt: new Date() },
     })
     await prisma.terminalCapability.create({
       data: { terminalId: id, capabilityKey: 'document_print', status: 'available' },
@@ -655,6 +655,33 @@ async function main(): Promise<void> {
         fail(`会员带走链接必须留审计（actorId=null、payload.endUserId=本人）：${JSON.stringify({ found: Boolean(row), actorId: row?.actorId, endUserId: payload.endUserId })}`)
       }
       pass('会员带走链接留审计：actorId 为空（外键指向运营账号），会员 ID 在 payload')
+    }
+    await prisma.printTask.update({
+      where: { id: takeawayTaskId },
+      data: { status: 'failed', errorCode: 'PRINTER_OFFLINE', errorMessage: null },
+    })
+    await prisma.order.update({
+      where: { id: created.id },
+      data: { taskStatus: 'failed', payStatus: 'paid' },
+    })
+    const retriedByMember = await printJobs.retryPaidFailedJob(takeawayTaskId, { endUserId: userId })
+    if (
+      retriedByMember.status !== 'pending' ||
+      retriedByMember.taskId !== takeawayTaskId ||
+      retriedByMember.orderId !== created.id
+    ) {
+      fail(`会员重试未成功：${JSON.stringify(retriedByMember)}`)
+    }
+    {
+      const row = await prisma.auditLog.findFirst({
+        where: { action: 'print_job.retry', targetId: takeawayTaskId },
+        orderBy: { createdAt: 'desc' },
+      })
+      const payload = row ? JSON.parse(row.payloadJson ?? '{}') as { endUserId?: string } : {}
+      if (!row || row.actorId !== null || payload.endUserId !== userId) {
+        fail(`会员重试必须留审计（actorId=null、payload.endUserId=本人）：${JSON.stringify({ found: Boolean(row), actorId: row?.actorId, endUserId: payload.endUserId })}`)
+      }
+      pass('会员重试留审计：actorId 为空（外键指向运营账号），会员 ID 在 payload')
     }
     pass('会员 owner 无需终端会话即可签发带走 URL')
     const boundTakeaway = await printJobs.issueTakeawayUrl(takeawayTaskId, {

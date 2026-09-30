@@ -153,7 +153,7 @@ JobApplication
 | 招聘信息真实性审查 | 发布闸门接 `JobQualityService`（当前 `publishJobSource` 完全不读它，见 compliance §4.3B） | 已有算法，缺接线 |
 | 向第三方提供个人信息须单独同意 | 投递前单独同意弹窗 + 同意快照 + 可撤回 | `UserAiConsent`（`scope`/`consentVersion`/`revokedAt`） |
 | 告知接收方名称、联系方式、处理目的、信息种类 | 同意弹窗内容 + 企业主体信息展示 | 新写文案，数据来自 #6 |
-| 服务日志留存 | 留存策略与年限（**年限待法务确认**；《网络安全法》第二十一条另有网络日志不少于六个月的要求） | `AuditLog` |
+| 服务日志留存 | 留存策略与年限（**年限待法务确认**；《网络安全法》（2025 年 10 月 28 日修正）第二十三条第三项另有网络日志不少于六个月的要求） | `AuditLog` |
 | 投诉举报机制 | 招聘类工单分类 + 处理时限 | `FeedbackTicket` / `FeedbackReply` |
 | 个人信息删除 / 导出权 | 投递记录纳入导出与删除范围 | `UserDataRequest` |
 | 简历访问最小化 | 企业侧只能看被投递岗位对应的那份简历，签名 URL + TTL + 访问日志 | `FileObject` + `SIGNED_URL_PURPOSES` |

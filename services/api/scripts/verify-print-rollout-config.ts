@@ -207,6 +207,17 @@ function main(): void {
     'ops doc covers production price upsert + seed ban + FREE_MODE',
     'docs/operations/price-config-production.md must document seed ban and explicit upsert',
   )
+  const priceSqlWithoutUtcClock = priceOpsDoc
+    .split("NOW() AT TIME ZONE 'UTC'").join('')
+    .split('不要照抄 NOW()').join('')
+  check(
+    !priceSqlWithoutUtcClock.includes('NOW()')
+      && priceOpsDoc.includes("NOW() AT TIME ZONE 'UTC'")
+      && priceOpsDoc.includes("strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+      && priceOpsDoc.includes('不要照抄 NOW()'),
+    'ops price SQL writes UTC wall clock for PostgreSQL and SQLite, and warns not to copy NOW()',
+    'price-config-production.md must not leave a bare NOW(); PostgreSQL uses NOW() AT TIME ZONE UTC, SQLite uses strftime UTC, and the doc says 不要照抄 NOW()',
+  )
 
   if (failures > 0) {
     console.error(`\nFAIL verify-print-rollout-config (${failures} failed checks)`)
