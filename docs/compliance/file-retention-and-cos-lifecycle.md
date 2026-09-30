@@ -1,5 +1,7 @@
 # 文件保存期限与 COS 生命周期验收
 
+> 全部数据类别的分类与保存期限总表见 [data-inventory-and-retention.md](data-inventory-and-retention.md)；本文件保留为文件与对象存储这一块的明细，并由门禁直接校验。
+
 > 适用范围：用户上传文件、AI 简历成果物、打印扫描文件、Admin 文件管理、生产 COS 私有桶验收。
 > 本文是试运营验收口径，不替代正式法务审定文本。
 
