@@ -17,6 +17,7 @@ import { OrderStatusService } from '../src/payment/order-status.service'
 import { verifyPaymentSessionToken } from '../src/payment/payment-session-token'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { FilesService } from '../src/files/files.service'
 import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -277,7 +278,14 @@ async function main(): Promise<void> {
     if (foreign.items.length !== 0 || foreign.total !== 0) fail('材料包订单列表必须按 endUserId 隔离')
     pass('GET /orders/package 能找回订单与到机码；不签发付款令牌、不回明细；按本人隔离')
 
+    const removedScans = await prisma.documentProcessTask.deleteMany({
+      where: { sourceFileId: { in: fileIds }, kind: 'pii_scan' },
+    })
+    if (removedScans.count !== fileIds.length) {
+      fail(`材料包清理模拟必须删掉每一份隐私检查，实际删了 ${removedScans.count} 条`)
+    }
     const claim = await pickup.claim(created.pickupCode!, terminalId)
+    pass('隐私检查记录被清理后，材料包到机认领仍成功')
     await statuses.markPaid(created.orderId, { paymentSource: 'offline', operatorId: 'verify-package' })
     const released = await pickup.release(created.orderId, terminalId, claim.paymentSessionToken)
     const afterRelease = await prisma.order.findUnique({
@@ -399,6 +407,48 @@ async function main(): Promise<void> {
       101,
       '材料包合计 101 面建单拒绝',
     )
+
+    // 直传完成后内容被换掉：放行仍要拒绝。代理上传没有直传基线，完整性校验会直接返回，测不到这一条。
+    await prisma.terminalHeartbeat.create({ data: { terminalId, status: 'online', localTaskDatabaseAvailable: true } })
+    const files = new FilesService(prisma, audit, storage)
+    const directIntent = await files.createUploadIntent({
+      body: { purpose: 'print_doc', filename: '放行篡改.pdf', mimeType: 'application/pdf', sizeBytes: 1024 },
+      uploaderId: null,
+      endUserId: userId,
+    })
+    const directRecord = await prisma.fileObject.findUniqueOrThrow({ where: { id: directIntent.fileId } })
+    storageKeys.push(directRecord.storageKey)
+    const directPdf = buildRealPdf(1)
+    await storage.putObject(directRecord.storageKey, directPdf, 'application/pdf', directRecord.bucket)
+    await files.completeUpload(directIntent.fileId, { kind: 'member', endUserId: userId })
+    const directScan = await prisma.documentProcessTask.create({
+      data: {
+        kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: directIntent.fileId,
+        endUserId: userId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        paramsJson: JSON.stringify({ sourceSha256: createHash('sha256').update(directPdf).digest('hex') }),
+      },
+    })
+    await prisma.piiFinding.create({ data: { taskId: directScan.id, type: 'phone', label: '手机号', action: 'keep' } })
+    const tamperOrder = await packages.create(userId, {
+      terminalId,
+      files: [{ fileId: directIntent.fileId }],
+      params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+    }, randomUUID())
+    if (!tamperOrder.pickupCode) fail('内容篡改用例必须先建成材料包订单')
+    const tamperClaim = await pickup.claim(tamperOrder.pickupCode, terminalId)
+    await statuses.markPaid(tamperOrder.orderId, { paymentSource: 'offline', operatorId: 'verify-package' })
+    await storage.putObject(directRecord.storageKey, buildRealPdf(2), 'application/pdf', directRecord.bucket)
+    await expectCode(
+      () => pickup.release(tamperOrder.orderId, terminalId, tamperClaim.paymentSessionToken),
+      'FILE_CONTENT_CHANGED',
+      '文件内容被改过时到机放行仍拒绝',
+    )
+    const tamperRow = await prisma.order.findUnique({
+      where: { id: tamperOrder.orderId },
+      select: { printTaskId: true, pickupStatus: true },
+    })
+    if (tamperRow?.printTaskId || tamperRow?.pickupStatus === 'used') fail('内容被改过时不得放出打印任务')
+    pass('文件内容被改过时到机放行被拒，且没有放出打印任务')
   } finally {
     setPrintScanCapabilityModeForTest(null)
     const orderIds = (await prisma.order.findMany({ where: { endUserId: userId }, select: { id: true } })).map((row) => row.id)

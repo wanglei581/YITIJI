@@ -24,6 +24,7 @@ import {
   type LlmVendor,
 } from '../../services/api/aiConfig'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 /**
  * 依赖招聘内容托管的 AI 功能：托管关闭时服务端对它们的接口回 403（岗位、招聘会在我们云上不开放），
@@ -160,18 +161,25 @@ export default function AiConfigPage() {
     if (!confirmIndependentConfig('保存并测试')) return
     setTesting(true)
     setTestResult(null)
+    setError(null)
+    let updated: AiConfigView
     try {
-      // 先保存当前配置，再测试，确保测的是最新值
-      const updated = await aiConfigApi.update({
+      updated = await aiConfigApi.update({
         feature: selectedFeature, vendor, model, baseURL, systemPrompt, roleScope, forbiddenWords: parseForbiddenWords(), temperature, enabled,
         ...(apiKey ? { apiKey } : {}),
       })
-      setConfigs((prev) => prev ? { ...prev, [selectedFeature]: updated } : prev)
-      applyConfig(updated)
+    } catch (e) {
+      setError(`未保存：${userMessageOf(e, '保存失败，请稍后重试')}`)
+      setTesting(false)
+      return
+    }
+    setConfigs((prev) => prev ? { ...prev, [selectedFeature]: updated } : prev)
+    applyConfig(updated)
+    try {
       const r = await aiConfigApi.test(selectedFeature)
       setTestResult(r)
     } catch (e) {
-      setTestResult({ ok: false, error: e instanceof Error ? e.message : '测试失败' })
+      setTestResult({ ok: false, error: userMessageOf(e, '测试失败，请稍后重试') })
     } finally {
       setTesting(false)
     }

@@ -31,9 +31,19 @@
 /* ── 渠道卡：多张时是目录行（图标字 · 名称与地址 · 右侧二维码），来源说明在名称下方 ── */
 .oc-list { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; list-style: none; }
 .oc-card {
+  position: relative;
   display: grid; grid-template-columns: 92px minmax(0, 1fr) auto;
   grid-template-areas: 'ic main qr' 'ic cap qr'; align-items: center; gap: 0 24px;
   padding: 20px 28px; border: 1px solid var(--qx-line); border-radius: 32px; background: var(--qx-surface);
+}
+.oc-card-check {
+  position: absolute; inset: 0; z-index: 1; margin: 0; padding: 0;
+  border: 0; border-radius: inherit; background: transparent; cursor: pointer;
+}
+.oc-withdrawn {
+  margin: 0; padding: 12px 18px; border: 1px solid var(--qx-line-2); border-radius: 22px;
+  background: var(--qx-wheat-soft); color: var(--qx-wheat-d);
+  font-size: var(--qx-fs-aux-lg); line-height: var(--qx-lh-body);
 }
 .oc-card-ic {
   grid-area: ic; width: 92px; height: 92px; border-radius: 27px;

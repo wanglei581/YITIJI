@@ -94,7 +94,11 @@ export interface PdfCanvasPreviewProps {
   showPager?: boolean
   credentials?: RequestCredentials
   failureMessage?: string
+  /** 这份 PDF 要打开密码时替换失败文案。不传则仍用 failureMessage。 */
+  passwordMessage?: string
   onError?: () => void
+  /** pdf.js 要求打开密码时调用。页面据此拦住继续，不再当成普通预览失败。 */
+  onPasswordRequired?: () => void
   onReady?: (info: { pageCount: number }) => void
   /** fill：撑满父级并在内部滚动。intrinsic：按画布尺寸撑开，交给外层滚动。 */
   layout?: PdfCanvasLayout
@@ -187,7 +191,9 @@ export function PdfCanvasPreview({
   showPager = true,
   credentials = 'same-origin',
   failureMessage = FAILURE_COPY,
+  passwordMessage,
   onError,
+  onPasswordRequired,
   onReady,
   layout = 'fill',
   sheetTestId,
@@ -198,10 +204,13 @@ export function PdfCanvasPreview({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const onErrorRef = useRef(onError)
   const onReadyRef = useRef(onReady)
+  const onPasswordRequiredRef = useRef(onPasswordRequired)
   onErrorRef.current = onError
   onReadyRef.current = onReady
+  onPasswordRequiredRef.current = onPasswordRequired
 
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [passwordBlocked, setPasswordBlocked] = useState(false)
   const [pageCount, setPageCount] = useState<number | null>(null)
   const [uncontrolledPage, setUncontrolledPage] = useState(1)
   const [renderSerial, setRenderSerial] = useState(0)
@@ -230,6 +239,7 @@ export function PdfCanvasPreview({
     }
     sessionRef.current = session
     setPhase('loading')
+    setPasswordBlocked(false)
     setPageCount(null)
     setRenderSerial(0)
     setDisplay(null)
@@ -260,6 +270,11 @@ export function PdfCanvasPreview({
         session.loadingTask = loadingTask
         loadingTask.onPassword = () => {
           passwordRejected = true
+          if (!session.dead) {
+            setPasswordBlocked(true)
+            setPhase('error')
+            onPasswordRequiredRef.current?.()
+          }
           void loadingTask.destroy()
         }
         const pdf = await loadingTask.promise
@@ -274,7 +289,8 @@ export function PdfCanvasPreview({
         onReadyRef.current?.({ pageCount: pdf.numPages })
       } catch (error) {
         if (session.dead) return
-        if (!passwordRejected && isBenignPreviewError(error)) return
+        if (passwordRejected) return
+        if (isBenignPreviewError(error)) return
         setPhase('error')
         onErrorRef.current?.()
       }
@@ -446,6 +462,7 @@ export function PdfCanvasPreview({
       data-pdf-renderer="canvas"
       data-preview-src={src}
       data-pdf-status={phase}
+      data-pdf-password={passwordBlocked ? 'true' : undefined}
       data-pdf-page={shownPage}
       data-pdf-fit={fit}
       data-pdf-page-count={pageCount ?? undefined}
@@ -476,7 +493,7 @@ export function PdfCanvasPreview({
       ) : (
         <div className="flex min-h-[160px] flex-1 items-center justify-center bg-white px-6 py-8 text-center" role="status">
           <p className={`max-w-md text-lg font-semibold leading-7 ${phase === 'error' ? 'text-neutral-700' : 'text-neutral-500'}`}>
-            {phase === 'error' ? failureMessage : LOADING_COPY}
+            {phase === 'error' ? (passwordBlocked && passwordMessage ? passwordMessage : failureMessage) : LOADING_COPY}
           </p>
         </div>
       )}

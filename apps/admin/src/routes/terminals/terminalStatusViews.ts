@@ -59,6 +59,7 @@ export function scanInputView(t: ScanInputFields) {
 //
 // Agent 真实上报：ready / offline / error / low_paper / unknown（apps/terminal-agent/src/agent/types.ts）。
 // ok / idle 是历史心跳的正常值；paper_empty / not_found 是早期约定，保留识别兼容存量心跳。
+// queue_cleanup_failed / queue_pause_failed：Agent 0.4.13 起，开机清理或暂停队列失败时主动停接打印单，恢复后回到正常值。
 // 认不出的原值显示「未知状态」并按需处理对待，绝不当成正常。
 
 const PRINTER_STATUS_MAP: Readonly<Record<string, { badge: BadgeTone; label: string }>> = {
@@ -71,6 +72,8 @@ const PRINTER_STATUS_MAP: Readonly<Record<string, { badge: BadgeTone; label: str
   error:       { badge: 'error',   label: '故障' },
   not_found:   { badge: 'warning', label: '未检测到' },
   unknown:     { badge: 'default', label: '驱动未返回状态' },
+  queue_cleanup_failed: { badge: 'error', label: '开机清理失败，暂停接打印单' },
+  queue_pause_failed:   { badge: 'error', label: '暂停队列失败，暂停接打印单' },
 }
 
 export function printerStatusView(status: string | null): { badge: BadgeTone; label: string } {

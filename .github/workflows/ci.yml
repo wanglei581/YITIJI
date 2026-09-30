@@ -146,6 +146,9 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-terminal-bind-code-ui
           pnpm --filter @ai-job-print/admin verify:admin-peripheral-views
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
+          pnpm --filter @ai-job-print/admin verify:admin-ai-usage-ui
+          pnpm --filter @ai-job-print/admin verify:console-plain-copy
+          pnpm --filter @ai-job-print/admin verify:admin-internal-accounts-ui
           pnpm --filter @ai-job-print/admin verify:admin-partner-contact-phone-ui
           pnpm --filter @ai-job-print/admin verify:admin-login-second-factor
           # D6/C6/C7 后台 AI 服务开关：适配器与面板在隔离进程里真跑，另读服务端
@@ -399,6 +402,8 @@ jobs:
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
           pnpm run verify:print-monitor-truth
+          # 解析 Get-PrintJob 输出并按本进程 SID 筛选。不建打印机。
+          pnpm run verify:print-queue-residue
           # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
           pnpm run verify:image-scale-truth
           pnpm run verify:network-diagnostics
@@ -414,6 +419,10 @@ jobs:
           # F0.5 仅观察边界：静态确认 Agent 没有下载、安装、服务控制或任何
           # 制品身份回传能力；不触发 Windows API、打印机或本地 Agent。
           pnpm run verify:release-observation-boundary
+
+      - name: Verify queue dispatch printer status
+        working-directory: services/api
+        run: pnpm run verify:queue-dispatch-printer-status
 
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
@@ -523,6 +532,8 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-state
+          # 屏保终端配置与百宝箱动作的状态单测（此前没挂进 CI；清理批准单第 3 条：模块仍在用，补进 CI 而不删）
+          pnpm --filter @ai-job-print/admin test:admin-state-units
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/admin verify:data-request-ui
           pnpm --filter @ai-job-print/admin verify:admin-users-ui

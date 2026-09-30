@@ -8,6 +8,16 @@ test.describe('AI 服务 / 配置（mock 口径）', () => {
     await expect(page.getByRole('heading', { name: 'AI 服务管理' })).toBeVisible()
   })
 
+  test('AI 用量与额度：mock 模式显示诚实空态，不出现金额或次数', async ({ page }) => {
+    const guards = await openAuthed(page, '/ai-services')
+    await settleAdminPage(page, guards)
+    const panel = page.getByRole('region', { name: 'AI 用量与额度' })
+    await expect(panel).toBeVisible()
+    await expect(panel.getByText('演示模式不连接真实用量数据')).toBeVisible()
+    // 运营看钱的面板：mock 不造假数，面板里不能出现「x.xx 元」这类金额
+    await expect(panel.getByText(/\d+\.\d{2} 元/)).toHaveCount(0)
+  })
+
   test('AI 大模型：功能位可点，连通性测试给出 mock 中文原因', async ({ page }) => {
     const guards = await openAuthed(page, '/ai-config')
     await settleAdminPage(page, guards)

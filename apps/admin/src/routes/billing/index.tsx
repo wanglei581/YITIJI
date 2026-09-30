@@ -6,6 +6,7 @@
 //
 // 合规：无任何支付凭证字段；改价前二次确认；停用价目会使对应报价 fail-closed，
 // 页面明示此语义（非「免费」）。
+import { formatDateTime } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState } from 'react'
 import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { CheckIcon, RefreshCwIcon, XIcon } from 'lucide-react'
@@ -212,7 +213,7 @@ function PriceConfigSection() {
                 <td className="px-5 py-3">
                   <StatusBadge status={item.active ? 'success' : 'default'} label={item.active ? '启用' : '停用'} />
                 </td>
-                <td className="px-5 py-3 text-xs text-neutral-400">{new Date(item.updatedAt).toLocaleString('zh-CN')}</td>
+                <td className="px-5 py-3 text-xs text-neutral-400" title={formatDateTime(item.updatedAt)}>{formatDateTime(item.updatedAt)}</td>
                 <td className="px-5 py-3 text-right">
                   <div className="flex justify-end gap-2">
                     {descriptionChanged && (

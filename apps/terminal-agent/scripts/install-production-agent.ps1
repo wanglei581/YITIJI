@@ -20,6 +20,8 @@
 #   # A test machine that is also someone's work PC (e.g. KSK-001): add -KeepFileSelectionDialogs so the
 #   # machine-wide AllowFileSelectionDialogs=0 Edge policy is not written (it would break file uploads in
 #   # that person's normal Edge). Never use it on a dedicated kiosk (golden image checklist A7a).
+#   # 同一类机器再加 -KeepPrinterQueueUnpaused。空闲暂停会挡住这台电脑上别的程序打印。
+#   # 专用一体机不要加这个开关。
 #
 #   # Replace previously preserved cross-origin Kiosk entries. Passing the
 #   # switch with no -LocalApiAllowedOrigins removes all historical extra origins.
@@ -76,7 +78,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.4.12-production",
+  [string]$AgentVersion = "0.4.13-production",
 
   [Parameter(Mandatory = $false)]
   [string]$InstalledAgentRoot,
@@ -100,6 +102,10 @@ param(
 
   [Parameter(Mandatory = $false)]
   [switch]$KeepFileSelectionDialogs,
+
+  # 默认暂停配置打印机的队列。兼作工作电脑时加上本开关，否则别的程序也打不出纸。
+  [Parameter(Mandatory = $false)]
+  [switch]$KeepPrinterQueueUnpaused,
 
   [Parameter(Mandatory = $false)]
   [ValidateRange(1, 65535)]
@@ -891,6 +897,7 @@ $config = [ordered]@{
   claimIntervalMs        = $ClaimIntervalMs
   localApiPort           = $effectiveLocalApiPort
   localApiAllowedOrigins = @($effectiveLocalApiAllowedOrigins)
+  holdPrinterQueueWhenIdle = -not [bool]$KeepPrinterQueueUnpaused
 }
 if ($null -ne $effectiveScanWatchFolder) {
   $config.scanWatchFolder = $effectiveScanWatchFolder

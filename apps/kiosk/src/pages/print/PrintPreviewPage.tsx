@@ -153,6 +153,7 @@ export function PrintPreviewPage({
     printerName,
     printer,
     printerLabel,
+    printerNotice,
     printerReady,
     kind: printerKind,
     loading: printerLoading,
@@ -207,7 +208,9 @@ export function PrintPreviewPage({
 
   const warnings = useMemo(() => {
     const next: Array<{ id: string; level: 'error' | 'warn'; text: string }> = []
-    if (printerKind === 'unknown' || printer.errorCode === 'statusUnknown') {
+    if (printerNotice) {
+      next.push({ id: 'queue-gate', level: 'error', text: printerNotice })
+    } else if (printerKind === 'unknown' || printer.errorCode === 'statusUnknown') {
       next.push({ id: 'unknown', level: 'error', text: '打印机状态未知，请稍候或联系工作人员' })
     } else if (printerKind === 'offline' || !printer.isOnline) {
       next.push({ id: 'offline', level: 'error', text: '打印机离线，请联系工作人员' })
@@ -220,7 +223,7 @@ export function PrintPreviewPage({
     }
     if (printerKind === 'low_paper') next.push({ id: 'low-paper', level: 'warn', text: '纸量偏低，建议补纸后再大批量打印' })
     return next
-  }, [printer, printerKind])
+  }, [printer, printerKind, printerNotice])
 
   const hasBlockingWarning = warnings.some((warning) => warning.level === 'error') || !printerReady
   const selectedPages = useMemo(() => {
@@ -375,11 +378,13 @@ export function PrintPreviewPage({
       ? { tone: 'bad' as const, label: '当前文件不能预览打印' }
       : printerReady
         ? { tone: 'ok' as const, label: '预览与参数待确认' }
-        : printerKind === 'offline'
-          ? { tone: 'bad' as const, label: '打印机离线' }
-          : printerKind === 'error'
-            ? { tone: 'bad' as const, label: '打印机异常' }
-            : { tone: 'warn' as const, label: '打印机状态未知' }
+        : printerNotice
+          ? { tone: 'bad' as const, label: printerLabel }
+          : printerKind === 'offline'
+            ? { tone: 'bad' as const, label: '打印机离线' }
+            : printerKind === 'error'
+              ? { tone: 'bad' as const, label: '打印机异常' }
+              : { tone: 'warn' as const, label: '打印机状态未知' }
 
   // Legacy gate markers: PrintPageFrame, KioskActionBar, step={3}.
   // The route now renders QxPageFrame and qx-ctabar while preserving the same business state.
@@ -403,12 +408,14 @@ export function PrintPreviewPage({
                 ? '请先逐页核对预览并确认隐私处理结果。'
               : printerLoading
                 ? '设备状态返回前不放行。'
-                : hasBlockingWarning
-                  ? '打印机当前不可用，不能进入报价确认。'
-                  : '下一步核对价格，确认前不会收费。'}
+                : printerNotice
+                  ? printerNotice
+                  : hasBlockingWarning
+                    ? '打印机当前不可用，不能进入报价确认。'
+                    : '下一步核对价格，确认前不会收费。'}
           </p>
           <button className="qx-btn" data-variant="primary" type="button" disabled={printerLoading || hasBlockingWarning || unsupported || (privacyGate.kind === 'confirm' && !privacyConfirmed)} onClick={handleNext}>
-            {privacyGate.kind === 'confirm' && !privacyConfirmed ? '请先确认隐私处理结果' : printerLoading ? '设备检测中…' : hasBlockingWarning ? '打印机不可用' : '下一步：核对价格'}
+            {privacyGate.kind === 'confirm' && !privacyConfirmed ? '请先确认隐私处理结果' : printerLoading ? '设备检测中…' : printerNotice ? printerLabel : hasBlockingWarning ? '打印机不可用' : '下一步：核对价格'}
           </button>
         </PrintDeskFooter>
       )}

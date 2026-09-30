@@ -1,3 +1,4 @@
+import { formatDateTime, formatRelativeTime, formatTime } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState, type ElementType, type ReactNode } from 'react'
 import { ErrorState, LoadingState, Meter, SectionCard, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
@@ -43,6 +44,8 @@ import {
 } from '../../services/api/adminOps'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import { recruitmentStockKpi, recruitmentStockTodo, type StockTodo } from './recruitmentStock'
+import { getAuditActionLabel, getAuditActorLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
+import { getUser } from '../../services/auth'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +70,7 @@ interface TodoRow {
   href: string
   actionLabel: string
   warn?: boolean
+  timeTitle?: string
 }
 
 /**
@@ -107,33 +111,6 @@ function initialBlock<V>(loading = true): BlockEntry<V> {
   return { value: null, error: null, loading }
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  'partner_account.contact_phone_registered': '登记机构联系人手机',
-  'ai_resume_result.cleanup_expired': '清理过期 AI 简历结果',
-  'data_source.create': '创建数据源',
-  'data_source.toggle': '启停数据源',
-  'fair.import': '招聘会导入',
-  'fair.publish': '招聘会发布',
-  'fair.review': '招聘会审核',
-  'file.cleanup_expired': '清理过期文件',
-  'file.force_delete': '文件删除',
-  'file.get_signed_url': '访问文件',
-  'file.upload': '文件上传',
-  'job.import': '岗位导入',
-  'job.publish': '岗位发布',
-  'job.review': '岗位审核',
-  'job_source.create': '创建岗位源',
-  'system.config_change': '配置变更',
-  'system.login': '登录',
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: '管理员',
-  kiosk: '一体机',
-  partner: '合作机构',
-  system: '系统',
-}
-
 const PRINT_STATUS_LABELS: Record<string, { label: string; status: 'success' | 'warning' | 'error' | 'info' | 'default' }> = {
   pending: { label: '排队中', status: 'info' },
   claimed: { label: '已领取', status: 'info' },
@@ -147,20 +124,11 @@ const PRINT_STATUS_LABELS: Record<string, { label: string; status: 'success' | '
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function relTime(iso: string): string {
-  const time = Date.parse(iso)
-  if (Number.isNaN(time)) return iso
-
-  const diff = Date.now() - time
-  if (diff < 60_000) return '刚刚'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
-  return `${Math.floor(diff / 86_400_000)} 天前`
+  return formatRelativeTime(iso)
 }
 
 function clockTime(iso: string): string {
-  const time = Date.parse(iso)
-  if (Number.isNaN(time)) return iso
-  return new Date(time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  return formatTime(iso, iso)
 }
 
 /** 非空平均值；全为空返回 null（诚实：无上报不显示均值）。 */
@@ -168,20 +136,6 @@ function avgLevel(values: Array<number | null>): number | null {
   const nums = values.filter((value): value is number => value !== null && Number.isFinite(value))
   if (nums.length === 0) return null
   return Math.round(nums.reduce((sum, value) => sum + value, 0) / nums.length)
-}
-
-function getAuditActionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action
-}
-
-function getActorLabel(log: AuditLogRecord): string {
-  const role = ROLE_LABELS[log.actorRole] ?? log.actorRole
-  return log.actorId ? `${role} · ${log.actorId}` : role
-}
-
-function getTargetLabel(log: AuditLogRecord): string {
-  if (!log.targetType) return ''
-  return log.targetId ? `${log.targetType}/${log.targetId}` : log.targetType
 }
 
 function printTypeLabel(task: AdminPrintTaskItem): string {
@@ -289,7 +243,7 @@ function TodoItemRow({ row, isFirst }: { row: TodoRow; isFirst: boolean }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-bold text-neutral-900">{row.title}</p>
-        <p className="mt-0.5 truncate text-[11.5px] text-neutral-500">{row.sub}</p>
+        <p className="mt-0.5 truncate text-[11.5px] text-neutral-500" title={row.timeTitle}>{row.sub}</p>
       </div>
       <a href={row.href} className="shrink-0 text-xs font-bold text-primary-700 hover:text-primary-600">
         {row.actionLabel}
@@ -340,7 +294,7 @@ function RecentPrintTasks({ tasks, total }: { tasks: AdminPrintTaskItem[]; total
                       <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5">
                         <StatusBadge dot status={st.status} label={st.label} />
                       </td>
-                      <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5 tabular-nums text-neutral-500">
+                      <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5 tabular-nums text-neutral-500" title={formatDateTime(task.createdAt)}>
                         {clockTime(task.createdAt)}
                       </td>
                     </tr>
@@ -364,7 +318,14 @@ function RecentActivity({ logs }: { logs: AuditLogRecord[] }) {
       ) : (
         <div>
           {logs.map((log, index) => {
-            const target = getTargetLabel(log)
+            const target = getAuditTargetLabel(log.targetType)
+            const actor = getAuditActorLabel({
+              actorRole: log.actorRole,
+              actorId: log.actorId,
+              payloadJson: log.payloadJson,
+              currentUser: getUser(),
+              record: log,
+            })
             return (
               <div
                 key={log.id}
@@ -384,11 +345,11 @@ function RecentActivity({ logs }: { logs: AuditLogRecord[] }) {
                     {getAuditActionLabel(log.action)}
                   </p>
                   <p className="mt-0.5 truncate text-[11.5px] text-neutral-500">
-                    {getActorLabel(log)}
+                    {actor}
                     {target ? ` · ${target}` : ''}
                   </p>
                 </div>
-                <span className="shrink-0 text-xs tabular-nums text-neutral-500">
+                <span className="shrink-0 text-xs tabular-nums text-neutral-500" title={log.createdAt ? formatDateTime(log.createdAt) : undefined}>
                   {relTime(log.createdAt)}
                 </span>
               </div>
@@ -473,6 +434,9 @@ function buildAlertRows(alerts: AdminAlertItem[]): TodoRow[] {
         ? `意见反馈 · ${relTime(alert.occurredAt)}`
         : `${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`,
     href: alert.type === 'feedback_pending' ? '/member-feedback?category=ai_content' : '/alerts',
+    timeTitle: formatDateTime(alert.occurredAt, { fallback: '' })
+      ? `发生时间 ${formatDateTime(alert.occurredAt)}`
+      : undefined,
     actionLabel: '处理',
     warn: true,
   }))
@@ -535,12 +499,7 @@ export default function DashboardPage() {
     void loadBlocks(ALL_BLOCKS).finally(() => setInitialLoading(false))
   }, [loadBlocks])
 
-  const today = new Date().toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-  })
+  const today = formatDateTime(new Date(), { style: 'zh-date-weekday' })
 
   const entry = <K extends BlockKey>(key: K): BlockEntry =>
     blocks[key] ?? { value: null, error: null, loading: true }
@@ -676,7 +635,7 @@ export default function DashboardPage() {
             icon={BotIcon}
             value={aiUsage !== null ? String(aiUsage.totalCalls) : '0'}
             unit="次"
-            sub={aiUsage !== null ? `成功率 ${aiUsage.successRate}%` : ''}
+            sub={aiUsage === null ? '' : aiUsage.totalCalls === 0 ? '今日暂无调用' : `成功率 ${aiUsage.successRate}%`}
             warn={aiUsage !== null && aiUsage.failCount > 0}
             failed={aiUsage === null}
             onRetry={retry(['aiUsage'])}

@@ -171,6 +171,112 @@ function buildTextPdf(lines: string[]): Buffer {
   return Buffer.from(bodyStr + xref + trailer, 'utf8')
 }
 
+/**
+ * 应届生简历，排法仿 Word 导出的文字层：每段用绝对坐标 Tm 定位，不靠换行符。
+ * 姓名拆成两个文字项且先写右边再写左边；联系方式同样先写邮箱再写手机。
+ * 中文走 UniGB-UCS2-H（与 fixtures/zh-cmap.pdf 同一套，不嵌字库、不落文件）。
+ */
+function ucs2Hex(text: string): string {
+  return [...text].map((ch) => (ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')).join('')
+}
+
+function pdfLiteral(text: string): string {
+  return `(${text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')})`
+}
+
+function buildWordLikeResumePdf(pageStreams: string[]): Buffer {
+  const header = '%PDF-1.4\n'
+  const firstPageObj = 7
+  const kids: string[] = []
+  const objects: string[] = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '',
+    '<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light /Encoding /UniGB-UCS2-H /DescendantFonts [4 0 R] >>',
+    '<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light /CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 4 >> /FontDescriptor 5 0 R /DW 1000 >>',
+    '<< /Type /FontDescriptor /FontName /STSong-Light /Flags 6 /FontBBox [-25 -254 1000 880] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 880 /StemV 93 >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]
+  pageStreams.forEach((content, index) => {
+    const pageObj = firstPageObj + index * 2
+    const contentObj = pageObj + 1
+    kids.push(`${pageObj} 0 R`)
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 6 0 R >> >> /Contents ${contentObj} 0 R >>`,
+    )
+    objects.push(`<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`)
+  })
+  objects[1] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${pageStreams.length} >>`
+  let bodyStr = header
+  const offsets: number[] = []
+  objects.forEach((obj, idx) => {
+    offsets.push(Buffer.byteLength(bodyStr, 'utf8'))
+    bodyStr += `${idx + 1} 0 obj\n${obj}\nendobj\n`
+  })
+  const xrefStart = Buffer.byteLength(bodyStr, 'utf8')
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  offsets.forEach((off) => {
+    xref += `${String(off).padStart(10, '0')} 00000 n \n`
+  })
+  const trailer = `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`
+  return Buffer.from(bodyStr + xref + trailer, 'utf8')
+}
+
+function zhTj(text: string): string {
+  return `<${ucs2Hex(text)}> Tj\n`
+}
+
+/** 两页应届生简历。项目名与时间段分属不同 y；姓名、联系方式的书写顺序与从左到右相反。 */
+function graduateResumePdf(): Buffer {
+  const page1 = `BT
+/F1 16 Tf
+1 0 0 1 108 760 Tm
+${zhTj('予安')}1 0 0 1 72 760 Tm
+${zhTj('陈')}/F2 11 Tf
+1 0 0 1 340 730 Tm
+${pdfLiteral('chen.yuan@example.com')} Tj
+1 0 0 1 72 730 Tm
+${pdfLiteral('13812345678')} Tj
+/F1 14 Tf
+1 0 0 1 72 690 Tm
+${zhTj('教育经历')}/F1 12 Tf
+1 0 0 1 72 666 Tm
+${zhTj('青序工学院')}/F2 11 Tf
+1 0 0 1 220 666 Tm
+${pdfLiteral('2020.09 - 2024.06')} Tj
+/F1 14 Tf
+1 0 0 1 72 628 Tm
+${zhTj('项目经历')}/F1 12 Tf
+1 0 0 1 72 604 Tm
+${zhTj('校园二手交易平台')}/F2 11 Tf
+1 0 0 1 72 582 Tm
+${pdfLiteral('2023.09 - 2024.06')} Tj
+/F1 11 Tf
+1 0 0 1 84 560 Tm
+${zhTj('负责商品发布与订单状态')}/F1 12 Tf
+1 0 0 1 72 528 Tm
+${zhTj('社团招新报名小程序')}/F2 11 Tf
+1 0 0 1 72 506 Tm
+${pdfLiteral('2022.03 - 2022.06')} Tj
+/F1 14 Tf
+1 0 0 1 72 468 Tm
+${zhTj('技能')}/F2 11 Tf
+1 0 0 1 72 446 Tm
+${pdfLiteral('TypeScript / React / Java')} Tj
+ET`
+  const page2 = `BT
+/F1 14 Tf
+1 0 0 1 72 760 Tm
+${zhTj('实习经历')}/F2 11 Tf
+1 0 0 1 72 736 Tm
+${pdfLiteral('2023.07 - 2023.08')} Tj
+/F1 12 Tf
+1 0 0 1 72 714 Tm
+${zhTj('青序信息科技')}/F1 11 Tf
+1 0 0 1 84 692 Tm
+${zhTj('参与内部打印终端页面联调')}ET`
+  return buildWordLikeResumePdf([page1, page2])
+}
+
 // ── 真实、pdfjs 会诚实报告 numPages=count 的最小 PDF（用于 MAX_BORN_DIGITAL_EXTRACT_PAGES
 //    回归测试，与 verify-materials-processing.ts 的 buildDeclaredBigPageCountPdf 同一实现）：
 //    /Pages 字典的 /Kids 数组重复引用同一个真实 Page 对象 count 次，/Count 与 Kids.length
@@ -324,6 +430,13 @@ async function main(): Promise<void> {
     purpose: 'resume_upload',
     endUserId: null,
   })
+  fixtures.set('word-pdf-1', {
+    buffer: graduateResumePdf(),
+    mimeType: PDF_MIME,
+    filename: 'chen-yuan-resume.pdf',
+    purpose: 'resume_upload',
+    endUserId: null,
+  })
 
   // 1) DOCX 提取
   const r1 = await service.extractResumeText({ fileId: 'docx-1' })
@@ -418,19 +531,28 @@ async function main(): Promise<void> {
   //     时必须跳过 born-digital 文字层抽取，直接落入 OCR_PROVIDER=disabled 时既有的诚实失败
   //     路径（PDF_TEXT_EMPTY），不做无界工作、不挂起、不崩溃。
   //
-  //     观测手段：monkey-patch require('unpdf') 导出对象上的 extractText。services/api 是
+  //     观测手段：monkey-patch require('unpdf') 导出对象上的 extractText 与 extractTextItems。services/api 是
   //     commonjs + node10 resolution，本脚本与 resume-extraction.service.ts 的
   //     require('unpdf') 解析到同一个被 Node 缓存的模块对象，patch 对两侧同时可见——这只是
   //     在观察一个已存在的真实模块边界调用是否发生，不是伪造整个 unpdf 的行为（getDocumentProxy
   //     仍是真实实现，big-page-1 fixture 也是 pdfjs 会诚实解析出 numPages=60 的合法 PDF，
   //     见 buildDeclaredBigPageCountPdf 上方注释）。
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const unpdfSpyModule = require('unpdf') as { extractText: (...args: unknown[]) => Promise<unknown> }
+  const unpdfSpyModule = require('unpdf') as {
+    extractText: (...args: unknown[]) => Promise<unknown>
+    extractTextItems: (...args: unknown[]) => Promise<unknown>
+  }
   const originalUnpdfExtractText = unpdfSpyModule.extractText
+  const originalUnpdfExtractTextItems = unpdfSpyModule.extractTextItems
   let unpdfExtractTextCalls = 0
+  let unpdfExtractTextItemsCalls = 0
   unpdfSpyModule.extractText = async (...args: unknown[]) => {
     unpdfExtractTextCalls += 1
     return originalUnpdfExtractText(...args)
+  }
+  unpdfSpyModule.extractTextItems = async (...args: unknown[]) => {
+    unpdfExtractTextItemsCalls += 1
+    return originalUnpdfExtractTextItems(...args)
   }
   try {
     process.env['OCR_PROVIDER'] = 'disabled'
@@ -438,8 +560,8 @@ async function main(): Promise<void> {
     const svcBigPage = new ResumeExtractionService(fakeFiles as never, ocrDisabledForBigPage)
     const r12 = await svcBigPage.extractResumeText({ fileId: 'big-page-1' })
     assert(
-      unpdfExtractTextCalls === 0,
-      '12a. PDF 声明页数(60) 超过 MAX_BORN_DIGITAL_EXTRACT_PAGES(50) 时，born-digital 文字层抽取 unpdf.extractText 从未被调用',
+      unpdfExtractTextCalls === 0 && unpdfExtractTextItemsCalls === 0,
+      '12a. PDF 声明页数(60) 超过 MAX_BORN_DIGITAL_EXTRACT_PAGES(50) 时，born-digital 文字层抽取（unpdf.extractText / extractTextItems）从未被调用',
     )
     assert(
       !r12.ok && r12.errorCode === 'PDF_TEXT_EMPTY' && r12.text === undefined,
@@ -447,6 +569,7 @@ async function main(): Promise<void> {
     )
   } finally {
     unpdfSpyModule.extractText = originalUnpdfExtractText
+    unpdfSpyModule.extractTextItems = originalUnpdfExtractTextItems
   }
 
   // 13) 有文字层但字数不足的 PDF：不得报「扫描件 / 无文字层」
@@ -482,6 +605,36 @@ async function main(): Promise<void> {
   process.env['OCR_PROVIDER'] = 'disabled'
   delete process.env['TENCENT_OCR_SECRET_ID']
   delete process.env['TENCENT_OCR_SECRET_KEY']
+
+  // 14) Word 式文字层简历必须按行保留。mergePages 会把全文压成一行，本断言随之变红。
+  const r14 = await service.extractResumeText({ fileId: 'word-pdf-1' })
+  const wordText = r14.ok ? (r14.text ?? '') : ''
+  const wordLines = wordText.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
+  const contactLine = wordLines.find((line) => line.includes('13812345678') && line.includes('chen.yuan@example.com'))
+  const dateLines = wordLines.filter((line) => /\d{4}\.\d{2} - \d{4}\.\d{2}/.test(line))
+  const projectLines = wordLines.filter((line) => line === '校园二手交易平台' || line === '社团招新报名小程序')
+  const sectionLines = ['教育经历', '项目经历', '技能', '实习经历'].filter((title) => wordLines.includes(title))
+  assert(
+    r14.ok && r14.textSource === 'pdf_text' && r14.pageCount === 2 && !wordText.includes('予安陈') && wordLines.some((line) => line.includes('陈予安')),
+    `14a. 文字层简历按行读出姓名（书写顺序是先「予安」后「陈」），textSource=pdf_text，两页。got ${JSON.stringify(r14.ok ? { textSource: r14.textSource, pageCount: r14.pageCount, head: wordText.slice(0, 80) } : r14)}`,
+  )
+  assert(
+    sectionLines.length === 4 && projectLines.length === 2 && dateLines.length >= 4,
+    `14b. 四段标题、两条项目各自成行，四个时间段都在可读的行里。sections=${sectionLines.join(',')} projects=${projectLines.length} dates=${dateLines.length} lines=${wordLines.length}`,
+  )
+  assert(
+    wordLines.includes('校园二手交易平台') && wordLines.includes('2023.09 - 2024.06') && !wordLines.some((line) => line.includes('校园二手交易平台') && line.includes('2023.09 - 2024.06')),
+    `14c. 「2023.09 - 2024.06」与「校园二手交易平台」不在同一行。lines=${JSON.stringify(wordLines)}`,
+  )
+  assert(
+    wordLines.length > 1 && !wordLines.some((line) => line.includes('教育经历') && line.includes('项目经历')) && contactLine !== undefined && contactLine.indexOf('13812345678') < contactLine.indexOf('chen.yuan@example.com'),
+    `14d. 全文不是一行；手机号在邮箱左边（书写时邮箱在前）。contact=${JSON.stringify(contactLine)} lineCount=${wordLines.length}`,
+  )
+  const meaningful = wordText.replace(/\s+/g, '')
+  assert(
+    r14.ok && r14.charCount === wordText.length && (r14.charCount ?? 0) > meaningful.length && wordText.length <= 20000 && meaningful.includes('13812345678') && meaningful.includes('chen.yuan@example.com') && !/\n{3,}/.test(wordText) && !/ {2,}/.test(wordText),
+    `14e. 字数仍按整份文本计（含换行），联系方式还在，连续空行与多余空格已收掉。charCount=${r14.charCount} meaningful=${meaningful.length}`,
+  )
 
   console.log('\n=== ALL PASS ===\n')
 }
