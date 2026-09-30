@@ -41,8 +41,8 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 78 |
-| **medium** | 只被文档或其它文件提及 | 29 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 77 |
+| **medium** | 只被文档或其它文件提及 | 28 |
 | **low** | 全仓零提及 | 94 |
 
 
@@ -186,9 +186,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## medium — 只被文档或其它文件提及（29）
+## medium — 只被文档或其它文件提及（28）
 
-### 页面/组件（12）
+### 页面/组件（11）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -203,7 +203,6 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/jobs/components/JobAiEntryPanel.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
 | `apps/kiosk/src/pages/jobs/components/JobFilterAssistant.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md |
 | `apps/kiosk/src/pages/jobs/components/JobListInsights.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/reviews/kiosk-runtime-engineering-words-2026-09-28.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
-| `apps/partner/src/components/RejectReason.tsx` | 不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/launch-audit-2026-09-05.md |
 
 ### 样式（17）
 
@@ -230,9 +229,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（78）
+## high — 仍被 CI / 门禁 / 包脚本引用（77）
 
-### 页面/组件（35）
+### 页面/组件（34）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -270,7 +269,6 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/profile/profileEntries.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs、apps/kiosk/scripts/verify-lightflow-profile-entry.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 | `apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 | `apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
-| `apps/partner/src/routes/policy/PolicyEmergencyNote.tsx` | 不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-console-plain-copy.mjs |
 
 ### 样式（40）
 

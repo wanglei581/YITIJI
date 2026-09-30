@@ -51,18 +51,16 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 断言了不存在的路径（8）
+## 断言了不存在的路径（6）
 
 门禁里写着某个仓库路径，但该路径在 git 里不存在。可能是文件被移动/删除后门禁
 没跟着改 —— 这类断言往往已经恒真或恒假，需要人确认。
 
 | 门禁脚本 | 找不到的路径 |
 | --- | --- |
-| `apps/admin/scripts/verify-console-plain-copy.mjs` | `src/routes/ai-services/AiLogsTable.tsx` |
 | `apps/kiosk/scripts/verify-data-request-ui.mjs` | `apps/admin/src/routes/member-privacy/index.tsx`<br/>`apps/admin/src/services/api/memberPrivacyAdmin.ts` |
 | `apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs` | `src/pages/resume/ResumeExportPage.tsx` |
 | `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs` | `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs` |
-| `apps/partner/scripts/verify-service-desk-jobs-ui.mjs` | `src/routes/jobs/JobsTable.tsx` |
 | `services/api/scripts/verify-legal-doc-version.ts` | `services/api/legalDocs.ts` |
 | `services/api/scripts/verify-policy-eligibility-authoring.ts` | `services/api/policies.ts` |
 | `services/api/scripts/verify-wave2-account-rebind.ts` | `services/auth/memberAuthApi.ts` |
@@ -71,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1757 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1759 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -152,7 +150,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 134 个文件</summary>
+<summary><code>apps/admin/src/</code> — 135 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -165,6 +163,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/account-settings/PhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-phone-transfer-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx` | `verify-admin-ai-access-ui.mjs` |
+| `apps/admin/src/routes/ai-services/AiLogsTable.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/ai-services/AiOperationCostTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/AiUsagePanel.tsx` | `verify-admin-ai-usage-ui.mjs` |
@@ -1042,7 +1041,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 45 个文件</summary>
+<summary><code>apps/partner/src/</code> — 46 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1054,6 +1053,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/dashboard/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/fairs/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-jobfair-checkin.ts` |
 | `apps/partner/src/routes/index.tsx` | `verify-console-screen-ui.mjs`<br/>`frontend.mjs` |
+| `apps/partner/src/routes/jobs/JobsTable.tsx` | `verify-service-desk-jobs-ui.mjs` |
 | `apps/partner/src/routes/jobs/components/JobQualitySummaryPanel.tsx` | `verify-job-quality-dashboard-ui.mjs` |
 | `apps/partner/src/routes/jobs/index.tsx` | `verify-job-quality-dashboard-ui.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
 | `apps/partner/src/routes/login/LegalDocsModal.tsx` | `verify-legal-doc-version.ts` |

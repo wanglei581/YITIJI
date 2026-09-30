@@ -12052,7 +12052,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 202,
+      "reachableFileCount": 204,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12807,7 +12807,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 227
+      "sourceFileCount": 229
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15818,7 +15818,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 74,
+      "reachableFileCount": 82,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16236,7 +16236,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 77
+      "sourceFileCount": 83
     }
   },
   "dataModel": {
@@ -17936,6 +17936,9 @@
     ],
     "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
+    ],
+    "apps/admin/src/routes/ai-services/AiLogsTable.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
@@ -21199,6 +21202,9 @@
     "apps/partner/src/routes/index.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
       "scripts/project-graph/frontend.mjs"
+    ],
+    "apps/partner/src/routes/jobs/JobsTable.tsx": [
+      "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
     ],
     "apps/partner/src/routes/jobs/components/JobQualitySummaryPanel.tsx": [
       "apps/partner/scripts/verify-job-quality-dashboard-ui.mjs"
@@ -26944,6 +26950,7 @@
         ],
         "files": [
           "apps/admin/src/lib/auditActionLabels.ts",
+          "apps/admin/src/routes/ai-services/AiLogsTable.tsx",
           "apps/admin/src/routes/devices/TerminalFleetOverview.tsx",
           "apps/admin/src/routes/devices/index.tsx",
           "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx",
@@ -26969,9 +26976,7 @@
           "packages/ui/package.json",
           "services/api/src/audit/audit.types.ts"
         ],
-        "missing": [
-          "src/routes/ai-services/AiLogsTable.tsx"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-console-plain-copy.mjs",
       "helper": false,
@@ -31178,11 +31183,10 @@
         "dirs": [],
         "files": [
           "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
+          "apps/partner/src/routes/jobs/JobsTable.tsx",
           "apps/partner/src/routes/jobs/index.tsx"
         ],
-        "missing": [
-          "src/routes/jobs/JobsTable.tsx"
-        ]
+        "missing": []
       },
       "file": "apps/partner/scripts/verify-service-desk-jobs-ui.mjs",
       "helper": false,
@@ -42821,28 +42825,6 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
-      },
-      {
-        "detail": "不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/partner/src/components/RejectReason.tsx",
-        "kind": "component",
-        "mentions": [
-          "docs/reviews/launch-audit-2026-09-05.md"
-        ],
-        "risk": "medium",
-        "scope": "partner",
-        "why": "仅被文档提及：docs/reviews/launch-audit-2026-09-05.md"
-      },
-      {
-        "detail": "不在 apps/partner/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx",
-        "kind": "component",
-        "mentions": [
-          "apps/admin/scripts/verify-console-plain-copy.mjs"
-        ],
-        "risk": "high",
-        "scope": "partner",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-console-plain-copy.mjs"
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
