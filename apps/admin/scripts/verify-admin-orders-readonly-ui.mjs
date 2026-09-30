@@ -143,7 +143,7 @@ if (
   page.includes('label="份数"') &&
   page.includes('label="页范围"') &&
   page.includes('duplexText(detail.print?.duplex)') &&
-  page.includes('pageRangeText(detail.print?.pageRange, detail.billablePages, Boolean(detail.printTaskId))') &&
+  page.includes('pageRangeText(detail.print?.pageRange, detail.billablePages)') &&
   page.includes('label="计费页数"') &&
   page.includes('billablePagesText(detail.billablePages)') &&
   page.includes('orderPagesText(order.billablePages, order.copies)') &&

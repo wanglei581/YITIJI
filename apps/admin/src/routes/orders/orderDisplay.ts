@@ -133,14 +133,11 @@ export function orderPagesText(pages: number | null | undefined, copies: number 
 }
 
 /**
- * 页范围。没有记录页范围、但有计费页数时：
- * - 单个打印任务的订单（printTaskId 有值）：一体机报价就是「全部页面」，写「全部页面（N 页）」；
- * - 多文件订单（小程序打包下单，订单上没有单一任务和页范围，billablePages 是各文件所选页数之和）：
- *   不能说成「全部页面」，写「各文件合计 N 页」。
+ * 页范围。订单上没记页范围、但有计费页数时，写「未单独记录（见计费页数）」，页数交给「计费页数」一行说：
+ * 单文件一体机单没记范围 = 全部页面，但小程序多文件（打包）单也没有订单级页范围、billablePages 是各文件所选页数之和；
+ * 前端分不出这两种（printTaskId 在小程序单放行前也为空），所以不说「全部页面」，也不说「各文件合计」。
  */
-export function pageRangeText(value: string | null | undefined, pages: number | null | undefined, singleTask: boolean): string {
+export function pageRangeText(value: string | null | undefined, pages: number | null | undefined): string {
   if (typeof value === 'string' && value.trim()) return recordedPageRangeText(value)
-  const text = billablePagesText(pages)
-  if (text === null) return '未记录'
-  return singleTask ? `全部页面（${text}）` : `各文件合计 ${text}`
+  return billablePagesText(pages) === null ? '未记录' : '未单独记录（见计费页数）'
 }

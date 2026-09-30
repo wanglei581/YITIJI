@@ -208,16 +208,17 @@ for (const [copies, expected] of [[null, '4 页'], [1, '4 页'], [2, '4 页 × 2
   const visible = textOf(amountColumn.cell({ ...noPageDetail, billablePages: 4, copies }))
   if (!visible.includes(expected) || (copies !== 2 && visible.includes('×'))) fail('列表内容页数与份数必须分别展示')
 }
-const counted = { ...noPageDetail, printTaskId: 'ptask_single', billablePages: 4, copies: 2 }
-if (!detailText(counted).includes('计费页数 4 页') || !detailText(counted).includes('页范围 全部页面（4 页）')) fail('单任务订单有计费页数且未指定范围时必须显示全部页面（4 页）')
-// 多文件订单（无单一打印任务）的 billablePages 是各文件所选页数之和，不能说成「全部页面」。
-const packaged = { ...noPageDetail, printTaskId: null, billablePages: 7, copies: 1 }
-if (!detailText(packaged).includes('页范围 各文件合计 7 页') || detailText(packaged).includes('全部页面')) fail('多文件订单不得写成全部页面，应写各文件合计 N 页')
+const counted = { ...noPageDetail, billablePages: 4, copies: 2 }
+// 订单级没记页范围时，前端分不出单文件（=全部页面）与多文件打包单（=各文件所选页数之和），两种都不能被说错。
+for (const printTaskId of ['ptask_single', null]) {
+  const text = detailText({ ...counted, printTaskId })
+  if (!text.includes('计费页数 4 页') || !text.includes('页范围 未单独记录（见计费页数）') || text.includes('全部页面') || text.includes('各文件合计')) fail('没记页范围时页范围写未单独记录（见计费页数），不得断言全部页面或各文件合计')
+}
 for (const billablePages of [4, null]) {
   if (!detailText({ ...counted, billablePages, print: { pageRange: '1-2' } }).includes('页范围 1-2')) fail('指定页范围不得被计费页数覆盖')
 }
-if (display.pageRangeText('  ', 4, true) !== '全部页面（4 页）' || display.pageRangeText('all', 4, true) !== '全部' || display.pageRangeText(null, 4, false) !== '各文件合计 4 页') fail('空白与 all 页范围必须保留既有解析口径，多文件写各文件合计')
-console.log('  PASS W-105 原值页数 / 份数 / null / 未记录 / 全部页面 / 指定范围真实组件展示')
+if (display.pageRangeText('  ', 4) !== '未单独记录（见计费页数）' || display.pageRangeText('all', 4) !== '全部' || display.pageRangeText(null, null) !== '未记录') fail('空白与 all 页范围保留既有解析口径；没记范围时按有无计费页数写未单独记录 / 未记录')
+console.log('  PASS W-105 原值页数 / 份数 / null / 未记录 / 未单独记录 / 指定范围真实组件展示')
 if (display.orderUserText({ ownerType: 'member', userLabel: '13812345678' }).includes('13812345678')) fail('用户不得显示完整手机号')
 const common = { '@ai-job-print/ui': ui, '@ai-job-print/shared': shared, '../Page': { Page: (p) => [p.title, p.subtitle, p.children] },
   '../components/FilterChip': { FilterChip: () => null }, 'lucide-react': {} }
