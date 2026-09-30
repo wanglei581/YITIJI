@@ -149,7 +149,7 @@ export function ScanSettingsStatusView({
   /* 稿 18 状态屏骨架：当前状态 → 链路位置 → 下一步。这几屏一律还没有一段开始（链路不点亮），
    * 标题只说「卡在哪」—— 不写百分比，也不暗示哪一段已经在动。 */
   const chainHead: readonly [string, string] = awaitingAck
-    ? ['这次扫描已经建好，还差投递授权', '授权到手之前，第一段也别开始']
+    ? ['这次扫描已经建好，还差投递授权', '授权确认前，请先不要按开始']
     : cleanupHolding
       ? ['还在收上一场的尾', '这一场的四段都还没开始']
       : phase === 'loading'
@@ -158,7 +158,7 @@ export function ScanSettingsStatusView({
           ? ['流程停在哪', '文件没有挂到这次扫描']
           : phase === 'invalid'
             ? ['这次扫描还没建好', '这四段一段都还没开始']
-            : ['现在卡在建立这次扫描', '第一段还没开始']
+            : ['现在卡在建立这次扫描', '扫描还没开始']
 
   return (
     <ScanWorkbenchShell

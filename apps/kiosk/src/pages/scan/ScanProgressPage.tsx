@@ -347,18 +347,18 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const deliveryAcked = ackState === 'acked'
   const ackRetryable = ackState === 'retryable'
   const matched = deliveryAcked && !error && lastLiveStatus === 'matched'
-  /* 稿 18：链路只在服务端亲口说「已匹配到回传文件」时点亮最后一段；其余时候前三段在哪本机看不见。 */
+  /* 稿 18：只有系统确认收到文件时才显示完成，不替用户猜中间状态。 */
   const chainHint = cancelling
     ? '取消也可能来不及，以系统为准'
     : !deliveryAcked
-      ? '授权到手之前，第一段也别开始'
+      ? '授权确认前，请先不要按开始'
       : pollInFlight
         ? '查询回来之前，这一屏不改判'
         : error
-          ? '这次没问到，位置就是不知道'
+          ? '这次没问到，继续等待下一次查询'
           : matched
-            ? '系统已匹配到回来的文件，停在最后一段'
-            : '系统还没说收到，前三段停在哪本机不知道'
+            ? '系统已收到文件，可以回来确认'
+            : '系统还没收到文件，继续等待'
   const workbenchState = cancelling
     ? 'cancelling'
     : !deliveryAcked
@@ -387,7 +387,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       layout="spread"
       title={deliveryAcked ? '等待打印机端扫描完成' : '正在确认投递授权'}
       subtitle={deliveryAcked
-        ? '请在打印机面板完成扫描到本机接收目录；本页每 3 秒自动检测结果'
+        ? '请在打印机面板完成扫描；本页每 3 秒自动检测结果'
         : '还没确认这台机器可以收这一场的文件；确认之前请先别在面板上按开始'}
       status={status}
       facts={deliveryAcked
@@ -493,7 +493,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           </>
         ) : (
           <>
-            <p>面板扫完之后，文件还要经过本机接收和送交才到系统。<b>这中间没有可显示的张数</b>，所以这里只告诉你系统最近一次说了什么、已经查过几次。</p>
+            <p>面板扫完之后，文件会回到这台机器。<b>这中间没有可显示的张数</b>，所以这里只告诉你系统最近一次说了什么、已经查过几次。</p>
             <p><b>本机正在自动检查</b>：每隔几秒替你问一次系统。想马上知道，点右下角「立即检查」就行。</p>
           </>
         )}

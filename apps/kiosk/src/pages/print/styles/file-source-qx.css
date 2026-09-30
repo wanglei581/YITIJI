@@ -560,3 +560,23 @@
   .fs-page .fs-now-m { flex-basis: 160px; }
   .fs-actions { flex-wrap: wrap; }
 }
+
+/* 终版 12：运行页沿用同一张工作区，不再额外占一条重复流程带。
+ * 来源卡、当前文件和二维码按稿的留白比例展开；真实状态与操作仍由 JSX 决定。 */
+.fs-page .fs-flow { display: none; }
+.fs-page .fs-ch { min-height: 260px; }
+.fs-page .fs-now { min-height: 156px; }
+.fs-page .fs-phone-slot,
+.fs-page .fs-qr-blank,
+.fs-page .fs-qr-live { min-height: 440px; }
+.fs-page .fs-qr-live svg { width: min(396px, 100%); height: auto; }
+.fs-page .fs-sec.qx-grow > .qx-card { min-height: 248px; }
+@media (max-width: 760px) {
+  .fs-page .fs-ch { min-height: 0; }
+  .fs-page .fs-now { min-height: 0; }
+  .fs-page .fs-phone-slot,
+  .fs-page .fs-qr-blank,
+  .fs-page .fs-qr-live { min-height: 220px; }
+  .fs-page .fs-qr-live svg { width: min(300px, 100%); }
+  .fs-page .fs-sec.qx-grow > .qx-card { min-height: 0; }
+}

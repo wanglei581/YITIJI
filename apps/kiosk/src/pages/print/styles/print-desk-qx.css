@@ -211,6 +211,26 @@
 .qpd-full-preview :is(button, nav span, p) { font-size: var(--qx-fs-body); }
 .qpd-full-preview [data-pdf-preview-host] nav { flex-wrap: wrap; }
 .qpd-full-preview [data-pdf-preview-host] button { min-height: 64px; }
+
+/* 终版 13：检查台左侧预览是主信息，右侧状态与决定卡随屏高展开。 */
+.qpd-check-grid, .qpd-preview-grid {
+  grid-template-columns: 430px minmax(0, 1fr);
+  gap: 20px;
+}
+.qpd-check-right, .qpd-preview-right { display: flex; flex-direction: column; }
+.qpd-check-right > .qpd-review, .qpd-preview-right > * { flex: 1 1 auto; min-height: 0; }
+.qpd-preview-shell { height: 600px; max-height: min(64vh, 620px); }
+.qpd-context-empty, .qpd-guard { justify-content: flex-start; }
+.qpd-context-empty .qpd-empty-work, .qpd-guard .qpd-guard-work { flex: 1 1 auto; min-height: 360px; }
+.qpd-context-empty .qpd-empty-sheet, .qpd-guard .qpd-file-sheet { min-height: 360px; }
+.qpd-context-empty .qpd-empty-work > .qx-card,
+.qpd-guard .qpd-guard-work > .qx-card { display: flex; flex-direction: column; justify-content: space-between; }
+@media (max-width: 760px) {
+  .qpd-check-grid, .qpd-preview-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .qpd-preview-shell { height: 440px; max-height: none; }
+  .qpd-context-empty .qpd-empty-work, .qpd-guard .qpd-guard-work { min-height: 0; }
+  .qpd-context-empty .qpd-empty-sheet, .qpd-guard .qpd-file-sheet { min-height: 280px; }
+}
 @keyframes qpd-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .qpd-steps li[data-state='active'] svg { animation: none; } }
 @media (max-width: 760px) {

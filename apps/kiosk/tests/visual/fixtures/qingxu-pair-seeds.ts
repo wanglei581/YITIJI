@@ -98,6 +98,10 @@ function hitOf(nn: string, screen: string, state: string): PriorityPlan | null {
       preview ? '/print/desk?step=preview' : '/print/desk?step=check',
     )
   }
+  if (nn === '14') {
+    if (state === 'quoting') return HIT('[data-testid="print-confirm-state-quoting"]', '/print/confirm')
+    return NONE('确认页其余报价态需要真实报价或下单结果，本轮只登记报价中状态')
+  }
   if (nn === '32') {
     if (CASHIER_NONE[state]) return NONE(CASHIER_NONE[state])
     return HIT(`[data-qx-state="${state}"]`, '/print/cashier')
@@ -342,6 +346,23 @@ async function openDesk(page: Page, api: ApiRouter, state: string): Promise<void
   else if (state === 'capability-color-locked' || state === 'capability-duplex-locked') {
     await see(page, 'text=本机尚未完成该项真机验证')
   } else await see(page, '[data-qx-state="preview"]')
+}
+
+async function openConfirm(page: Page, api: ApiRouter, state: string): Promise<void> {
+  if (state !== 'quoting') return
+  capabilities(api, 'available', 'available')
+  printer(api, true, 'ready')
+  api.respond('GET', '/api/v1/print/price-config', {
+    status: 200,
+    json: {
+      billingEnabled: true,
+      items: [{ serviceKey: 'print_bw_page', unitCents: 20, unit: 'page', description: '黑白打印每页' }],
+    },
+  })
+  api.respondWith('POST', '/api/v1/orders/quote', () => hang())
+  await seedPrintFlow(page, '/print/confirm')
+  await page.goto('/print/confirm', { waitUntil: 'domcontentloaded' })
+  await see(page, '[data-testid="print-confirm-state-quoting"]')
 }
 
 function payBody(payStatus: string, attempt: Record<string, unknown> | null = null) {
@@ -940,6 +961,7 @@ export async function preparePrioritySeed(page: Page, api: ApiRouter, target: Qi
   page.setDefaultTimeout(12_000)
   const state = target.state
   if (target.nn === '13') return openDesk(page, api, state)
+  if (target.nn === '14') return openConfirm(page, api, state)
   if (target.nn === '32') {
     if (state === 'no-order') {
       await page.goto('/print/cashier', { waitUntil: 'domcontentloaded' })

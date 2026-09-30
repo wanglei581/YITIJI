@@ -24,7 +24,7 @@
 }
 
 .cashier-qx-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.cashier-qx-scroll { gap: 16px; padding-top: 18px; padding-bottom: 16px; }
+.cashier-qx-scroll { gap: 20px; padding-top: 18px; padding-bottom: 16px; justify-content: flex-start; }
 
 /* ── 小青意图带 ─────────────────────────────────────────────── */
 .cashier-qx-xq {
@@ -249,8 +249,8 @@
 .cashier-qx-bignote svg { width: 30px; height: 30px; flex: none; }
 
 /* ── 付款列 + 订单列 ─────────────────────────────────────────── */
-.cashier-qx-paywrap { flex: none; display: flex; gap: 24px; align-items: flex-start; }
-.cashier-qx-paycol { flex: none; width: 372px; display: flex; flex-direction: column; gap: 14px; }
+.cashier-qx-paywrap { flex: none; display: flex; gap: 28px; align-items: stretch; }
+.cashier-qx-paycol { flex: none; width: 420px; display: flex; flex-direction: column; gap: 14px; }
 .cashier-qx-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 
 .cashier-qx-amount {

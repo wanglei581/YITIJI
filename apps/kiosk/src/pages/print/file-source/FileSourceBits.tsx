@@ -351,7 +351,7 @@ export function PhoneQrSlot({
   if (qrUrl && !loading) {
     return (
       <div className="fs-qr-live" data-testid="file-source-qr">
-        <QRCodeSVG value={qrUrl} size={180} level="M" marginSize={1} />
+        <QRCodeSVG value={qrUrl} size={396} level="M" marginSize={1} />
         <span>
           {expiresLabel
             ? `二维码有效期 ${expiresLabel}，文件最大 10MB。`

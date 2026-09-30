@@ -109,7 +109,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           ? ['不创建平台任务', '文件只在你的 U 盘', '暂未开通']
           : blocked
             ? undefined
-            : ['这台机器的接收目录已由管理员配好，面板上直接选就行，不用你填任何地址。']
+            : ['面板上的扫描入口已准备好，直接按提示操作，不用你填写地址。']
       }
       ctabar={
         usbPanel ? (
@@ -202,7 +202,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           </ScanSec>
           <ScanSec no="02" title="完成之后怎么继续" hint="U 盘里的文件要重新导入才能在本机办理">
             <div className="sw-grid2">
-              <ScanNoteCard title="要打印或继续加工" foot="能不能从 U 盘导入，仍以这台机器的本机程序是否连上为准。">
+              <ScanNoteCard title="要打印或继续加工" foot="能不能从 U 盘导入，以这台机器屏幕上的提示为准。">
                 <p>回到打印扫描，选择<b>U 盘导入</b>。本机只读取你再次选中的文件，不会自动扫描整个 U 盘。</p>
               </ScanNoteCard>
               <ScanNoteCard title="面板没有这个选项" foot="本页不假设所有奔图固件都提供相同菜单。">

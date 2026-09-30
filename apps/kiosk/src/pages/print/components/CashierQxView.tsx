@@ -223,7 +223,7 @@ function AmountCard(props: CashierQxViewProps & { free: boolean }) {
     : !known
       ? '金额暂不可用，请从我的打印订单重新进入查看。'
       : props.free
-        ? '本单实付 0 元 · 下一步的实际价格为 0，本次未收款'
+        ? '免费试运营 · 本单实付 0 元 · 本次未收款'
         : state === 'refunding' || state === 'partial-refunded' || state === 'refunded'
           ? '本单实付金额来自已建订单；退款金额与到账时间以支付渠道账单为准，本机不估算'
           : state === 'expired' || state === 'attempt-failed'

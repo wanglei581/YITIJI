@@ -695,6 +695,13 @@
 
 /* 出纸口（稿 .out-card）：位置引导，不代表进度。它吸收本屏余量，状态越少越舒展。 */
 .pfp-page > .pfp-out { flex: 1 0 auto; border-radius: 32px; padding: 24px 34px; gap: 32px; }
+.pfp-page > .pfp-out { align-items: stretch; }
+.pfp-page > .pfp-out .pff-out-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px 0 4px;
+}
 .pfp-page .pff-out-stage { width: 200px; height: 220px; }
 .pfp-page .pff-out-paper { top: 38px; height: 150px; }
 .pfp-page .pff-out-status { font-size: 34px; line-height: 1.25; gap: 10px 16px; }

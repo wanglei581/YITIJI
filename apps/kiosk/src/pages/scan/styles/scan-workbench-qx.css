@@ -15,6 +15,21 @@
   gap: 16px;
 }
 
+/* 稿 18 的起点与状态卡把内容按块收住，余量摊到区块之间；不保留整屏底部空白。 */
+.qx-stage:has(.sw-page) > .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.sw-scroll[data-layout='stack'] { justify-content: flex-start; }
+.sw-scroll[data-layout='spread'] { justify-content: space-between; }
+.sw-scroll .sw-chain { flex: none; min-height: 206px; }
+
 /* ── 小青横幅 ──────────────────────────────────────────────── */
 .sw-xq {
   flex: none;
