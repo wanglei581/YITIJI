@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-09-30：「我的打印订单」失败行给失败原因码、补网点名（小程序交付单；分支 `claude/backend-hardening-20260930-order-failure-code`）
+
+- **问题：** 小程序「我的打印订单」失败单只能显示「打印失败」，也缺网点名（任务上没记终端的行）。
+- **做法：** GET /me/print-orders 行新增可选 `failureCode`：只在 status=failed 时给，只给面向用户的白名单码（PAPER_EMPTY、PRINTER_ERROR、PRINTER_OFFLINE、PRINT_JOB_UNCONFIRMED、PARTIAL_OUTPUT），内部码与非失败行为 null；**不给 errorMessage 原文**（那是写给一体机现场的）。原有「不透出 errorCode / errorMessage」的禁止规则不变。任务上没记终端时用订单上的终端兜底给网点名。shared 类型同步。
+- **验证：** verify:member-print-orders 补失败码白名单、内部码为 null、无原文、终端兜底四项；变异「白名单放开」「去掉终端兜底」均变红；member-order-timeline、cloud-print-m2、backend-p0-contracts、shared/kiosk tsc、小程序契约全绿。
 ## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
 
 - 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
