@@ -163,7 +163,7 @@ export function TerminalLifecycleActions({
               {action === 'maintenance' && '设备将停止领取新任务，但会继续回传在途任务。'}
               {action === 'resume' && (terminal.lifecycleStatus === 'suspended' ? '设备将先恢复到维护状态，校验完成后才可再恢复运行。' : '设备将恢复领取新任务。')}
               {action === 'suspend' && '设备将停止领取新任务，保留凭证以继续心跳、诊断和在途回传。'}
-              {action === 'emergency-revoke' && 'Agent 将立即失去认证能力并转为暂停；在途任务状态可能需要人工核查。'}
+              {action === 'emergency-revoke' && '终端程序（Terminal Agent）将立即失去认证能力并转为暂停；在途任务状态可能需要人工核查。'}
               {action === 'retire' && '这是不可逆操作。退役后不能恢复、重新绑定或领取任务。'}
             </p>
             <label className="mt-4 block text-xs font-medium text-neutral-700">操作原因（必填）</label>

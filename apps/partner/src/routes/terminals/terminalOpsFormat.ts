@@ -1,6 +1,6 @@
 // 终端数据页的文案与格式化。所有数字都来自服务端，这里只决定怎么说。
 
-import { formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
+import { formatCount, formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { buildCsv } from '../../lib/csv'
 import type {
   PartnerTerminalOpsView,
@@ -28,7 +28,7 @@ export function visitText(data: PartnerTerminalOpsView, value: number | null): s
 
 /** 服务端对 1–4 的计数给 null（防止对上具体某一单），页面照实说「少于 5」。 */
 export function countText(value: number | null): string {
-  return value === null ? '少于 5' : value.toLocaleString('zh-CN')
+  return value === null ? '少于 5' : formatCount(value)
 }
 
 export function rateText(output: TerminalOpsOutput): string {

@@ -1,5 +1,5 @@
 import { useRefreshable } from '@ai-job-print/refresh'
-import { formatDateTime } from '@ai-job-print/shared'
+import { formatCount, formatDateTime } from '@ai-job-print/shared'
 import { Card, StatusBadge } from '@ai-job-print/ui'
 import { AlertTriangleIcon, RefreshCwIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -25,10 +25,10 @@ const HEALTH_VIEW: Record<DeviceFleetHealth, {
 
 const HEALTH_REASON: Record<DeviceFleetHealthReason, string> = {
   heartbeat_fresh: '心跳在 180 秒窗口内',
-  agent_reported_degraded: 'Agent 上报降级状态',
-  agent_reported_offline: 'Agent 上报离线状态',
-  agent_reported_error: 'Agent 上报错误或未知状态',
-  heartbeat_stale: '心跳已超过 180 秒',
+  agent_reported_degraded: '终端程序上报降级状态',
+  agent_reported_offline: '终端程序上报离线状态',
+  agent_reported_error: '终端程序上报错误或未知状态',
+  heartbeat_stale: '超过 180 秒无心跳',
   never_reported: '从未上报心跳',
 }
 
@@ -68,13 +68,13 @@ function configStatus(config: FleetConfig): string {
 
 function ConfigCell({ config, detail, to }: { config: FleetConfig; detail: string | null; to: string }) {
   return (
-    <div className="min-w-[116px] space-y-1">
-      <p className={config.state === 'conflict' ? 'font-semibold text-error-fg' : 'font-semibold text-neutral-700'}>
+    <div className="space-y-1">
+      <p className={`whitespace-nowrap font-semibold ${config.state === 'conflict' ? 'text-error-fg' : 'text-neutral-700'}`}>
         {configStatus(config)}
       </p>
       {detail && <p className="text-[11px] text-neutral-500">{detail}</p>}
-      <Link className="text-[11px] font-semibold text-primary-700 hover:underline" to={to}>
-        查看配置页
+      <Link className="whitespace-nowrap text-[11px] font-semibold text-primary-700 hover:underline" to={to}>
+        去配置
       </Link>
     </div>
   )
@@ -139,7 +139,7 @@ export default function TerminalFleetOverview() {
         {summaryCards(data).map((card) => (
           <Card key={card.label} className="p-4">
             <p className="text-xs font-semibold text-neutral-500">{card.label}</p>
-            <p className="mt-2 text-2xl font-bold tabular-nums text-neutral-900">{card.value ?? '—'}</p>
+            <p className="mt-2 text-2xl font-bold tabular-nums text-neutral-900">{card.value === undefined ? '—' : formatCount(card.value)}</p>
           </Card>
         ))}
       </div>
@@ -182,7 +182,7 @@ export default function TerminalFleetOverview() {
             <caption className="sr-only">终端设备只读总览</caption>
             <thead>
               <tr>
-                {['终端', '健康', 'Agent 版本', '机构与位置', '屏保', '智慧校园', '百宝箱', '原页面'].map((heading) => (
+                {['终端', '健康', '终端程序版本', '机构与位置', '屏保', '智慧校园', '百宝箱', '查看终端'].map((heading) => (
                   <th
                     key={heading}
                     scope="col"
@@ -216,10 +216,10 @@ export default function TerminalFleetOverview() {
                     : (row.config.screensaver.playlistConfigured ? '已配播放列表' : '未配播放列表')
                   const campusDetail = row.config.smartCampus.enabledModuleCount === null
                     ? null
-                    : `${row.config.smartCampus.enabledModuleCount} 个模块`
+                    : `${formatCount(row.config.smartCampus.enabledModuleCount)} 个模块`
                   const toolboxDetail = row.config.toolbox.itemCount === null
                     ? null
-                    : `${row.config.toolbox.itemCount} 个条目`
+                    : `${formatCount(row.config.toolbox.itemCount)} 个条目`
 
                   return (
                     <tr key={`${row.terminalCode}-${index}`} className="align-top hover:bg-neutral-50">
@@ -230,22 +230,22 @@ export default function TerminalFleetOverview() {
                           <p className="mt-1 text-[11px] font-semibold text-error-fg">配置冲突</p>
                         )}
                       </td>
-                      <td className="min-w-[154px] px-4 py-3">
+                      <td className="px-4 py-3">
                         <StatusBadge dot status={health.badge} label={row.enabled ? health.label : `已停用 · ${health.label}`} />
-                        <p className="mt-1 text-[11px] text-neutral-500">{HEALTH_REASON[row.healthReason]}</p>
+                        <p className="mt-1 whitespace-nowrap text-[11px] text-neutral-500">{HEALTH_REASON[row.healthReason]}</p>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <p className="font-mono text-xs text-neutral-700">{row.agentVersion ?? '未上报'}</p>
                         <p className="mt-1 text-[11px] text-neutral-500">{formatTime(row.lastHeartbeatAt)}</p>
                       </td>
-                      <td className="min-w-[160px] px-4 py-3">
+                      <td className="px-4 py-3">
                         <p className="font-semibold text-neutral-700">{row.orgName ?? '未绑定机构'}</p>
                         <p className="mt-1 text-xs text-neutral-500">{row.locationLabel ?? '未设置位置'}</p>
                       </td>
                       <td className="px-4 py-3"><ConfigCell config={row.config.screensaver} detail={screenDetail} to="/screensaver" /></td>
                       <td className="px-4 py-3"><ConfigCell config={row.config.smartCampus} detail={campusDetail} to="/smart-campus" /></td>
                       <td className="px-4 py-3"><ConfigCell config={row.config.toolbox} detail={toolboxDetail} to="/toolbox" /></td>
-                      <td className="whitespace-nowrap px-4 py-3">
+                      <td className="sticky right-0 z-10 whitespace-nowrap border-l border-neutral-900/[0.06] bg-surface px-4 py-3">
                         <Link
                           className="text-xs font-semibold text-primary-700 hover:underline"
                           to={`/devices?tab=terminals&search=${encodeURIComponent(row.terminalCode)}`}
