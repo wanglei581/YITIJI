@@ -18,7 +18,7 @@ export const SIM_DISPLAY_NAME = '测试·模拟终端'
 export const SIM_PRINTER_NAME = '（走查）模拟打印机'
 
 /** 打印机控制文件允许的取值（见 README「打印机状态怎么切」）。 */
-export const PRINTER_MODES = ['ready', 'paper_empty', 'offline', 'error', 'jam', 'unconfirmed']
+export const PRINTER_MODES = ['ready', 'paper_empty', 'offline', 'error', 'jam', 'unconfirmed', 'queue_cleanup_failed', 'queue_pause_failed']
 
 // ── 目录 ────────────────────────────────────────────────────────────────────
 

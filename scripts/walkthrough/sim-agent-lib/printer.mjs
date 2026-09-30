@@ -34,6 +34,8 @@ import {
 //   offline      → 'offline'      WorkOffline=True / PrinterStatus=7（wmi.ts:122-123）
 //   error        → 'error'        DetectedErrorState=6/7（wmi.ts:124-126）
 //   jam          → 'error'        卡纸 DetectedErrorState=8 同样映射成 'error'（wmi.ts:124-126）
+//   queue_cleanup_failed / queue_pause_failed → 原样上报（Agent 0.4.13 队列闸门，#1150）：
+//                                  开机清理或暂停打印队列失败，Agent 停领打印单，服务端拦报价与建单。
 //
 // 预检（task-runner.ts:154-171 preflightToError，消息原文照抄）：
 const PREFLIGHT_ERRORS = {
@@ -54,6 +56,7 @@ export function heartbeatPrinterStatus(mode) {
   if (mode === 'paper_empty') return 'paper_empty'
   if (mode === 'offline') return 'offline'
   if (mode === 'error' || mode === 'jam') return 'error'
+  if (mode === 'queue_cleanup_failed' || mode === 'queue_pause_failed') return mode
   return 'ready' // ready / unconfirmed
 }
 
@@ -201,7 +204,7 @@ export function startPrinterRuntime(options) {
 
   function currentPrinter() {
     const p = readPrinterMode(paths)
-    if (!p.valid && p.raw !== lastPrinterMode) warn('printer.mode_invalid', `打印机控制文件内容「${p.raw}」不认识，按 ready 处理（可选：ready / paper_empty / offline / error / jam / unconfirmed）`)
+    if (!p.valid && p.raw !== lastPrinterMode) warn('printer.mode_invalid', `打印机控制文件内容「${p.raw}」不认识，按 ready 处理（可选：ready / paper_empty / offline / error / jam / unconfirmed / queue_cleanup_failed / queue_pause_failed）`)
     if (p.valid && lastPrinterMode !== null && p.raw !== lastPrinterMode) info('printer.mode_changed', `${SIM_PRINTER_NAME}状态切换为 ${p.mode}`, { mode: p.mode })
     lastPrinterMode = p.raw
     return p.mode
@@ -501,6 +504,9 @@ export function startPrinterRuntime(options) {
 
   async function runClaimCycle() {
     if (closed || Date.now() < claimPausedUntil) return
+    // 队列闸门合上（Agent 0.4.13）：真 Agent 停领，模拟终端同样不领。
+    const gate = readPrinterMode(paths).mode
+    if (gate === 'queue_cleanup_failed' || gate === 'queue_pause_failed') return
     if (isUnauthorized()) {
       warn('claim.skipped', '领任务跳过：终端凭证已被拒绝，需要重新绑定')
       return
