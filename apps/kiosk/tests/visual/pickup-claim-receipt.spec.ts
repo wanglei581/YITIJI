@@ -56,7 +56,7 @@ for (const scenario of [
 }
 
 for (const printerCode of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']) {
-  test(`pickup ${printerCode} preserves code and retries after recovery @w2`, async ({ page, api }) => {
+  test(`pickup ${printerCode} clears input and retries the same code after recovery @w2`, async ({ page, api }) => {
     api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
     api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', { status: 200, json: { printerStatus: 'ready', isOnline: true, paperLevel: 'sufficient' } })
     const message = printerCode === 'PRINT_TERMINAL_QUEUE_HALTED'
@@ -73,7 +73,8 @@ for (const printerCode of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']
     await page.getByLabel('到机码输入框').fill('28491703')
     await expect(page.getByTestId('arrival-code-state-failed')).toBeVisible()
     await expect(page.getByRole('alert')).toContainText(message)
-    await expect(page.getByLabel('到机码输入框')).toHaveValue('28491703')
+    // 输入框清空：扫码枪再扫不会接在旧码后面拼出错码；「重试校验」用失败时记下的原码重发。
+    await expect(page.getByLabel('到机码输入框')).toHaveValue('')
     await page.getByRole('button', { name: '重试校验' }).click()
     await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
     expect(submitted).toEqual(['28491703', '28491703'])
