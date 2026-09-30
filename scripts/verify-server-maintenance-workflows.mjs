@@ -576,11 +576,29 @@ if (want('P6', 'P8', 'P8b', 'P3', 'P10', 'P11')) {
   const chromeMb = Number(metric('CACHE_CHROMIUM_MB'))
   const dumpMb = Number(metric('REDIS_DUMP_MB'))
   const aofMb = Number(metric('REDIS_APPENDONLY_MB'))
-  const growthKeys = ['CACHE_LIBREOFFICE_MB', 'CACHE_PUPPETEER_MB', 'SYSLOG_AUTH_MB', 'POSTGRESQL_LOG_MB', 'NPM_CACHE_MB', 'COREPACK_CACHE_MB', 'APT_CACHE_MB']
-  check(run.code === 0 && chromeMb >= 1 && tmpMb >= 4 && tmpMb <= 8 && dumpMb >= 1 && aofMb >= 1 && metric('GIT_DIR_MB') !== 'unknown'
-    && growthKeys.every((key) => Number(metric(key)) >= 1) && Number(metric('SYSLOG_AUTH_MB')) <= 4
-    && !out.includes(draft.home) && !out.includes(draft.srv) && !out.includes('gitprobe-unique') && !out.includes('dump.rdb'),
-    'P11 增长项只打数字，不打目录或文件名', `chrome=${chromeMb} tmp=${tmpMb} dump=${dumpMb} aof=${aofMb} syslog=${metric('SYSLOG_AUTH_MB')}\n${out}`)
+  // 与预检一致：每个路径单独 du -sm 后相加，保留文件系统实际分配和逐项取整。
+  const duMb = (path) => {
+    const result = spawnSync(realDu, ['-sm', path], { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' } })
+    const mb = (result.stdout ?? '').split('\t')[0]
+    if (result.status !== 0 || !/^\d+$/.test(mb)) throw new Error('P11 夹具体积实测失败')
+    return Number(mb)
+  }
+  const growthPaths = {
+    CACHE_LIBREOFFICE_MB: [join(draft.home, '.cache', 'libreoffice')],
+    CACHE_CHROMIUM_MB: [join(draft.home, '.cache', 'chromium')],
+    CACHE_PUPPETEER_MB: [join(draft.home, '.cache', 'puppeteer')],
+    TMP_LO_CHROME_MB: ['lu123', 'soffice.bin', '.org.chromium.abc'].map((name) => join(draft.tmp, name)),
+    REDIS_DUMP_MB: [join(draft.redis, 'dump.rdb')],
+    REDIS_APPENDONLY_MB: [join(draft.redis, 'appendonlydir')],
+    SYSLOG_AUTH_MB: ['syslog', 'auth.log'].map((name) => join(draft.syslog, name)),
+    POSTGRESQL_LOG_MB: [draft.pg], NPM_CACHE_MB: [join(draft.home, '.npm')],
+    COREPACK_CACHE_MB: [join(draft.home, '.cache', 'node', 'corepack')],
+    GIT_DIR_MB: [join(draft.expect, '.git')], APT_CACHE_MB: [draft.apt],
+  }
+  const expectedGrowth = Object.entries(growthPaths).map(([key, paths]) => [key, paths.reduce((sum, path) => sum + duMb(path), 0)])
+  check(run.code === 0 && expectedGrowth.every(([key, mb]) => /^\d+$/.test(metric(key)) && metric(key) === String(mb))
+    && !out.includes(draft.td) && !out.includes(draft.home) && !out.includes(draft.srv) && !out.includes('gitprobe-unique') && !out.includes('dump.rdb'),
+    'P11 增长项只打数字，不打目录或文件名', `chrome=${chromeMb} tmp=${tmpMb} dump=${dumpMb} aof=${aofMb} syslog=${metric('SYSLOG_AUTH_MB')} expected=${JSON.stringify(Object.fromEntries(expectedGrowth))}\n${out}`)
   rmSync(draft.td, { recursive: true, force: true })
 }
 
