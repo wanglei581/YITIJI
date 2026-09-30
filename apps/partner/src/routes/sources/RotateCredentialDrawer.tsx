@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Drawer } from '@ai-job-print/ui'
 import { AlertTriangleIcon, CopyIcon } from 'lucide-react'
-import { ROTATE_CREDENTIAL_CONFIRMATION, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
+import { formatDateTime, ROTATE_CREDENTIAL_CONFIRMATION, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
 import type { PartnerDataSource, PartnerDataSourceCredentialRotationResult } from '../../services/api'
 import { rotateDataSourceCredential } from '../../services/api'
 
@@ -170,7 +170,7 @@ export function RotateCredentialDrawer({ source, onClose, onRotated }: RotateCre
           )}
 
           <p className="text-xs text-neutral-400">
-            轮换时间：{new Date(result.rotatedAt).toLocaleString('zh-CN')}
+            轮换时间：{formatDateTime(result.rotatedAt)}
           </p>
 
           <label className="flex items-start gap-2 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-600">
@@ -250,7 +250,7 @@ export function RotateCredentialDrawer({ source, onClose, onRotated }: RotateCre
 
         {source.credentialRotatedAt && (
           <p className="text-xs text-neutral-400">
-            最近一次下发/轮换：{new Date(source.credentialRotatedAt).toLocaleString('zh-CN')}
+            最近一次下发/轮换：{formatDateTime(source.credentialRotatedAt)}
           </p>
         )}
 

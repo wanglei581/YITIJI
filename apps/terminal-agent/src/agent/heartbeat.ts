@@ -32,6 +32,7 @@ import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError } from './a
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { getPrinterStatus, getDiskFreeGB } from './wmi'
+import { printerStatusForHeartbeat } from './print-dispatch-gate'
 import { collectNetworkDiagnostics } from './network-diagnostics'
 import { observeReleasePlan } from './release-observation'
 import { log, warn, err } from '../logger'
@@ -137,11 +138,12 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
 
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
-  const [printerStatus, diskFreeGB, networkDiagnostics] = await Promise.all([
+  const [queriedPrinterStatus, diskFreeGB, networkDiagnostics] = await Promise.all([
     getPrinterStatus(config.printerName),
     getDiskFreeGB(),
     collectNetworkDiagnostics(config.printerName),
   ])
+  const printerStatus = printerStatusForHeartbeat(queriedPrinterStatus)
 
   const payload: HeartbeatPayload = {
     status: localTaskDatabaseAvailable ? 'online' : 'agent_degraded',

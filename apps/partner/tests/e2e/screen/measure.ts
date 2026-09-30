@@ -478,7 +478,8 @@ export async function numberAudit(page: Page, exemptPlaceLabels = false): Promis
       const style = getComputedStyle(el)
       return style.visibility !== 'hidden' && el.getClientRects().length > 0
     }
-    const SKIP = '.twin-axis, .twin-code, .twin-when, .twin-pop, .twin-heat > b, .twin-rank-no, title'
+    // 归并行「另有 N 项」是缺了几项指标的元计数，不是业务读数；托管关闭时会与「共 N 台」撞上。
+    const SKIP = '.twin-axis, .twin-code, .twin-when, .twin-pop, .twin-heat > b, .twin-rank-no, .twin-gapline, title'
     const blockOf = (el: Element): string | null => {
       const box = el.closest('.twin-panel, .ops-card')
       if (box) return box.querySelector('.twin-ph-t, h2')?.textContent?.trim() || box.className

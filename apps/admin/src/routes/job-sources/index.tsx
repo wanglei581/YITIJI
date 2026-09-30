@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { formatDateTime } from '@ai-job-print/shared'
+import { formatDate, formatDateTime } from '@ai-job-print/shared'
 import { Card, Drawer, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon, FilterIcon, XIcon } from 'lucide-react'
@@ -273,7 +273,7 @@ export default function JobSourcesPage() {
             <DetailRow
               label="有效期"
               value={viewing.validThrough
-                ? `${viewing.validThrough.slice(0, 10)}${viewing.expired ? '（已过期，求职者端已自动不再展示；如需更新请联系来源机构）' : ''}`
+                ? `${formatDate(viewing.validThrough)}${viewing.expired ? '（已过期，求职者端已自动不再展示；如需更新请联系来源机构）' : ''}`
                 : '来源未提供'}
             />
             {viewing.reviewStatus === 'rejected' && viewing.rejectReason ? (

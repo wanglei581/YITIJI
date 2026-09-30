@@ -5,10 +5,14 @@ import { spawnSync } from 'node:child_process'
 import { monitorPrintJob } from '../src/agent/task-runner'
 import {
   buildPrintServiceCompletionEventScript,
+  buildWin32PrinterProbeScript,
+  configuredPrinterNameMatches,
+  mapWin32PrinterPreflight,
   mapWin32PrinterQuery,
   parsePrintJobStatus,
   type PrintJobMonitorStatus,
 } from '../src/agent/wmi'
+import { ESCAPE_WQL_LITERAL_FUNCTION, escapeWqlLiteral } from '../src/agent/wql-literal'
 import { printWithPdfToPrinter } from '../src/printer/print-with-pdf-to-printer'
 import { buildImageTempPdfFileName } from '../src/printer/image-to-pdf'
 
@@ -361,36 +365,75 @@ async function main(): Promise<void> {
   // DetectedErrorState=0 is CIM Unknown and the Pantum driver never populates it
   // (checklist [N2]: 0 both idle and powered off), so readiness falls back to
   // PrinterStatus once WorkOffline / PrinterStatus=7 have ruled out offline.
-  const printerQueryCases: Array<[string | null, string]> = [
-    [null, 'unknown'],
-    ['', 'unknown'],
-    ['not_found', 'error'],
-    ['3,0,False', 'ready'],
-    ['4,0,False', 'ready'],
-    ['5,0,False', 'ready'],
-    ['3,0,True', 'offline'],
-    ['7,0,False', 'offline'],
-    ['6,0,False', 'unknown'],
-    ['2,0,False', 'unknown'],
-    ['3,4,True', 'offline'],
-    ['3,2,False', 'ready'],
-    ['3,3,False', 'low_paper'],
-    ['3,5,False', 'low_paper'],
-    ['3,4,False', 'paper_empty'],
-    ['3,6,False', 'error'],
-    ['3,7,False', 'error'],
-    ['3,8,False', 'error'],
-    ['7,2,False', 'offline'],
-    ['3,9,False', 'offline'],
-    ['3,2,True', 'offline'],
-    ['idle,nope,False', 'unknown'],
+  // 第三列是预检。查询失败仍是 unknown；解析成功但心跳 unknown 时预检不拦打印（ok）。
+  // 后两列是 PrinterState,ExtendedPrinterStatus。仅暂停视为就绪；离线/缺纸/故障位优先。
+  // 查询抛错和确认不存在各占一行：前者心跳 unknown，后者 error。
+  const probeFailureRows: Array<[string, string, string]> = [
+    ['query_failed', 'unknown', 'unknown'],
+    ['not_found', 'error', 'not_found'],
   ]
-  for (const [input, expected] of printerQueryCases) {
+  const printerQueryCases: Array<[string | null, string, string]> = [
+    [null, 'unknown', 'unknown'],
+    ['', 'unknown', 'unknown'],
+    ...probeFailureRows,
+    ['3,0,False', 'ready', 'ok'],
+    ['4,0,False', 'ready', 'ok'],
+    ['5,0,False', 'ready', 'ok'],
+    ['3,0,True', 'offline', 'offline'],
+    ['7,0,False', 'offline', 'offline'],
+    ['6,0,False', 'unknown', 'ok'],
+    ['2,0,False', 'unknown', 'ok'],
+    ['3,4,True', 'offline', 'offline'],
+    ['3,2,False', 'ready', 'ok'],
+    ['3,3,False', 'low_paper', 'ok'],
+    ['3,5,False', 'low_paper', 'ok'],
+    ['3,4,False', 'paper_empty', 'paper_empty'],
+    ['3,6,False', 'error', 'error'],
+    ['3,7,False', 'error', 'error'],
+    ['3,8,False', 'error', 'error'],
+    ['7,2,False', 'offline', 'offline'],
+    ['3,9,False', 'offline', 'offline'],
+    ['3,2,True', 'offline', 'offline'],
+    ['idle,nope,False', 'unknown', 'unknown'],
+    ['1,0,False', 'unknown', 'ok'],
+    ['1,0,False,1,8', 'ready', 'ok'],
+    ['6,0,False,1,8', 'ready', 'ok'],
+    ['2,0,False,1,8', 'ready', 'ok'],
+    ['1,0,False,0,3', 'unknown', 'ok'],
+    ['1,0,False,,8', 'ready', 'ok'],
+    ['3,0,True,1,8', 'offline', 'offline'],
+    ['7,0,False,1,8', 'offline', 'offline'],
+    ['3,9,False,1,8', 'offline', 'offline'],
+    ['3,4,False,1,8', 'paper_empty', 'paper_empty'],
+    ['3,8,False,1,8', 'error', 'error'],
+    ['1,3,False,1,8', 'low_paper', 'ok'],
+    ['1,0,False,129,8', 'offline', 'offline'],
+    ['1,0,False,17,8', 'paper_empty', 'paper_empty'],
+    ['1,0,False,9,8', 'error', 'error'],
+    ['1,0,False,3,8', 'error', 'error'],
+    ['3,0,False,0,3', 'ready', 'ok'],
+    ['4,0,False,1,8', 'ready', 'ok'],
+    ['1,0,False,131073,8', 'ready', 'ok'],
+    ['3,2,False,128,0', 'offline', 'offline'],
+    ['3,2,False,16,0', 'paper_empty', 'paper_empty'],
+    ['3,2,False,8,0', 'error', 'error'],
+    ['3,2,False,262144,0', 'error', 'error'],
+    ['3,2,False,4194304,0', 'error', 'error'],
+    ['3,2,False,0,7', 'offline', 'offline'],
+    ['3,2,False', 'ready', 'ok'],
+    ['6,0,False', 'unknown', 'ok'],
+  ]
+  for (const [input, expectedHeartbeat, expectedPreflight] of printerQueryCases) {
     try {
       assert.equal(
         mapWin32PrinterQuery(input),
-        expected,
+        expectedHeartbeat,
         `mapWin32PrinterQuery(${JSON.stringify(input)})`,
+      )
+      assert.equal(
+        mapWin32PrinterPreflight(input),
+        expectedPreflight,
+        `mapWin32PrinterPreflight(${JSON.stringify(input)})`,
       )
     } catch (error) {
       failures.push(`printer query ${JSON.stringify(input)}: ${error instanceof Error ? error.message : String(error)}`)
@@ -410,6 +453,18 @@ async function main(): Promise<void> {
       assert.match(serverAvailability, /UNAVAILABLE_PRINTER_STATUSES = new Set\(\[[^\]]*'paper_empty'/, 'server must refuse new orders on paper_empty')
       assert.match(serverAlerts, /paper_empty: '打印机缺纸'/, 'server alert must label paper_empty')
       assert.match(kioskStatus, /case 'paper_empty':/, 'kiosk must map paper_empty to its own view')
+      const trickyName = "\\\\srv\\Pan'tum"
+      assert.equal(configuredPrinterNameMatches(trickyName, trickyName), true)
+      assert.equal(configuredPrinterNameMatches(trickyName, "\\\\srv\\Pantum"), false)
+      assert.equal(configuredPrinterNameMatches("' OR $_.Name -eq 'other", 'other'), false)
+      const probe = buildWin32PrinterProbeScript()
+      assert.equal(probe.includes(trickyName), false)
+      assert.match(probe, /-Filter \$filter/)
+      assert.doesNotMatch(probe, /\$name\s*\+/)
+      assert.match(probe, /\.Name -eq \$name/)
+      assert.ok(probe.includes(ESCAPE_WQL_LITERAL_FUNCTION))
+      assert.equal(escapeWqlLiteral(trickyName), "\\\\\\\\srv\\\\Pan\\'tum")
+      assert.equal(escapeWqlLiteral("a\\b'c"), "a\\\\b\\'c")
     } catch (error) {
       failures.push(`paper_empty contract: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -419,7 +474,98 @@ async function main(): Promise<void> {
     throw new Error(`print monitor truth failures:\n- ${failures.join('\n- ')}`)
   }
 
+  verifyPrinterStatusMutations()
   console.log('verify-print-monitor-truth: all assertions passed')
+}
+
+const statusMapPath = path.join(__dirname, '../src/agent/printer-status-map.ts')
+const PAUSE_READY_ANCHOR = 'if (pauseSignal && !leftoverFault) return \'ready\''
+const DETECTED_ERROR_CLEAR_ANCHOR = `    const masked = faultFromExtended(line)
+    if (masked) return masked
+    return 'ready'`
+const NO_EXTENSION_READY_ANCHOR = `    if (masked) return masked
+    return 'ready'`
+const NO_EXTENSION_UNKNOWN_ANCHOR = `  return 'unknown'
+}
+
+export function mapWin32PrinterQuery`
+
+const statusMapChild = `
+const { mapWin32PrinterQuery, mapWin32PrinterPreflight } = require('./src/agent/printer-status-map')
+const cases = [
+  ['1,0,False,131073,8', 'ready', 'ok'],
+  ['3,2,False,128,0', 'offline', 'offline'],
+  ['3,2,False,16,0', 'paper_empty', 'paper_empty'],
+  ['3,2,False', 'ready', 'ok'],
+  ['6,0,False', 'unknown', 'ok'],
+  ['query_failed', 'unknown', 'unknown'],
+  ['not_found', 'error', 'not_found'],
+]
+for (const [input, heartbeat, preflight] of cases) {
+  if (mapWin32PrinterQuery(input) !== heartbeat) process.exit(1)
+  if (mapWin32PrinterPreflight(input) !== preflight) process.exit(1)
+}
+process.exit(0)
+`
+
+function verifyPrinterStatusMutations(): void {
+  const original = fs.readFileSync(statusMapPath, 'utf8')
+  const baseline = spawnSync(process.execPath, ['-r', 'ts-node/register/transpile-only', '-e', statusMapChild], {
+    cwd: path.join(__dirname, '..'),
+    encoding: 'utf8',
+    timeout: 60_000,
+    env: { ...process.env, TS_NODE_TRANSPILE_ONLY: '1' },
+  })
+  if (baseline.status !== 0) {
+    throw new Error(`status map baseline failed:\n${baseline.stdout ?? ''}\n${baseline.stderr ?? ''}`)
+  }
+  const mutations: Array<[string, string, string]> = [
+    [
+      'paused toner low',
+      PAUSE_READY_ANCHOR,
+      "if (pauseSignal && !leftoverFault && (state === null || (state & TONER_LOW_BIT) === 0)) return 'ready'",
+    ],
+    [
+      'detected error clear masks faults',
+      DETECTED_ERROR_CLEAR_ANCHOR,
+      "    return 'ready'",
+    ],
+    [
+      'no extension detected clear',
+      NO_EXTENSION_READY_ANCHOR,
+      `    if (masked) return masked
+    if (!extraFieldsPresent(line)) return 'unknown'
+    return 'ready'`,
+    ],
+    [
+      'no extension stays unknown',
+      NO_EXTENSION_UNKNOWN_ANCHOR,
+      `  return 'ready'
+}
+
+export function mapWin32PrinterQuery`,
+    ],
+    [
+      'query failure reported as missing',
+      "if (output === 'query_failed') return 'unknown' // probe-query-failed",
+      "if (output === 'query_failed') return 'error' // probe-query-failed",
+    ],
+  ]
+  for (const [label, from, to] of mutations) {
+    if (!original.includes(from)) throw new Error(`${label}: anchor missing`)
+    fs.writeFileSync(statusMapPath, original.replace(from, to))
+    try {
+      const result = spawnSync(process.execPath, ['-r', 'ts-node/register/transpile-only', '-e', statusMapChild], {
+        cwd: path.join(__dirname, '..'),
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: { ...process.env, TS_NODE_TRANSPILE_ONLY: '1' },
+      })
+      if (result.status === 0) throw new Error(`${label}: reversed mapping must fail`)
+    } finally {
+      fs.writeFileSync(statusMapPath, original)
+    }
+  }
 }
 
 main().catch((error: unknown) => {

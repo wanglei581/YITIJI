@@ -119,7 +119,7 @@ export function isPickupWindowClosed(
   return Boolean(order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= now)
 }
 
-/** 判断是否为 pickupCode 唯一约束冲突（Prisma P2002）。markPaid 的 update data 中唯一带唯一索引的列即 pickupCode。 */
+/** 判断是否为 pickupCode 唯一约束冲突（Prisma P2002）。有哈希的核销入账仍会写明文 pickupCode。 */
 function isPickupCodeUniqueConflict(e: unknown): boolean {
   const err = e as { code?: string; meta?: { target?: unknown } }
   if (err?.code !== 'P2002') return false
@@ -148,8 +148,9 @@ export function pickupCodeVisibleFor(o: {
  * P0a 订单支付/退款状态机（支付域后端底座，无 live 网关）。
  *
  * - `unpaid → paid`：paymentSource 只允许 offline/free/manual_confirmed（禁 wechat/alipay/benefit）；
- *   置 paidAt、生成唯一 pickupCode、写 AuditLog；事务内 compare-and-set（updateMany where payStatus='unpaid'）；
+ *   置 paidAt、写 AuditLog；事务内 compare-and-set（updateMany where payStatus='unpaid'）；
  *   重复 markPaid 幂等（同来源直接返回，不重复副作用/审计）。
+ *   没有 pickupCodeHash 的现场单不铸明文取件码；有哈希的单只把截止锚到付款起 7 天。
  * - `paid → refunded`：refundReason 必填、整单退款；置 refundedAt、写 AuditLog；重复 refund 幂等。
  * - 非法转移（refunded/failed→paid、unpaid→refunded、无来源/禁用来源的 paid）→ 明确错误码拒绝，绝不静默。
  * - C5-2 线上入账另走 markPaidOnline（唯一允许写 paymentSource=sandbox 的路径）；
@@ -207,57 +208,31 @@ export class OrderStatusService {
       throw new BadRequestException('FREE_REQUIRES_ZERO_AMOUNT')
     }
 
-    // CAS 落库 + 取件码唯一冲突有界重试：预检后仍可能与并发请求撞码（唯一索引拦截抛 P2002），
-    // 仅该情况换码重试；CAS 未命中(count=0)与其它错误不重试、不吞。耗尽仍撞码 → 明确错误码，不落 500。
-    // 已有 pickupCodeHash 的单不再另铸一枚明文码。
-    //
-    // 小程序云打印建单只写 pickupCodeHash + pickupCodeEnc（真码只存哈希与密文），
-    // 不写 Order.pickupCode；而认领是按 pickupCodeHash 查的
-    // （pickup-order.service.ts:56）。此前 markPaid 无条件再铸一枚写进 pickupCode，
-    // 那枚码没有对应哈希，任何人拿它到机认领都会 PICKUP_CODE_INVALID —— 现场会表现为
-    // 「系统给的码无效，用户自己手机里的码才有效」。
-    //
-    // 全仓已确认没有任何按 Order.pickupCode 明文列的认领查询（唯一一处
-    // findUnique({ where: { pickupCode } }) 是本文件生成时的查重），因此对这类单
-    // 保持该列为 null 不影响任何链路。
-    const mintPickupCode = order.pickupCodeHash == null
+    // 现场单（一体机现打现取）建单不写 pickupCodeHash，纸就在这台机器上出，不铸明文取件码。
+    // 认领只按 pickupCodeHash 查，没有哈希的明文谁输都无效。
+    // 有哈希的云打印 / 材料包不另写 pickupCode，只把截止锚到付款时刻起 7 天。
+    // 本方法不再写 pickupCode，因此也不再做唯一冲突重试。
     const paidAt = new Date()
     const anchoredExpiry = order.pickupCodeHash ? pickupDeadlineFromPayment(paidAt) : null
-    let settled = false
-    for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
-      const pickupCode = mintPickupCode ? await this.generateUniquePickupCode(this.prisma) : null
-      let res: { count: number }
-      try {
-        res = await this.prisma.order.updateMany({
-          where: { id: orderId, payStatus: 'unpaid', ...fulfillablePickupWindowWhere() },
-          data: {
-            payStatus: 'paid',
-            paymentSource,
-            paidAt,
-            paidBy: operatorId ?? 'system',
-            // 只在本单没有 pickupCodeHash 时写；否则真码在 hash/enc 里，另铸会造出幽灵码。
-            ...(mintPickupCode ? { pickupCode } : {}),
-            // 云打印到机码从付款时刻起 7 天，不再沿用建单时被文件夹短的截止。
-            ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
-          },
-        })
-      } catch (e) {
-        if (isPickupCodeUniqueConflict(e)) continue // 取件码唯一冲突 → 换码重试
-        throw e // 其它错误照抛，不吞
-      }
-      if (res.count === 0) {
-        // 并发竞态（非取件码冲突）：仅同一支付来源可幂等回放；不同来源必须冲突，
-        // 不能把「线下已收」误报为已经由 voucher/线上通道入账成功。
-        const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
-        if (fresh?.payStatus === 'paid' && fresh.paymentSource === paymentSource) return fresh
-        if (fresh?.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
-        if (fresh && isPickupWindowClosed(fresh)) throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
-        throw new BadRequestException('ORDER_INVALID_TRANSITION')
-      }
-      settled = true
-      break
+    const res = await this.prisma.order.updateMany({
+      where: { id: orderId, payStatus: 'unpaid', ...fulfillablePickupWindowWhere() },
+      data: {
+        payStatus: 'paid',
+        paymentSource,
+        paidAt,
+        paidBy: operatorId ?? 'system',
+        ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
+      },
+    })
+    if (res.count === 0) {
+      // 并发竞态：仅同一支付来源可幂等回放；不同来源必须冲突，
+      // 不能把「线下已收」误报为已经由 voucher/线上通道入账成功。
+      const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
+      if (fresh?.payStatus === 'paid' && fresh.paymentSource === paymentSource) return fresh
+      if (fresh?.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+      if (fresh && isPickupWindowClosed(fresh)) throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
+      throw new BadRequestException('ORDER_INVALID_TRANSITION')
     }
-    if (!settled) throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
     if (anchoredExpiry) {
       await extendActivePrintFilesToDeadline(this.prisma, await collectPickupFileIds(this.prisma, order), anchoredExpiry)
     }
@@ -283,7 +258,7 @@ export class OrderStatusService {
    *
    * - 合法起点：unpaid / paying；`closed` 仅当 late=true（已存在支付尝试的有效迟到回调）。
    * - 落库：payStatus=paid + paymentSource=channel + payChannel=channel + paidAt +
-   *   paidBy='online_callback'；无 pickupCodeHash 时才铸明文 pickupCode（同 markPaid）。
+   *   paidBy='online_callback'。无 pickupCodeHash 不铸明文码；有哈希则锚定 7 天。
    * - 取件窗口已关（过期/已取消）：拒绝转 paid，refundReason=ONLINE_PAID_PENDING_REFUND，审计待退。
    * - 幂等：已 paid 且 paymentSource=channel → 原样返回，不重复副作用/审计；
    *   已 paid 但来源不同（如 Admin 已线下确认）→ ORDER_ALREADY_PAID 冲突，绝不覆盖。
@@ -326,49 +301,34 @@ export class OrderStatusService {
       throw new BadRequestException('ORDER_INVALID_TRANSITION') // refunded / failed 不可转 paid
     }
 
-    // 已有 pickupCodeHash 的云打印单不再另铸明文码（与 markPaid 同一口径）。
-    const mintPickupCode = order.pickupCodeHash == null
+    // 与 markPaid 同一口径：无哈希不铸明文码，有哈希只锚定 7 天。本方法不写 pickupCode。
     const paidAt = new Date()
     const anchoredExpiry = order.pickupCodeHash ? pickupDeadlineFromPayment(paidAt) : null
-    let settled = false
-    for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
-      const pickupCode = mintPickupCode ? await this.generateUniquePickupCode(this.prisma) : null
-      let res: { count: number }
-      try {
-        res = await this.prisma.order.updateMany({
-          where: {
-            id: orderId,
-            payStatus: { in: fromStatuses },
-            ...fulfillablePickupWindowWhere(),
-          },
-          data: {
-            payStatus: 'paid',
-            paymentSource: channel,
-            payChannel: channel,
-            paidAt,
-            paidBy: 'online_callback',
-            ...(mintPickupCode ? { pickupCode } : {}),
-            ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
-          },
-        })
-      } catch (e) {
-        if (isPickupCodeUniqueConflict(e)) continue // 取件码唯一冲突 → 换码重试
-        throw e
+    const res = await this.prisma.order.updateMany({
+      where: {
+        id: orderId,
+        payStatus: { in: fromStatuses },
+        ...fulfillablePickupWindowWhere(),
+      },
+      data: {
+        payStatus: 'paid',
+        paymentSource: channel,
+        payChannel: channel,
+        paidAt,
+        paidBy: 'online_callback',
+        ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
+      },
+    })
+    if (res.count === 0) {
+      const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
+      if (fresh?.payStatus === 'paid' && fresh.paymentSource === channel) return fresh
+      if (fresh?.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+      if (fresh && isPickupWindowClosed(fresh)) {
+        await this.recordOnlinePaidPendingRefund(fresh, { channel, attemptId, channelTxnNo, late })
+        throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
       }
-      if (res.count === 0) {
-        const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
-        if (fresh?.payStatus === 'paid' && fresh.paymentSource === channel) return fresh
-        if (fresh?.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
-        if (fresh && isPickupWindowClosed(fresh)) {
-          await this.recordOnlinePaidPendingRefund(fresh, { channel, attemptId, channelTxnNo, late })
-          throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
-        }
-        throw new BadRequestException('ORDER_INVALID_TRANSITION')
-      }
-      settled = true
-      break
+      throw new BadRequestException('ORDER_INVALID_TRANSITION')
     }
-    if (!settled) throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
     if (anchoredExpiry) {
       await extendActivePrintFilesToDeadline(this.prisma, await collectPickupFileIds(this.prisma, order), anchoredExpiry)
     }
@@ -395,7 +355,7 @@ export class OrderStatusService {
    *
    * - 合法起点：unpaid（付费单）；要求 discountCents >= order.amountCents（**全额核销**，本波不接部分抵扣）。
    * - 落库：payStatus=paid + paymentSource='voucher' + payChannel='voucher' + discountCents(=应付) + paidAt +
-   *   paidBy='redemption' + 唯一 pickupCode；CAS + 取件码撞码有界重试（同 markPaid）。
+   *   paidBy='redemption'。无哈希的现场单不铸明文码；有哈希的单仍写明文并做撞码重试。
    * - 幂等：已 paid 且 paymentSource='voucher' → 原样返回；已 paid 但来源不同 → 冲突拒绝。
    * - 诚实标注：voucher = 平台券/权益抵扣，**非真实资金收款**；免费单同样落 Order + 审计。
    */
@@ -465,22 +425,36 @@ export class OrderStatusService {
 
     const paidAt = new Date()
     const anchoredExpiry = order.pickupCodeHash ? pickupDeadlineFromPayment(paidAt) : null
+    const settlement = {
+      payStatus: 'paid' as const,
+      paymentSource: 'voucher' as const,
+      payChannel: 'voucher' as const,
+      discountCents: order.amountCents, // 全额抵扣（净应付 0）
+      paidAt,
+      paidBy: 'redemption' as const,
+      ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
+    }
+    // 现场单没有哈希：不铸明文码，也不做唯一冲突重试。
+    if (!order.pickupCodeHash) {
+      const res = await tx.order.updateMany({
+        where: { id: orderId, payStatus: 'unpaid' },
+        data: settlement,
+      })
+      if (res.count === 0) {
+        const fresh = await this.requireOrder(tx, orderId)
+        if (fresh.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+        throw new BadRequestException('ORDER_INVALID_TRANSITION')
+      }
+      return this.requireOrder(tx, orderId)
+    }
+    // 有哈希的云打印 / 材料包仍写一枚明文（与改前一致）。认领继续只认哈希。
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
       const pickupCode = await this.generateUniquePickupCode(tx)
       let res: { count: number }
       try {
         res = await tx.order.updateMany({
           where: { id: orderId, payStatus: 'unpaid' }, // compare-and-set
-          data: {
-            payStatus: 'paid',
-            paymentSource: 'voucher',
-            payChannel: 'voucher',
-            discountCents: order.amountCents, // 全额抵扣（净应付 0）
-            paidAt,
-            paidBy: 'redemption',
-            pickupCode,
-            ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
-          },
+          data: { ...settlement, pickupCode },
         })
       } catch (e) {
         if (isPickupCodeUniqueConflict(e)) continue // 取件码唯一冲突 → 换码重试

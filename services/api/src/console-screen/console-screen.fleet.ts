@@ -17,6 +17,8 @@ const PRINTER_FAULT_TITLES: Record<string, string> = {
   toner_empty: '打印机缺墨',
   toner_low: '打印机墨粉不足',
   low_paper: '纸张或墨粉不足，可打印、需补充',
+  queue_cleanup_failed: '开机清理失败，暂停接打印单',
+  queue_pause_failed: '暂停队列失败，暂停接打印单',
 }
 
 export interface FleetTerminalRow {

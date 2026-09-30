@@ -1,3 +1,4 @@
+import { formatDate } from '@ai-job-print/shared'
 import { Card } from '@ai-job-print/ui'
 import { AlertTriangleIcon, CheckCircleIcon, LinkIcon } from 'lucide-react'
 import type { PartnerJobQualitySummary } from '../../../services/api'
@@ -69,7 +70,7 @@ export function JobQualitySummaryPanel({ qualitySummary, jobCount }: Props) {
             <Metric label="岗位总量" value={displayTotalJobs} note={hasSnapshot ? `${qualitySummary.length} 个来源分组` : '待生成质量快照'} />
             <Metric label="字段缺失" value={needsFix} note="需要补描述、要求、薪资或技能等字段" icon="warning" />
             <Metric label="来源链接异常" value={total.brokenSourceUrlJobs} note="请修正外部来源地址" icon="link" />
-            <Metric label="同步陈旧/过期" value={total.staleJobs} note={total.lastCheckedAt ? `最近检查 ${total.lastCheckedAt.slice(0, 10)}` : '暂无检查记录'} icon="warning" />
+            <Metric label="同步陈旧/过期" value={total.staleJobs} note={total.lastCheckedAt ? `最近检查 ${formatDate(total.lastCheckedAt)}` : '暂无检查记录'} icon="warning" />
           </div>
         </div>
       </div>

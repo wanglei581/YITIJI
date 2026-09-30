@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { PDFDocument as PdfLibDocument } from 'pdf-lib'
 import { formatBeijingDate } from '../../common/beijing-display-time'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
 import type {
@@ -149,19 +150,26 @@ export class DiagnosisReportPdfService {
     for (let index = pageRange.start; index < pageRange.start + pageRange.count; index += 1) {
       doc.switchToPage(index)
       doc.save()
-      doc.font('cjk').fontSize(8.5).fillColor('#8a4b2b')
-      doc.text(PAGE_HEADER, MARGIN, 25, { width: PAGE.width - MARGIN * 2, align: 'right' })
-      doc.fontSize(8).fillColor('#6b7280')
-      doc.text(`第 ${index - pageRange.start + 1} / ${pageRange.count} 页`, MARGIN, PAGE.height - 34, {
-        width: PAGE.width - MARGIN * 2,
-        align: 'center',
-      })
-      doc.restore()
+      const previousBottom = doc.page.margins.bottom
+      doc.page.margins.bottom = 0
+      try {
+        doc.font('cjk').fontSize(8.5).fillColor('#8a4b2b')
+        doc.text(PAGE_HEADER, MARGIN, 25, { width: PAGE.width - MARGIN * 2, align: 'right' })
+        doc.fontSize(8).fillColor('#6b7280')
+        doc.text(`第 ${index - pageRange.start + 1} / ${pageRange.count} 页`, MARGIN, PAGE.height - 34, {
+          width: PAGE.width - MARGIN * 2,
+          align: 'center',
+        })
+      } finally {
+        doc.page.margins.bottom = previousBottom
+        doc.restore()
+      }
     }
 
-    const pageCount = pageRange.count
     doc.end()
     const buffer = await done
+    const finalPdf = await PdfLibDocument.load(buffer)
+    const pageCount = finalPdf.getPageCount()
     this.logger.log(`resume_diagnosis_export.pdf_ok kind=${input.kind} bytes=${buffer.length} pages=${pageCount}`)
     return { buffer, pageCount }
   }

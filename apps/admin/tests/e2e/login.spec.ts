@@ -21,7 +21,7 @@ test.describe('登录页（mock 口径：密码登录旁路任意账号可进）
     await page.getByRole('button', { name: '登 录' }).click()
     await expect(page).toHaveURL(/\/$/, { timeout: 10_000 })
     await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
-    await expect(page.getByText('当前为 mock 模式')).toBeVisible()
+    await expect(page.getByText('当前是演示数据，没有连上真实后台。页面上的内容和操作不会保存。')).toBeVisible()
   })
 
   test('验证码登录在 mock 下给出中文原因，不静默', async ({ page }) => {

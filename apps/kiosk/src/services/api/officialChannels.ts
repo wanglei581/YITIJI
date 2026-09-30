@@ -113,6 +113,13 @@ export function peekCachedOfficialChannels(
   return Date.now() - cachedAt <= maxAgeMs ? cachedChannels : null
 }
 
+/** 一次新读到的结果写进缓存，避免渠道页刚确认过、首页 30 秒内仍拿出下架前的码。 */
+export function storeOfficialChannels(terminalId: string, channels: OfficialChannelsResponse): void {
+  cachedTerminalId = terminalId
+  cachedChannels = channels
+  cachedAt = Date.now()
+}
+
 export async function getCachedOfficialChannels(
   terminalId: string,
   maxAgeMs = DEFAULT_CACHE_TTL_MS,
@@ -123,9 +130,7 @@ export async function getCachedOfficialChannels(
 
   const request: Promise<OfficialChannelsResponse> = getOfficialChannels(terminalId)
     .then((channels) => {
-      cachedTerminalId = terminalId
-      cachedChannels = channels
-      cachedAt = Date.now()
+      storeOfficialChannels(terminalId, channels)
       return channels
     })
     .finally(() => {

@@ -237,7 +237,8 @@ for (const marker of [
   '<ProfileSessionRecords',
   "navigate('/me/settings')",
   "navigate('/print/preview'",
-  "clearSessionTo({ path: '/' })",
+  // 2026-09-29 统一清场：「结束使用」走 endKioskUse，回首页由它统一决定。
+  "endKioskUse('end_use')",
 ]) {
   expectIncludes(profile, marker, `ProfilePage preserves ${marker}`)
 }

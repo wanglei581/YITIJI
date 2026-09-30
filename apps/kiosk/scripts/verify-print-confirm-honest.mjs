@@ -199,14 +199,14 @@ expectMatches(
 )
 expectMatches(
   doneSrc,
-  /getPayStatus\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/,
-  'PrintDonePage 查询取件码时携带 paymentSessionToken',
+  /已在本机出纸/,
+  'PrintDonePage 现打现取完成只说已在本机出纸',
 )
-expectMatches(
-  doneSrc,
-  /error:\s*'取件凭证暂时无法读取，请联系工作人员核验订单'/,
-  'PrintDonePage 取件码查询失败时显式提示工作人员核验，不静默隐藏',
-)
+if (/getPayStatus|取件凭证暂时无法读取|取件码/.test(doneSrc)) {
+  fail('PrintDonePage 不再查询或展示取件码，也不把缺码说成需要工作人员核验')
+} else {
+  pass('PrintDonePage 不再查询或展示取件码')
+}
 
 // 8) P0-1：确认页 / 预览页不得硬编码单价；确认页改读后端报价。
 const PREVIEW = 'src/pages/print/PrintPreviewPage.tsx'
@@ -1108,6 +1108,23 @@ if (!confirmCopy.includes("'确认并去付款'")) {
 } else {
   pass('付费单主按钮仍是确认并去付款')
 }
+if (!/PRINT_MAX_SIDES_PER_ORDER/.test(confirmCopy) || !/每单最多打印 \$\{PRINT_MAX_SIDES_PER_ORDER\} 面（页数 × 份数），当前/.test(confirmCopy)) {
+  fail('确认页必须用共享上限，在报价前提示「每单最多打印 N 面（页数 × 份数），当前 N 面」')
+} else {
+  pass('确认页用共享上限提示当前面数')
+}
+if (!/sidesOverLimit \|\|/.test(confirmCopy) || !/sidesOverLimit \?[\s\S]{0,180}'确认打印'/.test(confirmCopy)) {
+  fail('超过面数上限时主按钮必须置灰，且文字是「确认打印」')
+} else {
+  pass('超限时确认打印置灰')
+}
+const userErrorCopy = stripComments(read('src/services/api/userErrorMessage.ts'))
+if (!userErrorCopy.includes("PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印'")) {
+  fail('一体机错误码表必须把 PRINT_JOB_TOO_LARGE 说成「每单最多打印 100 面，请分几单打印」')
+} else {
+  pass('PRINT_JOB_TOO_LARGE 人话已登记')
+}
+
 if (!/aria-label=\{label\}/.test(confirmCopy)) {
   fail('主按钮读屏必须念看得见的那句字')
 } else if (/aria-label=\{primaryAccessible\}/.test(confirmCopy)) {

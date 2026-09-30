@@ -34,6 +34,8 @@ export interface FileSourceViewProps {
   pageSubtitle: string
   terminalLabel: string
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+  /** 打印闸门合上时的可见说明。页头说明在本页只留给读屏，这句要出现在画面上。 */
+  orderPausedNotice?: string
   isResumePrint: boolean
   showFileChannel: boolean
   showScan: boolean
@@ -152,7 +154,7 @@ function disabledReason(screen: FileSourceScreen): string | null {
 
 export function FileSourceView(props: FileSourceViewProps) {
   const {
-    screen, pageTitle, pageSubtitle, terminalLabel, status, isResumePrint,
+    screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, isResumePrint,
     showFileChannel, showScan, tab, usbMode, currentFile, blockedName, blockedMeta,
     wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
     previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
@@ -675,6 +677,11 @@ export function FileSourceView(props: FileSourceViewProps) {
         <div className="fs-flow" aria-label="打印流程">
           <span aria-current="step">1 选文件</span><span>2 材料检查</span><span>3 预览与参数</span><span>4 核对价格</span>
         </div>
+        {orderPausedNotice ? (
+          <FileSourceStatus kind="warn" title={status.label}>
+            {orderPausedNotice}
+          </FileSourceStatus>
+        ) : null}
         {isResumePrint ? (
           <button type="button" className="fs-mini" onClick={onResumes} aria-label="查看我的简历记录">
             <h4><SparklesIcon size={22} aria-hidden="true" /><span>查看我的简历记录</span></h4>

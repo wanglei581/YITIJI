@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { partnerDegraded, partnerTruncated, partnerUsageVisitsFailed } from './fixtures/snapshots'
+import { partnerDegraded, partnerTruncated, partnerUsageVisitsFailed, partnerVisitBelowThreshold, partnerVisitFailed } from './fixtures/snapshots'
 import {
   expectLocation,
   expectUrlStays,
@@ -42,20 +42,25 @@ function flipAfterFirst(next: Responder): { responder: Responder; flip: () => vo
 }
 
 test.describe('partner data screen states', () => {
-  test('真实数据：七块面板都说得出口径，未接入的 14 项按原因归并，快照请求不带任何 query', async ({ page }) => {
+  test('真实数据：七块面板都说得出口径，未接入的 13 项按原因归并，快照请求不带任何 query', async ({ page }) => {
     const log = await serve(page, partnerApi())
     await open(page, '/screen/overview')
     await expect(page.getByRole('heading', { name: TITLE, exact: true })).toBeVisible()
     await expect(page.locator('.twin-panel')).toHaveCount(7)
     const shelf = panel(page, /^本机构在架信息$/)
     await expect(tile(shelf, '岗位信息').locator('b')).toHaveText('328条')
-    // 归并面板如实标注项数，不造成「已全部接入」的错觉；14 项、6 种原因，每项都点得出原因
+    const online = panel(page, /^本机构终端$/)
+    const visits = online.locator('.twin-stat', { hasText: '今日服务人次' })
+    await expect(visits.locator('b')).toHaveText('86人次')
+    await expect(visits).toContainText('会话数，不是人数')
+    // 归并面板如实标注项数，不造成「已全部接入」的错觉；服务人次已进主栅格，剩下 13 项、5 种原因
     const gaps = panel(page, /^建设中的指标$/)
-    await expect(gaps.locator('.twin-ph-sub')).toHaveText(/^14 项/)
+    await expect(gaps).not.toContainText('服务人次')
+    await expect(gaps.locator('.twin-ph-sub')).toHaveText(/^13 项/)
     const chips = gaps.locator('.twin-pend')
-    await expect(chips).toHaveCount(14)
+    await expect(chips).toHaveCount(13)
     const reasons = new Set(await chips.evaluateAll((els) => els.map((el) => el.getAttribute('title') ?? '')))
-    expect(reasons.size, '14 项按 6 种原因归并，原因一条不少').toBe(6)
+    expect(reasons.size, '13 项按 5 种原因归并，原因一条不少').toBe(5)
     for (const reason of reasons) expect(reason).toMatch(/[一-鿿]{6,}/)
 
     expect(await visibleDigits(page)).toContain('328条')
@@ -112,12 +117,34 @@ test.describe('partner data screen states', () => {
     await expect(printed.locator('.twin-pend')).toHaveCSS('border-top-style', 'dashed')
   })
 
-  test('信息使用：访问人次按原因区分「未接入」与「暂时取不到」', async ({ page }) => {
+  test('服务人次不可用时留在主栅格：1–4 次写「少于 5」，取数失败写「暂时取不到」', async ({ page }) => {
+    await serve(page, partnerApi({ snapshot: partnerVisitBelowThreshold }))
+    await open(page, '/screen/overview')
+    const card = panel(page, /^本机构终端$/).locator('.twin-stat', { hasText: '今日服务人次' })
+    await expect(card.locator('.twin-pend')).toHaveText('少于 5')
+    await expect(card).not.toContainText(/[1-4]/)
+    await expect(card).toContainText('会话数，不是人数')
+    await expect(panel(page, /^建设中的指标$/)).not.toContainText('服务人次')
+    await expect(page.locator('[data-ops-screen]')).not.toContainText('sample_below_threshold')
+
+    await serve(page, partnerApi({ snapshot: partnerVisitFailed }))
+    await page.reload()
+    await expect(card.locator('.twin-pend')).toHaveText('暂时取不到')
+    await expect(card.locator('.twin-pend')).toHaveClass(/\bis-failed\b/)
+    await expect(panel(page, /^建设中的指标$/)).not.toContainText('服务人次')
+    await expect(page.locator('[data-ops-screen]')).not.toContainText('source_query_failed')
+  })
+
+  test('信息使用：服务人次对 1–4 次写「少于 5」，取数失败写「暂时取不到」', async ({ page }) => {
     await serve(page, partnerApi())
     await open(page, '/screen/usage')
-    const visits = panel(page, /^统计口径$/).locator('.twin-kv', { hasText: '访问人次' }).locator('.twin-pend')
-    await expect(visits).toHaveText('未接入')
+    const row = panel(page, /^统计口径$/).locator('.twin-kv', { hasText: '服务人次' })
+    const visits = row.locator('.twin-pend')
+    await expect(visits).toHaveText('少于 5')
+    await expect(row).toContainText('会话数，不是人数')
+    await expect(row).not.toContainText(/[1-4]/)
     await expect(visits).not.toHaveClass(/\bis-failed\b/)
+    await expect(page.locator('[data-ops-screen]')).not.toContainText('sample_below_threshold')
 
     await serve(page, partnerApi({ usage: partnerUsageVisitsFailed }))
     await page.reload()
@@ -125,6 +152,7 @@ test.describe('partner data screen states', () => {
     await expect(visits).toHaveClass(/\bis-failed\b/)
     await expect(visits).toHaveAttribute('title', /^取数失败：/)
     await expect(visits).toHaveCSS('border-top-style', 'solid')
+    await expect(page.locator('[data-ops-screen]')).not.toContainText('source_query_failed')
   })
 
   test('403 ORG_REQUIRED 与角色不符分开提示', async ({ page }) => {

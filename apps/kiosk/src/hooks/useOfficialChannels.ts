@@ -9,8 +9,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
+  emptyOfficialChannels,
   getCachedOfficialChannels,
+  getOfficialChannels,
   peekCachedOfficialChannels,
+  storeOfficialChannels,
   type OfficialChannelItem,
   type OfficialChannelsResponse,
 } from '../services/api/officialChannels'
@@ -32,15 +35,32 @@ function readyWith(prev: OfficialChannelsState, next: OfficialChannelsResponse):
   return { status: 'ready', items: next.items, legacyPlatforms: next.legacyPlatforms }
 }
 
-function initialState(): OfficialChannelsState {
+function initialState(fresh: boolean): OfficialChannelsState {
   const terminalId = getTerminalId()
   if (!terminalId) return NO_TERMINAL
+  // 渠道页打开前要按当前结果画码，不能先把五分钟内的缓存码摆上去。
+  if (fresh) return LOADING
   const cached = peekCachedOfficialChannels(terminalId, REFRESH_MS)
   return cached ? readyWith(LOADING, cached) : LOADING
 }
 
-export function useOfficialChannels(): OfficialChannelsState & { retry: () => void } {
-  const [state, setState] = useState<OfficialChannelsState>(initialState)
+async function readChannels(terminalId: string, fresh: boolean): Promise<OfficialChannelsResponse> {
+  if (!fresh) return getCachedOfficialChannels(terminalId)
+  const next = await getOfficialChannels(terminalId)
+  storeOfficialChannels(terminalId, next)
+  return next
+}
+
+/**
+ * `fresh` 只给渠道页：每次进入都重新读，不拿缓存里的二维码先上屏。
+ * 首页磁贴仍走缓存。已有的五分钟刷新保留，这里不加第二套定时读取。
+ */
+export function useOfficialChannels(options?: { fresh?: boolean }): OfficialChannelsState & {
+  retry: () => void
+  recheck: () => Promise<OfficialChannelsResponse | null>
+} {
+  const fresh = options?.fresh ?? false
+  const [state, setState] = useState<OfficialChannelsState>(() => initialState(fresh))
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
@@ -52,7 +72,7 @@ export function useOfficialChannels(): OfficialChannelsState & { retry: () => vo
         return
       }
       try {
-        const next = await getCachedOfficialChannels(terminalId)
+        const next = await readChannels(terminalId, fresh)
         if (active) setState((prev) => readyWith(prev, next))
       } catch {
         if (active) setState((prev) => (prev.status === 'ready' ? prev : FAILED))
@@ -64,12 +84,29 @@ export function useOfficialChannels(): OfficialChannelsState & { retry: () => vo
       active = false
       window.clearInterval(timer)
     }
-  }, [attempt])
+  }, [attempt, fresh])
 
   const retry = useCallback(() => {
     setState(LOADING)
     setAttempt((value) => value + 1)
   }, [])
 
-  return { ...state, retry }
+  // 用户要点这张码之前再读一次。失败不把已经画上的码收掉，也不改成「没有渠道」。
+  const recheck = useCallback(async () => {
+    const terminalId = getTerminalId()
+    if (!terminalId) {
+      setState(NO_TERMINAL)
+      return emptyOfficialChannels()
+    }
+    try {
+      const next = await getOfficialChannels(terminalId)
+      storeOfficialChannels(terminalId, next)
+      setState({ status: 'ready', items: next.items, legacyPlatforms: next.legacyPlatforms })
+      return next
+    } catch {
+      return null
+    }
+  }, [])
+
+  return { ...state, retry, recheck }
 }
