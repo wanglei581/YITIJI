@@ -37,6 +37,11 @@ import {
 } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
+import {
+  readLockedPrintStatusAttempt,
+  reprintAttemptsByTaskId,
+  type PrintStatusAttemptMismatch,
+} from './print-status-attempt'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
 import type { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto'
 import {
@@ -104,6 +109,12 @@ export interface ClaimTaskResponse {
   mimeType?: string
   /** Order.billablePages；Agent 只用它放大出纸监控窗口（页数 × 份数），不参与计费。 */
   billablePages?: number
+  /**
+   * 同一任务号被允许重新打印的次数。等于状态日志里
+   * fromStatus='failed' 且 toStatus='pending' 的条数，不看 errorCode。
+   * 没有这种日志时为 0。老 Agent 忽略该字段，行为与改前相同。
+   */
+  attempt: number
 }
 
 // ── Bind code response types ───────────────────────────────────────────────────
@@ -426,7 +437,7 @@ export class TerminalAgentService implements OnModuleInit {
     const claimExpiry = new Date(now.getTime() + 5 * 60 * 1000)
     const limit = Math.min(dto.maxTasks, 1) // Phase 8.2A: max 1 per cycle
 
-    const results: ClaimTaskResponse[] = []
+    const claimedPayloads: Array<Omit<ClaimTaskResponse, 'attempt'>> = []
 
     // 出纸的唯一前置条件：这一单已经付过钱。
     //
@@ -549,7 +560,7 @@ export class TerminalAgentService implements OnModuleInit {
         typeof orderMeta?.billablePages === 'number' && orderMeta.billablePages > 0
           ? orderMeta.billablePages
           : undefined
-      results.push({
+      claimedPayloads.push({
         taskId: claimed.id,
         type: 'print',
         fileUrl,
@@ -565,7 +576,15 @@ export class TerminalAgentService implements OnModuleInit {
       })
     }
 
-    return results
+    // 领取本身不写 failed→pending，所以同一次重提被重复领到时 attempt 不变。
+    const attempts = await reprintAttemptsByTaskId(
+      this.prisma,
+      claimedPayloads.map((item) => item.taskId),
+    )
+    return claimedPayloads.map((item) => ({
+      ...item,
+      attempt: attempts.get(item.taskId) ?? 0,
+    }))
   }
 
   // ── 4. Patch task status ──────────────────────────────────────────────────────
@@ -595,39 +614,101 @@ export class TerminalAgentService implements OnModuleInit {
       throw new BadRequestException({ error: { code: 'TASK_NOT_OWNED', message: `任务 ${taskId} 不属于终端 ${terminalId}` } })
     }
 
-    if (TERMINAL_STATES.includes(preCheck.status as TaskStatus)) {
-      if (preCheck.status === dto.status) {
-        await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
-        return { acknowledged: true }
-      }
-      if (TERMINAL_STATES.includes(dto.status as TaskStatus)) {
-        throw new ConflictException({
-          error: {
-            code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
-            message: `任务已处于终态 ${preCheck.status}，不能确认不同终态 ${dto.status}`,
-          },
-        })
+    // 不带 attempt、且仍在第 0 轮时，终态回放在开写事务之前决定，不再写任务、订单和状态日志。
+    // 同一终态先清合同审查打印件：第一次清理失败时，这次重放是兜底。
+    // 已经进入重试轮次（current > 0）不能在这里返回。缺 attempt 必须进锁后的读取，
+    // 按落后拒绝；带了 attempt 的也不能走这里，旧 failed 会把新一轮的 failed 当成已经处理过。
+    const attemptUsable =
+      typeof dto.attempt === 'number' && Number.isInteger(dto.attempt) && dto.attempt >= 0
+    if (!attemptUsable && TERMINAL_STATES.includes(preCheck.status as TaskStatus)) {
+      const currentAttempt = (await reprintAttemptsByTaskId(this.prisma, [taskId])).get(taskId) ?? 0
+      if (currentAttempt === 0) {
+        if (preCheck.status === dto.status) {
+          await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
+          return { acknowledged: true }
+        }
+        if (TERMINAL_STATES.includes(dto.status as TaskStatus)) {
+          throw new ConflictException({
+            error: {
+              code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+              message: `任务已处于终态 ${preCheck.status}，不能确认不同终态 ${dto.status}`,
+            },
+          })
+        }
+        const replayAllowed = VALID_TRANSITIONS[preCheck.status]
+        if (!replayAllowed || !replayAllowed.includes(dto.status as TaskStatus)) {
+          throw new BadRequestException({
+            error: {
+              code: 'INVALID_STATUS_TRANSITION',
+              message: `任务当前状态 ${preCheck.status} 不允许转换为 ${dto.status}`,
+            },
+          })
+        }
       }
     }
 
-    const allowed = VALID_TRANSITIONS[preCheck.status]
-    if (!allowed || !allowed.includes(dto.status as TaskStatus)) {
-      throw new BadRequestException({
-        error: { code: 'INVALID_STATUS_TRANSITION', message: `任务当前状态 ${preCheck.status} 不允许转换为 ${dto.status}` },
-      })
-    }
-
-    const isTerminal = TERMINAL_STATES.includes(dto.status as TaskStatus)
+    // 锁、当前 attempt 和状态写入在同一个事务里。落后或超前补报先记元数据日志再提交，
+    // 冲突异常放在事务外抛，避免把这条日志一起回滚。
+    // 用对象承接：事务回调里的赋值对 let 的控制流分析不可见，收窄后会变成 never。
+    const attemptOutcome: { mismatch: PrintStatusAttemptMismatch | null } = { mismatch: null }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (this.prisma.$transaction as any)(async (tx: any) => {
+      const locked = await readLockedPrintStatusAttempt(tx, taskId, dto.attempt)
+      if (locked.mismatch) {
+        attemptOutcome.mismatch = locked.mismatch
+        return
+      }
+      const currentTask = locked.task
+      if (!currentTask) {
+        throw new NotFoundException({
+          error: { code: 'PRINT_TASK_NOT_FOUND', message: `任务 ${taskId} 不存在` },
+        })
+      }
+      if (currentTask.terminalId !== terminalId) {
+        throw new BadRequestException({
+          error: { code: 'TASK_NOT_OWNED', message: `任务 ${taskId} 不属于终端 ${terminalId}` },
+        })
+      }
+
+      // 落后 attempt 已在上面拒绝。同一终态的幂等确认不能抢在它前面，
+      // 否则旧 failed 会把新一轮的 failed 当成已经处理过。
+      if (TERMINAL_STATES.includes(currentTask.status as TaskStatus)) {
+        if (currentTask.status === dto.status) return
+        if (TERMINAL_STATES.includes(dto.status as TaskStatus)) {
+          throw new ConflictException({
+            error: {
+              code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+              message: `任务已处于终态 ${currentTask.status}，不能确认不同终态 ${dto.status}`,
+            },
+          })
+        }
+      }
+
+      const allowed = VALID_TRANSITIONS[currentTask.status]
+      if (!allowed || !allowed.includes(dto.status as TaskStatus)) {
+        throw new BadRequestException({
+          error: { code: 'INVALID_STATUS_TRANSITION', message: `任务当前状态 ${currentTask.status} 不允许转换为 ${dto.status}` },
+        })
+      }
+
+      // 失败回传：新传入的 errorCode 为空（缺省或空串）才保留原值；非空就覆盖，
+      // 新一次失败的原因必须能写进去。printing / completed 不带码时仍写成 null，
+      // 避免成功之后还挂着上一次的缺纸。
+      const incomingErrorCode =
+        typeof dto.errorCode === 'string' && dto.errorCode.length > 0 ? dto.errorCode : undefined
+      const persistedErrorCode: string | null =
+        dto.status === 'failed' && incomingErrorCode === undefined
+          ? (currentTask.errorCode ?? null)
+          : (incomingErrorCode ?? null)
+
       const updated = await tx.printTask.updateMany({
-        where: { id: taskId, status: preCheck.status, terminalId },
+        where: { id: taskId, status: currentTask.status, terminalId },
         data: {
           status: dto.status,
-          errorCode: dto.errorCode ?? null,
+          errorCode: persistedErrorCode,
           errorMessage: dto.errorMessage ?? null,
-          completedAt: isTerminal ? new Date() : null,
+          completedAt: TERMINAL_STATES.includes(dto.status as TaskStatus) ? new Date() : null,
         },
       })
       if (updated.count === 0) {
@@ -660,12 +741,12 @@ export class TerminalAgentService implements OnModuleInit {
         throw new ConflictException({
           error: {
             code: 'PRINT_TASK_STATUS_CHANGED',
-            message: `任务状态已由 ${preCheck.status} 变更为 ${current.status}，请重新确认后上报`,
+            message: `任务状态已由 ${currentTask.status} 变更为 ${current.status}，请重新确认后上报`,
           },
         })
       }
 
-      if (preCheck.status === 'claimed' && dto.status === 'completed') {
+      if (currentTask.status === 'claimed' && dto.status === 'completed') {
         // printing 上报丢失（AGT-01）：补写中间态日志，errorCode 标明是服务端推断，
         // 便于事后区分「Agent 真上报过 printing」与「跳态确认」。
         await tx.printTaskStatusLog.create({
@@ -675,17 +756,17 @@ export class TerminalAgentService implements OnModuleInit {
       await tx.printTaskStatusLog.create({
         data: {
           taskId,
-          fromStatus: preCheck.status === 'claimed' && dto.status === 'completed' ? 'printing' : preCheck.status,
+          fromStatus: currentTask.status === 'claimed' && dto.status === 'completed' ? 'printing' : currentTask.status,
           toStatus: dto.status,
-          errorCode: dto.errorCode ?? null,
+          errorCode: persistedErrorCode,
         },
       })
-      if (preCheck.orderId) {
+      if (currentTask.orderId) {
         await this.packageOrderFulfillment.advance(tx, {
-          orderId: preCheck.orderId,
+          orderId: currentTask.orderId,
           taskId,
           terminalId,
-          endUserId: preCheck.endUserId,
+          endUserId: currentTask.endUserId,
           status: dto.status,
         })
       } else {
@@ -696,6 +777,22 @@ export class TerminalAgentService implements OnModuleInit {
       }
     })
 
+    const mismatch = attemptOutcome.mismatch
+    if (
+      mismatch?.code === 'PRINT_STATUS_STALE_ATTEMPT'
+      || mismatch?.code === 'PRINT_STATUS_FUTURE_ATTEMPT'
+    ) {
+      throw new ConflictException({
+        error: {
+          code: mismatch.code,
+          message: mismatch.code === 'PRINT_STATUS_FUTURE_ATTEMPT'
+            ? '状态回传的轮次超前于服务端记录，已忽略'
+            : '状态回传属于更早的一次打印，已忽略',
+        },
+      })
+    }
+
+    const isTerminal = TERMINAL_STATES.includes(dto.status as TaskStatus)
     if (isTerminal) await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
 
     return { acknowledged: true }

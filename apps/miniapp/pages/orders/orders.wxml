@@ -173,6 +173,8 @@
             <view class="oc-info">
               <view class="oc-title">{{item.title}}</view>
               <view class="oc-spec">{{item.spec}}</view>
+              <!-- 失败原因（服务端白名单码）与过期说明：复用规格行的样式，不另起样式 -->
+              <view class="oc-spec" wx:if="{{item.reasonNote}}">{{item.reasonNote}}</view>
             </view>
           </view>
           <view class="pk-strip" wx:if="{{item.pickup}}">
