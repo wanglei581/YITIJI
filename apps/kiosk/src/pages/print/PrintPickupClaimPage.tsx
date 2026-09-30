@@ -28,6 +28,7 @@ import { ApiHttpError } from '../../services/api/httpAdapter'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRightIcon, CheckIcon } from 'lucide-react'
 import {
+  type PrintJobParams,
   PICKUP_CODE_ACCEPTED_PATTERN,
   PICKUP_CODE_INPUT_ALPHABET,
   PICKUP_CODE_LENGTH,
@@ -83,6 +84,8 @@ interface ClaimPickupResult {
   printTaskStatus: string
   amountCents?: number
   priceLines?: unknown[]
+  billablePages?: number | null
+  params?: Partial<PrintJobParams>
   fileName?: string | null
   paymentSessionToken: string
 }
@@ -208,8 +211,8 @@ export function PrintPickupClaimPage() {
     } catch (err) {
       if (staleSignal?.aborted) return
       claimLockRef.current = false
-      setCode('')
       const kind = classifyClaimFailure(err)
+      if (kind !== 'printer') setCode('')
       setFailure({ kind, code: submittedCode })
       // 文案按取件场景逐码登记（pickupClaimModel）；已用过 / 已退款这类终态码不许说「重试」。
       setErrorMsg(pickupClaimMessage(err))
@@ -257,7 +260,7 @@ export function PrintPickupClaimPage() {
     setTimeout(() => inputRef.current?.focus(), 80)
   }
 
-  // 网络失败才给「重试校验」：认领对同一终端幂等，原码重发不会重复认领或重复出纸。
+  // 网络失败或打印机暂不可用可「重试校验」：原码重发不会重复认领或重复出纸。
   const handleRetry = () => {
     if (failure) void handleClaim(failure.code)
   }
@@ -323,6 +326,9 @@ export function PrintPickupClaimPage() {
               onClick={() => navigate(destination, {
                 state: result.released
                   ? {
+                      pickupSource: true,
+                      file: result.fileName ? { name: result.fileName, size: '', pages: result.billablePages ?? null } : undefined,
+                      params: result.params,
                       taskId: result.taskId,
                       orderId: result.orderId,
                       orderNo: result.orderNo,
@@ -335,7 +341,9 @@ export function PrintPickupClaimPage() {
                       amountCents: result.amountCents,
                       priceLines: result.priceLines ?? [],
                       paymentSessionToken: result.paymentSessionToken,
-                      file: result.fileName ? { filename: result.fileName } : undefined,
+                      pickupSource: true,
+                      params: result.params,
+                      file: result.fileName ? { name: result.fileName, size: '', pages: result.billablePages ?? null } : undefined,
                     },
               })}
             >

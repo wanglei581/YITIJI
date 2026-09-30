@@ -75,12 +75,15 @@ export async function assertTerminalPrinterAvailable(
   prisma: PrismaService,
   terminalId: string,
   env: NodeJS.ProcessEnv = process.env,
+  scene: 'order' | 'pickup' = 'order',
 ): Promise<void> {
   const availability = await readPrinterAvailability(prisma, terminalId)
   // 先看闸门，再看开关。这两个状态表示 Agent 已经停领，不能被开关放行。
   if (isQueueDispatchHalted(availability)) {
     throw new BadRequestException({
-      error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message: QUEUE_DISPATCH_HALTED_MESSAGE },
+      error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message: scene === 'pickup'
+        ? '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+        : QUEUE_DISPATCH_HALTED_MESSAGE },
     })
   }
   if (!printerOnlineRequired(env)) return
@@ -90,6 +93,8 @@ export async function assertTerminalPrinterAvailable(
       ? '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请联系工作人员'
       : '本机打印服务暂未就绪，暂不能下单，请稍后再试或联系工作人员'
   throw new BadRequestException({
-    error: { code: 'PRINTER_UNAVAILABLE', message },
+    error: { code: 'PRINTER_UNAVAILABLE', message: scene === 'pickup'
+      ? '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+      : message },
   })
 }

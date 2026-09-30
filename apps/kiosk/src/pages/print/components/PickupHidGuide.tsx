@@ -375,8 +375,8 @@ export function PickupFailurePanel({
         </span>
       </div>
       <div className="pcp-actions">
-        <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onReset}>
-          清除，重新输入
+        <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={failure === 'printer' ? onRetry : onReset}>
+          {failure === 'printer' ? '重试校验' : '清除，重新输入'}
         </button>
         <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>
           {failure === 'invalid' ? '查看取码说明 / 找工作人员' : '找工作人员'}

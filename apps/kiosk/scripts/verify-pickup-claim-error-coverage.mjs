@@ -75,6 +75,7 @@ for (const rel of [
   'services/api/src/print-jobs/pickup-order.service.ts',
   'services/api/src/print-jobs/pii-scan-gate.ts',
   'services/api/src/files/file-content-integrity.ts',
+  'services/api/src/terminals/printer-availability.ts',
 ]) {
   for (const c of exceptionCodes(parse(rel))) serverCodes.add(c)
 }
@@ -86,7 +87,7 @@ for (const rel of [
 }
 
 // 阳性对照：抽取器坏了会抽出空集，后面的「全都有登记」就会空转变绿。
-for (const must of ['PICKUP_CODE_ALREADY_USED', 'PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'ORDER_REFUNDED', 'PICKUP_CLAIM_LOCKED', 'CAPABILITY_UNAVAILABLE']) {
+for (const must of ['PICKUP_CODE_ALREADY_USED', 'PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'ORDER_REFUNDED', 'PICKUP_CLAIM_LOCKED', 'CAPABILITY_UNAVAILABLE', 'PRINTER_UNAVAILABLE', 'PRINT_TERMINAL_QUEUE_HALTED']) {
   if (!serverCodes.has(must)) fail(`抽取器没从服务端源码抽到 ${must}（抽取器坏了或服务端改名，先查这里）`)
 }
 const pickupCodeCount = [...serverCodes].filter((c) => c.startsWith('PICKUP_CODE_')).length
@@ -145,6 +146,19 @@ for (const code of [...serverCodes].sort()) {
 }
 if (missing.length) fail(`一体机取件页没有登记这些认领失败码：${missing.join(', ')}`)
 else pass('服务端认领链路的每个码，一体机都有取件场景的登记文案')
+
+// 打印机拒绝不是输错码或终态；原话合格时原样显示，不合格才用取件场景固定句。
+for (const code of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']) {
+  assert.equal(model.classifyClaimFailure(new ApiHttpError(code, 'x', 400)), 'printer')
+  assert.match(table[code], /到机码没有作废/)
+  assert.doesNotMatch(table[code], /换一台/)
+}
+const original = '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', original, 400)), original)
+for (const bad of ['queue_cleanup_failed', 'HTTP 400 错误', '请求失败（400）', '故障'.repeat(40), '']) {
+  assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', bad, 400)), table.PRINT_TERMINAL_QUEUE_HALTED)
+}
+pass('打印机拒绝保持可恢复分类；合格原话透传、不合格回退取件原话')
 
 // ── 2. 终态码：分类 closed，文案不引人重输 ──────────────────────────
 const CLOSED_REQUIRED = [

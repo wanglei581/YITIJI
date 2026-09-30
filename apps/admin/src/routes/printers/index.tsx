@@ -35,7 +35,10 @@ function formatPaperTrayLevel(level: number | null) {
 
 function FaultCell({ printer }: { printer: AdminPrinterRecord }) {
   const view = printerStatusView(printer.printerStatus)
-  if (printer.printerStatus === 'queue_cleanup_failed' || printer.printerStatus === 'queue_pause_failed') return <span className="font-semibold text-error-fg">{view.label}</span>
+  // 开机清理 / 暂停队列失败：短标题下显示服务端给的现场处置指引。
+  if (printer.printerStatus === 'queue_cleanup_failed' || printer.printerStatus === 'queue_pause_failed') {
+    return <div className="text-error-fg"><span className="font-semibold">{view.label}</span>{printer.fault ? <p className="mt-1 text-sm">{printer.fault}</p> : null}</div>
+  }
   if (printer.fault) return <span className={`font-semibold ${printer.status === 'online' ? 'text-warning-fg' : 'text-error-fg'}`}>{printer.fault}</span>
   return view.badge === 'success' ? <span className="text-neutral-500">无</span> : <span className="text-neutral-500">{view.label}</span>
 }
