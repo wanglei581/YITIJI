@@ -3,6 +3,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { createStaticHandler, createStaticRouter, matchRoutes, StaticRouterProvider } from 'react-router-dom'
 import { checkShellChromeProp } from './lib/shell-chrome-contract.mjs'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -50,6 +53,70 @@ for (const route of routerArray.elements) {
   ))
   assert.ok(errorElement, 'every top-level route object must own the safe kiosk error element')
   assert.match(errorElement.getText(routeSource), /<KioskRouteErrorPage\s*\/>/)
+}
+
+// 未注册地址走真实的 * element，并不会产生 useRouteError 的 404 对象。
+// 从生产路由 AST 取路径树和兜底 JSX；只替换视觉组件，保留真实页面判定与 Router。
+{
+  let fallbackElement = null
+  const property = (object, name) => object.properties.find((node) => (
+    ts.isPropertyAssignment(node) && node.name.getText(routeSource) === name
+  ))?.initializer
+  const routeTree = (array) => array.elements.map((object) => {
+    const path = property(object, 'path')?.text
+    const children = property(object, 'children')
+    if (path === '*') fallbackElement = property(object, 'element').getText(routeSource)
+    return { path, index: property(object, 'index')?.kind === ts.SyntaxKind.TrueKeyword,
+      ...(children ? { children: routeTree(children) } : {}) }
+  })
+  const tree = routeTree(routerArray)
+  assert.ok(fallbackElement, 'unknown paths must have a fallback inside the runtime root')
+  for (const path of ['/smart-campus/freshman-insights', '/smart-campus/unknown', '/unknown']) {
+    const matches = matchRoutes(tree, path)
+    assert.equal(matches.at(-1).route.path, '*', `${path} must match only the unknown-route branch`)
+    assert.ok(matches.slice(0, -1).every(({ route }) => route.path === undefined),
+      'unknown paths must stay outside visual layouts and capability/hosting gates')
+  }
+  for (const path of ['/smart-campus', '/smart-campus/welcome', '/smart-campus/service/luggage', '/jobs']) {
+    assert.notEqual(matchRoutes(tree, path).at(-1).route.path, '*', `${path} must remain registered`)
+  }
+
+  const dataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
+  const chromeUrl = dataUrl('export const getKioskPresentationAttributes = () => ({});'
+    + 'export const KioskTopbar = () => null; export const KioskStageFit = ({ children }) => children;'
+    + 'export const HomeIcon = () => null; export const RefreshCwIcon = () => null; export const TriangleAlertIcon = () => null;')
+  const compile = (code) => ts.transpileModule(code, {
+    fileName: 'probe.tsx',
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText.replace(/from ["']react\/jsx-runtime["']/g, `from '${import.meta.resolve('react/jsx-runtime')}'`)
+  const pageUrl = dataUrl(compile(errorPage)
+    .replaceAll("from 'react-router-dom'", `from '${import.meta.resolve('react-router-dom')}'`)
+    .replace(/from '(?:@ai-job-print\/ui|lucide-react|\.\.\/\.\.\/components\/kiosk-shell\/KioskStageFit)'/g, `from '${chromeUrl}'`))
+  const { KioskRouteErrorPage } = await import(pageUrl)
+  const { fallback } = await import(dataUrl(compile(
+    `import { KioskRouteErrorPage } from '${pageUrl}'; export const fallback = ${fallbackElement}`,
+  )))
+  const renderRoute = async (path, loader) => {
+    const testRoutes = [
+      { path: '/registered', loader, element: createElement('h1', null, '已注册页面'), errorElement: createElement(KioskRouteErrorPage) },
+      { path: '*', element: fallback },
+    ]
+    const handler = createStaticHandler(testRoutes)
+    const context = await handler.query(new Request(`http://kiosk.test${path}`))
+    const router = createStaticRouter(handler.dataRoutes, context)
+    return renderToStaticMarkup(createElement(StaticRouterProvider, { router, context, hydrate: false }))
+  }
+  for (const path of ['/smart-campus/freshman-insights', '/smart-campus/unknown', '/unknown']) {
+    const html = await renderRoute(path)
+    assert.match(html, />页面不存在<\/h1>/, `${path} must display not-found without a route error`)
+    assert.match(html, /当前入口可能已经调整，请返回首页重新选择服务。/)
+  }
+  assert.match(await renderRoute('/registered'), /已注册页面/)
+  for (const error of [new Error('render failed'), new Response('unavailable', { status: 500 })]) {
+    assert.match(await renderRoute('/registered', () => { throw error }), /页面暂时无法显示/,
+      'registered route failures must not be disguised as missing pages')
+  }
+  assert.match(await renderRoute('/registered', () => { throw new Response('missing', { status: 404 }) }), /页面不存在/)
 }
 assert.match(main, /onError=\{handleRouterError\}/)
 assert.match(main, /\[kiosk-route-error\]/)
@@ -251,6 +318,7 @@ assert.deepEqual(
 }
 
 console.log('PASS kiosk route errors use a safe Chinese recovery page')
+console.log('PASS unknown routes show not-found; registered routes retain success, 404 and non-404 semantics')
 console.log('PASS actionbar routes replace the global bottom navigation')
 console.log(`PASS ${USER_FACING_ERROR_PAGES.length} 个业务页不再直接展示 err.message，适配器兜底全中文`)
 console.log('PASS userMessageOf 运行时收敛技术串与内部报错，白名单码保留各自文案')

@@ -3,6 +3,11 @@ import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { buildPageList } from './consolePageList'
 
+/** 总条数加千分位（2,057）。只放这一个小函数，免得 ui 包为此依赖 shared。 */
+function totalText(total: number): string {
+  return String(Math.max(0, Math.trunc(total))).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
 const DEFAULT_PAGE_SIZES = [10, 20, 50, 100] as const
 
 /**
@@ -41,7 +46,7 @@ export function ConsolePager({
     <div className={cn('flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-neutral-100 px-4 py-3', className)}>
       <div className="flex items-center gap-3">
         <span className="text-sm text-neutral-500">
-          共 <span className="font-medium text-neutral-700">{total}</span> 条
+          共 <span className="font-medium text-neutral-700">{totalText(total)}</span> 条
           <span className="text-neutral-400"> · </span>
           第 <span className="font-medium text-neutral-700">{current}</span>
           /{totalPages} 页
