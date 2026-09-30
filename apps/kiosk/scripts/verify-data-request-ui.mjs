@@ -59,11 +59,11 @@ const ci = read(join(repoRoot, '.github/workflows/ci.yml'))
 
 expectIncludes(shared, 'MEMBER_DATA_REQUEST_SCOPE', 'shared 导出范围横幅文案')
 expectIncludes(shared, '账号注销暂未开放', 'shared 明确账号注销未开放')
-expectIncludes(shared, '元数据清单', 'shared 说明导出为元数据清单')
+expectIncludes(shared, '本人资料清单', 'shared 说明导出为本人资料清单（摘要，不是文件原文）')
 expectIncludes(shared, '打印订单', 'shared 诚实披露导出含打印订单')
 expectIncludes(shared, '文件清单', 'shared 诚实披露导出含文件清单')
 expectIncludes(shared, '收藏', 'shared 诚实披露导出含收藏')
-expectIncludes(shared, '不含文件原文二进制', 'shared 说明不含文件原文')
+expectIncludes(shared, '不含文件原文与简历正文全文', 'shared 说明不含文件原文')
 expectIncludes(shared, 'ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM', 'shared 含管理端删除/注销诚实否定文案')
 expectIncludes(shared, '不是「仅岗位 AI 会话」', 'Admin 导出说明否定过时窄范围')
 // 只检查用户可见字符串常量，避免 JSDoc 误伤
@@ -73,6 +73,17 @@ expectAbsent(
   /不导出简历|不导出文档|不导出打印订单|不导出收藏|不会自动打包简历或其他个人资产/,
   'shared 用户可见文案不含过时「不导出订单/文件/收藏」表述',
 )
+// 2026-09-30 A 批（稿 v2 README 规则 4 / 规则 5）：一体机直接渲染的三组文案（范围横幅、类型名、类型说明）
+// 不写工程词，撤回项用与稿 41、账号设置页相同的名字「AI 使用授权」。管理端专用的 ADMIN_* 不在此列。
+const memberFacingStart = shared.indexOf('export const MEMBER_DATA_REQUEST_SCOPE')
+const memberFacingEnd = shared.indexOf('export const MEMBER_DATA_REQUEST_STATUS_LABEL')
+const memberFacing = memberFacingStart >= 0 && memberFacingEnd > memberFacingStart
+  ? shared.slice(memberFacingStart, memberFacingEnd)
+  : ''
+if (memberFacing) pass('shared 会员端文案段可定位')
+else fail('shared 会员端文案段定位失败（MEMBER_DATA_REQUEST_SCOPE … STATUS_LABEL）')
+expectAbsent(memberFacing, /元数据|step-up|后台|岗位 AI 授权|外跳/, 'shared 会员端文案不含工程词与「岗位 AI 授权」旧名')
+expectIncludes(memberFacing, "revoke_consent: '撤回 AI 使用授权'", 'shared 撤回项名与稿 41 一致')
 expectAbsent(
   shared,
   /全部个人数据已删除|清空账号|账号已注销|已删除全部/,
@@ -104,6 +115,7 @@ expectIncludes(kioskPage, 'MEMBER_DATA_REQUEST_SCOPE', 'Kiosk 页使用 shared �
 expectIncludes(kioskPage, '隐私与数据请求', 'Kiosk 页标题不再伪称仅岗位 AI')
 expectIncludes(kioskPage, 'MyPrivacyRequestsPage', 'Kiosk 隐私请求页存在')
 expectIncludes(kioskPage, 'revoke_consent', 'Kiosk 仅开放撤回授权操作')
+expectAbsent(kioskPage, /岗位 AI 授权|元数据|step-up/, 'Kiosk 隐私请求页不写「岗位 AI 授权」旧名与工程词')
 expectIncludes(kioskPage, 'QxPageFrame', 'Kiosk 隐私请求页使用青序页框')
 expectAbsent(kioskPage, /KioskPageFrame/, 'Kiosk 隐私请求页 has left the V6 frame')
 expectIncludes(kioskApi, '/me/data-requests', 'Kiosk API 走 me/data-requests')

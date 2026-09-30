@@ -33,7 +33,8 @@
 .k1-legal-doc .legal-doc-ic[data-tone='plum'] { color: var(--qx-plum-d); background: var(--qx-plum-soft); }
 .k1-legal-doc .legal-doc-head > .legal-doc-ic { width: 86px; height: 86px; border-radius: 26px; }
 .k1-legal-doc .legal-doc-head-main { flex: 1; min-width: 0; }
-.k1-legal-doc .legal-doc-eyebrow { color: var(--qx-ink-3); font-size: 17px; font-weight: 700; letter-spacing: 4px; }
+/* 眉题 2026-09-30 换成中文（稿 08：你和这台机器 / 你的信息），字距与字号照稿 v2 覆盖块。 */
+.k1-legal-doc .legal-doc-eyebrow { color: var(--qx-ink-3); font-size: var(--qx-fs-aux-lg); font-weight: 700; letter-spacing: 1px; }
 .k1-legal-doc .legal-doc-title { margin: 6px 0 0; font-family: var(--qx-serif); font-size: 36px; font-weight: 700; letter-spacing: 1px; }
 .k1-legal-doc .legal-doc-sum { margin: 8px 0 0; color: var(--qx-ink-2); font-size: 20px; line-height: 1.55; }
 .k1-legal-doc .legal-doc-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; color: var(--qx-ink-3); font-size: 17px; }

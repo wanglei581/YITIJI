@@ -19307,6 +19307,7 @@
     ],
     "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
@@ -19326,6 +19327,7 @@
     ],
     "apps/kiosk/src/pages/print-scan/SignStampPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
@@ -19341,8 +19343,12 @@
     "apps/kiosk/src/pages/print-scan/printHubContent.ts": [
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
     "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts": [
-      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
@@ -19627,6 +19633,7 @@
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-job-ai-history-privacy-ui.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs",
@@ -19643,6 +19650,7 @@
       "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
@@ -20111,6 +20119,7 @@
     "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
@@ -27999,10 +28008,16 @@
           "apps/kiosk/src/pages/placeholders/MeActivityDetailPage.tsx",
           "apps/kiosk/src/pages/placeholders/NotificationsPage.tsx",
           "apps/kiosk/src/pages/placeholders/SessionTimeoutPage.tsx",
+          "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx",
+          "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts",
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "apps/kiosk/src/pages/profile/assets/format.ts",
           "apps/kiosk/src/pages/profile/assets/useMemberProfileOverview.ts",
+          "apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MeListShell.tsx",
+          "apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MyActivityPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx",
@@ -28024,6 +28039,7 @@
           "apps/kiosk/src/pages/profile/profile-lightflow-state.css",
           "apps/kiosk/src/pages/profile/profileEntries.ts",
           "apps/kiosk/src/pages/profile/profileTypes.ts",
+          "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
           "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
           "apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx",
           "apps/kiosk/src/pages/toolbox/toolbox-zone.css",

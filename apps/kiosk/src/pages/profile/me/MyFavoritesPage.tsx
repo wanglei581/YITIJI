@@ -200,7 +200,7 @@ export function MyFavoritesPage() {
       view="favorites"
       screen="member-list"
       screenState={`favorites-${uiState}`}
-      eyebrow="MY FAVORITES"
+      eyebrow="我的收藏"
       ask={hostingOpen ? <>收藏的岗位与招聘会，<em>随时找回</em>。</> : <>收藏的政策，<em>随时找回</em>。</>}
       doing={<>只记录<b>本人收藏行为</b>，不含投递或预约结果。</>}
       truth={hostingOpen ? '投递与预约都在来源平台完成；本机不代收简历，也不记录结果。' : '收藏只记录本人收藏行为；本机不代收简历，也不记录办理结果。'}

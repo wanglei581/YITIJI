@@ -346,7 +346,9 @@ test('privacy revoke posts revoke_consent and does not claim account deletion @w
   })
 
   await loginThroughVisibleUi(page, '/me/privacy-requests')
-  await expect(page.getByText('撤回岗位 AI 授权').first()).toBeVisible()
+  await expect(page.getByText('撤回 AI 使用授权').first()).toBeVisible()
+  // 2026-09-30 A 批：旧名「岗位 AI 授权」与工程词「元数据」「step-up」不再上屏（稿 41）。
+  await expect(page.getByText(/岗位 AI 授权|元数据|step-up/)).toHaveCount(0)
   await expect(page.getByText('一体机未开放')).toBeVisible()
   await expect(page.getByText('暂未开放').first()).toBeVisible()
   await page.getByTestId('member-privacy-revoke-entry').click()
@@ -357,7 +359,7 @@ test('privacy revoke posts revoke_consent and does not claim account deletion @w
   const request = await posted
   expect(request.postDataJSON()).toMatchObject({ requestType: 'revoke_consent' })
   expect((await request.allHeaders())['idempotency-key'] ?? (await request.allHeaders())['Idempotency-Key']).toBeTruthy()
-  await expect(page.getByText('已撤回岗位 AI 授权，请求已记录')).toBeVisible()
+  await expect(page.getByText('已撤回 AI 使用授权，请求已记录')).toBeVisible()
   await expect(page.getByText('全部个人数据已删除')).toHaveCount(0)
   await expect(page.getByText('账号注销成功')).toHaveCount(0)
   await expectComplianceCopy(page)

@@ -109,16 +109,16 @@ export function SignStampPage() {
             data-testid="sign-stamp-cap"
           >
             {flow.displayLive.terminalId === ''
-              ? '终端未登记'
+              ? '这台还没登记'
               : flow.displayLive.cap === 'ready'
-                ? '能力已开放'
+                ? '可以签名'
                 : flow.displayLive.cap === 'loading'
-                  ? '能力读取中'
+                  ? '正在确认'
                   : flow.displayLive.cap === 'maintenance'
-                    ? '能力维护中'
+                    ? '签名暂停'
                     : flow.displayLive.cap === 'disabled'
-                      ? '能力未开放'
-                      : '能力读取失败'}
+                      ? '暂不能签名'
+                      : '还没确认'}
           </span>
           {flow.document ? (
             <span className="ss-tag" data-testid="sign-stamp-doc-tag">
@@ -134,7 +134,7 @@ export function SignStampPage() {
           <span className="sp" />
           {flow.synthetic ? (
             <span className="ss-fx" data-testid="sign-stamp-fixture-bar">
-              <b>演示</b>固定原型数据，不是真实用户文件
+              <b>示例</b>示例文件，不是哪位用户的文件
             </span>
           ) : null}
         </div>

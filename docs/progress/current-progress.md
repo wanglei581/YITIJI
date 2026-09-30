@@ -56,6 +56,15 @@
 
 - 「打印扫描运维」页列表与详情的「重试」只看服务端 `retryBlockedReason`：有值则置灰并把原因直接写在按钮下（未付款、已退款、结果未确认、已部分出纸、文件已过期、终端打印程序低于 0.4.13、终端已永久退役、终端当前不在运行状态、任务状态已变更等，文案与服务端拒绝时逐字一致）；null 可点；字段缺失时保持旧行为。页面写一次「后台不提供强制重打；需要补打请让用户另下新单。」管理员重试被拒错误码随服务端改为 `PRINT_RETRY_*`，门禁断言后台源码不再出现旧前缀。
 - 本地真实后端（#1152 第四、五轮）逐一造数据走查，各原因列表与详情均置灰并显示原因、可重试任务正常重新排队；截图在 `~/.cache`（不进仓库）。Grok 实现，Claude 审。
+## 2026-09-30：青序 2.0 A 批——一体机运行页合规文案（分支 `claude/qx-align-a-copy-0930`）
+
+- **范围：** 只改用户可见文字和眉题样式（字号、字距、颜色照稿 v2 覆盖块），不动功能、接口、数据。依据 v2 README 规则 4（工程词、英文眉题不上屏）、规则 5（托管 a 口径）。18 归 B 批，未动。
+- **英文眉题 → 中文（照同号稿）：** 08「TERMS OF SERVICE / PRIVACY POLICY」→「你和这台机器 / 你的信息」；19「IMAGES TO PDF」→「图片转 PDF」；20「SIGN & STAMP」→「签名」；34「SELF ASSESSMENT」→「自我探索」；35「NOTIFICATIONS」→「消息通知」；38「MY FILES & ORDERS」→「我的文档和订单」；39「MY RESUMES / MY FAVORITES / AI SERVICE RECORDS / MY ACTIVITY / ACTIVITY DETAIL」→「我的简历 / 我的收藏 / AI 服务记录 / 我的足迹 / 记录详情」；40「MY FEEDBACK」→「意见反馈」。
+- **工程词：** 04「继续后回到/interview」改写页面名（「继续后回到 练面试」），按钮读屏名同源，路由→页面名统一由 `sessionGuardModel.sessionGuardSourceName` 给（照稿 04 的对照表）；20 示例条「演示 固定原型数据，不是真实用户文件」→「示例 示例文件，不是哪位用户的文件」，顶部能力标签「能力已开放 / 能力读取中 / 终端未登记……」→「可以签名 / 正在确认 / 这台还没登记……」，示例态按钮原因「合成演示」→「这是示例」；34 步骤标「E2 / E3」→「记分 / 解读」；39 页签副标题「服务元数据」→「名称和状态」，简历与 AI 记录行不再显示模型名（demo / llm）和任务编号，模拟面试说明去掉「元数据」；41 去掉「元数据」「step-up」「后台」「外跳」（改共享会员端文案 `packages/shared/src/types/memberPrivacy.ts` 的范围横幅、类型名与说明，管理端专用 ADMIN_* 未动）。
+- **托管 a 残留：** 09 第 8 项「岗位与招聘会信息」→「机构官方渠道」；41「撤回岗位 AI 授权」→「撤回 AI 使用授权」（与稿 41、账号设置页同名）。撤回项保留，依据：撤回的是 job_ai 授权，托管 a 下 `/resume/job-fit` 手填岗位要求那条路仍要这项授权（`governed-job-fit.service` 的 requireActiveConsent，用例「hosting off: job fit keeps only the manual path」）。
+- **门禁与用例：** verify:data-request-ui 同步新文案并新增会员端文案反向断言；verify:fusion-w5 新增 A 批断言（眉题、示例条、页签、模型名与任务编号、机器状态第 8 项）；verify-qx-session-lifecycle 新增「不露路由」断言；profile-qx、kiosk-session-warning 用例同步。变异 12 处（改回旧文案）对应门禁全部转红。
+- **没改的：** 41 页底部约 580px 留白、各页版式差异（页头、底部问小青等）属后续版式批次；页头右上的终端编号来自共享页框，不在本批。
+
 ## 2026-09-30：依赖安全门禁——brace-expansion 两条新高危漏洞，钉版上调（分支 `claude/brace-expansion-ghsa-0930`）
 
 - 起因：GHSA-qhr7-859c-m2p7、GHSA-6j4f-fj2g-mc7p（HIGH，2026-09-29T23:45Z 发布，嵌套花括号 / parseCommaParts 无界递归导致栈耗尽）一发布，`verify:dependency-security` 就把所有 PR 和 main 卡在「Dependency security gate」。
