@@ -62,11 +62,11 @@ function hasOrganizationWord(line: string): boolean {
 }
 
 /**
- * 从简历开头几行识别独立姓名。姓名候选必须是 2~4 个汉字，且不是固定栏目
+ * 从简历开头 3 行识别独立姓名（再往下多是城市、岗位等 2~4 字行，容易误认）。姓名候选必须是 2~4 个汉字，且不是固定栏目
  * 标题；带「姓名」前缀的旧写法也继续兼容。无法确定时返回空串，调用方照常
  * 生成其余建议。
  */
-export function detectResumeName(text: string, lookahead = 8): string {
+export function detectResumeName(text: string, lookahead = 3): string {
   for (const raw of resumeTextLines(text).slice(0, lookahead)) {
     const line = raw.trim()
     const labeled = line.match(/^姓名\s*[：:]?\s*([\u4e00-\u9fff]{2,4})$/u)?.[1]
@@ -74,16 +74,6 @@ export function detectResumeName(text: string, lookahead = 8): string {
     if (/^[\u4e00-\u9fff]{2,4}$/u.test(line) && !NON_NAME_TITLES.has(line)) return line
   }
   return ''
-}
-
-/** 识别一个模块 before 是否对应某条完整原文行，支持模型只回贴其中一段。 */
-export function canonicalResumeSourceLine(before: string, candidates: readonly ResumeExperienceCandidate[]): string | undefined {
-  const needle = normalizeResumeStructureText(before)
-  if (needle.length < 4) return undefined
-  return candidates.find((candidate) => {
-    const hay = normalizeResumeStructureText(candidate.line)
-    return hay.includes(needle) || needle.includes(hay)
-  })?.line
 }
 
 /** 供内容块和 modules 共用的轻量归一，不改变事实字符，只去排版分隔符。 */

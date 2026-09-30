@@ -24,7 +24,7 @@ import { withAiSafety } from '../llm/ai-prompt-safety'
 import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
-import { canonicalResumeSourceLine, detectResumeName, extractResumeExperienceCandidates, normalizeResumeStructureText, RESUME_STRUCTURE_PROMPT_RULE } from './resume-structure'
+import { detectResumeName, RESUME_STRUCTURE_PROMPT_RULE } from './resume-structure'
 
 // ============================================================
 // LlmResumeOptimizeService — 阶段2B 真实简历优化(单轮、结构化 JSON,OpenAI 兼容)
@@ -499,7 +499,6 @@ export class LlmResumeOptimizeService {
 
     // 对比模块:before 必须真实摘自原文,否则丢弃该条(不因稻草人对比废整单)
     const modules: ResumeOptimizeModule[] = []
-    const sourceCandidates = extractResumeExperienceCandidates(originalText)
     for (const item of asArray(obj['modules'], MAX_MODULES)) {
       const title = strOf(item, 'title', 60)
       const before = strOf(item, 'before', MAX_MODULE_TEXT_CHARS)
@@ -508,25 +507,7 @@ export class LlmResumeOptimizeService {
       if (!title || !before || !after) continue
       if (before.length < MIN_BEFORE_CHARS) continue
       if (!normText.includes(normalizeResumeFactText(before))) continue
-      const canonicalBefore = canonicalResumeSourceLine(before, sourceCandidates) ?? before
-      modules.push({ title, before: canonicalBefore, after })
-    }
-    // 模型可能漏掉一条标题前或分栏经历。对已从原文确定识别、但没有对应
-    // 对比模块的行，退化成「只改表达」的人工核对提示：不添加任何事实，
-    // 也不因单条漏回而让优化页再次显示「没有逐条建议」。
-    const coveredSources = new Set(modules.map((module) => normalizeResumeStructureText(
-      canonicalResumeSourceLine(module.before, sourceCandidates) ?? module.before,
-    )))
-    for (const candidate of sourceCandidates) {
-      if (modules.length >= MAX_MODULES) break
-      const source = normalizeResumeStructureText(candidate.line)
-      if (!source || coveredSources.has(source)) continue
-      modules.push({
-        title: '经历表达建议',
-        before: candidate.line,
-        after: `请在不新增事实的前提下，按动作和结果重新组织这段经历：${candidate.line}`,
-      })
-      coveredSources.add(source)
+      modules.push({ title, before, after })
     }
 
     const optimizedResume: GeneratedResume = {

@@ -49,7 +49,8 @@ import { AiService } from '../src/ai/ai.service'
 import { LlmResumeProvider } from '../src/ai/providers/llm.provider'
 import { LlmResumeService } from '../src/ai/resume/llm-resume.service'
 import { LlmResumeGenerateService } from '../src/ai/resume/llm-resume-generate.service'
-import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
+import { LlmResumeOptimizeService, OPTIMIZE_SYSTEM_PROMPT } from '../src/ai/resume/llm-resume-optimize.service'
+import { RESUME_STRUCTURE_PROMPT_RULE } from '../src/ai/resume/resume-structure'
 import { ResumePdfService } from '../src/ai/resume/resume-pdf.service'
 import { RedisInflightLock } from '../src/ai/redis-inflight-lock'
 
@@ -577,7 +578,8 @@ async function main(): Promise<void> {
         fail(`W-97 ${fixture.id}. 逐条建议应至少 ${fixture.expectedModuleLines.length} 条，实际 ${modules.length}`)
       }
       for (const line of fixture.expectedModuleLines) {
-        if (!modules.some((module) => module.before === line)) {
+        // 模型常只摘公司名或项目名当 before；原文片段落在这一行里即算覆盖，服务端不改写 before。
+        if (!modules.some((module) => module.before.trim() !== '' && line.includes(module.before))) {
           fail(`W-97 ${fixture.id}. 未覆盖经历原文行「${line}」`)
         }
       }
@@ -591,6 +593,11 @@ async function main(): Promise<void> {
         pass(`W-97 ${fixture.id}. 姓名「${name}」正确，逐条建议 ${modules.length} 条（预期至少 ${fixture.expectedModuleLines.length}）`)
       }
       extractionByFileId.delete(fileId)
+    }
+    if (OPTIMIZE_SYSTEM_PROMPT.includes(RESUME_STRUCTURE_PROMPT_RULE)) {
+      pass('W-97 系统提示词带上经历段落归类规则（工作 / 实习 / 项目 / 校园）')
+    } else {
+      fail('W-97 系统提示词缺少经历段落归类规则')
     }
 
     // ── 2b. 编造学校 → 重试仍坏 → 诚实失败,且失败不缓存 ───────────────────
