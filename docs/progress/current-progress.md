@@ -21,6 +21,9 @@
 ## 2026-09-30：紧急下架通知正文不再出现「。。」（分支 `claude/backend-hardening-20260930-notice-punct`）
 
 - 两个后台窗口走查：事由本身以句号结尾时，发给机构的紧急下架通知拼成「……事由：xxx。。此下架不能由管理员恢复」。新增 `emergencyReasonForSentence`（放在政策与招聘内容两处共用的 recruitment-hosting.ts），拼接前去掉事由末尾的句末标点再统一补「。」；库里的事由原文不变。verify:policies 改用以句号结尾的事由断言正文；变异「不去尾标点」变红；policies、recruitment-emergency-scope、official-channels、companies、job-review 全绿。历史通知不回改。
+## 2026-09-30：会员权益撤销提示去掉英文状态值（W-06 口径；分支 `claude/backend-hardening-20260930-benefit-copy`）
+
+- `BENEFIT_NOT_ACTIVE` 的提示从「只有 active 状态的权益可以撤销」改为「只有「可用」状态的权益可以撤销」，与管理员后台权益页的状态叫法一致（两个后台窗口提出，前端原样显示服务端 message）。member-benefits-admin、benefit-redemption 门禁全绿。同类的「终端不在 active 状态」在 admin-print-scan.service.ts，随 #1152 一并改。
 
 ## 2026-09-30：打印每单最多 100 面（产品负责人拍板；分支 `claude/backend-hardening-20260929-print-max-100-sides`）
 
