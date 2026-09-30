@@ -15,7 +15,7 @@ export interface MeterProps {
 export function Meter({ label, percent, valueText, low = false, className }: MeterProps) {
   const width = Math.max(0, Math.min(100, percent))
   return (
-    <div className={cn('flex items-center gap-3 text-[13px]', className)}>
+    <div className={cn('flex items-center gap-3 text-sm', className)}>
       <span className="w-[76px] shrink-0 font-bold text-neutral-900">{label}</span>
       <div
         role="progressbar"

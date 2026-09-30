@@ -17920,7 +17920,8 @@
     ],
     "apps/admin/src/routes/account-settings/index.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
-      "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs"
+      "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs",
+      "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
@@ -17961,7 +17962,8 @@
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
     ],
     "apps/admin/src/routes/dashboard/index.tsx": [
-      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
+      "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/admin/src/routes/devices/TerminalFleetOverview.tsx": [
       "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs"
@@ -18096,7 +18098,8 @@
     "apps/admin/src/routes/peripherals/index.tsx": [
       "apps/admin/scripts/verify-admin-peripheral-views.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
-      "apps/admin/scripts/verify-honest-placeholders.mjs"
+      "apps/admin/scripts/verify-honest-placeholders.mjs",
+      "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/admin/src/routes/peripherals/peripheralViews.ts": [
       "apps/admin/scripts/verify-admin-peripheral-views.mjs"
@@ -18132,7 +18135,8 @@
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/printers/index.tsx": [
-      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
+      "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/admin/src/routes/privacy-requests/index.tsx": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
@@ -18181,6 +18185,7 @@
     "apps/admin/src/routes/terminals/index.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
       "apps/admin/scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
+      "scripts/verify-datetime-honesty.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
@@ -21223,7 +21228,8 @@
     ],
     "apps/partner/src/routes/terminals/terminalOpsFormat.ts": [
       "apps/partner/scripts/verify-partner-stats-contract.mjs",
-      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
+      "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/partner/src/services/api/client.ts": [
       "apps/partner/scripts/verify-partner-relative-api-url.mjs",
@@ -21709,6 +21715,10 @@
       "apps/admin/scripts/verify-refresh-safe.mjs"
     ],
     "packages/shared/src/formatDateTime.ts": [
+      "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
+      "scripts/verify-datetime-honesty.mjs"
+    ],
+    "packages/shared/src/formatNumber.ts": [
       "scripts/verify-datetime-honesty.mjs"
     ],
     "packages/shared/src/index.ts": [
@@ -21865,6 +21875,9 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-contract-review-contract.ts"
     ],
+    "packages/ui/src/components/ConsoleTable.tsx": [
+      "scripts/verify-datetime-honesty.mjs"
+    ],
     "packages/ui/src/components/Drawer.tsx": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
@@ -21873,6 +21886,9 @@
     ],
     "packages/ui/src/components/KioskTopbar.tsx": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+    ],
+    "packages/ui/src/components/consolePageList.ts": [
+      "scripts/verify-datetime-honesty.mjs"
     ],
     "packages/ui/src/index.ts": [
       "packages/ui/scripts/verify-fusion-youth-foundation.mjs",
@@ -30965,7 +30981,8 @@
           "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
-          "apps/partner/src/routes/terminals/terminalOpsFormat.ts"
+          "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
+          "packages/shared/src/formatDateTime.ts"
         ],
         "missing": []
       },
@@ -31882,8 +31899,17 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/account-settings/index.tsx",
+          "apps/admin/src/routes/dashboard/index.tsx",
+          "apps/admin/src/routes/peripherals/index.tsx",
+          "apps/admin/src/routes/printers/index.tsx",
+          "apps/admin/src/routes/terminals/index.tsx",
           "apps/kiosk/src/pages/jobs/utils/sourceTrust.ts",
+          "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
           "packages/shared/src/formatDateTime.ts",
+          "packages/shared/src/formatNumber.ts",
+          "packages/ui/src/components/ConsoleTable.tsx",
+          "packages/ui/src/components/consolePageList.ts",
           "services/api/src/jobs/jobs-shared.ts"
         ],
         "missing": []

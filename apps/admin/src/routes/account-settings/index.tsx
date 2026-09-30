@@ -4,6 +4,7 @@
 // 修改密码走登录态自助改密 POST /auth/password/change（须校验当前密码），
 // 成功后后端旧 token 立即失效，前端主动 logout() 并跳登录页重新登录。
 
+import { formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Card, Button } from '@ai-job-print/ui'
 import {
@@ -38,12 +39,7 @@ function parseDevice(ua: string | null): string {
 }
 
 function formatLoginTime(iso: string): string {
-  const d = new Date(iso)
-  const diff = Date.now() - d.getTime()
-  if (diff < 60_000) return '刚刚'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
-  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return formatRelativeTime(iso)
 }
 
 const labelCls = 'block text-sm font-medium text-neutral-700 mb-1.5'
@@ -359,13 +355,13 @@ export default function AccountSettingsPage() {
                       <MonitorIcon className="h-4 w-4" aria-hidden="true" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold text-neutral-900">{formatLoginTime(log.createdAt)}</p>
+                      <p className="text-[13px] font-semibold text-neutral-900" title={log.createdAt ? formatDateTime(log.createdAt) : undefined}>{formatLoginTime(log.createdAt)}</p>
                       <p className="mt-0.5 text-xs text-neutral-500">
                         {log.ipAddress ?? '未记录 IP'} · {parseDevice(log.userAgent)}
                       </p>
                     </div>
-                    <span className="shrink-0 text-xs tabular-nums text-neutral-400">
-                      {new Date(log.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                    <span className="shrink-0 text-xs tabular-nums text-neutral-400" title={formatDateTime(log.createdAt)}>
+                      {formatDate(log.createdAt)}
                     </span>
                   </div>
                 ))}
