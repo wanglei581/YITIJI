@@ -104,15 +104,23 @@ const SAMPLE = () => ({
   day: '2026-09-28',
   limits: { globalCny: 100, terminalCny: 30, memberCny: 5, unmeasuredCallCostCny: 0.05 },
   totals: { key: null, calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1, memberCount: 2 },
-  reached: { global: false, terminalIds: ['kiosk-01'], memberCount: 1 },
+  reached: { global: false, terminalIds: ['kiosk-01'], terminals: [{ terminalId: 'kiosk-01', terminalCode: null }], memberCount: 1 },
   byFeature: [{ key: 'resume_optimize', calls: 2, unmeasuredCalls: 0, measuredCostCny: 0.5, chargedCostCny: 0.5 }],
   byVendor: [{ key: 'deepseek', calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1 }],
   byTerminal: [
-    { key: null, calls: 1, unmeasuredCalls: 1, measuredCostCny: 0, chargedCostCny: 0.05 },
-    { key: 'kiosk-01', calls: 3, unmeasuredCalls: 0, measuredCostCny: 1.05, chargedCostCny: 1.05 },
+    { key: null, terminalCode: null, calls: 1, unmeasuredCalls: 1, measuredCostCny: 0, chargedCostCny: 0.05 },
+    { key: 'kiosk-01', terminalCode: null, calls: 3, unmeasuredCalls: 0, measuredCostCny: 1.05, chargedCostCny: 1.05 },
   ],
-  byOrg: [{ key: null, calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1 }],
+  byOrg: [{ key: null, orgName: null, calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1 }],
 })
+
+function legacySample() {
+  const sample = SAMPLE()
+  delete sample.reached.terminals
+  for (const bucket of sample.byTerminal) delete bucket.terminalCode
+  for (const bucket of sample.byOrg) delete bucket.orgName
+  return sample
+}
 
 console.log('\n=== Admin AI 用量与额度面板门禁 ===')
 
@@ -234,6 +242,51 @@ await check('B6 mock：标演示、不发请求、直接拒绝（不造假数）
   const error = await rejection(service.getAiUsageDaily('2026-09-28'))
   assert.equal(error.code, 'DEMO_MODE_NO_USAGE_DATA')
   assert.equal(calls.length, 0, 'mock 模式不能发请求')
+})
+
+await check('B7 新字段缺失（旧服务端）兼容为 null，触顶终端从 terminalIds 同序补齐', async () => {
+  const old = legacySample()
+  old.reached.terminalIds = ['kiosk-02', 'kiosk-01']
+  const { service } = loadAdapter('http', () => reply(200, { success: true, data: old }))
+  const summary = await service.getAiUsageDaily()
+  const expected = SAMPLE()
+  expected.reached.terminalIds = old.reached.terminalIds
+  expected.reached.terminals = old.reached.terminalIds.map((terminalId) => ({ terminalId, terminalCode: null }))
+  assert.deepEqual(JSON.parse(JSON.stringify(summary)), expected)
+})
+
+await check('B8 名称字段类型及 reached.terminals 与 terminalIds 的长度、顺序、ID 严格校验', async () => {
+  const edits = [
+    (s) => { s.byTerminal[1].terminalCode = 123 },
+    (s) => { s.byOrg[0].orgName = {} },
+    (s) => { s.reached.terminals = null },
+    (s) => { s.reached.terminals = [] },
+    (s) => { s.reached.terminals[0].terminalId = null },
+    (s) => { s.reached.terminals[0].terminalId = 'different-id' },
+    (s) => { s.reached.terminals[0].terminalCode = false },
+    (s) => { s.reached.terminals[0] = null },
+    (s) => {
+      s.reached.terminalIds.push('kiosk-02')
+      s.reached.terminals = [{ terminalId: 'kiosk-02', terminalCode: 'KSK-002' }, { terminalId: 'kiosk-01', terminalCode: 'KSK-001' }]
+    },
+    // 缺新字段也不能掩盖旧字段坏形状。
+    (s) => { delete s.byTerminal[1].terminalCode; s.byTerminal[1].calls = '3' },
+    (s) => { delete s.byOrg[0].orgName; s.byOrg[0].chargedCostCny = -1 },
+    (s) => { delete s.reached.terminals; s.reached.memberCount = -1 },
+  ]
+  for (const edit of edits) {
+    const sample = SAMPLE()
+    edit(sample)
+    const { service } = loadAdapter('http', () => reply(200, { success: true, data: sample }))
+    assert.equal((await rejection(service.getAiUsageDaily())).code, 'UNEXPECTED_RESPONSE')
+  }
+  const sample = SAMPLE()
+  sample.reached.terminalIds = ['kiosk-02', 'kiosk-01']
+  sample.reached.terminals = [{ terminalId: 'kiosk-02', terminalCode: 'KSK-002' }, { terminalId: 'kiosk-01', terminalCode: null }]
+  const normalized = http.aiUsageDailyFromResponse({ data: sample })
+  assert.deepEqual(JSON.parse(JSON.stringify(normalized)), sample, '服务端同序编号必须原样保留')
+  delete sample.reached.terminals[0].terminalCode
+  assert.equal(http.aiUsageDailyFromResponse({ data: sample }).reached.terminals[0].terminalCode, null)
 })
 
 // ─── C. 显示名与金额（真跑 aiUsageDisplay.ts） ────────────────────────────────
@@ -398,7 +451,7 @@ function mountPanel({ demo = false, get } = {}) {
     isAiUsageDayKey: http.isAiUsageDayKey,
     getAiUsageDaily: (day) => {
       calls.push(day)
-      return get ? get(day) : Promise.resolve(SAMPLE())
+      return (get ? get(day) : Promise.resolve(SAMPLE())).then((summary) => http.aiUsageDailyFromResponse({ success: true, data: summary }))
     },
   }
   const panel = load('src/routes/ai-services/AiUsagePanel.tsx', {
@@ -571,6 +624,50 @@ await check('D8 日期：未来日期不采纳也不重取；换成过去某天�
   await panel.view.settle()
   assert.equal(panel.calls.length, 2)
   assert.equal(panel.calls[1], '2026-09-28')
+})
+
+await check('D9 真适配与渲染：编号 / 机构名、null 和旧字段缺失均可显示；触顶编号同序，完整 ID 留在悬停', async () => {
+  for (const mode of ['named', 'null', 'legacy']) {
+    const sample = mode === 'legacy' ? legacySample() : SAMPLE()
+    sample.day = '2026-09-29'
+    sample.byOrg.push({ ...sample.byOrg[0], key: 'org-primary-123456' })
+    sample.reached.terminalIds = ['kiosk-02', 'kiosk-01']
+    if (mode !== 'legacy') {
+      sample.reached.terminals = [
+        { terminalId: 'kiosk-02', terminalCode: mode === 'named' ? 'KSK-002' : null },
+        { terminalId: 'kiosk-01', terminalCode: null },
+      ]
+    }
+    if (mode === 'named') {
+      sample.byTerminal[1].terminalCode = 'KSK-001'
+      sample.byOrg[1].orgName = '青岛服务机构'
+      // null key 的关联空态优先于名称，不可伪装成已关联。
+      sample.byTerminal[0].terminalCode = '不可显示的编号'
+      sample.byOrg[0].orgName = '不可显示的机构'
+    }
+    const panel = mountPanel({ get: () => Promise.resolve(sample) })
+    let tree = await panel.view.settle()
+    assert.doesNotMatch(textOf(tree), /数据不完整|读取失败/)
+    const alert = find(tree, (node) => node.props.role === 'alert').map((node) => textOf(node.children)).join('')
+    const reachedName = mode === 'named' ? 'KSK-002' : '终端（尾号 osk-02）'
+    assert.ok(alert.includes(`${reachedName}、终端（尾号 osk-01）`), '触顶列表必须按 terminalIds 同序，用 reached.terminals 的编号')
+    const reachedTitle = mode === 'named' ? '编号 KSK-002 · ID kiosk-02' : 'kiosk-02'
+    assert.ok(find(tree, (node) => node.type === 'span' && node.props.title === reachedTitle).length > 0)
+    act.click(tabs(tree, '按终端')[0])
+    tree = panel.view.render()
+    const terminalName = mode === 'named' ? 'KSK-001' : '终端（尾号 osk-01）'
+    const terminalTitle = mode === 'named' ? '编号 KSK-001 · ID kiosk-01' : 'kiosk-01'
+    assert.ok(find(tree, (node) => node.type === 'td' && node.props.title === terminalTitle).some((node) => textOf(node.children) === terminalName))
+    assert.match(textOf(tree), /无已验签终端/)
+    act.click(tabs(tree, '按机构')[0])
+    tree = panel.view.render()
+    const orgName = mode === 'named' ? '青岛服务机构' : '机构（尾号 123456）'
+    const orgTitle = mode === 'named' ? '名称 青岛服务机构 · ID org-primary-123456' : 'org-primary-123456'
+    assert.ok(find(tree, (node) => node.type === 'td' && node.props.title === orgTitle).some((node) => textOf(node.children) === orgName))
+    assert.match(textOf(tree), /无机构/)
+    assert.doesNotMatch(textOf(tree), /不可显示|org-primary-123456|kiosk-01/)
+    panel.view.unmount()
+  }
 })
 
 // ─── E. 纪律 ────────────────────────────────────────────────────────────────

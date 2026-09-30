@@ -10,7 +10,7 @@
 // ============================================================
 
 import { type AiUsageBucket, type AiUsageDailySummary } from '../../services/api/aiUsageDaily'
-import { aiUsageKeyName, formatCny, type AiUsageDimension } from './aiUsageDisplay'
+import { aiUsageKeyName, aiUsageKeyTitle, formatCny, type AiUsageDimension } from './aiUsageDisplay'
 
 type Tab = { dimension: AiUsageDimension; label: string }
 
@@ -34,7 +34,7 @@ interface BreakdownProps {
 }
 
 export function AiUsageBreakdownTable({ summary, tab, onTabChange }: BreakdownProps) {
-  const bucketsOf = (dimension: AiUsageDimension): AiUsageBucket[] => {
+  const bucketsOf = (dimension: AiUsageDimension): (AiUsageBucket & { terminalCode?: string | null; orgName?: string | null })[] => {
     switch (dimension) {
       case 'feature': return summary.byFeature
       case 'vendor': return summary.byVendor
@@ -86,17 +86,20 @@ export function AiUsageBreakdownTable({ summary, tab, onTabChange }: BreakdownPr
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={row.key ?? '__unassigned__'} className="hover:bg-neutral-50/50">
-                  <td className="px-4 py-3 text-neutral-700" title={row.key ?? undefined}>
-                    {aiUsageKeyName(tab, row.key)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-700">{row.calls}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-500">{row.unmeasuredCalls}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-500">{formatCny(row.measuredCostCny)}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-neutral-800">{formatCny(row.chargedCostCny)}</td>
-                </tr>
-              ))
+              rows.map((row) => {
+                const name = (tab === 'terminal' ? row.terminalCode : tab === 'org' ? row.orgName : null) ?? null
+                return (
+                  <tr key={row.key ?? '__unassigned__'} className="hover:bg-neutral-50/50">
+                    <td className="px-4 py-3 text-neutral-700" title={aiUsageKeyTitle(tab, row.key, name)}>
+                      {aiUsageKeyName(tab, row.key, name)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-700">{row.calls}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-500">{row.unmeasuredCalls}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-500">{formatCny(row.measuredCostCny)}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-neutral-800">{formatCny(row.chargedCostCny)}</td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>

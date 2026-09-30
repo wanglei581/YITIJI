@@ -23,7 +23,7 @@ import {
 } from '../../services/api/aiUsageDaily'
 import { ApiHttpError } from '../../services/api/client'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { aiUsageKeyName, formatCny } from './aiUsageDisplay'
+import { aiUsageKeyName, aiUsageKeyTitle, formatCny } from './aiUsageDisplay'
 import { AiUsageBreakdownTable } from './AiUsageBreakdownTable'
 import type { AiUsageDimension } from './aiUsageDisplay'
 
@@ -204,7 +204,7 @@ export function AiUsagePanel() {
             <div className="mt-3 space-y-2">
               {summary.reached.terminalIds.length > 0 && (
                 <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs leading-relaxed text-warning-fg" role="alert">
-                  已到单终端上限（{formatCny(summary.limits.terminalCny)}/台/日）的终端：{summary.reached.terminalIds.map((id, index) => <span key={id} title={id}>{index > 0 ? '、' : ''}{aiUsageKeyName('terminal', id)}</span>)}。
+                  已到单终端上限（{formatCny(summary.limits.terminalCny)}/台/日）的终端：{summary.reached.terminals.map(({ terminalId, terminalCode }, index) => <span key={terminalId} title={aiUsageKeyTitle('terminal', terminalId, terminalCode)}>{index > 0 ? '、' : ''}{aiUsageKeyName('terminal', terminalId, terminalCode)}</span>)}。
                   {viewingToday
                     ? liveRejectSentence('terminal', '这些终端上，')
                     : historicalReachedSentence(summary.day)}
