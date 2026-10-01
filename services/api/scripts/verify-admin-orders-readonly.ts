@@ -125,6 +125,7 @@ async function main(): Promise<void> {
         endUserId,
         terminalId,
         amountCents: 0,
+        billablePages: 2,
         currency: 'CNY',
         payStatus: 'unpaid',
         taskStatus: 'completed',
@@ -215,6 +216,7 @@ async function main(): Promise<void> {
       data: {
         id: brokenOrderId,
         orderNo: brokenOrderNo,
+        billablePages: null,
         type: 'print',
         printTaskId: brokenTaskId,
         amountCents: 0,
@@ -278,6 +280,17 @@ async function main(): Promise<void> {
     } else {
       fail(`list mismatch: ${JSON.stringify(page)}`)
     }
+
+    // 原值透传：2 页 × 3 份仍为 2；坏参数且无页数仍为 null，不重算。
+    for (const id of [orderId, brokenOrderId]) {
+      const stored = await prisma.order.findUniqueOrThrow({ where: { id }, select: { billablePages: true } })
+      const listed = page.items.find((row) => row.id === id)
+      const detailed = await service.getById(id)
+      if (listed?.billablePages !== stored.billablePages || detailed.billablePages !== stored.billablePages) {
+        fail(`billablePages must equal Order raw value in list/detail: ${id}`)
+      }
+    }
+    pass('list/detail billablePages equals database raw value for numeric and null orders, without copies multiplication')
 
     const failedOnly = await service.list({ taskStatus: 'failed', search: brokenOrderNo, page: 1, pageSize: 10 })
     if (failedOnly.pagination.total === 1 && failedOnly.items[0]?.id === brokenOrderId) {

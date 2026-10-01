@@ -14,7 +14,7 @@
       <!-- 未登录：材料包订单绑在会员账号上，不登录连文件都读不到 -->
       <view class="section-card" wx:if="{{!isLoggedIn}}">
         <view class="state-t">请先登录小程序</view>
-        <view class="state-d">材料包的文件、报价与到机码都绑定本人账号，登录后才能下单。</view>
+        <view class="state-d">材料包的文件、核定结果与到机码都绑定本人账号，登录后才能下单。</view>
         <view class="btn primary block tap" hover-class="tap-press" bindtap="toLogin" role="button">去登录</view>
       </view>
 
@@ -67,17 +67,17 @@
         <!-- 费用明细：页数与金额全部来自服务端多行报价，前端不做单价乘法 -->
         <view class="section-card">
           <view class="section-header">
-            <text class="ficon i-dollar-sign"></text>
-            <text class="section-title">服务端报价</text>
+            <text class="ficon {{quoteState === 'ready' && !quoteFree ? 'i-dollar-sign' : 'i-file-text'}}"></text>
+            <text class="section-title">{{quoteState === 'ready' && !quoteFree ? '服务端报价' : '页数核定'}}</text>
           </view>
 
-          <view wx:if="{{quoteState === 'loading'}}" class="state-d">正在向服务端核定页数与金额…</view>
+          <view wx:if="{{quoteState === 'loading'}}" class="state-d">正在向服务端核定页数…</view>
 
           <view wx:elif="{{quoteState === 'error'}}" class="state-block">
             <view class="state-t">{{quoteErrorTitle}}</view>
             <view class="state-d">{{quoteErrorText}}</view>
             <view class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{quoteRecover}}" role="button">
-              {{quoteRecover === 'login' ? '去登录' : quoteRecover === 'reorder' ? '重新下单' : quoteRecover === 'store' ? '换一个服务点' : quoteRecover === 'files' || quoteRecover === 'privacy' ? '回到选择文件' : quoteRecover === 'orders' ? '去我的打印订单' : '重新核价'}}
+              {{quoteRecover === 'login' ? '去登录' : quoteRecover === 'reorder' ? '重新下单' : quoteRecover === 'store' ? '换一个服务点' : quoteRecover === 'files' || quoteRecover === 'privacy' ? '回到选择文件' : quoteRecover === 'orders' ? '去我的打印订单' : '重新核定'}}
             </view>
             <!-- 这里此前还画了一句「原来那张订单仍可在「我的 · 打印订单」的材料包分区里
                  查看。」，条件是 canStartNewOrder。它是**确定的重复**：canStartNewOrder
@@ -91,27 +91,27 @@
 
           <view wx:elif="{{quoteState === 'ready'}}" class="price-rows">
             <view class="price-row">
-              <text class="price-label">计费页数（服务端识别）</text>
+              <text class="price-label">{{quoteState === 'ready' && !quoteFree ? '计费页数（服务端识别）' : '核定页数（服务端识别）'}}</text>
               <text class="price-value">{{quotePages}} 页</text>
             </view>
             <view class="price-row total">
-              <text class="price-label">应付金额</text>
+              <text class="price-label">{{quoteState === 'ready' && !quoteFree ? '应付金额' : '本次打印'}}</text>
               <text class="price-value final">{{quoteAmountText}}</text>
             </view>
-            <view class="state-d">这是服务端按真实文件页数与当前价目算出来的金额；下单结果里的金额为最终值。</view>
+            <view class="state-d">{{quoteState === 'ready' && !quoteFree ? '这是服务端按真实文件页数与当前价目算出来的金额；下单结果里的金额为最终值。' : '页数由服务端按真实文件核定，试运营期间免费。'}}</view>
           </view>
 
-          <view wx:else class="state-d">等待核价。</view>
+          <view wx:else class="state-d">等待核定。</view>
         </view>
 
         <!-- 付款方式：材料包没有在线支付，只有现场付款 -->
         <view class="section-card">
           <view class="section-header">
-            <text class="ficon i-credit-card"></text>
-            <text class="section-title">付款方式</text>
+            <text class="ficon {{quoteState === 'ready' && !quoteFree ? 'i-credit-card' : 'i-info'}}"></text>
+            <text class="section-title">{{quoteState === 'ready' && !quoteFree ? '付款方式' : '到机说明'}}</text>
           </view>
-          <view class="state-d">{{onsiteNotice}}</view>
-          <view class="state-d">{{noCancelNotice}}</view>
+          <view class="state-d">{{quoteState === 'ready' && !quoteFree ? onsiteNotice : onsiteNoticeFree}}</view>
+          <view class="state-d">{{quoteState === 'ready' && !quoteFree ? noCancelNotice : noCancelNoticeFree}}</view>
         </view>
 
         <!-- 建单失败：按服务端错误码给可执行的下一步。
@@ -123,7 +123,7 @@
           <!-- submitRecover 为空 = 这一刻没有可执行的下一步（核对正在进行中）。
                画一个按钮出来只会是一个按下去什么都不做的主动作。 -->
           <view wx:if="{{submitRecover}}" class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{submitRecover}}" role="button">
-            {{submitRecover === 'login' ? '去登录' : submitRecover === 'reconcile' ? '重新核对下单记录' : submitRecover === 'resubmit' ? '确认下单' : submitRecover === 'store' ? '换一个服务点' : submitRecover === 'files' || submitRecover === 'privacy' ? '回到选择文件' : submitRecover === 'orders' ? '去我的打印订单' : '重新核价'}}
+            {{submitRecover === 'login' ? '去登录' : submitRecover === 'reconcile' ? '重新核对下单记录' : submitRecover === 'resubmit' ? '确认下单' : submitRecover === 'store' ? '换一个服务点' : submitRecover === 'files' || submitRecover === 'privacy' ? '回到选择文件' : submitRecover === 'orders' ? '去我的打印订单' : '重新核定'}}
           </view>
         </view>
 
@@ -153,7 +153,7 @@
   <!-- 底部提交栏：金额只在服务端报价就绪后才显示 -->
   <view class="bottom-bar">
     <view class="price-info">
-      <text class="label">{{quoteState === 'ready' ? '到机应付' : '金额待服务端核定'}}</text>
+      <text class="label">{{quoteState === 'ready' && !quoteFree ? '到机应付' : (quoteState === 'ready' ? '本次打印' : '页数待服务端核定')}}</text>
       <text class="amount" wx:if="{{quoteState === 'ready'}}">{{quoteAmountText}}</text>
     </view>
     <!-- disabled 与 submitOrder() 的守卫**逐条对齐**（报价就绪 + 已同意协议 + 不在提交中）。

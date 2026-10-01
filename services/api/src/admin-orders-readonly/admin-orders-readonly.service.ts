@@ -28,6 +28,7 @@ interface OrderRow {
   endUserId: string | null
   terminalId: string | null
   amountCents: number
+  billablePages: number | null
   currency: string
   payStatus: string
   taskStatus: string
@@ -361,6 +362,7 @@ export class AdminOrdersReadonlyService {
       userLabel: ownerType === 'member' ? (nickname && nickname.length > 0 ? nickname : '会员') : '游客',
       terminalCode: effectiveTerminalId ? labels.terminalCodes.get(effectiveTerminalId) ?? null : null,
       amountCents: row.amountCents,
+      billablePages: row.billablePages,
       currency: row.currency,
       // channel 为 null = 存量单，前端必须显示「未标注」而非猜成 kiosk
       channel: row.channel,
@@ -389,6 +391,7 @@ function orderSelect() {
     endUserId: true,
     terminalId: true,
     amountCents: true,
+    billablePages: true,
     currency: true,
     payStatus: true,
     taskStatus: true,

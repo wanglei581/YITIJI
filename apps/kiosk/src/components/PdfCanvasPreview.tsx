@@ -149,6 +149,51 @@ function loadPdfjs(): Promise<PdfjsNamespace> {
   return pdfjsModule
 }
 
+/** 预览与简历失败核查共用同一次打开密码回调；本机不收密码。 */
+async function createPdfLoadingTask(bytes: Uint8Array, onPasswordRequired: () => void): Promise<PdfLoadingTask> {
+  const { getDocument } = await loadPdfjs()
+  const loadingTask = getDocument({
+    data: bytes,
+    isEvalSupported: false,
+    useSystemFonts: true,
+    useWorkerFetch: false,
+    disableAutoFetch: true,
+    disableStream: true,
+    verbosity: 0,
+    cMapUrl: pdfjsDataUrl('cmaps'),
+    cMapPacked: true,
+    standardFontDataUrl: pdfjsDataUrl('standard_fonts'),
+    wasmUrl: pdfjsDataUrl('wasm'),
+  })
+  loadingTask.onPassword = () => {
+    onPasswordRequired()
+    void loadingTask.destroy().catch(() => undefined)
+  }
+  return loadingTask
+}
+
+/** 只核查是否需要打开密码，不渲染页面；普通读取失败交给调用方保留原有处理。 */
+export async function checkPdfOpeningPassword(src: string, signal: AbortSignal): Promise<boolean> {
+  const response = await fetch(src, { signal, credentials: 'same-origin' })
+  if (!response.ok) throw new Error('preview-fetch-failed')
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  let encrypted = false
+  const task = await createPdfLoadingTask(bytes, () => { encrypted = true })
+  const cancel = () => { void task.destroy().catch(() => undefined) }
+  signal.addEventListener('abort', cancel, { once: true })
+  try {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+    await task.promise
+    return encrypted
+  } catch (error) {
+    if (encrypted) return true
+    throw error
+  } finally {
+    signal.removeEventListener('abort', cancel)
+    await task.destroy().catch(() => undefined)
+  }
+}
+
 function disposeSession(session: PreviewSession): void {
   if (session.dead) return
   session.dead = true
@@ -252,30 +297,19 @@ export function PdfCanvasPreview({
         if (!response.ok) throw new Error('preview-fetch-failed')
         const bytes = new Uint8Array(await response.arrayBuffer())
         if (session.dead) return
-        const { getDocument } = await loadPdfjs()
-        if (session.dead) return
-        const loadingTask = getDocument({
-          data: bytes,
-          isEvalSupported: false,
-          useSystemFonts: true,
-          useWorkerFetch: false,
-          disableAutoFetch: true,
-          disableStream: true,
-          verbosity: 0,
-          cMapUrl: pdfjsDataUrl('cmaps'),
-          cMapPacked: true,
-          standardFontDataUrl: pdfjsDataUrl('standard_fonts'),
-          wasmUrl: pdfjsDataUrl('wasm'),
-        })
-        session.loadingTask = loadingTask
-        loadingTask.onPassword = () => {
+        const loadingTask = await createPdfLoadingTask(bytes, () => {
           passwordRejected = true
           if (!session.dead) {
             setPasswordBlocked(true)
             setPhase('error')
             onPasswordRequiredRef.current?.()
           }
-          void loadingTask.destroy()
+        })
+        session.loadingTask = loadingTask
+        if (session.dead) {
+          await loadingTask.destroy().catch(() => undefined)
+          await loadingTask.promise.catch(() => undefined)
+          return
         }
         const pdf = await loadingTask.promise
         if (session.dead) {

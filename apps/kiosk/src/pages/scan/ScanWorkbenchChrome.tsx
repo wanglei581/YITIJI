@@ -125,7 +125,6 @@ export function ScanHero({
       <div className="sw-xq-row">
         <div className="sw-xq-face" aria-hidden="true">青</div>
         <div className="sw-xq-main">
-          <div className="sw-xq-eyebrow">SCAN VIA PANEL</div>
           <h2 className="sw-xq-ask">
             {i < 0 ? (
               ask

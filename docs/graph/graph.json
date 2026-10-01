@@ -12052,7 +12052,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 202,
+      "reachableFileCount": 209,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12807,7 +12807,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 227
+      "sourceFileCount": 234
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17222,6 +17222,7 @@
           "User"
         ],
         "usedBy": [
+          "services/api/src/ai/usage/ai-usage-summary.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/partner-account-action.service.ts",
           "services/api/src/auth/partner-phone-rebind.service.ts",
@@ -17536,6 +17537,7 @@
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/ai/usage/ai-usage-summary.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.service.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
@@ -17901,6 +17903,9 @@
       "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
+    "apps/admin/src/lib/printErrorText.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/main.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -17950,6 +17955,7 @@
     ],
     "apps/admin/src/routes/billing/index.tsx": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/kiosk/scripts/verify-price-single-source.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
@@ -17985,6 +17991,15 @@
     ],
     "apps/admin/src/routes/fairs/components/ZonesTab.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/admin/src/routes/files/FileTable.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/files/fileMeta.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/files/retentionMeta.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/import-batches/index.tsx": [
       "apps/admin/scripts/verify-source-publish-actions.mjs"
@@ -18044,13 +18059,46 @@
     "apps/admin/src/routes/offline-agencies/JobsDrawer.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/admin/src/routes/orders/OrderAftercare.tsx": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
+    ],
+    "apps/admin/src/routes/orders/OrderDetailDrawer.tsx": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
+    ],
+    "apps/admin/src/routes/orders/OrderPaymentActions.tsx": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
+    ],
     "apps/admin/src/routes/orders/index.tsx": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
+    "apps/admin/src/routes/orders/orderColumns.tsx": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/admin/src/routes/orders/orderDisplay.ts": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
+    ],
     "apps/admin/src/routes/orders/orderHonestyCopy.ts": [
-      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs"
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/orders/useOrderDetail.ts": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-api20-manual-refund.ts"
     ],
     "apps/admin/src/routes/partners/OrgContentTrustPanel.tsx": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
@@ -18136,7 +18184,8 @@
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/index.tsx": [
-      "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/printers/index.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
@@ -18629,7 +18678,8 @@
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs"
     ],
     "apps/kiosk/src/components/PdfCanvasPreview.tsx": [
-      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/components/hid-guard/KioskHidScanGuard.tsx": [
       "apps/kiosk/scripts/verify-scan-input-safety.mjs"
@@ -19087,7 +19137,8 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts": [
-      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
@@ -19526,6 +19577,9 @@
     ],
     "apps/kiosk/src/pages/print/components/printFileRetention.ts": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+    ],
+    "apps/kiosk/src/pages/print/components/printPreviewKind.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx": [
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
@@ -20237,6 +20291,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts": [
+      "apps/kiosk/scripts/verify-resume-decisions.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts": [
@@ -20414,6 +20469,7 @@
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-scan-quiet-period.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
@@ -21782,6 +21838,7 @@
       "scripts/verify-datetime-honesty.mjs"
     ],
     "packages/shared/src/formatNumber.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
     "packages/shared/src/index.ts": [
@@ -22760,6 +22817,7 @@
       "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
@@ -23334,6 +23392,7 @@
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-generate.ts",
+      "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
@@ -23931,6 +23990,7 @@
       "services/api/scripts/verify-pdfjs-engine.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-resume-export-label.ts",
+      "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
@@ -26726,10 +26786,18 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps"
+        ],
         "files": [
+          "apps/admin/src/routes/orders/OrderAftercare.tsx",
+          "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
+          "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
           "apps/admin/src/routes/orders/index.tsx",
+          "apps/admin/src/routes/orders/orderColumns.tsx",
+          "apps/admin/src/routes/orders/orderDisplay.ts",
           "apps/admin/src/routes/orders/orderHonestyCopy.ts",
+          "apps/admin/src/routes/orders/useOrderDetail.ts",
           "apps/admin/src/services/api/adminOrdersReadonly.ts",
           "apps/admin/src/services/api/adminPrintJobs.ts"
         ],
@@ -26935,15 +27003,26 @@
       "asserts": {
         "absent": [],
         "dirs": [
-          "apps"
+          "apps",
+          "apps/admin/src/routes"
         ],
         "files": [
           "apps/admin/src/lib/auditActionLabels.ts",
+          "apps/admin/src/lib/printErrorText.ts",
+          "apps/admin/src/routes/billing/index.tsx",
           "apps/admin/src/routes/devices/TerminalFleetOverview.tsx",
           "apps/admin/src/routes/devices/index.tsx",
+          "apps/admin/src/routes/files/FileTable.tsx",
+          "apps/admin/src/routes/files/fileMeta.ts",
+          "apps/admin/src/routes/files/retentionMeta.ts",
+          "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
+          "apps/admin/src/routes/orders/orderColumns.tsx",
+          "apps/admin/src/routes/orders/orderDisplay.ts",
+          "apps/admin/src/routes/orders/orderHonestyCopy.ts",
           "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx",
           "apps/admin/src/routes/peripherals/index.tsx",
           "apps/admin/src/routes/peripherals/peripheralViews.ts",
+          "apps/admin/src/routes/print-scan/index.tsx",
           "apps/admin/src/routes/printers/index.tsx",
           "apps/admin/src/routes/screensaver/AssetsTab.tsx",
           "apps/admin/src/routes/screensaver/PlaylistsTab.tsx",
@@ -26957,6 +27036,8 @@
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/smart-campus/index.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
+          "packages/shared/src/formatNumber.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/audit/audit.types.ts"
         ],
         "missing": []
@@ -27896,6 +27977,7 @@
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx",
           "apps/kiosk/src/pages/scan/ScanStartPage.tsx",
           "apps/kiosk/src/pages/scan/ScanWorkbenchChrome.tsx",
           "apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx",
@@ -29080,6 +29162,7 @@
           "apps/kiosk/src/pages/interview/InterviewTipsPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx",
           "apps/kiosk/src/pages/interview/interview-service-desk.css",
+          "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
           "apps/kiosk/src/pages/interview/session/types.ts",
@@ -30251,6 +30334,7 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts"
         ],
@@ -30274,6 +30358,8 @@
         "files": [
           "apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs",
           "apps/kiosk/src/components/FileContentPreview.tsx",
+          "apps/kiosk/src/components/PdfCanvasPreview.tsx",
+          "apps/kiosk/src/pages/print/components/printPreviewKind.ts",
           "apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
@@ -32281,7 +32367,13 @@
           "apps/admin/src/routes/job-sources/index.tsx",
           "apps/admin/src/routes/login/index.tsx",
           "apps/admin/src/routes/offline-agencies/JobsDrawer.tsx",
+          "apps/admin/src/routes/orders/OrderAftercare.tsx",
+          "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
+          "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
           "apps/admin/src/routes/orders/index.tsx",
+          "apps/admin/src/routes/orders/orderColumns.tsx",
+          "apps/admin/src/routes/orders/orderDisplay.ts",
+          "apps/admin/src/routes/orders/useOrderDetail.ts",
           "apps/admin/src/routes/partners/index.tsx",
           "apps/admin/src/routes/policy-sources/index.tsx",
           "apps/admin/src/routes/screensaver/index.tsx",
@@ -33952,7 +34044,12 @@
           "services"
         ],
         "files": [
+          "apps/admin/src/routes/orders/OrderAftercare.tsx",
+          "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
+          "apps/admin/src/routes/orders/OrderPaymentActions.tsx",
           "apps/admin/src/routes/orders/index.tsx",
+          "apps/admin/src/routes/orders/orderDisplay.ts",
+          "apps/admin/src/routes/orders/useOrderDetail.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/payment/admin-order-actions.controller.ts",
@@ -39992,7 +40089,9 @@
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/dto/resume-generate.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
-          "services/api/src/ai/resume/llm-resume-optimize.service.ts"
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/resume-pdf.service.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts"
         ],
         "missing": []
       },

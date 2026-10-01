@@ -50,4 +50,27 @@ assert.match(hook, /compareDecisionChanges\(/, 'compare return must include a ch
 const page = readFileSync(new URL('../src/pages/resume/ResumeOptimizePage.tsx', import.meta.url), 'utf8')
 assert.match(page, /第 \$\{number\} 条改写没能自动放进稿里，请在编辑区手动改。/, 'unplaced rewrite tells the user to edit by hand')
 
-console.log('PASS replaceResumeText first-hit only')
+// W-116：运行文案函数，确保技术字段只转换成受控中文，不把服务端原话甩给用户。
+const copySrc = readFileSync(new URL('../src/pages/resume/components/resume-deliver/optimizeStateCopy.ts', import.meta.url), 'utf8')
+const copyModule = { exports: {} }
+const { outputText: copyJs } = ts.transpileModule(copySrc, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+})
+const fallback = '原有非校验错误文案'
+new Function('exports', 'module', 'require', copyJs)(copyModule.exports, copyModule, () => ({
+  errorCodeOf: (error) => error.code,
+  userMessageOf: () => fallback,
+}))
+const validation = (message) => Object.assign(new Error(message), { code: 'VALIDATION_FAILED' })
+const { optimizeExportErrorMessage } = copyModule.exports
+assert.match(optimizeExportErrorMessage(validation('basic.name should not be empty')), /姓名还没填写.*不能在本页修改.*重新上传并诊断/)
+assert.match(optimizeExportErrorMessage(validation('summary must be shorter than or equal to 600 characters')), /个人简介.*600 字以内/)
+assert.match(optimizeExportErrorMessage(validation('experience.0.role should not be empty')), /工作经历第 1 条的职务.*不能在本页修改.*重新上传并诊断/)
+assert.match(optimizeExportErrorMessage(validation('experience[0].role: role should not be empty')), /工作经历第 1 条的职务.*不能在本页修改.*重新上传并诊断/)
+assert.match(optimizeExportErrorMessage(validation('experience[0].description: description must be shorter than or equal to 1000 characters')), /工作经历第 1 条的描述.*编辑区.*1000 字以内/)
+assert.match(optimizeExportErrorMessage(validation('intention.position should not be empty')), /求职意向可以留空.*现场工作人员.*修改清单/)
+assert.doesNotMatch(optimizeExportErrorMessage(validation('unknown.field secret technical payload')), /unknown|secret|technical/)
+assert.equal(optimizeExportErrorMessage({ code: 'NETWORK_ERROR' }), fallback)
+assert.match(page, /setExportError\(optimizeExportErrorMessage\(err\)\)/, '优化稿导出接入专用错误文案')
+assert.match(page, /setExportError\(userMessageOf\(err, '修改清单导出失败，请稍后重试'\)\)/, '修改清单沿用原来的错误文案')
+console.log('PASS replaceResumeText first-hit only; W-116 优化稿导出字段错误文案')

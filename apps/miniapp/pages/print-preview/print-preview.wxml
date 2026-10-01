@@ -60,10 +60,10 @@
       <view class="sp-row"><text class="sp-k">纸张规格</text><text class="sp-v">A4 · 210 × 297mm</text></view>
       <view class="sp-row"><text class="sp-k">打印方式</text><text class="sp-v">{{duplexLabel}}</text></view>
       <view class="sp-row"><text class="sp-k">打印份数</text><text class="sp-v">×{{copies}} 份</text></view>
-      <view class="sp-row"><text class="sp-k">计费页数</text><text class="sp-v {{hasQuote ? '' : 'pending'}}">{{hasQuote ? pages + ' 页 / 份' : '待服务端核定'}}</text></view>
+      <view class="sp-row"><text class="sp-k">{{hasQuote && !isFree ? '计费页数' : '核定页数'}}</text><text class="sp-v {{hasQuote ? '' : 'pending'}}">{{hasQuote ? pages + ' 页 / 份' : '待服务端核定'}}</text></view>
       <view class="sp-row total">
-        <text class="sp-k">{{isFree ? '试运营费用' : '服务端报价'}}</text>
-        <text class="sp-amt {{hasQuote ? '' : 'pending'}}">{{hasQuote ? (isFree ? '免费' : '¥' + total) : '待服务端核定'}}</text>
+        <text class="sp-k">{{hasQuote && !isFree ? '服务端报价' : '本次打印'}}</text>
+        <text class="sp-amt {{hasQuote ? '' : 'pending'}}">{{hasQuote && !isFree ? '¥' + total : (hasQuote ? '免费' : '待服务端核定')}}</text>
       </view>
     </view>
 

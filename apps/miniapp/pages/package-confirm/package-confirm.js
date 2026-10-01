@@ -100,6 +100,10 @@ Page({
 
     onsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
     noCancelNotice: pkg.PACKAGE_NO_CANCEL_NOTICE,
+    // 价目为 0（试点免费）时换用不提钱的两句；只有服务端报出大于 0 的金额才显示上面两句
+    onsiteNoticeFree: pkg.PACKAGE_ONSITE_NOTICE_FREE,
+    noCancelNoticeFree: pkg.PACKAGE_NO_CANCEL_NOTICE_FREE,
+    quoteFree: false,
     // 默认**不勾选**。模板里那句是「我已阅读并同意《打印服务协议》」并链到
     // /pages/legal/legal —— 那是一份法律文件的同意，预先替用户勾上等于替他声明
     // 「已阅读」。本仓库同类同意的既有口径就是显式勾选：`pages/launch/launch.js`
@@ -540,7 +544,7 @@ Page({
       this.setData({
         quoteState: 'error',
         quoteErrorTitle: auth.isLoggedIn() ? '登录状态不完整' : '登录已失效',
-        quoteErrorText: '请重新登录后再核价下单。',
+        quoteErrorText: '请重新登录后再核定下单。',
         quoteRecover: 'login',
       })
       return
@@ -565,19 +569,20 @@ Page({
         const amountCents = pkg.parseAmountCents(quote && quote.amountCents)
         const billablePages = Number(quote && quote.billablePages)
         if (amountCents === null || !Number.isSafeInteger(billablePages) || billablePages < 1) {
-          throw new Error('服务端报价缺少有效页数或金额')
+          throw new Error('服务端核定结果不完整，请重试')
         }
         this._quote = priceConfirm.bindQuote(quoteCtx, this._identityKey(), this._payloadFingerprint(), amountCents, billablePages)
-        if (!this._quote) throw new Error('这次报价已不对应当前账号或材料，请重新核价。')
+        if (!this._quote) throw new Error('这次核定结果已不对应当前账号或材料，请重新核定。')
         this.setData({
           quoteState: 'ready',
           quoteAmountText: pkg.formatAmount(amountCents),
+          quoteFree: amountCents === 0,
           quotePages: billablePages,
         })
       })
       .catch((err) => {
         if (!this._accepts(token)) return
-        const shown = pkg.describePackageError(err, '服务端报价失败，请稍后重试。')
+        const shown = pkg.describePackageError(err, '服务端核定失败，请稍后重试。')
         this.setData({
           quoteState: 'error',
           quoteErrorTitle: shown.title,
@@ -619,7 +624,7 @@ Page({
       submitLabel: '确认下单',
     })
     this.setData({
-      submitting: false, quoteState: 'ready', quoteAmountText: pkg.formatAmount(decision.amountCents), quotePages: decision.billablePages,
+      submitting: false, quoteState: 'ready', quoteAmountText: pkg.formatAmount(decision.amountCents), quoteFree: decision.amountCents === 0, quotePages: decision.billablePages,
       submitErrorTitle: shown.title, submitErrorText: shown.text, submitRecover: '', priceConfirmLabel: shown.button,
     })
   },
@@ -724,6 +729,8 @@ Page({
   _storedAmountNote() {
     const stored = this._storedAmount
     if (!stored || stored.orderId !== this._createdOrderId) return ''
+    // 试点免费（原单 0 元）不提钱
+    if (stored.amountCents === 0) return ''
     return `原订单金额：${pkg.formatAmount(stored.amountCents)}（下单时由服务端定下，之后改价不影响它）。`
   },
 
@@ -783,7 +790,7 @@ Page({
     this._lockAfterCreated(orderId)
     this.setData({
       quoteErrorTitle: reason,
-      quoteErrorText: '这一份材料包可以重新下一单：点下面的「重新下单」，本机会换一个新的下单标识重新报价。原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。' + this._storedAmountNote(),
+      quoteErrorText: '这一份材料包可以重新下一单：点下面的「重新下单」，本机会换一个新的下单标识重新核定。原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。' + this._storedAmountNote(),
       quoteRecover: 'reorder',
       canStartNewOrder: true,
     })
@@ -883,8 +890,8 @@ Page({
       wx.showModal({
         title: '还不能下单',
         content: this.data.quoteState === 'loading'
-          ? '正在等服务端报价，请稍候。'
-          : '服务端还没有给出这份材料包的金额，此时下单会被拒绝。请先解决上面的报价问题。',
+          ? '正在等服务端核定页数，请稍候。'
+          : '服务端还没有核定这份材料包，此时下单会被拒绝。请先解决上面的核定问题。',
         showCancel: false,
         confirmText: '知道了',
       })
@@ -911,7 +918,7 @@ Page({
     // 只带**屏幕上那个、属于当前账号与当前材料**的服务端金额出门；没有就不提交，
     // 排在任何清记录 / 换键之前（挡住的提交一个字节都不该动本机记录）。
     const quotedAmountCents = priceConfirm.quotedAmount(this._quote, account, fingerprint)
-    if (quotedAmountCents === null) { this._dropQuote('需要重新核价', '金额需要按当前账号与材料重新核定后才能下单。'); return }
+    if (quotedAmountCents === null) { this._dropQuote('需要重新核定', '需要按当前账号与材料重新核定后才能下单。'); return }
     // 服务端说过这个键配的是另一组参数（409 IDEMPOTENCY_KEY_REUSED）。**换新键之前
     // 必须先把旧记录清掉，而且读回来确认真的清掉了** —— 清不掉就会复用旧键，
     // 下一次仍然 409；而"以为清掉了就换新键"更糟：旧键那张单还在，新键又建一张。

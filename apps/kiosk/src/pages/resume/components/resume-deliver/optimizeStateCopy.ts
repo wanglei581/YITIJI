@@ -1,4 +1,37 @@
 import type { OptimizeViewState } from './constants'
+import { errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
+
+/** 仅优化稿导出的字段校验提示；不修改其他调用方的公共错误文案。 */
+export function optimizeExportErrorMessage(error: unknown): string {
+  if (errorCodeOf(error) !== 'VALIDATION_FAILED') return userMessageOf(error, '导出失败，请稍后重试')
+  const message = error instanceof Error ? error.message : ''
+  const field = message.match(/^(basic\.(?:name|phone|email|city)|intention\.(?:position|city|jobType|salary)|summary|(?:education|experience|projects)(?:\.\d+|\[\d+\])\.(?:school|major|degree|period|description|company|role|name)|skills|certificates)\b/)?.[1]?.replace(/\[(\d+)\]/g, '.$1')
+  if (field?.startsWith('intention.')) {
+    const label = { position: '求职意向', city: '意向城市', jobType: '工作类型', salary: '期望薪资' }[field.slice(10) as 'position' | 'city' | 'jobType' | 'salary']
+    return `${label}未被当前服务接受。求职意向可以留空，请联系现场工作人员核查导出服务；也可以先导出修改清单。`
+  }
+  const labels: Record<string, string> = {
+    'basic.name': '姓名', 'basic.phone': '电话', 'basic.email': '邮箱', 'basic.city': '所在城市',
+    summary: '个人简介', skills: '技能', certificates: '证书',
+    school: '学校', major: '专业', degree: '学历', period: '时间', description: '描述',
+    company: '公司', role: '职务', name: '名称',
+  }
+  const listField = field?.match(/^(education|experience|projects)\.(\d+)\.(\w+)$/)
+  const sections: Record<string, string> = { education: '教育经历', experience: '工作经历', projects: '项目经历' }
+  const label = listField
+    ? `${sections[listField[1] ?? '']}第 ${Number(listField[2]) + 1} 条的${labels[listField[3] ?? '']}`
+    : field ? labels[field] : undefined
+  if (!label) return '简历中有内容不符合导出要求，服务未说明具体项目。请联系现场工作人员核查；也可以先导出修改清单。'
+  const maxLength = message.match(/shorter than or equal to (\d+) characters/)?.[1]
+  const editable = field === 'summary' || field === 'skills' || field === 'certificates' || listField?.[3] === 'description'
+  if (!editable) {
+    const reason = message.includes('should not be empty') ? '还没填写' : maxLength ? `超过 ${maxLength} 字` : '格式不符合导出要求'
+    return `${label}${reason}。这一项不能在本页修改，请核对原简历后重新上传并诊断；仍失败可联系现场工作人员，也可以先导出修改清单。`
+  }
+  if (message.includes('should not be empty')) return `${label}还没填写，请在编辑区补上后再导出。`
+  if (maxLength) return `${label}太长了，请在编辑区缩短到 ${maxLength} 字以内后再导出。`
+  return `${label}的格式不符合导出要求，请在编辑区检查这一项后再导出；仍失败可联系现场工作人员。`
+}
 
 export function optimizeStateTitle(view: OptimizeViewState): string {
   if (view === 'loading') return '正在生成优化建议'
