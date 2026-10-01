@@ -93,7 +93,7 @@ pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui
 - Admin 创建高校机构、授权模块、创建账号、绑定终端。
 - Partner 学校账号只能看到本机构终端，非学校机构访问智慧校园被拒。
 - Kiosk 首页智慧校园随终端开关出现和消失。
-- `/smart-campus/freshman-insights` 始终只展示未开放。
+- `/smart-campus/freshman-insights` 已停放，源码保留在 `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx`，不注册路由。
 - Partner 新增招聘会后 Kiosk 不可见；Admin 审核并发布后 Kiosk 可见。
 - Partner 修改已发布招聘会后重新回待审，Kiosk 不再公开展示。
 - `/campus` 本校优先按终端归属学校展示。

@@ -84,7 +84,7 @@ export type QuoteView =
   | { status: 'demo' }
   | { status: 'loading' }
   | { status: 'ready'; amountCents: number; billablePages: number; unitCents: number; quantity: number }
-  | { status: 'unavailable'; reason: string }
+  | { status: 'unavailable'; reason: string; code?: string }
 
 export function derivePrintConfirmScreen(input: {
   queryInvalid: boolean

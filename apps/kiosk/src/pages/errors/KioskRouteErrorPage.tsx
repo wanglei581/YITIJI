@@ -3,10 +3,10 @@ import { HomeIcon, RefreshCwIcon, TriangleAlertIcon } from 'lucide-react'
 import { isRouteErrorResponse, useNavigate, useRouteError } from 'react-router-dom'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 
-export function KioskRouteErrorPage() {
+export function KioskRouteErrorPage({ notFound = false }: { notFound?: boolean }) {
   const routeError = useRouteError()
   const navigate = useNavigate()
-  const isNotFound = isRouteErrorResponse(routeError) && routeError.status === 404
+  const isNotFound = notFound || (isRouteErrorResponse(routeError) && routeError.status === 404)
 
   return (
     <KioskStageFit>

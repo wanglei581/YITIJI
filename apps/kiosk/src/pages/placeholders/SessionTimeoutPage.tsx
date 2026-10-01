@@ -8,6 +8,7 @@ import {
   deriveSessionGuardState,
   remainingSeconds,
   SESSION_GUARD_PILL,
+  sessionGuardSourceName,
 } from '../session-guard/sessionGuardModel'
 import '../session-guard/styles/session-guard-qx.css'
 
@@ -101,7 +102,7 @@ export default function SessionTimeoutPage() {
                   data-variant="primary"
                   data-testid="session-guard-primary"
                   onClick={continueSession}
-                  aria-label={sourceKnown ? `我还在，继续使用，回到 ${sourcePath}` : '我还在，继续使用；来源页不可用，只能回首页重新进入'}
+                  aria-label={sourceKnown ? `我还在，继续使用，回到${sessionGuardSourceName(sourcePath)}` : '我还在，继续使用；来源页不可用，只能回首页重新进入'}
                 >
                   {sourceKnown ? '我还在，继续使用' : '我还在，继续使用（回首页）'}
                 </button>

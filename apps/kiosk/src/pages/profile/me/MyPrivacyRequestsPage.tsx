@@ -1,5 +1,7 @@
 // 隐私与数据请求 — /me/privacy-requests
-// 与 main 后端对齐：仅开放撤回授权；导出需 step-up（一体机无提交）；账号注销暂未开放。
+// 与 main 后端对齐：仅开放撤回授权；导出需再次验证本人（一体机无提交）；账号注销暂未开放。
+// 撤回的是 job_ai 授权，用户可见名写「AI 使用授权」（稿 41、账号设置页同名）。托管 a 下它仍被
+// /resume/job-fit 手填岗位要求那条路使用，所以撤回项保留，只改说法（2026-09-30 A 批）。
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -71,7 +73,7 @@ export function MyPrivacyRequestsPage() {
       const created = await createMyDataRequest(token, 'revoke_consent')
       setItems((prev) => [created, ...prev])
       setConfirmRevoke(false)
-      setMessage('已撤回岗位 AI 授权，请求已记录')
+      setMessage('已撤回 AI 使用授权，请求已记录')
     } catch (error) {
       setMessage(userMessageOf(error, '提交失败，请稍后重试'))
     } finally {
@@ -97,7 +99,7 @@ export function MyPrivacyRequestsPage() {
     ? { tone: 'bad' as const, label: '请求记录这次没有加载出来' }
     : uiState === 'loading' || uiState === 'submitting'
       ? { tone: 'unknown' as const, label: '正在处理隐私请求' }
-      : { tone: 'unknown' as const, label: '一体机只开放撤回岗位 AI 授权' }
+      : { tone: 'unknown' as const, label: '一体机只开放撤回 AI 使用授权' }
 
   return (
     <div
@@ -138,7 +140,7 @@ export function MyPrivacyRequestsPage() {
               <span className="qx-state-ic" />
               <span>
                 <div className="qx-state-t">请先登录</div>
-                <p className="qx-state-d">登录后可提交撤回岗位 AI 授权，或查看本人相关请求记录。</p>
+                <p className="qx-state-d">登录后可提交撤回 AI 使用授权，或查看本人相关请求记录。</p>
               </span>
             </div>
           ) : null}
@@ -237,13 +239,13 @@ export function MyPrivacyRequestsPage() {
           <div className="pr-guide" aria-label="说明">
             <div className="pr-guide-item">
               <div className="pr-guide-k">撤回范围</div>
-              <div className="pr-guide-t">只影响岗位 AI 授权</div>
+              <div className="pr-guide-t">只影响 AI 使用授权</div>
               <p className="pr-guide-p">不影响简历诊断、打印、收藏或已保存文件</p>
             </div>
             <div className="pr-guide-item">
               <div className="pr-guide-k">再次使用</div>
               <div className="pr-guide-t">需要重新确认</div>
-              <p className="pr-guide-p">下次用岗位 AI 时会再次请求授权</p>
+              <p className="pr-guide-p">下次使用时会再次请求授权</p>
             </div>
             <div className="pr-guide-item">
               <div className="pr-guide-k">记录</div>
@@ -263,7 +265,7 @@ export function MyPrivacyRequestsPage() {
             className="pr-dlg"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 id="privacy-revoke-title">{busy ? '提交中…' : '确认撤回岗位 AI 授权'}</h2>
+            <h2 id="privacy-revoke-title">{busy ? '提交中…' : '确认撤回 AI 使用授权'}</h2>
             <p>{MEMBER_DATA_REQUEST_TYPE_HINT.revoke_consent}</p>
             <p>撤回不会删除简历、文档、打印订单或收藏；也不等于账号注销。</p>
             <p>点「确认撤回」后会提交一次请求并等待返回：<b>成功即完成撤回</b>，失败会提示稍后重试；本页不会提前显示成功。</p>
@@ -330,7 +332,7 @@ function PrivacyCta({
         disabled={busy || uiState === 'revoke-confirm' || uiState === 'submitting' || uiState === 'loading'}
         onClick={onRevoke}
       >
-        撤回岗位 AI 授权
+        撤回 AI 使用授权
       </button>
     </>
   )

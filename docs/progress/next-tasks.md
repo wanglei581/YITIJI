@@ -1,5 +1,25 @@
 # 下一步任务
 
+## 2026-09-30：走查复核新登记（候选 353b680d0，本地 rc 栈；均不阻塞第三次小步更新）
+
+后端（后端排雷窗口认领；证据 `~/.cache/walk0929/evidence/k14/`）：
+- **W-104** 诊断报告 PDF「四、内容结构摘录」把本人姓名、电话、邮箱印成「[劳动者_1]」「[手机号_1]」「[邮箱_1]」（`diagnosis-report-pdf.service.ts` 203–212；contentBlocks 只许逐字引用脱敏后原文，`llm-resume.service.ts` 384，真模型同样）。导出时还原本人原文，或不印摘录。证据 print/049-printed-p2.png。
+- **W-109** 扫描 / 图片简历诊断与优化各 OCR 一遍（48 页件 3 页×2 = 6 次），接真百度费用翻倍。
+- **W-110** 48 页扫描件只 OCR 前 3 页，页面只说「部分图片文字需要本人复核」，没说只读了 3 页。
+- **W-111** Word 简历进不了 AI 诊断：服务端 resume_upload 收 docx/doc 且有 mammoth，手机上传页按三种用途格式交集只放 PDF/JPG/PNG（模拟 U 盘同），拒收文案是打印口径。先查是哪条规则拦的再判。证据 resume/031–036。
+- **W-97 补充** 带「·」的少数民族姓名补不回（`resume-structure.ts` detectResumeName 只认 2–4 个连续汉字）；Mac 苹方导出 PDF 的康熙部首码位（U+2Fxx）未做 NFKC 归一化，姓名、标题、经历识别全部落空。
+
+一体机（候选写入方已派 Codex）：
+- **W-107** AI 简历诊断目标方向默认预选「信息传输、软件和信息技术服务业 · 应届 · 校招」（`ResumeSourcePage.tsx` 242–244）→ 不预选。
+- **W-108** 加密 PDF 诊断时只说「PDF 解析失败」，给的「重新解析」「打印原件」都走不通 → 说清是打开密码，只给「重新选择文件」。证据 resume/043–044。
+
+## 2026-09-30：第一家机构签约前必须完成（产品负责人 9/30 拍板，详见 current-progress 同日条目）
+
+1. 补 7 张 2.0 完整态稿：26、27、28、42、43、44、49（每张「暂时不开放」与机构部署完整态两个状态），解冻最终版，产品负责人看稿同意后加入 `docs/design/kiosk-redesign-2026-08-v2/`。
+2. 运行页照稿改：托管 a 显示「暂时不开放」、不发岗位请求；私有部署 b 整页打开，以机构名义署名。
+3. Terminal Agent 设备运维数据分两路上报：硬件状态回我方维保后台（不含用户、订单、岗位），业务数据只去机构系统。
+4. 律师确认：机构云账号模式远程运维边界、自营点位公共就业平台入口码、「暂时不开放」文案；向青岛人社书面咨询一体机展示的备案口径。
+
 ## 后端窗口待办（自我探索同意）
 
 已按合规裁定取消过渡期（服务端只收当前版本）。
@@ -138,6 +158,18 @@
 
 **发布当天（定稿，9/29 按 `.github/workflows/deploy.yml`、`.github/workflows/ci.yml`、`.github/scripts/deploy-api-release.sh` 逐步核过；每一步都由产品负责人本人操作）**
 
+**发布后核对**（只读探针可以由我们按域名代跑）
+- `/api/v1/health/ready` 正常；一体机、两个后台打开的都是新版本。
+- 会员能登录，协议显示的是新版本号。
+- **演示企业下架（#1115 随本次发布上线后，产品负责人授权执行；只下架、不删行）**：步骤见运维手册 §4.1。
+  1. 在生产运行目录先跑 `pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies`（默认 dry-run，不改库），核对输出里的「目标数据库」是生产库，清单里只有那 3 家带「（演示）」的企业。
+  2. 产品负责人授权后，带确认词和事由执行：`UNPUBLISH_DEMO_COMPANIES_CONFIRM=UNPUBLISH_DEMO_COMPANIES UNPUBLISH_DEMO_COMPANIES_REASON='首次发布清理开发期演示企业（产品负责人授权）' pnpm --filter @ai-job-print/api maintenance:unpublish-demo-companies`（事由 2–200 字；确认词或事由不对时命令不连库、退出码 2）。「已下架」的 id 要和第 1 步清单逐一对上，对不上就停下人工核对，不要重复执行。
+  3. 执行后跑 `node scripts/prod-readonly-probe.mjs --strict`。发布后核对用 `--strict`，并且要在本步演示企业用 #1115 下架之后跑（下架前那几家仍在公开列表里，退出码会非 0）。通过时岗位、招聘会、企业三行都是 PASS（total=0，无演示标记）；任一公开列表有演示标记也是 FAIL。9/29 只读核过：生产岗位、招聘会都是 0 条，线下机构列表为空，都没有演示标记，所以只处理企业。
+- 企业、岗位、招聘会的公开接口都返回 0 条（托管关闭）。
+- 一体机打印首页的签名盖章卡显示「本机暂未开通」。
+- 告警推送通了：比如让测试终端离线几分钟，看群里是否收到。
+- 第二天确认第一份自动备份成功（备份目录里的 `LAST_SUCCESS` 更新了）。
+- 在新后台新增并激活第四份法务文档「经营者信息」。
 前提：上面「发布前」第 1–6 条都已完成，#1074 的三条必需检查是绿的、页面显示可以合并。本定稿走「合并后手动触发发布」这条路：开关在 main CI 跑完之后才打开，所以合并时自动触发的那次发布一定是 skipped，发布目标就是你手填的那个 CI 运行号对应的提交，不会被别的提交抢先。
 
 1. **冻结 main**
@@ -152,6 +184,7 @@
    - 约多久：10 分钟。
    - 怎么判断成了：巡检里 `GET /api/v1/health` 一行是 `PASS status=ok db=postgres degraded=[]`，`GET /api/v1/health/ready` 一行是 `PASS 200`；`git ls-remote --tags origin prod-before-release1` 能看到标签，指向的提交与 `DEPLOY_SOURCE.txt` 一致（9/29 已知线上是 `50483cd2…`）。
    - 失败了怎么办：health 不是 PASS（有 `degraded`、数据库不是 postgres、ready 不是 200），今天不发布，把巡检输出交总指挥；`DEPLOY_SOURCE.txt` 读不到，也先停下，不要猜提交号。
+   - 超大在途订单：GitHub Actions 跑一次 `Deploy Precheck (read-only)`（只读，我们可以代跑），看 `OVERSIZE_PAID_UNFINISHED_ORDERS`：是 `0` 才继续；大于 0 或 `unknown` 就先停，找总指挥，这些订单由产品负责人人工处理后再升级 Agent（每单 100 面上限与 Agent 0.4.13 的超时按 100 面算，见 #1146；只输出数量，不输出订单号、用户或文件名）。
 
 3. **把候选合进 main（P0-4：普通合并，不 squash），等 main CI 跑完**
    - 合并前先核对：候选分支 `claude/codex-task-history-progress-0de1dc` 处于保护状态（禁止删除、禁止强推）。仓库开着「合并后自动删分支」，候选没有保护的话，合并 #1074 会把它删掉。查法：`gh api repos/wanglei581/YITIJI/branches/claude/codex-task-history-progress-0de1dc/protection -q '{del:.allow_deletions.enabled,force:.allow_force_pushes.enabled}'`，应输出 `{"del":false,"force":false}`（9/30 实测如此）；或看 Settings → Branches 里候选那条规则。不是这个结果就先停，找总指挥。
@@ -1874,7 +1907,8 @@ Grok 文档子审查已完成并确认文档陈旧，API/Agent 子审查仍为 `
 第 1 条和第 2 条谁先做，取决于是否接受带空板块提审 —— 这是产品决策，不是工程判断。
 
 另有一条**内容清理**：找企业板块线上 3 条全是「（演示）」数据且会原样显示给用户
-（`scripts/prod-readonly-probe.mjs` 现在会报 WARN 并点名是哪几家）。上线前替换或下架。
+（`scripts/prod-readonly-probe.mjs` 不带 `--strict` 时会报 WARN 并点名是哪几家）。上线前替换或下架。
+发布后核对改跑 `node scripts/prod-readonly-probe.mjs --strict`，并且要在演示企业用 #1115 下架之后跑。
 
 ### 真机验收（BL-03a / BL-03b）
 

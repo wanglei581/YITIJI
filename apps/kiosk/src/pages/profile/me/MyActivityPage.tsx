@@ -244,7 +244,7 @@ export function MyActivityPage() {
       view="activity"
       screen="member-list"
       screenState={`activity-${uiState}`}
-      eyebrow="MY ACTIVITY"
+      eyebrow="我的足迹"
       ask={<>看过什么、去过哪个来源、自己记了哪些进度，<em>都能回看</em>。</>}
       doing={<>浏览与跳转只记录<b>动作本身</b>；求职进度<b>由你自己填写</b>。</>}
       truth={tab === 'applications'

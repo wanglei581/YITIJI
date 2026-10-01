@@ -23,7 +23,13 @@ import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.se
 import { InflightCoalescer } from '../ai/ai-inflight'
 import { RedisInflightLock } from '../ai/redis-inflight-lock'
 import { RedisService } from '../common/redis/redis.service'
+import { formatBeijingDate } from '../common/beijing-display-time'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
+
+/** 练习报告和通用题单印在纸上的日期。北京时间自然日。 */
+export function interviewReportDisplayDate(at: Date): string {
+  return formatBeijingDate(at)
+}
 
 // ============================================================
 // 2C 模拟面试会话服务。
@@ -464,7 +470,7 @@ export class MockInterviewService {
         position: session.position,
         industry: session.industry,
         interviewerLabel: INTERVIEWER_LABEL[session.interviewerType] ?? session.interviewerType,
-        date: (session.endedAt ?? session.createdAt).toISOString().slice(0, 10),
+        date: interviewReportDisplayDate(session.endedAt ?? session.createdAt),
         contentId: sessionId,
       },
       stored.report,
@@ -526,7 +532,7 @@ export class MockInterviewService {
     const session = await this.loadAuthorized(sessionId, requester)
     const questions = pickPracticeQuestions(session.interviewerType, session.questionTarget)
     const { buffer, pageCount } = await this.practiceSheetPdf.render({
-      date: new Date().toISOString().slice(0, 10),
+      date: interviewReportDisplayDate(new Date()),
       position: session.position,
       industry: session.industry,
       interviewerLabel:

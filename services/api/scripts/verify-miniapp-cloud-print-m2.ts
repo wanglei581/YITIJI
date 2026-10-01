@@ -19,6 +19,7 @@ import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { MemberOrderClaimHereService } from '../src/member-print-orders/member-order-claim-here.service'
 import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
@@ -385,7 +386,7 @@ async function main(): Promise<void> {
       data: { id, terminalCode: code, agentToken: `token-${id}`, deviceFingerprint: `fp-${id}`, displayName: `终端 ${code}`, locationLabel: '验证点' },
     })
     await prisma.terminalHeartbeat.create({
-      data: { terminalId: id, status: 'online', localTaskDatabaseAvailable: true, createdAt: new Date() },
+      data: { terminalId: id, status: 'online', localTaskDatabaseAvailable: true, agentVersion: '0.4.13', createdAt: new Date() },
     })
     await prisma.terminalCapability.create({
       data: { terminalId: id, capabilityKey: 'document_print', status: 'available' },
@@ -656,6 +657,33 @@ async function main(): Promise<void> {
       }
       pass('会员带走链接留审计：actorId 为空（外键指向运营账号），会员 ID 在 payload')
     }
+    await prisma.printTask.update({
+      where: { id: takeawayTaskId },
+      data: { status: 'failed', errorCode: 'PRINTER_OFFLINE', errorMessage: null },
+    })
+    await prisma.order.update({
+      where: { id: created.id },
+      data: { taskStatus: 'failed', payStatus: 'paid' },
+    })
+    const retriedByMember = await printJobs.retryPaidFailedJob(takeawayTaskId, { endUserId: userId })
+    if (
+      retriedByMember.status !== 'pending' ||
+      retriedByMember.taskId !== takeawayTaskId ||
+      retriedByMember.orderId !== created.id
+    ) {
+      fail(`会员重试未成功：${JSON.stringify(retriedByMember)}`)
+    }
+    {
+      const row = await prisma.auditLog.findFirst({
+        where: { action: 'print_job.retry', targetId: takeawayTaskId },
+        orderBy: { createdAt: 'desc' },
+      })
+      const payload = row ? JSON.parse(row.payloadJson ?? '{}') as { endUserId?: string } : {}
+      if (!row || row.actorId !== null || payload.endUserId !== userId) {
+        fail(`会员重试必须留审计（actorId=null、payload.endUserId=本人）：${JSON.stringify({ found: Boolean(row), actorId: row?.actorId, endUserId: payload.endUserId })}`)
+      }
+      pass('会员重试留审计：actorId 为空（外键指向运营账号），会员 ID 在 payload')
+    }
     pass('会员 owner 无需终端会话即可签发带走 URL')
     const boundTakeaway = await printJobs.issueTakeawayUrl(takeawayTaskId, {
       paymentSessionToken: released.paymentSessionToken,
@@ -876,6 +904,135 @@ async function main(): Promise<void> {
       102,
       '一体机直接打印 34 页 × 3 份拒绝',
     )
+
+
+    // W-112：真实订单、心跳与核销服务；全部场景独立观察，变异时不得只在首条停止。
+    const gateFailures: string[] = []
+    const previousOnline = process.env['PRINT_REQUIRE_PRINTER_ONLINE']
+    const claimHere = new MemberOrderClaimHereService(prisma, redis as unknown as RedisService, pickup)
+    const setPrinter = async (printerStatus: string) => {
+      await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
+      await prisma.terminalHeartbeat.create({ data: { terminalId, status: 'online', printerStatus, localTaskDatabaseAvailable: true } })
+    }
+    const gateFile = `file_m2_gate_${suffix}`
+    await seedFile(gateFile, '核销闸门', 'keep')
+    try {
+      for (const scenario of [
+        { status: 'queue_cleanup_failed', required: 'false', member: false, code: 'PRINT_TERMINAL_QUEUE_HALTED' },
+        { status: 'queue_pause_failed', required: 'false', member: false, code: 'PRINT_TERMINAL_QUEUE_HALTED' },
+        { status: 'offline', required: 'true', member: false, code: 'PRINTER_UNAVAILABLE' },
+        { status: 'paper_empty', required: 'true', member: false, code: 'PRINTER_UNAVAILABLE' },
+        { status: 'queue_cleanup_failed', required: 'false', member: true, code: 'PRINT_TERMINAL_QUEUE_HALTED' },
+      ]) {
+        const label = `${scenario.member ? 'claim-here' : 'claim'} ${scenario.status}`
+        process.env['PRINT_REQUIRE_PRINTER_ONLINE'] = scenario.required
+        await setPrinter('ready')
+        redis.reset()
+        const gateOrder = await memberOrders.create(userId, { fileId: gateFile, terminalId, copies: 2, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
+        await orderStatus.markPaid(gateOrder.id, { paymentSource: 'offline', operatorId: 'verify-gate' })
+        await redis.setEx(`pickup:claim:fail:${terminalId}`, 600, '3')
+        const before = await prisma.order.findUniqueOrThrow({ where: { id: gateOrder.id } })
+        const tasksBefore = await prisma.printTask.count()
+        const auditsBefore = await prisma.auditLog.count()
+        await setPrinter(scenario.status)
+        const response = await captureHttpError(() => scenario.member
+          ? claimHere.claimHere(userId, gateOrder.id, terminalId, undefined)
+          : pickup.claim(gateOrder.pickupCode!, terminalId))
+        // 会员「在这台机器领取」手里没有码，不能说「到机码没有作废」。
+        const expectedMessage = scenario.member
+          ? (scenario.code === 'PRINT_TERMINAL_QUEUE_HALTED'
+            ? '这台终端暂停接打印单，你的订单没有受影响，请稍后再在这台终端领取，或找现场工作人员'
+            : '这台终端的打印机暂不可用，你的订单没有受影响，请稍后再在这台终端领取，或找现场工作人员')
+          : (scenario.code === 'PRINT_TERMINAL_QUEUE_HALTED'
+            ? '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+            : '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员')
+        const after = await prisma.order.findUniqueOrThrow({ where: { id: gateOrder.id } })
+        if (!response.thrown || response.status !== 400 || response.code !== scenario.code || response.message !== expectedMessage
+          || JSON.stringify(before) !== JSON.stringify(after) || after.pickupStatus !== 'pending'
+          || await prisma.printTask.count() !== tasksBefore || await prisma.auditLog.count() !== auditsBefore
+          || await redis.get(`pickup:claim:fail:${terminalId}`) !== '3' || await redis.get(`pickup:claim:lock:${terminalId}`) !== null) {
+          gateFailures.push(label)
+          console.error(`  FAIL W-112 ${label}: rejection=${JSON.stringify(response)}, pickupStatus=${after.pickupStatus}`)
+        } else pass(`W-112 ${label}: 拒绝原话、订单不变、不建任务、不写成功审计、不增锁定计数`)
+        await setPrinter('ready')
+        // 恢复走同一个入口：会员场景用 claimHere，到机码场景用 claim。
+        const recovered = scenario.member
+          ? await claimHere.claimHere(userId, gateOrder.id, terminalId, undefined)
+          : await pickup.claim(gateOrder.pickupCode!, terminalId)
+        const recoveredRow = await prisma.order.findUniqueOrThrow({ where: { id: gateOrder.id } })
+        if (!recovered.released || !('taskId' in recovered) || !recovered.taskId || recoveredRow.pickupStatus !== 'used') fail(`${label}: 恢复后同码不能取件`)
+        if (recovered.billablePages !== 2 || recovered.params?.copies !== 2 || recovered.params?.colorMode !== 'black_white' || recovered.params?.duplex !== 'simplex') fail(`${label}: 核销回执摘要不正确`)
+        await setPrinter(scenario.status)
+        const replay = await pickup.claim(gateOrder.pickupCode!, terminalId)
+        if (!replay.released || !('taskId' in replay) || replay.taskId !== recovered.taskId || await prisma.printTask.count() !== tasksBefore + 1) fail(`${label}: 闸门合上不得改变十分钟内已核销回放`)
+        pass(`W-112 ${label}: ready 后同码可取、摘要真实、再次合闸仍可回放且不重建任务`)
+      }
+      // 已付且超过七天的 pending 单：合闸不能抢在关窗判定之前说「码没有作废」。
+      process.env['PRINT_REQUIRE_PRINTER_ONLINE'] = 'false'
+      await setPrinter('ready')
+      redis.reset()
+      const expiredOrder = await memberOrders.create(userId, { fileId: gateFile, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
+      await orderStatus.markPaid(expiredOrder.id, { paymentSource: 'offline', operatorId: 'verify-gate' })
+      await prisma.order.update({ where: { id: expiredOrder.id }, data: {
+        paidAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+        pickupCodeExpiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      } })
+      const expiredTasksBefore = await prisma.printTask.count()
+      await setPrinter('queue_cleanup_failed')
+      const expiredResponse = await captureHttpError(() => pickup.claim(expiredOrder.pickupCode!, terminalId))
+      const expiredRow = await prisma.order.findUniqueOrThrow({ where: { id: expiredOrder.id } })
+      if (!expiredResponse.thrown || expiredResponse.status !== 400 || expiredResponse.code !== 'PICKUP_CODE_EXPIRED'
+        || expiredResponse.message !== '到机码已过期，请在小程序重新下单'
+        || expiredRow.pickupStatus !== 'expired' || expiredRow.printTaskId !== null
+        || await prisma.printTask.count() !== expiredTasksBefore) {
+        gateFailures.push('expired claim')
+        console.error(`  FAIL W-112 expired claim: rejection=${JSON.stringify(expiredResponse)}, pickupStatus=${expiredRow.pickupStatus}`)
+      } else pass('W-112 expired claim: 已付过期码在合闸时仍报 PICKUP_CODE_EXPIRED、落 expired、不建任务')
+
+      // 用真实付费单先认领、再付款，覆盖付款期间合闸后直接调用 release 的路径。
+      await setPrinter('ready')
+      redis.reset()
+      const releaseOrder = await memberOrders.create(userId, { fileId: gateFile, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
+      if (releaseOrder.amountCents <= 0) fail('W-112 release 前置：必须使用付费单，不能用认领即放行的零元单')
+      const releaseClaim = await pickup.claim(releaseOrder.pickupCode!, terminalId)
+      if (releaseClaim.released) fail('W-112 release 前置：未付款认领不能已放行')
+      await orderStatus.markPaid(releaseOrder.id, { paymentSource: 'offline', operatorId: 'verify-gate' })
+      const releaseBefore = await prisma.order.findUniqueOrThrow({ where: { id: releaseOrder.id } })
+      if (releaseBefore.pickupStatus !== 'claimed' || releaseBefore.payStatus !== 'paid' || releaseBefore.printTaskId) {
+        fail('W-112 release 前置：必须是已认领、已付、尚未建任务的订单')
+      }
+      const releaseTasksBefore = await prisma.printTask.count()
+      const releaseAuditsBefore = await prisma.auditLog.count()
+      await setPrinter('queue_cleanup_failed')
+      const releaseResponse = await captureHttpError(() => pickup.release(releaseOrder.id, terminalId, releaseClaim.paymentSessionToken))
+      const releaseAfter = await prisma.order.findUniqueOrThrow({ where: { id: releaseOrder.id } })
+      if (!releaseResponse.thrown || releaseResponse.status !== 400 || releaseResponse.code !== 'PRINT_TERMINAL_QUEUE_HALTED'
+        || releaseResponse.message !== '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+        || JSON.stringify(releaseBefore) !== JSON.stringify(releaseAfter) || releaseAfter.pickupStatus !== 'claimed'
+        || await prisma.printTask.count() !== releaseTasksBefore || await prisma.auditLog.count() !== releaseAuditsBefore) {
+        gateFailures.push('release halted')
+        console.error(`  FAIL W-112 release halted: rejection=${JSON.stringify(releaseResponse)}, pickupStatus=${releaseAfter.pickupStatus}`)
+      } else pass('W-112 release halted: 拒绝码与取件原话、订单保持 claimed、不建任务、不写成功审计')
+      await setPrinter('ready')
+      const releasedAfterGate = await pickup.release(releaseOrder.id, terminalId, releaseClaim.paymentSessionToken)
+      const releasedRow = await prisma.order.findUniqueOrThrow({ where: { id: releaseOrder.id } })
+      const releasedTask = await prisma.printTask.findUniqueOrThrow({ where: { id: releasedAfterGate.taskId } })
+      if (releasedRow.pickupStatus !== 'used' || releasedRow.printTaskId !== releasedAfterGate.taskId
+        || releasedTask.fileId !== gateFile || releasedTask.terminalId !== terminalId || releasedTask.status !== 'pending'
+        || await prisma.printTask.count() !== releaseTasksBefore + 1) fail('W-112 release ready: 恢复后必须放行并只建一个任务')
+      await setPrinter('queue_cleanup_failed')
+      const releaseReplay = await pickup.release(releaseOrder.id, terminalId, releaseClaim.paymentSessionToken)
+      if (releaseReplay.taskId !== releasedAfterGate.taskId || await prisma.printTask.count() !== releaseTasksBefore + 1) {
+        fail('W-112 release replay: 已建任务后合闸仍须幂等回放，不重建任务')
+      }
+      pass('W-112 release ready: 恢复后原付款凭证放行、唯一 pending 任务、再合闸幂等回放')
+      if (gateFailures.length) fail(`W-112 failed scenarios: ${gateFailures.join(', ')}`)
+    } finally {
+      if (previousOnline === undefined) delete process.env['PRINT_REQUIRE_PRINTER_ONLINE']
+      else process.env['PRINT_REQUIRE_PRINTER_ONLINE'] = previousOnline
+      await setPrinter('ready')
+      redis.reset()
+    }
 
   } finally {
     setPrintScanCapabilityModeForTest(null)

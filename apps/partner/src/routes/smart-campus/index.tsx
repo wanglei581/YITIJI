@@ -5,9 +5,7 @@ import { getSmartCampusTerminals, saveSmartCampusConfig, type PartnerSmartCampus
 import { useCapability, usePartnerCapabilities } from '../../services/capabilities'
 import {
   ActivityIcon,
-  CheckCircleIcon,
   GraduationCapIcon,
-  InfoIcon,
   LockIcon,
   MonitorSmartphoneIcon,
   PartyPopperIcon,
@@ -192,20 +190,13 @@ function TerminalsPanel() {
     <section className="space-y-4" aria-label="终端开关">
       <div>
         <h2 className="text-lg font-bold text-neutral-900">终端开关</h2>
-        <p className="mt-0.5 text-sm text-neutral-500">开启后该机器前端首页显示「智慧校园」模块；关闭即整张隐藏。</p>
-      </div>
-      <div className="flex items-start gap-2 rounded-lg border border-info/20 bg-info-bg/60 px-4 py-3">
-        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-info-fg" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-info-fg">
-          学校账号只能查看和配置归属本校的终端。校园大数据本期冻结，机构端不可开启；保存后 Kiosk 首页会按终端配置显示或隐藏「智慧校园」。
-        </p>
       </div>
       {error ? (
         <div className="rounded-lg border border-error/20 bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</div>
       ) : null}
       {savedHint && !error ? (
         <div className="rounded-lg border border-success/20 bg-success-bg px-4 py-3 text-sm text-success-fg">
-          已保存，Kiosk 刷新首页或下一轮拉取（约 5 分钟）后生效。
+          已保存，一体机刷新首页或下一轮拉取（约 5 分钟）后生效。
         </div>
       ) : null}
       <Card className="overflow-hidden p-0">
@@ -338,7 +329,7 @@ export default function SmartCampusPage() {
   return (
     <Page
       title="智慧校园"
-      subtitle={withFrontendHint('合作机构（学校）后台管理区 · 终端开关按 orgId 隔离已联动 Kiosk', FRONTEND_HINT.smartCampus)}
+      subtitle={withFrontendHint('配置本校终端上「智慧校园」模块的显示开关', FRONTEND_HINT.smartCampus)}
     >
       <div className="space-y-5">
         <Card className="border-info/20 bg-info-bg/50 p-5">
@@ -348,11 +339,11 @@ export default function SmartCampusPage() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold text-neutral-900">智慧校园 · 终端开关已联动</h2>
-                <StatusBadge dot status="success" label="终端开关已联动" />
+                <h2 className="text-base font-semibold text-neutral-900">智慧校园 · 终端开关</h2>
+                <StatusBadge dot status="success" label="可配置" />
               </div>
               <p className="mt-1 text-sm leading-6 text-neutral-600">
-                「终端开关」已接通后端：学校账号按 orgId 隔离，只配置归属本校的终端，保存即联动 Kiosk 首页智慧校园显隐。迎新内容 / 使用统计在内容模型与统计管线接入前显示「未开放」，不展示任何示例数据；校园大数据本期严格冻结。
+                只能配置本校终端；保存后一体机首页按开关显示或隐藏「智慧校园」。迎新内容 / 使用统计暂未开放，校园大数据暂不开放。
               </p>
             </div>
           </div>
@@ -370,12 +361,6 @@ export default function SmartCampusPage() {
         {activeTab === 'orientation' && <OrientationPanel />}
         {activeTab === 'usage' && <UsagePanel />}
 
-        <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-bg/70 px-4 py-3">
-          <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
-          <p className="text-xs leading-relaxed text-warning-fg">
-            「终端开关」已接通真实后端（含机构隔离与审计）。「迎新内容 / 使用统计」在内容模型与统计回传补齐前显示「未开放」真实空态，不展示任何示例数据；「校园大数据」本期严格冻结。
-          </p>
-        </div>
       </div>
     </Page>
   )

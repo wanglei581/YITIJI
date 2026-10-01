@@ -36,8 +36,6 @@ const DATA_TYPE_FILTER_MAP: Record<string, 'job' | 'fair' | null> = {
   全部: null, 岗位: 'job', 招聘会: 'fair',
 }
 
-const PAGE_SIZE = 15
-
 function fmtDate(iso: string | null): string {
   return formatDateTime(iso)
 }
@@ -54,6 +52,7 @@ export default function ImportBatchesPage() {
   const [statusFlt,   setStatusFlt]   = useState('全部')
   const [typeFlt,     setTypeFlt]     = useState('全部')
   const [page,        setPage]        = useState(1)
+  const [pageSize,    setPageSize]    = useState(20)
   // 本页本来只读（没有导入 / 确认 / 撤回按钮）。托管关闭时如实说明导入已停止，
   // 处置入口在两个信息源页（逐条紧急下架）与数据接入通道（按来源熔断）；这里不做按批次的批量下架。
   const hosting = useRecruitmentHosting()
@@ -95,7 +94,7 @@ export default function ImportBatchesPage() {
     : byType
 
   const total  = searched.length
-  const paged  = searched.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const paged  = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const counts: Record<string, number> = {
     全部:   batches.length,
@@ -283,9 +282,9 @@ export default function ImportBatchesPage() {
         <Pagination
           total={total}
           page={page}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
           onPageChange={setPage}
-          onPageSizeChange={() => setPage(1)}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
         />
       </Card>
 

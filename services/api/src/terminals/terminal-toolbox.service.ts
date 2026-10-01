@@ -50,7 +50,7 @@ const ALLOWED_TOOLBOX_ROUTE_PATTERNS = [
   /^\/renshi(?:[?#].*)?$/,
   /^\/resume(?:\/(?:career-plan|export|generate(?:\/preview)?|job-fit|parse|report|source|templates|upload))?(?:[?#].*)?$/,
   /^\/scan\/(?:progress|result|settings|start)(?:[?#].*)?$/,
-  /^\/smart-campus(?:\/(?:freshman-insights|service\/[^?#]+|welcome))?(?:[?#].*)?$/,
+  /^\/smart-campus(?:\/(?:service\/[^?#]+|welcome))?(?:[?#].*)?$/,
 ]
 
 interface ConfigRow {

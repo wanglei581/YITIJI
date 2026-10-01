@@ -19,7 +19,8 @@ const STATUS_META: Record<JobAiSessionListItem['session']['status'], { label: st
 function metaLine(item: JobAiSessionListItem): string {
   const expires = item.session.expiresAt ? ` · 留存至 ${formatTime(item.session.expiresAt)}` : ''
   const recommendation = item.recommendationCount > 0 ? ` · 推荐项共计 ${item.recommendationCount} 项` : ''
-  return `${item.session.provider ?? 'llm'} · ${formatTime(item.session.createdAt)}${recommendation}${expires}`
+  // 不写模型名（provider / llm）：工程信息，稿 39 只显示名称和状态（v2 规则 4，2026-09-30 A 批）。
+  return `${formatTime(item.session.createdAt)}${recommendation}${expires}`
 }
 
 export function JobAiSessionRecords({

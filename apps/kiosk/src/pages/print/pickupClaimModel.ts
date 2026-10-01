@@ -29,7 +29,7 @@ import { SHARED_USER_MESSAGE_CODES, errorCodeOf, userMessageOf } from '../../ser
  *   后面排队的人也跟着用不了。出路是回手机重新下单或找工作人员。
  * - other：其余明确业务拒绝（本机不能打印、隐私检查未完成、限流、并发冲突等），稍后可能恢复。
  */
-export type PickupFailure = 'invalid' | 'locked' | 'network' | 'closed' | 'other'
+export type PickupFailure = 'invalid' | 'locked' | 'network' | 'closed' | 'printer' | 'other'
 
 const INVALID_CODES = new Set([
   'PICKUP_CODE_INVALID',
@@ -72,6 +72,8 @@ const ORDER_BUSY_MESSAGE = '这笔订单正在处理，请等几秒再输一次�
  * release / 文件就绪 / 隐私检查 / 能力开关）；门禁从服务端源码抽码，逐个断言这里有。
  */
 export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
+  PRINT_TERMINAL_QUEUE_HALTED: '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员',
+  PRINTER_UNAVAILABLE: '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员',
   PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_ALREADY_USED: '这个到机码已经用过，不能再次取件。要再打一份，请在手机上重新下单；没拿到纸请找现场工作人员',
@@ -102,6 +104,7 @@ export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
 
 export function classifyClaimFailure(error: unknown): PickupFailure {
   const code = errorCodeOf(error)
+  if (code === 'PRINT_TERMINAL_QUEUE_HALTED' || code === 'PRINTER_UNAVAILABLE') return 'printer'
   if (code && INVALID_CODES.has(code)) return 'invalid'
   if (code === 'PICKUP_CLAIM_LOCKED') return 'locked'
   if (code && PICKUP_CLOSED_CODES.has(code)) return 'closed'
@@ -121,6 +124,10 @@ export const PICKUP_CLAIM_FALLBACK_MESSAGE = '到机码校验没有完成，请�
  */
 export function pickupClaimMessage(error: unknown): string {
   const code = errorCodeOf(error)
+  if (code === 'PRINT_TERMINAL_QUEUE_HALTED' && error instanceof ApiHttpError) {
+    const message = error.message
+    if (message.trim() && message.length <= 60 && /[\u4e00-\u9fa5]/.test(message) && !/^(HTTP\s|请求失败（)/.test(message.trim())) return message
+  }
   if (code && Object.prototype.hasOwnProperty.call(PICKUP_CLAIM_MESSAGES, code)) {
     return PICKUP_CLAIM_MESSAGES[code] as string
   }

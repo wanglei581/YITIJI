@@ -5,6 +5,19 @@ import type { AdminTerminalRecord } from '../../services/api/devices'
 
 export type BadgeTone = 'success' | 'error' | 'warning' | 'default'
 
+export const LIFECYCLE_VIEW: Readonly<Record<AdminTerminalRecord['lifecycleStatus'], { badge: BadgeTone; label: string }>> = {
+  planned: { badge: 'warning', label: '待安装' },
+  commissioning: { badge: 'default', label: '安装中' },
+  active: { badge: 'success', label: '运行中' },
+  maintenance: { badge: 'warning', label: '维护中' },
+  suspended: { badge: 'error', label: '已暂停' },
+  retired: { badge: 'default', label: '已退役（不可恢复）' },
+}
+
+export function lifecycleView(status: AdminTerminalRecord['lifecycleStatus']) {
+  return LIFECYCLE_VIEW[status]
+}
+
 // ─── 扫描输入闸门（Agent fail-closed 状态，只读）────────────────────────────
 //
 // Agent 在目录身份变化 / 读取失败 / watcher 异常时会把扫描输入锁死，并且**进程内不可逆**
