@@ -59,9 +59,10 @@ async function main(): Promise<void> {
     const admin = { userId: adminId, role: 'admin' as const, orgId: null }
     const binding = { adminTokenVersion: 0, partnerTokenVersion: 0 }
 
+    const callers = ['first', 'second'] as const
     const results = await Promise.allSettled([
-      service.deleteAccount(orgId, firstId, admin, binding),
-      service.deleteAccount(orgId, secondId, admin, binding),
+      racing.asCaller(callers[0], () => service.deleteAccount(orgId, firstId, admin, binding)),
+      racing.asCaller(callers[1], () => service.deleteAccount(orgId, secondId, admin, binding)),
     ])
 
     assert.equal(racing.afterRead.timedOut, false, 'both transactions must read before either writes (race not forced)')
@@ -86,13 +87,24 @@ async function main(): Promise<void> {
     assert.equal(racing.transactionCalls, 3, 'loser must be retried exactly once (2 first attempts + 1 retry)')
     passed += 1
 
+    // 按调用方分别计：被拒的一方至少发起过 2 次事务（首发 + 至少一次重试），任何一方不超过
+    // withSerializableRetry 的 3 次上限；两方之和就是上面的总数（没有漏记到标记之外的事务）。
+    const loser = callers[results.findIndex((result) => result.status === 'rejected')]!
+    const winner = callers[results.findIndex((result) => result.status === 'fulfilled')]!
+    const loserCalls = racing.transactionCallsOf(loser)
+    const winnerCalls = racing.transactionCallsOf(winner)
+    assert.ok(loserCalls >= 2 && loserCalls <= 3, `refused caller must retry at least once, at most 3 attempts; got ${loserCalls}`)
+    assert.ok(winnerCalls >= 1 && winnerCalls <= 3, `winning caller makes 1 to 3 attempts; got ${winnerCalls}`)
+    assert.equal(loserCalls + winnerCalls, racing.transactionCalls, 'every transaction must be attributed to a caller')
+    passed += 1
+
     assert.equal(await prisma.user.count({ where: { orgId, role: 'partner', enabled: true, deletedAt: null } }), 1)
     assert.equal(await prisma.auditLog.count({
       where: { actorId: adminId, action: 'org.account.delete', targetId: orgId },
     }), 1, 'the refused delete must not leave an audit row')
     passed += 1
 
-    console.log(`verify-pg-serialization-conflict-postgres: ${passed}/5 PASS`)
+    console.log(`verify-pg-serialization-conflict-postgres: ${passed}/6 PASS`)
   } finally {
     await prisma.auditLog.deleteMany({ where: { OR: [{ actorId: adminId }, { targetId: orgId }] } })
     await prisma.user.deleteMany({ where: { OR: [{ id: adminId }, { orgId }] } })
