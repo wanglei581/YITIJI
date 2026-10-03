@@ -104,7 +104,7 @@ import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 /** 稿底部那一行不可关闭的边界声明，四个页面共用。 */
 const SA_RAIL = ['结果仅供自我参考', '不评分不排名', '不替代能力证明'] as const
-const SA_EYEBROW = 'SELF ASSESSMENT'
+const SA_EYEBROW = '自我探索'
 const SA_TITLE = '自我探索 · 倾向参考'
 /** 四条路由共用的固定壳 props：标题、域标识与底部边界声明逐页相同。 */
 const SA_FRAME_BASE = { title: SA_TITLE, eyebrow: SA_EYEBROW, rail: SA_RAIL } as const
@@ -277,8 +277,8 @@ export function SelfAssessmentIntroPage() {
         </p>
         <SaFlow
           items={[
-            { key: 'e2', step: 'E2 · 不经过 AI', title: '维度强度与依据题号', current: true, desc: `${dimCount} 个方向的强度由固定权重算出，依据只有你自己的选择 —— AI 不可用时照样出。` },
-            { key: 'e3', step: 'E3 · 由 AI 生成', title: `${dimCount} 段陈述式解读`, desc: '它不打分、不排名，也不说你适合或不适合哪类岗位；AI 不可用时会如实缺，不拿别的东西顶上。' },
+            { key: 'e2', step: '记分 · 不经过 AI', title: '维度强度与依据题号', current: true, desc: `${dimCount} 个方向的强度由固定权重算出，依据只有你自己的选择 —— AI 不可用时照样出。` },
+            { key: 'e3', step: '解读 · 由 AI 生成', title: `${dimCount} 段陈述式解读`, desc: '它不打分、不排名，也不说你适合或不适合哪类岗位；AI 不可用时会如实缺，不拿别的东西顶上。' },
           ]}
         />
       </SaCard>

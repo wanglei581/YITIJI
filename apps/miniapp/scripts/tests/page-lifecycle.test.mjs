@@ -344,6 +344,20 @@ test('package-code：请求在途时 onHide，迟到的响应不得把到机码�
   assert.ok(!JSON.stringify(page.data).includes('87654321'))
 })
 
+test('package-code：只有服务端给出大于 0 的金额才说付款（试点免费不提钱）', async () => {
+  for (const [amountCents, paid] of [[200, true], [0, false], [undefined, false]]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const api = { getPackageOrder: () => Promise.resolve({ ...A_PACKAGE, amountCents }) }
+    const page = makePage('pages/package-code/package-code.js', { auth, api, wx })
+    page.onLoad({ orderId: 'pkg-A' })
+    page.onShow()
+    await flush()
+    assert.equal(page.data.ready, true)
+    assert.equal(page.data.paidOrder, paid, `amountCents=${amountCents}`)
+  }
+})
+
 test('package-code：请求在途时 onUnload，迟到的响应同样不得复活凭证', async () => {
   const auth = createAuth('A')
   const wx = createWx()
@@ -6440,4 +6454,55 @@ test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（
   const linkCss = wxss.match(/\.unknown-link\s*\{([^}]*)\}/)
   assert.ok(linkCss)
   assert.match(linkCss[1], /min-height:\s*48px/)
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// W-100：打印失败说清原因、过期单说清没打印（服务端 failureCode 白名单，#1171）
+// ══════════════════════════════════════════════════════════════════════
+
+function ordersToUi() {
+  const page = makePage('pages/orders/orders.js', { auth: createAuth('A'), api: {}, wx: createWx() })
+  page.onLoad()
+  return page._toUiItem
+}
+const FAILED = { id: 'pt-1', status: 'failed', payStatus: 'paid', fileName: '简历.pdf' }
+
+test('orders：失败行按服务端白名单码说原因，只认 5 个码', () => {
+  const toUi = ordersToUi()
+  const expected = {
+    PAPER_EMPTY: '打印机缺纸，这次没有出纸；需要的话可重新打印',
+    PRINTER_ERROR: '打印机故障（可能卡纸），这次没有出纸；需要的话可重新打印',
+    PRINTER_OFFLINE: '打印机离线，这次没有出纸；需要的话可重新打印',
+    PRINT_JOB_UNCONFIRMED: '已发到打印机，但没确认出纸；没拿到纸请找当时那台终端的工作人员核对，不会自动重打',
+    PARTIAL_OUTPUT: '只打出了一部分，没有整单重打；需要的话请重新下单',
+  }
+  for (const [code, note] of Object.entries(expected)) {
+    const ui = toUi({ ...FAILED, failureCode: code })
+    assert.equal(ui.statusLabel, '打印失败')
+    assert.equal(ui.reasonNote, note, `${code} 的说法`)
+    assert.ok(!/补纸后重试|禁止自动重派|联系工作人员补纸/.test(ui.reasonNote), '不出现写给一体机现场的话')
+  }
+})
+
+test('orders：白名单外的码、null、没有字段，都不写原因（不猜）', () => {
+  const toUi = ordersToUi()
+  for (const failureCode of ['DOWNLOAD_HASH_MISMATCH', null, undefined, '', 'constructor', 'toString']) {
+    const ui = toUi({ ...FAILED, failureCode })
+    assert.equal(ui.reasonNote, '', `failureCode=${JSON.stringify(failureCode)} 不写原因`)
+  }
+  assert.equal(toUi({ ...FAILED }).reasonNote, '', '没有 failureCode 字段也不写')
+})
+
+test('orders：到机码过期说清没打印；已完成、待到机不写', () => {
+  const toUi = ordersToUi()
+  const expired = toUi({ id: 'o-1', taskStatus: 'expired', pickupStatus: 'expired', payStatus: 'paid', fileName: '头像.png' })
+  assert.equal(expired.statusLabel, '已过期')
+  assert.equal(expired.reasonNote, '到机码已过期，这张单没有打印；需要的话请重新下单')
+  assert.equal(toUi({ id: 'pt-2', status: 'completed', payStatus: 'paid' }).reasonNote, '')
+  assert.equal(toUi({ id: 'o-2', pickupStatus: 'pending', payStatus: 'paid', pickupCode: '12345678' }).reasonNote, '')
+})
+
+test('orders：模板在规格行下方显示原因，复用规格行样式', () => {
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/orders/orders.wxml'), 'utf8')
+  assert.match(wxml, /<view class="oc-spec" wx:if="\{\{item\.reasonNote\}\}">\{\{item\.reasonNote\}\}<\/view>/)
 })

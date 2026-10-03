@@ -5,6 +5,7 @@ import { assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointe
 import { setReactRouterState, writeScanWorkbenchSession, SCAN_WORKBENCH_SESSION_KEY, W2_FILE } from './fixtures/fusion-w2-state'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
+import { chooseGenericResumeDirection } from './fixtures/direction-selection'
 
 const SCAN_TASK_ID = 'w2-scan-001'
 const CONTROL_TOKEN = 'w2-scan-control'
@@ -61,6 +62,8 @@ function registerScanCapability(
 }
 
 async function expectHealthy(page: Page, errors: string[]): Promise<void> {
+  await expect(page.getByText('任务编号', { exact: true })).toHaveCount(0)
+  await expect(page.locator('body')).not.toContainText(SCAN_TASK_ID)
   const path = new URL(page.url()).pathname
   if (path === '/scan' || path.startsWith('/scan/')) {
     await expect(page.locator('[data-qx-frame="true"]').first()).toBeVisible()
@@ -655,6 +658,7 @@ test('resume scan return keeps the file and an unresolved parse never auto-posts
   await expect(scanBlock).toBeVisible()
 
   // 再次进入仍是同一份扫描件；第一次结果未知时，不能自动再发一次 AI 请求。
+  await chooseGenericResumeDirection(page)
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('**/resume/parse')
   await expect(page.getByRole('button', { name: '原样再试一次' })).toBeVisible()
@@ -1034,7 +1038,10 @@ test('sensitive session clear returns the workbench to start without the previou
 
   await seedScanLive(page)
   await page.goto('/scan?stage=progress')
-  await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toBeVisible()
+  await expect(page.getByText('任务信息', { exact: true })).toBeVisible()
+  await expect(page.getByText('任务编号', { exact: true })).toHaveCount(0)
+  await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
+  expect(await page.evaluate(() => JSON.parse(window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '{}').live?.scanTaskId)).toBe(SCAN_TASK_ID)
 
   await page.evaluate((key) => {
     window.sessionStorage.removeItem(key)

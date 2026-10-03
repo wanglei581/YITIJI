@@ -21,7 +21,6 @@ import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-o
 import {
   isPaidUnfulfilledRefundRequired,
   markPaidUnfulfilledRefundRequired,
-  PAID_UNFULFILLED_PENDING_REFUND_REASON,
 } from '../src/payment/pending-refund-signal'
 import type { PaymentProvider } from '../src/payment/payment-provider.types'
 
@@ -67,7 +66,13 @@ async function main(): Promise<void> {
   const signalSrc = readRepo('services/api/src/payment/pending-refund-signal.ts')
   const convergeSrc = readRepo('services/api/src/payment/refund-convergence.task.ts')
   const controllerSrc = readRepo('services/api/src/payment/admin-order-actions.controller.ts')
-  const ordersPage = readRepo('apps/admin/src/routes/orders/index.tsx')
+  const ordersPage = ['apps/admin/src/routes/orders/index.tsx', 'apps/admin/src/routes/orders/orderDisplay.ts', 'apps/admin/src/routes/orders/useOrderDetail.ts', 'apps/admin/src/routes/orders/OrderDetailDrawer.tsx', 'apps/admin/src/routes/orders/OrderAftercare.tsx', 'apps/admin/src/routes/orders/OrderPaymentActions.tsx']
+    .map((file) => readRepo(file)
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')).join('\n')
+  if (!ordersPage.includes('<OrderDetailDrawer controls={controls}') ||
+      !ordersPage.includes('<OrderPaymentActions controls={controls}')) {
+    fail('订单页必须挂载详情与收退款操作组件')
+  }
 
   assertNoAutoRefundCall(abandonSrc, '废弃孤单')
   assertNoAutoRefundCall(verifySrc, '核查未出纸')

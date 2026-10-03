@@ -295,6 +295,8 @@ Page({
           fileCount: Array.isArray(order && order.items) ? order.items.length : 0,
           expireTime: pkg.formatExpireAt(order && order.expiresAt),
           amountText: pkg.formatAmount(order && order.amountCents),
+          // 只有服务端给出大于 0 的金额才说付款；试点免费（0）与读不到金额都不提钱
+          paidOrder: (pkg.parseAmountCents(order && order.amountCents) || 0) > 0,
           statusLabel: status.label,
           statusTone: status.tone,
           payStatus: (order && order.payStatus) || '',

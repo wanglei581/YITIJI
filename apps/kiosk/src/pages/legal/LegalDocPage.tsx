@@ -125,12 +125,12 @@ type DocKey = DocMeta['key']
 
 const DOCS: Record<DocKey, DocMeta> = {
   terms: {
-    key: 'terms', docType: 'terms_of_service', title: '用户服务协议', eyebrow: 'TERMS OF SERVICE', glyph: 'file', tone: 'slate',
+    key: 'terms', docType: 'terms_of_service', title: '用户服务协议', eyebrow: '你和这台机器', glyph: 'file', tone: 'slate',
     summary: '约定你和这台机器之间的服务关系：能办什么、要不要登录、你答应什么、AI 结果怎么算、打印怎么收费。',
     sections: TERMS_SECTIONS,
   },
   privacy: {
-    key: 'privacy', docType: 'privacy_policy', title: '隐私政策', eyebrow: 'PRIVACY POLICY', glyph: 'shield', tone: 'teal',
+    key: 'privacy', docType: 'privacy_policy', title: '隐私政策', eyebrow: '你的信息', glyph: 'shield', tone: 'teal',
     summary: '说明这台机器怎么处理你的个人信息：收什么、拿去做什么、存多久、你能怎么删、找谁问。',
     sections: PRIVACY_SECTIONS,
   },

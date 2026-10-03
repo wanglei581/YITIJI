@@ -272,6 +272,38 @@ if (
   } else {
     fail('发布 helper 必须在目标构建和生产写入前比对控制面与目标的生产闸门键')
   }
+
+  if (deploySource.includes('DEPLOY_MIN_FREE_FLOOR_MB:-10240')) {
+    pass('发布脚本的空间下限默认仍是 10240MB')
+  } else {
+    fail('deploy-api-release.sh 必须保留 DEPLOY_MIN_FREE_FLOOR_MB 默认值 10240')
+  }
+  if (
+    deployWorkflow.includes('DEPLOY_MIN_FREE_FLOOR_MB:-10240') &&
+    deployWorkflow.includes('pnpm store prune') &&
+    !deployWorkflow.includes('DEPLOY_MIN_FREE_BUILD_MB')
+  ) {
+    pass('full 构建前检查用 DEPLOY_MIN_FREE_FLOOR_MB 默认 10240，不够时先 pnpm store prune')
+  } else {
+    fail('deploy.yml 的构建前门槛必须是 DEPLOY_MIN_FREE_FLOOR_MB 默认 10240，并在不够时先 pnpm store prune；不得再使用 DEPLOY_MIN_FREE_BUILD_MB')
+  }
+
+  const dumpMvAt = deploySource.indexOf('mv -f -- "$DUMP_PARTIAL" "$BACKUP_PREFIX.dump"')
+  const runtimeMvAt = deploySource.indexOf('mv -f -- "$RUNTIME_PARTIAL" "$BACKUP_PREFIX.runtime"')
+  const restoreTrapAt = deploySource.indexOf("trap 'restore_runtime_and_exit")
+  if (dumpMvAt > 0 && runtimeMvAt > dumpMvAt && restoreTrapAt > runtimeMvAt) {
+    pass('pg_dump 与运行目录先写 partial，改名之后才武装回退陷阱')
+  } else {
+    fail('备份必须先落 .partial，改名成功后才能设置回退陷阱')
+  }
+}
+
+const precheckScript = readFileSync(join(repoRoot, '.github/scripts/deploy-precheck.sh'), 'utf8')
+const staticRoot = 'STATIC_BACKUP_ROOT="/srv/ai-job-print-static-backups"'
+if (deployWorkflow.includes(staticRoot) && precheckScript.includes(staticRoot)) {
+  pass('deploy-precheck 的静态备份根目录与 deploy.yml 默认值相同')
+} else {
+  fail('deploy-precheck.sh 必须使用 deploy.yml 里的 STATIC_BACKUP_ROOT 默认路径')
 }
 
 // ── 前端版的同一形态：部署脚本传 VITE_API_MODE=http，前端必须在没传时炸掉 ──────

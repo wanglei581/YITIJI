@@ -5,6 +5,8 @@ import { PrintPageCountService } from '../../print-jobs/print-page-count.service
 import { signFileUrl } from '../../files/signing'
 
 process.env['FILE_SIGNING_SECRET'] ||= 'contract-print-lifecycle-secret-0123456789'
+process.env['TERMINAL_ADMIN_SECRET'] ||= 'contract-print-lifecycle-admin-secret-0123456789'
+process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'contract-print-lifecycle-action-secret-0123456789'
 
 type TaskRow = { id: string; status: string; fileId: string | null }
 type FileRow = { id: string; purpose: string; deletedAt: Date | null; createdAt: Date }
@@ -49,6 +51,103 @@ test('reconciler retries terminal contract reports but ignores unrelated files',
 
   assert.deepEqual(harness.deleted, ['report-retry'])
   assert.equal(harness.findManyTake, 100)
+})
+
+test('same terminal status replay without attempt still cleans up the contract report', async () => {
+  const { TerminalAgentService } = await import('../../terminals/terminals-agent.service')
+  const cleaned: string[] = []
+  let transactions = 0
+  const service = new TerminalAgentService(
+    {
+      printTask: {
+        findUnique: async () => ({
+          id: 'print-replay',
+          terminalId: 'terminal-owner',
+          status: 'completed',
+          errorCode: null,
+          orderId: null,
+          endUserId: null,
+        }),
+      },
+      printTaskStatusLog: { groupBy: async () => [] },
+      $transaction: async () => {
+        transactions += 1
+        throw new Error('old-agent same-status replay must not open a write transaction')
+      },
+    } as never,
+    null as never,
+    { validateTerminalToken: async () => undefined } as never,
+    {} as never,
+    { cleanupTerminalTask: async (taskId: string) => { cleaned.push(taskId) } } as never,
+  )
+
+  const result = await service.patchTaskStatus(
+    'print-replay',
+    { status: 'completed' },
+    'Bearer fixture',
+    'terminal-owner',
+  )
+
+  assert.deepEqual(result, { acknowledged: true })
+  assert.deepEqual(cleaned, ['print-replay'])
+  assert.equal(transactions, 0)
+})
+
+test('matching attempt same terminal status still cleans up after the transaction', async () => {
+  const { TerminalAgentService } = await import('../../terminals/terminals-agent.service')
+  const cleaned: string[] = []
+  let transactions = 0
+  const service = new TerminalAgentService(
+    {
+      printTask: {
+        findUnique: async () => ({
+          id: 'print-replay-attempt',
+          terminalId: 'terminal-owner',
+          status: 'failed',
+          errorCode: 'PAPER_EMPTY',
+          orderId: null,
+          endUserId: null,
+        }),
+      },
+      printTaskStatusLog: { groupBy: async () => [] },
+      $transaction: async (run: (tx: unknown) => Promise<void>) => {
+        transactions += 1
+        await run({
+          $executeRaw: async () => 0,
+          printTask: {
+            findUnique: async () => ({
+              status: 'failed',
+              terminalId: 'terminal-owner',
+              errorCode: 'PAPER_EMPTY',
+              orderId: null,
+              endUserId: null,
+            }),
+          },
+          printTaskStatusLog: {
+            groupBy: async () => [],
+            create: async () => {
+              throw new Error('same-status replay must not write a status log')
+            },
+          },
+        })
+      },
+    } as never,
+    null as never,
+    { validateTerminalToken: async () => undefined } as never,
+    {} as never,
+    { cleanupTerminalTask: async (taskId: string) => { cleaned.push(taskId) } } as never,
+  )
+
+  const result = await service.patchTaskStatus(
+    'print-replay-attempt',
+    { status: 'failed', attempt: 0 },
+    'Bearer fixture',
+    'terminal-owner',
+  )
+
+  assert.deepEqual(result, { acknowledged: true })
+  assert.equal(transactions, 1)
+  assert.deepEqual(cleaned, ['print-replay-attempt'])
 })
 
 test('quote and create page counting reject a contract report with less than thirty minutes left', async () => {

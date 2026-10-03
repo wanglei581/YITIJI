@@ -158,8 +158,8 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
       return {
         kind: 'info', icon: <CheckCircle2Icon aria-hidden="true" />, title: '本次无需付款',
         paras: ['订单已经创建，可以直接开始打印。'],
-        chips: [['ok', '订单已建立'], [undefined, '无需付款'], [undefined, '本次未收款']],
-        rows: [['收款情况', '本次未收款'], ['下一步', '开始打印']],
+        chips: [['ok', '订单已建立'], [undefined, '免费试运营'], [undefined, '本次未收款']],
+        rows: [['收款情况', '免费试运营 · 本次未收款'], ['下一步', '开始打印']],
         ask: [<>这一单<em>不用付款</em>。</>, <>下一步的实际价格为 0。<b>订单已经建好了</b>，我只负责把任务交给打印机。</>],
       }
     case 'channel-loading':
@@ -268,9 +268,9 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
               <>订单已经创建，<b>本机没有向你收过钱</b>，只是这次创建打印任务没有完成。</>,
               <>重试只会重新创建同一个打印任务，<b>不会发起收款，也不会另开新订单</b>。</>,
             ],
-            chips: [['ok', '订单已建立'], [undefined, '本次未收款'], ['warn', '打印任务待恢复']],
-            rows: [['收款情况', '本次未收款'], ['打印任务', '尚未建立']],
-            ask: [<>这一单<em>本来就没收钱</em>，任务没建成。</>, '本次未收款。这里只重试创建同一打印任务，不会向你收款。'],
+            chips: [['ok', '订单已建立'], [undefined, '免费试运营'], ['warn', '打印任务待恢复']],
+            rows: [['收款情况', '免费试运营 · 本次未收款'], ['打印任务', '尚未建立']],
+            ask: [<>这一单<em>免费试运营</em>，任务没建成。</>, '本次未收款。这里只重试创建同一打印任务，不会向你收款。'],
           }
         : {
             kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '付款已确认，打印任务尚未建立',

@@ -22,6 +22,7 @@ function fail(message) {
 
 const required = [
   'src/routes/terminals/index.tsx',
+  'src/routes/terminals/TerminalDetailDrawer.tsx',
   'src/routes/terminals/TerminalBindCodeDialog.tsx',
   'src/routes/terminals/CreatePlannedTerminalDialog.tsx',
   'src/routes/terminals/TerminalLifecycleActions.tsx',
@@ -40,6 +41,8 @@ for (const rel of required) {
 }
 
 const { 'src/routes/terminals/index.tsx': page } = loaded
+const terminalDetail = loaded['src/routes/terminals/TerminalDetailDrawer.tsx']
+const terminalUi = `${page}\n${terminalDetail}`
 const { 'src/routes/terminals/TerminalBindCodeDialog.tsx': dialog } = loaded
 const { 'src/routes/terminals/CreatePlannedTerminalDialog.tsx': plannedDialog } = loaded
 const { 'src/routes/terminals/TerminalLifecycleActions.tsx': lifecycleActions } = loaded
@@ -80,14 +83,34 @@ if (
 }
 
 if (
-  page.includes('生成绑定码') &&
-  page.includes('openBindCodeModal') &&
-  page.includes('bindCodeTerminal') &&
-  page.includes('TerminalBindCodeDialog')
+  terminalUi.includes('生成绑定码') &&
+  terminalUi.includes('openBindCodeModal') &&
+  terminalUi.includes('bindCodeTerminal') &&
+  terminalUi.includes('TerminalBindCodeDialog')
 ) {
   pass('终端页含「生成绑定码」按钮和弹窗状态')
 } else {
   fail('admin terminals page must contain 生成绑定码 entry + modal state')
+}
+
+if (
+  page.includes("import { ReleaseObservationPanel } from './ReleaseObservationPanel'") &&
+  page.includes('<ReleaseObservationPanel terminals={terminals} onNotice={setNotice} />') &&
+  !terminalDetail.includes('ReleaseObservationPanel')
+) {
+  pass('发布观察面板留在终端页表格下方，详情抽屉不承载面板')
+} else {
+  fail('release observation panel must render below the terminals table, not inside the detail drawer')
+}
+
+if (
+  terminalDetail.includes('lifecycleView(terminal.lifecycleStatus)') &&
+  terminalDetail.includes('当前状态 ${lifecycle.label} 不允许生成绑定码') &&
+  !terminalDetail.includes('当前状态 ${terminal.lifecycleStatus} 不允许生成绑定码')
+) {
+  pass('绑定码说明使用生命周期中文标签，不直接露出原始状态值')
+} else {
+  fail('bind-code explanation must use lifecycleView label and never expose terminal.lifecycleStatus directly')
 }
 
 // 安装命令必须用 `-PromptForBindCode` 交互输入，**不得把绑定码拼进命令行**。
@@ -155,8 +178,8 @@ for (const token of suspect) {
 pass('页面对 plaintext bindCode 没有出现日志或审计旁路')
 
 if (
-  page.includes('预创建设备') &&
-  page.includes('CreatePlannedTerminalDialog') &&
+  terminalUi.includes('预创建设备') &&
+  terminalUi.includes('CreatePlannedTerminalDialog') &&
   plannedDialog.includes('createPlannedTerminal') &&
   plannedDialog.includes('这里只创建设备资产，不签发凭证') &&
   plannedDialog.includes('role="alert"') &&
@@ -171,9 +194,9 @@ if (
 }
 
 if (
-  page.includes('TerminalLifecycleActions') &&
-  page.includes("t.lifecycleStatus === 'planned' || t.lifecycleStatus === 'maintenance'") &&
-  page.includes('换机前请先进入维护') &&
+  terminalUi.includes('TerminalLifecycleActions') &&
+  terminalUi.includes("terminal.lifecycleStatus === 'planned' || terminal.lifecycleStatus === 'maintenance'") &&
+  terminalUi.includes('换机前请先进入维护') &&
   lifecycleActions.includes('updateTerminalLifecycle') &&
   lifecycleActions.includes('进入维护') &&
   lifecycleActions.includes('恢复运行') &&

@@ -271,10 +271,16 @@ function runStaticChecks(): void {
     ["import { TerminalsModule } from '../terminals/terminals.module'", 'TerminalsModule'],
     'E7. SmartCampusModule 装配终端应用上架服务依赖',
   )
+  // 终端页表格只留五列，设备档案编辑（MAC、启用）挪进详情抽屉；保存仍由终端页调用接口。
   contains(
     '../../apps/admin/src/routes/terminals/index.tsx',
-    ['updateTerminalProfile', 'MAC 地址', '启用终端'],
-    'F. Admin 终端页支持设备档案/MAC/启停编辑',
+    ['updateTerminalProfile', 'TerminalDetailDrawer'],
+    'F. Admin 终端页保存设备档案并打开详情抽屉',
+  )
+  contains(
+    '../../apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx',
+    ['MAC 地址', '启用终端', 'onSaveProfile'],
+    'F2. Admin 终端详情抽屉支持设备档案/MAC/启停编辑',
   )
 
   const publicConfigService = section(

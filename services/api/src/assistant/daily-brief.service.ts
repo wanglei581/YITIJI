@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { formatBeijingDate } from '../common/beijing-display-time'
 import { PrismaService } from '../prisma/prisma.service'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
@@ -26,7 +27,7 @@ export class DailyBriefService {
 
   async create(endUserId: string, requestedCity?: string): Promise<DailyReport> {
     const now = new Date()
-    const date = shanghaiDate(now)
+    const date = dailyBriefCalendarDate(now)
     const city = requestedCity?.trim() || null
     const modules: DailyReportModule[] = []
 
@@ -156,12 +157,9 @@ export class DailyBriefService {
   }
 }
 
-function shanghaiDate(now: Date): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(now)
-  const value = (type: string) => parts.find((part) => part.type === type)?.value
-  return `${value('year')}-${value('month')}-${value('day')}`
+/** 早报上的「今天」。北京时间自然日，同时当作当天缓存键（格式不变）。 */
+export function dailyBriefCalendarDate(now: Date): string {
+  return formatBeijingDate(now)
 }
 
 function shanghaiDayRange(date: string): { start: Date; end: Date } {

@@ -89,6 +89,27 @@ function terminalLabel(item) {
   return item.terminalDisplayName || item.terminalName || item.storeName || item.locationLabel || '打印服务终端'
 }
 
+// 打印失败的原因（W-100）：服务端 /me/print-orders 只在失败行给白名单码 failureCode（#1171），
+// 不给现场用的原文。这里只认这 5 个码；别的码或没这个字段，一律不写原因，不猜。
+const FAILURE_NOTES = {
+  PAPER_EMPTY:           '打印机缺纸，这次没有出纸；需要的话可重新打印',
+  PRINTER_ERROR:         '打印机故障（可能卡纸），这次没有出纸；需要的话可重新打印',
+  PRINTER_OFFLINE:       '打印机离线，这次没有出纸；需要的话可重新打印',
+  PRINT_JOB_UNCONFIRMED: '已发到打印机，但没确认出纸；没拿到纸请找当时那台终端的工作人员核对，不会自动重打',
+  PARTIAL_OUTPUT:        '只打出了一部分，没有整单重打；需要的话请重新下单',
+}
+// 到机码过期：这张单没有打印，用户能做的是重新下单。
+const EXPIRED_NOTE = '到机码已过期，这张单没有打印；需要的话请重新下单'
+
+function reasonNoteOf(item, effectiveStatus) {
+  if (effectiveStatus === 'failed') {
+    const code = item.failureCode
+    return typeof code === 'string' && Object.prototype.hasOwnProperty.call(FAILURE_NOTES, code) ? FAILURE_NOTES[code] : ''
+  }
+  if (item.pickupStatus === 'expired') return EXPIRED_NOTE
+  return ''
+}
+
 // 后端 item → UI 展示对象
 function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
@@ -117,6 +138,7 @@ function toUiItem(item) {
     status:      ds.key,
     statusLabel: ds.label,
     statusTone:  ds.tone,
+    reasonNote:  reasonNoteOf(item, effectiveStatus),
     pickup:      fmtCode(pickupRaw),
     pickupRaw,
     expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',

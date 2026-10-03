@@ -24,7 +24,7 @@ export function MockInterviewRecords({
   if (items.length === 0) return null
   return (
     <>
-      <div className="qx-me-legal">模拟面试 · 数据来自本人练习记录，仅展示元数据；报告可回看，不向企业转交。</div>
+      <div className="qx-me-legal">模拟面试 · 数据来自本人练习记录，只显示行业、时长和时间；报告可回看，不向企业转交。</div>
       {items.map((item) => {
         const confirming = confirmId === item.sessionId
         return (

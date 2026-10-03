@@ -1,3 +1,5 @@
+import { formatBeijingMinute } from '../common/beijing-display-time'
+import { describePrinterFault } from '../terminals/admin-printer-status'
 import type { PrismaService } from '../prisma/prisma.service'
 import { HEALTHY_PRINTER_STATUS_VALUES, isHealthyPrinterStatus, isLowPaperWarning } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
@@ -59,11 +61,23 @@ const PRINTER_STATUS_LABELS: Record<string, string> = {
 const PRINTER_WARNING_STATUSES = new Set(['paper_empty', 'low_paper'])
 
 /**
- * 告警文案里的时间一律按上海时间写（与后台页面 formatDateTime 同一时区）。
+ * 告警文案里的时间一律按北京时间写（与后台页面 formatDateTime 同一时区）。
  * 只影响给人看的 detail 文案；occurredAt、episodeToken、去重键仍用 UTC 时刻，不受影响。
  */
 export function formatShanghaiMinute(date: Date): string {
-  return new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 16).replace('T', ' ')
+  return formatBeijingMinute(date)
+}
+
+/** 打印失败告警正文。时刻只出现在这句话里，occurredAt 仍是 UTC。 */
+export function printFailedAlertDetail(task: {
+  id: string
+  terminalCode: string | null
+  updatedAt: Date
+  errorCode?: string | null
+}): string {
+  const terminal = task.terminalCode ? ` · 终端 ${task.terminalCode}` : ''
+  const code = task.errorCode ? ` · 错误码 ${task.errorCode}` : ''
+  return `任务 ${task.id}${terminal},失败于 ${formatShanghaiMinute(task.updatedAt)}${code}`
 }
 
 export interface DerivedAlert {
@@ -264,7 +278,7 @@ function buildTerminalAlert(
       title: `终端 ${terminal.terminalCode} ${label}`,
       detail: lowPaper
         ? '终端在线，打印机报纸张或墨粉不足（本机分不清是哪一样），仍可打印，请检查并补充。'
-        : `终端在线,但最近心跳上报打印机状态为 ${lastHeartbeat.printerStatus}`,
+        : `终端在线，${describePrinterFault(true, lastHeartbeat.printerStatus)}`,
       terminalCode: terminal.terminalCode,
       occurredAt: lastHeartbeat.createdAt.toISOString(),
     }
@@ -309,7 +323,12 @@ function buildPrintFailedAlert(task: FailedTaskRow): DerivedAlert {
     type: 'print_failed',
     severity: 'warning',
     title: printFailedAlertTitle(task.errorCode),
-    detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${formatShanghaiMinute(task.updatedAt)}${task.errorCode ? ` · 错误码 ${task.errorCode}` : ''}`,
+    detail: printFailedAlertDetail({
+      id: task.id,
+      terminalCode: task.terminal?.terminalCode ?? null,
+      updatedAt: task.updatedAt,
+      errorCode: task.errorCode,
+    }),
     terminalCode: task.terminal?.terminalCode ?? null,
     occurredAt: task.updatedAt.toISOString(),
   }

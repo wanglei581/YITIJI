@@ -22,6 +22,13 @@ const page = existsSync(pagePath) ? readFileSync(pagePath, 'utf8') : ''
 const service = existsSync(servicePath) ? readFileSync(servicePath, 'utf8') : ''
 const routes = readFileSync(routesPath, 'utf8')
 const nav = readFileSync(navPath, 'utf8')
+if (page.includes('其他价目') ||
+    !page.includes('SERVICE_LABELS[serviceKey] ?? `未登记价目（${serviceKey}）`') ||
+    (page.match(/SERVICE_LABELS\[item\.serviceKey\] \?\? `未登记价目（\$\{item\.serviceKey\}）`/g) ?? []).length !== 3) {
+  fail('未登记价目的表格、说明标签与改价/改说明确认必须显示实际键名')
+} else {
+  pass('未登记价目按实际键名显示，运营可核对确认项')
+}
 
 // service：只调既有端点，无支付凭证字段
 if (
@@ -64,8 +71,8 @@ if (page.includes('并非「免费」') || page.includes('不可下单')) {
 } else {
   fail('停用语义未诚实说明')
 }
-if (page.includes('渠道账单 diff 需在部署期')) {
-  pass('对账页明示渠道账单 diff 属部署期（不夸大本地对账为全量对账）')
+if (page.includes('渠道账单仍需使用真实商户账单另行核对。')) {
+  pass('对账页明示渠道账单需使用真实商户账单另行核对（不夸大本地对账为全量对账）')
 } else {
   fail('对账页缺渠道账单边界说明')
 }

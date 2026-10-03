@@ -8,16 +8,44 @@ const { syncTabBar } = require('../../utils/tab-bar-index')
 
 function countFromResult(res) {
   if (!res) return '—'
+  if (typeof res.display === 'string') return res.display
   if (typeof res.total === 'number') return String(res.total)
   if (Array.isArray(res)) return String(res.length)
   if (Array.isArray(res.items)) return String(res.items.length)
   return '—'
 }
 
+function countNumber(res) {
+  if (!res) return null
+  if (typeof res.total === 'number') return res.total
+  if (Array.isArray(res)) return res.length
+  if (Array.isArray(res.items)) return res.items.length
+  return null
+}
+
+// 服务端 listCloud 一次最多回这么多条手机单，且不带总数。
+const CLOUD_ORDER_LIST_CAP = 50
+
+/**
+ * 打印单 = 取件后的打印任务（getMyPrintOrders，有 total）+ 还没到机的手机单（getMyCloudPrintOrders）。
+ * 两段互不重叠：服务端 listCloud 只列 printTaskId 为空的单，取件后就只在前一段里。
+ * 只数前一段时，手机下了单还没去取、或过期没取的人会看到「打印单 0」，而订单页里明明有（走查 9/30，王堃）。
+ * 手机单那段满上限时不装精确，写成「N+」。任一段没读到就整项失败，不拿半个数冒充总数。
+ */
+function loadOrderCount() {
+  return Promise.all([api.getMyPrintOrders({ pageSize: 1 }), api.getMyCloudPrintOrders()]).then(function(r) {
+    const tasks = countNumber(r[0])
+    const cloud = countNumber(r[1])
+    if (tasks == null || cloud == null) throw new Error('打印单数量读取不完整')
+    const sum = tasks + cloud
+    return { display: cloud >= CLOUD_ORDER_LIST_CAP ? sum + '+' : String(sum) }
+  })
+}
+
 const STAT_DEFS = [
   { key: 'resume', label: '简历',   load: function() { return api.getMyResumes({ pageSize: 1 }) } },
   { key: 'docs',   label: '文档',   load: function() { return api.getMyDocuments({ pageSize: 1 }) } },
-  { key: 'order',  label: '打印单', load: function() { return api.getMyPrintOrders({ pageSize: 1 }) } },
+  { key: 'order',  label: '打印单', load: loadOrderCount },
 ]
 
 // 不含 AI 版不展示、也不请求「简历」计数：我的简历页只装 AI 处理过的简历，已随该页停放。

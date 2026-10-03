@@ -11,7 +11,8 @@
   background: linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep));
   color: var(--qx-paper);
 }
-.fb-xq-eyebrow { font-size: 17px; letter-spacing: 5px; color: color-mix(in srgb, var(--qx-paper) 50%, transparent); margin-bottom: 7px; }
+/* 眉题 2026-09-30 换成中文「意见反馈」，字号、字距、颜色照稿 40 v2 覆盖块。 */
+.fb-xq-eyebrow { font-size: var(--qx-fs-aux-lg); letter-spacing: 1px; color: color-mix(in srgb, var(--qx-paper) 92%, transparent); margin-bottom: 7px; }
 .fb-xq-ask { margin: 0; font-size: 32px; line-height: 1.28; font-weight: 800; }
 .fb-xq-ask em { font-style: normal; color: var(--qx-emerald); }
 .fb-xq-doing { margin-top: 9px; font-size: 20px; line-height: 1.5; color: color-mix(in srgb, var(--qx-paper) 74%, transparent); }

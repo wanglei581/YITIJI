@@ -15,7 +15,7 @@
     <view class="line"></view>
     <view class="st"><text class="n">3</text><text class="nl">到机核验</text></view>
     <view class="line"></view>
-    <view class="st"><text class="n">4</text><text class="nl">{{priceStatus === 'ready' ? (amountCents === 0 ? '现场打印' : '机端支付') : '到机完成'}}</text></view>
+    <view class="st"><text class="n">4</text><text class="nl">{{priceStatus === 'ready' && amountCents > 0 ? '机端支付' : (priceStatus === 'ready' ? '现场打印' : '到机完成')}}</text></view>
   </view>
 
   <!-- 文件 -->
@@ -70,7 +70,7 @@
         <view class="d-s">暂不可选</view>
       </view>
     </view>
-    <view class="set-why">彩色与双面本期不可选，点一下会说明原因；开放前不会按这两项计价。</view>
+    <view class="set-why">彩色与双面本期不可选，点一下会说明原因{{priceStatus === 'ready' && amountCents > 0 ? '；开放前不会按这两项计价' : ''}}。</view>
 
     <view class="set-sep"></view>
 
@@ -86,11 +86,11 @@
   </view>
 
   <!-- 页数与金额：明确写出这笔钱是怎么来的，页数、份数、单价、合计逐项对得上 -->
-  <view class="section-t rise-d4">页数与金额</view>
+  <view class="section-t rise-d4">{{priceStatus === 'ready' && amountCents > 0 ? '页数与金额' : '页数核定'}}</view>
   <view class="card flat bill rise-d4">
     <block wx:if="{{priceStatus === 'ready'}}">
       <view class="bl-row">
-        <text class="bl-k">计费页数</text>
+        <text class="bl-k">{{priceStatus === 'ready' && amountCents > 0 ? '计费页数' : '核定页数'}}</text>
         <text class="bl-v">{{file.pages}} 页 / 份</text>
       </view>
       <view class="bl-note">{{billingPageSource === 'image_single_page' ? '图片文件按 1 页核定' : (billingPageSource === 'pdf_lightweight_scan' ? '由服务端读取 PDF 实际页数核定' : '由服务端核定，不由手机端推算')}}</view>
@@ -103,23 +103,23 @@
         <text class="bl-v">{{file.pages * copies}} 页</text>
       </view>
       <view class="bl-row">
-        <text class="bl-k">黑白单价</text>
+        <text class="bl-k">{{priceStatus === 'ready' && amountCents > 0 ? '黑白单价' : '黑白打印'}}</text>
         <text class="bl-v">{{priceLabels.bw}}</text>
       </view>
       <view class="bl-row total">
-        <text class="bl-k strong">{{amountCents === 0 ? '试运营费用' : '服务端报价'}}</text>
-        <text class="bl-amt">{{amountCents === 0 ? '免费' : '¥' + total}}</text>
+        <text class="bl-k strong">{{priceStatus === 'ready' && amountCents > 0 ? '服务端报价' : '本次打印'}}</text>
+        <text class="bl-amt">{{priceStatus === 'ready' && amountCents > 0 ? '¥' + total : '免费'}}</text>
       </view>
     </block>
 
-    <view wx:elif="{{!hasFile}}" class="bl-idle">选择文件后，由服务端核定真实页数并给出精确报价。</view>
+    <view wx:elif="{{!hasFile}}" class="bl-idle">选择文件后，由服务端核定真实页数。</view>
 
-    <view wx:elif="{{priceStatus === 'loading'}}" class="bl-idle">服务端正在读取文件真实页数并核定金额…</view>
+    <view wx:elif="{{priceStatus === 'loading'}}" class="bl-idle">服务端正在读取文件真实页数…</view>
 
     <view wx:else class="bl-fail">
-      <view class="bl-fail-t"><text class="ficon i-warning"></text><text>暂时无法取得精确报价</text></view>
-      <view class="bl-fail-s">{{priceError || '服务端暂时无法核定页数和金额'}}</view>
-      <view class="btn ghost bl-retry" bindtap="retryQuote">重新报价</view>
+      <view class="bl-fail-t"><text class="ficon i-warning"></text><text>暂时无法核定页数</text></view>
+      <view class="bl-fail-s">{{priceError || '服务端暂时无法核定页数'}}</view>
+      <view class="btn ghost bl-retry" bindtap="retryQuote">重新核定</view>
     </view>
   </view>
 
@@ -149,9 +149,9 @@
 
 <view class="actionbar">
   <view class="ab-price">
-    <text class="ab-label">{{priceStatus === 'loading' ? '服务端正在报价' : (priceStatus === 'ready' ? (amountCents === 0 ? '免费试运营' : '精确报价') : '报价暂不可用')}}</text>
-    <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">{{amountCents === 0 ? '免费' : '¥' + total}}</text>
-    <text wx:else class="ab-amt pending">—</text>
+    <text class="ab-label">{{priceStatus === 'ready' && amountCents > 0 ? '精确报价' : (priceStatus === 'ready' ? '免费试运营' : (priceStatus === 'loading' ? '正在核定页数' : (hasFile ? '页数待核定' : '')))}}</text>
+    <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">{{priceStatus === 'ready' && amountCents > 0 ? '¥' + total : '免费'}}</text>
+    <text wx:elif="{{hasFile}}" class="ab-amt pending">—</text>
   </view>
   <view class="btn primary lg {{priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready' ? 'disabled' : ''}}" bindtap="toStore">{{!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选择终端')}}</view>
 </view>

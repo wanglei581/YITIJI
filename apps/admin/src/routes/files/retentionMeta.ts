@@ -34,17 +34,17 @@ export const OWNER_TYPE_LABELS: Record<FileOwnerType, string> = {
 }
 
 export function retentionPolicyLabel(policy: FileRetentionPolicy | null): string {
-  return policy ? RETENTION_POLICY_LABELS[policy] : '未标记'
+  return policy ? RETENTION_POLICY_LABELS[policy] : '—'
 }
 
 export function retentionSetByLabel(setBy: FileRetentionSetBy | null): string {
-  return setBy ? RETENTION_SET_BY_LABELS[setBy] : '未记录'
+  return setBy ? RETENTION_SET_BY_LABELS[setBy] : '—'
 }
 
 export function assetCategoryLabel(category: FileAssetCategory | undefined): string {
-  return category ? ASSET_CATEGORY_LABELS[category] : '未分类'
+  return category ? ASSET_CATEGORY_LABELS[category] : '—'
 }
 
 export function ownerTypeLabel(ownerType: FileOwnerType | null): string {
-  return ownerType ? OWNER_TYPE_LABELS[ownerType] : '未记录'
+  return ownerType ? OWNER_TYPE_LABELS[ownerType] : '—'
 }

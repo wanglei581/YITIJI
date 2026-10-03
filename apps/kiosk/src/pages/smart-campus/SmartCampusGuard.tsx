@@ -4,7 +4,7 @@
 // 背景（2026-08-11 补）：
 // 智慧校园配置的设计意图写得很明确——「智慧校园承载校园专属入口，
 // 机器搬离校园后绝不能残留」，因此默认 OFF、不持久化。
-// 但 SmartCampusHomePage 之外的子页（/welcome、/service/:key、/freshman-insights）
+// 但 SmartCampusHomePage 之外的子页（/welcome、/service/:key）
 // 此前**完全不检查配置**，路由注释称「保留直接访问容错」。
 // 结果：终端关闭智慧校园、甚至机器已搬离校园后，仍可通过深链接看到校园内容页——
 // 与 hook 的设计意图直接矛盾，属门禁缺口。

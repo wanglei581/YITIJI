@@ -6,6 +6,7 @@
 // ============================================================
 
 import { BadRequestException } from '@nestjs/common'
+import { formatBeijingDate } from '../common/beijing-display-time'
 import type { Prisma } from '../generated/prisma/client'
 import { jobValidityWhere, isJobExpiredForAdmin } from './job-validity'
 import { screenJob, type JobContentFlag } from './job-content-screening'
@@ -611,10 +612,6 @@ export function fmtSyncTime(d: Date): string {
   return d.toISOString()
 }
 
-function shanghaiDate(d: Date): string {
-  return new Date(d.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
-}
-
 export function isAbsoluteHttpUrl(value: string): boolean {
   const trimmed = value.trim()
   if (!trimmed) return false
@@ -763,7 +760,7 @@ export function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
     description: j.description ?? undefined,
     requirements: j.requirements ?? undefined,
     salaryDisplay,
-    dataSourceNote: `数据来源：${j.sourceName} · 同步于 ${shanghaiDate(j.syncTime)} · 仅供参考`,
+    dataSourceNote: `数据来源：${j.sourceName} · 同步于 ${formatBeijingDate(j.syncTime)} · 仅供参考`,
     companyProfileId: j.companyProfileId ?? null,
   }
 }
@@ -842,7 +839,7 @@ export function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     hasManagedData: companyCount > 0,
     managedCompanyCount: companyCount,
     managedMaterialCount: f._count?.materials ?? 0,
-    dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${shanghaiDate(f.syncTime)} · 仅供参考`,
+    dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${formatBeijingDate(f.syncTime)} · 仅供参考`,
     jobCount: f.jobCount,
     theme: f.theme,
     city: f.city,

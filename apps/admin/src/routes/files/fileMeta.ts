@@ -84,7 +84,7 @@ export function toViewFile(f: AdminFileRecord, now: number): ViewFile {
   return {
     raw: f,
     name: f.filename,
-    user: f.endUserId ?? f.uploaderId ?? '匿名(Kiosk)',
+    user: f.endUserId ? '会员' : f.uploaderId ? '上传账号' : '匿名（一体机）',
     source: meta.source,
     size: fmtBytes(f.sizeBytes),
     typeLabel: meta.label,
@@ -92,7 +92,7 @@ export function toViewFile(f: AdminFileRecord, now: number): ViewFile {
     sensitive: sens.key,
     sensitiveBadge: sens.badge,
     sensitiveLabel: sens.label,
-    createdAt: formatDateTime(f.createdAt, { fallback: '-' }),
+    createdAt: formatDateTime(f.createdAt, { fallback: '—' }),
     expiresAt: formatDateTime(f.expiresAt, { fallback: '长期保存' }),
     clean,
     cleanPolicy: cleanPolicyOf(f, clean),

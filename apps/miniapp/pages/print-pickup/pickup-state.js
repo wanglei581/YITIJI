@@ -50,7 +50,7 @@ function resolveOrderState(order) {
   }
   if (pickupStatus === 'claimed' || taskStatus === 'awaiting_payment') {
     return isFreeOrder
-      ? { key: 'awaiting_release', title: '已扫码，正在进入打印队列', detail: '免费试运营订单无需付款，请在终端旁等待。', showQr: false }
+      ? { key: 'awaiting_release', title: '已扫码，正在进入打印队列', detail: '免费试运营订单，请在终端旁等待。', showQr: false }
       : { key: 'awaiting_payment', title: '已扫码，等待现场支付', detail: '请在一体机确认订单并完成现场支付。', showQr: false }
   }
   return { key: 'pending', title: '等待终端扫码', detail: '将二维码对准一体机扫码器，或手动输入到机码。', showQr: true }

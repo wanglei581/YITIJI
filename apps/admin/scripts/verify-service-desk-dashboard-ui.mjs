@@ -119,8 +119,12 @@ check(
 )
 
 const screensaver = readFileSync(new URL('../src/routes/screensaver/index.tsx', import.meta.url), 'utf8')
+const playlists = readFileSync(new URL('../src/routes/screensaver/PlaylistsTab.tsx', import.meta.url), 'utf8')
 const saveStart = screensaver.indexOf('const save = useCallback')
-const saveBlock = saveStart >= 0 ? screensaver.slice(saveStart, saveStart + 1800) : ''
+const playlistSaveStart = playlists.indexOf('const save = useCallback')
+const saveBlock = saveStart >= 0
+  ? screensaver.slice(saveStart, saveStart + 1800)
+  : playlistSaveStart >= 0 ? playlists.slice(playlistSaveStart, playlistSaveStart + 1800) : ''
 check(
   saveBlock.includes('const input: SaveAdPlaylistInput') &&
     saveBlock.includes('if (!editor.id) input.status = \'active\'') &&

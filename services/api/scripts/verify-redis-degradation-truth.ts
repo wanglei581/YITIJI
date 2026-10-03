@@ -28,8 +28,10 @@ import 'reflect-metadata'
 import 'dotenv/config'
 import { JwtService } from '@nestjs/jwt'
 import { Redis } from 'ioredis'
+import { redisRetryDefaultFacts } from '../src/common/redis/redis-client-options'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { bootApp, probe, unusedLoopbackPort } from './support/boot-api-child'
+import { deadRedisGateEnv } from './support/dead-redis-gate-env'
 
 let failures = 0
 let checks = 0
@@ -63,7 +65,10 @@ async function verifyAuthSemantics(deadRedisPort: number): Promise<void> {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   // 关键：客户端指向一个确定连不上的端口 —— 这就是被守的故障现场。
-  const deadClient = new Redis(`redis://127.0.0.1:${deadRedisPort}`, { lazyConnect: true })
+  // 门禁自己的客户端。0 仍会真的连死端口并得到 MaxRetriesPerRequestError，
+  // 只是不等满 ioredis 默认 20 次重试。每条鉴权都清静默期，留着默认重试时
+  // tryRedis 的 500ms 上限会被每条吃满。
+  const deadClient = new Redis(`redis://127.0.0.1:${deadRedisPort}`, { lazyConnect: true, maxRetriesPerRequest: 0 })
   deadClient.on('error', () => { /* 预期内的 ECONNREFUSED，不让它变成 unhandled */ })
   const redis = new RedisService(deadClient)
   const guard = new JwtAuthGuard(jwt, prisma, redis)
@@ -270,7 +275,7 @@ async function verifyHealthHonesty(deadRedisPort: number): Promise<void> {
   const loginAdminId = `${FIXTURE_PREFIX}http-login-${suffix}`
   const loginPassword = `Verify-Login-${suffix}-Aa1!`
 
-  const app = await bootApp({ REDIS_URL: `redis://127.0.0.1:${deadRedisPort}` }, 120_000)
+  const app = await bootApp(deadRedisGateEnv(`redis://127.0.0.1:${deadRedisPort}`), 120_000)
   try {
     await prisma.user.create({
       data: {
@@ -507,6 +512,9 @@ async function verifyHealthyCachePath(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log('=== Redis 降级鉴权语义 + 健康检查诚实性门禁 verify:redis-degradation-truth ===')
+  for (const fact of redisRetryDefaultFacts()) {
+    check(fact.name, fact.ok, fact.detail)
+  }
   // 本门禁会写入临时用户/机构行，必须在隔离验证库上跑。
   assertIsolatedVerificationDatabase()
 

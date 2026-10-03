@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import type { PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { setReactRouterState, W2_FILE, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
@@ -72,7 +73,7 @@ test('forged success cannot override pending or failed backend status @kiosk', a
 
 // `PRINT_JOB_UNCONFIRMED` 的全部含义是「派发已开始，但重启后无法确认纸出没出」。
 // 整条链路都按「无法确认」处理：Agent 拒绝断言 completed，服务端在任何写入之前拒绝重排
-// 以防重复出纸（PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN），Admin 只引导人工核查。
+// 以防重复出纸（PRINT_RETRY_UNCONFIRMED_FORBIDDEN），Admin 只引导人工核查。
 // 唯独用户终态页此前把它和普通失败混成一屏，副标题写「打印任务已由服务端确认失败」——
 // 服务端恰恰没有确认任何事。两个方向都会害人：纸真出来了，用户以为失败去要退款；
 // 纸没出来，他也拿不到「系统承认不确定、请找人核查」这个说法。
@@ -268,6 +269,52 @@ async function openFailedDone(page: Page, api: ApiRouter): Promise<void> {
   await openDoneWithState(page, { ...taskState, success: true })
 }
 
+for (const errorCode of ['PRINTER_ERROR', 'PAPER_EMPTY']) {
+  test(`old agent retry rejection stays beside the actions in the first viewport (${errorCode}) @kiosk`, async ({ page, api }) => {
+    registerShell(api)
+    api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+      status: 200,
+      json: { taskId: TASK_ID, status: 'failed', errorCode, failureReasonForUser: '打印未完成' },
+    })
+    api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, {
+      status: 200,
+      json: {
+        orderId: 'truth-retry-order', orderNo: 'ORD-TRUTH-RETRY',
+        filename: W2_FILE.name, signedUrl: 'https://example.com/print-takeaway',
+        mimeType: 'application/pdf', sizeBytes: 2048,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        canRetry: true, amountCents: 200, payStatus: 'paid',
+      } satisfies PrintJobTakeawayUrl,
+    })
+    const retries: unknown[] = []
+    await page.route(`**/api/v1/print/jobs/${TASK_ID}/retry`, async (route) => {
+      retries.push(route.request().headers()['x-payment-session-token'])
+      await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: {
+        code: 'PRINT_RETRY_AGENT_VERSION',
+        message: '这台终端的打印程序版本过旧，升级到 0.4.13 后才能重新提交',
+      } }) })
+    })
+    await openDoneWithState(page, { ...taskState, paymentSessionToken: 'truth-retry-session' })
+    await expect(page.getByRole('region', { name: '文件带走' })).toBeVisible()
+    const retryButton = page.getByRole('button', { name: '重新提交打印', exact: true })
+    await expect(retryButton).toBeInViewport({ ratio: 1 })
+    await retryButton.click()
+
+    const alert = page.locator('.qx-ctabar').getByRole('alert')
+    await expect(alert).toHaveText('这台机器的打印程序需要升级后才能重新提交，请找现场工作人员')
+    // 不滚动找提示：toBeVisible 不能证明没有落在二维码下面的滚动区。
+    await expect(alert).toBeInViewport({ ratio: 1 })
+    const box = await alert.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.y).toBeGreaterThanOrEqual(0)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height)
+    await expect(page.getByText('重新提交失败，请联系工作人员补打', { exact: true })).toHaveCount(0)
+    await expect(retryButton).toBeEnabled()
+    await expect(page).toHaveURL(/\/print\/done$/)
+    expect(retries).toEqual(['truth-retry-session'])
+  })
+}
+
 test('anonymous user can submit print feedback without logging in @kiosk', async ({ page, api }) => {
   const submissions: { headers: Record<string, string>; body: unknown }[] = []
   await page.route('**/api/v1/kiosk/feedback', async (route) => {
@@ -369,4 +416,16 @@ test('the feedback surface never promises a refund @kiosk', async ({ page, api }
   for (const forbidden of ['退款', '申请退款', '赔付', '理赔', '已退款']) {
     await expect(dialog.getByText(forbidden, { exact: false })).toHaveCount(0)
   }
+})
+
+test('pickup completed receipt shows real summary and directs reorders to phone @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, { status: 200, json: { taskId: TASK_ID, status: 'completed' } })
+  await openDoneWithState(page, { taskId: TASK_ID, pickupSource: true, file: { name: '取件文件.pdf', size: '', pages: 3 }, params: { copies: 2, colorMode: 'color', duplex: 'duplex_long_edge' } })
+  await expect(page.getByText('本次任务摘要', { exact: true })).toBeVisible()
+  await expect(page.getByText('3 页 × 2 份', { exact: true })).toBeVisible()
+  await expect(page.getByText('双面（长边）', { exact: true })).toBeVisible()
+  await expect(page.getByText('彩色', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('print-fulfill-reprint')).toHaveCount(0)
+  await expect(page.getByText('要再打一份请在手机上重新下单', { exact: true })).toBeVisible()
 })

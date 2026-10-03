@@ -53,8 +53,9 @@ export class ResumeGenBasicDto {
 }
 
 export class ResumeGenIntentionDto {
-  @IsString() @IsNotEmpty() @MaxLength(60)
-  position!: string
+  // 原简历可能没有求职意向；缺省归一为空，生成、调整、导出都不替用户编造岗位。
+  @IsOptional() @IsString() @MaxLength(60)
+  position = ''
 
   @IsOptional() @IsString() @MaxLength(50)
   city?: string
@@ -113,7 +114,7 @@ export class ResumeGenerateRequestDto {
   basic!: ResumeGenBasicDto
 
   @IsObject() @ValidateNested() @Type(() => ResumeGenIntentionDto)
-  intention!: ResumeGenIntentionDto
+  intention = new ResumeGenIntentionDto()
 
   @IsArray() @ArrayMaxSize(6) @ValidateNested({ each: true }) @Type(() => ResumeGenEducationDto)
   education!: ResumeGenEducationDto[]
@@ -157,7 +158,7 @@ export class ResumeGenerateExportDto {
   basic!: ResumeGenBasicDto
 
   @IsObject() @ValidateNested() @Type(() => ResumeGenIntentionDto)
-  intention!: ResumeGenIntentionDto
+  intention = new ResumeGenIntentionDto()
 
   @IsString() @MaxLength(600)
   summary!: string
@@ -225,7 +226,7 @@ export class ResumeLayoutAdjustResumeDto {
   basic!: ResumeGenBasicDto
 
   @IsObject() @ValidateNested() @Type(() => ResumeGenIntentionDto)
-  intention!: ResumeGenIntentionDto
+  intention = new ResumeGenIntentionDto()
 
   @IsString() @MaxLength(600)
   summary!: string

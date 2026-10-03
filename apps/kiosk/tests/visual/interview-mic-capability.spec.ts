@@ -13,6 +13,7 @@
 import { test, expect, type Page } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { interviewCreated, interviewStarted } from './fixtures/fusion-w3-states'
+import { expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -74,11 +75,15 @@ async function stubMic(page: Page, scenario: MicScenario): Promise<void> {
 
 async function gotoSession(page: Page): Promise<void> {
   await page.goto('/interview/setup')
+  await expectInterviewDirectionUnselected(page)
   await page.getByRole('button', { name: '选择行业 (20)' }).click()
   const dialog = page.getByRole('dialog', { name: '选择面试行业' })
   await expect(dialog).toBeVisible()
+  await expect(dialog.getByText('当前：尚未选择', { exact: true })).toBeVisible()
+  await expect(dialog.getByRole('button', { pressed: true })).toHaveCount(0)
   await dialog.getByRole('button', { name: '制造业', exact: true }).click()
   await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
   await page.getByRole('button', { name: '创建并开始练习' }).click()
   await page.waitForURL(/\/interview\?stage=session/)
@@ -111,6 +116,7 @@ test('无设备与无权限两种提示不同 @mic-kiosk', async ({ page, api })
   const noDeviceReason = await page.locator('[data-mic-reason]').innerText()
 
   await page.context().clearCookies()
+  await page.evaluate(() => window.sessionStorage.removeItem('ai-job-print:current-interview-workbench'))
   await stubMic(page, 'permission-denied')
   interviewBaseline(api)
   await gotoSession(page)

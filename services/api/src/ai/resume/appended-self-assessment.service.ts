@@ -19,6 +19,7 @@ import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { AuditService } from '../../audit/audit.service'
 import {
   SelfAssessmentService,
+  selfAssessmentReportDate,
   tokenMatches,
   type AuditContext,
   EMPTY_AUDIT_CONTEXT,
@@ -96,7 +97,7 @@ export class AppendedSelfAssessmentService {
 
     // 4) 渲染自我探索报告 PDF → buffer
     const { buffer: saBuffer, pageCount: saPageCount } = await this.selfAssessment.renderReportForAppend({
-      date: stored.completedAt.slice(0, 10),
+      date: selfAssessmentReportDate(stored.completedAt),
       dimensions: stored.dimensions,
       summary: stored.summary,
       appendixDisclaimer: DISCLAIMER_TEXT,

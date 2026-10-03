@@ -513,7 +513,7 @@ function resolveCta(args: {
     if (live.outErr === 'expired') {
       return { primary: '去材料检查（先重新取链接）', primaryDisabled: true, reason: '链接已过期，重新取一次才能交给材料检查', action: 'none' }
     }
-    return { primary: '去材料检查', primaryDisabled: synthetic, reason: synthetic ? '合成演示，不会真正交接文件' : null, action: 'material' }
+    return { primary: '去材料检查', primaryDisabled: synthetic, reason: synthetic ? '这是示例，不会真正交给材料检查' : null, action: 'material' }
   }
   if (live.docErr) {
     return { primary: '换一份 PDF 再继续', primaryDisabled: true, reason: '刚才那份没有进入流程，先换一份符合要求的 PDF', action: 'none' }
@@ -550,5 +550,5 @@ function resolveCta(args: {
       action: 'none',
     }
   }
-  return { primary: '生成合成 PDF', primaryDisabled: synthetic, reason: synthetic ? '合成演示，不会真正生成' : null, action: 'compose' }
+  return { primary: '生成合成 PDF', primaryDisabled: synthetic, reason: synthetic ? '这是示例，不会真正生成' : null, action: 'compose' }
 }

@@ -7,7 +7,13 @@ import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmJobFitService, type JobFitPayload, type JobFitTokenUsage } from './llm-job-fit.service'
 import { JobFitPdfService } from './job-fit-pdf.service'
+import { formatBeijingDate } from '../../common/beijing-display-time'
 import { assertStoredJobFitJobBoardOpen, assertStoredJobFitReadable } from './job-fit-hosting'
+
+/** 岗位匹配参考印在纸上的日期。 */
+export function jobFitReportDate(updatedAt: Date): string {
+  return formatBeijingDate(updatedAt)
+}
 
 // ============================================================
 // 2D 岗位匹配参考会话服务。
@@ -235,7 +241,7 @@ export class JobFitService {
     const stored = JSON.parse(row.payloadJson) as StoredJobFit
     const { buffer, pageCount } = await this.pdf.render(
       {
-        date: new Date(row.updatedAt).toISOString().slice(0, 10),
+        date: jobFitReportDate(row.updatedAt),
         job: stored.job,
         // 旧缓存没有该可选字段时，PDF 明示降级而不是补造关键词。
         decisionSupport: stored.payload.decisionSupport,

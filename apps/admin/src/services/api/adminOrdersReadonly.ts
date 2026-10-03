@@ -11,6 +11,8 @@ export interface AdminOrderReadonlyItem {
   userLabel: string
   terminalCode: string | null
   amountCents: number
+  /** 订单原始计费内容页数，不含份数；多文件为各文件选中页数之和。 */
+  billablePages: number | null
   currency: string
   /** 下单渠道：kiosk | miniapp_cloud；null = 存量单，必须显示「未标注」不得猜成一体机 */
   channel: string | null
@@ -228,6 +230,7 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   currency: 'CNY',
   payStatus: 'unpaid',
   taskStatus: 'completed',
+  billablePages: 4,
   printFileName: '演示简历.pdf',
   copies: 2,
   colorMode: 'black_white',
@@ -266,6 +269,15 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   ],
 }
 
+/** 存量订单未记录计费页数，供列表和详情验证空值展示。 */
+const MOCK_UNRECORDED_DETAIL: AdminOrderReadonlyDetail = {
+  ...MOCK_DETAIL,
+  id: 'ord_mock_unrecorded',
+  orderNo: 'ORD-20260625-UNRECORDED',
+  billablePages: null,
+  payStatus: 'closed',
+}
+
 /**
  * mock 模式下的可变订单态。
  *
@@ -280,12 +292,12 @@ let mockPaymentSource: AdminOrderMarkPaidSource | null = null
 const mockAdapter: AdminOrdersReadonlyService = {
   async list(params) {
     return {
-      items: [mockDetailState],
-      pagination: { page: params.page, pageSize: params.pageSize, total: 1, totalPages: 1 },
+      items: [mockDetailState, MOCK_UNRECORDED_DETAIL],
+      pagination: { page: params.page, pageSize: params.pageSize, total: 2, totalPages: 1 },
     }
   },
-  async getById() {
-    return mockDetailState
+  async getById(id) {
+    return id === MOCK_UNRECORDED_DETAIL.id ? MOCK_UNRECORDED_DETAIL : mockDetailState
   },
   async markPaidOrder(_id, paymentSource) {
     // 复刻后端状态机：仅 unpaid 可入账；已 paid 同来源幂等回放，异来源冲突。

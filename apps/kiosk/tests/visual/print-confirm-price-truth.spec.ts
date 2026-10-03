@@ -482,3 +482,15 @@ for (const viewport of [
     await page.screenshot({ path: testInfo.outputPath(`price-changed-reconfirm-${viewport.name}.png`) })
   })
 }
+
+test('quote queue halt shows original guidance without unrelated possible causes @kiosk', async ({ page, api }) => {
+  registerShell(api, ['document_print'])
+  const message = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
+  api.respond('POST', '/api/v1/orders/quote', { status: 400, json: { error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message } } })
+  await openConfirmWith(page, W2_PRINT_PARAMS)
+  await expect(page.getByTestId('print-confirm-state-quote-failed')).toBeVisible()
+  await expect(page.getByText(message, { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('可能的原因', { exact: true })).toHaveCount(0)
+  await expect(page.getByText(/网络中断|参数里有本机暂未开通/)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /确认并付款|确认打印/ })).toHaveCount(0)
+})

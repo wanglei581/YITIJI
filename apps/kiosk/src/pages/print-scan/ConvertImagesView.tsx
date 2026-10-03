@@ -88,7 +88,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         <div className="i2p-xq-row">
           <div className="i2p-xq-face" aria-hidden>青</div>
           <div>
-            <div className="i2p-xq-eyebrow">IMAGES TO PDF</div>
+            <div className="i2p-xq-eyebrow">图片转 PDF</div>
             <div className="i2p-xq-ask">{advisor.ask}</div>
             <div className="i2p-xq-doing">{advisor.doing}</div>
           </div>
