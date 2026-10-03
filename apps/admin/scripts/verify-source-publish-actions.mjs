@@ -41,6 +41,9 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
+import vm from 'node:vm'
+import assert from 'node:assert/strict'
 
 const adminRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(adminRoot, '..', '..')
@@ -240,6 +243,33 @@ for (const { path, kind, api } of pages) {
 }
 
 const jobSources = readFileSync(join(adminRoot, 'src/routes/job-sources/index.tsx'), 'utf8')
+// 过期由后端单独派生：真正执行页面发布列的 cell，防止仅检查枚举漏掉 expired。
+{
+  const ast = ts.createSourceFile('jobs.tsx', jobSources, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let publishMap
+  let publishCell
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'PUBLISH_MAP') publishMap = node.initializer.getText(ast)
+    if (ts.isObjectLiteralExpression(node)) {
+      const props = new Map(node.properties.filter(ts.isPropertyAssignment).map((p) => [p.name.getText(ast), p.initializer]))
+      if (props.get('header')?.text === '发布状态') publishCell = props.get('cell')?.getText(ast)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.ok(publishMap && publishCell, '必须找到实际发布列与映射')
+  const output = ts.transpileModule(`const PUBLISH_MAP = ${publishMap}; const StatusBadge = 'badge'; const cell = ${publishCell}; module.exports = cell;`, {
+    fileName: 'cell.tsx', compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText
+  const module = { exports: {} }
+  const jsx = (type, props) => ({ type, props })
+  vm.runInNewContext(output, { module, exports: module.exports, require: () => ({ jsx, jsxs: jsx }) })
+  const labelOf = (node) => node.props.label ?? labelOf(node.props.children)
+  assert.equal(labelOf(module.exports({ expired: true, publishStatus: 'published' })), '已发布 · 已过期', '过期行必须显示已发布 · 已过期')
+  assert.equal(labelOf(module.exports({ expired: false, publishStatus: 'published' })), '已发布')
+  pass('岗位信息源真实发布列：过期行显示「已发布 · 已过期」，未过期仍为已发布')
+}
+
 const fairSources = readFileSync(join(adminRoot, 'src/routes/fair-sources/index.tsx'), 'utf8')
 const policySources = readFileSync(join(adminRoot, 'src/routes/policy-sources/index.tsx'), 'utf8')
 const importBatches = readFileSync(join(adminRoot, 'src/routes/import-batches/index.tsx'), 'utf8')
@@ -281,9 +311,19 @@ for (const [name, source, fetchName] of [
   if (source.includes('.slice((page - 1) * pageSize') || source.includes('const total = searched.length')) {
     fail(`ADM-C15: ${name} 不得再对全集做本地 slice / 用筛选长度当 total`)
   }
-  if (!source.includes('<Pagination total={total}')) {
-    fail(`ADM-C15: ${name} 分页控件必须把服务端 total 传给 Pagination`)
+  const ast = ts.createSourceFile(`${name}.tsx`, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let table = null
+  function visit(node) {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'ConsoleTable') table = node
+    ts.forEachChild(node, visit)
   }
+  visit(ast)
+  const attrs = new Map(table?.attributes.properties.filter(ts.isJsxAttribute).map((attr) => [attr.name.getText(ast), attr.initializer?.expression?.getText(ast)]) ?? [])
+  for (const [attr, value] of [['total', 'total'], ['page', 'page'], ['pageSize', 'pageSize'], ['onPageChange', 'setPage'], ['columns', 'columns']]) {
+    if (attrs.get(attr) !== value) fail(`ADM-C15: ${name} ConsoleTable 的 ${attr} 必须接 ${value}`)
+  }
+  if (!source.includes("header: '操作'") || !source.includes('紧急下架')) fail(`ADM-C15: ${name} 必须有可见的操作列与紧急下架`)
+
   if (!source.includes('setTotal(pageData.total)') && !source.includes('setTotal(data.total)')) {
     fail(`ADM-C15: ${name} 必须把服务端 total 写入分页控件`)
   }

@@ -407,7 +407,8 @@ export function AiAccessSwitchesPanel() {
 
       {load.kind !== 'forbidden' && (
         <p className="mt-3 text-[11.5px] leading-relaxed text-neutral-500">
-          后台切换保存一年，到期回到服务器配置文件里的值（服务器读不到后台切换记录时也按配置文件执行）；长期设置也请写进服务器配置：AI_PAUSED、MAINTENANCE_MODE、AI_LOGIN_GATE、AI_DECLARATION_ENFORCEMENT。
+          后台切换保存一年，到期回到服务器配置文件里的值（服务器读不到后台切换记录时也按配置文件执行）；长期设置也请写进服务器配置文件（运维知道对应项）。
+          <span className="ml-2 cursor-help underline decoration-dotted" title="AI_PAUSED、MAINTENANCE_MODE、AI_LOGIN_GATE、AI_DECLARATION_ENFORCEMENT">运维参考</span>
         </p>
       )}
     </section>

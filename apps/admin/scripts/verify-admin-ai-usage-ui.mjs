@@ -6,7 +6,7 @@
 //      服务端改了这里先红，免得面板说明与真实行为脱节。
 //   B. aiUsageDaily.ts 适配器：请求路径与 day 参数；不合法日期不发请求；401 跳登录；
 //      403 / 400 的错误码与服务端中文 message 原样带回；响应形状不对不当成功；mock 不造假数。
-//   C. 显示名与金额：null key → 「未关联终端 / 未关联机构」；已知功能 / 供应商 key 给中文名；
+//   C. 显示名与金额：null key → 「无已验签终端 / 无机构」；已知功能 / 供应商 key 给中文名；
 //      认不出的 key 原样显示；金额两位小数带「元」。
 //   D. 面板真渲染：演示模式诚实空态；读取中 / 失败重试 / 正常三态；触顶告警引用服务端原话；
 //      四个页签；0 调用如实显示；未来日期不采纳。失败只显示中文说明，不显示错误码。
@@ -104,15 +104,23 @@ const SAMPLE = () => ({
   day: '2026-09-28',
   limits: { globalCny: 100, terminalCny: 30, memberCny: 5, unmeasuredCallCostCny: 0.05 },
   totals: { key: null, calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1, memberCount: 2 },
-  reached: { global: false, terminalIds: ['kiosk-01'], memberCount: 1 },
+  reached: { global: false, terminalIds: ['kiosk-01'], terminals: [{ terminalId: 'kiosk-01', terminalCode: null }], memberCount: 1 },
   byFeature: [{ key: 'resume_optimize', calls: 2, unmeasuredCalls: 0, measuredCostCny: 0.5, chargedCostCny: 0.5 }],
   byVendor: [{ key: 'deepseek', calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1 }],
   byTerminal: [
-    { key: null, calls: 1, unmeasuredCalls: 1, measuredCostCny: 0, chargedCostCny: 0.05 },
-    { key: 'kiosk-01', calls: 3, unmeasuredCalls: 0, measuredCostCny: 1.05, chargedCostCny: 1.05 },
+    { key: null, terminalCode: null, calls: 1, unmeasuredCalls: 1, measuredCostCny: 0, chargedCostCny: 0.05 },
+    { key: 'kiosk-01', terminalCode: null, calls: 3, unmeasuredCalls: 0, measuredCostCny: 1.05, chargedCostCny: 1.05 },
   ],
-  byOrg: [{ key: null, calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1 }],
+  byOrg: [{ key: null, orgName: null, calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1 }],
 })
+
+function legacySample() {
+  const sample = SAMPLE()
+  delete sample.reached.terminals
+  for (const bucket of sample.byTerminal) delete bucket.terminalCode
+  for (const bucket of sample.byOrg) delete bucket.orgName
+  return sample
+}
 
 console.log('\n=== Admin AI 用量与额度面板门禁 ===')
 
@@ -236,11 +244,61 @@ await check('B6 mock：标演示、不发请求、直接拒绝（不造假数）
   assert.equal(calls.length, 0, 'mock 模式不能发请求')
 })
 
+await check('B7 新字段缺失（旧服务端）兼容为 null，触顶终端从 terminalIds 同序补齐', async () => {
+  const old = legacySample()
+  old.reached.terminalIds = ['kiosk-02', 'kiosk-01']
+  const { service } = loadAdapter('http', () => reply(200, { success: true, data: old }))
+  const summary = await service.getAiUsageDaily()
+  const expected = SAMPLE()
+  expected.reached.terminalIds = old.reached.terminalIds
+  expected.reached.terminals = old.reached.terminalIds.map((terminalId) => ({ terminalId, terminalCode: null }))
+  assert.deepEqual(JSON.parse(JSON.stringify(summary)), expected)
+})
+
+await check('B8 名称字段类型及 reached.terminals 与 terminalIds 的长度、顺序、ID 严格校验', async () => {
+  const edits = [
+    (s) => { s.byTerminal[1].terminalCode = 123 },
+    (s) => { s.byOrg[0].orgName = {} },
+    (s) => { s.reached.terminals = null },
+    (s) => { s.reached.terminals = [] },
+    (s) => { s.reached.terminals[0].terminalId = null },
+    (s) => { s.reached.terminals[0].terminalId = 'different-id' },
+    (s) => { s.reached.terminals[0].terminalCode = false },
+    (s) => { s.reached.terminals[0] = null },
+    (s) => {
+      s.reached.terminalIds.push('kiosk-02')
+      s.reached.terminals = [{ terminalId: 'kiosk-02', terminalCode: 'KSK-002' }, { terminalId: 'kiosk-01', terminalCode: 'KSK-001' }]
+    },
+    // 缺新字段也不能掩盖旧字段坏形状。
+    (s) => { delete s.byTerminal[1].terminalCode; s.byTerminal[1].calls = '3' },
+    (s) => { delete s.byOrg[0].orgName; s.byOrg[0].chargedCostCny = -1 },
+    (s) => { delete s.reached.terminals; s.reached.memberCount = -1 },
+  ]
+  for (const edit of edits) {
+    const sample = SAMPLE()
+    edit(sample)
+    const { service } = loadAdapter('http', () => reply(200, { success: true, data: sample }))
+    assert.equal((await rejection(service.getAiUsageDaily())).code, 'UNEXPECTED_RESPONSE')
+  }
+  const sample = SAMPLE()
+  sample.reached.terminalIds = ['kiosk-02', 'kiosk-01']
+  sample.reached.terminals = [{ terminalId: 'kiosk-02', terminalCode: 'KSK-002' }, { terminalId: 'kiosk-01', terminalCode: null }]
+  const normalized = http.aiUsageDailyFromResponse({ data: sample })
+  assert.deepEqual(JSON.parse(JSON.stringify(normalized)), sample, '服务端同序编号必须原样保留')
+  delete sample.reached.terminals[0].terminalCode
+  assert.equal(http.aiUsageDailyFromResponse({ data: sample }).reached.terminals[0].terminalCode, null)
+})
+
 // ─── C. 显示名与金额（真跑 aiUsageDisplay.ts） ────────────────────────────────
-await check('C1 null key 显示「未关联终端 / 未关联机构」；已知 key 给中文名；认不出原样显示', () => {
+await check('C1 null key 显示「无已验签终端 / 无机构」；已知 key 给中文名；认不出原样显示', () => {
   const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
-  assert.equal(display.aiUsageKeyName('terminal', null), '未关联终端')
-  assert.equal(display.aiUsageKeyName('org', null), '未关联机构')
+  assert.equal(display.aiUsageKeyName('terminal', null), '无已验签终端')
+  assert.equal(display.aiUsageKeyName('org', null), '无机构')
+  assert.equal(display.aiUsageKeyName('terminal', 't_09fd'), '终端（尾号 t_09fd）')
+  assert.equal(display.aiUsageKeyName('org', 'org_6349'), '机构（尾号 g_6349）')
+  assert.equal(display.aiUsageKeyName('terminal', 'ab'), '终端（尾号 ab）', '短 ID 全文显示，不补零')
+  assert.equal(display.aiUsageKeyName('org', 'cd'), '机构（尾号 cd）')
+  assert.notEqual(display.aiUsageKeyName('terminal', 'db-primary-123456'), display.aiUsageKeyName('terminal', 'db-primary-654321'))
   assert.equal(display.aiUsageKeyName('feature', 'resume_optimize'), 'AI简历优化')
   assert.equal(display.aiUsageKeyName('feature', 'assistant_chat'), 'AI助手对话')
   assert.equal(display.aiUsageKeyName('feature', 'unknown'), '未知功能')
@@ -256,6 +314,15 @@ await check('C2 金额两位小数带「元」', () => {
   assert.equal(display.formatCny(0.05), '0.05 元')
   assert.equal(display.formatCny(0), '0.00 元')
   assert.equal(display.formatCny(123.456), '123.46 元')
+})
+
+await check('C4 未登记失败原因显示各自码值，已登记原因保持中文', () => {
+  const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
+  const { aiLogReason } = load('src/routes/ai-services/aiLogDisplay.ts', { './aiUsageDisplay': display })
+  assert.equal(aiLogReason('NEW_FAILURE_A'), '未归类失败（NEW_FAILURE_A）')
+  assert.equal(aiLogReason('NEW_FAILURE_B'), '未归类失败（NEW_FAILURE_B）')
+  assert.notEqual(aiLogReason('NEW_FAILURE_A'), aiLogReason('NEW_FAILURE_B'))
+  assert.equal(aiLogReason('AI_PROVIDER_ERROR'), '模型厂商服务异常')
 })
 
 // ─── D. 面板真渲染（最小 hooks 运行时） ───────────────────────────────────────
@@ -384,7 +451,7 @@ function mountPanel({ demo = false, get } = {}) {
     isAiUsageDayKey: http.isAiUsageDayKey,
     getAiUsageDaily: (day) => {
       calls.push(day)
-      return get ? get(day) : Promise.resolve(SAMPLE())
+      return (get ? get(day) : Promise.resolve(SAMPLE())).then((summary) => http.aiUsageDailyFromResponse({ success: true, data: summary }))
     },
   }
   const panel = load('src/routes/ai-services/AiUsagePanel.tsx', {
@@ -436,7 +503,9 @@ await check('D3 查看北京时间今天且触顶：全局醒目标红并照服�
   assert.ok(alert.includes(EXHAUSTED_GLOBAL), `后果必须引用服务端原话「${EXHAUSTED_GLOBAL}」`)
   assert.match(alert, /这台机器今天的 AI 服务额度已用完/, '单终端触顶要引用终端档原话')
   assert.match(alert, /你今天的 AI 服务额度已用完/, '会员触顶要引用会员档原话')
-  assert.match(alert, /kiosk-01、kiosk-02/, '已到单终端上限的终端要列出')
+  assert.match(alert, /终端（尾号 osk-01）、终端（尾号 osk-02）/, '两台终端必须显示各自的末 6 位')
+  assert.doesNotMatch(alert, /kiosk-0[12]/, '终端 ID 不在正文展示')
+  for (const id of ['kiosk-01', 'kiosk-02']) assert.ok(find(tree, (node) => node.props.title === id).length > 0, `触顶终端 ${id} 必须保留悬停原值`)
   assert.match(alert, /3 人/, '已到会员上限的只给人数')
   assert.doesNotMatch(alert, /会员号|endUser|user-/, '告警里不能出现会员标识')
   assert.match(textOf(tree), /今日已计费金额/)
@@ -452,7 +521,8 @@ await check('D3b 历史日期触顶：列出终端与人数，但不把「现在
   assert.match(text, /历史日期 2026-09-28/)
   assert.match(text, /不会据此拒绝现在的新请求/)
   assert.doesNotMatch(text, /新的 AI 生成与语音请求会被拒绝/, '历史日期的账不能写成闸门正在拒绝新请求')
-  assert.match(text, /kiosk-01/)
+  assert.match(text, /终端（尾号 osk-01）/)
+  assert.ok(find(await panel.view.settle(), (node) => node.props.title === 'kiosk-01').length > 0, '历史触顶终端在悬停保留 ID')
   assert.match(text, /2 人/)
   assert.doesNotMatch(text, /均未触顶/)
   assert.match(text, /2026-09-28 已计费金额/)
@@ -470,8 +540,11 @@ await check('D3c 今天只触到单终端：不能写成三档都没满', async 
   assert.doesNotMatch(text, /你今天的 AI 服务额度已用完/)
 })
 
-await check('D4 四个页签：功能 / 供应商给中文名，终端 / 机构的 null key 给「未关联」', async () => {
-  const panel = mountPanel({})
+await check('D4 四个页签：功能 / 供应商给中文名，终端 / 机构的 null key 给「无已验签终端 / 无机构」', async () => {
+  const sample = SAMPLE()
+  sample.byTerminal.push({ ...sample.byTerminal[1], key: 'kiosk-02' })
+  sample.byOrg.push({ ...sample.byOrg[0], key: 'org-primary-123456' })
+  const panel = mountPanel({ get: () => Promise.resolve(sample) })
   let tree = await panel.view.settle()
   assert.match(textOf(tree), /AI简历优化/, '功能页签要显示中文名')
   assert.match(textOf(tree), /已计费金额（计入额度）/)
@@ -480,10 +553,17 @@ await check('D4 四个页签：功能 / 供应商给中文名，终端 / 机构�
   assert.match(textOf(tree), /DeepSeek/)
   act.click(tabs(tree, '按终端')[0])
   tree = panel.view.render()
-  assert.match(textOf(tree), /未关联终端/)
+  assert.match(textOf(tree), /无已验签终端/)
+  assert.match(textOf(tree), /终端（尾号 osk-01）/)
+  for (const id of ['kiosk-01', 'kiosk-02']) {
+    const cells = find(tree, (node) => node.props.title === id)
+    assert.ok(cells.some((node) => textOf(node.children) === `终端（尾号 ${id.slice(-6)}）`), `按终端列表 ${id} 的真实尾号及完整 title 必须同在一格`)
+  }
+  assert.doesNotMatch(textOf(tree), /kiosk-01/)
   act.click(tabs(tree, '按机构')[0])
   tree = panel.view.render()
-  assert.match(textOf(tree), /未关联机构/)
+  assert.match(textOf(tree), /无机构/)
+  assert.ok(find(tree, (node) => node.props.title === 'org-primary-123456').some((node) => textOf(node.children) === '机构（尾号 123456）'))
 })
 
 await check('D5 当天 0 调用：如实显示 0，不装作没查到', async () => {
@@ -532,6 +612,8 @@ await check('D8 日期：未来日期不采纳也不重取；换成过去某天�
   let tree = await panel.view.settle()
   assert.equal(panel.calls.length, 1)
   assert.equal(panel.calls[0], '2026-09-29', '默认查北京时间今天')
+  assert.match(textOf(tree), /年-月-日/, '英文区域浏览器也给明确的输入格式')
+  assert.ok(find(tree, (node) => node.props.lang === 'zh-CN').length > 0, '日期表单使用中文语言')
   // 未来日期（今天 2026-09-29）：不采纳
   byId(tree, 'ai-usage-day').props.onChange({ target: { value: '2026-09-30' } })
   tree = panel.view.render()
@@ -542,6 +624,50 @@ await check('D8 日期：未来日期不采纳也不重取；换成过去某天�
   await panel.view.settle()
   assert.equal(panel.calls.length, 2)
   assert.equal(panel.calls[1], '2026-09-28')
+})
+
+await check('D9 真适配与渲染：编号 / 机构名、null 和旧字段缺失均可显示；触顶编号同序，完整 ID 留在悬停', async () => {
+  for (const mode of ['named', 'null', 'legacy']) {
+    const sample = mode === 'legacy' ? legacySample() : SAMPLE()
+    sample.day = '2026-09-29'
+    sample.byOrg.push({ ...sample.byOrg[0], key: 'org-primary-123456' })
+    sample.reached.terminalIds = ['kiosk-02', 'kiosk-01']
+    if (mode !== 'legacy') {
+      sample.reached.terminals = [
+        { terminalId: 'kiosk-02', terminalCode: mode === 'named' ? 'KSK-002' : null },
+        { terminalId: 'kiosk-01', terminalCode: null },
+      ]
+    }
+    if (mode === 'named') {
+      sample.byTerminal[1].terminalCode = 'KSK-001'
+      sample.byOrg[1].orgName = '青岛服务机构'
+      // null key 的关联空态优先于名称，不可伪装成已关联。
+      sample.byTerminal[0].terminalCode = '不可显示的编号'
+      sample.byOrg[0].orgName = '不可显示的机构'
+    }
+    const panel = mountPanel({ get: () => Promise.resolve(sample) })
+    let tree = await panel.view.settle()
+    assert.doesNotMatch(textOf(tree), /数据不完整|读取失败/)
+    const alert = find(tree, (node) => node.props.role === 'alert').map((node) => textOf(node.children)).join('')
+    const reachedName = mode === 'named' ? 'KSK-002' : '终端（尾号 osk-02）'
+    assert.ok(alert.includes(`${reachedName}、终端（尾号 osk-01）`), '触顶列表必须按 terminalIds 同序，用 reached.terminals 的编号')
+    const reachedTitle = mode === 'named' ? '编号 KSK-002 · ID kiosk-02' : 'kiosk-02'
+    assert.ok(find(tree, (node) => node.type === 'span' && node.props.title === reachedTitle).length > 0)
+    act.click(tabs(tree, '按终端')[0])
+    tree = panel.view.render()
+    const terminalName = mode === 'named' ? 'KSK-001' : '终端（尾号 osk-01）'
+    const terminalTitle = mode === 'named' ? '编号 KSK-001 · ID kiosk-01' : 'kiosk-01'
+    assert.ok(find(tree, (node) => node.type === 'td' && node.props.title === terminalTitle).some((node) => textOf(node.children) === terminalName))
+    assert.match(textOf(tree), /无已验签终端/)
+    act.click(tabs(tree, '按机构')[0])
+    tree = panel.view.render()
+    const orgName = mode === 'named' ? '青岛服务机构' : '机构（尾号 123456）'
+    const orgTitle = mode === 'named' ? '名称 青岛服务机构 · ID org-primary-123456' : 'org-primary-123456'
+    assert.ok(find(tree, (node) => node.type === 'td' && node.props.title === orgTitle).some((node) => textOf(node.children) === orgName))
+    assert.match(textOf(tree), /无机构/)
+    assert.doesNotMatch(textOf(tree), /不可显示|org-primary-123456|kiosk-01/)
+    panel.view.unmount()
+  }
 })
 
 // ─── E. 纪律 ────────────────────────────────────────────────────────────────
@@ -668,7 +794,9 @@ await check('F2 面板渲染结果不含 HTTP 状态码、英文错误码、字�
   assert.match(text, /会被拒绝，并提示「/)
   assert.match(text, /AI简历优化/, '已知功能显示中文名')
   assert.doesNotMatch(text, /resume_optimize/, '已知功能不要再附英文 key')
-  assert.match(text, /kiosk-01/, '终端号要保留')
+  assert.match(text, /终端（尾号 osk-01）/, '只有 ID 时显示真实尾号')
+  assert.ok(find(await panel.view.settle(), (node) => node.props.title === 'kiosk-01').length > 0, '终端 ID 在悬停保留')
+  assert.doesNotMatch(text, /kiosk-01/, '正文不直接露出终端 ID')
   assertOperatorFacing(text, '触顶面板')
 
   const failed = mountPanel({

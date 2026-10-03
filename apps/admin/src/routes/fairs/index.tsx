@@ -1,3 +1,4 @@
+import { formatCount } from '@ai-job-print/shared'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { ActivityIcon, BuildingIcon, FileTextIcon, LayoutGridIcon, MapPinIcon } from 'lucide-react'
@@ -124,7 +125,7 @@ export default function FairsPage() {
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="flex-1 text-sm font-semibold leading-snug text-neutral-900">{fair.title}</p>
+                    <p className="min-w-0 flex-1 line-clamp-2 text-sm font-semibold leading-snug text-neutral-900" title={fair.title}>{fair.title}</p>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TIME_STATUS_STYLES[timeStatus]}`}>
                       {TIME_STATUS_LABELS[timeStatus]}
                     </span>
@@ -135,7 +136,7 @@ export default function FairsPage() {
                     <StatusBadge dot status={REVIEW_BADGE[fair.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[fair.reviewStatus]?.label ?? fair.reviewStatus} />
                     <StatusBadge dot status={PUBLISH_BADGE[fair.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[fair.publishStatus]?.label ?? fair.publishStatus} />
                     <span className="ml-auto text-xs text-neutral-400">
-                      企业 {fair.counts.companies} · 展区 {fair.counts.zones} · 资料 {fair.counts.materials}
+                      企业 {formatCount(fair.counts.companies)} · 展区 {formatCount(fair.counts.zones)} · 资料 {formatCount(fair.counts.materials)}
                     </span>
                   </div>
                 </button>
