@@ -14,13 +14,13 @@ const toDataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toS
 
 function transpile(absolutePath, replacements = {}) {
   let out = ts.transpileModule(readFileSync(absolutePath, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
     fileName: absolutePath,
   }).outputText
   for (const [specifier, url] of Object.entries(replacements)) {
     out = out.split(`'${specifier}'`).join(`'${url}'`).split(`"${specifier}"`).join(`"${url}"`)
   }
-  const leftover = [...out.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((match) => match[1]).filter((specifier) => !specifier.startsWith('data:'))
+  const leftover = [...out.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((match) => match[1]).filter((specifier) => !specifier.startsWith('data:') && !Object.values(replacements).includes(specifier))
   assert.deepEqual(leftover, [], `${absolutePath} 还有没替换的运行时依赖：${leftover.join(', ')}`)
   return toDataUrl(out)
 }
@@ -74,7 +74,7 @@ test('reprintHint 按真实价目写，0 元说免费试运营', () => {
   const free = progress.reprintHint(0)
   assert.match(free, /免费试运营/)
   assert.doesNotMatch(free, /不免费/)
-  assert.doesNotMatch(free, /去付款/)
+  assert.doesNotMatch(free, /报价|价格|付款|收费|未收款|抵扣|权益/)
 
   const paid = progress.reprintHint(200)
   assert.match(paid, /再付款/)
@@ -250,5 +250,139 @@ test('W-94 手机上传不支持的格式说清是什么、为什么、怎么办
     assert.match(view.fileNote.text, /没有发出去/)
     assert.doesNotMatch(view.fileNote.text, /已收到/)
     assert.equal(view.progress.right, '未发送')
+  }
+})
+
+// B 补：渲染现有表现组件的真实 JSX，检查零元屏可见文案和拒单原因数量。
+// 这里只隔离按钮/图标等依赖；下单与重试行为仍由现有 Playwright 用例验证。
+const jsxUrl = import.meta.resolve('react/jsx-runtime')
+const { createElement } = await import('react')
+const { renderToStaticMarkup } = await import('react-dom/server')
+const iconUrl = toDataUrl('export const AlertCircleIcon = () => null; export const ChevronRightIcon = () => null; export const FileTextIcon = () => null; export const LockIcon = () => null; export const ShieldCheckIcon = () => null; export const TicketIcon = () => null;')
+const aiUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function PrintAiHelp({label}) { return jsx('button', {children:label}) }`)
+const benefitStub = toDataUrl('export const PRINT_BENEFIT_REDEEM_CTA_LABEL = "使用权益"; export const PRINT_BENEFIT_REDEEM_DISABLED_REASON = "未开放"')
+const partsUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConfirmParts.tsx'), {
+  'react/jsx-runtime': jsxUrl,
+  'lucide-react': iconUrl,
+  '../../../services/api/benefits': benefitStub,
+  './PrintAiHelp': aiUrl,
+})
+const queryUrl = toDataUrl('export const isRegisteredScreen = () => true')
+const confirmModelUrl = transpile(join(kioskRoot, 'src/pages/print/printConfirmModel.ts'), { './printConfirmQuery': queryUrl })
+const viewUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConfirmView.tsx'), {
+  'react/jsx-runtime': jsxUrl,
+  'lucide-react': iconUrl,
+  '../printConfirmModel': confirmModelUrl,
+  './PrintConfirmParts': partsUrl,
+})
+const { PrintConfirmView } = await import(viewUrl)
+const confirmProps = {
+  step: 4, freePricing: true, file: { name: '本人文件.pdf', pages: 2, size: '14 KB' },
+  invalidReason: '', summaryRows: [], adjustments: [], paperNote: null,
+  pricedParamsLabel: '黑白 · 单面', costCalcLabel: '不应上屏的报价',
+  amountText: '0.00', benefitView: null, redactionText: null, materialDemo: false,
+  printerBlocked: false, printerBlockedReason: '', terminalFailed: false,
+  terminalFailedText: '', selfAssessment: null, printNotes: null,
+  actions: createElement('button', {}, '确认打印'), submitError: null, onLogin: () => {},
+}
+const visibleMarkup = (props) => renderToStaticMarkup(createElement(PrintConfirmView, props)).replace(/<[^>]*>/g, '')
+test('B 补：零元加载、失败、确认与参数收口的真实 JSX 不说收费或权益机制', () => {
+  for (const [screen, quote, adjustments] of [
+    ['quoting', { status: 'loading' }, []],
+    ['quote-failed', { status: 'unavailable', reason: '页数以实际结果为准，确认前不显示金额' }, []],
+    ['zero-amount', { status: 'ready', amountCents: 0, billablePages: 2 }, []],
+    ['capability-invalid-params', { status: 'ready', amountCents: 0, billablePages: 2 }, [{ field: 'colorMode' }]],
+  ]) {
+    const text = visibleMarkup({ ...confirmProps, screen, quote, adjustments })
+    assert.match(text, /页数核定/)
+    assert.doesNotMatch(text, /报价|价格|费用|付款|扣费|收款|抵扣|权益/)
+  }
+})
+test('W-117：收费闸门拒单原因只上屏一次，单卡占满现有栅格', () => {
+  const reason = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
+  const props = { ...confirmProps, freePricing: false, screen: 'quote-failed', quote: { status: 'unavailable', code: 'PRINT_TERMINAL_QUEUE_HALTED', reason }, costCalcLabel: reason, printerBlocked: true, printerBlockedReason: '打印机暂时不可用，请联系现场工作人员' }
+  const html = renderToStaticMarkup(createElement(PrintConfirmView, props))
+  assert.equal(html.split(reason).length - 1, 1)
+  assert.match(html, /data-single="true"/)
+  assert.doesNotMatch(html, /可能的原因/)
+  assert.doesNotMatch(html, /打印机暂时不可用，请联系现场工作人员/)
+})
+
+const hubIconUrl = toDataUrl('export const ArrowRightIcon = () => null; export const CopyIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null;')
+const hubContentUrl = transpile(join(kioskRoot, 'src/pages/print-scan/printHubContent.ts'))
+const hubViewUrl = transpile(join(kioskRoot, 'src/pages/print-scan/components/QxPrintHubView.tsx'), {
+  'react/jsx-runtime': jsxUrl,
+  'lucide-react': hubIconUrl,
+  '../../print/components/PrintAiHelp': aiUrl,
+  '../../../components/qingxu/QxAppNavbar': toDataUrl('export const QxAppNavbar = () => null'),
+  '../printHubContent': hubContentUrl,
+})
+const { QxPrintHubView } = await import(hubViewUrl)
+test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通时出现', () => {
+  for (const [label, notice] of [
+    ['打印机缺纸', '打印机缺纸，请找现场工作人员加纸'],
+    ['打印机异常', '打印机异常，请找现场工作人员检查'],
+    ['打印机离线', '打印机当前无法连接，请找现场工作人员'],
+  ]) {
+    for (const actionable of [false, true]) {
+      const html = renderToStaticMarkup(createElement(QxPrintHubView, {
+        hubState: 'device-off', probe: 'ok', mfp: 'unavailable',
+        printerUnavailable: { label, notice }, colorDuplexLabel: '本机暂未开通',
+        capabilities: [{ key: 'sign', title: '签名', description: '本人手写签名', icon: () => null, actionable, available: actionable }],
+        arrivalCode: { key: 'arrival', icon: () => null, title: '到机码', description: '输入到机码' },
+        quickLinks: [], capabilityGroupHint: label, recordsGroupHint: '', notices: [],
+        onBack: () => {}, onRetry: () => {}, onHelp: () => {}, onArrivalCode: () => {}, onQuickLink: () => {}, onCapability: () => {},
+      }))
+      const banner = /<section class="ph-fallback"[^>]*>(.*?)<\/section>/s.exec(html)?.[1]
+      assert.ok(banner)
+      assert.match(banner, new RegExp(notice))
+      if (label !== '打印机离线') assert.doesNotMatch(banner, /离线|无法连接/)
+      if (actionable) assert.match(banner, /签名仍可使用/)
+      else assert.doesNotMatch(banner, /签名仍可使用/)
+    }
+  }
+})
+
+const cashierIcons = toDataUrl('export const AlertTriangleIcon = () => null; export const CheckCircle2Icon = () => null; export const Clock3Icon = () => null; export const FileXIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null; export const QrCodeIcon = () => null; export const ScanLineIcon = () => null; export const Undo2Icon = () => null;')
+const cashierModelUrl = transpile(join(kioskRoot, 'src/pages/print/cashierQxModel.tsx'), {
+  'react/jsx-runtime': jsxUrl, 'lucide-react': cashierIcons, './cashierStatus': cashier,
+})
+const cashierViewUrl = transpile(join(kioskRoot, 'src/pages/print/components/CashierQxView.tsx'), {
+  'react/jsx-runtime': jsxUrl, 'lucide-react': cashierIcons, './PrintAiHelp': aiUrl,
+  '../cashierStatus': cashier, '../printConfirmModel': confirmModelUrl,
+  '../cashierQxModel': cashierModelUrl,
+  '../CashierPaymentPanel': toDataUrl('export const CashierPaymentPanel = () => null'),
+})
+const { CashierQxView } = await import(cashierViewUrl)
+test('B 补：零元收银台与放行失败只说免费试运营，不说收款、付款或权益机制', () => {
+  for (const state of ['free-order', 'release-failed']) {
+    const text = renderToStaticMarkup(createElement(CashierQxView, {
+      state, amountCents: 0, orderNo: 'ORD-20261003-FREE', orderId: 'internal-order-1',
+      channels: [], file: null, params: null, snapshot: null, view: null,
+      priceLines: [], refundAssistanceCopy: '不应上屏的退款说明',
+    })).replace(/<[^>]*>/g, '')
+    assert.match(text, /免费试运营/)
+    assert.doesNotMatch(text, /报价|价格|费用|付款|收款|收钱|扣费|抵扣|权益|退款/)
+  }
+})
+
+const doneSectionsUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintDoneSections.tsx'), {
+  'react': import.meta.resolve('react'), 'react/jsx-runtime': jsxUrl,
+  'lucide-react': toDataUrl('export const FileTextIcon = () => null; export const PrinterIcon = () => null'),
+  '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
+  '../cashierStatus': cashier, '../printProgressModel': progressUrl,
+  './PrintFileDeletionRecords': toDataUrl('export const PrintFileDeletionRecords = () => null'),
+  './PrintFileRetentionNotice': toDataUrl('export const PrintFileRetentionNotice = () => null'),
+  './PrintProgressSections': toDataUrl('export const PrintJobRow = () => null'),
+})
+const { PrintOutOfPaperPanel } = await import(doneSectionsUrl)
+test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保留原说明', () => {
+  for (const canRetry of [false, true]) {
+    const props = { file: null, params: null, taskId: 'internal-task', orderNo: 'ORD-20261003-PAPER', failureReason: '打印机缺纸', canRetry, takeaway: null }
+    const textOf = (money) => renderToStaticMarkup(createElement(PrintOutOfPaperPanel, { ...props, money })).replace(/<[^>]*>/g, '')
+    const freeText = textOf({ fact: 'free', amountCents: 0 })
+    assert.match(freeText, /免费试运营/)
+    assert.doesNotMatch(freeText, /报价|价格|费用|付款|收费|收款|扣费|抵扣|权益|internal-task/)
+    assert.match(textOf({ fact: 'paid', amountCents: 200 }), /不会重复收费/)
   }
 })

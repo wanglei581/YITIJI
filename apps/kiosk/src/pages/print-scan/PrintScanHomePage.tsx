@@ -35,6 +35,7 @@ import {
   UserSquareIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { usePrintPriceConfig, unitCentsFor } from '../../services/print/priceConfigApi'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { getTerminalId, subscribeTerminalIdentity } from '../../services/api/screensaver'
 import {
@@ -326,6 +327,7 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 export function PrintScanHomePage() {
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
+  const priceConfig = usePrintPriceConfig()
   const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [capabilityLoad, setCapabilityLoad] = useState<
@@ -478,12 +480,22 @@ export function PrintScanHomePage() {
     )
   const hubState = deriveHubUiState({ probe, mfp, locked })
   const pill = HUB_PILL[hubState]
+  const printerUnavailable = {
+    label: device.printerLabel,
+    notice: device.printer.errorCode === 'paperEmpty'
+      ? '打印机缺纸，请找现场工作人员加纸'
+      : device.kind === 'offline'
+        ? '打印机当前无法连接，请找现场工作人员'
+        : '打印机异常，请找现场工作人员检查',
+  }
+  const freePricing = unitCentsFor(priceConfig.config, 'black_white') === 0
+    && (capabilityLoad.map.color_print?.status !== 'available' || unitCentsFor(priceConfig.config, 'color') === 0)
 
   return (
     <QxPageFrame
       back={{ label: '返回首页', onBack: () => navigate('/') }}
       title="打印扫描服务"
-      status={device.printerNotice ? { tone: 'bad', label: device.printerLabel } : pill}
+      status={device.printerNotice ? { tone: 'bad', label: device.printerLabel } : hubState === 'device-off' ? { tone: 'warn', label: `${device.printerLabel} · 出纸类暂停` } : pill}
       terminalLabel="就业服务大厅"
       navbar={
         <PrintHubNavbar
@@ -497,6 +509,8 @@ export function PrintScanHomePage() {
         hubState={hubState}
         probe={probe}
         mfp={mfp}
+        printerUnavailable={printerUnavailable}
+        freePricing={freePricing}
         orderPaused={
           hubState === 'device-off' && device.printerNotice
             ? { label: device.printerLabel, notice: device.printerNotice }
@@ -526,12 +540,12 @@ export function PrintScanHomePage() {
             : arrivalCodeStateNote(probe, mfp),
         }}
         quickLinks={QUICK_LINKS}
-        capabilityGroupHint={device.printerNotice ? device.printerLabel : capabilityGroupHint(probe, mfp, locked)}
+        capabilityGroupHint={mfp === 'unavailable' && confirmed ? device.printerLabel : capabilityGroupHint(probe, mfp, locked)}
         recordsGroupHint={recordsGroupHint()}
         notices={[
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE,
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE,
-          PRINT_HUB_PRICE_NOTICE,
+          ...(freePricing ? [] : [PRINT_HUB_PRICE_NOTICE]),
         ]}
         onRetry={loadCapabilities}
         onHelp={() => navigate('/help')}

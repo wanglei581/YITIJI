@@ -72,7 +72,7 @@ export function publicOrderNo(value: string | null | undefined): string | null {
 
 /** 「再印一份」的说明跟真实价目走。0 元写免费试运营，不知道价格就不说要付款。 */
 export function reprintHint(amountCents: number | null | undefined): string {
-  if (amountCents === 0) return '重新选文件后再确认。免费试运营，不另收费。'
+  if (amountCents === 0) return '重新选文件后再确认。免费试运营。'
   if (typeof amountCents === 'number' && Number.isFinite(amountCents) && amountCents > 0) {
     return '重新选文件、核对价格后再付款。'
   }
@@ -136,7 +136,7 @@ export function outOfPaperMoneyOf(
 
 export function outOfPaperPill(money: OutOfPaperMoney): string {
   if (money.fact === 'paid' && money.amountCents != null) return `已付 ${formatCents(money.amountCents)} · 缺纸`
-  if (money.fact === 'free') return '本次未收款 · 缺纸'
+  if (money.fact === 'free') return '免费试运营 · 缺纸'
   return '订单保留 · 缺纸'
 }
 
@@ -155,7 +155,7 @@ export function paymentLead(payment: PaymentFact): string {
 
 /** 顶栏状态胶囊。拿不到金额时退回任务阶段，不编收款结论。 */
 export function paymentPill(payment: PaymentFact, amountCents: number | null, fallback: string): string {
-  if (payment === 'free') return '本次未收款 · 系统报价 0 元'
+  if (payment === 'free') return '免费试运营'
   if (payment === 'paid' && amountCents != null) return `已付 ${formatCents(amountCents)} · 只收纸张费`
   return fallback
 }

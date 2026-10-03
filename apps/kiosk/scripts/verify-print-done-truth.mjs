@@ -152,7 +152,7 @@ const checks = [
     assert.match(doneSections, /页数待识别/)
     assert.doesNotMatch(doneSections, /\{file\.pages\} 页/)
     assert.doesNotMatch(doneSections, /任务号/)
-    assert.match(model, /return '重新选文件后再确认。免费试运营，不另收费。'/)
+    assert.match(model, /return '重新选文件后再确认。免费试运营。'/)
     assert.doesNotMatch(model, /不免费/)
   }],
   ['失败态给出带走二维码、订单号和补打入口', () => {

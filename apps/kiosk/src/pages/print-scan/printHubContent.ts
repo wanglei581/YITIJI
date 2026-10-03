@@ -177,13 +177,13 @@ export interface PrintHubBandCopy {
 
 /** 原型 39-print-hub.html:542-554（data-when="device-off"）。 */
 export const PRINT_HUB_DEVICE_OFF_BAND: PrintHubBandCopy = {
-  title: '打印扫描一体机离线 —— 要出纸的停了，其余照常',
+  title: '打印机暂不可用 · 出纸类暂停',
   chip: 'AI 不受影响',
   act: '停的是同一台机器上的打印与扫描：文档打印、照片打印、材料扫描、证件照出片',
   lines: [
     {
       k: '照常可办',
-      v: '手机扫码上传、格式转换、签名不经过这台打印机，现在就能用；我的文档、打印订单、异常反馈也照常。',
+      v: '不依赖打印机的服务，请按卡片上显示的可用状态选择；我的文档、打印订单、异常反馈也照常。',
     },
     { k: '代价', v: '这一趟拿不到纸。文件传上来、拼好、签好之后要换一台机器才出得了纸。' },
     {
@@ -225,7 +225,7 @@ export const PRINT_HUB_PROBE_UNKNOWN_TECH_NOTE =
 export function capabilityGroupHint(probe: ProbeStatus, mfp: MfpStatus, locked = false): string {
   if (probe === 'loading') return '正在确认可用服务，请稍候'
   if (probe !== 'ok') return '查不到可用服务，请点页底「重新检测」'
-  if (mfp === 'unavailable') return '一体机确认离线'
+  if (mfp === 'unavailable') return '打印机暂不可用'
   if (locked) return '部分能力被管理员关闭'
   return '选一项开始准备材料'
 }
@@ -243,7 +243,7 @@ export const HUB_PILL: Record<
   default: { tone: 'unknown', label: '能力与设备状态以办理时确认' },
   'capability-error': { tone: 'bad', label: '服务状态无法确认 · 任务暂不开放' },
   locked: { tone: 'warn', label: '部分能力已被管理员关闭' },
-  'device-off': { tone: 'warn', label: '一体机离线 · 出纸类暂停' },
+  'device-off': { tone: 'warn', label: '打印机暂不可用 · 出纸类暂停' },
   'feature-id-photo': { tone: 'warn', label: '证件照尚未开放' },
   'feature-copy': { tone: 'unknown', label: '复印在打印机面板上操作' },
   'feature-not-found': { tone: 'warn', label: '能力说明不存在' },

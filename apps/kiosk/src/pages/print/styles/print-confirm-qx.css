@@ -143,6 +143,7 @@
 .pcf-state h3 { margin: 0; display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 700; }
 .pcf-state p, .pcf-pgrp p { margin: 10px 0 0; font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); color: var(--qx-ink-2); }
 .pcf-state p b, .pcf-pgrp p b { color: var(--qx-ink); }
+.pcf-grid2[data-single] { grid-template-columns: minmax(0, 1fr); }
 .pcf-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .pcf-pgrp { background: var(--qx-surface); border: 1px solid var(--qx-line); border-radius: 24px; padding: 18px 24px; }
 .pcf-pgrp h4 { margin: 0; font-size: 22px; font-weight: 700; }
@@ -297,3 +298,10 @@
 @media (max-width: 760px) {
   .pcf-page[data-state='quoting'] .pcf-xq, .pcf-page[data-state='quoting'] .pcf-fee { min-height: 0; }
 }
+
+/* 为 1080 舞台的整像素舍入留出首屏余量，主按钮尺寸与完整可见断言不变。 */
+@media (min-width: 761px) {
+  .pcf-page:has(.pcf-cfm-alert) { gap: 14px; }
+  .pcf-page:has(.pcf-cfm-alert) .pcf-xq { min-height: 220px; }
+}
+.pcf-act .qx-btn { scroll-margin-block: 24px; }
