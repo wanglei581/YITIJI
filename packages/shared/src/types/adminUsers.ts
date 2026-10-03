@@ -30,11 +30,26 @@ export interface AdminUserListQuery {
   phone?: string
   enabled?: boolean
   registeredFrom?: string
+  closure?: 'requested' | 'offline_executed' | 'executed'
   registeredTo?: string
+}
+
+export interface AdminUserClosureRequest {
+  source: 'member_request' | 'offline'
+  reasonText: string
+  phoneLast4: string
+  offlineEvidenceNo?: string
+}
+
+export interface AdminUserClosureResult {
+  endUserId: string
+  status: 'anonymized'
+  changed: boolean
 }
 
 export interface AdminUserListItem {
   id: string
+  closureRequest?: { requestedAt: string; source: 'member_request' | 'offline' } | null
   nickname: string | null
   maskedPhone: string
   enabled: boolean

@@ -3314,3 +3314,13 @@ model JobMaterialTemplate {
 
   @@index([status, sortOrder])
 }
+
+// 会员 FileObject 硬删后的物理删除重试账本；不保存会员/文件身份。
+model StorageDeletion {
+  id         String @id @default(cuid())
+  storageKey String @unique
+  bucket     String
+  attempts   Int @default(0)
+  lastError  String?
+  createdAt  DateTime @default(now())
+}
