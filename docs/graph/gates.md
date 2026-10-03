@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1782 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1792 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -177,7 +177,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 146 个文件</summary>
+<summary><code>apps/admin/src/</code> — 155 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -200,7 +200,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/ai-services/aiUsageDisplay.ts` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/index.tsx` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs` |
 | `apps/admin/src/routes/alerts/index.tsx` | `verify-feedback-sla.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
-| `apps/admin/src/routes/audit/index.tsx` | `verify-admin-partner-contact-phone-ui.mjs` |
+| `apps/admin/src/routes/audit/AuditDetailDrawer.tsx` | `verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/audit/auditColumns.tsx` | `verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/audit/auditPresentation.ts` | `verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/audit/index.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
 | `apps/admin/src/routes/components/BulkPublishButton.tsx` | `verify-admin-content-trust-ui.mjs` |
 | `apps/admin/src/routes/dashboard/index.tsx` | `verify-admin-ai-usage-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
@@ -237,12 +240,17 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/orders/orderDisplay.ts` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
 | `apps/admin/src/routes/orders/orderHonestyCopy.ts` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/orders/useOrderDetail.ts` | `verify-admin-orders-readonly-ui.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-api20-manual-refund.ts` |
+| `apps/admin/src/routes/partners/ContentTrustCell.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/partners/OrgContentTrustPanel.tsx` | `verify-admin-content-trust-ui.mjs` |
+| `apps/admin/src/routes/partners/OrgDetailDrawer.tsx` | `verify-admin-offline-agencies-ui.mjs` |
 | `apps/admin/src/routes/partners/OrgQualificationSection.tsx` | `verify-admin-offline-agencies-ui.mjs` |
 | `apps/admin/src/routes/partners/PartnerAccountActionDialog.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/PartnerAccountManager.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
-| `apps/admin/src/routes/partners/contentTrustRules.ts` | `verify-admin-content-trust-ui.mjs` |
+| `apps/admin/src/routes/partners/PartnerTable.tsx` | `verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/partners/contentTrustRules.ts` | `verify-admin-content-trust-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/partners/index.tsx` | `verify-admin-content-trust-ui.mjs`<br/>`verify-admin-offline-agencies-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/partners/orgFormParts.tsx` | `verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/partners/orgPresentation.ts` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/ActionCredentialSteps.tsx` | `verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/ContactPhoneRegistrationSteps.tsx` | `verify-admin-partner-contact-phone-ui.mjs` |
 | `apps/admin/src/routes/partners/partner-account-action-steps/PhoneRebindSteps.tsx` | `verify-partner-account-action-ui.mjs` |
@@ -262,10 +270,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/print-scan/PrintRetryButton.tsx` | `verify-admin-print-scan-ui.mjs` |
 | `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/printers/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
-| `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-data-request-ui.mjs` |
+| `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-data-request-ui.mjs` |
 | `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/metricLabels.ts` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenTabs.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
@@ -294,7 +303,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/users/UserDetailDrawer.tsx` | `verify-admin-users-ui.mjs` |
 | `apps/admin/src/routes/users/UserStatusDialog.tsx` | `verify-admin-users-ui.mjs` |
 | `apps/admin/src/routes/users/index.tsx` | `verify-admin-users-ui.mjs` |
-| `apps/admin/src/routes/users/userPresentation.ts` | `verify-admin-users-ui.mjs` |
+| `apps/admin/src/routes/users/userPresentation.ts` | `verify-admin-users-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/services/api/adminAiHttpAdapter.ts` | `verify-job-ai-ops-dashboard-ui.mjs` |
 | `apps/admin/src/services/api/adminBilling.ts` | `verify-admin-billing-ui.mjs` |
 | `apps/admin/src/services/api/adminHttpAdapter.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-source-publish-actions.mjs` |
@@ -1080,14 +1089,14 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 47 个文件</summary>
+<summary><code>apps/partner/src/</code> — 48 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/partner/src/layouts/PartnerLayoutWrapper.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
 | `apps/partner/src/lib/csv.ts` | `verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
 | `apps/partner/src/routes/Page.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-partner-refresh-safe.mjs` |
-| `apps/partner/src/routes/account/index.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
+| `apps/partner/src/routes/account/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/companies/CompaniesTable.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/companies/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/dashboard/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
@@ -1100,7 +1109,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/login/index.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/partner/src/routes/policy/PolicyEmergencyNote.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/partner/src/routes/policy/index.tsx` | `verify-partner-refresh-safe.mjs` |
-| `apps/partner/src/routes/profile/index.tsx` | `verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/profile/ComplianceRestrictions.tsx` | `verify-console-plain-copy.mjs` |
+| `apps/partner/src/routes/profile/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/screen/PartnerGrid.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/PartnerUsageHostingOff.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/PartnerUsageView.tsx` | `verify-console-screen-ui.mjs` |
@@ -1772,7 +1782,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/memberPrintOrders.ts` | `verify-member-order-timeline.ts` |
 | `packages/shared/src/types/memberPrivacy.ts` | `verify-data-request-ui.mjs`<br/>`verify-ai-usage-retention.ts`<br/>`verify-member-data-request-contract.ts` |
 | `packages/shared/src/types/mockInterview.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
-| `packages/shared/src/types/partner.ts` | `verify-admin-parked-recruitment-ui.mjs`<br/>`verify-org-type-enum-sync.ts`<br/>`verify-partner-smart-campus.ts` |
+| `packages/shared/src/types/partner.ts` | `verify-admin-parked-recruitment-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-org-type-enum-sync.ts`<br/>`verify-partner-smart-campus.ts` |
 | `packages/shared/src/types/payment.ts` | `verify-price-single-source.mjs`<br/>`verify-admin-order-filters.ts` |
 | `packages/shared/src/types/print.ts` | `verify-print-parameter-capability.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-print-parameter-capability.ts` |
 | `packages/shared/src/types/printScanCapability.ts` | `verify-admin-print-scan.ts`<br/>`verify-print-color-duplex-capability.ts` |

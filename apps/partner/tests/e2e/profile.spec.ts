@@ -28,4 +28,20 @@ test.describe('机构资料（mock 口径）', () => {
     await expect(page.getByText('张三')).toBeVisible()
     await assertPageHonest(page, errors)
   })
+  test('合规限制以中文显示，原代码只在悬停中', async ({ page }) => {
+    const { errors } = collectPageFaults(page)
+    await gotoPartner(page, '/profile', '机构资料')
+    await waitForMockList(page)
+    const limits = [
+      ['in_platform_apply', '禁止在平台内投递'], ['candidate_management', '禁止管理候选人'],
+      ['resume_delivery_to_enterprise', '禁止向企业推送简历'],
+      ['interview_invitation', '禁止向求职者发出企业面试邀约'], ['offer_management', '禁止管理企业录用通知'],
+    ]
+    for (const [code, label] of limits) {
+      await expect(page.getByText(label, { exact: true })).toHaveAttribute('title', code)
+      await expect(page.getByText(code, { exact: true })).toHaveCount(0)
+    }
+    await assertPageHonest(page, errors)
+  })
+
 })

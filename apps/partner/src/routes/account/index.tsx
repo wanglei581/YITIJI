@@ -40,7 +40,7 @@ export default function AccountPage() {
     setPwError(null)
 
     if (unicodeCharacterLength(newPassword) < 12) { setPwError('新密码至少 12 位'); return }
-    if (utf8ByteLength(newPassword) > 72)          { setPwError('新密码按 UTF-8 计算不能超过 72 字节'); return }
+    if (utf8ByteLength(newPassword) > 72)          { setPwError('新密码过长：最多 72 个英文字符，汉字约占 3 个字符的长度；混合输入或使用表情时可容纳数量会减少'); return }
     if (passwordCategoryCount(newPassword) < 3)    { setPwError('新密码至少包含大写字母、小写字母、数字、特殊字符中的 3 类'); return }
     if (newPassword !== confirmPassword)            { setPwError('两次输入的新密码不一致'); return }
     if (newPassword === currentPassword)            { setPwError('新密码不能与当前密码相同'); return }
@@ -58,7 +58,7 @@ export default function AccountPage() {
 
   return (
     <Page title="账号" subtitle={withFrontendHint('修改登录密码；机构子账号与操作权限由平台侧管理', FRONTEND_HINT.none)}>
-      <div className="max-w-xl space-y-5">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <Card className="p-5">
           <div className="mb-5 flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-primary-50 text-primary-600">
@@ -97,7 +97,7 @@ export default function AccountPage() {
                   onChange={(e) => setNewPassword(e.target.value)} required
                 />
                 <p className="mt-1.5 text-[11.5px] text-neutral-400">
-                  大写 + 小写 + 数字 + 特殊字符，至少 3 类；UTF-8 最多 72 字节。
+                  大写字母、小写字母、数字、特殊字符至少包含 3 类。最长约 24 个汉字或 72 个英文字符，混合输入或使用表情时可容纳数量会减少。
                 </p>
               </div>
               <div>
@@ -117,11 +117,11 @@ export default function AccountPage() {
           )}
         </Card>
 
-        <EmptyState
+        <Card className="p-5"><EmptyState
           icon={UserCogIcon}
           title="账号与角色由平台侧统一管理"
-          description="机构子账号与细粒度权限本阶段不开放自助配置。需要增删机构账号请联系平台运营，本页不做半套 RBAC。"
-        />
+          description="机构子账号与细分权限由平台统一管理。如需增删机构账号或调整权限，请联系平台运营。"
+        /></Card>
       </div>
     </Page>
   )
