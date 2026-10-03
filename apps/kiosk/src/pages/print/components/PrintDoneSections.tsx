@@ -74,7 +74,7 @@ export function PrintDoneRecordSection({
   retention,
 }: {
   file?: { name: string; pages: number | null }
-  params?: PrintJobParams
+  params?: Partial<PrintJobParams>
   retention: PrintFileRetentionInput
 }) {
   const [open, setOpen] = useState(false)
@@ -103,23 +103,23 @@ export function PrintDoneRecordSection({
 
 export function PrintJobSummaryCard({ file, params }: {
   file: { name: string; pages: number | null }
-  params: PrintJobParams
+  params: Partial<PrintJobParams>
 }) {
   const perCopy = pagesPerCopy(file, params)
-  const copies = params.copies >= 1 ? params.copies : 1
+  const copies = params.copies != null && params.copies >= 1 ? params.copies : null
   const pagesText = perCopy != null && perCopy >= 1
-    ? (copies > 1 ? `${perCopy} 页 × ${copies} 份` : `${perCopy} 页`)
-    : `${copies} 份，页数待识别`
+    ? (copies != null && copies > 1 ? `${perCopy} 页 × ${copies} 份` : `${perCopy} 页`)
+    : copies != null ? `${copies} 份，页数待识别` : '页数 / 份数未提供'
   return (
     <div className="qx-card">
       <b className="pff-info-hd">本次任务摘要</b>
       <div className="pff-i-row"><span className="pff-i-k">文件名</span><span className="pff-i-v">{file.name}</span></div>
       <div className="pff-i-row"><span className="pff-i-k">页数 / 份数</span><span className="pff-i-v">{pagesText}</span></div>
-      <div className="pff-i-row"><span className="pff-i-k">打印面</span><span className="pff-i-v">{DUPLEX_LABEL[params.duplex] ?? params.duplex}</span></div>
+      <div className="pff-i-row"><span className="pff-i-k">打印面</span><span className="pff-i-v">{params.duplex ? DUPLEX_LABEL[params.duplex] ?? params.duplex : '未提供'}</span></div>
       <div className="pff-i-row">
         <span className="pff-i-k">色彩 / 质量</span>
         <span className="pff-i-v">
-          {params.colorMode === 'color' ? '彩色' : '黑白'} · {params.quality === 'draft' ? '草稿' : params.quality === 'high' ? '高质量' : '标准'}
+          {params.colorMode === 'color' ? '彩色' : params.colorMode === 'black_white' ? '黑白' : '未提供'}{params.quality ? ` · ${params.quality === 'draft' ? '草稿' : params.quality === 'high' ? '高质量' : '标准'}` : ''}
         </span>
       </div>
     </div>

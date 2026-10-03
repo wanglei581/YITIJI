@@ -1,5 +1,57 @@
 # 当前开发进度
 
+## 2026-09-30：AI 简历走查 W-107 / W-108（隔离工作区 qx-w107，基线 `677cffefdb75edd82d18e50d6e50a21d48014e0f`）
+
+- **范围与审查：** 修复本人简历诊断/优化的方向输入和加密 PDF 失败出路；文件预算 8 个（来源页、方向表单、解析页、报告页、共用 PDF 预览、现有简历门禁、两份进度入口）。不新增页面、模型、服务、依赖或门禁文件；不改设计稿、小程序、API、生产配置、数据库、密钥及硬件链路。复用现有 `skipped: true` 通用诊断合同、打印链密码回调和 `printPreviewKind` 错误码表。方案审查：前端范围内可复用，无需改后端或产品/合规边界。
+- **W-107：** 取消 IT 行业、应届、校招预填；进入时为通用诊断。未填任何目标/背景仍提交 `skipped: true`，不携带默认重点，页面常驻说明「没选方向，按通用标准看」。本人选择行业、经验、场景才带入；经验与场景增加「暂不指定」可清空。简历生成、解析、报告与请求适配路径未发现其它方向预填。
+- **W-108：** 当前提取服务把加密文件也报为普通 PDF 解析失败，未修改它。失败页复用 PDF.js 预览的同一 `onPassword` 判断原件，并认打印链明确加密码及解析页透传的业务错误码；不凭页数检测失败判加密。确认加密后显示「这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传。」；办理出路仅「重新选择文件」，不提供重新解析或打印原件。核查过程中不露出这两项；普通读取失败/超时回到原失败文案与出路。
+- **规模评估：** 来源页原 697 行，未扩大功能职责；PDF 预览原 525 行，本次仅提取共用打开任务并增加无渲染密码核查，不增加一套解析器或预览 UI。后续拆分须保持已有打印参数/字体资源门禁。
+- **验证：** 现有 `verify-resume-diagnosis-flow-ui.mjs` 增补源码执行断言，覆盖未预选、通用提交、本人选项、密码回调、普通/损坏 PDF 与失败 CTA；首轮通过。两次恢复旧行为的变异都退出 1：W-107 由「行业、经验、求职场景均不预选」断言拦住；W-108 由「加密文件只给重新选择文件」断言拦住。变异均已恢复修复版。kiosk `tsc -b` 退出 0；6 个改动源码/门禁文件 eslint 退出 0（共用 PDF 预览新增非组件导出有 1 条 Fast Refresh 开发提示，无错误）。图谱点名的 16 个 kiosk 门禁退出 0（含简历流程的报告/decisions/单测闭包）；关联两份进度文档的 11 个 API 门禁退出 0。API 复用已有 `.pnpm/node_modules`，留存门禁用当前 schema 在临时目录生成客户端和隔离 SQLite，66 条检查通过，临时产物已删除，未写 API 目录。`verify:compliance-copy`（含其 3 项闭包）、`verify:ci-gate-coverage`、`verify:repository-integrity` 退出 0；未安装依赖。
+- **提交状态：** `git add` 退出 128，沙箱拒绝创建共享 Git 元数据中的 `index.lock`。未暂存、未提交；8 个文件保留在本工作区，由协调方代提交。
+- **证据边界：** 仅本地源码/门禁验证，未运行 Playwright、真机、CI 或生产发布；Playwright 由协调方跑。
+## 2026-10-01：main CI 两处红的紧急修复——axios 7 条高危、PG 并发门禁偶发（分支 `claude/axios-ghsa-pg-retry-1001-main`）
+
+- **axios 1.18.1 → 1.20.0**：9/30 发布 7 条 HIGH（GHSA-c29m-xwm3-cm6r、GHSA-mghh-pgcx-3jjj、GHSA-x97p-jq2g-jp4f、GHSA-3pq3-5fj3-cg6v、GHSA-542g-h47m-68v8、GHSA-m8m8-qj5v-23w3、GHSA-r4gj-5m52-g5wh），`verify:dependency-security` 把 main 和所有 PR 卡住。axios 只有一个引入方：`apps/terminal-agent` 的直接依赖，直接升版，锁文件只变 axios，未加 override、未加豁免。
+- **`verify:pg-serialization-conflict:postgres`**：事务次数断言由「恰好 3」改为 3–6。输方重试时的新快照可能早于赢家提交可见而再冲突、再重试一次（main CI 36798144531 实测 4，属正确行为）；下限 3 不放宽，每个调用方上限 3 次；「恰好一个成功、一个 409、只剩 1 个有效账号、1 条审计」不动。重试之间加随机等待是产品侧小加固，后端窗口另开。
+- **验证**：干净安装后依赖门禁 ALL PASS（高危、严重均 0）；installer-inputs、terminal-agent tsc 通过；本机一次性 PostgreSQL 16 + Redis 上并发门禁连跑 6 次全过。变异：axios 退回 1.18.1 依赖门禁退出码 1；把冲突判定改成不重试并发门禁退出码 1；恢复后均为 0。
+
+## 2026-09-29：两条慢门禁提速——Redis 降级与错误可观测性（分支 `claude/backend-hardening-20260929-gate-speedup`，叠在 #1135 上）
+
+- **时间花在哪（Grok 查、协调方核）：** 两条门禁都把 REDIS_URL 指到死端口起真实服务；ioredis 默认每条命令重试 20 次（约 10 秒到 40 秒），启动探测默认用满 5 秒，隐私调度注册默认用满 8 秒。
+- **改法：** 新增环境变量 `REDIS_MAX_RETRIES_PER_REQUEST`（0–20 的整数才生效；不设时仍是 `new Redis(url)`、ioredis 默认 20），**生产环境（NODE_ENV=production）一律忽略**（协调方加的保护，防误配后 Redis 一抖就失败）；两条门禁共用一组「门禁专用」环境（重试 0、已有的探测与调度上限配小）。断言、场景、死端口、真实子进程全部保留。
+- **验证：** 本机改前约 91 秒 / 46 秒，**改后 5 秒 / 3 秒**；变异「会员登录声明成不受影响」「5xx 不写错误日志」「去掉生产保护」全红；boot-resilience（仍走生产默认、含 15 秒存活等待）、internal-accounts、internal-login-real-redis、ai-platform-degradation、ci-gate-coverage 全绿。
+
+## 2026-09-29：真 Redis 登录门禁加固与提速（#1122 跟进；分支 `claude/backend-hardening-20260929-ephemeral-redis-hardening`）
+
+- **问题（Codex 复核、总指挥核实）：** 临时 redis-server 起不来时，停进程只等 exit 事件，可能永远卡住；CI 取消或 SIGTERM 时没有统一清理；用的是共享 dev.db。另外这条门禁每次要真等 68 秒登录 IP 窗口，#1074 的 build-and-verify 跑满 31 分钟被 30 分钟时限截断，它是最后一根稻草。
+- **修法：** Grok 实现加固：启停同时听 error / exit / close，10 秒超时后 SIGKILL；exit、SIGINT、SIGTERM、uncaughtException 上登记可重复调用的清理；每次自建临时 SQLite；新增 7 条自检（缺 redis-server 二进制 15 秒内失败、忽略 SIGTERM 的子进程会被停掉等）。协调方提速：子进程开 `TRUST_PROXY_HOPS=1`，每次登录带不同的 X-Forwarded-For，路由 IP 限流插不进来，按账号计、存在 Redis 的密码锁定照样生效，不再真等窗口。
+- **验证：** 25/25；**本机改前约 72 秒、改后 7 秒**；变异「锁定阈值改 100」变红（换 IP 后仍在测账号锁定），Grok 两处变异（去 error 监听、去超时）不卡住、非 0 退出；redis-degradation-truth、ai-platform-degradation、error-observability、ci-gate-coverage 全绿。另记一笔：redis-degradation-truth 本机 91 秒，是下一个可提速的门禁。
+
+## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
+
+- **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
+- **P1 `verify-feedback-notifications` 自建库过时：** 不设 `DATABASE_URL` 时它手抄建表语句，User 表缺 `passwordProofState`，一跑就报列不存在（CI 走 `DATABASE_URL` 所以没暴露，已复现）。改为按当前 schema `prisma db push`，以后 schema 加列不会再过时；设与不设 `DATABASE_URL` 两种都全绿，临时库照旧清理。
+## 2026-09-30：AI 按人额度设计定稿待确认（产品负责人 9/30 拍板四项；分支 `claude/backend-hardening-20260930-ai-quota-design`）
+
+- **是什么：** 设计文档 [ai-quota-per-user-design.md](../product/ai-quota-per-user-design.md)。每个登录用户每天三个桶：简历类 20 次、小青 80 轮、模拟面试 5 场；机构可在「会员权益」给某人加次数；用完不收费、提示明天 0 点恢复、AI 退回模板填空；游客池开关默认 0；金额封顶照旧保留。
+- **怎么做：** 新增每日计数表与预占记录表（预占、完成、归还，15 分钟未结算自动归还），权益账本 `BenefitGrant` 加 `serviceKey`；「1 次」按用户视角的一件事算（一场面试一次，小青语音加文字一轮一次）；分四个任务包 Q1–Q4，Codex 实现、agy 反方、Claude 审。
+- **状态：** 只有设计，没有代码。第一步「三个漏洞」（走查窗口）合进候选后才开工。设计第七节三处已由总指挥 9/30 确认，并补一条：断连扣了次数的，结果必须能在「我的 → AI 服务记录」里重开、重看不扣（先落记录再结算）。
+## 2026-09-30：后台 AI 当日用量给终端编号与机构名（两后台窗口需求；分支 `claude/backend-hardening-20260930-ai-usage-names`）
+
+- **问题：** `GET /admin/ai-usage/daily` 的终端桶、机构桶与触顶终端只给数据库主键，后台只能显示「终端（尾号 xxxxxx）」，运营认不出是哪台。
+- **修法：** `ai-usage-summary.ts` 终端桶加只读 `terminalCode`、机构桶加只读 `orgName`，从 Terminal / Organization 表查，不推算；终端或机构已删除、或本来就没有时给 null（后台照旧显示尾号）。`reached` 保留 `terminalIds`，另加同序的 `terminals: [{ terminalId, terminalCode }]`。功能、厂商桶字段不变；不含会员号的白名单不变。后台类型文件由两后台窗口接。
+- **验证：** verify:ai-usage-budget 门禁夹具的终端编号改成与主键不同的 `KSK-…`、机构名改成真实感名称，加一条已删终端与已删机构的用量行；新增 6 条断言（各桶字段白名单、给编号不是主键、已删为 null 且金额照计、机构名、触顶带编号）。反向变异三处全红：编号用主键、已删终端拿主键兜底、机构名恒空。admin-ai-usage-ui、ai-cost-coverage、api tsc 全绿。
+## 2026-09-30：青序流光 2.0 对齐 B 批——打印主线 6 页（12、13、14、15、18、32）
+
+- 依据 52 页逐页盘点（`~/.cache/claude-lanes/qingxu-status-0930.md`）。Codex 三轮实现，协调方每轮正式构建真渲染、1080×1920 与最终版逐状态并排验收（92 组并排图）。
+- 12 选文件：换成稿里的「本机选文件：备用通道」说明卡、格式胶囊、三列步骤与两条要点、底部「还没选文件，材料检查按住不放」；二维码 396px；来源按钮保持在 y ≥ 500。
+- 13 打印台、14 核对价格、15 出纸、18 扫描、32 收银台：收掉大片留白与卡片拉伸沉底，区块顺序照稿；18 去掉英文眉题与内部链路说明、不再显示内部任务编号；32 两栏配平、免费态写「免费试运营 · 本次未收款」。
+- 下单、付款、放行、清场行为不变。W2 浏览器用例 143 条全过。
+- 已知未清：18 扫描进度「正在查询」态底部整行约 180px 留白（稿无此态），归后续留白统一清扫。
+## 2026-09-30：小程序价目为 0 时不出现钱的字眼（分支 `claude/miniapp-free-copy-0930`）
+
+落实产品负责人 9/30 拍板「小程序首版不出现任何价格或购买引导」「试点免费，两行价目都是 0 元」。只改文字，不改 wxss、颜色变量和组件样式。打印参数、确认、选终端、下单、取件、我的打印订单、材料包组包 / 确认 / 到机码 9 页里的「报价、精确报价、单价、计费、金额待核定、重新核价、付款方式、现场支付」等，价目为 0 或还不知道金额时换成「页数核定、核定页数、本次打印 免费、重新核定、到机说明」；只有服务端报出大于 0 的金额时，才原样显示原来的金额与付款说法（分支保留，不硬拦）。没选文件时打印参数页底栏只剩「请先选择文件」。材料包状态标签对 0 元订单不再写「现场付款 / 已付款」。新增门禁 `scripts/tests/free-pilot-copy.test.mjs`（挂在 `verify:price-confirmation`）：WXML 里的钱字眼必须落在本页「已报出大于 0 的金额」条件的真分支里，JS 里含钱字眼的字面量必须登记；两处旧门禁锚点随文案更新。提审清单加「发布前确认生产价目两行都是 0」（next-tasks 小程序余项）。
+
 ## 2026-09-30：W-106 管理员后台列表「每页条数」切换失效修复
 
 走查实测：文件管理、日志审计、各信息源、设备管理、合作机构管理、Excel 导入记录选「每页 10 条」后弹回 20、不发请求。原因是公共分页状态 `useTableState` 用 react-router 的函数式 `setSearchParams`，同一次点击里页面先改条数、再把页码设回 1、分页器又补一次页码 1，三次写都基于渲染时的旧参数，最后一次把条数冲掉；Excel 导入记录更是直接丢弃所选条数。修法：`useTableState` 用 ref 在最新参数上累加同一事件内的写入（签名不变，所有使用它的页面一次修好）；Excel 导入记录改为真正切换条数并回第 1 页（默认 20，15 不在下拉档位里）；分页器「共 N 条」加千分位。其它 `setSearchParams` 用法逐个核对，都是单次写入。日志审计 E2E 新增用例：选 10 后地址栏、下拉、页码与行数都对，翻到第 2 页再选 50 回到第 1 页。
@@ -32,6 +84,12 @@
 - 产品负责人拍板：该页没有 2.0 稿、没有前端入口且与首页内容重复，现停放 `/smart-campus/freshman-insights`。页面源码保留在 `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx`，不注册路由，也不进入 Kiosk 构建入口。
 - 连带收口：移除 `apps/kiosk/src/routes/index.tsx` 的页面 import/注册；从 `apps/kiosk/tests/visual/route-manifest.ts`、`fusion-w6-route-cases.ts`、W4/W6 路由清单和 verify 脚本移除运行时路由；`verify-smart-campus-ui.mjs` 改为断言源码保留但路由不存在；W4/W6 Playwright 用例改为断言直达显示「页面不存在」；`services/api/src/terminals/terminal-toolbox.service.ts` 百宝箱目标白名单移除该地址。
 - 正式文档 `docs/decisions/2026-06-17-smart-campus-jobfair-delivery-rules.md` 已改为如实描述「已停放，源码保留」。Kiosk/API typecheck、改动文件 eslint、W2/W3/W4/W5/W6、fusion baseline/shell、视觉证据、百宝箱 API、CI 覆盖、仓库完整性、合规文案和图谱生成 `--check` 均通过；Vite 生产构建通过且产物不含迎新服务导览文案。W4/W6 浏览器用例因沙箱禁止 preview 绑定 127.0.0.1 端口未能启动；把注册临时加回的变异使 smart-campus-ui、fusion-w4、fusion-w6 均以退出码 1 变红。
+## 2026-09-30：两个后台 UI 优化第 2 批（订单、打印扫描、计费、文件、材料库、导入记录）+ W-105 订单计费页数
+
+- **排版**：订单页 947 行拆成主文件 + 列定义 / 显示 / 详情 / 收退款 / 出纸核查等子文件，列表 8 列（订单号与终端编号不截断，渠道并入用户列，操作固定右侧），收款、退款、废弃、出纸核查的确认与禁用条件原样保留在详情抽屉；打印扫描运维文件名截断、编号与时间不折行，任务编号挪进悬停与详情；订单与打印扫描两页换成统一分页器（10/20/50/100）；文件管理 12 列压到 8 列 + 详情抽屉，账号 ID 挪进悬停，空值统一「—」；材料库与导入记录改用统一表格外壳。
+- **用词与诚实**：错误码在列表与详情显示中文原因（后台自己的对照表 `apps/admin/src/lib/printErrorText.ts`，与服务端告警标题同一口径，门禁核对服务端登记的码后台都有；扫描单未登记码写「扫描失败（未归类）」）；「Terminal Agent 回报落库」「匿名(Kiosk)」「渠道账单 diff」等改人话；计费页价目键名只在悬停，未登记价目在确认框里写「未登记价目（键名）」。
+- **W-105**：管理员订单只读接口（`services/api/src/admin-orders-readonly/`）列表项与详情加只读 `billablePages`，直接取 `Order.billablePages` 原值。口径（按写入代码核对）：内容页数、不含份数；一体机单写报价原值，小程序多文件单是各文件所选页数之和；份数只在金额里另乘；双面不折算。前端：列表金额下「N 页」，份数 > 1 时「N 页 × M 份」；详情「计费页数」；为 null 不显示页数。订单级没记页范围时，前端分不出单文件（= 全部页面）与多文件打包单，所以页范围写「未单独记录（见计费页数）」，不写「全部页面」。
+- **验证**：admin / shared / api typecheck；图谱关联门禁与全文引用门禁全过（含需要本机端口与 Redis 的 6 条 API 门禁）；管理员后台 E2E 默认与大屏全过；变异：去掉服务端映射、null 显示成 0 页、多文件说成全部页面、扫描失败说成打印失败、服务端登记码后台缺中文，均转红。
 
 ## 2026-09-30：W-86 第五轮——锁序统一为 PrintTask → Order，超前补报与同一终态清理分开（分支 `grok/print-retry-attempt-0929`，提交 `bda0b4979`）
 
@@ -321,10 +379,6 @@ Agent 0.4.13 会在心跳里上报 `queue_cleanup_failed` 与 `queue_pause_faile
 - **空间与内存底子（23:3x 同一次只读）：** Agent 连续运行 180 小时，node 工作集 78 MB、峰值 84 MB，无内存上涨迹象；一体机 Edge 281 MB；可用内存 5.3 GB、C 盘剩余 130 GB。服务日志已按 10 MB 滚动、保留 5 个。**发现约 130 MB 早期遗留物**（都在 `C:\ProgramData\AIJobPrintAgent`，不在滚动范围内）：`agent-debug.log` 48 MB（6/9 后未再写）、`agent-out.log` 38 MB（6/2 后未再写）、`logs\AIJobPrintTerminalSetup.exe` 43 MB（0.4.8 旧安装包、未签名），以及 `scan-test-backup\` 里 1 个扫描件 PDF（9/10，可能含个人信息）。按规矩删除由产品负责人本人做；是否让安装包升级时顺带清掉这几类已知旧文件，交总指挥定。
 - **发布当天：** 现场验收单新增 R.5（用户走后残留、打印中强杀与拔电、重提能否出纸、缓存比对 W-87），一页纸改为约 110 分钟。
 
-## 2026-09-29：两条「还没人管」的原有问题——会员审计被外键吞掉（P0）、反馈通知门禁自建库过时（P1）（分支 `claude/backend-hardening-20260929-print-audit-actor`）
-
-- **P0 会员审计被外键吞掉（Codex 线上盘点标出，总指挥已对代码）：** `print-jobs.service.ts` 的带走链接与重试两条审计把会员 ID 写进 `AuditLog.actorId`，而该列外键指向运营账号表，在 PostgreSQL（以及开外键的 SQLite）上违反外键、被 `AuditService.write` 静默吞掉——会员的取件链接与重试没有审计。按仓库约定改为 `actorId: null`、会员 ID 放 `payload.endUserId`（`print-jobs.service.ts` 超 800 行，行数不变）。门禁：`verify:miniapp-cloud-print-m2` 断言会员带走链接留审计（旧代码上找不到审计行，已复现）；`verify-backend-p0-contracts` 全仓静态扫描，任何 `actorId` 写 endUserId 的写法判红。两处变异（带走 / 重试改回写会员 ID）各自变红。
-- **P1 `verify-feedback-notifications` 自建库过时：** 不设 `DATABASE_URL` 时它手抄建表语句，User 表缺 `passwordProofState`，一跑就报列不存在（CI 走 `DATABASE_URL` 所以没暴露，已复现）。改为按当前 schema `prisma db push`，以后 schema 加列不会再过时；设与不设 `DATABASE_URL` 两种都全绿，临时库照旧清理。
 ## 2026-09-29：自我探索同意条款加年龄一条与版本过渡、条款由服务端下发（分支 `claude/backend-hardening-20260929-selfassess-consent`）
 
 - **做了什么（Grok 实现、协调方审）：** 合规窗口裁定：同意条款加「本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。」当前版本升到 `sa-consent-v1.2026-09-29`；服务端另收一份明确列出的旧版本清单 `SELF_ASSESSMENT_CONSENT_LEGACY_VERSIONS`（只有 `sa-consent-v1.2026-08-16`），清单外仍 400；落库存实际提交的版本号。`GET /resume/self-assessment/questions` 下发 `consentItems`（与版本配套的同一份条款）。匿名结果只按 `AI_RESUME_RESULT_TTL_HOURS` 短期保存（门禁断言 expiresAt 与 endUserId 为空），「匿名不留库」的错注释已改。#1112 后续：附加到简历改按 export 档过闸；整体合规拒答改为只回打分、不让用户重答。过渡期结束的待办已写进 next-tasks（触发条件：小程序带新条款的版本全量）。

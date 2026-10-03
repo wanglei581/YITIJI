@@ -114,6 +114,8 @@ async function assertAlertsDisappear(status: (typeof STATUSES)[number], label: s
   assert.equal(issues.length, 1)
   assert.match(issues[0]?.title ?? '', new RegExp(label))
   assert.equal(issues[0]?.severity, 'error')
+  assert.equal(issues[0]?.detail, `终端在线，${ADVICE[status]}`)
+  assert.equal(issues[0]?.detail.includes(status), false)
   terminal.heartbeats = [{ createdAt: now, printerStatus: 'ready' }]
   const recovered = await collectDerivedAlerts(prisma as never, now)
   assert.equal(recovered.alerts.filter((alert) => alert.type === 'printer_issue').length, 0)
@@ -268,8 +270,8 @@ function assertMutationsFail(): void {
     ],
     [
       'halt branch uses the old printer code',
-      "error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message: QUEUE_DISPATCH_HALTED_MESSAGE },",
-      "error: { code: 'PRINTER_UNAVAILABLE', message: QUEUE_DISPATCH_HALTED_MESSAGE },",
+      "error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message:",
+      "error: { code: 'PRINTER_UNAVAILABLE', message:",
     ],
     [
       'put the halt back under the switch',

@@ -428,7 +428,7 @@ Page({
       'files[0].price': '—',
       quoteState: 'error',
       quoteError: switched
-        ? '当前账号与打开这一页时的不是同一个，已停止显示上一位的文件与金额。请返回重新选择文件。'
+        ? '当前账号与打开这一页时的不是同一个，已停止显示上一位的文件与核定结果。请返回重新选择文件。'
         : '登录状态已失效，请重新登录后返回重新选择文件。',
       quoteRecover: 'login',
     })
@@ -468,8 +468,8 @@ Page({
     this.setData({
       quoteState: 'error',
       quoteError: auth.isLoggedIn()
-        ? '当前会话缺少会员标识，无法核定本人订单金额。请重新登录一次。'
-        : '登录状态已失效，请重新登录后再核价。',
+        ? '当前会话缺少会员标识，无法核定本人订单。请重新登录一次。'
+        : '登录状态已失效，请重新登录后再核定。',
       // 这一支是**补签已经失败**之后才到的：再点一百次「重新核价」也只会再
       // fail-closed 一百次。必须给出登录这条真正有效的路。
       quoteRecover: 'login',
@@ -535,8 +535,8 @@ Page({
       this.setData({
         quoteState: 'error',
         quoteError: auth.isLoggedIn()
-          ? '当前会话缺少会员标识，无法核定本人订单金额。请重新登录一次。'
-          : '金额由服务端按本人订单核定，请登录后再核价。',
+          ? '当前会话缺少会员标识，无法核定本人订单。请重新登录一次。'
+          : '页数由服务端按本人订单核定，请登录后再核定。',
         // 认不出人时「重新核价」是个死循环：再点一次还是同一条 fail-closed。
         // 真正有效的下一步是重新登录，所以这里必须给出登录出口。
         quoteRecover: 'login',
@@ -560,11 +560,11 @@ Page({
         const billablePages = Number(quote && quote.billablePages)
         if (!Number.isSafeInteger(amountCents) || amountCents < 0
           || !Number.isSafeInteger(billablePages) || billablePages < 1) {
-          throw new Error('服务端报价缺少有效页数或金额')
+          throw new Error('服务端核定结果不完整，请重试')
         }
         const snapshot = priceConfirm.bindQuote(quoteCtx, this._account,
           idem.fingerprintOf(this._orderPayload()), amountCents, billablePages)
-        if (!snapshot) throw new Error('这次报价已不对应当前账号或打印参数，请重新核价。')
+        if (!snapshot) throw new Error('这次核定结果已不对应当前账号或打印参数，请重新核定。')
         this._quote = snapshot
         this._showAmount(amountCents, billablePages)
       })
@@ -573,7 +573,7 @@ Page({
         if (this._createdOrderId) { this._settleLateQuote(); return }
         this.setData({
           quoteState: 'error',
-          quoteError: (err && err.message) || '暂时取不到服务端报价。金额由服务端核定之后才能提交，请稍后重新核价。',
+          quoteError: (err && err.message) || '暂时无法由服务端核定页数。核定之后才能提交，请稍后重新核定。',
           // 普通失败（网络 / 服务端）重试是有意义的，这里不给登录出口。
           quoteRecover: 'retry',
         })
@@ -634,12 +634,12 @@ Page({
 
   /** 没有一个属于当前账号、当前参数的服务端金额：不提交，说清下一步。 */
   _requireQuote() {
-    if (this.data.quoteState === 'ready') this._dropQuote('金额需要重新核定后才能提交。')
+    if (this.data.quoteState === 'ready') this._dropQuote('需要重新核定后才能提交。')
     wx.showModal({
       title: '还不能提交',
       content: this.data.quoteState === 'loading'
-        ? '正在向服务端核定金额，请稍候。'
-        : '金额还没有由服务端核定。请先按页面上的提示重新核价，再提交。',
+        ? '正在向服务端核定页数，请稍候。'
+        : '服务端还没有核定这份文件。请先按页面上的提示重新核定，再提交。',
       showCancel: false,
     })
   },

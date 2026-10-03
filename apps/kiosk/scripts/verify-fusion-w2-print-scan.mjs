@@ -1309,4 +1309,22 @@ assert.match(printUploadPage, /isUsbSafeIdExpired/, 'USB 410/expired safeId is a
 assert.match(printUploadView, /file-source-primary/, 'primary CTA has a stable test id')
 assert.match(printUploadView, /下一步：材料检查/, 'ready-state primary names the real next step')
 
+// v2 规则 4：任务身份仍用于请求，但不渲染到公共终端的可见内容。
+for (const path of [
+  'src/pages/scan/ScanProgressPage.tsx',
+  'src/pages/scan/ScanSettingsStatusView.tsx',
+  'src/pages/scan/ScanResultPage.tsx',
+]) {
+  const code = read(path)
+  assert.doesNotMatch(code, /\[\s*['"]任务编号['"]\s*,/, `${path} must not display a task ID row`)
+  const ast = ts.createSourceFile(path, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const checkVisibleIdentity = (node) => {
+    if (ts.isJsxExpression(node) && node.expression) {
+      assert.doesNotMatch(node.expression.getText(ast), /\b(?:scanTaskId|priorScanTaskId)\b/, `${path} must not render internal task identity`)
+    }
+    ts.forEachChild(node, checkVisibleIdentity)
+  }
+  checkVisibleIdentity(ast)
+}
+
 console.log('ALL PASS fusion W2 print/scan contract')

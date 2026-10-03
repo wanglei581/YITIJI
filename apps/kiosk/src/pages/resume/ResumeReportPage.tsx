@@ -6,6 +6,8 @@ import { AI_LABEL_COPY, COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
 import { isAiOutage } from '../../ai'
+import { checkPdfOpeningPassword } from '../../components/PdfCanvasPreview'
+import { ENCRYPTED_PDF_BLOCK_COPY, inspectionSignalsEncrypted, previewKindForFile } from '../print/components/printPreviewKind'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { resumeUserReason } from './resumeUserCopy'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
@@ -43,6 +45,7 @@ interface ReportState {
   providerName?: string
   success?: boolean
   reason?: string
+  failureCode?: string
   /** 解析页判定为 AI 能力级停用（暂停 / 当日额度已到 / 未配置）：失败屏不给「重新解析」。 */
   aiDown?: boolean
   report?: ResumeReport
@@ -50,7 +53,7 @@ interface ReportState {
   targetContext?: ResumeTargetContext
 }
 
-const CONTROL_FIELDS = new Set(['success', 'reason', 'aiDown', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken', 'providerName'])
+const CONTROL_FIELDS = new Set(['success', 'reason', 'failureCode', 'aiDown', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken', 'providerName'])
 const CONFIDENCE_LABEL: Record<'high' | 'medium' | 'low', string> = { high: '较高', medium: '中等', low: '较低' }
 
 function buildExtractionNotice(notice?: ReportState['extractionNotice']): string | null {
@@ -148,7 +151,31 @@ export function ResumeReportPage() {
     return () => { cancelled = true }
   }, [taskId, success, state.report, state.targetContext, accessToken, getToken, skipFetch, reloadKey])
 
+  const failedPdfUrl = (!success || recoveredFail) && state.file && previewKindForFile({ ...state.file, pages: null }) === 'pdf'
+    ? state.file.fileUrl : undefined
+  const serverEncrypted = inspectionSignalsEncrypted([state.failureCode ?? '', reason ?? '', recoveredFail ?? ''])
+  const [passwordCheck, setPasswordCheck] = useState<{ url: string; encrypted: boolean } | null>(null)
+  const encryptedPdf = serverEncrypted || Boolean(failedPdfUrl && passwordCheck?.url === failedPdfUrl && passwordCheck.encrypted)
+  const checkingPassword = Boolean(failedPdfUrl && !serverEncrypted && passwordCheck?.url !== failedPdfUrl)
+
+  useEffect(() => {
+    if (!failedPdfUrl || serverEncrypted) return
+    const controller = new AbortController()
+    // 链接过期、普通损坏或核查超时都不是加密证据，继续原来的普通失败处理。
+    let active = true
+    const timeout = setTimeout(() => {
+      controller.abort()
+      if (active) setPasswordCheck({ url: failedPdfUrl, encrypted: false })
+    }, 8000)
+    void checkPdfOpeningPassword(failedPdfUrl, controller.signal)
+      .catch(() => false)
+      .then((encrypted) => { if (active) setPasswordCheck({ url: failedPdfUrl, encrypted }) })
+      .finally(() => clearTimeout(timeout))
+    return () => { active = false; clearTimeout(timeout); controller.abort() }
+  }, [failedPdfUrl, serverEncrypted])
+
   const handleRetry = () => {
+    if (encryptedPdf || checkingPassword) return
     const retryState = Object.fromEntries(Object.entries(state).filter(([k]) => !CONTROL_FIELDS.has(k)))
     navigate('/resume/parse', { state: retryState })
   }
@@ -220,15 +247,20 @@ export function ResumeReportPage() {
       <button type="button" className="qx-btn" data-variant="primary" onClick={handleRetry} data-route="/resume/parse" data-testid="resume-report-primary">重新解析</button>
     </>
   )
+  const fileFailureCta = encryptedPdf ? (
+    <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(intent === 'optimize' ? '/resume/source?intent=optimize' : '/resume/source', { replace: true })} data-route="/resume/source" data-testid="resume-report-primary">重新选择文件</button>
+  ) : checkingPassword ? (
+    <p className="why" role="status">正在确认这份 PDF 能否打开，请稍候。</p>
+  ) : failCta
   const failView = (failReason: string) => (
-    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }} status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={failCta}>
+    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }} status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={fileFailureCta}>
       <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-takeaway="诊断报告与修改清单" data-ai-down-exits="resume-diagnosis" data-state="diagnose-failed" data-testid="resume-report-state-diagnose-failed" className="qx-scroll rrp-page">
         <ResumeReportHead viewState="diagnose-failed" />
         <section className="rrp-state">
           <h2>解析中断，中断的只是「读懂它」这一步</h2>
-          <p>失败原因：{resumeUserReason(failReason, '这次未能完成解析，请重试或换一份清晰的简历。')}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。</p>
+          {encryptedPdf ? <p>{ENCRYPTED_PDF_BLOCK_COPY}。</p> : <p>失败原因：{resumeUserReason(failReason, '这次未能完成解析，请重试或换一份清晰的简历。')}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。</p>}
         </section>
-        <ResumeDiagnosisFailExits file={state.file} fileId={typeof state.fileId === 'string' ? state.fileId : undefined} />
+        {!encryptedPdf && !checkingPassword && <ResumeDiagnosisFailExits file={state.file} fileId={typeof state.fileId === 'string' ? state.fileId : undefined} />}
       </section>
     </QxPageFrame>
   )

@@ -92,6 +92,10 @@ const PACKAGE_ONSITE_NOTICE = '材料包在小程序只完成组包与到机码�
 /** 材料包目前没有在线取消端点，如实说明未付款订单的归宿，不暗示可以撤单。 */
 const PACKAGE_NO_CANCEL_NOTICE = '材料包订单暂不支持在线取消；未付款的订单会在有效期结束后自动失效。'
 
+/** 价目为 0（试点免费）时的同义说法：首版不出现任何价格或购买引导（2026-09-30 产品负责人）。 */
+const PACKAGE_ONSITE_NOTICE_FREE = '材料包在小程序只完成组包与到机码，还没有开始打印；到终端核验后才打印。'
+const PACKAGE_NO_CANCEL_NOTICE_FREE = '材料包订单暂不支持在线取消；没有使用的到机码会在有效期结束后自动失效。'
+
 function parseAmountCents(value) {
   if (value === undefined || value === null || value === '') return null
   const amountCents = Number(value)
@@ -170,6 +174,8 @@ function resolvePackageStatus(order, now) {
   const taskStatus = (order && order.taskStatus) || ''
   const payStatus = (order && order.payStatus) || ''
   const expiresAt = order && order.expiresAt ? new Date(order.expiresAt).getTime() : 0
+  // 试点免费（0 元，服务端建单即记为已付）不提付款：首版不出现任何价格或购买引导（2026-09-30）
+  const free = parseAmountCents(order && order.amountCents) === 0
 
   // 出纸任务的终态优先：它一旦有结论，就是用户最关心的那个事实。
   if (taskStatus === 'completed') return { key: 'done', label: '已完成', tone: 'ok' }
@@ -181,17 +187,17 @@ function resolvePackageStatus(order, now) {
   if (pickupStatus === 'cancelled') return { key: 'done', label: '已取消', tone: 'neutral' }
   if (pickupStatus === 'pending') {
     if (expiresAt && expiresAt <= at) return { key: 'done', label: '到机码已过期', tone: 'neutral' }
-    return { key: 'waiting', label: '待到机 · 现场付款', tone: 'wheat' }
+    return { key: 'waiting', label: free ? '待到机' : '待到机 · 现场付款', tone: 'wheat' }
   }
   if (pickupStatus === 'claimed') {
     // 核销了但还没付款：pickup-order.service 在出纸前硬卡 payStatus !== 'paid'。
     if (payStatus !== 'paid') return { key: 'printing', label: '已核销 · 待现场付款', tone: 'wheat' }
-    return { key: 'printing', label: '已付款 · 正在进入队列', tone: 'teal' }
+    return { key: 'printing', label: free ? '已核销 · 正在进入队列' : '已付款 · 正在进入队列', tone: 'teal' }
   }
   if (pickupStatus === 'used') {
     // 已付款并已交给一体机，此时 taskStatus 镜像 PrintTask.status。
     if (taskStatus === 'printing') return { key: 'printing', label: '正在打印', tone: 'teal' }
-    return { key: 'printing', label: '已付款 · 排队出纸', tone: 'teal' }
+    return { key: 'printing', label: free ? '排队出纸' : '已付款 · 排队出纸', tone: 'teal' }
   }
   // 未登记的服务端状态不猜：原样回显状态串，比编一个好看的标签安全。
   return { key: 'done', label: taskStatus || pickupStatus || '状态未知', tone: 'neutral' }
@@ -262,8 +268,9 @@ function statusText(kind, value) {
  * 只显示一个合成状态时，运营和用户都没法判断卡在哪一步。
  */
 function statusDetail(order) {
+  const free = parseAmountCents(order && order.amountCents) === 0
   return `取件 ${statusText('pickup', order && order.pickupStatus)}`
-    + ` · 付款 ${statusText('pay', order && order.payStatus)}`
+    + (free ? '' : ` · 付款 ${statusText('pay', order && order.payStatus)}`)
     + ` · 任务 ${statusText('task', order && order.taskStatus)}`
 }
 
@@ -459,6 +466,8 @@ module.exports = {
   PACKAGE_PII_PURPOSES,
   PACKAGE_ONSITE_NOTICE,
   PACKAGE_NO_CANCEL_NOTICE,
+  PACKAGE_ONSITE_NOTICE_FREE,
+  PACKAGE_NO_CANCEL_NOTICE_FREE,
   parseAmountCents,
   formatAmount,
   formatExpireAt,

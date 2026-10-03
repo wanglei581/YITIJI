@@ -223,7 +223,7 @@ function AmountCard(props: CashierQxViewProps & { free: boolean }) {
     : !known
       ? '金额暂不可用，请从我的打印订单重新进入查看。'
       : props.free
-        ? '本单实付 0 元 · 下一步的实际价格为 0，本次未收款'
+        ? '免费试运营 · 本单实付 0 元 · 本次未收款'
         : state === 'refunding' || state === 'partial-refunded' || state === 'refunded'
           ? '本单实付金额来自已建订单；退款金额与到账时间以支付渠道账单为准，本机不估算'
           : state === 'expired' || state === 'attempt-failed'
@@ -269,6 +269,8 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
     if (props.file.pages !== null && props.file.pages !== undefined) parts.push(`${props.file.pages} 页`)
     if (props.params?.copies) parts.push(`${props.params.copies} 份`)
     rows.push(['内容', parts.join(' · ')])
+  } else {
+    rows.push(['内容', '尚未取得文件信息，请到订单详情核对'])
   }
   if (props.params) {
     const params = [
@@ -277,6 +279,8 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
       DUPLEX_LABEL[props.params.duplex] ?? null,
     ].filter(Boolean)
     if (params.length > 0) rows.push(['参数', params.join(' · ')])
+  } else {
+    rows.push(['参数', '尚未取得参数信息，请到订单详情核对'])
   }
   if (props.channelLabel && !props.rows.some(([key]) => key === '支付通道')) rows.push(['支付通道', props.channelLabel])
   rows.push(...props.rows)

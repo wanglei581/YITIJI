@@ -18,9 +18,24 @@ function fail(message) {
 console.log('\n=== Admin orders read-only UI verification ===')
 
 if (!existsSync(servicePath)) fail('adminOrdersReadonly service is missing')
-const page = readFileSync(pagePath, 'utf8')
+const orderSources = ['apps/admin/src/routes/orders/index.tsx', 'apps/admin/src/routes/orders/useOrderDetail.ts', 'apps/admin/src/routes/orders/orderDisplay.ts', 'apps/admin/src/routes/orders/orderColumns.tsx', 'apps/admin/src/routes/orders/OrderDetailDrawer.tsx', 'apps/admin/src/routes/orders/OrderAftercare.tsx', 'apps/admin/src/routes/orders/OrderPaymentActions.tsx']
+const page = orderSources.map((file) => readFileSync(join(root, '../..', file), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')).join('\n')
+const index = readFileSync(pagePath, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+const drawer = readFileSync(join(root, 'src/routes/orders/OrderDetailDrawer.tsx'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+if (!index.includes('<OrderDetailDrawer controls={controls}')) fail('orders/index.tsx 必须实际挂载 OrderDetailDrawer')
+for (const component of ['useOrderDetail', 'orderColumns']) {
+  if (!index.includes(`${component}(`) && !index.includes(`<${component} `)) fail(`订单页必须实际调用 ${component}`)
+}
+for (const component of ['OrderAftercare', 'OrderPaymentActions']) {
+  if (!drawer.includes(`<${component} controls={controls}`)) fail(`详情必须实际渲染 ${component}`)
+}
 const service = readFileSync(servicePath, 'utf8')
 const honestyCopy = readFileSync(honestyCopyPath, 'utf8')
+if (!index.includes('const [pageSize, setPageSize] = useState(20)') ||
+    !index.includes('pageSize={pageSize}') || !index.includes('onPageSizeChange={setPageSize}') ||
+    !index.includes('pageSize,') || !index.includes('${page}:${pageSize}')) fail('统一分页器每页条数必须接入查询状态和刷新键')
 
 if (page.includes('adminOrdersReadonlyService') && !page.includes('listPrintTasks')) {
   pass('orders page uses the read-only order service, not print task fallback')
@@ -128,7 +143,11 @@ if (
   page.includes('label="份数"') &&
   page.includes('label="页范围"') &&
   page.includes('duplexText(detail.print?.duplex)') &&
-  page.includes('pageRangeText(detail.print?.pageRange)') &&
+  page.includes('pageRangeText(detail.print?.pageRange, detail.billablePages)') &&
+  page.includes('label="计费页数"') &&
+  page.includes('billablePagesText(detail.billablePages)') &&
+  page.includes('orderPagesText(order.billablePages, order.copies)') &&
+  service.includes('billablePages: number | null') &&
   !page.includes('label="打印参数"')
 ) {
   pass('订单详情逐项展示打印参数，缺值走 helper（未记录），不再合成一行把缺项吃掉')

@@ -270,6 +270,8 @@ const PAGES = {
     requote: (page) => page.retryQuote(),
     label: (page) => page.data.priceConfirmLabel,
     shown: (page) => (page.data.quoteState === 'ready' ? (page.data.isFreeOrder ? '免费' : '¥' + page.data.fee.total) : ''),
+    // 页面拿它决定显示「免费试运营」还是金额与付款说法（free-pilot-copy.test.mjs）
+    free: (page) => page.data.isFreeOrder,
     notice: (page) => page.data.priceChangeText,
     ok: (id, amountCents) => ({ data: { id, amountCents } }),
     submitLabel: '确认提交',
@@ -289,6 +291,7 @@ const PAGES = {
     requote: (page) => page.recover({ currentTarget: { dataset: { recover: page.data.quoteRecover } } }),
     label: (page) => page.data.priceConfirmLabel,
     shown: (page) => (page.data.quoteState === 'ready' ? page.data.quoteAmountText : ''),
+    free: (page) => page.data.quoteFree,
     notice: (page) => (page.data.submitErrorTitle === '价格已更新' ? page.data.submitErrorText : ''),
     ok: (orderId, amountCents) => ({ data: { orderId, amountCents, pickupStatus: 'pending', payStatus: 'unpaid', taskStatus: 'pending_release' } }),
     submitLabel: '确认下单',
@@ -304,6 +307,7 @@ for (const [name, P] of Object.entries(PAGES)) {
       server.quote = { amountCents: before, billablePages: 3 }
       const page = await P.open(wx)
       assert.equal(P.shown(page), yuan(before))
+      assert.equal(P.free(page), before === 0, '0 元才算免费，页面据此不提钱')
 
       P.tap(page)
       await flush()
@@ -319,6 +323,7 @@ for (const [name, P] of Object.entries(PAGES)) {
       await flush()
       assert.equal(server.creates.length, 1, '价格变化后不得自动重发')
       assert.equal(P.shown(page), yuan(after), '屏幕换成服务端当前金额')
+      assert.equal(P.free(page), after === 0, '价格变了，免费与否跟着服务端当前金额走')
       assert.equal(P.label(page), `按新金额${P.submitLabel}`, '主按钮写明是按新金额确认')
       assert.ok(P.notice(page).includes(yuan(before)) && P.notice(page).includes(yuan(after)), P.notice(page))
       assert.ok(P.notice(page).includes('没有建单'), '要说清这一次没有建单')
@@ -654,4 +659,19 @@ test('package：带着已建成的原单重进 —— 锁定说明写出原单�
   PAGES.package.tap(page)
   await flush()
   assert.equal(server.creates.length, 0, '原单金额不能拿去下单')
+})
+
+test('package：原单是 0 元（试点免费）时，锁定说明不提原单金额', async () => {
+  const { wx, server } = freshWorld()
+  const first = await PAGES.package.open(wx)
+  const fingerprint = packageIdem.fingerprintOf(first._orderPayload())
+  first.onUnload()
+  await seedOrder(packageIdem, fingerprint, 'pkg-old')
+
+  const page = await PAGES.package.open(wx)
+  server.lookups[0].respond(200, { data: { orderId: 'pkg-old', amountCents: 0, pickupStatus: 'cancelled', payStatus: 'paid', taskStatus: 'cancelled' } })
+  await flush()
+  assert.ok(page.data.quoteErrorText.includes('重新下单'), page.data.quoteErrorText)
+  assert.doesNotMatch(page.data.quoteErrorText, /金额|免费|原订单/, page.data.quoteErrorText)
+  assert.ok(page.data.onsiteNoticeFree && page.data.noCancelNoticeFree, '免费时的两句说明已进 data')
 })

@@ -32,9 +32,11 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { validateSync } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
-import { Logger } from '@nestjs/common'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
-import { ResumeLayoutAdjustDto } from '../src/ai/dto/resume-generate.dto'
+import { ResumeGenerateExportDto, ResumeLayoutAdjustDto } from '../src/ai/dto/resume-generate.dto'
+import { ResumePdfService } from '../src/ai/resume/resume-pdf.service'
+import { extractPdfText, openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import type { GeneratedResume } from '../src/ai/interfaces/ai-provider.interface'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
@@ -147,6 +149,43 @@ function configured(baseURL: string, enabled = true) {
 async function main(): Promise<void> {
   console.log('\n=== Wave 2 AI 简历排版/内容一键调整验证 ===')
   Logger.overrideLogger({ log: () => {}, error: () => {}, warn: () => {}, debug: () => {}, verbose: () => {}, fatal: () => {} })
+
+  // 真模型解析路径也接受漏抽的意向，即使原文有意向，也没有服务端回补保证。
+  const parser = new LlmResumeOptimizeService({} as never) as unknown as {
+    parseAndValidate(raw: string, text: string, forbidden: string[]): { optimizedResume: GeneratedResume } | null
+  }
+  const parsed = parser.parseAndValidate(JSON.stringify({ resume: {
+    basic: baseResume.basic, summary: '', education: [], experience: [], projects: [], skills: [], certificates: [],
+  }, modules: [] }), ORIGINAL_TEXT, [])
+  if (!parsed || parsed.optimizedResume.intention.position !== '') fail('W-116. 真模型漏抽意向应归一为空，不能编造')
+
+  // W-116：必须经过真实嵌套 DTO 校验，直接调用 renderer 会漏掉线上 400。
+  const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true })
+  for (const intention of [{ position: '' }, {}, undefined]) {
+    const input: Record<string, unknown> = { ...baseResume, intention, format: 'pdf' }
+    if (intention === undefined) delete input['intention']
+    const dto = await pipe.transform(input, {
+      type: 'body', metatype: ResumeGenerateExportDto,
+    }) as ResumeGenerateExportDto
+    if (dto.intention.position !== '') fail('W-116. 无求职意向不得被编造为一个岗位')
+    const { buffer, pageCount } = await new ResumePdfService().render(dto, { contentId: 'verify-w116-no-intention' })
+    if (buffer.subarray(0, 4).toString() !== '%PDF' || pageCount < 1) fail('W-116. 无求职意向也必须能导出 PDF')
+    const document = await openUnpdfDocument<{ destroy(): Promise<void> }>(new Uint8Array(buffer))
+    try {
+      const extracted = await extractPdfText(document, { mergePages: true })
+      const text = Array.isArray(extracted.text) ? extracted.text.join('\n') : extracted.text
+      if (!text.includes(baseResume.basic.name) || text.includes('求职意向') || text.includes('意向城市')) {
+        fail('W-116. PDF 必须保留姓名，且不得印空的求职意向标题')
+      }
+    } finally { await document.destroy() }
+  }
+  for (const position of [123, '岗'.repeat(61)]) {
+    const invalid = plainToInstance(ResumeGenerateExportDto, { ...baseResume, intention: { position } })
+    if (validateSync(invalid).length === 0) fail('W-116. 可选意向仍必须校验字符串类型和长度')
+  }
+  pass('W-116. 无求职意向也能通过导出 DTO 校验并生成 PDF，不印空标题、不编造岗位')
+  // 只跑 W-116 的无数据库回归，供无法监听本地桩服务的沙箱执行；默认仍跑完整门禁。
+  if (process.argv.includes('--export-only')) return
 
   const server = createServer((req, res) => {
     const chunks: Buffer[] = []

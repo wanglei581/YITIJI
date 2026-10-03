@@ -3,6 +3,7 @@ import { Redis } from 'ioredis'
 import { MemberDataExportRedisService } from './member-data-export-redis.service'
 import { PartnerAccountActionRedisService } from './partner-account-action-redis.service'
 import { RedisConnectivityService } from './redis-connectivity.service'
+import { redisClientOptions } from './redis-client-options'
 import { REDIS_CLIENT, RedisService } from './redis.service'
 
 /**
@@ -24,7 +25,8 @@ import { REDIS_CLIENT, RedisService } from './redis.service'
  * 现已由 `RedisConnectivityService` + `withBootTimeout()` 兜底，注释与行为对齐。
  *
  * 注意区分两条 Redis 路径（两者行为不同，不要混谈）：
- * - 这里的裸 ioredis 客户端：`maxRetriesPerRequest` 取默认值 20，
+ * - 这里的裸 ioredis 客户端：不设 `REDIS_MAX_RETRIES_PER_REQUEST` 时仍是 ioredis 默认 20
+ *   （该变量只给验证把重试改小，生产不要设）。
  *   Redis 不可达时命令会在 ~10s 后以 MaxRetriesPerRequestError **显式 reject**，
  *   请求层不会静默挂起（显式报错优于静默放行）。
  * - BullMQ 自建连接：`maxRetriesPerRequest: null`，命令永不 reject。
@@ -40,7 +42,9 @@ import { REDIS_CLIENT, RedisService } from './redis.service'
         if (!url) {
           throw new Error('REDIS_URL 未配置。member-auth(C 端登录会话/验证码/频控)强依赖 Redis,请在 services/api/.env 中设置。')
         }
-        return new Redis(url)
+        const options = redisClientOptions()
+        // 未设置时保持原来的 `new Redis(url)`，不把空对象传进去。
+        return Object.keys(options).length === 0 ? new Redis(url) : new Redis(url, options)
       },
     },
     RedisService,
