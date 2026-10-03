@@ -35,19 +35,38 @@ export function getLockPath(): string { return path.join(stateDir(), PID_FILE) }
 export function getInstanceIdentityPath(): string { return path.join(stateDir(), INSTANCE_ID_FILE) }
 
 // 首次启动时由服务（LocalSystem）在只有 SYSTEM 与管理员可写的状态目录里生成随机标识。
-// 缺文件就生成；两个进程同时生成时独占创建只有一个成功，另一个读取它写好的那份；
+// 缺文件就生成；两个进程同时生成时只有一个能把正式文件名占上，另一个读取它写好的那份；
 // 读得到但格式不对（被改过）仍然拒绝启动，绝不退回固定管道名。
+//
+// 正式文件名一出现，内容就必须是完整的：先把内容写进同目录的临时文件并落盘，再用硬链接
+// 落到正式文件名。硬链接是原子的，目标已存在就 EEXIST（NTFS 与 POSIX 都如此）。
+// 不能「独占创建正式文件、再往里写」：另一个进程会在建出文件、内容还没写进去的那一刻读到空串，
+// 被下面的格式校验当成「被改坏」拒绝启动（2026-10-03 CI 偶发，退出码 3）。
+// 状态目录所在的卷不支持硬链接时按「生成不了」拒绝启动，不退回先建后写。
 function createMachineIdentity(file: string): string {
   const value = crypto.randomBytes(16).toString('hex')
+  const dir = path.dirname(file)
+  const temp = path.join(dir, `${INSTANCE_ID_FILE}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`)
   try {
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(file, `${value}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-    return value
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-      try { return fs.readFileSync(file, 'utf8').trim() } catch { /* fall through to fail-closed */ }
+    fs.mkdirSync(dir, { recursive: true })
+    const fd = fs.openSync(temp, 'wx', 0o600)
+    try {
+      fs.writeSync(fd, `${value}\n`)
+      fs.fsyncSync(fd)
+    } finally {
+      fs.closeSync(fd)
     }
+    try {
+      fs.linkSync(temp, file) // machine-identity-publish
+      return value
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      return fs.readFileSync(file, 'utf8').trim()
+    }
+  } catch {
     throw new Error(`machine_identity_unavailable: cannot create ${file}`)
+  } finally {
+    try { fs.unlinkSync(temp) } catch { /* 临时文件没建出来或已删 */ }
   }
 }
 

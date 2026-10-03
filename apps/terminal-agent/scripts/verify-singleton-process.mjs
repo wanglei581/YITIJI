@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -18,10 +18,10 @@ const identitySource = `try { console.log(require('./src/agent/instance-lock')._
 
 // 持有者一直活到被测试显式结束（CI 慢时 60 秒不够，自己到时退出会被误判成锁丢了）；收尾统一强杀。
 const spawned = []
-function run(source, programData) {
+function run(source, programData, extraEnv = {}) {
   const proc = spawn(process.execPath, ['-r', 'ts-node/register', '-e', source], {
     cwd: process.cwd(),
-    env: { ...process.env, PROGRAMDATA: programData },
+    env: { ...process.env, PROGRAMDATA: programData, ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const out = { stdout: '', stderr: '', code: undefined }
@@ -33,6 +33,38 @@ function run(source, programData) {
   return out
 }
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// 并发生成机器标识的一轮：两个子进程各自加载好模块、报「就绪」后空转等放行文件，
+// 父进程见两边都就绪再放行，让两边尽量同一时刻去生成。类型检查前面的用例已经做过，这里只转译以省时间。
+const RACE_ROUNDS = 50
+async function raceIdentity(modulePath) {
+  const raceRoot = mkdtempSync(join(tmpdir(), 'terminal-agent-identity-race-'))
+  try {
+    const go = join(raceRoot, 'go')
+    const source = `const fs = require('fs'); const lock = require(${JSON.stringify(modulePath)}); fs.writeFileSync(process.env.RACE_READY, '1'); while (!fs.existsSync(process.env.RACE_GO)) {} try { console.log(lock.__readMachineIdentityForTests()) } catch (e) { console.error(e.message); process.exit(3) }`
+    const racers = [0, 1].map((index) => run(source, raceRoot, {
+      RACE_READY: join(raceRoot, `ready-${index}`),
+      RACE_GO: go,
+      TS_NODE_TRANSPILE_ONLY: 'true',
+    }))
+    const deadline = Date.now() + 30_000
+    while (Date.now() < deadline && !(existsSync(join(raceRoot, 'ready-0')) && existsSync(join(raceRoot, 'ready-1')))) {
+      if (racers.some((racer) => racer.code !== undefined)) break
+      await wait(10)
+    }
+    writeFileSync(go, '1')
+    await Promise.all(racers.map((racer) => racer.exited))
+    const stateDir = join(raceRoot, 'AIJobPrintAgent')
+    return {
+      codes: racers.map((racer) => racer.code),
+      values: racers.map((racer) => racer.stdout.trim()),
+      stderr: racers.map((racer) => racer.stderr).join('\n'),
+      leftovers: existsSync(stateDir) ? readdirSync(stateDir).filter((name) => name !== 'instance-id') : [],
+    }
+  } finally {
+    rmSync(raceRoot, { recursive: true, force: true })
+  }
+}
 // 等子进程明确报「已持有」或已经退出，不用固定时长猜（慢机器上 ts-node 启动可能超过 1 秒）。
 async function settle(child, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs
@@ -74,12 +106,39 @@ try {
     assert.equal(await again.exited, 0)
     assert.equal(again.stdout.trim(), created, 'identity is stable across starts')
 
-    const raceRoot = mkdtempSync(join(tmpdir(), 'terminal-agent-identity-race-'))
-    const racers = [run(identitySource, raceRoot), run(identitySource, raceRoot)]
-    await Promise.all(racers.map((r) => r.exited))
-    assert.deepEqual(racers.map((r) => r.code), [0, 0], `concurrent first starts must both succeed\n${racers.map((r) => r.stderr).join('\n')}`)
-    assert.equal(racers[0].stdout.trim(), racers[1].stdout.trim(), 'concurrent first starts must agree on one identity')
-    rmSync(raceRoot, { recursive: true, force: true })
+    // 并发首次启动：两个进程对齐到同一毫秒再生成标识，循环 50 轮都必须双双成功且结果一致。
+    // 单跑一轮撞不上「正式文件已建出、内容还没写进去」的窗口（2026-10-03 CI 偶发红过一次）。
+    for (let round = 0; round < RACE_ROUNDS; round += 1) {
+      const outcome = await raceIdentity('./src/agent/instance-lock')
+      assert.deepEqual(outcome.codes, [0, 0], `concurrent first starts must both succeed (round ${round})\n${outcome.stderr}`)
+      assert.equal(outcome.values[0], outcome.values[1], `concurrent first starts must agree on one identity (round ${round})`)
+      assert.match(outcome.values[0], /^[0-9a-f]{32}$/, `raced identity must be complete (round ${round})`)
+      assert.deepEqual(outcome.leftovers, [], `no temp file may be left beside instance-id (round ${round})`)
+    }
+
+    // 反向变异：把「临时文件 + 硬链接」退回成「先独占建出正式文件、再写内容」，同样的循环必须能红。
+    // 变异体写成源文件旁的副本，不改真正的源文件；门禁被中途杀掉也只留下一个未跟踪的副本。
+    const lockSourcePath = join(process.cwd(), 'src', 'agent', 'instance-lock.ts')
+    const original = readFileSync(lockSourcePath, 'utf8')
+    const publishAnchor = 'fs.linkSync(temp, file) // machine-identity-publish'
+    assert.equal(original.split(publishAnchor).length, 2, 'publish anchor must appear exactly once in instance-lock.ts')
+    const mutantName = `instance-lock.mutant-${process.pid}`
+    const mutantPath = join(process.cwd(), 'src', 'agent', `${mutantName}.ts`)
+    writeFileSync(mutantPath, original.replace(
+      publishAnchor,
+      "{ const mfd = fs.openSync(file, 'wx', 0o600); try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300); fs.writeSync(mfd, `${value}\\n`) } finally { fs.closeSync(mfd) } }",
+    ))
+    try {
+      let mutantRed = false
+      for (let round = 0; round < RACE_ROUNDS && !mutantRed; round += 1) {
+        const outcome = await raceIdentity(`./src/agent/${mutantName}`)
+        mutantRed = outcome.codes.some((code) => code !== 0) || outcome.values[0] !== outcome.values[1]
+        if (mutantRed) assert.match(outcome.stderr, /machine_identity_invalid/, `create-then-write mutant must fail as half-written identity\n${outcome.stderr}`)
+      }
+      assert.equal(mutantRed, true, 'create-then-write mutant must be caught by the concurrent first-start loop')
+    } finally {
+      rmSync(mutantPath, { force: true })
+    }
 
     writeFileSync(idFile, 'bad id with spaces\n')
     const tampered = run(identitySource, idRoot)

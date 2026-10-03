@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-10-03：Agent 机器标识改为原子落盘，修掉并发首次启动的偶发失败（分支 `claude/agent-machine-identity-atomic-1003`）
+
+- **现象：** #1202 的 build-and-verify 红在 `verify-singleton-process.mjs`「concurrent first starts must both succeed」，其中一个进程报 `machine_identity_invalid`。#1202 没碰 Agent；这条会随机让任何 PR 变红。
+- **原因：** `instance-lock.ts` 的 `createMachineIdentity` 用独占方式建出正式文件、再往里写内容。另一个进程在文件已建出、内容还没写进去的那一刻读到空串，过不了格式校验，被当成「被改坏」拒绝启动。
+- **修法：** 先把内容写进同目录临时文件并落盘，再用硬链接落到正式文件名（目标已存在即 EEXIST，NTFS 与 POSIX 都是原子的）；拿到 EEXIST 的一方读正式文件，这时内容一定完整。临时文件用完即删。「内容非法就拒绝」没有变弱：仍然报 `machine_identity_invalid`，不重建。状态目录所在的卷不支持硬链接时按 `machine_identity_unavailable` 拒绝启动，不退回先建后写。
+- **门禁：** 并发断言改为两个进程对齐后循环 50 轮，每轮都要双双成功、结果一致、目录里不留临时文件。加一条反向变异：把发布这一步退回成「先独占建出正式文件、等 300 毫秒再写」，同样的循环必须红在 `machine_identity_invalid`；变异体写成源文件旁的副本，不改真正的源文件。
+- **本机已验（macOS）：** 门禁连跑 4 次通过（修复后的代码合计 200 轮无失败）；把变异换成「不变」，门禁红在「变异没被抓到」；把修复整个退回成原写法、不加人为延时，3 次里有 1 次被 50 轮循环直接抓到（真实窗口只有微秒级，所以确定性由带延时的变异保证）。terminal-agent 全部 `verify:*` 与 `tsc --noEmit` 通过。
+- **没在本机验证：** Windows NTFS。由本 PR 的 `windows-agent-installer` 工作流实跑同一条门禁；没有在 KSK-001 上跑。
+- **影响范围：** 0.4.13 不含此修复，不为它单独出安装包，下次出包带上。影响只在首次安装（标识文件还不存在）时两个 Agent 进程同时启动；标识文件一旦生成就不再走这段代码。现场撞上时，后到的进程以退出码 1 退出（诊断码 `INSTANCE_LOCK_UNAVAILABLE`），服务恢复策略 60 秒后重启一次、再失败 300 秒后重启一次、之后不再重启（一天后清零）；60 秒后那次重启时标识文件已完整，正常即可启动。
+
 ## 2026-10-02：可串行化冲突重试前加短暂随机等待；并发门禁按调用方分别计数（分支 `claude/backend-hardening-20261002-serializable-retry-wait`）
 
 - **问题：** 10/1 main CI 上 `verify:pg-serialization-conflict:postgres` 偶发红：期望事务恰好 3 次，实际 4 次。成因是输的一方拿到冲突后**立刻**重试，新快照可能早于赢家提交可见，读到旧状态再冲突一次。结果仍正确，但白耗一次重试额度；连撞到 3 次上限会把冲突原样抛成 500。
