@@ -164,10 +164,11 @@ try {
 
     writeFileSync(idFile, '')
     const delayed = run(identitySource(), idRoot)
+    // startReaders 等到子进程报 READING（它已读到空文件、进入重读窗口）才返回，这里立刻写入。
+    // 不用固定延时：重读窗口只有 250ms，CI 机器忙时父进程的定时器晚到会让本用例自己变成偶发红。
     await startReaders([delayed])
-    await wait(80)
     writeFileSync(idFile, `${created}\n`)
-    assert.equal(await delayed.exited, 0, `empty identity completed after 80ms must succeed\n${delayed.stderr}`)
+    assert.equal(await delayed.exited, 0, `empty identity completed during the retry window must succeed\n${delayed.stderr}`)
     assert.equal(delayed.stdout.trim(), created)
     assertIdentityFiles(idRoot)
 
