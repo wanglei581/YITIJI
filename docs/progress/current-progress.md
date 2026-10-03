@@ -9,6 +9,9 @@
 
 - **改了什么：** 现场验收单 R.4 一页纸表格第 3 行原写「KSK-001 加 `-KeepFileSelectionDialogs -KeepPrinterQueueUnpaused`」，和 R.2 正文「发布当天 KSK-001 不加 `-KeepPrinterQueueUnpaused`」矛盾。改为只加 `-KeepFileSelectionDialogs`，并写明用命令行重跑、不用控制中心的按钮（控制中心不带这个开关，会把工作电脑上 Edge 的文件选择框整机禁掉）。第 3b 行补一句：KSK-001 是笔记本，空闲断电用长按电源键强制关机代替。
 - **为什么：** 9/30 给产品负责人备 0.4.13 升级的一页纸时照表格写错过一次，已当场更正。没有改代码、门禁或产品行为。
+## 2026-10-03：小程序模拟面试等四处把错误原话丢掉（走查登记；分支 `claude/miniapp-interview-error-copy`）
+
+请求层（`utils/request.js`）把给用户看的原话放在 `err.message`、错误码放在 `err.code`，模拟面试答题页、面试报告页、选终端页却读不存在的 `err.error`，结果原话永远读不到，只显示兜底句；面试报告页按错误码认「会话不存在」的判断也从未生效。修四处：提交答案、生成报告、打印复盘报告、终端列表加载失败。提交答案与打印复盘报告由 toast 改为弹窗（toast 只有两行，原话会被截断），已输入的回答照旧保留。只改 JS，不改样式。`page-lifecycle.test.mjs` 新增 6 条页面实跑用例（含「页面不许读 err.error」），7 处改动逐处反向变异全部转红。
 
 ## 2026-09-30：AI 简历走查 W-107 / W-108（隔离工作区 qx-w107，基线 `677cffefdb75edd82d18e50d6e50a21d48014e0f`）
 
