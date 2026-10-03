@@ -184,7 +184,7 @@ export default function MemberBenefitsPage() {
         权益只代表本终端服务与打印辅助。政策资格提示只作官方入口与材料指引，不代办、不承诺办理结果；页面不展示明文手机号。
       </div>
 
-      <form onSubmit={(event) => void search(event)} className="mb-4 flex gap-3">
+      <form lang="zh-CN" onSubmit={(event) => void search(event)} className="mb-4 flex gap-3">
         <input
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
@@ -224,7 +224,7 @@ export default function MemberBenefitsPage() {
               </div>
             </div>
 
-            <form onSubmit={(event) => void submitGrant(event)} className="mt-4 space-y-3">
+            <form lang="zh-CN" onSubmit={(event) => void submitGrant(event)} className="mt-4 space-y-3">
               <div>
                 <label className="text-xs font-medium text-neutral-500">权益类型</label>
                 <select
@@ -273,8 +273,8 @@ export default function MemberBenefitsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-neutral-500">有效期至</label>
-                  <input value={validUntil} onChange={(event) => setValidUntil(event.target.value)} type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" />
+                  <label className="text-xs font-medium text-neutral-500">有效期至（年/月/日 时:分）</label>
+                  <input value={validUntil} onChange={(event) => setValidUntil(event.target.value)} lang="zh-CN" title="格式：年/月/日 时:分" type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" />
                 </div>
               </div>
               <button
@@ -303,8 +303,8 @@ export default function MemberBenefitsPage() {
                   <div key={item.id} className="rounded-lg border border-neutral-100 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
-                        <p className="mt-1 text-xs text-neutral-400">{item.phoneMasked} · {item.sourceType} · 创建于 {fmt(item.createdAt)}</p>
+                        <p title={item.title} className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
+                        <p className="mt-1 text-xs text-neutral-400">{item.phoneMasked} · {SOURCE_TYPES.find((type) => type.value === item.sourceType)?.label ?? '其他来源'} · 创建于 {fmt(item.createdAt)}</p>
                       </div>
                       <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', STATUS_CLASS[item.status]].join(' ')}>
                         {STATUS_LABEL[item.status]}

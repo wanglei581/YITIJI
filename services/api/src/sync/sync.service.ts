@@ -8,6 +8,7 @@ import { RedisService } from '../common/redis/redis.service'
 import type { WebhookPayloadDto } from './dto/webhook-payload.dto'
 import { assertDataSourceCapability } from '../jobs/partner-capabilities'
 import {
+  assertRecruitmentContentHostingEnabled,
   EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE,
   recruitmentCircuitBlocks,
 } from '../recruitment-hosting/recruitment-hosting'
@@ -65,6 +66,8 @@ export class SyncService {
     userAgent: string | null
     requestId: string | null
   }): Promise<{ imported: number; receivedRequestId: string }> {
+    // 拒绝必须先于 nonce、导入以及失败日志写入。
+    assertRecruitmentContentHostingEnabled()
     const denied = (): never => {
       throw new UnauthorizedException({
         error: { code: 'WEBHOOK_UNAUTHORIZED', message: '签名无效或已过期' },

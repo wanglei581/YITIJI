@@ -123,7 +123,8 @@ console.log('\n=== Admin 招聘类页面 3.15 停放验证 ===')
 
   // 两个 <select> 真的用了这两个函数（改回 Object.entries(PARTNER_TYPE_LABELS) 会在这里红）
   const pagePath = R('partners/index.tsx')
-  const page = readOrFail(pagePath)
+  if (!/<CreateOrgDrawer[\s/>]/.test(readOrFail(pagePath)) || !/<OrgDetailDrawer[\s/>]/.test(readOrFail(pagePath))) fail('机构新建与详情抽屉必须仍由原页面渲染')
+  const page = ['CreateOrgDrawer.tsx', 'OrgDetailDrawer.tsx'].map((f) => readOrFail(R(`partners/${f}`))).join('\n')
   const ast = sourceFile(pagePath, page)
   const typeSelects = collect(ast, (n) => ts.isJsxElement(n) && n.openingElement.tagName.getText() === 'select' &&
     n.openingElement.attributes.properties.some((a) => ts.isJsxAttribute(a) && a.name.getText() === 'value' && /form\.type\b/.test(a.initializer?.getText() ?? '')))
