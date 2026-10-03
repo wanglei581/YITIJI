@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-10-01：main CI 两处红的紧急修复——axios 7 条高危、PG 并发门禁偶发（分支 `claude/axios-ghsa-pg-retry-1001-main`）
+
+- **axios 1.18.1 → 1.20.0**：9/30 发布 7 条 HIGH（GHSA-c29m-xwm3-cm6r、GHSA-mghh-pgcx-3jjj、GHSA-x97p-jq2g-jp4f、GHSA-3pq3-5fj3-cg6v、GHSA-542g-h47m-68v8、GHSA-m8m8-qj5v-23w3、GHSA-r4gj-5m52-g5wh），`verify:dependency-security` 把 main 和所有 PR 卡住。axios 只有一个引入方：`apps/terminal-agent` 的直接依赖，直接升版，锁文件只变 axios，未加 override、未加豁免。
+- **`verify:pg-serialization-conflict:postgres`**：事务次数断言由「恰好 3」改为 3–6。输方重试时的新快照可能早于赢家提交可见而再冲突、再重试一次（main CI 36798144531 实测 4，属正确行为）；下限 3 不放宽，每个调用方上限 3 次；「恰好一个成功、一个 409、只剩 1 个有效账号、1 条审计」不动。重试之间加随机等待是产品侧小加固，后端窗口另开。
+- **验证**：干净安装后依赖门禁 ALL PASS（高危、严重均 0）；installer-inputs、terminal-agent tsc 通过；本机一次性 PostgreSQL 16 + Redis 上并发门禁连跑 6 次全过。变异：axios 退回 1.18.1 依赖门禁退出码 1；把冲突判定改成不重试并发门禁退出码 1；恢复后均为 0。
+
 ## 2026-09-29：两条慢门禁提速——Redis 降级与错误可观测性（分支 `claude/backend-hardening-20260929-gate-speedup`，叠在 #1135 上）
 
 - **时间花在哪（Grok 查、协调方核）：** 两条门禁都把 REDIS_URL 指到死端口起真实服务；ioredis 默认每条命令重试 20 次（约 10 秒到 40 秒），启动探测默认用满 5 秒，隐私调度注册默认用满 8 秒。

@@ -44,7 +44,26 @@ assert.match(manifest.dependencies['form-data'], /^\^4\.0\.6(?:$|[\s])/,
 assert.ok(isAtLeast(installedVersion, '4.0.6'), `installed form-data must be >= 4.0.6, got ${installedVersion}`)
 assert.doesNotMatch(lockfile, /form-data@4\.0\.5:/, 'lockfile must not retain the vulnerable form-data@4.0.5 snapshot')
 assert.match(lockfile, /form-data@4\.0\.6:/, 'lockfile must resolve the patched form-data@4.0.6 snapshot')
-assert.match(lockfile, /axios@1\.18\.\d+:[\s\S]*?form-data: 4\.0\.6/, 'axios must dedupe to the patched form-data resolution')
+// 不钉 axios 的小版本（钉 1.18 的写法在 2026-10-01 升到 1.20.0 时过期变红）。
+// 只看性质：lock 里每个 axios 条目都不低于修掉 7 条高危的 1.20.0，且它自己的依赖块解析到 form-data 4.0.6。
+const AXIOS_SECURITY_FLOOR = '1.20.0'
+const axiosEntries = [...lockfile.matchAll(/^ {2}axios@(\d+\.\d+\.\d+)[^\n]*:\n((?: {4}.*\n)*)/gm)]
+  .map((match) => ({ version: match[1], body: match[2] }))
+assert.ok(axiosEntries.length > 0, 'lockfile must contain an axios entry')
+for (const entry of axiosEntries) {
+  assert.ok(
+    isAtLeast(entry.version, AXIOS_SECURITY_FLOOR),
+    `lockfile axios must be >= ${AXIOS_SECURITY_FLOOR}, got ${entry.version}`,
+  )
+}
+const axiosFormDataResolutions = axiosEntries
+  .flatMap((entry) => [...entry.body.matchAll(/^ {6}form-data: (\S+)$/gm)].map((match) => match[1]))
+assert.ok(axiosFormDataResolutions.length > 0, 'axios snapshot must declare its form-data resolution')
+assert.deepEqual(
+  [...new Set(axiosFormDataResolutions)],
+  ['4.0.6'],
+  'axios must dedupe to the patched form-data resolution',
+)
 
 // Windows filesystems reject CR/LF and double quotes in file names, so this is
 // a local dependency-boundary regression rather than a claim of a physical USB
