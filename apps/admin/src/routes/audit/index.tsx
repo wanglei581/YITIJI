@@ -1,86 +1,15 @@
-import { formatDateTime } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState } from 'react'
-import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
-import { ScrollTextIcon, RefreshCwIcon } from 'lucide-react'
+import { Card, ConsoleTable } from '@ai-job-print/ui'
+import { RefreshCwIcon } from 'lucide-react'
 import { Page } from '../Page'
-import { Pagination, useTableState } from '../components/DataTable'
+import { useTableState } from '../components/DataTable'
 import { getAuditLogs, type AuditLogRecord } from '../../services/api/audit'
+import { auditColumns } from './auditColumns'
+import { AuditDetailDrawer } from './AuditDetailDrawer'
+import { getAuditActionLabel } from '../../lib/auditActionLabels'
 import { API_MODE } from '../../services/api/client'
 
-// ─── Action 中文标签(覆盖契约枚举,未知动作回退原始字符串)──────────────────
-
-const ACTION_LABELS: Record<string, string> = {
-  'partner_account.contact_phone_registered': '登记机构联系人手机',
-  'file.upload':              '文件上传',
-  'file.delete':              '文件删除',
-  'file.force_delete':        '文件删除',
-  'file.cleanup_expired':     '过期文件清理',
-  'job.review':               '岗位审核',
-  'job.publish':              '岗位发布',
-  'job.import':               '岗位导入',
-  'job_source.create':        '岗位数据源创建',
-  'job_source.update':        '岗位数据源更新',
-  'fair.review':              '招聘会审核',
-  'fair.publish':             '招聘会发布',
-  'fair.import':              '招聘会导入',
-  'data_source.create':       '数据源创建',
-  'data_source.toggle':       '数据源启停',
-  'resume.parse_submitted':   '简历解析提交',
-  'resume.optimize_requested':'简历优化请求',
-  'assistant.chat_message':   'AI 助手消息',
-  'organization.create':      '机构创建',
-  'organization.update':      '机构资料更新（历史记录）',
-  'org.update':               '机构资料更新（管理员）',
-  'org.self_profile_update':  '机构自助资料更新',
-  'user.create':              '内部账号创建',
-  'user.disable':             '内部账号停用',
-  'user.enable':              '内部账号启用',
-  'user.step_up_failed':      '本人密码确认失败',
-  'user.backup_admin_challenge_started': '备用管理员验证码已发送',
-  'user.emergency_enable_requested': '备用管理员应急启用',
-  'admin.user.disable':       '用户停用',
-  'auth.password_login':      '密码登录',
-  'auth.sms_login':           '短信登录',
-  'system.login':             '登录（历史记录）',
-  'system.config_change':     '系统配置变更',
-  'alert.acknowledge':        '确认告警',
-  'alert.silence':            '静默告警',
-  'alert.close':              '关闭告警',
-  'alert.reopen':             '重新打开告警',
-  'legal_doc.view':           '查看法务文档正文',
-}
-
-// 筛选下拉常用动作(全部为查询用,空 = 不筛选)
-const ACTION_FILTERS: Array<{ value: string; label: string }> = [
-  { value: '',                   label: '全部动作' },
-  { value: 'auth.password_login', label: '密码登录' },
-  { value: 'auth.sms_login',     label: '短信登录' },
-  { value: 'job.review',         label: '岗位审核' },
-  { value: 'job.publish',        label: '岗位发布' },
-  { value: 'job.import',         label: '岗位导入' },
-  { value: 'fair.review',        label: '招聘会审核' },
-  { value: 'fair.publish',       label: '招聘会发布' },
-  { value: 'file.delete',        label: '文件删除' },
-  { value: 'file.cleanup_expired', label: '过期文件清理' },
-  { value: 'data_source.create', label: '数据源创建' },
-  { value: 'data_source.toggle', label: '数据源启停' },
-  { value: 'org.update',         label: '机构资料更新（管理员）' },
-  { value: 'org.self_profile_update', label: '机构自助资料更新' },
-  { value: 'admin.user.disable', label: '用户停用' },
-]
-
-const ROLE_BADGE: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
-  admin:   'info',
-  partner: 'success',
-  kiosk:   'warning',
-  system:  'default',
-}
-
-const ROLE_LABEL: Record<string, string> = {
-  admin: '管理员', partner: '合作机构', kiosk: '一体机', system: '系统',
-}
-
-const COLUMNS = ['时间', '操作人', '角色', '动作', '目标对象', '终端 IP', '请求 ID']
+const ACTION_FILTERS = ['', 'auth.password_login', 'auth.sms_login', 'admin.user.detail.view', 'admin.user.disable', 'print_job.create', 'order.mark_paid', 'resume.diagnosis_exported', 'file.delete', 'file.cleanup_expired', 'job_ai_session.cleanup_expired', 'ai_resume_result.cleanup_expired', 'job.review', 'job.publish', 'job.import', 'fair.review', 'fair.publish', 'data_source.create', 'data_source.toggle', 'org.update', 'org.self_profile_update']
 
 // 把 datetime-local 值(本地时区)转成 ISO,供后端 startAt/endAt 用
 function toIso(localValue: string): string | undefined {
@@ -91,6 +20,7 @@ function toIso(localValue: string): string | undefined {
 
 export default function AuditPage() {
   const { page, pageSize, setPage, setPageSize } = useTableState(20)
+  const [selected, setSelected] = useState<AuditLogRecord | null>(null)
   const [action, setAction] = useState('')
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
@@ -141,7 +71,7 @@ export default function AuditPage() {
       }
     >
       {/* 筛选栏 */}
-      <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
+      <div lang="zh-CN" className="mb-4 grid min-w-0 grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
         <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
           动作
           <select
@@ -149,11 +79,11 @@ export default function AuditPage() {
             onChange={(e) => { setAction(e.target.value); setPage(1) }}
             className="h-9 w-full min-w-0 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none sm:w-44"
           >
-            {ACTION_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+            {ACTION_FILTERS.map((value) => <option key={value} value={value}>{value ? getAuditActionLabel(value) : '全部动作'}</option>)}
           </select>
         </label>
         <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
-          起始时间
+          起始时间（年/月/日 时:分）
           <input
             type="datetime-local"
             value={startAt}
@@ -162,7 +92,7 @@ export default function AuditPage() {
           />
         </label>
         <label className="flex min-w-0 flex-col gap-1 text-xs text-neutral-500">
-          结束时间
+          结束时间（年/月/日 时:分）
           <input
             type="datetime-local"
             value={endAt}
@@ -181,89 +111,20 @@ export default function AuditPage() {
       </div>
 
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                {COLUMNS.map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-900/[0.06]">
-              {loading ? (
-                [0, 1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i}>
-                    {COLUMNS.map((_, j) => (
-                      <td key={j} className="px-4 py-4">
-                        <div className="h-3 w-3/4 animate-pulse rounded bg-neutral-100" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : error ? (
-                <tr>
-                  <td colSpan={COLUMNS.length}>
-                    <div className="flex flex-col items-center gap-3 py-12">
-                      <p className="text-sm text-neutral-400">日志加载失败,请稍后重试</p>
-                      <button onClick={load} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">
-                        重试
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={COLUMNS.length}>
-                    <EmptyState
-                      title="暂无审计日志"
-                      description={action || startAt || endAt ? '当前筛选条件下没有记录' : undefined}
-                      icon={ScrollTextIcon}
-                      className="py-12"
-                    />
-                  </td>
-                </tr>
-              ) : (
-                items.map((r) => (
-                  <tr key={r.id} className="hover:bg-neutral-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
-                      {formatDateTime(r.createdAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-700">
-                      {r.actorId ?? <span className="text-neutral-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge dot status={ROLE_BADGE[r.actorRole] ?? 'default'} label={ROLE_LABEL[r.actorRole] ?? r.actorRole} />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-700">
-                      {ACTION_LABELS[r.action] ?? r.action}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
-                      <span className="text-neutral-400">{r.targetType}</span>
-                      {r.targetId && <span className="ml-1 font-mono text-neutral-500">#{r.targetId}</span>}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">
-                      {r.ipAddress ?? <span className="text-neutral-300">—</span>}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">
-                      {r.requestId ?? '—'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <Pagination
-          total={total}
-          page={page}
-          pageSize={pageSize}
-          onPageChange={setPage}
+        <div onClick={(event) => {
+          const target = event.target as HTMLElement
+          const row = target.closest('tbody tr') as HTMLTableRowElement | null
+          if (row && !target.closest('button') && !loading && !error && items[row.sectionRowIndex]) setSelected(items[row.sectionRowIndex])
+        }}>
+        <ConsoleTable items={items} columns={auditColumns(setSelected)}
+          loading={loading} error={error ? { message: '日志加载失败，请稍后重试', onRetry: load } : null}
+          empty={{ title: '暂无审计日志', description: action || startAt || endAt ? '当前筛选条件下没有记录' : undefined }}
+          total={total} page={page} pageSize={pageSize} onPageChange={setPage}
           onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
         />
+        </div>
       </Card>
+      <AuditDetailDrawer record={selected} onClose={() => setSelected(null)} />
     </Page>
   )
 }

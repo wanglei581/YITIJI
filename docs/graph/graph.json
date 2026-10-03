@@ -12052,7 +12052,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 209,
+      "reachableFileCount": 220,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12807,7 +12807,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 234
+      "sourceFileCount": 245
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15791,7 +15791,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 76,
+      "reachableFileCount": 77,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16209,7 +16209,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 77
+      "sourceFileCount": 78
     }
   },
   "dataModel": {
@@ -17950,8 +17950,18 @@
       "apps/admin/scripts/verify-feedback-sla.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
+    "apps/admin/src/routes/audit/AuditDetailDrawer.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/audit/auditColumns.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/audit/auditPresentation.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/routes/audit/index.tsx": [
-      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs"
+      "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/billing/index.tsx": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
@@ -18100,8 +18110,14 @@
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
+    "apps/admin/src/routes/partners/ContentTrustCell.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/routes/partners/OrgContentTrustPanel.tsx": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
+    ],
+    "apps/admin/src/routes/partners/OrgDetailDrawer.tsx": [
+      "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
     ],
     "apps/admin/src/routes/partners/OrgQualificationSection.tsx": [
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs"
@@ -18114,13 +18130,23 @@
       "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
+    "apps/admin/src/routes/partners/PartnerTable.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/routes/partners/contentTrustRules.ts": [
-      "apps/admin/scripts/verify-admin-content-trust-ui.mjs"
+      "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/partners/index.tsx": [
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/admin/src/routes/partners/orgFormParts.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/partners/orgPresentation.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/partners/partner-account-action-steps/ActionCredentialSteps.tsx": [
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
@@ -21222,6 +21248,7 @@
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/account/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-honest-placeholders.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
@@ -21259,7 +21286,11 @@
     "apps/partner/src/routes/policy/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
+    "apps/partner/src/routes/profile/ComplianceRestrictions.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/partner/src/routes/profile/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/screen/PartnerGrid.tsx": [
@@ -21960,6 +21991,7 @@
     ],
     "packages/shared/src/types/partner.ts": [
       "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-smart-campus.ts"
     ],
@@ -26617,7 +26649,9 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps/admin/src/routes/partners"
+        ],
         "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/components/BulkPublishButton.tsx",
@@ -26756,6 +26790,7 @@
         "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/index.tsx",
+          "apps/admin/src/routes/partners/OrgDetailDrawer.tsx",
           "apps/admin/src/routes/partners/OrgQualificationSection.tsx",
           "apps/admin/src/routes/partners/index.tsx",
           "apps/admin/src/services/api/offlineAgenciesAdmin.ts",
@@ -27000,6 +27035,10 @@
         "files": [
           "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/lib/printErrorText.ts",
+          "apps/admin/src/routes/audit/AuditDetailDrawer.tsx",
+          "apps/admin/src/routes/audit/auditColumns.tsx",
+          "apps/admin/src/routes/audit/auditPresentation.ts",
+          "apps/admin/src/routes/audit/index.tsx",
           "apps/admin/src/routes/billing/index.tsx",
           "apps/admin/src/routes/devices/TerminalFleetOverview.tsx",
           "apps/admin/src/routes/devices/index.tsx",
@@ -27010,6 +27049,11 @@
           "apps/admin/src/routes/orders/orderColumns.tsx",
           "apps/admin/src/routes/orders/orderDisplay.ts",
           "apps/admin/src/routes/orders/orderHonestyCopy.ts",
+          "apps/admin/src/routes/partners/ContentTrustCell.tsx",
+          "apps/admin/src/routes/partners/PartnerTable.tsx",
+          "apps/admin/src/routes/partners/contentTrustRules.ts",
+          "apps/admin/src/routes/partners/orgFormParts.tsx",
+          "apps/admin/src/routes/partners/orgPresentation.ts",
           "apps/admin/src/routes/peripherals/PeripheralDrawer.tsx",
           "apps/admin/src/routes/peripherals/index.tsx",
           "apps/admin/src/routes/peripherals/peripheralViews.ts",
@@ -27025,9 +27069,13 @@
           "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
           "apps/partner/src/routes/Page.tsx",
+          "apps/partner/src/routes/account/index.tsx",
+          "apps/partner/src/routes/profile/ComplianceRestrictions.tsx",
+          "apps/partner/src/routes/profile/index.tsx",
           "apps/partner/src/routes/smart-campus/index.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
           "packages/shared/src/formatNumber.ts",
+          "packages/shared/src/types/partner.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/audit/audit.types.ts"
         ],

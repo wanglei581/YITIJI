@@ -1,10 +1,10 @@
+import { ComplianceRestrictions } from './ComplianceRestrictions'
 import { PARTNER_TYPE_LABELS, type PartnerType } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import {
   MODULE_LABELS,
   ORG_CONTENT_TRUST_STATUS_LABELS,
   ORG_CONTENT_TRUST_UNSET_LABEL,
-  PROHIBITED_MODULES,
   SCENE_TEMPLATE_LABELS,
   formatDate,
   formatDateTime,
@@ -347,13 +347,7 @@ export default function ProfilePage() {
             <span className="text-xs font-medium text-neutral-500">合规限制 — 永久禁用功能</span>
           </div>
           <p className="mb-2 text-xs text-neutral-400">以下功能属于招聘闭环，无论任何配置均不允许启用：</p>
-          <div className="flex flex-wrap gap-1.5">
-            {PROHIBITED_MODULES.map((m) => (
-              <span key={m} className="rounded bg-error-bg px-2 py-0.5 text-xs text-error-fg line-through">
-                {m}
-              </span>
-            ))}
-          </div>
+          <ComplianceRestrictions />
         </div>
       </Card>
 

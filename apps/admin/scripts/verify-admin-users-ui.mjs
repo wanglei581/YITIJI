@@ -81,7 +81,7 @@ const pageTokens = [
   '重置',
   '刷新',
   '查看详情',
-  'Pagination',
+  'ConsoleTable',
   '暂无注册用户',
   '未找到符合条件的用户',
 ]

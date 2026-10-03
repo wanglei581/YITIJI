@@ -163,7 +163,7 @@ else {
 
 console.log('\n=== 第二批页面实际渲染文案 ===')
 // VM 运行原组件/列定义，替换请求与 hook 的数据源；只取渲染树 children，title 中的核对码不算可见文字。
-const jsx = (type, props = {}) => ({ type, props })
+const jsx = (type, props = {}, key) => ({ type, props, key })
 const runtime = { jsx, jsxs: jsx, Fragment: 'fragment' }
 function textOf(node) {
   if (node == null || typeof node === 'boolean') return ''
@@ -349,6 +349,80 @@ console.log('\n=== 打印错误原因与服务端告警同一口径 ===')
   }
   if (failures.length === 0) console.log(`  PASS 服务端登记的 ${serverCodes.length} 个错误码后台都有中文原因，且不引用一体机源码`)
 }
+
+console.log('\n=== 第四批实际渲染：审计与账号隐私 ===')
+const auditLabels = module.exports
+const auditPresentation = runFile('apps/admin/src/routes/audit/auditPresentation.ts', { '../../lib/auditActionLabels': auditLabels })
+const auditTable = runFile('apps/admin/src/routes/audit/auditColumns.tsx', {
+  '@ai-job-print/shared': shared, '@ai-job-print/ui': ui,
+  '../../lib/auditActionLabels': auditLabels, './auditPresentation': auditPresentation,
+})
+const auditDrawer = runFile('apps/admin/src/routes/audit/AuditDetailDrawer.tsx', {
+  '@ai-job-print/shared': shared, '@ai-job-print/ui': ui,
+  '../../lib/auditActionLabels': auditLabels, './auditPresentation': auditPresentation,
+})
+const auditRecord = { id: 'log_fixture_123456', actorId: 'cmumb2kp40000m7yb1l6p0ssy', actorRole: 'admin', action: 'admin.user.detail.view', targetType: 'EndUser', targetId: 'cmu_fixture_654321', ipAddress: '::ffff:127.0.0.1', createdAt: '2026-09-30T04:00:00Z', requestId: 'request-long-value', userAgent: 'browser-test', payloadJson: '{}' }
+const columns4 = auditTable.auditColumns(() => {})
+if (columns4.map((c) => c.id).join(',') !== 'time,actor,role,action,target,ip') fail('审计列表须为六列，长字段进详情')
+const auditExtraActions = ['admin.user.detail.view', 'job_ai_session.cleanup_expired', 'ai_resume_result.cleanup_expired', 'print_job.create', 'order.mark_paid', 'resume.diagnosis_exported']
+for (const action of [...actions, ...auditExtraActions]) {
+  const visible = textOf(columns4.map((c) => c.cell({ ...auditRecord, action })))
+  if (!visible.includes(getAuditActionLabel(action)) || visible.includes(action)) fail(`审计列表显示原始动作码 ${action}`)
+  if (!visible.includes('管理员 · 尾号 6p0ssy') || visible.includes(auditRecord.actorId)) fail('审计列表应显示角色和尾号，完整 actorId 只在悬停')
+  if (visible.includes('::ffff:') || !visible.includes('127.0.0.1')) fail('审计 IP 展示应去 IPv4 映射前缀')
+  if (visible.includes('EndUser') || visible.includes(auditRecord.targetId) || !visible.includes('用户 · 尾号 654321')) fail('审计对象应显示中文和尾号')
+}
+for (const [role, label] of [['system', '系统'], ['system-cli', '系统'], ['enduser', '用户'], ['partner', '合作机构']]) {
+  const visible = auditPresentation.auditActorText({ ...auditRecord, actorRole: role })
+  if (!visible.startsWith(label) || (label === '系统' && visible !== '系统')) fail(`操作人角色 ${role} 未中文化`)
+}
+const sensitiveKeys = ['phone', 'contactPhone', 'mobile', 'telephone', 'email', 'password', 'passwd', 'pwd', 'access_token', 'refreshToken', 'apiKey', 'secret', 'private_key', 'credential', 'authorization', 'cookie', '手机号', '邮箱', '密码', '令牌', '密钥']
+for (const key of sensitiveKeys) {
+  const payloadJson = JSON.stringify({ reason: '测试原因', nested: [{ [key]: 'sensitive-value' }], unknown_key: 7 })
+  const visible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, payloadJson }, onClose: () => {} }))
+  if (!visible.includes('已隐藏') || visible.includes('sensitive-value')) fail(`抽屉敏感键 ${key} 必须显示已隐藏`)
+  if (!visible.includes('原因') || !visible.includes('测试原因') || !visible.includes('unknown_key') || !visible.includes('7')) fail('详情应翻译已知键并保留未知键和值')
+  if (!visible.includes('request-long-value') || !visible.includes('browser-test')) fail('请求 ID 与浏览器标识必须在详情显示')
+}
+for (const payloadJson of ['bad-json', '{"password":"secret-raw"', '{"email":"test@example.com"', '{"unknown":"13912345678"']) {
+  const visible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, payloadJson }, onClose: () => {} }))
+  if (!visible.includes('详情无法解析') || !visible.includes('查看原文')) fail('坏 JSON 必须提示无法解析并折叠原文')
+  if (payloadJson === 'bad-json' ? !visible.includes(payloadJson) : !visible.includes('已隐藏') || /secret-raw|test@example.com|13912345678/.test(visible)) fail('坏 JSON 原文也必须防敏感泄漏')
+}
+const auditPage = readFileSync(join(adminRoot, 'src/routes/audit/index.tsx'), 'utf8')
+if (!auditPage.includes('getAuditActionLabel(value)') || !auditPage.includes('auditColumns(setSelected)') || !auditPage.includes('record={selected}')) fail('审计页必须挂接中文筛选、可打开的列定义和详情抽屉')
+if (!auditPage.includes('lang="zh-CN"') || !auditPage.includes('年/月/日 时:分') || !auditPage.includes('d.toISOString()')) fail('审计日期筛选需中文区域与格式提示，保持 ISO 查询')
+const partnerConsts = runFile('packages/shared/src/types/partner.ts')
+const restrictions = runFile('apps/partner/src/routes/profile/ComplianceRestrictions.tsx', { '@ai-job-print/shared': partnerConsts })
+const restrictionText = textOf(restrictions.ComplianceRestrictions())
+for (const code of partnerConsts.PROHIBITED_MODULES) if (restrictionText.includes(code)) fail(`合规限制可见文字不得出现 ${code}`)
+for (const label of ['禁止在平台内投递', '禁止管理候选人', '禁止向企业推送简历', '禁止向求职者发出企业面试邀约', '禁止管理企业录用通知']) if (!restrictionText.includes(label)) fail(`合规限制缺中文说明 ${label}`)
+if (!readFileSync(join(repoRoot, 'apps/partner/src/routes/profile/index.tsx'), 'utf8').includes('<ComplianceRestrictions />')) fail('机构资料必须渲染中文合规限制')
+const account = runFile('apps/partner/src/routes/account/index.tsx', {
+  react: hooks(['', '', '', null, false, false]), '@ai-job-print/ui': { ...ui, Button: ({ children }) => children },
+  'lucide-react': { LockKeyholeIcon: () => null, UserCogIcon: () => null },
+  '../Page': { Page: ({ children }) => children, FRONTEND_HINT: { none: '' }, withFrontendHint: (value) => value },
+  '../../services/auth': {},
+})
+const accountText = textOf(account.default())
+if (/RBAC|UTF-8|字节/.test(accountText) || !accountText.includes('最长约 24 个汉字或 72 个英文字符') || !accountText.includes('如需增删机构账号或调整权限，请联系平台运营。')) fail('机构账号页密码长度与权限说明必须使用通俗文案')
+const accountSource = readFileSync(join(repoRoot, 'apps/partner/src/routes/account/index.tsx'), 'utf8')
+for (const phrase of ['utf8ByteLength(newPassword) > 72', 'unicodeCharacterLength(newPassword) < 12', 'passwordCategoryCount(newPassword) < 3']) if (!accountSource.includes(phrase)) fail(`机构密码校验不可更改 ${phrase}`)
+const orgView = runFile('apps/admin/src/routes/partners/orgPresentation.ts', { '@ai-job-print/shared': partnerConsts })
+for (const key of ['job_info', 'job_fair', 'external_apply_redirect']) {
+  if (!orgView.moduleLabel(key, false).includes('暂不开放') || orgView.moduleLabel(key, true).includes('暂不开放')) fail('招聘模块标签应随托管闸门标暂不开放，仅改显示')
+}
+if (orgView.contactPhoneText('13812345678') !== '138****5678' || orgView.contactPhoneText('138****5678') !== '138****5678') fail('机构联系人手机不能显示明文，也不能破坏已有掩码')
+const trustCell = runFile('apps/admin/src/routes/partners/ContentTrustCell.tsx', { '@ai-job-print/ui': ui, './contentTrustRules': runFile('apps/admin/src/routes/partners/contentTrustRules.ts') })
+const orgParts = runFile('apps/admin/src/routes/partners/orgFormParts.tsx', { react: hooks([]), '@ai-job-print/shared': partnerConsts, './orgPresentation': orgView })
+const orgTable = runFile('apps/admin/src/routes/partners/PartnerTable.tsx', {
+  './ContentTrustCell': trustCell, '@ai-job-print/shared': { ...partnerConsts, ...shared, formatDate: () => '2026-09-30' },
+  '@ai-job-print/ui': ui, './orgPresentation': orgView, './orgFormParts': orgParts,
+})
+const orgColumns = orgTable.PartnerTable({ items: [], showRecruitment: false }).props.columns
+const confirmButton = orgColumns.find((c) => c.id === 'actions').cell({ id: 'org-stable-identity', enabled: true }).props.children[1]
+if (confirmButton.key !== 'org-stable-identity') fail('机构两步确认必须以机构 id 为 key，筛选后不能继承另一家机构的确认态')
+if (!failures.length) console.log('  PASS 审计六列、动作中文、ID 尾号、IP、递归脱敏、坏 JSON、账号说明与合规限制')
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} 项未通过`)

@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { formatDateTime } from '@ai-job-print/shared'
-import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
+import { Drawer, ConsoleTable, StatusBadge } from '@ai-job-print/ui'
 import {
   ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT,
   ADMIN_DATA_REQUEST_REJECT_HINT,
   MEMBER_DATA_REQUEST_SCOPE,
 } from '@ai-job-print/shared'
-import { ShieldIcon, RefreshCwIcon, RotateCcwIcon, XCircleIcon } from 'lucide-react'
+import { RefreshCwIcon, RotateCcwIcon, XCircleIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
 import {
@@ -51,8 +51,6 @@ const TYPE_FILTERS: { label: string; value: DataRequestType | '' }[] = [
   { label: '撤回授权', value: 'revoke_consent' },
 ]
 
-const TH_CLS = 'whitespace-nowrap border-b border-neutral-900/10 px-2.5 py-2 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500'
-const TD_CLS = 'whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-[11px]'
 
 function fmt(iso: string | null): string {
   return formatDateTime(iso)
@@ -276,50 +274,27 @@ export default function PrivacyRequestsPage() {
           </div>
         </div>
 
-        {loadState === 'loading' && <LoadingState className="py-24" />}
-        {loadState === 'error' && <ErrorState className="py-24" onRetry={() => void load()} />}
-
-        {loadState === 'ready' && (
-          <>
-            <div className="overflow-x-auto px-5">
-              <table className="w-full border-collapse text-[13px]">
-                <thead>
-                  <tr>
-                    {['工单ID', '类型', '状态', '会员(掩码)', '昵称', '重试次数', '请求时间', '处理时间', '操作'].map((h) => (
-                      <th key={h} className={TH_CLS}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(items ?? []).length === 0 ? (
-                    <tr>
-                      <td colSpan={9}>
-                        <EmptyState
-                          icon={ShieldIcon}
-                          title="暂无数据权利工单"
-                          description="会员提交数据导出或撤回授权请求后会出现在这里"
-                          className="py-12"
-                        />
-                      </td>
-                    </tr>
-                  ) : (
-                    (items ?? []).map((item) => {
-                      const s = STATUS_MAP[item.status] ?? { badge: 'default' as const, label: item.status }
-                      return (
-                        <tr
-                          key={item.id}
-                          className="cursor-pointer transition-colors hover:bg-neutral-50"
-                          onClick={() => setDetail(item)}
-                        >
-                          <td className={`${TD_CLS} font-mono text-xs text-primary-700`}>{item.id.slice(0, 12)}…</td>
-                          <td className={`${TD_CLS} font-semibold text-neutral-800`}>{TYPE_MAP[item.requestType] ?? item.requestType}</td>
-                          <td className={TD_CLS}><StatusBadge dot status={s.badge} label={s.label} /></td>
-                          <td className={`${TD_CLS} font-mono text-xs text-neutral-600`}>{item.phoneMasked}</td>
-                          <td className={`${TD_CLS} text-neutral-600`}>{item.nickname ?? '—'}</td>
-                          <td className={`${TD_CLS} tabular-nums text-neutral-500`}>{item.retryCount}</td>
-                          <td className={`${TD_CLS} tabular-nums text-xs text-neutral-500`}>{fmt(item.requestedAt)}</td>
-                          <td className={`${TD_CLS} tabular-nums text-xs text-neutral-500`}>{fmt(item.handledAt)}</td>
-                          <td className={`${TD_CLS}`} onClick={(e) => e.stopPropagation()}>
+        {/* 接口只提供游标，没有总数；共用表格外壳，保留下面原有游标翻页。 */}
+        <div onClick={(event) => {
+          const target = event.target as HTMLElement
+          const row = target.closest('tbody tr') as HTMLTableRowElement | null
+          if (row && !target.closest('button') && loadState === 'ready' && items?.[row.sectionRowIndex]) setDetail(items[row.sectionRowIndex])
+        }}>
+        <ConsoleTable items={items ?? []} loading={loadState === 'loading'}
+          error={loadState === 'error' ? { onRetry: () => void load() } : null}
+          empty={{ title: '暂无数据权利工单', description: '会员提交数据导出或撤回授权请求后会出现在这里' }}
+          className="[&>div.border-t]:hidden" total={(items ?? []).length} page={1} pageSize={20} onPageChange={() => {}}
+          columns={[
+            { id: 'id', header: '工单编号', cell: (item) => <button type="button" title={item.id} onClick={() => setDetail(item)} className="text-xs text-primary-700">尾号 {item.id.slice(-6)}</button> },
+            { id: 'type', header: '类型', cell: (item) => TYPE_MAP[item.requestType] ?? item.requestType },
+            { id: 'status', header: '状态', cell: (item) => { const s = STATUS_MAP[item.status] ?? { badge: 'default' as const, label: item.status }; return <StatusBadge dot status={s.badge} label={s.label} /> } },
+            { id: 'phone', header: '会员手机（掩码）', cellClassName: 'whitespace-nowrap text-xs', cell: (item) => item.phoneMasked },
+            { id: 'name', header: '昵称', truncate: true, cell: (item) => item.nickname ?? '—' },
+            { id: 'retry', header: '重试次数', align: 'right', cell: (item) => item.retryCount },
+            { id: 'requested', header: '请求时间', cellClassName: 'whitespace-nowrap text-xs', cell: (item) => fmt(item.requestedAt) },
+            { id: 'handled', header: '处理时间', cellClassName: 'whitespace-nowrap text-xs', cell: (item) => fmt(item.handledAt) },
+            { id: 'actions', header: '操作', sticky: true, cell: (item) => <div className="flex items-center gap-1.5">
+              <button type="button" onClick={() => setDetail(item)} className="text-xs text-primary-700">详情</button>
                             <div className="flex items-center gap-1.5">
                               {canRetry(item) && (
                                 <button
@@ -346,15 +321,11 @@ export default function PrivacyRequestsPage() {
                                 </button>
                               )}
                             </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
+            </div> },
+          ]} />
+        </div>
+        {loadState === 'ready' && (
+          <>
             {/* 游标分页 */}
             <div className="flex items-center justify-between px-5 pb-4 pt-3.5 text-[12.5px] text-neutral-500">
               <span>当前页 {(items ?? []).length} 条</span>
@@ -456,7 +427,7 @@ export default function PrivacyRequestsPage() {
       />
 
       <p className="mt-3 text-xs text-neutral-500">
-        管理员操作（重试 / 拒绝）均写入 AuditLog，可在日志审计页查看。
+        管理员操作（重试 / 拒绝）均记录在审计日志中，可在日志审计页查看。
         手机号以掩码形式展示，完整号码不在此页回显。
       </p>
     </Page>
