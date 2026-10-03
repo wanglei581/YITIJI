@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
+import vm from 'node:vm'
 
 const packageRoot = new URL('../', import.meta.url)
 const failures = []
@@ -88,8 +90,10 @@ check(
 )
 
 const jobsPage = await read('src/routes/jobs/index.tsx')
+const jobsTable = await read('src/routes/jobs/JobsTable.tsx')
+check(jobsPage.includes('<JobsTable') && jobsTable.includes('<ConsoleTable') && jobsTable.includes("header: '岗位标题'"), '岗位表由现有路由挂载，公共表格保留可见岗位标题列')
 const categoryMap = extractBetween(
-  jobsPage,
+  jobsTable,
   'const CATEGORY_MAP:',
   'const REVIEW_MAP:',
   'CATEGORY_MAP',
@@ -118,7 +122,7 @@ check(
 )
 
 const reviewMap = extractBetween(
-  jobsPage,
+  jobsTable,
   'const REVIEW_MAP:',
   'const PUBLISH_MAP:',
   'REVIEW_MAP',
@@ -146,9 +150,9 @@ check(
 )
 
 const publishMap = extractBetween(
-  jobsPage,
+  jobsTable,
   'const PUBLISH_MAP:',
-  'const CATEGORY_FILTERS',
+  'interface Props',
   'PUBLISH_MAP',
 )
 const expectedPublishStatuses = [
@@ -189,7 +193,7 @@ const categoryFiltersUi = extractBetween(
 const reviewFiltersUi = extractBetween(
   jobsPage,
   '{REVIEW_FILTERS.map((f) => (',
-  '{/* 表格 */}',
+  '<JobsTable',
   'review filter UI',
 )
 for (const [label, block, stateName] of [
@@ -241,10 +245,10 @@ check(
 )
 check(
   jobsPage.includes('const jobsRefreshKey = `${PARTNER_JOBS_REFRESH_KEY}:${page}:${jobType ?? \'all\'}:${reviewStatus ?? \'all\'}`')
-    && jobsPage.includes('<ListPagination')
+    && jobsPage.includes('<JobsTable') && jobsTable.includes('<ConsoleTable')
     && jobsPage.includes('pageSize: PAGE_SIZE')
     && jobsPage.includes('setPage(1)'),
-  'jobs pagination uses filter-aware refresh key, PAGE_SIZE, ListPagination, and filter changes reset to page 1',
+  'jobs pagination uses filter-aware refresh key, PAGE_SIZE, ConsoleTable, and filter changes reset to page 1',
 )
 check(
   /const\s*\{\s*data:\s*qualitySummary\s*=\s*\[\]\s*\}\s*=\s*useRefreshable\(\s*PARTNER_JOB_QUALITY_REFRESH_KEY\s*,\s*getPartnerJobQualitySummary\s*,\s*\{\s*intervalMs:\s*60_000\s*,\s*merge:\s*replaceIfChanged\s*,\s*failPolicy:\s*['"]keep-last['"]\s*,?\s*\}\s*,?\s*\)/.test(
@@ -290,7 +294,6 @@ const filteringBlock = extractBetween(
 )
 const expectedFilteringBlock = `const jobs = data?.data ?? []
 const total = data?.pagination.total ?? 0
-const totalPages = data?.pagination.totalPages ?? 1
 const loading = status === 'idle' || (status === 'loading' && jobs.length === 0)
 const error = status === 'error' && jobs.length === 0`
 check(
@@ -324,28 +327,32 @@ check(
   'error condition returns the jobs Page with failure subtitle and visible failure copy',
 )
 
-const tableBody = stripComments(
-  extractBetween(
-    jobsPage,
-    '<tbody className="divide-y divide-neutral-900/[0.06]">',
-    '</tbody>',
-    'jobs table body',
-  ),
-)
-const filteredEmptyBranch = compact(
-  extractBetween(
-    tableBody,
-    '{jobs.length === 0 ? (',
-    ') : (',
-    'filtered-empty table branch',
-  ).replace('{jobs.length === 0 ? (', ''),
-)
-check(
-  /^<tr> <td colSpan=\{10\}[^>]*> .*当前筛选条件下无岗位.*<\/td> <\/tr>$/.test(
-    filteredEmptyBranch,
-  ),
-  'filtered-empty condition renders a table row and colSpan=10 cell with visible empty copy',
-)
+// 真执行拆出的 JobsTable，检查返回的 ConsoleTable 配置和可见空态文字。
+const jsxRuntime = { Fragment: Symbol('Fragment'), jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) }
+const consoleTableType = Symbol('ConsoleTable')
+const tableModule = { exports: {} }
+vm.runInNewContext(ts.transpileModule(jobsTable, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
+  module: tableModule, exports: tableModule.exports,
+  require(id) {
+    if (id === 'react/jsx-runtime') return jsxRuntime
+    if (id === '@ai-job-print/ui') return { Card: Symbol('Card'), ConsoleTable: consoleTableType, StatusBadge: Symbol('StatusBadge') }
+    if (id === '@ai-job-print/shared') return { formatDateTime: (value) => value }
+    if (id === '../../components/RejectReason') return { RejectReason: Symbol('RejectReason') }
+    throw new Error(`JobsTable 的新依赖未在门禁注册 ${id}`)
+  },
+})
+function tableNodes(node) {
+  if (node == null || typeof node === 'boolean') return []
+  if (Array.isArray(node)) return node.flatMap(tableNodes)
+  if (typeof node !== 'object') return []
+  return [node, ...tableNodes(node.props?.children)]
+}
+const rendered = tableModule.exports.JobsTable({ rows: [], page: 2, total: 41, busyId: null, openEdit() {}, setConfirmUnpublish() {}, onPageChange() {} })
+const table = tableNodes(rendered).find((node) => node.type === consoleTableType)
+check(Boolean(table), '路由子组件渲染公共 ConsoleTable')
+check(table?.props.empty.title === '当前筛选条件下无岗位', '筛选空态显示可见中文「当前筛选条件下无岗位」')
+check(table?.props.columns.length === 10 && table.props.columns.some((col) => col.header === '操作'), '十个可见表头和操作列都保留')
+check(table?.props.page === 2 && table.props.total === 41 && table.props.pageSize === 20, '分页准确传递后端总数与当前页')
 
 const unpublishBlock = extractBetween(
   jobsPage,
@@ -388,7 +395,7 @@ check(
 
 check(
   /<button\s+disabled=\{busyId\s*===\s*j\.id\}\s+className=['"][^'"]+['"]\s+onClick=\{\(\)\s*=>\s*setConfirmUnpublish\(j\)\}\s*>\s*\{busyId\s*===\s*j\.id\s*\?\s*['"]处理中…['"]\s*:\s*['"]下架['"]\}\s*<\/button>/.test(
-    jobsPage,
+    jobsTable,
   ),
   'published-row unpublish button is disabled while busy and calls handleUnpublish for its job',
 )
@@ -444,10 +451,23 @@ check(
   'Drawer keeps workType as a controlled immutable select',
 )
 
+const sample = { id: 'job-1', reviewStatus: 'approved', publishStatus: 'published', sourceUrl: 'https://official.invalid/job-1' }
+let selectedForUnpublish = null
+const rowElement = tableModule.exports.JobsTable({ rows: [sample], page: 1, total: 1, busyId: 'job-1', openEdit() {}, setConfirmUnpublish(row) { selectedForUnpublish = row }, onPageChange() {} })
+const rowTable = tableNodes(rowElement).find((node) => node.type === consoleTableType)
+const reviewCell = rowTable.props.columns.find((col) => col.header === '审核状态').cell(sample)
+check(tableNodes(reviewCell).some((node) => node.props.label === '已通过' && node.props.status === 'success'), '可见审核状态保持已通过与成功色')
+const publishCell = rowTable.props.columns.find((col) => col.header === '发布状态').cell(sample)
+check(tableNodes(publishCell).some((node) => node.props.className?.includes('bg-success')), '可见发布状态保留成功圆点')
+const linkCell = rowTable.props.columns.find((col) => col.header === '来源链接').cell(sample)
+check(tableNodes(linkCell).some((node) => node.type === 'a' && node.props.href === sample.sourceUrl), '查看来源仍指向该岗位真实来源链接')
+const actionCell = rowTable.props.columns.find((col) => col.header === '操作').cell(sample)
+const unpublish = tableNodes(actionCell).find((node) => node.type === 'button' && node.props.disabled === true)
+check(Boolean(unpublish), '处理中可见下架按钮禁用')
+unpublish?.props.onClick()
+check(selectedForUnpublish === sample, '下架按钮只把原岗位交给二次确认，直接执行服务的唯一调用仍在确认弹窗')
+
 for (const required of [
-  "status={review.badge}",
-  'publish.dot',
-  'href={j.sourceUrl}',
   '不在本系统内接收求职者简历',
   '保存并重新提审',
 ]) {

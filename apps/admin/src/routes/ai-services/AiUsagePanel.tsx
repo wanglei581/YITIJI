@@ -23,7 +23,7 @@ import {
 } from '../../services/api/aiUsageDaily'
 import { ApiHttpError } from '../../services/api/client'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { formatCny } from './aiUsageDisplay'
+import { aiUsageKeyName, aiUsageKeyTitle, formatCny } from './aiUsageDisplay'
 import { AiUsageBreakdownTable } from './AiUsageBreakdownTable'
 import type { AiUsageDimension } from './aiUsageDisplay'
 
@@ -107,7 +107,7 @@ export function AiUsagePanel() {
   const viewingToday = summary !== null && summary.day === todayKey
 
   return (
-    <section aria-labelledby="ai-usage-title" className="mb-6 min-w-0 max-w-full rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm max-sm:-mx-7 max-sm:max-w-none max-sm:px-2">
+    <section lang="zh-CN" aria-labelledby="ai-usage-title" className="mb-6 min-w-0 max-w-full rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm max-sm:-mx-7 max-sm:max-w-none max-sm:px-2">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1 basis-full sm:basis-auto">
           <h2 id="ai-usage-title" className="flex flex-wrap items-center gap-2 text-[13px] font-bold text-neutral-700">
@@ -125,7 +125,7 @@ export function AiUsagePanel() {
           <div className="flex w-full min-w-0 basis-full flex-col gap-2 sm:w-auto sm:basis-auto sm:flex-row sm:flex-wrap sm:items-end">
             <div className="min-w-0 w-full sm:w-auto">
               <label htmlFor="ai-usage-day" className="mb-1 block text-xs font-medium text-neutral-600">
-                日期（只能选今天及以前）
+                日期（只能选今天及以前，年-月-日）
               </label>
               <input
                 id="ai-usage-day"
@@ -204,7 +204,7 @@ export function AiUsagePanel() {
             <div className="mt-3 space-y-2">
               {summary.reached.terminalIds.length > 0 && (
                 <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs leading-relaxed text-warning-fg" role="alert">
-                  已到单终端上限（{formatCny(summary.limits.terminalCny)}/台/日）的终端：{summary.reached.terminalIds.join('、')}。
+                  已到单终端上限（{formatCny(summary.limits.terminalCny)}/台/日）的终端：{summary.reached.terminals.map(({ terminalId, terminalCode }, index) => <span key={terminalId} title={aiUsageKeyTitle('terminal', terminalId, terminalCode)}>{index > 0 ? '、' : ''}{aiUsageKeyName('terminal', terminalId, terminalCode)}</span>)}。
                   {viewingToday
                     ? liveRejectSentence('terminal', '这些终端上，')
                     : historicalReachedSentence(summary.day)}

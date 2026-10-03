@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
+import assert from 'node:assert/strict'
 
 const routes = [
   {
@@ -30,7 +32,6 @@ const requiredTokens = [
   'intervalMs: 60_000',
   "failPolicy: 'keep-last'",
   'pageSize: PAGE_SIZE',
-  'ListPagination',
   'setPage(1)',
 ]
 
@@ -59,6 +60,14 @@ let failed = false
 for (const route of routes) {
   const filePath = fileURLToPath(new URL(route.file, import.meta.url))
   const text = readFileSync(filePath, 'utf8')
+  const tableName = { jobs: 'JobsTable', fairs: 'FairsTable', policy: 'PolicyTable' }[route.name]
+  const tableText = readFileSync(fileURLToPath(new URL(`../src/routes/${route.name}/${tableName}.tsx`, import.meta.url)), 'utf8')
+  for (const token of [`<${tableName}`, 'page={page}', 'total={total}', 'onPageChange={setPage}']) {
+    if (!text.includes(token)) { console.error(`${route.name} 缺少服务端分页传入 ${token}`); failed = true }
+  }
+  for (const token of ['<ConsoleTable', 'page={page}', 'pageSize={20}', 'total={total}', 'onPageChange={onPageChange}', '当前筛选条件下无']) {
+    if (!tableText.includes(token)) { console.error(`${route.name} 公共表格缺少 ${token}`); failed = true }
+  }
   const missing = [route.key, route.hint, ...requiredTokens].filter((token) => !text.includes(token))
   for (const token of missing) {
     console.error(`${route.name} refresh integration missing token: ${token}`)
@@ -130,6 +139,25 @@ for (const route of subtitlePages) {
     }
   }
 }
+
+// 企业页本地筛选：子表须接收全量是否存在，不能用筛选后 rows.length 区分空态。
+const companies = readFileSync(fileURLToPath(new URL('../src/routes/companies/index.tsx', import.meta.url)), 'utf8')
+assert.ok(companies.includes('hasAny={companies.length > 0}'), '企业表必须从全量 rows 接收 hasAny')
+const companyTable = readFileSync(fileURLToPath(new URL('../src/routes/companies/CompaniesTable.tsx', import.meta.url)), 'utf8')
+const ast = ts.createSourceFile('CompaniesTable.tsx', companyTable, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+let emptyTitle
+function visitEmpty(node) {
+  if (ts.isJsxAttribute(node) && node.name.getText(ast) === 'empty') {
+    emptyTitle = node.initializer.expression.properties.find((p) => p.name?.getText(ast) === 'title').initializer.getText(ast)
+  }
+  ts.forEachChild(node, visitEmpty)
+}
+visitEmpty(ast)
+assert.ok(emptyTitle, '企业表必须提供空态标题')
+const titleOf = new Function('hasAny', 'rows', `return (${emptyTitle})`)
+assert.equal(titleOf(false, []), '暂无匹配的企业资料')
+assert.equal(titleOf(true, []), '当前筛选条件下无企业', '全量有企业但筛选为零时必须说明筛选无结果')
+console.log('PASS 企业表两种空态：全量无数据 / 全量有数据但筛选为零')
 
 if (failed) process.exit(1)
 console.log('verify:partner-refresh-safe passed')

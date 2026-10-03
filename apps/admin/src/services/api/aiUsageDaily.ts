@@ -38,16 +38,24 @@ export interface AiUsageBucket {
   chargedCostCny: number
 }
 
+export interface AiUsageTerminalBucket extends AiUsageBucket {
+  terminalCode: string | null
+}
+
+export interface AiUsageOrgBucket extends AiUsageBucket {
+  orgName: string | null
+}
+
 /** 与服务端 AiUsageDailySummary 一一对应（字段白名单，不含会员号）。 */
 export interface AiUsageDailySummary {
   day: string
   limits: AiUsageBudgetLimits
   totals: AiUsageBucket & { memberCount: number }
-  reached: { global: boolean; terminalIds: string[]; memberCount: number }
+  reached: { global: boolean; terminalIds: string[]; terminals: { terminalId: string; terminalCode: string | null }[]; memberCount: number }
   byFeature: AiUsageBucket[]
   byVendor: AiUsageBucket[]
-  byTerminal: AiUsageBucket[]
-  byOrg: AiUsageBucket[]
+  byTerminal: AiUsageTerminalBucket[]
+  byOrg: AiUsageOrgBucket[]
 }
 
 const AI_USAGE_DAILY_PATH = '/admin/ai-usage/daily'
@@ -97,6 +105,12 @@ function isBucketArray(value: unknown): value is AiUsageBucket[] {
   return Array.isArray(value) && value.every(isBucket)
 }
 
+/** 新名称字段只允许 string / null；旧服务端缺字段时兼容为 null。 */
+function isOptionalName(value: object, field: string): boolean {
+  const v = value as Record<string, unknown>
+  return !(field in v) || v[field] === null || typeof v[field] === 'string'
+}
+
 function malformed(status: number): ApiHttpError {
   return new ApiHttpError('UNEXPECTED_RESPONSE', '服务端返回的用量数据不完整，请点“刷新”重试', status)
 }
@@ -114,15 +128,26 @@ export function aiUsageDailyFromResponse(body: unknown, status = 200): AiUsageDa
   if (!totals || !isBucket(totals) || !isCount(totals.memberCount)) throw malformed(status)
   if (!reached || typeof reached.global !== 'boolean' || !Array.isArray(reached.terminalIds) || !reached.terminalIds.every((id) => typeof id === 'string') || !isCount(reached.memberCount)) throw malformed(status)
   if (!isBucketArray(d.byFeature) || !isBucketArray(d.byVendor) || !isBucketArray(d.byTerminal) || !isBucketArray(d.byOrg)) throw malformed(status)
+  if (!d.byTerminal.every((bucket) => isOptionalName(bucket, 'terminalCode')) || !d.byOrg.every((bucket) => isOptionalName(bucket, 'orgName'))) throw malformed(status)
+  const terminalIds = reached.terminalIds
+  const terminals = reached.terminals
+  if ('terminals' in reached && (!Array.isArray(terminals) || terminals.length !== terminalIds.length || !terminals.every((terminal, index) =>
+    terminal && typeof terminal === 'object' && terminal.terminalId === terminalIds[index] && isOptionalName(terminal, 'terminalCode'),
+  ))) throw malformed(status)
   return {
     day: d.day,
     limits: { globalCny: limits.globalCny, terminalCny: limits.terminalCny, memberCny: limits.memberCny, unmeasuredCallCostCny: limits.unmeasuredCallCostCny },
     totals: { ...(totals as unknown as AiUsageBucket), memberCount: totals.memberCount },
-    reached: { global: reached.global, terminalIds: [...reached.terminalIds], memberCount: reached.memberCount },
+    reached: {
+      global: reached.global, terminalIds: [...terminalIds], memberCount: reached.memberCount,
+      terminals: terminalIds.map((terminalId, index) => ({
+        terminalId, terminalCode: Array.isArray(terminals) ? terminals[index].terminalCode ?? null : null,
+      })),
+    },
     byFeature: [...(d.byFeature as AiUsageBucket[])],
     byVendor: [...(d.byVendor as AiUsageBucket[])],
-    byTerminal: [...(d.byTerminal as AiUsageBucket[])],
-    byOrg: [...(d.byOrg as AiUsageBucket[])],
+    byTerminal: d.byTerminal.map((bucket) => ({ ...bucket, terminalCode: (bucket as AiUsageTerminalBucket).terminalCode ?? null })),
+    byOrg: d.byOrg.map((bucket) => ({ ...bucket, orgName: (bucket as AiUsageOrgBucket).orgName ?? null })),
   }
 }
 

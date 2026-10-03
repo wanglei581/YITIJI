@@ -2092,3 +2092,45 @@ test('resume templates: empty, error with real retry, and selection that saves n
   await expect(screen).toHaveAttribute('data-state', 'list')
   expect(api.requestCount('GET', '/api/v1/job-materials/templates')).toBeGreaterThanOrEqual(2)
 })
+
+test('assistant voice deadline warns then preserves text conversation @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api)
+  const now = new Date('2026-09-30T12:00:00.000Z')
+  await page.clock.install({ time: now })
+  api.respond('POST', '/api/v1/trtc/session', {
+    status: 200,
+    json: { sdkAppId: 1, roomId: 'deadline-room', userId: 'deadline-user', userSig: 'synthetic', taskId: 'deadline-task',
+      maxSessionSeconds: 120, expiresAt: new Date(now.getTime() + 120_000).toISOString() },
+  })
+  api.respond('POST', '/api/v1/assistant/chat', { status: 200, json: assistantReply })
+  await page.goto('/assistant')
+  const transcript = page.locator('.assistant-transcript')
+  const input = page.locator('textarea')
+  await input.fill('我想整理简历')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.locator('[data-message-kind="ai"]')).toBeVisible()
+  const beforeTurn = (await page.locator('[data-message-kind="ai"]').first().textContent())?.trim() ?? ''
+  expect(beforeTurn.length).toBeGreaterThan(0)
+  await input.fill('继续帮我整理简历')
+  // 虚拟键盘的遮罩会挡住工具栏，先收起键盘再点语音咨询（与本文件其余用例同一做法）。
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '语音咨询', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
+  await dialog.getByRole('button', { name: /直接语音通话/ }).click()
+  await expect(dialog).toHaveAttribute('data-state', 'voice-live')
+  await page.clock.fastForward(61_000)
+  await expect(dialog.getByText(/本次语音通话还剩 1 分钟/)).toBeVisible()
+  await page.clock.fastForward(60_000)
+  await expect(dialog).toHaveCount(0)
+  await expect(transcript).toContainText('语音通话已到本次上限，已为你转成文字对话，可以继续问')
+  // 语音前的文字对话原样保留（用户这一句 + 小青的回答），到点提示只出现一次。
+  await expect(transcript).toContainText('我想整理简历')
+  await expect(transcript).toContainText(beforeTurn)
+  await expect(transcript.getByText('语音通话已到本次上限，已为你转成文字对话，可以继续问')).toHaveCount(1)
+  await expect(transcript).toContainText('可以先说说你最想解决的问题。')
+  await expect(input).toHaveValue('继续帮我整理简历')
+  await expect(input).toBeEnabled()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+  expect(api.requestCount('POST', '/api/v1/trtc/session')).toBe(1)
+})

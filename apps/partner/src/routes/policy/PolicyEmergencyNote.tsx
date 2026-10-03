@@ -4,6 +4,8 @@ import type { PartnerPolicyRecord } from '../../services/api/policies'
 
 function reasonLabel(code: string | null | undefined): string {
   if (!code) return '未注明'
+  // 表单标签保留填写提示，已发生的事由只显示结果标签。
+  if (code === 'other') return '其他'
   return RECRUITMENT_EMERGENCY_REASON_LABELS[code as RecruitmentEmergencyReasonCode] ?? code
 }
 
