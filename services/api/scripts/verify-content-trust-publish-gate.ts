@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 // verify-content-trust-publish-gate.ts
 //
 // 发布闸门门禁：**来源机构未被显式标记为内容可信,其内容不得被发布**。
