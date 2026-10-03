@@ -54,6 +54,8 @@ const SHARED_USER_MESSAGES = {
   // 那是对一体机说的，手机上没有现场工作人员；其余几句服务端是短句，这里补上下一步。
   AI_LOGIN_REQUIRED: '用 AI 之前需要先用手机号登录',
   AI_DECLARATION_REQUIRED: '年龄或录音确认没有记上，请稍后再试',
+  AI_BUDGET_EXHAUSTED: '今天的 AI 额度已用完，明天恢复；这一步可以先用模板手动填写，打印照常可用',
+  AI_BUDGET_UNAVAILABLE: 'AI 暂时用不了，请稍后再试；这一步可以先手动填写，打印照常可用',
   AI_PAUSED: 'AI 服务暂停中，打印等其他功能照常可以用',
   // 后端 9/29 交付：生产缺 AI 配置时 AI 路由 503；换绑手机号时没能先清掉旧登录 503（手机号没改）。
   AI_PROVIDER_NOT_CONFIGURED: 'AI 服务暂未开通，本次没有生成结果；打印等其他功能照常',

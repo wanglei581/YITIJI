@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1773 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1784 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -177,7 +177,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 144 个文件</summary>
+<summary><code>apps/admin/src/</code> — 146 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -191,9 +191,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/account-settings/PhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-phone-transfer-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx` | `verify-admin-ai-access-ui.mjs` |
+| `apps/admin/src/routes/ai-services/AiLogsTable.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/ai-services/AiOperationCostTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/AiUsagePanel.tsx` | `verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/ai-services/aiLogDisplay.ts` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/aiOperationLabels.ts` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/aiUsageDisplay.ts` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/index.tsx` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs` |
@@ -1080,7 +1082,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 44 个文件</summary>
+<summary><code>apps/partner/src/</code> — 47 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1088,14 +1090,17 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/lib/csv.ts` | `verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
 | `apps/partner/src/routes/Page.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-console-screen-ui.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/account/index.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
-| `apps/partner/src/routes/companies/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-companies.ts` |
+| `apps/partner/src/routes/companies/CompaniesTable.tsx` | `verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/companies/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/dashboard/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/fairs/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-jobfair-checkin.ts` |
 | `apps/partner/src/routes/index.tsx` | `verify-console-screen-ui.mjs`<br/>`frontend.mjs` |
+| `apps/partner/src/routes/jobs/JobsTable.tsx` | `verify-service-desk-jobs-ui.mjs` |
 | `apps/partner/src/routes/jobs/components/JobQualitySummaryPanel.tsx` | `verify-job-quality-dashboard-ui.mjs` |
 | `apps/partner/src/routes/jobs/index.tsx` | `verify-job-quality-dashboard-ui.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
 | `apps/partner/src/routes/login/LegalDocsModal.tsx` | `verify-legal-doc-version.ts` |
 | `apps/partner/src/routes/login/index.tsx` | `verify-admin-account-settings-ui.mjs` |
+| `apps/partner/src/routes/policy/PolicyEmergencyNote.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/partner/src/routes/policy/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/profile/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/screen/PartnerGrid.tsx` | `verify-console-screen-ui.mjs` |
@@ -1739,14 +1744,15 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/shared/src/</code> — 34 个文件</summary>
+<summary><code>packages/shared/src/</code> — 35 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `packages/shared/src/formatDateTime.ts` | `verify-partner-terminal-ops-honesty.mjs`<br/>`verify-datetime-honesty.mjs` |
+| `packages/shared/src/formatDateTime.ts` | `verify-console-plain-copy.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `packages/shared/src/formatNumber.ts` | `verify-console-plain-copy.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `packages/shared/src/index.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-campus-recruitment-stats.ts`<br/>`verify-companies.ts`<br/>`verify-contract-review-contract.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-materials.ts`<br/>`verify-job-requirement-stats.ts`<br/>`verify-toolbox-micro-app-platform.ts` |
 | `packages/shared/src/pickupCode.ts` | `verify-backend-p0-contracts.mjs` |
+| `packages/shared/src/types/admin.ts` | `verify-console-plain-copy.mjs` |
 | `packages/shared/src/types/adminUsers.ts` | `verify-admin-users-ui.mjs`<br/>`verify-admin-users.ts` |
 | `packages/shared/src/types/ai.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-job-ai-history-privacy-ui.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-contract-mirror.mjs`<br/>`verify-job-ai.ts`<br/>`verify-resume-diagnosis-context.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-voice-generate.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
 | `packages/shared/src/types/audit.ts` | `verify-change-password.ts`<br/>`verify-partner-contact-phone-registration.ts` |
@@ -1777,6 +1783,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/selfAssessment.ts` | `verify-compliance.ts` |
 | `packages/shared/src/types/toolboxMicroApp.ts` | `verify-toolbox-ai-skill-intents.ts`<br/>`verify-toolbox-micro-app-platform.ts` |
 | `packages/shared/src/types/uploadSession.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-contract-review-contract.ts` |
+
+</details>
+
+<details>
+<summary><code>packages/ui/package.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `packages/ui/package.json` | `verify-console-plain-copy.mjs` |
 
 </details>
 
@@ -2043,12 +2058,13 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 93 个文件</summary>
+<summary><code>services/api/scripts/</code> — 96 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `services/api/scripts/backfill-terminal-credentials.ts` | `verify-terminal-bind-code.ts` |
 | `services/api/scripts/change-password-verify-target.ts` | `verify-change-password-target-guard.ts`<br/>`verify-change-password.ts` |
+| `services/api/scripts/check-resume-optimize-live.ts` | `verify-resume-optimize-live-gate.ts` |
 | `services/api/scripts/d2-release-fixture.mjs` | `d2-docker-drill.mjs`<br/>`drill.mjs` |
 | `services/api/scripts/d2-same-host/contract.mjs` | `drill.mjs`<br/>`verify-contract.mjs` |
 | `services/api/scripts/d2-same-host/control-plane.mjs` | `drill.mjs`<br/>`managed-scope.mjs`<br/>`verify-contract.mjs` |
@@ -2099,6 +2115,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/payment-callback-race-cases.ts` | `verify-payment-flow.ts` |
 | `services/api/scripts/support/recruitment-wave2-full-inventory.ts` | `verify-recruitment-wave2-full-inventory.ts` |
 | `services/api/scripts/support/recruitment-wave2-public-snapshot.ts` | `verify-recruitment-wave2-full-inventory.ts` |
+| `services/api/scripts/support/resume-optimize-fetch-stub.ts` | `verify-resume-optimize.ts` |
+| `services/api/scripts/support/resume-optimize-original-content.ts` | `verify-resume-optimize.ts` |
 | `services/api/scripts/support/scan-panel-wording.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/serializable-race-barrier.ts` | `verify-first-admin-bootstrap-postgres.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-print-retry-lock-postgres.ts` |
 | `services/api/scripts/support/sqlite-cli.ts` | `verify-scan-tasks.ts` |
@@ -2144,7 +2162,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 595 个文件</summary>
+<summary><code>services/api/src/</code> — 596 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2269,7 +2287,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/usage/ai-budget.service.ts` | `verify-admin-ai-usage-ui.mjs`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-pricing.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-request-context.middleware.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
-| `services/api/src/ai/usage/ai-usage-context.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
+| `services/api/src/ai/usage/ai-usage-context.ts` | `verify-ai-public-quota.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-usage-meter.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-usage-retention.ts` | `verify-ai-usage-retention.ts`<br/>`verify-member-data-request-contract.ts` |
 | `services/api/src/ai/usage/ai-usage-summary.ts` | `verify-admin-ai-usage-ui.mjs`<br/>`verify-ai-usage-budget.ts` |
@@ -2736,9 +2754,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/terminals/toolbox-policy.ts` | `verify-terminal-device-config.ts`<br/>`verify-toolbox-micro-app-platform.ts` |
 | `services/api/src/terminals/toolbox-projection.ts` | `verify-toolbox-review-workflow.ts` |
 | `services/api/src/trtc/tencent-api.util.ts` | `verify-ai-endpoint-allowlist.ts` |
+| `services/api/src/trtc/trtc-session-registry.service.ts` | `verify-trtc-session-deadline.ts` |
 | `services/api/src/trtc/trtc.controller.ts` | `verify-ai-access.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/trtc/trtc.module.ts` | `verify-trtc-terminal-http.ts` |
-| `services/api/src/trtc/trtc.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-trtc-terminal-http.ts` |
+| `services/api/src/trtc/trtc.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-trtc-session-deadline.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/upload-sessions/upload-scene.ts` | `verify-upload-scene.ts` |
 | `services/api/src/upload-sessions/upload-session-object-delete.ts` | `verify-upload-sessions.ts` |
 | `services/api/src/upload-sessions/upload-sessions.controller.ts` | `verify-ai-access.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-upload-sessions.ts` |

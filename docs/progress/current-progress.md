@@ -8,6 +8,15 @@
 - 验证：`playwright.w3` 73 条全过；`verify-resume-diagnosis-flow-ui`、`verify-resume-report-qx`、`verify-compliance-copy`、`verify-resume-export-formats`（本机隔离库，ALL PASS）通过；并排图 32 组。
 - 遗留（进 E 批）：22 诊断报告页内容列表可视高度偏矮、底部两个按钮没撑满，基线就是这样，本批未动；21、25 的并排截图缺造状态夹具（60 个状态没配上对）。
 - 停放、隐藏、改名、降级：无。AI 诊断、优化、生成入口都在。
+## 2026-10-02：可串行化冲突重试前加短暂随机等待；并发门禁按调用方分别计数（分支 `claude/backend-hardening-20261002-serializable-retry-wait`）
+
+- **问题：** 10/1 main CI 上 `verify:pg-serialization-conflict:postgres` 偶发红：期望事务恰好 3 次，实际 4 次。成因是输的一方拿到冲突后**立刻**重试，新快照可能早于赢家提交可见，读到旧状态再冲突一次。结果仍正确，但白耗一次重试额度；连撞到 3 次上限会把冲突原样抛成 500。
+- **修法：** `serialization-conflict.ts` 新增共用的 `waitBeforeSerializationRetry`（第 n 次重试等约 n × 10–50 毫秒的随机量），三处没有等待的重试循环都用上：机构账号删除（admin-orgs）、机构手机号换绑（partner-phone-rebind）、会员隐私事务（member-privacy）。门禁屏障加 `asCaller` 与按调用方计数，断言被拒的一方至少 2 次、任何一方不超过 3 次、两方之和等于总数。「总数」那条断言本分支没动，由进 main 的紧急修复放宽为 3–6 后随 main 并回候选。
+- **验证（本机临时 PostgreSQL 16 真跑）：** 有等待 40 次全过；把机构账号那处等待去掉再跑 40 次，7 次失败，失败信息正是 `4 !== 3`——成因与修复效果都坐实。新断言反向变异（不按调用方计数）变红；同屏障的打印重试锁 PG 门禁通过。SQLite 侧 20 条关联门禁与 api typecheck 全绿。首个管理员引导的 PG 门禁有自己的目标库保护，本机没跑，交给 CI。
+## 2026-10-01：现场验收单 R.4 表格与 R.2 正文对齐（只改文档，分支 `claude/runsheet-r4-row3-1001`）
+
+- **改了什么：** 现场验收单 R.4 一页纸表格第 3 行原写「KSK-001 加 `-KeepFileSelectionDialogs -KeepPrinterQueueUnpaused`」，和 R.2 正文「发布当天 KSK-001 不加 `-KeepPrinterQueueUnpaused`」矛盾。改为只加 `-KeepFileSelectionDialogs`，并写明用命令行重跑、不用控制中心的按钮（控制中心不带这个开关，会把工作电脑上 Edge 的文件选择框整机禁掉）。第 3b 行补一句：KSK-001 是笔记本，空闲断电用长按电源键强制关机代替。
+- **为什么：** 9/30 给产品负责人备 0.4.13 升级的一页纸时照表格写错过一次，已当场更正。没有改代码、门禁或产品行为。
 
 ## 2026-09-30：AI 简历走查 W-107 / W-108（隔离工作区 qx-w107，基线 `677cffefdb75edd82d18e50d6e50a21d48014e0f`）
 
@@ -18,6 +27,20 @@
 - **验证：** 现有 `verify-resume-diagnosis-flow-ui.mjs` 增补源码执行断言，覆盖未预选、通用提交、本人选项、密码回调、普通/损坏 PDF 与失败 CTA；首轮通过。两次恢复旧行为的变异都退出 1：W-107 由「行业、经验、求职场景均不预选」断言拦住；W-108 由「加密文件只给重新选择文件」断言拦住。变异均已恢复修复版。kiosk `tsc -b` 退出 0；6 个改动源码/门禁文件 eslint 退出 0（共用 PDF 预览新增非组件导出有 1 条 Fast Refresh 开发提示，无错误）。图谱点名的 16 个 kiosk 门禁退出 0（含简历流程的报告/decisions/单测闭包）；关联两份进度文档的 11 个 API 门禁退出 0。API 复用已有 `.pnpm/node_modules`，留存门禁用当前 schema 在临时目录生成客户端和隔离 SQLite，66 条检查通过，临时产物已删除，未写 API 目录。`verify:compliance-copy`（含其 3 项闭包）、`verify:ci-gate-coverage`、`verify:repository-integrity` 退出 0；未安装依赖。
 - **提交状态：** `git add` 退出 128，沙箱拒绝创建共享 Git 元数据中的 `index.lock`。未暂存、未提交；8 个文件保留在本工作区，由协调方代提交。
 - **证据边界：** 仅本地源码/门禁验证，未运行 Playwright、真机、CI 或生产发布；Playwright 由协调方跑。
+## 2026-09-30：两个后台 UI 优化第 3 批（AI 服务管理、AI 大模型、各信息源、机构内容页）
+
+- **AI 服务管理**：副标题与开关面板去掉配置键名（`AI_PAUSED` 等挪进「运维参考」悬停），开关的确认、事由、警示原样保留；调用日志拆成独立表格组件，功能名、厂商与模型、失败原因显示中文（复用 `aiOperationLabels.ts`），原值悬停，任务编号在行内「任务详情」里可选中复制，未登记的失败码写「未归类失败（码）」以便区分；空态保留「已按条件查全库」的说明。用量面板已接候选 #1191 的终端编号、机构名与同序触顶终端，缺字段（旧服务端）或 null 时归一化为 null 并显示真实尾号，未关联空态和完整 ID 悬停保留；r3 本地 AI 用量门禁 33 项、admin typecheck / ESLint、文案与 mock 契约及图谱关联门禁通过，两处变异转红并逐字节还原，图谱无变化（不代表浏览器、真机或生产验收）。岗位来源质量 0 条不给百分比，英文状态改中文；日期框设中文区域并注明「年-月-日」。
+- **AI 大模型**：卡片铺满宽度，1280 两列、1440 三列、1920 四列，每行按内容高度对齐；角标不拆字；「运行链路消费 / planned」改人话；服务地址等配置数据保留，小号等宽截断、悬停全文。
+- **政策信息源 / 机构政策公告**：标题最多两行 + 一行摘要，日期不折行，操作固定右侧；机构端紧急下架事由只显示「其他」（表单填写提示不变）。岗位信息源恢复「已发布 · 已过期」派生显示。
+- **岗位 / 招聘会 / 企业（托管 a 下关闭或只读）**：只统一表格外壳、截断与文案，闸门、紧急下架确认与不可恢复说明一字未动；机构后台企业 / 岗位 / 招聘会 / 政策四页拆出子组件，全部降到 500 行以内，企业表空态两种文案都能出现。
+- **门禁**：`verify-console-plain-copy` 扩到 `.ts` 显示映射，「**」只拦 Markdown 加粗、不拦 138****0001、ab***@x.com 这类脱敏打码；变异（恢复旧副标题、配置键回正文、表单提示回展示、过期状态丢失、未登记码同名、Markdown 加粗）均转红。验证：admin / partner typecheck，本批与图谱关联门禁全过；两后台四套 E2E 全过（114 / 140 / 69 / 138）。
+## 2026-09-30：简历「优化版」不再丢原件的段落与条目（W-OPT-LOSS，走查窗口报；分支 `claude/backend-hardening-20260930-resume-opt-no-loss`）
+
+- **问题：** 优化是让模型重写整份简历，服务端直接用模型回来的数组拼「优化版」，不以原件为底。五条必丢路径：模型整段没回（教育 / 经历 / 项目 / 技能 / 证书）就整段消失、不重试；缺字段条目被静默跳过（经历有公司没职务最常见）；描述硬截 600 字；原文超过 12000 字的部分没送模型；条目上限（教育 6、经历 8、项目 6）。线上现在就是这个行为，真模型同样会丢，不只是假模型。
+- **修法（Codex 实现两轮、协调方审）：** 新增 `resume-optimize-coverage.ts`，用原文里的事实行（单位加时间段、学校、诊断已归好的行、证书与技能段）建原件基线；第一次输出缺段或缺条目 → 第二次重试点名缺的段与原文行（只用送模型的遮盖文本）；仍缺、或第二次输出不合法 → 用第一次合法结果加原文补回，按原件顺序插回，修改清单写「<段名>（保持原文）：这一段没有改动，保留原文」，超长部分写「简历过长，未送 AI 优化」。有公司没职务的经历保留；描述上限提到 2000 字、超过判非法重试，不再腰斩；技能与证书按整段判覆盖，避免模型改写措辞后被重复补回。不改 GeneratedResume 结构、不动前端。
+- **协调方审出并改掉的：** 第一轮「第二次坏 JSON 就整单失败」的回归；后置标题下的杂句（照片、联系方式）被当成经历条目（完整门禁跑出）；技能逐行判覆盖会重复；第二轮 Codex 为迁就用例加的「模型编造姓名就跳过缺项重试」特例——已删除，改为把该用例的模型输出补齐。
+- **真模型只读探针：** `probe:resume-optimize-live`（`scripts/check-resume-optimize-live.ts`），4 份虚构简历，密钥只经 `LlmConfigService` 读、不打印；不写数据库、不写 AI 用量记录；调用上限写死 8，第 9 次在发请求前拒绝；只输出每份一行结构统计。离线门禁 `verify:resume-optimize-live-gate` 钉住这四条，挂在 `verify:resume-optimize` 前面。随第五次更新上线后由总指挥在服务器上跑一次。
+- **验证：** verify:resume-optimize 新增 W-OPT-LOSS (a)–(h) 与顺序、第二次坏 JSON 回退两条；协调方在真端口下跑 12 条关联门禁全绿（含 resume-diagnosis-context、verify-real-resume-diagnosis、resume-layout-adjust、llm-input-pii-mask、ai-cost-coverage、ai-feature-keys、ai-safety-aigc、resume-generate、ci-gate-coverage）；协调方反向变异 7 处全红（不补回、第二次坏 JSON 不回退、后置标题可新建条目、技能逐行判覆盖、补回堆末尾、探针上限改 9，另核对主门禁单独也能抓住不补回）。
 ## 2026-10-01：main CI 两处红的紧急修复——axios 7 条高危、PG 并发门禁偶发（分支 `claude/axios-ghsa-pg-retry-1001-main`）
 
 - **axios 1.18.1 → 1.20.0**：9/30 发布 7 条 HIGH（GHSA-c29m-xwm3-cm6r、GHSA-mghh-pgcx-3jjj、GHSA-x97p-jq2g-jp4f、GHSA-3pq3-5fj3-cg6v、GHSA-542g-h47m-68v8、GHSA-m8m8-qj5v-23w3、GHSA-r4gj-5m52-g5wh），`verify:dependency-security` 把 main 和所有 PR 卡住。axios 只有一个引入方：`apps/terminal-agent` 的直接依赖，直接升版，锁文件只变 axios，未加 override、未加豁免。

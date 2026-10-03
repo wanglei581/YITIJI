@@ -2,7 +2,7 @@
 // AI 用量分组表：按功能 / 按供应商 / 按终端 / 按机构 四个页签
 //
 // 数据全部来自服务端 GET /admin/ai-usage/daily 的四个桶数组：
-//   - key 为 null：终端维度显示「未关联终端」、机构维度显示「未关联机构」
+//   - key 为 null：终端维度显示「无已验签终端」、机构维度显示「无机构」
 //     （服务端口径：无已验签终端 / 无所属机构的调用）。
 //   - 金额两列分开：实测金额（只含按 token 实测折算的）与已计费金额
 //     （实测 + 未计量 × 保守单价，即计入额度的口径），保留两位小数带「元」。
@@ -10,7 +10,7 @@
 // ============================================================
 
 import { type AiUsageBucket, type AiUsageDailySummary } from '../../services/api/aiUsageDaily'
-import { aiUsageKeyName, formatCny, type AiUsageDimension } from './aiUsageDisplay'
+import { aiUsageKeyName, aiUsageKeyTitle, formatCny, type AiUsageDimension } from './aiUsageDisplay'
 
 type Tab = { dimension: AiUsageDimension; label: string }
 
@@ -34,7 +34,7 @@ interface BreakdownProps {
 }
 
 export function AiUsageBreakdownTable({ summary, tab, onTabChange }: BreakdownProps) {
-  const bucketsOf = (dimension: AiUsageDimension): AiUsageBucket[] => {
+  const bucketsOf = (dimension: AiUsageDimension): (AiUsageBucket & { terminalCode?: string | null; orgName?: string | null })[] => {
     switch (dimension) {
       case 'feature': return summary.byFeature
       case 'vendor': return summary.byVendor
@@ -86,23 +86,26 @@ export function AiUsageBreakdownTable({ summary, tab, onTabChange }: BreakdownPr
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={row.key ?? '__unassigned__'} className="hover:bg-neutral-50/50">
-                  <td className="px-4 py-3 text-neutral-700">
-                    {aiUsageKeyName(tab, row.key)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-700">{row.calls}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-500">{row.unmeasuredCalls}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-500">{formatCny(row.measuredCostCny)}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-neutral-800">{formatCny(row.chargedCostCny)}</td>
-                </tr>
-              ))
+              rows.map((row) => {
+                const name = (tab === 'terminal' ? row.terminalCode : tab === 'org' ? row.orgName : null) ?? null
+                return (
+                  <tr key={row.key ?? '__unassigned__'} className="hover:bg-neutral-50/50">
+                    <td className="px-4 py-3 text-neutral-700" title={aiUsageKeyTitle(tab, row.key, name)}>
+                      {aiUsageKeyName(tab, row.key, name)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-700">{row.calls}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-500">{row.unmeasuredCalls}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-neutral-500">{formatCny(row.measuredCostCny)}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-neutral-800">{formatCny(row.chargedCostCny)}</td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
       </div>
       <p className="mt-2 text-[11.5px] leading-relaxed text-neutral-400">
-        已计费金额 = 实测金额 + 未计量次数 × 保守单价 {formatCny(summary.limits.unmeasuredCallCostCny)}/次。「未关联终端」= 这次调用没有已验签终端（没带终端身份，或验签没通过，终端号不入账）。「未关联机构」= 没写入机构：未验签的调用不记机构，已验签但终端当时不属于任何机构的也记在这里。
+        已计费金额 = 实测金额 + 未计量次数 × 保守单价 {formatCny(summary.limits.unmeasuredCallCostCny)}/次。「无已验签终端」= 这次调用没有已验签终端（没带终端身份，或验签没通过，终端号不入账）。「无机构」= 没写入机构：未验签的调用不记机构，已验签但终端当时不属于任何机构的也记在这里。
       </p>
     </div>
   )

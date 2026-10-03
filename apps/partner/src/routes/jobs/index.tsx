@@ -1,45 +1,23 @@
+import { JobsTable } from './JobsTable'
 import { useEffect, useState } from 'react'
 import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
-import { formatDate, formatDateTime } from '@ai-job-print/shared'
-import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
-import { FRONTEND_HINT, ListPagination, Page, withFrontendHint } from '../Page'
+import { formatDate } from '@ai-job-print/shared'
+import { Button, Drawer, LoadingState } from '@ai-job-print/ui'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { BriefcaseIcon, PlusIcon } from 'lucide-react'
 import type {
   PartnerJobRecord,
   JobCategory,
   ReviewStatus,
-  PublishStatus,
   UpdatePartnerJobInput,
 } from '../../services/api'
 import { getPartnerJobQualitySummary, getPartnerJobs, importPartnerJobs, unpublishPartnerJob, updatePartnerJob } from '../../services/api'
 import { JobQualitySummaryPanel } from './components/JobQualitySummaryPanel'
-import { RejectReason } from '../../components/RejectReason'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import { useCapability } from '../../services/capabilities'
 import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
-
-const CATEGORY_MAP: Record<JobCategory, { label: string; style: string }> = {
-  fulltime: { label: '全职', style: 'bg-blue-50 text-blue-700' },
-  intern: { label: '实习', style: 'bg-violet-50 text-violet-700' },
-  campus: { label: '校招', style: 'bg-emerald-50 text-emerald-700' },
-  parttime: { label: '兼职', style: 'bg-orange-50 text-orange-700' },
-}
-
-const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' | 'error'; label: string }> = {
-  pending:   { badge: 'warning', label: '待审核' },
-  reviewing: { badge: 'info',    label: '审核中' },
-  approved:  { badge: 'success', label: '已通过' },
-  rejected:  { badge: 'error',   label: '已拒绝' },
-}
-
-const PUBLISH_MAP: Record<PublishStatus, { dot: string; label: string }> = {
-  draft:       { dot: 'bg-warning', label: '待发布' },
-  published:   { dot: 'bg-success',  label: '已发布' },
-  unpublished: { dot: 'bg-neutral-300',   label: '已下架' },
-  expired:     { dot: 'bg-neutral-300',   label: '已过期' },
-}
 
 const CATEGORY_FILTERS = ['全部', '全职', '实习', '校招', '兼职'] as const
 const REVIEW_FILTERS   = ['全部', '待审核', '审核中', '已通过', '已拒绝'] as const
@@ -180,7 +158,6 @@ export default function JobsPage() {
 
   const jobs = data?.data ?? []
   const total = data?.pagination.total ?? 0
-  const totalPages = data?.pagination.totalPages ?? 1
   const loading = status === 'idle' || (status === 'loading' && jobs.length === 0)
   const error = status === 'error' && jobs.length === 0
 
@@ -365,86 +342,7 @@ export default function JobsPage() {
         </div>
       </div>
 
-      {/* 表格 */}
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                {['外部编号', '岗位标题', '公司', '城市', '类型', '来源链接', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-900/[0.06]">
-              {jobs.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="py-12 text-center text-sm text-neutral-400">
-                    <BriefcaseIcon className="mx-auto mb-2 h-8 w-8 text-neutral-200" />
-                    当前筛选条件下无岗位
-                  </td>
-                </tr>
-              ) : (
-                jobs.map((j) => {
-                  const cat     = j.category ? CATEGORY_MAP[j.category] : undefined
-                  const review  = REVIEW_MAP[j.reviewStatus]
-                  const publish = PUBLISH_MAP[j.publishStatus]
-                  return (
-                    <tr key={j.id} className="hover:bg-neutral-50">
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">{j.externalId}</td>
-                      <td className="px-4 py-3 font-medium text-neutral-800">{j.title}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{j.company}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{j.city}</td>
-                      <td className="px-4 py-3">
-                        {cat
-                          ? <span className={`rounded px-2 py-0.5 text-xs font-medium ${cat.style}`}>{cat.label}</span>
-                          : <span className="text-neutral-300">—</span>}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-primary-600">
-                        <a href={j.sourceUrl} target="_blank" rel="noreferrer" className="hover:underline">
-                          查看来源
-                        </a>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(j.syncTime)}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge dot status={review.badge}  label={review.label}  />
-                        <RejectReason reviewStatus={j.reviewStatus} reason={j.rejectReason} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-neutral-600">
-                          <span className={`h-1.5 w-1.5 rounded-full ${publish.dot}`} aria-hidden="true" />
-                          {publish.label}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex gap-2">
-                          <button
-                            className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                            onClick={() => openEdit(j)}
-                          >
-                            编辑
-                          </button>
-                          {j.publishStatus === 'published' && (
-                            <button
-                              disabled={busyId === j.id}
-                              className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                              onClick={() => setConfirmUnpublish(j)}
-                            >
-                              {busyId === j.id ? '处理中…' : '下架'}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+      <JobsTable rows={jobs} openEdit={openEdit} setConfirmUnpublish={setConfirmUnpublish} page={page} total={total} onPageChange={setPage} busyId={busyId} />
 
       <p className="mt-3 text-xs text-neutral-400">
         本后台仅管理外部来源岗位链接，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的岗位回到待审核;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示。
@@ -530,7 +428,7 @@ export default function JobsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="有效期">
-              <input type="date" className={inputCls} value={form.validThrough} onChange={(e) => setForm((f) => ({ ...f, validThrough: e.target.value }))} />
+              <input lang="zh-CN" type="date" className={inputCls} value={form.validThrough} onChange={(e) => setForm((f) => ({ ...f, validThrough: e.target.value }))} />
             </Field>
             <Field label="招聘人数">
               <input className={inputCls} inputMode="numeric" value={form.headcount} onChange={(e) => setForm((f) => ({ ...f, headcount: e.target.value }))} />

@@ -12052,7 +12052,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 209,
+      "reachableFileCount": 212,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12126,7 +12126,9 @@
             "AdminLayoutWrapper"
           ],
           "path": "/ai-config",
-          "styles": [],
+          "styles": [
+            "apps/admin/src/routes/ai-config/ai-config.css"
+          ],
           "wrappers": []
         },
         {
@@ -12807,7 +12809,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 234
+      "sourceFileCount": 237
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15791,7 +15793,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 76,
+      "reachableFileCount": 82,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16209,7 +16211,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 77
+      "sourceFileCount": 83
     }
   },
   "dataModel": {
@@ -17926,6 +17928,9 @@
     "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
     ],
+    "apps/admin/src/routes/ai-services/AiLogsTable.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
@@ -17933,6 +17938,9 @@
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiUsagePanel.tsx": [
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+    ],
+    "apps/admin/src/routes/ai-services/aiLogDisplay.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/aiOperationLabels.ts": [
@@ -21233,9 +21241,11 @@
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
+    "apps/partner/src/routes/companies/CompaniesTable.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
+    ],
     "apps/partner/src/routes/companies/index.tsx": [
-      "apps/partner/scripts/verify-partner-refresh-safe.mjs",
-      "services/api/scripts/verify-companies.ts"
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/dashboard/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
@@ -21248,6 +21258,9 @@
     "apps/partner/src/routes/index.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
       "scripts/project-graph/frontend.mjs"
+    ],
+    "apps/partner/src/routes/jobs/JobsTable.tsx": [
+      "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
     ],
     "apps/partner/src/routes/jobs/components/JobQualitySummaryPanel.tsx": [
       "apps/partner/scripts/verify-job-quality-dashboard-ui.mjs"
@@ -21262,6 +21275,9 @@
     ],
     "apps/partner/src/routes/login/index.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+    ],
+    "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/partner/src/routes/policy/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
@@ -21841,6 +21857,7 @@
       "apps/admin/scripts/verify-refresh-safe.mjs"
     ],
     "packages/shared/src/formatDateTime.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
@@ -21860,6 +21877,9 @@
     ],
     "packages/shared/src/pickupCode.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
+    "packages/shared/src/types/admin.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "packages/shared/src/types/adminUsers.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs",
@@ -22001,6 +22021,9 @@
     "packages/shared/src/types/uploadSession.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-contract-review-contract.ts"
+    ],
+    "packages/ui/package.json": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "packages/ui/src/components/Drawer.tsx": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
@@ -22348,6 +22371,9 @@
       "services/api/scripts/verify-change-password-target-guard.ts",
       "services/api/scripts/verify-change-password.ts"
     ],
+    "services/api/scripts/check-resume-optimize-live.ts": [
+      "services/api/scripts/verify-resume-optimize-live-gate.ts"
+    ],
     "services/api/scripts/d2-release-fixture.mjs": [
       "services/api/scripts/d2-docker-drill.mjs",
       "services/api/scripts/d2-same-host/drill.mjs"
@@ -22620,6 +22646,12 @@
     ],
     "services/api/scripts/support/recruitment-wave2-public-snapshot.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
+    ],
+    "services/api/scripts/support/resume-optimize-fetch-stub.ts": [
+      "services/api/scripts/verify-resume-optimize.ts"
+    ],
+    "services/api/scripts/support/resume-optimize-original-content.ts": [
+      "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/scripts/support/scan-panel-wording.ts": [
       "services/api/scripts/verify-scan-tasks.ts"
@@ -23463,6 +23495,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-usage-context.ts": [
+      "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -26453,6 +26486,9 @@
     "services/api/src/trtc/tencent-api.util.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
+    "services/api/src/trtc/trtc-session-registry.service.ts": [
+      "services/api/scripts/verify-trtc-session-deadline.ts"
+    ],
     "services/api/src/trtc/trtc.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
@@ -26466,6 +26502,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
+      "services/api/scripts/verify-trtc-session-deadline.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/upload-sessions/upload-scene.ts": [
@@ -26578,6 +26615,7 @@
           "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsagePanel.tsx",
+          "apps/admin/src/routes/ai-services/aiLogDisplay.ts",
           "apps/admin/src/routes/ai-services/aiOperationLabels.ts",
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "apps/admin/src/routes/ai-services/index.tsx",
@@ -27007,6 +27045,7 @@
         "files": [
           "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/lib/printErrorText.ts",
+          "apps/admin/src/routes/ai-services/AiLogsTable.tsx",
           "apps/admin/src/routes/billing/index.tsx",
           "apps/admin/src/routes/devices/TerminalFleetOverview.tsx",
           "apps/admin/src/routes/devices/index.tsx",
@@ -27032,9 +27071,13 @@
           "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
           "apps/partner/src/routes/Page.tsx",
+          "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx",
           "apps/partner/src/routes/smart-campus/index.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
+          "packages/shared/src/formatDateTime.ts",
           "packages/shared/src/formatNumber.ts",
+          "packages/shared/src/types/admin.ts",
+          "packages/ui/package.json",
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/audit/audit.types.ts"
         ],
@@ -31154,6 +31197,7 @@
         "files": [
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/account/index.tsx",
+          "apps/partner/src/routes/companies/CompaniesTable.tsx",
           "apps/partner/src/routes/companies/index.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
           "apps/partner/src/routes/fairs/index.tsx",
@@ -31255,6 +31299,7 @@
         "dirs": [],
         "files": [
           "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
+          "apps/partner/src/routes/jobs/JobsTable.tsx",
           "apps/partner/src/routes/jobs/index.tsx"
         ],
         "missing": []
@@ -33734,6 +33779,7 @@
           "services/api/src/ai/ai-public-quota.service.ts",
           "services/api/src/ai/ai-request-guard.ts",
           "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
           "services/api/src/common/redis/redis.service.ts"
         ],
         "missing": []
@@ -34624,7 +34670,6 @@
         "files": [
           "apps/admin/src/services/api/companiesAdmin.ts",
           "apps/kiosk/src/services/api/companies.ts",
-          "apps/partner/src/routes/companies/index.tsx",
           "apps/partner/src/services/api/partnerCompanies.ts",
           "packages/shared/src/index.ts",
           "packages/shared/src/types/company.ts",
@@ -40139,6 +40184,26 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/check-resume-optimize-live.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-optimize-live-gate.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-optimize-live-gate"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/resume-optimize-fetch-stub.ts",
+          "services/api/scripts/support/resume-optimize-original-content.ts",
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/providers/llm.provider.ts",
           "services/api/src/ai/redis-inflight-lock.ts",
@@ -41038,6 +41103,25 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-trtc-ownership.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:trtc-ownership"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/trtc/trtc-session-registry.service.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-trtc-session-deadline.ts",
       "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",

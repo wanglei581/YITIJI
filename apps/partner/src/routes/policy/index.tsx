@@ -1,14 +1,14 @@
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
-import { Card, Drawer, EmptyState, StatusBadge, LoadingState } from '@ai-job-print/ui'
-import { FRONTEND_HINT, ListPagination, Page, withFrontendHint } from '../Page'
-import { ClipboardListIcon, FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { Drawer, LoadingState } from '@ai-job-print/ui'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
+import { FileTextIcon, PlusIcon } from 'lucide-react'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
 import { PolicyReleaseDialog } from './PolicyReleaseDialog'
-import { PolicyEmergencyNote } from './PolicyEmergencyNote'
+import { PolicyTable } from './PolicyTable'
+import { AUDIENCE_LABELS, CATEGORY_LABELS } from './policyLabels'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import {
-  isPolicyEmergencyHeld,
   partnerPoliciesService,
   type PartnerPolicyRecord,
   type PolicyAudience,
@@ -18,32 +18,10 @@ import {
 } from '../../services/api/policies'
 import type { ReviewStatus } from '../../services/api'
 import { useCapability } from '../../services/capabilities'
-import { RejectReason } from '../../components/RejectReason'
 import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
-const KIND_LABELS: Record<string, string> = { policy_guide: '政策扶持', notice: '政策公告' }
-const AUDIENCE_LABELS: Record<string, string> = {
-  graduate: '应届高校毕业生', flexible: '灵活就业人员', migrant: '返乡务工人员', hardship: '困难群体就业援助', startup: '创业扶持', general: '通用',
-}
-const CATEGORY_LABELS: Record<string, string> = {
-  policy: '政策', announcement: '公告', notice: '通知', recruitment: '招募',
-}
-
-const REVIEW_MAP: Record<string, { badge: 'warning' | 'info' | 'success' | 'error'; label: string }> = {
-  pending:   { badge: 'warning', label: '待审核' },
-  reviewing: { badge: 'info',    label: '审核中' },
-  approved:  { badge: 'success', label: '已通过' },
-  rejected:  { badge: 'error',   label: '已拒绝' },
-}
-
-const PUBLISH_MAP: Record<string, { badge: 'success' | 'warning' | 'default'; label: string }> = {
-  draft:       { badge: 'warning', label: '待发布' },
-  published:   { badge: 'success', label: '已发布' },
-  unpublished: { badge: 'default', label: '已下架' },
-  expired:     { badge: 'default', label: '已过期' },
-}
 const PARTNER_POLICIES_REFRESH_KEY = 'partner:policies'
 const PAGE_SIZE = 20
 const REVIEW_FILTERS = ['全部', '待审核', '已通过', '已拒绝'] as const
@@ -153,7 +131,6 @@ export default function PolicyPage() {
 
   const rows = data?.data ?? []
   const total = data?.pagination.total ?? 0
-  const totalPages = data?.pagination.totalPages ?? 1
   const loading = status === 'idle' || (status === 'loading' && rows.length === 0)
   const error = status === 'error' && rows.length === 0
 
@@ -332,148 +309,8 @@ export default function PolicyPage() {
         </div>
       </div>
 
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={FileTextIcon}
-          title={reviewFilter === '全部' ? '暂无政策内容' : '当前筛选条件下无政策'}
-          description={reviewFilter === '全部'
-            ? (canCreate
-              ? '点击右上角"新增政策内容",录入就业政策说明与公告(本机构审核通过并确认发布后在一体机展示)'
-              : CANNOT_CREATE_HINT)
-            : '请调整审核状态后重试'}
-          className="py-16"
-        />
-      ) : (
-        <Card className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  {['类型', '标题', '分组/标签', '展示日期', '审核状态', '发布状态', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-900/[0.06]">
-                {rows.map((r) => {
-                  const review = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
-                  const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
-                  const held = isPolicyEmergencyHeld(r)
-                  return (
-                    <Fragment key={r.id}>
-                    <tr className={held ? 'border-b-0 hover:bg-neutral-50' : 'hover:bg-neutral-50'}>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span className={`rounded px-2 py-0.5 text-xs font-medium ${r.kind === 'policy_guide' ? 'bg-info-bg text-info-fg' : 'bg-purple-50 text-purple-600'}`}>
-                          {KIND_LABELS[r.kind] ?? r.kind}
-                        </span>
-                      </td>
-                      <td className="min-w-56 max-w-96 px-4 py-3">
-                        <p className="font-medium text-neutral-800">{r.title}</p>
-                        {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-neutral-400">{r.summary}</p>}
-                        {typeof r.contentVersion === 'number' && (
-                          <p className="mt-0.5 text-xs text-neutral-400">
-                            内容版本 v{r.contentVersion}
-                            {r.publishStatus === 'published' && typeof r.publishConfirmedContentVersion === 'number'
-                              ? ` · 已由本机构确认发布 v${r.publishConfirmedContentVersion}`
-                              : ''}
-                          </p>
-                        )}
-                        <RejectReason reviewStatus={r.reviewStatus as ReviewStatus} reason={r.rejectReason} />
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        {r.kind === 'policy_guide'
-                          ? (r.audience ? AUDIENCE_LABELS[r.audience] ?? r.audience : '—')
-                          : (r.category ? CATEGORY_LABELS[r.category] ?? r.category : '—')}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{r.publishedDate ?? '—'}</td>
-                      <td className="px-4 py-3"><StatusBadge dot status={review.badge} label={review.label} /></td>
-                      <td className="px-4 py-3">
-                        {held
-                          ? <StatusBadge dot status="error" label="平台已紧急下架" />
-                          : <StatusBadge dot status={publish.badge} label={publish.label} />}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {!held && (
-                          <button
-                            type="button"
-                            aria-label="编辑"
-                            onClick={() => openEdit(r)}
-                            className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                          >
-                            <PencilIcon className="h-3.5 w-3.5" />
-                          </button>
-                          )}
-                          {!held && r.kind === 'policy_guide' && (
-                            <button
-                              onClick={() => setRulesFor(r)}
-                              title="录入可机械比对的申领条件"
-                              className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                            >
-                              <ClipboardListIcon className="h-3.5 w-3.5" />
-                              申领条件
-                            </button>
-                          )}
-                          {!held && (r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
-                            <button
-                              type="button"
-                              disabled={busyId === r.id}
-                              onClick={() => void handleApprove(r)}
-                              className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg disabled:opacity-50"
-                            >
-                              审核通过
-                            </button>
-                          )}
-                          {!held && r.reviewStatus === 'approved' && r.publishStatus !== 'published' && (
-                            <button
-                              type="button"
-                              disabled={busyId === r.id}
-                              onClick={() => setReleasing(r)}
-                              className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:opacity-50"
-                            >
-                              发布
-                            </button>
-                          )}
-                          {r.publishStatus === 'published' && (
-                            <button
-                              disabled={busyId === r.id}
-                              onClick={() => setConfirmUnpublish(r)}
-                              className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg disabled:opacity-50"
-                            >
-                              下架
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            aria-label="删除"
-                            disabled={busyId === r.id}
-                            onClick={() => setConfirmDelete(r)}
-                            className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
-                          >
-                            <Trash2Icon className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    {held && (
-                      <tr>
-                        <td colSpan={7} className="px-4 pb-3 pt-0">
-                          <PolicyEmergencyNote row={r} />
-                        </td>
-                      </tr>
-                    )}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {total > 0 && (
-        <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
-      )}
+      <PolicyTable rows={rows} page={page} total={total} onPageChange={setPage} reviewFilter={reviewFilter} canCreate={canCreate} cannotCreateHint={CANNOT_CREATE_HINT}
+        busyId={busyId} openEdit={openEdit} setRulesFor={setRulesFor} handleApprove={handleApprove} setReleasing={setReleasing} setConfirmUnpublish={setConfirmUnpublish} setConfirmDelete={setConfirmDelete} />
 
       <p className="mt-3 text-xs text-neutral-400">
         政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会在一体机「政策服务」页展示;平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
@@ -552,7 +389,7 @@ export default function PolicyPage() {
               )}
             </Field>
             <Field label="展示日期">
-              <input type="date" className={inputCls} value={form.publishedDate} onChange={(e) => setForm((f) => ({ ...f, publishedDate: e.target.value }))} />
+              <input lang="zh-CN" type="date" className={inputCls} value={form.publishedDate} onChange={(e) => setForm((f) => ({ ...f, publishedDate: e.target.value }))} />
             </Field>
           </div>
           <p className="text-xs text-neutral-400">
