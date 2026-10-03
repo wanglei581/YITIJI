@@ -471,7 +471,7 @@ export function JobMaterialLibraryPage() {
         <span className="st"><i>3</i>{waiting ? '有链接才能去打印' : '成功才显示文件卡'}</span>
       </div>
       <StateBlock kind={waiting ? 'info' : 'error'} icon={waiting ? <ClockIcon size={32} /> : <AlertTriangleIcon size={32} />} title={waiting ? `正在生成《${selected.title}》这一份 PDF` : '这次没能生成出来'}>
-        {waiting ? '请求已提交；返回真实文件前不展示结果文件名、页数或打印入口。' : `${submitError}。你填写的内容还在，可以回表单核对后再试。`}
+        {waiting ? '请求已提交；返回真实文件前不展示结果文件名、页数或打印入口。' : <span role="alert">这次没能生成出来：{submitError}。你填写的内容还在，可以回表单核对后再试。</span>}
       </StateBlock>
       <div className="qx-rm-facts"><div className="qx-rm-facts-h">{waiting ? '这次提交的内容' : '这次失败的确切范围'}<span>{waiting ? '只发这些项，不含简历原文' : '只影响这一次办理'}</span></div>
         <div className="qx-rm-grid">{(waiting ? selected.fields.map((field) => [field.label, form[field.key]?.trim() || '未填']) : statusRows).map(([label, value]) => <div key={label}><u>{label}</u><b>{value}</b></div>)}</div>

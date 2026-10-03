@@ -152,6 +152,7 @@
 }
 
 /* 最终稿取件页：办理意图、方向摘要常驻，上传按钮随内容排，两个既有出口并排。 */
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-xq { min-height: 320px; }
 .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-dropzone { flex: none; min-height: 76px; padding: 14px 20px; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: 12px; }
 .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-dropzone > span:not(.ico) { font-size: var(--qx-fs-aux); }
 .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-dropzone .ico { width: 48px; height: 48px; }
@@ -160,4 +161,9 @@
 .qx-resume-triage .qx-rt-note > button { margin-left: 12px; color: var(--qx-wheat-d); font: inherit; font-weight: 700; min-height: 48px; }
 .rrp-page[data-state='report-empty'] :is(.rrp-state, .rrp-exits, .rrp-checks) { order: 3; }
 .rrp-page[data-state='report-empty'] .rrp-cbar { min-height: 0; }
-@media (max-width: 640px) { .qx-resume-triage .qx-rt-quick-exits { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-xq { min-height: 0; }
+  /* 手机先看到来源选择；办理意图与未登录说明仍在同一滚动区内。 */
+  .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-pick { order: -1; }
+  .qx-resume-triage .qx-rt-quick-exits { grid-template-columns: 1fr; }
+}
