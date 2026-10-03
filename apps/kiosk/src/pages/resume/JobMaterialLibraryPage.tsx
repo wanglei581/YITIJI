@@ -66,13 +66,16 @@ const VIEW: Record<Screen, [Tone, string, string]> = {
 /** 目录没有可填的模板时（读取中 / 失败 / 空）整屏说明；三者各是独立状态，互不冒充。 */
 const STATUS_SCREENS = {
   loading: {
-    kind: 'info', icon: <ClockIcon size={32} aria-hidden="true" />, title: '正在读取已发布的求职材料模板', action: null, facts: null,
+    kind: 'info', icon: <ClockIcon size={32} aria-hidden="true" />, title: '正在读取已发布的求职材料模板', action: null,
+    facts: ['这一刻已经确定的事', '读取中', [['请求', '已经发出，正在读取模板目录'], ['模板数量', '返回前不展示'],
+      ['本机缓存', '不拿上一次的列表顶替这一次'], ['表单', '读到模板之后才可以填写'],
+      ['已生成文件', '本次读取不影响我的文档里已有的材料'], ['接下来', '有模板就可选；没有模板和读取失败分别提示']]],
     desc: '读取完成前不显示模板名称或数量；读取失败和空列表是两个独立状态。', why: '读取期间不显示任何模板，也不保存任何选择。',
   },
   error: {
     kind: 'error', icon: <AlertTriangleIcon size={32} aria-hidden="true" />, title: '模板列表读取失败', action: '重新读取',
     desc: '这次没有读到模板，不会拿内置默认模板或上一次的列表冒充当前目录。', why: '重新读取只再要一次目录，不改动你填过的内容。',
-    facts: ['这次失败没有造成什么', '范围很窄', [['没有', '用内置默认模板或示例模板顶替'], ['没有', '生成文件、打印任务或费用'],
+    facts: ['这次失败没有造成什么', '范围很窄', [['没有', '用内置默认模板或示例模板顶替'], ['没有', '生成文件或打印任务'],
       ['仍可用', '打印、扫描与简历诊断三条流程'], ['仍可用', '我的文档里此前生成过的材料'],
       ['自动重试', '没有 —— 只有点「重新读取」才会再请求一次'], ['失败原因', '不显示在屏幕上，只说明这次读不到']]],
   },
@@ -80,8 +83,8 @@ const STATUS_SCREENS = {
     kind: 'warn', icon: <InfoIcon size={32} aria-hidden="true" />, title: '当前没有已发布的求职材料模板', action: '重新读取一次',
     desc: '读取成功，但这次没有已发布的模板。发布后会出现在这里；本机不拿示例模板补位。', why: '模板发布后目录会出现在这一页，不需要你做设置。',
     facts: ['空列表和读取失败不是一回事', '已读取成功', [['这次读取', '已完成，没有报错'], ['已发布模板', '0 条'],
-      ['本机不会', '拿示例模板或旧模板补位'], ['已生成过的材料', '不受影响，仍在我的文档里'],
-      ['费用', '没有产生任何生成或打印费用'], ['恢复方式', '模板发布后自动出现，不需要你做设置']]],
+      ['原因', '模板尚未发布，或已发布的被全部下架'], ['本机不会', '拿示例模板或旧模板补位'], ['已生成过的材料', '不受影响，仍在我的文档里'],
+      ['你填的内容', '还没有可填的表单，此时不保存草稿'], ['恢复方式', '模板发布后自动出现，不需要你做设置']]],
   },
 } as const
 
@@ -133,7 +136,7 @@ function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
     ['页数', file.pageCount > 0 ? `${file.pageCount} 页` : '未返回', file.pageCount <= 0],
     ['大小', formatBytes(file.sizeBytes)],
     ['类型', fileKindLabel(file.mimeType)],
-    ['文件编号', demo ? '演示对象不会保存' : file.fileId, demo],
+    ['核对这一份', '请按文件名、页数和大小核对'],
     ['查看链接有效至', demo ? '演示对象没有临时链接' : formatTime(file.signedUrlExpiresAt), demo],
     ['文件留存到', demo ? '不保存' : formatTime(file.fileExpiresAt), demo || !file.fileExpiresAt],
     ['打印凭证', canPrint ? '已就绪（只交给打印确认页）' : '未返回（打印保持禁用）', !canPrint],
@@ -433,8 +436,15 @@ export function JobMaterialLibraryPage() {
     const status = STATUS_SCREENS[screen]
     body = (
       <>
+        {screen !== 'loading' && <div className="qx-rm-after">
+          <b>{screen === 'empty' ? '模板发布后' : '重新读取会'}</b>
+          <span className="st"><i>1</i>{screen === 'empty' ? '目录里自动出现' : '只重发这一次目录请求'}</span><span className="sep">›</span>
+          <span className="st"><i>2</i>{screen === 'empty' ? '你选好模板再填写' : '不改动你填过的内容'}</span><span className="sep">›</span>
+          <span className="st"><i>3</i>{screen === 'empty' ? '生成可打印 PDF' : '读到才显示模板名'}</span>
+        </div>}
         <StateBlock kind={status.kind} icon={status.icon} title={status.title}>
           {screen === 'error' ? <span className="qx-rm-alert" role="alert">{error}</span> : null}{status.desc}
+          {status.action ? btn('primary', status.action, reload) : null}
         </StateBlock>
         {status.facts ? (
           <div className="qx-rm-facts">
@@ -447,7 +457,33 @@ export function JobMaterialLibraryPage() {
         {fallbackRows}
       </>
     )
-    cta = <><p className="why">{status.why}</p>{status.action ? btn('primary', status.action, reload) : btn('ghost', '返回简历服务', goResumeHub)}</>
+    cta = <><p className="why">{status.why}</p>{screen === 'loading' ? btn('ghost', '返回简历服务', goResumeHub) : null}
+      <QxStepActions onPrev={goResumeHub}><QxAiHelp label="让小青帮我整理材料亮点 →" draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。" testId="material-workshop-ai-help" /></QxStepActions></>
+  } else if ((screen === 'submitting' || screen === 'failed') && selected) {
+    const waiting = screen === 'submitting'
+    const statusRows = waiting
+      ? [['请求', '已经提交，正在生成文件'], ['已核对', '姓名与目标岗位非空'], ['还没有确认', '文件、页数、大小、保存期限与打印链接'], ['办理进度', '等待系统返回，不显示百分比或预计时间'], ['成功之后', '先核对返回文件，再决定带走或打印'], ['失败之后', '保留填写内容，由你决定是否再试']]
+      : [['这次结果', '系统未返回可使用的文件'], ['打印', '没有可交接的文件，不会自动打印'], ['仍然保留', '你刚才填写的内容'], ['已有材料', '不改动我的文档里此前生成的材料'], ['可能原因', '必填项不完整、模板停用或生成失败，以当前提示为准'], ['再试一次', '由你点击提交，不会自动重试']]
+    body = <>
+      <div className="qx-rm-after"><b>{waiting ? '接下来' : '再试一次会'}</b>
+        <span className="st"><i>1</i>{waiting ? '等待系统返回文件' : '沿用你填写的内容'}</span><span className="sep">›</span>
+        <span className="st"><i>2</i>{waiting ? '核对完整内容' : '重新提交这一份'}</span><span className="sep">›</span>
+        <span className="st"><i>3</i>{waiting ? '有链接才能去打印' : '成功才显示文件卡'}</span>
+      </div>
+      <StateBlock kind={waiting ? 'info' : 'error'} icon={waiting ? <ClockIcon size={32} /> : <AlertTriangleIcon size={32} />} title={waiting ? `正在生成《${selected.title}》这一份 PDF` : '这次没能生成出来'}>
+        {waiting ? '请求已提交；返回真实文件前不展示结果文件名、页数或打印入口。' : `${submitError}。你填写的内容还在，可以回表单核对后再试。`}
+      </StateBlock>
+      <div className="qx-rm-facts"><div className="qx-rm-facts-h">{waiting ? '这次提交的内容' : '这次失败的确切范围'}<span>{waiting ? '只发这些项，不含简历原文' : '只影响这一次办理'}</span></div>
+        <div className="qx-rm-grid">{(waiting ? selected.fields.map((field) => [field.label, form[field.key]?.trim() || '未填']) : statusRows).map(([label, value]) => <div key={label}><u>{label}</u><b>{value}</b></div>)}</div>
+      </div>
+      {waiting && <div className="qx-rm-facts"><div className="qx-rm-facts-h">这一刻的确切状态<span>等待系统返回</span></div><div className="qx-rm-grid">{statusRows.map(([label, value]) => <div key={label}><u>{label}</u><b>{value}</b></div>)}</div></div>}
+      {waiting ? <div className="qx-rm-facts"><div className="qx-rm-facts-h">这次用的是哪一份模板<span>{TYPE_LABEL[selected.type]}</span></div><div className="qx-rm-grid"><div><u>模板名称</u><b>{selected.title}</b></div><div><u>适用场景</u><b>{selected.recommendedFor}</b></div></div></div> : fallbackRows}
+    </>
+    cta = <>
+      <p className="why">{waiting ? '正在等待结果，内容已提交；此时不再重复生成。' : '回表单核对内容后，再由你点击生成。'}</p>
+      {waiting ? <button type="button" className="qx-btn" data-variant="primary" disabled>正在生成 PDF…</button> : btn('primary', '改一改再试一次', () => setSubmitError(null))}
+      <QxStepActions onPrev={goResumeHub}><QxAiHelp label="让小青帮我整理材料亮点 →" draft="请先问我的材料用途和真实经历，帮我整理可以填写的亮点。" testId="material-workshop-ai-help" /></QxStepActions>
+    </>
   } else {
     body = (
       <>
@@ -553,7 +589,7 @@ export function JobMaterialLibraryPage() {
           data-state={screen} data-testid={`material-workshop-state-${screen}`} aria-label="求职材料库">
           {body}
           <p className="qx-rm-truth">
-            模板按你填的内容排版，不调用 AI；不代投递。系统不收取求职者简历给企业。费用以确认时显示为准。
+            模板按你填的内容排版，不调用 AI；不代投递。系统不收取求职者简历给企业。生成后请先核对文件内容和页数。
           </p>
         </section>
       </QxPageFrame>

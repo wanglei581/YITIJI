@@ -39,12 +39,13 @@ export function ResumeExportResult(props: {
       ) : (
         <p>没有对应的真实文件可预览或打印；接入真实导出服务后才会生成。</p>
       )}
-      {props.savedToDocuments && !props.guest ? (
+      {hasFile && props.savedToDocuments === true && !props.guest ? (
         <p>已存入「我的文档」，可回账号查看。</p>
       ) : null}
-      {props.guest || props.savedToDocuments === false ? (
+      {props.guest ? (
         <p>未登录不写入「我的文档」，请在有效期内扫码带走。</p>
       ) : null}
+      {!props.guest && props.savedToDocuments === false ? <p>这次未存入「我的文档」，请在有效期内扫码带走。</p> : null}
       {hasFile && isPdf && (
         <FileContentPreview
           fileUrl={props.exported.signedUrl}
