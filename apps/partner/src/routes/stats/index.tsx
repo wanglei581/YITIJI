@@ -255,7 +255,7 @@ function NoActivityState({
   if (activeSources === 0) {
     reason = '本机构当前没有启用中的数据源，因此不会产生同步批次。先去数据源页配置并启用一个来源。'
   } else if (adminPending > 0) {
-    reason = `本机构有 ${formatCount(adminPending)} 条岗位、招聘会或企业资料还在等管理员审核，审核通过并发布后才会在终端展示。`
+    reason = `本机构有 ${formatCount(adminPending)} 条岗位、招聘会或企业资料尚未发布：审核发布入口尚未开放（平台不代审、不代发），通过并发布后才会在终端展示。`
       + (policyPending > 0 ? `另有 ${formatCount(policyPending)} 条政策待本机构自行审核发布。` : '')
   } else if (policyPending > 0) {
     reason = `本机构有 ${formatCount(policyPending)} 条政策待本机构自行审核，审核通过并确认发布后才会在终端展示。`
@@ -352,7 +352,7 @@ export default function StatsPage() {
             <SnapshotRow snapshot={data.snapshot} recruitmentHosting={recruitmentHosting} />
             {recruitmentHosting && data.snapshot.pendingReview > data.snapshot.pendingReviewPolicies && (
               <p className="mt-2.5 text-xs text-neutral-500">
-                另有 <strong className="tabular-nums text-neutral-700">{formatCount(data.snapshot.pendingReview - data.snapshot.pendingReviewPolicies)}</strong> 条岗位、招聘会或企业资料待管理员审核，通过并发布后才会在终端展示。
+                另有 <strong className="tabular-nums text-neutral-700">{formatCount(data.snapshot.pendingReview - data.snapshot.pendingReviewPolicies)}</strong> 条岗位、招聘会或企业资料尚未发布：审核发布入口尚未开放（平台不代审、不代发）。
               </p>
             )}
             {data.snapshot.pendingReviewPolicies > 0 && (

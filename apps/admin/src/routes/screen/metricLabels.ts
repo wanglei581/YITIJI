@@ -18,7 +18,9 @@ import { screenCount } from '@ai-job-print/ui'
  */
 export function aiOperationLabel(operation: string, hostingOff = false): string {
   if (hostingOff && operation === 'jobMatch') return '简历对照'
-  return AI_OPERATION_LABELS[operation] ?? AI_USAGE_FEATURE_LABELS[operation] ?? '其他 AI 服务'
+  // 共享映射里「语音转写 (ASR)」「语音播报 (TTS)」的括注是给日志页排障看的，英文缩写不上领导看的屏。
+  const label = AI_OPERATION_LABELS[operation] ?? AI_USAGE_FEATURE_LABELS[operation] ?? '其他 AI 服务'
+  return label.replace(/\s*\((?:ASR|TTS)\)$/, '')
 }
 
 /** 先按服务端出现顺序编号，再由调用方排序/截取；每行原计数（含 null）保留。 */

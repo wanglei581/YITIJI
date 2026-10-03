@@ -303,7 +303,6 @@ export default function DashboardPage() {
             <SectionCard title="待办事项">
               {(() => {
                 const failed = failedKeys(['jobSources', 'fairSources', 'files'])
-                if (['jobSources', 'fairSources', 'files'].some((key) => entry(key as BlockKey).loading)) return <BlockLoading />
                 if (jobSources === null && fairSources === null && files === null) {
                   if (failed.length > 0) {
                     return <BlockError message="待办数据加载失败" onRetry={retry(failed)} />

@@ -234,14 +234,15 @@ export default function AlertsPage() {
               const busy = busyKey?.startsWith(`${alert.subjectKey}:`) ?? false
               return (
                 <tr key={alert.id} className="group bg-surface hover:bg-neutral-50">
-                  <td className="min-w-[400px] max-w-[620px] px-4 py-4">
+                  <td className="relative min-w-[400px] max-w-[620px] px-4 py-4">
+                    <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${style.bar}`} />
                     <div className="flex items-start gap-3">
                       <span className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] ${style.iconBox}`}>
                         <Icon className="h-[19px] w-[19px]" aria-hidden="true" />
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="max-w-96 truncate text-sm font-bold text-neutral-900" title={alert.title}>{alert.title}</p>
+                          <p className="line-clamp-2 break-words text-sm font-bold text-neutral-900" title={alert.title}>{alert.title}</p>
                           <StatusBadge dot status={severity.badge} label={severity.label} />
                           <span className="rounded-md bg-neutral-50 px-1.5 py-0.5 text-xs text-neutral-500">{meta.label}</span>
                           <StatusBadge status={handling.badge} label={handling.label} />

@@ -1,10 +1,9 @@
-import { AI_LOG_REASON_LABELS, AI_USAGE_VENDOR_LABELS } from '@ai-job-print/shared'
+import { AI_USAGE_VENDOR_LABELS } from '@ai-job-print/shared'
 import { aiProviderName } from '../ai-services/aiLogDisplay'
 
 /** 服务端 provider / label 字段只作分类；未知编码不印到领导看的大屏。 */
 export function screenAiProvider(provider: string): string {
   if (provider === 'mock' || provider === 'stub') return '未就绪兜底模型'
-  if (AI_LOG_REASON_LABELS[provider]) return AI_LOG_REASON_LABELS[provider]
   if (provider.startsWith('llm:')) {
     const parts = provider.split(':')
     if (!AI_USAGE_VENDOR_LABELS[parts[1]]) return '其他 AI 模型'
