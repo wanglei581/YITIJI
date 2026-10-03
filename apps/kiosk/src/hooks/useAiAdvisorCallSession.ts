@@ -37,7 +37,7 @@ function stopBackendTask(taskId: string, terminalId: string): void {
   }).catch(() => {})
 }
 
-export type CallPhase = 'gate' | 'connecting' | 'live' | 'error'
+export type CallPhase = 'gate' | 'connecting' | 'live' | 'error' | 'expired'
 export type AiState = 'idle' | 'listening' | 'thinking' | 'speaking'
 
 interface SessionResp {
@@ -46,6 +46,8 @@ interface SessionResp {
   userSig:  string
   roomId:   string
   taskId:   string
+  maxSessionSeconds: number
+  expiresAt: string
 }
 
 // 从 AI 自定义消息中提取「AI 回复字幕」，过滤掉用户 ASR 识别文本
@@ -91,6 +93,8 @@ export function useAiAdvisorCallSession() {
   const [elapsed, setElapsed]       = useState(0)
   const [needResume, setNeedResume] = useState(false)
   const [micBlocked, setMicBlocked] = useState(false)
+  const [deadline, setDeadline] = useState<{ at: number; maxSeconds: number } | null>(null)
+  const [limitWarning, setLimitWarning] = useState(false)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const trtcRef       = useRef<any>(null)
@@ -102,13 +106,6 @@ export function useAiAdvisorCallSession() {
   const sessionEpochRef = useRef(0)
   const remoteAudioUsersRef = useRef<Set<string>>(new Set())
   const autoplayResumeRef   = useRef<(() => Promise<void>) | null>(null)
-
-  // 通话计时
-  useEffect(() => {
-    if (phase !== 'live') return
-    const t = setInterval(() => setElapsed((s) => s + 1), 1000)
-    return () => clearInterval(t)
-  }, [phase])
 
   // 卸载清理 + 关闭标签页/浏览器兜底
   useEffect(() => {
@@ -166,12 +163,40 @@ export function useAiAdvisorCallSession() {
     remoteAudioUsersRef.current.clear()
   }, [])
 
+  // 从服务端建会话起计时，连接等待也算。用墙钟而非累计 tick，后台挂起后仍会到期。
+  useEffect(() => {
+    if (!deadline) return
+    const checkDeadline = () => {
+      const remaining = Math.max(0, Math.ceil((deadline.at - Date.now()) / 1000))
+      setElapsed(Math.max(0, deadline.maxSeconds - remaining))
+      setLimitWarning(remaining > 0 && remaining <= 60)
+      if (remaining > 0 || !startedRef.current) return
+      startedRef.current = false
+      sessionEpochRef.current += 1
+      // 不等待 SDK 的退出 promise；页面立即转文字，后端另有独立硬截止。
+      void cleanup()
+      setDeadline(null)
+      setPhase('expired')
+    }
+    checkDeadline()
+    const timer = window.setInterval(checkDeadline, 250)
+    window.addEventListener('focus', checkDeadline)
+    document.addEventListener('visibilitychange', checkDeadline)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', checkDeadline)
+      document.removeEventListener('visibilitychange', checkDeadline)
+    }
+  }, [deadline, cleanup])
+
   // SDK 加载、进房与运行期错误都必须先释放后端任务和房间，再展示可重试错误。
   // startedRef 同步归零可防 EVENT.ERROR 与外层 catch 对同一故障重复清理。
   const failCall = useCallback(async (message: string) => {
     if (!startedRef.current) return
     startedRef.current = false
     sessionEpochRef.current += 1
+    setDeadline(null)
+    setLimitWarning(false)
     await cleanup()
     if (destroyedRef.current) return
     setErrMsg(message)
@@ -253,6 +278,10 @@ export function useAiAdvisorCallSession() {
       }
       taskIdRef.current = activeTaskId
       taskTerminalIdRef.current = terminalId
+      const maxSeconds = Number.isFinite(session.maxSessionSeconds) && session.maxSessionSeconds > 0
+        ? session.maxSessionSeconds : 600
+      const expiresAt = Date.parse(session.expiresAt)
+      setDeadline({ at: Math.min(Number.isFinite(expiresAt) ? expiresAt : Infinity, Date.now() + maxSeconds * 1000), maxSeconds })
 
       // 2. 加载 TRTC SDK
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -367,6 +396,8 @@ export function useAiAdvisorCallSession() {
   const endCall = useCallback(async () => {
     startedRef.current = false
     sessionEpochRef.current += 1
+    setDeadline(null)
+    setLimitWarning(false)
     await cleanup()
     autoplayResumeRef.current = null
     setPhase('gate')
@@ -409,6 +440,7 @@ export function useAiAdvisorCallSession() {
     elapsed,
     needResume,
     micBlocked,
+    limitWarning,
     startCall,
     resumePlay,
     toggleMute,
