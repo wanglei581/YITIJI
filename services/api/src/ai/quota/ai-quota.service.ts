@@ -130,18 +130,19 @@ export class AiQuotaService {
     if (capped) this.logger.warn(`AI_QUOTA_AUTO_RELEASE_CAP_EXCEEDED reservationId=${reservationId}`)
   }
 
-  async sweepStale(now = new Date()): Promise<{ releasedCount: number }> {
+  /** 每轮最多清 10 批（5000 条）；没清完时 truncated=true，下一分钟的定时任务接着清。 */
+  async sweepStale(now = new Date()): Promise<{ releasedCount: number; truncated: boolean }> {
     let releasedCount = 0
-    for (;;) {
+    for (let batch = 0; batch < 10; batch++) {
       const rows = await this.prisma.aiQuotaReservation.findMany({ where: { status: 'reserved', reservedAt: { lt: new Date(now.getTime() - 15 * 60_000) } }, take: 500, orderBy: { reservedAt: 'asc' } })
       for (const row of rows) {
         try { await this.release(row.id, 'stale', now); releasedCount++ } catch (error) {
           if (!(error instanceof ConflictException)) throw error
         }
       }
-      if (rows.length < 500) break
+      if (rows.length < 500) return { releasedCount, truncated: false }
     }
-    return { releasedCount }
+    return { releasedCount, truncated: true }
   }
 
   async remaining({ endUserId, now = new Date() }: { endUserId: string; now?: Date }) {
