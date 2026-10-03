@@ -318,6 +318,26 @@ const hubViewUrl = transpile(join(kioskRoot, 'src/pages/print-scan/components/Qx
   '../printHubContent': hubContentUrl,
 })
 const { QxPrintHubView } = await import(hubViewUrl)
+test('BFIX：Hub 不额外读取价目，入口与展开说明均使用中性文案', () => {
+  const home = readFileSync(join(kioskRoot, 'src/pages/print-scan/PrintScanHomePage.tsx'), 'utf8')
+  assert.doesNotMatch(home, /priceConfigApi|usePrintPriceConfig|fetchPrintPriceConfig|price-config/)
+  for (const hubState of ['default', 'capability-loading', 'capability-error', 'locked', 'device-off']) {
+    const html = renderToStaticMarkup(createElement(QxPrintHubView, {
+      hubState, probe: 'ok', mfp: 'ready', colorDuplexLabel: '本机暂未开通',
+      capabilities: [], arrivalCode: { key: 'arrival', icon: () => null, title: '到机码', description: '输入到机码' },
+      quickLinks: [], capabilityGroupHint: '', recordsGroupHint: '', notices: ['隐私说明', '电子签说明'],
+      onBack: () => {}, onRetry: () => {}, onHelp: () => {}, onArrivalCode: () => {}, onQuickLink: () => {}, onCapability: () => {},
+    }))
+    const text = html.replace(/<[^>]*>/g, '')
+    // 未办理、未核价的入口无需钱的字眼，也不得凭入口状态承诺免费；付费核对仍在确认页。
+    assert.doesNotMatch(text, /价格|报价|费用|付款|收款|抵扣|权益|免费/)
+    assert.match(text, /可用服务，以办理时显示为准/)
+    assert.match(text, /隐私与电子签说明/)
+    assert.match(text, /按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理/)
+    if (hubState === 'default') assert.match(text, /文件检查 → 设置参数 → 确认打印/)
+  }
+})
+
 test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通时出现', () => {
   for (const [label, notice] of [
     ['打印机缺纸', '打印机缺纸，请找现场工作人员加纸'],

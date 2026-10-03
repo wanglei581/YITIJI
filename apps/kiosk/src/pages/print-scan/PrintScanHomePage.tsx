@@ -35,7 +35,6 @@ import {
   UserSquareIcon,
   type LucideIcon,
 } from 'lucide-react'
-import { usePrintPriceConfig, unitCentsFor } from '../../services/print/priceConfigApi'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { getTerminalId, subscribeTerminalIdentity } from '../../services/api/screensaver'
 import {
@@ -51,7 +50,6 @@ import {
   COPY_GUIDE_KEY,
   COPY_GUIDE_ROUTE,
   HUB_PILL,
-  PRINT_HUB_PRICE_NOTICE,
   arrivalCodeStateNote,
   capabilityGroupHint,
   colorDuplexChip,
@@ -327,7 +325,7 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 export function PrintScanHomePage() {
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
-  const priceConfig = usePrintPriceConfig()
+  // Hub 只选办理入口，使用中性文案；价目由后续打印确认页读取，离开扫描不额外取价。
   const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [capabilityLoad, setCapabilityLoad] = useState<
@@ -488,8 +486,6 @@ export function PrintScanHomePage() {
         ? '打印机当前无法连接，请找现场工作人员'
         : '打印机异常，请找现场工作人员检查',
   }
-  const freePricing = unitCentsFor(priceConfig.config, 'black_white') === 0
-    && (capabilityLoad.map.color_print?.status !== 'available' || unitCentsFor(priceConfig.config, 'color') === 0)
 
   return (
     <QxPageFrame
@@ -510,7 +506,6 @@ export function PrintScanHomePage() {
         probe={probe}
         mfp={mfp}
         printerUnavailable={printerUnavailable}
-        freePricing={freePricing}
         orderPaused={
           hubState === 'device-off' && device.printerNotice
             ? { label: device.printerLabel, notice: device.printerNotice }
@@ -545,7 +540,6 @@ export function PrintScanHomePage() {
         notices={[
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE,
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE,
-          ...(freePricing ? [] : [PRINT_HUB_PRICE_NOTICE]),
         ]}
         onRetry={loadCapabilities}
         onHelp={() => navigate('/help')}

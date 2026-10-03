@@ -70,7 +70,6 @@ interface QxPrintHubViewProps {
   /** 打印闸门合上：沿用 device-off 的停用样式，只换短标题和说明。 */
   orderPaused?: { label: string; notice: string }
   printerUnavailable?: { label: string; notice: string }
-  freePricing?: boolean
   colorDuplexLabel: string
   capabilities: readonly QxPrintCapabilityView[]
   arrivalCode: QxPrintArrivalCodeView
@@ -329,10 +328,10 @@ function HubBanner({
   }
 }
 
-function axisChips(probe: ProbeStatus, mfp: MfpStatus, colorDuplexLabel: string, freePricing: boolean) {
+function axisChips(probe: ProbeStatus, mfp: MfpStatus, colorDuplexLabel: string) {
   return (
     <div className="ph-axes" data-testid="print-hub-axes" data-probe={probe} data-mfp={mfp}>
-      <span>{freePricing ? '文件检查 → 设置参数 → 确认打印' : '文件检查 → 设置参数 → 确认价格'}</span>
+      <span>文件检查 → 设置参数 → 确认打印</span>
       <span>按 A4 出纸 · {colorDuplexLabel}</span>
     </div>
   )
@@ -344,7 +343,6 @@ export function QxPrintHubView({
   mfp,
   colorDuplexLabel,
   printerUnavailable,
-  freePricing = false,
   capabilities,
   arrivalCode,
   quickLinks,
@@ -391,7 +389,7 @@ export function QxPrintHubView({
           <span className="t" id="ph-sec-tasks">要办什么</span>
           <span className="hint">{capabilityGroupHint}</span>
         </div>
-        {showBanner ? null : axisChips(probe, mfp, colorDuplexLabel, freePricing)}
+        {showBanner ? null : axisChips(probe, mfp, colorDuplexLabel)}
         <div className="ph-grid" aria-busy={checking || undefined}>
           {capabilities.map((capability, index) => {
             const Icon = capability.icon
@@ -491,15 +489,15 @@ export function QxPrintHubView({
         <PrintAiHelp label="问小青：怎么选打印方式 →" draft="我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。" />
       </div>
       <footer className="ph-foot">
-        <div className="ph-truth" data-disclaimer="true" data-testid="print-hub-truth"><div>{freePricing ? '可用服务，以办理时显示为准。' : '可用服务与价格，以办理时显示为准。'}</div></div>
+        <div className="ph-truth" data-disclaimer="true" data-testid="print-hub-truth"><div>可用服务，以办理时显示为准。</div></div>
         {notices.length > 0 ? (
           // 全文逐字保留，只是默认收起：开关常驻底注右侧，点开在底注上方展开（原生 details，键盘 / 读屏可达）。
           <details className="ph-notices" data-disclaimer="true">
             <summary>
-              <span>{freePricing ? '隐私与电子签说明' : '隐私、电子签与价格说明'}</span>
+              <span>隐私与电子签说明</span>
               <span className="ph-notices-go">点开看全文</span>
             </summary>
-            <p>{HUB_TRUTH.map((row) => freePricing && row.k === '办理提醒' ? { ...row, v: '按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理。' } : row).map((row) => `${row.k}：${row.v}`).join(' ')} {notices.join(' ')}</p>
+            <p>{HUB_TRUTH.map((row) => `${row.k}：${row.v}`).join(' ')} {notices.join(' ')}</p>
           </details>
         ) : null}
       </footer>

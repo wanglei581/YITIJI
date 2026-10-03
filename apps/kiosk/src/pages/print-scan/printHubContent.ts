@@ -261,7 +261,7 @@ export const HUB_ASK: Record<HubUiState, { text: string; em: string }> = {
 }
 
 export const HUB_TRUTH = [
-  { k: '办理提醒', v: '价格在确认页核对；按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理。' },
+  { k: '办理提醒', v: '按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理。' },
 ] as const
 
 /**
@@ -288,14 +288,6 @@ export function arrivalCodeStateNote(probe: ProbeStatus, mfp: MfpStatus): string
     return '这台机器现在出不了纸。核销完也拿不到纸，建议换一台空闲机器再核销。'
   return undefined
 }
-
-/**
- * 底部常驻声明的第三句。前两句复用 packages/shared 的 COMPLIANCE_COPY
- * （受 verify:compliance-copy 门禁保护，不在本页另抄一份）。
- * 价格这句只给指向、不含任何数字，与 verify:price-single-source 一致。
- */
-export const PRINT_HUB_PRICE_NOTICE =
-  '本页不核价、不结算，价格以打印工作台核价与现场公示价为准。'
 
 export function deriveHubUiState(input: {
   probe: ProbeStatus
