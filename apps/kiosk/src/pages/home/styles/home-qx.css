@@ -4,7 +4,7 @@
 
 .qx-home-hero {
   position: relative; flex: none; display: flex; flex-direction: column; height: 400px;
-  margin-bottom: 28px; padding: 0 var(--qx-gutter) 22px; color: var(--qx-paper);
+  margin-bottom: 48px; padding: 0 var(--qx-gutter) 22px; color: var(--qx-paper);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--qx-deep) 32%, transparent), color-mix(in srgb, var(--qx-deep) 93%, transparent)),
     url('/assets/bg-hero.jpg') center / cover no-repeat;
@@ -49,11 +49,11 @@
 
 .qx-home-board {
   flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
-  padding: 8px var(--qx-gutter) 0; background: var(--qx-paper);
+  padding: 2px var(--qx-gutter) 18px; background: var(--qx-paper);
 }
 .qx-home-voice {
   position: relative; isolation: isolate; display: flex; align-items: center; gap: 14px; width: 100%;
-  min-height: 76px; height: var(--qx-btn-h-lg); margin: 8px 0 10px; padding: 0 18px 0 12px; border: 0; border-radius: 48px;
+  flex: none; min-height: 96px; height: 96px; margin: 54px 0 14px; padding: 0 18px 0 12px; border: 0; border-radius: 48px;
   color: var(--qx-deep); background: linear-gradient(110deg, var(--qx-emerald), color-mix(in srgb, var(--qx-emerald) 62%, var(--qx-teal)));
   font-size: var(--qx-fs-btn); font-weight: 650; cursor: pointer; overflow: hidden;
 }
@@ -64,20 +64,15 @@
 .qx-home-voice small { margin-left: auto; font-size: var(--qx-fs-aux); font-weight: 650; }
 
 .qx-home-continue { flex: none; min-height: 0; }
-.qx-home-continue:has(.continue) > .qx-home-empty-context { display: none; }
-.qx-home-empty-context, .qx-home .continue {
-  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px; width: 100%;
+.qx-home-continue:empty { display: none; }
+.qx-home .continue {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; width: 100%;
   min-height: 64px; margin-bottom: 4px; padding: 8px 16px; border: 1px solid var(--qx-line); border-radius: var(--qx-home-r);
   color: var(--qx-ink); background: var(--qx-surface); text-align: left;
 }
-.qx-home .continue { grid-template-columns: 1fr auto; }
-.qx-home-empty-context .qx-home-context-icon {
-  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; color: var(--qx-teal-d); background: var(--qx-teal-soft);
-}
-.qx-home-context-icon svg { width: 26px; height: 26px; }
-.qx-home-empty-context span, .qx-home .continue .c-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.qx-home-empty-context strong, .qx-home .continue strong { font-size: var(--qx-fs-body); font-weight: 650; }
-.qx-home-empty-context small, .qx-home .continue p { margin: 0; color: var(--qx-ink-3); font-size: var(--qx-fs-aux); line-height: var(--qx-lh-body); }
+.qx-home .continue .c-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.qx-home .continue strong { font-size: var(--qx-fs-body); font-weight: 650; }
+.qx-home .continue p { margin: 0; color: var(--qx-ink-3); font-size: var(--qx-fs-aux); line-height: var(--qx-lh-body); }
 .qx-home .continue .c-icon { display: none; }
 .qx-home .continue .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; align-self: center; width: auto;
@@ -104,11 +99,11 @@
 .qx-home-identity[data-kind='status'] { cursor: default; color: var(--qx-ink); background: transparent; }
 
 .qx-home-tiles {
-  flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: minmax(168px, 1fr); align-content: stretch; gap: 14px 16px;
+  flex: none; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: auto; align-content: start; gap: 14px 16px;
 }
 .qx-home-tile {
-  position: relative; display: flex; min-width: 0; min-height: 0; height: 100%; flex-direction: column; overflow: hidden;
+  position: relative; display: flex; min-width: 0; min-height: 310px; height: auto; flex-direction: column; overflow: hidden;
   padding: 18px 22px; border: 1px solid var(--qx-line); border-radius: var(--qx-home-r); color: var(--qx-ink);
   background: var(--qx-surface); text-align: left; cursor: pointer;
   box-shadow: 0 4px 16px color-mix(in srgb, var(--qx-ink) 5%, transparent);
@@ -117,12 +112,14 @@
 .qx-home-tile:not(:disabled):active, .qx-home-voice:active, .qx-home-identity:active, .qx-home-device-link:active { transform: scale(.985); }
 .qx-home-tile > * { flex-shrink: 0; }
 .qx-home-tile[data-size='feature'] {
-  grid-column: 1 / -1; border: 0; color: var(--qx-paper);
+  grid-column: 1 / -1; min-height: 212px; border: 0; color: var(--qx-paper);
   background: linear-gradient(135deg, color-mix(in srgb, var(--qx-teal) 45%, var(--qx-deep-2)), var(--qx-deep-2));
   box-shadow: 0 12px 32px color-mix(in srgb, var(--qx-deep-2) 24%, transparent);
 }
-.qx-home-tile[data-action='policy-hub'], .qx-home-tile[data-span='full'] { grid-column: 1 / -1; }
-.qx-home[data-official-channels='shown'] .qx-home-tile[data-action='policy-hub'] { grid-column: auto; }
+.qx-home-tile:last-child:nth-child(even), .qx-home-tile[data-span='full'] { grid-column: 1 / -1; }
+.qx-home[data-extra-services='shown'] .qx-home-tile:not([data-size='feature']) { min-height: 224px; padding: 16px 20px; }
+.qx-home[data-extra-services='shown'] .qx-home-tile:not([data-size='feature']) .qx-home-tile-icon { width: 48px; height: 48px; border-radius: 14px; }
+.qx-home[data-extra-services='shown'] .qx-home-tile-foot { margin-top: 12px; }
 .qx-home-tile:disabled { cursor: not-allowed; opacity: .68; }
 .qx-home-tile:focus-visible, .qx-home-host .qx-home :is(button, a):focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 .qx-home-tile-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -150,7 +147,7 @@
 }
 .qx-home-tile[data-size='feature'] .qx-home-tile-desc,
 .qx-home-tile[data-size='feature'] .qx-home-tile-status { max-width: 78%; color: color-mix(in srgb, var(--qx-paper) 82%, transparent); }
-.qx-home-tile-foot { display: flex; align-items: center; gap: 6px; margin-top: auto; padding-top: 8px; color: var(--qx-teal-d); font-size: var(--qx-fs-aux-lg); font-weight: 650; }
+.qx-home-tile-foot { display: flex; align-items: center; gap: 6px; margin-top: 20px; padding-top: 8px; color: var(--qx-teal-d); font-size: var(--qx-fs-aux-lg); font-weight: 650; }
 .qx-home-tile[data-size='feature'] .qx-home-tile-foot { color: var(--qx-emerald); }
 .qx-home-tile-foot svg { width: 18px; height: 18px; }
 

@@ -130,7 +130,7 @@
 }
 
 /* W4 · 03 v2: read-only top, reachable agreement, compact fields, on-demand keypad. */
-.k1-login .qx-pagehead { min-height: 280px; padding-top: 14px; flex-direction: column; align-items: flex-start; gap: 10px; }
+.k1-login .qx-pagehead { min-height: 180px; padding-bottom: 12px; padding-top: 14px; flex-direction: column; align-items: flex-start; gap: 10px; }
 .k1-login .qx-pagehead p { flex: none; }
 .k1-login .lg-rail { display: flex; gap: 14px; margin: 0; padding: 0 0 18px; list-style: none; flex: none; }
 .k1-login .lg-rail li { flex: 1; border-top: 2px solid var(--qx-line); padding-top: 8px; font-size: var(--qx-fs-aux-lg); }
@@ -138,16 +138,16 @@
 .k1-login .lg-tab .tn, .k1-login .lg-entry .en { font-size: var(--qx-fs-sec); }
 .k1-login .lg-tab .td, .k1-login .lg-entry .ed { font-size: var(--qx-fs-aux-lg); }
 .k1-login .lg-tab[aria-current='page'] .td { color: var(--qx-paper); }
-.k1-login .lg-field { padding: 10px 16px; }
-.k1-login .lg-field + .lg-field { margin-top: 8px; }
+.k1-login .lg-field { padding: 14px 20px; }
+.k1-login .lg-field + .lg-field { margin-top: 12px; }
 .k1-login .lg-field label { margin-bottom: 4px; font-size: var(--qx-fs-body); }
-.k1-login .lg-input, .k1-login .lg-side { min-height: 58px; font-size: var(--qx-fs-body-lg); }
+.k1-login .lg-input, .k1-login .lg-side { min-height: 66px; font-size: var(--qx-fs-body-lg); }
 .k1-login .lg-input .ph { font-size: var(--qx-fs-body-lg); }
 .k1-login .lg-reason, .k1-login .lg-echo, .k1-login .lg-from, .k1-login .lg-hint { font-size: var(--qx-fs-aux-lg); line-height: 1.45; margin-top: 6px; }
 .k1-login .k-agree { padding: 8px 14px; margin: 8px 0 4px; font-size: var(--qx-fs-body); }
 .k1-login .k-agree-docs { font-size: var(--qx-fs-body); }
 .k1-login .k-agree-hint { padding: 6px 16px; margin: 4px 0 10px; font-size: var(--qx-fs-aux-lg); }
-.k1-login .qx-scroll { gap: 12px; padding-top: 8px; }
+.k1-login .qx-scroll { gap: 20px; padding-top: 8px; }
 .k1-login .lg-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .k1-login .lg-benefits { margin-top: 8px; }
 .k1-login .lg-grid2 .qx-card { padding: 14px 16px; }
@@ -175,7 +175,7 @@
 .k1-login .lg-sent p { margin: 4px 0 0; font-size: var(--qx-fs-body); line-height: 1.4; color: var(--qx-ink-2); }
 .k1-login .lg-anon { margin-top: 0; }
 .k1-login .lg-entries { gap: 8px; }
-.k1-login .lg-entry { min-height: 68px; padding: 8px 14px; }
+.k1-login .lg-entry { min-height: 96px; padding: 12px 18px; }
 .k1-login .lg-entry .ei {
   flex: none; width: 48px; height: 48px; border-radius: 16px;
   display: flex; align-items: center; justify-content: center;
@@ -206,3 +206,17 @@
 .k1-login .lg-kb { font-size: var(--qx-fs-page); }
 .k1-login .lg-kb.fn { font-size: var(--qx-fs-body); }
 .k1-login button:focus-visible { outline: 3px solid var(--qx-teal-d); outline-offset: -3px; }
+
+/* 状态区按阅读顺序排；恢复说明、字段与匿名入口的松度，不留固定空页头。 */
+.k1-login .lg-identity-note { margin: 0 0 28px; font-size: var(--qx-fs-body); line-height: 1.65; color: var(--qx-ink-2); }
+.k1-login .lg-rail { padding-bottom: 22px; }
+.k1-login .lg-tab { min-height: 104px; }
+.k1-login .lg-grid2 .qx-card { padding: 22px 20px; }
+.k1-login .lg-benefit p { line-height: 1.5; }
+.k1-login .lg-qrwrap .qrside { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+.k1-login .lg-qr-note { margin: 0; padding: 18px 20px; border: 1px solid var(--qx-line); border-radius: 24px; background: var(--qx-surface); font-size: var(--qx-fs-body); line-height: 1.5; }
+.k1-login .lg-qr-expiry { margin-top: 20px; }
+.k1-login .lg-input:disabled { justify-content: center; background: var(--qx-muted-bg); }
+
+/* 只分配区块之间的余高，字段、提示卡内仍从上往下排，不拉高空卡。 */
+.k1-login .qx-scroll { justify-content: space-between; }
