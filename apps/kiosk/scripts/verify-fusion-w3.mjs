@@ -125,7 +125,8 @@ const frozen = {
   // 2026-09-29 重新冻结（W-16）：语音会话在写成「正在连接」之前先完成使用声明。
   // 未同意就不发创建请求，也不把画面停在连接中。停止接口仍是 keepalive fetch。
   // 旧哈希 365da6215997c51c4f8d4a2f41ca623302431fefe2e463864c42c06c760c3a29。
-  'src/hooks/useAiAdvisorCallSession.ts': '25e10fe0aa0d35b7b7733b95089507ca0478880f371c1f6e408371365a4abff9',
+  // 2026-09-30 产品负责人授权：单次通话截止及文字降级；原有身份/声明/退出门禁仍由 assistant-trtc-guard 钉住。
+  'src/hooks/useAiAdvisorCallSession.ts': '7f4c697aca220e1c48f3a9df2f450800d0aec72b4c391488fed62caff797d0c6',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
 

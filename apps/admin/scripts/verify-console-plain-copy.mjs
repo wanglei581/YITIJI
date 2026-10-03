@@ -1,5 +1,5 @@
 // 两个后台的用户可见文案不得带工程词、Markdown 星号或原始状态码。
-// 只扫 .tsx 的字符串字面量与 JSX 文本，跳过注释。
+// 扫描 .ts 与 .tsx（排除测试与类型声明）的字符串字面量与 JSX 文本，跳过注释。
 // 另外真执行 auditActionLabels.ts：审计契约里的每个动作都有中文名，未知动作显示「其他操作」。
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -7,6 +7,8 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import vm from 'node:vm'
+import { createRequire } from 'node:module'
+import assert from 'node:assert/strict'
 
 const adminRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(adminRoot, '../..')
@@ -24,21 +26,27 @@ const FORBIDDEN = [
   '**',
 ]
 
+const MARKDOWN_BOLD = /\*\*(?=[^\s*\d@.])/
 const failures = []
 function fail(message) {
   failures.push(message)
   console.error(`  FAIL ${message}`)
 }
 
-function walkTsx(dir, out = []) {
+function walkSources(dir, out = []) {
   for (const name of readdirSync(dir)) {
     if (name === 'node_modules' || name.startsWith('.')) continue
     const path = join(dir, name)
     const info = statSync(path)
-    if (info.isDirectory()) walkTsx(path, out)
-    else if (name.endsWith('.tsx')) out.push(path)
+    if (info.isDirectory()) walkSources(path, out)
+    else if (/\.tsx?$/.test(name) && !/\.(?:test|d)\.ts$/.test(name)) out.push(path)
   }
   return out
+}
+
+// 第 2 批的检查只扫 .tsx（保持它原来的范围）；第 3 批的全局扫描用 walkSources（.ts 与 .tsx）。
+function walkTsx(dir) {
+  return walkSources(dir).filter((file) => file.endsWith('.tsx'))
 }
 
 function literalTexts(sourceFile) {
@@ -62,11 +70,12 @@ function literalTexts(sourceFile) {
 }
 
 console.log('\n=== 后台可见文案（工程词 / Markdown 星号）===')
-for (const file of scanRoots.flatMap((dir) => walkTsx(dir))) {
+for (const file of scanRoots.flatMap((dir) => walkSources(dir))) {
   const source = readFileSync(file, 'utf8')
-  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   for (const { value, pos } of literalTexts(sourceFile)) {
-    const hit = FORBIDDEN.find((token) => value.includes(token))
+    // 「**」只拦 Markdown 加粗（星号后紧跟文字），不拦脱敏打码：138****0001、ab***@x.com、*** 这类星号后是数字、星号、@、点或结尾。
+    const hit = FORBIDDEN.find((token) => token === '**' ? MARKDOWN_BOLD.test(value) : value.includes(token))
     if (!hit) continue
     const { line } = sourceFile.getLineAndCharacterOfPosition(pos)
     fail(`${relative(repoRoot, file)}:${line + 1} 含有「${hit}」`)
@@ -98,7 +107,7 @@ const batchFiles = [
 const batchForbidden = ['Terminal Agent 心跳上报', 'printerStatus', 'orgId', 'Kiosk']
 for (const file of batchFiles) {
   const source = readFileSync(file, 'utf8')
-  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   const visible = literalTexts(sourceFile).map(({ value }) => value).join('\n')
   for (const token of batchForbidden) {
     if (visible.includes(token)) fail(`${relative(repoRoot, file)} 可见文案仍含「${token}」`)
@@ -160,6 +169,124 @@ else {
   }
 }
 
+// 第 3 批与第 2 批的检查各自独立：各包一层块作用域，避免顶层同名辅助函数（如 jsx）互相冲突。
+{
+// 第 3 批：只看可见文本（title 与注释不算），技术状态判断和映射键不误判为正文。
+console.log('\n=== AI 与内容来源批次可见文案 ===')
+const contentRoutes = ['ai-services', 'ai-config', 'policy-sources', 'job-sources', 'fair-sources', 'fairs', 'companies']
+const partnerContentRoutes = ['policy', 'jobs', 'fairs', 'companies']
+const contentFiles = [
+  ...contentRoutes.flatMap((route) => walkSources(join(adminRoot, 'src/routes', route))),
+  ...partnerContentRoutes.flatMap((route) => walkSources(join(repoRoot, 'apps/partner/src/routes', route))),
+]
+const contentForbidden = ['元数据日志', 'Provider 状态', 'AI_PAUSED', 'MAINTENANCE_MODE', '运行链路消费', 'planned', 'parseResume', 'chatAssistant', 'ServiceUnavailableException', 'AI_PROVIDER_ERROR', 'ready', 'partial', 'insufficient', '（须在说明中写清）']
+function contentVisibleLiterals(sourceFile) {
+  const texts = []
+  function visit(node) {
+    if (ts.isJsxAttribute(node) && node.name.getText(sourceFile) === 'title') return
+    if (ts.isJsxText(node)) texts.push(node.text)
+    else if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+      let visible = sourceFile.fileName.endsWith('.ts') && (
+        (ts.isPropertyAssignment(node.parent) && node.parent.initializer === node) ||
+        ts.isReturnStatement(node.parent) || ts.isTemplateSpan(node.parent) ||
+        ts.isTemplateExpression(node.parent) ||
+        (ts.isBinaryExpression(node.parent) && node.parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)
+      )
+      let internal = false
+      for (let parent = node.parent; parent; parent = parent.parent) {
+        // 比较用的状态码/内部标识不是展示文字，右侧结果分支仍照常扫描。
+        if (ts.isBinaryExpression(parent) && [ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken, ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken].includes(parent.operatorToken.kind)) internal = true
+        if (ts.isJsxAttribute(parent) || ts.isJsxExpression(parent)) visible = true
+      }
+      if (visible && !internal) texts.push(node.text)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return texts.join('\n')
+}
+for (const file of contentFiles) {
+  const source = readFileSync(file, 'utf8')
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  const visible = contentVisibleLiterals(sf)
+  for (const word of contentForbidden) if (visible.includes(word)) fail(`${relative(repoRoot, file)} 第3批正文出现「${word}」`)
+}
+
+// 真执行显示映射与表格，再展开真实公共组件；不读取 title 当可见文字。
+const batchRequire = createRequire(join(repoRoot, 'packages/ui/package.json'))
+const fragment = Symbol.for('react.fragment')
+const jsx = (type, props) => ({ type, props: props ?? {} })
+const jsxRuntime = { jsx, jsxs: jsx, Fragment: fragment }
+const batchCache = new Map()
+function batchLoad(file) {
+  if (batchCache.has(file)) return batchCache.get(file)
+  const module = { exports: {} }
+  batchCache.set(file, module.exports)
+  const output = ts.transpileModule(readFileSync(file, 'utf8'), {
+    fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText
+  vm.runInNewContext(output, { module, exports: module.exports, console, require(id) {
+    if (id === 'react/jsx-runtime') return jsxRuntime
+    if (id === 'lucide-react') return new Proxy({}, { get: () => () => null })
+    if (id === '@ai-job-print/shared') return {
+      ...batchLoad(join(repoRoot, 'packages/shared/src/formatDateTime.ts')),
+      ...batchLoad(join(repoRoot, 'packages/shared/src/formatNumber.ts')),
+      ...batchLoad(join(repoRoot, 'packages/shared/src/types/admin.ts')),
+    }
+    if (id === '@ai-job-print/ui') return Object.assign({}, ...['Card', 'ConsoleTable', 'StatusBadge'].map((name) => batchLoad(join(repoRoot, `packages/ui/src/components/${name}.tsx`))))
+    if (id.startsWith('.')) {
+      const base = join(dirname(file), id)
+      const path = ['.ts', '.tsx'].map((ext) => base + ext).find((candidate) => { try { return statSync(candidate).isFile() } catch { return false } })
+      if (!path) throw new Error(`门禁无法加载 ${file} 的 ${id}`)
+      return batchLoad(path)
+    }
+    return batchRequire(id)
+  } }, { filename: file })
+  return module.exports
+}
+function batchNodes(node) {
+  if (node == null || typeof node === 'boolean') return []
+  if (Array.isArray(node)) return node.flatMap(batchNodes)
+  if (typeof node === 'string' || typeof node === 'number') return [String(node)]
+  if (node.type === fragment) return batchNodes(node.props.children)
+  if (typeof node.type === 'function') return batchNodes(node.type(node.props))
+  if (typeof node.type !== 'string') throw new Error(`未支持的渲染节点 ${String(node.type)}`)
+  return [{ ...node, children: batchNodes(node.props.children) }]
+}
+function batchText(nodes) { return nodes.map((node) => typeof node === 'string' ? node : batchText(node.children)).join('') }
+function allBatchNodes(nodes) { return nodes.flatMap((node) => typeof node === 'string' ? [] : [node, ...allBatchNodes(node.children)]) }
+function assertBatchText(nodes, location) {
+  const text = batchText(nodes)
+  for (const word of contentForbidden) assert.ok(!text.includes(word), `${location} 可见渲染含「${word}」`)
+  return text
+}
+try {
+  const { AiLogsTable } = batchLoad(join(adminRoot, 'src/routes/ai-services/AiLogsTable.tsx'))
+  const props = { logs: [
+    { taskId: 'task-private-1', operation: 'parseResume', provider: 'llm:deepseek:deepseek-v4-flash', status: 'failed', errorCode: 'AI_PROVIDER_ERROR', latencyMs: 1234, createdAt: '2026-09-29T11:45:00Z' },
+    { taskId: 'task-private-2', operation: 'chatAssistant', provider: 'llm:deepseek:deepseek-v4-flash', status: 'failed', errorCode: 'ServiceUnavailableException', latencyMs: 20, createdAt: '2026-09-29T11:45:00Z' },
+  ], logsTotal: 2, logsOffset: 0, logsLoading: false, logsError: null, opFilter: 'all', statusFilter: 'all', applyOpFilter() {}, applyStatusFilter() {}, setLogsOffset() {} }
+  const nodes = batchNodes(AiLogsTable(props))
+  const text = assertBatchText(nodes, 'AI 调用日志')
+  for (const phrase of ['简历解析', 'AI 对话', 'DeepSeek · deepseek-v4-flash', '模型厂商服务异常', 'AI 服务暂时不可用']) assert.ok(text.includes(phrase), `日志缺少中文展示 ${phrase}`)
+  assert.ok(!text.includes('task-private-1'), '列表不能直接露出任务 ID')
+  const titles = allBatchNodes(nodes).map((node) => node.props.title ?? '').join('\n')
+  for (const raw of ['task-private-1', 'parseResume', 'AI_PROVIDER_ERROR', 'ServiceUnavailableException', 'llm:deepseek:deepseek-v4-flash']) assert.ok(titles.includes(raw), `悬停丢失原值 ${raw}`)
+  assert.ok(allBatchNodes(nodes).some((node) => node.type === 'th' && batchText(node.children) === '服务类型'))
+  const emptyLogs = assertBatchText(batchNodes(AiLogsTable({ ...props, logs: [], logsTotal: 0 })), '空日志')
+  assert.ok(emptyLogs.includes('已按条件查全库，不是只翻了最近 100 条'), '空日志必须保留全库查询说明')
+  assert.ok(allBatchNodes(nodes).some((node) => node.type === 'input' && node.props.readOnly && node.props.value === 'task-private-1'), '任务详情必须有可选择复制的完整任务编号')
+  const { PolicyEmergencyNote } = batchLoad(join(repoRoot, 'apps/partner/src/routes/policy/PolicyEmergencyNote.tsx'))
+  const note = batchText(batchNodes(PolicyEmergencyNote({ row: { emergencyReasonCode: 'other', emergencyReasonText: '等待机构核对', emergencyTakedownAt: '2026-09-29T11:45:00Z' } })))
+  assert.ok(note.includes('事由：其他'), '政策下架展示须用「其他」')
+  assert.ok(!note.includes('须在说明中写清'), '表单提示不能混入事由展示')
+  for (const phrase of ['不能再编辑、审核或发布', '不能恢复', '由本机构审核发布']) assert.ok(note.includes(phrase), `冻结说明丢失 ${phrase}`)
+  // 表单提示原样保留，与结果展示是两种用途。
+  const reasons = batchLoad(join(repoRoot, 'packages/shared/src/types/admin.ts')).RECRUITMENT_EMERGENCY_REASON_LABELS
+  assert.equal(reasons.other, '其他（须在说明中写清）')
+  console.log('  PASS 第3批可见正文无工程词；日志中文与悬停原值、政策冻结展示与表单提示都保留')
+} catch (error) { fail(error.message) }
+}
 
 console.log('\n=== 第二批页面实际渲染文案 ===')
 // VM 运行原组件/列定义，替换请求与 hook 的数据源；只取渲染树 children，title 中的核对码不算可见文字。

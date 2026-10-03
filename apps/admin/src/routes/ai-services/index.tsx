@@ -8,8 +8,8 @@
 // ============================================================
 
 import { useEffect, useState } from 'react'
-import { formatDateTime } from '@ai-job-print/shared'
-import { Card, StatusBadge, LoadingState, ErrorState } from '@ai-job-print/ui'
+import { formatCount } from '@ai-job-print/shared'
+import { Card, LoadingState, ErrorState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import {
   BotIcon,
@@ -26,75 +26,15 @@ import {
   BriefcaseBusinessIcon,
 } from 'lucide-react'
 import { getAiUsage, getAiLogs, getAdminJobQualitySummary } from '../../services/api'
-import type { AdminAiUsage, AdminAiLogEntry, AiOperation, AiLogStatus, JobSourceQualitySummary } from '../../services/api'
+import type { AdminAiUsage, AdminAiLogEntry, AiOperation, JobSourceQualitySummary } from '../../services/api'
 import { AiAccessSwitchesPanel } from './AiAccessSwitchesPanel'
 import { AiUsagePanel } from './AiUsagePanel'
 import { AiOperationCostTable } from './AiOperationCostTable'
-import { OPERATION_LABELS } from './aiOperationLabels'
+import { AiLogsTable, LOGS_PAGE_SIZE, type OpFilter, type StatusFilter } from './AiLogsTable'
+import { aiLogReason, aiProviderName } from './aiLogDisplay'
 import { logOverviewLatency, logOverviewRate } from './aiUsageDisplay'
 
 // ─── 常量映射 ─────────────────────────────────────────────────
-
-const STATUS_MAP: Record<AiLogStatus, { badge: 'success' | 'error'; label: string }> = {
-  success: { badge: 'success', label: '成功' },
-  failed:  { badge: 'error',   label: '失败' },
-}
-
-// ─── 筛选类型 ─────────────────────────────────────────────────
-
-type OpFilter     = 'all' | AiOperation
-type StatusFilter = 'all' | AiLogStatus
-
-const OP_FILTERS: OpFilter[] = [
-  'all',
-  'parseResume',
-  'optimizeResume',
-  'adjustResumeLayout',
-  'generateResume',
-  'chatAssistant',
-  'classifyIntent',
-  'jobRecommend',
-  'jobExplain',
-  'jobMatch',
-  'careerPlan',
-  'fairVisitPlan',
-  'interviewQuestion',
-  'interviewReport',
-  'voiceTranscribe',
-  'voiceSynthesize',
-  // selfAssessment 此前有标签但漏在筛选列表外，日志页筛不出来；一并补上。
-  'selfAssessment',
-  'contractReview',
-]
-const OP_FILTER_LABELS: Record<OpFilter, string> = {
-  all:                '全部',
-  parseResume:        '简历解析',
-  optimizeResume:     '简历优化',
-  adjustResumeLayout: '排版调整',
-  generateResume:     'AI 简历生成',
-  chatAssistant:      'AI 对话',
-  classifyIntent:     '意图分类',
-  jobRecommend:       '岗位推荐',
-  jobExplain:         '岗位解读',
-  jobMatch:           '匹配参考',
-  careerPlan:         '职业规划',
-  fairVisitPlan:      '招聘会计划',
-  interviewQuestion:  '面试出题',
-  interviewReport:    '面试报告',
-  voiceTranscribe:    '语音转写',
-  voiceSynthesize:    '语音播报',
-  selfAssessment:     '自我探索 · 倾向参考',
-  contractReview:     '合同审查',
-}
-/** 单页条数。后端硬上限 500（services/api/src/ai/ai-log.service.ts MAX_LOG_LIMIT）。 */
-const LOGS_PAGE_SIZE = 100
-
-const STATUS_FILTERS: StatusFilter[] = ['all', 'success', 'failed']
-const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
-  all:     '全部状态',
-  success: '成功',
-  failed:  '失败',
-}
 
 // ─── 子组件 ───────────────────────────────────────────────────
 
@@ -104,9 +44,10 @@ interface MetricProps {
   note?: string
   icon: React.ElementType
   iconClass?: string
+  title?: string
 }
 
-function MetricCard({ label, value, note, icon: Icon, iconClass = 'text-primary-600 bg-primary-50' }: MetricProps) {
+function MetricCard({ label, value, note, title, icon: Icon, iconClass = 'text-primary-600 bg-primary-50' }: MetricProps) {
   return (
     <Card className="flex items-start gap-3.5 p-4">
       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] ${iconClass}`}>
@@ -114,7 +55,7 @@ function MetricCard({ label, value, note, icon: Icon, iconClass = 'text-primary-
       </div>
       <div className="min-w-0">
         <p className="text-[11.5px] font-medium text-neutral-500">{label}</p>
-        <p className="mt-0.5 text-[1.35rem] font-bold tabular-nums leading-none text-neutral-900">{value}</p>
+        <p className="mt-0.5 text-[1.35rem] font-bold tabular-nums leading-none text-neutral-900" title={title}>{value}</p>
         {note && <p className="mt-1 text-[11px] text-neutral-400">{note}</p>}
       </div>
     </Card>
@@ -197,7 +138,7 @@ export default function AiServicesPage() {
 
   if (loading) {
     return (
-      <Page title="AI 服务管理" subtitle="调用统计 · 元数据日志 · Provider 状态">
+      <Page title="AI 服务管理" subtitle="AI 开关、用量与额度、调用记录">
         <AiAccessSwitchesPanel />
         <AiUsagePanel />
         <LoadingState text="加载 AI 服务数据…" />
@@ -207,7 +148,7 @@ export default function AiServicesPage() {
 
   if (error || !usage) {
     return (
-      <Page title="AI 服务管理" subtitle="调用统计 · 元数据日志 · Provider 状态">
+      <Page title="AI 服务管理" subtitle="AI 开关、用量与额度、调用记录">
         <AiAccessSwitchesPanel />
         <AiUsagePanel />
         <ErrorState title="数据加载失败" message={error ?? '未知错误'} />
@@ -256,15 +197,8 @@ export default function AiServicesPage() {
     ? Math.round((qualityTotals.readyJobs / qualityTotals.totalJobs) * 1000) / 10
     : 0
 
-  // 日志已由后端按 operation / status 筛好，这里**不再做二次过滤**
-  //（客户端过滤正是「低频能力显示为空」的成因）。
-  const logsRangeFrom = logsTotal === 0 ? 0 : logsOffset + 1
-  const logsRangeTo = logsOffset + logs.length
-  const hasPrevLogsPage = logsOffset > 0
-  const hasNextLogsPage = logsOffset + logs.length < logsTotal
-
   return (
-    <Page title="AI 服务管理" subtitle="调用统计 · 元数据日志 · Provider 状态">
+    <Page title="AI 服务管理" subtitle="AI 开关、用量与额度、调用记录">
       <AiAccessSwitchesPanel />
       <AiUsagePanel />
 
@@ -312,7 +246,7 @@ export default function AiServicesPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricCard
             label="AI 调用总次数"
-            value={usage.totalCalls}
+            value={formatCount(usage.totalCalls)}
             note="近 24 小时累计"
             icon={BotIcon}
           />
@@ -341,29 +275,30 @@ export default function AiServicesPage() {
 
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
           <MetricCard
-            label="当前 Provider"
-            value={usage.providerName}
-            note="切换需修改服务端 AI_PROVIDER"
+            label="当前 AI 服务"
+            value={aiProviderName(usage.providerName)}
+            title={usage.providerName}
+            note="切换请联系运维修改服务器配置"
             icon={ServerIcon}
             iconClass="text-purple-600 bg-purple-50"
           />
           <MetricCard
             label="简历解析"
-            value={usage.byOperation.parseResume}
-            note="parseResume 调用次数"
+            value={formatCount(usage.byOperation.parseResume)}
+            note="简历解析调用次数"
             icon={ScanTextIcon}
           />
           <MetricCard
             label="简历优化"
-            value={usage.byOperation.optimizeResume}
-            note="optimizeResume 调用次数"
+            value={formatCount(usage.byOperation.optimizeResume)}
+            note="简历优化调用次数"
             icon={SparklesIcon}
             iconClass="text-yellow-600 bg-yellow-50"
           />
           <MetricCard
             label="AI 助手对话"
-            value={usage.byOperation.chatAssistant}
-            note="chatAssistant 调用次数"
+            value={formatCount(usage.byOperation.chatAssistant)}
+            note="AI 助手对话调用次数"
             icon={MessageSquareIcon}
             iconClass="text-teal-600 bg-teal-50"
           />
@@ -386,28 +321,28 @@ export default function AiServicesPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricCard
             label="岗位 AI 调用"
-            value={jobAiCalls}
+            value={formatCount(jobAiCalls)}
             note="推荐 / 解读 / 匹配参考"
             icon={BriefcaseBusinessIcon}
             iconClass="text-sky-600 bg-sky-50"
           />
           <MetricCard
             label="岗位推荐"
-            value={usage.byOperation.jobRecommend}
+            value={formatCount(usage.byOperation.jobRecommend)}
             note={opCostText('jobRecommend')}
             icon={SparklesIcon}
             iconClass="text-violet-600 bg-violet-50"
           />
           <MetricCard
             label="岗位解读"
-            value={usage.byOperation.jobExplain}
+            value={formatCount(usage.byOperation.jobExplain)}
             note={opCostText('jobExplain')}
             icon={ScanTextIcon}
             iconClass="text-info-fg bg-info-bg"
           />
           <MetricCard
             label="匹配参考"
-            value={usage.byOperation.jobMatch}
+            value={formatCount(usage.byOperation.jobMatch)}
             note={jobAiUnmeasured > 0
               ? `岗位 AI 总成本 ¥${jobAiCost.toFixed(4)}（+${jobAiUnmeasured} 笔未估算）`
               : `岗位 AI 总成本 ¥${jobAiCost.toFixed(4)}`}
@@ -431,27 +366,27 @@ export default function AiServicesPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricCard
             label="来源岗位总量"
-            value={qualityTotals.totalJobs}
+            value={formatCount(qualityTotals.totalJobs)}
             note={`${qualitySummary.length} 个来源分组`}
             icon={BriefcaseBusinessIcon}
           />
           <MetricCard
             label="AI 可读就绪率"
-            value={`${readyRate}%`}
-            note={`${qualityTotals.readyJobs} 条 ready`}
+            value={qualityTotals.totalJobs > 0 ? `${readyRate}%` : '—'}
+            note={`${qualityTotals.readyJobs} 条已就绪`}
             icon={CheckCircleIcon}
-            iconClass={readyRate >= 90 ? 'text-success-fg bg-success-bg' : 'text-warning-fg bg-warning-bg'}
+            iconClass={qualityTotals.totalJobs === 0 ? 'text-neutral-500 bg-neutral-100' : readyRate >= 90 ? 'text-success-fg bg-success-bg' : 'text-warning-fg bg-warning-bg'}
           />
           <MetricCard
             label="字段缺失"
             value={qualityTotals.partialJobs + qualityTotals.insufficientJobs}
-            note="partial / insufficient"
+            note="部分缺失 / 信息不足"
             icon={AlertTriangleIcon}
             iconClass="text-warning-fg bg-warning-bg"
           />
           <MetricCard
             label="来源链接异常"
-            value={qualityTotals.brokenSourceUrlJobs}
+            value={formatCount(qualityTotals.brokenSourceUrlJobs)}
             note={`${qualityTotals.staleJobs} 条过期或同步陈旧`}
             icon={XCircleIcon}
             iconClass="text-error-fg bg-error-bg"
@@ -474,7 +409,7 @@ export default function AiServicesPage() {
                   className="flex items-center gap-2 rounded-lg border border-error/20 bg-error-bg px-4 py-2"
                 >
                   <XCircleIcon className="h-4 w-4 text-error-fg" aria-hidden="true" />
-                  <span className="text-sm font-medium text-error-fg">{r.code}</span>
+                  <span className="text-sm font-medium text-error-fg" title={r.code}>{aiLogReason(r.code)}</span>
                   <span className="text-sm text-error-fg">{r.count} 次</span>
                 </div>
               ))}
@@ -483,152 +418,8 @@ export default function AiServicesPage() {
         </section>
       )}
 
-      {/* ── 最近调用日志 ──────────────────────────────── */}
-      <section aria-label="最近 AI 调用日志" className="mt-7">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-            <h2 className="text-[13px] font-bold text-neutral-700">最近调用日志</h2>
-          </div>
-          <div className="ml-auto flex flex-wrap gap-2">
-            <div className="flex rounded-lg border border-neutral-200 bg-surface text-sm">
-              {OP_FILTERS.map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => applyOpFilter(f)}
-                  className={`px-3 py-1.5 first:rounded-l-lg last:rounded-r-lg ${
-                    opFilter === f
-                      ? 'bg-primary-600 text-white'
-                      : 'text-neutral-600 hover:bg-neutral-50'
-                  }`}
-                >
-                  {OP_FILTER_LABELS[f]}
-                </button>
-              ))}
-            </div>
-            <div className="flex rounded-lg border border-neutral-200 bg-surface text-sm">
-              {STATUS_FILTERS.map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => applyStatusFilter(f)}
-                  className={`px-3 py-1.5 first:rounded-l-lg last:rounded-r-lg ${
-                    statusFilter === f
-                      ? 'bg-primary-600 text-white'
-                      : 'text-neutral-600 hover:bg-neutral-50'
-                  }`}
-                >
-                  {STATUS_FILTER_LABELS[f]}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <Card className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-neutral-100 bg-neutral-50 text-xs text-neutral-500">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Task ID</th>
-                  <th className="px-4 py-3 text-left font-medium">服务类型</th>
-                  <th className="px-4 py-3 text-left font-medium">Provider</th>
-                  <th className="px-4 py-3 text-left font-medium">状态</th>
-                  <th className="px-4 py-3 text-right font-medium">响应时间</th>
-                  <th className="px-4 py-3 text-left font-medium">时间</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-50">
-                {logsLoading ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
-                      加载中…
-                    </td>
-                  </tr>
-                ) : logsError ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-error-fg">
-                      {logsError}
-                    </td>
-                  </tr>
-                ) : logs.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
-                      该筛选条件下没有调用记录（已按条件查全库，不是只翻了最近 100 条）
-                    </td>
-                  </tr>
-                ) : (
-                  logs.map((log) => (
-                    <tr key={log.taskId} className="hover:bg-neutral-50/50">
-                      <td className="px-4 py-3 font-mono text-xs text-neutral-500">
-                        {log.taskId.slice(0, 28)}{log.taskId.length > 28 ? '…' : ''}
-                      </td>
-                      <td className="px-4 py-3 text-neutral-700">
-                        {OPERATION_LABELS[log.operation]}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="rounded bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
-                          {log.provider}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge
-                          dot
-                          status={STATUS_MAP[log.status].badge}
-                          label={STATUS_MAP[log.status].label}
-                        />
-                        {log.errorCode && (
-                          <code className="ml-2 text-xs text-neutral-400">{log.errorCode}</code>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-neutral-600">
-                        {log.latencyMs >= 1000
-                          ? `${(log.latencyMs / 1000).toFixed(1)}s`
-                          : `${log.latencyMs}ms`}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">
-                        {formatDateTime(log.createdAt)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* 分页：总数来自后端 count(匹配筛选条件)，不是本页条数 */}
-          <div className="flex flex-wrap items-center gap-3 border-t border-neutral-100 px-4 py-3 text-xs text-neutral-500">
-            <span className="tabular-nums">
-              {logsLoading
-                ? '统计中…'
-                : logsError
-                  ? '—'
-                  : logsTotal === 0
-                    ? '共 0 条'
-                    : `第 ${logsRangeFrom}–${logsRangeTo} 条 / 共 ${logsTotal} 条`}
-            </span>
-            <div className="ml-auto flex gap-2">
-              <button
-                type="button"
-                disabled={!hasPrevLogsPage || logsLoading}
-                onClick={() => setLogsOffset(Math.max(logsOffset - LOGS_PAGE_SIZE, 0))}
-                className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                上一页
-              </button>
-              <button
-                type="button"
-                disabled={!hasNextLogsPage || logsLoading}
-                onClick={() => setLogsOffset(logsOffset + LOGS_PAGE_SIZE)}
-                className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                下一页
-              </button>
-            </div>
-          </div>
-        </Card>
-      </section>
+      <AiLogsTable logs={logs} logsTotal={logsTotal} logsOffset={logsOffset} logsLoading={logsLoading} logsError={logsError}
+        opFilter={opFilter} statusFilter={statusFilter} applyOpFilter={applyOpFilter} applyStatusFilter={applyStatusFilter} setLogsOffset={setLogsOffset} />
 
       {/* ── 合规说明 ──────────────────────────────────── */}
       <section aria-label="合规说明" className="mt-8">
@@ -638,7 +429,7 @@ export default function AiServicesPage() {
             <p className="font-medium">数据合规说明</p>
             <ul className="mt-1 list-inside list-disc space-y-1 text-info-fg">
               <li>
-                AI 日志仅记录元数据（taskId / Provider / 响应时间 / 状态 / 错误码），
+                AI 日志仅记录任务编号、厂商与模型、响应时间、状态与失败原因，
                 不保存完整简历内容和聊天原文
               </li>
               <li>AI 服务结果仅服务求职者本人，不推送给企业或第三方</li>

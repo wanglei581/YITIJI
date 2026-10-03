@@ -30,7 +30,9 @@
  * 运行:pnpm --filter @ai-job-print/api verify:resume-optimize
  */
 import 'dotenv/config'
-import { createServer } from 'http'
+import { createServer, type RequestListener } from 'http'
+import { installResumeOptimizeFetchStub } from './support/resume-optimize-fetch-stub'
+import { verifyOriginalContent } from './support/resume-optimize-original-content'
 import type { AddressInfo } from 'net'
 import { randomUUID } from 'crypto'
 import { Logger } from '@nestjs/common'
@@ -187,6 +189,7 @@ const RESUME_FIXTURES: ResumeFixture[] = [
   },
   {
     // 模型回了一个原文里没有的姓名：不能照抄，改用原文开头识别出的姓名。
+    // 经历两段都回齐：本用例只测姓名；缺经历会按 W-OPT-LOSS 触发点名重试，那是另一组用例的事。
     id: 'C-fake-name',
     text: '赵明远\n青岛智造有限公司                 2020.09 - 2024.06\n海岳物流有限公司                 2024.07—至今\n工作经历\n负责仓储系统维护和收货安排。',
     expectedName: '赵明远',
@@ -199,6 +202,7 @@ const RESUME_FIXTURES: ResumeFixture[] = [
       education: [],
       experience: [
         { company: '青岛智造有限公司', role: '仓储管理', period: '2020.09 - 2024.06', description: '负责仓储系统维护和收货安排。' },
+        { company: '海岳物流有限公司', role: '仓储管理', period: '2024.07—至今', description: '负责收货安排。' },
       ],
       projects: [], skills: [], certificates: [],
     },
@@ -353,11 +357,12 @@ function buildFixtureOptimize(fixture: ResumeFixture): string {
 
 async function main(): Promise<void> {
   console.log('\n=== 阶段2B AI 简历优化真实化验证 ===')
+  await verifyOriginalContent()
   await verifyRedisInflightLock()
 
   Logger.overrideLogger({ log: () => {}, error: () => {}, warn: () => {}, debug: () => {}, verbose: () => {}, fatal: () => {} })
 
-  const server = createServer((req, res) => {
+  const stubHandler: RequestListener = (req, res) => {
     const chunks: Buffer[] = []
     req.on('data', (c: Buffer) => chunks.push(c))
     req.on('end', () => {
@@ -406,9 +411,11 @@ async function main(): Promise<void> {
       if (stubDelayMs > 0) setTimeout(finish, stubDelayMs)
       else finish()
     })
-  })
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()))
-  const baseURL = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`
+  }
+  const server = createServer(stubHandler)
+  const fetchStub = (process.argv.includes('--fetch-stub') || process.env['RESUME_OPTIMIZE_FETCH_STUB'] === '1') ? installResumeOptimizeFetchStub(stubHandler) : undefined
+  if (!fetchStub) await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()))
+  const baseURL = fetchStub?.baseURL ?? `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`
 
   const cfgBase = {
     vendor: 'deepseek', model: 'stub', baseURL, systemPrompt: '', roleScope: '',
@@ -571,6 +578,19 @@ async function main(): Promise<void> {
       pass('6c. 会员优化路径按 parse 行 endUserId 提取原文,他人会员被拒')
     }
 
+    // W-OPT-LOSS：首次合法结果不能被重试坏 JSON 拖成 failed。
+    {
+      const { taskId, accessToken } = await submitParse(ai, `file_opt_retry_bad_${suffix}`)
+      setResponses([optimizeReply((o) => { (o.resume as Record<string, unknown>).education = [] }), rawReply('坏 JSON')])
+      const opt = await ai.getResumeOptimize(taskId, { endUserId: null, accessToken })
+      assertStubHealthy()
+      if (opt.status !== 'completed' || Number(llmCallCount) !== 2
+        || opt.optimizedResume?.education[0]?.school !== '教育经历 验证大学 计算机科学与技术 本科 2021-2025') {
+        fail('W-OPT-LOSS completed. 首次合法漏教育、第二次坏 JSON，必须 completed 且原文补教育')
+      }
+      pass('W-OPT-LOSS completed. 首次合法漏教育、重试坏 JSON，completed 且教育原文补回')
+    }
+
     // ── W-97. 三种真实排版：姓名、跨标题/分栏经历和项目/实习逐条覆盖 ────────
     for (const fixture of RESUME_FIXTURES) {
       const fileId = `file_opt_w97_${fixture.id.replace(/[^A-Za-z0-9]/g, '').toLowerCase()}_${suffix}`
@@ -587,6 +607,7 @@ async function main(): Promise<void> {
       const opt = await ai.getResumeOptimize(taskId, { endUserId: null, accessToken })
       assertStubHealthy()
       if (opt.status !== 'completed' || !opt.optimizedResume) fail(`W-97 ${fixture.id}. 优化未完成: ${opt.failReason}`)
+      if (llmCallCount !== 1) fail(`W-97 ${fixture.id}. 完整原有桩队列必须单次回复完成`)
       const name = opt.optimizedResume.basic.name
       const modules = opt.modules ?? []
       if (name !== fixture.expectedName) {
@@ -808,6 +829,7 @@ async function main(): Promise<void> {
     }
     await prisma.aiResumeResult.deleteMany({ where: { taskId: { in: createdTaskIds } } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: { in: createdEndUserIds } } }).catch(() => undefined)
+    fetchStub?.restore()
     server.close()
     await prisma.onModuleDestroy?.()
   }

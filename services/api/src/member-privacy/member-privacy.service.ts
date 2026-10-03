@@ -6,7 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
-import { isSerializationConflict } from '../common/prisma/serialization-conflict'
+import { isSerializationConflict, waitBeforeSerializationRetry } from '../common/prisma/serialization-conflict'
 import type { MemberAiConsentScope, MemberAiConsentStatus } from './member-privacy.types'
 
 export const CURRENT_JOB_AI_CONSENT_VERSION = '20260701'
@@ -93,6 +93,7 @@ export async function runSerializableTransaction<R>(
       if (attempt === SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS) {
         throw new SerializableTransactionRetryExhaustedError()
       }
+      await waitBeforeSerializationRetry(attempt)
     }
   }
   throw new SerializableTransactionRetryExhaustedError()

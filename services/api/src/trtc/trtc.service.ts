@@ -1,4 +1,6 @@
-import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common'
+import { randomUUID } from 'node:crypto'
+import { TrtcSessionRegistry, readTrtcMaxSessionSeconds } from './trtc-session-registry.service'
 import { genUserSig } from './usersig.util'
 import { callTencentApi } from './tencent-api.util'
 import { assertTrtcDelegatedEndpoints } from './trtc-delegated-endpoints'
@@ -82,11 +84,76 @@ export interface StartSessionResult {
   userSig:    string
   roomId:     string
   taskId:     string
+  maxSessionSeconds: number
+  expiresAt: string
+}
+
+/** UserSig 只在进房时校验：保持原来的 5 分钟短 TTL，上限配得更短时再跟着收紧（上限 + 30 秒）。 */
+function trtcUserSigTtlSeconds(): number {
+  return Math.min(300, readTrtcMaxSessionSeconds() + 30)
 }
 
 @Injectable()
-export class TrtcService {
+export class TrtcService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TrtcService.name)
+
+  private deadlineTimer?: ReturnType<typeof setInterval>
+  private scanning = false
+  constructor(private readonly sessions: TrtcSessionRegistry) {}
+
+  onModuleInit(): void {
+    // 重启立即扫描 Redis；不等待腾讯云，避免依赖故障卡住 API 启动。
+    void this.expireSessions()
+    this.deadlineTimer = setInterval(() => { void this.expireSessions() }, 1_000)
+    this.deadlineTimer.unref()
+  }
+
+  onModuleDestroy(): void { if (this.deadlineTimer) clearInterval(this.deadlineTimer) }
+
+  async expireSessions(now = Date.now()): Promise<void> {
+    if (this.scanning) return
+    this.scanning = true
+    try {
+      const due = await this.sessions.due(now)
+      // 一次故障不能把其他已到期会话串行拖住；每批最多 10 个云侧停止请求。
+      for (let offset = 0; offset < due.length; offset += 10) {
+        await Promise.all(due.slice(offset, offset + 10).map(async (record) => {
+          try {
+            if (record.taskId) {
+              await this.stopSession(record.taskId)
+              return
+            }
+            await this.sessions.finish(record.sessionId, async (item) => {
+              let taskId = item.taskId
+              if (!taskId) {
+                // Start 返回前崩溃/超时：用预写的 SessionId 找回腾讯任务，不丢停止责任。
+                // 官方：https://cloud.tencent.com/document/api/647/108515（2026-09-30 核对）。
+                const { secretId, cloudKey } = this.cfg()
+                if (!secretId || !cloudKey) throw new Error('TRTC credentials unavailable')
+                try {
+                  const result = await callTencentApi<{ TaskId: string }>({
+                    secretId, secretKey: cloudKey, region: item.region, action: 'DescribeAIConversation',
+                    payload: { SdkAppId: item.sdkAppId, SessionId: item.sessionId },
+                  })
+                  taskId = result.TaskId
+                  if (!taskId) throw new Error('TRTC task not yet resolved')
+                } catch (error) {
+                  if (error instanceof Error && error.message.startsWith('FailedOperation.TaskNotExist:')) return
+                  throw error
+                }
+              }
+              await this.stopCloudSession(taskId, item.region)
+            })
+          } catch (error) {
+            await this.sessions.retry(record.sessionId, now)
+            this.logger.error('TRTC_DEADLINE_STOP_RETRY', error instanceof Error ? error.message : String(error))
+          }
+        }))
+      }
+    } catch (error) {
+      this.logger.error('TRTC_DEADLINE_SCAN_FAILED', error instanceof Error ? error.message : String(error))
+    } finally { this.scanning = false }
+  }
 
   private cfg() {
     const sdkAppId  = Number(process.env['TRTC_SDK_APP_ID'])
@@ -103,7 +170,7 @@ export class TrtcService {
     if (!sdkAppId || !secretKey) {
       throw new InternalServerErrorException('TRTC 应用凭证未配置')
     }
-    return { sdkAppId, userId, userSig: genUserSig(sdkAppId, secretKey, userId) }
+    return { sdkAppId, userId, userSig: genUserSig(sdkAppId, secretKey, userId, trtcUserSigTtlSeconds()) }
   }
 
   private buildTtsConfig(secretId: string, cloudKey: string): string {
@@ -149,10 +216,12 @@ export class TrtcService {
     }
 
     // 房间号：用时间戳派生，保证每次唯一（字符串房间）
-    const roomId       = `kiosk_${Date.now()}`
-    const botUserId    = `ai_bot_${Date.now()}`
-    const userSig      = genUserSig(sdkAppId, secretKey, userId)
-    const botUserSig   = genUserSig(sdkAppId, secretKey, botUserId)
+    const sessionId = randomUUID()
+    const maxSessionSeconds = readTrtcMaxSessionSeconds()
+    const roomId       = `kiosk_${sessionId}`
+    const botUserId    = `ai_bot_${sessionId}`
+    const userSig      = genUserSig(sdkAppId, secretKey, userId, trtcUserSigTtlSeconds())
+    const botUserSig   = genUserSig(sdkAppId, secretKey, botUserId, trtcUserSigTtlSeconds())
 
     // ── LLM 配置 ─────────────────────────────────────────────
     const llmApiKey = process.env['TRTC_LLM_API_KEY']
@@ -180,6 +249,7 @@ export class TrtcService {
     const ttsConfig = this.buildTtsConfig(secretId, cloudKey)
 
     const payload = {
+      SessionId:  sessionId,
       SdkAppId:   sdkAppId,
       RoomId:     roomId,
       RoomIdType: 1, // 1 = 字符串房间号
@@ -197,17 +267,32 @@ export class TrtcService {
       TTSConfig: ttsConfig,
     }
 
+    // 官方 Start/AgentConfig 仅有无推流的 MaxIdleTime，没有总时长字段：
+    // https://cloud.tencent.com/document/api/647/108514
+    // https://cloud.tencent.com/document/api/647/44055#AgentConfig（2026-09-30 核对）。
+    // 服务端截止从调用腾讯前开始，永不因重连/停止令牌重放而续期。
+    const startedAt = Date.now()
+    const record = { sessionId, sdkAppId, region, startedAt,
+      expiresAt: startedAt + maxSessionSeconds * 1000, taskId: null, stopped: false }
     try {
       // 交给腾讯云代调的模型 / 语音合成地址先过出站白名单：不在单内就不调腾讯云、不建房。
       assertTrtcDelegatedEndpoints(llmConfig, ttsConfig)
+      await this.sessions.reserve(record) // Redis 不可用时不向腾讯发起计费请求。
       const resp = await callTencentApi<{ TaskId: string }>({
         secretId, secretKey: cloudKey, region,
         action: 'StartAIConversation',
         payload,
       })
 
+      try {
+        await this.sessions.activate(record, resp.TaskId)
+        if (Date.now() >= record.expiresAt) throw new Error('TRTC session deadline elapsed during start')
+      } catch (error) {
+        await this.stopCloudSession(resp.TaskId, region)
+        throw error
+      }
       this.logger.log(`AI 会话已启动 room=${roomId} task=${resp.TaskId}`)
-      return { sdkAppId, userId, userSig, roomId, taskId: resp.TaskId }
+      return { sdkAppId, userId, userSig, roomId, taskId: resp.TaskId, maxSessionSeconds, expiresAt: new Date(record.expiresAt).toISOString() }
     } catch (err: unknown) {
       // 地址未通过出站白名单（代调地址或腾讯云主机）：一个请求都没发，如实报 503，不报成 500。
       if (err instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
@@ -219,13 +304,19 @@ export class TrtcService {
 
   /** 结束一次对话式 AI 会话 */
   async stopSession(taskId: string): Promise<void> {
+    const sessionId = await this.sessions.sessionForTask(taskId)
+    if (!sessionId) return this.stopCloudSession(taskId) // 发布前已开出的旧会话仍可止损。
+    await this.sessions.finish(sessionId, item => this.stopCloudSession(taskId, item.region))
+  }
+
+  private async stopCloudSession(taskId: string, sessionRegion?: string): Promise<void> {
     const { secretId, cloudKey, region } = this.cfg()
     if (!secretId || !cloudKey) {
       throw new InternalServerErrorException('腾讯云 API 凭证未配置')
     }
     try {
       await callTencentApi({
-        secretId, secretKey: cloudKey, region,
+        secretId, secretKey: cloudKey, region: sessionRegion ?? region,
         action: 'StopAIConversation',
         payload: { TaskId: taskId },
       })
@@ -233,6 +324,8 @@ export class TrtcService {
     } catch (err: unknown) {
       // 腾讯云主机被移出出站白名单：请求没发出，重试也不会成功，不报成「请重试」。
       if (err instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
+      // 腾讯官方停止/查询的 TaskNotExist 表示任务已结束，重复停止视为成功。
+      if (err instanceof Error && err.message.startsWith('FailedOperation.TaskNotExist:')) return
       const msg = err instanceof Error ? err.message : String(err)
       this.logger.warn(`StopAIConversation 失败: ${msg}`)
       throw new ServiceUnavailableException({
