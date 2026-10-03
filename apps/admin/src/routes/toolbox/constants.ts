@@ -85,7 +85,7 @@ export const BLOCK_REASON_LABELS: Record<string, string> = {
   app_archived: '微应用已归档，不能发布。',
   self_review: '提交人与审核人不能相同。',
   host_required: '外部地址缺少可审核目标域名。',
-  host_not_allowed: '目标域名未进入 DB 审核表。',
+  host_not_allowed: '目标域名尚未提交审核。',
   host_not_active: '目标域名尚未审核生效。',
   host_expired: '目标域名白名单已过期。',
   host_suspended: '目标域名已暂停。',
@@ -97,6 +97,8 @@ export const BLOCK_REASON_LABELS: Record<string, string> = {
   invalid_target_url: '目标地址不是合法 HTTPS 地址。',
 }
 
-export function formatCount(value: number): string {
-  return new Intl.NumberFormat('zh-CN').format(value)
+export { formatCount } from '@ai-job-print/shared'
+
+export const ENTRY_TYPE_LABELS: Readonly<Record<string, string>> = {
+  internal_route: '站内页面', web_app: '外部网页', qr_code: '二维码', mini_program_qr: '小程序码', ai_skill: 'AI 技能',
 }

@@ -40,6 +40,8 @@ export interface TwinTerminalTwinLike {
 }
 
 export interface TwinTerminalBoardProps {
+  /** 打印失败后的处置提示；默认管理员原句，机构可传联系平台运营。 */
+  failureGuidance?: string
   twin: TwinTerminalTwinLike
   /** ISO → 上海时区「HH:mm:ss」。 */
   formatClock: (iso: string) => string
@@ -132,7 +134,7 @@ function timelineTicks(twin: TwinTerminalTwinLike, formatClock: (iso: string) =>
   return ticks
 }
 
-export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassignedAreaLabel }: TwinTerminalBoardProps) {
+export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassignedAreaLabel, failureGuidance = '详情见打印扫描运维' }: TwinTerminalBoardProps) {
   const state = twinTerminalState({ health: twin.status.health, activity: null, alert: null })
   const current = twin.currentTask.available ? twin.currentTask.value : null
   const printing = current !== null
@@ -201,7 +203,7 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
                 : { label: '服务人次', unavailableReason: twin.today.visits.reason },
             ]}
           />
-          {twin.today.failed === null || twin.today.failed > 0 ? <p className="twin-cap">今日打印失败 {smallCount(twin.today.failed)} 次，详情见打印扫描运维</p> : null}
+          {twin.today.failed === null || twin.today.failed > 0 ? <p className="twin-cap">今日打印失败 {smallCount(twin.today.failed)} 次，{failureGuidance}</p> : null}
         </TwinPanel>
       </TwinSlot>
 

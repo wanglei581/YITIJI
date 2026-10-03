@@ -145,7 +145,7 @@ export function OpsGrid({ metrics, hostingOff = false, stock }: { metrics: Scree
         title="AI 成功率"
         metric={metrics.aiSuccessRate24h}
         span={2}
-        foot="AI 日志只有成功 / 失败两态，没有「降级」态：本平台的模型调用不做静默兜底。"
+        foot="近 24 小时成功与失败调用的成功率，0 次不给百分比；这里不统计兜底模型次数。服务调用页按所选窗口统计未就绪兜底模型的调用（不是日志状态），大于 0 且少于 5 次写「少于 5」。"
         render={(value) =>
           value.successRate === null ? (
             <ScreenKpi value="近 24 小时无 AI 调用" label="没有分母，因此不给百分比" labelMuted />
@@ -235,7 +235,7 @@ export function OpsGrid({ metrics, hostingOff = false, stock }: { metrics: Scree
         render={(value) => {
           const rows: ScreenBarItem[] = [
             ...Object.entries(value.printByStatus).map(([status, count]) => ({
-              label: taskStatusLabel(status),
+              label: ['cancelled', 'canceled'].includes(status) ? '已取消（打印）' : taskStatusLabel(status),
               value: count,
               tone: taskStatusTone(status),
             })),

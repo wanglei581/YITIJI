@@ -1,3 +1,4 @@
+import { screenAiProvider } from './aiScreenDisplay'
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
 import { formatTime, type ScreenUsageRange, type ScreenUsageSnapshot } from '@ai-job-print/shared'
@@ -51,7 +52,7 @@ const MEMBERS_NOTE = '只含登录会员的浏览与外跳；匿名使用按小�
 
 function usageMeta(usage: ScreenUsageSnapshot): ShellMeta {
   const failed = Object.values(usage.metrics).filter((m) => m && m.available === false && m.reason === 'source_query_failed').length
-  return { generatedAtText: stampText(usage.generatedAt), status: usage.status, failedSlices: failed, access: '访问口径：仅已登录后台会话可见；只出聚合数字，少于 5 次不显示' }
+  return { generatedAtText: stampText(usage.generatedAt), summaryMinutes: 5, status: usage.status, failedSlices: failed, access: '访问口径：仅已登录后台会话可见；只出聚合数字，少于 5 次不显示' }
 }
 
 function weekdayOf(date: string): string {
@@ -327,7 +328,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
             title="AI 服务"
             sub={`${rangeText} · 按功能`}
             metric={u.ai}
-            source="AI 服务日志：按功能计次，成功率 = 成功 ÷（成功 + 失败），平均耗时只算成功调用，成本只加已采集的估算。模型按调用方记录的提供方统计。少于 5 次不显示。"
+            source={`${rangeText}窗口；AI 服务日志按功能计次；成功率 = 成功 ÷（成功 + 失败），平均耗时只算成功调用，成本只加已采集的估算。模型按调用方记录的提供方统计；降级兜底统计未就绪兜底模型的调用，不是日志状态。大于 0 且少于 5 次写「少于 5」。`}
             render={(value) => (
               <>
                 <TwinBarList
@@ -338,7 +339,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                   emptyText="所选时间内没有 AI 调用"
                 />
                 <p className="twin-cap">
-                  模型：{value.providers.length ? value.providers.map((p) => `${p.label} ${twinSmall(p.count)}`).join(' · ') : '暂无调用'}
+                  模型：{value.providers.length ? value.providers.map((p) => `${screenAiProvider(p.provider)} ${twinSmall(p.count)}`).join(' · ') : '暂无调用'}
                 </p>
                 <div className="twin-push">
                   <TwinTiles

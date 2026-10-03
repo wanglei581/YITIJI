@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { formatDateTime } from '@ai-job-print/shared'
-import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
+import { formatCount, formatDateTime } from '@ai-job-print/shared'
+import { ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
 import { AlertTriangleIcon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'lucide-react'
@@ -151,13 +151,13 @@ export default function AlertsPage() {
   const emptyDescription = firingCount === 0
     ? '所有终端在线、打印机正常、近 24 小时无未处理失败任务、无文件不可用的已支付待打印任务'
     : filtered.length === 0 && typeFilter
-      ? `「${TYPE_META[typeFilter as AdminAlertItem['type']]?.label ?? typeFilter}」在当前栏无告警；仍有 ${firingCount} 条问题未恢复`
-      : `待处理 ${openCount} · 已确认仍在发生 ${acknowledgedCount} · 已静默/关闭仍在发生 ${suppressedCount}。确认不会把设备显示成正常。`
+      ? `「${TYPE_META[typeFilter as AdminAlertItem['type']]?.label ?? typeFilter}」在当前栏无告警；仍有 ${formatCount(firingCount)} 条问题未恢复`
+      : `待处理 ${formatCount(openCount)} · 已确认仍在发生 ${formatCount(acknowledgedCount)} · 已静默/关闭仍在发生 ${formatCount(suppressedCount)}。确认不会把设备显示成正常。`
 
   return (
     <Page
       title="告警中心"
-      subtitle={`实时派生 · 待处理 ${openCount} / 仍在发生 ${firingCount}${truncated ? (viewTotal !== null ? ` · 仅展示前 ${listedCount} 条，本视图共 ${viewTotal} 条` : ` · 仅展示前 ${listedCount} 条，全部在发 ${total} 条（派生层上限已触及，本视图精确条数未知）`) : ''}${derivedAt ? ` · 生成于 ${fmt(derivedAt)}` : ''}${errorCount ? ` · 本栏严重 ${errorCount}` : ''}`}
+      subtitle={`实时派生 · 待处理 ${formatCount(openCount)} / 仍在发生 ${formatCount(firingCount)}${truncated ? (viewTotal !== null ? ` · 仅展示前 ${formatCount(listedCount)} 条，本视图共 ${formatCount(viewTotal)} 条` : ` · 仅展示前 ${formatCount(listedCount)} 条，全部在发 ${formatCount(total)} 条（派生层上限已触及，本视图精确条数未知）`) : ''}${derivedAt ? ` · 生成于 ${fmt(derivedAt)}` : ''}${errorCount ? ` · 本栏严重 ${formatCount(errorCount)}` : ''}`}
       actions={
         <button
           type="button"
@@ -175,9 +175,9 @@ export default function AlertsPage() {
 
       {truncation && (
         <div className="mb-4 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-2.5 text-[13px] text-warning-fg">
-          当前仍在发生 <span className="font-bold tabular-nums">{firingCount}</span> 条，本页最多列出最近{' '}
-          <span className="tabular-nums">{truncation.cap}</span> 条，另有{' '}
-          <span className="font-bold tabular-nums">{truncation.omitted}</span> 条打印失败告警未在本页列出。
+          当前仍在发生 <span className="font-bold tabular-nums">{formatCount(firingCount)}</span> 条，本页最多列出最近{' '}
+          <span className="tabular-nums">{formatCount(truncation.cap)}</span> 条，另有{' '}
+          <span className="font-bold tabular-nums">{formatCount(truncation.omitted)}</span> 条打印失败告警未在本页列出。
           下方各栏计数只统计已列出的部分，未列出的告警同样仍在发生。
         </div>
       )}
@@ -222,8 +222,10 @@ export default function AlertsPage() {
             className="py-20"
           />
         ) : (
-          <div className="flex flex-col gap-2.5">
-            {filtered.map((alert) => {
+          <ConsoleTable items={filtered}
+            page={1} pageSize={Math.max(filtered.length, 1)} total={filtered.length} onPageChange={() => {}}
+            renderHeader={() => <tr>{['告警与处置说明', '时间与操作'].map((header, i) => <th key={header} className={`whitespace-nowrap px-4 py-3 text-left text-xs text-neutral-500 ${i === 1 ? 'sticky right-0 z-10 border-l border-neutral-100 bg-surface' : ''}`}>{header}</th>)}</tr>}
+            renderRow={(alert) => {
               const meta = TYPE_META[alert.type]
               const severity = SEVERITY_MAP[alert.severity] ?? SEVERITY_MAP.warning
               const style = SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.warning
@@ -231,76 +233,78 @@ export default function AlertsPage() {
               const Icon = meta.icon
               const busy = busyKey?.startsWith(`${alert.subjectKey}:`) ?? false
               return (
-                <div
-                  key={alert.id}
-                  className="relative flex flex-col gap-3 overflow-hidden rounded-lg border border-neutral-900/[0.06] bg-surface py-4 pl-[18px] pr-[18px] shadow-sm sm:flex-row sm:items-center"
-                >
-                  <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${style.bar}`} />
-                  <span className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] ${style.iconBox}`}>
-                    <Icon className="h-[19px] w-[19px]" aria-hidden="true" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-bold text-neutral-900">{alert.title}</p>
-                      <StatusBadge dot status={severity.badge} label={severity.label} />
-                      <span className="rounded-md bg-neutral-50 px-1.5 py-0.5 text-xs text-neutral-500">{meta.label}</span>
-                      <StatusBadge status={handling.badge} label={handling.label} />
+                <tr key={alert.id} className="group bg-surface hover:bg-neutral-50">
+                  <td className="min-w-[400px] max-w-[620px] px-4 py-4">
+                    <div className="flex items-start gap-3">
+                      <span className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] ${style.iconBox}`}>
+                        <Icon className="h-[19px] w-[19px]" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="max-w-96 truncate text-sm font-bold text-neutral-900" title={alert.title}>{alert.title}</p>
+                          <StatusBadge dot status={severity.badge} label={severity.label} />
+                          <span className="rounded-md bg-neutral-50 px-1.5 py-0.5 text-xs text-neutral-500">{meta.label}</span>
+                          <StatusBadge status={handling.badge} label={handling.label} />
+                        </div>
+                        <p className="mt-1 truncate text-[12.5px] text-neutral-500" title={[alert.terminalCode, alert.detail].filter(Boolean).join(' · ')}>
+                          {alert.terminalCode ? `${alert.terminalCode} · ` : ''}
+                          {alert.detail}
+                        </p>
+                        {meta.guidance && (
+                          <p className="mt-1 text-[12px] text-neutral-600">{meta.guidance}</p>
+                        )}
+                        {meta.link && (
+                          <Link
+                            to={meta.link.to}
+                            className="mt-1.5 inline-flex h-9 min-w-[48px] items-center rounded-[9px] border border-primary-300 bg-primary-50 px-3 text-[12px] font-bold text-primary-700 hover:bg-primary-100"
+                          >
+                            {meta.link.label} →
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                    <p className="mt-1 truncate text-[12.5px] text-neutral-500">
-                      {alert.terminalCode ? `${alert.terminalCode} · ` : ''}
-                      {alert.detail}
-                    </p>
-                    {meta.guidance && (
-                      <p className="mt-1 text-[12px] text-neutral-600">{meta.guidance}</p>
-                    )}
-                    {meta.link && (
-                      <Link
-                        to={meta.link.to}
-                        className="mt-1.5 inline-flex h-9 min-w-[48px] items-center rounded-[9px] border border-primary-300 bg-primary-50 px-3 text-[12px] font-bold text-primary-700 hover:bg-primary-100"
-                      >
-                        {meta.link.label} →
-                      </Link>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-                    <p className="text-xs tabular-nums text-neutral-500">{fmt(alert.occurredAt)}</p>
-                    {confirmCloseKey === alert.subjectKey ? (
-                      // 关闭会把仍在发生的告警移出默认视图，所以要二次确认；
-                      // 即使误点，也还有下面的「重新打开」可以退回待处理。
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[12px] text-neutral-600">关闭后不再出现在待处理，问题仍在发生：</span>
-                        <ActionButton
-                          disabled={busy}
-                          tone="danger"
-                          onClick={() => void dispose(alert, 'close')}
-                        >
-                          确认关闭
-                        </ActionButton>
-                        <ActionButton disabled={busy} onClick={() => setConfirmCloseKey(null)}>取消</ActionButton>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {alert.handlingState === 'open' && (
-                          <ActionButton disabled={busy} onClick={() => void dispose(alert, 'acknowledge')}>确认</ActionButton>
-                        )}
-                        {alert.handlingState !== 'closed' && (
-                          <>
-                            <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '1h')}>静默 1 小时</ActionButton>
-                            <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '4h')}>静默 4 小时</ActionButton>
-                            <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '24h')}>静默 24 小时</ActionButton>
-                            <ActionButton disabled={busy} onClick={() => setConfirmCloseKey(alert.subjectKey)}>关闭</ActionButton>
-                          </>
-                        )}
-                        {alert.handlingState !== 'open' && (
-                          <ActionButton disabled={busy} onClick={() => void dispose(alert, 'reopen')}>重新打开</ActionButton>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                  </td>
+                  <td className="sticky right-0 z-10 min-w-[300px] max-w-[360px] border-l border-neutral-100 bg-inherit px-4 py-4">
+                    <div className="flex flex-col items-start gap-2">
+                      <p className="text-xs tabular-nums text-neutral-500">{fmt(alert.occurredAt)}</p>
+                      {confirmCloseKey === alert.subjectKey ? (
+                        // 关闭会把仍在发生的告警移出默认视图，所以要二次确认；
+                        // 即使误点，也还有下面的「重新打开」可以退回待处理。
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[12px] text-neutral-600">关闭后不再出现在待处理，问题仍在发生：</span>
+                          <ActionButton
+                            disabled={busy}
+                            tone="danger"
+                            onClick={() => void dispose(alert, 'close')}
+                          >
+                            确认关闭
+                          </ActionButton>
+                          <ActionButton disabled={busy} onClick={() => setConfirmCloseKey(null)}>取消</ActionButton>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {alert.handlingState === 'open' && (
+                            <ActionButton disabled={busy} onClick={() => void dispose(alert, 'acknowledge')}>确认</ActionButton>
+                          )}
+                          {alert.handlingState !== 'closed' && (
+                            <>
+                              <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '1h')}>静默 1 小时</ActionButton>
+                              <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '4h')}>静默 4 小时</ActionButton>
+                              <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '24h')}>静默 24 小时</ActionButton>
+                              <ActionButton disabled={busy} onClick={() => setConfirmCloseKey(alert.subjectKey)}>关闭</ActionButton>
+                            </>
+                          )}
+                          {alert.handlingState !== 'open' && (
+                            <ActionButton disabled={busy} onClick={() => void dispose(alert, 'reopen')}>重新打开</ActionButton>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
               )
-            })}
-          </div>
+            }}
+          />
         )
       )}
     </Page>

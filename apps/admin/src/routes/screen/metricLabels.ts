@@ -1,33 +1,16 @@
+import { AI_OPERATION_LABELS, AI_USAGE_FEATURE_LABELS } from '@ai-job-print/shared'
 import type { ScreenUsageServiceKey } from '@ai-job-print/shared'
 import { screenCount } from '@ai-job-print/ui'
 
 /**
  * 大屏用到的展示名映射。
  *
- * 都遵守同一条规则：**认不出来的键照原样显示编码，不隐藏该行**。
- * 隐藏会让分项之和对不上总数，看屏的人会以为统计错了；显示编码至少是真的。
+ * 都遵守同一条规则：**认不出来的键显示「其他 AI 服务」，不隐藏该行**。
+ * 保留该行与计数，既不把内部编码印到屏上，也不漏掉未知服务的调用。
  */
 
 /** 与 `apps/admin/src/routes/ai-services/index.tsx` 的 OPERATION_LABELS 同源。 */
-const AI_OPERATION_LABELS: Readonly<Record<string, string>> = {
-  parseResume: '简历解析',
-  optimizeResume: '简历优化',
-  adjustResumeLayout: '排版调整',
-  generateResume: 'AI 简历生成',
-  chatAssistant: 'AI 对话',
-  classifyIntent: '意图分类',
-  jobRecommend: '岗位 AI 推荐',
-  jobExplain: 'AI 岗位解读',
-  jobMatch: '岗位匹配参考',
-  careerPlan: '职业规划',
-  fairVisitPlan: '招聘会参观计划',
-  interviewQuestion: '模拟面试出题',
-  interviewReport: '面试报告生成',
-  voiceTranscribe: '语音转写',
-  voiceSynthesize: '语音播报',
-  selfAssessment: '自我探索 · 倾向参考',
-  contractReview: '合同审查',
-}
+
 
 /**
  * 招聘内容托管关闭时，jobMatch 只剩手填岗位要求的「简历对照」（系统内岗位的匹配、推荐、解读都被服务端拒绝），
@@ -35,13 +18,13 @@ const AI_OPERATION_LABELS: Readonly<Record<string, string>> = {
  */
 export function aiOperationLabel(operation: string, hostingOff = false): string {
   if (hostingOff && operation === 'jobMatch') return '简历对照'
-  return AI_OPERATION_LABELS[operation] ?? operation
+  return AI_OPERATION_LABELS[operation] ?? AI_USAGE_FEATURE_LABELS[operation] ?? '其他 AI 服务'
 }
 
 /**
  * 服务调用里各项服务的中文名。3D 服务网络与轻量模式的条形图共用这一份，两边永远一样。
  *
- * 这是上面「认不出来的键照原样显示」的例外：服务网络只画得出有版式的服务，
+ * 这里与功能调用分项不同：服务网络只画得出有版式的服务，
  * 认不出来的键两边都不画（返回 null），英文键不上领导看的屏。这里没有合计，不画不会让分项对不上总数。
  */
 const USAGE_SERVICE_LABELS: Readonly<Record<ScreenUsageServiceKey, string>> = {

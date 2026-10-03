@@ -70,7 +70,7 @@ function viewRange(raw: string | null): ScreenUsageRange {
 
 function usageMeta(usage: ScreenUsageSnapshot): ShellMeta {
   const failed = Object.values(usage.metrics).filter((m) => m && m.available === false && m.reason === 'source_query_failed').length
-  return { generatedAtText: stampText(usage.generatedAt), status: usage.status, failedSlices: failed, access: '访问口径：仅本机构已登录后台会话可见；只出聚合数字，少于 5 次不显示' }
+  return { generatedAtText: stampText(usage.generatedAt), summaryMinutes: 5, status: usage.status, failedSlices: failed, access: '访问口径：仅本机构已登录后台会话可见；只出聚合数字，少于 5 次不显示' }
 }
 
 /** 按固定顺序排四类；服务端没下发的类型不凭空补一行（契约里四类总是齐的）。 */

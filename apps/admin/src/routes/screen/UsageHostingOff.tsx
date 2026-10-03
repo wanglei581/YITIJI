@@ -1,3 +1,4 @@
+import { screenAiProvider } from './aiScreenDisplay'
 import type { ScreenUsageSnapshot } from '@ai-job-print/shared'
 import { SCREEN_HOSTING_OFF_NOTE, TwinBarList, TwinMetricPanel, TwinTiles, twinSmall } from '@ai-job-print/ui'
 import { aiOperationLabel } from './metricLabels'
@@ -35,7 +36,7 @@ export function UsageAiPanel({ metric, rangeText, presenting }: { metric: UsageM
             <TwinTiles
               cols={value.providers.length >= 3 ? 3 : 2}
               compact
-              items={value.providers.slice(0, 3).map((p) => ({ value: twinSmall(p.count), label: p.label }))}
+              items={value.providers.slice(0, 3).map((p) => ({ value: twinSmall(p.count), label: screenAiProvider(p.provider) }))}
             />
           ) : (
             <p className="twin-cap">模型：暂无调用</p>
@@ -59,7 +60,7 @@ export function UsageAiQualityPanel({ metric, rangeText }: { metric: UsageMetric
       title="AI 质量"
       sub={rangeText}
       metric={metric}
-      source="成功率 = 成功 ÷（成功 + 失败）；平均耗时只算成功调用；降级兜底 = 由未就绪兜底模型应答的调用；调用失败含超时与上游拒绝。少于 5 次不显示。"
+      source={`${rangeText}窗口；成功率 = 成功 ÷（成功 + 失败）；平均耗时只算成功调用；降级兜底统计未就绪兜底模型的调用，不是日志状态；调用失败含超时与上游拒绝。大于 0 且少于 5 次写「少于 5」，不显示具体次数。`}
       render={(value) => (
         <>
           <TwinTiles

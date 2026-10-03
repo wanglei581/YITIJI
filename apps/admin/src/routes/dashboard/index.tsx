@@ -1,19 +1,13 @@
-import { formatDateTime, formatRelativeTime, formatTime } from '@ai-job-print/shared'
-import { useCallback, useEffect, useState, type ElementType, type ReactNode } from 'react'
-import { ErrorState, LoadingState, Meter, SectionCard, StatusBadge } from '@ai-job-print/ui'
+import { formatCount, formatDateTime } from '@ai-job-print/shared'
+import { useCallback, useEffect, useState } from 'react'
+import { ErrorState, LoadingState, SectionCard } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import {
   AlertTriangleIcon,
-  ArrowRightIcon,
   BotIcon,
-  Building2Icon,
-  FileWarningIcon,
   FolderIcon,
-  MessageSquareWarningIcon,
   MonitorIcon,
-  PrinterIcon,
   RefreshCwIcon,
-  ScrollTextIcon,
 } from 'lucide-react'
 import {
   getAiUsage,
@@ -37,41 +31,18 @@ import {
 } from '../../services/api/devices'
 import {
   adminOpsService,
-  type AdminAlertItem,
   type AdminAlertsResult,
-  type AdminPrintTaskItem,
   type AdminPrintTaskPage,
 } from '../../services/api/adminOps'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
-import { recruitmentStockKpi, recruitmentStockTodo, type StockTodo } from './recruitmentStock'
-import { getAuditActionLabel, getAuditActorLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
-import { getUser } from '../../services/auth'
+import { recruitmentStockKpi, recruitmentStockTodo } from './recruitmentStock'
+import { BlockError, BlockLoading, KpiCard, SectionLink, TodoItemRow } from './DashboardWidgets'
+import { RecentPrintTasks } from './RecentPrintTasks'
+import { RecentActivity } from './RecentActivity'
+import { DashboardDeviceStatus } from './DashboardDeviceStatus'
+import { fileAttention, buildTodoRows, buildAlertRows } from './dashboardRows'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface KpiCardProps {
-  label: string
-  value: string
-  unit?: string
-  sub: string
-  icon: ElementType
-  /** 数值转警示配色（陶色）。 */
-  warn?: boolean
-  /** 该指标的某个数据源加载失败：整卡转错误态并给「重试」，不再显示猜测值。 */
-  failed?: boolean
-  onRetry: () => void
-}
-
-interface TodoRow {
-  key: string
-  icon: ElementType
-  title: string
-  sub: string
-  href: string
-  actionLabel: string
-  warn?: boolean
-  timeTitle?: string
-}
 
 /**
  * 工作台分区降级模型（OPS-05）：
@@ -111,335 +82,11 @@ function initialBlock<V>(loading = true): BlockEntry<V> {
   return { value: null, error: null, loading }
 }
 
-const PRINT_STATUS_LABELS: Record<string, { label: string; status: 'success' | 'warning' | 'error' | 'info' | 'default' }> = {
-  pending: { label: '排队中', status: 'info' },
-  claimed: { label: '已领取', status: 'info' },
-  printing: { label: '打印中', status: 'info' },
-  completed: { label: '已完成', status: 'success' },
-  failed: { label: '失败', status: 'error' },
-  cancelled: { label: '已取消', status: 'default' },
-  abandoned: { label: '已废弃', status: 'default' },
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function relTime(iso: string): string {
-  return formatRelativeTime(iso)
-}
-
-function clockTime(iso: string): string {
-  return formatTime(iso, iso)
-}
-
 /** 非空平均值；全为空返回 null（诚实：无上报不显示均值）。 */
 function avgLevel(values: Array<number | null>): number | null {
   const nums = values.filter((value): value is number => value !== null && Number.isFinite(value))
   if (nums.length === 0) return null
   return Math.round(nums.reduce((sum, value) => sum + value, 0) / nums.length)
-}
-
-function printTypeLabel(task: AdminPrintTaskItem): string {
-  const color = task.colorMode === 'color' ? '彩色' : task.colorMode === 'black_white' ? '黑白' : '—'
-  const copies = task.copies != null ? ` · ${task.copies} 份` : ''
-  return `${color}${copies}`
-}
-
-// ─── Section building blocks ──────────────────────────────────────────────────
-
-function SectionLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <a
-      href={href}
-      className="inline-flex shrink-0 items-center gap-1 text-[12.5px] font-bold text-primary-700 hover:text-primary-600"
-    >
-      {children}
-      <ArrowRightIcon className="h-3 w-3" aria-hidden="true" />
-    </a>
-  )
-}
-
-/** KPI 卡片；数据源失败时卡内给错误 + 重试，不让整页因单块失败而崩溃。 */
-function KpiCard({ label, value, unit, sub, icon: Icon, warn, failed, onRetry }: KpiCardProps) {
-  return (
-    <div
-      className={
-        'rounded-lg border bg-surface px-5 py-[18px] shadow-sm ' +
-        (warn && !failed
-          ? 'border-warning/30'
-          : failed
-            ? 'border-error/30'
-            : 'border-neutral-900/[0.06]')
-      }
-    >
-      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-500">
-        <Icon className="h-[14px] w-[14px] shrink-0" aria-hidden="true" />
-        {label}
-      </div>
-      {failed ? (
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-[13px] text-error-fg">数据源加载失败</span>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="shrink-0 rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-bold text-neutral-700 hover:bg-neutral-50"
-          >
-            重试
-          </button>
-        </div>
-      ) : (
-        <>
-          <div
-            className={
-              'mt-2 text-[1.9rem] font-extrabold tabular-nums leading-none ' +
-              (warn ? 'text-warning' : 'text-neutral-900')
-            }
-          >
-            {value}
-            {unit && <span className="ml-1 text-sm font-bold opacity-50">{unit}</span>}
-          </div>
-          <p className="mt-2 text-[11.5px] text-neutral-500">{sub}</p>
-        </>
-      )}
-    </div>
-  )
-}
-
-/** 区块级错误：只影响所在卡片/区块，配独立重试。 */
-function BlockError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-2.5 py-8 text-center">
-      <p className="text-sm text-error-fg">{message}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="rounded-lg border border-neutral-200 bg-surface px-4 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50"
-      >
-        重试
-      </button>
-    </div>
-  )
-}
-
-function BlockLoading() {
-  return <p className="py-8 text-center text-sm text-neutral-400">加载中…</p>
-}
-
-function TodoItemRow({ row, isFirst }: { row: TodoRow; isFirst: boolean }) {
-  const Icon = row.icon
-  return (
-    <div
-      className={
-        'flex items-center gap-3 py-[11px] text-[13px]' +
-        (isFirst ? '' : ' border-t border-neutral-900/[0.06]')
-      }
-    >
-      <span
-        className={
-          'grid h-8 w-8 shrink-0 place-items-center rounded-[9px] ' +
-          (row.warn ? 'bg-warning-bg text-warning-fg' : 'bg-primary-100 text-primary-700')
-        }
-      >
-        <Icon className="h-4 w-4" aria-hidden="true" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-bold text-neutral-900">{row.title}</p>
-        <p className="mt-0.5 truncate text-[11.5px] text-neutral-500" title={row.timeTitle}>{row.sub}</p>
-      </div>
-      <a href={row.href} className="shrink-0 text-xs font-bold text-primary-700 hover:text-primary-600">
-        {row.actionLabel}
-      </a>
-    </div>
-  )
-}
-
-function RecentPrintTasks({ tasks, total }: { tasks: AdminPrintTaskItem[]; total: number }) {
-  return (
-    <SectionCard
-      title="最近打印任务"
-      action={<SectionLink href="/orders">进入订单管理</SectionLink>}
-      flush={tasks.length > 0}
-    >
-      {tasks.length === 0 ? (
-        <p className="py-6 text-center text-sm text-neutral-400">暂无打印任务</p>
-      ) : (
-        <>
-          <div className="overflow-x-auto px-5">
-            <table className="w-full border-collapse text-[13px]">
-              <thead>
-                <tr>
-                  {['任务', '终端', '参数', '状态', '时间'].map((th) => (
-                    <th
-                      key={th}
-                      className="whitespace-nowrap border-b border-neutral-900/10 px-2.5 py-2 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500"
-                    >
-                      {th}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((task) => {
-                  const st = PRINT_STATUS_LABELS[task.status] ?? { label: task.status, status: 'default' as const }
-                  return (
-                    <tr key={task.id} className="transition-colors hover:bg-neutral-50">
-                      <td className="max-w-[180px] truncate whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5 font-bold text-primary-700">
-                        {task.fileName ?? task.id.slice(0, 8)}
-                      </td>
-                      <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5 text-neutral-700">
-                        {task.terminalCode ?? '—'}
-                      </td>
-                      <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5 tabular-nums text-neutral-700">
-                        {printTypeLabel(task)}
-                      </td>
-                      <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5">
-                        <StatusBadge dot status={st.status} label={st.label} />
-                      </td>
-                      <td className="whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-2.5 tabular-nums text-neutral-500" title={formatDateTime(task.createdAt)}>
-                        {clockTime(task.createdAt)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          <p className="px-5 pb-4 pt-3 text-xs text-neutral-500">共 {total} 条打印任务</p>
-        </>
-      )}
-    </SectionCard>
-  )
-}
-
-function RecentActivity({ logs }: { logs: AuditLogRecord[] }) {
-  return (
-    <SectionCard title="最近操作" action={<SectionLink href="/audit">日志审计</SectionLink>}>
-      {logs.length === 0 ? (
-        <p className="py-6 text-center text-sm text-neutral-400">暂无审计记录</p>
-      ) : (
-        <div>
-          {logs.map((log, index) => {
-            const target = getAuditTargetLabel(log.targetType)
-            const actor = getAuditActorLabel({
-              actorRole: log.actorRole,
-              actorId: log.actorId,
-              payloadJson: log.payloadJson,
-              currentUser: getUser(),
-              record: log,
-            })
-            return (
-              <div
-                key={log.id}
-                className={
-                  'flex items-center gap-3 py-[11px] text-[13px]' +
-                  (index === 0 ? '' : ' border-t border-neutral-900/[0.06]')
-                }
-              >
-                <span
-                  aria-hidden="true"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-primary-100 text-primary-700"
-                >
-                  <ScrollTextIcon className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-bold text-neutral-900">
-                    {getAuditActionLabel(log.action)}
-                  </p>
-                  <p className="mt-0.5 truncate text-[11.5px] text-neutral-500">
-                    {actor}
-                    {target ? ` · ${target}` : ''}
-                  </p>
-                </div>
-                <span className="shrink-0 text-xs tabular-nums text-neutral-500" title={log.createdAt ? formatDateTime(log.createdAt) : undefined}>
-                  {relTime(log.createdAt)}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </SectionCard>
-  )
-}
-
-// ─── Data mapping（只对已加载成功的数据求值，失败块不进统计）──────────────
-
-interface LoadedSources {
-  /** 招聘类存量一行（3.15：不再有「待审核 / 去审核」，见 recruitmentStock.ts）；null = 不显示 */
-  recruitmentStock: StockTodo | null
-  files: AdminFileRecord[]
-}
-
-function fileAttention(files: AdminFileRecord[]): { expired: number; sensitive: number } {
-  const now = Date.now()
-  const activeFiles = files.filter((file) => file.deletedAt === null)
-  return {
-    expired: activeFiles.filter((file) => file.expiresAt !== null && Date.parse(file.expiresAt) <= now).length,
-    sensitive: activeFiles.filter((file) => file.sensitiveLevel === 'highly_sensitive').length,
-  }
-}
-
-function buildTodoRows(loaded: LoadedSources): TodoRow[] {
-  const rows: TodoRow[] = []
-  const fileStats = fileAttention(loaded.files)
-
-  if (loaded.recruitmentStock) rows.push(loaded.recruitmentStock)
-  if (fileStats.expired > 0) {
-    rows.push({
-      key: 'files',
-      icon: FolderIcon,
-      title: `${fileStats.expired} 个已过期在库文件`,
-      sub: '近 100 条内 · 建议执行清理',
-      href: '/files',
-      actionLabel: '去清理',
-      warn: true,
-    })
-  }
-  if (fileStats.sensitive > 0) {
-    rows.push({
-      key: 'sensitive',
-      icon: Building2Icon,
-      title: `${fileStats.sensitive} 个高敏文件在库`,
-      sub: '近 100 条内 · 关注保留时长与访问日志',
-      href: '/files',
-      actionLabel: '去查看',
-      warn: true,
-    })
-  }
-  return rows
-}
-
-const ALERT_ROW_ICON: Record<AdminAlertItem['type'], ElementType> = {
-  terminal_offline: MonitorIcon,
-  printer_issue: PrinterIcon,
-  print_failed: PrinterIcon,
-  paid_pending_file_unavailable: FileWarningIcon,
-  feedback_pending: MessageSquareWarningIcon,
-}
-
-/**
- * 已支付但文件不可用的任务排在最前：后端按发生时间倒序，文件状态较早变化的这类告警
- * 会被新近的离线/失败告警挤出前 3 条，而它涉及已付款订单、只能人工处置。
- */
-function buildAlertRows(alerts: AdminAlertItem[]): TodoRow[] {
-  const paidPending = alerts.filter((alert) => alert.type === 'paid_pending_file_unavailable')
-  const others = alerts.filter((alert) => alert.type !== 'paid_pending_file_unavailable')
-  return [...paidPending, ...others].slice(0, 3).map((alert) => ({
-    key: alert.id,
-    icon: ALERT_ROW_ICON[alert.type] ?? PrinterIcon,
-    title: alert.title,
-    sub: alert.type === 'paid_pending_file_unavailable'
-      ? `已支付 · 需人工处置 · ${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`
-      // 意见反馈不挂在终端上，terminalCode 为空时不能写成「未知终端」
-      : alert.type === 'feedback_pending'
-        ? `意见反馈 · ${relTime(alert.occurredAt)}`
-        : `${alert.terminalCode ?? '未知终端'} · ${relTime(alert.occurredAt)}`,
-    href: alert.type === 'feedback_pending' ? '/member-feedback?category=ai_content' : '/alerts',
-    timeTitle: formatDateTime(alert.occurredAt, { fallback: '' })
-      ? `发生时间 ${formatDateTime(alert.occurredAt)}`
-      : undefined,
-    actionLabel: '处理',
-    warn: true,
-  }))
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -592,7 +239,7 @@ export default function DashboardPage() {
               className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-600 px-4 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(16,48,43,0.18)] transition-transform hover:-translate-y-px hover:bg-primary-700 active:scale-[0.97]"
             >
               <AlertTriangleIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              处理告警 ({alertCount})
+              处理告警 ({formatCount(alertCount)})
             </a>
           )}
         </div>
@@ -603,9 +250,9 @@ export default function DashboardPage() {
           <KpiCard
             label="在线终端"
             icon={MonitorIcon}
-            value={String(onlineTerminals)}
-            unit={`/ ${totalTerminals} 台`}
-            sub={terminals !== null ? (offlineTerminals > 0 ? `${offlineTerminals} 台离线 · 点击设备管理查看` : '全部在线') : ''}
+            value={formatCount(onlineTerminals)}
+            unit={`/ ${formatCount(totalTerminals)} 台`}
+            sub={terminals !== null ? (totalTerminals === 0 ? '暂无终端' : offlineTerminals > 0 ? `${formatCount(offlineTerminals)} 台离线 · 点击设备管理查看` : '全部在线') : ''}
             warn={terminals !== null && offlineTerminals > 0}
             failed={terminals === null}
             onRetry={retry(['terminals'])}
@@ -623,9 +270,9 @@ export default function DashboardPage() {
           <KpiCard
             label="待清理文件"
             icon={FolderIcon}
-            value={String(fileStats.expired)}
+            value={formatCount(fileStats.expired)}
             unit="个"
-            sub={files !== null ? `近 100 条内 · 高敏 ${fileStats.sensitive}` : ''}
+            sub={files !== null ? `近 100 条内 · 高敏 ${formatCount(fileStats.sensitive)}` : ''}
             warn={files !== null && fileStats.expired > 0}
             failed={files === null}
             onRetry={retry(['files'])}
@@ -633,7 +280,7 @@ export default function DashboardPage() {
           <KpiCard
             label="AI 调用"
             icon={BotIcon}
-            value={aiUsage !== null ? String(aiUsage.totalCalls) : '0'}
+            value={aiUsage !== null ? formatCount(aiUsage.totalCalls) : '0'}
             unit="次"
             sub={aiUsage === null ? '' : aiUsage.totalCalls === 0 ? '近 24 小时暂无调用' : `近 24 小时 · 成功率 ${aiUsage.successRate}%`}
             warn={aiUsage !== null && aiUsage.failCount > 0}
@@ -645,29 +292,10 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.7fr_1fr]">
           {/* 左列 */}
           <div className="flex flex-col gap-4">
-            {printTaskPage ? (
-              <RecentPrintTasks tasks={printTaskPage.data} total={printTaskPage.pagination.total} />
-            ) : entry('printTasks').error ? (
-              <SectionCard title="最近打印任务">
-                <BlockError message="打印任务加载失败" onRetry={retry(['printTasks'])} />
-              </SectionCard>
-            ) : (
-              <SectionCard title="最近打印任务">
-                <BlockLoading />
-              </SectionCard>
-            )}
-
-            {auditLogs ? (
-              <RecentActivity logs={auditLogs} />
-            ) : entry('auditLogs').error ? (
-              <SectionCard title="最近操作">
-                <BlockError message="审计日志加载失败" onRetry={retry(['auditLogs'])} />
-              </SectionCard>
-            ) : (
-              <SectionCard title="最近操作">
-                <BlockLoading />
-              </SectionCard>
-            )}
+            <RecentPrintTasks tasks={printTaskPage?.data ?? []} total={printTaskPage?.pagination.total ?? 0}
+              loading={entry('printTasks').loading} error={Boolean(entry('printTasks').error)} onRetry={retry(['printTasks'])} />
+            <RecentActivity logs={auditLogs ?? []} loading={entry('auditLogs').loading}
+              error={Boolean(entry('auditLogs').error)} onRetry={retry(['auditLogs'])} />
           </div>
 
           {/* 右列 */}
@@ -675,6 +303,7 @@ export default function DashboardPage() {
             <SectionCard title="待办事项">
               {(() => {
                 const failed = failedKeys(['jobSources', 'fairSources', 'files'])
+                if (['jobSources', 'fairSources', 'files'].some((key) => entry(key as BlockKey).loading)) return <BlockLoading />
                 if (jobSources === null && fairSources === null && files === null) {
                   if (failed.length > 0) {
                     return <BlockError message="待办数据加载失败" onRetry={retry(failed)} />
@@ -689,14 +318,14 @@ export default function DashboardPage() {
                   <div>
                     {failed.length > 0 && (
                       <p className="border-b border-dashed border-neutral-200 py-2 text-xs text-warning-fg">
-                        部分来源加载失败（{failed.join(' / ')}），其待办未统计。
+                        部分来源加载失败（{failed.map((key) => ({ jobSources: '岗位存量', fairSources: '招聘会存量', files: '文件' })[key as 'jobSources' | 'fairSources' | 'files']).join(' / ')}），其待办未统计。
                         <button type="button" onClick={retry(failed)} className="ml-2 font-bold text-primary-700 hover:underline">
                           重试
                         </button>
                       </p>
                     )}
                     {rows.length === 0 ? (
-                      <p className="py-6 text-center text-sm text-neutral-400">暂无待办事项</p>
+                      <p className="py-8 text-center text-sm text-neutral-400">暂无待办事项</p>
                     ) : (
                       rows.map((row, index) => (
                         <TodoItemRow key={row.key} row={row} isFirst={index === 0 && failed.length === 0} />
@@ -707,82 +336,16 @@ export default function DashboardPage() {
               })()}
             </SectionCard>
 
-            <SectionCard title="设备状态" action={<SectionLink href="/devices">设备管理</SectionLink>}>
-              {terminals === null && printers === null ? (
-                entry('terminals').error || entry('printers').error ? (
-                  <BlockError
-                    message="设备状态加载失败"
-                    onRetry={retry(failedKeys(['terminals', 'printers']))}
-                  />
-                ) : (
-                  <BlockLoading />
-                )
-              ) : (
-                <div className="flex flex-col gap-2.5">
-                  {(() => {
-                    if (terminals === null) {
-                      return (
-                        <p className="text-xs text-warning-fg">
-                          终端列表加载失败，终端在线率暂缺。
-                          <button type="button" onClick={retry(['terminals'])} className="ml-2 font-bold text-primary-700 hover:underline">
-                            重试
-                          </button>
-                        </p>
-                      )
-                    }
-                    if (terminals.length === 0) {
-                      return <p className="py-6 text-center text-sm text-neutral-400">暂无已注册终端</p>
-                    }
-                    const online = terminals.filter((terminal) => terminal.online).length
-                    return (
-                      <>
-                        <Meter
-                          label="终端在线率"
-                          percent={(online / terminals.length) * 100}
-                          valueText={`${online}/${terminals.length}`}
-                          low={online < terminals.length}
-                        />
-                        {printers !== null && printerTotal > 0 && (
-                          <Meter
-                            label="打印机就绪"
-                            percent={(readyPrinters / printerTotal) * 100}
-                            valueText={`${readyPrinters}/${printerTotal}`}
-                            low={readyPrinters < printerTotal}
-                          />
-                        )}
-                      </>
-                    )
-                  })()}
-                  {printers !== null ? (
-                    <>
-                      {toner !== null && (
-                        <Meter label="碳粉均值" percent={toner} valueText={`${toner}%`} low={toner < 40} />
-                      )}
-                      {/* paperTrayLevel 后端当前恒 null（未上报），口径与工作台百分比一致；
-                          不上报时整行不渲染（avgLevel 返回 null），绝不显示「张」等猜测单位。 */}
-                      {paper !== null && (
-                        <Meter label="纸量均值" percent={paper} valueText={`${paper}%`} low={paper < 40} />
-                      )}
-                      {printerTotal === 0 && terminals !== null && terminals.length > 0 && (
-                        <p className="text-xs text-neutral-400">打印机尚无心跳上报</p>
-                      )}
-                    </>
-                  ) : (
-                    entry('printers').error && (
-                      <p className="text-xs text-warning-fg">
-                        打印机数据加载失败，打印机状态暂缺。
-                        <button type="button" onClick={retry(['printers'])} className="ml-2 font-bold text-primary-700 hover:underline">
-                          重试
-                        </button>
-                      </p>
-                    )
-                  )}
-                </div>
-              )}
-            </SectionCard>
+            <DashboardDeviceStatus
+              terminals={terminals} printers={printers}
+              terminalError={Boolean(entry('terminals').error)} printerError={Boolean(entry('printers').error)}
+              printerTotal={printerTotal} readyPrinters={readyPrinters} toner={toner} paper={paper}
+              onRetry={retry(failedKeys(['terminals', 'printers']))}
+              retryTerminals={retry(['terminals'])} retryPrinters={retry(['printers'])}
+            />
 
             <SectionCard title="实时告警" action={<SectionLink href="/alerts">告警中心</SectionLink>}>
-              {alerts === null ? (
+              {entry('alerts').loading ? <BlockLoading /> : alerts === null ? (
                 entry('alerts').error ? (
                   <BlockError message="实时告警加载失败" onRetry={retry(['alerts'])} />
                 ) : (
@@ -791,7 +354,7 @@ export default function DashboardPage() {
               ) : (
                 <div>
                   {alerts.data.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-neutral-400">暂无实时告警</p>
+                    <p className="py-8 text-center text-sm text-neutral-400">暂无实时告警</p>
                   ) : (
                     alertRows.map((row, index) => (
                       <TodoItemRow key={row.key} row={row} isFirst={index === 0} />
@@ -799,8 +362,8 @@ export default function DashboardPage() {
                   )}
                   {alertCount > alertRows.length && (
                     <p className="border-t border-neutral-900/[0.06] pt-2.5 text-[11.5px] text-neutral-500">
-                      当前共 {alertCount} 条告警仍在发生（含已确认/静默与截断部分），以上仅列 {alertRows.length} 条
-                      {paidPendingAlertCount > 0 ? `，本次加载的待处理告警中有 ${paidPendingAlertCount} 条已支付文件不可用、已优先列出` : ''}
+                      当前共 {formatCount(alertCount)} 条告警仍在发生（含已确认/静默与截断部分），以上仅列 {formatCount(alertRows.length)} 条
+                      {paidPendingAlertCount > 0 ? `，本次加载的待处理告警中有 ${formatCount(paidPendingAlertCount)} 条已支付文件不可用、已优先列出` : ''}
                       ，完整清单见告警中心。
                     </p>
                   )}

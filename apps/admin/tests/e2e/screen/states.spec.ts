@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test'
 import {
   govDegraded,
+  govFull,
+  usageSnapshot,
+  terminalTwin,
   govEmpty,
   govUnavailable,
   opsDegraded,
@@ -125,7 +128,7 @@ test.describe('admin data screen states', () => {
     await expect(summary.locator('.twin-kv', { hasText: '累计打印' }).locator('b')).toHaveText('0页')
     await expect(summary.locator('.twin-kv', { hasText: '今日服务人次' }).locator('b')).toHaveText('0人次')
     await expect(summary.locator('.twin-kv', { hasText: '今日服务人次' })).toContainText('是会话数，不是人数')
-    await expect(summary.locator('.twin-kv', { hasText: 'AI 服务调用' }).locator('b')).toHaveText('0次')
+    await expect(summary.locator('.twin-kv', { hasText: 'AI 服务调用（累计）' }).locator('b')).toHaveText('0次')
     await expect(summary.locator('.twin-pend')).toHaveCount(0)
     // 近 14 日全是零：画真实的零线（今日 0），不是「未接入」
     const trend = panel(page, '打印量趋势')
@@ -302,8 +305,9 @@ test.describe('admin data screen states', () => {
     await serve(page, responder)
     await open(page, '/screen/gov')
     await expect(page.getByText('128,431')).toBeVisible()
-    const stamp = (await page.locator('.twin-hd-sub').innerText()).match(/数据时间 (\S+ \S+)/)?.[1]
-    expect(stamp, '页眉应写出数据时间').toBeTruthy()
+    const stamp = (await page.locator('.twin-hd-sub').innerText()).match(/汇总数据截至 (\S+ \S+)/)?.[1]
+    expect(stamp, '页眉应明确汇总数据截至时间').toBeTruthy()
+    await expect(page.locator('.twin-hd-sub')).toContainText('每 5 分钟更新')
     flip()
     await page.getByRole('button', { name: '刷新' }).click()
     const banner = page.locator('.twin-banner', { hasText: '最近一次刷新失败' })
@@ -368,4 +372,47 @@ test.describe('admin data screen states', () => {
     await expect(page.getByText('已列出 4 / 共 137 条')).toBeVisible()
     await expect(page.getByText('访问口径：仅已登录后台会话可见，本期未签发免登录只读展示令牌')).toBeVisible()
   })
+})
+
+
+test('第五批口径：累计 AI 与打印取消、模型与内部名的可读展示', async ({ page }) => {
+  await serve(page, adminApi({ gov: () => {
+    const snapshot = govFull()
+    const taskFlow = snapshot.metrics.taskFlow24h
+    if (!taskFlow?.available) throw new Error('任务流夹具缺失')
+    taskFlow.value.printByStatus.cancelled = 11
+    taskFlow.value.scanByStatus.cancelled = 21
+    return snapshot
+  }, usage: (range) => {
+    const snapshot = usageSnapshot(range)
+    if (!snapshot.metrics.ai?.available) throw new Error('AI 夹具缺失')
+    snapshot.metrics.ai.value.providers = [
+      { provider: 'llm:deepseek:deepseek-v4-flash', label: 'llm:deepseek:deepseek-v4-flash', count: 9 },
+      { provider: 'ServiceUnavailableException', label: 'ServiceUnavailableException', count: 7 },
+      { provider: 'AI_PROVIDER_ERROR', label: 'AI_PROVIDER_ERROR', count: null },
+    ]
+    return snapshot
+  } }))
+  await open(page, '/screen/gov')
+  await expect(page.locator('.twin-kv', { hasText: 'AI 服务调用（累计）' })).toBeVisible()
+  const cancelled = page.locator('.twin-flow-node', { hasText: '已取消（打印）' })
+  await expect(cancelled.locator('b')).toHaveText('11')
+  await open(page, '/screen/usage')
+  const screen = page.locator('[data-ops-screen]')
+  await expect(screen).toContainText('DeepSeek · deepseek-v4-flash')
+  await expect(screen).toContainText('AI 服务暂时不可用')
+  await expect(screen).toContainText('模型厂商服务异常')
+  await expect(screen).toContainText('简历解析')
+  await expect(screen).not.toContainText(/llm:|parseResume|chatAssistant|ServiceUnavailableException|AI_PROVIDER_ERROR/)
+  expect((await panelSources(page)).map((entry) => entry.source).join(' ')).toContain('不是日志状态')
+})
+
+test('终端孪生：管理员打印失败提示指向现有运维页', async ({ page }) => {
+  await serve(page, adminApi({ twin: (id) => {
+    const twin = terminalTwin(id)
+    if (twin) twin.today.failed = 7
+    return twin
+  } }))
+  await open(page, '/screen/terminal?id=t-gz-th-005')
+  await expect(panel(page, /^今日服务$/)).toContainText('今日打印失败 7 次，详情见打印扫描运维')
 })
