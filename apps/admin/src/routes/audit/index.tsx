@@ -111,7 +111,12 @@ export default function AuditPage() {
       </div>
 
       <Card className="overflow-hidden p-0">
-        <div onClick={(event) => {
+        <div onClickCapture={(event) => {
+          if (window.getSelection()?.toString().trim()) {
+            event.preventDefault()
+            event.stopPropagation()
+          }
+        }} onClick={(event) => {
           const target = event.target as HTMLElement
           const row = target.closest('tbody tr') as HTMLTableRowElement | null
           if (row && !target.closest('button') && !loading && !error && items[row.sectionRowIndex]) setSelected(items[row.sectionRowIndex])

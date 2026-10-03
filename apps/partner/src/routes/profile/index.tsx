@@ -35,6 +35,16 @@ import { useRecruitmentHosting } from '../../services/capabilities'
 // 内容信任状态（contentTrustStatus）为发布闸门依据，由平台管理员人工核验与标记。
 
 
+function contactPhoneText(phone: string | null | undefined): string {
+  if (!phone?.trim()) return '—'
+  // 已有掩码不可还原或减少星号。
+  if (phone.includes('*')) return phone
+  const digits = phone.replace(/\D/g, '')
+  if (/^1[3-9]\d{9}$/.test(digits)) return `${digits.slice(0, 3)}${'*'.repeat(4)}${digits.slice(-4)}`
+  if (digits.length >= 7) return `${digits.slice(0, 3)}${'*'.repeat(digits.length - 5)}${digits.slice(-2)}`
+  return '已登记'
+}
+
 function trustStatusLabel(status: OrgContentTrustStatus | null | undefined): string {
   if (!status) return ORG_CONTENT_TRUST_UNSET_LABEL
   return ORG_CONTENT_TRUST_STATUS_LABELS[status] ?? status
@@ -149,7 +159,7 @@ export default function ProfilePage() {
           </div>
           <div className="space-y-3 text-sm">
             <Row label="联系人" value={profile.contact || <span className="text-neutral-400">未填写</span>} />
-            <Row label="联系电话" value={profile.contactPhone || <span className="text-neutral-400">未填写</span>} />
+            <Row label="联系电话" value={contactPhoneText(profile.contactPhone)} />
             <Row
               label="合作状态"
               value={

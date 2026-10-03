@@ -18219,6 +18219,7 @@
       "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/admin/src/routes/privacy-requests/index.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
     ],
     "apps/admin/src/routes/screen/GovGrid.tsx": [
@@ -18229,6 +18230,9 @@
     ],
     "apps/admin/src/routes/screen/index.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
+    "apps/admin/src/routes/screen/metricLabels.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/screen/screenMeta.ts": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
@@ -18333,7 +18337,8 @@
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
     "apps/admin/src/routes/users/userPresentation.ts": [
-      "apps/admin/scripts/verify-admin-users-ui.mjs"
+      "apps/admin/scripts/verify-admin-users-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/services/api/adminAiHttpAdapter.ts": [
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
@@ -27059,6 +27064,8 @@
           "apps/admin/src/routes/peripherals/peripheralViews.ts",
           "apps/admin/src/routes/print-scan/index.tsx",
           "apps/admin/src/routes/printers/index.tsx",
+          "apps/admin/src/routes/privacy-requests/index.tsx",
+          "apps/admin/src/routes/screen/metricLabels.ts",
           "apps/admin/src/routes/screensaver/AssetsTab.tsx",
           "apps/admin/src/routes/screensaver/PlaylistsTab.tsx",
           "apps/admin/src/routes/screensaver/TerminalsTab.tsx",
@@ -27068,6 +27075,7 @@
           "apps/admin/src/routes/terminals/TerminalDetailDrawer.tsx",
           "apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx",
           "apps/admin/src/routes/terminals/index.tsx",
+          "apps/admin/src/routes/users/userPresentation.ts",
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/profile/ComplianceRestrictions.tsx",

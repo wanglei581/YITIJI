@@ -275,7 +275,12 @@ export default function PrivacyRequestsPage() {
         </div>
 
         {/* 接口只提供游标，没有总数；共用表格外壳，保留下面原有游标翻页。 */}
-        <div onClick={(event) => {
+        <div onClickCapture={(event) => {
+          if (window.getSelection()?.toString().trim()) {
+            event.preventDefault()
+            event.stopPropagation()
+          }
+        }} onClick={(event) => {
           const target = event.target as HTMLElement
           const row = target.closest('tbody tr') as HTMLTableRowElement | null
           if (row && !target.closest('button') && loadState === 'ready' && items?.[row.sectionRowIndex]) setDetail(items[row.sectionRowIndex])
@@ -324,7 +329,7 @@ export default function PrivacyRequestsPage() {
             </div> },
           ]} />
         </div>
-        {loadState === 'ready' && (
+        {loadState === 'ready' && (items?.length ?? 0) > 0 && (
           <>
             {/* 游标分页 */}
             <div className="flex items-center justify-between px-5 pb-4 pt-3.5 text-[12.5px] text-neutral-500">

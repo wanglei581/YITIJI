@@ -2,7 +2,7 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer } from '@ai-job-print/ui'
 import type { AuditLogRecord } from '../../services/api/audit'
 import { getAuditActionLabel, getAuditRoleLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
-import { auditActorText, auditTargetText, auditIpText, parseAuditPayload, PAYLOAD_LABELS, safeAuditText } from './auditPresentation'
+import { auditActorText, auditTargetText, auditIpText, parseAuditPayload, invalidAuditPayloadText, PAYLOAD_LABELS, safeAuditText } from './auditPresentation'
 
 function PayloadValue({ value }: { value: unknown }) {
   if (value === null) return <span>—</span>
@@ -33,23 +33,18 @@ export function AuditDetailDrawer({ record, onClose }: { record: AuditLogRecord 
     ['目标对象', auditTargetText(record), record.targetId ?? undefined],
     ['终端 IP', auditIpText(record.ipAddress), record.ipAddress ?? undefined],
     ['请求 ID', safeAuditText(record.requestId ?? '—')],
-    ['浏览器标识（User-Agent）', safeAuditText(record.userAgent ?? '—')],
+    ['浏览器标识', safeAuditText(record.userAgent ?? '—'), 'User-Agent'],
   ] : []
   return (
     <Drawer open={!!record} onClose={onClose} title="审计日志详情" size="lg">
       <dl className="space-y-3">
         {fields.map(([label, value, title]) => <div key={label}>
-          <dt className="text-xs text-neutral-500">{label}</dt>
+          <dt title={label === '浏览器标识' ? 'User-Agent' : undefined} className="text-xs text-neutral-500">{label}</dt>
           <dd title={title} className="mt-1 break-all text-sm text-neutral-800">{value}</dd>
         </div>)}
       </dl>
       <h3 className="mb-3 mt-6 text-sm font-semibold">操作详情</h3>
-      {payload?.invalid ? <div>
-        <p className="text-sm text-neutral-500">详情无法解析</p>
-        <details className="mt-3"><summary className="cursor-pointer text-xs">查看原文（敏感内容已隐藏）</summary>
-          <pre className="mt-2 whitespace-pre-wrap break-all text-xs">{payload.raw}</pre>
-        </details>
-      </div> : payload && <PayloadValue value={payload.value} />}
+      {payload?.invalid ? <p className="text-sm text-neutral-500">{invalidAuditPayloadText(payload.length)}</p> : payload && <PayloadValue value={payload.value} />}
     </Drawer>
   )
 }

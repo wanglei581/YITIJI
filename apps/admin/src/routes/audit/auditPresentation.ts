@@ -1,4 +1,6 @@
 import type { AuditLogRecord } from '../../services/api/audit'
+import { USER_STATUS_LABELS } from '../users/userPresentation'
+import { taskStatusLabel } from '../screen/metricLabels'
 import { getAuditRoleLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
 
 export function auditActorText(record: AuditLogRecord): string {
@@ -32,31 +34,63 @@ export const PAYLOAD_LABELS: Record<string, string> = {
   action: '操作', rows: '行数', cleaned: '清理数量', enabled: '是否启用', field: '变更字段',
 }
 
+const SENSITIVE_WORDS = new Set([
+  'password', 'passwd', 'pwd', 'token', 'secret', 'credential', 'authorization',
+  'cookie', 'phone', 'mobile', 'telephone', 'email', 'signature', 'sign', 'tel', 'mail',
+])
+const KEY_PREFIXES = new Set(['api', 'secret', 'access', 'private', 'sign', 'encryption'])
+const SECTION_LABELS: Record<string, string> = { summary: '概要', stats: '统计', recent_activity: '最近动态' }
+
 export function isSensitiveAuditKey(key: string): boolean {
-  return /phone|mobile|tel(?:ephone)?|email|mail|password|passwd|pwd|token|secret|key|credential|authorization|cookie|手机号|电话|邮箱|密码|令牌|密钥/i.test(key)
+  if (/手机号|电话|邮箱|密码|令牌|密钥/.test(key)) return true
+  const words = key.replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
+    .replace(/([a-z\d])([A-Z])/g, '$1_$2').toLowerCase().split(/[_\s-]+/)
+  return words.some((word, i) => SENSITIVE_WORDS.has(word)
+    || (word === 'key' && KEY_PREFIXES.has(words[i - 1])))
+}
+
+export function invalidAuditPayloadText(length: number): string {
+  return `详情无法解析（原始记录约 ${length} 个字符，需要时请联系技术人员从服务器查看）`
 }
 
 export function safeAuditText(value: string): string {
-  // 防止个人联系方式或签名链接藏在未知键、错误原文及浏览器标识中。
-  if (/(?:\+?86[- ]?)?1[3-9]\d{9}|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:bearer\s+|(?:token|password|secret|api[_-]?key|sig)=)/i.test(value)) return '已隐藏'
+  // 字符串里的 JSON 也按结构脱敏；解析失败不回显原始记录。
+  const trimmed = value.trimStart()
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try { return JSON.stringify(sanitizeAuditValue(JSON.parse(value))) }
+    catch { return invalidAuditPayloadText(value.length) }
+  }
+  if (/(?<!\d)(?:\+?86[\s-]*)?1[3-9](?:[\s-]*\d){9}(?!\d)|[\w.+-]+@[\w.-]+\.[a-z]{2,}|bearer\s+\S+/i.test(value)) return '已隐藏'
+  // 手机号前后不能紧挨别的数字：13 位时间戳、长编号里碰巧含 11 位不算手机号。
+  // 兼容参数、普通键值对及嵌入文本的 JSON 写法，签名 URL 整段隐藏。
+  const pairs = value.matchAll(/(?:^|[\s?&,;{[])['"]?([\w\u4e00-\u9fff-]+)['"]?\s*[=:]\s*/g)
+  for (const [, key] of pairs) {
+    if (isSensitiveAuditKey(key) || key.toLowerCase() === 'sig') return '已隐藏'
+  }
   return value
 }
 
 export function sanitizeAuditValue(value: unknown, key = ''): unknown {
   if (isSensitiveAuditKey(key)) return '已隐藏'
-  if (Array.isArray(value)) return value.map((item) => sanitizeAuditValue(item))
+  if (Array.isArray(value)) return value.map((item) => sanitizeAuditValue(item, key))
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, sanitizeAuditValue(item, name)]))
   }
-  return typeof value === 'string' ? safeAuditText(value) : value
+  if (typeof value !== 'string') return value
+  const safe = safeAuditText(value)
+  if (safe !== value) return safe
+  if (key === 'sections') return Object.prototype.hasOwnProperty.call(SECTION_LABELS, value) ? SECTION_LABELS[value] : value
+  if (['fromStatus', 'toStatus', 'status', 'result'].includes(key)) {
+    const label = USER_STATUS_LABELS[value as keyof typeof USER_STATUS_LABELS] ?? taskStatusLabel(value)
+    return typeof label === 'string' ? label : value
+  }
+  return value
 }
 
-export function parseAuditPayload(raw: string): { value: unknown; invalid: boolean; raw: string } {
+export function parseAuditPayload(raw: string): { value: unknown; invalid: boolean; length: number } {
   try {
-    return { value: sanitizeAuditValue(JSON.parse(raw)), invalid: false, raw: '' }
+    return { value: sanitizeAuditValue(JSON.parse(raw)), invalid: false, length: raw.length }
   } catch {
-    // 坏 JSON 不能可靠定位值；出现敏感键时整段隐藏，避免折叠区泄漏。
-    const safeRaw = isSensitiveAuditKey(raw) ? '已隐藏' : safeAuditText(raw)
-    return { value: null, invalid: true, raw: safeRaw }
+    return { value: null, invalid: true, length: raw.length }
   }
 }

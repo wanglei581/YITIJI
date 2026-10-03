@@ -17,7 +17,7 @@ test.describe('合作机构管理（mock 口径）', () => {
     const guards = await openAuthed(page, '/partners')
     await settleAdminPage(page, guards)
     const table = page.locator('table')
-    await expect(table.getByRole('columnheader', { name: '机构名称' })).toBeVisible()
+    await expect(table.locator('thead th').filter({ hasText: /^机构名称$/ })).toBeVisible()
     const first = table.locator('tbody tr').first()
     const name = first.locator('td').first().locator('[title]')
     await expect(name).toHaveClass(/line-clamp-2/)

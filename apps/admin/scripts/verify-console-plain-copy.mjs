@@ -1,19 +1,16 @@
 // 两个后台的用户可见文案不得带工程词、Markdown 星号或原始状态码。
 // 只扫 .tsx 的字符串字面量与 JSX 文本，跳过注释。
 // 另外真执行 auditActionLabels.ts：审计契约里的每个动作都有中文名，未知动作显示「其他操作」。
-
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import vm from 'node:vm'
-
 const adminRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(adminRoot, '../..')
 const scanRoots = [join(adminRoot, 'src'), join(repoRoot, 'apps/partner/src')]
 const labelsPath = join(adminRoot, 'src/lib/auditActionLabels.ts')
 const auditTypesPath = join(repoRoot, 'services/api/src/audit/audit.types.ts')
-
 const FORBIDDEN = [
   'CLOSED_MODE',
   'fail-closed',
@@ -180,13 +177,13 @@ const ui = {
   EmptyState: ({ title, description }) => [title, description],
   LoadingState: () => '加载中', ErrorState: () => '加载失败',
 }
-function runFile(rel, imports = {}, append = '') {
+function runFile(rel, imports = {}, append = '', globals = {}) {
   const file = join(repoRoot, rel)
   const output = ts.transpileModule(readFileSync(file, 'utf8') + append, {
     fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
   const mod = { exports: {} }
-  vm.runInNewContext(output, { exports: mod.exports, module: mod, require(id) {
+  vm.runInNewContext(output, { ...globals, exports: mod.exports, module: mod, require(id) {
     if (id === 'react/jsx-runtime') return runtime
     if (!(id in imports)) throw new Error(`${rel}: 未登记依赖 ${id}`)
     return imports[id]
@@ -349,10 +346,13 @@ console.log('\n=== 打印错误原因与服务端告警同一口径 ===')
   }
   if (failures.length === 0) console.log(`  PASS 服务端登记的 ${serverCodes.length} 个错误码后台都有中文原因，且不引用一体机源码`)
 }
-
 console.log('\n=== 第四批实际渲染：审计与账号隐私 ===')
 const auditLabels = module.exports
-const auditPresentation = runFile('apps/admin/src/routes/audit/auditPresentation.ts', { '../../lib/auditActionLabels': auditLabels })
+const auditPresentation = runFile('apps/admin/src/routes/audit/auditPresentation.ts', {
+  '../../lib/auditActionLabels': auditLabels,
+  '../users/userPresentation': runFile('apps/admin/src/routes/users/userPresentation.ts'),
+  '../screen/metricLabels': runFile('apps/admin/src/routes/screen/metricLabels.ts', { '@ai-job-print/shared': shared, '@ai-job-print/ui': ui }),
+})
 const auditTable = runFile('apps/admin/src/routes/audit/auditColumns.tsx', {
   '@ai-job-print/shared': shared, '@ai-job-print/ui': ui,
   '../../lib/auditActionLabels': auditLabels, './auditPresentation': auditPresentation,
@@ -384,14 +384,72 @@ for (const key of sensitiveKeys) {
   if (!visible.includes('原因') || !visible.includes('测试原因') || !visible.includes('unknown_key') || !visible.includes('7')) fail('详情应翻译已知键并保留未知键和值')
   if (!visible.includes('request-long-value') || !visible.includes('browser-test')) fail('请求 ID 与浏览器标识必须在详情显示')
 }
-for (const payloadJson of ['bad-json', '{"password":"secret-raw"', '{"email":"test@example.com"', '{"unknown":"13912345678"']) {
-  const visible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, payloadJson }, onClose: () => {} }))
-  if (!visible.includes('详情无法解析') || !visible.includes('查看原文')) fail('坏 JSON 必须提示无法解析并折叠原文')
-  if (payloadJson === 'bad-json' ? !visible.includes(payloadJson) : !visible.includes('已隐藏') || /secret-raw|test@example.com|13912345678/.test(visible)) fail('坏 JSON 原文也必须防敏感泄漏')
+// r2：执行真实函数及抽屉，覆盖宽匹配误伤、嵌套字符串、签名与失败关闭。
+for (const key of ['token', 'authToken', 'apiKey', 'APIKey', 'secret_key', 'accessKey', 'privateKey', 'sign_key', 'encryptionKey', 'signature', 'sign', 'x-amz-signature', 'x-oss-signature', 'q-signature', 'tel', 'mail', '联系电话']) {
+  if (!auditPresentation.isSensitiveAuditKey(key) || auditPresentation.sanitizeAuditValue('private-value', key) !== '已隐藏') fail(`敏感整词应隐藏：${key}`)
 }
+for (const key of ['unknown_key', 'cacheKey', 'hotel', 'mailbox', 'key', 'monkey', 'tokenizer']) {
+  if (auditPresentation.isSensitiveAuditKey(key) || auditPresentation.sanitizeAuditValue('public-value', key) !== 'public-value') fail(`非敏感键应保留原值：${key}`)
+}
+for (const value of ['token=opaque', 'password:opaque', 'prefix "pwd":"opaque"', 'https://example.com/a?Signature=opaque', 'https://example.com/a?X-Amz-Signature=opaque', 'https://example.com/a?X-OSS-Signature=opaque', 'https://example.com/a?Q-Signature=opaque', 'https://example.com/a?sign=opaque', '+86 139 1234 5678', '139-1234-5678', '13912345678', 'test@example.com', 'Bearer opaque']) {
+  if (auditPresentation.safeAuditText(value) !== '已隐藏') fail(`敏感文本或整段签名 URL 应隐藏：${value}`)
+}
+for (const value of ['hotel:青岛', 'mailbox=已登记', 'cacheKey:public', 'https://example.com/a?unknown_key=public', '普通说明']) {
+  if (auditPresentation.safeAuditText(value) !== value) fail(`非敏感文本应保留：${value}`)
+}
+for (const value of ['{"password":"embedded-secret","cacheKey":"可见"}', '[{"apiKey":"embedded-secret","hotel":"可见"}]', '{"nested":"{\\"token\\":\\"embedded-secret\\"}"}']) {
+  const safe = auditPresentation.safeAuditText(value)
+  if (!safe.includes('已隐藏') || safe.includes('embedded-secret') || safe.includes('详情无法解析')) fail('字符串 JSON 必须递归脱敏且可解析')
+}
+for (const payloadJson of ['bad-json', '{"password":"secret-raw"', '{"unknown":"bad-json-secret"', '["unrecognized-private-value"']) {
+  const parsed = auditPresentation.parseAuditPayload(payloadJson)
+  const visible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, payloadJson }, onClose: () => {} }))
+  if (!parsed.invalid || parsed.length !== payloadJson.length || 'raw' in parsed || JSON.stringify(parsed).includes(payloadJson)) fail('坏 JSON 的解析结果不得携带原文')
+  if (!visible.includes(`详情无法解析（原始记录约 ${payloadJson.length} 个字符，需要时请联系技术人员从服务器查看）`) || /查看原文|敏感内容已隐藏/.test(visible) || visible.includes(payloadJson)) fail('坏 JSON 只展示长度及服务器查阅说明，不出原文')
+  if (auditPresentation.safeAuditText('{'+payloadJson).includes(payloadJson)) fail('嵌入字符串的坏 JSON 也不回显')
+}
+const translated = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, payloadJson: JSON.stringify({ sections: ['summary', 'stats', 'recent_activity', 'unknown_section'], fromStatus: 'active', toStatus: 'disabled', status: 'printing', result: 'unknown_result' }) }, onClose: () => {} }))
+for (const word of ['概要', '统计', '最近动态', 'unknown_section', '正常', '已停用', '打印中', 'unknown_result']) if (!translated.includes(word)) fail(`详情中文与未知值回落缺少 ${word}`)
+for (const key of ['sections', 'fromStatus', 'toStatus', 'status', 'result']) for (const value of ['constructor', '__proto__', 'toString']) if (auditPresentation.sanitizeAuditValue(value, key) !== value) fail('未知范围/状态值不得命中对象原型')
+if (translated.includes('浏览器标识（User-Agent）')) fail('浏览器标识标签不能显示英文协议词')
 const auditPage = readFileSync(join(adminRoot, 'src/routes/audit/index.tsx'), 'utf8')
 if (!auditPage.includes('getAuditActionLabel(value)') || !auditPage.includes('auditColumns(setSelected)') || !auditPage.includes('record={selected}')) fail('审计页必须挂接中文筛选、可打开的列定义和详情抽屉')
 if (!auditPage.includes('lang="zh-CN"') || !auditPage.includes('年/月/日 时:分') || !auditPage.includes('d.toISOString()')) fail('审计日期筛选需中文区域与格式提示，保持 ISO 查询')
+// 真实页面的捕获事件覆盖单元格按钮，选中后阻止冒泡；清除选区正常放行。
+let selectionText = ''
+const browserGlobals = { window: { getSelection: () => ({ toString: () => selectionText }) } }
+const auditPageModule = runFile('apps/admin/src/routes/audit/index.tsx', {
+  ...common, react: hooks([null, '', '', '', [auditRecord], 1, false, false]),
+  '../components/DataTable': { useTableState: () => ({ page: 1, pageSize: 20 }) },
+  '../../services/api/audit': {}, './auditColumns': auditTable, './AuditDetailDrawer': auditDrawer,
+  '../../lib/auditActionLabels': auditLabels, '../../services/api/client': { API_MODE: 'http' },
+}, '', browserGlobals)
+function findTree(node, predicate) {
+  if (!node || typeof node !== 'object') return null
+  if (Array.isArray(node)) return node.map((item) => findTree(item, predicate)).find(Boolean) ?? null
+  return predicate(node) ? node : findTree(node.props?.children, predicate)
+}
+const privacyStates = ['', '', undefined, [], [], null, 'ready', null, null, false, null]
+const privacyPageModule = runFile('apps/admin/src/routes/privacy-requests/index.tsx', {
+  ...common, react: hooks(privacyStates), '../../services/api/adminPrivacyRequests': {},
+}, '', browserGlobals)
+const privacyEmptyTree = privacyPageModule.default()
+const privacyPopulatedModule = runFile('apps/admin/src/routes/privacy-requests/index.tsx', {
+  ...common, react: hooks(['', '', undefined, [], [{ id: 'ticket', status: 'pending', requestType: 'export', phoneMasked: '138****5678' }], null, 'ready', null, null, false, null]),
+  '../../services/api/adminPrivacyRequests': {},
+}, '', browserGlobals)
+if (!textOf(privacyPopulatedModule.default()).replace(/\s+/g, '').includes('当前页1条')) fail('隐私请求有数据时保留原游标栏')
+if (textOf(privacyEmptyTree).includes('当前页')) fail('隐私请求空列表不得显示游标栏')
+for (const tree of [auditPageModule.default(), privacyEmptyTree]) {
+  const wrapper = findTree(tree, (node) => typeof node.props?.onClickCapture === 'function')
+  if (!wrapper) { fail('审计及隐私表格须捕获点击，保护选中的文字'); continue }
+  for (const selected of ['', '所选文字']) {
+    selectionText = selected
+    let prevented = false, stopped = false
+    wrapper.props.onClickCapture({ preventDefault: () => { prevented = true }, stopPropagation: () => { stopped = true } })
+    if (prevented !== Boolean(selected) || stopped !== Boolean(selected)) fail('选中文字阻止按钮/行点击，未选中时正常放行')
+  }
+}
 const partnerConsts = runFile('packages/shared/src/types/partner.ts')
 const restrictions = runFile('apps/partner/src/routes/profile/ComplianceRestrictions.tsx', { '@ai-job-print/shared': partnerConsts })
 const restrictionText = textOf(restrictions.ComplianceRestrictions())
@@ -412,6 +470,17 @@ const orgView = runFile('apps/admin/src/routes/partners/orgPresentation.ts', { '
 for (const key of ['job_info', 'job_fair', 'external_apply_redirect']) {
   if (!orgView.moduleLabel(key, false).includes('暂不开放') || orgView.moduleLabel(key, true).includes('暂不开放')) fail('招聘模块标签应随托管闸门标暂不开放，仅改显示')
 }
+const partnerPhoneView = runFile('apps/partner/src/routes/profile/index.tsx', {
+  react: hooks([]), '@ai-job-print/shared': partnerConsts, '@ai-job-print/ui': ui,
+  './ComplianceRestrictions': restrictions, '../Page': {}, 'lucide-react': {},
+  '../../services/api/orgSelf': {}, './OfficialChannelsSection': {}, '../../services/capabilities': {},
+}, '\nexport { contactPhoneText }\n')
+for (const view of [orgView, partnerPhoneView]) {
+  for (const [phone, expected] of [[null, '—'], ['', '—'], ['  ', '—'], ['123456', '已登记'], ['未知', '已登记'], ['1234567', '123**67'], ['13812345678', '138****5678'], ['138 1234 5678', '138****5678'], ['138-1234-5678', '138****5678'], ['+86 138-1234-5678', '861********78'], ['010-88888888', '010******88'], ['010-88888888 转 123', '010*********23'], ['138****5678', '138****5678']]) {
+    if (view.contactPhoneText(phone) !== expected) fail(`电话格式 ${phone} 应显示 ${expected}`)
+  }
+}
+if (!readFileSync(join(repoRoot, 'apps/partner/src/routes/profile/index.tsx'), 'utf8').includes('value={contactPhoneText(profile.contactPhone)}')) fail('机构资料展示必须调用统一电话规则')
 if (orgView.contactPhoneText('13812345678') !== '138****5678' || orgView.contactPhoneText('138****5678') !== '138****5678') fail('机构联系人手机不能显示明文，也不能破坏已有掩码')
 const trustCell = runFile('apps/admin/src/routes/partners/ContentTrustCell.tsx', { '@ai-job-print/ui': ui, './contentTrustRules': runFile('apps/admin/src/routes/partners/contentTrustRules.ts') })
 const orgParts = runFile('apps/admin/src/routes/partners/orgFormParts.tsx', { react: hooks([]), '@ai-job-print/shared': partnerConsts, './orgPresentation': orgView })
