@@ -50,7 +50,6 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
             <thead className="border-b border-neutral-100 bg-neutral-50 text-xs text-neutral-500">
               <tr>
                 <th className="px-4 py-3 text-left font-medium">AI 能力</th>
-                <th className="px-4 py-3 text-left font-medium">operation</th>
                 <th className="px-4 py-3 text-right font-medium">调用次数</th>
                 <th className="px-4 py-3 text-right font-medium">估算成本</th>
                 <th className="px-4 py-3 text-left font-medium">计费方式</th>
@@ -59,15 +58,14 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
             <tbody className="divide-y divide-neutral-50">
               {operationRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-neutral-400">
+                  <td colSpan={4} className="px-4 py-8 text-center text-neutral-400">
                     近 24 小时暂无 AI 调用记录
                   </td>
                 </tr>
               ) : (
                 operationRows.map((row) => (
                   <tr key={row.op} className="hover:bg-neutral-50/50">
-                    <td className="px-4 py-3 text-neutral-700">{OPERATION_LABELS[row.op]}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-neutral-400">{row.op}</td>
+                    <td className="px-4 py-3 text-neutral-700" title={row.op}>{OPERATION_LABELS[row.op]}</td>
                     <td className="px-4 py-3 text-right font-mono text-neutral-700">{row.calls}</td>
                     <td className="px-4 py-3 text-right font-mono text-xs">
                       {/* 三态：未采集绝不显示 ¥0（那等于谎称免费）；部分采集要标出缺口 */}
@@ -96,7 +94,7 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
             {operationRows.length > 0 && (
               <tfoot className="border-t border-neutral-100 bg-neutral-50 text-xs">
                 <tr>
-                  <td className="px-4 py-3 font-medium text-neutral-600" colSpan={2}>合计（按 token 计费部分）</td>
+                  <td className="px-4 py-3 font-medium text-neutral-600">合计（按 token 计费部分）</td>
                   <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">{totalOperationCalls}</td>
                   <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">¥{totalTokenBilledCost.toFixed(4)}</td>
                   <td className="px-4 py-3 text-neutral-500">

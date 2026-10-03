@@ -12052,7 +12052,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 220,
+      "reachableFileCount": 223,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12126,7 +12126,9 @@
             "AdminLayoutWrapper"
           ],
           "path": "/ai-config",
-          "styles": [],
+          "styles": [
+            "apps/admin/src/routes/ai-config/ai-config.css"
+          ],
           "wrappers": []
         },
         {
@@ -12807,7 +12809,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 245
+      "sourceFileCount": 248
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15791,7 +15793,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 77,
+      "reachableFileCount": 83,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16209,7 +16211,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 78
+      "sourceFileCount": 84
     }
   },
   "dataModel": {
@@ -17926,6 +17928,9 @@
     "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
     ],
+    "apps/admin/src/routes/ai-services/AiLogsTable.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
@@ -17933,6 +17938,9 @@
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiUsagePanel.tsx": [
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+    ],
+    "apps/admin/src/routes/ai-services/aiLogDisplay.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/aiOperationLabels.ts": [
@@ -21258,9 +21266,11 @@
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
+    "apps/partner/src/routes/companies/CompaniesTable.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
+    ],
     "apps/partner/src/routes/companies/index.tsx": [
-      "apps/partner/scripts/verify-partner-refresh-safe.mjs",
-      "services/api/scripts/verify-companies.ts"
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/dashboard/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
@@ -21273,6 +21283,9 @@
     "apps/partner/src/routes/index.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs",
       "scripts/project-graph/frontend.mjs"
+    ],
+    "apps/partner/src/routes/jobs/JobsTable.tsx": [
+      "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
     ],
     "apps/partner/src/routes/jobs/components/JobQualitySummaryPanel.tsx": [
       "apps/partner/scripts/verify-job-quality-dashboard-ui.mjs"
@@ -21287,6 +21300,9 @@
     ],
     "apps/partner/src/routes/login/index.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+    ],
+    "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/partner/src/routes/policy/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
@@ -21870,6 +21886,7 @@
       "apps/admin/scripts/verify-refresh-safe.mjs"
     ],
     "packages/shared/src/formatDateTime.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
@@ -21889,6 +21906,9 @@
     ],
     "packages/shared/src/pickupCode.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
+    "packages/shared/src/types/admin.ts": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "packages/shared/src/types/adminUsers.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs",
@@ -22031,6 +22051,9 @@
     "packages/shared/src/types/uploadSession.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-contract-review-contract.ts"
+    ],
+    "packages/ui/package.json": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "packages/ui/src/components/Drawer.tsx": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
@@ -26608,6 +26631,7 @@
           "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsagePanel.tsx",
+          "apps/admin/src/routes/ai-services/aiLogDisplay.ts",
           "apps/admin/src/routes/ai-services/aiOperationLabels.ts",
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "apps/admin/src/routes/ai-services/index.tsx",
@@ -27040,6 +27064,7 @@
         "files": [
           "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/lib/printErrorText.ts",
+          "apps/admin/src/routes/ai-services/AiLogsTable.tsx",
           "apps/admin/src/routes/audit/AuditDetailDrawer.tsx",
           "apps/admin/src/routes/audit/auditColumns.tsx",
           "apps/admin/src/routes/audit/auditPresentation.ts",
@@ -27078,12 +27103,16 @@
           "apps/admin/src/routes/users/userPresentation.ts",
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/account/index.tsx",
+          "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx",
           "apps/partner/src/routes/profile/ComplianceRestrictions.tsx",
           "apps/partner/src/routes/profile/index.tsx",
           "apps/partner/src/routes/smart-campus/index.tsx",
           "apps/partner/src/routes/terminals/index.tsx",
+          "packages/shared/src/formatDateTime.ts",
           "packages/shared/src/formatNumber.ts",
+          "packages/shared/src/types/admin.ts",
           "packages/shared/src/types/partner.ts",
+          "packages/ui/package.json",
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/audit/audit.types.ts"
         ],
@@ -31200,6 +31229,7 @@
         "files": [
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/account/index.tsx",
+          "apps/partner/src/routes/companies/CompaniesTable.tsx",
           "apps/partner/src/routes/companies/index.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
           "apps/partner/src/routes/fairs/index.tsx",
@@ -31301,6 +31331,7 @@
         "dirs": [],
         "files": [
           "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
+          "apps/partner/src/routes/jobs/JobsTable.tsx",
           "apps/partner/src/routes/jobs/index.tsx"
         ],
         "missing": []
@@ -34670,7 +34701,6 @@
         "files": [
           "apps/admin/src/services/api/companiesAdmin.ts",
           "apps/kiosk/src/services/api/companies.ts",
-          "apps/partner/src/routes/companies/index.tsx",
           "apps/partner/src/services/api/partnerCompanies.ts",
           "packages/shared/src/index.ts",
           "packages/shared/src/types/company.ts",
