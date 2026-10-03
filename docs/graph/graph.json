@@ -19400,6 +19400,7 @@
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx": [
+      "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
@@ -27746,6 +27747,7 @@
           "apps/kiosk/src/pages/home/components/QxHomeView.tsx",
           "apps/kiosk/src/pages/home/homeDomainStatus.ts",
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
+          "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx",
           "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
