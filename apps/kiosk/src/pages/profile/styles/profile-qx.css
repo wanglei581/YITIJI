@@ -310,8 +310,8 @@
   [data-kiosk-stage-fit='off'] .pf-root .pf-support-actions p { flex-basis: 100%; }
 }
 
-/* 余高分给有内容的区块之间；卡片内不使用沉底布局。 */
-.pf-root .pf-page { justify-content: space-between; }
+/* 身份与待办保持相邻；用固定区块间距，避免余高把继续办理按钮推远。 */
+.pf-root .pf-page { justify-content: flex-start; }
 
 /* 四个既有支持入口排成一行，把账号操作留在同组；描述仍供读屏读取。 */
 .pf-root .pf-support-rows { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }

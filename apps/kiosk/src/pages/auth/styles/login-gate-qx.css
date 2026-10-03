@@ -130,7 +130,8 @@
 }
 
 /* W4 · 03 v2: read-only top, reachable agreement, compact fields, on-demand keypad. */
-.k1-login .qx-pagehead { min-height: 180px; padding-bottom: 12px; padding-top: 14px; flex-direction: column; align-items: flex-start; gap: 10px; }
+/* 页头连同身份说明与步骤条，为下方登录操作保留 y >= 500 的触控区。 */
+.k1-login .qx-pagehead { min-height: 220px; padding-bottom: 12px; padding-top: 14px; flex-direction: column; align-items: flex-start; gap: 10px; }
 .k1-login .qx-pagehead p { flex: none; }
 .k1-login .lg-rail { display: flex; gap: 14px; margin: 0; padding: 0 0 18px; list-style: none; flex: none; }
 .k1-login .lg-rail li { flex: 1; border-top: 2px solid var(--qx-line); padding-top: 8px; font-size: var(--qx-fs-aux-lg); }
