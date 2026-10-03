@@ -303,7 +303,7 @@ export default function MemberFeedbackPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-neutral-900">{item.title ?? CATEGORY_LABEL[item.category]}</p>
+                      <p title={item.title ?? undefined} className="truncate text-sm font-semibold text-neutral-900">{item.title ?? CATEGORY_LABEL[item.category]}</p>
                       <p className="mt-1 text-xs text-neutral-400">
                         {submitterLabel(item)} · {fmt(item.createdAt)}
                       </p>

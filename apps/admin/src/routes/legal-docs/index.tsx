@@ -1,6 +1,7 @@
+import { useTableState } from '../components/DataTable'
 import { useEffect, useState } from 'react'
-import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
-import { FileTextIcon, PlusIcon, CheckIcon, EyeIcon } from 'lucide-react'
+import { Card, ConsoleTable, StatusBadge } from '@ai-job-print/ui'
+import { PlusIcon, CheckIcon, EyeIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { LegalDocDrawer } from './LegalDocDrawer'
 import { LegalDocViewDrawer } from './LegalDocViewDrawer'
@@ -39,6 +40,7 @@ function legalDocBadge(
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function LegalDocsPage() {
+  const table = useTableState(20)
   // 一次取全部版本：顶部「上线就绪」要看每一类的现行版本，列表按标签在前端筛选。
   const [allRows, setAllRows] = useState<LegalDocVersionView[]>([])
   const [loading, setLoading] = useState(true)
@@ -110,7 +112,7 @@ export default function LegalDocsPage() {
           <button
             key={String(t.key)}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => { setTab(t.key); table.setPage(1) }}
             className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
               tab === t.key
                 ? 'border-primary-600 text-primary-700'
@@ -122,51 +124,18 @@ export default function LegalDocsPage() {
         ))}
       </div>
 
-      <div className="mt-4">
-        {loading && (
-          <div className="py-16 text-center text-sm text-neutral-500">加载中…</div>
-        )}
-        {!loading && error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            加载失败：{error}
-          </div>
-        )}
-        {!loading && !error && rows.length === 0 && (
-          <EmptyState
-            icon={FileTextIcon}
-            title="暂无法务文档版本"
-            description="点击右上角「新增版本」创建草稿"
-          />
-        )}
-        {!loading && !error && rows.length > 0 && (
-          <Card>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-neutral-100 text-sm">
-                <thead className="bg-neutral-50 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  <tr>
-                    <th className="px-4 py-3 text-left">文档类型</th>
-                    <th className="px-4 py-3 text-left">版本号</th>
-                    <th className="px-4 py-3 text-left">标题</th>
-                    <th className="px-4 py-3 text-left">状态</th>
-                    <th className="px-4 py-3 text-left">发布时间</th>
-                    <th className="px-4 py-3 text-left">操作</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-50 bg-white">
-                  {rows.map((row) => {
-                    const badge = legalDocBadge(row, allRows)
-                    return (
-                    <tr key={row.id} className="hover:bg-neutral-50">
-                      <td className="px-4 py-3 text-neutral-700">
-                        {docTypeLabel(row.docType)}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-neutral-600">{row.version}</td>
-                      <td className="max-w-xs truncate px-4 py-3 text-neutral-800">{row.title}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={badge.status} label={badge.label} />
-                      </td>
-                      <td className="px-4 py-3 text-neutral-500">{formatDate(row.publishedAt)}</td>
-                      <td className="px-4 py-3">
+      <Card className="mt-4 overflow-hidden p-0">
+        <ConsoleTable items={rows.slice((table.page - 1) * table.pageSize, table.page * table.pageSize)} loading={loading}
+          error={error ? { message: error, onRetry: loadData } : null}
+          empty={{ title: '暂无法务文档版本', description: '点击右上角「新增版本」创建草稿' }}
+          total={rows.length} page={table.page} pageSize={table.pageSize} onPageChange={table.setPage}
+          onPageSizeChange={(size) => { table.setPageSize(size); table.setPage(1) }} columns={[
+            { id: 'type', header: '文档类型', cell: (row) => docTypeLabel(row.docType) },
+            { id: 'version', header: '版本号', truncate: true, cell: (row) => row.version },
+            { id: 'title', header: '标题', truncate: true, cell: (row) => row.title },
+            { id: 'status', header: '状态', cell: (row) => { const badge = legalDocBadge(row, allRows); return <StatusBadge status={badge.status} label={badge.label} /> } },
+            { id: 'time', header: '发布时间', cellClassName: 'whitespace-nowrap text-xs', cell: (row) => formatDate(row.publishedAt) },
+            { id: 'actions', header: '操作', sticky: true, cell: (row) => (
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
@@ -188,16 +157,9 @@ export default function LegalDocsPage() {
                             </button>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        )}
-      </div>
+            ) },
+          ]} />
+      </Card>
 
       {drawerOpen && (
         <LegalDocDrawer existing={allRows} onCreated={handleCreated} onClose={() => setDrawerOpen(false)} />

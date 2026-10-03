@@ -5,13 +5,13 @@ import {
   type AdminUserListQuery,
   type AdminUserStatusChangeResult,
 } from '@ai-job-print/shared'
-import { Card, EmptyState, ErrorState } from '@ai-job-print/ui'
+import { Card, ConsoleTable } from '@ai-job-print/ui'
 import { RefreshCwIcon, SearchIcon } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { list as listAdminUsers } from '../../services/api/adminUsers'
 import { ApiHttpError } from '../../services/api/client'
 import { Page } from '../Page'
-import { Pagination, useTableState } from '../components/DataTable'
+import { useTableState } from '../components/DataTable'
 import { UserDetailDrawer } from './UserDetailDrawer'
 import { UserStatusDialog, type UserStatusDialogTarget, type UserStatusIntent } from './UserStatusDialog'
 import {
@@ -31,18 +31,6 @@ const EMPTY_RESULT: AdminUserListResult = { items: [], total: 0, page: 1, pageSi
 
 function asPageSize(value: number): AdminUserListQuery['pageSize'] {
   return value === 10 || value === 50 || value === 100 ? value : 20
-}
-
-function TableSkeleton() {
-  return (
-    <div className="animate-pulse p-4" aria-label="正在加载用户列表">
-      {Array.from({ length: 6 }, (_, index) => (
-        <div key={index} className="grid grid-cols-6 gap-4 border-b border-neutral-100 py-4">
-          {Array.from({ length: 6 }, (__, cell) => <div key={cell} className="h-4 rounded bg-neutral-100" />)}
-        </div>
-      ))}
-    </div>
-  )
 }
 
 function StatusPill({ status }: { status: AdminUserListItem['status'] }) {
@@ -183,7 +171,7 @@ export default function UsersPage() {
   return (
     <Page title="用户管理" subtitle="查看终端注册用户与服务使用概况">
       <Card className="mb-4 p-4">
-        <form onSubmit={applyFilters} className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_160px_170px_170px_auto]">
+        <form lang="zh-CN" onSubmit={applyFilters} className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_160px_170px_170px_auto]">
           <label className="relative">
             <span className="sr-only">统一搜索</span>
             <SearchIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-neutral-400" aria-hidden />
@@ -204,12 +192,12 @@ export default function UsersPage() {
             </select>
           </label>
           <label>
-            <span className="sr-only">注册开始日期 registeredFrom</span>
-            <input type="date" value={draft.registeredFrom} max={draft.registeredTo || undefined} onChange={(event) => setDraft((value) => ({ ...value, registeredFrom: event.target.value }))} className="h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-primary-400" />
+            <span className="mb-1 block text-xs text-neutral-500">注册开始日期（年/月/日）</span>
+            <input lang="zh-CN" type="date" value={draft.registeredFrom} max={draft.registeredTo || undefined} onChange={(event) => setDraft((value) => ({ ...value, registeredFrom: event.target.value }))} className="h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-primary-400" />
           </label>
           <label>
-            <span className="sr-only">注册结束日期 registeredTo</span>
-            <input type="date" value={draft.registeredTo} min={draft.registeredFrom || undefined} onChange={(event) => setDraft((value) => ({ ...value, registeredTo: event.target.value }))} className="h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-primary-400" />
+            <span className="mb-1 block text-xs text-neutral-500">注册结束日期（年/月/日）</span>
+            <input lang="zh-CN" type="date" value={draft.registeredTo} min={draft.registeredFrom || undefined} onChange={(event) => setDraft((value) => ({ ...value, registeredTo: event.target.value }))} className="h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-primary-400" />
           </label>
           <div className="flex items-center gap-2">
             <button type="submit" className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700">查询</button>
@@ -237,46 +225,19 @@ export default function UsersPage() {
         </div>
       )}
 
-      <Card className="overflow-hidden">
-        {state === 'loading' && <TableSkeleton />}
-        {state === 'error' && (
-          <ErrorState
-            title={listErrorTitle}
-            message={listErrorMessage}
-            onRetry={retryable ? () => setRefreshKey((value) => value + 1) : undefined}
-            className="py-24"
-          />
-        )}
-        {state === 'ready' && result.items.length === 0 && (
-          <EmptyState
-            title={filtered ? '未找到符合条件的用户' : '暂无注册用户'}
-            description={filtered ? '请调整筛选条件后重新查询' : undefined}
-            action={filtered ? <button type="button" onClick={resetFilters} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">重置筛选</button> : undefined}
-            className="py-24"
-          />
-        )}
-        {state === 'ready' && result.items.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-neutral-100 bg-neutral-50/70 text-left text-xs font-medium text-neutral-500">
-                <tr>
-                  <th className="px-4 py-3">用户</th>
-                  <th className="px-4 py-3">手机号</th>
-                  <th className="px-4 py-3">账号状态</th>
-                  <th className="px-4 py-3">最近登录</th>
-                  <th className="px-4 py-3">注册时间</th>
-                  <th className="px-4 py-3 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {result.items.map((user) => (
-                  <tr key={user.id} className="text-neutral-700 hover:bg-neutral-50/70">
-                    <td className="px-4 py-3 font-medium text-neutral-900">{userDisplayName(user)}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{user.maskedPhone}</td>
-                    <td className="px-4 py-3"><StatusPill status={user.status} /></td>
-                    <td className="px-4 py-3" title={user.lastLoginAt ? formatDateTime(user.lastLoginAt) : undefined}>{user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '暂无登录记录'}</td>
-                    <td className="px-4 py-3" title={formatDateTime(user.createdAt)}>{formatDateTime(user.createdAt)}</td>
-                    <td className="px-4 py-3">
+      <Card className="overflow-hidden p-0">
+        <ConsoleTable items={result.items} loading={state === 'loading'}
+          error={state === 'error' ? { title: listErrorTitle, message: listErrorMessage, onRetry: retryable ? () => setRefreshKey((value) => value + 1) : undefined } : null}
+          empty={{ title: filtered ? '未找到符合条件的用户' : '暂无注册用户', description: filtered ? '请调整筛选条件后重新查询' : undefined,
+            action: filtered ? <button type="button" onClick={resetFilters} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm">重置筛选</button> : undefined }}
+          total={result.total} page={safePage} pageSize={pageSize} onPageChange={handlePageChange} onPageSizeChange={handlePageSizeChange}
+          columns={[
+            { id: 'name', header: '用户', truncate: true, cell: (user) => userDisplayName(user) },
+            { id: 'phone', header: '手机号', cellClassName: 'whitespace-nowrap font-mono text-xs', cell: (user) => user.maskedPhone },
+            { id: 'status', header: '账号状态', cell: (user) => <StatusPill status={user.status} /> },
+            { id: 'login', header: '最近登录', cellClassName: 'whitespace-nowrap text-xs', cell: (user) => user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '暂无登录记录' },
+            { id: 'created', header: '注册时间', cellClassName: 'whitespace-nowrap text-xs', cell: (user) => formatDateTime(user.createdAt) },
+            { id: 'actions', header: '操作', sticky: true, align: 'right', cell: (user) => (
                       <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
@@ -307,22 +268,9 @@ export default function UsersPage() {
                           </button>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {state === 'ready' && (
-          <Pagination
-            total={result.total}
-            page={safePage}
-            pageSize={pageSize}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-          />
-        )}
+            ) },
+          ]}
+        />
       </Card>
 
       <UserDetailDrawer
