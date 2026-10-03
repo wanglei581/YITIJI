@@ -84,7 +84,14 @@ async function main(): Promise<void> {
     assert.equal(apiCode(reason), 'LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED')
     passed += 1
 
-    assert.equal(racing.transactionCalls, 3, 'loser must be retried exactly once (2 first attempts + 1 retry)')
+    // 赢的一方 1 次；输的一方至少重试 1 次（证明 COMMIT 上的冲突被认出来并重试了）。
+    // 输方重试时的新快照可能早于赢家提交可见，于是再冲突、再重试一次，所以 4 也是正确行为
+    // （2026-10-01 main CI 实测到 4）。每个调用方上限 3 次尝试（withSerializableRetry），合计不超过 6。
+    // 下限 3 不能放宽：不重试的写法只有 2 次。
+    assert.ok(
+      racing.transactionCalls >= 3 && racing.transactionCalls <= 6,
+      `loser must be retried at least once and each caller makes at most 3 attempts; got ${racing.transactionCalls}`,
+    )
     passed += 1
 
     // 按调用方分别计：被拒的一方至少发起过 2 次事务（首发 + 至少一次重试），任何一方不超过
