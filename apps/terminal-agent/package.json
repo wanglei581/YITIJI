@@ -47,7 +47,7 @@
     "verify:field-day-evidence": "node scripts/verify-field-day-evidence.mjs"
   },
   "dependencies": {
-    "axios": "1.18.1",
+    "axios": "1.20.0",
     "better-sqlite3": "^12.10.0",
     "chokidar": "^4.0.0",
     "commander": "^12.1.0",
