@@ -394,7 +394,13 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     window.requestAnimationFrame(() => voiceTriggerRef.current?.focus({ preventScroll: true }))
   }
 
-  const switchVoiceToText = () => {
+  const switchVoiceToText = (expiredSubtitle?: string) => {
+    if (expiredSubtitle !== undefined) {
+      setMessages(previous => [...previous,
+        ...(expiredSubtitle ? [{ id: `voice-subtitle-${Date.now()}`, role: 'assistant' as const, kind: 'system' as const, text: expiredSubtitle }] : []),
+        { id: `voice-limit-${Date.now()}`, role: 'assistant', kind: 'system', text: '语音通话已到本次上限，已为你转成文字对话，可以继续问' },
+      ])
+    }
     setCallActive(false)
     setVoiceState(null)
     focusComposer()
@@ -517,7 +523,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 aria-busy={loading}
                 aria-relevant="additions text"
               >
-                {messages.filter((message) => !hasUserTurn || message.kind !== 'system').map((message) => <ChatBubble key={message.id} msg={message} />)}
+                {messages.filter((message) => !hasUserTurn || message.kind !== 'system' || message.id.startsWith('voice-')).map((message) => <ChatBubble key={message.id} msg={message} />)}
               </div>
 
               {(cockpitState === 'reply-error' || cockpitState === 'reply-not-ai' || cockpitState === 'ai-unavailable') && (

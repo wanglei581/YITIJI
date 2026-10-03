@@ -4,7 +4,9 @@ import { RESUME_DRAFT_EXPORT_MANUAL_PATH } from './resume-draft-export-manual-pa
 import { ResumeDraftSourceService } from './resume/resume-draft-source.service'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
-import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { TerminalScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { currentAiRequestContext, resolveAiCaller } from './usage/ai-usage-context'
+import { TerminalSessionService } from '../terminals/terminal-session.service'
 import { AiPublicQuotaService } from './ai-public-quota.service'
 import { JwtService } from '@nestjs/jwt'
 import { AsrService } from '../asr/asr.service'
@@ -148,7 +150,20 @@ export class AiController {
     private readonly assistantSummary: AssistantSummaryService,
     private readonly draftSource: ResumeDraftSourceService,
     @Optional() private readonly resumeParseIntent?: ResumeParseIntentRunner,
+    @Optional() private readonly terminalSessions?: TerminalSessionService,
   ) {}
+
+  /** 先复用 AI 访问守卫/用量中间件的惰性缓存；直接调用 handler 时再验签。 */
+  private async verifiedQuotaTerminal(req: ReqLike): Promise<string | null> {
+    const context = currentAiRequestContext()
+    const caller = context
+      ? await context.identity()
+      : await resolveAiCaller(req.headers, {
+        jwt: this.jwt, redis: this.redis, prisma: this.prisma,
+        terminalSessions: this.terminalSessions ?? { validate: async () => { throw new Error('Terminal validator unavailable') } },
+      })
+    return caller.terminalVerified ? caller.terminalId : null
+  }
 
   /**
    * 解析 AI 结果读取请求方（Phase C-2A）。
@@ -195,7 +210,7 @@ export class AiController {
     }
     const quotaContext = {
       member: endUser?.endUserId ?? null,
-      terminal: throttleTerminalIdOf(req),
+      terminal: await this.verifiedQuotaTerminal(req),
       ip: ipOf(req),
     }
     // 两头都缺才是过渡期旧路径。带意图头时不得再走 publicQuota.consume。
@@ -598,7 +613,7 @@ export class AiController {
     const chatMember = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
     const quotaTicket = await this.publicQuota.consume('assistant_chat', {
       member: chatMember?.endUserId ?? null,
-      terminal: throttleTerminalIdOf(req),
+      terminal: await this.verifiedQuotaTerminal(req),
       ip: ipOf(req),
     })
     const result = await runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
@@ -645,10 +660,11 @@ export class AiController {
     @UploadedFile() audio: Express.Multer.File | undefined,
     @Req() req: ReqLike,
   ): Promise<{ text: string; providerName: string }> {
+    const terminalId = await this.verifiedQuotaTerminal(req)
     const voiceMember = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
     const quotaTicket = await this.publicQuota.consume('assistant_chat', {
       member: voiceMember?.endUserId ?? null,
-      terminal: throttleTerminalIdOf(req),
+      terminal: terminalId,
       ip: ipOf(req),
     })
     return runWithPublicQuota(this.publicQuota, quotaTicket, req, async () => {
@@ -669,7 +685,7 @@ export class AiController {
         tokenUsage: undefined,
         errorCode: result.ok ? undefined : (result.errorCode ?? 'ASR_FAILED'),
         endUserId: voiceMember?.endUserId ?? null,
-        terminalId: throttleTerminalIdOf(req),
+        terminalId,
       })
       if (!result.ok) {
         throw new BadRequestException({

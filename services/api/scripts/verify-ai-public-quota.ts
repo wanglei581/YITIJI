@@ -20,6 +20,9 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { HttpException, ServiceUnavailableException } from '@nestjs/common'
 import ts from 'typescript'
+import { AiController } from '../src/ai/ai.controller'
+import { lazyAiRequestContext, resolveAiCaller, runWithAiRequestContext } from '../src/ai/usage/ai-usage-context'
+import type { AiCallerResolverDeps } from '../src/ai/usage/ai-usage-context'
 import type { RedisService } from '../src/common/redis/redis.service'
 import { AiPublicQuotaService, type AiPublicOperation } from '../src/ai/ai-public-quota.service'
 
@@ -268,10 +271,73 @@ async function verifyControllerContract(): Promise<void> {
   console.log(`  PASS 静态核验：${GUARDED_HANDLERS.length} 个匿名 AI 端点均有限流 + 配额且未加认证门槛`)
 }
 
+// 跑真实 controller → 验签 → 真实日配额；不把身份解析复制到断言里。
+async function verifyTrustedTerminal(): Promise<void> {
+  const run = async (handler: 'chat' | 'voice' | 'parse', ticket: 'missing' | 'wrong' | 'valid' | 'gone', member = false) => {
+    setLimits(2, 2, 2)
+    process.env.AI_RESUME_PARSE_IP_DAILY_LIMIT = '2'
+    const redis = makeFakeRedis()
+    let validations = 0
+    const deps = {
+      jwt: { verify: () => ({ sub: 'member-1', jti: 'session-1' }) },
+      redis: { ...redis.service, get: async () => 'member-1' },
+      prisma: {
+        endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) },
+        terminal: { findUnique: async () => ticket === 'gone' ? null : { orgId: 'org-1' } },
+      },
+      terminalSessions: { validate: async () => { validations++; if (ticket === 'wrong') throw new Error('invalid') } },
+    } as unknown as AiCallerResolverDeps
+    const quota = new AiPublicQuotaService(redis.service)
+    const controller = new AiController(...(Array.from({ length: AiController.length }, () => ({})) as never[]))
+    Object.assign(controller, deps, {
+      publicQuota: quota, audit: { write: async () => undefined }, privacy: { requireActiveConsent: async () => undefined },
+      aiService: {
+        chatWithAssistant: async () => ({ sessionId: 's' }),
+        submitResumeParse: async () => ({ taskId: 'p', status: 'queued' }), getProviderName: () => 'stub',
+      },
+      asr: { activeProviderName: 'stub', recognizeWav: async () => ({ ok: true, text: '你好' }) },
+      logService: { record: (entry: { terminalId: string | null }) => assert.equal(entry.terminalId, ticket === 'valid' ? 'terminal-0' : null) },
+    })
+    const call = async (i: number, cached: boolean) => {
+      const headers = {
+        'x-terminal-id': ticket === 'valid' ? 'terminal-0' : `forged-${i}`,
+        ...(ticket === 'missing' ? {} : { 'x-terminal-session-token': 'ticket' }),
+        ...(member ? { authorization: 'Bearer member' } : {}),
+      }
+      const req = { headers, ip: '10.9.8.7' }
+      const invoke = () => handler === 'chat' ? controller.chatWithAssistant({ message: '你好' } as never, req)
+        : handler === 'voice' ? controller.transcribeAssistantVoice({ buffer: Buffer.from('RIFF____WAVEfmt ') } as Express.Multer.File, req)
+        : controller.submitResumeParse({ fileId: 'f', source: 'upload', fileFormat: 'pdf' } as never, req)
+      if (!cached) return invoke()
+      const context = lazyAiRequestContext(() => resolveAiCaller(headers, deps))
+      return runWithAiRequestContext(context, async () => {
+        await context.identity() // 模拟入口额度守卫已解析过身份。
+        return invoke()
+      })
+    }
+    await call(0, true)
+    await call(1, false) // 没有中间件的直接调用也必须验签。
+    await assert.rejects(() => call(2, true), (e: unknown) => e instanceof HttpException && e.getStatus() === 429)
+    const terminalKeys = [...redis.counts.keys()].filter(k => k.includes(':terminal:'))
+    assert.equal(terminalKeys.length, ticket === 'valid' ? 1 : 0, '伪造头/错票/不存在的终端不得创建池')
+    assert.equal([...redis.counts.keys()].filter(k => k.includes(':ip:')).length, 1, '连续换号仍只用同一 IP 池')
+    assert.equal([...redis.counts.keys()].filter(k => k.includes(':member:')).length, member ? 1 : 0, '登录会员仍计会员池')
+    assert.equal(validations, ticket === 'missing' ? 0 : 3, '每请求最多一次终端验签，缓存不能重复验签')
+  }
+  for (const handler of ['chat', 'voice', 'parse'] as const) {
+    for (const ticket of ['missing', 'wrong', 'valid', 'gone'] as const) await run(handler, ticket)
+    await run(handler, 'valid', true)
+  }
+  clearLimits()
+  delete process.env.AI_RESUME_PARSE_IP_DAILY_LIMIT
+  console.log('  PASS 三个 handler：换号不建池、合法票进终端池、会员池不变、守卫缓存复用、ASR 记账可信')
+}
+
 async function main(): Promise<void> {
   console.log('=== 匿名公网 AI 端点限流与日配额验证 ===')
   await verifyControllerContract()
   await verifyQuotaBehaviour()
+  await verifyTrustedTerminal()
   console.log('PASS: /assistant/chat 与 /resume/parse 已具备限流与日配额，且仍保持匿名可用')
 }
 
