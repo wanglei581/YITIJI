@@ -92,8 +92,8 @@
 |---|---|---|---|
 | 1 | 开始前 | 纸盒装满 A4；后台**本人登录**（密码不交给任何人或模型） | 5 分钟 |
 | 2 | R.1 过渡检查 | 手机扫屏上码传一份 PDF，看零元单出纸，拍出纸照片 | 10 分钟 |
-| 3 | R.2 升级 | 装 MSI、重跑一次生产安装脚本（KSK-001 加 `-KeepFileSelectionDialogs -KeepPrinterQueueUnpaused`） | 15 分钟 |
-| 3b | R.5 空闲断电 | 在没加 `-KeepPrinterQueueUnpaused` 的机器上，空闲时拔电再上电，确认残留作业不自己出纸 | 10 分钟 |
+| 3 | R.2 升级 | 装 MSI、重跑一次生产安装脚本（KSK-001 **只加** `-KeepFileSelectionDialogs`，发布当天**不加** `-KeepPrinterQueueUnpaused`，见 R.2；用命令行重跑，不用「控制中心」的按钮——它不带 `-KeepFileSelectionDialogs`，会把这台工作电脑上 Edge 的文件选择框整机禁掉，来源：`apps/terminal-agent/installer/provision/terminal-control-center.ps1:156-165`） | 15 分钟 |
+| 3b | R.5 空闲断电 | 在没加 `-KeepPrinterQueueUnpaused` 的机器上，空闲时拔电再上电（KSK-001 是笔记本，拔电有电池顶着，改为长按电源键强制关机），确认残留作业不自己出纸 | 10 分钟 |
 | 4 | C 打印闭环 | 手机扫码传文件，取纸拍照，看后台订单「已完成」 | 10 分钟 |
 | 5 | E 扫描回传 | 把一张**无个人信息**的样张放进进纸器，按面板扫描，看文档里出现 | 10 分钟 |
 | 6 | H 到机码 | 小程序下单拿码，到机输码，取纸拍照，看小程序订单「已完成」 | 10 分钟 |
