@@ -430,10 +430,8 @@ function verifyStatic() {
  */
 function verifyUnreadyHint() {
   // 审计页与工作台「最近操作」要把登记动作显示成中文，不露原始动作码（走查 r5 第 7 步）。
-  // 工作台「最近操作」已改用公共中文名表 src/lib/auditActionLabels.ts（#1141），审计页仍用自己的表。
-  for (const page of ['src/routes/audit/index.tsx', 'src/lib/auditActionLabels.ts']) {
-    expect(read(page).includes("'partner_account.contact_phone_registered': '登记机构联系人手机'"), `${page} 有「登记机构联系人手机」中文动作名`)
-  }
+  expect(read('src/lib/auditActionLabels.ts').includes("'partner_account.contact_phone_registered': '登记机构联系人手机'"), '公共审计表有登记动作中文名')
+  expect(read('src/routes/audit/index.tsx').includes('getAuditActionLabel(value)'), '审计筛选调用公共中文标签；列表实际渲染由 console-plain-copy 守')
   const manager = read('src/routes/partners/PartnerAccountManager.tsx')
   expect(!manager.includes('本系统不提供管理员绕过'), '旧提示「本系统不提供管理员绕过」已去掉')
   expect(!manager.includes('否则只能走独立线下核验'), '旧提示「否则只能走独立线下核验」已去掉')
