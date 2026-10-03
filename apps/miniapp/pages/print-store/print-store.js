@@ -50,7 +50,7 @@ Page({
       .catch(err => {
         this.setData({
           loading: false,
-          loadError: (err && err.error && err.error.message) || '加载终端列表失败，请重试',
+          loadError: (err && err.message) || '加载终端列表失败，请重试',
         })
       })
   },
