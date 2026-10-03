@@ -29,7 +29,7 @@
           <view class="cat tap {{category === item.value ? 'on' : ''}}" wx:for="{{categories}}" wx:key="value"
             hover-class="tap-press" data-value="{{item.value}}" bindtap="setCategory" role="button" aria-label="{{item.label}}">{{item.label}}</view>
         </view>
-        <view class="fb-note" wx:if="{{category === 'ai_content'}}">对 AI 生成的内容有异议，写清是哪个功能、大概什么时间、哪段内容有问题。我们在 {{aiReplyDays}} 个工作日内答复，答复在下方「我的反馈」里查看。</view>
+        <view class="fb-note" wx:if="{{aiEnabled && category === 'ai_content'}}">对 AI 生成的内容有异议，写清是哪个功能、大概什么时间、哪段内容有问题。我们在 {{aiReplyDays}} 个工作日内答复，答复在下方「我的反馈」里查看。</view>
         <view class="field-label">标题（选填）</view>
         <input class="fb-input" value="{{title}}" maxlength="80" placeholder="如：打印预览显示不完整" bindinput="onTitle" />
         <view class="field-label">反馈内容</view>

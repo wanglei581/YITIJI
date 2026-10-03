@@ -2,16 +2,17 @@
 // 官方动态流：政策 / 权益 / 通知。未登录可读；无点赞、无评论。
 const app = getApp()
 const api = require('../../utils/api')
+const aiEntries = require('../../utils/ai-entries')
 
 const PAGE_LIMIT = 20
 const KIND_LABEL = { policy: '政策', benefit: '权益', broadcast: '通知' }
 const KIND_TONE = { policy: 'teal', benefit: 'wheat', broadcast: 'plum' }
 const TAB_PATHS = {
   '/pages/home/home': true,
-  '/pages/ai/ai': true,
   '/pages/jobs/jobs': true,
   '/pages/me/me': true,
 }
+if (aiEntries.aiTab) TAB_PATHS[aiEntries.aiTab] = true
 
 function timeAgo(dateStr) {
   if (!dateStr) return ''
@@ -104,7 +105,7 @@ Page({
     openMiniappRoute(e.currentTarget.dataset.route)
   },
 
-  goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/ai/ai' }) } }) },
+  goBack() { wx.navigateBack({ fail() { if (aiEntries.aiTab) wx.switchTab({ url: aiEntries.aiTab }) } }) },
 
   onShareAppMessage() {
     return { title: '最新动态', path: '/pages/community/community' }

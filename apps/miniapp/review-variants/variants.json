@@ -1,0 +1,70 @@
+{
+  "_readme": [
+    "full 是仓库默认。no-ai 由 scripts/make-review-variant.mjs --variant no-ai 就地生成，--variant full 按 stash 逐字节还原。",
+    "aiPages 是 no-ai 要停放的页面目录：源码保留，不注册，追加进 project.config.json 的 packOptions.ignore。",
+    "daily-report 不在最初名单里，但它调用 getDailyBrief（POST /assistant/daily-report，ai: generate），一并停放。",
+    "指向这些页的路由字面量只写在 utils/ai-entries.js。no-ai 把该文件整份换成空版本，full 按 stash 还原。",
+    "print-upload、package-create、documents、kiosk-send 也调用带 ai: 标记的上传或打印隐私检查，但不停放：不含 AI 版的审核说明要保留上传文件、选择终端、生成到机码、到终端取件。"
+  ],
+  "full": {
+    "aiPages": [
+      "ai",
+      "assistant",
+      "resume-build",
+      "resume-voice",
+      "resume-upload",
+      "resume-diagnose",
+      "resume-optimize",
+      "resume-parse",
+      "interview-entry",
+      "interview-qa",
+      "interview-result",
+      "career-plan",
+      "self-explore",
+      "job-fit",
+      "ai-records",
+      "resumes",
+      "daily-report"
+    ],
+    "tabs": [
+      { "pagePath": "pages/home/home", "text": "首页", "icon": "home" },
+      { "pagePath": "pages/ai/ai", "text": "AI 工具", "icon": "robot" },
+      { "pagePath": "pages/print/print", "text": "打印", "icon": "printer" },
+      { "pagePath": "pages/me/me", "text": "我的", "icon": "user" }
+    ],
+    "primaryCategory": "工具>办公",
+    "categories": ["工具>办公", "工具>信息查询", "深度合成>AI 问答", "深度合成>AI 创作"],
+    "privacyCategories": ["手机号", "选中的照片或视频信息", "选中的文件", "麦克风", "剪切板"],
+    "reviewNote": "职易达是一款求职材料准备与文档打印工具：提供 AI 简历诊断与优化、模拟面试练习、职业规划参考、求职材料模板，以及把本人文档送到线下自助终端打印。本小程序不提供招聘信息、岗位投递或人力资源服务，不向任何单位提供用户简历。屏幕上的 AI 生成结果标注「AI 生成，仅供参考」；导出的文件内含符合国家标准的隐式标识。所用大模型名称与备案号见「关于我们 → AI 服务说明」。使用 AI 与录音前会先确认年满 14 周岁，录音另有单独同意，可在「我的 → 账号设置 → 隐私与数据」撤回。试运营期间打印免费，小程序内没有任何支付或购买功能。"
+  },
+  "no-ai": {
+    "aiPages": [
+      "ai",
+      "assistant",
+      "resume-build",
+      "resume-voice",
+      "resume-upload",
+      "resume-diagnose",
+      "resume-optimize",
+      "resume-parse",
+      "interview-entry",
+      "interview-qa",
+      "interview-result",
+      "career-plan",
+      "self-explore",
+      "job-fit",
+      "ai-records",
+      "resumes",
+      "daily-report"
+    ],
+    "tabs": [
+      { "pagePath": "pages/home/home", "text": "首页", "icon": "home" },
+      { "pagePath": "pages/print/print", "text": "打印", "icon": "printer" },
+      { "pagePath": "pages/me/me", "text": "我的", "icon": "user" }
+    ],
+    "primaryCategory": "工具>办公",
+    "categories": ["工具>办公", "工具>信息查询"],
+    "privacyCategories": ["手机号", "选中的照片或视频信息", "选中的文件", "剪切板"],
+    "reviewNote": "职易达是一款求职材料与文档打印工具：提供求职材料模板（按模板填写，不经过任何自动撰写），以及把本人文档送到线下自助终端打印（上传文件、选择终端、生成到机码、到终端扫码或输入到机码取件，可分享给代取人或作废换码）。本小程序不提供招聘信息、岗位投递或人力资源服务，不向任何单位提供用户简历。登录前会确认年满 14 周岁。试运营期间打印免费，小程序内没有任何支付或购买功能。"
+  }
+}

@@ -73,23 +73,23 @@ Page({
 
   // 现场助手四个入口。fairId 是这四页的必需参数,取不到就不跳——
   // 与其跳进去让下游页面报「缺少招聘会参数」,不如在这里就不给点。
-  _openFairPage(page) {
+  _openFairPage(url) {
     const id = this.data.pageId
-    if (!id) return
+    if (!id || !url) return
     // 真机上快速双击会压两次栈,用户要按两次返回才出得来。
     // 500ms 内只放行一次;navigateTo 失败也要解锁,否则这个入口会永久卡住。
     if (this._navBusy) return
     this._navBusy = true
     setTimeout(() => { this._navBusy = false }, 500)
     wx.navigateTo({
-      url: `/pages/${page}/${page}?fairId=${encodeURIComponent(id)}`,
+      url: url + '?fairId=' + encodeURIComponent(id),
       fail: () => { this._navBusy = false },
     })
   },
-  tapVenue()     { this._openFairPage('fair-venue') },
-  tapCompanies() { this._openFairPage('fair-companies') },
-  tapMaterials() { this._openFairPage('fair-materials') },
-  tapVisitPlan() { this._openFairPage('fair-visit-plan') },
+  tapVenue()     { this._openFairPage('/pages/fair-venue/fair-venue') },
+  tapCompanies() { this._openFairPage('/pages/fair-companies/fair-companies') },
+  tapMaterials() { this._openFairPage('/pages/fair-materials/fair-materials') },
+  tapVisitPlan() { this._openFairPage('/pages/fair-visit-plan/fair-visit-plan') },
 
   goBack() {
     wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } });

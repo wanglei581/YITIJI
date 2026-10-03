@@ -11,6 +11,7 @@
 import fs from 'node:fs'
 import { execSync } from 'node:child_process'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -29,7 +30,7 @@ function read(rel) {
 // 不跳过的话，从主仓运行本门禁会走进嵌套检出并 EISDIR 崩溃——
 // 也就是说开发者工具实际读的那份代码上，门禁从来没跑起来过。
 // 这两个目录本来就在 app.json 的 packOptions.ignore 里，不属于产物。
-const SKIP_DIRS = new Set(['.claude', 'node_modules', '.git'])
+const SKIP_DIRS = new Set(['.claude', 'node_modules', '.git', 'review-variants'])
 // 停放页 = packOptions.ignore 里的 pages/* 目录：不注册、不打包（首发按非招聘类目提审，compliance-boundary.md §1.1），门禁只查实际上传的范围。
 const PARKED_DIRS = new Set((JSON.parse(read('project.config.json')).packOptions?.ignore || []).filter((e) => e?.type === 'folder' && /^pages\//.test(e.value)).map((e) => e.value))
 
@@ -70,28 +71,29 @@ if (appJson) {
   else ok('页面四件套完整')
 
   const tab = appJson.tabBar || {}
-  const expected = [
-    { pagePath: 'pages/home/home', text: '首页' },
-    // tabBar 是 custom:true，真正渲染的文案在 custom-tab-bar/index.js，本门禁逼两处同时改。
-    // 首发（无人力资源服务许可证）：「职业生活圈」改名「AI 工具」，「求职」位让给「打印」。
-    { pagePath: 'pages/ai/ai', text: 'AI 工具' },
-    { pagePath: 'pages/print/print', text: '打印' },
-    { pagePath: 'pages/me/me', text: '我的' },
-  ]
+  const require = createRequire(import.meta.url)
+  const { VARIANT } = require(path.join(ROOT, 'utils/build-variant.js'))
+  const variantSpec = JSON.parse(read('review-variants/variants.json'))[VARIANT] || {}
+  // tabBar 是 custom:true，真正渲染的文案在 custom-tab-bar/index.js。下标随版本变，文案以 variants.json 为准。
+  const expected = (variantSpec.tabs || []).map(({ pagePath, text }) => ({ pagePath, text }))
   const tabOk = tab.custom === true &&
     Array.isArray(tab.list) &&
-    tab.list.length === 4 &&
+    tab.list.length === expected.length &&
+    expected.length > 0 &&
     tab.list.every((item, i) => item.pagePath === expected[i].pagePath && item.text === expected[i].text) &&
     // Tab 页必须在主包：微信不允许 tabBar 指向分包页面。
     tab.list.every((item) => (appJson.pages || []).includes(item.pagePath))
-  if (tabOk) ok('tabBar 四 Tab 配置正确')
-  else bad('tabBar 四 Tab 配置', JSON.stringify(tab))
+  if (tabOk) ok(`tabBar 与 ${VARIANT} 版本定义一致（${expected.length} 个）`)
+  else bad(`tabBar 与 ${VARIANT} 版本定义一致`, JSON.stringify(tab))
 
   const barJs = read('custom-tab-bar/index.js')
   const normalizePath = (p) => p.replace(/^\/+/, '')
+  const aiTabNorm = String(require(path.join(ROOT, 'utils/ai-entries.js')).aiTab || '').replace(/^\/+/, '')
   const barListOk = expected.every(({ pagePath, text }) => {
     const target = normalizePath(pagePath)
-    return barJs.includes(`pagePath: '/${target}'`) && barJs.includes(`text: '${text}'`)
+    const literal = barJs.includes(`pagePath: '/${target}'`)
+    const viaAiTab = Boolean(aiTabNorm) && target === aiTabNorm && /pagePath:\s*aiTab\b/.test(barJs)
+    return (literal || viaAiTab) && barJs.includes(`text: '${text}'`)
   })
   if (barListOk) ok('custom-tab-bar 与 app.json 一致')
   else bad('custom-tab-bar 与 app.json 一致', 'pagePath/text 不匹配')
@@ -120,6 +122,8 @@ const allowedTopLevel = new Set([
   'tools',
   'sitemap.json',
   'utils',
+  // 版本定义与还原用的 stash。已在 packOptions.ignore，不进上传包。
+  'review-variants',
 ])
 const generatedTopLevel = new Set([
   '.DS_Store',
@@ -296,17 +300,30 @@ if (!fails.some((x) => x.startsWith('JS 跳转目标已注册'))) ok('JS 跳转�
 // 于是 KIND_META 里的 route 字面量从来没被校验过，2026-09-02 就因此漏过一次
 // 「页面已存在但表里是空字符串」。这里把这类路由表单独捞出来查。
 {
-  const aiRecordsJs = read('pages/ai-records/ai-records.js')
-  const routes = [...aiRecordsJs.matchAll(/route:\s*'([^']*)'/g)].map((m) => m[1]).filter(Boolean)
-  const dead = routes
-    .map((t) => t.replace(/^\//, '').replace(/\/$/, ''))
-    .filter((t) => !pagePathSet.has(t))
-  if (routes.length === 0) {
-    bad('AI 记录路由表已注册', 'ai-records.js 里取不到任何 route 字面量——抽取失效，不要当作通过')
-  } else if (dead.length) {
-    bad('AI 记录路由表已注册', `指向未注册页面: ${[...new Set(dead)].join(',')}`)
+  if (!pagePathSet.has('pages/ai-records/ai-records')) {
+    ok('AI 记录页未注册，跳过路由表检查')
   } else {
-    ok(`AI 记录路由表全部已注册（${routes.length} 条）`)
+    const aiRecordsJs = read('pages/ai-records/ai-records.js')
+    const entriesSrc = read('utils/ai-entries.js')
+    const entryLiteral = (key) => {
+      const matched = entriesSrc.match(new RegExp(`const ${key} = '([^']*)'`))
+      return matched ? matched[1] : ''
+    }
+    const routes = []
+    for (const matched of aiRecordsJs.matchAll(/route:\s*(?:'([^']*)'|aiEntries\.([A-Za-z0-9_]+))/g)) {
+      const value = matched[1] || (matched[2] ? entryLiteral(matched[2]) : '')
+      if (value) routes.push(value)
+    }
+    const dead = routes
+      .map((t) => t.replace(/^\//, '').replace(/\/$/, ''))
+      .filter((t) => !pagePathSet.has(t))
+    if (routes.length === 0) {
+      bad('AI 记录路由表已注册', 'ai-records.js 里取不到任何 route 字面量——抽取失效，不要当作通过')
+    } else if (dead.length) {
+      bad('AI 记录路由表已注册', `指向未注册页面: ${[...new Set(dead)].join(',')}`)
+    } else {
+      ok(`AI 记录路由表全部已注册（${routes.length} 条）`)
+    }
   }
 }
 
@@ -1001,12 +1018,21 @@ else bad('到机码撤下与轮询停机', 'claimed/PrintTask 阶段不得继续
 const aiRecordsJs = read('pages/ai-records/ai-records.js')
 const jobFitJs = read('pages/job-fit/job-fit.js')
 const careerPlanJs = read('pages/career-plan/career-plan.js')
+const reviewVariantName = createRequire(import.meta.url)(path.join(ROOT, 'utils/build-variant.js')).VARIANT
+const aiEntriesJs = read('utils/ai-entries.js')
+function aiEntryBound(key, literal) {
+  return reviewVariantName !== 'full' || aiEntriesJs.includes(`const ${key} = '${literal}'`)
+}
 if (
   apiJs.includes('deleteMyAiRecord(recordId)') &&
-  aiRecordsJs.includes("route: '/pages/resume-diagnose/resume-diagnose'") &&
-  aiRecordsJs.includes("route: '/pages/resume-optimize/resume-optimize'") &&
-  aiRecordsJs.includes("route: '/pages/job-fit/job-fit'") &&
-  aiRecordsJs.includes("route: '/pages/career-plan/career-plan'") &&
+  aiRecordsJs.includes('route: aiEntries.resumeDiagnoseUrl') &&
+  aiRecordsJs.includes('route: aiEntries.resumeOptimizeUrl') &&
+  aiRecordsJs.includes('route: aiEntries.jobFitUrl') &&
+  aiRecordsJs.includes('route: aiEntries.careerPlanUrl') &&
+  aiEntryBound('resumeDiagnoseUrl', '/pages/resume-diagnose/resume-diagnose') &&
+  aiEntryBound('resumeOptimizeUrl', '/pages/resume-optimize/resume-optimize') &&
+  aiEntryBound('jobFitUrl', '/pages/job-fit/job-fit') &&
+  aiEntryBound('careerPlanUrl', '/pages/career-plan/career-plan') &&
   aiRecordsJs.includes('api.deleteMyAiRecord(record.id)') &&
   aiRecordsJs.includes("key: 'interview'") &&
   aiRecordsJs.includes('getMyMockInterviews') &&
@@ -1742,7 +1768,8 @@ const apiAppendAtEnd = /module\.exports = api;\s*\/\/[\s\S]*?api\.appendSelfAsse
 const appendUsesInPagePicker = appendPrintJs.includes('api.getMyDocuments')
   && appendPrintJs.includes('resume_upload')
   && appendPrintJs.includes('resume_scan')
-  && appendPrintJs.includes("url: '/pages/resume-upload/resume-upload'")
+  && appendPrintJs.includes('url: aiEntries.resumeUploadUrl')
+  && aiEntryBound('resumeUploadUrl', '/pages/resume-upload/resume-upload')
   && appendPrintJs.includes('api.appendSelfAssessmentToResume(this.data.taskId, resumeFileId, this._token)')
   && appendPrintJs.includes('/pages/print-upload/print-upload?name=${name}&fileId=${encodeURIComponent(fileId)}&pages=${pages}')
   && !/\bgetOpenerEventChannel\b/.test(appendPrintJs)
