@@ -115,8 +115,10 @@ async function resolveVerifiedTerminal(headers: HeaderBag, deps: AiCallerResolve
   let orgId: string | null = null
   try {
     const terminal = await deps.prisma.terminal.findUnique({ where: { id: terminalId }, select: { orgId: true } })
-    orgId = terminal?.orgId ?? null
+    if (!terminal) return { terminalId: null, terminalVerified: false, orgId: null }
+    orgId = terminal.orgId ?? null
   } catch {
+    // 会话令牌已验签通过，只是查机构失败：终端身份仍算已验签（否则数据库一抖动，整厅终端都会挤进同一个出口 IP 池）。
     orgId = null
   }
   return { terminalId, terminalVerified: true, orgId }

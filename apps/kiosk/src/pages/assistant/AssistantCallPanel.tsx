@@ -16,7 +16,7 @@ const ADVISOR_IMG = '/assets/ai-advisor.png'
 
 interface AssistantCallPanelProps {
   onClose: () => void
-  onSwitchToText: () => void
+  onSwitchToText: (expiredSubtitle?: string) => void
   /** 把 TRTC 的真实相位上报给舱面（标题 · 胶囊 · 语音通道读数）。 */
   onStateChange?: (state: CockpitVoiceState) => void
 }
@@ -64,6 +64,15 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
     return () => window.clearTimeout(focusTimer)
   }, [call.phase])
 
+  // 到点转文字只做一次：父组件回调引用变化或清理期间又来一条字幕，都不能再插一遍提示。
+  const expiredHandledRef = useRef(false)
+  useEffect(() => {
+    if (call.phase === 'expired' && !expiredHandledRef.current) {
+      expiredHandledRef.current = true
+      onSwitchToText(call.subtitle || '')
+    }
+  }, [call.phase, call.subtitle, onSwitchToText])
+
   const runExit = useCallback(async (afterEnd: () => void) => {
     if (endingRef.current) return
     endingRef.current = true
@@ -92,7 +101,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
   }, [runExit])
 
   const switchToText = useCallback(() => {
-    void runExit(onSwitchToText)
+    void runExit(() => onSwitchToText())
   }, [onSwitchToText, runExit])
 
   const retryCall = useCallback(async () => {
@@ -212,7 +221,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                   <small>尚未开放</small>
                 </span>
               </button>
-              <button type="button" className="assistant-voice-choice" onClick={onSwitchToText}>
+              <button type="button" className="assistant-voice-choice" onClick={() => onSwitchToText()}>
                 <KIcon name="chat" />
                 <span className="assistant-voice-choice-copy">
                   <strong>继续用文字</strong>
@@ -276,6 +285,10 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                   <i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
                 </div>
               </>
+            )}
+
+            {call.limitWarning && (
+              <p className="assistant-voice-privacy" role="status">本次语音通话还剩 1 分钟，到点会转成文字对话，可以继续问。</p>
             )}
 
             {call.needResume && call.phase === 'live' && (

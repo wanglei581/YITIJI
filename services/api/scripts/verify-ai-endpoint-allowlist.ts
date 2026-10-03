@@ -506,6 +506,7 @@ async function main(): Promise<void> {
     TRTC_SDK_APP_ID: '1400000000', TRTC_SDK_SECRET_KEY: 'stub-sdk-secret', TENCENT_SECRET_ID: 'stub-id',
     TENCENT_SECRET_KEY: 'stub-key', TRTC_LLM_API_KEY: 'stub-llm-key', TRTC_TTS_APP_ID: '1300000000',
   }
+  const trtcRegistry = { reserve: async () => undefined, activate: async () => undefined, sessionForTask: async () => null } as never
   const trtcCases: Array<[string, EnvPatch]> = [
     ['代调模型地址在境外（TRTC_LLM_API_URL）', { TRTC_LLM_API_URL: 'https://api.openai.com/v1/chat/completions' }],
     ['整段模型配置没写地址（落到厂商默认地址，核对不了）', { TRTC_LLM_CONFIG_JSON: '{"LLMType":"dify","APIKey":"x"}' }],
@@ -517,12 +518,12 @@ async function main(): Promise<void> {
   ]
   for (const [label, patch] of trtcCases) {
     resetFetchCount()
-    const error = await withEnv({ ...trtcEnv, ...patch }, () => caught(() => new TrtcService().startSession('user-verify')))
+    const error = await withEnv({ ...trtcEnv, ...patch }, () => caught(() => new TrtcService(trtcRegistry).startSession('user-verify')))
     check(`E5 数字人建房被拒：${label} → 503 AI_ENDPOINT_NOT_ALLOWED，未调腾讯云`, expectNotAllowed(error) && fetchedHosts.length === 0,
       `${JSON.stringify(httpErrorOf(error))} fetched=${fetchedHosts.join(',')}`)
   }
   resetFetchCount()
-  const stopError = await withEnv({ ...trtcEnv, AI_ENDPOINT_ALLOWLIST: 'api.deepseek.com' }, () => caught(() => new TrtcService().stopSession('task-1')))
+  const stopError = await withEnv({ ...trtcEnv, AI_ENDPOINT_ALLOWLIST: 'api.deepseek.com' }, () => caught(() => new TrtcService(trtcRegistry).stopSession('task-1')))
   check('E5b 结束对话同样过白名单：503 AI_ENDPOINT_NOT_ALLOWED（不报成「请重试」），未发出请求',
     expectNotAllowed(stopError) && fetchedHosts.length === 0, JSON.stringify(httpErrorOf(stopError)))
   resetFetchCount()
@@ -530,11 +531,11 @@ async function main(): Promise<void> {
     callTencentApi({ secretId: 'a', secretKey: 'b', region: 'ap-guangzhou', action: 'StopAIConversation', payload: { TaskId: 't' } })))
   check('E5c callTencentApi 本身（写死的主机）也过白名单', directError instanceof AiEndpointNotAllowedError && fetchedHosts.length === 0)
   resetFetchCount()
-  const session = await withEnv(trtcEnv, () => new TrtcService().startSession('user-verify'))
+  const session = await withEnv(trtcEnv, () => new TrtcService(trtcRegistry).startSession('user-verify'))
   check('E5d 数字人阳性对照：默认配置照常建房（1 个请求）', session.taskId === 'task-verify' && fetchedHosts.length === 1, `fetched=${fetchedHosts.join(',')}`)
   resetFetchCount()
   const tencentTts = await withEnv({ ...trtcEnv, TRTC_TTS_CONFIG_JSON: '{"TTSType":"tencent","AppId":1300000000,"SecretId":"a","SecretKey":"b","VoiceType":1008}' },
-    () => new TrtcService().startSession('user-verify'))
+    () => new TrtcService(trtcRegistry).startSession('user-verify'))
   check('E5e 阳性对照：整段语音合成配置用腾讯云自家类型时放行', tencentTts.taskId === 'task-verify' && fetchedHosts.length === 1)
 
   // ── 短信 ──
