@@ -10,7 +10,9 @@
  * "补贴已到账 / 已发放金额"等承诺性文案；本类型不含任何支付凭证。
  */
 
-export type BenefitType = 'coupon' | 'free_quota' | 'package_entitlement' | 'subsidy_eligibility_hint'
+export type BenefitType = 'coupon' | 'free_quota' | 'package_entitlement' | 'ai_quota' | 'subsidy_eligibility_hint'
+
+export type AiQuotaBucket = 'ai_resume' | 'ai_assistant' | 'ai_interview'
 
 export type BenefitStatus = 'active' | 'used_up' | 'expired' | 'revoked'
 
@@ -19,6 +21,7 @@ export type BenefitSourceType = 'platform' | 'campus' | 'gov' | 'fair' | 'partne
 export interface MemberBenefitItem {
   id: string
   benefitType: BenefitType
+  serviceKey?: AiQuotaBucket | null
   title: string
   description: string | null
   quantityTotal: number | null
