@@ -26,6 +26,13 @@
 - **政策信息源 / 机构政策公告**：标题最多两行 + 一行摘要，日期不折行，操作固定右侧；机构端紧急下架事由只显示「其他」（表单填写提示不变）。岗位信息源恢复「已发布 · 已过期」派生显示。
 - **岗位 / 招聘会 / 企业（托管 a 下关闭或只读）**：只统一表格外壳、截断与文案，闸门、紧急下架确认与不可恢复说明一字未动；机构后台企业 / 岗位 / 招聘会 / 政策四页拆出子组件，全部降到 500 行以内，企业表空态两种文案都能出现。
 - **门禁**：`verify-console-plain-copy` 扩到 `.ts` 显示映射，「**」只拦 Markdown 加粗、不拦 138****0001、ab***@x.com 这类脱敏打码；变异（恢复旧副标题、配置键回正文、表单提示回展示、过期状态丢失、未登记码同名、Markdown 加粗）均转红。验证：admin / partner typecheck，本批与图谱关联门禁全过；两后台四套 E2E 全过（114 / 140 / 69 / 138）。
+## 2026-09-30：简历「优化版」不再丢原件的段落与条目（W-OPT-LOSS，走查窗口报；分支 `claude/backend-hardening-20260930-resume-opt-no-loss`）
+
+- **问题：** 优化是让模型重写整份简历，服务端直接用模型回来的数组拼「优化版」，不以原件为底。五条必丢路径：模型整段没回（教育 / 经历 / 项目 / 技能 / 证书）就整段消失、不重试；缺字段条目被静默跳过（经历有公司没职务最常见）；描述硬截 600 字；原文超过 12000 字的部分没送模型；条目上限（教育 6、经历 8、项目 6）。线上现在就是这个行为，真模型同样会丢，不只是假模型。
+- **修法（Codex 实现两轮、协调方审）：** 新增 `resume-optimize-coverage.ts`，用原文里的事实行（单位加时间段、学校、诊断已归好的行、证书与技能段）建原件基线；第一次输出缺段或缺条目 → 第二次重试点名缺的段与原文行（只用送模型的遮盖文本）；仍缺、或第二次输出不合法 → 用第一次合法结果加原文补回，按原件顺序插回，修改清单写「<段名>（保持原文）：这一段没有改动，保留原文」，超长部分写「简历过长，未送 AI 优化」。有公司没职务的经历保留；描述上限提到 2000 字、超过判非法重试，不再腰斩；技能与证书按整段判覆盖，避免模型改写措辞后被重复补回。不改 GeneratedResume 结构、不动前端。
+- **协调方审出并改掉的：** 第一轮「第二次坏 JSON 就整单失败」的回归；后置标题下的杂句（照片、联系方式）被当成经历条目（完整门禁跑出）；技能逐行判覆盖会重复；第二轮 Codex 为迁就用例加的「模型编造姓名就跳过缺项重试」特例——已删除，改为把该用例的模型输出补齐。
+- **真模型只读探针：** `probe:resume-optimize-live`（`scripts/check-resume-optimize-live.ts`），4 份虚构简历，密钥只经 `LlmConfigService` 读、不打印；不写数据库、不写 AI 用量记录；调用上限写死 8，第 9 次在发请求前拒绝；只输出每份一行结构统计。离线门禁 `verify:resume-optimize-live-gate` 钉住这四条，挂在 `verify:resume-optimize` 前面。随第五次更新上线后由总指挥在服务器上跑一次。
+- **验证：** verify:resume-optimize 新增 W-OPT-LOSS (a)–(h) 与顺序、第二次坏 JSON 回退两条；协调方在真端口下跑 12 条关联门禁全绿（含 resume-diagnosis-context、verify-real-resume-diagnosis、resume-layout-adjust、llm-input-pii-mask、ai-cost-coverage、ai-feature-keys、ai-safety-aigc、resume-generate、ci-gate-coverage）；协调方反向变异 7 处全红（不补回、第二次坏 JSON 不回退、后置标题可新建条目、技能逐行判覆盖、补回堆末尾、探针上限改 9，另核对主门禁单独也能抓住不补回）。
 ## 2026-10-01：main CI 两处红的紧急修复——axios 7 条高危、PG 并发门禁偶发（分支 `claude/axios-ghsa-pg-retry-1001-main`）
 
 - **axios 1.18.1 → 1.20.0**：9/30 发布 7 条 HIGH（GHSA-c29m-xwm3-cm6r、GHSA-mghh-pgcx-3jjj、GHSA-x97p-jq2g-jp4f、GHSA-3pq3-5fj3-cg6v、GHSA-542g-h47m-68v8、GHSA-m8m8-qj5v-23w3、GHSA-r4gj-5m52-g5wh），`verify:dependency-security` 把 main 和所有 PR 卡住。axios 只有一个引入方：`apps/terminal-agent` 的直接依赖，直接升版，锁文件只变 axios，未加 override、未加豁免。
