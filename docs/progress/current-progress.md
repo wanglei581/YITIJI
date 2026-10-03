@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-10-02：可串行化冲突重试前加短暂随机等待；并发门禁按调用方分别计数（分支 `claude/backend-hardening-20261002-serializable-retry-wait`）
+
+- **问题：** 10/1 main CI 上 `verify:pg-serialization-conflict:postgres` 偶发红：期望事务恰好 3 次，实际 4 次。成因是输的一方拿到冲突后**立刻**重试，新快照可能早于赢家提交可见，读到旧状态再冲突一次。结果仍正确，但白耗一次重试额度；连撞到 3 次上限会把冲突原样抛成 500。
+- **修法：** `serialization-conflict.ts` 新增共用的 `waitBeforeSerializationRetry`（第 n 次重试等约 n × 10–50 毫秒的随机量），三处没有等待的重试循环都用上：机构账号删除（admin-orgs）、机构手机号换绑（partner-phone-rebind）、会员隐私事务（member-privacy）。门禁屏障加 `asCaller` 与按调用方计数，断言被拒的一方至少 2 次、任何一方不超过 3 次、两方之和等于总数。「总数」那条断言本分支没动，由进 main 的紧急修复放宽为 3–6 后随 main 并回候选。
+- **验证（本机临时 PostgreSQL 16 真跑）：** 有等待 40 次全过；把机构账号那处等待去掉再跑 40 次，7 次失败，失败信息正是 `4 !== 3`——成因与修复效果都坐实。新断言反向变异（不按调用方计数）变红；同屏障的打印重试锁 PG 门禁通过。SQLite 侧 20 条关联门禁与 api typecheck 全绿。首个管理员引导的 PG 门禁有自己的目标库保护，本机没跑，交给 CI。
+## 2026-10-01：现场验收单 R.4 表格与 R.2 正文对齐（只改文档，分支 `claude/runsheet-r4-row3-1001`）
+
+- **改了什么：** 现场验收单 R.4 一页纸表格第 3 行原写「KSK-001 加 `-KeepFileSelectionDialogs -KeepPrinterQueueUnpaused`」，和 R.2 正文「发布当天 KSK-001 不加 `-KeepPrinterQueueUnpaused`」矛盾。改为只加 `-KeepFileSelectionDialogs`，并写明用命令行重跑、不用控制中心的按钮（控制中心不带这个开关，会把工作电脑上 Edge 的文件选择框整机禁掉）。第 3b 行补一句：KSK-001 是笔记本，空闲断电用长按电源键强制关机代替。
+- **为什么：** 9/30 给产品负责人备 0.4.13 升级的一页纸时照表格写错过一次，已当场更正。没有改代码、门禁或产品行为。
 ## 2026-10-03：两个后台 UI 第 4 批 r2（本地返工，待协调方浏览器复验）
 
 基线 `49517399c6101cd2f7b9952212a15dd9811b8028`，仍在 `codex/consoles-ui-batch4-20260930`：仅修现有审计、机构联系电话展示、隐私工单交互及既有 E2E/文案门禁，预算 10 个现有文件及生成图谱；方案复用现有抽屉、用户/任务状态中文映射，不新增文件、页面、路由、模型、服务或依赖，不改 API、招聘内容、简历、打印、生产配置、数据库、密钥或硬件链路。审计键改为拆词匹配，嵌套字符串 JSON 递归脱敏，签名键值对/URL、格式化手机、邮箱与 Bearer 隐藏，坏 JSON 撤去原文折叠，仅说明字符数和服务器查阅方式；联系电话在各 app 内各一处使用相同规则（已有掩码保留、标准手机号前 3 后 4、其它 ≥7 位前 3 后 2、短值「已登记」、空值「—」），User-Agent 仅悬停，查看范围中文化，选中文字时捕获并阻止按钮/行点击，隐私空列表不显示游标栏。两端 typecheck、改动文件 eslint、指定门禁及图谱关联门禁通过（API 用量留存复用当前生成客户端，在 `/private/tmp` 自建 SQLite、66 条检查通过并清理）；敏感词表去 token、key 恢复包含匹配、坏 JSON 恢复原文、电话恢复仅认 11 位四处变异均退出 1，逐字节恢复后均退出 0，SHA-256 和变异前后 diffstat 一致；图谱已重生成并 `graph:check` 通过。已读取协调方改后截图及两份 E2E 日志并据此返工，保留未知值断言，补缓存键、密钥、嵌套 JSON、签名 URL、坏 JSON 和划选文字用例；本轮仅 E2E 用例发现，未启动服务或浏览器，更新后截图/E2E 仍待协调方，不代表 CI、设备或生产验收；改动留在工作区，不提交、不推送。
@@ -17,6 +26,12 @@
 - **验证：** 现有 `verify-resume-diagnosis-flow-ui.mjs` 增补源码执行断言，覆盖未预选、通用提交、本人选项、密码回调、普通/损坏 PDF 与失败 CTA；首轮通过。两次恢复旧行为的变异都退出 1：W-107 由「行业、经验、求职场景均不预选」断言拦住；W-108 由「加密文件只给重新选择文件」断言拦住。变异均已恢复修复版。kiosk `tsc -b` 退出 0；6 个改动源码/门禁文件 eslint 退出 0（共用 PDF 预览新增非组件导出有 1 条 Fast Refresh 开发提示，无错误）。图谱点名的 16 个 kiosk 门禁退出 0（含简历流程的报告/decisions/单测闭包）；关联两份进度文档的 11 个 API 门禁退出 0。API 复用已有 `.pnpm/node_modules`，留存门禁用当前 schema 在临时目录生成客户端和隔离 SQLite，66 条检查通过，临时产物已删除，未写 API 目录。`verify:compliance-copy`（含其 3 项闭包）、`verify:ci-gate-coverage`、`verify:repository-integrity` 退出 0；未安装依赖。
 - **提交状态：** `git add` 退出 128，沙箱拒绝创建共享 Git 元数据中的 `index.lock`。未暂存、未提交；8 个文件保留在本工作区，由协调方代提交。
 - **证据边界：** 仅本地源码/门禁验证，未运行 Playwright、真机、CI 或生产发布；Playwright 由协调方跑。
+## 2026-10-01：main CI 两处红的紧急修复——axios 7 条高危、PG 并发门禁偶发（分支 `claude/axios-ghsa-pg-retry-1001-main`）
+
+- **axios 1.18.1 → 1.20.0**：9/30 发布 7 条 HIGH（GHSA-c29m-xwm3-cm6r、GHSA-mghh-pgcx-3jjj、GHSA-x97p-jq2g-jp4f、GHSA-3pq3-5fj3-cg6v、GHSA-542g-h47m-68v8、GHSA-m8m8-qj5v-23w3、GHSA-r4gj-5m52-g5wh），`verify:dependency-security` 把 main 和所有 PR 卡住。axios 只有一个引入方：`apps/terminal-agent` 的直接依赖，直接升版，锁文件只变 axios，未加 override、未加豁免。
+- **`verify:pg-serialization-conflict:postgres`**：事务次数断言由「恰好 3」改为 3–6。输方重试时的新快照可能早于赢家提交可见而再冲突、再重试一次（main CI 36798144531 实测 4，属正确行为）；下限 3 不放宽，每个调用方上限 3 次；「恰好一个成功、一个 409、只剩 1 个有效账号、1 条审计」不动。重试之间加随机等待是产品侧小加固，后端窗口另开。
+- **验证**：干净安装后依赖门禁 ALL PASS（高危、严重均 0）；installer-inputs、terminal-agent tsc 通过；本机一次性 PostgreSQL 16 + Redis 上并发门禁连跑 6 次全过。变异：axios 退回 1.18.1 依赖门禁退出码 1；把冲突判定改成不重试并发门禁退出码 1；恢复后均为 0。
+
 ## 2026-09-29：两条慢门禁提速——Redis 降级与错误可观测性（分支 `claude/backend-hardening-20260929-gate-speedup`，叠在 #1135 上）
 
 - **时间花在哪（Grok 查、协调方核）：** 两条门禁都把 REDIS_URL 指到死端口起真实服务；ioredis 默认每条命令重试 20 次（约 10 秒到 40 秒），启动探测默认用满 5 秒，隐私调度注册默认用满 8 秒。

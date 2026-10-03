@@ -59,9 +59,10 @@ async function main(): Promise<void> {
     const admin = { userId: adminId, role: 'admin' as const, orgId: null }
     const binding = { adminTokenVersion: 0, partnerTokenVersion: 0 }
 
+    const callers = ['first', 'second'] as const
     const results = await Promise.allSettled([
-      service.deleteAccount(orgId, firstId, admin, binding),
-      service.deleteAccount(orgId, secondId, admin, binding),
+      racing.asCaller(callers[0], () => service.deleteAccount(orgId, firstId, admin, binding)),
+      racing.asCaller(callers[1], () => service.deleteAccount(orgId, secondId, admin, binding)),
     ])
 
     assert.equal(racing.afterRead.timedOut, false, 'both transactions must read before either writes (race not forced)')
@@ -83,7 +84,25 @@ async function main(): Promise<void> {
     assert.equal(apiCode(reason), 'LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED')
     passed += 1
 
-    assert.equal(racing.transactionCalls, 3, 'loser must be retried exactly once (2 first attempts + 1 retry)')
+    // 赢的一方 1 次；输的一方至少重试 1 次（证明 COMMIT 上的冲突被认出来并重试了）。
+    // 输方重试时的新快照可能早于赢家提交可见，于是再冲突、再重试一次，所以 4 也是正确行为
+    // （2026-10-01 main CI 实测到 4）。每个调用方上限 3 次尝试（withSerializableRetry），合计不超过 6。
+    // 下限 3 不能放宽：不重试的写法只有 2 次。
+    assert.ok(
+      racing.transactionCalls >= 3 && racing.transactionCalls <= 6,
+      `loser must be retried at least once and each caller makes at most 3 attempts; got ${racing.transactionCalls}`,
+    )
+    passed += 1
+
+    // 按调用方分别计：被拒的一方至少发起过 2 次事务（首发 + 至少一次重试），任何一方不超过
+    // withSerializableRetry 的 3 次上限；两方之和就是上面的总数（没有漏记到标记之外的事务）。
+    const loser = callers[results.findIndex((result) => result.status === 'rejected')]!
+    const winner = callers[results.findIndex((result) => result.status === 'fulfilled')]!
+    const loserCalls = racing.transactionCallsOf(loser)
+    const winnerCalls = racing.transactionCallsOf(winner)
+    assert.ok(loserCalls >= 2 && loserCalls <= 3, `refused caller must retry at least once, at most 3 attempts; got ${loserCalls}`)
+    assert.ok(winnerCalls >= 1 && winnerCalls <= 3, `winning caller makes 1 to 3 attempts; got ${winnerCalls}`)
+    assert.equal(loserCalls + winnerCalls, racing.transactionCalls, 'every transaction must be attributed to a caller')
     passed += 1
 
     assert.equal(await prisma.user.count({ where: { orgId, role: 'partner', enabled: true, deletedAt: null } }), 1)
@@ -92,7 +111,7 @@ async function main(): Promise<void> {
     }), 1, 'the refused delete must not leave an audit row')
     passed += 1
 
-    console.log(`verify-pg-serialization-conflict-postgres: ${passed}/5 PASS`)
+    console.log(`verify-pg-serialization-conflict-postgres: ${passed}/6 PASS`)
   } finally {
     await prisma.auditLog.deleteMany({ where: { OR: [{ actorId: adminId }, { targetId: orgId }] } })
     await prisma.user.deleteMany({ where: { OR: [{ id: adminId }, { orgId }] } })
