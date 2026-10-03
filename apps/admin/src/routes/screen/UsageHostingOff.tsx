@@ -1,7 +1,7 @@
 import { screenAiProvider } from './aiScreenDisplay'
 import type { ScreenUsageSnapshot } from '@ai-job-print/shared'
 import { SCREEN_HOSTING_OFF_NOTE, TwinBarList, TwinMetricPanel, TwinTiles, twinSmall } from '@ai-job-print/ui'
-import { aiOperationLabel } from './metricLabels'
+import { aiOperationRows } from './metricLabels'
 
 /**
  * 服务调用在招聘内容托管关闭（托管 a）时的右栏三块。
@@ -9,12 +9,12 @@ import { aiOperationLabel } from './metricLabels'
  * 「岗位信息使用」整块是招聘内容（服务端给的是 recruitment_hosting_disabled），不再渲染；
  * 它的块位给「AI 质量」：成功率、平均耗时、降级兜底、调用失败从「AI 服务」里搬出来单独成块，
  * 「AI 服务」腾出的地方给功能分项与模型构成。右下「信息内容浏览」换成「政策服务使用」，
- * 并在这里说一次边界（全屏唯一一处）。所有数字都是服务调用快照里已有的，少于 5 写「少于 5」。
+ * 并在这里说一次边界（全屏唯一一处）。所有数字都是服务调用快照里已有的；0 保留，1–4 写「少于 5」。
  */
 
 type UsageMetrics = ScreenUsageSnapshot['metrics']
 
-const AI_SOURCE = 'AI 服务日志：按功能计次（成功与失败都算一次调用），模型按调用方记录的提供方统计；成本只加已采集的估算，是按单价估算、不是账单。少于 5 次不显示。'
+const AI_SOURCE = 'AI 服务日志：按功能计次（成功与失败都算一次调用），模型按调用方记录的提供方统计；成本只加已采集的估算，是按单价估算、不是账单。1 至 4 次不给数字，写『少于 5』；0 照常显示。'
 
 export function UsageAiPanel({ metric, rangeText, presenting }: { metric: UsageMetrics['ai']; rangeText: string; presenting: boolean }) {
   return (
@@ -26,8 +26,8 @@ export function UsageAiPanel({ metric, rangeText, presenting }: { metric: UsageM
       render={(value) => (
         <>
           <TwinBarList
-            items={value.byOperation
-              .map((row) => ({ label: aiOperationLabel(row.operation, true), value: row.count === null ? 0 : row.count, valueText: twinSmall(row.count) }))
+            items={aiOperationRows(value.byOperation, true)
+              .map((row) => ({ label: row.label, value: row.count === null ? 0 : row.count, valueText: twinSmall(row.count) }))
               .sort((a, b) => b.value - a.value)
               .slice(0, presenting ? 4 : 6)}
             emptyText="所选时间内没有 AI 调用"
@@ -60,7 +60,7 @@ export function UsageAiQualityPanel({ metric, rangeText }: { metric: UsageMetric
       title="AI 质量"
       sub={rangeText}
       metric={metric}
-      source={`${rangeText}窗口；成功率 = 成功 ÷（成功 + 失败）；平均耗时只算成功调用；降级兜底统计未就绪兜底模型的调用，不是日志状态；调用失败含超时与上游拒绝。大于 0 且少于 5 次写「少于 5」，不显示具体次数。`}
+      source={`${rangeText}窗口；成功率 = 成功 ÷（成功 + 失败）；平均耗时只算成功调用；降级兜底统计未就绪兜底模型的调用，不是日志状态；调用失败含超时与上游拒绝。1 至 4 次不给数字，写『少于 5』；0 照常显示。`}
       render={(value) => (
         <>
           <TwinTiles

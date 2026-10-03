@@ -1,4 +1,12 @@
 export function verifyScreenDetails({ read, check, stripComments, screenFiles, partnerLabels, copyBlock, twinShell, css }) {
+const countRule = '1 至 4 次不给数字，写『少于 5』；0 照常显示'
+for (const path of ['apps/admin/src/routes/screen/UsageView.tsx', 'apps/admin/src/routes/screen/UsageHostingOff.tsx',
+  'apps/partner/src/routes/screen/PartnerUsageView.tsx', 'apps/partner/src/routes/screen/PartnerUsageHostingOff.tsx']) {
+  const source = read(path)
+  check(source.includes(countRule) && !source.includes('少于 5 次不显示'), `${path}统一 0 / 1–4 口径`)
+}
+check((read('apps/admin/src/routes/screen/UsageView.tsx').match(/value\.paidOrders >= 5/g) ?? []).length === 2,
+  '会员下单占比分母 ≥5 才给百分比，0 不作为足够样本')
 // ── 14A. 页眉标题层级 ─────────────────────────────────────────────────────
 // 大屏嵌在 Admin / Partner 的 Page 里时，外层 PageHeader 已经是 h1；
 // 大屏页眉再渲染一个 h1 就是一页两个 h1 —— 读屏器读不出主次，

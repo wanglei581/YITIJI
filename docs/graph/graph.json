@@ -17878,6 +17878,7 @@
       "scripts/verify-compliance-copy.mjs"
     ],
     "apps/admin/package.json": [
+      "apps/admin/scripts/verify-console-screen-ui.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
     ],
@@ -18276,7 +18277,8 @@
       "apps/admin/scripts/verify-console-batch5-copy.mjs"
     ],
     "apps/admin/src/routes/screen/UsageHostingOff.tsx": [
-      "apps/admin/scripts/verify-console-batch5-copy.mjs"
+      "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-screen-details.mjs"
     ],
     "apps/admin/src/routes/screen/UsageView.tsx": [
       "apps/admin/scripts/verify-console-screen-details.mjs"
@@ -22160,6 +22162,10 @@
     "packages/ui/src/screen/screenCopy.ts": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
+    "packages/ui/src/screen/twin/TwinCharts.tsx": [
+      "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
+    ],
     "packages/ui/src/screen/twin/TwinFrame.tsx": [
       "apps/admin/scripts/verify-console-screen-details.mjs"
     ],
@@ -22174,7 +22180,8 @@
     ],
     "packages/ui/src/screen/twin/TwinTerminalBoard.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
-      "apps/admin/scripts/verify-console-screen-details.mjs"
+      "apps/admin/scripts/verify-console-screen-details.mjs",
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "packages/ui/src/styles/fusion-youth.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
@@ -24343,6 +24350,7 @@
       "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/src/console-screen/console-screen.usage.queries.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts",
       "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/src/console-screen/console-screen.usage.service.ts": [
@@ -27201,6 +27209,7 @@
           "apps/admin/src/routes/toolbox/components/ToolboxGovernancePanel.tsx",
           "apps/admin/src/routes/toolbox/constants.ts",
           "apps/partner/src/routes/screen/PartnerTerminalView.tsx",
+          "packages/ui/src/screen/twin/TwinCharts.tsx",
           "packages/ui/src/screen/twin/TwinTerminalBoard.tsx"
         ],
         "missing": []
@@ -27311,6 +27320,7 @@
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/screen/GovGrid.tsx",
+          "apps/admin/src/routes/screen/UsageHostingOff.tsx",
           "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/admin/src/routes/screen/screenTabs.ts",
           "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
@@ -27339,6 +27349,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/package.json",
           "apps/admin/scripts/verify-console-screen-details.mjs",
           "apps/admin/src/routes/screen/GovGrid.tsx",
           "apps/admin/src/routes/screen/index.tsx",
@@ -27357,9 +27368,11 @@
           "packages/ui/src/screen/ScreenFrame.tsx",
           "packages/ui/src/screen/ScreenPrimitives.tsx",
           "packages/ui/src/screen/screenCopy.ts",
+          "packages/ui/src/screen/twin/TwinCharts.tsx",
           "packages/ui/src/screen/twin/TwinInfoFlow.tsx",
           "packages/ui/src/screen/twin/TwinPanel.tsx",
           "packages/ui/src/screen/twin/TwinShell.tsx",
+          "packages/ui/src/screen/twin/TwinTerminalBoard.tsx",
           "packages/ui/src/styles/ops-screen-blocks.css",
           "packages/ui/src/styles/ops-screen-scale.css",
           "packages/ui/src/styles/ops-screen.css",
@@ -35051,6 +35064,7 @@
           "services/api/src/console-screen/console-screen.timeline.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.types.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/console-screen/console-screen.usage.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/admin-terminals.controller.ts",

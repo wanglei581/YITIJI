@@ -13,9 +13,13 @@ export function verifyBatch5Copy({ runFile, textOf, shared, ui, hooks, repoRoot,
     TwinPanel: children, TwinSlot: children,
     TwinTiles: ({ items }) => items.map((item) => [item.label, item.value, item.unit]),
     TwinBarList: ({ items }) => items.map((item) => [item.label, item.valueText ?? item.value]),
-    screenCount: shared.formatCount, twinSmall: (n) => n === null || n > 0 && n < 5 ? '少于 5' : shared.formatCount(n),
+    screenCount: shared.formatCount,
     twinTerminalState: () => 'ok', TWIN_STATE_TEXT: { ok: '在线' },
   }, { get: (target, key) => target[key] ?? children })
+  const charts = runFile('packages/ui/src/screen/twin/TwinCharts.tsx', {
+    '../../lib/cn': { cn: () => '' }, '../ScreenPrimitives': { screenCount: shared.formatCount }, './TwinReasonChip': {},
+  })
+  screenUi.twinSmall = charts.twinSmall
   const assertText = (node, phrases, forbidden = []) => {
     const text = textOf(node).replace(/\s+/g, ' ').trim()
     for (const phrase of phrases) assert.ok(text.replace(/\s+/g, '').includes(phrase.replace(/\s+/g, '')), `实际渲染缺少 ${phrase}`)
@@ -50,14 +54,19 @@ export function verifyBatch5Copy({ runFile, textOf, shared, ui, hooks, repoRoot,
     const panels = runFile('apps/admin/src/routes/screen/UsageHostingOff.tsx', {
       '@ai-job-print/shared': shared, '@ai-job-print/ui': screenUi, './metricLabels': labels, './aiScreenDisplay': display,
     })
-    const value = { byOperation: [{ operation: 'parseResume', count: 10 }, { operation: 'chatAssistant', count: null }, { operation: 'future_op', count: 6 }],
+    const unknownRows = labels.aiOperationRows([{ operation: 'new_a', count: 0 }, { operation: 'parseResume', count: 6 }, { operation: 'new_b', count: null }])
+    assert.equal(unknownRows[0].label, '其他 AI 服务（1）')
+    assert.equal(unknownRows[0].count, 0)
+    assert.equal(unknownRows[2].label, '其他 AI 服务（2）')
+    assert.equal(unknownRows[2].count, null)
+    const value = { byOperation: [{ operation: 'parseResume', count: 10 }, { operation: 'chatAssistant', count: null }, { operation: 'future_op', count: 6 }, { operation: 'another_future_op', count: null }, { operation: 'careerPlan', count: 0 }],
       providers: [{ provider: 'llm:deepseek:deepseek-v4-flash', label: 'llm:deepseek:deepseek-v4-flash', count: 10 },
         { provider: 'AI_PROVIDER_ERROR', label: 'AI_PROVIDER_ERROR', count: null },
         { provider: 'ServiceUnavailableException', label: 'ServiceUnavailableException', count: 5 }],
       estimatedCostCny: null, successRate: null, avgLatencyMs: null, fallbackCalls: null, failed: 0, total: 21 }
     assertText(panels.UsageAiPanel({ metric: { available: true, value }, rangeText: '今日', presenting: false }),
-      ['简历解析', 'AI 对话', '其他 AI 服务', 'DeepSeek · deepseek-v4-flash', '模型厂商服务异常', 'AI 服务暂时不可用', '少于 5'],
-      ['llm:deepseek', 'parseResume', 'chatAssistant', 'future_op', 'ServiceUnavailableException', 'AI_PROVIDER_ERROR'])
+      ['简历解析', 'AI 对话', '其他 AI 服务（1）', '其他 AI 服务（2）', '职业规划 0', 'DeepSeek · deepseek-v4-flash', '模型厂商服务异常', 'AI 服务暂时不可用', '少于 5'],
+      ['llm:deepseek', 'parseResume', 'chatAssistant', 'future_op', 'another_future_op', 'ServiceUnavailableException', 'AI_PROVIDER_ERROR'])
     assertText(panels.UsageAiQualityPanel({ metric: { available: true, value }, rangeText: '近 7 天' }),
       ['近 7 天窗口', '降级兜底', '不是日志状态', '少于 5', '样本不足'])
     const gov = runFile('apps/admin/src/routes/screen/GovGrid.tsx', {
@@ -67,7 +76,7 @@ export function verifyBatch5Copy({ runFile, textOf, shared, ui, hooks, repoRoot,
     assertText(gov.TaskFlow({ printByStatus: { cancelled: 7 }, scanByStatus: { cancelled: 12, completed: 5 } }), ['7 已取消（打印）', '5 扫描完成'], ['12 已取消'])
     assert.ok(read('apps/admin/src/routes/screen/GovGrid.tsx').includes('<span>AI 服务调用（累计）</span>'))
     const ops = read('apps/admin/src/routes/screen/OpsGrid.tsx')
-    for (const phrase of ['近 24 小时', '这里不统计兜底模型次数', '所选窗口', '少于 5']) assert.ok(ops.includes(phrase))
+    for (const phrase of ['近 24 小时成功率，0 次不给百分比；兜底模型次数见服务调用页。']) assert.ok(ops.includes(phrase))
     const board = runFile('packages/ui/src/screen/twin/TwinTerminalBoard.tsx', {
       '../ScreenPrimitives': screenUi, '../screenCopy': {}, './TwinDevice': screenUi, './TwinCharts': screenUi,
       './TwinCity': screenUi, './TwinFrame': screenUi, './TwinPanel': screenUi,

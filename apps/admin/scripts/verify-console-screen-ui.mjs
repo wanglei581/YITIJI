@@ -17,6 +17,9 @@ import { verifyScreenDetails } from './verify-console-screen-details.mjs'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
+import vm from 'node:vm'
+import { createRequire } from 'node:module'
 
 const adminRoot = fileURLToPath(new URL('..', import.meta.url))
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url))
@@ -54,6 +57,30 @@ function stripComments(source) {
 }
 
 console.log('\n=== 数据大屏前端门禁 ===')
+
+// 从真实源码执行展示函数，并用 React 渲染文字；不在门禁里重写小样本规则。
+function actualFunction(path, name, bindings = {}) {
+  const ast = ts.createSourceFile(path, read(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const fn = ast.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === name)
+  if (!fn) throw new Error(`缺少真实函数 ${path}:${name}`)
+  const output = ts.transpileModule(`${fn.getText(ast)}\nmodule.exports = ${name}`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+  const mod = { exports: {} }
+  vm.runInNewContext(output, { module: mod, exports: mod.exports, ...bindings })
+  return mod.exports
+}
+const screenCount = actualFunction('packages/ui/src/screen/ScreenPrimitives.tsx', 'screenCount')
+const twinSmall = actualFunction('packages/ui/src/screen/twin/TwinCharts.tsx', 'twinSmall', { screenCount })
+const terminalSmall = actualFunction('packages/ui/src/screen/twin/TwinTerminalBoard.tsx', 'smallCount', { screenCount })
+const uiRequire = createRequire(join(repoRoot, 'apps/admin/package.json'))
+const { createElement } = uiRequire('react')
+const { renderToStaticMarkup } = uiRequire('react-dom/server')
+for (const [name, format] of [['服务调用 / 信息使用', twinSmall], ['终端孪生', terminalSmall]]) {
+  check(renderToStaticMarkup(createElement('span', null, format(0))) === '<span>0</span>', `${name}真实函数：0 渲染为 0`)
+  check(renderToStaticMarkup(createElement('span', null, format(null))) === '<span>少于 5</span>', `${name}真实函数：null 渲染为 少于 5`)
+}
+
 
 const SCREEN_DIRS = [
   'apps/admin/src/routes/screen',

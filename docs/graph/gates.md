@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1810 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1811 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -161,7 +161,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `apps/admin/package.json` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-data-request-ui.mjs` |
+| `apps/admin/package.json` | `verify-console-screen-ui.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-data-request-ui.mjs` |
 
 </details>
 
@@ -283,7 +283,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/screen/GovGrid.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/OpsGrid.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/TerminalTwinView.tsx` | `verify-console-batch5-copy.mjs` |
-| `apps/admin/src/routes/screen/UsageHostingOff.tsx` | `verify-console-batch5-copy.mjs` |
+| `apps/admin/src/routes/screen/UsageHostingOff.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-details.mjs` |
 | `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-screen-details.mjs` |
 | `apps/admin/src/routes/screen/aiScreenDisplay.ts` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
@@ -1820,7 +1820,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/ui/src/</code> — 28 个文件</summary>
+<summary><code>packages/ui/src/</code> — 29 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1835,11 +1835,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/ui/src/screen/ScreenFrame.tsx` | `verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/ScreenPrimitives.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/screenCopy.ts` | `verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/twin/TwinCharts.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinFrame.tsx` | `verify-console-screen-details.mjs` |
 | `packages/ui/src/screen/twin/TwinInfoFlow.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinPanel.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinShell.tsx` | `verify-console-screen-ui.mjs` |
-| `packages/ui/src/screen/twin/TwinTerminalBoard.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-details.mjs` |
+| `packages/ui/src/screen/twin/TwinTerminalBoard.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/fusion-youth.css` | `verify-kiosk-visual-unity.mjs`<br/>`verify-fusion-youth-foundation.mjs` |
 | `packages/ui/src/styles/kiosk-components.css` | `verify-kiosk-visual-unity.mjs` |
 | `packages/ui/src/styles/kiosk-shell.css` | `verify-kiosk-visual-unity.mjs` |
@@ -2417,7 +2418,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/console-screen/console-screen.twin.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts` |
 | `services/api/src/console-screen/console-screen.types.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts` |
 | `services/api/src/console-screen/console-screen.usage.controller.ts` | `verify-console-screen-usage.ts` |
-| `services/api/src/console-screen/console-screen.usage.queries.ts` | `verify-console-screen-usage.ts` |
+| `services/api/src/console-screen/console-screen.usage.queries.ts` | `verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts` |
 | `services/api/src/console-screen/console-screen.usage.service.ts` | `verify-console-screen-printed-visits.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-console-screen-usage.ts` |
 | `services/api/src/console-screen/console-screen.visits.ts` | `verify-console-screen-printed-visits.ts` |
 | `services/api/src/content/content-signing.ts` | `verify-ad-asset-range.ts`<br/>`verify-screensaver-content.ts` |

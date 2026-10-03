@@ -1,6 +1,6 @@
 import { partnerTwin } from './fixtures/snapshots'
 import { test, expect } from '@playwright/test'
-import { partnerDegraded, partnerTruncated, partnerUsageVisitsFailed, partnerVisitBelowThreshold, partnerVisitFailed } from './fixtures/snapshots'
+import { partnerDegraded, partnerTruncated, partnerUsage, partnerUsageVisitsFailed, partnerVisitBelowThreshold, partnerVisitFailed } from './fixtures/snapshots'
 import {
   expectLocation,
   expectUrlStays,
@@ -134,6 +134,21 @@ test.describe('partner data screen states', () => {
     await expect(card.locator('.twin-pend')).toHaveClass(/\bis-failed\b/)
     await expect(panel(page, /^建设中的指标$/)).not.toContainText('服务人次')
     await expect(page.locator('[data-ops-screen]')).not.toContainText('source_query_failed')
+  })
+
+  test('信息使用：零计数显示 0，1 至 4 次的 null 显示少于 5', async ({ page }) => {
+    await serve(page, partnerApi({ usage: (range) => {
+      const snap = partnerUsage(range)
+      if (snap.metrics.partnerContent?.available) snap.metrics.partnerContent.value.byType = [
+        { type: 'policy', browse: 0, favorites: null, sourceOpens: 5 },
+      ]
+      return snap
+    } }))
+    await open(page, '/screen/usage')
+    const types = panel(page, /^按信息类型$/)
+    await expect(tile(types, '政策公告').locator('b')).toHaveText('0次浏览')
+    await expect(types).toContainText('收藏 少于 5 · 来源 5')
+    await expect(page.locator('.twin-toolbar').getByText(/^访问口径：/)).toContainText('0 照常显示')
   })
 
   test('信息使用：服务人次对 1–4 次写「少于 5」，取数失败写「暂时取不到」', async ({ page }) => {

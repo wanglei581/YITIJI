@@ -178,6 +178,40 @@ test.describe('admin data screen states', () => {
     await expect(page.getByText('9,706')).toBeVisible()
   })
 
+  test('服务调用：真实零计数显示 0，压制计数显示少于 5，零调用不给百分比', async ({ page }) => {
+    await serve(page, adminApi({ usage: (range) => {
+      const snap = usageSnapshot(range)
+      if (snap.metrics.channels?.available) snap.metrics.channels.value = { paidOrders: 0, kiosk: 0, miniapp: 0, unlabeled: 0, memberOrders: 0 }
+      if (snap.metrics.ai?.available) Object.assign(snap.metrics.ai.value, {
+        total: 0, success: 0, failed: 0, successRate: null, avgLatencyMs: null, estimatedCostCny: null,
+        costMeasuredCalls: 0, fallbackCalls: 0,
+        byOperation: [], providers: [],
+      })
+      return snap
+    } }))
+    await open(page, '/screen/usage')
+    const channels = panel(page, /^下单渠道$/)
+    await expect(channels.locator('.twin-lg', { hasText: /^一体机/ })).toHaveText('一体机 0')
+    await expect(channels.locator('.twin-lg', { hasText: /^小程序/ })).toHaveText('小程序 0')
+    await expect(channels.locator('.twin-lg', { hasText: /^未标注/ })).toHaveText('未标注 0')
+    await expect(tile(channels, '会员下单占比').locator('b')).toHaveText('样本不足')
+    const ai = panel(page, /^AI 服务$/)
+    await expect(ai).toContainText('所选时间内没有 AI 调用')
+    await expect(ai).toContainText('暂无调用')
+    await expect(tile(ai, '成功率').locator('b')).toHaveText('样本不足')
+    await expect(page.locator('.twin-toolbar').getByText(/^访问口径：/)).toContainText('0 照常显示')
+    await serve(page, adminApi({ usage: (range) => {
+      const snap = usageSnapshot(range)
+      if (snap.metrics.channels?.available) snap.metrics.channels.value = { paidOrders: 5, kiosk: 0, miniapp: null, unlabeled: null, memberOrders: 0 }
+      return snap
+    } }))
+    await page.reload()
+    await expect(channels.locator('.twin-lg', { hasText: /^一体机/ })).toHaveText('一体机 0')
+    await expect(channels.locator('.twin-lg', { hasText: /^小程序/ })).toHaveText('小程序 少于 5')
+    await expect(channels.locator('.twin-lg', { hasText: /^未标注/ })).toHaveText('未标注 少于 5')
+    await expect(tile(channels, '会员下单占比').locator('b')).toHaveText('0%')
+  })
+
   test('服务调用：下单渠道取数失败时，场景牌子写「暂时取不到」而不是「未接入」', async ({ page }) => {
     await serve(page, adminApi({ usage: usageChannelsFailed }))
     await open(page, '/screen/usage')

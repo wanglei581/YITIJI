@@ -1,11 +1,11 @@
 import { AI_OPERATION_LABELS, AI_USAGE_FEATURE_LABELS } from '@ai-job-print/shared'
-import type { ScreenUsageServiceKey } from '@ai-job-print/shared'
+import type { ScreenUsageAiValue, ScreenUsageServiceKey } from '@ai-job-print/shared'
 import { screenCount } from '@ai-job-print/ui'
 
 /**
  * 大屏用到的展示名映射。
  *
- * 都遵守同一条规则：**认不出来的键显示「其他 AI 服务」，不隐藏该行**。
+ * 都遵守同一条规则：**认不出来的键按出现顺序显示「其他 AI 服务（N）」，不隐藏该行**。
  * 保留该行与计数，既不把内部编码印到屏上，也不漏掉未知服务的调用。
  */
 
@@ -19,6 +19,15 @@ import { screenCount } from '@ai-job-print/ui'
 export function aiOperationLabel(operation: string, hostingOff = false): string {
   if (hostingOff && operation === 'jobMatch') return '简历对照'
   return AI_OPERATION_LABELS[operation] ?? AI_USAGE_FEATURE_LABELS[operation] ?? '其他 AI 服务'
+}
+
+/** 先按服务端出现顺序编号，再由调用方排序/截取；每行原计数（含 null）保留。 */
+export function aiOperationRows(rows: ScreenUsageAiValue['byOperation'], hostingOff = false) {
+  let unknown = 0
+  return rows.map((row) => {
+    const label = aiOperationLabel(row.operation, hostingOff)
+    return { ...row, label: label === '其他 AI 服务' ? `其他 AI 服务（${++unknown}）` : label }
+  })
 }
 
 /**
