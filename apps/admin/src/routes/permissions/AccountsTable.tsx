@@ -1,7 +1,7 @@
 // 内部账号名册表格。行级操作判定在 presentation.ts 的 rowActionFor：
 // admin 启停（自己 / 最后一个启用管理员禁用并说明）、partner 跳机构页、kiosk 只读。
 
-import { StatusBadge } from '@ai-job-print/ui'
+import { ConsoleTable, StatusBadge, type ConsoleTableProps } from '@ai-job-print/ui'
 import { Link } from 'react-router-dom'
 import type { InternalAccountItem } from '../../services/api/internalAccounts'
 import {
@@ -14,9 +14,7 @@ import {
   rowActionFor,
 } from './presentation'
 
-const COLUMNS = ['账号', '角色', '所属机构', '状态', '手机号', '密码状态', '最后登录', '创建时间', '操作'] as const
-
-export interface AccountsTableProps {
+export interface AccountsTableProps extends Pick<ConsoleTableProps<InternalAccountItem>, 'page' | 'pageSize' | 'total' | 'onPageChange' | 'onPageSizeChange' | 'loading' | 'error' | 'empty'> {
   items: InternalAccountItem[]
   currentUserId: string | null
   /** 当前启用管理员的真实总数（额外一次 role=admin&enabled=true 查询的 total）；null = 未知。 */
@@ -24,85 +22,18 @@ export interface AccountsTableProps {
   onSetStatus: (item: InternalAccountItem, intent: 'enable' | 'disable', trigger: HTMLButtonElement) => void
 }
 
-export function AccountsTable({ items, currentUserId, enabledAdminTotal, onSetStatus }: AccountsTableProps) {
-  return (
-    <div className="max-w-full overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="border-b border-neutral-100 bg-neutral-50/70 text-left text-xs font-medium text-neutral-500">
-          <tr>
-            {COLUMNS.map((column) => (
-              <th key={column} className="whitespace-nowrap px-4 py-3">{column}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-neutral-100">
-          {items.map((item) => (
-            <RosterRow
-              key={item.id}
-              item={item}
-              currentUserId={currentUserId}
-              enabledAdminTotal={enabledAdminTotal}
-              onSetStatus={onSetStatus}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function RosterRow({
-  item,
-  currentUserId,
-  enabledAdminTotal,
-  onSetStatus,
-}: {
-  item: InternalAccountItem
-  currentUserId: string | null
-  enabledAdminTotal: number | null
-  onSetStatus: AccountsTableProps['onSetStatus']
-}) {
-  const action = rowActionFor(item, currentUserId, enabledAdminTotal)
-  return (
-    <tr className="text-neutral-700 hover:bg-neutral-50/70">
-      <td className="px-4 py-3">
-        <div className="font-medium text-neutral-900">{item.username}</div>
-        <div className="text-xs text-neutral-400">{accountDisplayName(item)}</div>
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <StatusBadge
-            status={item.role === 'admin' ? 'info' : item.role === 'partner' ? 'success' : 'default'}
-            label={ROLE_LABELS[item.role] ?? item.role}
-          />
-          {item.isBackupAdmin && (
-            <StatusBadge status="warning" dot label="备用管理员" />
-          )}
-        </div>
-      </td>
-      <td className="max-w-40 truncate px-4 py-3" title={item.orgName ?? undefined}>
-        {item.orgName ?? <span className="text-neutral-400">—</span>}
-      </td>
-      <td className="px-4 py-3">
-        <StatusBadge dot status={item.enabled ? 'success' : 'error'} label={item.enabled ? '启用' : '停用'} />
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
-        {phoneCellText(item)}
-      </td>
-      <td className="whitespace-nowrap px-4 py-3">
-        {PASSWORD_STATE_LABELS[item.passwordState] ?? item.passwordState}
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
-        {formatBeijingDateTime(item.lastLoginAt)}
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
-        {formatBeijingDate(item.createdAt)}
-      </td>
-      <td className="px-4 py-3">
-        <RowActionCell item={item} action={action} onSetStatus={onSetStatus} />
-      </td>
-    </tr>
-  )
+export function AccountsTable({ items, currentUserId, enabledAdminTotal, onSetStatus, ...table }: AccountsTableProps) {
+  return <ConsoleTable {...table} items={items} columns={[
+    { id: 'account', header: '账号', truncate: true, title: (item) => `${item.username} · ${accountDisplayName(item)}`, cell: (item) => <div><p title={item.username} className="max-w-40 truncate font-medium">{item.username}</p><p title={accountDisplayName(item)} className="max-w-40 truncate text-xs text-neutral-400">{accountDisplayName(item)}</p></div> },
+    { id: 'role', header: '角色', cell: (item) => <div className="flex flex-wrap gap-1.5"><StatusBadge status={item.role === 'admin' ? 'info' : item.role === 'partner' ? 'success' : 'default'} label={ROLE_LABELS[item.role] ?? item.role} />{item.isBackupAdmin && <StatusBadge status="warning" dot label="备用管理员" />}</div> },
+    { id: 'org', header: '所属机构', truncate: true, cell: (item) => item.orgName ?? '—' },
+    { id: 'status', header: '状态', cell: (item) => <StatusBadge dot status={item.enabled ? 'success' : 'error'} label={item.enabled ? '启用' : '停用'} /> },
+    { id: 'phone', header: '手机号', cellClassName: 'whitespace-nowrap font-mono text-xs', cell: phoneCellText },
+    { id: 'password', header: '密码状态', cellClassName: 'whitespace-nowrap text-xs', cell: (item) => PASSWORD_STATE_LABELS[item.passwordState] ?? item.passwordState },
+    { id: 'login', header: '最后登录', cellClassName: 'whitespace-nowrap text-xs', cell: (item) => formatBeijingDateTime(item.lastLoginAt) },
+    { id: 'created', header: '创建时间', cellClassName: 'whitespace-nowrap text-xs', cell: (item) => formatBeijingDate(item.createdAt) },
+    { id: 'actions', header: '操作', sticky: true, cellClassName: 'whitespace-nowrap', cell: (item) => <RowActionCell item={item} action={rowActionFor(item, currentUserId, enabledAdminTotal)} onSetStatus={onSetStatus} /> },
+  ]} />
 }
 
 function RowActionCell({

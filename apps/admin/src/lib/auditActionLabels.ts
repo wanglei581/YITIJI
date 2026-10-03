@@ -1,11 +1,18 @@
 /**
  * 工作台「最近操作」用的审计中文名。
  * 取管理员工作台与日志审计页两份动作表的并集，并补上审计契约里有、两页都没有的动作。
- * 日志审计页那份表只读，不从这里回写。
+ * 工作台与日志审计共用这份标签，列表不显示原始动作码。
  * 没有映射时显示「其他操作」，不把动作码原样给运营看。
  */
 
 const ACTION_LABELS: Record<string, string> = {
+  'admin.user.detail.view': '查看用户详情',
+  'admin.user.phone_search': '按手机号查找用户',
+  'admin.user.restore': '恢复用户账号',
+  'job_ai_session.cleanup_expired': '清理过期岗位 AI 会话',
+  'print_job.create': '创建打印任务',
+  'order.mark_paid': '确认订单已付款',
+  'resume.diagnosis_exported': '导出简历诊断报告',
   'ai_resume_result.cleanup_expired': '清理过期 AI 简历结果',
   'file.upload': '文件上传',
   'file.delete': '文件删除',
@@ -90,10 +97,20 @@ const ROLE_LABELS: Record<string, string> = {
   partner: '合作机构',
   kiosk: '一体机',
   system: '系统',
+  'system-cli': '系统',
+  'system-bootstrap': '系统',
+  member: '会员',
+  anonymous_report_capability: '匿名用户',
+  enduser: '用户',
+  end_user: '用户',
 }
 
 const TARGET_LABELS: Record<string, string> = {
-  auth: '账号',
+  auth: '登录',
+  EndUser: '用户',
+  order: '订单',
+  ai_resume_result: 'AI 简历结果',
+  job_ai_session: '岗位 AI 会话',
   file: '文件',
   job: '岗位',
   job_source: '岗位信息源',
@@ -139,6 +156,10 @@ export function getAuditActionLabel(action: string): string {
 export function getAuditTargetLabel(targetType: string | null | undefined): string {
   if (!targetType) return ''
   return TARGET_LABELS[targetType] ?? '其他对象'
+}
+
+export function getAuditRoleLabel(role: string): string {
+  return ROLE_LABELS[role] ?? '其他角色'
 }
 
 function looksLikeOpaqueId(value: string): boolean {
