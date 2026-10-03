@@ -21107,7 +21107,8 @@
       "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/pages/policies/policies.js": [
-      "apps/miniapp/scripts/verify-empty-state-honesty.mjs"
+      "apps/miniapp/scripts/verify-empty-state-honesty.mjs",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "apps/miniapp/pages/print-pay/print-pay.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -22787,7 +22788,8 @@
     ],
     "services/api/src/activity/activity.controller.ts": [
       "services/api/scripts/verify-activity-logs.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/activity/activity.service.ts": [
       "services/api/scripts/verify-activity-logs.ts",
@@ -22795,7 +22797,8 @@
       "services/api/scripts/verify-jobfair-checkin.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-member-data-retention.ts",
-      "services/api/scripts/verify-policies.ts"
+      "services/api/scripts/verify-policies.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/activity/activity.types.ts": [
       "apps/kiosk/scripts/probe-activity-favorites-44.mjs",
@@ -22805,7 +22808,8 @@
     "services/api/src/activity/me-activity.controller.ts": [
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
-      "services/api/scripts/verify-policy-scope.ts"
+      "services/api/scripts/verify-policy-scope.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/admin-internal-accounts/admin-internal-accounts.module.ts": [
       "services/api/scripts/verify-internal-accounts.ts"
@@ -23541,7 +23545,8 @@
     ],
     "services/api/src/assistant/daily-brief.service.ts": [
       "services/api/scripts/verify-beijing-display-time.ts",
-      "services/api/scripts/verify-community-daily-brief.ts"
+      "services/api/scripts/verify-community-daily-brief.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/audit/audit.module.ts": [
       "services/api/scripts/verify-contract-review-http.ts",
@@ -23636,6 +23641,7 @@
       "services/api/scripts/verify-publish-expiry-completeness.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts",
       "services/api/scripts/verify-redemption-audit.ts",
       "services/api/scripts/verify-refund-convergence.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -23838,7 +23844,8 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
-      "services/api/scripts/verify-recruitment-emergency-scope.ts"
+      "services/api/scripts/verify-recruitment-emergency-scope.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/common/crypto/webhook-secret-strength.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -24103,6 +24110,7 @@
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
@@ -24140,7 +24148,8 @@
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-job-validity-expiry.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/companies/companies.types.ts": [
       "services/api/scripts/verify-companies.ts"
@@ -24539,7 +24548,8 @@
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
-      "services/api/scripts/verify-public-fair-demo-guard.ts"
+      "services/api/scripts/verify-public-fair-demo-guard.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/job-applications/dto/create-job-application.dto.ts": [
       "services/api/scripts/verify-job-application-track.ts"
@@ -24552,14 +24562,16 @@
     ],
     "services/api/src/job-applications/job-applications.controller.ts": [
       "services/api/scripts/verify-job-application-track.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/job-applications/job-applications.module.ts": [
       "services/api/scripts/verify-job-application-track.ts"
     ],
     "services/api/src/job-applications/job-applications.service.ts": [
       "services/api/scripts/verify-job-application-track.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/job-materials/job-material-pdf.service.ts": [
       "services/api/scripts/verify-cjk-font.ts",
@@ -24606,7 +24618,8 @@
     ],
     "services/api/src/jobs/admin-fairs.controller.ts": [
       "services/api/scripts/verify-jobfair-venue-guide.ts",
-      "services/api/scripts/verify-multipart-field-nesting.ts"
+      "services/api/scripts/verify-multipart-field-nesting.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/jobs/admin-fairs.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -24616,7 +24629,8 @@
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
-      "services/api/scripts/verify-partner-fair-subresources.ts"
+      "services/api/scripts/verify-partner-fair-subresources.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/jobs/campus-recruitment-stats.rules.ts": [
       "services/api/scripts/verify-campus-recruitment-stats.ts"
@@ -24676,7 +24690,8 @@
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
-      "services/api/scripts/verify-partner-fair-subresources.ts"
+      "services/api/scripts/verify-partner-fair-subresources.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/jobs/fair-material-print-bridge.cleanup.task.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -24691,10 +24706,12 @@
       "services/api/scripts/verify-job-sync.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
-      "services/api/scripts/verify-public-fair-demo-guard.ts"
+      "services/api/scripts/verify-public-fair-demo-guard.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/jobs/fair-material-signing.ts": [
-      "services/api/scripts/verify-admin-fairs.ts"
+      "services/api/scripts/verify-admin-fairs.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/jobs/fair-material.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -24705,7 +24722,8 @@
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
-      "services/api/scripts/verify-recruitment-emergency-scope.ts"
+      "services/api/scripts/verify-recruitment-emergency-scope.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/jobs/fair-venue-guide.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
@@ -24713,7 +24731,8 @@
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
-      "services/api/scripts/verify-public-fair-demo-guard.ts"
+      "services/api/scripts/verify-public-fair-demo-guard.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/jobs/job-content-screening.ts": [
       "services/api/scripts/verify-job-content-screening.ts"
@@ -24811,7 +24830,8 @@
       "services/api/scripts/verify-partner-edit.ts",
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
-      "services/api/scripts/verify-public-fair-demo-guard.ts"
+      "services/api/scripts/verify-public-fair-demo-guard.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/jobs/jobs-shared.ts": [
       "scripts/verify-datetime-honesty.mjs",
@@ -24862,6 +24882,7 @@
       "services/api/scripts/verify-partner-org-self.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts",
       "services/api/scripts/verify-recruitment-integration-readiness.ts"
     ],
     "services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts": [
@@ -24875,7 +24896,8 @@
     ],
     "services/api/src/jobs/partner-fairs.controller.ts": [
       "services/api/scripts/verify-multipart-field-nesting.ts",
-      "services/api/scripts/verify-partner-fair-subresources.ts"
+      "services/api/scripts/verify-partner-fair-subresources.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/jobs/partner-import-file.ts": [
       "services/api/scripts/verify-partner-excel-import.ts"
@@ -26208,6 +26230,7 @@
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
@@ -26236,7 +26259,8 @@
     "services/api/src/sync/sync.service.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
-      "services/api/scripts/verify-recruitment-emergency-scope.ts"
+      "services/api/scripts/verify-recruitment-emergency-scope.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/terminals/admin-kiosk-job-board.controller.ts": [
       "services/api/scripts/verify-kiosk-job-board-switch.ts"
@@ -26279,7 +26303,8 @@
     "services/api/src/terminals/kiosk-job-board.service.ts": [
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-job-fit.ts",
-      "services/api/scripts/verify-kiosk-job-board-switch.ts"
+      "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
     "services/api/src/terminals/print-status-attempt.ts": [
       "services/api/scripts/verify-print-jobs.ts"
@@ -39551,11 +39576,36 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/miniapp/pages/policies/policies.js",
           "services/api/scripts/lib/recruitment-hosting-default-probe.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/verify-recruitment-hosting-default-off.ts",
+          "services/api/src/activity/activity.controller.ts",
+          "services/api/src/activity/activity.service.ts",
+          "services/api/src/activity/me-activity.controller.ts",
+          "services/api/src/assistant/daily-brief.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/crypto/secret-cipher.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/companies/companies.service.ts",
+          "services/api/src/job-ai/job-quality.service.ts",
+          "services/api/src/job-applications/job-applications.controller.ts",
+          "services/api/src/job-applications/job-applications.service.ts",
+          "services/api/src/jobs/admin-fairs.controller.ts",
+          "services/api/src/jobs/admin-fairs.service.ts",
+          "services/api/src/jobs/fair-company-zone.service.ts",
+          "services/api/src/jobs/fair-material-print-bridge.service.ts",
+          "services/api/src/jobs/fair-material-signing.ts",
+          "services/api/src/jobs/fair-material.service.ts",
+          "services/api/src/jobs/fair-venue-guide.service.ts",
+          "services/api/src/jobs/jobs-partner.service.ts",
+          "services/api/src/jobs/jobs.service.ts",
+          "services/api/src/jobs/partner-fairs.controller.ts",
           "services/api/src/prisma/prisma.service.ts",
-          "services/api/src/recruitment-hosting/recruitment-hosting.ts"
+          "services/api/src/recruitment-hosting/recruitment-hosting.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/sync/sync.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
         ],
         "missing": []
       },
