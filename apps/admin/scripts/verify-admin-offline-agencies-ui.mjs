@@ -566,7 +566,7 @@ checkQualificationSurface(QUAL_SECTION, qualAst, { withoutSourceOrgState: false 
 {
   const routes = readOrFail(ROUTES)
   const nav = readOrFail(NAV)
-  const partners = readOrFail(PARTNERS_PAGE)
+  const partners = readOrFail(PARTNERS_PAGE) + readOrFail(join(adminRoot, 'src/routes/partners/OrgDetailDrawer.tsx'))
   const code = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
   if (/import\s+\w+\s+from\s+'\.\/offline-agencies'/.test(code(routes))) {
     fail(`${rel(ROUTES)} 仍 import 线下机构页 —— 3.15 停放后不得打包`)
@@ -580,7 +580,7 @@ checkQualificationSurface(QUAL_SECTION, qualAst, { withoutSourceOrgState: false 
   if (!/'\/offline-agencies':\s*'partners'/.test(nav)) {
     fail(`${rel(NAV)} 旧地址 /offline-agencies 没有映射到合作机构菜单高亮`)
   }
-  if (!/<OrgQualificationSection\s+organizationId=\{/.test(partners)) {
+  if (!/<OrgDetailDrawer[\s/>]/.test(readOrFail(PARTNERS_PAGE)) || !/<OrgQualificationSection\s+organizationId=\{/.test(partners)) {
     fail(`${rel(PARTNERS_PAGE)} 的机构详情没有挂「资质核验」小节 —— 迁移没有落地，入驻核验就丢了`)
   }
   for (const file of [INDEX, FORM, DRAWER, REVIEW, join(PAGE_DIR, 'JobsDrawer.tsx')]) {
