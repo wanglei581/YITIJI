@@ -149,7 +149,7 @@ function TerminalConfigRow({
       </label>
 
       <div>
-        <label className="mb-1 block text-xs text-neutral-500">无操作时长（秒）</label>
+        <label className="mb-1 block text-xs text-neutral-500">无人操作多久后播放（秒）</label>
         <input
           type="number"
           min={SCREENSAVER_IDLE_MIN_SEC}

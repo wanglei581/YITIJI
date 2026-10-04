@@ -38,7 +38,7 @@ test('idle timeout outside the allowed range is not submitted', async () => {
         called = true
         throw new Error('should not run')
       }, 'KSK-001', true, timeout, 'pl'),
-      /无操作时长/,
+      /等待时长请填/,
     )
     assert.equal(called, false, timeout)
   }
