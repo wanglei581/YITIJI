@@ -2,6 +2,7 @@ import type {
   SaveScreensaverConfigInput,
   TerminalScreensaverConfigView,
 } from '@ai-job-print/shared'
+import { resolveIdleTimeoutSec, SCREENSAVER_IDLE_DEFAULT_SEC } from './assetUploadRules'
 
 export interface ScreensaverTerminalFormState {
   enabled: boolean
@@ -14,7 +15,7 @@ export function screensaverTerminalFormState(
 ): ScreensaverTerminalFormState {
   return {
     enabled: config?.enabled ?? false,
-    timeout: String(config?.idleTimeoutSec ?? 180),
+    timeout: String(config?.idleTimeoutSec ?? SCREENSAVER_IDLE_DEFAULT_SEC),
     playlistId: config?.playlistId ?? '',
   }
 }
@@ -26,7 +27,7 @@ export function buildScreensaverConfigInput(
 ): SaveScreensaverConfigInput {
   return {
     enabled,
-    idleTimeoutSec: Math.max(30, Math.min(1800, Number(timeout) || 180)),
+    idleTimeoutSec: resolveIdleTimeoutSec(timeout),
     playlistId: playlistId || null,
   }
 }

@@ -95,6 +95,10 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   LOCAL_USB_FILE_UNREADABLE: '这个文件读不了，请换一个文件',
   // 列表过期（一次性编号已用过或超时）：同一个编号再点只会再失败，要重新读取 U 盘列表。
   LOCAL_USB_FILE_EXPIRED: '文件列表已过期，请重新读取 U 盘后再选',
+  // 2026-10-04 能力中心把这台机器的 U 盘导入配成非「可用」。重试过不了，改走手机扫码。
+  LOCAL_USB_DISABLED: '这台机器暂未开放 U 盘导入，请用手机扫码上传',
+  // 2026-10-04 查能力开关失败、超时或返回对不上。当时确认不了是否开放，不要当成已开放。
+  LOCAL_USB_CAPABILITY_UNKNOWN: '暂时确认不了 U 盘导入是否开放，请稍后再试或用手机扫码上传',
   CONVERT_TOO_MANY_IMAGES: '一次转换的图片过多，请减少张数后重试',
   SIGN_SOURCE_NOT_FOUND: '文件访问凭证已过期或文件已清理，请重新选择文件',
   NO_TERMINAL_IDENTITY: '这台机器还没完成登记，请联系现场工作人员',

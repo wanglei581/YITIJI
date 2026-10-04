@@ -35,4 +35,41 @@ test.describe('打印扫描运维（mock 口径）', () => {
     await expect(page.getByText('失败原因', { exact: true }).last()).toBeVisible()
   })
 
+  test('未登记能力必须先选择状态才能登记，已登记行保留原状态', async ({ page }) => {
+    const guards = await openAuthed(page, '/print-scan')
+    await settleAdminPage(page, guards)
+    await page.getByRole('button', { name: '设备能力' }).click()
+
+    const materialRow = page.locator('tr').filter({ hasText: '材料包' })
+    await expect(materialRow).toBeVisible()
+    const materialSelect = materialRow.locator('select')
+    await expect(materialSelect).toHaveValue('')
+    await expect(materialSelect.locator('option:checked')).toHaveText('请选择')
+    await expect(materialRow.getByRole('button', { name: '登记' })).toBeDisabled()
+    await expect(materialRow.getByText('请先选择要登记的状态')).toBeVisible()
+
+    // 彩色 / 双面未登记时一体机是关闭的，下拉仍不得预选成「未验收」。
+    const colorRow = page.locator('tr').filter({ hasText: '彩色打印（需真机验证）' })
+    await expect(colorRow.getByText('未登记 · 默认关闭')).toBeVisible()
+    await expect(colorRow.locator('select')).toHaveValue('')
+    await expect(colorRow.getByRole('button', { name: '登记' })).toBeDisabled()
+
+    const printRow = page.locator('tr').filter({ hasText: '文档打印' })
+    await expect(printRow.locator('select')).toHaveValue('available')
+    await expect(printRow.getByRole('button', { name: '保存' })).toBeDisabled()
+    await expect(printRow.getByText('请先选择要登记的状态')).toHaveCount(0)
+
+    const usbRow = page.locator('tr').filter({ hasText: 'U盘导入' })
+    await expect(usbRow.locator('select')).toHaveValue('not_verified')
+    await expect(usbRow.getByRole('button', { name: '保存' })).toBeDisabled()
+
+    await materialSelect.selectOption('available')
+    await expect(materialRow.getByText('请先选择要登记的状态')).toHaveCount(0)
+    await expect(materialRow.getByRole('button', { name: '登记' })).toBeEnabled()
+    await materialRow.getByRole('button', { name: '登记' }).click()
+    await expect(materialRow.getByText('已开通')).toBeVisible()
+    await expect(materialRow.getByRole('button', { name: '保存' })).toBeDisabled()
+    await settleAdminPage(page, guards)
+  })
+
 })

@@ -127,7 +127,7 @@
 }
 .pf-asset-t { font-size: var(--qx-fs-sec); font-weight: 700; }
 .pf-asset-d { font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-3); line-height: 1.5; }
-.pf-asset-n { margin-top: auto; display: flex; align-items: baseline; gap: 6px; }
+.pf-asset-n { margin-top: 16px; display: flex; align-items: baseline; gap: 6px; }
 .pf-asset-num { font: 800 var(--qx-fs-page)/1 var(--qx-mono); color: var(--qx-ink); }
 .pf-asset-num[data-unloaded] { color: var(--qx-ink-3); font-weight: 400; font-size: var(--qx-fs-page); }
 .pf-asset-unit { font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-3); }
@@ -267,17 +267,17 @@
 }
 
 /* 30 v2：身份卡只读，第一处操作从 y=500 以下开始。 */
-.pf-root .qx-pagehead { min-height: 80px; }
+.pf-root .qx-pagehead { min-height: 64px; }
 .pf-root .qx-body { padding-top: 12px; }
 .pf-root .pf-idcard { min-height: 132px; margin-bottom: 0; }
 .pf-root .pf-idstat { flex: none; max-width: 200px; text-align: right; font-size: var(--qx-fs-aux-lg); }
 .pf-root .pf-page > * { flex-shrink: 0; }
 .pf-root .qx-card { padding: 16px 20px; }
 .pf-root .pf-todo { min-height: 80px; }
-.pf-root .pf-asset { min-height: 160px; padding: 18px 20px; }
+.pf-root .pf-asset { min-height: 194px; padding: 22px 24px; }
 .pf-root .pf-morelinks { margin-top: 10px; }
 .pf-root .pf-mlink { min-height: 64px; }
-.pf-root .qx-row { min-height: 76px; padding-top: 10px; padding-bottom: 10px; }
+.pf-root .qx-row { min-height: 96px; padding-top: 14px; padding-bottom: 14px; }
 .pf-root .qx-ctabar .why { flex: 1; font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
 .pf-root .qx-ctabar .qx-btn { flex: none; }
 .pf-root .qx-ctabar .qx-btn[data-grow='1'] { flex: 1 1 auto; }
@@ -295,4 +295,35 @@
   [data-kiosk-stage-fit='off'] .pf-root .pf-truth, [data-kiosk-stage-fit='off'] .pf-root .qx-ctabar { flex-wrap: wrap; }
   [data-kiosk-stage-fit='off'] .pf-root .qx-ctabar .why { flex-basis: 100%; }
   [data-kiosk-stage-fit='off'] .pf-root .qx-sec-h, [data-kiosk-stage-fit='off'] .pf-root .kp-section-head { flex-wrap: wrap; }
+}
+
+/* 账号操作与通知支持同组；正文向下排，不将操作悬在独立底栏。 */
+.pf-root .pf-page { gap: 24px; padding-bottom: 16px; }
+.pf-root .pf-support-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+.pf-root .pf-support-actions p { flex: 1; margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+.pf-root .pf-support-actions .qx-btn { flex: none; }
+.pf-root .pf-reading-note { margin: 14px 0 0; font-size: var(--qx-fs-aux-lg); line-height: 1.5; color: var(--qx-ink-2); }
+.pf-root .pf-meta2 div { padding: 22px 20px; }
+.pf-root .kp-session-records .qx-card { padding: 22px 24px; }
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .pf-root .pf-support-actions { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-support-actions p { flex-basis: 100%; }
+}
+
+/* 身份与待办保持相邻；用固定区块间距，避免余高把继续办理按钮推远。 */
+.pf-root .pf-page { justify-content: flex-start; }
+
+/* 四个既有支持入口排成一行，把账号操作留在同组；描述仍供读屏读取。 */
+.pf-root .pf-support-rows { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pf-root .pf-support-rows .qx-row { position: relative; gap: 10px; padding: 12px; min-height: 76px; border-bottom: 0; }
+.pf-root .pf-support-rows .qx-row + .qx-row { border-left: 1px solid var(--qx-line); }
+.pf-root .pf-support-rows .qx-row-ic { width: 36px; height: 36px; }
+.pf-root .pf-support-rows .qx-row-d { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.pf-root[data-state='empty'] .pf-page { gap: 16px; }
+.pf-root[data-state='empty'] .pf-asset { min-height: 160px; padding: 18px 20px; }
+.pf-root[data-state='empty'] .qx-row { min-height: 76px; padding-top: 10px; padding-bottom: 10px; }
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .pf-root .pf-support-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-support-rows .qx-row { border-left: 0; border-bottom: 1px solid var(--qx-line); }
+  [data-kiosk-stage-fit='off'] .pf-root .pf-support-rows .qx-row-ic { display: none; }
 }
