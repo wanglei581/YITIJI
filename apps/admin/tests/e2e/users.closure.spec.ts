@@ -118,7 +118,7 @@ for (const changed of [true, false]) test(`成功 changed=${changed} 刷新列�
   const before = calls.length
   await confirm(page)
   await expect(page.getByRole('dialog', { name: '注销账号', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('status').filter({ hasText: changed ? /^已注销$/ : '该账号此前已注销' })).toBeVisible()
+  await expect(page.getByRole('status').getByText(changed ? '已注销' : '该账号此前已注销', { exact: true })).toBeVisible()
   await expect.poll(() => calls.slice(before).filter((call) => call.method === 'GET').length).toBe(2)
   const detail = page.getByRole('dialog', { name: '用户详情' })
   await expect(detail.getByText('已注销', { exact: true })).toBeVisible()
@@ -126,7 +126,8 @@ for (const changed of [true, false]) test(`成功 changed=${changed} 刷新列�
   await expect(detail.getByRole('button', { name: '注销账号', exact: true })).toHaveCount(0)
   await detail.getByRole('button', { name: '关闭用户详情' }).click()
   const row = page.getByRole('row').filter({ hasText: '注销验证会员' })
-  await expect(row.getByRole('button', { name: /停用|恢复|注销/ })).toHaveCount(0)
+  await expect(row.getByRole('button', { name: /^(停用|恢复|注销)/ })).toHaveCount(0)
+  await expect(row.getByRole('button')).toHaveCount(1) // 只剩「查看详情」
 })
 
 test('503 保留来源、事由、尾号、凭据，重试请求逐字段相同；无浏览器存储', async ({ page }) => {

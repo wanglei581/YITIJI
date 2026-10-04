@@ -221,6 +221,10 @@ export function UserClosureDialog({ user, onClose, onSuccess }: { user: AdminUse
             </fieldset>
           ) : (
             <>
+              <p className="rounded-lg bg-neutral-50 p-3 text-neutral-700">
+                将要注销的账号：<span className="font-medium text-neutral-900">{user.nickname || '未设置昵称'}</span> · {user.maskedPhone}
+                <span className="ml-2 text-neutral-500">（{input.source === 'offline' ? '凭线下申请办理' : '按本人申请执行'}）</span>
+              </p>
               <h3 className="font-semibold text-neutral-900">注销后会发生什么</h3>
               {CLOSURE_CONSEQUENCES.map(([title, text]) => (
                 <section key={title} className="rounded-lg border border-neutral-200 p-3">

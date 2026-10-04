@@ -201,10 +201,10 @@ export function UserDetailDrawer({ endUserId, onClose, onMissing, onClosureSucce
             </Card>
 
             {detail.user.closureRequest && <Card className="p-4">
-              <h3 className="text-sm font-semibold">注销申请</h3>
+              <h3 className="text-sm font-semibold">{detail.user.closureRequest.source === 'offline' ? '注销办理记录' : '注销申请'}</h3>
               {hasPendingClosure(detail.user) && <p role="status" className="mt-2 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-800">该会员已申请注销，等待管理员执行</p>}
               <dl className="mt-3 grid grid-cols-2 gap-4">
-                <DetailField label="申请时间" value={formatDateTime(detail.user.closureRequest.requestedAt)} />
+                <DetailField label={detail.user.closureRequest.source === 'offline' ? '登记时间' : '申请时间'} value={formatDateTime(detail.user.closureRequest.requestedAt)} />
                 <DetailField label="来源" value={CLOSURE_SOURCE_LABELS[detail.user.closureRequest.source]} />
               </dl>
             </Card>}
