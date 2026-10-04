@@ -1,4 +1,4 @@
-import { AI_USAGE_FEATURE_LABELS, AI_USAGE_VENDOR_LABELS } from '@ai-job-print/shared'
+import { formatYuan, AI_USAGE_FEATURE_LABELS, AI_USAGE_VENDOR_LABELS } from '@ai-job-print/shared'
 export { AI_USAGE_FEATURE_LABELS, AI_USAGE_VENDOR_LABELS } from '@ai-job-print/shared'
 // ============================================================
 // 「AI 用量与额度」面板（#1088）的显示名映射与金额格式化
@@ -44,9 +44,9 @@ export function aiUsageKeyTitle(dimension: AiUsageDimension, key: string | null,
   return key
 }
 
-/** 金额保留两位小数带「元」（面板展示口径；服务端内部保留 4 位，展示层两位）。 */
+/** AI 金额统一保留四位小数，避免细小成本被显示为零。 */
 export function formatCny(value: number): string {
-  return `${value.toFixed(2)} 元`
+  return formatYuan(value, { precision: 4 })
 }
 
 /**

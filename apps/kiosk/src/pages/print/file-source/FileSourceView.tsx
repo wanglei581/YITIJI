@@ -4,6 +4,7 @@ import { FileTextIcon, SparklesIcon } from 'lucide-react'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
 import { PrintFilePreviewModal } from '../components/PrintPreviewPanel'
+import type { UsbImportHold } from '../../../hooks/useUsbImportGate'
 import type { UsbFileListItem } from '../../../services/files/usbImportApi'
 import {
   FILE_SOURCE_HAS_FILE,
@@ -18,6 +19,7 @@ import {
   FileRow,
   FileSourceHero,
   FileSourceNote,
+  UsbImportHoldNotice,
   FileSourceReason,
   FileSourceStatus,
   FileSourceSteps,
@@ -41,6 +43,10 @@ export interface FileSourceViewProps {
   showScan: boolean
   tab: UploadTab
   usbMode: 'ok' | 'unavailable' | 'offline'
+  /** 令牌在、后台未放行时盖住 U 盘列表。未配置令牌不走这里，仍用原来的未开通屏。 */
+  usbHold?: UsbImportHold | null
+  /** 二维码过期时的「改用 U 盘导入」。非放行（含确认中）不出现，避免点进去才说不能用。 */
+  usbSwitchAllowed?: boolean
   currentFile: { name: string; size: string; mimeType?: string; fileUrl?: string; fileId?: string } | null
   blockedName: string | null
   blockedMeta: string | null
@@ -160,7 +166,7 @@ function disabledReason(screen: FileSourceScreen): string | null {
 export function FileSourceView(props: FileSourceViewProps) {
   const {
     screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, isResumePrint,
-    showFileChannel, showScan, tab, usbMode, currentFile, blockedName, blockedMeta,
+    showFileChannel, showScan, tab, usbMode, usbHold = null, usbSwitchAllowed = true, currentFile, blockedName, blockedMeta,
     wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
     previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
     onHelp, onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
@@ -238,10 +244,15 @@ export function FileSourceView(props: FileSourceViewProps) {
   } else if (screen === 'phone-status-unknown' || screen === 'phone-confirm-failed') {
     secondary = ghost('重新出一张码', onPhoneRefresh, 'file-source-refresh')
   } else if (screen === 'phone-expired' || screen === 'usb-agent-offline' || screen === 'usb-safeid-expired' || screen === 'usb-import-failed') {
+    const offerUsb = screen === 'phone-expired' && usbSwitchAllowed
     secondary = ghost(
-      screen === 'phone-expired' ? '改用 U 盘导入' : '改用手机扫码上传',
-      () => onSelectChannel(screen === 'phone-expired' ? 'usb' : 'qr'),
-      'file-source-switch-source',
+      offerUsb ? '改用 U 盘导入' : screen === 'phone-expired' ? '退出 · 回打印扫描' : '改用手机扫码上传',
+      () => {
+        if (offerUsb) onSelectChannel('usb')
+        else if (screen === 'phone-expired') onExit()
+        else onSelectChannel('qr')
+      },
+      offerUsb || screen !== 'phone-expired' ? 'file-source-switch-source' : 'file-source-exit',
     )
   } else if (screen === 'phone-cancel-failed') {
     secondary = ghost('保留这份 · 回去确认', onPhoneConfirm, 'file-source-keep')
@@ -257,8 +268,16 @@ export function FileSourceView(props: FileSourceViewProps) {
     secondary = ghost('退出 · 回打印扫描', onExit, 'file-source-exit')
   }
 
-  const enabled = primaryEnabled(screen)
-  const reason = disabledReason(screen)
+  const usbHoldActive = tab === 'usb' ? usbHold : null
+  if (usbHoldActive) secondary = ghost('退出 · 回打印扫描', onExit, 'file-source-exit')
+
+  const enabled = usbHoldActive ? usbHoldActive.state !== 'loading' : primaryEnabled(screen)
+  const reason = usbHoldActive
+    ? (usbHoldActive.state === 'loading' ? '确认完成前先不读 U 盘' : null)
+    : disabledReason(screen)
+  const primaryText = usbHoldActive
+    ? (usbHoldActive.state === 'loading' ? '确认后再选文件' : '改用手机扫码上传')
+    : primaryLabel(screen, isResumePrint)
   const ctabar = previewOpen ? undefined : (
     <div className="fs-bottom"><div className="print-upload-footer" data-testid="file-source-ctabar">
       {secondary}
@@ -268,11 +287,17 @@ export function FileSourceView(props: FileSourceViewProps) {
         data-variant="primary"
         disabled={!enabled}
         aria-disabled={!enabled || undefined}
-        onClick={handlePrimary}
+        onClick={() => {
+          if (usbHoldActive) {
+            if (usbHoldActive.state !== 'loading') onSelectChannel('qr')
+            return
+          }
+          handlePrimary()
+        }}
         data-testid="file-source-primary"
-        aria-label={enabled ? primaryLabel(screen, isResumePrint) : `${primaryLabel(screen, isResumePrint)}（${reason ?? '还没有文件'}）`}
+        aria-label={enabled ? primaryText : `${primaryText}（${reason ?? '还没有文件'}）`}
       >
-        {primaryLabel(screen, isResumePrint)}
+        {primaryText}
       </button>
     </div>
       <div className="fs-actions">
@@ -694,10 +719,11 @@ export function FileSourceView(props: FileSourceViewProps) {
         data-qx-screen="file-source"
         data-takeaway="检查后带走打印件"
         data-print-flow-step={1}
-        data-state={screen}
-        data-testid={`file-source-state-${screen}`}
+        data-state={usbHoldActive ? 'usb-hold' : screen}
+        data-usb-gate={usbHoldActive?.state}
+        data-testid={usbHoldActive ? 'file-source-state-usb-hold' : `file-source-state-${screen}`}
       >
-        <FileSourceHero screen={screen} isResume={isResumePrint} />
+        <FileSourceHero screen={screen} isResume={isResumePrint} hold={usbHoldActive?.state ?? null} />
         <div className="fs-flow" aria-label="打印流程">
           <span aria-current="step">1 选文件</span><span>2 材料检查</span><span>3 预览与参数</span><span>4 核对价格</span>
         </div>
@@ -712,7 +738,7 @@ export function FileSourceView(props: FileSourceViewProps) {
             <p>已生成的简历可继续查看并打印；已有电子简历也可以在本页上传后直接打印。这里不做 AI 诊断。</p>
           </button>
         ) : null}
-        {body}
+        {usbHoldActive ? <UsbImportHoldNotice hold={usbHoldActive} /> : body}
         {reason && !previewOpen ? <FileSourceReason>{reason}</FileSourceReason> : null}
         <FileSourceTruth />
         {previewOpen && currentFile ? (

@@ -121,6 +121,13 @@ export interface AiToolSectionProps {
   activeSkill?: string
 }
 
+const TOOL_GROUPS = [
+  { label: '准备材料', ids: ['self_intro_gen', 'cover_letter_gen', 'material_checklist'] },
+  { label: '简历与岗位', ids: ['resume_jd_match', 'jd_analysis'] },
+  { label: '求职方向', ids: ['career_explore'] },
+  { label: '面试准备', ids: ['interview_questions', 'company_research'] },
+] as const
+
 const LAMP_LABEL = { available: '已确认', unavailable: '暂停', unknown: '待确认' } as const
 
 export function AiToolSection({ degraded, degradedReason, availability, activeSkill }: AiToolSectionProps) {
@@ -156,34 +163,41 @@ export function AiToolSection({ degraded, degradedReason, availability, activeSk
       )}
 
       <div className="assistant-ai-tools-grid">
-        {AI_TOOLS.map((tool, index) => {
-          const Icon = tool.icon
-          const active = tool.id === activeSkill
-          return (
-            <button
-              key={tool.id}
-              type="button"
-              className={`assistant-ai-tool-card adv-tool--${tool.accent}`}
-              style={{ '--rail-i': index } as CSSProperties}
-              data-active={active || undefined}
-              aria-current={active ? 'true' : undefined}
-              // 置灰但保持可聚焦、可读；不绑 onClick，按下去不会有任何副作用。
-              aria-disabled={degraded || undefined}
-              aria-describedby={degraded ? reasonId : undefined}
-              onClick={degraded || active ? undefined : () => navigate(`/assistant?intent=${tool.id}`)}
-            >
-              <i className="assistant-ai-lamp" data-lamp={lamp} aria-hidden="true" />
-              <span className="aat-icon" aria-hidden="true">
-                <Icon />
-              </span>
-              <span className="aat-body">
-                <strong>{tool.title}</strong>
-                <small>{active ? '当前咨询 · ' : ''}{tool.description}</small>
-              </span>
-              <span className="kassist-sr-only">（{LAMP_LABEL[lamp]}）</span>
-            </button>
-          )
-        })}
+        {TOOL_GROUPS.map((group) => (
+          <div className="assistant-ai-tools-group" key={group.label}>
+            <span className="assistant-ai-tools-group-label">{group.label}</span>
+            <div className="assistant-ai-tools-group-items">
+              {AI_TOOLS.filter((tool) => group.ids.some((id) => id === tool.id)).map((tool, index) => {
+                const Icon = tool.icon
+                const active = tool.id === activeSkill
+                return (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    className={`assistant-ai-tool-card adv-tool--${tool.accent}`}
+                    style={{ '--rail-i': index } as CSSProperties}
+                    data-active={active || undefined}
+                    aria-current={active ? 'true' : undefined}
+                    // 置灰但保持可聚焦、可读；不绑 onClick，按下去不会有任何副作用。
+                    aria-disabled={degraded || undefined}
+                    aria-describedby={degraded ? reasonId : undefined}
+                    onClick={degraded || active ? undefined : () => navigate(`/assistant?intent=${tool.id}`)}
+                  >
+                    <i className="assistant-ai-lamp" data-lamp={lamp} aria-hidden="true" />
+                    <span className="aat-icon" aria-hidden="true">
+                      <Icon />
+                    </span>
+                    <span className="aat-body">
+                      <strong>{tool.title}</strong>
+                      <small>{active ? '当前咨询 · ' : ''}{tool.description}</small>
+                    </span>
+                    <span className="kassist-sr-only">（{LAMP_LABEL[lamp]}）</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   )

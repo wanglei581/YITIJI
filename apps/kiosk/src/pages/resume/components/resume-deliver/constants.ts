@@ -57,7 +57,7 @@ export const HTML_PREVIEW_NOTE = '示意，非打印稿'
 export const PRINT_THIS_COPY = '打印的就是这一份'
 export const SYNTHETIC_BANNER = '合成演示'
 export const COMPRESS_ONE_PAGE = '压到一页'
-export const FREE_PRICING_COPY = '当前免费，不扣权益'
+export const FREE_PRICING_COPY = '免费试运营'
 
 const FORMAT_SET = new Set<string>(['pdf', 'docx', 'txt', 'md'])
 export function parseExportFormat(raw: string | null): ResumeExportFormat | null {

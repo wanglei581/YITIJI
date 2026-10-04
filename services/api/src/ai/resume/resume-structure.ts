@@ -36,11 +36,21 @@ const NON_NAME_TITLES = new Set([
 ])
 
 const YEAR = '(?:19|20)\\d{2}'
-const DATE_POINT = `${YEAR}\\s*(?:年\\s*(?:\\d{1,2}\\s*月?)?|[./-]\\s*\\d{1,2}?)?`
+const DATE_POINT = `${YEAR}\\s*(?:年\\s*(?:\\d{1,2}\\s*月?)?|[./-]\\s*\\d{1,2})?`
+// 「2024.07 至今」里的「至」既是分隔符又是「至今」的一部分：分隔符吃掉「至」之后要允许只剩一个「今」，
+// 也允许起点后面直接跟「至今 / 现在 / 目前」，否则这一类在职经历一条都认不出来。
 const DATE_RANGE_RE = new RegExp(
-  `${DATE_POINT}\\s*(?:到|至|[-—–~～])\\s*(?:${DATE_POINT}|至今|现在|目前)`,
+  `${DATE_POINT}\\s*(?:(?:到|至|[-—–~～])\\s*(?:${DATE_POINT}|至今|现在|目前|今)|至今|现在|目前)`,
   'u',
 )
+
+/** 把「公司 时间段 其余」的一行拆开；时间段原样摘出，不改写。没有时间段返回 null。 */
+export function splitResumeDateRange(line: string): { before: string; period: string; after: string } | null {
+  const match = DATE_RANGE_RE.exec(line)
+  if (!match) return null
+  const trim = (value: string) => value.replace(/^[\s,，、;；:：|丨·\-—–]+|[\s,，、;；:：|丨·\-—–]+$/gu, '')
+  return { before: trim(line.slice(0, match.index)), period: match[0].trim(), after: trim(line.slice(match.index + match[0].length)) }
+}
 
 /** 统一提取层的换行，保留每行内容，不把左右分栏拆成两个字段。 */
 export function resumeTextLines(text: string): string[] {

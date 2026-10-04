@@ -80,18 +80,27 @@ async function callEnvelope<T>(
   return json.data
 }
 
+const qrCreatesInFlight = new Map<string, Promise<LocalQrCreateResult>>()
+
 export function createQrLoginViaLocalAgent(input: {
   deviceId?: string
   deviceLabel?: string
   returnTo?: string
 }): Promise<LocalQrCreateResult> {
-  return callEnvelope<LocalQrCreateResult>(
+  const key = JSON.stringify(input)
+  const existing = qrCreatesInFlight.get(key)
+  if (existing) return existing
+  const request = callEnvelope<LocalQrCreateResult>(
     LOCAL_AGENT_BASE_URL,
     '/local/qr-login/create',
     'POST',
     input,
     requireLocalAgentHeaders(),
-  )
+  ).finally(() => {
+    if (qrCreatesInFlight.get(key) === request) qrCreatesInFlight.delete(key)
+  })
+  qrCreatesInFlight.set(key, request)
+  return request
 }
 
 export function claimQrLoginViaLocalAgent(ticketId: string): Promise<LoginResult> {

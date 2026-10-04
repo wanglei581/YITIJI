@@ -278,7 +278,8 @@ assertIncludes(source, '更换文件', 'source action bar exposes change-file wh
 // 2026-09-23 迁入青序流光（稿 21）：两条拉伸断言从 Tailwind 类串改锚到本页 Qx 样式，判据不变。
 const triageCss = read('src/pages/resume/resume-triage-qx.css')
 assertIncludes(source, 'className="qx-rt-dropzone"', 'upload dropzone stretches to balance the direction column')
-assertIncludes(triageCss, '.qx-resume-triage .qx-rt-dropzone {\n  flex: 1;', 'upload dropzone stretches to balance the direction column (css)')
+// 最终稿要求内容向下顺排，上传条不能为了平衡方向区拉成空白框。
+assertIncludes(read('src/pages/resume/resume-r1-qx2.css'), ".qx-rt-dropzone { flex: none; min-height: 76px", 'source upload strip follows content without stretching an empty card')
 assertIncludes(source, 'className="qx-rt-main"', 'upload column stays a stretch column')
 assertIncludes(triageCss, '.qx-resume-triage .qx-rt-main { display: flex; flex-direction: column; min-width: 0;', 'upload column stays a stretch column (css)')
 
@@ -294,7 +295,7 @@ assertIncludes(optimize, 'Markdown', 'optimize page labels md as Markdown')
 assertIncludes(optimize, 'exportFormat', 'optimize page tracks selected export format state')
 assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined', 'optimize page exports with selected format and layout')
 assertIncludes(optimize, 'getResumeExportPricing', 'optimize export reads GET /resume/export/pricing')
-assertIncludes(optimize, '当前免费，不扣权益', 'optimize page shows free-mode copy from the pricing contract')
+assertIncludes(optimize, '免费试运营', 'optimize page shows free-mode copy from the pricing contract')
 assertIncludes(optimize, 'factsConfirmedAt', 'optimize export sends factsConfirmedAt after the confirmation wall')
 assertIncludes(optimize, "kind: 'change_list'", 'optimize page exports the change-list PDF')
 assertIncludes(generatePreview, 'getResumeExportPricing', 'generate preview reads export pricing')
@@ -564,5 +565,43 @@ const factsRun = spawnSync(process.execPath, ['--test', factsTest], { stdio: 'in
 if (factsRun.status !== 0) {
   throw new Error(`exportGeneratedResume factsConfirmedAt unit test failed (exit ${factsRun.status ?? 'null'})`)
 }
+
+// 批次 D：执行真实呈现分支，防旧服务端免费标签和未确认的保存状态再次上屏。
+const pricingBarSource = read('src/pages/resume/components/resume-deliver/ResumePricingBar.tsx')
+const freeCopySource = read('src/pages/resume/components/resume-deliver/constants.ts')
+const freeCopy = new Function(executable(`${sourceNode(freeCopySource, 'FREE_PRICING_COPY')}\nreturn FREE_PRICING_COPY;`))()
+const renderPricing = new Function('React', 'FREE_PRICING_COPY', executable(`${sourceNode(pricingBarSource, 'ResumePricingBar').replace('export ', '')}\nreturn ResumePricingBar;`))(React, freeCopy)
+assert.equal(labels(renderPricing({ pricing: { mode: 'free', label: '旧的收费和权益附带说明' }, loading: false, blockedReason: null })), '免费试运营', '免费态只显示定稿，旧服务端 label 不上屏')
+assert.match(labels(renderPricing({ pricing: { mode: 'charged', label: '核销一次', benefit: { available: 2 } }, loading: false, blockedReason: null })), /核销一次.*可用权益 2 次/, '收费态保留价目与权益次数')
+const resultSource = read('src/pages/resume/components/resume-deliver/ResumeExportResult.tsx')
+const renderResult = new Function('React', 'useCountdown', 'formatFileSize', 'PRINT_THIS_COPY', 'FileContentPreview', 'QRCodeSVG', executable(`${sourceNode(resultSource, 'ResumeExportResult').replace('export ', '')}\nreturn ResumeExportResult;`))(React, () => ({ expired: false, label: '10 分钟' }), () => '1 KB', '打印的就是这一份', 'preview', 'qr')
+const fileProps = { exported: { signedUrl: 'https://example.invalid/file', filename: '本人简历.pdf', pageCount: 1, sizeBytes: 1 }, formatLabel: 'PDF', kind: 'resume', version: 1, guest: false }
+assert.match(labels(renderResult({ ...fileProps, savedToDocuments: true })), /已存入「我的文档」/, '确认保存的优化稿说已存入')
+assert.match(labels(renderResult({ ...fileProps, kind: 'change_list', savedToDocuments: true })), /已存入「我的文档」/, '确认保存的修改清单使用同一说法')
+for (const savedToDocuments of [false, undefined]) assert.doesNotMatch(labels(renderResult({ ...fileProps, savedToDocuments })), /已存入/, '未确认保存时不说已存入')
+assert.doesNotMatch(labels(renderResult({ ...fileProps, savedToDocuments: true, exported: { ...fileProps.exported, signedUrl: '' } })), /已存入/, '无真实文件不能宣称已存入')
+assert.doesNotMatch(labels(renderResult({ ...fileProps, savedToDocuments: false })), /未登录/, '会员保存失败不冒充未登录')
+const pageSource = read('src/pages/resume/ResumeOptimizePage.tsx')
+const ownershipEffect = /useEffect\(\(\) => \{\n    if \(exportKind !== 'resume'[\s\S]*?\}, \[exported, exportKind, token, setSavedToDocuments\]\)/.exec(pageSource)?.[0]
+assert.ok(ownershipEffect, '优化稿实际查询本人的文件归属')
+const runOwnershipEffect = new Function('useEffect', 'exportKind', 'exported', 'token', 'getMyDocuments', 'setSavedToDocuments', executable(ownershipEffect))
+for (const scenario of ['owned', 'other', 'failed', 'canceled', 'guest']) {
+  const confirmed = []
+  let cleanup
+  runOwnershipEffect((fn) => { cleanup = fn() }, 'resume', { fileId: 'this-file' }, scenario === 'guest' ? null : 'member-token', async () => {
+    if (scenario === 'failed') throw new Error('offline')
+    return { items: [{ id: scenario === 'other' ? 'another-file' : 'this-file' }] }
+  }, (value) => confirmed.push(value))
+  if (scenario === 'canceled') cleanup()
+  await Promise.resolve(); await Promise.resolve()
+  assert.deepEqual(confirmed, scenario === 'owned' ? [true] : [], `保存提示归属检查：${scenario}`)
+}
+assertIncludes(source, '这次想让我做什么', '取件页有实际意图选择')
+assertIncludes(source, 'compact={!uploadedFile}', '未上传也有常驻方向摘要')
+assertIncludes(read('src/pages/resume/components/resume-report/ResumeReportBody.tsx'), '<ResumeReportStates viewState="report-empty" />', '空报告复用真实出口与人工自查，不填造结论')
+const formatChooser = read('src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx')
+assertIncludes(formatChooser, 'aria-label="文件生成流程"', '导出等待态四步流程常驻')
+assertIncludes(formatChooser, '系统没有提供逐步进度', '流程说明不冒充服务端逐步进度')
+console.log('PASS batch D 免费标签、保存归属、取件摘要、空报告和导出流程')
 
 console.log('PASS resume diagnosis flow UI verification')

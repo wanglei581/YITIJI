@@ -103,7 +103,7 @@ export function OptimizedResumeEditor({
                 {resume.experience.map((e, i) => (
                   <div key={i} className="break-inside-avoid">
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-sm font-semibold text-gray-800">{e.company} · {e.role}</p>
+                      <p className="text-sm font-semibold text-gray-800">{[e.company, e.role].filter(Boolean).join(' · ')}</p>
                       {e.period && <p className="shrink-0 text-xs text-gray-400">{e.period}</p>}
                     </div>
                     <textarea

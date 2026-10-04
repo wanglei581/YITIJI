@@ -27,6 +27,7 @@ const TYPE_META: Record<BenefitActivityType, { label: string; icon: LucideIcon }
   coupon: { label: '优惠券', icon: TicketIcon },
   free_quota: { label: '免费次数', icon: GiftIcon },
   package_entitlement: { label: '服务额度', icon: PackageIcon },
+  ai_quota: { label: 'AI 次数', icon: GiftIcon },
   subsidy_eligibility_hint: { label: '政策资格提示', icon: LandmarkIcon },
 }
 

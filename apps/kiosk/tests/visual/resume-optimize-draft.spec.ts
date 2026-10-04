@@ -346,6 +346,8 @@ test('AI provider outage shows an honest unavailable state without removing the 
   await page.goto('/resume/optimize')
 
   await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toHaveAttribute('data-optimize-state', 'unavailable')
+  await expect(page.locator('.qx-pill')).toHaveText('AI 暂时用不了')
+  await expect(page.locator('.qx-pill')).not.toContainText('等待优化建议')
   await expect(page.getByText('简历优化当前不可用', { exact: true })).toBeVisible()
   await expect(page.getByText('AI 能力尚未启用，请联系现场工作人员', { exact: true })).toBeVisible()
   await expect(page.getByTestId('resume-optimize-empty-fallback')).toBeVisible()

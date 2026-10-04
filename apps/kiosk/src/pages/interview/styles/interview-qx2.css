@@ -271,7 +271,8 @@
 }
 [data-qx-interview] .iv-panel .iv-copy { margin-top: 8px; }
 
-[data-qx-interview] .iv-alert {
+[data-qx-interview] .iv-alert,
+.interview-qx-cta > .iv-alert {
   margin: 0;
   padding: 13px 18px;
   border: 1px solid var(--qx-cinnabar-line);

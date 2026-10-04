@@ -24,7 +24,17 @@ function assertProdApiMode(command: string, mode: string, env: Record<string, st
   }
 }
 
+/** 生产构建时 shell 里带着 NODE_ENV=development 会打出 React 开发版（10/4 W-118 走查栈即如此）。 */
+function assertProdReactMode(command: string, mode: string) {
+  if (command !== 'build' || mode !== 'production') return
+  const nodeEnv = process.env.NODE_ENV
+  if (nodeEnv !== undefined && nodeEnv !== 'production') {
+    throw new Error(`[partner] 当前 shell 里 NODE_ENV=${nodeEnv}，这样构建出来的是 React 开发版，请去掉该变量再构建`)
+  }
+}
+
 export default defineConfig(({ command, mode }) => {
+  assertProdReactMode(command, mode)
   assertProdApiMode(command, mode, loadEnv(mode, process.cwd(), ''))
   return {
     plugins: [react(), tailwindcss()],

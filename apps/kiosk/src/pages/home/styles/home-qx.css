@@ -4,7 +4,7 @@
 
 .qx-home-hero {
   position: relative; flex: none; display: flex; flex-direction: column; height: 400px;
-  margin-bottom: 28px; padding: 0 var(--qx-gutter) 22px; color: var(--qx-paper);
+  margin-bottom: 48px; padding: 0 var(--qx-gutter) 22px; color: var(--qx-paper);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--qx-deep) 32%, transparent), color-mix(in srgb, var(--qx-deep) 93%, transparent)),
     url('/assets/bg-hero.jpg') center / cover no-repeat;
@@ -49,11 +49,11 @@
 
 .qx-home-board {
   flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
-  padding: 8px var(--qx-gutter) 0; background: var(--qx-paper);
+  padding: 2px var(--qx-gutter) 0; background: var(--qx-paper);
 }
 .qx-home-voice {
   position: relative; isolation: isolate; display: flex; align-items: center; gap: 14px; width: 100%;
-  min-height: 76px; height: var(--qx-btn-h-lg); margin: 8px 0 10px; padding: 0 18px 0 12px; border: 0; border-radius: 48px;
+  flex: none; min-height: 96px; height: 96px; margin: 54px 0 14px; padding: 0 18px 0 12px; border: 0; border-radius: 48px;
   color: var(--qx-deep); background: linear-gradient(110deg, var(--qx-emerald), color-mix(in srgb, var(--qx-emerald) 62%, var(--qx-teal)));
   font-size: var(--qx-fs-btn); font-weight: 650; cursor: pointer; overflow: hidden;
 }
@@ -71,6 +71,7 @@
   color: var(--qx-ink); background: var(--qx-surface); text-align: left;
 }
 .qx-home .continue { grid-template-columns: 1fr auto; }
+/* 清场说明（W-42）：干净首页说「不会显示上一位使用者的资料」，登录着说清离开前要点结束使用。 */
 .qx-home-empty-context .qx-home-context-icon {
   display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; color: var(--qx-teal-d); background: var(--qx-teal-soft);
 }
@@ -121,8 +122,9 @@
   background: linear-gradient(135deg, color-mix(in srgb, var(--qx-teal) 45%, var(--qx-deep-2)), var(--qx-deep-2));
   box-shadow: 0 12px 32px color-mix(in srgb, var(--qx-deep-2) 24%, transparent);
 }
-.qx-home-tile[data-action='policy-hub'], .qx-home-tile[data-span='full'] { grid-column: 1 / -1; }
-.qx-home[data-official-channels='shown'] .qx-home-tile[data-action='policy-hub'] { grid-column: auto; }
+.qx-home-tile:last-child:nth-child(even), .qx-home-tile[data-span='full'] { grid-column: 1 / -1; }
+.qx-home[data-extra-services='shown'] .qx-home-tile:not([data-size='feature']) { padding: 16px 20px; }
+.qx-home[data-extra-services='shown'] .qx-home-tile:not([data-size='feature']) .qx-home-tile-icon { width: 48px; height: 48px; border-radius: 14px; }
 .qx-home-tile:disabled { cursor: not-allowed; opacity: .68; }
 .qx-home-tile:focus-visible, .qx-home-host .qx-home :is(button, a):focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 .qx-home-tile-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

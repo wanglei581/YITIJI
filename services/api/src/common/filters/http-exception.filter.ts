@@ -18,6 +18,9 @@ function isNextActionId(value: unknown): value is string {
   return typeof value === 'string' && /^[a-z][a-z0-9_]{2,63}$/.test(value)
 }
 
+/** 迁移 20261003090000 里触发器抛出的错误文本，两边必须一字不差。 */
+const MEMBER_CLOSED_WRITE_FORBIDDEN = 'MEMBER_CLOSED_WRITE_FORBIDDEN'
+
 /** 500 的兜底句。只有真的是服务端故障时才该出现这句。 */
 const DEFAULT_ERROR_CODE = 'INTERNAL_SERVER_ERROR'
 const DEFAULT_ERROR_MESSAGE = '服务器内部错误'
@@ -104,6 +107,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let details: string[] | undefined
     let memberFileRetained = false
     let mismatchTerminal: MismatchTerminal | null | undefined
+    let closureOrders: Array<{ orderNo: string; status: string }> | undefined
     let nextAction: string | undefined
 
     if (exception instanceof HttpException) {
@@ -132,6 +136,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
           // 会员本机领取走错机器：给本人看该去哪台（网点名）。只认这一个错误码、只取三个字符串列。
           if (err['code'] === 'PICKUP_TERMINAL_MISMATCH') mismatchTerminal = pickMismatchTerminal(err['terminal'])
           // 页面不能是死胡同：拒绝时附一个下一步标识，前端据此挂按钮。
+          if (err['code'] === 'CLOSURE_BLOCKED_BY_OPEN_ORDERS' && Array.isArray(err['orders'])) {
+            closureOrders = err['orders'].filter((row): row is { orderNo: string; status: string } =>
+              Boolean(row && typeof row === 'object' && typeof row.orderNo === 'string' && row.orderNo.length <= 128
+                && typeof row.status === 'string' && /^[a-z_]{1,64}$/.test(row.status)))
+              .map((row) => ({ orderNo: row.orderNo, status: row.status }))
+          }
           if (isNextActionId(err['nextAction'])) nextAction = err['nextAction']
         } else if (typeof errField === 'string') {
           const bodyMessage = b['message']
@@ -150,6 +160,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
           message = b['message']
         }
       }
+    }
+
+    // 账号进入注销后，数据库触发器会拒绝再往它名下写个人数据（迟到写入防线）。这不是服务器故障：
+    // 统一答成「账号当前不可用」，和登录入口对停用 / 注销中账号的口径一致，不让它塌成 500。
+    if (!(exception instanceof HttpException) && String((exception as { message?: unknown } | null)?.message ?? '').includes(MEMBER_CLOSED_WRITE_FORBIDDEN)) {
+      status = HttpStatus.FORBIDDEN
+      code = 'ACCOUNT_UNAVAILABLE'
+      message = '账号当前不可用'
     }
 
     // Nest Throttler 429 的 body.message 含空格/非机器码（如 "ThrottlerException: Too Many Requests"），
@@ -209,6 +227,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ...(details ? { details } : {}),
         ...(memberFileRetained ? { memberFileRetained: true as const } : {}),
         ...(mismatchTerminal !== undefined ? { terminal: mismatchTerminal } : {}),
+        ...(closureOrders ? { orders: closureOrders } : {}),
         ...(nextAction ? { nextAction } : {}),
       },
       requestId: request.requestId,
