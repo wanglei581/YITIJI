@@ -223,6 +223,9 @@ export async function verifyOptimizeExportContract(): Promise<void> {
       if (!ouyang.optimizedResume.summary.includes('想转成仓管或收货')) fail('W-OPT-EXPORT (7). 自述里的求职岗位没有补回')
       const zhuge = await optimize(ZHUGE_XIAOYU, { ...blank('诸葛小雨'), summary: '做事细心，愿意从基础岗位做起。', skills: ['计算机二级（MS Office）'] })
       if (!zhuge.optimizedResume.intention.position.includes('行政专员')) fail('W-OPT-EXPORT (7). 「求职意向」栏下的岗位没有补回')
+      // 「技能证书」这种合并栏目下的内容，模型没写技能时也要补回，不能跟着标题一起丢。
+      const noSkills = await optimize(ZHUGE_XIAOYU, { ...blank('诸葛小雨'), summary: '做事细心，愿意从基础岗位做起。' })
+      if (!noSkills.optimizedResume.skills.join('、').includes('普通话二级甲等')) fail('W-OPT-EXPORT (7). 「技能证书」栏下的内容没有补回')
       // 模型已经写了个人简介时不再把自述原文叠一遍。
       const written = await optimize(ZHOU_MIN, { ...blank('周敏'), summary: '从事快递分拣工作。' })
       if (written.optimizedResume.summary !== '从事快递分拣工作。') fail('W-OPT-EXPORT (7). 模型已写个人简介时不应再叠加自述原文')
