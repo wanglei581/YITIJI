@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-10-04：AI 长文档档超时上限 180 → 95 秒（分支 `claude/backend-hardening-20261004-llm-long-timeout-ceiling`）
+
+- **为什么：** 一体机对简历诊断 / 生成 / 优化只等 100 秒（`aiHttpAdapter.ts` 的 `LLM_TIMEOUT_MS`、`useOptimizeLoad.ts` 的 `OPTIMIZE_LOAD_LIMIT_MS`）。后端 `AI_LLM_LONG_TIMEOUT_MS` 默认 90 秒、原上限 180 秒；若配到 100 秒以上，慢请求会先被一体机断开、记成客户端中止并排除在可用率分母外，签收单「AI 可用率」虚高（总指挥 10/4；线上未设，按默认 90 秒，现在没问题）。
+- **改了什么：** `llm-http.ts` 新增导出 `LLM_LONG_TIMEOUT_CEILING_MS = 95_000`，环境变量配多大都夹在 95 秒；默认仍 90 秒，行为不变。`.env.example` 注释同步。`verify:llm-timeout-concurrency` 加两条：读一体机两处等待时长，断言后端上限都短于它们。
+- **验证：** API typecheck、lint、`verify:llm-timeout-concurrency`（80）、`verify:ai-content-moderation`、`verify:ai-endpoint-allowlist`、`verify:ai-throttle-dimension`、`verify:ai-usage-budget`、`verify:llm-thinking-off`、`verify:production-runtime-gates` 通过。反向变异：上限改回 180 秒 → 8.e 红，已改回。
+
 ## 2026-10-04：W-118 一体机这一半——检查任务防重、被拒后带文件回材料检查、隐私摘要说实话、开发版构建闸
 
 - 根因先说清：走查报的「同一份文件建两条隐私检查」在走查栈上成对出现，是因为走查的一体机前端在 `NODE_ENV=development` 的 shell 里构建，打出了 React 开发版，StrictMode 把挂载副作用执行两遍。正式构建实测只建一次；线上产物 jsxDEV 0 处（总指挥核过）。服务端闸门与去重另见 #1222。

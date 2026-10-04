@@ -20446,7 +20446,8 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts": [
-      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -37454,6 +37455,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
           "services/api/src/ai/ai-request-guard.ts",
           "services/api/src/ai/llm/llm-http.ts"
