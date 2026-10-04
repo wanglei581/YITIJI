@@ -256,9 +256,9 @@ check(
   '1080×1920 底部保留合规真值与备案信息'
 )
 check(
-  /\.qx-home-voice[\s\S]{0,220}min-height:\s*76px/.test(css) &&
+  /\.qx-home-voice[\s\S]{0,220}min-height:\s*96px/.test(css) &&
     /\.qx-home-identity[\s\S]{0,220}min-height:\s*48px/.test(css),
-  '首页主按钮与身份入口达到 76px / 48px 触控下限'
+  '首页主按钮按稿为 96px，身份入口保持 48px 触控下限'
 )
 check(
   /@media\s*\(max-width:\s*760px\)/.test(css) &&
@@ -308,5 +308,12 @@ check(
     manifest.split('\n').length < 180,
   '运行时文件保持可维护体积'
 )
+
+
+// C 批：价格说明只认公开价目，不将免费或读取失败当成收费状态。
+check(viewOnly.includes('usePrintPriceConfig()') && viewOnly.includes("unitCentsFor(price.config, 'black_white')") && viewOnly.includes("unitCentsFor(price.config, 'color')"), '首页复用真实打印价目，两种单价都要读取')
+check(viewOnly.includes("price.status === 'ready' && bwUnit !== null && colorUnit !== null") && viewOnly.includes('priceKnown && (bwUnit > 0 || colorUnit > 0)') && viewOnly.includes('priceKnown && bwUnit === 0 && colorUnit === 0'), '收费、免费与未知价目分开，不把缺价当成免费')
+check(viewOnly.includes("{paidPrint ? ' · 收费以现场公示为准' : ''}") && viewOnly.includes("freePrint ? '免费打印 · 带走：打印件' : '先选材料再出纸 · 带走：打印件'"), '0 元与未知价目不显示价格、报价或收费说明')
+check(viewOnly.includes('这台机器上没有待继续的办理') && viewOnly.includes('{continueSlot}'), '保留清场说明（W-42）与真实续办卡')
 
 console.log('\nALL PASS — 青序流光首页视觉、动作、门控与响应式合同成立\n')

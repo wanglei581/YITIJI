@@ -14,6 +14,7 @@ import {
 } from '../../services/api/adminOps'
 import { ApiHttpError } from '../../services/api/client'
 import { AI_CONTENT_COMPLAINT_SLA_WORKDAYS } from '../member-feedback/feedbackSla'
+import { alertDetailText } from './alertDetailText'
 
 const TYPE_META: Record<
   AdminAlertItem['type'],
@@ -232,6 +233,7 @@ export default function AlertsPage() {
               const handling = handlingLabel(alert)
               const Icon = meta.icon
               const busy = busyKey?.startsWith(`${alert.subjectKey}:`) ?? false
+              const detailLine = alertDetailText(alert.terminalCode, alert.detail)
               return (
                 <tr key={alert.id} className="group bg-surface hover:bg-neutral-50">
                   <td className="relative min-w-[400px] max-w-[620px] px-4 py-4">
@@ -247,9 +249,8 @@ export default function AlertsPage() {
                           <span className="rounded-md bg-neutral-50 px-1.5 py-0.5 text-xs text-neutral-500">{meta.label}</span>
                           <StatusBadge status={handling.badge} label={handling.label} />
                         </div>
-                        <p className="mt-1 truncate text-[12.5px] text-neutral-500" title={[alert.terminalCode, alert.detail].filter(Boolean).join(' · ')}>
-                          {alert.terminalCode ? `${alert.terminalCode} · ` : ''}
-                          {alert.detail}
+                        <p className="mt-1 truncate text-[12.5px] text-neutral-500" title={detailLine}>
+                          {detailLine}
                         </p>
                         {meta.guidance && (
                           <p className="mt-1 text-[12px] text-neutral-600">{meta.guidance}</p>

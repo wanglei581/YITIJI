@@ -1,5 +1,6 @@
 /**
- * 后台「AI 次数」发放字段与「按人次数（今天）」只读面板。
+ * 后台「按人次数（今天）」只读面板，以及会员权益页确实提供「AI 次数」发放（发放表单本身由
+ * #1238 的 grantFormModel 及其单测负责，这里只核入口与三种用途在不在）。
  * 转译后在本进程里调用校验函数并渲染，不连服务、不开浏览器。
  *
  * Run: pnpm --filter @ai-job-print/admin verify:admin-ai-quota-ui
@@ -16,7 +17,7 @@ const read = (rel) => readFileSync(resolve(adminRoot, rel), 'utf8')
 const COMMERCIAL = /购买|充值|价格|会员费/
 const SOURCES = [
   'src/routes/member-benefits/index.tsx',
-  'src/routes/member-benefits/AiQuotaGrantFields.tsx',
+  'src/routes/member-benefits/grantFormModel.ts',
   'src/routes/ai-services/AiUsagePanel.tsx',
   'src/routes/ai-services/AiQuotaUsagePanel.tsx',
   'src/services/api/memberBenefitsAdmin.ts',
@@ -127,36 +128,12 @@ function* nodesOf(tree) {
 
 console.log('\n=== 后台 AI 次数发放与按人次数面板 ===')
 
-await check('发放页有「AI 次数」，用途和数量放在独立组件里', () => {
+await check('会员权益页提供「AI 次数」发放，三种用途齐全', () => {
   const page = read('src/routes/member-benefits/index.tsx')
-  const fields = read('src/routes/member-benefits/AiQuotaGrantFields.tsx')
-  assert.match(page, /value: 'ai_quota', label: 'AI 次数'/)
-  assert.match(page, /<AiQuotaGrantFields/)
-  assert.match(page, /aiQuotaGrantExtra\(/)
+  const model = read('src/routes/member-benefits/grantFormModel.ts')
+  assert.match(page, /buildGrantInput\(/)
   assert.match(page, /benefitType === 'ai_quota'/)
-  assert.match(fields, /简历类/)
-  assert.match(fields, /小青/)
-  assert.match(fields, /模拟面试/)
-  assert.match(fields, /id="ai-quota-purpose"/)
-  assert.match(fields, /id="ai-quota-quantity"/)
-  assert.ok(fields.split('\n').length <= 300, '用途字段组件应保持在 300 行以内')
-})
-
-await check('数量必须是 1–9999 的整数，发放额外字段带上用途', () => {
-  const fields = load('src/routes/member-benefits/AiQuotaGrantFields.tsx', { 'react/jsx-runtime': { jsx: () => null, jsxs: () => null } })
-  assert.equal(fields.validateAiQuotaGrant('', '2'), '请选择 AI 次数的用途')
-  assert.equal(fields.validateAiQuotaGrant('print', '2'), '请选择 AI 次数的用途')
-  for (const quantity of ['', '0', '10000', '1.5', '2e1', '-1', '  ']) {
-    assert.equal(fields.validateAiQuotaGrant('ai_resume', quantity), 'AI 次数必须为 1–9999 的整数', JSON.stringify(quantity))
-  }
-  assert.equal(fields.validateAiQuotaGrant('ai_interview', '1'), null)
-  assert.equal(fields.validateAiQuotaGrant('ai_assistant', '9999'), null)
-  const extra = fields.aiQuotaGrantExtra('ai_resume', '12')
-  assert.equal(extra.serviceKey, 'ai_resume')
-  assert.equal(extra.quantityTotal, 12)
-  assert.equal(fields.aiQuotaPurposeLabel('ai_assistant'), '小青')
-  assert.equal(fields.benefitTypeLabel('ai_quota'), 'AI 次数')
-  assert.equal(fields.AI_QUOTA_PURPOSES.map((item) => item.value).join(','), 'ai_resume,ai_assistant,ai_interview')
+  for (const bucket of ['ai_resume', 'ai_assistant', 'ai_interview']) assert.match(model, new RegExp(`value: '${bucket}'`))
 })
 
 await check('用量页挂了按人次数面板，演示模式没有数字也不发请求', async () => {

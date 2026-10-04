@@ -5,25 +5,23 @@ import { GiftIcon, RefreshCwIcon, SearchIcon, ShieldCheckIcon } from 'lucide-rea
 import { Page } from '../Page'
 import {
   memberBenefitsAdminApi,
+  type AdminAiQuotaService,
   type AdminBenefitGrantItem,
   type AdminBenefitSourceType,
   type AdminBenefitType,
   type AdminEndUserSearchItem,
 } from '../../services/api/memberBenefitsAdmin'
 import {
-  AiQuotaGrantFields,
-  aiQuotaGrantExtra,
-  aiQuotaPurposeLabel,
-  benefitTypeLabel,
-} from './AiQuotaGrantFields'
-
-const BENEFIT_TYPES: { value: AdminBenefitType; label: string; desc: string }[] = [
-  { value: 'coupon', label: '优惠券', desc: '用于打印或服务优惠' },
-  { value: 'free_quota', label: '免费次数', desc: '用于免费打印/服务次数' },
-  { value: 'package_entitlement', label: '服务额度', desc: '仅代表工具服务额度' },
-  { value: 'ai_quota', label: 'AI 次数', desc: '机构加发，指定用途后使用' },
-  { value: 'subsidy_eligibility_hint', label: '政策资格提示', desc: '仅作官方入口与材料指引' },
-]
+  AI_QUOTA_GRANT_NOTE,
+  AI_QUOTA_SERVICES,
+  BENEFIT_TYPES,
+  aiQuotaFieldErrors,
+  benefitKindLine,
+  buildGrantInput,
+  defaultBenefitTitle,
+  grantErrorMessage,
+  quantityLine,
+} from './grantFormModel'
 
 const SOURCE_TYPES: { value: AdminBenefitSourceType; label: string }[] = [
   { value: 'platform', label: '平台' },
@@ -51,14 +49,6 @@ function fmt(iso: string | null): string {
   return formatDateTime(iso)
 }
 
-function defaultTitle(type: AdminBenefitType): string {
-  if (type === 'free_quota') return '免费打印次数'
-  if (type === 'package_entitlement') return '求职服务额度'
-  if (type === 'ai_quota') return '机构加发的 AI 次数'
-  if (type === 'subsidy_eligibility_hint') return '政策资格提示'
-  return '打印服务优惠券'
-}
-
 export default function MemberBenefitsPage() {
   const [phone, setPhone] = useState('')
   const [selectedUser, setSelectedUser] = useState<AdminEndUserSearchItem | null>(null)
@@ -68,16 +58,21 @@ export default function MemberBenefitsPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [benefitType, setBenefitType] = useState<AdminBenefitType>('free_quota')
   const [sourceType, setSourceType] = useState<AdminBenefitSourceType>('platform')
-  const [title, setTitle] = useState(defaultTitle('free_quota'))
+  const [title, setTitle] = useState(defaultBenefitTitle('free_quota'))
   const [description, setDescription] = useState('')
   const [quantityTotal, setQuantityTotal] = useState('1')
-  const [aiServiceKey, setAiServiceKey] = useState('')
-  const [aiQuantity, setAiQuantity] = useState('')
   const [validUntil, setValidUntil] = useState('')
+  const [serviceKey, setServiceKey] = useState<AdminAiQuotaService | ''>('')
+  const [aiCount, setAiCount] = useState('')
+  const [attempted, setAttempted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const selectedType = useMemo(() => BENEFIT_TYPES.find((t) => t.value === benefitType)!, [benefitType])
-  const quantityEnabled = benefitType !== 'subsidy_eligibility_hint' && benefitType !== 'ai_quota'
+  const quantityEnabled = benefitType !== 'subsidy_eligibility_hint'
+  const quotaErrors = benefitType === 'ai_quota'
+    ? aiQuotaFieldErrors(serviceKey, aiCount, { showService: attempted, showEmptyCount: attempted })
+    : { service: null, count: null }
+  const showWorkspace = Boolean(selectedUser) || state === 'idle' || state === 'ready'
 
   const loadItems = useCallback(async (userId: string) => {
     setState('loading')
@@ -129,27 +124,40 @@ export default function MemberBenefitsPage() {
 
   const submitGrant = async (event: FormEvent) => {
     event.preventDefault()
-    if (!selectedUser) return
-    setSubmitting(true)
+    setAttempted(true)
     setMessage(null)
+    if (benefitType === 'ai_quota') {
+      const errors = aiQuotaFieldErrors(serviceKey, aiCount, { showService: true, showEmptyCount: true })
+      const first = errors.service ?? errors.count
+      if (first) return
+    }
+    if (!selectedUser) {
+      setMessage('请先搜索并定位会员。')
+      return
+    }
+    if (!selectedUser.enabled) return
+    setSubmitting(true)
     try {
-      const common = {
+      const input = buildGrantInput({
         endUserId: selectedUser.endUserId,
         benefitType,
         sourceType,
-        title: title.trim() || defaultTitle(benefitType),
-        description: description.trim() || null,
-        validFrom: null,
+        title,
+        description,
+        quantityTotal,
         validUntil: validUntil ? new Date(validUntil).toISOString() : null,
+        serviceKey,
+        aiCount,
+      })
+      if (!input) {
+        setMessage('发放内容不正确，请检查后再试。')
+        return
       }
-      const counted = benefitType === 'ai_quota'
-        ? aiQuotaGrantExtra(aiServiceKey, aiQuantity)
-        : { quantityTotal: quantityEnabled ? Number(quantityTotal || 1) : null }
-      await memberBenefitsAdminApi.grant({ ...common, ...counted })
+      await memberBenefitsAdminApi.grant(input)
       setMessage('权益已发放')
       await loadItems(selectedUser.endUserId)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '发放失败')
+      setMessage(grantErrorMessage(error))
     } finally {
       setSubmitting(false)
     }
@@ -171,15 +179,12 @@ export default function MemberBenefitsPage() {
 
   const handleTypeChange = (next: AdminBenefitType) => {
     setBenefitType(next)
-    setTitle(defaultTitle(next))
-    if (next === 'ai_quota') {
-      setAiServiceKey('')
-      setAiQuantity('')
-      return
-    }
-    setAiServiceKey('')
+    setTitle(defaultBenefitTitle(next))
+    setAttempted(false)
+    setServiceKey('')
+    setAiCount('')
     if (next === 'subsidy_eligibility_hint') setQuantityTotal('')
-    else if (!quantityTotal) setQuantityTotal('1')
+    else if (next !== 'ai_quota' && !quantityTotal) setQuantityTotal('1')
   }
 
   return (
@@ -230,23 +235,28 @@ export default function MemberBenefitsPage() {
         />
       )}
 
-      {selectedUser && (
+      {showWorkspace && (
         <div className="mb-4 grid gap-4 xl:grid-cols-[360px_1fr]">
           <Card className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-success-bg">
-                <ShieldCheckIcon className="h-5 w-5 text-success-fg" />
+            {selectedUser ? (
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-success-bg">
+                  <ShieldCheckIcon className="h-5 w-5 text-success-fg" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900">{selectedUser.phoneMasked}</p>
+                  <p className="mt-0.5 text-xs text-neutral-500">{selectedUser.nickname ?? '未设置昵称'} · {selectedUser.enabled ? '账号启用' : '账号停用'}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-neutral-900">{selectedUser.phoneMasked}</p>
-                <p className="mt-0.5 text-xs text-neutral-500">{selectedUser.nickname ?? '未设置昵称'} · {selectedUser.enabled ? '账号启用' : '账号停用'}</p>
-              </div>
-            </div>
+            ) : (
+              <p className="text-sm font-semibold text-neutral-900">先搜索并定位会员，再发放。</p>
+            )}
 
-            <form lang="zh-CN" onSubmit={(event) => void submitGrant(event)} className="mt-4 space-y-3">
+            <form lang="zh-CN" onSubmit={(event) => void submitGrant(event)} className={selectedUser ? 'mt-4 space-y-3' : 'mt-3 space-y-3'}>
               <div>
-                <label className="text-xs font-medium text-neutral-500">权益类型</label>
+                <label htmlFor="member-benefit-type" className="text-xs font-medium text-neutral-500">权益类型</label>
                 <select
+                  id="member-benefit-type"
                   value={benefitType}
                   onChange={(event) => handleTypeChange(event.target.value as AdminBenefitType)}
                   className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm"
@@ -254,9 +264,30 @@ export default function MemberBenefitsPage() {
                   {BENEFIT_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label} · {type.desc}</option>)}
                 </select>
               </div>
+              {benefitType === 'ai_quota' && (
+                <fieldset>
+                  <legend className="text-xs font-medium text-neutral-500">用于哪项 AI 服务</legend>
+                  <div className="mt-1 space-y-1">
+                    {AI_QUOTA_SERVICES.map((service) => (
+                      <label key={service.value} className="flex h-10 items-center gap-2 text-sm text-neutral-800">
+                        <input
+                          type="radio"
+                          name="ai-quota-service"
+                          value={service.value}
+                          checked={serviceKey === service.value}
+                          onChange={() => setServiceKey(service.value)}
+                        />
+                        {service.label}
+                      </label>
+                    ))}
+                  </div>
+                  {quotaErrors.service && <p className="mt-1 text-xs text-rose-600">{quotaErrors.service}</p>}
+                </fieldset>
+              )}
               <div>
-                <label className="text-xs font-medium text-neutral-500">来源</label>
+                <label htmlFor="member-benefit-source" className="text-xs font-medium text-neutral-500">来源</label>
                 <select
+                  id="member-benefit-source"
                   value={sourceType}
                   onChange={(event) => setSourceType(event.target.value as AdminBenefitSourceType)}
                   className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm"
@@ -265,12 +296,13 @@ export default function MemberBenefitsPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-neutral-500">标题</label>
-                <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" maxLength={80} />
+                <label htmlFor="member-benefit-title" className="text-xs font-medium text-neutral-500">标题</label>
+                <input id="member-benefit-title" value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" maxLength={80} />
               </div>
               <div>
-                <label className="text-xs font-medium text-neutral-500">说明</label>
+                <label htmlFor="member-benefit-description" className="text-xs font-medium text-neutral-500">说明</label>
                 <textarea
+                  id="member-benefit-description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   className="mt-1 min-h-[84px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
@@ -278,44 +310,54 @@ export default function MemberBenefitsPage() {
                   placeholder={benefitType === 'subsidy_eligibility_hint' ? '仅填写官方入口、材料清单、资格提示等说明文字' : '填写使用范围和现场规则'}
                 />
               </div>
-              {benefitType === 'ai_quota' && (
-                <AiQuotaGrantFields
-                  serviceKey={aiServiceKey}
-                  quantity={aiQuantity}
-                  onServiceKey={setAiServiceKey}
-                  onQuantity={setAiQuantity}
-                />
-              )}
-              <div className={benefitType === 'ai_quota' ? '' : 'grid grid-cols-2 gap-3'}>
-                {benefitType !== 'ai_quota' && (
-                <div>
-                  <label className="text-xs font-medium text-neutral-500">额度</label>
-                  <input
-                    value={quantityTotal}
-                    onChange={(event) => setQuantityTotal(event.target.value)}
-                    disabled={!quantityEnabled}
-                    type="number"
-                    min={1}
-                    max={9999}
-                    className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm disabled:bg-neutral-50"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                {benefitType === 'ai_quota' ? (
+                  <div>
+                    <label htmlFor="ai-quota-count" className="text-xs font-medium text-neutral-500">次数</label>
+                    <input
+                      id="ai-quota-count"
+                      value={aiCount}
+                      onChange={(event) => setAiCount(event.target.value)}
+                      inputMode="numeric"
+                      aria-invalid={quotaErrors.count ? true : undefined}
+                      className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm"
+                    />
+                    {quotaErrors.count && <p className="mt-1 text-xs text-rose-600">{quotaErrors.count}</p>}
+                  </div>
+                ) : (
+                  <div>
+                    <label htmlFor="benefit-quantity" className="text-xs font-medium text-neutral-500">额度</label>
+                    <input
+                      id="benefit-quantity"
+                      value={quantityTotal}
+                      onChange={(event) => setQuantityTotal(event.target.value)}
+                      disabled={!quantityEnabled}
+                      type="number"
+                      min={1}
+                      max={9999}
+                      className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm disabled:bg-neutral-50"
+                    />
+                  </div>
                 )}
                 <div>
-                  <label className="text-xs font-medium text-neutral-500">有效期至（年/月/日 时:分）</label>
-                  <input value={validUntil} onChange={(event) => setValidUntil(event.target.value)} lang="zh-CN" title="格式：年/月/日 时:分" type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" />
+                  <label htmlFor="member-benefit-until" className="text-xs font-medium text-neutral-500">有效期至（年/月/日 时:分）</label>
+                  <input id="member-benefit-until" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} lang="zh-CN" title="格式：年/月/日 时:分" type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" />
                 </div>
               </div>
+              {benefitType === 'ai_quota' && (
+                <p className="text-xs leading-relaxed text-neutral-500">{AI_QUOTA_GRANT_NOTE}</p>
+              )}
               <button
                 type="submit"
-                disabled={submitting || !selectedUser.enabled}
+                disabled={submitting || (selectedUser !== null && !selectedUser.enabled)}
                 className="h-11 w-full rounded-lg bg-primary-600 text-sm font-semibold text-white disabled:bg-neutral-300"
               >
-                {submitting ? '发放中…' : `发放${selectedType.label}`}
+                {submitting ? '发放中…' : benefitType === 'ai_quota' ? '发放 AI 额度' : `发放${selectedType.label}`}
               </button>
             </form>
           </Card>
 
+          {selectedUser ? (
           <Card className="p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-sm font-semibold text-neutral-900">权益记录</p>
@@ -333,7 +375,6 @@ export default function MemberBenefitsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p title={item.title} className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
-                        <p className="mt-1 text-xs text-neutral-500">{benefitTypeLabel(item.benefitType)}{aiQuotaPurposeLabel(item.serviceKey) ? ` · ${aiQuotaPurposeLabel(item.serviceKey)}` : ''}</p>
                         <p className="mt-1 text-xs text-neutral-400">{item.phoneMasked} · {SOURCE_TYPES.find((type) => type.value === item.sourceType)?.label ?? '其他来源'} · 创建于 {fmt(item.createdAt)}</p>
                       </div>
                       <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', STATUS_CLASS[item.status]].join(' ')}>
@@ -341,9 +382,10 @@ export default function MemberBenefitsPage() {
                       </span>
                     </div>
                     {item.description && <p className="mt-2 text-xs leading-relaxed text-neutral-500">{item.description}</p>}
+                    {benefitKindLine(item) && <p className="mt-2 text-xs font-medium text-neutral-700">{benefitKindLine(item)}</p>}
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <p className="text-xs text-neutral-400">
-                        额度 {item.quantityRemaining ?? '—'} / {item.quantityTotal ?? '—'} · 有效期至 {fmt(item.validUntil)}
+                        {quantityLine(item)} · 有效期至 {fmt(item.validUntil)}
                       </p>
                       <button
                         type="button"
@@ -359,11 +401,10 @@ export default function MemberBenefitsPage() {
               </div>
             )}
           </Card>
+        ) : (
+          <EmptyState icon={GiftIcon} title="先搜索会员" description="输入手机号精确定位会员后，再发放或查看权益记录" className="py-16" />
+        )}
         </div>
-      )}
-
-      {!selectedUser && state === 'idle' && (
-        <EmptyState icon={GiftIcon} title="先搜索会员" description="输入手机号精确定位会员后，再发放或查看权益记录" className="py-20" />
       )}
     </Page>
   )

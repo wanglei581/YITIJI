@@ -12100,7 +12100,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 234,
+      "reachableFileCount": 236,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12863,11 +12863,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 259
+      "sourceFileCount": 262
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 632,
+      "reachableFileCount": 635,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15843,7 +15843,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 726
+      "sourceFileCount": 729
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17966,6 +17966,9 @@
     "apps/admin/scripts/verify-console-batch6-copy.mjs": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
+    "apps/admin/scripts/verify-console-batch7-copy.mjs": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/scripts/verify-console-privacy-copy.mjs": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
@@ -18051,6 +18054,9 @@
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs",
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
+    ],
+    "apps/admin/src/routes/alerts/alertDetailText.ts": [
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/alerts/index.tsx": [
       "apps/admin/scripts/verify-feedback-sla.mjs",
@@ -18177,7 +18183,7 @@
       "apps/admin/scripts/verify-admin-login-second-factor.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
-    "apps/admin/src/routes/member-benefits/AiQuotaGrantFields.tsx": [
+    "apps/admin/src/routes/member-benefits/grantFormModel.ts": [
       "apps/admin/scripts/verify-admin-ai-quota-ui.mjs"
     ],
     "apps/admin/src/routes/member-benefits/index.tsx": [
@@ -18388,10 +18394,12 @@
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/admin/src/routes/screensaver/AssetUploadNotice.tsx": [
-      "apps/admin/scripts/verify-console-batch5-copy.mjs"
+      "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
     ],
     "apps/admin/src/routes/screensaver/AssetsTab.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-batch7-copy.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/screensaver/PlaylistsTab.tsx": [
@@ -18399,13 +18407,20 @@
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/screensaver/TerminalsTab.tsx": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/screensaver/assetUploadRules.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
     ],
     "apps/admin/src/routes/screensaver/index.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/admin/src/routes/screensaver/terminalConfigState.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
     ],
     "apps/admin/src/routes/smart-campus/index.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
@@ -19336,6 +19351,11 @@
     ],
     "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/interview/session/types.ts": [
@@ -21789,6 +21809,9 @@
     ],
     "apps/terminal-agent/src/runtime-version.ts": [
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts"
+    ],
+    "apps/terminal-agent/src/usb/usb-capability.ts": [
+      "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
     ],
     "apps/terminal-agent/src/usb/usb-files.ts": [
       "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
@@ -24531,12 +24554,28 @@
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
     "services/api/src/content/content.service.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs",
       "services/api/scripts/verify-ad-asset-range.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-screensaver-content.ts"
     ],
+    "services/api/src/content/dto/create-external-video.dto.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
+    ],
+    "services/api/src/content/dto/save-config.dto.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
+    ],
+    "services/api/src/content/dto/update-ad-asset.dto.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
+    ],
+    "services/api/src/content/dto/upload-ad-asset.dto.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
+    ],
     "services/api/src/content/external-video-url.ts": [
       "services/api/scripts/verify-external-video.ts"
+    ],
+    "services/api/src/content/media-validation.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
     ],
     "services/api/src/contract-review/__tests__/contract-review-http-controller.test.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts"
@@ -26902,7 +26941,7 @@
         "files": [
           "apps/admin/src/routes/ai-services/AiQuotaUsagePanel.tsx",
           "apps/admin/src/routes/ai-services/AiUsagePanel.tsx",
-          "apps/admin/src/routes/member-benefits/AiQuotaGrantFields.tsx",
+          "apps/admin/src/routes/member-benefits/grantFormModel.ts",
           "apps/admin/src/routes/member-benefits/index.tsx",
           "apps/admin/src/services/api/aiQuotaUsage.ts",
           "apps/admin/src/services/api/memberBenefitsAdmin.ts"
@@ -27447,6 +27486,32 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/screensaver/AssetUploadNotice.tsx",
+          "apps/admin/src/routes/screensaver/AssetsTab.tsx",
+          "apps/admin/src/routes/screensaver/TerminalsTab.tsx",
+          "apps/admin/src/routes/screensaver/assetUploadRules.ts",
+          "apps/admin/src/routes/screensaver/terminalConfigState.ts",
+          "services/api/src/content/content.service.ts",
+          "services/api/src/content/dto/create-external-video.dto.ts",
+          "services/api/src/content/dto/save-config.dto.ts",
+          "services/api/src/content/dto/update-ad-asset.dto.ts",
+          "services/api/src/content/dto/upload-ad-asset.dto.ts",
+          "services/api/src/content/media-validation.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-console-batch7-copy.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/admin",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "apps",
           "apps/admin/src/routes"
@@ -27454,6 +27519,7 @@
         "files": [
           "apps/admin/scripts/verify-console-batch5-copy.mjs",
           "apps/admin/scripts/verify-console-batch6-copy.mjs",
+          "apps/admin/scripts/verify-console-batch7-copy.mjs",
           "apps/admin/scripts/verify-console-privacy-copy.mjs",
           "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/lib/printErrorText.ts",
@@ -27737,6 +27803,7 @@
         "files": [
           "apps/admin/package.json",
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/routes/alerts/alertDetailText.ts",
           "apps/admin/src/routes/alerts/index.tsx",
           "apps/admin/src/routes/dashboard/dashboardRows.ts",
           "apps/admin/src/routes/legal-docs/index.tsx",
@@ -28021,6 +28088,7 @@
           "apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
+          "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
@@ -28535,6 +28603,7 @@
           "apps/kiosk/src/pages/interview/InterviewShell.tsx",
           "apps/kiosk/src/pages/interview/InterviewTipsPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx",
+          "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
           "apps/kiosk/src/pages/interview/styles/interview-shell.css",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
@@ -29678,6 +29747,7 @@
           "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
+          "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
           "apps/kiosk/src/pages/interview/styles/interview-report.css",
           "apps/kiosk/src/pages/interview/styles/interview-responsive.css",
@@ -32342,6 +32412,7 @@
         "files": [
           "apps/terminal-agent/src/agent/types.ts",
           "apps/terminal-agent/src/local-api/qr-login-server.ts",
+          "apps/terminal-agent/src/usb/usb-capability.ts",
           "apps/terminal-agent/src/usb/usb-files.ts"
         ],
         "missing": []
@@ -32952,6 +33023,22 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:no-raw-error-render"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/verify-prod-react-build.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:prod-react-build"
       ],
       "wired": true
     },
@@ -42198,6 +42285,17 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-source-publish-actions.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/member-benefits/grantFormModel.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",

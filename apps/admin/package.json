@@ -36,7 +36,7 @@
     "verify:admin-phone-transfer-ui": "node scripts/verify-admin-phone-transfer-ui.mjs",
     "verify:partner-account-action-ui": "node scripts/verify-partner-account-action-ui.mjs",
     "verify:admin-partner-contact-phone-ui": "node scripts/verify-admin-partner-contact-phone-ui.mjs",
-    "test:admin-state-units": "pnpm --filter @ai-job-print/api exec node --import tsx --test ../../apps/admin/src/routes/screensaver/terminalConfigState.test.ts ../../apps/admin/src/routes/toolbox/toolboxActionState.test.ts",
+    "test:admin-state-units": "pnpm --filter @ai-job-print/api exec node --import tsx --test ../../apps/admin/src/routes/screensaver/terminalConfigState.test.ts ../../apps/admin/src/routes/toolbox/toolboxActionState.test.ts ../../apps/admin/src/routes/member-benefits/grantFormModel.test.ts",
     "verify:partner-account-action-state": "pnpm --filter @ai-job-print/api exec node --import tsx --experimental-test-coverage --test-coverage-lines=97 --test-coverage-functions=100 --test-coverage-branches=80 --test ../../apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
     "verify:admin-device-fleet-overview-ui": "node scripts/verify-admin-device-fleet-overview-ui.mjs",
     "verify:admin-terminal-network-diagnostics-ui": "node scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
