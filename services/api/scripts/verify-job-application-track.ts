@@ -341,6 +341,8 @@ function checkRepoStructure(): void {
     'src/prisma/prisma.service.ts',
     // 个人信息导出（PIPL 权利）必须能读到本表，这是 §4.4A 明确允许的用途。
     'src/member-privacy/member-data-export.mapper.ts',
+    // 账号注销执行器要把本人自填的求职进度一并硬删（只删本人行，不读、不改、不外传）。
+    'src/member-privacy/member-closure.service.ts',
   ])
 
   const touchers: string[] = []

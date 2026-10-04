@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 // verify:data-request-ui — UserDataRequest 两端诚实文案守卫（P0-3 + C-04）
 //
 // 与 main 后端对齐：
-// - delete 创建路径拒绝账号注销（ACCOUNT_CLOSURE_NOT_AVAILABLE）
+// - delete 创建路径只登记一条待管理员执行的注销申请（2026-10-04 起；此前是固定拒绝），自己不删任何数据
 // - UI 不得暗示「全部个人数据已删除 / 账号注销成功」
 // - 导出范围文案必须与 MemberDataExportMapper 白名单一致（禁止「不导出订单/文件」）
 // ============================================================
@@ -102,8 +102,8 @@ expectMatches(
 
 expectMatches(
   backendCreate,
-  /requestType === 'delete'[\s\S]{0,120}ACCOUNT_CLOSURE_NOT_AVAILABLE/,
-  '后端 delete 创建路径拒绝账号注销',
+  /requestType === 'delete'[\s\S]{0,120}this\.closures\(\)\.create\(/,
+  '后端 delete 创建路径只登记注销申请，交管理员执行',
 )
 expectAbsent(
   backendCreate,
