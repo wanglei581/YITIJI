@@ -2223,7 +2223,9 @@ test('career plan guide, ai-down and generated result keep print available @w3-k
   await page.getByRole('button', { name: '生成求职方案' }).click()
   await expect(screen).toHaveAttribute('data-state', 'ai-down')
   await expect(page.getByText('这三条是通用建议，不是针对你这份简历的', { exact: false })).toBeVisible()
-  await expect(page.getByText('AI 能力未配置')).toBeVisible()
+  // AI 能力级不可用时页面给固定人话和手动出路，不再透出服务端原文（#1241）。
+  await expect(page.getByText('AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）')).toBeVisible()
+  await expect(page.getByText('AI 能力未配置')).toHaveCount(0)
   // 出纸不依赖 AI：ai-down 时打印按钮仍在，生成钮也仍可重试（不被 canStart 藏掉）。
   await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeVisible()
   await captureDecisionViewports(page, 'career-ai-down')
