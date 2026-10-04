@@ -23161,11 +23161,13 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
     "services/api/src/advisor/llm-advisor.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
-      "services/api/scripts/verify-ai-safety-aigc.ts"
+      "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
     "services/api/src/ai-access/admin-ai-access.controller.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
@@ -23209,6 +23211,7 @@
     "services/api/src/ai/ai-public-quota.service.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
@@ -23216,6 +23219,7 @@
     ],
     "services/api/src/ai/ai-request-guard.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
     "services/api/src/ai/ai-result.cleanup.task.ts": [
@@ -23309,6 +23313,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
@@ -23364,6 +23369,7 @@
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
@@ -23380,7 +23386,8 @@
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
     "services/api/src/ai/llm/llm-failure.ts": [
-      "services/api/scripts/verify-ai-endpoint-allowlist.ts"
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
     "services/api/src/ai/llm/llm-guard.ts": [
       "services/api/scripts/verify-ai-content-moderation.ts",
@@ -23404,6 +23411,7 @@
     ],
     "services/api/src/ai/providers/llm.provider.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-optimize.ts"
     ],
@@ -23441,6 +23449,7 @@
       "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/src/ai/resume-parse-intent-runner.service.ts": [
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts"
@@ -23552,6 +23561,7 @@
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/ai/resume/llm-fair-visit-plan.service.ts": [
@@ -23559,6 +23569,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/ai/resume/llm-job-fit.service.ts": [
@@ -23567,6 +23578,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-fit.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
@@ -23576,6 +23588,7 @@
     "services/api/src/ai/resume/llm-resume-generate.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-generate.ts",
@@ -23585,6 +23598,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
@@ -23594,6 +23608,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
@@ -23605,6 +23620,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
@@ -24460,7 +24476,8 @@
     ],
     "services/api/src/contract-review/contract-review-failure-reason.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
-      "services/api/scripts/verify-contract-review-timeout.ts"
+      "services/api/scripts/verify-contract-review-timeout.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
     "services/api/src/contract-review/contract-review-http.module.ts": [
       "services/api/scripts/verify-contract-review-http.ts"
@@ -24685,6 +24702,7 @@
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-llm-thinking-off.ts"
     ],
@@ -25505,6 +25523,7 @@
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
@@ -37247,6 +37266,42 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:legal-doc-version"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai-public-quota.service.ts",
+          "services/api/src/ai/ai-request-guard.ts",
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-failure.ts",
+          "services/api/src/ai/providers/llm.provider.ts",
+          "services/api/src/ai/resume-parse-intent-runner.service.ts",
+          "services/api/src/ai/resume/llm-career-plan.service.ts",
+          "services/api/src/ai/resume/llm-fair-visit-plan.service.ts",
+          "services/api/src/ai/resume/llm-job-fit.service.ts",
+          "services/api/src/ai/resume/llm-resume-generate.service.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/llm-resume.service.ts",
+          "services/api/src/ai/resume/llm-self-assessment.service.ts",
+          "services/api/src/contract-review/contract-review-failure-reason.ts",
+          "services/api/src/job-ai/job-ai-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-llm-account-unavailable.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:llm-account-unavailable"
       ],
       "wired": true
     },
