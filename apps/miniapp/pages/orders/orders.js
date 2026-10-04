@@ -187,7 +187,7 @@ Page({
     // 用户已经看到的订单不该因为下一页失败而消失。
     pkgMoreErrorText: '',
     pkgTotal: 0,
-    pkgOnsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
+    pkgOnsiteNotice: pkg.PACKAGE_ONSITE_NOTICE_FREE,
   },
 
   onLoad() {
