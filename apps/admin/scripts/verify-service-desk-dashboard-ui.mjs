@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 
 const layout = readFileSync(new URL('../src/layouts/AdminLayoutWrapper.tsx', import.meta.url), 'utf8')
-const dashboard = readFileSync(new URL('../src/routes/dashboard/index.tsx', import.meta.url), 'utf8')
+const dashboard = ['index.tsx', 'DashboardWidgets.tsx', 'RecentPrintTasks.tsx', 'RecentActivity.tsx', 'dashboardRows.ts', 'DashboardDeviceStatus.tsx'].map((file) => readFileSync(new URL(`../src/routes/dashboard/${file}`, import.meta.url), 'utf8')).join('\n')
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 
 const failures = []
@@ -109,7 +109,7 @@ check(
 const expectedAlertCtaClass =
   'inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-600 px-4 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(16,48,43,0.18)] transition-transform hover:-translate-y-px hover:bg-primary-700 active:scale-[0.97]'
 const alertCta = dashboard.match(
-  /<a\s+href="\/alerts"\s+className="([^"]+)"[\s\S]*?<AlertTriangleIcon[\s\S]*?处理告警 \(\{alertCount\}\)[\s\S]*?<\/a>/,
+  /<a\s+href="\/alerts"\s+className="([^"]+)"[\s\S]*?<AlertTriangleIcon[\s\S]*?处理告警 \(\{formatCount\(alertCount\)\}\)[\s\S]*?<\/a>/,
 )
 check(
   alertCta?.[1] === expectedAlertCtaClass &&
@@ -219,7 +219,7 @@ check(
 const paidPendingMeta = block(alertsPage, '  paid_pending_file_unavailable: {', '\n  },')
 // 工作台只扫告警相关代码：审计动作标签里合法地出现 file.get_signed_url。
 const dashboardAlertCode =
-  block(dashboard, 'const ALERT_ROW_ICON:', '// ─── Page') +
+  readFileSync(new URL('../src/routes/dashboard/dashboardRows.ts', import.meta.url), 'utf8') +
   block(dashboard, '<SectionCard title="实时告警"', '</SectionCard>')
 const alertSurfaces = stripComments(alertsPage) + stripComments(dashboardAlertCode) + stripComments(adminOps)
 check(

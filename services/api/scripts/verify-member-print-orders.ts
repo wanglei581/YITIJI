@@ -279,8 +279,11 @@ async function main() {
       if (JSON.stringify(fb?.['terminal']) === JSON.stringify({ id: orderTerminalId, displayName: '市民中心打印终端', locationLabel: '市民中心一楼' })) {
         pass('任务上没记终端时，用订单上的终端兜底显示网点名')
       } else fail(`终端兜底不对：${JSON.stringify(fb?.['terminal'])}`)
+      // W-117：列表给对外订单号（完成页也给用户看这一串），不给内部任务号以外的任何新标识。
+      if (fb?.['orderNo'] === fbOrderNo) pass('列表返回这一单的对外订单号 orderNo')
+      else fail(`orderNo 不对：${JSON.stringify(fb?.['orderNo'])}`)
     }
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents', 'refundRequired', 'orderId', 'terminal', 'failureCode'])
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents', 'refundRequired', 'orderId', 'orderNo', 'terminal', 'failureCode'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {

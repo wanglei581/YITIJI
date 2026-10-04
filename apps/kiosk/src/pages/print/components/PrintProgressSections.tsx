@@ -121,10 +121,10 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
             <div className="pff-inbar-h">
               <span className="pff-inbar-ic"><WalletIcon aria-hidden="true" /></span>
               <span>
-                费用与订单边界
+                {isFreeOrder ? '订单记录' : '费用与订单边界'}
                 <small>
                   {isFreeOrder
-                    ? '本次未收款，订单记录保留'
+                    ? '免费试运营，订单记录保留'
                     : payment === 'paid'
                       ? '订单和支付记录都在，不会因为查询超时消失'
                       : '订单记录保留，不会因为查询超时消失'}
@@ -133,7 +133,7 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
             </div>
             <p className="pff-inbar-b">
               {isFreeOrder
-                ? <>这次到底出没出纸、要不要补打，<b>都等工作人员现场核查</b>。本次系统报价 0 元，没有收款。</>
+                ? <>这次到底出没出纸、要不要补打，<b>都等工作人员现场核查</b>。订单记录保留。</>
                 : payment === 'paid'
                   ? <>这次到底出没出纸、要不要补打或退费，<b>都等工作人员现场核查</b>。是否退款、退多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动退款。</>
                   : <>这次到底出没出纸，<b>都等工作人员现场核查</b>；费用以订单记录和工作人员核查结果为准。</>}
@@ -141,7 +141,7 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
             <div className="pff-inbar-kv">
               {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}
               {payment === 'paid' && amountCents != null ? <span>支付状态 <b>已支付 {formatCents(amountCents)}</b></span> : null}
-              {isFreeOrder ? <span>支付状态 <b>本次未收款</b></span> : null}
+              {isFreeOrder ? <span>免费试运营</span> : null}
             </div>
           </div>
         </div>

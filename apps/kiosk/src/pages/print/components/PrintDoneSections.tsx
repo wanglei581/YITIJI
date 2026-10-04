@@ -50,7 +50,8 @@ export function PrintDoneXq({ ask, doing, mainClassName }: {
 }
 
 /** 稿 moneyBar：只写订单本身的确定事实 + 由谁裁决，不承诺补打、费用处理或到账。 */
-export function PrintFeeBoundaryBar({ sub, body, facts }: {
+export function PrintFeeBoundaryBar({ sub, body, facts, free = false }: {
+  free?: boolean
   sub: string
   body: ReactNode
   facts: ReactNode
@@ -59,7 +60,7 @@ export function PrintFeeBoundaryBar({ sub, body, facts }: {
     <div className="pff-inbar">
       <div className="pff-inbar-h">
         <span className="pff-inbar-ic"><FileTextIcon aria-hidden="true" /></span>
-        <span>费用与订单边界<small>{sub}</small></span>
+        <span>{free ? '订单记录' : '费用与订单边界'}<small>{sub}</small></span>
       </div>
       <p className="pff-inbar-b">{body}</p>
       <div className="pff-inbar-kv">{facts}</div>
@@ -172,18 +173,19 @@ export function PrintOutOfPaperPanel({
             </div>
             <p className="pff-inbar-b">
               纸匣已空，这次打印<b>不会在加纸后自动继续</b>。出纸口里如果已经有纸，可以先拿走；没打完的部分请<b>联系现场工作人员</b>处理。
-              {paid ? '订单和已付金额都保留着' : '订单记录保留着'}；只有本页出现「重新提交打印」按钮时，才能自己重打一次，且不会重复收费。
+              {paid ? '订单和已付金额都保留着' : '订单记录保留着'}；只有本页出现「重新提交打印」按钮时，才能自己重打一次{money.fact === 'free' ? '。' : '，且不会重复收费。'}
             </p>
             <p className="pff-inbar-b pfd-reason"><span className="pfd-reason-k">设备上报</span><span>{failureReason}</span></p>
           </div>
           <PrintFeeBoundaryBar
+            free={money.fact === 'free'}
             sub={paid ? '订单和支付记录都在，不会因为这次缺纸消失' : '订单记录都在，不会因为这次缺纸消失'}
-            body={<>补纸只能由工作人员做，这次打印<b>不会在加纸后自动续打</b>。是否补打、是否处理费用、处理多少，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
+            body={money.fact === 'free' ? <>补纸只能由工作人员做，这次打印<b>不会在加纸后自动续打</b>。是否补打，以工作人员现场核查结果为准。</> : <>补纸只能由工作人员做，这次打印<b>不会在加纸后自动续打</b>。是否补打、是否处理费用、处理多少，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
             facts={
               <>
                 {shownOrderNo ? <span>订单 <b>{shownOrderNo}</b></span> : null}
                 <span>
-                  支付状态 <b>{paid && money.amountCents != null ? `已付 ${formatCents(money.amountCents)}` : money.fact === 'free' ? '本次未收款' : '以订单为准'}</b>
+                  {money.fact === 'free' ? '办理方式' : '支付状态'} <b>{paid && money.amountCents != null ? `已付 ${formatCents(money.amountCents)}` : money.fact === 'free' ? '免费试运营' : '以订单为准'}</b>
                 </span>
               </>
             }
@@ -208,7 +210,11 @@ export function PrintOutOfPaperPanel({
           <div className="pff-step">
             <span className="pff-step-no">3</span>
             <span className="pff-step-txt">
-              {canRetry
+              {money.fact === 'free'
+                ? canRetry
+                  ? <>加完纸可点下方<b>重新提交打印</b>：同一订单<b>整份重打</b>，请不要重新下单。</>
+                  : <>记下<b>{orderRef}</b>，补打由工作人员凭它处理；请不要重新下单。</>
+                : canRetry
                 ? <>加完纸可点下方<b>重新提交打印</b>：同一订单<b>整份重打</b>、不再收费；<b>不要重新下单</b>，那会变成两笔费用。</>
                 : <>记下<b>{orderRef}</b>，补打由工作人员凭它处理；<b>不要重新下单再打一次</b>，那会变成两笔费用。</>}
             </span>

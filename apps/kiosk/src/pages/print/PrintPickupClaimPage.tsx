@@ -160,7 +160,7 @@ export function PrintPickupClaimPage() {
   const [state, setState] = useState<ClaimState>('idle')
   const [result, setResult] = useState<ClaimPickupResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
-  // 失败屏的种类与被拒的那串码（码格回显、网络重试用）。只在本组件内存里：离页 / 清场卸载即丢。
+  // 失败屏的种类与被拒的那串码（仅供重试用，不回显）。只在本组件内存里：离页 / 清场卸载即丢。
   const [failure, setFailure] = useState<{ kind: PickupFailure; code: string } | null>(null)
   // true = 显示 10 格与历史码字母键盘（稿 alphaKb）；受理正则同时接受 8 位新码与 10 位历史码，
   // 这个开关不参与任何格式判定，也不影响提交。
@@ -437,8 +437,8 @@ export function PrintPickupClaimPage() {
   }
 
   // ── 手输：idle / legacy / verifying / 各失败屏 ─────────────────
-  // 失败屏回显被拒的那串码（输入框本身已清空、保持聚焦，下一次扫码直接落进来）。
-  const display = state === 'error' && failure ? failure.code : code
+  // 公共终端失败屏不回显上一位提交的码；重试只从组件内存读取。
+  const display = state === 'error' ? '' : code
   const cells = pickupCells(display, legacyMode)
   const entering = screen === 'idle' || screen === 'legacy'
   const showKeypad = entering || screen === 'verifying'

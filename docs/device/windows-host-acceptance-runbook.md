@@ -125,6 +125,28 @@ agent-ctl status | start | stop | restart | logs
 - [ ] 日志路径固定 `%ProgramData%\AIJobPrintAgent\logs\`，**不含用户文件正文 / 密钥**（§7.5）
 - [ ] `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须在 Windows 实测。干净停止是否留锁是条件 P0，不得在 macOS 推断。在该阶梯留下证据前，本机 **DEVICE 仍 NO-GO**。
 
+### 4.1 首次启动失败怎么判断（2026-10-03）
+
+服务装好后没有 Running，先看 `%ProgramData%\AIJobPrintAgent\last-startup-diagnostic.json` 的 `code`。诊断文件里的 `lock.reason` 是脱敏过的（机器标识类问题一律写成 `lock_unavailable`），要分清是哪一种，再看 `%ProgramData%\AIJobPrintAgent\logs\aijobprintagent.err.log` 里以诊断码开头的那一行 `reason=`（来源：`apps/terminal-agent/src/agent/startup-diagnostics.ts` 的 `LOCK_REASONS` 白名单、`instance-lock.ts` 的 `failClosed`）。**不要删 `agent.pid`，也不要删 `instance-id`**——删了不解决问题，`instance-id` 重新生成还会换掉管道名。
+
+| 诊断码（诊断文件）与错误日志里的 `reason=` | 进程退出码 | 含义 | 现场怎么办 |
+|---|---|---|---|
+| `INSTANCE_LOCK_UNAVAILABLE`；日志 `reason=machine_identity_invalid…` | 1 | 机器标识文件 `instance-id` 的内容不合格式。两种来源：首次安装时两个 Agent 进程同时启动，后到的读到了还没写完的文件；或文件被人改过 | **先等 60 秒**看服务自己重启后是否 Running。起来了就是前一种，不用处理，记一笔。等过 6 分钟仍不 Running，按文件被改过处理：保留现场，报 Windows 真机路，不要自己重建文件 |
+| `INSTANCE_LOCK_UNAVAILABLE`；日志 `reason=machine_identity_unavailable…` | 1 | 标识文件读不了或建不出来（权限、磁盘） | 跑 `diagnose-production-agent.ps1`（只读），把输出和诊断文件一起交 Windows 真机路 |
+| `DUPLICATE_INSTANCE`；日志 `reason=duplicate` | 1 | 已有一个 Agent 占着单实例管道，这一个是多余的 | 这是保护在起作用。查是不是有人手工又起了一个；不要去杀服务那一个 |
+
+**服务会自己重启几次：** 第一次失败后 60 秒重启，再失败后 300 秒重启，第三次失败后不再重启；失败计数一天后清零，重启机器也会重新开始（来源：`apps/terminal-agent/installer/bootstrap/aijobprintagent.xml` 的三条 `onfailure` 与 `resetfailure`；MSI 在已绑定终端升级或修复时用 `sc failure … actions= restart/60000/restart/300000` 写回同一策略，来源：`apps/terminal-agent/installer/Agent.wxs`）。所以「装完立刻看到服务停了」不等于坏了，按上表先等够时间再判。
+
+现场核对当前策略（只读）：
+
+```powershell
+sc.exe qfailure aijobprintagent.exe
+Get-Content "$env:ProgramData\AIJobPrintAgent\last-startup-diagnostic.json"
+Select-String -Path "$env:ProgramData\AIJobPrintAgent\logs\aijobprintagent.err.log" -Pattern "INSTANCE_LOCK_UNAVAILABLE|DUPLICATE_INSTANCE" | Select-Object -Last 3
+```
+
+> 0.4.13 不含「并发首次启动读到半成品」的修复（#1206，下次出包带上）。影响只在首次安装、`instance-id` 还不存在、两个进程又恰好同时启动时；文件一旦生成就不再走那段代码。
+
 ---
 
 ## 5. 本地 Kiosk ↔ Agent 通信安全

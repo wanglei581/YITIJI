@@ -6,6 +6,11 @@
  *
  * 运行：pnpm --filter @ai-job-print/api verify:job-fit-print
  */
+// 本门禁覆盖的功能在生产（托管关闭）下也在用；它的夹具或断言依赖系统内岗位 / 招聘会数据，
+// 这里显式打开以保持原有覆盖不降。关闭态的专项断言在 verify:recruitment-hosting-default-off；
+// 把本门禁改成开、关两种状态都测是登记在案的后续项（2026-10-03 CI 主作业改跑关闭态时记）。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { createHash } from 'crypto'

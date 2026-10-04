@@ -50,7 +50,6 @@ import {
   COPY_GUIDE_KEY,
   COPY_GUIDE_ROUTE,
   HUB_PILL,
-  PRINT_HUB_PRICE_NOTICE,
   arrivalCodeStateNote,
   capabilityGroupHint,
   colorDuplexChip,
@@ -326,6 +325,7 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 export function PrintScanHomePage() {
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
+  // Hub 只选办理入口，使用中性文案；价目由后续打印确认页读取，离开扫描不额外取价。
   const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [capabilityLoad, setCapabilityLoad] = useState<
@@ -478,12 +478,20 @@ export function PrintScanHomePage() {
     )
   const hubState = deriveHubUiState({ probe, mfp, locked })
   const pill = HUB_PILL[hubState]
+  const printerUnavailable = {
+    label: device.printerLabel,
+    notice: device.printer.errorCode === 'paperEmpty'
+      ? '打印机缺纸，请找现场工作人员加纸'
+      : device.kind === 'offline'
+        ? '打印机当前无法连接，请找现场工作人员'
+        : '打印机异常，请找现场工作人员检查',
+  }
 
   return (
     <QxPageFrame
       back={{ label: '返回首页', onBack: () => navigate('/') }}
       title="打印扫描服务"
-      status={device.printerNotice ? { tone: 'bad', label: device.printerLabel } : pill}
+      status={device.printerNotice ? { tone: 'bad', label: device.printerLabel } : hubState === 'device-off' ? { tone: 'warn', label: `${device.printerLabel} · 出纸类暂停` } : pill}
       terminalLabel="就业服务大厅"
       navbar={
         <PrintHubNavbar
@@ -497,6 +505,7 @@ export function PrintScanHomePage() {
         hubState={hubState}
         probe={probe}
         mfp={mfp}
+        printerUnavailable={printerUnavailable}
         orderPaused={
           hubState === 'device-off' && device.printerNotice
             ? { label: device.printerLabel, notice: device.printerNotice }
@@ -526,12 +535,11 @@ export function PrintScanHomePage() {
             : arrivalCodeStateNote(probe, mfp),
         }}
         quickLinks={QUICK_LINKS}
-        capabilityGroupHint={device.printerNotice ? device.printerLabel : capabilityGroupHint(probe, mfp, locked)}
+        capabilityGroupHint={mfp === 'unavailable' && confirmed ? device.printerLabel : capabilityGroupHint(probe, mfp, locked)}
         recordsGroupHint={recordsGroupHint()}
         notices={[
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE,
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE,
-          PRINT_HUB_PRICE_NOTICE,
         ]}
         onRetry={loadCapabilities}
         onHelp={() => navigate('/help')}

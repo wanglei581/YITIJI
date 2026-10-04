@@ -229,7 +229,7 @@ const PARKED_ONLY_FROM = {
 // ---------------------------------------------------------------------------
 {
   const icons = { BriefcaseIcon: 'Briefcase', PrinterIcon: 'Printer' }
-  const stock = loadModule(R('dashboard/recruitmentStock.ts'), { 'lucide-react': icons })
+  const stock = loadModule(R('dashboard/recruitmentStock.ts'), { 'lucide-react': icons, '@ai-job-print/shared': loadModule(join(repoRoot, 'packages/shared/src/formatNumber.ts'), {}) })
   const ban = (text, where) => {
     for (const word of ['待审核', '去审核', '审核通过后', '管理员审核']) {
       if (text.includes(word)) fail(`工作台${where}出现「${word}」—— 管理员不再审核招聘类内容`)
@@ -261,7 +261,8 @@ const PARKED_ONLY_FROM = {
   ban(JSON.stringify([openKpi, openTodo]), '（托管打开）')
 
   const dashPath = R('dashboard/index.tsx')
-  const dash = codeOnly(readOrFail(dashPath))
+  const dash = codeOnly(readOrFail(dashPath) + '\n' + readOrFail(R('dashboard/dashboardRows.ts')))
+  if (!dash.includes("from './dashboardRows'")) fail('工作台必须挂接拆出的告警行映射')
   for (const word of ['待审核数据', '待办审核', '去审核']) {
     if (dash.includes(word)) fail(`${rel(dashPath)} 仍出现「${word}」`)
   }

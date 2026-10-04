@@ -15,6 +15,11 @@
  */
 require('dotenv').config()
 
+// 本门禁覆盖的功能在生产（托管关闭）下也在用；它的夹具或断言依赖系统内岗位 / 招聘会数据，
+// 这里显式打开以保持原有覆盖不降（文件后半段另有开、关对照）。关闭态的专项断言在
+// verify:recruitment-hosting-default-off；把前半段也改成两种状态都测是登记在案的后续项。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 import { createServer, type Server } from 'http'
 import { Logger } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'

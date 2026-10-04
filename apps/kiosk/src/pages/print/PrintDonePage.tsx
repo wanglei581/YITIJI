@@ -310,7 +310,7 @@ export function PrintDonePage() {
   if (feeInfoOpen) {
     return (
       <QxPageFrame
-        title="费用与订单边界"
+        title={amountCents === 0 ? '订单记录' : '费用与订单边界'}
         subtitle="本页只展示订单的真实状态，不替你承诺结果"
         status={{ tone: 'warn', label: displayOrderNo ? `订单 ${displayOrderNo}` : '状态未知' }}
         terminalLabel="就业服务大厅"
@@ -327,14 +327,15 @@ export function PrintDonePage() {
         navbar={navbar}
       >
         <div data-w2-page="print-done" data-print-flow-step={6} data-testid="print-fulfill-state-fee-info" className="qx-scroll pff-page">
-          <PrintDoneXq ask={<>钱的事，<em>一笔一笔说清楚</em>。</>} doing="本页只展示订单的真实状态，不替你承诺结果。" />
+          <PrintDoneXq ask={amountCents === 0 ? <>订单记录，<em>一项一项核对</em>。</> : <>钱的事，<em>一笔一笔说清楚</em>。</>} doing="本页只展示订单的真实状态，不替你承诺结果。" />
           <PrintFeeBoundaryBar
-            sub="订单和支付记录都在，不会因为这次异常消失"
-            body={<>是否处理费用、处理多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
+            free={amountCents === 0}
+            sub={amountCents === 0 ? '订单记录保留，不会因为这次异常消失' : '订单和支付记录都在，不会因为这次异常消失'}
+            body={amountCents === 0 ? <>是否补打，以工作人员现场核查结果为准。</> : <>是否处理费用、处理多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
             facts={
               <>
                 {displayOrderNo ? <span>订单 <b>{displayOrderNo}</b></span> : null}
-                {amountCents != null ? <span>支付状态 <b>{paidLabel}</b></span> : <span>支付状态 <b>以订单为准</b></span>}
+                {amountCents != null ? <span>{amountCents === 0 ? '办理方式' : '支付状态'} <b>{paidLabel}</b></span> : <span>支付状态 <b>以订单为准</b></span>}
               </>
             }
           />
@@ -344,7 +345,7 @@ export function PrintDonePage() {
             <div className="pff-step"><span className="pff-step-no">3</span><span className="pff-step-txt">由工作人员现场登记；<b>是否处理、处理多少，以核查结果为准</b>。</span></div>
           </div>
           <div className="pff-help" data-testid="print-fulfill-fallback">
-            <span className="txt">本机<b>不会自动处理费用</b>，也不会把支付异常写成打印状态。</span>
+            <span className="txt">{amountCents === 0 ? <>是否补打，以工作人员现场核查结果为准。</> : <>本机<b>不会自动处理费用</b>，也不会把支付异常写成打印状态。</>}</span>
             <button type="button" className="pff-help-btn" onClick={() => navigate('/help')}>联系工作人员</button>
           </div>
           <PrintAiHelp
@@ -461,7 +462,7 @@ export function PrintDonePage() {
           terminalLabel="就业服务大厅"
           ctabar={
             <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>查看费用说明</button>
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>{amountCents === 0 ? '查看订单说明' : '查看费用说明'}</button>
               {feedbackButton}
               {retryButton}
               <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
@@ -526,7 +527,7 @@ export function PrintDonePage() {
         ctabar={
           <>
             <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>返回首页</button>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>查看费用说明</button>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>{amountCents === 0 ? '查看订单说明' : '查看费用说明'}</button>
             {feedbackButton}
             {retryButton}
             <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>

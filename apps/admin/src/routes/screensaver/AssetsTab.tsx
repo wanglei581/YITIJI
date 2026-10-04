@@ -6,8 +6,11 @@ import { screensaverService } from '../../services/api/screensaver'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { formatBytes, resolvePreviewUrl } from './utils'
 import { AssetPreviewModal } from './AssetPreviewModal'
+import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+import { AssetUploadNotice } from './AssetUploadNotice'
 
 export function AssetsTab() {
+  const hosting = useRecruitmentHosting()
   const [assets, setAssets] = useState<AdAssetView[]>([])
   const [loading, setLoading] = useState(true)
   const [file, setFile] = useState<File | null>(null)
@@ -112,6 +115,7 @@ export function AssetsTab() {
 
   return (
     <div className="space-y-6">
+      <AssetUploadNotice hosting={hosting} />
       {/* 上传区 */}
       <Card className="p-5">
         <h3 className="mb-3 text-sm font-semibold text-neutral-800">上传素材</h3>
