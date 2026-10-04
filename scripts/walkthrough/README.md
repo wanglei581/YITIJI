@@ -44,6 +44,7 @@ FILE_STORAGE_DIR=<走查 API 的数据目录> SECRET_ENCRYPTION_KEY=<与走查 A
 | `ok` | 正常回包（默认） |
 | `timeout` | 挂住连接 200 秒不回 |
 | `http500` | 返回 500，带 OpenAI 格式的错误体 |
+| `http402` | 返回 402 `Insufficient Balance`（模拟模型账户余额耗尽，2026-10-04 线上 DeepSeek 实况） |
 | `badjson` | 返回 200，但内容不是合法 JSON；纯文本对话会回空内容 |
 | `blocked` | 返回 400，错误码 `data_inspection_failed`（内容安全拦截） |
 | `slow` | 等 25 秒后正常返回 |

@@ -34,7 +34,7 @@ const STATE_DIR = process.env.FAKE_LLM_STATE_DIR || join(homedir(), '.cache', 'w
 const MODES = new Set(['ok', 'timeout', 'http500', 'badjson', 'blocked', 'slow'])
 const HANG_MS = 200_000
 const SLOW_MS = 25_000
-const MARKER_RE = /【走查故障[:：]\s*(ok|timeout|http500|badjson|blocked|slow)\s*】/
+const MARKER_RE = /【走查故障[:：]\s*(ok|timeout|http500|http402|badjson|blocked|slow)\s*】/
 
 mkdirSync(STATE_DIR, { recursive: true })
 const LOG_FILE = join(STATE_DIR, 'requests.jsonl')
@@ -153,6 +153,13 @@ async function handleChat(req, res, path) {
   if (mode === 'http500') {
     log({ ...entry, outcome: 'http500' })
     return openAiError(res, 500, '走查故障模拟：The server had an error while processing your request.', 'server_error', 'internal_error')
+  }
+  if (mode === 'http402') {
+    // 模拟 DeepSeek 余额耗尽（2026-10-04 线上实况）：HTTP 402 Insufficient Balance。
+    log({ ...entry, outcome: 'http402' })
+    return sendJson(res, 402, {
+      error: { message: 'Insufficient Balance', type: 'unknown_error', param: null, code: 'invalid_request_error' },
+    })
   }
   if (mode === 'blocked') {
     log({ ...entry, outcome: 'blocked' })
