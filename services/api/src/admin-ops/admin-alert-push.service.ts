@@ -5,7 +5,9 @@ import { collectDerivedAlerts, type DerivedAlert } from './derived-alerts'
 import { PrismaService } from '../prisma/prisma.service'
 
 type PreviousAlert = Pick<DerivedAlert, 'subjectKey' | 'episodeToken' | 'type' | 'severity' | 'title' | 'terminalCode'>
-type AlertCollector = (prisma: PrismaService, now: Date) => Promise<{ alerts: DerivedAlert[] }>
+type AlertCollector = (prisma: PrismaService, now: Date) => Promise<{ alerts: DerivedAlert[]; terminalSubjectKeysInScope?: string[] }>
+
+const TERMINAL_ALERT_TYPES = new Set(['terminal_offline', 'printer_issue'])
 
 const DEFAULT_DEDUPE_TTL_SECONDS = 180 * 24 * 60 * 60
 
@@ -97,8 +99,14 @@ export class AdminAlertPushService {
       for (const alert of current.alerts) {
         await this.pushOnce(alert, 'firing')
       }
+      // 终端类告警从列表里消失有两种原因：真的回到在线 / 打印机恢复，或者这台终端被转成
+      // 计划中、退役、停用、删除而不再考察。后者推「已恢复」会误导人，静默移出即可。
+      // 收集器没给范围（旧桩）时按原逻辑都推。
+      const inScope = current.terminalSubjectKeysInScope ? new Set(current.terminalSubjectKeysInScope) : null
       for (const alert of previous) {
-        if (!currentByKey.has(alert.subjectKey)) await this.pushOnce(alert, 'recovered')
+        if (currentByKey.has(alert.subjectKey)) continue
+        if (inScope && TERMINAL_ALERT_TYPES.has(alert.type) && !inScope.has(alert.subjectKey)) continue
+        await this.pushOnce(alert, 'recovered')
       }
 
       const next: PreviousAlert[] = current.alerts.map(({ subjectKey, episodeToken, type, severity, title, terminalCode }) => ({
