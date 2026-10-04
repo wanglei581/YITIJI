@@ -371,6 +371,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       ctabar={
         <div className="interview-qx-cta">
           <QxAiHelp label="问小青：这场练习怎么设" draft={SETUP_AI_DRAFT} />
+          {error && <p className="iv-alert" role="alert" data-testid="interview-setup-error">{error}</p>}
           <div className="iv-cta-row">
             <button type="button" className="qx-btn" data-variant="ghost" onClick={goTips}>
               先看面试技巧
@@ -575,8 +576,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         <InterviewNotice>
           <b>模拟面试不是企业面试。</b>不代表任何招聘结果承诺，不会发出面试邀请，也不用于候选人筛选或录用判断。
         </InterviewNotice>
-
-        {error && <p className="iv-alert" role="alert">{error}</p>}
 
         <AiTaskRegion
           className="interview-setup-fallback"

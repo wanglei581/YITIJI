@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1842 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1843 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -419,7 +419,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 534 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 535 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -557,6 +557,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-mic-capability-truth.mjs` |
 | `apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx` | `verify-kiosk-ai-label-copy.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
+| `apps/kiosk/src/pages/interview/session/interviewTurnActions.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/session/types.ts` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/styles/interview-report.css` | `verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/styles/interview-responsive.css` | `verify-lightflow-k2c-interview.mjs` |

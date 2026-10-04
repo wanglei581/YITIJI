@@ -43,6 +43,16 @@ export function optimizeStateTitle(view: OptimizeViewState): string {
   return '请先上传简历完成诊断'
 }
 
+/**
+ * 右上角胶囊。AI 停用不再写成「等待优化建议」（W-131）。
+ * 其余状态维持原来的短标签：胶囊不照抄正文标题，屏上同一句不出现两次。
+ */
+export function optimizeStatusCapsule(view: OptimizeViewState): { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string } {
+  if (view === 'ready') return { tone: 'ok', label: '逐条确认' }
+  if (view === 'unavailable') return { tone: 'bad', label: 'AI 暂时用不了' }
+  return { tone: 'unknown', label: '等待优化建议' }
+}
+
 export function optimizeStateDescription(view: OptimizeViewState, failMsg: string | null): string {
   if (view === 'loading') return '正在读取优化结果，读回来之前不展示任何简历内容。'
   if (view === 'illegal') return '这个地址暂时无法打开，请从诊断报告或我的简历重新进入。'
