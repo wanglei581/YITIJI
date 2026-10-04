@@ -43,6 +43,29 @@ export function optimizeStateTitle(view: OptimizeViewState): string {
   return '请先上传简历完成诊断'
 }
 
+/** 右上角胶囊与正文同一套状态。AI 停用不再写成「等待优化建议」。 */
+export function optimizeStatusCapsule(view: OptimizeViewState): { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string } {
+  switch (view) {
+    case 'ready':
+      return { tone: 'ok', label: '逐条确认' }
+    case 'unavailable':
+      return { tone: 'bad', label: 'AI 暂时用不了' }
+    case 'loading':
+    case 'empty':
+    case 'no-context':
+      return { tone: 'unknown', label: optimizeStateTitle(view) }
+    case 'read-error':
+    case 'optimize-failed':
+      return { tone: 'warn', label: optimizeStateTitle(view) }
+    case 'illegal':
+      return { tone: 'bad', label: optimizeStateTitle(view) }
+    default: {
+      const unseen: never = view
+      return { tone: 'unknown', label: optimizeStateTitle(unseen) }
+    }
+  }
+}
+
 export function optimizeStateDescription(view: OptimizeViewState, failMsg: string | null): string {
   if (view === 'loading') return '正在读取优化结果，读回来之前不展示任何简历内容。'
   if (view === 'illegal') return '这个地址暂时无法打开，请从诊断报告或我的简历重新进入。'
