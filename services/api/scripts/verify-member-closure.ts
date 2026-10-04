@@ -364,7 +364,7 @@ async function main() {
     assert.equal((await closure.execute(owned.id, input, admin)).changed, false)
     assert.equal(await prisma.auditLog.count({ where: { targetId: owned.id, action: 'member.closure.executed' } }), 1)
     const saved = await prisma.auditLog.findFirstOrThrow({ where: { targetId: owned.id, action: 'member.closure.executed' } })
-    const p = JSON.parse(saved.payloadJson); for (const model of CLOSURE_DELETE_MODELS) assert.equal(p.deleted[model], 1)
+    const p = JSON.parse(saved.payloadJson); for (const model of CLOSURE_DELETE_MODELS) assert.equal(p.deleted[model], model === 'jobApplication' ? 2 : 1, `删除计数 ${model}`)
     assert.equal(p.deleted.fileObject, ownedFixture.fileIds.length)
   })
   await check('8 注销审计无手机号/尾号，offline=true 可筛选且详情含 closureRequest', async () => {
