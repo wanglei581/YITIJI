@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-10-04：现场验收单加 AI 用量终端号与机构服务人次两项（只改文档，分支 `claude/runsheet-ai-usage-visits-1004`）
+
+- **改了什么：** `onsite-acceptance-runsheet-2026-09.md` S 段加 S.9、S.10。S.9：测试会员在试点终端上把 7 个 AI 功能各用一次，再只读查 `AiUsageRecord`，每一行都要带试点终端 ID 且 `terminalVerified` 为真（签收单「AI 调用成功率」按终端算）。S.10：机构后台数据大屏的服务人次要显示数字；1–4 次按隐私规则显示「少于 5」，所以测试前先走满 5 次会话。
+- **依据：** 商业化窗口签收指标定稿 `~/.cache/claude-lanes/commercial-1003/drafts/signoff-metrics-v2.md`（总指挥转达）；字段核对自 `services/api/prisma/schema.prisma` 的 `AiUsageRecord`。没有改代码或门禁。
+
 ## 2026-10-04：W-118 一体机这一半——检查任务防重、被拒后带文件回材料检查、隐私摘要说实话、开发版构建闸
 
 - 根因先说清：走查报的「同一份文件建两条隐私检查」在走查栈上成对出现，是因为走查的一体机前端在 `NODE_ENV=development` 的 shell 里构建，打出了 React 开发版，StrictMode 把挂载副作用执行两遍。正式构建实测只建一次；线上产物 jsxDEV 0 处（总指挥核过）。服务端闸门与去重另见 #1222。
