@@ -186,6 +186,12 @@ const NO_TTL_REGISTRY: Record<string, string> = {
     '同意记录必须与账号同生命周期，撤回写 revokedAt 而不是删除；不含用户自由文本',
   AiUsageRecord:
     'P1-2a 逐次计量账，只落功能/厂商/型号/状态/tokens/金额与已验签终端、机构、会员号，无用户文本。留存与 AiServiceLog 相同：AI_SERVICE_LOG_RETENTION_DAYS 默认 90 天，由 AiResultCleanupTask 到期先按月汇总再硬删。会员注销只把 endUserId 置空（外键 SetNull，且 detachMemberAiUsageRecords），不删未到期的金额行。TRTC 数字人、ASR、TTS、OCR 本期不计量、不写本表。',
+  AiQuotaDaily:
+    '按人次数额度的每日计数，只有账号、用途、北京日期、已用次数，无用户文本；按 AI_SERVICE_LOG_RETENTION_DAYS 由 AiResultCleanupTask 调 AiQuotaService.purgeExpired 定期硬删',
+  AiQuotaReservation:
+    '一次 AI 操作的预占记录，只有操作号哈希、账号、终端、用途、来源、日期与结果编号，无用户文本；已结算的按 AI_SERVICE_LOG_RETENTION_DAYS 由 AiQuotaService.purgeExpired 定期硬删',
+  RedemptionRecord:
+    '权益核销流水（机构发放的 AI 次数被用掉一次记一行），属财务与权益账，只有权益号、用途、数量与幂等键，无用户文本；随订单与权益流水的保留期走，不随 AI 会话 TTL 走',
   AiUsageMonthlySummary:
     '按月费用汇总，只存北京时间月份、功能、厂商、型号、状态、调用次数、已计量金额与未计量次数；不含会员、终端、机构或任何用户文本，长期保留，不随明细到期删除。',
 }
