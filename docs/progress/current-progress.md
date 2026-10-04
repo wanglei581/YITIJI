@@ -1,46 +1,17 @@
 # 当前开发进度
 
-## 2026-10-04：AI 按人次数 Q2b-2——模拟面试与岗位 AI 接入
+## 2026-10-04：AI 按人次数 Q2b——小青、模拟面试、岗位 AI 接入（分支 `claude/backend-hardening-20261004-ai-quota-q2b`，叠在 Q2a #1244 上；Grok 分两包实现、Claude 合并与审；未上线）
 
-工作区 `tide/q2b2`，基线 `a1bfd814e`，改动未提交、未上线。小青三项、`advisor/*`、`assistant/*`、`trtc/*` 以及登记表里这几类的行没有动。
+登记表最后一行：**接入 16、不计次 15、待 Q2b 0、待裁定 0、违规 0**——所有调模型的入口都已有归属。只有登录会员进新账本，匿名照旧走公共计数。
 
-- **模拟面试（桶 `ai_interview`）：** `start` 在首题成功下发时结算，操作号 `interview:<sessionId>`。同一会话已有首题时直接返回该题，不再扣、不再调模型。首题失败仍把会话退回 `configured`，并按 `AI_INTERVIEW_QUESTION_FAILED` 归还。`create`、`answer`、`questionAudio`、`end` 登记不计次，理由「整场一次，首题下发时已计」。`transcribe` 登记不计次，理由「语音只查余量」：只在开场前、会话仍是 `configured` 且面试余量已用完时拒绝，场内不再查。没有登录身份的面试不进新账本。接线在 `services/api/src/mock-interview/mock-interview-charge.ts`；`mock-interview.service.ts` 由 720 行降到 702 行。
-- **场内上限：** `asked >= questionTarget`（时长 3/5/8 分钟对应 4/6/8 题）之后不再调模型；题已全部答完再提交返回 `INTERVIEW_ALREADY_COMPLETE`。同一道未完成的题用进程内合并，已落库的下一题直接返回。`questionAudio` 每次请求都调用 `TtsService.synthesize`；该服务写明不缓存、不落盘，本包没有加缓存。
-- **岗位 AI（桶 `ai_assistant`）：** 推荐、解读、匹配的控制器在招聘内容托管关闭时仍直接拒绝，计次只写在开关打开后才会走到的路径上。操作号按入参做成 `rec:` / `exp:` / `mat:` 加摘要，结果已在库里时直接返回、不再扣。空候选不扣。旧 Redis 的会员维在新账本已注入且有登录身份时跳过，终端与 IP 仍计。岗位对照 `analyzeForJobFit` 仍走简历桶；它和匹配共用的 `run()` 把会员维交给新账本。
-- **登记表：** 接入 13、不计次 12、待 Q2b 6、待裁定 0、违规 0。待 Q2b 只剩小青一族 6 项。
-- **验证（本机 SQLite）：** `typecheck`、`lint` 通过。`verify:ai-quota` 最后一行 `verify:ai-quota SQLite ALL PASS (18)`。`verify:ai-quota-coverage` 最后一行 `接入 13、不计次 12、待 Q2b 6、待裁定 0、违规 0`。`verify:mock-interview` 最后一行 `=== ALL PASS (23 checks) ===`。`verify:job-ai-backend`、`verify:job-ai-privacy`、`verify:job-fit`（`=== ALL PASS (27 checks) ===`）、`verify:governed-job-fit`（`=== 结果: 39 PASS / 0 FAIL ===`）、`verify:ai-public-quota`（`PASS: /assistant/chat 与 /resume/parse 已具备限流与日配额，且仍保持匿名可用`）通过。图谱上与本次文件相关的其余门禁（`verify:ai-access`、`verify:ai-cost-coverage` 178 PASS、`verify:ai-usage-budget` 21/21、`verify:multipart-field-nesting`、`verify:ai-user-text-retention` ALL PASS (542)、`verify:beijing-display-time` 21 checks、`verify:llm-input-pii-mask` 136 PASS、`verify:member-data-retention`、`verify:assess-isolation`、`verify:job-ai-ops-dashboard`、`verify:job-validity-expiry`，以及 kiosk 的 `verify:ai-down-fallbacks`、`verify:ai-artifact-print-url-contract`、`verify:profile-commercial-first-batch`）均通过。`node scripts/generate-project-graph.mjs --check`：`PASS docs/graph/ 与当前代码一致`。
-- **未跑：** `verify:ai-quota:postgres`。本机 `pg_isready` 对 `/tmp:5432` 无响应，`DATABASE_URL` 是 SQLite。没有单独的 `verify:mock-interview:postgres`。`verify:ai-cost-ui-coverage.ts` 在图谱里标为无脚本名，未执行。前端未改，没有做浏览器验证。
-- **反向变异（已还原，退出码都是 1）：** 开场不预占时首题已用次数 `0 !== 1`；同一会话再开场又扣时 `2 !== 1`；开场失败不归还时 `1 !== 0`；题数到上限后仍调模型时调用次数 `1 !== 0`；岗位推荐缓存命中仍扣时 `2 !== 1`。
-- **留待看的两点：** 两个进程同时开场时，进程内合并盖不住；后一个请求可能停在预占里等清扫，或在前一个已结算后用新序号再扣一次。首题和岗位 AI 在预占之后若抛出 `AI_NOT_CONFIGURED`，归还表不认这个码，要等清扫才退。
-## 2026-10-04：AI 按人次数 Q2b-1——小青一族接入（分支 `tide/q2b1`；基线 `a1bfd814e`；Grok 实现、Claude 审；尚未提交、未上线）
-
-桶是 `ai_assistant`，每日 80。只动小青这一族。模拟面试 6 项与岗位 AI 3 项仍是待 Q2b，文件和登记行都没改。没改前端、`.github`、Q1 账本语义、`runWithAiQuota` 的结算顺序、金额封顶阈值。
-
-**接入 2**
-
-- 小青文字一轮 `AiController.chatWithAssistant`（`ai.controller.ts:613`）。操作号只由服务端签发（`assistant-chat:` + `quotaSequence()`，`ai-assistant-charge.ts:69`）。回答先写入现有内存会话（`llm-chat.service.ts:383` 把助手回复推进会话 Map），再把会话号交给结算（`ai-assistant-charge.ts:72`）。服务端确认的失败原样抛出（`:112`），由已有的 `quotaReleaseReason` 归还。没有登录身份不进新账本。金额封顶仍由访问守卫在进处理器之前检查。客户端断开时，成功照扣；认得出的失败照常归还。
-- 顾问追问 `AdvisorService.ask`（控制器 `advisor.controller.ts:153` 传入 `req`；服务 `advisor.service.ts:323`，桶字面量在 `:350`）。回答先写入会话记忆（`qaMemory.append`，`:343`），结算引用是会话号。操作号是 `advisor-ask:` + `quotaSequence()`（`:351`）。没有登录身份或没有账本时不预占。
-
-**公网旧计数：** 小青对话的会员维交给新账本。`ledgerOwnsMember` 同时认 `resume_parse` 与 `assistant_chat`（`ai-public-quota.service.ts:203`），`countMember` 在 `:98`。终端与 IP 仍在旧 Redis 里扣。
-
-**不计次 4**
-
-- 小青语音 `transcribeAssistantVoice`（`ai.controller.ts:661`）。不预占。`assertMemberAssistantRemaining`（`ai-quota-run.ts:99`，调用点 `ai.controller.ts:679`）只在会员当天小青次数用完时拒绝；有余量不扣次。终端与 IP 日配额仍走旧 Redis。
-- 会话小结 `summarizeAssistantSession`。同一助手会话没有已存小结可直接返回。每次都 `condense` 调模型（`assistant-summary.service.ts:133`）并 `advisorSession.create` 新开一行（`:143`），不记下原助手会话号。已存则不再调模型的条件不成立，故不计次。
-- 早报 `DailyBriefController.create`（`daily-brief.controller.ts:16` → `daily-brief.service.ts:28`）。不调用模型。按人只读本人取件与收藏；城市新数与广播是全站共享缓存。没有按人落库的早报正文。
-- TRTC 开会话 `TrtcService.startSession`（`trtc.service.ts:208`）。这一下生成 UserSig，并调用腾讯云 `StartAIConversation`（`:283`），本服务不调模型。成本由单次通话时长上限与金额封顶管。
-
-**TRTC 每一轮：** 设计文档第 45 行写「会话里每一轮问答照小青计」。通话中的问答由腾讯云侧调模型。`services/api/src/trtc/` 下没有回调、转写或按轮 webhook。本服务看不到每一轮，本包不实现按轮计数。
-
-**登记表：** `接入 11、不计次 11、待 Q2b 9、待裁定 0、违规 0`。待 Q2b 的 9 项是模拟面试与岗位 AI。
-
-**大文件：** `ai.service.ts` 943→938，`ai.controller.ts` 840→838。小青文字接线拆到 `services/api/src/ai/quota/ai-assistant-charge.ts`（120 行，工作区未跟踪；本包禁止 git 写操作）。`advisor.service.ts` 521→538，未过 800，在原文件接入。`ai-quota-run.ts` 163→174，`ai-public-quota.service.ts` 249→254，`advisor.controller.ts` 仍 191 行。
-
-**验证（本机 lane，未上线）：** API `typecheck`、`lint` 退出码 0。`verify:ai-quota-coverage` 最后两行：`接入 11、不计次 11、待 Q2b 9、待裁定 0、违规 0`、`违规清单：无`。`verify:ai-quota`：`verify:ai-quota SQLite ALL PASS (18)`。`verify:ai-public-quota`：`PASS: /assistant/chat 与 /resume/parse 已具备限流与日配额，且仍保持匿名可用`。`verify:advisor-work`：`=== 顾问作业面验证通过：66 PASS ===`。`verify:ai-access`：`verify:ai-access：ALL PASS`。`verify:assistant-voice`：`=== ALL PASS: 小青语音 / 本次要点门禁 ===`。`verify:assistant-provider-label`：`S0-1 助手 provider 可识别验证: 40 PASS, 0 FAIL`。`verify:ai-cost-coverage`：`A-6 成本覆盖验证: 179 PASS, 0 FAIL`。`verify:ai-user-text-retention`：`ALL PASS (540)`。`verify:ai-usage-budget`：`✅ verify:ai-usage-budget（覆盖面）21/21 通过`。`verify:resume-parse-intent`：`PASS POST /resume/parse intent headers`。图谱查出的其余相关门禁（含 `verify:assess-isolation`、`verify:job-ai-ops-dashboard`、`verify:multipart-field-nesting`、`verify:resume-diagnosis-context`、`verify:resume-draft-versions`、`verify:resume-export-formats`、`verify:resume-export-label`、`verify:resume-layout-export`、`verify:resume-template-fill`、`verify:resume-voice-generate`、`verify:throttle-dimension`、`verify:ai-persistence-consistency`、`verify:ai-result-ownership`、`verify:ai-safety-aigc`、`verify:member-assets-c2d`、`verify:member-data-retention`、`verify-real-resume-diagnosis`、`verify:resume-generate`、`verify:resume-layout-adjust`、`verify:resume-optimize`、`verify:resume-report-export`、`verify:derivation-kind`、kiosk `verify:ai-artifact-print-url-contract`）均退出码 0。`node scripts/generate-project-graph.mjs --check`：`PASS docs/graph/ 与当前代码一致`。
-
-两处环境红，没有改门禁去放行：`verify:file-assets-trial-acceptance` 因未跟踪的 `ai-assistant-charge.ts` 失败（冻结候选要求未跟踪文件只能是治理文件；提交该文件后这条会过）。`verify:ai-quota:postgres` 抛 `AI_QUOTA_VERIFY_POSTGRES_REQUIRED`（本 lane 是 SQLite）。
-
-**反向变异（只报告，已还原，源码无残留）：** 五处都在对应断言变红，退出码 1。小青对话不预占（`回答写入会话时预占必须仍是 reserved`）；小青对话模型报错不归还（`模型报错必须归还`）；会员仍扣旧 Redis 会员维（`小青会员次数改由新账本计算`）；语音转写也扣次（`有余量时转写不扣次`）；顾问追问不预占（成功后已用次数 `0 !== 1`）。
+- **小青（`ai_assistant`，每日 80）：** 文字一轮、顾问追问、**本次要点（会话小结）**接入。操作号只由服务端签发（设计现行口径；要不要接受客户端消息号防弱网重试双扣，待总指挥定）。文字与追问的回答先写进会话再结算；要点先存成本人「我的」里能重开的顾问记录再结算。会员维从旧 Redis 交给新账本，终端与 IP 照旧。语音转写不预占，只在当天小青次数用完时拒绝。早报不调模型、TRTC 开会话本服务不调模型，登记不计次。
+- **会话小结由协调方改为接入：** Grok 原登记为不计次，理由是「没有已存小结可直接返回」——这只说明不需要防重放，不是不扣次的理由；设计文档第二节把它归小青桶。现在每生成一次扣 1 次，模型报错归还、失败不落记录，门禁加了运行时用例，「不走账本」的变异会红。
+- **模拟面试（`ai_interview`，每日 5 场）：** 首题成功下发时结算一场，操作号 `interview:<sessionId>`；同一会话已有首题直接返回、不再扣也不调模型；首题失败把会话退回 `configured` 并归还。建场、作答、题目语音、结束都不计次（整场一次）；转写只在开场前查余量。场内上限：答满题数（3/5/8 分钟对应 4/6/8 题）后不再调模型；同一题并发提交进程内合并、只调一次模型。接线在 `mock-interview/mock-interview-charge.ts`，`mock-interview.service.ts` 720→702 行。
+- **岗位 AI（`ai_assistant`）：** 推荐、解读、匹配只在招聘内容托管开关打开（私有化 b）时才走到；结果已在库里直接返回不扣，空候选不扣。旧 Redis 会员维交给新账本（含 Q2a 留下的岗位对照双记），终端与 IP 照旧。接线在 `job-ai/job-ai-charge.ts`。
+- **归还表补 `AI_NOT_CONFIGURED`：** 面试与岗位 AI 的模型服务在未配置时抛这个短码，原来认不出、要等 20 分钟清扫才退。
+- **TRTC 每一轮问答：** 由腾讯云侧调模型，本服务没有按轮回调，看不到每一轮，**没有按轮计数**；成本靠单次通话时长上限与金额封顶。设计文档第 45 行「每一轮照小青计」做不到，待定。
+- **已知未做：** 两个进程同时对同一场开场，进程内合并盖不住，可能停在预占里等清扫或多扣一次；题目语音每次播放都重新合成（`TtsService` 不缓存）；小青文字一轮的原文只在内存会话里，「我的」里重开不到这一轮原文（持久的是本次要点）。
+- **验证与变异：** 见 PR 描述。Grok 两包各 5 处反向变异都红；协调方合并后复跑登记门禁与关联门禁，并亲做「要点不走账本」变异。
 
 ## 2026-10-04：第二次发布清单补上「三个开关各自要同批改的文字」（分支 `claude/release2-switch-texts-1004`，只改文档）
 

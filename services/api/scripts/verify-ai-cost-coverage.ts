@@ -199,8 +199,8 @@ assertContains(llmProvider, 'onLlmCall: usage.add', 'llm provider: 把 usage sin
 assertContains(llmProvider, 'usage: usageOf(usage)', 'llm provider: 成功/失败都回传用量')
 
 const aiSvc = read('src/ai/ai.service.ts')
-// 小青文字落账已拆出服务文件。路径拆开，是因为图谱只认 git 已跟踪的文件。
-const assistantCharge = read(['src/ai/quota', 'ai-assistant-charge.ts'].join('/'))
+// 小青文字落账已随计次拆到 ai-assistant-charge.ts。
+const assistantCharge = read('src/ai/quota/ai-assistant-charge.ts')
 assertContains(aiSvc, 'aiLogFieldsFromUsageReport', 'ai.service: 落账走统一用量翻译层')
 assertContains(assistantCharge, 'aiLogFieldsFromUsageReport', '小青文字: 落账走统一用量翻译层')
 // 关键回归点：这五个落账点过去写死 provider: this.provider.name（恒为 'llm'）。

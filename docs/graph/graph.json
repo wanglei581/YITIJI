@@ -5142,8 +5142,12 @@
         "models": [
           "AdvisorArtifact",
           "AdvisorSession",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/assistant/sessions/:sessionId/summary",
         "roles": [],
@@ -17263,6 +17267,7 @@
         "usedBy": [
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/mock-interview/mock-interview-charge.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -17273,6 +17278,7 @@
           "MockInterviewSession"
         ],
         "usedBy": [
+          "services/api/src/mock-interview/mock-interview-charge.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -23612,6 +23618,9 @@
     ],
     "services/api/src/ai/providers/zhipu.provider.stub.ts": [
       "services/api/scripts/verify-ai-cost-runtime.ts"
+    ],
+    "services/api/src/ai/quota/ai-assistant-charge.ts": [
+      "services/api/scripts/verify-ai-cost-coverage.ts"
     ],
     "services/api/src/ai/quota/ai-quota-run.ts": [
       "services/api/scripts/verify-ai-quota-coverage.ts",
@@ -34217,9 +34226,7 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [
-          "services/api/src/ai/quota"
-        ],
+        "dirs": [],
         "files": [
           "services/api/scripts/verify-ai-cost-runtime.ts",
           "services/api/scripts/verify-ai-cost-ui-coverage.ts",
@@ -34228,6 +34235,7 @@
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
           "services/api/src/ai/providers/llm.provider.ts",
+          "services/api/src/ai/quota/ai-assistant-charge.ts",
           "services/api/src/ai/resume/llm-resume-generate.service.ts",
           "services/api/src/ai/resume/llm-resume-optimize.service.ts",
           "services/api/src/ai/resume/llm-resume.service.ts",
