@@ -24,6 +24,7 @@ import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
 import {
   duplexShortLabel,
   formatAmountCents,
+  isFreeMemberOrder,
   memberPayStatusLabel,
   publicOrderNo,
   paymentSourceLabel,
@@ -75,12 +76,17 @@ function metaLine(item: MemberPrintOrderItem): string {
   return parts.join(' · ')
 }
 
-/** 卡片上的支付概要一行：金额 · 支付状态（来源）；历史无 Order 显示「暂无支付信息」。 */
+/** 卡片上的支付概要一行。历史无 Order 显示「暂无支付信息」。
+ *  0 元或免费来源不写「已支付」：待退款仍优先，其余只写免费。收费单保持金额 · 支付状态（来源）。
+ */
 function paymentLine(item: MemberPrintOrderItem): string {
   if (item.payStatus == null) return '暂无支付信息'
+  if (item.amountCents === 0 || item.paymentSource === 'free') {
+    if (item.refundRequired === true) return `0 元（免费试运营） · ${PENDING_REFUND_LABEL}`
+    return '0 元（免费试运营） · 免费'
+  }
   const parts: string[] = []
-  if (item.amountCents === 0 || item.paymentSource === 'free') parts.push('0 元（免费试运营）')
-  else if (typeof item.amountCents === 'number') parts.push(formatAmountCents(item.amountCents))
+  if (typeof item.amountCents === 'number') parts.push(formatAmountCents(item.amountCents))
   const sourceLabel = item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined
   const source = sourceLabel ? `（${sourceLabel}）` : ''
   parts.push(`${memberPayStatusLabel(item).label}${source}`)
@@ -243,13 +249,16 @@ export function MyPrintOrdersPage() {
   }, [items, filterKey])
 
   const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 ? 'empty' : 'ready'
+  const allLoadedFree = items.length > 0 && items.every(isFreeMemberOrder)
   const summary = (
     <QxMeSummary
       tone="clay"
       icon={<PrinterIcon size={32} />}
       label="打印记录"
       big={total}
-      desc="只展示本人打印任务与订单安全信息；支付状态和金额以真实订单数据为准"
+      desc={allLoadedFree
+        ? '只展示本人打印任务与订单安全信息；状态以真实订单数据为准'
+        : '只展示本人打印任务与订单安全信息；支付状态和金额以真实订单数据为准'}
       minis={[`已加载 ${items.length}`, `进行中 ${activeOrderCount}`, `筛选 ${filtered.length}`]}
     />
   )
@@ -398,7 +407,9 @@ export function MyPrintOrdersPage() {
           )}
 
           <div className="qx-me-legal">
-            仅展示本人打印任务与订单的安全信息，不含文件内容；金额与支付状态为真实订单数据。再次打印会重新选择文件、确认参数与价格，并<b>建立一笔新订单</b>。
+            {allLoadedFree
+              ? <>仅展示本人打印任务与订单的安全信息，不含文件内容。再次打印会重新选择文件、确认参数，并<b>建立一笔新订单</b>。</>
+              : <>仅展示本人打印任务与订单的安全信息，不含文件内容；金额与支付状态为真实订单数据。再次打印会重新选择文件、确认参数与价格，并<b>建立一笔新订单</b>。</>}
           </div>
         </section>
       </>
@@ -416,7 +427,10 @@ export function MyPrintOrdersPage() {
       eyebrow="我的文档和订单"
       ask={<>打印到哪一步，<em>一眼看清</em>。</>}
       doing={DOING[uiState]}
-      truth="这里只显示当前登录账号的打印订单；状态、金额与取件码一律由系统返回。"
+      truth={allLoadedFree
+        ? '这里只显示当前登录账号的打印订单；状态与取件码一律由系统返回。'
+        : '这里只显示当前登录账号的打印订单；状态、金额与取件码一律由系统返回。'}
+      ordersHint={allLoadedFree ? '进度·取件' : undefined}
       ctabar={ctabar}
       live={false}
     >

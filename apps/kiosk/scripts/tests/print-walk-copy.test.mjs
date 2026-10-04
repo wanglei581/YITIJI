@@ -158,6 +158,25 @@ test('0 元实付写免费试运营，其余仍标未记录且不推算', () => 
   assert.equal(missing.value, '未记录')
 })
 
+test('0 元失败页不提已付金额，收费单保留原句', () => {
+  assert.equal(progress.jamOrderKeptLine('paid'), '你的订单和已付金额都保留着')
+  assert.equal(progress.jamOrderKeptLine('free'), '你的订单还在，处理好后可以继续打印')
+  assert.equal(progress.jamOrderKeptLine('unknown'), '你的订单还在，处理好后可以继续打印')
+  assert.equal(progress.failureStaffDoing('paid'), '订单和支付记录都在，请凭订单找现场工作人员处理。')
+  assert.equal(progress.failureStaffDoing('free'), '你的订单还在，请凭订单找现场工作人员处理。')
+  assert.equal(progress.failureStaffDoing('unknown'), '你的订单还在，请凭订单找现场工作人员处理。')
+  assert.match(progress.outOfPaperDoing({ fact: 'paid', amountCents: 200 }), /已付金额/)
+  assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'free', amountCents: 0 }), /已付金额|支付/)
+  assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'unknown', amountCents: null }), /已付金额|支付/)
+})
+
+test('0 元订单不算收费单', () => {
+  assert.equal(payment.isFreeMemberOrder({ payStatus: 'paid', amountCents: 0, paymentSource: 'offline' }), true)
+  assert.equal(payment.isFreeMemberOrder({ payStatus: 'paid', amountCents: 100, paymentSource: 'free' }), true)
+  assert.equal(payment.isFreeMemberOrder({ payStatus: 'paid', amountCents: 100, paymentSource: 'offline' }), false)
+  assert.equal(payment.isFreeMemberOrder({ payStatus: null, amountCents: 0 }), false)
+})
+
 const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
 const ENCRYPTED_COPY = '这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传'
 
@@ -394,6 +413,7 @@ const doneSectionsUrl = transpile(join(kioskRoot, 'src/pages/print/components/Pr
   './PrintFileDeletionRecords': toDataUrl('export const PrintFileDeletionRecords = () => null'),
   './PrintFileRetentionNotice': toDataUrl('export const PrintFileRetentionNotice = () => null'),
   './PrintProgressSections': toDataUrl('export const PrintJobRow = () => null'),
+  './PrintAiHelp': aiUrl,
 })
 const { PrintOutOfPaperPanel } = await import(doneSectionsUrl)
 test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保留原说明', () => {
@@ -405,6 +425,15 @@ test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保
     assert.doesNotMatch(freeText, /报价|价格|费用|付款|收费|收款|扣费|抵扣|权益|internal-task/)
     assert.match(textOf({ fact: 'paid', amountCents: 200 }), /不会重复收费/)
   }
+})
+
+const { PrintJamGuide } = await import(doneSectionsUrl)
+test('卡纸三步不提收款', () => {
+  const text = renderToStaticMarkup(createElement(PrintJamGuide, { orderNo: 'ORD-20261003-JAM' })).replace(/<[^>]*>/g, '')
+  assert.match(text, /找工作人员之前先做这三件/)
+  assert.match(text, /别硬拉纸/)
+  assert.match(text, /订单号 ORD-20261003-JAM/)
+  assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)
 })
 
 // W-118：执行真实配置回调；测试随 verify:print-done-truth 已进入 CI，无需另加登记。
