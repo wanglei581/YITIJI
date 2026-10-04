@@ -1663,7 +1663,7 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   await expect(locked).toHaveCount(3)
   await expect(locked.filter({ hasText: '登录后可用' })).toHaveCount(3)
   // 10/3 口径，与《隐私政策》一致：注销与复制个人信息按三条渠道人工申请，核实是本人后 15 个工作日内处理。
-  await expect(page.getByText('注销账号、复制个人信息，请找现场工作人员，或按《隐私政策》里的电话、邮箱联系我们申请', { exact: false })).toBeVisible()
+  await expect(page.getByText('注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请', { exact: false })).toBeVisible()
   await expect(page.getByText('我们核实是你本人后，15 个工作日内处理', { exact: false })).toBeVisible()
   await expect(page.getByText('数据导出尚未开放', { exact: false })).toHaveCount(0)
   await expect(page.getByRole('region', { name: '公共终端使用说明' })).toContainText('退出本机登录并清除这一次的临时信息')
@@ -1834,7 +1834,7 @@ for (const failure of [
     await expect(panel).not.toContainText('HTTP 500')
     await panel.getByRole('button', { name: '重新登录核对', exact: true }).click()
     await page.waitForURL((url) => url.pathname === '/login')
-    await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。')).toBeVisible()
+    await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请按《隐私政策》里的电话、邮箱联系我们。')).toBeVisible()
     await expectTokenNotPersisted(page)
   }
   expect(api.requestCount('POST', PHONE_REBIND)).toBe(1)
