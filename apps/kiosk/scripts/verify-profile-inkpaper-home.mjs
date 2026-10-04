@@ -356,7 +356,8 @@ expectIncludes(settingsPage, '手机号登录', '账号设置保留游客登录�
 expectIncludes(settingsPage, '公共终端使用说明', '账号设置保留公共终端使用说明')
 expectIncludes(settingsPage, '退出登录', '账号设置保留退出登录操作')
 // Wave 2 已实现换绑，只有注销和数据导出仍未开放
-expectIncludes(settingsPage, '账号注销和数据导出尚未开放', '账号设置明确尚未开放的账户能力')
+expectIncludes(settingsPage, '注销账号请找现场工作人员申请', '账号设置写清注销怎么申请')
+expectIncludes(settingsPage, '数据导出尚未开放', '账号设置明确尚未开放的账户能力')
 
 expectIncludes(aiRecordsPage, "import './styles/member-records-qx.css'", 'AI服务记录引入青序记录页 CSS')
 expectIncludes(aiRecordsPage, 'QxMePage', 'AI服务记录使用青序记录壳')

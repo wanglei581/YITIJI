@@ -25,7 +25,8 @@ import './styles/settings-qx2.css'
 // AI 使用授权只认服务端返回：读不到就是「本次未取到」，绝不退回成「未授权」。
 type JobAiConsent = 'idle' | 'loading' | 'granted' | 'not-granted' | 'error'
 
-const ACCOUNT_CLOSURE_NOTE = '账号注销和数据导出尚未开放。如需协助，请联系现场工作人员；如后续提供导出，内容包含文件、订单等业务摘要清单。'
+// 10/3 口径：本人申请、工作人员凭线下凭据核验身份后办理、15 个工作日内完成；一体机上不直接提交注销。
+const ACCOUNT_CLOSURE_NOTE = '注销账号请找现场工作人员申请，工作人员核验你的身份后办理，15 个工作日内完成。数据导出尚未开放。'
 
 const CONSENT_BADGE: Record<JobAiConsent, { text: string; tone?: 'run' | 'bad' | 'off' }> = {
   idle: { text: '—', tone: 'off' },

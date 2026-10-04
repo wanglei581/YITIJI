@@ -29,8 +29,9 @@ assert.match(entries, /label: '权益活动'[\s\S]{0,120}route: '\/activities'/)
 assert.match(entries, /label: '我的权益'[\s\S]{0,100}desc: '券与活动权益'/)
 assert.doesNotMatch(entries, /套餐、券、活动/)
 assert.doesNotMatch(settings, /身份切换/)
-// Wave 2 已实现手机号换绑，账号注销和数据导出仍未开放
-assert.match(settings, /账号注销和数据导出尚未开放/)
+// Wave 2 已实现手机号换绑；10/3 起注销走现场工作人员申请，数据导出仍未开放
+assert.match(settings, /注销账号请找现场工作人员申请/)
+assert.match(settings, /数据导出尚未开放/)
 assert.doesNotMatch(`${entries}\n${login}`, /一键投递|立即投递|平台投递|投递简历/)
 
 console.log('verify-user-center-wave0: ok')

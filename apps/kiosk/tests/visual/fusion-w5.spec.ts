@@ -1642,7 +1642,9 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   const locked = page.getByRole('region', { name: '登录后才出现的账号操作' }).locator('[aria-disabled="true"]')
   await expect(locked).toHaveCount(3)
   await expect(locked.filter({ hasText: '登录后可用' })).toHaveCount(3)
-  await expect(page.getByText('账号注销和数据导出尚未开放', { exact: false })).toBeVisible()
+  // 10/3 口径：注销走现场工作人员申请，导出仍未开放。
+  await expect(page.getByText('注销账号请找现场工作人员申请', { exact: false })).toBeVisible()
+  await expect(page.getByText('数据导出尚未开放', { exact: false })).toBeVisible()
   await expect(page.getByRole('region', { name: '公共终端使用说明' })).toContainText('退出本机登录并清除这一次的临时信息')
   await settingsShot(page, 'guest')
   expect(api.requestCount('GET', CONSENT_STATUS)).toBe(0)

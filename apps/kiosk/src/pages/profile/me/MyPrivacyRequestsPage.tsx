@@ -110,7 +110,7 @@ export function MyPrivacyRequestsPage() {
     >
       <QxPageFrame
         title="隐私与数据请求"
-        subtitle="撤回授权可用；导出与注销暂未在一体机开放"
+        subtitle="撤回授权可用；注销请找现场工作人员申请，导出暂未开放"
         status={status}
         terminalLabel={getTerminalCode() || '就业服务大厅'}
         ctabar={

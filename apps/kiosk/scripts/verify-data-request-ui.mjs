@@ -126,7 +126,8 @@ expectMatches(
   'Kiosk 路由注册 /me/privacy-requests',
 )
 expectIncludes(kioskSettings, '/me/privacy-requests', '账号设置入口链到隐私请求页')
-expectIncludes(kioskSettings, '账号注销和数据导出尚未开放', '设置页保持导出/注销未开放诚实句')
+expectIncludes(kioskSettings, '注销账号请找现场工作人员申请', '设置页写清注销走现场工作人员申请（10/3 口径）')
+expectIncludes(kioskSettings, '数据导出尚未开放', '设置页保持导出未开放诚实句')
 expectIncludes(kioskSettings, '文件、订单等业务摘要清单', '设置页以用户话说明导出范围仍包含文件与订单摘要')
 expectAbsent(
   kioskPage,
