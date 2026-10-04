@@ -114,6 +114,12 @@
 - **问题：** `verify:internal-accounts:postgres` 的 P2-1 要求并发互停的输家必须拿 409 `INTERNAL_ACCOUNT_LAST_ADMIN`，但输家重试时若冲突重试用完或发现对方状态已变，拿到的是 409 `INTERNAL_ACCOUNT_STATE_CHANGED`——同样是事务回滚后的正确拒绝。#1236 的 postgres-readiness（run 37189123001）因此偶发红，合并潮里任何 PR 都可能撞上。
 - **改法：** 只成功一个；输家是这两种 409 之一，且 HTTP 状态是 409 不是 500（新增 P2-1b）；库里至少剩一个可用管理员。服务端代码没动。
 - **验证：** 本机临时 PostgreSQL 连跑 6 次全过（7/7）。反向变异：去掉「最后一个管理员」检查让两边都成功，P2-1、P2-1b、P2-2 三条红，改回后通过。
+## 2026-10-04：终端能力可清除回「未配置」；开场失败的空面试会话满 30 分钟再删（分支 `claude/backend-hardening-20261004-capability-clear`；Grok 实现、Claude 审）
+
+- **清除接口：** `DELETE /api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey`，只许管理员。能力键非法 400 `CAPABILITY_KEY_INVALID`，终端不存在 404 `TERMINAL_NOT_FOUND`；该行本来没有时 200、`cleared: false`、不写审计。删掉后回到未配置：managed 放行、strict 拒绝，`color_print` / `duplex_print` / `signature_stamp` 未登记即拒绝。审计动作 `terminal.capability.cleared`，payload 只有终端号、能力键、删前状态、备注是否存在；后台中文名「清除终端能力配置」。只删精确键，不连带删 `cloud_upload` 旧别名。后台页面上的「清除」按钮由两个后台窗口在能力中心现有页上接。
+- **空会话：** 开场失败仍把会话滚回 `configured` 并原样抛错（503 `AI_INTERVIEW_QUESTION_FAILED`），不立刻删——一体机与小程序失败后都会拿这个会话号打通用题目单（现有门禁第 15 条），但都不会再对它调 `/start`。本人面试记录本来就只收 `completed`；每小时的 `cleanupExpired` 另删超过 30 分钟、仍是 `configured`、且没有任何题目的会话。未满 30 分钟、已有题目、进行中、开场成功的会话都不删。
+- **验证：** 见 PR 描述。三处反向变异（去掉管理员角色、去掉审计、去掉空会话清理）对应断言都红过，已改回。
+- **已知未做：** 会员数据导出里的面试查询不按状态过滤，空会话在被清理前（最长约 1.5 小时）仍会出现在导出里。
 
 ## 2026-10-04：第二次发布清单补上「三个开关各自要同批改的文字」（分支 `claude/release2-switch-texts-1004`，只改文档）
 
