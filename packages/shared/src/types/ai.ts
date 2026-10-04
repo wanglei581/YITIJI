@@ -545,7 +545,7 @@ export interface ResumeFactCheckResponse {
 
 /**
  * 简历导出收费三态（契约 2 / Admin 价目 `resume_export`）。
- * - free：unitCents=0 且 active，界面写「当前免费，不扣权益」
+ * - free：unitCents=0 且 active，界面写「免费试运营」
  * - charged：unitCents>0 且 active，导出前展示价格 + 可用权益
  * - unavailable：active=false 或价目缺失，fail-closed，不是免费
  */

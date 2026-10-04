@@ -12,6 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator'
 import { Type } from 'class-transformer'
+import { RESUME_DOC_LIMITS as L } from '../resume/resume-doc-limits'
 
 /**
  * 简历导出格式(Wave 1 Task 6)。本地字面量联合,镜像
@@ -152,32 +153,99 @@ export class ResumeLayoutDto {
   accent?: ResumeLayoutAccent
 }
 
-/** 导出 PDF:内容 = 用户在预览页确认/编辑后的最终简历(summary 为已润色文本)。 */
-export class ResumeGenerateExportDto {
-  @IsObject() @ValidateNested() @Type(() => ResumeGenBasicDto)
-  basic!: ResumeGenBasicDto
+/**
+ * 「优化稿」的条目校验：导出、排版调整、存草稿三处共用。
+ *
+ * 和上面给「AI 生成」用的录入校验分开：优化稿来自用户上传的原件，原件里只写了公司没写职务、
+ * 或者一条经历只有一段话都很常见，标题类字段必须允许为空，否则优化接口吐出来的结果自己都导不出去。
+ * 上限取自 RESUME_DOC_LIMITS，优化出口用同一份数字收口，两头不会再各说各的。
+ */
+export class ResumeDocBasicDto {
+  @IsString() @MaxLength(L.name)
+  name = ''
+
+  @IsOptional() @IsString() @MaxLength(30)
+  phone?: string
+
+  @IsOptional() @IsString() @MaxLength(100)
+  email?: string
+
+  @IsOptional() @IsString() @MaxLength(50)
+  city?: string
+}
+
+export class ResumeDocEducationDto {
+  @IsString() @MaxLength(L.title)
+  school = ''
+
+  @IsOptional() @IsString() @MaxLength(L.major)
+  major?: string
+
+  @IsOptional() @IsString() @MaxLength(L.degree)
+  degree?: string
+
+  @IsOptional() @IsString() @MaxLength(L.period)
+  period?: string
+
+  @IsOptional() @IsString() @MaxLength(L.description)
+  description?: string
+}
+
+export class ResumeDocExperienceDto {
+  @IsString() @MaxLength(L.title)
+  company = ''
+
+  // 原件只写公司没写职务时如实留空；模板在职务为空时不印空标题。
+  @IsString() @MaxLength(L.role)
+  role = ''
+
+  @IsOptional() @IsString() @MaxLength(L.period)
+  period?: string
+
+  @IsString() @MaxLength(L.description)
+  description = ''
+}
+
+export class ResumeDocProjectDto {
+  @IsString() @MaxLength(L.title)
+  name = ''
+
+  @IsOptional() @IsString() @MaxLength(L.role)
+  role?: string
+
+  @IsString() @MaxLength(L.description)
+  description = ''
+}
+
+/** 优化稿正文：导出与排版调整 / 存草稿都从这里继承，字段只写一遍。 */
+export class ResumeDocBodyDto {
+  @IsObject() @ValidateNested() @Type(() => ResumeDocBasicDto)
+  basic!: ResumeDocBasicDto
 
   @IsObject() @ValidateNested() @Type(() => ResumeGenIntentionDto)
   intention = new ResumeGenIntentionDto()
 
-  @IsString() @MaxLength(600)
+  @IsString() @MaxLength(L.summary)
   summary!: string
 
-  @IsArray() @ArrayMaxSize(6) @ValidateNested({ each: true }) @Type(() => ResumeGenEducationDto)
-  education!: ResumeGenEducationDto[]
+  @IsArray() @ArrayMaxSize(L.education) @ValidateNested({ each: true }) @Type(() => ResumeDocEducationDto)
+  education!: ResumeDocEducationDto[]
 
-  @IsArray() @ArrayMaxSize(8) @ValidateNested({ each: true }) @Type(() => ResumeGenExperienceDto)
-  experience!: ResumeGenExperienceDto[]
+  @IsArray() @ArrayMaxSize(L.experience) @ValidateNested({ each: true }) @Type(() => ResumeDocExperienceDto)
+  experience!: ResumeDocExperienceDto[]
 
-  @IsArray() @ArrayMaxSize(6) @ValidateNested({ each: true }) @Type(() => ResumeGenProjectDto)
-  projects!: ResumeGenProjectDto[]
+  @IsArray() @ArrayMaxSize(L.projects) @ValidateNested({ each: true }) @Type(() => ResumeDocProjectDto)
+  projects!: ResumeDocProjectDto[]
 
-  @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(40, { each: true })
+  @IsArray() @ArrayMaxSize(L.skills) @IsString({ each: true }) @MaxLength(L.skill, { each: true })
   skills!: string[]
 
-  @IsArray() @ArrayMaxSize(15) @IsString({ each: true }) @MaxLength(60, { each: true })
+  @IsArray() @ArrayMaxSize(L.certificates) @IsString({ each: true }) @MaxLength(L.certificate, { each: true })
   certificates!: string[]
+}
 
+/** 导出 PDF:内容 = 用户在预览页确认/编辑后的最终简历(summary 为已润色文本)。 */
+export class ResumeGenerateExportDto extends ResumeDocBodyDto {
   /** 关联的生成任务(仅审计溯源用,可缺省) */
   @IsOptional() @IsString() @MaxLength(100)
   taskId?: string
@@ -221,31 +289,7 @@ export class ResumeGenerateExportDto {
   factsConfirmedAt?: string
 }
 
-export class ResumeLayoutAdjustResumeDto {
-  @IsObject() @ValidateNested() @Type(() => ResumeGenBasicDto)
-  basic!: ResumeGenBasicDto
-
-  @IsObject() @ValidateNested() @Type(() => ResumeGenIntentionDto)
-  intention = new ResumeGenIntentionDto()
-
-  @IsString() @MaxLength(600)
-  summary!: string
-
-  @IsArray() @ArrayMaxSize(6) @ValidateNested({ each: true }) @Type(() => ResumeGenEducationDto)
-  education!: ResumeGenEducationDto[]
-
-  @IsArray() @ArrayMaxSize(8) @ValidateNested({ each: true }) @Type(() => ResumeGenExperienceDto)
-  experience!: ResumeGenExperienceDto[]
-
-  @IsArray() @ArrayMaxSize(6) @ValidateNested({ each: true }) @Type(() => ResumeGenProjectDto)
-  projects!: ResumeGenProjectDto[]
-
-  @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(40, { each: true })
-  skills!: string[]
-
-  @IsArray() @ArrayMaxSize(15) @IsString({ each: true }) @MaxLength(60, { each: true })
-  certificates!: string[]
-}
+export class ResumeLayoutAdjustResumeDto extends ResumeDocBodyDto {}
 
 export class ResumeLayoutAdjustDto {
   @IsObject() @ValidateNested() @Type(() => ResumeLayoutAdjustResumeDto)

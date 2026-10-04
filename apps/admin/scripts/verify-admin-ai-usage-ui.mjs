@@ -9,7 +9,7 @@ import { verifyUsageRender } from './verify-admin-ai-usage-render.mjs'
 //   B. aiUsageDaily.ts 适配器：请求路径与 day 参数；不合法日期不发请求；401 跳登录；
 //      403 / 400 的错误码与服务端中文 message 原样带回；响应形状不对不当成功；mock 不造假数。
 //   C. 显示名与金额：null key → 「无已验签终端 / 无机构」；已知功能 / 供应商 key 给中文名；
-//      认不出的 key 原样显示；金额两位小数带「元」。
+//      认不出的 key 原样显示；金额统一四位小数，沿用 formatYuan。
 //   D. 面板真渲染：演示模式诚实空态；读取中 / 失败重试 / 正常三态；触顶告警引用服务端原话；
 //      四个页签；0 调用如实显示；未来日期不采纳。失败只显示中文说明，不显示错误码。
 //   E. 纪律：面板源码不含「预计 / 估算 / 预测」；按钮可点区域 ≥48px；index.tsx 三个分支都挂面板。
@@ -49,7 +49,7 @@ function load(rel, imports, globals = {}) {
   })
   const module = { exports: {} }
   const requireStub = (id) => {
-    if (id === '@ai-job-print/shared') return load('../../packages/shared/src/aiDisplayLabels.ts', {})
+    if (id === '@ai-job-print/shared') return { ...load('../../packages/shared/src/aiDisplayLabels.ts', {}), ...load('../../packages/shared/src/formatNumber.ts', {}) }
     if (!(id in imports)) throw new Error(`${rel} 引用了门禁没登记的依赖 ${id}`)
     return imports[id]
   }

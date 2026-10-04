@@ -90,8 +90,9 @@ Page({
     piiError: '',
     piiSubmitting: false,
 
-    onsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
-    noCancelNotice: pkg.PACKAGE_NO_CANCEL_NOTICE,
+    // 这一页还没有报价，不知道金额：只用不提钱的两句（金额在确认页由服务端报出后才说付款）
+    onsiteNoticeFree: pkg.PACKAGE_ONSITE_NOTICE_FREE,
+    noCancelNoticeFree: pkg.PACKAGE_NO_CANCEL_NOTICE_FREE,
   },
 
   onLoad() {

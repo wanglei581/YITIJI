@@ -1,3 +1,5 @@
+import { verifyBatch6Copy } from './verify-console-batch6-copy.mjs'
+import { collectAuditActionCodes } from '../../../scripts/audit-action-codes.mjs'
 import { verifyPrivacyCopy } from './verify-console-privacy-copy.mjs'
 import { verifyBatch5Copy } from './verify-console-batch5-copy.mjs'
 // 两个后台的用户可见文案不得带工程词、Markdown 星号或原始状态码。
@@ -134,7 +136,7 @@ const actionBlock = auditTypes.slice(
   auditTypes.indexOf('export type AuditAction'),
   auditTypes.indexOf('export type AuditTargetType'),
 )
-const actions = [...actionBlock.matchAll(/'([^']+)'/g)].map((match) => match[1])
+const actions = [...new Set([...actionBlock.matchAll(/'([^']+)'/g)].map((match) => match[1]).concat(collectAuditActionCodes(join(repoRoot, 'services/api/src'))))]
 if (actions.length < 40) fail(`审计契约动作抽取过少（${actions.length}），门禁可能扫错了文件`)
 
 const transpiled = ts.transpileModule(readFileSync(labelsPath, 'utf8'), {
@@ -329,7 +331,7 @@ function hooks(values) {
 const nums = runFile('packages/shared/src/formatNumber.ts')
 const shared = { ...runFile('packages/shared/src/aiDisplayLabels.ts'), ...nums, formatDateTime: () => '2026-09-30 12:00' }
 const errors = runFile('apps/admin/src/lib/printErrorText.ts')
-const honesty = runFile('apps/admin/src/routes/orders/orderHonestyCopy.ts')
+const honesty = runFile('apps/admin/src/routes/orders/orderHonestyCopy.ts', { '@ai-job-print/shared': shared })
 const display = runFile('apps/admin/src/routes/orders/orderDisplay.ts', { '@ai-job-print/shared': shared, './orderHonestyCopy': honesty })
 const cols = runFile('apps/admin/src/routes/orders/orderColumns.tsx', {
   '@ai-job-print/ui': ui, '../../lib/printErrorText': errors, './orderDisplay': display, './orderHonestyCopy': honesty,
@@ -477,6 +479,7 @@ console.log('\n=== 打印错误原因与服务端告警同一口径 ===')
   }
   if (failures.length === 0) console.log(`  PASS 服务端登记的 ${serverCodes.length} 个错误码后台都有中文原因，且不引用一体机源码`)
 }
+verifyBatch6Copy({ runFile, textOf, shared, ui, fail })
 verifyPrivacyCopy({ runFile, textOf, shared, ui, hooks, common, adminRoot, repoRoot, fail, failures, actions, labels: module.exports })
 verifyBatch5Copy({ runFile, textOf, shared, ui, hooks, adminRoot, repoRoot, fail })
 

@@ -21,7 +21,8 @@ import { fileURLToPath } from 'node:url'
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => fs.readFileSync(path.join(MINIAPP, rel), 'utf8')
 
-const MONEY = /报价|单价|金额|核价|计价|计费|价格|价目|应付|付款|支付|预估|费用|收费|¥|￥|dollar|credit-card/
+// 「免费」「免费试运营」不算钱字眼（9/30 定：价目为 0 时如实写免费）；「权益」指收费导出的核销机制，免费时不提
+const MONEY = /报价|单价|金额|核价|计价|计费|价格|价目|应付|付款|支付|预估|费用|收费|权益|¥|￥|dollar|credit-card/
 
 // 每页「服务端已报出大于 0 的金额」这个条件的原文。钱字眼只许出现在它的真分支里。
 const PAID_GUARD = {
@@ -35,17 +36,35 @@ const PAID_GUARD = {
   // 取件页与订单列表的金额来自服务端订单本身（建单时就定了），渲染时金额总是已知
   'pages/print-pickup/print-pickup.wxml': '!isFreeOrder',
   'pages/orders/orders.wxml': 'item.amountCents > 0',
+  'pages/order-detail/order-detail.wxml': 'detail.paid',
 }
+
+// 扫的是 app.json 里**全部注册页面**，不是手写名单（10/3 走查：手写名单漏了材料包组包、选服务点、订单详情）。
+// 不在 PAID_GUARD 里的页面一律按「本页不许出现钱字眼」查。
+function registeredPages() {
+  const app = JSON.parse(read('app.json'))
+  const out = [...app.pages]
+  for (const sub of app.subPackages || app.subpackages || []) for (const pg of sub.pages) out.push(`${sub.root.replace(/\/$/, '')}/${pg}`)
+  return out
+}
+const PAGE_WXML = registeredPages().map((pg) => `${pg}.wxml`)
+// 页面目录下的全部 js（含 pickup-state.js 这类页面私有模块）
+const PAGE_JS = registeredPages().flatMap((pg) => {
+  const dir = pg.slice(0, pg.lastIndexOf('/'))
+  return fs.readdirSync(path.join(MINIAPP, dir)).filter((f) => f.endsWith('.js')).map((f) => `${dir}/${f}`)
+})
 
 // 模板正文里允许的钱字眼：只有服务端 409 PRICE_CHANGED（价目真的变了）才会渲染。
 const WXML_TEXT_ALLOW = {
   'pages/print-pay/print-pay.wxml': ['价格已更新'],
+  // 列举「个人数据导出包里有哪些类别」，说的是数据类别，不是收费或购买引导
+  'pages/privacy/privacy.wxml': ['收藏、权益、浏览'],
 }
 
-// 值里含钱字眼的 data 字段：模板里引用它们也必须挂在 PAID_GUARD 的真分支下
-const MONEY_VARS = {
-  'pages/package-confirm/package-confirm.wxml': ['onsiteNotice', 'noCancelNotice'],
-}
+// 值里含钱字眼的 data 字段名：**任何页面**的模板引用它们，都必须挂在该页 PAID_GUARD 的真分支下。
+// 下面 MONEY_CONSTANTS 的测试保证：含钱的常量只会被放进这几个名字里，换个名字躲不过去。
+const MONEY_VAR_NAMES = ['onsiteNotice', 'noCancelNotice']
+const MONEY_CONSTANTS = ['PACKAGE_ONSITE_NOTICE', 'PACKAGE_NO_CANCEL_NOTICE']
 
 /** 从 `?` 之后找同一层的 `:`（跳过字符串、括号和嵌套三元）。 */
 function matchColon(expr, q) {
@@ -117,12 +136,12 @@ function wxmlViolations(rel) {
         out.push(`${rel}:${lineOf(src, m.index)} 钱字眼不在「${guard || '（本页不许出现）'}」的真分支里：${l[0]}`)
       }
     }
-    for (const name of MONEY_VARS[rel] || []) {
+    for (const name of MONEY_VAR_NAMES) {
       const ref = new RegExp(`\\b${name}\\b`, 'g')
       let r
       while ((r = ref.exec(expr))) {
         if (!insidePaidBranch(expr, r.index, guard)) {
-          out.push(`${rel}:${lineOf(src, m.index)} 含钱字眼的字段 ${name} 不在「${guard}」的真分支里`)
+          out.push(`${rel}:${lineOf(src, m.index)} 含钱字眼的字段 ${name} 不在「${guard || '（本页不许出现）'}」的真分支里`)
         }
       }
     }
@@ -149,6 +168,11 @@ const JS_ALLOW = {
   // 待现场支付：amountCents 不是 0 的分支；待付款：0 元单建单即记已付，走不到；'¥'：formatPrice 0 元走「免费」；
   // 取消弹窗：canCancel 只给 unpaid + pending 的云打印单，0 元单是已付
   'pages/orders/orders.js': ['待现场支付', '待付款', '¥', '确定取消这张未付款订单'],
+  // 同上三条理由：awaiting_payment 只在金额不是 0 时出现；fmtPrice 0 元走「免费」；取消只给 unpaid 的单
+  'pages/order-detail/order-detail.js': ['待现场支付', '¥', '确定取消这张未付款订单'],
+  // 两句都只在 pricing.mode === 'charged'（服务端说导出要收费）时出现
+  'pages/resume-diagnose/resume-diagnose.js': ['未找到可核销权益', '未取得可核销权益'],
+  'pages/resume-optimize/resume-optimize.js': ['未找到可核销权益', '未取得可核销权益'],
 }
 
 /** 取 JS 里的字符串字面量（跳过注释）。模板字符串按整段取。 */
@@ -181,12 +205,29 @@ function jsViolations(rel) {
 }
 
 test('WXML：钱字眼只出现在「已报出大于 0 的金额」的分支里', () => {
-  const v = Object.keys(PAID_GUARD).flatMap(wxmlViolations)
+  for (const rel of Object.keys(PAID_GUARD)) assert.ok(PAGE_WXML.includes(rel), `${rel} 不是注册页面，PAID_GUARD 登记过期`)
+  const v = PAGE_WXML.flatMap(wxmlViolations)
   assert.deepEqual(v, [])
 })
 
+test('含钱的常量只进登记过的字段名（否则模板检查看不见它）', () => {
+  const bad = []
+  for (const rel of PAGE_JS) {
+    const src = read(rel)
+    for (const c of MONEY_CONSTANTS) {
+      const re = new RegExp(`([A-Za-z_$][\\w$]*)\\s*:\\s*pkg\\.${c}\\b(?!_FREE)|pkg\\.${c}\\b(?!_FREE)`, 'g')
+      let m
+      while ((m = re.exec(src))) {
+        if (!m[1] || !MONEY_VAR_NAMES.includes(m[1])) bad.push(`${rel}:${lineOf(src, m.index)} pkg.${c} 没有放进登记过的字段名`)
+      }
+    }
+  }
+  assert.deepEqual(bad, [])
+})
+
 test('JS：含钱字眼的字面量都已登记为只在收费时出现', () => {
-  const v = Object.keys(JS_ALLOW).flatMap(jsViolations)
+  for (const rel of Object.keys(JS_ALLOW)) assert.ok(PAGE_JS.includes(rel), `${rel} 不在注册页面目录下，JS_ALLOW 登记过期`)
+  const v = PAGE_JS.flatMap(jsViolations)
   assert.deepEqual(v, [])
 })
 

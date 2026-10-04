@@ -11,6 +11,10 @@ export function auditActorText(record: AuditLogRecord): string {
 
 export function auditTargetText(record: AuditLogRecord): string {
   const label = getAuditTargetLabel(record.targetType)
+  if (record.targetType === 'terminal') {
+    const parsed = parseAuditPayload(record.payloadJson).value
+    return auditTerminalText(record.targetId, parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {})
+  }
   return record.targetId ? `${label} · 尾号 ${record.targetId.slice(-6)}` : label
 }
 
@@ -19,20 +23,7 @@ export function auditIpText(value: string | null): string {
 }
 
 // 来源：用户状态变更、打印建单、账号绑定、文件清理等既有审计写入结构。
-export const PAYLOAD_LABELS: Record<string, string> = {
-  reason: '原因', fromStatus: '原状态', toStatus: '新状态', sections: '查看范围',
-  matched: '是否找到用户', queryType: '查询方式', fileId: '文件编号', fileName: '文件名',
-  sourceFileId: '原文件编号', hasFileHash: '是否记录文件校验值', params: '打印参数',
-  hasEndUser: '是否为登录用户', terminalId: '终端编号', orderId: '订单编号', orderNo: '订单号',
-  partnerId: '机构账号编号', orgId: '机构编号', userId: '账号编号', endUserId: '用户编号',
-  count: '数量', deletedCount: '删除数量', expiresAt: '过期时间', status: '状态',
-  result: '结果', phase: '步骤', copies: '份数', duplex: '双面', color: '彩色',
-  pageRange: '页范围', amountCents: '金额（分）', phoneMasked: '手机号',
-  phone: '手机号', contactPhone: '联系电话', mobile: '手机号', email: '邮箱',
-  password: '密码', token: '令牌', accessToken: '访问令牌', refreshToken: '刷新令牌',
-  apiKey: '接口密钥', secret: '密钥', authorization: '身份验证信息', cookie: '登录凭据',
-  action: '操作', rows: '行数', cleaned: '清理数量', enabled: '是否启用', field: '变更字段',
-}
+export { PAYLOAD_LABELS } from './auditPayloadLabels'
 
 const SENSITIVE_WORDS = new Set([
   'password', 'passwd', 'pwd', 'token', 'secret', 'credential', 'authorization',
@@ -93,4 +84,11 @@ export function parseAuditPayload(raw: string): { value: unknown; invalid: boole
   } catch {
     return { value: null, invalid: true, length: raw.length }
   }
+}
+
+/** 编号优先；没有编号时仅显示内部 ID 尾号，完整原值由抽屉悬停保留。 */
+export function auditTerminalText(value: unknown, payload: Record<string, unknown>): string {
+  const code = payload.terminalCode
+  if (typeof code === 'string' && code.trim()) return safeAuditText(code)
+  return typeof value === 'string' && value ? `终端（尾号 ${value.slice(-6)}）` : '—'
 }
