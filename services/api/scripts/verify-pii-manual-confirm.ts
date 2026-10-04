@@ -137,8 +137,8 @@ async function main(): Promise<void> {
     check('开关打开：未确认的降级扫描被拒（400 PRINT_PII_MANUAL_CONFIRM_REQUIRED）',
       !blocked.ok && blocked.status === 400 && blocked.code === 'PRINT_PII_MANUAL_CONFIRM_REQUIRED', describe(blocked))
     check('开关打开：确认过的降级扫描放行', (await gate(f1.id)).ok, describe(await gate(f1.id)))
-    // 同一原件重扫：新任务更晚、未确认 → 以最新为准，旧确认不继承。
-    await makeTask(f1.id, 1, 'degraded', { ageMs: -1_000 })
+    // 同一原件重扫：新任务更晚（超出孪生检查的时间窗）、未确认 → 以最新为准，旧确认不继承。
+    await makeTask(f1.id, 1, 'degraded', { ageMs: -60_000 })
     const rescan = await gate(f1.id)
     check('同一原件重扫后以最新任务为准，旧确认不继承', !rescan.ok && rescan.code === 'PRINT_PII_MANUAL_CONFIRM_REQUIRED', describe(rescan))
     check('完整扫描不需要确认即放行', (await gate(f4.id)).ok)
@@ -154,6 +154,110 @@ async function main(): Promise<void> {
     const convertedConfirm = await outcome(() => confirm.confirm(t8.task.id, t8.requester))
     check('格式转换件：本人确认后放行', convertedConfirm.ok && (await gate(converted.id)).ok, describe(convertedConfirm))
     check('非生产（不强制隐私检查）不受这道闸影响', (await gate(f6.id, false)).ok)
+
+    console.log('\n[D] W-118：同一次进页面并发建出的两条检查，只裁决了一条')
+    delete process.env['PRINT_PII_MANUAL_CONFIRM_ENFORCED']
+    const finding = (taskId: string, action: string, snippet = '138****0602') => prisma.piiFinding.create({ data: {
+      taskId, type: 'phone', label: '手机号', pageNumber: 1, snippet, action,
+    } })
+    const twinFile = await makeFile(20)
+    const twinA = await makeTask(twinFile.id, 20, 'real', { ageMs: 23 })
+    const twinB = await makeTask(twinFile.id, 20, 'real')
+    const pendingA = await finding(twinA.task.id, 'pending'); await finding(twinB.task.id, 'pending')
+    const both = await gate(twinFile.id)
+    check('两条都没裁决 → 拒绝（400 PRINT_PII_SCAN_REQUIRED）', !both.ok && both.status === 400 && both.code === 'PRINT_PII_SCAN_REQUIRED', describe(both))
+    const raw = await assertPiiScanned({ prisma, fileId: twinFile.id, requireCompleted: true, missingMessage: '未检查', pendingMessage: '待裁决' }).catch((error: { getResponse: () => { error: Record<string, unknown> } }) => error.getResponse().error)
+    check('被拒的响应带「回材料检查页」的下一步标识', (raw as Record<string, unknown> | undefined)?.['nextAction'] === 'return_to_material_check', JSON.stringify(raw))
+    await prisma.piiFinding.update({ where: { id: pendingA.id }, data: { action: 'keep' } })
+    const one = await gate(twinFile.id)
+    check('只裁决了较早那条、较晚那条没裁决 → 放行（线上那一半被拒的情形）', one.ok, describe(one))
+    // 反过来：裁决的是较晚那条，较早那条没裁决，本来就放行，保持。
+    const twinFile2 = await makeFile(21)
+    const early = await makeTask(twinFile2.id, 21, 'real', { ageMs: 15 })
+    const late = await makeTask(twinFile2.id, 21, 'real')
+    await finding(early.task.id, 'pending'); await finding(late.task.id, 'keep')
+    check('只裁决了较晚那条 → 放行', (await gate(twinFile2.id)).ok)
+    // 换了文件（新的文件对象）必须重新检查：别的文件上裁决过的检查不算数。
+    const otherFile = await makeFile(22)
+    const swapped = await gate(otherFile.id)
+    check('换了文件（新的文件对象，没有自己的检查）→ 拒绝', !swapped.ok && swapped.code === 'PRINT_PII_SCAN_REQUIRED', describe(swapped))
+    const otherScan = await makeTask(otherFile.id, 22, 'real'); await finding(otherScan.task.id, 'pending')
+    const swappedPending = await gate(otherFile.id)
+    check('换了文件且新文件的检查没裁决 → 拒绝，旧文件的裁决不继承', !swappedPending.ok, describe(swappedPending))
+    // 不是孪生的三种情形：隔得久的重扫、命中不一样、内容变了。
+    const rescanFile = await makeFile(23)
+    const old = await makeTask(rescanFile.id, 23, 'real', { ageMs: 60_000 }); await finding(old.task.id, 'keep')
+    const again = await makeTask(rescanFile.id, 23, 'real'); await finding(again.task.id, 'pending')
+    check('一分钟前裁决过、刚才重扫没裁决 → 拒绝（重扫以最新为准）', !(await gate(rescanFile.id)).ok)
+    const diffFile = await makeFile(24)
+    const few = await makeTask(diffFile.id, 24, 'real', { ageMs: 20 }); await finding(few.task.id, 'keep')
+    const more = await makeTask(diffFile.id, 24, 'real'); await finding(more.task.id, 'keep'); await finding(more.task.id, 'pending', '3702**********1234')
+    check('挨着的两条检查命中不一样（晚的多查出一处没裁决）→ 拒绝', !(await gate(diffFile.id)).ok)
+    const modeFile = await makeFile(25)
+    await makeTask(modeFile.id, 25, 'degraded', { ageMs: 20 })
+    const full = await makeTask(modeFile.id, 25, 'real'); await finding(full.task.id, 'pending')
+    check('挨着的两条检查覆盖程度不同（早的没查全、晚的查全了没裁决）→ 拒绝', !(await gate(modeFile.id)).ok)
+    const staleFile = await makeFile(26)
+    const staleTask = await makeTask(staleFile.id, 26, 'real'); await finding(staleTask.task.id, 'keep')
+    await prisma.fileObject.update({ where: { id: staleFile.id }, data: { sha256: sha(99) } })
+    const stale = await gate(staleFile.id)
+    check('检查后文件内容变了 → 409 PII_SCAN_STALE', !stale.ok && stale.status === 409 && stale.code === 'PII_SCAN_STALE', describe(stale))
+    // 挨着的两条但内容哈希不同（早的那条是对旧内容做的）：不是孪生，按最晚那条算「还没裁决」。
+    const shaFile = await makeFile(31)
+    const oldContent = await makeTask(shaFile.id, 30, 'real', { ageMs: 20 }); await finding(oldContent.task.id, 'keep')
+    const newContent = await makeTask(shaFile.id, 31, 'real'); await finding(newContent.task.id, 'pending')
+    const shaDiff = await gate(shaFile.id)
+    check('挨着的两条检查内容哈希不同 → 按最晚那条算没裁决（400 PRINT_PII_SCAN_REQUIRED）', !shaDiff.ok && shaDiff.code === 'PRINT_PII_SCAN_REQUIRED', describe(shaDiff))
+    // 本人确认开关打开时同样按孪生算：确认了其中一条即可。
+    process.env['PRINT_PII_MANUAL_CONFIRM_ENFORCED'] = 'true'
+    const confirmFile = await makeFile(27)
+    const c1st = await makeTask(confirmFile.id, 27, 'degraded', { ageMs: 12 })
+    await makeTask(confirmFile.id, 27, 'degraded')
+    check('孪生的降级检查都没确认 → 拒绝', !(await gate(confirmFile.id)).ok)
+    await confirm.confirm(c1st.task.id, c1st.requester)
+    check('孪生的降级检查确认了较早那条 → 放行', (await gate(confirmFile.id)).ok, describe(await gate(confirmFile.id)))
+    // 挨着的两条、都没有命中，但早的查全了、晚的没查全也没确认：不是孪生，晚的那条仍要本人确认。
+    const mixedFile = await makeFile(29)
+    await makeTask(mixedFile.id, 29, 'real', { ageMs: 18 })
+    await makeTask(mixedFile.id, 29, 'degraded')
+    const mixed = await gate(mixedFile.id)
+    check('挨着的两条都无命中但覆盖程度不同（晚的没查全、没确认）→ 仍要本人确认', !mixed.ok && mixed.code === 'PRINT_PII_MANUAL_CONFIRM_REQUIRED', describe(mixed))
+    delete process.env['PRINT_PII_MANUAL_CONFIRM_ENFORCED']
+
+    console.log('\n[E] W-118：建任务去重')
+    const { PII_SCAN_DEDUPE_MS } = await import('../src/materials/materials.service')
+    const dedupe = new MaterialsService(prisma, { getObject: async () => Buffer.from('不是 PDF 的内容') } as never, {} as never, {} as never)
+    const dedupeFile = await makeFile(28)
+    const dto = { kind: 'pii_scan', sourceFileId: dedupeFile.id } as never
+    const anon = { kind: 'anonymous' as const }
+    const [d1, d2] = await Promise.all([dedupe.createTask(dto, anon), dedupe.createTask(dto, anon)])
+    const created = () => prisma.documentProcessTask.count({ where: { sourceFileId: dedupeFile.id, kind: 'pii_scan' } })
+    check('同一文件并发两次建隐私检查：只建一条，两次拿到同一个任务和同一个访问口令',
+      d1.id === d2.id && !!d1.accessToken && d1.accessToken === d2.accessToken && (await created()) === 1, `${d1.id}/${d2.id} 共 ${await created()} 条`)
+    const d3 = await dedupe.createTask(dto, anon)
+    check('窗口内再提交一次仍是同一条', d3.id === d1.id && (await created()) === 1)
+    const realNow = Date.now
+    Date.now = () => realNow() + PII_SCAN_DEDUPE_MS + 1
+    try {
+      const d4 = await dedupe.createTask(dto, anon)
+      check('过了去重窗口再提交是一次新的检查', d4.id !== d1.id && (await created()) === 2)
+    } finally { Date.now = realNow }
+    // 已经裁决 / 确认过的任务不再复用：之后再提交是重扫，要一条新的、待处理的检查。
+    const touchedFile = await makeFile(32)
+    const touchedDto = { kind: 'pii_scan', sourceFileId: touchedFile.id } as never
+    const firstScan = await dedupe.createTask(touchedDto, anon)
+    await confirm.confirm(firstScan.id, { kind: 'anonymous', accessToken: firstScan.accessToken })
+    const secondScan = await dedupe.createTask(touchedDto, anon)
+    check('窗口内但前一条已被本人确认过：新建一条，不复用', secondScan.id !== firstScan.id, `${firstScan.id}/${secondScan.id}`)
+    // 去重按请求方分开：会员请求不能拿到匿名任务（连同它的访问口令）。
+    const asMember = await outcome(() => dedupe.createTask(dto, { kind: 'member', endUserId: `verify-pii-member-${suffix}` }))
+    check('窗口内换一个请求方：不复用匿名任务，也拿不到它的访问口令',
+      !asMember.ok || ((asMember.value as { id: string; accessToken?: string }).id !== d1.id && (asMember.value as { accessToken?: string }).accessToken === undefined), describe(asMember))
+    const missing = { kind: 'pii_scan', sourceFileId: `no-such-file-${suffix}` } as never
+    const m1 = await outcome(() => dedupe.createTask(missing, anon)); const m2 = await outcome(() => dedupe.createTask(missing, anon))
+    check('建任务失败不留在去重表里（两次都如实报错）', !m1.ok && !m2.ok && ![...(dedupe as unknown as { recentPiiScans: Map<string, unknown> }).recentPiiScans.keys()].some((key) => key.includes('no-such-file')))
+    const otherKind = await Promise.all([1, 2].map(() => outcome(() => dedupe.createTask({ kind: 'inspection', sourceFileId: dedupeFile.id } as never, anon))))
+    check('别的任务种类不走去重', otherKind.every((r) => !r.ok) || (otherKind[0].ok && otherKind[1].ok && (otherKind[0].value as { id: string }).id !== (otherKind[1].value as { id: string }).id))
 
     console.log('\n[C] 口径一致')
     check('确认接口接受的 mode 与建单闸门要求确认的 mode 是同一组',

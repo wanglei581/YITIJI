@@ -10475,7 +10475,6 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
-          "PiiFinding",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10524,7 +10523,6 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
-          "PiiFinding",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10551,7 +10549,6 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
-          "PiiFinding",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10578,7 +10575,6 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
-          "PiiFinding",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -17299,8 +17295,7 @@
           "DocumentProcessTask"
         ],
         "usedBy": [
-          "services/api/src/materials/materials.service.ts",
-          "services/api/src/print-jobs/pii-scan-gate.ts"
+          "services/api/src/materials/materials.service.ts"
         ]
       },
       {
