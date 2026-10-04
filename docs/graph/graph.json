@@ -23546,7 +23546,8 @@
       "services/api/scripts/verify-ai-cost-runtime.ts"
     ],
     "services/api/src/ai/quota/ai-quota-run.ts": [
-      "services/api/scripts/verify-ai-quota-coverage.ts"
+      "services/api/scripts/verify-ai-quota-coverage.ts",
+      "services/api/scripts/verify-ai-quota.ts"
     ],
     "services/api/src/ai/quota/ai-quota.policy.ts": [
       "services/api/scripts/verify-ai-quota.ts"
@@ -24625,6 +24626,7 @@
       "services/api/scripts/verify-contract-review-timeout.ts"
     ],
     "services/api/src/contract-review/contract-review-timing.ts": [
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-contract-review-timeout.ts"
     ],
     "services/api/src/contract-review/contract-review.controller.ts": [
@@ -34408,12 +34410,14 @@
           "packages/shared/src/types/memberBenefits.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/ai/ai-result.cleanup.task.ts",
+          "services/api/src/ai/quota/ai-quota-run.ts",
           "services/api/src/ai/quota/ai-quota.policy.ts",
           "services/api/src/ai/quota/ai-quota.service.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/contract-review/contract-review-timing.ts",
           "services/api/src/member-benefits/admin-member-benefits.service.ts",
           "services/api/src/member-benefits/dto/admin-member-benefits.dto.ts",
           "services/api/src/member-benefits/member-benefits.types.ts",

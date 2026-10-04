@@ -35,7 +35,7 @@ import { JobFitController } from '../src/ai/job-fit.controller'
 import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
 import { JobFitService } from '../src/ai/resume/job-fit.service'
 import { AiQuotaService } from '../src/ai/quota/ai-quota.service'
-import { quotaHttpCode, runWithAiQuota } from '../src/ai/quota/ai-quota-run'
+import { quotaHttpCode, quotaReleaseReason, runWithAiQuota } from '../src/ai/quota/ai-quota-run'
 import { DailyBriefController } from '../src/assistant/daily-brief.controller'
 import { DailyBriefService } from '../src/assistant/daily-brief.service'
 import { AuditService } from '../src/audit/audit.service'
@@ -100,7 +100,7 @@ const REGISTRY: Entry[] = [
   { controller: ContractReviewController, method: 'report', status: 'exempt', reason: '把已经落库的审查结果渲染成文件，不调用模型', via: via(ContractReviewLifecycleService.prototype, 'createReport') },
   { controller: MaterialsController, method: 'createTask', status: 'exempt', reason: '打印前材料检查是规则处理，已不是生成式调用', via: via(MaterialsService.prototype, 'createTask') },
 
-  { controller: AdvisorController, method: 'create', status: 'pending', reason: '创建会话会调用模型做作业型分类，失败时用关键词兜底。是否计入简历次数尚未裁定，本包不扣', via: via(AdvisorService.prototype, 'createSession') },
+  { controller: AdvisorController, method: 'create', status: 'exempt', reason: '建会话只做一次轻量判型，模型失败时退关键词判型，不产出给用户的 AI 内容；调用受每日金额上限约束', via: via(AdvisorService.prototype, 'createSession') },
 
   { controller: AiController, method: 'chatWithAssistant', status: 'q2b', via: via(AiService.prototype, 'chatWithAssistant') },
   { controller: AiController, method: 'transcribeAssistantVoice', status: 'q2b' },
@@ -280,6 +280,7 @@ async function main() {
     console.log(`违规清单：${scanned.violations.join('；')}`)
     process.exit(1)
   }
+  assert.equal(scanned.line, '接入 9、不计次 7、待 Q2b 15、待裁定 0、违规 0')
 
   const apiRoot = resolve(__dirname, '..')
   const temporary = mkdtempSync(join(tmpdir(), 'verify-ai-quota-coverage-'))
@@ -657,6 +658,14 @@ async function main() {
 
     await check('模型报错归还；客户端断开不归还，结果能按记录号读回', async () => {
       const ma = userOf.get('failure')!
+      for (const code of ['AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID']) {
+        const error = Object.assign(new Error(code), { code })
+        assert.equal(quotaReleaseReason(error), 'provider_error')
+        await assert.rejects(() => runWithAiQuota({
+          quota, bucket: 'ai_resume', operationKey: `${code}:${ma}`, endUserId: ma,
+        }, async () => { throw error }, async () => 'no-ref'))
+        assert.equal(await used('failure'), 0)
+      }
       const broken = Object.assign(new Error('upstream'), { code: 'AI_PROVIDER_ERROR' })
       await assert.rejects(() => runWithAiQuota({
         quota, bucket: 'ai_resume', operationKey: `broken:${ma}`, endUserId: ma,

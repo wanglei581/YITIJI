@@ -2311,7 +2311,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/providers/openai.provider.stub.ts` | `verify-ai-cost-runtime.ts` |
 | `services/api/src/ai/providers/qwen.provider.stub.ts` | `verify-ai-cost-runtime.ts` |
 | `services/api/src/ai/providers/zhipu.provider.stub.ts` | `verify-ai-cost-runtime.ts` |
-| `services/api/src/ai/quota/ai-quota-run.ts` | `verify-ai-quota-coverage.ts` |
+| `services/api/src/ai/quota/ai-quota-run.ts` | `verify-ai-quota-coverage.ts`<br/>`verify-ai-quota.ts` |
 | `services/api/src/ai/quota/ai-quota.policy.ts` | `verify-ai-quota.ts` |
 | `services/api/src/ai/quota/ai-quota.service.ts` | `verify-ai-quota-coverage.ts`<br/>`verify-ai-quota.ts` |
 | `services/api/src/ai/redis-inflight-lock.ts` | `verify-resume-optimize.ts` |
@@ -2467,7 +2467,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/contract-review/contract-review-provider.service.ts` | `verify-ai-cost-coverage.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-contract-review-timeout.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts` |
 | `services/api/src/contract-review/contract-review-report-pdf.service.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-aigc-pdf-metadata.ts`<br/>`verify-beijing-display-time.ts`<br/>`verify-cjk-font.ts` |
 | `services/api/src/contract-review/contract-review-task-view.mapper.ts` | `verify-contract-review-timeout.ts` |
-| `services/api/src/contract-review/contract-review-timing.ts` | `verify-contract-review-timeout.ts` |
+| `services/api/src/contract-review/contract-review-timing.ts` | `verify-ai-quota.ts`<br/>`verify-contract-review-timeout.ts` |
 | `services/api/src/contract-review/contract-review.controller.ts` | `verify-ai-access.ts`<br/>`verify-ai-quota-coverage.ts` |
 | `services/api/src/contract-review/contract-review.queue.ts` | `verify-contract-review-http.ts` |
 | `services/api/src/contract-review/contract-review.types.ts` | `verify-contract-review-http.ts`<br/>`verify-contract-review-timeout.ts` |

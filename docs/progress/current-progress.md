@@ -69,6 +69,7 @@
 - **合同审查时限（未改清扫）：** 分析阶段上限 15 分钟，与预占清扫窗口相同；模型单次调用上限 5 分钟。预占发生在抽取和规则之后。作业里不再查金额封顶（确认入口已经查过）。
 - **没动：** 金额封顶的阈值与逻辑、前端、`.github`、Q2b 那几类入口。`ai.service.ts` 现为 1168 行，本包没有拆文件。
 - **验证（本机，未上线）：** `pnpm run typecheck`、`lint`、`verify:ai-quota`、`verify:ai-quota-coverage`（最后一行：接入 9、不计次 6、待 Q2b 15、待裁定 1、违规 0）、`verify:ai-access`、`verify:resume-optimize`、`verify:resume-generate`、`verify:career-plan`、`verify:job-fit`、`verify:governed-job-fit`、`verify:contract-review:units`、`verify:ai-usage-budget`、`verify:resume-parse-intent`，以及图谱上与本次改动相关的一批 API 门禁。反向变异 6 处都让对应断言变红，随后已还原。`verify:ai-quota:postgres` 本机未跑。
+- **跟进：** 简历计次接线（`runResumeCharge`、`storeResumeParse`，以及诊断、优化、生成、排版调整里为计次新增的段落）挪到 `services/api/src/ai/quota/ai-resume-charge.ts` 与 `ai-resume-charge-steps.ts`，`ai.service.ts` 只留调用，由 1169 行回到 943 行。归还原因表补上 `AI_PROVIDER_ACCOUNT_UNAVAILABLE`、`AI_PROVIDER_MODEL_INVALID`，这两个码按模型错误归还次数。顾问新建会话改为不计次：建会话只做一次轻量判型，模型失败时退关键词判型，不产出给用户的 AI 内容。未结算预占清扫窗口由 15 分钟改为 20 分钟（`AI_QUOTA_STALE_RESERVATION_MS`），长于合同审查整段预算上限，避免长合同还在跑时被清掉。
 
 ## 2026-10-03：第五次更新暂停
 

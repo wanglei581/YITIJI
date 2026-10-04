@@ -13,8 +13,10 @@ import { execFileSync } from 'node:child_process'
 import { validate } from 'class-validator'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { PrismaService } from '../src/prisma/prisma.service'
-import { AiQuotaService } from '../src/ai/quota/ai-quota.service'
+import { AiQuotaService, AI_QUOTA_STALE_RESERVATION_MS } from '../src/ai/quota/ai-quota.service'
 import { hashQuotaOperation } from '../src/ai/quota/ai-quota.policy'
+import { quotaReleaseReason, runWithAiQuota } from '../src/ai/quota/ai-quota-run'
+import { CONTRACT_REVIEW_STAGE_MAX_MS } from '../src/contract-review/contract-review-timing'
 import { runWithAiRequestContext, lazyAiRequestContext } from '../src/ai/usage/ai-usage-context'
 import { AdminMemberBenefitsService } from '../src/member-benefits/admin-member-benefits.service'
 import { GrantBenefitDto } from '../src/member-benefits/dto/admin-member-benefits.dto'
@@ -219,9 +221,29 @@ async function main() {
       }
       process.env.AI_QUOTA_RESUME_DAILY = '3'
     })
-    await check('stale 清扫超过十五分钟归还，十五分钟边界仍保留', async () => {
-      const r = await reserve(users[10], { now: new Date(now.getTime() - 15 * 60_000 - 1) })
-      const boundary = await reserve(users[10], { now: new Date(now.getTime() - 15 * 60_000) })
+    await check('模型账户不可用与模型名失效抛出时按 provider_error 归还', async () => {
+      for (const code of ['AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID']) {
+        const error = Object.assign(new Error(code), { code })
+        assert.equal(quotaReleaseReason(error), 'provider_error')
+        const before = await prisma.aiQuotaReservation.count({ where: { endUserId: users[14], status: 'released' } })
+        await assert.rejects(() => runWithAiQuota({
+          quota, bucket: 'ai_resume', operationKey: operation(), endUserId: users[14],
+        }, async () => { throw error }, async () => 'unused'))
+        const released = await prisma.aiQuotaReservation.findMany({
+          where: { endUserId: users[14], status: 'released' }, orderBy: { reservedAt: 'desc' },
+        })
+        assert.equal(released.length, before + 1)
+        const row = released[0]
+        assert.ok(row)
+        const log = await prisma.auditLog.findFirstOrThrow({ where: { targetId: row.id, action: 'ai_quota.released' } })
+        assert.equal(JSON.parse(log.payloadJson).reason, 'provider_error')
+        assert.equal(await used(users[14], row.day), 0)
+      }
+    })
+    await check('stale 清扫超过窗口归还，窗口边界仍保留', async () => {
+      assert.ok(AI_QUOTA_STALE_RESERVATION_MS > CONTRACT_REVIEW_STAGE_MAX_MS)
+      const r = await reserve(users[10], { now: new Date(now.getTime() - AI_QUOTA_STALE_RESERVATION_MS - 1) })
+      const boundary = await reserve(users[10], { now: new Date(now.getTime() - AI_QUOTA_STALE_RESERVATION_MS) })
       // 排除其他场景的预占，精准收敛此次夹具。
       await prisma.aiQuotaReservation.updateMany({ where: { endUserId: { in: users.filter((id) => id !== users[10]) }, status: 'reserved' }, data: { reservedAt: now } })
       const result = await quota.sweepStale(now); assert.equal(result.releasedCount, 1)
