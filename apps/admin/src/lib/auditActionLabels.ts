@@ -208,6 +208,7 @@ const ACTION_LABELS: Record<string, string> = {
   'resume.layout_adjusted': '调整简历排版',
   'terminal.asset.create_planned': '登记计划装机终端',
   'terminal.bind_code.create': '创建终端绑定码',
+  'terminal.capability.cleared': '清除终端能力配置',
   'terminal.capability.update': '更新终端能力开通状态',
   'terminal.credential.emergency_revoke': '紧急撤销终端凭据',
   'terminal.lifecycle.update': '更新终端生命周期',

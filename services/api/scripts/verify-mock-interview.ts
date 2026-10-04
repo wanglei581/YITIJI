@@ -27,11 +27,11 @@ process.env['OCR_PROVIDER'] = process.env['OCR_PROVIDER'] ?? 'disabled'
 require('dotenv').config()
 
 import { createServer, type Server } from 'http'
-import { Logger } from '@nestjs/common'
+import { Logger, ServiceUnavailableException } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { MockInterviewLlmService, type InterviewReportPayload } from '../src/mock-interview/mock-interview-llm.service'
-import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
+import { EMPTY_CONFIGURED_SESSION_MAX_AGE_MS, MockInterviewService } from '../src/mock-interview/mock-interview.service'
 import { InterviewReportPdfService } from '../src/mock-interview/interview-report-pdf.service'
 import { InterviewPracticeSheetPdfService } from '../src/mock-interview/interview-practice-sheet-pdf.service'
 import { INTERVIEW_PRACTICE_RESULT_DISCLAIMER } from '../src/mock-interview/interview-practice-sheet'
@@ -774,6 +774,102 @@ async function main() {
       const recovered = await svc.end(created.sessionId, reqA)
       if (recovered.report.overall.level !== 'good') fail('19. 崩溃恢复应生成完整报告')
       pass('19. completed 且无报告时 /end 可恢复生成，不永久卡死')
+    }
+
+    // ── 20. 开场失败留下的空会话：列表不可见，满 30 分钟才硬删 ──────────────
+    // 两端失败后都不再对同一会话号调 /start，但会用它打题目单，所以失败时不删。
+    {
+      if (EMPTY_CONFIGURED_SESSION_MAX_AGE_MS !== 30 * 60 * 1000) {
+        fail('20. 空会话保留时长必须是 30 分钟')
+      }
+      const reqA = { endUserId: endUserA, accessToken: null }
+      const httpOf = (e: unknown): { status: number; code: string } => {
+        const status = e instanceof Error && 'getStatus' in e ? (e as { getStatus(): number }).getStatus() : 0
+        const body = e instanceof Error && 'getResponse' in e
+          ? (e as { getResponse(): { error?: { code?: string } } }).getResponse()
+          : undefined
+        return { status, code: body?.error?.code ?? '' }
+      }
+      const origNext = llm.nextQuestion.bind(llm)
+      llm.nextQuestion = async () => {
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_INTERVIEW_QUESTION_FAILED', message: '面试问题生成失败，请稍后重试' },
+        })
+      }
+      const failedIds: string[] = []
+      try {
+        for (let i = 0; i < 3; i += 1) {
+          const created = await svc.createSession({ ...baseCfg, durationMin: 3 }, reqA)
+          cleanupSessionIds.push(created.sessionId)
+          failedIds.push(created.sessionId)
+          try {
+            await svc.start(created.sessionId, reqA)
+            fail('20. 开场失败时代理应抛错')
+          } catch (e) {
+            const got = httpOf(e)
+            if (got.status !== 503 || got.code !== 'AI_INTERVIEW_QUESTION_FAILED') {
+              fail(`20. 开场失败的错误码不得变，实际 ${got.status}+${got.code}`)
+            }
+          }
+        }
+      } finally {
+        llm.nextQuestion = origNext
+      }
+      const [emptyId, youngId, withTurnId] = failedIds
+      if (!emptyId || !youngId || !withTurnId) fail('20. 前置：三场失败会话没建出来')
+      const emptyRow = await prisma.mockInterviewSession.findUnique({ where: { id: emptyId } })
+      const emptyTurns = await prisma.mockInterviewTurn.count({ where: { sessionId: emptyId } })
+      if (!emptyRow || emptyRow.status !== 'configured' || emptyTurns !== 0) {
+        fail('20. 开场失败后会话应仍在，且停在 configured、没有任何题目')
+      }
+      const hidden = await svc.listMine(endUserA, null, 50)
+      if (hidden.items.some((item) => failedIds.includes(item.sessionId))) {
+        fail('20. 没有任何题目的 configured 会话不得出现在本人面试记录')
+      }
+
+      const kept = await svc.createSession({ ...baseCfg, durationMin: 3 }, reqA)
+      cleanupSessionIds.push(kept.sessionId)
+      responseQueue.push(q('请自我介绍', { qType: 'intro' }))
+      await svc.start(kept.sessionId, reqA)
+      const inProgressBare = await svc.createSession({ ...baseCfg, durationMin: 3 }, reqA)
+      cleanupSessionIds.push(inProgressBare.sessionId)
+      await prisma.mockInterviewSession.update({
+        where: { id: inProgressBare.sessionId },
+        data: { status: 'in_progress', startedAt: new Date() },
+      })
+      await prisma.mockInterviewTurn.create({
+        data: { sessionId: withTurnId, idx: 0, role: 'interviewer', content: '已有题目' },
+      })
+
+      const now = new Date()
+      const age = async (id: string, minutes: number) => {
+        await prisma.mockInterviewSession.update({
+          where: { id },
+          data: { createdAt: new Date(now.getTime() - minutes * 60 * 1000) },
+        })
+      }
+      await age(emptyId, 31)
+      await age(youngId, 29)
+      await age(withTurnId, 31)
+      await age(inProgressBare.sessionId, 31)
+      await age(kept.sessionId, 31)
+      await svc.cleanupExpired(now)
+
+      const after = async (id: string) => prisma.mockInterviewSession.findUnique({ where: { id } })
+      if (await after(emptyId)) fail('20. 超过 30 分钟、configured、没有题目的会话应被硬删')
+      if (!(await after(youngId))) fail('20. 未满 30 分钟的空会话不得删（题目单还要用这个会话号）')
+      if (!(await after(withTurnId))) fail('20. 已有题目的 configured 会话不得按空会话删')
+      if (!(await after(inProgressBare.sessionId))) fail('20. 进行中的会话即使没有题目也不得删')
+      const keptRow = await after(kept.sessionId)
+      const keptTurns = await prisma.mockInterviewTurn.count({ where: { sessionId: kept.sessionId } })
+      if (!keptRow || keptRow.status !== 'in_progress' || keptTurns < 1) {
+        fail('20. 开场成功的会话不得被空会话清理影响')
+      }
+      const stillHidden = await svc.listMine(endUserA, null, 50)
+      if (stillHidden.items.some((item) => item.sessionId === youngId)) {
+        fail('20. 清理前的空会话仍不得出现在本人面试记录')
+      }
+      pass('20. 开场失败：错误码不变、空会话不进记录、超过 30 分钟才硬删；开场成功的会话保留')
     }
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)

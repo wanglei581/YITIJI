@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-10-04：终端能力可清除回「未配置」；开场失败的空面试会话满 30 分钟再删（分支 `claude/backend-hardening-20261004-capability-clear`；Grok 实现、Claude 审）
+
+- **清除接口：** `DELETE /api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey`，只许管理员。能力键非法 400 `CAPABILITY_KEY_INVALID`，终端不存在 404 `TERMINAL_NOT_FOUND`；该行本来没有时 200、`cleared: false`、不写审计。删掉后回到未配置：managed 放行、strict 拒绝，`color_print` / `duplex_print` / `signature_stamp` 未登记即拒绝。审计动作 `terminal.capability.cleared`，payload 只有终端号、能力键、删前状态、备注是否存在；后台中文名「清除终端能力配置」。只删精确键，不连带删 `cloud_upload` 旧别名。后台页面上的「清除」按钮由两个后台窗口在能力中心现有页上接。
+- **空会话：** 开场失败仍把会话滚回 `configured` 并原样抛错（503 `AI_INTERVIEW_QUESTION_FAILED`），不立刻删——一体机与小程序失败后都会拿这个会话号打通用题目单（现有门禁第 15 条），但都不会再对它调 `/start`。本人面试记录本来就只收 `completed`；每小时的 `cleanupExpired` 另删超过 30 分钟、仍是 `configured`、且没有任何题目的会话。未满 30 分钟、已有题目、进行中、开场成功的会话都不删。
+- **验证：** 见 PR 描述。三处反向变异（去掉管理员角色、去掉审计、去掉空会话清理）对应断言都红过，已改回。
+- **已知未做：** 会员数据导出里的面试查询不按状态过滤，空会话在被清理前（最长约 1.5 小时）仍会出现在导出里。
+
 ## 2026-10-04：第二次发布清单补上「三个开关各自要同批改的文字」（分支 `claude/release2-switch-texts-1004`，只改文档）
 
 - **改了什么：** `docs/progress/next-tasks.md` 第二次发布「发布前」第 2 条。原来只写了登录那一句，而且写成「协议现在写的是先登录」，与线上不符（线上是「以页面提示为准」）。现在三个开关各列一行：怎么切、打开后的实际行为、哪几句文字要同批改。
