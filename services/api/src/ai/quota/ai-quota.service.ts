@@ -145,6 +145,19 @@ export class AiQuotaService {
     return { releasedCount, truncated: true }
   }
 
+  /**
+   * 到期清理：已结算（已扣 / 已归还）的预占记录与每日计数只留 retentionDays 天，和 AI 调用日志同一期限。
+   * 还在预占中的不删（由 sweepStale 结算）。两张表都只有账号、用途、日期、次数，没有用户文本。
+   */
+  async purgeExpired(retentionDays: number, now = new Date()): Promise<{ reservations: number; daily: number }> {
+    const cutoff = new Date(now.getTime() - retentionDays * 24 * 3600_000)
+    const reservations = await this.prisma.aiQuotaReservation.deleteMany({
+      where: { status: { in: ['committed', 'released'] }, settledAt: { lt: cutoff } },
+    })
+    const daily = await this.prisma.aiQuotaDaily.deleteMany({ where: { day: { lt: quotaDay(cutoff) } } })
+    return { reservations: reservations.count, daily: daily.count }
+  }
+
   async remaining({ endUserId, now = new Date() }: { endUserId: string; now?: Date }) {
     if (!endUserId) throw new BadRequestException('AI_QUOTA_MEMBER_REQUIRED')
     const day = quotaDay(now)

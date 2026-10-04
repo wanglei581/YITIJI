@@ -48,6 +48,9 @@ export class AiResultCleanupTask {
     const retentionDays = readAiServiceLogRetentionDays()
     await this.cleanupExpiredAiServiceLogs(retentionDays)
     await this.cleanupExpiredAiUsageRecords(retentionDays)
+    try { await this.quota.purgeExpired(retentionDays) } catch (error) {
+      this.logger.error(`AI quota ledger cleanup failed: ${(error as Error).message}`)
+    }
   }
 
   private async cleanupExpiredResumeResults(): Promise<void> {
