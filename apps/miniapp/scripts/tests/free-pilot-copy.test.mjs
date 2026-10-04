@@ -332,7 +332,10 @@ test('现场无人值守：需要人帮忙时指向服务电话，不写死号�
   for (const taskStatus of ['failed', 'abandoned']) {
     const st = ps.resolveOrderState({ taskStatus, pickupStatus: 'used', amountCents: 0 })
     assert.ok(st.detail.includes(ue.SUPPORT_HINT), taskStatus)
-    assert.match(st.detail, /换一台机器/, taskStatus)
+    assert.match(st.detail, /重新/, `${taskStatus}：给一条手机上能自己做的出路`)
+    // 读不到 support-contact 的 otherOnlineTerminalNearby 之前，不知道附近有没有别的在线终端，
+    // 按最保守的不说「换一台机器」（总指挥 10/4 晚定；接口接上后按该字段再说）
+    assert.doesNotMatch(st.detail, /换一台|换台/, taskStatus)
   }
   for (const rel of ['pages/print-pickup/print-pickup.wxml', 'pages/print/print.wxml']) {
     assert.match(read(rel), /\{\{supportHint\}\}/, rel)

@@ -35,10 +35,10 @@ function resolveOrderState(order) {
     return { key: 'cancelled', title: '订单已取消', detail: '本次到机码已经失效。', showQr: false }
   }
   if (taskStatus === 'failed') {
-    return { key: 'failed', title: '打印失败', detail: `请查看终端屏幕上的提示；可以回到订单重新打印，或换一台机器。${SUPPORT_HINT}`, showQr: false }
+    return { key: 'failed', title: '打印失败', detail: `请查看终端屏幕上的提示；可以回到订单重新打印。${SUPPORT_HINT}`, showQr: false }
   }
   if (taskStatus === 'abandoned') {
-    return { key: 'abandoned', title: '打印任务已终止', detail: `请回到订单页重新发起，或换一台机器。${SUPPORT_HINT}`, showQr: false }
+    return { key: 'abandoned', title: '打印任务已终止', detail: `请回到订单页重新发起。${SUPPORT_HINT}`, showQr: false }
   }
   if (taskStatus === 'completed') {
     return { key: 'completed', title: '打印已完成', detail: '请及时取走纸张并检查是否齐全。', showQr: false }
