@@ -26,6 +26,14 @@ export class ApiRouter {
 
   constructor(page: Page) {
     this.#page = page
+    // 首页也读取同一公开价目；旧用例保留非零默认，免费/失败用例显式覆盖。
+    this.respond('GET', '/api/v1/print/price-config', {
+      status: 200,
+      json: { billingEnabled: true, items: [
+        { serviceKey: 'print_bw_page', unitCents: 20, unit: 'page', description: '黑白打印' },
+        { serviceKey: 'print_color_page', unitCents: 50, unit: 'page', description: '彩色打印' },
+      ] },
+    })
     // 包 F：优化 / 生成预览 / 导出页挂载时都会读导出收费口径（GET /resume/export/pricing）。
     // 默认按「免费」应答，让所有既有用例不因这条新请求中断；收费 / 未开放态的用例自行 respond 覆盖。
     this.respond('GET', '/api/v1/resume/export/pricing', {

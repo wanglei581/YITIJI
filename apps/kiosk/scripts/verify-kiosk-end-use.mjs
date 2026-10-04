@@ -147,7 +147,8 @@ check(
   '2.0 稿 01 首页有登录态 ?state=member（产品负责人 9/29 同意，FROZEN.json 已更新）',
 )
 // 空闲说明仍来自 kioskIdleTiming 单一来源（保留，不在本次改动范围内削弱）。
-check(/homeStandbyNote\(/.test(homeView) && /publicIdleLogoutLabel\(\)/.test(homeView), '首页空闲说明仍读 kioskIdleTiming')
+// C 批按最终稿去掉空待办行；清场时长仍须在常驻页脚可见，并来自同一时间源。
+check(/publicIdleLogoutLabel\(\)/.test(homeView) && /resultIdleLogoutLabel\(\)/.test(homeView) && homeView.includes('无操作自动退出') && !homeView.includes('这台机器上没有待继续的办理'), '首页无空待办行，页脚仍从 kioskIdleTiming 读取两种自动退出时长')
 
 // ── C. 进个人资产页先问「还是你吗？」 ───────────────────────
 const timing = code('src/auth/kioskIdleTiming.ts')
