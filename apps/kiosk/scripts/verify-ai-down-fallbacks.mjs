@@ -439,6 +439,9 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
       // 后端拆码后新增（services/api/src/ai/llm/llm-failure.ts）：
       // 只代表 fetch 层根本没连上，不再混着 429 / 5xx / 空回复。
       'AI_PROVIDER_UNREACHABLE',
+      // 上游 401/402/403 与模型名无效：配置恢复前每次都失败。
+      'AI_PROVIDER_ACCOUNT_UNAVAILABLE',
+      'AI_PROVIDER_MODEL_INVALID',
       // 服务端能力级停用（ai-access.service.ts enforce 在调模型之前拦下，503）：
       // 后台暂停、出站白名单不放行、当日金额上限已到、读不到当日花费。重试不会变好。
       'AI_PAUSED',
@@ -452,6 +455,7 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     // 必须在表里的码：这几个进不了表，页面就会把「AI 停用」当成「这次没成」继续叫人重试。
     const MUST_BE_OUTAGE = [
       'AI_PROVIDER_NOT_CONFIGURED', 'AI_PAUSED', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE',
+      'AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID',
     ]
     for (const code of MUST_BE_OUTAGE) {
       assert(
@@ -541,6 +545,21 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     /setGenerating\(true\)\s*\n\s*setAiOutage\(null\)/,
     '用户主动生成时必须先清除 aiOutage，否则上一次失败会把能力判定粘住',
   )
+  must(
+    'careerPlan',
+    /AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）/,
+    '能力级失败必须显示手动出路，而不是服务端原文',
+  )
+  mustNot(
+    'careerPlan',
+    /error\.message/,
+    '职业规划页不得把服务端 message 原文显示给用户',
+  )
+  mustNot(
+    'careerPlan',
+    /function errorMessageOf/,
+    '职业规划页不得再保留「有 message 就原样显示」的取值函数',
+  )
 }
 
 // ── ⑦ 能力级停用：不叫人重试，落到手动路径 ─────────────────────────────────
@@ -575,10 +594,10 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     } else if (errorsMod.__loadError) {
       failures.push(`aiOutage: 声明错误模块无法加载（${errorsMod.__loadError.message}）`)
     } else {
-      for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_PROVIDER_NOT_CONFIGURED']) {
+      for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_PROVIDER_NOT_CONFIGURED', 'AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID']) {
         assert(mod.isAiOutage({ code, status: 503 }) === true, `aiOutage.isAiOutage 不认 ${code} —— 页面会把 AI 停用当成一次失败继续叫人重试`)
       }
-      for (const code of ['AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'REQUEST_TIMEOUT', 'NETWORK_ERROR', 'AI_DECLARATION_DECLINED', 'AI_DECLARATION_CLEARED']) {
+      for (const code of ['AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'AI_PROVIDER_REQUEST_ERROR', 'REQUEST_TIMEOUT', 'NETWORK_ERROR', 'AI_DECLARATION_DECLINED', 'AI_DECLARATION_CLEARED']) {
         assert(mod.isAiOutage({ code, status: 503 }) === false, `aiOutage.isAiOutage 把单次失败 ${code} 判成了能力级停用`)
       }
       const declined = new errorsMod.AiDeclarationDeclinedError('age_14_plus')

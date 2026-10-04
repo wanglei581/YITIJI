@@ -306,7 +306,7 @@ export function ResumeOptimizePage() {
     )
   }
 
-  const retryable = view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent'
+  const retryable = failKind !== 'outage' && (view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent')
   const stateBody = view === 'ready' ? null : (
     <ResumeStatePanel
       tone={view === 'loading' ? 'info' : view === 'empty' || view === 'no-context' ? 'empty' : 'error'}

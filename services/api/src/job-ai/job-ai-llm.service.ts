@@ -191,7 +191,7 @@ export class JobAiLlmService {
       )
       if (!res.ok) {
         this.logger.warn(`${operation}.upstream_non_2xx status=${res.status}`)
-        throw llmUpstreamStatusError('AI 岗位服务', res.status)
+        throw llmUpstreamStatusError('AI 岗位服务', res.status, res.data)
       }
       const data = res.data as {
         choices?: Array<{ message?: { content?: string } }>

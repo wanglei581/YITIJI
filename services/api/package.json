@@ -292,6 +292,7 @@
     "typecheck:recruitment-wave2-proposed-governance": "tsc --noEmit --strict --noUnusedLocals --noUnusedParameters --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck scripts/recruitment-wave2-proposed-governance-dry-run.ts scripts/verify-recruitment-wave2-proposed-governance.ts scripts/support/recruitment-wave2-governance-readonly.ts scripts/support/recruitment-wave2-proposed-governance-input.ts src/recruitment-content/recruitment-wave2-proposed-governance.types.ts src/recruitment-content/recruitment-wave2-proposed-governance-plan.ts",
     "typecheck:recruitment-wave2-full-inventory": "tsc --noEmit --strict --target ES2021 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck scripts/recruitment-wave2-full-inventory.ts scripts/verify-recruitment-wave2-full-inventory.ts scripts/support/recruitment-wave2-full-inventory.ts scripts/support/recruitment-wave2-public-snapshot.ts",
     "verify:career-plan": "node -r @swc-node/register scripts/verify-career-plan.ts",
+    "verify:llm-account-unavailable": "node -r @swc-node/register scripts/verify-llm-account-unavailable.ts",
     "verify:advisor-work": "node -r @swc-node/register scripts/verify-advisor-work.ts",
     "verify:career-plan-degraded": "node -r @swc-node/register scripts/verify-career-plan-degraded.ts",
     "verify:llm-timeout-concurrency": "node -r @swc-node/register scripts/verify-llm-timeout-concurrency.ts",

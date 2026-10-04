@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { FilesService } from '../files/files.service'
 import { AiPublicQuotaService, type AiPublicQuotaContext } from './ai-public-quota.service'
+import { isOurSideProviderFailure } from './llm/llm-failure'
 import { AiService, type ResumeParseIntentBinding } from './ai.service'
 import type { ParseResumeInput, ParseResumeOutput } from './interfaces/ai-provider.interface'
 import { resumeParseAnonymousAccessToken } from './resume-parse-intent'
@@ -14,7 +15,9 @@ import {
  * Orchestrates one keyed resume parse.
  * Owner, proof, and payload checks happen before any file probe. A readable
  * file is required before quota and before the provider. Only the startProvider
- * CAS winner calls the provider. Failures are not refunded and are not retried here.
+ * CAS winner calls the provider. A thrown provider error is not released and is
+ * not retried here. A completed response with an our-side provider failure
+ * releases this intent's public count once. User-file problems stay charged.
  * A file that disappears after this check can still be charged; that window is not closed here.
  */
 @Injectable()
@@ -59,10 +62,16 @@ export class ResumeParseIntentRunner {
       if (followed) return followed
       return this.processing(started.submission.intentId, endUserId, intentKey, proof)
     }
-    await this.ai.submitResumeParse(this.whitelist(dto), endUserId, {
+    const output = await this.ai.submitResumeParse(this.whitelist(dto), endUserId, {
       intentId: started.submission.intentId,
       accessToken: binding.accessToken,
     })
+    if (output.status === 'failed' && isOurSideProviderFailure(output.failCode)) {
+      await this.quota.releaseResumeParseCharge({
+        intentId: started.submission.intentId,
+        context: quotaContext,
+      }).catch(() => undefined)
+    }
     const completed = await this.submission.complete(request)
     if (!completed.advanced) {
       // Member deletion keeps a revoked intent tombstone. Never return the

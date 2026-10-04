@@ -62,6 +62,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   AI_NOT_CONFIGURED: 'AI 能力尚未启用，请联系现场工作人员',
   AI_PROVIDER_NOT_CONFIGURED: 'AI 能力尚未启用，请联系现场工作人员',
   AI_PROVIDER_UNREACHABLE: 'AI 服务暂时连不上，请稍后重试',
+  AI_PROVIDER_ACCOUNT_UNAVAILABLE: 'AI 暂时不可用，你可以先按这一页的手动方式继续',
+  AI_PROVIDER_MODEL_INVALID: 'AI 暂时不可用，你可以先按这一页的手动方式继续',
   TERMINAL_NOT_READY: '本机设备未就绪，请联系现场工作人员后再试',
   TERMINAL_ID_REQUIRED: '本机设备未就绪，请联系现场工作人员后再试',
   TERMINAL_SESSION_INVALID: '这台机器的安全校验没通过，请联系现场工作人员',
