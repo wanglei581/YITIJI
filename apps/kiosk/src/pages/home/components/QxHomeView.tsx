@@ -7,6 +7,7 @@ import {
   CalendarDaysIcon,
   FileTextIcon,
   GraduationCapIcon,
+  HistoryIcon,
   HomeIcon,
   LandmarkIcon,
   MessageSquareTextIcon,
@@ -22,7 +23,8 @@ import type { RecruitmentHostingState } from '../../../hooks/useRecruitmentHosti
 import type { SmartCampusCapabilityState } from '../../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../../hooks/useTerminalDeviceStatus'
 import type { ToolboxCapabilityState } from '../../../hooks/useToolboxConfig'
-import { publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
+import { hasKioskSensitiveSession } from '../../../auth/kioskSensitiveSession'
+import { homeStandbyNote, publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import { rememberAssistantDraft } from '../../../services/assistantDraft'
 import { useTerminalKiosk } from '../../../services/api/screensaver'
 import { usePrintPriceConfig, unitCentsFor } from '../../../services/print/priceConfigApi'
@@ -121,6 +123,7 @@ export function QxHomeNavbar({ onAction }: Pick<QxHomeViewProps, 'onAction'>) {
 
 export function QxHomeView({
   isLoggedIn,
+  guestMode,
   device,
   toolbox,
   campus,
@@ -169,6 +172,10 @@ export function QxHomeView({
   const greeting = greetingWord(now)
   // 首页是公共屏：登录着也不打招呼叫名字、不显示手机号（打码的也不显示）。W-75。
   const hello = greeting
+  const standbyNote = homeStandbyNote(
+    { isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() },
+    publicIdleLogoutLabel(),
+  )
 
   return (
     <div
@@ -214,6 +221,13 @@ export function QxHomeView({
 
         <div className="qx-home-continue" data-testid="home-context-region">
           {continueSlot}
+          <div className="qx-home-empty-context" role="status">
+            <span className="qx-home-context-icon" aria-hidden="true"><HistoryIcon /></span>
+            <span>
+              <strong>这台机器上没有待继续的办理</strong>
+              <small>{standbyNote}</small>
+            </span>
+          </div>
         </div>
 
         <header className="qx-home-section-head" data-member={isLoggedIn ? 'true' : undefined}>

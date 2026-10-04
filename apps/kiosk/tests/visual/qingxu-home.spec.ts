@@ -179,7 +179,7 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(page.getByText('状态未知', { exact: true }).first()).toBeVisible()
   await expect(home.getByText('2026 青岛秋季高校毕业生招聘会', { exact: true })).toBeVisible()
   expect(fairRequestUrl.searchParams.get('terminalId')).toBe('KSK-001')
-  await expect(home.getByText('这台机器上没有待继续的办理')).toHaveCount(0)
+  await expect(home.getByText('这台机器上没有待继续的办理')).toBeVisible()
   // 打印机状态未知时，主卡照实说「状态未知」和受影响范围，不写成「进入后核验」的常态眉题。
   const printTile = home.locator('[data-action="print-hub"]')
   await expect(printTile).toHaveAttribute('data-panel-state', 'unknown')
@@ -193,8 +193,8 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(home.getByRole('button', { name: /百宝箱/ })).toHaveCount(0)
   await expect(home.getByRole('button', { name: /智慧校园/ })).toHaveCount(0)
 
-  // C 批最终稿不放空待办行；仍断言它既不显示，也不是按钮。
-  await expect(home.getByText('这台机器上没有待继续的办理')).toHaveCount(0)
+  // 空态是陈述不是动作：它不能是按钮（无论 disabled 与否）。它也是清场说明（W-42），不能删。
+  await expect(home.getByText('这台机器上没有待继续的办理')).toBeVisible()
   await expect(home.getByRole('button', { name: /没有待继续的办理/ })).toHaveCount(0)
 
   // 首页上每一颗点不动的按钮，都必须说得出「因为哪条能力闸门」。

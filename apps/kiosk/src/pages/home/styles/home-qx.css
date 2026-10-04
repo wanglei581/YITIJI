@@ -64,15 +64,21 @@
 .qx-home-voice small { margin-left: auto; font-size: var(--qx-fs-aux); font-weight: 650; }
 
 .qx-home-continue { flex: none; min-height: 0; }
-.qx-home-continue:empty { display: none; }
-.qx-home .continue {
-  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; width: 100%;
+.qx-home-continue:has(.continue) > .qx-home-empty-context { display: none; }
+.qx-home-empty-context, .qx-home .continue {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px; width: 100%;
   min-height: 64px; margin-bottom: 4px; padding: 8px 16px; border: 1px solid var(--qx-line); border-radius: var(--qx-home-r);
   color: var(--qx-ink); background: var(--qx-surface); text-align: left;
 }
-.qx-home .continue .c-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.qx-home .continue strong { font-size: var(--qx-fs-body); font-weight: 650; }
-.qx-home .continue p { margin: 0; color: var(--qx-ink-3); font-size: var(--qx-fs-aux); line-height: var(--qx-lh-body); }
+.qx-home .continue { grid-template-columns: 1fr auto; }
+/* 清场说明（W-42）：干净首页说「不会显示上一位使用者的资料」，登录着说清离开前要点结束使用。 */
+.qx-home-empty-context .qx-home-context-icon {
+  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; color: var(--qx-teal-d); background: var(--qx-teal-soft);
+}
+.qx-home-context-icon svg { width: 26px; height: 26px; }
+.qx-home-empty-context span, .qx-home .continue .c-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.qx-home-empty-context strong, .qx-home .continue strong { font-size: var(--qx-fs-body); font-weight: 650; }
+.qx-home-empty-context small, .qx-home .continue p { margin: 0; color: var(--qx-ink-3); font-size: var(--qx-fs-aux); line-height: var(--qx-lh-body); }
 .qx-home .continue .c-icon { display: none; }
 .qx-home .continue .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; align-self: center; width: auto;
