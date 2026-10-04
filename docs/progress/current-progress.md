@@ -35,6 +35,15 @@
 - **审查中自己撞到的一处：** 去重最初连已裁决的任务也复用，`verify:materials-processing` 与 `verify:pii-redaction` 红（重扫后应是待裁决、不能直接遮挡）；改成只复用没动过的。
 - **CI 首轮拦下的一处：** `verify:document-conversion` 手写的假数据库只有 `findFirst`，闸门改用 `findMany` 后崩溃；给假表补了按文件、种类、状态真实过滤的 `findMany`（本用例本就没有检查任务），原有断言照常通过。
 - **关联门禁** 25 条通过。没有新增表、接口或依赖；小程序、一体机页面没动。
+## 2026-10-04：两个后台第 7 批——告警副标题与宣传屏上传说明
+
+- 告警中心副标题：服务端正文已经含有该终端编号时，不再在前面重复拼；正文没有该编号时，仍把编号拼在前面。服务端原文不改写。标题仍最多两行。
+- 宣传屏「上传素材」旁写明限额，与服务端默认值一致（`services/api/src/content/media-validation.ts`）：图片 JPG、PNG、WebP，不超过 10 MB；视频 MP4、WebM，不超过 100 MB，时长 120 秒以内。类型或大小不合规时就地说明怎么改，不发上传请求；服务端仍做最终校验。这几个限额可用环境变量覆盖，页面写的是默认值（与 `.env.example` 一致）。
+- 素材页两处、终端配置一处的时长框下写清上下限与默认值：图片停留 3–1800 秒、留空默认 8 秒；上传视频停留 3–120 秒、留空默认 15 秒；外链停留 3–1800 秒、留空默认 15 秒；一体机无人操作多久后播放宣传屏 30–1800 秒、留空默认 180 秒。超出范围就地提示，不提交；终端配置不再把超范围的值悄悄夹到边界。
+- 外部视频链接的说明改成白话。HTTPS、iframe、直链只留在悬停「技术说明」。第 5 批「上传前请先看」原文和位置未改。
+- 新增 `apps/admin/src/routes/alerts/alertDetailText.ts`、`apps/admin/src/routes/screensaver/assetUploadRules.ts`、`apps/admin/scripts/verify-console-batch7-copy.mjs`。无删除。
+- 验证：`verify-console-plain-copy`（含新门禁，限额数字直接从服务端源码解析比对）、`verify-service-desk-dashboard-ui`、`verify-feedback-sla`、`verify-console-screen-ui`、`test:admin-state-units`、`verify:compliance-copy`、`verify-mock-server-contract`、admin 类型检查与 eslint 通过；管理员浏览器测试常规 124 条、大屏 160 条通过。反向变异（正文含终端号仍重复拼、放行 .txt、限额数字与服务端不一致、外链说明出现 HTTPS、默认值写错、类型提示改字）都会红。用户可见文字经 agy 挑过一轮后改写。
+
 ## 2026-10-04：两个后台第 6 批——小样本反推修补与审计文案
 
 - 出纸投影统一调用 `suppressAggregateCount`。出纸成功、未出纸、未确认、已结束任一存在小样本时，不给成功率，仅可保留非小样本的已结束数；逐台与原始数合计使用同一规则。终端服务人次、打印扫描次数、出纸成功、已结束、未确认逐列按机构合计已公开保护，必要时补充隐藏最小可见正值（同值取最早），保留零值；合计独立投影，不因逐台隐藏而整列清空。未出纸差值也受列残差保护，可能与公开合计及其它行联立的出纸字段整组补充隐藏。页面、详情与 CSV 明写“样本不足，不显示”。
