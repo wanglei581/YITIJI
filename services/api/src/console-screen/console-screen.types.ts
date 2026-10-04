@@ -129,7 +129,7 @@ export interface ScreenTerminalTwin {
   scanner: ScreenMetric<{ state: 'ready' | 'busy' | 'error' | 'unknown'; label: string | null }>
   currentTask: ScreenMetric<{ pages: number; colorMode: 'bw' | 'color' | null; startedAt: string | null } | null>
   today: {
-    // 0 保留；大于 0 且小于 SCREEN_MIN_AGGREGATE_SAMPLE 为 null。管理员与机构同一口径。
+    // 0 保留；1–4 为 null；≥5 原样。管理员与机构同一口径。
     // printPages 只计已出纸：计费页 × 份数，按 PrintTask.completedAt 落入上海自然日（与北京时间同一东八区）。
     printPages: number | null
     printTasks: number | null
@@ -379,6 +379,8 @@ export interface ScreenSnapshot {
 }
 
 // ── 服务调用 / 信息使用（第一步）──
+// 以下聚合计数字段：0 保留；1–4 为 null；≥5 原样（number | null）。
+// 比率、时延、成本仍要求各自分母/样本 ≥5；热力中尚未到来的小时仍为 null。
 
 export type ScreenUsageRange = 'today' | '7d' | '30d'
 export type ScreenUsageLane = 'info' | 'ai' | 'print'
@@ -439,8 +441,11 @@ export interface ScreenUsageAiValue {
   total: number | null
   success: number | null
   failed: number | null
+  /** 成功 + 失败 ≥5 才给成功率；0 次不给百分比。 */
   successRate: number | null
+  /** 成功调用 ≥5 才给平均时延。 */
   avgLatencyMs: number | null
+  /** 采集成本的调用 ≥5 才给估算成本。 */
   estimatedCostCny: number | null
   costMeasuredCalls: number | null
   fallbackCalls: number | null

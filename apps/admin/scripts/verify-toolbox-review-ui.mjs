@@ -161,12 +161,13 @@ mustNotContain(adminRoot, 'src/routes/toolbox/components/ToolboxGovernancePanel.
   '二维码图片或 assistant intent',
 ], '审核发布面板不得把二维码图片和扫码目标共用同一输入')
 mustContain(adminRoot, 'src/routes/toolbox/components/ToolboxAllowedHostPanel.tsx', [
-  'DB 审核表',
-  '环境白名单',
+  '域名审核记录',
+  '同时通过本页审核和服务器配置检查',
+  '运维参考：',
   'TOOLBOX_ALLOW_EXTERNAL_URL',
   'KIOSK_EXTERNAL_APP_ALLOWED_HOSTS',
   'KIOSK_QR_TARGET_ALLOWED_HOSTS',
-], '允许域名面板展示 DB 与环境变量双白名单口径')
+], '允许域名面板保留审核与服务器配置两项检查，配置键在悬停')
 mustContain(adminRoot, 'src/routes/toolbox/components/TerminalToolboxRow.tsx', [
   'isGovernedItem',
   'app:',

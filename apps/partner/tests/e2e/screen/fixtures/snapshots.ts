@@ -338,7 +338,7 @@ export function partnerUsageVisitsFailed(range: string): ScreenUsageSnapshot {
 /**
  * 托管关闭的信息使用，照 console-screen.usage.service.ts / usage.queries.ts 写：
  *   - partnerContent 只下发政策一类（byType 过滤到 policy）；
- *   - partnerDaily 只数政策的浏览与打开来源入口（countsTowardPartnerDaily），少于 5（含 0）→ null；
+ *   - partnerDaily 只数政策的浏览与打开来源入口（countsTowardPartnerDaily），0 保留；1–4 → null；≥5 原样；
  *   - partnerTop 只从政策里挑，浏览达到 5 次才列，每条的浏览不超过政策浏览合计（今日 21 / 近 7 天 126 / 近 30 天 504）。
  * 各块的数两两不撞（使用概况、每日趋势的峰值与孤立点、热门政策）：每屏一个数只出现一次的体检靠这个分辨复述。
  */
@@ -346,7 +346,7 @@ const POLICY_DAILY = [
   [21, 8], [16, 6], [9, 3], [18, 7], [24, 9], [2, 0], [15, 5], [19, 6], [22, 8], [13, 4], [11, 5], [25, 10], [27, 11], [20, 7], [17, 6],
   [0, 0], [14, 5], [18, 6], [21, 8], [23, 9], [26, 10], [22, 8], [15, 5], [19, 7], [28, 11], [31, 12], [24, 9], [21, 8], [29, 11], [26, 10],
 ] as const
-const suppressed = (value: number): number | null => (value >= 5 ? value : null)
+const suppressed = small
 
 export function partnerUsageHostingOff(range: string): ScreenUsageSnapshot {
   const base = partnerUsage(range)

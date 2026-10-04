@@ -252,7 +252,8 @@ function GapChart({ days, primary, second, secondary, seriesLabel, width, height
   const blocked = (from: number, to: number) => {
     for (let i = from; i <= to; i += 1) {
       for (const v of [primary[i], second[i]]) {
-        if (v !== null && yOf(v) > aboveBaseline - 16) return true
+        // 真值 0（服务端 0 照常给出）落在基线上，碰不到带子上方的标签；这时标签留在上方，写进带子反而会压在贴底的线上
+        if (v !== null && v > 0 && yOf(v) > aboveBaseline - 16) return true
       }
     }
     return false
