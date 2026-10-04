@@ -126,7 +126,12 @@ expectMatches(
   'Kiosk 路由注册 /me/privacy-requests',
 )
 expectIncludes(kioskSettings, '/me/privacy-requests', '账号设置入口链到隐私请求页')
-expectIncludes(kioskSettings, '注销账号、复制个人信息，请找现场工作人员，或按《隐私政策》里的电话、邮箱联系我们申请', '设置页写清注销与复制个人信息的三条申请渠道（与隐私政策一致）')
+expectIncludes(kioskSettings, '注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请', '设置页写清注销与复制个人信息的申请渠道（与隐私政策一致）')
+// 10/4 产品负责人：设备现场无人值守、全自助。这三页不再让用户找现场工作人员。
+const kioskProfile = read(join(kioskRoot, 'src/pages/profile/ProfilePage.tsx'))
+for (const [name, source] of [['设置页', kioskSettings], ['隐私请求页', kioskPage], ['我的页', kioskProfile]]) {
+  expectAbsent(source, /现场工作人员/, `${name}不出现「现场工作人员」（无人值守自助）`)
+}
 expectIncludes(kioskSettings, '我们核实是你本人后，15 个工作日内处理', '设置页用隐私政策原词与时限')
 expectAbsent(kioskSettings, /数据导出尚未开放|核验你的身份/, '设置页不再说导出未开放，也不用「核验」替代政策原词')
 // 10/4：复制个人信息按《隐私政策》人工申请；不再预告一个尚不存在的自助导出会包含什么。
