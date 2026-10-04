@@ -10,11 +10,18 @@ import {
   type AdminBenefitType,
   type AdminEndUserSearchItem,
 } from '../../services/api/memberBenefitsAdmin'
+import {
+  AiQuotaGrantFields,
+  aiQuotaGrantExtra,
+  aiQuotaPurposeLabel,
+  benefitTypeLabel,
+} from './AiQuotaGrantFields'
 
 const BENEFIT_TYPES: { value: AdminBenefitType; label: string; desc: string }[] = [
   { value: 'coupon', label: '优惠券', desc: '用于打印或服务优惠' },
   { value: 'free_quota', label: '免费次数', desc: '用于免费打印/服务次数' },
   { value: 'package_entitlement', label: '服务额度', desc: '仅代表工具服务额度' },
+  { value: 'ai_quota', label: 'AI 次数', desc: '机构加发，指定用途后使用' },
   { value: 'subsidy_eligibility_hint', label: '政策资格提示', desc: '仅作官方入口与材料指引' },
 ]
 
@@ -47,6 +54,7 @@ function fmt(iso: string | null): string {
 function defaultTitle(type: AdminBenefitType): string {
   if (type === 'free_quota') return '免费打印次数'
   if (type === 'package_entitlement') return '求职服务额度'
+  if (type === 'ai_quota') return '机构加发的 AI 次数'
   if (type === 'subsidy_eligibility_hint') return '政策资格提示'
   return '打印服务优惠券'
 }
@@ -63,11 +71,13 @@ export default function MemberBenefitsPage() {
   const [title, setTitle] = useState(defaultTitle('free_quota'))
   const [description, setDescription] = useState('')
   const [quantityTotal, setQuantityTotal] = useState('1')
+  const [aiServiceKey, setAiServiceKey] = useState('')
+  const [aiQuantity, setAiQuantity] = useState('')
   const [validUntil, setValidUntil] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const selectedType = useMemo(() => BENEFIT_TYPES.find((t) => t.value === benefitType)!, [benefitType])
-  const quantityEnabled = benefitType !== 'subsidy_eligibility_hint'
+  const quantityEnabled = benefitType !== 'subsidy_eligibility_hint' && benefitType !== 'ai_quota'
 
   const loadItems = useCallback(async (userId: string) => {
     setState('loading')
@@ -123,16 +133,19 @@ export default function MemberBenefitsPage() {
     setSubmitting(true)
     setMessage(null)
     try {
-      await memberBenefitsAdminApi.grant({
+      const common = {
         endUserId: selectedUser.endUserId,
         benefitType,
         sourceType,
         title: title.trim() || defaultTitle(benefitType),
         description: description.trim() || null,
-        quantityTotal: quantityEnabled ? Number(quantityTotal || 1) : null,
         validFrom: null,
         validUntil: validUntil ? new Date(validUntil).toISOString() : null,
-      })
+      }
+      const counted = benefitType === 'ai_quota'
+        ? aiQuotaGrantExtra(aiServiceKey, aiQuantity)
+        : { quantityTotal: quantityEnabled ? Number(quantityTotal || 1) : null }
+      await memberBenefitsAdminApi.grant({ ...common, ...counted })
       setMessage('权益已发放')
       await loadItems(selectedUser.endUserId)
     } catch (error) {
@@ -159,6 +172,12 @@ export default function MemberBenefitsPage() {
   const handleTypeChange = (next: AdminBenefitType) => {
     setBenefitType(next)
     setTitle(defaultTitle(next))
+    if (next === 'ai_quota') {
+      setAiServiceKey('')
+      setAiQuantity('')
+      return
+    }
+    setAiServiceKey('')
     if (next === 'subsidy_eligibility_hint') setQuantityTotal('')
     else if (!quantityTotal) setQuantityTotal('1')
   }
@@ -259,7 +278,16 @@ export default function MemberBenefitsPage() {
                   placeholder={benefitType === 'subsidy_eligibility_hint' ? '仅填写官方入口、材料清单、资格提示等说明文字' : '填写使用范围和现场规则'}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              {benefitType === 'ai_quota' && (
+                <AiQuotaGrantFields
+                  serviceKey={aiServiceKey}
+                  quantity={aiQuantity}
+                  onServiceKey={setAiServiceKey}
+                  onQuantity={setAiQuantity}
+                />
+              )}
+              <div className={benefitType === 'ai_quota' ? '' : 'grid grid-cols-2 gap-3'}>
+                {benefitType !== 'ai_quota' && (
                 <div>
                   <label className="text-xs font-medium text-neutral-500">额度</label>
                   <input
@@ -272,6 +300,7 @@ export default function MemberBenefitsPage() {
                     className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm disabled:bg-neutral-50"
                   />
                 </div>
+                )}
                 <div>
                   <label className="text-xs font-medium text-neutral-500">有效期至（年/月/日 时:分）</label>
                   <input value={validUntil} onChange={(event) => setValidUntil(event.target.value)} lang="zh-CN" title="格式：年/月/日 时:分" type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" />
@@ -304,6 +333,7 @@ export default function MemberBenefitsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p title={item.title} className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
+                        <p className="mt-1 text-xs text-neutral-500">{benefitTypeLabel(item.benefitType)}{aiQuotaPurposeLabel(item.serviceKey) ? ` · ${aiQuotaPurposeLabel(item.serviceKey)}` : ''}</p>
                         <p className="mt-1 text-xs text-neutral-400">{item.phoneMasked} · {SOURCE_TYPES.find((type) => type.value === item.sourceType)?.label ?? '其他来源'} · 创建于 {fmt(item.createdAt)}</p>
                       </div>
                       <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', STATUS_CLASS[item.status]].join(' ')}>

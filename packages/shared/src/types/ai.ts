@@ -871,3 +871,60 @@ export interface KioskAiCapabilityItem {
 export interface KioskAiCapabilitiesResponse {
   items: KioskAiCapabilityItem[]
 }
+
+// ── AI 按人次数余量（Q3，只读）────────────────────────────────────────────
+// 桶名与 memberBenefits.ts 的 AiQuotaBucket 相同：ai_resume / ai_assistant / ai_interview。
+// 三个接口都不含价格、购买或会员身份。管理员汇总只给人数和次数。
+
+export interface AiQuotaRemaining {
+  bucket: 'ai_resume' | 'ai_assistant' | 'ai_interview'
+  dailyLimit: number
+  dailyUsed: number
+  dailyRemaining: number
+  extraRemaining: number
+  /** 仍可用的机构次数里最早的到期时刻；没有则为 null。 */
+  extraEarliestExpiry: string | null
+  /** 下一个北京时间 0 点。 */
+  resetsAt: string
+}
+
+export interface KioskAiQuota {
+  guestEnabled: boolean
+  dailyLimit: number
+  dailyUsed: number
+  dailyRemaining: number
+  resetsAt: string
+}
+
+export interface AdminAiQuotaBucketUsage {
+  bucket: 'ai_resume' | 'ai_assistant' | 'ai_interview'
+  /** 会员行 used 之和。 */
+  usedTotal: number
+  /** used > 0 的人数。 */
+  membersUsed: number
+  /** used >= 当日上限的人数。 */
+  membersExhausted: number
+  dailyLimit: number
+}
+
+export interface AdminAiQuotaGuestUsage {
+  perTerminalDailyLimit: number
+  terminalsUsed: number
+  usedTotal: number
+}
+
+export interface AdminAiQuotaExtraBucket {
+  bucket: 'ai_resume' | 'ai_assistant' | 'ai_interview'
+  /** 仍可用的机构次数剩余合计。 */
+  remainingTotal: number
+  /** 其中 30 天内到期的剩余次数合计。 */
+  expiringWithin30Days: number
+}
+
+export interface AdminAiQuotaUsage {
+  /** 北京时间今天 YYYY-MM-DD。 */
+  day: string
+  buckets: AdminAiQuotaBucketUsage[]
+  guest: AdminAiQuotaGuestUsage
+  extra: AdminAiQuotaExtraBucket[]
+}

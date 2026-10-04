@@ -1,7 +1,7 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
-export type AdminBenefitType = 'coupon' | 'free_quota' | 'package_entitlement' | 'subsidy_eligibility_hint'
+export type AdminBenefitType = 'coupon' | 'free_quota' | 'package_entitlement' | 'ai_quota' | 'subsidy_eligibility_hint'
 export type AdminBenefitSourceType = 'platform' | 'campus' | 'gov' | 'fair' | 'partner'
 export type AdminBenefitStatus = 'active' | 'used_up' | 'expired' | 'revoked'
 
@@ -18,6 +18,8 @@ export interface AdminBenefitGrantItem {
   phoneMasked: string
   nickname: string | null
   benefitType: AdminBenefitType
+  /** AI 次数的用途。其它权益为空。 */
+  serviceKey?: 'ai_resume' | 'ai_assistant' | 'ai_interview' | null
   title: string
   description: string | null
   quantityTotal: number | null
@@ -35,6 +37,8 @@ export interface GrantBenefitInput {
   sourceType: AdminBenefitSourceType
   title: string
   description?: string | null
+  /** 仅 ai_quota 填写，且必须是三种用途之一。 */
+  serviceKey?: 'ai_resume' | 'ai_assistant' | 'ai_interview'
   quantityTotal?: number | null
   validFrom?: string | null
   validUntil?: string | null

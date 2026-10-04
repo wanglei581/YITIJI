@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 573,
+    "endpointCount": 576,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -588,6 +588,28 @@
         ],
         "services": [
           "AiLogService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/quota/ai-quota.controller.ts",
+        "handler": "AiQuotaController.adminUsage",
+        "method": "GET",
+        "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
+        ],
+        "path": "/api/v1/admin/ai/quota-usage",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/quota/ai-quota.service.ts"
+        ],
+        "services": [
+          "AiQuotaService"
         ]
       },
       {
@@ -6782,6 +6804,26 @@
         "services": []
       },
       {
+        "controller": "services/api/src/ai/quota/ai-quota.controller.ts",
+        "handler": "AiQuotaController.kiosk",
+        "method": "GET",
+        "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
+          "AuditLog",
+          "BenefitGrant",
+          "RedemptionRecord"
+        ],
+        "path": "/api/v1/kiosk/ai-quota",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/ai/quota/ai-quota.service.ts"
+        ],
+        "services": [
+          "AiQuotaService"
+        ]
+      },
+      {
         "controller": "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
         "handler": "KioskAiCapabilitiesController.listCapabilities",
         "method": "GET",
@@ -7190,6 +7232,16 @@
         "services": [
           "MemberPrivacyService"
         ]
+      },
+      {
+        "controller": "services/api/src/ai/quota/ai-quota.controller.ts",
+        "handler": "AiQuotaController.mine",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/me/ai-quota",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/member-assets/member-assets.controller.ts",
@@ -12052,7 +12104,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 230,
+      "reachableFileCount": 233,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12815,7 +12867,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 255
+      "sourceFileCount": 258
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17975,10 +18027,15 @@
     "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
+    "apps/admin/src/routes/ai-services/AiQuotaUsagePanel.tsx": [
+      "apps/admin/scripts/verify-admin-ai-quota-ui.mjs",
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+    ],
     "apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiUsagePanel.tsx": [
+      "apps/admin/scripts/verify-admin-ai-quota-ui.mjs",
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/aiLogDisplay.ts": [
@@ -18118,6 +18175,12 @@
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-login-second-factor.mjs",
       "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/admin/src/routes/member-benefits/AiQuotaGrantFields.tsx": [
+      "apps/admin/scripts/verify-admin-ai-quota-ui.mjs"
+    ],
+    "apps/admin/src/routes/member-benefits/index.tsx": [
+      "apps/admin/scripts/verify-admin-ai-quota-ui.mjs"
     ],
     "apps/admin/src/routes/member-feedback/FeedbackSlaBadges.tsx": [
       "apps/admin/scripts/verify-feedback-sla.mjs"
@@ -18460,6 +18523,9 @@
     "apps/admin/src/services/api/aiAccess.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
     ],
+    "apps/admin/src/services/api/aiQuotaUsage.ts": [
+      "apps/admin/scripts/verify-admin-ai-quota-ui.mjs"
+    ],
     "apps/admin/src/services/api/aiUsage.ts": [
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
     ],
@@ -18488,6 +18554,9 @@
     ],
     "apps/admin/src/services/api/jobMaterials.ts": [
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs"
+    ],
+    "apps/admin/src/services/api/memberBenefitsAdmin.ts": [
+      "apps/admin/scripts/verify-admin-ai-quota-ui.mjs"
     ],
     "apps/admin/src/services/api/offlineAgenciesAdmin.ts": [
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
@@ -22691,6 +22760,7 @@
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
@@ -23418,11 +23488,22 @@
     "services/api/src/ai/providers/zhipu.provider.stub.ts": [
       "services/api/scripts/verify-ai-cost-runtime.ts"
     ],
+    "services/api/src/ai/quota/ai-quota.controller.ts": [
+      "services/api/scripts/verify-ai-quota-api.ts"
+    ],
+    "services/api/src/ai/quota/ai-quota.module.ts": [
+      "services/api/scripts/verify-ai-quota-api.ts"
+    ],
     "services/api/src/ai/quota/ai-quota.policy.ts": [
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota.ts"
     ],
     "services/api/src/ai/quota/ai-quota.service.ts": [
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota.ts"
+    ],
+    "services/api/src/ai/quota/ai-quota.types.ts": [
+      "services/api/scripts/verify-ai-quota-api.ts"
     ],
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
@@ -23739,6 +23820,7 @@
     ],
     "services/api/src/ai/usage/ai-usage-context.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
@@ -24070,6 +24152,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
@@ -24147,6 +24230,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-platform-degradation.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
@@ -24174,6 +24258,7 @@
     ],
     "services/api/src/common/guards/end-user-auth.guard.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-benefit-activities.ts",
@@ -24199,6 +24284,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-change-password.ts",
@@ -24223,6 +24309,7 @@
     "services/api/src/common/guards/roles.guard.ts": [
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-console-screen-snapshot.ts",
@@ -24239,6 +24326,7 @@
       "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/common/jwt-verifier.module.ts": [
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-production-runtime-gates.ts",
       "services/api/scripts/verify-upload-sessions-http.ts"
     ],
@@ -24330,6 +24418,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-alert-push.cjs",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -26168,6 +26257,7 @@
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -26624,6 +26714,7 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminal-identity.guard.ts": [
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-kiosk-session.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -26635,6 +26726,7 @@
       "services/api/scripts/verify-console-screen-snapshot.ts"
     ],
     "services/api/src/terminals/terminal-session.service.ts": [
+      "services/api/scripts/verify-ai-quota-api.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -26888,6 +26980,29 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/routes/ai-services/AiQuotaUsagePanel.tsx",
+          "apps/admin/src/routes/ai-services/AiUsagePanel.tsx",
+          "apps/admin/src/routes/member-benefits/AiQuotaGrantFields.tsx",
+          "apps/admin/src/routes/member-benefits/index.tsx",
+          "apps/admin/src/services/api/aiQuotaUsage.ts",
+          "apps/admin/src/services/api/memberBenefitsAdmin.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-admin-ai-quota-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:admin-ai-quota-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/admin/src/routes/ai-services/aiLogDisplay.ts",
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "services/api/src/ai/usage/admin-ai-usage.controller.ts",
@@ -26927,6 +27042,7 @@
           "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
           "apps/admin/scripts/verify-admin-ai-usage-render.mjs",
           "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx",
+          "apps/admin/src/routes/ai-services/AiQuotaUsagePanel.tsx",
           "apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsagePanel.tsx",
           "apps/admin/src/routes/ai-services/aiOperationLabels.ts",
@@ -34230,6 +34346,40 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-public-quota"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/quota/ai-quota.controller.ts",
+          "services/api/src/ai/quota/ai-quota.module.ts",
+          "services/api/src/ai/quota/ai-quota.policy.ts",
+          "services/api/src/ai/quota/ai-quota.service.ts",
+          "services/api/src/ai/quota/ai-quota.types.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/jwt-verifier.module.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-quota-api.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-quota-api"
       ],
       "wired": true
     },

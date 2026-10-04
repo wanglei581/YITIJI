@@ -172,6 +172,73 @@ export class AiQuotaService {
     }))
   }
 
+  /** 已验签终端的游客池。开关为 0 或未设时不读计数行，数字全部为 0。 */
+  async remainingForTerminal(terminalId: string, now = new Date()) {
+    if (!terminalId) throw new BadRequestException('AI_QUOTA_TERMINAL_REQUIRED')
+    const resetsAt = quotaResetsAt(now)
+    const limit = quotaEnv('AI_QUOTA_GUEST_TERMINAL_DAILY', 0)
+    if (limit === 0) return { guestEnabled: false, dailyLimit: 0, dailyUsed: 0, dailyRemaining: 0, resetsAt }
+    const row = await this.prisma.aiQuotaDaily.findUnique({
+      where: { endUserId_bucket_day: this.dailyKey(null, terminalId, 'ai_resume', quotaDay(now)) },
+    })
+    const dailyUsed = row?.used ?? 0
+    return { guestEnabled: true, dailyLimit: limit, dailyUsed, dailyRemaining: Math.max(0, limit - dailyUsed), resetsAt }
+  }
+
+  /**
+   * 北京时间今天的管理员汇总。只选出计数与用途，响应里不带会员 id。
+   * 机构次数「30 天内到期」= 仍可用的剩余次数里，到期时刻落在 (now, now+30 天] 的数量合计。
+   */
+  async adminUsage(now = new Date()) {
+    const day = quotaDay(now)
+    const horizon = now.getTime() + 30 * 24 * 3600_000
+    const [rows, grants] = await Promise.all([
+      this.prisma.aiQuotaDaily.findMany({ where: { day }, select: { endUserId: true, bucket: true, used: true } }),
+      this.prisma.benefitGrant.findMany({
+        where: {
+          benefitType: 'ai_quota', status: 'active', quantityRemaining: { gt: 0 },
+          AND: [
+            { OR: [{ validFrom: null }, { validFrom: { lte: now } }] },
+            { OR: [{ validUntil: null }, { validUntil: { gt: now } }] },
+          ],
+        },
+        select: { serviceKey: true, quantityRemaining: true, validUntil: true },
+      }),
+    ])
+    const buckets = AI_QUOTA_BUCKETS.map((bucket) => {
+      const dailyLimitForBucket = dailyLimit(bucket)
+      const memberRows = rows.filter((row) => row.bucket === bucket && row.endUserId.startsWith('member:'))
+      return {
+        bucket,
+        usedTotal: memberRows.reduce((sum, row) => sum + row.used, 0),
+        membersUsed: memberRows.filter((row) => row.used > 0).length,
+        membersExhausted: memberRows.filter((row) => row.used >= dailyLimitForBucket).length,
+        dailyLimit: dailyLimitForBucket,
+      }
+    })
+    const guestRows = rows.filter((row) => row.bucket === 'guest' && row.endUserId.startsWith('terminal:'))
+    return {
+      day,
+      buckets,
+      guest: {
+        perTerminalDailyLimit: quotaEnv('AI_QUOTA_GUEST_TERMINAL_DAILY', 0),
+        terminalsUsed: guestRows.filter((row) => row.used > 0).length,
+        usedTotal: guestRows.reduce((sum, row) => sum + row.used, 0),
+      },
+      extra: AI_QUOTA_BUCKETS.map((bucket) => {
+        const mine = grants.filter((grant) => grant.serviceKey === bucket)
+        const remainingOf = (grant: { quantityRemaining: number | null }) => grant.quantityRemaining ?? 0
+        return {
+          bucket,
+          remainingTotal: mine.reduce((sum, grant) => sum + remainingOf(grant), 0),
+          expiringWithin30Days: mine.reduce((sum, grant) => (
+            grant.validUntil && grant.validUntil.getTime() <= horizon ? sum + remainingOf(grant) : sum
+          ), 0),
+        }
+      }),
+    }
+  }
+
   private dailyKey(endUserId: string | null, terminalId: string | null, bucket: AiQuotaBucket, day: string) {
     return { endUserId: endUserId ? `member:${endUserId}` : `terminal:${terminalId}`, bucket: endUserId ? bucket : 'guest', day }
   }
