@@ -13,6 +13,7 @@ import { resumeProcessCopy } from './resumeUserCopy'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
+import { AI_PUBLIC_QUOTA_EXCEEDED_COPY } from '../../services/api/userErrorMessage'
 import { AI_OUTAGE_CODES, aiErrorCodeOf, aiErrorMessageOf, isAiOutage } from '../../ai'
 import { inspectionSignalsEncrypted } from '../print/components/printPreviewKind'
 import {
@@ -380,7 +381,7 @@ export function ResumeParsePage() {
       // 公共额度 429 发生在记账之前，同键重试仍会被拒。只清对得上的本机意图，避免下次换材料被卡住。
       if (err instanceof ApiHttpError && err.status === 429 && aiErrorCodeOf(err) === 'AI_PUBLIC_QUOTA_EXCEEDED') {
         if (await dropHeldIntent(ownerId, '本机解析标识对不上，没有打开拒绝页，也没有另起一次解析。')) {
-          navigateFail(aiErrorMessageOf(err, '今日 AI 解析次数已用完'))
+          navigateFail(aiErrorMessageOf(err, AI_PUBLIC_QUOTA_EXCEEDED_COPY))
         }
         return
       }

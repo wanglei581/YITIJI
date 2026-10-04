@@ -27,6 +27,7 @@ import { hasKioskSensitiveSession } from '../../../auth/kioskSensitiveSession'
 import { homeStandbyNote, publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import { rememberAssistantDraft } from '../../../services/assistantDraft'
 import { useTerminalKiosk } from '../../../services/api/screensaver'
+import { usePrintPriceConfig, unitCentsFor } from '../../../services/print/priceConfigApi'
 import type { HomeV6ActionId } from '../homeV6Domains'
 import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
@@ -137,6 +138,12 @@ export function QxHomeView({
   onEndPrevious,
 }: QxHomeViewProps) {
   const kiosk = useTerminalKiosk()
+  const price = usePrintPriceConfig()
+  const bwUnit = unitCentsFor(price.config, 'black_white')
+  const colorUnit = unitCentsFor(price.config, 'color')
+  const priceKnown = price.status === 'ready' && bwUnit !== null && colorUnit !== null
+  const paidPrint = priceKnown && (bwUnit > 0 || colorUnit > 0)
+  const freePrint = priceKnown && bwUnit === 0 && colorUnit === 0
   const [now, setNow] = useState(() => new Date())
   const [introDone, setIntroDone] = useState(false)
   useEffect(() => {
@@ -156,17 +163,16 @@ export function QxHomeView({
   const campusKnown = campus.status === 'ready' && Boolean(campus.configVersion)
   const toolboxReady = toolboxKnown && toolbox.enabled
   const campusReady = campusKnown && campus.enabled
-  const extraCount = (toolboxReady ? 1 : 0) + (campusReady ? 1 : 0)
-  const printEyebrow = device.loading ? printStatus.note : device.printerReady ? '先看价格再出纸 · 带走：打印件' : device.printerLabel
+  const readyPrintEyebrow = paidPrint
+    ? '先看价格再出纸 · 带走：打印件'
+    : freePrint ? '免费打印 · 带走：打印件' : '先选材料再出纸 · 带走：打印件'
+  const printEyebrow = device.loading ? printStatus.note : device.printerReady ? readyPrintEyebrow : device.printerLabel
   const recruitmentOpen = recruitment.enabled
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
   // 首页是公共屏：登录着也不打招呼叫名字、不显示手机号（打码的也不显示）。W-75。
   const hello = greeting
-  const standbyNote = homeStandbyNote(
-    { isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() },
-    publicIdleLogoutLabel(),
-  )
+  const standbyNote = homeStandbyNote({ isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() }, publicIdleLogoutLabel())
 
   return (
     <div
@@ -174,6 +180,7 @@ export function QxHomeView({
       data-qx-page="home"
       data-testid="qx-home"
       data-recruitment={recruitmentOpen ? 'open' : 'closed'}
+      data-extra-services={toolboxReady || campusReady ? 'shown' : undefined}
       data-official-channels={channelsTile ? 'shown' : undefined}
       data-toolbox={capabilityMark(toolbox.status, toolbox.configVersion, toolboxReady)}
       data-campus={capabilityMark(campus.status, campus.configVersion, campusReady)}
@@ -189,7 +196,7 @@ export function QxHomeView({
             <span>今天想办哪件事？下面选一项，或者直接问我</span>
           </div>
         </div>
-        <p className="qx-home-hero-law">AI 生成的内容都会标明，仅供参考 · 本机不替你投递 · 收费以现场公示为准</p>
+        <p className="qx-home-hero-law">AI 生成的内容都会标明，仅供参考 · 本机不替你投递{paidPrint ? ' · 收费以现场公示为准' : ''}</p>
       </section>
 
       <section className="qx-home-board" aria-labelledby="qx-home-services-title">
@@ -281,10 +288,10 @@ export function QxHomeView({
             <HomeTile actionId="official-channels" title="机构官方渠道" description={`本机有 ${officialChannelCount} 个渠道，扫码到机构官网`} foot="扫码前往" badge="机构提供" icon={QrCodeIcon} tone="slate" onAction={onAction} />
           ) : null}
           {toolboxReady ? (
-            <HomeTile actionId="toolbox" title="百宝箱" description="按本机已上架的扩展服务进入" foot="进入已开通的服务" badge="受控开放" icon={WrenchIcon} tone="neutral" span={extraCount === 1 ? 'full' : undefined} onAction={onAction} />
+            <HomeTile actionId="toolbox" title="百宝箱" description="按本机已上架的扩展服务进入" foot="进入已开通的服务" badge="受控开放" icon={WrenchIcon} tone="neutral" onAction={onAction} />
           ) : null}
           {campusReady ? (
-            <HomeTile actionId="smart-campus" title="智慧校园" description="按本机开通范围进入校园服务" foot="进入校园服务" badge="受控开放" icon={GraduationCapIcon} tone="neutral" span={extraCount === 1 ? 'full' : undefined} onAction={onAction} />
+            <HomeTile actionId="smart-campus" title="智慧校园" description="按本机开通范围进入校园服务" foot="进入校园服务" badge="受控开放" icon={GraduationCapIcon} tone="neutral" onAction={onAction} />
           ) : null}
         </div>
       </section>

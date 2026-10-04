@@ -1,5 +1,6 @@
 import { AlertCircleIcon, ClockIcon, PencilLineIcon } from 'lucide-react'
 import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
+import type { InterviewFinishRecovery } from './interviewAnswerRecovery'
 import type { InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
 
@@ -28,6 +29,11 @@ interface InterviewAnswerDockProps {
   onSkip: () => void
   onSubmitText: () => void
   onFinish: () => void
+  finishRecovery: InterviewFinishRecovery | null
+  onContinueAnswering: () => void
+  onLeaveInterview: () => void
+  onOpenTips: () => void
+  onRetryReport: () => void
   omitPrintAnswers: boolean
   onOmitPrintAnswersChange: (value: boolean) => void
 }
@@ -37,7 +43,8 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
     micError, error, voiceLocked, busyTurn, phase, mode, voice, recordSec, maxRecordSec,
     draft, voiceAvailable, micBlockedReason, onRecheckMic, onDraftChange, onReviewChange,
     onReviewSubmit, onRetryVoice, onStopRecording, onUseText, onUseVoice, onSkip,
-    onSubmitText, onFinish, omitPrintAnswers, onOmitPrintAnswersChange,
+    onSubmitText, onFinish, finishRecovery, onContinueAnswering, onLeaveInterview,
+    onOpenTips, onRetryReport, omitPrintAnswers, onOmitPrintAnswersChange,
   } = props
   const answerStatus =
     phase === 'done_suggest' ? '本场已完成'
@@ -69,6 +76,18 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
         </div>
       )}
       {error && !micError && <p className="interview-session__error" role="alert">{error}</p>}
+      {finishRecovery === 'no-answers' && !micError && (
+        <div className="iv-tbar" data-testid="interview-finish-recovery">
+          <button type="button" className="qx-btn" data-variant="teal" disabled={busyTurn} onClick={onContinueAnswering}>继续答题</button>
+          <button type="button" className="qx-btn" disabled={busyTurn} onClick={onLeaveInterview}>离开</button>
+        </div>
+      )}
+      {finishRecovery === 'outage' && !micError && (
+        <div className="iv-tbar" data-testid="interview-finish-recovery">
+          <button type="button" className="qx-btn" data-variant="teal" disabled={busyTurn} onClick={onOpenTips}>看面试要点</button>
+          <button type="button" className="qx-btn" disabled={busyTurn} onClick={onRetryReport}>稍后再试生成报告</button>
+        </div>
+      )}
 
       <label className="interview-session__omit-print">
         <input

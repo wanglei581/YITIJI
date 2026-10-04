@@ -6,6 +6,7 @@ import type { AgentConfig } from '../agent/types'
 import { createApiClient, NO_RETRY_CONFIG } from '../agent/api-client'
 import { log, warn } from '../logger'
 import { consumeUsbFileOutcome, getUsbStatus, refreshUsbFileList } from '../usb/usb-files'
+import { decideUsbImport } from '../usb/usb-capability'
 import { allowedOrigins, isLocalBridgeTokenValid, isOriginAllowed } from './origin-guard'
 import type {
   LocalApiError,
@@ -243,7 +244,7 @@ async function handleRequest(input: {
   }
 
   if (isUsbRoute) {
-    await handleUsbRoute(req, res, origin, url, client, bridgeToken, bridgeSessions)
+    await handleUsbRoute(req, res, origin, url, client, bridgeToken, bridgeSessions, config)
     return
   }
 
@@ -316,6 +317,7 @@ async function handleUsbRoute(
   client: ReturnType<typeof createApiClient>,
   bridgeToken: string | undefined,
   bridgeSessions: LocalBridgeSessionStore,
+  config: AgentConfig,
 ): Promise<void> {
   if (
     !isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken) &&
@@ -332,6 +334,7 @@ async function handleUsbRoute(
   }
 
   if (req.method === 'GET' && url.pathname === '/local/usb/files') {
+    if (await usbImportClosedResponse(config, res, origin)) return
     const result = await refreshUsbFileList()
     const files: LocalUsbFileItem[] = result.files
     const response: LocalUsbListResponse = { present: result.present, driveLabel: result.driveLabel, files }
@@ -340,7 +343,7 @@ async function handleUsbRoute(
   }
 
   if (req.method === 'POST' && url.pathname === '/local/usb/upload') {
-    await handleUsbUpload(req, res, origin, client)
+    await handleUsbUpload(req, res, origin, client, config)
     return
   }
 
@@ -352,6 +355,7 @@ async function handleUsbUpload(
   res: ServerResponse,
   origin: string,
   client: ReturnType<typeof createApiClient>,
+  config: AgentConfig,
 ): Promise<void> {
   const body = await readJsonBody<LocalUsbUploadRequest>(req, 'usb')
   const safeId = typeof body.safeId === 'string' ? body.safeId : ''
@@ -369,6 +373,9 @@ async function handleUsbUpload(
     sendJson(res, 400, { code: 'LOCAL_USB_AUTHORIZATION_INVALID', message: '会员身份格式无效，请重新登录后再试' }, origin)
     return
   }
+
+  // 必须在 consumeUsbFileOutcome 之前：被拦时不消耗 safeId、不读文件、不转发。
+  if (await usbImportClosedResponse(config, res, origin)) return
 
   const outcome = consumeUsbFileOutcome(safeId)
   if (!outcome.ok) {
@@ -415,6 +422,17 @@ async function handleUsbUpload(
     fileUrlExpiresAt: uploaded.signedUrlExpiresAt ?? null,
   }
   sendEnvelope(res, 200, result, origin)
+}
+
+/** 能力开关关着或查不到时写响应并返回 true。/local/usb/status 不走这里。 */
+async function usbImportClosedResponse(config: AgentConfig, res: ServerResponse, origin: string): Promise<boolean> {
+  const decision = await decideUsbImport({
+    apiBaseUrl: config.apiBaseUrl,
+    terminalId: config.terminalId,
+  })
+  if (decision.allowed) return false
+  sendJson(res, decision.httpStatus, { code: decision.code, message: decision.message }, origin)
+  return true
 }
 
 function guessUsbMimeType(extension: string): string {

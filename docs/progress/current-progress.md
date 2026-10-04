@@ -1,5 +1,82 @@
 # 当前开发进度
 
+## 2026-10-04：W-118 一体机这一半——检查任务防重、被拒后带文件回材料检查、隐私摘要说实话、开发版构建闸
+
+- 根因先说清：走查报的「同一份文件建两条隐私检查」在走查栈上成对出现，是因为走查的一体机前端在 `NODE_ENV=development` 的 shell 里构建，打出了 React 开发版，StrictMode 把挂载副作用执行两遍。正式构建实测只建一次；线上产物 jsxDEV 0 处（总指挥核过）。服务端闸门与去重另见 #1222。
+- 防重（第二道防线）：材料检查整轮共享在途结果；建上传会话、扫码登录、简历解析、自评交卷各自合并同一请求的在途发送。
+- 被拒后的出路：确认打印被 `PRINT_PII_SCAN_REQUIRED` 拒时，不再说「稍后重试」，改为「这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。」加「回到材料检查」按钮，带着当前文件进新一轮检查。
+- 隐私摘要：用户保留了命中时不再写「没发现需要遮挡的内容」，按真实裁决写「发现 N 处个人信息，你选择了全部保留，原样打印。」或「发现 N 处个人信息，遮挡 M 处，保留 K 处。」
+- 构建闸：一体机、管理员、机构三端的 vite 配置在生产构建时遇到非 production 的 `NODE_ENV` 直接报错；CI 新增 `scripts/verify-prod-react-build.mjs`，三端产物 jsxDEV 必须为 0（自构一份开发版实测会红）。
+- 验证：八组浏览器用例（default、w1–w6、scan-safety）全过；W-118 新用例 7 条；反向变异：去掉检查任务防重、去掉上传会话防重、「全保留仍说没发现」各自必红。
+- 走查 N1（10/4）一并修：保存裁决的接口不回带任务访问凭证，存回交接时补上原凭证；游客从预览「返回材料检查」不再被 403 清掉（会员不受影响）。N4（摘要说没发现）即上面的隐私摘要。
+- 未做（另排）：14 号页主按钮被底栏盖住、走查量出的 9 处留白。
+- 停放、隐藏、改名、降级：无。
+## 2026-10-04：W-125 一体机 U 盘入口跟着后台能力开关走
+
+- 问题：后台把 `usb_import` 配成未验收、维护中或不支持后，只有打印扫描首页卡片置灰；打印上传深链接、二维码过期屏的「改用 U 盘导入」、简历来源页「U盘上传」照常能导入。它们只看构建时有没有网桥令牌，不读能力开关。
+- 改法：新增共享 hook `useUsbImportGate`（三处入口共用）：先看网桥令牌，再读终端能力；关闭时入口置灰或不出现，说明沿用首页卡片那三句（文案常量从首页挪到 `printScanCapabilities.ts` 共用）；读不到能力配置按拒绝处理，给「重新检查」；后台未配置这一项时与首页一致照常可用；演示模式不变。
+- 测试环境：打印组用例构建时注入本机网桥令牌；接口夹具默认能力列表为空（未接管），既有用例行为不变。
+- 验证：八组浏览器用例（default 392、w1–w6、scan-safety）全过；新用例 7 条，含维护中、未验收、读取失败、过期屏开关两态及各自的可用反向对照。
+- 服务端与终端 Agent 那一半的拦截由后端、Windows 窗口另做。
+- 停放、隐藏、改名、降级：无（关闭时入口按后台开关不可用，属既定口径）。
+## 2026-10-04：W-129 / W-131 一体机在 AI 不可用时的出路（模拟面试、公共额度文案、优化页胶囊）
+
+- 来源：走查在上游 402（DeepSeek 余额耗尽）时补测登记。
+- 提交回答失败：撤回刚追加的那条对话（按追加前的长度定位），原文放回输入框，并说「你刚才的回答还在输入框里。」跳过失败同样撤回。
+- 结束本场：
+  - 一题没答（`INTERVIEW_NO_ANSWERS`）：说「这一场还没有记下的回答，没法生成报告。」给「继续答题」「离开」，不再叫人重试；
+  - AI 不可用且本页见过回答成功：说「你的回答已保存，AI 恢复后可以接着生成报告。」给「看面试要点」「稍后再试生成报告」，会话不当成结束；没有成功过的回答时不说「已保存」。
+  - 「打印本场题目和我的回答（不含 AI 点评）」现有前端拼不出来，没有做假入口；需要后端补 `POST /api/v1/mock-interviews/:id/transcript/print`（已转总指挥派后端），接口到了再补按钮。
+- 面试开场失败的提示改在首屏底栏就地显示，不再落到屏外。
+- `AI_PUBLIC_QUOTA_EXCEEDED` 统一说「今天的 AI 次数用完了，明天恢复；可以先打印原件。」普通限流那句不变。
+- 优化页右上角胶囊：AI 不可用时写「AI 暂时用不了」，其余状态维持原短标签。
+- 验证：八组浏览器用例中 w1、w2、w4–w6、scan-safety 全过，w3 整组 79 过，默认组受影响的两份用例 16 过；反向变异「失败后不撤回那条对话」必红。
+- 停放、隐藏、改名、降级：无。AI 出错时退化成手动出路，没有删 AI 入口。
+
+## 2026-10-04：管理员后台能力中心，未登记行必须先选状态才能登记（分支 `grok/admin-capability-default-20261004`，未提交）
+
+- **问题：** 「调整为」对未登记行用列表里的 `status` 当初值。缺行在列表里固定是 `not_verified`，下拉显示「未验收」。不改下拉直接点「登记」，会把该项写成关闭。managed 下，未登记的既有能力本来是放行的。
+- **实际生效状态不是 `cap.status`。** 页面「当前状态」由 `capabilityStateView`（`apps/admin/src/routes/print-scan/CapabilityCenter.tsx` 第 76–91 行）根据 `configured` 和默认关闭名单算出：彩色、双面、签名未登记写「未登记 · 默认关闭」；其余未登记写「未登记」，并说明常规设置放行、严格设置关闭。后台读不到服务器用的是哪种设置。服务端判定在 `TerminalCapabilitiesService.assertUserTaskAllowed`（`services/api/src/terminals/terminal-capabilities.service.ts` 第 153–184 行）：没有配置行时，默认关闭名单里的键拒绝；其余键看 `resolvePrintScanCapabilityMode()`（同文件第 44–49 行，`PRINT_SCAN_CAPABILITY_MODE`，managed 放行、strict 拒绝）。彩色 / 双面另走 `assertPrintParamsAllowed`（第 229–234 行），未登记一律拒绝，不受 managed 影响。列表对缺行把 `status` 写成 `not_verified`、`configured: false`（同文件第 77–78 行）。因此不能把「实际生效」可靠映射成下拉里的某一项，按首选做了：未登记不预选。
+- **改法：** 只改管理员后台。未登记行下拉第一项是禁用的「请选择」，初值为空；未选时「登记」禁用，旁边写「请先选择要登记的状态」。已登记行初值仍是已登记状态。签名行的开通确认、关闭必填说明原样保留，没有新加确认框。登记之后回不到未配置，仍等后端清除接口。
+- **验证：** `apps/admin` 下 `node scripts/verify-admin-print-scan-ui.mjs` 退出码 0。反向变异两处（未登记初值改回 `cap.status`；未选时按钮改为 `disabled={saving}`）退出码都是 1，已逐字节还原。`pnpm exec tsc --noEmit` 退出码 0。`pnpm exec eslint src/` 退出码 0（4 条既有 warning 在 `screenView.tsx`，与本次无关）。`node scripts/verify-console-plain-copy.mjs` 退出码 1，失败点是 `ai_quota.release_cap_exceeded` / `ai_quota.released` 没有中文名；把本次三个文件还原到基线后同样失败，不是这次改出来的。仓库根 `node scripts/verify-no-raw-error-render.mjs`、`node scripts/verify-mock-server-contract.mjs` 退出码都是 0。`verify:print-color-duplex-capability` 在本 worktree 缺生成的 Prisma client，先 `prisma generate`，再用临时库 `file:/tmp/cap-verify.db` 跑完后删除，退出码 0。`node scripts/generate-project-graph.mjs` 退出码 0（0 个文件变化）；`npx -y pnpm@11.2.2 graph:check` 退出码 0。浏览器：`node scripts/run-e2e.mjs tests/e2e/print-scan.spec.ts -g "未登记能力必须先选择状态才能登记"` 1 条通过，退出码 0；另在 1280×800 与 390×844 看过「请选择 / 登记禁用 / 提示在按钮旁边」。没有 push，没有提交。
+
+## 2026-10-04：管理员后台「会员权益」可赠送 AI 额度
+
+- 发放表单增加权益种类「AI 额度」。选中后必须选择一项服务（AI 简历、AI 顾问、模拟面试）并填写 1–9999 的整数次数。其它权益不出现这两项，提交时也不带服务字段。
+- 权益记录对 AI 额度显示「AI 额度 · 某服务」，以及服务端返回的总次数、剩余次数和有效期。服务端没有登记的服务显示「未登记的服务」。
+- 页面写明扣减顺序：先用每天的免费次数，用完再扣这里。依据是 `AiQuotaService.reserve`：先增加当日已用次数；当日额度没有扣成、且是会员时，再扣最早到期的有效赠送次数。
+- 服务端校验失败（缺服务、次数越界、非 AI 额度带了服务字段）按错误码给中文提示。mock 模式仍拒绝检索和发放，不假装成功。`scripts/mock-server-contract-bindings.json` 未覆盖该接口，绑定清单未改。
+- 审计中文名补上两条归还动作与对象类型「AI 额度预占记录」，文字与 #1236 逐字一致。发放仍用已有动作。
+- 页面不出现购买、充值、付费、价格，也不把英文键名显示给管理员。
+- 验证：会员权益 Playwright 6 条通过，其中一条覆盖发放表单联动、次数 0 / 10000 / 小数拦截，以及未定位会员时不假装发放成功。`test:admin-state-units` 8 条通过。类型检查、eslint 与文案、合规、原始错误、mock 契约门禁通过。三处反向变异均使对应用例失败，还原后文件与变异前一致。图谱 `--check` 通过。
+
+- 真实流程（本机克隆库，不是生产）：只把「按手机号搜会员」这一个请求换成指定会员（克隆库手机号加密存储，拿不到明文），发放与记录列表都走真实服务端——选「AI 额度 · AI 顾问 · 3 次」提交返回 201，权益记录显示「AI 额度 · AI 顾问」「总次数 3 · 剩余次数 3」；整页没有购买、充值、付费、价格字样与英文键名。管理员浏览器测试 124 条通过。
+## 2026-10-04：合规总表「摄像头」一行补「装了但不用」的做法（分支 `claude/compliance-camera-disabled-1004`，只改文档）
+
+- **起因：** 产品负责人 10/4 说试点机会装一个摄像头与麦克风一体的设备。麦克风给小青和语音模拟面试用，摄像头目前没有功能用到。一体机代码只采集音频，没有调用摄像头的地方。
+- **改了什么：** `docs/compliance/compliance-boundary.md` §1.2 A「摄像头」一行补上三层停用：镜头遮挡加封条、系统里只停用摄像头、Edge 策略 `VideoCaptureAllowed` 设为 false。机身告示写明有摄像头、目前不启用。以后要用摄像头，先改隐私政策、做单独同意。
+- **配套（私有页，不进仓库）：** 现场告示、试用协议附件第七条、验收单都已同步。装机要求已交 Windows 窗口，由它写进装机清单。
+- **同一分支追加两行：** 「U 盘安全」写明 Defender 实时防护在什么前提下算恶意文件拦截、开放 U 盘前怎么验；「无障碍与适老化」写明《无障碍环境建设法》第三十三条第二款原文、义务先落在运营机构、律师答复前按最低三项准备（全局大字、关键步骤语音播报、机身盲文标识）。
+- **同一分支再追加：** §1.2 F「个人信息角色」改成与入驻三件套一致的写法（会员、AI、打印扫描由我方独立处理，机构只对自己发布的政策和机构资料是处理者）。旧写法「机构终端上不登录的即用会话由机构作处理者」已被 10/3 的三件套取代，试用协议正文起草时发现总表没跟上。
+- **试点合规制度第 6 条第 3 点：** 原写「现场查看并清空 Windows 打印队列」，和培训材料「不改 Windows 设置、不退出全屏」打架；改为由公司远程清空，现场人员不进 Windows。
+- **验证：** `verify:compliance-copy` 通过，图谱 `--check` 通过。
+## 2026-10-04：Agent 按能力开关拦截 U 盘导入（走查 W-125，分支 `claude/usb-capability-gate-1004`）
+
+- **起因：** 能力中心把某台终端的 `usb_import` 配成非「可用」后，一体机首页 U 盘卡片会关掉，但列文件和代传仍走 Agent 的 `/local/usb/files`、`/local/usb/upload`，再代传到匿名 `/files/kiosk-upload`。二维码过期后改用 U 盘、简历来源页、直接打开 U 盘页这三条不看首页卡片，所以还能导入。
+- **改法（Agent）：** 新增 `apps/terminal-agent/src/usb/usb-capability.ts`。列文件和代传之前请求公开只读 `GET /terminals/:id/capabilities`（5 秒上限，不用带重试的 30 秒客户端）。公开接口直接返回 `{ terminalCode, capabilities }`，没有全局 `{ success, data }` 包装；两种形状都认。`configured === true` 且 `status === 'available'` 放行；配过但不是 available（含 `not_verified`、`maintenance`、`unsupported`、`testing` 和枚举外脏值）回 403 `LOCAL_USB_DISABLED`。2026-10-04 再核 `DEFAULT_DENY_CAPABILITY_KEYS`，`usb_import` 不在名单里（仍是 `color_print` / `duplex_print` / `signature_stamp`），所以没有这一行或 `configured === false` 放行。请求失败、超时、形状不对回 503 `LOCAL_USB_CAPABILITY_UNKNOWN`，失败结果不缓存；放行和明确拒绝最多缓存 15 秒。`/local/usb/status` 不拦。upload 在 `consumeUsbFileOutcome` 之前拦，被拦不消耗 safeId、不读文件、不转发。日志只记判定和状态值。
+- **改法（一体机）：** `userErrorMessage.ts` 给两个码各加一句固定文案，避免落到「请重试」。服务端没改。
+- **门禁：** `verify:usb-import-agent` 假后端默认 available，原有用例仍过；另覆盖 available 下列文件与代传、`not_verified` 时 files/upload 都是 403 且 safeId 没被消耗（改回 available 后同一 safeId 仍能代传）、未配置与缺行放行、能力接口 500 与坏形状回 503、status 不受影响、成功结果 15 秒内不重复请求、失败不缓存。`verify-kiosk-runtime-error-boundary.mjs` 断言两个新码的固定文案。Agent `tsc --noEmit` 通过；`package.json` 里 31 条 `verify*` 全部退出码 0（`verify:print-queue-residue-windows` 在非 win32 上跳过真机部分，退出码仍是 0）。一体机 `tsc`、`verify-backend-error-copy-coverage`、仓库 `verify-no-raw-error-render`、图谱 `--check` 通过，图谱无 diff。
+- **反向测试（提交后逐项改坏，再 `git checkout` 还原）：** 去掉 `/local/usb/files` 拦截，门禁退出码 1（列文件变成 200）；去掉 `/local/usb/upload` 拦截，退出码 1（代传变成 200）；能力接口失败改成放行，退出码 1（接口 500 时列文件变成 200，不再是 503）；把 upload 拦截挪到 `consumeUsbFileOutcome` 之后，退出码 1（同一 safeId 再传变成 410）；删掉一体机 `LOCAL_USB_DISABLED` 文案，退出码 1（落到「U 盘文件导入失败，请重试」）。还原后工作区干净。
+- **没有验证：** 真 Windows 与真后端没跑。随下一个安装包出。0.4.13 不含此改动。
+
+## 2026-10-03：青序流光 2.0 对齐 C 批——首页、登录、我的、AI 顾问（01、03、05、30）
+
+- 范围：只改一体机这 4 页的页面与样式，共 16 个文件；不改服务端，不新增页面、路由、数据模型。
+- 登录页（03）：加上「验证码由短信发到你的手机」一句身份说明和扫码登录的过期说明；登录按钮让到 y ≥ 500 靠各段间距，不再用空页头垫高；默认态一屏放得下、不出滚动。
+- 「我的」页（05）：待付款提示回到顺序排列，不被拉开。
+- 验证：默认组 388 过、`playwright.w5` 60 过；红的 3 条（`account-assets-journey:53`、`print-confirm-price-truth:453`、`fusion-w5:743`）在干净候选上本机同样红，属本机环境差异，CI 上是绿的。并排图 45 组。
+- 遗留（进 E 批）：登录页「不登录也能办」三个入口的箭头没贴右边。
+- 停放、隐藏、改名、降级：无。AI 顾问入口与数字人都在。
 ## 2026-10-04：模型账户不可用时给人话和手动出路；简历解析失败不扣次（分支 `claude/backend-hardening-20261004-ai-account-unavailable`；Grok 实现、Claude 审）
 
 - **问题：** 上游 401 / 402 / 403 与已停用的模型名，原先都落成 `AI_PROVIDER_REQUEST_ERROR` 或 HTTP 200 的「请稍后重试」，一体机进不了「AI 暂不可用」。小青裸字符串异常对外是 `Service Unavailable`。
@@ -43,6 +120,15 @@
 - **审查中自己撞到的一处：** 去重最初连已裁决的任务也复用，`verify:materials-processing` 与 `verify:pii-redaction` 红（重扫后应是待裁决、不能直接遮挡）；改成只复用没动过的。
 - **CI 首轮拦下的一处：** `verify:document-conversion` 手写的假数据库只有 `findFirst`，闸门改用 `findMany` 后崩溃；给假表补了按文件、种类、状态真实过滤的 `findMany`（本用例本就没有检查任务），原有断言照常通过。
 - **关联门禁** 25 条通过。没有新增表、接口或依赖；小程序、一体机页面没动。
+## 2026-10-04：两个后台第 7 批——告警副标题与宣传屏上传说明
+
+- 告警中心副标题：服务端正文已经含有该终端编号时，不再在前面重复拼；正文没有该编号时，仍把编号拼在前面。服务端原文不改写。标题仍最多两行。
+- 宣传屏「上传素材」旁写明限额，与服务端默认值一致（`services/api/src/content/media-validation.ts`）：图片 JPG、PNG、WebP，不超过 10 MB；视频 MP4、WebM，不超过 100 MB，时长 120 秒以内。类型或大小不合规时就地说明怎么改，不发上传请求；服务端仍做最终校验。这几个限额可用环境变量覆盖，页面写的是默认值（与 `.env.example` 一致）。
+- 素材页两处、终端配置一处的时长框下写清上下限与默认值：图片停留 3–1800 秒、留空默认 8 秒；上传视频停留 3–120 秒、留空默认 15 秒；外链停留 3–1800 秒、留空默认 15 秒；一体机无人操作多久后播放宣传屏 30–1800 秒、留空默认 180 秒。超出范围就地提示，不提交；终端配置不再把超范围的值悄悄夹到边界。
+- 外部视频链接的说明改成白话。HTTPS、iframe、直链只留在悬停「技术说明」。第 5 批「上传前请先看」原文和位置未改。
+- 新增 `apps/admin/src/routes/alerts/alertDetailText.ts`、`apps/admin/src/routes/screensaver/assetUploadRules.ts`、`apps/admin/scripts/verify-console-batch7-copy.mjs`。无删除。
+- 验证：`verify-console-plain-copy`（含新门禁，限额数字直接从服务端源码解析比对）、`verify-service-desk-dashboard-ui`、`verify-feedback-sla`、`verify-console-screen-ui`、`test:admin-state-units`、`verify:compliance-copy`、`verify-mock-server-contract`、admin 类型检查与 eslint 通过；管理员浏览器测试常规 124 条、大屏 160 条通过。反向变异（正文含终端号仍重复拼、放行 .txt、限额数字与服务端不一致、外链说明出现 HTTPS、默认值写错、类型提示改字）都会红。用户可见文字经 agy 挑过一轮后改写。
+
 ## 2026-10-04：两个后台第 6 批——小样本反推修补与审计文案
 
 - 出纸投影统一调用 `suppressAggregateCount`。出纸成功、未出纸、未确认、已结束任一存在小样本时，不给成功率，仅可保留非小样本的已结束数；逐台与原始数合计使用同一规则。终端服务人次、打印扫描次数、出纸成功、已结束、未确认逐列按机构合计已公开保护，必要时补充隐藏最小可见正值（同值取最早），保留零值；合计独立投影，不因逐台隐藏而整列清空。未出纸差值也受列残差保护，可能与公开合计及其它行联立的出纸字段整组补充隐藏。页面、详情与 CSV 明写“样本不足，不显示”。

@@ -2,6 +2,7 @@ import { verifyBatch6Copy } from './verify-console-batch6-copy.mjs'
 import { collectAuditActionCodes } from '../../../scripts/audit-action-codes.mjs'
 import { verifyPrivacyCopy } from './verify-console-privacy-copy.mjs'
 import { verifyBatch5Copy } from './verify-console-batch5-copy.mjs'
+import { verifyBatch7Copy } from './verify-console-batch7-copy.mjs'
 // 两个后台的用户可见文案不得带工程词、Markdown 星号或原始状态码。
 // 扫描 .ts 与 .tsx（排除测试与类型声明）的字符串字面量与 JSX 文本，跳过注释。
 // 另外真执行 auditActionLabels.ts：审计契约里的每个动作都有中文名，未知动作显示「其他操作」。
@@ -482,6 +483,7 @@ console.log('\n=== 打印错误原因与服务端告警同一口径 ===')
 verifyBatch6Copy({ runFile, textOf, shared, ui, fail })
 verifyPrivacyCopy({ runFile, textOf, shared, ui, hooks, common, adminRoot, repoRoot, fail, failures, actions, labels: module.exports })
 verifyBatch5Copy({ runFile, textOf, shared, ui, hooks, adminRoot, repoRoot, fail })
+verifyBatch7Copy({ runFile, repoRoot, fail })
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} 项未通过`)

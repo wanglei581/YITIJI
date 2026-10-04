@@ -24,7 +24,7 @@ import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeAigcBadge } from './components/resume-deliver/ResumeAigcBadge'
 import { OptimizeWorkArea } from './components/resume-deliver/OptimizeWorkArea'
 import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
-import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
+import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle, optimizeStatusCapsule } from './components/resume-deliver/optimizeStateCopy'
 import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
 import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOptimizeLeaveDialog'
@@ -318,6 +318,7 @@ export function ResumeOptimizePage() {
     )
   }
 
+  const statusCapsule = optimizeStatusCapsule(view)
   const retryable = failKind !== 'outage' && (view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent')
   const stateBody = view === 'ready' ? null : (
     <ResumeStatePanel
@@ -335,7 +336,7 @@ export function ResumeOptimizePage() {
   )
 
   return (
-    <QxPageFrame title="简历优化建议" subtitle="建议只改表达，事实由你确认，随时可以保留原文。" back={{ label: '返回诊断报告', onBack: () => requestLeave(goToReport) }} status={{ tone: view === 'ready' ? 'ok' : 'unknown', label: view === 'ready' ? '逐条确认' : '等待优化建议' }} ctabar={ctabar} navbar={navbar}>
+    <QxPageFrame title="简历优化建议" subtitle="建议只改表达，事实由你确认，随时可以保留原文。" back={{ label: '返回诊断报告', onBack: () => requestLeave(goToReport) }} status={statusCapsule} ctabar={ctabar} navbar={navbar}>
       <section
         data-kiosk-domain="resume"
         data-kiosk-screen="resume-optimize"

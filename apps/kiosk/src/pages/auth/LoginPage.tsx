@@ -260,6 +260,7 @@ export function LoginPage() {
             </>
           }
         >
+          <p className="lg-identity-note">验证码由短信发到你的手机。这台机器不生成、也不代填。这一步不用 AI 核对是不是你。</p>
           <ol className="lg-rail" aria-label="登录步骤"><li><b>01</b>选择登录方式</li><li><b>02</b>核对本人身份</li><li><b>03</b>回到刚才的办理</li></ol>
           <div className="qx-scroll qx-grow" data-screen="login-gate" data-mode={mode} data-state={state} data-testid={`login-gate-state-${state}`}>
             {fromRejected ? (

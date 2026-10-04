@@ -270,4 +270,43 @@ if (page.includes("setActionError(e instanceof Error ? e.message : '操作失败
   fail('retry failure must surface the server error message')
 }
 
+// 10. 未登记行的「调整为」不预选 cap.status。列表对缺行固定回 not_verified，
+// 直接登记会把仍跟随部署设置（managed 下放行）的能力写成关闭。
+const capabilityRow = cap.slice(cap.indexOf('function CapabilityRow('), cap.indexOf('function SignatureCapabilityRow('))
+if (!capabilityRow.includes('function CapabilityRow(')) fail('CapabilityRow source block is missing')
+const blankInitial = "useState<PrintScanCapabilityStatus | ''>(cap.configured ? cap.status : '')"
+const blankReset = "setStatus(cap.configured ? cap.status : '')"
+if (
+  capabilityRow.includes(blankInitial) &&
+  capabilityRow.includes(blankReset) &&
+  !/useState<[^>\n]+>\(\s*cap\.status\s*\)/.test(capabilityRow) &&
+  !/setStatus\(\s*cap\.status\s*\)/.test(capabilityRow) &&
+  !cap.includes('未登记的行允许不改任何内容、原样登记')
+) {
+  pass('unconfigured rows start blank; configured rows still start from the saved status')
+} else {
+  fail('unconfigured rows must initialize and reset to empty string; configured rows must keep cap.status; the old “原样登记” note must be gone')
+}
+const placeholder = `{!cap.configured && (
+            <option value="" disabled>
+              请选择
+            </option>
+          )}`
+if (capabilityRow.includes(placeholder)) {
+  pass('unconfigured rows show a disabled 请选择 placeholder and configured rows do not')
+} else {
+  fail('unconfigured rows must render a disabled placeholder option 请选择, gated by !cap.configured')
+}
+if (
+  capabilityRow.includes("const savable = cap.configured ? dirty : status !== ''") &&
+  capabilityRow.includes('disabled={!savable || saving}') &&
+  capabilityRow.includes("if (status === '') return") &&
+  capabilityRow.includes("{!cap.configured && status === '' && <span className=\"whitespace-nowrap\">请先选择要登记的状态</span>}") &&
+  !capabilityRow.includes('dirty || !cap.configured')
+) {
+  pass('register stays disabled with a hint until a status is chosen; a chosen status can be registered')
+} else {
+  fail('unconfigured register must stay disabled until status !== \'\', show 请先选择要登记的状态, and become savable once a status is chosen')
+}
+
 console.log('\nverify-admin-print-scan-ui: ok')

@@ -1,7 +1,8 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
-export type AdminBenefitType = 'coupon' | 'free_quota' | 'package_entitlement' | 'subsidy_eligibility_hint'
+export type AdminBenefitType = 'coupon' | 'free_quota' | 'package_entitlement' | 'ai_quota' | 'subsidy_eligibility_hint'
+export type AdminAiQuotaService = 'ai_resume' | 'ai_assistant' | 'ai_interview'
 export type AdminBenefitSourceType = 'platform' | 'campus' | 'gov' | 'fair' | 'partner'
 export type AdminBenefitStatus = 'active' | 'used_up' | 'expired' | 'revoked'
 
@@ -18,6 +19,7 @@ export interface AdminBenefitGrantItem {
   phoneMasked: string
   nickname: string | null
   benefitType: AdminBenefitType
+  serviceKey?: AdminAiQuotaService | null
   title: string
   description: string | null
   quantityTotal: number | null
@@ -33,6 +35,7 @@ export interface GrantBenefitInput {
   endUserId: string
   benefitType: AdminBenefitType
   sourceType: AdminBenefitSourceType
+  serviceKey?: AdminAiQuotaService
   title: string
   description?: string | null
   quantityTotal?: number | null
