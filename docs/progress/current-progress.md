@@ -3,11 +3,11 @@
 ## 2026-10-04：两个后台第 7 批——告警副标题与宣传屏上传说明
 
 - 告警中心副标题：服务端正文已经含有该终端编号时，不再在前面重复拼；正文没有该编号时，仍把编号拼在前面。服务端原文不改写。标题仍最多两行。
-- 宣传屏「上传素材」旁写明限额，与服务端默认值一致：JPG、PNG、WebP 图片不超过 10 MB；MP4、WebM 视频不超过 100 MB、不超过 120 秒。类型或大小不合规时就地说明，不发上传请求。服务端拒绝时的提示仍按原样显示。视频文件本身的时长不在前端读取。
-- 素材页两处、终端配置一处的时长框下写「最长 1800 秒（30 分钟），不填用默认值」，并写明默认（图片 8 秒、视频 15 秒、外链 15 秒、无操作 180 秒）。上传视频填写的时长另受 120 秒上限。超出范围就地提示，不提交。
+- 宣传屏「上传素材」旁写明限额，与服务端默认值一致（`services/api/src/content/media-validation.ts`）：图片 JPG、PNG、WebP，不超过 10 MB；视频 MP4、WebM，不超过 100 MB，时长 120 秒以内。类型或大小不合规时就地说明怎么改，不发上传请求；服务端仍做最终校验。这几个限额可用环境变量覆盖，页面写的是默认值（与 `.env.example` 一致）。
+- 素材页两处、终端配置一处的时长框下写清上下限与默认值：图片停留 3–1800 秒、留空默认 8 秒；上传视频停留 3–120 秒、留空默认 15 秒；外链停留 3–1800 秒、留空默认 15 秒；一体机无人操作多久后播放宣传屏 30–1800 秒、留空默认 180 秒。超出范围就地提示，不提交；终端配置不再把超范围的值悄悄夹到边界。
 - 外部视频链接的说明改成白话。HTTPS、iframe、直链只留在悬停「技术说明」。第 5 批「上传前请先看」原文和位置未改。
 - 新增 `apps/admin/src/routes/alerts/alertDetailText.ts`、`apps/admin/src/routes/screensaver/assetUploadRules.ts`、`apps/admin/scripts/verify-console-batch7-copy.mjs`。无删除。
-- 验证：`verify:console-plain-copy`、`verify:service-desk-dashboard-ui`、`verify:feedback-sla`、`test:admin-state-units`、`verify:compliance-copy`（含时间诚实与原始错误门禁）、`verify:mock-server-contract`、admin 类型检查与改动文件 eslint 通过。反向变异四处（正文含终端号仍重复拼、不拦 .txt、图片上限改成 11、外链说明写回 HTTPS）退出码都是 1，已逐字节还原。宣传屏 E2E 已补「选 .txt 不上传、时长 1801 不能提交」，本轮未跑浏览器。未做真机与生产验证。
+- 验证：`verify-console-plain-copy`（含新门禁，限额数字直接从服务端源码解析比对）、`verify-service-desk-dashboard-ui`、`verify-feedback-sla`、`verify-console-screen-ui`、`test:admin-state-units`、`verify:compliance-copy`、`verify-mock-server-contract`、admin 类型检查与 eslint 通过；管理员浏览器测试常规 124 条、大屏 160 条通过。反向变异（正文含终端号仍重复拼、放行 .txt、限额数字与服务端不一致、外链说明出现 HTTPS、默认值写错、类型提示改字）都会红。用户可见文字经 agy 挑过一轮后改写。
 
 ## 2026-10-04：两个后台第 6 批——小样本反推修补与审计文案
 
