@@ -114,6 +114,9 @@ type ImageQualitySummary = {
   quality: 'ok' | 'low'
 }
 
+/** 隐私检查重复提交的去重窗口。只为吸收页面的重复请求，不是缓存：过了窗口再提交就是一次新的检查。 */
+export const PII_SCAN_DEDUPE_MS = 10_000
+
 @Injectable()
 export class MaterialsService {
   constructor(
@@ -123,7 +126,31 @@ export class MaterialsService {
     private readonly redaction: PiiRedactionService,
   ) {}
 
+  /**
+   * 同一份文件、同一个请求方、同样参数的隐私检查，短时间内重复提交只建一条（W-118）。
+   * 页面进材料检查页时可能把建任务请求发两遍（相隔几毫秒），建出两条一模一样的检查，
+   * 用户只会裁决其中一条。这里让第二次请求直接拿到第一次的结果（含匿名任务的访问口令，
+   * 口令明文只在这张进程内的表里留 PII_SCAN_DEDUPE_MS）。多实例部署下跨实例不去重，
+   * 由打印闸门的「孪生检查」规则兜底。
+   */
+  private readonly recentPiiScans = new Map<string, { at: number; view: Promise<DocumentProcessTaskView> }>()
+
   async createTask(dto: CreateMaterialTaskDto, requester: MaterialsRequester): Promise<DocumentProcessTaskView> {
+    if (dto.kind !== 'pii_scan') return this.createTaskOnce(dto, requester)
+    const now = Date.now()
+    for (const [key, entry] of this.recentPiiScans) if (now - entry.at > PII_SCAN_DEDUPE_MS) this.recentPiiScans.delete(key)
+    const owner = requester.kind === 'member' ? `member:${requester.endUserId ?? ''}` : 'anonymous'
+    const key = `${dto.sourceFileId}|${owner}|${JSON.stringify(dto.params ?? {})}`
+    const recent = this.recentPiiScans.get(key)
+    if (recent) return recent.view
+    const view = this.createTaskOnce(dto, requester)
+    this.recentPiiScans.set(key, { at: now, view })
+    // 失败的不留：下一次请求要能重新建。
+    view.catch(() => { if (this.recentPiiScans.get(key)?.view === view) this.recentPiiScans.delete(key) })
+    return view
+  }
+
+  private async createTaskOnce(dto: CreateMaterialTaskDto, requester: MaterialsRequester): Promise<DocumentProcessTaskView> {
     const sourceFile = await this.requireUsableSourceFile(dto.sourceFileId)
     this.assertCanUseSourceFile(sourceFile, requester)
 
