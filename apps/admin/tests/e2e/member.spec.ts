@@ -43,10 +43,10 @@ test.describe('会员权益 / 活动 / 反馈 / 通知 / 隐私（mock 口径）
     await page.getByRole('radio', { name: 'AI 顾问' }).check()
     for (const raw of ['0', '10000', '1.5']) {
       await page.getByLabel('次数').fill(raw)
-      await expect(page.getByText('次数须为 1–9999 的整数。')).toBeVisible()
+      await expect(page.getByText('次数请填 1–9999 的整数。')).toBeVisible()
     }
     await page.getByLabel('次数').fill('3')
-    await expect(page.getByText('次数须为 1–9999 的整数。')).toHaveCount(0)
+    await expect(page.getByText('次数请填 1–9999 的整数。')).toHaveCount(0)
     await page.getByRole('button', { name: '发放 AI 额度' }).click()
     await expect(page.getByText('请先搜索并定位会员。')).toBeVisible()
     await expect(page.getByText('权益已发放')).toHaveCount(0)

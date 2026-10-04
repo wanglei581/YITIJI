@@ -45,7 +45,7 @@ test('AI 额度必须选择服务并填写 1–9999 的整数次数', () => {
   assert.equal(aiQuotaFieldErrors('ai_resume', '', { showService: true, showEmptyCount: true }).service, null)
   for (const raw of ['0', '10000', '1.5', '1.0', '-1', '1e2', 'abc']) {
     assert.equal(parseAiQuotaCount(raw).ok, false, raw)
-    assert.equal(aiQuotaFieldErrors('ai_assistant', raw, { showService: false, showEmptyCount: false }).count, '次数须为 1–9999 的整数。')
+    assert.equal(aiQuotaFieldErrors('ai_assistant', raw, { showService: false, showEmptyCount: false }).count, '次数请填 1–9999 的整数。')
   }
   assert.deepEqual(parseAiQuotaCount('12'), { ok: true, value: 12 })
   assert.equal(aiQuotaFieldErrors('ai_interview', '12', { showService: true, showEmptyCount: true }).count, null)

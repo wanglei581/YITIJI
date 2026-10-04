@@ -32,7 +32,7 @@ export const BENEFIT_TYPES: { value: AdminBenefitType; label: string; desc: stri
 
 const GRANT_ERROR_TEXT: Readonly<Record<string, string>> = {
   BENEFIT_SERVICE_KEY_REQUIRED: '请选择这项额度用于哪项 AI 服务。',
-  BENEFIT_QUANTITY_INVALID: '次数须为 1–9999 的整数。',
+  BENEFIT_QUANTITY_INVALID: '次数请填 1–9999 的整数。',
   BENEFIT_SERVICE_KEY_FORBIDDEN: '这项权益不能指定 AI 服务。',
   BENEFIT_COPY_FORBIDDEN: '权益文案含有不合规承诺，请改成说明文字。',
   BENEFIT_QUANTITY_FORBIDDEN: '政策资格提示不能设置次数。',
@@ -91,7 +91,7 @@ export function aiQuotaFieldErrors(
     ? '请填写次数。'
     : parseAiQuotaCount(countRaw).ok
       ? null
-      : '次数须为 1–9999 的整数。'
+      : '次数请填 1–9999 的整数。'
   return {
     service: opts.showService ? serviceError : null,
     count: empty ? (opts.showEmptyCount ? countError : null) : countError,
