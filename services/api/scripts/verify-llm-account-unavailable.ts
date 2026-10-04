@@ -182,7 +182,7 @@ async function everyService402(): Promise<void> {
       mode: 'preparation',
       fair: {
         id: 'fair-1', title: '示例招聘会', sourceName: '示例来源', sourceUrl: 'https://example.com/fair',
-        startAt: '2026-10-01T00:00:00.000Z', endAt: '2026-10-02T00:00:00.000Z', venue: '会场', city: '杭州',
+        startAt: '2099-10-01T00:00:00.000Z', endAt: '2099-10-02T00:00:00.000Z', venue: '会场', city: '杭州',
       },
       fairCompanies: [],
     }))
