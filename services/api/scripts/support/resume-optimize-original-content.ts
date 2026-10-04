@@ -119,7 +119,7 @@ export async function verifyOriginalContent(): Promise<void> {
       ]
       const response = rawReply(JSON.stringify({ resume: output, modules }))
       const out = await run(text, [response, response], { sections: [], suggestions: [] } as unknown as ResumeReport)
-      if (out.optimizedResume.experience.map((e) => e.company).join('|') !== `${a}|海川科技有限公司`
+      if (out.optimizedResume.experience.map((e) => `${e.company} ${e.period ?? ''}`.trim()).join('|') !== `${a}|海川科技有限公司`
         || out.modules.map((m) => m.before).join('|') !== [schoolLine, a + '\n整理材料。', b, project + '\n整理同学反馈，维护服务说明。'].join('|')
         || out.modules.filter((m) => m.title.includes('保持原文')).map((m) => m.title).join('|') !== '工作经历（保持原文）|项目经历（保持原文）'
         || out.modules.filter((m) => m.title.includes('保持原文')).some((m) => m.after !== '这一段没有改动，保留原文')) {
@@ -185,7 +185,10 @@ export async function verifyOriginalContent(): Promise<void> {
         || PLACEHOLDER_TOKEN.test(JSON.stringify(out.optimizedResume))) fail('W-OPT-LOSS (g). 补回须逐字来自原文且还原联系方式')
       const second = JSON.stringify(sentMessages[1])
       if (second.includes('13853124680') || !second.includes('[手机号_')) fail('W-OPT-LOSS (g). 重试遗漏提示必须遮盖 PII')
-      if (out.optimizedResume.experience[0]?.company !== companyLine || out.optimizedResume.experience[0]?.description !== work
+      // 补回的首行按「公司 / 时间段 / 职务」拆开放，三段都逐字来自原文。
+      const restored = out.optimizedResume.experience[0]
+      if (restored?.company !== '海川科技有限公司' || restored?.period !== '2025年7月—2025年9月'
+        || restored?.role !== '产品运营实习生' || restored?.description !== work
         || out.optimizedResume.projects[0]?.name !== '校园服务小程序 2025.03 - 2025.06'
         || out.optimizedResume.projects[0]?.description !== '整理同学反馈，维护服务说明。'
         || out.optimizedResume.skills[0] !== 'Excel 数据整理' || out.optimizedResume.certificates[0] !== '大学英语六级') {
@@ -199,7 +202,8 @@ export async function verifyOriginalContent(): Promise<void> {
         experience: [{ company: '青岛智造有限公司', role: '', description: '维护仓储系统。' }] }
       const out = await run(text, [reply(partial), reply(partial)], { sections: [], suggestions: [] } as unknown as ResumeReport)
       if (out.optimizedResume.experience.length !== 2
-        || out.optimizedResume.experience[1]?.company !== '海岳物流有限公司 2024.07—至今'
+        || out.optimizedResume.experience[1]?.company !== '海岳物流有限公司'
+        || out.optimizedResume.experience[1]?.period !== '2024.07—至今'
         || out.optimizedResume.experience[1]?.description !== '负责收货安排。') fail('W-OPT-LOSS 条目. 漏经历应只补漏项与描述')
       pass('W-OPT-LOSS 条目. 两段少一条，重试后只补漏项及后续描述')
     }

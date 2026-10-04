@@ -10,6 +10,16 @@ import { pdfjsPresetAssets } from './pdfjs-cmap-plugin'
  * 生产构建必须连真实后端。仅在 production 构建时强制；dev / 非 production 构建不受影响。
  * 详见 docs/progress/project-full-audit-and-august-launch-plan-2026-06-14.md（P0）。
  */
+export function assertProdReactMode(command: string, mode: string) {
+  if (command !== 'build' || mode !== 'production') return
+  const nodeEnv = process.env.NODE_ENV
+  if (nodeEnv !== undefined && nodeEnv !== 'production') {
+    throw new Error(
+      `[kiosk] 当前 shell 里 NODE_ENV=${nodeEnv}，这样构建出来的是 React 开发版（StrictMode 会把挂载副作用执行两遍），请去掉该变量再构建`,
+    )
+  }
+}
+
 function assertProdApiMode(command: string, mode: string, env: Record<string, string>) {
   if (command !== 'build' || mode !== 'production') return
   const apiMode = (env['VITE_API_MODE'] ?? '').trim()
@@ -65,6 +75,7 @@ function resolveApiProxyTarget(env: Record<string, string>): string {
 }
 
 export default defineConfig(({ command, mode }) => {
+  assertProdReactMode(command, mode)
   const env = loadEnv(mode, process.cwd(), '')
   assertProdApiMode(command, mode, env)
   assertProdAssistantTrtcMode(command, mode, env)

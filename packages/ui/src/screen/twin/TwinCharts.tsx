@@ -217,7 +217,7 @@ export interface TwinTimelineSegment {
 
 const TIMELINE_COLOR: Record<TwinTimelineSegment['state'], string> = {
   idle: '#2ee6a8',
-  printing: '#72d6ff',
+  printing: '#2ee6a8', // 兼容旧响应：打印时段只表示在线空闲。
   alert: '#e8b45c',
   offline: '#e88b7d',
   unknown: 'rgba(125,143,137,.45)',
@@ -258,11 +258,11 @@ export function twinSmall(count: number | null): string {
 }
 
 export interface TwinHeatProps {
-  /** 每行一天：label 如「周六」「今天」，hours 24 项；null = 少于 5 或尚未到来。 */
+  /** 每行一天：label 如「周六」「今天」，hours 24 项；null = 不写数字（含 0、少于 5、补充隐藏及尚未到来）。 */
   rows: Array<{ key: string; label: string; hours: Array<number | null>; future?: number }>
 }
 
-/** 7 天 × 24 小时热力：颜色深浅按全图最大值的真实比例，少于 5 的格子只画虚线框。 */
+/** 7 天 × 24 小时热力：颜色深浅按全图最大值的真实比例，null 一律画最浅档，不写数字。 */
 export function TwinHeat({ rows }: TwinHeatProps) {
   let max = 0
   for (const row of rows) {
@@ -276,8 +276,7 @@ export function TwinHeat({ rows }: TwinHeatProps) {
         <div key={row.key} style={{ display: 'contents' }}>
           <b>{row.label}</b>
           {row.hours.map((value, hour) => {
-            if (row.future !== undefined && hour >= row.future) return <i key={hour} />
-            if (value === null) return <i key={hour} className="is-hidden" />
+            if (value === null || row.future !== undefined && hour >= row.future) return <i key={hour} className="is-hidden" style={{ background: 'rgba(46,230,168,.12)', border: 'none' }} />
             const ratio = max > 0 ? value / max : 0
             return (
               <i
@@ -307,7 +306,7 @@ export interface TwinPulseProps {
 
 const PULSE_COLOR = { info: '#8fb2ee', ai: '#2ee6a8', print: '#72d6ff' } as const
 
-/** 每 5 分钟一柱：信息 / AI / 打印三段堆叠；少于 5 的段不画（服务端已置 null）。 */
+/** 每 5 分钟一柱：信息 / AI / 打印三段堆叠；null 画最浅档，不写数字。 */
 export function TwinPulse({ buckets }: TwinPulseProps) {
   const max = buckets.reduce((best, b) => {
     const sum = (b.info === null ? 0 : b.info) + (b.ai === null ? 0 : b.ai) + (b.print === null ? 0 : b.print)
@@ -320,7 +319,8 @@ export function TwinPulse({ buckets }: TwinPulseProps) {
         <span key={b.key} className={i === buckets.length - 1 ? 'is-now' : undefined}>
           {(['info', 'ai', 'print'] as const).map((lane) => {
             const value = b[lane]
-            if (value === null || value === 0) return null
+            if (value === null) return <i key={lane} className="is-hidden" style={{ height: 2, background: 'rgba(46,230,168,.12)', color: 'transparent' }} />
+            if (value === 0) return null
             return <i key={lane} style={{ height: Math.max(2, Math.round(value * scale)), background: PULSE_COLOR[lane], color: PULSE_COLOR[lane] }} />
           })}
         </span>

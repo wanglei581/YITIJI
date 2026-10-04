@@ -68,7 +68,12 @@ if (existsSync(resolve(root, responsivePath))) {
   check(css.includes('prefers-reduced-motion'), '缺少 reduced-motion 合同')
 }
 
-const session = read('src/pages/interview/InterviewSessionPage.tsx')
+// 提交 / 结束的调用在 interviewTurnActions.ts。会话页过 500 行门禁后挪走，
+// 下面的调用形状断言改为两份一起扫，一条不减。
+const session = [
+  read('src/pages/interview/InterviewSessionPage.tsx'),
+  read('src/pages/interview/session/interviewTurnActions.ts'),
+].join('\n')
 for (const path of [
   'src/pages/interview/session/types.ts',
   'src/pages/interview/session/InterviewSessionPanels.tsx',

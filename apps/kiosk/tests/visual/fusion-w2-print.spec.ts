@@ -2131,6 +2131,16 @@ test('zero-amount order confirms pages without benefit mechanism copy @w2', asyn
   await expect(page.getByText('本单无需权益抵扣', { exact: true })).toHaveCount(0)
   await expect(page.getByTestId('print-confirm-amount')).toHaveText('免费试运营')
   await expect(page.locator('[data-w2-page="print-confirm"]')).not.toContainText(/报价|价格|付款|权益|抵扣|不扣/)
+  // 14 号页（走查 10/3）：主按钮整颗在首屏、不被底栏盖住，点它中心命中的就是它。
+  const confirmButton = page.getByRole('button', { name: '确认并打印', exact: true })
+  await expect(confirmButton).toBeInViewport({ ratio: 1 })
+  const confirmBox = (await confirmButton.boundingBox())!
+  expect(confirmBox.height).toBeGreaterThanOrEqual(56)
+  expect(await confirmButton.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return hit === el || el.contains(hit)
+  })).toBe(true)
   // 反向：免费单不得摆出核销入口，也不得声称权益被消耗。
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByText('已抵扣')).toHaveCount(0)
@@ -2476,4 +2486,346 @@ test('print preview paints preset-CMap Chinese text @w2', async ({ page, api }) 
   expect(cmapStatuses.length, 'CMap 按需请求，不打进首屏脚本').toBeGreaterThan(0)
   expect(cmapStatuses.every((status) => status === 200), `CMap 请求状态 ${cmapStatuses.join(',')}`).toBe(true)
   await expectHealthy(page, errors, 'print-preview')
+})
+
+// W-118：停住第一条建任务响应，覆盖编号尚未写回时的重复挂载与 SPA 返回。
+test('W-118 material checks share one in-flight round across immediate back and re-entry @w2', async ({ page, api }) => {
+  registerShell(api)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  const counts = { inspection: 0, normalize_a4: 0, pii_scan: 0 }
+  let release!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
+  await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+    const { kind } = route.request().postDataJSON() as { kind: keyof typeof counts }
+    counts[kind] += 1
+    if (kind === 'inspection') await held
+    await route.fulfill({ status: 201, json: { success: true, data: materialTask(kind) } })
+  })
+  await seedPrintHandoff(page, { materialCheck: null })
+  await page.goto('/print/desk?step=check')
+  await expect.poll(() => counts.inspection).toBe(1)
+  try {
+    await page.getByRole('button', { name: '返回选文件', exact: true }).first().click()
+    await expect(page).toHaveURL(/\/print\/upload/)
+    await page.goBack()
+    await expect(page.locator('[data-w2-page="print-material-check"]')).toHaveAttribute('data-qx-state', 'inspection')
+  } finally {
+    release()
+  }
+  await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeEnabled()
+  expect(counts).toEqual({ inspection: 1, normalize_a4: 1, pii_scan: 1 })
+  await expect(page.getByText(W2_FILE.name, { exact: true }).first()).toBeVisible()
+})
+
+for (const withDetails of [false, true]) {
+  test(`W-118 PII rejection retains the file and allows a fresh check and print (details=${withDetails}) @w2`, async ({ page, api }) => {
+    registerShell(api)
+    registerPrice(api)
+    registerQuote(api, { amountCents: 0, billablePages: 2, unitCents: 0 })
+    const binary = new FusionW2BinaryRoute(page)
+    await binary.install()
+    let attempts = 0
+    const kinds: string[] = []
+    const finding = {
+      id: 'w118-phone', taskId: 'w2-pii_scan', type: 'phone', label: '手机号', pageNumber: 1,
+      snippet: '13800138000', confidence: 0.98, action: 'pending' as const, createdAt: NOW,
+    }
+    api.respond('POST', '/api/v1/materials/tasks/w2-pii_scan/pii-findings/decisions', {
+      status: 200, json: { success: true, data: { ...materialTask('pii_scan'), piiFindings: [{ ...finding, action: 'keep' }] } },
+    })
+    await routeExactJson(page, 'POST', '/api/v1/print/jobs', async (route) => {
+      attempts += 1
+      expect(route.request().postDataJSON().fileUrl).toBe(W2_FILE.fileUrl)
+      await route.fulfill(attempts === 1 ? {
+        status: 400,
+        json: { error: { code: 'PRINT_PII_SCAN_REQUIRED', message: 'PRINT_PII_SCAN_REQUIRED', ...(withDetails ? { details: { piiTaskId: 'ignored-task', reason: 'ignored-reason' } } : {}) } },
+      } : {
+        status: 200,
+        json: { ...W2_ORDER, status: 'pending', amountCents: 0, payStatus: 'paid', priceLines: [], billablePages: 2, billingPageSource: 'detected' },
+      })
+    })
+    await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+      const { kind } = route.request().postDataJSON() as { kind: 'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact' }
+      kinds.push(kind)
+      expect(route.request().postDataJSON().sourceFileId).toBe(W2_FILE.fileId)
+      const task = materialTask(kind)
+      if (kind === 'pii_scan') task.piiFindings = [finding]
+      if (kind === 'pii_redact') task.result = { ...task.result, findingCount: 1, keptCount: 1 }
+      await route.fulfill({ status: 201, json: { success: true, data: task } })
+    })
+    api.respond('GET', '/api/v1/materials/tasks/w2-inspection/print-param-suggestions', { status: 200, json: { success: true, data: printParamSuggestions({ copies: 1 }) } })
+    api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, { status: 200, json: { taskId: W2_ORDER.taskId, status: 'pending' } })
+    // 只写一次，导航后不重新播种，防止夹具掩盖上下文丢失。
+    await openWithHandoff(page, '/print/confirm', {})
+    await page.getByRole('button', { name: '确认并打印', exact: true }).click()
+    await expect(page.getByText('这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。', { exact: true })).toBeVisible()
+    await expect(page.getByText(/稍后重试|PRINT_PII_SCAN_REQUIRED|ignored-task|ignored-reason/)).toHaveCount(0)
+    const recovery = page.getByRole('button', { name: '回到材料检查', exact: true })
+    await expect(recovery).toBeVisible()
+    expect((await recovery.boundingBox())!.height).toBeGreaterThanOrEqual(56)
+    await recovery.click()
+    await expect(page).toHaveURL(/\/print\/desk\?step=check/)
+    await expect(page.getByRole('heading', { name: '这一页没有待处理的文件' })).toHaveCount(0)
+    await expect(page.getByText(W2_FILE.name, { exact: true }).first()).toBeVisible()
+    await page.getByRole('button', { name: '全部保留', exact: true }).click()
+    await page.getByRole('button', { name: '下一步：预览与参数' }).click()
+    await expect(page).toHaveURL(/step=preview/)
+    await page.getByRole('button', { name: '下一步：核对价格' }).click()
+    await expect(page).toHaveURL(/\/print\/confirm/)
+    await expect(page.getByText('发现 1 处个人信息，你选择了全部保留，原样打印。')).toBeVisible()
+    await page.getByRole('button', { name: '确认并打印', exact: true }).click()
+    await expect(page).toHaveURL(/\/print\/progress/)
+    expect(attempts).toBe(2)
+    expect(kinds).toEqual(['inspection', 'normalize_a4', 'pii_scan', 'pii_redact'])
+  })
+}
+
+// 走查 N1（10/4）：保存裁决的接口不回带访问凭证，交接里丢了它，游客从预览返回检查页时
+// 隐私检查任务被 403 拒，整份办理被清。会员不靠这张凭证，所以只有游客会遇到。
+test('W-118 N1 guest returns from preview to check without losing the file after keeping findings @w2', async ({ page, api }) => {
+  registerShell(api)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  const finding = {
+    id: 'n1-phone', taskId: 'w2-pii_scan', type: 'phone', label: '手机号', pageNumber: 1,
+    snippet: '13800138000', confidence: 0.98, action: 'pending' as const, createdAt: NOW,
+  }
+  const withToken = (kind: 'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact') => ({
+    ...materialTask(kind), accessToken: `n1-token-${kind}`, ...(kind === 'pii_scan' ? { piiFindings: [finding] } : {}),
+  })
+  await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+    const { kind } = route.request().postDataJSON() as { kind: 'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact' }
+    await route.fulfill({ status: 201, json: { success: true, data: withToken(kind) } })
+  })
+  // 和服务端一样：裁决响应里没有 accessToken。
+  api.respond('POST', '/api/v1/materials/tasks/w2-pii_scan/pii-findings/decisions', {
+    status: 200, json: { success: true, data: { ...materialTask('pii_scan'), accessToken: undefined, piiFindings: [{ ...finding, action: 'keep' }] } },
+  })
+  const piiReads: Array<string | undefined> = []
+  for (const kind of ['inspection', 'normalize_a4', 'pii_scan'] as const) {
+    await routeExactJson(page, 'GET', `/api/v1/materials/tasks/w2-${kind}`, async (route) => {
+      const presented = route.request().headers()['x-material-task-token']
+      if (kind === 'pii_scan') piiReads.push(presented)
+      if (presented !== `n1-token-${kind}`) {
+        await route.fulfill({ status: 403, json: { success: false, error: { code: 'MATERIAL_TASK_TOKEN_REQUIRED', message: '缺少或无效的材料任务访问凭证' } } })
+        return
+      }
+      await route.fulfill({ status: 200, json: { success: true, data: { ...withToken(kind), ...(kind === 'pii_scan' ? { piiFindings: [{ ...finding, action: 'keep' }] } : {}) } } })
+    })
+  }
+  api.respond('GET', '/api/v1/materials/tasks/w2-inspection/print-param-suggestions', { status: 200, json: { success: true, data: printParamSuggestions({ copies: 1 }) } })
+  await seedPrintHandoff(page, { materialCheck: null })
+  await page.goto('/print/desk?step=check')
+  await page.getByRole('button', { name: '全部保留', exact: true }).click()
+  await page.getByRole('button', { name: '下一步：预览与参数' }).click()
+  await expect(page).toHaveURL(/step=preview/)
+  await page.getByRole('button', { name: '返回材料检查', exact: true }).click()
+  await expect(page).toHaveURL(/step=check/)
+  await expect(page.getByRole('heading', { name: '这一页没有待处理的文件' })).toHaveCount(0)
+  await expect(page.getByText(W2_FILE.name, { exact: true }).first()).toBeVisible()
+  await expect.poll(() => piiReads.length).toBeGreaterThan(0)
+  expect(piiReads.every((presented) => presented === 'n1-token-pii_scan')).toBe(true)
+})
+
+for (const [findingCount, redactedCount, keptCount, text] of [
+  [0, 0, 0, '没发现需要遮挡的内容'],
+  [3, 0, 3, '发现 3 处个人信息，你选择了全部保留，原样打印。'],
+  [3, 2, 1, '发现 3 处个人信息，遮挡 2 处，保留 1 处。'],
+] as const) {
+  test(`W-118 confirm privacy summary reports actual decisions ${findingCount}/${redactedCount}/${keptCount} @w2`, async ({ page, api }) => {
+    registerShell(api)
+    registerPrice(api)
+    registerQuote(api, { amountCents: 0, billablePages: 2, unitCents: 0 })
+    await seedPrintHandoff(page, { materialCheck: {
+      inspectionTaskId: 'w2-inspection-001', piiTaskId: 'w2-pii_scan', piiRedactTaskId: 'w2-pii_redact',
+      checkedAt: NOW, findingCount, redactedCount, keptCount, mode: 'checked',
+      redaction: { claim: redactedCount > 0 ? 'redacted_verified' : 'nothing_to_redact', redactedFileId: redactedCount > 0 ? W2_FILE.fileId : null, appliedRedactedCount: redactedCount, keptCount, failedNoPositionCount: 0, reverifyRan: redactedCount > 0, reverifyRemainingCount: 0 },
+    } })
+    await page.goto('/print/confirm')
+    await expect(page.getByText(text, { exact: false })).toBeVisible()
+    // 摘要文字和「隐私检查摘要」标签在同一个元素里，exact 匹配永远找不到它，toHaveCount(0) 会空转；这里必须用包含匹配。
+    if (findingCount > 0) await expect(page.getByText('没发现需要遮挡的内容')).toHaveCount(0)
+  })
+}
+// W-125：后台把 usb_import 关掉之后，深链接和二维码过期屏也要跟着停。
+// 这些用例打 @w2，靠 playwright.w2 注入的网桥令牌才能走到能力闸门；没令牌时页面停在「未配置」。
+function usbCapability(status: string, note: string | null = null) {
+  return {
+    status: 200,
+    json: {
+      terminalCode: 'KSK-001',
+      capabilities: [{
+        capabilityKey: 'usb_import',
+        status,
+        note,
+        configured: true,
+        updatedAt: '2026-10-04T00:00:00.000Z',
+      }],
+    },
+  }
+}
+
+async function installUsbBridge(page: Page, hits: { count: number }): Promise<void> {
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const origin = new URL(page.url()).origin
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders })
+      return
+    }
+    if (request.method() === 'GET' && (path.endsWith('/status') || path.endsWith('/files'))) hits.count += 1
+    if (path.endsWith('/status')) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'W125-USB' } }),
+      })
+      return
+    }
+    if (path.endsWith('/files')) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            present: true,
+            driveLabel: 'W125-USB',
+            files: [{ safeId: 'w125-safe', filename: '求职材料.pdf', extension: '.pdf', sizeBytes: 2048 }],
+          },
+        }),
+      })
+      return
+    }
+    await route.fulfill({ status: 404, headers: corsHeaders, contentType: 'application/json', body: '{}' })
+  })
+}
+
+function installExpiredPhoneUpload(api: ApiRouter): void {
+  const sessionId = 'w125-upload'
+  const expiresAt = '2000-01-01T00:00:00.000Z'
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        uploadUrl: '/upload/phone',
+        uploadToken: 'w125-upload-token',
+        controlToken: 'w125-control',
+        expiresAt,
+      },
+    },
+  })
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        status: 'expired',
+        purpose: 'print_doc',
+        mode: 'temporary',
+        file: null,
+        requiresKioskConfirmation: true,
+        expiresAt,
+      },
+    },
+  })
+}
+
+test('usb deep link stays closed while usb import is in maintenance @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  const hits = { count: 0 }
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', usbCapability('maintenance'))
+  await installUsbBridge(page, hits)
+
+  await page.goto('/print/upload?source=document&tab=usb&mode=transfer')
+  await expect(page.getByText('维护中，暂时不可用', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-testid^="file-source-usb-file"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导入这一份' })).toHaveCount(0)
+  // 轮询是放行后立刻发出的，不是等 2 秒。先看到拒绝文案再等一小段，才能证明没有迟到的请求。
+  await page.waitForTimeout(400)
+  expect(hits.count).toBe(0)
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('usb deep link lists files when usb import is available @w2', async ({ page, api }) => {
+  // 维护中、以及能力接口失败那两条的反向对照：同一条深链接，配成可用就要能选文件并走到导入。
+  const errors = collectRuntimeErrors(page)
+  const hits = { count: 0 }
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', usbCapability('available'))
+  await installUsbBridge(page, hits)
+
+  await page.goto('/print/upload?source=document&tab=usb&mode=transfer')
+  await expect(page.getByRole('button', { name: /求职材料\.pdf/ })).toBeVisible()
+  expect(hits.count).toBeGreaterThan(0)
+  await page.getByRole('button', { name: /求职材料\.pdf/ }).click()
+  await expect(page.getByRole('button', { name: '导入这一份' })).toBeVisible()
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('usb column explains when capability status cannot be read @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  const hits = { count: 0 }
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 500,
+    json: { message: 'boom-internal' },
+  })
+  await installUsbBridge(page, hits)
+
+  await page.goto('/print/upload?source=document&tab=usb&mode=transfer')
+  await expect(page.getByText('暂时读不到本机的服务开通情况，请稍后再试或使用其他方式', { exact: true })).toBeVisible()
+  await expect(page.getByText('boom-internal')).toHaveCount(0)
+  await expect(page.locator('[data-testid^="file-source-usb-file"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导入这一份' })).toHaveCount(0)
+  const retry = page.getByTestId('usb-import-retry')
+  await expect(retry).toBeVisible()
+  const box = await retry.boundingBox()
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(56)
+  const before = api.requestCount('GET', '/api/v1/terminals/KSK-001/capabilities')
+  await retry.click()
+  await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/capabilities')).toBeGreaterThan(before)
+  await page.waitForTimeout(400)
+  expect(hits.count).toBe(0)
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('expired phone upload hides the usb switch when usb import is closed @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', usbCapability('maintenance'))
+  installExpiredPhoneUpload(api)
+
+  await page.goto('/print/upload?source=document&tab=qr')
+  await expect(page.getByRole('button', { name: '重新出一张码' })).toBeVisible()
+  await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/capabilities')).toBeGreaterThan(0)
+  await page.waitForTimeout(300)
+  await expect(page.getByRole('button', { name: '改用 U 盘导入' })).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('expired phone upload offers the usb switch when usb import is available @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', usbCapability('available'))
+  installExpiredPhoneUpload(api)
+
+  await page.goto('/print/upload?source=document&tab=qr')
+  await expect(page.getByRole('button', { name: '重新出一张码' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '改用 U 盘导入' })).toBeVisible()
+  await expectHealthy(page, errors, 'print-upload')
 })

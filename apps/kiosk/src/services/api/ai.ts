@@ -142,11 +142,23 @@ const adapter: AiServiceInterface =
  * 提交简历解析。HTTP 模式还必须带上首次 POST 前已经回读成功的意图和证明；
  * 缺任一头时适配器不会发无头请求。演示模式仍由 mock 适配器以 MOCK_MODE 拒绝。
  */
+const parsesInFlight = new Map<string, Promise<ResumeParseResponse>>()
+
 export const submitResumeParse = (
   req: ResumeParseRequest,
   token?: string | null,
   intent?: ResumeParseIntentHeaders | null,
-) => adapter.submitResumeParse(req, token, intent)
+) => {
+  // 不替代现有意图凭据；只合并同一身份、同一意图、同一内容的在途发送。
+  const key = JSON.stringify([req, token ?? null, intent ?? null])
+  const existing = parsesInFlight.get(key)
+  if (existing) return existing
+  const request = adapter.submitResumeParse(req, token, intent).finally(() => {
+    if (parsesInFlight.get(key) === request) parsesInFlight.delete(key)
+  })
+  parsesInFlight.set(key, request)
+  return request
+}
 
 /**
  * 通过 taskId 查询解析结果（用于 http 模式刷新恢复）。

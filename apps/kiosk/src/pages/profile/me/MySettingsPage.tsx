@@ -25,7 +25,10 @@ import './styles/settings-qx2.css'
 // AI 使用授权只认服务端返回：读不到就是「本次未取到」，绝不退回成「未授权」。
 type JobAiConsent = 'idle' | 'loading' | 'granted' | 'not-granted' | 'error'
 
-const ACCOUNT_CLOSURE_NOTE = '账号注销和数据导出尚未开放。如需协助，请联系现场工作人员；如后续提供导出，内容包含文件、订单等业务摘要清单。'
+// 10/3 口径，与《隐私政策》（2026-10-pilot-1 第五节）一字对齐，用原词「核实是你本人」；
+// 10/4 产品负责人：设备现场无人值守、全自助，一体机不再把用户引向线下人工，只指向政策里的电话、邮箱。
+// 电话、邮箱不写死，引用隐私政策。一体机上不直接提交注销，也没有自助导出。
+const ACCOUNT_CLOSURE_NOTE = '注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。'
 
 const CONSENT_BADGE: Record<JobAiConsent, { text: string; tone?: 'run' | 'bad' | 'off' }> = {
   idle: { text: '—', tone: 'off' },
@@ -176,7 +179,7 @@ export function MySettingsPage() {
 
   if (showRebind && isLoggedIn && getToken()) return (
     <PhoneRebindPanel phoneMasked={phoneMasked} token={getToken()!} onDone={handleRebindDone}
-      onRecheck={() => endKioskUse('switch_account', { loginHint: '请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。' })}
+      onRecheck={() => endKioskUse('switch_account', { loginHint: '请用新手机号登录核对换绑结果；如有困难，请按《隐私政策》里的电话、邮箱联系我们。' })}
       onCancel={() => setShowRebind(false)} />
   )
   const ctabar = <>

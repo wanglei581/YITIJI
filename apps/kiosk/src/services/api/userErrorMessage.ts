@@ -35,7 +35,11 @@ import { ApiHttpError } from './httpAdapter'
 /**
  * 跨页面通用的技术性失败。这些码与「用户此刻在做什么」无关，因此可以给统一文案；
  * 与具体业务有关的失败一律留给调用方兜底句，那里才知道用户是在导出还是在转写。
+ *
+ * 公共额度用完（429 `AI_PUBLIC_QUOTA_EXCEEDED`）各页共用下面这一句，不写价格、购买或充值。
  */
+export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明天恢复；可以先打印原件。'
+
 const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   NETWORK_ERROR: '网络连接失败，请检查网络后重试',
   // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
@@ -49,6 +53,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   REQUEST_TIMEOUT: '本次请求响应超时，请重试',
   RATE_LIMITED: '当前使用的人较多，请稍后再试',
   AI_RATE_LIMITED: '当前使用的人较多，请稍后再试',
+  // 公共日额度：当天重试不会成功。不要并进上面的普通限流句。
+  AI_PUBLIC_QUOTA_EXCEEDED: AI_PUBLIC_QUOTA_EXCEEDED_COPY,
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
   PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印',
@@ -84,6 +90,15 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   RECONCILE_UNSUPPORTED: '当前通道不支持主动核实，请继续等待支付结果',
   LOCAL_AGENT_UNREACHABLE: '无法连接这台机器的本机程序，请确认设备正常后重试',
   LOCAL_USB_BRIDGE_TOKEN_MISSING: '这台机器还没配好 U 盘导入，请联系现场工作人员',
+  // 2026-10-04 Agent 本地接口：读的那一下失败（多半是 Windows Defender 拦下了可疑文件，或文件已被隔离）。
+  // 重试同一个文件不会成功，所以不说「请重试」，直接让用户换一个。
+  LOCAL_USB_FILE_UNREADABLE: '这个文件读不了，请换一个文件',
+  // 列表过期（一次性编号已用过或超时）：同一个编号再点只会再失败，要重新读取 U 盘列表。
+  LOCAL_USB_FILE_EXPIRED: '文件列表已过期，请重新读取 U 盘后再选',
+  // 2026-10-04 能力中心把这台机器的 U 盘导入配成非「可用」。重试过不了，改走手机扫码。
+  LOCAL_USB_DISABLED: '这台机器暂未开放 U 盘导入，请用手机扫码上传',
+  // 2026-10-04 查能力开关失败、超时或返回对不上。当时确认不了是否开放，不要当成已开放。
+  LOCAL_USB_CAPABILITY_UNKNOWN: '暂时确认不了 U 盘导入是否开放，请稍后再试或用手机扫码上传',
   CONVERT_TOO_MANY_IMAGES: '一次转换的图片过多，请减少张数后重试',
   SIGN_SOURCE_NOT_FOUND: '文件访问凭证已过期或文件已清理，请重新选择文件',
   NO_TERMINAL_IDENTITY: '这台机器还没完成登记，请联系现场工作人员',

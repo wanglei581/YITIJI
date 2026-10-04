@@ -269,16 +269,17 @@ function CapabilityRow({
   saving: boolean
   onSave: (key: PrintScanCapabilityKey, status: PrintScanCapabilityStatus, note: string) => void
 }) {
-  const [status, setStatus] = useState<PrintScanCapabilityStatus>(cap.status)
+  // 未登记行的 cap.status 固定是 not_verified（列表对缺行的占位），不是一体机实际生效结果。
+  // 下拉不预选：必须先选出一项才能登记，避免把仍跟随服务器部署设置的能力误写成关闭。
+  const [status, setStatus] = useState<PrintScanCapabilityStatus | ''>(cap.configured ? cap.status : '')
   const [note, setNote] = useState(cap.note ?? '')
   useEffect(() => {
-    setStatus(cap.status)
+    setStatus(cap.configured ? cap.status : '')
     setNote(cap.note ?? '')
   }, [cap])
 
   const dirty = status !== cap.status || (note.trim() || '') !== (cap.note ?? '')
-  // 未登记的行允许不改任何内容、原样登记（例如把「未验收」正式写进去，从此不再跟随服务器部署设置）。
-  const savable = dirty || !cap.configured
+  const savable = cap.configured ? dirty : status !== ''
 
   return (
     <tr className="border-b border-neutral-900/5 last:border-b-0">
@@ -296,9 +297,14 @@ function CapabilityRow({
       <td className="px-4 py-2.5">
         <select
           value={status}
-          onChange={(e) => setStatus(e.target.value as PrintScanCapabilityStatus)}
+          onChange={(e) => setStatus(e.target.value as PrintScanCapabilityStatus | '')}
           className="h-8 rounded-lg border border-neutral-900/15 bg-surface px-2 text-[12.5px] text-neutral-800"
         >
+          {!cap.configured && (
+            <option value="" disabled>
+              请选择
+            </option>
+          )}
           {CAPABILITY_STATUS_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
@@ -315,14 +321,20 @@ function CapabilityRow({
       </td>
       <td className="px-4 py-2.5 text-[12px] text-neutral-500">
         <span className="mr-2">{fmt(cap.updatedAt)}</span>
-        <button
-          type="button"
-          disabled={!savable || saving}
-          onClick={() => onSave(cap.capabilityKey, status, note.trim())}
-          className="rounded-lg bg-primary-700 px-3 py-1.5 text-[12px] font-bold text-white disabled:opacity-40"
-        >
-          {saving ? '保存中…' : cap.configured ? '保存' : '登记'}
-        </button>
+        <span className="inline-flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!savable || saving}
+            onClick={() => {
+              if (status === '') return
+              onSave(cap.capabilityKey, status, note.trim())
+            }}
+            className="rounded-lg bg-primary-700 px-3 py-1.5 text-[12px] font-bold text-white disabled:opacity-40"
+          >
+            {saving ? '保存中…' : cap.configured ? '保存' : '登记'}
+          </button>
+          {!cap.configured && status === '' && <span className="whitespace-nowrap">请先选择要登记的状态</span>}
+        </span>
       </td>
     </tr>
   )

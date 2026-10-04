@@ -158,6 +158,25 @@ test('0 元实付写免费试运营，其余仍标未记录且不推算', () => 
   assert.equal(missing.value, '未记录')
 })
 
+test('0 元失败页不提已付金额，收费单保留原句', () => {
+  assert.equal(progress.jamOrderKeptLine('paid'), '你的订单和已付金额都保留着')
+  assert.equal(progress.jamOrderKeptLine('free'), '你的订单还在，处理好后可以继续打印')
+  assert.equal(progress.jamOrderKeptLine('unknown'), '你的订单还在，处理好后可以继续打印')
+  assert.equal(progress.failureStaffDoing('paid'), '订单和支付记录都在，请凭订单找现场工作人员处理。')
+  assert.equal(progress.failureStaffDoing('free'), '你的订单还在，请凭订单找现场工作人员处理。')
+  assert.equal(progress.failureStaffDoing('unknown'), '你的订单还在，请凭订单找现场工作人员处理。')
+  assert.match(progress.outOfPaperDoing({ fact: 'paid', amountCents: 200 }), /已付金额/)
+  assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'free', amountCents: 0 }), /已付金额|支付/)
+  assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'unknown', amountCents: null }), /已付金额|支付/)
+})
+
+test('0 元订单不算收费单', () => {
+  assert.equal(payment.isFreeMemberOrder({ payStatus: 'paid', amountCents: 0, paymentSource: 'offline' }), true)
+  assert.equal(payment.isFreeMemberOrder({ payStatus: 'paid', amountCents: 100, paymentSource: 'free' }), true)
+  assert.equal(payment.isFreeMemberOrder({ payStatus: 'paid', amountCents: 100, paymentSource: 'offline' }), false)
+  assert.equal(payment.isFreeMemberOrder({ payStatus: null, amountCents: 0 }), false)
+})
+
 const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
 const ENCRYPTED_COPY = '这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传'
 
@@ -394,6 +413,7 @@ const doneSectionsUrl = transpile(join(kioskRoot, 'src/pages/print/components/Pr
   './PrintFileDeletionRecords': toDataUrl('export const PrintFileDeletionRecords = () => null'),
   './PrintFileRetentionNotice': toDataUrl('export const PrintFileRetentionNotice = () => null'),
   './PrintProgressSections': toDataUrl('export const PrintJobRow = () => null'),
+  './PrintAiHelp': aiUrl,
 })
 const { PrintOutOfPaperPanel } = await import(doneSectionsUrl)
 test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保留原说明', () => {
@@ -405,4 +425,122 @@ test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保
     assert.doesNotMatch(freeText, /报价|价格|费用|付款|收费|收款|扣费|抵扣|权益|internal-task/)
     assert.match(textOf({ fact: 'paid', amountCents: 200 }), /不会重复收费/)
   }
+})
+
+const { PrintJamGuide } = await import(doneSectionsUrl)
+test('卡纸三步不提收款', () => {
+  const text = renderToStaticMarkup(createElement(PrintJamGuide, { orderNo: 'ORD-20261003-JAM' })).replace(/<[^>]*>/g, '')
+  assert.match(text, /找工作人员之前先做这三件/)
+  assert.match(text, /别硬拉纸/)
+  assert.match(text, /订单号 ORD-20261003-JAM/)
+  assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)
+})
+
+// W-118：执行真实配置回调；测试随 verify:print-done-truth 已进入 CI，无需另加登记。
+const pluginStub = toDataUrl('export default () => ({})')
+let viteConfigSource = readFileSync(join(kioskRoot, 'vite.config.ts'), 'utf8')
+viteConfigSource = viteConfigSource.replace('import.meta.url', JSON.stringify(new URL('../../vite.config.ts', import.meta.url).href))
+let viteConfigJs = ts.transpileModule(viteConfigSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
+for (const [specifier, url] of Object.entries({
+  '@tailwindcss/vite': pluginStub, '@vitejs/plugin-react': pluginStub,
+  'vite': toDataUrl('export const defineConfig = f => f; export const loadEnv = () => ({VITE_API_MODE:"http", VITE_USE_TRTC_CALL:"true", VITE_API_BASE_URL:"/api/v1"})'),
+  './pdfjs-cmap-plugin': toDataUrl('export const pdfjsPresetAssets = () => ({})'),
+})) viteConfigJs = viteConfigJs.split(`'${specifier}'`).join(`'${url}'`).split(`"${specifier}"`).join(`"${url}"`)
+const { default: kioskConfig } = await import(toDataUrl(viteConfigJs))
+test('W-118：生产构建拒绝 shell 中的非 production NODE_ENV，开发与测试构建不受影响', () => {
+  const previous = process.env.NODE_ENV
+  try {
+    for (const value of ['development', 'test', '']) {
+      process.env.NODE_ENV = value
+      assert.throws(() => kioskConfig({ command: 'build', mode: 'production' }), /当前 shell 里 NODE_ENV=.*React 开发版.*StrictMode.*请去掉该变量再构建/)
+      assert.doesNotThrow(() => kioskConfig({ command: 'serve', mode: 'production' }))
+      assert.doesNotThrow(() => kioskConfig({ command: 'build', mode: 'test' }))
+    }
+    process.env.NODE_ENV = 'production'
+    assert.doesNotThrow(() => kioskConfig({ command: 'build', mode: 'production' }))
+    delete process.env.NODE_ENV
+    assert.doesNotThrow(() => kioskConfig({ command: 'build', mode: 'production' }))
+  } finally {
+    if (previous === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = previous
+  }
+})
+
+const deskModel = await import(transpile(join(kioskRoot, 'src/pages/print/printDeskModel.ts')))
+test('W-118：摘要按真实裁决区分无命中、全保留、部分遮挡，缺数时不编数字', () => {
+  const text = (counts) => deskModel.printPrivacyDecisionSummary(counts)
+  assert.equal(text({ findingCount: 0, redactedCount: 0, keptCount: 0 }), '没发现需要遮挡的内容')
+  assert.equal(text({ findingCount: 3, redactedCount: 0, keptCount: 3 }), '发现 3 处个人信息，你选择了全部保留，原样打印。')
+  assert.equal(text({ findingCount: 3, redactedCount: 2, keptCount: 1 }), '发现 3 处个人信息，遮挡 2 处，保留 1 处。')
+  for (const counts of [{}, { findingCount: 3, redactedCount: 1, keptCount: 1 }, { findingCount: -1, redactedCount: 0, keptCount: -1 }]) {
+    assert.equal(text(counts), '隐私检查结果以材料检查页为准')
+  }
+})
+
+// 抽取指定声明并执行源码，隔离网络依赖；不在测试中另写一份防重逻辑。
+async function loadFlightDeclarations(relativePath, names, stubs = '') {
+  const src = readFileSync(join(kioskRoot, relativePath), 'utf8')
+  const file = ts.createSourceFile(relativePath, src, ts.ScriptTarget.Latest, true)
+  const selected = file.statements.filter((node) =>
+    ts.isFunctionDeclaration(node) ? names.includes(node.name?.text)
+      : ts.isVariableStatement(node) && node.declarationList.declarations.some((d) => names.includes(d.name.getText(file))),
+  )
+  assert.equal(selected.length, names.length)
+  const js = ts.transpileModule(stubs + '\n' + selected.map((node) => node.getText(file)).join('\n'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+  return import(toDataUrl(js))
+}
+const networkFlightStub = `
+export let calls = 0;
+let settle;
+export function finish(fail = false) { fail ? settle.reject(new Error('failed')) : settle.resolve({sessionId:'one'}); }
+function send() { calls++; return new Promise((resolve, reject) => { settle = {resolve, reject}; }); }
+const requestJson = send, callEnvelope = send, call = send;
+const requireLocalAgentHeaders = () => ({}), LOCAL_AGENT_BASE_URL = '', API_MODE = 'http';
+const adapter = {submitResumeParse: send};
+`
+for (const [path, names, args] of [
+  ['src/services/api/uploadSessions.ts', ['uploadCreatesInFlight', 'createUploadSession'], [{ purpose: 'resume_upload', mode: 'temporary', channel: 'phone_h5' }, null]],
+  ['src/services/auth/memberQrLoginApi.ts', ['qrCreatesInFlight', 'createQrLoginViaLocalAgent'], [{ deviceId: 'device', returnTo: '/resume/source' }]],
+  ['src/services/api/ai.ts', ['parsesInFlight', 'submitResumeParse'], [{ fileId: 'file' }, 'member', { intent: 'one', proof: 'proof' }]],
+  ['src/services/api/selfAssessment.ts', ['assessmentsInFlight', 'submitSelfAssessment'], [{ answers: [], consent: { nonSensitive: true, sensitive: true } }, { token: 'member' }]],
+]) {
+  const mod = await loadFlightDeclarations(path, names, networkFlightStub)
+  test(`W-118：${names[1]} 同轮复用 Promise，成功和失败后均释放，允许显式新一轮`, async () => {
+    const create = mod[names[1]]
+    const first = create(...args)
+    assert.equal(create(...args), first)
+    assert.equal(mod.calls, 1)
+    mod.finish()
+    await first
+    const second = create(...args)
+    assert.notEqual(second, first)
+    assert.equal(mod.calls, 2)
+    mod.finish(true)
+    await assert.rejects(second, /failed/)
+    const third = create(...args)
+    assert.equal(mod.calls, 3)
+    mod.finish()
+    await third
+  })
+}
+const checkFlight = await loadFlightDeclarations('src/pages/print/printDeskModel.ts', ['checksInFlight', 'shareMaterialChecks'])
+test('W-118：重复挂载与重挂共享检查结果，不同文件隔离，失败后能重试', async () => {
+  const releases = []
+  let calls = 0
+  const run = () => { calls++; return new Promise((resolve) => { releases.push(resolve) }) }
+  const first = checkFlight.shareMaterialChecks('context:file', run)
+  assert.equal(checkFlight.shareMaterialChecks('context:file', run), first)
+  assert.equal(calls, 1)
+  const other = checkFlight.shareMaterialChecks('other:file', run)
+  assert.notEqual(other, first)
+  assert.equal(calls, 2)
+  releases[0]({ pii: { id: 'same-task' } })
+  releases[1]({ pii: { id: 'other' } })
+  await other
+  assert.deepEqual(await first, { pii: { id: 'same-task' } })
+  const failed = checkFlight.shareMaterialChecks('context:file', async () => { throw new Error('failed') })
+  await assert.rejects(failed, /failed/)
+  assert.deepEqual(await checkFlight.shareMaterialChecks('context:file', async () => ({ pii: { id: 'retry' } })), { pii: { id: 'retry' } })
 })

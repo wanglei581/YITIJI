@@ -6,6 +6,7 @@ import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
+import { getMyDocuments } from '../../services/api/memberAssets'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import {
@@ -23,7 +24,7 @@ import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeAigcBadge } from './components/resume-deliver/ResumeAigcBadge'
 import { OptimizeWorkArea } from './components/resume-deliver/OptimizeWorkArea'
 import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
-import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
+import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle, optimizeStatusCapsule } from './components/resume-deliver/optimizeStateCopy'
 import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
 import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOptimizeLeaveDialog'
@@ -132,6 +133,17 @@ export function ResumeOptimizePage() {
   const estimatedPagesLabel = exported?.pageCount ? `共 ${exported.pageCount} 页（上次导出）` : '导出后显示真实页数。若担心第二页只剩两三行，可先点「压到一页」。'
   const editorOpen = view === 'ready' && Boolean(resume) && draftAccepted && !draft.loading
   const choicePending = Boolean(token && draft.hasDraft && !draftAccepted && view === 'ready')
+
+  // 优化稿导出合同没有 savedToDocuments；只凭本人文档列表中的同一文件确认保存。
+  // 读取失败或未找到时保持未知，不能根据登录状态推断已保存。
+  useEffect(() => {
+    if (exportKind !== 'resume' || !exported || !token) return
+    let active = true
+    void getMyDocuments(token, { pageSize: 50 }).then((page) => {
+      if (active && page.items.some((item) => item.id === exported.fileId)) setSavedToDocuments(true)
+    }).catch(() => { /* 导出已成功；文档归属未确认时不宣称已保存。 */ })
+    return () => { active = false }
+  }, [exported, exportKind, token, setSavedToDocuments])
 
   const markEdited = () => { setIsDirty(true); setPreviewOpen(false); if (exported) setExported(null) }
   const issueMessage = (failure: ResumeDecisionFailure, attempted?: ResumeModuleDecision) => {
@@ -306,6 +318,7 @@ export function ResumeOptimizePage() {
     )
   }
 
+  const statusCapsule = optimizeStatusCapsule(view)
   const retryable = view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent'
   const stateBody = view === 'ready' ? null : (
     <ResumeStatePanel
@@ -323,7 +336,7 @@ export function ResumeOptimizePage() {
   )
 
   return (
-    <QxPageFrame title="简历优化建议" subtitle="建议只改表达，事实由你确认，随时可以保留原文。" back={{ label: '返回诊断报告', onBack: () => requestLeave(goToReport) }} status={{ tone: view === 'ready' ? 'ok' : 'unknown', label: view === 'ready' ? '逐条确认' : '等待优化建议' }} ctabar={ctabar} navbar={navbar}>
+    <QxPageFrame title="简历优化建议" subtitle="建议只改表达，事实由你确认，随时可以保留原文。" back={{ label: '返回诊断报告', onBack: () => requestLeave(goToReport) }} status={statusCapsule} ctabar={ctabar} navbar={navbar}>
       <section
         data-kiosk-domain="resume"
         data-kiosk-screen="resume-optimize"

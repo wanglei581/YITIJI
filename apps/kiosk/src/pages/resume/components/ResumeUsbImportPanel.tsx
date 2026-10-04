@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { FileTextIcon, LoaderIcon, RefreshCwIcon, UsbIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
+import { useUsbImportGate, type UsbImportGate } from '../../../hooks/useUsbImportGate'
 import { useAuth } from '../../../auth/useAuth'
 import {
   getUsbStatus,
@@ -23,6 +24,8 @@ export interface ResumeUsbImportedFile {
 }
 
 interface ResumeUsbImportPanelProps {
+  /** 来源页已经查过就传进来，避免再闪一次「正在确认」。面试设置页不传，面板自己查。 */
+  gate?: UsbImportGate
   onUploaded: (file: ResumeUsbImportedFile) => void
   onBusyChange?: (busy: boolean) => void
 }
@@ -47,7 +50,11 @@ function inferFormat(mimeType: string, filename: string): string {
   return 'unknown'
 }
 
-export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImportPanelProps) {
+const PANEL_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传，或联系现场工作人员。'
+
+export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyChange }: ResumeUsbImportPanelProps) {
+  const ownGate = useUsbImportGate(PANEL_USB_UNCONFIGURED_NOTE)
+  const gate = gateFromParent ?? ownGate
   const { getToken } = useAuth()
   const mountedRef = useRef(true)
   const [status, setStatus] = useState<UsbStatus | null>(null)
@@ -70,7 +77,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
   }, [onBusyChange])
 
   useEffect(() => {
-    if (!configured || importingId) return undefined
+    if (!configured || gate.state !== 'allowed' || importingId) return undefined
     let cancelled = false
     let timer: number | undefined
 
@@ -100,7 +107,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
       cancelled = true
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [configured, importingId])
+  }, [configured, gate.state, importingId])
 
   const importFile = async (item: UsbFileListItem) => {
     setImportingId(item.safeId)
@@ -135,6 +142,32 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
         tone="empty"
         title="这台机器暂未开通 U 盘导入"
         description="请改用手机扫码上传，或联系现场工作人员。"
+      />
+    )
+  }
+
+  if (gate.state !== 'allowed') {
+    return (
+      <KioskStatePanel
+        compact
+        tone={gate.state === 'unknown' ? 'error' : gate.state === 'loading' ? 'loading' : 'permission'}
+        title={
+          gate.state === 'loading'
+            ? (gate.note ?? '正在确认本机是否开通 U 盘导入…')
+            : gate.state === 'unknown'
+              ? '暂时确认不了'
+              : 'U盘上传现在不能用'
+        }
+        description={
+          gate.state === 'loading'
+            ? '确认完成前不会读取 U 盘，也不会列出文件。'
+            : (gate.note ?? undefined)
+        }
+        actions={gate.state === 'unknown' ? (
+          <button type="button" className="qx-btn" data-variant="ghost" data-testid="resume-usb-retry" onClick={gate.retry}>
+            重新检查
+          </button>
+        ) : undefined}
       />
     )
   }

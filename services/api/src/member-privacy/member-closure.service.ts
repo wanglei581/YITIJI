@@ -52,7 +52,7 @@ export class MemberClosureService {
       if (!initial) throw new NotFoundException({ error: { code: 'ADMIN_USER_NOT_FOUND', message: '用户不存在' } })
       if (initial.status === 'anonymized') return { endUserId, status: 'anonymized' as const, changed: false }
       if (decryptPhone(initial.phoneEnc).slice(-4) !== input.phoneLast4) {
-        throw badRequest('CLOSURE_PHONE_MISMATCH', '手机号尾号核验不通过')
+        throw badRequest('CLOSURE_PHONE_MISMATCH', '手机尾号不符，请确认是这位用户')
       }
       const scrub = closureTextScrubber(initial)
       const context: ClosureProgress = { source: input.source, reasonText: scrub(input.reasonText.trim()),
@@ -125,7 +125,16 @@ export class MemberClosureService {
         await runSerializableTransaction(this.prisma, async (tx) => {
           const revoked = await tx.benefitGrant.updateMany({ where: { endUserId, status: 'active' }, data: { status: 'revoked' } })
           const legacy = await tx.userNotification.deleteMany({ where: { memberId: endUserId } })
-          await this.addCounts(tx, request.id, 'deleted', { benefitGrantRevoked: revoked.count, userNotification: legacy.count })
+          // AI 按人次数账本：每日计数的键是 `member:<id>`（ai-quota.service.ts 的 dailyKey），按等值删，
+          // 不能用前缀匹配——否则注销 member:12 会连带删掉 member:123。预占记录存的是原始会员号。
+          // 预占记录一律删除（含还在预占中的）：账号已进入注销、登录态已撤销，在途请求结算时找不到记录会如实失败；
+          // 账本里没有手机号等身份信息，也没有统计读取它（后台汇总只读每日计数），所以不必匿名化保留。
+          const quotaDaily = await tx.aiQuotaDaily.deleteMany({ where: { endUserId: `member:${endUserId}` } })
+          const quotaReservations = await tx.aiQuotaReservation.deleteMany({ where: { endUserId } })
+          await this.addCounts(tx, request.id, 'deleted', {
+            benefitGrantRevoked: revoked.count, userNotification: legacy.count,
+            aiQuotaDaily: quotaDaily.count, aiQuotaReservation: quotaReservations.count,
+          })
         })
         // ownerId 是历史会员文件的第二条归属路径；派生文件跟随来源递归回收。
         const files = pendingProgress.fileIds

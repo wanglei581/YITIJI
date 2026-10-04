@@ -99,8 +99,8 @@ export function TerminalOpsCards({ data }: { data: PartnerTerminalOpsView }) {
         </p>
         <p className={totals.unrecoveredTerminals > 0 ? 'font-semibold text-error-fg' : 'text-neutral-500'}>
           {totals.unrecoveredTerminals > 0
-            ? `当前有 ${totals.unrecoveredTerminals} 台未恢复`
-            : totals.silentTerminals > 0 ? '已上报的终端当前没有未恢复的故障' : '当前没有未恢复的故障'}
+            ? `截至昨天有 ${totals.unrecoveredTerminals} 台未恢复`
+            : totals.silentTerminals > 0 ? '已上报的终端截至昨天没有未恢复的故障' : '截至昨天没有未恢复的故障'}
         </p>
         {totals.silentTerminals > 0 && (
           <p className="text-xs font-medium text-warning-fg">

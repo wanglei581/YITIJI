@@ -151,6 +151,18 @@ export const PENDING_REFUND_LABEL = '待退款'
 export const PENDING_REFUND_EXPLANATION =
   '本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'
 
+/**
+ * 0 元单：已经有订单，且金额为 0 或来源是免费。
+ * 没有支付状态的历史订单不算免费，仍走「暂无支付信息」。
+ */
+export function isFreeMemberOrder(item: {
+  payStatus?: string | null
+  amountCents?: number | null
+  paymentSource?: string | null
+}): boolean {
+  return item.payStatus != null && (item.amountCents === 0 || item.paymentSource === 'free')
+}
+
 /** 列表/详单支付状态：待退款信号优先于「已支付」，金额仍只格式化服务端字段。 */
 export function memberPayStatusLabel(
   item: Pick<MemberPrintOrderItem, 'payStatus' | 'refundRequired'>,

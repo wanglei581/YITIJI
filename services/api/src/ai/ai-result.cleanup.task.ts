@@ -1,3 +1,4 @@
+import { AiQuotaService } from './quota/ai-quota.service'
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { AiService } from './ai.service'
@@ -30,7 +31,15 @@ export class AiResultCleanupTask {
     private readonly ai: AiService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly quota: AiQuotaService,
   ) {}
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async sweepQuotaReservations(): Promise<void> {
+    try { await this.quota.sweepStale() } catch (error) {
+      this.logger.error(`AI quota stale sweep failed: ${(error as Error).message}`)
+    }
+  }
 
   @Cron(CronExpression.EVERY_HOUR)
   async handleHourly(): Promise<void> {
@@ -39,6 +48,9 @@ export class AiResultCleanupTask {
     const retentionDays = readAiServiceLogRetentionDays()
     await this.cleanupExpiredAiServiceLogs(retentionDays)
     await this.cleanupExpiredAiUsageRecords(retentionDays)
+    try { await this.quota.purgeExpired(retentionDays) } catch (error) {
+      this.logger.error(`AI quota ledger cleanup failed: ${(error as Error).message}`)
+    }
   }
 
   private async cleanupExpiredResumeResults(): Promise<void> {

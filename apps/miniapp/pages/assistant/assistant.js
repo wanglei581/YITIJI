@@ -3,7 +3,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const voice = require('../../utils/voice-recorder')
 const aiAccess = require('../../utils/ai-access')
-const { userMessageOf } = require('../../utils/user-error')
+const { userMessageOf, plainAiMessageOf } = require('../../utils/user-error')
 
 // 后端 route 字符串 → 小程序页面路径映射（后端返回 actions[].route 时使用）。
 // 没有映射的 route 会被丢掉（见 _send 里的 .filter）：服务端给一体机的岗位、招聘会、
@@ -59,7 +59,7 @@ Page({
         text: '你好，我是小青。简历怎么改、面试怎么准备、文件怎么打印，都可以问我。想从哪里开始？',
         cards: [
           { id: 'resume', icon: 'file-text', tone: 'plum', title: '诊断我的简历', sub: 'AI 分析并给出优化建议', url: '/pages/resume-upload/resume-upload' },
-          { id: 'print',  icon: 'printer',   tone: 'teal', title: '怎么打印文件', sub: '上传、扫码或到店打印',  url: '/pages/print/print' },
+          { id: 'print',  icon: 'printer',   tone: 'teal', title: '怎么打印文件', sub: '上传、扫码或在一体机上打印',  url: '/pages/print/print' },
         ],
       },
     ],
@@ -173,7 +173,7 @@ Page({
       })
     } catch (err) {
       // 说得出原因的就照实说：没登录、AI 暂停、年龄没确认、内容处理不了；其余才是「暂时无法回复」。
-      const aiMsg = { id: loadingMsg.id, role: 'ai', text: userMessageOf(err, '小青暂时无法回复，请稍后再试。') }
+      const aiMsg = { id: loadingMsg.id, role: 'ai', text: plainAiMessageOf(err, '小青暂时无法回复，请稍后再试。') }
       const msgs  = this.data.messages.slice(0, -1).concat(aiMsg)
       this.setData({ messages: msgs, sending: false })
     }

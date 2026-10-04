@@ -16,7 +16,7 @@
 .qx-resume-triage .qx-rt-doing { font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); }
 .qx-resume-triage .qx-rt-rail { margin-top: 20px; }
 .qx-resume-triage .qx-rt-rail li { font-size: var(--qx-fs-body); }
-.qx-resume-triage .qx-rt-scroll, .qx-resume-triage .qx-rt-wait { padding-top: 54px; padding-bottom: 18px; }
+.qx-resume-triage .qx-rt-scroll, .qx-resume-triage .qx-rt-wait { padding-top: 18px; padding-bottom: 18px; }
 .qx-resume-triage .qx-rt-scroll > *, .qx-resume-triage .qx-rt-wait > * { flex-shrink: 0; }
 .qx-resume-triage .qx-rt-sec-h { font-size: var(--qx-fs-sec); line-height: 1.4; }
 .qx-resume-triage .qx-rt-split { display: flex; flex-direction: column; gap: 18px; }
@@ -149,4 +149,21 @@
   .qx-stage:has(.qx-resume-compare) .qx-ctabar .qx-step-actions { grid-column: 1 / -1; }
   .qx-resume-compare .qxc-progress { flex-wrap: wrap; }
   .qx-resume-compare .qxc-progress-actions { flex-direction: row; flex-wrap: wrap; }
+}
+
+/* 最终稿取件页：办理意图、方向摘要常驻，上传按钮随内容排，两个既有出口并排。 */
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-xq { min-height: 320px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-dropzone { flex: none; min-height: 76px; padding: 14px 20px; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: 12px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-dropzone > span:not(.ico) { font-size: var(--qx-fs-aux); }
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-dropzone .ico { width: 48px; height: 48px; }
+.qx-resume-triage .qx-rt-quick-exits { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.qx-resume-triage .qx-rt-quick-exits .qx-rt-alt { padding: 14px; }
+.qx-resume-triage .qx-rt-note > button { margin-left: 12px; color: var(--qx-wheat-d); font: inherit; font-weight: 700; min-height: 48px; }
+.rrp-page[data-state='report-empty'] :is(.rrp-state, .rrp-exits, .rrp-checks) { order: 3; }
+.rrp-page[data-state='report-empty'] .rrp-cbar { min-height: 0; }
+@media (max-width: 640px) {
+  .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-xq { min-height: 0; }
+  /* 手机先看到来源选择；办理意图与未登录说明仍在同一滚动区内。 */
+  .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-pick { order: -1; }
+  .qx-resume-triage .qx-rt-quick-exits { grid-template-columns: 1fr; }
 }

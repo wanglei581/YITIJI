@@ -1,3 +1,4 @@
+import { formatDate } from '@ai-job-print/shared'
 import { screenAiProvider } from './aiScreenDisplay'
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
@@ -43,10 +44,10 @@ const SUBTITLE = '数字孪生 · 服务调用'
 const POLL_SECONDS = 60
 const RANGES: ReadonlyArray<{ key: ScreenUsageRange; label: string }> = [
   { key: 'today', label: '今日' },
-  { key: '7d', label: '近 7 天' },
-  { key: '30d', label: '近 30 天' },
+  { key: '7d', label: '近 7 天（截至昨天）' },
+  { key: '30d', label: '近 30 天（截至昨天）' },
 ]
-const RANGE_LABEL: Record<ScreenUsageRange, string> = { today: '今日', '7d': '近 7 天', '30d': '近 30 天' }
+const RANGE_LABEL: Record<ScreenUsageRange, string> = { today: '今日', '7d': '近 7 天（截至昨天）', '30d': '近 30 天（截至昨天）' }
 const WEEKDAY = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const MEMBERS_NOTE = '只含登录会员的浏览与外跳；匿名使用按小时计数接入后纳入。'
 
@@ -120,6 +121,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
       subtitle={`${SUBTITLE} · ${rangeText}`}
       layout="city"
       toolbar={toolbar}
+      reportingWindowText={usage.data.range === 'today' ? undefined : `${formatDate(usage.data.window.from)} 至 ${formatDate(new Date(Date.parse(usage.data.window.to) - 1).toISOString())}（截至昨天）`}
       meta={usageMeta(usage.data)}
       pollSeconds={POLL_SECONDS}
       failure={usage.failure}
@@ -179,7 +181,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
           title="使用时段热力"
           sub="近 7 天 · 每小时"
           metric={u.heat7d}
-          source="近 7 个上海自然日，按小时统计已记录的服务调用（AI、打印、扫描、会员浏览、外跳、收藏）。1 至 4 次的格子用虚线；0 照常显示。"
+          source="近 7 个上海自然日，按小时统计已记录的服务调用（AI、打印、扫描、会员浏览、外跳、收藏）。不足 5 次的时段不写数字；合计可能反推时另有时段不写数字。"
           render={(value) => (
             <>
               <TwinHeat
@@ -191,7 +193,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                 }))}
               />
               <p className="twin-cap twin-push">
-                {value.peakHour === null ? '样本不足，暂不标高峰' : `高峰在 ${value.peakHour}–${value.peakHour + 1} 时`}；虚线格为 1 至 4 次或尚未到来
+                {value.peakHour === null ? '样本不足，暂不标高峰' : `高峰在 ${value.peakHour}–${value.peakHour + 1} 时`}；不足 5 次的时段不写数字
               </p>
             </>
           )}
@@ -291,20 +293,20 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
       <TwinSlot slot="bottom">
         <TwinMetricPanel
           title="实时调用脉冲"
-          sub="近 2 小时 · 每 5 分钟汇总 · 不含个人明细"
+          sub="近 2 小时 · 每 5 分钟 · 不足 5 次的时段不写数字"
           metric={u.pulse2h}
-          source="每 5 分钟汇总一次信息浏览、AI 调用、打印扫描的次数；1 至 4 次的段不画；0 照常显示。只有汇总，不滚动任何一次个人操作。"
+          source="每 5 分钟汇总一次信息浏览、AI 调用、打印扫描的次数；不足 5 次的时段不写数字。只有汇总，不滚动任何一次个人操作。"
           render={(value) => {
             const last = value.buckets[value.buckets.length - 1]
             const first = value.buckets[0]
             return (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 22 }}>
-                <div style={{ width: 200, flex: 'none' }}>
+                <div style={{ width: 260, flex: 'none' }}>
                   <span className="twin-muted">最近 5 分钟</span>
                   <div className="twin-legend" style={{ marginTop: 6 }}>
-                    <span className="twin-lg" style={{ color: '#8fb2ee' }}>信息 {last ? twinSmall(last.info) : '—'}</span>
-                    <span className="twin-lg" style={{ color: '#2ee6a8' }}>AI {last ? twinSmall(last.ai) : '—'}</span>
-                    <span className="twin-lg" style={{ color: '#72d6ff' }}>打印 {last ? twinSmall(last.print) : '—'}</span>
+                    <span className="twin-lg" style={{ color: '#8fb2ee' }}>信息 {last?.info == null ? '不足 5' : screenCount(last.info)}</span>
+                    <span className="twin-lg" style={{ color: '#2ee6a8' }}>AI {last?.ai == null ? '不足 5' : screenCount(last.ai)}</span>
+                    <span className="twin-lg" style={{ color: '#72d6ff' }}>打印 {last?.print == null ? '不足 5' : screenCount(last.print)}</span>
                   </div>
                 </div>
                 <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -386,10 +388,10 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                 {u.topSources30d?.available ? (
                   <TwinBarList
                     items={u.topSources30d.value.items.slice(0, chrome.presenting ? 3 : 5).map((item) => ({ label: item.sourceName, value: item.count, tone: 'info' as const }))}
-                    emptyText="近 30 天没有达到 5 次的来源入口"
+                    emptyText="近 30 天（截至昨天）没有达到 5 次的来源入口"
                   />
                 ) : null}
-                <p className="twin-cap twin-push">只统计浏览、收藏与打开来源平台入口，不是投递结果</p>
+                <p className="twin-cap twin-push">来源入口榜为近 30 天（截至昨天）；只统计浏览、收藏与打开来源平台入口，不是投递结果</p>
               </>
             )}
           />
