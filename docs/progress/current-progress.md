@@ -22,6 +22,10 @@
 - **为什么：** 一体机对简历诊断 / 生成 / 优化只等 100 秒（`aiHttpAdapter.ts` 的 `LLM_TIMEOUT_MS`、`useOptimizeLoad.ts` 的 `OPTIMIZE_LOAD_LIMIT_MS`）。后端 `AI_LLM_LONG_TIMEOUT_MS` 默认 90 秒、原上限 180 秒；若配到 100 秒以上，慢请求会先被一体机断开、记成客户端中止并排除在可用率分母外，签收单「AI 可用率」虚高（总指挥 10/4；线上未设，按默认 90 秒，现在没问题）。
 - **改了什么：** `llm-http.ts` 新增导出 `LLM_LONG_TIMEOUT_CEILING_MS = 95_000`，环境变量配多大都夹在 95 秒；默认仍 90 秒，行为不变。`.env.example` 注释同步。`verify:llm-timeout-concurrency` 加两条：读一体机两处等待时长，断言后端上限都短于它们。
 - **验证：** API typecheck、lint、`verify:llm-timeout-concurrency`（80）、`verify:ai-content-moderation`、`verify:ai-endpoint-allowlist`、`verify:ai-throttle-dimension`、`verify:ai-usage-budget`、`verify:llm-thinking-off`、`verify:production-runtime-gates` 通过。反向变异：上限改回 180 秒 → 8.e 红，已改回。
+## 2026-10-04：现场验收单加 AI 用量终端号与机构服务人次两项（只改文档，分支 `claude/runsheet-ai-usage-visits-1004`）
+
+- **改了什么：** `onsite-acceptance-runsheet-2026-09.md` S 段加 S.9、S.10。S.9：测试会员在试点终端上把 7 个 AI 功能各用一次，再只读查 `AiUsageRecord`，每一行都要带试点终端 ID 且 `terminalVerified` 为真（签收单「AI 调用成功率」按终端算）。S.10：机构后台数据大屏的服务人次要显示数字；1–4 次按隐私规则显示「少于 5」，所以测试前先走满 5 次会话。
+- **依据：** 商业化窗口签收指标定稿 `~/.cache/claude-lanes/commercial-1003/drafts/signoff-metrics-v2.md`（总指挥转达）；字段核对自 `services/api/prisma/schema.prisma` 的 `AiUsageRecord`。没有改代码或门禁。
 
 ## 2026-10-04：W-118 一体机这一半——检查任务防重、被拒后带文件回材料检查、隐私摘要说实话、开发版构建闸
 
