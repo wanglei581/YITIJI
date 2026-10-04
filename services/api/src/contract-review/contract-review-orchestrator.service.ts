@@ -25,6 +25,8 @@ import {
 import type { ContractReviewStatus } from './contract-review.types'
 import { assertContractReviewTaskId } from './contract-review.queue'
 import { AiLogService, aiErrorCodeOf } from '../ai/ai-log.service'
+import { AiQuotaService } from '../ai/quota/ai-quota.service'
+import { quotaHttpCode, runWithAiQuota } from '../ai/quota/ai-quota-run'
 import { backgroundJobAiContext, runWithAiRequestContext } from '../ai/usage/ai-usage-context'
 
 export const CONTRACT_REVIEW_PROVIDER_RUNTIME = Symbol('CONTRACT_REVIEW_PROVIDER_RUNTIME')
@@ -88,6 +90,7 @@ export class ContractReviewOrchestratorService {
     private readonly aiLog: AiLogService,
     @Optional() @Inject(CONTRACT_REVIEW_ORCHESTRATOR_CLOCK)
     clock?: ContractReviewOrchestratorClock,
+    @Optional() private readonly quota?: AiQuotaService,
   ) {
     this.clock = clock ?? SYSTEM_CLOCK
   }
@@ -210,37 +213,11 @@ export class ContractReviewOrchestratorService {
       const authoritativeRuleFindings = this.findingMapper.mapRules(ruleDrafts)
 
       await this.assertActive(taskId, 'rule_checking', deadline)
-      await this.cas(taskId, 'rule_checking', { status: 'ai_analyzing' })
-      const reviewed = await this.reviewWithCostLogging(
-        { pages: masked.pages, partyFacts: masked.partyFacts },
-        task.endUserId,
-      )
-      await this.assertActive(taskId, 'ai_analyzing', deadline)
-      const aiFindings = this.findingMapper.mapAi(
-        reviewed.draft,
-        masked.pages,
-        authoritativeRuleFindings.map((finding) => finding.id),
-      )
-      const ocrConfidence = normalizedOcrConfidence(extracted.ocrConfidence)
-      const coverage = extracted.truncated ? 'truncated' : 'complete'
-      const candidate = this.findingMapper.composeResult({
-        ruleFindings: authoritativeRuleFindings,
-        aiFindings,
-        coverage,
-        ocrConfidence,
-        disclaimerVersion: task.disclaimerVersion,
+      await this.finishAnalyzeWithQuota(task, deadline, {
+        masked, authoritativeRuleFindings, extracted, merged,
       })
-
-      await this.cas(taskId, 'ai_analyzing', { status: 'safety_reviewing' })
-      const validated = this.validateSafety(candidate, masked.pages, {
-        task,
-        extracted,
-        merged,
-        authoritativeRuleFindings,
-      })
-      await this.assertActive(taskId, 'safety_reviewing', deadline)
-      await this.commitResult(taskId, validated, reviewed.identity, extracted)
     } catch (error) {
+      if (quotaHttpCode(error)?.startsWith('AI_QUOTA_')) throw error
       const safe = this.safeStageError(error, deadline, 'CONTRACT_REVIEW_ANALYSIS_FAILED')
       this.logStageFailure(taskId, 'analyze', safe.code, error)
       if (processingStarted) await this.bestEffortFail(taskId, safe.code)
@@ -265,6 +242,66 @@ export class ContractReviewOrchestratorService {
     } catch {
       // 可观测性不得反过来制造故障。
     }
+  }
+
+  /**
+   * 只在真正调用模型时预占。抽取、规则和确认都不在这里。
+   * 报告落库在 saveResult，结算在其后。作业自己的超时见 contract-review-timing.ts。
+   */
+  private async finishAnalyzeWithQuota(
+    task: ContractReviewTaskSnapshot,
+    deadline: Date,
+    prepared: {
+      masked: ReturnType<typeof maskContractPages>
+      authoritativeRuleFindings: ReturnType<ContractReviewFindingMapper['mapRules']>
+      extracted: ContractReviewExtractionResult
+      merged: ReturnType<ContractReviewFactMerger['merge']>
+    },
+  ): Promise<void> {
+    const taskId = task.id
+    const work = async () => {
+      await this.cas(taskId, 'rule_checking', { status: 'ai_analyzing' })
+      const reviewed = await this.reviewWithCostLogging(
+        { pages: prepared.masked.pages, partyFacts: prepared.masked.partyFacts },
+        task.endUserId,
+      )
+      await this.assertActive(taskId, 'ai_analyzing', deadline)
+      const aiFindings = this.findingMapper.mapAi(
+        reviewed.draft,
+        prepared.masked.pages,
+        prepared.authoritativeRuleFindings.map((finding) => finding.id),
+      )
+      const candidate = this.findingMapper.composeResult({
+        ruleFindings: prepared.authoritativeRuleFindings,
+        aiFindings,
+        coverage: prepared.extracted.truncated ? 'truncated' : 'complete',
+        ocrConfidence: normalizedOcrConfidence(prepared.extracted.ocrConfidence),
+        disclaimerVersion: task.disclaimerVersion,
+      })
+      await this.cas(taskId, 'ai_analyzing', { status: 'safety_reviewing' })
+      const validated = this.validateSafety(candidate, prepared.masked.pages, {
+        task,
+        extracted: prepared.extracted,
+        merged: prepared.merged,
+        authoritativeRuleFindings: prepared.authoritativeRuleFindings,
+      })
+      await this.assertActive(taskId, 'safety_reviewing', deadline)
+      return { validated, identity: reviewed.identity, extracted: prepared.extracted }
+    }
+    const saveResult = async (ready: Awaited<ReturnType<typeof work>>) => {
+      await this.commitResult(taskId, ready.validated, ready.identity, ready.extracted)
+      return taskId
+    }
+    if (!this.quota || !task.endUserId) {
+      await saveResult(await work())
+      return
+    }
+    await runWithAiQuota({
+      quota: this.quota,
+      bucket: 'ai_resume',
+      operationKey: `${taskId}:report`,
+      endUserId: task.endUserId,
+    }, work, saveResult)
   }
 
   /**

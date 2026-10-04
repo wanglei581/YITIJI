@@ -11,6 +11,7 @@ import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/r
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
+  aborted?: boolean
 }
 
 function headerOf(req: ReqLike, name: string): string | null {
@@ -41,7 +42,7 @@ export class FairVisitPlanController {
 
   async generate(@Param('fairId') fairId: string, @Param('taskId') taskId: string, @Req() req: ReqLike) {
     assertRecruitmentContentHostingEnabled()
-    return this.service.generate(fairId, taskId, await this.requesterOf(req))
+    return this.service.generate(fairId, taskId, await this.requesterOf(req), req)
   }
 
   @Get(':taskId')

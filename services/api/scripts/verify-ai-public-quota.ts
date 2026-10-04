@@ -8,8 +8,9 @@
  *      公共默认桶（兄弟 LLM 路由是 6 次/分钟），偏偏又是流量最大的两个。
  *   2. 两个 handler **真的调用了配额闸门**，且失败时回滚。
  *      光有装饰器不算数 —— 限流只管每分钟，配额才管每天花多少 token。
- *   3. 配额本身的行为：三维度（member / terminal / ip）分别计数、任一超限即 429、
- *      超限回滚、Redis 故障 fail-closed、维度值摘要后入 key 不落明文。
+ *   3. 配额本身的行为：助手仍是三维度（member / terminal / ip）分别计数。
+ *      简历解析的会员次数改由按人账本接管，公网配额只留终端与 IP。
+ *      任一超限即 429、超限回滚、Redis 故障 fail-closed、维度值摘要后入 key 不落明文。
  *   4. **不加认证**：匿名是产品口径（求职者不该被迫注册才能用 AI），
  *      这两个 handler 上不得出现 Guard。
  *
@@ -321,7 +322,14 @@ async function verifyTrustedTerminal(): Promise<void> {
     const terminalKeys = [...redis.counts.keys()].filter(k => k.includes(':terminal:'))
     assert.equal(terminalKeys.length, ticket === 'valid' ? 1 : 0, '伪造头/错票/不存在的终端不得创建池')
     assert.equal([...redis.counts.keys()].filter(k => k.includes(':ip:')).length, 1, '连续换号仍只用同一 IP 池')
-    assert.equal([...redis.counts.keys()].filter(k => k.includes(':member:')).length, member ? 1 : 0, '登录会员仍计会员池')
+    const memberPool = member && handler !== 'parse'
+    assert.equal(
+      [...redis.counts.keys()].filter(k => k.includes(':member:')).length,
+      memberPool ? 1 : 0,
+      handler === 'parse'
+        ? '简历解析不再计入公网会员池，会员次数由按人账本接管'
+        : '登录会员仍计会员池',
+    )
     assert.equal(validations, ticket === 'missing' ? 0 : 3, '每请求最多一次终端验签，缓存不能重复验签')
   }
   for (const handler of ['chat', 'voice', 'parse'] as const) {
@@ -330,7 +338,7 @@ async function verifyTrustedTerminal(): Promise<void> {
   }
   clearLimits()
   delete process.env.AI_RESUME_PARSE_IP_DAILY_LIMIT
-  console.log('  PASS 三个 handler：换号不建池、合法票进终端池、会员池不变、守卫缓存复用、ASR 记账可信')
+  console.log('  PASS 三个 handler：换号不建池、合法票进终端池、助手仍计会员池、简历解析不计会员池、守卫缓存复用、ASR 记账可信')
 }
 
 async function main(): Promise<void> {

@@ -1,11 +1,14 @@
-import { ForbiddenException, Injectable } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, Optional } from '@nestjs/common'
 import { AiLogService } from '../ai/ai-log.service'
 import {
   JobFitService,
+  jobFitQuotaTarget,
   type AuthorizedJobFitParse,
   type JobFitAnalyzeWithUsageResult,
   type JobFitRequester,
 } from '../ai/resume/job-fit.service'
+import { AiQuotaService } from '../ai/quota/ai-quota.service'
+import { runWithAiQuota, type QuotaAbortRequest } from '../ai/quota/ai-quota-run'
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { JobAiQuotaService, type JobAiQuotaContext, type JobAiQuotaTicket } from './job-ai-quota.service'
@@ -57,17 +60,35 @@ export class GovernedJobFitService {
     private readonly aiLog: AiLogService,
     private readonly privacy: MemberPrivacyService,
     private readonly quota: JobAiQuotaService,
+    @Optional() private readonly memberQuota?: AiQuotaService,
   ) {}
 
   async analyzeForJobFit(
     input: JobFitInput,
     requester: JobFitRequester,
     quotaContext: JobAiQuotaContext,
+    req?: QuotaAbortRequest,
   ): Promise<JobFitAnalyzeWithUsageResult['response']> {
     const parse = await this.authorizeForAnalysis(input.taskId, requester)
+    const targetKey = jobFitQuotaTarget(input)
+    if (!targetKey) {
+      throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
+    }
     const job = input.jobId ? await this.context.buildTargetJobContext(input.jobId) : null
-    const run = await this.run({ input, requester, parse, job, terminalId: quotaContext.terminal, quotaContext })
-    return run.response
+    const work = async () => {
+      const run = await this.run({ input, requester, parse, job, terminalId: quotaContext.terminal, quotaContext })
+      return run.response
+    }
+    if (!this.memberQuota || !parse.endUserId) return work()
+    return runWithAiQuota({
+      quota: this.memberQuota,
+      bucket: 'ai_resume',
+      operationKey: `${input.taskId}:job_fit:${targetKey}`,
+      endUserId: parse.endUserId,
+      req,
+      loadStored: () => this.jobFit.matchingStored(input.taskId, requester, targetKey),
+      failureOf: (value) => (value.status === 'failed' ? 'provider_error' : null),
+    }, work, async () => input.taskId)
   }
 
   async matchForMember(input: MatchForMemberInput) {
