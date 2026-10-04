@@ -2,7 +2,14 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer } from '@ai-job-print/ui'
 import type { AuditLogRecord } from '../../services/api/audit'
 import { getAuditActionLabel, getAuditRoleLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
-import { auditActorText, auditTargetText, auditIpText, parseAuditPayload, invalidAuditPayloadText, PAYLOAD_LABELS, safeAuditText } from './auditPresentation'
+import { auditActorText, auditTargetText, auditIpText, parseAuditPayload, invalidAuditPayloadText, PAYLOAD_LABELS, safeAuditText, auditTerminalText } from './auditPresentation'
+
+function PayloadTerminalValue({ value, payload }: { value: unknown; payload: Record<string, unknown> }) {
+  if (Array.isArray(value)) return <ul className="space-y-2">{value.map((item, i) => (
+    <li key={i}><PayloadTerminalValue value={item} payload={{ ...payload, terminalCode: Array.isArray(payload.terminalCodes) ? payload.terminalCodes[i] : undefined }} /></li>
+  ))}</ul>
+  return <span title={typeof value === 'string' ? value : undefined}>{auditTerminalText(value, payload)}</span>
+}
 
 function PayloadValue({ value }: { value: unknown }) {
   if (value === null) return <span>—</span>
@@ -12,8 +19,8 @@ function PayloadValue({ value }: { value: unknown }) {
     <dl className="space-y-2">
       {Object.entries(value).map(([key, item]) => (
         <div key={key} className="rounded-lg bg-neutral-50 p-3">
-          <dt className="mb-1 text-xs text-neutral-500">{PAYLOAD_LABELS[key] ?? key}</dt>
-          <dd className="break-words text-sm text-neutral-800"><PayloadValue value={item} /></dd>
+          <dt title={key} className="mb-1 text-xs text-neutral-500">{PAYLOAD_LABELS[key] ?? '其他字段'}</dt>
+          <dd className="break-words text-sm text-neutral-800">{['terminalId', 'terminalIds'].includes(key) ? <PayloadTerminalValue value={item} payload={value as Record<string, unknown>} /> : <PayloadValue value={item} />}</dd>
         </div>
       ))}
     </dl>

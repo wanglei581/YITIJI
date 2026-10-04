@@ -327,12 +327,12 @@ export async function loadTerminalTwin(
     ? availableMetric('PrintTask.status', 'current', {
         pages: currentTaskPages(current.order?.billablePages, current.paramsJson),
         colorMode: readCurrentTaskParams(current.paramsJson).colorMode,
-        startedAt: startedAt ? startedAt.toISOString() : null,
+        startedAt: startedAt ? startedAt.toISOString().slice(0, 16) + 'Z' : null,
       })
     : availableMetric('PrintTask.status', 'current', null)
 
   return {
-    generatedAt: now.toISOString(),
+    generatedAt: now.toISOString().slice(0, 16) + 'Z',
     audience,
     terminal: {
       id: terminal.id,
@@ -344,7 +344,7 @@ export async function loadTerminalTwin(
     },
     status: {
       health,
-      lastHeartbeatAt: heartbeat ? heartbeat.createdAt.toISOString() : null,
+      lastHeartbeatAt: heartbeat ? heartbeat.createdAt.toISOString().slice(0, 16) + 'Z' : null,
       onlineWindowSeconds: SCREEN_ONLINE_WINDOW_SECONDS,
       agentVersion: heartbeat?.agentVersion ?? null,
       wiredNetwork: wired && WIRED.has(wired) ? wired : null,
@@ -366,6 +366,7 @@ export async function loadTerminalTwin(
       visits: visitMetric(visits, VISIT_DAY_WINDOW, true),
     },
     consumables: unavailableMetric('TerminalHeartbeat', 'current', SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo),
+    timelinePrintingSuppressed: timeline.ok && timeline.printingSuppressed,
     timeline24h: timeline.ok
       ? availableMetric('TerminalHeartbeat+PrintTask', '24h', timeline.segments)
       : unavailableMetric('TerminalHeartbeat+PrintTask', '24h', timeline.reason),

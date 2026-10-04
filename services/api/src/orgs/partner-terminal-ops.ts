@@ -6,7 +6,7 @@
 // 响应只给终端编号、名称、摆放位置与机构级聚合，不带 orgId、终端内部 id、
 // 任务 id、错误码或任何单据级字段。
 
-import { suppressTerminalTodayCount } from '../console-screen/console-screen.twin'
+import { suppressAggregateCount } from '../console-screen/console-screen.metric'
 import { isHealthyPrinterStatus, isLowPaperWarning, isPrinterFaultStatus } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import { SCREEN_MIN_AGGREGATE_SAMPLE, SCREEN_TIMEZONE } from '../console-screen/console-screen.types'
@@ -70,7 +70,7 @@ export interface FaultSegment {
   kind: 'offline' | 'printer'
   /** 已截到统计窗口内的起点 */
   start: number
-  /** 恢复时间；未恢复时为 null（时长算到当前） */
+  /** 恢复时间；未恢复时为 null（时长算到统计截止时刻） */
   end: number | null
 }
 
@@ -101,7 +101,7 @@ export interface TerminalOpsRaw {
 
 /** 计数的小样本压制：0 保留，1–4 不给数字，≥5 原样。与数据大屏单台口径一致。 */
 export function suppressCount(count: number): number | null {
-  return suppressTerminalTodayCount(count)
+  return suppressAggregateCount(count)
 }
 
 /**
@@ -127,7 +127,7 @@ export function summarizeOutput(groups: readonly SettledPrintGroup[]): OutputRaw
 
 /** 分母不足最小样本时不给比率；比率按百分数保留一位小数。 */
 export function successRate(output: OutputRaw): number | null {
-  if (output.settled < TERMINAL_OPS_MIN_SAMPLE) return null
+  if (output.settled < TERMINAL_OPS_MIN_SAMPLE || hasHiddenOutput(output)) return null
   return Math.round((output.printed / output.settled) * 1000) / 10
 }
 
@@ -266,7 +266,16 @@ export function isOnlineAt(lastHeartbeatAt: Date | null, now: Date): boolean {
   return lastHeartbeatAt !== null && now.getTime() - lastHeartbeatAt.getTime() < TERMINAL_ONLINE_WINDOW_MS
 }
 
-function projectOutput(raw: OutputRaw) {
+/** 出纸组的差值也算计数；统一用唯一阈值函数判断。 */
+function hasHiddenOutput(raw: OutputRaw): boolean {
+  return [raw.printed, raw.settled, raw.unconfirmed, raw.settled - raw.printed]
+    .some((count) => suppressAggregateCount(count) === null)
+}
+
+export function projectOutput(raw: OutputRaw) {
+  if (hasHiddenOutput(raw)) {
+    return { printed: null, settled: suppressCount(raw.settled), successRate: null, unconfirmed: null }
+  }
   return {
     printed: suppressCount(raw.printed),
     settled: suppressCount(raw.settled),
@@ -275,7 +284,7 @@ function projectOutput(raw: OutputRaw) {
   }
 }
 
-export function projectTerminalRow(raw: TerminalOpsRaw, now: Date) {
+export function projectTerminalRow(raw: TerminalOpsRaw, now: Date, reportTo: Date = now) {
   return {
     terminalCode: raw.terminalCode,
     displayName: raw.displayName,
@@ -285,12 +294,12 @@ export function projectTerminalRow(raw: TerminalOpsRaw, now: Date) {
     visitCount: suppressCount(raw.visitCount),
     serviceCount: suppressCount(raw.serviceCount),
     output: projectOutput(raw.output),
-    faults: summarizeFaults(raw.segments, now, raw.reportedInWindow),
+    faults: summarizeFaults(raw.segments, reportTo, raw.reportedInWindow),
   }
 }
 
 /** 合计先把原始计数求和、再压制与算比率；不拿各台压制后的数相加。 */
-export function projectTotals(rows: readonly TerminalOpsRaw[], now: Date) {
+export function projectTotals(rows: readonly TerminalOpsRaw[], now: Date, reportTo: Date = now) {
   const output: OutputRaw = { printed: 0, settled: 0, unconfirmed: 0 }
   let serviceCount = 0
   let visitCount = 0
@@ -309,15 +318,17 @@ export function projectTotals(rows: readonly TerminalOpsRaw[], now: Date) {
     if (row.segments.some((segment) => segment.end === null)) unrecoveredTerminals += 1
     if (!row.reportedInWindow) silentTerminals += 1
   }
-  const faults = summarizeFaults(segments, now, rows.some((row) => row.reportedInWindow))
+  const faults = summarizeFaults(segments, reportTo, rows.some((row) => row.reportedInWindow))
+  // 合计减其余终端会还原隐藏值。隐藏相关合计列；出纸组一并隐藏比率与差值。
+  const hiddenOutput = rows.some((row) => hasHiddenOutput(row.output))
   return {
     terminalCount: rows.length,
     onlineTerminals: online,
     unrecoveredTerminals,
     silentTerminals,
-    visitCount: suppressCount(visitCount),
-    serviceCount: suppressCount(serviceCount),
-    output: projectOutput(output),
+    visitCount: rows.some((row) => suppressCount(row.visitCount) === null) ? null : suppressCount(visitCount),
+    serviceCount: rows.some((row) => suppressCount(row.serviceCount) === null) ? null : suppressCount(serviceCount),
+    output: hiddenOutput ? { printed: null, settled: null, successRate: null, unconfirmed: null } : projectOutput(output),
     faults: {
       offlineCount: faults.offlineCount,
       offlineMinutes: faults.offlineMinutes,
@@ -353,6 +364,7 @@ export interface PartnerTerminalOperations {
 export function assembleTerminalOperations(input: {
   period: StatsPeriod
   from: Date
+  to?: Date
   now: Date
   rows: readonly TerminalOpsRaw[]
   visitRecordingStarted: boolean
@@ -360,11 +372,11 @@ export function assembleTerminalOperations(input: {
   return {
     period: input.period,
     timezone: SCREEN_TIMEZONE,
-    window: { from: input.from.toISOString(), to: input.now.toISOString() },
+    window: { from: input.from.toISOString(), to: (input.to ?? input.now).toISOString() },
     generatedAt: input.now.toISOString(),
     minSample: TERMINAL_OPS_MIN_SAMPLE,
-    terminals: input.rows.map((row) => projectTerminalRow(row, input.now)),
-    totals: projectTotals(input.rows, input.now),
+    terminals: input.rows.map((row) => projectTerminalRow(row, input.now, input.to)),
+    totals: projectTotals(input.rows, input.now, input.to),
     visitCount: { available: true, recordingStarted: input.visitRecordingStarted },
     aiAvailability: { available: false, reason: AI_AVAILABILITY_UNAVAILABLE_REASON },
   }

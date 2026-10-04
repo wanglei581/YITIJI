@@ -96,9 +96,9 @@ export function TerminalOpsDrawer({
           <Item label="已恢复">{faults.recoveredCount} 次</Item>
           <Item label="平均恢复用时">{faults.avgRecoveryMinutes === null ? '—' : `${faults.avgRecoveryMinutes} 分钟`}</Item>
           <Item label="最长一次">{minutesText(faults.longestMinutes)}</Item>
-          <Item label="当前">
+          <Item label="截至昨天">
             {faults.unrecovered
-              ? <span className="text-error-fg">仍未恢复（时长算到现在）</span>
+              ? <span className="text-error-fg">仍未恢复（时长统计到昨天结束）</span>
               : '没有未恢复的故障'}
           </Item>
           </>

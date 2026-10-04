@@ -1,3 +1,4 @@
+import { formatYuan } from '@ai-job-print/shared'
 /** 订单详情诚实展示：缺值写「未记录」，金额不在前端推算。 */
 
 export const UNRECORDED = '未记录'
@@ -38,9 +39,7 @@ export function pageRangeText(value: string | null | undefined): string {
 /** 抵扣 / 已退款：0 分也按整数分格式化，不说「免费」。非法则未记录。 */
 export function recordedCentsText(cents: number | null | undefined, currency: string): string {
   if (typeof cents !== 'number' || !Number.isInteger(cents) || cents < 0) return UNRECORDED
-  const yuan = Math.floor(cents / 100)
-  const fen = String(cents % 100).padStart(2, '0')
-  return `${currency === 'CNY' ? '¥' : currency} ${yuan}.${fen}`
+  return currency === 'CNY' ? formatYuan(cents / 100) : `${currency}${(cents / 100).toFixed(2)}`
 }
 
 /**

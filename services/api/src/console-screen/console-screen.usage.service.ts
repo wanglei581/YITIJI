@@ -24,6 +24,7 @@ import {
   availableMetric,
   filterSourceEntryOpens,
   recruitmentHostingLimit,
+  daysAgoStart,
   shanghaiDayKey,
   snapshotLoadStatus,
   unavailableMetric,
@@ -113,13 +114,13 @@ export class ConsoleScreenUsageService {
 
   private async loadAdmin(range: ScreenUsageRange, now: Date, rowCap: number): Promise<CachedUsage> {
     const span = usageWindow(range, now)
-    const heatFrom = usageWindow('7d', now).from
+    const heatFrom = daysAgoStart(now, 7)
     const pulseFrom = pulseWindowStart(now)
     const [facts, heat, pulse, jumps, visits] = await Promise.all([
       this.settle('usageFacts', () => loadAdminUsageFacts(this.prisma, span.from, span.to)),
       this.settle('usageHeat', () => loadUsageTimeline(this.prisma, heatFrom, now, rowCap)),
       this.settle('usagePulse', () => loadUsageTimeline(this.prisma, pulseFrom, now, rowCap)),
-      this.settle('usageJumps', () => loadJumpRows(this.prisma, now)),
+      this.settle('usageJumps', () => loadJumpRows(this.prisma, now, usageWindow('30d', now))),
       this.settle('usageVisits', () => countAllVisits(this.prisma, span.from, span.to)),
     ])
     const status = snapshotLoadStatus([facts, heat, pulse, jumps, visits].filter((part) => part.ok).length, 5)
@@ -413,7 +414,7 @@ function addDay(counts: Map<string, number>, event: Date): void {
 }
 
 function buildUsageHeat(events: Date[], now: Date): ScreenUsageHeatValue {
-  const start = usageWindow('7d', now).from
+  const start = daysAgoStart(now, 7)
   const counts = new Map<string, number[]>()
   const days: string[] = []
   for (let i = 0; i < USAGE_HEAT_DAYS; i += 1) {

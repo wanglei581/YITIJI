@@ -450,3 +450,27 @@ test('终端孪生：管理员打印失败提示指向现有运维页', async ({
   await open(page, '/screen/terminal?id=t-gz-th-005')
   await expect(panel(page, /^今日服务$/)).toContainText('今日打印失败 7 次，详情见打印扫描运维')
 })
+
+
+test('第六批：少样本状态带无打印色块、有说明；达到阈值照常画', async ({ page }) => {
+  let hidden = true
+  const twin = (id: string) => {
+    const base = terminalTwin(id)
+    if (!base) return base
+    base.timelinePrintingSuppressed = hidden
+    base.today.printTasks = hidden ? null : 5
+    // 残留打印段检验前端兜底；非隐藏态使用相同段确认绘制分支还在。
+    base.timeline24h = { available: true, source: 'TerminalHeartbeat+PrintTask', window: '24h', value: [{ from: '2026-10-03T04:00Z', to: '2026-10-04T04:00Z', state: 'printing' }] }
+    return base
+  }
+  await serve(page, adminApi({ twin }))
+  await open(page, '/screen/terminal?id=t-gz-th-005')
+  const band = page.getByRole('img', { name: '近 24 小时状态', exact: true })
+  await expect(band).toBeVisible()
+  await expect(page.getByText('打印时段因样本少未单独标出', { exact: true })).toBeVisible()
+  expect(await band.locator('div').evaluateAll((nodes) => nodes.filter((n) => getComputedStyle(n).backgroundColor === 'rgb(114, 214, 255)').length)).toBe(0)
+  hidden = false
+  await page.reload()
+  await expect(band.locator('div').first()).toHaveCSS('background-color', 'rgb(114, 214, 255)')
+  await expect(page.getByText('打印时段因样本少未单独标出', { exact: true })).toHaveCount(0)
+})

@@ -292,7 +292,7 @@ mustContain(
 )
 mustContain(
   OPS_FORMAT,
-  ['统计窗口', '服务人次', 'AI 可用率', 'METRIC_NOTES.sample', "value === null ? '少于 5'"],
+  ['统计窗口', '服务人次', 'AI 可用率', 'METRIC_NOTES.sample', "value === null ? '样本不足，不显示'"],
   'D5. 导出 CSV 表头前写统计窗口与两项「暂不能统计」原因；1–4 不显示具体数字',
 )
 mustContain(

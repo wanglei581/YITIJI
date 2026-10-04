@@ -36,6 +36,8 @@ export interface TwinTerminalTwinLike {
   /** 服务端对 1–4 的计数给 null（少于 5 不显示），0 仍给 0。 */
   today: { printPages: number | null; printTasks: number | null; scans: number | null; failed: number | null; visits: ScreenMetricLike<number> }
   consumables: ScreenMetricLike<{ paper: string | null; toner: string | null }>
+  /** 近 24 小时打印段样本不足，已撤掉逐单覆盖。 */
+  timelinePrintingSuppressed: boolean
   timeline24h: ScreenMetricLike<Array<{ from: string; to: string; state: 'idle' | 'printing' | 'alert' | 'offline' | 'unknown' }>>
 }
 
@@ -215,7 +217,7 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
           source={`由终端心跳与打印任务推导：心跳后 ${twin.status.onlineWindowSeconds} 秒内算在线，缺口算离线，打印机异常心跳算告警。`}
           render={(segments) => (
             <>
-              <TwinTimeline segments={segments} ticks={timelineTicks(twin, formatClock)} />
+              <TwinTimeline segments={twin.timelinePrintingSuppressed ? segments.filter((segment) => segment.state !== 'printing') : segments} ticks={timelineTicks(twin, formatClock)} />
               <TwinLegend
                 items={[
                   { state: 'ok', label: '在线空闲' },
@@ -224,6 +226,7 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
                   { state: 'off', label: '离线' },
                 ]}
               />
+              {twin.timelinePrintingSuppressed && <p className="twin-cap">打印时段因样本少未单独标出</p>}
               <p className="twin-cap twin-push">纸盒、碳粉余量需 Windows Agent 上报后显示；接入前不估算。</p>
             </>
           )}

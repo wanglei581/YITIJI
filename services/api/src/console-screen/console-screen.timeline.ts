@@ -3,6 +3,7 @@ import {
   SCREEN_UNAVAILABLE_REASON,
   type ScreenTimelineState,
 } from './console-screen.types'
+import { suppressAggregateCount } from './console-screen.metric'
 import { isPrinterFaultStatus } from '../terminals/printer-status'
 
 /**
@@ -44,7 +45,7 @@ export interface TimelineSegment {
 }
 
 export type TimelineDeriveResult =
-  | { ok: true; segments: TimelineSegment[] }
+  | { ok: true; segments: TimelineSegment[]; printingSuppressed: boolean }
   | { ok: false; reason: typeof SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded }
 
 interface Seg {
@@ -76,8 +77,8 @@ function overlay(segments: Seg[], from: number, to: number, state: ScreenTimelin
   return next
 }
 
-function mergeAdjacent(segments: Seg[]): Seg[] {
-  const sorted = segments.filter((seg) => seg.to > seg.from).sort((a, b) => a.from - b.from || a.to - b.to)
+function mergeAdjacent(segments: Seg[], keepMinutePrintMarkers = false): Seg[] {
+  const sorted = segments.filter((seg) => seg.to > seg.from || (keepMinutePrintMarkers && seg.state === 'printing' && seg.to === seg.from)).sort((a, b) => a.from - b.from || a.to - b.to)
   const out: Seg[] = []
   for (const seg of sorted) {
     const last = out[out.length - 1]
@@ -180,15 +181,22 @@ export function deriveTerminalTimeline(input: {
     const to = Math.min(print.to.getTime(), nowMs)
     painted = overlay(painted, from, to, 'printing')
   }
-  const merged = mergeAdjacent(painted)
+  const printingSegments = mergeAdjacent(painted).filter((seg) => seg.state === 'printing').length
+  const printingSuppressed = suppressAggregateCount(printingSegments) === null
+  // 少样本时完全撤掉打印覆盖，回到心跳底图，不留下逐单边界。
+  const visible = printingSuppressed ? segments : painted
+  const minute = (at: number) => Math.floor(at / 60_000) * 60_000
+  // 达到阈值的短任务截分钟后可能成为时间点；保留位置标记，不伪造一分钟时长。
+  const merged = mergeAdjacent(visible.map((seg) => ({ ...seg, from: minute(seg.from), to: minute(seg.to) })), true)
   if (merged.length > segmentCap) {
     return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded }
   }
   return {
     ok: true,
+    printingSuppressed,
     segments: merged.map((seg) => ({
-      from: new Date(seg.from).toISOString(),
-      to: new Date(seg.to).toISOString(),
+      from: new Date(seg.from).toISOString().slice(0, 16) + 'Z',
+      to: new Date(seg.to).toISOString().slice(0, 16) + 'Z',
       state: seg.state,
     })),
   }

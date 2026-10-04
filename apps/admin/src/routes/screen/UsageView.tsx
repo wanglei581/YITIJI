@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from '@ai-job-print/shared'
 import { screenAiProvider } from './aiScreenDisplay'
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
@@ -43,10 +44,10 @@ const SUBTITLE = '数字孪生 · 服务调用'
 const POLL_SECONDS = 60
 const RANGES: ReadonlyArray<{ key: ScreenUsageRange; label: string }> = [
   { key: 'today', label: '今日' },
-  { key: '7d', label: '近 7 天' },
-  { key: '30d', label: '近 30 天' },
+  { key: '7d', label: '近 7 天（截至昨天）' },
+  { key: '30d', label: '近 30 天（截至昨天）' },
 ]
-const RANGE_LABEL: Record<ScreenUsageRange, string> = { today: '今日', '7d': '近 7 天', '30d': '近 30 天' }
+const RANGE_LABEL: Record<ScreenUsageRange, string> = { today: '今日', '7d': '近 7 天（截至昨天）', '30d': '近 30 天（截至昨天）' }
 const WEEKDAY = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const MEMBERS_NOTE = '只含登录会员的浏览与外跳；匿名使用按小时计数接入后纳入。'
 
@@ -120,6 +121,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
       subtitle={`${SUBTITLE} · ${rangeText}`}
       layout="city"
       toolbar={toolbar}
+      reportingWindowText={usage.data.range === 'today' ? undefined : `${formatDateTime(usage.data.window.from)} 至 ${formatDate(new Date(Date.parse(usage.data.window.to) - 1).toISOString())}（截至昨天）`}
       meta={usageMeta(usage.data)}
       pollSeconds={POLL_SECONDS}
       failure={usage.failure}
@@ -386,10 +388,10 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                 {u.topSources30d?.available ? (
                   <TwinBarList
                     items={u.topSources30d.value.items.slice(0, chrome.presenting ? 3 : 5).map((item) => ({ label: item.sourceName, value: item.count, tone: 'info' as const }))}
-                    emptyText="近 30 天没有达到 5 次的来源入口"
+                    emptyText="近 30 天（截至昨天）没有达到 5 次的来源入口"
                   />
                 ) : null}
-                <p className="twin-cap twin-push">只统计浏览、收藏与打开来源平台入口，不是投递结果</p>
+                <p className="twin-cap twin-push">来源入口榜为近 30 天（截至昨天）；只统计浏览、收藏与打开来源平台入口，不是投递结果</p>
               </>
             )}
           />
