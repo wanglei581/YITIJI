@@ -160,6 +160,7 @@ async function main(): Promise<void> {
     const memberAuth = {
       verifySmsCodeForUser: async () => userA,
       me: async () => userA,
+      assertAccountLoginable: async () => undefined,
       persistResolvedLegalConsent: async () => undefined,
       issueLoginForUser: async (user: { id: string }) => {
         issueCalls += 1
@@ -184,6 +185,7 @@ async function main(): Promise<void> {
     await seedTicket(redis)
     const memberAuth = {
       verifySmsCodeForUser: async () => userA,
+      assertAccountLoginable: async () => undefined,
       persistResolvedLegalConsent: async () => undefined,
       issueLoginForUser: async () => { throw new Error('original issue failure') },
     }
