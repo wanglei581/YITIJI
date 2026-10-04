@@ -6779,6 +6779,136 @@ test('还不知道金额的页面只用不提钱的说明：材料包组包、�
   }
 })
 
+// ══════════════════════════════════════════════════════════════════════
+// 账号注销申请（现有「隐私与数据」页）：申请 → 短信二次验证 → 已受理 → 可撤回
+// 契约：后端窗口 2026-10-04。purpose=close_account；受理后 status=pending；撤回 POST /me/data-requests/:id/cancel
+// ══════════════════════════════════════════════════════════════════════
+
+function makePrivacy({ available = true, items = [], createResult, cancelResult } = {}) {
+  const wx = createWx()
+  const modals = []
+  wx.showModal = (opts) => { modals.push(opts); if (opts.success) opts.success({ confirm: true }) }
+  const calls = { sms: [], verify: [], create: [], cancel: [], list: 0 }
+  const state = { items: items.slice() }
+  const api = {
+    listMemberDataRequests: () => { calls.list += 1; return Promise.resolve({ items: state.items, nextCursor: null, capabilities: { accountClosureAvailable: available } }) },
+    sendMemberStepUpCode: (action) => { calls.sms.push(action); return Promise.resolve({ challengeId: 'ch-1', phoneMasked: '138****0840', cooldownSeconds: 60, expiresInSeconds: 300 }) },
+    verifyMemberStepUp: (challengeId, code) => { calls.verify.push([challengeId, code]); return Promise.resolve({ stepUpToken: 'tok-1' }) },
+    createMemberDataRequest: (type, opts) => { calls.create.push([type, opts]); return createResult ? createResult() : Promise.resolve({ id: 'rq-1', requestType: 'delete', status: 'pending' }) },
+    cancelMemberDataRequest: (id) => { calls.cancel.push(id); return cancelResult ? cancelResult() : Promise.resolve({ id, status: 'cancelled' }) },
+    getMemberAiConsentStatus: () => Promise.resolve({}),
+  }
+  const page = makePage('pages/privacy/privacy.js', { auth: createAuth('A'), api, wx })
+  return { page, wx, modals, calls, state }
+}
+const PENDING_CLOSURE = { id: 'rq-1', requestType: 'delete', status: 'pending', requestedAt: '2026-10-04T02:00:00Z' }
+
+test('privacy 注销：申请要过短信二次验证（close_account），受理后说「已受理，等待处理」', async () => {
+  const { page, modals, calls } = makePrivacy()
+  page.onLoad(); page.onShow()
+  await flush()
+  assert.equal(page.data.accountClosureAvailable, true)
+  assert.ok(page.data.closureNotes.length >= 4, '说明：会删除 / 会保留 / 手机号 / 有订单时')
+
+  page.requestAccountClosure()
+  await flush()
+  assert.deepEqual(calls.sms, ['close_account'], '发的是注销专用的二次验证短信')
+  assert.equal(calls.create.length, 0, '没验证之前不提交申请')
+  assert.equal(page.data.su.open, true)
+
+  page.onCodeInput({ detail: { value: '123456' } })
+  page.submitStepUp()
+  await flush(); await flush()
+  assert.equal(calls.create.length, 1)
+  const [type, opts] = calls.create[0]
+  assert.equal(type, 'delete')
+  assert.equal(opts.stepUpToken, 'tok-1', '带着二次验证凭证提交')
+  assert.match(opts.idempotencyKey, /^[0-9a-f-]{36}$/)
+  const done = modals[modals.length - 1]
+  assert.equal(done.title, '已受理，等待处理')
+  assert.match(done.content, /还没有注销/)
+  assert.match(done.content, /15 个工作日/)
+  assert.match(done.content, /自动退出登录/)
+  assert.match(done.content, /撤回/)
+  page.onUnload()
+})
+
+test('privacy 注销：服务端没开放时不走验证码，照旧如实说明；状态没读到时不猜', async () => {
+  const closed = makePrivacy({ available: false })
+  closed.page.onLoad(); closed.page.onShow()
+  await flush()
+  closed.page.requestAccountClosure()
+  await flush()
+  assert.deepEqual(closed.calls.sms, [], '没开放就不发注销验证码')
+  assert.match(closed.modals[0].content, /未开放/)
+  closed.page.onUnload()
+
+  const early = makePrivacy()
+  early.page.onLoad()
+  early.page.setData({ isLoggedIn: true })
+  early.page.requestAccountClosure()
+  assert.equal(early.modals.length, 0)
+  assert.deepEqual(early.calls.sms, [])
+  assert.ok(early.wx.calls.showToast.some((t) => /正在读取/.test(t)))
+})
+
+test('privacy 注销：已有待处理的申请时不重复提交，可以撤回；撤回失败如实说', async () => {
+  const { page, modals, calls, state } = makePrivacy({ items: [PENDING_CLOSURE] })
+  page.onLoad(); page.onShow()
+  await flush()
+  const row = page.data.requests[0]
+  assert.equal(row.statusLabel, '已受理，等待处理')
+  assert.equal(row.canCancel, true)
+  assert.equal(page.data.activeClosure.id, 'rq-1')
+  assert.equal(page.data.hasActiveExport, false, '等人工处理的注销申请不触发轮询')
+  assert.ok(!page._poll, '没有挂轮询定时器')
+
+  page.requestAccountClosure()
+  await flush()
+  assert.deepEqual(calls.sms, [], '已有申请时不再发验证码')
+  assert.equal(modals[modals.length - 1].title, '已有注销申请')
+
+  state.items = [{ ...PENDING_CLOSURE, status: 'cancelled' }]
+  page.cancelClosure({ currentTarget: { dataset: { id: 'rq-1' } } })
+  await flush(); await flush()
+  assert.deepEqual(calls.cancel, ['rq-1'])
+  assert.equal(page.data.requests[0].canCancel, false)
+  assert.equal(page.data.activeClosure, null)
+  page.onUnload()
+
+  const late = makePrivacy({
+    items: [PENDING_CLOSURE],
+    cancelResult: () => Promise.reject(serverError('这条申请已经开始处理，不能撤回了', 'DATA_REQUEST_INVALID_TRANSITION', 409)),
+  })
+  late.page.onLoad(); late.page.onShow()
+  await flush()
+  late.page.cancelClosure({ currentTarget: { dataset: { id: 'rq-1' } } })
+  await flush(); await flush()
+  assert.equal(late.modals[late.modals.length - 1].title, '没有撤回成功')
+  late.page.onUnload()
+})
+
+test('privacy 注销：提交失败时如实说，幂等键留着给下一次重试用', async () => {
+  let n = 0
+  const { page, modals, calls } = makePrivacy({
+    createResult: () => (++n === 1 ? Promise.reject(netError()) : Promise.resolve({ id: 'rq-1', requestType: 'delete', status: 'pending' })),
+  })
+  page.onLoad(); page.onShow()
+  await flush()
+  for (let round = 0; round < 2; round += 1) {
+    page.requestAccountClosure()
+    await flush()
+    page.onCodeInput({ detail: { value: '123456' } })
+    page.submitStepUp()
+    await flush(); await flush()
+  }
+  assert.equal(calls.create.length, 2)
+  assert.equal(modals.some((m) => m.title === '注销申请没有提交成功'), true)
+  assert.equal(calls.create[0][1].idempotencyKey, calls.create[1][1].idempotencyKey, '重试复用同一个幂等键')
+  assert.equal(calls.sms.length, 2, '重试同样要重新过二次验证')
+  page.onUnload()
+})
+
 test('简历导出：免费时只写「当前免费」，不提权益', () => {
   const N = requireMiniapp('../utils/normalize.js')
   assert.equal(N.resumeExportPricing({ mode: 'free' }, true).text, '当前免费')
