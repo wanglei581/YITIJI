@@ -27,6 +27,15 @@
 - **同一分支再追加：** §1.2 F「个人信息角色」改成与入驻三件套一致的写法（会员、AI、打印扫描由我方独立处理，机构只对自己发布的政策和机构资料是处理者）。旧写法「机构终端上不登录的即用会话由机构作处理者」已被 10/3 的三件套取代，试用协议正文起草时发现总表没跟上。
 - **试点合规制度第 6 条第 3 点：** 原写「现场查看并清空 Windows 打印队列」，和培训材料「不改 Windows 设置、不退出全屏」打架；改为由公司远程清空，现场人员不进 Windows。
 - **验证：** `verify:compliance-copy` 通过，图谱 `--check` 通过。
+## 2026-10-04：Agent 按能力开关拦截 U 盘导入（走查 W-125，分支 `claude/usb-capability-gate-1004`）
+
+- **起因：** 能力中心把某台终端的 `usb_import` 配成非「可用」后，一体机首页 U 盘卡片会关掉，但列文件和代传仍走 Agent 的 `/local/usb/files`、`/local/usb/upload`，再代传到匿名 `/files/kiosk-upload`。二维码过期后改用 U 盘、简历来源页、直接打开 U 盘页这三条不看首页卡片，所以还能导入。
+- **改法（Agent）：** 新增 `apps/terminal-agent/src/usb/usb-capability.ts`。列文件和代传之前请求公开只读 `GET /terminals/:id/capabilities`（5 秒上限，不用带重试的 30 秒客户端）。公开接口直接返回 `{ terminalCode, capabilities }`，没有全局 `{ success, data }` 包装；两种形状都认。`configured === true` 且 `status === 'available'` 放行；配过但不是 available（含 `not_verified`、`maintenance`、`unsupported`、`testing` 和枚举外脏值）回 403 `LOCAL_USB_DISABLED`。2026-10-04 再核 `DEFAULT_DENY_CAPABILITY_KEYS`，`usb_import` 不在名单里（仍是 `color_print` / `duplex_print` / `signature_stamp`），所以没有这一行或 `configured === false` 放行。请求失败、超时、形状不对回 503 `LOCAL_USB_CAPABILITY_UNKNOWN`，失败结果不缓存；放行和明确拒绝最多缓存 15 秒。`/local/usb/status` 不拦。upload 在 `consumeUsbFileOutcome` 之前拦，被拦不消耗 safeId、不读文件、不转发。日志只记判定和状态值。
+- **改法（一体机）：** `userErrorMessage.ts` 给两个码各加一句固定文案，避免落到「请重试」。服务端没改。
+- **门禁：** `verify:usb-import-agent` 假后端默认 available，原有用例仍过；另覆盖 available 下列文件与代传、`not_verified` 时 files/upload 都是 403 且 safeId 没被消耗（改回 available 后同一 safeId 仍能代传）、未配置与缺行放行、能力接口 500 与坏形状回 503、status 不受影响、成功结果 15 秒内不重复请求、失败不缓存。`verify-kiosk-runtime-error-boundary.mjs` 断言两个新码的固定文案。Agent `tsc --noEmit` 通过；`package.json` 里 31 条 `verify*` 全部退出码 0（`verify:print-queue-residue-windows` 在非 win32 上跳过真机部分，退出码仍是 0）。一体机 `tsc`、`verify-backend-error-copy-coverage`、仓库 `verify-no-raw-error-render`、图谱 `--check` 通过，图谱无 diff。
+- **反向测试（提交后逐项改坏，再 `git checkout` 还原）：** 去掉 `/local/usb/files` 拦截，门禁退出码 1（列文件变成 200）；去掉 `/local/usb/upload` 拦截，退出码 1（代传变成 200）；能力接口失败改成放行，退出码 1（接口 500 时列文件变成 200，不再是 503）；把 upload 拦截挪到 `consumeUsbFileOutcome` 之后，退出码 1（同一 safeId 再传变成 410）；删掉一体机 `LOCAL_USB_DISABLED` 文案，退出码 1（落到「U 盘文件导入失败，请重试」）。还原后工作区干净。
+- **没有验证：** 真 Windows 与真后端没跑。随下一个安装包出。0.4.13 不含此改动。
+
 ## 2026-10-04：第二次发布清单补上「三个开关各自要同批改的文字」（分支 `claude/release2-switch-texts-1004`，只改文档）
 
 - **改了什么：** `docs/progress/next-tasks.md` 第二次发布「发布前」第 2 条。原来只写了登录那一句，而且写成「协议现在写的是先登录」，与线上不符（线上是「以页面提示为准」）。现在三个开关各列一行：怎么切、打开后的实际行为、哪几句文字要同批改。
