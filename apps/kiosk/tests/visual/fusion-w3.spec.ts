@@ -2134,3 +2134,26 @@ test('assistant voice deadline warns then preserves text conversation @w3-kiosk'
   await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
   expect(api.requestCount('POST', '/api/v1/trtc/session')).toBe(1)
 })
+
+test('W-118 resume diagnosis phone entry creates only one upload session @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  let creates = 0
+  api.respondWith('POST', '/api/v1/upload-sessions', async () => {
+    creates += 1
+    // 让 StrictMode 的第二次 effect 有机会赶在第一次返回前执行。
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return { status: 201, json: { success: true, data: {
+      sessionId: 'w118-resume-upload', uploadUrl: '/upload/phone',
+      uploadToken: 'w118-upload', controlToken: 'w118-control', expiresAt: '2099-01-01T00:00:00.000Z',
+    } } }
+  })
+  api.respond('GET', '/api/v1/upload-sessions/w118-resume-upload', { status: 200, json: { success: true, data: {
+    sessionId: 'w118-resume-upload', status: 'pending', purpose: 'resume_upload', mode: 'temporary',
+    file: null, requiresKioskConfirmation: false, expiresAt: '2099-01-01T00:00:00.000Z',
+  } } })
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /手机扫码/ }).click()
+  await expect(page.getByText('请用手机微信或浏览器扫码', { exact: true })).toBeVisible()
+  await expect(page.locator('.resume-source-phone-session svg[width="150"]')).toBeVisible()
+  expect(creates).toBe(1)
+})

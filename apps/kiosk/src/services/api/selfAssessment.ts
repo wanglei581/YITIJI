@@ -81,6 +81,8 @@ export function getSelfAssessmentQuestions(): Promise<unknown> {
  *   - 逐字等于当前版本 → 记版本 + 勾选时刻；
  *   - 其它（含缺省、空串、带首尾空格、旧版本）→ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，不落库。
  */
+const assessmentsInFlight = new Map<string, Promise<SelfAssessmentSubmitResponse>>()
+
 export function submitSelfAssessment(
   body: {
     answers: SelfAssessmentAnswerV1[]
@@ -89,7 +91,14 @@ export function submitSelfAssessment(
   access: SelfAssessmentAccess,
 ): Promise<SelfAssessmentSubmitResponse> {
   if (API_MODE !== 'http') return Promise.reject(new SelfAssessmentApiError('MOCK_MODE', '演示模式不提供自我探索，请连接真实服务', 0))
-  return call<SelfAssessmentSubmitResponse>('/resume/self-assessment', access, { method: 'POST', body })
+  const key = JSON.stringify([body, access.token ?? null, access.accessToken ?? null])
+  const existing = assessmentsInFlight.get(key)
+  if (existing) return existing
+  const request = call<SelfAssessmentSubmitResponse>('/resume/self-assessment', access, { method: 'POST', body }).finally(() => {
+    if (assessmentsInFlight.get(key) === request) assessmentsInFlight.delete(key)
+  })
+  assessmentsInFlight.set(key, request)
+  return request
 }
 
 export function getLatestSelfAssessment(taskId: string, access: SelfAssessmentAccess): Promise<SelfAssessmentSubmitResponse> {

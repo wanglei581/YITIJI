@@ -2477,3 +2477,116 @@ test('print preview paints preset-CMap Chinese text @w2', async ({ page, api }) 
   expect(cmapStatuses.every((status) => status === 200), `CMap 请求状态 ${cmapStatuses.join(',')}`).toBe(true)
   await expectHealthy(page, errors, 'print-preview')
 })
+
+// W-118：停住第一条建任务响应，覆盖编号尚未写回时的重复挂载与 SPA 返回。
+test('W-118 material checks share one in-flight round across immediate back and re-entry @w2', async ({ page, api }) => {
+  registerShell(api)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  const counts = { inspection: 0, normalize_a4: 0, pii_scan: 0 }
+  let release!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
+  await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+    const { kind } = route.request().postDataJSON() as { kind: keyof typeof counts }
+    counts[kind] += 1
+    if (kind === 'inspection') await held
+    await route.fulfill({ status: 201, json: { success: true, data: materialTask(kind) } })
+  })
+  await seedPrintHandoff(page, { materialCheck: null })
+  await page.goto('/print/desk?step=check')
+  await expect.poll(() => counts.inspection).toBe(1)
+  try {
+    await page.getByRole('button', { name: '返回选文件', exact: true }).first().click()
+    await expect(page).toHaveURL(/\/print\/upload/)
+    await page.goBack()
+    await expect(page.locator('[data-w2-page="print-material-check"]')).toHaveAttribute('data-qx-state', 'inspection')
+  } finally {
+    release()
+  }
+  await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeEnabled()
+  expect(counts).toEqual({ inspection: 1, normalize_a4: 1, pii_scan: 1 })
+  await expect(page.getByText(W2_FILE.name, { exact: true }).first()).toBeVisible()
+})
+
+for (const withDetails of [false, true]) {
+  test(`W-118 PII rejection retains the file and allows a fresh check and print (details=${withDetails}) @w2`, async ({ page, api }) => {
+    registerShell(api)
+    registerPrice(api)
+    registerQuote(api, { amountCents: 0, billablePages: 2, unitCents: 0 })
+    const binary = new FusionW2BinaryRoute(page)
+    await binary.install()
+    let attempts = 0
+    const kinds: string[] = []
+    const finding = {
+      id: 'w118-phone', taskId: 'w2-pii_scan', type: 'phone', label: '手机号', pageNumber: 1,
+      snippet: '13800138000', confidence: 0.98, action: 'pending' as const, createdAt: NOW,
+    }
+    api.respond('POST', '/api/v1/materials/tasks/w2-pii_scan/pii-findings/decisions', {
+      status: 200, json: { success: true, data: { ...materialTask('pii_scan'), piiFindings: [{ ...finding, action: 'keep' }] } },
+    })
+    await routeExactJson(page, 'POST', '/api/v1/print/jobs', async (route) => {
+      attempts += 1
+      expect(route.request().postDataJSON().fileUrl).toBe(W2_FILE.fileUrl)
+      await route.fulfill(attempts === 1 ? {
+        status: 400,
+        json: { error: { code: 'PRINT_PII_SCAN_REQUIRED', message: 'PRINT_PII_SCAN_REQUIRED', ...(withDetails ? { details: { piiTaskId: 'ignored-task', reason: 'ignored-reason' } } : {}) } },
+      } : {
+        status: 200,
+        json: { ...W2_ORDER, status: 'pending', amountCents: 0, payStatus: 'paid', priceLines: [], billablePages: 2, billingPageSource: 'detected' },
+      })
+    })
+    await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+      const { kind } = route.request().postDataJSON() as { kind: 'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact' }
+      kinds.push(kind)
+      expect(route.request().postDataJSON().sourceFileId).toBe(W2_FILE.fileId)
+      const task = materialTask(kind)
+      if (kind === 'pii_scan') task.piiFindings = [finding]
+      if (kind === 'pii_redact') task.result = { ...task.result, findingCount: 1, keptCount: 1 }
+      await route.fulfill({ status: 201, json: { success: true, data: task } })
+    })
+    api.respond('GET', '/api/v1/materials/tasks/w2-inspection/print-param-suggestions', { status: 200, json: { success: true, data: printParamSuggestions({ copies: 1 }) } })
+    api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, { status: 200, json: { taskId: W2_ORDER.taskId, status: 'pending' } })
+    // 只写一次，导航后不重新播种，防止夹具掩盖上下文丢失。
+    await openWithHandoff(page, '/print/confirm', {})
+    await page.getByRole('button', { name: '确认并打印', exact: true }).click()
+    await expect(page.getByText('这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。', { exact: true })).toBeVisible()
+    await expect(page.getByText(/稍后重试|PRINT_PII_SCAN_REQUIRED|ignored-task|ignored-reason/)).toHaveCount(0)
+    const recovery = page.getByRole('button', { name: '回到材料检查', exact: true })
+    await expect(recovery).toBeVisible()
+    expect((await recovery.boundingBox())!.height).toBeGreaterThanOrEqual(56)
+    await recovery.click()
+    await expect(page).toHaveURL(/\/print\/desk\?step=check/)
+    await expect(page.getByRole('heading', { name: '这一页没有待处理的文件' })).toHaveCount(0)
+    await expect(page.getByText(W2_FILE.name, { exact: true }).first()).toBeVisible()
+    await page.getByRole('button', { name: '全部保留', exact: true }).click()
+    await page.getByRole('button', { name: '下一步：预览与参数' }).click()
+    await expect(page).toHaveURL(/step=preview/)
+    await page.getByRole('button', { name: '下一步：核对价格' }).click()
+    await expect(page).toHaveURL(/\/print\/confirm/)
+    await expect(page.getByText('发现 1 处个人信息，你选择了全部保留，原样打印。', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '确认并打印', exact: true }).click()
+    await expect(page).toHaveURL(/\/print\/progress/)
+    expect(attempts).toBe(2)
+    expect(kinds).toEqual(['inspection', 'normalize_a4', 'pii_scan', 'pii_redact'])
+  })
+}
+
+for (const [findingCount, redactedCount, keptCount, text] of [
+  [0, 0, 0, '没发现需要遮挡的内容'],
+  [3, 0, 3, '发现 3 处个人信息，你选择了全部保留，原样打印。'],
+  [3, 2, 1, '发现 3 处个人信息，遮挡 2 处，保留 1 处。'],
+] as const) {
+  test(`W-118 confirm privacy summary reports actual decisions ${findingCount}/${redactedCount}/${keptCount} @w2`, async ({ page, api }) => {
+    registerShell(api)
+    registerPrice(api)
+    registerQuote(api, { amountCents: 0, billablePages: 2, unitCents: 0 })
+    await seedPrintHandoff(page, { materialCheck: {
+      inspectionTaskId: 'w2-inspection-001', piiTaskId: 'w2-pii_scan', piiRedactTaskId: 'w2-pii_redact',
+      checkedAt: NOW, findingCount, redactedCount, keptCount, mode: 'checked',
+      redaction: { claim: redactedCount > 0 ? 'redacted_verified' : 'nothing_to_redact', redactedFileId: redactedCount > 0 ? W2_FILE.fileId : null, appliedRedactedCount: redactedCount, keptCount, failedNoPositionCount: 0, reverifyRan: redactedCount > 0, reverifyRemainingCount: 0 },
+    } })
+    await page.goto('/print/confirm')
+    await expect(page.getByText(text, { exact: false })).toBeVisible()
+    if (findingCount > 0) await expect(page.getByText('没发现需要遮挡的内容', { exact: true })).toHaveCount(0)
+  })
+}
