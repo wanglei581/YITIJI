@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import type { ApiRouter } from '../fixtures/api-router'
@@ -89,7 +89,7 @@ async function loginBackToMaterials(page: Page): Promise<void> {
  * 1080×1920 一体机舞台与 390×844 手机（关缩放走流式）各量一遍：操作条不压滚动区、不掉出视口，
  * 无横向溢出与越界元素，状态胶囊可读，返回键与主操作真能被 ≥48px 的指针命中，再落一张截图。
  */
-async function captureViewports(page: Page, name: string): Promise<void> {
+async function captureViewports(page: Page, name: string, primary = page.locator('.qx-ctabar .qx-btn').last()): Promise<void> {
   for (const size of VIEWPORTS) {
     await page.setViewportSize(size)
     await expect.poll(async () => {
@@ -103,7 +103,8 @@ async function captureViewports(page: Page, name: string): Promise<void> {
     await assertNoHorizontalOverflow(page)
     await assertNoElementCrossesViewport(page)
     await assertQxPillReadable(page, `${name} ${size.width}x${size.height}`)
-    for (const target of [page.locator('.qx-topbar-back'), page.locator('.qx-ctabar .qx-btn').last()]) await assertTapTargetPointerHit(target)
+    await primary.scrollIntoViewIfNeeded()
+    for (const target of [page.locator('.qx-topbar-back'), primary]) await assertTapTargetPointerHit(target)
     await page.screenshot({ path: test.info().outputPath(`${name}-${size.width}x${size.height}.png`) })
   }
   await page.setViewportSize({ width: 1080, height: 1920 })
@@ -111,6 +112,8 @@ async function captureViewports(page: Page, name: string): Promise<void> {
 
 const screenOf = (page: Page) => page.locator('[data-kiosk-screen="resume-materials"]')
 const cta = (page: Page, name: string) => page.locator('.qx-ctabar').getByRole('button', { name, exact: true })
+/** 最终稿的目录重试在正文状态卡；点哪一个、量哪一个，不回落到其它按钮。 */
+const catalogRetry = (screen: Locator, name: string) => screen.getByRole('button', { name, exact: true })
 
 test('material workshop: catalog, signed-out draft handoff, inline validation and a real print-ready file @w3-kiosk', async ({ page, api }) => {
   registerShell(api)
@@ -165,13 +168,15 @@ test('material workshop: catalog, signed-out draft handoff, inline validation an
   expect(request.headers().authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
   expect(request.postDataJSON()).toEqual({ templateId: 'campus-cover-letter', applicantName: '王同学', targetRole: '用户运营专员' })
 
-  // 文件卡只摊开服务端返回的真实字段；签名链接与打印凭证本身都不上屏。
+  // 文件卡按真实文件名、页数、大小核对；内部编号与签名凭证不属于用户核对信息，不上屏。
   await expect(screen).toHaveAttribute('data-state', 'generated')
   const card = page.getByTestId('material-workshop-file')
   await expect(card).toHaveAttribute('data-print-ready', '1')
-  for (const text of ['校招自荐信.pdf', '2 页', '129 KB', 'jm-fixture-001', '2099-01-01 10:30', '2099-03-01 08:00', '文件已进入我的文档']) {
+  for (const text of ['校招自荐信.pdf', '2 页', '129 KB', '请按文件名、页数和大小核对', '2099-01-01 10:30', '2099-03-01 08:00', '文件已进入我的文档']) {
     await expect(card).toContainText(text)
   }
+  await expect(card).not.toContainText('jm-fixture-001')
+  await expect(card).not.toContainText('文件编号')
   expect(await page.locator('body').innerText()).not.toContain('sig=fixture')
   expect(await cta(page, '打印材料').getAttribute('aria-disabled')).toBeNull()
   expect(await cta(page, '查看我的文档').getAttribute('aria-disabled')).toBeNull()
@@ -211,18 +216,18 @@ test('material workshop: empty list and read failure are separate honest states 
   await expect(page.getByRole('heading', { name: '当前没有已发布的求职材料模板' })).toBeVisible()
   await expect(page.locator('.qx-rm-template')).toHaveCount(0)
   await expect(page.locator('.qx-pill')).toHaveText('当前没有已发布模板')
-  await captureViewports(page, 'materials-empty')
+  await captureViewports(page, 'materials-empty', catalogRetry(screen, '重新读取一次'))
 
   api.respond('GET', TEMPLATES, failure(503, 'fixture template failure'))
-  await cta(page, '重新读取一次').click()
+  await catalogRetry(screen, '重新读取一次').click()
   await expect(screen).toHaveAttribute('data-state', 'error')
   await expect(page.getByRole('alert')).toHaveText(SERVICE_DOWN)
   await expect(page.getByText('fixture template failure')).toHaveCount(0)
   await expect(page.locator('.qx-rm-template')).toHaveCount(0)
-  await captureViewports(page, 'materials-error')
+  await captureViewports(page, 'materials-error', catalogRetry(screen, '重新读取'))
 
   api.respond('GET', TEMPLATES, templatesOf(CHECKLIST))
-  await cta(page, '重新读取').click()
+  await catalogRetry(screen, '重新读取').click()
   await expect(screen).toHaveAttribute('data-state', 'select')
   await expect(page.getByTestId('material-workshop-template-job-fair-checklist')).toHaveAttribute('aria-pressed', 'true')
   expect(api.requestCount('GET', TEMPLATES)).toBe(3)
@@ -248,9 +253,15 @@ test('material workshop: failed generation keeps the form; a file without print 
   await expect(page.getByRole('alert')).toContainText('这次没能生成出来：生成失败，请稍后重试')
   await expect(page.getByText('fixture generate failure')).toHaveCount(0)
   await expect(page.getByTestId('material-workshop-file')).toHaveCount(0)
+  await captureViewports(page, 'materials-failed')
+  expect(api.requestCount('POST', GENERATE)).toBe(1)
+  // 最终稿用独立失败屏；回表单后逐字段核对草稿，返回本身不能偷偷重发生成请求。
+  await cta(page, '改一改再试一次').click()
+  await expect(screen).toHaveAttribute('data-state', 'select')
+  await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.locator('#material-field-applicantName')).toHaveValue('王同学')
   await expect(page.locator('#material-field-targetRole')).toHaveValue('用户运营专员')
-  await captureViewports(page, 'materials-failed')
+  expect(api.requestCount('POST', GENERATE)).toBe(1)
 
   await cta(page, '生成可打印版').click()
   await expect(screen).toHaveAttribute('data-state', 'generated-no-print')

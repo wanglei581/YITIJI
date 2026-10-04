@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { RESUME_SCORING_DIMENSIONS } from '@ai-job-print/shared'
 import { MANUAL_CHECKS, type ExportCaptureState, type ReportViewState } from '../../resume-report-model'
 
-type StateView = Exclude<ReportViewState, 'report' | 'report-minimal' | 'report-empty' | 'diagnose-failed' | ExportCaptureState>
+type StateView = Exclude<ReportViewState, 'report' | 'report-minimal' | 'diagnose-failed' | ExportCaptureState>
 
 interface Exit {
   title: string
@@ -12,6 +12,15 @@ interface Exit {
 }
 
 const COPY: Record<StateView, { h: string; p: string; exits: Exit[] }> = {
+  'report-empty': {
+    h: '报告回来了，但里面是空的',
+    p: '这次确实读到了报告，只是六个维度、建议、优先级和风险提醒都是空的。常见原因是这次提取到的简历文字太少，不足以给出有依据的结论。这不是读取失败，也不是能力未接通。本页不会为了把版面填满而生成任何结论，也不出总分。',
+    exits: [
+      { title: '换一份更完整的简历', desc: '内容多一些，解析才有东西可看', to: '/resume/source', testid: 'resume-report-empty-source' },
+      { title: '手动逐项填写', desc: '自己写一份，再决定是否润色', to: '/resume/generate', testid: 'resume-report-empty-manual' },
+      { title: '去打印 / 扫描', desc: '不依赖报告的现成流程', to: '/print-scan', testid: 'resume-report-empty-print' },
+    ],
+  },
   'no-context': {
     h: '还没有诊断报告',
     p: '请先上传一份本人简历完成诊断，或从我的诊断记录继续查看。',
@@ -80,14 +89,14 @@ export function ResumeReportStates({ viewState }: { viewState: StateView }) {
           ))}
         </div>
       </section>
-      <section className="rrp-state" style={{ paddingBottom: 18 }}>
+      {viewState !== 'report-empty' && <section className="rrp-state" style={{ paddingBottom: 18 }}>
         <div className="rrp-zh">报告会给你这六项<span>固定角度 · 没有报告时这里不会有分数</span></div>
         <div className="rrp-dnames">
           {RESUME_SCORING_DIMENSIONS.map((dim, i) => (
             <span key={dim.key} className="rrp-dn"><i>{i + 1}</i>{dim.label}</span>
           ))}
         </div>
-      </section>
+      </section>}
       <section className="rrp-checks" data-testid="resume-report-fallback">
         <div className="rrp-zh">不等 AI，先自己核一遍<span>6 项 · 纸质简历同样适用</span></div>
         <div className="list" data-testid="resume-report-list">

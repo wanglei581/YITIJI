@@ -1,6 +1,7 @@
 import type { GeneratedResume, ResumeReport } from '../interfaces/ai-provider.interface'
 import type { OptimizeResult } from './llm-resume-optimize.service'
-import { extractResumeExperienceCandidates, normalizeResumeStructureText } from './resume-structure'
+import { fitResumeToDocLimits } from './resume-doc-limits'
+import { detectResumeName, extractResumeExperienceCandidates, normalizeResumeStructureText, splitResumeDateRange } from './resume-structure'
 
 type RestoreFn = (value: string) => string
 
@@ -58,7 +59,7 @@ export function restoreOptimizeResult(result: OptimizeResult, restore: RestoreFn
 }
 
 
-type ListKey = 'education' | 'experience' | 'projects' | 'skills' | 'certificates' | 'summary'
+type ListKey = 'education' | 'experience' | 'projects' | 'skills' | 'certificates' | 'summary' | 'intention'
 export interface OriginalResumeEntry {
   key: ListKey
   label: string
@@ -68,7 +69,8 @@ export interface OriginalResumeEntry {
   position: number
 }
 const LABELS: Record<ListKey, string> = {
-  education: '教育经历', experience: '工作经历', projects: '项目经历', skills: '技能', certificates: '证书', summary: '原文补充',
+  education: '教育经历', experience: '工作经历', projects: '项目经历', skills: '技能', certificates: '证书',
+  summary: '原文补充', intention: '求职意向',
 }
 const REPORT_KEYS: Record<string, ListKey> = {
   education: 'education', experience: 'experience', project: 'projects', skill: 'skills',
@@ -77,15 +79,33 @@ const HEADINGS: Array<[RegExp, ListKey | null]> = [
   [/^(教育经历|教育背景|学历经历)(?=$|[\s:：])/u, 'education'],
   [/^(工作经历|工作经验|职业经历|实习经历|实习经验|兼职经历)(?=$|[\s:：])/u, 'experience'],
   [/^(项目经历|项目经验|实践经历|校园经历|校内经历|校园实践)(?=$|[\s:：])/u, 'projects'],
-  [/^(专业技能|技能|技能特长)(?=$|[\s:：])/u, 'skills'],
+  [/^(专业技能|技能证书|技能与证书|技能特长|技能)(?=$|[\s:：])/u, 'skills'],
   [/^(证书资质|证书|资格证书|获奖情况)(?=$|[\s:：])/u, 'certificates'],
-  [/^(基本信息|基础信息|个人信息|联系方式|求职意向|求职目标|个人简介|自我评价)(?=$|[\s:：])/u, null],
+  [/^(求职意向|求职目标|求职方向)(?=$|[\s:：])/u, 'intention'],
+  [/^(个人简介|自我评价|个人总结|自我介绍|个人概况)(?=$|[\s:：])/u, 'summary'],
+  [/^(基本信息|基础信息|个人信息|基本资料|个人资料|联系方式)(?=$|[\s:：])/u, null],
 ]
+/** 没列进上表的栏目标题（兴趣爱好、培训经历……）：只用来结束上一条，不当成经历正文。 */
+const UNKNOWN_HEADING_RE = /^[一-鿿]{2,8}$/u
+const UNKNOWN_HEADING_WORD_RE = /(经历|经验|背景|信息|资料|意向|评价|简介|总结|技能|证书|荣誉|奖项|爱好|特长|培训|语言|作品|其他|附加)$/u
+/** 联系方式、住址这类行属于基本信息，不是任何一条经历的描述。 */
+const CONTACT_LINE_RE = /(?<!\d)1[3-9]\d{9}(?!\d)|[\w.+-]+@[\w-]+\.[\w.-]+|^(手机|电话|联系电话|联系方式|邮箱|电子邮箱|微信|地址|住址|现住址|现居|通讯地址)/u
+const BULLET_RE = /^[\s·•●▪■◆*\-–—]+/u
+
+function headingOf(line: string): [RegExp, ListKey | null] | undefined {
+  const known = HEADINGS.find(([pattern]) => pattern.test(line))
+  if (known) return known
+  return UNKNOWN_HEADING_RE.test(line) && UNKNOWN_HEADING_WORD_RE.test(line) ? [new RegExp(`^${line}`, 'u'), null] : undefined
+}
 
 /**
  * 报告摘录有 6 行 / 80 字上限，只作为原文行归类的锚点。完整条目和描述始终从
  * 原文取；经历候选覆盖标题外的公司+日期行，标题补齐报告没摘出的段落和长尾。
  * 不信任报告里的字句：只有还原后能回配到完整原文行的摘录才参与归类。
+ *
+ * 一条经历的描述到这三种行为止，它们都不并进描述：下一个栏目标题、联系方式 / 住址行、
+ * 下一条经历的首行。第一个栏目标题或第一条经历之前的自述句归到「原文补充」，
+ * 模型没写个人简介时补回去。
  */
 export function buildOriginalCoverage(
   source: string, report: ResumeReport, inputLength: number, restore: RestoreFn,
@@ -98,9 +118,11 @@ export function buildOriginalCoverage(
   const candidates = new Map(extractResumeExperienceCandidates(source).map((entry) =>
     [norm(entry.line), entry.block === 'project' ? 'projects' as const : 'experience' as const],
   ))
+  const name = detectResumeName(source)
   const entries: OriginalResumeEntry[] = []
   let current: ListKey | null = null
   let active: OriginalResumeEntry | undefined
+  let started = false
   let offset = 0
   for (const raw of source.split(/\n/u)) {
     const position = offset
@@ -109,24 +131,43 @@ export function buildOriginalCoverage(
     const overflow = end > inputLength
     offset = end + 1
     if (!line) continue
-    const heading = HEADINGS.find(([pattern]) => pattern.test(line))
+    if (!started && name && line.replace(/^姓名\s*[：:]?\s*/u, '') === name) continue
+    const heading = headingOf(line)
     if (heading) {
+      started = true
       current = heading[1]
       // 后置标题只能接续已有事实条目，不能把照片、联系方式变成新经历。
-      active = [...entries].reverse().find((entry) => entry.key === current)
+      active = current === 'summary' || current === 'intention'
+        ? undefined : [...entries].reverse().find((entry) => entry.key === current)
       if (line.replace(heading[0], '').replace(/^[\s:：]+/u, '') === '') continue
     }
     const candidate = candidates.get(norm(line))
     const anchor = anchors.find((a) => norm(line).includes(a.quote))
     const schoolLine = /大学|学院|学校|职校|中学/u.test(line)
       && (current === 'education' || anchor?.key === 'education' || !current)
+    // 联系方式行结束上一条经历，自己也不成条目；只有同一行里写着学校或经历（带时间段）时才照常归类。
+    // 报告摘录不算豁免：页脚、住址被摘进报告时不能靠它变成一条经历。
+    if (!candidate && !schoolLine && CONTACT_LINE_RE.test(line)) {
+      active = undefined
+      // 联系方式行把一条经历截断之后，后面没有栏目标题的句子（多半是写在末尾的自我介绍）不能跟着丢：
+      // 回到「无归属」状态，按开头自述句同样的办法归到「原文补充」，模型没写个人简介时补回。
+      if (current === 'experience' || current === 'projects' || current === 'education') { current = null; started = false }
+      continue
+    }
     if (candidate) current = candidate
-    const key = candidate ?? (schoolLine ? 'education' : anchor?.key) ?? current ?? (overflow ? 'summary' : null)
+    const preamble = !started && !candidate && !schoolLine && !anchor
+    const key = candidate ?? (schoolLine ? 'education' : anchor?.key) ?? current
+      ?? (overflow || preamble ? 'summary' : null)
+    if (!preamble) started = true
     if (!key) continue
     if (schoolLine || anchor) current = key
     const section = key === 'skills' || key === 'certificates'
-    const fact = !!candidate || schoolLine || !!anchor || section || key === 'summary'
-    const newFact = !!candidate || schoolLine || (fact && (!active || active.key !== key))
+    const loose = key === 'summary' || key === 'intention'
+    // 教育经历标题下带时间段的行就是一条学历，哪怕校名里没有「大学 / 学院」这类字眼。
+    // 工作 / 项目标题下不这么放宽：那里带时间段的行已经是经历候选，其余多半是杂句。
+    const sectionStart = key === 'education' && current === 'education' && !heading && !!splitResumeDateRange(line)
+    const fact = !!candidate || schoolLine || !!anchor || section || loose || sectionStart
+    const newFact = !!candidate || schoolLine || sectionStart || (fact && (!active || active.key !== key))
     if (newFact || (section && heading)) {
       active = { key, label: LABELS[key], lines: [], overflow: false, position }
       entries.push(active)
@@ -148,12 +189,20 @@ function matchesOriginal(item: string | object, entry: OriginalResumeEntry): boo
   return typeof item === 'object' && Object.values(item).some((v) => typeof v === 'string' && v && source.includes(norm(v)))
 }
 
-/** 经历一对一回配；技能/证书整段非空即覆盖，允许模型改写技能措辞。 */
+/**
+ * 经历一对一回配；技能/证书整段非空即覆盖，允许模型改写技能措辞。
+ * 个人简介允许模型改写，所以只看「有没有写」；求职意向看岗位有没有填。
+ */
 export function missingOriginalEntries(resume: GeneratedResume, baseline: OriginalResumeEntry[]): OriginalResumeEntry[] {
+  const norm = normalizeResumeStructureText
   const used = new Map<ListKey, Set<number>>()
   return baseline.filter((entry) => {
     if (entry.overflow) return false
-    const list = entry.key === 'summary' ? [resume.summary] : resume[entry.key]
+    if (entry.key === 'summary') return !resume.summary.trim()
+    if (entry.key === 'intention') {
+      return !resume.intention.position.trim() && !norm(resume.summary).includes(norm(intentionText(entry)))
+    }
+    const list: Array<string | object> = resume[entry.key]
     if (entry.key === 'skills' || entry.key === 'certificates') return !list.length
     const taken = used.get(entry.key) ?? new Set<number>()
     const index = list.findIndex((item, i) => !taken.has(i) && matchesOriginal(item, entry))
@@ -164,6 +213,10 @@ export function missingOriginalEntries(resume: GeneratedResume, baseline: Origin
   })
 }
 
+function intentionText(entry: OriginalResumeEntry): string {
+  return entry.lines.join('\n').replace(HEADINGS.find(([, key]) => key === 'intention')![0], '').replace(/^[\s:：]+/u, '')
+}
+
 /** 只摘取实际送模型的遮盖行；绝不把 report 的还原值或超长尾部再次送出。 */
 export function originalCoverageRetryHint(entries: OriginalResumeEntry[], maskedText: string, restore: RestoreFn): string {
   const norm = normalizeResumeStructureText
@@ -172,6 +225,26 @@ export function originalCoverageRetryHint(entries: OriginalResumeEntry[], masked
     const lines = maskedLines.filter((line) => entry.lines.some((raw) => norm(raw) === norm(restore(line))))
     return `${entry.label}：\n${lines.join('\n')}`
   }).join('\n')
+}
+
+/**
+ * 模型把两段经历并成一段时，被并掉的那段原文还留在别的条目的描述里；
+ * 把它单独补回之前先从那些描述里拿掉，否则同一段话会印两遍。
+ * 只删逐行等于原文的行（忽略行首的项目符号），以及紧挨着的栏目标题行。
+ */
+function removeMergedLines(resume: GeneratedResume, entry: OriginalResumeEntry): void {
+  const norm = normalizeResumeStructureText
+  const own = new Set(entry.lines.map((line) => norm(line)).filter(Boolean))
+  const strip = (description: string | undefined): string | undefined => {
+    if (!description) return description
+    const lines = description.split('\n')
+    const kept = lines.filter((line) => !own.has(norm(line.replace(BULLET_RE, ''))))
+    if (kept.length === lines.length) return description
+    return kept.filter((line) => !headingOf(line.replace(BULLET_RE, '').trim())).join('\n')
+  }
+  for (const item of resume.education) item.description = strip(item.description)
+  for (const item of resume.experience) item.description = strip(item.description) ?? ''
+  for (const item of resume.projects) item.description = strip(item.description) ?? ''
 }
 
 /** 按原件位置把补回条目插入模型条目之间；未能回配的模型条目维持相对顺序。 */
@@ -193,10 +266,28 @@ export function preserveOriginalEntries(
       const index = list.findIndex((existing) => positionOf(existing, entry.key) > entry.position)
       list.splice(index < 0 ? list.length : index, 0, item)
     }
+    if (entry.key === 'education' || entry.key === 'experience' || entry.key === 'projects') removeMergedLines(resume, entry)
     switch (entry.key) {
-      case 'summary': resume.summary = [resume.summary, ...entry.lines].filter(Boolean).join('\n'); break
+      case 'summary': resume.summary = [...new Set([...resume.summary.split('\n'), ...entry.lines])].filter(Boolean).join('\n'); break
+      case 'intention': {
+        const text = intentionText(entry)
+        if (!text.includes('\n') && text.length <= 60) resume.intention = { ...resume.intention, position: text }
+        else resume.summary = [resume.summary, ...entry.lines].filter(Boolean).join('\n')
+        break
+      }
       case 'education': insert(resume.education, { school: first, description: description || undefined }); break
-      case 'experience': insert(resume.experience, { company: first, role: '', description }); break
+      case 'experience': {
+        // 「公司 时间段 其余」的首行拆开放：时间段进 period；其余是一个短词（没有句读）时就是原件写的职务，
+        // 是一句话时并进描述。原件没写职务就留空，不猜。
+        const parts = splitResumeDateRange(first)
+        const company = parts ? parts.before || parts.after : first
+        const tail = parts && parts.before ? parts.after : ''
+        const role = /^[^，。；,;.!！?？\n]{1,20}$/u.test(tail) ? tail : ''
+        insert(resume.experience, {
+          company, role, period: parts?.period, description: [role ? '' : tail, description].filter(Boolean).join('\n'),
+        })
+        break
+      }
       case 'projects': insert(resume.projects, { name: first, description }); break
       case 'skills': entry.lines.forEach((line) => insert(resume.skills, line)); break
       case 'certificates': entry.lines.forEach((line) => insert(resume.certificates, line)); break
@@ -210,5 +301,7 @@ export function preserveOriginalEntries(
   if (entries.some((entry) => entry.overflow)) {
     result.optimizedResume.summary += '\n简历过长，未送 AI 优化的内容已保持原文。'
   }
+  // 出口收口：优化接口吐出来的任何结果，原样交给导出 / 排版调整 / 存草稿都必须过校验。
+  result.optimizedResume = fitResumeToDocLimits(result.optimizedResume)
   return result
 }

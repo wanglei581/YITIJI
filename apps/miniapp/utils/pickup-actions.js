@@ -105,7 +105,7 @@ function drawCard(page, info) {
         canvas,
         fileType: 'png',
         success: (r) => resolve(r.tempFilePath),
-        fail: (e) => reject(new Error((e && e.errMsg) || 'canvasToTempFilePath failed')),
+        fail: () => reject(new Error('取件图没有生成，请再试一次')),
       })
     })
   })

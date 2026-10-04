@@ -13,9 +13,7 @@ import { availableMetric, hoursAgo, shanghaiDayStart, unavailableMetric, suppres
 import { loadTerminalPrintedPagesToday } from './console-screen.printed-pages'
 import {
   TIMELINE_HEARTBEAT_ROW_CAP,
-  TIMELINE_PRINT_ROW_CAP,
   deriveTerminalTimeline,
-  type TimelinePrintInterval,
 } from './console-screen.timeline'
 import { VISIT_DAY_WINDOW, countTerminalVisits, visitMetric, type VisitLoaded } from './console-screen.visits'
 
@@ -23,7 +21,6 @@ const ONLINE_WINDOW_MS = SCREEN_ONLINE_WINDOW_SECONDS * 1000
 const PRINT_BUSY = ['claimed', 'printing'] as const
 const SCAN_BUSY = ['waiting', 'matched'] as const
 const WIRED = new Set(['connected', 'disconnected', 'unknown'])
-const PRINT_END = new Set(['completed', 'failed', 'cancelled'])
 
 export { suppressTerminalTodayCount }
 
@@ -104,59 +101,6 @@ function scannerState(scanning: boolean, scanInputHealth: string | null | undefi
   return { state: 'unknown', label: null }
 }
 
-/**
- * 已结束任务的开区间不能画到 now。优先用 completedAt；没有就用最后一条日志。
- * 两者都不晚于开区间起点时不画这段，避免把截断的重试日志补成「打印到现在」。
- */
-function finishedPrintEnd(
-  task: { status: string; completedAt: Date | null },
-  logs: ReadonlyArray<{ createdAt: Date }>,
-  open: Date,
-): Date | null {
-  if (!PRINT_END.has(task.status)) return null
-  if (task.completedAt instanceof Date && task.completedAt.getTime() > open.getTime()) return task.completedAt
-  const last = logs[logs.length - 1]
-  if (last && last.createdAt.getTime() > open.getTime()) return last.createdAt
-  return null
-}
-
-function printingIntervals(
-  tasks: Array<{
-    status: string
-    claimedAt: Date | null
-    completedAt: Date | null
-    createdAt: Date
-    statusLogs: Array<{ toStatus: string; createdAt: Date }>
-  }>,
-  now: Date,
-): TimelinePrintInterval[] {
-  const intervals: TimelinePrintInterval[] = []
-  for (const task of tasks) {
-    const logs = [...task.statusLogs].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-    let open: Date | null = null
-    let closed = false
-    for (const log of logs) {
-      if (log.toStatus === 'printing') {
-        if (!open) open = log.createdAt
-        continue
-      }
-      if (open && PRINT_END.has(log.toStatus)) {
-        intervals.push({ from: open, to: log.createdAt })
-        open = null
-        closed = true
-      }
-    }
-    if (open) {
-      const end = finishedPrintEnd(task, logs, open)
-      if (end) intervals.push({ from: open, to: end })
-      else if (!PRINT_END.has(task.status)) intervals.push({ from: open, to: now })
-    } else if (!closed && task.status === 'printing') {
-      intervals.push({ from: task.claimedAt ?? task.createdAt, to: now })
-    }
-  }
-  return intervals
-}
-
 export async function loadTerminalTwin(
   prisma: PrismaService,
   terminalId: string,
@@ -191,7 +135,6 @@ export async function loadTerminalTwin(
     current,
     heartbeatRows,
     heartbeatBefore,
-    printTasks,
     printedToday,
     printTaskCount,
     scanCount,
@@ -243,31 +186,6 @@ export async function loadTerminalTwin(
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true, printerStatus: true },
     }),
-    prisma.printTask.findMany({
-      where: {
-        terminalId,
-        OR: [
-          { status: 'printing' },
-          { statusLogs: { some: { createdAt: { gte: since }, toStatus: { in: ['printing', 'completed', 'failed', 'cancelled'] } } } },
-        ],
-      },
-      orderBy: { createdAt: 'asc' },
-      take: TIMELINE_PRINT_ROW_CAP + 1,
-      select: {
-        status: true,
-        claimedAt: true,
-        completedAt: true,
-        createdAt: true,
-        // 倒序取最近 20 条，重试风暴才不会把结尾的 completed/failed/cancelled 截掉。
-        // 任务行已是终态时，printingIntervals 还会用 completedAt 收口，不用 now。
-        statusLogs: {
-          where: { toStatus: { in: ['printing', 'completed', 'failed', 'cancelled'] } },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-          select: { toStatus: true, createdAt: true },
-        },
-      },
-    }),
     loadTerminalPrintedPagesToday(prisma, terminalId, now),
     prisma.printTask.count({ where: { terminalId, createdAt: { gte: dayStart } } }),
     prisma.scanTask.count({ where: { terminalId, createdAt: { gte: dayStart } } }),
@@ -306,7 +224,6 @@ export async function loadTerminalTwin(
   const device = printerState({ heartbeat, now, printing: current?.status === 'printing' })
   const wired = heartbeat?.wiredNetworkStatus
   const heartbeatCapped = heartbeatRows.length > TIMELINE_HEARTBEAT_ROW_CAP
-  const printCapped = printTasks.length > TIMELINE_PRINT_ROW_CAP
   const timeline = deriveTerminalTimeline({
     now,
     heartbeats: [
@@ -316,9 +233,8 @@ export async function loadTerminalTwin(
         printerStatus: row.printerStatus,
       })),
     ],
-    prints: printingIntervals(printTasks.slice(0, TIMELINE_PRINT_ROW_CAP), now),
+    prints: [],
     heartbeatRowCapExceeded: heartbeatCapped,
-    printRowCapExceeded: printCapped,
   })
   const startedAt = current
     ? (current.statusLogs[0]?.createdAt ?? current.claimedAt ?? (current.status === 'printing' ? current.createdAt : null))
@@ -327,12 +243,12 @@ export async function loadTerminalTwin(
     ? availableMetric('PrintTask.status', 'current', {
         pages: currentTaskPages(current.order?.billablePages, current.paramsJson),
         colorMode: readCurrentTaskParams(current.paramsJson).colorMode,
-        startedAt: startedAt ? startedAt.toISOString() : null,
+        startedAt: startedAt ? startedAt.toISOString().slice(0, 16) + 'Z' : null,
       })
     : availableMetric('PrintTask.status', 'current', null)
 
   return {
-    generatedAt: now.toISOString(),
+    generatedAt: now.toISOString().slice(0, 16) + 'Z',
     audience,
     terminal: {
       id: terminal.id,
@@ -344,7 +260,7 @@ export async function loadTerminalTwin(
     },
     status: {
       health,
-      lastHeartbeatAt: heartbeat ? heartbeat.createdAt.toISOString() : null,
+      lastHeartbeatAt: heartbeat ? heartbeat.createdAt.toISOString().slice(0, 16) + 'Z' : null,
       onlineWindowSeconds: SCREEN_ONLINE_WINDOW_SECONDS,
       agentVersion: heartbeat?.agentVersion ?? null,
       wiredNetwork: wired && WIRED.has(wired) ? wired : null,
@@ -367,7 +283,7 @@ export async function loadTerminalTwin(
     },
     consumables: unavailableMetric('TerminalHeartbeat', 'current', SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo),
     timeline24h: timeline.ok
-      ? availableMetric('TerminalHeartbeat+PrintTask', '24h', timeline.segments)
-      : unavailableMetric('TerminalHeartbeat+PrintTask', '24h', timeline.reason),
+      ? availableMetric('TerminalHeartbeat', '24h', timeline.segments)
+      : unavailableMetric('TerminalHeartbeat', '24h', timeline.reason),
   }
 }

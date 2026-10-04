@@ -1,3 +1,4 @@
+import { prepareDatabase } from './console-screen-usage-cases-01'
 /**
  * GET /partner/stats 契约验证（C1，2026-08-16）
  *
@@ -182,6 +183,7 @@ async function assertQueryValidation(): Promise<void> {
 async function main(): Promise<void> {
   console.log('\n=== GET /partner/stats 契约验证 ===\n')
 
+  const isolated = prepareDatabase()
   assertVerifyDatabaseSafe()
   assertSourceContract()
   await assertQueryValidation()
@@ -261,7 +263,7 @@ async function main(): Promise<void> {
 
     // 同步日志：A 当期 3 条（2 成功 1 失败），B 当期 5 条（全成功）
     const now = new Date()
-    const hoursAgo = (h: number) => new Date(now.getTime() - h * 60 * 60 * 1000)
+    const hoursAgo = (h: number) => new Date(now.getTime() - (24 + h) * 60 * 60 * 1000)
     await prisma.syncLog.createMany({
       data: [
         { sourceId: srcA, orgId: orgA, dataType: 'job', syncMode: 'manual', result: 'success', addedCount: 4, updatedCount: 1, errorCount: 0, createdAt: hoursAgo(2) },
@@ -391,6 +393,7 @@ async function main(): Promise<void> {
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
+    isolated.cleanup()
   }
 
   console.log(`\n${'─'.repeat(52)}`)
@@ -402,6 +405,8 @@ async function main(): Promise<void> {
   console.log('\n✅ verify:partner-stats-contract PASSED')
 }
 
+// 本机构统计与终端数据门禁固定验证托管 a；不启用招聘内容。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 main().catch((error) => {
   console.error('\n❌ verify:partner-stats-contract 执行异常')
   console.error(error)

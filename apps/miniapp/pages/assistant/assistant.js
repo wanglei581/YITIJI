@@ -3,7 +3,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const voice = require('../../utils/voice-recorder')
 const aiAccess = require('../../utils/ai-access')
-const { userMessageOf } = require('../../utils/user-error')
+const { userMessageOf, plainAiMessageOf } = require('../../utils/user-error')
 
 // 后端 route 字符串 → 小程序页面路径映射（后端返回 actions[].route 时使用）。
 // 没有映射的 route 会被丢掉（见 _send 里的 .filter）：服务端给一体机的岗位、招聘会、
@@ -173,7 +173,7 @@ Page({
       })
     } catch (err) {
       // 说得出原因的就照实说：没登录、AI 暂停、年龄没确认、内容处理不了；其余才是「暂时无法回复」。
-      const aiMsg = { id: loadingMsg.id, role: 'ai', text: userMessageOf(err, '小青暂时无法回复，请稍后再试。') }
+      const aiMsg = { id: loadingMsg.id, role: 'ai', text: plainAiMessageOf(err, '小青暂时无法回复，请稍后再试。') }
       const msgs  = this.data.messages.slice(0, -1).concat(aiMsg)
       this.setData({ messages: msgs, sending: false })
     }

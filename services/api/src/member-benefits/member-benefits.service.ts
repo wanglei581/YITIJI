@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import type {
+  AiQuotaBucket,
   BenefitSourceType,
   BenefitStatus,
   BenefitType,
@@ -44,6 +45,7 @@ export class MemberBenefitsService {
       select: {
         id: true,
         benefitType: true,
+        serviceKey: true,
         title: true,
         description: true,
         quantityTotal: true,
@@ -61,6 +63,7 @@ export class MemberBenefitsService {
     return buildMemberPage(rows, page, total, (r) => ({
       id: r.id,
       benefitType: r.benefitType as BenefitType,
+      serviceKey: r.serviceKey as AiQuotaBucket | null,
       title: r.title,
       description: r.description,
       quantityTotal: r.quantityTotal,
