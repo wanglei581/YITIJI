@@ -33,6 +33,16 @@ export interface UpsertCapabilityResult {
   oldStatus: PrintScanCapabilityStatus | null
 }
 
+export type ClearCapabilityResult =
+  | { terminalCode: string; capabilityKey: PrintScanCapabilityKey; cleared: false }
+  | {
+      terminalCode: string
+      capabilityKey: PrintScanCapabilityKey
+      cleared: true
+      previousStatus: PrintScanCapabilityStatus
+      hadNote: boolean
+    }
+
 const MAX_NOTE_LENGTH = 200
 
 export type PrintScanCapabilityMode = 'managed' | 'strict'
@@ -135,6 +145,44 @@ export class TerminalCapabilitiesService {
         configured: true,
         updatedAt: row.updatedAt.toISOString(),
       },
+    }
+  }
+
+  /**
+   * 删掉管理员登记的一行，回到「未配置」（managed 放行 / strict 拒绝 / DEFAULT_DENY 拒绝）。
+   * 行本来就没有时幂等返回 cleared:false，由 controller 跳过审计。
+   */
+  async clear(terminalId: string, capabilityKey: string): Promise<ClearCapabilityResult> {
+    if (!(PRINT_SCAN_CAPABILITY_KEYS as readonly string[]).includes(capabilityKey)) {
+      throw new BadRequestException({ error: { code: 'CAPABILITY_KEY_INVALID', message: '未知的能力键' } })
+    }
+    const key = capabilityKey as PrintScanCapabilityKey
+    const terminal = await this.prisma.terminal.findUnique({
+      where: { id: terminalId },
+      select: { terminalCode: true },
+    })
+    if (!terminal) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+    const existing = await this.prisma.terminalCapability.findUnique({
+      where: { terminalId_capabilityKey: { terminalId, capabilityKey: key } },
+      select: { status: true, note: true },
+    })
+    if (!existing) {
+      return { terminalCode: terminal.terminalCode, capabilityKey: key, cleared: false }
+    }
+    const deleted = await this.prisma.terminalCapability.deleteMany({
+      where: { terminalId, capabilityKey: key },
+    })
+    if (deleted.count === 0) {
+      return { terminalCode: terminal.terminalCode, capabilityKey: key, cleared: false }
+    }
+    return {
+      terminalCode: terminal.terminalCode,
+      capabilityKey: key,
+      cleared: true,
+      previousStatus: this.asStatus(existing.status),
+      hadNote: !!existing.note?.trim(),
     }
   }
 

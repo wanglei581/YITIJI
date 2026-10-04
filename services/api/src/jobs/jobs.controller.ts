@@ -74,6 +74,7 @@ import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
 import { AuthScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { firstQueryString, type PartnerImportDataType, type PartnerListQuery } from './jobs-shared'
 import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
+import { restoreMultipartUtf8Filename } from '../files/file-validation'
 import {
   KioskJobBoardService,
   kioskJobBoardTerminalRef,
@@ -703,7 +704,7 @@ export class JobsController {
     if (!file) {
       throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少 Excel/CSV 文件' } })
     }
-    return this.jobsService.parseExcelColumns(file.buffer, file.originalname)
+    return this.jobsService.parseExcelColumns(file.buffer, restoreMultipartUtf8Filename(file.originalname))
   }
 
   @Post('partner/excel/preview')
@@ -737,7 +738,8 @@ export class JobsController {
 
     return this.jobsService.previewExcelImport({
       buffer: file.buffer,
-      fileName: file.originalname,
+      // 浏览器按 UTF-8 发中文文件名，multer 按 latin1 解出来是乱码；与文件上传同一个还原函数（H2-2）。
+      fileName: restoreMultipartUtf8Filename(file.originalname),
       sourceId,
       dataType: dataType as PartnerImportDataType,
       fieldMapping,

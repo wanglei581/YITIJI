@@ -64,6 +64,7 @@ export function QxMePage({
   toast,
   ctabar,
   live = true,
+  ordersHint,
   children,
 }: {
   title: string
@@ -78,6 +79,8 @@ export function QxMePage({
   ctabar: ReactNode
   /** 整页 aria-live。定时刷新的页（打印订单每 5 秒同步）传 false，否则读屏会反复播报整块列表。 */
   live?: boolean
+  /** 打印订单页在已加载订单全部为 0 元时，把「进度·支付·取件」换成不提钱的说法。 */
+  ordersHint?: string
   children: ReactNode
 }) {
   const navigate = useNavigate()
@@ -150,7 +153,7 @@ export function QxMePage({
                   onClick={() => navigate(item.to)}
                 >
                   {item.label}
-                  <span>{item.key === 'favorites' && !hostingOpen ? '政策' : item.hint}</span>
+                  <span>{item.key === 'orders' && ordersHint ? ordersHint : item.key === 'favorites' && !hostingOpen ? '政策' : item.hint}</span>
                 </button>
               )
             })}

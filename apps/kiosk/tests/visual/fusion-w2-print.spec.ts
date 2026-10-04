@@ -2131,6 +2131,16 @@ test('zero-amount order confirms pages without benefit mechanism copy @w2', asyn
   await expect(page.getByText('本单无需权益抵扣', { exact: true })).toHaveCount(0)
   await expect(page.getByTestId('print-confirm-amount')).toHaveText('免费试运营')
   await expect(page.locator('[data-w2-page="print-confirm"]')).not.toContainText(/报价|价格|付款|权益|抵扣|不扣/)
+  // 14 号页（走查 10/3）：主按钮整颗在首屏、不被底栏盖住，点它中心命中的就是它。
+  const confirmButton = page.getByRole('button', { name: '确认并打印', exact: true })
+  await expect(confirmButton).toBeInViewport({ ratio: 1 })
+  const confirmBox = (await confirmButton.boundingBox())!
+  expect(confirmBox.height).toBeGreaterThanOrEqual(56)
+  expect(await confirmButton.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return hit === el || el.contains(hit)
+  })).toBe(true)
   // 反向：免费单不得摆出核销入口，也不得声称权益被消耗。
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByText('已抵扣')).toHaveCount(0)
