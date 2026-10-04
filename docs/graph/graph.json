@@ -21721,6 +21721,9 @@
     "apps/terminal-agent/src/runtime-version.ts": [
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts"
     ],
+    "apps/terminal-agent/src/usb/usb-capability.ts": [
+      "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
+    ],
     "apps/terminal-agent/src/usb/usb-files.ts": [
       "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
     ],
@@ -32226,6 +32229,7 @@
         "files": [
           "apps/terminal-agent/src/agent/types.ts",
           "apps/terminal-agent/src/local-api/qr-login-server.ts",
+          "apps/terminal-agent/src/usb/usb-capability.ts",
           "apps/terminal-agent/src/usb/usb-files.ts"
         ],
         "missing": []
