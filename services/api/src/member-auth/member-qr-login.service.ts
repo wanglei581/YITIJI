@@ -177,6 +177,8 @@ export class MemberQrLoginService {
 
     // 勾选发生在一体机创建票据前；claim 时按服务端当前有效版本落库同意快照。
     try {
+      // 先确认账号仍可登录再写任何东西：确认之后账号可能已进入注销，那时写同意记录会被数据库拒绝。
+      await this.memberAuth.assertAccountLoginable(current.user.id)
       await this.memberAuth.persistResolvedLegalConsent(current.user.id, 'qr_login')
       return await this.memberAuth.issueLoginForUser(current.user)
     } catch (error) {

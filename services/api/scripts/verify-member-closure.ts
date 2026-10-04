@@ -189,6 +189,12 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
   await put('externalJumpLog', { endUserId: id, targetType: 'policy', targetId: randomUUID(), action: 'external_open', targetTitle: identity.nickname, expiresAt })
   await put('favorite', { endUserId: id, targetType: 'policy', targetId: randomUUID(), title: identity.nickname })
   await put('jobApplication', { endUserId: id, companyName: '青岛海岸软件服务有限公司', positionTitle: '产品助理', note: identity.phone, channel: 'external_self_reported' })
+  // H2-3：托管打开时期留下的「关联系统岗位」的求职进度。托管关闭后列表把它整条隐藏，但库里还在，注销时同样要删。
+  const linkOrg = await put('organization', { id: `closure-org-${id}`, name: '崂山区公共就业服务中心', type: 'licensed_hr_agency' })
+  const linkedJob = await put('job', { sourceOrgId: linkOrg.id, externalId: `closure-job-${id}`, sourceName: '崂山区公共就业服务中心',
+    sourceUrl: 'https://example.com/jobs/warehouse', title: '仓库理货员', company: '青岛崂山某配送服务有限公司', city: '青岛',
+    reviewStatus: 'approved', publishStatus: 'published' })
+  await put('jobApplication', { endUserId: id, jobId: linkedJob.id, companyName: '青岛崂山某配送服务有限公司', positionTitle: '仓库理货员', channel: 'external_self_reported' })
   await put('userNotification', { memberId: id, type: 'legacy', title: '打印材料通知', content: identity.nickname })
   await put('kioskSession', { memberId: id, terminalId, orgId: null, clientSessionId: randomUUID(), categoriesJson: JSON.stringify([identity.nickname]), expiresAt })
   await put('memberNotification', { endUserId: id, title: '材料已打印', content: identity.nickname })
@@ -313,6 +319,8 @@ async function main() {
       assert.equal(await (prisma[model] as any).count({ where: { endUserId: other.id } }), beforeOther.get(model), `误删另一会员 ${model}`)
     }
     assert.equal(await prisma.fileObject.count({ where: { endUserId: owned.id } }), 0)
+    // H2-3：关联系统岗位、托管关闭时被列表隐藏的那类求职进度也删了（不止删能看到的那几条）。
+    assert.equal(await prisma.jobApplication.count({ where: { endUserId: owned.id, jobId: { not: null } } }), 0, '关联岗位的求职进度没删')
     assert.equal(await prisma.fileObject.count({ where: { endUserId: other.id } }), beforeOther.get('fileObject'))
     assert.equal(await prisma.userNotification.count({ where: { memberId: owned.id } }), 0)
     assert.equal(await prisma.userNotification.count({ where: { memberId: other.id } }), 1)

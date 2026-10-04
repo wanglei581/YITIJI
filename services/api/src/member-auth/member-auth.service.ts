@@ -291,6 +291,12 @@ export class MemberAuthService {
     return { id: user.id, phoneMasked: maskPhone(phone), nickname: user.nickname }
   }
 
+  /** 账号仍是可登录状态（启用且 active）；否则统一 ACCOUNT_UNAVAILABLE。写任何会员名下的数据之前用它先挡。 */
+  async assertAccountLoginable(endUserId: string): Promise<void> {
+    const current = await this.prisma.endUser.findUnique({ where: { id: endUserId }, select: { enabled: true, status: true } })
+    if (!current || !current.enabled || current.status !== 'active') throw this.accountUnavailable()
+  }
+
   async issueLoginForUser(user: MemberAuthUser): Promise<MemberLoginResult> {
     const current = await this.prisma.endUser.findUnique({
       where: { id: user.id },
