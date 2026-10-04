@@ -53,7 +53,7 @@ async function confirm(page: Page) {
   await dialog.getByRole('button', { name: '下一步' }).click()
   await expect(dialog.getByRole('heading', { name: '注销后会发生什么' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: '确认注销' })).toBeDisabled()
-  await dialog.getByLabel('我已确认是这位用户（线下办理已在凭据上核对本人），知道注销后不能恢复').check()
+  await dialog.getByLabel('我已确认是这位用户，知道注销后不能恢复').check()
   await dialog.getByRole('button', { name: '确认注销' }).click()
   return dialog
 }

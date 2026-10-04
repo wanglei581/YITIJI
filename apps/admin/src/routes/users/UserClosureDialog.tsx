@@ -234,7 +234,7 @@ export function UserClosureDialog({ user, onClose, onSuccess }: { user: AdminUse
               ))}
               <label className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-amber-900">
                 <input type="checkbox" checked={acknowledged} disabled={busy} onChange={(event) => setAcknowledged(event.target.checked)} className="mt-1" />
-                我已确认是这位用户（线下办理已在凭据上核对本人），知道注销后不能恢复
+                我已确认是这位用户，知道注销后不能恢复
               </label>
             </>
           )}
