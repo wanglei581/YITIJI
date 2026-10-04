@@ -6888,6 +6888,31 @@ test('privacy 注销：已有待处理的申请时不重复提交，可以撤回
   late.page.onUnload()
 })
 
+test('privacy 注销：服务端的原话能到用户眼前；幂等键的工程话换成能照着做的一句', () => {
+  const ue = requireMiniapp('../utils/user-error.js')
+  const dr = requireMiniapp('../pages/privacy/data-rights.js')
+  // 请求层只放行登记过的码的原话（后端窗口 2026-10-04 逐句给出）
+  for (const [code, msg] of [
+    ['STEP_UP_TOKEN_INVALID', '二次验证凭证无效或已过期'],
+    ['ACCOUNT_UNAVAILABLE', '账号当前不可用'],
+    ['DATA_REQUEST_INVALID_TRANSITION', '只能撤回尚未执行的注销申请'],
+    ['DATA_REQUEST_INVALID_TRANSITION', '申请状态已变化'],
+    ['DATA_REQUEST_NOT_FOUND', '数据请求不存在'],
+  ]) {
+    assert.equal(ue.displayableServerMessage(msg, code), msg, code)
+    assert.equal(dr.errText(serverError(msg, code, 409)), `${msg}（${code}）`)
+  }
+  for (const code of ['INVALID_IDEMPOTENCY_KEY', 'IDEMPOTENCY_KEY_REUSED']) {
+    const shown = dr.errText(serverError('幂等键已用于其他数据请求', code, 409))
+    assert.doesNotMatch(shown, /幂等/)
+    assert.match(shown, /重新进入后再试/)
+  }
+  // 打印下单也用 IDEMPOTENCY_KEY_REUSED，全局表不能给它定说法
+  assert.ok(!Object.prototype.hasOwnProperty.call(ue.SHARED_USER_MESSAGES, 'IDEMPOTENCY_KEY_REUSED'))
+  const kept = dr.CLOSURE_NOTES.find((n) => n.k === '会保留')
+  assert.match(kept.v, /权益领取与核销流水/)
+})
+
 test('privacy 注销：提交失败时如实说，幂等键留着给下一次重试用', async () => {
   let n = 0
   const { page, modals, calls } = makePrivacy({

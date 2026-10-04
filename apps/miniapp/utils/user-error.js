@@ -133,6 +133,13 @@ const PASSTHROUGH_MESSAGE_CODES = [
   'QR_LOGIN_CLAIM_INVALID',      // 扫码登录凭证无效
   'QR_LOGIN_TERMINAL_MISMATCH',  // 扫码登录终端不匹配
   'QR_LOGIN_NOT_CONFIRMED',      // 扫码登录尚未确认
+
+  // 数据导出与账号注销（隐私与数据页）：这些码说的就是用户眼前这一步为什么没成，
+  // 原话由后端窗口 2026-10-04 逐句给出（member-privacy、member-step-up）。
+  'STEP_UP_TOKEN_INVALID',           // 二次验证凭证无效或已过期
+  'ACCOUNT_UNAVAILABLE',             // 账号当前不可用
+  'DATA_REQUEST_INVALID_TRANSITION', // 只能撤回尚未执行的注销申请 / 申请状态已变化
+  'DATA_REQUEST_NOT_FOUND',          // 数据请求不存在
 ];
 
 /**

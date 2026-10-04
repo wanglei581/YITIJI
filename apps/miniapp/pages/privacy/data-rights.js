@@ -42,7 +42,7 @@ const CLOSURE_PENDING_LABEL = '已受理，等待处理'
  */
 const CLOSURE_NOTES = [
   { k: '会删除', v: '你上传的文件（含扫描件）、AI 生成的结果、模拟面试记录、AI 顾问的会话记录、浏览与收藏、通知。还没用完的权益会作废。' },
-  { k: '会保留', v: '订单、打印记录、支付与退款流水、同意记录、意见反馈的处理记录。这些不再关联到你，按法律要求的期限保留。' },
+  { k: '会保留', v: '订单、打印记录、支付与退款流水、权益领取与核销流水、同意记录、意见反馈的处理记录。这些不再关联到你，按法律要求的期限保留。' },
   { k: '手机号', v: '解除绑定。之后用同一个号登录，是一个全新的账号。' },
   { k: '有订单时', v: '有还没取件、退款中或打印中的订单时，要等订单办完才会执行注销。' },
 ]
@@ -76,8 +76,14 @@ function statusLabel(status) {
 }
 
 /** 后端错误已由 request.js 归一成 Error(message, statusCode, code)。码值一并展示，便于排查与对账。 */
+// 幂等键两码的服务端原话是工程话（「幂等键已用于其他数据请求」），正常流程走不到；本页给一句能照着做的。
+// 只在本页处理：打印下单也用 IDEMPOTENCY_KEY_REUSED，那边有自己的换键逻辑，不能全局改它的说法。
+const IDEMPOTENCY_HINT = '这次提交没有成功，请退出本页重新进入后再试'
+const IDEMPOTENCY_CODES = { INVALID_IDEMPOTENCY_KEY: true, IDEMPOTENCY_KEY_REUSED: true }
+
 function errText(err) {
   if (!err) return '操作失败，请稍后重试'
+  if (err.code && IDEMPOTENCY_CODES[err.code] === true) return `${IDEMPOTENCY_HINT}（${err.code}）`
   const code = err.code ? `（${err.code}）` : ''
   return `${err.message || '操作失败'}${code}`
 }
