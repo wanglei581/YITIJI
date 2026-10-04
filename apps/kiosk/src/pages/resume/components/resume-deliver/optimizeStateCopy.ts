@@ -43,27 +43,14 @@ export function optimizeStateTitle(view: OptimizeViewState): string {
   return '请先上传简历完成诊断'
 }
 
-/** 右上角胶囊与正文同一套状态。AI 停用不再写成「等待优化建议」。 */
+/**
+ * 右上角胶囊。AI 停用不再写成「等待优化建议」（W-131）。
+ * 其余状态维持原来的短标签：胶囊不照抄正文标题，屏上同一句不出现两次。
+ */
 export function optimizeStatusCapsule(view: OptimizeViewState): { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string } {
-  switch (view) {
-    case 'ready':
-      return { tone: 'ok', label: '逐条确认' }
-    case 'unavailable':
-      return { tone: 'bad', label: 'AI 暂时用不了' }
-    case 'loading':
-    case 'empty':
-    case 'no-context':
-      return { tone: 'unknown', label: optimizeStateTitle(view) }
-    case 'read-error':
-    case 'optimize-failed':
-      return { tone: 'warn', label: optimizeStateTitle(view) }
-    case 'illegal':
-      return { tone: 'bad', label: optimizeStateTitle(view) }
-    default: {
-      const unseen: never = view
-      return { tone: 'unknown', label: optimizeStateTitle(unseen) }
-    }
-  }
+  if (view === 'ready') return { tone: 'ok', label: '逐条确认' }
+  if (view === 'unavailable') return { tone: 'bad', label: 'AI 暂时用不了' }
+  return { tone: 'unknown', label: '等待优化建议' }
 }
 
 export function optimizeStateDescription(view: OptimizeViewState, failMsg: string | null): string {

@@ -1696,6 +1696,8 @@ test('ending an interview with no saved answers does not say retry @w3-kiosk', a
 
 test('ending an interview during an AI outage keeps the saved answers and offers a non-AI exit @w3-kiosk', async ({ page, api }) => {
   armInterviewSession(api)
+  // 「看面试要点」进的面试服务页会查一次服务健康状态。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
   api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, {
     status: 503,
