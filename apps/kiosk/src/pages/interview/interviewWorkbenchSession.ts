@@ -39,6 +39,8 @@ export interface InterviewLiveState {
   questionIndex: number
   remainingSec: number
   omitPrintAnswers: boolean
+  /** 本场至少一次非跳过的 answer 接口成功过。缺省当没有。 */
+  answersRecorded?: boolean
 }
 
 export interface InterviewReportHandle {
@@ -124,6 +126,7 @@ function parseLive(raw: unknown): InterviewLiveState | undefined {
     questionIndex: typeof raw.questionIndex === 'number' ? raw.questionIndex : 1,
     remainingSec: typeof raw.remainingSec === 'number' ? raw.remainingSec : 0,
     omitPrintAnswers: raw.omitPrintAnswers === true,
+    answersRecorded: raw.answersRecorded === true,
   }
 }
 

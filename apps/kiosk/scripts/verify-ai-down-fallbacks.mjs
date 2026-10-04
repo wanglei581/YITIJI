@@ -61,7 +61,11 @@ const files = {
   // ⑦ 能力级停用（AI_PAUSED / AI_BUDGET_* 等）落到手动路径的接线
   assistantPage: kiosk('src/pages/assistant/AssistantPage.tsx'),
   selfAssessmentFlow: kiosk('src/pages/resume/SelfAssessmentFlow.tsx'),
-  interviewSession: kiosk('src/pages/interview/InterviewSessionPage.tsx'),
+  // 作答失败处理在 interviewTurnActions.ts：会话页已到 500 行门禁，表达式挪走后这里两份一起扫，断言不减。
+  interviewSession: [
+    kiosk('src/pages/interview/InterviewSessionPage.tsx'),
+    kiosk('src/pages/interview/session/interviewTurnActions.ts'),
+  ].join('\n'),
   contractReviewHome: kiosk('src/pages/contract-review/ContractReviewHomePage.tsx'),
   contractReviewProcessing: kiosk('src/pages/contract-review/ContractReviewProcessingPage.tsx'),
 }
@@ -609,7 +613,11 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     'assistantPage: 能力级停用必须置 unavailable 并在「本轮失败（可重试）」之前返回')
   // 自我探索：停用时不给「重试这一次」。
   must('selfAssessmentFlow', /taskAiDown\s*\n?\s*\? \{ retryHint: '[^']+' \}/, 'AI 停用时自我探索结果屏不得给「重试这一次」')
-  must('interviewSession', /setError\(aiDeclarationDeclineMessage\(err\) \?\? \(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : userMessageOf\(err, '提交失败，请重试'\)\)\)/, 'AI 停用时模拟面试作答失败不得叫人重试')
+  // W-129：作答失败要把草稿放回输入框，停用提示后面再补一句「还在输入框里」。
+  // 因此不再要求 setError( 直接粘在表达式前面。表达式本身（停用提示 / 「提交失败，请重试」兜底）必须原样保留，
+  // 并且只能经 submitFailureMessage 接后缀，不能另写一套停用文案。
+  must('interviewSession', /aiDeclarationDeclineMessage\(err\) \?\? \(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : userMessageOf\(err, '提交失败，请重试'\)\)/, 'AI 停用时模拟面试作答失败不得叫人重试')
+  must('interviewSession', /setError\(submitFailureMessage\(base, draftRestored\)\)/, '作答失败的补充说明必须接在原提示后面，且只在草稿真的放回输入框时出现')
   must('interviewSession', /setError\(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : `\$\{msg\}，可重新录音或改用文字输入`\)/, 'AI 停用时语音转写失败不得叫人重新录音')
   must('contractReviewHome', /setError\(isAiOutage\(err\)/, 'AI 停用时合同风险提示不得说成文件格式问题叫人重试')
   must('contractReviewProcessing', /setError\(declined \?\? \(isAiOutage\(err\)\s*\?\s*'[^']*暂时审不了[^']*'\s*:\s*'确认失败，请重试'\)\)/, 'AI 停用时合同确认失败不得叫人重试')
