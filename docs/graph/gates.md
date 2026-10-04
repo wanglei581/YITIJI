@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1832 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1842 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -166,7 +166,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/scripts/</code> — 9 个文件</summary>
+<summary><code>apps/admin/scripts/</code> — 10 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -176,6 +176,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/scripts/verify-admin-ai-usage-render.mjs` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/scripts/verify-console-batch5-copy.mjs` | `verify-console-plain-copy.mjs` |
 | `apps/admin/scripts/verify-console-batch6-copy.mjs` | `verify-console-plain-copy.mjs` |
+| `apps/admin/scripts/verify-console-batch7-copy.mjs` | `verify-console-plain-copy.mjs` |
 | `apps/admin/scripts/verify-console-privacy-copy.mjs` | `verify-console-plain-copy.mjs` |
 | `apps/admin/scripts/verify-console-screen-details.mjs` | `verify-console-screen-ui.mjs` |
 | `apps/admin/scripts/verify-honest-placeholders.mjs` | `verify-partner-stats-contract.mjs` |
@@ -183,7 +184,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 165 个文件</summary>
+<summary><code>apps/admin/src/</code> — 168 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -205,6 +206,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/ai-services/aiOperationLabels.ts` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/aiUsageDisplay.ts` | `verify-admin-ai-usage-contract.mjs`<br/>`verify-admin-ai-usage-ui.mjs`<br/>`verify-console-batch6-copy.mjs` |
 | `apps/admin/src/routes/ai-services/index.tsx` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs` |
+| `apps/admin/src/routes/alerts/alertDetailText.ts` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/alerts/index.tsx` | `verify-feedback-sla.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/audit/AuditDetailDrawer.tsx` | `verify-console-privacy-copy.mjs` |
 | `apps/admin/src/routes/audit/auditColumns.tsx` | `verify-console-privacy-copy.mjs` |
@@ -293,11 +295,13 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenTabs.ts` | `verify-console-screen-details.mjs` |
 | `apps/admin/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
-| `apps/admin/src/routes/screensaver/AssetUploadNotice.tsx` | `verify-console-batch5-copy.mjs` |
-| `apps/admin/src/routes/screensaver/AssetsTab.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/screensaver/AssetUploadNotice.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-batch7-copy.mjs` |
+| `apps/admin/src/routes/screensaver/AssetsTab.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-batch7-copy.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/screensaver/PlaylistsTab.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
-| `apps/admin/src/routes/screensaver/TerminalsTab.tsx` | `verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/screensaver/TerminalsTab.tsx` | `verify-console-batch7-copy.mjs`<br/>`verify-console-plain-copy.mjs` |
+| `apps/admin/src/routes/screensaver/assetUploadRules.ts` | `verify-console-batch7-copy.mjs` |
 | `apps/admin/src/routes/screensaver/index.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/screensaver/terminalConfigState.ts` | `verify-console-batch7-copy.mjs` |
 | `apps/admin/src/routes/smart-campus/index.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx` | `verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/routes/sync-sources/index.tsx` | `verify-no-raw-error-render.mjs`<br/>`verify-backend-p0-contracts.mjs` |
@@ -1186,7 +1190,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/src/</code> — 41 个文件</summary>
+<summary><code>apps/terminal-agent/src/</code> — 42 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1230,6 +1234,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/printer/print.ts` | `verify-image-scale-truth.ts`<br/>`verify-printer-config.mjs` |
 | `apps/terminal-agent/src/printer/types.ts` | `verify-print-retry-attempt.ts` |
 | `apps/terminal-agent/src/runtime-version.ts` | `verify-local-qr-proxy.ts` |
+| `apps/terminal-agent/src/usb/usb-capability.ts` | `verify-usb-import-agent.ts` |
 | `apps/terminal-agent/src/usb/usb-files.ts` | `verify-usb-import-agent.ts` |
 
 </details>
@@ -2233,7 +2238,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 581 个文件</summary>
+<summary><code>services/api/src/</code> — 586 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2452,8 +2457,13 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/console-screen/console-screen.fleet.ts` | `verify-queue-dispatch-printer-status.ts` |
 | `services/api/src/content/content-signing.ts` | `verify-ad-asset-range.ts`<br/>`verify-screensaver-content.ts` |
 | `services/api/src/content/content.controller.ts` | `verify-ad-asset-range.ts`<br/>`verify-multipart-field-nesting.ts` |
-| `services/api/src/content/content.service.ts` | `verify-ad-asset-range.ts`<br/>`verify-external-video-e2e.ts`<br/>`verify-screensaver-content.ts` |
+| `services/api/src/content/content.service.ts` | `verify-console-batch7-copy.mjs`<br/>`verify-ad-asset-range.ts`<br/>`verify-external-video-e2e.ts`<br/>`verify-screensaver-content.ts` |
+| `services/api/src/content/dto/create-external-video.dto.ts` | `verify-console-batch7-copy.mjs` |
+| `services/api/src/content/dto/save-config.dto.ts` | `verify-console-batch7-copy.mjs` |
+| `services/api/src/content/dto/update-ad-asset.dto.ts` | `verify-console-batch7-copy.mjs` |
+| `services/api/src/content/dto/upload-ad-asset.dto.ts` | `verify-console-batch7-copy.mjs` |
 | `services/api/src/content/external-video-url.ts` | `verify-external-video.ts` |
+| `services/api/src/content/media-validation.ts` | `verify-console-batch7-copy.mjs` |
 | `services/api/src/contract-review/__tests__/contract-review-http-controller.test.ts` | `verify-ai-throttle-dimension.ts` |
 | `services/api/src/contract-review/contract-review-error-log.ts` | `verify-contract-review-timeout.ts` |
 | `services/api/src/contract-review/contract-review-extraction.service.ts` | `verify-pdfjs-engine.ts` |

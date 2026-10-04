@@ -193,7 +193,7 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(home.getByRole('button', { name: /百宝箱/ })).toHaveCount(0)
   await expect(home.getByRole('button', { name: /智慧校园/ })).toHaveCount(0)
 
-  // 空态是陈述不是动作：它不能是按钮（无论 disabled 与否）。
+  // 空态是陈述不是动作：它不能是按钮（无论 disabled 与否）。它也是清场说明（W-42），不能删。
   await expect(home.getByText('这台机器上没有待继续的办理')).toBeVisible()
   await expect(home.getByRole('button', { name: /没有待继续的办理/ })).toHaveCount(0)
 
@@ -258,8 +258,7 @@ test('home ready state defers capability claims to entry without hiding the real
   const printTile = home.locator('[data-action="print-hub"]')
   await expect(printTile).toHaveAttribute('data-panel-state', 'ready')
   // 真实设备态仍在顶栏胶囊；主卡不重复报「打印机在线」。稿 01 写「先看价格，付了再打」，
-  // 但单价可以配成 0（免费试运营，订单记为 free、不进收银台），那时「付了再打」是假话；
-  // 改成价格为 0 时也成立的「先看价格再出纸」。
+  // 本用例沿用真实价目接口的非零夹具，所以保留原价格眉题；0 元与缺价见下方独立用例。
   await expect(printTile.getByText(/付了再打/)).toHaveCount(0)
   await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('打印机在线')
   await expect(printTile.getByText('先看价格再出纸 · 带走：打印件', { exact: true })).toBeVisible()
@@ -412,4 +411,44 @@ test('home entrance stays inside the narrow layout and settles fully @w1-mobile'
   await assertNoHorizontalOverflow(page)
   await expectTouchFloor(home.locator('button:visible, a:visible'), 48)
   await page.screenshot({ path: test.info().outputPath('home-intro-settled-390x844.png'), fullPage: true })
+})
+
+for (const [label, bw, color, expected] of [
+  ['两行零价', 0, 0, '免费打印 · 带走：打印件'],
+  ['仅黑白免费', 0, 50, '先看价格再出纸 · 带走：打印件'],
+  ['两行非零价', 20, 50, '先看价格再出纸 · 带走：打印件'],
+  ['彩色缺价', 0, null, '先选材料再出纸 · 带走：打印件'],
+] as const) {
+  test(`home print copy follows the published price: ${label} @w1-kiosk`, async ({ page, api }) => {
+    registerHomeApi(api)
+    api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+      status: 200, json: { printerStatus: 'ready', isOnline: true },
+    })
+    api.respond('GET', '/api/v1/print/price-config', {
+      status: 200, json: { billingEnabled: true, items: [
+        { serviceKey: 'print_bw_page', unitCents: bw, unit: 'page' },
+        ...(color === null ? [] : [{ serviceKey: 'print_color_page', unitCents: color, unit: 'page' }]),
+      ] },
+    })
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    const home = page.getByTestId('qx-home')
+    await expect(home.locator('[data-action="print-hub"]').getByText(expected, { exact: true })).toBeVisible()
+    if ((bw === 0 && color === 0) || color === null) {
+      await expect(home.getByText(/价格|报价|收费|付了再打/)).toHaveCount(0)
+    } else {
+      await expect(home.locator('.qx-home-hero-law')).toContainText('收费以现场公示为准')
+    }
+  })
+}
+
+test('home does not invent a price when the published price request fails @w1-kiosk', async ({ page, api }) => {
+  registerHomeApi(api)
+  api.respond('GET', '/api/v1/print/price-config', { status: 503, json: {} })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+    status: 200, json: { printerStatus: 'ready', isOnline: true },
+  })
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  await expect(home.locator('[data-action="print-hub"]').getByText('先选材料再出纸 · 带走：打印件', { exact: true })).toBeVisible()
+  await expect(home.getByText(/免费|价格|报价|收费/)).toHaveCount(0)
 })
