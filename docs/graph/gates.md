@@ -286,7 +286,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/screen/OpsGrid.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/TerminalTwinView.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/UsageHostingOff.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-details.mjs` |
-| `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-batch6-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/aiScreenDisplay.ts` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/metricLabels.ts` | `verify-console-batch5-copy.mjs`<br/>`verify-console-privacy-copy.mjs` |

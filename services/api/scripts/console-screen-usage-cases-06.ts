@@ -65,10 +65,10 @@ await prisma.browseLog.createMany({
   })
 heat = opened((await read()).metrics.heat7d)
 assert(
-    'u43. 04:00 原始合计为 7 也不当峰值，峰值只来自可见的 10 点',
+    'u43. 04:00低频与10:00的5同被隐藏，知道其余为0也无峰值反推',
     heat !== null && heat.days.every((day) => day.hours[4] === null)
-      && heat.days.find((day) => day.date === shanghaiDayKey(NOW))?.hours[10] === 5
-      && heat.peakHour === 10,
+      && heat.days.find((day) => day.date === shanghaiDayKey(NOW))?.hours[10] === null
+      && heat.peakHour === null,
   )
 await prisma.browseLog.deleteMany()
 const aiOf = (snap: ScreenUsageSnapshot) => opened(snap.metrics.ai)

@@ -106,7 +106,8 @@ await prisma.order.createMany({
         amountCents: 100,
       })),
     })
-const wall = new Date()
+// HTTP的7d用例必须落在截至昨天的完整日内。
+const wall = new Date(Date.now() - 86_400_000)
 await prisma.browseLog.createMany({
       data: [
         ...Array.from({ length: 5 }, () => ({ endUserId: memberId, targetType: 'job', targetId: jobJia, createdAt: wall, expiresAt: new Date(wall.getTime() + 86_400_000) })),

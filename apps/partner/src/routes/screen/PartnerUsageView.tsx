@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from '@ai-job-print/shared'
+import { formatDate } from '@ai-job-print/shared'
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
 import {
@@ -180,7 +180,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
       subtitle={`${SUBTITLE} · ${rangeText}`}
       layout="city"
       toolbar={toolbar}
-      reportingWindowText={usage.data.range === 'today' ? undefined : `${formatDateTime(usage.data.window.from)} 至 ${formatDate(new Date(Date.parse(usage.data.window.to) - 1).toISOString())}（截至昨天）`}
+      reportingWindowText={usage.data.range === 'today' ? undefined : `${formatDate(usage.data.window.from)} 至 ${formatDate(new Date(Date.parse(usage.data.window.to) - 1).toISOString())}（截至昨天）`}
       meta={usageMeta(usage.data)}
       pollSeconds={POLL_SECONDS}
       failure={usage.failure}

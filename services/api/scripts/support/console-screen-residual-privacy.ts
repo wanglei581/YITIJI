@@ -26,17 +26,17 @@ export function verifyResidualPrivacy(assert: Assert): void {
   let candidateCases = 0
   let protectedChecks = 0
   const completions = new Map<string, Envelope>()
-  for (const outside of [false, true]) {
-    for (let n = 1; n <= 6; n += 1) {
+  for (const knowsZero of [false, true]) for (const outside of [false, true]) {
+    for (let n = 1; n <= 4; n += 1) {
       let failure = ''
       sourceCases += enumerate(n, 7 * n, 7, (row, sum) => {
         const shown = suppressResidualRow(row, outside)
         if (row.some((v, i) => v < 5 && shown[i] !== null)) failure ||= `0与1–4必须共用null：row=${row} shown=${shown}`
-        const hidden = shown.flatMap((v, i) => v === null ? [i] : [])
+        const hidden = shown.flatMap((v, i) => v === null && (!knowsZero || row[i] !== 0) ? [i] : [])
         const visibleSum = shown.reduce<number>((total, v) => total + (v ?? 0), 0)
         const hiddenTotal = suppressAggregateCount(sum) === null
         const budget = hiddenTotal ? 4 : sum - visibleSum
-        const key = `${outside}:${hidden.length}:${budget}:${hiddenTotal}`
+        const key = `${knowsZero}:${outside}:${hidden.length}:${budget}:${hiddenTotal}`
         let env = completions.get(key)
         if (!env) {
           env = { min: Array(hidden.length).fill(Infinity), max: Array(hidden.length).fill(-Infinity) }
@@ -55,11 +55,15 @@ export function verifyResidualPrivacy(assert: Assert): void {
           if (index < 0 || env!.min[index] === env!.max[index]) failure ||= `outside=${outside} row=${row} shown=${shown} total=${sum} cell=${i}`
         })
       })
-      assert(`residual privacy：${n}格×0–7穷举，窗口外未知=${outside}，每个1–4格不唯一`, !failure, failure)
+      assert(`residual privacy：${n}格×0–7穷举，知道零值=${knowsZero}，窗口外未知=${outside}，每个1–4格不唯一`, !failure, failure)
     }
   }
   assert('residual privacy：未来null不计入m/r，补充隐藏最小格且同值取最早', JSON.stringify(suppressResidualRow([3, 5, 5, null], false)) === '[null,null,5,null]')
   assert('residual privacy：饱和4m也补充隐藏，无可见格则维持原样', JSON.stringify(suppressResidualRow([4, 4, 6], false)) === '[null,null,null]' && JSON.stringify(suppressResidualRow([3], false)) === '[null]')
+  const agy = [...Array<number>(10).fill(0), ...Array<number>(13).fill(10), 3]
+  const safe = suppressResidualRow(agy, false)
+  assert('residual privacy：agy的10个0、13个10、1个3，总计133，最早10也隐藏', safe[10] === null && safe[11] === 10 && safe[23] === null)
+  assert('residual privacy：已知零值时3/5不能由8减5反算', JSON.stringify(suppressResidualRow([0, 3, 5, null], false)) === '[null,null,null,null]')
   console.log(`  residual exhaustive: sourceCases=${sourceCases}, candidateCases=${candidateCases}, protectedChecks=${protectedChecks}`)
 }
 
@@ -77,13 +81,15 @@ export async function verifyResidualService(assert: Assert, prisma: PrismaServic
     const ai = snapshot.metrics.ai
     const heat = snapshot.metrics.heat7d
     const today = heat?.available ? heat.value.days.find((day) => day.date === '2032-10-04') : null
-    assert('residual service：真实AI合计8、可见5、低频3与零值共用null', ai?.available === true && ai.value.total === 8 && today?.hours[8] === 5 && today.hours.slice(0, 8).every((v) => v === null))
-    // 枚举与公开总计8、可见第8格5、其余null相符的已发生格子组合。
+    assert('residual service：真实AI合计8、5也补充隐藏，低频3与零值共用null', ai?.available === true && ai.value.total === 8 && today?.hours[8] === null && today.hours.slice(0, 8).every((v) => v === null))
+    // 已知其余小时为0，总计8；两格空值没有暴露哪格是补充隐藏。
     const possibilities = new Set<number>()
-    enumerate(8, 3, 3, (row, sum) => {
-      if (sum === 3 && JSON.stringify(suppressResidualRow([...row, 5], false)) === JSON.stringify(today?.hours.slice(0, 9))) possibilities.add(row[6]!)
-    })
-    assert('residual service：原隐藏格3有0/1/2/3四种可能，未来格不作掩护', possibilities.size === 4, [...possibilities].join(','))
+    for (let low = 1; low < 8; low += 1) {
+      const row = Array<number>(9).fill(0)
+      row[6] = low; row[8] = 8 - low
+      if (JSON.stringify(suppressResidualRow(row, false)) === JSON.stringify(today?.hours.slice(0, 9))) possibilities.add(low)
+    }
+    assert('residual service：知道零值、合计8时原3格仍有1–7七种可能，未来格不作掩护', possibilities.size === 7, [...possibilities].join(','))
     const pulse = snapshot.metrics.pulse2h
     assert('residual service：脉冲三序列0与1–4均null，可见5保留', pulse?.available === true && pulse.value.buckets.every((b) => b.info === null && b.print === null) && pulse.value.buckets.some((b) => b.ai === 5))
   } finally {

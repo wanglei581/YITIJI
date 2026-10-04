@@ -110,8 +110,8 @@ assert(
       a.terminals.map((t) => t.terminalCode).join(','),
     )
 assert(
-      'T4b. 出纸成功率：分母 8（completed + failed，窗口内结束），分子 6（含核查已出纸 1 单），75%',
-      a1?.output.settled === 8 && a1?.output.printed === null && a1?.output.successRate === null,
+      'T4b. 出纸成功率：分母8与另一台4形成公开合计12，补充隐藏；比率因低频未确认隐藏',
+      a1?.output.settled === null && a1?.output.printed === null && a1?.output.successRate === null,
       JSON.stringify(a1?.output),
     )
 assert(
@@ -120,8 +120,8 @@ assert(
       JSON.stringify(a1?.output),
     )
 assert(
-      'T4d. 打印扫描服务次数 = 窗口内新建的 10 个打印任务 + 2 个扫描任务，重试的任务只算一次',
-      a1?.serviceCount === 12,
+      'T4d. 打印扫描服务次数原始12，另一台4时按公开合计16补充隐藏',
+      a1?.serviceCount === null,
       String(a1?.serviceCount),
     )
 assert(
@@ -148,9 +148,9 @@ assert(
       a1?.online === false && a1?.lastHeartbeatAt === ago(258).toISOString(),
     )
 assert(
-      'T4i. 合计先求和再压制与算比率：服务 16 次，分母 12、分子 10、83.3%',
-      a.totals.terminalCount === 3 && a.totals.serviceCount === null
-        && a.totals.output.settled === null && a.totals.output.printed === null && a.totals.output.successRate === null
+      'T4i. 合计独立投影：服务16、已结束12；未出纸2与未确认1使成功数和比率隐藏',
+      a.totals.terminalCount === 3 && a.totals.serviceCount === 16
+        && a.totals.output.settled === 12 && a.totals.output.printed === null && a.totals.output.successRate === null
         && a.totals.unrecoveredTerminals === 1 && a.totals.silentTerminals === 2 && a.totals.onlineTerminals === 0,
       JSON.stringify(a.totals),
     )
@@ -161,9 +161,9 @@ assert(
       JSON.stringify(b.terminals[0]),
     )
 assert(
-      'T4k. 服务人次按会话数：A1 6 次、A2 0、A3 2 次压制为 null、合计 8；快照属 B 与窗口外的不算；B 只看到自己的 5 次',
-      a.visitCount.available === true && a.visitCount.recordingStarted === true && a1?.visitCount === 6 && a2?.visitCount === 0 && a3?.visitCount === null
-        && a.totals.visitCount === null && b.terminals[0]!.visitCount === 5 && b.totals.visitCount === 5,
+      'T4k. 服务人次按会话数：A1原6补充隐藏、A2保留0、A3原2隐藏、合计8公开；快照属 B 与窗口外的不算；B 只看到自己的 5 次',
+      a.visitCount.available === true && a.visitCount.recordingStarted === true && a1?.visitCount === null && a2?.visitCount === 0 && a3?.visitCount === null
+        && a.totals.visitCount === 8 && b.terminals[0]!.visitCount === 5 && b.totals.visitCount === 5,
       JSON.stringify({ a1: a1?.visitCount, a2: a2?.visitCount, a3: a3?.visitCount, total: a.totals.visitCount, b: b.totals.visitCount }),
     )
 assert(

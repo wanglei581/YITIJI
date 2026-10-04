@@ -49,6 +49,30 @@ export function verifyBatch6Copy({ runFile, textOf, shared, ui, fail }) {
     assert.ok(!textOf(pulse).includes('少于 5') && !textOf(pulse).includes('0'))
     assert.equal(colors(pulse).filter((c) => c === 'rgba(46,230,168,.12)').length, 2)
 
+    // 执行真实UsageView，包括可用空值及取数失败两条路径。
+    const date = runFile('packages/shared/src/formatDateTime.ts')
+    let usageData
+    const usage = runFile('apps/admin/src/routes/screen/UsageView.tsx', {
+      '@ai-job-print/shared': { ...shared, ...date },
+      react: { useCallback: (fn) => fn, useMemo: (fn) => fn() },
+      '@ai-job-print/refresh': { replaceIfChanged() {}, useRefreshable: () => ({ data: usageData }) },
+      '@ai-job-print/ui': { ...screen, TwinPulse: () => null },
+      '../../services/api/consoleScreen': { normalizeUsageRange: () => '7d' },
+      './aiScreenDisplay': {}, './metricLabels': {}, './screenMeta': {}, './UsageHostingOff': {},
+      './screenView': { TwinShell: ({ children, reportingWindowText }) => [reportingWindowText, children], stampText: () => '', failureOf: () => null },
+    })
+    const chrome = { params: { get: () => '7d' }, lite: true, setParam() {} }
+    usageData = { range: '7d', window: { from: '2026-09-26T16:00:00Z', to: '2026-10-03T16:00:00Z' }, generatedAt: '2026-10-04T04:00:00Z', limits: {}, metrics: {} }
+    // 其余面板不可用；脉冲独立可用。
+    for (const key of ['channels', 'heat7d', 'services', 'ai', 'jobs', 'content']) usageData.metrics[key] = { available: false }
+    usageData.metrics.pulse2h = ok({ buckets: [{ start: '2026-10-04T03:55:00Z', info: null, ai: null, print: null }] })
+    const usageText = textOf(usage.UsageView({ chrome })).replace(/\s+/g, ' ')
+    for (const label of ['信息 不足 5', 'AI 不足 5', '打印 不足 5']) assert.ok(usageText.includes(label), `脉冲null必须显示${label}`)
+    assert.ok(usageText.includes('2026-09-27 至 2026-10-03（截至昨天）'), '窗口两端必须均为上海日期')
+    usageData.metrics.pulse2h = { available: false, reason: 'source_query_failed' }
+    const failedText = textOf(usage.UsageView({ chrome }))
+    assert.ok(!failedText.includes('信息 不足 5') && failedText.includes('暂不能读取'), '取数失败必须与null分开')
+
     const fmt = runFile('apps/partner/src/routes/terminals/terminalOpsFormat.ts', {
       '@ai-job-print/shared': { ...shared, ...runFile('packages/shared/src/formatDateTime.ts') },
       '../../lib/csv': runFile('apps/partner/src/lib/csv.ts'),

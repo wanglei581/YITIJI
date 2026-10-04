@@ -6,6 +6,7 @@
 // 响应只给终端编号、名称、摆放位置与机构级聚合，不带 orgId、终端内部 id、
 // 任务 id、错误码或任何单据级字段。
 
+import { suppressResidualRow } from '../console-screen/console-screen.residual'
 import { suppressAggregateCount } from '../console-screen/console-screen.metric'
 import { isHealthyPrinterStatus, isLowPaperWarning, isPrinterFaultStatus } from '../terminals/printer-status'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
@@ -319,16 +320,14 @@ export function projectTotals(rows: readonly TerminalOpsRaw[], now: Date, report
     if (!row.reportedInWindow) silentTerminals += 1
   }
   const faults = summarizeFaults(segments, reportTo, rows.some((row) => row.reportedInWindow))
-  // 合计减其余终端会还原隐藏值。隐藏相关合计列；出纸组一并隐藏比率与差值。
-  const hiddenOutput = rows.some((row) => hasHiddenOutput(row.output))
   return {
     terminalCount: rows.length,
     onlineTerminals: online,
     unrecoveredTerminals,
     silentTerminals,
-    visitCount: rows.some((row) => suppressCount(row.visitCount) === null) ? null : suppressCount(visitCount),
-    serviceCount: rows.some((row) => suppressCount(row.serviceCount) === null) ? null : suppressCount(serviceCount),
-    output: hiddenOutput ? { printed: null, settled: null, successRate: null, unconfirmed: null } : projectOutput(output),
+    visitCount: suppressCount(visitCount),
+    serviceCount: suppressCount(serviceCount),
+    output: projectOutput(output),
     faults: {
       offlineCount: faults.offlineCount,
       offlineMinutes: faults.offlineMinutes,
@@ -369,13 +368,44 @@ export function assembleTerminalOperations(input: {
   rows: readonly TerminalOpsRaw[]
   visitRecordingStarted: boolean
 }): PartnerTerminalOperations {
+  const terminals = input.rows.map((row) => projectTerminalRow(row, input.now, input.to))
+  // 机构合计在其它页面也公开：保护逐台列，不能靠隐藏本页合计掩护。
+  for (const key of ['visitCount', 'serviceCount'] as const) {
+    const shown = suppressResidualRow(input.rows.map((row) => row[key]), false, terminals.map((row) => row[key]))
+    terminals.forEach((row, i) => { row[key] = shown[i]! })
+  }
+  for (const key of ['printed', 'settled', 'unconfirmed'] as const) {
+    const shown = suppressResidualRow(input.rows.map((row) => row.output[key]), false, terminals.map((row) => row.output[key]))
+    terminals.forEach((row, i) => {
+      if (row.output[key] !== shown[i]) {
+        // 比率及出纸组同一行的关联数字不能揭示补充隐藏值。
+        row.output.printed = null
+        row.output.unconfirmed = null
+        row.output.successRate = null
+      }
+      row.output[key] = shown[i]!
+    })
+  }
+  // 已结束−出纸成功也是公开列合计能约束的计数。
+  const failed = input.rows.map((row) => row.output.settled - row.output.printed)
+  const failedShown = suppressResidualRow(failed, false, terminals.map((row) =>
+    row.output.settled === null || row.output.printed === null ? null : row.output.settled - row.output.printed))
+  if (suppressCount(failed.reduce((sum, count) => sum + count, 0)) !== null
+    && failed.some((count) => suppressCount(count) === null)) {
+    terminals.forEach((row, i) => {
+      if (failed[i]! > 0 && failedShown[i] === null) {
+        // 保留已结束会与公开出纸合计、其它行的零值再次联立，整组补充隐藏。
+        row.output = { printed: null, settled: null, successRate: null, unconfirmed: null }
+      }
+    })
+  }
   return {
     period: input.period,
     timezone: SCREEN_TIMEZONE,
     window: { from: input.from.toISOString(), to: (input.to ?? input.now).toISOString() },
     generatedAt: input.now.toISOString(),
     minSample: TERMINAL_OPS_MIN_SAMPLE,
-    terminals: input.rows.map((row) => projectTerminalRow(row, input.now, input.to)),
+    terminals,
     totals: projectTotals(input.rows, input.now, input.to),
     visitCount: { available: true, recordingStarted: input.visitRecordingStarted },
     aiAvailability: { available: false, reason: AI_AVAILABILITY_UNAVAILABLE_REASON },

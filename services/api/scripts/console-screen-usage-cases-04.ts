@@ -118,7 +118,7 @@ assert(
         && heat.days[0]?.date === '2026-01-09'
         && heat.days[6]?.date === '2026-01-15'
         && todayHeat?.hours.length === 24
-        && todayHeat.hours[0] === 5
+        && todayHeat.hours[0] === null
         && todayHeat.hours[1] === 5
         && todayHeat.hours[4] === null
         && todayHeat.hours[7] === 5

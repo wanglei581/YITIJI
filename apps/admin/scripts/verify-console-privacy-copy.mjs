@@ -48,10 +48,10 @@ for (const numbered of [true, false]) {
 }
 const sensitiveKeys = ['phone', 'contactPhone', 'mobile', 'telephone', 'email', 'password', 'passwd', 'pwd', 'access_token', 'refreshToken', 'apiKey', 'secret', 'private_key', 'credential', 'authorization', 'cookie', '手机号', '邮箱', '密码', '令牌', '密钥']
 for (const key of sensitiveKeys) {
-  const payloadJson = JSON.stringify({ reason: '测试原因', nested: [{ [key]: 'sensitive-value' }], unknown_key: 7 })
+  const payloadJson = JSON.stringify({ reason: '测试原因', nested: [{ [key]: 'sensitive-value' }], unknown_key: 7, second_unknown: '第二个字段' })
   const visible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, payloadJson }, onClose: () => {} }))
   if (!visible.includes('已隐藏') || visible.includes('sensitive-value')) fail(`抽屉敏感键 ${key} 必须显示已隐藏`)
-  if (!visible.includes('原因') || !visible.includes('测试原因') || !visible.includes('其他字段') || !visible.includes('7')) fail('详情应翻译已知键并保留未知键和值')
+  if (!visible.includes('原因') || !visible.includes('测试原因') || !visible.includes('未登记字段') || !visible.includes('unknown_key') || !visible.includes('second_unknown') || !visible.includes('第二个字段') || !visible.includes('7')) fail('详情应翻译已知键并保留未知键和值')
   if (!visible.includes('request-long-value') || !visible.includes('browser-test')) fail('请求 ID 与浏览器标识必须在详情显示')
 }
 // r2：执行真实函数及抽屉，覆盖宽匹配误伤、嵌套字符串、签名与失败关闭。

@@ -41,25 +41,72 @@ export function verifyOutputPrivacy(assert: Assert): void {
   for (const size of [2, 3]) for (let i = 0; i < vectors.length; i++) for (let j = 0; j < vectors.length; j += 17) {
     const raws = [vectors[i]!, vectors[j]!, vectors[(i * 17 + j * 31) % vectors.length]!].slice(0, size)
     const output = assembleTerminalOperations({ period: 'week', from: new Date(now.getTime() - 7 * 86400_000), now, rows: raws.map(row), visitRecordingStarted: true })
-    for (const column of ['visitCount', 'serviceCount'] as const) {
-      if (output.terminals.some((r) => r[column] === null) && output.totals[column] !== null) multiLeaks.push(column)
-    }
     const totalRaw = raws.reduce((a, b) => ({ printed: a.printed + b.printed, settled: a.settled + b.settled, unconfirmed: a.unconfirmed + b.unconfirmed }), raw(0, 0, 0))
     for (const [k, actual] of raws.entries()) {
       const visible = output.terminals[k]!
       for (const [q, value] of quantities(actual).entries()) {
         if (suppressAggregateCount(value) !== null) continue
-        // 将一台换为另一个向量，逐字段维持所有已发布数字，包括合计与其余终端。
+        // 攻击者知道列合计，也能读其它行的全部非null字段；必须允许两台同时改值。
         const possibilities = vectors.filter((candidate) => {
           if (!agrees(visible.output, candidate)) return false
-          const changed = { printed: totalRaw.printed - actual.printed + candidate.printed,
+          const replacementTotal = { printed: totalRaw.printed - actual.printed + candidate.printed,
             settled: totalRaw.settled - actual.settled + candidate.settled,
             unconfirmed: totalRaw.unconfirmed - actual.unconfirmed + candidate.unconfirmed }
-          return agrees(output.totals.output, changed)
+          // 会话与新建任务是独立计数；不能把夹具的visitCount=printed当成业务恒等式。
+          if (agrees(output.totals.output, replacementTotal)) return true
+          return raws.some((other, j) => {
+            if (j === k) return false
+            const balanced = { printed: other.printed + actual.printed - candidate.printed,
+              settled: other.settled + actual.settled - candidate.settled,
+              unconfirmed: other.unconfirmed + actual.unconfirmed - candidate.unconfirmed }
+            if (quantities(balanced).some((v) => v < 0)) return false
+            if (!agrees(output.terminals[j]!.output, balanced)) return false
+            return agrees(output.totals.output, totalRaw)
+          })
         })
         if (new Set(possibilities.map((v) => quantities(v)[q])).size < 2) multiLeaks.push(`${size}/${i}/${j}/${k}/${q}`)
       }
     }
   }
-  assert('T privacy：2–3 台 14406 组抽样，合计相减也不能唯一还原隐藏量', multiLeaks.length === 0, multiLeaks.slice(0, 3).join('; '))
+  assert('T privacy：2–3 台 14406 组抽样，全部行出纸字段与公开合计无法唯一还原隐藏量', multiLeaks.length === 0, multiLeaks.slice(0, 3).join('; '))
+  verifyTerminalColumns(assert)
+}
+
+/** 独立攻击模型：合计已知，0也可已知；空格候选无上界（由合计约束）。 */
+export function verifyTerminalColumns(assert: Assert): void {
+  let sources = 0
+  let protectedChecks = 0
+  for (const size of [2, 3, 4]) {
+    let failure = ''
+    for (let encoded = 0; encoded < 8 ** size; encoded += 1) {
+      let code = encoded
+      const values = Array.from({ length: size }, () => { const v = code % 8; code = Math.floor(code / 8); return v })
+      const result = assembleTerminalOperations({ period: 'week', from: now, now,
+        rows: values.map((v, i) => row({ printed: v, settled: v, unconfirmed: v }, i)), visitRecordingStarted: true })
+      sources += 1
+      const sum = values.reduce((a, b) => a + b, 0)
+      const columns = [
+        result.terminals.map((r) => r.visitCount), result.terminals.map((r) => r.serviceCount),
+        ...(['printed', 'settled', 'unconfirmed'] as const).map((key) => result.terminals.map((r) => r.output[key])),
+      ]
+      if (result.totals.visitCount !== suppressAggregateCount(sum) || result.totals.serviceCount !== suppressAggregateCount(sum)) failure ||= `合计必须独立投影：${values}`
+      for (const shown of columns) for (const knowsZero of [false, true]) {
+        const hidden = shown.flatMap((v, i) => v === null && (!knowsZero || values[i] !== 0) ? [i] : [])
+        const residual = sum - shown.reduce<number>((a, b) => a + (b ?? 0), 0)
+        values.forEach((v, i) => {
+          if (v < 1 || v > 4) return
+          protectedChecks += 1
+          // 所有非零空格至少1，未知零值时至少0；其余残差任意分配给其它空格。
+          const min = knowsZero ? 1 : 0
+          const max = residual - min * (hidden.length - 1)
+          if (!hidden.includes(i) || (sum >= 5 && (hidden.length < 2 || max <= min))) failure ||= `knownZero=${knowsZero} values=${values} shown=${shown} sum=${sum} cell=${i}`
+        })
+      }
+    }
+    assert(`T column privacy：${size}台×0–7全量穷举，列合计已知/零值已知或未知，5列低频值不唯一`, !failure, failure)
+  }
+  const example = assembleTerminalOperations({ period: 'week', from: now, now,
+    rows: [8, 2].map((v, i) => row({ printed: v, settled: v, unconfirmed: v }, i)), visitRecordingStarted: true })
+  assert('T column privacy：8与2的逐台服务均隐藏，机构合计10照常公开', example.terminals.every((r) => r.visitCount === null) && example.totals.visitCount === 10)
+  console.log(`  terminal column exhaustive: sourceCases=${sources}, protectedChecks=${protectedChecks}`)
 }

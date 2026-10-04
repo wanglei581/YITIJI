@@ -18287,6 +18287,7 @@
       "apps/admin/scripts/verify-console-screen-details.mjs"
     ],
     "apps/admin/src/routes/screen/UsageView.tsx": [
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
@@ -27263,6 +27264,7 @@
         "files": [
           "apps/admin/src/routes/ai-services/aiLogDisplay.ts",
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
+          "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/terminalOpsFormat.ts",

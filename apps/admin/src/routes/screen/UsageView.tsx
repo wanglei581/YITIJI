@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from '@ai-job-print/shared'
+import { formatDate } from '@ai-job-print/shared'
 import { screenAiProvider } from './aiScreenDisplay'
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
@@ -121,7 +121,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
       subtitle={`${SUBTITLE} · ${rangeText}`}
       layout="city"
       toolbar={toolbar}
-      reportingWindowText={usage.data.range === 'today' ? undefined : `${formatDateTime(usage.data.window.from)} 至 ${formatDate(new Date(Date.parse(usage.data.window.to) - 1).toISOString())}（截至昨天）`}
+      reportingWindowText={usage.data.range === 'today' ? undefined : `${formatDate(usage.data.window.from)} 至 ${formatDate(new Date(Date.parse(usage.data.window.to) - 1).toISOString())}（截至昨天）`}
       meta={usageMeta(usage.data)}
       pollSeconds={POLL_SECONDS}
       failure={usage.failure}
@@ -293,7 +293,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
       <TwinSlot slot="bottom">
         <TwinMetricPanel
           title="实时调用脉冲"
-          sub="近 2 小时 · 每 5 分钟汇总 · 不含个人明细"
+          sub="近 2 小时 · 每 5 分钟 · 不足 5 次的时段不写数字"
           metric={u.pulse2h}
           source="每 5 分钟汇总一次信息浏览、AI 调用、打印扫描的次数；不足 5 次的时段不写数字。只有汇总，不滚动任何一次个人操作。"
           render={(value) => {
@@ -301,12 +301,12 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
             const first = value.buckets[0]
             return (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 22 }}>
-                <div style={{ width: 200, flex: 'none' }}>
+                <div style={{ width: 260, flex: 'none' }}>
                   <span className="twin-muted">最近 5 分钟</span>
                   <div className="twin-legend" style={{ marginTop: 6 }}>
-                    <span className="twin-lg" style={{ color: '#8fb2ee' }}>信息 {last?.info == null ? '—' : screenCount(last.info)}</span>
-                    <span className="twin-lg" style={{ color: '#2ee6a8' }}>AI {last?.ai == null ? '—' : screenCount(last.ai)}</span>
-                    <span className="twin-lg" style={{ color: '#72d6ff' }}>打印 {last?.print == null ? '—' : screenCount(last.print)}</span>
+                    <span className="twin-lg" style={{ color: '#8fb2ee' }}>信息 {last?.info == null ? '不足 5' : screenCount(last.info)}</span>
+                    <span className="twin-lg" style={{ color: '#2ee6a8' }}>AI {last?.ai == null ? '不足 5' : screenCount(last.ai)}</span>
+                    <span className="twin-lg" style={{ color: '#72d6ff' }}>打印 {last?.print == null ? '不足 5' : screenCount(last.print)}</span>
                   </div>
                 </div>
                 <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -315,7 +315,6 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                     <span>{first ? formatTime(first.start) : ''}</span>
                     <span>现在</span>
                   </div>
-                  <p className="twin-cap">不足 5 次的时段不写数字</p>
                 </div>
               </div>
             )

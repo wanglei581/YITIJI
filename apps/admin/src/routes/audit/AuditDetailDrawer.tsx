@@ -19,7 +19,7 @@ function PayloadValue({ value }: { value: unknown }) {
     <dl className="space-y-2">
       {Object.entries(value).map(([key, item]) => (
         <div key={key} className="rounded-lg bg-neutral-50 p-3">
-          <dt title={key} className="mb-1 text-xs text-neutral-500">{PAYLOAD_LABELS[key] ?? '其他字段'}</dt>
+          <dt title={key} className="mb-1 text-xs text-neutral-500">{PAYLOAD_LABELS[key] ?? <>未登记字段 · <code className="text-[10px] text-neutral-400">{key}</code></>}</dt>
           <dd className="break-words text-sm text-neutral-800">{['terminalId', 'terminalIds'].includes(key) ? <PayloadTerminalValue value={item} payload={value as Record<string, unknown>} /> : <PayloadValue value={item} />}</dd>
         </div>
       ))}
