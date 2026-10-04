@@ -1,5 +1,11 @@
 # 当前开发进度
 
+## 2026-10-04 夜：法律文本激活与线上静态压缩
+
+- 22:13 隐私政策 2026-10-pilot-3、用户协议 2026-10-pilot-2 激活（总指挥用公开接口核过正文逐字一致，线上巡检 11 项全过）。
+- 产品负责人 22:2x 同意后，总指挥在生产 nginx 新增 `/etc/nginx/conf.d/zyd-compression.conf`：gzip_vary on、gzip_comp_level 5、gzip_min_length 1024，gzip_types 为 css、js、json、svg、xml、manifest；gzip_proxied 保持默认 off，转发给后端的接口响应不压缩（避开 BREACH 一类问题）。改前备份 `/srv/ai-job-print-backups/nginx-before-gzip-20261004T142424Z`，`nginx -t` 通过后平滑重载。回退：`rm /etc/nginx/conf.d/zyd-compression.conf && nginx -t && systemctl reload nginx`。效果：一体机主脚本 2.38MB→714KB（下载约 6.3 秒→0.5 秒），两个后台主脚本 372KB / 339KB；`/api/v1/health` 仍不压缩。**重装服务器时要记得这份额外配置（nginx 站点配置目前不在仓库里）。** `/assets/` 指纹文件尚未加长缓存，第六次发布前再评估。
+- 当晚合入候选：后端 10 个（批次 #1255：#1243 #1248 #1251 #1250 #1252 #1242 #1225 #1230 #1232 #1233）、小程序无人值守文案 #1258、注销文案去掉「现场工作人员」#1257。
+
 ## 2026-10-04：小程序按「现场无人值守」改文字（分支 `claude/miniapp-unattended-copy`，叠在 #1219 上）
 
 产品负责人 10/4 主原则：设备现场没有工作人员，全程自助、自动。小程序里让用户「联系现场工作人员 / 找工作人员核对 / 工作人员处理后 / 到店核对」的地方（注册页面里 6 处，加 3 处「到店」）改成自助出路：手机上重试或重新下单、拨打服务电话。「换一台机器」要等后端接口说附近有别的在线终端才说，接口接上前一律不说（取件页两处；材料包那句「换一个服务点」是原有的、指选服务点，保留）。服务电话号码等后端公开接口（GET /api/v1/public/support-contact?terminalId=，返回 servicePhone / serviceHours / otherOnlineTerminalNearby / miniappPublished，开发中）再接，在那之前只说「号码在首页底部『经营者信息』里」，不写死（`utils/user-error.js` 的 `SUPPORT_HINT`）。停放的招聘会页面不打包，那里说的是主办方的现场人员，没动。新门禁（`free-pilot-copy.test.mjs`）：全部注册页面的 WXML、页面目录 JS 与 utils JS 的文字里不许出现找工作人员、店员、服务台、到店；`supportHint` 在页面 data 里实跑有值。只改文字与接线，不改样式。11 处改动逐处反向变异全部转红。
