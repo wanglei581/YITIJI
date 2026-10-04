@@ -38,6 +38,9 @@ const PROVIDER_CODES = new Set([
   'AI_RATE_LIMITED',
   'AI_BUSY',
   'AI_PROVIDER_NOT_CONFIGURED',
+  // 面试与岗位 AI 的 LLM 服务在模型未配置时抛这个短码（mock-interview-llm.service.ts、job-ai-llm.service.ts），
+  // 是我方配置问题，不该等 20 分钟清扫才退。
+  'AI_NOT_CONFIGURED',
   'AI_PROVIDER_INVALID',
   // 模型账户不可用、密钥失效、模型名停用。码的定义在 llm-failure.ts，这里只认字符串。
   'AI_PROVIDER_ACCOUNT_UNAVAILABLE',
@@ -45,6 +48,10 @@ const PROVIDER_CODES = new Set([
   'AI_ENDPOINT_NOT_ALLOWED',
   'AI_OPTIMIZE_INVALID_OUTPUT',
   'AI_LAYOUT_ADJUST_INVALID_OUTPUT',
+  // 模拟面试首题与岗位推荐/解读的诚实失败。码的定义在各自 LLM 服务，这里只认字符串。
+  'AI_INTERVIEW_QUESTION_FAILED',
+  'AI_JOB_RECOMMEND_FAILED',
+  'AI_JOB_EXPLAIN_FAILED',
 ])
 
 /**
@@ -82,6 +89,17 @@ export async function runWithAiQuota<T>(
     if (reason) await input.quota.release(receipt.reservationId, reason)
     throw error
   }
+}
+
+/** 语音转写不预占。会员当日面试次数已经用完、且本场尚未开场时才拒绝。 */
+export async function assertMemberInterviewRemaining(
+  quota: AiQuotaService | undefined,
+  endUserId: string | null | undefined,
+): Promise<void> {
+  if (!quota || !endUserId) return
+  const rows = await quota.remaining({ endUserId })
+  const interview = rows.find((row) => row.bucket === 'ai_interview')
+  if (!interview || interview.dailyRemaining + interview.extraRemaining <= 0) exhausted('ai_interview', new Date())
 }
 
 /** 语音转写不预占。会员当日简历次数已经用完时才拒绝。 */

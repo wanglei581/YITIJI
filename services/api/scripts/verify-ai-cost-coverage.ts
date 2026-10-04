@@ -307,6 +307,7 @@ async function runtimeChecks(): Promise<void> {
     getSession: async () => ({
       turns: [{ idx: 0, role: 'interviewer', content: '请做个自我介绍。' }],
     }),
+    assertTranscribeAllowed: async () => undefined,
   }
   // requesterOf 依赖 jwt/redis/prisma 解析可选会员；无 authorization 头时
   // resolveOptionalEndUser 返回 null，走匿名 accessToken 分支，不需要真 redis。

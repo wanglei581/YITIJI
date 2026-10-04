@@ -1,8 +1,9 @@
 /**
  * verify:ai-quota-coverage — Q2a 全入口登记。
  *
- * 静态：每个 @AiUse('generate'|'voice') 要么接入 runWithAiQuota（桶写在登记项上，默认 ai_resume），
- * 要么在登记表里标明不计次 / Q2b 接入 / 待裁定。登记表写了但路由没了、或新路由没登记，都报错。
+ * 静态：每个 @AiUse('generate'|'voice') 要么接入 runWithAiQuota（简历桶 ai_resume，
+ * 助手桶 ai_assistant，面试桶 ai_interview），要么在登记表里标明不计次 / Q2b 接入 / 待裁定。
+ * 登记表写了但路由没了、或新路由没登记，都报错。
  * 运行时：不监听端口。简历类入口扣 1、用完 429 且模型桩不再被调；同号重放与进行中 409；
  * 金额封顶先拒绝则不写预占；模型报错归还（客户端断开时也归还）、断开时成功照扣且结果能按记录号读回；
  * 简历桶用完不影响助手与面试；转写不预占；简历解析与小青对话不再扣旧的 Redis 会员计数。
@@ -51,7 +52,9 @@ import {
 import type { ContractReviewExtractionResult } from '../src/contract-review/contract-review-extraction.service'
 import { JobAiController, MemberJobAiSessionsController } from '../src/job-ai/job-ai.controller'
 import { GovernedJobFitService } from '../src/job-ai/governed-job-fit.service'
+import { JobAiQuotaService } from '../src/job-ai/job-ai-quota.service'
 import { JobAiService } from '../src/job-ai/job-ai.service'
+import { JobContextService } from '../src/job-ai/job-context.service'
 import { MaterialsController } from '../src/materials/materials.controller'
 import { MaterialsService } from '../src/materials/materials.service'
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
@@ -72,10 +75,10 @@ interface Entry {
   status: Status
   reason?: string
   via?: Via
-  /** 接入时核对的桶。不写则是 ai_resume。 */
-  bucket?: 'ai_resume' | 'ai_assistant'
   /** 控制器只入队，模型调用在作业里。 */
   asyncJob?: boolean
+  /** 接入时的次数桶。不写则是简历桶。 */
+  bucket?: 'ai_resume' | 'ai_assistant' | 'ai_interview'
 }
 
 const WIRED = '接入'
@@ -108,15 +111,15 @@ const REGISTRY: Entry[] = [
   { controller: AiController, method: 'chatWithAssistant', status: 'wired', bucket: 'ai_assistant', via: via(AiService.prototype, 'chatWithAssistant') },
   { controller: AiController, method: 'transcribeAssistantVoice', status: 'exempt', reason: '转写只查小青当天余量，不预占。会员次数用完才拒绝，有余量时不扣次' },
   { controller: AiController, method: 'summarizeAssistantSession', status: 'exempt', reason: '同一助手会话没有已存小结可直接返回；每次都会新建顾问会话并再调模型。按已存则不再调模型的条件不成立', via: via(AssistantSummaryService.prototype, 'summarize') },
-  { controller: MockInterviewController, method: 'create', status: 'q2b', via: via(MockInterviewService.prototype, 'createSession') },
-  { controller: MockInterviewController, method: 'start', status: 'q2b', via: via(MockInterviewService.prototype, 'start') },
-  { controller: MockInterviewController, method: 'answer', status: 'q2b', via: via(MockInterviewService.prototype, 'answer') },
-  { controller: MockInterviewController, method: 'transcribe', status: 'q2b' },
-  { controller: MockInterviewController, method: 'questionAudio', status: 'q2b' },
-  { controller: MockInterviewController, method: 'end', status: 'q2b', via: via(MockInterviewService.prototype, 'end') },
-  { controller: JobAiController, method: 'recommendations', status: 'q2b', via: via(JobAiService.prototype, 'recommendations') },
-  { controller: JobAiController, method: 'explain', status: 'q2b', via: via(JobAiService.prototype, 'explainJob') },
-  { controller: JobAiController, method: 'match', status: 'q2b', via: via(GovernedJobFitService.prototype, 'matchForMember') },
+  { controller: MockInterviewController, method: 'create', status: 'exempt', reason: '整场一次，首题下发时已计', via: via(MockInterviewService.prototype, 'createSession') },
+  { controller: MockInterviewController, method: 'start', status: 'wired', bucket: 'ai_interview', via: via(MockInterviewService.prototype, 'start') },
+  { controller: MockInterviewController, method: 'answer', status: 'exempt', reason: '整场一次，首题下发时已计', via: via(MockInterviewService.prototype, 'answer') },
+  { controller: MockInterviewController, method: 'transcribe', status: 'exempt', reason: '语音只查余量' },
+  { controller: MockInterviewController, method: 'questionAudio', status: 'exempt', reason: '整场一次，首题下发时已计' },
+  { controller: MockInterviewController, method: 'end', status: 'exempt', reason: '整场一次，首题下发时已计', via: via(MockInterviewService.prototype, 'end') },
+  { controller: JobAiController, method: 'recommendations', status: 'wired', bucket: 'ai_assistant', via: via(JobAiService.prototype, 'recommendations') },
+  { controller: JobAiController, method: 'explain', status: 'wired', bucket: 'ai_assistant', via: via(JobAiService.prototype, 'explainJob') },
+  { controller: JobAiController, method: 'match', status: 'wired', bucket: 'ai_assistant', via: via(GovernedJobFitService.prototype, 'matchForMember') },
   { controller: AdvisorController, method: 'ask', status: 'wired', bucket: 'ai_assistant', via: via(AdvisorService.prototype, 'ask') },
   { controller: DailyBriefController, method: 'create', status: 'exempt', reason: '早报不调用模型。按人只读本人取件与收藏，城市新数与广播是全站共享缓存；没有按人落库的早报正文', via: via(DailyBriefService.prototype, 'create') },
   { controller: TrtcController, method: 'startSession', status: 'exempt', reason: '开会话只向腾讯云建房并下发模型配置，本服务不调模型。成本由单次通话时长上限与金额封顶管', via: via(TrtcService.prototype, 'startSession') },
@@ -158,17 +161,13 @@ function reached(proto: Proto, name: string, depth = 2): string[] {
   return out
 }
 
-function quotaBucket(entry: Entry): 'ai_resume' | 'ai_assistant' {
-  return entry.bucket ?? 'ai_resume'
+function usesQuota(sources: string[], bucket: string): boolean {
+  const pattern = new RegExp(`bucket:\\s*['"]${bucket}['"]`)
+  return sources.some((source) => /runWithAiQuota/.test(source) && pattern.test(source))
 }
 
-function usesBucket(sources: string[], bucket: string): boolean {
-  const bucketRe = new RegExp(`bucket:\\s*['"]${bucket}['"]`)
-  return sources.some((source) => /runWithAiQuota/.test(source) && bucketRe.test(source))
-}
-
-function usesAnyRun(sources: string[]): boolean {
-  return sources.some((source) => /runWithAiQuota/.test(source))
+function usesAnyQuota(sources: string[]): boolean {
+  return sources.some((source) => /runWithAiQuota/.test(source) && /bucket:\s*['"]ai_(?:resume|assistant|interview)['"]/.test(source))
 }
 
 function routesOf(ctor: Ctor): string[] {
@@ -242,18 +241,18 @@ function staticScan(): { line: string; violations: string[] } {
       continue
     }
     const sources = entry.via ? reached(entry.via.proto, entry.via.method) : reached(entry.controller.prototype, entry.method)
-    const bucket = quotaBucket(entry)
-    const charged = usesBucket(sources, bucket)
+    const bucket = entry.bucket ?? 'ai_resume'
+    const charged = usesQuota(sources, bucket)
     const controllerSource = sourceOf(entry.controller.prototype, entry.method)
     if (entry.via && !entry.asyncJob && !controllerSource.includes(entry.via.method)) {
       violations.push(`${id} 的控制器没有调用 ${entry.via.method}`)
     }
     if (entry.status === 'wired') {
       if (charged) wired += 1
-      else violations.push(`${id} 应接入 ${bucket}，但方法体没有 runWithAiQuota 且桶不是 ${bucket}`)
+      else violations.push(`${id} 应接入 ${bucket}，但方法体没有 runWithAiQuota`)
       continue
     }
-    if (usesAnyRun(sources)) violations.push(`${id} 标为${entry.status === 'q2b' ? Q2B : entry.status === 'pending' ? PENDING : EXEMPT}，但调用了 runWithAiQuota`)
+    if (usesAnyQuota(sources)) violations.push(`${id} 标为${entry.status === 'q2b' ? Q2B : entry.status === 'pending' ? PENDING : EXEMPT}，但调用了 runWithAiQuota`)
     if ((entry.status === 'exempt' || entry.status === 'pending') && !entry.reason?.trim()) {
       violations.push(`${id} 的理由为空`)
     }
@@ -293,7 +292,7 @@ async function main() {
     console.log(`违规清单：${scanned.violations.join('；')}`)
     process.exit(1)
   }
-  assert.equal(scanned.line, '接入 11、不计次 11、待 Q2b 9、待裁定 0、违规 0')
+  assert.equal(scanned.line, '接入 15、不计次 16、待 Q2b 0、待裁定 0、违规 0')
 
   const apiRoot = resolve(__dirname, '..')
   const temporary = mkdtempSync(join(tmpdir(), 'verify-ai-quota-coverage-'))
@@ -349,6 +348,8 @@ async function main() {
       ['李婉清', 'contract'], ['高予辰', 'voice'], ['何清和', 'isolate'], ['马晓舟', 'failure'],
       ['沈清禾', 'order'], ['钱知衡', 'inflight'],
       ['顾清晏', 'xiaoqing'], ['江晚宁', 'assistant-voice'], ['宋知微', 'ask'], ['叶安然', 'chat-fail'],
+      ['顾言川', 'interview'], ['宋予宁', 'interviewFail'], ['叶晚宁', 'interviewTurn'], ['江澄', 'interviewEmpty'],
+      ['许南枝', 'recommend'], ['沈望舒', 'explain'], ['周晚舟', 'jobMatch'], ['梁书衡', 'fitRedis'],
     ] as const
     const userOf = new Map<string, string>()
     for (let i = 0; i < people.length; i++) {
@@ -364,6 +365,8 @@ async function main() {
     }
     const used = async (role: string) => (await quota.remaining({ endUserId: userOf.get(role)! })).find((row) => row.bucket === 'ai_resume')!.dailyUsed
     const usedAssistant = async (role: string) => (await quota.remaining({ endUserId: userOf.get(role)! })).find((row) => row.bucket === 'ai_assistant')!.dailyUsed
+    const usedBucket = async (role: string, bucket: 'ai_assistant' | 'ai_interview') =>
+      (await quota.remaining({ endUserId: userOf.get(role)! })).find((row) => row.bucket === bucket)!.dailyUsed
     const requester = (role: string) => ({ endUserId: userOf.get(role)!, accessToken: null as string | null })
     const expiresAt = new Date(Date.now() + 24 * 3600_000)
     const seedParse = async (role: string, taskId: string, fileId: string) => {
@@ -921,6 +924,281 @@ async function main() {
       const added = keys.slice(before)
       assert.equal(added.some((key) => key.includes(':member:')), false, '小青会员次数改由新账本计算')
       assert.equal(added.some((key) => key.includes(':terminal:')), true, '终端维仍扣')
+    })
+
+    const interviewCalls = { start: 0, answer: 0 }
+    let failInterviewQuestion = false
+    const interviewLlm = {
+      async nextQuestion(input: { askedCount: number }) {
+        if (failInterviewQuestion) {
+          throw new ServiceUnavailableException({ error: { code: 'AI_INTERVIEW_QUESTION_FAILED', message: '面试问题生成失败，请稍后重试' } })
+        }
+        if (input.askedCount === 0) interviewCalls.start += 1
+        else interviewCalls.answer += 1
+        return {
+          question: input.askedCount === 0 ? '请用一分钟说说你在青岛市南窗口做的事' : `第${input.askedCount + 1}题，请举一个材料一次办结的例子`,
+          qType: input.askedCount === 0 ? 'intro' : 'experience',
+        }
+      },
+    }
+    const interview = new MockInterviewService(
+      dbPrisma, interviewLlm as never, {} as never, {} as never, {} as never,
+      extraction as never, { write: async () => undefined } as never, quiet as never,
+      undefined, quota,
+    )
+    const interviewDto = {
+      interviewerType: 'hr', industry: '公共就业', position: '窗口服务', experience: 'y1_3', difficulty: 'standard', durationMin: 5,
+    }
+    const orgId = `org-jobai-${run}`
+    await dbPrisma.organization.create({ data: { id: orgId, name: '青岛市市南区公共就业服务中心', type: 'gov' } })
+    const publishedJob = await dbPrisma.job.create({
+      data: {
+        sourceOrgId: orgId, externalId: `shinan-window-${run}`, sourceName: '市南公共就业', sourceUrl: 'https://rsj.qingdao.gov.cn/window',
+        title: '就业服务窗口', company: '市南区公共就业服务中心', city: '青岛',
+        description: '在大厅窗口收求职材料，解答办理问题。', requirements: '熟悉材料清单',
+        reviewStatus: 'approved', publishStatus: 'published',
+      },
+    })
+    const jobRedisKeys: string[] = []
+    const jobRedis = {
+      async incrWithTtl(key: string) {
+        jobRedisKeys.push(key)
+        return jobRedisKeys.filter((item) => item === key).length
+      },
+      async decr(key: string) {
+        const index = jobRedisKeys.lastIndexOf(key)
+        if (index >= 0) jobRedisKeys.splice(index, 1)
+        return 0
+      },
+    }
+    const jobQuota = new JobAiQuotaService(jobRedis as never)
+    const jobCalls = { recommend: 0, explain: 0 }
+    const jobLlm = {
+      async recommend() {
+        jobCalls.recommend += 1
+        return {
+          provider: 'llm',
+          items: [{
+            jobId: publishedJob.id, fitLevel: 'reference_high', summary: '许南枝的窗口经历和这个岗位对得上',
+            matchPoints: ['做过求职登记'], gapPoints: ['材料话术还可以再固定'], actionChecklist: ['把清单印出来'],
+          }],
+        }
+      },
+      async explain() {
+        jobCalls.explain += 1
+        return {
+          provider: 'llm',
+          payload: {
+            responsibilities: ['在窗口收材料'], mustHaveRequirements: ['熟悉清单'],
+            niceToHaveRequirements: ['会简单解答'], preparationTips: ['先看公告'],
+          },
+        }
+      },
+    }
+    const jobAi = new JobAiService(
+      dbPrisma, jobLlm as never, new JobContextService(dbPrisma), extraction as never, jobFit,
+      quiet as never, new MemberPrivacyService(dbPrisma), jobQuota, governed, quota,
+    )
+
+    await check('模拟面试：首题下发扣 1 场，同一会话再开场不扣也不调模型', async () => {
+      const created = await interview.createSession(interviewDto, requester('interview'))
+      const before = interviewCalls.start
+      const first = await interview.start(created.sessionId, requester('interview'))
+      assert.match(first.question, /青岛市南/)
+      assert.equal(interviewCalls.start, before + 1)
+      assert.equal(await usedBucket('interview', 'ai_interview'), 1)
+      const second = await interview.start(created.sessionId, requester('interview'))
+      assert.equal(second.question, first.question)
+      assert.equal(interviewCalls.start, before + 1)
+      assert.equal(await usedBucket('interview', 'ai_interview'), 1)
+      const anonBefore = await dbPrisma.aiQuotaReservation.count()
+      const anon = await interview.createSession(interviewDto, { endUserId: null, accessToken: null })
+      await interview.start(anon.sessionId, { endUserId: null, accessToken: anon.accessToken ?? null })
+      assert.equal(await dbPrisma.aiQuotaReservation.count(), anonBefore)
+    })
+
+    await check('模拟面试：首题失败归还，会话回到未开始', async () => {
+      const created = await interview.createSession(interviewDto, requester('interviewFail'))
+      failInterviewQuestion = true
+      try {
+        await expectCode('开场失败', 'AI_INTERVIEW_QUESTION_FAILED', () => interview.start(created.sessionId, requester('interviewFail')))
+      } finally {
+        failInterviewQuestion = false
+      }
+      assert.equal(await usedBucket('interviewFail', 'ai_interview'), 0)
+      const session = await dbPrisma.mockInterviewSession.findUniqueOrThrow({ where: { id: created.sessionId } })
+      assert.equal(session.status, 'configured')
+      assert.equal(await dbPrisma.mockInterviewTurn.count({ where: { sessionId: created.sessionId } }), 0)
+    })
+
+    await check('模拟面试：题数到上限后不调模型，同一题重复提交只调一次', async () => {
+      const capped = await interview.createSession({ ...interviewDto, durationMin: 3 }, requester('interviewTurn'))
+      await interview.start(capped.sessionId, requester('interviewTurn'))
+      await dbPrisma.mockInterviewSession.update({ where: { id: capped.sessionId }, data: { questionTarget: 1 } })
+      const beforeCap = interviewCalls.answer
+      const done = await interview.answer(capped.sessionId, { answer: '我在市南窗口负责求职登记。' }, requester('interviewTurn'))
+      assert.equal(done.done, true)
+      assert.equal(interviewCalls.answer, beforeCap)
+      await expectCode('题已答完', 'INTERVIEW_ALREADY_COMPLETE', () => interview.answer(
+        capped.sessionId, { answer: '再答一次' }, requester('interviewTurn'),
+      ))
+      assert.equal(interviewCalls.answer, beforeCap)
+
+      const open = await interview.createSession(interviewDto, requester('interviewTurn'))
+      await interview.start(open.sessionId, requester('interviewTurn'))
+      const beforeSame = interviewCalls.answer
+      const [left, right] = await Promise.all([
+        interview.answer(open.sessionId, { answer: '我把缺的材料列成一张表。' }, requester('interviewTurn')),
+        interview.answer(open.sessionId, { answer: '我把缺的材料列成一张表。' }, requester('interviewTurn')),
+      ])
+      assert.equal(interviewCalls.answer, beforeSame + 1)
+      assert.equal(left.done, false)
+      assert.equal(right.done, false)
+      if (!left.done && !right.done) assert.equal(left.question, right.question)
+    })
+
+    await check('模拟面试余量用完：开场前拒绝，创建不受影响，场内转写不再查', async () => {
+      const jiang = userOf.get('interviewEmpty')!
+      for (let i = 0; i < 5; i++) {
+        const row = await quota.reserve({ bucket: 'ai_interview', endUserId: jiang, operationKey: `fill:${jiang}:${i}` })
+        await quota.commit(row.reservationId, { resultRef: `fill-${run}-${i}` })
+      }
+      const created = await interview.createSession(interviewDto, requester('interviewEmpty'))
+      assert.ok(created.sessionId)
+      const beforeModel = interviewCalls.start
+      await expectCode('面试用完', 'AI_QUOTA_EXHAUSTED', () => interview.start(created.sessionId, requester('interviewEmpty')))
+      assert.equal(interviewCalls.start, beforeModel)
+      const again = await interview.createSession(interviewDto, requester('interviewEmpty'))
+      assert.ok(again.sessionId)
+      const jwt = new JwtService({ secret: 'verify-ai-quota-coverage-secret-0123456789' })
+      const token = jwt.sign({ sub: jiang, jti: `sess-${jiang}` }, { audience: 'enduser', expiresIn: '10m' })
+      const redis = { async get(key: string) { return key === memberSessionKey(`sess-${jiang}`) ? jiang : null } }
+      let asrCalls = 0
+      const asr = { activeProviderName: 'coverage-asr', enabled: true, async recognizeWav() { asrCalls += 1; return { ok: true, text: '江澄想继续做窗口' } } }
+      const wav = Buffer.alloc(12)
+      wav.write('RIFF', 0)
+      wav.write('WAVE', 8)
+      const controller = new MockInterviewController(
+        interview, asr as never, {} as never, jwt, redis as never, dbPrisma, quiet as never,
+      )
+      await expectCode('开场前转写', 'AI_QUOTA_EXHAUSTED', () => controller.transcribe(created.sessionId, { buffer: wav } as never, { headers: { authorization: `Bearer ${token}` } } as never))
+      assert.equal(asrCalls, 0)
+      const gu = userOf.get('interview')!
+      for (let i = 0; i < 4; i++) {
+        const row = await quota.reserve({ bucket: 'ai_interview', endUserId: gu, operationKey: `fill:${gu}:${i}` })
+        await quota.commit(row.reservationId, { resultRef: `gu-${run}-${i}` })
+      }
+      const guSession = await dbPrisma.mockInterviewSession.findFirstOrThrow({ where: { endUserId: gu, status: 'in_progress' } })
+      const guToken = jwt.sign({ sub: gu, jti: `sess-${gu}` }, { audience: 'enduser', expiresIn: '10m' })
+      const guRedis = { async get(key: string) { return key === memberSessionKey(`sess-${gu}`) ? gu : null } }
+      const guController = new MockInterviewController(
+        interview, asr as never, {} as never, jwt, guRedis as never, dbPrisma, quiet as never,
+      )
+      const spoken = await guController.transcribe(guSession.id, { buffer: wav } as never, { headers: { authorization: `Bearer ${guToken}` } } as never)
+      assert.match(spoken.data.text, /江澄/)
+      assert.equal(asrCalls, 1)
+      const replay = await interview.start(guSession.id, requester('interview'))
+      assert.match(replay.question, /青岛市南/)
+      assert.equal(await usedBucket('interview', 'ai_interview'), 5)
+    })
+
+    await check('岗位推荐：空候选不扣，成功扣 1，缓存命中不扣也不调模型', async () => {
+      const taskId = `xu-${run}-rec`
+      await seedParse('recommend', taskId, `file-${run}-xu`)
+      await dbPrisma.userAiConsent.create({ data: { endUserId: userOf.get('recommend')!, scope: 'job_ai', consentVersion: '20260701' } })
+      const context = { member: userOf.get('recommend')!, terminal: 'desk-shinan-02', ip: '10.8.4.30' }
+      const empty = await jobAi.recommendations(
+        { resumeTaskId: taskId, filters: { city: '拉萨' }, terminalId: 'desk-shinan-02' },
+        requester('recommend'), context,
+      )
+      assert.equal(empty.recommendations.length, 0)
+      assert.equal(jobCalls.recommend, 0)
+      assert.equal(await usedBucket('recommend', 'ai_assistant'), 0)
+      const keysBefore = jobRedisKeys.length
+      const first = await jobAi.recommendations(
+        { resumeTaskId: taskId, terminalId: 'desk-shinan-02' }, requester('recommend'), context,
+      )
+      assert.equal(first.recommendations.length, 1)
+      assert.equal(jobCalls.recommend, 1)
+      assert.equal(await usedBucket('recommend', 'ai_assistant'), 1)
+      assert.equal(jobRedisKeys.slice(keysBefore).some((key) => key.includes(':member:')), false)
+      assert.equal(jobRedisKeys.slice(keysBefore).some((key) => key.includes(':terminal:')), true)
+      assert.equal(jobRedisKeys.slice(keysBefore).some((key) => key.includes(':ip:')), true)
+      const keysAfter = jobRedisKeys.length
+      const second = await jobAi.recommendations(
+        { resumeTaskId: taskId, terminalId: 'desk-shinan-02' }, requester('recommend'), context,
+      )
+      assert.equal(second.session.id, first.session.id)
+      assert.equal(jobCalls.recommend, 1)
+      assert.equal(await usedBucket('recommend', 'ai_assistant'), 1)
+      assert.equal(jobRedisKeys.length, keysAfter)
+    })
+
+    await check('岗位解读：成功扣 1，缓存命中不扣也不调模型', async () => {
+      await dbPrisma.userAiConsent.create({ data: { endUserId: userOf.get('explain')!, scope: 'job_ai', consentVersion: '20260701' } })
+      const context = { member: userOf.get('explain')!, terminal: 'desk-shinan-03', ip: '10.8.4.31' }
+      const first = await jobAi.explainJob(publishedJob.id, requester('explain'), 'desk-shinan-03', context)
+      assert.ok(first.responsibilities.includes('在窗口收材料'))
+      assert.equal(jobCalls.explain, 1)
+      assert.equal(await usedBucket('explain', 'ai_assistant'), 1)
+      const second = await jobAi.explainJob(publishedJob.id, requester('explain'), 'desk-shinan-03', context)
+      assert.equal(second.session.id, first.session.id)
+      assert.equal(jobCalls.explain, 1)
+      assert.equal(await usedBucket('explain', 'ai_assistant'), 1)
+    })
+
+    await check('岗位匹配：成功扣 1，缓存命中不扣也不调模型', async () => {
+      const taskId = `zhou-${run}-match`
+      await seedParse('jobMatch', taskId, `file-${run}-zhouwan`)
+      await dbPrisma.userAiConsent.create({ data: { endUserId: userOf.get('jobMatch')!, scope: 'job_ai', consentVersion: '20260701' } })
+      let matchCalls = 0
+      const matchLlm = { async analyze() { matchCalls += 1; return { provider: 'llm', payload: { summary: '周晚舟和窗口岗位大体对得上', matchPoints: [{ point: '做过窗口', evidence: '市南' }], gapPoints: [{ gap: '话术', suggestion: '写成清单' }], targetedSuggestions: ['带上材料'] } } } }
+      const matchFit = new JobFitService(dbPrisma, matchLlm as never, extraction as never, audit)
+      const matchGoverned = new GovernedJobFitService(
+        dbPrisma, matchFit, new JobContextService(dbPrisma), quiet as never, new MemberPrivacyService(dbPrisma), jobQuota, quota,
+      )
+      const context = { member: userOf.get('jobMatch')!, terminal: 'desk-shinan-04', ip: '10.8.4.32' }
+      const keysBefore = jobRedisKeys.length
+      const first = await matchGoverned.matchForMember({
+        jobId: publishedJob.id, resumeTaskId: taskId, requester: requester('jobMatch'), terminalId: 'desk-shinan-04', quotaContext: context,
+      })
+      assert.equal(first.jobFit.status, 'completed')
+      assert.equal(matchCalls, 1)
+      assert.equal(await usedBucket('jobMatch', 'ai_assistant'), 1)
+      assert.equal(jobRedisKeys.slice(keysBefore).some((key) => key.includes(':member:')), false)
+      assert.equal(jobRedisKeys.slice(keysBefore).some((key) => key.includes(':terminal:')), true)
+      const second = await matchGoverned.matchForMember({
+        jobId: publishedJob.id, resumeTaskId: taskId, requester: requester('jobMatch'), terminalId: 'desk-shinan-04', quotaContext: context,
+      })
+      assert.equal(second.session.id, first.session.id)
+      assert.equal(matchCalls, 1)
+      assert.equal(await usedBucket('jobMatch', 'ai_assistant'), 1)
+    })
+
+    await check('岗位对照的会员维不再扣旧 Redis，终端和 IP 仍扣', async () => {
+      const taskId = `liang-${run}-fit`
+      await seedParse('fitRedis', taskId, `file-${run}-liang`)
+      await dbPrisma.userAiConsent.create({ data: { endUserId: userOf.get('fitRedis')!, scope: 'job_ai', consentVersion: '20260701' } })
+      const fitKeys: string[] = []
+      const fitRedis = { async incrWithTtl(key: string) { fitKeys.push(key); return 1 }, async decr() { return 0 } }
+      const fitQuota = new JobAiQuotaService(fitRedis as never)
+      let fitCalls = 0
+      const fitLlm = { async analyze() { fitCalls += 1; return { provider: 'llm', payload: { summary: '梁书衡的窗口经历可以对照前台岗位', matchPoints: [{ point: '做过窗口', evidence: '市南' }], gapPoints: [], targetedSuggestions: ['整理清单'] } } } }
+      const fitService = new JobFitService(dbPrisma, fitLlm as never, extraction as never, audit)
+      const fitGoverned = new GovernedJobFitService(
+        dbPrisma, fitService, { async buildTargetJobContext() { throw new Error('手填岗位不应去读系统岗位') } } as never,
+        quiet as never, new MemberPrivacyService(dbPrisma), fitQuota, quota,
+      )
+      const result = await fitGoverned.analyzeForJobFit(
+        { taskId, manualJob: { title: '就业服务窗口', requirements: '熟悉材料清单' } },
+        requester('fitRedis'),
+        { member: userOf.get('fitRedis')!, terminal: 'desk-shinan-05', ip: '10.8.4.33' },
+      )
+      assert.equal(result.status, 'completed')
+      assert.equal(fitCalls, 1)
+      assert.equal(fitKeys.some((key) => key.includes(':member:')), false)
+      assert.equal(fitKeys.some((key) => key.includes(':terminal:')), true)
+      assert.equal(fitKeys.some((key) => key.includes(':ip:')), true)
     })
   } finally {
     LlmResumeOptimizeService.prototype.adjustLayoutDraft = originalLayout
