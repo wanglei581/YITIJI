@@ -38,7 +38,7 @@ import { MockInterviewService } from '../src/mock-interview/mock-interview.servi
 import { InterviewReportPdfService } from '../src/mock-interview/interview-report-pdf.service'
 import { InterviewPracticeSheetPdfService } from '../src/mock-interview/interview-practice-sheet-pdf.service'
 import { INTERVIEW_PRACTICE_RESULT_DISCLAIMER } from '../src/mock-interview/interview-practice-sheet'
-import { InterviewTranscriptPdfService, TRANSCRIPT_PRINT_FOOTER } from '../src/mock-interview/interview-transcript-pdf.service'
+import { InterviewTranscriptPdfService, TRANSCRIPT_AI_SOURCE_NOTE, TRANSCRIPT_PRINT_FOOTER } from '../src/mock-interview/interview-transcript-pdf.service'
 import { INTERVIEW_NO_ANSWERS_MESSAGE, InterviewTranscriptPrintService } from '../src/mock-interview/interview-transcript-print.service'
 import { PrintTranscriptDto } from '../src/mock-interview/mock-interview.controller'
 import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
@@ -851,7 +851,9 @@ async function main() {
       const rawPdf = pdfFile.buffer.toString('latin1')
       const aigcRef = rawPdf.match(/\/AIGenerated (\d+) 0 R/)
       const aigcValue = aigcRef ? rawPdf.match(new RegExp(`${aigcRef[1]} 0 obj\\s*\\(([^)]*)\\)`)) : null
-      if (!aigcValue || aigcValue[1] !== 'false') fail(`20. PDF 应写 AIGenerated=false，实际 ${aigcValue?.[1] ?? '缺失'}`)
+      // 题目由 AI 面试官（模型）生成：必须显式标明来源，元数据 AIGenerated=true；回答写明是本人作答。
+      if (!aigcValue || aigcValue[1] !== 'true') fail(`20. 题目由模型生成，PDF 应写 AIGenerated=true，实际 ${aigcValue?.[1] ?? '缺失'}`)
+      if (!offText.includes(TRANSCRIPT_AI_SOURCE_NOTE.replace(/\s+/gu, ''))) fail('20. PDF 应写明「题目由 AI 面试官生成；回答为你本人作答」')
       const still = await prisma.mockInterviewSession.findUnique({ where: { id: created.sessionId } })
       if (still?.status !== 'in_progress') fail('20. 打印不应改会话状态')
 

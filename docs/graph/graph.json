@@ -8408,10 +8408,20 @@
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
         "handler": "CreateInterviewDto.printTranscript",
         "method": "POST",
-        "models": [],
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "MockInterviewReport",
+          "MockInterviewSession",
+          "MockInterviewTurn",
+          "PrintTask"
+        ],
         "path": "/api/v1/mock-interviews/:id/transcript/print",
         "roles": [],
-        "serviceFiles": [],
+        "serviceFiles": [
+          "services/api/src/mock-interview/interview-transcript-print.service.ts"
+        ],
         "services": [
           "InterviewTranscriptPrintService"
         ]
@@ -17105,6 +17115,7 @@
         "usedBy": [
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -17115,6 +17126,7 @@
           "MockInterviewSession"
         ],
         "usedBy": [
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -25546,6 +25558,12 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
+      "services/api/scripts/verify-mock-interview.ts"
+    ],
+    "services/api/src/mock-interview/interview-transcript-pdf.service.ts": [
+      "services/api/scripts/verify-mock-interview.ts"
+    ],
+    "services/api/src/mock-interview/interview-transcript-print.service.ts": [
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
@@ -38286,6 +38304,8 @@
           "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
           "services/api/src/mock-interview/interview-practice-sheet.ts",
           "services/api/src/mock-interview/interview-report-pdf.service.ts",
+          "services/api/src/mock-interview/interview-transcript-pdf.service.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview-llm.service.ts",
           "services/api/src/mock-interview/mock-interview.controller.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",

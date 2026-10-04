@@ -11,12 +11,15 @@ import { registerInterviewCjkFont } from './interview-report-pdf.service'
 //   通用题目单    写死的题库 + 空白作答行，没有用户这次的回答
 //   本场作答记录  这一场已经问过的题和候选人自己的回答，不调模型
 //
-// 纸上不出现模型写的评语。刻意不写 AIGenerated='true'：
-// applyAigcPdfMetadata 会固定写成 true，而这张纸里没有模型生成的句子。
+// 纸上不出现模型写的评语、评分。但题目是 AI 面试官（模型）出的，所以显式写明
+// 「题目由 AI 面试官生成」，元数据 AIGenerated 也写 true（AI 生成合成内容的标识要求）；
+// 回答是本人作答、未经模型改写。
 // ============================================================
 
 const TRANSCRIPT_SERVICE_PROVIDER_CODE = 'zyd-interview-transcript-v1'
 
+/** 表头下的显式标识：题目来自模型，回答来自本人。 */
+export const TRANSCRIPT_AI_SOURCE_NOTE = '题目由 AI 面试官生成；回答为你本人作答，未经 AI 修改。'
 /** 页脚口径。改这句话要同时改 verify-mock-interview 里剥掉它再查禁词的断言。 */
 export const TRANSCRIPT_PRINT_FOOTER = '本页为练习记录，不含 AI 点评'
 
@@ -63,6 +66,7 @@ export class InterviewTranscriptPdfService {
     )
     doc.moveDown(0.15)
     doc.fontSize(9).fillColor('#6b7280').text(INTERVIEW_PRACTICE_RESULT_DISCLAIMER)
+    doc.fontSize(9).fillColor('#6b7280').text(TRANSCRIPT_AI_SOURCE_NOTE)
 
     doc.moveDown(0.6)
     content.items.forEach((item, index) => {
@@ -89,15 +93,15 @@ export class InterviewTranscriptPdfService {
     return { buffer, pageCount }
   }
 
-  /** 键名与题目单同一组，便于检索。值必须是 false：这张纸不是模型产物。 */
+  /** 键名与题目单同一组，便于检索。题目由模型生成，所以 AIGenerated 写 true。 */
   private applyHonestMetadata(doc: { info: PDFKit.DocumentInfo }): void {
     const generatedAt = new Date()
     const info = doc.info as unknown as Record<string, string | Date>
     info['Title'] = TRANSCRIPT_PRINT_TITLE
     info['Author'] = '青序 AI 求职服务'
-    info['Subject'] = '求职者本人本场练习的题目与回答，不含模型评语；仅供本人练习参考，不代表任何招聘结果'
+    info['Subject'] = '本场练习的题目（由 AI 面试官生成）与求职者本人的回答，不含模型评语；仅供本人练习参考，不代表任何招聘结果'
     info['CreationDate'] = generatedAt
-    info['AIGenerated'] = 'false'
+    info['AIGenerated'] = 'true'
     info['ServiceProviderCode'] = TRANSCRIPT_SERVICE_PROVIDER_CODE
     info['GeneratedAt'] = generatedAt.toISOString()
   }
