@@ -204,14 +204,24 @@ A11c 会阻止**新接入**的键盘类设备，扫码器在系统看来就是�
    - 触摸屏照常可点（A11c 不挡 HID 类，触摸不受影响）。
    扫码器坏了要换：**先**在第 2 步的允许名单里加上新扫码器的 `HID\VID…&PID…`，再插新的。同型号直接插即可。
 
-### G5 摄像头：只用麦克风，镜头不用
+4. **扫码器只当键盘用**：若它的配置工具或设置码里有「图像上传」「拍照存储」一类功能，一律关闭（合规窗口要求：扫码口只读取用户主动出示的码，不保存图像）。
 
-一体机现在**没有任何功能使用摄像头**：前端唯一的采集是麦克风（语音模拟面试的录音 `apps/kiosk/src/utils/wavRecorder.ts`、数字人小青通话 `apps/kiosk/src/hooks/useAiAdvisorCallSession.ts` 只开本地音频），没有视频采集（`peripheral-field-acceptance-2026-08.md` 第 12 行同此结论）。
 
-1. **镜头加物理遮挡**（遮挡片或不透光胶片）。机身告示的写法由合规窗口出。
-2. **浏览器层面**：安装脚本只给一体机站点放行麦克风（`AudioCaptureAllowedUrls`），**没有放行摄像头**；镜像里再加一条整机 Edge 策略禁止网页使用摄像头：`HKLM\SOFTWARE\Policies\Microsoft\Edge` 下 `VideoCaptureAllowed`（DWORD）= `0`。验：`edge://policy` 里看到 `VideoCaptureAllowed` 为 `false` 且状态「正常」，`AudioCaptureAllowedUrls` 列着一体机站点。
-3. 设置 → 声音 → 输入：默认输入设备选这台摄像头的麦克风，说话时音量条会动。
-4. **验**：进小青通话说一句话，有回应；语音模拟面试录一段，能转出文字（这两条也是 G8 的「语音」项）。
+### G5 摄像头：三层停用，麦克风照常（合规窗口 10/4 要求，缺一层不算完成）
+
+一体机现在**没有任何功能使用摄像头**：前端唯一的采集是麦克风（语音模拟面试的录音 `apps/kiosk/src/utils/wavRecorder.ts`、`micCapability.ts`，数字人小青通话 `apps/kiosk/src/hooks/useAiAdvisorCallSession.ts` 只开本地音频），没有视频采集（`peripheral-field-acceptance-2026-08.md` 第 12 行同此结论；合规窗口 10/4 另核过候选代码）。依据：`~/.cache/claude-lanes/legal-set-0930/reviews/camera-mic-scanner-install-spec.md`（合规窗口的装机要求）。
+
+1. **物理**：镜头贴**不透光遮挡片**，再贴一张**撕开会留痕的封条**。不要只靠设备自带的滑盖——滑盖谁都能推开。
+2. **系统**：设备管理器里**只停用摄像头那一个设备**（通常在「照相机」或「图像设备」下）；**不要停用整个 USB 设备**，否则麦克风一起没了。停用后立刻验证麦克风还能录（设置 → 声音 → 输入，说话时音量条会动）。PowerShell 只读查看：`Get-PnpDevice -Class Camera,Image -PresentOnly`，停用后 `Status` 应为 `Error`/`Disabled`，同一设备的音频端点（`-Class AudioEndpoint`）仍为 `OK`。
+3. **浏览器**：镜像里写 Edge 整机策略 `HKLM\SOFTWARE\Policies\Microsoft\Edge` 下 `VideoCaptureAllowed`（DWORD）= `0`，**不写** `VideoCaptureAllowedUrls`。安装脚本写的 `AudioCaptureAllowedUrls` 保持只放行一体机站点 origin，不加别的。
+4. 设置 → 声音 → 输入：默认输入设备选这台设备的麦克风。
+5. **机身贴**（原文照抄，与现场告示一致）：摄像头旁边贴「**摄像头未启用，镜头已遮挡**」。现场告示里关于麦克风、摄像头、扫码口的三句以合规窗口的现场告示为准，不在本清单另写。
+6. **验收，写进装机记录**：
+   - `edge://policy` 里 `VideoCaptureAllowed` 为 `false`、`AudioCaptureAllowedUrls` 只有一体机站点，两条状态都是「正常」；
+   - 一体机各页面都**不弹摄像头授权**；
+   - 麦克风照常：小青通话说一句有回应，语音模拟面试录一段能转出文字；
+   - 镜头遮挡片和封条完好，拍照留档（**只拍设备外观**）。
+7. **以后要启用摄像头**（例如证件照）：先停，不能只改浏览器策略就放开——要更新隐私政策、做单独同意页、更新告示和试用协议附件，并等律师清单第 59 问答复（合规窗口要求）。
 
 ### G6 专用账号与分配访问（专业版 25H2）
 
