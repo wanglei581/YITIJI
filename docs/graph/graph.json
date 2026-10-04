@@ -6638,13 +6638,18 @@
         "handler": "JobAiController.list",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
           "KioskJobBoardConfig",
+          "RedemptionRecord",
           "Terminal",
           "UserAiConsent"
         ],
@@ -6691,12 +6696,17 @@
         "handler": "JobAiController.remove",
         "method": "DELETE",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/jobs/:id",
@@ -6740,12 +6750,17 @@
         "handler": "JobAiController.explain",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/jobs/:id/ai/explain",
@@ -6789,12 +6804,17 @@
         "handler": "JobAiController.recommendations",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiResumeResult",
           "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "Job",
           "JobAiRecommendation",
           "JobAiSession",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/jobs/ai/recommendations",
@@ -8213,14 +8233,18 @@
         "handler": "CreateInterviewDto.list",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8236,14 +8260,18 @@
         "handler": "CreateInterviewDto.create",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8259,14 +8287,18 @@
         "handler": "CreateInterviewDto.remove",
         "method": "DELETE",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8282,14 +8314,18 @@
         "handler": "CreateInterviewDto.get",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8305,14 +8341,18 @@
         "handler": "CreateInterviewDto.answer",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/answer",
         "roles": [],
@@ -8328,14 +8368,18 @@
         "handler": "CreateInterviewDto.end",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/end",
         "roles": [],
@@ -8351,14 +8395,18 @@
         "handler": "CreateInterviewDto.practiceSheet",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/practice-sheet",
         "roles": [],
@@ -8374,14 +8422,18 @@
         "handler": "CreateInterviewDto.report",
         "method": "GET",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/report",
         "roles": [],
@@ -8397,14 +8449,18 @@
         "handler": "CreateInterviewDto.print",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/report/print",
         "roles": [],
@@ -8420,14 +8476,18 @@
         "handler": "CreateInterviewDto.start",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/start",
         "roles": [],
@@ -8443,14 +8503,18 @@
         "handler": "CreateInterviewDto.transcribe",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/transcribe",
         "roles": [],
@@ -8470,14 +8534,18 @@
         "handler": "CreateInterviewDto.questionAudio",
         "method": "POST",
         "models": [
+          "AiQuotaDaily",
+          "AiQuotaReservation",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/mock-interviews/:id/turns/:idx/audio",
         "roles": [],
@@ -24825,6 +24893,7 @@
       "services/api/scripts/verify-llm-thinking-off.ts"
     ],
     "services/api/src/job-ai/job-ai-quota.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts"
     ],
@@ -24852,6 +24921,7 @@
       "services/api/scripts/verify-job-validity-expiry.ts"
     ],
     "services/api/src/job-ai/job-context.service.ts": [
+      "services/api/scripts/verify-ai-quota-coverage.ts",
       "services/api/scripts/verify-job-ai-backend.ts"
     ],
     "services/api/src/job-ai/job-quality.service.ts": [
@@ -34382,8 +34452,10 @@
           "services/api/src/contract-review/contract-review-orchestrator.service.ts",
           "services/api/src/contract-review/contract-review.controller.ts",
           "services/api/src/job-ai/governed-job-fit.service.ts",
+          "services/api/src/job-ai/job-ai-quota.service.ts",
           "services/api/src/job-ai/job-ai.controller.ts",
           "services/api/src/job-ai/job-ai.service.ts",
+          "services/api/src/job-ai/job-context.service.ts",
           "services/api/src/materials/materials.controller.ts",
           "services/api/src/materials/materials.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts",

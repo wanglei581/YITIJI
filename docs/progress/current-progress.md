@@ -1,5 +1,17 @@
 # 当前开发进度
 
+## 2026-10-04：AI 按人次数 Q2b-2——模拟面试与岗位 AI 接入
+
+工作区 `tide/q2b2`，基线 `a1bfd814e`，改动未提交、未上线。小青三项、`advisor/*`、`assistant/*`、`trtc/*` 以及登记表里这几类的行没有动。
+
+- **模拟面试（桶 `ai_interview`）：** `start` 在首题成功下发时结算，操作号 `interview:<sessionId>`。同一会话已有首题时直接返回该题，不再扣、不再调模型。首题失败仍把会话退回 `configured`，并按 `AI_INTERVIEW_QUESTION_FAILED` 归还。`create`、`answer`、`questionAudio`、`end` 登记不计次，理由「整场一次，首题下发时已计」。`transcribe` 登记不计次，理由「语音只查余量」：只在开场前、会话仍是 `configured` 且面试余量已用完时拒绝，场内不再查。没有登录身份的面试不进新账本。接线在 `services/api/src/mock-interview/mock-interview-charge.ts`；`mock-interview.service.ts` 由 720 行降到 702 行。
+- **场内上限：** `asked >= questionTarget`（时长 3/5/8 分钟对应 4/6/8 题）之后不再调模型；题已全部答完再提交返回 `INTERVIEW_ALREADY_COMPLETE`。同一道未完成的题用进程内合并，已落库的下一题直接返回。`questionAudio` 每次请求都调用 `TtsService.synthesize`；该服务写明不缓存、不落盘，本包没有加缓存。
+- **岗位 AI（桶 `ai_assistant`）：** 推荐、解读、匹配的控制器在招聘内容托管关闭时仍直接拒绝，计次只写在开关打开后才会走到的路径上。操作号按入参做成 `rec:` / `exp:` / `mat:` 加摘要，结果已在库里时直接返回、不再扣。空候选不扣。旧 Redis 的会员维在新账本已注入且有登录身份时跳过，终端与 IP 仍计。岗位对照 `analyzeForJobFit` 仍走简历桶；它和匹配共用的 `run()` 把会员维交给新账本。
+- **登记表：** 接入 13、不计次 12、待 Q2b 6、待裁定 0、违规 0。待 Q2b 只剩小青一族 6 项。
+- **验证（本机 SQLite）：** `typecheck`、`lint` 通过。`verify:ai-quota` 最后一行 `verify:ai-quota SQLite ALL PASS (18)`。`verify:ai-quota-coverage` 最后一行 `接入 13、不计次 12、待 Q2b 6、待裁定 0、违规 0`。`verify:mock-interview` 最后一行 `=== ALL PASS (23 checks) ===`。`verify:job-ai-backend`、`verify:job-ai-privacy`、`verify:job-fit`（`=== ALL PASS (27 checks) ===`）、`verify:governed-job-fit`（`=== 结果: 39 PASS / 0 FAIL ===`）、`verify:ai-public-quota`（`PASS: /assistant/chat 与 /resume/parse 已具备限流与日配额，且仍保持匿名可用`）通过。图谱上与本次文件相关的其余门禁（`verify:ai-access`、`verify:ai-cost-coverage` 178 PASS、`verify:ai-usage-budget` 21/21、`verify:multipart-field-nesting`、`verify:ai-user-text-retention` ALL PASS (542)、`verify:beijing-display-time` 21 checks、`verify:llm-input-pii-mask` 136 PASS、`verify:member-data-retention`、`verify:assess-isolation`、`verify:job-ai-ops-dashboard`、`verify:job-validity-expiry`，以及 kiosk 的 `verify:ai-down-fallbacks`、`verify:ai-artifact-print-url-contract`、`verify:profile-commercial-first-batch`）均通过。`node scripts/generate-project-graph.mjs --check`：`PASS docs/graph/ 与当前代码一致`。
+- **未跑：** `verify:ai-quota:postgres`。本机 `pg_isready` 对 `/tmp:5432` 无响应，`DATABASE_URL` 是 SQLite。没有单独的 `verify:mock-interview:postgres`。`verify:ai-cost-ui-coverage.ts` 在图谱里标为无脚本名，未执行。前端未改，没有做浏览器验证。
+- **反向变异（已还原，退出码都是 1）：** 开场不预占时首题已用次数 `0 !== 1`；同一会话再开场又扣时 `2 !== 1`；开场失败不归还时 `1 !== 0`；题数到上限后仍调模型时调用次数 `1 !== 0`；岗位推荐缓存命中仍扣时 `2 !== 1`。
+- **留待看的两点：** 两个进程同时开场时，进程内合并盖不住；后一个请求可能停在预占里等清扫，或在前一个已结算后用新序号再扣一次。首题和岗位 AI 在预占之后若抛出 `AI_NOT_CONFIGURED`，归还表不认这个码，要等清扫才退。
 ## 2026-10-04：AI 按人次数 Q2b-1——小青一族接入（分支 `tide/q2b1`；基线 `a1bfd814e`；Grok 实现、Claude 审；尚未提交、未上线）
 
 桶是 `ai_assistant`，每日 80。只动小青这一族。模拟面试 6 项与岗位 AI 3 项仍是待 Q2b，文件和登记行都没改。没改前端、`.github`、Q1 账本语义、`runWithAiQuota` 的结算顺序、金额封顶阈值。

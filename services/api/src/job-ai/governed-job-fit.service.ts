@@ -9,6 +9,7 @@ import {
 } from '../ai/resume/job-fit.service'
 import { AiQuotaService } from '../ai/quota/ai-quota.service'
 import { runWithAiQuota, type QuotaAbortRequest } from '../ai/quota/ai-quota-run'
+import { executeJobAiCharge, matchQuotaKey, type JobAiChargeRunInput } from './job-ai-charge'
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { JobAiQuotaService, type JobAiQuotaContext, type JobAiQuotaTicket } from './job-ai-quota.service'
@@ -103,23 +104,89 @@ export class GovernedJobFitService {
 
     const parse = await this.authorizeForAnalysis(input.resumeTaskId, input.requester)
     const job = await this.context.buildTargetJobContext(input.jobId)
-    const run = await this.run({
-      input: { taskId: input.resumeTaskId, jobId: input.jobId },
-      requester: input.requester,
-      parse,
-      job,
-      terminalId: input.terminalId,
-      quotaContext: input.quotaContext ?? {
-        member: input.requester.endUserId,
-        terminal: input.terminalId,
-        ip: null,
+    const operationKey = matchQuotaKey(input.requester.endUserId, input.resumeTaskId, input.jobId)
+    const quotaContext = input.quotaContext ?? {
+      member: input.requester.endUserId,
+      terminal: input.terminalId,
+      ip: null,
+    }
+    return this.chargeMatch({
+      endUserId: input.requester.endUserId,
+      operationKey,
+      loadStored: () => this.loadCachedMatch(input, job),
+      failureOf: (value) => (value.jobFit.status === 'failed' ? 'provider_error' : null),
+      work: async () => {
+        const run = await this.run({
+          input: { taskId: input.resumeTaskId, jobId: input.jobId },
+          requester: input.requester,
+          parse,
+          job,
+          terminalId: input.terminalId,
+          quotaContext,
+        })
+        return {
+          session: this.sessionDto(run.session),
+          job,
+          jobFit: run.response,
+          disclaimer: '仅供参考' as const,
+        }
       },
+      saveResult: async (value) => value.session.id,
     })
-    return {
-      session: this.sessionDto(run.session),
+  }
+
+  private chargeMatch<T>(input: JobAiChargeRunInput<T>): Promise<T> {
+    return executeJobAiCharge(this.memberQuota, input, { bucket: 'ai_assistant', runWithAiQuota })
+  }
+
+  /** 同一简历、同一岗位已有对照时直接返回。没有查询方法的测试替身视为未命中。 */
+  private async loadCachedMatch(input: MatchForMemberInput, job: TargetJobContext) {
+    const targetKey = jobFitQuotaTarget({ jobId: input.jobId })
+    if (!targetKey || typeof this.jobFit.matchingStored !== 'function') return null
+    const stored = await this.jobFit.matchingStored(input.resumeTaskId, input.requester, targetKey)
+    if (!stored || stored.status !== 'completed') return null
+    const findMany = this.prisma.jobAiSession?.findMany
+    const replay = {
       job,
-      jobFit: run.response,
+      jobFit: stored,
       disclaimer: '仅供参考' as const,
+    }
+    if (typeof findMany !== 'function') {
+      return { ...replay, session: this.syntheticMatchSession(input) }
+    }
+    const rows = await findMany({
+      where: {
+        endUserId: input.requester.endUserId,
+        resumeTaskId: input.resumeTaskId,
+        operation: 'match',
+        status: 'completed',
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    })
+    const hit = rows.find((row) => {
+      try {
+        const parsed = JSON.parse(row.intentJson) as { jobId?: unknown }
+        return parsed.jobId === input.jobId
+      } catch {
+        return false
+      }
+    })
+    if (!hit) return { ...replay, session: this.syntheticMatchSession(input) }
+    return { ...replay, session: this.sessionDto(hit) }
+  }
+
+  private syntheticMatchSession(input: MatchForMemberInput) {
+    return {
+      id: input.resumeTaskId,
+      resumeTaskId: input.resumeTaskId,
+      operation: 'match' as const,
+      status: 'completed' as const,
+      provider: null,
+      terminalId: input.terminalId,
+      createdAt: new Date().toISOString(),
+      expiresAt: null,
     }
   }
 
@@ -161,7 +228,9 @@ export class GovernedJobFitService {
 
     let ticket: JobAiQuotaTicket | null = null
     try {
-      ticket = await this.quota.consume('match', input.quotaContext)
+      ticket = await this.quota.consume('match', input.quotaContext, {
+        skipMember: Boolean(this.memberQuota && input.parse.endUserId),
+      })
       const result = await this.jobFit.analyzeWithUsage(input.input, input.requester)
       if (result.response.status !== 'completed') {
         const failed = await this.markSessionFailed(session.id, result.provider)
