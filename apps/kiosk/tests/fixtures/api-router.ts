@@ -71,6 +71,8 @@ export class ApiRouter {
     // 自我探索同意页挂载时读题目与同一版的同意说明（#1119）。默认按服务端当前这一版应答；
     // 要测「说明没取到」的用例自行 respond 覆盖。
     this.respond('GET', SELF_ASSESSMENT_QUESTIONS_PATH, { status: 200, json: selfAssessmentQuestionsResponse() })
+    // W-125：打印上传页与简历来源页挂载时读终端能力。默认空列表 = 没接管，U 盘保持可用。
+    this.respond('GET', '/api/v1/terminals/KSK-001/capabilities', { status: 200, json: { capabilities: [] } })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
       status: 200,

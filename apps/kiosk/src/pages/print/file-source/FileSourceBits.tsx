@@ -15,12 +15,27 @@ import {
 } from 'lucide-react'
 import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/fileName'
 import type { FileSourceScreen, UploadTab } from './fileSourceModel'
+import type { UsbImportHold } from '../../../hooks/useUsbImportGate'
 import { FILE_SOURCE_ASK, fileSourceEyebrow } from './fileSourceModel'
 
-export function FileSourceHero({ screen, isResume }: { screen: FileSourceScreen; isResume: boolean }) {
-  const ask = FILE_SOURCE_ASK[screen]
+const USB_HOLD_ASK: Record<UsbImportHold['state'], { lead: string; em: string; tail: string; doing: string }> = {
+  loading: { lead: '先确认', em: '能不能用 U 盘', tail: '。', doing: '还没确认前，不读盘，也不列出文件。' },
+  blocked: { lead: 'U 盘这条', em: '现在不能用', tail: '。', doing: '原因写在下面。可以改用手机上传。' },
+  unknown: { lead: '暂时', em: '确认不了', tail: '。', doing: '读不到开通情况时，不把 U 盘当成能用。' },
+}
+
+export function FileSourceHero({
+  screen,
+  isResume,
+  hold = null,
+}: {
+  screen: FileSourceScreen
+  isResume: boolean
+  hold?: UsbImportHold['state'] | null
+}) {
+  const ask = hold ? USB_HOLD_ASK[hold] : FILE_SOURCE_ASK[screen]
   const doing =
-    isResume && screen === 'source-chooser'
+    !hold && isResume && screen === 'source-chooser'
       ? '上传已有简历，检查后带走打印件。'
       : ask.doing
   return (
@@ -69,6 +84,33 @@ export function FileSourceStatus({
         </div>
       ) : null}
     </div>
+  )
+}
+
+export function UsbImportHoldNotice({ hold }: { hold: UsbImportHold }) {
+  if (hold.state === 'loading') {
+    return (
+      <FileSourceStatus kind="plain" title={hold.note ?? '正在确认本机是否开通 U 盘导入…'} pulsing>
+        <div className="fs-status-p">确认完成前不会读取 U 盘，也不会列出文件。</div>
+      </FileSourceStatus>
+    )
+  }
+  if (hold.state === 'unknown') {
+    return (
+      <>
+        <FileSourceStatus kind="warn" title="暂时确认不了">
+          <div className="fs-status-p">{hold.note}</div>
+        </FileSourceStatus>
+        <button type="button" className="qx-btn" data-variant="ghost" data-testid="usb-import-retry" onClick={hold.onRetry}>
+          重新检查
+        </button>
+      </>
+    )
+  }
+  return (
+    <FileSourceStatus kind="lock" title="U 盘导入现在不能用">
+      <div className="fs-status-p">{hold.note}</div>
+    </FileSourceStatus>
   )
 }
 
