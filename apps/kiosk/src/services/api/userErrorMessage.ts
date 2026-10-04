@@ -35,7 +35,11 @@ import { ApiHttpError } from './httpAdapter'
 /**
  * 跨页面通用的技术性失败。这些码与「用户此刻在做什么」无关，因此可以给统一文案；
  * 与具体业务有关的失败一律留给调用方兜底句，那里才知道用户是在导出还是在转写。
+ *
+ * 公共额度用完（429 `AI_PUBLIC_QUOTA_EXCEEDED`）各页共用下面这一句，不写价格、购买或充值。
  */
+export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明天恢复；可以先打印原件。'
+
 const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   NETWORK_ERROR: '网络连接失败，请检查网络后重试',
   // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
@@ -49,6 +53,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   REQUEST_TIMEOUT: '本次请求响应超时，请重试',
   RATE_LIMITED: '当前使用的人较多，请稍后再试',
   AI_RATE_LIMITED: '当前使用的人较多，请稍后再试',
+  // 公共日额度：当天重试不会成功。不要并进上面的普通限流句。
+  AI_PUBLIC_QUOTA_EXCEEDED: AI_PUBLIC_QUOTA_EXCEEDED_COPY,
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
   PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印',
