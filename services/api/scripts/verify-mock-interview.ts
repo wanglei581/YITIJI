@@ -20,6 +20,8 @@
  * 17. 最后一题并发重发：唯一约束冲突返回 done:true，不 500
  * 18. 并发无权 /end → 403/404，且不二次打 LLM
  * 19. completed 且无报告时 /end 可恢复生成（崩溃恢复）
+ * 20. 本场作答记录：进行中且无报告可出；没有回答 400；includeSkipped 改变题数与正文；
+ *     越权 404；不调模型；审计 payload 无原文；PDF 含岗位/题目/回答，不含评语
  *
  * 运行：pnpm --filter @ai-job-print/api verify:mock-interview
  */
@@ -27,7 +29,8 @@ process.env['OCR_PROVIDER'] = process.env['OCR_PROVIDER'] ?? 'disabled'
 require('dotenv').config()
 
 import { createServer, type Server } from 'http'
-import { Logger } from '@nestjs/common'
+import { BadRequestException, Logger, ValidationPipe } from '@nestjs/common'
+import { validate } from 'class-validator'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { MockInterviewLlmService, type InterviewReportPayload } from '../src/mock-interview/mock-interview-llm.service'
@@ -35,6 +38,9 @@ import { MockInterviewService } from '../src/mock-interview/mock-interview.servi
 import { InterviewReportPdfService } from '../src/mock-interview/interview-report-pdf.service'
 import { InterviewPracticeSheetPdfService } from '../src/mock-interview/interview-practice-sheet-pdf.service'
 import { INTERVIEW_PRACTICE_RESULT_DISCLAIMER } from '../src/mock-interview/interview-practice-sheet'
+import { InterviewTranscriptPdfService, TRANSCRIPT_PRINT_FOOTER } from '../src/mock-interview/interview-transcript-pdf.service'
+import { INTERVIEW_NO_ANSWERS_MESSAGE, InterviewTranscriptPrintService } from '../src/mock-interview/interview-transcript-print.service'
+import { PrintTranscriptDto } from '../src/mock-interview/mock-interview.controller'
 import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import { AsrService } from '../src/mock-interview/asr/asr.service'
 import { TtsService, splitForTts } from '../src/mock-interview/asr/tts.service'
@@ -774,6 +780,240 @@ async function main() {
       const recovered = await svc.end(created.sessionId, reqA)
       if (recovered.report.overall.level !== 'good') fail('19. 崩溃恢复应生成完整报告')
       pass('19. completed 且无报告时 /end 可恢复生成，不永久卡死')
+    }
+
+    // ── 20. 本场题目和回答（不调模型，不含评语）────────────────────────────
+    {
+      const uploads: Array<{ buffer: Buffer; filename: string; createdBy?: string | null }> = []
+      const filesStub = {
+        upload: async (input: { buffer: Buffer; filename: string; createdBy?: string | null }) => {
+          uploads.push({ buffer: input.buffer, filename: input.filename, createdBy: input.createdBy })
+          return {
+            fileId: `tprint_${uploads.length}_${Date.now().toString(36)}`,
+            filename: input.filename,
+            sizeBytes: input.buffer.length,
+            signedUrl: 'https://example.invalid/stub-transcript',
+            signedUrlExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+          }
+        },
+      }
+      const transcriptPrint = new InterviewTranscriptPrintService(prisma, new InterviewTranscriptPdfService(), filesStub as never, audit)
+      const reqA = { endUserId: endUserA, accessToken: null }
+      const Q1 = '请介绍你负责的模块_题目甲MARKQ1'
+      const A1 = '我负责首页加载优化_回答甲MARKA1'
+      const Q2 = '请讲一次你怎么排错_题目乙MARKQ2'
+      const Q3 = '还有什么想补充的_题目丙MARKQ3'
+      const created = await svc.createSession(baseCfg, reqA)
+      cleanupSessionIds.push(created.sessionId)
+      responseQueue.push(q(Q1, { qType: 'experience' }))
+      await svc.start(created.sessionId, reqA)
+      responseQueue.push(q(Q2))
+      await svc.answer(created.sessionId, { answer: A1 }, reqA)
+      responseQueue.push(q(Q3))
+      await svc.answer(created.sessionId, { skip: true }, reqA)
+      const sessionRow = await prisma.mockInterviewSession.findUnique({ where: { id: created.sessionId } })
+      const reportRow = await prisma.mockInterviewReport.findUnique({ where: { sessionId: created.sessionId } })
+      if (sessionRow?.status !== 'in_progress') fail(`20. 前置：会话应为 in_progress，实际 ${sessionRow?.status}`)
+      if (reportRow) fail('20. 前置：此时不应已有报告')
+
+      const llmBefore = llmRequestBodies.length
+      const uploadsBefore = uploads.length
+      const printed = await transcriptPrint.print(created.sessionId, reqA, {})
+      if (llmRequestBodies.length !== llmBefore) fail(`20. 打印不应调用模型，实际多了 ${llmRequestBodies.length - llmBefore} 次`)
+      const fields = ['fileId', 'filename', 'sizeBytes', 'pageCount', 'printFileUrl', 'signedUrl', 'expiresAt', 'variant', 'questionCount', 'answerCount'] as const
+      for (const key of fields) {
+        const value = printed[key]
+        if (value === undefined || value === null || value === '') fail(`20. 返回缺少 ${key}`)
+      }
+      if (printed.variant !== 'transcript') fail(`20. variant 应为 transcript，实际 ${printed.variant}`)
+      if (printed.questionCount !== 1 || printed.answerCount !== 1) {
+        fail(`20. 默认不含跳过时应为题 1 答 1，实际题 ${printed.questionCount} 答 ${printed.answerCount}`)
+      }
+      if (printed.pageCount < 1) fail('20. pageCount 应 ≥1')
+      if (!printed.filename.endsWith('.pdf')) fail('20. 文件名应为 pdf')
+      if (!printed.printFileUrl.includes(printed.fileId)) fail('20. printFileUrl 应指向本次文件')
+      const pdfFile = uploads.at(-1)
+      if (!pdfFile || uploads.length !== uploadsBefore + 1) fail('20. 应落一份文件')
+      if (pdfFile.createdBy !== 'mock_interview_transcript') fail(`20. createdBy 应为 mock_interview_transcript，实际 ${pdfFile.createdBy}`)
+      if (pdfFile.buffer.slice(0, 4).toString() !== '%PDF') fail('20. 输出不是 PDF')
+      const offText = await pdfPlainText(pdfFile.buffer)
+      const footer = TRANSCRIPT_PRINT_FOOTER.replace(/\s+/gu, '')
+      if (!offText.includes('前端开发工程师') || !offText.includes('互联网/AI') || !offText.includes('技术面试官')) {
+        fail('20. PDF 应含岗位、行业、面试官称呼')
+      }
+      if (!offText.includes(Q1) || !offText.includes(A1)) fail('20. PDF 应含本题与回答')
+      if (offText.includes(Q2) || offText.includes(Q3) || offText.includes('本题跳过')) fail('20. 默认不应印出跳过题或未作答题')
+      if (!offText.includes(INTERVIEW_PRACTICE_RESULT_DISCLAIMER) || !offText.includes(footer)) fail('20. PDF 应含免责说明和页脚')
+      const offBody = offText.split(footer).join('')
+      for (const phrase of ['报告', '评分', '点评']) {
+        if (offBody.includes(phrase)) fail(`20. 去掉页脚后 PDF 仍含「${phrase}」`)
+      }
+      const rawPdf = pdfFile.buffer.toString('latin1')
+      const aigcRef = rawPdf.match(/\/AIGenerated (\d+) 0 R/)
+      const aigcValue = aigcRef ? rawPdf.match(new RegExp(`${aigcRef[1]} 0 obj\\s*\\(([^)]*)\\)`)) : null
+      if (!aigcValue || aigcValue[1] !== 'false') fail(`20. PDF 应写 AIGenerated=false，实际 ${aigcValue?.[1] ?? '缺失'}`)
+      const still = await prisma.mockInterviewSession.findUnique({ where: { id: created.sessionId } })
+      if (still?.status !== 'in_progress') fail('20. 打印不应改会话状态')
+
+      const withSkipped = await transcriptPrint.print(created.sessionId, reqA, { includeSkipped: true })
+      if (llmRequestBodies.length !== llmBefore) fail('20c. includeSkipped 打印也不应调用模型')
+      if (withSkipped.questionCount === printed.questionCount && withSkipped.answerCount === printed.answerCount) {
+        fail('20c. includeSkipped 两种取值的题数或答数应不同')
+      }
+      if (withSkipped.questionCount !== 2 || withSkipped.answerCount !== 1) {
+        fail(`20c. 含跳过时应为题 2 答 1，实际题 ${withSkipped.questionCount} 答 ${withSkipped.answerCount}`)
+      }
+      const onText = await pdfPlainText(uploads.at(-1)!.buffer)
+      if (onText === offText) fail('20c. includeSkipped 两种取值的 PDF 内容应不同')
+      if (!onText.includes(Q1) || !onText.includes(A1) || !onText.includes(Q2) || !onText.includes('本题跳过')) {
+        fail('20c. 含跳过的 PDF 应同时有回答和「本题跳过」')
+      }
+      if (onText.includes(Q3)) fail('20c. 尚未作答的题不应印出')
+      const onBody = onText.split(footer).join('')
+      for (const phrase of ['报告', '评分', '点评']) {
+        if (onBody.includes(phrase)) fail(`20c. 含跳过的 PDF 去掉页脚后仍含「${phrase}」`)
+      }
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { action: 'mock_interview.transcript_print', targetId: created.sessionId },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (!auditRow) fail('20f. 应留下审计')
+      const payload = JSON.parse(auditRow.payloadJson) as Record<string, unknown>
+      const payloadKeys = Object.keys(payload).sort()
+      if (JSON.stringify(payloadKeys) !== JSON.stringify(['answerCount', 'includeSkipped', 'questionCount', 'sessionId'])) {
+        fail(`20f. 审计 payload 只能有会话号、题数、答数、是否含跳过，实际 ${payloadKeys.join(',')}`)
+      }
+      const payloadText = auditRow.payloadJson
+      for (const secret of [Q1, A1, Q2, 'MARKQ1', 'MARKA1', 'MARKQ2']) {
+        if (payloadText.includes(secret)) fail('20f. 审计 payload 含题目或回答原文')
+      }
+
+      const empty = await svc.createSession(baseCfg, reqA)
+      cleanupSessionIds.push(empty.sessionId)
+      const emptyUploads = uploads.length
+      try {
+        await transcriptPrint.print(empty.sessionId, reqA, {})
+        fail('20b. 没有回答不应出 PDF')
+      } catch (e) {
+        if (httpStatusOf(e) !== 400) fail(`20b. 没有回答应为 400，实际 ${httpStatusOf(e)}`)
+        const resp = JSON.stringify((e as { getResponse?: () => unknown }).getResponse?.() ?? '')
+        if (!resp.includes('INTERVIEW_NO_ANSWERS') || !resp.includes(INTERVIEW_NO_ANSWERS_MESSAGE)) {
+          fail(`20b. 失败码或文案不符: ${resp}`)
+        }
+      }
+      if (uploads.length !== emptyUploads) fail('20b. 没有回答不应落文件')
+      if (llmRequestBodies.length !== llmBefore) fail('20b. 没有回答也不应调用模型')
+
+      const skippedOnly = await svc.createSession({ ...baseCfg, durationMin: 3 }, reqA)
+      cleanupSessionIds.push(skippedOnly.sessionId)
+      responseQueue.push(q('只有跳过的题_ONLYSKIP'))
+      await svc.start(skippedOnly.sessionId, reqA)
+      responseQueue.push(q('跳过后的下一题'))
+      await svc.answer(skippedOnly.sessionId, { skip: true }, reqA)
+      const skippedUploads = uploads.length
+      const llmAfterSkipSetup = llmRequestBodies.length
+      try {
+        await transcriptPrint.print(skippedOnly.sessionId, reqA, { includeSkipped: true })
+        fail('20b. 只有跳过、没有非跳过回答时不应出 PDF')
+      } catch (e) {
+        if (httpStatusOf(e) !== 400) fail(`20b. 只有跳过应为 400，实际 ${httpStatusOf(e)}`)
+        const resp = JSON.stringify((e as { getResponse?: () => unknown }).getResponse?.() ?? '')
+        if (!resp.includes('INTERVIEW_NO_ANSWERS')) fail(`20b. 只有跳过的失败码不符: ${resp}`)
+      }
+      if (uploads.length !== skippedUploads) fail('20b. 只有跳过不应落文件')
+      if (llmRequestBodies.length !== llmAfterSkipSetup) fail('20b. 只有跳过的打印不应调用模型')
+
+      try {
+        await transcriptPrint.print(created.sessionId, { endUserId: endUserB, accessToken: null }, {})
+        fail('20d. 会员越权应 404')
+      } catch (e) {
+        if (httpStatusOf(e) !== 404) fail(`20d. 会员越权应为 404，实际 ${httpStatusOf(e)}`)
+        const resp = JSON.stringify((e as { getResponse?: () => unknown }).getResponse?.() ?? '')
+        if (!resp.includes('INTERVIEW_NOT_FOUND')) fail(`20d. 越权码不符: ${resp}`)
+      }
+      try {
+        await transcriptPrint.print(created.sessionId, { endUserId: null, accessToken: null }, {})
+        fail('20d. 匿名无令牌读会员会话应 404')
+      } catch (e) {
+        if (httpStatusOf(e) !== 404) fail(`20d. 匿名无令牌应为 404，实际 ${httpStatusOf(e)}`)
+      }
+
+      const llmBeforeCompleted = llmRequestBodies.length
+      await prisma.mockInterviewSession.update({
+        where: { id: created.sessionId },
+        data: { status: 'completed', endedAt: new Date() },
+      })
+      const completed = await transcriptPrint.print(created.sessionId, reqA, {})
+      if (completed.variant !== 'transcript' || completed.answerCount !== 1) fail('20. completed 且无报告也应能出')
+      await prisma.mockInterviewReport.create({
+        data: {
+          sessionId: created.sessionId,
+          payloadJson: JSON.stringify({
+            summary: '机密点评标记RPT9',
+            score: '机密评分标记SCR8',
+            title: '机密报告标记REP7',
+          }),
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      })
+      await transcriptPrint.print(created.sessionId, reqA, { includeSkipped: true })
+      const baitText = await pdfPlainText(uploads.at(-1)!.buffer)
+      for (const bait of ['机密点评标记RPT9', '机密评分标记SCR8', '机密报告标记REP7']) {
+        if (baitText.includes(bait)) fail(`20. PDF 印出了报告内容 ${bait}`)
+      }
+      if (llmRequestBodies.length !== llmBeforeCompleted) fail('20. completed 打印不应调用模型')
+
+      const anon = await svc.createSession(baseCfg, { endUserId: null, accessToken: null })
+      cleanupSessionIds.push(anon.sessionId)
+      if (!anon.accessToken) fail('20d. 匿名创建应返回令牌')
+      const anonReq = { endUserId: null, accessToken: anon.accessToken }
+      responseQueue.push(q('匿名首题_ANONQ'))
+      await svc.start(anon.sessionId, anonReq)
+      responseQueue.push(q('匿名下一题'))
+      await svc.answer(anon.sessionId, { answer: '匿名回答_ANONA' }, anonReq)
+      const anonLlm = llmRequestBodies.length
+      const anonSheet = await transcriptPrint.print(anon.sessionId, anonReq, {})
+      if (anonSheet.answerCount !== 1 || anonSheet.variant !== 'transcript') fail('20d. 匿名凭令牌应能出')
+      if (llmRequestBodies.length !== anonLlm) fail('20d. 匿名打印不应调用模型')
+      try {
+        await transcriptPrint.print(anon.sessionId, { endUserId: null, accessToken: 'wrong-token' }, {})
+        fail('20d. 错令牌应 404')
+      } catch (e) {
+        if (httpStatusOf(e) !== 404) fail(`20d. 错令牌应为 404，实际 ${httpStatusOf(e)}`)
+      }
+      try {
+        await transcriptPrint.print(anon.sessionId, { endUserId: endUserB, accessToken: null }, {})
+        fail('20d. 其他会员读匿名会话应 404')
+      } catch (e) {
+        if (httpStatusOf(e) !== 404) fail(`20d. 其他会员读匿名会话应为 404，实际 ${httpStatusOf(e)}`)
+      }
+
+      const pipe = new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        exceptionFactory: () => new BadRequestException({
+          error: { code: 'VALIDATION_FAILED', message: '请求参数校验失败' },
+        }),
+      })
+      const meta = { type: 'body' as const, metatype: PrintTranscriptDto }
+      const accepted = await pipe.transform({}, meta)
+      if (accepted.includeSkipped !== undefined) fail('20g. 空对象不应带出 includeSkipped')
+      const acceptedFalse = await pipe.transform({ includeSkipped: false }, meta)
+      if (acceptedFalse.includeSkipped !== false) fail('20g. false 应保留')
+      for (const bad of ['yes', 1, 'true']) {
+        try {
+          await pipe.transform({ includeSkipped: bad }, meta)
+          fail(`20g. includeSkipped=${JSON.stringify(bad)} 应 400`)
+        } catch (e) {
+          if (httpStatusOf(e) !== 400) fail(`20g. 非布尔应为 400，实际 ${httpStatusOf(e)}`)
+        }
+      }
+      const dtoErrors = await validate(Object.assign(new PrintTranscriptDto(), { includeSkipped: 'yes' }))
+      if (dtoErrors.length === 0) fail('20g. DTO 应拒绝非布尔')
+
+      pass('20. 本场作答记录：进行中无报告可出，跳过开关、越权、不调模型、审计与 PDF 口径正确')
     }
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)

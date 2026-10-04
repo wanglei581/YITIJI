@@ -1,5 +1,21 @@
 # 当前开发进度
 
+## 2026-10-04：W-129 后端接口——打印本场面试题目和我的回答（不含 AI 点评）
+
+- 接口：`POST /api/v1/mock-interviews/:id/transcript/print`。入参 `{}` 或 `{ includeSkipped?: boolean }`，默认 false；非布尔返回 400 `VALIDATION_FAILED`。不调用模型。`in_progress` 且没有报告行、以及 `completed`，都能出。`configured`（还没有第一题）按没有回答处理。
+- 没有任何非跳过的候选人回答时返回 400 `INTERVIEW_NO_ANSWERS`，文案「这一场还没有作答，暂时没有可打印的内容」。只剩跳过题时，即使 `includeSkipped` 为 true，同样返回这个 400。
+- 跳过判定：候选人回合 `MockInterviewTurn.skipped === true`。`answer()` 在 `input.skip` 时写入该布尔值，并把 content 写成「（跳过）」；`buildQaExcerpts` 也只看这个布尔值。判定依据是布尔值。后面没有候选人回合的题不算回答，纸上也不印。空白内容不算回答。
+- 出参与练习卷相同：`fileId`、`filename`、`sizeBytes`、`pageCount`、`printFileUrl`、`signedUrl`、`expiresAt`，另加 `variant: 'transcript'`、`questionCount`、`answerCount`。`questionCount` 是这张纸上的题数，只有开关打开才把跳过题算进去。`answerCount` 只数非跳过的真实回答，开关打开时不变。一场里一题已答、一题跳过、还有一题未答：关为题 1 答 1，开为题 2 答 1，未答题两档都不印。
+- PDF 含岗位、行业、面试官中文称呼（沿用 `PRACTICE_SHEET_INTERVIEWER_LABEL`）、每题和紧跟的回答。开关打开时跳过题标「本题跳过」。页脚「本页为练习记录，不含 AI 点评」，并带现有免责声明。不含报告、评分或点评正文。元数据 `AIGenerated=false`。
+- 归属与练习卷相同：会员本人，或匿名凭令牌；越权一律 404 `INTERVIEW_NOT_FOUND`。校验从 `loadAuthorized` 照抄到新服务。`mock-interview.service.ts` 未改。
+- 文件落库与练习卷相同：`purpose=print_doc`，`assetCategory=derived`，`derivationKind=ai_generated`（生产隐私闸门与题目单同一口径），`createdBy=mock_interview_transcript`。`printFileUrl` 用 30 分钟 `PRINT_ARTIFACT_URL_TTL_MS`。
+- 审计动作 `mock_interview.transcript_print`。payload 只有 `sessionId`、`questionCount`、`answerCount`、`includeSkipped`，不带题目和回答原文。管理员中文名「打印面试作答记录（不含 AI 点评）」。节流与 `@AiUse('export')` 与练习卷相同。本工作区没有 `verify:ai-quota-coverage` 这个脚本。
+- 文件：新增 `services/api/src/mock-interview/interview-transcript-pdf.service.ts`（104 行）、`interview-transcript-print.service.ts`（188 行）。`mock-interview.controller.ts` 增加 DTO 与路由（+23，现 332 行），新服务放在构造函数最后一个参数。`mock-interview.module.ts` +4（52 行）。`apps/admin/src/lib/auditActionLabels.ts` +1。`verify-derivation-kind.ts` +1。`verify-mock-interview.ts` 增加用例 20（+242，现 1032 行）。`docs/graph/` 由生成脚本重写。
+- `verify:file-assets-trial-acceptance` 退出码 1。失败点是两个新源文件尚未纳入 Git 跟踪：`untracked files during frozen Gate 2 candidate 2187f6a7 must be governance-only`。本包禁止 git 写操作，不能 `git add`。没有把这两个运行时代码文件登记成治理豁免。
+- 验证最后一行：`verify:mock-interview` 为 `=== ALL PASS (24 checks) ===`；`verify:ai-safety-aigc` 为 `AI 标识与提示词安全句：PASS`；`verify:ai-access` 为 `verify:ai-access：ALL PASS`；`verify:console-plain-copy` 为 `verify:console-plain-copy passed`；`verify:derivation-kind` 为 `verify:derivation-kind：40/40 通过`；`verify:ai-cost-coverage` 为 `A-6 成本覆盖验证: 178 PASS, 0 FAIL`（其中调用了没有独立脚本名的 `verify-ai-cost-ui-coverage`）；`verify:ai-usage-budget` 覆盖面为 `✅ verify:ai-usage-budget（覆盖面）21/21 通过`；`verify:ai-down-fallbacks` 为 `verify-ai-down-fallbacks passed (31 files checked)`；`verify:multipart-field-nesting` 为 `PASS: multipart 字段嵌套与体积上限防护已验证`；`verify:admin-partner-contact-phone-ui` 为 `PASS 适配器、资格判断与弹层文案`；`verify:recruitment-hosting-gate-declares` 为 `verify:recruitment-hosting-gate-declares PASS`；`verify:ai-user-text-retention` 为 `ALL PASS (536)`；`verify:ai-artifact-print-url-contract` 为 `✅ ALL PASS — AI / 求职产物只使用内部 HMAC printFileUrl 打印`。API `typecheck`、`lint` 退出码 0。图谱 `--check` 为 `PASS docs/graph/ 与当前代码一致`。
+- 反向变异已还原，还原后用例 20 再跑仍是 `=== ALL PASS (24 checks) ===`。去掉归属校验：退出码 1，`FAIL 20d. 会员越权应为 404，实际 0`。没有回答仍出 PDF：退出码 1，`FAIL 20b. 没有回答应为 400，实际 0`。审计 payload 写入回答原文：退出码 1，`FAIL 20f. 审计 payload 含题目或回答原文`。忽略 `includeSkipped`：退出码 1，`FAIL 20c. includeSkipped 两种取值的题数或答数应不同`。
+- 一体机按钮由另一个窗口接 `beginPrintHandoff`。本窗口没有改前端页面，没有提交。
+
 ## 2026-10-04：W-118 一体机这一半——检查任务防重、被拒后带文件回材料检查、隐私摘要说实话、开发版构建闸
 
 - 根因先说清：走查报的「同一份文件建两条隐私检查」在走查栈上成对出现，是因为走查的一体机前端在 `NODE_ENV=development` 的 shell 里构建，打出了 React 开发版，StrictMode 把挂载副作用执行两遍。正式构建实测只建一次；线上产物 jsxDEV 0 处（总指挥核过）。服务端闸门与去重另见 #1222。

@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 573,
+    "endpointCount": 574,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -8402,6 +8402,18 @@
           "AiLogService",
           "AsrService",
           "MockInterviewService"
+        ]
+      },
+      {
+        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
+        "handler": "CreateInterviewDto.printTranscript",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/mock-interviews/:id/transcript/print",
+        "roles": [],
+        "serviceFiles": [],
+        "services": [
+          "InterviewTranscriptPrintService"
         ]
       },
       {
@@ -25548,6 +25560,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
     "services/api/src/mock-interview/mock-interview.module.ts": [
@@ -38274,6 +38287,7 @@
           "services/api/src/mock-interview/interview-practice-sheet.ts",
           "services/api/src/mock-interview/interview-report-pdf.service.ts",
           "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
