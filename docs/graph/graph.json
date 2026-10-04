@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 575,
+    "endpointCount": 576,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -4096,6 +4096,18 @@
         "method": "GET",
         "models": [],
         "path": "/api/v1/admin/terminals/:terminalId/capabilities",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminals.controller.ts",
+        "handler": "AdminTerminalsController.clearCapability",
+        "method": "DELETE",
+        "models": [],
+        "path": "/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey",
         "roles": [
           "admin"
         ],
@@ -24401,6 +24413,7 @@
     ],
     "services/api/src/common/guards/roles.guard.ts": [
       "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
@@ -26679,6 +26692,7 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/admin-terminals.controller.ts": [
+      "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts"
@@ -34072,6 +34086,7 @@
           "packages/shared/src/types/printScanCapability.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/guards/roles.guard.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/order-status.service.ts",
@@ -34081,6 +34096,7 @@
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
+          "services/api/src/terminals/admin-terminals.controller.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
           "services/api/src/terminals/terminal-capabilities.types.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
