@@ -202,6 +202,12 @@ async function main(): Promise<void> {
     await prisma.fileObject.update({ where: { id: staleFile.id }, data: { sha256: sha(99) } })
     const stale = await gate(staleFile.id)
     check('检查后文件内容变了 → 409 PII_SCAN_STALE', !stale.ok && stale.status === 409 && stale.code === 'PII_SCAN_STALE', describe(stale))
+    // 挨着的两条但内容哈希不同（早的那条是对旧内容做的）：不是孪生，按最晚那条算「还没裁决」。
+    const shaFile = await makeFile(31)
+    const oldContent = await makeTask(shaFile.id, 30, 'real', { ageMs: 20 }); await finding(oldContent.task.id, 'keep')
+    const newContent = await makeTask(shaFile.id, 31, 'real'); await finding(newContent.task.id, 'pending')
+    const shaDiff = await gate(shaFile.id)
+    check('挨着的两条检查内容哈希不同 → 按最晚那条算没裁决（400 PRINT_PII_SCAN_REQUIRED）', !shaDiff.ok && shaDiff.code === 'PRINT_PII_SCAN_REQUIRED', describe(shaDiff))
     // 本人确认开关打开时同样按孪生算：确认了其中一条即可。
     process.env['PRINT_PII_MANUAL_CONFIRM_ENFORCED'] = 'true'
     const confirmFile = await makeFile(27)
@@ -236,6 +242,10 @@ async function main(): Promise<void> {
       const d4 = await dedupe.createTask(dto, anon)
       check('过了去重窗口再提交是一次新的检查', d4.id !== d1.id && (await created()) === 2)
     } finally { Date.now = realNow }
+    // 去重按请求方分开：会员请求不能拿到匿名任务（连同它的访问口令）。
+    const asMember = await outcome(() => dedupe.createTask(dto, { kind: 'member', endUserId: `verify-pii-member-${suffix}` }))
+    check('窗口内换一个请求方：不复用匿名任务，也拿不到它的访问口令',
+      !asMember.ok || ((asMember.value as { id: string; accessToken?: string }).id !== d1.id && (asMember.value as { accessToken?: string }).accessToken === undefined), describe(asMember))
     const missing = { kind: 'pii_scan', sourceFileId: `no-such-file-${suffix}` } as never
     const m1 = await outcome(() => dedupe.createTask(missing, anon)); const m2 = await outcome(() => dedupe.createTask(missing, anon))
     check('建任务失败不留在去重表里（两次都如实报错）', !m1.ok && !m2.ok && ![...(dedupe as unknown as { recentPiiScans: Map<string, unknown> }).recentPiiScans.keys()].some((key) => key.includes('no-such-file')))
