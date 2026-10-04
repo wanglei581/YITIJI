@@ -1,11 +1,12 @@
 /**
  * verify:ai-quota-coverage — Q2a 全入口登记。
  *
- * 静态：每个 @AiUse('generate'|'voice') 要么接入 runWithAiQuota（桶 ai_resume），
+ * 静态：每个 @AiUse('generate'|'voice') 要么接入 runWithAiQuota（桶写在登记项上，默认 ai_resume），
  * 要么在登记表里标明不计次 / Q2b 接入 / 待裁定。登记表写了但路由没了、或新路由没登记，都报错。
  * 运行时：不监听端口。简历类入口扣 1、用完 429 且模型桩不再被调；同号重放与进行中 409；
  * 金额封顶先拒绝则不写预占；模型报错归还（客户端断开时也归还）、断开时成功照扣且结果能按记录号读回；
- * 简历桶用完不影响助手与面试；转写不预占；简历解析不再扣旧的 Redis 会员计数。
+ * 简历桶用完不影响助手与面试；转写不预占；简历解析与小青对话不再扣旧的 Redis 会员计数。
+ * 小青文字与顾问追问各扣 1，模型报错归还；小青语音只在余量用完时拒绝，有余量不扣。
  *
  * 运行：pnpm --filter @ai-job-print/api verify:ai-quota-coverage
  */
@@ -71,6 +72,8 @@ interface Entry {
   status: Status
   reason?: string
   via?: Via
+  /** 接入时核对的桶。不写则是 ai_resume。 */
+  bucket?: 'ai_resume' | 'ai_assistant'
   /** 控制器只入队，模型调用在作业里。 */
   asyncJob?: boolean
 }
@@ -102,9 +105,9 @@ const REGISTRY: Entry[] = [
 
   { controller: AdvisorController, method: 'create', status: 'exempt', reason: '建会话只做一次轻量判型，模型失败时退关键词判型，不产出给用户的 AI 内容；调用受每日金额上限约束', via: via(AdvisorService.prototype, 'createSession') },
 
-  { controller: AiController, method: 'chatWithAssistant', status: 'q2b', via: via(AiService.prototype, 'chatWithAssistant') },
-  { controller: AiController, method: 'transcribeAssistantVoice', status: 'q2b' },
-  { controller: AiController, method: 'summarizeAssistantSession', status: 'q2b', via: via(AssistantSummaryService.prototype, 'summarize') },
+  { controller: AiController, method: 'chatWithAssistant', status: 'wired', bucket: 'ai_assistant', via: via(AiService.prototype, 'chatWithAssistant') },
+  { controller: AiController, method: 'transcribeAssistantVoice', status: 'exempt', reason: '转写只查小青当天余量，不预占。会员次数用完才拒绝，有余量时不扣次' },
+  { controller: AiController, method: 'summarizeAssistantSession', status: 'exempt', reason: '同一助手会话没有已存小结可直接返回；每次都会新建顾问会话并再调模型。按已存则不再调模型的条件不成立', via: via(AssistantSummaryService.prototype, 'summarize') },
   { controller: MockInterviewController, method: 'create', status: 'q2b', via: via(MockInterviewService.prototype, 'createSession') },
   { controller: MockInterviewController, method: 'start', status: 'q2b', via: via(MockInterviewService.prototype, 'start') },
   { controller: MockInterviewController, method: 'answer', status: 'q2b', via: via(MockInterviewService.prototype, 'answer') },
@@ -114,9 +117,9 @@ const REGISTRY: Entry[] = [
   { controller: JobAiController, method: 'recommendations', status: 'q2b', via: via(JobAiService.prototype, 'recommendations') },
   { controller: JobAiController, method: 'explain', status: 'q2b', via: via(JobAiService.prototype, 'explainJob') },
   { controller: JobAiController, method: 'match', status: 'q2b', via: via(GovernedJobFitService.prototype, 'matchForMember') },
-  { controller: AdvisorController, method: 'ask', status: 'q2b', via: via(AdvisorService.prototype, 'ask') },
-  { controller: DailyBriefController, method: 'create', status: 'q2b', via: via(DailyBriefService.prototype, 'create') },
-  { controller: TrtcController, method: 'startSession', status: 'q2b', via: via(TrtcService.prototype, 'startSession') },
+  { controller: AdvisorController, method: 'ask', status: 'wired', bucket: 'ai_assistant', via: via(AdvisorService.prototype, 'ask') },
+  { controller: DailyBriefController, method: 'create', status: 'exempt', reason: '早报不调用模型。按人只读本人取件与收藏，城市新数与广播是全站共享缓存；没有按人落库的早报正文', via: via(DailyBriefService.prototype, 'create') },
+  { controller: TrtcController, method: 'startSession', status: 'exempt', reason: '开会话只向腾讯云建房并下发模型配置，本服务不调模型。成本由单次通话时长上限与金额封顶管', via: via(TrtcService.prototype, 'startSession') },
 ]
 
 const SCANNED: Ctor[] = [
@@ -155,8 +158,17 @@ function reached(proto: Proto, name: string, depth = 2): string[] {
   return out
 }
 
-function usesResumeQuota(sources: string[]): boolean {
-  return sources.some((source) => /runWithAiQuota/.test(source) && /bucket:\s*['"]ai_resume['"]/.test(source))
+function quotaBucket(entry: Entry): 'ai_resume' | 'ai_assistant' {
+  return entry.bucket ?? 'ai_resume'
+}
+
+function usesBucket(sources: string[], bucket: string): boolean {
+  const bucketRe = new RegExp(`bucket:\\s*['"]${bucket}['"]`)
+  return sources.some((source) => /runWithAiQuota/.test(source) && bucketRe.test(source))
+}
+
+function usesAnyRun(sources: string[]): boolean {
+  return sources.some((source) => /runWithAiQuota/.test(source))
 }
 
 function routesOf(ctor: Ctor): string[] {
@@ -230,17 +242,18 @@ function staticScan(): { line: string; violations: string[] } {
       continue
     }
     const sources = entry.via ? reached(entry.via.proto, entry.via.method) : reached(entry.controller.prototype, entry.method)
-    const charged = usesResumeQuota(sources)
+    const bucket = quotaBucket(entry)
+    const charged = usesBucket(sources, bucket)
     const controllerSource = sourceOf(entry.controller.prototype, entry.method)
     if (entry.via && !entry.asyncJob && !controllerSource.includes(entry.via.method)) {
       violations.push(`${id} 的控制器没有调用 ${entry.via.method}`)
     }
     if (entry.status === 'wired') {
       if (charged) wired += 1
-      else violations.push(`${id} 应接入简历次数，但方法体没有 runWithAiQuota 且桶不是 ai_resume`)
+      else violations.push(`${id} 应接入 ${bucket}，但方法体没有 runWithAiQuota 且桶不是 ${bucket}`)
       continue
     }
-    if (charged) violations.push(`${id} 标为${entry.status === 'q2b' ? Q2B : entry.status === 'pending' ? PENDING : EXEMPT}，但调用了 runWithAiQuota`)
+    if (usesAnyRun(sources)) violations.push(`${id} 标为${entry.status === 'q2b' ? Q2B : entry.status === 'pending' ? PENDING : EXEMPT}，但调用了 runWithAiQuota`)
     if ((entry.status === 'exempt' || entry.status === 'pending') && !entry.reason?.trim()) {
       violations.push(`${id} 的理由为空`)
     }
@@ -280,7 +293,7 @@ async function main() {
     console.log(`违规清单：${scanned.violations.join('；')}`)
     process.exit(1)
   }
-  assert.equal(scanned.line, '接入 9、不计次 7、待 Q2b 15、待裁定 0、违规 0')
+  assert.equal(scanned.line, '接入 11、不计次 11、待 Q2b 9、待裁定 0、违规 0')
 
   const apiRoot = resolve(__dirname, '..')
   const temporary = mkdtempSync(join(tmpdir(), 'verify-ai-quota-coverage-'))
@@ -335,6 +348,7 @@ async function main() {
       ['吴景行', 'career'], ['郑安然', 'fair'], ['陈予安', 'jobfit'], ['孙嘉树', 'advisor'],
       ['李婉清', 'contract'], ['高予辰', 'voice'], ['何清和', 'isolate'], ['马晓舟', 'failure'],
       ['沈清禾', 'order'], ['钱知衡', 'inflight'],
+      ['顾清晏', 'xiaoqing'], ['江晚宁', 'assistant-voice'], ['宋知微', 'ask'], ['叶安然', 'chat-fail'],
     ] as const
     const userOf = new Map<string, string>()
     for (let i = 0; i < people.length; i++) {
@@ -349,6 +363,7 @@ async function main() {
       userOf.set(people[i][1], id)
     }
     const used = async (role: string) => (await quota.remaining({ endUserId: userOf.get(role)! })).find((row) => row.bucket === 'ai_resume')!.dailyUsed
+    const usedAssistant = async (role: string) => (await quota.remaining({ endUserId: userOf.get(role)! })).find((row) => row.bucket === 'ai_assistant')!.dailyUsed
     const requester = (role: string) => ({ endUserId: userOf.get(role)!, accessToken: null as string | null })
     const expiresAt = new Date(Date.now() + 24 * 3600_000)
     const seedParse = async (role: string, taskId: string, fileId: string) => {
@@ -743,7 +758,157 @@ async function main() {
       assert.equal(await dbPrisma.aiQuotaReservation.count({ where: { endUserId: gao } }), reservations)
     })
 
-    await check('简历解析不再扣旧的 Redis 会员计数，助手对话仍扣', async () => {
+    await check('小青文字：成功扣 1，同一会话再问再扣，模型报错归还，匿名不进账本', async () => {
+      const gu = userOf.get('xiaoqing')!
+      const ye = userOf.get('chat-fail')!
+      const chatState = { calls: 0, fail: false, sawReserved: false }
+      const xiaoqing = Object.create(AiService.prototype) as AiService
+      Object.assign(xiaoqing, {
+        quota,
+        llmConfig: { isReady: () => true, getConfig: () => ({ vendor: 'coverage' }) },
+        llmChat: {
+          async chat(input: { message?: string; sessionId?: string }) {
+            chatState.calls += 1
+            if (chatState.fail) throw Object.assign(new Error('upstream'), { code: 'AI_PROVIDER_ERROR' })
+            const reserved = await dbPrisma.aiQuotaReservation.findFirst({ where: { endUserId: gu, status: 'reserved' } })
+            if (reserved) chatState.sawReserved = true
+            const sessionId = input.sessionId && /^[A-Za-z0-9_.:-]{1,200}$/.test(input.sessionId) ? input.sessionId : `qing-${run}-${chatState.calls}`
+            return { sessionId, reply: '顾清晏，市南窗口可以先把材料清单打印出来。', intent: 'print_help' }
+          },
+        },
+        provider: { name: 'stub', async chatAssistant() { throw new Error('不应走回落') } },
+        logService: quiet,
+      })
+      const sessionId = `qing-${run}`
+      const first = await xiaoqing.chatWithAssistant({ message: '市南窗口要带哪些材料', sessionId }, `u:${gu}`, gu)
+      assert.match(first.reply, /顾清晏/)
+      assert.equal(chatState.calls, 1)
+      assert.equal(chatState.sawReserved, true, '回答写入会话时预占必须仍是 reserved')
+      assert.equal(await usedAssistant('xiaoqing'), 1)
+      const committed = await dbPrisma.aiQuotaReservation.findFirst({ where: { endUserId: gu, status: 'committed' } })
+      assert.equal(committed?.resultRef, sessionId)
+      const second = await xiaoqing.chatWithAssistant({ message: '那身份证复印件呢', sessionId }, `u:${gu}`, gu)
+      assert.equal(second.sessionId, sessionId)
+      assert.equal(chatState.calls, 2, '同一会话再问一次必须再调模型')
+      assert.equal(await usedAssistant('xiaoqing'), 2, '客户端会话号不能当成操作号，第二次仍扣 1')
+      const beforeAnon = await dbPrisma.aiQuotaReservation.count()
+      await xiaoqing.chatWithAssistant({ message: '匿名也问一句窗口材料', sessionId: `anon-${run}` }, 'anon', null)
+      assert.equal(await dbPrisma.aiQuotaReservation.count(), beforeAnon, '没有登录身份时不进新账本')
+      chatState.fail = true
+      await assert.rejects(() => xiaoqing.chatWithAssistant({ message: '叶安然的材料还缺什么', sessionId: `ye-${run}` }, `u:${ye}`, ye))
+      assert.equal(await usedAssistant('chat-fail'), 0, '模型报错必须归还')
+      chatState.fail = false
+      await xiaoqing.chatWithAssistant(
+        { message: '叶安然断开后这一句仍应记下', sessionId: `ye-ok-${run}` }, `u:${ye}`, ye, { aborted: true },
+      )
+      assert.equal(await usedAssistant('chat-fail'), 1, '客户端断开时成功照扣')
+      chatState.fail = true
+      await assert.rejects(() => xiaoqing.chatWithAssistant(
+        { message: '叶安然断开时模型失败', sessionId: `ye-bad-${run}` }, `u:${ye}`, ye, { aborted: true },
+      ))
+      assert.equal(await usedAssistant('chat-fail'), 1, '客户端断开时服务端确认的失败照常归还')
+    })
+
+    await check('小青语音：有余量不扣次，用完才拒绝且不再转写', async () => {
+      const jiang = userOf.get('assistant-voice')!
+      const jwt = new JwtService({ secret: 'verify-ai-quota-coverage-secret-0123456789' })
+      const token = jwt.sign({ sub: jiang, jti: `sess-${jiang}` }, { audience: 'enduser', expiresIn: '10m' })
+      const redis = { async get(key: string) { return key === memberSessionKey(`sess-${jiang}`) ? jiang : null } }
+      let asrCalls = 0
+      const asr = { activeProviderName: 'coverage-asr', async recognizeWav() { asrCalls += 1; return { ok: true, text: '江晚宁想问市南窗口要带的材料' } } }
+      const publicQuota = { async consume() { return { keys: ['desk-shinan-voice'] } }, async rollback() {} }
+      const controller = new AiController(
+        {} as never, quiet as never, { write: async () => undefined } as never, jwt, redis as never, dbPrisma, asr as never,
+        {} as never, publicQuota as never, {} as never, {} as never, {} as never, undefined, undefined, quota,
+      )
+      const wav = Buffer.alloc(12)
+      wav.write('RIFF', 0)
+      wav.write('WAVE', 8)
+      const req = { headers: { authorization: `Bearer ${token}` } }
+      const before = await dbPrisma.aiQuotaReservation.count({ where: { endUserId: jiang } })
+      const spoken = await controller.transcribeAssistantVoice({ buffer: wav } as never, req as never)
+      assert.match(spoken.text, /江晚宁/)
+      assert.equal(asrCalls, 1)
+      assert.equal(await usedAssistant('assistant-voice'), 0, '有余量时转写不扣次')
+      assert.equal(await dbPrisma.aiQuotaReservation.count({ where: { endUserId: jiang } }), before)
+      const previousLimit = process.env.AI_QUOTA_ASSISTANT_DAILY
+      process.env.AI_QUOTA_ASSISTANT_DAILY = '1'
+      try {
+        const reserved = await quota.reserve({ bucket: 'ai_assistant', endUserId: jiang, operationKey: `voice-block:${jiang}` })
+        await quota.commit(reserved.reservationId, { resultRef: `voice-${run}` })
+        const reservations = await dbPrisma.aiQuotaReservation.count({ where: { endUserId: jiang } })
+        await expectCode('小青转写用完', 'AI_QUOTA_EXHAUSTED', () => controller.transcribeAssistantVoice({ buffer: wav } as never, req as never))
+        assert.equal(asrCalls, 1, '次数用完后不得再转写')
+        assert.equal(await dbPrisma.aiQuotaReservation.count({ where: { endUserId: jiang } }), reservations)
+        assert.equal(await usedAssistant('assistant-voice'), 1)
+      } finally {
+        if (previousLimit === undefined) delete process.env.AI_QUOTA_ASSISTANT_DAILY
+        else process.env.AI_QUOTA_ASSISTANT_DAILY = previousLimit
+      }
+    })
+
+    await check('顾问追问：成功扣 1，再问再扣，模型报错归还，匿名不进账本', async () => {
+      const song = userOf.get('ask')!
+      const askState = { calls: 0, fail: false }
+      const askLlm = {
+        isAvailable: () => true,
+        providerLabel: () => 'llm:coverage:ask',
+        async answer() {
+          askState.calls += 1
+          if (askState.fail) throw Object.assign(new Error('upstream'), { code: 'AI_PROVIDER_ERROR' })
+          return {
+            answer: '宋知微可以先把市南窗口的材料清单核对一遍。',
+            evidenceLevel: 'E3',
+            sourceNote: '一般做法',
+            disclaimer: '仅供参考',
+          }
+        },
+      }
+      const askAdvisor = new AdvisorService(
+        dbPrisma, askLlm as never, new AdvisorArtifactService(dbPrisma, {} as never, {} as never, audit), audit, quiet as never, quota,
+      )
+      const session = await dbPrisma.advisorSession.create({
+        data: {
+          endUserId: song, skill: 'qa', status: 'ready', skillSource: 'user_override',
+          topic: '青岛市南窗口材料怎么一次备齐', slotsJson: '{}', expiresAt,
+        },
+      })
+      const first = await askAdvisor.ask(session.id, '材料清单要怎么核对', requester('ask'))
+      assert.match(first.answer, /宋知微/)
+      assert.equal(first.persistence, 'not_saved')
+      assert.equal(askState.calls, 1)
+      assert.equal(await usedAssistant('ask'), 1)
+      const committed = await dbPrisma.aiQuotaReservation.findFirst({ where: { endUserId: song, status: 'committed' } })
+      assert.equal(committed?.resultRef, session.id)
+      await askAdvisor.ask(session.id, '那身份证复印件放哪一格', requester('ask'))
+      assert.equal(askState.calls, 2)
+      assert.equal(await usedAssistant('ask'), 2, '同一会话再追问一次仍扣 1')
+      askState.fail = true
+      const usedBeforeFail = await usedAssistant('ask')
+      await assert.rejects(() => askAdvisor.ask(session.id, '模型这次答不上来', requester('ask')))
+      assert.equal(await usedAssistant('ask'), usedBeforeFail, '模型报错必须归还')
+      askState.fail = false
+      await askAdvisor.ask(session.id, '断开后这一句仍应记下', requester('ask'), { aborted: true })
+      assert.equal(await usedAssistant('ask'), usedBeforeFail + 1, '客户端断开时成功照扣')
+      askState.fail = true
+      await assert.rejects(() => askAdvisor.ask(session.id, '断开时模型失败', requester('ask'), { aborted: true }))
+      assert.equal(await usedAssistant('ask'), usedBeforeFail + 1, '客户端断开时服务端确认的失败照常归还')
+      const anonToken = `宋知微匿名口令${run}`
+      const anon = await dbPrisma.advisorSession.create({
+        data: {
+          endUserId: null, accessTokenHash: createHash('sha256').update(anonToken, 'utf8').digest('hex'),
+          skill: 'qa', status: 'ready', skillSource: 'user_override',
+          topic: '匿名也问窗口材料', slotsJson: '{}', expiresAt,
+        },
+      })
+      const beforeAnon = await dbPrisma.aiQuotaReservation.count()
+      askState.fail = false
+      const anonTurn = await askAdvisor.ask(anon.id, '匿名怎么备材料', { endUserId: null, accessToken: anonToken })
+      assert.match(anonTurn.answer, /宋知微/)
+      assert.equal(await dbPrisma.aiQuotaReservation.count(), beforeAnon, '没有登录身份时不进新账本')
+    })
+
+    await check('简历解析与小青对话都不再扣旧的 Redis 会员计数，终端维仍扣', async () => {
       const keys: string[] = []
       const redis = { async incrWithTtl(key: string) { keys.push(key); return keys.filter((item) => item === key).length }, async decr() { return 0 } }
       const publicQuota = new AiPublicQuotaService(redis as never)
@@ -752,8 +917,10 @@ async function main() {
       assert.equal(keys.some((key) => key.includes(':terminal:')), true)
       assert.equal(keys.some((key) => key.includes(':ip:')), true)
       const before = keys.length
-      await publicQuota.consume('assistant_chat', { member: userOf.get('parse')!, terminal: null, ip: null })
-      assert.equal(keys.slice(before).some((key) => key.includes(':member:')), true)
+      await publicQuota.consume('assistant_chat', { member: userOf.get('xiaoqing')!, terminal: 'desk-shinan-01', ip: null })
+      const added = keys.slice(before)
+      assert.equal(added.some((key) => key.includes(':member:')), false, '小青会员次数改由新账本计算')
+      assert.equal(added.some((key) => key.includes(':terminal:')), true, '终端维仍扣')
     })
   } finally {
     LlmResumeOptimizeService.prototype.adjustLayoutDraft = originalLayout

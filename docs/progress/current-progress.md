@@ -1,5 +1,35 @@
 # 当前开发进度
 
+## 2026-10-04：AI 按人次数 Q2b-1——小青一族接入（分支 `tide/q2b1`；基线 `a1bfd814e`；Grok 实现、Claude 审；尚未提交、未上线）
+
+桶是 `ai_assistant`，每日 80。只动小青这一族。模拟面试 6 项与岗位 AI 3 项仍是待 Q2b，文件和登记行都没改。没改前端、`.github`、Q1 账本语义、`runWithAiQuota` 的结算顺序、金额封顶阈值。
+
+**接入 2**
+
+- 小青文字一轮 `AiController.chatWithAssistant`（`ai.controller.ts:613`）。操作号只由服务端签发（`assistant-chat:` + `quotaSequence()`，`ai-assistant-charge.ts:69`）。回答先写入现有内存会话（`llm-chat.service.ts:383` 把助手回复推进会话 Map），再把会话号交给结算（`ai-assistant-charge.ts:72`）。服务端确认的失败原样抛出（`:112`），由已有的 `quotaReleaseReason` 归还。没有登录身份不进新账本。金额封顶仍由访问守卫在进处理器之前检查。客户端断开时，成功照扣；认得出的失败照常归还。
+- 顾问追问 `AdvisorService.ask`（控制器 `advisor.controller.ts:153` 传入 `req`；服务 `advisor.service.ts:323`，桶字面量在 `:350`）。回答先写入会话记忆（`qaMemory.append`，`:343`），结算引用是会话号。操作号是 `advisor-ask:` + `quotaSequence()`（`:351`）。没有登录身份或没有账本时不预占。
+
+**公网旧计数：** 小青对话的会员维交给新账本。`ledgerOwnsMember` 同时认 `resume_parse` 与 `assistant_chat`（`ai-public-quota.service.ts:203`），`countMember` 在 `:98`。终端与 IP 仍在旧 Redis 里扣。
+
+**不计次 4**
+
+- 小青语音 `transcribeAssistantVoice`（`ai.controller.ts:661`）。不预占。`assertMemberAssistantRemaining`（`ai-quota-run.ts:99`，调用点 `ai.controller.ts:679`）只在会员当天小青次数用完时拒绝；有余量不扣次。终端与 IP 日配额仍走旧 Redis。
+- 会话小结 `summarizeAssistantSession`。同一助手会话没有已存小结可直接返回。每次都 `condense` 调模型（`assistant-summary.service.ts:133`）并 `advisorSession.create` 新开一行（`:143`），不记下原助手会话号。已存则不再调模型的条件不成立，故不计次。
+- 早报 `DailyBriefController.create`（`daily-brief.controller.ts:16` → `daily-brief.service.ts:28`）。不调用模型。按人只读本人取件与收藏；城市新数与广播是全站共享缓存。没有按人落库的早报正文。
+- TRTC 开会话 `TrtcService.startSession`（`trtc.service.ts:208`）。这一下生成 UserSig，并调用腾讯云 `StartAIConversation`（`:283`），本服务不调模型。成本由单次通话时长上限与金额封顶管。
+
+**TRTC 每一轮：** 设计文档第 45 行写「会话里每一轮问答照小青计」。通话中的问答由腾讯云侧调模型。`services/api/src/trtc/` 下没有回调、转写或按轮 webhook。本服务看不到每一轮，本包不实现按轮计数。
+
+**登记表：** `接入 11、不计次 11、待 Q2b 9、待裁定 0、违规 0`。待 Q2b 的 9 项是模拟面试与岗位 AI。
+
+**大文件：** `ai.service.ts` 943→938，`ai.controller.ts` 840→838。小青文字接线拆到 `services/api/src/ai/quota/ai-assistant-charge.ts`（120 行，工作区未跟踪；本包禁止 git 写操作）。`advisor.service.ts` 521→538，未过 800，在原文件接入。`ai-quota-run.ts` 163→174，`ai-public-quota.service.ts` 249→254，`advisor.controller.ts` 仍 191 行。
+
+**验证（本机 lane，未上线）：** API `typecheck`、`lint` 退出码 0。`verify:ai-quota-coverage` 最后两行：`接入 11、不计次 11、待 Q2b 9、待裁定 0、违规 0`、`违规清单：无`。`verify:ai-quota`：`verify:ai-quota SQLite ALL PASS (18)`。`verify:ai-public-quota`：`PASS: /assistant/chat 与 /resume/parse 已具备限流与日配额，且仍保持匿名可用`。`verify:advisor-work`：`=== 顾问作业面验证通过：66 PASS ===`。`verify:ai-access`：`verify:ai-access：ALL PASS`。`verify:assistant-voice`：`=== ALL PASS: 小青语音 / 本次要点门禁 ===`。`verify:assistant-provider-label`：`S0-1 助手 provider 可识别验证: 40 PASS, 0 FAIL`。`verify:ai-cost-coverage`：`A-6 成本覆盖验证: 179 PASS, 0 FAIL`。`verify:ai-user-text-retention`：`ALL PASS (540)`。`verify:ai-usage-budget`：`✅ verify:ai-usage-budget（覆盖面）21/21 通过`。`verify:resume-parse-intent`：`PASS POST /resume/parse intent headers`。图谱查出的其余相关门禁（含 `verify:assess-isolation`、`verify:job-ai-ops-dashboard`、`verify:multipart-field-nesting`、`verify:resume-diagnosis-context`、`verify:resume-draft-versions`、`verify:resume-export-formats`、`verify:resume-export-label`、`verify:resume-layout-export`、`verify:resume-template-fill`、`verify:resume-voice-generate`、`verify:throttle-dimension`、`verify:ai-persistence-consistency`、`verify:ai-result-ownership`、`verify:ai-safety-aigc`、`verify:member-assets-c2d`、`verify:member-data-retention`、`verify-real-resume-diagnosis`、`verify:resume-generate`、`verify:resume-layout-adjust`、`verify:resume-optimize`、`verify:resume-report-export`、`verify:derivation-kind`、kiosk `verify:ai-artifact-print-url-contract`）均退出码 0。`node scripts/generate-project-graph.mjs --check`：`PASS docs/graph/ 与当前代码一致`。
+
+两处环境红，没有改门禁去放行：`verify:file-assets-trial-acceptance` 因未跟踪的 `ai-assistant-charge.ts` 失败（冻结候选要求未跟踪文件只能是治理文件；提交该文件后这条会过）。`verify:ai-quota:postgres` 抛 `AI_QUOTA_VERIFY_POSTGRES_REQUIRED`（本 lane 是 SQLite）。
+
+**反向变异（只报告，已还原，源码无残留）：** 五处都在对应断言变红，退出码 1。小青对话不预占（`回答写入会话时预占必须仍是 reserved`）；小青对话模型报错不归还（`模型报错必须归还`）；会员仍扣旧 Redis 会员维（`小青会员次数改由新账本计算`）；语音转写也扣次（`有余量时转写不扣次`）；顾问追问不预占（成功后已用次数 `0 !== 1`）。
+
 ## 2026-10-04：第二次发布清单补上「三个开关各自要同批改的文字」（分支 `claude/release2-switch-texts-1004`，只改文档）
 
 - **改了什么：** `docs/progress/next-tasks.md` 第二次发布「发布前」第 2 条。原来只写了登录那一句，而且写成「协议现在写的是先登录」，与线上不符（线上是「以页面提示为准」）。现在三个开关各列一行：怎么切、打开后的实际行为、哪几句文字要同批改。

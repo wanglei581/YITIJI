@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException, Optional } from '@nestjs/common'
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
-import { isLlmProviderLabel, type AiProvider, type AiProviderName, type AssistantChatResult, type GeneratedResume, type GenerateResumeOutput, type ParseResumeInput, type ParseResumeOutput, type OptimizeResumeOutput, type ChatInput, type ResumeGenerateInput, type ResumeLayoutSettings } from './interfaces/ai-provider.interface'
+import { createHash, randomUUID, timingSafeEqual } from 'crypto'
+import { type AiProvider, type AiProviderName, type AssistantChatResult, type GeneratedResume, type GenerateResumeOutput, type ParseResumeInput, type ParseResumeOutput, type OptimizeResumeOutput, type ChatInput, type ResumeGenerateInput, type ResumeLayoutSettings } from './interfaces/ai-provider.interface'
 import { resolveAiProviderName } from '../config/ai-platform-config'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
@@ -9,7 +9,7 @@ import { LocalAiProvider } from './providers/local.provider.stub'
 import { QwenProvider } from './providers/qwen.provider.stub'
 import { ZhipuProvider } from './providers/zhipu.provider.stub'
 import { LlmResumeProvider } from './providers/llm.provider'
-import { AiLogService, AiUsageAccumulator, aiLogFieldsFromUsageReport } from './ai-log.service'
+import { AiLogService, aiLogFieldsFromUsageReport } from './ai-log.service'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
@@ -49,6 +49,12 @@ import {
   chargeComputeResumeOptimize,
   chargeSubmitResumeGenerate,
 } from './quota/ai-resume-charge-steps'
+import {
+  chargeAssistantChat,
+  executeAssistantCharge,
+  type AssistantChargeRunInput,
+  type AssistantChatDeps,
+} from './quota/ai-assistant-charge'
 
 // 简历派生结果留存窗口(CLAUDE.md §11「不长期保存简历」)。
 // MockProvider 阶段 payload 仅诊断评分 / 通用建议文本;接真 provider 后
@@ -900,44 +906,33 @@ export class AiService {
     return { deletedCount }
   }
 
-  async chatWithAssistant(input: ChatInput, ownerKey = 'anon', endUserId: string | null = null): Promise<AssistantChatResult> {
-    const t0 = Date.now()
-    // 配置就绪时走真实大模型（DeepSeek/通义/MiniMax），否则降级到默认 provider
-    const useLlm = this.llmConfig.isReady('assistant_chat')
-    const providerLabel = useLlm ? `llm:${this.llmConfig.getConfig('assistant_chat').vendor}` : this.provider.name
-    // AI-COST-TRUTH：chat 无重试，但仍用累计器统一形状，且 callCount 能区分
-    // 「回落到 mock 话术、没花钱」和「真打了模型但没拿到 usage」。
-    const usage = new AiUsageAccumulator()
-    try {
-      const result = useLlm
-        ? await this.llmChat.chat(input, usage.add, ownerKey)
-        : await this.provider.chatAssistant({
-            ...input,
-            sessionId: input.sessionId ?? randomBytes(16).toString('hex'),
-          })
-      const sessionId = result.sessionId
-      this.logService.record({
-        taskId:    sessionId,
-        ...aiLogFieldsFromUsageReport(usage.toReport(providerLabel), providerLabel),
-        operation: 'chatAssistant',
-        latencyMs: Date.now() - t0,
-        status:    'success', endUserId,
-      })
-      // S0-1 / 风险 R1：把 provider 标签透出，让调用方能分辨「真实模型」与
-      // 「mock/stub provider 预置话术」。回落时这里必须如实标 aiGenerated=false，
-      // 绝不因为 reply 看起来像 AI 回答就当成 AI 回答。
-      return { ...result, providerLabel, aiGenerated: isLlmProviderLabel(providerLabel) }
-    } catch (err) {
-      this.logService.record({
-        taskId:    input.sessionId ?? null,
-        // 失败前可能已经打过模型（上游 5xx / 空内容）——那次调用照样计费，必须落账。
-        ...aiLogFieldsFromUsageReport(usage.toReport(providerLabel), providerLabel),
-        operation: 'chatAssistant',
-        latencyMs: Date.now() - t0,
-        status:    'failed',
-        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN', endUserId,
-      })
-      throw err
+  async chatWithAssistant(
+    input: ChatInput,
+    ownerKey = 'anon',
+    endUserId: string | null = null,
+    req?: QuotaAbortRequest,
+  ): Promise<AssistantChatResult> {
+    return chargeAssistantChat(
+      this.assistantChatDeps(),
+      input,
+      ownerKey,
+      endUserId,
+      req,
+      (spec) => this.runAssistantCharge(spec),
+    )
+  }
+
+  private assistantChatDeps(): AssistantChatDeps {
+    return {
+      llmConfig: this.llmConfig,
+      llmChat: this.llmChat,
+      provider: this.provider,
+      log: this.logService,
     }
+  }
+
+  /** 小青文字的预占。桶字面量留在本类，供覆盖率门禁从方法体认出。 */
+  private runAssistantCharge<T>(input: AssistantChargeRunInput<T>): Promise<T> {
+    return executeAssistantCharge(this.quota, input, { bucket: 'ai_assistant', runWithAiQuota })
   }
 }

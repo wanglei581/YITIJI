@@ -34147,7 +34147,9 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "services/api/src/ai/quota"
+        ],
         "files": [
           "services/api/scripts/verify-ai-cost-runtime.ts",
           "services/api/scripts/verify-ai-cost-ui-coverage.ts",

@@ -320,7 +320,7 @@ export class AdvisorService {
    * 「继续回答」在本型的含义就是：同一个 sessionId 的第 2、3 轮能接住前文
    *（设计页的「那超过半年呢」），而不是每次都当成一个新问题。
    */
-  async ask(sessionId: string, question: string, requester: AdvisorRequester) {
+  async ask(sessionId: string, question: string, requester: AdvisorRequester, req?: QuotaAbortRequest) {
     const row = await this.loadOwned(sessionId, requester)
     if (this.skillOf(row) !== 'qa') {
       throw new BadRequestException({
@@ -330,15 +330,32 @@ export class AdvisorService {
     const memory = this.qaMemory.read(sessionId)
     const usage = new AiUsageAccumulator()
     const startedAt = Date.now()
-    let answer
-    try {
-      answer = await this.llm.answer(question, memory, { onLlmCall: usage.add })
-    } catch (error) {
-      this.recordAiLog(usage, startedAt, 'failed', row.endUserId, aiErrorCodeOf(error, 'ADVISOR_ANSWER_FAILED'))
-      throw error
+    const produce = async () => {
+      try {
+        return await this.llm.answer(question, memory, { onLlmCall: usage.add })
+      } catch (error) {
+        this.recordAiLog(usage, startedAt, 'failed', row.endUserId, aiErrorCodeOf(error, 'ADVISOR_ANSWER_FAILED'))
+        throw error
+      }
     }
-    this.recordAiLog(usage, startedAt, 'success', row.endUserId)
-    this.qaMemory.append(sessionId, question.trim().slice(0, 600), answer.answer)
+    const persist = async (value: Awaited<ReturnType<AdvisorService['llm']['answer']>>) => {
+      this.recordAiLog(usage, startedAt, 'success', row.endUserId)
+      this.qaMemory.append(sessionId, question.trim().slice(0, 600), value.answer)
+      return sessionId
+    }
+    // 没有账本或没有登录身份时不预占。操作号只在这里签发，不读客户端传来的号。
+    const answer = this.quota && row.endUserId
+      ? await runWithAiQuota({
+        quota: this.quota,
+        bucket: 'ai_assistant',
+        operationKey: `advisor-ask:${quotaSequence()}`,
+        endUserId: row.endUserId,
+        req,
+      }, produce, persist)
+      : await produce().then(async (value) => {
+        await persist(value)
+        return value
+      })
     return {
       sessionId,
       ...answer,

@@ -95,6 +95,17 @@ export async function assertMemberResumeRemaining(
   if (!resume || resume.dailyRemaining + resume.extraRemaining <= 0) exhausted('ai_resume', new Date())
 }
 
+/** 小青语音转写不预占。会员当日小青次数已经用完时才拒绝。 */
+export async function assertMemberAssistantRemaining(
+  quota: AiQuotaService | undefined,
+  endUserId: string | null | undefined,
+): Promise<void> {
+  if (!quota || !endUserId) return
+  const rows = await quota.remaining({ endUserId })
+  const assistant = rows.find((row) => row.bucket === 'ai_assistant')
+  if (!assistant || assistant.dailyRemaining + assistant.extraRemaining <= 0) exhausted('ai_assistant', new Date())
+}
+
 export function quotaSequence(): string {
   return randomBytes(8).toString('hex')
 }

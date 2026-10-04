@@ -9,7 +9,7 @@ import { currentAiRequestContext, resolveAiCaller } from './usage/ai-usage-conte
 import { TerminalSessionService } from '../terminals/terminal-session.service'
 import { AiPublicQuotaService } from './ai-public-quota.service'
 import { AiQuotaService } from './quota/ai-quota.service'
-import { assertMemberResumeRemaining } from './quota/ai-quota-run'
+import { assertMemberAssistantRemaining, assertMemberResumeRemaining } from './quota/ai-quota-run'
 import { JwtService } from '@nestjs/jwt'
 import { AsrService } from '../asr/asr.service'
 import { AiService } from './ai.service'
@@ -626,6 +626,7 @@ export class AiController {
         dto,
         assistantOwnerKey(chatMember?.endUserId ?? null, ipOf(req)),
         chatMember?.endUserId ?? null,
+        req,
       ),
     )
     await this.audit.write({
@@ -651,11 +652,7 @@ export class AiController {
     return result
   }
 
-  /**
-   * 小青文字对话的「按住说话」转写。multipart 字段名 audio，仅内存 WAV。
-   * 与 /assistant/chat 共用 assistant_chat 日配额；ASR 未配置返回 ASR_NOT_CONFIGURED。
-   * 转写正文不进日志 / 审计。
-   */
+  /** 小青按住说话。转写不占小青次数；会员当天次数用完才拒绝。终端与 IP 日配额仍在。 */
   @Post('assistant/voice')
   @TerminalScopedThrottle(12)
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
@@ -679,6 +676,7 @@ export class AiController {
       if (!isWavBuffer(audio.buffer)) {
         throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
       }
+      await assertMemberAssistantRemaining(this.quota, voiceMember?.endUserId)
       const asrStartedAt = Date.now()
       const result = await this.asr.recognizeWav(audio.buffer)
       this.logService.record({
