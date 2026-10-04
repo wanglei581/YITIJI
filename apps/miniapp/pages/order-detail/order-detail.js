@@ -23,6 +23,9 @@ const auth = require('../../utils/auth')
 const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 
 const STATUS_MAP = {
+  // 云打印单到机前的两个任务态（服务端 Order.taskStatus），与「我的打印订单」列表同一说法
+  pending_release: '待到机',
+  awaiting_payment: '待现场支付',
   pending:   '待取件',
   claimed:   '待取件',
   printing:  '打印中',
@@ -32,6 +35,7 @@ const STATUS_MAP = {
 }
 
 const STATUS_TONE = {
+  pending_release: 'wheat', awaiting_payment: 'wheat',
   pending: 'wheat', claimed: 'wheat', printing: 'teal',
   completed: 'ok', failed: 'danger', cancelled: 'neutral',
 }
@@ -88,6 +92,8 @@ function toDetail(raw) {
     store:        raw.terminalDisplayName || raw.terminalName || raw.storeName || '打印服务终端',
     spec:         buildSpec(raw),
     price:        fmtPrice(raw.amountCents),
+    // 只有服务端金额大于 0 才把这一行叫「金额」；0 元（试点免费）写「本次打印 免费」
+    paid:         Number(raw.amountCents) > 0,
     statusLabel:  STATUS_MAP[status] || status || '未知',
     statusTone:   STATUS_TONE[status] || 'neutral',
     pickup:       fmtCode(pickupRaw),

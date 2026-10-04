@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import type { GeneratedResume } from '../interfaces/ai-provider.interface'
 import { AIGC_VISIBLE_FOOTER } from '../../common/pdf/aigc-label'
+import { resumeEntryHead } from './resume-doc-limits'
 
 // ============================================================
 // ResumeTextService — Wave 1 Task 5 简历 txt / markdown 渲染
@@ -51,7 +52,7 @@ export class ResumeTextService {
     if (resume.education?.length > 0) {
       lines.push('【教育经历】')
       for (const e of resume.education) {
-        const head = [e.school, e.major, e.degree].filter(Boolean).join(' · ')
+        const head = resumeEntryHead(e.school, e.major, e.degree) || '学历'
         lines.push(e.period ? `- ${head}（${e.period}）` : `- ${head}`)
         if (e.description?.trim()) {
           lines.push(`    ${e.description.trim()}`)
@@ -63,7 +64,7 @@ export class ResumeTextService {
     if (resume.experience?.length > 0) {
       lines.push('【实习 / 工作经历】')
       for (const e of resume.experience) {
-        const head = `${e.company} · ${e.role}`
+        const head = resumeEntryHead(e.company, e.role) || '经历'
         lines.push(e.period ? `- ${head}（${e.period}）` : `- ${head}`)
         if (e.description?.trim()) {
           lines.push(`    ${e.description.trim()}`)
@@ -75,7 +76,7 @@ export class ResumeTextService {
     if (resume.projects?.length > 0) {
       lines.push('【项目经历】')
       for (const p of resume.projects) {
-        const head = p.role ? `${p.name} · ${p.role}` : p.name
+        const head = resumeEntryHead(p.name, p.role) || '项目'
         lines.push(`- ${head}`)
         if (p.description?.trim()) {
           lines.push(`    ${p.description.trim()}`)
@@ -139,7 +140,7 @@ export class ResumeTextService {
       lines.push('## 教育经历')
       lines.push('')
       for (const e of resume.education) {
-        const head = [e.school, e.major, e.degree].filter(Boolean).join(' · ')
+        const head = resumeEntryHead(e.school, e.major, e.degree) || '学历'
         lines.push(e.period ? `- **${head}**（${e.period}）` : `- **${head}**`)
         if (e.description?.trim()) {
           lines.push(`  ${e.description.trim()}`)
@@ -152,7 +153,7 @@ export class ResumeTextService {
       lines.push('## 实习 / 工作经历')
       lines.push('')
       for (const e of resume.experience) {
-        const head = `${e.company} · ${e.role}`
+        const head = resumeEntryHead(e.company, e.role) || '经历'
         lines.push(e.period ? `- **${head}**（${e.period}）` : `- **${head}**`)
         if (e.description?.trim()) {
           lines.push(`  ${e.description.trim()}`)
@@ -165,7 +166,7 @@ export class ResumeTextService {
       lines.push('## 项目经历')
       lines.push('')
       for (const p of resume.projects) {
-        const head = p.role ? `${p.name} · ${p.role}` : p.name
+        const head = resumeEntryHead(p.name, p.role) || '项目'
         lines.push(`- **${head}**`)
         if (p.description?.trim()) {
           lines.push(`  ${p.description.trim()}`)

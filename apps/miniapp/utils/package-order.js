@@ -69,7 +69,7 @@ const PAY_STATUS_LABELS = {
 }
 const TASK_STATUS_LABELS = {
   pending: '排队中',
-  pending_release: '等待到机释放',
+  pending_release: '到机核销后开始打印',
   awaiting_payment: '等待现场付款',
   claimed: '终端已领取',
   printing: '打印中',

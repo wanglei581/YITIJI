@@ -170,10 +170,25 @@ function userMessageOf(err, fallback) {
   return fallback;
 }
 
+/** 模拟面试、小青没有「先用模板手动填写」这条退路，额度两码只说事实（走查 MP-K18-6）。 */
+const AI_QUOTA_PLAIN_MESSAGES = {
+  AI_BUDGET_EXHAUSTED: '今天的 AI 次数用完了，明天恢复。',
+  AI_BUDGET_UNAVAILABLE: 'AI 暂时用不了，请稍后再试。',
+};
+
+/** 同 userMessageOf，只是额度两码换成不提模板的说法。 */
+function plainAiMessageOf(err, fallback) {
+  const code = err && err.code;
+  if (code && Object.prototype.hasOwnProperty.call(AI_QUOTA_PLAIN_MESSAGES, code)) return AI_QUOTA_PLAIN_MESSAGES[code];
+  return userMessageOf(err, fallback);
+}
+
 module.exports = {
   isMachineErrorCode,
   displayableServerMessage,
   userMessageOf,
+  plainAiMessageOf,
+  AI_QUOTA_PLAIN_MESSAGES,
   SERVER_GENERIC_MESSAGE,
   SHARED_USER_MESSAGES,
   PASSTHROUGH_MESSAGE_CODES,

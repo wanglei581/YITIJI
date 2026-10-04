@@ -89,6 +89,9 @@ export function OptimizeOverview(props: {
           >
             全部保留原文<small>这几条都换回你原来的句子</small>
           </button>
+          <button type="button" className="qx-opt-bx" disabled={props.disabled} onClick={() => props.onCompare()}>
+            逐条确认或自己写<small>打开对照页，再决定每一条用哪一版</small>
+          </button>
         </div>}
       </section>
 

@@ -26,6 +26,7 @@
  */
 import 'dotenv/config'
 import { createHash, randomUUID } from 'crypto'
+import { createRequire } from 'node:module'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { Logger } from '@nestjs/common'
@@ -146,7 +147,7 @@ function installLibsqlBusyTimeout(): void {
   // 这里只让本次 verify 的 libsql 连接等待,避免竞态被 SQLITE_BUSY 截断。不改服务代码。
   const clientEntry = require.resolve('@libsql/client', { paths: [join(__dirname, '..')] })
   const libsqlPath = require.resolve('libsql', { paths: [join(clientEntry, '..', '..')] })
-  const original = require(libsqlPath) as { __resumeExportBusyPatched?: boolean; prototype: object }
+  const original = createRequire(__filename)(libsqlPath) as { __resumeExportBusyPatched?: boolean; prototype: object }
   if (original.__resumeExportBusyPatched) return
   function WrappedDatabase(this: unknown, filename: string, options: unknown) {
     const db = new (original as unknown as new (filename: string, options: unknown) => {
@@ -454,12 +455,12 @@ async function main(): Promise<void> {
 
       await setExportPrice(0, true)
       const freePricing = await ai.getResumeExportPricing(endUser.id)
-      if (freePricing.mode !== 'free' || freePricing.label !== '当前免费，不扣权益' || freePricing.benefit !== null) {
+      if (freePricing.mode !== 'free' || freePricing.label !== '免费试运营' || freePricing.benefit !== null) {
         fail(`6c. free pricing 不符: ${JSON.stringify(freePricing)}`)
       }
       const freeExported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, 'txt', undefined, undefined, false, { taskId: 'verify-export-free-txt' })
       createdFileIds.push(freeExported.fileId)
-      pass('6c. free：GET pricing 写「当前免费，不扣权益」，导出放行且不扣权益')
+      pass('6c. free：GET pricing 写「免费试运营」，导出放行且不扣权益')
 
       await setExportPrice(199, true)
       const chargedAnon = await ai.getResumeExportPricing(null)

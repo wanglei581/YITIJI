@@ -278,6 +278,14 @@ assert.deepEqual(
     assert.notEqual(text, FALLBACK, `${code} 必须有自己的文案`)
     assert.match(text, hint, `${code} 文案须含下一步`)
   }
+  // 2026-10-04 U 盘读不了（Defender 拦截或已隔离）：固定说「换一个文件」，不能落到兜底「请重试」——
+  // 重试同一个文件不会成功。列表过期则要重新读取 U 盘，同样不能说成「重试」。
+  // 本地接口抛的是带 code 的 LocalAgentApiError（不是 ApiHttpError），这里用同形状的对象。
+  const usbUnreadable = userMessageOf({ code: 'LOCAL_USB_FILE_UNREADABLE', message: 'x' }, 'U 盘文件导入失败，请重试')
+  assert.equal(usbUnreadable, '这个文件读不了，请换一个文件', 'LOCAL_USB_FILE_UNREADABLE 必须提示换一个文件')
+  const usbExpired = userMessageOf({ code: 'LOCAL_USB_FILE_EXPIRED', message: 'x' }, 'U 盘文件导入失败，请重试')
+  assert.match(usbExpired, /重新读取 U 盘/, 'LOCAL_USB_FILE_EXPIRED 必须提示重新读取 U 盘')
+  assert.doesNotMatch(usbExpired, /请重试/, 'LOCAL_USB_FILE_EXPIRED 不能说成「请重试」')
   // PRINT_TERMINAL_QUEUE_HALTED（#1150 方案 A，只此一个新码）：
   // 合格中文原话原样显示。兜底句与拍板原话相同，只断言那一句时拿掉白名单仍会绿，
   // 所以再钉一条不同的合格中文（#1150 现文「本机…」），证明不是固定覆盖。

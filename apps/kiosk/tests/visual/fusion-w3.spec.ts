@@ -273,7 +273,7 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
   api.respond('GET', '/api/v1/resume/export/pricing', {
     status: 200,
-    json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' },
+    json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '免费试运营' },
   })
   api.respond('GET', '/api/v1/resume/records/resume-w3-inline-preview/optimize', {
     status: 200,
@@ -791,8 +791,11 @@ test('resume parse public quota rejection clears the local intent before the fai
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('/resume/report')
   await expect(page.getByText('当前使用的人较多，请稍后再试', { exact: false })).toBeVisible()
-  await page.getByTestId('resume-report-primary').click()
-  await page.waitForURL('/resume/parse')
+  // Trace 已证实第二次请求会在 click 完成前返回；先监听临时解析路由，仍要求它真实经过。
+  await Promise.all([
+    page.waitForURL('/resume/parse'),
+    page.getByTestId('resume-report-primary').click(),
+  ])
   await page.waitForURL('/resume/report')
   expect(posts).toHaveLength(2)
   expect(posts[0].intent).toMatch(/^[A-Za-z0-9_-]{43}$/)

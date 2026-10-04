@@ -103,14 +103,14 @@ const drawer = readFileSync(join(root, 'src/routes/terminals/TerminalOpsDrawer.t
 const page = readFileSync(join(root, 'src/routes/terminals/index.tsx'), 'utf8')
 check('B1 指标卡：合计无法统计时不显示计数', /!totalsFaultsReported\(data\) \?/.test(cards) && cards.includes('无法统计'))
 check('B2 指标卡：部分静默时注明另有 N 台未计入', /totals\.silentTerminals > 0 &&/.test(cards) && cards.includes('未计入以上数字'))
-check('B3 指标卡：有静默终端时不说「当前没有未恢复的故障」', cards.includes("totals.silentTerminals > 0 ? '已上报的终端当前没有未恢复的故障'"))
+check('B3 指标卡：有静默终端时不说「截至昨天没有未恢复的故障」', cards.includes("totals.silentTerminals > 0 ? '已上报的终端截至昨天没有未恢复的故障'"))
 check('B4 抽屉：本终端没上报时不列 0 次', /!faults\.reportedInWindow \?/.test(drawer) && drawer.includes('FAULTS_NOT_REPORTED'))
-for (const [id, heading] of [['offline', '离线'], ['printerFault', '打印机故障'], ['unrecovered', '未恢复']]) {
+for (const [id, heading] of [['offline', '离线'], ['printerFault', '打印机故障'], ['unrecovered', '截至昨天未恢复']]) {
   const line = page.split('\n').find((source) => source.includes(`id: '${id}'`)) ?? ''
   check(`B5 ${heading}：未上报时显示短词并以 title 保留完整说明`,
     line.includes('title={FAULTS_NOT_REPORTED}>无法统计</span>'), line)
 }
-for (const heading of ['终端', '当前状态', '服务人次', '打印扫描次数', '出纸成功率', '未确认出纸', '离线', '打印机故障', '未恢复']) {
+for (const heading of ['终端', '当前状态', '服务人次', '打印扫描次数', '出纸成功率', '未确认出纸', '离线', '打印机故障', '截至昨天未恢复']) {
   check(`B6 业务列「${heading}」存在`, page.includes(`header: '${heading}'`))
 }
 check('B6 表格使用统一 ConsoleTable', page.includes('ConsoleTable'))
