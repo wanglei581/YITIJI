@@ -22678,6 +22678,9 @@
     "services/api/scripts/support/recruitment-wave2-public-snapshot.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
     ],
+    "services/api/scripts/support/resume-optimize-export-contract.ts": [
+      "services/api/scripts/verify-resume-optimize.ts"
+    ],
     "services/api/scripts/support/resume-optimize-fetch-stub.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
     ],
@@ -40298,6 +40301,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/resume-optimize-export-contract.ts",
           "services/api/scripts/support/resume-optimize-fetch-stub.ts",
           "services/api/scripts/support/resume-optimize-original-content.ts",
           "services/api/src/ai/ai.service.ts",
