@@ -41,7 +41,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 78 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 79 |
 | **medium** | 只被文档或其它文件提及 | 28 |
 | **low** | 全仓零提及 | 94 |
 
@@ -229,7 +229,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（78）
+## high — 仍被 CI / 门禁 / 包脚本引用（79）
 
 ### 页面/组件（35）
 
@@ -270,6 +270,12 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 | `apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs、apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs |
 | `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs、apps/kiosk/scripts/verify-fusion-w6.mjs、apps/kiosk/scripts/verify-smart-campus-ui.mjs |
+
+### 门禁脚本（1）
+
+| 路径 | 判定依据 |
+| --- | --- |
+| `scripts/verify-prod-react-build.mjs` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：.github/workflows/ci.yml |
 
 ### 样式（40）
 

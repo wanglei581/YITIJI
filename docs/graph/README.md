@@ -41,14 +41,14 @@ node scripts/project-graph-query.mjs model PrintTask
 | --- | --- |
 | HTTP 端点（services/api） | 573 |
 | Prisma 模型 | 110 |
-| 门禁脚本文件 | 578 |
+| 门禁脚本文件 | 579 |
 | ├ 其中辅助库（被别的门禁 import） | 136 |
 | ├ 已在 package.json 里有脚本名 | 525 |
 | ├ 在 CI 执行闭包里 | 511 |
-| └ **无脚本名，从未被执行** | 0 |
+| └ **无脚本名，从未被执行** | 1 |
 | 被至少一条门禁断言的文件 | 1832 |
 | 孤儿候选 · protected（不得删） | 4 |
-| 孤儿候选 · high（仍被 CI/门禁引用） | 78 |
+| 孤儿候选 · high（仍被 CI/门禁引用） | 79 |
 | 孤儿候选 · medium（仅文档提及） | 28 |
 | 孤儿候选 · low（全仓零提及） | 94 |
 
@@ -72,7 +72,7 @@ flowchart LR
   partner["apps/partner<br/>合作机构后台<br/>15 路由"]
   api["services/api<br/>NestJS<br/>573 端点"]
   db[("Prisma<br/>110 模型")]
-  gates{{"verify 门禁<br/>578 个脚本"}}
+  gates{{"verify 门禁<br/>579 个脚本"}}
 
   kiosk -->|"/api/v1"| api
   admin -->|"/api/v1"| api
