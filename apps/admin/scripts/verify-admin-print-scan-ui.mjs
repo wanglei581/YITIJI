@@ -117,7 +117,7 @@ if (page.includes('未上线') && page.includes('implemented: false')) {
 } else {
   fail('page must mark photo/copy/material_pack/format_conversion/signature_stamp as 未上线')
 }
-if (page.includes('该任务类型尚未上线') && page.includes('不展示占位数据')) {
+if (page.includes('该任务类型尚未上线') && page.includes('该能力尚未开放，目前没有可查看的真实任务。')) {
   pass('unimplemented types render an honest empty state, not fabricated rows')
 } else {
   fail('unimplemented types must render an honest empty state')
@@ -169,7 +169,7 @@ if (layout.includes("'/print-scan'") && layout.includes('打印扫描运维')) {
 
 // 6. 动作后的 refresh 必须区分 failed/stale：旧 A 闭包不能覆盖切换后的 B 查询，也不能把 stale 误报成失败。
 if (
-  page.includes("const queryKey = [taskType, status, String(page)].join('\\u0000')") &&
+  page.includes("const queryKey = [taskType, status, String(page), String(pageSize)].join('\\u0000')") &&
   page.includes('const queryKeyRef = useRef(queryKey)') &&
   page.includes('queryKeyRef.current = queryKey') &&
   page.includes("Promise<'success' | 'failed' | 'stale'>") &&
@@ -184,6 +184,9 @@ if (
 } else {
   fail('task action must guard old query closures and distinguish failed from stale refresh')
 }
+if (!page.includes('const [pageSize, setPageSize] = useState(20)') ||
+    !page.includes('pageSize={pageSize}') || !page.includes('onPageSizeChange={setPageSize}') ||
+    !page.includes('page, pageSize }') || !page.includes('[taskType, status, page, pageSize, queryKey]')) fail('统一分页器每页条数必须接入请求和竞态保护')
 
 // 7. 保存请求必须同时绑定 sequence + terminal：A 的 success/catch/finally 都不得污染切到 B 后的 UI。
 if (

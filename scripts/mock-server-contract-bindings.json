@@ -26,6 +26,26 @@
   ],
   "enforced": [
     {
+      "id": "admin-orders.readonly-detail",
+      "lane": "payment",
+      "endpoint": "GET /api/v1/admin/orders/:id",
+      "serverType": {
+        "file": "services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts",
+        "name": "AdminOrderReadonlyDetail"
+      },
+      "clientType": {
+        "file": "apps/admin/src/services/api/adminOrdersReadonly.ts",
+        "name": "AdminOrderReadonlyDetail"
+      },
+      "mocks": [
+        {
+          "file": "apps/admin/src/services/api/adminOrdersReadonly.ts",
+          "fn": "MOCK_DETAIL"
+        }
+      ],
+      "note": "W-105：列表字段由详情继承；计费内容页数原值只读透传，与真实后端类型核对。"
+    },
+    {
       "id": "contract-review.consent-scope",
       "lane": "privacy",
       "endpoint": "GET /api/v1/contract-reviews/consent-scope",

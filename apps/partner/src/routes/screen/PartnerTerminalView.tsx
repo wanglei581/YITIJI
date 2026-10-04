@@ -137,7 +137,7 @@ function PartnerTerminalLive({
       hostingOff={fleetSnapshot?.limits.recruitmentHosting === 'disabled'}
     >
       {current ? (
-        <TwinTerminalBoard twin={current} formatClock={(iso) => formatTime(iso)} formatDateTime={(iso) => formatDateTime(iso)} unassignedAreaLabel={UNASSIGNED} />
+        <TwinTerminalBoard twin={current} formatClock={(iso) => formatTime(iso)} formatDateTime={(iso) => formatDateTime(iso)} unassignedAreaLabel={UNASSIGNED} failureGuidance="如需处理请联系平台运营" />
       ) : (
         <TwinSlot slot="full">
           {twin.failure ? (

@@ -115,7 +115,7 @@ export default function MemberNotificationsPage() {
       }
     >
       <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
-        广播内容用于系统维护、设备服务、文件处理和打印服务说明；后端会拦截不合规内容并在此显示错误。
+        广播内容用于系统维护、设备服务、文件处理和打印服务说明；系统会拦截不合规内容并在此显示错误。
       </div>
 
       {message && (
@@ -192,7 +192,7 @@ export default function MemberNotificationsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
+                        <p title={item.title ?? undefined} className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
                         <span className={['rounded-full px-2.5 py-1 text-xs font-medium', CATEGORY_CLASS[item.category]].join(' ')}>
                           {CATEGORY_LABEL[item.category]}
                         </span>

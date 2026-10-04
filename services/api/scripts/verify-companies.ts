@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 /**
  * 企业展示（CompanyProfile）— 离线回归验证（可进 CI）。
  *
@@ -24,7 +27,7 @@
  *
  * 运行：pnpm --filter @ai-job-print/api verify:companies
  */
-require('dotenv').config()
+import 'dotenv/config'
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
@@ -421,7 +424,8 @@ async function main() {
     const adminCompaniesPage = walk(join(repoRoot, 'apps/admin/src/routes/companies'))
       .map((f) => readFileSync(f, 'utf8'))
       .join('\n')
-    const partnerCompaniesPage = readFileSync(join(repoRoot, 'apps/partner/src/routes/companies/index.tsx'), 'utf8')
+    const partnerCompaniesPage = walk(join(repoRoot, 'apps/partner/src/routes/companies'))
+      .map((f) => readFileSync(f, 'utf8')).join('\n')
     const sharedIndex = readFileSync(join(repoRoot, 'packages/shared/src/index.ts'), 'utf8')
     const controllerDoc = readFileSync(join(repoRoot, 'services/api/src/companies/companies.controller.ts'), 'utf8')
     const serviceDoc = readFileSync(join(repoRoot, 'services/api/src/companies/companies.service.ts'), 'utf8')

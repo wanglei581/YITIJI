@@ -23,6 +23,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { AdminFairsService, FAIR_MATERIAL_MAX_BYTES } from './admin-fairs.service'
 import { verifyFairMaterialSignature } from './fair-material-signing'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import {
   SaveFairCompanyDto,
   SaveFairZoneDto,
@@ -256,8 +257,9 @@ export class AdminFairsController {
     @Query('expires') expires: string,
     @Query('sig') sig: string,
     @Res() res: Response,
+    @Query('scope') scope?: string,
   ): Promise<void> {
-    if (!expires || !sig || !verifyFairMaterialSignature(materialId, expires, sig)) {
+    if ((!isRecruitmentContentHostingEnabled() && scope !== 'admin') || !expires || !sig || !verifyFairMaterialSignature(materialId, expires, sig, scope)) {
       throw new UnauthorizedException({ error: { code: 'MATERIAL_SIGNATURE_INVALID', message: '签名无效或已过期' } })
     }
     const { buffer, mimeType } = await this.fairs.readMaterialContent(materialId)

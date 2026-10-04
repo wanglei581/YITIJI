@@ -10,6 +10,7 @@ import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
 // 对外 taskId 是每会话随机停止能力令牌，Redis 值才是真实腾讯 TaskId。
 // 同厅终端即使 IP/UA 相同，也无法猜到或复用其他会话的停止令牌。
 const OWNER_KEY_PREFIX = 'trtc:owner:'
+// 单次会话上限最多 30 分钟（TRTC_MAX_SESSION_MINUTES 1–30），且服务端到点自行停止；停止令牌 30 分钟足够。
 const OWNER_TTL_SECONDS = 30 * 60
 
 @Controller('trtc')
@@ -50,7 +51,13 @@ export class TrtcController {
     const userId = rawUserId || `user_${Date.now()}`
     const result = await this.trtcService.startSession(userId)
     const stopSecret = randomBytes(32).toString('base64url')
-    await this.redis.setEx(`${OWNER_KEY_PREFIX}${stopSecret}`, OWNER_TTL_SECONDS, result.taskId)
+    try {
+      await this.redis.setEx(`${OWNER_KEY_PREFIX}${stopSecret}`, OWNER_TTL_SECONDS, result.taskId)
+    } catch (error) {
+      await this.trtcService.stopSession(result.taskId)
+      throw error
+    }
+    // stopSecret 仅能停止，不能续期。每次 POST session 都是新任务并重走全部入口守卫。
     return { ...result, taskId: stopSecret }
   }
 

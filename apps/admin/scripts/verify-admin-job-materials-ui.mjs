@@ -51,8 +51,9 @@ assertNotContains(
 
 assertContains('src/routes/job-materials/index.tsx', '已停用', 'disabled templates are labelled 已停用')
 const jobMaterialsPage = read('src/routes/job-materials/index.tsx')
-if (/bg-success-bg[\s\S]{0,120}已停用|已停用[\s\S]{0,120}bg-success-bg/.test(jobMaterialsPage)) {
-  fail('ADM-A17: 「已停用」不得使用绿色徽章')
+if (!jobMaterialsPage.includes("status={template.status === 'published' ? 'success' : 'default'}") ||
+    !jobMaterialsPage.includes("label={template.status === 'published' ? '已发布' : '已停用'}")) {
+  fail('ADM-A17: 已停用必须渲染中性状态徽章')
 }
 pass('ADM-A17 已停用模板不使用绿色徽章')
 

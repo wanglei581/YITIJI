@@ -268,6 +268,22 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
   } else pass('取件页使用 printTaskStatus 分流')
 }
 
+// W-117：执行真实显示表达式，失败码仅能用于内存重试，不能出现在公共屏幕码格。
+{
+  const page = read('apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx')
+  const expression = /const display = ([^\n]+)/.exec(page)?.[1]
+  if (!expression) fail('到机码页缺少码格显示表达式')
+  else {
+    const display = new Function('state', 'failure', 'code', `return (${expression})`)
+    for (const value of ['28491703', 'AB23456789']) {
+      if (display('error', { code: value }, value) !== '') fail('失败屏泄露刚提交的到机码')
+      else pass(`失败屏不显示 ${value.length} 位到机码`)
+      if (display('idle', null, value) !== value) fail('正常输入态不能隐藏本人当前输入')
+    }
+  }
+  if (!/handleClaim\(failure\.code\)/.test(page)) fail('重试必须仍使用内存原码')
+}
+
 if (failures > 0) {
   console.error(`\n❌ verify:pickup-claim-error-coverage  ${failures} 项失败`)
   process.exit(1)

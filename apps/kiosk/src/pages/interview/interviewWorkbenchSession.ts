@@ -13,10 +13,11 @@ import {
 export const INTERVIEW_WORKBENCH_SESSION_KEY = 'ai-job-print:current-interview-workbench'
 
 export interface InterviewSetupDraft {
+  directionSelectionVersion: 1
   interviewerType: InterviewerType
   industry: string
   position: string
-  experience: InterviewExperience
+  experience: InterviewExperience | ''
   difficulty: InterviewDifficulty
   duration: InterviewDuration
   resumeFile: { fileId: string; name: string } | null
@@ -78,10 +79,14 @@ function parseSetupDraft(raw: unknown): InterviewSetupDraft | undefined {
         }
       : null
   return {
+    directionSelectionVersion: 1,
     interviewerType: raw.interviewerType as InterviewerType,
-    industry: raw.industry,
+    // 旧草稿可能含自动预选值，无法证明由本人选择，重新请本人选择。
+    industry: raw.directionSelectionVersion === 1 ? raw.industry : '',
     position: raw.position,
-    experience: raw.experience as InterviewExperience,
+    experience: raw.directionSelectionVersion === 1
+      && ['fresh', 'lt1', 'y1_3', 'y3_5', 'gt5', 'switch'].includes(raw.experience)
+      ? raw.experience as InterviewExperience : '',
     difficulty: raw.difficulty as InterviewDifficulty,
     duration: raw.duration as InterviewDuration,
     resumeFile,

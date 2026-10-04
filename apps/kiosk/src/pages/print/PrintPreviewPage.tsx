@@ -162,6 +162,7 @@ export function PrintPreviewPage({
   const capability = usePrintParamCapability()
   const colorReason = (capability.color.reason ?? '').replace(/尚未通过真机验证|未验证/g, '暂未开通')
   const duplexReason = (capability.duplex.reason ?? '').replace(/尚未通过真机验证|未验证/g, '暂未开通')
+  const capabilityUnknown = [colorReason, duplexReason].some((reason) => reason.startsWith('暂时无法确认本机打印能力'))
   const {
     copies, setCopies, colorMode, setColorMode, duplex, setDuplex, orientation, setOrientation,
     scale, setScale, pageRange, setPageRange, customRange, setCustomRange, capabilityNote,
@@ -420,12 +421,14 @@ export function PrintPreviewPage({
         </PrintDeskFooter>
       )}
     >
-      <PrintDeskGuide step={3} title={<>先<em>看清楚</em>再出纸。</>} detail="逐页核对文件，设好参数后到下一步核对价格。" />
+      <PrintDeskGuide step={3}
+        title={unsupported ? <>这份文件<em>印不了</em>。</> : printerLoading ? <>正在读<em>设备状态</em>。</> : printerKind === 'offline' ? <>打印机<em>离线</em>。</> : printerKind === 'error' ? <>打印机报了<em>异常</em>。</> : !printerReady ? <>打印机状态<em>读不到</em>。</> : capability.loading ? <>本机能力<em>还在确认</em>。</> : capabilityUnknown ? <>本机能力<em>读不到</em>。</> : !capability.color.allowed || !capability.duplex.allowed ? <>部分打印能力<em>暂未开通</em>。</> : <>纸上<em>会长这样</em>。</>}
+        detail={unsupported ? '请重新选择 PDF / JPG / PNG；Word 请先另存为 PDF。' : printerLoading ? '读到设备状态之前不放行，免得你白跑一趟。' : !printerReady ? '现在不能放行到报价，请等状态返回或联系工作人员。' : '核对内容与参数，下一步看价格，最后带走打印件。'} />
       <div className="qpd-device-strip" role="status">
         <div data-ready={printerReady ? 'true' : undefined}><span>打印机</span><strong>{printerLoading ? '正在检查' : printerLabel}</strong><small>{printerLoading ? '请稍候' : printerName}</small></div>
         <div><span>纸张</span><strong>A4</strong></div>
-        <div><span>颜色</span><strong>{colorModeLabel(colorMode)}</strong></div>
-        <div><span>单双面</span><strong>{duplexLabel(duplex)}</strong></div>
+        <div data-unavailable={!capability.color.allowed || undefined}><span>彩色打印</span><strong>{capability.color.allowed ? '已开通' : capability.loading ? '确认中' : capabilityUnknown ? '未确认' : '暂未开通'}</strong><small>{capability.color.allowed ? `当前：${colorModeLabel(colorMode)}` : colorReason}</small></div>
+        <div data-unavailable={!capability.duplex.allowed || undefined}><span>双面打印</span><strong>{capability.duplex.allowed ? '已开通' : capability.loading ? '确认中' : capabilityUnknown ? '未确认' : '暂未开通'}</strong><small>{capability.duplex.allowed ? `当前：${duplexLabel(duplex)}` : duplexReason}</small></div>
       </div>
       <div className="qpd-preview-grid" data-w2-page="print-preview" data-qx-state={unsupported ? 'file-unsupported' : 'preview'}>
         <section className="qpd-preview-left">

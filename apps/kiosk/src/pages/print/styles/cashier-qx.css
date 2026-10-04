@@ -24,7 +24,7 @@
 }
 
 .cashier-qx-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.cashier-qx-scroll { gap: 16px; padding-top: 18px; padding-bottom: 16px; }
+.cashier-qx-scroll { gap: 20px; padding-top: 18px; padding-bottom: 16px; justify-content: flex-start; }
 
 /* ── 小青意图带 ─────────────────────────────────────────────── */
 .cashier-qx-xq {
@@ -249,9 +249,20 @@
 .cashier-qx-bignote svg { width: 30px; height: 30px; flex: none; }
 
 /* ── 付款列 + 订单列 ─────────────────────────────────────────── */
-.cashier-qx-paywrap { flex: none; display: flex; gap: 24px; align-items: flex-start; }
-.cashier-qx-paycol { flex: none; width: 372px; display: flex; flex-direction: column; gap: 14px; }
+.cashier-qx-paywrap { flex: none; display: flex; gap: 28px; align-items: flex-start; }
+.cashier-qx-paycol { flex: none; width: 420px; display: flex; flex-direction: column; gap: 14px; }
 .cashier-qx-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.cashier-qx-paycol > .cashier-qx-group { display: flex; flex-direction: column; }
+.cashier-qx-paycol:not(:has(.cashier-qx-group)) > .cashier-qx-amount { display: flex; flex-direction: column; }
+.cashier-qx-side > [aria-label='订单信息'] { display: flex; flex-direction: column; }
+.cashier-qx-side > [aria-label='订单信息'] > .cashier-qx-p { margin-top: 20px; }
+.cashier-qx-paycol > .cashier-qx-instrument { flex: none; }
+.cashier-qx-paycol .cashier-fail-card { flex: none; }
+/* 没有支付工具的状态（免费单等）：两列等高并接住下方余高，不留整行空白。 */
+.cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) { flex: 1 1 auto; align-items: stretch; max-height: 620px; }
+.cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) .cashier-qx-amount,
+.cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) .cashier-qx-side > [aria-label='订单信息'] { flex: 1; }
+.cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) .cashier-qx-kv { flex: 1; justify-content: space-between; }
 
 .cashier-qx-amount {
   position: relative;
@@ -306,7 +317,7 @@
 .cashier-qx-group { padding: 20px 24px; border-radius: 24px; border: 1px solid var(--qx-line); background: var(--qx-surface); }
 .cashier-qx-group h3 { margin: 0; display: flex; align-items: center; gap: 12px; font-size: 22px; line-height: 1.35; font-weight: 700; }
 .cashier-qx-group .cashier-qx-p { margin-top: 10px; font-size: 19px; }
-.cashier-qx-kv { margin: 12px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.cashier-qx-kv { margin: 26px 0 0; display: flex; flex-direction: column; gap: 28px; }
 .cashier-qx-kv > div { display: flex; gap: 12px; font-size: 19px; line-height: 1.45; }
 .cashier-qx-kv dt { flex: none; width: 120px; color: var(--qx-ink-3); }
 .cashier-qx-kv dd { flex: 1; min-width: 0; margin: 0; font-weight: 600; color: var(--qx-ink); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
@@ -476,7 +487,7 @@
 .cashier-qx-instrument .cashier-verify-btn svg { width: 22px; height: 22px; flex: none; }
 .cashier-qx-instrument .cashier-verify-btn:disabled { opacity: .6; cursor: progress; }
 
-/* ── 收尾卡：吸收余量（稿 32 .closure）───────────────────────── */
+/* ── 收尾卡：按内容排布（稿 32 .closure）───────────────────────── */
 .cashier-qx-closure {
   display: flex;
   flex-direction: column;
@@ -485,7 +496,7 @@
   border: 1px solid var(--qx-line);
   background: var(--qx-surface);
 }
-.cashier-qx-closure.qx-grow { flex: 1 0 auto; }
+.cashier-qx-closure.qx-grow { flex: none; }
 .cashier-qx-closure h2 { margin: 0; font-size: 24px; font-weight: 700; }
 .cashier-qx-flow { margin: auto 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .cashier-qx-flow li { padding: 18px 4px 0; border-top: 1px solid var(--qx-line-2); }
@@ -516,6 +527,7 @@
 /* ── 底部：禁用原因 / 操作条 / 事实说明条 ──────────────────────── */
 .cashier-qx-route .qx-ctabar { flex-direction: column; align-items: stretch; gap: 0; padding: 0; }
 .cashier-qx-closure { display: none; }
+.cashier-qx-page[data-qx-state='no-order'] .cashier-qx-closure { display: flex; }
 .cashier-qx-cta-reason {
   display: flex;
   align-items: center;
@@ -528,7 +540,9 @@
   color: var(--qx-wheat-d);
 }
 .cashier-qx-cta-reason p { margin: 0; }
-.cashier-qx-cta-row { display: flex; gap: 16px; padding: 18px var(--qx-gutter); }
+.cashier-qx-cta-row { display: flex; flex-wrap: wrap; gap: 16px; padding: 18px var(--qx-gutter); }
+/* 三个真实出口时：主动作独占一行，两颗次动作平分下一行。 */
+.cashier-qx-cta-row:has(> .qx-btn:nth-child(3)) > .qx-btn[data-variant='primary'] { flex: 1 0 100%; order: -1; }
 .cashier-qx-cta-row .qx-btn { flex: 1; min-width: 0; min-height: var(--qx-btn-h); padding: 0 18px; border-radius: 22px; font-size: 22px; white-space: nowrap; }
 .cashier-qx-cta-row .qx-btn[data-variant='primary'] { flex: 1.6; color: var(--qx-emerald); }
 .cashier-qx-cta-row .qx-btn[data-variant='primary']:disabled { opacity: .55; }
@@ -575,7 +589,8 @@
   [data-kiosk-stage-fit='off'] .cashier-qx-state-h { font-size: 21px; gap: 10px; }
   [data-kiosk-stage-fit='off'] .cashier-qx-p { font-size: 16px; }
   [data-kiosk-stage-fit='off'] .cashier-qx-chip { min-height: 36px; padding: 0 12px; font-size: 14px; }
-  [data-kiosk-stage-fit='off'] .cashier-qx-paywrap { flex-direction: column; align-items: stretch; gap: 14px; }
+  [data-kiosk-stage-fit='off'] .cashier-qx-paywrap { flex-direction: column; align-items: stretch; gap: 14px; min-height: 0; flex: none; }
+  [data-kiosk-stage-fit='off'] .cashier-qx-kv { gap: 14px; }
   [data-kiosk-stage-fit='off'] .cashier-qx-paycol { width: 100%; }
   [data-kiosk-stage-fit='off'] .cashier-qx-amount { padding: 18px 20px; border-radius: 22px; }
   [data-kiosk-stage-fit='off'] .cashier-qx-amount-num { font-size: 44px; }

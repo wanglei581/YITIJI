@@ -83,7 +83,7 @@
           </view>
           <view class="divider"></view>
           <view class="info-row">
-            <text class="info-label">到机应付</text>
+            <text class="info-label">{{paidOrder ? '到机应付' : '本次打印'}}</text>
             <text class="info-val">{{amountText}}</text>
           </view>
           <view class="divider"></view>
@@ -94,7 +94,7 @@
           <view class="divider" wx:if="{{expireTime}}"></view>
           <view class="info-row">
             <text class="info-label">状态</text>
-            <text class="info-val">取件 {{pickupStatus}} · 付款 {{payStatus}} · 任务 {{taskStatus}}</text>
+            <text class="info-val">取件 {{pickupStatus}}{{paidOrder ? ' · 付款 ' + payStatus : ''}} · 任务 {{taskStatus}}</text>
           </view>
         </view>
       </view>
@@ -114,11 +114,11 @@
             </view>
             <view class="step-item">
               <view class="step-num">3</view>
-              <text class="step-text">在机器上现场支付</text>
+              <text class="step-text">{{paidOrder ? '在机器上现场支付' : '在机器上确认材料'}}</text>
             </view>
             <view class="step-item">
               <view class="step-num">4</view>
-              <text class="step-text">付款后开始打印，取走材料</text>
+              <text class="step-text">{{paidOrder ? '付款后开始打印，取走材料' : '开始打印，取走材料'}}</text>
             </view>
           </view>
         </view>

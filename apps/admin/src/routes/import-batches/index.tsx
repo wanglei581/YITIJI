@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { formatDateTime } from '@ai-job-print/shared'
-import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
+import { formatDateTime, formatCount } from '@ai-job-print/shared'
+import { Card, ConsoleTable, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { FileSpreadsheetIcon, SearchIcon } from 'lucide-react'
+import { SearchIcon } from 'lucide-react'
 import type { AdminImportBatch } from '../../services/api'
 import { getImportBatches } from '../../services/api'
-import { Pagination } from '../components/DataTable'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 
@@ -45,6 +44,7 @@ function fmtDate(iso: string | null): string {
 export default function ImportBatchesPage() {
   const navigate = useNavigate()
 
+  const [reloadKey, setReloadKey] = useState(0)
   const [batches,     setBatches]     = useState<AdminImportBatch[]>([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(false)
@@ -68,12 +68,14 @@ export default function ImportBatchesPage() {
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setError(false)
     getImportBatches()
       .then((data) => { if (!cancelled) setBatches(data) })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [reloadKey])
 
   // ── Filter chain ─────────────────────────────────────────────────────────────
 
@@ -110,25 +112,26 @@ export default function ImportBatchesPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <Page title="Excel 导入记录" subtitle="合作机构 Excel 批量导入的历史批次">
-        <Card className="flex h-40 items-center justify-center">
-          <span className="text-sm text-neutral-400">加载中…</span>
-        </Card>
-      </Page>
-    )
-  }
-
-  if (error) {
-    return (
-      <Page title="Excel 导入记录" subtitle="合作机构 Excel 批量导入的历史批次">
-        <Card className="flex h-40 items-center justify-center">
-          <span className="text-sm text-error-fg">加载失败，请刷新重试</span>
-        </Card>
-      </Page>
-    )
-  }
+  const columns: ConsoleColumn<AdminImportBatch>[] = [
+    { id: 'org', header: '机构', truncate: true, cell: (b) => b.orgName },
+    { id: 'source', header: '数据源', truncate: true, cell: (b) => b.sourceName },
+    { id: 'file', header: '文件名', truncate: true, cell: (b) => b.fileName },
+    { id: 'type', header: '类型', cellClassName: 'whitespace-nowrap', cell: (b) => DATA_TYPE_LABEL[b.dataType] },
+    { id: 'total', header: '总行数', align: 'right', cell: (b) => formatCount(b.totalRows) },
+    { id: 'valid', header: '有效', align: 'right', cellClassName: 'text-success-fg', cell: (b) => formatCount(b.validRows) },
+    { id: 'invalid', header: '无效', align: 'right', cellClassName: 'text-error-fg', cell: (b) => formatCount(b.invalidRows) },
+    { id: 'duplicate', header: '重复', align: 'right', cellClassName: 'text-warning-fg', cell: (b) => formatCount(b.dupRows) },
+    { id: 'status', header: '状态', cell: (b) => <StatusBadge dot status={STATUS_MAP[b.status].badge} label={STATUS_MAP[b.status].label} /> },
+    { id: 'created', header: '创建时间', cellClassName: 'whitespace-nowrap tabular-nums', cell: (b) => fmtDate(b.createdAt) },
+    { id: 'confirmed', header: '确认时间', cellClassName: 'whitespace-nowrap tabular-nums', cell: (b) => fmtDate(b.confirmedAt) },
+    { id: 'actions', header: '操作', sticky: true, align: 'right', cell: (b) => <button type="button"
+      className="whitespace-nowrap rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+      onClick={() => navigate(b.dataType === 'job'
+        ? `/job-sources?sourceId=${encodeURIComponent(b.sourceId)}&batchLabel=${encodeURIComponent(b.fileName)}&filterScope=source`
+        : `/fair-sources?sourceOrgId=${encodeURIComponent(b.orgId)}&batchLabel=${encodeURIComponent(b.fileName)}&filterScope=org`)}>
+      查看{DATA_TYPE_LABEL[b.dataType]}
+    </button> },
+  ]
 
   return (
     <Page
@@ -190,102 +193,11 @@ export default function ImportBatchesPage() {
 
       {/* 表格 */}
       <Card className="overflow-hidden p-0">
-        {paged.length === 0 ? (
-          <EmptyState
-            title="暂无导入记录"
-            description={
-              search
-                ? `未找到包含"${search}"的导入批次`
-                : '当前筛选条件下没有导入记录'
-            }
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  {['机构', '数据源', '文件名', '类型', '总行数', '有效', '无效', '重复', '状态', '创建时间', '确认时间', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-900/[0.06]">
-                {paged.map((b) => {
-                  const s = STATUS_MAP[b.status]
-                  return (
-                    <tr key={b.id} className="hover:bg-neutral-50">
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-neutral-800">
-                        {b.orgName}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        {b.sourceName}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <FileSpreadsheetIcon className="h-3.5 w-3.5 flex-shrink-0 text-success" />
-                          <span className="max-w-[200px] truncate text-xs text-neutral-700" title={b.fileName}>
-                            {b.fileName}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          b.dataType === 'job'
-                            ? 'bg-info-bg text-info-fg'
-                            : 'bg-purple-50 text-purple-700'
-                        }`}>
-                          {DATA_TYPE_LABEL[b.dataType]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm font-medium text-neutral-700">
-                        {b.totalRows}
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm font-medium text-success-fg">
-                        {b.validRows}
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm font-medium text-error-fg">
-                        {b.invalidRows > 0 ? b.invalidRows : <span className="text-neutral-300">0</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm font-medium text-warning">
-                        {b.dupRows > 0 ? b.dupRows : <span className="text-neutral-300">0</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge dot status={s.badge} label={s.label} />
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        {fmtDate(b.createdAt)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        {fmtDate(b.confirmedAt)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <button
-                          className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                          onClick={() => navigate(
-                            b.dataType === 'job'
-                              ? `/job-sources?sourceId=${encodeURIComponent(b.sourceId)}&batchLabel=${encodeURIComponent(b.fileName)}&filterScope=source`
-                              : `/fair-sources?sourceOrgId=${encodeURIComponent(b.orgId)}&batchLabel=${encodeURIComponent(b.fileName)}&filterScope=org`
-                          )}
-                        >
-                          查看{DATA_TYPE_LABEL[b.dataType]}
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <Pagination
-          total={total}
-          page={page}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
-        />
+        <ConsoleTable items={paged} columns={columns} loading={loading}
+          error={error ? { message: '加载失败，请重试', onRetry: () => setReloadKey((key) => key + 1) } : null}
+          empty={{ title: '暂无导入记录', description: search ? `未找到包含"${search}"的导入批次` : '当前筛选条件下没有导入记录' }}
+          total={total} page={page} pageSize={pageSize} onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
       </Card>
 
       {footnote && <p className="mt-3 text-xs text-neutral-400">{footnote}</p>}

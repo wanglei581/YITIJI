@@ -77,13 +77,13 @@
       </view>
       <view class="step-item">
         <view class="step-num">3</view>
-        <text class="step-text">{{isFreeOrder ? '核销后无需付款，直接等待进入打印队列' : '核销后在终端确认、付款并等待出纸'}}</text>
+        <text class="step-text">{{!isFreeOrder ? '核销后在终端确认、付款并等待出纸' : '核销后直接进入打印队列'}}</text>
       </view>
     </view>
 
     <view class="next-card" wx:elif="{{statusKey === 'awaiting_payment' || statusKey === 'awaiting_release'}}">
       <view class="next-title">二维码已自动撤下</view>
-      <view class="next-text">{{isFreeOrder ? '终端已经认领这笔免费试运营订单，无需付款。请在设备旁等待，手机端会继续刷新打印状态。' : '终端已经认领这笔订单。请查看一体机屏幕并完成现场支付，手机端会继续刷新打印状态。'}}</view>
+      <view class="next-text">{{!isFreeOrder ? '终端已经认领这笔订单。请查看一体机屏幕并完成现场支付，手机端会继续刷新打印状态。' : '终端已经认领这笔免费试运营订单。请在设备旁等待，手机端会继续刷新打印状态。'}}</view>
     </view>
 
     <view class="next-card" wx:elif="{{statusKey === 'queued' || statusKey === 'printing'}}">
@@ -106,7 +106,7 @@
     <view class="sync-warning" wx:if="{{errorMsg}}">状态同步暂时失败，当前展示最近一次可用状态：{{errorMsg}}</view>
 
     <view class="notice-card">
-      <text class="nc-text">二维码只包含本订单的到机码，不含文件、姓名或手机号。{{isFreeOrder ? '扫码和打印状态' : '扫码、付款和打印状态'}}以服务端与终端实时结果为准。</text>
+      <text class="nc-text">二维码只包含本订单的到机码，不含文件、姓名或手机号。{{!isFreeOrder ? '扫码、付款和打印状态' : '扫码和打印状态'}}以服务端与终端实时结果为准。</text>
     </view>
 
     <view class="pk-actions">

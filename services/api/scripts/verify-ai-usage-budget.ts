@@ -106,11 +106,14 @@ async function main(): Promise<void> {
   const memberA = await prisma.endUser.create({ data: { phoneHash: `verify-ai-usage-${runId}-a`, phoneEnc: 'x' } })
   const memberB = await prisma.endUser.create({ data: { phoneHash: `verify-ai-usage-${runId}-b`, phoneEnc: 'x' } })
   const orgId = `verify-ai-usage-org-${runId}`
-  await prisma.organization.create({ data: { id: orgId, name: '门禁机构', type: 'school' } })
+  const orgName = '青岛市市南区零工之家'
+  await prisma.organization.create({ data: { id: orgId, name: orgName, type: 'school' } })
   const terminalA = `verify-ai-usage-t1-${runId}`
   const terminalB = `verify-ai-usage-t2-${runId}`
+  // 终端编号故意与主键不同：后台汇总必须给编号而不是把主键当编号。
+  const codeOfTerminal = (id: string) => `KSK-${id === terminalA ? 'A' : 'B'}${runId.slice(-4).toUpperCase()}`
   for (const [id, org] of [[terminalA, orgId], [terminalB, null]] as const) {
-    await prisma.terminal.create({ data: { id, terminalCode: id, agentToken: `tok-${id}`, deviceFingerprint: 'fp', orgId: org } })
+    await prisma.terminal.create({ data: { id, terminalCode: codeOfTerminal(id), agentToken: `tok-${id}`, deviceFingerprint: 'fp', orgId: org } })
   }
 
   // ── 身份解析依赖：真 JWT、Redis 桩（会员会话）、真库（终端机构）、终端验签桩 ──────
@@ -257,9 +260,9 @@ async function main(): Promise<void> {
   const accessWith = (b: unknown) => new AiAccessService(redis, auditStub as never, jwt, prisma, b as never)
   const access = accessWith(budget)
   const enforce = (kind: 'generate' | 'voice' | 'read' | 'export') => outcome(() => access.enforce(kind, false, { headers: {} }, OFF))
-  const seed = async (dayKey: string, rows: Array<{ cost: number | null; terminalId?: string | null; endUserId?: string | null }>) => {
+  const seed = async (dayKey: string, rows: Array<{ cost: number | null; terminalId?: string | null; endUserId?: string | null; orgId?: string | null }>) => {
     await prisma.aiUsageRecord.createMany({
-      data: rows.map((r) => ({ dayKey, featureKey: feature('seed'), vendor: 'deepseek', model: 'deepseek-v4-flash', status: 'ok', costCny: r.cost, costMeasured: r.cost !== null, terminalId: r.terminalId ?? null, terminalVerified: Boolean(r.terminalId), endUserId: r.endUserId ?? null })),
+      data: rows.map((r) => ({ dayKey, featureKey: feature('seed'), vendor: 'deepseek', model: 'deepseek-v4-flash', status: 'ok', costCny: r.cost, costMeasured: r.cost !== null, terminalId: r.terminalId ?? null, terminalVerified: Boolean(r.terminalId), endUserId: r.endUserId ?? null, orgId: r.orgId ?? null })),
     })
     budget.resetForTests()
   }
@@ -407,19 +410,36 @@ async function main(): Promise<void> {
   console.log('\n[D] 后台只读汇总')
   {
     const d = setDay(11)
+    // 最后两行：终端 / 机构已被删除（主键在表里找不到），编号与机构名必须是 null，金额照计。
+    const goneTerminal = `verify-ai-usage-gone-t-${runId}`
+    const goneOrg = `verify-ai-usage-gone-org-${runId}`
     await seed(d, [
-      { cost: 0.3, terminalId: terminalA, endUserId: memberA.id },
-      { cost: 0.25, terminalId: terminalA },
+      { cost: 0.3, terminalId: terminalA, endUserId: memberA.id, orgId },
+      { cost: 0.25, terminalId: terminalA, orgId },
       { cost: null, endUserId: memberB.id },
       { cost: 0.5, endUserId: memberB.id },
+      { cost: 0, terminalId: goneTerminal, orgId: goneOrg },
     ])
     const summary = await buildAiUsageDailySummary(prisma, d, budget.limits)
     const json = JSON.stringify(summary)
     check('D1 顶层字段白名单', JSON.stringify(Object.keys(summary).sort()) === JSON.stringify(['byFeature', 'byOrg', 'byTerminal', 'byVendor', 'day', 'limits', 'reached', 'totals']), Object.keys(summary).join(','))
     const bucketKeys = JSON.stringify(['calls', 'chargedCostCny', 'key', 'measuredCostCny', 'unmeasuredCalls'])
-    check('D1 各维度桶字段白名单', [...summary.byFeature, ...summary.byVendor, ...summary.byTerminal, ...summary.byOrg].every((b) => JSON.stringify(Object.keys(b).sort()) === bucketKeys))
+    check('D1 功能 / 厂商桶字段白名单', [...summary.byFeature, ...summary.byVendor].every((b) => JSON.stringify(Object.keys(b).sort()) === bucketKeys))
+    check('D1 终端桶只多一个 terminalCode', summary.byTerminal.every((b) => JSON.stringify(Object.keys(b).sort()) === JSON.stringify(['calls', 'chargedCostCny', 'key', 'measuredCostCny', 'terminalCode', 'unmeasuredCalls'])))
+    check('D1 机构桶只多一个 orgName', summary.byOrg.every((b) => JSON.stringify(Object.keys(b).sort()) === JSON.stringify(['calls', 'chargedCostCny', 'key', 'measuredCostCny', 'orgName', 'unmeasuredCalls'])))
+    const tA = summary.byTerminal.find((b) => b.key === terminalA)
+    const tGone = summary.byTerminal.find((b) => b.key === goneTerminal)
+    const tNone = summary.byTerminal.find((b) => b.key === null)
+    check('D1 终端桶给终端编号（不是主键）', tA?.terminalCode === codeOfTerminal(terminalA) && tA.terminalCode !== terminalA, JSON.stringify(tA))
+    check('D1 终端已删除 / 无终端：编号为 null，金额照计', tGone?.terminalCode === null && tGone.calls === 1 && tNone?.terminalCode === null, JSON.stringify([tGone, tNone]))
+    const oA = summary.byOrg.find((b) => b.key === orgId)
+    const oGone = summary.byOrg.find((b) => b.key === goneOrg)
+    const oNone = summary.byOrg.find((b) => b.key === null)
+    check('D1 机构桶给机构名', oA?.orgName === orgName && oA.calls === 2, JSON.stringify(oA))
+    check('D1 机构已删除 / 无机构：机构名为 null', oGone?.orgName === null && oNone?.orgName === null, JSON.stringify([oGone, oNone]))
+    check('D1 触顶终端带编号，与 terminalIds 同序', JSON.stringify(summary.reached.terminals) === JSON.stringify([{ terminalId: terminalA, terminalCode: codeOfTerminal(terminalA) }]), JSON.stringify(summary.reached.terminals))
     check('D1 不含会员号，只给会员数', !json.includes(memberA.id) && !json.includes(memberB.id) && summary.totals.memberCount === 2)
-    check('D1 合计：4 次、1 次未计量、实测 1.05、计入 1.1', summary.totals.calls === 4 && summary.totals.unmeasuredCalls === 1 && summary.totals.measuredCostCny === 1.05 && summary.totals.chargedCostCny === 1.1, JSON.stringify(summary.totals))
+    check('D1 合计：5 次（含一条 0 元的已删终端行）、1 次未计量、实测 1.05、计入 1.1', summary.totals.calls === 5 && summary.totals.unmeasuredCalls === 1 && summary.totals.measuredCostCny === 1.05 && summary.totals.chargedCostCny === 1.1, JSON.stringify(summary.totals))
     check('D1 触顶：全站（1.1 ≥ 1）、终端 A（0.55 ≥ 0.5）、会员 2 人（0.3 与 0.55 都 ≥ 0.2）', summary.reached.global === true && JSON.stringify(summary.reached.terminalIds) === JSON.stringify([terminalA]) && summary.reached.memberCount === 2, JSON.stringify(summary.reached))
     check('D1 上限随汇总给出', summary.limits.globalCny === 1 && summary.limits.terminalCny === 0.5 && summary.limits.memberCny === 0.2 && summary.limits.unmeasuredCallCostCny === 0.05)
     const controller = new AdminAiUsageController(prisma, budget)

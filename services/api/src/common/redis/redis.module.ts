@@ -52,6 +52,6 @@ import { REDIS_CLIENT, RedisService } from './redis.service'
     MemberDataExportRedisService,
     PartnerAccountActionRedisService,
   ],
-  exports: [RedisService, MemberDataExportRedisService, PartnerAccountActionRedisService],
+  exports: [REDIS_CLIENT, RedisService, MemberDataExportRedisService, PartnerAccountActionRedisService],
 })
 export class RedisModule {}

@@ -123,7 +123,8 @@ console.log('\n=== Admin 招聘类页面 3.15 停放验证 ===')
 
   // 两个 <select> 真的用了这两个函数（改回 Object.entries(PARTNER_TYPE_LABELS) 会在这里红）
   const pagePath = R('partners/index.tsx')
-  const page = readOrFail(pagePath)
+  if (!/<CreateOrgDrawer[\s/>]/.test(readOrFail(pagePath)) || !/<OrgDetailDrawer[\s/>]/.test(readOrFail(pagePath))) fail('机构新建与详情抽屉必须仍由原页面渲染')
+  const page = ['CreateOrgDrawer.tsx', 'OrgDetailDrawer.tsx'].map((f) => readOrFail(R(`partners/${f}`))).join('\n')
   const ast = sourceFile(pagePath, page)
   const typeSelects = collect(ast, (n) => ts.isJsxElement(n) && n.openingElement.tagName.getText() === 'select' &&
     n.openingElement.attributes.properties.some((a) => ts.isJsxAttribute(a) && a.name.getText() === 'value' && /form\.type\b/.test(a.initializer?.getText() ?? '')))
@@ -228,7 +229,7 @@ const PARKED_ONLY_FROM = {
 // ---------------------------------------------------------------------------
 {
   const icons = { BriefcaseIcon: 'Briefcase', PrinterIcon: 'Printer' }
-  const stock = loadModule(R('dashboard/recruitmentStock.ts'), { 'lucide-react': icons })
+  const stock = loadModule(R('dashboard/recruitmentStock.ts'), { 'lucide-react': icons, '@ai-job-print/shared': loadModule(join(repoRoot, 'packages/shared/src/formatNumber.ts'), {}) })
   const ban = (text, where) => {
     for (const word of ['待审核', '去审核', '审核通过后', '管理员审核']) {
       if (text.includes(word)) fail(`工作台${where}出现「${word}」—— 管理员不再审核招聘类内容`)
@@ -260,7 +261,8 @@ const PARKED_ONLY_FROM = {
   ban(JSON.stringify([openKpi, openTodo]), '（托管打开）')
 
   const dashPath = R('dashboard/index.tsx')
-  const dash = codeOnly(readOrFail(dashPath))
+  const dash = codeOnly(readOrFail(dashPath) + '\n' + readOrFail(R('dashboard/dashboardRows.ts')))
+  if (!dash.includes("from './dashboardRows'")) fail('工作台必须挂接拆出的告警行映射')
   for (const word of ['待审核数据', '待办审核', '去审核']) {
     if (dash.includes(word)) fail(`${rel(dashPath)} 仍出现「${word}」`)
   }

@@ -11,6 +11,7 @@
  * 屏障只拦前两次到达；重试的第三次到达直接放行。等不齐时 5 秒后放行并记下
  * `timedOut`，门禁必须断言它为 false，防止退化成「没挤到一起也算过」。
  */
+import { AsyncLocalStorage } from 'node:async_hooks'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 
 export interface RaceBarrier {
@@ -41,6 +42,10 @@ export interface RacingPrisma {
   prisma: PrismaService
   /** `$transaction` 被调用的次数（含重试）。 */
   readonly transactionCalls: number
+  /** 在 `asCaller(label, fn)` 里发起的 `$transaction` 次数（含重试），按调用方分别计。 */
+  transactionCallsOf(label: string): number
+  /** 给 fn 里发起的事务打上调用方标记；不用它的门禁照旧只看 transactionCalls。 */
+  asCaller<T>(label: string, fn: () => Promise<T>): Promise<T>
   readonly afterRead: RaceBarrier
   readonly beforeCommit: RaceBarrier
 }
@@ -49,6 +54,8 @@ export function createRacingPrisma(prisma: PrismaService): RacingPrisma {
   const afterRead = createRaceBarrier()
   const beforeCommit = createRaceBarrier()
   let transactionCalls = 0
+  const callerScope = new AsyncLocalStorage<string>()
+  const callsByCaller = new Map<string, number>()
 
   const wrapTx = (tx: object): object => {
     let readSeen = false
@@ -78,6 +85,8 @@ export function createRacingPrisma(prisma: PrismaService): RacingPrisma {
       if (property === '$transaction') {
         return (operation: (tx: object) => Promise<unknown>, options?: unknown) => {
           transactionCalls += 1
+          const caller = callerScope.getStore()
+          if (caller !== undefined) callsByCaller.set(caller, (callsByCaller.get(caller) ?? 0) + 1)
           return (target.$transaction as unknown as (
             fn: (tx: object) => Promise<unknown>,
             opts?: unknown,
@@ -96,6 +105,8 @@ export function createRacingPrisma(prisma: PrismaService): RacingPrisma {
   return {
     prisma: racing,
     get transactionCalls() { return transactionCalls },
+    transactionCallsOf: (label: string) => callsByCaller.get(label) ?? 0,
+    asCaller: <T>(label: string, fn: () => Promise<T>) => callerScope.run(label, fn),
     afterRead,
     beforeCommit,
   }

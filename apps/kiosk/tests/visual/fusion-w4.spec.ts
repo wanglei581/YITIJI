@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
+import { expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
 import { registerW4Api, w4TerminalConfig } from '../fixtures/fusion-w4-api'
 import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 
@@ -501,6 +502,14 @@ test('/campus AI求职「开始模拟」进入面试设置 @w4', async ({ page, 
   // 两种都认等于「重定向没发生也算过」，那是放松断言。
   await expect(page).toHaveURL(/\/interview\?stage=setup$/)
   await expect(page.locator('[data-kiosk-screen="interview-setup"]')).toBeVisible()
+  await expectInterviewDirectionUnselected(page)
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await expect(dialog.getByText('当前：尚未选择', { exact: true })).toBeVisible()
+  await expect(dialog.getByRole('button', { pressed: true })).toHaveCount(0)
+  await dialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
   await verifyPage(page, errors)
 })
 

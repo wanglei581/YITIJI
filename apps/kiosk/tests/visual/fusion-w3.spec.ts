@@ -11,6 +11,7 @@ import {
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
 import { mockAssistantVoice } from './fixtures/assistant-voice'
+import { chooseGenericResumeDirection, chooseTargetedResumeDirection, expectResumeDirectionUnselected, expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -96,11 +97,14 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   })
   await page.goto('/resume/source')
   await assertKioskShellFillsViewport(page)
-  await page.locator('.qx-rt-settings > summary').click()
+  await expectResumeDirectionUnselected(page)
+  await page.getByRole('button', { name: /^定向诊断/ }).click()
   await page.getByRole('button', { name: '选择行业方向' }).click()
   const diagnosisIndustryDialog = page.getByRole('dialog', { name: '选择行业门类' })
   await expect(diagnosisIndustryDialog).toBeVisible()
   await assertDialogWithinViewport(page)
+  await expect(diagnosisIndustryDialog.getByText('当前：暂不指定', { exact: true })).toBeVisible()
+  await expect(diagnosisIndustryDialog.locator('button[aria-pressed="true"]')).toHaveText('暂不指定')
   await diagnosisIndustryDialog.getByRole('button', { name: '制造业', exact: true }).click()
   await diagnosisIndustryDialog.getByRole('button', { name: '完成' }).click()
   // 稿 21：经验 / 学历是点选组（同一组枚举），学历在「专业与学历」选填抽屉里。
@@ -141,8 +145,10 @@ test('USB resume keeps its purpose and reaches AI parsing @w3-kiosk', async ({ p
   await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
+    const origin = new URL(page.url()).origin
+    expect(request.headers()['origin']).toBe(origin)
     const corsHeaders = {
-      'Access-Control-Allow-Origin': 'http://127.0.0.1:4183',
+      'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Private-Network': 'true',
@@ -171,6 +177,7 @@ test('USB resume keeps its purpose and reaches AI parsing @w3-kiosk', async ({ p
   api.respond('POST', '/api/v1/resume/parse', { status: 200, json: diagnosis })
 
   await page.goto('/resume/source')
+  await chooseTargetedResumeDirection(page)
   await page.getByRole('button', { name: /U盘上传/ }).click()
   await page.getByRole('button', { name: /U盘简历\.pdf/ }).click()
   await page.locator('.qx-rt-preview > summary').click()
@@ -191,8 +198,10 @@ test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', 
   await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
+    const origin = new URL(page.url()).origin
+    expect(request.headers()['origin']).toBe(origin)
     const corsHeaders = {
-      'Access-Control-Allow-Origin': 'http://127.0.0.1:4183',
+      'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Private-Network': 'true',
@@ -234,6 +243,7 @@ test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', 
   terminalBaseline(api)
 
   await page.goto('/resume/source')
+  await chooseTargetedResumeDirection(page)
   await page.getByRole('button', { name: /U盘上传/ }).click()
   await expect(page.getByRole('button', { name: /my_pdf_resume\.jpg/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /too-large\.pdf/ })).toHaveCount(0)
@@ -333,6 +343,7 @@ test('resume preview recovers after replacing a failed file @w3-kiosk', async ({
   })
 
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   const input = page.getByLabel('选择本机简历文件')
   await input.setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('broken') })
   await page.locator('.qx-rt-preview > summary').click()
@@ -399,6 +410,7 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   })
   await page.clock.install()
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.locator('.qx-rt-preview > summary').click()
   const preview = page.locator('[data-file-preview-kind="pdf"]')
@@ -462,6 +474,7 @@ test('resume parse unknown with a task id rechecks the same record instead of re
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
   })
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await expect(page.getByText('解析还没出最终结果', { exact: true })).toBeVisible()
@@ -514,6 +527,7 @@ test('resume source Qingxu frame keeps intent, the 10MB limit and separates an u
     reply(200, JSON.stringify({ success: true, data: { ...uploadedResume.data, fileId, filename } }))
 
   await page.goto('/resume/source?intent=optimize')
+  await chooseGenericResumeDirection(page)
   const source = page.locator('[data-qx-frame="true"] [data-kiosk-screen="resume-source"]')
   await expect(source).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: 'AI 简历优化' })).toBeVisible()
@@ -527,6 +541,7 @@ test('resume source Qingxu frame keeps intent, the 10MB limit and separates an u
   await page.getByRole('button', { name: '返回 AI 简历服务' }).click()
   await page.waitForURL('/resume-service')
   await page.goto('/resume/source?intent=optimize')
+  await chooseGenericResumeDirection(page)
   await expect(source).toBeVisible()
 
   const pick = async (name: string, next: (route: Route) => Promise<void>) => {
@@ -600,6 +615,7 @@ test('resume parse: a result arriving after leaving never hijacks navigation @w3
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) }).catch(() => undefined)
   })
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('/resume/parse')
@@ -637,6 +653,7 @@ test('resume parse first POST carries both intent headers and a lost reply repla
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) })
   })
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('/resume/parse')
@@ -667,6 +684,7 @@ test('resume parse server failure is labelled failed, never as the running step 
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(failedBody) })
   })
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await expect(page.getByText('解析出错', { exact: true })).toBeVisible()
@@ -728,6 +746,7 @@ test('diagnosis failure prints the uploaded original through the print desk mate
   }))
 
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('/resume/report')
@@ -767,6 +786,7 @@ test('resume parse public quota rejection clears the local intent before the fai
     })
   })
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('/resume/report')
@@ -794,6 +814,7 @@ test('resume parse AI paused lands on the failure report with non-AI exits and n
     })
   })
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   // AI 停用是能力级：不留在解析页叫人「原样再试」，转明确失败屏。
@@ -820,6 +841,7 @@ test('resume parse public quota rejection stays on the parse page when the inten
     })
   })
   await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.evaluate(() => {
     const store = (window as Window & Record<string, Storage>)[['session', 'Storage'].join('')]
     const key = 'ai-job-print:kiosk-resume-parse-intent'
@@ -866,6 +888,7 @@ test('resume parse terminal keyed 4xx tells the truth and does not start another
     await page.goto('/resume/source')
     await clearResumeParseIntents(page)
     await page.reload()
+    await chooseGenericResumeDirection(page)
     await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
     await page.getByRole('button', { name: '开始 AI 诊断' }).click()
     await page.waitForURL('/resume/parse')
@@ -960,6 +983,7 @@ test('resume parse terminal keyed 4xx tells the truth and does not start another
   const changedIntent = posts[changedBefore].intent
   await page.getByTestId('resume-parse-reupload').click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
+  await chooseGenericResumeDirection(page)
   expect(posts).toHaveLength(changedBefore + 1)
   next = { status: 200, code: 'OK' }
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
@@ -1033,6 +1057,7 @@ test('resume parse consent gate pauses the rail and sends nothing until granted 
   await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '确认登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
+  await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('/resume/parse')
@@ -1071,6 +1096,7 @@ for (const viewport of [{ width: 1080, height: 1920 }, { width: 390, height: 844
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) }).catch(() => undefined)
     })
     await page.goto('/resume/source?intent=optimize')
+    await chooseGenericResumeDirection(page)
     await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
     await page.getByRole('button', { name: '上传并生成优化建议' }).click()
     await page.waitForURL('/resume/parse')
@@ -1574,12 +1600,16 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await expect(page.getByRole('button', { name: 'HR 面试', exact: true })).toBeVisible()
   await expect(page.getByText('HR 初筛')).toHaveCount(0)
   await assertKioskShellFillsViewport(page)
+  await expectInterviewDirectionUnselected(page)
   await page.getByRole('button', { name: '选择行业 (20)' }).click()
   const interviewIndustryDialog = page.getByRole('dialog', { name: '选择面试行业' })
   await expect(interviewIndustryDialog).toBeVisible()
   await assertDialogWithinViewport(page)
+  await expect(interviewIndustryDialog.getByText('当前：尚未选择', { exact: true })).toBeVisible()
+  await expect(interviewIndustryDialog.getByRole('button', { pressed: true })).toHaveCount(0)
   await interviewIndustryDialog.getByRole('button', { name: '制造业', exact: true }).click()
   await interviewIndustryDialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
   await page.getByRole('button', { name: '创建并开始练习' }).click()
   await page.waitForURL(/\/interview\?stage=session/)
@@ -2061,4 +2091,46 @@ test('resume templates: empty, error with real retry, and selection that saves n
   await page.getByRole('button', { name: '换一个版式' }).click()
   await expect(screen).toHaveAttribute('data-state', 'list')
   expect(api.requestCount('GET', '/api/v1/job-materials/templates')).toBeGreaterThanOrEqual(2)
+})
+
+test('assistant voice deadline warns then preserves text conversation @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api)
+  const now = new Date('2026-09-30T12:00:00.000Z')
+  await page.clock.install({ time: now })
+  api.respond('POST', '/api/v1/trtc/session', {
+    status: 200,
+    json: { sdkAppId: 1, roomId: 'deadline-room', userId: 'deadline-user', userSig: 'synthetic', taskId: 'deadline-task',
+      maxSessionSeconds: 120, expiresAt: new Date(now.getTime() + 120_000).toISOString() },
+  })
+  api.respond('POST', '/api/v1/assistant/chat', { status: 200, json: assistantReply })
+  await page.goto('/assistant')
+  const transcript = page.locator('.assistant-transcript')
+  const input = page.locator('textarea')
+  await input.fill('我想整理简历')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.locator('[data-message-kind="ai"]')).toBeVisible()
+  const beforeTurn = (await page.locator('[data-message-kind="ai"]').first().textContent())?.trim() ?? ''
+  expect(beforeTurn.length).toBeGreaterThan(0)
+  await input.fill('继续帮我整理简历')
+  // 虚拟键盘的遮罩会挡住工具栏，先收起键盘再点语音咨询（与本文件其余用例同一做法）。
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '语音咨询', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
+  await dialog.getByRole('button', { name: /直接语音通话/ }).click()
+  await expect(dialog).toHaveAttribute('data-state', 'voice-live')
+  await page.clock.fastForward(61_000)
+  await expect(dialog.getByText(/本次语音通话还剩 1 分钟/)).toBeVisible()
+  await page.clock.fastForward(60_000)
+  await expect(dialog).toHaveCount(0)
+  await expect(transcript).toContainText('语音通话已到本次上限，已为你转成文字对话，可以继续问')
+  // 语音前的文字对话原样保留（用户这一句 + 小青的回答），到点提示只出现一次。
+  await expect(transcript).toContainText('我想整理简历')
+  await expect(transcript).toContainText(beforeTurn)
+  await expect(transcript.getByText('语音通话已到本次上限，已为你转成文字对话，可以继续问')).toHaveCount(1)
+  await expect(transcript).toContainText('可以先说说你最想解决的问题。')
+  await expect(input).toHaveValue('继续帮我整理简历')
+  await expect(input).toBeEnabled()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+  expect(api.requestCount('POST', '/api/v1/trtc/session')).toBe(1)
 })

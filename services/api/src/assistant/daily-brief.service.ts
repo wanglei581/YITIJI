@@ -41,8 +41,7 @@ export class DailyBriefService {
     }
 
     if (city) {
-      const cityNew = await this.cityNew(city, date)
-      if (!hosting) cityNew.newJobs = 0
+      const cityNew = await this.cityNew(city, date, hosting)
       if (cityNew.newJobs > 0 || cityNew.newPolicies > 0) modules.push(cityNew)
     }
 
@@ -101,13 +100,13 @@ export class DailyBriefService {
     }
   }
 
-  private async cityNew(city: string, date: string): Promise<Extract<DailyReportModule, { type: 'city_new' }>> {
-    const hostingKey = isRecruitmentContentHostingEnabled() ? 'hosting' : 'closed'
+  private async cityNew(city: string, date: string, hosting: boolean): Promise<Extract<DailyReportModule, { type: 'city_new' }>> {
+    const hostingKey = hosting ? 'hosting' : 'closed'
     const cacheKey = `daily-brief:city-new:v2:${hostingKey}:${date}:${encodeURIComponent(city)}`
     const load = async () => {
       const { start, end } = shanghaiDayRange(date)
       const [newJobs, newPolicies] = await Promise.all([
-        this.prisma.job.count({ where: { ...PUBLISHED, city, syncTime: { gte: start, lt: end } } }),
+        hosting ? this.prisma.job.count({ where: { ...PUBLISHED, city, syncTime: { gte: start, lt: end } } }) : Promise.resolve(0),
         // PolicyPost 没有城市字段；这里如实统计当日已发布全局政策，不能伪造本地归属。
         // 托管关闭时不把招聘分类算进「新政策」；有下架留痕的也不算。
         this.prisma.policyPost.count({
@@ -117,7 +116,7 @@ export class DailyBriefService {
       return { newJobs, newPolicies }
     }
     const counts = await this.withCityCache(cacheKey, load)
-    return { type: 'city_new', city, ...counts, route: '/pages/jobs/jobs' }
+    return { type: 'city_new', city, ...counts, newJobs: hosting ? counts.newJobs : 0, route: hosting ? '/pages/jobs/jobs' : '/pages/policies/policies' }
   }
 
   private async latestBroadcast(): Promise<Extract<DailyReportModule, { type: 'broadcast' }> | null> {

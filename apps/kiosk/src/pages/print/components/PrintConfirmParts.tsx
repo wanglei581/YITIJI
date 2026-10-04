@@ -203,6 +203,7 @@ export function BenefitCard({ view, onLogin }: { view: PrintBenefitView; onLogin
 
 /** 稿 .cfm：流程三步（可选）→ 说明 → 黄色理由行 → 本屏唯一的错误/价格变更提示 → 动作行。 */
 export function ConfirmCard({
+  freePricing = false,
   tone,
   flow,
   note,
@@ -210,6 +211,7 @@ export function ConfirmCard({
   alert,
   actions,
 }: {
+  freePricing?: boolean
   tone?: 'warn' | 'error'
   flow?: boolean
   note: ReactNode
@@ -239,8 +241,8 @@ export function ConfirmCard({
       <div className="pcf-act">{actions}</div>
       <div className="pcf-airow">
         <PrintAiHelp
-          label="问小青：帮我看费用明细 →"
-          draft="请告诉我打印报价应该核对哪些项目，怎样确认页数、份数和费用是否一致？"
+          label={freePricing ? '问小青：帮我核对打印内容 →' : '问小青：帮我看费用明细 →'}
+          draft={freePricing ? '请帮我核对打印的页数、份数和参数。' : '请告诉我打印报价应该核对哪些项目，怎样确认页数、份数和费用是否一致？'}
         />
       </div>
     </div>

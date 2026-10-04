@@ -295,7 +295,7 @@ export default function AccountSettingsPage() {
                   onChange={(e) => setNewPassword(e.target.value)} required
                 />
                 <p id="account-new-password-hint" className="mt-1.5 text-[11.5px] text-neutral-400">
-                  大写 + 小写 + 数字 + 特殊字符，至少 3 类；UTF-8 最多 72 字节。
+                  大写 + 小写 + 数字 + 特殊字符，至少 3 类；最长约 24 个汉字或 72 个英文字符，混合输入或使用表情时可容纳数量会减少。
                 </p>
               </div>
               <div>

@@ -1,6 +1,6 @@
 import { formatDateTime } from '@ai-job-print/shared'
 import { useEffect, useState, useCallback } from 'react'
-import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
+import { Card, ConsoleTable, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { RefreshCwIcon } from 'lucide-react'
 import { API_MODE } from '../../services/api/client'
@@ -92,35 +92,20 @@ export default function SyncSourcesPage() {
       )}
 
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                {['数据源名称', '机构', '接入方式', '同步频率', '最后同步', '状态', '配置', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-900/[0.06]">
-              {sources.length === 0 ? (
-                <tr>
-                  <td colSpan={8}>
-                    <EmptyState
-                      title="暂无数据接入通道"
-                      description="合作机构创建数据来源后将在此显示"
-                      icon={RefreshCwIcon}
-                      className="py-12"
-                    />
-                  </td>
-                </tr>
-              ) : (
-                sources.map((s) => {
-                  return (
-                    <tr key={s.id} className="hover:bg-neutral-50">
-                      <td className="px-4 py-3 font-medium text-neutral-800">{s.name}</td>
+        <ConsoleTable
+          items={sources} page={1} pageSize={Math.max(sources.length, 1)} total={sources.length} onPageChange={() => {}}
+          empty={{ title: '暂无数据接入通道', description: '合作机构创建数据来源后将在此显示' }}
+          renderHeader={() => <tr>
+            {['数据源名称', '机构', '接入方式', '同步频率', '最后同步', '状态', '配置', '操作'].map((h, i) => (
+              <th key={h} className={`whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500 ${i === 7 ? 'sticky right-0 z-10 border-l border-neutral-100 bg-surface' : ''}`}>{h}</th>
+            ))}
+          </tr>}
+          renderRow={(s) => (
+                    <tr key={s.id} className="group bg-surface hover:bg-neutral-50">
+                      <td className="px-4 py-3 font-medium text-neutral-800"><div className="max-w-52 truncate" title={s.name}>{s.name}</div></td>
                       <td className="px-4 py-3 text-xs text-neutral-600">
-                        <div>{s.orgName}</div>
-                        <div className="font-mono text-[10px] text-neutral-400">{s.orgId.slice(0, 12)}…</div>
+                        <div className="max-w-40 truncate" title={s.orgName}>{s.orgName}</div>
+                        <div title={s.orgId} className="font-mono text-[10px] text-neutral-400">{s.orgId.slice(0, 12)}…</div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.accessMode.toUpperCase()}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
@@ -146,18 +131,12 @@ export default function SyncSourcesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1.5">
-                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasEndpoint ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-400'}`}>
-                            {s.hasEndpoint ? 'URL ✓' : 'URL —'}
-                          </span>
-                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasCredential ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-400'}`}>
-                            {s.hasCredential ? '凭证 ✓' : '凭证 —'}
-                          </span>
-                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasResponseConfig ? 'bg-success-bg text-success-fg' : 'bg-warning-bg text-warning-fg'}`}>
-                            {s.hasResponseConfig ? '映射 ✓' : '映射 auto'}
-                          </span>
+                          <StatusBadge status={s.hasEndpoint ? 'success' : 'default'} label={s.hasEndpoint ? '地址已配置' : '未配置地址'} />
+                          <StatusBadge status={s.hasCredential ? 'success' : 'default'} label={s.hasCredential ? '凭证已配置' : '未配置凭证'} />
+                          <StatusBadge status={s.hasResponseConfig ? 'success' : 'warning'} label={s.hasResponseConfig ? '映射已配置' : '自动映射'} />
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3">
+                      <td className="sticky right-0 z-10 whitespace-nowrap border-l border-neutral-100 bg-inherit px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
@@ -169,12 +148,8 @@ export default function SyncSourcesPage() {
                         </div>
                       </td>
                     </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+          )}
+        />
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">

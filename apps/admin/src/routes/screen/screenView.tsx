@@ -32,6 +32,7 @@ export function stampText(iso: string): string {
 export function snapshotMeta(snapshot: ScreenSnapshot): ShellMeta {
   return {
     generatedAtText: stampText(snapshot.generatedAt),
+    summaryMinutes: 5,
     status: snapshot.status,
     failedSlices: countFailedSlices(snapshot.metrics),
     access: accessText(snapshot),

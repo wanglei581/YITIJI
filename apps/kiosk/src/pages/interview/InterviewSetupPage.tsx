@@ -13,7 +13,6 @@ import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { Button } from '@ai-job-print/ui'
 import {
-  DEFAULT_EMPLOYMENT_INDUSTRY,
   EMPLOYMENT_INDUSTRY_SECTORS,
   type CreateInterviewInput,
   type InterviewDifficulty,
@@ -119,10 +118,10 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const setupDraft = readInterviewWorkbenchSession()?.setup
 
   const [interviewerType, setInterviewerType] = useState<InterviewerType>(setupDraft?.interviewerType ?? 'hr')
-  const [industry, setIndustry] = useState(setupDraft?.industry ?? DEFAULT_EMPLOYMENT_INDUSTRY)
+  const [industry, setIndustry] = useState(setupDraft?.industry ?? '')
   const [showIndustryPicker, setShowIndustryPicker] = useState(false)
   const [position, setPosition] = useState(setupDraft?.position ?? '')
-  const [experience, setExperience] = useState<InterviewExperience>(setupDraft?.experience ?? 'fresh')
+  const [experience, setExperience] = useState<InterviewExperience | ''>(setupDraft?.experience ?? '')
   const [difficulty, setDifficulty] = useState<InterviewDifficulty>(setupDraft?.difficulty ?? 'standard')
   const [duration, setDuration] = useState<InterviewDuration>(setupDraft?.duration ?? 5)
   const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string } | null>(setupDraft?.resumeFile ?? null)
@@ -157,6 +156,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   useEffect(() => {
     patchInterviewWorkbenchSession({
       setup: {
+        directionSelectionVersion: 1,
         interviewerType,
         industry,
         position,
@@ -193,6 +193,14 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     const pos = position.trim()
     if (!pos) {
       setError('请先填写目标岗位，例如：前端开发工程师、行政专员')
+      return
+    }
+    if (!industry.trim()) {
+      setError('请先选择本次练习的行业，不会替你预选')
+      return
+    }
+    if (!experience) {
+      setError('请先选择你的经验情况，不会替你预选')
       return
     }
     setCreating(true)
@@ -392,12 +400,12 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         id: 'industry',
         label: '行业门类',
         value: industry,
-        allLabel: '全部行业',
+        allLabel: '尚未选择',
         allowEmpty: false,
         options: EMPLOYMENT_INDUSTRY_SECTORS.map((item) => ({ value: item.label, label: item.label })),
       }]}
       onChange={(_, value) => setIndustry(value)}
-      onClear={() => setIndustry(DEFAULT_EMPLOYMENT_INDUSTRY)}
+      onClear={() => setIndustry('')}
       onClose={() => setShowIndustryPicker(false)}
     />
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-setup" data-qx-interview="" className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
@@ -412,7 +420,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         />
 
         <section className="iv-card interview-setup__stack">
-          <InterviewCardHead title="本场练习设置" hint="都设好才开始" />
+          <InterviewCardHead title="本场练习设置" hint="请本人填写目标岗位、选择行业和经验后再开始" />
           <div className="iv-fields">
             <label className="iv-field">
               <small>目标岗位（必填，最多 50 字）</small>
@@ -428,7 +436,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             </label>
             <div className="iv-field">
               <small>行业（必填，从就业行业清单选择）</small>
-              <b>{industry}</b>
+              <b>{industry || '尚未选择'}</b>
               <button type="button" className="iv-mini-btn" aria-haspopup="dialog" onClick={() => setShowIndustryPicker(true)}>
                 选择行业 ({EMPLOYMENT_INDUSTRY_SECTORS.length})
               </button>
@@ -452,12 +460,13 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             <p className="iv-hint">{interviewerDesc}</p>
           </div>
           <div className="iv-choice">
-            <p>经验</p>
+            <p>经验（必选）</p>
             <div className="iv-chips">
               {EXPERIENCES.map((item) => (
-                <OptionButton key={item.key} active={experience === item.key} onClick={() => setExperience(item.key)}>{item.label}</OptionButton>
+                <OptionButton key={item.key} active={experience === item.key} onClick={() => setExperience(experience === item.key ? '' : item.key)}>{item.label}</OptionButton>
               ))}
             </div>
+            {!experience && <p className="iv-hint">尚未选择，请按自己的实际情况选择。</p>}
           </div>
           <div className="iv-choice-row">
             <div className="iv-choice">

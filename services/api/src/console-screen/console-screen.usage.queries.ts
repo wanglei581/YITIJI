@@ -59,9 +59,7 @@ export function usageProviderLabel(provider: string): string {
   return PROVIDER_LABELS[provider] ?? provider
 }
 
-export function suppressSmallCount(count: number): number | null {
-  return count >= SCREEN_MIN_AGGREGATE_SAMPLE ? count : null
-}
+export { suppressAggregateCount as suppressSmallCount } from './console-screen.metric'
 
 export function usageWindow(range: ScreenUsageRange, now: Date): { from: Date; to: Date } {
   if (range === 'today') return { from: shanghaiDayStart(now), to: now }

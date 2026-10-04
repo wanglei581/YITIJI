@@ -45,6 +45,7 @@ import { ConsoleScreenService } from '../src/console-screen/console-screen.servi
 import { ScreenSnapshotCache, SCREEN_CACHE_MAX_KEYS, containsFailedLoaded } from '../src/console-screen/console-screen.cache'
 import {
   filterSourceEntryOpens,
+  suppressAggregateCount,
   FLEET_SAMPLE_TAKE,
   JUMP_SOURCE_GROUP_TAKE,
   PARTNER_FLEET_TAKE,
@@ -64,6 +65,7 @@ import {
 import { PartnerOrgRequiredError, requirePartnerOrgId } from '../src/console-screen/console-screen.org'
 import { offlineAlertTitle } from '../src/console-screen/console-screen.fleet'
 import { suppressTerminalTodayCount } from '../src/console-screen/console-screen.twin'
+import { suppressSmallCount } from '../src/console-screen/console-screen.usage.queries'
 import { CHINA_LAT_MIN, CHINA_LNG_MAX, terminalPlacementPatch } from '../src/terminals/terminal-placement'
 import {
   TIMELINE_HEARTBEAT_ROW_CAP,
@@ -599,10 +601,14 @@ async function assertPureHelpers(): Promise<void> {
   )
   assert(
     '2u. 终端当日计数：0 保留，1 与 4 为 null，5 给出',
-    suppressTerminalTodayCount(0) === 0
+    suppressTerminalTodayCount === suppressAggregateCount
+      && suppressSmallCount === suppressAggregateCount
+      && suppressTerminalTodayCount(-2) === 0
+      && suppressTerminalTodayCount(0) === 0
       && suppressTerminalTodayCount(1) === null
       && suppressTerminalTodayCount(4) === null
-      && suppressTerminalTodayCount(5) === 5,
+      && suppressTerminalTodayCount(5) === 5
+      && suppressTerminalTodayCount(12) === 12,
   )
 
   let now = 1_000
@@ -1171,7 +1177,7 @@ async function assertRecruitmentHostingContract(
         && jobId.length > 0
         && jobsOn?.available === true
         && jobsOn.value.browse === 6
-        && jobsOn.value.favorites === null
+        && jobsOn.value.favorites === 0
         && jobsOn.value.sourceOpens === 20 + 3 + 6
         && jobsOn.value.coverage === 'members_only'
         && jobsOn.source === 'BrowseLog/Favorite/ExternalJumpLog'
@@ -1234,7 +1240,7 @@ async function assertRecruitmentHostingContract(
       type: string,
     ) => rows?.byType.find((item) => item.type === type)
     assert(
-      '6o. 机构内容分类在打开时四类都在，关闭后只下发政策',
+      '6o. 机构内容分类在打开时四类都在，关闭后只下发政策；零收藏/来源计数保留 0',
       contentPartnerOn !== null
         && contentPartnerOff !== null
         && contentPartnerOn.coverage === 'members_only'
@@ -1244,16 +1250,16 @@ async function assertRecruitmentHostingContract(
         && contentPartnerOn.byType.map((item) => item.type).join(',') === 'job,job_fair,policy,company_profile'
         && typed(contentPartnerOn, 'job')?.browse === 6
         && typed(contentPartnerOn, 'job')?.sourceOpens === 6
-        && typed(contentPartnerOn, 'job')?.favorites === null
+        && typed(contentPartnerOn, 'job')?.favorites === 0
         && typed(contentPartnerOn, 'job_fair')?.browse === 6
-        && typed(contentPartnerOn, 'job_fair')?.sourceOpens === null
+        && typed(contentPartnerOn, 'job_fair')?.sourceOpens === 0
         && typed(contentPartnerOn, 'policy')?.browse === 6
         && typed(contentPartnerOn, 'policy')?.sourceOpens === 6
         && typed(contentPartnerOn, 'company_profile')?.browse === 6
-        && typed(contentPartnerOn, 'company_profile')?.sourceOpens === null
+        && typed(contentPartnerOn, 'company_profile')?.sourceOpens === 0
         && contentPartnerOff.byType.map((item) => item.type).join(',') === 'policy'
         && typed(contentPartnerOff, 'policy')?.browse === 6
-        && typed(contentPartnerOff, 'policy')?.favorites === null
+        && typed(contentPartnerOff, 'policy')?.favorites === 0
         && typed(contentPartnerOff, 'policy')?.sourceOpens === 6,
       `on=${JSON.stringify(contentPartnerOn?.byType)} off=${JSON.stringify(contentPartnerOff?.byType)}`,
     )
