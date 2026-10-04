@@ -53,6 +53,13 @@
 - **按合规窗口 10/4 的装机要求补（同一 PR）：** 摄像头改为三层停用（遮挡片加防撕封条、设备管理器只停摄像头那一个设备、Edge `VideoCaptureAllowed=0` 且不写 `VideoCaptureAllowedUrls`），机身贴原文，验收四项，以后启用摄像头须先走单独同意；扫码器关闭图像上传类功能；验收单 S 段加 S.6b。
 - **U 盘防护（同一 PR，合规窗口 10/4）：** 装机清单加 G9：Defender 四项锁定（实时防护与防篡改、病毒库 7 天内、可移动磁盘拒绝执行、关闭自动播放）及只读核对命令；试点 U 盘口先锁（能力中心「U盘导入」配「未验收」）；开放前做 EICAR 验收（被拦、页面提示「换一个文件」、Defender 有记录），页面提示要等带 #1229 的安装包。验收单加 S.8。
 - **没有验证：** 全部步骤都没有在真机上走过；菜单名、组策略名按 Windows 11 专业版与戴尔主机常见写法，以实机为准。没有改代码或门禁。
+## 2026-10-04：U 盘文件读不了时提示「换一个文件」，不再诱导反复重试（分支 `claude/usb-unreadable-file-1004`）
+
+- **起因：** 合规窗口定 U 盘「拦恶意文件」靠 Windows Defender 实时防护：Agent 读 U 盘文件的那一下被扫，可疑文件会让读取抛错或被隔离删除。原来这时 Agent 一律回 410 `LOCAL_USB_FILE_EXPIRED`，一体机不认这个码，落到兜底「U 盘文件导入失败，请重试」，用户照做只会一直失败。
+- **改法（Agent）：** `usb-files.ts` 新增 `consumeUsbFileOutcome`，把失败分成 expired（一次性编号用过或超时，重新读取列表能再选）和 unreadable（列出后读不了：被拦、被隔离删除、被替换）。本地接口对 unreadable 回 422 `LOCAL_USB_FILE_UNREADABLE`「这个文件读不了，请换一个文件」，不转发给后端；expired 照旧 410。读失败的日志只记错误码，不再记 Node 的错误原文（原文带完整路径，即用户的原始文件名，违反 AGT-07）。原 `consumeUsbFile` 保留为兼容包装。
+- **改法（一体机）：** `userErrorMessage.ts` 给两个码加固定说法：读不了是「这个文件读不了，请换一个文件」，列表过期是「文件列表已过期，请重新读取 U 盘后再选」，都不说「请重试」。
+- **门禁：** `verify:usb-import-agent` 加三条：注入「读的那一下抛错」必须是 unreadable 且日志不含文件名；列出后删除的文件是 unreadable、同编号再用是 expired；HTTP 层 422 与原文、不转发后端。`verify-kiosk-runtime-error-boundary.mjs` 加两个码的显示断言。反向测试四次都红：读失败改回 expired、日志带回原文、接口把 unreadable 当 410、删掉一体机新文案。
+- **没有验证：** 真 Windows Defender 与 EICAR 测试文件没跑过（试点 U 盘口先锁着，开放前按装机清单 G 段做 EICAR 验收）。0.4.13 不含此改动，下次出包带上。
 
 ## 2026-10-03：第五次更新暂停
 

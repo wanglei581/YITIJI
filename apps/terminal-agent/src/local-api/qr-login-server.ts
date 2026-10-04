@@ -5,7 +5,7 @@ import FormData from 'form-data'
 import type { AgentConfig } from '../agent/types'
 import { createApiClient, NO_RETRY_CONFIG } from '../agent/api-client'
 import { log, warn } from '../logger'
-import { consumeUsbFile, getUsbStatus, refreshUsbFileList } from '../usb/usb-files'
+import { consumeUsbFileOutcome, getUsbStatus, refreshUsbFileList } from '../usb/usb-files'
 import { allowedOrigins, isLocalBridgeTokenValid, isOriginAllowed } from './origin-guard'
 import type {
   LocalApiError,
@@ -370,11 +370,17 @@ async function handleUsbUpload(
     return
   }
 
-  const consumed = consumeUsbFile(safeId)
-  if (!consumed) {
+  const outcome = consumeUsbFileOutcome(safeId)
+  if (!outcome.ok) {
+    if (outcome.reason === 'unreadable') {
+      // 读的那一下失败（Defender 拦截、已被隔离、被替换）。重试同一个文件不会成功，只能换一个。
+      sendJson(res, 422, { code: 'LOCAL_USB_FILE_UNREADABLE', message: '这个文件读不了，请换一个文件' }, origin)
+      return
+    }
     sendJson(res, 410, { code: 'LOCAL_USB_FILE_EXPIRED', message: '该文件已失效，请重新刷新 U 盘文件列表' }, origin)
     return
   }
+  const consumed = outcome.file
 
   const form = new FormData()
   form.append('file', consumed.buffer, {
