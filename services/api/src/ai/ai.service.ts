@@ -38,6 +38,8 @@ import {
 import { RedisInflightLock } from './redis-inflight-lock'
 import { RedisService } from '../common/redis/redis.service'
 import { ResumeDraftStore } from './resume/resume-draft.store'
+import { AiQuotaService } from './quota/ai-quota.service'
+import { quotaHttpCode, quotaSequence, runWithAiQuota, type QuotaAbortRequest, type ReleaseReason } from './quota/ai-quota-run'
 
 // 简历派生结果留存窗口(CLAUDE.md §11「不长期保存简历」)。
 // MockProvider 阶段 payload 仅诊断评分 / 通用建议文本;接真 provider 后
@@ -161,6 +163,7 @@ export class AiService {
     redis?: RedisService,
     @Optional() private readonly exportGate?: ResumeExportGateService,
     @Optional() private readonly jobMaterials?: JobMaterialsService,
+    @Optional() private readonly quota?: AiQuotaService,
   ) {
     this.optimizeLock = new RedisInflightLock(redis)
     const rawName = resolveAiProviderName() // 生产恒为 llm：mock / stub 不在生产出结果（F-11）
@@ -261,101 +264,169 @@ export class AiService {
     }
   }
 
+  private runResumeCharge<T>(input: {
+    endUserId?: string | null
+    operationKey: string
+    loadStored?: () => Promise<T | null>
+    failureOf?: (value: T) => ReleaseReason | null
+    persistFailure?: boolean
+    req?: QuotaAbortRequest
+    work: () => Promise<T>
+    saveResult: (value: T) => Promise<string>
+  }): Promise<T> {
+    if (!this.quota || !input.endUserId) {
+      return input.work().then(async (value) => {
+        await input.saveResult(value)
+        return value
+      })
+    }
+    return runWithAiQuota({
+      quota: this.quota,
+      bucket: 'ai_resume',
+      operationKey: input.operationKey,
+      endUserId: input.endUserId,
+      req: input.req,
+      loadStored: input.loadStored,
+      failureOf: input.failureOf,
+      persistFailure: input.persistFailure,
+    }, input.work, input.saveResult)
+  }
+
+  private async storeResumeParse(
+    value: ParseResumeOutput,
+    endUserId: string | null | undefined,
+    intent: ResumeParseIntentBinding | undefined,
+    startedAt: number,
+    extractionErrorCode?: string,
+  ): Promise<string> {
+    const isAnonymous = !endUserId
+    const bound = Boolean(intent?.intentId && value.taskId === intent.intentId)
+    const accessToken = bound
+      ? (isAnonymous && intent?.accessToken ? intent.accessToken : undefined)
+      : (isAnonymous ? randomBytes(24).toString('hex') : undefined)
+    const accessTokenHash = accessToken ? hashAccessToken(accessToken) : null
+    await this.persistResult(value.taskId, 'parse', value.status, value, endUserId ?? null, accessTokenHash)
+    this.logService.record({
+      taskId: value.taskId,
+      ...aiLogFieldsFromUsageReport(value.usage, this.provider.name),
+      operation: 'parseResume',
+      latencyMs: Date.now() - startedAt,
+      status: value.status === 'failed' ? 'failed' : 'success',
+      endUserId: endUserId ?? null,
+      ...(extractionErrorCode ? { errorCode: extractionErrorCode } : {}),
+    })
+    if (accessToken) value.accessToken = accessToken
+    return value.taskId
+  }
+
   async submitResumeParse(
     input: ParseResumeInput,
     endUserId?: string | null,
     intent?: ResumeParseIntentBinding,
+    req?: QuotaAbortRequest,
   ): Promise<ParseResumeOutput> {
     if (intent) assertResumeParseIntentBinding(intent, endUserId ?? null)
     const t0 = Date.now()
     const boundTaskId = intent ? intent.intentId : undefined
+    const charging = Boolean(this.quota && endUserId)
+    const serverTaskId = boundTaskId ?? (charging ? randomBytes(16).toString('hex') : undefined)
     try {
-      // 真实诊断路径（llm provider）：先服务端提取简历文本。提取失败 → 直接返回明确原因，
-      // 不调 LLM、不落假报告。mock / stub provider 保持原行为（自包含演示，不提取）。
-      let result: ParseResumeOutput
-      let extractionErrorCode: string | undefined
+      if (charging && serverTaskId) {
+        const stored = await this.loadAuthorizedResult<ParseResumeOutput>(serverTaskId, 'parse', {
+          endUserId: endUserId ?? null,
+          accessToken: null,
+        })
+        if (stored) return stored
+      }
+      let useExtraction = false
+      let extractedText: string | undefined
+      let extractedPageCount: number | undefined
+      let extractionWarnings: string[] | undefined
+      let extractionTextSource: string | undefined
+      let extractionConfidence: 'high' | 'medium' | 'low' | undefined
       if (this.provider.name === 'llm') {
         const extraction = await this.resumeExtraction.extractResumeText({
           fileId: input.fileId,
           endUserId: endUserId ?? null,
         })
         if (!extraction.ok) {
-          extractionErrorCode = extraction.errorCode
-          result = {
-            taskId: `extract-fail-${randomBytes(8).toString('hex')}`,
+          const failed: ParseResumeOutput = {
+            taskId: boundTaskId ?? `extract-fail-${randomBytes(8).toString('hex')}`,
             status: 'failed',
             failReason: extraction.errorMessage ?? '简历文件无法提取文本，请重新上传',
+            providerName: this.provider.name,
+            fileId: input.fileId,
           }
-        } else {
-          result = await this.provider.parseResume({
-            ...input,
-            extractedText: extraction.text,
-            extractedPageCount: extraction.pageCount,
+          await this.storeResumeParse(failed, endUserId, intent, t0, extraction.errorCode)
+          return failed
+        }
+        useExtraction = true
+        extractedText = extraction.text
+        extractedPageCount = extraction.pageCount
+        extractionWarnings = extraction.warnings
+        extractionTextSource = extraction.textSource
+        extractionConfidence = extraction.confidence === 'high' || extraction.confidence === 'medium' || extraction.confidence === 'low'
+          ? extraction.confidence
+          : 'low'
+      }
+      const operationKey = `${serverTaskId ?? `parse-${randomBytes(8).toString('hex')}`}:parse`
+      return await this.runResumeCharge({
+        endUserId,
+        operationKey,
+        loadStored: serverTaskId
+          ? () => this.loadAuthorizedResult<ParseResumeOutput>(serverTaskId, 'parse', {
+            endUserId: endUserId ?? null,
+            accessToken: null,
           })
-          // Stage 3:OCR 来源（图片 / 扫描件）附带置信度与复核提示,前端必须如实展示。
-          //
-          // 此前这里只对 OCR 两种来源下发 extractionNotice，文字层 PDF / DOCX 的
-          // warnings 被整体丢弃 —— 其中就包括「简历文本较长，已截断至 N 字符」。
-          // 结果是：超长简历只有前一段进入诊断，用户却拿到一份看起来覆盖全文的报告，
-          // 属于 CLAUDE.md §9「不伪造能力」明确禁止的情况。改为所有来源都下发，
-          // 前端按 textSource 区分文案（OCR 才提识别置信度）。
-          const warnings = [...(extraction.warnings ?? [])]
-          // 提取层按 20000 截断并告警，但诊断层还会再按 12000 截一刀且此前完全无声。
-          // 只要实际送诊断的文本短于提取结果，就必须如实说出来。
-          if ((extraction.text ?? '').length > MAX_DIAGNOSIS_INPUT_CHARS) {
-            warnings.push(`简历内容较长，本次诊断仅分析前 ${MAX_DIAGNOSIS_INPUT_CHARS} 字符，其余部分未纳入评估`)
-          }
-          const isOcrSource = extraction.textSource === 'image_ocr' || extraction.textSource === 'pdf_ocr'
-          if (isOcrSource || warnings.length > 0) {
-            result.extractionNotice = {
-              textSource: extraction.textSource ?? 'unknown',
-              confidence: extraction.confidence ?? 'low',
-              warnings,
+          : undefined,
+        failureOf: (value) => (value.status === 'failed' ? 'provider_error' : null),
+        persistFailure: true,
+        req,
+        work: async () => {
+          let result = useExtraction
+            ? await this.provider.parseResume({
+              ...input,
+              extractedText,
+              extractedPageCount,
+            })
+            : await this.provider.parseResume(input)
+          if (this.provider.name === 'llm') {
+            const warnings = [...(extractionWarnings ?? [])]
+            if ((extractedText ?? '').length > MAX_DIAGNOSIS_INPUT_CHARS) {
+              warnings.push(`简历内容较长，本次诊断仅分析前 ${MAX_DIAGNOSIS_INPUT_CHARS} 字符，其余部分未纳入评估`)
+            }
+            const isOcrSource = extractionTextSource === 'image_ocr' || extractionTextSource === 'pdf_ocr'
+            if (isOcrSource || warnings.length > 0) {
+              result = {
+                ...result,
+                extractionNotice: {
+                  textSource: extractionTextSource ?? 'unknown',
+                  confidence: extractionConfidence ?? 'low',
+                  warnings,
+                },
+              }
             }
           }
-        }
-      } else {
-        result = await this.provider.parseResume(input)
-      }
-      if (boundTaskId) result = { ...result, taskId: boundTaskId }
-
-      // fileId 随结果落库(阶段2B):优化时按归属重新提取原文;不透明 id,无 PII
-      // targetContext 随结果落库(Wave 1 Task 3):优化懒生成时读回透传;只落结构化字段,
-      // 绝不落简历原文(extractedText 不写入 result/payload)。
-      const resultWithProvider: ParseResumeOutput = {
-        ...result,
-        providerName: this.provider.name,
-        fileId: input.fileId,
-        ...(input.targetContext ? { targetContext: input.targetContext } : {}),
-      }
-      // Phase C-2A：匿名 parse（无会员归属）铸造一次性访问令牌。
-      // DB 只存 SHA-256 hash；明文 token 只随本次响应返回一次。会员 parse 不铸 token。
-      // 新意图路径使用调用方传入的令牌，不再另铸随机 token，避免和 intentId 错位。
-      const isAnonymous = !endUserId
-      const accessToken = boundTaskId
-        ? (isAnonymous && intent?.accessToken ? intent.accessToken : undefined)
-        : (isAnonymous ? randomBytes(24).toString('hex') : undefined)
-      const accessTokenHash = accessToken ? hashAccessToken(accessToken) : null
-      await this.persistResult(resultWithProvider.taskId, 'parse', resultWithProvider.status, resultWithProvider, endUserId ?? null, accessTokenHash)
-      this.logService.record({
-        taskId:    resultWithProvider.taskId,
-        // AI-COST-TRUTH：provider 标签取 provider 回报的真实厂商标识，
-        // 不再用恒为 'llm' 的 AiProviderName（那样定价表永远匹配不到）。
-        ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
-        operation: 'parseResume',
-        latencyMs: Date.now() - t0,
-        status:    resultWithProvider.status === 'failed' ? 'failed' : 'success', endUserId: endUserId ?? null,
-        ...(extractionErrorCode ? { errorCode: extractionErrorCode } : {}),
+          if (serverTaskId) result = { ...result, taskId: serverTaskId }
+          return {
+            ...result,
+            providerName: this.provider.name,
+            fileId: input.fileId,
+            ...(input.targetContext ? { targetContext: input.targetContext } : {}),
+          }
+        },
+        saveResult: (value) => this.storeResumeParse(value, endUserId, intent, t0),
       })
-      return accessToken ? { ...resultWithProvider, accessToken } : resultWithProvider
     } catch (err) {
+      if (quotaHttpCode(err)?.startsWith('AI_QUOTA_')) throw err
       this.logService.record({
-        taskId:    `err-${Date.now()}`,
-        provider:  this.provider.name,
+        taskId: `err-${Date.now()}`,
+        provider: this.provider.name,
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
-        status:    'failed',
-        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN', endUserId: endUserId ?? null,
+        status: 'failed',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+        endUserId: endUserId ?? null,
       })
       throw err
     }
@@ -422,11 +493,12 @@ export class AiService {
     taskId: string,
     requester: AiResultRequester = { endUserId: null, accessToken: null },
     existingOnly = false,
+    req?: QuotaAbortRequest,
   ): Promise<OptimizeResumeOutput> {
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
     if (existingOnly) throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '这份优化稿已删除、已过期或不属于当前账号，无法打开' } })
-    return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester))
+    return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester, req))
   }
 
   /** PUT /resume/records/:taskId/draft — 仅登录用户；匿名 404。 */
@@ -456,6 +528,7 @@ export class AiService {
   private async computeResumeOptimize(
     taskId: string,
     requester: AiResultRequester,
+    req?: QuotaAbortRequest,
   ): Promise<OptimizeResumeOutput> {
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
@@ -468,7 +541,8 @@ export class AiService {
         error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' },
       })
     }
-    if (!parseResult.report) {
+    const report = parseResult.report
+    if (!report) {
       // Parse failed earlier — cannot optimize
       return { taskId, status: 'failed', failReason: '简历解析未成功，无法生成优化建议' }
     }
@@ -504,25 +578,38 @@ export class AiService {
         }
       }
 
-      const result = await this.provider.optimizeResume(taskId, parseResult.report, extractedText, parseResult.targetContext)
-      const withProvider: OptimizeResumeOutput = { ...result, providerName: this.provider.name }
-      // 只缓存成功结果:临时性失败(模型抖动/未配置)不落库,用户稍后重试可恢复
-      if (withProvider.status === 'completed') {
-        await this.persistResult(
-          taskId, 'optimize', withProvider.status, withProvider,
-          parseOwner?.endUserId ?? null,
-          parseOwner?.accessTokenHash ?? null,
-        )
-      }
-      this.logService.record({
-        taskId,
-        ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
-        operation: 'optimizeResume',
-        latencyMs: Date.now() - t0,
-        status:    withProvider.status === 'failed' ? 'failed' : 'success',
+      return await this.runResumeCharge({
+        endUserId: parseOwner?.endUserId ?? null,
+        operationKey: `${taskId}:optimize`,
+        req,
+        loadStored: () => this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester),
+        failureOf: (value) => (value.status === 'failed' ? 'provider_error' : null),
+        work: async () => {
+          const result = await this.provider.optimizeResume(taskId, report, extractedText, parseResult.targetContext)
+          const withProvider: OptimizeResumeOutput = { ...result, providerName: this.provider.name }
+          this.logService.record({
+            taskId,
+            ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
+            operation: 'optimizeResume',
+            latencyMs: Date.now() - t0,
+            status: withProvider.status === 'failed' ? 'failed' : 'success',
+          })
+          return withProvider
+        },
+        // 只缓存成功结果。失败不落库，归还后换序号重试。
+        saveResult: async (value) => {
+          if (value.status === 'completed') {
+            await this.persistResult(
+              taskId, 'optimize', value.status, value,
+              parseOwner?.endUserId ?? null,
+              parseOwner?.accessTokenHash ?? null,
+            )
+          }
+          return taskId
+        },
       })
-      return withProvider
     } catch (err) {
+      if (quotaHttpCode(err)?.startsWith('AI_QUOTA_')) throw err
       this.logService.record({
         taskId,
         provider:  this.provider.name,
@@ -547,6 +634,7 @@ export class AiService {
     action: ResumeLayoutAdjustAction,
     layout: ResumeLayoutSettings | undefined,
     requester: AiResultRequester = { endUserId: null, accessToken: null },
+    req?: QuotaAbortRequest,
   ): Promise<{ resume: GeneratedResume; warnings: string[] }> {
     const parseResult = await this.loadAuthorizedResult<ParseResumeOutput>(taskId, 'parse', requester)
     if (!parseResult) {
@@ -584,17 +672,33 @@ export class AiService {
         })
       }
 
-      const optimizer = new LlmResumeOptimizeService(this.llmConfig)
-      const result = await optimizer.adjustLayoutDraft({ currentResume, originalText, action, layout, onLlmCall: usage.add })
-      this.logService.record({
-        taskId,
-        ...aiLogFieldsFromUsageReport(usage.toReport(this.provider.name), this.provider.name),
-        operation: 'adjustResumeLayout',
-        latencyMs: Date.now() - t0,
-        status: 'success',
+      const charging = Boolean(this.quota && parseOwner?.endUserId)
+      return await this.runResumeCharge({
+        endUserId: parseOwner?.endUserId ?? null,
+        operationKey: `${taskId}:layout:${quotaSequence()}`,
+        req,
+        work: async () => {
+          const optimizer = new LlmResumeOptimizeService(this.llmConfig)
+          const result = await optimizer.adjustLayoutDraft({ currentResume, originalText, action, layout, onLlmCall: usage.add })
+          this.logService.record({
+            taskId,
+            ...aiLogFieldsFromUsageReport(usage.toReport(this.provider.name), this.provider.name),
+            operation: 'adjustResumeLayout',
+            latencyMs: Date.now() - t0,
+            status: 'success',
+          })
+          return result
+        },
+        // 未接入账本时保持原行为：不把排版结果另存一行。接入后先落库再结算，断开也能重开。
+        saveResult: async (value) => {
+          if (charging) {
+            await this.persistPayload(taskId, 'layout_adjust', 'completed', value, parseOwner?.endUserId ?? null, null)
+          }
+          return taskId
+        },
       })
-      return result
     } catch (err) {
+      if (quotaHttpCode(err)?.startsWith('AI_QUOTA_')) throw err
       this.logService.record({
         taskId,
         // 失败前可能已经打过模型（重试、上游 5xx）——那些调用照样计费，必须落账。
@@ -615,34 +719,52 @@ export class AiService {
    * 匿名铸一次性 accessToken(只在本响应返回一次),会员按 endUserId 归属;
    * 结果落 AiResumeResult(kind='generate'),TTL 到期自动清理(公共一体机不长期留存)。
    */
-  async submitResumeGenerate(input: ResumeGenerateInput, endUserId?: string | null): Promise<GenerateResumeOutput> {
+  async submitResumeGenerate(
+    input: ResumeGenerateInput,
+    endUserId?: string | null,
+    req?: QuotaAbortRequest,
+  ): Promise<GenerateResumeOutput> {
     const t0 = Date.now()
+    const charging = Boolean(this.quota && endUserId)
+    const serverTaskId = charging ? randomBytes(16).toString('hex') : undefined
     try {
-      let result: GenerateResumeOutput
-      if (this.provider.generateResume) {
-        result = await this.provider.generateResume(input)
-      } else {
-        // provider 未实现生成能力:明确失败,不静默 fallback
-        result = {
-          taskId: `gen-unsupported-${randomBytes(8).toString('hex')}`,
-          status: 'failed',
-          failReason: `当前 AI 服务(${this.provider.name})不支持简历生成，请联系管理员`,
-        }
-      }
-      const withProvider: GenerateResumeOutput = { ...result, providerName: this.provider.name }
-      const isAnonymous = !endUserId
-      const accessToken = isAnonymous ? randomBytes(24).toString('hex') : undefined
-      const accessTokenHash = accessToken ? hashAccessToken(accessToken) : null
-      await this.persistResult(withProvider.taskId, 'generate', withProvider.status, withProvider, endUserId ?? null, accessTokenHash)
-      this.logService.record({
-        taskId:    withProvider.taskId,
-        ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
-        operation: 'generateResume',
-        latencyMs: Date.now() - t0,
-        status:    withProvider.status === 'failed' ? 'failed' : 'success',
+      return await this.runResumeCharge({
+        endUserId,
+        operationKey: `${serverTaskId ?? `gen-${randomBytes(8).toString('hex')}`}:generate`,
+        req,
+        failureOf: (value) => (value.status === 'failed' ? 'provider_error' : null),
+        persistFailure: true,
+        work: async () => {
+          let result: GenerateResumeOutput
+          if (this.provider.generateResume) {
+            result = await this.provider.generateResume(input)
+          } else {
+            result = {
+              taskId: `gen-unsupported-${randomBytes(8).toString('hex')}`,
+              status: 'failed',
+              failReason: `当前 AI 服务(${this.provider.name})不支持简历生成，请联系管理员`,
+            }
+          }
+          if (serverTaskId) result = { ...result, taskId: serverTaskId }
+          return { ...result, providerName: this.provider.name }
+        },
+        saveResult: async (value) => {
+          const accessToken = endUserId ? undefined : randomBytes(24).toString('hex')
+          const accessTokenHash = accessToken ? hashAccessToken(accessToken) : null
+          await this.persistResult(value.taskId, 'generate', value.status, value, endUserId ?? null, accessTokenHash)
+          this.logService.record({
+            taskId: value.taskId,
+            ...aiLogFieldsFromUsageReport(value.usage, this.provider.name),
+            operation: 'generateResume',
+            latencyMs: Date.now() - t0,
+            status: value.status === 'failed' ? 'failed' : 'success',
+          })
+          if (accessToken) value.accessToken = accessToken
+          return value.taskId
+        },
       })
-      return accessToken ? { ...withProvider, accessToken } : withProvider
     } catch (err) {
+      if (quotaHttpCode(err)?.startsWith('AI_QUOTA_')) throw err
       this.logService.record({
         taskId:    `err-${Date.now()}`,
         provider:  this.provider.name,

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
@@ -9,6 +9,8 @@ import { FairVisitPlanPdfService } from './fair-visit-plan-pdf.service'
 import { LlmFairVisitPlanService, type FairVisitPlanContext, type FairVisitPlanMode, type FairVisitPlanPayload } from './llm-fair-visit-plan.service'
 import { formatBeijingDate } from '../../common/beijing-display-time'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
+import { AiQuotaService } from '../quota/ai-quota.service'
+import { runWithAiQuota, type QuotaAbortRequest } from '../quota/ai-quota-run'
 
 /** 参会准备单印在纸上的日期。 */
 export function fairVisitPlanReportDate(updatedAt: Date): string {
@@ -67,9 +69,10 @@ export class FairVisitPlanService {
     private readonly pdf: FairVisitPlanPdfService,
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
+    @Optional() private readonly quota?: AiQuotaService,
   ) {}
 
-  async generate(fairId: string, taskId: string, requester: FairVisitPlanRequester) {
+  async generate(fairId: string, taskId: string, requester: FairVisitPlanRequester, req?: QuotaAbortRequest) {
     const parse = await this.loadAuthorizedParse(taskId, requester)
     const fairContext = await this.loadFairContext(fairId)
 
@@ -88,53 +91,72 @@ export class FairVisitPlanService {
 
     // A-6 成本可见性：本能力此前完全不落 AiServiceLog，Admin 看不到调用量与成本。
     // 用量按重试累计；成功/失败都落一条（失败也真实花钱）。
-    const usage = new AiUsageAccumulator()
-    const startedAt = Date.now()
-    let payload: FairVisitPlanPayload
-    try {
-      payload = await this.llm.build({ resumeText, ...fairContext, onLlmCall: usage.add })
-    } catch (error) {
-      this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_FAIR_VISIT_PLAN_FAILED'))
-      throw error
-    }
-    this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
-    const stored = this.buildStored(fairContext, payload)
-    const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
-    await this.prisma.aiResumeResult.upsert({
-      where: { taskId_kind: { taskId, kind: 'fair_visit_plan' } },
-      update: { status: 'completed', payloadJson: JSON.stringify(stored), expiresAt },
-      create: {
+    const produce = async () => {
+      const usage = new AiUsageAccumulator()
+      const startedAt = Date.now()
+      let payload: FairVisitPlanPayload
+      try {
+        payload = await this.llm.build({ resumeText, ...fairContext, onLlmCall: usage.add })
+      } catch (error) {
+        this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_FAIR_VISIT_PLAN_FAILED'))
+        throw error
+      }
+      this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
+      const stored = this.buildStored(fairContext, payload)
+      const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
+      await this.prisma.aiResumeResult.upsert({
+        where: { taskId_kind: { taskId, kind: 'fair_visit_plan' } },
+        update: { status: 'completed', payloadJson: JSON.stringify(stored), expiresAt },
+        create: {
+          taskId,
+          kind: 'fair_visit_plan',
+          status: 'completed',
+          provider: 'llm',
+          payloadJson: JSON.stringify(stored),
+          endUserId: parse.endUserId,
+          accessTokenHash: parse.accessTokenHash,
+          expiresAt,
+        },
+      })
+      await this.audit.write({
+        actorId: null,
+        actorRole: parse.endUserId ? 'enduser' : 'kiosk',
+        action: 'fair.visit_plan',
+        targetType: 'ai_task',
+        targetId: taskId,
+        payload: {
+          fairId,
+          companyCount: stored.basedOn.companyCount,
+          positionCount: stored.basedOn.positionCount,
+          hasEndUser: !!parse.endUserId,
+        },
+        ipAddress: null,
+        userAgent: null,
+        requestId: null,
+      })
+      return this.toResponse(
         taskId,
-        kind: 'fair_visit_plan',
-        status: 'completed',
-        provider: 'llm',
-        payloadJson: JSON.stringify(stored),
-        endUserId: parse.endUserId,
-        accessTokenHash: parse.accessTokenHash,
-        expiresAt,
+        stored,
+        stored.payload.mode === 'review' ? await this.loadLocalRecords(fairId, parse.endUserId) : undefined,
+      )
+    }
+    if (!this.quota || !parse.endUserId) return produce()
+    return runWithAiQuota({
+      quota: this.quota,
+      bucket: 'ai_resume',
+      operationKey: `${fairId}:${taskId}:visit_plan`,
+      endUserId: parse.endUserId,
+      req,
+      loadStored: async () => {
+        const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'fair_visit_plan' } } })
+        if (!row?.expiresAt || row.expiresAt.getTime() < Date.now() || row.status !== 'completed') return null
+        try {
+          const stored = JSON.parse(row.payloadJson) as StoredFairVisitPlan
+          if (stored.basedOn?.fairId !== fairId) return null
+          return this.toResponse(taskId, stored, stored.payload.mode === 'review' ? await this.loadLocalRecords(fairId, parse.endUserId) : undefined)
+        } catch { return null }
       },
-    })
-    await this.audit.write({
-      actorId: null,
-      actorRole: parse.endUserId ? 'enduser' : 'kiosk',
-      action: 'fair.visit_plan',
-      targetType: 'ai_task',
-      targetId: taskId,
-      payload: {
-        fairId,
-        companyCount: stored.basedOn.companyCount,
-        positionCount: stored.basedOn.positionCount,
-        hasEndUser: !!parse.endUserId,
-      },
-      ipAddress: null,
-      userAgent: null,
-      requestId: null,
-    })
-    return this.toResponse(
-      taskId,
-      stored,
-      stored.payload.mode === 'review' ? await this.loadLocalRecords(fairId, parse.endUserId) : undefined,
-    )
+    }, produce, async () => taskId)
   }
 
   async getLatest(fairId: string, taskId: string, requester: FairVisitPlanRequester) {

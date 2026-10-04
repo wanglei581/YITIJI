@@ -53,7 +53,11 @@ export class AiQuotaService {
         if (existing.endUserId !== endUserId || (!endUserId && existing.terminalId !== terminalId)) {
           throw new ConflictException('AI_QUOTA_OPERATION_OWNER_MISMATCH')
         }
-        if (existing.status === 'reserved' || (existing.status === 'committed' && params.allowCommittedReplay === true && existing.resultRef)) {
+        // 同号仍在生成：不放行。放行会让两个并发请求都去调模型。
+        if (existing.status === 'reserved') {
+          throw new ConflictException({ error: { code: 'AI_QUOTA_OPERATION_IN_PROGRESS', message: '这一步正在生成，请稍等结果' } })
+        }
+        if (existing.status === 'committed' && params.allowCommittedReplay === true && existing.resultRef) {
           return this.receipt(existing, true)
         }
         throw new ConflictException({ error: { code: 'AI_QUOTA_OPERATION_SETTLED', message: '该操作已结算，请使用新的操作号' } })

@@ -94,8 +94,10 @@ export class AiPublicQuotaService {
   constructor(private readonly redis: RedisService) {}
 
   async consume(operation: AiPublicOperation, input: AiPublicQuotaContext): Promise<AiPublicQuotaTicket> {
+    // 简历解析的会员次数改由 AiQuota 账本计算，避免和按人次数双重计数。终端与 IP 仍在这里。
+    const countMember = operation !== 'resume_parse'
     const limits: DimensionLimit[] = [
-      input.member
+      countMember && input.member
         ? { key: this.key(operation, 'member', input.member), limit: memberLimit(operation) }
         : null,
       input.terminal
@@ -146,7 +148,9 @@ export class AiPublicQuotaService {
     const now = input.now ?? new Date()
     const day = dayKeyAt(now)
     const counters = this.resumeParseCounters(input.context, day)
-    if (!isIntentId(input.intentId) || !isPositiveInt(input.markerTtlSeconds) || counters.length === 0) {
+    // 只有会员、没有终端和 IP 时，计数数组为空。意图标记仍要写上，不能当成配额服务故障。
+    const memberLedgerOwnsCount = Boolean(input.context.member)
+    if (!isIntentId(input.intentId) || !isPositiveInt(input.markerTtlSeconds) || (counters.length === 0 && !memberLedgerOwnsCount)) {
       throw quotaUnavailable()
     }
     const markerTtlSeconds = Math.max(input.markerTtlSeconds, Math.ceil(resumeParseIntentTtlMs() / 1000))
@@ -168,7 +172,6 @@ export class AiPublicQuotaService {
 
   private resumeParseCounters(input: AiPublicQuotaContext, day: string): { key: string; limit: number }[] {
     return [
-      input.member ? { key: resumeParseQuotaCounterKey('member', input.member, day), limit: memberLimit('resume_parse') } : null,
       input.terminal ? { key: resumeParseQuotaCounterKey('terminal', input.terminal, day), limit: terminalLimit('resume_parse') } : null,
       input.ip ? { key: resumeParseQuotaCounterKey('ip', input.ip, day), limit: ipLimit('resume_parse') } : null,
     ].filter((item): item is { key: string; limit: number } => item !== null)

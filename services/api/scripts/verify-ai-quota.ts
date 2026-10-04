@@ -1,6 +1,7 @@
-/** Q1: 真数据库账本验证。默认自建 SQLite；--postgres 只接受隔离的本机 PG。
+/** Q1 账本验证。Q2a 改了一处：同号仍为 reserved 时第二个请求 409，不再放行去调模型。
+ * 已提交且 allowCommittedReplay 的重看仍不重复扣。默认自建 SQLite；--postgres 只接受隔离的本机 PG。
  * PG 前置：db:pg:generate + db:pg:deploy；两种库执行完全相同的并发/结算断言。
- * 结果重看用真实 AiResumeResult 做 Q2 接线前的服务契约模拟，不宣称 controller 已接入。
+ * 本脚本只测账本服务。入口是否接入由 verify:ai-quota-coverage 负责。
  */
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
@@ -123,18 +124,28 @@ async function main() {
       assert.equal(await prisma.aiQuotaReservation.count({ where: { endUserId: users[12] } }), 1)
       process.env.AI_QUOTA_RESUME_DAILY = '3'
     })
-    await check('同 operationKey 重放不重扣，hash 不信任输入且跨账号不可回放', async () => {
+    await check('同 operationKey 进行中不放行，hash 不信任输入且跨账号不可回放', async () => {
       const key = operation()
       const r = await reserve(users[4], { operationKey: key })
-      const replay = await reserve(users[4], { operationKey: key })
-      assert.equal(replay.replay, true); assert.equal(r.reservationId, replay.reservationId); assert.equal(await used(users[4]), 1)
-      assert.equal((await prisma.aiQuotaReservation.findUniqueOrThrow({ where: { id: r.reservationId } })).operationKey, createHash('sha256').update(`ai_resume:${key}`).digest('hex'))
+      await reject('AI_QUOTA_OPERATION_IN_PROGRESS', () => reserve(users[4], { operationKey: key }), 409)
+      assert.equal(await used(users[4]), 1)
+      const inProgress = await prisma.aiQuotaReservation.findUniqueOrThrow({ where: { id: r.reservationId } })
+      assert.equal(inProgress.status, 'reserved')
+      assert.equal(inProgress.operationKey, createHash('sha256').update(`ai_resume:${key}`).digest('hex'))
       await reject('AI_QUOTA_OPERATION_OWNER_MISMATCH', () => reserve(users[5], { operationKey: key }))
       await reject('AI_QUOTA_OPERATION_INVALID', () => reserve(users[4], { operationKey: '../forged/key' }))
       await reject('AI_QUOTA_OPERATION_INVALID', () => reserve(users[4], { operationKey: 'x'.repeat(201) }))
       const same = operation()
-      const results = await Promise.all(Array.from({ length: 10 }, () => reserve(users[4], { operationKey: same })))
-      assert.equal(new Set(results.map((v) => v.reservationId)).size, 1); assert.equal(await used(users[4]), 2)
+      const results = await Promise.allSettled(Array.from({ length: 10 }, () => reserve(users[4], { operationKey: same })))
+      const won = results.filter((item) => item.status === 'fulfilled')
+      assert.equal(won.length, 1, '十个同号并发只有一个拿到预占')
+      for (const item of results) if (item.status === 'rejected') {
+        const body = item.reason.getResponse?.() as { error?: { code?: string } }
+        assert.equal(body?.error?.code, 'AI_QUOTA_OPERATION_IN_PROGRESS')
+        assert.equal(item.reason.getStatus?.(), 409)
+      }
+      assert.equal(await used(users[4]), 2)
+      assert.equal(await prisma.aiQuotaReservation.count({ where: { endUserId: users[4], operationKey: createHash('sha256').update(`ai_resume:${same}`).digest('hex') } }), 1)
     })
     await check('北京时间跨日重置，23:59 预占归还前一天', async () => {
       const r = await reserve(users[5], { now: beforeMidnight })

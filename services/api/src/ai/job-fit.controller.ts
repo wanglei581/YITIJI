@@ -53,6 +53,7 @@ interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
   ip?: string
   socket?: { remoteAddress?: string }
+  aborted?: boolean
 }
 
 function headerOf(req: ReqLike, name: string): string | null {
@@ -149,7 +150,7 @@ export class JobFitController {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
     }
     const requester = await this.requesterOf(req)
-    return this.governed.analyzeForJobFit(dto, requester, quotaContextOf(req, requester))
+    return this.governed.analyzeForJobFit(dto, requester, quotaContextOf(req, requester), req)
   }
 
   @Post('consent')

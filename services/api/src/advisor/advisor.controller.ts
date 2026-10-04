@@ -22,6 +22,7 @@ import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
+  aborted?: boolean
 }
 
 function headerOf(req: ReqLike, name: string): string | null {
@@ -142,7 +143,7 @@ export class AdvisorController {
   @AiUse('generate')
   @PaidAiThrottle(6)
   async run(@Param('sessionId') sessionId: string, @Req() req: ReqLike) {
-    return this.service.run(sessionId, await this.requesterOf(req))
+    return this.service.run(sessionId, await this.requesterOf(req), req)
   }
 
   /** 问答型追问：在同一会话上继续，不是每次从零。 */
