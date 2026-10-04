@@ -6,6 +6,7 @@ import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
+import { getMyDocuments } from '../../services/api/memberAssets'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import {
@@ -132,6 +133,17 @@ export function ResumeOptimizePage() {
   const estimatedPagesLabel = exported?.pageCount ? `共 ${exported.pageCount} 页（上次导出）` : '导出后显示真实页数。若担心第二页只剩两三行，可先点「压到一页」。'
   const editorOpen = view === 'ready' && Boolean(resume) && draftAccepted && !draft.loading
   const choicePending = Boolean(token && draft.hasDraft && !draftAccepted && view === 'ready')
+
+  // 优化稿导出合同没有 savedToDocuments；只凭本人文档列表中的同一文件确认保存。
+  // 读取失败或未找到时保持未知，不能根据登录状态推断已保存。
+  useEffect(() => {
+    if (exportKind !== 'resume' || !exported || !token) return
+    let active = true
+    void getMyDocuments(token, { pageSize: 50 }).then((page) => {
+      if (active && page.items.some((item) => item.id === exported.fileId)) setSavedToDocuments(true)
+    }).catch(() => { /* 导出已成功；文档归属未确认时不宣称已保存。 */ })
+    return () => { active = false }
+  }, [exported, exportKind, token, setSavedToDocuments])
 
   const markEdited = () => { setIsDirty(true); setPreviewOpen(false); if (exported) setExported(null) }
   const issueMessage = (failure: ResumeDecisionFailure, attempted?: ResumeModuleDecision) => {

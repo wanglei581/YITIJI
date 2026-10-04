@@ -12,6 +12,8 @@ import { PartnerStatsService } from '../../src/orgs/partner-stats.service'
 import type { PrismaService } from '../../src/prisma/prisma.service'
 import { TerminalAdminService } from '../../src/terminals/terminals-admin.service'
 import { TerminalAgentService } from '../../src/terminals/terminals-agent.service'
+import { ReleaseObservationService } from '../../src/terminals/release-observation.service'
+import { TerminalCredentialSecurityService } from '../../src/terminals/terminal-credential-security.service'
 import { TerminalToolboxService } from '../../src/terminals/terminal-toolbox.service'
 
 type Assert = (label: string, condition: boolean, detail?: string) => void
@@ -24,17 +26,18 @@ export async function verifyTerminalRebindIsolation(assert: Assert, prisma: Pris
   const orgB = `org_rebind_b_${suffix}`
   const terminalId = `t_rebind_${suffix}`
   const queryNow = new Date()
-  const boundAAt = new Date(queryNow.getTime() - 120 * MIN)
-  const boundBAt = new Date(queryNow.getTime() - 60 * MIN)
-  const sameOrgAt = new Date(queryNow.getTime() - 30 * MIN)
-  const unbindAt = new Date(queryNow.getTime() - 10 * MIN)
-  const ago = (minutes: number) => new Date(queryNow.getTime() - minutes * MIN)
+  const end = new Date(new Date(queryNow.getTime() + 8 * 3600000).setUTCHours(0, 0, 0, 0) - 8 * 3600000)
+  const ago = (minutes: number) => new Date(end.getTime() - minutes * MIN)
+  const boundAAt = ago(120)
+  const boundBAt = ago(60)
+  const sameOrgAt = ago(30)
+  const unbindAt = ago(10)
 
   const audit = new AuditService(prisma)
   const toolbox = new TerminalToolboxService(prisma)
   const agent = new TerminalAgentService(prisma, audit)
   // 只调用 assignTerminalOrg，不跑 onModuleInit（避免播种打印任务、避免心跳定时器）。
-  const admin = new TerminalAdminService(prisma, agent, toolbox)
+  const admin = new TerminalAdminService(prisma, agent, toolbox, new ReleaseObservationService(prisma, new TerminalCredentialSecurityService(prisma, audit), audit))
   const stats = new PartnerStatsService(prisma)
 
   async function cleanup(): Promise<void> {
@@ -129,6 +132,7 @@ export async function verifyTerminalRebindIsolation(assert: Assert, prisma: Pris
       data: { terminalId, printerStatus: 'low_paper', createdAt: ago(2) },
     })
 
+    await prisma.terminalHeartbeat.create({ data: { terminalId, printerStatus: 'low_paper', createdAt: new Date(queryNow.getTime() - 3000) } })
     const a = await stats.getTerminalOperations(orgA as PartnerOrgId, 'week', queryNow)
     const b = await stats.getTerminalOperations(orgB as PartnerOrgId, 'week', queryNow)
     const bRow = b.terminals[0]

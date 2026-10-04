@@ -86,6 +86,11 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   RECONCILE_UNSUPPORTED: '当前通道不支持主动核实，请继续等待支付结果',
   LOCAL_AGENT_UNREACHABLE: '无法连接这台机器的本机程序，请确认设备正常后重试',
   LOCAL_USB_BRIDGE_TOKEN_MISSING: '这台机器还没配好 U 盘导入，请联系现场工作人员',
+  // 2026-10-04 Agent 本地接口：读的那一下失败（多半是 Windows Defender 拦下了可疑文件，或文件已被隔离）。
+  // 重试同一个文件不会成功，所以不说「请重试」，直接让用户换一个。
+  LOCAL_USB_FILE_UNREADABLE: '这个文件读不了，请换一个文件',
+  // 列表过期（一次性编号已用过或超时）：同一个编号再点只会再失败，要重新读取 U 盘列表。
+  LOCAL_USB_FILE_EXPIRED: '文件列表已过期，请重新读取 U 盘后再选',
   CONVERT_TOO_MANY_IMAGES: '一次转换的图片过多，请减少张数后重试',
   SIGN_SOURCE_NOT_FOUND: '文件访问凭证已过期或文件已清理，请重新选择文件',
   NO_TERMINAL_IDENTITY: '这台机器还没完成登记，请联系现场工作人员',

@@ -14,8 +14,28 @@ test.describe('终端数据（mock 口径）', () => {
     await expect(page.getByText(/不等于人次/).first()).toBeVisible()
     await expect(page.getByText('暂不能统计').first()).toBeVisible()
     await expect(page.getByRole('button', { name: /导出 CSV/ })).toBeVisible()
-    await page.getByRole('button', { name: '近 30 天' }).click()
-    await expect(page.getByRole('button', { name: '近 30 天' })).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: '近 30 天（截至昨天）' }).click()
+    await expect(page.getByRole('button', { name: '近 30 天（截至昨天）' })).toHaveAttribute('aria-pressed', 'true')
     await assertPageHonest(page, errors)
   })
+})
+
+
+test('第六批：终端数据隐藏比率与补充计数，CSV 标明截至昨天', async ({ page }) => {
+  await injectPartnerAuth(page)
+  await gotoPartner(page, '/terminals', '终端数据')
+  await expect(page.getByText('样本不足，不显示').first()).toBeVisible()
+  await expect(page.locator('main')).not.toContainText(/\d(?:\.\d+)?%/)
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: '导出 CSV', exact: true }).click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toContain('截至昨天')
+  const stream = await download.createReadStream()
+  if (!stream) throw new Error('无法读取 CSV')
+  const parts: Buffer[] = []
+  for await (const part of stream) parts.push(Buffer.from(part))
+  const csv = Buffer.concat(parts).toString('utf8')
+  expect(csv).toContain('样本不足，不显示')
+  expect(csv).not.toMatch(/\d(?:\.\d+)?%/)
+  expect(csv).toContain('截至昨天')
 })

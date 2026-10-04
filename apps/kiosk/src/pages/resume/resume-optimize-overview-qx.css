@@ -10,20 +10,21 @@
   flex: 1 1 auto;
   min-height: 0;
   padding-bottom: 12px;
-  overflow: hidden;
+  overflow-y: auto;
 }
 .qx-opt-overview > * { flex-shrink: 0; }
 .qx-opt-overview > .qx-opt-sec--list {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
 .qx-opt-overview > .qx-opt-sec--list > .qx-opt-sec-h { flex: none; }
 .qx-opt-overview > .qx-opt-sec--list > .qx-opt-mods {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
+  max-height: 440px;
   overflow-y: auto;
 }
 
@@ -113,7 +114,7 @@
 
 .qx-opt-batch {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 .qx-opt-bx {

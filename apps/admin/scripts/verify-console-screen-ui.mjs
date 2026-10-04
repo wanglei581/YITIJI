@@ -57,6 +57,15 @@ function stripComments(source) {
 }
 
 console.log('\n=== 数据大屏前端门禁 ===')
+const terminalBoard = read('packages/ui/src/screen/twin/TwinTerminalBoard.tsx')
+const charts = read('packages/ui/src/screen/twin/TwinCharts.tsx')
+const usageView = read('apps/admin/src/routes/screen/UsageView.tsx')
+check(terminalBoard.includes('打印时段不在状态带上单独标出，今日打印单数见上方。')
+  && !terminalBoard.includes("state: 'pr', label: '打印中'") && !terminalBoard.includes('timelinePrintingSuppressed'), '状态带只表可用性，无打印图例且有固定说明')
+check(charts.includes("printing: '#2ee6a8'") && !charts.includes("printing: '#72d6ff'"), '旧响应printing段也只画在线空闲色块')
+check(usageView.includes('不足 5 次的时段不写数字') && !usageView.includes('1 至 4 次的格子用虚线')
+  && charts.includes('className="is-hidden" style={{ height: 2'), '热力与脉冲null画最浅档且不写数字')
+
 
 // 从真实源码执行展示函数，并用 React 渲染文字；不在门禁里重写小样本规则。
 function actualFunction(path, name, bindings = {}) {
