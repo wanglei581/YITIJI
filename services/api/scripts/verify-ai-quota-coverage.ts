@@ -4,7 +4,7 @@
  * 静态：每个 @AiUse('generate'|'voice') 要么接入 runWithAiQuota（桶 ai_resume），
  * 要么在登记表里标明不计次 / Q2b 接入 / 待裁定。登记表写了但路由没了、或新路由没登记，都报错。
  * 运行时：不监听端口。简历类入口扣 1、用完 429 且模型桩不再被调；同号重放与进行中 409；
- * 金额封顶先拒绝则不写预占；模型报错归还、客户端断开不归还且结果能按记录号读回；
+ * 金额封顶先拒绝则不写预占；模型报错归还（客户端断开时也归还）、断开时成功照扣且结果能按记录号读回；
  * 简历桶用完不影响助手与面试；转写不预占；简历解析不再扣旧的 Redis 会员计数。
  *
  * 运行：pnpm --filter @ai-job-print/api verify:ai-quota-coverage
@@ -656,7 +656,7 @@ async function main() {
       assert.equal(providerCalls, 1)
     })
 
-    await check('模型报错归还；客户端断开不归还，结果能按记录号读回', async () => {
+    await check('模型报错归还；客户端断开时成功照扣、结果能按记录号读回，失败照常归还', async () => {
       const ma = userOf.get('failure')!
       for (const code of ['AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID']) {
         const error = Object.assign(new Error(code), { code })
@@ -671,6 +671,23 @@ async function main() {
         quota, bucket: 'ai_resume', operationKey: `broken:${ma}`, endUserId: ma,
       }, async () => { throw broken }, async () => 'no-ref'))
       assert.equal(await used('failure'), 0)
+      // 断开时模型失败：没有结果可重开，服务端确认的失败照常归还（失败不扣，总指挥 10/4）。
+      await assert.rejects(() => runWithAiQuota({
+        quota, bucket: 'ai_resume', operationKey: `disc-broken:${ma}`, endUserId: ma, req: { aborted: true },
+      }, async () => { throw Object.assign(new Error('upstream'), { code: 'AI_PROVIDER_ERROR' }) }, async () => 'no-ref'))
+      assert.equal(await used('failure'), 0, '断开时模型抛错应归还')
+      const savedFailures: string[] = []
+      const failedValue = await runWithAiQuota({
+        quota, bucket: 'ai_resume', operationKey: `disc-failed:${ma}`, endUserId: ma, req: { aborted: true },
+        failureOf: (value: { status: string }) => (value.status === 'failed' ? 'provider_error' : null),
+        persistFailure: true,
+      }, async () => ({ taskId: `disc${run}fail`, status: 'failed' }), async (value) => {
+        savedFailures.push(value.taskId)
+        return value.taskId
+      })
+      assert.equal(failedValue.status, 'failed')
+      assert.deepEqual(savedFailures, [`disc${run}fail`], '断开时的失败结果照常落库')
+      assert.equal(await used('failure'), 0, '断开时模型返回失败结果应归还')
       const taskId = `disc${run}ma`
       await runWithAiQuota({
         quota, bucket: 'ai_resume', operationKey: `disc:${ma}`, endUserId: ma, req: { aborted: true },

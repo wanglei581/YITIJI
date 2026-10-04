@@ -5,7 +5,10 @@ import { exhausted, type ReleaseReason } from './ai-quota.policy'
 
 export type { ReleaseReason }
 
-/** 客户端断开。与 runWithPublicQuota 不同：断开不归还次数。 */
+/**
+ * 客户端断开。结算不看它：成功照常落记录并结算（断开不归还，结果可按记录号重开），
+ * 服务端确认的失败照常归还。保留这个字段是为了调用方签名不变，以后要按断开做别的处理时有入口。
+ */
 export interface QuotaAbortRequest {
   aborted?: boolean
 }
@@ -59,11 +62,14 @@ export async function runWithAiQuota<T>(
     if (stored !== null && stored !== undefined) return stored
   }
   const receipt = await reserveAttempt(input)
+  // 客户端断开只影响成功路径：结果照常落进本人记录并结算，之后按记录号重开，不再扣
+  // （断开不归还，否则断连就能刷）。失败时没有结果可重开，服务端确认的失败不论是否
+  // 断开都归还——「失败不扣、成功只扣一次」（总指挥 10/4）。中止本身（AbortError 之类）
+  // 不是服务端确认的失败，quotaReleaseReason 认不出，照旧不归还。
   try {
     const value = await work()
-    const disconnected = isClientDisconnect(undefined, input.req)
     const reason = input.failureOf?.(value) ?? null
-    if (reason && !disconnected) {
+    if (reason) {
       if (input.persistFailure) await saveResult(value)
       await input.quota.release(receipt.reservationId, reason)
       return value
@@ -72,10 +78,8 @@ export async function runWithAiQuota<T>(
     await input.quota.commit(receipt.reservationId, { resultRef })
     return value
   } catch (error) {
-    if (!isClientDisconnect(error, input.req)) {
-      const reason = quotaReleaseReason(error)
-      if (reason) await input.quota.release(receipt.reservationId, reason)
-    }
+    const reason = quotaReleaseReason(error)
+    if (reason) await input.quota.release(receipt.reservationId, reason)
     throw error
   }
 }
@@ -156,13 +160,4 @@ function attemptKey(base: string, attempt: number): string {
 function isTimeoutCode(value: string | null): boolean {
   if (!value) return false
   return value.includes('TIMEOUT') || value === 'AI_ADVISOR_TIMEOUT'
-}
-
-function isClientDisconnect(error: unknown, req?: QuotaAbortRequest): boolean {
-  if (req?.aborted) return true
-  if (!error || typeof error !== 'object') return false
-  const name = (error as { name?: string }).name
-  const code = (error as { code?: string }).code
-  const message = (error as { message?: string }).message
-  return name === 'AbortError' || code === 'ABORT_ERR' || code === 'ECONNRESET' || message === 'REQUEST_ABORTED'
 }
