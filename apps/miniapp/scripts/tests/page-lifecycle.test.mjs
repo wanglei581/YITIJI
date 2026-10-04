@@ -6513,11 +6513,16 @@ test('orders：模板在规格行下方显示原因，复用规格行样式', ()
 // ══════════════════════════════════════════════════════════════════════
 
 const serverError = (message, code, statusCode = 400) => Object.assign(new Error(message), { code, statusCode })
-const QUOTA_MSG = '今天的 AI 次数已经用完，明天 0 点恢复。'
+// 请求层对额度码给的是通用句（带「先用模板手动填写」）；模拟面试、小青没有模板可填，页面换成只说事实的那句（MP-K18-6）
+const QUOTA_MSG = '今天的 AI 额度已用完，明天恢复；这一步可以先用模板手动填写，打印照常可用'
+const QUOTA_PLAIN = '今天的 AI 次数用完了，明天恢复。'
+const NET_MSG = '网络连接失败，请检查网络后重试'
+const netError = () => Object.assign(new Error(NET_MSG), { statusCode: -1, wxErrMsg: 'request:fail timeout' })
 
 test('interview-qa：提交答案失败时把服务端原话给用户看，已输入的回答保留', async () => {
   for (const [err, shown] of [
-    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_MSG],
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
+    [netError(), NET_MSG],
     [serverError('', 'SOME_MACHINE_CODE', 500), '提交失败，请重试。已输入的回答还在。'],
   ]) {
     const wx = createWx()
@@ -6541,7 +6546,8 @@ test('interview-qa：提交答案失败时把服务端原话给用户看，已�
 
 test('interview-qa：开场失败同样显示原话；会话不存在按错误码认', async () => {
   for (const [err, shown] of [
-    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_MSG],
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
+    [netError(), NET_MSG],
     [serverError('', 'INTERVIEW_SESSION_NOT_FOUND', 404), '面试会话不存在或无权访问'],
   ]) {
     const wx = createWx()
@@ -6555,7 +6561,8 @@ test('interview-qa：开场失败同样显示原话；会话不存在按错误�
 
 test('interview-result：生成报告失败时显示服务端原话；会话不存在按错误码认；没有原话才用兜底句', async () => {
   for (const [err, shown] of [
-    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_MSG],
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
+    [netError(), NET_MSG],
     [serverError('', 'INTERVIEW_SESSION_NOT_FOUND', 404), '面试会话不存在或无权访问'],
     [serverError('', undefined, 500), 'AI 报告生成失败，请稍后重试'],
   ]) {
@@ -6609,4 +6616,109 @@ test('页面不读 err.error：请求层的错误对象上没有这个字段', (
     })
   }
   assert.deepEqual(hits, [])
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// K18 走查登记（10/3）：断网英文、英文状态值、免费时仍提钱、额度提示不贴切
+// ══════════════════════════════════════════════════════════════════════
+
+test('请求层：断网/超时不把微信的英文 errMsg 给用户看，统一成一句中文，原文留在 wxErrMsg', async () => {
+  const wx = createWx()
+  wx.request = (opts) => opts.fail({ errMsg: 'request:fail timeout' })
+  wx.uploadFile = (opts) => opts.fail({ errMsg: 'uploadFile:fail net::ERR_INTERNET_DISCONNECTED' })
+  ACTIVE_WX = wx
+  const { request, uploadFile } = requireMiniapp('../utils/request.js')
+  for (const run of [
+    () => request('/print/price-config', { method: 'GET', needAuth: false }),
+    () => uploadFile('/files/upload', '/tmp/a.pdf', { needAuth: false }),
+  ]) {
+    const err = await run().then(() => null, (e) => e)
+    assert.ok(err, '必须失败')
+    assert.equal(err.message, NET_MSG)
+    assert.equal(err.statusCode, -1)
+    assert.match(err.wxErrMsg, /fail/)
+    assert.doesNotMatch(err.message, /[A-Za-z]{4,}/, '给用户看的句子里不带英文')
+  }
+})
+
+test('plainAiMessageOf：额度两码只说事实，其余与 userMessageOf 一致；四个页面都用它', () => {
+  const ue = requireMiniapp('../utils/user-error.js')
+  assert.equal(ue.plainAiMessageOf(serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), 'x'), QUOTA_PLAIN)
+  assert.equal(ue.plainAiMessageOf(serverError('', 'AI_BUDGET_UNAVAILABLE', 503), 'x'), 'AI 暂时用不了，请稍后再试。')
+  for (const s of Object.values(ue.AI_QUOTA_PLAIN_MESSAGES)) assert.doesNotMatch(s, /模板|手动填写/)
+  for (const err of [netError(), serverError('', 'SOME_MACHINE_CODE', 500), serverError('', 'AI_PAUSED', 503)]) {
+    assert.equal(ue.plainAiMessageOf(err, '兜底句'), ue.userMessageOf(err, '兜底句'))
+  }
+  for (const rel of ['pages/interview-entry/interview-entry.js', 'pages/interview-qa/interview-qa.js', 'pages/interview-result/interview-result.js', 'pages/assistant/assistant.js']) {
+    assert.match(fs.readFileSync(path.join(MINIAPP, rel), 'utf8'), /plainAiMessageOf\(err, '/, rel)
+  }
+})
+
+test('interview-entry：创建面试失败，额度用完只说明天恢复', async () => {
+  const wx = createWx()
+  const api = { createInterview: () => Promise.reject(serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429)) }
+  const page = makePage('pages/interview-entry/interview-entry.js', { auth: createAuth('A'), api, wx })
+  page.onLoad({})
+  page.inputPosition({ detail: { value: '行政助理' } })
+  await page.tapStart()
+  await flush()
+  assert.equal(page.data.creating, false)
+  assert.ok(wx.calls.showToast.includes(QUOTA_PLAIN), JSON.stringify(wx.calls.showToast))
+})
+
+test('package-code：状态行用中文，0 元订单不提付款；大于 0 的照旧说付款', async () => {
+  for (const [amountCents, paid] of [[0, false], [200, true]]) {
+    const wx = createWx()
+    const order = { ...A_PACKAGE, amountCents, payStatus: paid ? 'unpaid' : 'paid' }
+    const page = makePage('pages/package-code/package-code.js', { auth: createAuth('A'), api: { getPackageOrder: () => Promise.resolve(order) }, wx })
+    page.onLoad({ orderId: 'pkg-A' })
+    page.onShow()
+    await flush()
+    assert.doesNotMatch(page.data.statusDetail, /[a-z_]{4,}/, '不出现 pending_release 这类英文值')
+    assert.match(page.data.statusDetail, /取件 待到机核销/)
+    assert.equal(/付款/.test(page.data.statusDetail), paid)
+    assert.doesNotMatch(page.data.onsiteNoticeFree + page.data.noCancelNoticeFree, /付款/)
+    assert.ok(page.data.onsiteNoticeFree.length > 10 && page.data.noCancelNoticeFree.length > 10)
+  }
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/package-code/package-code.wxml'), 'utf8')
+  assert.ok(!/\{\{(pickupStatus|taskStatus|payStatus)\}\}/.test(wxml), '模板不直接显示服务端状态值')
+})
+
+test('order-detail：0 元订单这一行不叫「金额」；到机前的任务态显示中文', async () => {
+  for (const [amountCents, paid] of [[0, false], [150, true]]) {
+    const wx = createWx()
+    useRealAuth(wx, 'A')
+    const pending = []
+    const page = makeOrderDetail(wx, pending)
+    page.onLoad({ orderId: 'ord-A' })
+    page.onShow()
+    pending[0].resolve({ ...A_ORDER, amountCents, payStatus: paid ? 'unpaid' : 'paid', taskStatus: 'pending_release' })
+    await flush()
+    assert.equal(page.data.detail.paid, paid)
+    assert.equal(page.data.detail.statusLabel, '待到机')
+    assert.equal(page.data.detail.statusTone, 'wheat')
+  }
+})
+
+test('还不知道金额的页面只用不提钱的说明：材料包组包、选服务点、订单列表空态', () => {
+  const pkg = requireMiniapp('../utils/package-order.js')
+  for (const [rel, keys] of [
+    ['pages/package-create/package-create.js', ['onsiteNoticeFree', 'noCancelNoticeFree']],
+    ['pages/store-select/store-select.js', ['onsiteNoticeFree']],
+    ['pages/orders/orders.js', ['pkgOnsiteNotice']],
+  ]) {
+    const wx = createWx()
+    const page = makePage(rel, { auth: createAuth('A'), api: {}, wx })
+    for (const k of keys) {
+      assert.ok(typeof page.data[k] === 'string' && page.data[k].length > 10, `${rel} data.${k}`)
+      assert.doesNotMatch(page.data[k], /付款|支付|金额/, `${rel} data.${k}`)
+    }
+    assert.ok(!JSON.stringify(page.data).includes(pkg.PACKAGE_ONSITE_NOTICE), `${rel} 不带含「不付款」的那句`)
+  }
+})
+
+test('简历导出：免费时只写「当前免费」，不提权益', () => {
+  const N = requireMiniapp('../utils/normalize.js')
+  assert.equal(N.resumeExportPricing({ mode: 'free' }, true).text, '当前免费')
+  assert.match(N.resumeExportPricing({ mode: 'charged', unitCents: 300, benefit: { available: 1 } }, true).text, /权益/, '收费时原样保留')
 })

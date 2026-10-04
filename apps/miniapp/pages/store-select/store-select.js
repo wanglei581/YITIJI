@@ -29,7 +29,8 @@ Page({
     errorTitle: '',
     errorText: '',
     hasPackageData: true,
-    onsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
+    // 这一页还没有报价，不知道金额：只用不提钱的那句
+    onsiteNoticeFree: pkg.PACKAGE_ONSITE_NOTICE_FREE,
   },
 
   onLoad() {

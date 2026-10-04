@@ -172,7 +172,7 @@ test('状态三连：登记过的给中文，没登记的原样回显', () => {
   assert.equal(pkg.statusText('pickup', 'pending'), '待到机核销')
   assert.equal(pkg.statusText('pickup', 'used'), '已交付打印')
   assert.equal(pkg.statusText('pay', 'unpaid'), '未付款')
-  assert.equal(pkg.statusText('task', 'pending_release'), '等待到机释放')
+  assert.equal(pkg.statusText('task', 'pending_release'), '到机核销后开始打印')
   // 未登记取值：原样回显。编一个中文会把没理解的状态说成理解了的。
   assert.equal(pkg.statusText('pay', 'brand_new_state'), 'brand_new_state')
   assert.equal(pkg.statusText('task', ''), '—')

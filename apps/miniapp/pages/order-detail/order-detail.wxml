@@ -45,7 +45,7 @@
             <text class="od-val">{{detail.spec}}</text>
           </view>
           <view class="od-row">
-            <text class="od-label">金额</text>
+            <text class="od-label">{{detail.paid ? '金额' : '本次打印'}}</text>
             <text class="od-val">{{detail.price}}</text>
           </view>
           <view class="od-row">
