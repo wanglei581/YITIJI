@@ -70,12 +70,6 @@ BEGIN
 END; $$;
 CREATE TRIGGER "FileObject_closed_owner_insert" BEFORE INSERT OR UPDATE OF "ownerId", "ownerType" ON "FileObject" FOR EACH ROW EXECUTE FUNCTION reject_closed_file_owner_write();
 
-CREATE FUNCTION reject_closed_status_revive() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF OLD."status" IN ('closing','anonymized') AND NEW."status" NOT IN ('closing','anonymized') OR OLD."status"='anonymized' AND NEW."status"<>'anonymized' THEN RAISE EXCEPTION 'MEMBER_CLOSED_WRITE_FORBIDDEN'; END IF;
-  RETURN NEW;
-END; $$;
-CREATE TRIGGER "EndUser_closed_status_revive" BEFORE UPDATE OF "status" ON "EndUser" FOR EACH ROW EXECUTE FUNCTION reject_closed_status_revive();
 
 CREATE FUNCTION reject_closed_legacy_member_write() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE member_status TEXT;

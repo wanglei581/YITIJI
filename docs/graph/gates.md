@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1848 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1849 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2040,7 +2040,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/prisma/</code> — 38 个文件</summary>
+<summary><code>services/api/prisma/</code> — 39 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2078,6 +2078,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/prisma/postgres/migrations/20260917120000_add_console_screen_query_indexes/migration.sql` | `verify-console-screen-snapshot.ts` |
 | `services/api/prisma/postgres/migrations/20260925143000_add_terminal_area_geo/migration.sql` | `verify-console-screen-snapshot.ts` |
 | `services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql` | `verify-ai-usage-retention.ts` |
+| `services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql` | `verify-http-exception-filter.ts` |
 | `services/api/prisma/postgres/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-ai-usage-retention.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
 | `services/api/prisma/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-orgs-delete-schema.ts`<br/>`verify-ai-usage-retention.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-console-screen-snapshot.ts`<br/>`verify-db-load-indexes.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-fit-governance.ts`<br/>`verify-job-headcount.ts`<br/>`verify-jobfair-checkin.ts`<br/>`verify-legal-doc-version.ts`<br/>`verify-member-account-status.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-recruitment-capability-gate.ts`<br/>`verify-recruitment-p1-schema.ts`<br/>`verify-release-observation-contract.mjs`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-review-workflow.ts` |
 | `services/api/prisma/seed-guard.ts` | `verify-demo-seed-guard.ts` |
@@ -2632,7 +2633,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/member-privacy/admin-member-privacy.controller.ts` | `verify-job-ai-privacy.ts`<br/>`verify-member-data-request-state-machine.ts` |
 | `services/api/src/member-privacy/member-closure-redis.service.ts` | `verify-member-closure.ts` |
 | `services/api/src/member-privacy/member-closure-retention.ts` | `verify-member-closure.ts` |
-| `services/api/src/member-privacy/member-closure.service.ts` | `verify-member-closure.ts` |
+| `services/api/src/member-privacy/member-closure.service.ts` | `verify-job-application-track.ts`<br/>`verify-member-closure.ts` |
 | `services/api/src/member-privacy/member-data-export-download.service.ts` | `verify-member-closure.ts`<br/>`verify-member-data-export-download.ts`<br/>`verify-member-data-request-truth.ts` |
 | `services/api/src/member-privacy/member-data-export-reconciler.service.ts` | `verify-member-data-export-download.ts`<br/>`verify-member-data-request-truth.ts` |
 | `services/api/src/member-privacy/member-data-export.controller.ts` | `verify-member-data-export-download.ts` |
