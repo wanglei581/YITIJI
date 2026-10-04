@@ -8,6 +8,16 @@ import { formatBytes, resolvePreviewUrl } from './utils'
 import { AssetPreviewModal } from './AssetPreviewModal'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import { AssetUploadNotice } from './AssetUploadNotice'
+import {
+  dwellDurationError,
+  dwellLimitHint,
+  externalVideoHelp,
+  externalVideoTechNote,
+  screensaverUploadLimitText,
+  SCREENSAVER_DURATION_MAX_SEC,
+  SCREENSAVER_DURATION_MIN_SEC,
+  uploadFormError,
+} from './assetUploadRules'
 
 export function AssetsTab() {
   const hosting = useRecruitmentHosting()
@@ -22,7 +32,6 @@ export function AssetsTab() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [previewAsset, setPreviewAsset] = useState<AdAssetView | null>(null)
 
-  // 外部视频直链
   const [extUrl, setExtUrl] = useState('')
   const [extTitle, setExtTitle] = useState('')
   const [extDuration, setExtDuration] = useState('')
@@ -42,8 +51,17 @@ export function AssetsTab() {
   useEffect(reload, [reload])
 
   const handleUpload = useCallback(async () => {
-    if (!file || !title.trim()) {
-      setUploadError('请选择文件并填写标题')
+    if (!file) {
+      setUploadError('请选择要上传的文件')
+      return
+    }
+    const problem = uploadFormError(file, duration)
+    if (problem) {
+      setUploadError(problem)
+      return
+    }
+    if (!title.trim()) {
+      setUploadError('请填写标题')
       return
     }
     setUploading(true)
@@ -64,6 +82,11 @@ export function AssetsTab() {
   }, [file, title, duration, reload])
 
   const handleAddExternal = useCallback(async () => {
+    const durationProblem = dwellDurationError(extDuration, 'external')
+    if (durationProblem) {
+      setExtError(durationProblem)
+      return
+    }
     if (!extUrl.trim() || !extTitle.trim()) {
       setExtError('请填写视频链接和标题')
       return
@@ -119,20 +142,25 @@ export function AssetsTab() {
       {/* 上传区 */}
       <Card className="p-5">
         <h3 className="mb-3 text-sm font-semibold text-neutral-800">上传素材</h3>
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap items-start gap-3">
           <div>
-            <label className="mb-1 block text-xs text-neutral-500">文件（JPG/PNG/WebP / MP4/WebM）</label>
+            <label className="mb-1 block text-xs text-neutral-500">文件</label>
             <input
               ref={fileInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const next = e.target.files?.[0] ?? null
+                setFile(next)
+                setUploadError(uploadFormError(next, duration))
+              }}
               className="sr-only"
             />
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>选择文件</Button>
               <span className="max-w-64 truncate text-xs text-neutral-500" title={file?.name}>{file?.name ?? '未选择文件'}</span>
             </div>
+            <p className="mt-1 w-72 text-xs leading-5 text-neutral-500">{screensaverUploadLimitText()}</p>
           </div>
           <div>
             <label className="mb-1 block text-xs text-neutral-500">标题</label>
@@ -149,32 +177,41 @@ export function AssetsTab() {
             <label className="mb-1 block text-xs text-neutral-500">停留/时长（秒，选填）</label>
             <input
               type="number"
-              min={3}
-              max={1800}
+              min={SCREENSAVER_DURATION_MIN_SEC}
+              max={SCREENSAVER_DURATION_MAX_SEC}
               value={duration}
-              onChange={(e) => setDuration(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value
+                setDuration(value)
+                setUploadError(uploadFormError(file, value))
+              }}
               placeholder="图片默认 8"
               className="h-10 w-32 rounded-md border border-neutral-300 px-3 text-sm"
             />
+            <p className="mt-1 w-64 text-xs leading-5 text-neutral-500">{dwellLimitHint('upload')}</p>
           </div>
-          <Button onClick={handleUpload} disabled={uploading || !file}>
-            {uploading ? '上传中…' : '上传'}
-          </Button>
+          <div className="pt-5">
+            <Button onClick={handleUpload} disabled={uploading || !file}>
+              {uploading ? '上传中…' : '上传'}
+            </Button>
+          </div>
         </div>
-        {uploadError && <p className="mt-2 text-sm text-error">{uploadError}</p>}
+        {uploadError && <p role="alert" className="mt-2 text-sm text-error">{uploadError}</p>}
       </Card>
 
-      {/* 外部视频直链 */}
       <Card className="p-5">
         <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-neutral-800">
           <LinkIcon className="h-4 w-4 text-neutral-400" aria-hidden="true" /> 添加外部视频链接
         </h3>
-        <p className="mb-3 text-xs text-neutral-500">
-          仅支持 HTTPS 的 .mp4 / .webm 视频直链；不支持 iframe、B站 / 抖音 / YouTube 等网页链接。链接过期由管理员重新配置，系统不保存第三方账号密钥。
+        <p className="mb-3 text-xs leading-5 text-neutral-500">
+          {externalVideoHelp}
+          <button type="button" className="ml-1 cursor-help underline decoration-dotted" title={externalVideoTechNote}>
+            技术说明
+          </button>
         </p>
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap items-start gap-3">
           <div>
-            <label className="mb-1 block text-xs text-neutral-500">视频直链（https://…/xxx.mp4）</label>
+            <label className="mb-1 block text-xs text-neutral-500">视频文件网址</label>
             <input
               type="url"
               value={extUrl}
@@ -199,19 +236,26 @@ export function AssetsTab() {
             <label className="mb-1 block text-xs text-neutral-500">时长（秒，选填）</label>
             <input
               type="number"
-              min={3}
-              max={1800}
+              min={SCREENSAVER_DURATION_MIN_SEC}
+              max={SCREENSAVER_DURATION_MAX_SEC}
               value={extDuration}
-              onChange={(e) => setExtDuration(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value
+                setExtDuration(value)
+                setExtError(dwellDurationError(value, 'external'))
+              }}
               placeholder="默认 15"
               className="h-10 w-32 rounded-md border border-neutral-300 px-3 text-sm"
             />
+            <p className="mt-1 w-64 text-xs leading-5 text-neutral-500">{dwellLimitHint('external')}</p>
           </div>
-          <Button onClick={handleAddExternal} disabled={extSubmitting || !extUrl.trim()}>
-            {extSubmitting ? '添加中…' : '添加链接'}
-          </Button>
+          <div className="pt-5">
+            <Button onClick={handleAddExternal} disabled={extSubmitting || !extUrl.trim()}>
+              {extSubmitting ? '添加中…' : '添加链接'}
+            </Button>
+          </div>
         </div>
-        {extError && <p className="mt-2 text-sm text-error">{extError}</p>}
+        {extError && <p role="alert" className="mt-2 text-sm text-error">{extError}</p>}
       </Card>
 
       {/* 素材网格 */}
@@ -260,7 +304,7 @@ export function AssetsTab() {
                 <p className="flex items-center gap-2 text-xs text-neutral-500">
                   {a.type === 'video' ? <VideoIcon className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
                   {a.type === 'video' ? '视频' : '图片'} ·{' '}
-                  {a.source === 'external_url' ? '外链' : formatBytes(a.sizeBytes)} · {a.durationSec}s
+                  {a.source === 'external_url' ? '外链' : formatBytes(a.sizeBytes)} · {a.durationSec} 秒
                 </p>
                 {a.source === 'external_url' && a.externalUrl && (
                   <p className="truncate text-xs text-neutral-400" title={a.externalUrl}>

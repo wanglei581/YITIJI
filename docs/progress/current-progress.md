@@ -8,9 +8,28 @@
 - 隐私摘要：用户保留了命中时不再写「没发现需要遮挡的内容」，按真实裁决写「发现 N 处个人信息，你选择了全部保留，原样打印。」或「发现 N 处个人信息，遮挡 M 处，保留 K 处。」
 - 构建闸：一体机、管理员、机构三端的 vite 配置在生产构建时遇到非 production 的 `NODE_ENV` 直接报错；CI 新增 `scripts/verify-prod-react-build.mjs`，三端产物 jsxDEV 必须为 0（自构一份开发版实测会红）。
 - 验证：八组浏览器用例（default、w1–w6、scan-safety）全过；W-118 新用例 7 条；反向变异：去掉检查任务防重、去掉上传会话防重、「全保留仍说没发现」各自必红。
+- 走查 N1（10/4）一并修：保存裁决的接口不回带任务访问凭证，存回交接时补上原凭证；游客从预览「返回材料检查」不再被 403 清掉（会员不受影响）。N4（摘要说没发现）即上面的隐私摘要。
 - 未做（另排）：14 号页主按钮被底栏盖住、走查量出的 9 处留白。
 - 停放、隐藏、改名、降级：无。
 
+## 2026-10-04：管理员后台能力中心，未登记行必须先选状态才能登记（分支 `grok/admin-capability-default-20261004`，未提交）
+
+- **问题：** 「调整为」对未登记行用列表里的 `status` 当初值。缺行在列表里固定是 `not_verified`，下拉显示「未验收」。不改下拉直接点「登记」，会把该项写成关闭。managed 下，未登记的既有能力本来是放行的。
+- **实际生效状态不是 `cap.status`。** 页面「当前状态」由 `capabilityStateView`（`apps/admin/src/routes/print-scan/CapabilityCenter.tsx` 第 76–91 行）根据 `configured` 和默认关闭名单算出：彩色、双面、签名未登记写「未登记 · 默认关闭」；其余未登记写「未登记」，并说明常规设置放行、严格设置关闭。后台读不到服务器用的是哪种设置。服务端判定在 `TerminalCapabilitiesService.assertUserTaskAllowed`（`services/api/src/terminals/terminal-capabilities.service.ts` 第 153–184 行）：没有配置行时，默认关闭名单里的键拒绝；其余键看 `resolvePrintScanCapabilityMode()`（同文件第 44–49 行，`PRINT_SCAN_CAPABILITY_MODE`，managed 放行、strict 拒绝）。彩色 / 双面另走 `assertPrintParamsAllowed`（第 229–234 行），未登记一律拒绝，不受 managed 影响。列表对缺行把 `status` 写成 `not_verified`、`configured: false`（同文件第 77–78 行）。因此不能把「实际生效」可靠映射成下拉里的某一项，按首选做了：未登记不预选。
+- **改法：** 只改管理员后台。未登记行下拉第一项是禁用的「请选择」，初值为空；未选时「登记」禁用，旁边写「请先选择要登记的状态」。已登记行初值仍是已登记状态。签名行的开通确认、关闭必填说明原样保留，没有新加确认框。登记之后回不到未配置，仍等后端清除接口。
+- **验证：** `apps/admin` 下 `node scripts/verify-admin-print-scan-ui.mjs` 退出码 0。反向变异两处（未登记初值改回 `cap.status`；未选时按钮改为 `disabled={saving}`）退出码都是 1，已逐字节还原。`pnpm exec tsc --noEmit` 退出码 0。`pnpm exec eslint src/` 退出码 0（4 条既有 warning 在 `screenView.tsx`，与本次无关）。`node scripts/verify-console-plain-copy.mjs` 退出码 1，失败点是 `ai_quota.release_cap_exceeded` / `ai_quota.released` 没有中文名；把本次三个文件还原到基线后同样失败，不是这次改出来的。仓库根 `node scripts/verify-no-raw-error-render.mjs`、`node scripts/verify-mock-server-contract.mjs` 退出码都是 0。`verify:print-color-duplex-capability` 在本 worktree 缺生成的 Prisma client，先 `prisma generate`，再用临时库 `file:/tmp/cap-verify.db` 跑完后删除，退出码 0。`node scripts/generate-project-graph.mjs` 退出码 0（0 个文件变化）；`npx -y pnpm@11.2.2 graph:check` 退出码 0。浏览器：`node scripts/run-e2e.mjs tests/e2e/print-scan.spec.ts -g "未登记能力必须先选择状态才能登记"` 1 条通过，退出码 0；另在 1280×800 与 390×844 看过「请选择 / 登记禁用 / 提示在按钮旁边」。没有 push，没有提交。
+
+## 2026-10-04：管理员后台「会员权益」可赠送 AI 额度
+
+- 发放表单增加权益种类「AI 额度」。选中后必须选择一项服务（AI 简历、AI 顾问、模拟面试）并填写 1–9999 的整数次数。其它权益不出现这两项，提交时也不带服务字段。
+- 权益记录对 AI 额度显示「AI 额度 · 某服务」，以及服务端返回的总次数、剩余次数和有效期。服务端没有登记的服务显示「未登记的服务」。
+- 页面写明扣减顺序：先用每天的免费次数，用完再扣这里。依据是 `AiQuotaService.reserve`：先增加当日已用次数；当日额度没有扣成、且是会员时，再扣最早到期的有效赠送次数。
+- 服务端校验失败（缺服务、次数越界、非 AI 额度带了服务字段）按错误码给中文提示。mock 模式仍拒绝检索和发放，不假装成功。`scripts/mock-server-contract-bindings.json` 未覆盖该接口，绑定清单未改。
+- 审计中文名补上两条归还动作与对象类型「AI 额度预占记录」，文字与 #1236 逐字一致。发放仍用已有动作。
+- 页面不出现购买、充值、付费、价格，也不把英文键名显示给管理员。
+- 验证：会员权益 Playwright 6 条通过，其中一条覆盖发放表单联动、次数 0 / 10000 / 小数拦截，以及未定位会员时不假装发放成功。`test:admin-state-units` 8 条通过。类型检查、eslint 与文案、合规、原始错误、mock 契约门禁通过。三处反向变异均使对应用例失败，还原后文件与变异前一致。图谱 `--check` 通过。
+
+- 真实流程（本机克隆库，不是生产）：只把「按手机号搜会员」这一个请求换成指定会员（克隆库手机号加密存储，拿不到明文），发放与记录列表都走真实服务端——选「AI 额度 · AI 顾问 · 3 次」提交返回 201，权益记录显示「AI 额度 · AI 顾问」「总次数 3 · 剩余次数 3」；整页没有购买、充值、付费、价格字样与英文键名。管理员浏览器测试 124 条通过。
 ## 2026-10-04：第二次发布清单补上「三个开关各自要同批改的文字」（分支 `claude/release2-switch-texts-1004`，只改文档）
 
 - **改了什么：** `docs/progress/next-tasks.md` 第二次发布「发布前」第 2 条。原来只写了登录那一句，而且写成「协议现在写的是先登录」，与线上不符（线上是「以页面提示为准」）。现在三个开关各列一行：怎么切、打开后的实际行为、哪几句文字要同批改。
@@ -46,6 +65,15 @@
 - **审查中自己撞到的一处：** 去重最初连已裁决的任务也复用，`verify:materials-processing` 与 `verify:pii-redaction` 红（重扫后应是待裁决、不能直接遮挡）；改成只复用没动过的。
 - **CI 首轮拦下的一处：** `verify:document-conversion` 手写的假数据库只有 `findFirst`，闸门改用 `findMany` 后崩溃；给假表补了按文件、种类、状态真实过滤的 `findMany`（本用例本就没有检查任务），原有断言照常通过。
 - **关联门禁** 25 条通过。没有新增表、接口或依赖；小程序、一体机页面没动。
+## 2026-10-04：两个后台第 7 批——告警副标题与宣传屏上传说明
+
+- 告警中心副标题：服务端正文已经含有该终端编号时，不再在前面重复拼；正文没有该编号时，仍把编号拼在前面。服务端原文不改写。标题仍最多两行。
+- 宣传屏「上传素材」旁写明限额，与服务端默认值一致（`services/api/src/content/media-validation.ts`）：图片 JPG、PNG、WebP，不超过 10 MB；视频 MP4、WebM，不超过 100 MB，时长 120 秒以内。类型或大小不合规时就地说明怎么改，不发上传请求；服务端仍做最终校验。这几个限额可用环境变量覆盖，页面写的是默认值（与 `.env.example` 一致）。
+- 素材页两处、终端配置一处的时长框下写清上下限与默认值：图片停留 3–1800 秒、留空默认 8 秒；上传视频停留 3–120 秒、留空默认 15 秒；外链停留 3–1800 秒、留空默认 15 秒；一体机无人操作多久后播放宣传屏 30–1800 秒、留空默认 180 秒。超出范围就地提示，不提交；终端配置不再把超范围的值悄悄夹到边界。
+- 外部视频链接的说明改成白话。HTTPS、iframe、直链只留在悬停「技术说明」。第 5 批「上传前请先看」原文和位置未改。
+- 新增 `apps/admin/src/routes/alerts/alertDetailText.ts`、`apps/admin/src/routes/screensaver/assetUploadRules.ts`、`apps/admin/scripts/verify-console-batch7-copy.mjs`。无删除。
+- 验证：`verify-console-plain-copy`（含新门禁，限额数字直接从服务端源码解析比对）、`verify-service-desk-dashboard-ui`、`verify-feedback-sla`、`verify-console-screen-ui`、`test:admin-state-units`、`verify:compliance-copy`、`verify-mock-server-contract`、admin 类型检查与 eslint 通过；管理员浏览器测试常规 124 条、大屏 160 条通过。反向变异（正文含终端号仍重复拼、放行 .txt、限额数字与服务端不一致、外链说明出现 HTTPS、默认值写错、类型提示改字）都会红。用户可见文字经 agy 挑过一轮后改写。
+
 ## 2026-10-04：两个后台第 6 批——小样本反推修补与审计文案
 
 - 出纸投影统一调用 `suppressAggregateCount`。出纸成功、未出纸、未确认、已结束任一存在小样本时，不给成功率，仅可保留非小样本的已结束数；逐台与原始数合计使用同一规则。终端服务人次、打印扫描次数、出纸成功、已结束、未确认逐列按机构合计已公开保护，必要时补充隐藏最小可见正值（同值取最早），保留零值；合计独立投影，不因逐台隐藏而整列清空。未出纸差值也受列残差保护，可能与公开合计及其它行联立的出纸字段整组补充隐藏。页面、详情与 CSV 明写“样本不足，不显示”。
