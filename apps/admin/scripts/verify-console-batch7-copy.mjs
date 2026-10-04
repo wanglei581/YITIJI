@@ -64,10 +64,10 @@ export function verifyBatch7Copy({ runFile, repoRoot, fail }) {
     const uploadHint = rules.dwellLimitHint('upload')
     const externalHint = rules.dwellLimitHint('external')
     const idleHint = rules.dwellLimitHint('idle')
-    const maxSentence = `最长 ${durationMax} 秒（${durationMax / 60} 分钟），不填用默认值`
-    assert.ok(uploadHint.includes(maxSentence) && uploadHint.includes(`图片 ${imageDefault} 秒`) && uploadHint.includes(`视频 ${videoDefault} 秒`) && uploadHint.includes(`${videoSec} 秒`), '上传时长说明与服务端默认值不一致')
-    assert.ok(externalHint.includes(maxSentence) && externalHint.includes(`（${externalDefault} 秒）`), '外链时长说明与服务端默认值不一致')
-    assert.ok(idleHint.includes(maxSentence) && idleHint.includes(`（${idleDefault} 秒）`), '终端无操作时长说明与服务端默认值不一致')
+    const range = (lo, hi) => `${lo}–${hi} 秒`
+    assert.ok(uploadHint.includes(`图片停留 ${range(durationMin, durationMax)}，留空默认 ${imageDefault} 秒`) && uploadHint.includes(`视频停留 ${range(durationMin, videoSec)}，留空默认 ${videoDefault} 秒`), '上传时长说明与服务端范围 / 默认值不一致')
+    assert.ok(externalHint.includes(range(durationMin, durationMax)) && externalHint.includes(`留空默认 ${externalDefault} 秒`), '外链时长说明与服务端范围 / 默认值不一致')
+    assert.ok(idleHint.includes(range(idleMin, idleMax)) && idleHint.includes(`留空默认 ${idleDefault} 秒`), '终端无操作时长说明与服务端范围 / 默认值不一致')
 
     const exactImage = imageMb * 1024 * 1024
     const exactVideo = videoMb * 1024 * 1024
@@ -81,7 +81,7 @@ export function verifyBatch7Copy({ runFile, repoRoot, fail }) {
       { name: 'notes.txt', type: 'image/png', size: 20 },
     ]) {
       const message = rules.validateScreensaverUploadFile(file)
-      assert.ok(message?.includes('只能选择') && message.includes('JPG、PNG、WebP'), `${file.name}/${file.type} 应被拦住`)
+      assert.ok(message?.includes('不支持这种文件') && message.includes('JPG、PNG、WebP'), `${file.name}/${file.type} 应被拦住`)
     }
     assert.equal(rules.uploadFormError({ name: 'notes.txt', type: 'text/plain', size: 8 }, ''), rules.validateScreensaverUploadFile({ name: 'notes.txt', type: 'text/plain', size: 8 }))
     assert.equal(rules.dwellDurationError('', 'image'), null)

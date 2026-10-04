@@ -60,7 +60,7 @@ test('不合规文件和超长时长不能提交', async ({ page }) => {
   await expect(page.getByText(screensaverUploadLimitText())).toBeVisible()
   await expect(page.getByText(dwellLimitHint('upload'))).toBeVisible()
   await expect(page.getByText(dwellLimitHint('external'))).toBeVisible()
-  const help = page.getByText('只能填视频文件本身的网址', { exact: false })
+  const help = page.getByText('请填写视频文件本身的网址', { exact: false })
   await expect(help).toBeVisible()
   await expect(help).not.toContainText('HTTPS')
   await expect(help).not.toContainText('iframe')
@@ -70,10 +70,10 @@ test('不合规文件和超长时长不能提交', async ({ page }) => {
   await expect(page.getByRole('button', { name: '技术说明' })).toHaveAttribute('title', /直链/)
 
   await page.locator('input[type=file]').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('这不是图片') })
-  await expect(page.getByRole('alert')).toContainText('只能选择 JPG、PNG、WebP 图片，或 MP4、WebM 视频')
+  await expect(page.getByRole('alert')).toContainText('请重新选择 JPG、PNG、WebP 图片，或 MP4、WebM 视频')
   await page.getByPlaceholder('例：就业服务宣传海报').fill('文本不应入库')
   await page.getByRole('button', { name: '上传', exact: true }).click()
-  await expect(page.getByRole('alert')).toContainText('只能选择 JPG、PNG、WebP 图片，或 MP4、WebM 视频')
+  await expect(page.getByRole('alert')).toContainText('请重新选择 JPG、PNG、WebP 图片，或 MP4、WebM 视频')
   await expect(page.getByText('文本不应入库')).toHaveCount(0)
   expect(uploads).toEqual([])
 

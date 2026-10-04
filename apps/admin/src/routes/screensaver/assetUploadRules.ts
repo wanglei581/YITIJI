@@ -21,29 +21,23 @@ export const SCREENSAVER_IDLE_DEFAULT_SEC = 180
 const MB = 1024 * 1024
 
 export const externalVideoHelp =
-  '只能填视频文件本身的网址（以 https:// 开头、以 .mp4 或 .webm 结尾）。网页链接（如 B 站、抖音、优酷的播放页）不能用。链接失效后需要管理员重新填写；本系统不保存第三方账号或密码。'
+  '请填写视频文件本身的网址：以 https:// 开头，以 .mp4 或 .webm 结尾。B 站、抖音、优酷等网站的播放页或分享链接不能用。网址失效后，请在这里重新填写。'
 
 export const externalVideoTechNote =
-  '只接受 HTTPS 视频直链，不支持 iframe 或网页播放页（包括 YouTube）。链接不能带账号密码，也不能指向内网。'
+  '技术要求：须为 HTTPS 地址，指向可直接下载的视频文件（直链），不能是网页播放页或内嵌播放器（iframe）；地址里不能带登录用户名和密码，也不能指向单位内网。'
 
 export function screensaverUploadLimitText(): string {
-  return `JPG、PNG、WebP 图片，不超过 ${SCREENSAVER_IMAGE_MAX_MB} MB；MP4、WebM 视频，不超过 ${SCREENSAVER_VIDEO_MAX_MB} MB、不超过 ${SCREENSAVER_VIDEO_MAX_SEC} 秒。`
-}
-
-function maxSentence(sec: number): string {
-  const minutes = sec / 60
-  const minuteText = Number.isInteger(minutes) ? String(minutes) : String(minutes)
-  return `最长 ${sec} 秒（${minuteText} 分钟），不填用默认值`
+  return `图片：JPG、PNG、WebP，不超过 ${SCREENSAVER_IMAGE_MAX_MB} MB。视频：MP4、WebM，不超过 ${SCREENSAVER_VIDEO_MAX_MB} MB，时长 ${SCREENSAVER_VIDEO_MAX_SEC} 秒以内。`
 }
 
 export function dwellLimitHint(kind: 'upload' | 'external' | 'idle'): string {
   if (kind === 'upload') {
-    return `${maxSentence(SCREENSAVER_DURATION_MAX_SEC)}（图片 ${SCREENSAVER_IMAGE_DEFAULT_SEC} 秒，视频 ${SCREENSAVER_VIDEO_DEFAULT_SEC} 秒）。视频不能超过 ${SCREENSAVER_VIDEO_MAX_SEC} 秒。`
+    return `图片停留 ${SCREENSAVER_DURATION_MIN_SEC}–${SCREENSAVER_DURATION_MAX_SEC} 秒，留空默认 ${SCREENSAVER_IMAGE_DEFAULT_SEC} 秒；视频停留 ${SCREENSAVER_DURATION_MIN_SEC}–${SCREENSAVER_VIDEO_MAX_SEC} 秒，留空默认 ${SCREENSAVER_VIDEO_DEFAULT_SEC} 秒。`
   }
   if (kind === 'external') {
-    return `${maxSentence(SCREENSAVER_DURATION_MAX_SEC)}（${SCREENSAVER_EXTERNAL_DEFAULT_SEC} 秒）。`
+    return `停留 ${SCREENSAVER_DURATION_MIN_SEC}–${SCREENSAVER_DURATION_MAX_SEC} 秒（最长 30 分钟），留空默认 ${SCREENSAVER_EXTERNAL_DEFAULT_SEC} 秒。`
   }
-  return `${maxSentence(SCREENSAVER_IDLE_MAX_SEC)}（${SCREENSAVER_IDLE_DEFAULT_SEC} 秒）。`
+  return `一体机无人操作多久后开始播放宣传屏：${SCREENSAVER_IDLE_MIN_SEC}–${SCREENSAVER_IDLE_MAX_SEC} 秒（30 秒到 30 分钟），留空默认 ${SCREENSAVER_IDLE_DEFAULT_SEC} 秒（3 分钟）。`
 }
 
 function extOf(name: string): string {
@@ -72,11 +66,11 @@ export function validateScreensaverUploadFile(file: { name: string; type: string
   const image = isAllowedImage(mime, ext)
   const video = isAllowedVideo(mime, ext)
   if (!image && !video) {
-    return '这个文件不能上传。只能选择 JPG、PNG、WebP 图片，或 MP4、WebM 视频。'
+    return '不支持这种文件。请重新选择 JPG、PNG、WebP 图片，或 MP4、WebM 视频。'
   }
   const maxMb = image ? SCREENSAVER_IMAGE_MAX_MB : SCREENSAVER_VIDEO_MAX_MB
   if (file.size > maxMb * MB) {
-    return `${image ? '图片' : '视频'}超过 ${maxMb} MB 上限。`
+    return `${image ? '图片' : '视频'}超过 ${maxMb} MB，请压缩后再上传。`
   }
   return null
 }
@@ -84,13 +78,13 @@ export function validateScreensaverUploadFile(file: { name: string; type: string
 export function dwellDurationError(raw: string, kind: 'image' | 'video' | 'external'): string | null {
   const trimmed = raw.trim()
   if (!trimmed) return null
-  if (!/^\d+$/.test(trimmed)) return '停留时长须为整数秒，或留空使用默认值。'
+  if (!/^\d+$/.test(trimmed)) return '停留时长请填整数秒，或留空用默认值。'
   const n = Number(trimmed)
   const max = kind === 'video'
     ? Math.min(SCREENSAVER_VIDEO_MAX_SEC, SCREENSAVER_DURATION_MAX_SEC)
     : SCREENSAVER_DURATION_MAX_SEC
   if (n < SCREENSAVER_DURATION_MIN_SEC || n > max) {
-    return `停留时长须在 ${SCREENSAVER_DURATION_MIN_SEC} 到 ${max} 秒之间。`
+    return `停留时长请填 ${SCREENSAVER_DURATION_MIN_SEC} 到 ${max} 之间的秒数。`
   }
   return null
 }
@@ -110,10 +104,10 @@ export function uploadFormError(
 export function idleTimeoutError(raw: string): string | null {
   const trimmed = raw.trim()
   if (!trimmed) return null
-  if (!/^\d+$/.test(trimmed)) return '无操作时长须为整数秒，或留空使用默认值。'
+  if (!/^\d+$/.test(trimmed)) return '等待时长请填整数秒，或留空用默认值。'
   const n = Number(trimmed)
   if (n < SCREENSAVER_IDLE_MIN_SEC || n > SCREENSAVER_IDLE_MAX_SEC) {
-    return `无操作时长须在 ${SCREENSAVER_IDLE_MIN_SEC} 到 ${SCREENSAVER_IDLE_MAX_SEC} 秒之间。`
+    return `等待时长请填 ${SCREENSAVER_IDLE_MIN_SEC} 到 ${SCREENSAVER_IDLE_MAX_SEC} 之间的秒数。`
   }
   return null
 }

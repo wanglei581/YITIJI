@@ -52,7 +52,7 @@ export function AssetsTab() {
 
   const handleUpload = useCallback(async () => {
     if (!file) {
-      setUploadError('请选择文件并填写标题')
+      setUploadError('请选择要上传的文件')
       return
     }
     const problem = uploadFormError(file, duration)
@@ -61,7 +61,7 @@ export function AssetsTab() {
       return
     }
     if (!title.trim()) {
-      setUploadError('请选择文件并填写标题')
+      setUploadError('请填写标题')
       return
     }
     setUploading(true)
