@@ -57,7 +57,7 @@ export async function verifyUserClosure({ root, pass, fail, presentationModule }
   check(dialog.includes("replace(/\\D/g, '').slice(0, 4)") && dialog.includes('maxLength={4}') && dialog.includes('inputMode="numeric"'), '尾号输入过滤数字且限四位')
   check(dialog.includes('disabled={!memberSourceAvailable}'), '无待处理本人申请禁选对应来源')
   const expected = [
-    ['CLOSURE_PHONE_MISMATCH', '手机尾号与该账号不一致，请向会员本人核对后重填。'],
+    ['CLOSURE_PHONE_MISMATCH', '手机尾号与该账号不一致，请确认是不是这位用户后重填。'],
     ['CLOSURE_REQUEST_REQUIRED', '该会员没有待处理的注销申请。如会员到场办理，请改选「凭线下申请办理」并填写凭据编号。'],
     ['CLOSURE_BLOCKED_BY_OPEN_ORDERS', '该会员还有未完成的订单，暂不能注销。请先处理完下列订单：'],
     ['CLOSURE_IN_PROGRESS', '该账号正在注销中，请稍后刷新查看结果。'],

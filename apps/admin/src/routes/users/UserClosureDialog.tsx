@@ -196,7 +196,7 @@ export function UserClosureDialog({ user, onClose, onSuccess }: { user: AdminUse
                   onChange={(event) => change('phoneLast4', event.target.value.replace(/\D/g, '').slice(0, 4))}
                   className={`${inputCls} mt-1`}
                 />
-                <p className="mt-1 text-xs text-neutral-500">向会员本人核对手机尾号后填写</p>
+                <p className="mt-1 text-xs text-neutral-500">请会员说出手机后四位，用来确认是这位用户、防止点错（不作身份核验）</p>
                 <FieldError message={fields.phoneLast4} />
               </div>
               {input.source === 'offline' && (
@@ -214,7 +214,7 @@ export function UserClosureDialog({ user, onClose, onSuccess }: { user: AdminUse
                     onChange={(event) => change('offlineEvidenceNo', event.target.value)}
                     className={`${inputCls} mt-1`}
                   />
-                  <p className="mt-1 text-xs text-neutral-500">纸质申请单或工单的编号，便于日后核对</p>
+                  <p className="mt-1 text-xs text-neutral-500">纸质申请单或工单的编号。请先在凭据上核对是会员本人。</p>
                   <FieldError message={fields.offlineEvidenceNo} />
                 </div>
               )}
@@ -234,7 +234,7 @@ export function UserClosureDialog({ user, onClose, onSuccess }: { user: AdminUse
               ))}
               <label className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-amber-900">
                 <input type="checkbox" checked={acknowledged} disabled={busy} onChange={(event) => setAcknowledged(event.target.checked)} className="mt-1" />
-                我已核对会员身份，知道注销后不能恢复
+                我已确认是这位用户（线下办理已在凭据上核对本人），知道注销后不能恢复
               </label>
             </>
           )}

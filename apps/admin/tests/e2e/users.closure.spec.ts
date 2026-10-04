@@ -53,7 +53,7 @@ async function confirm(page: Page) {
   await dialog.getByRole('button', { name: '下一步' }).click()
   await expect(dialog.getByRole('heading', { name: '注销后会发生什么' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: '确认注销' })).toBeDisabled()
-  await dialog.getByLabel('我已核对会员身份，知道注销后不能恢复').check()
+  await dialog.getByLabel('我已确认是这位用户（线下办理已在凭据上核对本人），知道注销后不能恢复').check()
   await dialog.getByRole('button', { name: '确认注销' }).click()
   return dialog
 }
@@ -99,7 +99,7 @@ test('无本人申请禁选，线下凭据必填，尾号只收四位数字', as
 test('尾号不符只显示登记中文，不回显正确尾号或完整手机号', async ({ page }) => {
   await setup(page, { code: 'CLOSURE_PHONE_MISMATCH' })
   await fillOffline(page); const dialog = await confirm(page)
-  await expect(dialog.getByRole('alert')).toContainText('手机尾号与该账号不一致，请向会员本人核对后重填。')
+  await expect(dialog.getByRole('alert')).toContainText('手机尾号与该账号不一致，请确认是不是这位用户后重填。')
   await expect(dialog).not.toContainText('9876')
   await expect(dialog).not.toContainText('13800139876')
 })
