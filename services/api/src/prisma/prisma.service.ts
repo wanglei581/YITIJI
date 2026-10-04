@@ -200,6 +200,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // ── BE-1 / BE-2 ────────────────────────────────────────────────────────────
 
+  get storageDeletion() {
+    return this.client.storageDeletion
+  }
+
   get fileObject() {
     return this.client.fileObject
   }
@@ -431,6 +435,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── P1: 用户通知 / 意见反馈 ──────────────────────────────────────────────
+
+  get userNotification() {
+    return this.client.userNotification
+  }
 
   get memberNotification() {
     return this.client.memberNotification
