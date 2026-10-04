@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import vm from 'node:vm'
+import ts from 'typescript'
 
 const layout = readFileSync(new URL('../src/layouts/AdminLayoutWrapper.tsx', import.meta.url), 'utf8')
 const dashboard = ['index.tsx', 'DashboardWidgets.tsx', 'RecentPrintTasks.tsx', 'RecentActivity.tsx', 'dashboardRows.ts', 'DashboardDeviceStatus.tsx'].map((file) => readFileSync(new URL(`../src/routes/dashboard/${file}`, import.meta.url), 'utf8')).join('\n')
@@ -235,6 +237,34 @@ check(
     !/refund/i.test(stripComments(alertsPage) + stripComments(adminOps)),
   'ALERT-TYPES: paid file-unavailable alert says manual handling, no refund action, no signed URL / storageKey / hash',
 )
+
+const alertDetailOutput = ts.transpileModule(
+  readFileSync(new URL('../src/routes/alerts/alertDetailText.ts', import.meta.url), 'utf8'),
+  { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
+).outputText
+const alertDetailModule = { exports: {} }
+vm.runInNewContext(alertDetailOutput, {
+  exports: alertDetailModule.exports,
+  module: alertDetailModule,
+  require() { throw new Error('alertDetailText 不应有依赖') },
+})
+const { alertDetailText } = alertDetailModule.exports
+const containedDetail = '任务 ptask_kiosk_51cddbdaffc80f3a · 终端 WALK-001,失败于 2026-10-04 12:47 · 错误码 PRINTER_ERROR'
+const containedShown = alertDetailText('WALK-001', containedDetail)
+check(
+  containedShown === containedDetail && containedShown.indexOf('WALK-001') === containedShown.lastIndexOf('WALK-001'),
+  '正文已含终端号时不重复拼，也不改写服务端原文',
+)
+const offlineDetail = '最近一次心跳在 12 分钟前(2026-10-04 12:47)'
+check(alertDetailText('WALK-001', offlineDetail) === `WALK-001 · ${offlineDetail}`, '正文不含终端号时照旧拼在前面')
+check(alertDetailText(null, offlineDetail) === offlineDetail && alertDetailText('', offlineDetail) === offlineDetail, '没有终端号时不拼')
+check(
+  alertDetailText('WALK-001', '终端在线，打印机故障，需人工处理') === 'WALK-001 · 终端在线，打印机故障，需人工处理',
+  '正文只有「终端」二字、没有这台机器的编号时仍要拼',
+)
+check(alertsPage.includes('alertDetailText(alert.terminalCode, alert.detail)'), '告警页用 alertDetailText 渲染副标题')
+check(!alertsPage.includes('${alert.terminalCode} · '), '告警页不再无条件把终端号拼进副标题')
+check(alertsPage.includes('line-clamp-2') && alertsPage.includes('title={alert.title}'), '告警标题仍最多两行')
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} verification check(s) failed.`)

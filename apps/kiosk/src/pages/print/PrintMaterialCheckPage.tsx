@@ -39,7 +39,7 @@ import {
   type MaterialCheckStage,
 } from './components/MaterialCheckPresentation'
 import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
-import { manualOriginalPrintCheck } from './printDeskModel'
+import { manualOriginalPrintCheck, shareMaterialChecks } from './printDeskModel'
 import './styles/print-desk-qx.css'
 
 /** 检查途中这一份交接已被替换或失效：迟到的结果一律不写，当场停下。 */
@@ -69,6 +69,14 @@ interface NormalizeA4SummaryView {
 
 function isPendingStatus(task: DocumentProcessTaskView): boolean {
   return task.status === 'pending' || task.status === 'processing'
+}
+
+/**
+ * 保存裁决的接口不回带任务访问凭证；游客全靠这张凭证再读自己的隐私检查任务。
+ * 存回交接时丢了它，返回检查页会被 403 拒、整份办理被清（走查 N1，10/4）。
+ */
+function withAccessToken(task: DocumentProcessTaskView, accessToken: string | undefined): DocumentProcessTaskView {
+  return { ...task, accessToken: task.accessToken ?? accessToken }
 }
 
 async function waitForCompletedTask(
@@ -305,6 +313,7 @@ export function PrintMaterialCheckPage({
       return
     }
 
+    const fileId = file.fileId
     setStage('inspection')
     setError(null)
     setInspectionTask(null)
@@ -314,78 +323,87 @@ export function PrintMaterialCheckPage({
     // 新一轮检查一开始就作废上一轮的检查结论与遮挡结果（fail-closed）：结论只能由本轮 handleContinue 重新写入，
     // 否则检查未完成时直接进 ?step=preview 会凭旧摘要放行。文件、来源与可复用的检查任务保持不变。
     try {
-      persistSession({ materialCheck: undefined, piiRedactTask: undefined })
       const token = getToken()
-      const storedSession = session?.file.fileId === file.fileId ? session : null
-      const storedInspection = storedSession?.inspectionTask
-      let inspection: DocumentProcessTaskView
-      const reusedInspection = storedInspection?.id
-        ? await getMaterialTask(storedInspection.id, { token, accessToken: storedInspection.accessToken })
-            .then((queried) => ({ ...queried, accessToken: queried.accessToken ?? storedInspection.accessToken }))
-        : null
-      if (reusedInspection && !(retry && shouldRecreateOnRetry(reusedInspection, 'inspection'))) {
-        inspection = reusedInspection
-      } else {
-        inspection = await createMaterialTask({
-          kind: 'inspection',
-          sourceFileId: file.fileId,
-          params: { expectedPaperSize: 'A4', source: 'kiosk_print' },
-        }, token)
-      }
-      persistSession({ inspectionTask: inspection })
-      const readyInspection = await waitForCompletedTask(inspection, token, inspection.accessToken)
-      assertTaskReady(readyInspection, '文件体检')
-      const checkedFile = applyDetectedPageCount(file, readyInspection)
-      setInspectionTask(readyInspection)
-      persistSession({ file: checkedFile, inspectionTask: readyInspection })
+      const result = await shareMaterialChecks(JSON.stringify([contextId, file.fileId, token]), async () => {
+        persistSession({ materialCheck: undefined, piiRedactTask: undefined })
+        const storedSession = session?.file.fileId === file.fileId ? session : null
+        const storedInspection = storedSession?.inspectionTask
+        let inspection: DocumentProcessTaskView
+        const reusedInspection = storedInspection?.id
+          ? await getMaterialTask(storedInspection.id, { token, accessToken: storedInspection.accessToken })
+              .then((queried) => ({ ...queried, accessToken: queried.accessToken ?? storedInspection.accessToken }))
+          : null
+        if (reusedInspection && !(retry && shouldRecreateOnRetry(reusedInspection, 'inspection'))) {
+          inspection = reusedInspection
+        } else {
+          inspection = await createMaterialTask({
+            kind: 'inspection',
+            sourceFileId: fileId,
+            params: { expectedPaperSize: 'A4', source: 'kiosk_print' },
+          }, token)
+        }
+        persistSession({ inspectionTask: inspection })
+        const readyInspection = await waitForCompletedTask(inspection, token, inspection.accessToken)
+        assertTaskReady(readyInspection, '文件体检')
+        const checkedFile = applyDetectedPageCount(file, readyInspection)
+        setInspectionTask(readyInspection)
+        persistSession({ file: checkedFile, inspectionTask: readyInspection })
 
-      setStage('normalize_a4')
-      const storedNormalize = storedSession?.normalizeTask
-      let normalize: DocumentProcessTaskView
-      const reusedNormalize = storedNormalize?.id
-        ? await getMaterialTask(storedNormalize.id, { token, accessToken: storedNormalize.accessToken })
-            .then((queried) => ({ ...queried, accessToken: queried.accessToken ?? storedNormalize.accessToken }))
-        : null
-      if (reusedNormalize && !(retry && shouldRecreateOnRetry(reusedNormalize, 'normalize_a4'))) {
-        normalize = reusedNormalize
-      } else {
-        normalize = await createMaterialTask({
-          kind: 'normalize_a4',
-          sourceFileId: file.fileId,
-          params: { targetPaperSize: 'A4', source: 'kiosk_print' },
-        }, token)
-      }
-      persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: normalize })
-      const readyNormalize = await waitForCompletedTask(normalize, token, normalize.accessToken)
-      assertTaskReady(readyNormalize, 'A4 规范化评估')
-      setNormalizeTask(readyNormalize)
-      persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize })
+        setStage('normalize_a4')
+        const storedNormalize = storedSession?.normalizeTask
+        let normalize: DocumentProcessTaskView
+        const reusedNormalize = storedNormalize?.id
+          ? await getMaterialTask(storedNormalize.id, { token, accessToken: storedNormalize.accessToken })
+              .then((queried) => ({ ...queried, accessToken: queried.accessToken ?? storedNormalize.accessToken }))
+          : null
+        if (reusedNormalize && !(retry && shouldRecreateOnRetry(reusedNormalize, 'normalize_a4'))) {
+          normalize = reusedNormalize
+        } else {
+          normalize = await createMaterialTask({
+            kind: 'normalize_a4',
+            sourceFileId: fileId,
+            params: { targetPaperSize: 'A4', source: 'kiosk_print' },
+          }, token)
+        }
+        persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: normalize })
+        const readyNormalize = await waitForCompletedTask(normalize, token, normalize.accessToken)
+        assertTaskReady(readyNormalize, 'A4 规范化评估')
+        setNormalizeTask(readyNormalize)
+        persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize })
 
-      setStage('pii_scan')
-      const storedPii = storedSession?.piiTask
-      let pii: DocumentProcessTaskView
-      const reusedPii = storedPii?.id
-        ? await getMaterialTask(storedPii.id, { token, accessToken: storedPii.accessToken })
-            .then((queried) => ({ ...queried, accessToken: queried.accessToken ?? storedPii.accessToken }))
-        : null
-      if (reusedPii && !(retry && shouldRecreateOnRetry(reusedPii, 'pii_scan'))) {
-        pii = reusedPii
-      } else {
-        pii = await createMaterialTask({
-          kind: 'pii_scan',
-          sourceFileId: file.fileId,
-          params: {
-            scanScope: 'print_preview',
-            ...(session?.contentCategory ? { contentCategory: session.contentCategory } : {}),
-          },
-        }, token)
-      }
-      persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize, piiTask: pii })
-      const readyPii = await waitForCompletedTask(pii, token, pii.accessToken)
-      assertTaskReady(readyPii, '隐私检查')
-      setPiiTask(readyPii)
-      setDecisions(Object.fromEntries((readyPii.piiFindings ?? []).map((finding) => [finding.id, finding.action])))
-      persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize, piiTask: readyPii })
+        setStage('pii_scan')
+        const storedPii = storedSession?.piiTask
+        let pii: DocumentProcessTaskView
+        const reusedPii = storedPii?.id
+          ? await getMaterialTask(storedPii.id, { token, accessToken: storedPii.accessToken })
+              .then((queried) => ({ ...queried, accessToken: queried.accessToken ?? storedPii.accessToken }))
+          : null
+        if (reusedPii && !(retry && shouldRecreateOnRetry(reusedPii, 'pii_scan'))) {
+          pii = reusedPii
+        } else {
+          pii = await createMaterialTask({
+            kind: 'pii_scan',
+            sourceFileId: fileId,
+            params: {
+              scanScope: 'print_preview',
+              ...(session?.contentCategory ? { contentCategory: session.contentCategory } : {}),
+            },
+          }, token)
+        }
+        persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize, piiTask: pii })
+        const readyPii = await waitForCompletedTask(pii, token, pii.accessToken)
+        assertTaskReady(readyPii, '隐私检查')
+        setPiiTask(readyPii)
+        setDecisions(Object.fromEntries((readyPii.piiFindings ?? []).map((finding) => [finding.id, finding.action])))
+        const checkedSession = persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize, piiTask: readyPii })
+        return { inspection: readyInspection, normalize: readyNormalize, pii: readyPii, session: checkedSession }
+      })
+      // 每个订阅者都接住结果：原组件卸载后，新挂载的页面不能停在检查中。
+      setSession(result.session)
+      setInspectionTask(result.inspection)
+      setNormalizeTask(result.normalize)
+      setPiiTask(result.pii)
+      setDecisions(Object.fromEntries((result.pii.piiFindings ?? []).map((finding) => [finding.id, finding.action])))
       setStage('review')
     } catch (err) {
       if (err instanceof PrintHandoffGoneError) {
@@ -430,10 +448,10 @@ export function PrintMaterialCheckPage({
     try {
       const token = getToken()
       const decidedTask = findings.length > 0
-        ? await decidePiiFindings(piiTask.id, findings.map((finding) => ({
+        ? withAccessToken(await decidePiiFindings(piiTask.id, findings.map((finding) => ({
             findingId: finding.id,
             action: decisions[finding.id] as PiiFindingDecisionAction,
-          })), { token, accessToken: piiTask.accessToken })
+          })), { token, accessToken: piiTask.accessToken }), piiTask.accessToken)
         : piiTask
       const latestFindings = decidedTask.piiFindings ?? findings
       const materialCheck = manualOriginalPrintCheck({
@@ -488,7 +506,7 @@ export function PrintMaterialCheckPage({
         action: decisions[finding.id] as PiiFindingDecisionAction,
       }))
       const decidedTask = findings.length > 0
-        ? await decidePiiFindings(piiTask.id, payload, { token, accessToken: piiTask.accessToken })
+        ? withAccessToken(await decidePiiFindings(piiTask.id, payload, { token, accessToken: piiTask.accessToken }), piiTask.accessToken)
         : piiTask
       const latestFindings = decidedTask.piiFindings ?? findings
       const latestDecisions = Object.fromEntries(latestFindings.map((finding) => [finding.id, finding.action]))

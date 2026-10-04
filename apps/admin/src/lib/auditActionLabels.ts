@@ -18,6 +18,8 @@ const ACTION_LABELS: Record<string, string> = {
   'advisor.run': '执行 AI 顾问任务',
   'advisor.session_create': '新建顾问会话',
   'advisor_session.cleanup_expired': '清理过期顾问会话',
+  'ai_quota.released': 'AI 调用失败，退回已预占的额度',
+  'ai_quota.release_cap_exceeded': 'AI 调用失败，当日退回次数已达上限，不再退回额度',
   'ai.access_switch_changed': '修改 AI 使用开关',
   'ai.access_switch_failed': '修改 AI 使用开关失败',
   'ai.content_blocked': 'AI 内容安全拦截',
@@ -331,6 +333,7 @@ const ROLE_LABELS: Record<string, string> = {
 const TARGET_LABELS: Record<string, string> = {
   auth: '登录',
   EndUser: '用户',
+  AiQuotaReservation: 'AI 额度预占记录',
   order: '订单',
   ai_resume_result: 'AI 简历结果',
   job_ai_session: '岗位 AI 会话',

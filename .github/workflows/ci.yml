@@ -334,6 +334,10 @@ jobs:
           pnpm --filter @ai-job-print/partner build
           pnpm --filter terminal-agent build
 
+      - name: Production builds are not React development builds
+        # 10/4 W-118：走查栈用 NODE_ENV=development 构出了 React 开发版，StrictMode 把挂载副作用执行两遍，造出成对请求的假象。
+        run: pnpm verify:prod-react-build
+
       - name: Release provenance fixture
         # 仅验证临时 release/artifact 目录与 fake PM2/health；不得连接任何环境。
         run: pnpm --filter @ai-job-print/api verify:release-provenance
