@@ -48,6 +48,7 @@
     "verify:sms-budget": "node -r @swc-node/register scripts/verify-sms-budget.ts",
     "verify:sms-egress-limits": "node -r @swc-node/register scripts/verify-sms-egress-limits.ts",
     "verify:member-sms-provider-errors": "node -r @swc-node/register scripts/verify-member-sms-provider-errors.ts",
+    "verify:personal-data-retention": "node -r @swc-node/register scripts/verify-personal-data-retention.ts",
     "verify:member-closure": "node -r @swc-node/register scripts/verify-member-closure.ts --http",
     "verify:member-auth": "node -r @swc-node/register scripts/verify-member-auth.ts",
     "verify:member-account-status": "node -r @swc-node/register scripts/verify-member-account-status.ts",
