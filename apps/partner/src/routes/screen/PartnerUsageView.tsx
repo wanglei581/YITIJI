@@ -1,3 +1,4 @@
+import { formatDate } from '@ai-job-print/shared'
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
 import {
@@ -50,10 +51,10 @@ const SUBTITLE = '数字孪生 · 信息使用'
 const POLL_SECONDS = 60
 const RANGES: ReadonlyArray<{ key: ScreenUsageRange; label: string }> = [
   { key: 'today', label: '今日' },
-  { key: '7d', label: '近 7 天' },
-  { key: '30d', label: '近 30 天' },
+  { key: '7d', label: '近 7 天（截至昨天）' },
+  { key: '30d', label: '近 30 天（截至昨天）' },
 ]
-const RANGE_LABEL: Record<ScreenUsageRange, string> = { today: '今日', '7d': '近 7 天', '30d': '近 30 天' }
+const RANGE_LABEL: Record<ScreenUsageRange, string> = { today: '今日', '7d': '近 7 天（截至昨天）', '30d': '近 30 天（截至昨天）' }
 const TYPE_ORDER: readonly ScreenContentType[] = ['job', 'job_fair', 'policy', 'company_profile']
 const TYPE_LABEL: Record<ScreenContentType, string> = { job: '岗位信息', job_fair: '招聘会', policy: '政策公告', company_profile: '企业资料' }
 const TYPE_TAG: Record<ScreenContentType, string> = { job: '岗位', job_fair: '招聘会', policy: '政策', company_profile: '企业' }
@@ -179,6 +180,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
       subtitle={`${SUBTITLE} · ${rangeText}`}
       layout="city"
       toolbar={toolbar}
+      reportingWindowText={usage.data.range === 'today' ? undefined : `${formatDate(usage.data.window.from)} 至 ${formatDate(new Date(Date.parse(usage.data.window.to) - 1).toISOString())}（截至昨天）`}
       meta={usageMeta(usage.data)}
       pollSeconds={POLL_SECONDS}
       failure={usage.failure}

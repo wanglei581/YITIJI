@@ -94,7 +94,7 @@
           <view class="divider" wx:if="{{expireTime}}"></view>
           <view class="info-row">
             <text class="info-label">状态</text>
-            <text class="info-val">取件 {{pickupStatus}}{{paidOrder ? ' · 付款 ' + payStatus : ''}} · 任务 {{taskStatus}}</text>
+            <text class="info-val">{{statusDetail}}</text>
           </view>
         </view>
       </view>
@@ -124,8 +124,8 @@
         </view>
       </view>
 
-      <view class="compliance-note">{{onsiteNotice}}</view>
-      <view class="compliance-note">{{noCancelNotice}}</view>
+      <view class="compliance-note">{{paidOrder ? onsiteNotice : onsiteNoticeFree}}</view>
+      <view class="compliance-note">{{paidOrder ? noCancelNotice : noCancelNoticeFree}}</view>
       <view class="compliance-note">到机码只在本页向本人显示，不会保存在本机，也不随链接或分享传出去。</view>
 
       <view class="spacer-lg"></view>

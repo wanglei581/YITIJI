@@ -19,7 +19,7 @@ export function ResumePricingBar(props: {
   if (props.pricing.mode === 'free') {
     return (
       <p className="qx-rd-price" data-tone="ok" role="status">
-        {props.pricing.label || FREE_PRICING_COPY}
+        {FREE_PRICING_COPY}
       </p>
     )
   }

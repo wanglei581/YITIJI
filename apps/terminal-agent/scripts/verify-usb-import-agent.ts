@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
 import http from 'node:http'
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startQrLoginLocalServer } from '../src/local-api/qr-login-server'
 import {
   MAX_USB_FILE_BYTES,
   consumeUsbFile,
+  consumeUsbFileOutcome,
   enumerateDriveFiles,
   getUsbStatus,
   refreshUsbFileList,
@@ -206,7 +207,45 @@ async function verifyUsbFilesUnit(): Promise<void> {
     assert.deepEqual(noDrive, { present: false, driveLabel: null, files: [] })
     assert.deepEqual(await getUsbStatus(() => null), { present: false, driveLabel: null })
 
-    console.log('PASS usb-files.ts unit checks (enumeration whitelist / hidden filter / one-time safeId / size re-check)')
+    // 读的那一下失败（Windows Defender 实时防护拦截可疑文件时 readFileSync 抛错）：
+    // 要报 unreadable（让用户换文件），不能报 expired（会诱导「刷新后再点同一个」反复失败）；日志不得带文件名。
+    resetUsbRegistryForTest()
+    writeFileSync(join(dir, 'blocked-张三简历.pdf'), '%PDF-1.4 looks fine')
+    const blockedList = await refreshUsbFileList(driveProvider, hiddenNamesProvider)
+    const blocked = blockedList.files.find((f) => f.filename === 'blocked-张三简历.pdf')
+    assert.ok(blocked, 'blocked fixture must be listed')
+    // logger 直接写 process.stdout / stderr，不经过 console，所以在流上拦截。
+    const logged: string[] = []
+    const originalStdout = process.stdout.write.bind(process.stdout)
+    const originalStderr = process.stderr.write.bind(process.stderr)
+    const capture = ((chunk: unknown) => { logged.push(String(chunk)); return true }) as typeof process.stdout.write
+    process.stdout.write = capture
+    process.stderr.write = capture
+    let blockedOutcome
+    try {
+      blockedOutcome = consumeUsbFileOutcome(blocked!.safeId, (path) => {
+        const error = new Error(`UNKNOWN: unknown error, open '${path}'`) as NodeJS.ErrnoException
+        error.code = 'UNKNOWN'
+        throw error
+      })
+    } finally {
+      process.stdout.write = originalStdout
+      process.stderr.write = originalStderr
+    }
+    assert.deepEqual(blockedOutcome, { ok: false, reason: 'unreadable' }, 'a read blocked by antivirus must be reported as unreadable, not expired')
+    assert.ok(logged.some((line) => line.includes('usb: failed to read file') && line.includes('code=UNKNOWN')), `read failure must still be logged with its error code\n${logged.join('\n')}`)
+    assert.ok(logged.every((line) => !line.includes('张三') && !line.includes('blocked-')), `read failure log must not carry the original filename or path (AGT-07)\n${logged.join('\n')}`)
+
+    // 列出之后文件被隔离删除（Defender 隔离 EICAR 的常见表现）：同样是 unreadable。
+    writeFileSync(join(dir, 'quarantined.pdf'), '%PDF-1.4 to be removed')
+    const quarantineList = await refreshUsbFileList(driveProvider, hiddenNamesProvider)
+    const quarantined = quarantineList.files.find((f) => f.filename === 'quarantined.pdf')
+    assert.ok(quarantined, 'quarantine fixture must be listed')
+    unlinkSync(join(dir, 'quarantined.pdf'))
+    assert.deepEqual(consumeUsbFileOutcome(quarantined!.safeId), { ok: false, reason: 'unreadable' }, 'a file removed after listing must be unreadable')
+    assert.deepEqual(consumeUsbFileOutcome(quarantined!.safeId), { ok: false, reason: 'expired' }, 'the same safeId used again is expired (one-time)')
+
+    console.log('PASS usb-files.ts unit checks (enumeration whitelist / hidden filter / one-time safeId / size re-check / unreadable vs expired)')
   } finally {
     resetUsbRegistryForTest()
     rmSync(dir, { recursive: true, force: true })
@@ -402,6 +441,23 @@ async function verifyLocalHttpRoutes(): Promise<void> {
       )
       assert.equal(replay.status, 410)
       assert.equal(replay.json.error.code, 'LOCAL_USB_FILE_EXPIRED')
+
+      // 列出后被隔离删除的文件：422 LOCAL_USB_FILE_UNREADABLE，提示换文件，不转发给后端。
+      writeFileSync(join(dir, 'gone.pdf'), '%PDF-1.4 gone')
+      const goneList = await refreshUsbFileList(() => ({ rootPath: dir, label: 'UPLOAD-TEST' }), () => new Set())
+      const gone = goneList.files.find((f) => f.filename === 'gone.pdf')
+      assert.ok(gone, 'gone fixture must be listed')
+      unlinkSync(join(dir, 'gone.pdf'))
+      const forwardedBefore = backend.records.length
+      const unreadable = await callJson<{ success: false; error: { code: string; message: string } }>(
+        `${localBase}/local/usb/upload`,
+        'POST',
+        { origin: ALLOWED_ORIGIN, bridgeToken: BRIDGE_TOKEN, body: { safeId: gone!.safeId } },
+      )
+      assert.equal(unreadable.status, 422)
+      assert.equal(unreadable.json.error.code, 'LOCAL_USB_FILE_UNREADABLE')
+      assert.equal(unreadable.json.error.message, '这个文件读不了，请换一个文件')
+      assert.equal(backend.records.length, forwardedBefore, 'an unreadable file must not be forwarded to the backend')
     } finally {
       resetUsbRegistryForTest()
       rmSync(dir, { recursive: true, force: true })

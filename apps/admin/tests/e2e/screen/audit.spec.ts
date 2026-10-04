@@ -10,7 +10,7 @@ const record: AuditLogRecord = {
   targetType: 'EndUser', targetId: 'cmu_target_654321', ipAddress: '::ffff:127.0.0.1',
   requestId: 'request-id-with-a-long-value', userAgent: 'browser-fixture-with-a-long-value',
   createdAt: '2026-09-30T04:00:00Z',
-  payloadJson: JSON.stringify({ reason: '核对账号', nested: [{ password: 'plain-secret', phone: '13912345678', email: 'test@example.com', token: 'plain-token' }], unknown_key: '保留未知值', cacheKey: '缓存原值', apiKey: 'api-key-secret', embedded: JSON.stringify({ password: 'embedded-secret', hotel: '可见酒店' }), url: 'https://example.com/file?Signature=url-secret', sections: ['summary', 'stats', 'recent_activity'] }),
+  payloadJson: JSON.stringify({ reason: '核对账号', nested: [{ password: 'plain-secret', phone: '13912345678', email: 'test@example.com', token: 'plain-token' }], unknown_key: '保留未知值', second_unknown: '第二个未知值', cacheKey: '缓存原值', apiKey: 'api-key-secret', embedded: JSON.stringify({ password: 'embedded-secret', hotel: '可见酒店' }), url: 'https://example.com/file?Signature=url-secret', sections: ['summary', 'stats', 'recent_activity'] }),
 }
 
 async function setup(page: import('@playwright/test').Page, items = [record]) {
@@ -45,6 +45,9 @@ test('六列中文列表、尾号与悬停原值；长字段与递归脱敏在�
   await expect(drawer).toContainText('原因')
   await expect(drawer).toContainText('核对账号')
   await expect(drawer).toContainText('unknown_key')
+  await expect(drawer.locator('dt').filter({ hasText: 'unknown_key' })).toHaveText('未登记字段 · unknown_key')
+  await expect(drawer.locator('dt').filter({ hasText: 'second_unknown' })).toHaveText('未登记字段 · second_unknown')
+  await expect(drawer).toContainText('第二个未知值')
   await expect(drawer).toContainText('保留未知值')
   await expect(drawer).toContainText('cacheKey')
   await expect(drawer).toContainText('缓存原值')
