@@ -279,6 +279,27 @@ async function verifyExcelPreviewRules(): Promise<void> {
     'NEW,岗位C,公司,青岛,https://example.com/c\n' +
     'BAD,岗位D,公司,青岛,httpfoo\n',
   )
+  // H2-2：中文文件名经 multipart 上传，multer 按 latin1 解码；控制器必须还原成 UTF-8 再交给导入记录。
+  {
+    const { JobsController } = await import('../src/jobs/jobs.controller')
+    const seen: string[] = []
+    const capture = {
+      previewExcelImport: async (input: { fileName: string }) => { seen.push(input.fileName); return {} },
+      parseExcelColumns: async (_buffer: Buffer, fileName: string) => { seen.push(fileName); return {} },
+    }
+    const controller = new (JobsController as unknown as new (...args: unknown[]) => {
+      previewExcel(...args: unknown[]): Promise<unknown>; parseExcel(...args: unknown[]): Promise<unknown>
+    })(capture, {}, {}, {}, {}, {}, {})
+    const mangled = Buffer.from('崂山区招聘会岗位表.xlsx', 'utf8').toString('latin1')
+    const upload = { buffer: Buffer.from('x'), originalname: mangled }
+    await controller.parseExcel(upload)
+    await controller.previewExcel(upload, 'src-h22', 'job', '{}', { userId: 'p', role: 'partner', orgId: 'o' })
+    if (seen[0] !== '崂山区招聘会岗位表.xlsx' || seen[1] !== '崂山区招聘会岗位表.xlsx') {
+      throw new Error(`H2-2 中文文件名没有还原：${JSON.stringify(seen)}`)
+    }
+    console.log('  ✅ H2-2 Excel 解析与预览把 multipart 中文文件名还原成 UTF-8')
+  }
+
   const jobPreview = await service.previewExcelImport({
     buffer: jobCsv,
     fileName: 'jobs.csv',
