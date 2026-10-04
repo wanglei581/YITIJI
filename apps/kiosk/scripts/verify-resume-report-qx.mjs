@@ -50,7 +50,7 @@ assert(has(files.scores, '每维一句人话'), 'each dimension has a human sent
 assert(has(files.body, '这不是录取分'), 'page states this is not an admission score')
 assert(has(files.page, 'truncatedInput'), 'truncation banner is wired')
 assert(has(files.page, 'image_ocr'), 'OCR banner is gated on real OCR source')
-assert(has(files.body, '不求和') && has(files.body, '不出总分'), 'empty or any report does not invent a total score')
+assert(has(files.body, '不求和') && has(files.states, '不出总分') && has(files.body, '<ResumeReportStates viewState="report-empty" />'), 'empty or any report does not invent a total score')
 assert(has(files.page, 'res.targetContext'), 'refresh recovers targetContext from the server record')
 assert(!has(all, '报告导出端点上线后开放'), 'placeholder export-unavailable reason is gone')
 assert(has(files.takeaway, 'aria-disabled'), 'export actions use aria-disabled, not native disabled')

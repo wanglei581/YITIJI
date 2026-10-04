@@ -20391,6 +20391,9 @@
       "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
@@ -20429,6 +20432,7 @@
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportChrome.tsx": [
@@ -20518,6 +20522,9 @@
     ],
     "apps/kiosk/src/pages/resume/resume-optimize-qx.css": [
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resume-r1-qx2.css": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-report-fixture.ts": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
@@ -30836,6 +30843,7 @@
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeExportResult.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts",
@@ -30845,8 +30853,10 @@
           "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
+          "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
           "apps/kiosk/src/pages/resume/resume-triage-qx.css",
           "apps/kiosk/src/services/api/ai.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",

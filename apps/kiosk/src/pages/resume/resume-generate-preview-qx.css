@@ -172,7 +172,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  min-height: 168px;
+  min-height: 300px;
   padding: 16px;
   border: 1px solid var(--qx-line-2);
   border-radius: 18px;
@@ -302,3 +302,31 @@
     transition: none !important;
   }
 }
+
+/* 导出各态采用最终稿的流程 / 结果 / 后续操作结构，按内容排，不把空卡拉到底。 */
+.qx-rg-process { display: grid; gap: 8px; margin-top: 18px; padding: 24px; border-radius: 22px; background: var(--qx-deep); color: var(--qx-paper); }
+.qx-rg-process b { font-size: var(--qx-fs-body-lg); }
+.qx-rg-process span { font-size: var(--qx-fs-body); }
+.qx-rg-export-steps { display: grid; gap: 18px; padding: 0; margin: 22px 0; list-style: none; }
+.qx-rg-export-steps li { display: flex; align-items: center; gap: 16px; padding: 22px; border: 1px solid var(--qx-line); border-radius: 20px; background: var(--qx-paper); }
+.qx-rg-export-steps li[data-phase='done'] { background: var(--qx-teal-soft); }
+.qx-rg-export-steps li[data-phase='now'] { border-color: var(--qx-teal-d); background: var(--qx-surface); }
+.qx-rg-export-steps i { font-style: normal; color: var(--qx-teal-d); }
+.qx-rg-export-steps span { flex: 1; }
+.qx-rg-export-steps small { display: block; margin-top: 6px; font-size: var(--qx-fs-aux); color: var(--qx-ink-2); }
+.qx-rg-export-steps em { font-style: normal; font-size: var(--qx-fs-aux); color: var(--qx-ink-3); }
+.qx-rg-next h2 { margin: 0 0 16px; font-size: var(--qx-fs-sec); }
+.qx-rg-next .qx-row { min-height: 104px; }
+.qx-rg-export-facts { display: grid; grid-template-columns: 1fr 1fr; margin-top: 18px; border: 1px solid var(--qx-line); border-radius: 18px; overflow: hidden; }
+.qx-rg-export-facts div { padding: 18px; border: 1px solid var(--qx-line); }
+.qx-rg-export-facts span { display: block; margin-top: 6px; font-size: var(--qx-fs-body); color: var(--qx-ink-2); }
+.qx-rg-synthetic-take { display: grid; grid-template-columns: 260px 1fr; gap: 18px; margin-top: 22px; }
+.qx-rg-synthetic-take > div { padding: 24px; border: 1px solid var(--qx-line); border-radius: 20px; background: var(--qx-paper); }
+.qx-rg-synthetic-take b { font-size: var(--qx-fs-body-lg); }
+@media (max-width: 760px) {
+  .qx-rg-synthetic-take, .qx-rg-export-facts { grid-template-columns: 1fr; }
+  .qx-rg-export-steps li { padding: 14px; gap: 10px; }
+}
+
+.qx-rg-export[data-export-screen='export-failed'] > .qx-card:first-child { background: var(--qx-cinnabar-soft); border-color: var(--qx-cinnabar-line); }
+@media (max-width: 760px) { .qx-rg-fmt { min-height: 168px; } }
