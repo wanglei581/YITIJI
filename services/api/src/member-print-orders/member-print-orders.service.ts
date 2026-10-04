@@ -206,6 +206,7 @@ export class MemberPrintOrdersService {
         order: {
           select: {
             id: true,
+            orderNo: true,
             // 任务上没记终端时用订单上的终端兜底显示网点名。
             terminalId: true,
             amountCents: true,
@@ -252,6 +253,7 @@ export class MemberPrintOrdersService {
         pageRange: params.pageRange,
         // 单件订单经 Order.printTaskId 关联本任务；材料包子任务才在 PrintTask.orderId 上。
         orderId: r.order?.id ?? r.orderId ?? null,
+        orderNo: r.order?.orderNo ?? null,
         terminal: terminal ? { id: terminal.id, displayName: terminal.displayName ?? null, locationLabel: terminal.locationLabel ?? null } : null,
         failureCode: r.status === 'failed' && r.errorCode && MEMBER_VISIBLE_FAILURE_CODES.has(r.errorCode) ? r.errorCode : null,
         ...memberOrderPaymentFields(r.order),

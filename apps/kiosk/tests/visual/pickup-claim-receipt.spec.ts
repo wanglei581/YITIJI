@@ -37,6 +37,8 @@ for (const scenario of [
     await page.getByLabel('到机码输入框').fill('28491703')
     await expect(page.getByTestId('arrival-code-state-network-error')).toBeVisible()
     await expect(page.getByText('订单核验成功', { exact: true })).toHaveCount(0)
+    await expect(page.getByLabel('到机码输入框')).toHaveValue('')
+    await expect(page.locator('.pcp-codebox')).not.toContainText(/[0-9A-Z]/)
     await page.getByRole('button', { name: '重试校验' }).click()
     await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
     expect(claims).toBe(2)
@@ -75,6 +77,9 @@ for (const printerCode of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']
     await expect(page.getByRole('alert')).toContainText(message)
     // 输入框清空：扫码枪再扫不会接在旧码后面拼出错码；「重试校验」用失败时记下的原码重发。
     await expect(page.getByLabel('到机码输入框')).toHaveValue('')
+    // W-117：公共终端上被拒的码不得继续回显；重试仍应提交同一码。
+    await expect(page.locator('.pcp-codebox')).not.toContainText(/[0-9A-Z]/)
+    await expect(page.locator('body')).not.toContainText('28491703')
     await page.getByRole('button', { name: '重试校验' }).click()
     await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
     expect(submitted).toEqual(['28491703', '28491703'])

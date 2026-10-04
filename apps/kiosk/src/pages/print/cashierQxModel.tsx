@@ -156,11 +156,11 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
       }
     case 'free-order':
       return {
-        kind: 'info', icon: <CheckCircle2Icon aria-hidden="true" />, title: '本次无需付款',
+        kind: 'info', icon: <CheckCircle2Icon aria-hidden="true" />, title: '免费试运营',
         paras: ['订单已经创建，可以直接开始打印。'],
-        chips: [['ok', '订单已建立'], [undefined, '免费试运营'], [undefined, '本次未收款']],
-        rows: [['收款情况', '免费试运营 · 本次未收款'], ['下一步', '开始打印']],
-        ask: [<>这一单<em>不用付款</em>。</>, <>下一步的实际价格为 0。<b>订单已经建好了</b>，我只负责把任务交给打印机。</>],
+        chips: [['ok', '订单已建立'], [undefined, '免费试运营']],
+        rows: [['办理方式', '免费试运营'], ['下一步', '开始打印']],
+        ask: [<>这一单<em>免费试运营</em>。</>, <>确认后可以开始打印。<b>订单已经建好了</b>，我只负责把任务交给打印机。</>],
       }
     case 'channel-loading':
       return {
@@ -263,14 +263,14 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'release-failed':
       return c.free
         ? {
-            kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '本次无需付款，打印任务尚未建立',
+            kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '免费试运营，打印任务尚未建立',
             paras: [
-              <>订单已经创建，<b>本机没有向你收过钱</b>，只是这次创建打印任务没有完成。</>,
-              <>重试只会重新创建同一个打印任务，<b>不会发起收款，也不会另开新订单</b>。</>,
+              <>订单已经创建，只是这次<b>创建打印任务没有完成</b>。</>,
+              <>重试只会重新创建同一个打印任务，<b>不会另开新订单</b>。</>,
             ],
             chips: [['ok', '订单已建立'], [undefined, '免费试运营'], ['warn', '打印任务待恢复']],
-            rows: [['收款情况', '免费试运营 · 本次未收款'], ['打印任务', '尚未建立']],
-            ask: [<>这一单<em>免费试运营</em>，任务没建成。</>, '本次未收款。这里只重试创建同一打印任务，不会向你收款。'],
+            rows: [['办理方式', '免费试运营'], ['打印任务', '尚未建立']],
+            ask: [<>这一单<em>免费试运营</em>，任务没建成。</>, '这里只重试创建同一打印任务，订单记录保留。'],
           }
         : {
             kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '付款已确认，打印任务尚未建立',
@@ -383,12 +383,12 @@ export function cashierQxPill(state: CashierQxState, opts: { locked: boolean; fr
   label: string
 } {
   if (opts.locked && (state === 'pending' || state === 'channel-selected')) return { tone: 'warn', label: '重新出码 · 沿用本单金额' }
-  if (state === 'release-failed' && opts.free) return { tone: 'warn', label: '无需付款 · 打印任务待恢复' }
+  if (state === 'release-failed' && opts.free) return { tone: 'warn', label: '免费试运营 · 打印任务待恢复' }
   if (state === 'channel-selected' && opts.single) return { tone: 'unknown', label: '唯一可用通道 · 请选择扫码方式' }
   const PILL: Record<CashierQxState, readonly ['ok' | 'warn' | 'bad' | 'unknown', string]> = {
     'no-order': ['warn', '没有待支付的订单'],
     'session-expired': ['warn', '支付这次办理已过期'],
-    'free-order': ['ok', '无需付款 · 订单已建立'],
+    'free-order': ['ok', '免费试运营 · 订单已建立'],
     'channel-loading': ['unknown', '正在读取支付通道'],
     'channel-empty': ['bad', '未启用任何支付通道'],
     'channel-failed': ['bad', '支付通道读取失败'],
@@ -428,7 +428,8 @@ export const INSTRUMENT_STATES: ReadonlySet<CashierQxState> = new Set([
 export const PICKERS_ENABLED: ReadonlySet<CashierQxState> = new Set(['pending', 'channel-selected', 'pending-scan'])
 /** 没有通道可摆时，两格各换成一句说明（稿 32 picker-note）；不摆假按钮。 */
 export function pickerNote(state: CashierQxState, free: boolean, channelCount: number): readonly [string, string] | null {
-  if (free || state === 'no-order' || state === 'session-expired') return ['本次不涉及付款', '本次不需要扫码']
+  if (free) return ['免费试运营', '按下方按钮继续']
+  if (state === 'no-order' || state === 'session-expired') return ['本次不涉及付款', '本次不需要扫码']
   if (state === 'channel-loading') return ['正在读取本机可用的支付通道', '读到通道后才能选择']
   if (state === 'channel-failed') return ['暂时读不到本机可用的支付通道', '没有可用支付通道，暂不能扫码']
   if (state === 'channel-empty') return ['本机未启用任何支付通道', '没有可用支付通道，暂不能扫码']
