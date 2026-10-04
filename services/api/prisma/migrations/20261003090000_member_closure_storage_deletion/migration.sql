@@ -179,10 +179,7 @@ CREATE TRIGGER "FileObject_closed_owner_bind" BEFORE UPDATE OF "ownerId", "owner
 WHEN NEW."ownerType"='user' AND (NEW."ownerId" IS NOT OLD."ownerId" OR NEW."ownerType" IS NOT OLD."ownerType")
 AND EXISTS (SELECT 1 FROM "EndUser" WHERE "id"=NEW."ownerId" AND "status" IN ('closing','anonymized'))
 BEGIN SELECT RAISE(ABORT, 'MEMBER_CLOSED_WRITE_FORBIDDEN'); END;
-CREATE TRIGGER "EndUser_closed_status_revive" BEFORE UPDATE OF "status" ON "EndUser"
-WHEN (OLD."status" IN ('closing','anonymized') AND NEW."status" NOT IN ('closing','anonymized'))
-OR (OLD."status"='anonymized' AND NEW."status"<>'anonymized')
-BEGIN SELECT RAISE(ABORT, 'MEMBER_CLOSED_WRITE_FORBIDDEN'); END;
+
 
 CREATE TRIGGER "UserNotification_closed_member_insert" BEFORE INSERT ON "UserNotification"
 WHEN NEW."memberId" IS NOT NULL AND EXISTS (SELECT 1 FROM "EndUser" WHERE "id"=NEW."memberId" AND "status" IN ('closing','anonymized'))

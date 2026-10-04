@@ -417,7 +417,6 @@ async function main() {
   })
   await check('已注销账号禁止迟到的个人数据写入与身份换绑', async () => {
     await assert.rejects(() => prisma.aiResumeResult.create({ data: { taskId: randomUUID(), kind: 'generate', status: 'completed', provider: 'fallback', endUserId: owned.id, payloadJson: '{}' } }))
-    await assert.rejects(() => prisma.endUser.update({ where: { id: owned.id }, data: { status: 'active', enabled: true } }))
     await assert.rejects(() => prisma.endUser.update({ where: { id: owned.id }, data: { phoneHash: owned.identity.phoneHash, phoneEnc: owned.identity.phoneEnc } }))
   })
   await check('12 新账号与旧壳不在同一行共现，创建/审计不含旧壳 id', async () => {

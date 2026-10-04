@@ -22537,6 +22537,9 @@
     "services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
       "services/api/scripts/verify-ai-usage-retention.ts"
     ],
+    "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql": [
+      "services/api/scripts/verify-http-exception-filter.ts"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
@@ -25600,6 +25603,7 @@
       "services/api/scripts/verify-member-closure.ts"
     ],
     "services/api/src/member-privacy/member-closure.service.ts": [
+      "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-member-closure.ts"
     ],
     "services/api/src/member-privacy/member-data-export-download.service.ts": [
@@ -36391,6 +36395,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql",
           "services/api/src/common/filters/http-exception.filter.ts"
         ],
         "missing": []
@@ -36700,6 +36705,7 @@
           "services/api/src/job-applications/job-applications.controller.ts",
           "services/api/src/job-applications/job-applications.module.ts",
           "services/api/src/job-applications/job-applications.service.ts",
+          "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],

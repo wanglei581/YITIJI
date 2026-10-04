@@ -221,17 +221,24 @@ export class MemberAuthService {
     source: LegalConsentSource
     ipAddress?: string
   }): Promise<void> {
-    await this.prisma.memberLegalConsent.create({
-      data: {
-        endUserId: input.endUserId,
-        termsVersion: input.termsVersion,
-        privacyVersion: input.privacyVersion,
-        termsDocVersionId: input.termsDocVersionId,
-        privacyDocVersionId: input.privacyDocVersionId,
-        source: input.source,
-        ipAddress: input.ipAddress ?? null,
-      },
-    })
+    try {
+      await this.prisma.memberLegalConsent.create({
+        data: {
+          endUserId: input.endUserId,
+          termsVersion: input.termsVersion,
+          privacyVersion: input.privacyVersion,
+          termsDocVersionId: input.termsDocVersionId,
+          privacyDocVersionId: input.privacyDocVersionId,
+          source: input.source,
+          ipAddress: input.ipAddress ?? null,
+        },
+      })
+    } catch (error) {
+      // 账号已进入注销：数据库拒绝再往它名下写同意记录（迟到写入防线）。按登录入口同一口径答「账号不可用」，
+      // 不把数据库错误原样抛出去。
+      if (String((error as { message?: unknown } | null)?.message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')) throw this.accountUnavailable()
+      throw error
+    }
   }
 
   /** 原子消费短信验证码并创建/更新 EndUser；不签发 token，供 QR 确认阶段使用。 */
