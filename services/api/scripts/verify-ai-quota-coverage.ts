@@ -65,6 +65,10 @@ import { TrtcController } from '../src/trtc/trtc.controller'
 import { TrtcService } from '../src/trtc/trtc.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
+// 招聘内容托管开关显式写死为生产口径（关闭）。本门禁只核计次登记与计次语义，开、关两种状态本机都跑过；
+// 不写会被 verify:recruitment-hosting-gate-declares 判违规（它引用了受开关影响的模块）。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+
 type Proto = object
 type Ctor = { name: string; prototype: Proto }
 type Status = 'wired' | 'exempt' | 'q2b' | 'pending'
