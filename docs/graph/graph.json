@@ -12052,7 +12052,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 230,
+      "reachableFileCount": 231,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12815,7 +12815,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 255
+      "sourceFileCount": 256
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -17897,6 +17897,9 @@
     "apps/admin/scripts/verify-console-batch5-copy.mjs": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
+    "apps/admin/scripts/verify-console-batch6-copy.mjs": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/scripts/verify-console-privacy-copy.mjs": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
@@ -17962,14 +17965,16 @@
     ],
     "apps/admin/src/routes/ai-services/aiLogDisplay.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
-      "apps/admin/scripts/verify-console-batch5-copy.mjs"
+      "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-batch6-copy.mjs"
     ],
     "apps/admin/src/routes/ai-services/aiOperationLabels.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/aiUsageDisplay.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
-      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs",
+      "apps/admin/scripts/verify-console-batch6-copy.mjs"
     ],
     "apps/admin/src/routes/ai-services/index.tsx": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
@@ -17984,6 +17989,9 @@
       "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
     "apps/admin/src/routes/audit/auditColumns.tsx": [
+      "apps/admin/scripts/verify-console-privacy-copy.mjs"
+    ],
+    "apps/admin/src/routes/audit/auditPayloadLabels.ts": [
       "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
     "apps/admin/src/routes/audit/auditPresentation.ts": [
@@ -18279,7 +18287,8 @@
       "apps/admin/scripts/verify-console-screen-details.mjs"
     ],
     "apps/admin/src/routes/screen/UsageView.tsx": [
-      "apps/admin/scripts/verify-console-screen-details.mjs"
+      "apps/admin/scripts/verify-console-screen-details.mjs",
+      "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/admin/src/routes/screen/aiScreenDisplay.ts": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs"
@@ -21311,6 +21320,7 @@
       "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
     ],
     "apps/partner/src/lib/csv.ts": [
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
@@ -21439,6 +21449,7 @@
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx": [
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
@@ -21450,6 +21461,7 @@
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs"
     ],
     "apps/partner/src/routes/terminals/terminalOpsFormat.ts": [
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
       "scripts/verify-datetime-honesty.mjs"
@@ -21955,6 +21967,7 @@
       "services/api/scripts/verify-ai-cost-ui-coverage.ts"
     ],
     "packages/shared/src/formatDateTime.ts": [
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/partner/scripts/verify-partner-terminal-ops-honesty.mjs",
       "scripts/verify-datetime-honesty.mjs"
@@ -22162,6 +22175,7 @@
     ],
     "packages/ui/src/screen/twin/TwinCharts.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "packages/ui/src/screen/twin/TwinFrame.tsx": [
@@ -22178,6 +22192,7 @@
     ],
     "packages/ui/src/screen/twin/TwinTerminalBoard.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
@@ -22218,6 +22233,9 @@
     "packages/ui/src/theme/visualTheme.ts": [
       "packages/ui/scripts/verify-fusion-youth-foundation.mjs",
       "packages/ui/scripts/verify-service-desk-foundation.mjs"
+    ],
+    "scripts/audit-action-codes.mjs": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "scripts/ci-gate-exemptions.json": [
       "scripts/verify-ci-gate-coverage.mjs"
@@ -22464,6 +22482,18 @@
     ],
     "services/api/scripts/check-resume-optimize-live.ts": [
       "services/api/scripts/verify-resume-optimize-live-gate.ts"
+    ],
+    "services/api/scripts/console-screen-printed-visits-cases-04.ts": [
+      "services/api/scripts/verify-console-screen-printed-visits.ts"
+    ],
+    "services/api/scripts/console-screen-snapshot-cases-18.ts": [
+      "services/api/scripts/verify-console-screen-snapshot.ts"
+    ],
+    "services/api/scripts/console-screen-usage-cases-01.ts": [
+      "services/api/scripts/verify-partner-stats-contract.ts"
+    ],
+    "services/api/scripts/console-screen-usage-cases-07.ts": [
+      "services/api/scripts/verify-console-screen-usage.ts"
     ],
     "services/api/scripts/d2-release-fixture.mjs": [
       "services/api/scripts/d2-docker-drill.mjs",
@@ -27229,12 +27259,36 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/ai-services/aiLogDisplay.ts",
+          "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
+          "apps/partner/src/lib/csv.ts",
+          "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
+          "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
+          "packages/shared/src/formatDateTime.ts",
+          "packages/ui/src/screen/twin/TwinCharts.tsx",
+          "packages/ui/src/screen/twin/TwinTerminalBoard.tsx"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-console-batch6-copy.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/admin",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "apps",
           "apps/admin/src/routes"
         ],
         "files": [
           "apps/admin/scripts/verify-console-batch5-copy.mjs",
+          "apps/admin/scripts/verify-console-batch6-copy.mjs",
           "apps/admin/scripts/verify-console-privacy-copy.mjs",
           "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/lib/printErrorText.ts",
@@ -27272,6 +27326,7 @@
           "packages/shared/src/formatNumber.ts",
           "packages/shared/src/types/admin.ts",
           "packages/ui/package.json",
+          "scripts/audit-action-codes.mjs",
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/audit/audit.types.ts"
         ],
@@ -27293,6 +27348,7 @@
         "files": [
           "apps/admin/src/routes/audit/AuditDetailDrawer.tsx",
           "apps/admin/src/routes/audit/auditColumns.tsx",
+          "apps/admin/src/routes/audit/auditPayloadLabels.ts",
           "apps/admin/src/routes/audit/auditPresentation.ts",
           "apps/admin/src/routes/audit/index.tsx",
           "apps/admin/src/routes/partners/ContentTrustCell.tsx",
@@ -27308,9 +27364,7 @@
           "apps/partner/src/routes/profile/index.tsx",
           "packages/shared/src/types/partner.ts"
         ],
-        "missing": [
-          "apps/admin/src/routes/audit/auditPayloadLabels.ts"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-console-privacy-copy.mjs",
       "helper": true,
@@ -27359,6 +27413,7 @@
           "apps/admin/package.json",
           "apps/admin/scripts/verify-console-screen-details.mjs",
           "apps/admin/src/routes/screen/GovGrid.tsx",
+          "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/admin/src/routes/screen/index.tsx",
           "apps/admin/src/routes/screen/screenMeta.ts",
           "apps/admin/src/routes/screen/screenView.tsx",
@@ -32212,6 +32267,20 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/audit-action-codes.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "docs/graph"
         ],
@@ -35010,7 +35079,9 @@
       "asserts": {
         "absent": [],
         "dirs": [],
-        "files": [],
+        "files": [
+          "services/api/scripts/console-screen-printed-visits-cases-04.ts"
+        ],
         "missing": []
       },
       "file": "services/api/scripts/verify-console-screen-printed-visits.ts",
@@ -35026,7 +35097,9 @@
       "asserts": {
         "absent": [],
         "dirs": [],
-        "files": [],
+        "files": [
+          "services/api/scripts/console-screen-snapshot-cases-18.ts"
+        ],
         "missing": []
       },
       "file": "services/api/scripts/verify-console-screen-snapshot.ts",
@@ -35042,7 +35115,9 @@
       "asserts": {
         "absent": [],
         "dirs": [],
-        "files": [],
+        "files": [
+          "services/api/scripts/console-screen-usage-cases-07.ts"
+        ],
         "missing": []
       },
       "file": "services/api/scripts/verify-console-screen-usage.ts",
@@ -38738,6 +38813,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/console-screen-usage-cases-01.ts",
           "services/api/scripts/support/partner-terminal-ops-cases.ts",
           "services/api/src/orgs/partner-stats.controller.ts",
           "services/api/src/orgs/partner-stats.service.ts",

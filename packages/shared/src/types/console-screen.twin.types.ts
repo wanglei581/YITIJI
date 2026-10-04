@@ -1,6 +1,6 @@
 import type { ScreenMetric, ScreenAudience, ScreenFleetHealth, SCREEN_ONLINE_WINDOW_SECONDS } from './consoleScreen'
 
-export type ScreenTimelineState = 'idle' | 'printing' | 'alert' | 'offline' | 'unknown'
+export type ScreenTimelineState = 'idle' | 'alert' | 'offline' | 'unknown'
 
 export interface ScreenTerminalTwin {
   generatedAt: string
@@ -39,9 +39,7 @@ export interface ScreenTerminalTwin {
     visits: ScreenMetric<number>
   }
   consumables: ScreenMetric<{ paper: string | null; toner: string | null }>
-  /** 近 24 小时打印段样本不足，已撤掉逐单覆盖。 */
-  timelinePrintingSuppressed: boolean
-  /** 分钟精度；达到阈值的短打印可为 from===to 的位置标记，不虚增持续时间。 */
+  /** 分钟精度的可用性状态带；打印时段并入心跳在线空闲，不返回逐单边界。 */
   timeline24h: ScreenMetric<Array<{ from: string; to: string; state: ScreenTimelineState }>>
 }
 

@@ -36,9 +36,8 @@ export interface TwinTerminalTwinLike {
   /** 服务端对 1–4 的计数给 null（少于 5 不显示），0 仍给 0。 */
   today: { printPages: number | null; printTasks: number | null; scans: number | null; failed: number | null; visits: ScreenMetricLike<number> }
   consumables: ScreenMetricLike<{ paper: string | null; toner: string | null }>
-  /** 近 24 小时打印段样本不足，已撤掉逐单覆盖。 */
-  timelinePrintingSuppressed: boolean
-  timeline24h: ScreenMetricLike<Array<{ from: string; to: string; state: 'idle' | 'printing' | 'alert' | 'offline' | 'unknown' }>>
+  /** 分钟精度的心跳可用性；不表达打印时段。 */
+  timeline24h: ScreenMetricLike<Array<{ from: string; to: string; state: 'idle' | 'alert' | 'offline' | 'unknown' }>>
 }
 
 export interface TwinTerminalBoardProps {
@@ -214,19 +213,19 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
           title="24 小时状态"
           sub="近 24 小时 · 至现在"
           metric={twin.timeline24h}
-          source={`由终端心跳与打印任务推导：心跳后 ${twin.status.onlineWindowSeconds} 秒内算在线，缺口算离线，打印机异常心跳算告警。`}
+          source={`由终端心跳推导：心跳后 ${twin.status.onlineWindowSeconds} 秒内算在线，缺口算离线，打印机异常心跳算告警。`}
           render={(segments) => (
             <>
-              <TwinTimeline segments={twin.timelinePrintingSuppressed ? segments.filter((segment) => segment.state !== 'printing') : segments} ticks={timelineTicks(twin, formatClock)} />
+              <TwinTimeline segments={segments} ticks={timelineTicks(twin, formatClock)} />
               <TwinLegend
                 items={[
                   { state: 'ok', label: '在线空闲' },
-                  { state: 'pr', label: '打印中' },
                   { state: 'wa', label: '告警' },
                   { state: 'off', label: '离线' },
+                  { state: 'un', label: '未上报' },
                 ]}
               />
-              {twin.timelinePrintingSuppressed && <p className="twin-cap">打印时段因样本少未单独标出</p>}
+              <p className="twin-cap">打印时段不在状态带上单独标出，今日打印单数见上方。</p>
               <p className="twin-cap twin-push">纸盒、碳粉余量需 Windows Agent 上报后显示；接入前不估算。</p>
             </>
           )}

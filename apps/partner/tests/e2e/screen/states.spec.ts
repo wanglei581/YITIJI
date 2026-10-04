@@ -313,25 +313,25 @@ test('终端孪生：机构打印失败提示联系平台运营', async ({ page 
 })
 
 
-test('第六批：少样本状态带无打印色块、有说明；达到阈值照常画', async ({ page }) => {
-  let hidden = true
+test('第六批：任何打印单数下状态带无打印色块及图例，固定说明保留', async ({ page }) => {
+  let count = 0
   const twin = (id: string) => {
     const base = partnerTwin(id)
     if (!base) return base
-    base.timelinePrintingSuppressed = hidden
-    base.today.printTasks = hidden ? null : 5
-    // 残留打印段检验前端兜底；非隐藏态使用相同段确认绘制分支还在。
-    base.timeline24h = { available: true, source: 'TerminalHeartbeat+PrintTask', window: '24h', value: [{ from: '2026-10-03T04:00Z', to: '2026-10-04T04:00Z', state: 'printing' }] }
+    base.today.printTasks = count > 0 && count < 5 ? null : count
+    // 专门注入旧版本打印段，验证兼容响应也只表达在线空闲。
+    base.timeline24h = { available: true, source: 'TerminalHeartbeat', window: '24h', value: [{ from: '2026-10-03T04:00Z', to: '2026-10-04T04:00Z', state: 'printing' }] } as unknown as typeof base.timeline24h
     return base
   }
   await serve(page, partnerApi({ twin }))
   await open(page, '/screen/terminal?id=t-hz-zd-01')
   const band = page.getByRole('img', { name: '近 24 小时状态', exact: true })
-  await expect(band).toBeVisible()
-  await expect(page.getByText('打印时段因样本少未单独标出', { exact: true })).toBeVisible()
-  expect(await band.locator('div').evaluateAll((nodes) => nodes.filter((n) => getComputedStyle(n).backgroundColor === 'rgb(114, 214, 255)').length)).toBe(0)
-  hidden = false
-  await page.reload()
-  await expect(band.locator('div').first()).toHaveCSS('background-color', 'rgb(114, 214, 255)')
-  await expect(page.getByText('打印时段因样本少未单独标出', { exact: true })).toHaveCount(0)
+  for (count of [0, 3, 4, 5, 12]) {
+    if (count !== 0) await page.reload()
+    await expect(band).toBeVisible()
+    const status = panel(page, /^24 小时状态$/)
+    await expect(status).toContainText('打印时段不在状态带上单独标出，今日打印单数见上方。')
+    await expect(status.locator('.twin-legend')).not.toContainText('打印中')
+    expect(await band.locator('div').evaluateAll((nodes) => nodes.filter((n) => getComputedStyle(n).backgroundColor === 'rgb(114, 214, 255)').length)).toBe(0)
+  }
 })

@@ -181,7 +181,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
           title="使用时段热力"
           sub="近 7 天 · 每小时"
           metric={u.heat7d}
-          source="近 7 个上海自然日，按小时统计已记录的服务调用（AI、打印、扫描、会员浏览、外跳、收藏）。1 至 4 次的格子用虚线；0 照常显示。"
+          source="近 7 个上海自然日，按小时统计已记录的服务调用（AI、打印、扫描、会员浏览、外跳、收藏）。不足 5 次的时段不写数字；合计可能反推时另有时段不写数字。"
           render={(value) => (
             <>
               <TwinHeat
@@ -193,7 +193,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                 }))}
               />
               <p className="twin-cap twin-push">
-                {value.peakHour === null ? '样本不足，暂不标高峰' : `高峰在 ${value.peakHour}–${value.peakHour + 1} 时`}；虚线格为 1 至 4 次或尚未到来
+                {value.peakHour === null ? '样本不足，暂不标高峰' : `高峰在 ${value.peakHour}–${value.peakHour + 1} 时`}；不足 5 次的时段不写数字
               </p>
             </>
           )}
@@ -295,7 +295,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
           title="实时调用脉冲"
           sub="近 2 小时 · 每 5 分钟汇总 · 不含个人明细"
           metric={u.pulse2h}
-          source="每 5 分钟汇总一次信息浏览、AI 调用、打印扫描的次数；1 至 4 次的段不画；0 照常显示。只有汇总，不滚动任何一次个人操作。"
+          source="每 5 分钟汇总一次信息浏览、AI 调用、打印扫描的次数；不足 5 次的时段不写数字。只有汇总，不滚动任何一次个人操作。"
           render={(value) => {
             const last = value.buckets[value.buckets.length - 1]
             const first = value.buckets[0]
@@ -304,9 +304,9 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                 <div style={{ width: 200, flex: 'none' }}>
                   <span className="twin-muted">最近 5 分钟</span>
                   <div className="twin-legend" style={{ marginTop: 6 }}>
-                    <span className="twin-lg" style={{ color: '#8fb2ee' }}>信息 {last ? twinSmall(last.info) : '—'}</span>
-                    <span className="twin-lg" style={{ color: '#2ee6a8' }}>AI {last ? twinSmall(last.ai) : '—'}</span>
-                    <span className="twin-lg" style={{ color: '#72d6ff' }}>打印 {last ? twinSmall(last.print) : '—'}</span>
+                    <span className="twin-lg" style={{ color: '#8fb2ee' }}>信息 {last?.info == null ? '—' : screenCount(last.info)}</span>
+                    <span className="twin-lg" style={{ color: '#2ee6a8' }}>AI {last?.ai == null ? '—' : screenCount(last.ai)}</span>
+                    <span className="twin-lg" style={{ color: '#72d6ff' }}>打印 {last?.print == null ? '—' : screenCount(last.print)}</span>
                   </div>
                 </div>
                 <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -315,6 +315,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                     <span>{first ? formatTime(first.start) : ''}</span>
                     <span>现在</span>
                   </div>
+                  <p className="twin-cap">不足 5 次的时段不写数字</p>
                 </div>
               </div>
             )

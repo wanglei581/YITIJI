@@ -436,7 +436,7 @@ export function partnerTwin(id: string): ScreenTerminalTwin | null {
   const now = Date.now()
   const printing = cell.activity === 'printing'
   const printerState = cell.health === 'offline' ? 'offline' : cell.health === 'unknown' ? 'unknown' : cell.health === 'degraded' ? 'error' : printing ? 'printing' : 'ready'
-  const seg = (fromH: number, toH: number, state: 'idle' | 'printing' | 'alert' | 'offline' | 'unknown') => ({
+  const seg = (fromH: number, toH: number, state: 'idle' | 'alert' | 'offline' | 'unknown') => ({
     from: new Date(now - fromH * 3600_000).toISOString().slice(0, 16) + 'Z',
     to: new Date(now - toH * 3600_000).toISOString().slice(0, 16) + 'Z',
     state,
@@ -463,8 +463,7 @@ export function partnerTwin(id: string): ScreenTerminalTwin | null {
     currentTask: ok('PrintTask.status', 'current', printing ? { pages: 6, colorMode: 'bw', startedAt: new Date(now - 30_000).toISOString().slice(0, 16) + 'Z' } : null),
     today: { printPages: 22, printTasks: null, scans: null, failed: 0, visits: na('KioskSession.startedAt', 'shanghai-day', 'sample_below_threshold') },
     consumables: na('TerminalHeartbeat', 'current', 'no_consumable_or_geo_fields'),
-    timelinePrintingSuppressed: true,
-    timeline24h: ok('TerminalHeartbeat+PrintTask', '24h', [
+    timeline24h: ok('TerminalHeartbeat', '24h', [
       seg(24, 15, 'offline'),
       seg(15, 2, 'idle'),
 

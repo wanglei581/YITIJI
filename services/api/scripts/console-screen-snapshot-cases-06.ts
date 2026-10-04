@@ -53,9 +53,9 @@ const rowCapTimeline = deriveTerminalTimeline({
     heartbeatRowCapExceeded: true,
   })
 assert(
-    '2q. printing 盖在心跳上；缺纸标 alert；没有心跳是 unknown；超上限整段不可用',
+    '2q. 打印不改变心跳可用性；缺纸标 alert；没有心跳是 unknown；超上限整段不可用',
     printedTimeline.ok
-      && printedTimeline.printingSuppressed && !printedTimeline.segments.some((segment) => segment.state === 'printing')
+      && !printedTimeline.segments.some((segment) => String(segment.state) === 'printing')
       && alertTimeline.ok
       && alertTimeline.segments.some((segment) => segment.state === 'alert')
       && !alertTimeline.segments.some((segment) => segment.state === 'idle')

@@ -113,7 +113,7 @@ assert(
 const heat = opened(admin.metrics.heat7d)
 const todayHeat = heat?.days.find((day) => day.date === '2026-01-15')
 assert(
-      'u18. 热力是上海自然日的 24 小时：0 保留，1–4 和未到的钟点为 null',
+      'u18. 热力是上海自然日的 24 小时：0 与 1–4 同为 null，未来为 null',
       heat?.days.length === 7
         && heat.days[0]?.date === '2026-01-09'
         && heat.days[6]?.date === '2026-01-15'
@@ -139,8 +139,8 @@ assert(
         && pulse.buckets[0]?.start === '2026-01-15T00:10:00.000Z'
         && pulse.buckets[23]?.start === '2026-01-15T02:05:00.000Z'
         && pulse.buckets[0].ai === null
-        && pulse.buckets[0].info === 0
-        && pulse.buckets[0].print === 0
+        && pulse.buckets[0].info === null
+        && pulse.buckets[0].print === null
         && pulse.buckets[23].ai !== null
         && pulse.buckets[23].info !== null
         && pulse.buckets[23].print !== null,

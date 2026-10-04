@@ -145,7 +145,7 @@ export function terminalTwin(id: string): ScreenTerminalTwin | null {
   const cell = cityCells().find((c) => c.terminalId === id)
   if (!cell) return null
   const now = Date.now()
-  const seg = (fromH: number, toH: number, state: 'idle' | 'printing' | 'alert' | 'offline' | 'unknown') => ({
+  const seg = (fromH: number, toH: number, state: 'idle' | 'alert' | 'offline' | 'unknown') => ({
     from: new Date(now - fromH * 3600_000).toISOString().slice(0, 16) + 'Z',
     to: new Date(now - toH * 3600_000).toISOString().slice(0, 16) + 'Z',
     state,
@@ -174,17 +174,16 @@ export function terminalTwin(id: string): ScreenTerminalTwin | null {
     currentTask: ok('PrintTask.status', 'current', printing ? { pages: 12, colorMode: 'bw', startedAt: new Date(now - 40_000).toISOString().slice(0, 16) + 'Z' } : null),
     today: { printPages: 36, printTasks: 18, scans: null, failed: null, visits: na('KioskSession.startedAt', 'shanghai-day', 'sample_below_threshold') },
     consumables: na('TerminalHeartbeat', 'current', 'no_consumable_or_geo_fields'),
-    timelinePrintingSuppressed: true,
-    timeline24h: ok('TerminalHeartbeat+PrintTask', '24h', [
+    timeline24h: ok('TerminalHeartbeat', '24h', [
       seg(24, 17, 'offline'),
       seg(17, 9.5, 'idle'),
-      seg(9.5, 9.2, 'printing'),
+      seg(9.5, 9.2, 'idle'),
       seg(9.2, 7, 'idle'),
       seg(7, 6.7, 'alert'),
       seg(6.7, 3, 'idle'),
-      seg(3, 2.8, 'printing'),
+      seg(3, 2.8, 'idle'),
       seg(2.8, 0.02, 'idle'),
-      seg(0.02, 0, printing ? 'printing' : 'idle'),
+      seg(0.02, 0, 'idle'),
     ]),
   }
 }

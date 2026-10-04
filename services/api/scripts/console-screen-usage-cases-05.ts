@@ -4,6 +4,7 @@ import { PartnerUsageController } from '../src/console-screen/console-screen.usa
 import { loadUsageTimeline } from '../src/console-screen/console-screen.usage.queries'
 import { assert, opened } from './console-screen-usage-cases-01'
 import { assertBehaviorPhase2 } from './console-screen-usage-cases-04'
+import { verifyResidualService } from './support/console-screen-residual-privacy'
 import { NOW, TODAY_START, PHONE, FILE_NAME, IP_SECRET, APP_COMPANY, FAVORITE_SNAPSHOT, carryContext, assertSmallSampleFloor, assertHttp } from './console-screen-usage-cases-07'
 import { verifyClosedWindows } from './support/console-screen-closed-window-cases'
 import { ForbiddenException } from '@nestjs/common'
@@ -195,6 +196,7 @@ await assertSmallSampleFloor({
       prisma, usage, cache, memberId, terminalId: termLeak, fileUrl, suffix,
     })
 await verifyClosedWindows(assert, prisma)
+await verifyResidualService(assert, prisma)
 if (process.env['VERIFY_SKIP_HTTP'] !== '1') await assertHttp(prisma, { adminId, userA, userB, userBlank, orgA })
 return carryContext(context, {  })
 }

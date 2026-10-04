@@ -92,14 +92,14 @@ assertSourceContractPhase2(phase1)
 
 
 export function deriveTerminalTimelineQuadratic(input: TimelineSample): TimelineDeriveResult {
-  if (input.heartbeatRowCapExceeded || input.printRowCapExceeded) {
+  if (input.heartbeatRowCapExceeded) {
     return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded }
   }
   const nowMs = input.now.getTime()
   const windowStart = nowMs - 24 * 60 * 60 * 1000
   const onlineWindowMs = input.onlineWindowMs ?? SCREEN_ONLINE_WINDOW_SECONDS * 1000
   const segmentCap = input.segmentCap ?? TIMELINE_SEGMENT_CAP
-  const rank: Record<ScreenTimelineState, number> = { unknown: 0, offline: 1, idle: 2, alert: 3, printing: 4 }
+  const rank: Record<ScreenTimelineState, number> = { unknown: 0, offline: 1, idle: 2, alert: 3 }
   const heartbeats = input.heartbeats
     .filter((row) => row.at instanceof Date && Number.isFinite(row.at.getTime()) && row.at.getTime() <= nowMs)
     .sort((a, b) => a.at.getTime() - b.at.getTime())
@@ -136,23 +136,8 @@ export function deriveTerminalTimelineQuadratic(input: TimelineSample): Timeline
     const alert = Boolean(status) && status !== 'unknown' && status !== 'low_paper' && !isHealthyPrinterStatus(status)
     segments = overlay(segments, from, to, alert ? 'alert' : 'idle')
   }
-  for (const print of input.prints) {
-    if (!(print.from instanceof Date) || !(print.to instanceof Date)) continue
-    segments = overlay(
-      segments,
-      Math.max(print.from.getTime(), windowStart),
-      Math.min(print.to.getTime(), nowMs),
-      'printing',
-    )
-  }
-  const printingCount = segments.filter((seg, i) => seg.state === 'printing' && segments[i - 1]?.state !== 'printing').length
-  const printingSuppressed = printingCount > 0 && printingCount < 5
-  if (printingSuppressed) {
-    const base = deriveTerminalTimelineQuadratic({ ...input, prints: [] })
-    return base.ok ? { ...base, printingSuppressed: true } : base
-  }
   segments = segments.map((seg) => ({ ...seg, from: Math.floor(seg.from / 60000) * 60000, to: Math.floor(seg.to / 60000) * 60000 }))
-  const sorted = segments.filter((seg) => seg.to > seg.from || (seg.state === 'printing' && seg.to === seg.from)).sort((a, b) => a.from - b.from || a.to - b.to)
+  const sorted = segments.filter((seg) => seg.to > seg.from).sort((a, b) => a.from - b.from || a.to - b.to)
   const merged: Seg[] = []
   for (const seg of sorted) {
     const last = merged[merged.length - 1]
@@ -162,7 +147,6 @@ export function deriveTerminalTimelineQuadratic(input: TimelineSample): Timeline
   if (merged.length > segmentCap) return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded }
   return {
     ok: true,
-    printingSuppressed,
     segments: merged.map((seg) => ({
       from: new Date(seg.from).toISOString().slice(0, 16) + 'Z',
       to: new Date(seg.to).toISOString().slice(0, 16) + 'Z',

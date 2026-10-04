@@ -51,14 +51,13 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 断言了不存在的路径（7）
+## 断言了不存在的路径（6）
 
 门禁里写着某个仓库路径，但该路径在 git 里不存在。可能是文件被移动/删除后门禁
 没跟着改 —— 这类断言往往已经恒真或恒假，需要人确认。
 
 | 门禁脚本 | 找不到的路径 |
 | --- | --- |
-| `apps/admin/scripts/verify-console-privacy-copy.mjs` | `apps/admin/src/routes/audit/auditPayloadLabels.ts` |
 | `apps/kiosk/scripts/verify-data-request-ui.mjs` | `apps/admin/src/routes/member-privacy/index.tsx`<br/>`apps/admin/src/services/api/memberPrivacyAdmin.ts` |
 | `apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs` | `src/pages/resume/ResumeExportPage.tsx` |
 | `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs` | `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs` |
@@ -70,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1817 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1824 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -167,7 +166,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/scripts/</code> — 8 个文件</summary>
+<summary><code>apps/admin/scripts/</code> — 9 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -176,6 +175,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/scripts/verify-admin-ai-usage-contract.mjs` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/scripts/verify-admin-ai-usage-render.mjs` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/scripts/verify-console-batch5-copy.mjs` | `verify-console-plain-copy.mjs` |
+| `apps/admin/scripts/verify-console-batch6-copy.mjs` | `verify-console-plain-copy.mjs` |
 | `apps/admin/scripts/verify-console-privacy-copy.mjs` | `verify-console-plain-copy.mjs` |
 | `apps/admin/scripts/verify-console-screen-details.mjs` | `verify-console-screen-ui.mjs` |
 | `apps/admin/scripts/verify-honest-placeholders.mjs` | `verify-partner-stats-contract.mjs` |
@@ -183,7 +183,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 164 个文件</summary>
+<summary><code>apps/admin/src/</code> — 165 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -201,13 +201,14 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/ai-services/AiOperationCostTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/AiUsagePanel.tsx` | `verify-admin-ai-usage-ui.mjs` |
-| `apps/admin/src/routes/ai-services/aiLogDisplay.ts` | `verify-admin-ai-usage-contract.mjs`<br/>`verify-console-batch5-copy.mjs` |
+| `apps/admin/src/routes/ai-services/aiLogDisplay.ts` | `verify-admin-ai-usage-contract.mjs`<br/>`verify-console-batch5-copy.mjs`<br/>`verify-console-batch6-copy.mjs` |
 | `apps/admin/src/routes/ai-services/aiOperationLabels.ts` | `verify-admin-ai-usage-ui.mjs` |
-| `apps/admin/src/routes/ai-services/aiUsageDisplay.ts` | `verify-admin-ai-usage-contract.mjs`<br/>`verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/ai-services/aiUsageDisplay.ts` | `verify-admin-ai-usage-contract.mjs`<br/>`verify-admin-ai-usage-ui.mjs`<br/>`verify-console-batch6-copy.mjs` |
 | `apps/admin/src/routes/ai-services/index.tsx` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs` |
 | `apps/admin/src/routes/alerts/index.tsx` | `verify-feedback-sla.mjs`<br/>`verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/audit/AuditDetailDrawer.tsx` | `verify-console-privacy-copy.mjs` |
 | `apps/admin/src/routes/audit/auditColumns.tsx` | `verify-console-privacy-copy.mjs` |
+| `apps/admin/src/routes/audit/auditPayloadLabels.ts` | `verify-console-privacy-copy.mjs` |
 | `apps/admin/src/routes/audit/auditPresentation.ts` | `verify-console-privacy-copy.mjs` |
 | `apps/admin/src/routes/audit/index.tsx` | `verify-admin-partner-contact-phone-ui.mjs`<br/>`verify-console-privacy-copy.mjs` |
 | `apps/admin/src/routes/billing/index.tsx` | `verify-admin-billing-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-price-single-source.mjs`<br/>`verify-print-color-duplex-capability.ts` |
@@ -285,7 +286,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/screen/OpsGrid.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/TerminalTwinView.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/UsageHostingOff.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-details.mjs` |
-| `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-screen-details.mjs` |
+| `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/aiScreenDisplay.ts` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/metricLabels.ts` | `verify-console-batch5-copy.mjs`<br/>`verify-console-privacy-copy.mjs` |
@@ -1109,7 +1110,7 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/partner/src/layouts/PartnerLayoutWrapper.tsx` | `verify-console-screen-details.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
-| `apps/partner/src/lib/csv.ts` | `verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
+| `apps/partner/src/lib/csv.ts` | `verify-console-batch6-copy.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
 | `apps/partner/src/routes/Page.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/account/index.tsx` | `verify-console-privacy-copy.mjs`<br/>`verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/companies/CompaniesTable.tsx` | `verify-partner-refresh-safe.mjs` |
@@ -1144,9 +1145,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/stats/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/sync-logs/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/terminals/TerminalOpsCards.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
-| `apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx` | `verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
+| `apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx` | `verify-console-batch6-copy.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
 | `apps/partner/src/routes/terminals/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |
-| `apps/partner/src/routes/terminals/terminalOpsFormat.ts` | `verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs`<br/>`verify-datetime-honesty.mjs` |
+| `apps/partner/src/routes/terminals/terminalOpsFormat.ts` | `verify-console-batch6-copy.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/partner/src/services/api/client.ts` | `verify-partner-relative-api-url.mjs`<br/>`verify-deploy-gates-in-sync.mjs` |
 | `apps/partner/src/services/api/consoleScreen.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/services/api/partnerCompanies.ts` | `verify-companies.ts` |
@@ -1773,7 +1774,7 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `packages/shared/src/aiDisplayLabels.ts` | `verify-admin-ai-usage-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-ai-cost-ui-coverage.ts` |
-| `packages/shared/src/formatDateTime.ts` | `verify-console-plain-copy.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs`<br/>`verify-datetime-honesty.mjs` |
+| `packages/shared/src/formatDateTime.ts` | `verify-console-batch6-copy.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `packages/shared/src/formatNumber.ts` | `verify-admin-ai-usage-ui.mjs`<br/>`verify-admin-parked-recruitment-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `packages/shared/src/index.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-campus-recruitment-stats.ts`<br/>`verify-companies.ts`<br/>`verify-contract-review-contract.ts`<br/>`verify-job-ai.ts`<br/>`verify-job-materials.ts`<br/>`verify-job-requirement-stats.ts`<br/>`verify-toolbox-micro-app-platform.ts` |
 | `packages/shared/src/pickupCode.ts` | `verify-backend-p0-contracts.mjs` |
@@ -1836,12 +1837,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/ui/src/screen/ScreenFrame.tsx` | `verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/ScreenPrimitives.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/screenCopy.ts` | `verify-console-screen-ui.mjs` |
-| `packages/ui/src/screen/twin/TwinCharts.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/twin/TwinCharts.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-batch6-copy.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinFrame.tsx` | `verify-console-screen-details.mjs` |
 | `packages/ui/src/screen/twin/TwinInfoFlow.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinPanel.tsx` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/screen/twin/TwinShell.tsx` | `verify-console-screen-ui.mjs` |
-| `packages/ui/src/screen/twin/TwinTerminalBoard.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
+| `packages/ui/src/screen/twin/TwinTerminalBoard.tsx` | `verify-console-batch5-copy.mjs`<br/>`verify-console-batch6-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/fusion-youth.css` | `verify-kiosk-visual-unity.mjs`<br/>`verify-fusion-youth-foundation.mjs` |
 | `packages/ui/src/styles/kiosk-components.css` | `verify-kiosk-visual-unity.mjs` |
 | `packages/ui/src/styles/kiosk-shell.css` | `verify-kiosk-visual-unity.mjs` |
@@ -1854,6 +1855,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/ui/src/styles/twin-screen-parts.css` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/styles/twin-screen.css` | `verify-console-screen-ui.mjs` |
 | `packages/ui/src/theme/visualTheme.ts` | `verify-fusion-youth-foundation.mjs`<br/>`verify-service-desk-foundation.mjs` |
+
+</details>
+
+<details>
+<summary><code>scripts/audit-action-codes.mjs/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `scripts/audit-action-codes.mjs` | `verify-console-plain-copy.mjs` |
 
 </details>
 
@@ -2080,13 +2090,17 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 127 个文件</summary>
+<summary><code>services/api/scripts/</code> — 131 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `services/api/scripts/backfill-terminal-credentials.ts` | `verify-terminal-bind-code.ts` |
 | `services/api/scripts/change-password-verify-target.ts` | `verify-change-password-target-guard.ts`<br/>`verify-change-password.ts` |
 | `services/api/scripts/check-resume-optimize-live.ts` | `verify-resume-optimize-live-gate.ts` |
+| `services/api/scripts/console-screen-printed-visits-cases-04.ts` | `verify-console-screen-printed-visits.ts` |
+| `services/api/scripts/console-screen-snapshot-cases-18.ts` | `verify-console-screen-snapshot.ts` |
+| `services/api/scripts/console-screen-usage-cases-01.ts` | `verify-partner-stats-contract.ts` |
+| `services/api/scripts/console-screen-usage-cases-07.ts` | `verify-console-screen-usage.ts` |
 | `services/api/scripts/d2-release-fixture.mjs` | `d2-docker-drill.mjs`<br/>`drill.mjs` |
 | `services/api/scripts/d2-same-host/contract.mjs` | `drill.mjs`<br/>`verify-contract.mjs` |
 | `services/api/scripts/d2-same-host/control-plane.mjs` | `drill.mjs`<br/>`managed-scope.mjs`<br/>`verify-contract.mjs` |

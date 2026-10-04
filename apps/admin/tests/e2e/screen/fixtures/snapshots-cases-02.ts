@@ -151,7 +151,7 @@ export function heatDays(nowMs: number) {
       hours: profile.map((p, h) => {
         if (d === 0 && h > hourNow) return null
         const v = Math.round(p * (weekend ? 0.55 : 1) * (0.82 + ((d * 24 + h) % 7) * 0.04))
-        return v > 0 && v < 5 ? null : v
+        return v < 5 ? null : v
       }),
     })
   }
@@ -168,8 +168,8 @@ export function pulseBuckets(nowMs: number) {
   ]
   return lanes.map(([info, ai, print], k) => ({
     start: new Date(start + k * 300_000).toISOString(),
-    info: info > 0 && info < 5 ? null : info,
-    ai: ai > 0 && ai < 5 ? null : ai,
-    print: print > 0 && print < 5 ? null : print,
+    info: info < 5 ? null : info,
+    ai: ai < 5 ? null : ai,
+    print: print < 5 ? null : print,
   }))
 }

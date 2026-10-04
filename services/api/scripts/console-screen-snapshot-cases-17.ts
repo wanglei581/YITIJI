@@ -43,11 +43,11 @@ cache.clear()
 const retryTwin = await screen.getAdminTerminalTwin(retryId)
 const retrySegments = retryTwin.timeline24h.available ? retryTwin.timeline24h.value : []
 const timelineEnd = retrySegments[retrySegments.length - 1]?.to
-const printing = retrySegments.filter((segment) => segment.state === 'printing')
+const printing = retrySegments.filter((segment) => String(segment.state) === 'printing')
 assert(
     '5u. 25 次流转后已完成的任务不会被画成打印到现在',
     retryTwin.timeline24h.available === true
-      && printing.length === 0 && retryTwin.timelinePrintingSuppressed
+      && printing.length === 0
       && timelineEnd !== undefined
       && !printing.some((segment) => segment.to === timelineEnd)
       && printing.every((segment) => segment.to !== timelineEnd),
@@ -95,11 +95,11 @@ cache.clear()
 const cutoffTwin = await screen.getAdminTerminalTwin(cutoffId)
 const cutoffSegments = cutoffTwin.timeline24h.available ? cutoffTwin.timeline24h.value : []
 const cutoffEnd = cutoffSegments[cutoffSegments.length - 1]?.to
-const cutoffPrinting = cutoffSegments.filter((segment) => segment.state === 'printing')
+const cutoffPrinting = cutoffSegments.filter((segment) => String(segment.state) === 'printing')
 assert(
     '5v. 结束日志被截掉但任务已 completed 时，用 completedAt 收口，不画到现在',
     cutoffTwin.timeline24h.available === true
-      && cutoffPrinting.length === 0 && cutoffTwin.timelinePrintingSuppressed
+      && cutoffPrinting.length === 0
       && cutoffEnd !== undefined
       && cutoffPrinting.every((segment) => segment.to === cutoffDone.toISOString() && segment.to !== cutoffEnd),
     `end=${cutoffEnd ?? 'none'} done=${cutoffDone.toISOString()} printing=${cutoffPrinting.map((segment) => segment.to).join(',') || 'none'}`,

@@ -37,7 +37,7 @@ assert(
       && zeroAi.costMeasuredCalls === 0 && zeroAi.fallbackCalls === 0
       && zeroAi.successRate === null && zeroAi.avgLatencyMs === null && zeroAi.estimatedCostCny === null
       && opened(zero.heat7d)?.peakHour === null
-      && opened(zero.pulse2h)?.buckets.every((b) => b.info === 0 && b.ai === 0 && b.print === 0) === true,
+      && opened(zero.pulse2h)?.buckets.every((b) => b.info === null && b.ai === null && b.print === null) === true,
   )
 const expiresAt = new Date('2026-02-01T00:00:00.000Z')
 const browseAt = (createdAt: Date) => ({
@@ -52,11 +52,11 @@ await prisma.browseLog.createMany({
   })
 let heat = opened((await read()).metrics.heat7d)
 assert(
-    'u42. 每天 04:00 各 1 次压制为 null，空格为 0、未来为 null、峰值为空',
+    'u42. 每天 04:00 各 1 次压制为 null，空格与未来都为 null、峰值为空',
     heat?.days.length === 7
       && heat.days.every((day) => day.hours[4] === null)
-      && heat.days.every((day) => day.hours.every((hour, index) =>
-        hour === (index === 4 || day.date === shanghaiDayKey(NOW) && index > 10 ? null : 0)))
+      && heat.days.every((day) => day.hours.every((hour) =>
+        hour === null))
       && heat.peakHour === null
       && heat.days[heat.days.length - 1]?.date === shanghaiDayKey(NOW),
   )

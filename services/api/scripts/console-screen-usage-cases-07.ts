@@ -1,3 +1,4 @@
+import { verifyResidualPrivacy } from './support/console-screen-residual-privacy'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { ScreenSnapshotCache } from '../src/console-screen/console-screen.cache'
 import { ConsoleScreenUsageService } from '../src/console-screen/console-screen.usage.service'
@@ -118,6 +119,7 @@ export async function assertHttp(
 
 
 export async function main(): Promise<void> {
+  verifyResidualPrivacy(assert)
   console.log('\n=== console screen usage 契约 ===\n')
   assertSourceContract()
   const anchor = usageWindow('today', NOW)

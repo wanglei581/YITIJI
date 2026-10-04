@@ -22,8 +22,7 @@ export function verifyBatch6Copy({ runFile, textOf, shared, ui, fail }) {
       status: { health: 'healthy', lastHeartbeatAt: null, onlineWindowSeconds: 300, agentVersion: null, wiredNetwork: null },
       printer: ok({ state: 'ready' }), scanner: ok({ state: 'ready' }), currentTask: ok(null),
       today: { printPages: null, printTasks: null, scans: 0, failed: 0, visits: ok(0) }, consumables: { available: false },
-      timelinePrintingSuppressed: true,
-      // 故意喂进残留打印段，证明前端隐藏态兜底仍不会画色块。
+      // 故意喂进残留打印段，证明前端旧响应兜底仍不会画色块。
       timeline24h: ok([{ from: '2026-10-03T04:00Z', to: '2026-10-04T03:59Z', state: 'idle' }, { from: '2026-10-04T03:59Z', to: '2026-10-04T04:00Z', state: 'printing' }]),
     }
     function colors(node, out = []) {
@@ -37,9 +36,18 @@ export function verifyBatch6Copy({ runFile, textOf, shared, ui, fail }) {
     const props = { twin, formatClock: () => '12:00', formatDateTime: () => '2026-10-04 12:00', unassignedAreaLabel: '未设置' }
     const hidden = board.TwinTerminalBoard(props)
     assert.ok(!colors(hidden).includes('#72d6ff'), '隐藏态仍绘制打印色块')
-    assert.ok(textOf(hidden).includes('打印时段因样本少未单独标出'), '隐藏态缺少说明')
-    const shown = board.TwinTerminalBoard({ ...props, twin: { ...twin, timelinePrintingSuppressed: false, timeline24h: ok([{ from: '2026-10-04T04:00Z', to: '2026-10-04T04:00Z', state: 'printing' }]) } })
-    assert.ok(colors(shown).includes('#72d6ff'), '达到阈值的短打印位置标记丢失')
+    assert.ok(textOf(hidden).includes('打印时段不在状态带上单独标出，今日打印单数见上方。'), '状态带缺少固定说明')
+    assert.ok(!textOf(hidden).includes('打印中'), '状态带图例仍含打印中')
+    for (const n of [0, 3, 4, 5, 12]) {
+      const shown = board.TwinTerminalBoard({ ...props, twin: { ...twin, today: { ...twin.today, printTasks: n < 5 && n > 0 ? null : n } } })
+      assert.ok(!colors(shown).includes('#72d6ff'), `${n}单时仍绘制打印色块`)
+      assert.ok(textOf(shown).includes('打印时段不在状态带上单独标出，今日打印单数见上方。'))
+    }
+    const heat = charts.TwinHeat({ rows: [{ key: 'today', label: '今天', hours: [null, 5, null] }] })
+    const pulse = charts.TwinPulse({ buckets: [{ key: 'now', info: null, ai: 5, print: null }] })
+    assert.equal(textOf(heat).replace(/\s/g, ''), '今天061218')
+    assert.ok(!textOf(pulse).includes('少于 5') && !textOf(pulse).includes('0'))
+    assert.equal(colors(pulse).filter((c) => c === 'rgba(46,230,168,.12)').length, 2)
 
     const fmt = runFile('apps/partner/src/routes/terminals/terminalOpsFormat.ts', {
       '@ai-job-print/shared': { ...shared, ...runFile('packages/shared/src/formatDateTime.ts') },

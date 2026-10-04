@@ -57,10 +57,10 @@ assert(
   )
 const segments = adminTwin.timeline24h.available ? adminTwin.timeline24h.value : []
 assert(
-    '5e. 孪生时间轴升序、首尾相接、相邻不同状态，且含 printing',
+    '5e. 孪生时间轴升序、首尾相接、相邻不同状态，不含 printing',
     segments.length > 0
       && segments.length <= TIMELINE_SEGMENT_CAP
-      && adminTwin.timelinePrintingSuppressed && !segments.some((segment) => segment.state === 'printing')
+      && !segments.some((segment) => String(segment.state) === 'printing')
       && segments.every((segment, index) => index === 0 || segment.from === segments[index - 1]?.to)
       && segments.every((segment, index) => index === segments.length - 1 || segment.state !== segments[index + 1]?.state),
   )
