@@ -2563,7 +2563,7 @@ for (const withDetails of [false, true]) {
     await expect(page).toHaveURL(/step=preview/)
     await page.getByRole('button', { name: '下一步：核对价格' }).click()
     await expect(page).toHaveURL(/\/print\/confirm/)
-    await expect(page.getByText('发现 1 处个人信息，你选择了全部保留，原样打印。', { exact: true })).toBeVisible()
+    await expect(page.getByText('发现 1 处个人信息，你选择了全部保留，原样打印。')).toBeVisible()
     await page.getByRole('button', { name: '确认并打印', exact: true }).click()
     await expect(page).toHaveURL(/\/print\/progress/)
     expect(attempts).toBe(2)
@@ -2587,6 +2587,7 @@ for (const [findingCount, redactedCount, keptCount, text] of [
     } })
     await page.goto('/print/confirm')
     await expect(page.getByText(text, { exact: false })).toBeVisible()
-    if (findingCount > 0) await expect(page.getByText('没发现需要遮挡的内容', { exact: true })).toHaveCount(0)
+    // 摘要文字和「隐私检查摘要」标签在同一个元素里，exact 匹配永远找不到它，toHaveCount(0) 会空转；这里必须用包含匹配。
+    if (findingCount > 0) await expect(page.getByText('没发现需要遮挡的内容')).toHaveCount(0)
   })
 }
