@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-10-04：管理员后台能力中心，未登记行必须先选状态才能登记（分支 `grok/admin-capability-default-20261004`，未提交）
+
+- **问题：** 「调整为」对未登记行用列表里的 `status` 当初值。缺行在列表里固定是 `not_verified`，下拉显示「未验收」。不改下拉直接点「登记」，会把该项写成关闭。managed 下，未登记的既有能力本来是放行的。
+- **实际生效状态不是 `cap.status`。** 页面「当前状态」由 `capabilityStateView`（`apps/admin/src/routes/print-scan/CapabilityCenter.tsx` 第 76–91 行）根据 `configured` 和默认关闭名单算出：彩色、双面、签名未登记写「未登记 · 默认关闭」；其余未登记写「未登记」，并说明常规设置放行、严格设置关闭。后台读不到服务器用的是哪种设置。服务端判定在 `TerminalCapabilitiesService.assertUserTaskAllowed`（`services/api/src/terminals/terminal-capabilities.service.ts` 第 153–184 行）：没有配置行时，默认关闭名单里的键拒绝；其余键看 `resolvePrintScanCapabilityMode()`（同文件第 44–49 行，`PRINT_SCAN_CAPABILITY_MODE`，managed 放行、strict 拒绝）。彩色 / 双面另走 `assertPrintParamsAllowed`（第 229–234 行），未登记一律拒绝，不受 managed 影响。列表对缺行把 `status` 写成 `not_verified`、`configured: false`（同文件第 77–78 行）。因此不能把「实际生效」可靠映射成下拉里的某一项，按首选做了：未登记不预选。
+- **改法：** 只改管理员后台。未登记行下拉第一项是禁用的「请选择」，初值为空；未选时「登记」禁用，旁边写「请先选择要登记的状态」。已登记行初值仍是已登记状态。签名行的开通确认、关闭必填说明原样保留，没有新加确认框。登记之后回不到未配置，仍等后端清除接口。
+- **验证：** `apps/admin` 下 `node scripts/verify-admin-print-scan-ui.mjs` 退出码 0。反向变异两处（未登记初值改回 `cap.status`；未选时按钮改为 `disabled={saving}`）退出码都是 1，已逐字节还原。`pnpm exec tsc --noEmit` 退出码 0。`pnpm exec eslint src/` 退出码 0（4 条既有 warning 在 `screenView.tsx`，与本次无关）。`node scripts/verify-console-plain-copy.mjs` 退出码 1，失败点是 `ai_quota.release_cap_exceeded` / `ai_quota.released` 没有中文名；把本次三个文件还原到基线后同样失败，不是这次改出来的。仓库根 `node scripts/verify-no-raw-error-render.mjs`、`node scripts/verify-mock-server-contract.mjs` 退出码都是 0。`verify:print-color-duplex-capability` 在本 worktree 缺生成的 Prisma client，先 `prisma generate`，再用临时库 `file:/tmp/cap-verify.db` 跑完后删除，退出码 0。`node scripts/generate-project-graph.mjs` 退出码 0（0 个文件变化）；`npx -y pnpm@11.2.2 graph:check` 退出码 0。浏览器：`node scripts/run-e2e.mjs tests/e2e/print-scan.spec.ts -g "未登记能力必须先选择状态才能登记"` 1 条通过，退出码 0；另在 1280×800 与 390×844 看过「请选择 / 登记禁用 / 提示在按钮旁边」。没有 push，没有提交。
+
 ## 2026-10-04：第二次发布清单补上「三个开关各自要同批改的文字」（分支 `claude/release2-switch-texts-1004`，只改文档）
 
 - **改了什么：** `docs/progress/next-tasks.md` 第二次发布「发布前」第 2 条。原来只写了登录那一句，而且写成「协议现在写的是先登录」，与线上不符（线上是「以页面提示为准」）。现在三个开关各列一行：怎么切、打开后的实际行为、哪几句文字要同批改。
