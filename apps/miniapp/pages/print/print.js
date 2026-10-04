@@ -1,4 +1,5 @@
 // pages/print/print.js
+const { SUPPORT_HINT } = require('../../utils/user-error')
 const app = getApp()
 
 // 底部「打印」Tab。原「求职」Tab 的位置在无人力资源服务许可证期间让给打印：
@@ -6,6 +7,8 @@ const app = getApp()
 // 订单与售后是小程序该承担的线上部分，一体机负责现场出纸。
 Page({
   data: {
+    // 现场无人值守：需要帮助只有服务电话（utils/user-error.js SUPPORT_HINT）
+    supportHint: SUPPORT_HINT,
     statusBarHeight: 20,
     // 首期真实流程：本人文件 → 选终端 → 到机核验 → 机端支付与打印。
     steps: [
