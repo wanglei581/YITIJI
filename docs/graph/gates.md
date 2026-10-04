@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1843 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1844 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -419,7 +419,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 535 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 536 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -790,6 +790,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-deliver/optimizeQuery.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts` | `verify-resume-decisions.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts` | `verify-resume-decisions.mjs` |
+| `apps/kiosk/src/pages/resume/components/resume-deliver/resumeEntryTitles.ts` | `verify-resume-decisions.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts` | `verify-resume-decisions.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
