@@ -702,7 +702,7 @@ export class AiService {
   /** GET /resume/export/pricing：三态价目 + 登录会员可用权益次数。 */
   async getResumeExportPricing(endUserId: string | null): Promise<ResumeExportPricingView> {
     if (this.exportGate) return this.exportGate.getPricing(endUserId)
-    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' }
+    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '免费试运营' }
   }
 
   /**
