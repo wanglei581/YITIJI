@@ -223,6 +223,20 @@ export async function verifyOptimizeExportContract(): Promise<void> {
       if (!ouyang.optimizedResume.summary.includes('想转成仓管或收货')) fail('W-OPT-EXPORT (7). 自述里的求职岗位没有补回')
       const zhuge = await optimize(ZHUGE_XIAOYU, { ...blank('诸葛小雨'), summary: '做事细心，愿意从基础岗位做起。', skills: ['计算机二级（MS Office）'] })
       if (!zhuge.optimizedResume.intention.position.includes('行政专员')) fail('W-OPT-EXPORT (7). 「求职意向」栏下的岗位没有补回')
+      // 联系方式行之后的自我介绍（没有栏目标题）不能被当成杂句丢掉；联系方式本身仍不进简介和经历。
+      const tailIntro = ['郝建民', '青岛李沧某物流有限公司 2018.03 - 2024.09 叉车司机', '负责仓库装卸和盘点。',
+        '电话 13853219907，住李沧区示例路 9 号。', '本人干活踏实，持有叉车证，能上夜班，想找一份离家近的仓库工作。'].join('\n')
+      const hao = await optimize(tailIntro, blank('郝建民'))
+      if (!hao.optimizedResume.summary.includes('本人干活踏实，持有叉车证，能上夜班，想找一份离家近的仓库工作。')) {
+        fail('W-OPT-EXPORT (7). 联系方式之后的自我介绍被丢掉了')
+      }
+      if (hao.optimizedResume.summary.includes('13853219907') || hao.optimizedResume.experience[0]?.description !== '负责仓库装卸和盘点。') {
+        fail(`W-OPT-EXPORT (7). 联系方式进了简介，或经历描述不对：${JSON.stringify(hao.optimizedResume.experience)}`)
+      }
+      await acceptedEverywhere(hao.optimizedResume, '联系方式之后有自我介绍')
+      // 有栏目标题的写法同样保留。
+      const headed = await optimize(tailIntro.replace('本人干活踏实', '自我评价\n本人干活踏实'), blank('郝建民'))
+      if (!headed.optimizedResume.summary.includes('本人干活踏实')) fail('W-OPT-EXPORT (7). 联系方式之后「自我评价」栏的内容被丢掉了')
       // 「技能证书」这种合并栏目下的内容，模型没写技能时也要补回，不能跟着标题一起丢。
       const noSkills = await optimize(ZHUGE_XIAOYU, { ...blank('诸葛小雨'), summary: '做事细心，愿意从基础岗位做起。' })
       if (!noSkills.optimizedResume.skills.join('、').includes('普通话二级甲等')) fail('W-OPT-EXPORT (7). 「技能证书」栏下的内容没有补回')

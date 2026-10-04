@@ -147,7 +147,13 @@ export function buildOriginalCoverage(
       && (current === 'education' || anchor?.key === 'education' || !current)
     // 联系方式行结束上一条经历，自己也不成条目；只有同一行里写着学校或经历（带时间段）时才照常归类。
     // 报告摘录不算豁免：页脚、住址被摘进报告时不能靠它变成一条经历。
-    if (!candidate && !schoolLine && CONTACT_LINE_RE.test(line)) { active = undefined; continue }
+    if (!candidate && !schoolLine && CONTACT_LINE_RE.test(line)) {
+      active = undefined
+      // 联系方式行把一条经历截断之后，后面没有栏目标题的句子（多半是写在末尾的自我介绍）不能跟着丢：
+      // 回到「无归属」状态，按开头自述句同样的办法归到「原文补充」，模型没写个人简介时补回。
+      if (current === 'experience' || current === 'projects' || current === 'education') { current = null; started = false }
+      continue
+    }
     if (candidate) current = candidate
     const preamble = !started && !candidate && !schoolLine && !anchor
     const key = candidate ?? (schoolLine ? 'education' : anchor?.key) ?? current
@@ -262,7 +268,7 @@ export function preserveOriginalEntries(
     }
     if (entry.key === 'education' || entry.key === 'experience' || entry.key === 'projects') removeMergedLines(resume, entry)
     switch (entry.key) {
-      case 'summary': resume.summary = [resume.summary, ...entry.lines].filter(Boolean).join('\n'); break
+      case 'summary': resume.summary = [...new Set([...resume.summary.split('\n'), ...entry.lines])].filter(Boolean).join('\n'); break
       case 'intention': {
         const text = intentionText(entry)
         if (!text.includes('\n') && text.length <= 60) resume.intention = { ...resume.intention, position: text }
