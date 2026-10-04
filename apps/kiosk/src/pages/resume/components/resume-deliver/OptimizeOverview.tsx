@@ -22,7 +22,7 @@ function charCount(text: string): number {
  * 这里不画没有的状态。「待确认事实」是本页的文字比对：只比对数字和职责词，不是通用事实校验。
  *
  * 切换靠在优化稿里找改写的原句；找不到（或原文为空）的条目记为「只能手改」：不画开关、不进用改写 / 保留原文的计数和批量。
- * 一条可切换的都没有时（例如演示模式的建议句），计数仍显示四格真实计数；不能切换的批量操作禁用，对照入口保留。
+ * 一条可切换的都没有时（例如演示模式的建议句），计数只剩「只能手改」和「待确认事实」，批量按钮不画。
  */
 export function OptimizeOverview(props: {
   modules: ResumeOptimizeModule[]
@@ -64,19 +64,19 @@ export function OptimizeOverview(props: {
           改写里若出现原文没有的数字或职责词，那一条会标出来，导出前要你<b>逐项确认</b>。
         </p>
         <div className="qx-opt-stat" aria-label="当前选择" data-testid="resume-optimize-counts">
-          <span data-d="optimized"><u>用改写</u><b>{optimizedCount}<small> / {switchableRows.length}</small></b></span>
-          <span data-d="original"><u>保留原文</u><b>{originalCount}</b></span>
-          <span data-d="manual"><u>需自己写</u><b>{manualCount}</b></span>
+          {canSwitch && <span data-d="optimized"><u>用改写</u><b>{optimizedCount}<small> / {switchableRows.length}</small></b></span>}
+          {canSwitch && <span data-d="original"><u>保留原文</u><b>{originalCount}</b></span>}
+          {manualCount > 0 && <span data-d="manual"><u>只能手改</u><b>{manualCount}</b></span>}
           <span data-d="facts"><u>待确认事实</u><b>{factCount}</b></span>
         </div>
         <div className="qx-opt-seg" aria-hidden="true">
           {rows.map((row) => <u key={row.key} data-d={row.switchable ? row.decision : 'manual'} />)}
         </div>
-        <div className="qx-opt-batch" data-testid="resume-optimize-batch">
+        {canSwitch && <div className="qx-opt-batch" data-testid="resume-optimize-batch">
           <button
             type="button"
             className="qx-opt-bx"
-            disabled={props.disabled || !canSwitch || optimizedCount === switchableRows.length}
+            disabled={props.disabled || optimizedCount === switchableRows.length}
             onClick={() => props.onBatch('optimized')}
           >
             全部用改写<small>有待确认事实的，导出前仍要逐项确认</small>
@@ -84,7 +84,7 @@ export function OptimizeOverview(props: {
           <button
             type="button"
             className="qx-opt-bx"
-            disabled={props.disabled || !canSwitch || originalCount === switchableRows.length}
+            disabled={props.disabled || originalCount === switchableRows.length}
             onClick={() => props.onBatch('original')}
           >
             全部保留原文<small>这几条都换回你原来的句子</small>
@@ -92,7 +92,7 @@ export function OptimizeOverview(props: {
           <button type="button" className="qx-opt-bx" disabled={props.disabled} onClick={() => props.onCompare()}>
             逐条确认或自己写<small>打开对照页，再决定每一条用哪一版</small>
           </button>
-        </div>
+        </div>}
       </section>
 
       <section className="qx-opt-sec qx-opt-sec--list" aria-labelledby="qx-opt-list-title">
