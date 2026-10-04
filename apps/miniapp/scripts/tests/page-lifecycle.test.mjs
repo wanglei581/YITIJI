@@ -6666,6 +6666,23 @@ test('interview-entry：创建面试失败，额度用完只说明天恢复', as
   assert.ok(wx.calls.showToast.includes(QUOTA_PLAIN), JSON.stringify(wx.calls.showToast))
 })
 
+test('assistant：小青回复失败，额度用完只说明天恢复；断网给中文', async () => {
+  for (const [err, shown] of [
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
+    [netError(), NET_MSG],
+    [serverError('', 'SOME_MACHINE_CODE', 500), '小青暂时无法回复，请稍后再试。'],
+  ]) {
+    const wx = createWx()
+    const page = makePage('pages/assistant/assistant.js', { auth: createAuth('A'), api: { assistantChat: () => Promise.reject(err) }, wx })
+    await page._send('简历怎么改')
+    await flush()
+    const last = page.data.messages[page.data.messages.length - 1]
+    assert.equal(last.role, 'ai')
+    assert.equal(last.text, shown)
+    assert.equal(page.data.sending, false)
+  }
+})
+
 test('package-code：状态行用中文，0 元订单不提付款；大于 0 的照旧说付款', async () => {
   for (const [amountCents, paid] of [[0, false], [200, true]]) {
     const wx = createWx()
