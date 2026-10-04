@@ -255,6 +255,92 @@ test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', 
   await expect(preview.locator('iframe')).toHaveCount(0)
 })
 
+function resumeUsbCapability(status: string) {
+  return {
+    status: 200,
+    json: {
+      terminalCode: 'KSK-001',
+      capabilities: [{
+        capabilityKey: 'usb_import',
+        status,
+        note: null,
+        configured: true,
+        updatedAt: '2026-10-04T00:00:00.000Z',
+      }],
+    },
+  }
+}
+
+async function installResumeUsbBridge(page: Page, hits: { count: number }): Promise<void> {
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const origin = new URL(page.url()).origin
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders })
+      return
+    }
+    if (request.method() === 'GET' && (path.endsWith('/status') || path.endsWith('/files'))) hits.count += 1
+    if (path.endsWith('/status')) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'W125-USB' } }),
+      })
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      headers: corsHeaders,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          present: true,
+          driveLabel: 'W125-USB',
+          files: [{ safeId: 'w125-resume', filename: '求职材料.pdf', extension: '.pdf', sizeBytes: 2048 }],
+        },
+      }),
+    })
+  })
+}
+
+test('resume usb card stays closed when usb import is not verified @w3-kiosk', async ({ page, api }) => {
+  const hits = { count: 0 }
+  await installResumeUsbBridge(page, hits)
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', resumeUsbCapability('not_verified'))
+
+  await page.goto('/resume/source')
+  const card = page.getByRole('button', { name: /U盘上传/ })
+  await expect(card).toBeDisabled()
+  await expect(card).toContainText('本机暂未开通')
+  await expect(page.getByText('等待插入U盘')).toHaveCount(0)
+  // 轮询是放行后立刻发出的。先看到拒绝文案，再等一小段，才能证明没有迟到的读盘请求。
+  await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 400) }))
+  expect(hits.count).toBe(0)
+})
+
+test('resume usb card opens when usb import is available @w3-kiosk', async ({ page, api }) => {
+  // 上一条的反向对照：配成可用后，卡片可以点，并且能看到盘里的文件。
+  await installResumeUsbBridge(page, { count: 0 })
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', resumeUsbCapability('available'))
+
+  await page.goto('/resume/source')
+  const card = page.getByRole('button', { name: /U盘上传/ })
+  await expect(card).toBeEnabled()
+  await card.click()
+  await expect(page.getByRole('button', { name: /求职材料\.pdf/ })).toBeVisible()
+})
+
 test('optimized resume previews inline without opening a new tab @w3-kiosk', async ({ page, api }) => {
   const optimizedResume = {
     basic: { name: '测试用户', city: '青岛' },

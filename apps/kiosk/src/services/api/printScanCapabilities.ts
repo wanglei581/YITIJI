@@ -21,6 +21,18 @@ export interface ConfiguredCapability {
 
 export type ConfiguredCapabilityMap = Partial<Record<PrintScanCapabilityKey, ConfiguredCapability>>
 
+/**
+ * 管理员没写说明时，一体机按能力状态给用户看的固定话。
+ * 打印扫描首页卡片和 U 盘入口共用这一份，避免各写各的。
+ */
+export const CAPABILITY_STATUS_NOTES: Record<PrintScanCapabilityStatus, string | null> = {
+  available: null,
+  testing: '测试中，暂未对用户开放',
+  maintenance: '维护中，暂时不可用',
+  unsupported: '本机不支持此项服务',
+  not_verified: '本机暂未开通',
+}
+
 export type CapabilitiesLoadResult =
   | { status: 'ok'; map: ConfiguredCapabilityMap }
   | { status: 'skipped'; map: ConfiguredCapabilityMap }
