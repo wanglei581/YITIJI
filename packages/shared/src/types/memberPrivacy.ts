@@ -3,7 +3,8 @@
  *
  * 类型契约以 `./member-privacy` 为准；本文件只承载两端 UI 共用文案。
  * 与后端对齐（2026-07-25）：
- * - `delete` 创建会被 ACCOUNT_CLOSURE_NOT_AVAILABLE 拒绝（账号注销暂未开放）
+ * - `delete` 创建：2026-10-04 起后端受理为「待管理员执行」的注销申请（需二次短信验证）。
+ *   下面几句「账号注销暂未开放」是各端入口尚未接上时的文案，由各端接入口时一并改，后端 PR 不动用户可见文案。
  * - `export` 由后台 MemberDataExportMapper 生成元数据包（含文件清单/订单/收藏等），一体机本波不提供提交与下载
  * - `revoke_consent` 可即时撤回 job_ai 授权（用户可见名「AI 使用授权」，与稿 41、账号设置页同名；
  *   托管 a 下 job_ai 仍被「目标岗位定向优化 + 简历对照」手填岗位要求那条路使用，所以撤回项保留）
@@ -55,11 +56,11 @@ export const MEMBER_DATA_REQUEST_STATUS_LABEL: Record<MemberDataRequestStatus, s
 
 /** 管理端：驳回说明（导出失败后的人工处理口径）。 */
 export const ADMIN_DATA_REQUEST_REJECT_HINT =
-  '驳回仅记录运营处理结论，不会删除简历、文档、打印订单或收藏。账号注销仍未开放。'
+  '驳回只记录处理结论。账号注销由管理员在用户管理页执行。'
 
-/** 管理端：完成删除类文案保留为诚实否定口径（后端拒绝创建 delete）。 */
+/** 管理端：注销执行位置说明，不将工单状态标记当作执行操作。 */
 export const ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM =
-  '账号注销暂未开放。请勿将任何状态标记理解为「已清空全部个人资产」。岗位 AI 会话删除与账号注销是不同能力。'
+  '账号注销由管理员在用户管理页执行，需要核对会员身份并再次确认；本页只记录请求与处理结论。数据导出为本人资料清单，不含文件原文与简历正文全文。'
 
 /** 管理端：导出处理说明（与 MemberDataExportMapper 白名单一致）。 */
 export const ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT =

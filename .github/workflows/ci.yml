@@ -751,6 +751,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-request-contract
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-closure
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
@@ -1134,6 +1135,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-request-contract
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-closure
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
@@ -1327,6 +1329,12 @@ jobs:
         # 与既有 mock 包的 27 条用例互不影响（另起端口、另起 webServer）。
         working-directory: apps/admin
         run: node scripts/run-e2e.mjs --config=playwright.screen.config.ts
+
+      - name: Run Admin member-closure browser E2E
+        # 会员账号注销的管理员执行：mock 包里用户列表恒为空，走不到注销对话框，
+        # 所以与大屏一样用 VITE_API_MODE=http 构建 + page.route 夹具单独跑（不访问真实用户）。
+        working-directory: apps/admin
+        run: node scripts/run-e2e.mjs --config=playwright.users.config.ts
 
       - name: Run Partner data-screen browser E2E
         run: pnpm --filter @ai-job-print/partner test:e2e:screen
