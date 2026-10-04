@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 // verify-publish-expiry-completeness.ts
 // 发布路径两道闸门:①「不复活过期内容」 ②「来源不可追溯不得上线」
 //

@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1792 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1822 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2066,7 +2066,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 96 个文件</summary>
+<summary><code>services/api/scripts/</code> — 125 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2131,46 +2131,75 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/upload-session-verifier.ts` | `verify-upload-sessions-bind.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/scripts/unpublish-demo-companies.ts` | `verify-demo-company-unpublish.ts` |
 | `services/api/scripts/verify-admin-fairs.ts` | `verify-profile-commercial-first-batch.mjs` |
+| `services/api/scripts/verify-ai-access.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-assistant-voice.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-beijing-display-time.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-benefit-redemption.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs` |
+| `services/api/scripts/verify-career-plan-degraded.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-career-plan.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-change-password.ts` | `run-verify-change-password.mjs` |
+| `services/api/scripts/verify-console-screen-printed-visits.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-derivation-kind.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-document-page-count.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-fair-company-positions.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-fair-info-fields.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-fair-visit-plan.ts` | `verify-profile-commercial-first-batch.mjs` |
+| `services/api/scripts/verify-field-mapping-rule.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-file-assets-trial-acceptance.ts` | `verify-file-assets-trial-acceptance.ts` |
 | `services/api/scripts/verify-governed-job-fit.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-job-ai-backend.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-job-ai-privacy.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-job-application-track.ts` | `verify-profile-resumes-notifications-inkpaper.mjs` |
-| `services/api/scripts/verify-job-fit-governance.ts` | `verify-profile-commercial-first-batch.mjs` |
+| `services/api/scripts/verify-job-fit-governance.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-job-fit-print.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-job-fit.ts` | `verify-profile-commercial-first-batch.mjs` |
-| `services/api/scripts/verify-job-materials.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-job-materials.ts` |
+| `services/api/scripts/verify-job-materials.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-job-materials.ts`<br/>`verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-jobfair-venue-guide.ts` | `verify-profile-commercial-first-batch.mjs` |
-| `services/api/scripts/verify-kiosk-cashier-ui.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs` |
+| `services/api/scripts/verify-kiosk-cashier-ui.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-kiosk-job-board-switch.ts` | `verify-terminal-device-config.ts` |
-| `services/api/scripts/verify-member-assets.ts` | `verify-profile-commercial-first-batch.mjs` |
+| `services/api/scripts/verify-legacy-pending-print-task-disposition.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-member-assets.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-member-data-request-truth.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-member-step-up-adversarial.ts` | `verify-member-step-up.ts` |
 | `services/api/scripts/verify-member-step-up-http.ts` | `verify-member-step-up.ts` |
 | `services/api/scripts/verify-member-step-up.helpers.ts` | `verify-member-step-up-adversarial.ts`<br/>`verify-member-step-up-http.ts`<br/>`verify-member-step-up.ts` |
 | `services/api/scripts/verify-member-step-up.ts` | `verify-profile-commercial-first-batch.mjs` |
+| `services/api/scripts/verify-offline-agencies-page.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-order.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-org-type-enum-sync.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-partner-smart-campus.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-payment-flow.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs` |
+| `services/api/scripts/verify-payment-real-channels.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-policy-eligibility-authoring.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-policy-eligibility.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-policy-scope.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-print-jobs.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-print-scan-first-release.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-print-sign.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-production-real-services.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs` |
 | `services/api/scripts/verify-production-runtime-gates.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs` |
 | `services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs` |
 | `services/api/scripts/verify-recruitment-hosting-default-off.ts` | `verify-recruitment-hosting-default-off.ts` |
+| `services/api/scripts/verify-recruitment-integration-readiness.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-recruitment-p1-preflight.ts` | `verify-recruitment-p1-schema.ts` |
+| `services/api/scripts/verify-refund-idempotent.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-resume-draft-versions.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-resume-export-draft-source.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-resume-export-formats.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-resume-generate.ts` | `verify-file-assets-trial-acceptance.ts` |
+| `services/api/scripts/verify-resume-report-export.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-scan-input-lockout-telemetry.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-terminal-credentials.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-terminal-device-config.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-terminal-provisioning.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-terminal-test-print-seed-guard.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-toolbox-ai-skill-intents.ts` | `verify-toolbox-ai-skill-real-acceptance.ts` |
 | `services/api/scripts/verify-wave2-account-rebind.ts` | `verify-profile-commercial-first-batch.mjs` |
 
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 596 个文件</summary>
+<summary><code>services/api/src/</code> — 597 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2252,6 +2281,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume-parse-intent.ts` | `verify-member-assets-c2d.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-intent-runner.ts`<br/>`verify-resume-parse-quota-once.ts`<br/>`verify-resume-parse-submission.ts` |
 | `services/api/src/ai/resume-parse-submission.service.ts` | `verify-member-assets-c2d.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-intent-runner.ts`<br/>`verify-resume-parse-quota-once.ts`<br/>`verify-resume-parse-submission.ts` |
 | `services/api/src/ai/resume-report-export.controller.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-beijing-display-time.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-report-export.ts` |
+| `services/api/src/ai/resume/__tests__/self-assessment-consent-reconfirm.test.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/src/ai/resume/appended-self-assessment.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/resume/career-plan-degraded-pdf.service.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-career-plan.ts` |
 | `services/api/src/ai/resume/career-plan-degraded.ts` | `verify-career-plan-degraded.ts` |

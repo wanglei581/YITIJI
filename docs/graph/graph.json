@@ -22707,15 +22707,36 @@
     "services/api/scripts/verify-admin-fairs.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    "services/api/scripts/verify-ai-access.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-assistant-voice.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-beijing-display-time.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
     "services/api/scripts/verify-benefit-redemption.ts": [
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
+    ],
+    "services/api/scripts/verify-career-plan-degraded.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-career-plan.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-change-password.ts": [
       "services/api/scripts/run-verify-change-password.mjs"
+    ],
+    "services/api/scripts/verify-console-screen-printed-visits.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-derivation-kind.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-document-page-count.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-fair-company-positions.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -22725,6 +22746,9 @@
     ],
     "services/api/scripts/verify-fair-visit-plan.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+    ],
+    "services/api/scripts/verify-field-mapping-rule.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-file-assets-trial-acceptance.ts": [
       "services/api/scripts/verify-file-assets-trial-acceptance.ts"
@@ -22742,7 +22766,8 @@
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
     ],
     "services/api/scripts/verify-job-fit-governance.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-job-fit-print.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -22752,20 +22777,26 @@
     ],
     "services/api/scripts/verify-job-materials.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "services/api/scripts/verify-job-materials.ts"
+      "services/api/scripts/verify-job-materials.ts",
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-jobfair-venue-guide.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "services/api/scripts/verify-kiosk-cashier-ui.ts": [
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-kiosk-job-board-switch.ts": [
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
+    "services/api/scripts/verify-legacy-pending-print-task-disposition.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
     "services/api/scripts/verify-member-assets.ts": [
-      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-member-data-request-truth.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -22784,9 +22815,36 @@
     "services/api/scripts/verify-member-step-up.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    "services/api/scripts/verify-offline-agencies-page.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-order.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-org-type-enum-sync.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-partner-smart-campus.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
     "services/api/scripts/verify-payment-flow.ts": [
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
+    ],
+    "services/api/scripts/verify-payment-real-channels.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-policy-eligibility-authoring.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-policy-eligibility.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-policy-scope.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-print-jobs.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-print-scan-first-release.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -22809,11 +22867,44 @@
     "services/api/scripts/verify-recruitment-hosting-default-off.ts": [
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
+    "services/api/scripts/verify-recruitment-integration-readiness.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
     "services/api/scripts/verify-recruitment-p1-preflight.ts": [
       "services/api/scripts/verify-recruitment-p1-schema.ts"
     ],
+    "services/api/scripts/verify-refund-idempotent.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-resume-draft-versions.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-resume-export-draft-source.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-resume-export-formats.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
     "services/api/scripts/verify-resume-generate.ts": [
       "services/api/scripts/verify-file-assets-trial-acceptance.ts"
+    ],
+    "services/api/scripts/verify-resume-report-export.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-scan-input-lockout-telemetry.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-terminal-credentials.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-terminal-device-config.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-terminal-provisioning.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
+    "services/api/scripts/verify-terminal-test-print-seed-guard.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/scripts/verify-toolbox-ai-skill-intents.ts": [
       "services/api/scripts/verify-toolbox-ai-skill-real-acceptance.ts"
@@ -23248,6 +23339,9 @@
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-report-export.ts"
+    ],
+    "services/api/src/ai/resume/__tests__/self-assessment-consent-reconfirm.test.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
     "services/api/src/ai/resume/appended-self-assessment.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -31844,7 +31938,7 @@
         "missing": []
       },
       "file": "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "terminal-agent",
       "scriptNames": [
@@ -33633,7 +33727,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-ai-access.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -34273,7 +34367,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-assistant-voice.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -34431,7 +34525,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-beijing-display-time.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -34582,7 +34676,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-career-plan-degraded.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -34817,7 +34911,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-console-screen-printed-visits.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -35287,7 +35381,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-derivation-kind.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -35357,7 +35451,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-document-page-count.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -35657,7 +35751,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-field-mapping-rule.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -36898,7 +36992,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -38042,7 +38136,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-offline-agencies-page.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -38082,7 +38176,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-order.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -38103,7 +38197,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-org-type-enum-sync.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -38555,7 +38649,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-partner-smart-campus.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -38999,7 +39093,7 @@
         ]
       },
       "file": "services/api/scripts/verify-policy-eligibility-authoring.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -39028,7 +39122,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-policy-eligibility.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -39053,7 +39147,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-policy-scope.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -39681,6 +39775,57 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/verify-ai-access.ts",
+          "services/api/scripts/verify-assistant-voice.ts",
+          "services/api/scripts/verify-beijing-display-time.ts",
+          "services/api/scripts/verify-career-plan-degraded.ts",
+          "services/api/scripts/verify-console-screen-printed-visits.ts",
+          "services/api/scripts/verify-derivation-kind.ts",
+          "services/api/scripts/verify-document-page-count.ts",
+          "services/api/scripts/verify-field-mapping-rule.ts",
+          "services/api/scripts/verify-job-fit-governance.ts",
+          "services/api/scripts/verify-job-materials.ts",
+          "services/api/scripts/verify-kiosk-cashier-ui.ts",
+          "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
+          "services/api/scripts/verify-member-assets.ts",
+          "services/api/scripts/verify-offline-agencies-page.ts",
+          "services/api/scripts/verify-order.ts",
+          "services/api/scripts/verify-org-type-enum-sync.ts",
+          "services/api/scripts/verify-partner-smart-campus.ts",
+          "services/api/scripts/verify-payment-real-channels.ts",
+          "services/api/scripts/verify-policy-eligibility-authoring.ts",
+          "services/api/scripts/verify-policy-eligibility.ts",
+          "services/api/scripts/verify-policy-scope.ts",
+          "services/api/scripts/verify-print-jobs.ts",
+          "services/api/scripts/verify-recruitment-integration-readiness.ts",
+          "services/api/scripts/verify-refund-idempotent.ts",
+          "services/api/scripts/verify-resume-draft-versions.ts",
+          "services/api/scripts/verify-resume-export-draft-source.ts",
+          "services/api/scripts/verify-resume-export-formats.ts",
+          "services/api/scripts/verify-resume-report-export.ts",
+          "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
+          "services/api/scripts/verify-terminal-credentials.ts",
+          "services/api/scripts/verify-terminal-device-config.ts",
+          "services/api/scripts/verify-terminal-provisioning.ts",
+          "services/api/scripts/verify-terminal-test-print-seed-guard.ts",
+          "services/api/src/ai/resume/__tests__/self-assessment-consent-reconfirm.test.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-recruitment-hosting-gate-declares.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:recruitment-hosting-gate-declares"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/jobs/dto/import-fairs.dto.ts",
           "services/api/src/jobs/dto/import-jobs.dto.ts",
           "services/api/src/jobs/jobs.service.ts",
@@ -39690,7 +39835,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-recruitment-integration-readiness.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -39907,7 +40052,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-refund-idempotent.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40072,7 +40217,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-resume-draft-versions.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40101,7 +40246,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-resume-export-draft-source.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40137,7 +40282,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-resume-export-formats.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40449,7 +40594,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-resume-report-export.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40549,7 +40694,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40814,7 +40959,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-terminal-credentials.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40863,7 +41008,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-terminal-device-config.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40935,7 +41080,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-terminal-provisioning.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40975,7 +41120,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-terminal-test-print-seed-guard.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
