@@ -32848,10 +32848,12 @@
       },
       "file": "scripts/verify-prod-react-build.mjs",
       "helper": false,
-      "inCi": false,
-      "package": "",
-      "scriptNames": [],
-      "wired": false
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:prod-react-build"
+      ],
+      "wired": true
     },
     {
       "asserts": {
@@ -44288,18 +44290,6 @@
         "risk": "low",
         "scope": "docs",
         "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过",
-        "file": "scripts/verify-prod-react-build.mjs",
-        "kind": "gate",
-        "mentions": [
-          ".github/workflows/ci.yml",
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "high",
-        "scope": "verify",
-        "why": "仍被 CI / 门禁 / 包脚本引用：.github/workflows/ci.yml"
       }
     ]
   }
