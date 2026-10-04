@@ -5,6 +5,7 @@ import type { AdPlaylistView, ScreensaverTerminalView } from '../../services/api
 import { screensaverService } from '../../services/api/screensaver'
 import { getTerminals } from '../../services/api/devices'
 import { indexScreensaverTerminalPlaces, saveScreensaverTerminalForm, screensaverTerminalFormState, screensaverTerminalHeading, type ScreensaverTerminalPlace } from './terminalConfigState'
+import { dwellLimitHint, idleTimeoutError, SCREENSAVER_IDLE_MAX_SEC, SCREENSAVER_IDLE_MIN_SEC } from './assetUploadRules'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 
 export function TerminalsTab() {
@@ -98,6 +99,11 @@ function TerminalConfigRow({
   }, [reloadGeneration, terminal.config, msg, enabled, timeout, playlistId])
 
   const save = useCallback(async () => {
+    const problem = idleTimeoutError(timeout)
+    if (problem) {
+      setMsg(problem)
+      return
+    }
     setSaving(true)
     setMsg(null)
     try {
@@ -121,7 +127,7 @@ function TerminalConfigRow({
   }, [enabled, timeout, playlistId, terminal.terminalId, onSaved])
 
   return (
-    <Card className="flex flex-wrap items-end gap-4 p-4">
+    <Card className="flex flex-wrap items-start gap-4 p-4">
       <div className="flex items-center gap-2">
         <MonitorIcon className="h-5 w-5 text-neutral-400" aria-hidden="true" />
         <div>
@@ -146,12 +152,17 @@ function TerminalConfigRow({
         <label className="mb-1 block text-xs text-neutral-500">无操作时长（秒）</label>
         <input
           type="number"
-          min={30}
-          max={1800}
+          min={SCREENSAVER_IDLE_MIN_SEC}
+          max={SCREENSAVER_IDLE_MAX_SEC}
           value={timeout}
-          onChange={(e) => setTimeoutSec(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value
+            setTimeoutSec(value)
+            setMsg(idleTimeoutError(value))
+          }}
           className="h-10 w-28 rounded-md border border-neutral-300 px-3 text-sm"
         />
+        <p className="mt-1 w-64 text-xs leading-5 text-neutral-500">{dwellLimitHint('idle')}</p>
       </div>
 
       <div>
@@ -174,10 +185,16 @@ function TerminalConfigRow({
         </select>
       </div>
 
-      <Button onClick={save} disabled={saving}>
-        {saving ? '保存中…' : '保存'}
-      </Button>
-      {msg && <span className="text-sm text-neutral-500">{msg}</span>}
+      <div className="pt-5">
+        <Button onClick={save} disabled={saving}>
+          {saving ? '保存中…' : '保存'}
+        </Button>
+      </div>
+      {msg && (
+        <span role={msg === '已保存' ? 'status' : 'alert'} className={`text-sm ${msg === '已保存' ? 'text-neutral-500' : 'text-error'}`}>
+          {msg}
+        </span>
+      )}
     </Card>
   )
 }
