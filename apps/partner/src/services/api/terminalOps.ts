@@ -113,8 +113,9 @@ async function fetchTerminalOps(period: TerminalOpsPeriod): Promise<PartnerTermi
 // ─── mock 模式演示数据（只在 VITE_API_MODE 不是 http 时出现）────────────────
 
 function buildDemoTerminalOps(period: TerminalOpsPeriod): PartnerTerminalOpsView {
-  const to = '2026-05-26T08:00:00.000Z'
-  const from = period === 'week' ? '2026-05-19T16:00:00.000Z' : period === 'month' ? '2026-04-26T16:00:00.000Z' : '2026-02-25T16:00:00.000Z'
+  const to = '2026-05-26T16:00:00.000Z' // 固定演示参考日 5/27 零点，统计截至 5/26。
+  const days = period === 'week' ? 7 : period === 'month' ? 30 : 90
+  const from = new Date(Date.parse(to) - days * 86400_000).toISOString()
   const faults = (over: Partial<TerminalOpsFaults>): TerminalOpsFaults => ({
     offlineCount: 0, offlineMinutes: 0, printerFaultCount: 0, printerFaultMinutes: 0,
     recoveredCount: 0, avgRecoveryMinutes: null, longestMinutes: null,
@@ -124,13 +125,13 @@ function buildDemoTerminalOps(period: TerminalOpsPeriod): PartnerTerminalOpsView
     {
       terminalCode: 'DEMO-001', displayName: '演示终端 · 图书馆一层', locationLabel: '演示位置 A',
       online: true, lastHeartbeatAt: to, visitCount: 54, serviceCount: 86,
-      output: { printed: 61, settled: 63, successRate: 96.8, unconfirmed: null },
+      output: { printed: null, settled: 63, successRate: null, unconfirmed: null },
       faults: faults({ offlineCount: 1, offlineMinutes: 12, recoveredCount: 1, avgRecoveryMinutes: 12, longestMinutes: 12 }),
     },
     {
       terminalCode: 'DEMO-002', displayName: '演示终端 · 就业服务大厅', locationLabel: '演示位置 B',
       online: false, lastHeartbeatAt: '2026-05-26T05:40:00.000Z', visitCount: null, serviceCount: null,
-      output: { printed: null, settled: null, successRate: null, unconfirmed: 0 },
+      output: { printed: null, settled: null, successRate: null, unconfirmed: null },
       faults: faults({ offlineCount: 2, offlineMinutes: 175, printerFaultCount: 1, printerFaultMinutes: 18, recoveredCount: 2, avgRecoveryMinutes: 16.5, longestMinutes: 135, unrecovered: true }),
     },
     {
@@ -150,9 +151,9 @@ function buildDemoTerminalOps(period: TerminalOpsPeriod): PartnerTerminalOpsView
     terminals,
     totals: {
       terminalCount: 3, onlineTerminals: 1, unrecoveredTerminals: 1, silentTerminals: 1,
-      visitCount: 57,
-      serviceCount: 89,
-      output: { printed: 63, settled: 66, successRate: 95.5, unconfirmed: null },
+      visitCount: null,
+      serviceCount: null,
+      output: { printed: null, settled: null, successRate: null, unconfirmed: null },
       faults: { offlineCount: 3, offlineMinutes: 187, printerFaultCount: 1, printerFaultMinutes: 18, recoveredCount: 3, avgRecoveryMinutes: 15, longestMinutes: 135 },
     },
     visitCount: { available: true, recordingStarted: true },

@@ -180,7 +180,7 @@ export class ConsoleScreenService {
     const loaded = await this.cache.getOrLoad(cacheKey, SCREEN_CACHE_TTL_SECONDS.realtime, () =>
       loadTerminalTwin(this.prisma, terminalId, audience, expectedOrgId, now),
     )
-    return { ...loaded.value, generatedAt: new Date(loaded.storedAt).toISOString() }
+    return { ...loaded.value, generatedAt: new Date(loaded.storedAt).toISOString().slice(0, 16) + 'Z' }
   }
 
   private async settle<T>(slice: string, load: () => Promise<T>): Promise<Loaded<T>> {

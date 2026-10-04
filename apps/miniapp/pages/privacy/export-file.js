@@ -79,7 +79,7 @@ function fetchExportContent(requestId, ticket) {
         }
       },
       fail(err) {
-        reject(makeError((err && err.errMsg) || '下载导出包失败，请检查网络', -1));
+        reject(wxFailError(err, '下载导出包失败，请检查网络后重试'));
       },
     });
   });
@@ -91,6 +91,13 @@ function readError(res) {
     return makeError(body.error.message || `下载失败（${res.statusCode}）`, res.statusCode, body.error.code);
   }
   return makeError(`下载失败（${res.statusCode}）`, res.statusCode);
+}
+
+/** 微信接口失败：给用户看中文句子，微信的英文 errMsg 只留在 wxErrMsg 供排查。 */
+function wxFailError(err, message) {
+  const e = makeError(message, -1);
+  if (err && typeof err.errMsg === 'string' && err.errMsg) e.wxErrMsg = err.errMsg;
+  return e;
 }
 
 function makeError(message, statusCode, code) {
@@ -117,7 +124,7 @@ function saveExportContent(text) {
         resolve({ filePath, fileName, sizeBytes: byteLength(text) });
       },
       fail(err) {
-        reject(makeError((err && err.errMsg) || '导出包写入本机失败', -1));
+        reject(wxFailError(err, '导出包写入本机失败，请稍后重试'));
       },
     });
   });
@@ -153,7 +160,7 @@ function removeSavedExport(filePath) {
     fs().unlink({
       filePath,
       success: () => resolve(true),
-      fail: (err) => reject(makeError((err && err.errMsg) || '删除本机副本失败', -1)),
+      fail: (err) => reject(wxFailError(err, '删除本机副本失败，请稍后重试')),
     });
   });
 }
@@ -171,7 +178,7 @@ function shareExportFile(filePath, fileName) {
       filePath,
       fileName,
       success: () => resolve(true),
-      fail: (err) => reject(makeError((err && err.errMsg) || '转发文件失败', -1)),
+      fail: (err) => reject(wxFailError(err, '没有转发出去，可以再试一次')),
     });
   });
 }
@@ -185,7 +192,7 @@ function saveExportToDisk(filePath) {
     wx.saveFileToDisk({
       filePath,
       success: () => resolve(true),
-      fail: (err) => reject(makeError((err && err.errMsg) || '另存失败', -1)),
+      fail: (err) => reject(wxFailError(err, '没有另存成功，可以再试一次')),
     });
   });
 }
@@ -197,7 +204,7 @@ function readSavedExport(filePath) {
       filePath,
       encoding: 'utf8',
       success: (res) => resolve(res.data),
-      fail: (err) => reject(makeError((err && err.errMsg) || '读取本机副本失败', -1)),
+      fail: (err) => reject(wxFailError(err, '读取本机副本失败，请稍后重试')),
     });
   });
 }

@@ -268,42 +268,62 @@ export async function getUsbStatus(driveProvider: UsbDriveProvider = detectRemov
  * 已知限制：不校验 volume serial 等设备身份——同盘符换入另一块 U 盘且同名同大小
  * 文件存在时无法区分（需 Windows API，留待真机验收阶段评估），此时读到的是新盘
  * 上用户可见的同名文件，不构成路径逃逸。
+ *
+ * 失败分两种，给一体机的提示不同：
+ *   - expired：safeId 不在注册表或已超时。重新读取 U 盘列表就能再选。
+ *   - unreadable：文件还在列表里，但这一次读不了。典型是 Windows Defender 实时防护在打开的那一下
+ *     拦截（readFileSync 抛错），或文件已被隔离删除、被替换。重试同一个文件不会成功，只能换一个。
+ * 日志只记错误码，不记 message：Node 的错误 message 带完整路径，路径里就是用户的原始文件名（AGT-07）。
  */
-export function consumeUsbFile(safeId: string): ConsumedUsbFile | null {
+export type UsbConsumeOutcome =
+  | { ok: true; file: ConsumedUsbFile }
+  | { ok: false; reason: 'expired' | 'unreadable' }
+
+export function consumeUsbFileOutcome(
+  safeId: string,
+  readFile: (path: string) => Buffer = readFileSync,
+): UsbConsumeOutcome {
   const entry = registry.get(safeId)
-  if (!entry) return null
+  if (!entry) return { ok: false, reason: 'expired' }
   registry.delete(safeId)
 
-  if (Date.now() - entry.createdAt > SAFE_ID_TTL_MS) return null
+  if (Date.now() - entry.createdAt > SAFE_ID_TTL_MS) return { ok: false, reason: 'expired' }
 
   let stat
   try {
     stat = lstatSync(entry.absolutePath)
   } catch {
-    return null
+    return { ok: false, reason: 'unreadable' }
   }
-  if (!stat.isFile()) return null
-  if (stat.size !== entry.sizeBytes) return null
+  if (!stat.isFile()) return { ok: false, reason: 'unreadable' }
+  if (stat.size !== entry.sizeBytes) return { ok: false, reason: 'unreadable' }
 
   try {
     const realRoot = realpathSync.native(entry.driveRoot)
     const realFile = realpathSync.native(entry.absolutePath)
     const rootWithSep = realRoot.endsWith(sep) ? realRoot : realRoot + sep
-    if (!realFile.startsWith(rootWithSep)) return null
+    if (!realFile.startsWith(rootWithSep)) return { ok: false, reason: 'unreadable' }
   } catch {
-    return null
+    return { ok: false, reason: 'unreadable' }
   }
 
   let buffer: Buffer
   try {
-    buffer = readFileSync(entry.absolutePath)
+    buffer = readFile(entry.absolutePath)
   } catch (e) {
-    warn(`usb: failed to read file — ${e instanceof Error ? e.message : String(e)}`)
-    return null
+    const code = (e as NodeJS.ErrnoException | undefined)?.code
+    warn(`usb: failed to read file — code=${typeof code === 'string' ? code : 'unknown'}`)
+    return { ok: false, reason: 'unreadable' }
   }
-  if (buffer.length <= 0 || buffer.length > MAX_USB_FILE_BYTES) return null
+  if (buffer.length <= 0 || buffer.length > MAX_USB_FILE_BYTES) return { ok: false, reason: 'unreadable' }
 
-  return { buffer, filename: entry.filename, extension: entry.extension }
+  return { ok: true, file: { buffer, filename: entry.filename, extension: entry.extension } }
+}
+
+/** 兼容旧调用：只关心成没成。 */
+export function consumeUsbFile(safeId: string): ConsumedUsbFile | null {
+  const outcome = consumeUsbFileOutcome(safeId)
+  return outcome.ok ? outcome.file : null
 }
 
 /** 仅供 verify 脚本在多个用例之间重置内存态。 */

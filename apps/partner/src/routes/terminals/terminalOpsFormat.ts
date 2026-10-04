@@ -26,15 +26,15 @@ export function visitText(data: PartnerTerminalOpsView, value: number | null): s
   return data.visitCount.recordingStarted ? countText(value) : VISIT_NOT_STARTED
 }
 
-/** 服务端对 1–4 的计数给 null（防止对上具体某一单），页面照实说「少于 5」。 */
+/** 原始小样本与防反推的补充隐藏均为 null，页面统一说明不显示数字。 */
 export function countText(value: number | null): string {
-  return value === null ? '少于 5' : formatCount(value)
+  return value === null ? '样本不足，不显示' : formatCount(value)
 }
 
 export function rateText(output: TerminalOpsOutput): string {
   if (output.successRate !== null) return `${output.successRate.toFixed(1)}%`
   if (output.settled === 0) return '暂无出纸记录'
-  return '样本不足 5 单'
+  return '样本不足，不显示'
 }
 
 export function minutesText(minutes: number | null): string {
@@ -56,7 +56,7 @@ export function shanghaiDate(iso: string): string {
 }
 
 export function windowText(data: PartnerTerminalOpsView): string {
-  return `${shanghaiDateTime(data.window.from)} 至 ${shanghaiDateTime(data.window.to)}`
+  return `${shanghaiDate(data.window.from)} 至 ${shanghaiDate(new Date(Date.parse(data.window.to) - 1).toISOString())}（截至昨天）`
 }
 
 export function relativeTime(iso: string | null, nowMs: number = Date.now()): string {
@@ -98,8 +98,8 @@ export const METRIC_NOTES = {
   service: '打印扫描服务次数 = 统计期内在本机构终端新建的打印任务与扫描任务数，按任务计，不等于人次。',
   output: '出纸成功率 = 出纸成功 ÷ 统计期内结束的打印任务；成功含工作人员现场核查「已出纸」的单，取消、作废与进行中的不计。',
   ai: 'AI 可用率需要按终端归属 AI 调用，目前记录里没有终端标识。',
-  faults: '相邻两次心跳间隔超过 5 分钟记一次离线；打印机从报异常到重新报正常记一次故障；「未知」状态不算开始也不算恢复。纸张不足（仍可打印、需补纸）不算故障，也不算未恢复。',
-  sample: '为避免对上具体某一单，1–4 次的计数不显示具体数字；已结束任务不足 5 单时不给出纸成功率。终端改绑到本机构之前的数据不计入。',
+  faults: '相邻两次心跳间隔超过 5 分钟记一次离线；打印机从报异常到重新报正常记一次故障；「未知」状态不算开始也不算恢复。纸张不足（仍可打印、需补纸）不算故障，也不算未恢复。故障时长与恢复状态截至昨天；当前在线状态依据最新心跳。',
+  sample: '为避免对上具体某一单，0 照常显示，1–4 次不显示数字；出纸成功、未出纸或未确认中有小样本时，只保留非小样本的已结束数，不给成功率；逐列按公开合计保护，必要时另隐藏最小可见终端值；合计按原始数独立判断。终端改绑到本机构之前的数据不计入。',
 } as const
 
 export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
@@ -107,9 +107,9 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
     '终端编号', '终端名称', '摆放位置', '当前状态', '最后心跳（北京时间）',
     '服务人次', '打印扫描服务次数（按任务计）', '出纸成功', '已结束打印任务', '出纸成功率', '未确认出纸',
     '离线次数', '离线时长（分钟）', '打印机故障次数', '打印机故障时长（分钟）',
-    '已恢复次数', '平均恢复（分钟）', '最长一次（分钟）', '当前未恢复', '统计期内有上报',
+    '已恢复次数', '平均恢复（分钟）', '最长一次（分钟）', '截至昨天未恢复', '统计期内有上报',
   ]
-  const csvCount = (value: number | null) => (value === null ? '少于5（不显示具体数字）' : value)
+  const csvCount = (value: number | null) => (value === null ? '样本不足，不显示' : value)
   const csvRate = (output: TerminalOpsOutput) => (output.successRate === null ? rateText(output) : `${output.successRate.toFixed(1)}%`)
   const faultCells = (f: TerminalOpsFaultTotals, reported: boolean, unrecoveredCell: string | number): (string | number)[] => (reported
     ? [f.offlineCount, f.offlineMinutes, f.printerFaultCount, f.printerFaultMinutes, f.recoveredCount, f.avgRecoveryMinutes ?? '', f.longestMinutes ?? '', unrecoveredCell]
@@ -151,5 +151,5 @@ export function buildTerminalOpsCsv(data: PartnerTerminalOpsView): string {
 }
 
 export function terminalOpsCsvName(orgName: string, data: PartnerTerminalOpsView): string {
-  return `${orgName}-终端数据-${shanghaiDate(data.window.from)}至${shanghaiDate(data.window.to)}.csv`
+  return `${orgName}-终端数据-${shanghaiDate(data.window.from)}至${shanghaiDate(new Date(Date.parse(data.window.to) - 1).toISOString())}（截至昨天）.csv`
 }

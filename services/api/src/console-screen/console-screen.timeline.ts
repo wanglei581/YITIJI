@@ -24,7 +24,6 @@ const RANK: Record<ScreenTimelineState, number> = {
   offline: 1,
   idle: 2,
   alert: 3,
-  printing: 4,
 }
 
 export interface TimelineHeartbeat {
@@ -56,24 +55,6 @@ interface Seg {
 function printerIssue(status: string | null): boolean {
   // 纸张不足仍可打印，时间轴不标成故障段。
   return isPrinterFaultStatus(status)
-}
-
-function overlay(segments: Seg[], from: number, to: number, state: ScreenTimelineState): Seg[] {
-  if (to <= from) return segments
-  const rank = RANK[state]
-  const next: Seg[] = []
-  for (const seg of segments) {
-    if (seg.to <= from || seg.from >= to) {
-      next.push(seg)
-      continue
-    }
-    if (seg.from < from) next.push({ from: seg.from, to: from, state: seg.state })
-    const midFrom = Math.max(seg.from, from)
-    const midTo = Math.min(seg.to, to)
-    next.push({ from: midFrom, to: midTo, state: RANK[seg.state] > rank ? seg.state : state })
-    if (seg.to > to) next.push({ from: to, to: seg.to, state: seg.state })
-  }
-  return next
 }
 
 function mergeAdjacent(segments: Seg[]): Seg[] {
@@ -135,8 +116,8 @@ function applyHeartbeatWindow(
 /**
  * 近 24 小时时间轴。
  * 心跳覆盖 [at, at+在线窗口]；窗口之间的缺口是 offline（从未有心跳则整段 unknown）。
- * 打印机异常心跳标 alert。printing 区间盖在最上面。相邻同状态合并。
- * 心跳按时间单遍扫描；打印区间数量少，最后逐段 overlay。
+ * 打印机异常心跳标 alert。只表达可用性，打印不产生时段或边界。
+ * 心跳按时间单遍扫描；相邻同状态合并。
  */
 export function deriveTerminalTimeline(input: {
   now: Date
@@ -147,7 +128,7 @@ export function deriveTerminalTimeline(input: {
   segmentCap?: number
   onlineWindowMs?: number
 }): TimelineDeriveResult {
-  if (input.heartbeatRowCapExceeded || input.printRowCapExceeded) {
+  if (input.heartbeatRowCapExceeded) {
     return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded }
   }
   const nowMs = input.now.getTime()
@@ -173,22 +154,17 @@ export function deriveTerminalTimeline(input: {
     const tail = segments[segments.length - 1]!
     if (tail.to < nowMs) segments.push({ from: tail.to, to: nowMs, state: gapState })
   }
-  let painted = segments
-  for (const print of input.prints) {
-    if (!(print.from instanceof Date) || !(print.to instanceof Date)) continue
-    const from = Math.max(print.from.getTime(), windowStart)
-    const to = Math.min(print.to.getTime(), nowMs)
-    painted = overlay(painted, from, to, 'printing')
-  }
-  const merged = mergeAdjacent(painted)
+  // 打印输入仅兼容旧调用；所有 audience 的状态带均只用心跳可用性。
+  const minute = (at: number) => Math.floor(at / 60_000) * 60_000
+  const merged = mergeAdjacent(segments.map((seg) => ({ ...seg, from: minute(seg.from), to: minute(seg.to) })))
   if (merged.length > segmentCap) {
     return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded }
   }
   return {
     ok: true,
     segments: merged.map((seg) => ({
-      from: new Date(seg.from).toISOString(),
-      to: new Date(seg.to).toISOString(),
+      from: new Date(seg.from).toISOString().slice(0, 16) + 'Z',
+      to: new Date(seg.to).toISOString().slice(0, 16) + 'Z',
       state: seg.state,
     })),
   }
