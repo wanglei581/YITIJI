@@ -2141,10 +2141,12 @@ test('assistant voice deadline warns then preserves text conversation @w3-kiosk'
 test('W-118 resume diagnosis phone entry creates only one upload session @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   let creates = 0
+  let release!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
   api.respondWith('POST', '/api/v1/upload-sessions', async () => {
     creates += 1
-    // 让 StrictMode 的第二次 effect 有机会赶在第一次返回前执行。
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    // 正式构建只挂载一次；这里压住第一次请求，在它还在途时切走再切回，制造第二次挂载。
+    await held
     return { status: 201, json: { success: true, data: {
       sessionId: 'w118-resume-upload', uploadUrl: '/upload/phone',
       uploadToken: 'w118-upload', controlToken: 'w118-control', expiresAt: '2099-01-01T00:00:00.000Z',
@@ -2156,6 +2158,13 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
   } } })
   await page.goto('/resume/source')
   await page.getByRole('button', { name: /手机扫码/ }).click()
+  await expect.poll(() => creates).toBe(1)
+  try {
+    await page.getByRole('button', { name: /本机文件/ }).click()
+    await page.getByRole('button', { name: /手机扫码/ }).click()
+  } finally {
+    release()
+  }
   await expect(page.getByText('请用手机微信或浏览器扫码', { exact: true })).toBeVisible()
   await expect(page.locator('.resume-source-phone-session svg[width="150"]')).toBeVisible()
   expect(creates).toBe(1)
