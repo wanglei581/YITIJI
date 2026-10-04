@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-10-04：小程序按「现场无人值守」改文字（分支 `claude/miniapp-unattended-copy`，叠在 #1219 上）
+
+产品负责人 10/4 主原则：设备现场没有工作人员，全程自助、自动。小程序里让用户「联系现场工作人员 / 找工作人员核对 / 工作人员处理后 / 到店核对」的地方（注册页面里 6 处，加 3 处「到店」）改成自助出路：手机上重试或重新下单、拨打服务电话。「换一台机器」要等后端接口说附近有别的在线终端才说，接口接上前一律不说（取件页两处；材料包那句「换一个服务点」是原有的、指选服务点，保留）。服务电话号码等后端公开接口（GET /api/v1/public/support-contact?terminalId=，返回 servicePhone / serviceHours / otherOnlineTerminalNearby / miniappPublished，开发中）再接，在那之前只说「号码在首页底部『经营者信息』里」，不写死（`utils/user-error.js` 的 `SUPPORT_HINT`）。停放的招聘会页面不打包，那里说的是主办方的现场人员，没动。新门禁（`free-pilot-copy.test.mjs`）：全部注册页面的 WXML、页面目录 JS 与 utils JS 的文字里不许出现找工作人员、店员、服务台、到店；`supportHint` 在页面 data 里实跑有值。只改文字与接线，不改样式。11 处改动逐处反向变异全部转红。
+
 ## 2026-10-04：第五次更新已上线；当晚线上 AI 与运维调整
 
 - 第五次更新：2026-10-04 15:56 上线（Deploy to zyidai.cn run 37187023341，15:50:38–15:56:09，success）。发布版本 main `e2e530a29`（#1224，第二父 `3faa07816`，树与 #1220 头一致）；回退标签 `prod-before-release5` → `8e8fd31e2`。发布开关 15:51:26 在 SSH 步骤开始后关闭。发布日志：PREFLIGHT OK 20、LEGAL 3、迁移 92 个无待执行、readiness OK。发布后公开只读探针 11 项通过；服务器 DEPLOY_SOURCE 与 e2e530a29 一致；三端产物 jsxDEV 0；KSK-001 心跳正常。**没验的：线上还没有人真的走过一张 0 元打印单到出纸。**

@@ -8,6 +8,7 @@
 // 或一张转发出去的卡片，就能在别人手机上渲染出一张带码的取件页 —— 而金额与有效期
 // 同样是本人订单状态，不该由调用方"告诉"本页。现在只收 orderId，其余一律向服务端取。
 // 与材料包的 package-code 同一口径。
+const { SUPPORT_HINT } = require('../../utils/user-error')
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
@@ -59,6 +60,8 @@ Page({
   _inflight: null,
 
   data: {
+    // 现场无人值守：需要帮助只有服务电话（utils/user-error.js SUPPORT_HINT）
+    supportHint: SUPPORT_HINT,
     statusBarHeight: 20,
     state: 'loading', // loading | ready | error
     errorMsg: '',
