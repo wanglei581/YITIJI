@@ -172,10 +172,7 @@ export function QxHomeView({
   const greeting = greetingWord(now)
   // 首页是公共屏：登录着也不打招呼叫名字、不显示手机号（打码的也不显示）。W-75。
   const hello = greeting
-  const standbyNote = homeStandbyNote(
-    { isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() },
-    publicIdleLogoutLabel(),
-  )
+  const standbyNote = homeStandbyNote({ isLoggedIn, guestMode, hasSensitiveSession: hasKioskSensitiveSession() }, publicIdleLogoutLabel())
 
   return (
     <div
