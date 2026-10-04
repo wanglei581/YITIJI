@@ -107,11 +107,12 @@ await prisma.order.createMany({
       })),
     })
 // HTTP的7d用例必须落在截至昨天的完整日内。
-const wall = new Date(Date.now() - 86_400_000)
+// 取「上海昨天中午」：落在截至昨天的窗口内；过期时间放到一周后，避免被浏览记录的留存过滤先剔掉。
+const wall = new Date(shanghaiDayStart(new Date()).getTime() - 12 * 3_600_000)
 await prisma.browseLog.createMany({
       data: [
-        ...Array.from({ length: 5 }, () => ({ endUserId: memberId, targetType: 'job', targetId: jobJia, createdAt: wall, expiresAt: new Date(wall.getTime() + 86_400_000) })),
-        ...Array.from({ length: 5 }, () => ({ endUserId: memberId, targetType: 'job', targetId: jobB, createdAt: wall, expiresAt: new Date(wall.getTime() + 86_400_000) })),
+        ...Array.from({ length: 5 }, () => ({ endUserId: memberId, targetType: 'job', targetId: jobJia, createdAt: wall, expiresAt: new Date(Date.now() + 7 * 86_400_000) })),
+        ...Array.from({ length: 5 }, () => ({ endUserId: memberId, targetType: 'job', targetId: jobB, createdAt: wall, expiresAt: new Date(Date.now() + 7 * 86_400_000) })),
       ],
     })
 await prisma.auditLog.createMany({

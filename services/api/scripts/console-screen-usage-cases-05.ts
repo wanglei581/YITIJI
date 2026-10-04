@@ -192,12 +192,13 @@ assert(
       'u31. 空白机构 fail-closed',
       context.blankOrg instanceof PartnerOrgRequiredError && context.controllerBlank instanceof ForbiddenException,
     )
+// HTTP 段必须排在小样本用例之前：后者会清空全部浏览记录（拆分前的原顺序）。
+if (process.env['VERIFY_SKIP_HTTP'] !== '1') await assertHttp(prisma, { adminId, userA, userB, userBlank, orgA })
 await assertSmallSampleFloor({
       prisma, usage, cache, memberId, terminalId: termLeak, fileUrl, suffix,
     })
 await verifyClosedWindows(assert, prisma)
 await verifyResidualService(assert, prisma)
-if (process.env['VERIFY_SKIP_HTTP'] !== '1') await assertHttp(prisma, { adminId, userA, userB, userBlank, orgA })
 return carryContext(context, {  })
 }
 

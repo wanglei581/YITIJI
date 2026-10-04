@@ -105,7 +105,7 @@ export async function assertHttp(
         && partnerBody.range === '7d'
         && titles.includes('甲机构岗位')
         && !titles.includes('乙机构岗位'),
-      titles.slice(0, 240),
+      JSON.stringify(partnerBody.metrics?.partnerTop ?? null).slice(0, 400),
     )
     const otherRes = await fetch(`${base}/partner/screen/usage?range=7d`, { headers: { Authorization: `Bearer ${otherToken}` } })
     const otherBody = await otherRes.text()
