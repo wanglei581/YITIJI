@@ -2571,6 +2571,53 @@ for (const withDetails of [false, true]) {
   })
 }
 
+// 走查 N1（10/4）：保存裁决的接口不回带访问凭证，交接里丢了它，游客从预览返回检查页时
+// 隐私检查任务被 403 拒，整份办理被清。会员不靠这张凭证，所以只有游客会遇到。
+test('W-118 N1 guest returns from preview to check without losing the file after keeping findings @w2', async ({ page, api }) => {
+  registerShell(api)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  const finding = {
+    id: 'n1-phone', taskId: 'w2-pii_scan', type: 'phone', label: '手机号', pageNumber: 1,
+    snippet: '13800138000', confidence: 0.98, action: 'pending' as const, createdAt: NOW,
+  }
+  const withToken = (kind: 'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact') => ({
+    ...materialTask(kind), accessToken: `n1-token-${kind}`, ...(kind === 'pii_scan' ? { piiFindings: [finding] } : {}),
+  })
+  await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+    const { kind } = route.request().postDataJSON() as { kind: 'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact' }
+    await route.fulfill({ status: 201, json: { success: true, data: withToken(kind) } })
+  })
+  // 和服务端一样：裁决响应里没有 accessToken。
+  api.respond('POST', '/api/v1/materials/tasks/w2-pii_scan/pii-findings/decisions', {
+    status: 200, json: { success: true, data: { ...materialTask('pii_scan'), accessToken: undefined, piiFindings: [{ ...finding, action: 'keep' }] } },
+  })
+  const piiReads: Array<string | undefined> = []
+  for (const kind of ['inspection', 'normalize_a4', 'pii_scan'] as const) {
+    await routeExactJson(page, 'GET', `/api/v1/materials/tasks/w2-${kind}`, async (route) => {
+      const presented = route.request().headers()['x-material-task-token']
+      if (kind === 'pii_scan') piiReads.push(presented)
+      if (presented !== `n1-token-${kind}`) {
+        await route.fulfill({ status: 403, json: { success: false, error: { code: 'MATERIAL_TASK_TOKEN_REQUIRED', message: '缺少或无效的材料任务访问凭证' } } })
+        return
+      }
+      await route.fulfill({ status: 200, json: { success: true, data: { ...withToken(kind), ...(kind === 'pii_scan' ? { piiFindings: [{ ...finding, action: 'keep' }] } : {}) } } })
+    })
+  }
+  api.respond('GET', '/api/v1/materials/tasks/w2-inspection/print-param-suggestions', { status: 200, json: { success: true, data: printParamSuggestions({ copies: 1 }) } })
+  await seedPrintHandoff(page, { materialCheck: null })
+  await page.goto('/print/desk?step=check')
+  await page.getByRole('button', { name: '全部保留', exact: true }).click()
+  await page.getByRole('button', { name: '下一步：预览与参数' }).click()
+  await expect(page).toHaveURL(/step=preview/)
+  await page.getByRole('button', { name: '返回材料检查', exact: true }).click()
+  await expect(page).toHaveURL(/step=check/)
+  await expect(page.getByRole('heading', { name: '这一页没有待处理的文件' })).toHaveCount(0)
+  await expect(page.getByText(W2_FILE.name, { exact: true }).first()).toBeVisible()
+  await expect.poll(() => piiReads.length).toBeGreaterThan(0)
+  expect(piiReads.every((presented) => presented === 'n1-token-pii_scan')).toBe(true)
+})
+
 for (const [findingCount, redactedCount, keptCount, text] of [
   [0, 0, 0, '没发现需要遮挡的内容'],
   [3, 0, 3, '发现 3 处个人信息，你选择了全部保留，原样打印。'],

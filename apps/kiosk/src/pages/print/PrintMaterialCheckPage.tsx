@@ -71,6 +71,14 @@ function isPendingStatus(task: DocumentProcessTaskView): boolean {
   return task.status === 'pending' || task.status === 'processing'
 }
 
+/**
+ * 保存裁决的接口不回带任务访问凭证；游客全靠这张凭证再读自己的隐私检查任务。
+ * 存回交接时丢了它，返回检查页会被 403 拒、整份办理被清（走查 N1，10/4）。
+ */
+function withAccessToken(task: DocumentProcessTaskView, accessToken: string | undefined): DocumentProcessTaskView {
+  return { ...task, accessToken: task.accessToken ?? accessToken }
+}
+
 async function waitForCompletedTask(
   task: DocumentProcessTaskView,
   token: string | null,
@@ -440,10 +448,10 @@ export function PrintMaterialCheckPage({
     try {
       const token = getToken()
       const decidedTask = findings.length > 0
-        ? await decidePiiFindings(piiTask.id, findings.map((finding) => ({
+        ? withAccessToken(await decidePiiFindings(piiTask.id, findings.map((finding) => ({
             findingId: finding.id,
             action: decisions[finding.id] as PiiFindingDecisionAction,
-          })), { token, accessToken: piiTask.accessToken })
+          })), { token, accessToken: piiTask.accessToken }), piiTask.accessToken)
         : piiTask
       const latestFindings = decidedTask.piiFindings ?? findings
       const materialCheck = manualOriginalPrintCheck({
@@ -498,7 +506,7 @@ export function PrintMaterialCheckPage({
         action: decisions[finding.id] as PiiFindingDecisionAction,
       }))
       const decidedTask = findings.length > 0
-        ? await decidePiiFindings(piiTask.id, payload, { token, accessToken: piiTask.accessToken })
+        ? withAccessToken(await decidePiiFindings(piiTask.id, payload, { token, accessToken: piiTask.accessToken }), piiTask.accessToken)
         : piiTask
       const latestFindings = decidedTask.piiFindings ?? findings
       const latestDecisions = Object.fromEntries(latestFindings.map((finding) => [finding.id, finding.action]))
