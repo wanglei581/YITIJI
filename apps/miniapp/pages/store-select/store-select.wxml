@@ -13,7 +13,7 @@
       <!-- 提示信息 -->
       <view class="tip-card">
         <text class="ficon i-info"></text>
-        <text>选择要去的一体机，下单后凭到机码在机器上核销并现场付款</text>
+        <text>选择要去的一体机，下单后凭到机码在机器上核销</text>
       </view>
 
       <!-- 深链直接进来、没有材料包草稿时，说清为什么不能继续 -->
@@ -84,7 +84,7 @@
         </view>
 
         <view class="compliance-note">下单时服务端会再核一次终端心跳与打印能力；这里显示在线也仍可能被服务端拒单。</view>
-        <view class="compliance-note">{{onsiteNotice}}</view>
+        <view class="compliance-note">{{onsiteNoticeFree}}</view>
       </block>
 
       <!-- 底部占位 -->

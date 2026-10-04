@@ -360,7 +360,7 @@ Page({
         wx.setClipboardData({
           data: text,
           success: () => resolve(true),
-          fail: (er) => reject(new Error((er && er.errMsg) || '复制失败')),
+          fail: () => reject(new Error('复制失败，请再试一次')),
         })
       }))
       .catch((err) => wx.showModal({

@@ -198,6 +198,12 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
   await put('userNotification', { memberId: id, type: 'legacy', title: '打印材料通知', content: identity.nickname })
   await put('kioskSession', { memberId: id, terminalId, orgId: null, clientSessionId: randomUUID(), categoriesJson: JSON.stringify([identity.nickname]), expiresAt })
   await put('memberNotification', { endUserId: id, title: '材料已打印', content: identity.nickname })
+  // AI 按人次数账本：每日计数键是 `member:<id>`，预占记录存原始会员号。
+  await prisma.aiQuotaDaily.create({ data: { endUserId: `member:${id}`, bucket: 'ai_resume', day: '2026-10-03', used: 3 } })
+  await prisma.aiQuotaReservation.create({ data: { operationKey: randomBytes(32).toString('hex'), endUserId: id, bucket: 'ai_resume',
+    source: 'daily', day: '2026-10-03', status: 'committed', resultRef: `resume-${randomUUID()}` } })
+  await prisma.aiQuotaReservation.create({ data: { operationKey: randomBytes(32).toString('hex'), endUserId: id, bucket: 'ai_assistant',
+    source: 'daily', day: '2026-10-03', status: 'reserved' } })
   const broadcast = await put('systemBroadcast', { title: '东厅打印机维护通知', content: '下午开放使用' })
   await put('broadcastReadState', { endUserId: id, broadcastId: broadcast.id })
   const ticket = await put('feedbackTicket', { endUserId: id, terminalId, category: 'print', content: `${identity.nickname} ${identity.phone} 尾号 ${identity.phone.slice(-4)} 请处理`, contactPhoneEnc: identity.phoneEnc })
@@ -221,6 +227,10 @@ async function main() {
   await put('user', { id: admin.userId, username: `closure-admin-${tag}`, name: '运营管理员', passwordHash: 'not-a-login-password', role: 'admin' })
   const owned = await member('林知远'); const other = await member('沈嘉宁')
   const ownedFixture = await fixture(owned.id, owned.identity); const otherFixture = await fixture(other.id, other.identity)
+  // 阳性对照：会员号以本人会员号开头的另一行（等值删不会碰它，前缀删会误删它）。
+  await prisma.aiQuotaDaily.create({ data: { endUserId: `member:${owned.id}9`, bucket: 'ai_resume', day: '2026-10-03', used: 1 } })
+  await prisma.aiQuotaReservation.create({ data: { operationKey: randomBytes(32).toString('hex'), endUserId: `${owned.id}9`, bucket: 'ai_resume',
+    source: 'daily', day: '2026-10-03', status: 'committed', resultRef: 'resume-prefix-control' } })
   const input: MemberClosureInput = { source: 'offline', offlineEvidenceNo: `ZX-${tag.slice(0, 8)}`, reasonText: '本人到场申请注销', phoneLast4: owned.identity.phone.slice(-4) }
   const page = { cursor: null, pageSize: 20 }
   const beforeOther = new Map<string, number>()
@@ -319,6 +329,13 @@ async function main() {
       assert.equal(await (prisma[model] as any).count({ where: { endUserId: other.id } }), beforeOther.get(model), `误删另一会员 ${model}`)
     }
     assert.equal(await prisma.fileObject.count({ where: { endUserId: owned.id } }), 0)
+    // AI 次数账本：本人每日计数与预占（含还在预占中的）都删；另一会员与「会员号以本人会员号开头」的那一个都一条不动。
+    assert.equal(await prisma.aiQuotaDaily.count({ where: { endUserId: `member:${owned.id}` } }), 0, '漏删 AI 每日计数')
+    assert.equal(await prisma.aiQuotaReservation.count({ where: { endUserId: owned.id } }), 0, '漏删 AI 预占记录')
+    assert.equal(await prisma.aiQuotaDaily.count({ where: { endUserId: `member:${other.id}` } }), 1, '误删另一会员的 AI 每日计数')
+    assert.equal(await prisma.aiQuotaReservation.count({ where: { endUserId: other.id } }), 2, '误删另一会员的 AI 预占')
+    assert.equal(await prisma.aiQuotaDaily.count({ where: { endUserId: `member:${owned.id}9` } }), 1, '按前缀误删了 member:<本人号>9')
+    assert.equal(await prisma.aiQuotaReservation.count({ where: { endUserId: `${owned.id}9` } }), 1, '按前缀误删了 <本人号>9 的预占')
     // H2-3：关联系统岗位、托管关闭时被列表隐藏的那类求职进度也删了（不止删能看到的那几条）。
     assert.equal(await prisma.jobApplication.count({ where: { endUserId: owned.id, jobId: { not: null } } }), 0, '关联岗位的求职进度没删')
     assert.equal(await prisma.fileObject.count({ where: { endUserId: other.id } }), beforeOther.get('fileObject'))
@@ -393,7 +410,7 @@ async function main() {
     const scan = await scanClosureDatabase(scanClient, owned.identity)
     const metadata = (scanClient as any)._runtimeDataModel.models
     const actualModels = Object.entries(metadata).filter(([, model]: any) => model.fields.some((field: any) => field.name === 'endUserId')).map(([name]) => name).sort()
-    const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
+    const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
     assert.deepEqual(actualModels, expectedModels, '新增会员模型必须显式纳入注销处置')
     assert.deepEqual(scan.hits, [], `全库遗留身份: ${scan.hits.join(',')}`)
     assert.ok(scan.columns > 200)

@@ -14,6 +14,7 @@ import {
   requireAigcProduceId,
   resumeExportShowsVisibleLabel,
 } from '../../common/pdf/aigc-label'
+import { resumeEntryHead } from './resume-doc-limits'
 
 // ============================================================
 // ResumeDocxService — Wave 1 Task 4 简历 Word(docx) 渲染
@@ -110,7 +111,8 @@ export class ResumeDocxService {
     if (resume.education.length > 0) {
       children.push(section('教育经历'))
       for (const e of resume.education) {
-        children.push(entryHead([e.school, e.major, e.degree].filter(Boolean).join(' · '), e.period))
+        const head = resumeEntryHead(e.school, e.major, e.degree)
+        if (head || e.period) children.push(entryHead(head, e.period))
         if (e.description?.trim()) {
           children.push(body(e.description))
         } else {
@@ -122,7 +124,8 @@ export class ResumeDocxService {
     if (resume.experience.length > 0) {
       children.push(section('实习 / 工作经历'))
       for (const e of resume.experience) {
-        children.push(entryHead(`${e.company} · ${e.role}`, e.period))
+        const head = resumeEntryHead(e.company, e.role)
+        if (head || e.period) children.push(entryHead(head, e.period))
         if (e.description.trim()) children.push(body(e.description))
       }
     }
@@ -130,7 +133,8 @@ export class ResumeDocxService {
     if (resume.projects.length > 0) {
       children.push(section('项目经历'))
       for (const p of resume.projects) {
-        children.push(entryHead(p.role ? `${p.name} · ${p.role}` : p.name))
+        const head = resumeEntryHead(p.name, p.role)
+        if (head) children.push(entryHead(head))
         if (p.description.trim()) children.push(body(p.description))
       }
     }

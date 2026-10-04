@@ -118,6 +118,7 @@ export interface TwinShellProps {
   /** 桌面档筛选栏；展示模式不渲染。 */
   toolbar?: ReactNode
   /** 已取到的主数据的时间与状态；没有时由调用方渲染 TwinShellEmpty。 */
+  reportingWindowText?: string
   meta: TwinShellMeta | null
   pollSeconds: number
   /** 最近一次刷新失败的原因（已有数据时也要传，身份类失败要说清楚）。 */
@@ -131,9 +132,9 @@ export interface TwinShellProps {
   children: ReactNode
 }
 
-export function TwinShell({ chrome, title, subtitle, layout, toolbar, meta, pollSeconds, failure, onRefresh, refreshing, hostingOff, variant, children }: TwinShellProps) {
+export function TwinShell({ chrome, title, subtitle, layout, toolbar, meta, pollSeconds, failure, onRefresh, refreshing, hostingOff, variant, reportingWindowText, children }: TwinShellProps) {
   const headingLevel = chrome.headingLevel
-  const stamp = meta
+  const stamp = reportingWindowText ? `统计窗口 ${reportingWindowText} · 每 ${pollSeconds} 秒刷新` : meta
     ? meta.summaryMinutes
       ? `汇总数据截至 ${meta.generatedAtText} · 每 ${meta.summaryMinutes} 分钟更新 · 页面每 ${pollSeconds} 秒刷新`
       : `数据时间 ${meta.generatedAtText} · 每 ${pollSeconds} 秒刷新`

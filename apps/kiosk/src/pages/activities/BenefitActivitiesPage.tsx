@@ -22,6 +22,7 @@ const TYPE_META: Record<BenefitActivityType, { label: string; icon: LucideIcon; 
   coupon: { label: '优惠券', icon: TicketIcon, bg: 'bg-error-bg', color: 'text-error-fg' },
   free_quota: { label: '免费次数', icon: GiftIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
   package_entitlement: { label: '服务额度', icon: PackageIcon, bg: 'bg-warning-bg', color: 'text-warning-fg' },
+  ai_quota: { label: 'AI 次数', icon: GiftIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
   subsidy_eligibility_hint: { label: '政策资格提示', icon: LandmarkIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
 }
 

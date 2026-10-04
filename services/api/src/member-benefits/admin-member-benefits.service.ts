@@ -3,7 +3,7 @@ import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { hashPhone, isValidCnMobile, maskPhone, maskPhoneFromEnc, normalizePhone } from '../common/crypto/phone-identity'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
-import type { BenefitSourceType, BenefitStatus, BenefitType, MemberBenefitItem } from './member-benefits.types'
+import type { AiQuotaBucket, BenefitSourceType, BenefitStatus, BenefitType, MemberBenefitItem } from './member-benefits.types'
 import { deriveBenefitStatus } from './benefit-status'
 import type { GrantBenefitDto, RevokeBenefitDto } from './dto/admin-member-benefits.dto'
 
@@ -20,7 +20,7 @@ export interface AdminBenefitGrantItem extends MemberBenefitItem {
   nickname: string | null
 }
 
-const BENEFIT_TYPES: readonly BenefitType[] = ['coupon', 'free_quota', 'package_entitlement', 'subsidy_eligibility_hint']
+const BENEFIT_TYPES: readonly BenefitType[] = ['coupon', 'free_quota', 'package_entitlement', 'ai_quota', 'subsidy_eligibility_hint']
 const SOURCE_TYPES: readonly BenefitSourceType[] = ['platform', 'campus', 'gov', 'fair', 'partner']
 const STATUS_TYPES: readonly BenefitStatus[] = ['active', 'used_up', 'expired', 'revoked']
 const FORBIDDEN_COPY = /到账|已发放金额|发放金额|保证|通过率|录用|面试|候选人推荐|平台投递|一键投递|立即投递/
@@ -88,6 +88,7 @@ export class AdminMemberBenefitsService {
       data: {
         endUserId: dto.endUserId,
         benefitType: dto.benefitType,
+        serviceKey: dto.serviceKey ?? null,
         title: dto.title.trim(),
         description: cleanNullable(dto.description),
         quantityTotal,
@@ -109,6 +110,7 @@ export class AdminMemberBenefitsService {
         endUserId: dto.endUserId,
         phoneMasked,
         benefitType: created.benefitType,
+        serviceKey: created.serviceKey,
         sourceType: created.sourceType,
         quantityTotal: created.quantityTotal,
       },
@@ -167,6 +169,16 @@ export class AdminMemberBenefitsService {
     if (dto.benefitType === 'subsidy_eligibility_hint' && dto.quantityTotal !== null && dto.quantityTotal !== undefined) {
       throw new BadRequestException({ error: { code: 'BENEFIT_QUANTITY_FORBIDDEN', message: '政策资格提示不允许设置额度' } })
     }
+    if (dto.benefitType === 'ai_quota') {
+      if (!['ai_resume', 'ai_assistant', 'ai_interview'].includes(dto.serviceKey ?? '')) {
+        throw new BadRequestException({ error: { code: 'BENEFIT_SERVICE_KEY_REQUIRED', message: 'AI 次数必须指定合法用途' } })
+      }
+      if (!Number.isInteger(dto.quantityTotal) || dto.quantityTotal! < 1 || dto.quantityTotal! > 9999) {
+        throw new BadRequestException({ error: { code: 'BENEFIT_QUANTITY_INVALID', message: 'AI 次数必须为 1–9999 的整数' } })
+      }
+    } else if (dto.serviceKey !== undefined) {
+      throw new BadRequestException({ error: { code: 'BENEFIT_SERVICE_KEY_FORBIDDEN', message: '该权益不允许指定 AI 用途' } })
+    }
     const validFrom = parseOptionalDate(dto.validFrom)
     const validUntil = parseOptionalDate(dto.validUntil)
     if (validFrom && validUntil && validFrom.getTime() > validUntil.getTime()) {
@@ -190,6 +202,7 @@ export class AdminMemberBenefitsService {
       id: string
       endUserId: string
       benefitType: string
+      serviceKey: string | null
       title: string
       description: string | null
       quantityTotal: number | null
@@ -209,6 +222,7 @@ export class AdminMemberBenefitsService {
       phoneMasked,
       nickname,
       benefitType: row.benefitType as BenefitType,
+      serviceKey: row.serviceKey as AiQuotaBucket | null,
       title: row.title,
       description: row.description,
       quantityTotal: row.quantityTotal,

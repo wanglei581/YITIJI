@@ -5,6 +5,7 @@ import { requireAigcProduceId, resumeExportShowsVisibleLabel, stampAigcPageFoote
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../../common/pdf/cjk-font'
 import type { GeneratedResume, ResumeLayoutSettings } from '../interfaces/ai-provider.interface'
 import type { ResumeTemplateLayoutPreset, ResumeTemplateSectionKey } from '../../job-materials/job-materials.types'
+import { resumeEntryHead } from './resume-doc-limits'
 
 // ============================================================
 // ResumePdfService — 阶段2A 简历 PDF 渲染(服务端真实产物)
@@ -119,7 +120,7 @@ export class ResumePdfService {
       size: 'A4',
       margins: { top: cfg.margin, bottom: cfg.margin, left: cfg.margin, right: cfg.margin },
       bufferPages: true,
-      info: { Title: `${resume.basic.name} 的简历` },
+      info: { Title: resume.basic.name ? `${resume.basic.name} 的简历` : '简历' },
     })
     // S0-4：AI 简历导出保留隐式元数据；每页显式页脚标识由 RESUME_EXPORT_VISIBLE_LABEL 控制（默认关，上线按拍板打开）。
     // 事实字段仍由服务端逐字复制用户输入（防编造契约），AI 只参与表达润色。
@@ -130,7 +131,7 @@ export class ResumePdfService {
       this.applyDraftMetadata(doc, resume.basic.name)
     } else {
       applyAigcPdfMetadata(doc, {
-        title: `${resume.basic.name} 的简历`,
+        title: resume.basic.name ? `${resume.basic.name} 的简历` : '简历',
         subject: '经 AI 简历服务生成/优化的简历文件；事实信息来自用户本人填写或原简历，AI 只参与表达润色',
         kind: 'resume',
         contentId: requireAigcProduceId(renderOptions.contentId ?? ''),
@@ -228,7 +229,8 @@ export class ResumePdfService {
       if (resume.education.length === 0) return
       section('教育经历')
       for (const e of resume.education) {
-        entryHead([e.school, e.major, e.degree].filter(Boolean).join(' · '), e.period)
+        const head = resumeEntryHead(e.school, e.major, e.degree)
+        if (head || e.period) entryHead(head, e.period)
         if (e.description?.trim()) body(e.description)
         else doc.moveDown(0.3)
       }
@@ -238,7 +240,9 @@ export class ResumePdfService {
       if (resume.experience.length === 0) return
       section('实习 / 工作经历')
       for (const e of resume.experience) {
-        entryHead(`${e.company} · ${e.role}`, e.period)
+        // 职务、公司都可能为空（原件没写）：有什么印什么，都没有就只印描述，不留空标题行。
+        const head = resumeEntryHead(e.company, e.role)
+        if (head || e.period) entryHead(head, e.period)
         if (e.description.trim()) body(e.description)
       }
     }
@@ -247,7 +251,8 @@ export class ResumePdfService {
       if (resume.projects.length === 0) return
       section('项目经历')
       for (const p of resume.projects) {
-        entryHead(p.role ? `${p.name} · ${p.role}` : p.name)
+        const head = resumeEntryHead(p.name, p.role)
+        if (head) entryHead(head)
         if (p.description.trim()) body(p.description)
       }
     }

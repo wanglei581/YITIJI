@@ -311,3 +311,27 @@ test('终端孪生：机构打印失败提示联系平台运营', async ({ page 
   await expect(today).toContainText('今日打印失败 7 次，如需处理请联系平台运营')
   await expect(today).not.toContainText('打印扫描运维')
 })
+
+
+test('第六批：任何打印单数下状态带无打印色块及图例，固定说明保留', async ({ page }) => {
+  let count = 0
+  const twin = (id: string) => {
+    const base = partnerTwin(id)
+    if (!base) return base
+    base.today.printTasks = count > 0 && count < 5 ? null : count
+    // 专门注入旧版本打印段，验证兼容响应也只表达在线空闲。
+    base.timeline24h = { available: true, source: 'TerminalHeartbeat', window: '24h', value: [{ from: '2026-10-03T04:00Z', to: '2026-10-04T04:00Z', state: 'printing' }] } as unknown as typeof base.timeline24h
+    return base
+  }
+  await serve(page, partnerApi({ twin }))
+  await open(page, '/screen/terminal?id=t-hz-zd-01')
+  const band = page.getByRole('img', { name: '近 24 小时状态', exact: true })
+  for (count of [0, 3, 4, 5, 12]) {
+    if (count !== 0) await page.reload()
+    await expect(band).toBeVisible()
+    const status = panel(page, /^24 小时状态$/)
+    await expect(status).toContainText('打印时段不在状态带上单独标出，今日打印单数见上方。')
+    await expect(status.locator('.twin-legend')).not.toContainText('打印中')
+    expect(await band.locator('div').evaluateAll((nodes) => nodes.filter((n) => getComputedStyle(n).backgroundColor === 'rgb(114, 214, 255)').length)).toBe(0)
+  }
+})

@@ -32,7 +32,7 @@ import { AiUsagePanel } from './AiUsagePanel'
 import { AiOperationCostTable } from './AiOperationCostTable'
 import { AiLogsTable, LOGS_PAGE_SIZE, type OpFilter, type StatusFilter } from './AiLogsTable'
 import { aiLogReason, aiProviderName } from './aiLogDisplay'
-import { logOverviewLatency, logOverviewRate } from './aiUsageDisplay'
+import { formatCny, logOverviewLatency, logOverviewRate } from './aiUsageDisplay'
 
 // ─── 常量映射 ─────────────────────────────────────────────────
 
@@ -158,13 +158,13 @@ export default function AiServicesPage() {
 
   const successRate    = usage.successRate
   const noCallsIn24h   = usage.totalCalls === 0
-  const estimatedCost  = `¥${usage.estimatedCostCny.toFixed(2)}`
+  const estimatedCost  = formatCny(usage.estimatedCostCny)
   // 这张卡来自旧调用日志的 token 估算，和上面额度面板按计量账算出的「已计费金额」不是同一本账。
   const logCostDistinction = '这是旧调用日志按 token 估算的金额，和上面额度面板的「已计费金额」不是一回事'
   const costNote       = usage.unmeasuredCalls > 0
     ? `下限 · 另有 ${usage.unmeasuredCalls} 次调用未采集成本。${logCostDistinction}`
     : usage.estimatedCostCny === 0
-      ? `${usage.providerName} 暂无已记录 token 成本。${logCostDistinction}`
+      ? `${aiProviderName(usage.providerName)} 暂无已记录 token 成本。${logCostDistinction}`
       : `基于 token 用量估算。${logCostDistinction}`
   const jobAiCalls = usage.byOperation.jobRecommend + usage.byOperation.jobExplain + usage.byOperation.jobMatch
   /** 岗位 AI 三项成本：只取已采集部分，并单独给出「未估算」笔数，不把未采集当 0。 */
@@ -179,7 +179,7 @@ export default function AiServicesPage() {
     const cost = usage.costByOperation[op]
     if (!cost || cost.measuredCalls === 0) return cost && cost.calls > 0 ? '成本未估算' : '成本 ¥0.0000'
     const suffix = cost.measuredCalls < cost.calls ? `（+${cost.calls - cost.measuredCalls} 笔未估算）` : ''
-    return `成本 ¥${cost.cny.toFixed(4)}${suffix}`
+    return `成本 ${formatCny(cost.cny)}${suffix}`
   }
 
   const qualityTotals = qualitySummary.reduce(
@@ -344,8 +344,8 @@ export default function AiServicesPage() {
             label="匹配参考"
             value={formatCount(usage.byOperation.jobMatch)}
             note={jobAiUnmeasured > 0
-              ? `岗位 AI 总成本 ¥${jobAiCost.toFixed(4)}（+${jobAiUnmeasured} 笔未估算）`
-              : `岗位 AI 总成本 ¥${jobAiCost.toFixed(4)}`}
+              ? `岗位 AI 总成本 ${formatCny(jobAiCost)}（+${jobAiUnmeasured} 笔未估算）`
+              : `岗位 AI 总成本 ${formatCny(jobAiCost)}`}
             icon={CheckCircleIcon}
             iconClass="text-success-fg bg-success-bg"
           />
