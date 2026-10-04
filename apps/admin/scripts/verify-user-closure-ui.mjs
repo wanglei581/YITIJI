@@ -77,9 +77,10 @@ export async function verifyUserClosure({ root, pass, fail, presentationModule }
   }
   check(messages.closureOrderStatus('refunding') === '退款中' && messages.closureOrderStatus('pickup_pending') === '待取件' && messages.closureOrderStatus('printing') === '打印中', '订单状态消费本后台现有中文映射')
   const expectedLists = [
-    ['会删除：', '简历与 AI 生成的简历结果；上传的文件、扫描件及其衍生文件；模拟面试、AI 顾问、岗位 AI 的会话与报告；合同审查与材料检查记录；浏览、收藏、打开来源平台的记录；本人自填的求职进度；站内通知。'],
-    ['会保留（已去掉能认出本人的信息）：', '订单、支付与退款流水（金额与订单号保留）；打印任务的状态记录；权益发放与兑换流水；意见反馈的处理记录；已签署的协议版本与时间；AI 调用的计量记录；操作审计日志。'],
-    ['另外：', '未使用的权益会作废；未处理完的意见反馈会关闭；该手机号以后重新注册是一个新账号，看不到以上任何记录；注销不能撤销。'],
+    ['会删除，无法恢复：', '简历与 AI 生成的简历结果；上传的文件、扫描件及其衍生文件；模拟面试、AI 顾问、岗位 AI 的会话与报告；合同审查与材料检查记录；浏览、收藏、打开来源平台的记录；本人自填的求职进度；站内通知。'],
+    ['会保留（已去掉能认出本人的信息）：', '订单、支付与退款流水（金额与订单号保留）；打印任务的状态记录；权益发放与兑换流水；意见反馈的处理记录；已同意的协议版本与时间；AI 调用的计量记录和服务日志；隐私请求记录。'],
+    ['按原样保留：', '操作审计和安全日志（其中手机号只有部分数字）。'],
+    ['另外：', '有未办完的订单时不能执行，要先办完；未使用的权益会作废；未处理完的意见反馈会关闭；该手机号以后重新注册是一个新账号，看不到以上任何记录；执行后不能撤销。'],
   ]
   check(JSON.stringify(messages.CLOSURE_CONSEQUENCES) === JSON.stringify(expectedLists), '确认清单逐字一致')
   reply = { ok: false, status: 409, json: async () => ({ error: { code: 'CLOSURE_BLOCKED_BY_OPEN_ORDERS', message: 'raw expected 9876', orders: [{ orderNo: 'ORD-1', status: 'refunding' }] } }) }
