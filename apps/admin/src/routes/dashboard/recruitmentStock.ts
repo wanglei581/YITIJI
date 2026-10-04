@@ -1,3 +1,4 @@
+import { formatCount } from '@ai-job-print/shared'
 import type { ElementType } from 'react'
 import { BriefcaseIcon, PrinterIcon } from 'lucide-react'
 
@@ -41,7 +42,7 @@ interface StockInput {
 }
 
 function stockSub(jobs: number, fairs: number, tail: string): string {
-  return `岗位 ${jobs} · 招聘会 ${fairs} · ${tail}`
+  return `岗位 ${formatCount(jobs)} · 招聘会 ${formatCount(fairs)} · ${tail}`
 }
 
 /** 岗位有存量就去岗位信息源，否则去招聘会信息源；两页都能逐条紧急下架。 */
@@ -56,10 +57,10 @@ export function recruitmentStockKpi({ hostingOpen, jobs, fairs, printers }: Stoc
   }
   const total = jobs + fairs
   if (hostingOpen) {
-    return { label, value: String(total), unit: '条', sub: stockSub(jobs, fairs, '由发布机构自审自发'), icon: BriefcaseIcon, retryKeys: [] }
+    return { label, value: formatCount(total), unit: '条', sub: stockSub(jobs, fairs, '由发布机构自审自发'), icon: BriefcaseIcon, retryKeys: [] }
   }
   if (total > 0) {
-    return { label, value: String(total), unit: '条', sub: stockSub(jobs, fairs, '托管关闭，不再审核'), icon: BriefcaseIcon, retryKeys: [] }
+    return { label, value: formatCount(total), unit: '条', sub: stockSub(jobs, fairs, '托管关闭，不再审核'), icon: BriefcaseIcon, retryKeys: [] }
   }
   // 托管关闭且没有存量：这一格不再讲招聘，换成打印机就绪数（同一页已加载的真实数据）。
   if (printers === null) {
@@ -67,9 +68,9 @@ export function recruitmentStockKpi({ hostingOpen, jobs, fairs, printers }: Stoc
   }
   return {
     label: '打印机就绪',
-    value: String(printers.ready),
-    unit: `/ ${printers.total} 台`,
-    sub: printers.total === 0 ? '打印机尚无心跳上报' : printers.ready < printers.total ? `${printers.total - printers.ready} 台未就绪` : '全部就绪',
+    value: formatCount(printers.ready),
+    unit: `/ ${formatCount(printers.total)} 台`,
+    sub: printers.total === 0 ? '打印机尚无心跳上报' : printers.ready < printers.total ? `${formatCount(printers.total - printers.ready)} 台未就绪` : '全部就绪',
     icon: PrinterIcon,
     warn: printers.total > 0 && printers.ready < printers.total,
     retryKeys: [],
@@ -85,7 +86,7 @@ export function recruitmentStockTodo({ hostingOpen, jobs, fairs }: Omit<StockInp
     ? {
         key: 'recruitment-content',
         icon: BriefcaseIcon,
-        title: `招聘类内容 ${total} 条（由发布机构自审自发）`,
+        title: `招聘类内容 ${formatCount(total)} 条（由发布机构自审自发）`,
         sub: stockSub(j, f, '如有违法违规内容可紧急下架'),
         href: takedownHref(j),
         actionLabel: '去查看',
@@ -93,7 +94,7 @@ export function recruitmentStockTodo({ hostingOpen, jobs, fairs }: Omit<StockInp
     : {
         key: 'recruitment-stock',
         icon: BriefcaseIcon,
-        title: `招聘类存量 ${total} 条（托管关闭，不再审核）`,
+        title: `招聘类存量 ${formatCount(total)} 条（托管关闭，不再审核）`,
         sub: stockSub(j, f, '如有违法违规内容可紧急下架'),
         href: takedownHref(j),
         actionLabel: '去查看',

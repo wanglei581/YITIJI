@@ -3,14 +3,13 @@ import { buildDeviceFleetOverview } from '../device-fleet/device-fleet.projectio
 import type { PrismaService } from '../prisma/prisma.service'
 import { isHealthyPrinterStatus } from '../terminals/printer-status'
 import {
-  SCREEN_MIN_AGGREGATE_SAMPLE,
   SCREEN_ONLINE_WINDOW_SECONDS,
   SCREEN_UNAVAILABLE_REASON,
   type ScreenAudience,
   type ScreenTerminalTwin,
 } from './console-screen.types'
 import { isPrinterIssueStatus, printerFaultTitle, screenGeo } from './console-screen.fleet'
-import { availableMetric, hoursAgo, shanghaiDayStart, unavailableMetric } from './console-screen.metric'
+import { availableMetric, hoursAgo, shanghaiDayStart, unavailableMetric, suppressAggregateCount as suppressTerminalTodayCount } from './console-screen.metric'
 import { loadTerminalPrintedPagesToday } from './console-screen.printed-pages'
 import {
   TIMELINE_HEARTBEAT_ROW_CAP,
@@ -26,12 +25,7 @@ const SCAN_BUSY = ['waiting', 'matched'] as const
 const WIRED = new Set(['connected', 'disconnected', 'unknown'])
 const PRINT_END = new Set(['completed', 'failed', 'cancelled'])
 
-/** 0 不指向任何人；1–4 能对上这一台机器上的单，不给数字。 */
-export function suppressTerminalTodayCount(count: number): number | null {
-  if (count <= 0) return 0
-  if (count < SCREEN_MIN_AGGREGATE_SAMPLE) return null
-  return count
-}
+export { suppressTerminalTodayCount }
 
 export function terminalTwinNotFound(): NotFoundException {
   return new NotFoundException({

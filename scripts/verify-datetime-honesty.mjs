@@ -315,7 +315,8 @@ if (
 }
 
 const relativeCallers = [
-  'apps/admin/src/routes/dashboard/index.tsx',
+  'apps/admin/src/routes/dashboard/RecentActivity.tsx',
+  'apps/admin/src/routes/dashboard/dashboardRows.ts',
   'apps/admin/src/routes/account-settings/index.tsx',
   'apps/admin/src/routes/printers/index.tsx',
   'apps/admin/src/routes/peripherals/index.tsx',

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Button, Card, StatusBadge } from '@ai-job-print/ui'
 import { toolboxService, type ToolboxAllowedHostRecord } from '../../../services/api/toolbox'
 import { HOST_PURPOSE_OPTIONS, HOST_REVIEW_OPTIONS, STATUS_LABELS } from '../constants'
@@ -47,7 +48,7 @@ export function ToolboxAllowedHostPanel({
       expiresAt: form.expiresAt || undefined,
     })
     setForm({ host: '', purpose: 'web_app', owner: '', reason: '', expiresAt: '' })
-  }, '域名已提交 DB 审核表')
+  }, '域名已提交审核')
 
   const reviewHost = (host: ToolboxAllowedHostRecord, option: typeof HOST_REVIEW_OPTIONS[number]) => {
     if (option.value !== 'active') {
@@ -65,9 +66,9 @@ export function ToolboxAllowedHostPanel({
       <div className="grid gap-4 xl:grid-cols-[0.95fr_1.2fr]">
         <div>
           <h2 className="text-base font-bold text-neutral-900">允许域名</h2>
-          <p className="mt-1 text-sm text-neutral-500">DB 审核表负责业务审批；环境白名单由服务端配置控制，此处只读展示口径。</p>
-          <div className="mt-3 rounded-xl border border-info/20 bg-info-bg px-4 py-3 text-xs leading-relaxed text-info-fg">
-            环境白名单：TOOLBOX_ALLOW_EXTERNAL_URL、KIOSK_EXTERNAL_APP_ALLOWED_HOSTS、KIOSK_QR_TARGET_ALLOWED_HOSTS。DB 与 env 双门禁同时满足后，外部 H5 或二维码目标才允许发布。
+          <p className="mt-1 text-sm text-neutral-500">先在本页提交域名并通过审核，再由运维人员核对服务器允许的域名。</p>
+          <div title="运维参考：TOOLBOX_ALLOW_EXTERNAL_URL、KIOSK_EXTERNAL_APP_ALLOWED_HOSTS、KIOSK_QR_TARGET_ALLOWED_HOSTS" className="mt-3 rounded-xl border border-info/20 bg-info-bg px-4 py-3 text-xs leading-relaxed text-info-fg">
+            外部网页或二维码目标地址必须同时通过本页审核和服务器配置检查，才能发布。
           </div>
 
           <div className="mt-4 grid gap-3">
@@ -84,7 +85,7 @@ export function ToolboxAllowedHostPanel({
 
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-bold text-neutral-900">DB 审核表</h3>
+            <h3 className="text-sm font-bold text-neutral-900">域名审核记录</h3>
             {message && <span className="text-sm font-medium text-neutral-600">{message}</span>}
           </div>
           <input value={reviewReason} onChange={(e) => setReviewReason(e.target.value)} placeholder="审核说明" className="mt-3 h-9 w-full rounded-lg border border-neutral-200 px-3 text-xs" />
@@ -95,11 +96,11 @@ export function ToolboxAllowedHostPanel({
               <div key={host.id} className="rounded-xl border border-neutral-200 bg-surface px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-neutral-900">{host.host}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{host.purpose}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{HOST_PURPOSE_OPTIONS.find((option) => option.value === host.purpose)?.label ?? '其他用途'}</span>
                   <StatusBadge dot status={badgeStatus(host.status)} label={STATUS_LABELS[host.status] ?? host.status} />
                 </div>
                 <p className="mt-2 text-xs text-neutral-500">{host.owner} · {host.reason}</p>
-                {host.expiresAt && <p className="mt-1 text-xs text-neutral-400">过期：{host.expiresAt}</p>}
+                {host.expiresAt && <p className="mt-1 text-xs text-neutral-400">过期：{formatDateTime(host.expiresAt)}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {HOST_REVIEW_OPTIONS.map((option) => (
                     <Button key={option.value} size="sm" variant={option.value === 'active' ? 'secondary' : 'outline'} onClick={() => reviewHost(host, option)}>
