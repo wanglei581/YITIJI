@@ -15,6 +15,21 @@
   gap: 16px;
 }
 
+/* 稿 18 的起点与状态卡把内容按块收住，余量摊到区块之间；不保留整屏底部空白。 */
+.qx-stage:has(.sw-page) > .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.sw-scroll[data-layout='stack'] { justify-content: flex-start; }
+.sw-scroll[data-layout='spread'] { justify-content: flex-start; }
+.sw-scroll .sw-chain { flex: none; min-height: 206px; }
+
 /* ── 小青横幅 ──────────────────────────────────────────────── */
 .sw-xq {
   flex: none;
@@ -650,11 +665,20 @@
 
 /* ── 状态屏的排法（稿 18 `.body.spread`）────────────────────────
  * 建会话 / 等授权 / 等回传 / 没扫成这些屏，内容本来就比一屏少。旧排法把余量整片
- * 堆在正文底下，27 寸竖屏上像页面没做完。稿的做法：卡片按内容收住，余量摊进
- * 「当前状态 → 链路位置 → 下一步」几段之间；卡片里的字阶跟着放大一档。
- * 内容多于一屏时 space-between 退化成从顶部排，照常滚动，不会有够不着的内容。 */
-.sw-scroll[data-layout='spread'] { justify-content: space-between; gap: 22px; }
-.sw-scroll[data-layout='spread'] .sw-pgrp { padding: 22px 26px; }
+ * 堆在正文底下，27 寸竖屏上像页面没做完。第二轮把区块按固定间距顺排，
+ * 说明卡按内容自然高度从上往下排，保持既有字阶；内容超过一屏时照常滚动。 */
+.sw-scroll[data-layout='spread'] { justify-content: flex-start; gap: 22px; }
+.sw-scroll[data-layout='spread'] .sw-pgrp { padding: 22px 26px; display: flex; flex-direction: column; justify-content: flex-start; }
+.sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) { flex: none; display: flex; flex-direction: column; }
+.sw-scroll[data-layout='spread'] > .sw-sec > .sw-grid2 { align-items: start; }
+.sw-scroll[data-layout='stack']:has(.sw-panel) .sw-sec.is-grow { flex: none; }
+.sw-scroll[data-layout='stack'] > .sw-sec.is-grow > .sw-grid2 { align-items: start; }
+.sw-scroll[data-layout='stack']:has(.sw-panel) > .sw-sec:last-child { flex: none; }
+.sw-scroll[data-layout='stack']:has(.sw-panel) > .sw-sec:last-child .sw-grid2 { align-items: start; }
+@media (max-width: 760px) {
+  .sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) { flex: none; }
+  .sw-scroll[data-layout='spread'] .sw-pgrp, .sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) .sw-pgrp { min-height: 0; }
+}
 .sw-scroll[data-layout='spread'] .sw-pgrp h4 { font-size: 23px; }
 .sw-scroll[data-layout='spread'] .sw-note-body { font-size: 20px; line-height: 1.6; }
 .sw-scroll[data-layout='spread'] .sw-plan li { font-size: 20px; line-height: 1.5; }
@@ -700,4 +724,12 @@
   .sw-exit:not(:disabled):active,
   .sw-pvh-open:active,
   .qx-stage:has(.sw-page) .qx-ctabar .qx-btn:not(:disabled):active { transform: none; }
+}
+
+/* 查询态将余量分给既有说明区块；内容从上往下排，不把操作条推到空白下方。 */
+@media (min-width: 761px) {
+  .sw-page[data-w2-page='scan-progress'] .sw-scroll { gap: 30px; }
+  .sw-page[data-w2-page='scan-progress'] .sw-state-hero { padding-block: 32px; }
+  .sw-page[data-w2-page='scan-progress'] .sw-chain { min-height: 250px; }
+  .sw-page[data-w2-page='scan-progress'] .sw-pgrp { padding-block: 30px; }
 }

@@ -24,6 +24,7 @@ import { FAIR_MATERIAL_MAX_BYTES, FairMaterialService } from './fair-material.se
 import { FairVenueGuideService } from './fair-venue-guide.service'
 import { SaveFairZoneDto, UpdateFairMaterialDto, UploadFairMaterialDto } from './dto/admin-fair.dto'
 import { SaveVenueGuideDto } from './dto/venue-guide.dto'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 
 // 留出略高于业务上限的空间，让服务层返回稳定的 MATERIAL_TOO_LARGE 错误。
 const UPLOAD_HARD_LIMIT = FAIR_MATERIAL_MAX_BYTES + 2 * 1024 * 1024
@@ -49,6 +50,7 @@ export class PartnerFairsController {
   @Get(':id/zones')
   async getZones(@Param('id') fairId: string, @CurrentUser() user: AuthedUser) {
     await this.assertPartnerOwnsFair(fairId, user)
+    if (!isRecruitmentContentHostingEnabled()) return { data: [] }
     return { data: await this.zones.listZones(fairId) }
   }
 
@@ -86,6 +88,7 @@ export class PartnerFairsController {
   @Get(':id/materials')
   async getMaterials(@Param('id') fairId: string, @CurrentUser() user: AuthedUser) {
     await this.assertPartnerOwnsFair(fairId, user)
+    if (!isRecruitmentContentHostingEnabled()) return { data: [] }
     return { data: await this.materials.listMaterials(fairId) }
   }
 
@@ -156,6 +159,7 @@ export class PartnerFairsController {
   @Get(':id/venue-guide')
   async getVenueGuide(@Param('id') fairId: string, @CurrentUser() user: AuthedUser) {
     await this.assertPartnerOwnsFair(fairId, user)
+    if (!isRecruitmentContentHostingEnabled()) return { data: null }
     return this.venueGuide.getVenueGuideAdmin(fairId)
   }
 

@@ -1,3 +1,5 @@
+import { verifyUsageContract } from './verify-admin-ai-usage-contract.mjs'
+import { verifyUsageRender } from './verify-admin-ai-usage-render.mjs'
 // Admin「AI 用量与额度」面板门禁（对接后端 #1088 GET /admin/ai-usage/daily）。
 //
 // 不靠搜几个字符串过关：适配器、显示名映射、分组表与面板都在本进程里真跑
@@ -6,7 +8,7 @@
 //      服务端改了这里先红，免得面板说明与真实行为脱节。
 //   B. aiUsageDaily.ts 适配器：请求路径与 day 参数；不合法日期不发请求；401 跳登录；
 //      403 / 400 的错误码与服务端中文 message 原样带回；响应形状不对不当成功；mock 不造假数。
-//   C. 显示名与金额：null key → 「未关联终端 / 未关联机构」；已知功能 / 供应商 key 给中文名；
+//   C. 显示名与金额：null key → 「无已验签终端 / 无机构」；已知功能 / 供应商 key 给中文名；
 //      认不出的 key 原样显示；金额两位小数带「元」。
 //   D. 面板真渲染：演示模式诚实空态；读取中 / 失败重试 / 正常三态；触顶告警引用服务端原话；
 //      四个页签；0 调用如实显示；未来日期不采纳。失败只显示中文说明，不显示错误码。
@@ -47,6 +49,7 @@ function load(rel, imports, globals = {}) {
   })
   const module = { exports: {} }
   const requireStub = (id) => {
+    if (id === '@ai-job-print/shared') return load('../../packages/shared/src/aiDisplayLabels.ts', {})
     if (!(id in imports)) throw new Error(`${rel} 引用了门禁没登记的依赖 ${id}`)
     return imports[id]
   }
@@ -104,159 +107,28 @@ const SAMPLE = () => ({
   day: '2026-09-28',
   limits: { globalCny: 100, terminalCny: 30, memberCny: 5, unmeasuredCallCostCny: 0.05 },
   totals: { key: null, calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1, memberCount: 2 },
-  reached: { global: false, terminalIds: ['kiosk-01'], memberCount: 1 },
+  reached: { global: false, terminalIds: ['kiosk-01'], terminals: [{ terminalId: 'kiosk-01', terminalCode: null }], memberCount: 1 },
   byFeature: [{ key: 'resume_optimize', calls: 2, unmeasuredCalls: 0, measuredCostCny: 0.5, chargedCostCny: 0.5 }],
   byVendor: [{ key: 'deepseek', calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1 }],
   byTerminal: [
-    { key: null, calls: 1, unmeasuredCalls: 1, measuredCostCny: 0, chargedCostCny: 0.05 },
-    { key: 'kiosk-01', calls: 3, unmeasuredCalls: 0, measuredCostCny: 1.05, chargedCostCny: 1.05 },
+    { key: null, terminalCode: null, calls: 1, unmeasuredCalls: 1, measuredCostCny: 0, chargedCostCny: 0.05 },
+    { key: 'kiosk-01', terminalCode: null, calls: 3, unmeasuredCalls: 0, measuredCostCny: 1.05, chargedCostCny: 1.05 },
   ],
-  byOrg: [{ key: null, calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1 }],
+  byOrg: [{ key: null, orgName: null, calls: 4, unmeasuredCalls: 1, measuredCostCny: 1.05, chargedCostCny: 1.1 }],
 })
+
+function legacySample() {
+  const sample = SAMPLE()
+  delete sample.reached.terminals
+  for (const bucket of sample.byTerminal) delete bucket.terminalCode
+  for (const bucket of sample.byOrg) delete bucket.orgName
+  return sample
+}
 
 console.log('\n=== Admin AI 用量与额度面板门禁 ===')
 
 // ─── A. 服务端事实 ──────────────────────────────────────────────────────────
-const controllerSource = read('services/api/src/ai/usage/admin-ai-usage.controller.ts', repoRoot)
-const budgetSource = read('services/api/src/ai/usage/ai-budget.service.ts', repoRoot)
-const summarySource = read('services/api/src/ai/usage/ai-usage-summary.ts', repoRoot)
-
-function budgetMessage(varName, key) {
-  const match = new RegExp(`${key}:\\s*'([^']+)'`).exec(budgetSource.slice(budgetSource.indexOf(varName)))
-  assert.ok(match, `ai-budget.service.ts 里找不到 ${varName}.${key} 的原话`)
-  return match[1]
-}
-const EXHAUSTED_GLOBAL = budgetMessage('EXHAUSTED_MESSAGE', 'global')
-
-await check('A1 服务端事实：GET /admin/ai-usage/daily 只给 admin；day 校验与错误码同判法', () => {
-  assert.match(controllerSource, /@Controller\('admin\/ai-usage'\)/, '控制器路径变了')
-  assert.match(controllerSource, /@Get\('daily'\)/, '缺 GET daily')
-  assert.match(controllerSource, /@Roles\('admin'\)/, '不再只限 admin')
-  assert.match(controllerSource, /day\?\.trim\(\) \|\| beijingDayKey\(aiUsageNow\(\)\)/, '省略 day 不再默认北京时间今天')
-  assert.match(controllerSource, /code: 'AI_USAGE_DAY_INVALID', message: '日期格式应为 YYYY-MM-DD'/, '非法 day 的错误码或提示变了')
-})
-
-await check('A2 服务端事实：触顶后果照真实行为——只拦生成与语音，只读导出删除材料检查不拦，次日恢复', () => {
-  assert.equal(EXHAUSTED_GLOBAL, '今天的 AI 服务额度已用完，明天恢复；打印、扫描等其他功能照常', '全局触顶提示原话变了，面板告警文字要跟着改')
-  // 触顶是拒绝（503），不是降级：assertWithinBudget 抛 ServiceUnavailableException
-  assert.match(budgetSource, /throw new ServiceUnavailableException\(\{ error: \{ code: AI_BUDGET_EXHAUSTED/, '触顶不再抛 503 AI_BUDGET_EXHAUSTED')
-  assert.match(budgetSource, /只拦 generate \/ voice/, '拦截范围说明变了（面板「后果」段落要重写）')
-  assert.match(budgetSource, /只读、导出、删除、打印前材料检查（@AiUseExempt）一律不拦/, '豁免范围说明变了（面板「后果」段落要重写）')
-  assert.match(budgetSource, /失败关闭/, '读不到花费时不再是失败关闭')
-})
-
-await check('A3 服务端事实：桶字段白名单、null key 口径、不含会员号', () => {
-  assert.match(summarySource, /null 表示「无已验签终端」\/「无所属机构」/, 'null key 口径说明变了')
-  assert.match(summarySource, /\*\*不含会员号\*\*，会员只给人数/, '汇总不再遵守「不含会员号」白名单')
-  for (const field of ['calls', 'unmeasuredCalls', 'measuredCostCny', 'chargedCostCny']) {
-    assert.match(summarySource, new RegExp(`${field}:`), `桶缺 ${field}`)
-  }
-})
-
-// ─── B. 适配器（node:vm 沙箱真跑） ───────────────────────────────────────────
-const http = loadAdapter('http', () => reply(200, { success: true, data: SAMPLE() })).service
-
-await check('B1 http：GET /admin/ai-usage/daily 带管理员令牌与 day 参数，按 { success, data } 取全量字段', async () => {
-  const { service, calls } = loadAdapter('http', () => reply(200, { success: true, data: SAMPLE() }))
-  const summary = await service.getAiUsageDaily('2026-09-28')
-  assert.equal(calls.length, 1)
-  assert.equal(calls[0].url, `${API_BASE}/admin/ai-usage/daily?day=2026-09-28`)
-  assert.equal(calls[0].init.method, 'GET')
-  assert.equal(calls[0].init.headers.Authorization, 'Bearer gate-admin-token')
-  // vm 沙箱里创建的对象原型与宿主不同，deepStrictEqual 会连原型一起比：先 JSON 往返归一化。
-  assert.deepEqual(JSON.parse(JSON.stringify(summary)), SAMPLE(), '解析结果必须逐字段等于服务端 data')
-  assert.equal(service.AI_USAGE_DAILY_DEMO, false, 'http 模式不能标演示')
-})
-
-await check('B2 http：省略 day 不带查询串', async () => {
-  const { service, calls } = loadAdapter('http', () => reply(200, { success: true, data: SAMPLE() }))
-  await service.getAiUsageDaily()
-  assert.equal(calls[0].url, `${API_BASE}/admin/ai-usage/daily`)
-})
-
-await check('B3 http：不合法日期（格式错、月或日越界）根本不发请求', async () => {
-  for (const day of ['2026-9-1', '2026/09/28', 'abc', '2026-13-01', '2026-09-32', '']) {
-    const { service, calls } = loadAdapter('http', () => reply(200, { success: true, data: SAMPLE() }))
-    const error = await rejection(service.getAiUsageDaily(day))
-    assert.equal(error.code, 'AI_USAGE_DAY_INVALID', `day=${JSON.stringify(day)}`)
-    assert.equal(error.status, 400)
-    assert.equal(calls.length, 0, `day=${JSON.stringify(day)} 不能发请求`)
-  }
-  assert.equal(http.isAiUsageDayKey('2026-09-28'), true)
-  assert.equal(http.isAiUsageDayKey('2026-13-01'), false)
-})
-
-await check('B4 http：401 跳登录；403 / 400 的错误码与服务端中文 message 原样带回', async () => {
-  const unauthorized = loadAdapter('http', () => reply(401, { error: { code: 'AUTH_TOKEN_INVALID', message: 'Token 无效或已过期' } }))
-  assert.equal((await rejection(unauthorized.service.getAiUsageDaily())).status, 401)
-  assert.equal(unauthorized.redirects.length, 1, '401 必须跳登录')
-
-  const forbidden = loadAdapter('http', () => reply(403, { error: { code: 'AUTH_ROLE_FORBIDDEN', message: '当前角色无权访问 (需要: admin)' } }))
-  const forbiddenError = await rejection(forbidden.service.getAiUsageDaily())
-  assert.equal(forbiddenError.status, 403)
-  assert.equal(forbiddenError.code, 'AUTH_ROLE_FORBIDDEN')
-  assert.equal(forbiddenError.message, '当前角色无权访问 (需要: admin)', '服务端 message 要原样带回')
-  assert.equal(forbidden.redirects.length, 0, '403 不是登录过期，不能跳登录')
-
-  const badDay = loadAdapter('http', () => reply(400, { error: { code: 'AI_USAGE_DAY_INVALID', message: '日期格式应为 YYYY-MM-DD' } }))
-  const badDayError = await rejection(badDay.service.getAiUsageDaily())
-  assert.equal(badDayError.code, 'AI_USAGE_DAY_INVALID')
-  assert.equal(badDayError.message, '日期格式应为 YYYY-MM-DD')
-
-  const offline = loadAdapter('http', () => { throw new TypeError('Failed to fetch') })
-  const offlineError = await rejection(offline.service.getAiUsageDaily())
-  assert.equal(offlineError.code, 'NETWORK_ERROR')
-  assert.equal(offlineError.status, 0)
-})
-
-await check('B5 http：响应形状不对不当成功（缺 data / 日期错 / 负数金额 / 未计量单价 0 / 桶字段坏）', async () => {
-  const broken = [
-    { success: true },
-    { success: true, data: { ...SAMPLE(), day: '2026/09/28' } },
-    { success: true, data: { ...SAMPLE(), limits: { ...SAMPLE().limits, globalCny: -1 } } },
-    { success: true, data: { ...SAMPLE(), limits: { ...SAMPLE().limits, unmeasuredCallCostCny: 0 } } },
-    { success: true, data: { ...SAMPLE(), totals: { ...SAMPLE().totals, memberCount: '2' } } },
-    { success: true, data: { ...SAMPLE(), reached: { ...SAMPLE().reached, terminalIds: 'kiosk-01' } } },
-    { success: true, data: { ...SAMPLE(), byFeature: {} } },
-    { success: true, data: { ...SAMPLE(), byTerminal: [{ key: 123, calls: 1, unmeasuredCalls: 0, measuredCostCny: 0, chargedCostCny: 0 }] } },
-    { success: true, data: { ...SAMPLE(), byVendor: [{ key: 'deepseek', calls: -1, unmeasuredCalls: 0, measuredCostCny: 0, chargedCostCny: 0 }] } },
-  ]
-  for (const body of broken) {
-    const { service } = loadAdapter('http', () => reply(200, body))
-    const error = await rejection(service.getAiUsageDaily())
-    assert.equal(error.code, 'UNEXPECTED_RESPONSE', `body=${JSON.stringify(body).slice(0, 80)} 不能当成功`)
-  }
-})
-
-await check('B6 mock：标演示、不发请求、直接拒绝（不造假数）', async () => {
-  const { service, calls } = loadAdapter('mock')
-  assert.equal(service.AI_USAGE_DAILY_DEMO, true, 'mock 模式必须标演示')
-  const error = await rejection(service.getAiUsageDaily('2026-09-28'))
-  assert.equal(error.code, 'DEMO_MODE_NO_USAGE_DATA')
-  assert.equal(calls.length, 0, 'mock 模式不能发请求')
-})
-
-// ─── C. 显示名与金额（真跑 aiUsageDisplay.ts） ────────────────────────────────
-await check('C1 null key 显示「未关联终端 / 未关联机构」；已知 key 给中文名；认不出原样显示', () => {
-  const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
-  assert.equal(display.aiUsageKeyName('terminal', null), '未关联终端')
-  assert.equal(display.aiUsageKeyName('org', null), '未关联机构')
-  assert.equal(display.aiUsageKeyName('feature', 'resume_optimize'), 'AI简历优化')
-  assert.equal(display.aiUsageKeyName('feature', 'assistant_chat'), 'AI助手对话')
-  assert.equal(display.aiUsageKeyName('feature', 'unknown'), '未知功能')
-  assert.equal(display.aiUsageKeyName('vendor', 'deepseek'), 'DeepSeek')
-  assert.equal(display.aiUsageKeyName('vendor', 'qwen'), '通义千问')
-  assert.equal(display.aiUsageKeyName('feature', 'brand_new_feature'), 'brand_new_feature', '认不出的功能 key 必须原样显示')
-  assert.equal(display.aiUsageKeyName('vendor', 'api.somehost.com'), 'api.somehost.com', '认不出的厂商 key（主机名）必须原样显示')
-})
-
-await check('C2 金额两位小数带「元」', () => {
-  const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
-  assert.equal(display.formatCny(1.1), '1.10 元')
-  assert.equal(display.formatCny(0.05), '0.05 元')
-  assert.equal(display.formatCny(0), '0.00 元')
-  assert.equal(display.formatCny(123.456), '123.46 元')
-})
+const { http, EXHAUSTED_GLOBAL } = await verifyUsageContract({ check, read, repoRoot, loadAdapter, load, SAMPLE, legacySample, reply, rejection, ApiHttpError, API_BASE })
 
 // ─── D. 面板真渲染（最小 hooks 运行时） ───────────────────────────────────────
 const FRAGMENT = Symbol('Fragment')
@@ -384,7 +256,7 @@ function mountPanel({ demo = false, get } = {}) {
     isAiUsageDayKey: http.isAiUsageDayKey,
     getAiUsageDaily: (day) => {
       calls.push(day)
-      return get ? get(day) : Promise.resolve(SAMPLE())
+      return (get ? get(day) : Promise.resolve(SAMPLE())).then((summary) => http.aiUsageDailyFromResponse({ success: true, data: summary }))
     },
   }
   const panel = load('src/routes/ai-services/AiUsagePanel.tsx', {
@@ -401,148 +273,7 @@ function mountPanel({ demo = false, get } = {}) {
   return { view: runtime.mount(panel.AiUsagePanel), calls }
 }
 
-await check('D1 演示模式：诚实空态，不出现任何数字，也不发请求', async () => {
-  const panel = mountPanel({ demo: true })
-  const tree = await panel.view.settle()
-  assert.match(textOf(tree), /演示模式不连接真实用量数据/)
-  assert.doesNotMatch(textOf(tree), /\d/, '演示模式不能出现任何数字（不造演示数据）')
-  assert.equal(panel.calls.length, 0)
-  assert.equal(byId(tree, 'ai-usage-day'), undefined, '演示模式不渲染日期选择')
-})
-
-await check('D2 读取中不出数字；读完只显示服务端给的数', async () => {
-  const pending = deferred()
-  const panel = mountPanel({ get: () => pending.promise })
-  let tree = panel.view.render()
-  assert.match(textOf(tree), /正在读取/)
-  assert.doesNotMatch(textOf(tree), /已计费金额/)
-  pending.resolve(SAMPLE())
-  tree = await panel.view.settle()
-  assert.match(textOf(tree), /1\.10 元 \/ 100\.00 元/, '已计费金额 / 全局上限要用服务端数字')
-  assert.match(textOf(tree), /4 次/)
-  assert.match(textOf(tree), /未计量/, '要有一句话解释未计量')
-  assert.match(textOf(tree), /0\.05 元\/次/, '解释里要带服务端的保守单价')
-  assert.match(textOf(tree), /2 人/)
-})
-
-await check('D3 查看北京时间今天且触顶：全局醒目标红并照服务端原话写后果；终端与会员只给终端号和人数', async () => {
-  const summary = SAMPLE()
-  summary.day = '2026-09-29'
-  summary.reached = { global: true, terminalIds: ['kiosk-01', 'kiosk-02'], memberCount: 3 }
-  const panel = mountPanel({ get: () => Promise.resolve(summary) })
-  const tree = await panel.view.settle()
-  const alert = find(tree, (node) => node.props.role === 'alert').map((node) => textOf(node.children)).join('\n')
-  assert.match(alert, /全站当日 AI 额度已用完/)
-  assert.ok(alert.includes(EXHAUSTED_GLOBAL), `后果必须引用服务端原话「${EXHAUSTED_GLOBAL}」`)
-  assert.match(alert, /这台机器今天的 AI 服务额度已用完/, '单终端触顶要引用终端档原话')
-  assert.match(alert, /你今天的 AI 服务额度已用完/, '会员触顶要引用会员档原话')
-  assert.match(alert, /kiosk-01、kiosk-02/, '已到单终端上限的终端要列出')
-  assert.match(alert, /3 人/, '已到会员上限的只给人数')
-  assert.doesNotMatch(alert, /会员号|endUser|user-/, '告警里不能出现会员标识')
-  assert.match(textOf(tree), /今日已计费金额/)
-})
-
-await check('D3b 历史日期触顶：列出终端与人数，但不把「现在就会拒绝新请求」说成正在发生', async () => {
-  const summary = SAMPLE()
-  summary.day = '2026-09-28'
-  summary.reached = { global: true, terminalIds: ['kiosk-01'], memberCount: 2 }
-  const panel = mountPanel({ get: () => Promise.resolve(summary) })
-  const tree = await panel.view.settle()
-  const text = textOf(tree)
-  assert.match(text, /历史日期 2026-09-28/)
-  assert.match(text, /不会据此拒绝现在的新请求/)
-  assert.doesNotMatch(text, /新的 AI 生成与语音请求会被拒绝/, '历史日期的账不能写成闸门正在拒绝新请求')
-  assert.match(text, /kiosk-01/)
-  assert.match(text, /2 人/)
-  assert.doesNotMatch(text, /均未触顶/)
-  assert.match(text, /2026-09-28 已计费金额/)
-})
-
-await check('D3c 今天只触到单终端：不能写成三档都没满', async () => {
-  const summary = SAMPLE()
-  summary.day = '2026-09-29'
-  summary.reached = { global: false, terminalIds: ['kiosk-01'], memberCount: 0 }
-  const panel = mountPanel({ get: () => Promise.resolve(summary) })
-  const text = textOf(await panel.view.settle())
-  assert.match(text, /全站当日额度未用完/)
-  assert.doesNotMatch(text, /均未触顶/)
-  assert.match(text, /这台机器今天的 AI 服务额度已用完/)
-  assert.doesNotMatch(text, /你今天的 AI 服务额度已用完/)
-})
-
-await check('D4 四个页签：功能 / 供应商给中文名，终端 / 机构的 null key 给「未关联」', async () => {
-  const panel = mountPanel({})
-  let tree = await panel.view.settle()
-  assert.match(textOf(tree), /AI简历优化/, '功能页签要显示中文名')
-  assert.match(textOf(tree), /已计费金额（计入额度）/)
-  act.click(tabs(tree, '按供应商')[0])
-  tree = panel.view.render()
-  assert.match(textOf(tree), /DeepSeek/)
-  act.click(tabs(tree, '按终端')[0])
-  tree = panel.view.render()
-  assert.match(textOf(tree), /未关联终端/)
-  act.click(tabs(tree, '按机构')[0])
-  tree = panel.view.render()
-  assert.match(textOf(tree), /未关联机构/)
-})
-
-await check('D5 当天 0 调用：如实显示 0，不装作没查到', async () => {
-  const summary = SAMPLE()
-  summary.totals = { key: null, calls: 0, unmeasuredCalls: 0, measuredCostCny: 0, chargedCostCny: 0, memberCount: 0 }
-  summary.byFeature = []
-  summary.byVendor = []
-  summary.byTerminal = []
-  summary.byOrg = []
-  summary.reached = { global: false, terminalIds: [], memberCount: 0 }
-  const panel = mountPanel({ get: () => Promise.resolve(summary) })
-  const tree = await panel.view.settle()
-  assert.match(textOf(tree), /当天 0 次 AI 调用/)
-  assert.match(textOf(tree), /当日该维度没有调用记录/)
-  assert.match(textOf(tree), /0\.00 元 \/ 100\.00 元/)
-})
-
-await check('D6 失败可重试：只显示服务端中文说明，不显示错误码，重试后恢复', async () => {
-  let attempt = 0
-  const panel = mountPanel({
-    get: () => {
-      attempt += 1
-      return attempt === 1
-        ? Promise.reject(new ApiHttpError('AI_USAGE_DAY_INVALID', '日期格式应为 YYYY-MM-DD', 400))
-        : Promise.resolve(SAMPLE())
-    },
-  })
-  let tree = await panel.view.settle()
-  assert.match(textOf(tree), /AI 用量读取失败：日期格式应为 YYYY-MM-DD/)
-  assert.doesNotMatch(textOf(tree), /AI_USAGE_DAY_INVALID/, '失败说明不能把英文错误码给运营看')
-  act.click(buttons(tree, '重试')[0])
-  panel.view.render() // 点击只改状态，要再渲染一次 effect 才会发出第二次请求
-  assert.equal(panel.calls.length, 2)
-  tree = await panel.view.settle()
-  assert.match(textOf(tree), /已计费金额/)
-})
-
-await check('D7 403：写明只有管理员可以查看', async () => {
-  const panel = mountPanel({ get: () => Promise.reject(new ApiHttpError('AUTH_ROLE_FORBIDDEN', '当前角色无权访问 (需要: admin)', 403)) })
-  const tree = await panel.view.settle()
-  assert.match(textOf(tree), /只有管理员可以查看 AI 用量与额度/)
-})
-
-await check('D8 日期：未来日期不采纳也不重取；换成过去某天按该日重取', async () => {
-  const panel = mountPanel({})
-  let tree = await panel.view.settle()
-  assert.equal(panel.calls.length, 1)
-  assert.equal(panel.calls[0], '2026-09-29', '默认查北京时间今天')
-  // 未来日期（今天 2026-09-29）：不采纳
-  byId(tree, 'ai-usage-day').props.onChange({ target: { value: '2026-09-30' } })
-  tree = panel.view.render()
-  assert.equal(panel.calls.length, 1, '未来日期不能触发重取')
-  assert.equal(byId(tree, 'ai-usage-day').props.value, '2026-09-29', '未来日期不能被采纳')
-  // 昨天：按该日重取
-  byId(tree, 'ai-usage-day').props.onChange({ target: { value: '2026-09-28' } })
-  await panel.view.settle()
-  assert.equal(panel.calls.length, 2)
-  assert.equal(panel.calls[1], '2026-09-28')
-})
+await verifyUsageRender({ check, mountPanel, textOf, find, buttons, tabs, act, SAMPLE, legacySample, loadAdapter, reply, ApiHttpError, deferred, byId, EXHAUSTED_GLOBAL })
 
 // ─── E. 纪律 ────────────────────────────────────────────────────────────────
 const PANEL_SOURCES = [
@@ -668,7 +399,9 @@ await check('F2 面板渲染结果不含 HTTP 状态码、英文错误码、字�
   assert.match(text, /会被拒绝，并提示「/)
   assert.match(text, /AI简历优化/, '已知功能显示中文名')
   assert.doesNotMatch(text, /resume_optimize/, '已知功能不要再附英文 key')
-  assert.match(text, /kiosk-01/, '终端号要保留')
+  assert.match(text, /终端（尾号 osk-01）/, '只有 ID 时显示真实尾号')
+  assert.ok(find(await panel.view.settle(), (node) => node.props.title === 'kiosk-01').length > 0, '终端 ID 在悬停保留')
+  assert.doesNotMatch(text, /kiosk-01/, '正文不直接露出终端 ID')
   assertOperatorFacing(text, '触顶面板')
 
   const failed = mountPanel({

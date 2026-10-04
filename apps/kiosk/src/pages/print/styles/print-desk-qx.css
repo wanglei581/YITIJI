@@ -83,7 +83,7 @@
 .qpd-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .qpd-summary-grid[data-single='true'] { grid-template-columns: minmax(0, 1fr); }
 .qpd-check-grid[data-encrypted='true'] .qpd-check-right { display: flex; flex-direction: column; }
-.qpd-check-grid[data-encrypted='true'] .qpd-review { flex: 1 1 auto; min-height: 0; justify-content: space-between; }
+.qpd-check-grid[data-encrypted='true'] .qpd-review { flex: none; min-height: 0; justify-content: flex-start; }
 .qpd-check-grid[data-encrypted='true'] .qpd-review > * { flex-shrink: 0; }
 .qpd-summary { padding: 16px; border: 1px solid var(--qx-line); border-radius: 20px; background: var(--qx-surface); }
 .qpd-summary > div { display: flex; flex-direction: column; gap: 8px; }
@@ -211,6 +211,35 @@
 .qpd-full-preview :is(button, nav span, p) { font-size: var(--qx-fs-body); }
 .qpd-full-preview [data-pdf-preview-host] nav { flex-wrap: wrap; }
 .qpd-full-preview [data-pdf-preview-host] button { min-height: 64px; }
+
+/* 终版 13：检查台左侧预览是主信息，右侧状态与决定卡按内容顺排。 */
+.qpd-check-grid, .qpd-preview-grid {
+  grid-template-columns: 430px minmax(0, 1fr);
+  gap: 20px;
+}
+.qpd-check-right, .qpd-preview-right { display: flex; flex-direction: column; }
+.qpd-check-right > .qpd-review { flex: none; min-height: 0; }
+.qpd-preview-right > * { flex: none; }
+.qpd-preview-right .qpd-param-stack { flex: none; gap: 14px; }
+.qpd-check-right .qpd-review > .qpd-options-note { display: flex; flex-direction: column; gap: 14px; }
+.qpd-check-right .qpd-next-note ul { margin: 20px 0 0; padding-left: 24px; font-size: var(--qx-fs-body); line-height: 1.6; }
+.qpd-check-right .qpd-next-note li + li { margin-top: 18px; }
+.qpd-device-strip > div[data-unavailable='true'] { background: var(--qx-paper); border-style: dashed; }
+.qpd-device-strip > div[data-unavailable='true'] strong { color: var(--qx-wheat-d); }
+.qpd-check-intro { min-height: 76px; padding: 12px 0; }
+.qpd-check-left .qpd-preview-shell { height: 600px; max-height: min(64vh, 620px); }
+.qpd-preview-left .qpd-preview-shell { height: 450px; max-height: 450px; }
+.qpd-context-empty, .qpd-guard { justify-content: flex-start; }
+.qpd-context-empty .qpd-empty-work, .qpd-guard .qpd-guard-work { flex: none; align-items: start; }
+.qpd-context-empty .qpd-empty-sheet, .qpd-guard .qpd-file-sheet { min-height: 0; }
+.qpd-context-empty .qpd-empty-work > .qx-card,
+.qpd-guard .qpd-guard-work > .qx-card { display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 760px) {
+  .qpd-check-grid, .qpd-preview-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .qpd-check-left .qpd-preview-shell, .qpd-preview-left .qpd-preview-shell { height: 440px; max-height: none; }
+  .qpd-context-empty .qpd-empty-work, .qpd-guard .qpd-guard-work { min-height: 0; }
+  .qpd-context-empty .qpd-empty-sheet, .qpd-guard .qpd-file-sheet { min-height: 280px; }
+}
 @keyframes qpd-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .qpd-steps li[data-state='active'] svg { animation: none; } }
 @media (max-width: 760px) {

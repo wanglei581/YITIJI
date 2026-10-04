@@ -344,6 +344,20 @@ test('package-code：请求在途时 onHide，迟到的响应不得把到机码�
   assert.ok(!JSON.stringify(page.data).includes('87654321'))
 })
 
+test('package-code：只有服务端给出大于 0 的金额才说付款（试点免费不提钱）', async () => {
+  for (const [amountCents, paid] of [[200, true], [0, false], [undefined, false]]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const api = { getPackageOrder: () => Promise.resolve({ ...A_PACKAGE, amountCents }) }
+    const page = makePage('pages/package-code/package-code.js', { auth, api, wx })
+    page.onLoad({ orderId: 'pkg-A' })
+    page.onShow()
+    await flush()
+    assert.equal(page.data.ready, true)
+    assert.equal(page.data.paidOrder, paid, `amountCents=${amountCents}`)
+  }
+})
+
 test('package-code：请求在途时 onUnload，迟到的响应同样不得复活凭证', async () => {
   const auth = createAuth('A')
   const wx = createWx()
@@ -6491,4 +6505,108 @@ test('orders：到机码过期说清没打印；已完成、待到机不写', ()
 test('orders：模板在规格行下方显示原因，复用规格行样式', () => {
   const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/orders/orders.wxml'), 'utf8')
   assert.match(wxml, /<view class="oc-spec" wx:if="\{\{item\.reasonNote\}\}">\{\{item\.reasonNote\}\}<\/view>/)
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// 错误原话：请求层把给用户看的原话放在 err.message、错误码放在 err.code（utils/request.js）。
+// 这几页此前读的是不存在的 err.error，原话永远读不到，只剩兜底句（走查登记）。
+// ══════════════════════════════════════════════════════════════════════
+
+const serverError = (message, code, statusCode = 400) => Object.assign(new Error(message), { code, statusCode })
+const QUOTA_MSG = '今天的 AI 次数已经用完，明天 0 点恢复。'
+
+test('interview-qa：提交答案失败时把服务端原话给用户看，已输入的回答保留', async () => {
+  for (const [err, shown] of [
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_MSG],
+    [serverError('', 'SOME_MACHINE_CODE', 500), '提交失败，请重试。已输入的回答还在。'],
+  ]) {
+    const wx = createWx()
+    const api = {
+      startInterview: () => Promise.resolve({ questionIndex: 1, questionTarget: 5, question: '请做自我介绍', qType: 'intro' }),
+      answerInterview: () => Promise.reject(err),
+    }
+    const page = makePage('pages/interview-qa/interview-qa.js', { auth: createAuth('A'), api, wx })
+    page.onLoad({ sessionId: 's1' })
+    await flush()
+    assert.equal(page.data.phase, 'running')
+    page.inputAnswer({ detail: { value: '我做过三年行政排班。' } })
+    page.tapSubmit()
+    await flush()
+    assert.equal(wx.calls.showModal.length, 1)
+    assert.equal(wx.calls.showModal[0].content, shown)
+    assert.equal(page.data.phase, 'running', '回到可作答')
+    assert.equal(page.data.myAnswer, '我做过三年行政排班。', '已输入的回答不丢')
+  }
+})
+
+test('interview-qa：开场失败同样显示原话；会话不存在按错误码认', async () => {
+  for (const [err, shown] of [
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_MSG],
+    [serverError('', 'INTERVIEW_SESSION_NOT_FOUND', 404), '面试会话不存在或无权访问'],
+  ]) {
+    const wx = createWx()
+    const page = makePage('pages/interview-qa/interview-qa.js', { auth: createAuth('A'), api: { startInterview: () => Promise.reject(err) }, wx })
+    page.onLoad({ sessionId: 's1' })
+    await flush()
+    assert.equal(page.data.phase, 'failed')
+    assert.equal(page.data.failMsg, shown)
+  }
+})
+
+test('interview-result：生成报告失败时显示服务端原话；会话不存在按错误码认；没有原话才用兜底句', async () => {
+  for (const [err, shown] of [
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_MSG],
+    [serverError('', 'INTERVIEW_SESSION_NOT_FOUND', 404), '面试会话不存在或无权访问'],
+    [serverError('', undefined, 500), 'AI 报告生成失败，请稍后重试'],
+  ]) {
+    const wx = createWx()
+    const api = {
+      getInterviewReport: () => Promise.reject(serverError('', 'INTERVIEW_REPORT_NOT_READY', 404)),
+      endInterview: () => Promise.reject(err),
+    }
+    const page = makePage('pages/interview-result/interview-result.js', { auth: createAuth('A'), api, wx })
+    page.onLoad({ sessionId: 's1' })
+    await flush()
+    await flush()
+    assert.equal(page.data.phase, 'failed')
+    assert.equal(page.data.failMsg, shown)
+  }
+})
+
+test('interview-result：打印复盘报告失败时显示服务端原话', async () => {
+  const wx = createWx()
+  const api = {
+    getInterviewReport: () => Promise.resolve({ endedAt: '2026-10-03T02:00:00Z', position: '行政助理', report: { overall: { summary: '结构清楚。' }, expression: ['表达清楚'] } }),
+    printInterviewReport: () => Promise.reject(serverError('这份报告已按隐私策略清理，请重新练习一次。', 'INTERVIEW_REPORT_PURGED', 410)),
+  }
+  const page = makePage('pages/interview-result/interview-result.js', { auth: createAuth('A'), api, wx })
+  page.onLoad({ sessionId: 's1' })
+  await flush()
+  page.tapPrint()
+  await flush()
+  assert.equal(wx.calls.showModal.length, 1)
+  assert.equal(wx.calls.showModal[0].content, '这份报告已按隐私策略清理，请重新练习一次。')
+  assert.equal(page.data.printing, false)
+})
+
+test('print-store：终端列表加载失败时显示服务端原话', async () => {
+  const wx = createWx()
+  const api = { getPublicTerminals: () => Promise.reject(serverError('服务点列表暂时取不到，请稍后再试。', 'TERMINALS_UNAVAILABLE', 503)) }
+  const page = makePage('pages/print-store/print-store.js', { auth: createAuth('A'), api, wx })
+  page.onLoad({ fileId: 'f1', name: 'a.pdf' })
+  await flush()
+  assert.equal(page.data.loadError, '服务点列表暂时取不到，请稍后再试。')
+})
+
+test('页面不读 err.error：请求层的错误对象上没有这个字段', () => {
+  const dir = path.join(MINIAPP, 'pages')
+  const hits = []
+  for (const name of fs.readdirSync(dir)) {
+    const file = path.join(dir, name, `${name}.js`)
+    if (!fs.existsSync(file)) continue
+    fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+      if (/\berr(or)?\.error\b|\be\.error\b/.test(line) && !/^\s*(\/\/|\*)/.test(line)) hits.push(`pages/${name}/${name}.js:${i + 1}`)
+    })
+  }
+  assert.deepEqual(hits, [])
 })

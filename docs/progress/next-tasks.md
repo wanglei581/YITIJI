@@ -1,5 +1,15 @@
 # 下一步任务
 
+## 2026-09-30：AI 额度拍板（产品负责人，四条都按推荐）
+
+1. 「用 AI 前先登录」保持不变。游客额度开关做好但默认 0，等山东省网信办答复宽松再开。
+2. 每人每天沿用现有默认：简历类 20 次、小青 80 轮；模拟面试另加 5 场/天。
+3. 用完不收费：提示明天恢复，AI 这一步退回模板加填空，打印、扫描照常；付费只留接口，不做收费、价格与购买引导。
+4. 先花 1–2 天补三个漏洞，再在 10 月内做整套按人额度，赶在试点前上线。
+   - 第一步（本 PR）三个漏洞：公共次数额度改认验签的终端身份，缺票或伪造的终端号只按 IP 计、不单开池；数字人通话（TRTC）单次上限 `TRTC_MAX_SESSION_MINUTES`（默认 10 分钟，1–30），服务端到点结束、重启后补停，一体机提前一分钟提示、到点转文字，再开要重走全部入口检查；小程序公共错误映射登记 `AI_BUDGET_EXHAUSTED` / `AI_BUDGET_UNAVAILABLE`（只改文字，颜色风格不动）。TRTC 参考价 0.024 元/分钟，出处写在 `services/api/src/ai/usage/ai-pricing.ts`。
+   - 第二步（另排，约 10–15 人日）：权益账本加 AI 用途、预占记录、余量接口、后台与两端显示。证据与方案见只读核查报告（本机 `~/.cache/claude-lanes/ai-quota-0930/codex-final.md`）。
+   - 已知遗留：`TerminalScopedThrottle` 的每分钟限流仍按自报终端号分桶（不在本步范围）；小程序模拟面试提交答案、生成报告两处仍丢弃映射后的错误原话。
+
 ## 2026-09-30：走查复核新登记（候选 353b680d0，本地 rc 栈；均不阻塞第三次小步更新）
 
 后端（后端排雷窗口认领；证据 `~/.cache/walk0929/evidence/k14/`）：
@@ -327,7 +337,7 @@
 - 改完必跑：API 类型检查与 lint，`verify:resume-extraction`、`verify:resume-report-export`、`verify:document-conversion`、`verify:file-display-truth`、`verify:materials-processing`、`verify:pii-redaction`、`verify:print-sign`、`verify:contract-review:units`，再补一个用真实 unpdf 的合同 PDF 冒烟；锁文件变了跑根目录 `verify:dependency-security`。
 ## 2026-09-29：小程序余项（小程序窗口）
 
-- **提审前产品负责人在公众平台做的事**（清单已交总指挥）：用户隐私保护指引按 `apps/miniapp/scripts/privacy-api-inventory.json` 五类填；类目工具 > 办公；备案（0.11）；后台「法务文档」发布四份文档（先发布再部署，C4）；request / uploadFile / downloadFile 合法域名。
+- **提审前产品负责人在公众平台做的事**（清单已交总指挥）：用户隐私保护指引按 `apps/miniapp/scripts/privacy-api-inventory.json` 五类填；类目工具 > 办公；备案（0.11）；后台「法务文档」发布四份文档（先发布再部署，C4）；request / uploadFile / downloadFile 合法域名；**发布前确认生产价目两行都是 0**（`GET /api/v1/print/price-config` 里 `print_bw_page`、`print_color_page` 的 `unitCents` 都为 0。不为 0 时打印链路会照常显示金额，违反 9/30「首版不出现任何价格或购买引导」；代码不硬拦，留给以后正式收费）。
 - **交主执行窗口：** 一体机「我的打印订单」补读 `/me/print-orders/cloud` 与 `/orders/package`（手机上下的单在一体机上看不到，见 current-progress 同日条目）。
 - **交后端窗口（已转）：** 全局异常过滤器丢掉 `AI_DECLARATION_REQUIRED` 的 `missing`，建议放进 `details`；小程序两处都读，已兼容。
 - **待真机与实跑：** 对照工具 `apps/miniapp/tools/cross-end-member-parity.mjs` 连本地全栈或试点测试会员跑一次；分享图与作废重发、年龄与录音声明在两台真机各走一遍（4.3）。

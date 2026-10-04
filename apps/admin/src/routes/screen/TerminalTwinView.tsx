@@ -122,7 +122,7 @@ function TerminalTwinLive({
       hostingOff={fleetSnapshot?.limits.recruitmentHosting === 'disabled'}
     >
       {current ? (
-        <TwinTerminalBoard twin={current} formatClock={(iso) => formatTime(iso)} formatDateTime={(iso) => formatDateTime(iso)} unassignedAreaLabel="未设置所在区" />
+        <TwinTerminalBoard twin={current} formatClock={(iso) => formatTime(iso)} formatDateTime={(iso) => formatDateTime(iso)} unassignedAreaLabel="未设置所在区" failureGuidance="详情见打印扫描运维" />
       ) : (
         <TwinSlot slot="full">
           {twin.failure ? (

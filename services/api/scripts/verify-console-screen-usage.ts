@@ -390,7 +390,7 @@ async function assertBehavior(): Promise<void> {
   const aiWhere = (from: Date, to: Date) => ai.filter((row) => inWindow(row.createdAt, from, to))
   const successOf = (ops: string[], from: Date, to: Date) => aiWhere(from, to).filter((row) => row.status === 'success' && ops.includes(row.operation)).length
   const paidWhere = (from: Date, to: Date) => orders.filter((row) => row.payStatus === 'paid' && row.paidAt !== null && inWindow(row.paidAt, from, to))
-  const show = (count: number) => (count >= SCREEN_MIN_AGGREGATE_SAMPLE ? count : null)
+  const show = (count: number) => (count <= 0 ? 0 : count < 5 ? null : count)
 
   try {
     const expiresAt = new Date('2026-02-01T00:00:00.000Z')
@@ -551,7 +551,7 @@ async function assertBehavior(): Promise<void> {
     const channels = opened(admin.metrics.channels)
     const paidToday = paidWhere(today.from, today.to)
     assert(
-      'u13. 渠道按 paidAt 计已支付，分项小于 5 为 null，未支付和已退款不计',
+      'u13. 渠道按 paidAt 计已支付，分项 1–4 为 null，0 保留，未支付和已退款不计',
       channels?.paidOrders === paidToday.length
         && channels.kiosk === show(paidToday.filter((row) => row.channel === 'kiosk').length)
         && channels.miniapp === show(paidToday.filter((row) => row.channel === 'miniapp_cloud').length)
@@ -660,7 +660,7 @@ async function assertBehavior(): Promise<void> {
     const heat = opened(admin.metrics.heat7d)
     const todayHeat = heat?.days.find((day) => day.date === '2026-01-15')
     assert(
-      'u18. 热力是上海自然日的 24 小时，未到的钟点和小于 5 为 null',
+      'u18. 热力是上海自然日的 24 小时：0 保留，1–4 和未到的钟点为 null',
       heat?.days.length === 7
         && heat.days[0]?.date === '2026-01-09'
         && heat.days[6]?.date === '2026-01-15'
@@ -686,8 +686,8 @@ async function assertBehavior(): Promise<void> {
         && pulse.buckets[0]?.start === '2026-01-15T00:10:00.000Z'
         && pulse.buckets[23]?.start === '2026-01-15T02:05:00.000Z'
         && pulse.buckets[0].ai === null
-        && pulse.buckets[0].info === null
-        && pulse.buckets[0].print === null
+        && pulse.buckets[0].info === 0
+        && pulse.buckets[0].print === 0
         && pulse.buckets[23].ai !== null
         && pulse.buckets[23].info !== null
         && pulse.buckets[23].print !== null,
@@ -758,7 +758,7 @@ async function assertBehavior(): Promise<void> {
     )
     const dailyA = opened((await usage.getPartnerUsage(orgA, '7d', NOW)).metrics.partnerDaily)
     assert(
-      'u23. 机构按日序列长度跟随 range，小于 5 的日子为 null',
+      'u23. 机构按日序列跟随 range：0 保留；1–4 为 null；≥5 原样',
       opened(partnerA.metrics.partnerDaily)?.days.length === 1
         && opened(partnerA.metrics.partnerDaily)?.days[0]?.date === '2026-01-15'
         && dailyA?.days.length === 7
@@ -766,7 +766,7 @@ async function assertBehavior(): Promise<void> {
         && dailyA.days[6]?.date === '2026-01-15'
         && dailyA.days[6]?.browse !== null
         && dailyA.days[5]?.sourceOpens === 5
-        && dailyA.days[0]?.browse === null,
+        && dailyA.days[0]?.browse === 0 && dailyA.days[0]?.sourceOpens === 0,
       `days=${String(dailyA?.days.length)} yOpens=${String(dailyA?.days[5]?.sourceOpens)}`,
     )
     assert(
@@ -777,9 +777,9 @@ async function assertBehavior(): Promise<void> {
         && countFav('policy', today.from, today.to, owned.A['policy']) === 4
         && rowA('policy')?.favorites === null
         && rowA('job')?.favorites === 5
-        && rowA('job_fair')?.favorites === null
+        && rowA('job_fair')?.favorites === 0
         && dailyA?.days[5]?.sourceOpens === 5
-        && dailyA.days[0]?.browse === null,
+        && dailyA.days[0]?.browse === 0 && dailyA.days[0]?.sourceOpens === 0,
     )
 
     const packed = JSON.stringify({ admin, weekSnap, monthSnap, partnerA, partnerB })
@@ -929,6 +929,23 @@ async function assertSmallSampleFloor(input: {
     cache.clear()
     return usage.getAdminUsage(range, NOW)
   }
+  const zero = (await read()).metrics
+  const zeroAi = opened(zero.ai)
+  assert(
+    'u42z. 空库真实服务返回计数 0；成功率、时延、成本与高峰仍为空',
+    Object.values(opened(zero.channels) ?? {}).length === 5
+      && Object.values(opened(zero.channels) ?? {}).every((count) => count === 0)
+      && opened(zero.services)?.every((row) => row.count === 0) === true
+      && Object.values(opened(zero.outcomes) ?? {}).every((count) => count === 0)
+      && opened(zero.printSteps)?.paid === 0 && opened(zero.printSteps)?.printed === 0
+      && opened(zero.resumeSteps)?.analyzed === 0 && opened(zero.resumeSteps)?.optimized === 0
+      && opened(zero.resumeSteps)?.exported === 0
+      && zeroAi?.total === 0 && zeroAi.success === 0 && zeroAi.failed === 0
+      && zeroAi.costMeasuredCalls === 0 && zeroAi.fallbackCalls === 0
+      && zeroAi.successRate === null && zeroAi.avgLatencyMs === null && zeroAi.estimatedCostCny === null
+      && opened(zero.heat7d)?.peakHour === null
+      && opened(zero.pulse2h)?.buckets.every((b) => b.info === 0 && b.ai === 0 && b.print === 0) === true,
+  )
   const expiresAt = new Date('2026-02-01T00:00:00.000Z')
   const browseAt = (createdAt: Date) => ({
     endUserId: memberId,
@@ -942,10 +959,11 @@ async function assertSmallSampleFloor(input: {
   })
   let heat = opened((await read()).metrics.heat7d)
   assert(
-    'u42. 每天 04:00 各 1 次时格子和峰值都是 null，最后一行仍是今天',
+    'u42. 每天 04:00 各 1 次压制为 null，空格为 0、未来为 null、峰值为空',
     heat?.days.length === 7
       && heat.days.every((day) => day.hours[4] === null)
-      && heat.days.every((day) => day.hours.every((hour) => hour === null))
+      && heat.days.every((day) => day.hours.every((hour, index) =>
+        hour === (index === 4 || day.date === shanghaiDayKey(NOW) && index > 10 ? null : 0)))
       && heat.peakHour === null
       && heat.days[heat.days.length - 1]?.date === shanghaiDayKey(NOW),
   )
@@ -1029,15 +1047,15 @@ async function assertSmallSampleFloor(input: {
   await seedAi(4, successSeed(NOW))
   snap = await read()
   assert(
-    'u49. AI 成功、总量、时延、成本和解析步骤在 4 次时都是 null',
+    'u49. AI 4 次计数、时延、成本和解析步骤为 null；失败与兜底 0 保留',
     aiOf(snap)?.total === null
       && aiOf(snap)?.success === null
-      && aiOf(snap)?.failed === null
+      && aiOf(snap)?.failed === 0
       && aiOf(snap)?.successRate === null
       && aiOf(snap)?.avgLatencyMs === null
       && aiOf(snap)?.estimatedCostCny === null
       && aiOf(snap)?.costMeasuredCalls === null
-      && aiOf(snap)?.fallbackCalls === null
+      && aiOf(snap)?.fallbackCalls === 0
       && resumeOf(snap)?.analyzed === null,
   )
   await seedAi(1, successSeed(NOW))

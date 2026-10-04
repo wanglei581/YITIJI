@@ -14,6 +14,7 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { aiErrorCodeOf, aiErrorMessageOf, isAiOutage } from '../../ai'
+import { inspectionSignalsEncrypted } from '../print/components/printPreviewKind'
 import {
   canonicalResumeParsePayload,
   classifyResumeParseTerminal,
@@ -64,6 +65,7 @@ const NO_REPLY_CODES = new Set(['NETWORK_ERROR', 'REQUEST_TIMEOUT', 'UNKNOWN_ERR
 
 function parseErrorOutcome(err: unknown): 'failed' | 'unknown' {
   const code = aiErrorCodeOf(err)
+  if (inspectionSignalsEncrypted([code])) return 'failed'
   if (code === 'RESUME_PARSE_OUTCOME_UNKNOWN' || code === 'AI_TASK_NOT_FOUND') return 'unknown'
   if (NO_REPLY_CODES.has(code)) return 'unknown'
   if (err instanceof ApiHttpError && (err.status >= 500 || err.status === 408)) return 'unknown'
@@ -127,7 +129,7 @@ export function ResumeParsePage() {
    * aiDown：AI 能力级停用（暂停 / 当日额度已到 / 未配置），失败屏不再给「重新解析」。
    */
   const navigateFail = useCallback(
-    (reason: string, task?: ParseTask, aiDown = false) => {
+    (reason: string, task?: ParseTask, aiDown = false, failureCode?: string) => {
       if (task) {
         saveAiResumeSession(task)
         if (!anonymousAccessReady(task.taskId, task.accessToken, ownerRef.current === null)) {
@@ -140,7 +142,7 @@ export function ResumeParsePage() {
       }
       setOutcome('failed')
       failTimerRef.current = setTimeout(() => {
-        navigate('/resume/report', { state: { ...state, success: false, reason, ...(aiDown ? { aiDown: true } : {}), ...(task ? { taskId: task.taskId, accessToken: task.accessToken } : {}) } })
+        navigate('/resume/report', { state: { ...state, success: false, reason, failureCode, ...(aiDown ? { aiDown: true } : {}), ...(task ? { taskId: task.taskId, accessToken: task.accessToken } : {}) } })
       }, 700)
     },
     [navigate, state],
@@ -378,7 +380,7 @@ export function ResumeParsePage() {
         }
         return
       }
-      navigateFail(aiErrorMessageOf(err, 'AI 服务暂时不可用，请稍后重试'))
+      navigateFail(aiErrorMessageOf(err, 'AI 服务暂时不可用，请稍后重试'), undefined, false, aiErrorCodeOf(err))
     } finally {
       inFlightRef.current = false
     }

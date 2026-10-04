@@ -1,10 +1,10 @@
+import { ComplianceRestrictions } from './ComplianceRestrictions'
 import { PARTNER_TYPE_LABELS, type PartnerType } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import {
   MODULE_LABELS,
   ORG_CONTENT_TRUST_STATUS_LABELS,
   ORG_CONTENT_TRUST_UNSET_LABEL,
-  PROHIBITED_MODULES,
   SCENE_TEMPLATE_LABELS,
   formatDate,
   formatDateTime,
@@ -34,6 +34,16 @@ import { useRecruitmentHosting } from '../../services/capabilities'
 // 机构自助仅可改 联系人/联系电话；名称、类型、场景模板、启用模块由管理员管理（运营边界）。
 // 内容信任状态（contentTrustStatus）为发布闸门依据，由平台管理员人工核验与标记。
 
+
+function contactPhoneText(phone: string | null | undefined): string {
+  if (!phone?.trim()) return '—'
+  // 已有掩码不可还原或减少星号。
+  if (phone.includes('*')) return phone
+  const digits = phone.replace(/\D/g, '')
+  if (/^1[3-9]\d{9}$/.test(digits)) return `${digits.slice(0, 3)}${'*'.repeat(4)}${digits.slice(-4)}`
+  if (digits.length >= 7) return `${digits.slice(0, 3)}${'*'.repeat(digits.length - 5)}${digits.slice(-2)}`
+  return '已登记'
+}
 
 function trustStatusLabel(status: OrgContentTrustStatus | null | undefined): string {
   if (!status) return ORG_CONTENT_TRUST_UNSET_LABEL
@@ -149,7 +159,7 @@ export default function ProfilePage() {
           </div>
           <div className="space-y-3 text-sm">
             <Row label="联系人" value={profile.contact || <span className="text-neutral-400">未填写</span>} />
-            <Row label="联系电话" value={profile.contactPhone || <span className="text-neutral-400">未填写</span>} />
+            <Row label="联系电话" value={contactPhoneText(profile.contactPhone)} />
             <Row
               label="合作状态"
               value={
@@ -347,13 +357,7 @@ export default function ProfilePage() {
             <span className="text-xs font-medium text-neutral-500">合规限制 — 永久禁用功能</span>
           </div>
           <p className="mb-2 text-xs text-neutral-400">以下功能属于招聘闭环，无论任何配置均不允许启用：</p>
-          <div className="flex flex-wrap gap-1.5">
-            {PROHIBITED_MODULES.map((m) => (
-              <span key={m} className="rounded bg-error-bg px-2 py-0.5 text-xs text-error-fg line-through">
-                {m}
-              </span>
-            ))}
-          </div>
+          <ComplianceRestrictions />
         </div>
       </Card>
 

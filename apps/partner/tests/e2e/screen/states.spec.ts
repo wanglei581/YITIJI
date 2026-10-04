@@ -1,5 +1,6 @@
+import { partnerTwin } from './fixtures/snapshots'
 import { test, expect } from '@playwright/test'
-import { partnerDegraded, partnerTruncated, partnerUsageVisitsFailed, partnerVisitBelowThreshold, partnerVisitFailed } from './fixtures/snapshots'
+import { partnerDegraded, partnerTruncated, partnerUsage, partnerUsageVisitsFailed, partnerVisitBelowThreshold, partnerVisitFailed } from './fixtures/snapshots'
 import {
   expectLocation,
   expectUrlStays,
@@ -135,6 +136,21 @@ test.describe('partner data screen states', () => {
     await expect(page.locator('[data-ops-screen]')).not.toContainText('source_query_failed')
   })
 
+  test('信息使用：零计数显示 0，1 至 4 次的 null 显示少于 5', async ({ page }) => {
+    await serve(page, partnerApi({ usage: (range) => {
+      const snap = partnerUsage(range)
+      if (snap.metrics.partnerContent?.available) snap.metrics.partnerContent.value.byType = [
+        { type: 'policy', browse: 0, favorites: null, sourceOpens: 5 },
+      ]
+      return snap
+    } }))
+    await open(page, '/screen/usage')
+    const types = panel(page, /^按信息类型$/)
+    await expect(tile(types, '政策公告').locator('b')).toHaveText('0次浏览')
+    await expect(types).toContainText('收藏 少于 5 · 来源 5')
+    await expect(page.locator('.twin-toolbar').getByText(/^访问口径：/)).toContainText('0 照常显示')
+  })
+
   test('信息使用：服务人次对 1–4 次写「少于 5」，取数失败写「暂时取不到」', async ({ page }) => {
     await serve(page, partnerApi())
     await open(page, '/screen/usage')
@@ -215,8 +231,9 @@ test.describe('partner data screen states', () => {
     await open(page, '/screen/overview')
     const jobs = tile(panel(page, /^本机构在架信息$/), '岗位信息').locator('b')
     await expect(jobs).toHaveText('328条')
-    const stamp = (await page.locator('.twin-hd-sub').innerText()).match(/数据时间 (\S+ \S+)/)?.[1]
-    expect(stamp, '页眉应写出数据时间').toBeTruthy()
+    const stamp = (await page.locator('.twin-hd-sub').innerText()).match(/汇总数据截至 (\S+ \S+)/)?.[1]
+    expect(stamp, '页眉应明确汇总数据截至时间').toBeTruthy()
+    await expect(page.locator('.twin-hd-sub')).toContainText('每 5 分钟更新')
     flip()
     await page.getByRole('button', { name: '刷新', exact: true }).click()
     const banner = page.locator('.twin-banner', { hasText: '最近一次刷新失败' })
@@ -280,4 +297,17 @@ test.describe('partner data screen states', () => {
     await expect(banner).not.toContainText('无权查看')
     await expect(jobs).toHaveText('328条')
   })
+})
+
+
+test('终端孪生：机构打印失败提示联系平台运营', async ({ page }) => {
+  await serve(page, partnerApi({ twin: (id) => {
+    const twin = partnerTwin(id)
+    if (twin) twin.today.failed = 7
+    return twin
+  } }))
+  await open(page, '/screen/terminal?id=t-hz-zd-01')
+  const today = panel(page, /^今日服务$/)
+  await expect(today).toContainText('今日打印失败 7 次，如需处理请联系平台运营')
+  await expect(today).not.toContainText('打印扫描运维')
 })

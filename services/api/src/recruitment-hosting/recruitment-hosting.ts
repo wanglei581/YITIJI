@@ -13,6 +13,8 @@ import { ForbiddenException } from '@nestjs/common'
  */
 export const RECRUITMENT_CONTENT_HOSTING_ENV = 'RECRUITMENT_CONTENT_HOSTING_ENABLED'
 export const RECRUITMENT_HOSTING_DISABLED_CODE = 'RECRUITMENT_HOSTING_DISABLED'
+/** 足迹中属于招聘内容的类型；政策等个人足迹不受托管开关影响。 */
+export const RECRUITMENT_ACTIVITY_TARGET_TYPES: readonly string[] = ['job', 'job_fair', 'company_profile', 'fair_company']
 export const ADMIN_POLICY_PUBLISH_DISABLED_CODE = 'ADMIN_POLICY_PUBLISH_DISABLED'
 export const EMERGENCY_TAKEDOWN_IRREVERSIBLE_CODE = 'EMERGENCY_TAKEDOWN_IRREVERSIBLE'
 export const TAKEDOWN_REASON_REQUIRED_CODE = 'TAKEDOWN_REASON_REQUIRED'

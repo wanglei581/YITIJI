@@ -11,6 +11,7 @@
 // 合规：API Key 只存服务端，前端不回显（仅显示"已配置"）。
 // ============================================================
 
+import './ai-config.css'
 import { useCallback, useEffect, useState } from 'react'
 import { Card, Button, LoadingState, ErrorState } from '@ai-job-print/ui'
 import { CheckCircle2Icon, XCircleIcon, KeyRoundIcon, SparklesIcon, ShieldCheckIcon } from 'lucide-react'
@@ -31,6 +32,9 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
  * 这里就不能照样标「已接入」。只改标签，不改配置能力——b 版本打开托管后照常使用。
  */
 const RECRUITMENT_HOSTED_FEATURES: ReadonlySet<AiModelFeatureKey> = new Set<AiModelFeatureKey>(['fair_visit_plan', 'job_recommend', 'job_explain'])
+
+/** 与侧栏「AI大模型」统一：AI 与中文功能名之间不留空格。 */
+function featureText(text: string): string { return text.replace(/AI\s+(?=[\u4e00-\u9fff])/g, 'AI') }
 
 export default function AiConfigPage() {
   const hosting = useRecruitmentHosting()
@@ -196,15 +200,15 @@ export default function AiConfigPage() {
       title="AI大模型"
       subtitle="按功能配置大模型。API Key 仅保存在服务端，前端不回显。"
     >
-      <div className="max-w-3xl space-y-5">
+      <div className="w-full min-w-0 space-y-5">
 
         {/* 功能选择 */}
         <Card className="p-4">
           <div className="mb-3">
             <p className="text-sm font-medium text-neutral-900">功能配置</p>
-            <p className="mt-1 text-xs text-neutral-500">已接入功能会被运行链路消费；planned 功能可先保存配置，但当前不会影响线上流程。</p>
+            <p className="mt-1 text-xs text-neutral-500">已接入的功能保存后生效；标为「未接入」的功能可以先保存配置，接入前不影响一体机。</p>
           </div>
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="ai-feature-grid grid gap-3">
             {features.map((feature) => {
               const featureConfig = configs?.[feature.key]
               const configured = Boolean(featureConfig?.enabled && featureConfig.apiKeyConfigured)
@@ -216,44 +220,44 @@ export default function AiConfigPage() {
                   key={feature.key}
                   type="button"
                   onClick={() => onFeatureChange(feature.key)}
-                  className={`rounded-lg border p-3 text-left transition-colors ${selectedFeature === feature.key
+                  className={`flex h-full min-w-0 flex-col items-stretch rounded-lg border p-3 text-left transition-colors ${selectedFeature === feature.key
                     ? 'border-primary-400 bg-primary-50'
                     : 'border-neutral-200 bg-surface hover:bg-neutral-50'}`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-neutral-900">{feature.label}</span>
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-neutral-900">{featureText(feature.label)}</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {featureConfig?.inheritedFrom && (
-                        <span className="rounded-full bg-info-bg px-2 py-0.5 text-[11px] font-medium text-info-fg">
-                          继承自 {inheritedFrom?.label ?? featureConfig.inheritedFrom}
+                        <span className="whitespace-nowrap rounded-full bg-info-bg px-2 py-0.5 text-[11px] font-medium text-info-fg">
+                          继承自 {featureText(inheritedFrom?.label ?? featureConfig.inheritedFrom)}
                         </span>
                       )}
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${configured ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
+                      <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${configured ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
                         {configured ? '配置可用' : '未启用'}
                       </span>
                       {RECRUITMENT_HOSTED_FEATURES.has(feature.key) && hosting.status !== 'ready' ? (
                         // 托管状态没读到时按关闭处理：不说「已接入」，也不冒充「托管关闭」
-                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-500">
+                        <span className="whitespace-nowrap rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-500">
                           {hosting.status === 'error' ? '托管状态未读到' : '正在确认托管状态'}
                         </span>
                       ) : RECRUITMENT_HOSTED_FEATURES.has(feature.key) && hosting.status === 'ready' && !hosting.enabled ? (
-                        <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[11px] font-medium text-warning-fg">托管关闭，不可用</span>
+                        <span className="whitespace-nowrap rounded-full bg-warning-bg px-2 py-0.5 text-[11px] font-medium text-warning-fg">托管关闭，不可用</span>
                       ) : (
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${feature.status === 'active'
+                        <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${feature.status === 'active'
                           ? 'bg-info-bg text-info-fg'
                           : 'bg-warning-bg text-warning-fg'}`}
                         >
-                          {feature.status === 'active' ? '已接入' : '后续接入'}
+                          {feature.status === 'active' ? '已接入' : '未接入'}
                         </span>
                       )}
                     </div>
                   </div>
-                  <p className="mt-1 text-xs text-neutral-500">{feature.description}</p>
-                  <p className="mt-1 text-[11px] text-neutral-400">
+                  <p className="mt-1 text-xs text-neutral-500">{featureText(feature.description)}</p>
+                  <p className="mt-1 truncate font-mono text-[11px] text-neutral-400" title={featureConfig ? `${featureConfig.vendor} · ${featureConfig.model} · ${featureConfig.baseURL}` : feature.runtimeNote}>
                     {featureConfig ? `${featureConfig.vendor} · ${featureConfig.model} · ${featureConfig.baseURL}` : feature.runtimeNote}
                   </p>
                   <p className="mt-0.5 text-[11px] text-neutral-400">
-                    API Key：{featureConfig?.apiKeyConfigured ? '已配置' : '未配置'} · {feature.runtimeNote}
+                    API Key：{featureConfig?.apiKeyConfigured ? '已配置' : '未配置'} · {featureText(feature.runtimeNote)}
                   </p>
                 </button>
               )
@@ -267,19 +271,19 @@ export default function AiConfigPage() {
             <div className="flex items-center gap-2.5">
               <SparklesIcon className="h-5 w-5 text-primary-600" />
               <div>
-                <p className="text-sm font-medium text-neutral-900">当前功能模型：{currentFeature?.label ?? selectedFeature}</p>
+                <p className="text-sm font-medium text-neutral-900">当前功能模型：{featureText(currentFeature?.label ?? selectedFeature)}</p>
                 <p className="text-xs text-neutral-500">
                   {currentPreset?.label ?? vendor} · {cfg?.model}
                   {cfg?.enabled ? '' : '（未启用，相关功能会明确失败或走既有默认应答）'}
                 </p>
                 {cfg?.inheritedFrom && (
                   <p className="mt-1 text-xs font-medium text-info-fg">
-                    当前配置继承自「{inheritedFeature?.label ?? cfg.inheritedFrom}」；保存或测试会创建独立配置。
+                    当前配置继承自「{featureText(inheritedFeature?.label ?? cfg.inheritedFrom)}」；保存或测试会创建独立配置。
                   </p>
                 )}
               </div>
             </div>
-            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium
+            <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium
               ${cfg?.enabled && cfg?.apiKeyConfigured ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
               {cfg?.enabled && cfg?.apiKeyConfigured ? '已启用' : '未启用'}
             </span>
@@ -367,7 +371,7 @@ export default function AiConfigPage() {
             />
             <p className="mt-1 text-xs text-neutral-400">
               {currentFeature?.allowCustomSystemPrompt === false
-                ? '此功能 v1 不会把管理员自定义 System Prompt 喂给运行链路；服务端会强制固定结构化提示词，避免破坏 JSON 契约。'
+                ? '此功能目前使用服务器固定的提示词；这里填写的自定义提示词暂不生效，以保证结果格式稳定。'
                 : '建议保留合规红线说明，避免引导用户在本系统内完成招聘闭环。'}
             </p>
           </div>

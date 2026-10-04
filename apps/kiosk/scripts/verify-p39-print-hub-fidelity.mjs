@@ -48,7 +48,6 @@ const COPY = [
   'U 盘导入打印',
   '服务状态无法确认',
   '正在检查本机能力',
-  '打印扫描一体机离线 —— 要出纸的停了，其余照常',
   '有几项被管理员关掉了',
   '证件照：本机尚未开放',
   '没有这项能力说明',
@@ -63,6 +62,9 @@ for (const line of COPY) {
   }
   must(productionSrc.includes(line), `文案已迁移：「${line}」`)
 }
+// W-117：冻结稿把缺纸 / 异常统称离线；按实际状态修正文案，不回写设计稿。
+must(proto.includes('打印扫描一体机离线 —— 要出纸的停了，其余照常'), '冻结稿的设备停用态仍可定位')
+must(contentSrc.includes('打印机暂不可用 · 出纸类暂停'), '生产停用态不把缺纸或异常宣称为离线')
 
 console.log('\n[B] 结构保真')
 must(/data-qx-page=["']print-hub["']/.test(viewSrc), '保留青序设计语言标记 data-qx-page="print-hub"')

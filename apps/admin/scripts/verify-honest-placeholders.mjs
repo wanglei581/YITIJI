@@ -57,7 +57,7 @@ const targets = [
   },
   {
     path: join(repoRoot, 'apps/partner/src/routes/account/index.tsx'),
-    must: ['账号与角色由平台侧统一管理', '半套 RBAC'],
+    must: ['账号与角色由平台侧统一管理', '如需增删机构账号或调整权限，请联系平台运营。'],
   },
 ]
 

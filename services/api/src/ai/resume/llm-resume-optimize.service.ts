@@ -25,6 +25,10 @@ import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { detectResumeName, RESUME_STRUCTURE_PROMPT_RULE } from './resume-structure'
+import {
+  buildOriginalCoverage, missingOriginalEntries, originalCoverageRetryHint, preserveOriginalEntries,
+  restoreGeneratedResume, restoreOptimizeResult,
+} from './resume-optimize-coverage'
 
 // ============================================================
 // LlmResumeOptimizeService — 阶段2B 真实简历优化(单轮、结构化 JSON,OpenAI 兼容)
@@ -60,6 +64,7 @@ const OPTIMIZE_TEMPERATURE = 0.3
 const MASK_SPLIT = '\n<<<PII_MASK_SPLIT>>>\n'
 const MAX_SUMMARY_CHARS = 300
 const MAX_DESC_CHARS = 600
+const MAX_OPTIMIZE_DESC_CHARS = 2000
 const MAX_SKILL_CHARS = 40
 const MAX_MODULES = 8
 const MAX_MODULE_TEXT_CHARS = 600
@@ -89,6 +94,8 @@ export const OPTIMIZE_SYSTEM_PROMPT = withAiSafety([
   '6. 不得输出任何录用、投递、面试邀约、Offer 或通过率类承诺;优化只是表达参考,由求职者本人决定是否采纳。',
   '7. 原文信息不足的部分,在对应字段留空即可,不要替用户补内容。',
   '8. 若收到"优化方向"提示(专业/学历/目标岗位/经验级别/求职场景),只能用于调整措辞重点与用词方向;不得据此新增、替换或"纠正"任何学校、公司、学历、证书、时间段等事实字段——事实字段仍必须逐字来自简历原文。',
+  '9. 必须保留原文全部教育、工作/实习、项目/校园、技能和证书条目，不得省略段落或合并不同经历；只有公司没有职务时 role 留空字符串，仍保留该条经历。',
+  `10. 每条 description 最多 ${MAX_OPTIMIZE_DESC_CHARS} 字，不得腰斩句子；原文过长时优先保留完整事实与成果，不得删掉经历条目。`,
 ].join('\n'))
 
 export const OPTIMIZE_RETRY_HINT = withAiSafety(
@@ -192,7 +199,8 @@ export class LlmResumeOptimizeService {
    * 基于简历原文 + 诊断报告生成优化版简历与新旧对比。
    * targetContext(可选):仅拼进「优化方向」提示引导措辞重点,不改变防编造/承诺拦截校验。
    * - 未配置 / 未启用 → AI_PROVIDER_NOT_CONFIGURED(绝不 fallback mock)。
-   * - 非法 JSON / 事实串不在原文 / 命中承诺类拦截词 → 重试一次;仍坏 → AI_OPTIMIZE_INVALID_OUTPUT。
+   * - 非法 JSON / 事实串不在原文 / 命中承诺类拦截词 / 描述超长 → 重试一次;仍坏 → AI_OPTIMIZE_INVALID_OUTPUT。
+   * - 合法输出缺段或缺条目 → 逐条提示重试;仍缺或未送模型的长尾 → 保持原文。
    */
   async optimize(
     extractedText: string,
@@ -214,7 +222,10 @@ export class LlmResumeOptimizeService {
     // 拿原文校验会让模型回包里的 `[手机号_1]` 判不在原文而整单作废。
     // 产物是用户要打印的简历，因此最后用 restore() 把占位符换回真值（restore 只在
     // 服务端内存里发生，真值从未离开本进程）。
-    const masked = maskUserTextForLlmReversible((extractedText ?? '').slice(0, MAX_INPUT_CHARS), 'resume_optimize')
+    const original = extractedText ?? ''
+    const input = original.slice(0, MAX_INPUT_CHARS)
+    const masked = maskUserTextForLlmReversible(input, 'resume_optimize')
+    const baseline = buildOriginalCoverage(original, report, input.length, masked.restore)
     const text = masked.text
     const reportBrief = report.sections.map((s) => `${s.label}:${s.score}/${s.maxScore}`).join('、')
     const directionPrompt = buildTargetContextPrompt(targetContext)
@@ -226,18 +237,33 @@ export class LlmResumeOptimizeService {
       },
     ]
 
+    let firstValid: OptimizeResult | undefined
+    let firstMissing: ReturnType<typeof missingOriginalEntries> = []
+    let retryHint = OPTIMIZE_RETRY_HINT
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
-        attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: OPTIMIZE_RETRY_HINT }]
+        attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: retryHint }]
       const raw = await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
         `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, onLlmCall,
       )
       const result = this.parseAndValidate(raw, text, cfg.forbiddenWords)
-      if (result) return restoreOptimizeResult(result, masked.restore)
+      if (result) {
+        const restored = restoreOptimizeResult(result, masked.restore)
+        const missing = missingOriginalEntries(restored.optimizedResume, baseline)
+        if (attempt === 2 || missing.length === 0) {
+          return preserveOriginalEntries(restored, [...missing, ...baseline.filter((entry) => entry.overflow)], baseline)
+        }
+        firstValid = restored
+        firstMissing = missing
+        retryHint = `${OPTIMIZE_RETRY_HINT}\n${originalCoverageRetryHint(missing, text, masked.restore)}`
+      }
       this.logger.warn(`resume optimize: invalid output (attempt ${attempt}/2)`)
     }
 
+    if (firstValid) {
+      return preserveOriginalEntries(firstValid, [...firstMissing, ...baseline.filter((entry) => entry.overflow)], baseline)
+    }
     throw new ServiceUnavailableException({
       error: { code: 'AI_OPTIMIZE_INVALID_OUTPUT', message: 'AI 简历优化服务暂时不可用，请稍后重试' },
     })
@@ -410,7 +436,9 @@ export class LlmResumeOptimizeService {
     const blocked = [...OPTIMIZE_GUARD_TERMS, ...forbiddenWords]
     const clean = (value: unknown, maxLen: number): string | null => {
       if (typeof value !== 'string') return ''
-      const text = value.trim().slice(0, maxLen)
+      const trimmed = value.trim()
+      if (maxLen === MAX_OPTIMIZE_DESC_CHARS && trimmed.length > MAX_OPTIMIZE_DESC_CHARS) return null
+      const text = maxLen === MAX_OPTIMIZE_DESC_CHARS ? trimmed : trimmed.slice(0, maxLen)
       // 承诺类表述出现在任何输出文本 → 整体判非法(重试;绝不带承诺出简历)
       if (text && containsForbiddenWord(text, blocked)) return null
       return text
@@ -444,14 +472,14 @@ export class LlmResumeOptimizeService {
     const education: GeneratedResume['education'] = []
     for (const item of asArray(r['education'], 6)) {
       const school = strOf(item, 'school', 100)
-      if (!school) continue
       const major = strOf(item, 'major', 60)
       const degree = strOf(item, 'degree', 20)
       // 2B 收口补强:学历/专业同为高危篡改点(如 大专→本科),必须在原文中出现;
       // 原文没有时模型应留空(inText('') 合法),写了但不在原文 → 整体非法
       if (!inText(school) || !inText(major) || !inText(degree)) return null
-      const description = clean(item['description'], MAX_DESC_CHARS)
+      const description = clean(item['description'], MAX_OPTIMIZE_DESC_CHARS)
       if (description === null) return null
+      if (![school, major, degree, strOf(item, 'period', 40), description].some(Boolean)) continue
       education.push({
         school,
         major: major || undefined,
@@ -465,20 +493,20 @@ export class LlmResumeOptimizeService {
     for (const item of asArray(r['experience'], 8)) {
       const company = strOf(item, 'company', 100)
       const role = strOf(item, 'role', 60)
-      if (!company || !role) continue
       if (!inText(company)) return null
-      const description = clean(item['description'], MAX_DESC_CHARS)
+      const description = clean(item['description'], MAX_OPTIMIZE_DESC_CHARS)
       if (description === null) return null
+      if (![company, role, strOf(item, 'period', 40), description].some(Boolean)) continue
       experience.push({ company, role, period: strOf(item, 'period', 40) || undefined, description })
     }
 
     const projects: GeneratedResume['projects'] = []
     for (const item of asArray(r['projects'], 6)) {
       const projectName = strOf(item, 'name', 100)
-      if (!projectName) continue
       if (!inText(projectName)) return null
-      const description = clean(item['description'], MAX_DESC_CHARS)
+      const description = clean(item['description'], MAX_OPTIMIZE_DESC_CHARS)
       if (description === null) return null
+      if (![projectName, strOf(item, 'role', 60), description].some(Boolean)) continue
       projects.push({ name: projectName, role: strOf(item, 'role', 60) || undefined, description })
     }
 
@@ -513,6 +541,7 @@ export class LlmResumeOptimizeService {
     const optimizedResume: GeneratedResume = {
       basic, intention, summary, education, experience, projects, skills, certificates,
     }
+    // 姓名已被确定性纠正时直接保留合法内容并补回遗漏，不再让模型修复身份。
     return { optimizedResume, modules }
   }
 
@@ -664,59 +693,6 @@ function buildLayoutHint(layout?: ResumeLayoutSettings): string {
 }
 
 type RestoreFn = (value: string) => string
-
-/**
- * 把模型产物里的遮盖占位符换回真值。
- *
- * 为什么必须还原：这两个接口的产物就是**用户要导出/打印的那份简历**
- * （ResumeOptimizePage → exportGeneratedResume）。只遮盖不还原，
- * 用户简历上的联系方式会变成 `[手机号_1]` —— 那是拿功能损坏换合规。
- * 还原全程只在服务端内存里发生，真值从未离开本进程、不落日志。
- */
-function restoreGeneratedResume(resume: GeneratedResume, restore: RestoreFn): GeneratedResume {
-  const opt = (value: string | undefined): string | undefined => (value === undefined ? undefined : restore(value))
-  return {
-    ...resume,
-    basic: { ...resume.basic, name: restore(resume.basic.name), phone: opt(resume.basic.phone), email: opt(resume.basic.email), city: opt(resume.basic.city) },
-    intention: { ...resume.intention, position: restore(resume.intention.position), city: opt(resume.intention.city) },
-    summary: restore(resume.summary),
-    education: resume.education.map((item) => ({
-      ...item,
-      school: restore(item.school),
-      major: opt(item.major),
-      degree: opt(item.degree),
-      period: opt(item.period),
-      description: opt(item.description),
-    })),
-    experience: resume.experience.map((item) => ({
-      ...item,
-      company: restore(item.company),
-      role: restore(item.role),
-      period: opt(item.period),
-      description: restore(item.description),
-    })),
-    projects: resume.projects.map((item) => ({
-      ...item,
-      name: restore(item.name),
-      role: opt(item.role),
-      description: restore(item.description),
-    })),
-    skills: resume.skills.map((skill) => restore(skill)),
-    certificates: resume.certificates.map((cert) => restore(cert)),
-  }
-}
-
-function restoreOptimizeResult(result: OptimizeResult, restore: RestoreFn): OptimizeResult {
-  return {
-    optimizedResume: restoreGeneratedResume(result.optimizedResume, restore),
-    // 前后对比是直接展示给用户的文本，占位符同样必须还原
-    modules: result.modules.map((item) => ({
-      title: restore(item.title),
-      before: restore(item.before),
-      after: restore(item.after),
-    })),
-  }
-}
 
 function restoreLayoutAdjustResult(
   result: LayoutAdjustResult,

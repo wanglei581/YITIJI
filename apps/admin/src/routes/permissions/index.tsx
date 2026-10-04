@@ -2,8 +2,8 @@
 // 只在既有 /permissions 路由上替换内容：不新建页、不新增路由。
 // mock 模式（VITE_API_MODE=mock）下不造假名册，显示诚实空态。
 
-import { Card, EmptyState, ErrorState } from '@ai-job-print/ui'
-import { PlusIcon, RefreshCwIcon, SearchIcon, ShieldIcon } from 'lucide-react'
+import { Card } from '@ai-job-print/ui'
+import { PlusIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getUser } from '../../services/auth'
 import { API_MODE, ApiHttpError } from '../../services/api/client'
@@ -15,7 +15,6 @@ import type {
 } from '../../services/api/internalAccounts'
 import { listInternalAccounts, toAllowedPageSize } from '../../services/api/internalAccounts'
 import { Page } from '../Page'
-import { Pagination } from '../components/DataTable'
 import { AccountStatusDialog, type AccountStatusDialogTarget } from './AccountStatusDialog'
 import { AccountsTable } from './AccountsTable'
 import { BackupAdminDrawer } from './BackupAdminDrawer'
@@ -254,59 +253,17 @@ export default function PermissionsPage() {
         </form>
       </Card>
 
-      <Card className="min-w-0 overflow-hidden">
-        {state === 'loading' && <TableSkeleton />}
-        {state === 'error' && (
-          <ErrorState
-            title={listError?.status === 403 ? '无权查看内部账号名册' : '名册加载失败'}
-            message={
-              listError?.status === 403
-                ? userMessageOf(listError, '当前账号没有权限管理内部账号。')
-                : userMessageOf(listError, '服务暂时不可用，请稍后重试。')
-            }
-            onRetry={retryable ? refresh : undefined}
-            className="py-24"
-          />
-        )}
-        {state === 'ready' && result.items.length === 0 && (
-          <EmptyState
-            icon={ShieldIcon}
-            title={filtered ? '未找到符合条件的内部账号' : '暂无内部账号'}
-            description={
-              filtered
-                ? '请调整筛选条件后重新查询'
-                : API_MODE === 'http'
-                  ? '当前没有可显示的内部账号。'
-                  : '当前演示模式不连接真实账号数据；连接真实后端后此处显示管理员、合作机构与终端账号名册。'
-            }
-            action={filtered ? (
-              <button type="button" onClick={resetFilters} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
-                重置筛选
-              </button>
-            ) : undefined}
-            className="py-24"
-          />
-        )}
-        {state === 'ready' && result.items.length > 0 && (
-          <>
-            <AccountsTable
-              items={result.items}
-              currentUserId={currentUser?.id ?? null}
-              enabledAdminTotal={enabledAdminTotal}
-              onSetStatus={openStatusDialog}
-            />
-            <Pagination
-              total={result.total}
-              page={page}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size)
-                setPage(1)
-              }}
-            />
-          </>
-        )}
+      <Card className="min-w-0 overflow-hidden p-0">
+        <AccountsTable items={result.items} currentUserId={currentUser?.id ?? null} enabledAdminTotal={enabledAdminTotal} onSetStatus={openStatusDialog}
+          loading={state === 'loading'} error={state === 'error' ? {
+            title: listError?.status === 403 ? '无权查看内部账号名册' : '名册加载失败',
+            message: listError?.status === 403 ? userMessageOf(listError, '当前账号没有权限管理内部账号。') : userMessageOf(listError, '服务暂时不可用，请稍后重试。'),
+            onRetry: retryable ? refresh : undefined,
+          } : null}
+          empty={{ title: filtered ? '未找到符合条件的内部账号' : '暂无内部账号', description: filtered ? '请调整筛选条件后重新查询' : API_MODE === 'http' ? '当前没有可显示的内部账号。' : '当前演示模式不连接真实账号数据；连接真实后端后此处显示管理员、合作机构与终端账号名册。',
+            action: filtered ? <button type="button" onClick={resetFilters} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm">重置筛选</button> : undefined }}
+          total={result.total} page={page} pageSize={pageSize} onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
@@ -326,17 +283,5 @@ export default function PermissionsPage() {
         onCreated={handleBackupCreated}
       />
     </Page>
-  )
-}
-
-function TableSkeleton() {
-  return (
-    <div className="animate-pulse p-4" aria-label="正在加载内部账号名册">
-      {Array.from({ length: 6 }, (_, index) => (
-        <div key={index} className="grid grid-cols-6 gap-4 border-b border-neutral-100 py-4">
-          {Array.from({ length: 6 }, (__, cell) => <div key={cell} className="h-4 rounded bg-neutral-100" />)}
-        </div>
-      ))}
-    </div>
   )
 }

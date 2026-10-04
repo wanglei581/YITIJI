@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
  * 招聘会活动资料签名 URL(HMAC-SHA256)。
  *
  * 与 content/content-signing.ts(宣传屏素材)同密钥(FILE_SIGNING_SECRET)、同算法,但:
- *   - message 前缀 'fairmat:',独立命名空间,一个签名不能跨用途复用
+ *   - Kiosk message 前缀 'fairmat:',Admin 'fairmat-admin:'（scope=admin），签名绑定用途
  *   - 路由独立:/api/v1/job-fairs/materials/:id/content
  *   - Kiosk 浏览 TTL 30 分钟(资料页停留 + 预览即可),Admin 预览 10 分钟
  *
@@ -26,22 +26,27 @@ export function signFairMaterialUrl(
   materialId: string,
   ttlMs: number = KIOSK_TTL_MS,
 ): { url: string; expiresAt: Date } {
+  return signMaterialUrl(materialId, ttlMs, 'kiosk')
+}
+
+function signMaterialUrl(materialId: string, ttlMs: number, scope: 'kiosk' | 'admin'): { url: string; expiresAt: Date } {
   const expiresAtMs = Date.now() + ttlMs
-  const message = `fairmat:${materialId}.${expiresAtMs}`
+  const message = `${scope === 'admin' ? 'fairmat-admin' : 'fairmat'}:${materialId}.${expiresAtMs}`
   const signature = createHmac('sha256', getSecret()).update(message).digest('hex')
-  const url = `/api/v1/job-fairs/materials/${materialId}/content?expires=${expiresAtMs}&sig=${signature}`
+  const url = `/api/v1/job-fairs/materials/${materialId}/content?expires=${expiresAtMs}&sig=${signature}${scope === 'admin' ? '&scope=admin' : ''}`
   return { url, expiresAt: new Date(expiresAtMs) }
 }
 
 /** 管理员后台预览用,短 TTL。 */
 export function signFairMaterialPreviewUrl(materialId: string): string {
-  return signFairMaterialUrl(materialId, PREVIEW_TTL_MS).url
+  return signMaterialUrl(materialId, PREVIEW_TTL_MS, 'admin').url
 }
 
-export function verifyFairMaterialSignature(materialId: string, expires: string, sig: string): boolean {
+export function verifyFairMaterialSignature(materialId: string, expires: string, sig: string, scope?: string): boolean {
+  if (scope !== undefined && scope !== 'admin') return false
   const expiresMs = Number(expires)
   if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) return false
-  const message = `fairmat:${materialId}.${expiresMs}`
+  const message = `${scope === 'admin' ? 'fairmat-admin' : 'fairmat'}:${materialId}.${expiresMs}`
   const expected = createHmac('sha256', getSecret()).update(message).digest('hex')
   if (sig.length !== expected.length) return false
   try {
