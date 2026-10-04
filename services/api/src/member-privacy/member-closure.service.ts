@@ -52,7 +52,7 @@ export class MemberClosureService {
       if (!initial) throw new NotFoundException({ error: { code: 'ADMIN_USER_NOT_FOUND', message: '用户不存在' } })
       if (initial.status === 'anonymized') return { endUserId, status: 'anonymized' as const, changed: false }
       if (decryptPhone(initial.phoneEnc).slice(-4) !== input.phoneLast4) {
-        throw badRequest('CLOSURE_PHONE_MISMATCH', '手机号尾号核验不通过')
+        throw badRequest('CLOSURE_PHONE_MISMATCH', '手机尾号不符，请确认是这位用户')
       }
       const scrub = closureTextScrubber(initial)
       const context: ClosureProgress = { source: input.source, reasonText: scrub(input.reasonText.trim()),
