@@ -68,15 +68,24 @@ async function requestJson<T>(path: string, init?: RequestInit & { token?: strin
   return payload as T
 }
 
+const uploadCreatesInFlight = new Map<string, Promise<UploadSessionCreateResponse>>()
+
 export function createUploadSession(
   input: UploadSessionCreateRequest,
   token?: string | null,
 ): Promise<UploadSessionCreateResponse> {
-  return requestJson<UploadSessionCreateResponse>('/upload-sessions', {
+  const key = JSON.stringify([input, token ?? null])
+  const existing = uploadCreatesInFlight.get(key)
+  if (existing) return existing
+  const request = requestJson<UploadSessionCreateResponse>('/upload-sessions', {
     method: 'POST',
     token,
     body: JSON.stringify(input),
+  }).finally(() => {
+    if (uploadCreatesInFlight.get(key) === request) uploadCreatesInFlight.delete(key)
   })
+  uploadCreatesInFlight.set(key, request)
+  return request
 }
 
 export function getUploadSessionStatus(sessionId: string, controlToken: string): Promise<UploadSessionStatusResponse> {

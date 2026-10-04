@@ -32906,6 +32906,22 @@
       "asserts": {
         "absent": [],
         "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/verify-prod-react-build.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:prod-react-build"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
         "files": [
           "scripts/prod-readonly-probe.mjs"
         ],
