@@ -197,6 +197,8 @@ test('USB files render as named buttons and retain size, MIME, purpose and busy 
       listUsbFiles: async () => ({ files }),
       uploadUsbFile: (...args) => { requests.push(args); return upload.promise },
     },
+    // W-125：面板先过后台能力闸门；这份单测只管文件列表与导入契约，闸门按已放行处理。
+    '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
   }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
   const props = { onUploaded: (file) => imported.push(file), onBusyChange: (value) => busy.push(value) }
   const nodes = (node) => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : []
