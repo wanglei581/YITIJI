@@ -575,11 +575,18 @@
 .fs-page .fs-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .fs-page .fs-steps + .fs-note { margin-top: 22px; }
 .fs-page .fs-phone-guide { display: grid; grid-template-columns: 440px minmax(0, 1fr); gap: 30px; align-items: stretch; }
-.fs-page .fs-phone-guide .fs-steps { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.fs-page .fs-phone-guide > div:last-child { display: flex; flex-direction: column; justify-content: space-between; gap: 20px; }
+.fs-page .fs-phone-guide > div:last-child { display: flex; flex-direction: column; min-height: 100%; gap: 12px; }
+.fs-page .fs-phone-guide > div:last-child > div:first-child { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.fs-page .fs-phone-guide .fs-steps { display: flex; flex: 1 1 auto; flex-direction: column; justify-content: space-evenly; gap: 8px; }
 .fs-page .fs-phone-guide .fs-phone-slot { min-height: 0; }
 .fs-page .fs-phone-guide .fs-qr-live, .fs-page .fs-phone-guide .fs-qr-blank { padding: 12px; }
 .fs-page .fs-truth { margin-top: auto; }
+.fs-page:is([data-state='phone-waiting'], [data-state='local-ready'], [data-state='usb-ready'], [data-state='phone-confirmed']) {
+  justify-content: space-evenly;
+}
+.fs-page:is([data-state='phone-waiting'], [data-state='local-ready'], [data-state='usb-ready'], [data-state='phone-confirmed']) .fs-truth {
+  margin-top: 0;
+}
 /* 顶部只读区预算：104 顶栏 + 20 顶距 + 308 引导 + 18 间距 + 50 分区标题 >= 500。 */
 .fs-page:is([data-state='source-chooser'], [data-state='missing-file'], [data-state='unknown']) .fs-hero { min-height: 308px; }
 .fs-page [data-testid='file-source-file-card'] { justify-content: space-between; }

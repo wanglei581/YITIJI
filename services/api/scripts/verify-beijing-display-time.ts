@@ -7,7 +7,7 @@
  * 不连数据库。Run: pnpm --filter @ai-job-print/api verify:beijing-display-time
  */
 import { formatBeijingDate, formatBeijingDateTime, formatBeijingMinute } from '../src/common/beijing-display-time'
-import { formatShanghaiMinute, printFailedAlertDetail } from '../src/admin-ops/derived-alerts'
+import { formatElapsedAgo, formatShanghaiMinute, printFailedAlertDetail } from '../src/admin-ops/derived-alerts'
 import { contractReviewGeneratedAtLine } from '../src/contract-review/contract-review-report-pdf.service'
 import { formatFairCompanyPrintTime } from '../src/jobs/fair-company-print.service'
 import { bulkPublishExpiredMessage } from '../src/bulk-publish/bulk-publish-expiry'
@@ -117,6 +117,11 @@ check('共用函数：日期跨日', formatBeijingDate(FIXED) === DATE, formatBe
 check('共用函数：零点是 00 不是 24', formatBeijingMinute(MIDNIGHT) === '2026-09-30 00:00', formatBeijingMinute(MIDNIGHT))
 
 check('告警正文', printFailedAlertDetail({ id: 'task-1', terminalCode: 'T-1', updatedAt: FIXED }) === `任务 task-1 · 终端 T-1,失败于 ${MINUTE}`, printFailedAlertDetail({ id: 'task-1', terminalCode: 'T-1', updatedAt: FIXED }))
+const MIN = 60_000
+for (const [ms, want] of [[40 * MIN, '40 分钟前'], [59 * MIN + 59_000, '59 分钟前'], [60 * MIN, '1 小时前'], [125 * MIN, '2 小时 5 分钟前'],
+  [24 * 60 * MIN, '1 天前'], [5211 * MIN, '3 天 14 小时前'], [(30 * 24 + 1) * 60 * MIN, '30 天 1 小时前'], [-5 * MIN, '0 分钟前']] as const) {
+  check(`离线时长「${want}」`, formatElapsedAgo(ms) === want, formatElapsedAgo(ms))
+}
 check('告警分钟与共用函数同一口径', formatShanghaiMinute(FIXED) === MINUTE, formatShanghaiMinute(FIXED))
 
 check('签约风险提示纸上的生成时间', contractReviewGeneratedAtLine(FIXED) === `生成时间：${SECOND}  ｜  AI 生成`, contractReviewGeneratedAtLine(FIXED))

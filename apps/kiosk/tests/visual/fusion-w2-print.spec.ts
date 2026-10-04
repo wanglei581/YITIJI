@@ -2131,6 +2131,16 @@ test('zero-amount order confirms pages without benefit mechanism copy @w2', asyn
   await expect(page.getByText('本单无需权益抵扣', { exact: true })).toHaveCount(0)
   await expect(page.getByTestId('print-confirm-amount')).toHaveText('免费试运营')
   await expect(page.locator('[data-w2-page="print-confirm"]')).not.toContainText(/报价|价格|付款|权益|抵扣|不扣/)
+  // 14 号页（走查 10/3）：主按钮整颗在首屏、不被底栏盖住，点它中心命中的就是它。
+  const confirmButton = page.getByRole('button', { name: '确认并打印', exact: true })
+  await expect(confirmButton).toBeInViewport({ ratio: 1 })
+  const confirmBox = (await confirmButton.boundingBox())!
+  expect(confirmBox.height).toBeGreaterThanOrEqual(56)
+  expect(await confirmButton.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return hit === el || el.contains(hit)
+  })).toBe(true)
   // 反向：免费单不得摆出核销入口，也不得声称权益被消耗。
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByText('已抵扣')).toHaveCount(0)
@@ -2638,3 +2648,184 @@ for (const [findingCount, redactedCount, keptCount, text] of [
     if (findingCount > 0) await expect(page.getByText('没发现需要遮挡的内容')).toHaveCount(0)
   })
 }
+// W-125：后台把 usb_import 关掉之后，深链接和二维码过期屏也要跟着停。
+// 这些用例打 @w2，靠 playwright.w2 注入的网桥令牌才能走到能力闸门；没令牌时页面停在「未配置」。
+function usbCapability(status: string, note: string | null = null) {
+  return {
+    status: 200,
+    json: {
+      terminalCode: 'KSK-001',
+      capabilities: [{
+        capabilityKey: 'usb_import',
+        status,
+        note,
+        configured: true,
+        updatedAt: '2026-10-04T00:00:00.000Z',
+      }],
+    },
+  }
+}
+
+async function installUsbBridge(page: Page, hits: { count: number }): Promise<void> {
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const origin = new URL(page.url()).origin
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders })
+      return
+    }
+    if (request.method() === 'GET' && (path.endsWith('/status') || path.endsWith('/files'))) hits.count += 1
+    if (path.endsWith('/status')) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'W125-USB' } }),
+      })
+      return
+    }
+    if (path.endsWith('/files')) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            present: true,
+            driveLabel: 'W125-USB',
+            files: [{ safeId: 'w125-safe', filename: '求职材料.pdf', extension: '.pdf', sizeBytes: 2048 }],
+          },
+        }),
+      })
+      return
+    }
+    await route.fulfill({ status: 404, headers: corsHeaders, contentType: 'application/json', body: '{}' })
+  })
+}
+
+function installExpiredPhoneUpload(api: ApiRouter): void {
+  const sessionId = 'w125-upload'
+  const expiresAt = '2000-01-01T00:00:00.000Z'
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        uploadUrl: '/upload/phone',
+        uploadToken: 'w125-upload-token',
+        controlToken: 'w125-control',
+        expiresAt,
+      },
+    },
+  })
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        status: 'expired',
+        purpose: 'print_doc',
+        mode: 'temporary',
+        file: null,
+        requiresKioskConfirmation: true,
+        expiresAt,
+      },
+    },
+  })
+}
+
+test('usb deep link stays closed while usb import is in maintenance @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  const hits = { count: 0 }
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', usbCapability('maintenance'))
+  await installUsbBridge(page, hits)
+
+  await page.goto('/print/upload?source=document&tab=usb&mode=transfer')
+  await expect(page.getByText('维护中，暂时不可用', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-testid^="file-source-usb-file"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导入这一份' })).toHaveCount(0)
+  // 轮询是放行后立刻发出的，不是等 2 秒。先看到拒绝文案再等一小段，才能证明没有迟到的请求。
+  await page.waitForTimeout(400)
+  expect(hits.count).toBe(0)
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('usb deep link lists files when usb import is available @w2', async ({ page, api }) => {
+  // 维护中、以及能力接口失败那两条的反向对照：同一条深链接，配成可用就要能选文件并走到导入。
+  const errors = collectRuntimeErrors(page)
+  const hits = { count: 0 }
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', usbCapability('available'))
+  await installUsbBridge(page, hits)
+
+  await page.goto('/print/upload?source=document&tab=usb&mode=transfer')
+  await expect(page.getByRole('button', { name: /求职材料\.pdf/ })).toBeVisible()
+  expect(hits.count).toBeGreaterThan(0)
+  await page.getByRole('button', { name: /求职材料\.pdf/ }).click()
+  await expect(page.getByRole('button', { name: '导入这一份' })).toBeVisible()
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('usb column explains when capability status cannot be read @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  const hits = { count: 0 }
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 500,
+    json: { message: 'boom-internal' },
+  })
+  await installUsbBridge(page, hits)
+
+  await page.goto('/print/upload?source=document&tab=usb&mode=transfer')
+  await expect(page.getByText('暂时读不到本机的服务开通情况，请稍后再试或使用其他方式', { exact: true })).toBeVisible()
+  await expect(page.getByText('boom-internal')).toHaveCount(0)
+  await expect(page.locator('[data-testid^="file-source-usb-file"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导入这一份' })).toHaveCount(0)
+  const retry = page.getByTestId('usb-import-retry')
+  await expect(retry).toBeVisible()
+  const box = await retry.boundingBox()
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(56)
+  const before = api.requestCount('GET', '/api/v1/terminals/KSK-001/capabilities')
+  await retry.click()
+  await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/capabilities')).toBeGreaterThan(before)
+  await page.waitForTimeout(400)
+  expect(hits.count).toBe(0)
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('expired phone upload hides the usb switch when usb import is closed @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', usbCapability('maintenance'))
+  installExpiredPhoneUpload(api)
+
+  await page.goto('/print/upload?source=document&tab=qr')
+  await expect(page.getByRole('button', { name: '重新出一张码' })).toBeVisible()
+  await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/capabilities')).toBeGreaterThan(0)
+  await page.waitForTimeout(300)
+  await expect(page.getByRole('button', { name: '改用 U 盘导入' })).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('expired phone upload offers the usb switch when usb import is available @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', usbCapability('available'))
+  installExpiredPhoneUpload(api)
+
+  await page.goto('/print/upload?source=document&tab=qr')
+  await expect(page.getByRole('button', { name: '重新出一张码' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '改用 U 盘导入' })).toBeVisible()
+  await expectHealthy(page, errors, 'print-upload')
+})

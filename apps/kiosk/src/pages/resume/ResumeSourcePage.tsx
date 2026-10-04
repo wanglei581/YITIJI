@@ -35,6 +35,7 @@ import {
 import { clearAiResumeSession } from './aiResumeSession'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
+import { useUsbImportGate } from '../../hooks/useUsbImportGate'
 import { ResumeUsbImportPanel, type ResumeUsbImportedFile } from './components/ResumeUsbImportPanel'
 import { ResumeTriageHero } from './components/ResumeTriageHero'
 import { ResumeScanReady } from './components/ResumeScanReady'
@@ -54,6 +55,8 @@ interface UploadOption {
   helper: string
   icon: React.ComponentType<{ className?: string }>
 }
+
+const RESUME_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传，或联系现场工作人员。'
 
 const UPLOAD_OPTIONS: UploadOption[] = [
   {
@@ -226,6 +229,7 @@ export function ResumeSourcePage() {
   const accept = wordConversionAvailable ? `${BASE_ACCEPT},${WORD_ACCEPT}` : BASE_ACCEPT
   const fileInputRef = useRef<HTMLInputElement>(null)
   const kiosk = useTerminalKiosk()
+  const usbGate = useUsbImportGate(RESUME_USB_UNCONFIGURED_NOTE)
   const [pickedChannel, setSelected] = useState<UploadChannel>(() => isTerminalKiosk() ? 'phone' : 'cloud')
   const selected = kiosk && pickedChannel === 'cloud' ? 'phone' : pickedChannel
   // 从解析页带着扫描件交接回来时，直接落在稿 21 的 scan-ready：同一份文件，不用重扫。
@@ -272,6 +276,7 @@ export function ResumeSourcePage() {
 
   const handleSelect = (option: UploadOption) => {
     if (isTerminalKiosk() && option.type === 'cloud') return
+    if (option.type === 'usb' && usbGate.state !== 'allowed') return
     setError(null)
     if (option.type !== selected) {
       setUploadedFile(null)
@@ -520,23 +525,29 @@ export function ResumeSourcePage() {
               {UPLOAD_OPTIONS.filter((option) => option.type !== 'cloud' || !isTerminalKiosk()).map((option) => {
                 const isSelected = selected === option.type
                 const Icon = option.icon
+                const usbLocked = option.type === 'usb' && usbGate.state !== 'allowed'
                 return (
                   <button
                     type="button"
                     key={option.type}
                     className="qx-rt-src"
                     aria-pressed={isSelected}
-                    onClick={() => !sourceBusy && handleSelect(option)}
-                    disabled={sourceBusy}
+                    onClick={() => !sourceBusy && !usbLocked && handleSelect(option)}
+                    disabled={sourceBusy || usbLocked}
                   >
                     <span className="ico"><Icon className="h-8 w-8" /></span>
                     <span className="n">{option.label}</span>
                     <span className="d">{option.description}</span>
-                    <span className="go">{option.helper}</span>
+                    <span className="go">{usbLocked ? (usbGate.note ?? '暂时不能用') : option.helper}</span>
                   </button>
                 )
               })}
             </div>
+            {usbGate.state === 'unknown' && selected !== 'usb' ? (
+              <button type="button" className="qx-btn" data-variant="ghost" data-testid="resume-usb-retry" onClick={usbGate.retry}>
+                重新检查
+              </button>
+            ) : null}
           </section>
         ) : null}
 
@@ -550,7 +561,7 @@ export function ResumeSourcePage() {
               </div>
             ) : selected === 'usb' ? (
               <div className="qx-rt-usb">
-                <ResumeUsbImportPanel onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
+                <ResumeUsbImportPanel gate={usbGate} onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
               </div>
             ) : (
               <button
