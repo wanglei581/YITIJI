@@ -1,3 +1,4 @@
+import { screenAiProvider } from './aiScreenDisplay'
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
 import { formatTime, type ScreenUsageRange, type ScreenUsageSnapshot } from '@ai-job-print/shared'
@@ -20,7 +21,7 @@ import {
   type TwinTileItem,
 } from '@ai-job-print/ui'
 import { loadAdminUsage, normalizeUsageRange } from '../../services/api/consoleScreen'
-import { aiOperationLabel, usageServiceLabel } from './metricLabels'
+import { aiOperationRows, usageServiceLabel } from './metricLabels'
 import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
 import { metricReason } from './screenMeta'
 import { UsageAiPanel, UsageAiQualityPanel, UsagePolicyPanel } from './UsageHostingOff'
@@ -29,8 +30,8 @@ import { UsageAiPanel, UsageAiQualityPanel, UsagePolicyPanel } from './UsageHost
  * 服务调用：系统里每一类服务被用了多少次，按渠道、时段、步骤、AI 功能与模型拆开。
  *
  * 口径（与后端统计接口一致，面板角标与口径说明里逐条写明）：
- *   - 只统计系统已经记下来的行为；服务人次是一体机会话数，不是人数，少于 5 次不显示具体数字。匿名浏览、上传与检查计数尚未记录，如实标「待接入」。
- *   - 任何分组少于 5 次一律显示「少于 5」（服务端已置空），不补数、不估算。
+ *   - 只统计系统已经记下来的行为；服务人次是一体机会话数，不是人数，1 至 4 次不给数字，写『少于 5』；0 照常显示。匿名浏览、上传与检查计数尚未记录，如实标「待接入」。
+ *   - 1 至 4 次不给数字，写『少于 5』；0 照常显示（服务端将 1–4 置空），不补数、不估算。
  *   - 岗位、招聘会、政策、企业的浏览与外跳只含登录会员；外跳是「打开来源平台入口」，不是投递结果。
  *   - 渠道拆分只来自已付款订单（订单才有渠道字段），不是全部调用的渠道。
  *   - 招聘内容托管关闭时服务端不下发岗位、招聘会、企业三个节点与「岗位信息使用」；
@@ -51,7 +52,7 @@ const MEMBERS_NOTE = '只含登录会员的浏览与外跳；匿名使用按小�
 
 function usageMeta(usage: ScreenUsageSnapshot): ShellMeta {
   const failed = Object.values(usage.metrics).filter((m) => m && m.available === false && m.reason === 'source_query_failed').length
-  return { generatedAtText: stampText(usage.generatedAt), status: usage.status, failedSlices: failed, access: '访问口径：仅已登录后台会话可见；只出聚合数字，少于 5 次不显示' }
+  return { generatedAtText: stampText(usage.generatedAt), summaryMinutes: 5, status: usage.status, failedSlices: failed, access: '访问口径：后台登录可见、仅聚合；1 至 4 次不给数字，写『少于 5』；0 照常显示' }
 }
 
 function weekdayOf(date: string): string {
@@ -131,7 +132,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
           title="下单渠道"
           sub={`${rangeText} · 已付款订单`}
           metric={u.channels}
-          source="按订单支付时间统计已付款订单的渠道（一体机 / 小程序），存量没有渠道的单列「未标注」。只有订单记录渠道，这不是全部调用的渠道拆分。少于 5 单显示「少于 5」。"
+          source="按订单支付时间统计已付款订单的渠道（一体机 / 小程序），存量没有渠道的单列「未标注」。只有订单记录渠道，这不是全部调用的渠道拆分。1 至 4 次不给数字，写『少于 5』；0 照常显示。"
           render={(value) => {
             const kiosk = value.kiosk === null ? 0 : value.kiosk
             const miniapp = value.miniapp === null ? 0 : value.miniapp
@@ -150,17 +151,17 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                 <div className="twin-legend">
                   <span className="twin-lg">一体机 {twinSmall(value.kiosk)}</span>
                   <span className="twin-lg">小程序 {twinSmall(value.miniapp)}</span>
-                  {value.unlabeled !== null && value.unlabeled > 0 ? <span className="twin-lg">未标注 {screenCount(value.unlabeled)}</span> : null}
+                  <span className="twin-lg">未标注 {twinSmall(value.unlabeled)}</span>
                 </div>
                 <div className="twin-push">
                   <TwinTiles
                     items={[
                       {
                         value:
-                          value.memberOrders !== null && value.paidOrders !== null && value.paidOrders > 0
+                          value.memberOrders !== null && value.paidOrders !== null && value.paidOrders >= 5
                             ? String(Math.round((value.memberOrders / value.paidOrders) * 100))
                             : '样本不足',
-                        unit: value.memberOrders !== null && value.paidOrders !== null && value.paidOrders > 0 ? '%' : undefined,
+                        unit: value.memberOrders !== null && value.paidOrders !== null && value.paidOrders >= 5 ? '%' : undefined,
                         label: '会员下单占比',
                       },
                       visitsTile(u.visits),
@@ -178,7 +179,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
           title="使用时段热力"
           sub="近 7 天 · 每小时"
           metric={u.heat7d}
-          source="近 7 个上海自然日，按小时统计已记录的服务调用（AI、打印、扫描、会员浏览、外跳、收藏）。少于 5 次的格子不显示（虚线）。"
+          source="近 7 个上海自然日，按小时统计已记录的服务调用（AI、打印、扫描、会员浏览、外跳、收藏）。1 至 4 次的格子用虚线；0 照常显示。"
           render={(value) => (
             <>
               <TwinHeat
@@ -190,7 +191,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
                 }))}
               />
               <p className="twin-cap twin-push">
-                {value.peakHour === null ? '样本不足，暂不标高峰' : `高峰在 ${value.peakHour}–${value.peakHour + 1} 时`}；虚线格不足 5 次
+                {value.peakHour === null ? '样本不足，暂不标高峰' : `高峰在 ${value.peakHour}–${value.peakHour + 1} 时`}；虚线格为 1 至 4 次或尚未到来
               </p>
             </>
           )}
@@ -272,7 +273,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
             title="各项服务使用次数"
             sub={rangeText}
             metric={u.services}
-            source="各项服务在所选时间内的使用次数，少于 5 次显示「少于 5」。"
+            source="各项服务在所选时间内的使用次数，1 至 4 次不给数字，写『少于 5』；0 照常显示。"
             render={(value) => (
               <TwinBarList
                 items={value.flatMap((s) => {
@@ -292,7 +293,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
           title="实时调用脉冲"
           sub="近 2 小时 · 每 5 分钟汇总 · 不含个人明细"
           metric={u.pulse2h}
-          source="每 5 分钟汇总一次信息浏览、AI 调用、打印扫描的次数；少于 5 次的段不画。只有汇总，不滚动任何一次个人操作。"
+          source="每 5 分钟汇总一次信息浏览、AI 调用、打印扫描的次数；1 至 4 次的段不画；0 照常显示。只有汇总，不滚动任何一次个人操作。"
           render={(value) => {
             const last = value.buckets[value.buckets.length - 1]
             const first = value.buckets[0]
@@ -327,18 +328,18 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
             title="AI 服务"
             sub={`${rangeText} · 按功能`}
             metric={u.ai}
-            source="AI 服务日志：按功能计次，成功率 = 成功 ÷（成功 + 失败），平均耗时只算成功调用，成本只加已采集的估算。模型按调用方记录的提供方统计。少于 5 次不显示。"
+            source={`${rangeText}窗口；AI 服务日志按功能计次；成功率 = 成功 ÷（成功 + 失败），平均耗时只算成功调用，成本只加已采集的估算。模型按调用方记录的提供方统计；降级兜底统计未就绪兜底模型的调用，不是日志状态。1 至 4 次不给数字，写『少于 5』；0 照常显示。`}
             render={(value) => (
               <>
                 <TwinBarList
-                  items={value.byOperation
-                    .map((row) => ({ label: aiOperationLabel(row.operation), value: row.count === null ? 0 : row.count, valueText: twinSmall(row.count) }))
+                  items={aiOperationRows(value.byOperation)
+                    .map((row) => ({ label: row.label, value: row.count === null ? 0 : row.count, valueText: twinSmall(row.count) }))
                     .sort((a, b) => b.value - a.value)
                     .slice(0, chrome.presenting ? 4 : 6)}
                   emptyText="所选时间内没有 AI 调用"
                 />
                 <p className="twin-cap">
-                  模型：{value.providers.length ? value.providers.map((p) => `${p.label} ${twinSmall(p.count)}`).join(' · ') : '暂无调用'}
+                  模型：{value.providers.length ? value.providers.map((p) => `${screenAiProvider(p.provider)} ${twinSmall(p.count)}`).join(' · ') : '暂无调用'}
                 </p>
                 <div className="twin-push">
                   <TwinTiles

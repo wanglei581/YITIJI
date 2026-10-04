@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { formatDateTime } from '@ai-job-print/shared'
-import { Button, Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
+import { formatCount, formatDateTime } from '@ai-job-print/shared'
+import { Button, Card, ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import {
   AlertCircleIcon,
@@ -50,7 +50,7 @@ function PendingReviewCallout({ count, recruitmentHosting, onView }: { count: nu
       <div className="flex items-center gap-3">
         <AlertCircleIcon className="h-5 w-5 shrink-0 text-warning-fg" aria-hidden="true" />
         <div>
-          <p className="text-sm font-semibold text-warning-fg">有 {count} 条内容待审核</p>
+          <p className="text-sm font-semibold text-warning-fg">有 {formatCount(count)} 条内容待审核</p>
           <p className="mt-0.5 text-xs text-warning-fg">
             {recruitmentHosting
               ? '政策由本机构自行审核并确认发布；岗位、招聘会、企业资料的审核发布入口尚未开放（平台不代审、不代发）。通过并发布后才会在终端展示'
@@ -86,22 +86,22 @@ function MetricsGrid({
   const hostedMetrics = [
     {
       label: '已上传岗位', value: data.jobs.total,
-      note: `已发布 ${data.jobs.published} · 待初审 ${data.jobs.pending}`,
+      note: `已发布 ${formatCount(data.jobs.published)} · 待初审 ${formatCount(data.jobs.pending)}`,
       icon: BriefcaseIcon, iconClass: 'bg-info-bg text-info-fg', path: '/jobs',
     },
     {
       label: '已上传招聘会', value: data.fairs.total,
-      note: `已发布 ${data.fairs.published} · 待初审 ${data.fairs.pending}`,
+      note: `已发布 ${formatCount(data.fairs.published)} · 待初审 ${formatCount(data.fairs.pending)}`,
       icon: CalendarIcon, iconClass: 'bg-purple-50 text-purple-600', path: '/fairs',
     },
     {
       label: '政策公告', value: data.policies.total,
-      note: `已发布 ${data.policies.published} · 待初审 ${data.policies.pending}`,
+      note: `已发布 ${formatCount(data.policies.published)} · 待初审 ${formatCount(data.policies.pending)}`,
       icon: ScrollTextIcon, iconClass: 'bg-success-bg text-success-fg', path: '/policy',
     },
     {
       label: '已发布数据', value: data.jobs.published + data.fairs.published + data.policies.published,
-      note: `岗位 ${data.jobs.published} + 招聘会 ${data.fairs.published} + 政策 ${data.policies.published}`,
+      note: `岗位 ${formatCount(data.jobs.published)} + 招聘会 ${formatCount(data.fairs.published)} + 政策 ${formatCount(data.policies.published)}`,
       icon: CheckCircleIcon, iconClass: 'bg-success-bg text-success-fg', path: '/jobs',
     },
     {
@@ -111,7 +111,7 @@ function MetricsGrid({
     },
     {
       label: '数据源', value: data.sources.total,
-      note: `启用中 ${data.sources.enabled} 个`,
+      note: `启用中 ${formatCount(data.sources.enabled)} 个`,
       icon: DatabaseIcon, iconClass: 'bg-cyan-50 text-cyan-600', path: '/sources',
     },
   ]
@@ -119,7 +119,7 @@ function MetricsGrid({
   const policyOnlyMetrics = [
     {
       label: '政策公告', value: data.policies.total,
-      note: `已发布 ${data.policies.published}`,
+      note: `已发布 ${formatCount(data.policies.published)}`,
       icon: ScrollTextIcon, iconClass: 'bg-success-bg text-success-fg', path: '/policy',
     },
     {
@@ -147,7 +147,7 @@ function MetricsGrid({
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-[11.5px] font-medium text-neutral-500">{m.label}</p>
-                  <p className="mt-1.5 text-[1.5rem] font-bold tabular-nums leading-none text-neutral-900">{m.value}</p>
+                  <p className="mt-1.5 text-[1.5rem] font-bold tabular-nums leading-none text-neutral-900">{formatCount(m.value)}</p>
                   <p className="mt-1.5 text-[10.5px] text-neutral-400">{m.note}</p>
                 </div>
                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] ${m.iconClass}`}>
@@ -189,39 +189,20 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
             className="py-10"
           />
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                {['数据源', '类型', '新增/更新/失败', '结果', '同步时间'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium text-neutral-500">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-900/[0.06]">
-              {data.recentSyncs.map((s) => {
+          <ConsoleTable
+            items={data.recentSyncs}
+            page={1} pageSize={Math.max(data.recentSyncs.length, 1)} total={data.recentSyncs.length} onPageChange={() => {}}
+            columns={[
+              { id: 'source', header: '数据源', truncate: true, cell: (s) => s.source },
+              { id: 'type', header: '类型', cell: (s) => DATA_TYPE_LABEL[s.dataType] ?? s.dataType },
+              { id: 'counts', header: '新增/更新/失败', cellClassName: 'whitespace-nowrap tabular-nums', cell: (s) => <>{formatCount(s.addedCount)} / {formatCount(s.updatedCount)} / <span className={s.errorCount > 0 ? 'text-error-fg' : ''}>{formatCount(s.errorCount)}</span></> },
+              { id: 'result', header: '结果', cell: (s) => {
                 const cfg = RESULT_CONFIG[s.status] ?? { label: s.status, badge: 'warning' as const }
-                return (
-                  <tr key={s.id} className="transition-colors hover:bg-neutral-50">
-                    <td className="px-5 py-3.5 font-medium text-neutral-800">{s.source}</td>
-                    <td className="px-5 py-3.5">
-                      <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
-                        {DATA_TYPE_LABEL[s.dataType] ?? s.dataType}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 tabular-nums text-neutral-700">
-                      {s.addedCount} / {s.updatedCount} / <span className={s.errorCount > 0 ? 'text-error-fg' : ''}>{s.errorCount}</span>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <StatusBadge dot status={cfg.badge} label={cfg.label} />
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-xs tabular-nums text-neutral-400">{formatDateTime(s.syncTime)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                return <StatusBadge dot status={cfg.badge} label={cfg.label} />
+              } },
+              { id: 'time', header: '同步时间', cellClassName: 'whitespace-nowrap tabular-nums', cell: (s) => formatDateTime(s.syncTime) },
+            ]}
+          />
         )}
       </Card>
     </section>

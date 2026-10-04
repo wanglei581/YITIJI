@@ -99,7 +99,7 @@ function TaskFlow({ printByStatus, scanByStatus }: { printByStatus: Record<strin
       <i className="twin-flow-sep" aria-hidden="true" />
       <div className="twin-flow-node"><b>{screenCount(count(scanByStatus, ['completed']))}</b><span>扫描完成</span></div>
       <div className="twin-flow-node is-warn"><b>{screenCount(count(printByStatus, ['failed']))}</b><span>失败待核查</span></div>
-      <div className="twin-flow-node is-muted"><b>{screenCount(count(printByStatus, ['cancelled', 'canceled']))}</b><span>已取消</span></div>
+      <div className="twin-flow-node is-muted"><b>{screenCount(count(printByStatus, ['cancelled', 'canceled']))}</b><span>已取消（打印）</span></div>
     </div>
   )
 }
@@ -223,7 +223,7 @@ export function GovGrid({ chrome }: { chrome: ScreenChrome }) {
                       <p className="twin-cap">是会话数，不是人数</p>
                     </div>
                     <div className="twin-kv">
-                      <span>AI 服务调用</span>
+                      <span>AI 服务调用（累计）</span>
                       {g.aiCallsCumulative?.available ? (
                         <b>
                           {screenCount(g.aiCallsCumulative.value.totalCalls)}

@@ -87,6 +87,12 @@ export function daysAgoStart(now: Date, days: number): Date {
   return new Date(shanghaiDayStart(now).getTime() - (days - 1) * 24 * HOUR_MS)
 }
 
+/** 聚合计数：0 保留；1–4 为 null；≥5 原样。负计数防御性归零。 */
+export function suppressAggregateCount(count: number): number | null {
+  if (count <= 0) return 0
+  return count >= SCREEN_MIN_AGGREGATE_SAMPLE ? count : null
+}
+
 export function rateFromCounts(success: number, failed: number): number | null {
   const total = success + failed
   if (total <= 0) return null

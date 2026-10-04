@@ -358,13 +358,13 @@ export function PrintProgressPage() {
 
   const timeoutPill = payment === 'paid' && amountCents != null
     ? `已付 ${formatCents(amountCents)} · 状态查询中`
-    : isFreeOrder ? '本次未收款 · 状态查询中' : '状态查询中'
+    : isFreeOrder ? '免费试运营 · 状态查询中' : '状态查询中'
   const frameStatus = timedOut
     ? { tone: 'warn' as const, label: timeoutPill }
     : failed
       ? { tone: 'bad' as const, label: isSim ? '演示失败' : failureView.badge }
       : progressQuiet
-        ? { tone: 'warn' as const, label: isFreeOrder ? '本次未收款 · 进度未更新' : '进度未更新' }
+        ? { tone: 'warn' as const, label: isFreeOrder ? '免费试运营 · 进度未更新' : '进度未更新' }
       : backendStatus == null && useRealApi
         ? { tone: 'unknown' as const, label: '状态未知' }
         : { tone: 'ok' as const, label: pillLabel }
@@ -756,7 +756,7 @@ export function PrintProgressPage() {
                 <CreditCardIcon aria-hidden="true" />
                 <p>
                   {isFreeOrder
-                    ? <><b>打印失败</b>：本次未收款，记录已保存，请找现场工作人员核对。</>
+                    ? <><b>打印失败</b>：订单记录保留，请找现场工作人员核对。</>
                     : payment === 'paid'
                       ? <><b>已支付但打印失败</b>：订单与支付记录都在，退款以工作人员核查为准。</>
                       : <><b>打印失败</b>：订单记录已保存，费用以工作人员核查结果为准。</>

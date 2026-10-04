@@ -2110,7 +2110,7 @@ test('benefit card reports 后台刚调价 when quote and price-config disagree 
   await expectHealthy(page, errors, 'print-confirm')
 })
 
-test('benefit card reports 本单不适用 for a zero-amount order @w2', async ({ page, api }) => {
+test('zero-amount order confirms pages without benefit mechanism copy @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   // 免费试运营价目：公示价与报价单价一致（同为 0），排除「调价」干扰，只留「免费单」。
@@ -2125,8 +2125,12 @@ test('benefit card reports 本单不适用 for a zero-amount order @w2', async (
   await seedMaterialSession(page)
 
   await page.goto('/print/confirm')
-  await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'not_applicable')
-  await expect(page.getByText('本单无需权益抵扣', { exact: true })).toBeVisible()
+  // 9/30 零元口径：保留免费事实，权益机制不出现在公共屏幕；收费单的权益用例原样保留。
+  await expect(page.getByTestId('print-confirm-state-zero-amount')).toBeVisible()
+  await expect(benefitCard(page)).toHaveCount(0)
+  await expect(page.getByText('本单无需权益抵扣', { exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('print-confirm-amount')).toHaveText('免费试运营')
+  await expect(page.locator('[data-w2-page="print-confirm"]')).not.toContainText(/报价|价格|付款|权益|抵扣|不扣/)
   // 反向：免费单不得摆出核销入口，也不得声称权益被消耗。
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByText('已抵扣')).toHaveCount(0)

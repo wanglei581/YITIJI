@@ -275,7 +275,10 @@ INSERT INTO "ReviewDecision" (
     'qualification_revoke','revoked','CI negative fixture','admin',now(),
     'rw2-correlation-qualification-revoke','rw2-request-qualification-revoke');
 SQL
+# 本门禁拿公开接口返回的 ID 与库内 ID 逐条对账，验证的是托管打开（私有化版）下的行为；
+# CI 主作业按生产配置（托管关闭）跑，关闭时公开接口一律返回空集合，所以这里显式打开。
 DATABASE_URL="$RECRUITMENT_WAVE2_RESTORED_READONLY_URL" NODE_ENV=test PORT=3102 \
+  RECRUITMENT_CONTENT_HOSTING_ENABLED=true \
   EXCLUDE_DEMO_PUBLIC_DATA=false node -r @swc-node/register src/main.ts >/tmp/rw2-api.log 2>&1 &
 api_pid=$!
 for attempt in $(seq 1 30); do

@@ -11,8 +11,10 @@ test.describe('告警中心（mock 口径）', () => {
     await page.getByRole('button', { name: /已确认/ }).first().click()
     await page.getByRole('button', { name: /已静默/ }).first().click()
     await page.getByRole('button', { name: /待处理/ }).first().click()
+    await expect(page.getByRole('table')).toBeVisible()
     const close = page.getByRole('button', { name: '关闭', exact: true }).first()
-    if (await close.isVisible()) {
+    await expect(close).toBeVisible()
+    {
       await close.click()
       await expect(page.getByText('关闭后不再出现在待处理')).toBeVisible()
       await page.getByRole('button', { name: '取消' }).click()

@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 /**
  * P1-A② 参展企业岗位明细(FairCompanyPosition)CRUD — 验证。
  *
