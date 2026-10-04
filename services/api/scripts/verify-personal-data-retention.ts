@@ -49,7 +49,7 @@ async function main(): Promise<void> {
   const sweep = () => sweepPersonalDataRetention(prisma, NOW)
 
   // ── 夹具：三个会员——匿名化 6 年、匿名化 1 年、在用（数据同样老）──────────────────────
-  const member = async (nickname: string, status: 'active' | 'anonymized', anonymizedDaysAgo: number | null) => {
+  const member = async (nickname: string, status: 'active' | 'anonymized' | 'disabled', anonymizedDaysAgo: number | null) => {
     const phone = `139${randomInt(10000000, 99999999)}`
     const user = await prisma.endUser.create({ data: {
       phoneHash: status === 'anonymized' ? `anonymized:${randomUUID()}` : hashPhone(phone),
@@ -76,6 +76,8 @@ async function main(): Promise<void> {
   const oldShell = await member('', 'anonymized', 6 * 365)
   const newShell = await member('', 'anonymized', 365)
   const active = await member('孙海燕', 'active', null)
+  // 状态与匿名化时间对不上的账号（例如人工纠错后改回停用）：只认状态，不能因为有一个旧的匿名化时间就删它的记录。
+  const inconsistent = await member('韩志强', 'disabled', 6 * 365)
 
   const auditRow = (days: number, extra: Record<string, unknown> = {}) => prisma.auditLog.create({ data: {
     actorRole: 'admin', action: 'feedback.view', targetType: 'FeedbackTicket', targetId: randomUUID(),
@@ -100,7 +102,7 @@ async function main(): Promise<void> {
     await check('1 三个配置都不填：什么都不动', async () => {
       const result = await sweep()
       assert.deepEqual(result.audit, { scrubbed: 0, deleted: 0 }); assert.equal(result.consents.deleted, 0); assert.equal(result.orders.orders, 0)
-      for (const who of [oldShell, newShell, active]) assert.deepEqual(await counts(who.id), full)
+      for (const who of [oldShell, newShell, active, inconsistent]) assert.deepEqual(await counts(who.id), full)
       assert.equal((await prisma.auditLog.findUniqueOrThrow({ where: { id: oldAudit.id } })).ipAddress, '198.51.100.23')
     })
 
@@ -146,6 +148,7 @@ async function main(): Promise<void> {
       assert.equal((await counts(oldShell.id)).consents, 0)
       assert.equal((await counts(newShell.id)).consents, 2)
       assert.equal((await counts(active.id)).consents, 2)
+      assert.equal((await counts(inconsistent.id)).consents, 2, '状态不是已匿名化的账号不能删')
       assert.equal((await counts(oldShell.id)).orders, 1, '只配同意年限时订单不动')
       delete process.env['CLOSURE_RETAINED_CONSENT_YEARS']
     })
@@ -161,6 +164,7 @@ async function main(): Promise<void> {
       assert.equal(await prisma.printTaskStatusLog.count({ where: { taskId: oldShell.taskId } }), 0)
       assert.deepEqual(await counts(newShell.id), full)
       assert.deepEqual(await counts(active.id), full)
+      assert.deepEqual(await counts(inconsistent.id), full)
       assert.equal(await prisma.endUser.count({ where: { id: oldShell.id } }), 1, '账号壳本身保留')
       assert.equal(result.truncated, false)
       delete process.env['CLOSURE_RETAINED_ORDER_YEARS']
