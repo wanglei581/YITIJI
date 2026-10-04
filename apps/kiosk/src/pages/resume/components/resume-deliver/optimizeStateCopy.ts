@@ -23,7 +23,12 @@ export function optimizeExportErrorMessage(error: unknown): string {
     : field ? labels[field] : undefined
   if (!label) return '简历中有内容不符合导出要求，服务未说明具体项目。请联系现场工作人员核查；也可以先导出修改清单。'
   const maxLength = message.match(/shorter than or equal to (\d+) characters/)?.[1]
-  const editable = field === 'summary' || field === 'skills' || field === 'certificates' || listField?.[3] === 'description'
+  const section = listField?.[1]
+  const key = listField?.[3]
+  // 经历的公司、职务和教育的学校、专业可以在优化页改。项目标题、学历、时间段仍不能改。
+  const editable = field === 'summary' || field === 'skills' || field === 'certificates' || key === 'description'
+    || (section === 'experience' && (key === 'company' || key === 'role'))
+    || (section === 'education' && (key === 'school' || key === 'major'))
   if (!editable) {
     const reason = message.includes('should not be empty') ? '还没填写' : maxLength ? `超过 ${maxLength} 字` : '格式不符合导出要求'
     return `${label}${reason}。这一项不能在本页修改，请核对原简历后重新上传并诊断；仍失败可联系现场工作人员，也可以先导出修改清单。`

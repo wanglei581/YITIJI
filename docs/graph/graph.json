@@ -12903,7 +12903,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 635,
+      "reachableFileCount": 636,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15879,7 +15879,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 729
+      "sourceFileCount": 730
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20581,6 +20581,9 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts": [
+      "apps/kiosk/scripts/verify-resume-decisions.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/resumeEntryTitles.ts": [
       "apps/kiosk/scripts/verify-resume-decisions.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts": [
@@ -31000,6 +31003,7 @@
           "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/resumeEntryTitles.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts"
         ],
         "missing": []

@@ -20,6 +20,7 @@ import { ResumeAigcBadge } from './components/resume-deliver/ResumeAigcBadge'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
 import { ResumeStatePanel } from './components/resume-deliver/ResumeStatePanel'
 import { GenerateResumeEditor } from './components/resume-deliver/GenerateResumeEditor'
+import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { ResumeFormatChooser } from './components/resume-deliver/ResumeFormatChooser'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
 import { detectUnconfirmedAdditions, extractConfirmableFacts } from './components/resume-deliver/facts'
@@ -75,6 +76,7 @@ export function ResumeGeneratePreviewPage() {
   const pricing = useResumeExportPricing(access, token)
   const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
   const summaryRef = useRef<HTMLTextAreaElement>(null)
+  const pendingTitleFocus = useRef<string | null>(null)
 
   const [resume, setResume] = useState<GeneratedResume | null>(state?.result?.resume ?? null)
   const [result, setResult] = useState<ResumeGenerateResponse | null>(state?.result ?? null)
@@ -177,13 +179,15 @@ export function ResumeGeneratePreviewPage() {
   const facts = resume ? extractConfirmableFacts(resume) : []
   const hints = result?.missingHints ?? []
   const exportBlocked = pricing.unavailable || pricing.chargedBlocked || !resume || exporting
+  const titleIssues = resume ? resumeTitleIssues(resume) : []
+  const titleBlocked = titleIssues.length > 0
   const canPrint = exportFormat === 'pdf' && Boolean(exported?.printFileUrl)
   const estimatedPagesLabel = exported?.pageCount
     ? `共 ${exported.pageCount} 页（上次导出）`
     : '导出后显示真实页数。若担心第二页只剩两三行，可先点「压到一页」。'
 
   const handleExport = async (factsConfirmedAt: string) => {
-    if (!resume || !result) return
+    if (!resume || !result || resumeTitleIssues(resume).length > 0) return
     setExporting(true)
     setExportError(null)
     try {
@@ -197,6 +201,7 @@ export function ResumeGeneratePreviewPage() {
   }
 
   const handlePrint = () => {
+    if (titleBlocked) { focusTitleIssue(); return }
     if (!exported?.printFileUrl) return
     if (exportFormat !== 'pdf') return
     setPrintNavigating(true)
@@ -215,6 +220,7 @@ export function ResumeGeneratePreviewPage() {
   }
 
   const openExport = () => {
+    if (titleBlocked) { focusTitleIssue(); return }
     const base = state && typeof state === 'object' ? state : {}
     navigate(
       { pathname: location.pathname, search: location.search },
@@ -232,6 +238,17 @@ export function ResumeGeneratePreviewPage() {
       { pathname: location.pathname, search: location.search },
       { replace: true, state: { ...base, deliverPhase: 'preview' } },
     )
+  }
+
+  function focusTitleIssue() {
+    const id = titleIssues[0]?.id
+    if (!id) return
+    if (phase === 'export') {
+      pendingTitleFocus.current = id
+      backToPreview()
+      return
+    }
+    focusResumeTitleIssue(id)
   }
 
   const focusSummary = () => {
@@ -263,11 +280,19 @@ export function ResumeGeneratePreviewPage() {
   const canRetry = Boolean(restoreTaskId) && !synthetic
   const go = (to: string) => navigate(to)
   const onExportScreen = showWorkspace && phase === 'export'
+  useEffect(() => {
+    const id = pendingTitleFocus.current
+    if (!id || phase !== 'preview') return
+    pendingTitleFocus.current = null
+    focusResumeTitleIssue(id)
+  }, [phase, resume])
   const ctabar = GeneratePreviewCta({
     view: onExportScreen ? exportScreen : view,
     phase,
     showWorkspace,
     exportBlocked,
+    titleBlocked,
+    onTitleBlocked: focusTitleIssue,
     exporting,
     canPrint,
     printNavigating,
@@ -279,7 +304,7 @@ export function ResumeGeneratePreviewPage() {
     onRetry: () => { setRestoreFailed(false); setRestoring(true); setRetryNonce((n) => n + 1) },
     onOpenExport: openExport,
     onBackToPreview: backToPreview,
-    onConfirmExport: () => setFactOpen(true),
+    onConfirmExport: () => { if (titleBlocked) { focusTitleIssue(); return } setFactOpen(true) },
     onPrint: handlePrint,
   })
 
@@ -353,7 +378,7 @@ export function ResumeGeneratePreviewPage() {
             {unconfirmed.length > 0 && <p className="qx-rd-pending">待本人确认：{unconfirmed.join('、')}</p>}
             <div className="qx-rg-help">
               <p>
-                润色只动个人简介和各段描述。学校、专业、学历、公司、职务、项目名、证书和时间段按你填的保留。
+                润色只动个人简介和各段描述。学校、专业、公司和职务可以在这一页改；学历、时间段、项目名和证书仍按你填的保留。
                 {hints.length > 0 ? `另外还有 ${hints.length} 处建议补充。` : ''}
               </p>
               <button type="button" className="qx-rg-hbtn" onClick={focusSummary}>改一段描述</button>
@@ -368,7 +393,7 @@ export function ResumeGeneratePreviewPage() {
               <p>{token ? '这一页先在屏幕上核对。导出之后可以扫码带走，登录状态下按保存期限留在账号里。' : '这一页只在屏幕上。没登录时导出的文件不会进账号，事后登录也不补绑。要留底就先登录，再生成、再导出。'}</p>
               <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={() => go('/help')}>找工作人员</button>
             </div>
-            <p className="qx-rg-reason">事实内容要改，得回填写页改。这一页改的是描述，改完就留在这一份上。</p>
+            <p className="qx-rg-reason">学校、专业、公司和职务改完就留在这一份上。学历、时间段、项目名和证书要改，得回填写页。</p>
           </div>
         )}
         {showWorkspace && onExportScreen && (
@@ -392,6 +417,8 @@ export function ResumeGeneratePreviewPage() {
             guest={!token}
             synthetic={resolved.synthetic}
             printNavigating={printNavigating}
+            titleBlocked={titleBlocked}
+            onTitleBlocked={focusTitleIssue}
             onPrint={handlePrint}
             onOpenPreview={() => setPreviewOpen(true)}
             onClearExport={() => { setExported(null); setExportError(null) }}
@@ -403,7 +430,7 @@ export function ResumeGeneratePreviewPage() {
           <ResumeFactConfirmDialog facts={facts} unconfirmed={unconfirmed} busy={exporting} onCancel={() => setFactOpen(false)} onConfirm={(at) => { void handleExport(at) }} />
         )}
         {previewOpen && exported?.signedUrl && (
-          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating } : undefined} onClose={() => setPreviewOpen(false)} />
+          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
       </section>
     </QxPageFrame>
