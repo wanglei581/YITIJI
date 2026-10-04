@@ -1,5 +1,22 @@
 # 当前开发进度
 
+## 2026-10-04：取件码方案②（候选分支，未合入、未上线）
+
+产品负责人 10/4 拍板「取件码按推荐」。本段是后端契约，一体机与小程序按同一批字段改前端。字段名不要改。
+
+- 明文列写入路径（本分支核实）：全仓生产代码里，新铸一枚明文 `Order.pickupCode` 的路径原来只有 `order-status.service.ts` 的 `settleRedemptionInTransaction`（`generateUniquePickupCode` 重试循环）。该循环与辅助函数已删。`markPaid` / `markPaidOnline` 本来就不写这一列。建单与作废重发只写 `pickupCodeHash` + `pickupCodeEnc`。退款（`refund.service.ts` 两处）和账号注销保留（`member-closure-retention.ts`）只把这一列置 null。退款来源含糊判断仍会读这一列，不下发。列保留，不迁移存量。
+- 响应里的 `pickupCode` 只可能是解密后的到机码或 null。有哈希、且（仍可取，或此刻可续打）才解密 `pickupCodeEnc`。没有哈希的现场单保持 null。可取口径：`pickupStatus=pending`，付款态为 unpaid / paying / paid，且 `pickupCodeExpiresAt` 仍在未来。
+- 上限：每单自助续打 2 次（`SELF_SERVICE_REPRINT_LIMIT`，加上首次出纸最多 3 次）。计数：该任务状态日志里 `fromStatus=failed`、`toStatus=pending`、`errorCode` 属于 `kiosk_retry` 或 `pickup_code_resume` 的条数。管理员重试（`admin_retry`）不计入、也不受限。`POST /api/v1/print-jobs/:taskId/retry` 与到机码续打共用这个数。旧的 `reprintAttemptsByTaskId` 仍统计全部 failed→pending，不含这次过滤。
+- 两个字段，挂在下发 `pickupCode` 的订单视图上（云打印与材料包的列表和详情、我的打印订单列表与详情、跨端时间线）。在线支付状态和管理员订单动作不带这两个字段。
+  - `reprintAllowed`：此刻绑定终端用同一个到机码能否续打。任务失败、`paidReprintBlockReason` 为空（含 Agent 版本）、任务终端与订单终端相同、取件窗口未关、自助次数未到上限，才为 true。没任务、没失败、现场单、退款中为 false。
+  - `reprintRemaining`：剩余自助次数 0–2。没有任务或现场单（没有哈希）为 null。有任务且有哈希时给数字，哪怕此刻 `reprintAllowed` 为 false。
+  - `reprintAllowed` 为 true 时继续下发到机码。已用且不可续打的单不下发。
+- 续打：认领入口在已放行（used / 有 printTaskId）之后、10 分钟回放之前。满足上面条件则把同一个任务和订单的 `taskStatus` 从 failed 改回 pending，状态日志 `errorCode=pickup_code_resume`，刷新 30 分钟签名文件地址。返回与正常放行同一形状，并多一个 `resumed: true`。不建任务、不改金额、不新建订单。正常放行和 10 分钟回放不带 `resumed`。回放窗口仍从任务最初的 `createdAt` 算，续打不重置。
+- 拒绝：次数用完 409 `PICKUP_RESUME_LIMIT_REACHED`「这单已经接着打过 2 次，不能再打了」。结果未确认 409 `PICKUP_RESUME_UNCONFIRMED`「这单的出纸结果还没确认，暂时不能接着打，请稍后再试」。已出部分纸 409 `PICKUP_RESUME_PARTIAL_OUTPUT`「这单已经出了一部分纸，不能整单重打」。其它不可续打原因沿用既有 `REPRINT_BLOCKED_CODE` 与对应文案；既有「未确认」那句本包不改。会员 `/retry` 超限 409 `PRINT_RETRY_LIMIT_REACHED`，文案与次数用完那句相同。取件窗口已关沿用 400 `PICKUP_CODE_EXPIRED`。退款中 / 已退沿用认领入口既有 400 `ORDER_REFUNDED`，走不到续打。别的终端输这个码仍是认领入口既有 404 `PICKUP_CODE_INVALID`。任务还在排队、打印中或已完成，仍走 10 分钟回放。
+- 管理员可见性：只读订单视图与 `POST /admin/orders/:id/mark-paid` 都不把到机码交给管理员浏览器。`mark-paid` 的 `pickupCode` 恒为 null（字段还在，避免旧客户端缺键）。密文列也不回。
+- 新门禁 `verify:pickup-code-resume` 挂在 `verify:print-jobs` 后面，CI 已有的 `verify:print-jobs` 行会带上它，未改 `.github/`。
+- 停放、隐藏、改名、降级：无。存量明文列留在库里，任何接口不再把它读出来。
+
 ## 2026-10-04：第五次更新已上线；当晚线上 AI 与运维调整
 
 - 第五次更新：2026-10-04 15:56 上线（Deploy to zyidai.cn run 37187023341，15:50:38–15:56:09，success）。发布版本 main `e2e530a29`（#1224，第二父 `3faa07816`，树与 #1220 头一致）；回退标签 `prod-before-release5` → `8e8fd31e2`。发布开关 15:51:26 在 SSH 步骤开始后关闭。发布日志：PREFLIGHT OK 20、LEGAL 3、迁移 92 个无待执行、readiness OK。发布后公开只读探针 11 项通过；服务器 DEPLOY_SOURCE 与 e2e530a29 一致；三端产物 jsxDEV 0；KSK-001 心跳正常。**没验的：线上还没有人真的走过一张 0 元打印单到出纸。**

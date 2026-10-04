@@ -7728,7 +7728,6 @@
         "handler": "MemberPrintOrdersController.list",
         "method": "GET",
         "models": [
-          "Order",
           "PrintTask",
           "Terminal"
         ],
