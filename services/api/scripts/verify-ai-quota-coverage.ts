@@ -110,7 +110,7 @@ const REGISTRY: Entry[] = [
 
   { controller: AiController, method: 'chatWithAssistant', status: 'wired', bucket: 'ai_assistant', via: via(AiService.prototype, 'chatWithAssistant') },
   { controller: AiController, method: 'transcribeAssistantVoice', status: 'exempt', reason: '转写只查小青当天余量，不预占。会员次数用完才拒绝，有余量时不扣次' },
-  { controller: AiController, method: 'summarizeAssistantSession', status: 'exempt', reason: '同一助手会话没有已存小结可直接返回；每次都会新建顾问会话并再调模型。按已存则不再调模型的条件不成立', via: via(AssistantSummaryService.prototype, 'summarize') },
+  { controller: AiController, method: 'summarizeAssistantSession', status: 'wired', bucket: 'ai_assistant', via: via(AssistantSummaryService.prototype, 'summarize') },
   { controller: MockInterviewController, method: 'create', status: 'exempt', reason: '整场一次，首题下发时已计', via: via(MockInterviewService.prototype, 'createSession') },
   { controller: MockInterviewController, method: 'start', status: 'wired', bucket: 'ai_interview', via: via(MockInterviewService.prototype, 'start') },
   { controller: MockInterviewController, method: 'answer', status: 'exempt', reason: '整场一次，首题下发时已计', via: via(MockInterviewService.prototype, 'answer') },
@@ -292,7 +292,7 @@ async function main() {
     console.log(`违规清单：${scanned.violations.join('；')}`)
     process.exit(1)
   }
-  assert.equal(scanned.line, '接入 15、不计次 16、待 Q2b 0、待裁定 0、违规 0')
+  assert.equal(scanned.line, '接入 16、不计次 15、待 Q2b 0、待裁定 0、违规 0')
 
   const apiRoot = resolve(__dirname, '..')
   const temporary = mkdtempSync(join(tmpdir(), 'verify-ai-quota-coverage-'))
@@ -347,7 +347,7 @@ async function main() {
       ['吴景行', 'career'], ['郑安然', 'fair'], ['陈予安', 'jobfit'], ['孙嘉树', 'advisor'],
       ['李婉清', 'contract'], ['高予辰', 'voice'], ['何清和', 'isolate'], ['马晓舟', 'failure'],
       ['沈清禾', 'order'], ['钱知衡', 'inflight'],
-      ['顾清晏', 'xiaoqing'], ['江晚宁', 'assistant-voice'], ['宋知微', 'ask'], ['叶安然', 'chat-fail'],
+      ['顾清晏', 'xiaoqing'], ['江晚宁', 'assistant-voice'], ['宋知微', 'ask'], ['叶安然', 'chat-fail'], ['陆知夏', 'summary'], ['程以宁', 'summary-fail'],
       ['顾言川', 'interview'], ['宋予宁', 'interviewFail'], ['叶晚宁', 'interviewTurn'], ['江澄', 'interviewEmpty'],
       ['许南枝', 'recommend'], ['沈望舒', 'explain'], ['周晚舟', 'jobMatch'], ['梁书衡', 'fitRedis'],
     ] as const
@@ -848,6 +848,43 @@ async function main() {
         if (previousLimit === undefined) delete process.env.AI_QUOTA_ASSISTANT_DAILY
         else process.env.AI_QUOTA_ASSISTANT_DAILY = previousLimit
       }
+    })
+
+    await check('小青本次要点：存进本人记录后扣 1，模型报错归还', async () => {
+      const lu = userOf.get('summary')!
+      const cheng = userOf.get('summary-fail')!
+      const transcript = [
+        { role: 'user' as const, content: '陆知夏想问市南就业窗口打印简历要带什么' },
+        { role: 'assistant' as const, content: '带身份证，到窗口打印机扫码即可。' },
+      ]
+      let condenseCalls = 0
+      let failNext = false
+      const summary = new AssistantSummaryService(
+        dbPrisma,
+        { getOwnedTranscript: () => transcript } as never,
+        { isReady: () => true, getConfig: () => ({ vendor: 'coverage', enabled: true }), getApiKey: () => 'k' } as never,
+        { save: async () => ({ artifactId: `pins-${run}` }), print: async () => { throw new Error('no font') } } as never,
+        { write: async () => undefined } as never,
+        { record: () => undefined } as never,
+        quota,
+      )
+      ;(summary as unknown as { condense: () => Promise<{ highlights: string[]; todos: string[] }> }).condense = async () => {
+        condenseCalls += 1
+        if (failNext) throw Object.assign(new Error('upstream'), { code: 'AI_PROVIDER_ERROR' })
+        return { highlights: ['陆知夏打印简历只需带身份证'], todos: ['明天上午去市南窗口'] }
+      }
+      const view = await summary.summarize(`sess-${run}-lu`, lu, '127.0.0.1')
+      assert.equal(condenseCalls, 1)
+      assert.equal(await usedAssistant('summary'), 1, '要点生成成功扣 1 次')
+      const savedRow = await dbPrisma.advisorSession.findUnique({ where: { id: view.advisorSessionId } })
+      assert.equal(savedRow?.endUserId, lu, '要点存进本人记录')
+      const committed = await dbPrisma.aiQuotaReservation.findFirst({ where: { endUserId: lu, bucket: 'ai_assistant' } })
+      assert.equal(committed?.status, 'committed')
+      assert.equal(committed?.resultRef, view.advisorSessionId, '结算引用是本人记录号')
+      failNext = true
+      await assert.rejects(() => summary.summarize(`sess-${run}-cheng`, cheng, '127.0.0.1'))
+      assert.equal(await usedAssistant('summary-fail'), 0, '模型报错必须归还')
+      assert.equal(await dbPrisma.advisorSession.count({ where: { endUserId: cheng } }), 0, '失败不落记录')
     })
 
     await check('顾问追问：成功扣 1，再问再扣，模型报错归还，匿名不进账本', async () => {
