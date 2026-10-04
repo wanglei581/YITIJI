@@ -25,8 +25,9 @@ import './styles/settings-qx2.css'
 // AI 使用授权只认服务端返回：读不到就是「本次未取到」，绝不退回成「未授权」。
 type JobAiConsent = 'idle' | 'loading' | 'granted' | 'not-granted' | 'error'
 
-// 10/3 口径：本人申请、工作人员凭线下凭据核验身份后办理、15 个工作日内完成；一体机上不直接提交注销。
-const ACCOUNT_CLOSURE_NOTE = '注销账号请找现场工作人员申请，工作人员核验你的身份后办理，15 个工作日内完成。数据导出尚未开放。'
+// 10/3 口径，与《隐私政策》（2026-10-pilot-1 第五节）一字对齐：三条渠道都能申请，用原词「核实是你本人」；
+// 电话、邮箱不写死，引用隐私政策。一体机上不直接提交注销，也没有自助导出。
+const ACCOUNT_CLOSURE_NOTE = '注销账号、复制个人信息，请找现场工作人员，或按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。'
 
 const CONSENT_BADGE: Record<JobAiConsent, { text: string; tone?: 'run' | 'bad' | 'off' }> = {
   idle: { text: '—', tone: 'off' },

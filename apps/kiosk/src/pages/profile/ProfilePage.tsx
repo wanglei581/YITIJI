@@ -272,7 +272,7 @@ function AccountRows({ onEnd, primaryEnd }: { onEnd: () => void; primaryEnd: boo
   const navigate = useNavigate()
   const rows = [
     { icon: BellIcon, title: '消息通知', desc: '系统下发的会员通知，已读与标记都会记录。', to: '/me/notifications', testid: 'profile-notifications' },
-    { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；注销账号请找现场工作人员申请，数据导出尚未开放。', to: '/me/privacy-requests', testid: 'profile-privacy' },
+    { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请找现场工作人员或按《隐私政策》的联系方式申请。', to: '/me/privacy-requests', testid: 'profile-privacy' },
     { icon: HelpCircleIcon, title: '帮助中心', desc: '服务台位置、常见问题与找人处理。', to: '/help', testid: 'profile-help' },
     { icon: MessageSquareIcon, title: '意见反馈', desc: '提交后能看到处理状态。', to: '/me/feedback', testid: 'profile-feedback' },
   ]
