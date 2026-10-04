@@ -1529,6 +1529,26 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await feedbackLoaded
 })
 
+// 走查 N3（10/4）：0 元单的列表与详单不出现支付、金额机制的说法；收费单的金额明细原样保留。
+test('orders: free orders speak without payment terms while paid orders keep the amount detail @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const free = memberOrder({ id: 'order-free', fileName: '免费简历.pdf', amountCents: 0, payStatus: 'paid', paymentSource: 'free', billablePages: 2, discountCents: 0, refundedAmountCents: 0 })
+  const paid = memberOrder({ id: 'order-paid', amountCents: 300, payStatus: 'paid', paymentSource: 'offline', billablePages: 3, discountCents: 0, refundedAmountCents: 0 })
+  api.respond('GET', '/api/v1/me/print-orders', memberPage([free, paid]))
+  api.respond('GET', '/api/v1/me/feedback', memberPage([]))
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  const rows = page.getByTestId('member-assets-order')
+  await expect(rows).toHaveCount(2)
+  const freeRow = rows.filter({ hasText: '免费简历.pdf' })
+  await expect(freeRow).toContainText('免费')
+  await freeRow.getByRole('button', { name: '查看订单详单 免费简历.pdf' }).click()
+  await expect(freeRow).not.toContainText(/支付|实付|优惠|权益抵扣|已退款|价格/)
+  const paidRow = rows.filter({ hasText: '个人简历.pdf' })
+  await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
+  await expect(paidRow.getByText('下单金额')).toBeVisible()
+})
+
 test('documents and orders stay operable at 390x844 without overlap @w5-mobile', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerMemberLogin(api)
