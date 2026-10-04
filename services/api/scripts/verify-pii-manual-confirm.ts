@@ -242,6 +242,13 @@ async function main(): Promise<void> {
       const d4 = await dedupe.createTask(dto, anon)
       check('过了去重窗口再提交是一次新的检查', d4.id !== d1.id && (await created()) === 2)
     } finally { Date.now = realNow }
+    // 已经裁决 / 确认过的任务不再复用：之后再提交是重扫，要一条新的、待处理的检查。
+    const touchedFile = await makeFile(32)
+    const touchedDto = { kind: 'pii_scan', sourceFileId: touchedFile.id } as never
+    const firstScan = await dedupe.createTask(touchedDto, anon)
+    await confirm.confirm(firstScan.id, { kind: 'anonymous', accessToken: firstScan.accessToken })
+    const secondScan = await dedupe.createTask(touchedDto, anon)
+    check('窗口内但前一条已被本人确认过：新建一条，不复用', secondScan.id !== firstScan.id, `${firstScan.id}/${secondScan.id}`)
     // 去重按请求方分开：会员请求不能拿到匿名任务（连同它的访问口令）。
     const asMember = await outcome(() => dedupe.createTask(dto, { kind: 'member', endUserId: `verify-pii-member-${suffix}` }))
     check('窗口内换一个请求方：不复用匿名任务，也拿不到它的访问口令',
