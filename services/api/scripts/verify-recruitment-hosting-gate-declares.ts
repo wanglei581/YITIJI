@@ -19,6 +19,7 @@ const exemptions: Record<string, string> = {
   "scripts/verify-document-page-count.ts": "验证文档页数与响应字段白名单，列表强制包含全部指定夹具，不含系统岗位匹配存档。",
   "scripts/verify-field-mapping-rule.ts": "只调用字段映射规则的保存、读取与归属检查，不调用托管内容发布或公开列表。",
   "scripts/verify-job-fit-governance.ts": "只调用匿名匹配授权 grant/status/revoke 与静态路由检查，不创建或读取系统岗位匹配。",
+  "scripts/verify-partner-excel-import.ts": "只用替身服务调用 Excel 解析与预览两个控制器方法，核对中文文件名还原；这两个方法本身不经过托管判断，服务层的导入另由本门禁直接调用。",
   "scripts/verify-job-materials.ts": "验证用户自备材料生成与文档入列，明确断言生成文件存在，不涉及系统岗位报告。",
   "scripts/verify-kiosk-cashier-ui.ts": "终端管理服务仅用于打印夹具，断言对象是现金收银与打印 UI 合同。",
   "scripts/verify-legacy-pending-print-task-disposition.ts": "验证旧打印任务处置、审计与退款，终端管理调用不涉及招聘托管。",

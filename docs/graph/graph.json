@@ -22907,6 +22907,9 @@
     "services/api/scripts/verify-org-type-enum-sync.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
+    "services/api/scripts/verify-partner-excel-import.ts": [
+      "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
+    ],
     "services/api/scripts/verify-partner-smart-campus.ts": [
       "services/api/scripts/verify-recruitment-hosting-gate-declares.ts"
     ],
@@ -25072,6 +25075,7 @@
       "services/api/scripts/verify-jobfair-review.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
+      "services/api/scripts/verify-partner-excel-import.ts",
       "services/api/scripts/verify-partner-excel-template.ts"
     ],
     "services/api/src/jobs/jobs.module.ts": [
@@ -38765,12 +38769,13 @@
           "services/api/src/jobs/excel-template.ts",
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-shared.ts",
+          "services/api/src/jobs/jobs.controller.ts",
           "services/api/src/jobs/partner-import-file.ts"
         ],
         "missing": []
       },
       "file": "services/api/scripts/verify-partner-excel-import.ts",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -40023,6 +40028,7 @@
           "services/api/scripts/verify-offline-agencies-page.ts",
           "services/api/scripts/verify-order.ts",
           "services/api/scripts/verify-org-type-enum-sync.ts",
+          "services/api/scripts/verify-partner-excel-import.ts",
           "services/api/scripts/verify-partner-smart-campus.ts",
           "services/api/scripts/verify-payment-real-channels.ts",
           "services/api/scripts/verify-policy-eligibility-authoring.ts",

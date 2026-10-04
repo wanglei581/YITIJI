@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1841 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1842 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2083,7 +2083,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 127 个文件</summary>
+<summary><code>services/api/scripts/</code> — 128 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2186,6 +2186,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/verify-offline-agencies-page.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-order.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-org-type-enum-sync.ts` | `verify-recruitment-hosting-gate-declares.ts` |
+| `services/api/scripts/verify-partner-excel-import.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-partner-smart-campus.ts` | `verify-recruitment-hosting-gate-declares.ts` |
 | `services/api/scripts/verify-payment-flow.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs` |
 | `services/api/scripts/verify-payment-real-channels.ts` | `verify-recruitment-hosting-gate-declares.ts` |
@@ -2547,7 +2548,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/jobs/jobs-kiosk.service.ts` | `verify-admin-fairs.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-fair-stats-truth.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-headcount.ts`<br/>`verify-job-requirement-stats.ts`<br/>`verify-job-review.ts`<br/>`verify-job-validity-expiry.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-public-fair-demo-guard.ts` |
 | `services/api/src/jobs/jobs-partner.service.ts` | `verify-admin-fairs.ts`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-backend-p0-http.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-headcount.ts`<br/>`verify-job-review.ts`<br/>`verify-job-validity-expiry.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-public-fair-demo-guard.ts`<br/>`verify-recruitment-hosting-default-off.ts` |
 | `services/api/src/jobs/jobs-shared.ts` | `verify-datetime-honesty.mjs`<br/>`verify-beijing-display-time.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-fair-stats-truth.ts`<br/>`verify-job-content-screening.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-validity-expiry.ts`<br/>`verify-partner-excel-import.ts` |
-| `services/api/src/jobs/jobs.controller.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-backend-p0-http.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-requirement-stats.ts`<br/>`verify-job-review.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-partner-excel-template.ts` |
+| `services/api/src/jobs/jobs.controller.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-backend-p0-http.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-requirement-stats.ts`<br/>`verify-job-review.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-partner-excel-import.ts`<br/>`verify-partner-excel-template.ts` |
 | `services/api/src/jobs/jobs.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-campus-recruitment-stats.ts`<br/>`verify-job-data-quality.ts` |
 | `services/api/src/jobs/jobs.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-admin-fairs.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-review.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-public-fair-demo-guard.ts`<br/>`verify-publish-expiry-completeness.ts`<br/>`verify-recruitment-hosting-default-off.ts`<br/>`verify-recruitment-integration-readiness.ts` |
 | `services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts` | `verify-campus-recruitment-stats.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-throttle-dimension.ts` |
