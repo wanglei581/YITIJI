@@ -31,7 +31,7 @@ import { TEXT_FEATURES, badContent, detectFeature, generateContent } from './fak
 
 const PORT = Number(process.env.FAKE_LLM_PORT || 4340)
 const STATE_DIR = process.env.FAKE_LLM_STATE_DIR || join(homedir(), '.cache', 'walk0929', 'fake-llm')
-const MODES = new Set(['ok', 'timeout', 'http500', 'badjson', 'blocked', 'slow'])
+const MODES = new Set(['ok', 'timeout', 'http500', 'http402', 'badjson', 'blocked', 'slow'])
 const HANG_MS = 200_000
 const SLOW_MS = 25_000
 const MARKER_RE = /【走查故障[:：]\s*(ok|timeout|http500|http402|badjson|blocked|slow)\s*】/
