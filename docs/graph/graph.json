@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 573,
+    "endpointCount": 575,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -4760,7 +4760,8 @@
           "EndUser",
           "ExternalJumpLog",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "UserDataRequest"
         ],
         "path": "/api/v1/admin/users",
         "roles": [
@@ -4784,7 +4785,8 @@
           "EndUser",
           "ExternalJumpLog",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "UserDataRequest"
         ],
         "path": "/api/v1/admin/users/:endUserId",
         "roles": [
@@ -4799,6 +4801,58 @@
       },
       {
         "controller": "services/api/src/admin-users/admin-users.controller.ts",
+        "handler": "AdminUsersController.closure",
+        "method": "POST",
+        "models": [
+          "AdvisorArtifact",
+          "AdvisorPin",
+          "AiQuotaDaily",
+          "AiQuotaReservation",
+          "AiServiceLog",
+          "AuditLog",
+          "BenefitClaim",
+          "BenefitGrant",
+          "ContractReviewTask",
+          "DocumentProcessTask",
+          "EndUser",
+          "FairMaterialPrintBridge",
+          "FeedbackReply",
+          "FeedbackTicket",
+          "FileObject",
+          "JobAiRecommendation",
+          "KioskSession",
+          "MemberLegalConsent",
+          "MockInterviewReport",
+          "MockInterviewSession",
+          "MockInterviewTurn",
+          "Order",
+          "OrderItem",
+          "OrderSubmissionLedger",
+          "PaymentAttempt",
+          "PiiFinding",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "RedemptionRecord",
+          "Refund",
+          "ScanTask",
+          "StorageDeletion",
+          "UserAiConsent",
+          "UserDataRequest",
+          "UserNotification"
+        ],
+        "path": "/api/v1/admin/users/:endUserId/closure",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/member-privacy/member-closure.service.ts"
+        ],
+        "services": [
+          "MemberClosureService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-users/admin-users.controller.ts",
         "handler": "AdminUsersController.disable",
         "method": "POST",
         "models": [
@@ -4808,7 +4862,8 @@
           "EndUser",
           "ExternalJumpLog",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "UserDataRequest"
         ],
         "path": "/api/v1/admin/users/:endUserId/disable",
         "roles": [
@@ -4832,7 +4887,8 @@
           "EndUser",
           "ExternalJumpLog",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "UserDataRequest"
         ],
         "path": "/api/v1/admin/users/:endUserId/restore",
         "roles": [
@@ -5780,7 +5836,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files",
         "roles": [
@@ -5801,7 +5858,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files",
         "roles": [],
@@ -5820,7 +5878,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files/:id",
         "roles": [],
@@ -5841,7 +5900,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files/:id/complete",
         "roles": [],
@@ -5860,7 +5920,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files/:id/content",
         "roles": [],
@@ -5930,7 +5991,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files/:id/retention",
         "roles": [],
@@ -5951,7 +6013,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files/:id/url",
         "roles": [],
@@ -5972,7 +6035,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files/cleanup-expired",
         "roles": [
@@ -6005,7 +6069,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files/lifecycle-summary",
         "roles": [
@@ -6026,7 +6091,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "StorageDeletion"
         ],
         "path": "/api/v1/files/upload-intent",
         "roles": [],
@@ -7204,6 +7270,16 @@
         "method": "POST",
         "models": [],
         "path": "/api/v1/me/ai-consents",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
+        "handler": "MemberPrivacyController.cancel",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/me/ai-consents/:id/cancel",
         "roles": [],
         "serviceFiles": [],
         "services": []
@@ -12150,7 +12226,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 231,
+      "reachableFileCount": 234,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12913,11 +12989,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 256
+      "sourceFileCount": 260
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 632,
+      "reachableFileCount": 635,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15893,7 +15969,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 726
+      "sourceFileCount": 729
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -16319,7 +16395,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 110,
+    "modelCount": 111,
     "models": [
       {
         "fieldCount": 7,
@@ -16375,7 +16451,9 @@
           "services/api/src/advisor/advisor-artifact.service.ts",
           "services/api/src/advisor/advisor-retention.task.ts",
           "services/api/src/advisor/advisor.service.ts",
-          "services/api/src/member-assets/member-assets.service.ts"
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-privacy/member-closure-files.ts",
+          "services/api/src/member-privacy/member-closure.service.ts"
         ]
       },
       {
@@ -16385,7 +16463,8 @@
           "AdvisorSession"
         ],
         "usedBy": [
-          "services/api/src/advisor/advisor.service.ts"
+          "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/member-privacy/member-closure.service.ts"
         ]
       },
       {
@@ -16441,7 +16520,8 @@
         "name": "AiQuotaDaily",
         "relations": [],
         "usedBy": [
-          "services/api/src/ai/quota/ai-quota.service.ts"
+          "services/api/src/ai/quota/ai-quota.service.ts",
+          "services/api/src/member-privacy/member-closure.service.ts"
         ]
       },
       {
@@ -16449,7 +16529,8 @@
         "name": "AiQuotaReservation",
         "relations": [],
         "usedBy": [
-          "services/api/src/ai/quota/ai-quota.service.ts"
+          "services/api/src/ai/quota/ai-quota.service.ts",
+          "services/api/src/member-privacy/member-closure.service.ts"
         ]
       },
       {
@@ -16486,7 +16567,8 @@
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/ai/ai-result.cleanup.task.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
-          "services/api/src/console-screen/console-screen.usage.queries.ts"
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts"
         ]
       },
       {
@@ -16528,6 +16610,7 @@
         "usedBy": [
           "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/admin-users/admin-user-closure-read.ts",
           "services/api/src/ai/quota/ai-quota.service.ts",
           "services/api/src/ai/resume/job-fit-hosting.ts",
           "services/api/src/audit/audit.service.ts",
@@ -16572,7 +16655,8 @@
           "EndUser"
         ],
         "usedBy": [
-          "services/api/src/benefit-activities/benefit-activities.service.ts"
+          "services/api/src/benefit-activities/benefit-activities.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts"
         ]
       },
       {
@@ -16589,6 +16673,8 @@
           "services/api/src/benefit-redemption/resume-export-gate.service.ts",
           "services/api/src/member-benefits/admin-member-benefits.service.ts",
           "services/api/src/member-benefits/member-benefits.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
@@ -16645,6 +16731,7 @@
           "services/api/src/contract-review/contract-review-report.service.ts",
           "services/api/src/contract-review/contract-review.cleanup.task.ts",
           "services/api/src/contract-review/contract-review.service.ts",
+          "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
         ]
       },
@@ -16661,6 +16748,7 @@
           "services/api/src/materials/materials-manual-confirmation.service.ts",
           "services/api/src/materials/materials.service.ts",
           "services/api/src/materials/pii-redaction.service.ts",
+          "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/print-jobs/pii-scan-gate.ts"
         ]
       },
@@ -16701,6 +16789,8 @@
           "services/api/src/member-auth/member-phone-rebind.service.ts",
           "services/api/src/member-auth/member-step-up.service.ts",
           "services/api/src/member-benefits/admin-member-benefits.service.ts",
+          "services/api/src/member-privacy/member-closure-requests.ts",
+          "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/member-privacy/member-data-request.admin.ts"
         ]
@@ -16857,7 +16947,8 @@
           "User"
         ],
         "usedBy": [
-          "services/api/src/member-feedback/member-feedback.service.ts"
+          "services/api/src/member-feedback/member-feedback.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts"
         ]
       },
       {
@@ -16871,6 +16962,7 @@
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/member-feedback/member-feedback.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
@@ -16909,6 +17001,7 @@
           "services/api/src/contract-review/contract-review.cleanup.task.ts",
           "services/api/src/contract-review/contract-review.service.ts",
           "services/api/src/document-conversion/document-conversion.service.ts",
+          "services/api/src/files/closure-file-deletion.ts",
           "services/api/src/files/contract-report-print-lifecycle.service.ts",
           "services/api/src/files/file-content-integrity.ts",
           "services/api/src/files/files.service.ts",
@@ -16920,6 +17013,8 @@
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
+          "services/api/src/member-privacy/member-closure-files.ts",
+          "services/api/src/member-privacy/member-closure-redis.service.ts",
           "services/api/src/member-privacy/member-data-export-reconciler.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/payment/pickup-validity.ts",
@@ -17010,7 +17105,8 @@
         ],
         "usedBy": [
           "services/api/src/job-ai/governed-job-fit.service.ts",
-          "services/api/src/job-ai/job-ai.service.ts"
+          "services/api/src/job-ai/job-ai.service.ts",
+          "services/api/src/member-privacy/member-closure.service.ts"
         ]
       },
       {
@@ -17140,7 +17236,8 @@
           "services/api/src/console-screen/console-screen.visits.ts",
           "services/api/src/kiosk-session/kiosk-session-retention.task.ts",
           "services/api/src/kiosk-session/kiosk-session.queries.ts",
-          "services/api/src/kiosk-session/kiosk-session.service.ts"
+          "services/api/src/kiosk-session/kiosk-session.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts"
         ]
       },
       {
@@ -17161,7 +17258,8 @@
         ],
         "usedBy": [
           "services/api/src/ai/resume/resume-unlabeled-export.ts",
-          "services/api/src/member-auth/member-auth.service.ts"
+          "services/api/src/member-auth/member-auth.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts"
         ]
       },
       {
@@ -17182,6 +17280,7 @@
           "MockInterviewSession"
         ],
         "usedBy": [
+          "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -17194,6 +17293,7 @@
         ],
         "usedBy": [
           "services/api/src/ai/resume/career-plan.service.ts",
+          "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
@@ -17205,6 +17305,7 @@
           "MockInterviewSession"
         ],
         "usedBy": [
+          "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -17288,6 +17389,8 @@
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
           "services/api/src/member-print-orders/package-order.service.ts",
           "services/api/src/member-print-orders/pickup-code-reissue.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/order-status.service.ts",
@@ -17315,6 +17418,7 @@
         "usedBy": [
           "services/api/src/console-screen/console-screen.printed-pages.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/pickup-validity.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
@@ -17326,7 +17430,8 @@
         "name": "OrderSubmissionLedger",
         "relations": [],
         "usedBy": [
-          "services/api/src/member-print-orders/order-submission-ledger.ts"
+          "services/api/src/member-print-orders/order-submission-ledger.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts"
         ]
       },
       {
@@ -17385,6 +17490,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/online-payment.service.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund.service.ts"
@@ -17397,7 +17503,8 @@
           "DocumentProcessTask"
         ],
         "usedBy": [
-          "services/api/src/materials/materials.service.ts"
+          "services/api/src/materials/materials.service.ts",
+          "services/api/src/member-privacy/member-closure.service.ts"
         ]
       },
       {
@@ -17489,6 +17596,8 @@
           "services/api/src/member-print-orders/member-order-timeline.service.ts",
           "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/member-print-orders/package-order-fulfillment.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/refund.service.ts",
@@ -17516,6 +17625,7 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
@@ -17564,7 +17674,8 @@
           "services/api/src/ai/quota/ai-quota.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/benefit-redemption/resume-export-gate.service.ts",
-          "services/api/src/member-benefits/member-benefits.service.ts"
+          "services/api/src/member-benefits/member-benefits.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts"
         ]
       },
       {
@@ -17574,6 +17685,7 @@
           "Order"
         ],
         "usedBy": [
+          "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/reconciliation.service.ts",
           "services/api/src/payment/refund-amount-hold.ts",
           "services/api/src/payment/refund.service.ts"
@@ -17601,6 +17713,7 @@
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
+          "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/scan-tasks/scan-task-reaper.task.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
@@ -17612,6 +17725,15 @@
         "name": "ScreensaverContent",
         "relations": [],
         "usedBy": []
+      },
+      {
+        "fieldCount": 6,
+        "name": "StorageDeletion",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/files/closure-file-deletion.ts",
+          "services/api/src/member-privacy/member-closure-redis.service.ts"
+        ]
       },
       {
         "fieldCount": 15,
@@ -17876,6 +17998,7 @@
         ],
         "usedBy": [
           "services/api/src/ai-access/ai-access.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/member-privacy/member-data-request.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
@@ -17888,6 +18011,10 @@
           "EndUser"
         ],
         "usedBy": [
+          "services/api/src/admin-users/admin-user-closure-read.ts",
+          "services/api/src/member-privacy/member-closure-requests.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export-download.service.ts",
           "services/api/src/member-privacy/member-data-export-reconciler.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
@@ -17900,7 +18027,9 @@
         "fieldCount": 10,
         "name": "UserNotification",
         "relations": [],
-        "usedBy": []
+        "usedBy": [
+          "services/api/src/member-privacy/member-closure.service.ts"
+        ]
       }
     ],
     "schema": "services/api/prisma/schema.prisma"
@@ -18016,6 +18145,9 @@
     "apps/admin/scripts/verify-console-batch6-copy.mjs": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
+    "apps/admin/scripts/verify-console-batch7-copy.mjs": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/scripts/verify-console-privacy-copy.mjs": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
@@ -18096,6 +18228,9 @@
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs",
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
+    ],
+    "apps/admin/src/routes/alerts/alertDetailText.ts": [
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/alerts/index.tsx": [
       "apps/admin/scripts/verify-feedback-sla.mjs",
@@ -18427,10 +18562,12 @@
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
     "apps/admin/src/routes/screensaver/AssetUploadNotice.tsx": [
-      "apps/admin/scripts/verify-console-batch5-copy.mjs"
+      "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
     ],
     "apps/admin/src/routes/screensaver/AssetsTab.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-batch7-copy.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/screensaver/PlaylistsTab.tsx": [
@@ -18438,13 +18575,20 @@
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/screensaver/TerminalsTab.tsx": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
+    "apps/admin/src/routes/screensaver/assetUploadRules.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
     ],
     "apps/admin/src/routes/screensaver/index.tsx": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
+    ],
+    "apps/admin/src/routes/screensaver/terminalConfigState.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
     ],
     "apps/admin/src/routes/smart-campus/index.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
@@ -19369,6 +19513,11 @@
     ],
     "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/interview/session/types.ts": [
@@ -21823,6 +21972,9 @@
     "apps/terminal-agent/src/runtime-version.ts": [
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts"
     ],
+    "apps/terminal-agent/src/usb/usb-capability.ts": [
+      "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
+    ],
     "apps/terminal-agent/src/usb/usb-files.ts": [
       "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
     ],
@@ -22541,6 +22693,9 @@
     "services/api/prisma/postgres/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
       "services/api/scripts/verify-ai-usage-retention.ts"
     ],
+    "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql": [
+      "services/api/scripts/verify-http-exception-filter.ts"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
@@ -22827,6 +22982,8 @@
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-member-closure.ts",
+      "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-audit-postgres.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -22857,6 +23014,9 @@
     ],
     "services/api/scripts/support/llm-pii-callsite-checks.ts": [
       "services/api/scripts/verify-llm-input-pii-mask.ts"
+    ],
+    "services/api/scripts/support/member-closure-verification.ts": [
+      "services/api/scripts/verify-member-closure.ts"
     ],
     "services/api/scripts/support/minimal-pdf.ts": [
       "services/api/scripts/verify-derivation-kind.ts",
@@ -23219,10 +23379,12 @@
       "services/api/scripts/verify-refund-idempotent.ts"
     ],
     "services/api/src/admin-users/admin-users.controller.ts": [
-      "services/api/scripts/verify-admin-users.ts"
+      "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-member-closure.ts"
     ],
     "services/api/src/admin-users/admin-users.service.ts": [
-      "services/api/scripts/verify-admin-users.ts"
+      "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-member-closure.ts"
     ],
     "services/api/src/admin-users/admin-users.types.ts": [
       "services/api/scripts/verify-admin-users.ts"
@@ -23991,6 +24153,7 @@
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-request-contract.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -24219,6 +24382,7 @@
       "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
@@ -24295,6 +24459,7 @@
       "services/api/scripts/verify-job-favorites-http.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-auth.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-qr-login.ts",
@@ -24324,6 +24489,7 @@
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-assets.ts",
       "services/api/scripts/verify-member-auth.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-favorites-benefits.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
@@ -24344,6 +24510,7 @@
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
@@ -24364,6 +24531,7 @@
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts"
@@ -24432,6 +24600,7 @@
       "services/api/scripts/verify-recruitment-capability-gate.ts"
     ],
     "services/api/src/common/redis/member-data-export-redis.service.ts": [
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-export-download.ts"
     ],
     "services/api/src/common/redis/partner-account-action-redis.service.ts": [
@@ -24474,6 +24643,7 @@
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-member-auth.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
@@ -24570,12 +24740,28 @@
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
     "services/api/src/content/content.service.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs",
       "services/api/scripts/verify-ad-asset-range.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-screensaver-content.ts"
     ],
+    "services/api/src/content/dto/create-external-video.dto.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
+    ],
+    "services/api/src/content/dto/save-config.dto.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
+    ],
+    "services/api/src/content/dto/update-ad-asset.dto.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
+    ],
+    "services/api/src/content/dto/upload-ad-asset.dto.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
+    ],
     "services/api/src/content/external-video-url.ts": [
       "services/api/scripts/verify-external-video.ts"
+    ],
+    "services/api/src/content/media-validation.ts": [
+      "apps/admin/scripts/verify-console-batch7-copy.mjs"
     ],
     "services/api/src/contract-review/__tests__/contract-review-http-controller.test.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts"
@@ -24748,6 +24934,7 @@
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
@@ -25325,6 +25512,7 @@
     ],
     "services/api/src/member-assets/member-assets.controller.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
@@ -25339,6 +25527,7 @@
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-member-assets.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
@@ -25382,6 +25571,7 @@
       "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-account-status.ts",
       "services/api/scripts/verify-member-auth.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-member-sms-provider-errors.ts",
       "services/api/scripts/verify-sms-budget.ts",
@@ -25399,6 +25589,7 @@
       "services/api/scripts/verify-member-auth.ts"
     ],
     "services/api/src/member-auth/member-step-up.service.ts": [
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-step-up.ts"
     ],
     "services/api/src/member-auth/member-step-up.types.ts": [
@@ -25494,11 +25685,13 @@
       "services/api/scripts/verify-feedback-notifications.ts"
     ],
     "services/api/src/member-print-orders/member-order-claim-here.service.ts": [
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "services/api/src/member-print-orders/member-order-timeline.service.ts": [
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts"
     ],
@@ -25509,6 +25702,7 @@
       "apps/miniapp/scripts/verify-package-chain.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
@@ -25519,6 +25713,7 @@
     ],
     "services/api/src/member-print-orders/member-print-orders.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
@@ -25526,6 +25721,7 @@
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/member-print-orders/member-print-orders.service.ts": [
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
@@ -25550,6 +25746,7 @@
       "services/api/scripts/verify-package-order-idempotency-http.ts"
     ],
     "services/api/src/member-print-orders/pickup-code-reissue.service.ts": [
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
@@ -25557,7 +25754,18 @@
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts"
     ],
+    "services/api/src/member-privacy/member-closure-redis.service.ts": [
+      "services/api/scripts/verify-member-closure.ts"
+    ],
+    "services/api/src/member-privacy/member-closure-retention.ts": [
+      "services/api/scripts/verify-member-closure.ts"
+    ],
+    "services/api/src/member-privacy/member-closure.service.ts": [
+      "services/api/scripts/verify-job-application-track.ts",
+      "services/api/scripts/verify-member-closure.ts"
+    ],
     "services/api/src/member-privacy/member-data-export-download.service.ts": [
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-export-download.ts",
       "services/api/scripts/verify-member-data-request-truth.ts"
     ],
@@ -25581,12 +25789,14 @@
     "services/api/src/member-privacy/member-data-request.service.ts": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "services/api/scripts/verify-job-ai-privacy.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts"
     ],
     "services/api/src/member-privacy/member-privacy.controller.ts": [
       "services/api/scripts/verify-job-ai-privacy.ts",
-      "services/api/scripts/verify-job-fit-governance.ts"
+      "services/api/scripts/verify-job-fit-governance.ts",
+      "services/api/scripts/verify-member-closure.ts"
     ],
     "services/api/src/member-privacy/member-privacy.module.ts": [
       "services/api/scripts/verify-job-ai-privacy.ts"
@@ -26220,6 +26430,7 @@
       "services/api/scripts/verify-print-sign.ts"
     ],
     "services/api/src/prisma/create-client.ts": [
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-production-db-guard.ts",
       "services/api/scripts/verify-scan-tasks.ts"
     ],
@@ -26312,6 +26523,7 @@
       "services/api/scripts/verify-member-assets.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-request-contract.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-member-favorites-benefits.ts",
@@ -26548,6 +26760,7 @@
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-materials-processing.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-audit-postgres.ts",
@@ -26696,6 +26909,7 @@
     ],
     "services/api/src/terminals/terminal-identity.guard.ts": [
       "services/api/scripts/verify-kiosk-session.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-scan-tasks.ts",
@@ -26704,6 +26918,7 @@
     ],
     "services/api/src/terminals/terminal-session.service.ts": [
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -27477,6 +27692,32 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/screensaver/AssetUploadNotice.tsx",
+          "apps/admin/src/routes/screensaver/AssetsTab.tsx",
+          "apps/admin/src/routes/screensaver/TerminalsTab.tsx",
+          "apps/admin/src/routes/screensaver/assetUploadRules.ts",
+          "apps/admin/src/routes/screensaver/terminalConfigState.ts",
+          "services/api/src/content/content.service.ts",
+          "services/api/src/content/dto/create-external-video.dto.ts",
+          "services/api/src/content/dto/save-config.dto.ts",
+          "services/api/src/content/dto/update-ad-asset.dto.ts",
+          "services/api/src/content/dto/upload-ad-asset.dto.ts",
+          "services/api/src/content/media-validation.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-console-batch7-copy.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/admin",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "apps",
           "apps/admin/src/routes"
@@ -27484,6 +27725,7 @@
         "files": [
           "apps/admin/scripts/verify-console-batch5-copy.mjs",
           "apps/admin/scripts/verify-console-batch6-copy.mjs",
+          "apps/admin/scripts/verify-console-batch7-copy.mjs",
           "apps/admin/scripts/verify-console-privacy-copy.mjs",
           "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/lib/printErrorText.ts",
@@ -27767,6 +28009,7 @@
         "files": [
           "apps/admin/package.json",
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/routes/alerts/alertDetailText.ts",
           "apps/admin/src/routes/alerts/index.tsx",
           "apps/admin/src/routes/dashboard/dashboardRows.ts",
           "apps/admin/src/routes/legal-docs/index.tsx",
@@ -28051,6 +28294,7 @@
           "apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
+          "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
@@ -28565,6 +28809,7 @@
           "apps/kiosk/src/pages/interview/InterviewShell.tsx",
           "apps/kiosk/src/pages/interview/InterviewTipsPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx",
+          "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
           "apps/kiosk/src/pages/interview/styles/interview-shell.css",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
@@ -29708,6 +29953,7 @@
           "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
+          "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
           "apps/kiosk/src/pages/interview/styles/interview-report.css",
           "apps/kiosk/src/pages/interview/styles/interview-responsive.css",
@@ -32372,6 +32618,7 @@
         "files": [
           "apps/terminal-agent/src/agent/types.ts",
           "apps/terminal-agent/src/local-api/qr-login-server.ts",
+          "apps/terminal-agent/src/usb/usb-capability.ts",
           "apps/terminal-agent/src/usb/usb-files.ts"
         ],
         "missing": []
@@ -32982,6 +33229,22 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:no-raw-error-render"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/verify-prod-react-build.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:prod-react-build"
       ],
       "wired": true
     },
@@ -34395,7 +34658,7 @@
       },
       "file": "services/api/scripts/verify-ai-quota-coverage.ts",
       "helper": false,
-      "inCi": false,
+      "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-quota-coverage"
@@ -36401,6 +36664,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql",
           "services/api/src/common/filters/http-exception.filter.ts"
         ],
         "missing": []
@@ -36710,6 +36974,7 @@
           "services/api/src/job-applications/job-applications.controller.ts",
           "services/api/src/job-applications/job-applications.module.ts",
           "services/api/src/job-applications/job-applications.service.ts",
+          "services/api/src/member-privacy/member-closure.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -37789,6 +38054,57 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/member-closure-verification.ts",
+          "services/api/src/admin-users/admin-users.controller.ts",
+          "services/api/src/admin-users/admin-users.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/member-data-export-redis.service.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/member-assets/member-assets.controller.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-auth/member-auth.service.ts",
+          "services/api/src/member-auth/member-step-up.service.ts",
+          "services/api/src/member-print-orders/member-order-claim-here.service.ts",
+          "services/api/src/member-print-orders/member-order-timeline.service.ts",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.controller.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
+          "services/api/src/member-print-orders/pickup-code-reissue.service.ts",
+          "services/api/src/member-privacy/member-closure-redis.service.ts",
+          "services/api/src/member-privacy/member-closure-retention.ts",
+          "services/api/src/member-privacy/member-closure.service.ts",
+          "services/api/src/member-privacy/member-data-export-download.service.ts",
+          "services/api/src/member-privacy/member-data-request.service.ts",
+          "services/api/src/member-privacy/member-privacy.controller.ts",
+          "services/api/src/prisma/create-client.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-member-closure.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:member-closure"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/common/redis/member-data-export-redis.service.ts",
           "services/api/src/member-privacy/member-data-export-download.service.ts",
           "services/api/src/member-privacy/member-data-export-reconciler.service.ts",
@@ -37906,6 +38222,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/member-privacy/member-data-export-download.service.ts",
           "services/api/src/member-privacy/member-data-export-reconciler.service.ts",
@@ -42253,6 +42570,17 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-source-publish-actions.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/member-benefits/grantFormModel.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",

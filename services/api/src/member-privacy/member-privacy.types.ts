@@ -35,7 +35,7 @@ export interface MemberDataRequestPage {
   items: MemberDataRequestItem[]
   nextCursor: string | null
   capabilities: {
-    accountClosureAvailable: false
+    accountClosureAvailable: boolean
   }
 }
 
