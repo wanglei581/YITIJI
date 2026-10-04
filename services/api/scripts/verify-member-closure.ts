@@ -1,3 +1,6 @@
+// 本门禁要验证「同一手机号重新注册后读不到旧数据」，读取接口里有招聘类收藏；按托管打开跑，
+// 免得列表因为托管关闭恒为空而让这条断言空过。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
