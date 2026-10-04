@@ -755,6 +755,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-request-contract
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-closure
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
@@ -1140,6 +1141,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-request-contract
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-closure
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download

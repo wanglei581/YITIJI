@@ -190,6 +190,14 @@ function main(): void {
   assert(throttled.body.error.code === 'RATE_LIMITED', 'ThrottlerException maps to RATE_LIMITED (not INTERNAL_SERVER_ERROR)')
   assert(throttled.body.error.message === '尝试过于频繁，请稍后再试', 'ThrottlerException shows friendly rate-limit message')
 
+  // 账号注销后的迟到写入被数据库触发器拒绝：不是服务器故障，答「账号当前不可用」，不塌成 500。
+  const closedWrite = capture(Object.assign(new Error('MEMBER_CLOSED_WRITE_FORBIDDEN'), { name: 'DriverAdapterError' }))
+  assert(closedWrite.statusCode === 403, 'closed-member late write keeps out of 500 (HTTP 403)')
+  assert(closedWrite.body.error.code === 'ACCOUNT_UNAVAILABLE', 'closed-member late write maps to ACCOUNT_UNAVAILABLE')
+  assert(closedWrite.body.error.message === '账号当前不可用', 'closed-member late write shows a plain message')
+  const triggerSql = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql'), 'utf8') as string
+  assert(triggerSql.includes("RAISE EXCEPTION 'MEMBER_CLOSED_WRITE_FORBIDDEN'"), 'trigger error text matches the filter mapping')
+
   const oversized = capture(new PayloadTooLargeException('File too large'))
   assert(oversized.statusCode === 413, 'oversized upload keeps HTTP 413')
   assert(oversized.body.error.code === 'FILE_TOO_LARGE', 'oversized upload maps to stable FILE_TOO_LARGE code')
