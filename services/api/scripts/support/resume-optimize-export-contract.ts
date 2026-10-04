@@ -325,6 +325,13 @@ export async function verifyOptimizeExportContract(): Promise<void> {
         fail(`W-OPT-EXPORT (11). 样本 6：整句应进描述、单位留空、时间段单独放，实际 ${JSON.stringify(exp)}`)
       }
       await acceptedEverywhere(guo.optimizedResume, '样本 6')
+      // 项目经历同理：首行是一句短话（不到 100 字、带句读），也不当项目名称。
+      const projectSentence = '社区便民服务站 2023.05 - 2023.09 每周末帮老人登记医保、打印材料。'
+      const proj = await optimize(['冯晓梅', '项目经历', projectSentence, '一共去了十几次。'].join('\n'), blank('冯晓梅'))
+      const restored = proj.optimizedResume.projects[0]
+      if (restored?.name !== '' || !restored.description.startsWith(projectSentence)) {
+        fail(`W-OPT-EXPORT (11). 像句子的项目首行不应当项目名称：${JSON.stringify(proj.optimizedResume.projects)}`)
+      }
       if ((await overlaps(guo.optimizedResume)).length) fail(`W-OPT-EXPORT (11). 样本 6 的 PDF 有文字重叠：${JSON.stringify(await overlaps(guo.optimizedResume))}`)
 
       // 用户在页面上自己把单位、职务改得很长时，排版同样不能叠字（6 月起的老问题，公司加职务超过约 27 字就会触发）。
