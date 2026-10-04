@@ -5,7 +5,7 @@ import type { ApiRouter } from '../fixtures/api-router'
 import type { DocumentProcessTaskView } from '../../src/services/api/materials'
 import { test, expect } from '../fixtures/kiosk-test'
 import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
-import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
+import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 import { seedMaterialSession, seedPrintHandoff, setReactRouterState, writeMaterialSession, writePrintHandoff, W2_FILE, W2_ORDER, W2_PRINT_PARAMS, type PrintHandoffSeed } from './fixtures/fusion-w2-state'
@@ -175,7 +175,7 @@ test('pickup controls remain readable in Windows landscape @pickup-landscape', a
 
   const input = page.getByLabel('到机码输入框')
   // 11-arrival-code.html 主按钮是「确认校验」，不是旧壳「确认取件」。
-  // 行为不变：横屏下提交控件必须可见、高度 ≥56px。
+  // 横屏电脑走 1080×1920 舞台缩放：控件必须可见，高度除回 scale 后仍 ≥56 CSS px。
   const submit = page.getByRole('button', { name: '确认校验' })
   // 同稿 outs()：「码找不到了？」取代旧壳「怎么找到机码？」；仍是找不到码时的兜底说明。
   const help = page.getByText('码找不到了？')
@@ -185,8 +185,9 @@ test('pickup controls remain readable in Windows landscape @pickup-landscape', a
   await assertNoHorizontalOverflow(page)
 
   const [inputBox, submitBox] = await Promise.all([input.boundingBox(), submit.boundingBox()])
-  expect(inputBox?.height ?? 0).toBeGreaterThanOrEqual(56)
-  expect(submitBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  const scale = await readEnabledStageScale(page)
+  expect((inputBox?.height ?? 0) / scale).toBeGreaterThanOrEqual(56)
+  expect((submitBox?.height ?? 0) / scale).toBeGreaterThanOrEqual(56)
   const layout = await page.locator('.ui-kiosk-content').evaluate((node) => {
     const submitButton = node.querySelector<HTMLElement>('.pcp-submit')
     const contentRect = node.getBoundingClientRect()
