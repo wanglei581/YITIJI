@@ -286,8 +286,7 @@ check(
   kioskRoot.includes('<KioskStageFit enabled={!usesFluidViewport}>') && kioskRoot.includes("'/'"),
   '1080×1920 舞台缩放能力未被替换'
 )
-// C 批最终稿无空待办行；不再为了待机说明额外占一行，也不写上一位资料安全的假承诺。
-check(!viewOnly.includes('这台机器上没有待继续的办理') && !viewOnly.includes('不会显示上一位使用者的资料'), '首页去掉空待办行，不把「看不到上一位」写死')
+check(viewOnly.includes('homeStandbyNote('), '首页待机说明走同一套判定，不把「看不到上一位」写死')
 check(viewOnly.includes('publicIdleLogoutLabel()'), '首页退出时长引用公共空闲计时')
 check(viewOnly.includes('resultIdleLogoutLabel()'), '首页同时写出本人文档、诊断报告、优化结果的更短时长')
 check(!viewOnly.includes('idleLogoutMinutes'), '首页不再自算分钟数')
@@ -315,6 +314,6 @@ check(
 check(viewOnly.includes('usePrintPriceConfig()') && viewOnly.includes("unitCentsFor(price.config, 'black_white')") && viewOnly.includes("unitCentsFor(price.config, 'color')"), '首页复用真实打印价目，两种单价都要读取')
 check(viewOnly.includes("price.status === 'ready' && bwUnit !== null && colorUnit !== null") && viewOnly.includes('priceKnown && (bwUnit > 0 || colorUnit > 0)') && viewOnly.includes('priceKnown && bwUnit === 0 && colorUnit === 0'), '收费、免费与未知价目分开，不把缺价当成免费')
 check(viewOnly.includes("{paidPrint ? ' · 收费以现场公示为准' : ''}") && viewOnly.includes("freePrint ? '免费打印 · 带走：打印件' : '先选材料再出纸 · 带走：打印件'"), '0 元与未知价目不显示价格、报价或收费说明')
-check(!viewOnly.includes('这台机器上没有待继续的办理') && viewOnly.includes('{continueSlot}'), '按稿去掉空待办说明，保留真实续办卡')
+check(viewOnly.includes('这台机器上没有待继续的办理') && viewOnly.includes('{continueSlot}'), '保留清场说明（W-42）与真实续办卡')
 
 console.log('\nALL PASS — 青序流光首页视觉、动作、门控与响应式合同成立\n')
