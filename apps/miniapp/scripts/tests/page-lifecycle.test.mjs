@@ -6683,6 +6683,21 @@ test('微信接口失败的英文 errMsg 不直接当成给用户看的句子', 
   assert.deepEqual(hits, [])
 })
 
+test('print-preview：打开原文失败时不显示微信的英文报错，页面自己的中文句子照用', () => {
+  for (const [dl, expected] of [
+    [(opts) => opts.fail({ errMsg: 'downloadFile:fail unknown reason' }), '打开原文失败，请检查网络后重试。'],
+    [(opts) => opts.success({ statusCode: 403, tempFilePath: '' }), '服务端返回 403，预览链接可能已过期'],
+  ]) {
+    const wx = createWx()
+    wx.downloadFile = dl
+    const page = makePage('pages/print-preview/print-preview.js', { auth: createAuth('A'), api: {}, wx })
+    page.setData({ fileUrl: 'https://zyidai.cn/f/a.pdf', opening: false, ext: 'pdf' })
+    page.openDoc()
+    assert.equal(wx.calls.showModal.length, 1)
+    assert.equal(wx.calls.showModal[0].content, expected)
+  }
+})
+
 test('隐私页导出：微信接口失败给中文，英文原文只留在 wxErrMsg', async () => {
   const wx = createWx()
   wx.shareFileMessage = (opts) => opts.fail({ errMsg: 'shareFileMessage:fail cancel' })
