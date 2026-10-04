@@ -6666,6 +6666,36 @@ test('interview-entry：创建面试失败，额度用完只说明天恢复', as
   assert.ok(wx.calls.showToast.includes(QUOTA_PLAIN), JSON.stringify(wx.calls.showToast))
 })
 
+test('微信接口失败的英文 errMsg 不直接当成给用户看的句子', () => {
+  // `(err && err.errMsg) || '中文'` 这种写法里 errMsg 几乎总有值，中文兜底永远轮不到（走查 MP-K18-3 同类）
+  const hits = []
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(path.join(MINIAPP, dir))) {
+      const rel = `${dir}/${name}`
+      if (fs.statSync(path.join(MINIAPP, rel)).isDirectory()) { walk(rel); continue }
+      if (!name.endsWith('.js')) continue
+      fs.readFileSync(path.join(MINIAPP, rel), 'utf8').split('\n').forEach((line, i) => {
+        if (/\(\w+ && \w+\.errMsg\) \|\| '[^']|\b\w+\.errMsg \|\| '[^']/.test(line) && !/^\s*(\/\/|\*)/.test(line)) hits.push(`${rel}:${i + 1}`)
+      })
+    }
+  }
+  walk('pages'); walk('utils')
+  assert.deepEqual(hits, [])
+})
+
+test('隐私页导出：微信接口失败给中文，英文原文只留在 wxErrMsg', async () => {
+  const wx = createWx()
+  wx.shareFileMessage = (opts) => opts.fail({ errMsg: 'shareFileMessage:fail cancel' })
+  wx.downloadFile = (opts) => opts.fail({ errMsg: 'downloadFile:fail timeout' })
+  ACTIVE_WX = wx
+  const exportFile = requireMiniapp('../pages/privacy/export-file.js')
+  const err = await exportFile.shareExportFile('/x/a.json', 'a.json').then(() => null, (e) => e)
+  assert.ok(err)
+  assert.doesNotMatch(err.message, /[A-Za-z]{4,}/)
+  assert.match(err.message, /[\u4e00-\u9fa5]/)
+  assert.equal(err.wxErrMsg, 'shareFileMessage:fail cancel')
+})
+
 test('assistant：小青回复失败，额度用完只说明天恢复；断网给中文', async () => {
   for (const [err, shown] of [
     [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
