@@ -94,10 +94,10 @@ export function CompanyFormFields({ form, onChange }: { form: CompanyFormState; 
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="荣誉标签（逗号分隔，≤10 个）">
-          <input className={inputCls} placeholder="如 高新技术企业,省级专精特新" value={form.honorTags} onChange={(e) => set({ honorTags: e.target.value })} />
+          <input className={inputCls} placeholder="如 高新技术企业，省级专精特新" value={form.honorTags} onChange={(e) => set({ honorTags: e.target.value })} />
         </Field>
         <Field label="展示标签（逗号分隔，≤10 个）">
-          <input className={inputCls} placeholder="如 五险一金,带薪年假" value={form.tags} onChange={(e) => set({ tags: e.target.value })} />
+          <input className={inputCls} placeholder="如 五险一金，带薪年假" value={form.tags} onChange={(e) => set({ tags: e.target.value })} />
         </Field>
       </div>
       <Field label="Logo 图片地址">

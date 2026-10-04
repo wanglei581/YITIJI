@@ -24,10 +24,12 @@ import {
   availableMetric,
   filterSourceEntryOpens,
   recruitmentHostingLimit,
+  daysAgoStart,
   shanghaiDayKey,
   snapshotLoadStatus,
   unavailableMetric,
 } from './console-screen.metric'
+import { suppressResidualRow } from './console-screen.residual'
 import { loadJumpRows } from './console-screen.queries'
 import { requirePartnerOrgId, type PartnerOrgId } from './console-screen.org'
 import { countAllVisits, countOrgVisits, visitMetric } from './console-screen.visits'
@@ -113,13 +115,13 @@ export class ConsoleScreenUsageService {
 
   private async loadAdmin(range: ScreenUsageRange, now: Date, rowCap: number): Promise<CachedUsage> {
     const span = usageWindow(range, now)
-    const heatFrom = usageWindow('7d', now).from
+    const heatFrom = daysAgoStart(now, 7)
     const pulseFrom = pulseWindowStart(now)
     const [facts, heat, pulse, jumps, visits] = await Promise.all([
       this.settle('usageFacts', () => loadAdminUsageFacts(this.prisma, span.from, span.to)),
       this.settle('usageHeat', () => loadUsageTimeline(this.prisma, heatFrom, now, rowCap)),
       this.settle('usagePulse', () => loadUsageTimeline(this.prisma, pulseFrom, now, rowCap)),
-      this.settle('usageJumps', () => loadJumpRows(this.prisma, now)),
+      this.settle('usageJumps', () => loadJumpRows(this.prisma, now, usageWindow('30d', now))),
       this.settle('usageVisits', () => countAllVisits(this.prisma, span.from, span.to)),
     ])
     const status = snapshotLoadStatus([facts, heat, pulse, jumps, visits].filter((part) => part.ok).length, 5)
@@ -413,7 +415,7 @@ function addDay(counts: Map<string, number>, event: Date): void {
 }
 
 function buildUsageHeat(events: Date[], now: Date): ScreenUsageHeatValue {
-  const start = usageWindow('7d', now).from
+  const start = daysAgoStart(now, 7)
   const counts = new Map<string, number[]>()
   const days: string[] = []
   for (let i = 0; i < USAGE_HEAT_DAYS; i += 1) {
@@ -431,10 +433,8 @@ function buildUsageHeat(events: Date[], now: Date): ScreenUsageHeatValue {
   const nowHour = shanghaiHour(now)
   const dayRows = days.map((date) => ({
     date,
-    hours: (counts.get(date) ?? []).map((count, hour) => {
-      if (date === today && hour > nowHour) return null
-      return suppressSmallCount(count)
-    }),
+    hours: suppressResidualRow((counts.get(date) ?? []).map((count, hour) =>
+      date === today && hour > nowHour ? null : count), false),
   }))
   return { days: dayRows, peakHour: peakHourOf(dayRows) }
 }
@@ -476,13 +476,17 @@ function buildUsagePulse(
   place(lanes.info, 'info')
   place(lanes.ai, 'ai')
   place(lanes.print, 'print')
+  // 固定 2 小时窗口不覆盖今天全天；每条序列各投影一次。
+  const info = suppressResidualRow(totals.map((bucket) => bucket.info), true)
+  const ai = suppressResidualRow(totals.map((bucket) => bucket.ai), true)
+  const print = suppressResidualRow(totals.map((bucket) => bucket.print), true)
   return {
     bucketMinutes: 5,
-    buckets: totals.map((bucket, index) => ({
+    buckets: totals.map((_, index) => ({
       start: new Date(start + index * PULSE_BUCKET_MS).toISOString(),
-      info: suppressSmallCount(bucket.info),
-      ai: suppressSmallCount(bucket.ai),
-      print: suppressSmallCount(bucket.print),
+      info: info[index] ?? null,
+      ai: ai[index] ?? null,
+      print: print[index] ?? null,
     })),
   }
 }

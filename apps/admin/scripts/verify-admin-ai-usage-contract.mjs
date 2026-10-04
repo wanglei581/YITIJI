@@ -184,12 +184,12 @@ await check('C1 null key 显示「无已验签终端 / 无机构」；已知 key
   assert.equal(display.aiUsageKeyName('vendor', 'api.somehost.com'), 'api.somehost.com', '认不出的厂商 key（主机名）必须原样显示')
 })
 
-await check('C2 金额两位小数带「元」', () => {
+await check('C2 AI 金额统一四位小数', () => {
   const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
-  assert.equal(display.formatCny(1.1), '1.10 元')
-  assert.equal(display.formatCny(0.05), '0.05 元')
-  assert.equal(display.formatCny(0), '0.00 元')
-  assert.equal(display.formatCny(123.456), '123.46 元')
+  assert.equal(display.formatCny(1.1), '¥1.1000')
+  assert.equal(display.formatCny(0.05), '¥0.0500')
+  assert.equal(display.formatCny(0), '¥0.0000')
+  assert.equal(display.formatCny(123.456), '¥123.4560')
 })
 
 await check('C4 未登记失败原因显示各自码值，已登记原因保持中文', () => {
