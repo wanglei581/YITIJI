@@ -190,7 +190,7 @@ function rawRequest(path, options = {}) {
         }
       },
       fail(err) {
-        reject(makeError(err.errMsg || '网络连接失败,请稍后重试', -1));
+        reject(makeNetworkError(err));
       },
     });
   });
@@ -316,10 +316,20 @@ function rawUploadFile(path, filePath, options = {}) {
         }
       },
       fail(err) {
-        reject(makeError(err.errMsg || '文件上传失败,请检查网络后重试', -1));
+        reject(makeNetworkError(err));
       },
     });
   });
+}
+
+/**
+ * 请求根本没到服务端（断网、超时、域名不通）。微信给的 errMsg 是英文（request:fail timeout），
+ * 不给用户看：统一成一句中文，原文留在 err.wxErrMsg 供排查（走查 MP-K18-3）。
+ */
+function makeNetworkError(wxErr) {
+  const e = makeError(SHARED_USER_MESSAGES.NETWORK_ERROR, -1);
+  if (wxErr && typeof wxErr.errMsg === 'string' && wxErr.errMsg) e.wxErrMsg = wxErr.errMsg;
+  return e;
 }
 
 function makeError(message, statusCode, code) {
