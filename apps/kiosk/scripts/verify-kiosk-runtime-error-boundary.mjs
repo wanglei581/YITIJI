@@ -286,6 +286,13 @@ assert.deepEqual(
   const usbExpired = userMessageOf({ code: 'LOCAL_USB_FILE_EXPIRED', message: 'x' }, 'U 盘文件导入失败，请重试')
   assert.match(usbExpired, /重新读取 U 盘/, 'LOCAL_USB_FILE_EXPIRED 必须提示重新读取 U 盘')
   assert.doesNotMatch(usbExpired, /请重试/, 'LOCAL_USB_FILE_EXPIRED 不能说成「请重试」')
+  // 2026-10-04 能力开关：关着和查不到各有一句固定说法，不能落到兜底「请重试」。
+  const usbDisabled = userMessageOf({ code: 'LOCAL_USB_DISABLED', message: 'x' }, 'U 盘文件导入失败，请重试')
+  assert.equal(usbDisabled, '这台机器暂未开放 U 盘导入，请用手机扫码上传', 'LOCAL_USB_DISABLED 必须提示改用手机扫码')
+  assert.doesNotMatch(usbDisabled, /请重试/, 'LOCAL_USB_DISABLED 不能落到兜底「请重试」')
+  const usbUnknown = userMessageOf({ code: 'LOCAL_USB_CAPABILITY_UNKNOWN', message: 'x' }, 'U 盘文件导入失败，请重试')
+  assert.equal(usbUnknown, '暂时确认不了 U 盘导入是否开放，请稍后再试或用手机扫码上传', 'LOCAL_USB_CAPABILITY_UNKNOWN 必须说明暂时确认不了')
+  assert.notEqual(usbUnknown, 'U 盘文件导入失败，请重试', 'LOCAL_USB_CAPABILITY_UNKNOWN 不能落到兜底「请重试」')
   // PRINT_TERMINAL_QUEUE_HALTED（#1150 方案 A，只此一个新码）：
   // 合格中文原话原样显示。兜底句与拍板原话相同，只断言那一句时拿掉白名单仍会绿，
   // 所以再钉一条不同的合格中文（#1150 现文「本机…」），证明不是固定覆盖。

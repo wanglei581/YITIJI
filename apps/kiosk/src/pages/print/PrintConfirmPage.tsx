@@ -29,6 +29,7 @@ import { countPagesInRange } from './pageRange'
 import { clearPrintMaterialSession, printUploadPathForSource, type PrintFileState } from './printMaterialSession'
 import { patchPrintHandoff } from './printHandoff'
 import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
+import { printPrivacyDecisionSummary } from './printDeskModel'
 import { materialRedactionBadge } from './piiRedaction'
 import { subscribeTerminalSession, terminalSessionState, type TerminalSessionState } from '../../services/terminalAuth'
 import { PrintConfirmView } from './components/PrintConfirmView'
@@ -142,6 +143,7 @@ export function PrintConfirmPage() {
   const [submitting, setSubmitting] = useState(false)
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
   const [abandoning, setAbandoning] = useState(false)
+  const [piiCheckRequired, setPiiCheckRequired] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
   const [quoteNonce, setQuoteNonce] = useState(0)
@@ -453,6 +455,9 @@ export function PrintConfirmPage() {
               ? `价格已更新：你确认的是 ${formatCents(quote.amountCents)}，现在应付 ${formatCents(current.amountCents)}。本次没有建单，也没有扣款；请核对新金额后再点确认。`
               : '价格已更新，本次没有建单，也没有扣款。正在重新获取报价，请核对新金额后再确认。',
           })
+        } else if (errorCodeOf(err) === 'PRINT_PII_SCAN_REQUIRED') {
+          setPiiCheckRequired(true)
+          setSubmitError('这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。')
         } else {
           setSubmitError(userMessageOf(err, '提交失败，请稍后重试或联系现场工作人员'))
         }
@@ -485,6 +490,11 @@ export function PrintConfirmPage() {
             : '页数以实际结果为准，确认前不显示金额'
 
   const redactionBadge = materialRedactionBadge(materialCheck?.redaction)
+  const decisionSummary = materialCheck ? printPrivacyDecisionSummary(materialCheck) : null
+  // 裁决摘要修正“全保留”的说法；定位失败、复检残留等既有警告仍然保留。
+  const privacySummary = materialCheck?.redaction?.claim === 'nothing_to_redact'
+    ? decisionSummary
+    : [decisionSummary, redactionBadge?.text].filter(Boolean).join(' ') || null
   const amountText = quote.status === 'ready' ? formatCents(quote.amountCents).replace(/^¥/, '') : ''
   const pill = PILL[screen]
   const pricingPill = freePricing && screen === 'quoting' ? { tone: 'unknown' as const, label: '正在核定页数' }
@@ -542,7 +552,22 @@ export function PrintConfirmPage() {
   const waitButton = (label: string) => (
     <button type="button" className="qx-btn" data-variant="primary" disabled aria-disabled="true">{label}</button>
   )
-  const actions = screen === 'missing-context' ? (
+  const returnToMaterialCheck = () => {
+    if (!handoff) return
+    // 显式新一轮：保留当前文件、来源与参数，不再复用可能落后于服务端闸门的任务。
+    const kept = patchPrintHandoff(handoff.contextId, {
+      materialCheck: undefined, inspectionTask: undefined, normalizeTask: undefined,
+      piiTask: undefined, piiRedactTask: undefined,
+    })
+    if (!kept) {
+      setSubmitError('这份文件已失效，请重新选择文件。')
+      return
+    }
+    navigate('/print/desk?step=check', { state: { printContextId: kept.contextId } })
+  }
+  const actions = piiCheckRequired ? (
+    <button type="button" className="qx-btn" data-variant="primary" style={{ minHeight: 56 }} onClick={returnToMaterialCheck}>回到材料检查</button>
+  ) : screen === 'missing-context' ? (
     <>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>我的打印订单</button>
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>重新选文件</button>
@@ -653,7 +678,7 @@ export function PrintConfirmPage() {
         costCalcLabel={costCalcLabel}
         amountText={amountText}
         benefitView={freePricing ? null : benefitView}
-        redactionText={redactionBadge?.text ?? null}
+        redactionText={privacySummary}
         materialDemo={materialCheck?.mode === 'demo'}
         printerBlocked={printerBlocked}
         printerBlockedReason={freePricing ? printerBlockedReason.replace('不会扣费。', '') : printerBlockedReason}

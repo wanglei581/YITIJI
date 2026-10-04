@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 // verify:data-request-ui — UserDataRequest 两端诚实文案守卫（P0-3 + C-04）
 //
 // 与 main 后端对齐：
-// - delete 创建路径拒绝账号注销（ACCOUNT_CLOSURE_NOT_AVAILABLE）
+// - delete 创建路径只登记一条待管理员执行的注销申请（2026-10-04 起；此前是固定拒绝），自己不删任何数据
 // - UI 不得暗示「全部个人数据已删除 / 账号注销成功」
 // - 导出范围文案必须与 MemberDataExportMapper 白名单一致（禁止「不导出订单/文件」）
 // ============================================================
@@ -102,8 +102,8 @@ expectMatches(
 
 expectMatches(
   backendCreate,
-  /requestType === 'delete'[\s\S]{0,120}ACCOUNT_CLOSURE_NOT_AVAILABLE/,
-  '后端 delete 创建路径拒绝账号注销',
+  /requestType === 'delete'[\s\S]{0,120}this\.closures\(\)\.create\(/,
+  '后端 delete 创建路径只登记注销申请，交管理员执行',
 )
 expectAbsent(
   backendCreate,
@@ -126,8 +126,12 @@ expectMatches(
   'Kiosk 路由注册 /me/privacy-requests',
 )
 expectIncludes(kioskSettings, '/me/privacy-requests', '账号设置入口链到隐私请求页')
-expectIncludes(kioskSettings, '账号注销和数据导出尚未开放', '设置页保持导出/注销未开放诚实句')
-expectIncludes(kioskSettings, '文件、订单等业务摘要清单', '设置页以用户话说明导出范围仍包含文件与订单摘要')
+expectIncludes(kioskSettings, '注销账号、复制个人信息，请找现场工作人员，或按《隐私政策》里的电话、邮箱联系我们申请', '设置页写清注销与复制个人信息的三条申请渠道（与隐私政策一致）')
+expectIncludes(kioskSettings, '我们核实是你本人后，15 个工作日内处理', '设置页用隐私政策原词与时限')
+expectAbsent(kioskSettings, /数据导出尚未开放|核验你的身份/, '设置页不再说导出未开放，也不用「核验」替代政策原词')
+// 10/4：复制个人信息按《隐私政策》人工申请；不再预告一个尚不存在的自助导出会包含什么。
+expectIncludes(kioskSettings, '复制个人信息', '设置页写明可以申请复制个人信息')
+expectAbsent(kioskSettings, /如后续提供导出/, '设置页不预告尚未提供的自助导出内容')
 expectAbsent(
   kioskPage,
   /全部个人数据已删除|清空账号|账号注销成功|已删除全部|删除您的简历|删除打印订单|仅限岗位 AI 咨询会话与授权/,

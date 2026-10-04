@@ -334,6 +334,10 @@ jobs:
           pnpm --filter @ai-job-print/partner build
           pnpm --filter terminal-agent build
 
+      - name: Production builds are not React development builds
+        # 10/4 W-118：走查栈用 NODE_ENV=development 构出了 React 开发版，StrictMode 把挂载副作用执行两遍，造出成对请求的假象。
+        run: pnpm verify:prod-react-build
+
       - name: Release provenance fixture
         # 仅验证临时 release/artifact 目录与 fake PM2/health；不得连接任何环境。
         run: pnpm --filter @ai-job-print/api verify:release-provenance
@@ -751,6 +755,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-request-contract
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-closure
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
@@ -784,6 +789,9 @@ jobs:
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           pnpm --filter @ai-job-print/api verify:ai-quota
+          # Q2 全入口登记：每个 @AiUse('generate'|'voice') 路由要么接入按人次数、要么写明不计次理由；
+          # 运行时用例 import services/api/src 并写隔离库，所以放在「Prepare fresh SQLite db」之后。
+          pnpm --filter @ai-job-print/api verify:ai-quota-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:kiosk-session
@@ -1136,6 +1144,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-request-contract
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-closure
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download

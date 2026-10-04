@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startQrLoginLocalServer } from '../src/local-api/qr-login-server'
+import { decideUsbImport, resetUsbCapabilityCacheForTest } from '../src/usb/usb-capability'
 import {
   MAX_USB_FILE_BYTES,
   consumeUsbFile,
@@ -39,6 +40,34 @@ interface RecordedRequest {
   body: string
 }
 
+type UsbCapabilityStub =
+  | { kind: 'available' }
+  | { kind: 'configured'; status: string }
+  | { kind: 'unconfigured' }
+  | { kind: 'missing' }
+  | { kind: 'http_error' }
+  | { kind: 'bad_shape' }
+
+function usbCapabilityPayload(stub: UsbCapabilityStub): { status: number; body: unknown } {
+  if (stub.kind === 'http_error') {
+    return { status: 500, body: { success: false, error: { code: 'INTERNAL', message: 'stub' } } }
+  }
+  if (stub.kind === 'bad_shape') return { status: 200, body: { success: true } }
+  const capabilities = stub.kind === 'missing'
+    ? []
+    : stub.kind === 'unconfigured'
+      ? [{ capabilityKey: 'usb_import', status: 'not_verified', configured: false, note: null, updatedAt: null }]
+      : [{
+          capabilityKey: 'usb_import',
+          status: stub.kind === 'available' ? 'available' : stub.status,
+          configured: true,
+          note: null,
+          updatedAt: null,
+        }]
+  // 与公开接口一致：不包 { success, data }。包装形状在 decideUsbImport 的直接调用里另测。
+  return { status: 200, body: { terminalCode: 'T-LOCAL-USB', capabilities } }
+}
+
 function readBody(req: http.IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -51,9 +80,11 @@ function readBody(req: http.IncomingMessage): Promise<Buffer> {
 async function startBackendStub(): Promise<{
   baseUrl: string
   records: RecordedRequest[]
+  setUsbCapability: (stub: UsbCapabilityStub) => void
   close: () => Promise<void>
 }> {
   const records: RecordedRequest[] = []
+  let usbCapability: UsbCapabilityStub = { kind: 'available' }
   const server = http.createServer((req, res) => {
     void (async () => {
       const body = await readBody(req)
@@ -90,6 +121,13 @@ async function startBackendStub(): Promise<{
         return
       }
 
+      if (req.method === 'GET' && /^\/api\/v1\/terminals\/[^/]+\/capabilities$/.test(req.url ?? '')) {
+        const payload = usbCapabilityPayload(usbCapability)
+        res.writeHead(payload.status, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(payload.body))
+        return
+      }
+
       res.writeHead(404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: false, error: { code: 'NOT_FOUND', message: 'not found' } }))
     })().catch((error) => {
@@ -104,6 +142,7 @@ async function startBackendStub(): Promise<{
   return {
     baseUrl: `http://127.0.0.1:${address.port}/api/v1`,
     records,
+    setUsbCapability: (stub) => { usbCapability = stub },
     close: () => new Promise((resolve) => server.close(() => resolve())),
   }
 }
@@ -448,7 +487,7 @@ async function verifyLocalHttpRoutes(): Promise<void> {
       const gone = goneList.files.find((f) => f.filename === 'gone.pdf')
       assert.ok(gone, 'gone fixture must be listed')
       unlinkSync(join(dir, 'gone.pdf'))
-      const forwardedBefore = backend.records.length
+      const uploadsBefore = backend.records.filter((record) => record.url === '/api/v1/files/kiosk-upload').length
       const unreadable = await callJson<{ success: false; error: { code: string; message: string } }>(
         `${localBase}/local/usb/upload`,
         'POST',
@@ -457,17 +496,323 @@ async function verifyLocalHttpRoutes(): Promise<void> {
       assert.equal(unreadable.status, 422)
       assert.equal(unreadable.json.error.code, 'LOCAL_USB_FILE_UNREADABLE')
       assert.equal(unreadable.json.error.message, '这个文件读不了，请换一个文件')
-      assert.equal(backend.records.length, forwardedBefore, 'an unreadable file must not be forwarded to the backend')
+      assert.equal(
+        backend.records.filter((record) => record.url === '/api/v1/files/kiosk-upload').length,
+        uploadsBefore,
+        'an unreadable file must not be forwarded to the backend',
+      )
     } finally {
       resetUsbRegistryForTest()
       rmSync(dir, { recursive: true, force: true })
     }
 
-    console.log('PASS local /local/usb/* HTTP route checks (origin / bridge token / upload forwarding / one-time consume)')
+    await verifyUsbCapabilityHttp(localBase, backend)
+    console.log('PASS local /local/usb/* HTTP route checks (origin / bridge token / upload forwarding / one-time consume / capability gate)')
   } finally {
     await handle.close()
     await backend.close()
   }
+}
+
+const USB_DISABLED_MESSAGE = '这台机器暂未开放 U 盘导入，请用手机扫码上传'
+const USB_UNKNOWN_MESSAGE = '暂时确认不了 U 盘导入是否开放，请稍后再试或用手机扫码上传'
+
+function kioskUploadCount(records: RecordedRequest[]): number {
+  return records.filter((record) => record.url === '/api/v1/files/kiosk-upload').length
+}
+
+function capabilityHitCount(records: RecordedRequest[]): number {
+  return records.filter((record) => record.method === 'GET' && /^\/api\/v1\/terminals\/[^/]+\/capabilities$/.test(record.url)).length
+}
+
+async function verifyUsbCapabilityHttp(
+  localBase: string,
+  backend: { records: RecordedRequest[]; setUsbCapability: (stub: UsbCapabilityStub) => void },
+): Promise<void> {
+  const headers = { origin: ALLOWED_ORIGIN, bridgeToken: BRIDGE_TOKEN }
+  backend.setUsbCapability({ kind: 'available' })
+  resetUsbCapabilityCacheForTest()
+
+  const listedOk = await callJson<{ success: true; data: { present: boolean; files: unknown[] } }>(
+    `${localBase}/local/usb/files`,
+    'GET',
+    headers,
+  )
+  assert.equal(listedOk.status, 200, 'available must still list files')
+
+  const dir = mkdtempSync(join(tmpdir(), 'usb-capability-gate-'))
+  try {
+    writeFileSync(join(dir, 'usb-sample.pdf'), '%PDF-1.4 sample')
+    const drive = (): UsbDriveInfo => ({ rootPath: dir, label: 'GATE-USB' })
+    const listed = await refreshUsbFileList(drive, () => new Set())
+    const target = listed.files.find((file) => file.filename === 'usb-sample.pdf')
+    assert.ok(target, 'capability fixture must be listed')
+    const uploaded = await callJson<{ success: true; data: { fileId: string } }>(
+      `${localBase}/local/usb/upload`,
+      'POST',
+      { ...headers, body: { safeId: target!.safeId } },
+    )
+    assert.equal(uploaded.status, 200, 'available must still forward the upload')
+    assert.equal(uploaded.json.data.fileId, 'file_usb_1')
+
+    for (const status of ['not_verified', 'maintenance', 'unsupported', 'testing', 'retired']) {
+      backend.setUsbCapability({ kind: 'configured', status })
+      resetUsbCapabilityCacheForTest()
+      const denied = await callJson<{ success: false; error: { code: string; message: string } }>(
+        `${localBase}/local/usb/files`,
+        'GET',
+        headers,
+      )
+      assert.equal(denied.status, 403, `${status} must reject listing`)
+      assert.equal(denied.json.error.code, 'LOCAL_USB_DISABLED')
+      assert.equal(denied.json.error.message, USB_DISABLED_MESSAGE)
+    }
+
+    resetUsbRegistryForTest()
+    const blockedList = await refreshUsbFileList(drive, () => new Set())
+    const blocked = blockedList.files.find((file) => file.filename === 'usb-sample.pdf')
+    assert.ok(blocked, 'safeId for the closed-switch upload must exist before the gate')
+    backend.setUsbCapability({ kind: 'configured', status: 'not_verified' })
+    resetUsbCapabilityCacheForTest()
+    const filesClosed = await callJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/usb/files`,
+      'GET',
+      headers,
+    )
+    assert.equal(filesClosed.status, 403)
+    assert.equal(filesClosed.json.error.code, 'LOCAL_USB_DISABLED')
+    const statusWhileClosed = await callJson<{ success: true; data: { present: boolean } }>(
+      `${localBase}/local/usb/status`,
+      'GET',
+      headers,
+    )
+    assert.equal(statusWhileClosed.status, 200, '/local/usb/status must ignore the capability switch')
+    const uploadsBefore = kioskUploadCount(backend.records)
+    const uploadClosed = await callJson<{ success: false; error: { code: string; message: string } }>(
+      `${localBase}/local/usb/upload`,
+      'POST',
+      { ...headers, body: { safeId: blocked!.safeId } },
+    )
+    assert.equal(uploadClosed.status, 403)
+    assert.equal(uploadClosed.json.error.code, 'LOCAL_USB_DISABLED')
+    assert.equal(uploadClosed.json.error.message, USB_DISABLED_MESSAGE)
+    assert.equal(kioskUploadCount(backend.records), uploadsBefore, 'a closed switch must not forward the file')
+
+    backend.setUsbCapability({ kind: 'available' })
+    resetUsbCapabilityCacheForTest()
+    const resumed = await callJson<{ success: true; data: { fileId: string } }>(
+      `${localBase}/local/usb/upload`,
+      'POST',
+      { ...headers, body: { safeId: blocked!.safeId } },
+    )
+    assert.equal(resumed.status, 200, 'the same safeId must still work after the switch returns to available')
+    assert.equal(kioskUploadCount(backend.records), uploadsBefore + 1)
+
+    backend.setUsbCapability({ kind: 'unconfigured' })
+    resetUsbCapabilityCacheForTest()
+    const unconfiguredFiles = await callJson<{ success: true; data: { files: unknown[] } }>(
+      `${localBase}/local/usb/files`,
+      'GET',
+      headers,
+    )
+    assert.equal(unconfiguredFiles.status, 200, 'unconfigured usb_import must allow listing')
+    const unconfiguredList = await refreshUsbFileList(drive, () => new Set())
+    const unconfiguredTarget = unconfiguredList.files.find((file) => file.filename === 'usb-sample.pdf')
+    assert.ok(unconfiguredTarget)
+    const unconfiguredUpload = await callJson<{ success: true; data: { fileId: string } }>(
+      `${localBase}/local/usb/upload`,
+      'POST',
+      { ...headers, body: { safeId: unconfiguredTarget!.safeId } },
+    )
+    assert.equal(unconfiguredUpload.status, 200, 'unconfigured usb_import must allow upload')
+
+    backend.setUsbCapability({ kind: 'missing' })
+    resetUsbCapabilityCacheForTest()
+    const missingRow = await callJson<{ success: true }>(`${localBase}/local/usb/files`, 'GET', headers)
+    assert.equal(missingRow.status, 200, 'a capabilities payload without usb_import must allow listing')
+
+    backend.setUsbCapability({ kind: 'http_error' })
+    resetUsbCapabilityCacheForTest()
+    const statusWhileUnknown = await callJson<{ success: true; data: { present: boolean } }>(
+      `${localBase}/local/usb/status`,
+      'GET',
+      headers,
+    )
+    assert.equal(statusWhileUnknown.status, 200, '/local/usb/status must stay up when the capability API fails')
+    const unknownFiles = await callJson<{ success: false; error: { code: string; message: string } }>(
+      `${localBase}/local/usb/files`,
+      'GET',
+      headers,
+    )
+    assert.equal(unknownFiles.status, 503)
+    assert.equal(unknownFiles.json.error.code, 'LOCAL_USB_CAPABILITY_UNKNOWN')
+    assert.equal(unknownFiles.json.error.message, USB_UNKNOWN_MESSAGE)
+    const unknownList = await refreshUsbFileList(drive, () => new Set())
+    const unknownTarget = unknownList.files.find((file) => file.filename === 'usb-sample.pdf')
+    assert.ok(unknownTarget)
+    const uploadsBeforeUnknown = kioskUploadCount(backend.records)
+    const unknownUpload = await callJson<{ success: false; error: { code: string; message: string } }>(
+      `${localBase}/local/usb/upload`,
+      'POST',
+      { ...headers, body: { safeId: unknownTarget!.safeId } },
+    )
+    assert.equal(unknownUpload.status, 503)
+    assert.equal(unknownUpload.json.error.code, 'LOCAL_USB_CAPABILITY_UNKNOWN')
+    assert.equal(kioskUploadCount(backend.records), uploadsBeforeUnknown, 'an unknown capability must not forward the file')
+    backend.setUsbCapability({ kind: 'available' })
+    const unknownNotCached = await callJson<{ success: true; data: { fileId: string } }>(
+      `${localBase}/local/usb/upload`,
+      'POST',
+      { ...headers, body: { safeId: unknownTarget!.safeId } },
+    )
+    assert.equal(unknownNotCached.status, 200, 'a failed capability lookup must not be cached')
+
+    backend.setUsbCapability({ kind: 'bad_shape' })
+    resetUsbCapabilityCacheForTest()
+    const badShape = await callJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/usb/files`,
+      'GET',
+      headers,
+    )
+    assert.equal(badShape.status, 503)
+    assert.equal(badShape.json.error.code, 'LOCAL_USB_CAPABILITY_UNKNOWN')
+
+    backend.setUsbCapability({ kind: 'available' })
+    resetUsbCapabilityCacheForTest()
+    const hitsBefore = capabilityHitCount(backend.records)
+    const first = await callJson<{ success: true }>(`${localBase}/local/usb/files`, 'GET', headers)
+    assert.equal(first.status, 200)
+    assert.equal(capabilityHitCount(backend.records), hitsBefore + 1)
+    const second = await callJson<{ success: true }>(`${localBase}/local/usb/files`, 'GET', headers)
+    assert.equal(second.status, 200)
+    assert.equal(capabilityHitCount(backend.records), hitsBefore + 1, 'an allow decision must be reused within 15 seconds')
+    backend.setUsbCapability({ kind: 'http_error' })
+    const cached = await callJson<{ success: true }>(`${localBase}/local/usb/files`, 'GET', headers)
+    assert.equal(cached.status, 200, 'a cached allow must not turn into a failure while it is fresh')
+    assert.equal(capabilityHitCount(backend.records), hitsBefore + 1)
+  } finally {
+    resetUsbRegistryForTest()
+    resetUsbCapabilityCacheForTest()
+    backend.setUsbCapability({ kind: 'available' })
+    rmSync(dir, { recursive: true, force: true })
+  }
+
+  console.log('PASS usb capability gate (available / closed / unconfigured / unknown / status unaffected)')
+}
+
+async function verifyUsbCapabilityDecisionUnit(): Promise<void> {
+  resetUsbCapabilityCacheForTest()
+  const base = { apiBaseUrl: 'http://unit.invalid/api/v1', terminalId: 'unit-terminal' }
+  let fetches = 0
+  const allowBody = {
+    success: true,
+    data: {
+      terminalCode: 'T',
+      capabilities: [{ capabilityKey: 'usb_import', status: 'available', configured: true }],
+    },
+  }
+  const allow = await decideUsbImport({
+    ...base,
+    now: 1_000_000,
+    fetchCapabilities: async () => {
+      fetches += 1
+      return allowBody
+    },
+  })
+  assert.equal(allow.allowed, true, 'wrapped { success, data } must be accepted')
+  const cached = await decideUsbImport({
+    ...base,
+    now: 1_014_999,
+    fetchCapabilities: async () => {
+      fetches += 1
+      return allowBody
+    },
+  })
+  assert.equal(cached.allowed, true)
+  assert.equal(fetches, 1, 'a successful decision stays cached for under 15 seconds')
+  const expired = await decideUsbImport({
+    ...base,
+    now: 1_015_000,
+    fetchCapabilities: async () => {
+      fetches += 1
+      return allowBody
+    },
+  })
+  assert.equal(expired.allowed, true)
+  assert.equal(fetches, 2, 'the cache must expire at 15 seconds')
+
+  resetUsbCapabilityCacheForTest()
+  const absent = await decideUsbImport({
+    ...base,
+    fetchCapabilities: async () => ({ terminalCode: 'T', capabilities: [{ capabilityKey: 'scan', status: 'available', configured: true }] }),
+  })
+  assert.equal(absent.allowed, true, 'a payload without usb_import must allow')
+
+  resetUsbCapabilityCacheForTest()
+  const dirty = await decideUsbImport({
+    ...base,
+    fetchCapabilities: async () => ({ capabilities: [{ capabilityKey: 'usb_import', status: 'retired', configured: true }] }),
+  })
+  assert.equal(dirty.allowed, false)
+  if (!dirty.allowed) {
+    assert.equal(dirty.httpStatus, 403)
+    assert.equal(dirty.code, 'LOCAL_USB_DISABLED')
+    assert.equal(dirty.message, USB_DISABLED_MESSAGE)
+  }
+
+  resetUsbCapabilityCacheForTest()
+  const bad = await decideUsbImport({
+    ...base,
+    fetchCapabilities: async () => ({ success: true }),
+  })
+  assert.equal(bad.allowed, false)
+  if (!bad.allowed) assert.equal(bad.code, 'LOCAL_USB_CAPABILITY_UNKNOWN')
+
+  resetUsbCapabilityCacheForTest()
+  let called = false
+  const missingTerminal = await decideUsbImport({
+    apiBaseUrl: base.apiBaseUrl,
+    terminalId: '  ',
+    fetchCapabilities: async () => {
+      called = true
+      return allowBody
+    },
+  })
+  assert.equal(missingTerminal.allowed, false)
+  assert.equal(called, false, 'a missing terminal id must fail closed without calling the API')
+
+  resetUsbCapabilityCacheForTest()
+  const logged: string[] = []
+  const originalStdout = process.stdout.write.bind(process.stdout)
+  process.stdout.write = ((chunk: unknown) => {
+    logged.push(String(chunk))
+    return true
+  }) as typeof process.stdout.write
+  let failed: Awaited<ReturnType<typeof decideUsbImport>>
+  try {
+    failed = await decideUsbImport({
+      ...base,
+      now: 50,
+      fetchCapabilities: async () => {
+        throw new Error("EPERM: open 'D:\\\\张三简历.pdf'")
+      },
+    })
+  } finally {
+    process.stdout.write = originalStdout
+  }
+  assert.equal(failed.allowed, false)
+  if (!failed.allowed) assert.equal(failed.code, 'LOCAL_USB_CAPABILITY_UNKNOWN')
+  assert.ok(logged.some((line) => line.includes('decision=unknown')), `failure must be logged\n${logged.join('\n')}`)
+  assert.ok(logged.every((line) => !line.includes('张三') && !line.includes('.pdf')), `capability failure log must not carry a filename or path\n${logged.join('\n')}`)
+
+  const recovered = await decideUsbImport({
+    ...base,
+    now: 51,
+    fetchCapabilities: async () => allowBody,
+  })
+  assert.equal(recovered.allowed, true, 'a failed lookup must not be cached')
+  resetUsbCapabilityCacheForTest()
+  console.log('PASS usb capability decision unit (envelope / cache / fail-closed / log redaction)')
 }
 
 // ── Part 3: Agent 侧未配置静态令牌 → 随机令牌拒绝，动态 session 放行 ───────
@@ -546,6 +891,7 @@ function verifyPlatformGapDisclosure(): void {
 async function main(): Promise<void> {
   await verifyUsbFilesUnit()
   await verifyLocalHttpRoutes()
+  await verifyUsbCapabilityDecisionUnit()
   await verifyUnconfiguredTokenFailClosed()
   verifyPlatformGapDisclosure()
   console.log('verify-usb-import-agent: ok')
