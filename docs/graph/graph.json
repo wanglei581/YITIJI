@@ -10475,7 +10475,6 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
-          "PiiFinding",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10524,7 +10523,6 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
-          "PiiFinding",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10551,7 +10549,6 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
-          "PiiFinding",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10578,7 +10575,6 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
-          "PiiFinding",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -16221,7 +16217,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 108,
+    "modelCount": 110,
     "models": [
       {
         "fieldCount": 7,
@@ -16339,6 +16335,22 @@
         ]
       },
       {
+        "fieldCount": 4,
+        "name": "AiQuotaDaily",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/ai/quota/ai-quota.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 12,
+        "name": "AiQuotaReservation",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/ai/quota/ai-quota.service.ts"
+        ]
+      },
+      {
         "fieldCount": 16,
         "name": "AiResumeResult",
         "relations": [
@@ -16414,6 +16426,7 @@
         "usedBy": [
           "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/ai/quota/ai-quota.service.ts",
           "services/api/src/ai/resume/job-fit-hosting.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
@@ -16461,13 +16474,14 @@
         ]
       },
       {
-        "fieldCount": 16,
+        "fieldCount": 17,
         "name": "BenefitGrant",
         "relations": [
           "BenefitClaim",
           "EndUser"
         ],
         "usedBy": [
+          "services/api/src/ai/quota/ai-quota.service.ts",
           "services/api/src/benefit-activities/benefit-activities.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/benefit-redemption/resume-export-gate.service.ts",
@@ -17281,8 +17295,7 @@
           "DocumentProcessTask"
         ],
         "usedBy": [
-          "services/api/src/materials/materials.service.ts",
-          "services/api/src/print-jobs/pii-scan-gate.ts"
+          "services/api/src/materials/materials.service.ts"
         ]
       },
       {
@@ -17446,6 +17459,7 @@
         "name": "RedemptionRecord",
         "relations": [],
         "usedBy": [
+          "services/api/src/ai/quota/ai-quota.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
           "services/api/src/benefit-redemption/resume-export-gate.service.ts",
           "services/api/src/member-benefits/member-benefits.service.ts"
@@ -20395,6 +20409,9 @@
       "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
@@ -20433,6 +20450,7 @@
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportChrome.tsx": [
@@ -20522,6 +20540,9 @@
     ],
     "apps/kiosk/src/pages/resume/resume-optimize-qx.css": [
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resume-r1-qx2.css": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-report-fixture.ts": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
@@ -22098,6 +22119,9 @@
     "packages/shared/src/types/memberAssets.ts": [
       "services/api/scripts/verify-jobfair-checkin.ts"
     ],
+    "packages/shared/src/types/memberBenefits.ts": [
+      "services/api/scripts/verify-ai-quota.ts"
+    ],
     "packages/shared/src/types/memberPrintOrders.ts": [
       "services/api/scripts/verify-member-order-timeline.ts"
     ],
@@ -22697,6 +22721,7 @@
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
@@ -22780,6 +22805,9 @@
     ],
     "services/api/scripts/support/recruitment-wave2-public-snapshot.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts"
+    ],
+    "services/api/scripts/support/resume-optimize-export-contract.ts": [
+      "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/scripts/support/resume-optimize-fetch-stub.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
@@ -23206,6 +23234,7 @@
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
     "services/api/src/ai/ai-result.cleanup.task.ts": [
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-job-ai-backend.ts"
@@ -23416,6 +23445,12 @@
     ],
     "services/api/src/ai/providers/zhipu.provider.stub.ts": [
       "services/api/scripts/verify-ai-cost-runtime.ts"
+    ],
+    "services/api/src/ai/quota/ai-quota.policy.ts": [
+      "services/api/scripts/verify-ai-quota.ts"
+    ],
+    "services/api/src/ai/quota/ai-quota.service.ts": [
+      "services/api/scripts/verify-ai-quota.ts"
     ],
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
@@ -23732,6 +23767,7 @@
     ],
     "services/api/src/ai/usage/ai-usage-context.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -23804,6 +23840,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
@@ -24003,6 +24040,7 @@
       "services/api/scripts/verify-benefit-activities.ts"
     ],
     "services/api/src/benefit-redemption/benefit-redemption.service.ts": [
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-benefit-redemption.ts",
       "services/api/scripts/verify-payment-flow.ts",
@@ -24059,6 +24097,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-internal-accounts.ts",
@@ -25289,13 +25328,20 @@
       "services/api/scripts/verify-member-benefits-admin.ts"
     ],
     "services/api/src/member-benefits/admin-member-benefits.service.ts": [
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-member-benefits-admin.ts"
+    ],
+    "services/api/src/member-benefits/dto/admin-member-benefits.dto.ts": [
+      "services/api/scripts/verify-ai-quota.ts"
     ],
     "services/api/src/member-benefits/member-benefits.service.ts": [
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-favorites-benefits.ts",
       "services/api/scripts/verify-wave3-print-aftercare.ts"
+    ],
+    "services/api/src/member-benefits/member-benefits.types.ts": [
+      "services/api/scripts/verify-ai-quota.ts"
     ],
     "services/api/src/member-favorites/member-favorites.controller.ts": [
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
@@ -26087,6 +26133,7 @@
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
@@ -30794,6 +30841,7 @@
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeExportResult.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts",
@@ -30803,8 +30851,10 @@
           "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
+          "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
           "apps/kiosk/src/pages/resume/resume-triage-qx.css",
           "apps/kiosk/src/services/api/ai.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
@@ -34205,6 +34255,37 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-public-quota"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "packages/shared/src/types/memberBenefits.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/ai-result.cleanup.task.ts",
+          "services/api/src/ai/quota/ai-quota.policy.ts",
+          "services/api/src/ai/quota/ai-quota.service.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/benefit-redemption/benefit-redemption.service.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/member-benefits/admin-member-benefits.service.ts",
+          "services/api/src/member-benefits/dto/admin-member-benefits.dto.ts",
+          "services/api/src/member-benefits/member-benefits.types.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-quota.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-quota",
+        "@ai-job-print/api::verify:ai-quota:postgres"
       ],
       "wired": true
     },
@@ -40629,6 +40710,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/resume-optimize-export-contract.ts",
           "services/api/scripts/support/resume-optimize-fetch-stub.ts",
           "services/api/scripts/support/resume-optimize-original-content.ts",
           "services/api/src/ai/ai.service.ts",

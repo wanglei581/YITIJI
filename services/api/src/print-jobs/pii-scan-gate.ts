@@ -48,14 +48,24 @@ export async function assertPiiScanned(args: PiiGateArgs): Promise<void> {
   if (!file) return
   if (!materialCheckRequired(file)) return
 
-  const scan = await args.prisma.documentProcessTask.findFirst({
+  // 以最晚的一条完成检查为准（重扫可能查出更多内容，旧结论不继承）；
+  // 但同一次进页面可能并发建出两条一模一样的检查（W-118：间隔 0–23 毫秒），用户只裁决了其中一条。
+  // 这种「孪生」检查——同一内容、同一结果、创建时间挨着——裁决过任意一条即视为已裁决。
+  const scans = await args.prisma.documentProcessTask.findMany({
     where: { sourceFileId: args.fileId, kind: 'pii_scan', status: 'completed' },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, paramsJson: true, resultJson: true },
+    take: PII_SCAN_TWIN_LOOKBACK,
+    select: {
+      id: true, paramsJson: true, resultJson: true, createdAt: true,
+      findings: { select: { type: true, label: true, pageNumber: true, snippet: true, action: true } },
+    },
   })
-  const pendingFindings = scan
-    ? await args.prisma.piiFinding.count({ where: { taskId: scan.id, action: 'pending' } })
-    : 0
+  const latest = scans[0]
+  const twins = latest ? scans.filter((scan) => scan === latest || isTwinScan(latest, scan)) : []
+  const pendingOf = (scan: PiiScanRow) => scan.findings.filter((finding) => finding.action === 'pending').length
+  const decided = twins.filter((scan) => pendingOf(scan) === 0)
+  const scan = decided[0] ?? latest
+  const pendingFindings = scan ? pendingOf(scan) : 0
 
   if (scan && pendingFindings === 0) {
     const scanSha = readPiiScanSourceSha256(scan.paramsJson)
@@ -64,16 +74,21 @@ export async function assertPiiScanned(args: PiiGateArgs): Promise<void> {
         error: {
           code: 'PII_SCAN_STALE',
           message: '文件在隐私检查后又被改过，请重新检查后再打印',
+          nextAction: PII_GATE_NEXT_ACTION,
         },
       })
     }
     if (args.requireCompleted && piiManualConfirmEnforced()) {
-      const result = readJsonObject(scan.resultJson)
-      if (PII_SCAN_INCOMPLETE_MODES.has(String(result['mode'] ?? '')) && typeof result['manualConfirmedAt'] !== 'string') {
+      const confirmed = decided.some((item) => {
+        const result = readJsonObject(item.resultJson)
+        return !PII_SCAN_INCOMPLETE_MODES.has(String(result['mode'] ?? '')) || typeof result['manualConfirmedAt'] === 'string'
+      })
+      if (!confirmed) {
         throw new BadRequestException({
           error: {
             code: 'PRINT_PII_MANUAL_CONFIRM_REQUIRED',
             message: '隐私检查没有完整覆盖这份文件，请先确认文件里没有不想打印的个人信息',
+            nextAction: PII_GATE_NEXT_ACTION,
           },
         })
       }
@@ -103,8 +118,37 @@ export async function assertPiiScanned(args: PiiGateArgs): Promise<void> {
     error: {
       code: scan && pendingFindings > 0 ? (args.pendingCode ?? 'PRINT_PII_SCAN_REQUIRED') : 'PRINT_PII_SCAN_REQUIRED',
       message: scan && pendingFindings > 0 ? args.pendingMessage : args.missingMessage,
+      // 页面凭这个标识把用户带回材料检查页；被拒后原地重试救不回来。
+      nextAction: PII_GATE_NEXT_ACTION,
     },
   })
+}
+
+/** 被隐私闸门拒绝时给页面的下一步：回材料检查页把检查 / 裁决做完。 */
+export const PII_GATE_NEXT_ACTION = 'return_to_material_check'
+/** 孪生检查的创建时间最多相差这么久；超过就是用户后来的重扫，旧结论不继承。 */
+export const PII_SCAN_TWIN_WINDOW_MS = 3_000
+const PII_SCAN_TWIN_LOOKBACK = 10
+
+type PiiScanRow = {
+  id: string
+  paramsJson: string
+  resultJson: string | null
+  createdAt: Date
+  findings: Array<{ type: string; label: string; pageNumber: number | null; snippet: string | null; action: string }>
+}
+
+function findingSignature(scan: PiiScanRow): string {
+  return scan.findings.map((f) => `${f.type}|${f.label}|${f.pageNumber ?? ''}|${f.snippet ?? ''}`).sort().join('\n')
+}
+
+/** 同一内容（sha）、同一覆盖程度（mode）、同一组命中、创建时间挨着，才算同一次检查的两份。 */
+function isTwinScan(a: PiiScanRow, b: PiiScanRow): boolean {
+  if (Math.abs(a.createdAt.getTime() - b.createdAt.getTime()) > PII_SCAN_TWIN_WINDOW_MS) return false
+  const sha = readPiiScanSourceSha256(a.paramsJson)
+  if (!sha || sha !== readPiiScanSourceSha256(b.paramsJson)) return false
+  if (String(readJsonObject(a.resultJson)['mode'] ?? '') !== String(readJsonObject(b.resultJson)['mode'] ?? '')) return false
+  return findingSignature(a) === findingSignature(b)
 }
 
 function readJsonObject(json: string | null): Record<string, unknown> {

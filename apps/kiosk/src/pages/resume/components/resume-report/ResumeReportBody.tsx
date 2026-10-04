@@ -1,3 +1,4 @@
+import { ResumeReportStates } from './ResumeReportStates'
 import type { ResumeContentBlockKey, ResumeIssue, ResumeReport, ResumeScoringDimensionKey } from '@ai-job-print/shared'
 import {
   conclusionCount,
@@ -164,14 +165,14 @@ function ConclusionsZone({ report }: { report: ResumeReport }) {
 export function EmptyReportBody() {
   return (
     <>
-      <section className="rrp-state">
-        <h2>报告回来了，但里面是空的</h2>
-        <p>
-          这次确实读到了报告，只是六个维度、建议、优先级和风险提醒都是空的。
-          常见原因是这次提取到的简历文字太少，不足以给出有依据的结论。
-          这不是读取失败，也不是能力未接通。本页不会为了把版面填满而生成任何结论，也不出总分。
-        </p>
+      <section className="rrp-cbar" data-testid="resume-report-counts">
+        <div className="rrp-cgrid">
+          {['内容块', '问题', '原文证据', '量化命中', '评分维度', '结论条目'].map((label) => (
+            <span key={label} className="rrp-cc" data-zero="1"><u>{label}</u><b>0</b></span>
+          ))}
+        </div>
       </section>
+      <ResumeReportStates viewState="report-empty" />
     </>
   )
 }
