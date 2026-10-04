@@ -330,3 +330,19 @@
 
 .qx-rg-export[data-export-screen='export-failed'] > .qx-card:first-child { background: var(--qx-cinnabar-soft); border-color: var(--qx-cinnabar-line); }
 @media (max-width: 760px) { .qx-rg-fmt { min-height: 168px; } }
+
+.qx-rg-cap {
+  display: block;
+  margin: 6px 0 0;
+  font-size: var(--qx-fs-aux);
+  font-weight: 700;
+  color: var(--qx-ink-3);
+}
+.qx-rg-title { font-weight: 700; }
+.qx-stage:has([data-kiosk-screen='resume-generate-preview']) > .qx-ctabar > .qx-btn[aria-disabled='true'],
+.qx-rg-result-actions .qx-btn[aria-disabled='true'] {
+  background: var(--qx-line-2);
+  border-color: var(--qx-line);
+  color: var(--qx-ink-3);
+  cursor: not-allowed;
+}

@@ -49,6 +49,8 @@ export function ResumeFormatChooser(props: {
   guest: boolean
   synthetic: boolean
   printNavigating: boolean
+  titleBlocked?: boolean
+  onTitleBlocked?: () => void
   onPrint: () => void
   onOpenPreview: () => void
   onClearExport: () => void
@@ -121,7 +123,16 @@ export function ResumeFormatChooser(props: {
               </button>
             )}
             {printReady && (
-              <button type="button" className="qx-btn" data-variant="teal" aria-disabled={props.printNavigating || undefined} onClick={() => { if (!props.printNavigating) props.onPrint() }}>
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="teal"
+                aria-disabled={props.printNavigating || props.titleBlocked || undefined}
+                onClick={() => {
+                  if (props.titleBlocked) { props.onTitleBlocked?.(); return }
+                  if (!props.printNavigating) props.onPrint()
+                }}
+              >
                 {props.printNavigating ? '正在进入打印确认…' : '去打印确认'}
               </button>
             )}

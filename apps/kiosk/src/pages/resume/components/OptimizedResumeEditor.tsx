@@ -1,10 +1,10 @@
 import type { CSSProperties } from 'react'
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { PencilLineIcon, ShieldCheckIcon } from 'lucide-react'
 import { Card } from '@ai-job-print/ui'
 import type { GeneratedResume, ResumeLayoutSettings } from '@ai-job-print/shared'
 import { MaskedContactLine } from '../../../components/MaskedContactLine'
+import { DeleteEntryButton, EntryDeleteDialog } from './resume-deliver/ResumeFactConfirmDialog'
 import { resumeTitleIssues } from './resume-deliver/resumeEntryTitles'
 
 type OptimizedResumeEditorProps = {
@@ -60,31 +60,6 @@ function TitleField(props: {
       {props.message ? <p className="qx-rd-error" id={errorId} role="alert">{props.message}</p> : null}
     </div>
   )
-}
-
-function DeleteEntryButton(props: { label: string; onClick: () => void }) {
-  return (
-    <button type="button" className="qx-btn mt-1.5" data-variant="ghost" aria-label={props.label} onClick={props.onClick}>
-      删掉这一条
-    </button>
-  )
-}
-
-function EntryDeleteDialog(props: { onCancel: () => void; onConfirm: () => void }) {
-  const dialog = (
-    <div className="qx-rd-overlay" role="dialog" aria-modal="true" aria-labelledby="resume-entry-delete-title">
-      <div className="qx-rd-dialog">
-        <h2 id="resume-entry-delete-title">确定删掉这一条吗？</h2>
-        <p>删了以后导出和打印都不会再带这一条。</p>
-        <div className="qx-rd-dialog-actions">
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onCancel}>取消</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={props.onConfirm}>确定</button>
-        </div>
-      </div>
-    </div>
-  )
-  const host = typeof document !== 'undefined' ? document.querySelector('[data-kiosk-screen="resume-optimize"]') : null
-  return host ? createPortal(dialog, host) : dialog
 }
 
 export function OptimizedResumeEditor({
@@ -293,7 +268,7 @@ export function OptimizedResumeEditor({
         优化版中的学校/公司/证书等事实信息均来自你的简历原文,AI 未做任何添加;原文没有的内容保持为空,由你自行补充。
       </p>
       {pendingDelete && (
-        <EntryDeleteDialog onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} />
+        <EntryDeleteDialog hostSelector='[data-kiosk-screen="resume-optimize"]' onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} />
       )}
     </>
   )
