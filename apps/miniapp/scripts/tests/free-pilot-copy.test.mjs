@@ -338,3 +338,13 @@ test('现场无人值守：需要人帮忙时指向服务电话，不写死号�
     assert.match(read(rel), /\{\{supportHint\}\}/, rel)
   }
 })
+
+test('现场无人值守：模板用到的 supportHint 在页面 data 里真有值（实跑页面定义）', async () => {
+  const { loadPageDefinition } = await import('./page-sandbox.mjs')
+  const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
+  const { SUPPORT_HINT } = requireMiniapp('../utils/user-error.js')
+  for (const rel of ['pages/print/print.js', 'pages/print-pickup/print-pickup.js']) {
+    const def = loadPageDefinition(rel, { wx: {}, modules: {} })
+    assert.equal(def.data.supportHint, SUPPORT_HINT, rel)
+  }
+})
