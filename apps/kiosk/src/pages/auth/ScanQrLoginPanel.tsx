@@ -228,7 +228,9 @@ export function ScanQrLoginPanel({
           : '重新生成后，新的二维码会显示在这里。'
 
   return (
-    <div className="service-desk k1-scan-qr-login lg-qrwrap">
+    <section className="service-desk k1-scan-qr-login lg-qr-section">
+    <div className="qx-sec-h"><span className="t">扫码登录</span><span className="hint">请在有效期内回到本机</span></div>
+    <div className="lg-qrwrap">
       <div className="lg-qrslot k-qrframe" data-testid="login-gate-qr-slot" role="group" aria-label={slotTitle}>
         {phase === 'qr-ready' && qr?.qrValue ? (
           <QRCodeSVG value={qr.qrValue} size={280} level="M" marginSize={1} />
@@ -244,11 +246,14 @@ export function ScanQrLoginPanel({
           <li><span className="sn">2</span><span>用手机相机或微信扫左边的二维码，在手机上完成手机号验证并确认。</span></li>
           <li><span className="sn">3</span><span>手机上确认后，回到这台机器等待页面跳转。</span></li>
         </ol>
+        <p className="lg-qr-note">手机上的确认不等于你已经登录；短信验证码验证的是这个号码能收到短信。请回到这台机器等待登录结果。</p>
         {notice ? <p className="lg-echo" role="status">{notice}</p> : null}
         {error ? <p className="lg-reason" role="alert">{error}</p> : null}
 
       </div>
     </div>
+    <p className="lg-qr-note lg-qr-expiry"><b>过期了怎么办</b><br />二维码过期就不能再用。请在这台机器上重新生成，再用手机扫描并确认。</p>
+    </section>
   )
 }
 
