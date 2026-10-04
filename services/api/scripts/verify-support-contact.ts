@@ -27,6 +27,7 @@ import {
   SUPPORT_CONTACT_CACHE_TTL_MS,
   SupportContactService,
   setSupportContactClock,
+  supportContactCacheSize,
   type PublicSupportContact,
 } from '../src/support-contact/support-contact.service'
 
@@ -286,8 +287,11 @@ async function main(): Promise<void> {
     assert.equal((await advance(() => shape({ columnOffset: -(TERMINAL_ONLINE_WINDOW_MS - 1), rowOffset: null }), SELF_CODE)).otherOnlineTerminalNearby, true)
     console.log('PASS 心跳列与心跳行取较新者，窗口边界严格小于')
 
-    assert.equal((await advance(() => shape({ columnOffset: -30_000, rowOffset: null, lifecycleStatus: 'maintenance' }), SELF_CODE)).otherOnlineTerminalNearby, true)
-    console.log('PASS 同机构维护中且有心跳 → true')
+    // 只算正常运营（active）的机器：维护中、已暂停、调试中即使有心跳也不能让用户去那台。
+    for (const status of ['maintenance', 'suspended', 'commissioning']) {
+      assert.equal((await advance(() => shape({ columnOffset: -30_000, rowOffset: null, lifecycleStatus: status }), SELF_CODE)).otherOnlineTerminalNearby, false, status)
+    }
+    console.log('PASS 同机构维护中 / 已暂停 / 调试中即使有心跳 → false')
 
     assert.equal((await advance(async () => {
       await shape({ columnOffset: -30_000, rowOffset: null })
@@ -298,6 +302,14 @@ async function main(): Promise<void> {
     assert.equal((await advance(async () => {}, undefined)).otherOnlineTerminalNearby, false)
     assert.equal((await advance(async () => {}, 'NO-SUCH-TERMINAL')).otherOnlineTerminalNearby, false)
     assert.equal((await advance(async () => {}, 'x'.repeat(129))).otherOnlineTerminalNearby, false)
+    // 公开接口不登录：换着终端号刷，缓存条数也不能无限涨；超长的号不进缓存。
+    const contactService = app.get(SupportContactService)
+    for (let i = 0; i < 620; i += 1) await contactService.getPublic(`probe-${i}`)
+    assert.ok(supportContactCacheSize() <= 500, `缓存条数应有上限，实际 ${supportContactCacheSize()}`)
+    const sizeBefore = supportContactCacheSize()
+    await contactService.getPublic('y'.repeat(300))
+    assert.ok(supportContactCacheSize() <= sizeBefore, '超长终端号不得进缓存')
+    console.log('PASS 公开接口缓存有上限，超长终端号不缓存')
     console.log('PASS 本机退役、本机没绑机构、不带参数、终端号不存在 → false')
 
     const beforeClear = await auditCount()

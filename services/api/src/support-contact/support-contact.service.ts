@@ -16,8 +16,8 @@ const KEY_MINIAPP = 'support.miniappPublished'
 const AUDIT_ACTION = 'support_contact.update'
 const TERMINAL_REF_MAX = 128
 
-/** 其它终端里不算「附近还有一台」：已退役、计划中（后台称待安装）。停用看 enabled。 */
-const EXCLUDED_OTHER_LIFECYCLES = ['retired', 'planned'] as const
+/** 公开接口不登录，缓存条数要有上限，否则换着终端号刷会让进程内存一直涨。 */
+const SUPPORT_CONTACT_CACHE_MAX_ENTRIES = 500
 
 export interface PublicSupportContact {
   servicePhone: string | null
@@ -55,6 +55,11 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>()
 
+/** 门禁用：当前缓存条数（核上限）。 */
+export function supportContactCacheSize(): number {
+  return cache.size
+}
+
 function storedText(value: string | null | undefined): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
@@ -74,7 +79,14 @@ export class SupportContactService {
     const hit = cache.get(key)
     if (hit && hit.expiresAt > now) return { ...hit.value }
     const value = await this.computePublic(key, now)
-    cache.set(key, { expiresAt: now + SUPPORT_CONTACT_CACHE_TTL_MS, value })
+    // 超长的号不缓存（本来也判 false）；到上限先清过期项，仍满就整表清掉。
+    if (key.length <= TERMINAL_REF_MAX) {
+      if (cache.size >= SUPPORT_CONTACT_CACHE_MAX_ENTRIES) {
+        for (const [k, entry] of cache) if (entry.expiresAt <= now) cache.delete(k)
+        if (cache.size >= SUPPORT_CONTACT_CACHE_MAX_ENTRIES) cache.clear()
+      }
+      cache.set(key, { expiresAt: now + SUPPORT_CONTACT_CACHE_TTL_MS, value })
+    }
     return { ...value }
   }
 
@@ -132,8 +144,8 @@ export class SupportContactService {
    *
    * 判据：本机 orgId 非空；同一 orgId 下除本机外，至少一台在线。
    * 在线见 support-contact.online.ts（terminals-admin.service.ts 第 328 行 + TERMINAL_ONLINE_WINDOW_MS）。
-   * 其它终端排除已退役、计划中（lifecycle planned）、停用（enabled=false）。
-   * 维护中、安装中、已暂停不因此排除。
+   * 其它终端只算正常运营的：enabled 且 lifecycleStatus === 'active'。计划中、调试中、维护中、
+   * 已暂停、已退役都不算——让用户去找一台正在维护或暂停的机器，就是合规要防的虚假指引。
    * 读不到本机、不带 terminalId、终端号超过 128 字、本机已退役、本机没绑机构 → false。
    */
   private async otherOnlineNearby(terminalId: string, now: number): Promise<boolean> {
@@ -145,7 +157,7 @@ export class SupportContactService {
         orgId: self.orgId,
         id: { not: self.id },
         enabled: true,
-        lifecycleStatus: { notIn: [...EXCLUDED_OTHER_LIFECYCLES] },
+        lifecycleStatus: 'active',
       },
       select: {
         lastHeartbeatAt: true,
