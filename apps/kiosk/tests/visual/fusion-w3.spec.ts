@@ -255,6 +255,92 @@ test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', 
   await expect(preview.locator('iframe')).toHaveCount(0)
 })
 
+function resumeUsbCapability(status: string) {
+  return {
+    status: 200,
+    json: {
+      terminalCode: 'KSK-001',
+      capabilities: [{
+        capabilityKey: 'usb_import',
+        status,
+        note: null,
+        configured: true,
+        updatedAt: '2026-10-04T00:00:00.000Z',
+      }],
+    },
+  }
+}
+
+async function installResumeUsbBridge(page: Page, hits: { count: number }): Promise<void> {
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const origin = new URL(page.url()).origin
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders })
+      return
+    }
+    if (request.method() === 'GET' && (path.endsWith('/status') || path.endsWith('/files'))) hits.count += 1
+    if (path.endsWith('/status')) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'W125-USB' } }),
+      })
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      headers: corsHeaders,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          present: true,
+          driveLabel: 'W125-USB',
+          files: [{ safeId: 'w125-resume', filename: '求职材料.pdf', extension: '.pdf', sizeBytes: 2048 }],
+        },
+      }),
+    })
+  })
+}
+
+test('resume usb card stays closed when usb import is not verified @w3-kiosk', async ({ page, api }) => {
+  const hits = { count: 0 }
+  await installResumeUsbBridge(page, hits)
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', resumeUsbCapability('not_verified'))
+
+  await page.goto('/resume/source')
+  const card = page.getByRole('button', { name: /U盘上传/ })
+  await expect(card).toBeDisabled()
+  await expect(card).toContainText('本机暂未开通')
+  await expect(page.getByText('等待插入U盘')).toHaveCount(0)
+  // 轮询是放行后立刻发出的。先看到拒绝文案，再等一小段，才能证明没有迟到的读盘请求。
+  await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 400) }))
+  expect(hits.count).toBe(0)
+})
+
+test('resume usb card opens when usb import is available @w3-kiosk', async ({ page, api }) => {
+  // 上一条的反向对照：配成可用后，卡片可以点，并且能看到盘里的文件。
+  await installResumeUsbBridge(page, { count: 0 })
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', resumeUsbCapability('available'))
+
+  await page.goto('/resume/source')
+  const card = page.getByRole('button', { name: /U盘上传/ })
+  await expect(card).toBeEnabled()
+  await card.click()
+  await expect(page.getByRole('button', { name: /求职材料\.pdf/ })).toBeVisible()
+})
+
 test('optimized resume previews inline without opening a new tab @w3-kiosk', async ({ page, api }) => {
   const optimizedResume = {
     basic: { name: '测试用户', city: '青岛' },
@@ -273,7 +359,7 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
   api.respond('GET', '/api/v1/resume/export/pricing', {
     status: 200,
-    json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' },
+    json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '免费试运营' },
   })
   api.respond('GET', '/api/v1/resume/records/resume-w3-inline-preview/optimize', {
     status: 200,
@@ -790,9 +876,13 @@ test('resume parse public quota rejection clears the local intent before the fai
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('/resume/report')
-  await expect(page.getByText('当前使用的人较多，请稍后再试', { exact: false })).toBeVisible()
-  await page.getByTestId('resume-report-primary').click()
-  await page.waitForURL('/resume/parse')
+  await expect(page.getByText('今天的 AI 次数用完了', { exact: false })).toBeVisible()
+  await expect(page.getByText('使用的人较多')).toHaveCount(0)
+  // Trace 已证实第二次请求会在 click 完成前返回；先监听临时解析路由，仍要求它真实经过。
+  await Promise.all([
+    page.waitForURL('/resume/parse'),
+    page.getByTestId('resume-report-primary').click(),
+  ])
   await page.waitForURL('/resume/report')
   expect(posts).toHaveLength(2)
   expect(posts[0].intent).toMatch(/^[A-Za-z0-9_-]{43}$/)
@@ -1634,6 +1724,121 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   expect(runtimeErrors).toEqual([])
 })
 
+const INTERVIEW_ID = 'interview-w3-public-fixture'
+const INTERVIEW_ANSWER = '我做过一个可访问性改造项目。'
+
+function armInterviewSession(api: ApiRouter): void {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/mock-interviews', { status: 200, json: interviewCreated })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/start`, { status: 200, json: interviewStarted })
+}
+
+async function beginTextInterview(page: Page): Promise<void> {
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await dialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
+  await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await page.getByRole('button', { name: '创建并开始练习' }).click()
+  await page.waitForURL(/\/interview\?stage=session/)
+}
+
+test('interview answer outage drops the unsent turn and restores the draft @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  const alert = page.locator('.interview-session__error')
+  await expect(alert).toContainText('你刚才的回答还在输入框里')
+  await expect(alert).toContainText('AI 现在停用')
+  await expect(page.locator('.interview-session__history')).not.toContainText(INTERVIEW_ANSWER)
+  await expect(page.getByRole('textbox', { name: '本题回答' })).toHaveValue(INTERVIEW_ANSWER)
+})
+
+test('ending an interview with no saved answers does not say retry @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, {
+    status: 400,
+    json: { success: false, error: { code: 'INTERVIEW_NO_ANSWERS', message: 'no answers' } },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  const alert = page.locator('.interview-session__error')
+  await expect(alert).toContainText('还没有记下的回答')
+  await expect(alert).not.toContainText('重试')
+  await expect(alert).not.toContainText('已保存')
+  const recovery = page.getByTestId('interview-finish-recovery')
+  await expect(recovery).not.toContainText('重试')
+  await expect(recovery.getByRole('button', { name: '继续答题', exact: true })).toBeVisible()
+  await recovery.getByRole('button', { name: '离开', exact: true }).click()
+  await page.waitForURL(/\/interview-service\/?$/)
+})
+
+test('ending an interview during an AI outage keeps the saved answers and offers a non-AI exit @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  // 「看面试要点」进的面试服务页会查一次服务健康状态。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await expect(page.locator('.interview-session__history')).toContainText('请说明一次解决困难的真实经历。')
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  const alert = page.locator('.interview-session__error')
+  await expect(alert).toContainText('你的回答已保存')
+  const recovery = page.getByTestId('interview-finish-recovery')
+  await recovery.getByRole('button', { name: '稍后再试生成报告', exact: true }).click()
+  await expect.poll(() => api.requestCount('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`)).toBe(2)
+  await expect(page).toHaveURL(/\/interview\?stage=session/)
+  await expect(alert).toContainText('你的回答已保存')
+  await recovery.getByRole('button', { name: '看面试要点', exact: true }).click()
+  await expect(page.locator('[data-kiosk-screen="interview-tips"]')).toBeVisible()
+  await expect(page).toHaveURL(/stage=tips/)
+})
+
+test('ending an interview during an AI outage does not claim answers were saved when none succeeded @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  await expect(page.locator('.interview-session__error')).toContainText('AI 暂时用不了，报告现在生成不了')
+  await expect(page.getByText('你的回答已保存')).toHaveCount(0)
+  await expect(page.getByTestId('interview-finish-recovery').getByRole('button', { name: '看面试要点', exact: true })).toBeVisible()
+})
+
+test('interview setup failure stays inside the first screen @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/mock-interviews', {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await dialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
+  await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await page.getByRole('button', { name: '创建并开始练习' }).click()
+  const alert = page.locator('.qx-ctabar [role="alert"]')
+  await expect(alert).toBeVisible()
+  await expect(alert).toBeInViewport()
+  await expect(alert).toContainText('AI 服务暂停中')
+})
+
 const COVERED_EVIDENCE = '我做过两年社群运营，最多同时管 6 个群'
 
 function advisorCompareSession() {
@@ -2133,4 +2338,36 @@ test('assistant voice deadline warns then preserves text conversation @w3-kiosk'
   await expect(input).toBeEnabled()
   await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
   expect(api.requestCount('POST', '/api/v1/trtc/session')).toBe(1)
+})
+
+test('W-118 resume diagnosis phone entry creates only one upload session @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  let creates = 0
+  let release!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
+  api.respondWith('POST', '/api/v1/upload-sessions', async () => {
+    creates += 1
+    // 正式构建只挂载一次；这里压住第一次请求，在它还在途时切走再切回，制造第二次挂载。
+    await held
+    return { status: 201, json: { success: true, data: {
+      sessionId: 'w118-resume-upload', uploadUrl: '/upload/phone',
+      uploadToken: 'w118-upload', controlToken: 'w118-control', expiresAt: '2099-01-01T00:00:00.000Z',
+    } } }
+  })
+  api.respond('GET', '/api/v1/upload-sessions/w118-resume-upload', { status: 200, json: { success: true, data: {
+    sessionId: 'w118-resume-upload', status: 'pending', purpose: 'resume_upload', mode: 'temporary',
+    file: null, requiresKioskConfirmation: false, expiresAt: '2099-01-01T00:00:00.000Z',
+  } } })
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /手机扫码/ }).click()
+  await expect.poll(() => creates).toBe(1)
+  try {
+    await page.getByRole('button', { name: /本机文件/ }).click()
+    await page.getByRole('button', { name: /手机扫码/ }).click()
+  } finally {
+    release()
+  }
+  await expect(page.getByText('请用手机微信或浏览器扫码', { exact: true })).toBeVisible()
+  await expect(page.locator('.resume-source-phone-session svg[width="150"]')).toBeVisible()
+  expect(creates).toBe(1)
 })

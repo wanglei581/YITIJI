@@ -19,6 +19,7 @@ const TYPE_META: Record<BenefitType, { label: string; tone: 'teal' | 'wheat' | '
   coupon: { label: '优惠券', tone: 'teal' },
   free_quota: { label: '免费次数', tone: 'wheat' },
   package_entitlement: { label: '套餐额度', tone: 'plum' },
+  ai_quota: { label: 'AI 次数', tone: 'teal' },
   subsidy_eligibility_hint: { label: '政策资格提示', tone: 'slate' },
 }
 

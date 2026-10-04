@@ -321,7 +321,7 @@ export const aiMockAdapter = {
   async getResumeExportPricing(_access?: ResumeReadAccess): Promise<ResumeExportPricing> {
     void _access
     await delay(40)
-    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' }
+    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '免费试运营' }
   },
 
   getResumeDraft(taskId: string, _token: string): Promise<ResumeDraftResponse> {

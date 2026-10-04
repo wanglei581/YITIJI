@@ -1,3 +1,4 @@
+import { formatCny } from './aiUsageDisplay'
 // ============================================================
 // 分能力调用量与成本（A-6，近 24 小时）—— 从 ai-services/index.tsx 拆出
 //
@@ -73,7 +74,7 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
                         ? <span className="text-neutral-400">未估算</span>
                         : (
                           <span className="text-neutral-700">
-                            ¥{row.cost.toFixed(4)}
+                            {formatCny(row.cost)}
                             {row.costState === 'partial' && (
                               <span className="ml-1 text-warning">+{row.unmeasured} 笔未估算</span>
                             )}
@@ -96,7 +97,7 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
                 <tr>
                   <td className="px-4 py-3 font-medium text-neutral-600">合计（按 token 计费部分）</td>
                   <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">{totalOperationCalls}</td>
-                  <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">¥{totalTokenBilledCost.toFixed(4)}</td>
+                  <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">{formatCny(totalTokenBilledCost)}</td>
                   <td className="px-4 py-3 text-neutral-500">
                     {totalUnmeasuredCalls > 0
                       ? `语音能力未含在内；另有 ${totalUnmeasuredCalls} 笔未采集，合计为下限`

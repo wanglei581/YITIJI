@@ -239,6 +239,7 @@ async function verifyRuntime(): Promise<void> {
   const requestedFileId = 'word-source'
   const derivedFileId = 'word-derived-pdf'
   let printTaskData: Record<string, unknown> | null = null
+  const piiScanTasks: Array<{ sourceFileId: string; kind: string; status: string; findings: unknown[] }> = []
   let pageCountUrl = ''
   const printPrisma = {
     fileObject: {
@@ -256,7 +257,15 @@ async function verifyRuntime(): Promise<void> {
         : null,
     },
     fairMaterialPrintBridge: { findFirst: async () => null },
-    documentProcessTask: { findFirst: async () => null },
+    // 本用例没有任何隐私检查任务（转换件建单走「未检查 → 只写审计放行」那条路）。
+    // 假表按闸门给的条件真实过滤，而不是无条件返回空 / 返回全部。
+    documentProcessTask: {
+      findMany: async ({ where }: { where: { sourceFileId?: string; kind?: string; status?: string } }) =>
+        piiScanTasks.filter((task) => (where.sourceFileId === undefined || task.sourceFileId === where.sourceFileId)
+          && (where.kind === undefined || task.kind === where.kind)
+          && (where.status === undefined || task.status === where.status)),
+      findFirst: async () => null,
+    },
     piiFinding: { count: async () => 0 },
     terminal: {
       findFirst: async () => ({ id: 'terminal-1', enabled: true, lifecycleStatus: 'active' }),

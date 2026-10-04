@@ -100,6 +100,15 @@ function imports(source: ts.SourceFile): string[] {
   })
 }
 
+/** 门禁拆分后仍检查脚本模块的实际引用与声明；进入业务源码即停止递归。 */
+function gateSources(file: string, seen = new Set<string>()): ts.SourceFile[] {
+  if (seen.has(file)) return []
+  seen.add(file)
+  const source = parse(file)
+  const children = imports(source).filter((dependency) => relative(apiRoot, dependency).startsWith('scripts/'))
+  return [source, ...children.flatMap((child) => gateSources(child, seen))]
+}
+
 function main(): void {
   const hostedModules = new Set(walk(sourceRoot).filter((file) => file.endsWith('.ts')
     && !relative(sourceRoot, file).startsWith('recruitment-hosting/')
@@ -113,18 +122,18 @@ function main(): void {
   let declared = 0
   let exempted = 0
   for (const file of gates) {
-    const source = parse(file)
-    const dependencies = imports(source).filter((dependency) => hostedModules.has(dependency))
+    const sources = gateSources(file)
+    const dependencies = sources.flatMap(imports).filter((dependency) => hostedModules.has(dependency))
     if (!dependencies.length) continue
     const name = relative(apiRoot, file).replace(/\\/g, '/')
     importers.add(name)
-    if (declaresFlag(source)) declared += 1
+    if (sources.some(declaresFlag)) declared += 1
     else if (Object.hasOwn(exemptions, name) && exemptions[name].trim()) exempted += 1
     else violations.push(`${name}: 未显式赋值 ${flag}，引用 ${dependencies.map((dependency) => relative(apiRoot, dependency)).join(', ')}`)
   }
   for (const [name, reason] of Object.entries(exemptions)) {
     if (!reason.trim()) violations.push(`${name}: 豁免理由为空`)
-    if (!importers.has(name)) violations.push(`${name}: 豁免过期，已不直接 import 托管模块`)
+    if (!importers.has(name)) violations.push(`${name}: 豁免过期，已不引用托管模块`)
   }
   console.log(`声明 ${declared} 个、豁免 ${exempted} 个、违规 ${violations.length} 个`)
   for (const violation of violations) console.error(`违规 ${violation}`)

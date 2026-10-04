@@ -176,8 +176,8 @@
         </view>
 
         <!-- 真实边界：小程序只组包拿码，钱在机器上付 -->
-        <view class="compliance-note">{{onsiteNotice}}</view>
-        <view class="compliance-note">{{noCancelNotice}}</view>
+        <view class="compliance-note">{{onsiteNoticeFree}}</view>
+        <view class="compliance-note">{{noCancelNoticeFree}}</view>
         <view class="compliance-note">页数全部由服务端按真实文件核定，本页不做本地推算。</view>
       </block>
 

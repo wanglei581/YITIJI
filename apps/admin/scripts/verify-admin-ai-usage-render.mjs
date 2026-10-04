@@ -18,10 +18,10 @@ await check('D2 读取中不出数字；读完只显示服务端给的数', asyn
   assert.doesNotMatch(textOf(tree), /已计费金额/)
   pending.resolve(SAMPLE())
   tree = await panel.view.settle()
-  assert.match(textOf(tree), /1\.10 元 \/ 100\.00 元/, '已计费金额 / 全局上限要用服务端数字')
+  assert.match(textOf(tree), /¥1\.1000 \/ ¥100\.0000/, '已计费金额 / 全局上限要用服务端数字')
   assert.match(textOf(tree), /4 次/)
   assert.match(textOf(tree), /未计量/, '要有一句话解释未计量')
-  assert.match(textOf(tree), /0\.05 元\/次/, '解释里要带服务端的保守单价')
+  assert.match(textOf(tree), /¥0\.0500\/次/, '解释里要带服务端的保守单价')
   assert.match(textOf(tree), /2 人/)
 })
 
@@ -111,7 +111,7 @@ await check('D5 当天 0 调用：如实显示 0，不装作没查到', async ()
   const tree = await panel.view.settle()
   assert.match(textOf(tree), /当天 0 次 AI 调用/)
   assert.match(textOf(tree), /当日该维度没有调用记录/)
-  assert.match(textOf(tree), /0\.00 元 \/ 100\.00 元/)
+  assert.match(textOf(tree), /¥0\.0000 \/ ¥100\.0000/)
 })
 
 await check('D6 失败可重试：只显示服务端中文说明，不显示错误码，重试后恢复', async () => {

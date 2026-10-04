@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
+const { plainAiMessageOf } = require('../../utils/user-error')
 
 // 模拟面试合规口径（合规窗口 9/29 裁定，C9 于 9/28 拍板）：练习表现等级整个不显示，也不换别的叫法——
 // 分档读起来像用人单位的结论。服务端的 overall.level 原样留在数据里（overallLevel），页面不渲染。
@@ -73,7 +74,7 @@ Page({
     } catch (err) {
       const code = (err && err.code) || ''
       if (code === 'INTERVIEW_SESSION_NOT_FOUND') this._fail('面试会话不存在或无权访问')
-      else this._fail((err && err.message) || 'AI 报告生成失败，请稍后重试')
+      else this._fail(plainAiMessageOf(err, 'AI 报告生成失败，请稍后重试'))
     }
   },
   _render(dto) {

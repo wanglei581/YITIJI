@@ -47,7 +47,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'VITE_API_MODE=http VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_API_BASE_URL=/api/v1 VITE_API_PROXY_TARGET=http://127.0.0.1:3010 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4182 --strictPort',
+    // W-125：U 盘闸门用例要能看见后台能力。没注入网桥令牌时，页面停在「未配置」短路上，维护中和已开通对不上。
+    command: 'VITE_API_MODE=http VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_API_BASE_URL=/api/v1 VITE_API_PROXY_TARGET=http://127.0.0.1:3010 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w2-synthetic-bridge-token pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4182 --strictPort',
     url: 'http://127.0.0.1:4182',
     reuseExistingServer: false,
     timeout: 180_000,

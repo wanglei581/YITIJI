@@ -16,7 +16,6 @@ import {
   COMPLIANCE_COPY,
   canCreateFormalPrintScanTask,
   type PrintScanCapabilityKey,
-  type PrintScanCapabilityStatus,
 } from '@ai-job-print/shared'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -38,6 +37,7 @@ import {
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { getTerminalId, subscribeTerminalIdentity } from '../../services/api/screensaver'
 import {
+  CAPABILITY_STATUS_NOTES,
   loadConfiguredCapabilities,
   resolveCapabilityOverride,
   type CapabilitiesLoadResult,
@@ -276,14 +276,6 @@ const CARD_CAPABILITY_KEY: Partial<Record<string, PrintScanCapabilityKey>> = {
   'id-photo': 'id_photo',
   convert: 'format_convert',
   sign: 'signature_stamp',
-}
-
-const CAPABILITY_STATUS_NOTES: Record<PrintScanCapabilityStatus, string | null> = {
-  available: null,
-  testing: '测试中，暂未对用户开放',
-  maintenance: '维护中，暂时不可用',
-  unsupported: '本机不支持此项服务',
-  not_verified: '本机暂未开通',
 }
 
 /** 反馈入口的 key。它不跳路由，而是就地打开匿名反馈弹层（见 handleQuickLink）。 */

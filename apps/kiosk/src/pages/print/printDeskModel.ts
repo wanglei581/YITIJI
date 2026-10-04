@@ -1,4 +1,6 @@
 import type { MaterialCheckSummary, PrintFileState } from './printMaterialSession'
+import type { DocumentProcessTaskView } from '../../services/api/materials'
+import type { PrintHandoffContext } from './printHandoff'
 
 export type PrintDeskStep = 'check' | 'preview'
 
@@ -124,4 +126,35 @@ export function resolvePrintDeskView(args: {
   if (args.requested === 'preview') return 'preview'
   if (args.requested === 'check') return 'check'
   return args.previewAuthorized ? 'preview' : 'check'
+}
+
+/** 数量来自材料检查保存的真实命中与裁决，不把“选择保留”说成“没有命中”。 */
+export function printPrivacyDecisionSummary(check: MaterialCheckSummary): string {
+  const { findingCount: total, redactedCount: redacted, keptCount: kept } = check
+  if (![total, redacted, kept].every((n) => Number.isSafeInteger(n) && n >= 0) || redacted + kept !== total) {
+    return '隐私检查结果以材料检查页为准'
+  }
+  if (total === 0 && check.redaction?.claim === 'not_supported') return '隐私检查结果以材料检查页为准'
+  if (total === 0) return '没发现需要遮挡的内容'
+  if (redacted === 0) return `发现 ${total} 处个人信息，你选择了全部保留，原样打印。`
+  return `发现 ${total} 处个人信息，遮挡 ${redacted} 处，保留 ${kept} 处。`
+}
+
+interface CheckResult {
+  inspection: DocumentProcessTaskView
+  normalize: DocumentProcessTaskView
+  pii: DocumentProcessTaskView
+  session: PrintHandoffContext
+}
+// 编号与文件共同隔离这一轮；只保留在途 Promise，结束后仍由交接上下文负责复水。
+const checksInFlight = new Map<string, Promise<CheckResult>>()
+
+export function shareMaterialChecks(key: string, run: () => Promise<CheckResult>): Promise<CheckResult> {
+  const existing = checksInFlight.get(key)
+  if (existing) return existing
+  const request = run().finally(() => {
+    if (checksInFlight.get(key) === request) checksInFlight.delete(key)
+  })
+  checksInFlight.set(key, request)
+  return request
 }

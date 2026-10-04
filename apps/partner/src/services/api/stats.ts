@@ -114,9 +114,9 @@ function buildDemoTrend(days: number): StatsBucket[] {
   ]
   return Array.from({ length: days }, (_, i) => {
     const [a, u, f] = BASE[i % BASE.length]!
-    // 用固定偏移标注演示日期（从 2026-05-20 起）
-    const d = new Date('2026-05-20T00:00:00Z')
-    d.setUTCDate(d.getUTCDate() + i)
+    // 固定演示参考日 2026-05-27，只给此前完整自然日，不随时钟伪装实时变化。
+    const d = new Date('2026-05-27T00:00:00Z')
+    d.setUTCDate(d.getUTCDate() - days + i)
     return { date: formatDate(d), added: a, updated: u, failed: f }
   })
 }
@@ -131,12 +131,9 @@ function buildDemoStats(period: StatsPeriod): PartnerStatsResponse {
   const prevSuccessBatches = prevBatches - Math.round(total.f * 0.9)
   const prevAdded = Math.round(total.a * 0.78)
 
-  const labels: Record<StatsPeriod, [string, string, string]> = {
-    week:    ['本周',   '2026-05-20', '2026-05-26'],
-    month:   ['本月',   '2026-05-01', '2026-05-30'],
-    quarter: ['本季度', '2026-04-01', '2026-06-30'],
-  }
-  const [label, from, to] = labels[period]
+  const label = `近 ${days} 天（截至昨天）`
+  const from = trend[0]!.date
+  const to = trend[trend.length - 1]!.date
 
   return {
     dataMode: 'demo',
@@ -164,23 +161,23 @@ function buildDemoStats(period: StatsPeriod): PartnerStatsResponse {
       totalBatches: {
         current: batches, previous: prevBatches,
         deltaPercent: Math.round(((batches - prevBatches) / prevBatches) * 100),
-        comparisonLabel: `vs 上${period === 'week' ? '周' : period === 'month' ? '月' : '季度'}`,
+        comparisonLabel: `对比此前 ${days} 天`,
       },
       successRate: {
         current: Math.round((successBatches / batches) * 100),
         previous: Math.round((prevSuccessBatches / prevBatches) * 100),
         deltaPercent: Math.round(((successBatches / batches) - (prevSuccessBatches / prevBatches)) * 100),
-        comparisonLabel: `vs 上${period === 'week' ? '周' : period === 'month' ? '月' : '季度'}`,
+        comparisonLabel: `对比此前 ${days} 天`,
       },
       totalAdded: {
         current: total.a, previous: prevAdded,
         deltaPercent: Math.round(((total.a - prevAdded) / prevAdded) * 100),
-        comparisonLabel: `vs 上${period === 'week' ? '周' : period === 'month' ? '月' : '季度'}`,
+        comparisonLabel: `对比此前 ${days} 天`,
       },
       totalFailed: {
         current: total.f, previous: Math.round(total.f * 1.2),
         deltaPercent: total.f === 0 ? null : -17,
-        comparisonLabel: `vs 上${period === 'week' ? '周' : period === 'month' ? '月' : '季度'}`,
+        comparisonLabel: `对比此前 ${days} 天`,
       },
     },
     trend,

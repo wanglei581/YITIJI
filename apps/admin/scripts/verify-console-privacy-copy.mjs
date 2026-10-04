@@ -6,6 +6,7 @@ console.log('\n=== 第四批实际渲染：审计与账号隐私 ===')
 const auditLabels = labels
 const { getAuditActionLabel } = labels
 const auditPresentation = runFile('apps/admin/src/routes/audit/auditPresentation.ts', {
+  './auditPayloadLabels': runFile('apps/admin/src/routes/audit/auditPayloadLabels.ts'),
   '../../lib/auditActionLabels': auditLabels,
   '../users/userPresentation': runFile('apps/admin/src/routes/users/userPresentation.ts'),
   '../screen/metricLabels': runFile('apps/admin/src/routes/screen/metricLabels.ts', { '@ai-job-print/shared': shared, '@ai-job-print/ui': ui }),
@@ -33,12 +34,24 @@ for (const [role, label] of [['system', '系统'], ['system-cli', '系统'], ['e
   const visible = auditPresentation.auditActorText({ ...auditRecord, actorRole: role })
   if (!visible.startsWith(label) || (label === '系统' && visible !== '系统')) fail(`操作人角色 ${role} 未中文化`)
 }
+// 真实抽屉：编号优先，只有内部 ID 时显示尾号，完整原值仅保留悬停。
+for (const numbered of [true, false]) {
+  const internalId = 'terminal-private-123456'
+  const payloadJson = JSON.stringify({ terminalId: internalId, ...(numbered ? { terminalCode: 'WALK-003' } : {}), billablePages: 12, terminalIds: [internalId], ...(numbered ? { terminalCodes: ['WALK-003'] } : {}) })
+  const record = { ...auditRecord, targetType: 'terminal', targetId: internalId, payloadJson }
+  const tree = auditDrawer.AuditDetailDrawer({ record, onClose: () => {} })
+  const visible = textOf(tree)
+  const expected = numbered ? 'WALK-003' : '终端（尾号 123456）'
+  if (!visible.includes(expected) || visible.includes(internalId) || !visible.includes('计费页数') || !visible.includes('终端编号')) fail('审计终端编号、尾号与字段标签未按真实 payload 显示')
+  if (!findTree(tree, (node) => node.props?.title === internalId)) fail('审计完整终端 ID 应保留在悬停')
+  if (auditPresentation.auditTargetText(record) !== expected) fail('审计目标对象应使用同样终端编号规则')
+}
 const sensitiveKeys = ['phone', 'contactPhone', 'mobile', 'telephone', 'email', 'password', 'passwd', 'pwd', 'access_token', 'refreshToken', 'apiKey', 'secret', 'private_key', 'credential', 'authorization', 'cookie', '手机号', '邮箱', '密码', '令牌', '密钥']
 for (const key of sensitiveKeys) {
-  const payloadJson = JSON.stringify({ reason: '测试原因', nested: [{ [key]: 'sensitive-value' }], unknown_key: 7 })
+  const payloadJson = JSON.stringify({ reason: '测试原因', nested: [{ [key]: 'sensitive-value' }], unknown_key: 7, second_unknown: '第二个字段' })
   const visible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, payloadJson }, onClose: () => {} }))
   if (!visible.includes('已隐藏') || visible.includes('sensitive-value')) fail(`抽屉敏感键 ${key} 必须显示已隐藏`)
-  if (!visible.includes('原因') || !visible.includes('测试原因') || !visible.includes('unknown_key') || !visible.includes('7')) fail('详情应翻译已知键并保留未知键和值')
+  if (!visible.includes('原因') || !visible.includes('测试原因') || !visible.includes('未登记字段') || !visible.includes('unknown_key') || !visible.includes('second_unknown') || !visible.includes('第二个字段') || !visible.includes('7')) fail('详情应翻译已知键并保留未知键和值')
   if (!visible.includes('request-long-value') || !visible.includes('browser-test')) fail('请求 ID 与浏览器标识必须在详情显示')
 }
 // r2：执行真实函数及抽屉，覆盖宽匹配误伤、嵌套字符串、签名与失败关闭。

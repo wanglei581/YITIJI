@@ -64,6 +64,8 @@
     "verify:member-favorites-benefits": "node -r @swc-node/register scripts/verify-member-favorites-benefits.ts",
     "verify:member-benefits-admin": "node -r @swc-node/register scripts/verify-member-benefits-admin.ts",
     "verify:benefit-activities": "node -r @swc-node/register scripts/verify-benefit-activities.ts",
+    "verify:ai-quota": "node -r @swc-node/register scripts/verify-ai-quota.ts",
+    "verify:ai-quota:postgres": "node -r @swc-node/register scripts/verify-ai-quota.ts --postgres",
     "verify:benefit-redemption": "node -r @swc-node/register scripts/verify-benefit-redemption.ts",
     "verify:feedback-notifications": "node -r @swc-node/register scripts/verify-feedback-notifications.ts",
     "verify:community-daily-brief": "node -r @swc-node/register scripts/verify-community-daily-brief.ts",

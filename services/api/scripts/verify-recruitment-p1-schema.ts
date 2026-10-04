@@ -150,7 +150,7 @@ function assertNoSqliteDrift(db: string, label: string): void {
 // P1-2a AiUsageRecord（AI 逐次计量账，额度与将来收费的底座）→ 107。
 // P1-2a AiUsageMonthlySummary（按月费用汇总，只有金额和次数，不含个人信息）→ 108。
 // 加表就要同步这个数，忘了改 build-and-verify 与 postgres-readiness 会一起红。
-const EXPECTED_MODEL_COUNT = 109
+const EXPECTED_MODEL_COUNT = 111
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
