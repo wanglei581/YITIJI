@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-10-04：派生告警只看正常运营的终端（跟第六次；分支 `claude/backend-hardening-20261004-alert-active-terminals`）
+
+- **问题：** 10/4 22:53 线上告警推送开通后，第一轮就推出「终端 new01 离线」。new01 是计划中、没起名、没绑机构、从未心跳的登记行，不是真机掉线。根因是 `derived-alerts.ts` 的 `collectDerivedAlerts` 取终端时没有条件，所有终端都进了离线 / 打印机异常判断；管理员告警中心用的是同一个收集器。
+- **改法：** 终端类告警只取 `enabled=true` 且 `lifecycleStatus='active'` 的终端（与 `pickup-order.service.ts` 放行口径一致），告警中心的计数与列表同一口径。收集结果新增 `terminalSubjectKeysInScope`；推送服务对上一轮有、这一轮没了的终端类告警，只有该终端仍在考察范围内时才推「已恢复」，被转成计划中 / 退役 / 停用 / 删除的静默移出，不推误导人的「已恢复」。
+- **验证：** `verify:admin-ops` 加计划中、已退役、停用三台（含旧心跳与缺纸），断言都不出告警、也不在考察范围内，正常运营的离线终端照常出；`verify:alert-push` 加「被筛掉不推已恢复」「仍在范围内回到在线照推已恢复」。三处反向变异（去掉筛选、只看启停不看生命周期、去掉已恢复抑制）都红。另跑 `verify:beijing-display-time`、`verify:queue-dispatch-printer-status`、后台 `verify:console-plain-copy`、Agent `verify:print-monitor-truth`。不改生产数据，new01 不删不改。
+- **Redis 库号（只读评估）：** 推送服务注释里「生产应使用约定的 14 号库」在任何部署文档里都没有出处（部署手册写 `/0`），整套应用本就共用一个库、各自用键前缀区分；已把注释改成实际口径。
+
 ## 2026-10-04 夜：法律文本激活与线上静态压缩
 
 - 22:13 隐私政策 2026-10-pilot-3、用户协议 2026-10-pilot-2 激活（总指挥用公开接口核过正文逐字一致，线上巡检 11 项全过）。

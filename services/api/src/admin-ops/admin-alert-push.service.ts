@@ -66,7 +66,8 @@ export async function deliverOpsAlert(input: {
 
 /**
  * 企业微信群机器人推送。告警仍由 admin-ops 的派生查询决定，本任务只复用它的节奏。
- * Redis DB 由 REDIS_URL 决定；生产应使用约定的 14 号库。
+ * Redis 库号由 REDIS_URL 决定，与本应用其它 Redis 键同库（部署手册 production-deployment-runbook.md 写的是 /0）；
+ * 本服务的键都带 `admin-alert-push:` 前缀，不需要单独的库。旧注释里「约定的 14 号库」在任何部署文档里都没有出处。
  */
 @Injectable()
 export class AdminAlertPushService {
