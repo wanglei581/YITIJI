@@ -1,5 +1,43 @@
 # 当前开发进度
 
+## 2026-10-04：公开只读接口 support-contact（服务电话与提示条件）
+
+一体机出错时按条件显示「拨打服务电话」「换一台机器」「用手机继续」。本段是后端判断。一体机和小程序的句子由主执行窗口接，本分支不改那三端。
+
+### 契约
+
+`GET /api/v1/public/support-contact?terminalId=<终端号>`，不需要登录。一体机手里是终端号 `terminalCode`（也有内部 id）。接口两种都接受：先按内部 id 查，没有再按终端号查。
+
+`200 { success: true, data: { servicePhone, serviceHours, otherOnlineTerminalNearby, miniappPublished } }`
+
+- `servicePhone`：管理员填写。没配返回 `null`，不会返回空串。
+- `serviceHours`：管理员填写。没配时公开接口返回「工作日 9:00–18:00」。
+- `miniappPublished`：后台开关，默认 false。库存值只有精确的 `true` 才算已发布。
+- 管理员 `GET /api/v1/admin/support-contact` 在服务时间没配时返回 `null`，表单才能区分「没填」和「改过」。公开接口才补上默认句子。
+- 读不到终端、不带 `terminalId`、终端号不存在、超过 128 字、本机已退役：`otherOnlineTerminalNearby=false`，仍然 200。
+
+### 判据
+
+同一机构（`orgId` 非空且相同）下、除本机外，至少一台终端在线。
+
+在线沿用 `services/api/src/terminals/printer-availability.ts` 的 `TERMINAL_ONLINE_WINDOW_MS`，以及 `terminals-admin.service.ts` `listTerminalsForAdmin` 第 328 行：有心跳，且最近心跳落在窗口内。心跳取终端列 `lastHeartbeatAt` 与最新一条 `TerminalHeartbeat.createdAt` 里较新的那个。不用 `lastSeenAt`（它是 `@updatedAt`，改名称也会刷新）。比较是严格小于窗口。
+
+其它终端不计入：已退役（`lifecycleStatus=retired`）、计划中（`lifecycleStatus=planned`，后台称待安装）、停用（`enabled=false`）。维护中、安装中、已暂停不因此排除。
+
+本机没绑机构 → false。本机已退役 → false，即使同机构还有别的在线终端。响应只有这一个布尔值，不带其它终端的编号、数量或位置。
+
+### 存储
+
+新建模型 `PlatformSetting`（键 `support.servicePhone`、`support.serviceHours`、`support.miniappPublished`）。没有可复用的平台级键值：一体机统一配置按终端，法务文档是带版本的正文，价目属于收费，线下网点电话属于招聘内容，Redis 上的 AI 开关会过期。本表没有 `endUserId`，不是会员数据，不进注销删除或置空清单。号码只由管理员写入，代码、迁移、种子和文档里不放号码。
+
+### 后台在哪一页改
+
+管理员后台现有页「法务文档版本」（路由 `/legal-docs`）里的「服务联系」卡片。不新页面、不新菜单。`PUT /api/v1/admin/support-contact` 仅管理员，与配置在同一事务里写审计 `support_contact.update`。公开读取不写审计。
+
+### 缓存与节流
+
+按请求里的 `terminalId` 做进程内缓存，不带参数单独一个键，缓存整份公开响应（含附近是否在线），5 分钟。后台改完配置不主动清缓存，最迟一个缓存周期后一体机和小程序才看到新值。节流与一体机 AI 能力公开读相同：`@TerminalScopedThrottle(30)`。
+
 ## 2026-10-04：第五次更新已上线；当晚线上 AI 与运维调整
 
 - 第五次更新：2026-10-04 15:56 上线（Deploy to zyidai.cn run 37187023341，15:50:38–15:56:09，success）。发布版本 main `e2e530a29`（#1224，第二父 `3faa07816`，树与 #1220 头一致）；回退标签 `prod-before-release5` → `8e8fd31e2`。发布开关 15:51:26 在 SSH 步骤开始后关闭。发布日志：PREFLIGHT OK 20、LEGAL 3、迁移 92 个无待执行、readiness OK。发布后公开只读探针 11 项通过；服务器 DEPLOY_SOURCE 与 e2e530a29 一致；三端产物 jsxDEV 0；KSK-001 心跳正常。**没验的：线上还没有人真的走过一张 0 元打印单到出纸。**

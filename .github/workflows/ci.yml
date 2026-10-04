@@ -735,6 +735,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:legal-doc-version
+          pnpm --filter @ai-job-print/api verify:support-contact
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-auth-races
           pnpm --filter @ai-job-print/api verify:member-step-up

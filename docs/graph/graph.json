@@ -16293,7 +16293,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 111,
+    "modelCount": 112,
     "models": [
       {
         "fieldCount": 7,
@@ -17414,6 +17414,12 @@
         "usedBy": [
           "services/api/src/common/recruitment-capability.ts"
         ]
+      },
+      {
+        "fieldCount": 4,
+        "name": "PlatformSetting",
+        "relations": [],
+        "usedBy": []
       },
       {
         "fieldCount": 10,
