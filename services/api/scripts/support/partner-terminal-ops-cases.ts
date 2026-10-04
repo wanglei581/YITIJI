@@ -177,7 +177,7 @@ async function verifyFailClosed(assert: Assert, prisma: PrismaService): Promise<
 function verifyPure(assert: Assert): void {
   assert(
     'T3a. 小样本压制 0→0、1→null、4→null、5→5',
-    suppressCount(0) === 0 && suppressCount(1) === null && suppressCount(4) === null && suppressCount(5) === 5,
+    suppressCount(-1) === 0 && suppressCount(0) === 0 && suppressCount(1) === null && suppressCount(4) === null && suppressCount(5) === 5 && suppressCount(12) === 12,
   )
   const four = summarizeOutput([{ status: 'completed', printOutcome: null, errorCode: null, count: 4 }])
   const five = summarizeOutput([{ status: 'completed', printOutcome: null, errorCode: null, count: 5 }])
@@ -453,7 +453,7 @@ export async function verifyTerminalOperations(
     )
     assert(
       'T4f. 0 单的终端保留 0；从未上报心跳的终端不在线、不推断离线',
-      a2?.serviceCount === 0 && a2?.output.settled === 0 && a2?.online === false && a2?.lastHeartbeatAt === null
+      a2?.serviceCount === 0 && a2?.output.settled === 0 && a2?.output.printed === 0 && a2?.output.successRate === null && a2?.online === false && a2?.lastHeartbeatAt === null
         && a2?.faults.reportedInWindow === false && a2?.faults.offlineCount === 0,
       JSON.stringify(a2),
     )

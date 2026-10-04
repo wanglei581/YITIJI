@@ -71,8 +71,8 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
-      # 招聘内容托管生产默认关。既有 verify 要看打开后的行为，必须显式打开。
-      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true'
+      # 主作业按生产配置（托管关闭）跑；需要打开的门禁在脚本里自己打开，元门禁 verify:recruitment-hosting-gate-declares 钉住。
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'false'
     steps:
       # Profile 等 diff 范围守卫需要 merge-base；PR 默认 shallow checkout 无法可靠计算。
       - uses: actions/checkout@v4
@@ -429,6 +429,10 @@ jobs:
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
         run: npx prisma db push --accept-data-loss
+
+      - name: Verify recruitment hosting gate declarations
+        working-directory: services/api
+        run: pnpm verify:recruitment-hosting-gate-declares
 
       - name: Verify alert push runtime gate
         working-directory: services/api
@@ -959,8 +963,8 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
-      # 与 build-and-verify 相同：既有 verify 显式打开招聘内容托管，未设置即关只由专门门禁覆盖。
-      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true'
+      # 主作业按生产配置（托管关闭）跑；需要打开的门禁在脚本里自己打开，元门禁 verify:recruitment-hosting-gate-declares 钉住。
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

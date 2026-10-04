@@ -419,7 +419,7 @@ export function isUsageRange(raw: string | null): raw is ScreenUsageRange {
   return raw !== null && (SAFE_RANGES as readonly string[]).includes(raw)
 }
 
-/** 近 7 天 × 24 小时：今天未到的小时是 null（不是 0），少于 5 的格子也是 null。 */
+/** 近 7 天 × 24 小时：今天未到的小时是 null（不是 0）；0 保留，1–4 的格子为 null。 */
 function heatDays(nowMs: number) {
   const hourNow = new Date(nowMs + 8 * 3600_000).getUTCHours()
   const profile = [0, 0, 0, 0, 0, 1, 3, 12, 60, 190, 360, 400, 250, 210, 330, 390, 370, 300, 240, 200, 160, 110, 40, 6]
@@ -431,7 +431,7 @@ function heatDays(nowMs: number) {
       hours: profile.map((p, h) => {
         if (d === 0 && h > hourNow) return null
         const v = Math.round(p * (weekend ? 0.55 : 1) * (0.82 + ((d * 24 + h) % 7) * 0.04))
-        return v < 5 ? null : v
+        return v > 0 && v < 5 ? null : v
       }),
     })
   }
@@ -448,9 +448,9 @@ function pulseBuckets(nowMs: number) {
   ]
   return lanes.map(([info, ai, print], k) => ({
     start: new Date(start + k * 300_000).toISOString(),
-    info: info < 5 ? null : info,
-    ai: ai < 5 ? null : ai,
-    print: print < 5 ? null : print,
+    info: info > 0 && info < 5 ? null : info,
+    ai: ai > 0 && ai < 5 ? null : ai,
+    print: print > 0 && print < 5 ? null : print,
   }))
 }
 
