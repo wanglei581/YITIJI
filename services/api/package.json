@@ -316,6 +316,7 @@
     "verify:companies": "node -r @swc-node/register scripts/verify-companies.ts",
     "verify:recruitment-emergency-scope": "node -r @swc-node/register scripts/verify-recruitment-emergency-scope.ts",
     "verify:official-channels": "node -r @swc-node/register scripts/verify-official-channels.ts",
+    "verify:recruitment-hosting-gate-declares": "node -r @swc-node/register scripts/verify-recruitment-hosting-gate-declares.ts",
     "verify:recruitment-hosting-default-off": "node -r @swc-node/register scripts/verify-recruitment-hosting-default-off.ts",
     "verify:offline-agencies-page": "node -r @swc-node/register scripts/verify-offline-agencies-page.ts",
     "verify:offline-agencies-contract": "node -r @swc-node/register scripts/verify-offline-agencies-contract.ts",

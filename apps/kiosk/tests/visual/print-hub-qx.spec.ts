@@ -265,7 +265,8 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
 
   await page.goto('/print-scan')
   await expect(page.locator('[data-testid="print-hub-state-device-off"]')).toBeVisible()
-  await expect(page.getByTestId('print-hub-fallback').getByText('打印扫描一体机离线', { exact: false })).toBeVisible()
+  await expect(page.getByTestId('print-hub-fallback').getByText('打印机离线 · 出纸类暂停', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('print-hub-fallback')).toContainText('打印机当前无法连接，请找现场工作人员')
   await expect(page.getByTestId('print-hub-cap-doc-print')).toBeDisabled()
   await expect(page.getByTestId('print-hub-cap-scan')).toBeDisabled()
   await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
@@ -473,7 +474,8 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
     await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
     await expect(page.getByTestId('print-hub-fallback')).toContainText(PAUSE_LABEL)
     await expect(page.getByTestId('print-hub-fallback')).toContainText(PAUSE_NOTICE)
-    await expect(page.getByText('打印扫描一体机离线')).toHaveCount(0)
+    // 这两种心跳表示打印队列闸门失败，不是连接中断；新旧离线文案都必须被拦住。
+    await expect(page.getByText(/离线|无法连接/)).toHaveCount(0)
     await docPrint.click({ force: true })
     await expect(page).toHaveURL(/\/print-scan$/)
     await shot(page, `G8-${status}-print-hub`)

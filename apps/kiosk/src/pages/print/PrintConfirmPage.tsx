@@ -179,6 +179,7 @@ export function PrintConfirmPage() {
   const benefitCardEnabled = API_MODE === 'http' && hasFileContext && !queryInvalid && !waitingCapability && !ordered
   const [benefits, setBenefits] = useState<BenefitsView>({ status: 'loading' })
   const [priceCfg, setPriceCfg] = useState<PriceCfgView>({ status: 'loading' })
+  const freePricing = quote.status === 'ready' ? quote.amountCents === 0 : priceCfg.status === 'ready' && priceCfg.unitCents === 0
 
   useEffect(() => {
     if (API_MODE !== 'http') return
@@ -286,13 +287,13 @@ export function PrintConfirmPage() {
       label: '色彩模式',
       value: colorAdjusted ? '彩色本机暂未开通，' : COLOR_MODE_LABEL[params.colorMode] ?? params.colorMode,
       off: colorAdjusted,
-      note: colorAdjusted ? '已按黑白报价' : undefined,
+      note: colorAdjusted ? (freePricing ? '已改为黑白' : '已按黑白报价') : undefined,
     },
     {
       label: '单双面',
       value: duplexAdjusted ? '双面本机暂未开通，' : DUPLEX_LABEL[params.duplex] ?? params.duplex,
       off: duplexAdjusted,
-      note: duplexAdjusted ? '已按单面报价' : undefined,
+      note: duplexAdjusted ? (freePricing ? '已改为单面' : '已按单面报价') : undefined,
     },
     { label: '版式', value: `${params.pagesPerSheet} 版/页` },
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
@@ -397,7 +398,7 @@ export function PrintConfirmPage() {
             setMergedMaterial(next)
             setPriceNotice({
               key: quoteKeyOf(next.printFileUrl, params),
-              text: '已生成合并版（简历+自我探索），费用已按合并后的最终文件重新报价。本次还没有建单，请核对新金额后再点确认。',
+              text: freePricing ? '已生成合并版（简历+自我探索），正在核定最终文件的页数。本次还没有建单，请核对页数后再点确认。' : '已生成合并版（简历+自我探索），费用已按合并后的最终文件重新报价。本次还没有建单，请核对新金额后再点确认。',
             })
             return
           }
@@ -446,7 +447,9 @@ export function PrintConfirmPage() {
           else setQuoteNonce((n) => n + 1)
           setPriceNotice({
             key: quoteKey,
-            text: current
+            text: current?.amountCents === 0
+              ? '页数与参数已更新，本次没有建单。请核对后再点确认打印。'
+              : current
               ? `价格已更新：你确认的是 ${formatCents(quote.amountCents)}，现在应付 ${formatCents(current.amountCents)}。本次没有建单，也没有扣款；请核对新金额后再点确认。`
               : '价格已更新，本次没有建单，也没有扣款。正在重新获取报价，请核对新金额后再确认。',
           })
@@ -484,13 +487,15 @@ export function PrintConfirmPage() {
   const redactionBadge = materialRedactionBadge(materialCheck?.redaction)
   const amountText = quote.status === 'ready' ? formatCents(quote.amountCents).replace(/^¥/, '') : ''
   const pill = PILL[screen]
+  const pricingPill = freePricing && screen === 'quoting' ? { tone: 'unknown' as const, label: '正在核定页数' }
+    : freePricing && screen === 'quote-failed' ? { tone: 'bad' as const, label: '页数核定未完成 · 未建单' } : pill
   const status = printerLoading && (screen === 'quoted' || screen === 'zero-amount')
     ? { tone: 'unknown' as const, label: '状态未知' }
-    : pill
+    : pricingPill
 
   // 金额变了（服务端 409 或生成了合并版）：按钮写明新金额，用户再点的就是这一笔。
   const reconfirmLabel = activeNotice && quote.status === 'ready'
-    ? `按新金额 ${formatCents(quote.amountCents)} 确认${appendEligible ? '（合并版）' : ''}`
+    ? quote.amountCents === 0 ? `核对后确认打印${appendEligible ? '（合并版）' : ''}` : `按新金额 ${formatCents(quote.amountCents)} 确认${appendEligible ? '（合并版）' : ''}`
     : null
 
   const primaryLabel = terminalSession === 'checking'
@@ -561,11 +566,11 @@ export function PrintConfirmPage() {
   ) : sidesOverLimit ? (
     <>{backButton()}{confirmButton('确认打印')}</>
   ) : screen === 'quoting' ? (
-    <>{backButton()}{waitButton('获取报价后可继续')}</>
+    <>{backButton()}{waitButton(freePricing ? '页数核定后可继续' : '获取报价后可继续')}</>
   ) : screen === 'quote-failed' ? (
     <>
       {backButton()}
-      <button type="button" className="qx-btn" data-variant="primary" onClick={() => setQuoteNonce((n) => n + 1)}>重新报价</button>
+      <button type="button" className="qx-btn" data-variant="primary" onClick={() => setQuoteNonce((n) => n + 1)}>{freePricing ? '重新核定页数' : '重新报价'}</button>
     </>
   ) : screen === 'benefit-unverified' ? (
     <>
@@ -611,7 +616,7 @@ export function PrintConfirmPage() {
             <li>隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</li>
           </>
         )}
-        <li>提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。</li>
+        <li>{freePricing ? '提交后请留在机器旁，任务确认后自动开始打印。' : '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。'}</li>
         <li>打印完成请从出纸口取件；如有质量问题请联系现场工作人员。</li>
       </ol>
     </section>
@@ -622,7 +627,7 @@ export function PrintConfirmPage() {
       // 直达打印台参数页（不经旧地址重定向）；是哪一份文件由交接上下文决定。
       back={{ label: '返回预览与参数', onBack: () => navigate('/print/desk?step=preview') }}
       // 稿 14 没有独立页头：小青区就是页头。标题留给读屏，视觉上由小青区承担。
-      title="报价确认"
+      title={freePricing ? '确认打印' : '报价确认'}
       status={status}
       terminalLabel="就业服务大厅"
       navbar={
@@ -631,6 +636,7 @@ export function PrintConfirmPage() {
     >
       <PrintConfirmView
         step={4}
+        freePricing={freePricing}
         screen={screen}
         invalidReason={
           (handoffInvalid ? problem : null)
@@ -646,11 +652,11 @@ export function PrintConfirmPage() {
         quote={quote}
         costCalcLabel={costCalcLabel}
         amountText={amountText}
-        benefitView={benefitView}
+        benefitView={freePricing ? null : benefitView}
         redactionText={redactionBadge?.text ?? null}
         materialDemo={materialCheck?.mode === 'demo'}
         printerBlocked={printerBlocked}
-        printerBlockedReason={printerBlockedReason}
+        printerBlockedReason={freePricing ? printerBlockedReason.replace('不会扣费。', '') : printerBlockedReason}
         terminalFailed={terminalSession === 'failed'}
         terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, '这台机器的安全校验没通过，请联系现场工作人员')}
         selfAssessment={selfAssessment}

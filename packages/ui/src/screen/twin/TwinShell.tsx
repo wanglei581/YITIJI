@@ -41,6 +41,8 @@ export interface TwinChrome {
 /** 页眉时间戳与横幅需要的最小信息；generatedAtText 由调用方按上海时区格式化。 */
 export interface TwinShellMeta {
   generatedAtText: string
+  /** 汇总块的缓存周期；不传时沿用实时取数时间提示。 */
+  summaryMinutes?: number
   status: 'ok' | 'degraded' | 'unavailable'
   failedSlices: number
   access: string | null
@@ -131,7 +133,11 @@ export interface TwinShellProps {
 
 export function TwinShell({ chrome, title, subtitle, layout, toolbar, meta, pollSeconds, failure, onRefresh, refreshing, hostingOff, variant, children }: TwinShellProps) {
   const headingLevel = chrome.headingLevel
-  const stamp = meta ? `数据时间 ${meta.generatedAtText} · 每 ${pollSeconds} 秒刷新` : '正在取数，未取到之前不显示任何数值'
+  const stamp = meta
+    ? meta.summaryMinutes
+      ? `汇总数据截至 ${meta.generatedAtText} · 每 ${meta.summaryMinutes} 分钟更新 · 页面每 ${pollSeconds} 秒刷新`
+      : `数据时间 ${meta.generatedAtText} · 每 ${pollSeconds} 秒刷新`
+    : '正在取数，未取到之前不显示任何数值'
   const banners: ReactNode[] = []
   if (meta && failure?.kind === 'offline') {
     banners.push(

@@ -102,6 +102,12 @@ expectMatches(hookSrc, /状态未知/, 'hook 含「状态未知」文案')
 // 打印闸门合上：两个心跳值各走自己的 case，不掉进 default（default 是「状态未知」，入口不会停）。
 const QUEUE_GATE_NOTICE = '打印机暂时不可用，请联系现场工作人员'
 const hubPageSrc = read('src/pages/print-scan/PrintScanHomePage.tsx')
+expectMatches(hubPageSrc, /device\.printer\.errorCode === 'paperEmpty'/, 'W-117 缺纸单独识别，不归入离线文案')
+expectMatches(hubPageSrc, /打印机缺纸，请找现场工作人员加纸/, 'W-117 缺纸提示加纸出路')
+expectMatches(hubPageSrc, /打印机异常，请找现场工作人员检查/, 'W-117 真实异常不说成离线')
+const hubView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
+expectMatches(hubView, /capabilities\.filter\(\(item\) => item\.actionable/, 'W-117 提示条只声明真可用的服务')
+expectMatches(hubView, /usableServices=.*usableServices/, 'W-117 可用服务进入设备异常提示条')
 const uploadSrc = read('src/pages/print/PrintUploadPage.tsx')
 const homeDomainSrc = read('src/pages/home/homeDomainStatus.ts')
 const homeViewSrc = read('src/pages/home/components/QxHomeView.tsx')

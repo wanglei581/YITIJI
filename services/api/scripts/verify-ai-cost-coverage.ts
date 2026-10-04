@@ -15,6 +15,8 @@
  */
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
+import { verifyAiCostUiCoverage } from './verify-ai-cost-ui-coverage'
+import { costTriStateRuntimeChecks, providerCompatRuntimeChecks } from './verify-ai-cost-runtime'
 
 const ROOT = join(__dirname, '..')
 const APPS_ROOT = join(ROOT, '..', '..', 'apps')
@@ -39,12 +41,14 @@ function readApps(rel: string): string {
 
 function assertContains(src: string, pattern: string | RegExp, label: string) {
   const ok = typeof pattern === 'string' ? src.includes(pattern) : pattern.test(src)
-  ok ? pass(label) : fail(label)
+  if (ok) pass(label)
+  else fail(label)
 }
 
 function assertNotContains(src: string, pattern: string | RegExp, label: string) {
   const bad = typeof pattern === 'string' ? src.includes(pattern) : pattern.test(src)
-  bad ? fail(label) : pass(label)
+  if (bad) fail(label)
+  else pass(label)
 }
 
 // ─── 1. 后端 AiOperation 联合类型 ─────────────────────────────────────────────
@@ -247,127 +251,7 @@ assertContains(logSvc, 'costCollectionSince', '成本三态: 暴露采集起始�
 assertNotContains(logSvc, 'costByOperation[e.operation] += e.estimatedCostCny ?? 0',
   '成本三态: 聚合不再用 ?? 0 把未采集吞成 0')
 
-// ─── 2. NON_TOKEN_BILLED_OPERATIONS ──────────────────────────────────────────
-
-assertContains(logSvc, 'NON_TOKEN_BILLED_OPERATIONS', 'NON_TOKEN_BILLED_OPERATIONS 已声明')
-assertContains(logSvc, "'voiceTranscribe'", 'voiceTranscribe 在 NON_TOKEN_BILLED_OPERATIONS')
-assertContains(logSvc, "'voiceSynthesize'", 'voiceSynthesize 在 NON_TOKEN_BILLED_OPERATIONS')
-
-// ─── 3. careerPlan 日志覆盖（service 层）────────────────────────────────────
-
-const careerSvc = read('src/ai/resume/career-plan.service.ts')
-assertContains(careerSvc, 'AiUsageAccumulator', 'career-plan: 使用 AiUsageAccumulator')
-assertContains(careerSvc, 'recordAiLog', 'career-plan: 存在 recordAiLog 方法')
-assertContains(careerSvc, "operation: 'careerPlan'", "career-plan: operation='careerPlan'")
-assertContains(careerSvc, 'callCount === 0', 'career-plan: callCount === 0 guard 存在')
-
-// ─── 4. fairVisitPlan 日志覆盖（service 层）─────────────────────────────────
-
-const fairVisitSvc = read('src/ai/resume/fair-visit-plan.service.ts')
-assertContains(fairVisitSvc, 'AiUsageAccumulator', 'fair-visit-plan: 使用 AiUsageAccumulator')
-assertContains(fairVisitSvc, 'recordAiLog', 'fair-visit-plan: 存在 recordAiLog 方法')
-assertContains(fairVisitSvc, "operation: 'fairVisitPlan'", "fair-visit-plan: operation='fairVisitPlan'")
-assertContains(fairVisitSvc, 'callCount === 0', 'fair-visit-plan: callCount === 0 guard 存在')
-
-// ─── 5. interviewQuestion / interviewReport 日志覆盖（service 层）───────────
-
-const interviewSvc = read('src/mock-interview/mock-interview.service.ts')
-assertContains(interviewSvc, 'AiUsageAccumulator', 'mock-interview service: 使用 AiUsageAccumulator')
-assertContains(interviewSvc, 'recordAiLog', 'mock-interview service: 存在 recordAiLog 方法')
-assertContains(interviewSvc, "'interviewQuestion'", "mock-interview service: operation='interviewQuestion'")
-assertContains(interviewSvc, "'interviewReport'", "mock-interview service: operation='interviewReport'")
-assertContains(interviewSvc, 'callCount === 0', 'mock-interview service: callCount === 0 guard 存在')
-
-// ─── 6. voiceTranscribe 日志覆盖（controller 层）────────────────────────────
-
-const mockInterviewCtrl = read('src/mock-interview/mock-interview.controller.ts')
-assertContains(mockInterviewCtrl, "'voiceTranscribe'", 'mock-interview ctrl: voiceTranscribe 日志')
-assertContains(mockInterviewCtrl, 'asrStartedAt', 'mock-interview ctrl: asrStartedAt 计时')
-assertContains(mockInterviewCtrl, 'tokenUsage: undefined', 'mock-interview ctrl: ASR tokenUsage 明确为 undefined')
-
-// voiceTranscribe 也在 ai.controller.ts（简历语音转写入口）
-const aiCtrl = read('src/ai/ai.controller.ts')
-assertContains(aiCtrl, "'voiceTranscribe'", 'ai.controller: voiceTranscribe 日志')
-assertContains(aiCtrl, 'asrStartedAt', 'ai.controller: asrStartedAt 计时')
-
-// ─── 7. voiceSynthesize 日志覆盖（controller 层）────────────────────────────
-
-assertContains(mockInterviewCtrl, "'voiceSynthesize'", 'mock-interview ctrl: voiceSynthesize 日志')
-assertContains(mockInterviewCtrl, 'ttsStartedAt', 'mock-interview ctrl: ttsStartedAt 计时')
-assertContains(mockInterviewCtrl, 'tts:tencent', 'mock-interview ctrl: TTS provider label 存在')
-
-// ─── 8. 前端 Admin AiOperation 同步 ──────────────────────────────────────────
-
-const adminTypes = readApps('admin/src/services/api/types.ts')
-for (const op of NEW_OPS) {
-  assertContains(adminTypes, `'${op}'`, `Admin types: AiOperation 包含 ${op}`)
-}
-assertContains(adminTypes, 'Record<AiOperation, number>', 'Admin types: byOperation 改用 Record<AiOperation, number>')
-
-// ─── 9. OPERATION_LABELS 覆盖新增操作 ────────────────────────────────────────
-
-// 「AI 服务管理」页 2026-09-30 拆文件（#1143）：成本明细表与 operation 中文名表移到同目录两个文件。
-// 断言对象是这一页的全部源码，三者合并后逐条检查，不放松任何一条。
-const aiServicesRoute = [
-  'admin/src/routes/ai-services/index.tsx',
-  'admin/src/routes/ai-services/AiOperationCostTable.tsx',
-  'admin/src/routes/ai-services/aiOperationLabels.ts',
-].map((rel) => readApps(rel)).join('\n')
-for (const op of NEW_OPS) {
-  assertContains(aiServicesRoute, op, `ai-services route: OPERATION_LABELS 覆盖 ${op}`)
-}
-
-// ─── 10. 合规：服务端不编造 ASR/TTS 成本（禁止 estimatedCostCny = 0 for NON_TOKEN_BILLED）
-
-// ASR / TTS record 调用里 estimatedCostCny 字段不应存在（undefined 即忽略），
-// 而不是 "0"（0 意味着「免费」，是编造）。
-const asr_record_block = (() => {
-  const idx = mockInterviewCtrl.indexOf("'voiceTranscribe'")
-  return idx >= 0 ? mockInterviewCtrl.slice(Math.max(0, idx - 300), idx + 300) : ''
-})()
-assertNotContains(asr_record_block, 'estimatedCostCny: 0', 'ASR log block 未编造 estimatedCostCny: 0')
-
-const tts_record_block = (() => {
-  const idx = mockInterviewCtrl.indexOf("'voiceSynthesize'")
-  return idx >= 0 ? mockInterviewCtrl.slice(Math.max(0, idx - 300), idx + 300) : ''
-})()
-assertNotContains(tts_record_block, 'estimatedCostCny: 0', 'TTS log block 未编造 estimatedCostCny: 0')
-
-// ─── 10b. Admin 全量 operation 明细表 + 成本诚实标注 ─────────────────────────
-//
-// 页面顶部卡片只覆盖 6 个高频能力。若没有全量明细表，
-// 职业规划 / 参会计划 / 模拟面试 / 语音这些能力的花费在 Admin 侧就是不可见的，
-// A-6 等于没做完。同时守住：非 token 计费能力不得显示 ¥0（等于谎称免费）。
-
-assertContains(aiServicesRoute, 'NON_TOKEN_BILLED_OPS', 'ai-services route: 声明 NON_TOKEN_BILLED_OPS')
-assertContains(aiServicesRoute, 'operationRows', 'ai-services route: 存在全量 operation 明细表数据')
-assertContains(aiServicesRoute, '未估算', 'ai-services route: 非 token 计费能力显示「未估算」而非 ¥0')
-assertContains(
-  aiServicesRoute,
-  /分能力调用量与成本/,
-  'ai-services route: 明细表分区标题存在',
-)
-// 明细表的成本单元格必须按 tokenBilled 分支渲染，不能无条件 toFixed 成金额
-assertContains(aiServicesRoute, 'row.tokenBilled', 'ai-services route: 成本按 tokenBilled 分支渲染')
-
-// ─── 10c. Admin 必须渲染成本三态，而不是把未采集画成 ¥0 ─────────────────────
-
-assertContains(adminTypes, 'AiOperationCost', 'Admin types: 引入成本三态 AiOperationCost')
-assertContains(adminTypes, 'Record<AiOperation, AiOperationCost>', 'Admin types: costByOperation 不再是纯 number')
-assertContains(adminTypes, 'unmeasuredCalls', 'Admin types: 暴露未采集笔数')
-assertContains(adminTypes, 'costCollectionSince', 'Admin types: 暴露采集起始日期')
-assertContains(aiServicesRoute, 'costState', 'ai-services route: 按成本三态渲染')
-assertContains(aiServicesRoute, "'uncollected'", 'ai-services route: 存在「未采集」态')
-assertContains(aiServicesRoute, 'usage.costCollectionSince', 'ai-services route: 如实标注历史成本不完整（带日期）')
-assertContains(aiServicesRoute, '不做回填', 'ai-services route: 明示不回填历史数据（D-2）')
-// token 计费能力的成本单元格绝不能无条件 toFixed —— 那正是 ¥0.0000 的来源
-assertNotContains(aiServicesRoute, 'usage.costByOperation.jobRecommend.toFixed',
-  'ai-services route: 岗位 AI 卡片不再无条件把未采集渲染成 ¥0')
-assertContains(aiServicesRoute, 'contractReview', 'ai-services route: 覆盖 contractReview')
-assertContains(adminTypes, 'contractReview', 'Admin types: AiOperation 包含 contractReview')
-const mockAdapter = readApps('admin/src/services/api/adminAiMockAdapter.ts')
-assertContains(mockAdapter, 'measuredCalls', 'Admin mock adapter: costByOperation 已改成三态结构')
-assertContains(mockAdapter, 'contractReview', 'Admin mock adapter: 覆盖 contractReview')
+verifyAiCostUiCoverage({ read, readApps, assertContains, assertNotContains, logSvc, NEW_OPS })
 
 // ─── 11. 运行时：ASR / TTS 日志真的落进 AiServiceLog ──────────────────────────
 //
@@ -513,172 +397,10 @@ async function runtimeChecks(): Promise<void> {
     where: { createdAt: { gte: since }, operation: { in: ['voiceTranscribe', 'voiceSynthesize'] } },
   })
 
-  await costTriStateRuntimeChecks(prisma, aiLog)
-  await providerCompatRuntimeChecks()
+  await costTriStateRuntimeChecks(pass, fail, prisma, aiLog)
+  await providerCompatRuntimeChecks(pass, fail)
 
   await prisma.onModuleDestroy()
-}
-
-/**
- * 运行时：改 AiProvider 接口后，**既有 provider 实现全部仍可调用**。
- *
- * AiProvider 是所有 AI 能力的公共接口。AI-COST-TRUTH 给四个 Output 类型加了
- * `usage?: AiUsageReport`。加成可选字段是为了让 mock + 5 个 stub 一行不改就继续编译；
- * 这里再从运行时证明它们真的还能构造和调用，而不是只靠 tsc 过了就算。
- */
-async function providerCompatRuntimeChecks(): Promise<void> {
-  const mods = await Promise.all([
-    import('../src/ai/providers/mock.provider'),
-    import('../src/ai/providers/claude.provider.stub'),
-    import('../src/ai/providers/openai.provider.stub'),
-    import('../src/ai/providers/qwen.provider.stub'),
-    import('../src/ai/providers/zhipu.provider.stub'),
-    import('../src/ai/providers/local.provider.stub'),
-  ])
-  const [mockMod, claudeMod, openaiMod, qwenMod, zhipuMod, localMod] = mods
-  const providers = [
-    ['mock', new mockMod.MockAiProvider()],
-    ['claude', new claudeMod.ClaudeProvider()],
-    ['openai', new openaiMod.OpenAiProvider()],
-    ['qwen', new qwenMod.QwenProvider()],
-    ['zhipu', new zhipuMod.ZhipuProvider()],
-    ['local', new localMod.LocalAiProvider()],
-  ] as const
-
-  for (const [label, provider] of providers) {
-    const ok = typeof provider.parseResume === 'function'
-      && typeof provider.optimizeResume === 'function'
-      && typeof provider.chatAssistant === 'function'
-      && typeof provider.classifyIntent === 'function'
-      && typeof provider.name === 'string'
-    if (ok) pass(`provider 兼容: ${label} 仍满足 AiProvider 接口`)
-    else fail(`provider 兼容: ${label} 不再满足 AiProvider 接口 —— 改接口破坏了既有实现`)
-  }
-
-  // mock provider 必须仍能真的跑完一次调用（stub 按设计抛 NotImplemented，不在此断言）
-  const mock = new mockMod.MockAiProvider()
-  try {
-    const parsed = await mock.parseResume({
-      fileId: 'verify-file', fileName: 'r.pdf', fileFormat: 'pdf', source: 'upload',
-    })
-    if (parsed.report) pass('provider 兼容: mock provider 仍可正常产出诊断报告')
-    else fail('provider 兼容: mock provider 未产出报告')
-
-    const chat = await mock.chatAssistant({ message: '你好' })
-    if (chat.reply) pass('provider 兼容: mock provider 仍可正常对话')
-    else fail('provider 兼容: mock provider 未产出回复')
-  } catch (error) {
-    fail(`provider 兼容: mock provider 调用抛错 —— ${error instanceof Error ? error.message : String(error)}`)
-  }
-
-  // mock 不打任何上游 → 成本确定为 0（「成本为 0」态），不得被算成「未采集」
-  const { AiUsageAccumulator } = await import('../src/ai/ai-log.service')
-  const report = new AiUsageAccumulator().toReport('mock')
-  if (report.callCount === 0) pass('provider 兼容: 空累计器 callCount===0（表示未产生上游调用）')
-  else fail('provider 兼容: 空累计器 callCount 应为 0')
-}
-
-/**
- * 运行时：「未采集 / 成本为 0 / 有成本」在接口层必须真的可区分。
- *
- * 静态断言只能证明类型里有 measuredCalls；证明不了聚合真的没把 null 吞成 0。
- * 这里落三条真实的 AiServiceLog，再回读 getUsage 断言三态各自的形状。
- *
- * ⚠️ 必须按**增量**断言，不能按绝对值。getUsage 聚合的是最近 24h 的**全表**，
- * 不只是本函数写的那三行。CI 两个 job 里 verify:career-plan 都紧邻在本门禁之前
- * 跑（且都没走 VERIFICATION_DATABASE_TARGET=isolated，共用同一个库），它会留下
- * 6 条 provider='llm:deepseek:stub' 的 careerPlan 行 —— 'stub' 命中
- * estimateCostCny 的 mock/stub 短路分支返回 0，于是这 6 条被如实记为
- * 「已采集，¥0」。绝对值断言 measuredCalls===0 因此在空库绿、在 CI 必红
- * （实测 {"cny":0,"calls":7,"measuredCalls":6}，7-6=1 正是本函数那条未采集行，
- * 说明实现是对的、断言的作用域错了）。
- *
- * 取前后差值既与库里既有数据无关，又把断言从 `>=1` / `===0` 收紧成精确增量，
- * 是**加强**而不是放宽 —— 三态诚实性（未采集绝不折叠成 ¥0）仍由
- * `careerPlan` 的 Δcalls===1 且 ΔmeasuredCalls===0 守住。
- */
-async function costTriStateRuntimeChecks(
-  prisma: { aiServiceLog: { deleteMany: (a: unknown) => Promise<unknown> } },
-  aiLog: import('../src/ai/ai-log.service').AiLogService,
-): Promise<void> {
-  const since = new Date()
-  await new Promise((r) => setTimeout(r, 5))
-
-  const before = await aiLog.getUsage('AiServiceLog')
-
-  // ① 有成本：真实厂商标签 + token → 可定价
-  aiLog.record({
-    taskId: null, provider: 'llm:deepseek:deepseek-chat', operation: 'contractReview',
-    latencyMs: 10, status: 'success',
-    tokenUsage: { promptTokens: 1_000_000, completionTokens: 1_000_000, totalTokens: 2_000_000 },
-  })
-  // ② 未采集：打到模型了但上游没回 usage → 成本必须留空
-  aiLog.record({
-    taskId: null, provider: 'llm:deepseek:deepseek-chat', operation: 'careerPlan',
-    latencyMs: 10, status: 'success',
-  })
-  // ③ 成本为 0：mock provider 压根不打上游 → 0 是实测
-  aiLog.record({
-    taskId: null, provider: 'mock', operation: 'jobMatch',
-    latencyMs: 10, status: 'success',
-  })
-  await aiLog.flush()
-
-  const usage = await aiLog.getUsage('AiServiceLog')
-
-  // 同一条 getUsage 聚合路径的前后差值 —— 断言的仍是 getUsage 的三态聚合行为，
-  // 没有绕开它去直接读表（绕开就等于不再验「聚合有没有把 null 吞成 0」）。
-  function deltaOf(operation: 'contractReview' | 'careerPlan' | 'jobMatch') {
-    const a = usage.costByOperation[operation]
-    const b = before.costByOperation[operation]
-    return {
-      cny: Math.round((a.cny - b.cny) * 10_000) / 10_000,
-      calls: a.calls - b.calls,
-      measuredCalls: a.measuredCalls - b.measuredCalls,
-    }
-  }
-
-  const measured = deltaOf('contractReview')
-  if (measured.calls === 1 && measured.measuredCalls === 1 && measured.cny > 0) {
-    pass('三态运行时: 有成本 → Δ measuredCalls===1 且 Δcny>0（真实厂商标签可定价）')
-  } else {
-    fail(`三态运行时: 有成本态错误 —— Δ${JSON.stringify(measured)}`)
-  }
-
-  const uncollected = deltaOf('careerPlan')
-  if (uncollected.calls === 1 && uncollected.measuredCalls === 0) {
-    pass('三态运行时: 未采集 → Δcalls===1 但 Δ measuredCalls===0（未被吞成 ¥0）')
-  } else {
-    fail(`三态运行时: 未采集态错误 —— Δ${JSON.stringify(uncollected)}；未采集被当成 0 会让付费调用显示免费`)
-  }
-
-  const zero = deltaOf('jobMatch')
-  if (zero.calls === 1 && zero.measuredCalls === 1 && zero.cny === 0) {
-    pass('三态运行时: 成本为 0 → Δ measuredCalls===1 且 Δcny===0（与「未采集」形状不同）')
-  } else {
-    fail(`三态运行时: 成本为 0 态错误 —— Δ${JSON.stringify(zero)}`)
-  }
-
-  // 「未采集」与「成本为 0」必须真的长得不一样，否则三态形同虚设
-  if (uncollected.measuredCalls !== zero.measuredCalls) {
-    pass('三态运行时: 未采集 与 成本为 0 在接口层可区分')
-  } else {
-    fail('三态运行时: 未采集 与 成本为 0 形状相同 —— 前端无法诚实展示')
-  }
-
-  const unmeasuredDelta = usage.unmeasuredCalls - before.unmeasuredCalls
-  if (unmeasuredDelta === 1) pass('三态运行时: 顶层 unmeasuredCalls 已计数（总成本自曝是下限）')
-  else fail(`三态运行时: 顶层 unmeasuredCalls 未计数 —— Δ${unmeasuredDelta}，应为 1`)
-
-  if (/^\d{4}-\d{2}-\d{2}$/u.test(usage.costCollectionSince)) {
-    pass(`三态运行时: costCollectionSince 有效（${usage.costCollectionSince}）`)
-  } else {
-    fail(`三态运行时: costCollectionSince 非法 —— ${usage.costCollectionSince}`)
-  }
-
-  await prisma.aiServiceLog.deleteMany({
-    where: { createdAt: { gte: since }, operation: { in: ['contractReview', 'careerPlan', 'jobMatch'] } },
-  })
 }
 
 // ─── 结果 ─────────────────────────────────────────────────────────────────────

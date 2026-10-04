@@ -21,3 +21,29 @@ test.describe('宣传屏（mock 口径）', () => {
     }
   })
 })
+
+const uploadCopy = [
+  '不要上传：招聘简章；写了用人单位和岗位、人数、薪资、条件或报名方式的图片或视频；列出企业或岗位的招聘会海报；企业或商业招聘网站的二维码。',
+  '可以上传：机构介绍和服务时间；就业政策和补贴宣传；不指向具体单位和岗位的讲座、培训通知；本机使用指引。',
+  '拿不准的先不放：只写时间地点的招聘会预告；机构招聘自己工作人员的公告；人才引进政策里附带的岗位表。',
+  '图片和视频里的招聘信息，同样算发布招聘信息。',
+]
+for (const mode of ['off', 'error', 'on']) {
+  test(`上传提示：托管 ${mode}，原文与上传动作`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('mock:recruitment-hosting', value), mode)
+    const guards = await openAuthed(page, '/screensaver')
+    await settleAdminPage(page, guards)
+    const notice = page.getByRole('note', { name: '上传前请先看' })
+    // 等上传区挂载后再检查明确开启时提示消失，防止空页面假通过。
+    await expect(page.getByRole('heading', { name: '上传素材' })).toBeVisible()
+    if (mode === 'on') await expect(notice).toHaveCount(0)
+    else {
+      await expect(notice).toBeVisible()
+      for (const copy of uploadCopy) await expect(notice.getByText(copy, { exact: true })).toBeVisible()
+    }
+    await expect(page.getByText(/待机宣传屏属线下一体机运营广告位/)).toBeVisible()
+    await page.locator('input[type=file]').setInputFiles({ name: 'notice.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jVwAAAABJRU5ErkJggg==', 'base64') })
+    await page.getByPlaceholder('例：就业服务宣传海报').fill('上传提示测试')
+    await expect(page.getByRole('button', { name: '上传', exact: true })).toBeEnabled()
+  })
+}

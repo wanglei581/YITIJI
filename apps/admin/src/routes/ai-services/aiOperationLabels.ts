@@ -9,28 +9,7 @@
 import type { AiOperation } from '../../services/api'
 
 /** AI 服务日志 operation → 中文名（从 index.tsx 原样拆出，语义未动）。 */
-export const OPERATION_LABELS: Record<AiOperation, string> = {
-  parseResume:        '简历解析',
-  optimizeResume:     '简历优化',
-  adjustResumeLayout: '排版调整',
-  generateResume:     'AI 简历生成',
-  chatAssistant:      'AI 对话',
-  classifyIntent:     '意图分类',
-  jobRecommend:       '岗位 AI 推荐',
-  jobExplain:         'AI 岗位解读',
-  jobMatch:           '岗位匹配参考',
-  // A-6 成本可见性补齐
-  careerPlan:         '职业规划',
-  fairVisitPlan:      '招聘会参观计划',
-  interviewQuestion:  '模拟面试出题',
-  interviewReport:    '面试报告生成',
-  voiceTranscribe:    '语音转写 (ASR)',   // 按时长计费，成本 Admin 展示 N/A
-  voiceSynthesize:    '语音播报 (TTS)',   // 按字符计费，成本 Admin 展示 N/A
-  // 自我探索 · 倾向参考（2026-08-01）
-  selfAssessment:     '自我探索 · 倾向参考',
-  // 合同审查（2026-08-17）：此前完全不落 AiServiceLog，花费在统计里根本查不到
-  contractReview:     '合同审查',
-}
+export { AI_OPERATION_LABELS as OPERATION_LABELS } from '@ai-job-print/shared'
 
 /**
  * 不按 token 计费的操作：ASR 按音频时长、TTS 按字符数。
