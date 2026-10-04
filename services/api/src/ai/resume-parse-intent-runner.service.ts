@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { FilesService } from '../files/files.service'
 import { AiPublicQuotaService, type AiPublicQuotaContext } from './ai-public-quota.service'
-import { isOurSideProviderFailure } from './llm/llm-failure'
+import { isRefundableAiFailure, llmExceptionCode } from './llm/llm-failure'
 import { AiService, type ResumeParseIntentBinding } from './ai.service'
 import type { ParseResumeInput, ParseResumeOutput } from './interfaces/ai-provider.interface'
 import { resumeParseAnonymousAccessToken } from './resume-parse-intent'
@@ -15,9 +15,10 @@ import {
  * Orchestrates one keyed resume parse.
  * Owner, proof, and payload checks happen before any file probe. A readable
  * file is required before quota and before the provider. Only the startProvider
- * CAS winner calls the provider. A thrown provider error is not released and is
- * not retried here. A completed response with an our-side provider failure
- * releases this intent's public count once. User-file problems stay charged.
+ * CAS winner calls the provider. Provider failures (thrown, or a completed
+ * response carrying a failCode) release this intent's public count once — a
+ * failure does not charge, a success charges exactly once. The provider is never
+ * retried here. User-file problems and content-moderation blocks stay charged.
  * A file that disappears after this check can still be charged; that window is not closed here.
  */
 @Injectable()
@@ -62,16 +63,23 @@ export class ResumeParseIntentRunner {
       if (followed) return followed
       return this.processing(started.submission.intentId, endUserId, intentKey, proof)
     }
-    const output = await this.ai.submitResumeParse(this.whitelist(dto), endUserId, {
+    const release = () => this.quota.releaseResumeParseCharge({
       intentId: started.submission.intentId,
-      accessToken: binding.accessToken,
-    })
-    if (output.status === 'failed' && isOurSideProviderFailure(output.failCode)) {
-      await this.quota.releaseResumeParseCharge({
+      context: quotaContext,
+    }).catch(() => undefined)
+    let output: Awaited<ReturnType<typeof this.ai.submitResumeParse>>
+    try {
+      output = await this.ai.submitResumeParse(this.whitelist(dto), endUserId, {
         intentId: started.submission.intentId,
-        context: quotaContext,
-      }).catch(() => undefined)
+        accessToken: binding.accessToken,
+      })
+    } catch (error) {
+      // 失败不扣：模型这一环抛错，用户没拿到结果，退回本次公共次数（只减计数，不删去重标记，同一意图不会再打一次模型）。
+      // 内容审核拦下用户自己的内容不退。
+      if (isRefundableAiFailure(llmExceptionCode(error) ?? 'AI_UNKNOWN')) await release()
+      throw error
     }
+    if (output.status === 'failed' && isRefundableAiFailure(output.failCode)) await release()
     const completed = await this.submission.complete(request)
     if (!completed.advanced) {
       // Member deletion keeps a revoked intent tombstone. Never return the

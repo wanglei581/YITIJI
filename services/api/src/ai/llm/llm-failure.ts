@@ -77,6 +77,18 @@ const OUR_SIDE_PROVIDER_FAILURES: ReadonlySet<string> = new Set([
   AI_PROVIDER_UNREACHABLE,
 ])
 
+/**
+ * 简历解析的公共次数要不要退：**失败不扣、成功只扣一次**（总指挥 10/4）。
+ * 只要失败发生在模型这一环（带机器码：上游 4xx / 5xx、限流、超时、忙、连不上、账户、模型名、空回复、
+ * 输出不合格、未配置……），用户都没拿到结果，一律退。唯一不退的是内容审核拦下了用户自己的内容。
+ * 用户文件本身的问题（无法提取文本、为空）在进模型之前就失败，没有机器码，照旧扣。
+ */
+const NON_REFUNDABLE_AI_FAILURES: ReadonlySet<string> = new Set(['AI_CONTENT_BLOCKED'])
+
+export function isRefundableAiFailure(code: string | null | undefined): boolean {
+  return typeof code === 'string' && code.trim() !== '' && !NON_REFUNDABLE_AI_FAILURES.has(code)
+}
+
 export function isOurSideProviderFailure(code: string | null | undefined): boolean {
   return typeof code === 'string' && OUR_SIDE_PROVIDER_FAILURES.has(code)
 }

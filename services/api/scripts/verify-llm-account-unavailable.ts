@@ -23,6 +23,7 @@ import {
   AI_RATE_LIMITED,
   AI_UNKNOWN,
   isOurSideProviderFailure,
+  isRefundableAiFailure,
   llmExceptionCode,
   llmExceptionMessage,
   llmUpstreamStatusError,
@@ -131,6 +132,14 @@ function classifyMatrix(): void {
   assert.equal(isOurSideProviderFailure(AI_PROVIDER_REQUEST_ERROR), false)
   assert.equal(isOurSideProviderFailure(AI_UNKNOWN), false)
   assert.equal(isOurSideProviderFailure(undefined), false)
+  // 退次口径：失败不扣、成功只扣一次。模型这一环的失败都退，只有内容审核拦下用户内容不退；没有机器码（文件本身的问题）不退。
+  for (const code of [AI_PROVIDER_ACCOUNT_UNAVAILABLE, AI_PROVIDER_MODEL_INVALID, AI_PROVIDER_ERROR, AI_PROVIDER_UNREACHABLE,
+    AI_PROVIDER_REQUEST_ERROR, 'AI_RATE_LIMITED', 'AI_DIAGNOSIS_TIMEOUT', 'AI_BUSY', 'AI_EMPTY_RESPONSE', AI_UNKNOWN]) {
+    assert.equal(isRefundableAiFailure(code), true, `${code} 应退次`)
+  }
+  assert.equal(isRefundableAiFailure('AI_CONTENT_BLOCKED'), false, '内容审核拦下用户内容不退')
+  assert.equal(isRefundableAiFailure(undefined), false, '没有机器码（文件本身的问题）不退')
+  assert.equal(isRefundableAiFailure(''), false)
   console.log('classifier matrix ok')
 }
 
@@ -248,7 +257,7 @@ async function quotaRefund(): Promise<void> {
   let rolls = 0
   const quota = { async rollback() { rolls += 1 } }
   const refund = (result: { status?: string; failCode?: string }) =>
-    result.status === 'failed' && isOurSideProviderFailure(result.failCode)
+    result.status === 'failed' && isRefundableAiFailure(result.failCode)
   await runWithPublicQuota(quota as never, { keys: ['k'] }, {}, async () => ({
     status: 'failed',
     failCode: AI_PROVIDER_ACCOUNT_UNAVAILABLE,
@@ -272,9 +281,10 @@ async function quotaRefund(): Promise<void> {
   await runWithPublicQuota(quota as never, { keys: ['k'] }, {}, async () => ({
     status: 'failed',
     failCode: AI_UNKNOWN,
-    failReason: '未获取到简历文本，无法生成诊断报告',
+    failReason: 'AI 诊断服务暂时不可用，请稍后重试',
   }), refund)
-  assert.equal(rolls, 3, 'empty text does not release the public count')
+  // 模型这一环出了没归类的错（AI_UNKNOWN）：用户没拿到结果，退。真实的「文件为空」不带机器码（上面 empty.failCode === undefined 已断言），不退。
+  assert.equal(rolls, 4, 'an unclassified failure in the model step releases the public count')
   console.log('legacy quota release ok')
 }
 
@@ -355,14 +365,16 @@ async function intentRelease(): Promise<void> {
   }
   const files = { async assertContentAccessibleForEndUser() { return undefined } }
   const runner = new ResumeParseIntentRunner(submission as never, quota, ai as never, files as never)
-  const context = { member: 'member-a', terminal: null, ip: '203.0.113.10' }
+  // 会员、终端、IP 三项都要退（总指挥 10/4：上游一次故障不能把整台机、整个场地当天的次数烧掉）。
+  const context = { member: 'member-a', terminal: 'KSK-001', ip: '203.0.113.10' }
+  const total = () => [...counts.values()].reduce((sum, value) => sum + value, 0)
   const dto = { fileId: 'file-1', fileName: 'a.pdf', fileFormat: 'pdf', source: 'upload' as const }
 
   const accountId = 'a'.repeat(64)
   canned.set(accountId, { taskId: accountId, status: 'failed', failCode: AI_PROVIDER_ACCOUNT_UNAVAILABLE, failReason: 'AI 暂时不可用，可以先打印原件或手动填写简历' })
   const account = await runner.submit(dto, 'member-a', context, accountId, token())
   assert.equal(account.failCode, AI_PROVIDER_ACCOUNT_UNAVAILABLE)
-  assert.ok(counts.size > 0, 'account failure was charged before release')
+  assert.equal(counts.size, 3, 'account failure was charged on member, terminal and ip before release')
   assert.ok([...counts.values()].every((value) => value === 0), 'account failure released the charged counters')
 
   const fileId = 'b'.repeat(64)
@@ -371,11 +383,33 @@ async function intentRelease(): Promise<void> {
   assert.ok([...counts.values()].some((value) => value > 0), 'unreadable file stays charged')
   const charged = [...counts.values()].reduce((sum, value) => sum + value, 0)
 
+  assert.equal(charged, 3, 'unreadable file charged once on each of the three counters')
+
+  // 模型这一环抛错：退次（失败不扣）。
   thrown = new Error('provider down')
   const crashId = 'c'.repeat(64)
   await assert.rejects(() => runner.submit(dto, 'member-a', context, crashId, token()))
-  const afterCrash = [...counts.values()].reduce((sum, value) => sum + value, 0)
-  assert.ok(afterCrash > charged, 'a thrown provider error stays charged')
+  assert.equal(total(), charged, 'a thrown provider error is released')
+  thrown = null
+
+  // 超时、普通 4xx：退次。
+  for (const [id, code] of [['d'.repeat(64), 'AI_DIAGNOSIS_TIMEOUT'], ['e'.repeat(64), AI_PROVIDER_REQUEST_ERROR]] as const) {
+    canned.set(id, { taskId: id, status: 'failed', failCode: code, failReason: 'AI 诊断服务暂时不可用，请稍后重试' })
+    await runner.submit(dto, 'member-a', context, id, token())
+    assert.equal(total(), charged, `${code} is released`)
+  }
+  // 内容审核拦下用户内容：照扣。
+  const blockedId = 'f'.repeat(64)
+  canned.set(blockedId, { taskId: blockedId, status: 'failed', failCode: 'AI_CONTENT_BLOCKED', failReason: '这个问题我不能回答' })
+  await runner.submit(dto, 'member-a', context, blockedId, token())
+  assert.equal(total(), charged + 3, 'content-moderation block stays charged')
+  // 成功：三项各只扣一次；同一意图重放不再扣。
+  const okId = '1'.repeat(64)
+  canned.set(okId, { taskId: okId, status: 'completed' } as never)
+  await runner.submit(dto, 'member-a', context, okId, token())
+  assert.equal(total(), charged + 6, 'success charges exactly once on each counter')
+  await runner.submit(dto, 'member-a', context, okId, token())
+  assert.equal(total(), charged + 6, 'replaying the same successful intent does not charge again')
 
   const source = readFileSync(join(here, '../src/ai/resume-parse-intent-runner.service.ts'), 'utf8')
   assert.equal(source.includes('rollback'), false)
