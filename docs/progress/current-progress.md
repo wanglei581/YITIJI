@@ -1,6 +1,8 @@
 # 当前开发进度
 
-## 2026-10-04：AI 按人次数 Q3——余量接口与后台（worktree `bh-g-q3`，基线 Q1 账本 `9c4d3ed3c`）
+## 2026-10-04：AI 按人次数 Q3——余量接口与后台（分支 `claude/backend-hardening-20261004-ai-quota-q3`，叠在 Q1 #1216 上；Grok 实现、Claude 审）
+
+- **协调方审核补充：** 两条新门禁登记进 CI 两份清单；整个 AppModule 真启动、三个新地址未登录都是 401（不存在的地址 404 作对照）；另做三处变异（会员汇总混进游客池、用完人数用 > 代替 >=、30 天到期不看期限）都红；关联门禁 18 条通过。
 
 - **做了什么：** 三个只读接口。`GET /api/v1/me/ai-quota` 用会员守卫，只认令牌里的本人。`GET /api/v1/kiosk/ai-quota` 用已验签终端，看游客池；`AI_QUOTA_GUEST_TERMINAL_DAILY` 为 0 或未设时 `guestEnabled` 为 false、数字为 0，仍返回下次北京时间零点的 `resetsAt`。`GET /api/v1/admin/ai/quota-usage` 要 admin 角色，汇总北京时间今天的三个桶、游客池和机构次数；响应不含会员 id 与手机号。账本的预占、结算、归还、清扫未改，只新增 `remainingForTerminal` 与 `adminUsage`。
 - **后台：** 会员权益发放增加「AI 次数」，要选用途（简历类 / 小青 / 模拟面试）和 1–9999 的数量，字段在同目录 `AiQuotaGrantFields.tsx`。AI 服务用量面板增加「按人次数（今天）」；游客池为 0 时写「关闭（需登录后使用 AI）」，并写「在服务器配置里调整」。只读，没有修改入口，没有新页面或菜单。
