@@ -97,19 +97,31 @@
 .aa-lg[data-e='E2'] b { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
 .aa-lg[data-e='E3'] b { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
 
-/* 内容卡按内容高度排。空白分散成间距，不把卡片拉成空盒。 */
+/* 钉住条目通常只有两三条。从上往下排，间距固定 20px，不再把余高摊进区块之间。 */
 .aa-body {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
+  justify-content: flex-start;
   gap: 20px;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
 }
 .aa-body::-webkit-scrollbar { display: none; }
+/* 稿 52 第 121、432 行：只有「01 你钉住的条目」伸长，条目贴着卡顶往下排。
+   flex-shrink 为 0、min-height 保持 auto：条目放不下时不把卡片压扁，
+   由 .aa-body 整页滚动，带走区和底栏留在原位，不盖住正文。
+   成稿、比对、打印读不到、空态和过期内容本来就铺满，不拉卡片，版式保持原样。 */
+.aa-root[data-state='qa-pins'] .aa-body > [data-testid='advisor-artifact-qa'] {
+  flex: 1 0 auto;
+  min-height: auto;
+  justify-content: flex-start;
+}
+.aa-root:not([data-state='qa-pins']) .aa-body {
+  justify-content: space-evenly;
+}
 
 .aa-sec {
   flex: none;
