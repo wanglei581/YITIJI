@@ -2364,7 +2364,7 @@ test('assistant voice silent prompt switches to text @w3-kiosk', async ({ page, 
   await expect(notice).toBeVisible()
   await expect(notice).toHaveAttribute('role', 'status')
   await expect(notice.getByRole('heading', { name: '小青这边没有声音，也没有字幕' })).toBeVisible()
-  await expect(notice).toContainText('可能是网络或语音服务没接通。可以改用文字继续问，刚才问过的不会丢。')
+  await expect(notice).toContainText('可能是网络或语音服务没接通。可以改用文字继续问。')
   const toText = dialog.getByTestId('assistant-voice-silent-to-text')
   const retry = notice.getByRole('button', { name: '重新连接', exact: true })
   expect(await toText.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(64)

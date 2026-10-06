@@ -33,7 +33,7 @@ function AdvisorSilentNotice({
   return (
     <div className="assistant-voice-silent" data-testid="assistant-voice-silent" role="status">
       <h3>小青这边没有声音，也没有字幕</h3>
-      <p>可能是网络或语音服务没接通。可以改用文字继续问，刚才问过的不会丢。</p>
+      <p>可能是网络或语音服务没接通。可以改用文字继续问。</p>
       <div className="assistant-voice-silent-actions">
         <button
           type="button"
