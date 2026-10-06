@@ -619,6 +619,22 @@ test('benefit activities list and detail drop the terminal code and mark 我的 
   await expectFusionAcceptance(page, errors)
 })
 
+test('signed-out benefit activity primary is 登录后领取 @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: { success: true, data: benefitActivityFixture() },
+  })
+
+  await page.goto('/activities/w5-benefit-detail')
+  const primary = page.getByTestId('activity-primary')
+  await expect(page.getByTestId('activity-state-signed-out')).toBeVisible()
+  await expect(primary).toHaveText('登录后领取')
+  await expect(primary).toBeEnabled()
+  await expectFusionAcceptance(page, errors)
+})
+
 test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
