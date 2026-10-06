@@ -302,6 +302,19 @@
   line-height: 1.5;
 }
 [data-qx-interview] .iv-empty.is-bad h2 { color: var(--qx-cinnabar-d); }
+[data-qx-interview] .iv-empty .iv-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+  border-radius: 24px;
+  background: var(--qx-cinnabar-soft);
+  color: var(--qx-cinnabar-d);
+  font-size: 29px;
+  font-weight: 800;
+  line-height: 1;
+}
 
 [data-qx-interview] .iv-history {
   display: flex;
@@ -732,6 +745,11 @@
   font-style: normal;
   font-size: var(--qx-fs-sec);
 }
+[data-qx-interview] .iv-optlist button.is-go {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal-soft);
+}
+[data-qx-interview] .iv-optlist button.is-go em { color: var(--qx-teal-d); }
 
 [data-qx-interview] .iv-report-grid {
   display: grid;

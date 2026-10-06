@@ -130,7 +130,7 @@ try {
   assert.ok(setup.includes("{industry || '尚未选择'}"), '未选行业如实显示')
   assert.ok(setup.includes('请本人填写目标岗位、选择行业和经验后再开始'), '必须选的方向在开始前说明')
   const start = new Function('context', executable(`const {
-    position, industry, experience, interviewerType, difficulty, duration, resumeFile,
+    position, industry, experience, interviewerType, difficulty, duration, interactionMode, resumeFile,
     setError, setCreating, setAiOutage, setStartFailed, getToken, createInterview,
     setPendingSession, startInterview, setProbed, patchInterviewWorkbenchSession, onGoStage,
   } = context; return ${sourceNode(setupAst, 'handleStart')};`))
@@ -139,7 +139,7 @@ try {
     const requests = []
     const errors = []
     const context = {
-      ...draft, duration: 5, resumeFile: null,
+      ...draft, duration: 5, resumeFile: null, interactionMode: 'text',
       setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop,
       setStartFailed: noop, getToken: noop, setPendingSession: noop, setProbed: noop,
       patchInterviewWorkbenchSession: noop, onGoStage: noop,
@@ -161,10 +161,12 @@ try {
     assert.ok(result.errors.at(-1)?.includes(expected), `缺少${expected}提示本人填写或选择`)
   }
   const result = await runStart({ position: '  机械工程师  ' })
-  // 2026-10-06：建场请求开始带 interactionMode。门禁把 handleStart 抽出来单独跑时
-  // 没有页面状态，函数按 globalThis 缺省收成 text。这条期望从「不带该字段」改成
-  // 「缺省就是 text」，用来钉住默认纯文字；没有删掉创建体里的其他字段。
+  // 2026-10-06：建场请求带 interactionMode。handleStart 和 position、duration 一样，
+  // 直接读组件里的 interactionMode。门禁单独执行时从上面的上下文取这个值，缺省是 text。
+  // 这条期望钉住默认纯文字；没有删掉创建体里的其他字段。
   assert.deepEqual(result.requests, [{ interviewerType: 'hr', industry: '制造业', position: '机械工程师', experience: 'y3_5', difficulty: 'standard', durationMin: 5, interactionMode: 'text' }, 'start'], '本人选项原样创建后再开始')
+  const voice = await runStart({ position: '  机械工程师  ', interactionMode: 'voice' })
+  assert.deepEqual(voice.requests, [{ interviewerType: 'hr', industry: '制造业', position: '机械工程师', experience: 'y3_5', difficulty: 'standard', durationMin: 5, interactionMode: 'voice' }, 'start'], '指定语音回合时请求体带 interactionMode: voice')
   check(true, '模拟面试不预选与本人选择校验')
 } catch (error) {
   check(false, `模拟面试不预选与本人选择校验：${error.message}`)

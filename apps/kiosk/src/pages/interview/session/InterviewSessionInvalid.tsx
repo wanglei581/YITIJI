@@ -53,6 +53,7 @@ export function InterviewSessionInvalid({
           />
           <section className="iv-card iv-empty is-bad">
             <div>
+              <div className="iv-empty-mark" aria-hidden="true">!</div>
               <h2>这场练习已过期，需要重新开始</h2>
               <p>公共终端上的这场练习有有效期。过期之后，旧的题目和还没提交的回答都不能继续使用。</p>
             </div>

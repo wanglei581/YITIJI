@@ -181,10 +181,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
    */
   const [startFailed, setStartFailed] = useState(setupDraft?.startFailed ?? false)
 
-  // 建场函数会被门禁抽出去单独跑，抽出去时读不到这里的状态。
-  // 选择写在 globalThis 上，函数里只读这个值；没人写过就按纯文字。
-  ;(globalThis as { __interviewInteractionMode?: InterviewInteractionMode }).__interviewInteractionMode = interactionMode
-
   useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)
 
   useEffect(() => {
@@ -269,7 +265,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     setAiOutage(null)
     setStartFailed(false)
     try {
-      const mode: 'text' | 'voice' = (globalThis as { __interviewInteractionMode?: unknown }).__interviewInteractionMode === 'voice' ? 'voice' : 'text'
+      const mode: 'text' | 'voice' = interactionMode === 'voice' ? 'voice' : 'text'
       const input = {
         interviewerType,
         industry,

@@ -2,7 +2,7 @@
 // 模拟面试 — 练习报告页（2C）。
 //
 // 数据：路由 state（刚结束）或凭 sessionId+凭证从服务端读回（会员历史/刷新）。
-// 操作：打印报告（服务端真实 PDF → 既有打印链路）、重新练习。
+// 操作：查看历史报告、生成打印版（服务端真实 PDF → 既有打印链路）；再练一场回到设置。
 // 合规：不显示等级、不写岗位匹配；固定免责说明，只给本人复盘。
 // ============================================================
 
@@ -186,11 +186,11 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
       subtitle={`${data.position} · ${data.industry} · ${data.interviewerLabel}。只用于本人复盘，不代表通过率或录用结果。`}
       ctabar={
         <div className="interview-qx-cta">
-          <QxStepActions onPrev={goReports} prevLabel="查看历史报告">
+          <QxStepActions onPrev={goSetup} prevLabel="再练一场">
             <QxAiHelp label="问小青：这份练习报告怎么看" draft={REPORT_AI_DRAFT} />
           </QxStepActions>
           <div className="iv-history-actions">
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={goSetup}>重新练习</button>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={goReports}>查看历史报告</button>
             <button
               type="button"
               className="qx-btn"
@@ -249,32 +249,6 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
           </div>
         </section>
 
-        <section className="iv-card">
-          <InterviewCardHead title="五项能力" hint="按本场已确认的回答归纳" />
-          <div className="iv-mini-list">
-            <div>
-              <h2>表达清晰度</h2>
-              <Lines items={data.report.expression} />
-            </div>
-            <div>
-              <h2>和目标岗位要求的对照</h2>
-              <Lines items={data.report.positionFit} />
-            </div>
-            <div>
-              <h2>经历可信度与细节</h2>
-              <Lines items={data.report.credibility} />
-            </div>
-            <div>
-              <h2>专业能力表现</h2>
-              <Lines items={data.report.professional} />
-            </div>
-            <div>
-              <h2>沟通与应变能力</h2>
-              <Lines items={data.report.adaptability} />
-            </div>
-          </div>
-        </section>
-
         <section className="iv-card" data-testid="interview-report-review">
           <InterviewCardHead title="报告包含的复盘区" hint="按实际结果填写" />
           <div className="iv-mini-list">
@@ -308,6 +282,32 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
                 <span>{item}</span>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="iv-card">
+          <InterviewCardHead title="五项能力" hint="按本场已确认的回答归纳" />
+          <div className="iv-mini-list">
+            <div>
+              <h2>表达清晰度</h2>
+              <Lines items={data.report.expression} />
+            </div>
+            <div>
+              <h2>和目标岗位要求的对照</h2>
+              <Lines items={data.report.positionFit} />
+            </div>
+            <div>
+              <h2>经历可信度与细节</h2>
+              <Lines items={data.report.credibility} />
+            </div>
+            <div>
+              <h2>专业能力表现</h2>
+              <Lines items={data.report.professional} />
+            </div>
+            <div>
+              <h2>沟通与应变能力</h2>
+              <Lines items={data.report.adaptability} />
+            </div>
           </div>
         </section>
 
