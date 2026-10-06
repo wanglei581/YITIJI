@@ -270,6 +270,7 @@ test('feedback submit posts the visible form payload and shows server failure @w
 
   await loginThroughVisibleUi(page, '/me/feedback')
   await expect(page.getByRole('heading', { name: '提交反馈' })).toBeVisible()
+  await page.getByRole('button', { name: /^打印服务/ }).click()
   await page.getByLabel('标题（选填）').fill('页面使用反馈')
   await page.getByLabel('反馈内容').fill('这是用于验证真实反馈提交失败状态的合成说明。')
 
@@ -319,6 +320,123 @@ test('ai-records complaint entry preselects AI 内容投诉 and posts category a
   await assertNoHorizontalOverflow(page)
   await expectComplianceCopy(page)
   await page.screenshot({ path: test.info().outputPath('feedback-ai-content.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
+function createdFeedbackDetail() {
+  return {
+    id: 'fb-new-1006',
+    category: 'print',
+    title: '页面使用反馈',
+    content: '这是用于验证真实反馈提交成功后进入详情的合成说明。',
+    contactPhoneMasked: null,
+    terminalId: null,
+    relatedPrintTaskId: null,
+    status: 'pending',
+    createdAt: '2026-10-06T10:16:00.000+08:00',
+    updatedAt: '2026-10-06T10:16:00.000+08:00',
+    replies: [],
+  }
+}
+
+test('feedback submit stays disabled with a reason until category and ten characters are present @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/feedback', { status: 200, json: emptyPage(0) })
+
+  await loginThroughVisibleUi(page, '/me/feedback')
+  const blocked = page.getByRole('button', { name: '提交反馈（请先选择分类，并写满 10 个字）', exact: true })
+  await expect(blocked).toBeDisabled()
+  await expect(blocked).toContainText('请先选择分类，并写满 10 个字')
+  await page.getByLabel('反馈内容').fill('还不够十个字')
+  await expect(page.getByRole('button', { name: '提交反馈（请先选择分类，并写满 10 个字）', exact: true })).toBeDisabled()
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+test('feedback submit success opens the new ticket detail @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const detail = createdFeedbackDetail()
+  api.respond('GET', '/api/v1/me/feedback', { status: 200, json: emptyPage(0) })
+  api.respond('POST', '/api/v1/me/feedback', { status: 200, json: { success: true, data: detail } })
+  api.respond('GET', '/api/v1/me/feedback/fb-new-1006', { status: 200, json: { success: true, data: detail } })
+
+  await loginThroughVisibleUi(page, '/me/feedback')
+  await page.getByRole('button', { name: /^打印服务/ }).click()
+  await page.getByLabel('标题（选填）').fill(detail.title)
+  await page.getByLabel('反馈内容').fill(detail.content)
+  await page.getByRole('button', { name: '提交反馈', exact: true }).click()
+
+  await expect(page.getByTestId('member-feedback-state-success')).toBeVisible()
+  await expect(page.getByText('反馈已提交', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/ticket=fb-new-1006/)
+  await expect(page.getByRole('heading', { name: detail.title, exact: true })).toBeVisible()
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+test('feedback submit failure keeps the filled form @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/feedback', { status: 200, json: emptyPage(0) })
+  api.respond('POST', '/api/v1/me/feedback', {
+    status: 503,
+    json: { success: false, error: { code: 'W5_FEEDBACK_UNAVAILABLE', message: 'fixture unavailable' } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/feedback')
+  await page.getByRole('button', { name: /^打印服务/ }).click()
+  await page.getByLabel('标题（选填）').fill('页面使用反馈')
+  await page.getByLabel('联系电话（选填）').fill('13800138000')
+  await page.getByLabel('反馈内容').fill('这是用于验证真实反馈提交失败后内容还在的合成说明。')
+  await page.getByRole('button', { name: '提交反馈', exact: true }).click()
+
+  await expect(page.getByText('提交失败，请检查登录状态或稍后重试', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('标题（选填）')).toHaveValue('页面使用反馈')
+  await expect(page.getByLabel('联系电话（选填）')).toHaveValue('13800138000')
+  await expect(page.getByLabel('反馈内容')).toHaveValue('这是用于验证真实反馈提交失败后内容还在的合成说明。')
+  await expect(page.getByRole('button', { name: '重试提交', exact: true })).toBeVisible()
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+test('feedback detail back to list clears the ticket query @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const item = {
+    id: 'fb-preview-cut',
+    category: 'print',
+    title: '打印预览页文字被截掉一行',
+    content: '简历预览最下面一行字被裁掉了，按预览打出来也少这一行。',
+    contactPhoneMasked: null,
+    terminalId: null,
+    relatedPrintTaskId: null,
+    status: 'processing',
+    createdAt: '2026-10-02T09:18:00.000+08:00',
+    updatedAt: '2026-10-03T11:05:00.000+08:00',
+  }
+  api.respond('GET', '/api/v1/me/feedback', {
+    status: 200,
+    json: { success: true, data: { items: [item], nextCursor: null, total: 1 } },
+  })
+  api.respond('GET', '/api/v1/me/feedback/fb-preview-cut', {
+    status: 200,
+    json: { success: true, data: { ...item, replies: [] } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/feedback')
+  await page.getByTestId('member-feedback-ticket-fb-preview-cut').click()
+  await expect(page).toHaveURL(/ticket=fb-preview-cut/)
+  await expect(page.getByRole('heading', { name: item.title, exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '返回列表', exact: true }).click()
+  await expect(page).not.toHaveURL(/ticket=/)
+  await expect(page.getByRole('heading', { name: '提交反馈', exact: true })).toBeVisible()
+  await expectComplianceCopy(page)
   expect(errors).toEqual([])
 })
 

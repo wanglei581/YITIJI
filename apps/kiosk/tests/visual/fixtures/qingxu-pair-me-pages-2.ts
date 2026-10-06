@@ -41,14 +41,6 @@ const ACTIVITY_REASON: Record<string, string> = {
   'sold-out': `${NO_SCREEN}。没有单独的领完页，仍是活动详情，库存标成「已领完」，领取按钮禁用。`,
 }
 
-const FEEDBACK_REASON: Record<string, string> = {
-  'submit-busy': `${NO_SCREEN}。提交按钮停在禁用的「提交反馈」，data-state 仍是 form-list。`,
-  success: `${NO_SCREEN}。提交成功后停在这条工单上，顶上出一句「反馈已提交」。`,
-  failure: `${NO_SCREEN}。提交失败后仍停在表单，顶上出一句「提交失败，请检查登录状态或稍后重试」。`,
-  'reply-busy': `${NO_SCREEN}。「追加描述」停在禁用，data-state 仍是 detail-ready。`,
-  'close-busy': `${NO_SCREEN}。「关闭反馈」停在禁用，data-state 仍是 detail-ready。`,
-}
-
 const PRIVACY_REASON: Record<string, string> = {
   success: `${NO_SCREEN}。撤回成功后弹层关掉，记录回到列表，顶上出一句「已撤回 AI 使用授权，请求已记录」。`,
   failure: `${NO_SCREEN}。提交失败后确认弹层还在，顶上出一句「提交失败，请稍后重试」。`,
@@ -420,7 +412,7 @@ const TICKETS: Ticket[] = [
       id: 'rp-ai-1',
       senderType: 'admin',
       actorId: null,
-      content: '诊断等待过久这件事我们已经记下。这次如果没有生成结果，可以再提交一次。还是一直转圈的话，告诉现场工作人员，我们查这台机器的网络。不承诺当天一定出结果。',
+      content: '诊断等待过久这件事我们已经记下。这次如果没有生成结果，可以再提交一次。还是一直转圈的话，可以拨打服务电话，我们远程查这台机器的网络。不承诺当天一定出结果。',
       createdAt: '2026-09-29T15:18:00.000+08:00',
     }],
   }),
@@ -511,17 +503,17 @@ const NEW_TICKET: Ticket = ticket({
 
 function feedbackPlan(state: string): MePages2Plan {
   const marker = state === 'submit-busy'
-    ? 'button[disabled]:text-is("提交反馈")'
+    ? 'button[disabled]:text-is("正在提交…")'
     : state === 'success'
       ? '.fb-toast:text-is("反馈已提交")'
       : state === 'failure'
         ? '.fb-toast:text-is("提交失败，请检查登录状态或稍后重试")'
         : state === 'reply-busy'
-          ? 'button[disabled]:text-is("追加描述")'
+          ? 'button[disabled]:text-is("正在提交…")'
           : state === 'close-busy'
-            ? 'button[disabled]:text-is("关闭反馈")'
+            ? 'button[disabled]:text-is("正在关闭…")'
             : `[data-testid="member-feedback-state-${state}"]`
-  return hit(marker, '/me/feedback', FEEDBACK_REASON[state] ?? null)
+  return hit(marker, '/me/feedback', null)
 }
 
 async function fillField(page: Page, name: string, value: string): Promise<void> {
@@ -559,6 +551,7 @@ async function prepareFeedback(page: Page, api: ApiRouter, state: string): Promi
   await loginTo(page, ticketId ? `/me/feedback?ticket=${ticketId}` : '/me/feedback')
   if (state === 'submit-busy' || state === 'success' || state === 'failure') {
     await show(page, '[data-testid="member-feedback-state-form-list"]')
+    await page.getByRole('button', { name: /^打印服务/ }).click()
     await fillField(page, '反馈内容', '打印预览页最下面一行字被裁掉了，打出来也少这一行。')
     await page.getByRole('button', { name: '提交反馈', exact: true }).click()
   }

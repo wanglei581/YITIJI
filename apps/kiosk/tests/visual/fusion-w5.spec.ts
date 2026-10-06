@@ -379,6 +379,7 @@ test('feedback exposes the authenticated form and honest submit error through vi
 
   await loginThroughVisibleUi(page, '/me/feedback')
   await expect(page.getByRole('heading', { name: '提交反馈' })).toBeVisible()
+  await page.getByRole('button', { name: /^打印服务/ }).click()
   await page.getByLabel('标题（选填）').fill('页面使用反馈')
   await page.getByLabel('反馈内容').fill('这是用于验证真实反馈提交失败状态的合成说明。')
   await page.getByRole('button', { name: '提交反馈', exact: true }).click()
