@@ -1,2 +1,3 @@
 # The script reads DATABASE_URL and ALERT_WEBHOOK_URL from API_ENV_FILE itself.
+# 异地副本的开关和目的地也写在这个文件里，不要写在 cron 这一行。名字见 docs/device/postgres-operations.md 第 10 节。
 15 2 * * * API_ENV_FILE=/srv/ai-job-print/services/api/.env /srv/ai-job-print/services/api/scripts/backup-postgres.sh >> /var/log/ai-job-print/backup.log 2>&1

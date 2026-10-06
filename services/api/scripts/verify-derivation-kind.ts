@@ -101,6 +101,7 @@ const EXPECTED_DERIVED_SITES: Record<string, string> = {
   'src/ai/resume/fair-visit-plan.service.ts#printPlan#1': 'ai_generated', // 参会准备单
   'src/mock-interview/mock-interview.service.ts#printReport#1': 'ai_generated', // 模拟面试报告
   'src/mock-interview/mock-interview.service.ts#printPracticeSheet#1': 'ai_generated', // 模拟面试题目单
+  'src/mock-interview/interview-transcript-print.service.ts#print#1': 'ai_generated', // 本场作答记录（不调模型；闸门豁免与题目单相同）
   'src/job-materials/job-materials.service.ts#generate#1': 'ai_generated', // 求职材料模板生成
   'src/contract-review/contract-review-report-file.service.ts#create#1': 'ai_generated', // 合同风险提示报告
   'src/files/member-data-export-file.service.ts#create#1': 'ai_generated', // 会员本人数据导出

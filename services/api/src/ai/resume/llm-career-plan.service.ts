@@ -297,7 +297,7 @@ export class LlmCareerPlanService {
     if (!res.ok) {
       onLlmCall?.({ provider: providerLabel })
       this.logger.error(`careerplan.llm upstream_non_2xx status=${res.status}`)
-      throw llmUpstreamStatusError('AI 职业规划服务', res.status)
+      throw llmUpstreamStatusError('AI 职业规划服务', res.status, res.data)
     }
     const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>

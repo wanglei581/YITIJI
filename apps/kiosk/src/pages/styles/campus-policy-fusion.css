@@ -43,7 +43,7 @@
     radial-gradient(1000px 520px at 88% -6%, rgba(31, 158, 134, .07), transparent 62%),
     radial-gradient(760px 420px at -10% 28%, rgba(184, 104, 60, .06), transparent 58%),
     var(--kp-paper);
-  font-family: var(--font-sans, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif);
+  font-family: var(--font-sans, "PingFang SC", "Qingxu Sans", "Microsoft YaHei", system-ui, sans-serif);
 }
 
 .kproto-teal {
@@ -120,7 +120,7 @@
 }
 
 .kproto-title h1 {
-  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-family: var(--kp-serif, "Qingxu Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
   font-size: 44px;
   font-weight: 900;
   letter-spacing: 2px;
@@ -185,7 +185,7 @@
 }
 
 .kproto-card-head h2 {
-  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-family: var(--kp-serif, "Qingxu Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
   font-size: 32px;
   font-weight: 800;
   letter-spacing: 1px;
@@ -490,7 +490,7 @@ button.kproto-badge {
 
 .campus-proto .campus-hero h1 {
   margin-top: 20px;
-  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-family: var(--kp-serif, "Qingxu Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
   font-size: 40px;
   font-weight: 900;
   letter-spacing: 2px;
@@ -558,7 +558,7 @@ button.kproto-badge {
   border: none;
   background: none;
   color: var(--kp-muted);
-  font-family: var(--kp-sans, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif);
+  font-family: var(--kp-sans, "PingFang SC", "Qingxu Sans", "Microsoft YaHei", system-ui, sans-serif);
   font-size: 19px;
   cursor: pointer;
 }
@@ -607,7 +607,7 @@ button.kproto-badge {
 
 .campus-proto .campus-band4 .campus-band-cell b {
   display: block;
-  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-family: var(--kp-serif, "Qingxu Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
   font-size: 34px;
   font-weight: 900;
   color: var(--kp-wheat-deep);
@@ -667,7 +667,7 @@ button.kproto-badge {
   border-radius: 12px;
   background: var(--kp-wheat-soft);
   color: var(--kp-wheat-deep);
-  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-family: var(--kp-serif, "Qingxu Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
   font-size: 26px;
   font-weight: 700;
 }
@@ -726,7 +726,7 @@ button.kproto-badge {
 }
 
 .sc-mod-title b {
-  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-family: var(--kp-serif, "Qingxu Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
   font-size: 28px;
   font-weight: 700;
   letter-spacing: 1px;
@@ -773,7 +773,7 @@ button.kproto-badge {
 }
 
 .sc-ext-head h2 {
-  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-family: var(--kp-serif, "Qingxu Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
   font-size: 26px;
   font-weight: 700;
   letter-spacing: 1px;
