@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { useRef } from 'react'
 import { SparklesIcon } from 'lucide-react'
 import { ChipRow, Field, GenerateStepHeading } from './ResumeGenerateShell'
-import { CERT_CHIPS, LIMITS, SKILL_CHIPS, splitList, toggleMulti } from './resumeGenerateModel'
+import { CERT_CHIPS, LIMITS, SKILL_CHIPS, TEXT_LIMITS, listNearLimit, splitList, textNearLimit, toggleMulti } from './resumeGenerateModel'
 
 export function ResumeGenerateStrengthsStep(props: {
   skillsText: string
@@ -30,6 +30,7 @@ export function ResumeGenerateStrengthsStep(props: {
           value={props.skillsText}
           onChange={(event) => props.onSkills(event.target.value)}
         />
+        {listNearLimit(props.skillsText, TEXT_LIMITS.skill) ? <span className="qx-rg-hint">最多 {TEXT_LIMITS.skill} 字</span> : null}
         <div className="qx-rg-voice">{props.skillsVoice}</div>
       </Field>
       <ChipRow
@@ -49,6 +50,7 @@ export function ResumeGenerateStrengthsStep(props: {
           value={props.certsText}
           onChange={(event) => props.onCerts(event.target.value)}
         />
+        {listNearLimit(props.certsText, TEXT_LIMITS.certificate) ? <span className="qx-rg-hint">最多 {TEXT_LIMITS.certificate} 字</span> : null}
         <div className="qx-rg-voice">{props.certsVoice}</div>
       </Field>
       <ChipRow
@@ -64,9 +66,11 @@ export function ResumeGenerateStrengthsStep(props: {
         <textarea
           className="qx-rd-field"
           placeholder="一两句就够：你做事的方式"
+          maxLength={TEXT_LIMITS.selfIntro}
           value={props.selfIntro}
           onChange={(event) => props.onIntro(event.target.value)}
         />
+        {textNearLimit(props.selfIntro, TEXT_LIMITS.selfIntro) ? <span className="qx-rg-hint">最多 {TEXT_LIMITS.selfIntro} 字</span> : null}
         <div className="qx-rg-voice">{props.introVoice}</div>
       </Field>
     </>

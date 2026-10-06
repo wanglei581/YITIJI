@@ -36,7 +36,10 @@ import {
   LIMITS,
   STEPS,
   STEP_STATE,
+  TEXT_LIMITS,
   bootGenerate,
+  clampListText,
+  clampText,
   splitList,
   type GenerateFormSnapshot,
   type HistorySeg,
@@ -131,9 +134,9 @@ export function ResumeGeneratePage() {
     projects: projects
       .filter((item) => item.name.trim())
       .map((item) => ({ name: item.name.trim(), role: item.role?.trim() || undefined, description: item.description.trim() })),
-    skills: splitList(skillsText, LIMITS.skills),
-    certificates: splitList(certsText, LIMITS.certificates),
-    selfIntro: selfIntro.trim() || undefined,
+    skills: splitList(skillsText, LIMITS.skills).map((item) => clampText(item, TEXT_LIMITS.skill)),
+    certificates: splitList(certsText, LIMITS.certificates).map((item) => clampText(item, TEXT_LIMITS.certificate)),
+    selfIntro: clampText(selfIntro.trim(), TEXT_LIMITS.selfIntro) || undefined,
   })
 
   const openStep = (next: number) => {
@@ -372,8 +375,8 @@ export function ResumeGeneratePage() {
       >
         <ResumeGenerateAdvisor
           eyebrow="AI 简历生成"
-          ask={phase === 'entry' ? <>先看清<em>这四步</em>再填</> : reviewing ? <>提交前<em>你先核一遍</em></> : STEPS[step].ask}
-          doing={phase === 'entry' ? '只有姓名和目标岗位必填。点一行就能直接进那一步。' : reviewing ? '先核对资料，再让小青整理成新简历。信息不完整的经历可点开补充。' : STEPS[step].doing}
+          ask={phase === 'entry' ? '从零写一份简历？' : reviewing ? <>提交前<em>你先核一遍</em></> : STEPS[step].ask}
+          doing={phase === 'entry' ? <>我分四步问你，问完<b>一次生成</b>。AI 只整理你说的，不替你编。</> : reviewing ? '先核对资料，再让小青整理成新简历。信息不完整的经历可点开补充。' : STEPS[step].doing}
         />
         {phase === 'entry' ? <ResumeGenerateEntry onOpen={openStep} /> : (
           <>
@@ -437,12 +440,12 @@ export function ResumeGeneratePage() {
                         skillsText={skillsText}
                         certsText={certsText}
                         selfIntro={selfIntro}
-                        onSkills={setSkillsText}
-                        onCerts={setCertsText}
-                        onIntro={setSelfIntro}
-                        skillsVoice={<ResumeVoiceInputButton className="qx-rd-voice" label="技能" disabled={generating} onConfirm={(text) => setSkillsText((current) => appendVoiceText(current, text))} />}
-                        certsVoice={<ResumeVoiceInputButton className="qx-rd-voice" label="证书资质" disabled={generating} onConfirm={(text) => setCertsText((current) => appendVoiceText(current, text))} />}
-                        introVoice={<ResumeVoiceInputButton className="qx-rd-voice" label="自我评价" disabled={generating} onConfirm={(text) => setSelfIntro((current) => appendVoiceText(current, text))} />}
+                        onSkills={(next) => setSkillsText(clampListText(next, TEXT_LIMITS.skill))}
+                        onCerts={(next) => setCertsText(clampListText(next, TEXT_LIMITS.certificate))}
+                        onIntro={(next) => setSelfIntro(clampText(next, TEXT_LIMITS.selfIntro))}
+                        skillsVoice={<ResumeVoiceInputButton className="qx-rd-voice" label="技能" disabled={generating} onConfirm={(text) => setSkillsText((current) => clampListText(appendVoiceText(current, text), TEXT_LIMITS.skill))} />}
+                        certsVoice={<ResumeVoiceInputButton className="qx-rd-voice" label="证书资质" disabled={generating} onConfirm={(text) => setCertsText((current) => clampListText(appendVoiceText(current, text), TEXT_LIMITS.certificate))} />}
+                        introVoice={<ResumeVoiceInputButton className="qx-rd-voice" label="自我评价" disabled={generating} onConfirm={(text) => setSelfIntro((current) => clampText(appendVoiceText(current, text), TEXT_LIMITS.selfIntro))} />}
                       />
                     )}
                   </div>

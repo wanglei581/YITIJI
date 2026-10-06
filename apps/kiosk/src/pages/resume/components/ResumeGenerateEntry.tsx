@@ -15,6 +15,7 @@ export function ResumeGenerateEntry({ onOpen }: { onOpen: (step: number) => void
     <div className="qx-rg-entry" data-testid="resume-generate-entry">
       <div className="qx-card qx-rg-card">
         <div className="qx-rd-heading">
+          <span className="qx-rg-no">01</span>
           <b>这四步我会问什么</b>
           <span className="qx-rg-hint">只有 2 项必填</span>
         </div>

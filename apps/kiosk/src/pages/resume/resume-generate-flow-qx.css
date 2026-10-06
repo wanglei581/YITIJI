@@ -103,11 +103,23 @@
   justify-content: space-evenly;
   overflow: hidden;
 }
+.qx-resume-generate .qx-rg-no {
+  flex: none;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--qx-teal-d);
+}
 .qx-resume-generate .qx-rg-hint {
   margin-left: auto;
   font-size: 20px;
   font-weight: 600;
   color: var(--qx-ink-3);
+}
+.qx-resume-generate .qx-rd-label > .qx-rg-hint {
+  display: block;
+  width: fit-content;
+  margin: 8px 0 0 auto;
 }
 .qx-resume-generate .qx-rg-rows {
   flex: 1 1 auto;
@@ -245,6 +257,7 @@
 .qx-resume-generate .qx-rd-synthetic,
 .qx-resume-generate .qx-rd-why { font-size: 20px; }
 .qx-resume-generate .rg-xq-ask em { font-style: normal; color: var(--qx-emerald); }
+.qx-resume-generate .rg-xq-doing b { color: var(--qx-paper); font-weight: 600; }
 .qx-resume-generate .resume-generate-fallback:empty { margin: 0; }
 .qx-resume-generate .resume-generate-fallback:not(:empty) { margin-top: 12px; }
 

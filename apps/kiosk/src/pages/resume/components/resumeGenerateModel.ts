@@ -4,6 +4,42 @@ import { ALLOW_FIXTURES } from '../../../utils/buildMode'
 /** 与 services/api ResumeGenerateRequestDto 的 ArrayMaxSize 一致，前端不得放得更宽。 */
 export const LIMITS = { education: 6, experience: 8, projects: 6, skills: 20, certificates: 15 } as const
 
+/** 与同一 DTO 的 MaxLength 一致：每条技能 40、每条证书 60、自我评价 500。 */
+export const TEXT_LIMITS = { skill: 40, certificate: 60, selfIntro: 500 } as const
+
+/** 离上限不到这些字时，才写出「最多 N 字」。 */
+const NEAR_LIMIT = 10
+
+export function clampText(text: string, max: number): string {
+  return text.length <= max ? text : text.slice(0, max)
+}
+
+/** 按逗号、顿号、换行切开，每一条单独封顶，分隔符保留。 */
+export function clampListText(text: string, itemMax: number): string {
+  let itemLen = 0
+  let out = ''
+  for (const ch of text) {
+    if (ch === ',' || ch === '，' || ch === '、' || ch === '\n') {
+      out += ch
+      itemLen = 0
+      continue
+    }
+    if (itemLen >= itemMax) continue
+    out += ch
+    itemLen += 1
+  }
+  return out
+}
+
+export function textNearLimit(text: string, max: number): boolean {
+  return text.length >= Math.max(1, max - NEAR_LIMIT)
+}
+
+export function listNearLimit(text: string, itemMax: number): boolean {
+  const floor = Math.max(1, itemMax - NEAR_LIMIT)
+  return text.split(/[,，、\n]/).some((item) => item.length >= floor)
+}
+
 /**
  * 所在城市 / 意向城市的候选。
  * 试点在青岛；换点位时改这里。

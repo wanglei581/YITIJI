@@ -326,6 +326,16 @@ test('回去改资料把已填内容原样带回对应那一步，不经过第 0
   await expectNoStaff(page)
 })
 
+test('输入超长技能时最多只进得去 40 字 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  await page.goto('/resume/generate')
+  await page.getByTestId('resume-generate-plan-4').click()
+  const skills = page.getByRole('textbox', { name: /^技能/ })
+  await skills.fill('仓'.repeat(80))
+  await expect(skills).toHaveValue('仓'.repeat(40))
+  await expect(page.getByText('最多 40 字', { exact: true })).toBeVisible()
+})
+
 test('四个没有结果的预览屏各自成文，且没有工作人员 @kiosk', async ({ page, api }) => {
   registerW4Api(api)
   await page.goto('/resume/generate/preview')
