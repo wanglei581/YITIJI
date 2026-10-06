@@ -281,8 +281,8 @@ test.describe('partner screen navigation', () => {
 
     await tabLink(page, '终端孪生').click()
     const today = panel(page, /^今日服务$/)
-    await expect(tile(today, '打印任务').locator('b')).toHaveText('少于 5单')
-    await expect(tile(today, '扫描').locator('b')).toHaveText('少于 5次')
+    await expect(tile(today, '打印任务').locator('b')).toHaveText('少于 5 单')
+    await expect(tile(today, '扫描').locator('b')).toHaveText('少于 5 次')
     await expect(tile(today, '打印页数').locator('b')).toHaveText('22页')
   })
 
