@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-10-06：后台定时任务一次失败不再让 API 进程退出（P0，随第六次；分支 `claude/backend-hardening-20261006-timer-crash`）
+
+- **问题：** `terminals-agent.service.ts` 的 `setInterval(() => void this.resetExpiredClaims(), 30_000)` 没有 catch，`services/api/src` 也没有进程级兜底。一次 Prisma P2028（事务 5 秒内起不来）就是未处理的 Promise 拒绝，Node 22 直接退出整个 API；PM2 拉起前一体机、小程序、后台请求全部失败。走查 10/4、10/6 在本地 rc 栈复现两次。
+- **改法：** 新增 `src/common/process/background-task.ts`：`scheduleBackground` / `runBackground` 把后台异步任务的错误在本处收住、记日志、下一轮再试；日志只记错误类型、错误码与抛出位置，**不记 message**（可能带用户输入或手机号）。回收定时器与 TRTC 到期扫描都改用它。`main.ts` 装进程级兜底 `installUnhandledRejectionGuard`：未处理拒绝记日志并推企业微信（每小时最多一条），**进程不退出**；同步未捕获异常仍按 Node 默认退出、由 PM2 拉起。
+- **复核：** `@Cron` 方法由 `@nestjs/schedule` 的 `wrapFunctionInTryCatchBlocks` `await` 后捕获，安全；扫描心跳定时器自带 `.catch`；TRTC 的 `expireSessions` 内部有 try，仍统一换成 `scheduleBackground`；会员注销 Redis 租约续期已接 `.catch`。
+- **门禁：** `verify:background-task-safety`（进 CI）：静态扫描定时器回调里不接 `.catch` 的 `void 调用`；`scheduleBackground` 次次失败仍照跑；真实 `TerminalAgentService` 遇 P2028 只记一行 warn；兜底记日志并告警、不含原文。反向变异见 PR。
+
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
 - **决定：** 10/4 21:5x 产品负责人定主原则「设备现场不需要工作人员，是自助的、自动的，这个是主要的」。

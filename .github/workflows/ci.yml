@@ -789,6 +789,8 @@ jobs:
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           pnpm --filter @ai-job-print/api verify:ai-quota
+          # 后台定时任务一次失败不能让 API 进程退出（10/6 P0：P2028 让 Node 22 直接退出）；import src，放在建库之后。
+          pnpm --filter @ai-job-print/api verify:background-task-safety
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:kiosk-session
