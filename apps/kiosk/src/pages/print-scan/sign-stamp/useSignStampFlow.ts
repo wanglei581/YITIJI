@@ -89,7 +89,7 @@ export function useSignStampFlow() {
   const [authorized, setAuthorized] = useState(false)
   const [result, setResult] = useState<ComposeResult | null>(null)
   const [busy, setBusy] = useState(false)
-  const [showQr, setShowQr] = useState<'document' | 'stamp' | null>(null)
+  const [showQr, setShowQr] = useState(false)
   const [qrBusy, setQrBusy] = useState(false)
   const [docStage, setDocStage] = useState<DocStage>('idle')
   const [stampStage, setStampStage] = useState<StampStage>('idle')
@@ -111,7 +111,7 @@ export function useSignStampFlow() {
   const [cap, setCap] = useState<CapStatus>('loading')
   const [terminalId, setTerminalId] = useState(() => getTerminalId())
 
-  useBusyLock(busy || qrBusy || showQr !== null)
+  useBusyLock(busy || qrBusy || showQr)
 
   useEffect(() => {
     setTerminalId(getTerminalId())
@@ -245,24 +245,14 @@ export function useSignStampFlow() {
     }
   }
 
-  const handlePhoneUploaded = (target: 'document' | 'stamp') => (file: PhoneUploadedFile) => {
+  const handlePhoneUploaded = (file: PhoneUploadedFile) => {
     if (!file.fileUrl) {
-      if (target === 'document') setDocErr('document-source-expired')
-      else setStampErr('stamp-source-expired')
+      setDocErr('document-source-expired')
       return
     }
     const picked: PickedFile = { fileId: file.fileId, fileAccessUrl: file.fileUrl, name: file.name, size: file.size }
-    setShowQr(null)
-    if (target === 'document') {
-      void acceptDocument(picked)
-    } else {
-      setStamp(picked)
-      setResult(null)
-      setPhase('idle')
-      setAuthorized(false)
-      setAuthReset(true)
-      setStampJustAdded(true)
-    }
+    setShowQr(false)
+    void acceptDocument(picked)
   }
 
   const ensureKey = (docId: string, stampId: string) => {
@@ -367,12 +357,12 @@ export function useSignStampFlow() {
     cap,
     doc: document,
     pages,
-    docStage: showQr === 'document' ? 'phone' : docStage,
+    docStage: showQr ? 'phone' : docStage,
     docErr,
     docJustRead,
     derived,
     stamp,
-    stampStage: showQr === 'stamp' ? 'phone' : stampStage,
+    stampStage,
     stampErr,
     stampJustAdded,
     page,
@@ -525,13 +515,13 @@ function resolveCta(args: {
     return { primary: '正在生成…', primaryDisabled: true, reason: '这一次合成还没有回来，重复提交可能生成两份', action: 'none' }
   }
   if (live.phase === 'result-unknown') {
-    return { primary: '原样再试一次', primaryDisabled: synthetic, reason: null, action: 'retry' }
+    return { primary: '重试刚才那一次', primaryDisabled: synthetic, reason: null, action: 'retry' }
   }
   if (live.phase === 'known-failed' || live.phase === 'rate-limited' || live.phase === 'in-progress') {
-    return { primary: '重试生成', primaryDisabled: synthetic, reason: live.phase === 'rate-limited' ? '请稍候用同一个标记再试，不会自己再发一次' : null, action: 'retry' }
+    return { primary: '重试生成', primaryDisabled: synthetic, reason: live.phase === 'rate-limited' ? '请稍候原样再试一次，不会自己再发一次' : null, action: 'retry' }
   }
   if (live.phase === 'conflict') {
-    return { primary: '重新开始一次再生成', primaryDisabled: true, reason: '这个标记已经对应另一组页码、位置和大小，必须重新开始一次，不能覆盖上一次', action: 'none' }
+    return { primary: '当作新的一次再生成', primaryDisabled: true, reason: '刚才那一次用的是另一组参数，只能当作新的一次，不能覆盖上一次', action: 'none' }
   }
   if (!live.doc) {
     return { primary: '选好 PDF 再继续', primaryDisabled: true, reason: '还没有选文档，没有文档就没法选页码和位置', action: 'none' }

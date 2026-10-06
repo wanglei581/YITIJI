@@ -392,7 +392,14 @@ test('signature page fails closed for anonymous users @w2', async ({ page, api }
   await page.goto('/print-scan/sign')
   await expect(page.locator('[data-testid="sign-stamp-state-login-required"]')).toBeVisible()
   await expect(page.getByTestId('sign-stamp-fallback')).toContainText('先登录才能签名')
-  await expect(page.locator('[data-w2-page="print-scan-sign"]')).toContainText('不提供 CA 电子签')
+  await expect(page.getByTestId('sign-stamp-truth')).toContainText('只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。')
+  await expect(page.getByTestId('sign-stamp-notice-full')).toHaveCount(0)
+  await page.getByTestId('sign-stamp-notice-toggle').click()
+  await expect(page.getByTestId('sign-stamp-notice-full')).toContainText(
+    '签名仅用于个人材料整理与打印辅助，不提供 CA 电子签、电子认证或合同签署服务；仅为图片合成预览，不具备法律认证效力，正式法律文件请通过具备资质的电子签名服务办理。',
+  )
+  await expect(page.getByTestId('sign-stamp-ask')).toContainText('问小青：签名放在哪一页')
+  await expect(page.getByText('工作人员')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-scan-sign')
   await page.getByTestId('sign-stamp-primary').click()
   await expect(page).toHaveURL(/\/login/)
@@ -530,7 +537,7 @@ test('signature inspect renders server pages and compose sends placement payload
 
   await loginThroughVisibleUi(page, '/print-scan/sign')
   await expect(page.getByText('选要签名的 PDF')).toBeVisible()
-  await expect(page.getByRole('note')).toContainText('只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。')
+  await expect(page.getByTestId('sign-stamp-truth')).toContainText('只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。')
   await page.locator('input[accept="application/pdf"]').setInputFiles({
     name: '就业协议.pdf',
     mimeType: 'application/pdf',
@@ -544,12 +551,12 @@ test('signature inspect renders server pages and compose sends placement payload
     buffer: Buffer.from('png'),
   })
   await expect(page.getByTestId('sign-stamp-stamp-tag')).toContainText('签名.png')
-  const authorize = page.getByRole('checkbox', { name: /我确认本人拥有该签名\/印章图片的使用授权/ })
+  const authorize = page.getByRole('checkbox', { name: /我确认本人拥有该本人手写签名的使用授权/ })
   await expect(authorize).not.toBeChecked()
   await expect(page.getByRole('button', { name: '生成合成 PDF（请先确认授权）' })).toBeDisabled()
   await authorize.click()
   await page.getByRole('button', { name: '生成合成 PDF', exact: true }).click()
-  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('新的 PDF 已生成')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('新的签好的 PDF 已生成')
   expect(composeBodies).toHaveLength(1)
   const payload = JSON.parse(composeBodies[0]) as {
     authorizationConfirmed: boolean
@@ -625,12 +632,55 @@ test('signature compose 429 shows rate-limited and does not silently retry @w2',
     mimeType: 'image/png',
     buffer: Buffer.from('png'),
   })
-  await page.getByRole('checkbox', { name: /我确认本人拥有该签名\/印章图片的使用授权/ }).click()
+  await page.getByRole('checkbox', { name: /我确认本人拥有该本人手写签名的使用授权/ }).click()
   await page.getByRole('button', { name: '生成合成 PDF', exact: true }).click()
   await expect(page.getByTestId('sign-stamp-fallback')).toContainText('提交太频繁了')
   await expect(page.locator('[data-testid="sign-stamp-state-rate-limited"]')).toBeVisible()
   await expect(page.getByText('新的 PDF 已生成')).toHaveCount(0)
   expect(api.requestCount('POST', '/api/v1/print/sign/compose')).toBe(1)
+  await expectHealthy(page, errors, 'print-scan-sign')
+})
+
+test('signature phone stamp card stays disabled and does not open an upload session @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/print-scan/sign?capture=1&state=pick-stamp')
+  const phone = page.getByTestId('sign-stamp-pick-stamp-phone')
+  await expect(phone).toBeVisible()
+  await expect(phone).toHaveAttribute('aria-disabled', 'true')
+  await expect(phone).toContainText('签名图片暂不支持手机上传，请在本机上传。')
+  await expect(page.getByRole('button', { name: /手机扫码上传图片/ })).toHaveCount(0)
+  expect(api.requestCount('POST', '/api/v1/upload-sessions')).toBe(0)
+  // aria-disabled 会让 Playwright 的普通 click 一直等「可点」。强制点下去，确认这条死路没有点击处理。
+  await phone.click({ force: true })
+  expect(api.requestCount('POST', '/api/v1/upload-sessions')).toBe(0)
+  await expect(page.getByText('手机扫码上传 PDF 文档')).toHaveCount(0)
+  await expect(page.getByTestId('sign-stamp-ask')).toContainText('问小青：签名放在哪一页')
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByTestId('sign-stamp-notice-full')).toHaveCount(0)
+  await page.getByTestId('sign-stamp-notice-toggle').click()
+  await expect(page.getByTestId('sign-stamp-notice-full')).toContainText(
+    '签名仅用于个人材料整理与打印辅助，不提供 CA 电子签、电子认证或合同签署服务；仅为图片合成预览，不具备法律认证效力，正式法律文件请通过具备资质的电子签名服务办理。',
+  )
+  await expectHealthy(page, errors, 'print-scan-sign')
+})
+
+test('signature preview toolbar sits under the page view @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/print-scan/sign?capture=1&state=placement-default')
+  const view = page.getByTestId('sign-stamp-pv-view')
+  const bar = page.getByTestId('sign-stamp-pv-toolbar')
+  await expect(view).toBeVisible()
+  await expect(bar).toBeVisible()
+  const viewBox = await view.boundingBox()
+  const barBox = await bar.boundingBox()
+  expect(viewBox).toBeTruthy()
+  expect(barBox).toBeTruthy()
+  expect(barBox!.y).toBeGreaterThanOrEqual(viewBox!.y + viewBox!.height - 2)
+  await expect(page.getByTestId('sign-stamp-ask')).toBeVisible()
   await expectHealthy(page, errors, 'print-scan-sign')
 })
 

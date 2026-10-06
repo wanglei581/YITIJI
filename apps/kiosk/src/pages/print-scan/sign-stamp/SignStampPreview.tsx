@@ -160,23 +160,21 @@ export function SignStampPreview({
             top: `${(box.y / PAGE_H) * 100}%`,
             width: `${(box.w / PAGE_W) * 100}%`,
             height: `${(box.h / PAGE_H) * 100}%`,
-            fontSize: 15,
+            fontSize: 20,
           }
         : {
             left: box.x * scale,
             top: box.y * scale,
             width: box.w * scale,
             height: box.h * scale,
-            fontSize: Math.max(15, box.h * 0.26 * scale),
+            fontSize: Math.max(20, box.h * 0.26 * scale),
           }}
     >
       签名图
     </span>
   ) : null
 
-  return (
-    <section className="ss-pvcol" aria-label="文档完整页预览">
-      {!compact && (
+  const toolbar = !compact ? (
         <div className="ss-pvbar" data-testid="sign-stamp-pv-toolbar">
           <div className="ss-pvrow">
             <button type="button" className="ss-pvbtn" data-testid="sign-stamp-pv-prev" aria-label="上一页" disabled={viewPage <= 1} onClick={() => onViewPage(viewPage - 1)}>
@@ -247,8 +245,10 @@ export function SignStampPreview({
             </button>
           </div>
         </div>
-      )}
+  ) : null
 
+  return (
+    <section className="ss-pvcol" aria-label="文档完整页预览">
       <div
         className="ss-pv-view"
         ref={viewRef}
@@ -280,11 +280,12 @@ export function SignStampPreview({
             data-preview-kind="no-file"
             style={{ position: 'relative', left: 20, top: 20, width: pw, height: ph }}
           >
-            <p style={{ margin: 24, fontSize: 18, lineHeight: 1.5 }}>没有可打开的文件内容，这里不画示意纸面。</p>
+            <p style={{ margin: 24, fontSize: 22, lineHeight: 1.45 }}>没有可打开的文件内容，这里不画示意纸面。</p>
             {marker}
           </div>
         )}
       </div>
+      {toolbar}
       <div className="ss-pv-cap" data-testid="sign-stamp-pv-caption">
         {!previewUrl
           ? '没有可打开的文件内容，不画示意纸面。'

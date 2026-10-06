@@ -120,8 +120,6 @@ export function SignStampPickView({
         </div>
       </section>
 
-      <p role="note">只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。</p>
-
       <section className="ss-sec" aria-label={phase === 'doc' ? '选要签名的 PDF' : '传这次的本人手写签名图'}>
         {phase === 'doc' ? (
           <>
@@ -210,12 +208,12 @@ export function SignStampPickView({
               />)}
               <PickCard
                 title="手机扫码上传图片"
-                d="手机拍摄本人手写签名或选择本人的手写签名图片，确认后自动进入下一步。"
-                f="JPG / PNG · ≤ 10MB"
+                d="签名图片暂不支持手机上传，请在本机上传。"
+                f="暂时用不了"
                 tid="sign-stamp-pick-stamp-phone"
-                tone="slate"
+                tone="muted"
                 icon={SmartphoneIcon}
-                onClick={onPhone}
+                disabled
               />
               <PickCard
                 title="从 U 盘选图片"
@@ -317,7 +315,9 @@ export function pickAsk(phase: 'doc' | 'stamp', state: string, derived: boolean)
     return ['这张图没收下。', '原因在右边，换一张就行。']
   }
   if (state === 'stamp-local-uploading') return ['正在传这张签名图。', '按高敏材料短期保留，不进「我的文档」。']
-  if (state === 'stamp-phone-entry') return ['用手机传本人手写签名图。', '手机上确认之后才进下一步，这一页不替你确认。']
+  if (state === 'stamp-phone-entry') {
+    return ['签名图暂不支持手机上传。', '请在这台机器上选一张本人手写签名的图片，这一页不替你确认。']
+  }
   if (derived || state === 'add-another-ready') return ['接着叠第二处。', '刚才那份生成的新 PDF 成了新的原文档，签名图要重传。']
   if (state === 'document-ready') return ['这份 PDF 读好了。', '接下来传这次要用的本人手写签名图片。']
   return ['传一张这次要用的签名图。', '只能这次新传，不进「我的文档」，也不能复用历史。']

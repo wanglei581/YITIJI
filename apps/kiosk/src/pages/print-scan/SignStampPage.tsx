@@ -2,8 +2,10 @@
 // 四步：选文档 → 传本人手写签名图 → 选位置 → 合成结果。业务调用仍走
 // signInspect / signCompose，本文件只换外壳并补状态覆盖。
 
+import { useState } from 'react'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { HomeIcon, SparklesIcon, UserRoundIcon } from 'lucide-react'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
@@ -20,6 +22,7 @@ void SIGN_ENDPOINTS
 export function SignStampPage() {
   const flow = useSignStampFlow()
   const terminalLabel = getTerminalCode() || getTerminalId() || '终端未登记'
+  const [noticeOpen, setNoticeOpen] = useState(false)
 
 
   const onPrimary = () => {
@@ -36,10 +39,10 @@ export function SignStampPage() {
     <QxPageFrame
       back={{ label: '返回打印扫描', onBack: () => flow.navigate('/print-scan') }}
       title="签名"
-      subtitle="把本人手写签名图片叠到 PDF 上，生成一份新文件。只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。"
       terminalLabel={terminalLabel}
       status={flow.pill}
       ctabar={
+        <>
         <div className="ss-cta-wrap">
           {flow.cta.reason ? (
             <p className="ss-cta-reason" id="sign-stamp-disabled-reason" data-testid="sign-stamp-disabled-reason">
@@ -74,6 +77,14 @@ export function SignStampPage() {
             </button>
           </div>
         </div>
+        <QxStepActions onPrev={() => flow.navigate('/print-scan')} prevLabel="返回打印扫描">
+          <QxAiHelp
+            label="问小青：签名放在哪一页 →"
+            draft="我要在自己的 PDF 上放本人手写签名。请告诉我放在哪一页、哪个位置。不要使用公章。"
+            testId="sign-stamp-ask"
+          />
+        </QxStepActions>
+        </>
       }
       navbar={
         <>
@@ -149,7 +160,9 @@ export function SignStampPage() {
             localDisabled={flow.localDisabled}
             localDisabledReason={flow.localDisabledReason}
             onLocal={() => flow.openLocal(flow.pickPhase === 'stamp' ? 'stamp' : 'document')}
-            onPhone={() => flow.setShowQr(flow.pickPhase === 'stamp' ? 'stamp' : 'document')}
+            onPhone={() => {
+              if (flow.pickPhase === 'doc') flow.setShowQr(true)
+            }}
             onDocs={flow.goDocs}
             document={flow.document}
             pages={flow.pages}
@@ -209,33 +222,38 @@ export function SignStampPage() {
 
         {flow.showQr ? (
           <div className="ss-qr">
-            {flow.showQr === 'document' ? (
-              <UploadSessionQrPanel
-                purpose="print_doc"
-                title="手机扫码上传 PDF 文档"
-                description="手机扫码上传一份 PDF，确认后自动进入下一步。"
-                confirmLabel="确认使用该文档"
-                onUploaded={flow.handlePhoneUploaded('document')}
-                onBusyChange={flow.setQrBusy}
-              />
-            ) : (
-              <UploadSessionQrPanel
-                purpose="signature_image"
-                title="手机扫码上传本人手写签名图片"
-                description="手机拍摄或选择本人手写签名图片（JPG/PNG），确认后自动进入下一步。"
-                confirmLabel="确认使用该图片"
-                onUploaded={flow.handlePhoneUploaded('stamp')}
-                onBusyChange={flow.setQrBusy}
-              />
-            )}
+            <UploadSessionQrPanel
+              purpose="print_doc"
+              title="手机扫码上传 PDF 文档"
+              description="手机扫码上传一份 PDF，确认后自动进入下一步。"
+              confirmLabel="确认使用该文档"
+              onUploaded={flow.handlePhoneUploaded}
+              onBusyChange={flow.setQrBusy}
+            />
           </div>
         ) : null}
 
         <div className="ss-truth" data-testid="sign-stamp-truth">
-          <span data-disclaimer="true">
-            <b>这不是电子签名服务：</b>
-            {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
-          </span>
+          <div className="ss-truth-row">
+            <span data-disclaimer="true">
+              <b>只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。</b>
+            </span>
+            <button
+              type="button"
+              className="ss-truth-toggle"
+              data-testid="sign-stamp-notice-toggle"
+              aria-expanded={noticeOpen}
+              onClick={() => setNoticeOpen((open) => !open)}
+            >
+              {noticeOpen ? '收起完整说明' : '展开完整说明'}
+            </button>
+          </div>
+          {noticeOpen ? (
+            <p className="ss-truth-full" data-testid="sign-stamp-notice-full">
+              <b>这不是电子签名服务：</b>
+              {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
+            </p>
+          ) : null}
         </div>
       </div>
     </QxPageFrame>

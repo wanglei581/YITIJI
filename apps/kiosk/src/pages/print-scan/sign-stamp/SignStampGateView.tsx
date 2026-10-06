@@ -81,7 +81,7 @@ export function SignStampGateView({
               </button>
             ))}
           </div>
-          <p className="note" style={{ margin: 0, fontSize: 17, color: 'var(--qx-ink-3)' }}>
+          <p className="note">
             这里只是导航；能不能用由那一页自己判断。
           </p>
         </div>

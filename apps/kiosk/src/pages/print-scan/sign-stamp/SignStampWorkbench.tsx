@@ -102,7 +102,7 @@ export function SignStampWorkbench({
               <div className="ss-grp">
                 <h3>
                   <CheckCircleIcon size={24} />
-                  这份生成的新 PDF
+                  这份签好的 PDF
                 </h3>
                 <div className="ss-kv" data-testid="sign-stamp-output">
                   <div>
@@ -126,7 +126,11 @@ export function SignStampWorkbench({
                     <b>{outErr === 'expired' ? '已过期 · 30 分钟有效' : '有效期 30 分钟'}</b>
                   </div>
                 </div>
-                <p className="note">交出去的就是这份生成的新 PDF，标记不放进地址栏。图片排版，不是电子签名。</p>
+                <p className="note">
+                  下一步用的是这份签好的 PDF，不是原件。
+                  <br />
+                  <span>原件没有被改写。</span>
+                </p>
               </div>
               <div className="ss-grp">
                 <h3>这一次用的输入</h3>
@@ -307,8 +311,8 @@ export function SignStampWorkbench({
                       <b>{authorized ? '已确认' : '未确认'}</b>
                     </div>
                     <div>
-                      <span>标记</span>
-                      <b>已绑定 · 不显示编号</b>
+                      <span>参数一改</span>
+                      <b>就算新的一次</b>
                     </div>
                   </div>
                 </div>
@@ -340,15 +344,15 @@ export function SignStampWorkbench({
               <>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>一次性请求，没有进度也没有阶段。</span>
+                  <span>交出去之后只等结果，没有进度也没有阶段。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>结果还没确认时，只能原样再试一次，并保持同一组页码、位置和大小。</span>
+                  <span>结果还没确认时，只能原样再试刚才那一次。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>记录这次操作如果失败会报错，但生成的新 PDF可能已经有了。</span>
+                  <span>如果这次没记成功，会告诉你出错了，但签好的 PDF 可能已经生成。</span>
                 </li>
               </>
             ) : (

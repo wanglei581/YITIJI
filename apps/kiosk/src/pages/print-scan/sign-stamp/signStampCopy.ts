@@ -194,12 +194,12 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'stamp-phone-entry': {
       kind: 'info',
-      title: '用手机传本人手写签名图',
-      body: '手机拍摄本人手写签名，或选择本人的手写签名图片。确认之后才会进入下一步。这张图同样只在这一次使用期间短期保留。',
+      title: '签名图片暂不支持手机上传',
+      body: '手机上传的通道还不收签名图片。请在这台机器上选一张本人手写签名的图片。',
       chips: [
-        { text: '手机扫屏幕码' },
-        { text: '需你在手机上确认', tone: 'warn' },
-        { text: '高敏 · 约 1 小时', tone: 'warn' },
+        { text: '请在本机上传' },
+        { text: '这一页不替你确认', tone: 'warn' },
+        { text: '只收本人手写签名', tone: 'warn' },
       ],
     },
     'stamp-ready': {
@@ -274,7 +274,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     composing: {
       kind: 'info',
       title: '正在提交这一次合成',
-      body: `按${place}把图片叠上去，生成一份新 PDF。一次性请求，系统不回传进度，所以没有百分比也没有阶段。`,
+      body: `按${place}把图片叠上去，生成一份新 PDF。交出去之后，系统不回传进度，所以没有百分比也没有阶段。`,
       chips: [
         { text: '页码位置大小已锁定' },
         { text: '不会自动重复提交', tone: 'ok' },
@@ -284,7 +284,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'rate-limited': {
       kind: 'warn',
       title: '提交太频繁了',
-      body: '合成一分钟内最多三次。你的文档、签名图和位置都还在，等一会儿用同一个标记重试即可。',
+      body: '合成一分钟内最多三次。你的文档、签名图和位置都还在，等一会儿原样重试一次即可。',
       chips: [
         { text: '一分钟内 3 次上限' },
         { text: '输入已全部保留', tone: 'ok' },
@@ -294,7 +294,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'conversion-in-progress': {
       kind: 'warn',
       title: '上一次合成还没结束',
-      body: '同一个标记上还有一次正在进行的合成。为避免生成两份，这次不受理，稍候原样再试一次。',
+      body: '刚才那一次的合成还在进行。为避免生成两份，这次先不受理，稍候原样重试。',
       chips: [
         { text: '系统登记为进行中' },
         { text: '输入已全部保留', tone: 'ok' },
@@ -314,25 +314,25 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'result-unknown': {
       kind: 'warn',
       title: '这一次的结果没有确认',
-      body: '请求中断了，不知道系统有没有执行。所以这里不说已生成，也不说没生成。只能用同一个标记、同一份输入重试。',
+      body: '刚才那一次中途断了，不知道系统做了没有。所以这里不说已生成，也不说没生成。只能原样重试刚才那一次。文档、签名图或位置一改就算新的一次，可能真的生成两份。',
       chips: [
         { text: '结果未确认' },
-        { text: '输入和这个标记都还在', tone: 'ok' },
-        { text: '只允许同一请求重试', tone: 'ok' },
+        { text: '输入已全部保留', tone: 'ok' },
+        { text: '只能原样重试那一次', tone: 'ok' },
       ],
     },
     'retrying-same-request': {
       kind: 'info',
-      title: '正在原样再试一次',
-      body: '还是用同一个标记，并且文档、签名图、页码、位置、大小一个字节都没有改。如果系统上一次已经做完，会把那一份直接还回来，不会再生成一份。',
-      chips: [{ text: '同一个标记' }, { text: '同一份输入', tone: 'ok' }, { text: '页码位置大小已锁定', tone: 'ok' }],
+      title: '正在原样重试刚才那一次',
+      body: '还是刚才那一次：文档、签名图、页码、位置、大小一点都没改。如果系统上一次已经做完，会把那一份直接还回来，不会再生成一份。',
+      chips: [{ text: '不算新的一次' }, { text: '同一份输入', tone: 'ok' }, { text: '参数已锁定', tone: 'ok' }],
     },
     'idempotency-conflict': {
       kind: 'error',
-      title: '这个标记已经用过了',
-      body: '同一个标记上一次对应的是另一组页码、位置和大小。系统拒绝覆盖，上一次的结果原样保留。要换这些，就得重新开始一次。',
+      title: '和刚才那一次的参数对不上',
+      body: '刚才那一次交的是另一组参数，系统拒绝覆盖，上一次的结果原样保留。换参数就得重新开始。',
       chips: [
-        { text: '这个标记已经用过' },
+        { text: '系统拒绝覆盖' },
         { text: '上一次结果未被覆盖', tone: 'ok' },
         { text: '未生成新文件', tone: 'ok' },
       ],
@@ -340,17 +340,17 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'recovered-completed': {
       kind: 'info',
       title: '这一份是恢复出来的已完成结果',
-      body: '系统确认同一个标记、同一份输入上已经有完成的结果，于是把那一份还回来了。没有重复生成。',
+      body: '已经确认刚才那一次、同一份输入其实已经做完，于是把那一份还回来了。没有重复生成。',
       chips: [
-        { text: '同一请求已完成' },
+        { text: '刚才那一次已完成' },
         { text: '没有重复生成', tone: 'ok' },
         { text: '原 PDF 不被改写', tone: 'ok' },
       ],
     },
     completed: {
       kind: 'info',
-      title: '新的 PDF 已生成',
-      body: '系统返回了一份新文件。原 PDF 一个字节没改。下一步去材料检查，那一步才决定能不能打印。',
+      title: '新的签好的 PDF 已生成',
+      body: '结果回来了一份新文件。原 PDF 一点没改。下一步去材料检查，那一步才决定能不能打印。',
       chips: [
         { text: live.result ? `${live.result.pages} 页 · ${formatResultSize(live.result)}` : '生成的新 PDF' },
         { text: '原 PDF 未被改写', tone: 'ok' },
@@ -359,7 +359,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'output-preview-failed': {
       kind: 'warn',
-      title: '新的 PDF 已生成，但这里显示不出来',
+      title: '签好的 PDF 已生成，但这里显示不出来',
       body: '浏览器没能把这份 PDF 画出来。这不代表文件损坏或丢失，可以重新取一次预览链接，或直接去材料检查。',
       chips: [
         { text: '预览渲染失败', tone: 'warn' },
@@ -369,7 +369,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'output-expired': {
       kind: 'warn',
-      title: '新的 PDF 已生成，但预览链接过期了',
+      title: '签好的 PDF 已生成，但预览链接过期了',
       body: '访问链接有效期 30 分钟，已到期。文件没丢，但现在打不了——要重新取一次。',
       chips: [
         { text: '链接已过期', tone: 'warn' },
