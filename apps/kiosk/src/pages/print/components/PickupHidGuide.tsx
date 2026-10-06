@@ -14,7 +14,13 @@ import {
   PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
 } from '@ai-job-print/shared'
-import { LEGACY_KEYS, type ClaimSuccessCopy, type PickupFailure, type PickupScreen } from '../pickupClaimModel'
+import {
+  LEGACY_KEYS,
+  PICKUP_SAME_CODE_RESUME_NOTE,
+  type ClaimSuccessCopy,
+  type PickupFailure,
+  type PickupScreen,
+} from '../pickupClaimModel'
 
 // 到机码页（原型 11-arrival-code.html）的展示件。只接收页面算好的数据与回调，
 // 不发请求、不判定成败；认领、终端身份与离页作废都在 PrintPickupClaimPage 里。
@@ -103,22 +109,19 @@ export function PickupHidGuide({
   )
 }
 
+/** 方案②：到机码就是取件码，不再单列第三种码。函数名沿用，避免改动页面对这张卡的引用锚点。 */
 export function PickupThreeCodeCard() {
   return (
-    <section className="qx-card pcp-ab" aria-label="三种码的区别">
-      <h2 className="pcp-ab-t"><InfoIcon size={22} aria-hidden="true" />三种码，别搞混</h2>
+    <section className="qx-card pcp-ab" aria-label="两种码的区别">
+      <h2 className="pcp-ab-t"><InfoIcon size={22} aria-hidden="true" />两种码，别搞混</h2>
       <div className="pcp-ab-cols">
         <div className="pcp-ab-col is-current">
           <b>到机码 · 本页用</b>
-          <span>{PICKUP_CODE_LENGTH} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。</span>
+          <span>{PICKUP_CODE_LENGTH} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。取件和接着打都用它。</span>
         </div>
         <div className="pcp-ab-col">
           <b>上传码 · 手机传文件用</b>
           <span>用于把手机文件传到本机。</span>
-        </div>
-        <div className="pcp-ab-col">
-          <b>取件凭证码 · 取纸/补打用</b>
-          <span>取纸时出示给工作人员，不在本页输入。</span>
         </div>
       </div>
     </section>
@@ -218,8 +221,8 @@ export function PickupKeypadCard({
         {loading
           ? '正在校验，键盘暂时不可用——校验结果出来后会自动恢复。'
           : legacyMode
-            ? <>历史码一共 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位</b>，不含 <b>0、O、1、I、L</b>，键盘上没有这几个键——不用担心认错。读满 {PICKUP_CODE_MAX_INPUT_LENGTH} 位自动校验。</>
-            : <>新码是 <b>{PICKUP_CODE_LENGTH} 位纯数字</b>：输满稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码</b>点左下角「输入历史码」。</>}
+            ? <>历史码一共 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位</b>，不含 <b>0、O、1、I、L</b>，键盘上没有这几个键——不用担心认错。读满 {PICKUP_CODE_MAX_INPUT_LENGTH} 位自动校验。{PICKUP_SAME_CODE_RESUME_NOTE}</>
+            : <>新码是 <b>{PICKUP_CODE_LENGTH} 位纯数字</b>：输满稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码</b>点左下角「输入历史码」。{PICKUP_SAME_CODE_RESUME_NOTE}</>}
       </p>
       {legacyMode ? (
         <PickupAlphaKeys value={code} onChange={onChange} disabled={loading} />

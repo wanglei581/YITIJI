@@ -256,11 +256,11 @@
 .pcp-hid-ab-col b { font-size: 21px; }
 .pcp-hid-cta { flex: 1; }
 
-/* ── 三种码对照（稿 .vs）：现场最高频的求助是「我手上这串码是哪种」。 ── */
+/* ── 两种码对照（稿 .vs）：现场最高频的求助是「我手上这串码是哪种」。 ── */
 .qx-card.pcp-ab { padding: 22px 28px; border-radius: 24px; }
 .pcp-ab-t { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 21px; font-weight: 700; color: var(--qx-ink); }
 .pcp-ab-t > svg { color: var(--qx-teal-d); }
-.pcp-ab-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pcp-ab-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .pcp-ab-col {
   display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 14px; background: var(--qx-teal-soft);
   color: var(--qx-teal-d);
@@ -484,7 +484,7 @@
   .pcp-hid-ab-col { padding: 12px 14px; font-size: 15px; }
   .pcp-hid-ab-col b { font-size: 17px; }
 
-  /* 三种码对照：三栏在 390 下被挤成竖排字，改单列逐条排，三条说明都保留。 */
+  /* 两种码对照：两栏在 390 下被挤成竖排字，改单列逐条排，两条说明都保留。 */
   .qx-card.pcp-ab { padding: 16px; border-radius: 20px; }
   .pcp-ab-cols { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .pcp-ab-col { padding: 12px 16px; }
