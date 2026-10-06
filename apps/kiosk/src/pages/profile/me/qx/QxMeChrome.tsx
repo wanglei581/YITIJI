@@ -1,4 +1,4 @@
-import { Children, cloneElement, createContext, isValidElement, useContext, type ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowRightIcon,
@@ -10,7 +10,6 @@ import {
   RefreshCwIcon,
   SparklesIcon,
   TriangleAlertIcon,
-  type LucideIcon,
 } from 'lucide-react'
 import { QxPageFrame } from '../../../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../../../components/qingxu/QxAppNavbar'
@@ -316,28 +315,6 @@ export function QxMeGuide({ items }: { items: [string, string, string][] }) {
   )
 }
 
-function childText(node: ReactNode): string {
-  return Children.toArray(node).map((kid) => (typeof kid === 'string' || typeof kid === 'number' ? String(kid) : '')).join('')
-}
-
-function primaryIcon(text: string): LucideIcon {
-  if (text.includes('登录')) return LogInIcon
-  if (text.includes('还未加载') || text.includes('正在')) return ClockIcon
-  if (text.includes('重新')) return RefreshCwIcon
-  return ArrowRightIcon
-}
-
-/** 给还没有图标的底栏键补一枚。写着「工作人员」「服务台」的键一个字都不动。 */
-function paintButton(node: ReactNode): ReactNode {
-  if (!isValidElement<{ children?: ReactNode }>(node)) return node
-  if (node.type !== 'button' && node.type !== 'span') return node
-  const text = childText(node.props.children)
-  if (text.includes('工作人员') || text.includes('服务台')) return node
-  if (Children.toArray(node.props.children).some((kid) => isValidElement(kid))) return node
-  const Icon = primaryIcon(text)
-  return cloneElement(node, {}, <Icon size={24} aria-hidden />, node.props.children)
-}
-
 export function QxMeAskButton({ label, draft }: QxMeAsk) {
   const navigate = useNavigate()
   return (
@@ -357,26 +334,20 @@ export function QxMeAskButton({ label, draft }: QxMeAsk) {
   )
 }
 
-/** 操作条两行：上面整行按钮，下面通栏「本人可见」。放进 QxPageFrame 的 ctabar 插槽，不改共享壳。 */
+/** 操作条两行：上面整行按钮，下面通栏「本人可见」。不改子元素。 */
 function QxMeCtaStack({ truth, children }: { truth: string; children: ReactNode }) {
-  const ask = useMeAsk()
-  const nodes = Children.toArray(children)
-  const flat = nodes.length >= 2 && nodes.every((node) => isValidElement(node) && (node.type === 'button' || node.type === 'span'))
-  const row = flat
-    ? nodes.flatMap((node, index) => {
-        const painted = paintButton(node)
-        const keyed = isValidElement(painted) ? cloneElement(painted, { key: `cta-${index}` }) : painted
-        return index === nodes.length - 1 && ask
-          ? [<QxMeAskButton key="qx-me-ask" {...ask} />, keyed]
-          : [keyed]
-      })
-    : children
   return (
     <div className="qx-me-cta-stack">
-      <div className="qx-me-cta-row">{row}</div>
+      <div className="qx-me-cta-row">{children}</div>
       <p className="qx-me-truth"><b>本人可见</b><span>{truth}</span></p>
     </div>
   )
+}
+
+/** 按当前页和状态放「问小青」。没有该问的状态渲染为空。 */
+export function QxMeAskSlot() {
+  const ask = useMeAsk()
+  return ask ? <QxMeAskButton {...ask} /> : null
 }
 
 export function QxMeCta({
@@ -398,7 +369,82 @@ export function QxMeCta({
         {secondaryLabel}
       </button>
       {ask ? <QxMeAskButton {...ask} /> : null}
-      {paintButton(primary)}
+      {primary}
+    </>
+  )
+}
+
+function QxMeBackToProfile({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="qx-btn" data-variant="ghost" data-route="/profile" onClick={onClick}>
+      <ChevronLeftIcon size={24} aria-hidden />
+      返回我的
+    </button>
+  )
+}
+
+/** 记录类底栏。每个状态的键和图标写在分支里，渲染时才读问小青（此时已在壳的 Provider 下）。 */
+function QxMeRecordsCta({
+  uiState,
+  navigate,
+  retry,
+  loginFrom,
+  readyLabel,
+  onReady,
+}: {
+  uiState: string
+  navigate: ReturnType<typeof useNavigate>
+  retry: () => void
+  loginFrom: string
+  readyLabel: string
+  onReady: () => void
+}) {
+  const ask = useMeAsk()
+  const askButton = ask ? <QxMeAskButton {...ask} /> : null
+  if (uiState === 'error' || uiState.endsWith('error')) {
+    return (
+      <>
+        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
+        {askButton}
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={retry}>
+          <RefreshCwIcon size={24} aria-hidden />
+          重新加载
+        </button>
+      </>
+    )
+  }
+  if (uiState === 'login' || uiState.endsWith('login')) {
+    return (
+      <>
+        <QxMeBackToProfile onClick={() => navigate('/profile')} />
+        {askButton}
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => navigate('/login', { state: { from: loginFrom } })}>
+          <LogInIcon size={24} aria-hidden />
+          手机号登录
+        </button>
+      </>
+    )
+  }
+  if (uiState === 'loading' || uiState.endsWith('loading')) {
+    return (
+      <>
+        <QxMeBackToProfile onClick={() => navigate('/profile')} />
+        {askButton}
+        <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="member-records-primary">
+          <ClockIcon size={24} aria-hidden />
+          记录还未加载完成
+        </span>
+      </>
+    )
+  }
+  return (
+    <>
+      <QxMeBackToProfile onClick={() => navigate('/profile')} />
+      {askButton}
+      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={onReady}>
+        <ArrowRightIcon size={24} aria-hidden />
+        {readyLabel}
+      </button>
     </>
   )
 }
@@ -411,25 +457,14 @@ export function recordsCtabar(
   readyLabel: string,
   onReady: () => void,
 ): ReactNode {
-  if (uiState === 'error' || uiState.endsWith('error')) {
-    return (
-      <>
-        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={retry}>重新加载</button>
-      </>
-    )
-  }
-  const primary = uiState === 'login' || uiState.endsWith('login')
-    ? <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => navigate('/login', { state: { from: loginFrom } })}>手机号登录</button>
-    : uiState === 'loading' || uiState.endsWith('loading')
-      ? <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="member-records-primary">记录还未加载完成</span>
-      : <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={onReady}>{readyLabel}</button>
   return (
-    <QxMeCta
-      secondaryLabel="返回我的"
-      secondaryRoute="/profile"
-      onSecondary={() => navigate('/profile')}
-      primary={primary}
+    <QxMeRecordsCta
+      uiState={uiState}
+      navigate={navigate}
+      retry={retry}
+      loginFrom={loginFrom}
+      readyLabel={readyLabel}
+      onReady={onReady}
     />
   )
 }

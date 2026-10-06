@@ -472,6 +472,30 @@ async function expectMeShell(page: Page, item: (typeof ME_SHELL_PAGES)[number]):
   await expect(page).toHaveURL(/\/profile$/)
 }
 
+test('me error cta on documents and notifications includes 问小青 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const down = { status: 500 as const, json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } } }
+  api.respond('GET', '/api/v1/me/documents', down)
+  api.respond('GET', '/api/v1/me/notifications', down)
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  const documentsRow = page.locator('.qx-me-cta-row')
+  await expect(documentsRow.getByRole('button', { name: '联系工作人员', exact: true })).toBeVisible()
+  await expect(documentsRow.getByTestId('qx-me-ask')).toHaveAccessibleName('问小青：怎么打')
+  await expect(documentsRow.getByRole('button', { name: '重新加载', exact: true }).locator('svg')).toHaveCount(1)
+  await expect(documentsRow.locator('.qx-btn')).toHaveCount(3)
+
+  await loginThroughVisibleUi(page, '/me/notifications')
+  const notificationsRow = page.locator('.qx-me-cta-row')
+  await expect(notificationsRow.getByRole('button', { name: '联系工作人员', exact: true })).toBeVisible()
+  await expect(notificationsRow.getByTestId('qx-me-ask')).toHaveAccessibleName('问小青')
+  await expect(notificationsRow.getByRole('button', { name: '重新加载', exact: true }).locator('svg')).toHaveCount(1)
+  await expect(notificationsRow.locator('.qx-btn')).toHaveCount(3)
+  expect(errors).toEqual([])
+})
+
 for (const item of ME_SHELL_PAGES) {
   test(`me shell signed-out ${item.path} shows page name, back, ask and 20px floor @w5-kiosk`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)

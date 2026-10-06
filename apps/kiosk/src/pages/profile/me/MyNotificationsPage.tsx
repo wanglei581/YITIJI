@@ -8,9 +8,12 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BellIcon,
+  ClockIcon,
+  LogInIcon,
   MegaphoneIcon,
   MessageSquareIcon,
   PrinterIcon,
+  RefreshCwIcon,
   SparklesIcon,
   WrenchIcon,
   CheckIcon,
@@ -26,7 +29,7 @@ import {
   type MemberNotificationItem,
 } from '../../../services/api/memberNotifications'
 import { formatTime } from '../assets/format'
-import { QxMeBanner, QxMeCta, QxMeGuide, QxMePage, QxMeSummary, QX_ME_GUIDE } from './qx/QxMeChrome'
+import { QxMeAskSlot, QxMeBanner, QxMeCta, QxMeGuide, QxMePage, QxMeSummary, QX_ME_GUIDE } from './qx/QxMeChrome'
 import './styles/notifications-qx.css'
 
 const CATEGORY_META: Record<string, { label: string; icon: typeof BellIcon; tone: 'slate' | 'clay' | 'plum' | 'wheat' | undefined; hint: string }> = {
@@ -283,22 +286,46 @@ function notificationCtabar({
     return (
       <>
         <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={refresh}>重新加载</button>
+        <QxMeAskSlot />
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={refresh}>
+          <RefreshCwIcon size={24} aria-hidden />
+          重新加载
+        </button>
       </>
     )
   }
   const primary = (() => {
     if (uiState === 'login') {
-      return <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={() => navigate('/login', { state: { from: loginFrom } })}>手机号登录</button>
+      return (
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={() => navigate('/login', { state: { from: loginFrom } })}>
+          <LogInIcon size={24} aria-hidden />
+          手机号登录
+        </button>
+      )
     }
     if (uiState === 'loading') {
-      return <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="notifications-primary">消息还未加载完成</span>
+      return (
+        <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="notifications-primary">
+          <ClockIcon size={24} aria-hidden />
+          消息还未加载完成
+        </span>
+      )
     }
     if (uiState === 'unread-empty') {
-      return <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={onShowAll}>看全部消息</button>
+      return (
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={onShowAll}>
+          <BellIcon size={24} aria-hidden />
+          看全部消息
+        </button>
+      )
     }
     if (busy) {
-      return <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="notifications-primary">正在标记全部已读…</span>
+      return (
+        <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="notifications-primary">
+          <ClockIcon size={24} aria-hidden />
+          正在标记全部已读…
+        </span>
+      )
     }
     if (!canUseRemote || unreadCount === 0) {
       return <span className="qx-btn" data-variant="primary" aria-disabled="true" aria-label="全部已读（当前没有未读消息）" data-testid="notifications-primary"><CheckIcon size={24} aria-hidden />全部已读</span>
