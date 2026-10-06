@@ -8,6 +8,12 @@
  * 门禁断言会先除回 scale 再比 48/56，所以这里写的就是 CSS px 真值。
  */
 
+/* 稿 16 顶栏时钟。壳层类名只有字族和字号，这里补上稿的字重。 */
+.qx-stage:has([data-qx-page='service-hub']) .qx-topbar-clock {
+  font-weight: 700;
+  font-size: 24px;
+}
+
 /* 稿 16 没有第二套页头：深色导言就是标题。框架页头留给读屏。 */
 .qx-stage:has([data-qx-page='service-hub']) > .qx-pagehead {
   position: absolute;
