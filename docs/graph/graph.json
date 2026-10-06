@@ -12258,10 +12258,14 @@
           "component": "AuditPage",
           "endpoints": [
             "GET /admin/import-batches",
+            "GET /admin/orders",
+            "GET /admin/orders/:param",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
-            "PATCH /admin/job-sources/:param/review"
+            "PATCH /admin/job-sources/:param/review",
+            "POST /admin/orders/:param/mark-paid",
+            "POST /admin/orders/:param/refund"
           ],
           "file": "apps/admin/src/routes/audit/index.tsx",
           "layout": [
@@ -12617,6 +12621,8 @@
             "DELETE /admin/orgs/:param/accounts/:param/action-tickets/current",
             "DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current",
             "GET /admin/import-batches",
+            "GET /admin/orders",
+            "GET /admin/orders/:param",
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
@@ -12632,6 +12638,8 @@
             "PATCH /admin/orgs/:param/accounts/:param/status",
             "PATCH /admin/orgs/:param/content-trust",
             "PATCH /admin/orgs/:param/status",
+            "POST /admin/orders/:param/mark-paid",
+            "POST /admin/orders/:param/refund",
             "POST /admin/orgs",
             "POST /admin/orgs/:param/accounts",
             "POST /admin/orgs/:param/accounts/:param/action-challenges",
@@ -18312,12 +18320,14 @@
     "apps/admin/src/routes/orders/orderDisplay.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "apps/admin/scripts/verify-console-privacy-copy.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
     "apps/admin/src/routes/orders/orderHonestyCopy.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
     "apps/admin/src/routes/orders/useOrderDetail.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
@@ -22203,7 +22213,9 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "packages/shared/src/types/admin.ts": [
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-admin-users-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
     "packages/shared/src/types/adminUsers.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs",
@@ -22311,6 +22323,7 @@
     ],
     "packages/shared/src/types/partner.ts": [
       "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+      "apps/admin/scripts/verify-admin-users-ui.mjs",
       "apps/admin/scripts/verify-console-privacy-copy.mjs",
       "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-smart-campus.ts"
@@ -27517,10 +27530,14 @@
           "apps/admin/src/routes/users/index.tsx",
           "apps/admin/src/routes/users/userPresentation.ts",
           "apps/admin/src/services/api/adminUsers.ts",
+          "packages/shared/src/types/admin.ts",
           "packages/shared/src/types/adminUsers.ts",
+          "packages/shared/src/types/partner.ts",
           "packages/ui/src/components/Drawer.tsx"
         ],
-        "missing": []
+        "missing": [
+          "src/routes/users/activityDisplay.ts"
+        ]
       },
       "file": "apps/admin/scripts/verify-admin-users-ui.mjs",
       "helper": false,
@@ -27555,7 +27572,9 @@
           "packages/ui/src/screen/twin/TwinCharts.tsx",
           "packages/ui/src/screen/twin/TwinTerminalBoard.tsx"
         ],
-        "missing": []
+        "missing": [
+          "apps/admin/src/routes/screen/measureUnit.ts"
+        ]
       },
       "file": "apps/admin/scripts/verify-console-batch5-copy.mjs",
       "helper": true,
@@ -27579,7 +27598,9 @@
           "packages/ui/src/screen/twin/TwinCharts.tsx",
           "packages/ui/src/screen/twin/TwinTerminalBoard.tsx"
         ],
-        "missing": []
+        "missing": [
+          "apps/admin/src/routes/screen/measureUnit.ts"
+        ]
       },
       "file": "apps/admin/scripts/verify-console-batch6-copy.mjs",
       "helper": true,
@@ -27687,6 +27708,8 @@
           "apps/admin/src/routes/audit/auditPayloadLabels.ts",
           "apps/admin/src/routes/audit/auditPresentation.ts",
           "apps/admin/src/routes/audit/index.tsx",
+          "apps/admin/src/routes/orders/orderDisplay.ts",
+          "apps/admin/src/routes/orders/orderHonestyCopy.ts",
           "apps/admin/src/routes/partners/ContentTrustCell.tsx",
           "apps/admin/src/routes/partners/PartnerTable.tsx",
           "apps/admin/src/routes/partners/contentTrustRules.ts",
@@ -27698,6 +27721,7 @@
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/profile/ComplianceRestrictions.tsx",
           "apps/partner/src/routes/profile/index.tsx",
+          "packages/shared/src/types/admin.ts",
           "packages/shared/src/types/partner.ts"
         ],
         "missing": []
@@ -31911,7 +31935,9 @@
           "apps/partner/src/services/api/stats.ts",
           "apps/partner/src/services/api/terminalOps.ts"
         ],
-        "missing": []
+        "missing": [
+          "src/routes/stats/ServiceVisitsCard.tsx"
+        ]
       },
       "file": "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "helper": false,

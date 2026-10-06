@@ -12,6 +12,11 @@ test.describe('数据统计（mock 口径：dataMode=demo）', () => {
     await waitForMockList(page)
 
     await expect(page.getByText('在架岗位')).toBeVisible()
+    const visits = page.getByRole('region', { name: '服务人次' })
+    await expect(visits).toBeVisible()
+    await expect(visits).toContainText('近 7 天（截至昨天）')
+    await expect(visits).toContainText('样本不足，不显示')
+    await expect(visits.getByRole('link', { name: '查看各终端明细' })).toHaveAttribute('href', '/terminals')
     await expect(page.getByText('产生了什么效果')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: '同步概况' })).toBeVisible()
     await expect(page.getByText('还不能按本机构统计，这里不显示这些数字')).toBeVisible()

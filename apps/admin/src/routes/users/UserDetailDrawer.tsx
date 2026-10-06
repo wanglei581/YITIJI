@@ -4,6 +4,7 @@ import { XIcon } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { ApiHttpError } from '../../services/api/client'
 import { getDetail } from '../../services/api/adminUsers'
+import { activityActionText, activityCategoryText, activityStatusText, activityTerminalText } from './activityDisplay'
 import { ACTIVITY_TYPE_LABELS } from './userPresentation'
 
 interface UserDetailDrawerProps {
@@ -23,16 +24,20 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
-function DetailField({ label, value }: { label: string; value: string }) {
+function DetailField({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
     <div>
       <dt className="text-xs text-neutral-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-medium text-neutral-800">{value}</dd>
+      <dd title={title} className="mt-1 break-words text-sm font-medium text-neutral-800">{value}</dd>
     </div>
   )
 }
 
 function ActivityCard({ activity }: { activity: AdminUserActivityItem }) {
+  const category = activityCategoryText(activity)
+  const action = activityActionText(activity)
+  const status = activityStatusText(activity)
+  const terminal = activityTerminalText(activity.terminalId)
   return (
     <li className="rounded-lg border border-neutral-100 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -40,10 +45,10 @@ function ActivityCard({ activity }: { activity: AdminUserActivityItem }) {
         <time className="text-xs text-neutral-400" dateTime={activity.occurredAt} title={formatDateTime(activity.occurredAt)}>{formatDateTime(activity.occurredAt)}</time>
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-        <DetailField label="类别" value={activity.category ?? '—'} />
-        <DetailField label="动作" value={activity.action ?? '—'} />
-        <DetailField label="状态" value={activity.status || '—'} />
-        <DetailField label="终端" value={activity.terminalId ?? '—'} />
+        <DetailField label="类别" value={category.label} title={category.title} />
+        <DetailField label="动作" value={action.label} title={action.title} />
+        <DetailField label="状态" value={status.label} title={status.title} />
+        <DetailField label="终端" value={terminal.label} title={terminal.title} />
       </dl>
     </li>
   )

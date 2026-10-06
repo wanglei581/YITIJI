@@ -5,11 +5,18 @@ export function verifyPrivacyCopy({ runFile, textOf, shared, ui, hooks, common, 
 console.log('\n=== 第四批实际渲染：审计与账号隐私 ===')
 const auditLabels = labels
 const { getAuditActionLabel } = labels
+const orderHonesty = runFile('apps/admin/src/routes/orders/orderHonestyCopy.ts', { '@ai-job-print/shared': shared })
+const orderDisplay = runFile('apps/admin/src/routes/orders/orderDisplay.ts', { '@ai-job-print/shared': shared, './orderHonestyCopy': orderHonesty })
+const partnerTypes = runFile('packages/shared/src/types/partner.ts')
+const adminTypes = runFile('packages/shared/src/types/admin.ts')
 const auditPresentation = runFile('apps/admin/src/routes/audit/auditPresentation.ts', {
-  './auditPayloadLabels': runFile('apps/admin/src/routes/audit/auditPayloadLabels.ts'),
+  './auditPayloadLabels': runFile('apps/admin/src/routes/audit/auditPayloadLabels.ts', {
+    '@ai-job-print/shared': { ...shared, ...partnerTypes, ...adminTypes },
+  }),
   '../../lib/auditActionLabels': auditLabels,
   '../users/userPresentation': runFile('apps/admin/src/routes/users/userPresentation.ts'),
   '../screen/metricLabels': runFile('apps/admin/src/routes/screen/metricLabels.ts', { '@ai-job-print/shared': shared, '@ai-job-print/ui': ui }),
+  '../orders/orderDisplay': orderDisplay,
 })
 const auditTable = runFile('apps/admin/src/routes/audit/auditColumns.tsx', {
   '@ai-job-print/shared': shared, '@ai-job-print/ui': ui,

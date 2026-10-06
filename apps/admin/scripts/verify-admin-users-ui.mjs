@@ -14,8 +14,9 @@
  * 必须填原因、后果文案必须与实际代码行为一致。边界是挪位置，不是撤掉。
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import ts from 'typescript'
+import vm from 'node:vm'
 
 const root = process.cwd()
 const paths = {
@@ -241,5 +242,81 @@ if (page.includes('UserDetailDrawer') && !page.includes('UsersIcon')) {
 } else {
   fail('用户页仍可能是占位实现')
 }
+
+const drawerCode = drawer.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+const cardStart = drawerCode.indexOf('function ActivityCard')
+const cardEnd = drawerCode.indexOf('export function UserDetailDrawer')
+const card = cardStart >= 0 && cardEnd > cardStart ? drawerCode.slice(cardStart, cardEnd) : ''
+for (const call of ['activityCategoryText(activity)', 'activityStatusText(activity)', 'activityActionText(activity)', 'activityTerminalText(activity.terminalId)']) {
+  if (!card.includes(call)) fail(`最近活动没有调用 ${call}`)
+}
+for (const raw of ['activity.category ??', 'activity.status ||', 'activity.status ??', 'activity.terminalId ??', '{activity.category}', '{activity.status}', '{activity.terminalId}', '{activity.action}']) {
+  if (card.includes(raw)) fail(`最近活动仍直接渲染原值：${raw}`)
+}
+
+function loadActivityModule() {
+  const cache = new Map()
+  const partner = loadPlain(join(root, '../../packages/shared/src/types/partner.ts'))
+  const adminTypes = loadPlain(join(root, '../../packages/shared/src/types/admin.ts'))
+  const stubs = {
+    '@ai-job-print/shared': {
+      formatDateTime: (value) => String(value ?? ''),
+      formatYuan: (value) => String(value),
+      AI_OPERATION_LABELS: {},
+      AI_USAGE_FEATURE_LABELS: {},
+      ...partner,
+      ...adminTypes,
+    },
+    '@ai-job-print/ui': { screenCount: (value) => String(value) },
+  }
+  function loadPlain(file) {
+    return load(file, {})
+  }
+  function load(file, localStubs) {
+    if (cache.has(file)) return cache.get(file)
+    const js = ts.transpileModule(readFileSync(file, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+      fileName: file,
+    }).outputText
+    const exportsBox = {}
+    const mod = { exports: exportsBox }
+    const req = (id) => {
+      const table = Object.keys(localStubs).length ? localStubs : stubs
+      if (Object.prototype.hasOwnProperty.call(table, id)) return table[id]
+      if (!id.startsWith('.')) throw new Error(`最近活动模块出现未登记依赖 ${id}（${file}）`)
+      const base = join(dirname(file), id)
+      return load(base.endsWith('.ts') || base.endsWith('.tsx') ? base : `${base}.ts`, stubs)
+    }
+    vm.runInNewContext(js, { module: mod, exports: exportsBox, require: req }, { filename: file })
+    cache.set(file, mod.exports)
+    return mod.exports
+  }
+  return load(join(root, 'src/routes/users/activityDisplay.ts'), stubs)
+}
+
+const activity = loadActivityModule()
+const samples = [
+  activity.activityCategoryText({ type: 'file', category: 'resume_upload:application/pdf', status: 'active', action: null }),
+  activity.activityStatusText({ type: 'file', category: 'resume_upload:application/pdf', status: 'active', action: null }),
+  activity.activityStatusText({ type: 'print', category: null, status: 'pending_release', action: null }),
+  activity.activityStatusText({ type: 'print', category: null, status: 'completed', action: null }),
+  activity.activityCategoryText({ type: 'ai', category: 'optimize_confirmed', status: 'completed', action: null }),
+  activity.activityCategoryText({ type: 'ai', category: 'parse_intent', status: 'completed', action: null }),
+  activity.activityTerminalText('t_09fd272201b6588e'),
+]
+const visible = samples.map((item) => item.label).join('\n')
+if (samples[0].label !== '上传简历（PDF）' || samples[1].label !== '上传完成' || samples[2].label !== '待到机' || samples[3].label !== '已完成') {
+  fail(`最近活动中文不对：${visible}`)
+}
+if (samples[4].label !== '简历优化确认稿' || samples[5].label !== '简历诊断提交') fail(`AI 类别中文不对：${samples[4].label} / ${samples[5].label}`)
+if (samples[6].label !== '终端（尾号 b6588e）' || samples[6].title !== 't_09fd272201b6588e' || samples[6].label.includes('t_')) {
+  fail(`终端应显示尾号，完整 ID 只放悬停：${samples[6].label}`)
+}
+if (/\b(completed|active|optimize_confirmed|parse_intent|resume_upload|application\/pdf|pending_release)\b/.test(visible) || visible.includes('t_')) {
+  fail(`最近活动可见文字仍有英文枚举或内部 ID：${visible}`)
+}
+const unknown = activity.activityCategoryText({ type: 'ai', category: 'future_kind', status: null, action: null })
+if (unknown.label !== '未归类（future_kind）' || unknown.title !== 'future_kind') fail('未知类别必须保留原值')
+pass('最近活动状态、类别和终端走中文映射，可见文字不含英文枚举与 t_ 内部 ID')
 
 console.log('\nALL PASS')
