@@ -1,4 +1,4 @@
-// C2-16：51 手机接力的小青页脚、签名屏、扫码登录错误态、390×844 字号与单卡留白。
+// 51 手机接力：小青页脚、签名屏、扫码登录错误态、390×844 字号、单卡留白、预检错误说明在首屏。
 import type { Page } from '@playwright/test'
 import { expect, test } from '../fixtures/kiosk-test'
 import { prepareRelayPages, type RelayPagesPlan } from './fixtures/qingxu-pair-relay-pages'
@@ -72,7 +72,7 @@ function refuseStaff(text: string): void {
   expect(text).not.toContain('服务台')
 }
 
-test('两条手机接力路由都只放小青页脚句，不放问小青按钮 @relay-c216', async ({ page }) => {
+test('两条手机接力路由都只放小青页脚句，不放问小青按钮 @mobile', async ({ page }) => {
   await page.goto('/member/qr-login')
   await expect(page.locator('.k1-mobile-qr-xiaoqing')).toHaveText(XIAOQING)
   await expect(page.getByRole('button', { name: '问小青' })).toHaveCount(0)
@@ -82,22 +82,21 @@ test('两条手机接力路由都只放小青页脚句，不放问小青按钮 @
   await expect(page.locator('main[data-kiosk-screen="phone-upload"]')).toContainText(XIAOQING)
 })
 
-test('签名屏写本机上传，不写工作人员 @relay-c216', async ({ page, api }) => {
+test('签名屏不指向本机上传，不写工作人员 @mobile', async ({ page, api }) => {
   api.respond('GET', '/api/v1/public/support-contact', { status: 404, json: { success: false } })
   await prepareRelayPages(page, api, asTarget('phone-upload', 'signature-blocked', '/upload/phone#purpose=signature_image'))
   const root = page.locator('main[data-kiosk-screen="phone-upload"]')
   await expect(root.getByRole('heading', { name: '签名暂不支持手机上传', exact: true })).toBeVisible()
   const text = await root.innerText()
-  expect(text).toContain('本机上传')
-  expect(text).toContain('请回到一体机，在「签名」的第 2 步用「本机上传」选一张本人手写签名照片（JPG / PNG）。')
-  expect(text).toContain('返回上一步。')
-  expect(text).toContain('本页没有别的上传方式可试。')
-  expect(text).toContain('需要帮助？查看《隐私政策》里的联系方式。')
+  expect(text).not.toContain('本机上传')
+  expect(text).toContain('请回到「签名」的原步骤查看可用方式。没有可用方式时，需要帮助？查看《隐私政策》里的联系方式。')
+  expect(text).toContain('回到原步骤查看可用方式；只接受本人手写签名图片。')
+  expect(text).toContain('返回上一步。需要帮助？查看《隐私政策》里的联系方式。本页没有别的上传方式可试。')
   expect(text).not.toContain('拨打服务电话')
   refuseStaff(text)
 })
 
-test('扫码登录各错误态不出现工作人员，有号码和没号码两种拼法都读得通 @relay-c216', async ({ page, api }) => {
+test('扫码登录各错误态不出现工作人员，有号码和没号码两种拼法都读得通 @mobile', async ({ page, api }) => {
   api.respond('GET', STATUS, pending(126))
   api.respond('POST', SMS, fail(400, 'SMS_REJECTED', '请求失败（400）'))
   const denied = await openQr(page)
@@ -105,7 +104,7 @@ test('扫码登录各错误态不出现工作人员，有号码和没号码两�
   await expect(denied).toHaveAttribute('data-mobile-qr-state', 'send-error')
   await expect(denied).toContainText('需要帮助？拨打服务电话')
   const deniedText = await denied.innerText()
-  expect(deniedText).toContain('系统没有接受这次请求。请核对手机号后再试。仍然不行就回一体机换其他登录方式。')
+  expect(deniedText).toContain('系统没有接受这次请求。请核对手机号后再试；仍然不行就回一体机换其他登录方式。')
   expect(deniedText).not.toMatch(/，需要帮助？/)
   refuseStaff(deniedText)
 
@@ -138,7 +137,7 @@ test('扫码登录各错误态不出现工作人员，有号码和没号码两�
   await send(expired)
   await confirm(expired, '572046')
   await expect(expired).toHaveAttribute('data-mobile-qr-state', 'confirm-code-expired')
-  await expect(expired).toContainText('回一体机在屏幕上换其他登录方式；拨打服务电话 18369161921（工作日 9:00–18:00）')
+  await expect(expired).toContainText('回一体机在屏幕上换其他登录方式。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。')
   const expiredText = await expired.innerText()
   refuseStaff(expiredText)
 
@@ -151,7 +150,7 @@ test('扫码登录各错误态不出现工作人员，有号码和没号码两�
   await expect(rejected).toHaveAttribute('data-mobile-qr-state', 'confirm-rejected')
   await expect(rejected).toContainText('需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。')
   const rejectedText = await rejected.innerText()
-  expect(rejectedText).toContain('系统没有接受这次确认。可以核对手机号和验证码后再试。仍然不行就回一体机换其他登录方式。')
+  expect(rejectedText).toContain('系统没有接受这次确认。可以核对手机号和验证码后再试；仍然不行就回一体机换其他登录方式。')
   expect(rejectedText).toContain('这张二维码没有因此作废。')
   expect(rejectedText).not.toMatch(/，需要帮助？/)
   const alert = rejected.locator('.k1-mobile-qr-alert')
@@ -162,7 +161,7 @@ test('扫码登录各错误态不出现工作人员，有号码和没号码两�
   refuseStaff(rejectedText)
 })
 
-test('390×844 可见文字不小于 15px，三张单卡屏整行空白小于 160px @relay-c216', async ({ page, api }) => {
+test('390×844 可见文字不小于 15px，三张单卡屏整行空白小于 160px @mobile', async ({ page, api }) => {
   const screens: Array<{ screen: 'qr-login' | 'phone-upload'; state: string; url: string }> = [
     { screen: 'qr-login', state: 'missing-ticket', url: '/member/qr-login' },
     { screen: 'qr-login', state: 'checking', url: '/member/qr-login?ticketId=relay51qr0123456789abcdef' },
@@ -243,5 +242,17 @@ test('390×844 可见文字不小于 15px，三张单卡屏整行空白小于 16
     blanks[`${item.screen}/${item.state}`] = gap
     expect(gap, `${item.screen}/${item.state} 整行空白 ${gap}px`).toBeLessThan(160)
   }
-  console.log(`C2-16 整行空白 ${JSON.stringify(blanks)}`)
+  console.log(`手机接力整行空白 ${JSON.stringify(blanks)}`)
+})
+
+test('390×844 四态预检错误说明的底边不超过首屏 @mobile', async ({ page, api }) => {
+  for (const state of ['empty-error', 'too-large', 'type-error', 'content-type-error']) {
+    await prepareRelayPages(page, api, asTarget('phone-upload', state, `/upload/phone#sessionId=upl51haichuan&token=tok51haichuan&purpose=resume_upload`))
+    const note = page.getByTestId('phone-upload-precheck-error')
+    await expect(note).toBeVisible()
+    const box = await note.boundingBox()
+    expect(box, `${state} 没有量到预检错误说明`).toBeTruthy()
+    const bottom = box!.y + box!.height
+    expect(bottom, `${state} 预检错误说明底边 ${bottom}`).toBeLessThanOrEqual(844)
+  }
 })

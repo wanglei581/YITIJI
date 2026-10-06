@@ -17,11 +17,12 @@ import {
   UploadIcon,
   type LucideIcon,
 } from 'lucide-react'
-import { helpNeededLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { uploadPhoneSessionFile, uploadSessionUserMessage } from '../../services/api/uploadSessions'
 
 const XIAOQING_FOOT = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
+/** 空文件、超限、格式、类型。红色预检说明要在 390×844 首屏里看全，这四态的页脚跟在说明后面。 */
+const PRECHECK_ERROR_STATES = new Set<string>(['empty-error', 'too-large', 'type-error', 'content-type-error'])
 import {
   useDocumentConversionCapabilities,
   WORD_CONVERSION_DISCLOSURE,
@@ -164,10 +165,20 @@ function FileBox({ file, removable, note, onRemove }: {
   )
 }
 
+function RelayFoot({ icon, text }: { icon: IconKey; text: string }) {
+  return (
+    <>
+      <p className="ph-up-xiaoqing">{XIAOQING_FOOT}</p>
+      <p className="ph-up-footer">
+        <Icon name={icon} />
+        <span>{text}</span>
+      </p>
+    </>
+  )
+}
+
 export function PhoneUploadPage() {
-  const contact = useSupportContact()
-  const helpLine = helpNeededLine(contact)
-  const helpSentence = /[。！？]$/.test(helpLine) ? helpLine : `${helpLine}。`
+  useSupportContact()
   const kiosk = useTerminalKiosk()
   const location = useLocation()
   const { capabilities: conversionCapabilities, loading: conversionLoading } = useDocumentConversionCapabilities()
@@ -198,8 +209,9 @@ export function PhoneUploadPage() {
     ? uploadView(s.state, { file: s.file, typeIssue: s.typeIssue, unknownType: Boolean(s.file && !s.file.type), chips: policy.chips })
     : null
   const canPick = !kiosk && ready && view?.picker === 'ready'
+  const precheckError = PRECHECK_ERROR_STATES.has(s.state)
   const chrome = chromeCopy(issue, s.state, confirmed?.label ?? null)
-  const takeover = issue ? takeoverCopy(issue, helpSentence) : null
+  const takeover = issue ? takeoverCopy(issue) : null
   const chipsText = policy.chips.join(' / ')
   const formatsNote = conversionCapabilities.wordToPdf
     ? `在系统核对用途之前，本页只放行 **${chipsText}**；Word ${WORD_CONVERSION_DISCLOSURE}。要传其他格式，请回一体机按那一步屏幕上的说明操作。`
@@ -309,6 +321,13 @@ export function PhoneUploadPage() {
                       {hinted && <span className="ph-up-unsure">链接里写着这次可能是「{hinted.label}」。本页无法核对这句话，也不按它决定任何事。</span>}
                     </span>
                   </p>
+                  {precheckError && view.fileNote && (
+                    <p className="ph-up-note" data-tone={view.fileNote.tone} data-testid="phone-upload-precheck-error">
+                      <Icon name={noteIcon(view.fileNote.tone, 'info')} />
+                      <span><Rich text={view.fileNote.text} /></span>
+                    </p>
+                  )}
+                  {precheckError && <RelayFoot icon={chrome.icon} text={chrome.foot} />}
                   {!view.facts && (
                     <ol className="ph-up-steps" aria-label="手机上传的三步">
                       {UPLOAD_STEPS.map((step, index) => (
@@ -317,7 +336,7 @@ export function PhoneUploadPage() {
                     </ol>
                   )}
                   {renderPicker(view.picker)}
-                  <FileBox file={s.file} removable={view.removable} note={view.fileNote} onRemove={removeFile} />
+                  <FileBox file={s.file} removable={view.removable} note={precheckError ? null : view.fileNote} onRemove={removeFile} />
                   {view.chips && (
                     <>
                       <div className="ph-up-sect">现在能发送的格式</div>
@@ -355,11 +374,7 @@ export function PhoneUploadPage() {
           )}
         </div>
 
-        <p className="ph-up-xiaoqing">{XIAOQING_FOOT}</p>
-        <p className="ph-up-footer">
-          <Icon name={chrome.icon} />
-          <span>{chrome.foot}</span>
-        </p>
+        {!precheckError && <RelayFoot icon={chrome.icon} text={chrome.foot} />}
       </section>
     </main>
   )

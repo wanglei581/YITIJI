@@ -216,10 +216,10 @@ export function MobileQrLoginPage() {
     setS((prev) => ({ ...prev, state: formEntryState(prev.deviceLabel), locked: false, hasUsableCode: false, code: '', cooldown: 0 }))
   }, [])
 
-  const contact = useSupportContact()
+  useSupportContact()
   const ready = isFormState(s.state)
   const takeover = takeoverCopy(s.state, s.deviceLabel)
-  const alert = ready ? formAlertCopy(s, contact) : null
+  const alert = ready ? formAlertCopy(s) : null
   const compact = s.locked || alert !== null
   const device = formDeviceCopy(s.deviceLabel, compact)
   const chrome = chromeCopy(s.state)
@@ -274,7 +274,7 @@ export function MobileQrLoginPage() {
               <Steps />
               <QrForm
                 facts={s}
-                notices={formNoticesCopy(s, s.sentSeconds, contact)}
+                notices={formNoticesCopy(s, s.sentSeconds)}
                 phoneRef={phoneRef}
                 codeRef={codeRef}
                 onPhone={(phone) => setS((prev) => ({ ...prev, phone }))}
@@ -283,7 +283,7 @@ export function MobileQrLoginPage() {
                 onChangePhone={handleChangePhone}
               />
               <div className="k1-mobile-qr-grow" />
-              <Facts rows={formFactsCopy(s, contact)} />
+              <Facts rows={formFactsCopy(s)} />
             </>
           )}
         </div>

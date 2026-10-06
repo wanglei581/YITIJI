@@ -12,14 +12,8 @@ import {
   sendBlockedBy,
   sendVerb,
 } from './mobileQrLoginModel'
-import { helpNeededLine, servicePhoneLine, type PublicSupportContact } from '../../copy/unattendedCopy'
 import { maskPhone } from '../../utils/maskPii'
-
-/** 标准求助句补上句号，接在已经说完的一句后面，不插进半句里。 */
-function helpSentence(contact?: PublicSupportContact | null): string {
-  const line = helpNeededLine(contact)
-  return /[。！？]$/.test(line) ? line : `${line}。`
-}
+import { helpNeededLine } from '../../copy/unattendedCopy'
 
 export type QrIconKey = 'alert' | 'ban' | 'check' | 'clock' | 'help' | 'info' | 'loader' | 'lock' | 'qr' | 'wait'
 export type QrTone = 'error' | 'warn' | 'ok' | 'calm'
@@ -121,7 +115,7 @@ function sentence(message: string): string {
   return /[。！？.!?]$/.test(message) ? message : `${message}。`
 }
 
-export function formAlertCopy(c: QrCopyContext, contact?: PublicSupportContact | null): QrAlertCopy | null {
+export function formAlertCopy(c: QrCopyContext): QrAlertCopy | null {
   const verb = sendVerb(c)
   if (c.state === 'send-error') {
     if (c.sendError === 'channel') {
@@ -130,12 +124,12 @@ export function formAlertCopy(c: QrCopyContext, contact?: PublicSupportContact |
     if (c.sendError === 'unknown') {
       return { tone: 'warn', icon: 'help', head: '验证码这次有没有发出，本页不知道', body: `请求没有拿到明确结果，可能是网络中断。本页不能确认短信是否发出，所以不开放验证码输入；请稍后再点「${verb}」重新获取一条。如果提示太频繁，说明上一次可能已经发出，等按钮倒计时走完再获取。` }
     }
-    return { tone: 'error', icon: 'alert', head: '验证码没有发出去', body: c.serverMessage ? `${sentence(c.serverMessage)}请核对手机号后再试。` : `系统没有接受这次请求。请核对手机号后再试。仍然不行就回一体机换其他登录方式。${helpSentence(contact)}` }
+    return { tone: 'error', icon: 'alert', head: '验证码没有发出去', body: c.serverMessage ? `${sentence(c.serverMessage)}请核对手机号后再试。` : `系统没有接受这次请求。请核对手机号后再试；仍然不行就回一体机换其他登录方式。${helpNeededLine()}。` }
   }
   if (c.state === 'send-limited') {
     const noCode = c.locked && !c.hasUsableCode ? '你手上那条验证码已经不能用了，这次重新获取又被挡下，所以现在没有可以填的验证码。' : ''
     if (c.limitKind === 'tomorrow') {
-      return { tone: 'warn', icon: 'clock', head: '这个号码今天不能再获取验证码了', body: `${maskPhone(c.dailyLimitedPhone ?? c.phone)} 今天的验证码次数已经用完，请明天再试。${noCode}这一条等下去不会变，所以「${verb}」对这个号码已经不能点。急着办可以换一个本人手机号。不方便换号就回一体机换其他登录方式。${helpSentence(contact)}` }
+      return { tone: 'warn', icon: 'clock', head: '这个号码今天不能再获取验证码了', body: `${maskPhone(c.dailyLimitedPhone ?? c.phone)} 今天的验证码次数已经用完，请明天再试。${noCode}这一条等下去不会变，所以「${verb}」对这个号码已经不能点；急着办可以换一个本人手机号，或者回一体机换其他登录方式。${helpNeededLine()}。` }
     }
     return { tone: 'warn', icon: 'clock', head: '现在获取得太频繁了', body: `刚刚已经请求过，或者当前网络、当前这台手机的请求太密集，系统暂时没有再发。${noCode}现在不能马上重试：「${verb}」已经被本页拦住，还要等多久、什么时候能再点，按钮上和它下面那条说明写着。系统那边还要多久，本页看不到，不给你报一个假的秒数。` }
   }
@@ -149,7 +143,7 @@ export function formAlertCopy(c: QrCopyContext, contact?: PublicSupportContact |
     return { tone: 'warn', icon: 'lock', head: '验证码试得太多次了', body: `为了防止有人逐个猜码，系统已经把这条验证码作废，输入框也已清空。请点下面的「重新获取」拿一条新的再确认。${TICKET_INTACT}` }
   }
   if (c.state === 'confirm-rejected') {
-    return { tone: 'error', icon: 'alert', head: '这次确认没有通过', body: c.serverMessage ? `${sentence(c.serverMessage)}${TICKET_INTACT}` : `系统没有接受这次确认。可以核对手机号和验证码后再试。仍然不行就回一体机换其他登录方式。${helpSentence(contact)}${TICKET_INTACT}` }
+    return { tone: 'error', icon: 'alert', head: '这次确认没有通过', body: c.serverMessage ? `${sentence(c.serverMessage)}${TICKET_INTACT}` : `系统没有接受这次确认。可以核对手机号和验证码后再试；仍然不行就回一体机换其他登录方式。${helpNeededLine()}。${TICKET_INTACT}` }
   }
   if (c.state === 'confirm-unknown') {
     return { tone: 'warn', icon: 'help', head: '这次确认有没有成功，本页不知道', body: '请求已经发出去了，但没有拿到明确结果，可能是网络中断，也可能是结果没能传回这一页。不要在这里反复点确认 —— 先回一体机看屏幕，那边显示的才是真结果。' }
@@ -158,14 +152,14 @@ export function formAlertCopy(c: QrCopyContext, contact?: PublicSupportContact |
 }
 
 /** 发码按钮点不动时，「什么时候 / 怎么才能再点」写在按钮旁边。 */
-export function sendBlockNoticeCopy(c: QrCopyContext, contact?: PublicSupportContact | null): QrNoticeCopy | null {
+export function sendBlockNoticeCopy(c: QrCopyContext): QrNoticeCopy | null {
   const blocked = sendBlockedBy(c)
   const verb = sendVerb(c)
   if (blocked === 'retry-gate') {
     return { tone: 'warn', icon: 'wait', id: 'retry-gate', text: `现在不能${verb}：本页按正常重发间隔留了 ${RETRY_GATE_SECONDS} 秒最短等待，按钮上倒数的就是这个数。系统那边还要多久，本页看不到，也不会编一个给你。等按钮能点了可以再试一次，那一次仍然可能再被挡下。` }
   }
   if (blocked === 'daily-limit') {
-    return { tone: 'warn', icon: 'ban', id: 'daily-limit', text: `这个手机号今天不能再获取验证码，等下去也不会变。${c.locked ? '点上面的「更换」，改成另一个本人手机号就可以继续。' : '把上面的手机号改成另一个本人手机号就可以继续。'}不方便换号就回一体机换其他登录方式。${helpSentence(contact)}` }
+    return { tone: 'warn', icon: 'ban', id: 'daily-limit', text: `这个手机号今天不能再获取验证码，等下去也不会变。${c.locked ? '点上面的「更换」，改成另一个本人手机号就可以继续。' : '把上面的手机号改成另一个本人手机号就可以继续。'}不方便换号就回一体机换其他登录方式。${helpNeededLine()}。` }
   }
   if (blocked === 'cooldown' && c.state === 'send-limited') {
     return { tone: 'calm', icon: 'clock', id: 'cooldown', text: '按钮上倒数的是上一次成功发码之后的重发间隔，这个数是系统给的。它走完之后本页才会再判断能不能重新获取。' }
@@ -177,9 +171,9 @@ export function sendBlockNoticeCopy(c: QrCopyContext, contact?: PublicSupportCon
 }
 
 /** 表单里的状态提示。「已发送」只在发码成功过、且那条码还没被服务端销毁时出现。 */
-export function formNoticesCopy(c: QrCopyContext, sentSeconds: number, contact?: PublicSupportContact | null): QrNoticeCopy[] {
+export function formNoticesCopy(c: QrCopyContext, sentSeconds: number): QrNoticeCopy[] {
   const notices: QrNoticeCopy[] = []
-  const block = sendBlockNoticeCopy(c, contact)
+  const block = sendBlockNoticeCopy(c)
   if (block) notices.push(block)
   if (c.hasUsableCode && ['code-sent', 'ready', 'device-missing', 'confirming'].includes(c.state)) {
     notices.push({ tone: 'ok', icon: 'check', id: 'sent', text: `验证码已发送至 ${maskPhone(c.phone)}，${sentSeconds} 秒后可重新获取。` })
@@ -198,7 +192,7 @@ export function formNoticesCopy(c: QrCopyContext, sentSeconds: number, contact?:
   return notices
 }
 
-export function formFactsCopy(c: QrCopyContext, contact?: PublicSupportContact | null): readonly FactRow[] {
+export function formFactsCopy(c: QrCopyContext): readonly FactRow[] {
   if (c.state === 'confirm-unknown') {
     return [
       ['第一步', '回一体机看屏幕：已经进入账号就直接在一体机上继续办事。'],
@@ -227,7 +221,7 @@ export function formFactsCopy(c: QrCopyContext, contact?: PublicSupportContact |
         ? '同一条验证码连续填错太多次。这是防止有人逐个猜码的保护，不是封号，也不影响你的账号。'
         : '超过了验证码的有效期，或者这条码之前已经用过一次。'],
       ['二维码还在', '这张二维码没有因此作废；但它有自己的时限，来不及就回一体机重新生成。'],
-      ['一直收不到短信', `回一体机在屏幕上换其他登录方式；${servicePhoneLine(contact)}`],
+      ['一直收不到短信', `回一体机在屏幕上换其他登录方式。${helpNeededLine()}。`],
     ]
   }
   if (c.state === 'send-limited') {
@@ -243,7 +237,7 @@ export function formFactsCopy(c: QrCopyContext, contact?: PublicSupportContact |
       ['之前的验证码', c.locked && !c.hasUsableCode
         ? '手上那条已经不能用了，现在一条可填的都没有，只能等「重新获取」可以点了再拿一条新的。'
         : '如果刚才收到过一条，可以再核对一次；本页看不到它还剩多少有效期，也不能保证它一定还有效。'],
-      ['实在等不了', `回一体机在屏幕上换其他登录方式；${servicePhoneLine(contact)}`],
+      ['实在等不了', `回一体机在屏幕上换其他登录方式。${helpNeededLine()}。`],
     ]
   }
   return [

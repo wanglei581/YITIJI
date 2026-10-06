@@ -5,6 +5,7 @@
  * 文案里的 **xx** 由页面渲染成加粗。 */
 import type { UploadSessionStatusResponse } from '@ai-job-print/shared'
 import { ApiHttpError } from '../../services/api/httpAdapter'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 
 /** upload-sessions.service.ts SESSION_TTL_SECONDS = 10 * 60，自一体机生成起算。 */
 export const SESSION_TTL_MINUTES = 10
@@ -144,7 +145,7 @@ export const UPLOAD_STEPS = ['选手机里的文件', '系统接收', '回一体
 
 export function chromeCopy(issue: LinkIssue, state: UploadState, confirmedLabel: string | null) {
   if (issue === 'signature-blocked') {
-    return { sub: '本人手写签名 · 手机端不可用', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前没有可用的上传入口，也不会发送任何文件；请回一体机在「签名」的第 2 步用「本机上传」选一张本人手写签名照片（JPG / PNG）。' }
+    return { sub: '本人手写签名 · 手机端不可用', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前没有可用的上传入口，也不会发送任何文件；本人手写签名图片请回一体机在原步骤上传。' }
   }
   if (issue === 'invalid' || state === 'session-expired') {
     return { sub: issue === 'invalid' ? '上传链接不可用' : '手机上传 · 需回一体机重新生成', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前不能再发送文件；请回一体机重新生成上传二维码后再扫一次。' }
@@ -160,16 +161,16 @@ export function chromeCopy(issue: LinkIssue, state: UploadState, confirmedLabel:
   }
 }
 
-export function takeoverCopy(issue: Exclude<LinkIssue, null>, helpLine = '') {
+export function takeoverCopy(issue: Exclude<LinkIssue, null>) {
   if (issue === 'signature-blocked') {
     return {
       kind: 'warn' as const, icon: 'ban' as IconKey, head: '签名暂不支持手机上传',
-      body: '请回到一体机，在「签名」的第 2 步用「本机上传」选一张本人手写签名照片（JPG / PNG）。',
+      body: `请回到「签名」的原步骤查看可用方式。没有可用方式时，${helpNeededLine()}。`,
       facts: [
         ['为什么不可用', '手机上传当前只接受 **简历 / 打印文件 / 合同**，签名图片不在其中，系统不会为它开出上传链接。'],
         ['不是你的问题', '不是文件格式不对，也不是网络问题，换张图或换台手机都不会变。'],
-        ['现场怎么办', '回一体机在「签名」的第 2 步点**本机上传**，选一张本人手写签名照片（JPG / PNG）。'],
-        ['还是不行', `返回上一步。本页没有别的上传方式可试。${helpLine}`],
+        ['现场怎么办', `回到原步骤查看可用方式；只接受本人手写签名图片。没有可用方式时，${helpNeededLine()}。`],
+        ['还是不行', `返回上一步。${helpNeededLine()}。本页没有别的上传方式可试。`],
       ] as FactRow[],
     }
   }

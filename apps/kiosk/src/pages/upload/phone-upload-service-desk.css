@@ -246,6 +246,11 @@
 .k1-phone-upload .ph-up-xiaoqing {
   margin: 0 18px 8px; color: var(--m-teal-d); font-size: 15px; line-height: 1.45;
 }
+/* 预检四态：错误说明在文件信息上面，页脚跟在说明后面，不再占住壳层底边把红字挤出首屏。 */
+.k1-phone-upload .ph-up-flow > .ph-up-xiaoqing { margin-right: 0; margin-left: 0; }
+.k1-phone-upload .ph-up-flow > .ph-up-footer {
+  padding-right: 0; padding-left: 0; border-top: 0; background: transparent;
+}
 
 /* 9/28 留白：链接不可用、签名不可用只有一张状态卡。grow 藏掉，余量分到说明表上下。 */
 .k1-phone-upload:is([data-phone-upload-state='invalid'], [data-phone-upload-state='signature-blocked']) .ph-up-grow { display: none; }
