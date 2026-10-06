@@ -28,8 +28,10 @@ export function isResumeScreen(value: string | null): value is ResumeScreen {
 /**
  * 地址栏只记画面，不记文件。显式 screen 优先；确认屏没有文件时退回来源；
  * 没带参数但已经有文件（扫描交接）时进确认屏。
+ * 写出了白名单以外的画面时停在「认不出」，不拿来源页冒充那一屏。
  */
-export function resolveResumeScreen(requested: string | null, hasFile: boolean): ResumeScreen {
+export function resolveResumeScreen(requested: string | null, hasFile: boolean): ResumeScreen | 'unknown' {
+  if (requested && !isResumeScreen(requested)) return 'unknown'
   if (isResumeScreen(requested)) {
     if (requested === 'summary' && !hasFile) return 'source'
     return requested
@@ -38,14 +40,17 @@ export function resolveResumeScreen(requested: string | null, hasFile: boolean):
 }
 
 export function sourceFrameStatus(input: {
-  screen: ResumeScreen
+  screen: ResumeScreen | 'unknown'
   uploading: boolean
   receiving: boolean
   uploadUnknown: boolean
+  uploadRecheck: boolean
   error: boolean
 }): { tone: 'ok' | 'warn' | 'unknown'; label: string } {
+  if (input.screen === 'unknown') return { tone: 'warn', label: '无法识别的状态' }
   if (input.uploading) return { tone: 'warn', label: '上传中' }
   if (input.receiving) return { tone: 'warn', label: '接收中' }
+  if (input.uploadRecheck) return { tone: 'warn', label: '上传结果未知 · 无可查记录' }
   if (input.uploadUnknown) return { tone: 'warn', label: '上传结果未知 · 不重发' }
   if (input.error) return { tone: 'warn', label: '上传未完成' }
   if (input.screen === 'summary') return { tone: 'ok', label: '第 2 步 · 确认这次办理' }

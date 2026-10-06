@@ -3,7 +3,6 @@ import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensave
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
-import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
@@ -13,7 +12,6 @@ import {
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { ResumeSourceSummary } from './components/ResumeSourceSummary'
 import { KIOSK_DEVICE_ORIGINAL_NOTICE } from '../../utils/kioskLocalPrivacy'
 import {
@@ -32,9 +30,14 @@ import { readScanHandoff } from './resumeScanHandoff'
 import { ResumeIntentSwitch } from './components/ResumeIntentSwitch'
 import { ResumeSourceCards } from './components/ResumeSourceCards'
 import { ResumeExtraExits } from './components/ResumeExtraExits'
-import { ResumeSourceActions } from './components/ResumeSourceActions'
-import { ResumeUploadNotices } from './components/ResumeUploadNotices'
+import { ResumeSourceCta } from './components/ResumeSourceCta'
+import { ResumeUploadPanels } from './components/ResumeUploadPanels'
+import { ResumeWithoutAi } from './components/ResumeWithoutAi'
+import { ResumeTargetSendoff } from './components/ResumeTargetSendoff'
+import { ResumeUnrecognized } from './components/ResumeUnrecognized'
 import { ResumeIndustrySheet } from './components/ResumeIndustrySheet'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import {
   formatSize,
   inferFormat,
@@ -77,6 +80,8 @@ export function ResumeSourcePage() {
   const accept = wordConversionAvailable ? `${BASE_ACCEPT},${WORD_ACCEPT}` : BASE_ACCEPT
   const fileInputRef = useRef<HTMLInputElement>(null)
   const industryAtOpen = useRef('')
+  const retryFile = useRef<File | null>(null)
+  const contact = useSupportContact()
   const kiosk = useTerminalKiosk()
   const usbGate = useUsbImportGate(RESUME_USB_UNCONFIGURED_NOTE)
   const [pickedChannel, setSelected] = useState<UploadChannel>(() => isTerminalKiosk() ? 'phone' : 'cloud')
@@ -87,6 +92,8 @@ export function ResumeSourcePage() {
   const [usbBusy, setUsbBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadUnknown, setUploadUnknown] = useState(false)
+  const [uploadRecheck, setUploadRecheck] = useState(false)
+  const [pendingName, setPendingName] = useState<string | null>(null)
   const [genericDiagnosis, setGenericDiagnosis] = useState(() => !directedScreenRequest())
   const [selectedDimensions, setSelectedDimensions] = useState<ResumeScoringDimensionKey[]>(DEFAULT_SELECTED_DIMENSIONS)
   const [targetIndustry, setTargetIndustry] = useState('')
@@ -128,10 +135,29 @@ export function ResumeSourcePage() {
       skipped: false,
     }
   }
+  const leaveUnknown = () => {
+    setUploadUnknown(false)
+    setUploadRecheck(false)
+    setPendingName(null)
+    setError(null)
+    releaseScreen()
+  }
+  const recheckUpload = () => {
+    if (!uploadUnknown || uploadRecheck) return
+    setUploadRecheck(true)
+  }
   const handleSelect = (type: UploadChannel) => {
     if (isTerminalKiosk() && type === 'cloud') return
     if (type === 'usb' && usbGate.state !== 'allowed') return
     setError(null)
+    if (uploadUnknown || uploadRecheck) {
+      setUploadUnknown(false)
+      setUploadRecheck(false)
+      setPendingName(null)
+      if (type !== selected) setUploadedFile(null)
+      setSelected(type)
+      return
+    }
     if (type !== selected) {
       setUploadedFile(null)
       setUploadUnknown(false)
@@ -150,23 +176,30 @@ export function ResumeSourcePage() {
     if (isTerminalKiosk()) return
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file) return
+    if (!file || uploadUnknown || uploadRecheck) return
     setUploadedFile(null)
     setUploadUnknown(false)
+    setUploadRecheck(false)
+    setPendingName(file.name)
     if (file.size > MAX_BYTES) {
+      retryFile.current = file
       setError(`文件超过 10MB(${formatSize(file.size)}),请压缩后重试`)
       return
     }
+    retryFile.current = file
     setError(null)
     setUploading(true)
     clearAiResumeSession()
     try {
       const uploaded = await kioskUploadFile(file, 'resume_upload', getToken())
       if (typeof uploaded?.fileId !== 'string' || !uploaded.fileId) {
+        retryFile.current = null
         setUploadUnknown(true)
         releaseScreen()
         return
       }
+      retryFile.current = null
+      setPendingName(null)
       setUploadedFile({
         name: uploaded.filename,
         size: formatSize(uploaded.sizeBytes),
@@ -178,12 +211,20 @@ export function ResumeSourcePage() {
       })
       releaseScreen()
     } catch (err) {
-      if (uploadOutcomeOf(err) === 'unknown') setUploadUnknown(true)
-      else setError(uploadErrorMessage(err))
+      if (uploadOutcomeOf(err) === 'unknown') {
+        retryFile.current = null
+        setUploadUnknown(true)
+      } else setError(uploadErrorMessage(err))
       releaseScreen()
     } finally {
       setUploading(false)
     }
+  }
+  const retryUpload = () => {
+    const file = retryFile.current
+    if (!file || uploadUnknown || uploadRecheck) return
+    const target = { files: [file], value: '' }
+    void handleFileChosen({ target } as React.ChangeEvent<HTMLInputElement>)
   }
 
   const handlePhoneUploaded = (file: PhoneUploadedFile) => {
@@ -241,20 +282,24 @@ export function ResumeSourcePage() {
     channel === 'usb' ? 'U盘上传' : channel === 'phone' ? '手机扫码上传' : channel === 'scan' ? '扫描工作台交接' : '本机文件'
 
   const scanReady = uploadedFile?.channel === 'scan'
-  const heroKey: SourceHeroKey = screen === 'target' || screen === 'target-context' || screen === 'target-profile' || screen === 'target-industry'
+  const heroKey: SourceHeroKey = screen === 'unknown'
+    ? 'unknown'
+    : screen === 'target' || screen === 'target-context' || screen === 'target-profile' || screen === 'target-industry'
     ? screen
     : uploading ? 'uploading'
-      : uploadUnknown ? 'upload-unknown'
-        : error ? 'upload-failed'
-          : screen === 'summary' ? (scanReady ? 'scan-ready' : 'staged')
-            : !uploadedFile && selected === 'usb' ? 'usb'
-              : !uploadedFile && selected === 'phone' ? 'phone'
-                : 'source'
+      : uploadRecheck ? 'upload-rechecking'
+        : uploadUnknown ? 'upload-unknown'
+          : error ? 'upload-failed'
+            : screen === 'summary' ? (scanReady ? 'scan-ready' : 'staged')
+              : !uploadedFile && selected === 'usb' ? 'usb'
+                : !uploadedFile && selected === 'phone' ? 'phone'
+                  : 'source'
   const hero = heroCopy(heroKey, intent)
   const formats = receivableFormatView(kiosk, wordConversionAvailable)
   const frameStatus = sourceFrameStatus({
-    screen, uploading, receiving: phoneBusy || usbBusy, uploadUnknown, error: Boolean(error),
+    screen, uploading, receiving: phoneBusy || usbBusy, uploadUnknown, uploadRecheck, error: Boolean(error),
   })
+  const helpLine = helpNeededLine(contact)
   const target = buildTargetContext()
   const generic = target.skipped === true
   const formProps: DiagnosisDirectionFields = {
@@ -267,7 +312,11 @@ export function ResumeSourcePage() {
     onOpenOfficialChannels: () => navigate('/official-channels'),
   }
   const contextPrimary = uploadedFile ? '用这些设置，回去确认' : '用这些设置，去取文件'
-  const industryPrimary = targetIndustry ? '用所选门类继续' : '用『暂不指定』继续'
+  const industryLabel = targetIndustry.trim() || '暂不指定'
+  const industryPrimary = `用「${industryLabel}」继续`
+  const uploadBusyPanel = uploading || uploadUnknown || uploadRecheck || Boolean(error)
+  // 稿 21 确认屏次按钮写「换一份文件」。旧字「更换文件」和稿不一致。
+  const changeFileLabel = '换一份文件'
 
   return (
     <QxPageFrame
@@ -290,56 +339,35 @@ export function ResumeSourcePage() {
         </>
       )}
       ctabar={(
-        <>
-          <QxStepActions onPrev={() => navigate('/resume-service')}>
-            <QxAiHelp label="问小青：帮我选诊断重点 →" draft="请先问我的求职方向，帮我选择这次简历诊断应重点看的部分。" />
-          </QxStepActions>
-          {screen === 'source' ? (
-            <ResumeSourceActions disabled={sourceBusy} onGeneric={() => setGenericDiagnosis(true)} onOpenWorkbench={openDirectionSettings} />
-          ) : null}
-          {screen === 'target' ? (
-            <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => rememberScreen('source')}>回到来源选择</button>
-              <button type="button" className="qx-btn resume-primary-action" data-variant="primary" onClick={() => rememberScreen(genericDiagnosis ? 'source' : 'target-context')}>
-                {genericDiagnosis ? '通用诊断，直接回来源选择' : '下一步：设目标岗位与背景'}
-              </button>
-            </>
-          ) : null}
-          {(screen === 'target-context' || screen === 'target-profile') ? (
-            <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => rememberScreen('target')}>上一步：诊断范围</button>
-              <button type="button" className="qx-btn resume-primary-action" data-variant="primary" onClick={() => { if (uploadedFile) rememberScreen('summary'); else rememberScreen('source') }}>
-                {contextPrimary}
-              </button>
-            </>
-          ) : null}
-          {screen === 'target-industry' ? (
-            <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => { setTargetIndustry(industryAtOpen.current); rememberScreen('target-context') }}>不改了，返回</button>
-              <button type="button" className="qx-btn resume-primary-action" data-variant="primary" onClick={() => rememberScreen('target-context')}>{industryPrimary}</button>
-            </>
-          ) : null}
-          {screen === 'summary' && uploadedFile ? (
-            <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={openDirectionSettings}>改诊断方向</button>
-              <button type="button" className="qx-btn resume-change-file" data-variant="ghost" disabled={sourceBusy} onClick={changeFile}>更换文件</button>
-              <span className="qx-ai-declaration-slot">
-                <button type="button" className="qx-btn resume-primary-action" data-variant="primary" disabled={sourceBusy} onClick={handleStartDiagnosis}>
-                  {intent === 'optimize' ? 'AI 优化，看改进建议' : 'AI 诊断，看改进建议'}
-                </button>
-                <AiDeclarationNote />
-              </span>
-            </>
-          ) : null}
-        </>
+        <ResumeSourceCta
+          screen={screen} intent={intent} uploadBusyPanel={uploadBusyPanel} uploading={uploading} error={Boolean(error)}
+          uploadUnknown={uploadUnknown} uploadRecheck={uploadRecheck} sourceBusy={sourceBusy} genericDiagnosis={genericDiagnosis}
+          hasFile={Boolean(uploadedFile)} helpLine={helpLine} contextPrimary={contextPrimary} industryPrimary={industryPrimary}
+          changeFileLabel={changeFileLabel} onService={() => navigate('/resume-service')} onGeneric={() => setGenericDiagnosis(true)}
+          onOpenDirection={openDirectionSettings} onRemember={rememberScreen} onPickFile={() => fileInputRef.current?.click()}
+          onRetry={retryUpload} onLeaveUnknown={leaveUnknown} onLeavePage={() => navigate('/resume-service')} onRecheck={recheckUpload}
+          onRevertIndustry={() => { setTargetIndustry(industryAtOpen.current); rememberScreen('target-context') }}
+          onChangeFile={changeFile} onStart={handleStartDiagnosis} onHome={() => navigate('/')}
+        />
       )}
     >
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={heroKey} data-screen={screen} className="qx-resume-triage" data-takeaway="简历诊断报告">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={heroKey} data-screen={screen} data-dock={screen === 'target-context' || screen === 'target-profile' ? 'sendoff' : undefined} className="qx-resume-triage" data-takeaway="简历诊断报告">
       <ResumeTriageHero eyebrow={title} ask={hero.ask} doing={hero.doing} flag={hero.flag} warn={hero.warn} rail={['current', 'todo', 'todo', 'todo']} />
       {!kiosk && (
         <input ref={fileInputRef} type="file" aria-label="选择本机简历文件" accept={accept} className="hidden" onChange={handleFileChosen} />
       )}
       <div className="qx-scroll qx-rt-scroll">
+        {screen === 'unknown' ? (
+          <ResumeUnrecognized
+            helpLine={helpLine}
+            onSource={() => rememberScreen('source')}
+            onHome={() => navigate('/')}
+            onProfile={() => navigate('/profile')}
+            onAssistant={() => navigate('/assistant')}
+            onGenerate={() => navigate('/resume/generate')}
+            onPrint={() => navigate('/print-scan')}
+          />
+        ) : null}
         {screen === 'source' ? (
           <>
             <ResumeIntentSwitch heading="这次想让我做什么" intent={intent} disabled={sourceBusy} onChange={(value) => setSearchParams((params) => { params.set('intent', value); return params }, { replace: true })} />
@@ -374,6 +402,11 @@ export function ResumeSourcePage() {
                   </div>
                 ) : selected === 'usb' ? (
                   <div className="qx-rt-usb"><ResumeUsbImportPanel gate={usbGate} onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} /></div>
+                ) : uploadBusyPanel ? (
+                  <ResumeUploadPanels
+                    error={error} uploadUnknown={uploadUnknown} uploadRecheck={uploadRecheck} uploading={uploading}
+                    signedIn={Boolean(getToken())} pendingName={pendingName} helpLine={helpLine}
+                  />
                 ) : (
                   <button type="button" disabled={sourceBusy} onClick={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }} className="qx-rt-dropzone">
                     <span className="ico"><UploadCloudIcon className="h-8 w-8" aria-hidden="true" /></span>
@@ -381,7 +414,6 @@ export function ResumeSourcePage() {
                     <span>{wordConversionAvailable ? '支持 PDF、DOC、DOCX 和图片格式，单个文件最大 10MB' : '支持 PDF / 图片格式，单个文件最大 10MB'}</span>
                   </button>
                 )}
-                <ResumeUploadNotices error={error} uploadUnknown={uploadUnknown} uploading={uploading} signedIn={Boolean(getToken())} />
                 <p id="resume-word-conversion-reason" className="qx-rt-hint" aria-disabled={!wordConversionAvailable || undefined}>
                   {wordConversionAvailable ? `Word ${WORD_CONVERSION_DISCLOSURE}。` : 'Word 转换暂未开放，请另存为 PDF 再上传。'}
                 </p>
@@ -402,6 +434,7 @@ export function ResumeSourcePage() {
 
         {screen === 'summary' && uploadedFile ? (
           <>
+            <h2 className="qx-rt-sec-h">这次要用的文件 <small>来自{channelLabel(uploadedFile.channel)}</small></h2>
             {scanReady ? <ResumeScanReady name={uploadedFile.name} size={uploadedFile.size} format={uploadedFile.format} onDrop={changeFile} onRescan={() => navigate('/scan')} /> : (
               <div className="qx-rt-filecard">
                 <span className="fx">
@@ -412,6 +445,7 @@ export function ResumeSourcePage() {
               </div>
             )}
             <ResumeSourceSummary generic={generic} dimensions={selectedDimensions} target={target} intent={intent} />
+            <ResumeWithoutAi onGenerate={() => navigate('/resume/generate')} onPrint={() => navigate('/print-scan')} />
             <details className="qx-rt-preview">
               <summary>预览原件</summary>
               <FileContentPreview compact fileUrl={uploadedFile.fileUrl} fileName={uploadedFile.name} mimeType={uploadedFile.mimeType} format={uploadedFile.format} fileId={uploadedFile.fileId} token={getToken()} />
@@ -426,13 +460,26 @@ export function ResumeSourcePage() {
           <DiagnosisDirectionForm part="context" forceMore={screen === 'target-profile'} {...formProps} />
         ) : null}
         {screen === 'target-industry' ? <ResumeIndustrySheet value={targetIndustry} onChange={setTargetIndustry} /> : null}
-        {screen === 'target' ? null : (
+        {screen === 'target' || screen === 'unknown' ? null : (
           <p className="qx-rt-note" data-tone="warn">
             <AlertCircleIcon size={18} aria-hidden="true" style={{ display: 'inline', marginRight: 6, verticalAlign: '-3px' }} />
             {NO_FABRICATION_NOTE}
           </p>
         )}
       </div>
+      {(screen === 'target-context' || screen === 'target-profile') ? (
+        <ResumeTargetSendoff
+          generic={genericDiagnosis}
+          intent={intent}
+          selectedDimensions={selectedDimensions}
+          targetIndustry={targetIndustry}
+          targetJob={targetJob}
+          targetExperience={targetExperience}
+          targetScene={targetScene}
+          targetMajor={targetMajor}
+          targetDegree={targetDegree}
+        />
+      ) : null}
     </section>
     </QxPageFrame>
   )
