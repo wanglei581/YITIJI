@@ -58,7 +58,9 @@ export function MyFavoritesPage() {
   const [state, setState] = useState<LoadState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const requestedTab = getFavoriteTab(searchParams)
-  // 托管关闭时分类只有「全部」和「政策」。没有机构渠道这一类收藏，不摆那个页签。旧链接里的岗位 / 招聘会分类回到全部。
+  // 真实分类不含「全部」。托管关闭时只剩政策一类，「全部」和「政策」是同一份列表，不摆分类条。
+  // 托管打开时有岗位、招聘会、政策，分类条照旧。旧链接里的岗位 / 招聘会分类在关闭时回到全部。
+  const favoriteCategories: FavoriteTargetType[] = hostingOpen ? ['job', 'job_fair', 'policy'] : ['policy']
   const tab: FavoriteTab = hostingOpen || requestedTab === 'policy' ? requestedTab : 'all'
   const setTab = (next: FavoriteTab) => {
     setSearchParams(next === 'all' ? {} : { tab: next }, { replace: true })
@@ -151,7 +153,7 @@ export function MyFavoritesPage() {
           desc="只记录本人浏览兴趣，不含投递或预约结果"
           minis={minis}
         />
-        {hostingOpen ? (
+        {favoriteCategories.length >= 2 ? (
           <div className="qx-me-tabbar" data-n="4" role="group" aria-label="记录筛选">
             {TABS.map((t) => (
               <button key={t.key} type="button" className="qx-me-tab" aria-current={tab === t.key ? 'true' : undefined} data-testid={`member-records-fav-tab-${t.key}`} onClick={() => setTab(t.key)}>
@@ -159,15 +161,7 @@ export function MyFavoritesPage() {
               </button>
             ))}
           </div>
-        ) : (
-          <div className="qx-me-tabbar" data-n="2" role="group" aria-label="记录筛选">
-            {([{ key: 'all' as const, label: '全部' }, { key: 'policy' as const, label: '政策' }]).map((t) => (
-              <button key={t.key} type="button" className="qx-me-tab" aria-current={tab === t.key ? 'true' : undefined} data-testid={`member-records-fav-tab-${t.key}`} onClick={() => setTab(t.key)}>
-                {t.label}<i>{counts[t.key]}</i>
-              </button>
-            ))}
-          </div>
-        )}
+        ) : null}
         <section className="qx-me-list qx-me-grow" data-testid="member-records-list" aria-label="我的收藏">
           {visible.length === 0 ? (
             <div className="qx-me-legal">当前分类下没有收藏。</div>
@@ -223,8 +217,8 @@ export function MyFavoritesPage() {
         navigate,
         () => setReloadKey((k) => k + 1),
         '/me/favorites',
-        hostingOpen ? '查看岗位' : uiState === 'ready' ? '去看机构官方渠道' : '查看政策',
-        () => navigate(hostingOpen ? '/jobs' : uiState === 'ready' ? '/official-channels' : '/policy-service'),
+        hostingOpen ? '查看岗位' : '查看政策',
+        () => navigate(hostingOpen ? '/jobs' : '/policy-service'),
       )}
     >
       {body}
