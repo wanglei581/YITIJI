@@ -6784,3 +6784,30 @@ test('简历导出：免费时只写「当前免费」，不提权益', () => {
   assert.equal(N.resumeExportPricing({ mode: 'free' }, true).text, '当前免费')
   assert.match(N.resumeExportPricing({ mode: 'charged', unitCents: 300, benefit: { available: 1 } }, true).text, /权益/, '收费时原样保留')
 })
+
+// ══════════════════════════════════════════════════════════════════════
+// U 盘打印指引：按一体机实际能力说（2026-10-06，评审 P0）
+// Terminal Agent 只列 U 盘最外层的 pdf/jpg/jpeg/png（apps/terminal-agent/src/usb/usb-files.ts）；
+// 彩色、双面、U 盘导入都按终端逐台开通，默认关闭。
+// ══════════════════════════════════════════════════════════════════════
+
+test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，彩色双面说按机器开通', () => {
+  const page = makePage('pages/usb-import/usb-import.js', { auth: createAuth('A'), api: {}, wx: createWx() })
+  const formats = Array.from(page.data.formats)
+  assert.equal(formats.join('|'), 'PDF|JPG|PNG', '与 usb-files.ts 的 ALLOWED_USB_EXTENSIONS 对应')
+  const steps = page.data.steps.map((s) => `${s.title} ${s.desc}`).join('\n')
+  assert.match(steps, /另存为 PDF/)
+  assert.match(steps, /最外层/)
+  assert.match(steps, /15MB/)
+  assert.match(steps, /「U 盘导入打印」/, '入口名与一体机打印扫描页的卡片标题一致')
+  assert.match(steps, /彩色、双面按每台机器开通[^。]*暂未开通/)
+  assert.doesNotMatch(steps, /右下方|黑白\/彩色/, '不写口位置、不把彩色说成一定能选')
+  assert.match(page.data.formatNote, /另存为 PDF/)
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/usb-import/usb-import.wxml'), 'utf8')
+  assert.match(wxml, /暂未开通/)
+  assert.match(wxml, /\{\{formatNote\}\}/)
+  const help = makePage('pages/help/help.js', { auth: createAuth('A'), api: {}, wx: createWx() })
+  const usbFaq = help.data.faqs.find((f) => f.id === 'usb')
+  assert.doesNotMatch(usbFaq.a, /OTG|读卡器|传输到终端/, '小程序读不了 U 盘，也没有手机直传终端')
+  assert.match(usbFaq.a, /U盘打印指引/)
+})
