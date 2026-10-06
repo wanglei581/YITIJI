@@ -981,13 +981,19 @@ test('privacy bottom bar fills the row and the honest note sits under the button
   const metrics = await page.evaluate(() => {
     const bar = document.querySelector('.qx-ctabar')
     const truth = document.querySelector('.pr-cta .pr-truth')
+    const row = document.querySelector('.pr-cta-row')
     const buttons = [...document.querySelectorAll('.pr-cta-row > .qx-btn, .pr-cta-row > .qx-ai-help')]
-    if (!bar || !truth || buttons.length !== 3) return null
+    if (!bar || !truth || !row || buttons.length !== 3) return null
     const stage = document.querySelector('.kiosk-stage')
     const transform = stage ? getComputedStyle(stage).transform : 'none'
     const scale = transform === 'none' ? 1 : Number(/^matrix\(([^,]+)/.exec(transform)?.[1] ?? 1)
     const barRect = bar.getBoundingClientRect()
-    const pad = parseFloat(getComputedStyle(bar).paddingLeft) + parseFloat(getComputedStyle(bar).paddingRight)
+    const rowRect = row.getBoundingClientRect()
+    const truthRect = truth.getBoundingClientRect()
+    const sideInset = (rect: DOMRect) => ({
+      left: rect.left - barRect.left,
+      right: barRect.right - rect.right,
+    })
     const boxes = buttons.map((element) => {
       const rect = element.getBoundingClientRect()
       return {
@@ -1001,14 +1007,21 @@ test('privacy bottom bar fills the row and the honest note sits under the button
     })
     return {
       scale,
-      barWidth: barRect.width - pad,
+      // 三键总宽对的是留边之后的内容宽度，不是整条底栏。
+      contentWidth: rowRect.width,
+      rowInset: sideInset(rowRect),
+      truthInset: sideInset(truthRect),
       sum: boxes.reduce((total, box) => total + box.width, 0),
       boxes,
-      truthY: truth.getBoundingClientRect().top,
+      truthY: truthRect.top,
     }
   })
   expect(metrics).not.toBeNull()
-  expect(metrics!.sum / metrics!.barWidth).toBeGreaterThanOrEqual(0.95)
+  expect(metrics!.sum / metrics!.contentWidth).toBeGreaterThanOrEqual(0.95)
+  expect(metrics!.rowInset.left / metrics!.scale).toBeGreaterThanOrEqual(16)
+  expect(metrics!.rowInset.right / metrics!.scale).toBeGreaterThanOrEqual(16)
+  expect(metrics!.truthInset.left / metrics!.scale).toBeGreaterThanOrEqual(16)
+  expect(metrics!.truthInset.right / metrics!.scale).toBeGreaterThanOrEqual(16)
   for (const box of metrics!.boxes) {
     expect(box.height / metrics!.scale, box.text).toBeGreaterThanOrEqual(72)
     expect(box.scrollWidth, box.text).toBeLessThanOrEqual(box.clientWidth + 1)
