@@ -25,6 +25,7 @@ import { ApiHttpError } from '../../services/api/client'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { aiUsageKeyName, aiUsageKeyTitle, formatCny } from './aiUsageDisplay'
 import { AiUsageBreakdownTable } from './AiUsageBreakdownTable'
+import { AiQuotaUsagePanel } from './AiQuotaUsagePanel'
 import type { AiUsageDimension } from './aiUsageDisplay'
 
 type LoadState =
@@ -253,6 +254,7 @@ export function AiUsagePanel() {
           <AiUsageBreakdownTable summary={summary} tab={tab} onTabChange={setTab} />
         </>
       )}
+      <AiQuotaUsagePanel reloadKey={reloadSeq} />
     </section>
   )
 }

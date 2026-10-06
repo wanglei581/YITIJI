@@ -147,6 +147,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-peripheral-views
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
           pnpm --filter @ai-job-print/admin verify:admin-ai-usage-ui
+          pnpm --filter @ai-job-print/admin verify:admin-ai-quota-ui
           pnpm --filter @ai-job-print/admin verify:console-plain-copy
           pnpm --filter @ai-job-print/admin verify:admin-internal-accounts-ui
           pnpm --filter @ai-job-print/admin verify:admin-partner-contact-phone-ui
@@ -793,6 +794,7 @@ jobs:
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           pnpm --filter @ai-job-print/api verify:ai-quota
+          pnpm --filter @ai-job-print/api verify:ai-quota-api
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:kiosk-session

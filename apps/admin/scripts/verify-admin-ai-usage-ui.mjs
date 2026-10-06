@@ -259,6 +259,24 @@ function mountPanel({ demo = false, get } = {}) {
       return (get ? get(day) : Promise.resolve(SAMPLE())).then((summary) => http.aiUsageDailyFromResponse({ success: true, data: summary }))
     },
   }
+  const quietQuota = {
+    day: '2026-09-29',
+    buckets: [
+      { bucket: 'ai_resume', usedTotal: 0, membersUsed: 0, membersExhausted: 0, dailyLimit: 20 },
+      { bucket: 'ai_assistant', usedTotal: 0, membersUsed: 0, membersExhausted: 0, dailyLimit: 80 },
+      { bucket: 'ai_interview', usedTotal: 0, membersUsed: 0, membersExhausted: 0, dailyLimit: 5 },
+    ],
+    guest: { perTerminalDailyLimit: 0, terminalsUsed: 0, usedTotal: 0 },
+    extra: ['ai_resume', 'ai_assistant', 'ai_interview'].map((bucket) => ({ bucket, remainingTotal: 0, expiringWithin30Days: 0 })),
+  }
+  const quotaPanel = load('src/routes/ai-services/AiQuotaUsagePanel.tsx', {
+    react: runtime.react,
+    'react/jsx-runtime': runtime.jsxRuntime,
+    '../../services/api/aiUsageDaily': service,
+    '../../services/api/aiQuotaUsage': { getAdminAiQuotaUsage: () => Promise.resolve(quietQuota) },
+    '../../services/api/client': clientStub('http'),
+    '../../services/api/userErrorMessage': userErrorMessage,
+  })
   const panel = load('src/routes/ai-services/AiUsagePanel.tsx', {
     react: runtime.react,
     'react/jsx-runtime': runtime.jsxRuntime,
@@ -268,6 +286,7 @@ function mountPanel({ demo = false, get } = {}) {
     '../../services/api/userErrorMessage': userErrorMessage,
     './aiUsageDisplay': displayModule,
     './AiUsageBreakdownTable': breakdownModule,
+    './AiQuotaUsagePanel': quotaPanel,
   })
   assert.equal(typeof panel.AiUsagePanel, 'function', '面板必须具名导出 AiUsagePanel')
   return { view: runtime.mount(panel.AiUsagePanel), calls }
