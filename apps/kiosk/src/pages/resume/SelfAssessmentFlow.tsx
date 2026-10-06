@@ -9,9 +9,10 @@
 //   稿是**静态原型**（没有服务端，所以它不画结果、不画打印）。运行时这三样都是真的，
 //   迁移只向前补齐，不按静态稿把已上线能力删掉。
 //
-// **本文件是合规关键词扫描的锚点**：`services/api/scripts/verify-compliance.ts`
-// 的 SELF_ASSESSMENT_FILES 逐路径点名了它。用户可见的中文全部留在这里，
-// 呈现原语放 components/self-assessment/SelfAssessmentQxKit.tsx（那边不放文案）。
+// 同意来源门禁只钉本文件里的六句拦截标题（见下方 SA_WHY_HEAD 等）。
+// 临床词扫描（services/api/scripts/verify-compliance.ts）也只点名本文件，本批不改 services。
+// 没被钉住的拦截正文与结果空态在 components/self-assessment/ 下两个组件里；
+// 呈现原语仍在 SelfAssessmentQxKit.tsx（那边不放文案）。
 //
 // 合规（与 CLAUDE.md §11 / 18 / docs/compliance/compliance-boundary.md §4.5 同档）：
 // - 工具性质说明：非临床 / 非诊断 / 本人自助参考；不沿用 MBTI / 大五 / DISC / 霍兰德标签
@@ -101,6 +102,8 @@ import {
   type SaStatus,
 } from './components/self-assessment/SelfAssessmentQxKit'
 import { SaConsentBox, SaConsentLinkedCheck, SaConsentList } from './components/self-assessment/SelfAssessmentConsentKit'
+import { SelfAssessmentNowCard, SelfAssessmentQuizIntercept, SelfAssessmentRecordPreview } from './components/self-assessment/SelfAssessmentInterceptFacts'
+import { SelfAssessmentResultPending } from './components/self-assessment/SelfAssessmentResultEmpty'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
@@ -118,6 +121,13 @@ const SA_STEPS = [
 const SA_FRAME_BASE = { title: SA_TITLE, eyebrow: SA_EYEBROW, rail: SA_RAIL, steps: SA_STEPS } as const
 /** 返回口：稿的返回键指向「简历服务」服务台，不是浏览器历史（一体机没有后退键）。 */
 const SA_BACK_ROUTE = '/resume-service'
+/** verify-self-assessment-consent-source.mjs 钉在本文件的六句标题，正文在同目录组件。 */
+const SA_WHY_HEAD = '为什么会这样'
+const SA_NOW_HEAD = '这次作答现在的状态'
+const SA_PARAM_LEAD = '不显示你打开的链接参数内容。'
+const SA_NO_RESULT_HEAD = '还没有可查看的完成结果'
+const SA_NO_QUIZ_HEAD = '还不能进入作答'
+const SA_SUBMITTED_HEAD = '本次作答已经提交'
 
 /**
  * 置灰但仍可读到原因的动作按钮。用 `aria-disabled` 而不是原生 `disabled` ——
@@ -167,39 +177,6 @@ function GhostButton({ label, route, testId, onClick }: { label: string; route?:
 function askXiaoqing(go: NavigateFunction) {
   rememberAssistantDraft('我想了解这次自我探索的选择能怎么用，以及强弱和解读分别代表什么。')
   go('/assistant')
-}
-
-/** 拦截态中间三格。数字来自这次作答，不写死成「已完成」。 */
-function saNow(consented: boolean, done: number, total: number, submitted: boolean) {
-  return [
-    { key: 'consent', label: '是否已确认说明', value: consented ? '已确认，可以作答。' : '尚未确认，不能开始作答。' },
-    { key: 'done', label: '已作答题数', value: `${done} / ${total} 题${total > 0 && done >= total ? '，已答满。' : '，未答满不进入确认。'}` },
-    { key: 'submit', label: '是否已提交', value: submitted ? '已提交，可查看结果。' : '未提交，不生成任何结果。' },
-  ]
-}
-
-function SaWhy({ facts }: { facts: readonly { key: string; step: string; desc: string; current?: boolean }[] }) {
-  return (
-    <SaCard head="为什么会这样" hint="三条都可核对">
-      <SaFlow items={facts} />
-    </SaCard>
-  )
-}
-
-function SaNowCard({ consented, done, total, submitted }: { consented: boolean; done: number; total: number; submitted: boolean }) {
-  return (
-    <SaCard head="这次作答现在的状态" hint="页面按这次作答如实显示">
-      <SaMeta cols={3} items={saNow(consented, done, total, submitted)} />
-    </SaCard>
-  )
-}
-
-function SaParamNotice() {
-  return (
-    <SaNotice>
-      <b>不显示你打开的链接参数内容。</b>这里只说明是哪一类前置条件没满足，不回显参数原值。
-    </SaNotice>
-  )
 }
 
 function PrimaryButton({ label, testId, onClick }: { label: string; testId?: string; onClick: () => void }) {
@@ -452,105 +429,37 @@ export function SelfAssessmentQuizPage() {
 
   const restart = () => { clearSession(); navigate('/resume/self-assessment/intro') }
 
-  /**
-   * 两个 fail-closed 拦截面（稿 recover-consent / recover-submitted）。
-   * 共用一套版式：说清「为什么不放行」+「已有的东西不会被动」+ 两个真出口。
-   * 它们不是错误提示 —— 这一步本来就有前置条件，所以不用红色错误块，用 down 卡。
-   * 条数不写死：说明页渲染的是这次下发的条款，这里只说「每一条」，避免和条数对不上。
-   */
-  const emptyBank = consentOk && flat.length === 0
-  const staleConsent = !consentOk && session.resubmitAfterConsent === true
-  const consentFacts = emptyBank
-    ? [
-        { key: 'f1', step: '事实 1', desc: '当前题目集是空的，没有可以作答的题。', current: true },
-        { key: 'f2', step: '事实 2', desc: '说明已经确认，但没有题目就不能进入作答。' },
-        { key: 'f3', step: '事实 3', desc: '不会补一套题目，也不会跳过这一步。' },
-      ]
-    : staleConsent
-      ? [
-          { key: 'f1', step: '事实 1', desc: '说明已经更新，这次作答里的确认不再算数。', current: true },
-          { key: 'f2', step: '事实 2', desc: `你已答的 ${done} 题都还在，确认后会自动重新提交，不用重答。` },
-          { key: 'f3', step: '事实 3', desc: '不会因为你直接打开答题链接就当作已按新说明同意。' },
-        ]
-      : [
-          { key: 'f1', step: '事实 1', desc: '这次作答里没有「已确认说明」的记录。', current: true },
-          { key: 'f2', step: '事实 2', desc: '说明里的每一条前提，都要读完并勾选后才开始作答。' },
-          { key: 'f3', step: '事实 3', desc: '不会因为你直接打开答题链接就当作已同意。' },
-        ]
+  // 两个 fail-closed 拦截面。版式与三条事实在 SelfAssessmentQuizIntercept。
   const blocked = !consentOk || flat.length === 0
     ? {
-        state: 'recover-consent',
-        pill: '前置条件未满足',
-        ask: <>这一步<em>还打不开</em>。</>,
-        doing: <>这一步需要先在说明页确认。<b>页面不会跳过这一步，也不会补一个假结果给你看。</b></>,
-        head: '还不能进入作答',
-        hint: '这一步本来就有前置条件',
-        facts: consentFacts,
-        chips: [
-          { key: 'blocked', text: <>当前入口<b>不放行</b></>, tone: 'warn' as const },
-          { key: 'keep', text: '已有作答不会被清空' },
-          { key: 'none', text: '不生成任何结果' },
-        ],
-        body: consentOk
-          ? '当前题目集为空，请回到说明页重新开始。'
-          : session.resubmitAfterConsent
-            ? `说明已经更新，提交前要请你按新的说明重新确认一次。你已答的 ${done} 题都还在，确认后会自动重新提交，不用重答。`
-            : '这台机器上还没有记录到你对当前说明的同意，或说明已更新。作答会被送去生成 AI 解读，所以必须先看过说明再开始。',
-        secondary: { label: '返回简历服务', route: SA_BACK_ROUTE, onClick: () => navigate(SA_BACK_ROUTE) },
-        primary: { label: '去看说明并确认', onClick: () => navigate('/resume/self-assessment/intro') },
-      }
+      state: 'recover-consent' as const,
+      kind: consentOk && flat.length === 0 ? 'empty-bank' as const : session.resubmitAfterConsent === true ? 'stale' as const : 'no-consent' as const,
+    }
     : alreadySubmitted
-      ? {
-          state: 'recover-submitted',
-          pill: '本次已提交',
-          ask: <>这一步<em>还打不开</em>。</>,
-          doing: <>已提交的答案不再改动。<b>页面不会跳过这一步，也不会补一个假结果给你看。</b></>,
-          head: '本次作答已经提交',
-          hint: '已提交的答案不再改动',
-          facts: [
-            { key: 'f1', step: '事实 1', desc: `本次 ${total} 题已提交，答题页不再打开以免答案与提交不一致。`, current: true },
-            { key: 'f2', step: '事实 2', desc: '可以回完成页查看这次的结果。' },
-            { key: 'f3', step: '事实 3', desc: '想换答案就重新开始一次新的作答。' },
-          ],
-          chips: [
-            { key: 'blocked', text: <>答题入口<b>不放行</b></>, tone: 'warn' as const },
-            { key: 'kept', text: '本次结果仍可查看' },
-            { key: 'redo', text: '重新开始会清空这一次' },
-          ],
-          body: '重新开始一次会清掉这台机器上的本次作答与结果；已提交的那一次若要物理删除，请在结果页用「撤回本次探索」。',
-          secondary: { label: '重新开始一次', route: undefined, onClick: restart },
-          primary: { label: '查看本次结果', onClick: () => navigate('/resume/self-assessment/result') },
-        }
+      ? { state: 'recover-submitted' as const, kind: 'submitted' as const }
       : null
 
   if (blocked) {
     return (
-      <SaFrame
-        {...SA_FRAME_BASE}
-        screen="resume-self-assessment-quiz"
+      <SelfAssessmentQuizIntercept
+        frame={SA_FRAME_BASE}
         state={blocked.state}
-        status={{ tone: 'warn', label: blocked.pill }}
-        ask={blocked.ask}
-        doing={blocked.doing}
-        back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
-        ctabar={
-          <>
-            <GhostButton label={blocked.secondary.label} route={blocked.secondary.route} onClick={blocked.secondary.onClick} />
-            <PrimaryButton label={blocked.primary.label} onClick={blocked.primary.onClick} />
-          </>
-        }
-      >
-        <SaCard head={blocked.head} hint={blocked.hint} tone="down" testId="self-assessment-recover">
-          <SaChips items={blocked.chips} />
-          <p className="sa-sub">{blocked.body}</p>
-        </SaCard>
-        <SaWhy facts={blocked.facts} />
-        <SaNowCard consented={consentOk} done={done} total={total} submitted={Boolean(session.result)} />
-        <SaCard head="现在可以做什么" hint="都是现在就能打开的入口">
-          <SaPicks items={saExits(navigate, '/resume/self-assessment/questions', consentOk && !alreadySubmitted)} />
-        </SaCard>
-        <SaParamNotice />
-      </SaFrame>
+        kind={blocked.kind}
+        consented={consentOk}
+        done={done}
+        total={total}
+        hasResult={Boolean(session.result)}
+        whyHead={SA_WHY_HEAD}
+        nowHead={SA_NOW_HEAD}
+        paramLead={SA_PARAM_LEAD}
+        blockedHead={blocked.state === 'recover-submitted' ? SA_SUBMITTED_HEAD : SA_NO_QUIZ_HEAD}
+        exits={saExits(navigate, '/resume/self-assessment/questions', consentOk && !alreadySubmitted)}
+        resumeRoute={SA_BACK_ROUTE}
+        onResumeService={() => navigate(SA_BACK_ROUTE)}
+        onIntro={() => navigate('/resume/self-assessment/intro')}
+        onResult={() => navigate('/resume/self-assessment/result')}
+        onRestart={restart}
+      />
     )
   }
 
@@ -561,10 +470,10 @@ export function SelfAssessmentQuizPage() {
         {...SA_FRAME_BASE}
         screen="resume-self-assessment-quiz"
         state="review"
-          status={{ tone: 'ok', label: `已答 ${done}/${total}` }}
-          ask={<>提交前，<em>先检查这 {total} 个选择</em>。</>}
+        status={{ tone: 'ok', label: `已答 ${done}/${total}` }}
+        ask={<>提交前，<em>先检查这 {total} 个选择</em>。</>}
         doing={<>{total} 题已全部作答。<b>确认提交后才会把作答送去生成解读；在那之前不产生任何结果。</b></>}
-          back={{ label: '返回作答', onBack: () => setStage('quiz') }}
+        back={{ label: '返回作答', onBack: () => setStage('quiz') }}
         gate={
           <SaGate tone="ok">
             <><b>{total} 题都已作答。</b>确认无误后再提交；现在取消也不会丢掉这些选择。</>
@@ -884,96 +793,25 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
   const live = progress(questionsFor(session.consent.sensitive === true), session.answers)
   if (!result || !taskId || !dimensions) {
     const failure = taskError ?? (malformed ? '这次返回的结果缺少维度数据，本页不展示不完整结果。' : null)
-    const state = inflight === 'submit' ? 'submitting' : inflight === 'fetch' ? 'fetching' : failure ? 'result-error' : 'result-empty'
-    const status: SaStatus = inflight
-      ? { tone: 'unknown', label: inflight === 'submit' ? '正在生成' : '正在读取' }
-      : failure
-        ? { tone: 'bad', label: '这次没拿到结果' }
-        : { tone: 'unknown', label: '无最近结果' }
     return (
-      <SaFrame
-        {...SA_FRAME_BASE}
-        screen="resume-self-assessment-result"
-        state={state}
-          status={status}
-          ask={inflight ? <>请稍候，<em>这一步还在等结果</em>。</> : failure ? <>这次<em>没能拿到结果</em>。</> : <>这一步<em>还打不开</em>。</>}
-        doing={inflight
-          ? <>页面不设倒计时，也不会自己变成「完成」；<b>只有系统真实返回才会换屏。</b></>
-          : failure
-            ? <>失败原因写在下面。<b>页面不会用别的东西顶上，也不会假装已完成。</b></>
-            : <>这次作答没有「答满并提交」的标记。<b>页面不会跳过这一步，也不会补一个假结果给你看。</b></>}
-          back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
-        ctabar={
-          <>
-            {failure && taskAiDown ? (
-              <>
-                <GhostButton label="返回首页" route="/" onClick={() => navigate('/')} />
-                <PrimaryButton label="返回简历服务" onClick={() => navigate(SA_BACK_ROUTE)} />
-              </>
-            ) : (
-              <>
-                <GhostButton label="返回简历服务" route={SA_BACK_ROUTE} onClick={() => navigate(SA_BACK_ROUTE)} />
-                <PrimaryButton label={failure ? '重新作答' : '去看说明并开始'} onClick={() => navigate('/resume/self-assessment/intro')} />
-              </>
-            )}
-          </>
-        }
-      >
-        <AiTaskRegion task={task} label="AI 陈述式解读" className="sa-ai-region"
-          fallback={{
-            mode: 'result-unavailable',
-            reason: failure ?? '这次没能拿到结果，页面不会用别的东西顶上。',
-            ...(taskAiDown
-              ? { retryHint: 'AI 现在停用，重试不会变好。下面的入口不经过 AI，照常能办。' }
-              : {
-                  retryHint: `${linkedTaskId ? `记录编号 ${linkedTaskId}。` : ''}作答还留在这台机器上，可以直接重试；离开或闲置 60 秒会清空。`,
-                  action: { label: '重试这一次', onClick: () => { startedRef.current = null; setAttempt((n) => n + 1) } },
-                }),
-          }}
-          running={
-            <SaCard head={inflight === 'submit' ? '正在生成本次解读' : '正在读取这次结果'} hint="等系统真实返回">
-              <p className="sa-sub" data-ai-progress="true">
-                {inflight === 'submit'
-                  ? '维度强度由固定权重当场算出，解读由 AI 写 —— 这一步在等系统的真实返回，页面不设倒计时，也不会自己变成「完成」。'
-                  : '正在按记录编号读回本次结果。'}
-              </p>
-            </SaCard>
-          }
-          idle={
-            <SaCard head="还没有可查看的完成结果" hint="这次作答没有「答满并提交」的标记" tone="down" testId="self-assessment-recover">
-              <SaChips
-                items={[
-                  { key: 'none', text: <>当前入口<b>不放行</b></>, tone: 'warn' },
-                  { key: 'keep', text: '已有作答不会被清空' },
-                  { key: 'noguess', text: '不生成任何结果' },
-                ]}
-              />
-              <p className="sa-sub">这不是错误提示，而是这一步本来就有前置条件。结果只在本机保留 24 小时，过期会自动清理。按下面任意一个出口继续即可。</p>
-            </SaCard>
-          }
-        />
-        {state === 'result-empty' ? (
-          <>
-            <SaWhy facts={[
-              { key: 'f1', step: '事实 1', desc: `完成页只在本次 ${live.total} 题答满并明确提交后才显示。`, current: true },
-              { key: 'f2', step: '事实 2', desc: '直接打开完成页的链接不会放行，也不会补一个结果给你看。' },
-              { key: 'f3', step: '事实 3', desc: '之前的作答如果还在，可以接着答完再提交。' },
-            ]} />
-            <SaNowCard consented={consentOk} done={live.done} total={live.total} submitted={false} />
-            <SaCard head="答满并提交之后，这一页会列出" hint="现在没有这些内容，也不展示示例">
-              <SaFlow items={[
-                { key: 'cov', step: '会列出', title: '五个方向的强弱', current: true, desc: '按固定规则从你的选择算出，不经过 AI。现在没有作答，这里不显示数字。' },
-                { key: 'read', step: '会列出', title: 'AI 解读', desc: '只在真的生成之后出现。这次没有提交，不会写一段看起来像结论的话。' },
-                { key: 'print', step: '会列出', title: '打印与撤回', desc: '生成 PDF、送到打印工作台，或撤回这一次，都要等结果真实存在。' },
-              ]} />
-            </SaCard>
-          </>
-        ) : null}
-        <SaCard head="现在可以做什么" hint="都是现在就能打开的入口">
-          <SaPicks items={saExits(navigate, '/resume/self-assessment/result', false)} />
-        </SaCard>
-        {state === 'result-empty' ? <SaParamNotice /> : null}
-      </SaFrame>
+      <SelfAssessmentResultPending
+        frame={SA_FRAME_BASE} inflight={inflight} failure={failure} task={task} taskAiDown={taskAiDown}
+        fallback={{
+          mode: 'result-unavailable',
+          reason: failure ?? '这次没能拿到结果，页面不会用别的东西顶上。',
+          ...(taskAiDown
+            ? { retryHint: 'AI 现在停用，重试不会变好。下面的入口不经过 AI，照常能办。' }
+            : {
+                retryHint: `${linkedTaskId ? `记录编号 ${linkedTaskId}。` : ''}作答还留在这台机器上，可以直接重试；离开或闲置 60 秒会清空。`,
+                action: { label: '重试这一次', onClick: () => { startedRef.current = null; setAttempt((n) => n + 1) } },
+              }),
+        }}
+        consentOk={consentOk} done={live.done} total={live.total}
+        whyHead={SA_WHY_HEAD} nowHead={SA_NOW_HEAD} paramLead={SA_PARAM_LEAD} emptyHead={SA_NO_RESULT_HEAD}
+        resumeRoute={SA_BACK_ROUTE}
+        onHome={() => navigate('/')} onResume={() => navigate(SA_BACK_ROUTE)} onIntro={() => navigate('/resume/self-assessment/intro')}
+        exits={saExits(navigate, '/resume/self-assessment/result', false)}
+      />
     )
   }
 
@@ -1309,20 +1147,9 @@ export function SelfAssessmentHistoryPage() {
         </SaCard>
       )}
 
-      {current ? null : (
-        <SaCard head="有记录时这里显示什么" hint="会列出哪些内容，不是已有数据">
-          <SaMeta
-            cols={3}
-            items={[
-              { key: 'done', label: '完成情况', value: '是否五个方向都已算出。' },
-              { key: 'keep', label: '保留期限', value: '结果保留 24 小时，到期自动清理。' },
-              { key: 'next', label: '还能做什么', value: '回看结果、打印或撤回。' },
-            ]}
-          />
-        </SaCard>
-      )}
+      {current ? null : <SelfAssessmentRecordPreview />}
 
-      <SaNowCard consented={consented} done={tally.done} total={tally.total} submitted={Boolean(session.result)} />
+      <SelfAssessmentNowCard head={SA_NOW_HEAD} consented={consented} done={tally.done} total={tally.total} submitted={Boolean(session.result)} />
 
       <SaCard head="这里没有什么" hint="每一条都可核对">
         <SaMeta

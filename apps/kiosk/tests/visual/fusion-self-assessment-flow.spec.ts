@@ -42,7 +42,7 @@ const submissionData = {
   expiresAt: '2099-01-01T00:00:00.000Z',
 }
 
-function registerSelfAssessmentApi(api: ReturnType<typeof Object>, page: Page): void {
+function registerSelfAssessmentApi(api: ReturnType<typeof Object>): void {
   // 复用 W6 的其他端点（首页 / 计时器 / 终端等）
   registerW6Api(api as never)
 
@@ -94,7 +94,7 @@ async function columnGap(page: Page, state: string): Promise<number> {
 test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
   test('§1.4 三方 taskId 一致 + §1.7 summary 不注入 LLM @kiosk', async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)
-    registerSelfAssessmentApi(api, page)
+    registerSelfAssessmentApi(api)
 
     // 进 Intro 页验证渲染
     await page.goto('/resume/self-assessment/intro')
@@ -134,7 +134,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
 
   test('§1.6 print 端点真实网络可达 @kiosk', async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)
-    registerSelfAssessmentApi(api, page)
+    registerSelfAssessmentApi(api)
 
     // 直接派发 POST 看 print 端点真打
     const printResp = page.waitForResponse(
@@ -156,7 +156,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
   })
 
   test('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk', async ({ page, api }) => {
-    registerSelfAssessmentApi(api, page)
+    registerSelfAssessmentApi(api)
     api.respond('POST', `/api/v1/resume/self-assessment/${MOCK_TASK_ID}/print`, {
       status: 200,
       json: {
@@ -200,7 +200,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
 
   test('§1.3 + §1.5: 撤回 DELETE 真网络可达 @kiosk', async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)
-    registerSelfAssessmentApi(api, page)
+    registerSelfAssessmentApi(api)
 
     const delResp = page.waitForResponse(
       (resp) => resp.url().endsWith(`/api/v1/resume/self-assessment/${MOCK_TASK_ID}`) && resp.request().method() === 'DELETE',
@@ -235,7 +235,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
   }
 
   test('同意页渲染下发的条款与勾选框文字；链接打开到未成年人专章，返回后勾选仍在 @w3-kiosk', async ({ page, api }) => {
-    registerSelfAssessmentApi(api, page)
+    registerSelfAssessmentApi(api)
     registerLegal(api)
     await page.goto('/resume/self-assessment/intro')
     const items = page.getByTestId('self-assessment-consent-items').locator('li > div')
@@ -268,7 +268,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
   })
 
   test('同意说明没有取到：不放行作答，重试取到后才可勾选 @w3-kiosk', async ({ page, api }) => {
-    registerSelfAssessmentApi(api, page)
+    registerSelfAssessmentApi(api)
     api.respondWith('GET', SELF_ASSESSMENT_QUESTIONS_PATH, (n) => n === 1
       ? { status: 503, json: { error: { code: 'MAINTENANCE_MODE', message: '设备维护中，请稍后再来' } } }
       : { status: 200, json: served })
@@ -284,7 +284,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
   })
 
   test('旧版本会话提交被拒：回到重新确认，已答保留，确认后自动重交一次 @w3-kiosk', async ({ page, api }) => {
-    registerSelfAssessmentApi(api, page)
+    registerSelfAssessmentApi(api)
     const bodies: Array<{ consent?: { consentVersion?: string } }> = []
     page.on('request', (request) => {
       if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/self-assessment') bodies.push(request.postDataJSON())
@@ -321,7 +321,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
   })
 
   test('拦截态写明原因和当前状态，底栏两个按钮等宽 @w3-kiosk', async ({ page, api }) => {
-    registerSelfAssessmentApi(api, page)
+    registerSelfAssessmentApi(api)
     await page.goto('/resume/self-assessment/questions')
     const quiz = page.locator('[data-kiosk-screen="resume-self-assessment-quiz"]')
     await expect(quiz).toHaveAttribute('data-state', 'recover-consent')

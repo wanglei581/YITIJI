@@ -1,11 +1,9 @@
 // 自我探索 · 倾向参考 —— 青序流光呈现原语（稿 34-self-assessment.html）。
 //
-// **这个文件里不许出现自我探索的业务文案。** 原因不是洁癖：
-// `services/api/scripts/verify-compliance.ts` 的 `SELF_ASSESSMENT_FILES` 是一张
-// 逐路径的扫描白名单（临床 / 量表 / 疾病 关键词），它点名的是
-// `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx`，不是本文件。把用户可见的
-// 中文搬到这里，等于把那条合规扫描绕过去 —— 而那条门禁在 services/ 下，本批不改。
-// 所以分工是：**文案全部留在 SelfAssessmentFlow.tsx，本文件只收结构与样式**。
+// 本文件只收结构与样式，不放自我探索的业务文案。
+// 临床词扫描只点名 SelfAssessmentFlow.tsx（services/api/scripts/verify-compliance.ts，
+// 不改 services）。同意来源门禁钉住的六句标题留在那个文件；没被钉住的拦截正文
+// 与结果空态在 SelfAssessmentInterceptFacts.tsx / SelfAssessmentResultEmpty.tsx。
 //
 // 触控：这里出现的每个 <button> 都会被 fusion-w6 的 expectTouchTargets 量到，
 // 换算回舞台 CSS px 后最小边必须 ≥48px。尺寸写在 self-assessment-qx.css，
