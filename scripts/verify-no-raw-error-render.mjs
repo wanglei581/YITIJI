@@ -207,6 +207,11 @@ if (failures === 0) pass(`本包 ${PACKET_PAGES.length} 个页面/入口不再�
 //    经 userMessageOf(...) 包一层的不算。下面每条允许都写明为什么不是给人看的异常原文。
 const MESSAGE_ALLOW = [
   {
+    rel: 'apps/admin/src/routes/users/UserClosureDialog.tsx',
+    ok: (line) => line.includes('failure.message'),
+    why: 'failure 来自 userClosurePresentation.ts 的 closureFailure：已登记的注销错误码走中文码表（合规定稿），其余经 userMessageOf，不含异常原文。',
+  },
+  {
     rel: 'apps/partner/src/routes/screen/screenView.tsx',
     ok: (line) => line.includes('result.message'),
     why: 'result 来自 consoleScreen.ts 的 ScreenFetchResult，message 已由 readableMessage 按大屏专用码表转成中文（如「当前账号没有查看机构数据大屏的权限」），比通用码表更具体。',
