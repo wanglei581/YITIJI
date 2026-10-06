@@ -22422,6 +22422,7 @@
       "services/api/scripts/verify-ai-quota.ts"
     ],
     "packages/shared/src/types/memberPrintOrders.ts": [
+      "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
       "services/api/scripts/verify-member-order-timeline.ts"
     ],
     "packages/shared/src/types/memberPrivacy.ts": [
@@ -30221,7 +30222,8 @@
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
-          "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts"
+          "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts",
+          "packages/shared/src/types/memberPrintOrders.ts"
         ],
         "missing": []
       },

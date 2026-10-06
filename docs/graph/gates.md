@@ -1825,7 +1825,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/member-privacy.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-member-data-request-contract.ts`<br/>`verify-member-step-up.helpers.ts`<br/>`verify-member-step-up.ts`<br/>`verify-wave2-account-rebind.ts` |
 | `packages/shared/src/types/memberAssets.ts` | `verify-jobfair-checkin.ts` |
 | `packages/shared/src/types/memberBenefits.ts` | `verify-ai-quota.ts` |
-| `packages/shared/src/types/memberPrintOrders.ts` | `verify-member-order-timeline.ts` |
+| `packages/shared/src/types/memberPrintOrders.ts` | `verify-member-print-orders-ui.mjs`<br/>`verify-member-order-timeline.ts` |
 | `packages/shared/src/types/memberPrivacy.ts` | `verify-user-closure-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-ai-usage-retention.ts`<br/>`verify-member-data-request-contract.ts` |
 | `packages/shared/src/types/mockInterview.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
 | `packages/shared/src/types/partner.ts` | `verify-admin-parked-recruitment-ui.mjs`<br/>`verify-console-privacy-copy.mjs`<br/>`verify-org-type-enum-sync.ts`<br/>`verify-partner-smart-campus.ts` |
