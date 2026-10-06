@@ -43,7 +43,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
 | **high** | 仍被 CI / 门禁 / 包脚本引用 | 79 |
 | **medium** | 只被文档或其它文件提及 | 28 |
-| **low** | 全仓零提及 | 94 |
+| **low** | 全仓零提及 | 96 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -69,17 +69,19 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（94）
+## low — 全仓零提及（96）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
 
-### 页面/组件（6）
+### 页面/组件（8）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/profile/assets/ui.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `apps/kiosk/src/pages/resume/components/ResumeContextStrip.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `apps/kiosk/src/pages/resume/components/ResumeUploadNotices.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/pages/scan/ScanFlowSteps.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampusHttpAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
