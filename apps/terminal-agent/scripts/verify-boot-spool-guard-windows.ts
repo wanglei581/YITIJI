@@ -441,6 +441,29 @@ Write-Output 'jobs=cleared'
       .pop()
     assert.equal(rebootLine, 'reboot')
     console.log('PASS daily-reboot dry-run')
+    try {
+      stopSpooler()
+      const logFile = join(process.env['ProgramData'] ?? '', 'AIJobPrintAgent', 'logs', 'daily-reboot.log')
+      const before = existsSync(logFile) ? readFileSync(logFile).length : 0
+      const stopped = spawnSync(
+        'powershell',
+        ['-NonInteractive', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', DAILY, '-DryRun'],
+        { encoding: 'utf8', timeout: 60_000 },
+      )
+      assert.equal(stopped.status, 0, stopped.stderr || stopped.stdout || 'dry-run with spooler stopped failed')
+      const stoppedLine = (stopped.stdout ?? '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .pop()
+      assert.equal(stoppedLine, 'reboot')
+      const added = existsSync(logFile) ? readFileSync(logFile).subarray(before).toString('utf8') : ''
+      assert.match(added, /dry-run-reboot-spooler-stopped/)
+      console.log('PASS daily-reboot spooler-stopped dry-run')
+    } finally {
+      abortShutdown()
+      restoreSpooler()
+    }
   } finally {
     abortShutdown()
     if (original) writeFileSync(path, original)

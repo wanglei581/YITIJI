@@ -103,16 +103,29 @@ const customActionAttributes = (element) => {
   return attributes
 }
 const customActions = customActionElements.map(customActionAttributes)
-const expectedCustomActionIds = [
+const serviceRecoveryActionIds = [
   'AgentServiceRestoreAutoStart',
   'AgentServiceRestoreRecovery',
   'AgentServiceRestoreFailureFlag',
   'AgentServiceBestEffortStart',
 ]
+const spoolerUninstallActionIds = [
+  'RemoveBootSpoolGuardTask',
+  'RemoveDailyRebootTask',
+  'RestoreSpoolerAutomatic',
+  'StartSpoolerService',
+]
+const spoolerUninstallCommands = new Map([
+  ['RemoveBootSpoolGuardTask', '&quot;[System64Folder]schtasks.exe&quot; /Delete /TN &quot;AIJobPrintBootSpoolGuard&quot; /F'],
+  ['RemoveDailyRebootTask', '&quot;[System64Folder]schtasks.exe&quot; /Delete /TN &quot;AIJobPrintDailyReboot&quot; /F'],
+  ['RestoreSpoolerAutomatic', '&quot;[System64Folder]sc.exe&quot; config Spooler start= auto'],
+  ['StartSpoolerService', '&quot;[System64Folder]sc.exe&quot; start Spooler'],
+])
+const expectedCustomActionIds = [...serviceRecoveryActionIds, ...spoolerUninstallActionIds]
 assert.deepEqual(
   customActions.map((attributes) => attributes.get('Id')),
   expectedCustomActionIds,
-  'MSI CustomAction set must contain exactly the four fixed service recovery actions, in order',
+  'MSI CustomAction set must be the four service recovery actions followed by the four spooler-guard uninstall actions',
 )
 for (const attributes of customActions) {
   assert.deepEqual(
@@ -124,20 +137,35 @@ for (const attributes of customActions) {
   assert.equal(attributes.get('Impersonate'), 'no', `CustomAction ${attributes.get('Id')} must run elevated`)
   assert.equal(attributes.get('Return'), 'ignore', `CustomAction ${attributes.get('Id')} must not make install fail on start error`)
   const command = attributes.get('ExeCommand')
-  assert.match(command, /^&quot;\[System64Folder\]sc\.exe&quot; /, `CustomAction ${attributes.get('Id')} must call system sc.exe`)
-  assert.match(command, /\baijobprintagent\.exe\b/i, `CustomAction ${attributes.get('Id')} must target the Agent service`)
   assert.doesNotMatch(command, /node|powershell|pwsh|\.ps1|\.js|\.cmd|\.bat|\.vbs|provision|cmd\.exe|msiexec/i, `CustomAction ${attributes.get('Id')} must not shell out to provisioning code`)
+  if (serviceRecoveryActionIds.includes(attributes.get('Id'))) {
+    assert.match(command, /^&quot;\[System64Folder\]sc\.exe&quot; /, `CustomAction ${attributes.get('Id')} must call system sc.exe`)
+    assert.match(command, /\baijobprintagent\.exe\b/i, `CustomAction ${attributes.get('Id')} must target the Agent service`)
+  } else {
+    assert.equal(
+      command,
+      spoolerUninstallCommands.get(attributes.get('Id')),
+      `CustomAction ${attributes.get('Id')} must use the fixed uninstall command`,
+    )
+  }
 }
 const actionSchedules = [...wix.matchAll(/<Custom\s+Action="([^"]+)"\s+After="([^"]+)"\s+Condition="([^"]+)"\s*\/>/g)]
 // 同理：Before 写法、扩展里现成的动作（如 QuietExec）的调度也是 <Custom>，都必须落在上面的固定格式里。
 assert.equal((wix.match(/<Custom\s/g) ?? []).length, actionSchedules.length, 'every <Custom> scheduling element must use the fixed After/Condition form checked below')
 assert.equal(actionSchedules.length, expectedCustomActionIds.length, 'all fixed CustomActions must be scheduled exactly once')
-for (let index = 0; index < expectedCustomActionIds.length; index += 1) {
+for (let index = 0; index < serviceRecoveryActionIds.length; index += 1) {
   const [id, after, condition] = actionSchedules[index].slice(1)
-  assert.equal(id, expectedCustomActionIds[index], `CustomAction ${expectedCustomActionIds[index]} must be scheduled in order`)
-  assert.equal(after, index === 0 ? 'StartServices' : expectedCustomActionIds[index - 1], `CustomAction ${id} has the wrong sequence predecessor`)
+  assert.equal(id, serviceRecoveryActionIds[index], `CustomAction ${serviceRecoveryActionIds[index]} must be scheduled in order`)
+  assert.equal(after, index === 0 ? 'StartServices' : serviceRecoveryActionIds[index - 1], `CustomAction ${id} has the wrong sequence predecessor`)
   assert.match(condition, /AGENTBOUND = &quot;#1&quot;/, `CustomAction ${id} must require the bound marker`)
   assert.match(condition, /NOT \(REMOVE~=&quot;ALL&quot;\)/, `CustomAction ${id} must be excluded during uninstall`)
+}
+for (let index = 0; index < spoolerUninstallActionIds.length; index += 1) {
+  const [id, after, condition] = actionSchedules[serviceRecoveryActionIds.length + index].slice(1)
+  assert.equal(id, spoolerUninstallActionIds[index], `CustomAction ${spoolerUninstallActionIds[index]} must be scheduled in order`)
+  assert.equal(after, index === 0 ? 'StopServices' : spoolerUninstallActionIds[index - 1], `CustomAction ${id} has the wrong sequence predecessor`)
+  assert.match(condition, /REMOVE~=&quot;ALL&quot;/, `CustomAction ${id} must run only when removing the product`)
+  assert.match(condition, /NOT UPGRADINGPRODUCTCODE/, `CustomAction ${id} must not run when a major upgrade removes the old product`)
 }
 const boundProperty = wix.match(/<Property\s+Id="AGENTBOUND"[\s\S]*?<\/Property>/)?.[0]
 assert.ok(boundProperty, 'AGENTBOUND property must search the binding marker')
@@ -222,7 +250,7 @@ assert.match(fs.readFileSync(path.join(root, 'generate-wix-fragment.ps1'), 'utf8
 assert.match(fs.readFileSync(path.join(root, 'generate-wix-fragment.ps1'), 'utf8'), /provision\/launch-control-center\.vbs/)
 
 // Kiosk browser launcher + watchdog: shipped as MSI files, registered as a logon
-// task by the elevated provisioning flow (the MSI itself stays CustomAction-free).
+// task by the elevated provisioning flow. The kiosk task is not an MSI CustomAction.
 const kioskWatchdog = read('kiosk/kiosk-watchdog.ps1')
 const kioskRegister = read('kiosk/register-kiosk-watchdog.ps1')
 const kioskLauncher = read('kiosk/launch-kiosk.cmd')
@@ -433,6 +461,15 @@ assert.match(lifecycle, /Assert-PanelShortcut/)
 assert.match(lifecycle, /Assert-DesktopShortcut/)
 assert.match(lifecycle, /desktop link is an MSI advertised shortcut/)
 assert.match(lifecycle, /Terminal control center desktop shortcut remains after uninstall/)
+assert.match(lifecycle, /Install-BootSpoolGuard -GuardScriptPath/)
+assert.match(lifecycle, /Install-DailyRebootTask -At/)
+assert.match(lifecycle, /DEMAND_START/)
+assert.match(lifecycle, /Stop-Service -Name "Spooler"/)
+assert.match(lifecycle, /Boot spool guard task remains after uninstall/)
+assert.match(lifecycle, /Daily reboot task remains after uninstall/)
+assert.match(lifecycle, /Spooler was not Automatic after uninstall/)
+assert.match(lifecycle, /Spooler was not Running after uninstall/)
+assert.match(lifecycle, /Restore-LifecycleSpooler/)
 assert.ok(lifecycle.includes('URL=http://127\\.0\\.0\\.1:9527/local/panel'))
 assert.match(lifecycle, /Start Menu shortcut remains after uninstall/)
 assert.match(workflow, /artifacts\/evidence\/fresh-msi-lifecycle-logs\//)
