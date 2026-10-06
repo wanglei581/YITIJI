@@ -44,6 +44,7 @@ import { DEFAULT_SMART_CAMPUS_MODULES } from '../smart-campus/smart-campus.types
 import { ReleaseObservationService, type AdminReleaseObservationView } from './release-observation.service'
 import { KioskJobBoardService } from './kiosk-job-board.service'
 import { AiAccessService } from '../ai-access/ai-access.service'
+import { todayFreePrintSidesByTerminal } from '../print-jobs/free-print-quota.usage'
 
 // ── Admin view types ───────────────────────────────────────────────────────────
 
@@ -83,6 +84,8 @@ export interface AdminTerminalView {
   ipAddress: string | null
   diskFreeGb: number | null
   releaseObservation: AdminReleaseObservationView | null
+  /** 今天（北京日）已出纸成功的免费面数。不含在途。 */
+  todayFreePrintSides: number
 }
 
 export interface AdminOrganizationOption {
@@ -295,6 +298,8 @@ export class TerminalAdminService {
       },
     })
 
+    const todayFreePrintSides = await todayFreePrintSidesByTerminal(this.prisma, rows.map((row) => row.id))
+
     const terminals: AdminTerminalView[] = rows.map((t: (typeof rows)[number]) => {
       const hb = t.heartbeats[0]
       // W-04：终端上的心跳时间列（只在心跳时写，不受 90 天心跳表清理影响）与最新心跳行取较新者。
@@ -342,6 +347,7 @@ export class TerminalAdminService {
         releaseObservation: releaseTarget
           ? this.releases.toAdminObservation(releaseTarget)
           : null,
+        todayFreePrintSides: todayFreePrintSides.get(t.id) ?? 0,
       }
     })
 

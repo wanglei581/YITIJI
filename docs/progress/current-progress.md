@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-10-06：免费打印防刷（Grok 实现、Claude 审，未部署）
+
+- **默认值待产品负责人确认，全部可配。** 没配、空值或越界时回落：每台每天 300 面、每个登录会员每天 50 面、免登录每单 20 面、告警阈值 80%。平台设置键 `print.freeQuota.terminalDailySides` / `memberDailySides` / `guestPerOrderSides` / `alertPercent`。单台覆盖是 `Terminal.dailyFreePrintSides`（null = 用全局）。只约束实付 0 的免费单；实付大于 0 不受这三条限制。
+- **收紧一（在途）：** 拒绝条件是「今天已出纸 + 仍在途（同一终端或同一会员、今天建的、pending / claimed / printing）+ 本单面数 > 上限」。余量接口的 `used` 只算已出纸，`remaining = max(0, 上限 − 已出纸 − 在途)`。失败、未确认、取消不计。成功出纸的 `errorCode` 是空的，计数时必须把空错误码算进去，不能用 SQL `NOT errorCode = 未确认`（那会把空值行丢掉）。
+- **收紧二（文案）：** `PRINT_TERMINAL_DAILY_QUOTA_REACHED` 只说「今天这台机器的免费打印量已用完，明天 0 点恢复。」不写「文件已存在你的『我的文档』里」（不是每单都进了「我的文档」）。三条文案都不出现「工作人员」。
+- **收紧三（告警）：** `print_terminal_quota_high` 写在新文件 `services/api/src/admin-ops/derived-print-quota-alerts.ts`。`collectDerivedAlerts` 只加一行调用。只算 `enabled && lifecycleStatus === 'active'` 的终端；达到阈值 warning，用满 error；回合 = 终端 + 北京日期。`firingTotal` 必须把这一类的条数加进去，否则运营列表的总数会少算。企业微信推送仍用既有包装（标题前加「【职易达告警】」、后面加「正在发生」），告警标题本身是「终端 … 今日免费打印量已达 used / limit 面」。
+- **日界：** 北京自然日 0 点恢复，复用 AI 额度的 `quotaDay` / `quotaResetsAt`。`resetAt` 是次日 0 点的 UTC ISO。
+- **触发器：** `Terminal_planned_update_guard` 只拦 `agentToken`、`lifecycleStatus`、`credentialGeneration`。`Terminal_retired_update_guard` 只在身份列变化时拦截。改 `dailyFreePrintSides` 会刷新 `lastSeenAt`（`@updatedAt`），这一列不在退役身份比较里，不会被拦。已退役行不能直接插入，门禁用静态断言加计划中终端的列更新来证明。
+- **拦截点：** 一体机现场建单、手机单到机放行、自助续打与 `/retry`。管理员后台重试不拦。已经放行、正在出纸的单不打断。
+- **内存桩：** 既有告警和终端列表门禁把 Prisma 收成残缺对象。没有 `platformSetting` 时额度配置用上面的默认值；没有 `printTask` 或订单表时今日免费面数记 0。真实库始终有这些委托。
+- **本机验证（未部署）：** `verify:free-print-quota` 最后一行 `PASS verify:free-print-quota`。API typecheck、lint 退出 0。临时 PostgreSQL（`127.0.0.1:55481`，库 `verify_free_print_quota`）96 条迁移 deploy 成功，`migrate diff --exit-code` 为 No difference detected；随后停库、删除数据目录，并 `prisma generate` 恢复 SQLite 客户端。`pnpm graph:check` PASS，模型数仍是 112。反向变异五处已还原。
+- **留给告警页窗口：** `apps/admin` 的 `AdminAlertType` / `TYPE_META` / `TYPE_FILTERS` 还没有 `print_terminal_quota_high`。本窗口不改页面，`verify:service-desk-dashboard-ui` 会继续红，直到那一页补上这个类型。
+
 ## 2026-10-06：取件「出纸未确认 / 只出一部分」的自助出路（叠在 #1261 上，Grok 实现、Claude 审，未部署）
 
 - **为什么：** 现场无人值守（10/4 定）。#1261 只让「整单失败」能用同一到机码续打；出纸未确认（`PRINT_JOB_UNCONFIRMED`）与只出一部分（`PARTIAL_OUTPUT`）仍被拒，文案让人「联系工作人员」「另下新单」，现场没人。

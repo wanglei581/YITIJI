@@ -99,6 +99,40 @@ export class TerminalCapabilitiesService {
     return { terminalCode: terminal.terminalCode, capabilities }
   }
 
+  async readDailyFreePrintSides(terminalId: string): Promise<number | null> {
+    const terminal = await this.prisma.terminal.findUnique({
+      where: { id: terminalId },
+      select: { dailyFreePrintSides: true },
+    })
+    if (!terminal) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+    return terminal.dailyFreePrintSides
+  }
+
+  async setDailyFreePrintSides(
+    terminalId: string,
+    value: number | null,
+  ): Promise<{ terminalCode: string; previous: number | null; dailyFreePrintSides: number | null }> {
+    if (value !== null && (!Number.isInteger(value) || value < 1 || value > 10_000)) {
+      throw new BadRequestException({
+        error: { code: 'VALIDATION_FAILED', message: '每日免费打印上限须为 1 到 10000 的整数，或留空使用全局默认' },
+      })
+    }
+    const terminal = await this.prisma.terminal.findUnique({
+      where: { id: terminalId },
+      select: { terminalCode: true, dailyFreePrintSides: true },
+    })
+    if (!terminal) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+    await this.prisma.terminal.update({
+      where: { id: terminalId },
+      data: { dailyFreePrintSides: value },
+    })
+    return { terminalCode: terminal.terminalCode, previous: terminal.dailyFreePrintSides, dailyFreePrintSides: value }
+  }
+
   async upsert(
     terminalId: string,
     capabilityKey: string,

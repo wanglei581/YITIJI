@@ -10602,6 +10602,7 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10651,6 +10652,7 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10677,6 +10679,7 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -10703,6 +10706,7 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
@@ -17393,7 +17397,9 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/pickup-validity.ts",
+          "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -17747,7 +17753,7 @@
         ]
       },
       {
-        "fieldCount": 29,
+        "fieldCount": 30,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",

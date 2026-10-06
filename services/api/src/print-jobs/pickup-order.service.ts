@@ -12,6 +12,9 @@ import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { assertFileContentIntegrity } from '../files/file-content-integrity'
+import { payableCents } from '../payment/pending-refund-signal'
+import { assertFreePrintQuota } from './free-print-quota.decide'
+import { printOrderSideCount } from './verified-print-parameters'
 import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
 import { StorageService } from '../storage/storage.service'
 import {
@@ -298,6 +301,18 @@ export class PickupOrderService {
             ...(item.pageRange ? { pageRange: item.pageRange } : {}),
           })
         : current.printParamsJson
+      await tx.terminal.updateMany({
+        where: { id: terminal.id, enabled: true, lifecycleStatus: 'active' },
+        data: { lifecycleStatus: 'active' },
+      })
+      await assertFreePrintQuota(tx, {
+        terminalId: terminal.id,
+        endUserId: current.endUserId,
+        requestedSides: item
+          ? item.billablePages * item.copies
+          : printOrderSideCount([], { billablePages: current.billablePages, printParamsJson: taskParams }),
+        payableCents: payableCents(current),
+      })
       await tx.printTask.create({
         data: {
           id: taskId,
