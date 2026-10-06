@@ -38,13 +38,14 @@ import { API_MODE } from '../../services/api/client'
 import { getPrintJobStatus, type BackendJobStatus, type PrintJobStatusResult } from '../../services/print/printJobsApi'
 import { wakeLocalPrintQueue } from '../../services/print/localPrintWakeApi'
 import type { PrintJobParams } from '@ai-job-print/shared'
+import { helpNeededLine, preferUnattended } from '../../copy/unattendedCopy'
 import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
 import { formatCents } from './cashierStatus'
 import { PrintJobRow, PrintProgressFailureActions, PrintProgressFailureNote, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
 import './styles/print-fulfill-qx.css'
 import {
-  FAIL_REASONS,
+  failReasons,
   STEPS,
   backendStatusToStep,
   errorCodeToMessage,
@@ -56,7 +57,7 @@ import {
   reprintHint,
   paymentLead,
   paymentPill,
-  PRINT_PROGRESS_QUIET_COPY,
+  printProgressQuietCopy,
   PRINT_PROGRESS_QUIET_MS,
   progressFailurePresentation,
   progressStatusFingerprint,
@@ -140,7 +141,7 @@ export function PrintProgressPage() {
   const isSim = canSimulate
 
   const shouldFail = canSimulate && state?.simulateFailure === true
-  const failReason = typeof state?.failReason === 'string' ? state.failReason : FAIL_REASONS[0]
+  const failReason = typeof state?.failReason === 'string' ? state.failReason : failReasons()[0]
 
   const [current, setCurrent]   = useState<Step>(useRealApi ? 'queuing' : 'submitting')
   const [backendStatus, setBackendStatus] = useState<BackendJobStatus | null>(null)
@@ -190,7 +191,7 @@ export function PrintProgressPage() {
 
   const handleDevFail = useCallback(() => {
     cancelRef.current = true
-    navigateFail(FAIL_REASONS[0])
+    navigateFail(failReasons()[0])
   }, [navigateFail])
 
   const recheckStatus = useCallback(() => {
@@ -278,17 +279,22 @@ export function PrintProgressPage() {
         if (result.status === 'failed') {
           stopped = true
           navigateFail(
-            result.failureReasonForUser ?? errorCodeToMessage(result.errorCode) ?? FAIL_REASONS[0],
+            preferUnattended(
+              result.failureReasonForUser ?? '',
+              errorCodeToMessage(result.errorCode) ?? failReasons()[0],
+            ),
           )
           return
         }
         if (result.status === 'cancelled' || result.status === 'abandoned') {
           stopped = true
           navigateFail(
-            result.failureReasonForUser
-              ?? (result.status === 'cancelled'
-                ? '任务已取消，请联系现场工作人员确认订单'
-                : '任务已结束，请联系现场工作人员确认订单'),
+            preferUnattended(
+              result.failureReasonForUser ?? '',
+              `${result.status === 'cancelled'
+                ? '任务已取消，请到打印订单里核对。'
+                : '任务已结束，请到打印订单里核对。'}${helpNeededLine()}`,
+            ),
           )
           return
         }
@@ -304,7 +310,7 @@ export function PrintProgressPage() {
         setStatusReadError(true)
         if (pollFailsRef.current >= POLL_FAIL_LIMIT) {
           stopped = true
-          navigateFail(`${STATUS_READ_ERROR_TEXT}，请联系工作人员`)
+          navigateFail(`${STATUS_READ_ERROR_TEXT}。${helpNeededLine()}`)
         }
       }
     }
@@ -455,7 +461,7 @@ export function PrintProgressPage() {
       desc: isSim
         ? '演示：未出纸，无真实打印动作'
         : progressQuiet
-          ? PRINT_PROGRESS_QUIET_COPY
+          ? printProgressQuietCopy()
           : backendStatus === 'printing'
             ? '打印机正在出纸，请在出纸口等候'
             : '终端开始打印后才会出纸',
@@ -474,7 +480,7 @@ export function PrintProgressPage() {
     : showFailure
       ? failureView.headerTitle
       : progressQuiet
-        ? PRINT_PROGRESS_QUIET_COPY
+        ? printProgressQuietCopy()
         : realStatus.stageTitle
   const stageLine = isSim
     ? (simDone ? '未真实打印，可返回首页或重新上传' : '仅演示进度步骤，未建单、未支付、未出纸')
@@ -490,7 +496,7 @@ export function PrintProgressPage() {
       : showFailure
         ? <>{failureView.ask}</>
         : progressQuiet
-          ? <>{PRINT_PROGRESS_QUIET_COPY}</>
+          ? <>{printProgressQuietCopy()}</>
         : <>{paymentLead(payment)}<em>{realStatus.askPhase}</em>。</>
   const askDoing = isSim
     ? (simDone ? '未真实打印，未创建打印任务' : '当前为演示模式，不会建单、支付或出纸')

@@ -19,6 +19,7 @@
 // ============================================================
 
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
+import { helpNeededLine, machineCannotPrintLine, preferUnattended } from '../../copy/unattendedCopy'
 import type { BackendJobStatus } from '../../services/print/printJobsApi'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
@@ -140,10 +141,11 @@ export function outOfPaperPill(money: OutOfPaperMoney): string {
   return '订单保留 · 缺纸'
 }
 
-export function outOfPaperDoing(money: OutOfPaperMoney): string {
-  return money.fact === 'paid'
-    ? '不是你操作的问题，纸匣空了。订单和已付金额都保留着，请联系工作人员处理。'
-    : '不是你操作的问题，纸匣空了。订单记录保留着，请联系工作人员处理。'
+export function outOfPaperDoing(money: OutOfPaperMoney, phone?: string | null): string {
+  // 缺纸是机器故障。收费、免费、金额不明都用标准句 2，这句里不写已付、退款或金额。
+  // 金额仍只出现在 outOfPaperPill。订单还在，补上手机能看到。
+  void money
+  return machineCannotPrintLine(phone, { orderKept: true })
 }
 
 /** 小青区首句的前半截：先说钱的事实，再说任务阶段（稿「支付成功，正在出纸。」）。 */
@@ -180,28 +182,32 @@ export const STEPS: { key: Step; label: string; duration: number }[] = [
   { key: 'printing',   label: '打印中',   duration: 2500 },
 ]
 
-export const FAIL_REASONS = [
-  '打印机离线，请联系工作人员或稍后重试',
-  '打印机缺纸，请联系工作人员补纸',
-  '任务处理超时，请稍后重试',
-  '文件解析失败，请重新上传文件',
-]
+const PRINT_FAULT_CODES = new Set([
+  'PRINTER_NOT_FOUND',
+  'PRINTER_OFFLINE',
+  'PAPER_EMPTY',
+  'PRINTER_ERROR',
+  'PRINT_JOB_UNCONFIRMED',
+  'PRINT_COMMAND_FAILED',
+])
 
 const ERROR_CODE_MESSAGES: Record<string, string> = {
   DOWNLOAD_HASH_MISMATCH: '文件校验未通过（上传可能中断或文件已变化），请返回重新上传后再打印',
-  PRINTER_NOT_FOUND: '未找到打印机，请联系工作人员检查打印机连接',
-  PRINTER_OFFLINE: '打印机离线，请联系工作人员检查电源 / 网线 / USB 后重试',
-  PAPER_EMPTY: '打印机缺纸，当前无法打印，请联系工作人员补纸后重试',
-  PRINTER_ERROR: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理',
-  PRINT_JOB_UNCONFIRMED: '打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态',
   PRINT_TIMEOUT: '打印超时，请稍后重试',
-  PRINT_COMMAND_FAILED: '打印执行失败，请稍后重试或联系工作人员',
   UNSUPPORTED_FILE_TYPE: '该文件格式暂不支持打印，请上传 PDF 或 JPG / PNG',
   FILE_NOT_FOUND: '打印文件已失效，请返回重新上传',
 }
 
-export function errorCodeToMessage(code?: string): string | undefined {
-  return code ? ERROR_CODE_MESSAGES[code] : undefined
+/** 演示时间轴用的四句。前两句是机器故障，跟真实错误码走同一句标准句 2。 */
+export function failReasons(phone?: string | null): readonly string[] {
+  const fault = machineCannotPrintLine(phone, { orderKept: true })
+  return [fault, fault, '任务处理超时，请稍后重试', '文件解析失败，请重新上传文件']
+}
+
+export function errorCodeToMessage(code?: string, phone?: string | null): string | undefined {
+  if (!code) return undefined
+  if (PRINT_FAULT_CODES.has(code)) return machineCannotPrintLine(phone, { orderKept: true })
+  return ERROR_CODE_MESSAGES[code]
 }
 
 export const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)
@@ -218,8 +224,9 @@ export function backendStatusToStep(status: BackendJobStatus): Step {
  */
 export const PRINT_PROGRESS_QUIET_MS = 45_000
 
-export const PRINT_PROGRESS_QUIET_COPY =
-  '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
+export function printProgressQuietCopy(phone?: string | null): string {
+  return `请先看出纸口。${machineCannotPrintLine(phone, { orderKept: true })}`
+}
 
 /** 同一份回报不算「新状态」。状态、失败原因或完成时间变了才重新计时。 */
 export function progressStatusFingerprint(result: {
@@ -239,19 +246,20 @@ export function progressStatusFingerprint(result: {
 /** 已经知道失败之后的进度页文案。不再套用排队或「等待领取」。
  *  ask 只放顶栏和出错的那一步；红条只用 wayOut，不再把原因写第三遍。
  */
-export function progressFailurePresentation(reason: string): {
+export function progressFailurePresentation(reason: string, phone?: string | null): {
   headerTitle: string
   badge: string
   ask: string
   doing: string
   wayOut: string
 } {
-  const text = reason.trim()
+  const down = machineCannotPrintLine(phone, { orderKept: true })
+  const text = preferUnattended(reason.trim(), '')
   return {
     headerTitle: '打印没有完成',
     badge: '打印未完成',
-    ask: text || '打印没有完成，请联系现场工作人员核对。',
-    doing: '可以联系现场工作人员，查看打印订单，或重新选文件再印。',
-    wayOut: '请用下面的按钮联系工作人员、查看订单，或重新打印。',
+    ask: text || down,
+    doing: `可以查看打印订单，或重新选文件再印。${helpNeededLine(phone)}`,
+    wayOut: `请用下面的按钮查看订单或重新打印。${helpNeededLine(phone)}`,
   }
 }

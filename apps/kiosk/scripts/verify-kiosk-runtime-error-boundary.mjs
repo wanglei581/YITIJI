@@ -228,14 +228,18 @@ assert.deepEqual(
 // 做法沿用 verify-ai-down-fallbacks.mjs ⑤-A：纯本地编译 + 内存 import，不连网络/数据库。
 {
   const source = read('src/services/api/userErrorMessage.ts')
-  // 唯一的值导入是 ApiHttpError，用等价的本地类替掉即可独立加载（其余是纯逻辑）。
-  const standalone = source.replace(
-    /^import \{ ApiHttpError \} from '\.\/httpAdapter'$/m,
-    'export class ApiHttpError extends Error {\n'
-      + '  constructor(code, message, status) { super(message); this.code = code; this.status = status }\n'
-      + '}',
-  )
-  assert.doesNotMatch(standalone, /^\s*import\s/m, 'userErrorMessage.ts 新增了运行时依赖，本判据需同步调整')
+  // 2026-10-04：标准句抽到 supportCopy.ts（无第三方依赖）。运行时判据把该文件一并编进来，
+  // 仍然不连网络。ApiHttpError 继续用本地类替掉。
+  const supportCopy = read('src/services/supportCopy.ts')
+  const standalone = supportCopy + '\n' + source
+    .replace(
+      /^import \{ ApiHttpError \} from '\.\/httpAdapter'$/m,
+      'export class ApiHttpError extends Error {\n'
+        + '  constructor(code, message, status) { super(message); this.code = code; this.status = status }\n'
+        + '}',
+    )
+    .replace(/^import \{[\s\S]*?\} from '\.\.\/supportCopy'$/m, '')
+  assert.doesNotMatch(standalone, /^\s*import\s/m, 'userErrorMessage.ts 新增了 supportCopy 以外的运行时依赖，本判据需同步调整')
 
   const js = ts.transpileModule(standalone, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
@@ -269,10 +273,11 @@ assert.deepEqual(
   assert.notEqual(userMessageOf({ code: 'MOCK_MODE' }, FALLBACK), FALLBACK, 'MOCK_MODE 必须有自己的文案')
   for (const [code, hint] of [
     ['NETWORK_ERROR', /网络|重试/],
-    ['TERMINAL_NOT_READY', /设备未就绪|现场/],
-    ['ONLINE_PAYMENT_DISABLED', /支付|现场/],
+    // 2026-10-04 无人值守：机器故障与暂停接单改标准句，不再用「现场」当出路。
+    ['TERMINAL_NOT_READY', /暂时不能用/],
+    ['ONLINE_PAYMENT_DISABLED', /支付/],
     ['SCAN_TERMINAL_BUSY', /扫描|等待/],
-    ['PRINTER_UNAVAILABLE', /打印机|重试|现场/],
+    ['PRINTER_UNAVAILABLE', /打不了/],
   ]) {
     const text = userMessageOf({ code }, FALLBACK)
     assert.notEqual(text, FALLBACK, `${code} 必须有自己的文案`)
@@ -298,12 +303,17 @@ assert.deepEqual(
   // 所以再钉一条不同的合格中文（#1150 现文「本机…」），证明不是固定覆盖。
   // 英文堆栈或路径、以及空原话，回退一体机自己的那句，不落到调用方兜底。
   // PRINTER_UNAVAILABLE 不放行：带「本机暂停接打印单…」时仍是原来的固定文案。
-  const PRINTER_FIXED = '打印机当前不可用（离线、缺纸或故障），请稍后再试或联系现场工作人员'
-  const QUEUE_HALTED_FALLBACK = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
+  // 2026-10-04 无人值守：合格中文原话仍原样透传（包括「换一台终端」这种没有让人去找工作人员的句子）。
+  // 英文堆栈、空原话、以及仍写「联系现场工作人员」的原话，回退标准句 3。
+  // 缓存里没有服务联系方式时，标准句 3 不写「换一台机器」。
+  // PRINTER_UNAVAILABLE 固定为标准句 2，不透传。
+  const PRINTER_FIXED = '这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请查看《隐私政策》里的联系方式。'
+  const QUEUE_HALTED_LOCAL = '这台机器暂时不能用，请稍后再来，或查看《隐私政策》里的联系方式。'
+  const QUEUE_HALTED_PASSTHROUGH = '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端'
   const QUEUE_HALTED_SERVER = '本机暂停接打印单，暂不能下单，请稍后再试或换一台终端'
   assert.equal(
-    userMessageOf(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', QUEUE_HALTED_FALLBACK, 400), FALLBACK),
-    QUEUE_HALTED_FALLBACK,
+    userMessageOf(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', QUEUE_HALTED_PASSTHROUGH, 400), FALLBACK),
+    QUEUE_HALTED_PASSTHROUGH,
     '新码带拍板那句时必须原样显示',
   )
   assert.equal(
@@ -313,16 +323,21 @@ assert.deepEqual(
   )
   const leakedPath = 'Error: ENOENT\n    at Queue.pause (C:\\\\Windows\\\\System32\\\\spool\\\\PRINTERS:12:3)'
   const leaked = userMessageOf(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', leakedPath, 400), FALLBACK)
-  assert.equal(leaked, QUEUE_HALTED_FALLBACK, '英文堆栈或路径不得透传，须回退到一体机兜底句')
+  assert.equal(leaked, QUEUE_HALTED_LOCAL, '英文堆栈或路径不得透传，须回退到标准句 3')
   assert.notEqual(leaked, leakedPath)
   assert.notEqual(leaked, FALLBACK)
   const missing = userMessageOf(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', '   ', 400), FALLBACK)
-  assert.equal(missing, QUEUE_HALTED_FALLBACK, '原话缺失时回退到一体机兜底句')
+  assert.equal(missing, QUEUE_HALTED_LOCAL, '原话缺失时回退到标准句 3')
   assert.notEqual(missing, FALLBACK)
+  const staffSeeking = userMessageOf(
+    new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', '本机暂停接单，请联系现场工作人员', 400),
+    FALLBACK,
+  )
+  assert.equal(staffSeeking, QUEUE_HALTED_LOCAL, '原话若让用户去找现场的人，须回退到标准句 3')
   const printerShown = userMessageOf(new ApiHttpError('PRINTER_UNAVAILABLE', QUEUE_HALTED_SERVER, 400), FALLBACK)
   assert.equal(printerShown, PRINTER_FIXED, 'PRINTER_UNAVAILABLE 不得透传「本机暂停接打印单」')
   assert.notEqual(printerShown, QUEUE_HALTED_SERVER)
-  assert.notEqual(printerShown, QUEUE_HALTED_FALLBACK)
+  assert.notEqual(printerShown, QUEUE_HALTED_LOCAL)
   const otherCode = userMessageOf(new ApiHttpError('RATE_LIMITED', QUEUE_HALTED_SERVER, 429), FALLBACK)
   assert.equal(otherCode, '当前使用的人较多，请稍后再试', '非透传码不得显示服务端原话')
   assert.notEqual(otherCode, QUEUE_HALTED_SERVER)
