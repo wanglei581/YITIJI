@@ -33,6 +33,7 @@ import { ResumeGenerateHistoryStep } from './components/ResumeGenerateHistorySte
 import { ResumeGenerateStrengthsStep } from './components/ResumeGenerateStrengthsStep'
 import { GenerateHelper, GenerateProgress } from './components/ResumeGenerateShell'
 import {
+  LIMITS,
   STEPS,
   STEP_STATE,
   bootGenerate,
@@ -130,8 +131,8 @@ export function ResumeGeneratePage() {
     projects: projects
       .filter((item) => item.name.trim())
       .map((item) => ({ name: item.name.trim(), role: item.role?.trim() || undefined, description: item.description.trim() })),
-    skills: splitList(skillsText, 20),
-    certificates: splitList(certsText, 15),
+    skills: splitList(skillsText, LIMITS.skills),
+    certificates: splitList(certsText, LIMITS.certificates),
     selfIntro: selfIntro.trim() || undefined,
   })
 

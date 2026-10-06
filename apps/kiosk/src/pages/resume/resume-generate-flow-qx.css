@@ -58,6 +58,14 @@
   line-height: 1.45;
   color: var(--qx-ink-2);
 }
+.qx-resume-generate .qx-rg-helpline {
+  display: block;
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--qx-ink-3);
+}
 .qx-resume-generate .qx-rg-helper button {
   flex: none;
   min-height: 56px;

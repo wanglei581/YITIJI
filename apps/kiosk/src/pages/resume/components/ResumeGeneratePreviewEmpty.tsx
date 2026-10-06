@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { GeneratePreviewViewState } from './resume-deliver/constants'
+import { ResumeGenerateHelpLine } from './ResumeGenerateShell'
 
 const REFILL = [
   { title: '基本信息', detail: '姓名必填，城市和联系方式点候选词就行', mark: '第 1 步' },
@@ -49,6 +50,7 @@ export function ResumeGeneratePreviewEmpty(props: { view: GeneratePreviewViewSta
             </li>
           ))}
         </ol>
+        <ResumeGenerateHelpLine />
       </div>
     )
   }
@@ -69,6 +71,7 @@ export function ResumeGeneratePreviewEmpty(props: { view: GeneratePreviewViewSta
           left={{ title: '两种进得来的方式', body: <>一是刚提交完、结果直接带过来；二是登录后从「我的简历」点进来。<b>直接敲地址进不来。</b></> }}
           right={{ title: '为什么不先放点什么', body: <>放一份示例在这里，你会以为那是你的简历。<b>宁可这一屏是空的</b>，也不放一份不属于你的内容。</> }}
         />
+        <ResumeGenerateHelpLine />
       </div>
     )
   }
@@ -87,6 +90,7 @@ export function ResumeGeneratePreviewEmpty(props: { view: GeneratePreviewViewSta
           left={{ title: '可能是过了留存期', body: <>生成结果按保存期限清理，到期是真的没有了。这一页<b>不会假装还留着一份</b>。</> }}
           right={{ title: '也可能不是本人', body: <>结果只认你的登录身份或那次提交的一次性令牌。换个人、换个账号，一律当它不存在。</> }}
         />
+        <ResumeGenerateHelpLine />
       </div>
     )
   }
@@ -105,6 +109,7 @@ export function ResumeGeneratePreviewEmpty(props: { view: GeneratePreviewViewSta
           left={{ title: '不会丢东西', body: <>只是这一屏认不出地址里的状态。你之前填的、生成的、导出的都不受这一屏影响。</> }}
           right={{ title: '为什么不猜一个', body: <>猜错一步，你可能以为自己在改这份简历，其实在改另一份。<b>认不出就停下来问你</b>。</> }}
         />
+        <ResumeGenerateHelpLine />
       </div>
     )
   }

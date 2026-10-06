@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { PlusIcon, Trash2Icon } from 'lucide-react'
 import { QxAiHelp } from '../../../components/qingxu/QxAiHelp'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { STEPS } from './resumeGenerateModel'
 
 export function GenerateProgress({ step }: { step: number }) {
@@ -29,10 +31,22 @@ export function GenerateStepHeading({ icon, title, hint }: { icon: ReactNode; ti
   )
 }
 
+/** 帮助条上的求助句。号码和服务时间从公示联系方式来。 */
+export function ResumeGenerateHelpLine() {
+  return (
+    <span className="qx-rg-helpline" data-testid="resume-generate-help-line">
+      {helpNeededLine(useSupportContact())}
+    </span>
+  )
+}
+
 export function GenerateHelper({ text, draft }: { text: string; draft: string }) {
   return (
     <div className="qx-rg-helper">
-      <span>{text}</span>
+      <span>
+        {text}
+        <ResumeGenerateHelpLine />
+      </span>
       <QxAiHelp label="问小青" draft={draft} testId="resume-generate-step-help" />
     </div>
   )

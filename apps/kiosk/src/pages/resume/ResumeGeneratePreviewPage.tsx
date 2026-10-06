@@ -31,6 +31,7 @@ import type { GeneratePreviewViewState } from './components/resume-deliver/const
 import { GeneratePreviewCta, GeneratePreviewEmptyExits, GeneratePreviewNavbar } from './GeneratePreviewChrome'
 import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
 import { ResumeGeneratePreviewEmpty } from './components/ResumeGeneratePreviewEmpty'
+import { ResumeGenerateHelpLine } from './components/ResumeGenerateShell'
 import { readHandoff } from './components/resumeGenerateModel'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
@@ -284,8 +285,13 @@ export function ResumeGeneratePreviewPage() {
   const go = (to: string) => navigate(to)
   const refill = () => {
     const handoff = readHandoff(location.state)
+    // 带着已填内容回来时，落到交接里记下的那一步（生成后「回去改资料」记的是基本信息），不经过第 0 屏。
     navigate('/resume/generate', {
-      state: { generateHandoff: { step: 0, ...(handoff?.form ? { form: handoff.form, seg: handoff.seg } : {}) } },
+      state: {
+        generateHandoff: handoff?.form
+          ? { step: handoff.step, seg: handoff.seg, form: handoff.form }
+          : { step: 0 },
+      },
     })
   }
   const onExportScreen = showWorkspace && phase === 'export'
@@ -399,7 +405,10 @@ export function ResumeGeneratePreviewPage() {
               {hints.length > 0 ? hints.map((hint) => <p key={hint}>{hint}</p>) : <p>按当前内容，没有要补充的项。不补也能导出。</p>}
             </div>
             <div className="qx-rg-help">
-              <p>{token ? '这一页先在屏幕上核对。导出之后可以扫码带走，登录状态下按保存期限留在账号里。' : '这一页只在屏幕上。没登录时导出的文件不会进账号，事后登录也不补绑。要留底就先登录，再生成、再导出。'}</p>
+              <p>
+                {token ? '这一页先在屏幕上核对。导出之后可以扫码带走，登录状态下按保存期限留在账号里。' : '这一页只在屏幕上。没登录时导出的文件不会进账号，事后登录也不补绑。要留底就先登录，再生成、再导出。'}
+                <ResumeGenerateHelpLine />
+              </p>
               <QxAiHelp label="问小青" draft="我在核对生成的简历，帮我看看这一页怎么核对、怎么导出。" testId="resume-generate-preview-help" />
             </div>
             <p className="qx-rg-reason">学校、专业、公司和职务改完就留在这一份上。学历、时间段、项目名和证书要改，得回填写页。</p>

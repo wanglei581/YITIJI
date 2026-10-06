@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { BookOpenIcon, FileTextIcon, HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
 import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
+import { ResumeGenerateHelpLine } from './components/ResumeGenerateShell'
 
 type Go = (to: string) => void
 
@@ -74,6 +75,9 @@ export function GeneratePreviewEmptyExits(props: { view: GeneratePreviewViewStat
         testId="resume-generate-preview-exit-help"
       />,
     )
+  }
+  if (props.view === 'preview-loading') {
+    rows.push(<ResumeGenerateHelpLine key="help-line" />)
   }
   if (rows.length === 0) return null
   return <div className="qx-rows qx-rd-exits">{rows}</div>
