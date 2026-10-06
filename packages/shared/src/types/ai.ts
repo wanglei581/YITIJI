@@ -557,6 +557,18 @@ export interface ResumeFactCheckResponse {
  */
 export type ResumeExportPricingMode = 'free' | 'charged' | 'unavailable'
 
+/**
+ * 申请不印显式标识但没放行时，导出响应 unlabeledDeniedReason 的取值。
+ * 没申请或已经放行时该字段为 null（不返回 not_requested）。
+ */
+export type ResumeUnlabeledDeniedReason =
+  | 'option_off'
+  | 'format_not_eligible'
+  | 'draft'
+  | 'anonymous'
+  | 'terms_not_accepted'
+  | 'terms_outdated'
+
 /** GET /api/v1/resume/export/pricing */
 export interface ResumeExportPricing {
   mode: ResumeExportPricingMode
@@ -564,6 +576,11 @@ export interface ResumeExportPricing {
   unit: string
   benefit: { available: number; serviceType: 'resume_export' } | null
   label: string
+  /**
+   * 两个开关都开时为 true，只表示开关层面可以申请不印。
+   * 登录、同意当前正式协议，仍在导出时再判。
+   */
+  unlabeledOptionAvailable: boolean
 }
 
 /** 导出响应:真实 FileObject + 短时签名 URL,可直接进打印链路(pdf)或下载(docx/txt/md) */
@@ -579,6 +596,10 @@ export interface ResumeGenerateExportResponse {
   /** 系统 HMAC content URL(signFileUrl 生成,形如 /api/v1/files/<fileId>/content?expires=<ms>&sig=<hex>),供 /print/jobs 打印使用。
    *  pdf 直接指向本文件;docx/txt/md 指向 Wave 6 额外渲染的同内容 PDF 副本(fileId 与本文件不同) */
   printFileUrl?: string
+  /** 这一份文件是否印了显式标识「含人工智能辅助生成内容」。 */
+  visibleLabelApplied: boolean
+  /** 用户申请了不印但没放行的原因；没申请或已放行为 null。 */
+  unlabeledDeniedReason: ResumeUnlabeledDeniedReason | null
 }
 
 // ── 2D 目标岗位定向优化 + 岗位匹配度参考 ─────────────────────────────────────

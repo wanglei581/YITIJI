@@ -1,5 +1,17 @@
 # 当前开发进度
 
+## 2026-10-06：简历导出显式标识「默认印，用户申请才不印」后端（分支 `claude/tide-resume-label-optout`，基线 `e8048adf5`）
+
+- 产品负责人 10/6 晚拍板（标识办法第九条）：默认印；用户自己申请才不印。这一次只做接口和共享类型，给第七次或第八次、10/30 前进候选。一体机、小程序、管理员后台、合作机构后台都没有新页面。
+- `GET /resume/export/pricing` 增加 `unlabeledOptionAvailable`。两个开关都开才是 `true`，只表示开关层面可以申请不印；登录、同意当前正式协议仍在导出时再判。
+- 导出响应增加 `visibleLabelApplied` 与 `unlabeledDeniedReason`。没申请或已放行时原因为 `null`。公开原因码：`option_off`、`format_not_eligible`、`draft`、`anonymous`、`terms_not_accepted`、`terms_outdated`。TXT / MD 申请不印一律 `format_not_eligible`，照印、照常导出、不报错。PDF / Word 放行后页脚无字，隐式标识仍在。
+- 审计 `resume.export_unlabeled_requested` 与 `resume.generate_exported` 的 payload 增加 `terminalCode`（已验签一体机的终端编号；没有终端身份、查不到、编号为空或查询失败时为 `null`，导出继续）。payload 不含手机号，也不带其它终端字段。
+- 保留期挂进 `verify:resume-export-label`：静态扫描 `services/api/src` 与 `services/worker`。出现对 `auditLog` 的删除或更新（含 `DELETE FROM "AuditLog"`）时，同一文件必须同时写出上述两个动作名，以及不少于 180 天的保留常量，否则变红。来由是标识办法第九条留存要求和方案 04b 第 5 节。
+- `services/api/.env.example`：`RESUME_EXPORT_VISIBLE_LABEL=true`（10/6 口径）；`RESUME_EXPORT_UNLABELED_OPTION=false`，注释写明等律师答复第 21 问、新用户协议上线后再开。代码在没配环境变量时仍是关（`=== 'true'` 才开）。没有改任何生产 `.env`。合规长文（compliance-boundary、feature-scope、next-tasks）仍写着 9/29「保持关」，这次只改样例和本节。
+- 一体机只做类型对齐：价格夹具 `unlabeledOptionAvailable: false`；导出夹具 `visibleLabelApplied: true`、`unlabeledDeniedReason: null`。优化页同一状态槽既放简历导出也放修改清单，清单没有这两个字段，状态类型改成两者的联合，没有填假的印没印。没有勾选、没有新文案。浏览器没有验界面。`verify:ai-access` 的控制器替身补了 `verifiedQuotaTerminal: async () => null`，否则按原样导出的授权用例会在取终端编号时抛错。
+- 验证：API `typecheck`、`lint` 通过；一体机 `typecheck` 通过。`verify:resume-export-label` 最后一行「简历导出显式标识：PASS」。干净库 `prisma migrate deploy` 后 `verify:resume-export-formats` 通过（脚本自身 `=== ALL PASS ===`，随后的草稿版本门禁 `ALL PASS`）。图谱已重生，`--check` 为「PASS docs/graph/ 与当前代码一致」。反向变异四处退出码都是 1，跑完已还原。
+- 停放、隐藏、改名、降级：无。隐式标识没动。Grok 实现，Claude 审。
+
 ## 2026-10-06：小青语音通话没声音也没字幕时，带用户回到文字对话（分支 `claude/kiosk-b-advisor-call-silent-fallback-1006`）
 
 - 问题：小青语音进房后，如果机器人没进房、语音合成出错或网络只通了一半，屏幕一直显示「通话中」，用户听不到声音也看不到字幕，只能干等。现场没有工作人员，必须自己把人带回文字对话。
