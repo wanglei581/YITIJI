@@ -157,7 +157,9 @@ assertNotIncludes(parse, 'function delay(', 'parse page removes timer-driven sta
 assertNotIncludes(parse, "setCurrent('ocr')", 'parse page does not claim a live OCR stage without server evidence')
 assertNotIncludes(parse, "setCurrent('extracting')", 'parse page does not claim a live extraction stage without server evidence')
 assertNotIncludes(parse, '评分维度准备进度（逐项点亮）', 'parse page does not present dimensions as live progress')
-assertIncludes(parse, '处理内容说明 · 非实时阶段', 'parse page visibly labels the stage list as non-realtime')
+// 稿 21 把开发向的「处理内容说明 · 非实时阶段」换成用户能看懂的「这次要看的内容，不是进度」。
+// 「不代表实时进度」仍守住「这不是服务端阶段回传」。
+assertIncludes(parse, '这次要看的内容，不是进度', 'parse page labels the stage list in user language')
 assertIncludes(parse, '不代表实时进度', 'parse page explains that capability steps are not server telemetry')
 assertIncludes(parse, 'useBusyLock(Boolean(fileId) && !failed)', 'parse page prevents standby only while waiting for a real result')
 assertIncludes(parse, 'startedRef', 'parse page prevents duplicate submit in repeated effect setup')
@@ -166,6 +168,8 @@ assertIncludes(parse, "result.status !== 'completed'", 'parse page only treats t
 assertIncludes(parse, 'failTimerRef', 'parse page tracks the failure navigation timer')
 assertIncludes(parse, 'clearTimeout(failTimerRef.current)', 'parse page clears the failure timer on leave')
 assertIncludes(parse, '未找到简历文件', 'parse page fails closed when opened without a real file id')
+assertIncludes(parse, '不会自动挑一份文件', 'missing file says this page will not pick a file on its own')
+assertNotIncludes(parse, '之前选的诊断方向和目标背景还在', 'direction state does not survive leaving this page')
 assertIncludes(parse, '返回上一步', 'parse page does not falsely claim it can cancel the submitted server task')
 assertNotIncludes(parse, '取消解析', 'parse page removes the misleading server-cancel label')
 assertIncludes(parse, '简历原文不会发送给企业', 'parse page retains the enterprise non-disclosure privacy boundary')
@@ -357,7 +361,10 @@ assertIncludes(diagnosisForm, 'targetMajor', 'diagnosis form receives major prop
 assertIncludes(diagnosisForm, 'targetDegree', 'diagnosis form receives degree props')
 assertNotIncludes(source, '补充方向（可选）', 'source page no longer uses orphan context card that creates L-shaped void')
 assertNotIncludes(source, 'resume-source-context', 'source page removes separate context card class')
-assertIncludes(source, '更换文件', 'source action bar exposes change-file when a resume is staged')
+// 稿 21 确认屏次按钮写「换一份文件」。旧字「更换文件」和稿不一致，断言改钉真实按钮文案。
+assertIncludes(source, "const changeFileLabel = '换一份文件'", 'summary secondary action uses the design label 换一份文件')
+const sourceCards = read('src/pages/resume/components/ResumeSourceCards.tsx')
+assertIncludes(sourceCards, "const kioskLocal = kiosk && card.type === 'cloud'", 'kiosk local-file card is unavailable only for the local-file channel on a kiosk')
 // 2026-09-23 迁入青序流光（稿 21）：两条拉伸断言从 Tailwind 类串改锚到本页 Qx 样式，判据不变。
 const triageCss = read('src/pages/resume/resume-triage-qx.css')
 assertIncludes(source, 'className="qx-rt-dropzone"', 'upload dropzone stretches to balance the direction column')

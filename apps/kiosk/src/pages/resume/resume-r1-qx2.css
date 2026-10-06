@@ -274,3 +274,54 @@
 .qx-resume-triage .qx-rt-sector[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
 .qx-resume-triage .qx-rt-industry { display: flex; flex-direction: column; gap: 14px; }
 .qx-resume-triage .qx-rt-settings .qx-rt-direction { min-width: 0; }
+
+/* 来源首屏在 1080×1920 里要同时看见「没有电子简历 / 只想打印原件」和底栏主按钮。
+   只收这一屏的任务头、来源卡和投放区，目标工作台的 320px 任务头不动。
+   投放区 76px 的底线仍由上面那条规则钉住。 */
+@media (min-width: 641px) {
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-srcs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-xq {
+  min-height: 0;
+  padding: 12px 22px 10px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-face {
+  width: 56px;
+  height: 56px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-title {
+  margin-top: 2px;
+  font-size: var(--qx-fs-body-lg);
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-doing { margin-top: 4px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-rail { margin-top: 6px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-seg button { min-height: 72px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-src {
+  min-height: 0;
+  padding: 12px 14px;
+  gap: 6px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-src .ico {
+  width: 40px;
+  height: 40px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-dropzone {
+  min-height: 56px;
+  padding: 8px 16px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-quick-exits .qx-rt-alt {
+  min-height: 64px;
+  padding: 8px 14px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-scroll {
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.qx-resume-triage[data-dock='sendoff'] .qx-rt-scroll { flex: 1; min-height: 0; }
+.qx-resume-triage[data-dock='sendoff'] .qx-rt-sendoff {
+  flex: none;
+  position: relative;
+  z-index: 1;
+}
