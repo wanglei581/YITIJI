@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-10-06：无人值守标准句与服务联系方式的共享代码先行合入（分支 `claude/kiosk-support-contact-shared-1006`）
+
+- 从全量替换线（`claude/kiosk-unattended-copy-1004`，随第七次）里原样拆出三个共享文件先合，供前端 C 等页面线直接用：`copy/unattendedCopy.ts`（标准句 1–5、禁用说法表、续打句）、`services/api/supportContact.ts`（读 `GET /api/v1/public/support-contact?terminalId=`，404 / 超时 / 缺字段按最保守的一套）、`hooks/useSupportContact.ts`；测试夹具默认应答同步。导出名以后保持不变。
+- 补了一个漏洞：这组单测 12 条原先没挂在任何 CI 会跑的门禁上，现登记为 `verify:kiosk-support-contact` 并接进 CI；另补一条单测：文案层 resolveSupportContact 缺字段或非布尔一律按保守值（原先「小程序发布字段缺失当成已发布」的变异没被拦住）；现在 13 条，反向变异三处（换机不看附近终端、发布缺省当真、附近终端非布尔当真）全红。
+- 本 PR 只加代码，不改任何页面文案；页面换句随全量替换线和各页面线。
+- 停放、隐藏、改名、降级：无。
+
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
 - **决定：** 10/4 21:5x 产品负责人定主原则「设备现场不需要工作人员，是自助的、自动的，这个是主要的」。

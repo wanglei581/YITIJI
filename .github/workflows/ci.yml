@@ -192,6 +192,8 @@ jobs:
           # 统一清场（隐私 P0，W-42/W-43/W-75/W-64/B-12）：所有离场出口经 endKioskUse、首页登录态不露个人信息、
           # 个人资产页进门前 30 秒「还是你吗？」。源码文本断言 + 四步顺序与 30 秒判据单测真跑，不连网。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-end-use
+          # 无人值守标准句与公开服务联系方式（10/6）：读不到接口时按最保守的一套，号码 / 服务时间 / 附近终端 / 小程序发布从接口读，单测真跑源码。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-support-contact
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
