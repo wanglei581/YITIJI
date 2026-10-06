@@ -1,7 +1,7 @@
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common'
 import { quotaDay, quotaResetsAt } from '../ai/quota/ai-quota.policy'
 
-/** 默认值待产品负责人确认。平台设置缺省、空值或越界时回落到这四个数。 */
+/** 默认值 10/6 产品负责人已定（按推荐）。平台设置缺省、空值或越界时回落到这四个数。 */
 export const FREE_PRINT_TERMINAL_DAILY_SIDES = 300
 export const FREE_PRINT_MEMBER_DAILY_SIDES = 50
 export const FREE_PRINT_GUEST_PER_ORDER_SIDES = 20
