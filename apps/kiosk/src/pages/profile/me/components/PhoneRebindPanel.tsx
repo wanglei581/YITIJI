@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { helpNeededLine } from '../../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../../hooks/useSupportContact'
 import { QxPageFrame } from '../../../../components/qingxu/QxPageFrame'
 import { QxAiHelp, QxStepActions } from '../../../../components/qingxu/QxAiHelp'
 import { useBusyLock } from '../../../../contexts/KioskBusyContext'
@@ -21,6 +23,7 @@ export function PhoneRebindPanel({ phoneMasked, token, onDone, onRecheck, onCanc
   onRecheck: () => void
   onCancel: () => void
 }) {
+  const contact = useSupportContact()
   const [step, setStep] = useState<RebindStep>('send_old')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -65,7 +68,7 @@ export function PhoneRebindPanel({ phoneMasked, token, onDone, onRecheck, onCanc
     try { await fn(current) } catch (error) {
       if (!current()) return
       setErrorCode(error instanceof MemberApiError ? error.code : null)
-      setErr(accountErrorMessage(error, '这一步没有完成，请重试或联系工作人员。'))
+      setErr(accountErrorMessage(error, `这一步没有完成，请重试。${helpNeededLine(contact)}`))
       if (step === 'verify_old') setOldOtp('')
       if (step === 'verify_new') setNewOtp('')
       if (error instanceof MemberApiError && error.code === 'SMS_SEND_FAILED') {
@@ -145,7 +148,7 @@ export function PhoneRebindPanel({ phoneMasked, token, onDone, onRecheck, onCanc
           <section className="qx-card settings-form" aria-busy={busy}>
             <h2>{step === 'done' ? '手机号已换绑，正在退出本机登录' : LABELS[stepIndex]}</h2>
             {err ? <p role="alert" className="settings-error">{err}</p> : null}
-            {restartRequired ? <p>请从旧手机号验证重新开始，再获取新号验证码完成换绑。</p> : recovery === 'relogin' ? <p>换绑结果还不能确认。请先结束本次使用，再用新手机号登录核对；如有困难，请联系现场工作人员。</p> : null}
+            {restartRequired ? <p>请从旧手机号验证重新开始，再获取新号验证码完成换绑。</p> : recovery === 'relogin' ? <p>换绑结果还不能确认。请先结束本次使用，再用新手机号登录核对。{helpNeededLine(contact)}</p> : null}
             {step === 'send_old' ? <><p>将向当前手机号发送验证码，确认是本人操作后才能换绑。</p><div className="settings-facts"><div><span>当前手机号</span><b>{accountPhoneDisplay(phoneMasked)}</b></div><div><span>本步会做</span><b>发送短信，核对本人操作</b></div><div><span>发送次数</span><b>按系统限制执行</b></div><div><span>本步不会</span><b>改变手机号的绑定关系</b></div></div></> : null}
             {step === 'verify_old' ? <><p>已发送至 {accountPhoneDisplay(challenge?.phoneMasked ?? phoneMasked)}，输入 6 位验证码继续。</p><input ref={inputRef} type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={oldOtp} onChange={(e) => setOldOtp(e.target.value.replace(/\D/g, ''))} aria-label="当前手机号验证码，已隐藏显示" className="settings-input me-otp-mask" disabled={busy || unusable} /></> : null}
             {step === 'send_new' ? <><p>请输入新手机号，我们将发送验证码。</p><input ref={inputRef} type="password" inputMode="numeric" autoComplete="off" maxLength={11} value={newPhone} onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, ''))} aria-label="新手机号" className="settings-input" disabled={busy} /><p>本次输入：{newPhone ? maskPhone(newPhone) : '尚未填写'} · {newPhone.length} / 11 位</p></> : null}

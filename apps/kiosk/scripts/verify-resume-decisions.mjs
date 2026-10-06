@@ -57,10 +57,15 @@ const { outputText: copyJs } = ts.transpileModule(copySrc, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 })
 const fallback = '原有非校验错误文案'
-new Function('exports', 'module', 'require', copyJs)(copyModule.exports, copyModule, () => ({
-  errorCodeOf: (error) => error.code,
-  userMessageOf: () => fallback,
-}))
+new Function('exports', 'module', 'require', copyJs)(copyModule.exports, copyModule, (specifier) => {
+  if (String(specifier).includes('unattendedCopy')) {
+    return { helpNeededLine: () => '需要帮助？查看《隐私政策》里的联系方式' }
+  }
+  return {
+    errorCodeOf: (error) => error.code,
+    userMessageOf: () => fallback,
+  }
+})
 const validation = (message) => Object.assign(new Error(message), { code: 'VALIDATION_FAILED' })
 const { optimizeExportErrorMessage } = copyModule.exports
 assert.match(optimizeExportErrorMessage(validation('basic.name should not be empty')), /姓名还没填写.*不能在本页修改.*重新上传并诊断/)
@@ -68,7 +73,7 @@ assert.match(optimizeExportErrorMessage(validation('summary must be shorter than
 assert.match(optimizeExportErrorMessage(validation('experience.0.role should not be empty')), /工作经历第 1 条的职务.*不能在本页修改.*重新上传并诊断/)
 assert.match(optimizeExportErrorMessage(validation('experience[0].role: role should not be empty')), /工作经历第 1 条的职务.*不能在本页修改.*重新上传并诊断/)
 assert.match(optimizeExportErrorMessage(validation('experience[0].description: description must be shorter than or equal to 1000 characters')), /工作经历第 1 条的描述.*编辑区.*1000 字以内/)
-assert.match(optimizeExportErrorMessage(validation('intention.position should not be empty')), /求职意向可以留空.*现场工作人员.*修改清单/)
+assert.match(optimizeExportErrorMessage(validation('intention.position should not be empty')), /求职意向可以留空.*需要帮助？查看《隐私政策》里的联系方式.*修改清单/)
 assert.doesNotMatch(optimizeExportErrorMessage(validation('unknown.field secret technical payload')), /unknown|secret|technical/)
 assert.equal(optimizeExportErrorMessage({ code: 'NETWORK_ERROR' }), fallback)
 assert.match(page, /setExportError\(optimizeExportErrorMessage\(err\)\)/, '优化稿导出接入专用错误文案')

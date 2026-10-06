@@ -2,8 +2,10 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { BriefcaseIcon, LandmarkIcon, PrinterIcon } from 'lucide-react'
+import { helpNeededLine } from '../../../../copy/unattendedCopy'
 import { useRecruitmentHosting, type RecruitmentHostingState } from '../../../../hooks/useRecruitmentHosting'
-import { QxMeBanner, QxMeGuide, QX_ME_GUIDE } from './QxMeChrome'
+import { useSupportContact } from '../../../../hooks/useSupportContact'
+import { QxMeBanner, QxMeGuide, qxMeErrorGuide, QX_ME_GUIDE } from './QxMeChrome'
 
 export function QxMeSkeletonList({ count = 4, foot }: { count?: number; foot: string }) {
   return (
@@ -181,14 +183,15 @@ export function QxMeLoadingBlock({ title }: { title: string }) {
 }
 
 export function QxMeErrorBlock({ title, desc, struct }: { title: string; desc: string; struct: React.ReactNode }) {
+  const contact = useSupportContact()
   return (
     <>
       <QxMeBanner tone="warn" title={title} desc={<>{desc}<b>本页不会拿上一次的内容冒充当前账号</b>，所以每一项都显示「—」。</>} minis={['共 —', '本次未取到']} />
       <section className="qx-me-list qx-me-grow" aria-label="本次未取到的内容结构">
         {struct}
-        <div className="qx-me-legal">重试不会重复创建记录，也不会改动已保存的内容。多次重试仍失败时，可以让现场工作人员协助查询。</div>
+        <div className="qx-me-legal">重试不会重复创建记录，也不会改动已保存的内容。{helpNeededLine(contact)}</div>
       </section>
-      <QxMeGuide items={[...QX_ME_GUIDE.error]} />
+      <QxMeGuide items={qxMeErrorGuide(contact)} />
     </>
   )
 }

@@ -20,6 +20,8 @@ import {
   machineCannotPrintLine,
   machineUnusableLine,
   preferUnattended,
+  whenMiniapp,
+  type PublicSupportContact,
 } from '../../copy/unattendedCopy'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { formatCents } from './cashierStatus'
@@ -32,7 +34,7 @@ import { SHARED_USER_MESSAGE_CODES, errorCodeOf, userMessageOf } from '../../ser
  * - network：网络/服务异常或缺少可信回执；是否已认领未知。认领对同一终端幂等，可以原码重查。
  * - closed：这枚码在服务端已经是终态（已用过、已退款、文件失效、订单不能再付款），
  *   在这台机器上怎么重输都不会变。主操作不能是「重试 / 重新输入」：照着重输只会占限流配额，
- *   后面排队的人也跟着用不了。出路是回手机重新下单，或查看服务电话。
+ *   后面排队的人也跟着用不了。出路是查看服务电话；小程序已发布时才引导回手机重新下单。
  * - other：其余明确业务拒绝（本机不能打印、隐私检查未完成、限流、并发冲突等），稍后可能恢复。
  */
 export type PickupFailure = 'invalid' | 'locked' | 'network' | 'closed' | 'printer' | 'other'
@@ -64,17 +66,17 @@ export const PICKUP_CLOSED_CODES: ReadonlySet<string> = new Set([
  * 不在这里接住就会落到「请重试」——而锁定期内重试只会再被拒。
  * 服务端不回剩余时长，所以不写分钟数。
  */
-export function pickupLockedMessage(phone?: string | null): string {
-  return `本机输码暂时停用，过一段时间会自动解除。${helpNeededLine(phone)}`
+export function pickupLockedMessage(contact?: PublicSupportContact | null): string {
+  return `本机输码暂时停用，过一段时间会自动解除。${helpNeededLine(contact)}`
 }
 
-const terminalNotReadyMessage = (phone?: string | null) => machineUnusableLine(phone)
-const orderBusyMessage = (phone?: string | null) => `这笔订单正在处理，请等几秒再输一次。${helpNeededLine(phone)}`
+const terminalNotReadyMessage = (contact?: PublicSupportContact | null) => machineUnusableLine(contact)
+const orderBusyMessage = (contact?: PublicSupportContact | null) => `这笔订单正在处理，请等几秒再输一次。${helpNeededLine(contact)}`
 
-type ClaimLine = string | ((phone?: string | null) => string)
+type ClaimLine = string | ((contact?: PublicSupportContact | null) => string)
 
-function claimLine(entry: ClaimLine, phone?: string | null): string {
-  return typeof entry === 'function' ? entry(phone) : entry
+function claimLine(entry: ClaimLine, contact?: PublicSupportContact | null): string {
+  return typeof entry === 'function' ? entry(contact) : entry
 }
 
 /**
@@ -86,24 +88,53 @@ function claimLine(entry: ClaimLine, phone?: string | null): string {
  * release / 文件就绪 / 隐私检查 / 能力开关）；门禁从服务端源码抽码，逐个断言这里有。
  */
 export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, ClaimLine>> = {
-  PRINT_TERMINAL_QUEUE_HALTED: (phone) => `你的到机码没有作废。${machineUnusableLine(phone)}`,
-  PRINTER_UNAVAILABLE: (phone) => `你的到机码没有作废。${machineCannotPrintLine(phone, { orderKept: true })}`,
+  PRINT_TERMINAL_QUEUE_HALTED: (contact) => `你的到机码没有作废。${machineUnusableLine(contact)}`,
+  PRINTER_UNAVAILABLE: (contact) => `你的到机码没有作废。${machineCannotPrintLine(contact, { orderKept: true })}`,
   PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
-  PICKUP_CODE_ALREADY_USED: (phone) => `这个到机码已经用过，不能再次取件。要再打一份，请在手机上重新下单。${helpNeededLine(phone)}`,
-  PICKUP_CODE_UNAVAILABLE: '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单',
-  ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
-  ORDER_PAYMENT_UNAVAILABLE: '这笔订单已经不能付款（可能已关闭）。请在手机小程序「我的 → 打印订单」查看，需要的话重新下单',
-  PRINT_FILE_EXPIRED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
-  PRINT_FILE_NOT_FOUND: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
-  FILE_CONTENT_CHANGED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
-  PRINT_PII_SCAN_REQUIRED: (phone) => `这份文件的隐私检查还没完成，暂时不能打印。请过一会儿再输一次。${helpNeededLine(phone)}`,
-  PII_SCAN_STALE: '这份文件在隐私检查后又改过，暂时不能打印。请在手机上重新检查后再来取件',
-  PRINT_PII_MANUAL_CONFIRM_REQUIRED: '这份文件的隐私检查没有完整覆盖，需要你本人先在手机上确认文件里没有不想打印的个人信息，确认后再来取件',
+  PICKUP_CODE_ALREADY_USED: (contact) => {
+    const again = whenMiniapp(contact, '要再打一份，请在手机上重新下单。')
+    return `这个到机码已经用过，不能再次取件。${again}${helpNeededLine(contact)}`
+  },
+  PICKUP_CODE_UNAVAILABLE: (contact) => {
+    const where = whenMiniapp(contact, '请在小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单。')
+    return `这个到机码已经不能使用。${where}${helpNeededLine(contact)}`
+  },
+  ORDER_REFUNDED: (contact) => {
+    const where = whenMiniapp(contact, '可在小程序「我的 → 打印订单」查看退款进度。')
+    return `本单已退款，不再出纸。款项按原路退回。${where || helpNeededLine(contact)}`
+  },
+  ORDER_PAYMENT_UNAVAILABLE: (contact) => {
+    const where = whenMiniapp(contact, '请在小程序「我的 → 打印订单」查看，需要的话重新下单。')
+    return `这笔订单已经不能付款（可能已关闭）。${where}${helpNeededLine(contact)}`
+  },
+  PRINT_FILE_EXPIRED: (contact) => {
+    const again = whenMiniapp(contact, '请在手机上重新上传文件、重新下单。')
+    return `这笔订单的文件已经失效，不能打印。${again}${helpNeededLine(contact)}`
+  },
+  PRINT_FILE_NOT_FOUND: (contact) => {
+    const again = whenMiniapp(contact, '请在手机上重新上传文件、重新下单。')
+    return `这笔订单的文件已经失效，不能打印。${again}${helpNeededLine(contact)}`
+  },
+  FILE_CONTENT_CHANGED: (contact) => {
+    const again = whenMiniapp(contact, '请在手机上重新上传文件、重新下单。')
+    return `这笔订单的文件已经失效，不能打印。${again}${helpNeededLine(contact)}`
+  },
+  PRINT_PII_SCAN_REQUIRED: (contact) => `这份文件的隐私检查还没完成，暂时不能打印。请过一会儿再输一次。${helpNeededLine(contact)}`,
+  PII_SCAN_STALE: (contact) => {
+    const again = whenMiniapp(contact, '请在手机上重新检查后再来取件。')
+    return `这份文件在隐私检查后又改过，暂时不能打印。${again || helpNeededLine(contact)}`
+  },
+  PRINT_PII_MANUAL_CONFIRM_REQUIRED: (contact) => {
+    const again = whenMiniapp(contact, '需要你本人先在手机上确认文件里没有不想打印的个人信息，确认后再来取件。')
+    return again
+      ? `这份文件的隐私检查没有完整覆盖，${again}`
+      : `这份文件的隐私检查没有完整覆盖，暂时不能打印。${helpNeededLine(contact)}`
+  },
   PICKUP_CLAIM_RATE_LIMITED: '输码太频繁了，请等一分钟再输',
   PICKUP_CLAIM_LOCKED: pickupLockedMessage,
-  CAPABILITY_NOT_CONFIGURED: (phone) => `这台机器暂时不能打印这笔订单。${machineUnusableLine(phone)}`,
-  CAPABILITY_UNAVAILABLE: (phone) => `这台机器暂时不能打印这笔订单。${machineUnusableLine(phone)}`,
+  CAPABILITY_NOT_CONFIGURED: (contact) => `这台机器暂时不能打印这笔订单。${machineUnusableLine(contact)}`,
+  CAPABILITY_UNAVAILABLE: (contact) => `这台机器暂时不能打印这笔订单。${machineUnusableLine(contact)}`,
   PRINT_TERMINAL_NOT_READY: terminalNotReadyMessage,
   PRINT_TERMINAL_DEGRADED: terminalNotReadyMessage,
   PRINT_TERMINAL_NOT_FOUND: terminalNotReadyMessage,
@@ -130,8 +161,8 @@ export function classifyClaimFailure(error: unknown): PickupFailure {
 }
 
 /** 未登记的码走共享码表；共享码表也没有时用这句（它是「还能再试」的那类失败才会落到的）。 */
-export function pickupClaimFallbackMessage(phone?: string | null): string {
-  return `到机码校验没有完成，请重试。${helpNeededLine(phone)}`
+export function pickupClaimFallbackMessage(contact?: PublicSupportContact | null): string {
+  return `到机码校验没有完成，请重试。${helpNeededLine(contact)}`
 }
 
 /** 门禁仍按这个名字取兜底句。它是函数：调用时才读号码，模块加载时不取。 */
@@ -141,24 +172,24 @@ export const PICKUP_CLAIM_FALLBACK_MESSAGE = pickupClaimFallbackMessage
  * 认领失败时屏上那一句话。取件页没有会员登录：未登记的 401/403 不能落成共享码表的
  * 「登录状态已失效」，按「本机安全校验」说。
  */
-export function pickupClaimMessage(error: unknown, phone?: string | null): string {
+export function pickupClaimMessage(error: unknown, contact?: PublicSupportContact | null): string {
   const code = errorCodeOf(error)
-  const fallback = pickupClaimFallbackMessage(phone)
+  const fallback = pickupClaimFallbackMessage(contact)
   if (code === 'PRINT_TERMINAL_QUEUE_HALTED' && error instanceof ApiHttpError) {
     const message = error.message
-    const registered = claimLine(PICKUP_CLAIM_MESSAGES.PRINT_TERMINAL_QUEUE_HALTED, phone)
+    const registered = claimLine(PICKUP_CLAIM_MESSAGES.PRINT_TERMINAL_QUEUE_HALTED, contact)
     if (message.trim() && message.length <= 60 && /[\u4e00-\u9fa5]/.test(message) && !/^(HTTP\s|请求失败（)/.test(message.trim())) {
       return preferUnattended(message, registered)
     }
   }
   if (code && Object.prototype.hasOwnProperty.call(PICKUP_CLAIM_MESSAGES, code)) {
-    return claimLine(PICKUP_CLAIM_MESSAGES[code], phone)
+    return claimLine(PICKUP_CLAIM_MESSAGES[code], contact)
   }
-  if (code && SHARED_USER_MESSAGE_CODES.includes(code)) return userMessageOf(error, fallback, phone)
+  if (code && SHARED_USER_MESSAGE_CODES.includes(code)) return userMessageOf(error, fallback, contact)
   if (error instanceof ApiHttpError && (error.status === 401 || error.status === 403)) {
-    return machineUnusableLine(phone)
+    return machineUnusableLine(contact)
   }
-  return userMessageOf(error, fallback, phone)
+  return userMessageOf(error, fallback, contact)
 }
 
 
@@ -211,7 +242,7 @@ const FINISHED_PRINT_STATUSES = new Set(['completed', 'failed', 'cancelled', 'ab
  * released=true 且已经打完 —— 如实说完成，给出路；
  * 其余已放行 —— 还在队列或正在出纸，请留在出纸口旁。
  */
-export function claimSuccessCopy(released: boolean, printTaskStatus?: string | null, phone?: string | null): ClaimSuccessCopy {
+export function claimSuccessCopy(released: boolean, printTaskStatus?: string | null, contact?: PublicSupportContact | null): ClaimSuccessCopy {
   if (!released) {
     return {
       title: '订单核验成功',
@@ -231,8 +262,8 @@ export function claimSuccessCopy(released: boolean, printTaskStatus?: string | n
   if (printTaskStatus === 'failed' || printTaskStatus === 'cancelled' || printTaskStatus === 'abandoned') {
     return {
       title: '这一单没有打成',
-      line: `这一单没有打成。不要在出纸口空等。${machineCannotPrintLine(phone, { orderKept: true })}`,
-      steps: ['订单已核对', '打印没有完成', '到手机上查看这一单'],
+      line: `这一单没有打成。不要在出纸口空等。${machineCannotPrintLine(contact, { orderKept: true })}`,
+      steps: ['订单已核对', '打印没有完成', '按屏幕上的说明继续'],
       cta: '查看这一单',
     }
   }

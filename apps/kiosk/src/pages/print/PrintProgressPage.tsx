@@ -38,7 +38,7 @@ import { API_MODE } from '../../services/api/client'
 import { getPrintJobStatus, type BackendJobStatus, type PrintJobStatusResult } from '../../services/print/printJobsApi'
 import { wakeLocalPrintQueue } from '../../services/print/localPrintWakeApi'
 import type { PrintJobParams } from '@ai-job-print/shared'
-import { helpNeededLine, preferUnattended } from '../../copy/unattendedCopy'
+import { helpNeededLine, machineCannotPrintLine, preferUnattended, refundApplyLine } from '../../copy/unattendedCopy'
 import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
 import { formatCents } from './cashierStatus'
@@ -556,7 +556,7 @@ export function PrintProgressPage() {
               重新查询状态
             </button>
             <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/help')}>
-              联系工作人员
+              问小青
             </button>
           </>
         ) : showFailure ? (
@@ -751,29 +751,27 @@ export function PrintProgressPage() {
         <section className="pff-sec" aria-label="常见情况处理">
           <div className="pff-sec-h">
             <span className="t">遇到这些情况怎么办</span>
-            <span className="hint">找现场工作人员最快</span>
+            <span className="hint">需要帮助看下面</span>
           </div>
           <div className="pfp-card pfp-faq-card">
             <ul className="pfp-faq">
               <li><AlertTriangleIcon aria-hidden="true" /><p><b>打印机缺纸 / 卡纸</b>：别硬拉纸；打印机报告卡纸或缺纸后，本页会转到结果页说明原因。</p></li>
-              <li><ClockIcon aria-hidden="true" /><p><b>长时间没有新进度</b>：如果停在出纸又没有新消息，请看出纸口或找现场工作人员。查了很久仍没有最终结果时，本页也会另外提示。</p></li>
+              <li><ClockIcon aria-hidden="true" /><p><b>长时间没有新进度</b>：如果停在出纸又没有新消息，请看出纸口。{machineCannotPrintLine(undefined, { orderKept: true })}</p></li>
               <li><FileTextIcon aria-hidden="true" /><p><b>文件校验未通过</b>：上传可能中断或文件已变化，需返回重新上传。</p></li>
               <li>
                 <CreditCardIcon aria-hidden="true" />
                 <p>
-                  {isFreeOrder
-                    ? <><b>打印失败</b>：订单记录保留，请找现场工作人员核对。</>
-                    : payment === 'paid'
-                      ? <><b>已支付但打印失败</b>：订单与支付记录都在，退款以工作人员核查为准。</>
-                      : <><b>打印失败</b>：订单记录已保存，费用以工作人员核查结果为准。</>
+                  {payment === 'paid' && typeof amountCents === 'number' && amountCents > 0
+                    ? <><b>打印失败</b>：订单与支付记录都在。{refundApplyLine()}</>
+                    : <><b>打印失败</b>：订单记录保留。{machineCannotPrintLine(undefined, { orderKept: true })}</>
                   }
                 </p>
               </li>
             </ul>
             <div className="pff-help" data-testid="print-fulfill-fallback">
-              <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>，找现场工作人员处理。</span>
+              <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>。{helpNeededLine()}</span>
               <button type="button" className="pff-help-btn" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-                联系工作人员
+                问小青
               </button>
             </div>
             <PrintAiHelp

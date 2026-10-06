@@ -186,8 +186,8 @@ jobs:
           # 真跑一体机码表模块；已用过 / 已退款等终态码不许叫人重试。
           pnpm --filter @ai-job-print/kiosk verify:pickup-claim-error-coverage
           pnpm --filter @ai-job-print/kiosk verify:backend-error-copy-coverage
-          # 2026-10-04 无人值守：扫 apps/kiosk/src 字符串字面量，禁止再让用户去找现场工作人员。
-          # 纯静态，TypeScript AST，不连库、不起服务。取件凭证码与 #1257 注销三句有冻结白名单。
+          # 2026-10-06 无人值守：扫 apps/kiosk/src 字符串字面量，禁止再让用户去找现场工作人员。
+          # 纯静态，TypeScript AST，不连库、不起服务。取件白名单已清空；只留 #1257 注销三句。
           pnpm verify:kiosk-unattended-copy
           # 服务人次上报（KioskSession 契约 v1）：接线 AST 取证 + 上报器单测真跑；
           # 白名单对照服务端 kiosk-session.types.ts 源码文本，不 import、不连库。

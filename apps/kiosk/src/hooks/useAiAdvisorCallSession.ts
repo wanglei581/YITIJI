@@ -21,6 +21,7 @@ import { getTerminalId } from '../services/api/screensaver'
 import { terminalProtectedFetch } from '../services/terminalAuth'
 import { prepareAiDeclaration } from '../ai/aiDeclarationGate'
 import { aiDeclarationDeclineMessage } from '../ai/aiDeclarationErrors'
+import { machineUnusableLine } from '../copy/unattendedCopy'
 
 // 通知后端结束腾讯云 AI 会话（StopAIConversation），立即停止按分钟计费。
 //  - keepalive：保证在组件卸载 / 切走页面 / 关闭标签页时请求仍能发出
@@ -208,7 +209,7 @@ export function useAiAdvisorCallSession() {
     if (startedRef.current || preparingRef.current) return
     const terminalId = getTerminalId()
     if (!terminalId) {
-      setErrMsg('当前设备身份不可用，请联系现场工作人员')
+      setErrMsg(machineUnusableLine())
       setPhase('error')
       return
     }

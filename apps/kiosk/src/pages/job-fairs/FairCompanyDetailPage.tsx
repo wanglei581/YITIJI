@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import type { FairCompanyDTO } from '@ai-job-print/shared'
@@ -45,6 +47,7 @@ function formatSize(bytes: number): string {
 }
 
 export function FairCompanyDetailPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
   const { id, companyId } = useParams<{ id: string; companyId: string }>()
@@ -211,7 +214,7 @@ export function FairCompanyDetailPage() {
               <DirStripItem icon={BuildingIcon} tone="wheat" title="参展企业列表" desc="回本场名单重新选一家" onClick={() => navigate(listPath)} />
               <DirStripItem icon={MapPinIcon} title="展位图" desc="主办方给了真实图才展示" onClick={() => navigate(`/job-fairs/${fairId}/map`)} />
               <DirStripItem icon={PrinterIcon} title="先打好纸质简历" desc="展位现场收纸质简历很常见" onClick={() => navigate('/print/upload')} />
-              <DirStripItem icon={BuildingIcon} tone="slate" title="现场工作人员" desc="手上有主办方纸质名单" onClick={() => navigate('/help')} />
+              <DirStripItem icon={BuildingIcon} tone="slate" title="问小青" desc={helpNeededLine(contact)} onClick={() => navigate('/help')} />
             </DirExitList>
             <DirNote>{BOUNDARY}</DirNote>
           </>
@@ -301,8 +304,8 @@ export function FairCompanyDetailPage() {
               <DirAiAssist screen="fair-company" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
             )}
             <DirNote warn>
-              {PRINT_NOTE}
-              <button type="button" className="dw-chip" onClick={() => navigate('/help')}>联系工作人员</button>
+              {PRINT_NOTE}{helpNeededLine(contact)}
+              <button type="button" className="dw-chip" onClick={() => navigate('/help')}>问小青</button>
             </DirNote>
           </>
         ) : null}

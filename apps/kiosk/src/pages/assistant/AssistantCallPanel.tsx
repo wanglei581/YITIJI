@@ -10,6 +10,7 @@ import { AdvisorManualEntries } from './AdvisorConversation'
 import { advisorDisplayText, advisorUserReason } from './advisorUserCopy'
 import { COCKPIT_COPY, type CockpitVoiceState } from './advisorScenes'
 import { isTerminalKiosk } from '../../services/api/screensaver'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 
 const ADVISOR_IMG = '/assets/ai-advisor.png'
@@ -242,7 +243,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
               {call.errMsg ? <p className="assistant-voice-error-message">{advisorUserReason(call.errMsg, '语音暂不可用，请稍后再试。')}</p> : null}
             </div>
             <div className="assistant-voice-twocol">
-              <MiniList title="现在可做什么" items={['重新连接，再试一次', '改用文字，继续提问', '连续失败请找现场工作人员']} />
+              <MiniList title="现在可做什么" items={['重新连接，再试一次', '改用文字，继续提问', `连续失败时，${helpNeededLine()}。`]} />
               <MiniList title="也可以直接办理" items={['打印或扫描自己的材料', '查看政策和办事说明', '管理已有的简历文件']} />
             </div>
             {/* 稿 05：语音没建立不影响这四项。点进去会卸载本面板，会话清理由 useAiAdvisorCallSession 负责。 */}
@@ -320,7 +321,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
               <div className="assistant-voice-card assistant-voice-mic-warning" data-kind="warn" role="status">
                 <h3><KIcon name="mic-off" />浏览器没有授予麦克风权限</h3>
                 <p>{isTerminalKiosk()
-                  ? '当前为只听模式：小青能说，你这边的声音传不过去。可以改用文字；如需语音请联系现场工作人员。'
+                  ? `当前为只听模式：小青能说，你这边的声音传不过去。可以改用文字；如需语音，${helpNeededLine()}。`
                   : '当前为只听模式：小青能说，你这边的声音传不过去。可以在浏览器里允许麦克风后「重新尝试授权」，也可以直接改用文字。'}</p>
               </div>
             )}

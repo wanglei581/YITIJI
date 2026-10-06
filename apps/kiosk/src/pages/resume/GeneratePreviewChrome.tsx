@@ -65,7 +65,7 @@ export function GeneratePreviewEmptyExits(props: { view: GeneratePreviewViewStat
   }
   if (props.view === 'preview-loading' || props.view === 'illegal') {
     rows.push(
-      <ExitRow key="help" icon={I.help} title="找工作人员" desc="现场有人能帮你看一眼" to="/help" testid="resume-generate-preview-exit-help" onNavigate={go} />,
+      <ExitRow key="help" icon={I.help} title="问小青" desc="常见问题和求助都在帮助中心" to="/help" testid="resume-generate-preview-exit-help" onNavigate={go} />,
     )
   }
   if (rows.length === 0) return null

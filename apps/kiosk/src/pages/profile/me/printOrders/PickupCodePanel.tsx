@@ -8,17 +8,17 @@
 
 import { KIcon } from '../../../../components/kiosk-icon'
 
-export function PickupCodePanel({ code }: { code: string }) {
+export function PickupCodePanel({ code, hint }: { code: string; hint?: string | null }) {
   return (
     <div className="me-pickup-panel">
       <p>
         <KIcon name="ticket" />
-        取件码 · 凭此码现场取件
+        到机码 · 取件和接着打都用它
       </p>
-      <strong aria-label={`取件码 ${code}`}>
+      <strong aria-label={`到机码 ${code}`}>
         {code}
       </strong>
-      <span>请向现场工作人员出示；订单完成或退款后取件码自动失效</span>
+      {hint ? <span>{hint}</span> : null}
     </div>
   )
 }

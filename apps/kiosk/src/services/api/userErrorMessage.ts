@@ -34,8 +34,11 @@ import {
   helpNeededLine,
   machineCannotPrintLine,
   machineUnusableLine,
-  peekServicePhone,
+  networkDisconnectLine,
   preferUnattended,
+  resolveSupportContact,
+  whenMiniapp,
+  type PublicSupportContact,
 } from '../../copy/unattendedCopy'
 import { ApiHttpError } from './httpAdapter'
 
@@ -47,16 +50,20 @@ import { ApiHttpError } from './httpAdapter'
  */
 export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明天恢复；可以先打印原件。'
 
-type SharedUserMessage = string | ((phone: string | null) => string)
+type SharedUserMessage = string | ((contact?: PublicSupportContact | null) => string)
 
 const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
-  NETWORK_ERROR: '网络连接失败，请检查网络后重试',
+  NETWORK_ERROR: `网络连接失败，请稍后再试。${networkDisconnectLine()}。`,
   // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
   PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
-  PICKUP_CODE_UNAVAILABLE: (phone) => `这个到机码对应的文件暂时不可用。${helpNeededLine(phone)}`,
+  PICKUP_CODE_UNAVAILABLE: (contact) => `这个到机码对应的文件暂时不可用。${helpNeededLine(contact)}`,
   // 2026-09-07 产品裁决「退款则不出文件」：服务端在任何状态写入前拦下，这里给同义稳定文案。
-  ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
+  // 这是已经退过款的订单状态，不是向免费单提供退款。看进度只在小程序已发布时写。
+  ORDER_REFUNDED: (contact) => {
+    const where = whenMiniapp(contact, '可在小程序「我的 → 打印订单」查看退款进度。')
+    return `本单已退款，不再出纸。款项按原路退回。${where || helpNeededLine(contact)}`
+  },
   PICKUP_CODE_LENGTH: '到机码位数不对，请重新输入',
   PICKUP_CODE_PATTERN: '到机码格式不对，请重新输入',
   REQUEST_TIMEOUT: '本次请求响应超时，请重试',
@@ -74,44 +81,55 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
   // 演示模式：verify-ai-down-fallbacks.mjs 要求解析页透出**真实原因**，
   // 不许把它抹成通用文案，因此必须在白名单里有自己的说法。
   MOCK_MODE: '当前为演示模式，未连接真实 AI 服务',
-  AI_NOT_CONFIGURED: (phone) => `AI 能力尚未启用。${helpNeededLine(phone)}`,
-  AI_PROVIDER_NOT_CONFIGURED: (phone) => `AI 能力尚未启用。${helpNeededLine(phone)}`,
+  AI_NOT_CONFIGURED: (contact) => `AI 能力尚未启用。${helpNeededLine(contact)}`,
+  AI_PROVIDER_NOT_CONFIGURED: (contact) => `AI 能力尚未启用。${helpNeededLine(contact)}`,
   AI_PROVIDER_UNREACHABLE: 'AI 服务暂时连不上，请稍后重试',
-  TERMINAL_NOT_READY: (phone) => machineUnusableLine(phone),
-  TERMINAL_ID_REQUIRED: (phone) => machineUnusableLine(phone),
-  TERMINAL_SESSION_INVALID: (phone) => machineUnusableLine(phone),
+  TERMINAL_NOT_READY: (contact) => machineUnusableLine(contact),
+  TERMINAL_ID_REQUIRED: (contact) => machineUnusableLine(contact),
+  TERMINAL_SESSION_INVALID: (contact) => machineUnusableLine(contact),
   TERMINAL_SESSION_RETRYABLE: '这台机器正在做安全校验，请稍候',
-  ONLINE_PAYMENT_DISABLED: (phone) => `本机暂未开通线上支付，请改用其他支付方式。${helpNeededLine(phone)}`,
-  PRINTER_UNAVAILABLE: (phone) => machineCannotPrintLine(phone),
+  ONLINE_PAYMENT_DISABLED: (contact) => `本机暂未开通线上支付，请改用其他支付方式。${helpNeededLine(contact)}`,
+  PRINTER_UNAVAILABLE: (contact) => machineCannotPrintLine(contact),
   // #1150 方案 A：只给「终端队列闸门停领」用的新码，不占用上面的 PRINTER_UNAVAILABLE。
   // 原话通过透传形状检查就原样显示；缺失或不像人话时回退标准句 3。
-  // 2026-10-04：暂停接单不再写「找现场工作人员」。固定句始终包含「换一台机器」。
-  PRINT_TERMINAL_QUEUE_HALTED: (phone) => machineUnusableLine(phone),
+  // 2026-10-06：暂停接单不再写「找现场工作人员」。附近没有别的在线终端时不写「换一台机器」。
+  PRINT_TERMINAL_QUEUE_HALTED: (contact) => machineUnusableLine(contact),
   SCAN_TERMINAL_BUSY: '本机正在扫描中，请等待当前任务完成后再试',
-  SCAN_TERMINAL_DISABLED: (phone) => `本机扫描功能已停用。${machineUnusableLine(phone)}`,
+  SCAN_TERMINAL_DISABLED: (contact) => `本机扫描功能已停用。${machineUnusableLine(contact)}`,
   SCAN_SESSION_EXPIRED: '这次扫描已过期，请返回重新开始',
   INVALID_SCAN_SESSION: '扫描任务未创建成功，请返回重试',
   PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED: '检测到上一笔支付待核实，请先等待自动确认或点击核实',
   PAYMENT_ATTEMPT_PENDING: '已有支付正在处理中，请勿重复扫码',
   // 该码含「受理未知」（出码超时/中断）与「已受理但本地回填失败」两支，本机都无从判定是否扣款。
   // 因此固定文案只说未知结果，既不断言「已受理」，也不落 5xx「请稍后重试」诱导重复支付。
-  PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED: (phone) => `支付结果尚未确认，可能已扣款。请勿重复支付，可在手机支付账单中核对。${helpNeededLine(phone)}`,
+  PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED: (contact) => `支付结果尚未确认，可能已扣款。请勿重复支付，可在手机支付账单中核对。${helpNeededLine(contact)}`,
   RECONCILE_TOO_FREQUENT: '核实过于频繁，请稍候几秒再试',
   RECONCILE_UNSUPPORTED: '当前通道不支持主动核实，请继续等待支付结果',
   LOCAL_AGENT_UNREACHABLE: '无法连接这台机器的本机程序，请确认设备正常后重试',
-  LOCAL_USB_BRIDGE_TOKEN_MISSING: (phone) => `这台机器还没配好 U 盘导入，请改用手机扫码上传。${helpNeededLine(phone)}`,
+  LOCAL_USB_BRIDGE_TOKEN_MISSING: (contact) => {
+    const viaPhone = whenMiniapp(contact, '请改用手机扫码上传。')
+    return `这台机器还没配好 U 盘导入。${viaPhone}${helpNeededLine(contact)}`
+  },
   // 2026-10-04 Agent 本地接口：读的那一下失败（多半是 Windows Defender 拦下了可疑文件，或文件已被隔离）。
   // 重试同一个文件不会成功，所以不说「请重试」，直接让用户换一个。
   LOCAL_USB_FILE_UNREADABLE: '这个文件读不了，请换一个文件',
   // 列表过期（一次性编号已用过或超时）：同一个编号再点只会再失败，要重新读取 U 盘列表。
   LOCAL_USB_FILE_EXPIRED: '文件列表已过期，请重新读取 U 盘后再选',
   // 2026-10-04 能力中心把这台机器的 U 盘导入配成非「可用」。重试过不了，改走手机扫码。
-  LOCAL_USB_DISABLED: '这台机器暂未开放 U 盘导入，请用手机扫码上传',
+  LOCAL_USB_DISABLED: (contact) => {
+    const viaPhone = whenMiniapp(contact, '请用手机扫码上传。')
+    return viaPhone
+      ? `这台机器暂未开放 U 盘导入，${viaPhone}`
+      : `这台机器暂未开放 U 盘导入。${helpNeededLine(contact)}`
+  },
   // 2026-10-04 查能力开关失败、超时或返回对不上。当时确认不了是否开放，不要当成已开放。
-  LOCAL_USB_CAPABILITY_UNKNOWN: '暂时确认不了 U 盘导入是否开放，请稍后再试或用手机扫码上传',
+  LOCAL_USB_CAPABILITY_UNKNOWN: (contact) => {
+    const viaPhone = whenMiniapp(contact, '或用手机扫码上传')
+    return `暂时确认不了 U 盘导入是否开放，请稍后再试${viaPhone}。`
+  },
   CONVERT_TOO_MANY_IMAGES: '一次转换的图片过多，请减少张数后重试',
   SIGN_SOURCE_NOT_FOUND: '文件访问凭证已过期或文件已清理，请重新选择文件',
-  NO_TERMINAL_IDENTITY: (phone) => machineUnusableLine(phone),
+  NO_TERMINAL_IDENTITY: (contact) => machineUnusableLine(contact),
   KIOSK_FEEDBACK_RATE_LIMITED: '反馈提交过于频繁，请稍后再试',
   KIOSK_FEEDBACK_PII_REJECTED: '反馈内容含不宜提交的个人信息，请删改后再试',
   KIOSK_FEEDBACK_EMPTY: '请填写问题说明后再提交',
@@ -148,7 +166,7 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, SharedUserMessage>> = {
  * #1150 的 services/api/src，码名按拍板登记）。服务端把这句写成给一体机前求职者看的话，
  * 原文可能与下面的固定句不完全相同，固定覆盖会把原话吞掉。
  * 它同时留在 SHARED_USER_MESSAGES：原话缺失，或通不过下面的形状检查，就回退到
- * 标准句 3（这台机器暂时不能用，请换一台机器，或服务电话 / 隐私政策联系方式）。
+ * 标准句 3（这台机器暂时不能用；附近有别的在线终端才写「换一台机器」，否则「请稍后再来」）。
  * 原话若仍让用户去找现场的人，同样回退，不原样上屏。
  * `PRINTER_UNAVAILABLE` 不进这张表，固定用标准句 2，不透传服务端原话。
  *
@@ -198,14 +216,14 @@ export function errorCodeOf(error: unknown): string | undefined {
  *
  * `fallback` 必须是**与当前操作相关**的中文句子（「导出失败，请稍后重试」而不是
  * 「操作失败」），因为未知错误码一律落到它 —— 它是用户实际会看到的那句话。
- * `phone` 省略时读会话缓存，不在这里发请求。显式传 null 表示当前没有号码。
+ * `contact` 省略时读会话缓存，不在这里发请求。显式传 null 表示当前没有联系方式。
  */
-function resolveSharedMessage(entry: SharedUserMessage, phone: string | null): string {
-  return typeof entry === 'function' ? entry(phone) : entry
+function resolveSharedMessage(entry: SharedUserMessage, contact?: PublicSupportContact | null): string {
+  return typeof entry === 'function' ? entry(contact) : entry
 }
 
-export function userMessageOf(error: unknown, fallback: string, phone?: string | null): string {
-  const resolvedPhone = phone === undefined ? peekServicePhone() : phone
+export function userMessageOf(error: unknown, fallback: string, contact?: PublicSupportContact | null): string {
+  const resolved = contact === undefined ? resolveSupportContact(undefined) : contact
   const code = errorCodeOf(error)
   // 透传先于固定覆盖。目前只有 PRINT_TERMINAL_QUEUE_HALTED 两张表都在：
   // 原话过形状检查就显示原话，否则落到下面的固定文案。没进透传表的码行为不变。
@@ -215,22 +233,22 @@ export function userMessageOf(error: unknown, fallback: string, phone?: string |
     if (serverMessage) {
       const entry = code in SHARED_USER_MESSAGES ? SHARED_USER_MESSAGES[code] : undefined
       const replacement = entry
-        ? resolveSharedMessage(entry, resolvedPhone)
-        : `服务暂时不可用，请稍后重试。${helpNeededLine(resolvedPhone)}`
+        ? resolveSharedMessage(entry, resolved)
+        : `服务暂时不可用，请稍后重试。${helpNeededLine(resolved)}`
       return preferUnattended(serverMessage, replacement)
     }
   }
   if (code && code in SHARED_USER_MESSAGES) {
-    return resolveSharedMessage(SHARED_USER_MESSAGES[code] as SharedUserMessage, resolvedPhone)
+    return resolveSharedMessage(SHARED_USER_MESSAGES[code] as SharedUserMessage, resolved)
   }
   // 浏览器 fetch 失败是 TypeError。普通 Error('Failed to fetch') 仍走兜底——
   // verify-kiosk-runtime-error-boundary 钉死不得按 message 文本猜测。
-  if (error instanceof TypeError) return resolveSharedMessage(SHARED_USER_MESSAGES.NETWORK_ERROR, resolvedPhone)
+  if (error instanceof TypeError) return resolveSharedMessage(SHARED_USER_MESSAGES.NETWORK_ERROR, resolved)
   if (error instanceof ApiHttpError) {
-    if (error.status === 0) return resolveSharedMessage(SHARED_USER_MESSAGES.NETWORK_ERROR, resolvedPhone)
-    if (error.status === 429) return resolveSharedMessage(SHARED_USER_MESSAGES.RATE_LIMITED, resolvedPhone)
-    if (error.status === 401) return resolveSharedMessage(SHARED_USER_MESSAGES.MEMBER_AUTH_REQUIRED, resolvedPhone)
-    if (error.status >= 500) return `服务暂时不可用，请稍后重试。${helpNeededLine(resolvedPhone)}`
+    if (error.status === 0) return resolveSharedMessage(SHARED_USER_MESSAGES.NETWORK_ERROR, resolved)
+    if (error.status === 429) return resolveSharedMessage(SHARED_USER_MESSAGES.RATE_LIMITED, resolved)
+    if (error.status === 401) return resolveSharedMessage(SHARED_USER_MESSAGES.MEMBER_AUTH_REQUIRED, resolved)
+    if (error.status >= 500) return `服务暂时不可用，请稍后重试。${helpNeededLine(resolved)}`
   }
   return fallback
 }

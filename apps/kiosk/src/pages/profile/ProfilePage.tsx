@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { BellIcon, FileTextIcon, GiftIcon, HelpCircleIcon, LockIcon, MessageSquareIcon, PrinterIcon, ShieldIcon } from 'lucide-react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
@@ -270,10 +272,11 @@ function statusFor(state: ProfileUiState): { tone: 'ok' | 'warn' | 'bad' | 'unkn
 
 function AccountRows({ onEnd, primaryEnd }: { onEnd: () => void; primaryEnd: boolean }) {
   const navigate = useNavigate()
+  const contact = useSupportContact()
   const rows = [
     { icon: BellIcon, title: '消息通知', desc: '系统下发的会员通知，已读与标记都会记录。', to: '/me/notifications', testid: 'profile-notifications' },
     { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请找现场工作人员或按《隐私政策》的联系方式申请。', to: '/me/privacy-requests', testid: 'profile-privacy' },
-    { icon: HelpCircleIcon, title: '帮助中心', desc: '服务台位置、常见问题与找人处理。', to: '/help', testid: 'profile-help' },
+    { icon: HelpCircleIcon, title: '帮助中心', desc: `常见问题。${helpNeededLine(contact)}`, to: '/help', testid: 'profile-help' },
     { icon: MessageSquareIcon, title: '意见反馈', desc: '提交后能看到处理状态。', to: '/me/feedback', testid: 'profile-feedback' },
   ]
   return (
@@ -435,7 +438,7 @@ function ProfileCta({
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>找工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>求助</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onRetry}>
           重新加载
         </button>

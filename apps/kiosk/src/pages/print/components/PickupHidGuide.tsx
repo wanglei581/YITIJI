@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { helpNeededLine, networkDisconnectLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { KioskNumpad } from '../../../components/kiosk-numpad/KioskNumpad'
 import {
   AlertCircleIcon,
@@ -21,6 +23,7 @@ import { LEGACY_KEYS, type ClaimSuccessCopy, type PickupFailure, type PickupScre
 
 /** 稿 11 各屏页头的说明句。页头标题全程是「输入你的到机码」，变化的只有这一句。 */
 export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
+  const contact = useSupportContact()
   switch (screen) {
     case 'legacy':
       return <>输入早前订单中的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位到机码</b>。核对订单、完成后续步骤，领取打印件。</>
@@ -39,7 +42,9 @@ export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
     case 'success':
       return <>校验通过，<b>打印订单已认领</b>。</>
     default:
-      return <>打开手机小程序<b>「我的 → 打印订单」</b>，找到 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
+      return contact.miniappPublished
+        ? <>打开手机小程序<b>「我的 → 打印订单」</b>，找到 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
+        : <>输入订单上的 <b>{PICKUP_CODE_LENGTH} 位到机码</b>。核对订单后，领取打印件。</>
   }
 }
 
@@ -57,6 +62,7 @@ export function PickupHidGuide({
   echo: ReactNode
   errorMsg: string
 }) {
+  const contact = useSupportContact()
   return (
     <>
       <div className="qx-card pcp-hid-card pcp-enter">
@@ -72,7 +78,8 @@ export function PickupHidGuide({
         <div className="pcp-hid-main">
           <p className="pcp-hid-t">请出示手机上的码</p>
           <p className="pcp-hid-s" id="pcp-hid-hint">
-            打开小程序里的到机码页面，把手机屏幕对准<strong>机身侧面的扫码区</strong>。
+            {contact.miniappPublished ? '打开小程序里的到机码页面，把手机屏幕对准' : '把手机上的到机码对准'}
+            <strong>机身侧面的扫码区</strong>。
             扫码模组靠接近感应触发，不会一直亮着。
             <strong>把手机屏幕亮度调高</strong>，再把屏幕凑近扫码区。
             扫到的内容以 USB 键盘方式输入，和手输走同一套校验规则。
@@ -105,20 +112,16 @@ export function PickupHidGuide({
 
 export function PickupThreeCodeCard() {
   return (
-    <section className="qx-card pcp-ab" aria-label="三种码的区别">
-      <h2 className="pcp-ab-t"><InfoIcon size={22} aria-hidden="true" />三种码，别搞混</h2>
+    <section className="qx-card pcp-ab" aria-label="两种码的区别">
+      <h2 className="pcp-ab-t"><InfoIcon size={22} aria-hidden="true" />两种码，别搞混</h2>
       <div className="pcp-ab-cols">
         <div className="pcp-ab-col is-current">
           <b>到机码 · 本页用</b>
-          <span>{PICKUP_CODE_LENGTH} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。</span>
+          <span>{PICKUP_CODE_LENGTH} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位）。取件、接着打，都输这一串。</span>
         </div>
         <div className="pcp-ab-col">
           <b>上传码 · 手机传文件用</b>
-          <span>用于把手机文件传到本机。</span>
-        </div>
-        <div className="pcp-ab-col">
-          <b>取件凭证码 · 取纸/补打用</b>
-          <span>取纸时出示给工作人员，不在本页输入。</span>
+          <span>用于把手机文件传到本机，不能在本页当到机码输入。</span>
         </div>
       </div>
     </section>
@@ -273,8 +276,8 @@ export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: 
         </li>
         <li>
           <button type="button" className="pch-out-btn" onClick={onHelp}>
-            <b>问工作人员</b>
-            <span>帮你查订单</span>
+            <b>问小青</b>
+            <span>{helpNeededLine()}</span>
           </button>
         </li>
       </ul>
@@ -301,6 +304,7 @@ export function PickupFailurePanel({
   onHelp: () => void
   onHome: () => void
 }) {
+  const contact = useSupportContact()
   if (failure === 'locked' || failure === 'network') {
     const locked = failure === 'locked'
     return (
@@ -316,9 +320,9 @@ export function PickupFailurePanel({
         </div>
         <p className="pcp-block-body">
           {locked ? (
-            <>这是为了防止有人在公共机器上反复试码。停用<b>过一段时间会自动解除</b>，你的码不会因为停用而作废，到时候再输就行；着急的话请找现场工作人员。</>
+            <>这是为了防止有人在公共机器上反复试码。停用<b>过一段时间会自动解除</b>，你的码不会因为停用而作废，到时候再输就行。{helpNeededLine(contact)}</>
           ) : (
-            <>可以用<b>同一串码重试校验</b>，系统会按这台机器核对已认领状态，不会因此重复出纸；如果仍拿不到结果，请找工作人员核实订单。</>
+            <>可以用<b>同一串码重试校验</b>，系统会按这台机器核对已认领状态，不会因此重复出纸。{networkDisconnectLine()}。{helpNeededLine(contact)}</>
           )}
         </p>
         <div className="pcp-actions">
@@ -326,7 +330,7 @@ export function PickupFailurePanel({
             <>
               <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHome}>先回首页</button>
               <button type="button" className="qx-btn pcp-act pcp-act--staff" data-testid="arrival-code-primary" onClick={onHelp}>
-                联系工作人员获取帮助
+                求助
               </button>
             </>
           ) : (
@@ -334,7 +338,7 @@ export function PickupFailurePanel({
               <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onRetry}>
                 重试校验
               </button>
-              <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>联系工作人员</button>
+              <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>问小青</button>
             </>
           )}
         </div>
@@ -379,7 +383,7 @@ export function PickupFailurePanel({
           {failure === 'printer' ? '重试校验' : '清除，重新输入'}
         </button>
         <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>
-          {failure === 'invalid' ? '查看取码说明 / 找工作人员' : '找工作人员'}
+          {failure === 'invalid' ? '查看取码说明' : '问小青'}
         </button>
       </div>
     </>
@@ -396,12 +400,14 @@ export function PickupWinCard({
   meta,
   onReset,
   primary,
+  reprintHint,
 }: {
   copy: ClaimSuccessCopy
   orderNo: string
   meta: string
   onReset: () => void
   primary: ReactNode
+  reprintHint?: string | null
 }) {
   return (
     <>
@@ -418,6 +424,7 @@ export function PickupWinCard({
           <div className="pcp-win-fm">
             <p className="pcp-win-fn">打印订单 <span className="qx-num">{orderNo}</span></p>
             {meta ? <p className="pcp-win-fs">{meta}</p> : null}
+            {reprintHint ? <p className="pcp-win-fs">{reprintHint}</p> : null}
           </div>
         </div>
         <ol className="pcp-win-steps">

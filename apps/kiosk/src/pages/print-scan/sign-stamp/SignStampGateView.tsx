@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { FileTextIcon, FolderIcon, ImageIcon, InfoIcon } from 'lucide-react'
 import type { StatusCopy } from './signStampModel'
 import { SignStampStatus } from './SignStampStatus'
+import { machineUnusableLine } from '../../../copy/unattendedCopy'
 
 const ALTS = [
   {
@@ -124,7 +125,7 @@ export function gateWhy(state: string): string[] {
     return ['签名图不留到下一次使用，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
   }
   if (state === 'terminal-missing') {
-    return ['不假设「读不到就是可用」。', '请联系现场工作人员登记这台机器。']
+    return ['不假设「读不到就是可用」。', machineUnusableLine()]
   }
   if (state.startsWith('capability-')) {
     return ['读取中不等于可用，也不等于不可用。', '读不到就不放行，不把失败当成已关闭。']

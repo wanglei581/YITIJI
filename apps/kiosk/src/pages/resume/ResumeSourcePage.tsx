@@ -7,6 +7,7 @@ import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import {
   AlertCircleIcon,
   CloudUploadIcon,
@@ -56,7 +57,9 @@ interface UploadOption {
   icon: React.ComponentType<{ className?: string }>
 }
 
-const RESUME_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传，或联系现场工作人员。'
+function resumeUsbUnconfiguredNote(): string {
+  return `这台机器暂未开通 U 盘导入。请改用手机扫码上传。${helpNeededLine()}。`
+}
 
 const UPLOAD_OPTIONS: UploadOption[] = [
   {
@@ -229,7 +232,7 @@ export function ResumeSourcePage() {
   const accept = wordConversionAvailable ? `${BASE_ACCEPT},${WORD_ACCEPT}` : BASE_ACCEPT
   const fileInputRef = useRef<HTMLInputElement>(null)
   const kiosk = useTerminalKiosk()
-  const usbGate = useUsbImportGate(RESUME_USB_UNCONFIGURED_NOTE)
+  const usbGate = useUsbImportGate(resumeUsbUnconfiguredNote())
   const [pickedChannel, setSelected] = useState<UploadChannel>(() => isTerminalKiosk() ? 'phone' : 'cloud')
   const selected = kiosk && pickedChannel === 'cloud' ? 'phone' : pickedChannel
   // 从解析页带着扫描件交接回来时，直接落在稿 21 的 scan-ready：同一份文件，不用重扫。

@@ -34,6 +34,8 @@ import {
   UserSquareIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { useSupportContact } from '../../hooks/useSupportContact'
+import { machineCannotPrintLine } from '../../copy/unattendedCopy'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { getTerminalId, subscribeTerminalIdentity } from '../../services/api/screensaver'
 import {
@@ -135,7 +137,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     // 运行时由 describeDocPrintFoot 按本机彩色 / 双面登记改写；这里是未登记时的口径。
     stateNote: '带走：打印件',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '文件可以先传上来存着，换一台再打。',
+    mfpOffNote: '文件可以先传上来存着，请稍后再打。',
   },
   {
     key: 'phone-upload',
@@ -222,7 +224,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     available: true,
     iconTone: 'clay',
     stateNote: '带走：生成的新 PDF',
-    mfpOffStateNote: '照常可用 · 出纸要换机',
+    mfpOffStateNote: '照常可用 · 出纸请稍后再来',
   },
   {
     key: 'id-photo',
@@ -249,8 +251,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
  *
  * ⚠ 命名：后端与小程序下单页都叫它「到机码」（pickup-order.service.ts 的
  * 错误文案「到机码无效或已过期」、小程序 print-pay 的「提交并生成到机码」），
- * 它与付款后才生成的「取件凭证码」(Order.pickupCode) 是两个码。原型据此
- * 把卡面写成「到机码核销 · 不是取件码」。生产此前把两个码都叫「取件码」。
+ * 方案②起，到机码就是唯一的取件码。原型卡面写成「到机码核销 · 取件就用它」。
  *
  * ⚠ 门禁：刻意不登记进 CARD_CAPABILITY_KEY，也不随 MFP 轴停用 ——
  * 核销的是订单而非新建本机打印任务。原型在 device-off / 探测失败时把这张卡
@@ -293,7 +294,7 @@ const QUICK_LINKS: readonly (QxPrintQuickLinkView & { to?: string })[] = [
     key: 'print-orders',
     icon: PrinterIcon,
     title: '打印订单',
-    description: '查看订单与取件凭证码',
+    description: '查看订单与到机码',
     to: '/me/print-orders',
   },
   {
@@ -316,6 +317,7 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 
 export function PrintScanHomePage() {
   const navigate = useNavigate()
+  const contact = useSupportContact()
   const device = useTerminalDeviceStatus()
   // Hub 只选办理入口，使用中性文案；价目由后续打印确认页读取，离开扫描不额外取价。
   const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
@@ -420,7 +422,11 @@ export function PrintScanHomePage() {
               to: '',
               state: undefined,
               stateNote: undefined,
-              note: orderPaused ? device.printerNotice : (resolved.mfpOffNote ?? resolved.note),
+              note: orderPaused
+                ? device.printerNotice
+                : resolved.key === 'doc-print' && contact.otherOnlineTerminalNearby
+                  ? '文件可以先传上来存着，换一台再打。'
+                  : (resolved.mfpOffNote ?? resolved.note),
               unavailableBadge: orderPaused
                 ? device.printerLabel
                 : (resolved.mfpOffBadge ?? `暂停 · ${device.printerLabel}`),
@@ -434,6 +440,7 @@ export function PrintScanHomePage() {
     [
       capabilityLoad,
       confirmed,
+      contact.otherOnlineTerminalNearby,
       device.printerLabel,
       device.printerNotice,
       mfp,
@@ -472,11 +479,7 @@ export function PrintScanHomePage() {
   const pill = HUB_PILL[hubState]
   const printerUnavailable = {
     label: device.printerLabel,
-    notice: device.printer.errorCode === 'paperEmpty'
-      ? '打印机缺纸，请找现场工作人员加纸'
-      : device.kind === 'offline'
-        ? '打印机当前无法连接，请找现场工作人员'
-        : '打印机异常，请找现场工作人员检查',
+    notice: machineCannotPrintLine(contact),
   }
 
   return (
@@ -544,7 +547,6 @@ export function PrintScanHomePage() {
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
         issueOptions={PRINT_HUB_ISSUE_OPTIONS}
-        description="选择这次遇到的问题，工作人员会核实后现场处理"
       />
     </QxPageFrame>
   )

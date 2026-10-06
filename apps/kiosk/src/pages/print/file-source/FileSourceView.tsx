@@ -29,6 +29,7 @@ import {
   PhoneQrSlot,
 } from './FileSourceBits'
 import '../styles/file-source-qx.css'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 
 export interface FileSourceViewProps {
   screen: FileSourceScreen
@@ -236,7 +237,7 @@ export function FileSourceView(props: FileSourceViewProps) {
   } else if (screen === 'local-rejected' || screen === 'local-oversize' || screen === 'local-unreadable') {
     secondary = ghost('换一条通道', () => onSelectChannel('qr'), 'file-source-switch-source')
   } else if (screen === 'local-upload-failed' || screen === 'phone-gen-failed' || screen === 'usb-read-failed' || screen === 'usb-unavailable') {
-    secondary = ghost('联系工作人员', onHelp, 'file-source-help')
+    secondary = ghost('问小青', onHelp, 'file-source-help')
   } else if (screen === 'phone-ready') {
     secondary = ghost('刷新二维码', onPhoneRefresh, 'file-source-refresh')
   } else if (screen === 'phone-waiting' || screen === 'phone-uploading' || screen === 'phone-uploaded' || screen === 'phone-confirming') {
@@ -472,10 +473,10 @@ export function FileSourceView(props: FileSourceViewProps) {
               <div className="fs-empty">
                 <span>收到文件之前，<b>当前文件仍然是空的</b>。{screen === 'local-upload-failed' ? '重试仍失败时，换手机扫码这条通道。' : '结果由系统返回，这一页没有取消上传动作。'}</span>
               </div>
-              <FileSourceSteps title={screen === 'local-uploading' ? '接下来只有三种结果' : '重试会怎么走'} items={screen === 'local-uploading' ? ['成功：系统确认保存，文件成为当前文件。', '失败：没有确认收到，可以直接重试。', '一直没结束：叫工作人员来看。'] : ['仍用刚才挑的那一份。', '把这一份重新送一次。', '收到后显示在当前文件里。']} />
+              <FileSourceSteps title={screen === 'local-uploading' ? '接下来只有三种结果' : '重试会怎么走'} items={screen === 'local-uploading' ? ['成功：系统确认保存，文件成为当前文件。', '失败：没有确认收到，可以直接重试。', `一直没结束：${helpNeededLine()}。`] : ['仍用刚才挑的那一份。', '把这一份重新送一次。', '收到后显示在当前文件里。']} />
             </div>
           </section>
-          {screen === 'local-uploading' ? <HelpMini onHelp={onHelp} text="上传一直不结束，或者反复失败，可以叫工作人员来看一眼。" /> : null}
+          {screen === 'local-uploading' ? <HelpMini onHelp={onHelp} text={`上传一直不结束，或者反复失败。${helpNeededLine()}。`} /> : null}
         </>
       )
       break
@@ -561,8 +562,8 @@ export function FileSourceView(props: FileSourceViewProps) {
           {screen === 'phone-generating' || screen === 'phone-gen-failed' ? switchRow : null}
           {screen === 'phone-generating' || screen === 'phone-gen-failed' ? null : (
             <div className="fs-mini" data-static="true">
-              <h4>卡住了？找人帮忙</h4>
-              <p>扫码、确认或取消一直没结果时，可以叫现场工作人员来看看。</p>
+              <h4>问小青</h4>
+              <p>扫码、确认或取消一直没结果时，{helpNeededLine()}。</p>
             </div>
           )}
         </>
@@ -590,7 +591,7 @@ export function FileSourceView(props: FileSourceViewProps) {
           >
             <div className="fs-status-p">
               {screen === 'usb-unavailable'
-                ? '本机暂未开通 U 盘导入，请改用手机上传或联系工作人员。'
+                ? `本机暂未开通 U 盘导入。请改用手机扫码上传。${helpNeededLine()}。`
                 : screen === 'usb-agent-offline'
                   ? '暂时无法读取 U 盘。可以重新连接，或改用手机上传。'
                   : screen === 'usb-wait'
@@ -603,7 +604,7 @@ export function FileSourceView(props: FileSourceViewProps) {
             </div>
           </FileSourceStatus>
           {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (
-            <div className="qx-card"><FileSourceSteps title={screen === 'usb-empty' ? '对号入座' : '重试是安全的'} items={screen === 'usb-empty' ? ['Word 另存为 PDF，再放到 U 盘最外层。', '不进入子文件夹，请把文件移到最外层。', '单份超过 15MB 时，降低分辨率再导出。'] : ['重新插入 U 盘，或换一个 USB 口。', '重新读取最外层文件，不改动盘上内容。', '仍没有结果时，换手机上传或联系工作人员。']} /></div>
+            <div className="qx-card"><FileSourceSteps title={screen === 'usb-empty' ? '对号入座' : '重试是安全的'} items={screen === 'usb-empty' ? ['Word 另存为 PDF，再放到 U 盘最外层。', '不进入子文件夹，请把文件移到最外层。', '单份超过 15MB 时，降低分辨率再导出。'] : ['重新插入 U 盘，或换一个 USB 口。', '重新读取最外层文件，不改动盘上内容。', `仍没有结果时，改用手机扫码上传。${helpNeededLine()}。`]} /></div>
           ) : null}
           {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (
             <section className="fs-sec">

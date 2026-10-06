@@ -110,7 +110,7 @@ expectMatches(summarySrc, /\{item\.pickupCode\s*&&\s*<PickupCodePanel/, '详单�
   }
 }
 // PickupCodePanel 组件本身：取件码只来自 prop code，不含任何生成/推断逻辑。
-expectMatches(panelSrc, /\{\s*code\s*\}\s*:\s*\{\s*code:\s*string\s*\}/, 'PickupCodePanel 取件码只来自 prop code（非内部生成）')
+expectMatches(panelSrc, /\{\s*code\s*,\s*hint\s*\}\s*:\s*\{\s*code:\s*string\s*;\s*hint\?:\s*string\s*\|\s*null\s*\}/, 'PickupCodePanel 到机码只来自 prop code（hint 只是续打说明，码仍非内部生成）')
 for (const [name, src] of all) {
   expectAbsent(src, /^.*pickupCode.*payStatus.*$|^.*payStatus.*pickupCode.*$/m, `${name} 不依据 payStatus 推断取件码可见性（门控在服务端）`)
   expectAbsent(src, /pickupCode\s*=[^=]/, `${name} 不本地赋值 / 生成取件码`)
@@ -232,17 +232,14 @@ expectAbsent(pageSrc + refreshSrc, /failureReasonForUser|errorCode|errorMessage/
 
 // API-20：顾客侧待退款状态。不承诺到账天数，已退款只展示服务端 refundedAmountCents。
 expectMatches(copySrc, /PENDING_REFUND_LABEL = '待退款'/, '待退款标签在 paymentCopy')
-expectMatches(
-  copySrc,
-  /PENDING_REFUND_EXPLANATION =\s*'本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'/,
-  '待退款说明不写到账天数',
-)
+expectAbsent(copySrc, /退款由工作人员/, '待退款说明不再交给现场工作人员')
 expectMatches(copySrc, /item\.refundRequired === true/, 'memberPayStatusLabel 以服务端 refundRequired 为准')
 expectMatches(copySrc, /refunding:\s*\{\s*label:\s*'退款中'/, '退款中单独展示，不伪装已退款')
 expectMatches(pageSrc, /item\.refundRequired === true/, '列表待退款 chip 由服务端 refundRequired 门控')
 expectMatches(pageSrc, /PENDING_REFUND_LABEL/, '列表使用待退款标签常量')
-expectMatches(summarySrc, /PENDING_REFUND_EXPLANATION/, '详单展示待退款诚实说明')
-expectMatches(summarySrc, /item\.refundRequired === true/, '详单待退款说明由服务端 refundRequired 门控')
+expectMatches(summarySrc, /refundApplyLine\(contact\)/, '详单待退款说明用标准句 5（核实后原路退回，不写到账天数）')
+expectMatches(summarySrc, /item\.amountCents > 0/, '退款说明只在金额大于 0 时出现')
+expectMatches(summarySrc, /item\.refundRequired === true && typeof item\.amountCents === 'number' && item\.amountCents > 0/, '详单待退款说明由服务端 refundRequired 且金额大于 0 门控')
 expectMatches(summarySrc, /recordedAmountDisplay\(item\.refundedAmountCents\)/, '已退款只格式化服务端 refundedAmountCents')
 expectAbsent(copySrc, /[0-9]+\s*个?工作日|[0-9]+\s*天内到账|保证到账/, '待退款文案不承诺到账天数')
 expectAbsent(pageSrc, /[0-9]+\s*个?工作日|[0-9]+\s*天内到账|保证到账/, '列表不承诺到账天数')

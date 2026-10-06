@@ -56,7 +56,7 @@ export const SAVED_TO_DOCUMENTS_COPY = '已存入我的文档'
 export const EXPORT_BEFORE_PRINT_COPY = '请先导出 PDF，成功后才能打印或扫码带走。'
 export const EXPORT_ERROR_COPY: Record<string, string> = {
   AI_RESULT_NOT_READY: '诊断结果还没准备好，请稍后再导出。刷新本页或重新诊断后再试。',
-  RESUME_PDF_FONT_NOT_FOUND: '这次无法生成报告文件，请稍后再试或联系现场工作人员。',
+  RESUME_PDF_FONT_NOT_FOUND: '这次无法生成报告文件，请稍后再试。',
   RESUME_EXPORT_UNAVAILABLE: '简历导出当前不可用（价目已停用，不是免费）。',
   AI_TASK_NOT_FOUND: '找不到这份报告，可能已过期或无权查看。请从简历来源重新进入。',
 }

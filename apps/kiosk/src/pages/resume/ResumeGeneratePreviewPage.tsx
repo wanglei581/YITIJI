@@ -366,7 +366,7 @@ export function ResumeGeneratePreviewPage() {
             </div>
             <div className="qx-rg-help">
               <p>{token ? '这一页先在屏幕上核对。导出之后可以扫码带走，登录状态下按保存期限留在账号里。' : '这一页只在屏幕上。没登录时导出的文件不会进账号，事后登录也不补绑。要留底就先登录，再生成、再导出。'}</p>
-              <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={() => go('/help')}>找工作人员</button>
+              <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={() => go('/help')}>问小青</button>
             </div>
             <p className="qx-rg-reason">事实内容要改，得回填写页改。这一页改的是描述，改完就留在这一份上。</p>
           </div>

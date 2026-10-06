@@ -27,15 +27,18 @@ function transpile(absolutePath, replacements = {}) {
 
 const pageRange = transpile(join(kioskRoot, 'src/pages/print/pageRange.ts'))
 const cashier = transpile(join(kioskRoot, 'src/pages/print/cashierStatus.ts'))
+const unattendedUrl = transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts'))
 const progressUrl = transpile(join(kioskRoot, 'src/pages/print/printProgressModel.ts'), {
   './cashierStatus': cashier,
   './pageRange': pageRange,
+  '../../copy/unattendedCopy': unattendedUrl,
 })
 const paymentUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/paymentCopy.ts'))
 
 const httpStub = toDataUrl('export class ApiHttpError extends Error { constructor(status, code) { super(String(code)); this.status = status; this.code = code } }')
 const phoneUrl = transpile(join(kioskRoot, 'src/pages/upload/phoneUploadModel.ts'), {
   '../../services/api/httpAdapter': httpStub,
+  '../../copy/unattendedCopy': unattendedUrl,
 })
 const conversionStub = toDataUrl('export function isWordDocument() { return false }')
 const previewKindUrl = transpile(join(kioskRoot, 'src/pages/print/components/printPreviewKind.ts'), {
@@ -158,19 +161,21 @@ test('0 元实付写免费试运营，其余仍标未记录且不推算', () => 
   assert.equal(missing.value, '未记录')
 })
 
-const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
 const ENCRYPTED_COPY = '这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传'
 
 test('W-91 出纸中长时间没有新状态就换掉正在出纸', () => {
   assert.equal(progress.PRINT_PROGRESS_QUIET_MS, 45_000)
-  assert.equal(progress.PRINT_PROGRESS_QUIET_COPY, QUIET_COPY)
+  const quiet = progress.printProgressQuietCopy()
+  assert.match(quiet, /请先看出纸口/)
+  assert.match(quiet, /这台机器暂时打不了/)
+  assert.doesNotMatch(quiet, /找现场工作人员|换一台机器/)
   const printing = { status: 'printing', errorCode: '', failureReasonForUser: '', completedAt: '' }
   assert.equal(progress.progressStatusFingerprint(printing), progress.progressStatusFingerprint({ ...printing }))
   assert.notEqual(progress.progressStatusFingerprint(printing), progress.progressStatusFingerprint({ ...printing, status: 'failed' }))
   assert.match(progressPage, /PRINT_PROGRESS_QUIET_MS/)
-  assert.match(progressPage, /PRINT_PROGRESS_QUIET_COPY/)
+  assert.match(progressPage, /printProgressQuietCopy\(\)/)
   assert.match(progressPage, /backendStatus === 'printing' && !progressQuiet/)
-  assert.match(progressPage, /progressQuiet\s*\?\s*<>\{PRINT_PROGRESS_QUIET_COPY\}<\/>/)
+  assert.doesNotMatch(progressPage, /PRINT_PROGRESS_QUIET_COPY/)
 })
 
 test('W-88 已知失败不再说排队', () => {
@@ -178,12 +183,14 @@ test('W-88 已知失败不再说排队', () => {
   const view = progress.progressFailurePresentation(reason)
   assert.equal(view.headerTitle, '打印没有完成')
   assert.equal(view.badge, '打印未完成')
-  assert.match(view.ask, /打印机缺纸/)
+  assert.match(view.ask, /这台机器暂时打不了/)
+  assert.doesNotMatch(view.ask, /联系工作人员|补纸/)
   assert.match(view.wayOut, /重新打印/)
   assert.doesNotMatch(view.wayOut, /打印机缺纸/)
-  assert.doesNotMatch(`${view.headerTitle}${view.badge}${view.ask}${view.doing}${view.wayOut}`, /排队|等待终端领取|正在出纸/)
+  assert.doesNotMatch(`${view.headerTitle}${view.badge}${view.ask}${view.doing}${view.wayOut}`, /排队|等待终端领取|正在出纸|换一台机器/)
   const blank = progress.progressFailurePresentation('   ')
-  assert.match(blank.ask, /请联系现场工作人员/)
+  assert.match(blank.ask, /这台机器暂时打不了/)
+  assert.doesNotMatch(blank.ask, /联系现场工作人员/)
   assert.doesNotMatch(blank.badge, /排队/)
   assert.match(progressPage, /progressFailurePresentation/)
   assert.match(progressPage, /failed && !isSim \? failureView\.badge/)
@@ -196,7 +203,8 @@ test('W-88 已知失败不再说排队', () => {
   assert.match(progressSections, /<p className="why">\{hint\}<\/p>/)
   assert.match(progressSections, />\s*重新打印\s*</)
   assert.match(progressSections, /查看订单/)
-  assert.match(progressSections, /联系工作人员/)
+  assert.match(progressSections, /问小青/)
+  assert.doesNotMatch(progressSections, /联系工作人员/)
   assert.doesNotMatch(progressSections, /重新打印[\s\S]{0,40}<small>/)
 })
 
@@ -274,6 +282,7 @@ const viewUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConfi
   'lucide-react': iconUrl,
   '../printConfirmModel': confirmModelUrl,
   './PrintConfirmParts': partsUrl,
+  '../../../copy/unattendedCopy': unattendedUrl,
 })
 const { PrintConfirmView } = await import(viewUrl)
 const confirmProps = {
@@ -309,13 +318,16 @@ test('W-117：收费闸门拒单原因只上屏一次，单卡占满现有栅格
 })
 
 const hubIconUrl = toDataUrl('export const ArrowRightIcon = () => null; export const CopyIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null;')
-const hubContentUrl = transpile(join(kioskRoot, 'src/pages/print-scan/printHubContent.ts'))
+const hubContentUrl = transpile(join(kioskRoot, 'src/pages/print-scan/printHubContent.ts'), {
+  '../../copy/unattendedCopy': unattendedUrl,
+})
 const hubViewUrl = transpile(join(kioskRoot, 'src/pages/print-scan/components/QxPrintHubView.tsx'), {
   'react/jsx-runtime': jsxUrl,
   'lucide-react': hubIconUrl,
   '../../print/components/PrintAiHelp': aiUrl,
   '../../../components/qingxu/QxAppNavbar': toDataUrl('export const QxAppNavbar = () => null'),
   '../printHubContent': hubContentUrl,
+  '../../../copy/unattendedCopy': unattendedUrl,
 })
 const { QxPrintHubView } = await import(hubViewUrl)
 test('BFIX：Hub 不额外读取价目，入口与展开说明均使用中性文案', () => {
@@ -339,11 +351,9 @@ test('BFIX：Hub 不额外读取价目，入口与展开说明均使用中性文
 })
 
 test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通时出现', () => {
-  for (const [label, notice] of [
-    ['打印机缺纸', '打印机缺纸，请找现场工作人员加纸'],
-    ['打印机异常', '打印机异常，请找现场工作人员检查'],
-    ['打印机离线', '打印机当前无法连接，请找现场工作人员'],
-  ]) {
+  // 三种状态仍靠短标题分开。说明统一为标准句 2：缺纸传感器报不准，不写找人补纸。
+  const notice = '这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请查看《隐私政策》里的联系方式。'
+  for (const label of ['打印机缺纸', '打印机异常', '打印机离线']) {
     for (const actionable of [false, true]) {
       const html = renderToStaticMarkup(createElement(QxPrintHubView, {
         hubState: 'device-off', probe: 'ok', mfp: 'unavailable',
@@ -366,12 +376,15 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
 const cashierIcons = toDataUrl('export const AlertTriangleIcon = () => null; export const CheckCircle2Icon = () => null; export const Clock3Icon = () => null; export const FileXIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null; export const QrCodeIcon = () => null; export const ScanLineIcon = () => null; export const Undo2Icon = () => null;')
 const cashierModelUrl = transpile(join(kioskRoot, 'src/pages/print/cashierQxModel.tsx'), {
   'react/jsx-runtime': jsxUrl, 'lucide-react': cashierIcons, './cashierStatus': cashier,
+  '../../copy/unattendedCopy': unattendedUrl,
 })
 const cashierViewUrl = transpile(join(kioskRoot, 'src/pages/print/components/CashierQxView.tsx'), {
   'react/jsx-runtime': jsxUrl, 'lucide-react': cashierIcons, './PrintAiHelp': aiUrl,
   '../cashierStatus': cashier, '../printConfirmModel': confirmModelUrl,
   '../cashierQxModel': cashierModelUrl,
   '../CashierPaymentPanel': toDataUrl('export const CashierPaymentPanel = () => null'),
+  // 收银台可见句改走无人值守文案。替身必须是真模块，零元屏的「退款」断言才测得到生产代码。
+  '../../../copy/unattendedCopy': unattendedUrl,
 })
 const { CashierQxView } = await import(cashierViewUrl)
 test('B 补：零元收银台与放行失败只说免费试运营，不说收款、付款或权益机制', () => {
@@ -391,6 +404,7 @@ const doneSectionsUrl = transpile(join(kioskRoot, 'src/pages/print/components/Pr
   'lucide-react': toDataUrl('export const FileTextIcon = () => null; export const PrinterIcon = () => null'),
   '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
   '../cashierStatus': cashier, '../printProgressModel': progressUrl,
+  '../../../copy/unattendedCopy': unattendedUrl,
   './PrintFileDeletionRecords': toDataUrl('export const PrintFileDeletionRecords = () => null'),
   './PrintFileRetentionNotice': toDataUrl('export const PrintFileRetentionNotice = () => null'),
   './PrintProgressSections': toDataUrl('export const PrintJobRow = () => null'),

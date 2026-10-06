@@ -362,8 +362,8 @@ assert.match(
 assert.match(printScanHome, /到机码/, 'arrival-code entry uses the backend/miniapp name 到机码')
 assert.match(
   printScanHomeView,
-  /不是取件码/,
-  'arrival-code entry disambiguates itself from the post-payment 取件凭证码'
+  /取件就用它/,
+  'arrival-code entry says the arrival code is the pickup code (方案②，不再有另一枚取件凭证码)'
 )
 // 核销的是订单而非新建打印任务，不得被本机打印/扫描能力探测结果关闭。
 // 只在 CARD_CAPABILITY_KEY 的字面量块内查找，避免正则跨越整个文件误报。

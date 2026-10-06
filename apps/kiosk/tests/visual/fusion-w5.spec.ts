@@ -1517,7 +1517,20 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await expect(paidRow.getByText('W5K7Q2', { exact: true })).toBeVisible()
   await expect(paidRow.getByText('下单金额')).toBeVisible()
   await expect(paidRow.getByRole('button', { name: '去我的文档再打印' })).toBeVisible()
+  // 付过钱但没有待退款标记：有「已退款」金额行，不出现「如需退款」申请句。
+  await expect(paidRow).toContainText('已退款')
+  await expect(paidRow).not.toContainText('如需退款')
   await assetShot(page, 'orders-detail')
+
+  const refundRow = rows.filter({ hasText: '成绩单.pdf' })
+  await refundRow.getByRole('button', { name: '查看订单详单 成绩单.pdf' }).click()
+  await expect(refundRow).toContainText('如需退款，请拨打服务电话 18369161921（工作日 9:00–18:00），我们核实后原路退回。')
+  await expect(refundRow).not.toContainText('在手机上申请')
+
+  const historyRow = rows.filter({ hasText: '历史打印.pdf' })
+  await historyRow.getByRole('button', { name: '查看订单详单 历史打印.pdf' }).click()
+  await expect(historyRow).toContainText('暂无支付信息')
+  await expect(historyRow).not.toContainText('退款')
 
   await page.getByRole('button', { name: /加载更多（已加载 4 \/ 共 5 条）/ }).click()
   await expect(page.getByText('第二页取消的订单.pdf', { exact: true })).toBeVisible()
@@ -1814,7 +1827,7 @@ for (const failure of [
     await expect(panel).not.toContainText('HTTP 500')
     await panel.getByRole('button', { name: '重新登录核对', exact: true }).click()
     await page.waitForURL((url) => url.pathname === '/login')
-    await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。')).toBeVisible()
+    await expect(page.getByText('请用新手机号登录核对换绑结果。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）')).toBeVisible()
     await expectTokenNotPersisted(page)
   }
   expect(api.requestCount('POST', PHONE_REBIND)).toBe(1)

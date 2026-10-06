@@ -9,6 +9,7 @@
 // 不驱动任何业务状态；prefers-reduced-motion 下由 shell 与本页样式一并关掉。
 
 import { type CSSProperties, type ReactNode } from 'react'
+import { machineCannotPrintLine } from '../../../copy/unattendedCopy'
 import { PrintAiHelp } from '../../print/components/PrintAiHelp'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import {
@@ -318,7 +319,7 @@ function HubBanner({
         >
           <p className="ph-state-p">
             {orderPaused ? orderPaused.notice : (
-              <>{printerUnavailable?.notice ?? '打印机暂不可用，请找现场工作人员'}。{usableServices ? `${usableServices}仍可使用。` : '请查看卡片上的可用状态。'}</>
+              <>{printerUnavailable?.notice ?? machineCannotPrintLine()}。{usableServices ? `${usableServices}仍可使用。` : '请查看卡片上的可用状态。'}</>
             )}
           </p>
         </PrintHubState>
@@ -468,7 +469,7 @@ export function QxPrintHubView({
           <span className="ph-src-main">
             <span className="ph-src-name">
               {arrivalCode.title}
-              <span className="ph-tag">不是取件码</span>
+              <span className="ph-tag">取件就用它</span>
             </span>
             <span className="ph-src-desc">{emphasize(arrivalCode.description, arrivalCode.emphasis)}</span>
             {arrivalCode.stateNote ? (
@@ -485,7 +486,7 @@ export function QxPrintHubView({
       <div className="ph-actions">
         <button type="button" onClick={onBack}>上一步</button>
         {hubState === 'capability-error' ? <button type="button" onClick={onRetry}>重新检测</button> : null}
-        {showBanner ? <button type="button" onClick={onHelp}>联系工作人员</button> : null}
+        {showBanner ? <button type="button" onClick={onHelp}>求助</button> : null}
         <PrintAiHelp label="问小青：怎么选打印方式 →" draft="我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。" />
       </div>
       <footer className="ph-foot">

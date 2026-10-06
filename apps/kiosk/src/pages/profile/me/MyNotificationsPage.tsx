@@ -16,6 +16,8 @@ import {
   CheckIcon,
   XIcon,
 } from 'lucide-react'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { useAuth } from '../../../auth/useAuth'
 import { API_MODE } from '../../../services/api/client'
 import {
@@ -26,7 +28,7 @@ import {
   type MemberNotificationItem,
 } from '../../../services/api/memberNotifications'
 import { formatTime } from '../assets/format'
-import { QxMeBanner, QxMeCta, QxMeGuide, QxMePage, QxMeSummary, QX_ME_GUIDE } from './qx/QxMeChrome'
+import { QxMeBanner, QxMeCta, QxMeGuide, QxMePage, QxMeSummary, qxMeErrorGuide, QX_ME_GUIDE } from './qx/QxMeChrome'
 import './styles/notifications-qx.css'
 
 const CATEGORY_META: Record<string, { label: string; icon: typeof BellIcon; tone: 'slate' | 'clay' | 'plum' | 'wheat' | undefined; hint: string }> = {
@@ -60,6 +62,7 @@ function screenStateOf(opts: {
 }
 
 export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { loginFrom?: string }) {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -172,9 +175,9 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
           <QxMeBanner tone="warn" title="消息这次没有加载出来" desc={<>当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>，所以一律显示「—」；已读状态和已有消息不会因为这次失败而改变。</>} minis={['未读 —', '本次未取到']} />
           <section className="qx-me-list qx-me-grow" aria-label="本次未取到的消息类型">
             {CAT_ORDER.map((cat) => <CategoryStructRow key={cat} cat={cat} mode="error" />)}
-            <div className="qx-me-legal">重试不会重复标记已读，也不会删除消息。多次重试仍失败时，可以让现场工作人员协助查询。</div>
+            <div className="qx-me-legal">重试不会重复标记已读，也不会删除消息。{helpNeededLine(contact)}</div>
           </section>
-          <QxMeGuide items={[...QX_ME_GUIDE.error]} />
+          <QxMeGuide items={qxMeErrorGuide(contact)} />
         </>
       )
     } else {
@@ -282,7 +285,7 @@ function notificationCtabar({
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
+        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>求助</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={refresh}>重新加载</button>
       </>
     )

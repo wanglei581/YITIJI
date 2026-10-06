@@ -76,8 +76,8 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   const entry = page.getByRole('button', { name: /到机码核销/ })
   await expect(entry).toBeVisible()
   // 两个码必须在卡面上被区分开，否则用户拿错码白跑一趟。
-  // 2.0 卡面用徽标「不是取件码」区分（稿 10），不再重复长句。
-  await expect(entry).toContainText('不是取件码')
+  // 方案②：到机码就是唯一取件码。卡面徽标不再说「不是取件码」。
+  await expect(entry).toContainText('取件就用它')
   // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
   await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(8)
   await entry.click()

@@ -12,6 +12,7 @@
 
 import type { ReactNode } from 'react'
 import { AlertCircleIcon, AlertTriangleIcon, FileTextIcon, WalletIcon } from 'lucide-react'
+import { helpNeededLine, machineCannotPrintLine, refundApplyLine } from '../../../copy/unattendedCopy'
 import { formatCents } from '../cashierStatus'
 import type { PaymentFact } from '../printProgressModel'
 
@@ -48,7 +49,7 @@ export function PrintProgressFailureActions({
     <>
       <p className="why">{hint}</p>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>
-        联系工作人员
+        问小青
       </button>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={onOrders}>
         查看订单
@@ -95,6 +96,8 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
   taskId: string | null
 }) {
   const isFreeOrder = payment === 'free'
+  const paid = payment === 'paid' && typeof amountCents === 'number' && amountCents > 0
+  const fault = machineCannotPrintLine(undefined, { orderKept: true })
   return (
     <>
       <section className="pff-sec" aria-label="这一单现在的状态">
@@ -108,13 +111,13 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
             <div className="pff-inbar-h">
               <span className="pff-inbar-ic"><AlertTriangleIcon aria-hidden="true" /></span>
               <span>
-                状态暂未确认，请联系工作人员
+                状态暂未确认
                 <small>本机连续查询 10 分钟没有拿到最终结果</small>
               </span>
             </div>
             <p className="pff-inbar-b">
               这只是<b>查询超时</b>：系统的打印任务状态<b>没有被改变</b>，我们不会猜它成功或失败。
-              可以先重新查询，或直接找工作人员现场确认。
+              可以先重新查询。{fault}
             </p>
           </div>
           <div className="pff-inbar">
@@ -132,11 +135,9 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
               </span>
             </div>
             <p className="pff-inbar-b">
-              {isFreeOrder
-                ? <>这次到底出没出纸、要不要补打，<b>都等工作人员现场核查</b>。订单记录保留。</>
-                : payment === 'paid'
-                  ? <>这次到底出没出纸、要不要补打或退费，<b>都等工作人员现场核查</b>。是否退款、退多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动退款。</>
-                  : <>这次到底出没出纸，<b>都等工作人员现场核查</b>；费用以订单记录和工作人员核查结果为准。</>}
+              {paid
+                ? <>请先看出纸口。{refundApplyLine()}</>
+                : <>请先看出纸口。{fault}</>}
             </p>
             <div className="pff-inbar-kv">
               {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}
@@ -150,7 +151,7 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
       <section className="pff-sec" aria-label="这一刻你可以做的三件">
         <div className="pff-sec-h">
           <span className="t">这一刻你可以做的三件</span>
-          <span className="hint">赶时间就直接找人</span>
+          <span className="hint">先看出纸口</span>
         </div>
         <div className="pfp-card pfp-todo">
           <div className="pff-step">
@@ -165,8 +166,8 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
             <span className="pff-step-no">3</span>
             <span className="pff-step-txt">
               {orderNo
-                ? <>还是查不到就把<b>订单号 {orderNo}</b>和这台机器的位置告诉现场工作人员。</>
-                : <>还是查不到就把这台机器的位置告诉现场工作人员，请他们核对这一单。</>}
+                ? <>还是查不到就记下<b>订单号 {orderNo}</b>。{helpNeededLine()}</>
+                : <>还是查不到就先停在这一页。{helpNeededLine()}</>}
             </span>
           </div>
         </div>

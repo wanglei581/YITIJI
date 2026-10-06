@@ -19,7 +19,12 @@
 // ============================================================
 
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
-import { helpNeededLine, machineCannotPrintLine, preferUnattended } from '../../copy/unattendedCopy'
+import {
+  helpNeededLine,
+  machineCannotPrintLine,
+  preferUnattended,
+  type PublicSupportContact,
+} from '../../copy/unattendedCopy'
 import type { BackendJobStatus } from '../../services/print/printJobsApi'
 import { formatCents } from './cashierStatus'
 import { countPagesInRange } from './pageRange'
@@ -141,11 +146,11 @@ export function outOfPaperPill(money: OutOfPaperMoney): string {
   return '订单保留 · 缺纸'
 }
 
-export function outOfPaperDoing(money: OutOfPaperMoney, phone?: string | null): string {
+export function outOfPaperDoing(money: OutOfPaperMoney, contact?: PublicSupportContact | null): string {
   // 缺纸是机器故障。收费、免费、金额不明都用标准句 2，这句里不写已付、退款或金额。
-  // 金额仍只出现在 outOfPaperPill。订单还在，补上手机能看到。
+  // 金额仍只出现在 outOfPaperPill。手机上能看到只在小程序已发布时由标准句补上。
   void money
-  return machineCannotPrintLine(phone, { orderKept: true })
+  return machineCannotPrintLine(contact, { orderKept: true })
 }
 
 /** 小青区首句的前半截：先说钱的事实，再说任务阶段（稿「支付成功，正在出纸。」）。 */
@@ -199,14 +204,14 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
 }
 
 /** 演示时间轴用的四句。前两句是机器故障，跟真实错误码走同一句标准句 2。 */
-export function failReasons(phone?: string | null): readonly string[] {
-  const fault = machineCannotPrintLine(phone, { orderKept: true })
+export function failReasons(contact?: PublicSupportContact | null): readonly string[] {
+  const fault = machineCannotPrintLine(contact, { orderKept: true })
   return [fault, fault, '任务处理超时，请稍后重试', '文件解析失败，请重新上传文件']
 }
 
-export function errorCodeToMessage(code?: string, phone?: string | null): string | undefined {
+export function errorCodeToMessage(code?: string, contact?: PublicSupportContact | null): string | undefined {
   if (!code) return undefined
-  if (PRINT_FAULT_CODES.has(code)) return machineCannotPrintLine(phone, { orderKept: true })
+  if (PRINT_FAULT_CODES.has(code)) return machineCannotPrintLine(contact, { orderKept: true })
   return ERROR_CODE_MESSAGES[code]
 }
 
@@ -224,8 +229,8 @@ export function backendStatusToStep(status: BackendJobStatus): Step {
  */
 export const PRINT_PROGRESS_QUIET_MS = 45_000
 
-export function printProgressQuietCopy(phone?: string | null): string {
-  return `请先看出纸口。${machineCannotPrintLine(phone, { orderKept: true })}`
+export function printProgressQuietCopy(contact?: PublicSupportContact | null): string {
+  return `请先看出纸口。${machineCannotPrintLine(contact, { orderKept: true })}`
 }
 
 /** 同一份回报不算「新状态」。状态、失败原因或完成时间变了才重新计时。 */
@@ -246,20 +251,20 @@ export function progressStatusFingerprint(result: {
 /** 已经知道失败之后的进度页文案。不再套用排队或「等待领取」。
  *  ask 只放顶栏和出错的那一步；红条只用 wayOut，不再把原因写第三遍。
  */
-export function progressFailurePresentation(reason: string, phone?: string | null): {
+export function progressFailurePresentation(reason: string, contact?: PublicSupportContact | null): {
   headerTitle: string
   badge: string
   ask: string
   doing: string
   wayOut: string
 } {
-  const down = machineCannotPrintLine(phone, { orderKept: true })
+  const down = machineCannotPrintLine(contact, { orderKept: true })
   const text = preferUnattended(reason.trim(), '')
   return {
     headerTitle: '打印没有完成',
     badge: '打印未完成',
     ask: text || down,
-    doing: `可以查看打印订单，或重新选文件再印。${helpNeededLine(phone)}`,
-    wayOut: `请用下面的按钮查看订单或重新打印。${helpNeededLine(phone)}`,
+    doing: `可以查看打印订单，或重新选文件再印。${helpNeededLine(contact)}`,
+    wayOut: `请用下面的按钮查看订单或重新打印。${helpNeededLine(contact)}`,
   }
 }

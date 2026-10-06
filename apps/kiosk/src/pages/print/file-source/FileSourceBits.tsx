@@ -372,8 +372,8 @@ export function ExistingSourceLinks({
 
 export function HelpMini({ onHelp, text }: { onHelp: () => void; text: string }) {
   return (
-    <button type="button" className="fs-mini" onClick={onHelp} data-testid="file-source-help-link" aria-label="联系工作人员">
-      <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>卡住了？找人帮忙</span></h4>
+    <button type="button" className="fs-mini" onClick={onHelp} data-testid="file-source-help-link" aria-label="问小青">
+      <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>问小青</span></h4>
       <p>{text}</p>
     </button>
   )

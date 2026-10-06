@@ -520,7 +520,7 @@ export function ConvertImagesCta(props: {
     <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onBack}>返回打印扫描</button>
   )
   const help = (
-    <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onHelp}>联系工作人员</button>
+    <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onHelp}>问小青</button>
   )
 
   if (phase === 'empty') {

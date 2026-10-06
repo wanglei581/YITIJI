@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BuildingIcon, BriefcaseIcon, ClockIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
@@ -37,6 +39,7 @@ function salaryText(job: OfflineAgencyDetailDTO['jobs'][number]): string {
 }
 
 export default function OfflineAgencyDetailPage() {
+  const contact = useSupportContact()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [agency, setAgency] = useState<OfflineAgencyDetailDTO | null>(null)
@@ -143,7 +146,7 @@ export default function OfflineAgencyDetailPage() {
             <DirExitList>
               <DirStripItem icon={BuildingIcon} title="重新加载机构详情" desc="再次请求当前机构" onClick={reload} />
               <DirStripItem icon={BuildingIcon} tone="slate" title="返回机构目录" desc="保留目录主任务" onClick={() => navigate('/offline-agencies')} />
-              <DirStripItem icon={BuildingIcon} tone="wheat" title="联系工作人员" desc="现场核对纸质名单" onClick={() => navigate('/help')} />
+              <DirStripItem icon={BuildingIcon} tone="wheat" title="求助" desc={helpNeededLine(contact)} onClick={() => navigate('/help')} />
             </DirExitList>
           </>
         ) : notFound ? (
@@ -154,7 +157,7 @@ export default function OfflineAgencyDetailPage() {
             <DirExitList>
               <DirStripItem icon={BuildingIcon} title="回机构目录" desc="重新检索已发布机构" onClick={() => navigate('/offline-agencies')} />
               <DirStripItem icon={BriefcaseIcon} tone="wheat" title="看岗位信息" desc="第三方来源岗位，带来源与同步时间" onClick={() => navigate('/jobs')} />
-              <DirStripItem icon={BuildingIcon} tone="slate" title="联系工作人员" desc="现场按纸质名单帮你确认门店" onClick={() => navigate('/help')} />
+              <DirStripItem icon={BuildingIcon} tone="slate" title="求助" desc={helpNeededLine(contact)} onClick={() => navigate('/help')} />
             </DirExitList>
             <DirNote>{BOUNDARY}</DirNote>
           </>

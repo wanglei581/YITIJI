@@ -676,7 +676,7 @@ export function ResumeGeneratePage() {
               ? '可以慢慢核对，准备好后再点生成。'
               : '姓名、手机号这两项建议自己核对一遍，简历印出来就是这个。'}
           </span>
-          <button type="button" onClick={() => navigate('/help')}>找工作人员</button>
+          <button type="button" onClick={() => navigate('/help')}>问小青</button>
         </div>
       )}
       {!reviewing && step === 0 && !basic.name.trim() && (

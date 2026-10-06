@@ -59,7 +59,7 @@ test('print hub default state reads capabilities and never claims 设备正常 @
   await expect(page.getByRole('button', { name: /文档打印/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /U 盘导入打印/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /到机码核销/ })).toContainText('不是取件码')
+  await expect(page.getByRole('button', { name: /到机码核销/ })).toContainText('取件就用它')
   await expect(page.getByText('在打印机面板上操作，取走纸质复印件。')).toBeVisible()
   await expect(page.getByRole('button', { name: '问小青：怎么选打印方式 →' })).toBeVisible()
   await page.locator('.ph-page').evaluate((element) => { element.scrollTop = 0 })
@@ -174,7 +174,7 @@ test('print hub capability-error fail-closes tasks and keeps arrival-code @w2', 
   await expect(page.getByTestId('print-hub-fallback').getByText('服务状态无法确认', { exact: true })).toBeVisible()
   await expect(page.getByTestId('print-hub-cap-doc-print')).toBeDisabled()
   await expect(page.locator('.ph-actions').getByRole('button', { name: '重新检测', exact: true })).toBeVisible()
-  await expect(page.locator('.ph-actions').getByRole('button', { name: '联系工作人员', exact: true })).toBeVisible()
+  await expect(page.locator('.ph-actions').getByRole('button', { name: /问小青/ })).toBeVisible()
   await expect(page.getByTestId('print-hub-primary')).toBeEnabled()
   await expectNoForgedReady(page)
   expect(errors).toEqual([])
@@ -266,7 +266,8 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
   await page.goto('/print-scan')
   await expect(page.locator('[data-testid="print-hub-state-device-off"]')).toBeVisible()
   await expect(page.getByTestId('print-hub-fallback').getByText('打印机离线 · 出纸类暂停', { exact: true })).toBeVisible()
-  await expect(page.getByTestId('print-hub-fallback')).toContainText('打印机当前无法连接，请找现场工作人员')
+  await expect(page.getByTestId('print-hub-fallback')).toContainText('这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请拨打服务电话 18369161921（工作日 9:00–18:00）。')
+  await expect(page.getByTestId('print-hub-fallback')).not.toContainText('换一台机器')
   await expect(page.getByTestId('print-hub-cap-doc-print')).toBeDisabled()
   await expect(page.getByTestId('print-hub-cap-scan')).toBeDisabled()
   await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
@@ -339,7 +340,7 @@ test('unknown feature key fails closed with recovery actions @w2', async ({ page
   await expect(page.getByRole('heading', { name: '未找到该功能' })).toBeVisible()
   await expect(page.getByText('没有这项能力说明')).toBeVisible()
   await expect(page.getByRole('button', { name: '返回打印扫描服务' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '联系工作人员' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '求助' })).toBeVisible()
   await page.getByRole('button', { name: '返回打印扫描服务' }).click()
   await expect(page).toHaveURL(/\/print-scan$/)
   expect(errors).toEqual([])
@@ -382,7 +383,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   }
   // 身份证放置位置待现场核实：只给指路句，不编造位置。
   await expect(page.getByTestId('print-hub-copy-case-id-card')).toHaveAttribute('data-pending', 'true')
-  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕提示或找工作人员。')
+  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕提示。')
   await expect(page.getByTestId('print-hub-copy-take-original')).toContainText('别忘了取走玻璃上或进纸口里的原件（身份证等）')
   await expect(page.getByTestId('print-hub-copy-legal')).toContainText('不得复印伪造的证件、印章、票据。')
   // 不伪造结果、不写收费、不写工程词。
@@ -425,7 +426,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
 })
 
 const PAUSE_LABEL = '暂停接单'
-const PAUSE_NOTICE = '打印机暂时不可用，请联系现场工作人员'
+const PAUSE_NOTICE = '这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。'
 
 function registerQueueGate(api: ApiRouter, printerStatus: string): void {
   registerShell(api, { isOnline: true, printerStatus })
@@ -449,7 +450,7 @@ async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: `${dir}/${name}.png` })
 }
 
-// 打印闸门合上：要出纸的入口停用，短标题「暂停接单」，说明给现场工作人员。
+// 打印闸门合上：要出纸的入口停用，短标题「暂停接单」，说明是标准句 3。默认单点位不写「换一台机器」。
 // 不经过打印机的入口（格式转换）照旧可点。删掉 map 里的 case 会掉进「状态未知」，这两条变红。
 for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
   test(`print entry pauses new orders when heartbeat is ${status} @w2`, async ({ page, api }) => {
@@ -461,6 +462,7 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
     await expect(printTile).toHaveAttribute('data-panel-state', 'error')
     await expect(printTile.getByText(PAUSE_LABEL, { exact: true })).toBeVisible()
     await expect(printTile.getByText(PAUSE_NOTICE, { exact: true })).toBeVisible()
+    await expect(printTile).not.toContainText('换一台机器')
     await shot(page, `G8-${status}-home`)
 
     await page.goto('/print-scan')
@@ -504,4 +506,72 @@ test('unknown feature page lists the copy guide as the second known explanation 
   await expect(page).toHaveURL(/\/print-scan\/feature\/copy$/)
   await expect(page.getByTestId('print-hub-state-feature-copy')).toBeVisible()
   expect(errors).toEqual([])
+})
+
+function supportContact(api: ApiRouter, patch: { nearby?: boolean; miniapp?: boolean; missing?: boolean }): void {
+  if (patch.missing) {
+    api.respond('GET', '/api/v1/public/support-contact', { status: 404, json: { success: false } })
+    return
+  }
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone: '18369161921',
+        serviceHours: '工作日 9:00–18:00',
+        otherOnlineTerminalNearby: patch.nearby === true,
+        miniappPublished: patch.miniapp === true,
+      },
+    },
+  })
+}
+
+test('queue gate names another machine only when one is online nearby @w2', async ({ page, api }) => {
+  registerQueueGate(api, 'queue_cleanup_failed')
+  supportContact(api, { nearby: true })
+  await page.goto('/')
+  const printTile = page.locator('[data-action="print-hub"]')
+  await expect(printTile.getByText('这台机器暂时不能用，请换一台机器，或拨打服务电话 18369161921（工作日 9:00–18:00）。', { exact: true })).toBeVisible()
+  await expect(printTile).toContainText('换一台机器')
+})
+
+test('queue gate still renders when support contact is missing @w2', async ({ page, api }) => {
+  registerQueueGate(api, 'queue_pause_failed')
+  supportContact(api, { missing: true })
+  await page.goto('/')
+  const printTile = page.locator('[data-action="print-hub"]')
+  await expect.poll(() => api.requestCount('GET', '/api/v1/public/support-contact')).toBeGreaterThan(0)
+  await expect(printTile.getByText(PAUSE_LABEL, { exact: true })).toBeVisible()
+  await expect(printTile.getByText('这台机器暂时不能用，请稍后再来，或查看《隐私政策》里的联系方式。', { exact: true })).toBeVisible()
+  await expect(printTile).not.toContainText('18369161921')
+  await expect(printTile).not.toContainText('换一台机器')
+})
+
+test('device-off names another machine only when one is online nearby @w2', async ({ page, api }) => {
+  registerShell(api, { isOnline: false, printerStatus: 'offline' })
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+  supportContact(api, { nearby: true })
+  await page.goto('/print-scan')
+  const fallback = page.getByTestId('print-hub-fallback')
+  await expect(fallback).toContainText('你可以换一台机器继续，或稍后再来')
+  await expect(fallback).toContainText('换一台机器')
+  await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText('换一台再打')
+})
+
+test('device-off does not say the order is on the phone when no order is on this screen @w2', async ({ page, api }) => {
+  registerShell(api, { isOnline: false, printerStatus: 'offline' })
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+  supportContact(api, { miniapp: true })
+  await page.goto('/print-scan')
+  const fallback = page.getByTestId('print-hub-fallback')
+  await expect(fallback).toContainText('这台机器暂时打不了')
+  await expect(fallback).not.toContainText('这单还在，手机上能看到')
+  await expect(fallback).not.toContainText('换一台机器')
 })

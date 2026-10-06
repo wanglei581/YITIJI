@@ -504,7 +504,7 @@ function resolveCta(args: {
     return { primary: '重试读取', primaryDisabled: false, reason: null, action: 'retry-cap' }
   }
   if (state === 'terminal-missing' || state.startsWith('capability-')) {
-    return { primary: '联系工作人员', primaryDisabled: false, reason: null, action: 'help' }
+    return { primary: '问小青', primaryDisabled: false, reason: null, action: 'help' }
   }
   if (state === 'context-missing' || state === 'return-source-unknown') {
     return { primary: `${backLabel}（唯一出口）`, primaryDisabled: false, reason: null, action: 'back' }

@@ -273,7 +273,7 @@ function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: 
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>求助</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={onRetry}>
           重新加载
         </button>

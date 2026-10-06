@@ -350,11 +350,11 @@ export function MyPrintOrdersPage() {
                     <div className="qx-me-row-foot">
                       <span className="qx-me-chip">{paymentLine(item)}</span>
                       {publicOrderNo(item.orderNo) ? <span className="qx-me-chip">订单 {publicOrderNo(item.orderNo)}</span> : null}
-                      {item.refundRequired === true && <span className="qx-me-chip" data-tone="warn">{PENDING_REFUND_LABEL}</span>}
+                      {item.refundRequired === true && typeof item.amountCents === 'number' && item.amountCents > 0 && <span className="qx-me-chip" data-tone="warn">{PENDING_REFUND_LABEL}</span>}
                       {item.pickupCode && (
                         <span className="qx-me-chip" data-tone="ok">
                           <TicketIcon size={16} aria-hidden="true" />
-                          取件码
+                          到机码
                         </span>
                       )}
                     </div>

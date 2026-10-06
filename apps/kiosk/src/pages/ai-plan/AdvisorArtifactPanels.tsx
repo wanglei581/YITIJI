@@ -1,4 +1,5 @@
 import { ClockIcon, MessageSquareIcon, PrinterIcon } from 'lucide-react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import {
   LEGEND,
   VERDICT_LABEL,
@@ -185,7 +186,7 @@ export function ArtifactStatePanel({
       <section className="aa-sec aa-state" data-tone="warn" data-testid="advisor-artifact-print-unavailable">
         <span className="aa-state-ic"><PrinterIcon size={56} aria-hidden /></span>
         <p className="aa-state-t">读不到打印能力，先不放打印按钮</p>
-        <p className="aa-state-d">这台机器的打印状态暂时确认不了。产物正文还在，可以先看；能力恢复后再打印，或者去问工作人员。</p>
+        <p className="aa-state-d">这台机器的打印状态暂时确认不了。产物正文还在，可以先看；能力恢复后再打印。{helpNeededLine()}。</p>
       </section>
     )
   }

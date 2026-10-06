@@ -11,6 +11,8 @@ import {
   UserIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { useAuth } from '../../../auth/useAuth'
 import { accountErrorMessage, accountPhoneDisplay } from '../../auth/accountUserMessage'
 import { useKioskSessionControl } from '../../../auth/KioskSessionControlContext'
@@ -80,6 +82,7 @@ function SettingsRow({
 }
 
 export function MySettingsPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const { user, isLoggedIn, getToken } = useAuth()
   const { endKioskUse } = useKioskSessionControl()
@@ -137,7 +140,7 @@ export function MySettingsPage() {
   const handleLogout = () => {
     setClearing(true); setClearError(null)
     try { endKioskUse('end_use') } catch {
-      setClearing(false); setClearError('本机登录尚未清除，请重试或联系工作人员。')
+      setClearing(false); setClearError(`本机登录尚未清除，请重试。${helpNeededLine(contact)}`)
     }
   }
 
@@ -145,7 +148,7 @@ export function MySettingsPage() {
   const handleSwitch = () => {
     setClearing(true); setClearError(null)
     try { endKioskUse('switch_account') } catch {
-      setClearing(false); setClearError('还不能切换账号，请重试或联系工作人员。')
+      setClearing(false); setClearError(`还不能切换账号，请重试。${helpNeededLine(contact)}`)
     }
   }
 
@@ -178,7 +181,7 @@ export function MySettingsPage() {
 
   if (showRebind && isLoggedIn && getToken()) return (
     <PhoneRebindPanel phoneMasked={phoneMasked} token={getToken()!} onDone={handleRebindDone}
-      onRecheck={() => endKioskUse('switch_account', { loginHint: '请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。' })}
+      onRecheck={() => endKioskUse('switch_account', { loginHint: `请用新手机号登录核对换绑结果。${helpNeededLine(contact)}` })}
       onCancel={() => setShowRebind(false)} />
   )
   const ctabar = <>

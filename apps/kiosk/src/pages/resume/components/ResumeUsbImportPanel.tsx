@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { FileTextIcon, LoaderIcon, RefreshCwIcon, UsbIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
 import { useUsbImportGate, type UsbImportGate } from '../../../hooks/useUsbImportGate'
@@ -50,10 +51,12 @@ function inferFormat(mimeType: string, filename: string): string {
   return 'unknown'
 }
 
-const PANEL_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传，或联系现场工作人员。'
+function panelUsbUnconfiguredNote(): string {
+  return `这台机器暂未开通 U 盘导入。请改用手机扫码上传。${helpNeededLine()}。`
+}
 
 export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyChange }: ResumeUsbImportPanelProps) {
-  const ownGate = useUsbImportGate(PANEL_USB_UNCONFIGURED_NOTE)
+  const ownGate = useUsbImportGate(panelUsbUnconfiguredNote())
   const gate = gateFromParent ?? ownGate
   const { getToken } = useAuth()
   const mountedRef = useRef(true)
@@ -93,7 +96,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
         if (cancelled) return
         setStatus(null)
         setFiles(null)
-        setError(userMessageOf(err, 'U盘读取失败，请重新插入或联系现场工作人员'))
+        setError(userMessageOf(err, `U盘读取失败，请重新插入。${helpNeededLine()}。`))
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -141,7 +144,7 @@ export function ResumeUsbImportPanel({ gate: gateFromParent, onUploaded, onBusyC
         compact
         tone="empty"
         title="这台机器暂未开通 U 盘导入"
-        description="请改用手机扫码上传，或联系现场工作人员。"
+        description={`请改用手机扫码上传。${helpNeededLine()}。`}
       />
     )
   }

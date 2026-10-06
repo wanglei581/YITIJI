@@ -16,6 +16,8 @@
 
 import { useNavigate } from 'react-router-dom'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
+import { helpNeededLine, readReprintFields, refundApplyLine, reprintHintLine } from '../../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../../hooks/useSupportContact'
 import { KIcon } from '../../../../components/kiosk-icon'
 import {
   BILLING_PAGE_SOURCE_LABEL,
@@ -28,7 +30,6 @@ import {
   pageRangeDisplay,
   publicOrderNo,
   paymentSourceLabel,
-  PENDING_REFUND_EXPLANATION,
   PENDING_REFUND_LABEL,
   recordedAmountDisplay,
 } from './paymentCopy'
@@ -48,7 +49,10 @@ function DetailRow({ label, value, hint }: { label: string; value: string; hint?
 
 export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
   const navigate = useNavigate()
+  const contact = useSupportContact()
   const payStatus = item.payStatus ?? null
+  const reprintFields = readReprintFields(item)
+  const reprint = reprintHintLine(reprintFields.reprintAllowed, reprintFields.reprintRemaining, contact)
   const orderNo = publicOrderNo(item.orderNo)
   const paid = netPaidDisplay(item)
 
@@ -65,7 +69,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
       {payStatus === null ? (
         <p className="me-payment-empty">
           暂无支付信息
-          <span>（该订单未关联支付记录，如有疑问请联系现场工作人员）</span>
+          <span>（该订单未关联支付记录。{helpNeededLine(contact)}）</span>
         </p>
       ) : (
         <div className="me-payment-grid">
@@ -74,7 +78,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
             value={typeof item.amountCents === 'number' ? formatAmountCents(item.amountCents) : '未记录'}
           />
           <DetailRow label="优惠/权益抵扣" value={recordedAmountDisplay(item.discountCents)} />
-          <DetailRow label="已退款" value={recordedAmountDisplay(item.refundedAmountCents)} />
+          {typeof item.amountCents === 'number' && item.amountCents > 0 ? <DetailRow label="已退款" value={recordedAmountDisplay(item.refundedAmountCents)} /> : null}
           <DetailRow label="实付" value={paid.value} hint={paid.hint} />
           <DetailRow
             label="支付状态"
@@ -91,15 +95,15 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
         </div>
       )}
 
-      {item.refundRequired === true && (
+      {item.refundRequired === true && typeof item.amountCents === 'number' && item.amountCents > 0 ? (
         <p className="me-note" role="status">
           <strong>{PENDING_REFUND_LABEL}</strong>
           {' '}
-          {PENDING_REFUND_EXPLANATION}
+          {refundApplyLine(contact)}
         </p>
-      )}
+      ) : null}
 
-      {item.pickupCode && <PickupCodePanel code={item.pickupCode} />}
+      {item.pickupCode && <PickupCodePanel code={item.pickupCode} hint={reprint} />}
 
       <button
         type="button"

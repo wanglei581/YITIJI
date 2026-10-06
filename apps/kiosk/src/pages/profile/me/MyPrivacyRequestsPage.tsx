@@ -314,7 +314,7 @@ function PrivacyCta({
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>联系工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>求助</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onRetry}>
           重新加载
         </button>

@@ -46,6 +46,8 @@ import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
 import { PickupCodeBoxes, PickupFailurePanel, PickupKeypadCard, PickupOutsStrip, PickupSubtitle, PickupWinCard } from './components/PickupHidGuide'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { readReprintFields, reprintHintLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { classifyClaimFailure, claimMetaLine, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
 
@@ -88,6 +90,8 @@ interface ClaimPickupResult {
   params?: Partial<PrintJobParams>
   fileName?: string | null
   paymentSessionToken: string
+  reprintAllowed?: boolean
+  reprintRemaining?: number | null
 }
 
 type ClaimState = 'idle' | 'loading' | 'success' | 'error'
@@ -143,7 +147,8 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
   ) {
     throw new ApiHttpError('CLAIM_RECEIPT_UNKNOWN', '本次到机码校验结果尚未确认', res.status)
   }
-  return body as ClaimPickupResult
+  const reprint = readReprintFields(body)
+  return { ...(body as ClaimPickupResult), ...reprint }
 }
 
 // ── 组件 ──────────────────────────────────────────────────────
@@ -159,7 +164,9 @@ export function PrintPickupClaimPage() {
   const [code, setCode] = useState('')
   const [state, setState] = useState<ClaimState>('idle')
   const [result, setResult] = useState<ClaimPickupResult | null>(null)
-  const [errorMsg, setErrorMsg] = useState('')
+  // 失败原因留着，文案在渲染时用当前联系方式现算。认领往往比服务电话接口先回来，
+  // 写死在出错那一刻会停在「没有号码」的保守句，电话到了也不再改。
+  const [claimError, setClaimError] = useState<unknown>(null)
   // 失败屏的种类与被拒的那串码（仅供重试用，不回显）。只在本组件内存里：离页 / 清场卸载即丢。
   const [failure, setFailure] = useState<{ kind: PickupFailure; code: string } | null>(null)
   // true = 显示 10 格与历史码字母键盘（稿 alphaKb）；受理正则同时接受 8 位新码与 10 位历史码，
@@ -168,6 +175,8 @@ export function PrintPickupClaimPage() {
   // keypad = 手输；hid = 稿 rHid() 扫码指引。默认 keypad 保住数字键盘主路径；
   // hid 必须在未扫码时就可达（入口在手输页，不依赖扫到才出现）。
   const [guide, setGuide] = useState<GuideMode>('keypad')
+  const contact = useSupportContact()
+  const errorMsg = state === 'error' && claimError != null ? pickupClaimMessage(claimError, contact) : ''
 
   const isValid = PICKUP_CODE_ACCEPTED_PATTERN.test(code)
   const loading = state === 'loading'
@@ -199,7 +208,7 @@ export function PrintPickupClaimPage() {
     claimLockRef.current = true
     setCode(submittedCode)
     setState('loading')
-    setErrorMsg('')
+    setClaimError(null)
     setFailure(null)
     // 取本次挂载的信号。await 之后 ref 可能已指向下一次挂载，回读会把上一单画到公共屏上。
     const staleSignal = pageAliveRef.current?.signal
@@ -216,7 +225,7 @@ export function PrintPickupClaimPage() {
       const kind = classifyClaimFailure(err)
       setFailure({ kind, code: submittedCode })
       // 文案按取件场景逐码登记（pickupClaimModel）；已用过 / 已退款这类终态码不许说「重试」。
-      setErrorMsg(pickupClaimMessage(err))
+      setClaimError(err)
       setState('error')
       setTimeout(() => inputRef.current?.focus(), 80)
     }
@@ -228,7 +237,7 @@ export function PrintPickupClaimPage() {
     const nextCode = normalizeInput(raw)
     setCode(nextCode)
     cancelSettle()
-    if (state === 'error') { setState('idle'); setErrorMsg(''); setFailure(null) }
+    if (state === 'error') { setState('idle'); setClaimError(null); setFailure(null) }
     // USB/HID 扫码器会像键盘一样一次性输入二维码内容。
     // 存量 10 位码读满即自动核销（它不可能再长，无歧义）；
     // 提交锁同时拦住扫码器随后附带的 Enter，避免重复请求。
@@ -253,7 +262,7 @@ export function PrintPickupClaimPage() {
     setCode('')
     setState('idle')
     setResult(null)
-    setErrorMsg('')
+    setClaimError(null)
     setFailure(null)
     claimLockRef.current = false
     setGuide('keypad')
@@ -318,6 +327,7 @@ export function PrintPickupClaimPage() {
           copy={copy}
           orderNo={result.orderNo}
           meta={claimMetaLine(result.fileName, result.amountCents)}
+          reprintHint={reprintHintLine(result.reprintAllowed, result.reprintRemaining, contact)}
           onReset={handleReset}
           primary={
             <button
