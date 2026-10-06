@@ -971,7 +971,8 @@ test('leaving the scan flow drops the rescan authority @scan-safety', async ({ p
   await page.goBack()
   await page.waitForURL(/\/scan/)
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
 
   expect(server.creates).toHaveLength(1)
@@ -1007,7 +1008,8 @@ test('the result page own exit drops the rescan authority too @scan-safety', asy
   await page.goBack()
   await page.waitForURL(/\/scan/)
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
 
   expect(server.creates).toHaveLength(1)
@@ -1774,7 +1776,8 @@ for (const exit of COMPLETED_EXITS) {
     expect(residue).toEqual({ session: false, local: false })
 
     // ③ 下一次创建不许带上一位的重扫血缘。
-    await page.getByRole('button', { name: /下一步/ }).click()
+    await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
     await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
     expect(server.creates).toHaveLength(1)
     expect(server.creates[0]!.body.retryOfScanTaskId).toBeUndefined()
@@ -1966,7 +1969,8 @@ test('a later member cannot reopen the previous guest scan @scan-safety', async 
   expect(printMaterial, '闸门范围只到扫描：游客的打印材料不许被这次登录清掉').toContain('guest-print-material')
 
   // ⑥ 这位会员自己开的那一场不许继承上一位的重扫血缘。
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
   expect(server.creates).toHaveLength(1)
   expect(server.creates[0]!.body.retryOfScanTaskId).toBeUndefined()
@@ -2332,7 +2336,8 @@ test('leaving after an interrupted create never resurrects the rescan authority 
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
 
   // 下一位在这台机器上从头选类型开一场：必须是干净的普通创建，一个字节的血缘都不许带。
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
   expect(server.creates).toHaveLength(2)
   expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()

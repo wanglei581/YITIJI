@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react'
 import { ClockIcon } from 'lucide-react'
 import { SCAN_ACK_PENDING_NOTICE, type ScanAckState } from './scanDeliveryAck'
 import { SCAN_OUTPUT_FORMAT_PENDING } from './scanOutputFormat'
@@ -159,6 +160,14 @@ export function ScanSettingsStatusView({
           : phase === 'invalid'
             ? ['这次扫描还没建好', '这四段一段都还没开始']
             : ['现在卡在建立这次扫描', '扫描还没开始']
+  /* 判读第 4 列：收尾闸、投递授权、类型非法这三屏把状态卡放进 02。
+   * 创建中 / 创建失败 / 已过期仍按稿的状态屏骨架：状态卡在最前。 */
+  const statusInMiddle = cleanupHolding || awaitingAck || phase === 'invalid'
+  const middleHint = awaitingAck
+    ? '投递授权还没到手'
+    : cleanupHolding
+      ? '上一场还没收完尾'
+      : '还没有可创建的扫描类型'
 
   return (
     <ScanWorkbenchShell
@@ -240,6 +249,12 @@ export function ScanSettingsStatusView({
         </ScanCta>
       }
     >
+      <ScanSettingsStatusLayout
+        statusInMiddle={statusInMiddle}
+        middleHint={middleHint}
+        chainTitle={chainHead[0]}
+        chainHint={chainHead[1]}
+        statusPanel={(
       <ScanStatusPanel
         tone={
           awaitingAck
@@ -310,11 +325,9 @@ export function ScanSettingsStatusView({
           </p>
         ) : null}
       </ScanStatusPanel>
-      <ScanSec no="01" title={chainHead[0]} hint={chainHead[1]}>
-        <ScanChain active={-1} />
-      </ScanSec>
-      <ScanSec no="02" title="下一步" hint="这一屏现在能做什么">
-        {awaitingAck ? (
+        )}
+        nextBody={(
+        awaitingAck ? (
           <div className="sw-grid2">
             <ScanNoteCard
               title="本机正在做什么"
@@ -338,7 +351,7 @@ export function ScanSettingsStatusView({
               <ScanPlan items={[
                 '系统给出的任务编号，用来认领待会儿回来的文件。',
                 '按扫描类型写好的面板操作说明，本机原样转达。',
-                '一份只留在当前页面里的控制凭证，用来查询和取消。',
+                '一份只留在当前页面里的临时凭证，用来查询和取消。',
               ]} />
             </ScanNoteCard>
             <ScanNoteCard title="这一刻你可以做什么" foot="这一刻页面还没有任何结论可写。">
@@ -372,9 +385,53 @@ export function ScanSettingsStatusView({
               <p>编号是系统给出的，本机编不出来。<b>硬编一个给你看，你就会照着它去面板上操作</b>，扫出来的文件也没人接收。</p>
             </ScanNoteCard>
           </div>
+        )
         )}
-      </ScanSec>
+      />
     </ScanWorkbenchShell>
+  )
+}
+
+function ScanSettingsStatusLayout({
+  statusInMiddle,
+  middleHint,
+  chainTitle,
+  chainHint,
+  statusPanel,
+  nextBody,
+}: {
+  statusInMiddle: boolean
+  middleHint: string
+  chainTitle: string
+  chainHint: string
+  statusPanel: ReactNode
+  nextBody: ReactNode
+}) {
+  if (statusInMiddle) {
+    return (
+      <>
+        <ScanSec no="01" title="就这三步" hint={chainHint}>
+          <ScanChain active={-1} />
+        </ScanSec>
+        <ScanSec no="02" title="现在这一步" hint={middleHint}>
+          {statusPanel}
+        </ScanSec>
+        <ScanSec no="03" title="下一步" hint="这一屏现在能做什么">
+          {nextBody}
+        </ScanSec>
+      </>
+    )
+  }
+  return (
+    <>
+      {statusPanel}
+      <ScanSec no="01" title={chainTitle} hint={chainHint}>
+        <ScanChain active={-1} />
+      </ScanSec>
+      <ScanSec no="02" title="下一步" hint="这一屏现在能做什么">
+        {nextBody}
+      </ScanSec>
+    </>
   )
 }
 
@@ -415,7 +472,7 @@ export function ScanSettingsSessionFacts({
             ['剩余时间', countdown],
             ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
             ...(natureRow ? [natureRow] : []),
-            ['控制凭证', '不显示在屏幕上、不放进链接；只留在当前页面里，换人清场会清掉'],
+            ['临时凭证', '不显示在屏幕上、不放进链接；只留在当前页面里，换人清场会清掉'],
           ]}
         />
         <ScanNoteCard title="按完面板之后" foot={<><ClockIcon size={16} aria-hidden /> 任务剩余 {countdown}。只在这一次有效。点击返回会取消这个还没确认的任务。</>}>

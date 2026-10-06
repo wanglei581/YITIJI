@@ -188,6 +188,23 @@ assert.match(
   /SCAN_OUTPUT_FORMAT_PENDING/,
   'settings must not promise a format before the file exists',
 )
+/* 2026-10-06：稿 18 把用户看得见的「控制凭证」写成「临时凭证」。
+ * 说明仍是不上屏、不进链接、换人清场会清掉。不照稿写「不落存储」：
+ * 这一场自己的令牌仍在 sessionStorage，刷新后才能继续查询。 */
+assert.match(scanSettingsView, /临时凭证/, 'settings names the session credential the way the draft does')
+assert.doesNotMatch(scanSettingsView, /控制凭证/, 'settings must not show the engineering name 控制凭证')
+assert.match(
+  scanFormat,
+  /按机器传回的原样保存/,
+  'pending format tells the user the machine keeps the original bytes',
+)
+assert.doesNotMatch(
+  scanFormat,
+  /设备回传原格式/,
+  'pending format must not use the engineering phrase',
+)
+assert.match(scanSettings, /现在在第一段/, 'panel screen says which step the chain is on')
+assert.match(scanSettings, /做到哪一步，不是完成百分比/, 'panel chain hint matches the draft')
 for (const [label, source] of [['page', scanSettings], ['status view', scanSettingsView]]) {
   assert.doesNotMatch(
     source,
@@ -205,10 +222,18 @@ assert.doesNotMatch(
   /format:\s*'PDF'|自动生成 PDF|PDF（自动生成）/,
   'progress must not hardcode PDF as the scan output',
 )
+/* 2026-10-06：这句话随等待页说明卡搬进 ScanProgressSections（500 行硬线）。
+ * 判据不减，改读新文件。ScanProgressPage 仍须从回传 mime 推导格式。 */
+const scanProgressSections = read('src/pages/scan/ScanProgressSections.tsx')
 assert.match(
-  scanProgress,
+  scanProgressSections,
   /系统不做转换/,
   'progress must say the system stores the original bytes and does not convert them',
+)
+assert.doesNotMatch(
+  scanProgressSections,
+  /盖板/,
+  'progress sections must not imply lid-sensing hardware events',
 )
 assert.doesNotMatch(
   scanResult,
@@ -1104,18 +1129,22 @@ assert.match(
 )
 assert.match(
   scanResult,
+  /setInterval\(\(\) => \{\s*\n\s*setRescanAuthorized\(hasScanRescanAuthority\(scanType\)\)\s*\n\s*\}, RESCAN_AUTHORITY_RECHECK_MS\)/,
+  '本地有效期会走完：不重新采样，按钮会一直挂着「（同一份材料）」那句话，'
+    + '用户照着它把同一张纸放回去，而那时本机其实已经没有可用凭据了',
+)
+/* 2026-10-06：失败结果屏随 500 行硬线拆进 ScanResultOutcomeView。
+ * 两个按钮必须仍是两套文案、各自接自己的处置；「凭据用不了了」仍须出现在屏幕上。
+ * 判据不减，改读新文件。登记、返回值判定和有效期重采样仍在 ScanResultPage。 */
+const scanResultOutcome = read('src/pages/scan/ScanResultOutcomeView.tsx')
+assert.match(
+  scanResultOutcome,
   /rescanAuthorized \? \([\s\S]{0,400}?重试扫描（同一份材料）[\s\S]{0,400}?onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
   '两个按钮不是一个按钮两种文案：拿到凭据是安全重扫，拿不到是普通新会话'
     + '（同一张纸会被按重复件拒收）。代价不同，文案必须分开，且各自接自己的处置',
 )
 assert.match(
-  scanResult,
-  /setInterval\(\(\) => \{\s*\n\s*setRescanAuthorized\(hasScanRescanAuthority\(scanType\)\)\s*\n\s*\}, RESCAN_AUTHORITY_RECHECK_MS\)/,
-  '本地有效期会走完：不重新采样，按钮会一直挂着「（同一份材料）」那句话，'
-    + '用户照着它把同一张纸放回去，而那时本机其实已经没有可用凭据了',
-)
-assert.match(
-  scanResult,
+  scanResultOutcome,
   /data-testid="scan-safe-rescan-lost"/,
   '「刚才那份凭据已经用不了了」必须在屏幕上说出来：按钮按下去什么都没发生，'
     + '而页面一言不发，比静默降级更难排查',
@@ -1191,11 +1220,20 @@ assert.equal(
   '结果页只许有两处 navigate：leaveScanFlow 里那一处（replace），以及 goToSettings 的'
     + '非工作台兜底。多出来的一处就是一个绕开了撤销/清场/replace 的出口',
 )
+/* 2026-10-06：失败结果屏的三个出口随 500 行硬线拆进 ScanResultOutcomeView。
+ * 判据不减：每个落点仍必须是 leaveScanFlow('…')，不许改回裸 navigate。
+ * leaveScanFlow 本体（先撤任务、再清登记、再 replace）仍在 ScanResultPage，
+ * 所以结果页源文件也不许长出绕开它的裸 navigate。 */
 for (const destination of ['/print-scan', '/help', '/']) {
   assert.match(
-    scanResult,
+    scanResultOutcome,
     new RegExp(`leaveScanFlow\\('${destination.replaceAll('/', '\\/')}'\\)`),
     `结果页落点 ${destination} 的出口必须走 leaveScanFlow`,
+  )
+  assert.doesNotMatch(
+    scanResultOutcome,
+    new RegExp(`onClick=\\{\\(\\) => navigate\\('${destination.replaceAll('/', '\\/')}'\\)\\}`),
+    `落点 ${destination} 一旦改回裸 navigate，这一屏又会把上一位的凭证和授权留给下一位`,
   )
   assert.doesNotMatch(
     scanResult,
@@ -1218,8 +1256,15 @@ assert.doesNotMatch(
   /服务端给的安全重扫放行|服务端已放行|系统已放行/,
   '结果页不得说已经放行：这一刻它只有凭据，没有放行结果',
 )
+assert.doesNotMatch(
+  scanResultOutcome,
+  /服务端给的安全重扫放行|服务端已放行|系统已放行/,
+  '失败结果屏同样不得说已经放行：这一刻它只有凭据，没有放行结果',
+)
+/* 2026-10-06：「带着凭据去申请、不会悄悄降级」随失败结果屏拆进 ScanResultOutcomeView。
+ * 判据不减，改读新文件。 */
 assert.match(
-  scanResult,
+  scanResultOutcome,
   /去申请安全重扫放行[\s\S]{0,120}?不会悄悄按普通重扫处理/,
   '结果页只能说「带着凭据去申请」，并当场承诺不会悄悄降级 —— 用户据此决定'
     + '要不要把同一张纸放回去',

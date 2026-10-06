@@ -84,6 +84,8 @@ export function isValidCreatedSession(created: unknown): created is ScanSessionC
 
 export function formatCountdown(expiresAt: string): string {
   const seconds = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
+  /* 夹具和异常有效期会算出上千万分钟。超过一天就不再把原始分钟数贴上 27 寸屏。 */
+  if (seconds > 24 * 60 * 60) return '有效期过长，以系统为准'
   const minutes = Math.floor(seconds / 60)
   const remain = seconds % 60
   return `${minutes}:${String(remain).padStart(2, '0')}`

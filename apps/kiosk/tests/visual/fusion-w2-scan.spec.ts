@@ -292,12 +292,16 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
 
   await page.goto('/scan/start')
   await expect(page.getByText(/下一步会真实建立这次扫描/).first()).toBeVisible()
-  await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
-  const next = page.getByRole('button', { name: /下一步 · 建立这次扫描/ })
-  await expect(next).toBeEnabled()
+  await expect(page.getByText('第 1 步 · 选扫描类型', { exact: true })).toBeVisible()
+  const next = page.getByRole('button', { name: '开始这次扫描', exact: true })
+  await expect(next).toBeDisabled()
+  await expect(page.getByTestId('scan-workbench-disabled-reason')).toHaveText('先选一种材料')
+  await expect(page.getByRole('button', { name: '问小青：扫描要怎么按' })).toBeVisible()
   // 稿 18：底部三列口径是一次性说明，只在选类型这一屏出现，后面各屏不复读。
   await expect(page.getByTestId('scan-workbench-truth')).toBeVisible()
   expect(legacyDeviceRequests).toBe(0)
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await expect(next).toBeEnabled()
   const createRequest = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/scan/sessions',
   )
@@ -323,6 +327,7 @@ test('scan start blocks continuation while scan capability is unavailable @w2', 
   await page.goto('/scan/start')
   await expect(page.getByText('扫描能力暂未开放', { exact: true }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '开始这次扫描', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '改用上传文件打印' })).toBeVisible()
   await expectHealthy(page, errors)
 })
@@ -575,7 +580,7 @@ test.describe('scan result at 390x844', () => {
     await expect(aiButton).toBeEnabled()
 
     // 顶栏、操作条、底栏不许被横幅盖住（修复前 .sw-xq 溢出正文区，压在打印主按钮上）。
-    await assertTapTargetPointerHit(page.getByRole('button', { name: '返回打印扫描' }))
+    await assertTapTargetPointerHit(page.locator('.qx-topbar-back'))
     await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '重新扫描' }))
     await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '拿去打印' }))
     for (const item of await navbar.getByRole('button').all()) await assertTapTargetPointerHit(item)
@@ -932,7 +937,7 @@ test('qingxu scan workbench captures 1080x1920 evidence @w2', async ({ page, api
   }
 
   await page.goto('/scan/start')
-  await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
+  await expect(page.getByText('第 1 步 · 选扫描类型', { exact: true })).toBeVisible()
   await shot('qx-scan-start.png')
 
   registerScanCapability(api, 'maintenance', '扫描仪正在保养')

@@ -3,8 +3,8 @@
  * 不做格式转换；页面必须按真实 mimeType 派生文案，不得写死「PDF」。
  */
 
-/** 文件尚未回传时：只能说明保存策略，不能预告具体格式。 */
-export const SCAN_OUTPUT_FORMAT_PENDING = '设备回传原格式（系统不转换）'
+/** 文件尚未回传时：只说明保存策略，不预告具体格式，也不用工程口径。 */
+export const SCAN_OUTPUT_FORMAT_PENDING = '按机器传回的原样保存'
 
 export function formatLabelFromMime(mimeType: string | null | undefined): string {
   const mime = (mimeType ?? '').split(';', 1)[0]?.trim().toLowerCase() ?? ''

@@ -1,0 +1,360 @@
+/* 扫描工作台 · 青序流光 · 面板、结果与底栏
+ * 从 scan-workbench-qx.css 拆出，两份都停在 500 行以内。
+ * 必须紧跟主样式引入，并且位于 compact 之前。
+ */
+
+/* ── 面板示意图 ───────────────────────────────────────────── */
+.sw-panel { display: flex; gap: 20px; align-items: stretch; }
+.sw-mfp {
+  flex: none;
+  align-self: flex-start;
+  width: 322px;
+  border-radius: 32px;
+  background: linear-gradient(168deg, var(--qx-deep-2), var(--qx-deep));
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--qx-paper);
+}
+.sw-mfp-face {
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--qx-paper) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--qx-paper) 14%, transparent);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.sw-mfp-row { display: flex; gap: 8px; }
+.sw-mfp-row span {
+  flex: 1;
+  height: 42px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--qx-paper) 10%, transparent);
+}
+.sw-mfp-row span.is-hi { background: color-mix(in srgb, var(--qx-emerald) 34%, transparent); }
+.sw-mfp-screen {
+  height: 96px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--qx-emerald) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--qx-emerald) 30%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 21px;
+  color: var(--qx-emerald);
+  text-align: center;
+  padding: 0 14px;
+  line-height: 1.35;
+}
+.sw-mfp-cap {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--qx-paper) 72%, transparent);
+}
+.sw-mfp-cap b { color: var(--qx-paper); }
+.sw-psteps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.sw-pstep {
+  display: flex;
+  gap: 16px;
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  padding: 16px 20px;
+  align-items: flex-start;
+}
+.sw-pstep-n {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sw-pstep-t { font-size: 21px; line-height: 1.45; color: var(--qx-ink); padding-top: 2px; }
+.sw-psrc { margin: 4px 0 0; font-size: 21px; color: var(--qx-ink-3); line-height: 1.45; }
+
+/* ── 结果出口 ─────────────────────────────────────────────── */
+.sw-actrow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.sw-exit {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  min-height: 82px;
+  border-radius: 16px;
+  border: 1px solid var(--qx-line-2);
+  background: var(--qx-surface);
+  padding: 9px 14px;
+  font-size: 19px;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+.sw-actrow .sw-exit { height: 100%; }
+.sw-exit:disabled,
+.sw-exit.is-off {
+  border-style: dashed;
+  background: var(--qx-paper);
+  color: var(--qx-ink-2);
+  cursor: default;
+}
+.sw-exit:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.sw-exit-ic {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sw-exit:disabled .sw-exit-ic,
+.sw-exit.is-off .sw-exit-ic {
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line-2);
+  color: var(--qx-ink-3);
+}
+.sw-exit-body { min-width: 0; display: flex; flex-direction: column; }
+.sw-exit-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sw-exit small {
+  display: block;
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--qx-ink-3);
+  line-height: 1.32;
+}
+.sw-offtag {
+  flex: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--qx-wheat-d);
+  background: var(--qx-wheat-soft);
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+
+/* ── 预览 ─────────────────────────────────────────────────── */
+.sw-result {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sw-preview {
+  flex: 1;
+  min-height: 280px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sw-pvhead {
+  flex: none;
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  padding: 8px 18px;
+}
+.sw-pvh-1 { display: flex; align-items: center; gap: 12px; min-height: 40px; }
+.sw-pvh-ic {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+.sw-pvh-t { font-size: 25px; font-weight: 700; line-height: 1.2; min-width: 0; }
+.sw-pvh-2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 3px;
+  min-height: 26px;
+  font-size: 18px;
+  color: var(--qx-ink-2);
+  min-width: 0;
+}
+.sw-pvh-2 b {
+  font-weight: 700;
+  color: var(--qx-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.sw-pvh-2 .sep { color: var(--qx-ink-3); }
+.sw-pvstage {
+  flex: 1;
+  min-height: 280px;
+  overflow: hidden;
+  background: var(--qx-paper);
+  border: 1px solid var(--qx-line-2);
+  border-radius: 16px;
+}
+.sw-pvstage [data-file-preview-kind] {
+  height: 100%;
+  min-height: 280px;
+  border: 0;
+  background: transparent;
+}
+.sw-actrow { flex: none; }
+.sw-pvh-open {
+  flex: none;
+  margin-left: auto;
+  min-height: 56px;
+  padding: 0 18px;
+  border-radius: 16px;
+  border: 1.5px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  color: var(--qx-teal-d);
+  font: inherit;
+  font-size: 19px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* ── 底注 / CTA ───────────────────────────────────────────── */
+.sw-truth {
+  flex: none;
+  padding: 16px 0 10px;
+  border-top: 1px solid var(--qx-line);
+  display: flex;
+  gap: 24px;
+}
+.sw-truth div { flex: 1; font-size: 21px; line-height: 1.45; color: var(--qx-ink-2); }
+.sw-truth b { color: var(--qx-ink-2); font-weight: 600; display: block; }
+.sw-airow { flex: none; padding: 2px 0 0; }
+.sw-airow .qx-step-actions { min-height: 56px; }
+
+.sw-cta-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.sw-cta-reason {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--qx-wheat-d);
+  line-height: 1.3;
+}
+.sw-cta-row { display: flex; gap: 16px; align-items: center; }
+.sw-cta-row .qx-btn { flex: 1; white-space: nowrap; }
+.sw-cta-row .qx-btn[data-variant='primary'] { flex: 1.5; }
+.sw-note-actions { margin-top: 16px; }
+.sw-preview-cap {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--qx-ink-3);
+}
+.sw-preview-cap b { color: var(--qx-ink-2); font-weight: 600; }
+
+/* ── 状态屏的排法（稿 18 `.body.spread`）────────────────────────
+ * 建会话 / 等授权 / 没扫成这些屏，内容比一屏少。余量摊进现有区块之间，
+ * 不在正文底下留一整条空白，也不把说明卡拉高去填。内容超过一屏时照常滚动。 */
+.sw-scroll[data-layout='spread'] { justify-content: space-evenly; gap: 12px; }
+.sw-scroll[data-layout='spread'] .sw-pgrp { padding: 22px 26px; display: flex; flex-direction: column; justify-content: flex-start; }
+.sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) { flex: none; display: flex; flex-direction: column; }
+.sw-scroll[data-layout='spread'] > .sw-sec > .sw-grid2 { align-items: start; }
+.sw-scroll[data-layout='stack']:has(.sw-panel) .sw-sec.is-grow { flex: none; }
+.sw-scroll[data-layout='stack'] > .sw-sec.is-grow > .sw-grid2 { align-items: start; }
+.sw-scroll[data-layout='stack']:has(.sw-panel) > .sw-sec:last-child { flex: none; }
+.sw-scroll[data-layout='stack']:has(.sw-panel) > .sw-sec:last-child .sw-grid2 { align-items: start; }
+@media (max-width: 760px) {
+  .sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) { flex: none; }
+  .sw-scroll[data-layout='spread'] .sw-pgrp, .sw-scroll[data-layout='spread'] > .sw-sec:has(> .sw-grid2) .sw-pgrp { min-height: 0; }
+}
+.sw-scroll[data-layout='spread'] .sw-pgrp h4 { font-size: 26px; }
+.sw-scroll[data-layout='spread'] .sw-note-body { font-size: 22px; line-height: 1.6; }
+.sw-scroll[data-layout='spread'] .sw-plan li { font-size: 22px; line-height: 1.5; }
+.sw-scroll[data-layout='spread'] .sw-foot { font-size: 21px; padding-top: 14px; }
+
+/* 等待页每 3 秒查一次，理由行只在查询在路上那一瞬出现：给它留住一行高度，
+ * 操作条不跟着每 3 秒跳一下，主按钮不在手指底下挪位。 */
+.sw-cta-wrap[data-reserve-reason='true'] {
+  min-height: calc(var(--qx-btn-h-lg) + 21px * 1.3 + 8px);
+  justify-content: flex-end;
+}
+
+/* ── 动效：阶段进场 + 按压反馈 ───────────────────────────────
+ * 进场只在换阶段时播一次（各阶段是各自的页面组件，换阶段即重挂）；同一阶段里
+ * 等待 ↔ 查询来回切不会重播，免得每 3 秒闪一下。填充方式用 backwards：播完不留
+ * opacity / transform，不给整屏预览这类覆盖层多造一层层叠上下文。 */
+.sw-page { animation: sw-enter 220ms ease-out backwards; }
+.sw-state-hero { animation: sw-rise 260ms ease-out backwards; }
+@keyframes sw-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sw-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.sw-ty,
+.sw-exit,
+.sw-pvh-open {
+  transition: transform 120ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+.sw-ty:active,
+.sw-exit:not(:disabled):active,
+.sw-pvh-open:active,
+.qx-stage:has(.sw-page) .qx-ctabar .qx-btn:not(:disabled):active { transform: scale(.985); }
+
+/* 手机宽度 / 不缩放舞台的收紧规则在 scan-workbench-compact-qx.css（同一组组件，按视口拆出）。 */
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-page, .sw-page *,
+  .qx-stage:has(.sw-page) .qx-ctabar .qx-btn { animation: none !important; transition: none !important; }
+  .sw-ty:active,
+  .sw-exit:not(:disabled):active,
+  .sw-pvh-open:active,
+  .qx-stage:has(.sw-page) .qx-ctabar .qx-btn:not(:disabled):active { transform: none; }
+}
+
+/* 查询态将余量分给既有说明区块；内容从上往下排，不把操作条推到空白下方。 */
+@media (min-width: 761px) {
+  .sw-page[data-w2-page='scan-progress'] .sw-scroll { gap: 30px; }
+  .sw-page[data-w2-page='scan-progress'] .sw-state-hero { padding-block: 32px; }
+  .sw-page[data-w2-page='scan-progress'] .sw-chain { min-height: 0; }
+  .sw-page[data-w2-page='scan-progress'] .sw-pgrp { padding-block: 30px; }
+}
+
+/* 等待回传内容偏短，余量摊进现有区块之间。面板指引改从上往下排：
+ * 四步原文自己占满右列，再把示意图拉高会在右列底下空出半边。 */
+.sw-page[data-state='waiting-delivery'] .sw-scroll { justify-content: space-evenly; gap: 12px; }
+.sw-page[data-state='usb-panel'] .sw-scroll { justify-content: space-evenly; gap: 12px; }
+/* 结果页两张说明卡左高右矮时，右半会露出一整条底色。两卡拉齐，短的那张把条目撑开。 */
+.sw-page[data-w2-page='scan-result'] .sw-scroll[data-layout='spread'] > .sw-sec > .sw-grid2 { align-items: stretch; }
+.sw-page[data-w2-page='scan-result'] .sw-scroll[data-layout='spread'] .sw-pgrp { height: 100%; }
+.sw-page[data-w2-page='scan-result'] .sw-scroll[data-layout='spread'] .sw-plan { flex: 1; justify-content: space-evenly; }
+.sw-page[data-state='completed-no-file'] .sw-state-hero { padding-bottom: 96px; }
+.sw-page[data-state='panel-instruction'] .sw-scroll { justify-content: flex-start; gap: 16px; }
+.sw-page[data-state='panel-instruction'] .sw-mfp { align-self: flex-start; }
