@@ -1,5 +1,21 @@
 # 当前开发进度
 
+## 2026-10-06：N-7 一体机提前知道本机不接新单（只加配置字段，未改一体机页面）
+
+给主执行的契约。一体机首页已经在读 `GET /api/v1/terminals/:terminalId/config`（`apps/kiosk/src/pages/home/HomePage.tsx` 经 `useToolboxConfig.ts`、`useSmartCampusConfig.ts`，每 5 分钟一次；请求带终端会话）。本包只在这个响应上给出本机接不接新单。
+
+- `maintenance: boolean`。`true` 表示本机此刻不接新单：`enabled=false`，或 `lifecycleStatus` 为 `maintenance` / `suspended` / `commissioning` / `planned` / `retired`。
+- `maintenanceMessage: string | null`。`maintenance=false` 时为 `null`。为 `true` 时只可能是下面三句：
+  - 生命周期是 `maintenance`：「这台机器正在维护，暂时不能打印和扫描，请稍后再来」
+  - 生命周期是 `suspended`，或生命周期仍是 `active` 但 `enabled=false`：「这台机器暂停服务，请稍后再来」
+  - `commissioning` / `planned` / `retired`：「这台机器还没有开始服务」
+- 心跳超过 5 分钟不算进这两个字段。确认打印原有的 `PRINT_TERMINAL_NOT_READY` 不改。
+- 不读取、不下发管理员备注、操作人、生命周期原值。
+- 顶层 `maintenance` 从本包起表示本机不接新单。原先这个位置是全局 AI 全机维护开关，现改放在 `ai.maintenance`。`ai.paused` 仍是 AI 暂停。
+- 生效：服务端每次请求读库，没有按终端缓存。后台改状态后，下一次这个接口就返回新值。一体机首页自己每 5 分钟重拉，所以屏幕上最迟 5 分钟能看到。`useRecruitmentHosting` 另有 30 秒内存缓存，盖不住这 5 分钟的下一轮。
+- 没有终端会话，或会话对不上这台机器：接口仍是 401 `TERMINAL_SESSION_INVALID`，不返回配置正文，因此也看不到别的终端是否在维护。字段函数在未验明身份时固定 `maintenance=false`、`maintenanceMessage=null`。
+- `enabled=false` 但会话代次仍有效时，只有这个配置接口放行，好把暂停文案读回去。领票、刷新会话和其它接口仍拒绝停用终端。正式退役会把凭证代次加一，旧会话随即 401，一体机下一轮读不到「还没有开始服务」；库里的字段值本身仍是这句文案。
+
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
 - **决定：** 10/4 21:5x 产品负责人定主原则「设备现场不需要工作人员，是自助的、自动的，这个是主要的」。

@@ -44,6 +44,7 @@ import { DEFAULT_SMART_CAMPUS_MODULES } from '../smart-campus/smart-campus.types
 import { ReleaseObservationService, type AdminReleaseObservationView } from './release-observation.service'
 import { KioskJobBoardService } from './kiosk-job-board.service'
 import { AiAccessService } from '../ai-access/ai-access.service'
+import { kioskTerminalMaintenanceNotice } from './kiosk-terminal-maintenance'
 
 // ── Admin view types ───────────────────────────────────────────────────────────
 
@@ -706,6 +707,12 @@ export class TerminalAdminService {
     const ai = this.aiAccess ? await this.aiAccess.getConfig() : {
       loginGate: 'off' as const, declarationEnforced: false, paused: false, maintenance: false,
     }
+    // 找不到这台终端时不当成「已验明本机」。心跳不参与，管理员备注不参与。
+    const notice = kioskTerminalMaintenanceNotice({
+      identityVerified: terminal != null,
+      enabled: terminal?.enabled === true,
+      lifecycleStatus: terminal?.lifecycleStatus ?? 'active',
+    })
 
     return {
       smartCampus: {
@@ -737,14 +744,21 @@ export class TerminalAdminService {
         deploymentEnabled,
         reason: deploymentEnabled ? 'open' as const : 'deployment_off' as const,
       },
-      ai: { loginGate: ai.loginGate, declarationEnforced: ai.declarationEnforced, paused: ai.paused },
-      maintenance: ai.maintenance,
+      ai: {
+        loginGate: ai.loginGate,
+        declarationEnforced: ai.declarationEnforced,
+        paused: ai.paused,
+        maintenance: ai.maintenance,
+      },
+      maintenance: notice.maintenance,
+      maintenanceMessage: notice.maintenanceMessage,
       configVersion: [
         terminal?.lastSeenAt.toISOString() ?? 'unregistered',
         smartCampusConfig?.updatedAt.toISOString() ?? 'smart-campus:none',
         toolboxConfig.version,
         jobBoard.version,
         JSON.stringify(ai),
+        notice.maintenance ? 'terminal-maintenance:1' : 'terminal-maintenance:0',
       ].join('|'),
       refreshIntervalMs: CONFIG_REFRESH_INTERVAL_MS,
       serverTime,
