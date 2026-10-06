@@ -11,7 +11,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/activities",
         "roles": [],
@@ -31,7 +32,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/activities/:id",
         "roles": [],
@@ -51,7 +53,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/activities/:id/claim",
         "roles": [],
@@ -116,7 +119,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/ad-assets/:id/content",
         "roles": [
@@ -139,7 +143,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets",
         "roles": [
@@ -162,7 +167,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets",
         "roles": [
@@ -185,7 +191,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets/:id",
         "roles": [
@@ -208,7 +215,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets/:id",
         "roles": [
@@ -231,7 +239,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets/external-video",
         "roles": [
@@ -254,7 +263,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-playlists",
         "roles": [
@@ -277,7 +287,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-playlists",
         "roles": [
@@ -300,7 +311,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-playlists/:id",
         "roles": [
@@ -323,7 +335,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-playlists/:id",
         "roles": [
@@ -343,6 +356,7 @@
         "models": [
           "AiUsageRecord",
           "AuditLog",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/admin/ai-access",
@@ -363,6 +377,7 @@
         "models": [
           "AiUsageRecord",
           "AuditLog",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/admin/ai-access",
@@ -604,7 +619,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/admin/ai/usage",
         "roles": [
@@ -670,7 +686,8 @@
         "handler": "AuditController.list",
         "method": "GET",
         "models": [
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/admin/audit-logs",
         "roles": [
@@ -692,7 +709,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities",
         "roles": [
@@ -714,7 +732,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities",
         "roles": [
@@ -736,7 +755,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities/:id",
         "roles": [
@@ -758,7 +778,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities/:id/claims",
         "roles": [
@@ -780,7 +801,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities/:id/end",
         "roles": [
@@ -802,7 +824,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities/:id/publish",
         "roles": [
@@ -821,7 +844,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "PriceConfig"
+          "PriceConfig",
+          "User"
         ],
         "path": "/api/v1/admin/billing/price-config",
         "roles": [
@@ -840,7 +864,8 @@
         "method": "PUT",
         "models": [
           "AuditLog",
-          "PriceConfig"
+          "PriceConfig",
+          "User"
         ],
         "path": "/api/v1/admin/billing/price-config/:serviceKey",
         "roles": [
@@ -929,7 +954,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies",
         "roles": [
@@ -951,7 +977,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies",
         "roles": [
@@ -973,7 +1000,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id",
         "roles": [
@@ -995,7 +1023,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id",
         "roles": [
@@ -1017,7 +1046,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/jobs",
         "roles": [
@@ -1039,7 +1069,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/jobs/:jobId",
         "roles": [
@@ -1061,7 +1092,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/linkable-jobs",
         "roles": [
@@ -1083,7 +1115,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/publish",
         "roles": [
@@ -1105,7 +1138,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/review",
         "roles": [
@@ -1241,7 +1275,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs",
         "roles": [
@@ -1269,7 +1304,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id",
         "roles": [
@@ -1297,7 +1333,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id",
         "roles": [
@@ -1325,7 +1362,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/companies",
         "roles": [
@@ -1353,7 +1391,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/companies/:companyId",
         "roles": [
@@ -1381,7 +1420,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/companies/:companyId",
         "roles": [
@@ -1409,7 +1449,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/materials",
         "roles": [
@@ -1437,7 +1478,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/materials/:materialId",
         "roles": [
@@ -1465,7 +1507,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/materials/:materialId",
         "roles": [
@@ -1493,7 +1536,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/materials/:materialId/publish",
         "roles": [
@@ -1521,7 +1565,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/stats",
         "roles": [
@@ -1549,7 +1594,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/venue-guide",
         "roles": [
@@ -1577,7 +1623,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/venue-guide",
         "roles": [
@@ -1605,7 +1652,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/venue-guide",
         "roles": [
@@ -1633,7 +1681,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/zones",
         "roles": [
@@ -1661,7 +1710,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/zones/:zoneId",
         "roles": [
@@ -1689,7 +1739,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/zones/:zoneId",
         "roles": [
@@ -1725,7 +1776,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/admin/feedback/:id",
         "roles": [
@@ -1761,7 +1813,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/admin/feedback/:id/replies",
         "roles": [
@@ -1785,7 +1838,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/admin/feedback/:id/status",
         "roles": [
@@ -2028,7 +2082,8 @@
           "JobFair",
           "JobSource",
           "PrintTask",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/admin/job-sync/sources/:sourceId/enabled",
         "roles": [
@@ -2055,7 +2110,8 @@
           "JobFair",
           "JobSource",
           "PrintTask",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/admin/job-sync/sources/:sourceId/impact",
         "roles": [
@@ -2106,7 +2162,8 @@
           "JobFair",
           "JobSource",
           "PrintTask",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/admin/job-sync/sources/:sourceId/unpublish-content",
         "roles": [
@@ -2164,7 +2221,8 @@
         "models": [
           "AuditLog",
           "KioskJobBoardConfig",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/kiosk-job-board",
         "roles": [
@@ -2185,7 +2243,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/admin/legal-doc-versions",
         "roles": [
@@ -2204,7 +2263,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/admin/legal-doc-versions",
         "roles": [
@@ -2223,7 +2283,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/admin/legal-doc-versions/:id",
         "roles": [
@@ -2242,7 +2303,8 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/admin/legal-doc-versions/:id/activate",
         "roles": [
@@ -2262,7 +2324,8 @@
         "models": [
           "AuditLog",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/member-benefits",
         "roles": [
@@ -2282,7 +2345,8 @@
         "models": [
           "AuditLog",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/member-benefits",
         "roles": [
@@ -2302,7 +2366,8 @@
         "models": [
           "AuditLog",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/member-benefits/:id/revoke",
         "roles": [
@@ -2322,7 +2387,8 @@
         "models": [
           "AuditLog",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/member-benefits/users",
         "roles": [
@@ -2342,6 +2408,7 @@
         "models": [
           "AuditLog",
           "EndUser",
+          "User",
           "UserAiConsent",
           "UserDataRequest"
         ],
@@ -2363,6 +2430,7 @@
         "models": [
           "AuditLog",
           "EndUser",
+          "User",
           "UserAiConsent",
           "UserDataRequest"
         ],
@@ -2384,6 +2452,7 @@
         "models": [
           "AuditLog",
           "EndUser",
+          "User",
           "UserAiConsent",
           "UserDataRequest"
         ],
@@ -2418,7 +2487,8 @@
           "AuditLog",
           "BroadcastReadState",
           "MemberNotification",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/admin/notifications/broadcasts",
         "roles": [
@@ -2469,7 +2539,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies",
         "roles": [
@@ -2491,7 +2562,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id",
         "roles": [
@@ -2532,7 +2604,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id",
         "roles": [
@@ -2573,7 +2646,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/jobs",
         "roles": [
@@ -2595,7 +2669,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/jobs/:jobId",
         "roles": [
@@ -2617,7 +2692,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/jobs/:jobId",
         "roles": [
@@ -2639,7 +2715,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/publish",
         "roles": [
@@ -2661,7 +2738,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/review",
         "roles": [
@@ -2728,7 +2806,8 @@
           "AuditLog",
           "FileObject",
           "Order",
-          "OrderItem"
+          "OrderItem",
+          "User"
         ],
         "path": "/api/v1/admin/orders/:id/mark-paid",
         "roles": [
@@ -2750,7 +2829,8 @@
           "Order",
           "PaymentAttempt",
           "PrintTask",
-          "Refund"
+          "Refund",
+          "User"
         ],
         "path": "/api/v1/admin/orders/:id/refund",
         "roles": [
@@ -2949,7 +3029,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/content-trust",
         "roles": [
@@ -2968,7 +3049,8 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/content-trust",
         "roles": [
@@ -2991,7 +3073,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/official-channels",
         "roles": [
@@ -3034,7 +3117,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/verified-official-domains",
         "roles": [
@@ -3057,7 +3141,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/verified-official-domains",
         "roles": [
@@ -3259,7 +3344,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/policy-sources",
         "roles": [
@@ -3279,7 +3365,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/admin/policy-sources/:id/eligibility-rules",
         "roles": [
@@ -3301,7 +3388,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/policy-sources/:id/publish",
         "roles": [
@@ -3323,7 +3411,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/policy-sources/:id/review",
         "roles": [
@@ -3382,7 +3471,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/print-scan/tasks",
         "roles": [
@@ -3407,7 +3497,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/print-scan/tasks/:type/:taskId",
         "roles": [
@@ -3432,7 +3523,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/print-scan/tasks/:type/:taskId/actions",
         "roles": [
@@ -3457,7 +3549,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/print-scan/tasks/print/:taskId/close-unpaid",
         "roles": [
@@ -3517,7 +3610,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/agency-profiles",
         "roles": [
@@ -3543,7 +3637,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/agency-profiles/:profileId",
         "roles": [
@@ -3569,7 +3664,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/agency-profiles/:profileId/branches/:branchId",
         "roles": [
@@ -3595,7 +3691,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/organizations/:organizationId/qualifications",
         "roles": [
@@ -3621,7 +3718,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/organizations/:organizationId/qualifications/:qualificationId",
         "roles": [
@@ -3647,7 +3745,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/organizations/:organizationId/qualifications/:qualificationId/evidence-access",
         "roles": [
@@ -3673,7 +3772,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/platform-directories",
         "roles": [
@@ -3699,7 +3799,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/platform-directories/:id",
         "roles": [
@@ -3729,7 +3830,8 @@
           "PartnerOrgNotice",
           "PolicyPost",
           "RecruitmentCircuitBreak",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-emergency/circuit-break",
         "roles": [
@@ -3759,7 +3861,8 @@
           "PartnerOrgNotice",
           "PolicyPost",
           "RecruitmentCircuitBreak",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-emergency/takedown",
         "roles": [
@@ -3786,7 +3889,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/admin/release-observation-plans",
         "roles": [
@@ -3813,7 +3917,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/admin/release-observation-plans",
         "roles": [
@@ -3840,7 +3945,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/admin/release-observation-plans/:planId",
         "roles": [
@@ -3969,7 +4075,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/screensaver/terminals",
         "roles": [
@@ -4011,7 +4118,8 @@
         "models": [
           "AuditLog",
           "PlatformSetting",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/support-contact",
         "roles": [
@@ -4031,7 +4139,8 @@
         "models": [
           "AuditLog",
           "PlatformSetting",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/support-contact",
         "roles": [
@@ -4085,7 +4194,8 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
-          "TerminalSmartCampusConfig"
+          "TerminalSmartCampusConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals",
         "roles": [
@@ -4222,7 +4332,8 @@
         "models": [
           "AuditLog",
           "KioskJobBoardConfig",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/job-board-config",
         "roles": [
@@ -4284,7 +4395,8 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
-          "TerminalSmartCampusConfig"
+          "TerminalSmartCampusConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/org",
         "roles": [
@@ -4316,7 +4428,8 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
-          "TerminalSmartCampusConfig"
+          "TerminalSmartCampusConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/profile",
         "roles": [
@@ -4341,7 +4454,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/screensaver-config",
         "roles": [
@@ -4364,7 +4478,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/screensaver-config",
         "roles": [
@@ -4409,7 +4524,8 @@
           "Terminal",
           "TerminalSmartCampusConfig",
           "TerminalToolboxConfig",
-          "ToolboxLaunchEvent"
+          "ToolboxLaunchEvent",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/smart-campus-config",
         "roles": [
@@ -4454,7 +4570,8 @@
           "Terminal",
           "TerminalHeartbeat",
           "TerminalToolboxConfig",
-          "ToolboxLaunchEvent"
+          "ToolboxLaunchEvent",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/toolbox-config",
         "roles": [
@@ -4811,6 +4928,7 @@
           "ExternalJumpLog",
           "FileObject",
           "PrintTask",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/admin/users",
@@ -4836,6 +4954,7 @@
           "ExternalJumpLog",
           "FileObject",
           "PrintTask",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/admin/users/:endUserId",
@@ -4886,6 +5005,7 @@
           "Refund",
           "ScanTask",
           "StorageDeletion",
+          "User",
           "UserAiConsent",
           "UserDataRequest",
           "UserNotification"
@@ -4913,6 +5033,7 @@
           "ExternalJumpLog",
           "FileObject",
           "PrintTask",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/admin/users/:endUserId/disable",
@@ -4938,6 +5059,7 @@
           "ExternalJumpLog",
           "FileObject",
           "PrintTask",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/admin/users/:endUserId/restore",
@@ -4960,7 +5082,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/availability",
         "roles": [],
@@ -4980,7 +5103,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions",
         "roles": [],
@@ -5000,7 +5124,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId",
         "roles": [],
@@ -5020,7 +5145,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print",
         "roles": [],
@@ -5040,7 +5166,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/ask",
         "roles": [],
@@ -5060,7 +5187,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/pins",
         "roles": [],
@@ -5080,7 +5208,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/pins/:pinId",
         "roles": [],
@@ -5100,7 +5229,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/run",
         "roles": [],
@@ -5120,7 +5250,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/skill",
         "roles": [],
@@ -5140,7 +5271,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/slots",
         "roles": [],
@@ -5165,7 +5297,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/assistant/chat",
         "roles": [],
@@ -5207,7 +5340,8 @@
           "AdvisorArtifact",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/assistant/sessions/:sessionId/summary",
         "roles": [],
@@ -5583,7 +5717,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies",
         "roles": [],
@@ -5603,7 +5738,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies/:id",
         "roles": [],
@@ -5623,7 +5759,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies/:id/jobs",
         "roles": [],
@@ -5643,7 +5780,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies/filters",
         "roles": [],
@@ -5663,7 +5801,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies/stats",
         "roles": [],
@@ -5845,7 +5984,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files",
         "roles": [
@@ -5867,7 +6007,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files",
         "roles": [],
@@ -5887,7 +6028,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id",
         "roles": [],
@@ -5909,7 +6051,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id/complete",
         "roles": [],
@@ -5929,7 +6072,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id/content",
         "roles": [],
@@ -5948,7 +6092,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/files/:id/convert",
         "roles": [],
@@ -6000,7 +6145,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id/retention",
         "roles": [],
@@ -6022,7 +6168,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id/url",
         "roles": [],
@@ -6044,7 +6191,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/cleanup-expired",
         "roles": [
@@ -6078,7 +6226,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/lifecycle-summary",
         "roles": [
@@ -6100,7 +6249,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/upload-intent",
         "roles": [],
@@ -6182,7 +6332,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:fairId/visit-plan/:taskId",
         "roles": [],
@@ -6205,7 +6356,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:fairId/visit-plan/:taskId",
         "roles": [],
@@ -6228,7 +6380,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:fairId/visit-plan/:taskId/print",
         "roles": [],
@@ -6410,7 +6563,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:id/materials",
         "roles": [],
@@ -6436,7 +6590,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:id/materials/:materialId/print-url",
         "roles": [],
@@ -6489,7 +6644,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:id/venue-guide",
         "roles": [],
@@ -6542,7 +6698,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/materials/:materialId/content",
         "roles": [
@@ -6564,7 +6721,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/generate",
         "roles": [],
@@ -6584,7 +6742,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/summary",
         "roles": [],
@@ -6604,7 +6763,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates",
         "roles": [],
@@ -6624,7 +6784,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates",
         "roles": [],
@@ -6644,7 +6805,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates",
         "roles": [],
@@ -6664,7 +6826,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates/:id",
         "roles": [],
@@ -6684,7 +6847,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates/:id/publish",
         "roles": [],
@@ -6965,7 +7129,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/kiosk/legal/:type",
         "roles": [],
@@ -7181,7 +7346,8 @@
           "AuditLog",
           "DocumentProcessTask",
           "FileObject",
-          "PiiFinding"
+          "PiiFinding",
+          "User"
         ],
         "path": "/api/v1/materials/tasks/:id/manual-confirmation",
         "roles": [],
@@ -7402,7 +7568,8 @@
           "FairCompany",
           "Job",
           "JobFair",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/me/browse-logs/:id",
         "roles": [],
@@ -7487,7 +7654,8 @@
           "FairCompany",
           "Job",
           "JobFair",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/me/external-jump-logs/:id",
         "roles": [],
@@ -7550,7 +7718,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback",
         "roles": [],
@@ -7572,7 +7741,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback",
         "roles": [],
@@ -7594,7 +7764,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback/:id",
         "roles": [],
@@ -7616,7 +7787,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback/:id/close",
         "roles": [],
@@ -7638,7 +7810,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback/:id/replies",
         "roles": [],
@@ -7715,7 +7888,8 @@
           "AuditLog",
           "BroadcastReadState",
           "MemberNotification",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/notifications",
         "roles": [],
@@ -7744,7 +7918,8 @@
           "AuditLog",
           "BroadcastReadState",
           "MemberNotification",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/notifications/:kind/:id/read",
         "roles": [],
@@ -7802,7 +7977,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders",
         "roles": [],
@@ -7823,7 +7999,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/:orderId",
         "roles": [],
@@ -7844,7 +8021,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/:orderId/cancel",
         "roles": [],
@@ -7883,7 +8061,8 @@
           "AuditLog",
           "FileObject",
           "Order",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/:orderId/reissue-pickup-code",
         "roles": [],
@@ -7904,7 +8083,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/cloud",
         "roles": [],
@@ -7925,7 +8105,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/submissions/resolve",
         "roles": [],
@@ -8136,7 +8317,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/member/auth/step-up/sms-code",
         "roles": [],
@@ -8153,7 +8335,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/member/auth/step-up/verify",
         "roles": [],
@@ -8208,6 +8391,7 @@
           "AuditLog",
           "EndUser",
           "FileObject",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/member/data-exports/:id/content",
@@ -8243,7 +8427,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/member/phone/rebind",
         "roles": [],
@@ -8286,7 +8471,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8309,7 +8495,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8332,7 +8519,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8355,7 +8543,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8378,7 +8567,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/answer",
         "roles": [],
@@ -8401,7 +8591,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/end",
         "roles": [],
@@ -8424,7 +8615,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/practice-sheet",
         "roles": [],
@@ -8447,7 +8639,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/report",
         "roles": [],
@@ -8470,7 +8663,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/report/print",
         "roles": [],
@@ -8493,7 +8687,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/start",
         "roles": [],
@@ -8516,7 +8711,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/transcribe",
         "roles": [],
@@ -8542,7 +8738,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/transcript/print",
         "roles": [],
@@ -8565,7 +8762,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/turns/:idx/audio",
         "roles": [],
@@ -8597,7 +8795,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/orders/:id/code-pay",
         "roles": [],
@@ -8615,7 +8814,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/orders/:id/pay",
         "roles": [],
@@ -8633,7 +8833,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/orders/:id/pay-status",
         "roles": [],
@@ -8651,7 +8852,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/orders/:id/pay/reconcile",
         "roles": [],
@@ -8670,7 +8872,8 @@
           "AuditLog",
           "BenefitGrant",
           "Order",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/orders/:id/redeem",
         "roles": [],
@@ -8691,7 +8894,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/orders/package",
         "roles": [],
@@ -8712,7 +8916,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/orders/package",
         "roles": [],
@@ -8733,7 +8938,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/orders/package/:id",
         "roles": [],
@@ -8772,7 +8978,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/partner/companies",
         "roles": [
@@ -8794,7 +9001,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/partner/companies/:id",
         "roles": [
@@ -8816,7 +9024,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/partner/companies/:id/publish",
         "roles": [
@@ -8838,7 +9047,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/partner/companies/import",
         "roles": [
@@ -8950,7 +9160,8 @@
           "JobSource",
           "Organization",
           "PolicyPost",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/partner/data-sources/:id/archive",
         "roles": [
@@ -8975,7 +9186,8 @@
           "JobSource",
           "Organization",
           "PolicyPost",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/partner/data-sources/:id/rotate-credential",
         "roles": [
@@ -9029,7 +9241,8 @@
           "JobSource",
           "Organization",
           "PolicyPost",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/partner/data-sources/:id/unarchive",
         "roles": [
@@ -9383,7 +9596,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/materials",
         "roles": [
@@ -9406,7 +9620,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/materials",
         "roles": [
@@ -9429,7 +9644,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/materials/:materialId",
         "roles": [
@@ -9452,7 +9668,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/materials/:materialId",
         "roles": [
@@ -9504,7 +9721,8 @@
           "FairVenueFacility",
           "FairVenueGuide",
           "FairVenueHall",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/venue-guide",
         "roles": [
@@ -9527,7 +9745,8 @@
           "FairVenueFacility",
           "FairVenueGuide",
           "FairVenueHall",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/venue-guide",
         "roles": [
@@ -9550,7 +9769,8 @@
           "FairVenueFacility",
           "FairVenueGuide",
           "FairVenueHall",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/venue-guide",
         "roles": [
@@ -9571,7 +9791,8 @@
           "AuditLog",
           "FairCompany",
           "FairZone",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/zones",
         "roles": [
@@ -9592,7 +9813,8 @@
           "AuditLog",
           "FairCompany",
           "FairZone",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/zones",
         "roles": [
@@ -9613,7 +9835,8 @@
           "AuditLog",
           "FairCompany",
           "FairZone",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/zones/:zoneId",
         "roles": [
@@ -9634,7 +9857,8 @@
           "AuditLog",
           "FairCompany",
           "FairZone",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/zones/:zoneId",
         "roles": [
@@ -9821,7 +10045,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/partner/official-channels",
         "roles": [
@@ -9844,7 +10069,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/partner/official-channels",
         "roles": [
@@ -9867,7 +10093,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/partner/official-channels/:id",
         "roles": [
@@ -9890,7 +10117,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/partner/official-channels/:id",
         "roles": [
@@ -9920,7 +10148,8 @@
           "PartnerOrgNotice",
           "PolicyPost",
           "RecruitmentCircuitBreak",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/org-notices",
         "roles": [
@@ -9942,7 +10171,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies",
         "roles": [
@@ -9964,7 +10194,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies",
         "roles": [
@@ -9986,7 +10217,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id",
         "roles": [
@@ -10008,7 +10240,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id",
         "roles": [
@@ -10028,7 +10261,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/eligibility-preview",
         "roles": [
@@ -10048,7 +10282,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/eligibility-rules",
         "roles": [
@@ -10068,7 +10303,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/eligibility-rules",
         "roles": [
@@ -10090,7 +10326,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/publish",
         "roles": [
@@ -10112,7 +10349,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/release",
         "roles": [
@@ -10134,7 +10372,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/review",
         "roles": [
@@ -10325,7 +10564,8 @@
           "Terminal",
           "TerminalSmartCampusConfig",
           "TerminalToolboxConfig",
-          "ToolboxLaunchEvent"
+          "ToolboxLaunchEvent",
+          "User"
         ],
         "path": "/api/v1/partner/smart-campus/terminals/:terminalId/config",
         "roles": [
@@ -10440,7 +10680,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/payment/channels",
         "roles": [],
@@ -10458,7 +10699,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/payment/sandbox/simulate",
         "roles": [],
@@ -10478,7 +10720,8 @@
           "Order",
           "PaymentAttempt",
           "PrintTask",
-          "Refund"
+          "Refund",
+          "User"
         ],
         "path": "/api/v1/payment/wechat/refund-notify",
         "roles": [],
@@ -10498,7 +10741,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/policies",
         "roles": [],
@@ -10518,7 +10762,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/policies/:id",
         "roles": [],
@@ -10536,7 +10781,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/policies/eligibility-check",
         "roles": [],
@@ -10554,7 +10800,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/policies/eligibility-questions",
         "roles": [],
@@ -10603,7 +10850,8 @@
           "FileObject",
           "PrintTask",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/convert/images-to-pdf",
         "roles": [],
@@ -10629,7 +10877,8 @@
           "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "User"
         ],
         "path": "/api/v1/print/jobs",
         "roles": [],
@@ -10652,7 +10901,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/jobs/:orderId/release",
         "roles": [],
@@ -10678,7 +10928,8 @@
           "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "User"
         ],
         "path": "/api/v1/print/jobs/:taskId",
         "roles": [],
@@ -10704,7 +10955,8 @@
           "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "User"
         ],
         "path": "/api/v1/print/jobs/:taskId/retry",
         "roles": [],
@@ -10730,7 +10982,8 @@
           "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "User"
         ],
         "path": "/api/v1/print/jobs/:taskId/takeaway-url",
         "roles": [],
@@ -10753,7 +11006,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/jobs/claim-pickup",
         "roles": [],
@@ -10790,7 +11044,8 @@
           "FileObject",
           "PrintTask",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/sign/compose",
         "roles": [],
@@ -10811,7 +11066,8 @@
           "FileObject",
           "PrintTask",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/sign/inspect",
         "roles": [],
@@ -10829,7 +11085,8 @@
         "models": [
           "AuditLog",
           "PlatformSetting",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/public/support-contact",
         "roles": [],
@@ -10851,7 +11108,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
@@ -10873,7 +11131,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
@@ -10895,7 +11154,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/career-plan/:taskId/print",
         "roles": [],
@@ -10920,7 +11180,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/export/pricing",
         "roles": [],
@@ -10949,6 +11210,7 @@
           "PrintTask",
           "RedemptionRecord",
           "Terminal",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/generate",
@@ -10980,7 +11242,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/generate/:taskId",
         "roles": [],
@@ -11009,6 +11272,7 @@
           "PrintTask",
           "RedemptionRecord",
           "Terminal",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/generate/export",
@@ -11058,7 +11322,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/:taskId",
         "roles": [],
@@ -11079,7 +11344,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/:taskId/print",
         "roles": [],
@@ -11100,7 +11366,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/consent",
         "roles": [],
@@ -11121,7 +11388,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/consent/:taskId",
         "roles": [],
@@ -11142,7 +11410,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/consent/:taskId",
         "roles": [],
@@ -11169,6 +11438,7 @@
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/parse",
@@ -11198,7 +11468,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/records/:taskId",
         "roles": [],
@@ -11223,7 +11494,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/records/:taskId/draft",
         "roles": [],
@@ -11250,6 +11522,7 @@
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/records/:taskId/draft",
@@ -11289,6 +11562,7 @@
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/records/:taskId/fact-check",
@@ -11316,7 +11590,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/records/:taskId/layout-adjust",
         "roles": [],
@@ -11348,6 +11623,7 @@
           "PrintTask",
           "RedemptionRecord",
           "Terminal",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/records/:taskId/optimize",
@@ -11381,7 +11657,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/records/:taskId/versions",
         "roles": [],
@@ -11402,7 +11679,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment",
         "roles": [],
@@ -11423,7 +11701,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId",
         "roles": [],
@@ -11444,7 +11723,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId",
         "roles": [],
@@ -11464,7 +11744,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId/append",
         "roles": [],
@@ -11485,7 +11766,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId/print",
         "roles": [],
@@ -11705,7 +11987,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/terminals/:terminalId/official-channels",
         "roles": [
@@ -11760,7 +12043,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/terminals/:terminalId/release-observation",
         "roles": [],
@@ -11785,7 +12069,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/terminals/:terminalId/release-observation-plan",
         "roles": [],
@@ -11898,7 +12183,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/terminals/:terminalId/screensaver",
         "roles": [
@@ -17984,6 +18270,7 @@
           "services/api/src/admin-internal-accounts/backup-admin-create.service.ts",
           "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts",
           "services/api/src/admin-ops/admin-alert-actions.service.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
           "services/api/src/auth/admin-login-second-factor.ts",
           "services/api/src/auth/admin-phone-transfer.service.ts",
