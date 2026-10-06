@@ -1,6 +1,6 @@
 /* 到机码页 · 青序流光专属样式。视觉真值：docs/design/kiosk-redesign-2026-08/11-arrival-code.html（1080×1920）。
  * 地基已有的（按钮/卡片基类、顶栏、底部导航）不重复定义，只写本页特有的。
- * 三段：默认 = 1080×1920 缩放舞台；Windows 横屏（流体 1280×720）；手机宽（390）。
+ * 三段：默认 = 1080×1920 缩放舞台（一体机与电脑横屏）；舞台关闭时的窄横屏；手机宽（390）。
  * 动效克制（按压 120ms、卡片 240ms 淡入、校验中三点脉冲、扫码角标呼吸、光标闪烁），prefers-reduced-motion 下全部关闭。 */
 
 .pickup-claim-page { --pcp-ease: cubic-bezier(.22, 1, .36, 1); }
@@ -308,10 +308,11 @@
   .pcp-keypad-card .qx-btn.pcp-submit:active { transform: none; }
 }
 
-/* ── Windows 横屏窄高（1280×720 流体视口，舞台缩放关闭）─────────────
-   原型只有 1080×1920，但没有取消这条生产约束：主操作必须留在可视区内，
-   用户按得到「确认校验 / 进入现场支付」。手输屏改左右两栏：左侧码位与说明，右侧整块键盘。 */
+/* ── 横屏且舞台关闭（窄横屏手机。电脑横屏已改走 1080×1920 缩放）──────
+   原型只有 1080×1920。舞台打开时整页按竖屏稿等比缩小，不再吃这条流体两栏。
+   舞台关闭时主操作仍须留在可视区内：手输屏改左右两栏，左侧码位与说明，右侧整块键盘。 */
 @media (max-height: 900px) and (orientation: landscape) {
+  [data-kiosk-stage-fit='off'] {
   .qx-stage:has(.pickup-claim-page) > .qx-pagehead { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-top: 10px; }
   .qx-stage:has(.pickup-claim-page) > .qx-pagehead::before { display: none; }
   .qx-stage:has(.pickup-claim-page) > .qx-pagehead h1 { font-size: 30px; }
@@ -404,6 +405,7 @@
   .pch-outs li, .pch-out-btn { min-height: var(--qx-tap-min); padding: 4px 10px; }
   .pch-outs b { font-size: 16px; }
   .pch-outs span { font-size: 14px; }
+  }
 }
 
 /* ── 390 手机宽（舞台缩放关闭，按真实宽度排版）──────────────────

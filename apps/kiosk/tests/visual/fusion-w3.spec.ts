@@ -2,7 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
-import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
+import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
 import {
   ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
@@ -2091,7 +2091,7 @@ test('job fit completed-but-empty result says未提供 rather than尚未返回 @
 
 // ── 简历决策工作台其余三条 route（稿 46：actions / career-plan / templates）────────
 // 夹具逐条 respond，未登记的请求照常被 ApiRouter 中止并在收尾报错（fail-closed）。
-// 三个视口都要量：1080×1920 一体机舞台、390×844 手机（关缩放走流式）、1440×900 横屏电脑。
+// 三个视口都要量：1080×1920 一体机舞台、390×844 手机（关缩放走流式）、1440×900 横屏电脑（1080×1920 舞台缩放）。
 const DECISION_VIEWPORTS = [
   { width: 1080, height: 1920 },
   { width: 390, height: 844 },
@@ -2133,11 +2133,13 @@ async function captureDecisionViewports(page: Parameters<typeof assertNoHorizont
       return 'ok'
     }, { message: `${name} ${size.width}x${size.height} 操作条与滚动区` }).toBe('ok')
     await assertNoHorizontalOverflow(page)
+    // 横屏电脑改为舞台缩放后，屏上像素要除回 scale；舞台关闭（手机）时 scale 取 1，门槛仍是 48。
+    const scale = await readEnabledStageScale(page)
     for (const target of [page.locator('.qx-topbar-back'), page.locator('.qx-ctabar .qx-btn').last()]) {
       const box = await target.boundingBox()
       expect(box, '可点区域必须可见').not.toBeNull()
-      expect(box!.height, `${name} ${size.width}x${size.height} 触控高度`).toBeGreaterThanOrEqual(48)
-      expect(box!.width).toBeGreaterThanOrEqual(48)
+      expect(box!.height / scale, `${name} ${size.width}x${size.height} 触控高度`).toBeGreaterThanOrEqual(48)
+      expect(box!.width / scale).toBeGreaterThanOrEqual(48)
     }
     await page.screenshot({ path: test.info().outputPath(`${name}-${size.width}x${size.height}.png`) })
   }

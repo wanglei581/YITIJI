@@ -87,8 +87,14 @@ export const LLM_TIMEOUT_MS = readTimeoutEnv('AI_LLM_TIMEOUT_MS', 45_000, 60_000
  * 「正常但慢」误判成故障，用户看到超时、后台却照样计费。为什么不放到几百秒：
  * 一体机用户站在屏幕前等，90 秒已经是可解释的上限；合同审查敢用 60–300 秒
  * 是因为它异步跑在队列里、用户不在原地等，简历这条链不具备那个条件。
+ *
+ * 上限 95 秒（原 180 秒）：一体机对这几条只等 100 秒（`aiHttpAdapter.ts` 的 LLM_TIMEOUT_MS、
+ * `useOptimizeLoad.ts` 的 OPTIMIZE_LOAD_LIMIT_MS）。环境变量若配到 100 秒以上，慢请求会先被
+ * 一体机断开、记成客户端中止并排除在可用率分母外，签收单上的「AI 可用率」就会虚高。
+ * 夹在 95 秒，保证后端一定先超时、如实记成失败（总指挥 10/4）。
  */
-export const LLM_LONG_TIMEOUT_MS = readTimeoutEnv('AI_LLM_LONG_TIMEOUT_MS', 90_000, 180_000)
+export const LLM_LONG_TIMEOUT_CEILING_MS = 95_000
+export const LLM_LONG_TIMEOUT_MS = readTimeoutEnv('AI_LLM_LONG_TIMEOUT_MS', 90_000, LLM_LONG_TIMEOUT_CEILING_MS)
 
 // ---------------------------------------------------------------------------
 // 全局并发闸门
