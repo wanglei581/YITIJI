@@ -89,9 +89,11 @@ export function reducePollLink(state: PollLinkState, event: PollRead, nowMs: num
 }
 
 /**
- * 断网（offline）不算打印结束，锁保持，避免屏保和自动登出把人从出纸口赶走。
- * 结果未确认必须放锁，否则这台机器会一直锁着。
- * 失败、查询超时、模拟结束同样放锁。模拟进行中照旧持锁。
+ * 断网（offline）和结果未确认（unconfirmed）都不算打印结束，锁保持，避免屏保和自动登出把人从出纸口赶走。
+ * 结果未确认也持锁：隐私守卫的硬截止默认 5 分钟、忙碌最多顺延 15 分钟，到第 10 分钟放锁会让早已过期的截止
+ * 立刻清场，「没法确认这单打完了没有」这一屏一眼都看不到（10/6 浏览器用例实测）。机器不会锁死：
+ * 隐私守卫的顺延上限照样会在最后一次操作后约 20 分钟清场。
+ * 失败、查询超时、模拟结束放锁。模拟进行中照旧持锁。
  */
 export function holdsPrintBusyLock(input: {
   useRealApi: boolean
@@ -101,7 +103,7 @@ export function holdsPrintBusyLock(input: {
   isSim: boolean
   simDone: boolean
 }): boolean {
-  const realActive = input.useRealApi && !input.failed && !input.timedOut && !input.resultUnconfirmed
+  const realActive = input.useRealApi && !input.failed && !input.timedOut
   const simActive = input.isSim && !input.failed && !input.simDone
   return realActive || simActive
 }

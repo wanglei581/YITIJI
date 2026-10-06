@@ -634,9 +634,10 @@ if (!simDoneCheckCutsLast && simDoneChecksAllItems && simDoneClassifiesAllItems)
 
 // 10) 忙碌锁
 // N-2（2026-10-06）：断网不再跳失败页，连续读不到不能放锁，否则屏保和自动登出
-// 会把人从出纸口赶走。结果未确认（超过 10 分钟仍读不到）必须放锁，否则机器一直锁着。
+// 会把人从出纸口赶走。结果未确认（超过 10 分钟仍读不到）也持锁：放锁会让早已过期的隐私硬截止
+// 立刻清场，这一屏看不到（浏览器用例实测）；隐私守卫的顺延上限保证机器不会锁死。
 // 失败、查询超时、模拟结束照旧放锁。公式在 holdsPrintBusyLock，页面不再内联。
-// resultUnconfirmed 只能是 linkPhase === 'unconfirmed'。写成 !== 'live' 会把断网也放锁。
+// resultUnconfirmed 只能是 linkPhase === 'unconfirmed'（页面文案与相位判定用它）。
 const pollingCode = stripComments(read('src/pages/print/printProgressPolling.ts'))
 const pageHoldsLock =
   /useBusyLock\(\s*holdsPrintBusyLock\(\{[\s\S]*?\buseRealApi\b[\s\S]*?\bfailed\b[\s\S]*?\btimedOut\b[\s\S]*?\bresultUnconfirmed\b[\s\S]*?\bisSim\b[\s\S]*?\bsimDone\b[\s\S]*?\}\s*,?\s*\)\s*\)/.test(
@@ -646,13 +647,13 @@ const unconfirmedIsStrict =
   /const resultUnconfirmed = linkPhase === 'unconfirmed'/.test(progressCode) &&
   !/const resultUnconfirmed = linkPhase !== 'live'/.test(progressCode)
 const helperHoldsOffline =
-  /const realActive = input\.useRealApi && !input\.failed && !input\.timedOut && !input\.resultUnconfirmed/.test(pollingCode) &&
+  /const realActive = input\.useRealApi && !input\.failed && !input\.timedOut\s*$/m.test(pollingCode) &&
   /const simActive = input\.isSim && !input\.failed && !input\.simDone/.test(pollingCode) &&
   /return realActive \|\| simActive/.test(pollingCode)
 if (pageHoldsLock && unconfirmedIsStrict && helperHoldsOffline) {
-  pass('真实任务执行中与断网持锁；失败、超时、结果未确认和模拟结束放锁')
+  pass('真实任务执行中、断网与结果未确认持锁；失败、超时和模拟结束放锁')
 } else {
-  fail('useBusyLock 须走 holdsPrintBusyLock：断网持锁，结果未确认（仅 unconfirmed）放锁，模拟公式不变')
+  fail('useBusyLock 须走 holdsPrintBusyLock：断网与结果未确认都持锁，失败与超时放锁，模拟公式不变')
 }
 
 // 11) SIM / 失败跳转定时器须可清理，避免离页后回调继续执行

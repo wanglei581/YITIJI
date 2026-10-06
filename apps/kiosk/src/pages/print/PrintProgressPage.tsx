@@ -171,7 +171,7 @@ export function PrintProgressPage() {
   const wakeRequestedTaskIdRef  = useRef<string | null>(null)
   const resultUnconfirmed = linkPhase === 'unconfirmed'
   const linkOffline = linkPhase === 'offline'
-  // 断网仍持锁。结果未确认放锁，否则屏保和自动登出永远不来，机器会锁死。
+  // 断网、结果未确认都持锁；隐私守卫的顺延上限保证不会锁死（见 holdsPrintBusyLock 注释）。
   useBusyLock(holdsPrintBusyLock({
     useRealApi,
     failed,

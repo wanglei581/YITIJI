@@ -106,7 +106,7 @@ test('只有服务端 completed / failed / cancelled / abandoned 才是终态，
   }
 })
 
-test('忙碌锁：断网持锁，结果未确认放锁，模拟路径不看断网相位', () => {
+test('忙碌锁：断网、结果未确认都持锁（放锁会被过期的隐私截止立刻清场），模拟路径不看断网相位', () => {
   const base = {
     useRealApi: true,
     failed: false,
@@ -116,7 +116,7 @@ test('忙碌锁：断网持锁，结果未确认放锁，模拟路径不看断�
     simDone: false,
   }
   assert.equal(polling.holdsPrintBusyLock(base), true)
-  assert.equal(polling.holdsPrintBusyLock({ ...base, resultUnconfirmed: true }), false)
+  assert.equal(polling.holdsPrintBusyLock({ ...base, resultUnconfirmed: true }), true)
   assert.equal(polling.holdsPrintBusyLock({ ...base, failed: true }), false)
   assert.equal(polling.holdsPrintBusyLock({ ...base, timedOut: true }), false)
   assert.equal(polling.holdsPrintBusyLock({ ...base, useRealApi: false }), false)
