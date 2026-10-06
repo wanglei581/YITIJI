@@ -180,9 +180,9 @@
 }
 .qx-resume-materials .qx-rm-facts .qx-rm-grid div { padding: 10px 18px; }
 /* 整屏状态的余量吸收块：兜底出口列表（稿 25 alt-row 134px 起），行高随余量拉伸但封顶，不撑成空卡。 */
-.qx-resume-materials .qx-rm-alt { flex: 1 0 auto; display: flex; flex-direction: column; gap: 10px; }
-.qx-resume-materials .qx-rm-alt .qx-rows { flex: 1 0 auto; max-height: 760px; display: flex; flex-direction: column; }
-.qx-resume-materials .qx-rm-alt .qx-row { flex: 1 0 auto; min-height: 134px; }
+.qx-resume-materials .qx-rm-alt { flex: none; display: flex; flex-direction: column; gap: 10px; }
+.qx-resume-materials .qx-rm-alt .qx-rows { flex: none; max-height: 760px; display: flex; flex-direction: column; }
+.qx-resume-materials .qx-rm-alt .qx-row { flex: none; min-height: 134px; }
 .qx-resume-materials .qx-rm-truth { flex: none; margin: 0; padding: 12px 0 4px; border-top: 1px solid var(--qx-line); font-size: 20px; line-height: 1.45; color: var(--qx-ink-3); }
 .qx-resume-materials .qx-rm-truth b { font-weight: 600; color: var(--qx-ink-2); }
 
@@ -226,3 +226,9 @@
 @media (prefers-reduced-motion: reduce) {
   .qx-resume-materials *, .qx-resume-materials *::before, .qx-resume-materials *::after { transition: none !important; animation: none !important; }
 }
+
+/* 最终稿状态卡内重读，底部只放上一步与顾问；状态出口按内容排。 */
+.qx-resume-materials .qx-rm-state p > .qx-btn { display: flex; width: fit-content; margin-top: 22px; }
+.qx-resume-materials .qx-rm-after { min-height: 104px; }
+.qx-resume-materials .qx-step-actions { order: 5; }
+.qx-resume-materials .qx-rm-alt .qx-row-ic { background: var(--qx-teal-soft); border-color: var(--qx-teal-line); color: var(--qx-teal-d); }

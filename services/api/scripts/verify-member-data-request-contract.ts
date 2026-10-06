@@ -238,7 +238,7 @@ function verifyRealSqliteMigrationBehavior(): void {
   const databasePath = join(temporaryDirectory, 'contract.db')
   closeSync(openSync(databasePath, 'a'))
   try {
-    execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
+    execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
       cwd: apiRoot,
       env: { ...process.env, DATABASE_URL: `file:${databasePath}` },
       stdio: ['ignore', 'pipe', 'pipe'],

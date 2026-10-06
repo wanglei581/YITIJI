@@ -282,6 +282,7 @@ async function main(): Promise<void> {
             fail('closing test member was not created')
           } else {
             await prisma.endUser.update({ where: { id: closingUser.id }, data: { status: 'closing' } })
+            const consentsBeforeClaim = await prisma.memberLegalConsent.count({ where: { endUserId: closingUser.id } })
             const closingClaim = await request(
               'POST',
               `/auth/qr/${encodeURIComponent(closingTicketId)}/claim`,
@@ -293,6 +294,10 @@ async function main(): Promise<void> {
             } else {
               fail(`closing account QR claim -> ${closingClaim.status} ${JSON.stringify(closingClaim.json)}`)
             }
+            // 领取前先确认账号可登录：注销中的账号连同意记录都不写（SQLite 主作业没有数据库触发器兜底，靠的就是这一步）。
+            const consentsAfterClaim = await prisma.memberLegalConsent.count({ where: { endUserId: closingUser.id } })
+            if (consentsAfterClaim === consentsBeforeClaim) pass('closing account QR claim writes no consent row')
+            else fail(`closing account QR claim wrote ${consentsAfterClaim - consentsBeforeClaim} consent row(s)`)
           }
         }
       }

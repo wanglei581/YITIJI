@@ -53,7 +53,7 @@
     </view>
 
     <view class="compliance-note">
-      打印状态、出纸完成均以一体机终端实时上报为准，如与实际不符请到店核对。
+      打印状态、出纸完成均以一体机终端实时上报为准；如与实际不符，{{supportHint}}
     </view>
 
   </view>

@@ -49,6 +49,8 @@ export function ResumeFormatChooser(props: {
   guest: boolean
   synthetic: boolean
   printNavigating: boolean
+  titleBlocked?: boolean
+  onTitleBlocked?: () => void
   onPrint: () => void
   onOpenPreview: () => void
   onClearExport: () => void
@@ -57,18 +59,25 @@ export function ResumeFormatChooser(props: {
 }) {
   const [layoutOpen, setLayoutOpen] = useState(false)
   const isPdf = props.format === 'pdf'
-  const showChooser = props.screen === 'export-chooser' || props.screen === 'export-failed'
+  const showChooser = props.screen === 'export-chooser'
   const showResult = props.screen === 'export-ready' || props.screen === 'export-url-expired' || props.screen === 'export-print-unavailable'
   const printReady = isPdf && Boolean(props.exported?.printFileUrl)
   const previewReady = Boolean(props.exported?.signedUrl)
 
   return (
-    <div className="qx-rg-export">
+    <div className="qx-rg-export" data-export-screen={props.screen}>
       {props.screen === 'export-exporting' && (
         <div className="qx-card">
           <div className="qx-sec-h"><span className="qx-rg-no">01</span><span className="t">正在生成文件</span><span className="hint">完成前没有文件</span></div>
           <p className="qx-rg-lead">正在整理 {formatName(props.format)}。文件出来之前，不能下载，也不能打印。</p>
-          <p className="qx-rg-note">页数和大小要等这一次的结果，这里不事先估。这一步不改你已经核对过的内容。</p>
+          <div className="qx-rg-process" role="status"><b>正在渲染 {formatName(props.format)} 并保存</b><span>渲染、保存、生成取件链接，完成后才能带走文件。</span></div>
+          <ol className="qx-rg-export-steps" aria-label="文件生成流程">
+            <li data-phase="done"><i>1</i><span><b>内容你已经核对过</b><small>导出不改内容，也不会再过一遍模型</small></span><em>完成</em></li>
+            <li data-phase="now"><i>2</i><span><b>渲染 {formatName(props.format)} 并保存</b><small>{isPdf ? '完成后才有真实页数' : '这一格式不分页；打印另用 PDF'}</small></span><em>处理中</em></li>
+            <li><i>3</i><span><b>准备手机取件与打印</b><small>下载链接与打印链接用途不同</small></span><em>之后</em></li>
+            <li><i>4</i><span><b>扫码保存到手机，或去打印</b><small>{isPdf ? '有打印链接才能去打印确认' : '这一格式先保存到手机；要打印请导出 PDF'}</small></span><em>之后</em></li>
+          </ol>
+          <p className="qx-rg-note">页数和大小要等这一次的结果，这里不事先估。这一步不改你已经核对过的内容，也不会自动开始打印。以上是办理顺序，系统没有提供逐步进度。</p>
         </div>
       )}
 
@@ -114,7 +123,16 @@ export function ResumeFormatChooser(props: {
               </button>
             )}
             {printReady && (
-              <button type="button" className="qx-btn" data-variant="teal" aria-disabled={props.printNavigating || undefined} onClick={() => { if (!props.printNavigating) props.onPrint() }}>
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="teal"
+                aria-disabled={props.printNavigating || props.titleBlocked || undefined}
+                onClick={() => {
+                  if (props.titleBlocked) { props.onTitleBlocked?.(); return }
+                  if (!props.printNavigating) props.onPrint()
+                }}
+              >
                 {props.printNavigating ? '正在进入打印确认…' : '去打印确认'}
               </button>
             )}
@@ -226,6 +244,21 @@ export function ResumeFormatChooser(props: {
         </div>
       )}
 
+      {props.screen !== 'export-chooser' && props.screen !== 'export-exporting' && (
+        <section className="qx-card qx-rg-next" aria-label="接下来怎么带走">
+          <h2>接下来可以做的</h2>
+          <div className="qx-rows">
+            <button type="button" className="qx-row" disabled={props.exporting} onClick={props.onClearExport}><span className="qx-row-tx"><b className="qx-row-t">{props.screen === 'export-failed' ? '换个格式再试一次' : '再导一份别的格式'}</b><span className="qx-row-d">内容仍在；PDF 用于打印，Word、TXT、Markdown 可带走编辑</span></span><span className="qx-row-go">›</span></button>
+            <button type="button" className="qx-row" onClick={props.onHelp}><span className="qx-row-tx"><b className="qx-row-t">找工作人员帮忙</b><span className="qx-row-d">请工作人员看看当前提示，不需要重新填写经历</span></span><span className="qx-row-go">›</span></button>
+          </div>
+          <div className="qx-rg-export-facts">
+            <div><b>简历内容</b><span>导出只做排版与文件保存，不再润色</span></div>
+            <div><b>文件与页数</b><span>以这次导出结果为准；未收到结果时不估算</span></div>
+            <div><b>手机取件</b><span>真实下载链接在有效期内才显示二维码</span></div>
+            <div><b>打印确认</b><span>PDF 和打印链接都就绪才可进入，不会自动打印</span></div>
+          </div>
+        </section>
+      )}
       <div className="qx-rg-help">
         <p>不确定要哪种？要打印或投简历就选 PDF；要回去自己改就选 DOCX。</p>
         <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={props.onHelp}>找工作人员</button>
@@ -250,6 +283,10 @@ function SyntheticFileCard(props: {
           : '合成演示不生成可扫描的码，也不冒充文件已经进了账号。'}
       </p>
       <p>{props.printReady ? '打印链接在这一次的演示里标成可用。' : '这一次没有可交接的打印链接。'}</p>
+      <div className="qx-rg-synthetic-take">
+        <div><b>扫码保存到手机</b><p>{props.screen === 'export-url-expired' ? '下载链接已过期，这里不显示二维码。' : '这是示例文件，没有真实下载链接，因此不显示可扫描的二维码。'}</p></div>
+        <div><b>按文件名和页数核对</b><p>真实办理时只展示本次返回的文件信息。文件按保存期限保留，下载链接到期后需要重新导出。</p><p>公共终端请用手机取件，不把求职文件留在本机。</p></div>
+      </div>
     </div>
   )
 }

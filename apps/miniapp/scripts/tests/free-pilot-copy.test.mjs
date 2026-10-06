@@ -289,3 +289,67 @@ test('材料包状态：0 元订单各状态都不提付款，大于 0 的原样
     assert.match(pkg.resolvePackageStatus(paid, now).label + pkg.statusDetail(paid), /付款/, JSON.stringify(st))
   }
 })
+
+// ══════════════════════════════════════════════════════════════════════
+// 现场无人值守（2026-10-04 产品负责人主原则：设备现场没有工作人员，全程自助、自动）。
+// 小程序任何给用户看的文字都不许让用户去找人；出路只有：手机上重试 / 换一台机器 / 拨打服务电话。
+// 扫全部注册页面的 WXML、页面目录下全部 JS，外加 utils 下全部 JS 的字符串字面量（注释不算）。
+// ══════════════════════════════════════════════════════════════════════
+
+const STAFF = /工作人员|现场人员|店员|值守人员|服务台|到店/
+
+function utilsJs() {
+  return fs.readdirSync(path.join(MINIAPP, 'utils')).filter((f) => f.endsWith('.js')).map((f) => `utils/${f}`)
+}
+
+function staffHits(rel) {
+  const src = read(rel)
+  if (rel.endsWith('.wxml')) {
+    const bare = src.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '))
+    return bare.split('\n').flatMap((line, i) => (STAFF.test(line) ? [`${rel}:${i + 1} ${line.trim().slice(0, 50)}`] : []))
+  }
+  return jsLiterals(src).filter((l) => STAFF.test(l.text)).map((l) => `${rel}:${lineOf(src, l.index)} ${l.text.slice(0, 50)}`)
+}
+
+test('现场无人值守：给用户看的文字不让人去找工作人员', () => {
+  const files = [...PAGE_WXML, ...PAGE_JS, ...utilsJs()]
+  assert.ok(files.length > 80, `扫到的文件太少（${files.length}），页面清单可能没读到`)
+  assert.deepEqual(files.flatMap(staffHits), [])
+})
+
+test('现场无人值守：判据自检——字面量、模板正文都报，注释不报', () => {
+  assert.equal(STAFF.test('请联系现场工作人员处理'), true)
+  assert.equal(STAFF.test('如与实际不符请到店核对'), true)
+  assert.equal(STAFF.test('需要帮助可拨打服务电话'), false)
+  const lits = jsLiterals("// 现场工作人员当场就能处理\nconst a = '换一台机器'\nconst b = `请找工作人员`")
+  assert.deepEqual(lits.filter((l) => STAFF.test(l.text)).map((l) => l.text), ['请找工作人员'])
+})
+
+test('现场无人值守：需要人帮忙时指向服务电话，不写死号码', () => {
+  const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
+  const ue = requireMiniapp('../utils/user-error.js')
+  assert.match(ue.SUPPORT_HINT, /服务电话/)
+  assert.doesNotMatch(ue.SUPPORT_HINT, /\d{7,}/, '号码等后端公开接口，不写死')
+  const ps = requireMiniapp('../pages/print-pickup/pickup-state.js')
+  for (const taskStatus of ['failed', 'abandoned']) {
+    const st = ps.resolveOrderState({ taskStatus, pickupStatus: 'used', amountCents: 0 })
+    assert.ok(st.detail.includes(ue.SUPPORT_HINT), taskStatus)
+    assert.match(st.detail, /重新/, `${taskStatus}：给一条手机上能自己做的出路`)
+    // 读不到 support-contact 的 otherOnlineTerminalNearby 之前，不知道附近有没有别的在线终端，
+    // 按最保守的不说「换一台机器」（总指挥 10/4 晚定；接口接上后按该字段再说）
+    assert.doesNotMatch(st.detail, /换一台|换台/, taskStatus)
+  }
+  for (const rel of ['pages/print-pickup/print-pickup.wxml', 'pages/print/print.wxml']) {
+    assert.match(read(rel), /\{\{supportHint\}\}/, rel)
+  }
+})
+
+test('现场无人值守：模板用到的 supportHint 在页面 data 里真有值（实跑页面定义）', async () => {
+  const { loadPageDefinition } = await import('./page-sandbox.mjs')
+  const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
+  const { SUPPORT_HINT } = requireMiniapp('../utils/user-error.js')
+  for (const rel of ['pages/print/print.js', 'pages/print-pickup/print-pickup.js']) {
+    const def = loadPageDefinition(rel, { wx: {}, modules: {} })
+    assert.equal(def.data.supportHint, SUPPORT_HINT, rel)
+  }
+})

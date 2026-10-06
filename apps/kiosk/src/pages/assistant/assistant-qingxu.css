@@ -11,7 +11,7 @@
   position: relative;
   color: var(--qx-ink);
   font: var(--qx-fs-body)/var(--qx-lh-body) var(--qx-sans);
-  overflow: hidden;
+  overflow-y: auto;
 }
 .kassist * { box-sizing: border-box; }
 .kassist :is(p, h2, h3, dl, dd) { margin: 0; }
@@ -23,8 +23,8 @@
 .kassist .kassist-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .kassist.kassist-qingxu .assistant-workbench {
   width: min(100%, 980px);
-  height: 100%;
-  min-height: 0;
+  height: auto;
+  min-height: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -33,13 +33,13 @@
 }
 .kassist .assistant-cockpit {
   flex: none;
-  padding: 24px 28px;
+  padding: 24px 28px 28px;
   border-radius: 32px;
   color: var(--qx-paper);
   background: radial-gradient(ellipse at 80% 0%, rgb(46 230 168 / 12%), transparent 60%), linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep) 68%);
 }
-.kassist .assistant-cockpit-row { display: flex; align-items: center; gap: 22px; min-height: 250px; }
-.kassist .assistant-cockpit-mark { display: grid; place-items: center; flex: none; width: 76px; height: 92px; color: var(--qx-emerald); border: 1px solid rgb(46 230 168 / 42%); border-radius: 26px; background: rgb(46 230 168 / 9%); }
+.kassist .assistant-cockpit-row { display: flex; align-items: center; gap: 22px; min-height: 164px; align-items: flex-start; }
+.kassist .assistant-cockpit-mark { display: grid; place-items: center; flex: none; width: 90px; height: 148px; color: var(--qx-emerald); border: 1px solid rgb(46 230 168 / 42%); border-radius: 26px; background: rgb(46 230 168 / 9%); }
 .kassist .assistant-cockpit-mark svg { width: 46px; height: 46px; }
 .kassist .assistant-cockpit-copy { flex: 1; min-width: 0; }
 .kassist .assistant-cockpit-eyebrow { font-size: var(--qx-fs-aux-lg); }
@@ -63,8 +63,8 @@
 .kassist .assistant-ai-tools-header h2 { font-size: var(--qx-fs-aux-lg); }
 .kassist :is(.assistant-ai-tools-count, .assistant-ai-tools-reason, .kiosk-ai-chip) { font-size: var(--qx-fs-aux); }
 .kassist .assistant-ai-tools-reason { margin-bottom: 12px; color: var(--qx-on-deep-warn); }
-.kassist .assistant-ai-tools-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-.kassist .assistant-ai-tool-card { display: flex; align-items: center; gap: 8px; padding: 12px; min-height: 64px; background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 22%); border-radius: 16px; color: var(--qx-paper); text-align: left; }
+.kassist .assistant-ai-tools-grid { display: grid; gap: 12px; }
+.kassist .assistant-ai-tool-card { display: flex; align-items: center; gap: 8px; padding: 10px 14px; min-height: 56px; background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 22%); border-radius: 16px; color: var(--qx-paper); text-align: left; }
 .kassist .assistant-ai-tool-card[data-active] { border-color: var(--qx-emerald); background: rgb(46 230 168 / 12%); }
 .kassist .assistant-ai-tool-card[aria-disabled='true'] { color: var(--qx-paper); background: transparent; }
 .kassist .assistant-ai-lamp { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--qx-line-2); }
@@ -74,13 +74,12 @@
 .kassist .aat-body { min-width: 0; }
 .kassist .aat-body strong { font-size: var(--qx-fs-aux-lg); font-weight: 600; }
 .kassist .aat-body small { display: none; }
-.kassist .assistant-cockpit-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; display: flex; flex-direction: column; gap: 18px; padding: 2px 4px 12px; scroll-padding: 16px; }
+.kassist .assistant-cockpit-body { flex: none; min-height: 0; overflow: visible; overscroll-behavior: contain; scrollbar-width: thin; display: flex; flex-direction: column; gap: 18px; padding: 2px 4px 12px; scroll-padding: 16px; }
 .kassist .assistant-cockpit-body > * { flex-shrink: 0; }
 .kassist .assistant-truth { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; font-size: var(--qx-fs-aux); color: var(--qx-ink-2); }
 .kassist .assistant-complaint-link { flex: none; min-height: 48px; padding: 0 4px; border: 0; background: none; color: var(--qx-teal-d); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
-.kassist .assistant-workbench[data-kb-open] { padding-bottom: calc(var(--kassist-kb-h) - 132px + 20px); }
-.kassist .assistant-workbench[data-kb-open] .assistant-cockpit { display: none; }
-/* 屏幕键盘打开时暂让阅读区滚动；收起后恢复所有信息。 */
+/* 键盘覆盖的高度只留在页面末尾；头卡、正文和输入区仍按阅读顺序滚动。 */
+.kassist .assistant-workbench[data-kb-open] { padding-bottom: calc(var(--kassist-kb-h) + 20px); }
 @media (max-width: 600px) {
   .kassist.kassist-qingxu { overflow-y: auto; }
   .kassist.kassist-qingxu .assistant-workbench { height: auto; min-height: 100%; padding: 16px 0 24px; gap: 16px; }
@@ -97,10 +96,9 @@
   .kassist .assistant-cockpit-telemetry div { display: block; }
   .kassist .assistant-cockpit-disclosure { margin-top: 10px; }
   .kassist .assistant-ai-tools-header { flex-wrap: wrap; }
-  .kassist .assistant-ai-tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kassist .assistant-ai-tools-group { grid-template-columns: 1fr; }
   .kassist .assistant-cockpit-body { flex: none; overflow: visible; padding: 2px 4px; }
   .kassist .assistant-workbench[data-kb-open] { padding-bottom: var(--kassist-kb-h); }
-  .kassist .assistant-workbench[data-kb-open] .assistant-cockpit { display: contents; }
 }
 @media (prefers-reduced-motion: reduce) {
   .kassist *, .kassist *::before, .kassist *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -117,4 +115,12 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.kassist .assistant-ai-tools-group { display: grid; grid-template-columns: 130px 1fr; gap: 16px; align-items: start; }
+.kassist .assistant-ai-tools-group-label { padding-top: 14px; font-size: var(--qx-fs-aux-lg); color: var(--qx-paper); }
+.kassist .assistant-ai-tools-group-items { display: flex; flex-wrap: wrap; gap: 10px; }
+.kassist .assistant-cockpit-telemetry { margin: 0; padding-top: 4px; }
+@media (max-width: 600px) {
+  .kassist .assistant-ai-tools-group { grid-template-columns: 1fr; gap: 8px; }
 }

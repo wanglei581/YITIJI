@@ -6473,7 +6473,7 @@ test('orders：失败行按服务端白名单码说原因，只认 5 个码', ()
     PAPER_EMPTY: '打印机缺纸，这次没有出纸；需要的话可重新打印',
     PRINTER_ERROR: '打印机故障（可能卡纸），这次没有出纸；需要的话可重新打印',
     PRINTER_OFFLINE: '打印机离线，这次没有出纸；需要的话可重新打印',
-    PRINT_JOB_UNCONFIRMED: '已发到打印机，但没确认出纸；没拿到纸请找当时那台终端的工作人员核对，不会自动重打',
+    PRINT_JOB_UNCONFIRMED: '已发到打印机，但没确认出纸，不会自动重打；没拿到纸可以重新下单',
     PARTIAL_OUTPUT: '只打出了一部分，没有整单重打；需要的话请重新下单',
   }
   for (const [code, note] of Object.entries(expected)) {

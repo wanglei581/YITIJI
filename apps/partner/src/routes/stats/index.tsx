@@ -58,9 +58,9 @@ import { useRecruitmentHosting } from '../../services/capabilities'
 // ─── 时间范围选择器 ────────────────────────────────────────────────────────
 
 const PERIODS: { value: StatsPeriod; label: string }[] = [
-  { value: 'week',    label: '本周' },
-  { value: 'month',   label: '本月' },
-  { value: 'quarter', label: '本季度' },
+  { value: 'week',    label: '近 7 天（截至昨天）' },
+  { value: 'month',   label: '近 30 天（截至昨天）' },
+  { value: 'quarter', label: '近 90 天（截至昨天）' },
 ]
 
 function PeriodSelector({

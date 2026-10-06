@@ -19,6 +19,7 @@ const exemptions: Record<string, string> = {
   "scripts/verify-document-page-count.ts": "验证文档页数与响应字段白名单，列表强制包含全部指定夹具，不含系统岗位匹配存档。",
   "scripts/verify-field-mapping-rule.ts": "只调用字段映射规则的保存、读取与归属检查，不调用托管内容发布或公开列表。",
   "scripts/verify-job-fit-governance.ts": "只调用匿名匹配授权 grant/status/revoke 与静态路由检查，不创建或读取系统岗位匹配。",
+  "scripts/verify-partner-excel-import.ts": "只用替身服务调用 Excel 解析与预览两个控制器方法，核对中文文件名还原；这两个方法本身不经过托管判断，服务层的导入另由本门禁直接调用。",
   "scripts/verify-job-materials.ts": "验证用户自备材料生成与文档入列，明确断言生成文件存在，不涉及系统岗位报告。",
   "scripts/verify-kiosk-cashier-ui.ts": "终端管理服务仅用于打印夹具，断言对象是现金收银与打印 UI 合同。",
   "scripts/verify-legacy-pending-print-task-disposition.ts": "验证旧打印任务处置、审计与退款，终端管理调用不涉及招聘托管。",
@@ -100,6 +101,15 @@ function imports(source: ts.SourceFile): string[] {
   })
 }
 
+/** 门禁拆分后仍检查脚本模块的实际引用与声明；进入业务源码即停止递归。 */
+function gateSources(file: string, seen = new Set<string>()): ts.SourceFile[] {
+  if (seen.has(file)) return []
+  seen.add(file)
+  const source = parse(file)
+  const children = imports(source).filter((dependency) => relative(apiRoot, dependency).startsWith('scripts/'))
+  return [source, ...children.flatMap((child) => gateSources(child, seen))]
+}
+
 function main(): void {
   const hostedModules = new Set(walk(sourceRoot).filter((file) => file.endsWith('.ts')
     && !relative(sourceRoot, file).startsWith('recruitment-hosting/')
@@ -113,18 +123,18 @@ function main(): void {
   let declared = 0
   let exempted = 0
   for (const file of gates) {
-    const source = parse(file)
-    const dependencies = imports(source).filter((dependency) => hostedModules.has(dependency))
+    const sources = gateSources(file)
+    const dependencies = sources.flatMap(imports).filter((dependency) => hostedModules.has(dependency))
     if (!dependencies.length) continue
     const name = relative(apiRoot, file).replace(/\\/g, '/')
     importers.add(name)
-    if (declaresFlag(source)) declared += 1
+    if (sources.some(declaresFlag)) declared += 1
     else if (Object.hasOwn(exemptions, name) && exemptions[name].trim()) exempted += 1
     else violations.push(`${name}: 未显式赋值 ${flag}，引用 ${dependencies.map((dependency) => relative(apiRoot, dependency)).join(', ')}`)
   }
   for (const [name, reason] of Object.entries(exemptions)) {
     if (!reason.trim()) violations.push(`${name}: 豁免理由为空`)
-    if (!importers.has(name)) violations.push(`${name}: 豁免过期，已不直接 import 托管模块`)
+    if (!importers.has(name)) violations.push(`${name}: 豁免过期，已不引用托管模块`)
   }
   console.log(`声明 ${declared} 个、豁免 ${exempted} 个、违规 ${violations.length} 个`)
   for (const violation of violations) console.error(`违规 ${violation}`)

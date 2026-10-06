@@ -190,8 +190,15 @@ function plainAiMessageOf(err, fallback) {
   return userMessageOf(err, fallback);
 }
 
+/**
+ * 现场没有工作人员（2026-10-04 产品负责人：全程自助、自动）。需要人帮忙时只有一条出路：服务电话。
+ * 号码以后从后端公开接口读（GET /api/v1/public/support-contact?terminalId=，开发中），在那之前只说号码在哪看，不写死。
+ */
+const SUPPORT_HINT = '需要帮助可拨打服务电话，号码在首页底部「经营者信息」里。'
+
 module.exports = {
   isMachineErrorCode,
+  SUPPORT_HINT,
   displayableServerMessage,
   userMessageOf,
   plainAiMessageOf,

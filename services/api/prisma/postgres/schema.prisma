@@ -2208,6 +2208,7 @@ model BenefitGrant {
   endUserId         String
   endUser           EndUser   @relation(fields: [endUserId], references: [id], onDelete: Cascade)
   benefitType       String
+  serviceKey        String?
   title             String
   description       String?
   quantityTotal     Int?
@@ -3318,4 +3319,42 @@ model JobMaterialTemplate {
   updatedByUserId    String?
 
   @@index([status, sortOrder])
+}
+
+// 会员 FileObject 硬删后的物理删除重试账本；不保存会员/文件身份。
+model StorageDeletion {
+  id         String @id @default(cuid())
+  storageKey String @unique
+  bucket     String
+  attempts   Int @default(0)
+  lastError  String?
+  createdAt  DateTime @default(now())
+}
+
+// AI 按人次数账本：member:<id> / terminal:<id> 隔离身份空间；guest 桶跨服务共享。
+model AiQuotaDaily {
+  endUserId String
+  bucket    String
+  day       String
+  used      Int @default(0)
+
+  @@id([endUserId, bucket, day])
+}
+
+model AiQuotaReservation {
+  id             String @id @default(cuid())
+  operationKey   String @unique
+  endUserId      String?
+  terminalId     String?
+  bucket         String
+  source         String
+  day            String
+  benefitGrantId String?
+  resultRef      String?
+  status         String
+  reservedAt     DateTime @default(now())
+  settledAt      DateTime?
+
+  @@index([endUserId, bucket, day])
+  @@index([status, reservedAt])
 }
