@@ -15,7 +15,7 @@
     </Property>
 
     <CustomAction Id="AgentServiceRestoreAutoStart" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; config aijobprintagent.exe start= auto" Execute="deferred" Impersonate="no" Return="ignore" />
-    <CustomAction Id="AgentServiceRestoreRecovery" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; failure aijobprintagent.exe reset= 86400 actions= restart/60000/restart/300000/&quot;&quot;/0" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="AgentServiceRestoreRecovery" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; failure aijobprintagent.exe reset= 86400 actions= restart/60000/restart/300000/restart/1800000" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="AgentServiceRestoreFailureFlag" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; failureflag aijobprintagent.exe 1" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="AgentServiceBestEffortStart" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; start aijobprintagent.exe" Execute="deferred" Impersonate="no" Return="ignore" />
 
@@ -57,6 +57,10 @@
             <File Id="ProvisionProductionScript" Source="$(var.StagingRoot)\provision\install-production-agent.ps1" Checksum="yes" />
             <File Id="ProvisionServiceIdentity" Source="$(var.StagingRoot)\provision\service-identity.ps1" Checksum="yes" />
             <File Id="ControlCenterScript" Source="$(var.StagingRoot)\provision\terminal-control-center.ps1" Checksum="yes" />
+            <File Id="BootSpoolGuardScript" Source="$(var.StagingRoot)\provision\boot-spool-guard.ps1" Checksum="yes" />
+            <File Id="BootSpoolGuardTaskScript" Source="$(var.StagingRoot)\provision\boot-spool-guard-task.ps1" Checksum="yes" />
+            <File Id="DailyRebootScript" Source="$(var.StagingRoot)\provision\daily-reboot.ps1" Checksum="yes" />
+            <File Id="DailyRebootTaskScript" Source="$(var.StagingRoot)\provision\daily-reboot-task.ps1" Checksum="yes" />
             <File Id="ControlCenterLauncher" Source="$(var.StagingRoot)\provision\launch-control-center.vbs" KeyPath="yes" Checksum="yes" />
             <Shortcut
               Id="ControlCenterStartMenuShortcut"

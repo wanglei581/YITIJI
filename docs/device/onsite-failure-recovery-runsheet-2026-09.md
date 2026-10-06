@@ -59,7 +59,7 @@
 | 一体机进度轮询 | 每 3 秒；连续 5 次读失败才判失败；客户端 10 分钟查不到终态走「查询超时」 | `PrintProgressPage.tsx:124-126,331-332,452-501` |
 | 一体机设备状态刷新 | 60 秒 | `useTerminalDeviceStatus.ts:54` |
 | 离线 PATCH 重试 | 每 60 秒，指数退避，最多 10 次 | `offline-queue.ts:35-38` |
-| Agent 崩溃重启 | WinSW 第一次 60 秒后尝试重启，第二次 300 秒，第三次不再自动拉起。**这不等于锁被接管或服务必然回到 Running。** 进程退出后命名管道由系统释放；残留 agent.pid 仅作诊断，不阻止启动。 | `apps/terminal-agent/installer/bootstrap/aijobprintagent.xml:9-11`；`instance-lock.ts` `acquireLock` |
+| Agent 崩溃重启 | WinSW 第一次 60 秒后尝试重启，第二次 300 秒，第三次及以后每 1800 秒（30 分钟）再试一次。失败计数一天后清零，不是无限快速重启。**这不等于锁被接管或服务必然回到 Running。** 进程退出后命名管道由系统释放；残留 agent.pid 仅作诊断，不阻止启动。 | `apps/terminal-agent/installer/bootstrap/aijobprintagent.xml:9-12`；`instance-lock.ts` `acquireLock` |
 
 管理员告警页写的是「终端离线（心跳超 3 分钟）」（`apps/admin/src/routes/alerts/index.tsx:153`）。**以代码 5 分钟为准**；现场不要用那句 3 分钟去判定系统对不对。
 
@@ -458,7 +458,7 @@ taskkill /F /PID <Agent的PID>
 
 ### ② 系统应该怎么反应
 
-- WinSW：第一次失败 60 秒后**尝试**重启，第二次 300 秒，第三次不再自动重启；失败计数 1 天重置（`aijobprintagent.xml:9-12`）。安装脚本对 SCM 写入同类策略（`install-production-agent.ps1`）。尝试拉起 ≠ 已经 Running。
+- WinSW：第一次失败 60 秒后**尝试**重启，第二次 300 秒，第三次及以后每 1800 秒再试一次；失败计数 1 天重置（`aijobprintagent.xml:9-12`）。安装脚本对 SCM 写入同类策略（`install-production-agent.ps1`）。尝试拉起 ≠ 已经 Running。
 - 单实例锁（`instance-lock.ts`）：Windows 用带机器标识的命名管道，其它系统用 Unix 域套接字；进程退出（含强杀、断电）后由操作系统释放。已有实例在跑时，第二个进程报 `DUPLICATE_INSTANCE` 并退出（`instance-lock.ts:241`）。`agent.pid` 只记录启动 PID 供诊断，残留不阻止启动，**不需要也不要手工删除**；启动失败先跑 `diagnose-production-agent.ps1`（只读），再看 `last-startup-diagnostic.json`（`startup-diagnostics.ts:62`）。
 - 重启后本地库对账（`task-runner.ts:331-363`），**不会自动再调用打印机**：
   - 本地 `spooled` / `dispatching` → `failed` + `PRINT_JOB_UNCONFIRMED`，文案「打印派发已开始，但无法确认是否已进入队列或完成出纸，请工作人员现场核查」
@@ -716,7 +716,7 @@ taskkill /F /PID <Agent的PID>
 
 1. **远程先确认队列安全。** 看 Agent 开机日志有 `print-queue-hold: idle queue paused`，残留作业清理结果只记数量；后台这台终端的打印机状态不是「开机清理失败，暂停接打印单」或「暂停队列失败，暂停接打印单」。确认前在后台把终端设为「维护中」，停止接单。
 2. **Windows 打印队列由本公司远程清**（站点不进系统，管理员密码由本公司保管，见母盘清单 B11），确认空了；奔图面板上的残留作业，留到巡检时在面板上取消。
-3. **出纸盘可能留有上一位的打印件。** Agent 0.4.13 起空闲时会暂停打印队列，但正在出纸那一段队列是开着的，断电后 Windows 可能在 Agent 起来之前把剩下的纸打出来——里面可能是上一位的简历。断电恢复后**尽快安排一次巡检**取走：本人能联系上就交还本人，联系不上就当场销毁，并登记时间、终端编号、份数（不记内容）。
+3. **开机防护会清掉 Windows 里没打完的作业。** 专用一体机把打印服务改成手动启动。开机任务在打印服务起来之前，清掉 spool 目录里没打完的文件，再启动打印服务。所以上电后不应再出这一单剩下的纸。打印机自己内存里已经收下的那一两页，主机掉电而打印机没掉电时仍会出来，所以巡检仍要看出纸盘：本人能联系上就交还本人，联系不上就当场销毁，并登记时间、终端编号、份数（不记内容）。防护失败时（文件删不掉，打印服务不会被拉起），后台这台终端显示「开机清理失败，暂停接打印单」，整机暂停接打印单，按打印机异常处理。控制中心「开机打印防护」不是「已开启」时，同样先停单再查。
 4. 远程确认以上都正常后，把终端恢复运行。
 
 涉及退款或信息泄露的，交由负责人按试点合规制度处理。

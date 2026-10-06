@@ -22,6 +22,8 @@
 #   # that person's normal Edge). Never use it on a dedicated kiosk (golden image checklist A7a).
 #   # 同一类机器再加 -KeepPrinterQueueUnpaused。空闲暂停会挡住这台电脑上别的程序打印。
 #   # 专用一体机不要加这个开关。
+#   # KSK-001 这台工作电脑再加 -DailyRebootAt off，不注册每天 04:30 的整机重启。
+#   # 专用一体机不要传 off，用默认 04:30。时间必须是 HH:mm，写错会直接失败。
 #
 #   # Replace previously preserved cross-origin Kiosk entries. Passing the
 #   # switch with no -LocalApiAllowedOrigins removes all historical extra origins.
@@ -104,8 +106,13 @@ param(
   [switch]$KeepFileSelectionDialogs,
 
   # 默认暂停配置打印机的队列。兼作工作电脑时加上本开关，否则别的程序也打不出纸。
+  # 加上本开关时不安装开机打印防护，并卸掉已有任务、把 Spooler 恢复为自动启动。
   [Parameter(Mandatory = $false)]
   [switch]$KeepPrinterQueueUnpaused,
+
+  # 每天这个时间重启整机。传 off 不注册。默认 04:30。KSK-001 必须传 off。
+  [Parameter(Mandatory = $false)]
+  [string]$DailyRebootAt = "04:30",
 
   [Parameter(Mandatory = $false)]
   [ValidateRange(1, 65535)]
@@ -300,11 +307,36 @@ function Invoke-Sc([string[]]$Arguments) {
 
 function Set-AgentServiceRecovery([string]$ServiceName) {
   Write-Step "Configuring Windows service recovery"
-  Invoke-Sc @("failure", $ServiceName, "reset=", "86400", "actions=", 'restart/60000/restart/300000/""/0') | Out-Null
+  Invoke-Sc @("failure", $ServiceName, "reset=", "86400", "actions=", "restart/60000/restart/300000/restart/1800000") | Out-Null
   Invoke-Sc @("failureflag", $ServiceName, "1") | Out-Null
   $policy = Invoke-Sc @("qfailure", $ServiceName)
   Write-Host "SCM failure policy for ${ServiceName}:"
   Write-Host $policy
+}
+
+function Resolve-AgentProvisionSource([string]$FileName) {
+  $beside = Join-Path $PSScriptRoot $FileName
+  if (Test-Path -LiteralPath $beside -PathType Leaf) { return $beside }
+  $repoCopy = Join-Path $PSScriptRoot (Join-Path "..\installer\provision" $FileName)
+  if (Test-Path -LiteralPath $repoCopy -PathType Leaf) {
+    return (Resolve-Path -LiteralPath $repoCopy).Path
+  }
+  Fail "Provision script was not found beside the installer or in installer/provision: $FileName"
+}
+
+function Publish-AgentProvisionScript([string]$SourcePath) {
+  if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
+    Fail "Provision script is missing: $SourcePath"
+  }
+  $destinationDir = Join-Path $env:ProgramFiles "AIJobPrintAgent\provision"
+  New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
+  $destination = Join-Path $destinationDir (Split-Path -Leaf $SourcePath)
+  $sourceFull = [System.IO.Path]::GetFullPath($SourcePath)
+  $destinationFull = [System.IO.Path]::GetFullPath($destination)
+  if (-not $sourceFull.Equals($destinationFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Copy-Item -LiteralPath $sourceFull -Destination $destinationFull -Force
+  }
+  return $destinationFull
 }
 
 function Resolve-RepoRoot {
@@ -710,6 +742,10 @@ $apiBase = ConvertTo-CanonicalApiBaseUrl $ApiBaseUrl
 $apiOrigin = ([System.Uri]$apiBase).GetLeftPart([System.UriPartial]::Authority)
 $edgeKioskOrigins = @($LocalApiAllowedOrigins | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { ConvertTo-CanonicalOrigin $_ })
 if ($edgeKioskOrigins.Count -eq 0) { $edgeKioskOrigins = @($apiOrigin) }
+$dailyRebootMode = $DailyRebootAt.Trim()
+if ($dailyRebootMode -ne "off" -and $dailyRebootMode -notmatch "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$") {
+  Fail "DailyRebootAt must be HH:mm between 00:00 and 23:59, or off"
+}
 Set-EdgeKioskPolicies -Origins $edgeKioskOrigins -Remove:$RemoveEdgeKioskPolicies -KeepFileDialogs:$KeepFileSelectionDialogs
 if ($RemoveEdgeKioskPolicies) { exit 0 }
 $preservedLocalSettings = Get-PreservedLocalSettings `
@@ -1014,6 +1050,30 @@ if (-not $SkipServiceInstall) {
 } else {
   Write-WarnLine "Skipping service install/start by request"
 }
+
+# boot-spool-guard-install-begin
+$bootGuardTask = Resolve-AgentProvisionSource "boot-spool-guard-task.ps1"
+. $bootGuardTask
+$dailyRebootTask = Resolve-AgentProvisionSource "daily-reboot-task.ps1"
+. $dailyRebootTask
+if ($KeepPrinterQueueUnpaused) {
+  Uninstall-BootSpoolGuard
+} else {
+  $bootGuardScript = Publish-AgentProvisionScript -SourcePath (Resolve-AgentProvisionSource "boot-spool-guard.ps1")
+  Install-BootSpoolGuard -GuardScriptPath $bootGuardScript
+}
+Write-Host (Get-BootSpoolGuardStatusLine)
+# boot-spool-guard-install-end
+
+# daily-reboot-install-begin
+if ($dailyRebootMode -eq "off") {
+  Uninstall-DailyRebootTask
+} else {
+  $dailyRebootScript = Publish-AgentProvisionScript -SourcePath (Resolve-AgentProvisionSource "daily-reboot.ps1")
+  Install-DailyRebootTask -At $dailyRebootMode -ScriptPath $dailyRebootScript
+}
+Write-Host (Get-DailyRebootStatusLine)
+# daily-reboot-install-end
 
 if (-not $SkipHeartbeatVerify) {
   Write-Step "Verifying remote heartbeat"

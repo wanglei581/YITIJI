@@ -15,6 +15,10 @@ $excluded = @(
   "provision/service-identity.ps1",
   "provision/terminal-control-center.ps1",
   "provision/launch-control-center.vbs",
+  "provision/boot-spool-guard.ps1",
+  "provision/boot-spool-guard-task.ps1",
+  "provision/daily-reboot.ps1",
+  "provision/daily-reboot-task.ps1",
   "kiosk/kiosk-watchdog.ps1",
   "kiosk/register-kiosk-watchdog.ps1",
   "kiosk/launch-kiosk.cmd"

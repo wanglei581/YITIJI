@@ -300,6 +300,10 @@ foreach ($relativeProvisionPath in @(
   "provision\service-identity.ps1",
   "provision\terminal-control-center.ps1",
   "provision\launch-control-center.vbs",
+  "provision\boot-spool-guard.ps1",
+  "provision\boot-spool-guard-task.ps1",
+  "provision\daily-reboot.ps1",
+  "provision\daily-reboot-task.ps1",
   "kiosk\kiosk-watchdog.ps1",
   "kiosk\register-kiosk-watchdog.ps1",
   "kiosk\launch-kiosk.cmd"
@@ -395,7 +399,8 @@ if ($null -eq $service -or $service.StartMode -ne "Auto") {
 $failurePolicy = (& "$env:SystemRoot\System32\sc.exe" qfailure $serviceName 2>&1 | Out-String)
 if ($failurePolicy -notmatch 'RESET_PERIOD[^:]*:\s*86400' -or
     $failurePolicy -notmatch 'RESTART -- Delay = 60000' -or
-    $failurePolicy -notmatch 'RESTART -- Delay = 300000') {
+    $failurePolicy -notmatch 'RESTART -- Delay = 300000' -or
+    $failurePolicy -notmatch 'RESTART -- Delay = 1800000') {
   throw "Bound repair did not restore the expected service failure policy: $failurePolicy"
 }
 $failureFlagPolicy = (& "$env:SystemRoot\System32\sc.exe" qfailureflag $serviceName 2>&1 | Out-String)

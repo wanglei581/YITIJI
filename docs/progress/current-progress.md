@@ -1,5 +1,17 @@
 # 当前开发进度
 
+## 2026-10-06：开机打印防护与本机自愈两项（分支 `claude/agent-boot-spool-guard`，基于 `07e0ad943`）
+
+- **决定：** 产品负责人 10/6 批准。整机断电再上电时，Windows 打印服务比 Agent 起得早，会把没打完的作业再送一遍。专用一体机把 Spooler 改为手动启动；开机任务 `AIJobPrintBootSpoolGuard`（SYSTEM、系统启动时、最高权限、限时 3 分钟、失败不重试）在服务起来之前只删 `%SystemRoot%\System32\spool\PRINTERS` 的直接子文件（`*.SPL` / `*.SHD` / `*.TMP`，不递归、不跟链接、不删目录），再启动打印服务。删不掉就不启动，整机停打。打印服务已经在跑时什么都不删。安装当次不重启电脑，当时服务在跑也不删当前队列。
+- **工作电脑模式：** 传了 `-KeepPrinterQueueUnpaused` 不安装防护；若以前装过，卸掉任务并把 Spooler 恢复为自动且在运行。
+- **服务恢复：** 第一次 60 秒、第二次 300 秒，第三次及以后每 1800 秒。`reset` 仍为 1 天。`failureflag 1` 和启动诊断文件没改。安装脚本、WinSW xml、MSI 自定义动作三处一致。
+- **每日维护重启：** 默认 04:30，任务 `AIJobPrintDailyReboot`。队列有作业就等 10 分钟再看，最多 3 次，仍有作业当天不重启。`-DailyRebootAt off` 不注册，并卸掉已有任务。时间不是 `HH:mm` 也不是 `off` 时安装直接失败。KSK-001 每次重跑必须加 `-DailyRebootAt off`（发布当天仍不加 `-KeepPrinterQueueUnpaused`）。专用一体机用默认 04:30。
+- **卸载：** MSI 自定义动作仍是四个 `sc.exe`，条件都是卸载时不跑，没有能跑 PowerShell 的位置，没有硬加。MSI/EXE 卸完可能把打印服务留在「手动且未运行」。手工恢复命令在母盘清单 G7。工作电脑模式重跑安装脚本会自动回退。
+- **版本与试点：** 版本号仍是 `0.4.13`。随下一个从这个分支打出来的安装包走。拔电实测通过之前不上试点。别的触发器仍可能提前拉起打印服务，防护会跳过；诊断只读采集 `sc.exe qtriggerinfo Spooler`，不删那些触发器。
+- **门禁：** 静态 `verify:boot-spool-guard` 进 CI Linux 的 Agent 段。Windows 用例 `verify:boot-spool-guard-windows` 挂进 `windows-agent-installer.yml` 的 `unsigned-exe-upgrade`（windows-2022），在 `build-staging` 之前。本机 macOS 跑该脚本只打印跳过并退出 0。已写好、待 CI。真机拔电没做。
+- **本机验证（2026-10-06）：** `tsc --noEmit -p .` 退出 0。`verify:boot-spool-guard`、`verify:windows-service-recovery`、`verify:installer-inputs`、`verify:production-provisioning`、`verify:print-scan-agent` 退出 0。`node scripts/verify-repository-integrity.mjs` 退出 0（5117 个文件，6 个 workflow YAML）。`node scripts/generate-project-graph.mjs` 后 `--check` 通过，图谱 0 个文件变化。`verify:singleton-process` 退出 0。`verify:scan-watcher` 重跑退出 0（同一次在机器忙时有一条反向子进程超时，重跑通过）。`verify:task-reliability` 退出 1，两处都在本分支原有文件上、这次没改它们：`dead-letter list` 在 15 秒内没有退出（status 为 null）；内嵌的单实例检查限时 120 秒，身份竞争约 95 秒后整体超时。单独的 `verify:singleton-process` 已通过。其余 `package.json` 里能在 macOS 跑的 `verify*` 在本分支上此前已逐个退出 0；两个 Windows 专属脚本在 macOS 上跳过，靠 CI。反向测试退出码补在下一笔。
+- **停放、隐藏、改名、降级：** 无。没有新增岗位、招聘会、企业功能。
+
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
 - **决定：** 10/4 21:5x 产品负责人定主原则「设备现场不需要工作人员，是自助的、自动的，这个是主要的」。

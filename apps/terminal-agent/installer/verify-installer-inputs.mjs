@@ -159,9 +159,9 @@ assert.match(autoStartCommand, /\bconfig\s+aijobprintagent\.exe\s+start=\s+auto$
 const recoveryCommand = customActions.find((attributes) => attributes.get('Id') === 'AgentServiceRestoreRecovery').get('ExeCommand').replaceAll('&quot;', '"')
 const failureFlagCommand = customActions.find((attributes) => attributes.get('Id') === 'AgentServiceRestoreFailureFlag').get('ExeCommand').replaceAll('&quot;', '"')
 const recoveryReset = productionInstaller.match(/Invoke-Sc\s+@\("failure",\s*\$ServiceName,\s*"reset=",\s*"([^"]+)"/)?.[1]
-const recoveryActions = productionInstaller.match(/'restart\/60000\/restart\/300000\/""\/0'/)?.[0]
+const recoveryActions = productionInstaller.match(/"restart\/60000\/restart\/300000\/restart\/1800000"/)?.[0]
 assert.equal(recoveryReset, '86400', 'MSI recovery reset period must match install-production-agent.ps1')
-assert.equal(recoveryActions, "'restart/60000/restart/300000/\"\"/0'", 'MSI recovery actions must match install-production-agent.ps1')
+assert.equal(recoveryActions, '"restart/60000/restart/300000/restart/1800000"', 'MSI recovery actions must match install-production-agent.ps1')
 assert.match(recoveryCommand, new RegExp(`reset=\\s+${recoveryReset}\\s+actions=\\s+${recoveryActions.slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'), 'MSI recovery command must match binding recovery policy')
 const failureFlag = productionInstaller.match(/Invoke-Sc\s+@\("failureflag",\s*\$ServiceName,\s*"([01])"/)?.[1]
 assert.equal(failureFlag, '1', 'binding failureflag value must remain parseable')
@@ -235,6 +235,16 @@ assert.match(wix, /ComponentRef Id="KioskWatchdogComponent"/)
 for (const staged of ['kiosk/kiosk-watchdog.ps1', 'kiosk/register-kiosk-watchdog.ps1', 'kiosk/launch-kiosk.cmd']) {
   assert.match(wixFragment, new RegExp(staged.replace(/[./]/g, '\\$&')), `${staged} must be excluded from the auto-generated payload fragment`)
   assert.match(staging, new RegExp(staged.split('/')[1].replace(/\./g, '\\.')), `${staged} must be staged`)
+}
+for (const staged of [
+  'provision/boot-spool-guard.ps1',
+  'provision/boot-spool-guard-task.ps1',
+  'provision/daily-reboot.ps1',
+  'provision/daily-reboot-task.ps1',
+]) {
+  assert.match(wixFragment, new RegExp(staged.replace(/[./]/g, '\\$&')), `${staged} must be excluded from the auto-generated payload fragment`)
+  assert.match(staging, new RegExp(staged.split('/')[1].replace(/\./g, '\\.')), `${staged} must be staged`)
+  assert.match(wix, new RegExp(staged.split('/')[1].replace(/[.]/g, '\\.')), `${staged} must ship in the provision component`)
 }
 assert.match(staging, /\$kioskRoot = Join-Path \$stagingRoot "kiosk"/)
 assert.match(stagedPowerShellVerify, /Join-Path \$StagingRoot "kiosk"/, 'staged kiosk scripts must be BOM + parse checked')
@@ -349,6 +359,8 @@ assert.match(
 )
 assert.match(serviceXml, /delay="60 sec"/)
 assert.match(serviceXml, /delay="300 sec"/)
+assert.match(serviceXml, /<onfailure action="restart" delay="1800 sec" \/>/)
+assert.doesNotMatch(serviceXml, /action="none"/)
 
 assert.match(staging, /--frozen-lockfile/)
 assert.match(staging, /SecurityProtocolType\]::Tls12/, 'Windows PowerShell 5.1 downloads must allow TLS 1.2')

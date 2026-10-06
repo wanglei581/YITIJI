@@ -63,6 +63,18 @@ function Get-ControlCenterSnapshot {
   $config = Read-AgentConfig
   $printers = @()
   try { $printers = @(Get-Printer -ErrorAction Stop | Sort-Object Name | Select-Object -ExpandProperty Name) } catch {}
+  $bootTask = Get-ScheduledTask -TaskName "AIJobPrintBootSpoolGuard" -ErrorAction SilentlyContinue
+  $spoolerService = Get-Service -Name "Spooler" -ErrorAction SilentlyContinue
+  $bootSpoolGuardEnabled = $null -ne $bootTask -and $null -ne $spoolerService -and [string]$spoolerService.StartType -eq "Manual"
+  $dailyTask = Get-ScheduledTask -TaskName "AIJobPrintDailyReboot" -ErrorAction SilentlyContinue
+  $dailyRebootLabel = "未开启"
+  if ($null -ne $dailyTask) {
+    $dailyTrigger = @($dailyTask.Triggers) | Select-Object -First 1
+    $dailyRebootLabel = "未知"
+    if ($null -ne $dailyTrigger -and -not [string]::IsNullOrWhiteSpace([string]$dailyTrigger.StartBoundary)) {
+      try { $dailyRebootLabel = ([datetime]$dailyTrigger.StartBoundary).ToString("HH:mm") } catch { $dailyRebootLabel = "未知" }
+    }
+  }
   return [ordered]@{
     version = $agentVersion.Replace("-production", "")
     installed = Test-Path -LiteralPath (Join-Path $agentRoot "dist\index.js") -PathType Leaf
@@ -76,6 +88,8 @@ function Get-ControlCenterSnapshot {
     serviceStartType = if ($null -ne $service) { [string]$service.StartType } else { "NotInstalled" }
     kioskWatchdogRegistered = $null -ne (Get-ScheduledTask -TaskName $kioskTaskName -ErrorAction SilentlyContinue)
     kioskWatchdogAvailable = Test-Path -LiteralPath $kioskRegisterScript -PathType Leaf
+    bootSpoolGuardEnabled = $bootSpoolGuardEnabled
+    dailyRebootLabel = $dailyRebootLabel
     printers = @($printers)
   }
 }
@@ -233,8 +247,8 @@ function Test-QrBridge {
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "AI 求职打印服务终端 - 控制中心"
 $form.StartPosition = "CenterScreen"
-$form.Size = New-Object System.Drawing.Size(940, 762)
-$form.MinimumSize = New-Object System.Drawing.Size(940, 762)
+$form.Size = New-Object System.Drawing.Size(940, 798)
+$form.MinimumSize = New-Object System.Drawing.Size(940, 798)
 $form.MaximizeBox = $false
 $form.BackColor = [System.Drawing.ColorTranslator]::FromHtml("#F1F5F9")
 $form.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
@@ -253,7 +267,7 @@ $form.Controls.Add($header)
 
 $summary = New-Object System.Windows.Forms.Panel
 $summary.Location = New-Object System.Drawing.Point(24, 112)
-$summary.Size = New-Object System.Drawing.Size(884, 82)
+$summary.Size = New-Object System.Drawing.Size(884, 118)
 $summary.BackColor = [System.Drawing.Color]::White
 $summary.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
 $terminalText = New-Label "终端：尚未绑定" 22 14 280 26
@@ -262,12 +276,14 @@ $serviceText = New-Label "服务：正在检查" 316 14 300 26
 $versionText = New-Label "版本：0.4.13" 640 14 180 26
 $statusText = New-Label "正在读取本机状态…" 22 46 820 24
 $statusText.ForeColor = [System.Drawing.ColorTranslator]::FromHtml("#64748B")
-$summary.Controls.AddRange(@($terminalText, $serviceText, $versionText, $statusText))
+$bootGuardText = New-Label "开机打印防护：正在检查" 22 74 400 26
+$dailyRebootText = New-Label "每日维护重启：正在检查" 440 74 400 26
+$summary.Controls.AddRange(@($terminalText, $serviceText, $versionText, $statusText, $bootGuardText, $dailyRebootText))
 $form.Controls.Add($summary)
 
 $settings = New-Object System.Windows.Forms.GroupBox
 $settings.Text = "设备配置"
-$settings.Location = New-Object System.Drawing.Point(24, 212)
+$settings.Location = New-Object System.Drawing.Point(24, 248)
 $settings.Size = New-Object System.Drawing.Size(884, 198)
 $settings.BackColor = [System.Drawing.Color]::White
 $settings.Controls.Add((New-Label "打印机" 22 34 120))
@@ -299,7 +315,7 @@ $form.Controls.Add($settings)
 
 $actions = New-Object System.Windows.Forms.GroupBox
 $actions.Text = "运行与维护"
-$actions.Location = New-Object System.Drawing.Point(24, 426)
+$actions.Location = New-Object System.Drawing.Point(24, 462)
 $actions.Size = New-Object System.Drawing.Size(884, 140)
 $actions.BackColor = [System.Drawing.Color]::White
 $startButton = New-Button "启动服务" 20 34 120
@@ -315,7 +331,7 @@ $actions.Controls.AddRange(@($startButton, $restartButton, $refreshButton, $pane
 $form.Controls.Add($actions)
 
 $logBox = New-Object System.Windows.Forms.TextBox
-$logBox.Location = New-Object System.Drawing.Point(24, 584)
+$logBox.Location = New-Object System.Drawing.Point(24, 620)
 $logBox.Size = New-Object System.Drawing.Size(884, 112)
 $logBox.Multiline = $true
 $logBox.ReadOnly = $true
@@ -357,6 +373,11 @@ function Refresh-View {
     "Kiosk 看门狗：未注册，登录后不会自动打开全屏"
   }
   $kioskText.ForeColor = if ($snapshot.kioskWatchdogRegistered) { [System.Drawing.ColorTranslator]::FromHtml("#15803D") } else { [System.Drawing.ColorTranslator]::FromHtml("#B45309") }
+  $bootGuardText.Text = if ($snapshot.bootSpoolGuardEnabled) { "开机打印防护：已开启" } else { "开机打印防护：未开启" }
+  $bootGuardText.ForeColor = if ($snapshot.bootSpoolGuardEnabled) { [System.Drawing.ColorTranslator]::FromHtml("#15803D") } else { [System.Drawing.ColorTranslator]::FromHtml("#B45309") }
+  $dailyRebootText.Text = "每日维护重启：$($snapshot.dailyRebootLabel)"
+  $dailyOn = $snapshot.dailyRebootLabel -ne "未开启" -and $snapshot.dailyRebootLabel -ne "未知"
+  $dailyRebootText.ForeColor = if ($dailyOn) { [System.Drawing.ColorTranslator]::FromHtml("#15803D") } else { [System.Drawing.ColorTranslator]::FromHtml("#B45309") }
   $kioskRegisterButton.Enabled = $snapshot.kioskWatchdogAvailable
   $kioskUnregisterButton.Enabled = $snapshot.kioskWatchdogAvailable -and $snapshot.kioskWatchdogRegistered
   $panelButton.Enabled = $snapshot.serviceStatus -eq "Running"

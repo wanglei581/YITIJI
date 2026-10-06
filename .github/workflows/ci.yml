@@ -388,6 +388,8 @@ jobs:
           pnpm run verify:agent-config-resilience
           pnpm run verify:windows-service-recovery
           pnpm run verify:print-scan-agent
+          # 开机打印防护、服务第三次起 30 分钟重试、每日维护重启：只读脚本，不碰打印服务。
+          pnpm run verify:boot-spool-guard
           pnpm run verify:agent-unauthorized
           pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher

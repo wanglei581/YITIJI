@@ -22,6 +22,8 @@
     "verify:legacy-residue-cleanup": "ts-node scripts/agent-crash-privacy.helper.ts",
     "verify:print-queue-residue": "ts-node scripts/verify-print-queue-residue.ts",
     "verify:print-queue-residue-windows": "ts-node scripts/verify-print-queue-residue-windows.ts",
+    "verify:boot-spool-guard": "node scripts/verify-boot-spool-guard.mjs",
+    "verify:boot-spool-guard-windows": "ts-node scripts/verify-boot-spool-guard-windows.ts",
     "verify:image-scale-truth": "ts-node scripts/verify-image-scale-truth.ts",
     "verify:usb-import-agent": "ts-node scripts/verify-usb-import-agent.ts",
     "verify:printer-config": "node scripts/verify-printer-config.mjs",
