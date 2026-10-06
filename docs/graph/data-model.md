@@ -125,20 +125,20 @@ flowchart TD
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineJob** | 22 | Job、OfflineAgency | 1 个文件<br/>`offline-agencies/offline-agencies.service.ts` |
 | **OnlinePlatformDirectory** | 33 | FileObject、Organization | 3 个文件<br/>`official-channels/official-channels.service.ts`<br/>`recruitment-content/recruitment-content-read.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
-| **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 31 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
-| **OrderItem** | 15 | Order | 9 个文件<br/>`console-screen/console-screen.printed-pages.ts`<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
+| **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 32 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
+| **OrderItem** | 15 | Order | 10 个文件<br/>`console-screen/console-screen.printed-pages.ts`<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **OrderSubmissionLedger** | 11 | — | 2 个文件<br/>`member-print-orders/order-submission-ledger.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **Organization** | 28 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、Terminal、User | 20 个文件<br/>`ai/usage/ai-usage-summary.ts`<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>… |
 | **PartnerOrgNotice** | 8 | — | 2 个文件<br/>`policies/policies.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
 | **PaymentAttempt** | 13 | Order | 5 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/online-payment.service.ts`<br/>… |
 | **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **PlatformQualification** | 19 | FileObject | 1 个文件<br/>`common/recruitment-capability.ts` |
-| **PlatformSetting** | 4 | — | 1 个文件<br/>`support-contact/support-contact.service.ts` |
+| **PlatformSetting** | 4 | — | 2 个文件<br/>`print-jobs/free-print-quota.config.ts`<br/>`support-contact/support-contact.service.ts` |
 | **PolicyEligibilityRule** | 10 | PolicyPost | 1 个文件<br/>`policies/policy-eligibility.service.ts` |
 | **PolicyPost** | 26 | Organization、PolicyEligibilityRule | 12 个文件<br/>`activity/activity.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 4 个文件<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>… |
 | **PrintMaterialPack** | 9 | — | **无代码读写** |
-| **PrintTask** | 22 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 37 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
+| **PrintTask** | 22 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 38 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
 | **PrintTaskStatusLog** | 7 | PrintTask | 14 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **QualificationRecord** | 26 | FileObject、OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **RecruitmentCircuitBreak** | 7 | — | 2 个文件<br/>`official-channels/official-channels.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
@@ -151,7 +151,7 @@ flowchart TD
 | **StorageDeletion** | 6 | — | 2 个文件<br/>`files/closure-file-deletion.ts`<br/>`member-privacy/member-closure-redis.service.ts` |
 | **SyncLog** | 15 | JobSource | 6 个文件<br/>`console-screen/console-screen.queries.ts`<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 3 个文件<br/>`assistant/daily-brief.service.ts`<br/>`community/community.service.ts`<br/>`member-notifications/member-notifications.service.ts` |
-| **Terminal** | 30 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 38 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>… |
+| **Terminal** | 30 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 40 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-ops/derived-print-quota-alerts.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 2 个文件<br/>`console-screen/console-screen.twin.ts`<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |

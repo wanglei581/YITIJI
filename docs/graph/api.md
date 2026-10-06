@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`579` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`582` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -916,6 +916,14 @@
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/admin/print-jobs/:id/abandon` | AdminPrintJobsController.abandonPending | admin | AdminPrintJobsAbandonService | AuditLog<br/>Order<br/>PrintTask<br/>PrintTaskStatusLog<br/>User |
 | POST | `/api/v1/admin/print-jobs/:id/verify-outcome` | AdminPrintJobsController.verifyOutcome | admin | — | — |
+
+## `services/api/src/print-jobs/free-print-quota.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/kiosk/print-quota` | KioskPrintQuotaController.get | — | FreePrintQuotaService | AuditLog<br/>PlatformSetting<br/>Terminal |
+| GET | `/api/v1/kiosk/print-quota` | KioskPrintQuotaController.get | — | FreePrintQuotaService | AuditLog<br/>PlatformSetting<br/>Terminal |
+| PUT | `/api/v1/kiosk/print-quota` | KioskPrintQuotaController.update | — | FreePrintQuotaService | AuditLog<br/>PlatformSetting<br/>Terminal |
 
 ## `services/api/src/print-jobs/print-jobs.controller.ts`
 
