@@ -45,6 +45,7 @@
     "verify:pickup-claim-error-coverage": "node scripts/verify-pickup-claim-error-coverage.mjs",
     "verify:backend-error-copy-coverage": "node scripts/verify-backend-error-copy-coverage.mjs",
     "verify:kiosk-session-reporting": "node scripts/verify-kiosk-session-reporting.mjs && node --test scripts/tests/kiosk-session-reporting.test.mjs",
+    "verify:kiosk-support-contact": "node --test scripts/tests/unattended-copy.test.mjs",
     "verify:kiosk-end-use": "node scripts/verify-kiosk-end-use.mjs && node --test scripts/tests/kiosk-end-use.test.mjs",
     "verify:p39-print-hub-fidelity": "node scripts/verify-p39-print-hub-fidelity.mjs",
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",

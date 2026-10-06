@@ -2,9 +2,9 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`111` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`112` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 111 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 112 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
@@ -118,8 +118,8 @@ flowchart TD
 | **MemberLegalConsent** | 10 | EndUser | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
 | **MockInterviewReport** | 6 | MockInterviewSession | 2 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
-| **MockInterviewSession** | 21 | MockInterviewReport、MockInterviewTurn | 4 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
-| **MockInterviewTurn** | 13 | MockInterviewSession | 2 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
+| **MockInterviewSession** | 21 | MockInterviewReport、MockInterviewTurn | 5 个文件<br/>`ai/resume/career-plan.service.ts`<br/>`member-privacy/member-closure-files.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
+| **MockInterviewTurn** | 13 | MockInterviewSession | 3 个文件<br/>`member-privacy/member-closure.service.ts`<br/>`mock-interview/interview-transcript-print.service.ts`<br/>`mock-interview/mock-interview.service.ts` |
 | **OfflineAgency** | 23 | OfflineJob | 2 个文件<br/>`offline-agencies/offline-agencies.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
 | **OfflineAgencyBranch** | 31 | Job、OfflineAgencyProfile、QualificationRecord | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
@@ -133,6 +133,7 @@ flowchart TD
 | **PaymentAttempt** | 13 | Order | 5 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/online-payment.service.ts`<br/>… |
 | **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **PlatformQualification** | 19 | FileObject | 1 个文件<br/>`common/recruitment-capability.ts` |
+| **PlatformSetting** | 4 | — | 1 个文件<br/>`support-contact/support-contact.service.ts` |
 | **PolicyEligibilityRule** | 10 | PolicyPost | 1 个文件<br/>`policies/policy-eligibility.service.ts` |
 | **PolicyPost** | 26 | Organization、PolicyEligibilityRule | 12 个文件<br/>`activity/activity.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 4 个文件<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>… |
@@ -150,7 +151,7 @@ flowchart TD
 | **StorageDeletion** | 6 | — | 2 个文件<br/>`files/closure-file-deletion.ts`<br/>`member-privacy/member-closure-redis.service.ts` |
 | **SyncLog** | 15 | JobSource | 6 个文件<br/>`console-screen/console-screen.queries.ts`<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 3 个文件<br/>`assistant/daily-brief.service.ts`<br/>`community/community.service.ts`<br/>`member-notifications/member-notifications.service.ts` |
-| **Terminal** | 29 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 37 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>… |
+| **Terminal** | 29 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 38 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 2 个文件<br/>`console-screen/console-screen.twin.ts`<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |

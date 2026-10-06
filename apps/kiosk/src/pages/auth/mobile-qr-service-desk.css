@@ -21,7 +21,7 @@
   --m-cinnabar-line: var(--qx-cinnabar-line, #d9b8b2);
   --m-muted-bg: var(--qx-muted-bg, #ece7d9); --m-muted-line: var(--qx-muted-line, #dcd7c9); --m-muted-ink: var(--qx-muted-ink, #6d7069);
   --m-on-deep: var(--m-paper);
-  --m-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --m-serif: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
   --m-ease: cubic-bezier(.22, 1, .36, 1);
   display: flex;
   min-height: 100vh;
@@ -30,7 +30,7 @@
   align-items: center;
   color: var(--m-ink);
   background: var(--m-muted-bg);
-  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 

@@ -140,7 +140,8 @@ export class AiPublicQuotaService {
 
   /**
    * resume_parse 意图的一次性计数。同 intentId 在 marker 存活期间只计一次。
-   * marker TTL 不会短于 resumeParseIntentTtlMs。没有退款，也不会重新放行 provider。
+   * marker TTL 不会短于 resumeParseIntentTtlMs。抛错不会重放 provider。
+   * 我们这边导致的 200-failed 由 releaseResumeParseCharge 减回当日计数，marker 仍留着。
    */
   async consumeOnce(input: ResumeParseQuotaOnceRequest): Promise<ResumeParseQuotaOnceReceipt> {
     const now = input.now ?? new Date()
@@ -164,6 +165,27 @@ export class AiPublicQuotaService {
       if (error instanceof HttpException) throw error
       throw quotaUnavailable()
     }
+  }
+
+  /**
+   * 简历解析这次没拿到可用结果，原因在我们这边。只减当日公共计数。
+   * 不删 once marker，同一次意图不会因此再打一次模型。
+   * day 缺省时读 marker 里记下的计费日，避免跨日减错桶。
+   */
+  async releaseResumeParseCharge(input: {
+    intentId: string
+    context: AiPublicQuotaContext
+    day?: string
+  }): Promise<void> {
+    let day = input.day
+    if (!day) {
+      const stored = await this.redis.get(resumeParseQuotaMarkerKey(input.intentId))
+      day = stored ?? undefined
+    }
+    if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return
+    const keys = this.resumeParseCounters(input.context, day).map((item) => item.key)
+    if (keys.length === 0) return
+    await this.rollbackKeys(keys)
   }
 
   private resumeParseCounters(input: AiPublicQuotaContext, day: string): { key: string; limit: number }[] {
