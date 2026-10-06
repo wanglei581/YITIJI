@@ -6,6 +6,12 @@
 - **改了什么：** 只改版本号。`package.json`、两份配置示例、安装器 `inputs.json`、Windows 安装器工作流 6 处 `-ProductVersion`、生产安装脚本与控制中心的 `-production` 版本串、MSI/EXE 生命周期测试的候选版本与对应门禁断言，0.4.13 → 0.4.14。升级测试的前代仍是现场 0.4.10，没动。源码注释里「发布顺序是先服务端、再 Agent 0.4.13」与服务端重提门槛「≥0.4.13」是历史与功能口径，不改。
 - **验证（本机）：** Agent `tsc --noEmit` 通过；`verify-installer-inputs`、`verify-candidate-provenance`、`verify-signing-workflow-contract`、`verify-production-provisioning`、`verify-print-scan-agent`、`verify-windows-service-recovery`、`verify-print-queue-residue`、`verify-usb-import-agent`、`verify-print-retry-attempt` 等 Agent 门禁全部退出 0；仓库根 `verify-repository-integrity`（改了工作流 YAML）通过。安装包由 PR 上的 `windows-agent-installer` 工作流出，出包后核身份清单 `productVersion=0.4.14`、`sourceCommit` 与 SHA256，再替换现场步骤里的包。
 - **没做：** 真机没装。KSK-001 仍按现场步骤先装 0.4.13 跑 15 步（另加第 3b 步核双面翻页方向）；0.4.14 装到试点硬件上。
+## 2026-10-06：并排截图工具可换端口，搭好 B 路夹具登记处（只改测试工具，分支 `claude/kiosk-b-qxpairs-port-1006`）
+
+- 起因：一体机前端分 A、B、C 三路同时照青序 2.0 稿补页，都要跑 `capture:qingxu-pairs`；端口原来写死 4217 / 4218，两路同时跑就撞。
+- 改法：加环境变量 `QX_PAIRS_PORT`。不设时仍是 4217，稿服务用它 +1；不是 1024–65534 的整数就立刻报中文错误，不开始构建。B 路（16、18–25、29、34、46、52）的造状态夹具每页一个文件 `tests/visual/fixtures/qingxu-pair-b/pNN.ts`，由 `qingxu-pair-resume-pages.ts` 统一转交，`qingxu-pair-targets.ts` 只加三处接线。13 个文件现在都是空壳，造状态和改之前一样；之后每页的 PR 只改自己那一个文件，几个 PR 之间不冲突。
+- 验证：一体机类型检查通过；`audit:qingxu-v2-drafts --only='^(52|22)-'` 退出码 0；用 4357 端口实截，52 号 8 对、22 号 9 对全部配上。这个工具按需跑，不进 CI。
+- 停放、隐藏、改名、降级：无。Grok 实现，一体机前端 B 窗口审。
 
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
