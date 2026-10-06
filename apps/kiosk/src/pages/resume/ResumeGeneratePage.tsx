@@ -45,6 +45,7 @@ import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-flow-qx.css'
+import { toSubmittedExperience } from './resumeGenerateSubmit'
 
 const STEPS = [
   { title: '基本信息', description: '姓名与联系方式', ask: '先留下能联系上你的方式', doing: '这一步只有姓名必填。城市和联系方式可以空着。' },
@@ -177,7 +178,7 @@ export function ResumeGeneratePage() {
       jobType: intention.jobType.trim() || undefined,
       salary: intention.salary.trim() || undefined,
     },
-    // 只提交填了关键字段的条目(学校/公司+职务/项目名),半空条目不提交
+    // 只提交填了关键字段的条目(学校/公司/项目名)；经历只看公司，职务可以空（见 resumeGenerateSubmit）
     education: education
       .filter((e) => e.school.trim())
       .map((e) => ({
@@ -187,14 +188,7 @@ export function ResumeGeneratePage() {
         period: e.period?.trim() || undefined,
         description: e.description?.trim() || undefined,
       })),
-    experience: experience
-      .filter((e) => e.company.trim() && e.role.trim())
-      .map((e) => ({
-        company: e.company.trim(),
-        role: e.role.trim(),
-        period: e.period?.trim() || undefined,
-        description: e.description.trim(),
-      })),
+    experience: toSubmittedExperience(experience),
     projects: projects
       .filter((p) => p.name.trim())
       .map((p) => ({ name: p.name.trim(), role: p.role?.trim() || undefined, description: p.description.trim() })),

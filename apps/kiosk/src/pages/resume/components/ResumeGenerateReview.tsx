@@ -5,6 +5,7 @@ import type {
 } from '@ai-job-print/shared'
 import { PenLineIcon } from 'lucide-react'
 import { maskEmail, maskPhone } from '../../../utils/maskPii'
+import { isSubmittableExperience } from '../resumeGenerateSubmit'
 
 /** 与 ResumeGeneratePage.buildInput 同一条提交规则：半空条目不送出。 */
 function splitList(text: string, cap: number): string[] {
@@ -41,7 +42,7 @@ export function ResumeGenerateReview(props: {
   onEdit: (step: number) => void
 }) {
   const eduKept = props.education.filter((item) => item.school.trim()).length
-  const expKept = props.experience.filter((item) => item.company.trim() && item.role.trim()).length
+  const expKept = props.experience.filter(isSubmittableExperience).length
   const projKept = props.projects.filter((item) => item.name.trim()).length
   const eduSkip = props.education.length - eduKept
   const expSkip = props.experience.length - expKept
