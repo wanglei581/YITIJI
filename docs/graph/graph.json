@@ -12903,7 +12903,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 638,
+      "reachableFileCount": 645,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15879,7 +15879,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 735
+      "sourceFileCount": 739
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19981,6 +19981,10 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/src/pages/profile/components/ProfileHomeStates.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
     "apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
@@ -20153,6 +20157,14 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/documents/documentClassify.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -20232,6 +20244,10 @@
     "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css": [
@@ -29873,6 +29889,7 @@
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileHeader.tsx",
+          "apps/kiosk/src/pages/profile/components/ProfileHomeStates.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MeListShell.tsx",
@@ -29897,6 +29914,8 @@
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
           "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx",
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
+          "apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx",
+          "apps/kiosk/src/pages/profile/me/documents/documentClassify.ts",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
@@ -29909,6 +29928,7 @@
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx",
+          "apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts",
           "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/feedback-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
@@ -30699,6 +30719,7 @@
           "apps/kiosk/src/pages/profile/components/ProfileContinueCard.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileHeader.tsx",
+          "apps/kiosk/src/pages/profile/components/ProfileHomeStates.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/components/QxMemberNavbar.tsx",
           "apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx",
@@ -30724,6 +30745,8 @@
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
           "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx",
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
+          "apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx",
+          "apps/kiosk/src/pages/profile/me/documents/documentClassify.ts",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
@@ -30737,6 +30760,7 @@
           "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx",
+          "apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts",
           "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/feedback-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
@@ -42645,29 +42669,6 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/copy/unattendedCopy.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/hooks/useSupportContact.ts",
-        "kind": "component",
-        "mentions": [
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "medium",
-        "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/assistant/assistant-advisor.css",
         "kind": "style",
         "mentions": [
@@ -43895,18 +43896,6 @@
         "risk": "low",
         "scope": "kiosk",
         "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/services/api/supportContact.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
