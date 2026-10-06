@@ -69,7 +69,7 @@ export function BenefitActivitiesPage() {
       ? '没有正在进行的活动时保持空态。'
       : uiState === 'error'
         ? '取不到就不显示，不拿旧活动顶替。'
-        : '活动由主办方发布；参与条件与费用以活动说明为准。'
+        : '活动由活动方发布；参与条件与费用以活动说明为准。'
 
   return (
     <div
@@ -108,7 +108,7 @@ export function BenefitActivitiesPage() {
                 </button>
               )}
             >
-              活动由主办方发布，<b>没有就是没有</b>。有新的活动时，这一页会直接出现，不需要你反复刷新。
+              活动由活动方发布，<b>没有就是没有</b>。有新的活动时，这一页会直接出现，不需要你反复刷新。
             </StateBlock>
           ) : null}
           {uiState === 'list' ? (
@@ -146,7 +146,7 @@ export function BenefitActivitiesPage() {
                             {tag ? <span className="act-tag" data-tone={tone}>{tag}</span> : null}
                           </span>
                           <span className="act-sub">
-                            <span>主办方 {SOURCE_LABEL[item.sourceType]}</span>
+                            <span>来源 {SOURCE_LABEL[item.sourceType]}</span>
                             <span>活动时间 {validity(item)}</span>
                           </span>
                           <span className="act-item-note">参与条件与是否收费，以活动说明与现场核价为准</span>
@@ -183,7 +183,7 @@ function LoadingRows() {
               <span className="act-ic"><FlagIcon size={28} aria-hidden /></span>
               <span className="act-tx">
                 <span className="act-t">活动名称<span className="act-tag">读取中</span></span>
-                <span className="act-sub"><span>主办方 读取中</span><span>活动时间 读取中</span></span>
+                <span className="act-sub"><span>来源 读取中</span><span>活动时间 读取中</span></span>
                 <span className="act-item-note">参与条件与是否收费，以活动说明与现场核价为准</span>
               </span>
               <span className="act-go" aria-disabled="true">读取中</span>
@@ -201,7 +201,7 @@ function ListCta({ uiState, onRetry }: { uiState: ListUi; onRetry: () => void })
     ? <button type="button" className="qx-btn" data-variant="primary" data-testid="activities-primary" onClick={onRetry}>重新加载</button>
     : <button type="button" className="qx-btn" data-variant="primary" data-testid="activities-primary" onClick={() => navigate('/me/benefits')}>回我的权益</button>
   return (
-    <ActivityCtaStack note={uiState === 'list' ? '活动是否收费、名额是否还有，以主办方说明和实际结果为准。' : null}>
+    <ActivityCtaStack note={uiState === 'list' ? '活动是否收费、名额是否还有，以活动方说明和实际结果为准。' : null}>
       <AskQing testId="activities-ask" />
       {primary}
     </ActivityCtaStack>

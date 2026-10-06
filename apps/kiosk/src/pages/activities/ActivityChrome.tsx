@@ -44,7 +44,7 @@ export function LedgerRules() {
         <span className="hint">与本机是否有权益无关</span>
       </div>
       <div className="act-rules">
-        <span className="act-rule"><i />是否符合条件：由系统按主办方的官方规则逐条比对后返回，本机与小青都<b>不替你判定资格</b>。</span>
+        <span className="act-rule"><i />是否符合条件：由系统按活动方的官方规则逐条比对后返回，本机与小青都<b>不替你判定资格</b>。</span>
         <span className="act-rule"><i />能不能抵扣：<b>抵扣功能尚未开放</b>，领到的权益先记在台账里；开放后以使用时的实际结果为准。</span>
         <span className="act-rule" data-no="true"><i />是否收费、收多少：以活动说明与现场公示价为准；补贴类只给说明与官方入口，<b>本机不代办</b>。</span>
       </div>

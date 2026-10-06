@@ -215,12 +215,12 @@ export function BenefitActivityDetailPage() {
               ) : null}
               {uiState === 'ended' ? (
                 <StateBlock tone="warn" title="这个活动已经结束" testId="activity-fallback">
-                  主办方标注的活动时间已经过去，所以<b>不再提供领取入口</b>。已经领到的权益不受影响，仍按它自己的有效期留在台账里。
+                  活动方标注的活动时间已经过去，所以<b>不再提供领取入口</b>。已经领到的权益不受影响，仍按它自己的有效期留在台账里。
                 </StateBlock>
               ) : null}
               {uiState === 'sold-out' ? (
                 <StateBlock tone="warn" title="这个活动的名额已经领完" testId="activity-fallback">
-                  名额由主办方设定，现在<b>已无可领名额</b>。本机不排队、不预约、不承诺补发；如果主办方后续追加，活动会重新开放。
+                  名额由活动方设定，现在<b>已无可领名额</b>。本机不排队、不预约、不承诺补发；如果活动方后续追加，活动会重新开放。
                 </StateBlock>
               ) : null}
               <DetailCards item={item} />
@@ -259,7 +259,7 @@ function DetailCards({ item }: { item: BenefitActivityListItem }) {
           {tag ? <span className="act-tag k8-act-stock" data-tone={phase === '已领取' ? 'teal' : 'wheat'} data-stock-label={phase}>{tag}</span> : null}
         </div>
         <div className="act-kv" style={{ marginTop: 16 }}>
-          <div className="act-kv-row"><span className="act-kv-k">主办方</span><span className="act-kv-v">{SOURCE_LABEL[item.sourceType]}</span></div>
+          <div className="act-kv-row"><span className="act-kv-k">来源</span><span className="act-kv-v">{SOURCE_LABEL[item.sourceType]}</span></div>
           <div className="act-kv-row"><span className="act-kv-k">活动时间</span><span className="act-kv-v">{validity(item)}</span></div>
           <div className="act-kv-row"><span className="act-kv-k">参与方式</span><span className="act-kv-v">{participation(item)}</span></div>
           <div className="act-kv-row"><span className="act-kv-k">费用说明</span><span className="act-kv-v">{FEE_LINE}</span></div>
