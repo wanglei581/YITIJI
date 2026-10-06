@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-10-06：W-156 库被锁时领任务不再挂满一分钟（PostgreSQL 会话超时，未提交）
+
+- **72.7 秒从哪来：** 仓库里没有 72.7 这个常数，也没有 `lock_timeout` / `statement_timeout`。领任务是 `terminals-agent.service.ts` 里一次交互事务（约 500 行），第一条语句是终端行的 `updateMany`（约 502 行，等价于 `UPDATE ... WHERE`，行锁）。这条路径没有 `FOR UPDATE` 字面量，也没有可串行化重试。PostgreSQL 默认 `lock_timeout = 0`，等于一直等。Prisma 交互事务默认 5 秒从 `BEGIN` 返回起算，到点只是把 `ROLLBACK` 排进同一条 pg 连接；正在等锁的 `UPDATE` 不会被这条回滚打断，所以 5 秒计时取消不了这次等待。连接池默认 10 条，领任务卡的是行锁，不是等连接。终端程序 axios 超时 30 秒、5xx 最多再试 3 次（间隔 2/4/6 秒），只有服务端一直不返回才会加到大约 132 秒，对不上 72.7。72.7 是走查看到的返回时间（锁被放开，或客户端在没有对应代码的时刻放弃），不是这几段计时器相加。
+- **这次加上的会话参数（只进应用连接池的启动包，`prisma migrate` 不用这个池，SQLite 不读）：** `DB_LOCK_TIMEOUT_MS` 缺省 5000（允许 200–60000）；`DB_STATEMENT_TIMEOUT_MS` 缺省 30000（允许 1000–300000）；`DB_IDLE_TX_TIMEOUT_MS` 缺省 60000（允许 30000–600000）。空白用缺省且不告警；不是整数或越界则回落缺省，启动时按变量名告警一次，不打印原值。现有最长的交互事务预算是工具箱发布/停用的 30 秒，里面是逐条短更新；报表、导出、注销清理也是短语句，缺省 30 秒不会取消它们，所以没有另用 `SET LOCAL` 放宽。空闲事务 60 秒高于那条 30 秒预算，而且只在事务里没有语句在跑时才计时。
+- **领任务：** PostgreSQL 上把这次交互事务上限放到 `lock_timeout + 2 秒`（缺省 7 秒）。不放的话，Prisma 的 5 秒计时会和 5 秒锁等待抢先后，调用方拿到 P2028 而不是 55P03。没被锁时语句毫秒级结束，领取结果不变。SQLite 仍用 Prisma 默认 5 秒。遇到 55P03 或 57014 立刻 503 `TERMINAL_CLAIM_BUSY`（「服务器忙，稍后自动重试」），不重试。其它接口由现有异常过滤器映射成 503 `DB_BUSY`（「服务器忙，请稍后再试」），不回显驱动原文。可串行化重试（会员隐私、机构、换绑、内部账号、备用管理员、AI 次数，以及绑定码那次会吞掉错误再试的循环）遇到这两个码直接抛出。40001 仍按原来的冲突重试。
+- **门禁：** `verify:pg-lock-timeout:postgres` 在本机临时 PostgreSQL（127.0.0.1:55487，库名 `bh_g_pgtimeout_verify`）上通过。应用连接的三个 `pg_settings.setting` 等于配置（测试里是 2000 / 8000 / 60000，语句超时长于锁等待，持锁用例才会是 55P03）；不带这三个参数的原生连接仍是 0；越界回落 5000 / 30000 / 60000 并告警。持有终端行锁时，其它更新走过滤器得到 503 `DB_BUSY`，领任务在 `lock_timeout + 3 秒` 内得到 503 `TERMINAL_CLAIM_BUSY`，任务仍是 pending；放锁后能领到。`pg_sleep` 被语句超时取消后过滤器给出 503 `DB_BUSY`。可串行化重试在锁超时下只进入 1 次。同库还过了 `verify:pg-serialization-conflict:postgres`（6/6）和 `verify:print-retry-lock:postgres`。跑完已停库、删数据目录，并 `npx prisma generate` 恢复 SQLite 客户端。
+- **反向变异（已改回）：** 不设 `lock_timeout` → `SHOW` 得到 0，退出码 1。从忙码里拿掉 55P03 → 持锁更新不再被认成忙，退出码 1。重试循环把锁超时当成可重试 → 尝试次数 3，退出码 1。
+- **另外跑过：** API `typecheck`、`lint`、`verify:http-exception-filter`（ALL PASS）、`verify:pg-serialization-conflict`（7/7）、`verify:production-db-guard`、`verify:print-jobs`（ALL PASS）、`verify:queue-dispatch-printer-status`、`node scripts/verify-ci-gate-coverage.mjs`（532/542 在闭包内）。`node scripts/generate-project-graph.mjs` 与 `--check` 通过（图谱 0 个文件变化）。没有 push。
+- **停放、隐藏、改名、降级：** 无。
+
 ## 2026-10-06：取件码方案②一体机配套（分支 `claude/kiosk-pickup-arrival-code-only-1006`，叠在 #1261 上）
 
 - 到机码是唯一的取件 / 续打码。到机码页的消歧卡从「三种码」改成「两种码，别搞混」，删了第三栏「取件凭证码 · 出示给工作人员」；键盘说明加续打一句（回出纸失败的那台机器、每单最多 2 次）。

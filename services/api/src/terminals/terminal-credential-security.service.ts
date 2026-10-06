@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
+import { isPostgresBusyError } from '../common/prisma/postgres-busy'
 import { PrismaService } from '../prisma/prisma.service'
 import type { PrismaTransactionClient } from '../prisma/prisma.service'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
@@ -169,7 +170,7 @@ export class TerminalCredentialSecurityService {
           expiresAt: expiresAt.toISOString(),
         }
       } catch (error) {
-        if (attempt === 2) throw error
+        if (isPostgresBusyError(error) || attempt === 2) throw error
       }
     }
     throw new Error('Failed to create terminal bind code')
