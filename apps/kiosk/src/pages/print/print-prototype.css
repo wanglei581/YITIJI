@@ -24,8 +24,8 @@
   --print-slate-soft: var(--color-info-bg);
   --print-plum: var(--color-plum);
   --print-error: var(--color-error);
-  --print-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
-  --print-sans: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --print-serif: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --print-sans: 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', system-ui, sans-serif;
   --print-page-gutter: 48px;
 }
 

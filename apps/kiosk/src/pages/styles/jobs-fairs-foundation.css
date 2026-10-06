@@ -24,8 +24,8 @@
   --dark: var(--k-ink);
   --r-sm: 14px;
   --r-md: 18px;
-  --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
-  --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --serif: "Qingxu Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  --sans: "PingFang SC", "Qingxu Sans", "Microsoft YaHei", system-ui, sans-serif;
   --accent: var(--teal);
   --accent-deep: var(--teal-deep);
   --accent-soft: var(--teal-soft);
