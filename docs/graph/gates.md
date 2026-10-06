@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1851 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1852 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2243,7 +2243,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 590 个文件</summary>
+<summary><code>services/api/src/</code> — 591 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2705,8 +2705,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/payment.controller.ts` | `verify-price-single-source.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-ai-access.ts`<br/>`verify-payment-codepay.ts` |
 | `services/api/src/payment/payment.module.ts` | `verify-payment-codepay.ts`<br/>`verify-pickup-code-share.ts` |
 | `services/api/src/payment/payment.types.ts` | `verify-admin-order-filters.ts` |
-| `services/api/src/payment/pending-refund-signal.ts` | `verify-admin-orders-readonly.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-payment-flow.ts`<br/>`verify-refund-real-channels.ts` |
-| `services/api/src/payment/pickup-expiry-refund.service.ts` | `verify-pickup-code-share.ts` |
+| `services/api/src/payment/pending-refund-signal.ts` | `verify-admin-orders-readonly.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-payment-flow.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-real-channels.ts` |
+| `services/api/src/payment/pickup-expiry-refund.service.ts` | `verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts` |
 | `services/api/src/payment/pickup-expiry-refund.task.ts` | `verify-pickup-code-share.ts` |
 | `services/api/src/payment/pickup-validity.ts` | `verify-payment-flow.ts`<br/>`verify-pickup-code-share.ts` |
 | `services/api/src/payment/price-config.seed.ts` | `verify-admin-billing.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pricing.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
@@ -2739,6 +2739,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/print-jobs/dto/create-print-job.dto.ts` | `verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-parameter-capability.ts` |
 | `services/api/src/print-jobs/material-check-policy.ts` | `verify-profile-documents-inkpaper.mjs`<br/>`verify-derivation-kind.ts` |
 | `services/api/src/print-jobs/page-range.util.ts` | `verify-pricing.ts` |
+| `services/api/src/print-jobs/paid-reprint-eligibility.ts` | `verify-pickup-code-resume.ts` |
 | `services/api/src/print-jobs/pickup-claim-lockout.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-pickup-code-share.ts` |
 | `services/api/src/print-jobs/pickup-claim-memory.ts` | `verify-pickup-code-share.ts` |
 | `services/api/src/print-jobs/pickup-claim-rate-limit.ts` | `verify-pickup-code-share.ts` |
