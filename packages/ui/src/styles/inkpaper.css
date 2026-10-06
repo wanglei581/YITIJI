@@ -67,7 +67,7 @@
   --color-surface: #fffdf8;   /* --surface */
 
   /* ── Typography ───────────────────────────────────────────── */
-  --font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-serif: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
 
   /* ── Border Radius（纸感圆角，lg/xl 略放大） ──────────────── */
   --radius-lg: 0.875rem;   /* 14px — cards */
@@ -84,7 +84,7 @@
  * 该变量只在引入本文件的应用中定义 → Kiosk 不受影响。
  */
 :root {
-  --font-heading: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-heading: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
 }
 
 /* 纸纹：极淡的横向罗纹，铺在页面底色上 */
