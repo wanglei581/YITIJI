@@ -2,7 +2,7 @@
 
 ## 2026-10-06：免费打印防刷（Grok 实现、Claude 审，未部署）
 
-- **默认值待产品负责人确认，全部可配。** 没配、空值或越界时回落：每台每天 300 面、每个登录会员每天 50 面、免登录每单 20 面、告警阈值 80%。平台设置键 `print.freeQuota.terminalDailySides` / `memberDailySides` / `guestPerOrderSides` / `alertPercent`。单台覆盖是 `Terminal.dailyFreePrintSides`（null = 用全局）。只约束实付 0 的免费单；实付大于 0 不受这三条限制。
+- **默认值 10/6 产品负责人已定（「打印上限按推荐」），全部可配。** 没配、空值或越界时回落：每台每天 300 面、每个登录会员每天 50 面、免登录每单 20 面、告警阈值 80%。平台设置键 `print.freeQuota.terminalDailySides` / `memberDailySides` / `guestPerOrderSides` / `alertPercent`。单台覆盖是 `Terminal.dailyFreePrintSides`（null = 用全局）。只约束实付 0 的免费单；实付大于 0 不受这三条限制。
 - **收紧一（在途）：** 拒绝条件是「今天已出纸 + 仍在途（同一终端或同一会员、今天建的、pending / claimed / printing）+ 本单面数 > 上限」。余量接口的 `used` 只算已出纸，`remaining = max(0, 上限 − 已出纸 − 在途)`。失败、未确认、取消不计。成功出纸的 `errorCode` 是空的，计数时必须把空错误码算进去，不能用 SQL `NOT errorCode = 未确认`（那会把空值行丢掉）。
 - **收紧二（文案）：** `PRINT_TERMINAL_DAILY_QUOTA_REACHED` 只说「今天这台机器的免费打印量已用完，明天 0 点恢复。」不写「文件已存在你的『我的文档』里」（不是每单都进了「我的文档」）。三条文案都不出现「工作人员」。
 - **收紧三（告警）：** `print_terminal_quota_high` 写在新文件 `services/api/src/admin-ops/derived-print-quota-alerts.ts`。`collectDerivedAlerts` 只加一行调用。只算 `enabled && lifecycleStatus === 'active'` 的终端；达到阈值 warning，用满 error；回合 = 终端 + 北京日期。`firingTotal` 必须把这一类的条数加进去，否则运营列表的总数会少算。企业微信推送仍用既有包装（标题前加「【职易达告警】」、后面加「正在发生」），告警标题本身是「终端 … 今日免费打印量已达 used / limit 面」。
