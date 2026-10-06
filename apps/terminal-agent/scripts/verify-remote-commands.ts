@@ -368,6 +368,73 @@ async function assertNonWindowsNoop(): Promise<void> {
   assert.equal(listed, false)
 }
 
+function assertHoldAlreadyCalled(calls: string[], label: string): void {
+  const busyAt = calls.indexOf('isBusy')
+  assert.ok(busyAt > 0, `${label}: isBusy must run after holdClaims, got ${calls.join(' > ')}`)
+  assert.equal(
+    calls.slice(0, busyAt).includes('holdClaims'),
+    true,
+    `${label}: holdClaims must already have run when isBusy is called, got ${calls.join(' > ')}`,
+  )
+}
+
+async function assertHoldClaimsBeforeBusy(server: FakeServer, config: AgentConfig): Promise<void> {
+  resetRuntime()
+  server.acks.length = 0
+  const calls: string[] = []
+  let busy = false
+  const handle = createRemoteCommandProcessor({
+    now: () => NOW,
+    isBusy: () => {
+      calls.push('isBusy')
+      return busy
+    },
+    ack: async (commandId, body) => {
+      calls.push(`ack:${body.result}`)
+      return postTerminalCommandAck(config, commandId, body)
+    },
+    exit: () => {
+      calls.push('exit')
+    },
+    holdPrinterQueueWhenIdle: true,
+    pauseQueue: async () => {
+      calls.push('pause')
+    },
+    clearPrintQueue: async () => ({ result: 'done', remainingJobs: 0 }),
+    holdClaims: (reason) => {
+      calls.push('holdClaims')
+      holdPrintClaims(reason)
+    },
+    releaseClaims: () => {
+      calls.push('releaseClaims')
+      releasePrintClaims()
+    },
+    printerName: config.printerName,
+  })
+
+  assert.equal(await beat(server, config, handle, [command('tcmd_orderclr', 'clear_print_queue', FUTURE)]), true)
+  assertHoldAlreadyCalled(calls, 'clear')
+  assert.equal(server.acks[0]?.body['result'], 'done')
+  assert.equal(calls.includes('exit'), false)
+  assert.equal(remoteClaimHoldReason(), null)
+
+  busy = true
+  calls.length = 0
+  resetRuntime()
+  server.acks.length = 0
+  assert.equal(await beat(server, config, handle, [command('tcmd_orderbusy', 'restart_agent', FUTURE)]), true)
+  assertHoldAlreadyCalled(calls, 'busy restart')
+  assert.equal(server.acks[0]?.body['result'], 'rejected_busy')
+  const busyAt = calls.indexOf('isBusy')
+  const releaseAt = calls.indexOf('releaseClaims')
+  const ackAt = calls.indexOf('ack:rejected_busy')
+  assert.ok(releaseAt > busyAt, `busy restart must release after the busy check, got ${calls.join(' > ')}`)
+  assert.ok(ackAt > releaseAt, `busy restart must ack after release, got ${calls.join(' > ')}`)
+  assert.equal(calls.includes('exit'), false)
+  assert.equal(calls.includes('pause'), false)
+  assert.equal(remoteClaimHoldReason(), null)
+}
+
 function namesAreConfigured(names: string[]): void {
   assert.ok(names.length > 0, 'clear must be invoked')
   assert.equal(names.every((name) => name === PRINTER), true, 'clear touched a printer other than the configured one')
@@ -470,6 +537,9 @@ async function main(): Promise<void> {
       assert.equal(busy.clearCalls, 0)
       assert.equal(busy.order.includes('exit'), false)
       assert.equal(busy.order.includes('pause'), false)
+      assert.equal(remoteClaimHoldReason(), null)
+
+      await assertHoldClaimsBeforeBusy(server, config)
 
       resetRuntime()
       server.acks.length = 0

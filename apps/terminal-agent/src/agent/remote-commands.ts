@@ -123,7 +123,10 @@ export function createRemoteCommandProcessor(
       commandLog(command.id, command.type, ok ? 'expired' : 'ack_failed')
       return ok
     }
+    // 先挡住领取，再查忙。顺序反过来时，领取循环可能在两步之间开始一单。
+    deps.holdClaims(command.type)
     if (await deps.isBusy()) {
+      deps.releaseClaims()
       const ok = await deps.ack(command.id, { result: 'rejected_busy' })
       commandLog(command.id, command.type, ok ? 'rejected_busy' : 'ack_failed')
       return ok

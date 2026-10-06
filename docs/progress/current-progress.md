@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-10-06：远程指令先挡住领取，再查是否在忙（分支 `claude/agent-remote-commands-1006`，本地提交，未推送）
+
+- **问题：** `handle` 先 `await isBusy()`，到 `acceptRestart` / `clearQueue` 里才 `holdClaims`。两步之间领取循环可能刚好开始一单：重启会在有任务时退出，清空会删掉刚提交的作业。
+- **改法：** 过期指令仍直接回 `expired`，不挡领取。不过期的指令先 `holdClaims`，再查 `isBusy`。忙则先 `releaseClaims`，再回 `rejected_busy`。不忙则继续原来的重启或清空。重启回执失败仍 `releaseClaims`；清空结束仍在 `finally` 里 `releaseClaims`。
+- **领取请求算不算忙：** 算。`hasInFlightPrintWork()` 在 `claimRequestsInFlight > 0` 或有正在执行的打印任务时为真。计数在 `claimConfiguredPrintTasks` 里、发出领取请求之前同步加一，请求返回后在 `finally` 里减一，然后才把任务放进 `activePrintTasks`。所以「已经通过闸门、领取请求还在进行」会被看成忙，先挡后查就够，没有改 `task-runner` 或闸门。闸门检查和进入 `claim()` 之间还有一次已经决议的 `await`（恢复函数在闸门开着时立刻返回）；那一跳里计数仍是 0，不在「正在进行的领取请求」里。
+- **门禁：** `verify-remote-commands` 加了一条调用顺序用例。清空（不忙）和重启（忙）都记录调用顺序，断言 `isBusy` 被调用时 `holdClaims` 已经调用过。忙的重启还断言先放开领取，再回 `rejected_busy`。
+- **本机验证：** 在 `apps/terminal-agent` 下，`tsc --noEmit -p .` 退出 0；`ts-node scripts/verify-remote-commands.ts` 退出 0；`node scripts/verify-print-scan-agent.mjs` 退出 0。真机和真后端没跑。
+- 停放、隐藏、改名、降级：无。
+
 ## 2026-10-06：终端程序接后台远程指令（分支 `claude/agent-remote-commands-1006`，本地提交 `85d616a63`，未推送）
 
 - **改了什么：** 心跳带上本进程启动时刻 `agentStartedAt`（进程启动时取一次，之后不变）。旧服务器开了字段白名单，不认识这个字段会回 400，终端会被看成离线。心跳若收到 400 且 `error.message` 或 `error.details` 指向 `agentStartedAt`，本进程停发该字段并立刻重发一次，日志记 `heartbeat: server does not accept agentStartedAt, disabled`。其他 400 仍按原来的失败处理。
