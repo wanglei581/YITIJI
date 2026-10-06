@@ -10,7 +10,10 @@ import type {
   UpdateTerminalProfileInput,
 } from '../../services/api/devices'
 import { isParkedOrgType } from '../partners/orgTypeOptions'
+import { TerminalActivationFileButton } from './TerminalActivationFileButton'
+import { TerminalIdentityDisposition } from './TerminalIdentityDisposition'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
+import { TerminalProvisionReport } from './TerminalProvisionReport'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
 import { TerminalRemoteCommands } from './TerminalRemoteCommands'
 import { fmtDisk, lifecycleView, printerStatusView, scanInputView } from './terminalStatusViews'
@@ -200,9 +203,12 @@ export function TerminalDetailDrawer({
 
         <Section title="生命周期与启停">
           <div><p className="mb-2 text-sm text-neutral-500">生命周期操作</p><TerminalLifecycleActions terminal={terminal} disabled={statusSaving || lifecycleSaving || profileSaving || savingOrg} onBusyChange={onLifecycleBusy} onUpdated={onLifecycleUpdated} onConflict={onLifecycleConflict} onNotice={onNotice} /></div>
-          <div className="border-t border-neutral-900/[0.06] pt-3"><button type="button" onClick={() => onOpenBindCode(terminal)} disabled={statusSaving || lifecycleSaving || !terminal.enabled || !canCreateBindCode} title={bindCodeTitle} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-primary-200 bg-primary-50 px-3 text-xs font-medium text-primary-700 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"><KeyRoundIcon className="h-3.5 w-3.5" />生成绑定码</button><p className="mt-1 text-[11px] text-neutral-500">{bindCodeTitle}</p></div>
+          <div className="border-t border-neutral-900/[0.06] pt-3"><button type="button" onClick={() => onOpenBindCode(terminal)} disabled={statusSaving || lifecycleSaving || !terminal.enabled || !canCreateBindCode} title={bindCodeTitle} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-primary-200 bg-primary-50 px-3 text-xs font-medium text-primary-700 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"><KeyRoundIcon className="h-3.5 w-3.5" />生成绑定码</button><p className="mt-1 text-[11px] text-neutral-500">{bindCodeTitle}</p><TerminalActivationFileButton terminal={terminal} /></div>
           <div className="flex items-center justify-between gap-3"><span className="text-sm text-neutral-500">启停状态</span><div className="flex items-center gap-2"><StatusBadge dot status={terminal.enabled ? 'success' : 'error'} label={terminal.enabled ? '启用' : '停用'} /><button type="button" onClick={() => onToggleStatus(terminal)} disabled={statusSaving || profileSaving || savingOrg || lifecycleSaving || terminal.lifecycleStatus === 'retired'} className={`rounded-md border px-2 py-1 text-xs font-medium ${terminal.enabled ? 'border-error/20 text-error-fg hover:bg-error-bg' : 'border-success/20 text-success-fg hover:bg-success-bg'}`}>{statusSaving ? '保存中' : terminal.enabled ? '停用' : '启用'}</button></div></div>
         </Section>
+
+        <TerminalProvisionReport terminal={terminal} />
+        <TerminalIdentityDisposition terminal={terminal} onConflict={onLifecycleConflict} onNotice={onNotice} />
 
         <Section title="远程操作">
           <TerminalRemoteCommands key={terminal.id} terminal={terminal} onNotice={onNotice} />

@@ -197,20 +197,28 @@ const typeFilterValues = [
   ...block(alertsPage, 'const TYPE_FILTERS = [', '] as const').matchAll(/value: '([a-z_]+)'/g),
 ].map((match) => match[1])
 const rowIconKeys = keysOf(block(dashboard, 'const ALERT_ROW_ICON:', '\n}\n'))
-const sameSet = (a, b) => a.length === b.length && a.every((item) => b.includes(item))
+// 契约 v1 在后端 ALERT_TYPES 定稿前多两个派生告警。shared 里没有这组联合类型，
+// 只允许恰好这两个额外值，后端已有的每一个仍然必须覆盖。
+const CONTRACT_ALERT_EXTRAS = ['terminal_identity_conflict', 'terminal_credential_expiring']
+function coversBackendPlusContractExtras(frontend, backend) {
+  const extras = frontend.filter((item) => !backend.includes(item))
+  return backend.every((item) => frontend.includes(item))
+    && extras.length === CONTRACT_ALERT_EXTRAS.length
+    && CONTRACT_ALERT_EXTRAS.every((item) => extras.includes(item))
+}
 
 check(
   backendAlertTypes.includes('paid_pending_file_unavailable') &&
-    sameSet(frontendAlertTypes, backendAlertTypes) &&
+    coversBackendPlusContractExtras(frontendAlertTypes, backendAlertTypes) &&
     /type: AdminAlertType\b/.test(adminOps),
-  `ALERT-TYPES: AdminAlertItem.type mirrors backend ALERT_TYPES (${backendAlertTypes.join(', ')})`,
+  `ALERT-TYPES: AdminAlertItem.type covers backend ALERT_TYPES plus the two contract extras (${backendAlertTypes.join(', ')})`,
 )
 check(
-  sameSet(typeMetaKeys, backendAlertTypes) && sameSet(typeFilterValues, backendAlertTypes),
+  coversBackendPlusContractExtras(typeMetaKeys, backendAlertTypes) && coversBackendPlusContractExtras(typeFilterValues, backendAlertTypes),
   `ALERT-TYPES: alerts TYPE_META [${typeMetaKeys.join(', ')}] and TYPE_FILTERS [${typeFilterValues.join(', ')}] cover every alert type`,
 )
 check(
-  sameSet(rowIconKeys, backendAlertTypes) &&
+  coversBackendPlusContractExtras(rowIconKeys, backendAlertTypes) &&
     dashboard.includes('icon: ALERT_ROW_ICON[alert.type]') &&
     /const alertRows = alerts \? buildAlertRows\(alerts\.data\) : \[\]/.test(dashboard) &&
     dashboard.includes('{alertCount > alertRows.length && (') &&

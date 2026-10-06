@@ -1,5 +1,5 @@
 import { formatDateTime } from '@ai-job-print/shared'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CopyIcon, KeyRoundIcon, RefreshCwIcon, XIcon } from 'lucide-react'
 import { API_BASE_URL, API_MODE } from '../../services/api/client'
 import {
@@ -37,31 +37,9 @@ function commandApiBaseUrl(): string {
 }
 
 /**
- * 安装命令用 `-PromptForBindCode` 交互输入绑定码，**不把码拼进命令行**。
- *
- * 这不是偏好，是本仓已经写死的口径 ——
- * docs/device/production-agent-onboarding.md:14 原文：
- *   「通过 `-PromptForBindCode` 安全交互输入一次性绑定码（推荐）…
- *     兼容参数 `-BindCode` 仅用于受控旧流程，**因为它会进入进程命令行**」
- * 该文档给出的示例命令用的也是 `-PromptForBindCode`（第 29 行）。
- *
- * 本对话框此前生成的是 `-BindCode "<码>"` —— 正是文档判为「仅用于旧流程」的那种：
- * 码会落进 PowerShell 的 ConsoleHost_history.txt，安装期间也出现在进程命令行里。
- * 运营人员照后台复制粘贴，就会拿到被弃用的那条路径，而文档说的是另一条。
- *
- * 码本身仍然显示在弹窗里，供运营人员在脚本提示时粘贴 —— 少的只是「写进命令行」这一步。
+ * 绑定码只在弹窗里显示一次，供终端机安装包里的一键激活在提示时粘贴。
+ * 不把码写进命令，页面上也不展示仓库路径或脚本名。
  */
-function buildInstallCommand(bindCode: TerminalBindCodeCreated): string {
-  return [
-    'powershell -ExecutionPolicy Bypass -File .\\apps\\terminal-agent\\scripts\\install-production-agent.ps1',
-    `-ApiBaseUrl "${commandApiBaseUrl()}"`,
-    `-TerminalCode "${bindCode.terminalCode}"`,
-    `-TerminalId "${bindCode.terminalId}"`,
-    '-PromptForBindCode',
-    '-PrinterName "<Windows 实际打印机名>"',
-  ].join(' `\n  ')
-}
-
 export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: TerminalBindCodeDialogProps) {
   const [bindCodeDraft, setBindCodeDraft] = useState<TerminalBindCodeCreated | null>(null)
   const [bindCodeTtlMin, setBindCodeTtlMin] = useState<number>(10)
@@ -69,11 +47,6 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
   const [bindCodeError, setBindCodeError] = useState<string | null>(null)
   const [bindCodeCountdown, setBindCodeCountdown] = useState<number>(0)
   const [bindCodeCopied, setBindCodeCopied] = useState(false)
-
-  const installCommand = useMemo(
-    () => bindCodeDraft ? buildInstallCommand(bindCodeDraft) : '',
-    [bindCodeDraft],
-  )
 
   useEffect(() => {
     if (!bindCodeDraft) {
@@ -171,10 +144,7 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
         {!bindCodeDraft ? (
           <div className="space-y-4">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-              绑定码仅返回一次，关闭弹窗后无法再次查看；请在 Windows 一体机上运行<br />
-              <code className="rounded bg-amber-100 px-1.5 py-0.5">install-production-agent.ps1 -PromptForBindCode</code><br />
-              脚本会提示输入绑定码，届时粘贴即可 —— <strong>不要把码写进命令行</strong>，那样它会留在
-              PowerShell 命令历史里。建议先在 Windows 端核对打印机名后再生成码，避免码过期浪费。
+              绑定码仅返回一次，关闭弹窗后无法再次查看。请在终端机上运行安装包里的一键激活。程序会提示输入绑定码，届时粘贴即可。不要把码写进命令或发到聊天里。建议先在终端机上核对打印机名后再生成码，避免码过期浪费。
             </div>
             <label className="block">
               <span className="text-xs font-medium text-gray-700">有效时长（分钟，最长 60）</span>
@@ -237,9 +207,10 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
               <p className="text-[11px] text-gray-400" title={formatDateTime(bindCodeDraft.expiresAt)}>过期时间：{formatDateTime(bindCodeDraft.expiresAt)}</p>
             </div>
             <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-600">
-              <p className="font-medium text-gray-700">Windows 一体机上推荐的安装命令</p>
-              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-[11px] text-gray-700">{installCommand}</pre>
-              <p className="mt-2 text-[11px] text-amber-800">请确认这是终端能访问到的服务地址。</p>
+              <p className="font-medium text-gray-700">在终端机上运行安装包里的一键激活。按提示输入这一次的绑定码，不要把它写进命令或发到聊天里。</p>
+              <p className="mt-2">服务地址：<span className="font-mono">{commandApiBaseUrl()}</span></p>
+              <p className="mt-1">终端编号：<span className="font-mono">{bindCodeDraft.terminalCode}</span></p>
+              <p className="mt-2 text-[11px] text-amber-800">打印机名在终端机上按实际安装的名称点选。请确认这是终端能访问到的服务地址。</p>
             </div>
             <div className="flex items-center justify-end gap-2 pt-1">
               <button

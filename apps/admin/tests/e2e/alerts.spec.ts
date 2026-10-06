@@ -24,4 +24,21 @@ test.describe('告警中心（mock 口径）', () => {
     await page.getByRole('button', { name: '刷新' }).click()
     await expect(page.getByRole('heading', { name: '告警中心' })).toBeVisible()
   })
+
+  test('终端身份冲突与终端凭证到期可显示、可筛选', async ({ page }) => {
+    const guards = await openAuthed(page, '/alerts')
+    await settleAdminPage(page, guards)
+    await expect(page.getByText('终端 KSK-002 疑似被克隆，已暂停领打印任务')).toBeVisible()
+    await expect(page.getByText('终端 KSK-007 的终端凭证将于 2026-12-05 到期')).toBeVisible()
+    await expect(page.getByText('终端身份冲突').first()).toBeVisible()
+    await expect(page.getByText('终端凭证到期').first()).toBeVisible()
+
+    await page.getByRole('button', { name: /终端身份冲突/ }).click()
+    await expect(page.getByText('终端 KSK-002 疑似被克隆，已暂停领打印任务')).toBeVisible()
+    await expect(page.getByText('终端 KSK-007 的终端凭证将于 2026-12-05 到期')).toHaveCount(0)
+
+    await page.getByRole('button', { name: /终端凭证到期/ }).click()
+    await expect(page.getByText('终端 KSK-007 的终端凭证将于 2026-12-05 到期')).toBeVisible()
+    await expect(page.getByText('终端 KSK-002 疑似被克隆，已暂停领打印任务')).toHaveCount(0)
+  })
 })

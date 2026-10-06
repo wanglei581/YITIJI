@@ -4,7 +4,7 @@ import { formatCount, formatDateTime } from '@ai-job-print/shared'
 import { ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
-import { AlertTriangleIcon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'lucide-react'
+import { AlertTriangleIcon, CalendarClockIcon, FileWarningIcon, MessageSquareWarningIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon, ShieldAlertIcon } from 'lucide-react'
 import {
   adminOpsService,
   type AdminAlertItem,
@@ -36,6 +36,16 @@ const TYPE_META: Record<
     guidance: `有 AI 内容投诉等待处理（条数与最早提交时间见上一行），须在 ${AI_CONTENT_COMPLAINT_SLA_WORKDAYS} 个工作日内答复。点「去处理」直接打开已按「AI 内容投诉」筛好的意见反馈，答复后这条告警自动消失；有新投诉进来会再次提醒。确认 / 静默只记录处理。`,
     link: { label: '去处理', to: '/member-feedback?category=ai_content' },
   },
+  terminal_identity_conflict: {
+    label: '终端身份冲突',
+    icon: ShieldAlertIcon,
+    guidance: '在终端详情的「身份处置」里放行、确认换件或吊销。放行和确认换件会用最近一次上报的硬件信息覆盖存档并解除暂停。',
+  },
+  terminal_credential_expiring: {
+    label: '终端凭证到期',
+    icon: CalendarClockIcon,
+    guidance: '到期后这台终端需要重新激活。请在终端详情生成新的激活文件，用 U 盘拷到这台机器。',
+  },
 }
 
 const SEVERITY_MAP: Record<string, { badge: 'error' | 'warning'; label: string }> = {
@@ -55,6 +65,8 @@ const TYPE_FILTERS = [
   { label: '打印失败', value: 'print_failed' },
   { label: '已支付文件不可用', value: 'paid_pending_file_unavailable' },
   { label: 'AI 内容投诉', value: 'feedback_pending' },
+  { label: '终端身份冲突', value: 'terminal_identity_conflict' },
+  { label: '终端凭证到期', value: 'terminal_credential_expiring' },
 ] as const
 
 const VIEW_TABS: Array<{ label: string; value: AlertListView }> = [

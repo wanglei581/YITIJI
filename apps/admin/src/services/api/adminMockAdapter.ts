@@ -30,6 +30,12 @@ import type {
   ReleaseObservationPlansResponse,
   UpdateReleaseObservationPlanInput,
 } from './types'
+import type {
+  TerminalActivationFile,
+  TerminalIdentityActionResult,
+  TerminalIdentityStatus,
+  TerminalProvisionReport,
+} from './terminalActivation'
 import { ApiHttpError } from './client'
 import type { ReviewAction } from './review-types'
 import type { PublishAction } from './review-types'
@@ -188,6 +194,8 @@ const MOCK_TERMINAL_PROFILE: Record<string, UpdateTerminalProfileResult> = {
 const MOCK_PLANNED_TERMINALS: PlannedTerminalCreated[] = []
 const MOCK_TERMINAL_LIFECYCLE: Record<string, { status: TerminalLifecycleStatus; version: number }> = {}
 const MOCK_TERMINAL_CREDENTIAL_STATE: Record<string, { generation: number; active: boolean }> = {}
+/** 放行 / 确认换件之后的身份。激活文件本身不进这里。 */
+const MOCK_IDENTITY_STATUS: Record<string, TerminalIdentityStatus> = {}
 function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null; orgType: string | null } {
   const orgId = MOCK_TERMINAL_ORG[terminalCode] ?? null
   const org = orgId ? MOCK_ORG_OPTIONS.find((o) => o.id === orgId) : undefined
@@ -399,6 +407,7 @@ export const adminMockAdapter = {
         localTaskDatabaseAvailable: t.terminalCode === 'KSK-004' ? false : true,
         ...(MOCK_TERMINAL_PROFILE[t.terminalCode] ?? {}),
         ...mockOrgFields(t.terminalCode),
+        ...mockProvisionExtras(t.terminalCode, now),
         releaseObservation: t.terminalCode === 'KSK-001'
           ? {
               planId: 'rop_demo_001',
@@ -654,6 +663,40 @@ export const adminMockAdapter = {
     return { terminalId: terminal.id, terminalCode: terminal.terminalCode, bindCode, expiresAt }
   },
 
+  async createActivationFile(terminalId: string, ttlMinutes = 1440): Promise<TerminalActivationFile> {
+    await delay()
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    if (!terminal) throw new ApiHttpError('TERMINAL_NOT_FOUND', '终端不存在', 404)
+    if (terminal.lifecycleStatus === 'retired') {
+      throw new ApiHttpError('TERMINAL_RETIRED', '终端已退役，不能激活', 409)
+    }
+    if (terminal.lifecycleStatus !== 'planned' && terminal.lifecycleStatus !== 'maintenance') {
+      throw new ApiHttpError('TERMINAL_MAINTENANCE_REQUIRED', '终端须先设为「待安装」或「维护中」', 409)
+    }
+    // 生产上限拍板前按 60 分钟截断。码和签名只在这一次返回里，不写入模块状态。
+    const capped = Math.max(1, Math.min(60, ttlMinutes))
+    return {
+      schemaVersion: 1,
+      terminalCode: terminal.terminalCode,
+      bindCode: mockBindCode(),
+      expiresAt: new Date(Date.now() + capped * 60_000).toISOString(),
+      apiBaseUrl: 'https://zyidai.cn/api/v1',
+      printerNamePattern: null,
+      kid: 'mock-not-a-signing-key',
+      signature: 'bW9jay1zaWduYXR1cmUtbm90LWEtcmVhbC1rZXk=',
+    }
+  },
+
+  async acceptTerminalIdentity(terminalId: string): Promise<TerminalIdentityActionResult> {
+    return settleMockIdentity(this, terminalId)
+  },
+
+  async confirmTerminalReplacement(terminalId: string): Promise<TerminalIdentityActionResult> {
+    return settleMockIdentity(this, terminalId)
+  },
+
   async getPrinters(): Promise<AdminPrintersResponse> {
     await delay()
     const terminals = (await this.getTerminals()).terminals
@@ -713,6 +756,78 @@ function toMockPrinterStatus(online: boolean, printerStatus: string | null): Adm
   if (!online) return 'offline'
   if (!printerStatus || printerStatus === 'unknown') return 'offline'
   return printerStatus === 'ok' ? 'online' : 'error'
+}
+
+async function settleMockIdentity(
+  adapter: { getTerminals(): Promise<AdminTerminalsResponse> },
+  terminalId: string,
+): Promise<TerminalIdentityActionResult> {
+  await delay()
+  const terminal = (await adapter.getTerminals()).terminals.find(
+    (item) => item.id === terminalId || item.terminalCode === terminalId,
+  )
+  if (!terminal) throw new ApiHttpError('TERMINAL_NOT_FOUND', '终端不存在', 404)
+  if (terminal.identityStatus !== 'suspected_clone' && terminal.identityStatus !== 'suspected_replacement') {
+    throw new ApiHttpError('TERMINAL_IDENTITY_NOTHING_PENDING', '这台终端当前没有待处置的身份冲突', 409)
+  }
+  MOCK_IDENTITY_STATUS[terminal.terminalCode] = 'ok'
+  return { accepted: true }
+}
+
+function mockProvisionExtras(code: string, now: number): {
+  lastProvisionReport: TerminalProvisionReport | null
+  identityStatus: TerminalIdentityStatus
+  credentialExpiresAt: string | null
+} {
+  const day = 86_400_000
+  const at = (offsetMs: number) => new Date(now + offsetMs).toISOString()
+  const passed: TerminalProvisionReport = {
+    ok: true,
+    failedKeys: [],
+    failedChecks: [],
+    reportedAt: at(-5 * 60_000),
+    agentVersion: '1.4.0',
+  }
+  const presets: Record<string, {
+    lastProvisionReport: TerminalProvisionReport | null
+    identityStatus: TerminalIdentityStatus
+    credentialExpiresAt: string | null
+  }> = {
+    'KSK-001': { lastProvisionReport: passed, identityStatus: 'ok', credentialExpiresAt: at(200 * day) },
+    'KSK-002': {
+      lastProvisionReport: {
+        ok: false,
+        failedKeys: ['printer_ready', 'hardware_identity'],
+        failedChecks: [
+          { key: 'printer_ready', code: 'PRINTER_MULTIPLE_MATCH' },
+          { key: 'hardware_identity', code: 'PRINTER_FOO' },
+        ],
+        reportedAt: at(-12 * 60_000),
+        agentVersion: '1.4.0',
+      },
+      identityStatus: 'suspected_clone',
+      credentialExpiresAt: at(40 * day),
+    },
+    'KSK-003': {
+      lastProvisionReport: {
+        ok: false,
+        failedKeys: ['hardware_identity'],
+        failedChecks: [{ key: 'hardware_identity', code: 'HARDWARE_ID_PARTIAL' }],
+        reportedAt: at(-20 * 60_000),
+        agentVersion: '1.3.2',
+      },
+      identityStatus: 'suspected_replacement',
+      credentialExpiresAt: at(-2 * day),
+    },
+    'KSK-004': { lastProvisionReport: passed, identityStatus: 'ok', credentialExpiresAt: at(120 * day) },
+    'KSK-007': { lastProvisionReport: null, identityStatus: 'unknown', credentialExpiresAt: at(59 * day) },
+    'KSK-008': { lastProvisionReport: passed, identityStatus: 'ok', credentialExpiresAt: at(61 * day) },
+    'KSK-009': { lastProvisionReport: null, identityStatus: 'unknown', credentialExpiresAt: null },
+    'KSK-010': { lastProvisionReport: null, identityStatus: 'unknown', credentialExpiresAt: null },
+  }
+  const preset = presets[code] ?? { lastProvisionReport: null, identityStatus: 'unknown' as const, credentialExpiresAt: null }
+  if (MOCK_IDENTITY_STATUS[code]) preset.identityStatus = MOCK_IDENTITY_STATUS[code]
+  return preset
 }
 
 function mockBindCode(): string {

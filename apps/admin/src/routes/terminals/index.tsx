@@ -22,6 +22,7 @@ import { CreatePlannedTerminalDialog } from './CreatePlannedTerminalDialog'
 import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
 import { TerminalDetailDrawer } from './TerminalDetailDrawer'
 import { ReleaseObservationPanel } from './ReleaseObservationPanel'
+import { provisionListColumns } from './terminalColumns'
 import { lifecycleView } from './terminalStatusViews'
 
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
@@ -234,6 +235,7 @@ export default function TerminalsPage() {
     { id: 'terminal', header: '终端', truncate: true, title: (t) => `${t.terminalCode} · ${t.displayName ?? '未命名终端'} · ${t.locationLabel ?? '未设置摆放位置'}`, cell: (t) => <div><p className="truncate font-semibold text-neutral-900">{t.displayName || '未命名终端'}</p><p className="truncate text-xs text-neutral-500"><span className="font-mono">{t.terminalCode}</span> · {t.locationLabel || '未设置摆放位置'}</p></div> },
     { id: 'org', header: '所属机构', truncate: true, cell: (t) => <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-info-bg px-2 py-0.5 text-xs text-info-fg"><span className="truncate">{t.orgName ?? '未绑定'}</span></span> },
     { id: 'runtime', header: '运行状态', cell: (t) => { const view = runtimeStatusView(t); return <div><StatusBadge dot status={view.badge} label={view.label} /><p className="mt-1 text-[11px] text-neutral-500" title={t.lastHeartbeatAt ? formatDateTime(t.lastHeartbeatAt) : undefined}>{t.lastHeartbeatAt ? formatRelativeTime(t.lastHeartbeatAt) : '从未连接'}</p>{view.detail && <p className="mt-1 text-[11px] text-warning-fg">{view.detail}</p>}</div> } },
+    ...provisionListColumns(),
     { id: 'lifecycle', header: '启停与生命周期', cell: (t) => { const view = lifecycleView(t.lifecycleStatus); return <div className="flex flex-wrap gap-1.5"><StatusBadge dot status={t.enabled ? 'success' : 'error'} label={t.enabled ? '启用' : '停用'} /><StatusBadge dot status={view.badge} label={view.label} /></div> } },
     { id: 'actions', header: '操作', sticky: true, align: 'right', cell: (t) => <button type="button" onClick={() => setSelectedId(t.id)} className="inline-flex h-8 items-center rounded-md bg-primary-600 px-3 text-xs font-semibold text-white hover:bg-primary-700" aria-label={`管理 ${t.terminalCode}`}>管理</button> },
   ]
@@ -246,7 +248,7 @@ export default function TerminalsPage() {
         <div className="ml-auto flex items-center gap-2"><span className="text-[12.5px] text-neutral-500">共 {filtered.length} 台终端</span><button type="button" onClick={() => { setCreatingPlannedTerminal(true); setNotice(null) }} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] bg-primary-600 px-3 text-xs font-bold text-white hover:bg-primary-700"><PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />预创建设备</button><button type="button" onClick={() => void refresh()} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 hover:bg-neutral-50"><RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />刷新</button></div>
       </div>
       {notice && <div className={`mb-3 rounded-[9px] border px-4 py-3 text-sm ${notice.type === 'success' ? 'border-success/20 bg-success-bg text-success-fg' : 'border-error/20 bg-error-bg text-error-fg'}`}>{notice.text}</div>}
-      <Card className="overflow-hidden p-0">
+      <Card className="min-w-0 max-w-full overflow-hidden p-0">
         <ConsoleTable items={paginated} columns={columns} loading={loading} error={failed ? { title: '终端数据加载失败', message: '请稍后重试', onRetry: () => void refresh() } : null} empty={{ title: search ? '未找到匹配的终端' : '该分类暂无终端', description: search ? '请尝试其他关键词' : undefined }} page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />
       </Card>
       <ReleaseObservationPanel terminals={terminals} onNotice={setNotice} />

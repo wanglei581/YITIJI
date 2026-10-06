@@ -35,8 +35,8 @@ export interface AdminPrintTaskPage {
 export type AlertHandlingState = 'open' | 'acknowledged' | 'silenced' | 'closed'
 export type AlertListView = 'open' | 'acknowledged' | 'suppressed' | 'all'
 
-/** 与后端 services/api/src/admin-ops/derived-alert-identity.ts 的 ALERT_TYPES 一一对应。 */
-export type AdminAlertType = 'terminal_offline' | 'printer_issue' | 'print_failed' | 'paid_pending_file_unavailable' | 'feedback_pending'
+/** 后端 ALERT_TYPES，再加上契约里的终端身份冲突、终端凭证到期。shared 里没有这组联合类型。 */
+export type AdminAlertType = 'terminal_offline' | 'printer_issue' | 'print_failed' | 'paid_pending_file_unavailable' | 'feedback_pending' | 'terminal_identity_conflict' | 'terminal_credential_expiring'
 
 export interface AdminAlertItem {
   id: string
@@ -190,6 +190,38 @@ const MOCK_ALERTS: AdminAlertItem[] = [
     detail: '演示数据:接真实后端后展示实时派生告警',
     terminalCode: 'KSK-002',
     occurredAt: now(),
+    conditionState: 'firing',
+    handlingState: 'open',
+    acknowledgedAt: null,
+    silencedUntil: null,
+    note: null,
+  },
+  {
+    id: 'terminal_identity_conflict:mock-ksk-002',
+    subjectKey: 'terminal_identity_conflict:mock-ksk-002',
+    episodeToken: '2026-10-06T02:00:00.000Z',
+    type: 'terminal_identity_conflict',
+    severity: 'error',
+    title: '终端 KSK-002 疑似被克隆，已暂停领打印任务',
+    detail: '这个终端身份同时出现在另一台机器上，已暂停领打印任务。请在终端详情的身份处置里放行、确认换件或吊销。',
+    terminalCode: 'KSK-002',
+    occurredAt: '2026-10-06T02:00:00.000Z',
+    conditionState: 'firing',
+    handlingState: 'open',
+    acknowledgedAt: null,
+    silencedUntil: null,
+    note: null,
+  },
+  {
+    id: 'terminal_credential_expiring:mock-ksk-007',
+    subjectKey: 'terminal_credential_expiring:mock-ksk-007',
+    episodeToken: '2026-10-06T03:00:00.000Z',
+    type: 'terminal_credential_expiring',
+    severity: 'warning',
+    title: '终端 KSK-007 的终端凭证将于 2026-12-05 到期',
+    detail: '到期后这台终端需要重新激活。请在终端详情生成新的激活文件，用 U 盘拷到这台机器。',
+    terminalCode: 'KSK-007',
+    occurredAt: '2026-10-06T03:00:00.000Z',
     conditionState: 'firing',
     handlingState: 'open',
     acknowledgedAt: null,

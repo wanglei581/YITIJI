@@ -39,7 +39,23 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   TERMINAL_COMMAND_RATE_LIMITED: '这台终端一小时内的远程命令已达 3 次，请稍后再试',
   TERMINAL_NOT_OPERATIONAL: '终端不在运营中，不能下发远程命令',
   TERMINAL_COMMAND_TYPE_INVALID: '远程命令类型不正确，请刷新页面后重试',
-  TERMINAL_NOT_FOUND: '终端不存在，请刷新列表',
+  TERMINAL_NOT_FOUND: '终端不存在',
+  // 契约 §8。句子必须与 terminalProvisionViews.ts 的 ACTIVATION_CODE_MESSAGES 逐字一致。
+  // 本文件只能 import ./client（AI 门禁会加载它），所以这里不能改为从那边导入。
+  ACTIVATION_SIGNING_UNAVAILABLE: '服务器还没配置激活文件签名密钥，暂时不能生成',
+  ACTIVATION_CONFIG_UNAVAILABLE: '服务器还没配置终端连接地址，暂时不能生成',
+  TERMINAL_MAINTENANCE_REQUIRED: '终端须先设为「待安装」或「维护中」',
+  TERMINAL_IN_FLIGHT_TASKS: '这台终端还有进行中的任务，等任务结束再生成',
+  TERMINAL_RETIRED: '终端已退役，不能激活',
+  BIND_CODE_USED: '激活码已被别的机器用过（若不是自己用的，按冒领处理并看审计）',
+  BIND_CODE_INVALID: '激活码无效，请重新生成',
+  BIND_CODE_EXPIRED: '激活码已过期，请重新生成',
+  BIND_CODE_REVOKED: '激活码已被作废（重新生成过），请用最新的激活文件',
+  MAC_ALREADY_BOUND: '这台机器的网卡已绑定到另一台终端',
+  TERMINAL_IDENTITY_CONFLICT: '这个终端身份同时出现在另一台机器上，已暂停领打印任务；请在告警里放行、确认换件或吊销',
+  TERMINAL_IDENTITY_NOTHING_PENDING: '这台终端当前没有待处置的身份冲突',
+  PROVISION_REPORT_INVALID: '自检回报格式不对（未知检查项或重复）',
+  AUTH_TOKEN_INVALID: '终端令牌无效，需要重新激活',
 }
 
 const ENGLISH_STATUS_TEXT = /^(OK|Created|Bad Request|Unauthorized|Forbidden|Not Found|Conflict|Too Many Requests|Internal Server Error|Bad Gateway|Service Unavailable)$/i

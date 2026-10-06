@@ -1,4 +1,5 @@
 import type { JobSourceQualitySummaryDTO, ReviewStatus, PublishStatus } from '@ai-job-print/shared'
+import type { TerminalIdentityStatus, TerminalProvisionReport } from './terminalActivation'
 import type { JobFairStatus } from '@ai-job-print/shared'
 import type { AuditLogRecord, AuditLogListResponse, AuditLogListQuery } from '@ai-job-print/shared'
 
@@ -183,6 +184,12 @@ export interface AdminTerminalRecord {
     observedAt: string | null
     state: 'draft' | 'paused' | 'expired' | 'not_seen' | 'unverified' | 'current' | 'mismatch' | 'stale'
   } | null
+  /** 最近一次装机自检。缺省或 null 都是未回报，不能显示成通过。 */
+  lastProvisionReport?: TerminalProvisionReport | null
+  /** 缺省或 unknown 都是未上报，不能显示成正常。 */
+  identityStatus?: TerminalIdentityStatus | null
+  /** 当前有效凭证到期时间。null 显示「—」。 */
+  credentialExpiresAt?: string | null
 }
 
 export interface CreatePlannedTerminalInput {

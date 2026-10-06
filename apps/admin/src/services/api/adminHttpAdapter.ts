@@ -27,6 +27,7 @@ import type {
   ReleaseObservationPlansResponse,
   UpdateReleaseObservationPlanInput,
 } from './types'
+import type { TerminalActivationFile, TerminalIdentityActionResult } from './terminalActivation'
 import type { ReviewAction, PublishAction } from './review-types'
 import { isPagedSourceQuery, toAdminSourceQueryString } from './sourcePaging'
 
@@ -207,6 +208,24 @@ export const adminHttpAdapter = {
     postData<TerminalBindCodeCreated>(
       `/admin/terminals/${encodeURIComponent(terminalId)}/bind-code`,
       ttlMinutes ? { ttlMinutes } : {},
+    ),
+
+  createActivationFile: (terminalId: string, ttlMinutes?: number) =>
+    postData<TerminalActivationFile>(
+      `/admin/terminals/${encodeURIComponent(terminalId)}/activation-file`,
+      ttlMinutes === undefined ? {} : { ttlMinutes },
+    ),
+
+  acceptTerminalIdentity: (terminalId: string) =>
+    postData<TerminalIdentityActionResult>(
+      `/admin/terminals/${encodeURIComponent(terminalId)}/identity/accept`,
+      {},
+    ),
+
+  confirmTerminalReplacement: (terminalId: string) =>
+    postData<TerminalIdentityActionResult>(
+      `/admin/terminals/${encodeURIComponent(terminalId)}/identity/confirm-replacement`,
+      {},
     ),
 
   getPrinters: () =>

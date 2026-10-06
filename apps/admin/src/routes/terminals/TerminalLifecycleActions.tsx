@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { StatusBadge } from '@ai-job-print/ui'
 import { ApiHttpError } from '../../services/api/client'
 import {
@@ -9,6 +9,7 @@ import {
   type TerminalLifecycleStatus,
   type UpdateTerminalLifecycleResult,
 } from '../../services/api/devices'
+import { REQUEST_EMERGENCY_REVOKE } from './terminalEmergencyRevoke'
 
 type Notice = { type: 'success' | 'error'; text: string }
 type LifecycleAction = 'maintenance' | 'resume' | 'suspend' | 'retire' | 'emergency-revoke'
@@ -78,6 +79,19 @@ export function TerminalLifecycleActions({
     setReason('')
     setConfirmationText('')
   }
+
+  useEffect(() => {
+    function onRequest(event: Event) {
+      const detail = (event as CustomEvent<{ terminalId?: string }>).detail
+      if (detail?.terminalId !== terminal.id) return
+      if (!availableActions(terminal.lifecycleStatus).includes('emergency-revoke')) return
+      setAction('emergency-revoke')
+      setReason('')
+      setConfirmationText('')
+    }
+    window.addEventListener(REQUEST_EMERGENCY_REVOKE, onRequest)
+    return () => window.removeEventListener(REQUEST_EMERGENCY_REVOKE, onRequest)
+  }, [terminal.id, terminal.lifecycleStatus])
 
   async function submit() {
     if (!action || !reasonIsValid || !confirmationIsValid) return
@@ -163,7 +177,7 @@ export function TerminalLifecycleActions({
               {action === 'maintenance' && '设备将停止领取新任务，但会继续回传在途任务。'}
               {action === 'resume' && (terminal.lifecycleStatus === 'suspended' ? '设备将先恢复到维护状态，校验完成后才可再恢复运行。' : '设备将恢复领取新任务。')}
               {action === 'suspend' && '设备将停止领取新任务，保留凭证以继续心跳、诊断和在途回传。'}
-              {action === 'emergency-revoke' && '终端程序（Terminal Agent）将立即失去认证能力并转为暂停；在途任务状态可能需要人工核查。'}
+              {action === 'emergency-revoke' && '终端程序（Terminal Agent）将立即失去认证能力并转为暂停；在途任务状态可能需要人工核查。这台机器立即失去终端身份，需要重新激活。'}
               {action === 'retire' && '这是不可逆操作。退役后不能恢复、重新绑定或领取任务。'}
             </p>
             <label className="mt-4 block text-xs font-medium text-neutral-700">操作原因（必填）</label>

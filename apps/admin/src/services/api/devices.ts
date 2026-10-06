@@ -32,6 +32,7 @@ import type {
   ReleaseObservationPlansResponse,
   UpdateReleaseObservationPlanInput,
 } from './types'
+import type { TerminalActivationFile, TerminalIdentityActionResult } from './terminalActivation'
 
 export type {
   AdminPrintersResponse,
@@ -75,6 +76,9 @@ interface AdminDeviceServiceInterface {
   updateTerminalLifecycle(terminalId: string, input: UpdateTerminalLifecycleInput): Promise<UpdateTerminalLifecycleResult>
   emergencyRevokeTerminal(terminalId: string, input: EmergencyRevokeTerminalInput): Promise<EmergencyRevokeTerminalResult>
   createTerminalBindCode(terminalId: string, ttlMinutes?: number): Promise<TerminalBindCodeCreated>
+  createActivationFile(terminalId: string, ttlMinutes?: number): Promise<TerminalActivationFile>
+  acceptTerminalIdentity(terminalId: string): Promise<TerminalIdentityActionResult>
+  confirmTerminalReplacement(terminalId: string): Promise<TerminalIdentityActionResult>
   createPlannedTerminal(input: CreatePlannedTerminalInput): Promise<PlannedTerminalCreated>
   getReleaseObservationPlans(): Promise<ReleaseObservationPlansResponse>
   createReleaseObservationPlan(input: CreateReleaseObservationPlanInput): Promise<ReleaseObservationPlanRecord>
@@ -120,6 +124,18 @@ export const emergencyRevokeTerminal = (terminalId: string, input: EmergencyRevo
 /** 生成一次性终端绑定码(POST /admin/terminals/:id/bind-code)。明文只在响应里返回一次。 */
 export const createTerminalBindCode = (terminalId: string, ttlMinutes?: number) =>
   adapter.createTerminalBindCode(terminalId, ttlMinutes)
+
+/** 生成激活文件。响应不缓存；调用方下载后只保留到期时间。 */
+export const createActivationFile = (terminalId: string, ttlMinutes?: number) =>
+  adapter.createActivationFile(terminalId, ttlMinutes)
+
+/** 放行疑似克隆 / 疑似换件。请求体为空。 */
+export const acceptTerminalIdentity = (terminalId: string) =>
+  adapter.acceptTerminalIdentity(terminalId)
+
+/** 确认换件。请求体为空。 */
+export const confirmTerminalReplacement = (terminalId: string) =>
+  adapter.confirmTerminalReplacement(terminalId)
 
 /** Admin 预创建 planned 设备资产；不签发 Agent 凭证。 */
 export const createPlannedTerminal = (input: CreatePlannedTerminalInput) =>
