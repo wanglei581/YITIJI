@@ -14,7 +14,7 @@ function registerShell(api: ApiRouter): void {
   })
 }
 
-test('help topbar shows one HH:MM clock and advances on the minute', async ({ page, api }) => {
+test('help topbar shows one HH:MM clock and advances on the minute @kiosk', async ({ page, api }) => {
   registerShell(api)
   await page.clock.install({ time: new Date('2026-10-06T01:30:20.000Z') })
   await page.goto('/help', { waitUntil: 'domcontentloaded' })
