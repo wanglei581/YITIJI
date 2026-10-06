@@ -637,6 +637,14 @@ async function main(): Promise<void> {
     const shared = await claim(SHIBEI, '48291637')
     assert.equal(shared.status, 429, JSON.stringify(shared.json))
     assert.equal(shared.json.error?.code, PRINT_TERMINAL_DAILY_QUOTA_REACHED, JSON.stringify(shared.json))
+    // 额度拒绝必须发生在认领之前：订单仍是待领取、没挂任务，明天同一个码还能直接领。
+    const sharedOrder = await prisma.order.findFirst({
+      where: { pickupCodeHash: hashPickupCode('48291637') },
+      select: { pickupStatus: true, pickupClaimedAt: true, printTaskId: true },
+    })
+    assert.equal(sharedOrder?.pickupStatus, 'pending', JSON.stringify(sharedOrder))
+    assert.equal(sharedOrder?.pickupClaimedAt, null, JSON.stringify(sharedOrder))
+    console.log('PASS 额度拒绝时到机码不被认领')
     await phoneOrder({ code: '59102846', sides: 2, amountCents: 100, discountCents: 100 })
     const discounted = await claim(SHIBEI, '59102846')
     assert.equal(discounted.status, 429, JSON.stringify(discounted.json))
