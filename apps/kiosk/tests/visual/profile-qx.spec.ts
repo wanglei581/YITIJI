@@ -789,7 +789,8 @@ test('me error pages show the fixture service phone and no staff handoff @w5-kio
     })
     await expect(page.getByRole('heading', { name: item.heading })).toBeVisible()
     await expect(page.locator('.qx-me-cta-row').getByRole('button', { name: '帮助中心', exact: true })).toHaveAttribute('data-route', '/help')
-    await expect(page.locator('.qx-me-legal').last()).toContainText(`多次重试仍失败时，${FIXTURE_HELP_LINE}`)
+    // 文案审查（C1-6）：「……时，」后接设问读起来断了。标准句不动，改成先说可以稍后再来。
+    await expect(page.locator('.qx-me-legal').last()).toContainText(`多次重试仍不成功的话，可以稍后再来。${FIXTURE_HELP_LINE}`)
     await expect(page.locator('.qx-me-guide')).toContainText(FIXTURE_SERVICE_PHONE)
     await expect(page.locator('.qx-me-guide')).toContainText(FIXTURE_SERVICE_HOURS)
     await expectNoStaffHandoff(page)
@@ -815,7 +816,8 @@ test('me error pages point at the privacy policy when support contact is missing
     await loginThroughVisibleUi(page, item.path)
     expect((await contact).status()).toBe(404)
     await expect(page.getByRole('heading', { name: item.heading })).toBeVisible()
-    await expect(page.locator('.qx-me-legal').last()).toContainText(`多次重试仍失败时，需要帮助？${NO_PHONE_HINT}`)
+    // 文案审查（C1-6）：同上，404 时标准句是「需要帮助？查看《隐私政策》里的联系方式」。
+    await expect(page.locator('.qx-me-legal').last()).toContainText(`多次重试仍不成功的话，可以稍后再来。需要帮助？${NO_PHONE_HINT}`)
     await expect(page.locator('.qx-me-guide')).toContainText(NO_PHONE_HINT)
     await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
     await expectNoStaffHandoff(page)
@@ -957,4 +959,30 @@ test('benefits error points at the privacy policy when support contact is missin
   await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
   await expect(page.getByText('拨打服务电话')).toHaveCount(0)
   await expectNoStaffHandoff(page)
+})
+
+test('me error guide says 联系我们 and hides 拨打服务电话 when support contact is 404 @w5-kiosk', async ({ page, api }) => {
+  // 文案审查（C1-6）：读不到号码时第三格粗体不再写「拨打服务电话」，改成「联系我们」。
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  registerMeReadFailures(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 404,
+    json: { success: false, error: { code: 'NOT_FOUND', message: 'no contact' } },
+  })
+
+  for (const item of ME_READ_FAILURES) {
+    const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+    await loginThroughVisibleUi(page, item.path)
+    expect((await contact).status()).toBe(404)
+    await expect(page.getByRole('heading', { name: item.heading })).toBeVisible()
+    const third = page.locator('.qx-me-guide-item').nth(2)
+    await expect(third.locator('.qx-me-guide-k')).toHaveText('仍不行')
+    await expect(third.locator('.qx-me-guide-t')).toHaveText('联系我们')
+    await expect(third.locator('.qx-me-guide-p')).toHaveText(NO_PHONE_HINT)
+    expect(await page.locator('body').innerText()).not.toContain('拨打服务电话')
+    await expectNoStaffHandoff(page)
+  }
+  expect(errors).toEqual([])
 })

@@ -325,7 +325,7 @@ export function MyDocumentsPage() {
       icon={<FilesIcon size={32} />}
       label="文档资产"
       big={state === 'ready' ? pagination.total : '—'}
-      desc="预览和打印时才换取短期访问链接；到期或删除后不可恢复"
+      desc="预览、打印时才临时调取文件；到期或删除后就打不开了"
       minis={[`可用 ${availableCount}`, `长期 ${items.filter((doc) => doc.expiresAt === null).length}`, `到期 ${items.length - availableCount}`]}
     />
   )
@@ -372,6 +372,7 @@ export function MyDocumentsPage() {
       : null
     const countText = (value: number | null) => (value === null ? '—' : String(value))
     const visibleDocs = items.filter((doc) => matchesDocumentFilter(doc, docFilter))
+    const hasMore = Boolean(pagination.nextCursor)
     const retryAccess = () => {
       if (!access || access.phase === 'loading') return
       if (access.intent === 'print') void print(access.doc, access.convertedFrom)
@@ -392,7 +393,7 @@ export function MyDocumentsPage() {
               className="qx-me-tab"
               aria-current={docFilter === key ? 'true' : undefined}
               data-testid={`member-assets-filter-${key}`}
-              title={key !== 'all' && pagination.nextCursor ? '这是已加载文件里的数量，后面还有' : undefined}
+              title={key !== 'all' && hasMore ? '当前显示的数量，往下还有更多' : undefined}
               onClick={() => setDocFilter(key)}
             >
               {label}<i>{countText(count)}</i>
@@ -508,7 +509,9 @@ export function MyDocumentsPage() {
               </article>
             )
           })}
-          {visibleDocs.length === 0 ? <div className="qx-me-legal">这一类里还没有已加载的文件。</div> : null}
+          {visibleDocs.length === 0 ? (
+            <div className="qx-me-legal">{hasMore ? '当前显示的文件里没有这一类，可以先加载更多。' : '这一类里还没有文件。'}</div>
+          ) : null}
           <div className="qx-me-legal">文件仅本人可查看和打印；访问链接短期有效，保存期限以文件卡片为准；原始简历/求职材料默认 90 天，AI 优化成果确认后可长期保存</div>
         </section>
         <QxMeGuide items={[['会显示什么', '办完才出现', '不写死文件名或时间'], ['继续办理', '从同一文件接着办', '预览、打印、签名共用一份'], ['留存', '按保存期限', '到期或删除后无法再打开']]} />

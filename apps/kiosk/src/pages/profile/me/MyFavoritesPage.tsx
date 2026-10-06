@@ -195,7 +195,7 @@ export function MyFavoritesPage() {
             ) : (
               <>
                 <div><b>政策</b><span>再打开这则说明，办理仍以官方入口为准。</span></div>
-                <div><b>机构官方渠道</b><span>本机构官方渠道在『本机构官方渠道』页查看</span></div>
+                <div><b>机构官方渠道</b><span>本机构的二维码和官方入口在『本机构官方渠道』页查看</span></div>
                 <div><b>不会发生</b><span>这里不代收简历，也不记报名结果。</span></div>
               </>
             )}

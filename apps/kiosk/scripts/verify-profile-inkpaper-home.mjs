@@ -447,6 +447,9 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
   'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
   'apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx',
+  // C 路 C1-6（2026-10-06）文案审查：失败指引第三格收成一份。
+  // 从组件文件导出非组件函数会触发 react-refresh 警告，所以单独成这个小文件。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts',
   'apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css',
   'apps/kiosk/src/pages/profile/me/styles/notifications-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/member-records-qx.css',
