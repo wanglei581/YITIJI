@@ -24,6 +24,7 @@ const ACTION_LABELS: Record<string, string> = {
   'ai.access_switch_failed': '修改 AI 使用开关失败',
   'ai.content_blocked': 'AI 内容安全拦截',
   'ai_safety.lexicon.update': '更新 AI 内容安全词库',
+  'ai_safety.content_blocked': 'AI 内容安全拦截',
   'ai_model_config.toggle': '启停 AI 模型配置',
   'ai_model_config.update': '更新 AI 模型配置',
   'ai_service_log.cleanup_expired': '清理过期 AI 服务日志',

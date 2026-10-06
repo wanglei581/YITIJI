@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, type OnModuleInit } from '@nestjs/comm
 import { AuditService } from '../../audit/audit.service'
 import type { AuthedUser } from '../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
+import { registerSafetyBlockSink } from './block-log'
 import { applyLexiconRows, lexiconView, resetLexiconToSeed, type LexiconRow } from './matcher'
 import { normalizeForSafety } from './normalize'
 import { isSafetyCategory } from './refusal'
@@ -48,6 +49,21 @@ export class AiSafetyLexiconService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    // 拦截记录落审计表（AuditLog，动作 ai_safety.content_blocked）。只记五个字段：
+    // 时间（行的 createdAt）、终端编号、入口、类别代码、位置。不存用户原文，也不存命中词。
+    registerSafetyBlockSink((record) => this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'ai_safety.content_blocked',
+      targetType: 'ai_feature',
+      targetId: record.feature,
+      payload: {
+        terminalCode: record.terminalCode,
+        feature: record.feature,
+        category: record.category,
+        position: record.position,
+      },
+    }))
     try {
       const rows = await this.prisma.aiSafetyTerm.findMany({
         select: { category: true, term: true, kind: true, enabled: true },

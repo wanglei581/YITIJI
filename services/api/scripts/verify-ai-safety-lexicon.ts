@@ -1,4 +1,6 @@
 /**
+ * 本文件为安全测试用例，用于验证拒答，不代表任何立场。
+ *
  * AI 内容安全词库门禁。
  *
  * 60 道拒答题走 assertContentAllowed（会写五字段日志）。其中两题再走真实 Nest HTTP：
@@ -47,7 +49,7 @@ import { contentBlockedException } from '../src/ai/safety/content-blocked'
 import { blockDisplayTerms, matchLexicon, resetLexiconToSeed } from '../src/ai/safety/matcher'
 import { normalizeForSafety } from '../src/ai/safety/normalize'
 import {
-  AI_SAFETY_REFUSAL_INSTRUCTION, REFUSAL_BASE, REFUSAL_C2, REFUSAL_DANGER, refusalMessage,
+  AI_SAFETY_REFUSAL_INSTRUCTION, REFUSAL_BASE, REFUSAL_C2, REFUSAL_DANGER, SAFETY_CATEGORIES, refusalMessage,
 } from '../src/ai/safety/refusal'
 import { AiRequestContextMiddleware } from '../src/ai/usage/ai-request-context.middleware'
 import { RedisService } from '../src/common/redis/redis.service'
@@ -279,8 +281,32 @@ function lexiconRows() {
   }
 }
 
+/**
+ * 种子词库的形状约束（合规 10/6 晚边界）：不许单字或常用词进库，否则正常求职问题会被误拦。
+ * 主管部门 / 第三方补充词库只走后台导入或生产配置，不进仓库，所以这里只管种子文件。
+ */
+const COMMON_WORD_BLACKLIST = [
+  '男性', '女性', '年龄', '35岁', '炸', '毒', '枪', '钱', '政府', '国家', '警察', '医院', '学校', '简历', '面试',
+  '假新闻', '黑料', '人肉', '疫情', '封城', '谣言', '独立', '兼职', '贷款', '彩票', '药', '刀', '血',
+]
+
+function checkSeedShape(): void {
+  const seed = JSON.parse(readFileSync(join(__dirname, '../src/ai/safety/lexicon.seed.json'), 'utf8')) as {
+    block: Record<string, string[]>
+    allow: Record<string, string[]>
+  }
+  const blockTerms = Object.values(seed.block).flat()
+  const tooShort = blockTerms.filter((term) => normalizeForSafety(term).length < 2)
+  check(tooShort.length === 0, `种子拦截词归一化后都不少于 2 个字（违规 ${tooShort.length} 个）`)
+  const blacklisted = new Set(COMMON_WORD_BLACKLIST.map((word) => normalizeForSafety(word)))
+  const common = blockTerms.filter((term) => blacklisted.has(normalizeForSafety(term)))
+  check(common.length === 0, `种子拦截词里没有常用词（违规 ${common.length} 个）`)
+  check(Object.keys(seed.block).every((category) => SAFETY_CATEGORIES.includes(category as never)), '种子类别全是合规 15 类代码')
+}
+
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === 'production') process.env.NODE_ENV = 'test'
+  checkSeedShape()
   check(BLOCK_QUESTIONS.length === 60 && BLOCK_CATEGORY.length === 60, '拒答题 60 道')
   check(REVERSE_QUESTIONS.length === 25, '反向题 25 道')
   check(refusalMessage('A3') === `${REFUSAL_BASE}${REFUSAL_DANGER}`, 'A3 追加 110')
@@ -425,6 +451,13 @@ async function main(): Promise<void> {
     check(quotaBalance === 0, `顾问文字拒答不扣次数 实际 ${quotaBalance}`)
     check(fetchCalls === beforeBlockFetch, '顾问文字提问在到达模型前被拦')
     assertLog(BLOCK_QUESTIONS[0]!, 'A1', 'assistant_chat', 'input', 'KIOSK-01')
+    // 拦截记录要落审计表（ai_safety.content_blocked），payload 只有四个字段（时间是行的 createdAt），不含题目原文。
+    const persisted = audits.filter((row) => row.action === 'ai_safety.content_blocked').at(-1)
+    const persistedPayload = (persisted?.payload ?? {}) as Record<string, unknown>
+    check(Boolean(persisted), '拦截记录写进审计表')
+    check(Object.keys(persistedPayload).sort().join(',') === 'category,feature,position,terminalCode', `审计表拦截记录只有四个字段 实际=${Object.keys(persistedPayload).sort().join(',')}`)
+    check(persistedPayload['category'] === 'A1' && persistedPayload['position'] === 'input' && persistedPayload['terminalCode'] === 'KIOSK-01', '审计表拦截记录的类别、位置、终端')
+    check(!JSON.stringify(persistedPayload).includes(BLOCK_QUESTIONS[0]!.slice(0, 6)), '审计表拦截记录不含题目原文')
 
     clearSafetyBlocks()
     const advisorBlocked = await http('POST', '/probe/advisor/answer', { question: BLOCK_QUESTIONS[38] }, { 'x-terminal-id': 'KIOSK-02' })

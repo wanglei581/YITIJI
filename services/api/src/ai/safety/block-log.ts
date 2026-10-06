@@ -12,6 +12,14 @@ export interface SafetyBlockRecord {
 const RING_CAP = 200
 const ring: SafetyBlockRecord[] = []
 
+/** 落库口子：由 AiSafetyLexiconService 启动时接到审计表。写库失败不影响拒答本身。 */
+type SafetyBlockSink = (record: SafetyBlockRecord) => Promise<unknown>
+let sink: SafetyBlockSink | null = null
+
+export function registerSafetyBlockSink(next: SafetyBlockSink | null): void {
+  sink = next
+}
+
 // eslint-disable-next-line no-control-regex -- 刻意匹配控制字符以剔除
 const CONTROL_CHARS = new RegExp('[\\u0000-\\u001f\\u007f]', 'g')
 
@@ -35,6 +43,7 @@ export function recordSafetyBlock(input: {
     position: input.position,
   }
   console.warn(JSON.stringify(record))
+  if (sink) void sink(record).catch(() => undefined)
   ring.push(record)
   if (ring.length > RING_CAP) ring.shift()
   if (ctx) ctx.safetyRefund = true
