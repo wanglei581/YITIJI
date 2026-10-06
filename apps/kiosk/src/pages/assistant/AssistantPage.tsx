@@ -394,8 +394,15 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     window.requestAnimationFrame(() => voiceTriggerRef.current?.focus({ preventScroll: true }))
   }
 
-  const switchVoiceToText = (expiredSubtitle?: string) => {
-    if (expiredSubtitle !== undefined) {
+  const switchVoiceToText = (expiredSubtitle?: string, reason?: 'limit' | 'silent') => {
+    if (reason === 'silent') {
+      setMessages(previous => [...previous, {
+        id: `voice-silent-${Date.now()}`,
+        role: 'assistant',
+        kind: 'system',
+        text: '这次语音没有接通声音，已为你转成文字对话，可以接着问',
+      }])
+    } else if (reason === 'limit' || expiredSubtitle !== undefined) {
       setMessages(previous => [...previous,
         ...(expiredSubtitle ? [{ id: `voice-subtitle-${Date.now()}`, role: 'assistant' as const, kind: 'system' as const, text: expiredSubtitle }] : []),
         { id: `voice-limit-${Date.now()}`, role: 'assistant', kind: 'system', text: '语音通话已到本次上限，已为你转成文字对话，可以继续问' },
@@ -451,7 +458,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   let sectionNo = 0
   const nextNo = () => { sectionNo += 1; return sectionNo }
   const showPicker = (!hasUserTurn || cockpitState === 'composer') && !aiLocked
+  // 语音转文字的系统消息 id 以 voice- 开头。没有用户发言时对话区本来不展开，
+  // 没接通的说明会写进状态却看不见。有这类消息就把对话区展开。
   const showConversation = hasUserTurn || Boolean(toolboxScene || selectedTask) || advisorTask.isFailed
+    || messages.some((message) => message.id.startsWith('voice-'))
   const draftLength = input.trim().length
 
   return (

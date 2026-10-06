@@ -59,7 +59,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.13"
+            -ProductVersion "0.4.14"
 
       - name: Exercise EXE install, repair, and uninstall
         shell: powershell
@@ -102,7 +102,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.13"
+            -ProductVersion "0.4.14"
 
       - name: Upload exact tested unsigned candidate
         uses: actions/upload-artifact@v4
@@ -257,7 +257,7 @@ jobs:
             -Mode Create `
             -CandidateRoot $candidateRoot `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.13"
+            -ProductVersion "0.4.14"
 
       - name: Build exact field predecessor 0.4.10 upgrade fixture
         shell: powershell
@@ -292,7 +292,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.13"
+            -ProductVersion "0.4.14"
 
       - name: Transfer exact upgrade-tested candidate
         uses: actions/upload-artifact@v4
@@ -357,7 +357,7 @@ jobs:
             -Mode Verify `
             -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.13"
+            -ProductVersion "0.4.14"
 
       - name: Exercise internal signing pipeline and signed installer lifecycles
         shell: powershell
@@ -366,7 +366,7 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-internal-signing-pipeline.ps1 `
             -UnsignedCandidateRoot apps/terminal-agent/installer/artifacts/candidate `
             -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
-            -ProductVersion "0.4.13" `
+            -ProductVersion "0.4.14" `
             -EvidenceRoot "$env:RUNNER_TEMP\ai-job-print-internal-signing-evidence" `
             -WixToolPath $wix `
             -ExerciseLifecycle `

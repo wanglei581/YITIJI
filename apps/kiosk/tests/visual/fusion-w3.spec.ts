@@ -2100,6 +2100,8 @@ test('advisor artifact eight proto states fit the kiosk stage @w3-kiosk', async 
     await page.goto(`/ai/plan?state=${state}&capture=1`)
     await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', state)
     await expect(page.getByText('一键投递')).toHaveCount(0)
+    await expect(page.getByText('工作人员')).toHaveCount(0)
+    await expect(page.getByText('服务台')).toHaveCount(0)
     await assertNoHorizontalOverflow(page)
     await page.screenshot({ path: test.info().outputPath(`advisor-artifact-${state}.png`) })
   }
@@ -2146,6 +2148,11 @@ test('advisor artifact print-unavailable state has no print button @w3-kiosk', a
   await page.goto('/ai/plan?state=print-unavailable&capture=1')
   await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'print-unavailable')
   await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-legend')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-qa')).toBeVisible()
+  await expect(page.getByText('我做过两年社群运营，最多同时管 6 个群。')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-take')).toBeVisible()
+  await expect(page.getByText('带走这一页')).toBeVisible()
   await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '打印带走' })).toHaveCount(0)
   await expect(page.getByText('打印能力读不到，按钮先不放出来', { exact: false })).toBeVisible()
@@ -2211,6 +2218,61 @@ test('advisor artifact print waits for the server receipt @w3-kiosk', async ({ p
   expect(printPath).toBe('/api/v1/advisor/sessions/w3-art-sess/artifacts/w3-art-1/print')
   await expect(page.getByText('已打印')).toHaveCount(0)
   await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact no-artifact shows the three jobs and opens AI records @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=no-artifact&capture=1')
+  await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'no-artifact')
+  await expect(page.getByTestId('advisor-artifact-kinds')).toBeVisible()
+  await expect(page.locator('.aa-kind')).toHaveCount(3)
+  await expect(page.getByText('边问边钉住')).toBeVisible()
+  await expect(page.getByText('她问，你答，拼成一段话')).toBeVisible()
+  await expect(page.getByText('逐条比：有没有写到')).toBeVisible()
+  await expect(page.getByText('做完以后怎么带走')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-cta-records')).toHaveText('打开我的 AI 记录')
+  await page.getByTestId('advisor-artifact-cta-records').click()
+  await page.waitForURL((url) => url.pathname === '/me/ai-records')
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact expired offers only a redo @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=expired&capture=1')
+  await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'expired')
+  await expect(page.getByTestId('advisor-artifact-cta-redo')).toHaveText('回去重做一次')
+  await expect(page.getByTestId('advisor-artifact-cta-back')).toHaveCount(0)
+  await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
+  await expect(page.getByTestId('advisor-artifact-cta-records')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '打印带走' })).toHaveCount(0)
+  await page.getByTestId('advisor-artifact-cta-redo').click()
+  await page.waitForURL((url) => url.pathname === '/assistant')
+  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact content state opens my documents @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=qa-pins&capture=1')
+  await expect(page.getByTestId('advisor-artifact-take')).toBeVisible()
+  const documentsLink = page.getByRole('link', { name: '我的文档' })
+  // 1080×1920 视口下舞台缩放是 1；换算后再比，避免别的视口把屏幕像素当成 CSS 像素。
+  const scale = await readEnabledStageScale(page)
+  const documentsBox = await documentsLink.boundingBox()
+  expect(documentsBox, '我的文档链接必须有点击框').not.toBeNull()
+  expect(documentsBox!.height / scale, '我的文档链接点击框换算到舞台 CSS px 后高度不得小于 48').toBeGreaterThanOrEqual(48)
+  await documentsLink.click()
+  await page.waitForURL((url) => url.pathname === '/me/documents')
   expect(runtimeErrors).toEqual([])
 })
 
@@ -2439,7 +2501,9 @@ test('career plan guide, ai-down and generated result keep print available @w3-k
   await page.getByRole('button', { name: '生成求职方案' }).click()
   await expect(screen).toHaveAttribute('data-state', 'ai-down')
   await expect(page.getByText('这三条是通用建议，不是针对你这份简历的', { exact: false })).toBeVisible()
-  await expect(page.getByText('AI 能力未配置')).toBeVisible()
+  // AI 能力级不可用时页面给固定人话和手动出路，不再透出服务端原文（#1241）。
+  await expect(page.getByText('AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）')).toBeVisible()
+  await expect(page.getByText('AI 能力未配置')).toHaveCount(0)
   // 出纸不依赖 AI：ai-down 时打印按钮仍在，生成钮也仍可重试（不被 canStart 藏掉）。
   await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeVisible()
   await captureDecisionViewports(page, 'career-ai-down')
@@ -2554,6 +2618,64 @@ test('assistant voice deadline warns then preserves text conversation @w3-kiosk'
   await expect(input).toBeEnabled()
   await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
   expect(api.requestCount('POST', '/api/v1/trtc/session')).toBe(1)
+})
+
+const VOICE_SILENT_TEXT = '这次语音没有接通声音，已为你转成文字对话，可以接着问'
+
+async function beginAdvisorCall(page: Page) {
+  await page.goto('/assistant')
+  await page.getByRole('button', { name: '语音咨询', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
+  await dialog.getByRole('button', { name: /直接语音通话/ }).click()
+  await expect(dialog).toHaveAttribute('data-state', 'voice-live')
+  return dialog
+}
+
+test('assistant voice silent prompt switches to text @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api, false, { silent: true })
+  await page.clock.install()
+  const dialog = await beginAdvisorCall(page)
+  await expect(dialog.getByTestId('assistant-voice-silent')).toHaveCount(0)
+  await page.clock.fastForward(12_000)
+  const notice = dialog.getByTestId('assistant-voice-silent')
+  await expect(notice).toBeVisible()
+  await expect(notice).toHaveAttribute('role', 'status')
+  await expect(notice.getByRole('heading', { name: '小青这边没有声音，也没有字幕' })).toBeVisible()
+  await expect(notice).toContainText('可能是网络或语音服务没接通。可以改用文字继续问。')
+  const toText = dialog.getByTestId('assistant-voice-silent-to-text')
+  const retry = notice.getByRole('button', { name: '重新连接', exact: true })
+  expect(await toText.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(64)
+  expect(await retry.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(64)
+  await toText.click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByLabel('输入咨询问题')).toBeEnabled()
+  await expect(page.getByText(VOICE_SILENT_TEXT)).toHaveCount(1)
+  await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+})
+
+test('assistant voice silent call switches to text at 30s @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api, false, { silent: true })
+  await page.clock.install()
+  const dialog = await beginAdvisorCall(page)
+  await page.clock.fastForward(30_000)
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByLabel('输入咨询问题')).toBeEnabled()
+  await expect(page.getByText(VOICE_SILENT_TEXT)).toHaveCount(1)
+  await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+})
+
+test('assistant voice with subtitle stays in the call past 40s @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api)
+  await page.clock.install()
+  const dialog = await beginAdvisorCall(page)
+  await expect(dialog.getByText('可以先说说你最想解决的问题。', { exact: true })).toBeVisible()
+  await page.clock.fastForward(40_000)
+  await expect(dialog.getByTestId('assistant-voice-silent')).toHaveCount(0)
+  await expect(dialog).toHaveAttribute('data-state', 'voice-live')
+  expect(api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(0)
 })
 
 test('W-118 resume diagnosis phone entry creates only one upload session @w3-kiosk', async ({ page, api }) => {

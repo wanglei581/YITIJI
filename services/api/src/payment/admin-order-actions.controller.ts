@@ -47,13 +47,13 @@ export class AdminOrderActionsController {
     //
     // 没有 pickupCodeHash 的现场单不发取件码：纸已在这台机器上出。
     // 历史行上可能还留着认领不了的明文，这里也不下发。
-    // 有哈希的云打印单真码在密文里，本端点不回那一列。
+    // 有哈希的云打印单真码在密文里。只读订单视图与本端点都不把到机码交给管理员浏览器。
     return {
       id: order.id,
       payStatus: order.payStatus,
       paymentSource: order.paymentSource,
       paidAt: order.paidAt,
-      pickupCode: order.pickupCodeHash ? order.pickupCode : null,
+      pickupCode: null,
     }
   }
 
