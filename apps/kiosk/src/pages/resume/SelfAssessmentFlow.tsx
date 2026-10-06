@@ -51,6 +51,7 @@ import {
 } from '../../ai'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   SelfAssessmentApiError,
   getLatestSelfAssessment,
@@ -762,7 +763,9 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           return
         }
         setTaskAiDown(isAiOutage(err))
-        setTaskError(err instanceof SelfAssessmentApiError ? err.message : mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试')
+        setTaskError(isAiOutage(err)
+          ? 'AI 暂时不可用，你可以先看这次的固定记分'
+          : userMessageOf(err, mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试'))
       })
       .finally(() => { if (mountedRef.current) setInflight(null) })
   }, [attempt, consentOk, getToken, linkedTaskId, navigate, pendingAnswers, pendingComplete, result, session.accessToken, session.consent.nonSensitive, session.consent.sensitive, session.consentVersion])
