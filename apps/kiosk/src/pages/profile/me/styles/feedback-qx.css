@@ -158,15 +158,28 @@
 .fb-dl dt { color: var(--qx-ink-3); font-weight: 700; }
 .fb-dl dd { margin: 0; font-weight: 750; text-align: right; }
 .fb-thread {
+  flex: 1 1 auto;
+  min-height: 120px;
   display: flex;
   flex-direction: column;
+  justify-content: safe center;
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--qx-line);
   border-radius: 20px;
   background: var(--qx-paper);
+  overflow-y: auto;
+  scrollbar-width: none;
 }
-.fb-thread[data-reply-count='0'] { justify-content: center; }
+.fb-thread::-webkit-scrollbar { display: none; }
+/* 记录区拿最大一份余量。正文条和工单网格各拿一小份，避免一条回复
+   被单独撑开后，记录框内部出现超过 160px 的纸色空白。补充描述不参与拉伸。 */
+.fb-detail-scroll > .fb-note,
+.fb-detail-scroll > .fb-dl { flex: 0.45 1 auto; }
+.fb-detail-scroll > .fb-field,
+.fb-detail-scroll > .fb-closed-note,
+.fb-detail-scroll > .fb-new,
+.fb-detail-scroll > .fb-sec { flex: none; }
 .fb-thread-empty { margin: 0; text-align: center; color: var(--qx-ink-2); line-height: 1.45; }
 .fb-bubble { padding: 14px 16px; border-radius: 18px; background: var(--qx-surface); border: 1px solid var(--qx-line); }
 .fb-bubble-mine { background: var(--qx-teal-soft); border-color: #c6e2d8; }
@@ -220,6 +233,7 @@
   height: auto;
   font-size: 26px;
   font-weight: 700;
+  white-space: nowrap;
 }
 .qx-stage:has(.fb-page) .fb-cta-row > .qx-btn[data-variant='primary'] { flex: 1.5; min-height: 72px; }
 .qx-stage:has(.fb-page) .fb-cta-row > .qx-ai-help {
@@ -240,17 +254,19 @@
   padding-top: 8px;
   padding-bottom: 8px;
 }
-.fb-hold-main { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.fb-hold-main { display: inline-flex; align-items: center; justify-content: center; gap: 8px; max-width: 100%; white-space: nowrap; }
 .fb-hold small,
-.qx-stage:has(.fb-page) .fb-hold small { font-size: 21px; font-weight: 700; letter-spacing: 0; }
+.qx-stage:has(.fb-page) .fb-hold small { font-size: 21px; font-weight: 700; letter-spacing: 0; white-space: normal; }
 .qx-stage:has(.fb-page) .fb-cta-row > .qx-btn[data-variant='primary']:disabled {
   opacity: 1;
   background: #dcd8cc;
   border-color: #dcd8cc;
   color: #2c332c;
 }
+/* 纸飞机 svg 自身没有宽高。尺寸挂在图标上，而不是 fb-hold：
+   提交中、重试、以及没有第二行小字时都没有 fb-hold，flex 会把默认替换尺寸拉开。 */
 .fb-send-ico,
-.fb-hold svg { width: 22px; height: 22px; }
+.fb-hold svg { width: 24px; height: 24px; flex: none; }
 
 .fb-truth {
   width: 100%;

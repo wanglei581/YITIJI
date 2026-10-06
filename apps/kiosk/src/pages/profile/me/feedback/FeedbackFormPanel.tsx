@@ -143,7 +143,7 @@ export function FeedbackSubmitButton({
       onClick={onSubmit}
     >
       <span className="fb-hold-main">
-        <KIcon name="send" />
+        <KIcon name="send" className="fb-send-ico" />
         <span>{label}</span>
       </span>
       {disabled && !busy && why ? <small>{why}</small> : null}
