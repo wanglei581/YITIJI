@@ -342,13 +342,14 @@
   .jfq-modal { padding: 16px; }
 }
 
-/* ── 真实视口布局（手机 / 横屏电脑）──────────────────────────────
- * 一体机竖屏走的是 1080×1920 定高舞台（KioskStageFit），本段**不参与**：
- * 下面两条媒体查询在 1080×1920 下都不命中，稿 46 的版式一字不改。
+/* ── 真实视口布局（只在舞台关闭时接手）──────────────────────────
+ * 一体机竖屏与电脑横屏走 1080×1920 定高舞台（KioskStageFit）。横屏电脑不再
+ * 关掉缩放，所以下面的横屏规则必须挂在 data-kiosk-stage-fit="off" 上，
+ * 避免媒体查询按真实视口命中后，把已经缩放的竖屏稿再改成流式居中。
  *
- * 为什么需要这一段：舞台缩放是等比的，390px 手机上整张稿被缩到 0.36 ——
+ * 为什么手机要换布局：舞台缩放是等比的，390px 手机上整张稿被缩到 0.36 ——
  * 返回键 23px、主操作 35px，正文小到读不了。缩放解决不了小屏，只能换布局。
- * JobFitPage 的 useJobFitStage 在手机/横屏电脑上关掉缩放，这里接手排版。
+ * useJobFitStage 只在手机关掉缩放，这里接手排版。
  *
  * 作用域：全部挂在本页根 `.jfq-root` 下。共享层（.qx-topbar / .qx-ctabar …）
  * 被 51 页共用，绝不能在这里裸改；套一层 .jfq-root 既满足「选择器必须以
@@ -402,8 +403,8 @@
   .jfq-root .jfq-sec { gap: 10px; }
 }
 
-/* 横屏电脑：不拉伸成满屏大横条，按 1080 稿宽居中，其余留白。 */
+/* 舞台关闭的宽横屏：不拉伸成满屏大横条，按 1080 稿宽居中。电脑横屏舞台是开的，不吃这里。 */
 @media (min-width: 961px) and (orientation: landscape) {
-  .jfq-root { display: flex; justify-content: center; background: var(--qx-paper); }
-  .jfq-root .qx-stage { width: 100%; max-width: 1080px; }
+  .jfq-root:is([data-kiosk-stage-fit='off'] .jfq-root) { display: flex; justify-content: center; background: var(--qx-paper); }
+  .jfq-root:is([data-kiosk-stage-fit='off'] .jfq-root) .qx-stage { width: 100%; max-width: 1080px; }
 }
