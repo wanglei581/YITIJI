@@ -60,9 +60,8 @@ test('tool center honors terminal capability configuration @w2', async ({ page, 
   await expectHealthy(page, errors, 'print-scan-home')
 })
 
-// P39 迁移（V6 纵切第一刀）后，这个入口改名叫「到机码核销」并移出「七件事」栅格：
-// 后端与小程序下单页本来就叫它到机码（pickup-order.service.ts 的「到机码无效或已过期」），
-// 它和付款后生成的「取件凭证码」(Order.pickupCode) 是两个码。
+// P39 迁移（V6 纵切第一刀）后，这个入口改名叫「到机码核销」并移出「七件事」栅格。
+// 2026-10-06 方案②：到机码就是取件码。卡面上的「不是取件码」只用来和上传码消歧。
 // 合同不变：入口必须可见、可点、落到 /print/pickup-claim。
 test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)

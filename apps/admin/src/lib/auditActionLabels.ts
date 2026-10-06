@@ -277,6 +277,7 @@ const ACTION_LABELS: Record<string, string> = {
   'auth.password_login': '密码登录',
   'auth.sms_login': '短信登录',
   'auth.password_change_self': '本人修改密码',
+  'auth.logout': '退出登录',
   'auth.phone_initial_bind_start': '开始绑定手机号',
   'auth.phone_initial_bind_complete': '完成绑定手机号',
   'auth.phone_initial_bind_cancel': '取消绑定手机号',
