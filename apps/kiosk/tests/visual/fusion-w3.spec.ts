@@ -1323,6 +1323,135 @@ test('R1 2.0 keeps resume controls below the read-only header and preserves the 
   }
 })
 
+test('resume report expands seven blocks, drops the inner scroller, and fills the action row @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/resume/export/pricing', { status: 200, json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null } })
+  await page.goto('/resume/report?capture=1&state=report&taskId=paircapture01')
+  await expect(page.getByTestId('resume-report-state-report')).toBeVisible()
+  // 2.0 规则 4：出处标记不上屏。空的 .rrp-prov 没有文字，底色和边框仍会画出浅色小方块。
+  await expect(page.locator('.rrp-prov')).toHaveCount(0)
+
+  const blockKeys = ['basic', 'objective', 'education', 'experience', 'project', 'skill', 'selfintro']
+  for (const key of blockKeys) {
+    const block = page.getByTestId(`resume-report-block-${key}`)
+    await block.scrollIntoViewIfNeeded()
+    await expect(block).toBeInViewport()
+  }
+  await expect(page.getByTestId('resume-report-block-basic')).toContainText('命中 1 条问题 · 1 条证据')
+  await expect(page.getByTestId('resume-report-block-experience')).toContainText('命中 1 条问题 · 2 条证据')
+  await expect(page.getByTestId('resume-report-block-selfintro')).toContainText('本块没有命中问题')
+
+  const listOverflow = await page.getByTestId('resume-report-list').evaluate((el) => getComputedStyle(el).overflowY)
+  expect(listOverflow).not.toBe('auto')
+  expect(listOverflow).not.toBe('scroll')
+  const tagFlush = await page.getByTestId('resume-report-block-basic').locator('.bhd').evaluate((el) => {
+    const tag = el.querySelector('.rrp-tag')
+    if (!tag) return 999
+    return el.getBoundingClientRect().right - tag.getBoundingClientRect().right
+  })
+  expect(tagFlush).toBeLessThanOrEqual(8)
+
+  await expect(page.getByTestId('resume-report-takeaway-title')).toHaveText('带走这份报告')
+  const takeawayButtons = page.locator('[data-testid="resume-report-export-actions"] .rrp-export > button')
+  await expect(takeawayButtons).toHaveCount(4)
+  const takeawayRow = await takeawayButtons.evaluateAll((els) => els.map((el) => {
+    const rect = el.getBoundingClientRect()
+    return { top: Math.round(rect.top), height: rect.height }
+  }))
+  expect(new Set(takeawayRow.map((item) => item.top)).size).toBe(1)
+  for (const item of takeawayRow) expect(item.height).toBeGreaterThanOrEqual(64)
+
+  const barBefore = await page.locator('.qx-ctabar').boundingBox()
+  await page.getByTestId('resume-report-block-selfintro').scrollIntoViewIfNeeded()
+  const barAfter = await page.locator('.qx-ctabar').boundingBox()
+  expect(Math.abs((barBefore?.y ?? 0) - (barAfter?.y ?? 1))).toBeLessThan(2)
+
+  const ratio = await page.evaluate(() => {
+    const bar = document.querySelector('.qx-ctabar')
+    const primary = document.querySelector('[data-testid="resume-report-primary"]')
+    if (!bar || !primary) return 0
+    return primary.getBoundingClientRect().width / bar.getBoundingClientRect().width
+  })
+  expect(ratio).toBeGreaterThanOrEqual(0.45)
+  await expect(page.getByRole('button', { name: '目标岗位匹配参考（仅供参考）' })).toHaveCount(0)
+
+  for (const seg of ['issues', 'scores', 'conclusions'] as const) {
+    await page.getByTestId(`resume-report-seg-${seg}`).click()
+    const overflows = await page.locator('.rrp-page .rrp-scroll').evaluateAll((els) => els.map((el) => getComputedStyle(el).overflowY))
+    expect(overflows.every((value) => value !== 'auto' && value !== 'scroll')).toBe(true)
+    if (seg === 'scores') {
+      await page.getByTestId('resume-report-dim-basic').click()
+      const scoreOverflow = await page.getByTestId('resume-report-dim-issues').evaluate((el) => getComputedStyle(el).overflowY)
+      expect(scoreOverflow).not.toBe('auto')
+      expect(scoreOverflow).not.toBe('scroll')
+    }
+  }
+  await page.getByRole('button', { name: '目标岗位匹配参考（仅供参考）' }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('button', { name: '目标岗位匹配参考（仅供参考）' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '做一次自我探索' })).toBeVisible()
+
+  await page.goto('/resume/report?capture=1&state=diagnose-failed&taskId=paircapture01')
+  await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
+  const failRatio = await page.evaluate(() => {
+    const bar = document.querySelector('.qx-ctabar')
+    const primary = document.querySelector('[data-testid="resume-report-primary"]')
+    if (!bar || !primary) return 0
+    return primary.getBoundingClientRect().width / bar.getBoundingClientRect().width
+  })
+  expect(failRatio).toBeGreaterThanOrEqual(0.45)
+})
+
+test('resume report scroll hint clears after the page is scrolled to the bottom @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/resume/export/pricing', { status: 200, json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null } })
+  await page.goto('/resume/report?capture=1&state=report&taskId=paircapture01')
+  await expect(page.getByTestId('resume-report-state-report')).toBeVisible()
+  const hint = page.getByTestId('resume-report-scroll-hint')
+  await expect(hint).toBeVisible()
+  await expect(hint).toContainText(/下滑还有 [1-9]\d* 块/)
+  await expect(hint).toContainText('最下面可以带走报告')
+
+  const scroller = page.locator('[data-kiosk-screen="resume-report"]')
+  await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight })
+  await expect(hint).toHaveCount(0)
+
+  await scroller.evaluate((el) => { el.scrollTop = 0 })
+  await expect(hint).toBeVisible()
+  await expect(hint).toContainText('最下面可以带走报告')
+})
+
+test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  for (const state of ['unavailable', 'diagnose-failed', 'read-error', 'no-context'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    const rows = page.locator('.rrp-exits .rrp-row')
+    const count = await rows.count()
+    expect(count).toBeGreaterThan(0)
+    for (let i = 0; i < count; i += 1) {
+      const row = rows.nth(i)
+      const box = await row.boundingBox()
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(64)
+      await expect(row.locator('.rrp-ic')).toHaveCount(1)
+      const disabled = await row.getAttribute('aria-disabled')
+      await expect(row.locator('.rrp-go')).toHaveCount(disabled === 'true' ? 0 : 1)
+    }
+    if (state === 'diagnose-failed') {
+      await expect(page.getByRole('button', { name: /打印我上传的原件/ })).toContainText('本次不可用')
+      await expect(page.getByText('这里拿不到你刚上传的那份原件（离开这一页再回来就拿不到了）。请回到简历来源重新选取文件，再去打印。')).toBeVisible()
+    }
+  }
+
+  for (const state of ['no-context', 'read-error', 'unavailable', 'illegal', 'diagnose-failed'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    const minHeight = await page.locator('.rrp-state').first().evaluate((el) => getComputedStyle(el).minHeight)
+    expect(minHeight === '0px' || minHeight === 'auto').toBe(true)
+    const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
+    const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
+    expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
+  }
+})
+
 test('assistant first screen keeps composer and send above the Qingxu navbar @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   await page.goto('/assistant')
