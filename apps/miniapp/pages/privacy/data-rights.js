@@ -35,6 +35,18 @@ const FAILURE_HINT = {
   QUEUE_ENQUEUE_FAILED: '导出任务排队失败',
 }
 
+const CLOSURE_PENDING_LABEL = '已受理，等待处理'
+
+/**
+ * 账号注销说明。与后端执行器实际做的一致（后端窗口 2026-10-04 核对）；保留年限交律师，不写具体年数。
+ */
+const CLOSURE_NOTES = [
+  { k: '会删除', v: '你上传的文件（含扫描件）、AI 生成的结果、模拟面试记录、AI 顾问的会话记录、浏览与收藏、通知。还没用完的权益会作废。' },
+  { k: '会保留', v: '订单、打印记录、支付与退款流水、权益领取与核销流水、同意记录、意见反馈的处理记录。这些不再关联到你，按法律要求的期限保留。' },
+  { k: '手机号', v: '解除绑定。之后用同一个号登录，是一个全新的账号。' },
+  { k: '有订单时', v: '有还没取件、退款中或打印中的订单时，要等订单办完才会执行注销。' },
+]
+
 // 服务端同一时间只允许一个「进行中」的数据权利请求（activeKey 唯一约束）。
 const ACTIVE_STATUS = { pending: true, handling: true }
 
@@ -64,8 +76,14 @@ function statusLabel(status) {
 }
 
 /** 后端错误已由 request.js 归一成 Error(message, statusCode, code)。码值一并展示，便于排查与对账。 */
+// 幂等键两码的服务端原话是工程话（「幂等键已用于其他数据请求」），正常流程走不到；本页给一句能照着做的。
+// 只在本页处理：打印下单也用 IDEMPOTENCY_KEY_REUSED，那边有自己的换键逻辑，不能全局改它的说法。
+const IDEMPOTENCY_HINT = '这次提交没有成功，请退出本页重新进入后再试'
+const IDEMPOTENCY_CODES = { INVALID_IDEMPOTENCY_KEY: true, IDEMPOTENCY_KEY_REUSED: true }
+
 function errText(err) {
   if (!err) return '操作失败，请稍后重试'
+  if (err.code && IDEMPOTENCY_CODES[err.code] === true) return `${IDEMPOTENCY_HINT}（${err.code}）`
   const code = err.code ? `（${err.code}）` : ''
   return `${err.message || '操作失败'}${code}`
 }
@@ -84,7 +102,10 @@ function toListView(page) {
     requestType: it.requestType,
     typeLabel: TYPE_LABEL[it.requestType] || it.requestType,
     status: it.status,
-    statusLabel: statusLabel(it.status),
+    // 注销申请受理后要等管理员核实执行，不是系统在排队：说「已受理，等待处理」
+    statusLabel: (it.requestType === 'delete' && it.status === 'pending') ? CLOSURE_PENDING_LABEL : statusLabel(it.status),
+    // 只有本人还在待处理的注销申请能撤回（服务端同一判据）
+    canCancel: it.requestType === 'delete' && it.status === 'pending',
     requestedAtText: fmtTime(it.requestedAt),
     exportExpiresAtText: fmtTime(it.exportExpiresAt),
     // canDownload 由服务端算（requestType==='export' && status==='ready'），前端不重算。
@@ -96,9 +117,13 @@ function toListView(page) {
     requests,
     latestExport: requests.filter((v) => v.requestType === 'export')[0] || null,
     hasActiveRequest: requests.some((v) => ACTIVE_STATUS[v.status] === true),
+    // 轮询只为异步导出；注销申请要等人工处理，可能好几天，不轮询
+    hasActiveExport: requests.some((v) => v.requestType === 'export' && ACTIVE_STATUS[v.status] === true),
+    // 还在处理中的注销申请（待处理或执行中），页面据此不让重复提交
+    activeClosure: requests.filter((v) => v.requestType === 'delete' && ACTIVE_STATUS[v.status] === true)[0] || null,
     // 服务端对「账号注销是否开放」的唯一真话，前端不做任何推断。
     accountClosureAvailable: caps.accountClosureAvailable === true,
   }
 }
 
-module.exports = { uuidV4, statusLabel, errText, toListView }
+module.exports = { uuidV4, statusLabel, errText, toListView, CLOSURE_NOTES, CLOSURE_PENDING_LABEL }
