@@ -206,8 +206,9 @@
 }
 .act-rule[data-no] i { background: var(--qx-wheat); }
 
-.act-steps { display: flex; flex-direction: column; gap: 12px; }
-.act-step { display: flex; gap: 12px; align-items: flex-start; }
+.act-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.act-step { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+.act-step > div { min-width: 0; }
 .act-step b { display: block; font-size: var(--qx-fs-body); }
 .act-step span { display: block; margin-top: 4px; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
 .act-step-num {
