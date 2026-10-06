@@ -12989,7 +12989,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 639,
+      "reachableFileCount": 645,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15965,7 +15965,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 736
+      "sourceFileCount": 742
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19498,6 +19498,9 @@
       "apps/kiosk/scripts/verify-fusion-home.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
     ],
+    "apps/kiosk/src/pages/interview/InterviewModePicker.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
     "apps/kiosk/src/pages/interview/InterviewReportPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -19508,6 +19511,9 @@
     ],
     "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/InterviewResumePreview.tsx": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx": [
@@ -19553,6 +19559,9 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-mic-capability-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/session/InterviewSessionInvalid.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
@@ -30080,8 +30089,10 @@
           ".github/workflows/ci.yml",
           "apps/kiosk/scripts/tests/interview-workbench-model.test.mjs",
           "apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx",
+          "apps/kiosk/src/pages/interview/InterviewModePicker.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx",
+          "apps/kiosk/src/pages/interview/InterviewResumePreview.tsx",
           "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewShell.tsx",
@@ -30090,6 +30101,7 @@
           "apps/kiosk/src/pages/interview/interview-service-desk.css",
           "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
+          "apps/kiosk/src/pages/interview/session/InterviewSessionInvalid.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
           "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
