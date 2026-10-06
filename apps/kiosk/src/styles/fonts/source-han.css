@@ -1,0 +1,165 @@
+/* 由 apps/kiosk/scripts/fonts/build_source_han_subset.py 生成，不要手改。
+   思源宋体 / 思源黑体（SIL OFL 1.1，许可证见 public/fonts/source-han/LICENSE-*.txt）。
+   OFL 保留字体名「Source」：子集是修改版，故字族名改为 Qingxu Serif / Qingxu Sans；各页字体栈引用这两个名字。 */
+
+@font-face {
+  font-family: 'Qingxu Serif';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/serif-400-a.woff2') format('woff2');
+  unicode-range: U+0000-4DFF, U+A000-FFFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Serif';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/serif-400-b.woff2') format('woff2');
+  unicode-range: U+4E00-6FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Serif';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/serif-400-c.woff2') format('woff2');
+  unicode-range: U+7000-9FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Serif';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/serif-700-a.woff2') format('woff2');
+  unicode-range: U+0000-4DFF, U+A000-FFFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Serif';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/serif-700-b.woff2') format('woff2');
+  unicode-range: U+4E00-6FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Serif';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/serif-700-c.woff2') format('woff2');
+  unicode-range: U+7000-9FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Serif';
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/serif-900-a.woff2') format('woff2');
+  unicode-range: U+0000-4DFF, U+A000-FFFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Serif';
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/serif-900-b.woff2') format('woff2');
+  unicode-range: U+4E00-6FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Serif';
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/serif-900-c.woff2') format('woff2');
+  unicode-range: U+7000-9FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Sans';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/sans-400-a.woff2') format('woff2');
+  unicode-range: U+0000-4DFF, U+A000-FFFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Sans';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/sans-400-b.woff2') format('woff2');
+  unicode-range: U+4E00-6FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Sans';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/sans-400-c.woff2') format('woff2');
+  unicode-range: U+7000-9FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Sans';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/sans-500-a.woff2') format('woff2');
+  unicode-range: U+0000-4DFF, U+A000-FFFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Sans';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/sans-500-b.woff2') format('woff2');
+  unicode-range: U+4E00-6FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Sans';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/sans-500-c.woff2') format('woff2');
+  unicode-range: U+7000-9FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Sans';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/sans-700-a.woff2') format('woff2');
+  unicode-range: U+0000-4DFF, U+A000-FFFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Sans';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/sans-700-b.woff2') format('woff2');
+  unicode-range: U+4E00-6FFF;
+}
+
+@font-face {
+  font-family: 'Qingxu Sans';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/source-han/sans-700-c.woff2') format('woff2');
+  unicode-range: U+7000-9FFF;
+}
