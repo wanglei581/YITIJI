@@ -1,5 +1,21 @@
 # 当前开发进度
 
+## 2026-10-06：N-6 AI 不可用三种情况进派生告警（随第七次 10/16，Grok 实现）
+
+现场无人值守时，模型账户挂了、连续失败、全站当天费用到顶，都要进现有派生告警，并走现有每分钟企业微信推送。推送服务没改。口径以 `services/api/src/admin-ops/derived-ai-alerts.ts` 文件头为准。
+
+- **数据来源：** 只读逐次计量账 `AiUsageRecord`（`schema.prisma` 1962 行）。判定用 `createdAt`、`status`、`httpStatus`。401 / 402 / 403 由 `ai-usage-meter.ts` 的 `statusFromHttp`（114–117 行）记成 `upstream_error`，HTTP 码留在 `httpStatus`。`AiServiceLog` 有 `errorCode`（1942 行）、没有 `httpStatus`。`AI_PROVIDER_ACCOUNT_UNAVAILABLE` 与 `AI_PROVIDER_MODEL_INVALID` 在本候选没有写入点（`llm-failure.ts` 75 行把其余 4xx 一律记成 `AI_PROVIDER_REQUEST_ERROR`），所以账户不可用只认 `httpStatus` ∈ {401, 402, 403} 且 `status` 不是 `ok`。查询不取会员、终端、厂商、型号、功能名、提示词。
+- **`ai_provider_unavailable`（error）：** 最近 15 分钟内至少一次账户级失败，并且最后一次 `ok` 之后仍有这类失败。之后出现 `ok` 即消失。回合 = 这一轮第一次未恢复失败所在的 15 分钟窗口，按 Unix 纪元对齐，不是上海钟面的 :00 / :15 / :30 / :45。全站一条，`subjectKey` 为 `ai_provider_unavailable:global`。标题固定为「AI 服务账户不可用（余额或密钥问题），用户只能用手动方式」。
+- **`ai_consecutive_failures`（末尾这段 10 分钟里一次 `ok` 都没有则 error，否则 warning）：** 最近 10 分钟内，去掉 `aborted` / `blocked` 之后，末尾连续 ≥ 5 次都是 `upstream_error` / `timeout` / `network_error` / `busy`。这两种状态不计入次数，也不把连续段打断。中间的 `ok` 把连续段截断。「全部功能都失败」指这 10 分钟里计入判定的请求没有一次 `ok`，不是产品功能清单逐项失败。标题带失败次数和最近一次的状态类别（上游错误 / 超时 / 网络错误 / 繁忙），不带功能名和请求内容。与第 1 种同时成立时只报第 1 种。回合 = 当前这一段的第一次失败时刻。
+- **`ai_budget_exhausted`（error）：** 只报全站当天。已花和上限都走 `AiBudgetService.spent` / `limits.globalCny`，不另写公式。单终端、单会员到顶是正常限流，不进告警。标题固定为「今天的 AI 费用上限已用完，AI 功能暂停到明天 0 点」。回合 = 北京时间当天日期。告警每次新开一个 `AiBudgetService`，不吃入口闸门那 10 秒缓存和本进程叠加，所以可能比当场的 503 晚一次落库。明细只写日期和「全局」，不写金额。
+- **查询边界：** 模型请求只扫最近 15 分钟，列只有上面三列，走 `@@index([createdAt])`（1990 行）。费用按 `dayKey` 做 `groupBy`，走 `@@index([dayKey])`（1985 行）。没有新索引。`firingTotal` 把这三条的条数加进去，和列表同一口径。
+- **推送：** `admin-alert-push.service.ts` 100–101 行对「上一轮有、这一轮没有」的 `subjectKey` 一律推「已恢复」，不按类型过滤，也没有「终端类被筛掉就不推已恢复」的分支。这三条 `terminalCode` 为空，消失时同样推。正文只用标题。
+- **后台可见文案（只补类型名，不改流程）：** `apps/admin` 告警中心类型名「AI 账户不可用 / AI 连续失败 / AI 费用上限已用完」，筛选芯片、空态和页头说明各补一句；工作台这三条的副标题是「AI 服务 · 相对时间」，避免空终端号显示成「未知终端」。意见反馈那条原有分支没动。类型集合要和后端 `ALERT_TYPES` 一致，否则 `verify:service-desk-dashboard-ui` 会红。
+- **夹具：** `verify-queue-dispatch-printer-status.ts` 的内存 Prisma 补了空的 `aiUsageRecord`（`findMany` / `groupBy` 都返回空）。这组夹具没有 AI 调用，空结果不报这三条。
+- **门禁（退出码都是 0）：** `verify:admin-ops` 最后一行 `=== ALL PASS ===`（含第 12 节）；`verify:alert-push` 最后一行 `alert push gates passed`；API `typecheck` 最后一行是 Prisma Client 7.8.0 生成成功，`tsc --noEmit` 无输出；API `lint` 无输出；`verify:ai-usage-budget` 最后一行 `✅ verify:ai-usage-budget（覆盖面）21/21 通过`；`verify:ai-usage-retention` 最后一行 `66 PASS / 0 FAIL / 66 checks`；`verify:beijing-display-time` 最后一行 `ALL PASS verify-beijing-display-time (29 checks)`；`verify:console-plain-copy` 最后一行 `verify:console-plain-copy passed`；`verify:service-desk-dashboard-ui` 最后一行 `ALL PASS`；`verify:feedback-sla` 最后一行 `verify-feedback-sla: 33 项全部通过`；`verify:datetime-honesty` 最后一行 `ALL PASS`；`verify:print-monitor-truth` 最后一行 `verify-print-monitor-truth: all assertions passed`；`verify:queue-dispatch-printer-status` 最后一行 `PASS queue dispatch printer status`；`verify:admin-print-outcome` 最后一行 `ALL PASS`；`node scripts/verify-ci-gate-coverage.mjs` 最后一行 `OK: 21 deterministic CI gates are directly executed; 524/534 verify/ui 门禁在 CI 执行闭包内，10 条已登记豁免（其中 0 条待接线，上限 1）；581 个门禁脚本文件中 0 个无脚本名（全部已登记，上限 0）`。`pnpm graph` 写入 `docs/graph/` 2 个文件有变化；`pnpm graph:check` 最后一行 `PASS docs/graph/ 与当前代码一致`。没改 `.github/`，两条门禁本来就在 CI 里。
+- **反向变异（已改回，不留在代码里）：** 账户失败后有成功仍报 → 退出码 1，`FAIL 账户失败之后有成功，告警应消失`；连续失败阈值改成 1 → 退出码 1，`FAIL 连续 4 次超时不得告警`；`aborted` 计入且不再忽略 → 退出码 1，`FAIL aborted 不计，4 次超时加 1 次中止不得告警`；预算比较改成单终端上限 → 退出码 1，`FAIL 单终端达上限不得出 ai_budget_exhausted`。源文件哈希与变异前一致。
+- **没验的：** 本会话没有浏览器工具，后台告警中心和工作台没有在浏览器里点过。金额封顶、计费、一体机、小程序、机构后台页面都没改。
+
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
 - **决定：** 10/4 21:5x 产品负责人定主原则「设备现场不需要工作人员，是自助的、自动的，这个是主要的」。

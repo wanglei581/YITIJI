@@ -108,6 +108,8 @@ async function assertAlertsDisappear(status: (typeof STATUSES)[number], label: s
     terminalHeartbeat: { groupBy: async () => [] },
     printTask: { findMany: async () => [], count: async () => 0 },
     feedbackTicket: { count: async () => 0, findFirst: async () => null },
+    // 派生告警会读计量账。这组夹具没有 AI 调用，空结果既不报账户不可用，也不报费用用完。
+    aiUsageRecord: { findMany: async () => [], groupBy: async () => [] },
   }
   const fault = await collectDerivedAlerts(prisma as never, now)
   const issues = fault.alerts.filter((alert) => alert.type === 'printer_issue')
