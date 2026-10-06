@@ -31,9 +31,10 @@ import {
   PrintDoneRecordSection,
   PrintDoneXq,
   PrintFeeBoundaryBar,
+  PrintJamGuide,
   PrintOutOfPaperPanel,
 } from './components/PrintDoneSections'
-import { doneTakeaway, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, publicOrderNo, reprintHint } from './printProgressModel'
+import { doneTakeaway, failureStaffDoing, jamOrderKeptLine, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, paymentFactOf, publicOrderNo, reprintHint } from './printProgressModel'
 import { formatCents } from './cashierStatus'
 import './styles/print-fulfill-qx.css'
 
@@ -502,6 +503,7 @@ export function PrintDonePage() {
     }
 
     const jam = visual === 'paper-jam'
+    const payment = paymentFactOf(amountCents)
     const issueTitle = isUnconfirmed ? '打印结果未确认' : jam ? '打印机卡纸' : '打印失败'
     const ask = isUnconfirmed
       ? <>这次打印<em>结果未确认</em>。</>
@@ -512,11 +514,11 @@ export function PrintDonePage() {
       ? '系统已经正式登记，工作人员核查后给出结论，不会让你自认倒霉。'
       : jam
         ? '硬拉可能撕坏纸、伤到机器，交给我们来处理。'
-        : '订单和支付记录都在，请凭订单找现场工作人员处理。'
+        : failureStaffDoing(payment)
     const issueSub = isUnconfirmed
       ? '系统已明确登记，等待人工核查'
       : jam
-        ? '你的订单和已付金额都保留着'
+        ? jamOrderKeptLine(payment)
         : '打印任务已经确认失败'
     return (
       <QxPageFrame
@@ -547,7 +549,7 @@ export function PrintDonePage() {
                 ? 'print-fulfill-state-paper-jam'
                 : 'print-fulfill-state-failed'
           }
-          className="qx-scroll pff-page"
+          className={jam ? 'qx-scroll pff-page pff-jam' : 'qx-scroll pff-page'}
         >
           <PrintDoneXq ask={ask} doing={doing} />
 
@@ -578,6 +580,7 @@ export function PrintDonePage() {
           ) : null}
           <p className="pff-out-sub">联系工作人员补打</p>
           {takeawayNotices}
+          {jam ? <PrintJamGuide orderNo={publicOrderNo(takeaway?.orderNo) ?? displayOrderNo} /> : null}
         </div>
         {feedbackDialog}
       </QxPageFrame>
@@ -629,30 +632,38 @@ export function PrintDonePage() {
         <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing={idDocument ? '拿走前记得核一下页数，证件原件和复印件一起带走。' : '拿走前记得核一下页数，少页当场能处理。'} />
 
         <div className="qx-card">
-          <div className="pff-done-title" role="status">
-            <span className="pff-ok"><CheckIcon aria-hidden="true" /></span>
-            都打好了，拿走前核一下
-          </div>
-          <p className="pff-out-sub">
-            {takeawayCopy.facesLabel}
-          </p>
-          <div className="pff-step">
-            <span className="pff-step-no">1</span>
-            <span className="pff-step-txt">
-              从出纸口取走 <b>{takeawayCopy.pagesLabel}</b>。
-            </span>
-          </div>
-          <div className="pff-step">
-            <span className="pff-step-no">2</span>
-            <span className="pff-step-txt">当场核对<b>页数和清晰度</b>，少页、卡纸、印花了都能当场处理。</span>
-          </div>
-          {idDocument ? (
-            <div className="pff-step">
-              <span className="pff-step-no">3</span>
-              <span className="pff-step-txt">证件<b>原件和复印件一起带走</b>，别留在机器旁；复印件只用于本人求职等正当用途。</span>
+          <div className="pff-done-layout">
+            <div>
+              <div className="pff-done-title" role="status">
+                <span className="pff-ok"><CheckIcon aria-hidden="true" /></span>
+                都打好了，拿走前核一下
+              </div>
+              <p className="pff-out-sub">
+                {takeawayCopy.facesLabel}
+              </p>
+              <div className="pff-step">
+                <span className="pff-step-no">1</span>
+                <span className="pff-step-txt">
+                  从出纸口取走 <b>{takeawayCopy.pagesLabel}</b>。
+                </span>
+              </div>
+              <div className="pff-step">
+                <span className="pff-step-no">2</span>
+                <span className="pff-step-txt">当场核对<b>页数和清晰度</b>，少页、卡纸、印花了都能当场处理。</span>
+              </div>
+              {idDocument ? (
+                <div className="pff-step">
+                  <span className="pff-step-no">3</span>
+                  <span className="pff-step-txt">证件<b>原件和复印件一起带走</b>，别留在机器旁；复印件只用于本人求职等正当用途。</span>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-          <p className="pff-out-sub">已在本机出纸</p>
+            <aside className="pff-done-side" aria-label="取件核对">
+              <b>已在本机出纸</b>
+              <span>{displayOrderNo ? `订单号 ${displayOrderNo}` : '核对页数'}</span>
+              <span>少页当场能处理</span>
+            </aside>
+          </div>
         </div>
 
         {typeof hasEndUser === 'boolean' && (

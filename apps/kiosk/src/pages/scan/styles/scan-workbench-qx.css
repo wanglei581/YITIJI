@@ -733,3 +733,10 @@
   .sw-page[data-w2-page='scan-progress'] .sw-chain { min-height: 250px; }
   .sw-page[data-w2-page='scan-progress'] .sw-pgrp { padding-block: 30px; }
 }
+
+/* 面板指引、等待回传：余量摊进现有区块之间，不在底栏上方留一整行空白。
+ * 放在查询态间距之后，避免 30px 间距把摊开的缝又撑过 160。
+ * 面板示意图是深色，拉高后算作有内容，补上右列步骤旁边的左半空白。 */
+.sw-page[data-state='waiting-delivery'] .sw-scroll,
+.sw-page[data-state='panel-instruction'] .sw-scroll { justify-content: space-evenly; gap: 12px; }
+.sw-page[data-state='panel-instruction'] .sw-mfp { align-self: stretch; justify-content: space-between; }

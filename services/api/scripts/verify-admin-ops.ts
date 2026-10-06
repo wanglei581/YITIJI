@@ -187,6 +187,10 @@ async function verifyPrinterStatusLabelsAndShanghaiTime(): Promise<void> {
   if (!offline || !offline.detail.includes('(2026-09-28 16:00)')) {
     fail(`3a2. 离线告警里的心跳时间应按上海时间写 2026-09-28 16:00，实际「${offline?.detail}」`)
   }
+  // 离线已经好几天：写「N 天 M 小时前」，不写成「5211 分钟前」那样要值班人员自己换算的数。
+  if (!/最近一次心跳在 \d+ 天( \d+ 小时)?前/.test(offline.detail) || /\d{3,} 分钟前/.test(offline.detail)) {
+    fail(`3a2. 离线多天的告警应写「N 天 M 小时前」，实际「${offline.detail}」`)
+  }
   if (offline.occurredAt !== lastSeen.toISOString() || offline.episodeToken !== offlineEpisodeToken(lastSeen)) {
     fail('3a2. 改时区只许动文案：occurredAt / episodeToken 必须仍按原 UTC 时刻算')
   }

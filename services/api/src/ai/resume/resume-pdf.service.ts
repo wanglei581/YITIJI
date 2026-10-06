@@ -206,9 +206,15 @@ export class ResumePdfService {
       const y = doc.y
       const rightWidth = cfg.columns === 1 ? 130 : Math.min(110, Math.max(80, columnWidth * 0.35))
       doc.fillColor(ink).fontSize(fs(11.5)).text(left, xForColumn(), y, { width: columnWidth - rightWidth })
+      const leftBottom = doc.y
+      let rightBottom = y
       if (right) {
         doc.fillColor(sub).fontSize(fs(10)).text(right, xForColumn() + columnWidth - rightWidth, y, { width: rightWidth, align: 'right' })
+        rightBottom = doc.y
       }
+      // 左标题与右侧时间段各自折行，下面的描述从两边较低的那一边往下画（R-2：以前只按右栏推进，
+      // 标题折成三行、时间段两行时描述压在标题第三行上）。
+      doc.y = Math.max(leftBottom, rightBottom)
       resetX()
       doc.moveDown(0.1)
     }

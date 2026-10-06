@@ -78,6 +78,9 @@ export function GeneratePreviewCta(props: {
   phase: 'preview' | 'export'
   showWorkspace: boolean
   exportBlocked: boolean
+  /** 公司、职务、学校、专业不合法时，导出和打印入口不可用，点了把焦点带回出错那一格。 */
+  titleBlocked: boolean
+  onTitleBlocked: () => void
   exporting: boolean
   canPrint: boolean
   printNavigating: boolean
@@ -97,6 +100,8 @@ export function GeneratePreviewCta(props: {
       <ExportPhaseCta
         view={props.view}
         exportBlocked={props.exportBlocked}
+        titleBlocked={props.titleBlocked}
+        onTitleBlocked={props.onTitleBlocked}
         exporting={props.exporting}
         canPrint={props.canPrint}
         printNavigating={props.printNavigating}
@@ -111,7 +116,14 @@ export function GeneratePreviewCta(props: {
     return (
       <>
         <button type="button" className="qx-btn" data-variant="ghost" data-route="/resume/generate" data-testid="resume-generate-preview-cta-refill" onClick={props.onRefill}>回去改资料</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-preview-cta-export" onClick={props.onOpenExport}>
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="primary"
+          data-testid="resume-generate-preview-cta-export"
+          aria-disabled={props.titleBlocked || undefined}
+          onClick={() => { if (props.titleBlocked) { props.onTitleBlocked(); return } props.onOpenExport() }}
+        >
           内容没问题，去导出
         </button>
       </>
@@ -163,6 +175,8 @@ export function GeneratePreviewCta(props: {
 function ExportPhaseCta(props: {
   view: GeneratePreviewViewState
   exportBlocked: boolean
+  titleBlocked: boolean
+  onTitleBlocked: () => void
   exporting: boolean
   canPrint: boolean
   printNavigating: boolean
@@ -176,11 +190,19 @@ function ExportPhaseCta(props: {
       回预览再看看
     </button>
   )
+  const printClick = () => {
+    if (props.titleBlocked) { props.onTitleBlocked(); return }
+    if (!props.printNavigating) props.onPrint()
+  }
+  const confirmClick = () => {
+    if (props.titleBlocked) { props.onTitleBlocked(); return }
+    if (!props.exportBlocked) props.onConfirmExport()
+  }
   if (props.view === 'export-ready' && props.canPrint) {
     return (
       <>
         {back}
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-preview-cta-print" aria-disabled={props.printNavigating || undefined} onClick={() => { if (!props.printNavigating) props.onPrint() }}>
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-preview-cta-print" aria-disabled={props.printNavigating || props.titleBlocked || undefined} onClick={printClick}>
           {props.printNavigating ? '正在进入打印确认…' : '去打印确认'}
         </button>
       </>
@@ -199,10 +221,10 @@ function ExportPhaseCta(props: {
   if (props.view === 'export-url-expired' && props.canPrint) {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" data-testid="resume-generate-preview-cta-confirm-export" aria-disabled={props.exportBlocked || undefined} onClick={() => { if (!props.exportBlocked) props.onConfirmExport() }}>
+        <button type="button" className="qx-btn" data-variant="ghost" data-testid="resume-generate-preview-cta-confirm-export" aria-disabled={props.exportBlocked || props.titleBlocked || undefined} onClick={confirmClick}>
           重新导出拿新链接
         </button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-preview-cta-print" aria-disabled={props.printNavigating || undefined} onClick={() => { if (!props.printNavigating) props.onPrint() }}>
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-preview-cta-print" aria-disabled={props.printNavigating || props.titleBlocked || undefined} onClick={printClick}>
           {props.printNavigating ? '正在进入打印确认…' : '去打印确认'}
         </button>
       </>
@@ -213,7 +235,7 @@ function ExportPhaseCta(props: {
     : props.view === 'export-failed' || props.view === 'export-url-expired' || props.view === 'export-print-unavailable'
       ? '重新导出'
       : '导出这一份'
-  const blocked = props.exportBlocked || props.exporting || props.view === 'export-exporting'
+  const blocked = props.exportBlocked || props.titleBlocked || props.exporting || props.view === 'export-exporting'
   return (
     <>
       {back}
@@ -223,7 +245,7 @@ function ExportPhaseCta(props: {
         data-variant="primary"
         data-testid="resume-generate-preview-cta-confirm-export"
         aria-disabled={blocked || undefined}
-        onClick={() => { if (!blocked) props.onConfirmExport() }}
+        onClick={() => { if (props.titleBlocked) { props.onTitleBlocked(); return } if (!blocked) props.onConfirmExport() }}
       >
         {label}
       </button>
