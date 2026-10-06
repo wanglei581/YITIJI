@@ -202,13 +202,14 @@ function HumanDesk({ no }: { no: string }) {
   const contact = useSupportContact()
   return (
     <>
-      <SectionHead no={no} title="自己解决不了" hint="机器故障我们会收到提醒" />
+      <SectionHead no={no} title="遇到问题怎么办" hint="机器故障我们会收到提醒" />
       <div className="k1-help-people">
         <div className="k1-help-contact">
           <span className="k1-help-cat-icon" aria-hidden="true"><PhoneIcon /></span>
           <div>
             <h3>需要帮助</h3>
             <p>{helpNeededLine(contact)}。机器故障我们已经收到提醒，会尽快处理。</p>
+            <p>也可以在「我的 → 意见反馈」里留言，登录后在那里看处理状态（处理中、已回复）。</p>
             <p className="k1-help-note">本页不会替你拨出电话，点按钮也不等于已经有人受理。</p>
           </div>
         </div>
