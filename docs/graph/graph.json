@@ -11611,6 +11611,7 @@
           "services/api/src/terminals/terminals.service.ts"
         ],
         "services": [
+          "TerminalCommandService",
           "TerminalsService"
         ]
       },
@@ -16305,7 +16306,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 111,
+    "modelCount": 112,
     "models": [
       {
         "fieldCount": 7,
@@ -17673,7 +17674,7 @@
         ]
       },
       {
-        "fieldCount": 29,
+        "fieldCount": 30,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -17683,6 +17684,7 @@
           "ScanTask",
           "TerminalBindCode",
           "TerminalCapability",
+          "TerminalCommand",
           "TerminalCredential",
           "TerminalHeartbeat",
           "TerminalScanDeletionAudit"
@@ -17748,6 +17750,15 @@
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ]
+      },
+      {
+        "fieldCount": 13,
+        "name": "TerminalCommand",
+        "relations": [
+          "Terminal",
+          "User"
+        ],
+        "usedBy": []
       },
       {
         "fieldCount": 9,
@@ -17864,7 +17875,7 @@
         ]
       },
       {
-        "fieldCount": 28,
+        "fieldCount": 29,
         "name": "User",
         "relations": [
           "AuditLog",
@@ -17872,7 +17883,8 @@
           "FeedbackReply",
           "FileObject",
           "Organization",
-          "ReviewDecision"
+          "ReviewDecision",
+          "TerminalCommand"
         ],
         "usedBy": [
           "services/api/src/admin-internal-accounts/admin-internal-accounts.service.ts",

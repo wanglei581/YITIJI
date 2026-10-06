@@ -18,6 +18,11 @@ function isNextActionId(value: unknown): value is string {
   return typeof value === 'string' && /^[a-z][a-z0-9_]{2,63}$/.test(value)
 }
 
+/** 未结束命令冲突时回传的命令 id。只接受有界标识，避免把任意文本带回响应。 */
+function isTerminalCommandId(value: unknown): value is string {
+  return typeof value === 'string' && /^[\w-]{8,80}$/.test(value)
+}
+
 /** 迁移 20261003090000 里触发器抛出的错误文本，两边必须一字不差。 */
 const MEMBER_CLOSED_WRITE_FORBIDDEN = 'MEMBER_CLOSED_WRITE_FORBIDDEN'
 
@@ -109,6 +114,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let mismatchTerminal: MismatchTerminal | null | undefined
     let closureOrders: Array<{ orderNo: string; status: string }> | undefined
     let nextAction: string | undefined
+    let commandId: string | undefined
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -143,6 +149,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
               .map((row) => ({ orderNo: row.orderNo, status: row.status }))
           }
           if (isNextActionId(err['nextAction'])) nextAction = err['nextAction']
+          // 同一终端已有未结束命令时，把那条命令的 id 交回管理员。只认这一个错误码，并且只接受有界 id。
+          if (err['code'] === 'TERMINAL_COMMAND_PENDING' && isTerminalCommandId(err['commandId'])) {
+            commandId = err['commandId']
+          }
         } else if (typeof errField === 'string') {
           const bodyMessage = b['message']
           if (typeof bodyMessage === 'string' && isMachineErrorCode(bodyMessage)) {
@@ -229,6 +239,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ...(mismatchTerminal !== undefined ? { terminal: mismatchTerminal } : {}),
         ...(closureOrders ? { orders: closureOrders } : {}),
         ...(nextAction ? { nextAction } : {}),
+        ...(commandId ? { commandId } : {}),
       },
       requestId: request.requestId,
     }

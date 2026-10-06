@@ -115,6 +115,7 @@
     "verify:terminal-credentials": "node -r @swc-node/register scripts/verify-terminal-credentials.ts",
     "verify:terminal-identity": "node -r @swc-node/register scripts/verify-terminal-identity.ts",
     "verify:terminal-provisioning": "node -r @swc-node/register scripts/verify-terminal-provisioning.ts",
+    "verify:terminal-remote-command": "node -r @swc-node/register scripts/verify-terminal-remote-command.ts",
     "verify:terminal-status-idempotency": "node -r @swc-node/register scripts/verify-terminal-status-idempotency.ts",
     "verify:terminal-network-diagnostics": "node -r @swc-node/register scripts/verify-terminal-network-diagnostics.ts && pnpm run verify:scan-input-lockout-telemetry",
     "verify:scan-input-lockout-telemetry": "node -r @swc-node/register scripts/verify-scan-input-lockout-telemetry.ts",

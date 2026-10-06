@@ -434,6 +434,10 @@ jobs:
         working-directory: services/api
         run: npx prisma db push --accept-data-loss
 
+      - name: Verify terminal remote command
+        working-directory: services/api
+        run: pnpm verify:terminal-remote-command
+
       - name: Verify recruitment hosting gate declarations
         working-directory: services/api
         run: pnpm verify:recruitment-hosting-gate-declares
