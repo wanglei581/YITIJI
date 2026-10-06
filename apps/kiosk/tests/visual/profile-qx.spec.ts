@@ -474,8 +474,8 @@ test('privacy revoke posts revoke_consent and does not claim account deletion @w
   await expect(page.getByText('撤回 AI 使用授权').first()).toBeVisible()
   // 2026-09-30 A 批：旧名「岗位 AI 授权」与工程词「元数据」「step-up」不再上屏（稿 41）。
   await expect(page.getByText(/岗位 AI 授权|元数据|step-up/)).toHaveCount(0)
-  await expect(page.getByText('一体机未开放')).toBeVisible()
-  await expect(page.getByText('暂未开放').first()).toBeVisible()
+  await expect(page.getByText('一体机不提供')).toBeVisible()
+  await expect(page.getByText('一体机不办理')).toBeVisible()
   await page.getByTestId('member-privacy-revoke-entry').click()
   await expect(page.getByRole('dialog')).toBeVisible()
 
@@ -811,6 +811,113 @@ for (const item of ME_SHELL_PAGES) {
     expect(errors).toEqual([])
   })
 }
+
+const EXPORT_WITH_PHONE = `公共屏上不导出个人资料。需要复制个人信息的，也可以拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）申请，我们核实是你本人后处理。`
+const CLOSURE_WITH_PHONE = `这台机器上不办理注销。也可以拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）申请。我们核实是你本人后，15 个工作日内处理。`
+const EXPORT_WITHOUT_PHONE = '公共屏上不导出个人资料。需要复制个人信息的，也可以查看《隐私政策》里的联系方式申请，我们核实是你本人后处理。'
+const CLOSURE_WITHOUT_PHONE = '这台机器上不办理注销。也可以查看《隐私政策》里的联系方式申请。我们核实是你本人后，15 个工作日内处理。'
+
+function privacyList(items: unknown[]) {
+  return {
+    status: 200,
+    json: { success: true, data: { items, nextCursor: null, capabilities: { accountClosureAvailable: false } } },
+  }
+}
+
+function privacyCreated(id: string) {
+  return {
+    id,
+    requestType: 'revoke_consent',
+    status: 'completed',
+    requestedAt: '2026-10-06T10:24:00.000+08:00',
+    handledAt: '2026-10-06T10:24:00.000+08:00',
+    executionStep: null,
+    exportExpiresAt: null,
+    failureCode: null,
+    canRetry: false,
+    canDownload: false,
+  }
+}
+
+test('privacy export and closure stay on the fixture phone while the miniapp is unpublished @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await page.goto('/me/privacy-requests')
+  await contact
+  await expect(page.getByTestId('member-privacy-state-login')).toBeVisible()
+  await expect(page.getByTestId('member-privacy-export-line')).toHaveText(EXPORT_WITH_PHONE)
+  await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_WITH_PHONE)
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('小程序')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('小程序')
+  await expect(page.getByText('一体机不提供')).toBeVisible()
+  await expect(page.getByText('一体机不办理')).toBeVisible()
+  await expectNoStaffHandoff(page)
+  expect(errors).toEqual([])
+})
+
+test('privacy export and closure point at the privacy policy when support contact is missing @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  hideSupportContact(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 404)
+
+  await page.goto('/me/privacy-requests')
+  await contact
+  await expect(page.getByTestId('member-privacy-export-line')).toHaveText(EXPORT_WITHOUT_PHONE)
+  await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_WITHOUT_PHONE)
+  await expect(page.getByText(NO_PHONE_HINT).first()).toBeVisible()
+  const body = await page.locator('body').innerText()
+  expect(body.split('拨打服务电话').length - 1).toBe(0)
+  await expectNoStaffHandoff(page)
+  expect(errors).toEqual([])
+})
+
+test('privacy revoke success opens the success screen @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/data-requests', privacyList([]))
+  api.respond('POST', '/api/v1/me/data-requests', {
+    status: 200,
+    json: { success: true, data: privacyCreated('req-ok') },
+  })
+
+  await loginThroughVisibleUi(page, '/me/privacy-requests')
+  await page.getByTestId('member-privacy-revoke-entry').click()
+  await page.getByRole('button', { name: '确认撤回', exact: true }).click()
+  await expect(page.getByTestId('member-privacy-state-success')).toBeVisible()
+  await expect(page.getByTestId('member-privacy-result')).toContainText('已撤回 AI 使用授权，请求已记录')
+  await expect(page.getByTestId('member-privacy-dialog')).toHaveCount(0)
+  await expect(page.getByText('全部个人数据已删除')).toHaveCount(0)
+  await expect(page.getByText('账号注销成功')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('privacy revoke failure opens the failure screen and retry can succeed @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/data-requests', privacyList([]))
+  api.respondWith('POST', '/api/v1/me/data-requests', (attempt) => attempt === 1
+    ? { status: 400, json: { success: false, error: { code: 'DATA_REQUEST_UNAVAILABLE', message: 'upstream rejected' } } }
+    : { status: 200, json: { success: true, data: privacyCreated('req-retry') } })
+
+  await loginThroughVisibleUi(page, '/me/privacy-requests')
+  await page.getByTestId('member-privacy-revoke-entry').click()
+  await page.getByRole('button', { name: '确认撤回', exact: true }).click()
+  await expect(page.getByTestId('member-privacy-state-failure')).toBeVisible()
+  await expect(page.getByTestId('member-privacy-result')).toContainText('授权没有变化')
+  await expect(page.getByTestId('member-privacy-result')).toContainText('提交失败，请稍后重试')
+  await expect(page.getByTestId('member-privacy-dialog')).toHaveCount(0)
+
+  await page.getByTestId('member-privacy-primary').click()
+  await expect(page.getByTestId('member-privacy-state-success')).toBeVisible()
+  await expect(page.getByTestId('member-privacy-result')).toContainText('已撤回 AI 使用授权，请求已记录')
+  expect(api.requestCount('POST', '/api/v1/me/data-requests')).toBe(2)
+  expect(errors).toEqual([])
+})
 
 function registerEmptyAccount(api: ApiRouter): void {
   registerMemberLogin(api)

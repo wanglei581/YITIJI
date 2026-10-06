@@ -41,10 +41,7 @@ const ACTIVITY_REASON: Record<string, string> = {
   'sold-out': `${NO_SCREEN}。没有单独的领完页，仍是活动详情，库存标成「已领完」，领取按钮禁用。`,
 }
 
-const PRIVACY_REASON: Record<string, string> = {
-  success: `${NO_SCREEN}。撤回成功后弹层关掉，记录回到列表，顶上出一句「已撤回 AI 使用授权，请求已记录」。`,
-  failure: `${NO_SCREEN}。提交失败后确认弹层还在，顶上出一句「提交失败，请稍后重试」。`,
-}
+const PRIVACY_REASON: Record<string, string> = {}
 
 type JsonReply = { status: number; json: unknown }
 
@@ -600,12 +597,7 @@ function privacyBody(items: unknown[]) {
 }
 
 function privacyPlan(state: string): MePages2Plan {
-  const marker = state === 'success'
-    ? '.pr-toast:text-is("已撤回 AI 使用授权，请求已记录")'
-    : state === 'failure'
-      ? '.pr-toast:text-is("提交失败，请稍后重试")'
-      : `[data-testid="member-privacy-state-${state}"]`
-  return hit(marker, '/me/privacy-requests', PRIVACY_REASON[state] ?? null)
+  return hit(`[data-testid="member-privacy-state-${state}"]`, '/me/privacy-requests', PRIVACY_REASON[state] ?? null)
 }
 
 async function preparePrivacy(page: Page, api: ApiRouter, state: string): Promise<void> {
