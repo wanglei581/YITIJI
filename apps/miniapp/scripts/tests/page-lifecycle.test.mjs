@@ -7006,3 +7006,21 @@ test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，
   assert.doesNotMatch(usbFaq.a, /OTG|读卡器|传输到终端/, '小程序读不了 U 盘，也没有手机直传终端')
   assert.match(usbFaq.a, /U盘打印指引/)
 })
+
+// AI 简历导出默认印「含人工智能辅助生成内容」（产品负责人 2026-10-06 晚拍板，服务端开关 10/9 打开）。
+// 导出之前就要让用户知道：生成页「导出设置」卡、优化页「导出优化稿」格式格下方各一句。
+test('AI 简历导出：生成页与优化页在导出处说明每页底部会印 AI 标注', () => {
+  const m = requireMiniapp('../utils/resume-build-model.js')
+  assert.match(m.RESUME_AI_LABEL_NOTE, /每页底部有一行小字：含人工智能辅助生成内容/)
+  for (const rel of ['pages/resume-build/resume-build.js', 'pages/resume-optimize/resume-optimize.js']) {
+    const page = makePage(rel, { auth: createAuth('A'), api: {}, wx: createWx() })
+    assert.equal(page.data.aiLabelNote, m.RESUME_AI_LABEL_NOTE, `${rel} data.aiLabelNote`)
+  }
+  const build = fs.readFileSync(path.join(MINIAPP, 'pages/resume-build/resume-build.wxml'), 'utf8')
+  const card = build.slice(build.indexOf('<view class="section-t">导出设置</view>'))
+  assert.ok(card.indexOf('{{aiLabelNote}}') > 0 && card.indexOf('{{aiLabelNote}}') < card.indexOf('</view></view>'), '在「导出设置」卡内')
+  const opt = fs.readFileSync(path.join(MINIAPP, 'pages/resume-optimize/resume-optimize.wxml'), 'utf8')
+  const grid = opt.indexOf('<view class="format-grid">')
+  const note = opt.indexOf('{{aiLabelNote}}')
+  assert.ok(grid > 0 && note > grid && note < opt.indexOf('pricing-line', grid), '在「导出优化稿」格式格下方、价格说明之前')
+})
