@@ -63,6 +63,7 @@ export const GENERATE_SYSTEM_PROMPT = withAiSafety([
   '6. 红线:不得编造或暗示用户输入中不存在的学校、学历、专业、公司、职务、项目、证书、奖项、数据指标或时间段;不得把用户没写的数字写进润色文本。',
   '7. 润色方向:动词开头、表达具体、突出职责与成果;用户原文里有的数字必须原样保留。',
   '8. 不得输出任何录用、投递、面试邀约或求职结果类承诺。',
+  '9. 某条经历的「职务」为空时，该条润色描述里不得出现任何职务、岗位或头衔名称（如店长、经理、主管、专员、实习生等），只润色用户写的职责与成果。',
 ].join('\n'))
 
 export const GENERATE_RETRY_HINT = withAiSafety(
@@ -314,7 +315,7 @@ function buildGenerateUserPrompt(input: ResumeGenerateInput): string {
   return JSON.stringify({
     求职意向: input.intention,
     教育经历: input.education.map((e) => ({ 学校: e.school, 专业: e.major ?? '', 学历: e.degree ?? '', 描述: e.description ?? '' })),
-    实习工作经历: input.experience.map((e) => ({ 公司: e.company, 职务: e.role, 描述: e.description })),
+    实习工作经历: input.experience.map((e) => ({ 公司: e.company, 职务: e.role ?? '', 描述: e.description })),
     项目经历: input.projects.map((p) => ({ 项目: p.name, 角色: p.role ?? '', 描述: p.description })),
     技能: input.skills,
     证书: input.certificates,
@@ -326,6 +327,29 @@ function buildGenerateUserPrompt(input: ResumeGenerateInput): string {
  * 服务端组装最终简历:事实字段逐字复制自用户输入,仅描述文本采用润色产物。
  * 润色文本命中合规拦截词 → 丢弃该条润色,回退用户原文。
  */
+/**
+ * 常见职务 / 头衔词。润色文本里出现这些词、而输入里没有，视为编造了职务。
+ * 只列名词性头衔，不列「运营」「销售」「设计」这类同时可作职责动词的词（会误伤「负责门店日常运营」）。
+ */
+export const RESUME_TITLE_TERMS = [
+  '店长', '副店长', '店员', '经理', '副经理', '总经理', '主管', '总监', '组长', '副组长', '班长', '领班', '主任',
+  '专员', '助理', '工程师', '设计师', '实习生', '文员', '会计', '出纳', '收银员', '客服专员', '顾问', '督导',
+  '合伙人', '董事', '总裁', '队长', '站长', '校长', '老师', '教师', '讲师', '护士', '医生', '司机', '厨师',
+] as const
+
+/** 润色文本是否引入了输入里没有的职务 / 头衔（含「担任…」「任职…」句式）。 */
+export function introducesUnstatedTitle(polished: string, sources: readonly string[]): boolean {
+  const text = polished.trim()
+  if (!text) return false
+  const source = sources.join(' ')
+  for (const term of RESUME_TITLE_TERMS) {
+    if (text.includes(term) && !source.includes(term)) return true
+  }
+  // 「担任 / 任职 / 职位为 …」：输入里没有这类说法就不许润色出来。
+  if (/(担任|任职|职位为|职务为|岗位为)/.test(text) && !/(担任|任职|职位|职务|岗位)/.test(source)) return true
+  return false
+}
+
 export function assembleResume(
   input: ResumeGenerateInput,
   polish: PolishPayload,
@@ -349,12 +373,17 @@ export function assembleResume(
       period: e.period,
       description: safe(polish.educationDesc[i] ?? '', e.description ?? '', MAX_DESC_CHARS) || undefined,
     })),
-    experience: input.experience.map((e, i) => ({
-      company: e.company,
-      role: e.role,
-      period: e.period,
-      description: safe(polish.experienceDesc[i] ?? '', e.description, MAX_DESC_CHARS),
-    })),
+    experience: input.experience.map((e, i) => {
+      const polished = polish.experienceDesc[i] ?? ''
+      // 职务防编造：润色里出现输入（公司 / 职务 / 原描述）中没有的职务或头衔 → 丢弃润色，回落原文。
+      const keepPolish = !introducesUnstatedTitle(polished, [e.company, e.role ?? '', e.description])
+      return {
+        company: e.company,
+        role: e.role ?? '',
+        period: e.period,
+        description: safe(keepPolish ? polished : '', e.description, MAX_DESC_CHARS),
+      }
+    }),
     projects: input.projects.map((p, i) => ({
       name: p.name,
       role: p.role,
