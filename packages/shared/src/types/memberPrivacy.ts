@@ -56,11 +56,11 @@ export const MEMBER_DATA_REQUEST_STATUS_LABEL: Record<MemberDataRequestStatus, s
 
 /** 管理端：驳回说明（导出失败后的人工处理口径）。 */
 export const ADMIN_DATA_REQUEST_REJECT_HINT =
-  '驳回仅记录运营处理结论，不会删除简历、文档、打印订单或收藏。账号注销仍未开放。'
+  '驳回只记录处理结论。账号注销由管理员在用户管理页执行。'
 
-/** 管理端：完成删除类文案保留为诚实否定口径（后端拒绝创建 delete）。 */
+/** 管理端：注销执行位置说明，不将工单状态标记当作执行操作。 */
 export const ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM =
-  '账号注销暂未开放。请勿将任何状态标记理解为「已清空全部个人资产」。岗位 AI 会话删除与账号注销是不同能力。'
+  '账号注销由管理员在用户管理页执行，需要核对会员身份并再次确认；本页只记录请求与处理结论。数据导出为本人资料清单，不含文件原文与简历正文全文。'
 
 /** 管理端：导出处理说明（与 MemberDataExportMapper 白名单一致）。 */
 export const ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT =

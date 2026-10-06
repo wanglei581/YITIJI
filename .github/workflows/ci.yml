@@ -1347,6 +1347,12 @@ jobs:
         working-directory: apps/admin
         run: node scripts/run-e2e.mjs --config=playwright.screen.config.ts
 
+      - name: Run Admin member-closure browser E2E
+        # 会员账号注销的管理员执行：mock 包里用户列表恒为空，走不到注销对话框，
+        # 所以与大屏一样用 VITE_API_MODE=http 构建 + page.route 夹具单独跑（不访问真实用户）。
+        working-directory: apps/admin
+        run: node scripts/run-e2e.mjs --config=playwright.users.config.ts
+
       - name: Run Partner data-screen browser E2E
         run: pnpm --filter @ai-job-print/partner test:e2e:screen
 

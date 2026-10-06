@@ -318,7 +318,7 @@ flowchart LR
   app --> sync_sources["/sync-sources<br/>1 页 · 11 端点"]
   app --> terminals["/terminals<br/>1 页 · 0 端点"]
   app --> toolbox["/toolbox<br/>1 页 · 15 端点"]
-  app --> users["/users<br/>1 页 · 4 端点"]
+  app --> users["/users<br/>1 页 · 9 端点"]
 ```
 
 | 路由 | 页面组件 | 页面文件 | 端点数 | 样式 |
@@ -360,7 +360,7 @@ flowchart LR
 | `/sync-sources` | SyncSourcesPage | `apps/admin/src/routes/sync-sources/index.tsx` | 11 | — |
 | `/terminals` | Navigate | — _(重定向)_ | 0 | — |
 | `/toolbox` | ToolboxPage | `apps/admin/src/routes/toolbox/index.tsx` | 15 | — |
-| `/users` | UsersPage | `apps/admin/src/routes/users/index.tsx` | 4 | — |
+| `/users` | UsersPage | `apps/admin/src/routes/users/index.tsx` | 9 | — |
 
 <details>
 <summary>展开：每个路由触达的端点（28 个路由）</summary>
@@ -419,7 +419,7 @@ flowchart LR
 
 **`/toolbox`** → `GET /admin/toolbox/allowed-hosts`、`GET /admin/toolbox/apps`、`GET /admin/toolbox/apps/:param/versions`、`GET /admin/toolbox/launch-summary`、`GET /admin/toolbox/terminals`、`POST /admin/toolbox/allowed-hosts`、`POST /admin/toolbox/allowed-hosts/:param/review`、`POST /admin/toolbox/apps`、`POST /admin/toolbox/apps/:param/suspend`、`POST /admin/toolbox/apps/:param/versions`、`POST /admin/toolbox/apps/:param/versions/:param/approve`、`POST /admin/toolbox/apps/:param/versions/:param/publish`、`POST /admin/toolbox/apps/:param/versions/:param/reject`、`POST /admin/toolbox/apps/:param/versions/:param/submit`、`PUT /admin/terminals/:param/toolbox-config`
 
-**`/users`** → `GET /admin/users`、`GET /admin/users/:param`、`POST /admin/users/:param/disable`、`POST /admin/users/:param/restore`
+**`/users`** → `GET /admin/orders`、`GET /admin/orders/:param`、`GET /admin/users`、`GET /admin/users/:param`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`、`POST /admin/users/:param/closure`、`POST /admin/users/:param/disable`、`POST /admin/users/:param/restore`
 
 </details>
 
