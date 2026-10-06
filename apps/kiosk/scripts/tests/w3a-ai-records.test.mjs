@@ -151,11 +151,13 @@ test('resume failure reasons preserve user messages and shared rate-limit copy v
   for (const reason of ['文字识别失败，请确保文件清晰', '当前使用的人较多，请稍后再试', '文件已清理，请重新上传', '今日配额已用完', 'AI 服务繁忙，请稍后再试', '请上传清晰的 PDF 或 JPG 文件']) {
     assert.equal(resumeUserReason(reason, fallback), reason)
   }
-  // 执行既有 userMessageOf：HTTP 429 的统一提示不能再被结果页改成“额度用完”。
+  // 公共额度是独立码：429 且 AI_PUBLIC_QUOTA_EXCEEDED 用统一句，
+  // 不再落到 RATE_LIMITED 的「当前使用的人较多」。resumeUserReason 必须原样放过这句。
+  // 上面循环里的「当前使用的人较多，请稍后再试」仍覆盖普通限流，不能被这句替换。
   class ApiHttpError extends Error {}
   const { userMessageOf } = load('src/services/api/userErrorMessage.ts', { './httpAdapter': { ApiHttpError } })
   const error = Object.assign(new ApiHttpError('今日次数已用完'), { code: 'AI_PUBLIC_QUOTA_EXCEEDED', status: 429 })
-  assert.equal(resumeUserReason(userMessageOf(error, fallback), fallback), '当前使用的人较多，请稍后再试')
+  assert.equal(resumeUserReason(userMessageOf(error, fallback), fallback), '今天的 AI 次数用完了，明天恢复；可以先打印原件。')
 })
 
 test('resume failure reasons fall back exactly for empty, technical or injected text', () => {
@@ -197,6 +199,8 @@ test('USB files render as named buttons and retain size, MIME, purpose and busy 
       listUsbFiles: async () => ({ files }),
       uploadUsbFile: (...args) => { requests.push(args); return upload.promise },
     },
+    // W-125：面板先过后台能力闸门；这份单测只管文件列表与导入契约，闸门按已放行处理。
+    '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
   }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
   const props = { onUploaded: (file) => imported.push(file), onBusyChange: (value) => busy.push(value) }
   const nodes = (node) => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : []

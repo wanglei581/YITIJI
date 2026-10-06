@@ -124,15 +124,13 @@ function ProfileContent() {
         subtitle="简历、文档、订单、收藏与权益都在这里；以实际记录为准。"
         status={status}
         back={{ label: '返回首页', onBack: () => navigate('/') }}
-        ctabar={
+        ctabar={uiState === 'member' || uiState === 'ready' ? undefined :
           <ProfileCta
             uiState={uiState}
             pendingTask={pendingTask}
             onLogin={goLogin}
             onHome={() => navigate('/')}
             onRetry={() => setReloadKey((key) => key + 1)}
-            onEnd={() => endKioskUse('end_use')}
-            onSettings={() => navigate('/me/settings')}
             onHelp={() => navigate('/help')}
             onProgress={() => {
               if (!pendingTask) return
@@ -166,6 +164,7 @@ function ProfileContent() {
             <div className="qx-card" aria-busy="true">
               <div className="pf-skel" style={{ width: '40%' }} />
               <div className="pf-skel" style={{ width: '66%', marginTop: 14 }} />
+              <p className="pf-reading-note">正在取你的资产数量与待办。数量返回前显示「—」，不显示上一次的数字。</p>
             </div>
           ) : null}
 
@@ -181,18 +180,6 @@ function ProfileContent() {
             </div>
           ) : null}
 
-          {uiState === 'empty' ? (
-            <div className="qx-state" data-tone="info" data-testid="profile-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">这个账号下还没有任何记录</div>
-                <p className="qx-state-d">
-                  你还没有保存过简历、生成过文档或下过打印订单。办过之后，会列在下面几项里。
-                </p>
-              </span>
-            </div>
-          ) : null}
-
           {isLoggedIn && uiState !== 'loading' && uiState !== 'error' ? (
             <ProfileContinueCard task={pendingTask} tasksError={tasksError} />
           ) : null}
@@ -201,9 +188,31 @@ function ProfileContent() {
             <ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} />
           ) : null}
 
+          {uiState === 'loading' || uiState === 'error' ? (
+            <section aria-label="账号数据读取说明">
+              <div className="qx-sec-h"><span className="t">{uiState === 'loading' ? '正在读取什么' : '这次没读到什么'}</span><span className="hint">以本人账号的实际记录为准</span></div>
+              <div className="pf-meta2">
+                <div><small>资产数量</small><b>简历、文档、订单、收藏、权益与 AI 服务记录</b></div>
+                <div><small>未办完的事</small><b>{uiState === 'loading' ? '正在查询你的待办' : '待办这次没取到，不表示没有待办'}</b></div>
+                <div><small>上一次的数字</small><b>不会拿来冒充当前账号</b></div>
+                <div><small>各项入口</small><b>仍然可以点进查看；读不到时可以重新加载</b></div>
+              </div>
+            </section>
+          ) : null}
+          {uiState === 'empty' ? (
+            <div className="qx-state" data-tone="info" data-testid="profile-fallback">
+              <span className="qx-state-ic" />
+              <span>
+                <div className="qx-state-t">这个账号下还没有任何记录</div>
+                <p className="qx-state-d">
+                  你还没有保存过简历、生成过文档或下过打印订单。办过之后，会列在上面几项里。
+                </p>
+              </span>
+            </div>
+          ) : null}
           {uiState === 'empty' ? <EmptyStartRows /> : null}
 
-          {isLoggedIn ? (
+          {isLoggedIn && (resumes.length + scans.length + aiRecords.length > 0 || uiState === 'member' || uiState === 'ready' || uiState === 'printing') ? (
             <ProfileSessionRecords
               resumes={resumes}
               scans={scans}
@@ -215,7 +224,7 @@ function ProfileContent() {
             />
           ) : null}
 
-          {isLoggedIn ? <AccountRows /> : null}
+          {isLoggedIn ? <AccountRows onEnd={() => endKioskUse('end_use')} primaryEnd={uiState === 'member' || uiState === 'ready'} /> : null}
 
           <p className="pf-truth">
             <span><b>结束使用会退出本机并清除临时信息。</b>已提交的订单与文件按保存期限管理。</span>
@@ -259,11 +268,11 @@ function statusFor(state: ProfileUiState): { tone: 'ok' | 'warn' | 'bad' | 'unkn
   return { tone: 'unknown', label: '以你账号里的实际记录为准' }
 }
 
-function AccountRows() {
+function AccountRows({ onEnd, primaryEnd }: { onEnd: () => void; primaryEnd: boolean }) {
   const navigate = useNavigate()
   const rows = [
     { icon: BellIcon, title: '消息通知', desc: '系统下发的会员通知，已读与标记都会记录。', to: '/me/notifications', testid: 'profile-notifications' },
-    { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；数据导出与账号注销尚未开放。', to: '/me/privacy-requests', testid: 'profile-privacy' },
+    { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》的联系方式申请。', to: '/me/privacy-requests', testid: 'profile-privacy' },
     { icon: HelpCircleIcon, title: '帮助中心', desc: '服务台位置、常见问题与找人处理。', to: '/help', testid: 'profile-help' },
     { icon: MessageSquareIcon, title: '意见反馈', desc: '提交后能看到处理状态。', to: '/me/feedback', testid: 'profile-feedback' },
   ]
@@ -273,7 +282,7 @@ function AccountRows() {
         <span className="t">通知与支持</span>
         <span className="hint">只列已经能用的</span>
       </div>
-      <div className="qx-rows">
+      <div className="qx-rows pf-support-rows">
         {rows.map((row) => (
           <button
             type="button"
@@ -292,6 +301,11 @@ function AccountRows() {
             <span className="qx-row-go">›</span>
           </button>
         ))}
+      </div>
+      <div className="pf-support-actions">
+        <p>离开前请点「结束使用」；这会退出登录并清掉本机这一次的临时信息。</p>
+        <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={() => navigate('/me/settings')}>账号设置</button>
+        <button type="button" className="qx-btn" data-variant="danger" data-testid={primaryEnd ? 'profile-primary' : 'profile-end-use'} onClick={onEnd}>结束使用</button>
       </div>
     </section>
   )
@@ -392,8 +406,6 @@ function ProfileCta({
   onLogin,
   onHome,
   onRetry,
-  onEnd,
-  onSettings,
   onHelp,
   onProgress,
 }: {
@@ -402,8 +414,6 @@ function ProfileCta({
   onLogin: () => void
   onHome: () => void
   onRetry: () => void
-  onEnd: () => void
-  onSettings: () => void
   onHelp: () => void
   onProgress: () => void
 }) {
@@ -419,14 +429,12 @@ function ProfileCta({
   }
   if (uiState === 'loading') {
     return (
-      <><button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
-      <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-primary" onClick={onHome}>回首页</button></>
+      <><button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-primary" onClick={onHome}>回首页</button></>
     )
   }
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
         <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>找工作人员</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onRetry}>
           重新加载
@@ -437,7 +445,6 @@ function ProfileCta({
   if (uiState === 'empty') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onHome}>
           回首页选服务
         </button>
@@ -447,7 +454,6 @@ function ProfileCta({
   if (uiState === 'printing' && pendingTask) {
     return (
       <>
-<button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
         <p className="why">出纸完成前不要离开取件口；离开这一页不会取消已经提交的打印。</p>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onProgress}>
           看出纸进度
@@ -455,13 +461,5 @@ function ProfileCta({
       </>
     )
   }
-  return (
-    <>
-      <button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-account" onClick={onSettings}>账号设置</button>
-      <p className="why">离开前请点「结束使用」；这会退出登录并清掉本机这一次的临时信息。</p>
-      <button type="button" className="qx-btn" data-variant="danger" data-testid="profile-primary" onClick={onEnd}>
-        结束使用
-      </button>
-    </>
-  )
+  return null
 }

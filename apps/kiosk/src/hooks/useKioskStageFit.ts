@@ -21,6 +21,22 @@ function readViewportSize(): { width: number; height: number } {
   return { width: window.innerWidth, height: window.innerHeight }
 }
 
+/**
+ * 手机流式视口：宽 ≤760，或宽 ≤960 的横屏。
+ * 这些尺寸关掉 1080×1920 舞台，按真实宽度排。真机竖屏与电脑横屏都不走这里。
+ */
+export function isKioskCompactViewport(viewportW: number, viewportH: number): boolean {
+  return viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
+}
+
+/**
+ * 流式视口只等于手机紧凑视口。
+ * 横屏电脑（宽 >960 且宽大于高）一律走 1080×1920 舞台缩放，不再按窗口铺满。
+ */
+export function usesKioskFluidViewport(viewportW: number, viewportH: number): boolean {
+  return isKioskCompactViewport(viewportW, viewportH)
+}
+
 function computeFit(width: number, height: number): KioskStageFit {
   const safeW = Math.max(1, width)
   const safeH = Math.max(1, height)

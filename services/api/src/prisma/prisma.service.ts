@@ -200,6 +200,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // ── BE-1 / BE-2 ────────────────────────────────────────────────────────────
 
+  get storageDeletion() {
+    return this.client.storageDeletion
+  }
+
   get fileObject() {
     return this.client.fileObject
   }
@@ -331,6 +335,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.aiServiceLog
   }
 
+  get aiQuotaDaily() { return this.client.aiQuotaDaily }
+
+  get aiQuotaReservation() { return this.client.aiQuotaReservation }
+
   get aiUsageRecord() {
     return this.client.aiUsageRecord
   }
@@ -427,6 +435,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── P1: 用户通知 / 意见反馈 ──────────────────────────────────────────────
+
+  get userNotification() {
+    return this.client.userNotification
+  }
 
   get memberNotification() {
     return this.client.memberNotification
@@ -542,6 +554,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get recruitmentCircuitBreak() {
     return this.client.recruitmentCircuitBreak
+  }
+
+  get platformSetting() {
+    return this.client.platformSetting
   }
 
   // ── Transaction ────────────────────────────────────────────────────────────

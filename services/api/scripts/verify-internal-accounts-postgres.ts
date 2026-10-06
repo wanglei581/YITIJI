@@ -3,8 +3,8 @@
  *
  * SQLite 版（verify:internal-accounts）已覆盖全部接口行为；这里只验 PostgreSQL 与 SQLite 不同的部分：
  *   [P1] 迁移里的条件唯一索引在 PostgreSQL 上生效：第二个未删除的备用管理员插不进去；软删后可以再建。
- *   [P2] 两个管理员同时互相停用（Serializable 事务 + 冲突重试）：只成功一个，另一个 409 INTERNAL_ACCOUNT_LAST_ADMIN，
- *        系统里至少剩一个可用管理员。
+ *   [P2] 两个管理员同时互相停用（Serializable 事务 + 冲突重试）：只成功一个，另一个 409（LAST_ADMIN 或 STATE_CHANGED，
+ *        取决于输家重试时看到的时序，两种都是回滚后的正确拒绝），系统里至少剩一个可用管理员。
  *   [P3] 两个管理员同时提交建备用管理员：一个成功、一个 409 BACKUP_ADMIN_EXISTS，库里只有一个。
  * 两个并发用例都用屏障保证两边的前置检查都已通过、再一起进入事务。PostgreSQL 的冲突经 adapter-pg 抛出时是
  * `DriverAdapterError: TransactionWriteConflict`（cause.originalCode=40001）或 P2034，两种都必须被识别为可重试，
@@ -134,10 +134,18 @@ async function main(): Promise<void> {
     const fulfilled = results.filter((r) => r.status === 'fulfilled').length
     const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected').map((r) => codeOf(r.reason))
     const enabledAdmins = await prisma.user.count({ where: { role: 'admin', enabled: true, deletedAt: null } })
-    check('P2-1 两边都进入事务（冲突方重试后再次进入），只成功一个，另一个 409 INTERNAL_ACCOUNT_LAST_ADMIN',
-      race.arrivals() >= 2 && fulfilled === 1 && rejected.length === 1 && rejected[0] === 'INTERNAL_ACCOUNT_LAST_ADMIN',
+    // 按性质断言，不按时序断言：输家重试时若先看到赢家已提交，拿 LAST_ADMIN；若重试用完仍冲突，
+    // 或更新时发现对方状态已变，拿 STATE_CHANGED。两种都是事务回滚后的 409，结果一样安全。
+    // 2026-10-04 #1236 的 postgres-readiness（run 37189123001）就拿到了后一种，旧断言只认前一种而偶发红。
+    const RACE_LOSER_CODES = new Set(['INTERNAL_ACCOUNT_LAST_ADMIN', 'INTERNAL_ACCOUNT_STATE_CHANGED'])
+    check('P2-1 两边都进入事务（冲突方重试后再次进入），只成功一个，另一个 409（LAST_ADMIN 或 STATE_CHANGED）',
+      race.arrivals() >= 2 && fulfilled === 1 && rejected.length === 1 && RACE_LOSER_CODES.has(rejected[0] ?? ''),
       `arrivals=${race.arrivals()} fulfilled=${fulfilled} rejected=${rejected.join(',')}`)
-    check('P2-2 至少剩一个可用管理员', enabledAdmins === 1, `${enabledAdmins}`)
+    const loserStatus = results
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .map((r) => (r.reason as { getStatus?: () => number })?.getStatus?.())
+    check('P2-1b 输家是 HTTP 409，不是 500', loserStatus.length === 1 && loserStatus[0] === 409, loserStatus.join(','))
+    check('P2-2 至少剩一个可用管理员', enabledAdmins >= 1, `${enabledAdmins}`)
 
     // ── [P3] 并发建备用管理员 ─────────────────────────────────────────────
     await prisma.user.updateMany({ where: { id: { in: [adminA.id, adminB.id] } }, data: { enabled: true } })

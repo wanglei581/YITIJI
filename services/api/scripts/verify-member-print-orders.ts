@@ -283,7 +283,7 @@ async function main() {
       if (fb?.['orderNo'] === fbOrderNo) pass('列表返回这一单的对外订单号 orderNo')
       else fail(`orderNo 不对：${JSON.stringify(fb?.['orderNo'])}`)
     }
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents', 'refundRequired', 'orderId', 'orderNo', 'terminal', 'failureCode'])
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'reprintAllowed', 'reprintRemaining', 'refundedAmountCents', 'discountCents', 'refundRequired', 'orderId', 'orderNo', 'terminal', 'failureCode'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {

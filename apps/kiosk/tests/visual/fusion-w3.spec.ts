@@ -2,7 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
-import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit } from './assert-layout'
+import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
 import {
   ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
@@ -255,6 +255,92 @@ test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', 
   await expect(preview.locator('iframe')).toHaveCount(0)
 })
 
+function resumeUsbCapability(status: string) {
+  return {
+    status: 200,
+    json: {
+      terminalCode: 'KSK-001',
+      capabilities: [{
+        capabilityKey: 'usb_import',
+        status,
+        note: null,
+        configured: true,
+        updatedAt: '2026-10-04T00:00:00.000Z',
+      }],
+    },
+  }
+}
+
+async function installResumeUsbBridge(page: Page, hits: { count: number }): Promise<void> {
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const origin = new URL(page.url()).origin
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders })
+      return
+    }
+    if (request.method() === 'GET' && (path.endsWith('/status') || path.endsWith('/files'))) hits.count += 1
+    if (path.endsWith('/status')) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'W125-USB' } }),
+      })
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      headers: corsHeaders,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          present: true,
+          driveLabel: 'W125-USB',
+          files: [{ safeId: 'w125-resume', filename: '求职材料.pdf', extension: '.pdf', sizeBytes: 2048 }],
+        },
+      }),
+    })
+  })
+}
+
+test('resume usb card stays closed when usb import is not verified @w3-kiosk', async ({ page, api }) => {
+  const hits = { count: 0 }
+  await installResumeUsbBridge(page, hits)
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', resumeUsbCapability('not_verified'))
+
+  await page.goto('/resume/source')
+  const card = page.getByRole('button', { name: /U盘上传/ })
+  await expect(card).toBeDisabled()
+  await expect(card).toContainText('本机暂未开通')
+  await expect(page.getByText('等待插入U盘')).toHaveCount(0)
+  // 轮询是放行后立刻发出的。先看到拒绝文案，再等一小段，才能证明没有迟到的读盘请求。
+  await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 400) }))
+  expect(hits.count).toBe(0)
+})
+
+test('resume usb card opens when usb import is available @w3-kiosk', async ({ page, api }) => {
+  // 上一条的反向对照：配成可用后，卡片可以点，并且能看到盘里的文件。
+  await installResumeUsbBridge(page, { count: 0 })
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', resumeUsbCapability('available'))
+
+  await page.goto('/resume/source')
+  const card = page.getByRole('button', { name: /U盘上传/ })
+  await expect(card).toBeEnabled()
+  await card.click()
+  await expect(page.getByRole('button', { name: /求职材料\.pdf/ })).toBeVisible()
+})
+
 test('optimized resume previews inline without opening a new tab @w3-kiosk', async ({ page, api }) => {
   const optimizedResume = {
     basic: { name: '测试用户', city: '青岛' },
@@ -273,7 +359,7 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
   api.respond('GET', '/api/v1/resume/export/pricing', {
     status: 200,
-    json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' },
+    json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '免费试运营' },
   })
   api.respond('GET', '/api/v1/resume/records/resume-w3-inline-preview/optimize', {
     status: 200,
@@ -790,9 +876,13 @@ test('resume parse public quota rejection clears the local intent before the fai
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await page.waitForURL('/resume/report')
-  await expect(page.getByText('当前使用的人较多，请稍后再试', { exact: false })).toBeVisible()
-  await page.getByTestId('resume-report-primary').click()
-  await page.waitForURL('/resume/parse')
+  await expect(page.getByText('今天的 AI 次数用完了', { exact: false })).toBeVisible()
+  await expect(page.getByText('使用的人较多')).toHaveCount(0)
+  // Trace 已证实第二次请求会在 click 完成前返回；先监听临时解析路由，仍要求它真实经过。
+  await Promise.all([
+    page.waitForURL('/resume/parse'),
+    page.getByTestId('resume-report-primary').click(),
+  ])
   await page.waitForURL('/resume/report')
   expect(posts).toHaveLength(2)
   expect(posts[0].intent).toMatch(/^[A-Za-z0-9_-]{43}$/)
@@ -1220,6 +1310,135 @@ test('R1 2.0 keeps resume controls below the read-only header and preserves the 
   }
 })
 
+test('resume report expands seven blocks, drops the inner scroller, and fills the action row @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/resume/export/pricing', { status: 200, json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null } })
+  await page.goto('/resume/report?capture=1&state=report&taskId=paircapture01')
+  await expect(page.getByTestId('resume-report-state-report')).toBeVisible()
+  // 2.0 规则 4：出处标记不上屏。空的 .rrp-prov 没有文字，底色和边框仍会画出浅色小方块。
+  await expect(page.locator('.rrp-prov')).toHaveCount(0)
+
+  const blockKeys = ['basic', 'objective', 'education', 'experience', 'project', 'skill', 'selfintro']
+  for (const key of blockKeys) {
+    const block = page.getByTestId(`resume-report-block-${key}`)
+    await block.scrollIntoViewIfNeeded()
+    await expect(block).toBeInViewport()
+  }
+  await expect(page.getByTestId('resume-report-block-basic')).toContainText('命中 1 条问题 · 1 条证据')
+  await expect(page.getByTestId('resume-report-block-experience')).toContainText('命中 1 条问题 · 2 条证据')
+  await expect(page.getByTestId('resume-report-block-selfintro')).toContainText('本块没有命中问题')
+
+  const listOverflow = await page.getByTestId('resume-report-list').evaluate((el) => getComputedStyle(el).overflowY)
+  expect(listOverflow).not.toBe('auto')
+  expect(listOverflow).not.toBe('scroll')
+  const tagFlush = await page.getByTestId('resume-report-block-basic').locator('.bhd').evaluate((el) => {
+    const tag = el.querySelector('.rrp-tag')
+    if (!tag) return 999
+    return el.getBoundingClientRect().right - tag.getBoundingClientRect().right
+  })
+  expect(tagFlush).toBeLessThanOrEqual(8)
+
+  await expect(page.getByTestId('resume-report-takeaway-title')).toHaveText('带走这份报告')
+  const takeawayButtons = page.locator('[data-testid="resume-report-export-actions"] .rrp-export > button')
+  await expect(takeawayButtons).toHaveCount(4)
+  const takeawayRow = await takeawayButtons.evaluateAll((els) => els.map((el) => {
+    const rect = el.getBoundingClientRect()
+    return { top: Math.round(rect.top), height: rect.height }
+  }))
+  expect(new Set(takeawayRow.map((item) => item.top)).size).toBe(1)
+  for (const item of takeawayRow) expect(item.height).toBeGreaterThanOrEqual(64)
+
+  const barBefore = await page.locator('.qx-ctabar').boundingBox()
+  await page.getByTestId('resume-report-block-selfintro').scrollIntoViewIfNeeded()
+  const barAfter = await page.locator('.qx-ctabar').boundingBox()
+  expect(Math.abs((barBefore?.y ?? 0) - (barAfter?.y ?? 1))).toBeLessThan(2)
+
+  const ratio = await page.evaluate(() => {
+    const bar = document.querySelector('.qx-ctabar')
+    const primary = document.querySelector('[data-testid="resume-report-primary"]')
+    if (!bar || !primary) return 0
+    return primary.getBoundingClientRect().width / bar.getBoundingClientRect().width
+  })
+  expect(ratio).toBeGreaterThanOrEqual(0.45)
+  await expect(page.getByRole('button', { name: '目标岗位匹配参考（仅供参考）' })).toHaveCount(0)
+
+  for (const seg of ['issues', 'scores', 'conclusions'] as const) {
+    await page.getByTestId(`resume-report-seg-${seg}`).click()
+    const overflows = await page.locator('.rrp-page .rrp-scroll').evaluateAll((els) => els.map((el) => getComputedStyle(el).overflowY))
+    expect(overflows.every((value) => value !== 'auto' && value !== 'scroll')).toBe(true)
+    if (seg === 'scores') {
+      await page.getByTestId('resume-report-dim-basic').click()
+      const scoreOverflow = await page.getByTestId('resume-report-dim-issues').evaluate((el) => getComputedStyle(el).overflowY)
+      expect(scoreOverflow).not.toBe('auto')
+      expect(scoreOverflow).not.toBe('scroll')
+    }
+  }
+  await page.getByRole('button', { name: '目标岗位匹配参考（仅供参考）' }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('button', { name: '目标岗位匹配参考（仅供参考）' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '做一次自我探索' })).toBeVisible()
+
+  await page.goto('/resume/report?capture=1&state=diagnose-failed&taskId=paircapture01')
+  await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
+  const failRatio = await page.evaluate(() => {
+    const bar = document.querySelector('.qx-ctabar')
+    const primary = document.querySelector('[data-testid="resume-report-primary"]')
+    if (!bar || !primary) return 0
+    return primary.getBoundingClientRect().width / bar.getBoundingClientRect().width
+  })
+  expect(failRatio).toBeGreaterThanOrEqual(0.45)
+})
+
+test('resume report scroll hint clears after the page is scrolled to the bottom @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/resume/export/pricing', { status: 200, json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null } })
+  await page.goto('/resume/report?capture=1&state=report&taskId=paircapture01')
+  await expect(page.getByTestId('resume-report-state-report')).toBeVisible()
+  const hint = page.getByTestId('resume-report-scroll-hint')
+  await expect(hint).toBeVisible()
+  await expect(hint).toContainText(/下滑还有 [1-9]\d* 块/)
+  await expect(hint).toContainText('最下面可以带走报告')
+
+  const scroller = page.locator('[data-kiosk-screen="resume-report"]')
+  await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight })
+  await expect(hint).toHaveCount(0)
+
+  await scroller.evaluate((el) => { el.scrollTop = 0 })
+  await expect(hint).toBeVisible()
+  await expect(hint).toContainText('最下面可以带走报告')
+})
+
+test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  for (const state of ['unavailable', 'diagnose-failed', 'read-error', 'no-context'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    const rows = page.locator('.rrp-exits .rrp-row')
+    const count = await rows.count()
+    expect(count).toBeGreaterThan(0)
+    for (let i = 0; i < count; i += 1) {
+      const row = rows.nth(i)
+      const box = await row.boundingBox()
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(64)
+      await expect(row.locator('.rrp-ic')).toHaveCount(1)
+      const disabled = await row.getAttribute('aria-disabled')
+      await expect(row.locator('.rrp-go')).toHaveCount(disabled === 'true' ? 0 : 1)
+    }
+    if (state === 'diagnose-failed') {
+      await expect(page.getByRole('button', { name: /打印我上传的原件/ })).toContainText('本次不可用')
+      await expect(page.getByText('这里拿不到你刚上传的那份原件（离开这一页再回来就拿不到了）。请回到简历来源重新选取文件，再去打印。')).toBeVisible()
+    }
+  }
+
+  for (const state of ['no-context', 'read-error', 'unavailable', 'illegal', 'diagnose-failed'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    const minHeight = await page.locator('.rrp-state').first().evaluate((el) => getComputedStyle(el).minHeight)
+    expect(minHeight === '0px' || minHeight === 'auto').toBe(true)
+    const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
+    const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
+    expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
+  }
+})
+
 test('assistant first screen keeps composer and send above the Qingxu navbar @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   await page.goto('/assistant')
@@ -1634,6 +1853,121 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   expect(runtimeErrors).toEqual([])
 })
 
+const INTERVIEW_ID = 'interview-w3-public-fixture'
+const INTERVIEW_ANSWER = '我做过一个可访问性改造项目。'
+
+function armInterviewSession(api: ApiRouter): void {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/mock-interviews', { status: 200, json: interviewCreated })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/start`, { status: 200, json: interviewStarted })
+}
+
+async function beginTextInterview(page: Page): Promise<void> {
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await dialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
+  await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await page.getByRole('button', { name: '创建并开始练习' }).click()
+  await page.waitForURL(/\/interview\?stage=session/)
+}
+
+test('interview answer outage drops the unsent turn and restores the draft @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  const alert = page.locator('.interview-session__error')
+  await expect(alert).toContainText('你刚才的回答还在输入框里')
+  await expect(alert).toContainText('AI 现在停用')
+  await expect(page.locator('.interview-session__history')).not.toContainText(INTERVIEW_ANSWER)
+  await expect(page.getByRole('textbox', { name: '本题回答' })).toHaveValue(INTERVIEW_ANSWER)
+})
+
+test('ending an interview with no saved answers does not say retry @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, {
+    status: 400,
+    json: { success: false, error: { code: 'INTERVIEW_NO_ANSWERS', message: 'no answers' } },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  const alert = page.locator('.interview-session__error')
+  await expect(alert).toContainText('还没有记下的回答')
+  await expect(alert).not.toContainText('重试')
+  await expect(alert).not.toContainText('已保存')
+  const recovery = page.getByTestId('interview-finish-recovery')
+  await expect(recovery).not.toContainText('重试')
+  await expect(recovery.getByRole('button', { name: '继续答题', exact: true })).toBeVisible()
+  await recovery.getByRole('button', { name: '离开', exact: true }).click()
+  await page.waitForURL(/\/interview-service\/?$/)
+})
+
+test('ending an interview during an AI outage keeps the saved answers and offers a non-AI exit @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  // 「看面试要点」进的面试服务页会查一次服务健康状态。
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await expect(page.locator('.interview-session__history')).toContainText('请说明一次解决困难的真实经历。')
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  const alert = page.locator('.interview-session__error')
+  await expect(alert).toContainText('你的回答已保存')
+  const recovery = page.getByTestId('interview-finish-recovery')
+  await recovery.getByRole('button', { name: '稍后再试生成报告', exact: true }).click()
+  await expect.poll(() => api.requestCount('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`)).toBe(2)
+  await expect(page).toHaveURL(/\/interview\?stage=session/)
+  await expect(alert).toContainText('你的回答已保存')
+  await recovery.getByRole('button', { name: '看面试要点', exact: true }).click()
+  await expect(page.locator('[data-kiosk-screen="interview-tips"]')).toBeVisible()
+  await expect(page).toHaveURL(/stage=tips/)
+})
+
+test('ending an interview during an AI outage does not claim answers were saved when none succeeded @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  await expect(page.locator('.interview-session__error')).toContainText('AI 暂时用不了，报告现在生成不了')
+  await expect(page.getByText('你的回答已保存')).toHaveCount(0)
+  await expect(page.getByTestId('interview-finish-recovery').getByRole('button', { name: '看面试要点', exact: true })).toBeVisible()
+})
+
+test('interview setup failure stays inside the first screen @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/mock-interviews', {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await dialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
+  await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await page.getByRole('button', { name: '创建并开始练习' }).click()
+  const alert = page.locator('.qx-ctabar [role="alert"]')
+  await expect(alert).toBeVisible()
+  await expect(alert).toBeInViewport()
+  await expect(alert).toContainText('AI 服务暂停中')
+})
+
 const COVERED_EVIDENCE = '我做过两年社群运营，最多同时管 6 个群'
 
 function advisorCompareSession() {
@@ -1681,6 +2015,8 @@ test('advisor artifact eight proto states fit the kiosk stage @w3-kiosk', async 
     await page.goto(`/ai/plan?state=${state}&capture=1`)
     await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', state)
     await expect(page.getByText('一键投递')).toHaveCount(0)
+    await expect(page.getByText('工作人员')).toHaveCount(0)
+    await expect(page.getByText('服务台')).toHaveCount(0)
     await assertNoHorizontalOverflow(page)
     await page.screenshot({ path: test.info().outputPath(`advisor-artifact-${state}.png`) })
   }
@@ -1727,6 +2063,11 @@ test('advisor artifact print-unavailable state has no print button @w3-kiosk', a
   await page.goto('/ai/plan?state=print-unavailable&capture=1')
   await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'print-unavailable')
   await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-legend')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-qa')).toBeVisible()
+  await expect(page.getByText('我做过两年社群运营，最多同时管 6 个群。')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-take')).toBeVisible()
+  await expect(page.getByText('带走这一页')).toBeVisible()
   await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '打印带走' })).toHaveCount(0)
   await expect(page.getByText('打印能力读不到，按钮先不放出来', { exact: false })).toBeVisible()
@@ -1792,6 +2133,61 @@ test('advisor artifact print waits for the server receipt @w3-kiosk', async ({ p
   expect(printPath).toBe('/api/v1/advisor/sessions/w3-art-sess/artifacts/w3-art-1/print')
   await expect(page.getByText('已打印')).toHaveCount(0)
   await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact no-artifact shows the three jobs and opens AI records @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=no-artifact&capture=1')
+  await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'no-artifact')
+  await expect(page.getByTestId('advisor-artifact-kinds')).toBeVisible()
+  await expect(page.locator('.aa-kind')).toHaveCount(3)
+  await expect(page.getByText('边问边钉住')).toBeVisible()
+  await expect(page.getByText('她问，你答，拼成一段话')).toBeVisible()
+  await expect(page.getByText('逐条比：有没有写到')).toBeVisible()
+  await expect(page.getByText('做完以后怎么带走')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-cta-records')).toHaveText('打开我的 AI 记录')
+  await page.getByTestId('advisor-artifact-cta-records').click()
+  await page.waitForURL((url) => url.pathname === '/me/ai-records')
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact expired offers only a redo @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=expired&capture=1')
+  await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'expired')
+  await expect(page.getByTestId('advisor-artifact-cta-redo')).toHaveText('回去重做一次')
+  await expect(page.getByTestId('advisor-artifact-cta-back')).toHaveCount(0)
+  await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
+  await expect(page.getByTestId('advisor-artifact-cta-records')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '打印带走' })).toHaveCount(0)
+  await page.getByTestId('advisor-artifact-cta-redo').click()
+  await page.waitForURL((url) => url.pathname === '/assistant')
+  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact content state opens my documents @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=qa-pins&capture=1')
+  await expect(page.getByTestId('advisor-artifact-take')).toBeVisible()
+  const documentsLink = page.getByRole('link', { name: '我的文档' })
+  // 1080×1920 视口下舞台缩放是 1；换算后再比，避免别的视口把屏幕像素当成 CSS 像素。
+  const scale = await readEnabledStageScale(page)
+  const documentsBox = await documentsLink.boundingBox()
+  expect(documentsBox, '我的文档链接必须有点击框').not.toBeNull()
+  expect(documentsBox!.height / scale, '我的文档链接点击框换算到舞台 CSS px 后高度不得小于 48').toBeGreaterThanOrEqual(48)
+  await documentsLink.click()
+  await page.waitForURL((url) => url.pathname === '/me/documents')
   expect(runtimeErrors).toEqual([])
 })
 
@@ -1886,7 +2282,7 @@ test('job fit completed-but-empty result says未提供 rather than尚未返回 @
 
 // ── 简历决策工作台其余三条 route（稿 46：actions / career-plan / templates）────────
 // 夹具逐条 respond，未登记的请求照常被 ApiRouter 中止并在收尾报错（fail-closed）。
-// 三个视口都要量：1080×1920 一体机舞台、390×844 手机（关缩放走流式）、1440×900 横屏电脑。
+// 三个视口都要量：1080×1920 一体机舞台、390×844 手机（关缩放走流式）、1440×900 横屏电脑（1080×1920 舞台缩放）。
 const DECISION_VIEWPORTS = [
   { width: 1080, height: 1920 },
   { width: 390, height: 844 },
@@ -1928,11 +2324,13 @@ async function captureDecisionViewports(page: Parameters<typeof assertNoHorizont
       return 'ok'
     }, { message: `${name} ${size.width}x${size.height} 操作条与滚动区` }).toBe('ok')
     await assertNoHorizontalOverflow(page)
+    // 横屏电脑改为舞台缩放后，屏上像素要除回 scale；舞台关闭（手机）时 scale 取 1，门槛仍是 48。
+    const scale = await readEnabledStageScale(page)
     for (const target of [page.locator('.qx-topbar-back'), page.locator('.qx-ctabar .qx-btn').last()]) {
       const box = await target.boundingBox()
       expect(box, '可点区域必须可见').not.toBeNull()
-      expect(box!.height, `${name} ${size.width}x${size.height} 触控高度`).toBeGreaterThanOrEqual(48)
-      expect(box!.width).toBeGreaterThanOrEqual(48)
+      expect(box!.height / scale, `${name} ${size.width}x${size.height} 触控高度`).toBeGreaterThanOrEqual(48)
+      expect(box!.width / scale).toBeGreaterThanOrEqual(48)
     }
     await page.screenshot({ path: test.info().outputPath(`${name}-${size.width}x${size.height}.png`) })
   }
@@ -2018,7 +2416,9 @@ test('career plan guide, ai-down and generated result keep print available @w3-k
   await page.getByRole('button', { name: '生成求职方案' }).click()
   await expect(screen).toHaveAttribute('data-state', 'ai-down')
   await expect(page.getByText('这三条是通用建议，不是针对你这份简历的', { exact: false })).toBeVisible()
-  await expect(page.getByText('AI 能力未配置')).toBeVisible()
+  // AI 能力级不可用时页面给固定人话和手动出路，不再透出服务端原文（#1241）。
+  await expect(page.getByText('AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）')).toBeVisible()
+  await expect(page.getByText('AI 能力未配置')).toHaveCount(0)
   // 出纸不依赖 AI：ai-down 时打印按钮仍在，生成钮也仍可重试（不被 canStart 藏掉）。
   await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeVisible()
   await captureDecisionViewports(page, 'career-ai-down')
@@ -2133,4 +2533,94 @@ test('assistant voice deadline warns then preserves text conversation @w3-kiosk'
   await expect(input).toBeEnabled()
   await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
   expect(api.requestCount('POST', '/api/v1/trtc/session')).toBe(1)
+})
+
+const VOICE_SILENT_TEXT = '这次语音没有接通声音，已为你转成文字对话，可以接着问'
+
+async function beginAdvisorCall(page: Page) {
+  await page.goto('/assistant')
+  await page.getByRole('button', { name: '语音咨询', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
+  await dialog.getByRole('button', { name: /直接语音通话/ }).click()
+  await expect(dialog).toHaveAttribute('data-state', 'voice-live')
+  return dialog
+}
+
+test('assistant voice silent prompt switches to text @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api, false, { silent: true })
+  await page.clock.install()
+  const dialog = await beginAdvisorCall(page)
+  await expect(dialog.getByTestId('assistant-voice-silent')).toHaveCount(0)
+  await page.clock.fastForward(12_000)
+  const notice = dialog.getByTestId('assistant-voice-silent')
+  await expect(notice).toBeVisible()
+  await expect(notice).toHaveAttribute('role', 'status')
+  await expect(notice.getByRole('heading', { name: '小青这边没有声音，也没有字幕' })).toBeVisible()
+  await expect(notice).toContainText('可能是网络或语音服务没接通。可以改用文字继续问。')
+  const toText = dialog.getByTestId('assistant-voice-silent-to-text')
+  const retry = notice.getByRole('button', { name: '重新连接', exact: true })
+  expect(await toText.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(64)
+  expect(await retry.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(64)
+  await toText.click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByLabel('输入咨询问题')).toBeEnabled()
+  await expect(page.getByText(VOICE_SILENT_TEXT)).toHaveCount(1)
+  await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+})
+
+test('assistant voice silent call switches to text at 30s @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api, false, { silent: true })
+  await page.clock.install()
+  const dialog = await beginAdvisorCall(page)
+  await page.clock.fastForward(30_000)
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByLabel('输入咨询问题')).toBeEnabled()
+  await expect(page.getByText(VOICE_SILENT_TEXT)).toHaveCount(1)
+  await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+})
+
+test('assistant voice with subtitle stays in the call past 40s @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api)
+  await page.clock.install()
+  const dialog = await beginAdvisorCall(page)
+  await expect(dialog.getByText('可以先说说你最想解决的问题。', { exact: true })).toBeVisible()
+  await page.clock.fastForward(40_000)
+  await expect(dialog.getByTestId('assistant-voice-silent')).toHaveCount(0)
+  await expect(dialog).toHaveAttribute('data-state', 'voice-live')
+  expect(api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(0)
+})
+
+test('W-118 resume diagnosis phone entry creates only one upload session @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  let creates = 0
+  let release!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
+  api.respondWith('POST', '/api/v1/upload-sessions', async () => {
+    creates += 1
+    // 正式构建只挂载一次；这里压住第一次请求，在它还在途时切走再切回，制造第二次挂载。
+    await held
+    return { status: 201, json: { success: true, data: {
+      sessionId: 'w118-resume-upload', uploadUrl: '/upload/phone',
+      uploadToken: 'w118-upload', controlToken: 'w118-control', expiresAt: '2099-01-01T00:00:00.000Z',
+    } } }
+  })
+  api.respond('GET', '/api/v1/upload-sessions/w118-resume-upload', { status: 200, json: { success: true, data: {
+    sessionId: 'w118-resume-upload', status: 'pending', purpose: 'resume_upload', mode: 'temporary',
+    file: null, requiresKioskConfirmation: false, expiresAt: '2099-01-01T00:00:00.000Z',
+  } } })
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /手机扫码/ }).click()
+  await expect.poll(() => creates).toBe(1)
+  try {
+    await page.getByRole('button', { name: /本机文件/ }).click()
+    await page.getByRole('button', { name: /手机扫码/ }).click()
+  } finally {
+    release()
+  }
+  await expect(page.getByText('请用手机微信或浏览器扫码', { exact: true })).toBeVisible()
+  await expect(page.locator('.resume-source-phone-session svg[width="150"]')).toBeVisible()
+  expect(creates).toBe(1)
 })

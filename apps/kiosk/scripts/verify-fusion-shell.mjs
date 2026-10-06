@@ -173,6 +173,8 @@ function assertMobilePageContract(page, { label, stylesheet, services }) {
 function assertImportOrder(css) {
   const imports = [...css.matchAll(/@import\s+["']([^"']+)["']\s*;/g)].map((match) => match[1])
   assert.deepEqual(imports, [
+    // 10/6：字体声明（Qingxu Serif / Qingxu Sans）只有 @font-face，不定义令牌也不覆盖样式，放最前面。
+    './styles/fonts/source-han.css',
     '@ai-job-print/ui/styles/tokens.css',
     '@ai-job-print/ui/styles/fusion-youth.css',
     // service-desk 在 kiosk-shell 之前：避免冰蓝 --sd-color-primary 盖住 fusion 青绿。
@@ -183,7 +185,7 @@ function assertImportOrder(css) {
     './pages/jobs-fairs-prototype.css',
     'tailwindcss',
     './styles/warm-professional-override.css',
-  ], 'index.css must preserve tokens -> fusion-youth -> service-desk -> kiosk-shell/components -> stage-fit -> local CSS -> Tailwind -> warm override import order')
+  ], 'index.css must preserve fonts -> tokens -> fusion-youth -> service-desk -> kiosk-shell/components -> stage-fit -> local CSS -> Tailwind -> warm override import order')
 }
 
 const packageJson = JSON.parse(await read('package.json'))
@@ -198,6 +200,7 @@ const root = await read('src/layouts/KioskRoot.tsx')
 const runtimeRoot = await read('src/layouts/KioskRuntimeRoot.tsx')
 const privacyGuard = await read('src/auth/KioskPrivacyGuard.tsx')
 const stageFit = await read('src/components/kiosk-shell/KioskStageFit.tsx')
+const stageFitHook = await read('src/hooks/useKioskStageFit.ts')
 const css = await read('src/index.css')
 const routes = await read('src/routes/index.tsx')
 const mobileQrLogin = await read('src/pages/auth/MobileQrLoginPage.tsx')
@@ -289,7 +292,7 @@ for (const [label, pattern] of [
   ['unified service-desk theme', /visualTheme\s*=\s*['"]service-desk['"]/],
   ['unified fusion presentation', /presentation\s*=\s*['"]fusion-youth['"]/],
   ['responsive viewport size binding', /const\s*\{\s*viewportW\s*,\s*viewportH\s*\}\s*=\s*useKioskStageFit\(\s*\)/],
-  ['compact viewport boundary', /const\s+isCompactViewport\s*=\s*viewportW\s*<=\s*760\s*\|\|\s*\(\s*viewportW\s*<=\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)/],
+  ['compact viewport boundary', /const\s+isCompactViewport\s*=\s*isKioskCompactViewport\(\s*viewportW\s*,\s*viewportH\s*\)/],
   ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*isCompactViewport/],
   ['responsive viewport', /viewport\s*=\s*\{\s*isCompactViewport\s*\?\s*['"]mobile['"]\s*:\s*['"]kiosk['"]\s*\}/],
   // V6 落 main 后 className 由裸三元改为模板串，用于在 V6 路由上追加
@@ -297,7 +300,7 @@ for (const [label, pattern] of [
   // 因此这里仍逐字校验 isResponsiveHome ? 'kiosk-home-mobile' : 'h-full'，
   // 只允许它被模板串包裹，不放宽成任意表达式。
   ['responsive home stable class', /className\s*=\s*\{[\s\S]{0,40}?isResponsiveHome\s*\?\s*['"]kiosk-home-mobile['"]\s*:\s*['"]h-full['"]/],
-  ['fluid desktop boundary', /const\s+usesFluidViewport\s*=\s*isCompactViewport\s*\|\|\s*\(\s*viewportW\s*>\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)/],
+  ['fluid desktop boundary', /const\s+usesFluidViewport\s*=\s*usesKioskFluidViewport\(\s*viewportW\s*,\s*viewportH\s*\)/],
   ['stable KioskStageFit wrapper', /return\s*<KioskStageFit\s+enabled=\{\s*!usesFluidViewport\s*\}>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
   ['device status always on', /useTerminalDeviceStatus\(\s*true\s*\)/],
   ['campus route detection', /pathname\s*===\s*['"]\/campus['"]/],
@@ -320,6 +323,63 @@ assert.equal(responsiveHomeFor(932, 800), true, '932x800 must not depend on visu
 assert.equal(responsiveHomeFor(800, 932), false, '800x932 portrait must preserve the staged kiosk shell')
 assert.equal(responsiveHomeFor(961, 760), false, '961x760 must preserve the staged kiosk shell')
 assert.equal(responsiveHomeFor(1024, 768), false, '1024x768 must preserve the staged kiosk shell')
+const compactBody = functionBody(stageFitHook, 'isKioskCompactViewport')
+assert.match(
+  compactBody,
+  /return\s+viewportW\s*<=\s*760\s*\|\|\s*\(\s*viewportW\s*<=\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)/,
+  'isKioskCompactViewport must keep the phone compact boundary',
+)
+const fluidBody = functionBody(stageFitHook, 'usesKioskFluidViewport')
+assert.match(
+  fluidBody,
+  /return\s+isKioskCompactViewport\(\s*viewportW\s*,\s*viewportH\s*\)/,
+  'usesKioskFluidViewport must stay compact-only so landscape desktops keep the stage',
+)
+assert.doesNotMatch(
+  fluidBody,
+  /viewportW\s*>\s*960/,
+  'landscape desktop must not disable the 1080x1920 stage',
+)
+assert.doesNotMatch(
+  withoutComments(root),
+  /viewportW\s*>\s*960\s*&&\s*viewportW\s*>\s*viewportH/,
+  'KioskRoot must not keep a second landscape-fluid predicate',
+)
+const fluidFor = (viewportW, viewportH) => viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
+assert.equal(fluidFor(1440, 900), false, '1440x900 landscape desktop must keep the staged shell')
+assert.equal(fluidFor(1920, 1080), false, '1920x1080 landscape desktop must keep the staged shell')
+assert.equal(fluidFor(1280, 720), false, '1280x720 landscape desktop must keep the staged shell')
+assert.equal(fluidFor(390, 844), true, '390x844 phone must stay fluid')
+assert.equal(fluidFor(1080, 1920), false, '1080x1920 kiosk must stay staged')
+assert.equal(fluidFor(932, 430), true, '932x430 must stay fluid')
+assert.match(shellBody, /<KioskRootStageScope>/, 'KioskRoot must mark its stage contents so nested stages do not scale again')
+assert.match(
+  withoutComments(stageFit),
+  /if\s*\(\s*insideRootStage\s*\)\s*return\s+children/,
+  'KioskStageFit must render children only when already inside the KioskRoot stage',
+)
+const jobFitPage = await read('src/pages/resume/JobFitPage.tsx')
+const legalDocPage = await read('src/pages/legal/LegalDocPage.tsx')
+assert.match(
+  withoutComments(jobFitPage),
+  /usesKioskFluidViewport\(\s*viewportW\s*,\s*viewportH\s*\)/,
+  'job-fit must share the KioskRoot fluid predicate',
+)
+assert.match(
+  withoutComments(legalDocPage),
+  /usesKioskFluidViewport\(\s*viewportW\s*,\s*viewportH\s*\)/,
+  'legal doc must share the KioskRoot fluid predicate',
+)
+assert.doesNotMatch(
+  withoutComments(jobFitPage),
+  /viewportW\s*>\s*960\s*&&\s*viewportW\s*>\s*viewportH/,
+  'job-fit must not keep a second landscape-fluid predicate',
+)
+assert.doesNotMatch(
+  withoutComments(legalDocPage),
+  /viewportW\s*>\s*960\s*&&\s*viewportW\s*>\s*viewportH/,
+  'legal doc must not keep a second landscape-fluid predicate',
+)
 assert.equal(shellBody.includes('SERVICE_DESK_EXACT_ROUTES'), false, 'KioskShell must remove SERVICE_DESK_EXACT_ROUTES theme fork')
 assert.equal(shellBody.includes("'legacy'"), false, 'KioskShell must not select legacy visualTheme')
 assert.doesNotMatch(shellBody, /if\s*\(\s*isResponsiveHome\s*\)\s*return\s+shell/, 'KioskShell must not replace the stage root across rotation')

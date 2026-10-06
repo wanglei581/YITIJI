@@ -43,7 +43,9 @@ function readableDownloadError(errMsg) {
     return '微信后台尚未把文件域名加入 downloadFile 合法域名，小程序暂时无法打开原文。可先在「我的文档」核对文件，或到门店终端查看。'
   }
   if (/timeout/i.test(text)) return '下载原文超时，请检查网络后重试。'
-  return text || '打开原文失败'
+  // 页面自己给的中文句子照用；微信的英文 errMsg 不给用户看
+  if (/[\u4e00-\u9fa5]/.test(text)) return text
+  return '打开原文失败，请检查网络后重试。'
 }
 
 Page({
@@ -174,7 +176,7 @@ Page({
           filePath: dl.tempFilePath,
           showMenu: true,
           success: finish,
-          fail: (e) => failWith((e && e.errMsg) || '微信自带阅读器无法打开该文件'),
+          fail: () => failWith('微信自带阅读器无法打开该文件'),
         }
         if (OPENABLE_EXT.indexOf(this.data.ext) >= 0) params.fileType = this.data.ext
         wx.openDocument(params)

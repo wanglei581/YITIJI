@@ -78,13 +78,13 @@ export default function CompaniesPage() {
       {hosting.status === 'ready' && hosting.enabled && <p className="mb-4 text-xs text-neutral-500">本平台不代建、不代审、不代发企业资料；如有违法违规内容，请用紧急下架。</p>}
       {/* 筛选条 */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <select className={`${inputCls} w-auto`} value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)}>
+        <select className={`${inputCls} !w-auto`} value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)}>
           {REVIEW_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <select className={`${inputCls} w-auto`} value={publishStatus} onChange={(e) => setPublishStatus(e.target.value)}>
+        <select className={`${inputCls} !w-auto`} value={publishStatus} onChange={(e) => setPublishStatus(e.target.value)}>
           {PUBLISH_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <div className="flex flex-1 gap-2 sm:max-w-sm">
+        <div className="flex min-w-[220px] flex-1 gap-2 sm:max-w-sm">
           <input
             className={inputCls}
             placeholder="按企业名称搜索"

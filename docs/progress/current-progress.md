@@ -1,5 +1,476 @@
 # 当前开发进度
 
+## 2026-10-06：取件码方案②一体机配套（分支 `claude/kiosk-pickup-arrival-code-only-1006`，叠在 #1261 上）
+
+- 到机码是唯一的取件 / 续打码。到机码页的消歧卡从「三种码」改成「两种码，别搞混」，删了第三栏「取件凭证码 · 出示给工作人员」；键盘说明加续打一句（回出纸失败的那台机器、每单最多 2 次）。
+- 认领错误新接三条 409：`PICKUP_RESUME_LIMIT_REACHED`、`PICKUP_RESUME_PARTIAL_OUTPUT` 归「这枚码在这里不会再变」（回首页），`PICKUP_RESUME_UNCONFIRMED` 归可稍后再试，文案与后端逐字一致。`PICKUP_CODE_ALREADY_USED` 去掉「找现场工作人员」，改为重新下单或问小青、查看《隐私政策》联系方式（服务电话标准句随全量替换线接上）。
+- 「我的 → 打印订单」详单的码面板标题改成「到机码」，去掉「请向现场工作人员出示」；按订单上的 `reprintAllowed` / `reprintRemaining`（共享类型，#1261）写「还能续打 N 次」或「不能再打了」，字段缺省不加句。
+- 改稿：产品负责人 10/4「取件码按推荐」批准稿 11、33 例外。11 消歧卡改两栏、加续打说明；33 顶部标「本稿已停用」，正文保留。`FROZEN.json` 已按 `verify-qingxu-v2-frozen --update` 重写两份哈希。
+- 门禁：`verify-pickup-claim-error-coverage` 加静态扫描，一体机源码字面量与 JSX 文本不许出现「取件凭证码」「出示给工作人员」「出示给现场工作人员」（带阳性对照）。
+- 停放、隐藏、改名、降级：稿 33 标为停用（文件保留、仍在冻结清单里）；面板标题「取件码」改名「到机码」。功能不减。
+## 2026-10-06：小青语音通话没声音也没字幕时，带用户回到文字对话（分支 `claude/kiosk-b-advisor-call-silent-fallback-1006`）
+
+- 问题：小青语音进房后，如果机器人没进房、语音合成出错或网络只通了一半，屏幕一直显示「通话中」，用户听不到声音也看不到字幕，只能干等。现场没有工作人员，必须自己把人带回文字对话。
+- 改法：通话接通后开始计时。只要收到过一次小青的声音（远端音量大于 5，与现有「说话中」判断同一个阈值）或一条字幕，就算接通，这一通不再判，所以对话中间安静不会误报。12 秒还没接通：通话面板出现提示「小青这边没有声音，也没有字幕」，给「改用文字继续问」「重新连接」两个按钮。30 秒还没接通：自动结束这一通（调停止接口，停止计费），转到文字对话，并在对话里说明「这次语音没有接通声音，已为你转成文字对话，可以接着问」。挂断、出错、到时长上限、重新连接、离开页面都会清掉计时。原有的自动播放被拦、只听模式、到时长上限转文字三种兜底不变。
+- 助手页（`AssistantPage.tsx`）只改两处：`switchVoiceToText` 多一个「转文字原因」参数（不传时行为不变）；有 `voice-` 开头的系统消息时展开对话区（原来没有用户发言时，这条说明会写进状态但看不见）。
+- 验证：一体机类型检查、eslint；`verify-fusion-w3`（它按字节冻结通话钩子，哈希按新内容更新，旧哈希留在注释里）、`verify-assistant-trtc-guard`、`verify-advisor-provider-gate`、`verify-ai-down-fallbacks`、`verify-kiosk-ai-declaration`、`verify-runtime-terminal-identity` 全过；W3 语音相关浏览器用例 14 条通过（新加 3 条：12 秒提示后改用文字、30 秒自动转文字、有字幕时过 40 秒仍在通话中）。反向变异：「字幕不算接通」「30 秒改成 300 秒」「不启动计时」三处都让用例变红；「转文字时不先挂断」用例不红——面板关闭时钩子卸载的清理本来也会调停止接口，停止计费由两处兜底，用例断言的是停止接口恰好被调一次。
+- 停放、隐藏、改名、降级：无。Grok 实现，一体机前端 B 窗口审。
+## 2026-10-06：一体机 52 号「小青的作业面」照青序 2.0 定稿补齐（分支 `claude/kiosk-b-52-advisor-artifact-1006`）
+
+- 打印读不到时（从小青保存要点进来、打印能力读不到）原来把正文和图例都藏了，只剩一张卡却写着「产物正文还在，可以先看」。现在照稿照常显示图例和正文，下面「带走这一页」里加黄色提示「这台机器的打印暂时读不到」，打印按钮仍不出现。稿上提示末尾「或者问现场工作人员」按现场无人值守删掉。
+- 9/29 拍板保留的「02 带走这一页」做上：A4 打印稿缩略样子（按问答、成稿、比对三种画法，纯装饰）、两步说明（第二步「我的文档」可点）、「打印稿上有：……」。没有作业和过期时，照稿加「01 小青能帮你做的三种作业」和「02 做完以后怎么带走」，不再是一张卡加大片空白。
+- 过期只留主按钮「回去重做一次」；没有作业时「去问小青」+「打开我的 AI 记录」。顶部胶囊照稿写「这份可以打印带走」「还没有可带走的内容」。字号按 2.0（小青这句 42、说明 23、条目 24、分区标题 30、图例与出处 21、按钮 27）；卡片不再被拉满剩余高度。
+- 稿上没有的读取中、读取失败两态，用同样的横排卡并接三种作业；这两态的文字改成人话（「正在读取刚做好的作业」「作业内容这次没读到」等，agy 挑过）。原有功能都在：读取重试 3 次、读不到时用带过来的要点兜底并可「重新读取」、打印防连点、打印失败提示、生成打印稿后进打印链、过期判断、夹具门。
+- 验证：一体机类型检查、eslint；`verify-fusion-w3`（新加 20 余条断言，含五个文件不出现「工作人员」「服务台」）、`verify-public-screen-mask`、`verify-ai-artifact-print-url-contract`、`verify-fusion-w6` 全过；W3 作业面浏览器用例 7 条通过（新加 3 条）；并排图 52 号 8 态全部配上，有内容的 5 态走真实会话接口（「打印带走」可点）。反向变异四处（打印读不到又藏正文、去掉带走区、塞进「请找现场工作人员」、去掉「回去重做一次」）全部变红。
+- 停放、隐藏、改名、降级：无。Grok 实现，一体机前端 B 窗口审。
+
+## 2026-10-06：管理员 / 合作机构登录凭证即时失效（服务端会话，未提交、未部署）
+
+- **基线：** 候选 `07e0ad943`，工作区 `bh-g-adminsess`。改前守卫已经每次读库，核对账号存在、`enabled`、`deletedAt` 和 JWT 的 `ver` 是否等于 `User.tokenVersion`；签发声明是 `sub`、`role`、`orgId`、`ver`、`jti`（`randomUUID()`），有效期仍是 `auth.module.ts` 的 `24h`。`POST /auth/logout` 当时只清理管理员近期高风险验证，注释写明不撤销已签发 JWT。`tokenVersion` 在本人改密、手机号重置、首个管理员改密、内部账号启停、合作机构启停 / 重置密码 / 换邮箱 / 删除、备用管理员紧急启用、手机号从机构账号转出、机构手机号换绑上已经递增。没有改 `User.role` 的 HTTP 写路径。合作机构与管理员走同一套 `JwtAuthGuard`。
+- **这次补上：** 退出把当前 `jti` 写入 Redis `internal:session-revoked:{jti}`，TTL 取该 JWT 剩余寿命。守卫先验这份名单，再读库。名单读不到时继续查库：仍启用且版本匹配的凭证放行，停用、删除、版本不一致拒绝。名单写失败时退出返回 503 `AUTH_LOGOUT_UNAVAILABLE`（「暂时无法退出，请稍后再试」），不返回成功。身份不成立时 401，错误码 `AUTH_TOKEN_INVALID`，文案「登录已失效，请重新登录」。鉴权不把 `internal:session-state` 当读缓存；写路径照旧发布更高版本或删除该键。未加会话表，未改有效期，未改会员登录。
+- **改密后的当前请求：** 接口仍只返回 `{ success: true }`，不发新凭证。管理员账号设置页（`apps/admin/src/routes/account-settings/index.tsx`）成功后 1.2 秒调用 `logout()` 再跳登录页；该文件头注释已经按这个行为写。合作机构账号页同样先改密再本地退出。本次唯一改过的前端文件是审计中文名。
+- **审计：** 新动作 `auth.logout`，后台中文名「退出登录」。改密、停用、删除沿用原动作。
+- **门禁：** `verify:admin-session-revocation` 56/56 通过（2026-10-06 15:05 复跑，退出码 0）。已登记 `services/api/package.json`，并写进 `.github/workflows/ci.yml` SQLite 主作业、「Prepare fresh SQLite db」之后、`verify:change-password` 的下一行。`verify:ci-gate-coverage`、`pnpm verify:repository-integrity`、`node scripts/generate-project-graph.mjs` 与 `--check` 通过（图谱 0 个文件变化）。反向变异四处都已改回源码：不比 `tokenVersion` 50/56、退出不撤 `jti` 53/56、停用不递增 `tokenVersion` 54/56、Redis 不可用时放行 54/56，退出码都是 1。
+- **`verify:change-password` 的 9e：** 本机红。守卫的会话状态写入被 500ms 超时放弃后，用改密前读到的数据库行放行。把 `optional-internal-user.ts` 换回 `07e0ad943` 再跑，同一条同样红（15:00，`session-state:set timeoutMs=500`）。本机 bcrypt cost 10 单次约 1.2–3.2 秒，改密在挡住的写入被放开之前要做两次 compare 和一次 hash。这条超时和单调版本写入在基线上已经如此。本次没有改超时，也没有改这条断言。
+- **留下的缝：** 合作机构后台的 `logout()` 只清本地存储，不调用 `POST /auth/logout`，页面上的退出不会写入 `jti` 名单；服务端端点对合作机构凭证已经按同一守卫生效，门禁直接打了这个端点。管理员 `logout()` 会打端点。`apps/admin/src/services/auth/index.ts` 里仍有一句「服务端端点不声称撤销当前无 jti 的 JWT」，与现在的退出端点不一致，这次不许改那个文件。`admin-orgs.service.ts` 约 844 行仍写「缓存最多接受 60 秒」，守卫实际不读这份缓存。退出写入成功之后 Redis 再不可用时，名单读不到，版本仍匹配且账号仍启用的凭证会再通过数据库检查，直到 JWT 到期；停用和版本变化仍拒绝。管理员把手机号绑到自己身上时不递增管理员自己的 `tokenVersion`（转出的机构账号会递增）。没有「管理员重置另一名管理员密码」的端点。
+## 2026-10-06：一体机 22 号「简历诊断报告」照青序 2.0 定稿补齐版式（分支 `claude/kiosk-b-22-resume-report-1006`）
+
+- 「内容结构」七块原来压在约 440px 高的内滚小框里，只露出 3 块半；现在整屏展开，整页滚动，每块标题行右端是「命中 N 条问题 · M 条证据」。另外三个页签同样不用小框。标题行照稿补下滑提示「· 下滑还有 N 块」，「带走」区还没露出来时写「最下面可以带走报告」，滑到底就消失（IntersectionObserver，不轮询）。
+- 底部两颗按钮撑满一行（「重新诊断」+ 主按钮），诊断意图下主按钮文字仍按原逻辑。解析中断屏同样撑满。只改本页样式，没动共用底栏。
+- 带走区（打印这份报告 / 导出 PDF / 生成二维码带走 / 导出修改清单、价目条、导出结果、游客提示、倒计时）一项不少，挪到页签卡下面，标题「带走这份报告」；「先改这几处 · 六维解读」和目标岗位匹配参考挪进「报告结论」页签。
+- 出错屏（暂时不能用、解析中断、读取失败、没有报告）的出路行照稿补左侧图标和右侧圆形箭头，整行可点、≥ 64px；状态卡去掉多余的最小高度，「暂时不能用」一屏放得下。稿上「找工作人员」那条出路按无人值守换成「查政策」「本机构官方渠道」。
+- 去掉计数格和标题行里的空浅色小方块：原型「合同 / 本页算 / 夹具」出处标记删了字却留了带底色的壳，正式数据下也会显示。
+- 文字（agy 挑过、审核方采纳）：「这里拿不到你刚上传的那份原件（离开这一页再回来就拿不到了）……」（一体机上没有「刷新」）、「选好文件、份数和单双面就能出纸」、「在打印机面板上扫描，存成 PDF」。
+- 验证：一体机类型检查、eslint；`verify-resume-report-qx`、`verify-resume-diagnosis-flow-ui`、`verify-ai-down-fallbacks`、`verify-lightflow-k2b-ai-resume`、`verify-kiosk-frontend-debt`、`verify-kiosk-ai-label-copy`、`verify-fusion-w3` 全过；W3 报告相关浏览器用例 7 条通过；并排图 22 号 9 态全部配上。反向变异四处：恢复内滚小框、主按钮不撑满、下滑提示永不出现（三处用例变红）、删掉「带走这份报告」标题（门禁变红）。
+- 停放、隐藏、改名、降级：无。Grok 实现，一体机前端 B 窗口审。
+## 2026-10-06 晚：试点合规制度落实产品负责人两项拍板（只改文档，分支 `claude/compliance-owner-decisions-1006`）
+
+- **出纸盘遗留件（断电续打、已知暴露）：** 工作时间内，打电话请机构对接人不看内容，把出纸盘纸张装信封封好，投进本公司只进不出的锁盒；巡检时取走、按记录销毁。联系不上或非工作时间的，次一工作日到场取走。锁盒随试点设备采购，到货前按次一工作日到场执行。
+- **非工作时间：** 试点两周不设值班电话，正式合同前再评估；屏幕和机身告示写清「工作日 9:00–18:00」，非工作时间在「意见反馈」留言，下一工作日处理。
+- 制度 2、6 里三处「【待产品负责人确认】」改成已定结论。私有页里的试用协议附件、对接人须知、现场告示同步改。
+
+## 2026-10-06：终端程序 Agent 升 0.4.14（分支 `claude/agent-0.4.14-package`）
+
+- **为什么：** 10/6 产品负责人批准全面检查报告，第五节按推荐执行；其中「下一个安装包 10/12 前」。#1206（机器标识原子落盘）、#1229（U 盘文件读不了提示换一个）、#1237（U 盘按能力开关拦截，W-125）都已在候选，但 0.4.13 安装包不含；不升版本号，两个不同的包会同名同版本。
+- **改了什么：** 只改版本号。`package.json`、两份配置示例、安装器 `inputs.json`、Windows 安装器工作流 6 处 `-ProductVersion`、生产安装脚本与控制中心的 `-production` 版本串、MSI/EXE 生命周期测试的候选版本与对应门禁断言，0.4.13 → 0.4.14。升级测试的前代仍是现场 0.4.10，没动。源码注释里「发布顺序是先服务端、再 Agent 0.4.13」与服务端重提门槛「≥0.4.13」是历史与功能口径，不改。
+- **验证（本机）：** Agent `tsc --noEmit` 通过；`verify-installer-inputs`、`verify-candidate-provenance`、`verify-signing-workflow-contract`、`verify-production-provisioning`、`verify-print-scan-agent`、`verify-windows-service-recovery`、`verify-print-queue-residue`、`verify-usb-import-agent`、`verify-print-retry-attempt` 等 Agent 门禁全部退出 0；仓库根 `verify-repository-integrity`（改了工作流 YAML）通过。安装包由 PR 上的 `windows-agent-installer` 工作流出，出包后核身份清单 `productVersion=0.4.14`、`sourceCommit` 与 SHA256，再替换现场步骤里的包。
+- **没做：** 真机没装。KSK-001 仍按现场步骤先装 0.4.13 跑 15 步（另加第 3b 步核双面翻页方向）；0.4.14 装到试点硬件上。
+## 2026-10-06：并排截图工具可换端口，搭好 B 路夹具登记处（只改测试工具，分支 `claude/kiosk-b-qxpairs-port-1006`）
+
+- 起因：一体机前端分 A、B、C 三路同时照青序 2.0 稿补页，都要跑 `capture:qingxu-pairs`；端口原来写死 4217 / 4218，两路同时跑就撞。
+- 改法：加环境变量 `QX_PAIRS_PORT`。不设时仍是 4217，稿服务用它 +1；不是 1024–65534 的整数就立刻报中文错误，不开始构建。B 路（16、18–25、29、34、46、52）的造状态夹具每页一个文件 `tests/visual/fixtures/qingxu-pair-b/pNN.ts`，由 `qingxu-pair-resume-pages.ts` 统一转交，`qingxu-pair-targets.ts` 只加三处接线。13 个文件现在都是空壳，造状态和改之前一样；之后每页的 PR 只改自己那一个文件，几个 PR 之间不冲突。
+- 验证：一体机类型检查通过；`audit:qingxu-v2-drafts --only='^(52|22)-'` 退出码 0；用 4357 端口实截，52 号 8 对、22 号 9 对全部配上。这个工具按需跑，不进 CI。
+- 停放、隐藏、改名、降级：无。Grok 实现，一体机前端 B 窗口审。
+## 2026-10-06：《职易达全面检查报告》获批，按新计划开工
+
+- 产品负责人 10/6 13:4x 批准报告（私有页，链接见产品负责人待办页），第五节 20 条全部按推荐执行；现行计划写在 `next-tasks.md` 顶部「2026-10-06：现行计划」。
+- 报告结论之一：9/30–10/4 合入的青序 A–D 批（#1179、#1184、#1211、#1248、#1210、#1207）是细节对齐，不是照稿重做结构（每批一体机源码只增 100–250 行）；并排截图大量状态从未配上对（例如 21 页 50 个状态 0 个）。所以前端改为 A / B / C 三路照最终版补齐结构，原 E1 / E2 / F 排期作废。
+- 发布节奏改为：第六次 10/9、第七次 10/16、第八次 10/30、第九次 11/13、正式发布 11/20（原 11/27 取消），11/23–11/29 现场试运行。47、50 挪到试点后。小程序备案已完成。
+## 2026-10-06：小程序「隐私与数据」页接上账号注销申请（分支 `claude/miniapp-account-closure`；后端是 #1221，管理员执行按钮是 #1223，三者同批上线）
+
+- **用户看到什么：** 「隐私与数据」页的「账号注销」入口，服务端开放时（`capabilities.accountClosureAvailable`）点开先说清楚会删除什么、会保留什么（订单、打印记录、支付与退款流水、权益领取与核销流水、同意记录，按法定期限保存、去掉能认出你的信息）、手机号怎么处理、有订单在途时怎么办，以及「核实是你本人后，15 个工作日内处理完；处理之前可以撤回」。确认后发短信二次验证（purpose `close_account`），通过才提交；受理后入口下方显示「已受理，等待处理」，可以撤回（`POST /me/data-requests/:id/cancel`，只限还没开始处理的）。已有一条待处理时不重复提交。待人工处理的注销申请不触发导出那套轮询。退出登录或换人后，页面清掉上一位的申请状态。
+- **报错：** 后端四个码的原话（二次验证凭证无效或已过期、账号当前不可用、只能撤回尚未执行的注销申请 / 申请状态已变化、数据请求不存在）登记进 `utils/user-error.js` 放行表；两个幂等键码只在本页 `data-rights.js` 的 `errText` 里换成「请重新进入后再试」——不进全局表，打印下单也用 `IDEMPOTENCY_KEY_REUSED`，有自己的换键逻辑。
+- **文案：** 只说「由我们核实处理」，不出现工作人员（无人值守原则，`free-pilot-copy` 门禁会拦）。保留年限不写具体年数（交律师）。只改文字与接线，不改颜色和样式。
+- **验证：** 契约快照加撤回端点（`scripts/api-contract.json`）；`verify:static` 全链 0 失败。反向变异 25 处：阳性对照绿；23 处转红；存活 2 处都是注释（api.js 与 privacy.js 的参数说明）；跳过 1 处（常量插入对，已由实跑断言覆盖）。第一轮存活的 5 处（撤回方法、退出后清空、模板三处）已补检查后重跑全红。
+## 2026-10-06：小程序 U 盘打印指引按一体机实际能力说（分支 `claude/miniapp-usb-guide-truth`；全面检查评审 P0 第 3 条）
+
+- **改前：** 指引把 Word、TIFF、OFD、PDF/A 列成能打，步骤写「选择黑白/彩色、份数、单双面」，口位置写「屏幕右下方」，入口写「打印扫描 → U盘导入」；帮助页说安卓可用 OTG、iOS 可「通过微信文件传输到终端」。
+- **核对的事实（候选 07e0ad943）：** Terminal Agent 只列 U 盘最外层和下一层文件夹里的 .pdf/.jpg/.jpeg/.png、单份 ≤15MB（`apps/terminal-agent/src/usb/usb-files.ts`）；Word 不出现在 U 盘列表里，一体机提示另存为 PDF；U 盘导入、彩色、双面都按终端逐台开通、默认关闭，没开通时显示「暂未开通」并改回黑白单面；一体机卡片名是「U 盘导入打印」。
+- **改后：** 格式只写 PDF、JPG、PNG，另加一句「Word 请先另存为 PDF；TIFF、OFD 等打不了」；步骤写「只看最外层和下一层文件夹」、15MB、按屏幕提示插入、彩色双面按机器开通；开头说明 U 盘导入按机器开通、没开通可改用手机上传。帮助页改为「小程序读不了 U 盘」，指向 U 盘打印指引或先发到微信聊天再在「我的文档」上传。只改文字，没动颜色和样式。
+- **验证：** 新增实跑断言（格式、关键说法、帮助页）；`verify:static` 全链 0 失败；反向变异 9 处 8 红，存活 1 处是分区标题改名（旧标题本身不算错，不钉）。
+- **子文件夹口径（产品负责人 10/6「U 盘按推荐」）：** 保留 Agent 多读一层子文件夹，所有文字统一说「只看最外层和下一层文件夹」；本分支已按此写，一体机 `FileSourceView.tsx` 的「不进子文件夹」与三处「联系工作人员」由主执行改。
+## 2026-10-06：合规文档按「现场无人值守」同步（只改文档，分支 `claude/compliance-unattended-sync-1006`）
+
+- **依据：** 10/6 产品负责人批准全面检查报告，第五节按推荐执行；合规现状报告 (d) 列出仓库里还没统一的 6 处。
+- **试点合规制度（`docs/compliance/pilot-compliance-procedures.md`）：** 制度 6「意外断电或主机重启」改为远程暂停接单、巡检和运维人员到场或下次巡检取走出纸盘遗留件；本人不到场的按遗留件处理（收走后按记录销毁或锁存，对接人在场时请其见证，不翻看、不拍照）；渠道里删掉「驻点运营岗位」，改为机身告示公示服务电话；制度 8 删掉「或现场工作人员」。
+- **个人信息保护影响评估（C1）：** 仓库 10/3 版与本机 10/4 版合成一版：「驻点人员」改为「本公司巡检和运维人员」，补上网方式一段（本公司 4G CPE、网线接主机、公司实名卡、不接入机构内网）。律师问题仍只放私有清单。
+- **现场告示（`docs/device/pilot-onsite-notices.html`）：** 换成三张版：机身告示、打印机旁使用者告示（只写服务电话和自助办法）、柜门内侧补纸说明（只给对接人看）；换粉、卡纸、重启步骤不贴现场。号码、公司全称仍用【】占位。
+- **未改：** 一体机打印失败页「联系工作人员核查」「重新提交打印」属代码，归一体机或主执行。
+- **C4、C5 升级（同一 PR，10/6 晚）：** 制度 2、3（事件应急）和制度 6、7、8（投诉与权利请求）整段换成升级稿。Grok 起草，Claude 子代理核了法规原文、上线文本时限和候选代码，agy 反方审查两轮，合规窗口裁定。
+  - 事件应急：补通报对象与时限表。《国家网络安全事件报告管理办法》2025-11-01 施行，4、1、2 小时三档；《网络安全法》2025 修正版第二十七条、第四十四条第二款。12387 只用于网络安全事件；普通刑事线索报公安，危害国家安全线索报国家安全机关。企业微信只推运维告警，不写成「安全告警」。补演练记录模板。
+  - 投诉与权利请求：
+    - 定作打印不适用七日无理由退货；
+    - AI 违法内容按本公司实际能做的整改；
+    - 注销按后端 #1221 写清（短信二次验证只能本人在小程序发起；尾号只防点错；线下凭据为当面核对，或邮寄复印件、15 个工作日内销毁；小程序端尚未合入）；
+    - 遗留件范围写全出纸盘、扫描稿台、进纸器，次一工作日到场；
+    - 「远程清空 Windows 打印队列」列为待补能力，不写成现有步骤。
+  - 待产品负责人确认两项：工作时间内是否请对接人把出纸盘纸张封袋锁存；非工作时间是否设值班电话。律师问题照旧只放私有清单。
+## 2026-10-06：小程序 ai-access 门禁偶发失败（只改测试）（分支 `claude/miniapp-ai-access-flake`）
+
+- `apps/miniapp/scripts/tests/ai-access.test.mjs` 第一个场景 `resumeAiConsentRecoversOnce` 偶发失败（单跑约 1/20，机器忙时更高）：本文件冷启动加五轮来回，超过 `settle` 默认的 400ms 看门狗，报 ok=false。只给这一处放宽到 2000ms；默认值不动（别的场景靠它等到超时，整体改成 2000ms 会让文件从 7 秒变 12 秒）。改后单跑 30 次 0 失败，`verify:static` 全链 0 失败。产品代码不变。
+## 2026-10-06：一体机打包思源宋体 / 思源黑体子集（分支 `claude/kiosk-fonts-source-han-1006`）
+
+- 产品负责人 10/6 在主执行窗口同意下载。来源：Adobe 官方 GitHub 发布页 `14_SourceHanSerifCN.zip`、`19_SourceHanSansCN.zip`，SIL OFL 1.1；原始包不进仓库。
+- 宋体 400 / 700 / 900、黑体 400 / 500 / 700。字集是 GB2312 全部汉字加一体机与共享包源码用字，共 7168 字。每个字重按码位切三段（unicode-range），18 个 woff2，单个不超过 1MB，合计约 7.5MB，浏览器只下载页面用到的段。
+- OFL 保留名「Source」：子集属修改版，内部名与 CSS 字族名改为 Qingxu Serif / Qingxu Sans，版权与许可证条目保留，两份 OFL 许可证（`OFL-SourceHanSerif.txt` / `OFL-SourceHanSans.txt`）和改名、子集说明 `README.md` 与字体放在一起：`apps/kiosk/src/assets/fonts/source-han/`。字体放在 `src/assets` 下由 Vite 打包，产物文件名带内容哈希，字体没变时跨发布不重下。
+- 字体栈 51 处：宋体栈第一位是 Qingxu Serif；黑体栈把 Qingxu Sans 排在微软雅黑之前（Mac 仍是苹方，Windows 用思源黑体）。
+- 新门禁 `verify:kiosk-font-subset` 接 CI（构建之后跑）：源码用字都在子集、声明是相对地址且与文件一一对应、许可证与说明在、产物里每个字体带哈希；反向变异 7 处全红。
+- 线上缓存（10/6 只读探测）：`/assets/` 目前只有 ETag 和 Last-Modified，没有 Cache-Control。字体没变时浏览器重新验证只拿到 304，不重下；要做到「一年不变、不发请求」，需要在服务器 nginx 上给 `/assets/` 加 `Cache-Control: public, max-age=31536000, immutable`。这是改生产配置，要产品负责人点头、在发布窗口里做，本分支不改。重新生成用 `apps/kiosk/scripts/fonts/build_source_han_subset.py`（本机，需要 fonttools）。
+- 本机按 Windows 字体栈渲染核对：/help 标题是 Qingxu Serif，正文是 Qingxu Sans。Windows 真机效果待每周五真机录屏确认。
+## 2026-10-06：无人值守标准句与服务联系方式的共享代码先行合入（分支 `claude/kiosk-support-contact-shared-1006`）
+
+- 从全量替换线（`claude/kiosk-unattended-copy-1004`，随第七次）里原样拆出三个共享文件先合，供前端 C 等页面线直接用：`copy/unattendedCopy.ts`（标准句 1–5、禁用说法表、续打句）、`services/api/supportContact.ts`（读 `GET /api/v1/public/support-contact?terminalId=`，404 / 超时 / 缺字段按最保守的一套）、`hooks/useSupportContact.ts`；测试夹具默认应答同步。导出名以后保持不变。
+- 补了一个漏洞：这组单测 12 条原先没挂在任何 CI 会跑的门禁上，现登记为 `verify:kiosk-support-contact` 并接进 CI；另补一条单测：文案层 resolveSupportContact 缺字段或非布尔一律按保守值（原先「小程序发布字段缺失当成已发布」的变异没被拦住）；现在 13 条，反向变异三处（换机不看附近终端、发布缺省当真、附近终端非布尔当真）全红。
+- 本 PR 只加代码，不改任何页面文案；页面换句随全量替换线和各页面线。
+- 停放、隐藏、改名、降级：无。
+## 2026-10-06：后台定时任务一次失败不再让 API 进程退出（P0，随第六次；分支 `claude/backend-hardening-20261006-timer-crash`）
+
+- **问题：** `terminals-agent.service.ts` 的 `setInterval(() => void this.resetExpiredClaims(), 30_000)` 没有 catch，`services/api/src` 也没有进程级兜底。一次 Prisma P2028（事务 5 秒内起不来）就是未处理的 Promise 拒绝，Node 22 直接退出整个 API；PM2 拉起前一体机、小程序、后台请求全部失败。走查 10/4、10/6 在本地 rc 栈复现两次。
+- **改法：** 新增 `src/common/process/background-task.ts`：`scheduleBackground` / `runBackground` 把后台异步任务的错误在本处收住、记日志、下一轮再试；日志只记错误类型、错误码与抛出位置，**不记 message**（可能带用户输入或手机号）。回收定时器与 TRTC 到期扫描都改用它。`main.ts` 装进程级兜底 `installUnhandledRejectionGuard`：未处理拒绝记日志并推企业微信（每小时最多一条），**进程不退出**；同步未捕获异常仍按 Node 默认退出、由 PM2 拉起。
+- **复核：** `@Cron` 方法由 `@nestjs/schedule` 的 `wrapFunctionInTryCatchBlocks` `await` 后捕获，安全；扫描心跳定时器自带 `.catch`；TRTC 的 `expireSessions` 内部有 try，仍统一换成 `scheduleBackground`；会员注销 Redis 租约续期已接 `.catch`。
+- **门禁：** `verify:background-task-safety`（进 CI）：静态扫描定时器回调里不接 `.catch` 的 `void 调用`；`scheduleBackground` 次次失败仍照跑；真实 `TerminalAgentService` 遇 P2028 只记一行 warn；兜底记日志并告警、不含原文。反向变异见 PR。
+## 2026-10-06：数据库异地备份脚本与另一台机器恢复演练（本机临时库，未连接生产）
+
+- **范围：** 产品负责人 10/6 批准数据库备份要有异地副本，并在另一台机器上恢复一次。本包只做脚本、rclone 配置样例、运维文档和本机可验证的部分。没有连接生产，没有写入真实桶名、密钥、账号或服务器地址。对象存储的桶仍由产品负责人开通。
+- **补上的缺口：** `backup-postgres.sh` 原来上传后不校验；本机和异地共用 `RETENTION_DAYS`；`BACKUP_UPLOAD_ENABLED` 未开时没有提示。没有「另一台机器从异地拉最新 dump、校验、恢复到新建 drill 库、只读核对」的脚本。
+- **脚本：** 上传后用 `rclone check`（只含当天那一个文件）核对；本地目录模式比对字节数和 SHA-256。上传失败和校验失败都走原来的 `fail` 告警。异地保留天数改为 `BACKUP_REMOTE_RETENTION_DAYS`（默认 30，不跟随本机 `RETENTION_DAYS`）。未开启上传时，本机备份仍成功，标准错误只提示一次。新脚本 `restore-offsite-drill.sh` 在拉取之前拒绝库名不含 `drill` 的目标；库已存在则拒绝覆盖；可选 `DRILL_DROP_DATABASE=1` 只删除这个临时库。
+- **本机演练：** 本机没有 rclone，也没有 shellcheck。用本地目录模式，在临时 PostgreSQL 16.15（127.0.0.1:55486，`LC_ALL=C`，只走 TCP）上跑通：`initdb`、94 个迁移、插入 1 行演练用户、备份、拷到另一目录、`pg_restore -l`、恢复到 `offsite_drill`、核对、删除临时库。源库用户行数仍是 1。跑完已停库，数据目录、备份目录和拉回目录已删。演练记录：时间 2026-10-06 14:04:52 +0800；文件 `postgres_2026-10-06.dump`；大小 368868；`pg_restore -l` 通过，sha256 `9ee4fffa705f95dac31a75e9f5b24cddd0b39ea6294b835308c39d9a90669e5a`；脚本计时 2 秒（不含前面的迁移）；表数 112；`_prisma_migrations` 94；User 1；Organization 0；Terminal 0；库迁移与仓库迁移都是 `20261003120000_ai_quota_per_user`；结论通过。
+- **门禁：** `pnpm --filter @ai-job-print/api verify:backup-ops` 最后一行 `backup ops gates passed`。`node scripts/verify-repository-integrity.mjs`、`node scripts/verify-ci-gate-coverage.mjs` 通过。图谱重新生成后 `--check` 通过（`docs/graph/` 三份产物跟着门禁对新文档的引用更新）。反向变异三处都是退出码 1，已还原：去掉库名校验后生产库名被放行（退出码 0）；上传后不校验则日志里没有 `rclone check`；校验失败不告警则没有 `curl`。
+- **还要人做的：** 按 `docs/device/postgres-operations.md` 第 10 节开桶、建子账号、放 `chmod 600` 的 rclone 配置，并在服务器 `.env` 里设置第 10.2 节的变量。若生产已经把 `RETENTION_DAYS` 设成不是 30 的数，异地不再跟着它走，要单独设 `BACKUP_REMOTE_RETENTION_DAYS`。每季度在另一台机器上演练一次。
+
+## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
+
+- **决定：** 10/4 21:5x 产品负责人定主原则「设备现场不需要工作人员，是自助的、自动的，这个是主要的」。
+- **现场故障处置单：** 开头加无人值守说明；「给现场工作人员」改名「给巡检与运维人员」，断电恢复后改为远程确认队列安全、设维护停单、远程清 Windows 队列、尽快安排巡检取走出纸盘遗留件；新增「无人值守下的缺纸、碳粉与卡纸」：远程看得到什么（失败与未确认、离线、队列闸门；本机型缺纸卡纸多半只表现为未确认）、看不到什么（碳粉余量、纸盒余量），发现后设维护停单再安排巡检，巡检频率按出纸量待校准，机构对接人是否补纸待合规窗口在协议里定；「每日开门检查」改为巡检时检查；两处「由驻点人员处理」改为远程处理。界面原文里的「请联系工作人员」按代码现状照录，并注明已报代码窗口改。
+- **引用同步：** 合规制度 6（`docs/compliance/pilot-compliance-procedures.md`）与现场验收单 R.5 里对该节的引用改为新节名；验收单 D.4 一处让测试人员「找工作人员」改为报远程核查。
+- **合规更正（同一 PR）：** 补一句「本机不能保证缺纸时自动停单」（打印机报不准缺纸，缺纸时打印失败或停在等待，屏幕提示稍后再试并显示服务电话），注明文中「停单」都是远程人工设维护；巡检频率统一为「每周一次补纸，量大时加次」。
+- **产品负责人 10/4 22:2x「都按推荐」（同一 PR）：** 补纸按方案 A（对接人只顺手补纸，纸锁在打印机台柜子里只给柜门钥匙，本公司按出纸页数提前提醒；换粉、废粉瓶、卡纸与其他故障归本公司）；巡检改为试点两周每周两次（周二、周五，每次 30–60 分钟）、正式合作每月一次另加按次上门；主机改用本公司随身 WiFi 上网、不用机构网络，打印机 USB 接主机——母盘清单 A10、B4、C 段、T5 改口径并新增 G10「随身 WiFi」（流量卡、常插电不休眠、改默认密码、自动连接与网卡不节能、三项实测），验收单开场核对与两处排障改成随身 WiFi 并新增 S.11，故障处置单 F5 注明用断开随身 WiFi 模拟、备件表加随身 WiFi 与备用卡。
+- **产品负责人 10/4 22:2x 补定网络（同一 PR）：** 主机改用本公司 **4G CPE（带网口）、网线接主机**上网，随身 WiFi 留作备用。G10 改写为 CPE 设置（公司实名卡每月 50GB 以上、常插柜内电源、改默认管理密码、能关 WiFi 就关、掉线自动重拨与凌晨定时重启、柜内信号差加外置天线、有线网卡首选且不节能、按流量计费照旧并按 G9 核病毒库），新增第 6 步备用方案（随身 WiFi 与别家运营商的卡进备件表、主机最好有无线网卡）；A10、B4、C 段、T5、G1 登记，验收单开场核对、两处排障、⑪、S.11（三项实测改为 CPE 信号、拔 CPE 电源或网线后的离线告警用时、恢复后自动连回），故障处置单 F5 改为拔网线或拔 CPE 电源、备件表改为 CPE 的备用上网；`pantum-cm2820adn.md` 第七节同步（要用打印机网口须另加一块有线网卡）。只改文档，不涉及代码与生产配置；CPE 信号达标线待首台实测后定。
+- **未改：** 母盘清单只有一处是引用界面原文。一体机与服务端约 71 个文件、224 处让用户「联系工作人员」的文案属代码，未在本 PR 改，已报总指挥另派。
+
+## 2026-10-04 夜：法律文本激活与线上静态压缩
+
+- 22:13 隐私政策 2026-10-pilot-3、用户协议 2026-10-pilot-2 激活（总指挥用公开接口核过正文逐字一致，线上巡检 11 项全过）。
+- 产品负责人 22:2x 同意后，总指挥在生产 nginx 新增 `/etc/nginx/conf.d/zyd-compression.conf`：gzip_vary on、gzip_comp_level 5、gzip_min_length 1024，gzip_types 为 css、js、json、svg、xml、manifest；gzip_proxied 保持默认 off，转发给后端的接口响应不压缩（避开 BREACH 一类问题）。改前备份 `/srv/ai-job-print-backups/nginx-before-gzip-20261004T142424Z`，`nginx -t` 通过后平滑重载。回退：`rm /etc/nginx/conf.d/zyd-compression.conf && nginx -t && systemctl reload nginx`。效果：一体机主脚本 2.38MB→714KB（下载约 6.3 秒→0.5 秒），两个后台主脚本 372KB / 339KB；`/api/v1/health` 仍不压缩。**重装服务器时要记得这份额外配置（nginx 站点配置目前不在仓库里）。** `/assets/` 指纹文件尚未加长缓存，第六次发布前再评估。
+- 当晚合入候选：后端 10 个（批次 #1255：#1243 #1248 #1251 #1250 #1252 #1242 #1225 #1230 #1232 #1233）、小程序无人值守文案 #1258、注销文案去掉「现场工作人员」#1257。
+
+## 2026-10-04：小程序按「现场无人值守」改文字（分支 `claude/miniapp-unattended-copy`，叠在 #1219 上）
+
+产品负责人 10/4 主原则：设备现场没有工作人员，全程自助、自动。小程序里让用户「联系现场工作人员 / 找工作人员核对 / 工作人员处理后 / 到店核对」的地方（注册页面里 6 处，加 3 处「到店」）改成自助出路：手机上重试或重新下单、拨打服务电话。「换一台机器」要等后端接口说附近有别的在线终端才说，接口接上前一律不说（取件页两处；材料包那句「换一个服务点」是原有的、指选服务点，保留）。服务电话号码等后端公开接口（GET /api/v1/public/support-contact?terminalId=，返回 servicePhone / serviceHours / otherOnlineTerminalNearby / miniappPublished，开发中）再接，在那之前只说「号码在首页底部『经营者信息』里」，不写死（`utils/user-error.js` 的 `SUPPORT_HINT`）。停放的招聘会页面不打包，那里说的是主办方的现场人员，没动。新门禁（`free-pilot-copy.test.mjs`）：全部注册页面的 WXML、页面目录 JS 与 utils JS 的文字里不许出现找工作人员、店员、服务台、到店；`supportHint` 在页面 data 里实跑有值。只改文字与接线，不改样式。11 处改动逐处反向变异全部转红。
+## 2026-10-04：公开只读接口 support-contact（服务电话与提示条件）
+
+一体机出错时按条件显示「拨打服务电话」「换一台机器」「用手机继续」。本段是后端判断。一体机和小程序的句子由主执行窗口接，本分支不改那三端。
+
+### 契约
+
+`GET /api/v1/public/support-contact?terminalId=<终端号>`，不需要登录。一体机手里是终端号 `terminalCode`（也有内部 id）。接口两种都接受：先按内部 id 查，没有再按终端号查。
+
+`200 { success: true, data: { servicePhone, serviceHours, otherOnlineTerminalNearby, miniappPublished } }`
+
+- `servicePhone`：管理员填写。没配返回 `null`，不会返回空串。
+- `serviceHours`：管理员填写。没配时公开接口返回「工作日 9:00–18:00」。
+- `miniappPublished`：后台开关，默认 false。库存值只有精确的 `true` 才算已发布。
+- 管理员 `GET /api/v1/admin/support-contact` 在服务时间没配时返回 `null`，表单才能区分「没填」和「改过」。公开接口才补上默认句子。
+- 读不到终端、不带 `terminalId`、终端号不存在、超过 128 字、本机已退役：`otherOnlineTerminalNearby=false`，仍然 200。
+
+### 判据
+
+同一机构（`orgId` 非空且相同）下、除本机外，至少一台终端在线。
+
+在线沿用 `services/api/src/terminals/printer-availability.ts` 的 `TERMINAL_ONLINE_WINDOW_MS`，以及 `terminals-admin.service.ts` `listTerminalsForAdmin` 第 328 行：有心跳，且最近心跳落在窗口内。心跳取终端列 `lastHeartbeatAt` 与最新一条 `TerminalHeartbeat.createdAt` 里较新的那个。不用 `lastSeenAt`（它是 `@updatedAt`，改名称也会刷新）。比较是严格小于窗口。
+
+其它终端不计入：已退役（`lifecycleStatus=retired`）、计划中（`lifecycleStatus=planned`，后台称待安装）、停用（`enabled=false`）。维护中、安装中、已暂停不因此排除。
+
+本机没绑机构 → false。本机已退役 → false，即使同机构还有别的在线终端。响应只有这一个布尔值，不带其它终端的编号、数量或位置。
+
+### 存储
+
+新建模型 `PlatformSetting`（键 `support.servicePhone`、`support.serviceHours`、`support.miniappPublished`）。没有可复用的平台级键值：一体机统一配置按终端，法务文档是带版本的正文，价目属于收费，线下网点电话属于招聘内容，Redis 上的 AI 开关会过期。本表没有 `endUserId`，不是会员数据，不进注销删除或置空清单。号码只由管理员写入，代码、迁移、种子和文档里不放号码。
+
+### 后台在哪一页改
+
+管理员后台现有页「法务文档版本」（路由 `/legal-docs`）里的「服务联系」卡片。不新页面、不新菜单。`PUT /api/v1/admin/support-contact` 仅管理员，与配置在同一事务里写审计 `support_contact.update`。公开读取不写审计。
+
+### 缓存与节流
+
+按请求里的 `terminalId` 做进程内缓存，不带参数单独一个键，缓存整份公开响应（含附近是否在线），5 分钟。后台改完配置不主动清缓存，最迟一个缓存周期后一体机和小程序才看到新值。节流与一体机 AI 能力公开读相同：`@TerminalScopedThrottle(30)`。
+## 2026-10-04：取件码方案②（候选分支，未合入、未上线）
+
+产品负责人 10/4 拍板「取件码按推荐」。本段是后端契约，一体机与小程序按同一批字段改前端。字段名不要改。
+
+- 明文列写入路径（本分支核实）：全仓生产代码里，新铸一枚明文 `Order.pickupCode` 的路径原来只有 `order-status.service.ts` 的 `settleRedemptionInTransaction`（`generateUniquePickupCode` 重试循环）。该循环与辅助函数已删。`markPaid` / `markPaidOnline` 本来就不写这一列。建单与作废重发只写 `pickupCodeHash` + `pickupCodeEnc`。退款（`refund.service.ts` 两处）和账号注销保留（`member-closure-retention.ts`）只把这一列置 null。退款来源含糊判断仍会读这一列，不下发。列保留，不迁移存量。
+- 响应里的 `pickupCode` 只可能是解密后的到机码或 null。有哈希、且（仍可取，或此刻可续打）才解密 `pickupCodeEnc`。没有哈希的现场单保持 null。可取口径：`pickupStatus=pending`，付款态为 unpaid / paying / paid，且 `pickupCodeExpiresAt` 仍在未来。
+- 上限：每单自助续打 2 次（`SELF_SERVICE_REPRINT_LIMIT`，加上首次出纸最多 3 次）。计数：该任务状态日志里 `fromStatus=failed`、`toStatus=pending`、`errorCode` 属于 `kiosk_retry` 或 `pickup_code_resume` 的条数。管理员重试（`admin_retry`）不计入、也不受限。`POST /api/v1/print-jobs/:taskId/retry` 与到机码续打共用这个数。旧的 `reprintAttemptsByTaskId` 仍统计全部 failed→pending，不含这次过滤。
+- 两个字段，挂在下发 `pickupCode` 的订单视图上（云打印与材料包的列表和详情、我的打印订单列表与详情、跨端时间线）。在线支付状态和管理员订单动作不带这两个字段。
+  - `reprintAllowed`：此刻绑定终端用同一个到机码能否续打。任务失败、`paidReprintBlockReason` 为空（含 Agent 版本）、任务终端与订单终端相同、取件窗口未关、自助次数未到上限，才为 true。没任务、没失败、现场单、退款中为 false。
+  - `reprintRemaining`：剩余自助次数 0–2。没有任务或现场单（没有哈希）为 null。有任务且有哈希时给数字，哪怕此刻 `reprintAllowed` 为 false。
+  - `reprintAllowed` 为 true 时继续下发到机码。已用且不可续打的单不下发。
+- 续打：认领入口在已放行（used / 有 printTaskId）之后、10 分钟回放之前。满足上面条件则把同一个任务和订单的 `taskStatus` 从 failed 改回 pending，状态日志 `errorCode=pickup_code_resume`，刷新 30 分钟签名文件地址。返回与正常放行同一形状，并多一个 `resumed: true`。不建任务、不改金额、不新建订单。正常放行和 10 分钟回放不带 `resumed`。回放窗口仍从任务最初的 `createdAt` 算，续打不重置。
+- 拒绝：次数用完 409 `PICKUP_RESUME_LIMIT_REACHED`「这单已经接着打过 2 次，不能再打了」。结果未确认 409 `PICKUP_RESUME_UNCONFIRMED`「这单的出纸结果还没确认，暂时不能接着打，请稍后再试」。已出部分纸 409 `PICKUP_RESUME_PARTIAL_OUTPUT`「这单已经出了一部分纸，不能整单重打」。其它不可续打原因沿用既有 `REPRINT_BLOCKED_CODE` 与对应文案；既有「未确认」那句本包不改。会员 `/retry` 超限 409 `PRINT_RETRY_LIMIT_REACHED`，文案与次数用完那句相同。取件窗口已关沿用 400 `PICKUP_CODE_EXPIRED`。退款中 / 已退沿用认领入口既有 400 `ORDER_REFUNDED`，走不到续打。别的终端输这个码仍是认领入口既有 404 `PICKUP_CODE_INVALID`。任务还在排队、打印中或已完成，仍走 10 分钟回放。
+- 管理员可见性：只读订单视图与 `POST /admin/orders/:id/mark-paid` 都不把到机码交给管理员浏览器。`mark-paid` 的 `pickupCode` 恒为 null（字段还在，避免旧客户端缺键）。密文列也不回。
+- 新门禁 `verify:pickup-code-resume` 挂在 `verify:print-jobs` 后面，CI 已有的 `verify:print-jobs` 行会带上它，未改 `.github/`。
+- 停放、隐藏、改名、降级：无。存量明文列留在库里，任何接口不再把它读出来。
+
+## 2026-10-04：R-6 简历优化页可改经历 / 教育的标题、可删整条（产品负责人 10/4 单独批准的冻结稿例外）
+
+- 来源：走查 R-6（AI 解析出错时，例如 R-1 样本一整句被当成公司名，用户在优化页改不了、删不掉）。产品负责人 10/4 20:3x：「优化页按推荐，允许改标题和删条目」。
+- 范围只限两项：工作 / 实习经历的公司、职务，教育经历的学校、专业可改；经历、教育的整条可删（「删掉这一条」，≥48px，确认「确定删掉这一条吗？删了以后导出和打印都不会再带这一条。」）。项目标题、学历、时间段仍只读。只用这一页现有输入框和按钮样式，版面不变。
+- 就地校验跟导出规则：公司、学校不能空且最多 100 字，职务不能空且最多 60 字，专业最多 60 字；有错时「导出 PDF」「确认优化版，导出 PDF」不可用，点了把焦点带回出错那一格；「导出修改清单」不受影响。
+- 生成预览页（`GenerateResumeEditor`）按产品负责人 10/4 21:1x「也按推荐一起改」同样处理：同两项操作、同一套校验（复用 `resumeEntryTitles.ts`）、同一句确认文案；有错时导出与打印入口不可用并把焦点带回出错格。
+- 验证：两页合入后八组浏览器用例（default 400、w1–w6、scan-safety）与一体机单测 280 全过；新用例两页各 4 条；反向变异「删了还导出」「没删的也丢了」「标题有错仍发出导出请求」两页各三条，各自必红。
+- 停放、隐藏、改名、降级：无。
+## 2026-10-04：电脑上每一页都按 1080×1920 竖屏等比缩小居中（产品负责人 10/4 21:4x）
+
+- 问题：横屏电脑（宽 >960 且宽大于高）时 `KioskRoot` 关掉舞台缩放、普通路由按电脑宽度铺开，而登录页、打印全屏页等自己又套一层舞台，同一台电脑上两种大小混在一起。10/20 上门演示用笔记本放，必须统一。
+- 改法：判据收成 `useKioskStageFit.ts` 的 `isKioskCompactViewport` / `usesKioskFluidViewport` 一处（KioskRoot 与 JobFitPage 共用）：流式只留给手机（宽 ≤760，或宽 ≤960 的横屏），横屏电脑与竖屏一体机都走外层舞台；`KioskRootStageScope` 标记已在外层舞台内，后代再挂 `KioskStageFit` 时直接渲染子节点，避免缩两次。KioskRoot 之外独立渲染的整屏页保留自己那层。真机竖屏 1080×1920 时 scale≈1，不受影响。
+- 门禁：新用例 `kiosk-desktop-stage-fit.spec.ts`（挂 `test:browser:journeys`，进 CI 冒烟）：1440×900、1920×1080 下首页、打印 Hub、登录、简历分诊、「我的」五页各只有一层启用的舞台、缩放比相同且等于 min(宽/1080, 高/1920)、无横向滚动、无嵌套舞台、主按钮在视口内；390×844 首页仍是手机流式。两条按像素的触控断言改为除以缩放比例（阈值不变）。反向变异「恢复横屏铺开」必红。
+- 验证：八组浏览器用例（default 394、w1–w6、scan-safety）、journeys 组（126 过，剩干净候选本机同样红的 1 条环境用例）、一体机单测 280 全过。
+- 停放、隐藏、改名、降级：无。
+
+## 2026-10-04：第五次更新已上线；当晚线上 AI 与运维调整
+
+- 第五次更新：2026-10-04 15:56 上线（Deploy to zyidai.cn run 37187023341，15:50:38–15:56:09，success）。发布版本 main `e2e530a29`（#1224，第二父 `3faa07816`，树与 #1220 头一致）；回退标签 `prod-before-release5` → `8e8fd31e2`。发布开关 15:51:26 在 SSH 步骤开始后关闭。发布日志：PREFLIGHT OK 20、LEGAL 3、迁移 92 个无待执行、readiness OK。发布后公开只读探针 11 项通过；服务器 DEPLOY_SOURCE 与 e2e530a29 一致；三端产物 jsxDEV 0；KSK-001 心跳正常。**没验的：线上还没有人真的走过一张 0 元打印单到出纸。**
+- 发布后真模型检查当时因 DeepSeek 余额不足（402）全部失败，产品负责人充值后复测通过。
+- 21:11 新版《AI 服务说明》2026-10-pilot-2 激活（草稿由总指挥在后台建，产品负责人本人点激活；公开接口核过线上正文与定稿逐字一致）。
+- 后台把 5 个父功能换成 deepseek-v4-pro，逐张「保存并测试连通」正常，7 个子功能继承；真模型检查 4/4 保留，花费 0.1058 元。
+- 腾讯云语音合成资源包用完后已开通后付费，音色 1008 重测可合成。
+- 生产每日备份已装好（每天 02:15），恢复演练通过。
+- 第六次更新同批合入 #1221（会员账号注销后端：本人申请 + 管理员执行）与一体机注销文案（与《隐私政策》2026-10-pilot-1 第五节对齐：现场工作人员或政策里的电话、邮箱申请，「核实是你本人后，15 个工作日内处理」）。
+## 2026-10-04：打印主线 0 元口径收尾（走查 N2、N3）与留白
+
+- N2 卡纸等失败页：0 元单不再说「你的订单和已付金额都保留着」，改「你的订单还在，处理好后可以继续打印」；一般失败页小青区同样按 0 元 / 收费分开（`printProgressModel.ts`）。收费单原句保留。
+- N3「我的打印订单」：0 元单列表状态写「免费」，详单不出现支付、实付、优惠/权益抵扣、已退款、价格；收费单金额明细不动。判断用 `isFreeMemberOrder`（已有支付状态且金额为 0 或来源为免费；没有支付状态的历史订单不算）。W5 冻结门禁对 `paymentCopy.ts` 的哈希随这次有意改动前移，仍逐字节校验。
+- 14 号页：0 元报价已走短版确认页，费用明细不渲染，主按钮整颗在首屏；新用例断言按钮在视口内、≥56px、点中心命中按钮本身。
+- 留白：12 号等待上传 / 已收到、13 号加密、15 号完成右半与卡纸、18 号面板指引 / 等待回传、32 号无订单，把已有内容摊开，没有新编文案。
+- 验证：八组浏览器用例（default 392、w1–w6、scan-safety）与一体机单测 283 全过；新用例：N2 免费卡纸、N3 免费与收费详单对照、14 号页按钮；反向变异「免费判断恒为否」必红。
+- 停放、隐藏、改名、降级：无。
+## 2026-10-04：AI 长文档档超时上限 180 → 95 秒（分支 `claude/backend-hardening-20261004-llm-long-timeout-ceiling`）
+
+- **为什么：** 一体机对简历诊断 / 生成 / 优化只等 100 秒（`aiHttpAdapter.ts` 的 `LLM_TIMEOUT_MS`、`useOptimizeLoad.ts` 的 `OPTIMIZE_LOAD_LIMIT_MS`）。后端 `AI_LLM_LONG_TIMEOUT_MS` 默认 90 秒、原上限 180 秒；若配到 100 秒以上，慢请求会先被一体机断开、记成客户端中止并排除在可用率分母外，签收单「AI 可用率」虚高（总指挥 10/4；线上未设，按默认 90 秒，现在没问题）。
+- **改了什么：** `llm-http.ts` 新增导出 `LLM_LONG_TIMEOUT_CEILING_MS = 95_000`，环境变量配多大都夹在 95 秒；默认仍 90 秒，行为不变。`.env.example` 注释同步。`verify:llm-timeout-concurrency` 加两条：读一体机两处等待时长，断言后端上限都短于它们。
+- **验证：** API typecheck、lint、`verify:llm-timeout-concurrency`（80）、`verify:ai-content-moderation`、`verify:ai-endpoint-allowlist`、`verify:ai-throttle-dimension`、`verify:ai-usage-budget`、`verify:llm-thinking-off`、`verify:production-runtime-gates` 通过。反向变异：上限改回 180 秒 → 8.e 红，已改回。
+## 2026-10-04：现场验收单加 AI 用量终端号与机构服务人次两项（只改文档，分支 `claude/runsheet-ai-usage-visits-1004`）
+
+- **改了什么：** `onsite-acceptance-runsheet-2026-09.md` S 段加 S.9、S.10。S.9：测试会员在试点终端上把 7 个 AI 功能各用一次，再只读查 `AiUsageRecord`，每一行都要带试点终端 ID 且 `terminalVerified` 为真（签收单「AI 调用成功率」按终端算）。S.10：机构后台数据大屏的服务人次要显示数字；1–4 次按隐私规则显示「少于 5」，所以测试前先走满 5 次会话。
+- **依据：** 商业化窗口签收指标定稿 `~/.cache/claude-lanes/commercial-1003/drafts/signoff-metrics-v2.md`（总指挥转达）；字段核对自 `services/api/prisma/schema.prisma` 的 `AiUsageRecord`。没有改代码或门禁。
+## 2026-10-04：管理员密码由本公司保管，站点只持钥匙（只改文档，分支 `claude/admin-password-company-held-1004`）
+
+- **决定：** 10/4 20:2x 产品负责人按推荐定了试用协议第 5 项：管理员密码由本公司保管，不交站点；站点负责人只持打印机台和主机锁盒的钥匙；现场要进系统时电话联系本公司远程处理。
+- **改了什么：** 母盘清单 B11 改成上述口径；现场故障处置单里两处让现场清 Windows 打印队列的步骤（「给现场工作人员」第 2 步、缺纸恢复的人工步骤）改成「奔图面板上取消残留作业，Windows 队列由本公司远程清」。其余写到管理员账号的地方都是装机人员（本公司）操作，未改。
+- **合规引用：** 「给现场工作人员」节名没改（合规制度 6 按节名引用），只改了第 2 步内容。
+## 2026-10-04：W-129 后端接口——打印本场面试题目和我的回答（不含 AI 点评）（分支 `claude/backend-hardening-20261004-interview-transcript-print`；Grok 实现、Claude 审）
+
+- 接口：`POST /api/v1/mock-interviews/:id/transcript/print`。入参 `{}` 或 `{ includeSkipped?: boolean }`，默认 false；非布尔返回 400 `VALIDATION_FAILED`。不调用模型。`in_progress` 且没有报告行、以及 `completed`，都能出。`configured`（还没有第一题）按没有回答处理。
+- 没有任何非跳过的候选人回答时返回 400 `INTERVIEW_NO_ANSWERS`，文案「这一场还没有作答，暂时没有可打印的内容」。只剩跳过题时，即使 `includeSkipped` 为 true，同样返回这个 400。
+- 跳过判定：候选人回合 `MockInterviewTurn.skipped === true`。`answer()` 在 `input.skip` 时写入该布尔值，并把 content 写成「（跳过）」；`buildQaExcerpts` 也只看这个布尔值。判定依据是布尔值。后面没有候选人回合的题不算回答，纸上也不印。空白内容不算回答。
+- 出参与练习卷相同：`fileId`、`filename`、`sizeBytes`、`pageCount`、`printFileUrl`、`signedUrl`、`expiresAt`，另加 `variant: 'transcript'`、`questionCount`、`answerCount`。`questionCount` 是这张纸上的题数，只有开关打开才把跳过题算进去。`answerCount` 只数非跳过的真实回答，开关打开时不变。一场里一题已答、一题跳过、还有一题未答：关为题 1 答 1，开为题 2 答 1，未答题两档都不印。
+- PDF 含岗位、行业、面试官中文称呼（沿用 `PRACTICE_SHEET_INTERVIEWER_LABEL`）、每题和紧跟的回答。开关打开时跳过题标「本题跳过」。页脚「本页为练习记录，不含 AI 点评」，并带现有免责声明。不含报告、评分或点评正文。**协调方审核时改：** 题目是 AI 面试官（模型）出的，Grok 原写元数据 `AIGenerated=false` 且纸上没说明题目来源，不符合 AI 生成内容标识要求；现表头下加「题目由 AI 面试官生成；回答为你本人作答，未经 AI 修改。」，元数据 `AIGenerated=true`，门禁加两条断言，两处反向变异（改回 false、去掉来源说明）都红。
+- 归属与练习卷相同：会员本人，或匿名凭令牌；越权一律 404 `INTERVIEW_NOT_FOUND`。校验从 `loadAuthorized` 照抄到新服务。`mock-interview.service.ts` 未改。
+- 文件落库与练习卷相同：`purpose=print_doc`，`assetCategory=derived`，`derivationKind=ai_generated`（生产隐私闸门与题目单同一口径），`createdBy=mock_interview_transcript`。`printFileUrl` 用 30 分钟 `PRINT_ARTIFACT_URL_TTL_MS`。
+- 审计动作 `mock_interview.transcript_print`。payload 只有 `sessionId`、`questionCount`、`answerCount`、`includeSkipped`，不带题目和回答原文。管理员中文名「打印面试作答记录（不含 AI 点评）」。节流与 `@AiUse('export')` 与练习卷相同。`verify:ai-quota-coverage`（Q2a 起才有）只扫 generate / voice，`export` 不进登记。
+- 文件：新增 `services/api/src/mock-interview/interview-transcript-pdf.service.ts`（104 行）、`interview-transcript-print.service.ts`（188 行）。`mock-interview.controller.ts` 增加 DTO 与路由（+23，现 332 行），新服务放在构造函数最后一个参数。`mock-interview.module.ts` +4（52 行）。`apps/admin/src/lib/auditActionLabels.ts` +1。`verify-derivation-kind.ts` +1。`verify-mock-interview.ts` 增加用例 20（+242，现 1032 行）。`docs/graph/` 由生成脚本重写。
+- 验证最后一行：`verify:mock-interview` 为 `=== ALL PASS (24 checks) ===`；`verify:ai-safety-aigc` 为 `AI 标识与提示词安全句：PASS`；`verify:ai-access` 为 `verify:ai-access：ALL PASS`；`verify:console-plain-copy` 为 `verify:console-plain-copy passed`；`verify:derivation-kind` 为 `verify:derivation-kind：40/40 通过`；`verify:ai-cost-coverage` 为 `A-6 成本覆盖验证: 178 PASS, 0 FAIL`（其中调用了没有独立脚本名的 `verify-ai-cost-ui-coverage`）；`verify:ai-usage-budget` 覆盖面为 `✅ verify:ai-usage-budget（覆盖面）21/21 通过`；`verify:ai-down-fallbacks` 为 `verify-ai-down-fallbacks passed (31 files checked)`；`verify:multipart-field-nesting` 为 `PASS: multipart 字段嵌套与体积上限防护已验证`；`verify:admin-partner-contact-phone-ui` 为 `PASS 适配器、资格判断与弹层文案`；`verify:recruitment-hosting-gate-declares` 为 `verify:recruitment-hosting-gate-declares PASS`；`verify:ai-user-text-retention` 为 `ALL PASS (536)`；`verify:ai-artifact-print-url-contract` 为 `✅ ALL PASS — AI / 求职产物只使用内部 HMAC printFileUrl 打印`。API `typecheck`、`lint` 退出码 0。图谱 `--check` 为 `PASS docs/graph/ 与当前代码一致`。
+- 反向变异已还原，还原后用例 20 再跑仍是 `=== ALL PASS (24 checks) ===`。去掉归属校验：退出码 1，`FAIL 20d. 会员越权应为 404，实际 0`。没有回答仍出 PDF：退出码 1，`FAIL 20b. 没有回答应为 400，实际 0`。审计 payload 写入回答原文：退出码 1，`FAIL 20f. 审计 payload 含题目或回答原文`。忽略 `includeSkipped`：退出码 1，`FAIL 20c. includeSkipped 两种取值的题数或答数应不同`。
+- 一体机按钮由主执行窗口接 `beginPrintHandoff`。本分支没有改前端页面（只加一条后台审计中文名）。
+
+## 2026-10-04：W-118 一体机这一半——检查任务防重、被拒后带文件回材料检查、隐私摘要说实话、开发版构建闸
+
+- 根因先说清：走查报的「同一份文件建两条隐私检查」在走查栈上成对出现，是因为走查的一体机前端在 `NODE_ENV=development` 的 shell 里构建，打出了 React 开发版，StrictMode 把挂载副作用执行两遍。正式构建实测只建一次；线上产物 jsxDEV 0 处（总指挥核过）。服务端闸门与去重另见 #1222。
+- 防重（第二道防线）：材料检查整轮共享在途结果；建上传会话、扫码登录、简历解析、自评交卷各自合并同一请求的在途发送。
+- 被拒后的出路：确认打印被 `PRINT_PII_SCAN_REQUIRED` 拒时，不再说「稍后重试」，改为「这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。」加「回到材料检查」按钮，带着当前文件进新一轮检查。
+- 隐私摘要：用户保留了命中时不再写「没发现需要遮挡的内容」，按真实裁决写「发现 N 处个人信息，你选择了全部保留，原样打印。」或「发现 N 处个人信息，遮挡 M 处，保留 K 处。」
+- 构建闸：一体机、管理员、机构三端的 vite 配置在生产构建时遇到非 production 的 `NODE_ENV` 直接报错；CI 新增 `scripts/verify-prod-react-build.mjs`，三端产物 jsxDEV 必须为 0（自构一份开发版实测会红）。
+- 验证：八组浏览器用例（default、w1–w6、scan-safety）全过；W-118 新用例 7 条；反向变异：去掉检查任务防重、去掉上传会话防重、「全保留仍说没发现」各自必红。
+- 走查 N1（10/4）一并修：保存裁决的接口不回带任务访问凭证，存回交接时补上原凭证；游客从预览「返回材料检查」不再被 403 清掉（会员不受影响）。N4（摘要说没发现）即上面的隐私摘要。
+- 未做（另排）：14 号页主按钮被底栏盖住、走查量出的 9 处留白。
+- 停放、隐藏、改名、降级：无。
+## 2026-10-04：W-125 一体机 U 盘入口跟着后台能力开关走
+
+- 问题：后台把 `usb_import` 配成未验收、维护中或不支持后，只有打印扫描首页卡片置灰；打印上传深链接、二维码过期屏的「改用 U 盘导入」、简历来源页「U盘上传」照常能导入。它们只看构建时有没有网桥令牌，不读能力开关。
+- 改法：新增共享 hook `useUsbImportGate`（三处入口共用）：先看网桥令牌，再读终端能力；关闭时入口置灰或不出现，说明沿用首页卡片那三句（文案常量从首页挪到 `printScanCapabilities.ts` 共用）；读不到能力配置按拒绝处理，给「重新检查」；后台未配置这一项时与首页一致照常可用；演示模式不变。
+- 测试环境：打印组用例构建时注入本机网桥令牌；接口夹具默认能力列表为空（未接管），既有用例行为不变。
+- 验证：八组浏览器用例（default 392、w1–w6、scan-safety）全过；新用例 7 条，含维护中、未验收、读取失败、过期屏开关两态及各自的可用反向对照。
+- 服务端与终端 Agent 那一半的拦截由后端、Windows 窗口另做。
+- 停放、隐藏、改名、降级：无（关闭时入口按后台开关不可用，属既定口径）。
+## 2026-10-04：W-129 / W-131 一体机在 AI 不可用时的出路（模拟面试、公共额度文案、优化页胶囊）
+
+- 来源：走查在上游 402（DeepSeek 余额耗尽）时补测登记。
+- 提交回答失败：撤回刚追加的那条对话（按追加前的长度定位），原文放回输入框，并说「你刚才的回答还在输入框里。」跳过失败同样撤回。
+- 结束本场：
+  - 一题没答（`INTERVIEW_NO_ANSWERS`）：说「这一场还没有记下的回答，没法生成报告。」给「继续答题」「离开」，不再叫人重试；
+  - AI 不可用且本页见过回答成功：说「你的回答已保存，AI 恢复后可以接着生成报告。」给「看面试要点」「稍后再试生成报告」，会话不当成结束；没有成功过的回答时不说「已保存」。
+  - 「打印本场题目和我的回答（不含 AI 点评）」现有前端拼不出来，没有做假入口；需要后端补 `POST /api/v1/mock-interviews/:id/transcript/print`（已转总指挥派后端），接口到了再补按钮。
+- 面试开场失败的提示改在首屏底栏就地显示，不再落到屏外。
+- `AI_PUBLIC_QUOTA_EXCEEDED` 统一说「今天的 AI 次数用完了，明天恢复；可以先打印原件。」普通限流那句不变。
+- 优化页右上角胶囊：AI 不可用时写「AI 暂时用不了」，其余状态维持原短标签。
+- 验证：八组浏览器用例中 w1、w2、w4–w6、scan-safety 全过，w3 整组 79 过，默认组受影响的两份用例 16 过；反向变异「失败后不撤回那条对话」必红。
+- 停放、隐藏、改名、降级：无。AI 出错时退化成手动出路，没有删 AI 入口。
+
+## 2026-10-04：管理员后台能力中心，未登记行必须先选状态才能登记（分支 `grok/admin-capability-default-20261004`，未提交）
+
+- **问题：** 「调整为」对未登记行用列表里的 `status` 当初值。缺行在列表里固定是 `not_verified`，下拉显示「未验收」。不改下拉直接点「登记」，会把该项写成关闭。managed 下，未登记的既有能力本来是放行的。
+- **实际生效状态不是 `cap.status`。** 页面「当前状态」由 `capabilityStateView`（`apps/admin/src/routes/print-scan/CapabilityCenter.tsx` 第 76–91 行）根据 `configured` 和默认关闭名单算出：彩色、双面、签名未登记写「未登记 · 默认关闭」；其余未登记写「未登记」，并说明常规设置放行、严格设置关闭。后台读不到服务器用的是哪种设置。服务端判定在 `TerminalCapabilitiesService.assertUserTaskAllowed`（`services/api/src/terminals/terminal-capabilities.service.ts` 第 153–184 行）：没有配置行时，默认关闭名单里的键拒绝；其余键看 `resolvePrintScanCapabilityMode()`（同文件第 44–49 行，`PRINT_SCAN_CAPABILITY_MODE`，managed 放行、strict 拒绝）。彩色 / 双面另走 `assertPrintParamsAllowed`（第 229–234 行），未登记一律拒绝，不受 managed 影响。列表对缺行把 `status` 写成 `not_verified`、`configured: false`（同文件第 77–78 行）。因此不能把「实际生效」可靠映射成下拉里的某一项，按首选做了：未登记不预选。
+- **改法：** 只改管理员后台。未登记行下拉第一项是禁用的「请选择」，初值为空；未选时「登记」禁用，旁边写「请先选择要登记的状态」。已登记行初值仍是已登记状态。签名行的开通确认、关闭必填说明原样保留，没有新加确认框。登记之后回不到未配置，仍等后端清除接口。
+- **验证：** `apps/admin` 下 `node scripts/verify-admin-print-scan-ui.mjs` 退出码 0。反向变异两处（未登记初值改回 `cap.status`；未选时按钮改为 `disabled={saving}`）退出码都是 1，已逐字节还原。`pnpm exec tsc --noEmit` 退出码 0。`pnpm exec eslint src/` 退出码 0（4 条既有 warning 在 `screenView.tsx`，与本次无关）。`node scripts/verify-console-plain-copy.mjs` 退出码 1，失败点是 `ai_quota.release_cap_exceeded` / `ai_quota.released` 没有中文名；把本次三个文件还原到基线后同样失败，不是这次改出来的。仓库根 `node scripts/verify-no-raw-error-render.mjs`、`node scripts/verify-mock-server-contract.mjs` 退出码都是 0。`verify:print-color-duplex-capability` 在本 worktree 缺生成的 Prisma client，先 `prisma generate`，再用临时库 `file:/tmp/cap-verify.db` 跑完后删除，退出码 0。`node scripts/generate-project-graph.mjs` 退出码 0（0 个文件变化）；`npx -y pnpm@11.2.2 graph:check` 退出码 0。浏览器：`node scripts/run-e2e.mjs tests/e2e/print-scan.spec.ts -g "未登记能力必须先选择状态才能登记"` 1 条通过，退出码 0；另在 1280×800 与 390×844 看过「请选择 / 登记禁用 / 提示在按钮旁边」。没有 push，没有提交。
+
+## 2026-10-04：管理员后台「会员权益」可赠送 AI 额度
+
+- 发放表单增加权益种类「AI 额度」。选中后必须选择一项服务（AI 简历、AI 顾问、模拟面试）并填写 1–9999 的整数次数。其它权益不出现这两项，提交时也不带服务字段。
+- 权益记录对 AI 额度显示「AI 额度 · 某服务」，以及服务端返回的总次数、剩余次数和有效期。服务端没有登记的服务显示「未登记的服务」。
+- 页面写明扣减顺序：先用每天的免费次数，用完再扣这里。依据是 `AiQuotaService.reserve`：先增加当日已用次数；当日额度没有扣成、且是会员时，再扣最早到期的有效赠送次数。
+- 服务端校验失败（缺服务、次数越界、非 AI 额度带了服务字段）按错误码给中文提示。mock 模式仍拒绝检索和发放，不假装成功。`scripts/mock-server-contract-bindings.json` 未覆盖该接口，绑定清单未改。
+- 审计中文名补上两条归还动作与对象类型「AI 额度预占记录」，文字与 #1236 逐字一致。发放仍用已有动作。
+- 页面不出现购买、充值、付费、价格，也不把英文键名显示给管理员。
+- 验证：会员权益 Playwright 6 条通过，其中一条覆盖发放表单联动、次数 0 / 10000 / 小数拦截，以及未定位会员时不假装发放成功。`test:admin-state-units` 8 条通过。类型检查、eslint 与文案、合规、原始错误、mock 契约门禁通过。三处反向变异均使对应用例失败，还原后文件与变异前一致。图谱 `--check` 通过。
+
+- 真实流程（本机克隆库，不是生产）：只把「按手机号搜会员」这一个请求换成指定会员（克隆库手机号加密存储，拿不到明文），发放与记录列表都走真实服务端——选「AI 额度 · AI 顾问 · 3 次」提交返回 201，权益记录显示「AI 额度 · AI 顾问」「总次数 3 · 剩余次数 3」；整页没有购买、充值、付费、价格字样与英文键名。管理员浏览器测试 124 条通过。
+## 2026-10-04：合规总表「摄像头」一行补「装了但不用」的做法（分支 `claude/compliance-camera-disabled-1004`，只改文档）
+
+- **起因：** 产品负责人 10/4 说试点机会装一个摄像头与麦克风一体的设备。麦克风给小青和语音模拟面试用，摄像头目前没有功能用到。一体机代码只采集音频，没有调用摄像头的地方。
+- **改了什么：** `docs/compliance/compliance-boundary.md` §1.2 A「摄像头」一行补上三层停用：镜头遮挡加封条、系统里只停用摄像头、Edge 策略 `VideoCaptureAllowed` 设为 false。机身告示写明有摄像头、目前不启用。以后要用摄像头，先改隐私政策、做单独同意。
+- **配套（私有页，不进仓库）：** 现场告示、试用协议附件第七条、验收单都已同步。装机要求已交 Windows 窗口，由它写进装机清单。
+- **同一分支追加两行：** 「U 盘安全」写明 Defender 实时防护在什么前提下算恶意文件拦截、开放 U 盘前怎么验；「无障碍与适老化」写明《无障碍环境建设法》第三十三条第二款原文、义务先落在运营机构、律师答复前按最低三项准备（全局大字、关键步骤语音播报、机身盲文标识）。
+- **同一分支再追加：** §1.2 F「个人信息角色」改成与入驻三件套一致的写法（会员、AI、打印扫描由我方独立处理，机构只对自己发布的政策和机构资料是处理者）。旧写法「机构终端上不登录的即用会话由机构作处理者」已被 10/3 的三件套取代，试用协议正文起草时发现总表没跟上。
+- **试点合规制度第 6 条第 3 点：** 原写「现场查看并清空 Windows 打印队列」，和培训材料「不改 Windows 设置、不退出全屏」打架；改为由公司远程清空，现场人员不进 Windows。
+- **验证：** `verify:compliance-copy` 通过，图谱 `--check` 通过。
+## 2026-10-04：Agent 按能力开关拦截 U 盘导入（走查 W-125，分支 `claude/usb-capability-gate-1004`）
+
+- **起因：** 能力中心把某台终端的 `usb_import` 配成非「可用」后，一体机首页 U 盘卡片会关掉，但列文件和代传仍走 Agent 的 `/local/usb/files`、`/local/usb/upload`，再代传到匿名 `/files/kiosk-upload`。二维码过期后改用 U 盘、简历来源页、直接打开 U 盘页这三条不看首页卡片，所以还能导入。
+- **改法（Agent）：** 新增 `apps/terminal-agent/src/usb/usb-capability.ts`。列文件和代传之前请求公开只读 `GET /terminals/:id/capabilities`（5 秒上限，不用带重试的 30 秒客户端）。公开接口直接返回 `{ terminalCode, capabilities }`，没有全局 `{ success, data }` 包装；两种形状都认。`configured === true` 且 `status === 'available'` 放行；配过但不是 available（含 `not_verified`、`maintenance`、`unsupported`、`testing` 和枚举外脏值）回 403 `LOCAL_USB_DISABLED`。2026-10-04 再核 `DEFAULT_DENY_CAPABILITY_KEYS`，`usb_import` 不在名单里（仍是 `color_print` / `duplex_print` / `signature_stamp`），所以没有这一行或 `configured === false` 放行。请求失败、超时、形状不对回 503 `LOCAL_USB_CAPABILITY_UNKNOWN`，失败结果不缓存；放行和明确拒绝最多缓存 15 秒。`/local/usb/status` 不拦。upload 在 `consumeUsbFileOutcome` 之前拦，被拦不消耗 safeId、不读文件、不转发。日志只记判定和状态值。
+- **改法（一体机）：** `userErrorMessage.ts` 给两个码各加一句固定文案，避免落到「请重试」。服务端没改。
+- **门禁：** `verify:usb-import-agent` 假后端默认 available，原有用例仍过；另覆盖 available 下列文件与代传、`not_verified` 时 files/upload 都是 403 且 safeId 没被消耗（改回 available 后同一 safeId 仍能代传）、未配置与缺行放行、能力接口 500 与坏形状回 503、status 不受影响、成功结果 15 秒内不重复请求、失败不缓存。`verify-kiosk-runtime-error-boundary.mjs` 断言两个新码的固定文案。Agent `tsc --noEmit` 通过；`package.json` 里 31 条 `verify*` 全部退出码 0（`verify:print-queue-residue-windows` 在非 win32 上跳过真机部分，退出码仍是 0）。一体机 `tsc`、`verify-backend-error-copy-coverage`、仓库 `verify-no-raw-error-render`、图谱 `--check` 通过，图谱无 diff。
+- **反向测试（提交后逐项改坏，再 `git checkout` 还原）：** 去掉 `/local/usb/files` 拦截，门禁退出码 1（列文件变成 200）；去掉 `/local/usb/upload` 拦截，退出码 1（代传变成 200）；能力接口失败改成放行，退出码 1（接口 500 时列文件变成 200，不再是 503）；把 upload 拦截挪到 `consumeUsbFileOutcome` 之后，退出码 1（同一 safeId 再传变成 410）；删掉一体机 `LOCAL_USB_DISABLED` 文案，退出码 1（落到「U 盘文件导入失败，请重试」）。还原后工作区干净。
+- **没有验证：** 真 Windows 与真后端没跑。随下一个安装包出。0.4.13 不含此改动。
+
+## 2026-10-03：青序流光 2.0 对齐 C 批——首页、登录、我的、AI 顾问（01、03、05、30）
+
+- 范围：只改一体机这 4 页的页面与样式，共 16 个文件；不改服务端，不新增页面、路由、数据模型。
+- 登录页（03）：加上「验证码由短信发到你的手机」一句身份说明和扫码登录的过期说明；登录按钮让到 y ≥ 500 靠各段间距，不再用空页头垫高；默认态一屏放得下、不出滚动。
+- 「我的」页（05）：待付款提示回到顺序排列，不被拉开。
+- 验证：默认组 388 过、`playwright.w5` 60 过；红的 3 条（`account-assets-journey:53`、`print-confirm-price-truth:453`、`fusion-w5:743`）在干净候选上本机同样红，属本机环境差异，CI 上是绿的。并排图 45 组。
+- 遗留（进 E 批）：登录页「不登录也能办」三个入口的箭头没贴右边。
+- 停放、隐藏、改名、降级：无。AI 顾问入口与数字人都在。
+## 2026-10-04：备用管理员 PG 并发互停门禁按性质断言（分支 `claude/backend-hardening-20261004-pg-last-admin-race`，只改门禁）
+
+- **问题：** `verify:internal-accounts:postgres` 的 P2-1 要求并发互停的输家必须拿 409 `INTERNAL_ACCOUNT_LAST_ADMIN`，但输家重试时若冲突重试用完或发现对方状态已变，拿到的是 409 `INTERNAL_ACCOUNT_STATE_CHANGED`——同样是事务回滚后的正确拒绝。#1236 的 postgres-readiness（run 37189123001）因此偶发红，合并潮里任何 PR 都可能撞上。
+- **改法：** 只成功一个；输家是这两种 409 之一，且 HTTP 状态是 409 不是 500（新增 P2-1b）；库里至少剩一个可用管理员。服务端代码没动。
+- **验证：** 本机临时 PostgreSQL 连跑 6 次全过（7/7）。反向变异：去掉「最后一个管理员」检查让两边都成功，P2-1、P2-1b、P2-2 三条红，改回后通过。
+## 2026-10-04：终端能力可清除回「未配置」；开场失败的空面试会话满 30 分钟再删（分支 `claude/backend-hardening-20261004-capability-clear`；Grok 实现、Claude 审）
+
+- **清除接口：** `DELETE /api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey`，只许管理员。能力键非法 400 `CAPABILITY_KEY_INVALID`，终端不存在 404 `TERMINAL_NOT_FOUND`；该行本来没有时 200、`cleared: false`、不写审计。删掉后回到未配置：managed 放行、strict 拒绝，`color_print` / `duplex_print` / `signature_stamp` 未登记即拒绝。审计动作 `terminal.capability.cleared`，payload 只有终端号、能力键、删前状态、备注是否存在；后台中文名「清除终端能力配置」。只删精确键，不连带删 `cloud_upload` 旧别名。后台页面上的「清除」按钮由两个后台窗口在能力中心现有页上接。
+- **空会话：** 开场失败仍把会话滚回 `configured` 并原样抛错（503 `AI_INTERVIEW_QUESTION_FAILED`），不立刻删——一体机与小程序失败后都会拿这个会话号打通用题目单（现有门禁第 15 条），但都不会再对它调 `/start`。本人面试记录本来就只收 `completed`；每小时的 `cleanupExpired` 另删超过 30 分钟、仍是 `configured`、且没有任何题目的会话。未满 30 分钟、已有题目、进行中、开场成功的会话都不删。
+- **验证：** 见 PR 描述。三处反向变异（去掉管理员角色、去掉审计、去掉空会话清理）对应断言都红过，已改回。
+- **已知未做：** 会员数据导出里的面试查询不按状态过滤，空会话在被清理前（最长约 1.5 小时）仍会出现在导出里。
+## 2026-10-04：模型账户不可用时给人话和手动出路；简历解析失败不扣次（分支 `claude/backend-hardening-20261004-ai-account-unavailable`；Grok 实现、Claude 审）
+
+- **问题：** 上游 401 / 402 / 403 与已停用的模型名，原先都落成 `AI_PROVIDER_REQUEST_ERROR` 或 HTTP 200 的「请稍后重试」，一体机进不了「AI 暂不可用」。小青裸字符串异常对外是 `Service Unavailable`。
+- **改了什么：** 新增 503 码 `AI_PROVIDER_ACCOUNT_UNAVAILABLE`（401/402/403）和 `AI_PROVIDER_MODEL_INVALID`（404，或 400 且响应体能看出模型名无效）。给用户的句子不带状态码。诊断 / 优化 / 生成的 200-failed 增加 `failCode`。简历解析在这类我们这边的失败上退回本次公共次数；文件本身无法识别不退。合同审查账户级失败改说「AI 服务暂时不可用」。一体机把两个新码放进能力级表，诊断、优化、生成、职业规划、自我探索走已有手动出路。小程序未改，只留契约。
+- **验证：** API 与一体机 typecheck、lint、`verify:llm-account-unavailable`、`verify:ai-down-fallbacks` 及图谱点名的相关门禁通过。六处反向变异对应断言变红后已改回。未做浏览器点击。未部署。
+- **协调方审核时改的退次口径（总指挥 10/4：失败不扣、成功只扣一次）：** Grok 原来只在账户 / 模型名 / 上游 5xx / 连不上时退次。走查在正式构建上模拟 402 实测：每失败一次会员、终端、IP 三项各加 1，连点约 4 分钟会员当天 20 次就用完，终端 120 次、IP 240 次同样会被烧掉，上游一次故障整台机甚至整个场地当天都用不了 AI。现改为：模型这一环的失败（带机器码：抛错、上游 4xx / 5xx、限流、超时、忙、空回复、未归类）一律退三项计数；只有内容审核拦下用户自己的内容、以及文件本身的问题（无法提取文本，没有机器码）照扣；意图路径抛错也退（只减计数，不删去重标记，同一意图不会再打一次模型）。门禁加了三项计数逐一核对、成功三项各只扣一次、同一意图重放不再扣、超时与普通 4xx 退、内容审核照扣；三处变异（内容审核也退、意图路径抛错不退、超时不退）都红。其它公共次数调用点（岗位推荐 / 解读 / 匹配）本来就在失败时回滚，没有同类问题。
+- **关联门禁：** 按图谱查出 74 条加类型检查共 77 条，76 条通过；`verify:resume-export-formats` 的 6g 在本机长期复用的测试库上红，换全新库与文件目录复跑通过（本机残留，与本次无关）。
+
+## 2026-10-04：第二次发布清单补上「三个开关各自要同批改的文字」（分支 `claude/release2-switch-texts-1004`，只改文档）
+
+- **改了什么：** `docs/progress/next-tasks.md` 第二次发布「发布前」第 2 条。原来只写了登录那一句，而且写成「协议现在写的是先登录」，与线上不符（线上是「以页面提示为准」）。现在三个开关各列一行：怎么切、打开后的实际行为、哪几句文字要同批改。
+- **新查到的一处出入：** 年龄声明开关打开后，一体机对选「未满 14 周岁」的人不提供 AI；线上用户服务协议、隐私政策第六章和现场告示写的还是「在监护人同意并陪同下使用」。要同批改，否则文字和页面行为对不上。
+- **新查到的一个后果：** 政策范围开关打开后，没绑机构的终端政策页是空态。
+- **验证：** 图谱 `--check` 通过。
+## 2026-10-04：小程序补齐 K18 走查登记的五处（分支 `claude/miniapp-k18-copy-fixes`）
+
+10/3 走查在候选上复走 #1189、#1201，登记 MP-K18-1/2/3/4/6，都不挡发布、10/31 提审前补齐。只改文字与接线，不改颜色和样式。
+- **免费时仍提钱（1、2）**：材料包组包、选服务点两页还没有报价、不知道金额，改用不提钱的说明；材料包到机码页按订单金额分流；订单详情 0 元时行标签写「本次打印」；订单列表材料包空态同改。全页面扫描另抓到简历诊断、简历优化的导出条写「正在确认导出价格」「为避免误扣权益」「当前免费，不扣权益」，一并改成「正在确认能否导出」「当前免费」；服务端说导出要收费时的说法原样保留。
+- **门禁盲区**：`free-pilot-copy.test.mjs` 原先是手写页面名单加逐页登记含钱字段，所以漏页。现在扫 `app.json` 里全部注册页面的 WXML 与页面目录下全部 JS；含钱字段名改为全局登记，并加一条「含钱常量只许放进登记过的字段名」；字眼表加「权益」。「免费」「免费试运营」按 9/30 口径不算钱字眼。
+- **断网英文（3）**：`utils/request.js` 的请求与上传在 `fail` 里统一成一句中文（`NETWORK_ERROR` 那句），微信的英文 `errMsg` 只留在 `err.wxErrMsg`。同类一并修：隐私页导出的下载 / 写入 / 转发 / 另存 / 删除 / 读取、复制、取件图生成、打印预览打开原文、微信登录。加一条门禁：`pages`、`utils` 下不许再写把英文 `errMsg` 排在中文兜底前面的写法。
+- **英文状态值（4）**：订单详情认 `pending_release`（显示「待到机」）与 `awaiting_payment`；材料包到机码页的状态行改用 `pkg.statusDetail`（中文标签，0 元不出付款一段），模板不再直接显示服务端状态值；`pending_release` 的标签改为「到机核销后开始打印」。
+- **额度提示（6）**：模拟面试（入口、答题、报告）与小青没有「先用模板手动填写」这条退路，额度两码改说「今天的 AI 次数用完了，明天恢复。」「AI 暂时用不了，请稍后再试。」（`utils/user-error.js` 的 `plainAiMessageOf`）；其它页面仍用带模板提示的那句。
+- 验证：`verify:static` 全链 0 失败；49 处改动逐处反向变异，未变异时绿，49 处全部转红（中途存活的 2 处已补页面实跑用例）。
+
+## 2026-10-03：青序流光 2.0 对齐 D 批——简历线 5 页（21、22、23、24、25）
+
+- 范围：只改一体机简历线页面、样式、用例与两条静态门禁；服务端只改一句价目标签。不新增页面、路由、数据模型。
+- 口径：价目为 0 时导出处只写「免费试运营」，不再出现「不扣权益」。服务端 `resume-export-gate.service.ts`、`ai.service.ts` 兜底、一体机模拟适配器、共享类型注释同步；价目大于 0 的分支原样保留。后台价目页与小程序的同一句未动，归各自窗口。
+- 材料工坊（25）：内部文件编号不上屏；失败提示保留 `role="alert"`；重试按钮在正文状态卡。
+- 验证：`playwright.w3` 73 条全过；`verify-resume-diagnosis-flow-ui`、`verify-resume-report-qx`、`verify-compliance-copy`、`verify-resume-export-formats`（本机隔离库，ALL PASS）通过；并排图 32 组。
+- 遗留（进 E 批）：22 诊断报告页内容列表可视高度偏矮、底部两个按钮没撑满，基线就是这样，本批未动；21、25 的并排截图缺造状态夹具（60 个状态没配上对）。
+- 停放、隐藏、改名、降级：无。AI 诊断、优化、生成入口都在。
+## 2026-10-04：有隐私命中的文件点「确认并打印」约半数被拒（W-118，服务端这半）（分支 `claude/backend-hardening-20261004-pii-scan-gate-idempotent`）
+
+- **问题（走查 10/4 报）：** 进材料检查页时同一份文件被建了两条隐私检查（相隔 0–23 毫秒），用户的裁决只写进其中一条；建单闸门只认创建时间最晚的那条，取到没裁决的那条就以 `PRINT_PII_SCAN_REQUIRED` 拒绝，原地重试救不回来。**一小时后查明「成对请求」是走查栈前端被构建成 React 开发版（StrictMode 双挂载）造成的，线上是正式构建，「约半数打不了」在线上不成立。** 但闸门只看最晚一条仍是真缺陷：重试、返回再进、网络重放都可能造出第二条检查，所以服务端照修。
+- **修法：**
+  1. 闸门认「孪生检查」：同一文件对象上，内容哈希相同、覆盖程度相同、命中完全一样、创建时间相差 3 秒内的两条完成检查算同一次检查的两份，裁决过（开关打开时还要本人确认过）任意一条即放行。**没有照「认任何一条较早已裁决的检查」做**：现有门禁明确要求隔一段时间的重扫以最新为准、旧结论不继承（重扫可能查出更多内容），这条保持。
+  2. 建任务短时去重：同一文件、同一请求方、同样参数的隐私检查 10 秒内重复提交，第二次直接拿到第一次那条**还没被动过**的任务（含匿名任务的访问口令，明文只在进程内存留 10 秒）；已经裁决或确认过的不复用，之后再提交就是一次新的检查。多实例部署下跨实例不去重，由第 1 条兜底。
+  3. 被这道闸拒绝的四种响应都带 `nextAction: 'return_to_material_check'`，页面可凭它把用户带回材料检查页。页面那半（为什么请求发两遍、提示怎么写）归主窗口。
+- **门禁：** `verify:pii-manual-confirm` 从 20 条增到 42 条：孪生只裁决较早一条放行、只裁决较晚一条放行、两条都没裁决拒绝、换了文件对象拒绝且旧文件的裁决不继承、一分钟前裁决过刚才重扫没裁决拒绝、挨着的两条命中不同 / 覆盖程度不同 / 内容哈希不同都不算孪生、内容变了报过期、本人确认开关打开时同样按孪生算；建任务并发两次只建一条且拿到同一口令、窗口外是新检查、失败不留、已动过的不复用、不同请求方不串。原有一条「同一原件重扫旧确认不继承」的夹具把重扫间隔从 1 秒改成 60 秒（落在孪生时间窗之外），断言不变。反向变异 12 处全部在对应断言处变红，其中 2 处第一次没红，补了断言后变红。
+- **审查中自己撞到的一处：** 去重最初连已裁决的任务也复用，`verify:materials-processing` 与 `verify:pii-redaction` 红（重扫后应是待裁决、不能直接遮挡）；改成只复用没动过的。
+- **CI 首轮拦下的一处：** `verify:document-conversion` 手写的假数据库只有 `findFirst`，闸门改用 `findMany` 后崩溃；给假表补了按文件、种类、状态真实过滤的 `findMany`（本用例本就没有检查任务），原有断言照常通过。
+- **关联门禁** 25 条通过。没有新增表、接口或依赖；小程序、一体机页面没动。
+## 2026-10-04：两个后台第 7 批——告警副标题与宣传屏上传说明
+
+- 告警中心副标题：服务端正文已经含有该终端编号时，不再在前面重复拼；正文没有该编号时，仍把编号拼在前面。服务端原文不改写。标题仍最多两行。
+- 宣传屏「上传素材」旁写明限额，与服务端默认值一致（`services/api/src/content/media-validation.ts`）：图片 JPG、PNG、WebP，不超过 10 MB；视频 MP4、WebM，不超过 100 MB，时长 120 秒以内。类型或大小不合规时就地说明怎么改，不发上传请求；服务端仍做最终校验。这几个限额可用环境变量覆盖，页面写的是默认值（与 `.env.example` 一致）。
+- 素材页两处、终端配置一处的时长框下写清上下限与默认值：图片停留 3–1800 秒、留空默认 8 秒；上传视频停留 3–120 秒、留空默认 15 秒；外链停留 3–1800 秒、留空默认 15 秒；一体机无人操作多久后播放宣传屏 30–1800 秒、留空默认 180 秒。超出范围就地提示，不提交；终端配置不再把超范围的值悄悄夹到边界。
+- 外部视频链接的说明改成白话。HTTPS、iframe、直链只留在悬停「技术说明」。第 5 批「上传前请先看」原文和位置未改。
+- 新增 `apps/admin/src/routes/alerts/alertDetailText.ts`、`apps/admin/src/routes/screensaver/assetUploadRules.ts`、`apps/admin/scripts/verify-console-batch7-copy.mjs`。无删除。
+- 验证：`verify-console-plain-copy`（含新门禁，限额数字直接从服务端源码解析比对）、`verify-service-desk-dashboard-ui`、`verify-feedback-sla`、`verify-console-screen-ui`、`test:admin-state-units`、`verify:compliance-copy`、`verify-mock-server-contract`、admin 类型检查与 eslint 通过；管理员浏览器测试常规 124 条、大屏 160 条通过。反向变异（正文含终端号仍重复拼、放行 .txt、限额数字与服务端不一致、外链说明出现 HTTPS、默认值写错、类型提示改字）都会红。用户可见文字经 agy 挑过一轮后改写。
+
+## 2026-10-04：两个后台第 6 批——小样本反推修补与审计文案
+
+- 出纸投影统一调用 `suppressAggregateCount`。出纸成功、未出纸、未确认、已结束任一存在小样本时，不给成功率，仅可保留非小样本的已结束数；逐台与原始数合计使用同一规则。终端服务人次、打印扫描次数、出纸成功、已结束、未确认逐列按机构合计已公开保护，必要时补充隐藏最小可见正值（同值取最早），保留零值；合计独立投影，不因逐台隐藏而整列清空。未出纸差值也受列残差保护，可能与公开合计及其它行联立的出纸字段整组补充隐藏。页面、详情与 CSV 明写“样本不足，不显示”。
+- 两后台终端孪生的近 24 小时状态带对所有 audience 只表达心跳可用性，不返回 printing 段、逐单边界或 `timelinePrintingSuppressed`；时间戳统一至分钟，图例仅在线空闲／告警／离线／未上报，固定说明“打印时段不在状态带上单独标出，今日打印单数见上方。”当前打印状态与今日单数 0／少于 5／原样规则保留，管理员逐单运维照常。
+- 用量 7d／30d、独立来源入口 30 天榜、机构统计及终端数据 week／month／quarter 截至昨天的完整上海自然日，终点为今天零点且排除终点；相邻对比周期不重叠，多日趋势不含今天。当前在线状态仍用当前心跳，故障时长与恢复状态标明截至昨天。两后台窗口两端均为上海日期，机构统计、CSV 窗口与文件名同步说明；HTTP 的机构 7d 标题隔离用例种子在昨天。
+- 审计源码动作全集 293 项，补齐 217 个中文名，新增未配名动作会使门禁失败。审计已登记字段显示中文，未登记字段显示“未登记字段 · 原键名”，原键名用小号灰色等宽字，值继续递归脱敏；两个未登记键可区分。终端编号优先、只有内部 ID 时显示尾号并悬停保留原值。AI 提供方名称可读，AI 金额统一四位小数；订单人民币金额沿用 `formatYuan` 两位且无空格。企业筛选同排可换行、中文标点及终端页旧注释已修正。
+- 热力图每一天、脉冲每条序列与终端列共用残差纯函数：热力／脉冲已发生格的 0 与 1–4 均为 null、不写数字，未来格不参与残差；假设零值已知，仅真实 1–4 格进入低频域，通过动态规划判定是否唯一，不安全时逐格补充隐藏最小可见正值，补充隐藏无上界。高峰仅取最终可见格；固定两小时脉冲具有全天窗口之外的未知部分。脉冲实时数字 null 写“不足 5”，取数失败沿用失败态，说明并入既有副标题，不改字号或块位高度。
+- 验证：API 门禁 `verify-console-screen-usage` 116 项、`-snapshot` 144 项、`-printed-visits` 65 项、`verify-partner-stats-contract` 86 项（含 HTTP 段）全部通过；残差穷举 18720 组输入、终端列多台穷举 4672 组、出纸组 729 组全量，攻击者知道 / 不知道哪些格是 0 两种知识都覆盖。反向变异（比率泄露、逐段公开打印、窗口含今天、隐藏态画色块、去掉补充隐藏、残差按输出空格计数、脉冲 null 写「—」、审计未登记键不写原键名）全部会红。
+- 浏览器测试：管理员常规 123、管理员大屏 160、机构常规 72、机构大屏 144 条全部通过；六包类型检查、eslint、图谱检查通过。未做真机与生产验证。
+- 留给总指挥定的口径：滚动的「近 7 天 / 近 30 天」逐日相减仍可能得出某一天（8 天前为 0 时）；根治需改成固定的上一个完整自然周 / 月。改绑首日与多日窗口之差同属此类。本批未改。
+## 2026-10-04：试点分体配置的装机、锁机与首装验收步骤（只改文档，分支 `claude/split-config-install-1004`）
+
+- **背景：** 10/3 产品负责人定试点先用分体配置（27 寸触摸屏竖装在立架上、迷你主机挂屏后、奔图在带锁的打印机台上），机柜到货前用；10/4 已按商业化落地窗口的采购清单下单，到货型号未登记。
+- **装机清单新增 G 段：** 到货登记；BIOS（来电自动开机、只从内置硬盘启动、BIOS 密码）；竖屏与触摸校准；扫码器加进 A11c 的允许名单（怎么查 `HID\VID&PID`、在组策略里怎么加、换口和新键盘怎么验，不能用通用键盘 ID）；摄像头只用麦克风（核对前端没有视频采集，镜头物理遮挡，Edge 整机策略 `VideoCaptureAllowed=0`）；专业版 25H2 的分配访问；Agent 0.4.13 安装（#1206 下次出包带上）；四个待定项（U 盘口位置、喇叭、打印机 USB 线长、线缆与接口防护）。F 段开头补一句现状。
+- **现场验收单新增 S 段：** 分体首装七项（装机与锁机、打印、扫描、到机码、扫码、语音、锁机复验），引用已有 A、C、E、F、H 段和 D 段 T6–T8，到货后先在远程接得到的地方装一次。
+- **按合规窗口 10/4 的装机要求补（同一 PR）：** 摄像头改为三层停用（遮挡片加防撕封条、设备管理器只停摄像头那一个设备、Edge `VideoCaptureAllowed=0` 且不写 `VideoCaptureAllowedUrls`），机身贴原文，验收四项，以后启用摄像头须先走单独同意；扫码器关闭图像上传类功能；验收单 S 段加 S.6b。
+- **U 盘防护（同一 PR，合规窗口 10/4）：** 装机清单加 G9：Defender 四项锁定（实时防护与防篡改、病毒库 7 天内、可移动磁盘拒绝执行、关闭自动播放）及只读核对命令；试点 U 盘口先锁（能力中心「U盘导入」配「未验收」）；开放前做 EICAR 验收（被拦、页面提示「换一个文件」、Defender 有记录），页面提示要等带 #1229 的安装包。验收单加 S.8。
+- **没有验证：** 全部步骤都没有在真机上走过；菜单名、组策略名按 Windows 11 专业版与戴尔主机常见写法，以实机为准。没有改代码或门禁。
+## 2026-10-04：U 盘文件读不了时提示「换一个文件」，不再诱导反复重试（分支 `claude/usb-unreadable-file-1004`）
+
+- **起因：** 合规窗口定 U 盘「拦恶意文件」靠 Windows Defender 实时防护：Agent 读 U 盘文件的那一下被扫，可疑文件会让读取抛错或被隔离删除。原来这时 Agent 一律回 410 `LOCAL_USB_FILE_EXPIRED`，一体机不认这个码，落到兜底「U 盘文件导入失败，请重试」，用户照做只会一直失败。
+- **改法（Agent）：** `usb-files.ts` 新增 `consumeUsbFileOutcome`，把失败分成 expired（一次性编号用过或超时，重新读取列表能再选）和 unreadable（列出后读不了：被拦、被隔离删除、被替换）。本地接口对 unreadable 回 422 `LOCAL_USB_FILE_UNREADABLE`「这个文件读不了，请换一个文件」，不转发给后端；expired 照旧 410。读失败的日志只记错误码，不再记 Node 的错误原文（原文带完整路径，即用户的原始文件名，违反 AGT-07）。原 `consumeUsbFile` 保留为兼容包装。
+- **改法（一体机）：** `userErrorMessage.ts` 给两个码加固定说法：读不了是「这个文件读不了，请换一个文件」，列表过期是「文件列表已过期，请重新读取 U 盘后再选」，都不说「请重试」。
+- **门禁：** `verify:usb-import-agent` 加三条：注入「读的那一下抛错」必须是 unreadable 且日志不含文件名；列出后删除的文件是 unreadable、同编号再用是 expired；HTTP 层 422 与原文、不转发后端。`verify-kiosk-runtime-error-boundary.mjs` 加两个码的显示断言。反向测试四次都红：读失败改回 expired、日志带回原文、接口把 unreadable 当 410、删掉一体机新文案。
+- **没有验证：** 真 Windows Defender 与 EICAR 测试文件没跑过（试点 U 盘口先锁着，开放前按装机清单 G 段做 EICAR 验收）。0.4.13 不含此改动，下次出包带上。
+
+## 2026-10-04：管理员后台接上会员账号注销的管理员执行（用户管理页内，不新建页）
+
+- **入口**：管理员后台「用户管理」。列表在状态旁标「申请注销」（悬停看申请时间与来源），新增「注销」筛选（待执行的本人申请 / 已按线下凭据执行 / 已注销）；详情抽屉显示申请信息，admin 角色可见「注销账号」。
+- **执行**：页内两步对话框（不用浏览器自带确认框）。先填办理来源（按本人申请 / 凭线下申请）、事由（1–200 字）、手机尾号四位、线下凭据编号（线下必填）；再看「注销后会发生什么」四段清单（合规窗口 10/4 定稿，逐字），勾选「已确认是这位用户（线下办理已在凭据上核对本人），知道注销后不能恢复」后才能提交。手机尾号只用来确认是这位用户、防止点错，不作身份核验（合规窗口 10/4 定：本人申请靠申请时的二次短信验证，线下办理靠凭据并由管理员核对本人）。接口 `POST /admin/users/:endUserId/closure`（后端 #1221）。
+- **拒绝与失败**：尾号不符不回显正确尾号；没有待处理申请时引导改选线下；有未完成订单时列出订单号与中文状态；执行中、上下文不一致、执行失败（账号停在注销中，保留已填内容原样重试）各有中文提示。已注销账号手机号显示 `***`，不再提供停用、恢复、注销操作。
+- **共用文案**：`packages/shared/src/types/memberPrivacy.ts` 只改了管理员后台专用的两句（驳回只记录处理结论；注销在用户管理页执行）；一体机引用的四个常量逐字节未变，小程序不引用该文件。
+- **演示模式**：用户列表为空，注销请求明确拒绝并提示「演示模式不执行账号注销」。
+- **验证**：门禁 `verify-admin-users-ui`（含新的 `verify-user-closure-ui`：真实校验函数、适配器、对话框事件、清单逐字）、文案 / 合规 / 时间 / 原始错误 / mock 契约门禁、管理员状态单测、admin / shared / kiosk 类型检查通过；四处反向变异（去掉勾选禁用、回显尾号、线下不要求凭据、已注销仍显示注销按钮）都会红。浏览器测试新增 8 条（HTTP 构建 + 请求拦截，不访问真实用户），由新增的 CI 步骤 `playwright.users.config.ts` 执行。未做生产验证。
+- **新增文件**：`apps/admin/src/routes/users/UserClosureDialog.tsx`、`userClosurePresentation.ts`、`apps/admin/scripts/verify-user-closure-ui.mjs`、`apps/admin/tests/e2e/users.closure.spec.ts`、`apps/admin/playwright.users.config.ts`；无删除。
+
+## 2026-10-04：会员账号注销后端（本人申请 + 管理员执行）（分支 `claude/backend-hardening-20261003-member-closure`；**各端入口还没接，用户暂时看不到变化**）
+
+- **做了什么（Codex 实现、协调方审）：** 本人在 `POST /me/data-requests` 提交注销申请（要二次短信验证，登记为待处理，不自动执行，可撤回）；管理员在 `POST /admin/users/:endUserId/closure` 执行，必须填事由、核对手机尾号，凭本人申请或线下凭据编号。执行器分步、可重入：停用并撤销登录态 → 硬删个人数据与文件 → 保留的记录去标识 → 手机号换成纯随机值、账号标为已匿名 → 写审计。有已付款未取件、退款中、打印中的订单时拒绝并列出订单号。同一手机号之后登录是全新账号，读不到任何旧数据。
+- **删除与保留：** 删除——上传与生成的文件、AI 结果、模拟面试、顾问会话、岗位 AI 会话、合同审查、材料处理、扫描任务、浏览与跳转记录、收藏、自填求职进度、通知；未用完的权益作废。保留但去标识——订单、打印任务、提交流水、支付与退款、权益与核销流水、意见反馈处理记录、同意记录、数据请求流水、AI 调用日志与费用账。保留年限做成配置项、默认不自动清理，等律师定。
+- **数据库防线：** 迁移里加了一组触发器，账号进入注销后拒绝再往它名下写个人数据、拒绝改回身份字段（防登录态失效前已经在跑的请求或后台任务在删除之后补写一行）。PostgreSQL 上会员相关表每次写入多一次按主键查账号状态。
+- **协调方审出并修的五处：** ① 放弃过的订单（未付款已关闭、过期未取、材料包明细停在待处理）会让注销永远被挡——材料包过期时只改订单不改明细；现在只有已付款且取件未过期的订单才看明细。② 保留记录把终端号、机构号也清空了，按终端、按机构的营收与 AI 成本统计会丢行；这两样是我们自己的设备与客户标识，改为保留（待合规窗口确认）。③ 未结的意见反馈随注销关闭，否则管理员回复时要给已注销账号写通知，会被上面的触发器拒绝、回复接口报错。④ 门禁的 HTTP 段 Codex 的沙箱跑不了、从没执行过，藏着两处脚手架问题（守卫依赖没给、收尾时把共用的 Redis 连接关了），已修并真跑通。⑤ 注销门禁原先挂在另一条门禁的命令后面，改为在 CI 两份清单里明写。
+- **验证：** `verify:member-closure` 17 组加 HTTP 段：SQLite + 真 Redis 通过；本机临时 PostgreSQL 16（含触发器）+ 真 Redis + HTTP 通过，迁移后无漂移。全库 988 个字符串列反查原手机号、哈希、密文、微信标识、昵称零命中（历史审计里既有的脱敏手机号字段是显式豁免，待合规窗口裁定）。协调方反向变异 11 处全部在对应断言处变红；Codex 另报 11 处。关联门禁 43 条通过；两条旧门禁里钉着「注销暂未开放」的锚点已改成新口径。
+- **PG 作业首轮拦下的三处（10/4 补）：** ① 触发器把一条受控的拒绝变成了 500——扫码登录「确认后账号进入注销、再领取」会先写同意记录，被触发器拒绝后数据库错误原样抛出（SQLite 主作业用 `db push` 建库、没有触发器，所以只在 PG 上红）。现在三层：领取前先确认账号仍可登录、写同意记录处把这类拒绝转成 403、全局错误处理对任何写入口撞上触发器都答 403「账号当前不可用」。本机 PG 上逐层去掉验证：只去事前检查或再去同意记录处仍是 403，三层全去才 500；另加「注销中的账号领取不写同意记录」断言，SQLite 上去掉事前检查即红。② 「禁止把注销中 / 已注销的账号改回正常」那一个触发器撤掉了：没有任何业务代码会这么改（管理员恢复只对「已停用」生效），留着只挡住了人工纠错和两条旧门禁的夹具；拒绝迟到写入、拒绝改回身份字段的触发器保留。③ 求职进度表的「只许自身模块触及」门禁把注销执行器登记进白名单（只删本人行）；注销门禁加了走查登记的 H2-3：托管关闭期间被列表隐藏的「关联系统岗位」的求职进度，注销时同样删除。本机临时 PostgreSQL 上这三条旧门禁与注销门禁复跑通过。
+- **并基线与 AI 额度账本（10/4 补）：** 与候选 781025155 在两份 schema 上真冲突（两边都在同一位置加了模型），两边都保留，模型总数钉子改为 111，两份 schema 都通过校验、PG 同步校验通过。注销执行器把 AI 按人次数账本纳入删除：每日计数按 `member:<会员号>` **等值**删（不用前缀，否则会误删以本人号开头的另一个会员），预占记录按原始会员号等值删，含还在预占中的（登录态已撤，在途请求结算时如实失败；账本无身份信息、后台汇总只读每日计数，不必匿名化保留）。注销门禁补了这两张表的断言与前缀阳性对照，「带会员号的模型必须显式写明处置」的清单加了这两张；三处变异（每日计数改前缀删、预占改前缀删、不删预占）都红。后台审计中文名补了注销四个动作。本机 SQLite 与临时 PostgreSQL 上注销、额度、模型数、登录相关门禁都通过。
+- **还没做、要别的窗口接的：** 小程序申请入口（小程序窗口，10/31 提审前）；管理员后台执行入口加在现有用户页（两后台窗口）；一体机与共用文案里几处「账号注销暂未开放」要在入口接上时一并改（后端 PR 没动用户可见文案）。后端合入后 `accountClosureAvailable` 恒为真，小程序现有入口会直接可点但不带二次验证、会收到 401，所以小程序改动要和后端同一次发布。
+- **要知道的：** 服务进程内存里的助手对话缓存与 AI 预算缓存不随注销立刻清（最长 30 分钟自然淘汰）；短信发送的应用日志与短信供应商侧的留存不在本包范围；AI 额度账本的两张新表（另一 PR）合入后注销清单要补上，注销门禁会自动报出漏掉的表。
+## 2026-10-04：简历经历标题过长时 PDF 叠字（R-1 / R-2，跟第六次更新）（分支 `claude/backend-hardening-20261004-resume-long-heading`，叠在 #1220 之上）
+
+- **问题（走查 k19 样本 6）：** 首行是「2019 年 3 月到 2024 年 12 月」后接一句 97 字的话，补回时整句被当成公司标题；PDF 里标题折成三行、右侧时间段两行，描述直接压在标题第三行上，一体机导出后预览（就是这份 PDF 的渲染）同样看不清。第五次更新的走查结论是这条不挡发布。
+- **修法：** ① 补回时单位名、项目名称、职务都要像标题——不带句读、单位与项目不超过 40 字、职务不超过 20 字；不像的整句进描述、标题留空，时间段照旧单独放。② PDF 的条目标题与右侧时间段各自折行后，描述从两边较低的一边往下画（以前只按右栏推进；6 月起的老问题，公司加职务超过约 27 字就会触发，用户在页面上自己改长也会）。一体机的可编辑预览是普通网页排版，不会叠字；导出后的预览和缩略图都是这份 PDF 的渲染，跟着修好。
+- **门禁：** `verify:resume-optimize` 加 W-OPT-EXPORT (11)：样本 6 整句进描述；像句子的项目首行不当项目名称；超长单位、超长职务、两者都长三种，在单栏与双栏下渲染真实 PDF，按文字坐标判断互不重叠（横向有交叠且纵向基线差小于字高八成即判重叠）。反向变异 5 处全红：只按右栏推进、只按左栏推进、单位不做标题判断、职务不做句读判断、项目名不做标题判断（最后一处第一次没红——那条长项目行被出口收口挪走了——补了一条短句样本后变红）。关联门禁 14 条通过。
+- 「联系方式之后的附言被当成工作经历」只在假大模型下出现，按总指挥安排上线后跑真模型探针时再看，本条不动。
+## 2026-10-04：走查登记 H2-1 / H2-2 收尾（分支 `claude/backend-hardening-20261004-h2-fixes`，跟第六次更新）
+
+- **H2-2：** 机构 Excel 导入的中文文件名在管理员导入记录里乱码——解析与预览两个接口没像文件上传那样调用 `restoreMultipartUtf8Filename`。已补；`verify:partner-excel-import` 加一条控制器级断言（传入按 latin1 解码的中文文件名，交给服务层的必须是还原后的 UTF-8），去掉还原即红。只影响托管打开或客户私有化部署。
+- **H2-1：** 托管关闭后，关闭前 10 分钟内签给管理员的招聘会资料预览链接仍能打开到过期。评估为可接受（链接只发给管理员本人、有效期 10 分钟，管理员查看是托管关闭后保留的能力），在 `admin-fairs.controller.ts` 放行处写明是有意的，代码行为不变。
+## 2026-10-04：终端离线告警的时长改成「天 + 小时」（分支 `claude/backend-hardening-20261004-alert-elapsed`，跟第六次更新）
+
+- **问题：** 后台告警中心对离线几天的终端写「最近一次心跳在 5211 分钟前」，值班人员要自己换算。
+- **改法：** 新增 `formatElapsedAgo`：不满 1 小时写分钟，不满 1 天写「H 小时 M 分钟前」，1 天以上写「D 天 H 小时前」（5211 分钟 → 3 天 14 小时前）。只改给人看的说明文字，告警的发生时刻、去重键不变。
+- **门禁：** `verify:beijing-display-time` 加 8 条边界（40 分钟、59 分 59 秒、整 1 小时、2 小时 5 分钟、整 1 天、5211 分钟、30 天 1 小时、负数归零）；`verify:admin-ops` 加一条调用处断言（离线多天必须写成天，不许出现三位数以上的分钟）。两处反向变异都变红。
+## 2026-10-04：备份两处缺口（分支 `claude/backend-hardening-20261004-backup-retention`，跟第六次更新）
+
+- **异地副本只传不删：** `backup-postgres.sh` 开了异地上传后，异地会无限期留着备份（包括其中已经删掉的个人数据）。现在上传成功后按同一个 `RETENTION_DAYS` 清理异地过期副本，只清本脚本写的 `postgres_*.dump`；清理失败不算备份失败，但发告警。`RETENTION_DAYS` 写错（0、负数、非数字）直接拒绝执行。`verify:backup-ops` 加了上传后清理、天数跟随配置、清理失败告警、不上传不碰 rclone、天数校验五组；去掉清理、去掉校验两处反向变异都变红。
+- **等待期写进运维文档：** `docs/device/postgres-operations.md` §8.1 列出四类备份与日志删除后最长还留多久：每日备份 30 天、异地副本 30 天（另加对象存储版本控制的保留期）、发布前备份没有时间上限（删除后要再成功发布 3 次才轮换掉）、应用日志 180 天。对外说「已清干净」要按这个口径。
+- **要知道的：** 发布前备份按组数而不是天数保留，这一点没改（改它会影响回退锚点）；如果要给它加时间上限，需要单独拍板。
+
 ## 2026-10-03：第五次更新暂停
 
 - 10/3 20:08 暂停：走查在候选 `bb49ea064` 上发现简历优化页「导出 PDF」必然 400（#1195 的补回会写出空职务，导出校验不许空）。线上是第四次的版本，没有这段代码，不受影响。
@@ -35,6 +506,15 @@
 - **门禁：** `verify:resume-optimize` 新增 W-OPT-EXPORT 11 组——每个样本都走真实的优化编排（只替换模型传输）→ JSON 往返 → 与 `main.ts` 同配置的校验管道 → 三个接收端都要过 → 真实 PDF 渲染 → 从 PDF 读回文字核对。覆盖：补回路径、提示词第 9 条路径、首行超 100 字、技能一行超 200 字、经历 25 条、只有学校没有专业、四条缺陷的走查样本、任意超限输入的收口、Word 与文本导出。反向变异 12 处全部在对应断言处变红（含「把职务改回不许空」）；其中 1 处第一次没红，查明是另一条兜底规则遮住了，补了一条断言后变红。关联门禁 21 条通过（`verify:resume-export-formats` 的 6g 是本机长期复用的测试库残留，与本次无关，以 CI 为准）。
 - **证据：** 用走查的四份真实样本文件做了进程内全链路（真实文字提取 → 真实优化编排 → 真实校验 → 真实 PDF），四份都导出成功，PDF 与读回文字留在 `~/.cache/claude-lanes/bh-0930/opt-export-evidence/`。**整栈 HTTP 流程（上传 → 诊断 → 优化 → 导出）由走查窗口在它的栈上复走，本条不冒充。**
 - **改动面：** 只动简历优化与导出；AI 生成简历的录入校验没有放宽；小程序没动；一体机只改了优化稿预览里的一行标题拼接。
+## 2026-10-03：AI 按人次数额度 Q1——账本底座（分支 `claude/backend-hardening-20261003-ai-quota-q1`；**还没接任何 AI 入口，用户看不到变化**）
+
+- **做了什么（Codex 实现、协调方审）：** 按 `docs/product/ai-quota-per-user-design.md` 落了账本：两张新表 `AiQuotaDaily`（每人每用途每天用了几次）与 `AiQuotaReservation`（一次 AI 操作的预占，状态 reserved / committed / released）；`BenefitGrant` 加 `serviceKey`，权益种类加 `ai_quota`（机构发放的额外次数，管理员发放时必须指定用途、1–9999 的整数）。服务 `AiQuotaService`：预占（先扣每天免费次数，用完再扣机构次数，最早到期的先用）、提交（必须带已保存结果的编号）、归还（模型出错、内容被拒、服务端超时、超 15 分钟未结算）、每分钟清扫、查询剩余。默认每天：简历类 20、助手类 80、面试 5；游客默认 0（先登录）。
+- **防滥用：** 同一操作号重放不重复扣；操作号绑定账号，别人拿去用被拒；每人每天自动归还最多 5 次（跨用途合计），超过的照扣并写审计；过期或被撤销的机构次数不加回；`ai_quota` 不能走旧的通用核销（不能拿 AI 次数抵打印）。
+- **协调方补的三处：** ① 共享类型加了新权益种类后，一体机三张权益标签表缺一项、类型检查红，各补一行「AI 次数」（沿用现有图标与色调，没改样式）；② 清扫循环原先没有上限也不说明是否清完，改为每轮最多 5000 条并返回 `truncated`（列表截断诚实门禁要求）；③ 模型总数的钉子 108 → 110。
+- **验证：** 新门禁 `verify:ai-quota` 16 组，SQLite 通过；本机临时 PostgreSQL 16 上迁移后无漂移，`verify:ai-quota:postgres` 连跑 6 次全过（含十并发只成功剩余次数那么多）。两条已登记进 CI 两个作业的清单。协调方反向变异 11 处（去掉上限条件、归还不封顶、不校验归属、按 UTC 日切、过期次数也加回、已提交无条件重放、信任调用方传的终端号、用完不走机构次数、清扫阈值改 1 分钟、机构次数只按创建时间、无期限排最前）全部在对应断言处变红；另有 1 处变异没红，查明是变异本身与夹具等价（不是门禁漏），已换成后两处。关联门禁 19 条通过。
+- **CI 首轮拦下的一处（10/4 补）：** 留存门禁 `verify:ai-user-text-retention` 报 AI 模块新写的三张表既无到期清理也没登记理由。拦得对：预占记录会一直涨。已加 `AiQuotaService.purgeExpired`——已结算的预占与每日计数按 AI 调用日志同一期限（默认 90 天）由每小时清理任务硬删，未结算的不删；三张表在门禁里登记了理由（核销流水属财务账，随订单保留期）。`verify:ai-quota` 增到 17 组。
+- **要知道的两处口径（已报总指挥）：** ① 第 6 次及以后的失败不归还，记为「已扣」但没有结果编号——这是唯一允许没有结果编号的已扣记录；② 游客次数（默认关）若以后打开，是按终端合计、三种用途共用一个池。
+- **留给后面的：** Q2 把各 AI 入口接上预占与提交（现在没有任何入口调用它）；注销执行器要把这两张新表算进清单（谁后合谁补）。
 
 ## 2026-10-03：第四次更新已上线
 

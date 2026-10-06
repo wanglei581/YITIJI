@@ -37,6 +37,9 @@ Page({
     requests: [],
     latestExport: null,
     hasActiveRequest: false,
+    hasActiveExport: false,
+    activeClosure: null,
+    closureNotes: dr.CLOSURE_NOTES,
 
     savedFiles: [],
 
@@ -73,7 +76,7 @@ Page({
     this.setData({ isLoggedIn, savedFiles: exportFile.listSavedExports() })
     this.loadConsents()
     if (isLoggedIn) this.loadRequests()
-    else this.setData({ requests: [], latestExport: null, capabilityLoaded: false, hasActiveRequest: false })
+    else this.setData({ requests: [], latestExport: null, capabilityLoaded: false, hasActiveRequest: false, hasActiveExport: false, activeClosure: null })
   },
 
   onHide() { this.stopTimers() },
@@ -100,6 +103,8 @@ Page({
           requests: view.requests,
           latestExport: view.latestExport,
           hasActiveRequest: view.hasActiveRequest,
+          hasActiveExport: view.hasActiveExport,
+          activeClosure: view.activeClosure,
           accountClosureAvailable: view.accountClosureAvailable,
           capabilityLoaded: true,
           loading: false,
@@ -117,7 +122,7 @@ Page({
   // 导出是异步队列任务，pending/handling 期间轮询。只在本页可见时继续。
   schedulePoll() {
     if (this._poll) { clearTimeout(this._poll); this._poll = null }
-    if (!this.data.hasActiveRequest) { this._pollCount = 0; return }
+    if (!this.data.hasActiveExport) { this._pollCount = 0; return }
     this._pollCount = (this._pollCount || 0) + 1
     if (this._pollCount > 24) return // 约 2 分钟后停手，交给下拉刷新，不无限空转
     this._poll = setTimeout(() => this.loadRequests(), 5000)
@@ -128,7 +133,7 @@ Page({
   // ---------- 二次验证浮层 ----------
 
   /**
-   * @param {'export_data_request'|'export_data_download'} purpose step-up action，白名单见 member-step-up.types.ts
+   * @param {'export_data_request'|'export_data_download'|'close_account'} purpose step-up action，白名单见 member-step-up.types.ts
    */
   openStepUp(purpose, title, desc) {
     this._code = ''
@@ -214,6 +219,7 @@ Page({
         this.setData({ 'su.open': false, 'su.verifying': false, 'su.code': '' })
         if (su.purpose === 'export_data_request') return this.doCreateExport(token)
         if (su.purpose === 'export_data_download') return this.doDownload(token)
+        if (su.purpose === 'close_account') return this.doCreateClosure(token)
         return null
       })
       .catch((err) => {
@@ -360,7 +366,7 @@ Page({
         wx.setClipboardData({
           data: text,
           success: () => resolve(true),
-          fail: (er) => reject(new Error((er && er.errMsg) || '复制失败')),
+          fail: () => reject(new Error('复制失败，请再试一次')),
         })
       }))
       .catch((err) => wx.showModal({
@@ -437,21 +443,39 @@ Page({
   requestAccountClosure() {
     if (!this.requireLogin()) return
     if (this.data.busy) return
+    // 服务端说没说「开放注销」还没读到：不猜，等读到再办
+    if (!this.data.capabilityLoaded) { wx.showToast({ title: '正在读取服务端状态，请稍候再点', icon: 'none' }); return }
 
-    const unavailable = this.data.capabilityLoaded && !this.data.accountClosureAvailable
+    const unavailable = !this.data.accountClosureAvailable
     const content = unavailable
       ? '服务端当前未开放线上自助注销，提交后会被服务端直接拒绝，你会看到它的原话。'
         + '本入口不会删除简历、文档或打印订单。'
         + '现在就能做的：导出我的数据、撤回 AI 分析授权、在「我的文档」里删除文件、退出登录。'
-      : '账号注销不可逆。提交后由服务端按其注销流程处理，本页只如实展示服务端返回的状态，不代表已经注销。'
+      : `账号注销不可逆，会删什么、保留什么见本页说明。提交后由我们核实处理，${this.data.privacyRequestDays} 个工作日内处理完；处理之前可以在本页撤回。`
+        + '确认后会向你账号绑定的手机号发送验证码。'
+
+    if (!unavailable && this.data.activeClosure) {
+      wx.showModal({
+        title: '已有注销申请',
+        content: `你的注销申请${this.data.activeClosure.statusLabel}，不用重复提交。还没开始处理时，可以在下面的「处理记录」里撤回。`,
+        showCancel: false,
+      })
+      return
+    }
 
     wx.showModal({
       title: '账号注销',
       content,
-      confirmText: unavailable ? '仍要提交' : '提交注销请求',
+      confirmText: unavailable ? '仍要提交' : '发送验证码',
       confirmColor: '#b5643c',
       success: (r) => {
         if (!r.confirm) return
+        if (!unavailable) {
+          // 同一次申请的重试必须复用同一个幂等键；重放同样要带有效的二次验证凭证
+          this._closureIdemKey = this._closureIdemKey || dr.uuidV4()
+          this.openStepUp('close_account', '验证身份后提交注销申请', '账号注销不可逆，需要短信二次验证。')
+          return
+        }
         this.setData({ busy: '正在提交…' })
         wx.showLoading({ title: '提交中', mask: true })
         api.createMemberDataRequest('delete', { idempotencyKey: dr.uuidV4() })
@@ -472,6 +496,61 @@ Page({
             // 原样回显服务端答复（当前实现固定 ACCOUNT_CLOSURE_NOT_AVAILABLE / 账号注销暂未开放）。
             wx.showModal({ title: '服务端未受理', content: dr.errText(err), showCancel: false })
             this.loadRequests()
+          })
+      },
+    })
+  },
+
+  doCreateClosure(stepUpToken) {
+    this.setData({ busy: '正在提交注销申请…' })
+    wx.showLoading({ title: '提交中', mask: true })
+    const key = this._closureIdemKey || dr.uuidV4()
+    this._closureIdemKey = key
+    return api.createMemberDataRequest('delete', { idempotencyKey: key, stepUpToken })
+      .then(() => {
+        this._closureIdemKey = null
+        wx.hideLoading()
+        this.setData({ busy: '' })
+        wx.showModal({
+          title: dr.CLOSURE_PENDING_LABEL,
+          content: `注销申请已受理，账号此刻还没有注销。我们核实后 ${this.data.privacyRequestDays} 个工作日内处理完；处理完成后会自动退出登录。处理之前可以在「处理记录」里撤回。`,
+          showCancel: false,
+          confirmText: '知道了',
+        })
+        this.loadRequests()
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        this.setData({ busy: '' })
+        this.loadRequests()
+        wx.showModal({ title: '注销申请没有提交成功', content: dr.errText(err), showCancel: false })
+      })
+  },
+
+  /** 撤回还在待处理的注销申请（只有 pending 的那条有这个按钮）。 */
+  cancelClosure(e) {
+    const id = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id
+    const item = this.data.requests.find((v) => v.id === id)
+    if (!item || !item.canCancel || this.data.busy) return
+    wx.showModal({
+      title: '撤回注销申请',
+      content: '撤回后账号照常使用，以后还可以再申请。',
+      confirmText: '撤回申请',
+      cancelText: '先不撤',
+      success: (r) => {
+        if (!r.confirm) return
+        this.setData({ busy: '正在撤回…' })
+        api.cancelMemberDataRequest(id)
+          .then(() => {
+            this.setData({ busy: '' })
+            wx.showToast({ title: '已撤回', icon: 'none' })
+            this.loadRequests()
+          })
+          .catch((err) => {
+            this.setData({ busy: '' })
+            this.loadRequests()
+            // 已开始执行的撤不了（DATA_REQUEST_INVALID_TRANSITION）：刷新后按服务端状态说话
+            wx.showModal({ title: '没有撤回成功', content: dr.errText(err), showCancel: false })
           })
       },
     })

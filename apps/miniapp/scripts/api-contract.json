@@ -98,6 +98,7 @@
     "POST /me/ai-consents",
     "POST /me/ai-consents/:p/revoke",
     "POST /me/data-requests",
+    "POST /me/data-requests/:p/cancel",
     "POST /me/data-requests/:p/download-authorizations",
     "POST /me/favorites",
     "POST /me/feedback",

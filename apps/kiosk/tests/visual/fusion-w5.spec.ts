@@ -1515,6 +1515,10 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   const paidRow = rows.filter({ hasText: '个人简历.pdf' }).first()
   await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
   await expect(paidRow.getByText('W5K7Q2', { exact: true })).toBeVisible()
+  await expect(paidRow.getByText('到机码', { exact: true })).toBeVisible()
+  await expect(page.getByText('取件凭证码')).toHaveCount(0)
+  await expect(paidRow.getByText('还能续打')).toHaveCount(0)
+  await expect(paidRow.getByText('不能再打了')).toHaveCount(0)
   await expect(paidRow.getByText('下单金额')).toBeVisible()
   await expect(paidRow.getByRole('button', { name: '去我的文档再打印' })).toBeVisible()
   await assetShot(page, 'orders-detail')
@@ -1527,6 +1531,69 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await rows.filter({ hasText: '成绩单.pdf' }).getByRole('button', { name: '反馈打印订单 成绩单.pdf' }).click()
   await expect(page).toHaveURL(/\/me\/feedback\?category=print&relatedPrintTaskId=order-failed$/)
   await feedbackLoaded
+})
+
+test('orders: reprint notice follows reprintAllowed and reprintRemaining @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const canResume = memberOrder({
+    id: 'order-resume',
+    fileName: '还能续打的简历.pdf',
+    amountCents: 300,
+    payStatus: 'paid',
+    paymentSource: 'offline',
+    billablePages: 3,
+    pickupCode: '28491703',
+    discountCents: 0,
+    refundedAmountCents: 0,
+    reprintAllowed: true,
+    reprintRemaining: 1,
+  })
+  const usedUp = memberOrder({
+    id: 'order-used-up',
+    fileName: '不能再打的简历.pdf',
+    amountCents: 300,
+    payStatus: 'paid',
+    paymentSource: 'offline',
+    billablePages: 3,
+    pickupCode: '39502814',
+    discountCents: 0,
+    refundedAmountCents: 0,
+    reprintAllowed: false,
+    reprintRemaining: 0,
+  })
+  api.respond('GET', '/api/v1/me/print-orders', memberPage([canResume, usedUp]))
+  api.respond('GET', '/api/v1/me/feedback', memberPage([]))
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  const resumeRow = page.getByTestId('member-assets-order').filter({ hasText: '还能续打的简历.pdf' })
+  await resumeRow.getByRole('button', { name: '查看订单详单 还能续打的简历.pdf' }).click()
+  await expect(resumeRow.getByText('到机码', { exact: true })).toBeVisible()
+  await expect(resumeRow.getByText('还能续打 1 次')).toBeVisible()
+  await expect(page.getByText('取件凭证码')).toHaveCount(0)
+  const usedRow = page.getByTestId('member-assets-order').filter({ hasText: '不能再打的简历.pdf' })
+  await usedRow.getByRole('button', { name: '查看订单详单 不能再打的简历.pdf' }).click()
+  await expect(usedRow.getByText('这单已经接着打过 2 次，不能再打了。')).toBeVisible()
+  await expect(usedRow.getByText('还能续打')).toHaveCount(0)
+})
+
+// 走查 N3（10/4）：0 元单的列表与详单不出现支付、金额机制的说法；收费单的金额明细原样保留。
+test('orders: free orders speak without payment terms while paid orders keep the amount detail @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const free = memberOrder({ id: 'order-free', fileName: '免费简历.pdf', amountCents: 0, payStatus: 'paid', paymentSource: 'free', billablePages: 2, discountCents: 0, refundedAmountCents: 0 })
+  const paid = memberOrder({ id: 'order-paid', amountCents: 300, payStatus: 'paid', paymentSource: 'offline', billablePages: 3, discountCents: 0, refundedAmountCents: 0 })
+  api.respond('GET', '/api/v1/me/print-orders', memberPage([free, paid]))
+  api.respond('GET', '/api/v1/me/feedback', memberPage([]))
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  const rows = page.getByTestId('member-assets-order')
+  await expect(rows).toHaveCount(2)
+  const freeRow = rows.filter({ hasText: '免费简历.pdf' })
+  await expect(freeRow).toContainText('免费')
+  await freeRow.getByRole('button', { name: '查看订单详单 免费简历.pdf' }).click()
+  await expect(freeRow).not.toContainText(/支付|实付|优惠|权益抵扣|已退款|价格/)
+  const paidRow = rows.filter({ hasText: '个人简历.pdf' })
+  await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
+  await expect(paidRow.getByText('下单金额')).toBeVisible()
 })
 
 test('documents and orders stay operable at 390x844 without overlap @w5-mobile', async ({ page, api }) => {
@@ -1642,7 +1709,10 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   const locked = page.getByRole('region', { name: '登录后才出现的账号操作' }).locator('[aria-disabled="true"]')
   await expect(locked).toHaveCount(3)
   await expect(locked.filter({ hasText: '登录后可用' })).toHaveCount(3)
-  await expect(page.getByText('账号注销和数据导出尚未开放', { exact: false })).toBeVisible()
+  // 10/3 口径，与《隐私政策》一致：注销与复制个人信息按三条渠道人工申请，核实是本人后 15 个工作日内处理。
+  await expect(page.getByText('注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请', { exact: false })).toBeVisible()
+  await expect(page.getByText('我们核实是你本人后，15 个工作日内处理', { exact: false })).toBeVisible()
+  await expect(page.getByText('数据导出尚未开放', { exact: false })).toHaveCount(0)
   await expect(page.getByRole('region', { name: '公共终端使用说明' })).toContainText('退出本机登录并清除这一次的临时信息')
   await settingsShot(page, 'guest')
   expect(api.requestCount('GET', CONSENT_STATUS)).toBe(0)
@@ -1811,7 +1881,7 @@ for (const failure of [
     await expect(panel).not.toContainText('HTTP 500')
     await panel.getByRole('button', { name: '重新登录核对', exact: true }).click()
     await page.waitForURL((url) => url.pathname === '/login')
-    await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。')).toBeVisible()
+    await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请按《隐私政策》里的电话、邮箱联系我们。')).toBeVisible()
     await expectTokenNotPersisted(page)
   }
   expect(api.requestCount('POST', PHONE_REBIND)).toBe(1)

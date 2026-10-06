@@ -318,6 +318,15 @@ export function issuesOfBlock(issues: ResumeIssue[], key: string): ResumeIssue[]
   return issues.filter((issue) => issue.evidence.some((ev) => ev.blockKey === key))
 }
 
+/** 这一块被引用了几条原文。一条问题可以指到同一块的多行，按引用条数计，不按问题条数计。 */
+export function evidenceCountOfBlock(issues: ResumeIssue[], key: string): number {
+  let n = 0
+  for (const issue of issues) {
+    for (const ev of issue.evidence) if (ev.blockKey === key) n += 1
+  }
+  return n
+}
+
 export function evidenceLineSet(issues: ResumeIssue[], key: string): Set<number> {
   const set = new Set<number>()
   for (const issue of issues) {

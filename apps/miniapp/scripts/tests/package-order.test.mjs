@@ -172,7 +172,7 @@ test('状态三连：登记过的给中文，没登记的原样回显', () => {
   assert.equal(pkg.statusText('pickup', 'pending'), '待到机核销')
   assert.equal(pkg.statusText('pickup', 'used'), '已交付打印')
   assert.equal(pkg.statusText('pay', 'unpaid'), '未付款')
-  assert.equal(pkg.statusText('task', 'pending_release'), '等待到机释放')
+  assert.equal(pkg.statusText('task', 'pending_release'), '到机核销后开始打印')
   // 未登记取值：原样回显。编一个中文会把没理解的状态说成理解了的。
   assert.equal(pkg.statusText('pay', 'brand_new_state'), 'brand_new_state')
   assert.equal(pkg.statusText('task', ''), '—')
@@ -291,7 +291,7 @@ test('错误码：打印机出不了纸时说的是「可以处理完再来」�
   // 最近 5 分钟没心跳 / 从未上报 / 心跳里的 printerStatus ∈ {offline, error, paper_empty}
   // → 400 PRINTER_UNAVAILABLE。这个码此前在本表里**没有映射**，于是用户看到的是
   // describePackageError 末尾那句「操作未完成 / 请稍后重试」——而三种成因里有两种
-  // （缺纸、卡纸故障）是现场工作人员当场就能处理的，处理完回来重新核价就能过。
+  // （缺纸、卡纸故障）可能很快恢复，稍后回来重新核定就能过。现场没有工作人员（2026-10-04），不让用户去找人。
   const shown = pkg.describePackageError({ code: 'PRINTER_UNAVAILABLE', statusCode: 400, message: '' }, '创建订单失败，请稍后重试。')
   assert.notEqual(shown.title, '操作未完成', '不得落到未知码兜底')
   assert.notEqual(shown.text, '创建订单失败，请稍后重试。')
@@ -299,7 +299,8 @@ test('错误码：打印机出不了纸时说的是「可以处理完再来」�
   // CAPABILITY_* 要管理员登记、PRINT_TERMINAL_OFFLINE 是整台终端联系不上，那两类用户等不来；
   // 这一条是终端在线、只是打印机此刻出不了纸，**可能**当场恢复。
   assert.equal(shown.recover, 'retry')
-  assert.match(shown.text, /工作人员/, '必须说出那条唯一可执行的下一步')
+  assert.match(shown.text, /重新核定/, '必须说出能自己做的下一步')
+  assert.doesNotMatch(shown.text, /工作人员/, '现场没有工作人员')
   assert.match(shown.text, /服务点/, '也要留一条走得通的退路（它也可能是真的坏了）')
   // 不把机器码摊到用户脸上（user-error.js 的 fail-closed 只管服务端 message，
   // 本表自己的中文同样不许夹带）。

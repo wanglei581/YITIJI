@@ -16,7 +16,6 @@ import {
   COMPLIANCE_COPY,
   canCreateFormalPrintScanTask,
   type PrintScanCapabilityKey,
-  type PrintScanCapabilityStatus,
 } from '@ai-job-print/shared'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -38,6 +37,7 @@ import {
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { getTerminalId, subscribeTerminalIdentity } from '../../services/api/screensaver'
 import {
+  CAPABILITY_STATUS_NOTES,
   loadConfiguredCapabilities,
   resolveCapabilityOverride,
   type CapabilitiesLoadResult,
@@ -247,10 +247,9 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
  * 到机码核销 —— 手机上已经下过单的人的入口。
  * 原型 39-print-hub.html:585-627（PR #644 补入），单独一行、不进七张卡的栅格。
  *
- * ⚠ 命名：后端与小程序下单页都叫它「到机码」（pickup-order.service.ts 的
- * 错误文案「到机码无效或已过期」、小程序 print-pay 的「提交并生成到机码」），
- * 它与付款后才生成的「取件凭证码」(Order.pickupCode) 是两个码。原型据此
- * 把卡面写成「到机码核销 · 不是取件码」。生产此前把两个码都叫「取件码」。
+ * ⚠ 命名：方案②（2026-10-06）起，到机码就是唯一的取件码。
+ * 卡面仍写「不是取件码」，是和上传码消歧（verify-fusion-w2-print-scan 断言这句），
+ * 不是在说还有第二种取件码。
  *
  * ⚠ 门禁：刻意不登记进 CARD_CAPABILITY_KEY，也不随 MFP 轴停用 ——
  * 核销的是订单而非新建本机打印任务。原型在 device-off / 探测失败时把这张卡
@@ -278,14 +277,6 @@ const CARD_CAPABILITY_KEY: Partial<Record<string, PrintScanCapabilityKey>> = {
   sign: 'signature_stamp',
 }
 
-const CAPABILITY_STATUS_NOTES: Record<PrintScanCapabilityStatus, string | null> = {
-  available: null,
-  testing: '测试中，暂未对用户开放',
-  maintenance: '维护中，暂时不可用',
-  unsupported: '本机不支持此项服务',
-  not_verified: '本机暂未开通',
-}
-
 /** 反馈入口的 key。它不跳路由，而是就地打开匿名反馈弹层（见 handleQuickLink）。 */
 const FEEDBACK_QUICK_LINK_KEY = 'feedback'
 
@@ -301,7 +292,7 @@ const QUICK_LINKS: readonly (QxPrintQuickLinkView & { to?: string })[] = [
     key: 'print-orders',
     icon: PrinterIcon,
     title: '打印订单',
-    description: '查看订单与取件凭证码',
+    description: '查看订单与到机码',
     to: '/me/print-orders',
   },
   {

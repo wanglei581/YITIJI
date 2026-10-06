@@ -31,6 +31,7 @@ import { writeScanWorkbenchSession } from './fusion-w2-state'
 import { w6RouteCases, type W6RouteCase } from './fusion-w6-route-cases'
 import { preparePrioritySeed, priorityPlan } from './qingxu-pair-seeds'
 import { policyPagesExtraPairs, policyPagesPlan, preparePolicyPages } from './qingxu-pair-policy-pages'
+import { prepareResumePages, resumePagesExtraPairs, resumePagesPlan } from './qingxu-pair-resume-pages'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const PROTO_DIR = path.resolve(here, '../../../../../docs/design/kiosk-redesign-2026-08')
@@ -159,6 +160,8 @@ export type RuntimePlan =
   | { kind: 'priority' }
   /** 45 本机构官方渠道、48 政策服务（qingxu-pair-policy-pages.ts）。 */
   | { kind: 'policy-pages' }
+  /** B 路 16/18–25/29/34/46/52（qingxu-pair-resume-pages.ts）。 */
+  | { kind: 'resume-pages' }
 
 interface RawPair {
   screen: string
@@ -759,6 +762,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
     const raw = enumerateFile(file)
     // 稿里画不出、运行页真有的态（目前只登记 45）：配到最接近的稿态上并排看。
     for (const extra of policyPagesExtraPairs(file)) raw.push({ ...extra, axis: 'state' })
+    for (const extra of resumePagesExtraPairs(file)) raw.push({ ...extra, axis: 'state' })
     const byScreen = new Map<string, string[]>()
     for (const pair of raw) {
       const list = byScreen.get(pair.screen) ?? []
@@ -768,7 +772,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
     for (const pair of raw) {
       const siblings = byScreen.get(pair.screen) ?? [pair.state]
       const route = routeOf(file, pair)
-      const priority = priorityPlan(file, pair.screen, pair.state) ?? policyPagesPlan(file, pair.screen, pair.state)
+      const priority = resumePagesPlan(file, pair.screen, pair.state) ?? priorityPlan(file, pair.screen, pair.state) ?? policyPagesPlan(file, pair.screen, pair.state)
       const decided = priority
         ? { plan: priority.plan, reason: priority.reason, marker: priority.marker }
         : planOf(file, pair.screen, pair.state, siblings)
@@ -881,6 +885,11 @@ export async function prepareRuntime(page: Page, api: ApiRouter, target: QingxuP
   if (target.plan.kind === 'policy-pages') {
     registerEvidenceShell(api)
     await preparePolicyPages(page, api, target)
+    return
+  }
+  if (target.plan.kind === 'resume-pages') {
+    registerEvidenceShell(api)
+    await prepareResumePages(page, api, target)
     return
   }
   if (target.plan.kind === 'fair') {

@@ -382,10 +382,12 @@ export async function loadSyncSlice(
   }
 }
 
-export async function loadJumpRows(prisma: PrismaService, now: Date): Promise<JumpRow[]> {
+export async function loadJumpRows(
+  prisma: PrismaService, now: Date, closedWindow?: { from: Date; to: Date },
+): Promise<JumpRow[]> {
   const rows = await prisma.externalJumpLog.groupBy({
     by: ['sourceName'],
-    where: { createdAt: { gte: daysAgoStart(now, JUMP_LOOKBACK_DAYS) } },
+    where: { createdAt: closedWindow ? { gte: closedWindow.from, lt: closedWindow.to } : { gte: daysAgoStart(now, JUMP_LOOKBACK_DAYS) } },
     _count: { _all: true },
     orderBy: { _count: { sourceName: 'desc' } },
     take: JUMP_SOURCE_GROUP_TAKE,

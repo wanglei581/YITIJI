@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { InterviewSessionInvalid } from './session/InterviewSessionInvalid'
 import { resolveInterviewSessionState } from './session/resolveInterviewSessionState'
-import { answerInterview, endInterview, fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
+import { fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
 import { startWavRecorder, type WavRecorder } from '../../utils/wavRecorder'
 import {
   classifyMicError,
@@ -24,16 +24,15 @@ import { useInterviewLivePersist } from './session/useInterviewLivePersist'
 import { InterviewShell } from './InterviewShell'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
 import { INTERVIEW_AI_DOWN_HINT, INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
-import {
-  patchInterviewWorkbenchSession,
-  readInterviewWorkbenchSession,
-} from './interviewWorkbenchSession'
+import { readInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { isAiOutage } from '../../ai/aiOutage'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
+import type { InterviewFinishRecovery } from './session/interviewAnswerRecovery'
+import { finishInterview, submitInterviewAnswer } from './session/interviewTurnActions'
 
 const advisorPortrait = '/assets/ai-advisor.png'
 
@@ -64,6 +63,11 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const [phase, setPhase] = useState<InterviewSessionPhase>('answering')
   const [error, setError] = useState<string | null>(null)
   const [omitPrintAnswers, setOmitPrintAnswers] = useState(storedLive?.omitPrintAnswers ?? false)
+  // 只认本场亲眼成功过的非跳过回答。乐观写进对话的那条不算，刷新也不能把没成功的说成已保存。
+  const [answersRecorded, setAnswersRecorded] = useState(
+    Boolean(state?.sessionId && storedLive?.sessionId === state.sessionId && storedLive.answersRecorded),
+  )
+  const [finishRecovery, setFinishRecovery] = useState<InterviewFinishRecovery | null>(null)
   const [remainingSec, setRemainingSec] = useState(storedLive?.remainingSec ?? (state?.durationMin ?? 5) * 60)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -97,6 +101,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     questionIndex,
     remainingSec,
     omitPrintAnswers,
+    answersRecorded,
   })
 
   const access = useMemo(
@@ -296,67 +301,20 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     }
   }
 
-  const submit = async (args: { text: string; skip: boolean; voiceMeta?: { transcript: string; edited: boolean; durationSec: number } }) => {
-    if (voice.kind === 'requesting_permission' || voice.kind === 'transcribing') return
-    const answer = args.text.trim()
-    if (!args.skip && !answer) {
-      setError('请输入回答内容，或选择跳过此题')
-      return
-    }
-    setError(null)
-    setMicError(false)
-    setMessages((prev) => [...prev, { role: 'candidate', content: args.skip ? '跳过了这个问题' : answer, skipped: args.skip }])
-    setDraft('')
-    setVoice({ kind: 'idle' })
-    setPhase('thinking')
-    try {
-      const textDuration = Math.min(600, Math.round((Date.now() - questionShownAtRef.current) / 1000))
-      const res = await answerInterview(
-        state.sessionId,
-        args.skip
-          ? { skip: true }
-          : {
-              answer,
-              inputMode: args.voiceMeta ? 'voice' : 'text',
-              ...(args.voiceMeta
-                ? { transcriptText: args.voiceMeta.transcript, transcriptEdited: args.voiceMeta.edited, answerDurationSec: args.voiceMeta.durationSec }
-                : { answerDurationSec: textDuration }),
-            },
-        access,
-      )
-      if (res.done) {
-        setPhase('done_suggest')
-        return
-      }
-      setMessages((prev) => [...prev, { role: 'interviewer', content: res.question ?? '' }])
-      setQuestionIndex(res.questionIndex)
-      setPhase('answering')
-    } catch (err) {
-      setError(aiDeclarationDeclineMessage(err) ?? (isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '提交失败，请重试')))
-      setPhase('answering')
-    }
+  const submit = (args: { text: string; skip: boolean; voiceMeta?: { transcript: string; edited: boolean; durationSec: number } }) => {
+    void submitInterviewAnswer({
+      args, state, access, messages, draft, voiceKind: voice.kind, questionShownAtRef,
+      setMessages, setDraft, setMode, setVoice, setPhase, setError, setMicError,
+      setFinishRecovery, setAnswersRecorded, setQuestionIndex,
+    })
   }
 
-  const finish = async () => {
-    if (voice.kind === 'requesting_permission' || voice.kind === 'transcribing' || phase === 'finishing') return
-    stopPlayback()
-    resetVoiceState()
-    setPhase('finishing')
-    setError(null)
-    try {
-      const report = await endInterview(state.sessionId, access, {
-        includeAnswersInPrint: !omitPrintAnswers,
-      })
-      patchInterviewWorkbenchSession({
-        stage: 'report',
-        report: { sessionId: state.sessionId, accessToken: state.accessToken },
-      })
-      if (onGoStage) onGoStage('report')
-      else navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
-    } catch (err) {
-      setError(aiDeclarationDeclineMessage(err) ?? (isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '报告生成失败，请重试')))
-      setPhase(messages.some((m) => m.role === 'candidate' && !m.skipped) ? 'done_suggest' : 'answering')
-    }
+  const finish = () => {
+    void finishInterview({
+      state, access, phase, voiceKind: voice.kind, messages, answersRecorded, omitPrintAnswers,
+      onGoStage, navigate, stopPlayback, resetVoiceState,
+      setPhase, setError, setMicError, setFinishRecovery,
+    })
   }
 
   const interviewerLabel = INTERVIEWER_LABEL[state.interviewerType] ?? '面试官'
@@ -488,6 +446,15 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         onSkip={() => void submit({ text: '', skip: true })}
         onSubmitText={() => void submit({ text: draft, skip: false })}
         onFinish={() => void finish()}
+        finishRecovery={finishRecovery}
+        onContinueAnswering={() => {
+          setFinishRecovery(null)
+          setError(null)
+          setPhase('answering')
+        }}
+        onLeaveInterview={() => navigate('/interview-service')}
+        onOpenTips={() => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))}
+        onRetryReport={() => void finish()}
         omitPrintAnswers={omitPrintAnswers}
         onOmitPrintAnswersChange={setOmitPrintAnswers}
       />

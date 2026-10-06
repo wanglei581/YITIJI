@@ -229,7 +229,8 @@ async function main(): Promise<void> {
     requestService,
     [
       'MemberDataRequestService',
-      'ACCOUNT_CLOSURE_NOT_AVAILABLE',
+      // 注销申请交给 MemberClosureRequests 登记（待管理员执行），不再固定拒绝。
+      'this.closures().create(',
       'export_data_request',
       'writeRequired',
       'activeKey',

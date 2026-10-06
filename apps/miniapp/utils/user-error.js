@@ -133,6 +133,13 @@ const PASSTHROUGH_MESSAGE_CODES = [
   'QR_LOGIN_CLAIM_INVALID',      // 扫码登录凭证无效
   'QR_LOGIN_TERMINAL_MISMATCH',  // 扫码登录终端不匹配
   'QR_LOGIN_NOT_CONFIRMED',      // 扫码登录尚未确认
+
+  // 数据导出与账号注销（隐私与数据页）：这些码说的就是用户眼前这一步为什么没成，
+  // 原话由后端窗口 2026-10-04 逐句给出（member-privacy、member-step-up）。
+  'STEP_UP_TOKEN_INVALID',           // 二次验证凭证无效或已过期
+  'ACCOUNT_UNAVAILABLE',             // 账号当前不可用
+  'DATA_REQUEST_INVALID_TRANSITION', // 只能撤回尚未执行的注销申请 / 申请状态已变化
+  'DATA_REQUEST_NOT_FOUND',          // 数据请求不存在
 ];
 
 /**
@@ -170,10 +177,32 @@ function userMessageOf(err, fallback) {
   return fallback;
 }
 
+/** 模拟面试、小青没有「先用模板手动填写」这条退路，额度两码只说事实（走查 MP-K18-6）。 */
+const AI_QUOTA_PLAIN_MESSAGES = {
+  AI_BUDGET_EXHAUSTED: '今天的 AI 次数用完了，明天恢复。',
+  AI_BUDGET_UNAVAILABLE: 'AI 暂时用不了，请稍后再试。',
+};
+
+/** 同 userMessageOf，只是额度两码换成不提模板的说法。 */
+function plainAiMessageOf(err, fallback) {
+  const code = err && err.code;
+  if (code && Object.prototype.hasOwnProperty.call(AI_QUOTA_PLAIN_MESSAGES, code)) return AI_QUOTA_PLAIN_MESSAGES[code];
+  return userMessageOf(err, fallback);
+}
+
+/**
+ * 现场没有工作人员（2026-10-04 产品负责人：全程自助、自动）。需要人帮忙时只有一条出路：服务电话。
+ * 号码以后从后端公开接口读（GET /api/v1/public/support-contact?terminalId=，开发中），在那之前只说号码在哪看，不写死。
+ */
+const SUPPORT_HINT = '需要帮助可拨打服务电话，号码在首页底部「经营者信息」里。'
+
 module.exports = {
   isMachineErrorCode,
+  SUPPORT_HINT,
   displayableServerMessage,
   userMessageOf,
+  plainAiMessageOf,
+  AI_QUOTA_PLAIN_MESSAGES,
   SERVER_GENERIC_MESSAGE,
   SHARED_USER_MESSAGES,
   PASSTHROUGH_MESSAGE_CODES,

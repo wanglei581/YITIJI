@@ -35,6 +35,7 @@ import {
 import { clearAiResumeSession } from './aiResumeSession'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
+import { useUsbImportGate } from '../../hooks/useUsbImportGate'
 import { ResumeUsbImportPanel, type ResumeUsbImportedFile } from './components/ResumeUsbImportPanel'
 import { ResumeTriageHero } from './components/ResumeTriageHero'
 import { ResumeScanReady } from './components/ResumeScanReady'
@@ -54,6 +55,8 @@ interface UploadOption {
   helper: string
   icon: React.ComponentType<{ className?: string }>
 }
+
+const RESUME_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传，或联系现场工作人员。'
 
 const UPLOAD_OPTIONS: UploadOption[] = [
   {
@@ -214,7 +217,7 @@ function uploadErrorMessage(err: unknown): string {
 export function ResumeSourcePage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const intent: ResumeIntent = searchParams.get('intent') === 'optimize' ? 'optimize' : 'diagnose'
   const copy = INTENT_COPY[intent]
   const { getToken } = useAuth()
@@ -226,6 +229,7 @@ export function ResumeSourcePage() {
   const accept = wordConversionAvailable ? `${BASE_ACCEPT},${WORD_ACCEPT}` : BASE_ACCEPT
   const fileInputRef = useRef<HTMLInputElement>(null)
   const kiosk = useTerminalKiosk()
+  const usbGate = useUsbImportGate(RESUME_USB_UNCONFIGURED_NOTE)
   const [pickedChannel, setSelected] = useState<UploadChannel>(() => isTerminalKiosk() ? 'phone' : 'cloud')
   const selected = kiosk && pickedChannel === 'cloud' ? 'phone' : pickedChannel
   // 从解析页带着扫描件交接回来时，直接落在稿 21 的 scan-ready：同一份文件，不用重扫。
@@ -272,6 +276,7 @@ export function ResumeSourcePage() {
 
   const handleSelect = (option: UploadOption) => {
     if (isTerminalKiosk() && option.type === 'cloud') return
+    if (option.type === 'usb' && usbGate.state !== 'allowed') return
     setError(null)
     if (option.type !== selected) {
       setUploadedFile(null)
@@ -491,6 +496,20 @@ export function ResumeSourcePage() {
       )}
 
       <div className="qx-scroll qx-rt-scroll">
+        <section aria-labelledby="resume-intent-title">
+          <h2 className="qx-rt-sec-h" id="resume-intent-title">这次想让我做什么 <small>选错了随时能改</small></h2>
+          <div className="qx-rt-seg" role="group" aria-label="这次要做的事">
+            {(['diagnose', 'optimize'] as const).map((value) => (
+              <button key={value} type="button" aria-pressed={intent === value} disabled={sourceBusy}
+                onClick={() => setSearchParams((params) => { params.set('intent', value); return params }, { replace: true })}>
+                <b>{value === 'diagnose' ? 'AI 诊断' : 'AI 优化'}</b>
+                <small>{value === 'diagnose' ? '读你的简历，逐条指出问题' : '先完成诊断，再基于原文重写表达'}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+        {!getToken() && <p className="qx-rt-note" data-tone="warn"><b>当前未登录 · 这次按临时上传处理</b>未登录的文件按短期留存规则清理，不进入「我的文档」。需要留在账号里，请先登录再上传。<button type="button" onClick={() => navigate('/login', { state: { from: `${location.pathname}${location.search}` } })}>去登录 →</button></p>}
+
         {scanReady && uploadedFile ? (
           <ResumeScanReady
             name={uploadedFile.name}
@@ -506,23 +525,29 @@ export function ResumeSourcePage() {
               {UPLOAD_OPTIONS.filter((option) => option.type !== 'cloud' || !isTerminalKiosk()).map((option) => {
                 const isSelected = selected === option.type
                 const Icon = option.icon
+                const usbLocked = option.type === 'usb' && usbGate.state !== 'allowed'
                 return (
                   <button
                     type="button"
                     key={option.type}
                     className="qx-rt-src"
                     aria-pressed={isSelected}
-                    onClick={() => !sourceBusy && handleSelect(option)}
-                    disabled={sourceBusy}
+                    onClick={() => !sourceBusy && !usbLocked && handleSelect(option)}
+                    disabled={sourceBusy || usbLocked}
                   >
                     <span className="ico"><Icon className="h-8 w-8" /></span>
                     <span className="n">{option.label}</span>
                     <span className="d">{option.description}</span>
-                    <span className="go">{option.helper}</span>
+                    <span className="go">{usbLocked ? (usbGate.note ?? '暂时不能用') : option.helper}</span>
                   </button>
                 )
               })}
             </div>
+            {usbGate.state === 'unknown' && selected !== 'usb' ? (
+              <button type="button" className="qx-btn" data-variant="ghost" data-testid="resume-usb-retry" onClick={usbGate.retry}>
+                重新检查
+              </button>
+            ) : null}
           </section>
         ) : null}
 
@@ -536,7 +561,7 @@ export function ResumeSourcePage() {
               </div>
             ) : selected === 'usb' ? (
               <div className="qx-rt-usb">
-                <ResumeUsbImportPanel onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
+                <ResumeUsbImportPanel gate={usbGate} onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
               </div>
             ) : (
               <button
@@ -610,8 +635,9 @@ export function ResumeSourcePage() {
           </div>
 
           <aside className="qx-rt-side">
+            <h2 className="qx-rt-sec-h">这次的诊断方向与目标背景 <small>没有选择时按通用标准看</small></h2>
             {buildTargetContext().skipped && <p className="qx-rt-hint">没选方向，按通用标准看</p>}
-            {uploadedFile && <ResumeSourceSummary generic={buildTargetContext().skipped === true} dimensions={selectedDimensions} target={buildTargetContext()} intent={intent} />}
+            <ResumeSourceSummary compact={!uploadedFile} generic={buildTargetContext().skipped === true} dimensions={selectedDimensions} target={buildTargetContext()} intent={intent} />
             <details className="qx-rt-settings">
               <summary>改诊断方向 <span>选重点、目标与背景</span></summary>
             <div className="qx-rt-direction">
@@ -649,6 +675,7 @@ export function ResumeSourcePage() {
         </details>
 
         {/* 阶段2A:没有电子简历的用户 → AI 简历生成(引导式表单,只润色不编造) */}
+        <div className="qx-rt-quick-exits">
         <button type="button" onClick={() => navigate('/resume/generate')} className="qx-rt-alt">
           <SparklesIcon size={30} aria-hidden="true" />
           <span>
@@ -657,6 +684,11 @@ export function ResumeSourcePage() {
           </span>
           <span className="go">去生成</span>
         </button>
+
+        <button type="button" className="qx-rt-alt" onClick={() => navigate('/print-scan')}>
+          <FileTextIcon size={30} aria-hidden="true" /><span><strong>只想打印原件</strong><small>选择文件、核对页数，再去打印确认</small></span><span className="go">带走打印件 →</span>
+        </button>
+        </div>
 
         {/*
           维度清单默认收起（R5）：主 CTA 固定在 ctabar，但这张卡仍是页面上最高的

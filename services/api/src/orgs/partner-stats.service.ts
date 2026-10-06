@@ -59,22 +59,22 @@ function toShanghaiDay(date: Date): string {
   return new Date(date.getTime() + TZ_OFFSET_MS).toISOString().slice(0, 10)
 }
 
-function buildPeriodRange(p: StatsPeriod, nowMs: number = Date.now()) {
+export function buildPeriodRange(p: StatsPeriod, nowMs: number = Date.now()) {
   const days = periodDays(p)
   // 以上海时间"今天"0点为起始参考
   const nowSh = new Date(nowMs + TZ_OFFSET_MS)
   nowSh.setUTCHours(0, 0, 0, 0)
   const todayUtcStart = new Date(nowSh.getTime() - TZ_OFFSET_MS)
 
-  // 当前周期：[from, to)  — to = 明天 UTC 0点（包含今天全天）
-  const to      = new Date(todayUtcStart.getTime() + 24 * 60 * 60 * 1000)
-  const from    = new Date(todayUtcStart.getTime() - (days - 1) * 24 * 60 * 60 * 1000)
+  // 只统计截至昨天的完整上海自然日：[今天零点 - N 天, 今天零点)。
+  const to      = todayUtcStart
+  const from    = new Date(todayUtcStart.getTime() - days * 24 * 60 * 60 * 1000)
   // 对比周期
   const prevTo  = from
   const prevFrom = new Date(from.getTime() - days * 24 * 60 * 60 * 1000)
 
-  const labels: Record<StatsPeriod, string> = { week: '本周', month: '本月', quarter: '本季度' }
-  const compLabels: Record<StatsPeriod, string> = { week: 'vs 上周', month: 'vs 上月', quarter: 'vs 上季度' }
+  const labels: Record<StatsPeriod, string> = { week: '近 7 天（截至昨天）', month: '近 30 天（截至昨天）', quarter: '近 90 天（截至昨天）' }
+  const compLabels: Record<StatsPeriod, string> = { week: '对比此前 7 天', month: '对比此前 30 天', quarter: '对比此前 90 天' }
 
   return { from, to, prevFrom, prevTo, label: labels[p], compLabel: compLabels[p] }
 }
@@ -100,8 +100,8 @@ export const TERMINAL_OPS_HEARTBEAT_BATCH = 2000
 export class PartnerStatsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getStats(orgId: PartnerOrgId | string, period: StatsPeriod) {
-    const { from, to, prevFrom, prevTo, label, compLabel } = buildPeriodRange(period)
+  async getStats(orgId: PartnerOrgId | string, period: StatsPeriod, now: Date = new Date()) {
+    const { from, to, prevFrom, prevTo, label, compLabel } = buildPeriodRange(period, now.getTime())
     const days = periodDays(period)
 
     // 1. 并发拉取：当期同步日志 + 上期同步日志 + 快照
@@ -217,7 +217,7 @@ export class PartnerStatsService {
   }
 
   /**
-   * 本机构终端运营数据。窗口 = 上海自然日起点（近 7/30/90 天）到当前。
+   * 本机构终端运营数据。窗口 = 上海自然日起点（近 7/30/90 天）截至昨天的完整自然日。
    * 终端集合只取 Terminal.orgId = 本机构；集合为空直接返回空结果，后续查询一条都不发，
    * 所以任何情况下都不会退化成全局查询。
    * 每台终端只统计 max(窗口开始, orgBoundAt) 之后的打印、扫描和心跳，改绑前的数据不计入。
@@ -229,14 +229,14 @@ export class PartnerStatsService {
     now: Date = new Date(),
   ): Promise<PartnerTerminalOperations> {
     const scopedOrgId = requirePartnerOrgId(orgId)
-    const { from } = buildPeriodRange(period, now.getTime())
+    const { from, to } = buildPeriodRange(period, now.getTime())
     const terminals = await this.prisma.terminal.findMany({
       where: { orgId: scopedOrgId },
       orderBy: { terminalCode: 'asc' },
       select: { id: true, terminalCode: true, displayName: true, locationLabel: true, orgBoundAt: true },
     })
     if (terminals.length === 0) {
-      return assembleTerminalOperations({ period, from, now, rows: [], visitRecordingStarted: false })
+      return assembleTerminalOperations({ period, from, to, now, rows: [], visitRecordingStarted: false })
     }
 
     const ids = terminals.map((terminal) => terminal.id)
@@ -247,7 +247,7 @@ export class PartnerStatsService {
         where: {
           OR: terminals.map((terminal) => ({
             terminalId: terminal.id,
-            createdAt: { gte: since(terminal.orgBoundAt), lte: now },
+            createdAt: { gte: since(terminal.orgBoundAt), lt: to },
           })),
         },
         _count: { _all: true },
@@ -257,7 +257,7 @@ export class PartnerStatsService {
         where: {
           OR: terminals.map((terminal) => ({
             terminalId: terminal.id,
-            createdAt: { gte: since(terminal.orgBoundAt), lte: now },
+            createdAt: { gte: since(terminal.orgBoundAt), lt: to },
           })),
         },
         _count: { _all: true },
@@ -268,13 +268,13 @@ export class PartnerStatsService {
           status: { in: ['completed', 'failed'] },
           OR: terminals.map((terminal) => ({
             terminalId: terminal.id,
-            completedAt: { gte: since(terminal.orgBoundAt), lte: now },
+            completedAt: { gte: since(terminal.orgBoundAt), lt: to },
           })),
         },
         _count: { _all: true },
       }),
       // 服务人次只数机构快照为本机构的会话，终端改绑前的历史不带过来
-      countKioskVisitsByTerminal(this.prisma, { orgId: scopedOrgId, terminalIds: ids, from, to: now }),
+      countKioskVisitsByTerminal(this.prisma, { orgId: scopedOrgId, terminalIds: ids, from, to }),
       hasKioskVisitsForOrg(this.prisma, scopedOrgId),
     ])
 
@@ -292,12 +292,15 @@ export class PartnerStatsService {
             count: row._count._all,
           })),
       )
-      const folder = await this.foldHeartbeats(terminal.id, from, terminal.orgBoundAt, now)
+      const [folder, currentHeartbeat] = await Promise.all([
+        this.foldHeartbeats(terminal.id, from, terminal.orgBoundAt, to),
+        this.prisma.terminalHeartbeat.findFirst({ where: { terminalId: terminal.id, createdAt: { lte: now } }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+      ])
       rows.push({
         terminalCode: terminal.terminalCode,
         displayName: terminal.displayName,
         locationLabel: terminal.locationLabel,
-        lastHeartbeatAt: folder.lastHeartbeatAt,
+        lastHeartbeatAt: currentHeartbeat?.createdAt ?? null,
         visitCount: visits.get(terminal.id) ?? 0,
         serviceCount: printCount + scanCount,
         output,
@@ -305,7 +308,7 @@ export class PartnerStatsService {
         reportedInWindow: folder.reportedInWindow,
       })
     }
-    return assembleTerminalOperations({ period, from, now, rows, visitRecordingStarted })
+    return assembleTerminalOperations({ period, from, to, now, rows, visitRecordingStarted })
   }
 
   private async foldHeartbeats(
@@ -341,7 +344,7 @@ export class PartnerStatsService {
     for (;;) {
       const batch: Array<{ id: string; createdAt: Date; printerStatus: string | null }> =
         await this.prisma.terminalHeartbeat.findMany({
-          where: { terminalId, createdAt: { gte: from, lte: now } },
+          where: { terminalId, createdAt: { gte: from, lt: now } },
           orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           take: TERMINAL_OPS_HEARTBEAT_BATCH,
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

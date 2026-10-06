@@ -1,3 +1,5 @@
+import { MemberClosureService } from '../member-privacy/member-closure.service'
+import type { AdminUserClosureRequest } from './admin-users.types'
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
 import type { Request } from 'express'
 import { isIP } from 'node:net'
@@ -42,7 +44,7 @@ function auditContextOf(admin: AuthedUser, request: AuditRequest): AdminUserAudi
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class AdminUsersController {
-  constructor(private readonly service: AdminUsersService) {}
+  constructor(private readonly service: AdminUsersService, private readonly closures: MemberClosureService) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -52,6 +54,7 @@ export class AdminUsersController {
     @Req() request: AuditRequest,
   ) {
     const serviceQuery: AdminUserListQuery = {
+      closure: query.closure,
       page: query.page,
       pageSize: query.pageSize,
       keyword: query.keyword,
@@ -61,6 +64,13 @@ export class AdminUsersController {
       registeredTo: query.registeredTo,
     }
     return this.service.list(serviceQuery, auditContextOf(admin, request))
+  }
+
+  @Post(':endUserId/closure')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async closure(@Param('endUserId') id: string, @Body() input: AdminUserClosureRequest, @CurrentUser() admin: AuthedUser) {
+    return this.closures.execute(id, input, admin)
   }
 
   @Get(':endUserId')

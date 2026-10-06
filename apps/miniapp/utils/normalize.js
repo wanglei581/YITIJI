@@ -892,7 +892,7 @@ function resumeExportPricing(raw, loggedIn) {
     ? Math.max(0, Number(benefit.available)) : null;
   const serverLabel = typeof source.label === 'string' ? source.label.trim() : '';
 
-  if (mode === 'free') return { mode, unitCents: 0, available: null, text: '当前免费，不扣权益', disabledReason: '' };
+  if (mode === 'free') return { mode, unitCents: 0, available: null, text: '当前免费', disabledReason: '' };
   if (mode === 'charged') {
     const price = formatCents(unitCents);
     if (!loggedIn) {

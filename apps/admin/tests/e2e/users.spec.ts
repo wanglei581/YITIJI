@@ -7,6 +7,10 @@ test.describe('用户管理（mock 口径：演示模式不连真实用户库，
     await settleAdminPage(page, guards)
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible()
     await expect(page.getByText('暂无注册用户')).toBeVisible()
+    await page.getByLabel('注销', { exact: true }).selectOption('requested')
+    await expect(page).toHaveURL(/closure=requested/)
+    await page.getByRole('button', { name: '重置', exact: true }).click()
+    await expect(page.getByLabel('注销', { exact: true })).toHaveValue('')
 
     await page.getByPlaceholder('搜索昵称、关键词或完整手机号').fill('13800138000')
     await page.getByRole('button', { name: '查询' }).click()

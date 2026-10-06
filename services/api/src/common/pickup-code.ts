@@ -57,10 +57,8 @@ export const PICKUP_CODE_ALPHABET = '0123456789'
  * 接受低熵的 `terminalCode`（形如 KSK-001），所以「必须在正确终端」不构成强约束。
  *
  * ── 已知长期问题（与有效期无关，只由累计签发量驱动）────────────────────
- * 取件码只增不减：`Order.pickupCode` / `pickupCodeHash` 都是全表永久 @unique，
- * 订单过期或完成后**不回收**。`generateUniquePickupCode` 预检 6 次后 fail-closed，
- * 累计签发量 C 时预检全撞概率 (C/S)^6。改到 8 位后 S=10^8，
- * C=300 万时才约 7.3e-4 —— 比 6 位宽裕约两个数量级，但回收机制仍须单独立项。
+ * 到机码哈希 `pickupCodeHash` 全表永久 @unique，订单过期或完成后不回收。
+ * 明文列不再新写。8 位数字空间是 10^8；累计签发量抬高后仍须单独立项做回收。
  */
 export const PICKUP_CODE_LENGTH = 8
 
