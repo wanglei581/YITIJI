@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import {
   FolderIcon,
   ImageIcon,
@@ -65,13 +66,23 @@ function PickCard({
   )
 }
 
-function Note({ id, title, items }: { id?: string; title: string; items: string[] }) {
+function Note({
+  id,
+  title,
+  items,
+  span,
+}: {
+  id?: string
+  title: string
+  items: ReactNode[]
+  span?: boolean
+}) {
   return (
-    <div className="ss-note" id={id} data-testid={id}>
+    <div className={span ? 'ss-note ss-note-span' : 'ss-note'} id={id} data-testid={id}>
       <h3>{title}</h3>
       <ul className="ss-plan">
-        {items.map((item) => (
-          <li key={item}>
+        {items.map((item, index) => (
+          <li key={index}>
             <span className="sq" aria-hidden />
             <span>{item}</span>
           </li>
@@ -94,7 +105,7 @@ export function SignStampPickView({
   onDocs,
 }: {
   phase: 'doc' | 'stamp'
-  ask: [string, string]
+  ask: [ReactNode, ReactNode]
   status: StatusCopy
   localDisabled: boolean
   localDisabledReason: string
@@ -120,12 +131,12 @@ export function SignStampPickView({
         </div>
       </section>
 
-      <section className="ss-sec" aria-label={phase === 'doc' ? '选要签名的 PDF' : '传这次的本人手写签名图'}>
+      <section className="ss-sec" aria-label={phase === 'doc' ? '选要放入签名的 PDF' : '传这次的本人手写签名'}>
         {phase === 'doc' ? (
           <>
             <div className="ss-sec-label">
               <span className="no">01</span>
-              <span className="t">选要签名的 PDF</span>
+              <span className="t">选要放入签名的 PDF</span>
               <span className="hint">≤ 15MB · 1–30 页</span>
             </div>
             <div className="ss-pickrow">
@@ -174,7 +185,7 @@ export function SignStampPickView({
                   '是不是真的 PDF。',
                   '有没有加密、损坏或数字签名域。',
                   '页数在不在 1–30 之间。',
-                  '原文件全程不改写。',
+                  <b>原文件全程不改写。</b>,
                 ]}
               />
               <Note
@@ -191,13 +202,13 @@ export function SignStampPickView({
           <>
             <div className="ss-sec-label">
               <span className="no">02</span>
-              <span className="t">传这次的本人手写签名图</span>
-              <span className="hint">≤ 10MB · ≤ 2500 万像素</span>
+              <span className="t">传这次的本人手写签名</span>
+              <span className="hint">白纸签字后拍照 · ≤ 10MB</span>
             </div>
             <div className="ss-pickrow">
               {!localDisabled && (<PickCard
-                title="本机上传图片"
-                d="在白纸上签好本人姓名后拍一张。背景干净、边缘清楚更好。"
+                title="本机上传签名照片"
+                d="请本人在白纸上签字，再把这张纸拍清楚。不要拍单位公章或圆形章。"
                 f={localDisabled ? localDisabledReason : 'JPG / PNG · ≤ 10MB'}
                 tid="sign-stamp-pick-stamp-local"
                 tone="clay"
@@ -227,8 +238,8 @@ export function SignStampPickView({
               />
               <PickCard
                 title="在屏幕上手写签名"
-                d="触屏手写要先做压感校准。"
-                f="未开放 · 需校准后开放"
+                d="直接在屏幕上写，要先校准触屏。现在请用白纸签字后拍照。"
+                f="本机暂未开通"
                 tid="sign-stamp-pick-stamp-handwrite"
                 tone="muted"
                 icon={PenToolIcon}
@@ -237,11 +248,12 @@ export function SignStampPickView({
               />
               <Note
                 id="sign-stamp-stamp-note"
-                title="这张图会被怎么对待"
+                span
+                title="这张签名会怎么保存"
                 items={[
-                  '只能这次新传，U 盘和手写暂时用不了。',
-                  '按高敏材料短期保留，约 1 小时。',
-                  '不进「我的文档」，也不能复用历史。',
+                  '只收本人这一次新拍的手写签名。',
+                  '大约保留 1 小时，用完即清。',
+                  <b>不进「我的文档」，也不能下次再用。</b>,
                 ]}
               />
             </div>
@@ -274,7 +286,7 @@ export function SignStampPickView({
           <div className="ss-grp">
             <h3>这一趟四步</h3>
             <div className="ss-steps" data-testid="sign-stamp-steps">
-              {['选文档', '传本人手写签名图', '选位置', '合成结果'].map((label, i) => (
+              {['选文档', '传签名图', '选位置', '合成结果'].map((label, i) => (
                 <div key={label} className={`ss-step${i < step ? ' done' : i === step ? ' on' : ''}`}>
                   <i aria-hidden />
                   <span>{label}</span>
@@ -293,7 +305,7 @@ export function SignStampPickView({
   )
 }
 
-export function pickAsk(phase: 'doc' | 'stamp', state: string, derived: boolean): [string, string] {
+export function pickAsk(phase: 'doc' | 'stamp', state: string, derived: boolean): [ReactNode, ReactNode] {
   if (phase === 'doc') {
     if (
       state.startsWith('document-') &&
@@ -304,21 +316,33 @@ export function pickAsk(phase: 'doc' | 'stamp', state: string, derived: boolean)
         state.includes('digital') ||
         state.includes('source-'))
     ) {
-      return ['这一份没收下。', '原因在右边。它没有进入流程，换一份就行。']
+      return [<>这一份<em>没收下</em>。</>, <>原因在右边。<b>它没有进入流程</b>，换一份就行。</>]
     }
-    if (state === 'document-local-uploading') return ['正在传这份 PDF。', '单次上传，没有进度回传，传完立刻读页数。']
-    if (state === 'document-phone-entry') return ['用手机把 PDF 传进来。', '扫屏幕上的码；手机上确认之后才进下一步。']
-    if (state === 'document-inspecting') return ['正在读这份 PDF 的页数。', '加密、损坏、已经带数字签名的，这一步就会被拒。']
-    return ['先选一份要签名的 PDF。', '把签名图叠上去，生成一份新的 PDF，原件不动。']
+    if (state === 'document-local-uploading') {
+      return [<>正在<em>传这份 PDF</em>。</>, <>单次上传，<b>没有进度回传</b>，传完立刻读页数。</>]
+    }
+    if (state === 'document-phone-entry') {
+      return [<>用<em>手机</em>把 PDF 传进来。</>, <>扫屏幕上的码；<b>手机上确认之后</b>才进下一步。</>]
+    }
+    if (state === 'document-inspecting') {
+      return [<>正在<em>读这份 PDF 的页数</em>。</>, <>加密、损坏、含数字签名域的，<b>这一步就会被拒</b>。</>]
+    }
+    return [<>先选一份<em>要签名的 PDF</em>。</>, <>把签名图叠上去，生成<b>一份新的 PDF</b>，原件不动。</>]
   }
   if (state.startsWith('stamp-') && (state.includes('rejected') || state.includes('too-') || state.includes('corrupt') || state.includes('encoding') || state.includes('source-'))) {
-    return ['这张图没收下。', '原因在右边，换一张就行。']
+    return [<>这张图<em>没收下</em>。</>, <>原因在右边，<b>换一张就行</b>。</>]
   }
-  if (state === 'stamp-local-uploading') return ['正在传这张签名图。', '按高敏材料短期保留，不进「我的文档」。']
+  if (state === 'stamp-local-uploading') {
+    return [<>正在<em>传这张签名图</em>。</>, <>按高敏材料短期保留，<b>不进「我的文档」</b>。</>]
+  }
   if (state === 'stamp-phone-entry') {
-    return ['签名图暂不支持手机上传。', '请在这台机器上选一张本人手写签名的图片，这一页不替你确认。']
+    return [<>签名图<em>暂不支持</em>手机上传。</>, <>请在这台机器上选一张本人手写签名的图片，<b>这一页不替你确认</b>。</>]
   }
-  if (derived || state === 'add-another-ready') return ['接着叠第二处。', '刚才那份生成的新 PDF 成了新的原文档，签名图要重传。']
-  if (state === 'document-ready') return ['这份 PDF 读好了。', '接下来传这次要用的本人手写签名图片。']
-  return ['传一张这次要用的签名图。', '只能这次新传，不进「我的文档」，也不能复用历史。']
+  if (derived || state === 'add-another-ready') {
+    return [<>接着叠<em>第二处</em>。</>, <>刚才那份签好的 PDF 成了新原文档，<b>签名图要重传</b>。</>]
+  }
+  if (state === 'document-ready') {
+    return [<>这份 PDF <em>读好了</em>。</>, <>接下来传<b>这次要用的</b>签名图片。</>]
+  }
+  return [<>传一张<em>这次要用的</em>签名图。</>, <>只能这次新传，<b>不进「我的文档」，也不能复用历史</b>。</>]
 }

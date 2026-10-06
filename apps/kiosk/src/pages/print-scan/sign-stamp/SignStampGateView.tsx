@@ -117,11 +117,14 @@ export function SignStampGateView({
 }
 
 export function gateWhy(state: string): string[] {
-  if (state === 'login-required' || state === 'auth-unknown') {
-    return ['没有拿到登录状态就不放行，而不是先放行再补检查。', '普通打印、扫描、格式转换不受影响。']
+  if (state === 'login-required') {
+    return ['登录后才能确认这份文档和这张签名图都属于你本人。', '普通打印、扫描、格式转换不受影响，可以直接去用。']
+  }
+  if (state === 'auth-unknown') {
+    return ['没有拿到登录状态，也没有拿到「未登录」的确定答复。', '这种情况一律当作不允许，而不是先放行再补检查。']
   }
   if (state === 'login-expired') {
-    return ['签名图不留到下一次使用，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
+    return ['签名图不做跨这次办理保留，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
   }
   if (state === 'terminal-missing') {
     return ['不假设「读不到就是可用」。', '请联系现场工作人员登记这台机器。']

@@ -547,6 +547,24 @@ assert.match(
 assert.match(signStamp, /问小青：签名放在哪一页/, 'sign page keeps the ask-xiaoqing row')
 assert.match(signStamp, /KIOSK_PRINT_SCAN_ESIGN_NOTICE/, 'long esign notice still comes from the frozen constant')
 assert.match(signStamp, /展开完整说明/, 'long esign notice sits behind an expand control')
+assert.match(
+  signStamp,
+  /data-testid="sign-stamp-truth"[\s\S]*data-testid="sign-stamp-fixture-bar"/,
+  'sample fixture sits in the truth bar, on the same row as the disclaimer',
+)
+const signCtx = signStamp.match(/className="ss-ctxbar"[\s\S]*?<\/div>/)
+assert.ok(signCtx && !signCtx[0].includes('sign-stamp-fixture-bar'), 'sample fixture is no longer a context-bar row')
+assert.match(signPick, /传这次的本人手写签名/, 'stamp section title follows the v2 draft')
+assert.match(signPick, /ss-note-span/, 'stamp retention note spans the full pick row')
+assert.match(signPick, /只收本人这一次新拍的手写签名。/, 'stamp retention note follows the v2 draft')
+assert.match(signPick, /直接在屏幕上写，要先校准触屏。现在请用白纸签字后拍照。/, 'handwrite card follows the v2 draft')
+assert.match(signFlow, /传好签名图再继续/, 'stamp primary follows the v2 draft')
+assert.match(signStamp, /再加一处签名/, 'add-another button follows the v2 draft')
+assert.match(
+  signCss,
+  /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+  'blocked-state alternatives are a 2 by 2 grid',
+)
 assert.doesNotMatch(
   read('src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx'),
   /标记不放进地址栏/,

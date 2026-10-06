@@ -127,9 +127,9 @@ export function SignStampWorkbench({
                   </div>
                 </div>
                 <p className="note">
-                  下一步用的是这份签好的 PDF，不是原件。
+                  下一步用的是<b>这份签好的 PDF</b>，<b>不是原件</b>。
                   <br />
-                  <span>原件没有被改写。</span>
+                  <span data-disclaimer="true">原件没有被改写。</span>
                 </p>
               </div>
               <div className="ss-grp">
@@ -163,7 +163,7 @@ export function SignStampWorkbench({
                 <div className="ss-kv" data-testid="sign-stamp-next-round">
                   <div>
                     <span>原文档</span>
-                    <b>换成这份生成的新 PDF</b>
+                    <b>换成这份签好的 PDF</b>
                   </div>
                   <div>
                     <span>签名图</span>
@@ -287,8 +287,8 @@ export function SignStampWorkbench({
                       {AUTHORIZATION_LABEL}。
                     </span>
                   </button>
-                  <p className="note">
-                    勾选只表示你有这张图的使用权，不是签署协议，不产生法律凭证。伪造印章或冒用他人签名违法，责任自负。换图后要重新确认。
+                  <p className="note" data-disclaimer="true">
+                    勾选只表示你有这张图的使用权，<b>不是签署协议</b>，不产生法律凭证。<b>伪造印章或冒用他人签名违法</b>，责任自负。换图后要重新确认。
                   </p>
                 </div>
               ) : (
@@ -304,7 +304,7 @@ export function SignStampWorkbench({
                     </div>
                     <div>
                       <span>签名图</span>
-                      <b>{stamp ? `${stamp.name} · 这一次` : '—'}</b>
+                      <b>{stamp ? `${stamp.name} · 这次办理` : '—'}</b>
                     </div>
                     <div>
                       <span>授权</span>
@@ -329,45 +329,45 @@ export function SignStampWorkbench({
               <>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>去材料检查核对隐私与可打印性，那之后才谈报价。</span>
+                  <span>去<b>材料检查</b>核对隐私与可打印性，那之后才谈报价。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>也可以拿它再叠一处。</span>
+                  <span>也可以拿它<b>再叠一处</b>。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>再叠要重新传签名图。</span>
+                  <span>再叠要<b>重新传签名图</b>。</span>
                 </li>
               </>
             ) : phase !== 'idle' ? (
               <>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>交出去之后只等结果，没有进度也没有阶段。</span>
+                  <span>交出去之后只等结果，<b>没有进度也没有阶段</b>。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>结果还没确认时，只能原样再试刚才那一次。</span>
+                  <span>结果还没确认时，只能<b>原样再试刚才那一次</b>。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>如果这次没记成功，会告诉你出错了，但签好的 PDF 可能已经生成。</span>
+                  <span>如果这次没记成功，会告诉你出错了，但签好的 PDF <b>可能已经生成</b>。</span>
                 </li>
               </>
             ) : (
               <>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>原 PDF：永不改写。</span>
+                  <span><b>原 PDF</b>：永不改写。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>签名图：只能这次新传，约 1 小时，不进我的文档。</span>
+                  <span><b>签名图</b>：只能这次新传，约 1 小时，不进我的文档。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>生成的新 PDF：每次都是新文件。</span>
+                  <span><b>签好的 PDF</b>：每次都是新文件。</span>
                 </li>
               </>
             )}
@@ -387,7 +387,7 @@ export function SignStampWorkbench({
                   <span>不下单、不出纸、不显示金额。</span>
                 </li>
               </>
-            ) : (
+            ) : phase !== 'idle' ? (
               <>
                 <li>
                   <span className="sq" aria-hidden />
@@ -395,7 +395,18 @@ export function SignStampWorkbench({
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>不覆盖原 PDF。不判断该签在哪。不做防篡改，不发证书。</span>
+                  <span>不覆盖原 PDF。</span>
+                </li>
+              </>
+            ) : (
+              <>
+                <li>
+                  <span className="sq" aria-hidden />
+                  <span>不判断该签在哪。</span>
+                </li>
+                <li>
+                  <span className="sq" aria-hidden />
+                  <span>不做防篡改，不发证书。</span>
                 </li>
               </>
             )}

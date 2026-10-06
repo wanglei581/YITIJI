@@ -15,7 +15,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'auth-unknown': {
       kind: 'lock',
       title: '还没确认你是谁',
-      body: '签名是高敏材料，在确认身份之前，这一页不提供上传、不显示任何文件，也不合成。',
+      body: '签名是<b>高敏材料</b>，在确认身份之前，这一页不提供上传、不显示任何文件，也不合成。',
       chips: [
         { text: '这一页不显示任何文件' },
         { text: '不生成、不保存、不上传' },
@@ -25,17 +25,17 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'login-required': {
       kind: 'lock',
       title: '先登录才能签名',
-      body: '本人手写签名图片属于高敏个人材料，只允许本人在登录后上传与合成。未登录不能在这里签名。',
+      body: '签名图片属于<b>高敏个人材料</b>，只允许本人在登录后上传与合成。未登录不能在这里签名。',
       chips: [
         { text: '这一页不显示任何文件' },
         { text: '不生成、不保存、不上传' },
-        { text: '普通打印扫描不受影响', tone: 'ok' },
+        { text: '签名图不跨这次办理保留' },
       ],
     },
     'login-expired': {
       kind: 'warn',
       title: '登录已过期',
-      body: '为保护高敏材料，登录过期时已上传的本人手写签名图片会被丢弃，需要重新登录后重新上传。原文档还在你的账号里。',
+      body: '为保护高敏材料，登录过期时<b>已上传的签名图片会被丢弃</b>，需要重新登录后重新上传。原文档还在你的账号里。',
       chips: [
         { text: '签名图不留到下一次使用' },
         { text: '不会替你自动重传' },
@@ -50,14 +50,14 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'terminal-missing': {
       kind: 'error',
-      title: '这台机器还没完成登记',
-      body: '签名要先确认这台机器是否被允许使用。读不到登记信息就不放行，不把读不到当成可以用。',
+      title: '这台机器还没登记',
+      body: '签名要先确认这台机器能不能用。读不到登记信息就<b>无法确认是否允许使用</b>，因此不放行。',
       chips: [{ text: '不假设读不到就是可用' }, { text: '请联系现场工作人员' }],
     },
     'capability-loading': {
       kind: 'info',
-      title: '正在读取这台机器的能力开关',
-      body: '还没拿到「签名」在这台机器上是否开放的答复。拿到之前不提供上传，也不显示任何文件。',
+      title: '正在确认这台机器能不能签名',
+      body: '还没拿到这台机器是否开放「签名」的答复。<b>拿到之前不提供上传，也不显示任何文件</b>。',
       chips: [{ text: '读取中不等于可用' }, { text: '这里不画进度条' }],
     },
     'capability-disabled': {
@@ -74,8 +74,8 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'capability-error': {
       kind: 'error',
-      title: '能力开关读取失败',
-      body: '没能读到这台机器的能力开关。读不到就不放行——不说可用，也不说不可用。',
+      title: '还没确认能不能签名',
+      body: '没能确认这台机器能不能签名。<b>确认之前不放行</b>——不说能用，也不说不能用。',
       chips: [{ text: '不把一次读取失败当成已关闭' }, { text: '可重试读取' }],
     },
     'return-source-unknown': {
@@ -109,14 +109,14 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'document-inspecting': {
       kind: 'info',
       title: '正在读这份 PDF 的页数',
-      body: '系统打开文档，读出一共几页，好让你选放在第几页。加密、损坏、已经带数字签名的会在这一步被拒绝。',
+      body: '系统打开文档，读出<b>一共几页</b>，好让你选放在第几页。<b>加密、损坏、含数字签名域的会在这一步被拒绝</b>。',
       chips: [{ text: '读取页数' }, { text: '没有进度回传' }, { text: '原文件不被改写', tone: 'ok' }],
     },
     'document-ready': {
       kind: 'info',
       title: live.pages ? `这份 PDF 读好了：共 ${live.pages} 页` : '这份 PDF 读好了',
       body: live.pages
-        ? `读到 ${live.pages} 页；没加密、没损坏、没有数字签名域。接下来传这次要用的签名图。`
+        ? `读到 <b>${live.pages} 页</b>；没加密、没损坏、没有数字签名域。接下来传<b>这次要用的</b>签名图。`
         : '页数已读到。接下来传这次要用的签名图。',
       chips: [
         { text: live.doc ? `${live.doc.name} · ${live.doc.size}` : FX.doc.name },
@@ -174,8 +174,8 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'pick-stamp': {
       kind: 'info',
-      title: '传一张这次要用的本人手写签名图',
-      body: '只能用这次新传的图：按高敏材料保留约 1 小时，不进我的文档。',
+      title: '传一张这次要用的签名图',
+      body: '只能用<b>这次新传的图</b>：按高敏材料保留约 1 小时，<b>不进我的文档</b>。',
       chips: [
         { text: 'JPG / PNG ≤ 10MB' },
         { text: '≤ 2500 万像素' },
@@ -184,8 +184,8 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     },
     'stamp-local-uploading': {
       kind: 'info',
-      title: '正在传这张本人手写签名图',
-      body: '这张图按高敏材料处理：短期保留（约 1 小时），不进「我的文档」，这次使用结束就不能再用。',
+      title: '正在传这张签名图',
+      body: '这张图按<b>高敏材料</b>处理：短期保留（约 1 小时），<b>不进「我的文档」</b>，这次办理结束即不可再用。',
       chips: [
         { text: '单次上传' },
         { text: '高敏 · 约 1 小时', tone: 'warn' },
@@ -195,7 +195,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'stamp-phone-entry': {
       kind: 'info',
       title: '签名图片暂不支持手机上传',
-      body: '手机上传的通道还不收签名图片。请在这台机器上选一张本人手写签名的图片。',
+      body: '手机上传的通道<b>还不收签名图片</b>。请回到上一步，在这台机器上选一张本人手写签名的图片。',
       chips: [
         { text: '请在本机上传' },
         { text: '这一页不替你确认', tone: 'warn' },
@@ -206,8 +206,8 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       kind: 'info',
       title: '签名图收到了',
       body: live.stamp
-        ? `${live.stamp.name} 已经在这一次使用里。接下来选第几页、哪个位置、多大，左边同步画出来。`
-        : '签名图已经在这一次使用里。接下来选第几页、哪个位置、多大。',
+        ? `${live.stamp.name.replace(/[<>]/g, '')} 已经在这次办理里。接下来选<b>第几页、哪个位置、多大</b>，左边同步画出来。`
+        : '签名图已经在这次办理里。接下来选<b>第几页、哪个位置、多大</b>。',
       chips: [
         { text: live.stamp ? live.stamp.size : FX.stamp.size },
         { text: '高敏 · 约 1 小时', tone: 'warn' },
@@ -263,20 +263,26 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       kind: 'warn',
       title: live.authReset ? '换了签名图，授权要重新确认' : '生成之前先确认授权',
       body: live.authReset
-        ? '上一次的授权只对上一张图有效。换图之后授权已经复位，得对这张新图再确认一次才能生成。'
-        : '勾选「我拥有这张图的使用授权」之后才能生成。没勾就不给生成，原因常驻在按钮上方。',
-      chips: [
-        { text: '需勾选授权', tone: 'warn' },
-        { text: '换图后需重新确认', tone: 'warn' },
-        { text: '原 PDF 不被改写', tone: 'ok' },
-      ],
+        ? '上一次的授权只对上一张图有效。换图之后<b>授权已经复位</b>，得对这张新图再确认一次才能生成。'
+        : '勾选「我拥有这张图的使用授权」之后才能生成。<b>没勾就不给生成</b>，原因常驻在按钮上方。',
+      chips: live.authReset
+        ? [
+            { text: '授权已复位', tone: 'warn' },
+            { text: '上一张图不留存', tone: 'warn' },
+            { text: '原 PDF 不被改写', tone: 'ok' },
+          ]
+        : [
+            { text: '需勾选授权', tone: 'warn' },
+            { text: '换图后需重新确认', tone: 'warn' },
+            { text: '原 PDF 不被改写', tone: 'ok' },
+          ],
     },
     composing: {
       kind: 'info',
       title: '正在提交这一次合成',
-      body: `按${place}把图片叠上去，生成一份新 PDF。交出去之后，系统不回传进度，所以没有百分比也没有阶段。`,
+      body: `按<b>${place}</b>把图片叠上去，生成一份新 PDF。交出去之后<b>系统不回传进度</b>，所以没有百分比也没有阶段。`,
       chips: [
-        { text: '页码位置大小已锁定' },
+        { text: '参数已锁定' },
         { text: '不会自动重复提交', tone: 'ok' },
         { text: '原 PDF 不被改写', tone: 'ok' },
       ],
@@ -284,7 +290,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'rate-limited': {
       kind: 'warn',
       title: '提交太频繁了',
-      body: '合成一分钟内最多三次。你的文档、签名图和位置都还在，等一会儿原样重试一次即可。',
+      body: '合成一分钟内最多三次。<b>你的文档、签名图和位置都还在</b>，等一会儿<b>原样重试</b>一次即可。',
       chips: [
         { text: '一分钟内 3 次上限' },
         { text: '输入已全部保留', tone: 'ok' },
@@ -294,7 +300,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'conversion-in-progress': {
       kind: 'warn',
       title: '上一次合成还没结束',
-      body: '刚才那一次的合成还在进行。为避免生成两份，这次先不受理，稍候原样重试。',
+      body: '刚才那一次的合成<b>还在进行</b>。为避免生成两份，这次先不受理，<b>稍候原样重试</b>。',
       chips: [
         { text: '系统登记为进行中' },
         { text: '输入已全部保留', tone: 'ok' },
@@ -304,7 +310,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'known-failed': {
       kind: 'error',
       title: '这一次明确失败了',
-      body: '系统给了明确的失败答复：这一次没有生成文件。文档、签名图、页码、位置、大小和授权全部保留，重试不用重传。',
+      body: '系统给了<b>明确的失败答复</b>：这一次<b>没有生成文件</b>。文档、签名图、页码、位置、大小和授权全部保留，重试不用重传。',
       chips: [
         { text: '系统明确拒绝' },
         { text: '输入已全部保留', tone: 'ok' },
@@ -314,7 +320,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'result-unknown': {
       kind: 'warn',
       title: '这一次的结果没有确认',
-      body: '刚才那一次中途断了，不知道系统做了没有。所以这里不说已生成，也不说没生成。只能原样重试刚才那一次。文档、签名图或位置一改就算新的一次，可能真的生成两份。',
+      body: '刚才那一次中途断了，<b>不知道系统做了没有</b>。所以这里<b>不说已生成，也不说没生成</b>。只能<b>原样重试刚才那一次</b>。文档、签名图或位置一改就算新的一次，可能真的生成两份。',
       chips: [
         { text: '结果未确认' },
         { text: '输入已全部保留', tone: 'ok' },
@@ -324,13 +330,13 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'retrying-same-request': {
       kind: 'info',
       title: '正在原样重试刚才那一次',
-      body: '还是刚才那一次：文档、签名图、页码、位置、大小一点都没改。如果系统上一次已经做完，会把那一份直接还回来，不会再生成一份。',
+      body: '还是<b>刚才那一次</b>：文档、签名图、页码、位置、大小<b>一点都没改</b>。如果系统上一次已经做完，会把那一份直接还回来，不会再生成一份。',
       chips: [{ text: '不算新的一次' }, { text: '同一份输入', tone: 'ok' }, { text: '参数已锁定', tone: 'ok' }],
     },
     'idempotency-conflict': {
       kind: 'error',
       title: '和刚才那一次的参数对不上',
-      body: '刚才那一次交的是另一组参数，系统拒绝覆盖，上一次的结果原样保留。换参数就得重新开始。',
+      body: '刚才那一次交的是<b>另一组参数</b>，系统拒绝覆盖，<b>上一次的结果原样保留</b>。换参数就得重新开始。',
       chips: [
         { text: '系统拒绝覆盖' },
         { text: '上一次结果未被覆盖', tone: 'ok' },
@@ -340,7 +346,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'recovered-completed': {
       kind: 'info',
       title: '这一份是恢复出来的已完成结果',
-      body: '已经确认刚才那一次、同一份输入其实已经做完，于是把那一份还回来了。没有重复生成。',
+      body: '已经确认<b>刚才那一次、同一份输入</b>其实已经做完，于是把那一份还回来了。<b>没有重复生成</b>。',
       chips: [
         { text: '刚才那一次已完成' },
         { text: '没有重复生成', tone: 'ok' },
@@ -350,9 +356,9 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     completed: {
       kind: 'info',
       title: '新的签好的 PDF 已生成',
-      body: '结果回来了一份新文件。原 PDF 一点没改。下一步去材料检查，那一步才决定能不能打印。',
+      body: '结果回来了<b>一份新文件</b>。<b>原 PDF 一点没改</b>。下一步去<b>材料检查</b>，那一步才决定能不能打印。',
       chips: [
-        { text: live.result ? `${live.result.pages} 页 · ${formatResultSize(live.result)}` : '生成的新 PDF' },
+        { text: live.result ? `${live.result.pages} 页 · ${formatResultSize(live.result)}` : '签好的 PDF' },
         { text: '原 PDF 未被改写', tone: 'ok' },
         { text: '下一步：材料检查', tone: 'ok' },
       ],
@@ -360,7 +366,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'output-preview-failed': {
       kind: 'warn',
       title: '签好的 PDF 已生成，但这里显示不出来',
-      body: '浏览器没能把这份 PDF 画出来。这不代表文件损坏或丢失，可以重新取一次预览链接，或直接去材料检查。',
+      body: '浏览器没能把这份 PDF 画出来。<b>这不代表文件损坏或丢失</b>，可以重新取一次预览链接，或直接去材料检查。',
       chips: [
         { text: '预览渲染失败', tone: 'warn' },
         { text: '文件仍在', tone: 'ok' },
@@ -370,7 +376,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'output-expired': {
       kind: 'warn',
       title: '签好的 PDF 已生成，但预览链接过期了',
-      body: '访问链接有效期 30 分钟，已到期。文件没丢，但现在打不了——要重新取一次。',
+      body: '访问链接<b>有效期 30 分钟</b>，已到期。<b>文件没丢，但现在打不了</b>——要重新取一次。',
       chips: [
         { text: '链接已过期', tone: 'warn' },
         { text: '文件仍在', tone: 'ok' },
@@ -386,9 +392,9 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     'add-another-ready': {
       kind: 'info',
       title: '以刚才的合成结果继续叠加',
-      body: '旧签名图和授权已清空，得重新传一张才能接着叠。',
+      body: '旧签名图和授权<b>已清空</b>，<b>得重新传一张</b>才能接着叠。',
       chips: [
-        { text: live.doc ? `${live.doc.name} · ${live.pages ?? ''} 页` : '生成的新 PDF 已作为原文档' },
+        { text: live.doc ? `${live.doc.name} · ${live.pages ?? ''} 页` : '签好的 PDF 已作为原文档' },
         { text: '旧签名图已清空', tone: 'warn' },
         { text: '授权已复位', tone: 'warn' },
       ],
@@ -399,14 +405,24 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     return copies.completed as StatusCopy
   }
   if (state.startsWith('preview-') || state.startsWith('placement-')) {
+    if (!live.authorized) {
+      return {
+        kind: 'warn',
+        title: '生成之前先确认授权',
+        body: '勾选「我拥有这张图的使用授权」之后才能生成。<b>没勾就不给生成</b>，原因常驻在按钮上方。',
+        chips: [
+          { text: '需勾选授权', tone: 'warn' },
+          { text: '换图后需重新确认', tone: 'warn' },
+          { text: '原 PDF 不被改写', tone: 'ok' },
+        ],
+      }
+    }
     return {
       kind: 'info',
-      title: live.authorized ? '参数已就绪，可以生成' : '生成之前先确认授权',
-      body: live.authorized
-        ? `将按${place}合成一份新的 PDF。原 PDF 不会被改写，成功后进入材料检查。`
-        : '勾选授权确认之后才能生成。没勾就不给生成。',
+      title: '参数已就绪，可以生成',
+      body: `将按<b>${place}</b>合成一份新的 PDF。<b>原 PDF 不会被改写</b>，成功后进入材料检查。`,
       chips: [
-        { text: place, tone: live.authorized ? 'ok' : undefined },
+        { text: place, tone: 'ok' },
         { text: '产物是新文件', tone: 'ok' },
         { text: '下一步是材料检查', tone: 'ok' },
       ],
@@ -416,7 +432,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
     return {
       kind: 'info',
       title: '参数已就绪，可以生成',
-      body: `将按${place}合成一份新的 PDF。原 PDF 不会被改写，成功后进入材料检查。`,
+      body: `将按<b>${place}</b>合成一份新的 PDF。<b>原 PDF 不会被改写</b>，成功后进入材料检查。`,
       chips: [
         { text: place, tone: 'ok' },
         { text: '产物是新文件', tone: 'ok' },

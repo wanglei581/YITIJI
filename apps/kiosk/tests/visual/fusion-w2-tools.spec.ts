@@ -536,7 +536,7 @@ test('signature inspect renders server pages and compose sends placement payload
   })
 
   await loginThroughVisibleUi(page, '/print-scan/sign')
-  await expect(page.getByText('选要签名的 PDF')).toBeVisible()
+  await expect(page.getByText('选要放入签名的 PDF')).toBeVisible()
   await expect(page.getByTestId('sign-stamp-truth')).toContainText('只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。')
   await page.locator('input[accept="application/pdf"]').setInputFiles({
     name: '就业协议.pdf',
@@ -663,6 +663,148 @@ test('signature phone stamp card stays disabled and does not open an upload sess
   await expect(page.getByTestId('sign-stamp-notice-full')).toContainText(
     '签名仅用于个人材料整理与打印辅助，不提供 CA 电子签、电子认证或合同签署服务；仅为图片合成预览，不具备法律认证效力，正式法律文件请通过具备资质的电子签名服务办理。',
   )
+  await expectHealthy(page, errors, 'print-scan-sign')
+})
+
+async function assertTruthDoesNotCover(page: Page) {
+  const read = () =>
+    page.evaluate(() => {
+      const truth = document.querySelector('[data-testid="sign-stamp-truth"]')
+      const root = document.querySelector('.ss-page')
+      if (!truth || !root) return { covered: ['missing'], lastBottom: 0, truthTop: 0, fits: false }
+      const clip = (el: Element) => {
+        let top = el.getBoundingClientRect().top
+        let bottom = el.getBoundingClientRect().bottom
+        let left = el.getBoundingClientRect().left
+        let right = el.getBoundingClientRect().right
+        let parent = el.parentElement
+        while (parent) {
+          const style = getComputedStyle(parent)
+          if (/(auto|scroll|hidden)/.test(style.overflowY) || /(auto|scroll|hidden)/.test(style.overflowX)) {
+            const box = parent.getBoundingClientRect()
+            top = Math.max(top, box.top)
+            bottom = Math.min(bottom, box.bottom)
+            left = Math.max(left, box.left)
+            right = Math.min(right, box.right)
+          }
+          parent = parent.parentElement
+        }
+        return { top, bottom, left, right, width: Math.max(0, right - left), height: Math.max(0, bottom - top) }
+      }
+      const t = truth.getBoundingClientRect()
+      const nodes = [
+        ...root.querySelectorAll(
+          '.ss-state, .ss-pick, .ss-note, .ss-grp, .ss-step, .ss-consent, .ss-acol, .ss-pickcard, .ss-xq, .ss-sec-label, .ss-pvcol, .ss-gatecol',
+        ),
+      ]
+      const covered: string[] = []
+      let lastBottom = -Infinity
+      for (const el of nodes) {
+        if (truth.contains(el)) continue
+        const r = clip(el)
+        if (r.width < 2 || r.height < 2) continue
+        if (r.bottom > lastBottom) lastBottom = r.bottom
+        const overlaps = r.top < t.bottom - 1 && r.bottom > t.top + 1 && r.left < t.right && r.right > t.left
+        if (overlaps) covered.push(el.getAttribute('data-testid') || String(el.className).slice(0, 80))
+      }
+      const pageBox = root.getBoundingClientRect()
+      return {
+        covered,
+        lastBottom,
+        truthTop: t.top,
+        fits: root.scrollHeight <= root.clientHeight + 1 && t.bottom <= pageBox.bottom + 1,
+      }
+    })
+  let info = await read()
+  if (info.covered.length > 0 || info.lastBottom > info.truthTop + 1) {
+    await page.locator('.ss-page').evaluate((el) => {
+      el.scrollTop = el.scrollHeight
+    })
+    info = await read()
+  }
+  expect(info.covered).toEqual([])
+  expect(info.lastBottom).toBeLessThanOrEqual(info.truthTop + 1)
+  return info.fits
+}
+
+test('signature four capture states keep the truth bar from covering content @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await page.setViewportSize({ width: 1080, height: 1920 })
+
+  await page.goto('/print-scan/sign?capture=1&state=pick-stamp')
+  const fixture = page.getByTestId('sign-stamp-fixture-bar')
+  await expect(page.getByTestId('sign-stamp-truth')).toContainText('示例')
+  await expect(fixture).toBeVisible()
+  await expect(page.locator('.ss-ctxbar [data-testid="sign-stamp-fixture-bar"]')).toHaveCount(0)
+  const sameRow = await page.evaluate(() => {
+    const fx = document.querySelector('[data-testid="sign-stamp-fixture-bar"]')
+    const disc = document.querySelector('[data-testid="sign-stamp-truth"] [data-disclaimer]')
+    if (!fx || !disc) return false
+    const a = fx.getBoundingClientRect()
+    const b = disc.getBoundingClientRect()
+    return a.left < b.left && Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 36
+  })
+  expect(sameRow).toBe(true)
+  await expect(page.locator('.ss-xq-ask em')).toHaveText('这次要用的')
+  await expect(page.getByTestId('sign-stamp-primary')).toHaveText('传好签名图再继续')
+  const note = page.getByTestId('sign-stamp-stamp-note')
+  await expect(note).toContainText('只收本人这一次新拍的手写签名。')
+  await expect(note).toContainText('大约保留 1 小时，用完即清。')
+  await expect(note).toContainText('不进「我的文档」，也不能下次再用。')
+  const noteWide = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="sign-stamp-stamp-note"]')
+    const row = document.querySelector('.ss-pickrow')
+    if (!card || !row) return { wide: false, inline: false }
+    const cardBox = card.getBoundingClientRect()
+    const rowBox = row.getBoundingClientRect()
+    const lis = [...card.querySelectorAll('li')].map((el) => el.getBoundingClientRect())
+    const inline =
+      lis.length === 3 &&
+      Math.abs(lis[0].y - lis[1].y) < 8 &&
+      Math.abs(lis[1].y - lis[2].y) < 8 &&
+      lis[0].x < lis[1].x &&
+      lis[1].x < lis[2].x
+    return { wide: cardBox.width > rowBox.width * 0.85, inline }
+  })
+  expect(noteWide.wide).toBe(true)
+  expect(noteWide.inline).toBe(true)
+  expect(await assertTruthDoesNotCover(page)).toBe(true)
+
+  await page.goto('/print-scan/sign?capture=1&state=placement-default')
+  await expect(page.getByTestId('sign-stamp-fallback')).toHaveAttribute('data-kind', 'warn')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('需勾选授权')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('换图后需重新确认')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('原 PDF 不被改写')
+  await expect(page.getByText('签好的 PDF：每次都是新文件。')).toBeVisible()
+  await expect(page.getByText('不判断该签在哪。')).toBeVisible()
+  await expect(page.getByText('不做防篡改，不发证书。')).toBeVisible()
+  await expect(page.locator('.ss-aside').getByText('不画进度条，也不自动重试。')).toHaveCount(0)
+  expect(await assertTruthDoesNotCover(page)).toBe(true)
+
+  await page.goto('/print-scan/sign?capture=1&state=completed')
+  await expect(page.getByTestId('sign-stamp-add-another')).toHaveText('再加一处签名')
+  await expect(page.getByTestId('sign-stamp-fallback').locator('b')).toContainText(['一份新文件', '原 PDF 一点没改', '材料检查'])
+  expect(await assertTruthDoesNotCover(page)).toBe(true)
+
+  await page.goto('/print-scan/sign?capture=1&state=login-required')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('签名图片属于高敏个人材料')
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('签名图不跨这次办理保留')
+  await expect(page.getByText('登录后才能确认这份文档和这张签名图都属于你本人。')).toBeVisible()
+  const grid = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.ss-gaterow .ss-pickcard')].map((el) => {
+      const box = el.getBoundingClientRect()
+      const icon = el.querySelector('.pi')?.getBoundingClientRect()
+      const title = el.querySelector('b')?.getBoundingClientRect()
+      return { x: box.x, y: box.y, iconBottom: icon?.bottom ?? 0, titleTop: title?.top ?? 0 }
+    })
+    if (cards.length !== 4) return false
+    const sameRow = (a: number, b: number) => Math.abs(cards[a].y - cards[b].y) < 8
+    const iconAbove = cards.every((card) => card.iconBottom <= card.titleTop + 1)
+    return sameRow(0, 1) && sameRow(2, 3) && cards[2].y > cards[0].y + 40 && cards[0].x < cards[1].x && cards[2].x < cards[3].x && iconAbove
+  })
+  expect(grid).toBe(true)
+  expect(await assertTruthDoesNotCover(page)).toBe(true)
   await expectHealthy(page, errors, 'print-scan-sign')
 })
 

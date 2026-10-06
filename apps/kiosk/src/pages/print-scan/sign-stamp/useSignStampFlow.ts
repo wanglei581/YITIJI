@@ -527,7 +527,7 @@ function resolveCta(args: {
     return { primary: '选好 PDF 再继续', primaryDisabled: true, reason: '还没有选文档，没有文档就没法选页码和位置', action: 'none' }
   }
   if (!live.stamp) {
-    return { primary: '传好本人手写签名图再继续', primaryDisabled: true, reason: '还没有这次的本人手写签名图片，没有图就没有可叠加的内容', action: 'none' }
+    return { primary: '传好签名图再继续', primaryDisabled: true, reason: '还没有这次的签名图片，没有图就没有可叠加的内容', action: 'none' }
   }
   if (live.placeErr) {
     return { primary: '先改成有效页码', primaryDisabled: true, reason: '页码超出这份文档的范围，系统会直接拒绝', action: 'none' }

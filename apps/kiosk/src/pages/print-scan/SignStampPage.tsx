@@ -1,5 +1,5 @@
 // 签名（图形排版），/print-scan/sign。青序流光 20-sign-stamp.html。
-// 四步：选文档 → 传本人手写签名图 → 选位置 → 合成结果。业务调用仍走
+// 四步：选文档 → 传签名图 → 选位置 → 合成结果。业务调用仍走
 // signInspect / signCompose，本文件只换外壳并补状态覆盖。
 
 import { useState } from 'react'
@@ -61,7 +61,7 @@ export function SignStampPage() {
                 data-testid="sign-stamp-add-another"
                 onClick={flow.addAnother}
               >
-                再加一处本人手写签名
+                再加一处签名
               </button>
             ) : null}
             <button
@@ -143,11 +143,6 @@ export function SignStampPage() {
             </span>
           ) : null}
           <span className="sp" />
-          {flow.synthetic ? (
-            <span className="ss-fx" data-testid="sign-stamp-fixture-bar">
-              <b>示例</b>示例文件，不是哪位用户的文件
-            </span>
-          ) : null}
         </div>
 
         {flow.shape === 'block' ? (
@@ -235,6 +230,11 @@ export function SignStampPage() {
 
         <div className="ss-truth" data-testid="sign-stamp-truth">
           <div className="ss-truth-row">
+            {flow.synthetic ? (
+              <span className="ss-fx" data-testid="sign-stamp-fixture-bar">
+                <b>示例</b>示例文件，不是哪位用户的文件
+              </span>
+            ) : null}
             <span data-disclaimer="true">
               <b>只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。</b>
             </span>

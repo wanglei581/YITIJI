@@ -180,14 +180,14 @@
 .ss-plan .sq { flex: none; width: 9px; height: 9px; border-radius: 3px; background: var(--qx-teal); margin-top: 7px; }
 
 .ss-work {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: min-content;
   margin: 14px var(--qx-gutter) 0;
   display: flex;
   gap: 18px;
 }
 .ss-page[data-shape='pick'] .ss-work { margin: 14px 44px 0; }
-.ss-page[data-shape='pick'] .ss-pvcol { width: 400px; }
+.ss-page[data-shape='pick'] .ss-pvcol { width: 280px; }
 
 .ss-pvcol {
   flex: none;
@@ -414,9 +414,7 @@
 .ss-acol h4 { font-size: 26px; font-weight: 700; margin: 0 0 9px; }
 
 .ss-truth {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
+  position: static;
   flex: none;
   margin-top: auto;
   min-height: 76px;
@@ -433,7 +431,9 @@
   color: var(--qx-ink-2);
 }
 .ss-truth b { color: var(--qx-ink); font-weight: 700; }
-.ss-truth-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.ss-truth-row { display: flex; align-items: center; gap: 14px; }
+.ss-truth-row [data-disclaimer] { flex: 1 1 auto; min-width: 0; }
+.ss-truth .ss-fx { flex: none; }
 .ss-truth-toggle {
   flex: none;
   min-height: 48px;
@@ -526,6 +526,83 @@
 .qx-stage:has(.ss-page) > .qx-ctabar > .ss-cta-wrap,
 .qx-stage:has(.ss-page) > .qx-ctabar > .qx-step-actions { flex: 1 1 100%; }
 .ss-page[data-shape='work'] .ss-pvcol { width: 520px; }
+
+/* 20 v2 覆盖块：字号、间距、卡片高度逐项取稿 #qx2，不另加大。
+   说明卡通栏对应稿 .pickrow>.picknote:last-child:nth-child(odd)；
+   用 .ss-note-span，避免本机卡隐藏后 nth-child 错位。
+   底栏留在文档流里。放不下时整页滚动，不再用 sticky 盖住下半截。 */
+.ss-pages { gap: 5px; }
+.ss-consent { padding: 12px 14px; min-height: 0; }
+.ss-page[data-shape='work'] .ss-aside { height: auto; min-height: 0; margin-top: 10px; }
+.ss-page[data-shape='work'] .ss-ctrlcol,
+.ss-page[data-shape='pick'] .ss-ctrlcol {
+  gap: 8px;
+  padding-top: 32px;
+  overflow: visible;
+  min-height: min-content;
+}
+.ss-page[data-shape='work'] .ss-grp { padding: 13px 16px; }
+.ss-page[data-shape='work'] .ss-pvbtn { padding: 0 9px; }
+.ss-page[data-state='placement-invalid-page'] .ss-status { min-height: 0; }
+.ss-page[data-state='placement-invalid-page'] .ss-ctrlcol { padding-top: 0; }
+.ss-page[data-state='placement-invalid-page'] .ss-grp:has(> .ss-pages) { display: flex; flex-direction: column; }
+.ss-page[data-state='placement-invalid-page'] .ss-grp:has(> .ss-pages) > .ss-pages { order: 2; }
+.ss-page[data-state='placement-invalid-page'] .ss-grp:has(> .ss-pages) > .note { order: 1; margin: 0 0 10px; }
+.ss-page[data-state='output-expired'] .ss-pvcol,
+.ss-page[data-state='output-preview-failed'] .ss-pvcol { width: 400px; }
+
+.ss-page[data-shape='block'] .ss-status { min-height: 0; }
+.ss-page[data-shape='block'] .ss-work { flex: none; margin-top: auto; min-height: 0; }
+.ss-page[data-shape='block'] .ss-aside { margin-top: auto; height: auto; min-height: 0; margin-bottom: auto; }
+.ss-page[data-shape='block'] .ss-gatecol { flex: 1; padding: 20px 22px; gap: 14px; }
+.ss-page[data-shape='block'] .ss-gatecol h3 { font-size: 26px; }
+.ss-page[data-shape='block'] .ss-gaterow {
+  flex: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  gap: 14px;
+}
+.ss-page[data-shape='block'] .ss-gaterow .ss-pickcard {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 24px 22px;
+  min-height: 330px;
+}
+.ss-page[data-shape='block'] .ss-gaterow .ss-pickcard .pi { width: 88px; height: 88px; border-radius: 24px; }
+.ss-page[data-shape='block'] .ss-gaterow .ss-pickcard .pt { flex: 1; display: flex; flex-direction: column; }
+.ss-page[data-shape='block'] .ss-gaterow .ss-pickcard b { font-size: 24px; }
+.ss-page[data-shape='block'] .ss-gaterow .ss-pickcard .d { font-size: 22px; margin-top: 8px; }
+.ss-page[data-shape='block'] .ss-gaterow .ss-pickcard .f { margin-top: auto; padding-top: 14px; }
+.ss-page[data-shape='block'] .ss-acol h4 { font-size: 24px; }
+
+.ss-pickrow > .ss-note-span { grid-column: 1 / -1; }
+.ss-pickrow > .ss-note-span .ss-plan { flex-direction: row; gap: 18px; }
+.ss-pickrow > .ss-note-span .ss-plan li { flex: 1 1 0; min-width: 0; }
+.ss-page[data-shape='pick'] .ss-xq { margin-top: 18px; padding: 20px 38px 18px; }
+.ss-page[data-shape='pick'] .ss-xq-face { width: 88px; height: 88px; font-size: 40px; }
+.ss-page[data-shape='pick'] .ss-sec { margin-top: 16px; }
+.ss-page[data-shape='pick'] .ss-sec-label { margin-bottom: 8px; }
+.ss-page[data-shape='pick'] .ss-work { margin-top: 10px; }
+.ss-page[data-shape='pick'] .ss-note { padding: 18px 22px; }
+.ss-page[data-shape='pick'] .ss-ctrlcol .ss-state { padding: 16px 18px; gap: 8px; }
+.ss-page[data-shape='pick'] .ss-ctrlcol .ss-chip { padding: 0 12px; min-height: 40px; }
+.ss-page[data-shape='pick'] .ss-ctrlcol .ss-grp { padding: 12px 16px; }
+.ss-page[data-shape='pick'] .ss-grp:has(> .ss-steps) { display: flex; align-items: center; gap: 14px; }
+.ss-page[data-shape='pick'] .ss-grp:has(> .ss-steps) h3 { margin: 0; flex: none; }
+.ss-page[data-shape='pick'] .ss-steps { flex: 1; min-width: 0; flex-direction: row; gap: 8px; }
+.ss-page[data-shape='pick'] .ss-step {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 64px;
+  padding: 8px 10px;
+  gap: 8px;
+  justify-content: center;
+  text-align: center;
+}
+.ss-page[data-shape='pick'] .ss-step i { display: none; }
+.ss-truth .ss-fx,
+.ss-truth .ss-fx b { font-size: 20px; }
 
 .ss-hidden-file {
   position: absolute;

@@ -254,7 +254,7 @@ export function SignStampPreview({
         ref={viewRef}
         data-testid="sign-stamp-pv-view"
         tabIndex={0}
-        aria-label={`${burned ? '生成的新 PDF' : '原 PDF'}完整页预览，可拖动平移`}
+        aria-label={`${burned ? '签好的 PDF' : '原 PDF'}完整页预览，可拖动平移`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -290,7 +290,7 @@ export function SignStampPreview({
         {!previewUrl
           ? '没有可打开的文件内容，不画示意纸面。'
           : burned
-            ? '生成的新 PDF · 签名已印在纸上'
+            ? '签好的 PDF · 签名已印在纸上'
             : compact
               ? `原 PDF 第 ${viewPage} 页 · 下一步可翻页放大`
               : '原 PDF · 框是标记，原件不改写'}
