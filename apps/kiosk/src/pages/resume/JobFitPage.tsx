@@ -33,7 +33,7 @@ import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
-import { useKioskStageFit } from '../../hooks/useKioskStageFit'
+import { isKioskCompactViewport, useKioskStageFit, usesKioskFluidViewport } from '../../hooks/useKioskStageFit'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { readAiResumeSession } from './aiResumeSession'
@@ -53,22 +53,24 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
 /**
- * 舞台缩放开关：与 `KioskRoot.tsx`（isCompactViewport / usesFluidViewport）用**同一套判据**。
+ * 舞台缩放开关：与 `KioskRoot` 用同一套 `usesKioskFluidViewport`。
  *
  * /resume/job-fit 是 KioskRoot 之外的整屏路由（fusion-w6 的 expectedFullScreen 钉着
- * depth=2），拿不到 KioskRoot 算好的结果，只能同口径再算一次。
+ * depth=2），拿不到 KioskRoot 算好的结果，只能同口径再算一次。这一页必须自己挂舞台，
+ * 否则横屏电脑会漏缩。
  *
- * 为什么必须算：`KioskStageFit` 默认 enabled，会把整张 1080×1920 稿等比缩到可视区。
+ * 为什么手机要关：`KioskStageFit` 默认 enabled，会把整张 1080×1920 稿等比缩到可视区。
  * 一体机上 scale≈1 没问题，但 390×844 手机上 scale≈0.36 —— 返回键量出来只有 23px、
- * 主操作 35px，正文小到读不了，触控下限（48px）全线失守。手机与横屏电脑因此关掉缩放，
+ * 主操作 35px，正文小到读不了，触控下限（48px）全线失守。只有手机关掉缩放，
  * 改走真实流式布局（窄屏样式在 job-fit-qx.css 的 .jfq-root 段，随本页作用域）。
+ * 横屏电脑不再关缩放，和一体机一样走 1080×1920 舞台。
  *
- * 一体机竖屏（1080×1920）两个条件都不命中 → 仍然是原来的定高舞台，稿 46 不受影响。
+ * 一体机竖屏（1080×1920）不是紧凑视口 → 仍然是原来的定高舞台，稿 46 不受影响。
  */
 function useJobFitStage(): { enabled: boolean; layout: 'kiosk' | 'phone' | 'desktop' } {
   const { viewportW, viewportH } = useKioskStageFit()
-  const isCompact = viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
-  const isFluid = isCompact || (viewportW > 960 && viewportW > viewportH)
+  const isCompact = isKioskCompactViewport(viewportW, viewportH)
+  const isFluid = usesKioskFluidViewport(viewportW, viewportH)
   if (!isFluid) return { enabled: true, layout: 'kiosk' }
   return { enabled: false, layout: isCompact ? 'phone' : 'desktop' }
 }

@@ -36,6 +36,22 @@ export async function assertNoElementCrossesViewport(page: Page): Promise<void> 
   expect(overflowingElements, '不得包含越过视口边界的元素').toEqual([])
 }
 
+/**
+ * 舞台开启时读 `.kiosk-stage` 的 scale。关闭或不存在时返回 1。
+ * 屏上像素要折回设计像素时用它做除数；手机流式布局不能再除一次。
+ */
+export async function readEnabledStageScale(page: Page): Promise<number> {
+  const stage = page.locator('[data-kiosk-stage-fit="on"] .kiosk-stage')
+  if ((await stage.count()) === 0) return 1
+  return stage.first().evaluate((element) => {
+    const transform = getComputedStyle(element).transform
+    if (!transform || transform === 'none') return 1
+    const match = /^matrix\(([^,]+)/.exec(transform)
+    const value = match ? Number(match[1]) : 1
+    return Number.isFinite(value) && value > 0 ? value : 1
+  })
+}
+
 /** 量 bounding box，并用 elementFromPoint 确认 ≥48px 区域内真能命中该控件。 */
 export async function assertTapTargetPointerHit(locator: Locator): Promise<void> {
   const box = await locator.boundingBox()
