@@ -303,7 +303,7 @@ export class LlmSelfAssessmentService {
     }
     if (!res.ok) {
       onLlmCall?.({ provider: providerLabel })
-      throw llmUpstreamStatusError('AI 自我探索解读服务', res.status)
+      throw llmUpstreamStatusError('AI 自我探索解读服务', res.status, res.data)
     }
     const data = res.data as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage } | null
     onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })

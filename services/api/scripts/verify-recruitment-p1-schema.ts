@@ -149,9 +149,12 @@ function assertNoSqliteDrift(db: string, label: string): void {
 // PartnerOrgNotice（下架后通知所属机构）→ 106。
 // P1-2a AiUsageRecord（AI 逐次计量账，额度与将来收费的底座）→ 107。
 // P1-2a AiUsageMonthlySummary（按月费用汇总，只有金额和次数，不含个人信息）→ 108。
-// AiSafetyTerm（违法和不良信息词库，只有类别、词条和开关）→ 112。
 // 加表就要同步这个数，忘了改 build-and-verify 与 postgres-readiness 会一起红。
-const EXPECTED_MODEL_COUNT = 112
+// 112（本次，服务联系方式，+1）：
+//   PlatformSetting —— 平台级公开键值（服务电话、服务时间、小程序是否已发布）。
+//   没有可复用的平台键值表。没有 endUserId，不是会员数据，不进注销删除或置空清单。
+// 113（AI 内容安全，+1）：AiSafetyTerm —— 违法和不良信息词库（类别、词条、开关），无会员字段，不进注销清单。
+const EXPECTED_MODEL_COUNT = 113
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)

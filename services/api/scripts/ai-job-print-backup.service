@@ -3,5 +3,6 @@ Description=AI job print PostgreSQL daily backup
 [Service]
 Type=oneshot
 # The script reads this file itself; EnvironmentFile is optional convenience for overrides.
+# 异地备份变量写在这份 .env 里，名字见 docs/device/postgres-operations.md 第 10 节。不要把值写进 unit。
 EnvironmentFile=-/srv/ai-job-print/services/api/.env
 ExecStart=/srv/ai-job-print/services/api/scripts/backup-postgres.sh

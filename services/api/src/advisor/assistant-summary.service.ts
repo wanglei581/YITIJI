@@ -26,7 +26,7 @@ import {
   llmTimeoutMessage,
 } from '../ai/llm/llm-http'
 import { deepseekThinkingOff } from '../ai/llm/deepseek-thinking'
-import { llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
+import { llmEndpointNotAllowedError, llmUpstreamStatusError } from '../ai/llm/llm-failure'
 import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
 import { LlmChatService, assistantOwnerKey } from '../ai/llm/llm-chat.service'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
@@ -304,9 +304,7 @@ export class AssistantSummaryService {
       tokenUsage: normalizeLlmUsage(data?.usage),
     })
     if (!res.ok) {
-      throw new ServiceUnavailableException({
-        error: { code: 'AI_PROVIDER_ERROR', message: '生成本次要点失败，请稍后重试' },
-      })
+      throw llmUpstreamStatusError('本次要点', res.status, res.data)
     }
     const raw = data?.choices?.[0]?.message?.content?.trim()
     if (!raw) {

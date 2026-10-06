@@ -5,8 +5,9 @@ import {
   type AdminUserListQuery,
   type AdminUserStatusChangeResult,
 } from '@ai-job-print/shared'
-import { Card, ConsoleTable } from '@ai-job-print/ui'
+import { Card, ConsoleTable, StatusBadge } from '@ai-job-print/ui'
 import { RefreshCwIcon, SearchIcon } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { list as listAdminUsers } from '../../services/api/adminUsers'
 import { ApiHttpError } from '../../services/api/client'
@@ -20,6 +21,9 @@ import {
   canRestoreUser,
   EMPTY_USER_FILTERS,
   hasUserFilters,
+  hasPendingClosure,
+  CLOSURE_SOURCE_LABELS,
+  userPhone,
   USER_STATUS_LABELS,
   userDisplayName,
   type UserFilterState,
@@ -43,6 +47,10 @@ function StatusPill({ status }: { status: AdminUserListItem['status'] }) {
 
 export default function UsersPage() {
   const { page, pageSize, setPage, setPageSize } = useTableState(20)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const closureParam = searchParams.get('closure')
+  const closure: UserFilterState['closure'] = ['requested', 'offline_executed', 'executed'].includes(closureParam ?? '')
+    ? closureParam as UserFilterState['closure'] : ''
   const safePage = Number.isSafeInteger(page) && page >= 1 ? page : 1
   const [draft, setDraft] = useState<UserFilterState>(EMPTY_USER_FILTERS)
   const [applied, setApplied] = useState<UserFilterState>(EMPTY_USER_FILTERS)
@@ -61,8 +69,8 @@ export default function UsersPage() {
   setPageRef.current = setPage
 
   const query = useMemo(
-    () => buildAdminUserQuery(applied, safePage, asPageSize(pageSize)),
-    [applied, safePage, pageSize],
+    () => buildAdminUserQuery({ ...applied, closure }, safePage, asPageSize(pageSize)),
+    [applied, closure, safePage, pageSize],
   )
 
   useEffect(() => {
@@ -102,7 +110,17 @@ export default function UsersPage() {
   const resetFilters = () => {
     setDraft(EMPTY_USER_FILTERS)
     setApplied(EMPTY_USER_FILTERS)
-    setPage(1)
+    setSearchParams((current) => { const next = new URLSearchParams(current); next.delete('closure'); next.set('page', '1'); return next })
+  }
+
+  const changeClosure = (value: UserFilterState['closure']) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (value) next.set('closure', value)
+      else next.delete('closure')
+      next.set('page', '1')
+      return next
+    })
   }
 
   const handlePageSizeChange = (nextPageSize: number) => {
@@ -157,7 +175,7 @@ export default function UsersPage() {
     )
   }
 
-  const filtered = hasUserFilters(applied)
+  const filtered = hasUserFilters({ ...applied, closure })
   const retryable = listError === null || listError.status === 0 || listError.status >= 500
   const listErrorTitle = listError?.status === 403 ? '无权查看用户列表' : '用户列表加载失败'
   const listErrorMessage = listError?.status === 403
@@ -171,7 +189,7 @@ export default function UsersPage() {
   return (
     <Page title="用户管理" subtitle="查看终端注册用户与服务使用概况">
       <Card className="mb-4 p-4">
-        <form lang="zh-CN" onSubmit={applyFilters} className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_160px_170px_170px_auto]">
+        <form lang="zh-CN" onSubmit={applyFilters} className="grid gap-3 lg:grid-cols-3">
           <label className="relative">
             <span className="sr-only">统一搜索</span>
             <SearchIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-neutral-400" aria-hidden />
@@ -189,6 +207,15 @@ export default function UsersPage() {
               <option value="all">全部状态</option>
               <option value="enabled">正常</option>
               <option value="disabled">已停用</option>
+            </select>
+          </label>
+          <label>
+            <span className="sr-only">注销</span>
+            <select aria-label="注销" value={closure} onChange={(event) => changeClosure(event.target.value as UserFilterState['closure'])} className="h-10 w-full rounded-lg border border-neutral-200 bg-surface px-3 text-sm">
+              <option value="">全部注销状态</option>
+              <option value="requested">待执行的本人申请</option>
+              <option value="offline_executed">已按线下凭据执行</option>
+              <option value="executed">已注销</option>
             </select>
           </label>
           <label>
@@ -233,8 +260,8 @@ export default function UsersPage() {
           total={result.total} page={safePage} pageSize={pageSize} onPageChange={handlePageChange} onPageSizeChange={handlePageSizeChange}
           columns={[
             { id: 'name', header: '用户', truncate: true, cell: (user) => userDisplayName(user) },
-            { id: 'phone', header: '手机号', cellClassName: 'whitespace-nowrap font-mono text-xs', cell: (user) => user.maskedPhone },
-            { id: 'status', header: '账号状态', cell: (user) => <StatusPill status={user.status} /> },
+            { id: 'phone', header: '手机号', cellClassName: 'whitespace-nowrap font-mono text-xs', cell: (user) => userPhone(user) },
+            { id: 'status', header: '账号状态', cell: (user) => <div className="flex flex-wrap items-center gap-1.5"><StatusPill status={user.status} />{hasPendingClosure(user) && user.closureRequest && <span title={`申请时间：${formatDateTime(user.closureRequest.requestedAt)}；来源：${CLOSURE_SOURCE_LABELS[user.closureRequest.source]}`}><StatusBadge status="warning" label="申请注销" /></span>}</div> },
             { id: 'login', header: '最近登录', cellClassName: 'whitespace-nowrap text-xs', cell: (user) => user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '暂无登录记录' },
             { id: 'created', header: '注册时间', cellClassName: 'whitespace-nowrap text-xs', cell: (user) => formatDateTime(user.createdAt) },
             { id: 'actions', header: '操作', sticky: true, align: 'right', cell: (user) => (
@@ -277,6 +304,10 @@ export default function UsersPage() {
         endUserId={selectedId}
         onClose={closeDetail}
         onMissing={() => setRefreshKey((value) => value + 1)}
+        onClosureSuccess={(result) => {
+          setStatusNotice(result.changed ? '已注销' : '该账号此前已注销')
+          setRefreshKey((value) => value + 1)
+        }}
       />
 
       <UserStatusDialog

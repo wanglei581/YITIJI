@@ -417,6 +417,13 @@ async function main() {
     const safetyBlock = safetySchema.slice(safetyAt, safetySchema.indexOf('\nmodel ', safetyAt + 1))
     assert.ok(safetyAt >= 0 && !/\bendUserId\b|\bmemberId\b/.test(safetyBlock), 'AiSafetyTerm 不含会员字段')
     assert.equal((CLOSURE_DELETE_MODELS as readonly string[]).includes('aiSafetyTerm'), false, 'AiSafetyTerm 不进注销清单')
+    const platformSetting = metadata.PlatformSetting
+    assert.ok(platformSetting, 'PlatformSetting 必须存在')
+    assert.equal(
+      platformSetting.fields.some((field: { name: string }) => field.name === 'endUserId'),
+      false,
+      '新增会员模型必须显式纳入注销处置',
+    )
     assert.deepEqual(scan.hits, [], `全库遗留身份: ${scan.hits.join(',')}`)
     assert.ok(scan.columns > 200)
     assert.equal(scan.exempted.length, 1)

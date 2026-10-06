@@ -500,7 +500,7 @@ export class LlmAdvisorService {
     if (!res.ok) {
       onLlmCall?.({ provider: providerLabel })
       this.logger.error(`advisor.llm upstream_non_2xx status=${res.status}`)
-      throw llmUpstreamStatusError('AI 顾问服务', res.status)
+      throw llmUpstreamStatusError('AI 顾问服务', res.status, res.data)
     }
     const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>

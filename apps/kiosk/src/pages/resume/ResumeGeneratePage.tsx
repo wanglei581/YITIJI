@@ -210,7 +210,11 @@ export function ResumeGeneratePage() {
     const input = buildInput()
     try {
       const result: ResumeGenerateResponse = await submitResumeGenerate(input, getToken())
-      // 拿到结构化响应就算一次真实往返 —— 即便 status 是 failed，服务本身是通的。
+      if (result.failCode && isAiOutage({ code: result.failCode })) {
+        setAiOutage('AI 暂时不可用，你可以先导出并打印已填的内容')
+        return
+      }
+      // 拿到结构化响应就算一次真实往返 —— 账户级 / 模型名问题除外，那种每次都会失败。
       setProbed(true)
       if (result.status !== 'completed' || !result.resume) {
         setError(result.failReason ?? 'AI 简历生成失败，请稍后重试')
@@ -372,8 +376,8 @@ export function ResumeGeneratePage() {
             type="button"
             className="qx-btn"
             data-variant="primary"
-            disabled={generating}
-            onClick={() => void handleGenerate()}
+            disabled={generating || Boolean(aiOutage)}
+            onClick={() => { if (!aiOutage) void handleGenerate() }}
           >
             <SparklesIcon className="h-5 w-5" aria-hidden="true" />
             {generating ? '正在整理…' : '让 AI 整理成新简历'}

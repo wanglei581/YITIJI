@@ -158,10 +158,29 @@ export function AiPlanPage() {
     : (isContentState(viewState) && printBlockedReason ? 'print-unavailable' : viewState)
 
   const copy = copyFor(derivedState)
-  const showLegend = isContentState(derivedState)
+  const showLegend = isContentState(derivedState) || derivedState === 'print-unavailable'
   const showPrint = isContentState(derivedState) && Boolean(activeIds || fixtureState)
   const showRecords = derivedState === 'no-artifact'
-  const backLabel = derivedState === 'no-artifact' ? '去问小青' : '再问一轮'
+  const showBack = derivedState !== 'expired'
+  const showRedo = derivedState === 'expired'
+  const backLabel = derivedState === 'no-artifact' || derivedState === 'loading' || derivedState === 'error'
+    ? '去问小青'
+    : '再问一轮'
+  const reread = !fixtureState && readFailed ? (
+    <button
+      type="button"
+      className="aa-reread"
+      data-testid="advisor-artifact-reread"
+      onClick={() => { void loadSession() }}
+    >
+      重新读取
+    </button>
+  ) : null
+  const showStale = Boolean(reread)
+    && derivedState !== 'error'
+    && derivedState !== 'loading'
+    && derivedState !== 'expired'
+    && derivedState !== 'no-artifact'
 
   const onPrint = async () => {
     if (!showPrint || printLock.current || !activeIds) return
@@ -214,27 +233,40 @@ export function AiPlanPage() {
       navbar={
         <>
           <button type="button" className="qx-nav-item" onClick={() => navigate('/')} data-testid="advisor-artifact-nav-home">
-            <HomeIcon size={32} aria-hidden />首页
+            <HomeIcon size={28} aria-hidden />首页
           </button>
           <button type="button" className="qx-nav-item" onClick={() => navigate('/assistant')} aria-current="page" data-testid="advisor-artifact-nav-advisor">
-            <SparklesIcon size={32} aria-hidden />AI 顾问
+            <SparklesIcon size={28} aria-hidden />AI 顾问
           </button>
           <button type="button" className="qx-nav-item" onClick={() => navigate('/profile')} data-testid="advisor-artifact-nav-profile">
-            <UserIcon size={32} aria-hidden />我的
+            <UserIcon size={28} aria-hidden />我的
           </button>
         </>
       }
       ctabar={
         <>
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="ghost"
-            data-testid="advisor-artifact-cta-back"
-            onClick={() => navigate('/assistant')}
-          >
-            {backLabel}
-          </button>
+          {showBack ? (
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="ghost"
+              data-testid="advisor-artifact-cta-back"
+              onClick={() => navigate('/assistant')}
+            >
+              {backLabel}
+            </button>
+          ) : null}
+          {showRedo ? (
+            <button
+              type="button"
+              className="qx-btn aa-cta-print"
+              data-variant="primary"
+              data-testid="advisor-artifact-cta-redo"
+              onClick={() => navigate('/assistant')}
+            >
+              回去重做一次
+            </button>
+          ) : null}
           {showPrint ? (
             <button
               type="button"
@@ -257,18 +289,18 @@ export function AiPlanPage() {
               data-testid="advisor-artifact-cta-records"
               onClick={() => navigate('/me/ai-records')}
             >
-              看我的 AI 服务记录
+              打开我的 AI 记录
             </button>
           ) : null}
           {derivedState === 'print-unavailable' ? (
-            <p className="why">打印能力读不到，按钮先不放出来 —— 不做点了没反应的按钮。</p>
+            <p className="aa-cta-note">打印能力读不到，按钮先不放出来 —— 不做点了没反应的按钮。</p>
           ) : null}
-          {printError ? <p className="why" role="status">{printError}</p> : null}
+          {printError ? <p className="aa-cta-note" role="status">{printError}</p> : null}
         </>
       }
     >
       <div
-        className="aa-root qx-grow"
+        className="aa-root"
         data-kiosk-screen="advisor-artifact"
         data-state={derivedState}
         data-testid="advisor-artifact-main"
@@ -280,19 +312,8 @@ export function AiPlanPage() {
           sub={copy.sub}
         />
         {showLegend ? <EvidenceLegend /> : null}
-        <div className="aa-body qx-grow">
-          <ArtifactBody state={derivedState} payload={payload} />
-          {(derivedState === 'error' || readFailed) && !fixtureState ? (
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="teal"
-              data-testid="advisor-artifact-reread"
-              onClick={() => { void loadSession() }}
-            >
-              重新读取
-            </button>
-          ) : null}
+        <div className="aa-body">
+          <ArtifactBody state={derivedState} payload={payload} stale={showStale} reread={reread} />
         </div>
       </div>
     </QxPageFrame>

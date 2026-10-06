@@ -429,7 +429,7 @@ export class LlmJobFitService {
     }
     if (!res.ok) {
       this.logger.error(`jobfit.llm upstream_non_2xx status=${res.status}`)
-      throw llmUpstreamStatusError('AI 岗位匹配服务', res.status)
+      throw llmUpstreamStatusError('AI 岗位匹配服务', res.status, res.data)
     }
     const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>

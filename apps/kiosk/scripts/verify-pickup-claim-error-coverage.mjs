@@ -16,7 +16,7 @@
  *      pickupClaimMessage / classifyClaimFailure。
  */
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -174,7 +174,8 @@ for (const code of CLOSED_REQUIRED) {
   const said = model.pickupClaimMessage(err)
   if (kind !== 'closed') fail(`${code}：应分类为 closed（码已是终态），实际 ${kind}`)
   if (/重试|重新输入|再试/.test(said)) fail(`${code}：文案「${said}」叫人重试，但这个码重输不会有别的结果`)
-  if (!/手机|工作人员|小程序/.test(said)) fail(`${code}：文案「${said}」没有给出路（回手机或找工作人员）`)
+  // 10/4 起现场无人值守：问小青、按《隐私政策》联系方式求助也是出路（「工作人员」留着，等全量替换线收掉）。
+  if (!/手机|工作人员|小程序|小青|联系方式/.test(said)) fail(`${code}：文案「${said}」没有给出路（回手机、问小青或联系方式）`)
 }
 if (model.failureScreen('closed') !== 'closed') fail('closed 失败没有映射到独立的 closed 屏')
 pass(`终态码 ${CLOSED_REQUIRED.length} 个：分类 closed、文案不含「重试」、给出路`)
@@ -282,6 +283,76 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     }
   }
   if (!/handleClaim\(failure\.code\)/.test(page)) fail('重试必须仍使用内存原码')
+}
+
+// 方案②：三个续打错误码的句子与分类。不放进 CLOSED_REQUIRED——
+// 次数用尽和已经出过一部分纸的句子没有「手机 / 工作人员 / 小程序」；
+// 出纸未确认的句子含「请稍后再试」，按可恢复处理。
+{
+  const limit = '这单已经接着打过 2 次，不能再打了'
+  const unconfirmed = '这单的出纸结果还没确认，暂时不能接着打，请稍后再试'
+  const partial = '这单已经出了一部分纸，不能整单重打'
+  const already = '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。'
+  const resume = '没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。'
+  for (const [code, sentence, kind] of [
+    ['PICKUP_RESUME_LIMIT_REACHED', limit, 'closed'],
+    ['PICKUP_RESUME_UNCONFIRMED', unconfirmed, 'other'],
+    ['PICKUP_RESUME_PARTIAL_OUTPUT', partial, 'closed'],
+  ]) {
+    const err = new ApiHttpError(code, 'server says', 409)
+    if (model.pickupClaimMessage(err) !== sentence) fail(`${code} 文案不是后端那句`)
+    else if (model.classifyClaimFailure(err) !== kind) fail(`${code} 应分类为 ${kind}，实际 ${model.classifyClaimFailure(err)}`)
+    else pass(`${code}：${kind}，文案与后端一致`)
+  }
+  if (table.PICKUP_CODE_ALREADY_USED !== already) fail('PICKUP_CODE_ALREADY_USED 没有改成不找人的说法')
+  else pass('PICKUP_CODE_ALREADY_USED：出路是重新下单或问小青，不找现场工作人员、不叫原地重输')
+  if (model.PICKUP_SAME_CODE_RESUME_NOTE !== resume) fail('到机码页续打说明丢了或改了次数以外的承诺')
+  else pass('到机码页续打说明只承诺每单最多 2 次')
+}
+
+// 方案②口径：一体机源码的字符串字面量与 JSX 文本不得再出现旧说法。
+// 扫的是 apps/kiosk/src，不扫注释、测试和门禁脚本（否定断言要保留这几个词）。
+// 阳性对照：扫不到「两种码，别搞混」或续打说明，说明遍历坏了，不能算通过。
+{
+  const banned = ['取件凭证码', '出示给工作人员', '出示给现场工作人员']
+  const hits = []
+  let sawTwoCodes = false
+  let sawResumeNote = false
+  const resumeNote = '没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。'
+  const textsOf = (sf) => {
+    const texts = []
+    const visit = (node) => {
+      if (ts.isStringLiteralLike(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node) || ts.isJsxText(node)) {
+        texts.push(node.text)
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(sf)
+    return texts
+  }
+  const walk = (dir) => {
+    for (const ent of readdirSync(dir, { withFileTypes: true })) {
+      const abs = join(dir, ent.name)
+      if (ent.isDirectory()) {
+        if (ent.name === 'node_modules' || ent.name === 'dist') continue
+        walk(abs)
+        continue
+      }
+      if (!/\.tsx?$/.test(ent.name) || ent.name.endsWith('.d.ts')) continue
+      const sf = ts.createSourceFile(abs, readFileSync(abs, 'utf8'), ts.ScriptTarget.ES2022, true, ent.name.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+      for (const text of textsOf(sf)) {
+        if (text.includes('两种码，别搞混')) sawTwoCodes = true
+        if (text.includes(resumeNote)) sawResumeNote = true
+        for (const phrase of banned) {
+          if (text.includes(phrase)) hits.push(`${abs.slice(kioskRoot.length + 1)} 含「${phrase}」`)
+        }
+      }
+    }
+  }
+  walk(join(kioskRoot, 'src'))
+  if (!sawTwoCodes || !sawResumeNote) fail('口径扫描没有扫到「两种码，别搞混」或续打说明（遍历坏了，不能算通过）')
+  else if (hits.length) fail(`一体机源码仍有旧说法：${hits.slice(0, 8).join('；')}`)
+  else pass('一体机源码的字符串与 JSX 文本不再出现取件凭证码或出示给工作人员')
 }
 
 if (failures > 0) {
