@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
+import { OptimizePageCta } from './components/resume-deliver/OptimizePageCta'
+import { OptimizeDraftPreview } from './components/resume-deliver/OptimizeDraftPreview'
+import { OptimizeSaveExtras } from './components/resume-deliver/OptimizeSaveExtras'
+import { OptimizeSourcePreview } from './components/resume-deliver/OptimizeSourcePreview'
+import { applyOverviewBatch, buildOverviewRows, draftPreviewItems, type OverviewBatchAction } from './components/resume-deliver/optimizeOverviewModel'
+import { readOptimizeSourceFile } from './components/resume-deliver/optimizeSourceFile'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { getMyDocuments } from '../../services/api/memberAssets'
@@ -43,8 +49,6 @@ import {
   moduleKeyOf,
   parseDecisionMap,
   toggleModuleDecision,
-  isModuleSwitchable,
-  moduleSwitchBlock,
   type ResumeDecisionFailure,
   type ResumeModuleDecision,
 } from './components/resume-deliver/resumeDecisions'
@@ -94,6 +98,10 @@ export function ResumeOptimizePage() {
   } = useOptimizeSession(query.format, Boolean(token))
   const [decisionIssues, setDecisionIssues] = useState<Record<string, string>>({})
   const [baseResume, setBaseResume] = useState<GeneratedResume | null>(null)
+  const [batchNote, setBatchNote] = useState<string | null>(null)
+  const [sourceOpen, setSourceOpen] = useState(false)
+  const [finalOpen, setFinalOpen] = useState(() => new URLSearchParams(location.search).get('screen') === 'final')
+  const sourceFile = useMemo(() => readOptimizeSourceFile(state), [state])
 
   useBusyLock(exporting || printNavigating || Boolean(adjusting))
   const syntheticReady = query.capture || query.debug
@@ -142,6 +150,7 @@ export function ResumeOptimizePage() {
   const estimatedPagesLabel = exported?.pageCount ? `共 ${exported.pageCount} 页（上次导出）` : '导出后显示真实页数。若担心第二页只剩两三行，可先点「压到一页」。'
   const editorOpen = view === 'ready' && Boolean(resume) && draftAccepted && !draft.loading
   const choicePending = Boolean(token && draft.hasDraft && !draftAccepted && view === 'ready')
+  const overviewRows = useMemo(() => buildOverviewRows(modules, decisions, baseResume), [modules, decisions, baseResume])
 
   // 优化稿导出合同没有 savedToDocuments；只凭本人文档列表中的同一文件确认保存。
   // 读取失败或未找到时保持未知，不能根据登录状态推断已保存。
@@ -191,20 +200,18 @@ export function ResumeOptimizePage() {
     setOptimizedResume(result.resume)
     setDecisions((prev) => ({ ...prev, [key]: next }))
     setDecisionIssues((prev) => { const nextIssues = { ...prev }; delete nextIssues[key]; return nextIssues })
+    setBatchNote(null)
     markEdited()
   }
-  /** 总览的两个批量动作：全部用改写 / 全部保留原文。与逐条切换走同一个替换函数，结果一致。 */
-  const handleBatch = (next: ResumeModuleDecision) => {
+  const handleBatch = (action: OverviewBatchAction) => {
     if (!optimizedResume) return
-    const changes = modules.flatMap((module, index): Array<[string, ResumeModuleDecision]> => {
-      if (!isModuleSwitchable(baseResume, module)) return []
-      return [[moduleKeyOf(module, index), next]]
-    })
-    const applied = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
-    setOptimizedResume(applied.resume)
-    setDecisions(applied.decisions)
-    setDecisionFailures(applied.failures, next)
-    if (applied.failures.length < changes.length) markEdited()
+    const rows = buildOverviewRows(modules, decisions, baseResume)
+    const result = applyOverviewBatch(optimizedResume, modules, decisions, rows, action, baseResume)
+    setOptimizedResume(result.resume)
+    setDecisions(result.decisions)
+    setDecisionFailures(result.failures, action === 'keep-undecided' ? 'original' : 'optimized')
+    setBatchNote(result.note)
+    if (result.changed) markEdited()
   }
   const openCompare = (focusIndex?: number) => requestLeave(() => navigate('/resume/optimize/compare', {
     state: { taskId, accessToken, decisions, existingOnly, ...(typeof focusIndex === 'number' ? { focusIndex } : {}) },
@@ -292,35 +299,27 @@ export function ResumeOptimizePage() {
   const showOverview = workView === 'overview' && modules.length > 0
 
   const ctabar = (
-    <>
-      <QxStepActions onPrev={() => requestLeave(goToReport)} prevLabel="返回报告">
-        <span className="qx-r1-ai-exit" onClickCapture={(event) => {
-          if (!isDirty) return
-          event.stopPropagation()
-          requestLeave(() => { rememberAssistantDraft(OPTIMIZE_AI_DRAFT); navigate('/assistant') })
-        }}><QxAiHelp label="问小青：这句还能怎么改 →" draft={OPTIMIZE_AI_DRAFT} /></span>
-      </QxStepActions>
-      {editorOpen && showOverview && (
-        <div className="qx-opt-cta">
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('editor')}>编辑并导出</button>
-          <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-optimize-primary" onClick={() => openCompare()}>
-            逐条处理这 {modules.length} 条<em aria-hidden="true">→</em>
-          </button>
-        </div>
-      )}
-      {assembled && editorOpen && !showOverview && (
-        <div className="qx-opt-cta">
-          {modules.length > 0 && (
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('overview')}>返回建议总览</button>
-          )}
-          {/* 导出的就是编辑区里的这一份：用户在编辑区亲手改过的段落以他改的为准，
-              不因为和某条「保留原文」的选择对不上就拦住导出。 */}
-          <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || titleBlocked || undefined} onClick={requestResumeExport}>
-            {exporting ? '正在生成文件…' : `确认优化版，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
-          </button>
-        </div>
-      )}
-    </>
+    <OptimizePageCta
+      assistant={<span className="qx-r1-ai-exit" onClickCapture={(event) => {
+        if (!isDirty) return
+        event.stopPropagation()
+        requestLeave(() => { rememberAssistantDraft(OPTIMIZE_AI_DRAFT); navigate('/assistant') })
+      }}><QxAiHelp label="问小青：这句还能怎么改 →" draft={OPTIMIZE_AI_DRAFT} /></span>}
+      showOverview={showOverview}
+      editorOpen={editorOpen}
+      moduleCount={modules.length}
+      sourceReady={Boolean(sourceFile)}
+      exporting={exporting}
+      exportFormat={exportFormat}
+      exportBlocked={exportBlocked || !assembled}
+      titleBlocked={titleBlocked}
+      onReport={() => requestLeave(goToReport)}
+      onSource={() => setSourceOpen(true)}
+      onFinal={() => setFinalOpen(true)}
+      onCompare={() => openCompare()}
+      onOverview={() => setWorkView('overview')}
+      onExport={requestResumeExport}
+    />
   )
 
   if (consent.needsPrompt && !syntheticReady) {
@@ -374,7 +373,7 @@ export function ResumeOptimizePage() {
             onMyResumes={() => navigate('/me/resumes')}
           />
         )}
-        {view === 'ready' && (
+        {view === 'ready' && (!showOverview || choicePending || (Boolean(token) && draft.loading)) && (
           <ResumeDraftBanner
             guest={!token}
             loading={Boolean(token && draft.loading)}
@@ -390,10 +389,12 @@ export function ResumeOptimizePage() {
           <OptimizeOverview
             modules={modules}
             decisions={decisions}
-            switchBlocks={Object.fromEntries(modules.map((module, index) => [moduleKeyOf(module, index), moduleSwitchBlock(baseResume, module)]))}
+            baseResume={baseResume}
             synthetic={resolved.synthetic}
             disabled={loading || exporting || Boolean(adjusting)}
+            batchNote={batchNote}
             decisionIssues={decisionIssues}
+            saveExtra={<OptimizeSaveExtras guest={!token} draft={draft} pricing={pricing} taskId={taskId} token={token} exportVersion={exportVersion} />}
             onDecisionChange={handleDecisionChange}
             onBatch={handleBatch}
             onCompare={openCompare}
@@ -455,6 +456,16 @@ export function ResumeOptimizePage() {
             onPrint={handlePrint}
             onOpenPreview={() => setPreviewOpen(true)}
           />
+        )}
+        {finalOpen && editorOpen && showOverview && (
+          <OptimizeDraftPreview
+            items={draftPreviewItems(overviewRows)}
+            onClose={() => setFinalOpen(false)}
+            onEdit={() => { setFinalOpen(false); setWorkView('editor') }}
+          />
+        )}
+        {sourceOpen && sourceFile && (
+          <OptimizeSourcePreview file={sourceFile} token={token} onClose={() => setSourceOpen(false)} />
         )}
         {factOpen && assembled && (
           <ResumeFactConfirmDialog
