@@ -635,6 +635,50 @@ test('signed-out benefit activity primary is 登录后领取 @w5-kiosk', async (
   await expectFusionAcceptance(page, errors)
 })
 
+test('activity footer primary stays on one line and the footnote stays under the buttons @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: { success: true, data: benefitActivityFixture() },
+  })
+
+  await page.goto('/activities/w5-benefit-detail')
+  const primary = page.getByTestId('activity-primary')
+  await expect(primary).toHaveText('登录后领取')
+  const row = page.locator('.act-cta-row')
+  await expect(row).toBeVisible()
+  await expect(row).not.toContainText('权益只对应本机服务与打印')
+  await expect(page.locator('.act-cta-row .act-truth')).toHaveCount(0)
+  await expect(page.locator('.act-truth')).toContainText('权益只对应本机服务与打印')
+
+  const keys = page.locator('.act-cta-row > .qx-btn, .act-cta-row > .qx-ai-help')
+  expect(await keys.count()).toBeGreaterThan(0)
+  for (let index = 0; index < await keys.count(); index += 1) {
+    const metrics = await keys.nth(index).evaluate((el) => {
+      const style = getComputedStyle(el)
+      const node = Array.from(el.childNodes).reverse().find((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())
+      let lines = 0
+      if (node) {
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        lines = new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top))).size
+      }
+      return {
+        whiteSpace: style.whiteSpace,
+        fontSize: Number.parseFloat(style.fontSize),
+        minHeight: Number.parseFloat(style.minHeight),
+        lines,
+      }
+    })
+    expect(metrics.whiteSpace, '底栏键必须 nowrap').toBe('nowrap')
+    expect(metrics.lines, '底栏主键主字必须一行').toBe(1)
+    expect(metrics.fontSize).toBeGreaterThanOrEqual(26)
+    expect(metrics.minHeight).toBeGreaterThanOrEqual(72)
+  }
+  await expectFusionAcceptance(page, errors)
+})
+
 test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerMemberLogin(api)
