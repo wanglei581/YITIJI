@@ -383,7 +383,7 @@ export function useSignStampFlow() {
 
   const synthetic = Boolean(query.requested && query.capture)
   const displayLive: LiveSnapshot = synthetic
-    ? { ...live, ...fixtureLive(query.requested as NonNullable<typeof query.requested>), authReady: true }
+    ? { ...live, ...fixtureLive(query.requested as NonNullable<typeof query.requested>) }
     : live
   const viewState = synthetic && query.requested ? query.requested : deriveLiveState(live)
   const shape = shapeOf(viewState)

@@ -10,7 +10,7 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
 import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
-import { SignStampGateView, gateWhy } from './sign-stamp/SignStampGateView'
+import { SignStampGateView } from './sign-stamp/SignStampGateView'
 import { SignStampPickView, pickAsk } from './sign-stamp/SignStampPickView'
 import { SignStampWorkbench } from './sign-stamp/SignStampWorkbench'
 import { AUTHORIZATION_LABEL, useSignStampFlow } from './sign-stamp/useSignStampFlow'
@@ -112,7 +112,13 @@ export function SignStampPage() {
       >
         <div className="ss-ctxbar" id="ctxbar">
           <span className="ss-tag" data-tone={flow.displayLive.loggedIn ? 'ok' : 'warn'} data-testid="sign-stamp-auth">
-            {flow.displayLive.sessionExpired ? '登录已过期' : flow.displayLive.loggedIn ? '已登录会员' : '未登录'}
+            {flow.displayLive.sessionExpired
+              ? '登录已过期'
+              : flow.displayLive.loggedIn
+                ? '已登录会员'
+                : flow.displayLive.authReady
+                  ? '未登录'
+                  : '身份未确认'}
           </span>
           <span
             className="ss-tag"
@@ -146,7 +152,7 @@ export function SignStampPage() {
         </div>
 
         {flow.shape === 'block' ? (
-          <SignStampGateView copy={flow.status} why={gateWhy(flow.viewState)} />
+          <SignStampGateView copy={flow.status} state={flow.viewState} />
         ) : flow.shape === 'pick' && flow.pickPhase ? (
           <SignStampPickView
             phase={flow.pickPhase}

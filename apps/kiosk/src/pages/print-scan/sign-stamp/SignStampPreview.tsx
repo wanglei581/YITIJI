@@ -91,9 +91,15 @@ export function SignStampPreview({
           <FileTextIcon size={44} />
           <b>{outErr === 'expired' ? '预览链接已过期' : '这份预览暂时打不开'}</b>
           <span>
-            {outErr === 'expired'
-              ? '访问链接有效期 30 分钟，已经到期。文件本身没有丢，重新取一次即可。'
-              : '浏览器没能渲染这份 PDF。不代表文件损坏或丢失，可以重新取一次预览链接。'}
+            {outErr === 'expired' ? (
+              <>
+                访问链接<b>有效期 30 分钟</b>，已经到期。<b>文件本身没有丢</b>，重新取一次即可。
+              </>
+            ) : (
+              <>
+                浏览器没能渲染这份 PDF。<b>不代表文件损坏或丢失</b>，可以重新取一次预览链接。
+              </>
+            )}
           </span>
         </div>
         <div className="ss-pv-cap">不放上一次的画面，免得你当成这次的结果。</div>
@@ -108,7 +114,7 @@ export function SignStampPreview({
           <div className="ss-pv-ghost">
             <FileTextIcon size={44} />
             <b>还没有文档</b>
-            <span>选好 PDF 之后，这里显示完整的一页纸。</span>
+            <span>选好 PDF 之后，这里显示<b>完整的一页纸</b>。</span>
           </div>
         </div>
         <div className="ss-pv-cap">这里只显示你选的文件，不放示例文件。</div>
@@ -278,7 +284,11 @@ export function SignStampPreview({
             className="ss-pv-page"
             data-testid="sign-stamp-pv-page"
             data-preview-kind="no-file"
-            style={{ position: 'relative', left: 20, top: 20, width: pw, height: ph }}
+            style={
+              compact
+                ? { position: 'absolute', inset: 16, width: 'auto', height: 'auto' }
+                : { position: 'relative', left: 20, top: 20, width: pw, height: ph }
+            }
           >
             <p style={{ margin: 24, fontSize: 22, lineHeight: 1.45 }}>没有可打开的文件内容，这里不画示意纸面。</p>
             {marker}

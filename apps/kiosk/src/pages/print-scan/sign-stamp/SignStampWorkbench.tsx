@@ -186,8 +186,8 @@ export function SignStampWorkbench({
               {isLockedPhase(phase) && (
                 <p className="ss-reason lockline" id="sign-stamp-lock-reason" data-testid="sign-stamp-lock-reason">
                   {phase === 'result-unknown'
-                    ? '结果还没确认，页码、位置和大小已锁定：改一点就是另一次，可能真的生成两份。'
-                    : '正在提交这一次合成，页码、位置和大小已锁定，也不能再次提交，避免生成两份。'}
+                    ? '结果还没确认，参数已锁定：改一点就算新的一次，可能真的生成两份。'
+                    : '正在提交这一次合成，参数与再次提交都已锁定，避免生成两份。'}
                 </p>
               )}
               <div className="ss-grp">
@@ -348,7 +348,7 @@ export function SignStampWorkbench({
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>结果还没确认时，只能<b>原样再试刚才那一次</b>。</span>
+                  <span>结果没确认时，只许<b>原样重试刚才那一次</b>。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />

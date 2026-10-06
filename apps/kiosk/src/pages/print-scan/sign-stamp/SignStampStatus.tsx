@@ -29,6 +29,7 @@ export function SignStampStatus({ copy }: { copy: StatusCopy }) {
         {richInline(copy.title)}
       </div>
       <p className="ss-state-p">{richInline(copy.body)}</p>
+      {copy.more ? <p className="ss-state-p">{richInline(copy.more)}</p> : null}
       <div className="ss-chips">
         {copy.chips.map((chip) => (
           <span key={chip.text} className="ss-chip" data-tone={chip.tone}>

@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { FileTextIcon, FolderIcon, ImageIcon, InfoIcon } from 'lucide-react'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import type { StatusCopy } from './signStampModel'
 import { SignStampStatus } from './SignStampStatus'
 
@@ -44,12 +46,13 @@ const ALTS = [
 
 export function SignStampGateView({
   copy,
-  why,
+  state,
 }: {
   copy: StatusCopy
-  why: string[]
+  state: string
 }) {
   const navigate = useNavigate()
+  const why = gateWhy(state, helpNeededLine(useSupportContact()))
   return (
     <>
       <div className="ss-status">
@@ -116,7 +119,7 @@ export function SignStampGateView({
   )
 }
 
-export function gateWhy(state: string): string[] {
+export function gateWhy(state: string, helpLine: string): string[] {
   if (state === 'login-required') {
     return ['登录后才能确认这份文档和这张签名图都属于你本人。', '普通打印、扫描、格式转换不受影响，可以直接去用。']
   }
@@ -129,8 +132,23 @@ export function gateWhy(state: string): string[] {
   if (state === 'terminal-missing') {
     return ['不假设「读不到就是可用」。', '请联系现场工作人员登记这台机器。']
   }
-  if (state.startsWith('capability-')) {
-    return ['读取中不等于可用，也不等于不可用。', '读不到就不放行，不把失败当成已关闭。']
+  if (state === 'capability-loading') {
+    return ['读取中不等于可用，也不等于不可用。', '这里不画进度条：系统不回传进度。']
+  }
+  if (state === 'capability-disabled') {
+    return ['文档打印、材料扫描、格式转换不受影响。', helpLine]
+  }
+  if (state === 'capability-maintenance') {
+    return ['维护是管理员登记的真实状态，不是这一页猜的。', helpLine]
+  }
+  if (state === 'capability-error') {
+    return ['这一次没确认，先不当成不能用。', helpLine]
+  }
+  if (state === 'context-missing') {
+    return ['不猜上一步是什么，也不放示例文件。', '这一步不会替你上传或保存任何文件。']
+  }
+  if (state === 'return-source-unknown') {
+    return ['外部地址一律不作为返回落点。', '不会照着来路参数渲染任何内容。']
   }
   return ['不猜上一步是什么，也不放示例文件。', '外部地址一律不作为返回落点。']
 }

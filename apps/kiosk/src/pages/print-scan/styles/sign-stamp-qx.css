@@ -522,7 +522,13 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
-.qx-stage:has(.ss-page) > .qx-ctabar { flex-wrap: wrap; }
+/* 底栏在本页拆成「原因 + 按钮」和「问小青」两行，和稿的 ctabar + qx-airow 一样。
+   壳层默认 18px 内边距会再垫一层，四态就放不进 1080×1920。这里收掉这层。 */
+.qx-stage:has(.ss-page) > .qx-ctabar {
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px var(--qx-gutter) 0;
+}
 .qx-stage:has(.ss-page) > .qx-ctabar > .ss-cta-wrap,
 .qx-stage:has(.ss-page) > .qx-ctabar > .qx-step-actions { flex: 1 1 100%; }
 .ss-page[data-shape='work'] .ss-pvcol { width: 520px; }
@@ -583,7 +589,12 @@
 .ss-page[data-shape='pick'] .ss-xq-face { width: 88px; height: 88px; font-size: 40px; }
 .ss-page[data-shape='pick'] .ss-sec { margin-top: 16px; }
 .ss-page[data-shape='pick'] .ss-sec-label { margin-bottom: 8px; }
-.ss-page[data-shape='pick'] .ss-work { margin-top: 10px; }
+/* 选签名这一步预览列跟右栏一样高，缩进剩余空间，不把整页撑出屏幕。 */
+.ss-page[data-shape='pick'] .ss-work {
+  margin-top: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
 .ss-page[data-shape='pick'] .ss-note { padding: 18px 22px; }
 .ss-page[data-shape='pick'] .ss-ctrlcol .ss-state { padding: 16px 18px; gap: 8px; }
 .ss-page[data-shape='pick'] .ss-ctrlcol .ss-chip { padding: 0 12px; min-height: 40px; }

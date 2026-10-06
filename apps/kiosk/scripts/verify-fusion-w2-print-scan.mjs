@@ -565,6 +565,11 @@ assert.match(
   /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
   'blocked-state alternatives are a 2 by 2 grid',
 )
+assert.match(
+  read('src/pages/print-scan/sign-stamp/SignStampGateView.tsx'),
+  /helpNeededLine\(useSupportContact\(\)\)/,
+  'blocked-state help lines use the unattended help sentence',
+)
 assert.doesNotMatch(
   read('src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx'),
   /标记不放进地址栏/,
