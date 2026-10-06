@@ -508,6 +508,82 @@ assert.match(
   /mapComposeError/,
   'sign-stamp classifies compose failures without fabricating a completed result',
 )
+const signPick = read('src/pages/print-scan/sign-stamp/SignStampPickView.tsx')
+const signPreview = read('src/pages/print-scan/sign-stamp/SignStampPreview.tsx')
+const signCss = read('src/pages/print-scan/styles/sign-stamp-qx.css')
+const signFlow = read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts')
+assert.match(
+  signPick,
+  /签名图片暂不支持手机上传，请在本机上传。/,
+  'stamp phone card stays on screen and explains why phone upload is unavailable',
+)
+assert.match(
+  signPick,
+  /sign-stamp-pick-stamp-phone[\s\S]{0,240}disabled/,
+  'stamp phone card is disabled instead of opening an upload session',
+)
+assert.doesNotMatch(
+  signPick,
+  /sign-stamp-pick-stamp-phone[\s\S]{0,240}onClick/,
+  'stamp phone card has no click handler',
+)
+assert.doesNotMatch(
+  signStamp,
+  /purpose="signature_image"/,
+  'sign page no longer creates a signature_image upload session',
+)
+assert.match(signStamp, /purpose="print_doc"/, 'document phone upload still uses print_doc')
+assert.match(
+  signFlow,
+  /kioskUploadFile\([\s\S]{0,80}'signature_image'/,
+  'local stamp upload still sends signature_image',
+)
+assert.match(
+  read('src/pages/print-scan/sign-stamp/constants.ts'),
+  /我确认本人拥有该本人手写签名的使用授权，仅用于本人材料的版式整理/,
+  'authorization label matches the v2 draft and only talks about a handwritten signature',
+)
+assert.match(signStamp, /问小青：签名放在哪一页/, 'sign page keeps the ask-xiaoqing row')
+assert.match(signStamp, /KIOSK_PRINT_SCAN_ESIGN_NOTICE/, 'long esign notice still comes from the frozen constant')
+assert.match(signStamp, /展开完整说明/, 'long esign notice sits behind an expand control')
+assert.match(
+  signStamp,
+  /data-testid="sign-stamp-truth"[\s\S]*data-testid="sign-stamp-fixture-bar"/,
+  'sample fixture sits in the truth bar, on the same row as the disclaimer',
+)
+const signCtx = signStamp.match(/className="ss-ctxbar"[\s\S]*?<\/div>/)
+assert.ok(signCtx && !signCtx[0].includes('sign-stamp-fixture-bar'), 'sample fixture is no longer a context-bar row')
+assert.match(signPick, /传这次的本人手写签名/, 'stamp section title follows the v2 draft')
+assert.match(signPick, /ss-note-span/, 'stamp retention note spans the full pick row')
+assert.match(signPick, /只收本人这一次新拍的手写签名。/, 'stamp retention note follows the v2 draft')
+assert.match(signPick, /直接在屏幕上写，要先校准触屏。现在请用白纸签字后拍照。/, 'handwrite card follows the v2 draft')
+assert.match(signFlow, /传好签名图再继续/, 'stamp primary follows the v2 draft')
+assert.match(signStamp, /再加一处签名/, 'add-another button follows the v2 draft')
+assert.match(
+  signCss,
+  /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+  'blocked-state alternatives are a 2 by 2 grid',
+)
+assert.match(
+  read('src/pages/print-scan/sign-stamp/SignStampGateView.tsx'),
+  /helpNeededLine\(useSupportContact\(\)\)/,
+  'blocked-state help lines use the unattended help sentence',
+)
+assert.doesNotMatch(
+  read('src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx'),
+  /标记不放进地址栏/,
+  'output note no longer uses the address-bar wording',
+)
+assert.match(
+  signPreview,
+  /data-testid="sign-stamp-pv-view"[\s\S]*\{toolbar\}/,
+  'preview toolbar is placed after the preview view',
+)
+const signPageHead = signCss.match(/\.qx-stage:has\(\.ss-page\) > \.qx-pagehead\s*\{[^}]*\}/)
+assert.ok(signPageHead, 'this page hides the duplicate page head')
+assert.match(signPageHead[0], /margin:\s*0/, 'hidden page head does not use a negative margin')
+assert.match(signPageHead[0], /clip-path:\s*inset\(50%\)/, 'hidden page head is clipped in place')
+assert.doesNotMatch(signPageHead[0], /margin:\s*-/, 'hidden page head rule has no negative margin')
 
 const printUploadPage = read('src/pages/print/PrintUploadPage.tsx')
 const printUploadView = read('src/pages/print/file-source/FileSourceView.tsx')
