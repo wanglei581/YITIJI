@@ -1537,6 +1537,42 @@ test('resume report failure and no-report screens keep exit rows and close the o
   await expect(page.getByTestId('resume-report-primary')).toHaveText('重新解析')
 })
 
+test('resume report read-error and illegal screens keep exit rows and close the open band @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  // 读取失败、地址打不开只用这一屏已经接上的三条出路。出路行最小高度按稿是 88；
+  // 行本身还会按余高拉高，把其中一屏的最小高度改到 73px 左右时这条必须红。
+  const exits: Record<'read-error' | 'illegal', string[]> = {
+    'read-error': ['返回简历来源', '打开我的诊断记录', '去打印 / 扫描'],
+    illegal: ['返回简历来源', '打开我的诊断记录', '返回首页'],
+  }
+  for (const state of ['read-error', 'illegal'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    const stack = await readReportBandGaps(page)
+    expect(stack.justify, `${state} 从上往下排`).toBe('flex-start')
+    for (const band of stack.gaps) {
+      expect(band.gap, `${state}「${band.from}」到「${band.to}」不超过 40px，量到 ${band.gap.toFixed(1)}`).toBeLessThanOrEqual(40)
+      expect(band.gap, `${state}「${band.from}」不应盖住「${band.to}」`).toBeGreaterThanOrEqual(-1)
+    }
+    for (const gap of stack.rowGaps) {
+      expect(gap, `${state} 出路行之间不拉开`).toBeLessThanOrEqual(40)
+      expect(gap, `${state} 出路行不应互相盖住`).toBeGreaterThanOrEqual(-1)
+    }
+    expect(stack.trailing, `${state} 最后一块贴着正文底部`).toBeLessThanOrEqual(40)
+    expect(stack.trailing, `${state} 最后一块仍在正文里面`).toBeGreaterThanOrEqual(-1)
+    const rows = page.locator('.rrp-exits .rrp-row')
+    await expect(rows).toHaveCount(exits[state].length)
+    for (const [index, title] of exits[state].entries()) {
+      await expect(rows.nth(index)).toContainText(title)
+    }
+    const minHeight = await rows.first().evaluate((el) => Number.parseFloat(getComputedStyle(el).minHeight))
+    expect(minHeight, `${state} 出路行最小高度`).toBeGreaterThanOrEqual(88)
+    const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
+    const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
+    expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
+  }
+})
+
 test('assistant first screen keeps composer and send above the Qingxu navbar @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   await page.goto('/assistant')

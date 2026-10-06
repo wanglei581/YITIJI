@@ -79,7 +79,8 @@
 .rrp-page :is(.rrp-export-reason, .qx-rd-price, .qx-rd-price p) { font-size: var(--qx-fs-aux); line-height: var(--qx-lh-body); }
 .rrp-page .rrp-jobfit { min-height: 56px; }
 .rrp-page .rrp-self { margin: 0; font-size: var(--qx-fs-aux); }
-/* 没报告的这几屏按内容排进一屏：任务头不再撑到 188，出口行收到 72（仍不低于 64）。 */
+/* 没报告的这几屏按内容排进一屏：任务头不再撑到 188。能力未接通的出口行收到 72（仍不低于 64）。
+   读取失败、地址打不开、诊断失败、无报告在下面按稿的最小高度把余高分给出路行。 */
 .rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) {
   gap: 8px; padding-top: 8px; padding-bottom: 8px;
 }
@@ -89,10 +90,10 @@
 .rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) .rrp-state {
   padding-top: 14px; padding-bottom: 14px;
 }
-.rrp-page:is([data-state='read-error'], [data-state='unavailable'], [data-state='illegal']) .rrp-row {
+.rrp-page[data-state='unavailable'] .rrp-row {
   min-height: 72px;
 }
-.rrp-page:is([data-state='read-error'], [data-state='unavailable'], [data-state='illegal']) .rrp-checks .list > div {
+.rrp-page[data-state='unavailable'] .rrp-checks .list > div {
   min-height: 64px;
 }
 /* 诊断失败 / 无报告：稿上出口行至少 104 / 88，诊断失败的自查格至少 84。
@@ -127,6 +128,32 @@
 }
 .rrp-page[data-state='diagnose-failed'] .rrp-checks .list > div { min-height: 84px; }
 .rrp-page[data-state='no-context'] .rrp-checks .list > div { min-height: 74px; }
+/* 读取失败 / 地址打不开：稿上出口行至少 88（.row 按内容定高），自查格回到稿上的 74。
+   整页从上往下排，卡片间距回到 12px；余高分给出路按钮，不拉说明卡。
+   只用这两屏已经接上的三条出路，不补稿上多出来的入口。 */
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) {
+  gap: 12px;
+  justify-content: flex-start;
+}
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) .rrp-state {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) > .rrp-exits {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.rrp-page[data-state='read-error'] .rrp-row { min-height: 88px; }
+.rrp-page[data-state='illegal'] .rrp-row { min-height: 88px; }
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) .rrp-exits .rows {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+.rrp-page[data-state='read-error'] .rrp-exits .rows { grid-auto-rows: minmax(88px, 1fr); }
+.rrp-page[data-state='illegal'] .rrp-exits .rows { grid-auto-rows: minmax(88px, 1fr); }
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) .rrp-checks .list > div { min-height: 74px; }
 
 /* 稿 23：只读任务区在上，概览 / 编辑工作区在触达区，按钮保持真实动作。 */
 .qx-stage:has(:is(.qx-resume-optimize, .qx-resume-compare)) .qx-pagehead {
