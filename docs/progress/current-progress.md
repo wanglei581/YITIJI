@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-10-06：终端程序 Agent 升 0.4.14（分支 `claude/agent-0.4.14-package`）
+
+- **为什么：** 10/6 产品负责人批准全面检查报告，第五节按推荐执行；其中「下一个安装包 10/12 前」。#1206（机器标识原子落盘）、#1229（U 盘文件读不了提示换一个）、#1237（U 盘按能力开关拦截，W-125）都已在候选，但 0.4.13 安装包不含；不升版本号，两个不同的包会同名同版本。
+- **改了什么：** 只改版本号。`package.json`、两份配置示例、安装器 `inputs.json`、Windows 安装器工作流 6 处 `-ProductVersion`、生产安装脚本与控制中心的 `-production` 版本串、MSI/EXE 生命周期测试的候选版本与对应门禁断言，0.4.13 → 0.4.14。升级测试的前代仍是现场 0.4.10，没动。源码注释里「发布顺序是先服务端、再 Agent 0.4.13」与服务端重提门槛「≥0.4.13」是历史与功能口径，不改。
+- **验证（本机）：** Agent `tsc --noEmit` 通过；`verify-installer-inputs`、`verify-candidate-provenance`、`verify-signing-workflow-contract`、`verify-production-provisioning`、`verify-print-scan-agent`、`verify-windows-service-recovery`、`verify-print-queue-residue`、`verify-usb-import-agent`、`verify-print-retry-attempt` 等 Agent 门禁全部退出 0；仓库根 `verify-repository-integrity`（改了工作流 YAML）通过。安装包由 PR 上的 `windows-agent-installer` 工作流出，出包后核身份清单 `productVersion=0.4.14`、`sourceCommit` 与 SHA256，再替换现场步骤里的包。
+- **没做：** 真机没装。KSK-001 仍按现场步骤先装 0.4.13 跑 15 步（另加第 3b 步核双面翻页方向）；0.4.14 装到试点硬件上。
+
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
 - **决定：** 10/4 21:5x 产品负责人定主原则「设备现场不需要工作人员，是自助的、自动的，这个是主要的」。
