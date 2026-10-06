@@ -29,6 +29,7 @@ import {
 import { getOrgProfile, updateOrgProfile, type PartnerOrgProfile } from '../../services/api/orgSelf'
 import { OfficialChannelsSection } from './OfficialChannelsSection'
 import { useRecruitmentHosting } from '../../services/capabilities'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── 机构资料（审计修复：原 MOCK_PROFILE 硬编码已删除，全部走 /partner/profile 真实数据）──
 // 机构自助仅可改 联系人/联系电话；名称、类型、场景模板、启用模块由管理员管理（运营边界）。
@@ -110,7 +111,7 @@ export default function ProfilePage() {
       setProfile(updated)
       setEditing(false)
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : '保存失败，请稍后重试')
+      setSaveError(userMessageOf(err, '保存失败，请稍后重试'))
     } finally {
       setSaving(false)
     }

@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Drawer, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { ClipboardListIcon, PlayIcon, PlusIcon } from 'lucide-react'
 import EligibilityRuleEditor from './EligibilityRuleEditor'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   partnerPoliciesService,
   policyRuleDraftError,
@@ -40,11 +41,8 @@ const RESULT_STYLE: Record<PolicyConditionResult, { cls: string; label: string }
 const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
-function errMsg(e: unknown): string {
-  if (e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string') {
-    return (e as Error).message
-  }
-  return '操作失败,请重试'
+function errMsg(e: unknown, fallback: string): string {
+  return userMessageOf(e, fallback)
 }
 
 let draftSeq = 0
@@ -87,7 +85,7 @@ export default function EligibilityRulesDrawer({ policy, onClose, onSaved }: Pro
       setQuestionSet(qs)
       setRules(saved.map((r) => ({ ...r, draftKey: r.id })))
     } catch (e) {
-      setLoadError(errMsg(e))
+      setLoadError(errMsg(e, '资格条件加载失败，请稍后重试'))
     }
   }, [policy.id])
 
@@ -124,7 +122,7 @@ export default function EligibilityRulesDrawer({ policy, onClose, onSaved }: Pro
       )
       onSaved()
     } catch (e) {
-      setSaveError(errMsg(e))
+      setSaveError(errMsg(e, '资格条件没有保存，请检查后重试'))
     } finally {
       setSaving(false)
     }
@@ -138,7 +136,7 @@ export default function EligibilityRulesDrawer({ policy, onClose, onSaved }: Pro
       setPreview(await partnerPoliciesService.previewEligibility(policy.id, answers))
     } catch (e) {
       setPreview(null)
-      setPreviewError(errMsg(e))
+      setPreviewError(errMsg(e, '资格预览没有生成，请稍后重试'))
     } finally {
       setPreviewing(false)
     }

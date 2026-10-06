@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { ApiHttpError } from '../../services/api/client'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   orgsAdminService,
   type AdminOrgAccount,
@@ -349,7 +350,7 @@ export function usePartnerAccountAction(
       const result = await orgsAdminService.registerPartnerContactPhone(orgId, target.id, input)
       if (operationId !== operationIdRef.current) return
       if (!result.ok) {
-        setErrorMessage(result.message)
+        setErrorMessage(userMessageOf(result, ''))
         dispatch({ type: 'ERROR', code: result.code })
         if (result.code === 'PARTNER_CONTACT_PHONE_NOT_ELIGIBLE') void refreshForConvergence()
         return

@@ -13,7 +13,8 @@
  *   D. Admin main.tsx 有 unhandledrejection 全局提示
  *   E. 确认页/收银页/扫描设置/来源创建走 userMessageOf 或码表，文案含下一步
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -199,6 +200,133 @@ if (failures === 0) pass(`本包 ${PACKET_PAGES.length} 个页面/入口不再�
     fail('AI / 求职材料适配器未把断网包成 NETWORK_ERROR')
   } else {
     pass('断网 TypeError 在 AI / 材料适配器包成 NETWORK_ERROR')
+  }
+}
+
+// F. 两个后台的页面与组件不得把 *.message 直接放进 JSX 或 set*Error / setMessage / toast。
+//    经 userMessageOf(...) 包一层的不算。下面每条允许都写明为什么不是给人看的异常原文。
+const MESSAGE_ALLOW = [
+  {
+    rel: 'apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx',
+    ok: (line) => line.includes('reasonProblem.message'),
+    why: '本页自己的中文校验文案（请填写切换事由 / 长度限制），不是异常原文。',
+  },
+  {
+    rel: 'apps/admin/src/routes/member-benefits/grantFormModel.ts',
+    ok: (line) => line.includes('http.message') || line.includes('record.message'),
+    why: '解析 ApiHttpError 交给 grantErrorMessage，页面不渲染这段原文。',
+  },
+  {
+    rel: 'apps/admin/src/routes/sync-sources/syncSourcesApi.ts',
+    ok: (line) => line.includes('body.error?.message'),
+    why: '解析响应体后抛出，页面不直接渲染。',
+  },
+  {
+    rel: 'apps/admin/src/routes/toolbox/toolboxActionState.ts',
+    ok: (line) => line.includes('candidate.message'),
+    why: '只用来对照拦截原因码后缀（BLOCK_REASON_LABELS），对不上则交给 userMessageOf，不把英文原文返回页面。',
+  },
+]
+
+function walkTs(dir, out) {
+  if (!existsSync(dir)) return
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name)
+    if (statSync(full).isDirectory()) walkTs(full, out)
+    else if (/\.(ts|tsx)$/.test(name)) out.push(full)
+  }
+}
+
+function maskUserMessageOf(source) {
+  const token = 'userMessageOf('
+  let out = ''
+  let i = 0
+  while (i < source.length) {
+    const idx = source.indexOf(token, i)
+    if (idx < 0) {
+      out += source.slice(i)
+      break
+    }
+    out += source.slice(i, idx) + 'userMessageOf()'
+    let depth = 1
+    let j = idx + token.length
+    let quote = ''
+    while (j < source.length && depth > 0) {
+      const ch = source[j]
+      if (quote) {
+        if (ch === quote && source[j - 1] !== '\\') quote = ''
+      } else if (ch === "'" || ch === '"' || ch === '`') quote = ch
+      else if (ch === '(') depth += 1
+      else if (ch === ')') depth -= 1
+      j += 1
+    }
+    i = j
+  }
+  return out
+}
+
+{
+  const scanDirs = [
+    'apps/admin/src/routes',
+    'apps/admin/src/components',
+    'apps/partner/src/routes',
+    'apps/partner/src/components',
+  ]
+  let rawHits = 0
+  for (const relDir of scanDirs) {
+    const files = []
+    walkTs(join(repoRoot, relDir), files)
+    for (const full of files) {
+      const rel = relative(repoRoot, full)
+      const lines = maskUserMessageOf(stripComments(read(rel))).split('\n')
+      lines.forEach((line, index) => {
+        if (!/\.message\b/.test(line)) return
+        const allow = MESSAGE_ALLOW.find((item) => item.rel === rel && item.ok(line))
+        if (allow) return
+        rawHits += 1
+        fail(`${rel}:${index + 1} 把 .message 直接放进页面或状态：${line.trim()}`)
+      })
+    }
+  }
+  if (rawHits === 0) {
+    pass(`页面与组件的 .message 只出现在 userMessageOf 内，或 ${MESSAGE_ALLOW.length} 条已写明理由的允许项`)
+  }
+}
+
+{
+  const probe = [
+    "import assert from 'node:assert/strict'",
+    "import { userMessageOf as adminOf } from '../../apps/admin/src/services/api/userErrorMessage.ts'",
+    "import { userMessageOf as partnerOf } from '../../apps/partner/src/services/api/userErrorMessage.ts'",
+    'function httpError(code, message, status = 400) {',
+    '  const error = new Error(message)',
+    "  error.name = 'ApiHttpError'",
+    '  return Object.assign(error, { code, status })',
+    '}',
+    'const pageType = new TypeError("Cannot read properties of undefined (reading \'items\')")',
+    "assert.equal(adminOf(pageType, '加载失败，请稍后重试'), '加载失败，请稍后重试')",
+    "assert.equal(partnerOf(pageType, '加载失败，请稍后重试'), '加载失败，请稍后重试')",
+    "assert.equal(adminOf(new TypeError('Failed to fetch'), '加载失败，请稍后重试'), '网络连接失败，请检查网络后重试')",
+    "assert.equal(partnerOf(new TypeError('Failed to fetch'), '加载失败，请稍后重试'), '网络连接失败，请检查网络后重试')",
+    "assert.equal(adminOf(new Error('socket hang up'), '保存失败，请检查后重试'), '保存失败，请检查后重试')",
+    "assert.equal(partnerOf(new Error('socket hang up'), '保存失败，请检查后重试'), '保存失败，请检查后重试')",
+    "assert.equal(adminOf(new Error('请先选择终端'), '保存失败，请检查后重试'), '请先选择终端')",
+    "assert.equal(partnerOf(httpError('SOME_NEW_CODE', '该终端正在维护，请稍后再改'), '保存失败，请稍后重试'), '该终端正在维护，请稍后再改')",
+    "assert.equal(adminOf(httpError('ORDER_NOT_FOUND', 'missing'), '加载订单失败，请稍后重试'), '订单不存在')",
+    "assert.equal(partnerOf(httpError('ORG_REQUIRED', 'missing'), '加载失败，请稍后重试'), '当前账号未绑定机构，无法查看本机构数据')",
+    "console.log('userMessageOf runtime ok')",
+  ].join('\n')
+  const result = spawnSync(
+    'pnpm',
+    ['--filter', '@ai-job-print/api', 'exec', 'node', '--import', 'tsx', '--input-type=module', '-e', probe],
+    { cwd: repoRoot, encoding: 'utf8' },
+  )
+  if (result.status !== 0) {
+    fail(`userMessageOf 运行时断言失败（exit ${result.status}）\n${result.stdout ?? ''}\n${result.stderr ?? ''}`)
+  } else if (!String(result.stdout).includes('userMessageOf runtime ok')) {
+    fail(`userMessageOf 运行时没有打印成功\n${result.stdout ?? ''}\n${result.stderr ?? ''}`)
+  } else {
+    pass('userMessageOf 运行时：页面 TypeError 用兜底，断网才算网络，无中文 Error 用兜底，中文与已登记码按规则')
   }
 }
 

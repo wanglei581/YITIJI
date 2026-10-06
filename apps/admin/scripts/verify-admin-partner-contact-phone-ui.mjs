@@ -411,7 +411,7 @@ function verifyStatic() {
   ]) {
     expect(dialog.includes(code), `弹层兜底含 ${code}`)
   }
-  expect(hook.includes('setErrorMessage(result.message)') && hook.includes('code: result.code'), 'hook 原样带回错误码与 message')
+  expect(hook.includes('setErrorMessage(userMessageOf(result,') && hook.includes('code: result.code'), 'hook 把结果交给 userMessageOf，并带回错误码')
   expect(hook.includes('contactPhoneSubmitRef'), '提交中用同步标记防重复点击')
   for (const [label, source] of [
     ['适配器', read('src/services/api/registerPartnerContactPhone.ts')],

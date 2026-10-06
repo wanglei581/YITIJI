@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button, Card } from '@ai-job-print/ui'
 import { CircleAlertIcon, CircleCheckIcon } from 'lucide-react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   cancelAdminPhoneTransfer,
   redirectToLogin,
@@ -91,7 +92,7 @@ export function AdminPhoneTransferCard({ onBound, onBack }: Props) {
           setCurrentPassword('')
           setPhone('')
           if (requiresKnownSmsCooldown(result.code)) setCooldownSeconds(60)
-          setMessage({ kind: 'error', text: result.message || '短信服务暂不可用，请稍后重试' })
+          setMessage({ kind: 'error', text: userMessageOf(result, '短信服务暂不可用，请稍后重试') })
           return
         }
         if (result.code === 'AUTH_PHONE_TRANSFER_UNAVAILABLE') {
@@ -99,11 +100,11 @@ export function AdminPhoneTransferCard({ onBound, onBack }: Props) {
           setPhone('')
           setMessage({
             kind: 'error',
-            text: `${result.message || '当前账号暂不可进行手机号安全转移'}。若刚才操作中断，请 5 分钟后再试。`,
+            text: `${userMessageOf(result, '当前账号暂不可进行手机号安全转移')}。若刚才操作中断，请 5 分钟后再试。`,
           })
           return
         }
-        setMessage({ kind: 'error', text: result.message || '验证码发送失败，请稍后重试' })
+        setMessage({ kind: 'error', text: userMessageOf(result, '验证码发送失败，请稍后重试') })
         return
       }
 
@@ -161,15 +162,15 @@ export function AdminPhoneTransferCard({ onBound, onBack }: Props) {
           return
         }
         if (result.code === 'SMS_CODE_INVALID') {
-          setMessage({ kind: 'error', text: result.message || '验证码不正确，请重新输入' })
+          setMessage({ kind: 'error', text: userMessageOf(result, '验证码不正确，请重新输入') })
           return
         }
         if (requiresRestartAfterVerificationFailure(result.code)) {
           clearTransferState()
-          setMessage({ kind: 'error', text: `${result.message || '本次转移验证已失效'}，请重新发起手机号转移。` })
+          setMessage({ kind: 'error', text: `${userMessageOf(result, '本次转移验证已失效')}，请重新发起手机号转移。` })
           return
         }
-        setMessage({ kind: 'error', text: result.message || '验证失败，请稍后重试' })
+        setMessage({ kind: 'error', text: userMessageOf(result, '验证失败，请稍后重试') })
         return
       }
 
@@ -205,7 +206,7 @@ export function AdminPhoneTransferCard({ onBound, onBack }: Props) {
           redirectToLogin()
           return
         }
-        setMessage({ kind: 'error', text: result.message || '取消当前转移失败，请稍后重试。' })
+        setMessage({ kind: 'error', text: userMessageOf(result, '取消当前转移失败，请稍后重试。') })
         return
       }
       clearTransferState()

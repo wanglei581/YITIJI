@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-10-06：两个后台第 9 批——能力中心「恢复未配置」与报错改中文（分支 `grok/consoles-batch9-20261006`）
+
+- **能力中心：** 已登记的能力行在「保存」旁增加次要按钮「恢复未配置」。页内确认写明：恢复后这一项不再由后台登记决定，改为跟随服务器的默认设置；彩色、自动双面、签名默认关闭，一体机显示「暂未开通」；其余能力在常规设置下放行，在严格设置下关闭。确认后调用已有 `DELETE /api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey`。成功提示「已恢复为未配置」并刷新该终端的能力列表；接口返回 `cleared: false` 时提示「这一项本来就未配置」。未登记行没有这个按钮。mock 下未知能力键报错，本来未登记的行返回 `cleared: false`，不假装成功。审计动作 `terminal.capability.cleared` 的中文名原本已是「清除终端能力配置」，未改。
+- **报错：** 管理员 `userMessageOf` 只把 message 匹配 `Failed to fetch`、`NetworkError`、`Load failed`、`network` 的 TypeError 当成网络失败；页面自己的 TypeError，以及没有中文的普通 Error，用调用处的兜底句；后端中文 message 与已登记错误码仍按原规则。机构后台新增同职工具，不引用管理员后台的文件。两个后台页面上把错误原文放进提示的位置改为按场景写的中文兜底：管理员 63 个页面文件、137 处；机构 16 个页面文件、48 处。
+- **仍按原有中文口径显示、没有改成共用兜底的：** 订单「登记收款」失败在中文说明后附错误码（`orderDisplay.ts` 写明便于上报）；会员权益发放继续用 `grantErrorMessage`（已登记码走中文，后端中文原因在不含键名泄漏与 `HTTP_` 时原样，其余用发放兜底）；机构官方渠道继续用 `officialChannelErrorMessage`（中文原因原样，英文技术串换成本渠道码表或兜底）。服务层把响应体 message 装进 `ApiHttpError` 的地方未改，页面再经上述函数。
+- **门禁：** `verify:no-raw-error-render` 增加页面与组件扫描，以及两端 `userMessageOf` 的运行时断言（页面 TypeError 用兜底、断网 TypeError 用网络句、无中文普通 Error 用兜底、后端中文原样、已登记码走码表）。`verify:admin-print-scan-ui` 断言已登记行才有按钮、点按钮只出确认、确认文案含「跟随服务器的默认设置」、不用 `window.confirm`。浏览器用例「已登记能力恢复未配置要先确认，确认后刷新列表」已写入，浏览器未跑。
+- **未改：** 服务端、一体机、小程序、公共包；未新建页面或路由；`scripts/mock-server-contract-bindings.json` 未改（现有绑定是终端能力行的类型，不含这次删除接口）。
+
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
 - **决定：** 10/4 21:5x 产品负责人定主原则「设备现场不需要工作人员，是自助的、自动的，这个是主要的」。
