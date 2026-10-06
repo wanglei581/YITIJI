@@ -41,6 +41,8 @@ export function OptimizeWorkArea(props: {
   pricingLoading: boolean
   blockedReason: string | null
   exportBlocked: boolean
+  contentBlocked?: boolean
+  onContentBlocked?: () => void
   changeListBusy: boolean
   showChangeList: boolean
   guest: boolean
@@ -104,6 +106,8 @@ export function OptimizeWorkArea(props: {
           pricingLoading={props.pricingLoading}
           blockedReason={props.blockedReason}
           exportBlocked={props.exportBlocked}
+          contentBlocked={props.contentBlocked}
+          onContentBlocked={props.onContentBlocked}
           onRequestExport={props.onRequestExport}
           onChangeList={props.onChangeList}
           changeListBusy={props.changeListBusy}
