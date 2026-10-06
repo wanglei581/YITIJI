@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1850 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1853 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1579,6 +1579,15 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
+<summary><code>docs/device/postgres-operations.md/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `docs/device/postgres-operations.md` | `verify-backup-ops.mjs` |
+
+</details>
+
+<details>
 <summary><code>docs/device/print-scan-first-release-acceptance.md/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
@@ -2101,7 +2110,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 134 个文件</summary>
+<summary><code>services/api/scripts/</code> — 136 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2140,8 +2149,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/lib/verify-governed-job-fit-runtime.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-governed-job-fit.ts` |
 | `services/api/scripts/preflight-legal-docs.mjs` | `verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-legal-docs-preflight.mjs` |
 | `services/api/scripts/preflight-production-gates.mjs` | `verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs` |
+| `services/api/scripts/rclone-offsite.conf.example` | `verify-backup-ops.mjs` |
 | `services/api/scripts/recruitment-wave2-restored-dry-run.ts` | `verify-recruitment-wave2-readonly.ts` |
 | `services/api/scripts/release-provenance-fixture.ts` | `verify-release-genesis.ts`<br/>`verify-release-provenance.ts` |
+| `services/api/scripts/restore-offsite-drill.sh` | `verify-backup-ops.mjs` |
 | `services/api/scripts/scan-lease-contract.helper.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/admin-phone-transfer-security-cases.ts` | `verify-admin-phone-transfer.ts` |
 | `services/api/scripts/support/admin-phone-transfer-static-contract.ts` | `verify-admin-phone-transfer.ts` |
