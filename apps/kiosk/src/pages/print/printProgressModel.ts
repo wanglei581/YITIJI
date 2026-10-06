@@ -153,6 +153,24 @@ export function outOfPaperDoing(money: OutOfPaperMoney, contact?: PublicSupportC
   return machineCannotPrintLine(contact, { orderKept: true })
 }
 
+/** 卡纸说明的副标题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。 */
+export function jamOrderKeptLine(fact: PaymentFact): string {
+  return fact === 'paid'
+    ? '你的订单和已付金额都保留着'
+    : '你的订单还在，处理好后可以继续打印'
+}
+
+/**
+ * 一般失败页小青区。收费单可以提支付记录；0 元和金额未知不提钱。
+ * 2026-10-06：候选侧原句叫人「找现场工作人员」，换成标准句 1。
+ */
+export function failureStaffDoing(fact: PaymentFact, contact?: PublicSupportContact | null): string {
+  const help = helpNeededLine(contact)
+  return fact === 'paid'
+    ? `订单和支付记录都在。${help}`
+    : `你的订单还在，处理好后可以继续打印。${help}`
+}
+
 /** 小青区首句的前半截：先说钱的事实，再说任务阶段（稿「支付成功，正在出纸。」）。 */
 export function paymentLead(payment: PaymentFact): string {
   if (payment === 'paid') return '支付成功，'

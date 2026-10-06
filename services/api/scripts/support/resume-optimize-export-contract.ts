@@ -10,7 +10,7 @@ import { ResumeDocxService } from '../../src/ai/resume/resume-docx.service'
 import { ResumePdfService } from '../../src/ai/resume/resume-pdf.service'
 import { ResumeTextService } from '../../src/ai/resume/resume-text.service'
 import { extractResumeExperienceCandidates } from '../../src/ai/resume/resume-structure'
-import { extractPdfText, openUnpdfDocument } from '../../src/common/pdf/pdfjs-document'
+import { extractPdfText, extractPdfTextItems, openUnpdfDocument, type PdfTextItem } from '../../src/common/pdf/pdfjs-document'
 
 /**
  * W-OPT-EXPORT：优化接口吐出来的任何结果，原样交给导出 / 排版调整 / 存草稿都必须过校验，
@@ -308,7 +308,76 @@ export async function verifyOptimizeExportContract(): Promise<void> {
       if (!docx || !(docx as { buffer?: Buffer }).buffer?.length) fail('W-OPT-EXPORT (10). Word 导出失败')
       pass('W-OPT-EXPORT (10). 文本 / Markdown / Word 导出职务为空的经历：不留悬空分隔符')
     }
+
+    // ── 11. 标题过长时 PDF 里文字不能叠在一起（R-1 / R-2，走查样本 6）───────────────────────
+    {
+      // 样本 6：时间段写在行首，后面是一句 97 字的话。补回时这句话不能当公司标题。
+      const sentence = '一直在胶州城郊的一个物流仓库里干活，开始跟着老师傅卸车码垛，后来考了证开叉车，旺季的时候一个晚上要倒四十多托货，中间还替班长盯过半年夜班的出库单。'
+      const s6 = ['郭鹏', '男，41 岁。想找叉车或者仓库的活。', `2019 年 3 月到 2024 年 12 月 ${sentence}`,
+        '每个月底跟着盘一次库，五年多下来没出过大的差错。', '手机 13800000613。'].join('\n')
+      // 诊断报告把这一行摘成工作经历（走查时正是这样；没有报告锚点时这行不带「公司」字样，不会被认成经历）。
+      const s6Report = { sections: [], suggestions: [], contentBlocks: [
+        { key: 'experience', label: '工作经历', lines: [`2019 年 3 月到 2024 年 12 月 ${sentence}`.slice(0, 40)] },
+      ] } as unknown as ResumeReport
+      const guo = await optimize(s6, blank('郭鹏'), s6Report)
+      const exp = guo.optimizedResume.experience
+      if (exp.length !== 1 || exp[0].company !== '' || exp[0].period !== '2019 年 3 月到 2024 年 12 月' || !exp[0].description.startsWith(sentence)) {
+        fail(`W-OPT-EXPORT (11). 样本 6：整句应进描述、单位留空、时间段单独放，实际 ${JSON.stringify(exp)}`)
+      }
+      await acceptedEverywhere(guo.optimizedResume, '样本 6')
+      // 项目经历同理：首行是一句短话（不到 100 字、带句读），也不当项目名称。
+      const projectSentence = '社区便民服务站 2023.05 - 2023.09 每周末帮老人登记医保、打印材料。'
+      const proj = await optimize(['冯晓梅', '项目经历', projectSentence, '一共去了十几次。'].join('\n'), blank('冯晓梅'))
+      const restored = proj.optimizedResume.projects[0]
+      if (restored?.name !== '' || !restored.description.startsWith(projectSentence)) {
+        fail(`W-OPT-EXPORT (11). 像句子的项目首行不应当项目名称：${JSON.stringify(proj.optimizedResume.projects)}`)
+      }
+      if ((await overlaps(guo.optimizedResume)).length) fail(`W-OPT-EXPORT (11). 样本 6 的 PDF 有文字重叠：${JSON.stringify(await overlaps(guo.optimizedResume))}`)
+
+      // 用户在页面上自己把单位、职务改得很长时，排版同样不能叠字（6 月起的老问题，公司加职务超过约 27 字就会触发）。
+      const longCompany = '青岛西海岸新区某某国际物流供应链管理服务有限公司胶州湾保税港区第三分公司'
+      const longRole = '仓储主管兼夜班叉车调度及出库单据复核负责人'
+      const cases: Array<[string, string, string]> = [
+        ['超长单位', longCompany, '叉车工'],
+        ['超长职务', '某物流公司', longRole],
+        ['超长单位加职务', longCompany, longRole],
+      ]
+      for (const columns of [1, 2] as const) {
+        for (const [label, company, role] of cases) {
+          const resume = { ...guo.optimizedResume, experience: [
+            { company, role, period: '2019.03 - 2024.12', description: '负责装卸、码垛与夜班出库；每月底参与盘库，五年没有出过大的差错。' },
+            { company: '胶州某超市', role: '理货员', period: '2016.05 - 2019.02', description: '负责货架补货与临期商品下架。' },
+          ] }
+          await acceptedEverywhere(resume, label)
+          const hits = await overlaps(resume, columns)
+          if (hits.length) fail(`W-OPT-EXPORT (11). ${label}（${columns} 栏）的 PDF 文字重叠：${JSON.stringify(hits.slice(0, 2))}`)
+        }
+      }
+      pass('W-OPT-EXPORT (11). 样本 6 整句进描述；超长单位 / 职务 / 两者都长，单栏与双栏 PDF 文字框按坐标都不重叠')
+    }
   } finally {
     globalThis.fetch = originalFetch
   }
+}
+
+/**
+ * 按坐标找 PDF 里互相压住的两段文字：横向有重叠、纵向基线差小于字高的八成。
+ * 同一行相邻的文字横向不重叠，相邻两行纵向相差至少一个行高，都不会误报。
+ */
+async function overlaps(resume: GeneratedResume, columns: 1 | 2 = 1): Promise<string[]> {
+  const rendered = await new ResumePdfService().render(resume, { layout: { columns }, contentId: 'opt-export-contract' } as never)
+  const { items } = await extractPdfTextItems(await openUnpdfDocument(new Uint8Array(rendered.buffer)))
+  const hits: string[] = []
+  for (const page of items) {
+    const boxes = page.filter((item: PdfTextItem) => item.str.trim() && item.width > 0)
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i], b = boxes[j]
+        const xOverlap = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
+        const height = Math.min(a.height || a.fontSize, b.height || b.fontSize)
+        if (xOverlap > 1 && Math.abs(a.y - b.y) < height * 0.8) hits.push(`「${a.str.slice(0, 12)}」×「${b.str.slice(0, 12)}」`)
+      }
+    }
+  }
+  return hits
 }

@@ -16,6 +16,9 @@
   padding-top: 12px;
   padding-bottom: 24px;
 }
+.pff-page.pff-jam {
+  min-height: 100%;
+}
 
 .pff-xq {
   flex: none;
@@ -301,6 +304,38 @@
   cursor: pointer;
 }
 
+.pff-done-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 20px;
+  align-items: stretch;
+}
+.pff-done-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 12px;
+  border-left: 1px solid var(--qx-line);
+  padding-left: 18px;
+  color: var(--qx-ink);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.45;
+}
+.pff-jam-fill {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 12px;
+}
+.pff-jam-steps {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 8px;
+}
 .pff-done-title {
   display: flex;
   align-items: center;

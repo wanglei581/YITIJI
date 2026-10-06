@@ -275,7 +275,7 @@ function AccountRows({ onEnd, primaryEnd }: { onEnd: () => void; primaryEnd: boo
   const contact = useSupportContact()
   const rows = [
     { icon: BellIcon, title: '消息通知', desc: '系统下发的会员通知，已读与标记都会记录。', to: '/me/notifications', testid: 'profile-notifications' },
-    { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请找现场工作人员或按《隐私政策》的联系方式申请。', to: '/me/privacy-requests', testid: 'profile-privacy' },
+    { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。', to: '/me/privacy-requests', testid: 'profile-privacy' },
     { icon: HelpCircleIcon, title: '帮助中心', desc: `常见问题。${helpNeededLine(contact)}`, to: '/help', testid: 'profile-help' },
     { icon: MessageSquareIcon, title: '意见反馈', desc: '提交后能看到处理状态。', to: '/me/feedback', testid: 'profile-feedback' },
   ]

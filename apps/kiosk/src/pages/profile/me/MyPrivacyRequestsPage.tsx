@@ -110,7 +110,7 @@ export function MyPrivacyRequestsPage() {
     >
       <QxPageFrame
         title="隐私与数据请求"
-        subtitle="当前可撤回 AI 使用授权；注销账号、复制个人信息，请找现场工作人员或按《隐私政策》的联系方式申请。"
+        subtitle="当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。"
         status={status}
         terminalLabel={getTerminalCode() || '就业服务大厅'}
         ctabar={

@@ -179,6 +179,13 @@ export function buildOriginalCoverage(
   return entries
 }
 
+/** 补回时单位 / 项目名称、职务能当标题的最大字数；超过或带句读就整句放进描述。 */
+const RESTORED_TITLE_MAX = 40
+const RESTORED_ROLE_MAX = 20
+function isTitleLike(text: string, max: number): boolean {
+  return text.length > 0 && text.length <= max && !/[，。；,;!！?？\n]/u.test(text)
+}
+
 /** 回配主事实；主字段缺失时才允许用其他原文事实定位。 */
 function matchesOriginal(item: string | object, entry: OriginalResumeEntry): boolean {
   const norm = normalizeResumeStructureText
@@ -279,16 +286,24 @@ export function preserveOriginalEntries(
       case 'experience': {
         // 「公司 时间段 其余」的首行拆开放：时间段进 period；其余是一个短词（没有句读）时就是原件写的职务，
         // 是一句话时并进描述。原件没写职务就留空，不猜。
+        // 单位名同理：像一句话（带句读）或太长的，不当标题，整句进描述、单位留空（R-1：时间段写在行首、后面跟一大段话时，
+        // 那段话曾被当成公司名印成三行标题）。
         const parts = splitResumeDateRange(first)
-        const company = parts ? parts.before || parts.after : first
+        const head = parts ? parts.before || parts.after : first
         const tail = parts && parts.before ? parts.after : ''
-        const role = /^[^，。；,;.!！?？\n]{1,20}$/u.test(tail) ? tail : ''
+        const company = isTitleLike(head, RESTORED_TITLE_MAX) ? head : ''
+        const role = company && isTitleLike(tail, RESTORED_ROLE_MAX) ? tail : ''
         insert(resume.experience, {
-          company, role, period: parts?.period, description: [role ? '' : tail, description].filter(Boolean).join('\n'),
+          company, role, period: parts?.period,
+          description: [company ? '' : head, role ? '' : tail, description].filter(Boolean).join('\n'),
         })
         break
       }
-      case 'projects': insert(resume.projects, { name: first, description }); break
+      case 'projects': {
+        const name = isTitleLike(first, RESTORED_TITLE_MAX) ? first : ''
+        insert(resume.projects, { name, description: [name ? '' : first, description].filter(Boolean).join('\n') })
+        break
+      }
       case 'skills': entry.lines.forEach((line) => insert(resume.skills, line)); break
       case 'certificates': entry.lines.forEach((line) => insert(resume.certificates, line)); break
     }

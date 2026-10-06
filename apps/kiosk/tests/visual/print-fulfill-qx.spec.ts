@@ -308,8 +308,19 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   await expect(jam).toContainText(SENTENCE_5)
   await expect(jam).not.toContainText('在手机上申请')
   await expect(jam).not.toContainText('换一台机器')
+  await expect(jam).toContainText('你的订单和已付金额都保留着')
+  await expect(page.getByRole('region', { name: '找工作人员之前先做这三件' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
   await expectTouchAndBounds(page)
+  if (page.viewportSize()?.width === 1080) {
+    const geo = await page.evaluate(() => {
+      const scroller = document.querySelector('.pff-page') as HTMLElement
+      const box = scroller.getBoundingClientRect()
+      const lastBottom = Math.max(...[...scroller.children].map((el) => el.getBoundingClientRect().bottom))
+      return { trailingBlank: box.bottom - lastBottom }
+    })
+    expect(geo.trailingBlank, '卡纸失败页不许整行留白 ≥160px').toBeLessThan(160)
+  }
   await page.screenshot({ path: test.info().outputPath('fulfill-paper-jam.png'), fullPage: true })
 
   await page.getByRole('button', { name: '重新提交打印' }).click()
@@ -324,6 +335,46 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   ])
   await expect(page.locator('[data-w2-page="print-progress"]')).toBeVisible()
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('free paper jam keeps the order without mentioning payment @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      errorCode: 'PRINTER_ERROR',
+      failureReasonForUser: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: 0,
+      canRetry: false,
+    },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, amountCents: 0 })
+
+  const jam = page.locator('[data-testid="print-fulfill-state-paper-jam"]')
+  await expect(jam).toBeVisible()
+  await expect(jam).toContainText('你的订单还在，处理好后可以继续打印')
+  await expect(jam).not.toContainText('已付金额')
+  await expect(jam).not.toContainText('已支付')
+  await expect(page.getByRole('region', { name: '找工作人员之前先做这三件' })).toBeVisible()
   expect(errors).toEqual([])
 })
 

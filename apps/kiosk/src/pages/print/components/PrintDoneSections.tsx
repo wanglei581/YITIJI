@@ -7,6 +7,7 @@
 //   PrintDoneRecordSection 完成态「本次记录」：摘要默认可见，保留与删除记录可展开
 //   PrintJobSummaryCard    完成态「本次任务摘要」
 //   PrintOutOfPaperPanel   PAPER_EMPTY 缺纸态正文（稿 out-of-paper）：任务卡 + 缺纸说明 + 费用边界 + 现场三步
+//   PrintJamGuide          卡纸态下半屏：稿 paper-jam 的三步 + 求助条，用来填掉二维码下面的空白
 //
 // 结果判定（completed / failed / errorCode 分态）、带走链接、重试与清场仍在页面里，门禁按页面文件取证。
 // 本文件渲染在完成页上：不写「已支付」（用「已付」）。退款只在金额大于 0 时用标准句 5，免费单不写。
@@ -22,6 +23,7 @@ import { jobSubline, pagesPerCopy, publicOrderNo, type OutOfPaperMoney } from '.
 import { PrintFileDeletionRecords } from './PrintFileDeletionRecords'
 import { PrintFileRetentionNotice } from './PrintFileRetentionNotice'
 import type { PrintFileRetentionInput } from './printFileRetention'
+import { PrintAiHelp } from './PrintAiHelp'
 import { PrintJobRow } from './PrintProgressSections'
 
 const DUPLEX_LABEL: Record<string, string> = {
@@ -226,5 +228,39 @@ export function PrintOutOfPaperPanel({
 
       <div className="pfd-takeaway">{takeaway}</div>
     </>
+  )
+}
+
+/** 稿 15 paper-jam 的三步和求助条。不写收款；订单号没有时只说「这一单」。 */
+export function PrintJamGuide({ orderNo }: { orderNo: string | null }) {
+  const orderRef = orderNo ? `订单号 ${orderNo}` : '这一单'
+  return (
+    <section className="pff-jam-fill" aria-label="找工作人员之前先做这三件">
+      <div className="pff-sec-h">
+        <span className="t">找工作人员之前先做这三件</span>
+        <span className="hint">当场处理最快</span>
+      </div>
+      <div className="pff-jam-steps">
+        <div className="pff-step">
+          <span className="pff-step-no">1</span>
+          <span className="pff-step-txt">把出纸口里<b>已经出来的纸取走收好</b>，别留在机器上。</span>
+        </div>
+        <div className="pff-step">
+          <span className="pff-step-no">2</span>
+          <span className="pff-step-txt"><b>不要自己开机盖、不要拽纸</b>：撕在里面更难取，也可能弄坏机器。</span>
+        </div>
+        <div className="pff-step">
+          <span className="pff-step-no">3</span>
+          <span className="pff-step-txt">记下<b>{orderRef}</b>，补打时工作人员按它找这一单。</span>
+        </div>
+      </div>
+      <div className="pff-help">
+        <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>，找现场工作人员处理。</span>
+      </div>
+      <PrintAiHelp
+        label="问小青：取纸或异常怎么办 →"
+        draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
+      />
+    </section>
   )
 }

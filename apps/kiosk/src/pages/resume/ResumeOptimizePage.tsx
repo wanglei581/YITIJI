@@ -52,6 +52,7 @@ import {
 } from './components/resume-deliver/resumeDecisions'
 import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
 import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
+import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-optimize-qx.css'
 import './optimize-empty-state-qx.css'
@@ -139,6 +140,14 @@ export function ResumeOptimizePage() {
   const unconfirmed = assembled ? detectUnconfirmedAdditions(assembled, modules) : []
   const facts = assembled ? extractConfirmableFacts(assembled) : []
   const exportBlocked = pricing.unavailable || pricing.chargedBlocked || !assembled || exporting
+  // 标题问题只拦简历导出和打印。导出修改清单不带这些标题，仍只看 exportBlocked。
+  const shownTitleIssues = resume ? resumeTitleIssues(resume) : []
+  const exportTitleIssues = assembled && assembled !== resume ? resumeTitleIssues(assembled) : []
+  const titleBlocked = shownTitleIssues.length > 0 || exportTitleIssues.length > 0
+  const focusTitleIssue = () => {
+    const id = (shownTitleIssues[0] ?? exportTitleIssues[0])?.id
+    if (id) focusResumeTitleIssue(id)
+  }
   const estimatedPagesLabel = exported?.pageCount ? `共 ${exported.pageCount} 页（上次导出）` : '导出后显示真实页数。若担心第二页只剩两三行，可先点「压到一页」。'
   const editorOpen = view === 'ready' && Boolean(resume) && draftAccepted && !draft.loading
   const choicePending = Boolean(token && draft.hasDraft && !draftAccepted && view === 'ready')
@@ -231,8 +240,13 @@ export function ResumeOptimizePage() {
     setWorkView('editor')
   }
 
+  const requestResumeExport = () => {
+    if (titleBlocked) { focusTitleIssue(); return }
+    if (!exportBlocked) setFactOpen('resume')
+  }
+
   const runResumeExport = async (factsConfirmedAt: string) => {
-    if (!assembled) return
+    if (!assembled || titleBlocked) return
     const optimizedResume = assembled
     setExporting(true); setExportError(null); setPreviewOpen(false)
     try {
@@ -310,7 +324,7 @@ export function ResumeOptimizePage() {
           )}
           {/* 导出的就是编辑区里的这一份：用户在编辑区亲手改过的段落以他改的为准，
               不因为和某条「保留原文」的选择对不上就拦住导出。 */}
-          <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => { if (!exportBlocked) setFactOpen('resume') }}>
+          <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || titleBlocked || undefined} onClick={requestResumeExport}>
             {exporting ? '正在生成文件…' : `确认优化版，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
           </button>
         </div>
@@ -428,6 +442,8 @@ export function ResumeOptimizePage() {
             pricingLoading={pricing.loading}
             blockedReason={pricing.blockedReason}
             exportBlocked={exportBlocked}
+            contentBlocked={titleBlocked}
+            onContentBlocked={focusTitleIssue}
             changeListBusy={exporting && factOpen === 'change_list'}
             showChangeList={Boolean(taskId)}
             guest={!token}
@@ -443,7 +459,7 @@ export function ResumeOptimizePage() {
             onLayoutChange={handleLayoutChange}
             onTemplateChange={handleTemplateChange}
             onExportFormatChange={handleExportFormatChange}
-            onRequestExport={() => setFactOpen('resume')}
+            onRequestExport={requestResumeExport}
             onChangeList={() => setFactOpen('change_list')}
             onPrint={handlePrint}
             onOpenPreview={() => setPreviewOpen(true)}
@@ -459,7 +475,7 @@ export function ResumeOptimizePage() {
           />
         )}
         {previewOpen && exported?.signedUrl && (
-          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportKind === 'change_list' ? 'pdf' : exportFormat} mimeType={exportKind === 'change_list' ? 'application/pdf' : undefined} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && (exportKind === 'change_list' || exportFormat === 'pdf') ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating } : undefined} onClose={() => setPreviewOpen(false)} />
+          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportKind === 'change_list' ? 'pdf' : exportFormat} mimeType={exportKind === 'change_list' ? 'application/pdf' : undefined} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && (exportKind === 'change_list' || exportFormat === 'pdf') ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
         {confirmLeave && (
           <ResumeOptimizeLeaveDialog
