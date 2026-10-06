@@ -61,7 +61,7 @@ const COPY_CASE_ICON: Record<CopyGuideCase['key'], typeof CopyIcon> = {
 
 const RECORD_LINKS: readonly (QxPrintQuickLinkView & { to: string })[] = [
   { key: 'documents', icon: FilesIcon, title: '我的文档', description: '已上传 / 生成的文件', to: '/me/documents' },
-  { key: 'print-orders', icon: PrinterIcon, title: '打印订单', description: '任务状态与取件凭证码', to: '/me/print-orders' },
+  { key: 'print-orders', icon: PrinterIcon, title: '打印订单', description: '任务状态与到机码', to: '/me/print-orders' },
 ]
 
 function featureState(key: string | undefined): HubFeatureState {

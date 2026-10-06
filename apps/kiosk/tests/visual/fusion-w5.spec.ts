@@ -1515,6 +1515,10 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   const paidRow = rows.filter({ hasText: '个人简历.pdf' }).first()
   await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
   await expect(paidRow.getByText('W5K7Q2', { exact: true })).toBeVisible()
+  await expect(paidRow.getByText('到机码', { exact: true })).toBeVisible()
+  await expect(page.getByText('取件凭证码')).toHaveCount(0)
+  await expect(paidRow.getByText('还能续打')).toHaveCount(0)
+  await expect(paidRow.getByText('不能再打了')).toHaveCount(0)
   await expect(paidRow.getByText('下单金额')).toBeVisible()
   await expect(paidRow.getByRole('button', { name: '去我的文档再打印' })).toBeVisible()
   await assetShot(page, 'orders-detail')
@@ -1527,6 +1531,49 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await rows.filter({ hasText: '成绩单.pdf' }).getByRole('button', { name: '反馈打印订单 成绩单.pdf' }).click()
   await expect(page).toHaveURL(/\/me\/feedback\?category=print&relatedPrintTaskId=order-failed$/)
   await feedbackLoaded
+})
+
+test('orders: reprint notice follows reprintAllowed and reprintRemaining @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const canResume = memberOrder({
+    id: 'order-resume',
+    fileName: '还能续打的简历.pdf',
+    amountCents: 300,
+    payStatus: 'paid',
+    paymentSource: 'offline',
+    billablePages: 3,
+    pickupCode: '28491703',
+    discountCents: 0,
+    refundedAmountCents: 0,
+    reprintAllowed: true,
+    reprintRemaining: 1,
+  })
+  const usedUp = memberOrder({
+    id: 'order-used-up',
+    fileName: '不能再打的简历.pdf',
+    amountCents: 300,
+    payStatus: 'paid',
+    paymentSource: 'offline',
+    billablePages: 3,
+    pickupCode: '39502814',
+    discountCents: 0,
+    refundedAmountCents: 0,
+    reprintAllowed: false,
+    reprintRemaining: 0,
+  })
+  api.respond('GET', '/api/v1/me/print-orders', memberPage([canResume, usedUp]))
+  api.respond('GET', '/api/v1/me/feedback', memberPage([]))
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  const resumeRow = page.getByTestId('member-assets-order').filter({ hasText: '还能续打的简历.pdf' })
+  await resumeRow.getByRole('button', { name: '查看订单详单 还能续打的简历.pdf' }).click()
+  await expect(resumeRow.getByText('到机码', { exact: true })).toBeVisible()
+  await expect(resumeRow.getByText('还能续打 1 次')).toBeVisible()
+  await expect(page.getByText('取件凭证码')).toHaveCount(0)
+  const usedRow = page.getByTestId('member-assets-order').filter({ hasText: '不能再打的简历.pdf' })
+  await usedRow.getByRole('button', { name: '查看订单详单 不能再打的简历.pdf' }).click()
+  await expect(usedRow.getByText('这单已经接着打过 2 次，不能再打了。')).toBeVisible()
+  await expect(usedRow.getByText('还能续打')).toHaveCount(0)
 })
 
 // 走查 N3（10/4）：0 元单的列表与详单不出现支付、金额机制的说法；收费单的金额明细原样保留。
