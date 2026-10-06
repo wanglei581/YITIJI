@@ -20,7 +20,7 @@ export default defineConfig({
   // 这边是 mock 包（大屏在 mock 下一个请求都不发）。不排除的话默认 config 会把
   // tests/e2e/screen/** 一并收进来，在 mock 服务器上跑出与口径无关的红。
   // 匹配走绝对路径 + minimatch（Playwright 会自动补 `**/` 前缀），故写全相对段。
-  testIgnore: '**/tests/e2e/screen/**',
+  testIgnore: ['**/tests/e2e/screen/**', '**/tests/e2e/users.closure.spec.ts'],
   outputDir: '../../test-results/admin-e2e',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

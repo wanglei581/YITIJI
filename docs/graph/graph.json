@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 576,
+    "endpointCount": 580,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -4005,6 +4005,46 @@
         ]
       },
       {
+        "controller": "services/api/src/support-contact/support-contact.admin.controller.ts",
+        "handler": "SupportContactAdminController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/support-contact",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/support-contact/support-contact.service.ts"
+        ],
+        "services": [
+          "SupportContactService"
+        ]
+      },
+      {
+        "controller": "services/api/src/support-contact/support-contact.admin.controller.ts",
+        "handler": "SupportContactAdminController.update",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/support-contact",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/support-contact/support-contact.service.ts"
+        ],
+        "services": [
+          "SupportContactService"
+        ]
+      },
+      {
         "controller": "services/api/src/recruitment-hosting/admin-recruitment-hosting.controller.ts",
         "handler": "AdminRecruitmentHostingController.getRecruitmentHosting",
         "method": "GET",
@@ -7740,7 +7780,6 @@
         "handler": "MemberPrintOrdersController.list",
         "method": "GET",
         "models": [
-          "Order",
           "PrintTask",
           "Terminal"
         ],
@@ -8490,6 +8529,28 @@
           "AiLogService",
           "AsrService",
           "MockInterviewService"
+        ]
+      },
+      {
+        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
+        "handler": "CreateInterviewDto.printTranscript",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "MockInterviewReport",
+          "MockInterviewSession",
+          "MockInterviewTurn",
+          "PrintTask"
+        ],
+        "path": "/api/v1/mock-interviews/:id/transcript/print",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/mock-interview/interview-transcript-print.service.ts"
+        ],
+        "services": [
+          "InterviewTranscriptPrintService"
         ]
       },
       {
@@ -10589,6 +10650,7 @@
           "Order",
           "OrderItem",
           "PrintTask",
+          "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability"
         ],
@@ -10689,6 +10751,7 @@
           "Order",
           "OrderItem",
           "PrintTask",
+          "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability"
         ],
@@ -10757,6 +10820,24 @@
         ],
         "services": [
           "PrintSignService"
+        ]
+      },
+      {
+        "controller": "services/api/src/support-contact/support-contact.public.controller.ts",
+        "handler": "SupportContactPublicController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/public/support-contact",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/support-contact/support-contact.service.ts"
+        ],
+        "services": [
+          "SupportContactService"
         ]
       },
       {
@@ -12136,7 +12217,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 238,
+      "reachableFileCount": 242,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12904,6 +12985,7 @@
             "PATCH /admin/job-sources/:param/review",
             "POST /admin/orders/:param/mark-paid",
             "POST /admin/orders/:param/refund",
+            "POST /admin/users/:param/closure",
             "POST /admin/users/:param/disable",
             "POST /admin/users/:param/restore"
           ],
@@ -12916,11 +12998,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 267
+      "sourceFileCount": 275
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 636,
+      "reachableFileCount": 639,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15896,7 +15978,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 730
+      "sourceFileCount": 736
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -16322,7 +16404,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 111,
+    "modelCount": 112,
     "models": [
       {
         "fieldCount": 7,
@@ -16947,10 +17029,12 @@
           "services/api/src/payment/pickup-validity.ts",
           "services/api/src/print-conversion/print-conversion.service.ts",
           "services/api/src/print-jobs/paid-reprint-eligibility.ts",
+          "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/pii-scan-gate.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/print-jobs/self-service-reprint.ts",
           "services/api/src/print-sign/print-sign.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts",
@@ -17222,6 +17306,7 @@
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -17233,6 +17318,7 @@
         ],
         "usedBy": [
           "services/api/src/member-privacy/member-closure.service.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -17330,6 +17416,7 @@
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
           "services/api/src/print-jobs/paid-reprint-eligibility.ts",
+          "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
@@ -17445,6 +17532,14 @@
         ]
       },
       {
+        "fieldCount": 4,
+        "name": "PlatformSetting",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/support-contact/support-contact.service.ts"
+        ]
+      },
+      {
         "fieldCount": 10,
         "name": "PolicyEligibilityRule",
         "relations": [
@@ -17532,8 +17627,10 @@
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
+          "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/self-service-reprint.ts",
           "services/api/src/terminals/claim-unprintable-file.ts",
           "services/api/src/terminals/print-status-attempt.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
@@ -17557,7 +17654,9 @@
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
+          "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/self-service-reprint.ts",
           "services/api/src/terminals/print-status-attempt.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
@@ -17733,6 +17832,7 @@
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
+          "services/api/src/support-contact/support-contact.service.ts",
           "services/api/src/terminals/kiosk-job-board.service.ts",
           "services/api/src/terminals/release-observation.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
@@ -18087,6 +18187,9 @@
     "apps/admin/scripts/verify-measure-spacing.mjs": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
+    "apps/admin/scripts/verify-user-closure-ui.mjs": [
+      "apps/admin/scripts/verify-admin-users-ui.mjs"
+    ],
     "apps/admin/src/UnhandledRejectionBanner.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -18269,6 +18372,9 @@
     "apps/admin/src/routes/legal-docs/LegalDocPreview.tsx": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/admin/src/routes/legal-docs/SupportContactCard.tsx": [
+      "services/api/scripts/verify-support-contact.ts"
+    ],
     "apps/admin/src/routes/legal-docs/index.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
@@ -18333,6 +18439,7 @@
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/admin/scripts/verify-console-privacy-copy.mjs",
+      "apps/admin/scripts/verify-user-closure-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
@@ -18462,6 +18569,7 @@
     ],
     "apps/admin/src/routes/privacy-requests/index.tsx": [
       "apps/admin/scripts/verify-console-privacy-copy.mjs",
+      "apps/admin/scripts/verify-user-closure-ui.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
     ],
     "apps/admin/src/routes/screen/GovGrid.tsx": [
@@ -18615,8 +18723,13 @@
     "apps/admin/src/routes/toolbox/toolboxActionState.ts": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/admin/src/routes/users/UserClosureDialog.tsx": [
+      "apps/admin/scripts/verify-user-closure-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
+    ],
     "apps/admin/src/routes/users/UserDetailDrawer.tsx": [
-      "apps/admin/scripts/verify-admin-users-ui.mjs"
+      "apps/admin/scripts/verify-admin-users-ui.mjs",
+      "apps/admin/scripts/verify-user-closure-ui.mjs"
     ],
     "apps/admin/src/routes/users/UserStatusDialog.tsx": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
@@ -18625,7 +18738,11 @@
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
     "apps/admin/src/routes/users/index.tsx": [
-      "apps/admin/scripts/verify-admin-users-ui.mjs"
+      "apps/admin/scripts/verify-admin-users-ui.mjs",
+      "apps/admin/scripts/verify-user-closure-ui.mjs"
+    ],
+    "apps/admin/src/routes/users/userClosurePresentation.ts": [
+      "apps/admin/scripts/verify-user-closure-ui.mjs"
     ],
     "apps/admin/src/routes/users/userPresentation.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs",
@@ -18660,7 +18777,8 @@
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
     ],
     "apps/admin/src/services/api/adminUsers.ts": [
-      "apps/admin/scripts/verify-admin-users-ui.mjs"
+      "apps/admin/scripts/verify-admin-users-ui.mjs",
+      "apps/admin/scripts/verify-user-closure-ui.mjs"
     ],
     "apps/admin/src/services/api/aiAccess.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
@@ -18747,7 +18865,8 @@
       "apps/admin/scripts/verify-admin-login-second-factor.mjs"
     ],
     "apps/kiosk/index.html": [
-      "scripts/verify-compliance-copy.mjs"
+      "scripts/verify-compliance-copy.mjs",
+      "scripts/verify-kiosk-font-subset.mjs"
     ],
     "apps/kiosk/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -19060,7 +19179,8 @@
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
-      "packages/ui/scripts/verify-service-desk-foundation.mjs"
+      "packages/ui/scripts/verify-service-desk-foundation.mjs",
+      "scripts/verify-kiosk-font-subset.mjs"
     ],
     "apps/kiosk/src/layouts/KioskRoot.tsx": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
@@ -19121,9 +19241,18 @@
     "apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/ai-plan/AdvisorTakeaway.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
     "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-public-screen-mask.mjs"
+    ],
+    "apps/kiosk/src/pages/ai-plan/advisorArtifactModel.ts": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
+    "apps/kiosk/src/pages/ai-plan/styles/advisor-artifact-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
@@ -21288,6 +21417,9 @@
     "apps/kiosk/src/styles/ai-primitives.css": [
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
     ],
+    "apps/kiosk/src/styles/fonts/source-han.css": [
+      "scripts/verify-kiosk-font-subset.mjs"
+    ],
     "apps/kiosk/src/styles/kiosk-stage-fit.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
@@ -21299,6 +21431,9 @@
     ],
     "apps/kiosk/src/styles/qingxu/primitives.css": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/styles/qingxu/tokens.css": [
+      "scripts/verify-kiosk-font-subset.mjs"
     ],
     "apps/kiosk/src/styles/warm-professional-override.css": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
@@ -22083,6 +22218,9 @@
     "docs/device/postgres-load-hardening-runbook.md": [
       "services/api/scripts/verify-db-load-indexes.ts"
     ],
+    "docs/device/postgres-operations.md": [
+      "services/api/scripts/verify-backup-ops.mjs"
+    ],
     "docs/device/print-scan-first-release-acceptance.md": [
       "services/api/scripts/verify-print-scan-first-release.ts"
     ],
@@ -22134,6 +22272,7 @@
       "services/api/scripts/verify-job-info-ai-real-acceptance.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts",
       "services/api/scripts/verify-toolbox-ai-skill-real-acceptance.ts",
       "services/api/scripts/verify-toolbox-governance-acceptance.ts",
@@ -22338,6 +22477,7 @@
       "services/api/scripts/verify-member-order-timeline.ts"
     ],
     "packages/shared/src/types/memberPrivacy.ts": [
+      "apps/admin/scripts/verify-user-closure-ui.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-member-data-request-contract.ts"
@@ -22717,6 +22857,7 @@
       "services/api/scripts/verify-recruitment-p1-schema.ts",
       "services/api/scripts/verify-release-observation-contract.mjs",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
@@ -22880,12 +23021,18 @@
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs"
     ],
+    "services/api/scripts/rclone-offsite.conf.example": [
+      "services/api/scripts/verify-backup-ops.mjs"
+    ],
     "services/api/scripts/recruitment-wave2-restored-dry-run.ts": [
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
     ],
     "services/api/scripts/release-provenance-fixture.ts": [
       "services/api/scripts/verify-release-genesis.ts",
       "services/api/scripts/verify-release-provenance.ts"
+    ],
+    "services/api/scripts/restore-offsite-drill.sh": [
+      "services/api/scripts/verify-backup-ops.mjs"
     ],
     "services/api/scripts/scan-lease-contract.helper.ts": [
       "services/api/scripts/verify-scan-tasks.ts"
@@ -22971,6 +23118,7 @@
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -23004,6 +23152,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -23350,6 +23499,7 @@
     ],
     "services/api/src/admin-print-scan/admin-print-scan.service.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-refund-idempotent.ts"
@@ -23402,11 +23552,13 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
     "services/api/src/advisor/llm-advisor.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
-      "services/api/scripts/verify-ai-safety-aigc.ts"
+      "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
     "services/api/src/ai-access/admin-ai-access.controller.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
@@ -23450,6 +23602,7 @@
     "services/api/src/ai/ai-public-quota.service.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
@@ -23457,6 +23610,7 @@
     ],
     "services/api/src/ai/ai-request-guard.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
     "services/api/src/ai/ai-result.cleanup.task.ts": [
@@ -23550,6 +23704,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
@@ -23605,6 +23760,7 @@
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
@@ -23621,7 +23777,8 @@
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
     "services/api/src/ai/llm/llm-failure.ts": [
-      "services/api/scripts/verify-ai-endpoint-allowlist.ts"
+      "services/api/scripts/verify-ai-endpoint-allowlist.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
     "services/api/src/ai/llm/llm-guard.ts": [
       "services/api/scripts/verify-ai-content-moderation.ts",
@@ -23645,6 +23802,7 @@
     ],
     "services/api/src/ai/providers/llm.provider.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-optimize.ts"
     ],
@@ -23682,6 +23840,7 @@
       "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/src/ai/resume-parse-intent-runner.service.ts": [
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts"
@@ -23793,6 +23952,7 @@
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/ai/resume/llm-fair-visit-plan.service.ts": [
@@ -23800,6 +23960,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/ai/resume/llm-job-fit.service.ts": [
@@ -23808,6 +23969,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-fit.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
@@ -23817,6 +23979,7 @@
     "services/api/src/ai/resume/llm-resume-generate.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-generate.ts",
@@ -23826,6 +23989,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
@@ -23835,6 +23999,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
@@ -23846,6 +24011,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
@@ -24132,6 +24298,7 @@
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policies.ts",
@@ -24160,6 +24327,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -24422,6 +24590,7 @@
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -24464,7 +24633,8 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
-      "services/api/scripts/verify-redis-degradation-truth.ts"
+      "services/api/scripts/verify-redis-degradation-truth.ts",
+      "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/common/guards/member-closure-receipt.guard.ts": [
       "services/api/scripts/verify-member-account-status.ts"
@@ -24486,7 +24656,8 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
-      "services/api/scripts/verify-recruitment-content-http.ts"
+      "services/api/scripts/verify-recruitment-content-http.ts",
+      "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/common/health.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -24547,6 +24718,9 @@
     "services/api/src/common/privacy/client-declaration.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "services/api/scripts/verify-miniapp-review-backend.ts"
+    ],
+    "services/api/src/common/process/background-task.ts": [
+      "services/api/scripts/verify-background-task-safety.ts"
     ],
     "services/api/src/common/recruitment-capability.ts": [
       "services/api/scripts/verify-recruitment-capability-gate.ts"
@@ -24610,6 +24784,7 @@
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -24620,6 +24795,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
       "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-scene.ts",
@@ -24726,7 +24902,8 @@
     ],
     "services/api/src/contract-review/contract-review-failure-reason.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
-      "services/api/scripts/verify-contract-review-timeout.ts"
+      "services/api/scripts/verify-contract-review-timeout.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
     "services/api/src/contract-review/contract-review-http.module.ts": [
       "services/api/scripts/verify-contract-review-http.ts"
@@ -24952,6 +25129,7 @@
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-llm-thinking-off.ts"
     ],
@@ -25634,7 +25812,8 @@
     "services/api/src/member-print-orders/member-order-timeline.service.ts": [
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
-      "services/api/scripts/verify-member-print-order-idempotency-http.ts"
+      "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts"
     ],
     "services/api/src/member-print-orders/member-order-timeline.status.ts": [
       "services/api/scripts/verify-member-order-timeline.ts"
@@ -25649,6 +25828,7 @@
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
@@ -25666,7 +25846,8 @@
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
-      "services/api/scripts/verify-order.ts"
+      "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts"
     ],
     "services/api/src/member-print-orders/member-print-orders.types.ts": [
       "services/api/scripts/verify-member-order-timeline.ts"
@@ -25680,6 +25861,7 @@
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/member-print-orders/package-orders.controller.ts": [
@@ -25793,9 +25975,16 @@
       "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
+    "services/api/src/mock-interview/interview-transcript-pdf.service.ts": [
+      "services/api/scripts/verify-mock-interview.ts"
+    ],
+    "services/api/src/mock-interview/interview-transcript-print.service.ts": [
+      "services/api/scripts/verify-mock-interview.ts"
+    ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
@@ -25805,6 +25994,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
     "services/api/src/mock-interview/mock-interview.module.ts": [
@@ -25917,7 +26107,8 @@
     "services/api/src/payment/admin-order-actions.controller.ts": [
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-order.ts",
-      "services/api/scripts/verify-payment-flow.ts"
+      "services/api/scripts/verify-payment-flow.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts"
     ],
     "services/api/src/payment/channel-accepted-signal.ts": [
       "services/api/scripts/verify-payment-codepay.ts",
@@ -25943,6 +26134,7 @@
       "services/api/scripts/verify-payment-codepay.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts"
     ],
@@ -25958,6 +26150,7 @@
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-param-suggestion.ts",
@@ -25981,6 +26174,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-redemption-audit.ts",
@@ -25997,6 +26191,7 @@
       "services/api/scripts/verify-payment-codepay.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-refund-convergence.ts",
@@ -26025,6 +26220,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-codepay.ts",
       "services/api/scripts/verify-payment-flow.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-refund-idempotent.ts"
@@ -26076,6 +26272,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
@@ -26105,6 +26302,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
@@ -26155,6 +26353,7 @@
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-order.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-refund-convergence.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -26261,6 +26460,7 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts"
@@ -26297,6 +26497,7 @@
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -26324,6 +26525,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
@@ -26337,6 +26539,9 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
+    ],
+    "services/api/src/print-jobs/self-service-reprint.ts": [
+      "services/api/scripts/verify-pickup-code-resume.ts"
     ],
     "services/api/src/print-jobs/verified-print-parameters.ts": [
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
@@ -26494,6 +26699,7 @@
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
@@ -26530,6 +26736,7 @@
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-screensaver-content.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -26670,6 +26877,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -26711,6 +26919,7 @@
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -26733,6 +26942,18 @@
       "services/api/scripts/verify-upload-sessions.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
+    ],
+    "services/api/src/support-contact/support-contact.admin.controller.ts": [
+      "services/api/scripts/verify-support-contact.ts"
+    ],
+    "services/api/src/support-contact/support-contact.online.ts": [
+      "services/api/scripts/verify-support-contact.ts"
+    ],
+    "services/api/src/support-contact/support-contact.public.controller.ts": [
+      "services/api/scripts/verify-support-contact.ts"
+    ],
+    "services/api/src/support-contact/support-contact.service.ts": [
+      "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/sync/dto/webhook-payload.dto.ts": [
       "services/api/scripts/verify-job-customer-sample-readiness.ts"
@@ -26822,6 +27043,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -26859,6 +27081,7 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-terminal-identity.ts",
@@ -26907,6 +27130,7 @@
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-background-task-safety.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
@@ -27551,6 +27775,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/scripts/verify-user-closure-ui.mjs",
           "apps/admin/src/routes/users/UserDetailDrawer.tsx",
           "apps/admin/src/routes/users/UserStatusDialog.tsx",
           "apps/admin/src/routes/users/activityDisplay.ts",
@@ -28050,6 +28275,29 @@
         "@ai-job-print/admin::verify:toolbox-review-ui"
       ],
       "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/orders/orderDisplay.ts",
+          "apps/admin/src/routes/privacy-requests/index.tsx",
+          "apps/admin/src/routes/users/UserClosureDialog.tsx",
+          "apps/admin/src/routes/users/UserDetailDrawer.tsx",
+          "apps/admin/src/routes/users/index.tsx",
+          "apps/admin/src/routes/users/userClosurePresentation.ts",
+          "apps/admin/src/services/api/adminUsers.ts",
+          "packages/shared/src/types/memberPrivacy.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-user-closure-ui.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/admin",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
@@ -28766,7 +29014,10 @@
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx",
+          "apps/kiosk/src/pages/ai-plan/AdvisorTakeaway.tsx",
           "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx",
+          "apps/kiosk/src/pages/ai-plan/advisorArtifactModel.ts",
+          "apps/kiosk/src/pages/ai-plan/styles/advisor-artifact-qx.css",
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx",
@@ -33086,6 +33337,27 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/index.html",
+          "apps/kiosk/src/index.css",
+          "apps/kiosk/src/styles/fonts/source-han.css",
+          "apps/kiosk/src/styles/qingxu/tokens.css"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-kiosk-font-subset.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:kiosk-font-subset"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/scripts/preflight-legal-docs.mjs"
         ],
         "missing": []
@@ -33162,6 +33434,7 @@
           "apps/admin/src/routes/sync-sources/index.tsx",
           "apps/admin/src/routes/sync-sources/syncSourcesApi.ts",
           "apps/admin/src/routes/toolbox/toolboxActionState.ts",
+          "apps/admin/src/routes/users/UserClosureDialog.tsx",
           "apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
@@ -35145,7 +35418,33 @@
       "asserts": {
         "absent": [],
         "dirs": [],
-        "files": [],
+        "files": [
+          "services/api/src/common/process/background-task.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-background-task-safety.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:background-task-safety"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services",
+          "services/api/prisma/postgres/migrations"
+        ],
+        "files": [
+          "docs/device/postgres-operations.md",
+          "services/api/scripts/rclone-offsite.conf.example",
+          "services/api/scripts/restore-offsite-drill.sh"
+        ],
         "missing": []
       },
       "file": "services/api/scripts/verify-backup-ops.mjs",
@@ -37643,6 +37942,42 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai-public-quota.service.ts",
+          "services/api/src/ai/ai-request-guard.ts",
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-failure.ts",
+          "services/api/src/ai/providers/llm.provider.ts",
+          "services/api/src/ai/resume-parse-intent-runner.service.ts",
+          "services/api/src/ai/resume/llm-career-plan.service.ts",
+          "services/api/src/ai/resume/llm-fair-visit-plan.service.ts",
+          "services/api/src/ai/resume/llm-job-fit.service.ts",
+          "services/api/src/ai/resume/llm-resume-generate.service.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/llm-resume.service.ts",
+          "services/api/src/ai/resume/llm-self-assessment.service.ts",
+          "services/api/src/contract-review/contract-review-failure-reason.ts",
+          "services/api/src/job-ai/job-ai-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-llm-account-unavailable.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:llm-account-unavailable"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/ai/llm/llm-config.service.ts"
         ],
         "missing": []
@@ -38635,7 +38970,10 @@
           "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
           "services/api/src/mock-interview/interview-practice-sheet.ts",
           "services/api/src/mock-interview/interview-report-pdf.service.ts",
+          "services/api/src/mock-interview/interview-transcript-pdf.service.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -39566,6 +39904,50 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:pg-serialization-conflict"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/member-print-orders/member-order-timeline.service.ts",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
+          "services/api/src/member-print-orders/package-order.service.ts",
+          "services/api/src/payment/admin-order-actions.controller.ts",
+          "services/api/src/payment/online-payment.service.ts",
+          "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/payment/order-status.service.ts",
+          "services/api/src/payment/payment-provider.factory.ts",
+          "services/api/src/payment/payment-session-token.ts",
+          "services/api/src/payment/price-config.seed.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/payment/refund.service.ts",
+          "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/print-jobs/self-service-reprint.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.interface.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pickup-code-resume.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pickup-code-resume"
       ],
       "wired": true
     },
@@ -41566,6 +41948,38 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "services"
+        ],
+        "files": [
+          "apps/admin/src/routes/legal-docs/SupportContactCard.tsx",
+          "docs/progress/current-progress.md",
+          "services/api/prisma/schema.prisma",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/support-contact/support-contact.admin.controller.ts",
+          "services/api/src/support-contact/support-contact.online.ts",
+          "services/api/src/support-contact/support-contact.public.controller.ts",
+          "services/api/src/support-contact/support-contact.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-support-contact.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:support-contact"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "apps/terminal-agent/scripts/install-production-agent.ps1",
@@ -42736,6 +43150,29 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/copy/unattendedCopy.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/hooks/useSupportContact.ts",
+        "kind": "component",
+        "mentions": [
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/progress/current-progress.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -43966,6 +44403,18 @@
         "risk": "low",
         "scope": "kiosk",
         "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/services/api/supportContact.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

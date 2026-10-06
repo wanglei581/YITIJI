@@ -28,7 +28,14 @@ import {
   llmTimeoutMessage,
 } from './llm-http'
 import { deepseekThinkingOff } from './deepseek-thinking'
-import { llmEndpointNotAllowedError } from './llm-failure'
+import {
+  llmEmptyResponseError,
+  llmEndpointNotAllowedError,
+  llmExceptionMessage,
+  llmNotConfiguredError,
+  llmUnreachableError,
+  llmUpstreamStatusError,
+} from './llm-failure'
 import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWords, enforceForbiddenWords, safeRefusalReply } from './llm-guard'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
@@ -319,7 +326,7 @@ export class LlmChatService {
     const cfg = this.config.getConfig('assistant_chat')
 
     if (!apiKey || !cfg.enabled) {
-      throw new ServiceUnavailableException('AI 模型未配置或未启用')
+      throw llmNotConfiguredError()
     }
 
     const now = Date.now()
@@ -451,16 +458,17 @@ export class LlmChatService {
       this.logger.error(
         `LLM 请求失败: category=network_error feature=${featureKey} vendor=${safeLogValue(vendor)} model=${safeLogValue(model)}`,
       )
-      throw new ServiceUnavailableException('AI 模型连接失败')
+      throw llmUnreachableError('AI 模型')
     }
 
     if (!res.ok) {
       // 打到模型了但没拿到 usage：如实回报「调用发生过、token 未知」，不塞 tokenUsage。
       onLlmCall?.({ provider: providerLabel })
+      // 只记状态码与状态短语，不记响应正文（可能回显用户原文）。
       this.logger.error(
         `LLM 上游错误: category=upstream_non_2xx status=${res.status} statusText=${safeLogValue(res.statusText)} feature=${featureKey} vendor=${safeLogValue(vendor)} model=${safeLogValue(model)}`,
       )
-      throw new ServiceUnavailableException(`AI 模型返回错误 (${res.status})`)
+      throw llmUpstreamStatusError('AI 模型', res.status, res.data)
     }
 
     const data = res.data as {
@@ -471,7 +479,7 @@ export class LlmChatService {
     onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
     const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
-      throw new ServiceUnavailableException('AI 模型未返回内容')
+      throw llmEmptyResponseError('AI 模型')
     }
     return reply
   }
@@ -482,7 +490,7 @@ export class LlmChatService {
       const apiKey = this.config.getApiKey(feature)
       const cfg = this.config.getConfig(feature)
       if (!apiKey || !cfg.enabled) {
-        throw new ServiceUnavailableException('AI 模型未配置或未启用')
+        throw llmNotConfiguredError()
       }
       const messages: ChatMessage[] = [
         { role: 'system', content: buildGuardedSystemPrompt(cfg) },
@@ -491,7 +499,7 @@ export class LlmChatService {
       const rawReply = await this.callLlm(feature, cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, messages, cfg.forbiddenWords)
       return { ok: true, reply: enforceForbiddenWords(rawReply, cfg.forbiddenWords) }
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      return { ok: false, error: llmExceptionMessage(err) }
     }
   }
 }

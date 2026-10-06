@@ -567,12 +567,18 @@ async function main(): Promise<void> {
     check(get('cloud_single', C3.id).hasArrivalCode === false && get('cloud_single', C6.id).hasArrivalCode === false,
       '已取消 / 已被机器领走的单 hasArrivalCode=false')
 
-    // 到机码明文不下发
+    // 可取或可续打才下发到机码；已用且不能续打的码不得出现在整页 JSON 里。
     const reissuedFree = arrivalCodes.length
-    const leaked = arrivalCodes.filter((code) => all.raws.some((raw) => raw.includes(code)))
+    const fieldsOk = all.items.every((i) => typeof i.reprintAllowed === 'boolean' && (i.reprintRemaining === null || typeof i.reprintRemaining === 'number'))
+    const visible = all.items.filter((i) => i.hasArrivalCode || i.reprintAllowed)
+    const hidden = all.items.filter((i) => !i.hasArrivalCode && !i.reprintAllowed)
+    const visibleCodes = new Set(visible.map((i) => i.pickupCode))
+    const visibleOk = visible.length > 0 && visible.every((i) => typeof i.pickupCode === 'string' && arrivalCodes.includes(i.pickupCode))
+    const hiddenNull = hidden.every((i) => i.pickupCode === null)
+    const hiddenLeaked = arrivalCodes.filter((code) => !visibleCodes.has(code) && all.raws.some((raw) => raw.includes(code)))
     const keysSeen = new Set(all.items.flatMap((i) => Object.keys(i)))
-    check(reissuedFree >= 8 && leaked.length === 0 && !keysSeen.has('share') && !keysSeen.has('pickupCodeEnc') && !keysSeen.has('paymentSessionToken'),
-      `整页 JSON 里没有任何到机码明文（查了 ${reissuedFree} 枚），也没有 share / paymentSessionToken`, `泄露 ${leaked.length}`)
+    check(reissuedFree >= 8 && fieldsOk && visibleOk && hiddenNull && hiddenLeaked.length === 0 && !keysSeen.has('share') && !keysSeen.has('pickupCodeEnc') && !keysSeen.has('paymentSessionToken'),
+      `可取的单下发到机码（${visible.length} 条），其余不下发；整页没有 share / paymentSessionToken`, `隐藏泄露 ${hiddenLeaked.length}`)
 
     // pickupCode 与旧列表同口径
     const legacyPage = await legacy.list(U, { cursor: null, pageSize: 50 })

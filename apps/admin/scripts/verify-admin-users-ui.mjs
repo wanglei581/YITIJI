@@ -9,14 +9,15 @@
  *     「只读 GET /admin/users（…**封禁开关后置**），访问写审计」——「后置」是排期
  *   - docs/product/user-center-commercial-closure-plan-2026-07.md:115 的状态图
  *     直接写着 `Active --> Disabled: 管理员封禁`
- * 现在补齐该 P1 能力，只读边界随之挪到 **disable / restore 两条写路径**：
- * 适配器仍不得出现第三条写路径或 PATCH/PUT/DELETE，且停用必须走二次确认、
- * 必须填原因、后果文案必须与实际代码行为一致。边界是挪位置，不是撤掉。
+ * 2026-10-04：经任务包授权新增管理员注销路径（后端 PR #1221）。
+ * 允许 disable / restore / closure 三条写路径；注销须核对尾号、事由与来源，
+ * 二次确认并写审计，相关正向行为由 verify-user-closure-ui.mjs 运行验证。
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import ts from 'typescript'
 import vm from 'node:vm'
+import { verifyUserClosure } from './verify-user-closure-ui.mjs'
 
 const root = process.cwd()
 const paths = {
@@ -53,8 +54,7 @@ const shared = readFileSync(paths.shared, 'utf8')
 const drawerPrimitive = readFileSync(paths.drawerPrimitive, 'utf8')
 const runtime = `${page}\n${drawer}\n${statusDialog}\n${presentation}\n${service}\n${shared}`
 
-// 适配器写边界：只读两条 GET + disable / restore 两条写路径，此外一条都不许有。
-// 想加第三条写路径必须先改这里，顺带被迫回答「后端写不写审计、要不要二次确认」。
+// 适配器写边界：GET 列表/详情，POST 停用/恢复/注销，此外不许扩写。
 const exportedFns = [...service.matchAll(/export function (\w+)\(/g)].map((match) => match[1]).sort()
 const httpVerbs = [...service.matchAll(/method:\s*'([A-Z]+)'/g)].map((match) => match[1])
 const writeVerbs = httpVerbs.filter((verb) => verb !== 'GET')
@@ -63,13 +63,14 @@ if (
   service.includes('`/admin/users/${encodeURIComponent(endUserId)}`') &&
   service.includes('`/admin/users/${encodeURIComponent(endUserId)}/disable`') &&
   service.includes('`/admin/users/${encodeURIComponent(endUserId)}/restore`') &&
-  JSON.stringify(exportedFns) === JSON.stringify(['disable', 'getDetail', 'list', 'restore']) &&
+  service.includes('`/admin/users/${encodeURIComponent(endUserId)}/closure`') &&
+  JSON.stringify(exportedFns) === JSON.stringify(['closeUserAccount', 'disable', 'getDetail', 'list', 'restore']) &&
   writeVerbs.length === 1 && writeVerbs[0] === 'POST' &&
   !/\b(PATCH|PUT|DELETE)\b|mockAdapter|MOCK_/.test(service)
 ) {
-  pass('API 适配器：真实 GET 列表/详情 + disable/restore 两条写路径，无 mock、无其它写方法')
+  pass('API 适配器：真实 GET 列表/详情 + disable/restore/closure 三条写路径，无 mock、无其它写方法')
 } else {
-  fail('API 适配器只允许 GET 列表/详情与 disable/restore 两条写路径（单一 POST 通道，禁 PATCH/PUT/DELETE）')
+  fail('API 适配器只允许 GET 列表/详情与 disable/restore/closure 三条写路径（单一 POST 通道，禁 PATCH/PUT/DELETE）')
 }
 
 const pageTokens = [
@@ -318,5 +319,6 @@ if (/\b(completed|active|optimize_confirmed|parse_intent|resume_upload|applicati
 const unknown = activity.activityCategoryText({ type: 'ai', category: 'future_kind', status: null, action: null })
 if (unknown.label !== '未归类（future_kind）' || unknown.title !== 'future_kind') fail('未知类别必须保留原值')
 pass('最近活动状态、类别和终端走中文映射，可见文字不含英文枚举与 t_ 内部 ID')
+await verifyUserClosure({ root, pass, fail, presentationModule })
 
 console.log('\nALL PASS')

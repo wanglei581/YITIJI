@@ -7,6 +7,12 @@ test.describe('用户管理（mock 口径：一条演示用户，完整手机号
     await settleAdminPage(page, guards)
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible()
     await expect(page.getByText('演示用户')).toBeVisible()
+    // 注销筛选进地址栏、可重置（注销界面 #1223）
+    await page.getByLabel('注销', { exact: true }).selectOption('requested')
+    await expect(page).toHaveURL(/closure=requested/)
+    await page.getByRole('button', { name: '重置', exact: true }).click()
+    await expect(page.getByLabel('注销', { exact: true })).toHaveValue('')
+    await expect(page.getByText('演示用户')).toBeVisible()
 
     await page.getByRole('button', { name: '查看用户 演示用户 的详情' }).click()
     const dialog = page.getByRole('dialog', { name: '用户详情' })

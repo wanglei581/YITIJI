@@ -35,7 +35,7 @@
   --m-done-line: color-mix(in srgb, var(--m-teal) 40%, var(--m-paper));
   --m-done-ink: color-mix(in srgb, var(--m-teal-d) 45%, var(--m-deep));
   --m-on-deep: var(--m-paper);
-  --m-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --m-serif: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
   --m-ease: cubic-bezier(.22, 1, .36, 1);
   display: flex;
   min-height: 100vh;
@@ -44,7 +44,7 @@
   align-items: center;
   color: var(--m-ink);
   background: var(--m-muted-bg);
-  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 

@@ -1,5 +1,7 @@
 import type {
   AdminUserActivityItem,
+  AdminUserClosureRequest,
+  AdminUserClosureResult,
   AdminUserDetailResult,
   AdminUserListItem,
   AdminUserListQuery,
@@ -10,20 +12,37 @@ export type { AdminUserActivityItem, AdminUserListItem } from '@ai-job-print/sha
 import { authHeader, redirectToLogin } from '../auth'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 
+export interface ClosureBlockingOrder { orderNo: string; status: string }
+
+export class AdminUserClosureError extends ApiHttpError {
+  constructor(code: string, status: number, public readonly orders: ClosureBlockingOrder[] = []) {
+    super(code, '注销未完成，请稍后重试', status)
+  }
+}
+
 interface ErrorBody {
   code?: string
   message?: string
-  error?: { code?: string; message?: string }
+  error?: { code?: string; message?: string; orders?: unknown }
 }
 
-async function parse<T>(response: Response): Promise<T> {
+async function parse<T>(response: Response, closure = false): Promise<T> {
   if (!response.ok) {
     let code = `HTTP_${response.status}`
+    let orders: ClosureBlockingOrder[] = []
     let message = response.statusText || '请求失败'
     try {
       const body = (await response.json()) as ErrorBody
       code = body.error?.code ?? body.code ?? code
       message = body.error?.message ?? body.message ?? message
+      if (closure && Array.isArray(body.error?.orders)) {
+        orders = body.error.orders.flatMap((row: unknown) => {
+          if (!row || typeof row !== 'object') return []
+          const item = row as Record<string, unknown>
+          return typeof item.orderNo === 'string' && typeof item.status === 'string'
+            ? [{ orderNo: item.orderNo, status: item.status }] : []
+        })
+      }
     } catch {
       // 响应不是 JSON 时保留 HTTP 状态信息。
     }
@@ -31,6 +50,7 @@ async function parse<T>(response: Response): Promise<T> {
       redirectToLogin()
       throw new ApiHttpError(code || 'AUTH_REQUIRED', '登录已过期', response.status)
     }
+    if (closure) throw new AdminUserClosureError(code, response.status, orders)
     throw new ApiHttpError(code, message, response.status)
   }
 
@@ -47,21 +67,15 @@ async function get<T>(path: string, query?: URLSearchParams): Promise<T> {
   return parse<T>(response)
 }
 
-/**
- * 本适配器唯一的写方法通道。
- *
- * 只服务于 disable / restore 两条账号状态路径 —— 用户管理面的其余能力保持只读。
- * verify-admin-users-ui.mjs 会断言这一点：新增第三条写路径会让门禁转红，
- * 那是设计意图，不是需要绕开的障碍。
- */
-async function post<T>(path: string, body: unknown): Promise<T> {
+/** 写通道仅供停用、恢复与管理员注销，均由服务端执行并写审计。 */
+async function post<T>(path: string, body: unknown, closure = false): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...authHeader() },
     credentials: 'include',
     body: JSON.stringify(body),
   })
-  return parse<T>(response)
+  return parse<T>(response, closure)
 }
 
 function demoModeUnavailable(action: string): Promise<never> {
@@ -111,6 +125,7 @@ export function list(query: AdminUserListQuery): Promise<AdminUserListResult> {
   })
   if (query.keyword) params.set('keyword', query.keyword)
   if (query.phone) params.set('phone', query.phone)
+  if (query.closure) params.set('closure', query.closure)
   if (query.enabled !== undefined) params.set('enabled', String(query.enabled))
   if (query.registeredFrom) params.set('registeredFrom', query.registeredFrom)
   if (query.registeredTo) params.set('registeredTo', query.registeredTo)
@@ -142,4 +157,10 @@ export function disable(endUserId: string, reason: string): Promise<AdminUserSta
 export function restore(endUserId: string, reason: string): Promise<AdminUserStatusChangeResult> {
   if (API_MODE !== 'http') return demoModeUnavailable('恢复用户')
   return post<AdminUserStatusChangeResult>(`/admin/users/${encodeURIComponent(endUserId)}/restore`, { reason })
+}
+
+/** 注销不可逆；演示模式明确拒绝，不伪造执行结果。 */
+export function closeUserAccount(endUserId: string, input: AdminUserClosureRequest): Promise<AdminUserClosureResult> {
+  if (API_MODE !== 'http') return Promise.reject(new ApiHttpError('DEMO_MODE_READONLY', '演示模式不执行账号注销', 501))
+  return post<AdminUserClosureResult>(`/admin/users/${encodeURIComponent(endUserId)}/closure`, input, true)
 }
