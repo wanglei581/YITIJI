@@ -298,7 +298,11 @@
 .pr-dlg-acts { display: flex; gap: 14px; margin-top: 24px; }
 .pr-dlg-acts .qx-btn { flex: 1; min-height: 72px; font-size: 26px; }
 
-.qx-stage:has(.pr-page) > .qx-ctabar {
+/* 外壳 .qx-stage:has(.qx-me-page) .qx-ctabar（qx-me-shared.css）把 padding 清成 0、
+   display 改成 block，记录壳改由 .qx-me-cta-row 留白。41 的按钮直接铺在底栏里，
+   选择器必须压过那条，左右才回到 --qx-gutter。 */
+.qx-stage:has(.qx-me-page.pr-page) > .qx-ctabar {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0;
