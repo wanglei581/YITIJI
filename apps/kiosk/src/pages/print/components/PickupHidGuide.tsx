@@ -14,7 +14,13 @@ import {
   PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
 } from '@ai-job-print/shared'
-import { LEGACY_KEYS, type ClaimSuccessCopy, type PickupFailure, type PickupScreen } from '../pickupClaimModel'
+import {
+  LEGACY_KEYS,
+  PICKUP_SAME_CODE_RESUME_NOTE,
+  type ClaimSuccessCopy,
+  type PickupFailure,
+  type PickupScreen,
+} from '../pickupClaimModel'
 
 // 到机码页（原型 11-arrival-code.html）的展示件。只接收页面算好的数据与回调，
 // 不发请求、不判定成败；认领、终端身份与离页作废都在 PrintPickupClaimPage 里。
@@ -103,22 +109,21 @@ export function PickupHidGuide({
   )
 }
 
+/** 方案②：到机码就是取件码，不再单列第三种码。函数名沿用，避免改动页面对这张卡的引用锚点。
+ *  续打说明放在这一栏，不放键盘说明：键盘说明多一行会在 1280×720 横屏把「确认校验」挤出可视区。 */
 export function PickupThreeCodeCard() {
   return (
-    <section className="qx-card pcp-ab" aria-label="三种码的区别">
-      <h2 className="pcp-ab-t"><InfoIcon size={22} aria-hidden="true" />三种码，别搞混</h2>
+    <section className="qx-card pcp-ab" aria-label="两种码的区别">
+      <h2 className="pcp-ab-t"><InfoIcon size={22} aria-hidden="true" />两种码，别搞混</h2>
       <div className="pcp-ab-cols">
         <div className="pcp-ab-col is-current">
           <b>到机码 · 本页用</b>
-          <span>{PICKUP_CODE_LENGTH} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。</span>
+          <span>{PICKUP_CODE_LENGTH} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。取件和接着打都用它。</span>
+          <span className="pcp-ab-note">{PICKUP_SAME_CODE_RESUME_NOTE}</span>
         </div>
         <div className="pcp-ab-col">
           <b>上传码 · 手机传文件用</b>
           <span>用于把手机文件传到本机。</span>
-        </div>
-        <div className="pcp-ab-col">
-          <b>取件凭证码 · 取纸/补打用</b>
-          <span>取纸时出示给工作人员，不在本页输入。</span>
         </div>
       </div>
     </section>
