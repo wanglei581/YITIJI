@@ -1886,6 +1886,8 @@ test('advisor artifact eight proto states fit the kiosk stage @w3-kiosk', async 
     await page.goto(`/ai/plan?state=${state}&capture=1`)
     await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', state)
     await expect(page.getByText('一键投递')).toHaveCount(0)
+    await expect(page.getByText('工作人员')).toHaveCount(0)
+    await expect(page.getByText('服务台')).toHaveCount(0)
     await assertNoHorizontalOverflow(page)
     await page.screenshot({ path: test.info().outputPath(`advisor-artifact-${state}.png`) })
   }
@@ -1932,6 +1934,11 @@ test('advisor artifact print-unavailable state has no print button @w3-kiosk', a
   await page.goto('/ai/plan?state=print-unavailable&capture=1')
   await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'print-unavailable')
   await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-legend')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-qa')).toBeVisible()
+  await expect(page.getByText('我做过两年社群运营，最多同时管 6 个群。')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-take')).toBeVisible()
+  await expect(page.getByText('带走这一页')).toBeVisible()
   await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '打印带走' })).toHaveCount(0)
   await expect(page.getByText('打印能力读不到，按钮先不放出来', { exact: false })).toBeVisible()
@@ -1997,6 +2004,61 @@ test('advisor artifact print waits for the server receipt @w3-kiosk', async ({ p
   expect(printPath).toBe('/api/v1/advisor/sessions/w3-art-sess/artifacts/w3-art-1/print')
   await expect(page.getByText('已打印')).toHaveCount(0)
   await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact no-artifact shows the three jobs and opens AI records @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=no-artifact&capture=1')
+  await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'no-artifact')
+  await expect(page.getByTestId('advisor-artifact-kinds')).toBeVisible()
+  await expect(page.locator('.aa-kind')).toHaveCount(3)
+  await expect(page.getByText('边问边钉住')).toBeVisible()
+  await expect(page.getByText('她问，你答，拼成一段话')).toBeVisible()
+  await expect(page.getByText('逐条比：有没有写到')).toBeVisible()
+  await expect(page.getByText('做完以后怎么带走')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-cta-records')).toHaveText('打开我的 AI 记录')
+  await page.getByTestId('advisor-artifact-cta-records').click()
+  await page.waitForURL((url) => url.pathname === '/me/ai-records')
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact expired offers only a redo @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=expired&capture=1')
+  await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'expired')
+  await expect(page.getByTestId('advisor-artifact-cta-redo')).toHaveText('回去重做一次')
+  await expect(page.getByTestId('advisor-artifact-cta-back')).toHaveCount(0)
+  await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
+  await expect(page.getByTestId('advisor-artifact-cta-records')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '打印带走' })).toHaveCount(0)
+  await page.getByTestId('advisor-artifact-cta-redo').click()
+  await page.waitForURL((url) => url.pathname === '/assistant')
+  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact content state opens my documents @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=qa-pins&capture=1')
+  await expect(page.getByTestId('advisor-artifact-take')).toBeVisible()
+  const documentsLink = page.getByRole('link', { name: '我的文档' })
+  // 1080×1920 视口下舞台缩放是 1；换算后再比，避免别的视口把屏幕像素当成 CSS 像素。
+  const scale = await readEnabledStageScale(page)
+  const documentsBox = await documentsLink.boundingBox()
+  expect(documentsBox, '我的文档链接必须有点击框').not.toBeNull()
+  expect(documentsBox!.height / scale, '我的文档链接点击框换算到舞台 CSS px 后高度不得小于 48').toBeGreaterThanOrEqual(48)
+  await documentsLink.click()
+  await page.waitForURL((url) => url.pathname === '/me/documents')
   expect(runtimeErrors).toEqual([])
 })
 
