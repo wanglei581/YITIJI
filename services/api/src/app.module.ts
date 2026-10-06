@@ -57,6 +57,7 @@ import { OfflineAgenciesModule } from './offline-agencies/offline-agencies.modul
 import { KioskSessionModule } from './kiosk-session/kiosk-session.module'
 import { HelpModule } from './help/help.module'
 import { LegalModule } from './legal/legal.module'
+import { SupportContactModule } from './support-contact/support-contact.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
@@ -166,6 +167,7 @@ const redisUrl = process.env['REDIS_URL']
     KioskSessionModule,
     HelpModule,
     LegalModule,
+    SupportContactModule,
     NotificationsModule,
     ActivitiesModule,
     ScreensaverModule,
