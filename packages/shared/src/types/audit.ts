@@ -119,6 +119,8 @@ export interface AuditLogRecord {
   userAgent: string | null
   requestId: string | null
   createdAt: string  // ISO
+  /** 操作人显示名（只读）：内部账号姓名或登录名；机构账号「机构名 · 账号名」；系统、会员、已删除账号为 null。绝不含手机号。 */
+  actorDisplayName?: string | null
 }
 
 /** 审计列表查询(Admin)。 */
