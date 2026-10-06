@@ -1,8 +1,11 @@
 import type { CSSProperties } from 'react'
+import { useState } from 'react'
 import { PencilLineIcon, ShieldCheckIcon } from 'lucide-react'
 import { Card } from '@ai-job-print/ui'
 import type { GeneratedResume, ResumeLayoutSettings } from '@ai-job-print/shared'
 import { MaskedContactLine } from '../../../components/MaskedContactLine'
+import { DeleteEntryButton, EntryDeleteDialog } from './resume-deliver/ResumeFactConfirmDialog'
+import { resumeTitleIssues } from './resume-deliver/resumeEntryTitles'
 
 type OptimizedResumeEditorProps = {
   resume: GeneratedResume
@@ -11,6 +14,8 @@ type OptimizedResumeEditorProps = {
   previewClassName?: string
   previewStyle?: CSSProperties
 }
+
+type EntrySection = 'experience' | 'education'
 
 const taCls =
   'w-full scroll-mt-32 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
@@ -24,6 +29,39 @@ function SectionTitle({ title }: { title: string }) {
   )
 }
 
+function scrollFieldIntoView(event: { currentTarget: HTMLElement }) {
+  event.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+function TitleField(props: {
+  caption: string
+  label: string
+  fieldId: string
+  value: string
+  message?: string
+  onChange: (value: string) => void
+}) {
+  const errorId = `${props.fieldId}-error`
+  return (
+    <div className="mt-1.5">
+      <label className="block text-sm text-gray-500" htmlFor={props.fieldId}>{props.caption}</label>
+      <input
+        id={props.fieldId}
+        className={`${taCls} mt-1 min-h-12`}
+        aria-label={props.label}
+        data-entry-field={props.fieldId}
+        data-entry-invalid={props.message ? 'true' : undefined}
+        aria-invalid={props.message ? true : undefined}
+        aria-describedby={props.message ? errorId : undefined}
+        value={props.value}
+        onFocus={scrollFieldIntoView}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+      {props.message ? <p className="qx-rd-error" id={errorId} role="alert">{props.message}</p> : null}
+    </div>
+  )
+}
+
 export function OptimizedResumeEditor({
   resume,
   onChange,
@@ -31,7 +69,18 @@ export function OptimizedResumeEditor({
   previewClassName = '',
   previewStyle,
 }: OptimizedResumeEditorProps) {
-  const update = (next: GeneratedResume) => onChange(next)
+  const [pendingDelete, setPendingDelete] = useState<{ section: EntrySection; index: number } | null>(null)
+  const issues = new Map(resumeTitleIssues(resume).map((issue) => [issue.id, issue.message]))
+  const confirmDelete = () => {
+    if (!pendingDelete) return
+    const { section, index } = pendingDelete
+    if (section === 'experience') {
+      onChange({ ...resume, experience: resume.experience.filter((_, i) => i !== index) })
+    } else {
+      onChange({ ...resume, education: resume.education.filter((_, i) => i !== index) })
+    }
+    setPendingDelete(null)
+  }
 
   return (
     <>
@@ -63,8 +112,8 @@ export function OptimizedResumeEditor({
               className={`${taCls} min-h-24 resize-y`}
               value={resume.summary}
               placeholder="(空)"
-              onFocus={(e) => e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-              onChange={(e) => update({ ...resume, summary: e.target.value.slice(0, 600) })}
+              onFocus={scrollFieldIntoView}
+              onChange={(e) => onChange({ ...resume, summary: e.target.value.slice(0, 600) })}
             />
           </div>
 
@@ -72,26 +121,51 @@ export function OptimizedResumeEditor({
             <div>
               <SectionTitle title="教育经历" />
               <div className="space-y-3">
-                {resume.education.map((e, i) => (
-                  <div key={i} className="break-inside-avoid">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-sm font-semibold text-gray-800">
-                        {[e.school, e.major, e.degree].filter(Boolean).join(' · ')}
-                      </p>
-                      {e.period && <p className="shrink-0 text-xs text-gray-400">{e.period}</p>}
+                {resume.education.map((e, i) => {
+                  const schoolId = `education-${i}-school`
+                  const majorId = `education-${i}-major`
+                  return (
+                    <div key={schoolId} className="break-inside-avoid">
+                      {(e.degree || e.period) && (
+                        <p className="text-xs text-gray-400">{[e.degree, e.period].filter(Boolean).join(' · ')}</p>
+                      )}
+                      <TitleField
+                        caption="学校"
+                        label={`第 ${i + 1} 条教育的学校`}
+                        fieldId={schoolId}
+                        value={e.school}
+                        message={issues.get(schoolId)}
+                        onChange={(school) => onChange({
+                          ...resume,
+                          education: resume.education.map((row, idx) => idx === i ? { ...row, school } : row),
+                        })}
+                      />
+                      <TitleField
+                        caption="专业"
+                        label={`第 ${i + 1} 条教育的专业`}
+                        fieldId={majorId}
+                        value={e.major ?? ''}
+                        message={issues.get(majorId)}
+                        onChange={(major) => onChange({
+                          ...resume,
+                          education: resume.education.map((row, idx) => idx === i ? { ...row, major } : row),
+                        })}
+                      />
+                      <textarea
+                        className={`${taCls} mt-1.5 min-h-20 resize-y`}
+                        aria-label={`第 ${i + 1} 条教育的描述`}
+                        value={e.description ?? ''}
+                        placeholder="(无描述)"
+                        onFocus={scrollFieldIntoView}
+                        onChange={(ev) => onChange({
+                          ...resume,
+                          education: resume.education.map((row, idx) => idx === i ? { ...row, description: ev.target.value.slice(0, 1000) } : row),
+                        })}
+                      />
+                      <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条教育`} onClick={() => setPendingDelete({ section: 'education', index: i })} />
                     </div>
-                    <textarea
-                      className={`${taCls} mt-1.5 min-h-20 resize-y`}
-                      value={e.description ?? ''}
-                      placeholder="(无描述)"
-                      onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                      onChange={(ev) => update({
-                        ...resume,
-                        education: resume.education.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                      })}
-                    />
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -100,23 +174,48 @@ export function OptimizedResumeEditor({
             <div>
               <SectionTitle title="实习 / 工作经历" />
               <div className="space-y-3">
-                {resume.experience.map((e, i) => (
-                  <div key={i} className="break-inside-avoid">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-sm font-semibold text-gray-800">{[e.company, e.role].filter(Boolean).join(' · ')}</p>
-                      {e.period && <p className="shrink-0 text-xs text-gray-400">{e.period}</p>}
+                {resume.experience.map((e, i) => {
+                  const companyId = `experience-${i}-company`
+                  const roleId = `experience-${i}-role`
+                  return (
+                    <div key={companyId} className="break-inside-avoid">
+                      {e.period ? <p className="text-xs text-gray-400">{e.period}</p> : null}
+                      <TitleField
+                        caption="公司"
+                        label={`第 ${i + 1} 条经历的公司`}
+                        fieldId={companyId}
+                        value={e.company}
+                        message={issues.get(companyId)}
+                        onChange={(company) => onChange({
+                          ...resume,
+                          experience: resume.experience.map((row, idx) => idx === i ? { ...row, company } : row),
+                        })}
+                      />
+                      <TitleField
+                        caption="职务"
+                        label={`第 ${i + 1} 条经历的职务`}
+                        fieldId={roleId}
+                        value={e.role}
+                        message={issues.get(roleId)}
+                        onChange={(role) => onChange({
+                          ...resume,
+                          experience: resume.experience.map((row, idx) => idx === i ? { ...row, role } : row),
+                        })}
+                      />
+                      <textarea
+                        className={`${taCls} mt-1.5 min-h-24 resize-y`}
+                        aria-label={`第 ${i + 1} 条经历的描述`}
+                        value={e.description}
+                        onFocus={scrollFieldIntoView}
+                        onChange={(ev) => onChange({
+                          ...resume,
+                          experience: resume.experience.map((row, idx) => idx === i ? { ...row, description: ev.target.value.slice(0, 1000) } : row),
+                        })}
+                      />
+                      <DeleteEntryButton label={`删掉这一条，第 ${i + 1} 条经历`} onClick={() => setPendingDelete({ section: 'experience', index: i })} />
                     </div>
-                    <textarea
-                      className={`${taCls} mt-1.5 min-h-24 resize-y`}
-                      value={e.description}
-                      onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                      onChange={(ev) => update({
-                        ...resume,
-                        experience: resume.experience.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                      })}
-                    />
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -130,11 +229,12 @@ export function OptimizedResumeEditor({
                     <p className="text-sm font-semibold text-gray-800">{p.role ? `${p.name} · ${p.role}` : p.name}</p>
                     <textarea
                       className={`${taCls} mt-1.5 min-h-24 resize-y`}
+                      aria-label={`第 ${i + 1} 条项目的描述`}
                       value={p.description}
-                      onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                      onChange={(ev) => update({
+                      onFocus={scrollFieldIntoView}
+                      onChange={(ev) => onChange({
                         ...resume,
-                        projects: resume.projects.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
+                        projects: resume.projects.map((row, idx) => idx === i ? { ...row, description: ev.target.value.slice(0, 1000) } : row),
                       })}
                     />
                   </div>
@@ -167,6 +267,9 @@ export function OptimizedResumeEditor({
         <ShieldCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
         优化版中的学校/公司/证书等事实信息均来自你的简历原文,AI 未做任何添加;原文没有的内容保持为空,由你自行补充。
       </p>
+      {pendingDelete && (
+        <EntryDeleteDialog hostSelector='[data-kiosk-screen="resume-optimize"]' onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} />
+      )}
     </>
   )
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { maskPii } from '../../../../utils/maskPii'
 import type { ConfirmableFact } from './facts'
 
@@ -73,4 +74,34 @@ export function ResumeFactConfirmDialog(props: {
       </div>
     </div>
   )
+}
+
+/** 优化页和生成预览页共用。文案与按钮样式保持两边一致，只换挂载的屏幕。 */
+export function DeleteEntryButton(props: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="qx-btn mt-1.5" data-variant="ghost" aria-label={props.label} onClick={props.onClick}>
+      删掉这一条
+    </button>
+  )
+}
+
+export function EntryDeleteDialog(props: {
+  hostSelector: string
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const dialog = (
+    <div className="qx-rd-overlay" role="dialog" aria-modal="true" aria-labelledby="resume-entry-delete-title">
+      <div className="qx-rd-dialog">
+        <h2 id="resume-entry-delete-title">确定删掉这一条吗？</h2>
+        <p>删了以后导出和打印都不会再带这一条。</p>
+        <div className="qx-rd-dialog-actions">
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onCancel}>取消</button>
+          <button type="button" className="qx-btn" data-variant="primary" onClick={props.onConfirm}>确定</button>
+        </div>
+      </div>
+    </div>
+  )
+  const host = typeof document !== 'undefined' ? document.querySelector(props.hostSelector) : null
+  return host ? createPortal(dialog, host) : dialog
 }
