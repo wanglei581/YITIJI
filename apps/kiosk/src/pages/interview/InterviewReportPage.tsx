@@ -28,7 +28,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { InterviewShell } from './InterviewShell'
-import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus } from './interviewQxParts'
+import { InterviewCardHead, InterviewLoadingCard, InterviewNotice, InterviewOptList, InterviewRail, InterviewStatus, InterviewSteps } from './interviewQxParts'
 import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
 import {
   patchInterviewWorkbenchSession,
@@ -124,6 +124,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
 
   const goSetup = () => onGoStage ? onGoStage('setup') : navigate('/interview/setup')
   const goReports = () => onGoStage ? onGoStage('reports') : navigate('/interview/reports')
+  const goTips = () => onGoStage ? onGoStage('tips') : navigate('/interview/tips')
 
   if (loading) {
     return (
@@ -136,13 +137,34 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
             <QxStepActions>
               <QxAiHelp label="问小青：报告还在读取怎么办" draft="练习报告还在读取。请说明我可以先做什么，不要假装报告已经生成。" />
             </QxStepActions>
+            <div className="iv-cta-row">
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={goTips}>查看面试技巧</button>
+            </div>
           </div>
         }
       >
-        <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+        <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" data-interview-state="report-loading" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
           <div className="interview-flow__scroll">
             <InterviewStatus label="报告读取状态" items={[{ k: '报告内容', v: '读取中' }, { k: '打印版', v: '未生成' }, { k: '录用预测', v: '不提供' }]} />
-            <section className="iv-card iv-empty"><div><h2>正在读取本场练习报告</h2><p>读取完成前，这里不展示上一次的内容。</p></div></section>
+            <InterviewLoadingCard label="正在读取本场练习报告" />
+            <section className="iv-card">
+              <InterviewCardHead title="返回结果只会是三种" hint="由系统决定" />
+              <InterviewSteps rows={[
+                ['结果 A', '报告已返回', '显示内容，并放开生成打印版。'],
+                ['结果 B', '报告不可用', '未生成、已过期或没有查看权限。'],
+                ['结果 C', '读取失败', '停留在可重试状态。'],
+              ]} />
+            </section>
+            <section className="iv-card">
+              <InterviewCardHead title="等待时可以先做" hint="不依赖本次读取" />
+              <InterviewOptList rows={[{
+                k: '技',
+                title: '查看公开面试技巧',
+                desc: 'STAR 结构与准备清单随时可读。',
+                onClick: goTips,
+              }]} />
+            </section>
+            <InterviewRail />
           </div>
         </div>
       </InterviewShell>
@@ -163,14 +185,53 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
           </div>
         }
       >
-      <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+      <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" data-interview-state="report-unavailable" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="interview-flow__scroll">
           <section className="iv-card iv-empty is-bad">
             <div>
+              <div className="iv-empty-mark" aria-hidden="true">!</div>
               <h2>报告不存在或已过期</h2>
               <p>没有真实报告时，不显示评分、打印成功或可下载文件。</p>
             </div>
           </section>
+          <section className="iv-card">
+            <InterviewCardHead title="对上原因，再选一条路" hint="三种常见情况" />
+            <InterviewOptList
+              rows={[
+                {
+                  k: '未',
+                  title: '还没有完成过练习',
+                  desc: '先设置一场练习并完成作答，报告才会生成。',
+                  onClick: goSetup,
+                  go: true,
+                },
+                {
+                  k: '过',
+                  title: '报告已过期或换了入口',
+                  desc: '到本人练习记录里再找一次。登录后才能看到保存下来的列表。',
+                  onClick: goReports,
+                },
+                {
+                  k: '权',
+                  title: '当前账号没有访问权限',
+                  desc: '报告只对本人开放。没登录时，记录页会停在登录后才可查看的说明。',
+                  onClick: goReports,
+                },
+              ]}
+            />
+          </section>
+          <section className="iv-card">
+            <InterviewCardHead title="不受影响的入口" hint="随时可用" />
+            <div className="iv-mini-list">
+              <div><small>面试技巧</small><p>公开准备方法不依赖报告。</p></div>
+              <div><small>文字练习</small><p>重新开始一场文字作答。</p></div>
+              <div><small>本人记录</small><p>登录后查看历史列表。</p></div>
+            </div>
+          </section>
+          <InterviewNotice tone="danger">
+            公共设备直接打开或刷新后，这场练习是否还有效以系统校验为准。不要把这一页理解成报告已被保存。
+          </InterviewNotice>
+          <InterviewRail />
         </div>
       </div>
       </InterviewShell>

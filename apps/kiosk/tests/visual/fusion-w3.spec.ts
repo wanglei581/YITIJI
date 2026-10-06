@@ -1925,6 +1925,98 @@ test('interview report still shows answer excerpts when the print copy leaves th
   await expect(page.getByText('工作人员')).toHaveCount(0)
 })
 
+test('interview report unavailable offers three real exits @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  const openUnavailable = async () => {
+    await page.goto('/interview/report')
+    await expect(page.locator('[data-interview-state="report-unavailable"]')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '报告不存在或已过期' })).toBeVisible()
+    await expect(page.getByText('工作人员')).toHaveCount(0)
+    await expect(page.getByText('服务台')).toHaveCount(0)
+  }
+
+  await openUnavailable()
+  await page.getByRole('button', { name: '还没有完成过练习' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=setup/)
+  await expect(page.locator('[data-kiosk-screen="interview-setup"]')).toBeVisible()
+
+  await openUnavailable()
+  await page.getByRole('button', { name: '报告已过期或换了入口' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=reports/)
+  await expect(page.getByRole('heading', { name: '登录后可保存练习报告' })).toBeVisible()
+
+  await openUnavailable()
+  await page.getByRole('button', { name: '当前账号没有访问权限' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=reports/)
+  await expect(page.getByRole('heading', { name: '登录后可保存练习报告' })).toBeVisible()
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+})
+
+test('interview AI outage still prints the practice sheet @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/mock-interviews', { status: 200, json: interviewCreated })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/start`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/practice-sheet`, {
+    status: 200,
+    json: {
+      data: {
+        fileId: 'pair-sheet',
+        filename: '通用题目与答案单.pdf',
+        sizeBytes: 48_000,
+        pageCount: 2,
+        signedUrl: '/api/v1/files/pair-sheet/content?expires=4102444800000&sig=preview',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        printFileUrl: '/api/v1/files/pair-sheet/content?expires=4102444800000&sig=sheet',
+        variant: 'degraded',
+        questionCount: 4,
+      },
+    },
+  })
+  api.respond('POST', '/api/v1/orders/quote', {
+    status: 200,
+    json: {
+      amountCents: 200,
+      billablePages: 2,
+      billingPageSource: 'detected',
+      priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+    },
+  })
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await dialog.getByRole('button', { name: '交通运输、仓储和邮政业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
+  await page.getByPlaceholder(/输入目标岗位/).fill('仓储主管')
+  await page.getByRole('button', { name: '创建并开始练习' }).click()
+  const down = page.locator('[data-interview-state="ai-down"]')
+  await expect(down).toBeVisible()
+  await expect(down.getByRole('button', { name: '语音回合（文字兜底）', exact: true })).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('interview-mode-voice-reason')).toContainText('语音识别没有开启，这一场先用文字。')
+  await expect(page.getByTestId('interview-mode-voice-reason')).toContainText('AI 面试官暂时不能出题')
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+  await page.getByRole('button', { name: '打印通用题目与答案单', exact: true }).click()
+  await expect(page).toHaveURL(/\/print\/confirm/)
+})
+
+test('interview tips AI advisor opens the assistant @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  await page.goto('/interview?stage=tips')
+  await expect(page.locator('[data-kiosk-screen="interview-tips"]')).toBeVisible()
+  await expect(page.getByTestId('interview-primary')).toHaveText(/设置一场练习/)
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+  await page.getByTestId('interview-ai-advisor').click()
+  await expect(page).toHaveURL(/\/assistant/)
+  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
+})
+
 const COVERED_EVIDENCE = '我做过两年社群运营，最多同时管 6 个群'
 
 function advisorCompareSession() {

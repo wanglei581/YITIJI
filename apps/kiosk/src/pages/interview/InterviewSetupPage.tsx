@@ -45,6 +45,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
 import { ResumeUsbImportPanel } from '../resume/components/ResumeUsbImportPanel'
+import { InterviewAiDownScreen } from './InterviewAiDownScreen'
 import { InterviewShell } from './InterviewShell'
 import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus, InterviewSteps } from './interviewQxParts'
 import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
@@ -169,6 +170,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [pendingSession, setPendingSession] = useState<{ sessionId: string; accessToken?: string } | null>(setupDraft?.pendingSession ?? null)
   /** AI 能力级不可用的真实原因；null 表示未观测到不可用。 */
   const [aiOutage, setAiOutage] = useState<string | null>(setupDraft?.aiOutage ?? null)
+  /** 停用整屏上「查看练习说明」才回到表单；默认先看整屏，不把降级条挂在表单下面。 */
+  const [showSetupForm, setShowSetupForm] = useState(false)
   /** 已完成过一次真实往返 —— 没探到之前一律 fail-closed（aiOutage.ts 口径）。 */
   const [probed, setProbed] = useState(setupDraft?.probed ?? false)
   /** 通用题目单生成中（不经过模型，只是服务端排版 + 上传）。 */
@@ -264,6 +267,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     setError(null)
     setAiOutage(null)
     setStartFailed(false)
+    // 门禁会把 handleStart 单独抽出去跑，那时没有这个 setter。组件里有，就开始前收回整屏说明。
+    if (typeof setShowSetupForm === 'function') setShowSetupForm(false)
     try {
       const mode: 'text' | 'voice' = interactionMode === 'voice' ? 'voice' : 'text'
       const input = {
@@ -422,6 +427,29 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const titleParts = emphasizedTitle(copy)
   const goTips = () => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))
   const interviewerDesc = INTERVIEWERS.find((it) => it.key === interviewerType)?.desc
+  const voiceDownReason = voiceAsr === 'off'
+    ? '语音识别没有开启，这一场先用文字。AI 面试官暂时不能出题，语音回合先不开放。'
+    : 'AI 面试官暂时不能出题，语音回合先不开放。'
+
+  if (aiOutage && !showSetupForm) {
+    return (
+      <InterviewAiDownScreen
+        voiceReason={voiceDownReason}
+        error={error}
+        onOpenTips={goTips}
+        onHome={() => navigate('/')}
+        onReviewSetup={() => setShowSetupForm(true)}
+        fallback={(
+          <AiTaskRegion
+            className="interview-setup-fallback"
+            task={aiTask}
+            label="AI 面试官出题与点评"
+            fallback={fallback}
+          />
+        )}
+      />
+    )
+  }
 
   return (
     <InterviewShell

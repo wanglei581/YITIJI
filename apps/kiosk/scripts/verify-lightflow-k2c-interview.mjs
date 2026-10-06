@@ -265,6 +265,8 @@ for (const token of ['getMyInterviews(', 'deleteMyInterview(', '!isLoggedIn', "'
 const tips = read(pages[3])
 const tipsRuntime = withoutComments(tips)
 check(tips.includes("navigate('/interview/setup')"), 'Tips 缺少真实面试入口')
+check(tips.includes("navigate('/assistant')"), 'Tips 缺少 AI 顾问入口')
+check(tips.includes('AI 顾问'), 'Tips 底栏缺少 AI 顾问')
 check(!tipsRuntime.includes('window.print') && !tipsRuntime.includes('打印准备清单'), 'Tips 不得新增未接线打印能力')
 
 const allPages = withoutComments(pages.map(read).join('\n'))

@@ -136,6 +136,16 @@ export function InterviewOptList({
   )
 }
 
+/** 稿 29 的读取动效卡。只表示请求还在进行，不写已经生成或已经保存。 */
+export function InterviewLoadingCard({ label }: { label: string }) {
+  return (
+    <section className="iv-card iv-load" aria-live="polite">
+      <div className="iv-wave" aria-hidden="true"><i /><i /><i /><i /><i /></div>
+      <b className="iv-load-label">{label}</b>
+    </section>
+  )
+}
+
 /** 卡片头：标题 + 右侧一句提示。`as="h2"` 时标题是真正的标题（读屏与测试都按标题找）。 */
 export function InterviewCardHead({ title, hint, as = 'b', id }: { title: string; hint?: string; as?: 'b' | 'h2'; id?: string }) {
   const Title = as

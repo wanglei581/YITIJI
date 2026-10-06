@@ -1,6 +1,7 @@
-// 稿 29：模拟面试。只给设置、简历预览、过期、报告、AI 不可用、麦克风拒绝配运行时。
+// 稿 29：模拟面试。设置、作答、报告、记录、技巧相关态配运行时；稿上的演示跳转不造。
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../../../fixtures/api-router'
+import { registerAuthenticatedMemberApis, registerMemberLogin } from '../kiosk-p1-evidence-capture-api'
 import { chooseInterviewExperience } from '../direction-selection'
 import type { QingxuPairTarget } from '../qingxu-pair-targets'
 import type { ResumePageFixture, ResumePagesPlan } from './types'
@@ -48,8 +49,45 @@ const WAREHOUSE_REPORT = {
   },
 }
 
+const MEMBER_PHONE = '13800138000'
+const MEMBER_CODE = '123456'
+
+const WAREHOUSE_ANSWER = '上个月盘点有一排货对不上。我按货位把进出记录对了一遍，发现夜班把两箱货记到了隔壁库位。我改了账，也跟夜班对过交接。'
+const WAREHOUSE_FOLLOWUP = '如果旺季到货比平时多一倍，你先保哪一件事？'
+const WINDOW_QUESTION = '请用一两分钟说说，你在市南区社区服务中心窗口接待居民时，怎么把一件事办清楚。'
+
 function hit(marker: string, runtimePath: string): ResumePagesPlan {
   return { plan: { kind: 'resume-pages' }, marker, runtimePath, reason: null }
+}
+
+function hang(api: ApiRouter, method: string, path: string): void {
+  api.respondWith(method, path, () => new Promise(() => {}))
+}
+
+async function seedWorkbench(page: Page, session: unknown): Promise<void> {
+  await page.addInitScript(([key, value]) => {
+    sessionStorage.setItem(key, JSON.stringify(value))
+  }, [WORKBENCH_KEY, session] as const)
+}
+
+function liveSession(sessionId: string, interactionMode: 'text' | 'voice', messages: Array<{ role: 'interviewer' | 'candidate'; content: string }>, position: string) {
+  return {
+    stage: 'session',
+    live: {
+      sessionId,
+      accessToken: 'pair-interview-token',
+      questionTarget: 4,
+      durationMin: 8,
+      interviewerType: position.includes('窗口') ? 'hr' : 'manager',
+      position,
+      messages,
+      questionIndex: messages.filter((item) => item.role === 'interviewer').length,
+      remainingSec: 240,
+      omitPrintAnswers: false,
+      answersRecorded: messages.some((item) => item.role === 'candidate'),
+      interactionMode,
+    },
+  }
 }
 
 function voiceCapability(api: ApiRouter, asrEnabled: boolean): void {
@@ -116,6 +154,73 @@ async function seedResumePreview(page: Page): Promise<void> {
   }, WORKBENCH_KEY)
 }
 
+function reportListItem(input: {
+  sessionId: string
+  position: string
+  industry: string
+  interviewerType: string
+  interviewerLabel: string
+  createdAt: string
+}) {
+  return {
+    ...input,
+    durationMin: 8,
+    endedAt: input.createdAt,
+    hasReport: true,
+  }
+}
+
+async function loginToReports(page: Page): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent('/interview?stage=reports')}`)
+  const phoneTab = page.getByRole('button', { name: '手机号登录', exact: true })
+  if (await phoneTab.count()) await phoneTab.click()
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  const smsTab = page.getByRole('button', { name: '短信验证码', exact: true })
+  if (await smsTab.count()) await smsTab.click()
+  for (const digit of MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
+  await page.waitForURL(/\/interview\?stage=reports/)
+}
+
+async function stubGrantedMic(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const devices = [{
+      deviceId: 'pair-mic',
+      groupId: 'pair',
+      kind: 'audioinput' as const,
+      label: '夹具麦克风',
+      toJSON() { return this },
+    }]
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        enumerateDevices: async () => devices,
+        getUserMedia: async () => {
+          const ctx = new AudioContext()
+          const dest = ctx.createMediaStreamDestination()
+          const osc = ctx.createOscillator()
+          osc.frequency.value = 440
+          osc.connect(dest)
+          osc.start()
+          await ctx.resume()
+          return dest.stream
+        },
+        addEventListener() { /* noop */ },
+        removeEventListener() { /* noop */ },
+      },
+    })
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query: async () => ({ state: 'granted' }) },
+    })
+  })
+}
+
 async function stubDeniedMic(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const devices = [{
@@ -161,6 +266,20 @@ export const page29: ResumePageFixture = {
         return hit('.kiosk-ai-fallback', '/interview?stage=setup')
       case 'mic-denied':
         return hit('[data-mic-reason]', '/interview?stage=session')
+      case 'session-text':
+        return hit('.interview-session__question-text', '/interview?stage=session')
+      case 'report-pending':
+        return hit('[data-interview-state="report-pending"]', '/interview?stage=session')
+      case 'report-loading':
+        return hit('text=正在读取本场练习报告', '/interview?stage=report')
+      case 'reports-ready':
+        return hit('text=青岛某物流公司 · 仓储主管', '/interview?stage=reports')
+      case 'reports-empty-member':
+        return hit('text=还没有练习报告', '/interview?stage=reports')
+      case 'network-error':
+        return hit('text=这三种结果分别意味着', '/interview?stage=session')
+      case 'transcript-review':
+        return hit('text=转写结果（可编辑，确认后提交）', '/interview?stage=session')
       default:
         return null
     }
@@ -253,6 +372,101 @@ export const page29: ResumePageFixture = {
       await page.getByRole('button', { name: '语音回合（文字兜底）', exact: true }).click()
       await page.getByRole('button', { name: '创建并开始练习' }).click()
       await page.locator('[data-mic-reason]').waitFor({ state: 'visible' })
+      return
+    }
+    if (target.state === 'session-text') {
+      voiceCapability(api, false)
+      await seedWorkbench(page, liveSession('pair-session-text', 'text', [
+        { role: 'interviewer', content: '请讲一次你把库存差异查清楚的经历。' },
+        { role: 'candidate', content: WAREHOUSE_ANSWER },
+        { role: 'interviewer', content: WAREHOUSE_FOLLOWUP },
+      ], '仓储主管'))
+      await page.goto('/interview?stage=session')
+      await page.locator('.interview-session__question-text').filter({ hasText: WAREHOUSE_FOLLOWUP }).waitFor({ state: 'visible' })
+      return
+    }
+    if (target.state === 'report-pending') {
+      voiceCapability(api, false)
+      hang(api, 'POST', '/api/v1/mock-interviews/pair-report-pending/end')
+      await seedWorkbench(page, liveSession('pair-report-pending', 'text', [
+        { role: 'interviewer', content: '请讲一次你把库存差异查清楚的经历。' },
+        { role: 'candidate', content: WAREHOUSE_ANSWER },
+      ], '仓储主管'))
+      await page.goto('/interview?stage=session')
+      await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+      await page.locator('[data-interview-state="report-pending"]').waitFor({ state: 'visible' })
+      return
+    }
+    if (target.state === 'report-loading') {
+      hang(api, 'GET', '/api/v1/mock-interviews/pair-report-loading/report')
+      await seedWorkbench(page, {
+        stage: 'report',
+        report: { sessionId: 'pair-report-loading', accessToken: 'pair-interview-token' },
+      })
+      await page.goto('/interview?stage=report')
+      await page.getByText('正在读取本场练习报告').waitFor({ state: 'visible' })
+      return
+    }
+    if (target.state === 'reports-ready' || target.state === 'reports-empty-member') {
+      registerMemberLogin(api)
+      registerAuthenticatedMemberApis(api)
+      api.respond('GET', '/api/v1/me/mock-interviews', {
+        status: 200,
+        json: {
+          data: {
+            items: target.state === 'reports-ready' ? [
+              reportListItem({
+                sessionId: 'pair-reports-warehouse',
+                position: '青岛某物流公司 · 仓储主管',
+                industry: '交通运输、仓储和邮政业',
+                interviewerType: 'manager',
+                interviewerLabel: '业务主管',
+                createdAt: '2026-10-05T09:20:00.000Z',
+              }),
+              reportListItem({
+                sessionId: 'pair-reports-window',
+                position: '市南区社区服务中心 · 窗口服务专员',
+                industry: '公共管理、社会保障和社会组织',
+                interviewerType: 'hr',
+                interviewerLabel: 'HR 面试',
+                createdAt: '2026-10-04T06:10:00.000Z',
+              }),
+            ] : [],
+            nextCursor: null,
+          },
+        },
+      })
+      await loginToReports(page)
+      const marker = target.state === 'reports-ready' ? '青岛某物流公司 · 仓储主管' : '还没有练习报告'
+      await page.getByText(marker).waitFor({ state: 'visible' })
+      return
+    }
+    if (target.state === 'network-error') {
+      voiceCapability(api, false)
+      api.abort('POST', '/api/v1/mock-interviews/pair-network/answer', 'internetdisconnected')
+      await seedWorkbench(page, liveSession('pair-network', 'text', [
+        { role: 'interviewer', content: '请讲一次你把库存差异查清楚的经历。' },
+      ], '仓储主管'))
+      await page.goto('/interview?stage=session')
+      await page.getByRole('textbox', { name: '本题回答' }).fill('我先保住当天要发出的货，临时加人之前先把夜班交接写清楚。')
+      await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+      await page.getByText('这三种结果分别意味着').waitFor({ state: 'visible' })
+      return
+    }
+    if (target.state === 'transcript-review') {
+      await stubGrantedMic(page)
+      voiceCapability(api, true)
+      api.respond('POST', '/api/v1/mock-interviews/pair-transcript/transcribe', {
+        status: 200,
+        json: { data: { text: '居民来办居住证明，我先核对姓名和住址，缺的材料写在回执上，约好下午再来取。' } },
+      })
+      await seedWorkbench(page, liveSession('pair-transcript', 'voice', [
+        { role: 'interviewer', content: WINDOW_QUESTION },
+      ], '窗口服务专员'))
+      await page.goto('/interview?stage=session')
+      await page.getByRole('button', { name: '开始回答（语音）', exact: true }).click()
+      await page.getByRole('button', { name: /结束回答（已录/ }).click()
+      await page.getByText('转写结果（可编辑，确认后提交）').waitFor({ state: 'visible' })
     }
   },
 }
