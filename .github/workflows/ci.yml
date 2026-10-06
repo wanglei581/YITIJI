@@ -339,6 +339,10 @@ jobs:
         # 10/4 W-118：走查栈用 NODE_ENV=development 构出了 React 开发版，StrictMode 把挂载副作用执行两遍，造出成对请求的假象。
         run: pnpm verify:prod-react-build
 
+      - name: Kiosk web font subset covers every character in source
+        # 10/6 一体机打包思源宋体 / 思源黑体子集（Qingxu Serif / Qingxu Sans）；新文案里的字不在子集就会退回系统字体。在构建之后跑，顺带核对产物里有字体文件。
+        run: pnpm verify:kiosk-font-subset
+
       - name: Release provenance fixture
         # 仅验证临时 release/artifact 目录与 fake PM2/health；不得连接任何环境。
         run: pnpm --filter @ai-job-print/api verify:release-provenance

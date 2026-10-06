@@ -12,7 +12,7 @@
   border: 2px solid rgba(31, 158, 134, 0.35);
   background: var(--color-primary-50, var(--fy-teal-soft));
   color: var(--color-primary-700, var(--fy-teal-deep));
-  font-family: var(--fy-serif, 'Noto Serif SC', serif);
+  font-family: var(--fy-serif, 'Qingxu Serif', 'Noto Serif SC', serif);
   font-size: 42px;
   font-weight: 700;
   line-height: 1;
