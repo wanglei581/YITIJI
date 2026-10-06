@@ -4,6 +4,7 @@ import {
   type ScanCleanupOutcome,
   type ScanCleanupStatus,
 } from '../pages/scan/scanCleanupGate'
+import { formatRemainingDuration } from '../pages/scan/scanSettingsModel'
 
 /**
  * 清场遮罩。两种形态，判据只有一个：**服务端那一头收完尾了没有**。
@@ -27,9 +28,8 @@ const OUTCOME_TEXT: Record<ScanCleanupOutcome, string> = {
 }
 
 function formatRemaining(deadlineAt: number, now: number): string {
-  const seconds = Math.max(0, Math.ceil((deadlineAt - now) / 1000))
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+  const seconds = Math.ceil((deadlineAt - now) / 1000)
+  return formatRemainingDuration(seconds)
 }
 
 function CleanupHoldPanel({ status }: { status: ScanCleanupStatus }) {

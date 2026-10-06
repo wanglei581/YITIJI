@@ -19,6 +19,7 @@
 
 import { type ReactNode } from 'react'
 import '../../styles/qingxu/index.css'
+import { useMinuteClock } from './useMinuteClock'
 
 export interface QxPageFrameProps {
   /** 页面主标题。宋体，左侧带一道翡翠色竖条。 */
@@ -50,6 +51,7 @@ export function QxPageFrame({
   navbar,
   back,
 }: QxPageFrameProps) {
+  const clock = useMinuteClock()
   return (
     <div className="qx-stage" data-qx-frame="true">
       <header className="qx-topbar">
@@ -72,6 +74,8 @@ export function QxPageFrame({
         <span className="qx-pill" data-tone={status?.tone ?? 'unknown'}>
           {status?.label ?? '状态未知'}
         </span>
+        {/* 稿的顶栏最右是时钟，在状态胶囊之后。首页和待机屏不走这个壳，各自只留自己的那一只。 */}
+        <time className="qx-topbar-clock" dateTime={clock} aria-label={`当前时间 ${clock}`}>{clock}</time>
       </header>
 
       <section className="qx-pagehead">
