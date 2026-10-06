@@ -635,6 +635,80 @@ test('signed-out benefit activity primary is 登录后领取 @w5-kiosk', async (
   await expectFusionAcceptance(page, errors)
 })
 
+test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerKioskShell(api)
+  const successId = 'spring-print-2026'
+  const failureId = 'resume-diagnosis-quota'
+  api.respondWith('GET', `/api/v1/activities/${successId}`, (requestNumber) => ({
+    status: 200,
+    json: {
+      success: true,
+      data: benefitActivityFixture({
+        id: successId,
+        title: '春季现场打印体验',
+        description: '到店打印简历时，可领取一次黑白打印体验额度。',
+        claimed: requestNumber > 1,
+      }),
+    },
+  }))
+  api.respond('POST', `/api/v1/activities/${successId}/claim`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        id: 'grant-spring-print-2026',
+        benefitType: 'free_quota',
+        serviceKey: null,
+        title: '春季现场打印体验',
+        description: '到店打印简历时，可领取一次黑白打印体验额度。',
+        quantityTotal: 1,
+        quantityRemaining: 1,
+        status: 'active',
+        sourceType: 'platform',
+        validFrom: null,
+        validUntil: null,
+        createdAt: '2026-07-24T00:00:00.000Z',
+      },
+    },
+  })
+  api.respond('GET', `/api/v1/activities/${failureId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: benefitActivityFixture({
+        id: failureId,
+        title: '简历诊断体验次数',
+        description: '领取后记入本人权益，用于本机简历诊断。',
+        benefitType: 'ai_quota',
+        quantityTotal: 2,
+      }),
+    },
+  })
+  api.respond('POST', `/api/v1/activities/${failureId}/claim`, {
+    status: 409,
+    json: { error: { code: 'BENEFIT_ACTIVITY_NOT_CLAIMABLE', message: '当前不可领取' } },
+  })
+
+  await loginThroughVisibleUi(page, `/activities/${successId}`)
+  const successPrimary = page.getByTestId('activity-primary')
+  await expect(successPrimary).toHaveText('领取这项权益')
+  await successPrimary.click()
+  await expect(page.getByTestId('activity-state-claim-success')).toBeVisible()
+  await expect(successPrimary).toHaveText('查看我的权益')
+  await expect(page.getByText('领取成功，已加入我的权益', { exact: true })).toBeVisible()
+
+  await page.goto(`/activities/${failureId}`)
+  const failurePrimary = page.getByTestId('activity-primary')
+  await expect(failurePrimary).toHaveText('领取这项权益')
+  await failurePrimary.click()
+  await expect(page.getByTestId('activity-state-claim-error')).toBeVisible()
+  await expect(failurePrimary).toHaveText('重试')
+  await expect(failurePrimary).toBeEnabled()
+  await expectFusionAcceptance(page, errors)
+})
+
 test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
