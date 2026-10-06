@@ -709,6 +709,33 @@ test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', 
   await expectFusionAcceptance(page, errors)
 })
 
+test('ended benefit activity primary stays disabled @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities/summer-print-assist', {
+    status: 200,
+    json: {
+      success: true,
+      data: benefitActivityFixture({
+        id: 'summer-print-assist',
+        title: '暑期简历打印协助',
+        description: '活动时间已经过去，不再提供领取入口。',
+        status: 'ended',
+        claimable: false,
+        ended: true,
+        validUntil: '2026-08-31T16:00:00.000Z',
+      }),
+    },
+  })
+
+  await page.goto('/activities/summer-print-assist')
+  await expect(page.getByTestId('activity-state-ended')).toBeVisible()
+  const primary = page.getByTestId('activity-primary')
+  await expect(primary).toHaveText('已结束')
+  await expect(primary).toBeDisabled()
+  await expectFusionAcceptance(page, errors)
+})
+
 test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
