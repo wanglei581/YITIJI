@@ -12989,7 +12989,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 674,
+      "reachableFileCount": 677,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15966,7 +15966,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 770
+      "sourceFileCount": 773
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21019,6 +21019,9 @@
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
+    "apps/kiosk/src/pages/service-hubs/serviceHubChrome.ts": [
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+    ],
     "apps/kiosk/src/pages/service-hubs/serviceHubModel.ts": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
@@ -21028,6 +21031,9 @@
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css": [
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+    ],
+    "apps/kiosk/src/pages/service-hubs/useHubAiAvailability.ts": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/session-guard/SessionGuardView.tsx": [
@@ -31691,9 +31697,11 @@
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
           "apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx",
+          "apps/kiosk/src/pages/service-hubs/serviceHubChrome.ts",
           "apps/kiosk/src/pages/service-hubs/serviceHubModel.ts",
           "apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts",
           "apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css",
+          "apps/kiosk/src/pages/service-hubs/useHubAiAvailability.ts",
           "apps/kiosk/src/services/api/printScanCapabilities.ts",
           "docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html"
         ],

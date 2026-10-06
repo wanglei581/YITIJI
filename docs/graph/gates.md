@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1882 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1884 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -423,7 +423,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 552 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 554 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -880,9 +880,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/screensaver/screensaver-service-desk.css` | `verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/screensaver/standbyModel.ts` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-service-entry-readiness.mjs` |
+| `apps/kiosk/src/pages/service-hubs/serviceHubChrome.ts` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/service-hubs/serviceHubModel.ts` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts` | `extract-service-hub-specs.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css` | `verify-service-entry-readiness.mjs` |
+| `apps/kiosk/src/pages/service-hubs/useHubAiAvailability.ts` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/session-guard/SessionGuardView.tsx` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-guard/sessionGuardModel.ts` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-guard/styles/session-guard-qx.css` | `verify-qx-session-lifecycle.mjs` |
