@@ -77,6 +77,14 @@
 - **改法：** 新增 `src/common/process/background-task.ts`：`scheduleBackground` / `runBackground` 把后台异步任务的错误在本处收住、记日志、下一轮再试；日志只记错误类型、错误码与抛出位置，**不记 message**（可能带用户输入或手机号）。回收定时器与 TRTC 到期扫描都改用它。`main.ts` 装进程级兜底 `installUnhandledRejectionGuard`：未处理拒绝记日志并推企业微信（每小时最多一条），**进程不退出**；同步未捕获异常仍按 Node 默认退出、由 PM2 拉起。
 - **复核：** `@Cron` 方法由 `@nestjs/schedule` 的 `wrapFunctionInTryCatchBlocks` `await` 后捕获，安全；扫描心跳定时器自带 `.catch`；TRTC 的 `expireSessions` 内部有 try，仍统一换成 `scheduleBackground`；会员注销 Redis 租约续期已接 `.catch`。
 - **门禁：** `verify:background-task-safety`（进 CI）：静态扫描定时器回调里不接 `.catch` 的 `void 调用`；`scheduleBackground` 次次失败仍照跑；真实 `TerminalAgentService` 遇 P2028 只记一行 warn；兜底记日志并告警、不含原文。反向变异见 PR。
+## 2026-10-06：数据库异地备份脚本与另一台机器恢复演练（本机临时库，未连接生产）
+
+- **范围：** 产品负责人 10/6 批准数据库备份要有异地副本，并在另一台机器上恢复一次。本包只做脚本、rclone 配置样例、运维文档和本机可验证的部分。没有连接生产，没有写入真实桶名、密钥、账号或服务器地址。对象存储的桶仍由产品负责人开通。
+- **补上的缺口：** `backup-postgres.sh` 原来上传后不校验；本机和异地共用 `RETENTION_DAYS`；`BACKUP_UPLOAD_ENABLED` 未开时没有提示。没有「另一台机器从异地拉最新 dump、校验、恢复到新建 drill 库、只读核对」的脚本。
+- **脚本：** 上传后用 `rclone check`（只含当天那一个文件）核对；本地目录模式比对字节数和 SHA-256。上传失败和校验失败都走原来的 `fail` 告警。异地保留天数改为 `BACKUP_REMOTE_RETENTION_DAYS`（默认 30，不跟随本机 `RETENTION_DAYS`）。未开启上传时，本机备份仍成功，标准错误只提示一次。新脚本 `restore-offsite-drill.sh` 在拉取之前拒绝库名不含 `drill` 的目标；库已存在则拒绝覆盖；可选 `DRILL_DROP_DATABASE=1` 只删除这个临时库。
+- **本机演练：** 本机没有 rclone，也没有 shellcheck。用本地目录模式，在临时 PostgreSQL 16.15（127.0.0.1:55486，`LC_ALL=C`，只走 TCP）上跑通：`initdb`、94 个迁移、插入 1 行演练用户、备份、拷到另一目录、`pg_restore -l`、恢复到 `offsite_drill`、核对、删除临时库。源库用户行数仍是 1。跑完已停库，数据目录、备份目录和拉回目录已删。演练记录：时间 2026-10-06 14:04:52 +0800；文件 `postgres_2026-10-06.dump`；大小 368868；`pg_restore -l` 通过，sha256 `9ee4fffa705f95dac31a75e9f5b24cddd0b39ea6294b835308c39d9a90669e5a`；脚本计时 2 秒（不含前面的迁移）；表数 112；`_prisma_migrations` 94；User 1；Organization 0；Terminal 0；库迁移与仓库迁移都是 `20261003120000_ai_quota_per_user`；结论通过。
+- **门禁：** `pnpm --filter @ai-job-print/api verify:backup-ops` 最后一行 `backup ops gates passed`。`node scripts/verify-repository-integrity.mjs`、`node scripts/verify-ci-gate-coverage.mjs` 通过。图谱重新生成后 `--check` 通过（`docs/graph/` 三份产物跟着门禁对新文档的引用更新）。反向变异三处都是退出码 1，已还原：去掉库名校验后生产库名被放行（退出码 0）；上传后不校验则日志里没有 `rclone check`；校验失败不告警则没有 `curl`。
+- **还要人做的：** 按 `docs/device/postgres-operations.md` 第 10 节开桶、建子账号、放 `chmod 600` 的 rclone 配置，并在服务器 `.env` 里设置第 10.2 节的变量。若生产已经把 `RETENTION_DAYS` 设成不是 30 的数，异地不再跟着它走，要单独设 `BACKUP_REMOTE_RETENTION_DAYS`。每季度在另一台机器上演练一次。
 
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 

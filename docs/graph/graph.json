@@ -22038,6 +22038,9 @@
     "docs/device/postgres-load-hardening-runbook.md": [
       "services/api/scripts/verify-db-load-indexes.ts"
     ],
+    "docs/device/postgres-operations.md": [
+      "services/api/scripts/verify-backup-ops.mjs"
+    ],
     "docs/device/print-scan-first-release-acceptance.md": [
       "services/api/scripts/verify-print-scan-first-release.ts"
     ],
@@ -22832,12 +22835,18 @@
       "scripts/verify-deploy-gates-in-sync.mjs",
       "scripts/verify-deploy-rollback.mjs"
     ],
+    "services/api/scripts/rclone-offsite.conf.example": [
+      "services/api/scripts/verify-backup-ops.mjs"
+    ],
     "services/api/scripts/recruitment-wave2-restored-dry-run.ts": [
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
     ],
     "services/api/scripts/release-provenance-fixture.ts": [
       "services/api/scripts/verify-release-genesis.ts",
       "services/api/scripts/verify-release-provenance.ts"
+    ],
+    "services/api/scripts/restore-offsite-drill.sh": [
+      "services/api/scripts/verify-backup-ops.mjs"
     ],
     "services/api/scripts/scan-lease-contract.helper.ts": [
       "services/api/scripts/verify-scan-tasks.ts"
@@ -35083,8 +35092,15 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
-        "files": [],
+        "dirs": [
+          "services",
+          "services/api/prisma/postgres/migrations"
+        ],
+        "files": [
+          "docs/device/postgres-operations.md",
+          "services/api/scripts/rclone-offsite.conf.example",
+          "services/api/scripts/restore-offsite-drill.sh"
+        ],
         "missing": []
       },
       "file": "services/api/scripts/verify-backup-ops.mjs",
