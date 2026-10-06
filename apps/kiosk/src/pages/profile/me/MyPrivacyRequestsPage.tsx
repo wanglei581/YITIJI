@@ -93,9 +93,9 @@ function boundaryNote(): string {
   return inventoryOk ? `${machine}${inventory}${kept}` : scope
 }
 
-function safeMessage(error: unknown, fallback: string, contact: PublicSupportContact): string {
+function safeMessage(error: unknown, fallback: string): string {
   const detail = userMessageOf(error, fallback)
-  if (containsStaffHandoff(detail)) return `${fallback}。${helpNeededLine(contact)}`
+  if (containsStaffHandoff(detail)) return fallback
   return detail
 }
 
@@ -142,7 +142,7 @@ export function MyPrivacyRequestsPage() {
       setLoadState('ready')
     } catch (error) {
       setLoadState('error')
-      setLoadMessage(safeMessage(error, '加载失败，请稍后重试', contact))
+      setLoadMessage(safeMessage(error, '加载失败，请稍后重试'))
     }
   }
 
@@ -170,7 +170,7 @@ export function MyPrivacyRequestsPage() {
       setOutcome('success')
     } catch (error) {
       setConfirmRevoke(false)
-      setFailMessage(safeMessage(error, FAILURE_FALLBACK, contact))
+      setFailMessage(safeMessage(error, FAILURE_FALLBACK))
       setOutcome('failure')
     } finally {
       setBusy(false)
