@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-10-06：注销门禁偶发红「全库遗留身份: Job.id,Job.externalId,Job.sourceUrl」查明是测试撞号（分支 `fix/member-closure-job-collision`）
+
+- 现象：#1262 的 postgres-readiness 作业里 `verify:member-closure` 第 11 组红过一次，重跑就绿（run 37440229757）。
+- 原因：PG 作业里本门禁与 `prisma/seed.ts`、上百条门禁共用一个库。第 11 组除了反查完整手机号、哈希、密文、openid、昵称，还按手机号后四位做边界匹配（前后不挨字母数字），专抓「尾号 1234」「139****1234」这类残留。测试手机号是 `139` + 随机 8 位，种子岗位的 id / externalId / sourceUrl（`job-uni-0041`、`UNI-2026-JOB-0041`、`job-hr-1001` 等 13 条）都带被 `-` 包住的 4 位数；后四位碰巧落在这 13 个值里，三列就一起命中。本机把原版后四位固定成 0041，在带种子的临时 PG 上稳定复现同样三列。**不是业务把会员身份写进了岗位表。** SQLite 模式本门禁自建空库，不会撞。
+- 改法（只改门禁）：造会员前先把库里已有的独立 4 位数收集一遍（本机带种子时 15 个，含 0041、1001），选号时避开。扫描本身没放宽：遍历逻辑抽成共用函数，列、行、匹配规则不变，不排除任何表或行。
+- 验证：SQLite（`VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated`）17 组全过；临时 PG 跑 migrate deploy + seed + seed-fairs，再跑 `verify:job-fit`、`verify:activity-logs`、`verify:companies`、`verify:recruitment-emergency-scope`、`verify:job-sync`，最后跑本门禁 17 组全过；强制第一次抽到 0041 时被跳过、仍全过。反向变异：第 11 组之前把后四位残留或昵称写进种子岗位 sourceUrl，两次都红（`Job.sourceUrl`）。`verify:member-data-request-truth` 仍过。
+- 顺带说明（未改）：把会员 id 写进岗位表，第 11 组不会红。反查令牌本来就不含会员 id：注销后账号壳保留原 id，保留的订单、审计都引用它；新旧 id 同行共现由第 12 组和 Redis 扫描负责。修复前也是这样。
+- 停放、隐藏、改名、降级：无。
+
 ## 2026-10-06：小青语音通话没声音也没字幕时，带用户回到文字对话（分支 `claude/kiosk-b-advisor-call-silent-fallback-1006`）
 
 - 问题：小青语音进房后，如果机器人没进房、语音合成出错或网络只通了一半，屏幕一直显示「通话中」，用户听不到声音也看不到字幕，只能干等。现场没有工作人员，必须自己把人带回文字对话。
