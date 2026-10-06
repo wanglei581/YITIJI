@@ -440,6 +440,17 @@ for (const [path, expected] of A_BATCH_EYEBROWS) {
 }
 assert.doesNotMatch(read('src/pages/print-scan/SignStampPage.tsx'), /固定原型数据|<b>演示<\/b>/, 'sign page sample bar says 示例, never 原型/演示')
 assert.doesNotMatch(read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'), /合成演示/, 'sign page CTA reasons do not say 合成演示')
+assert.match(
+  read('src/pages/print-scan/sign-stamp/constants.ts'),
+  /我确认本人拥有该本人手写签名的使用授权，仅用于本人材料的版式整理/,
+  'sign authorization sentence follows the v2 draft',
+)
+assert.match(read('src/pages/print-scan/SignStampPage.tsx'), /问小青：签名放在哪一页/, 'sign page asks 小青 where to place the signature')
+assert.doesNotMatch(
+  read('src/pages/print-scan/SignStampPage.tsx'),
+  /purpose="signature_image"/,
+  'sign page does not create a signature_image upload session',
+)
 assert.doesNotMatch(qxMeChrome, /服务元数据/, 'member record tab hint does not say 元数据')
 assert.doesNotMatch(read('src/pages/profile/me/MockInterviewRecords.tsx'), /元数据/, 'mock interview legal line does not say 元数据')
 for (const path of ['src/pages/profile/me/MyResumesPage.tsx', 'src/pages/profile/me/MyAiRecordsPage.tsx', 'src/pages/profile/me/JobAiSessionRecords.tsx']) {

@@ -12989,7 +12989,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 646,
+      "reachableFileCount": 674,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15397,6 +15397,7 @@
           "path": "/resume/optimize/compare",
           "styles": [
             "apps/kiosk/src/pages/resume/resume-optimize-compare.css",
+            "apps/kiosk/src/pages/resume/resume-optimize-overview-qx.css",
             "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15965,7 +15966,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 740
+      "sourceFileCount": 770
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19825,7 +19826,21 @@
     "apps/kiosk/src/pages/print-scan/printHubContent.ts": [
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts": [
@@ -19844,6 +19859,9 @@
     ],
     "apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/CashierPaymentPanel.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
@@ -20645,6 +20663,13 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/ResumeSourceActions.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/ResumeSourceCards.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx": [
@@ -28892,10 +28917,16 @@
           "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
           "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx",
           "apps/kiosk/src/pages/print-scan/convert-images-model.ts",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts",
           "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts",
           "apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css",
           "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
           "apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css",
+          "apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css",
           "apps/kiosk/src/pages/print/CashierPaymentPanel.tsx",
           "apps/kiosk/src/pages/print/DevSandboxControls.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
@@ -28990,6 +29021,7 @@
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/aiResumeSession.ts",
+          "apps/kiosk/src/pages/resume/components/ResumeSourceActions.tsx",
           "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
           "apps/kiosk/src/pages/resume/jobFit-inkpaper.css",
@@ -29105,6 +29137,7 @@
           "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx",
           "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
           "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts",
           "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts",
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "apps/kiosk/src/pages/profile/assets/format.ts",
@@ -31336,6 +31369,8 @@
           "apps/kiosk/src/pages/resume/components/DiagnosisDirectionForm.tsx",
           "apps/kiosk/src/pages/resume/components/OptimizedResumeEditor.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx",
+          "apps/kiosk/src/pages/resume/components/ResumeSourceActions.tsx",
+          "apps/kiosk/src/pages/resume/components/ResumeSourceCards.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
           "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareBatchBar.tsx",
@@ -44043,6 +44078,24 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/design/kiosk-v6-migration-matrix.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/resume/components/ResumeContextStrip.tsx",
+        "kind": "component",
+        "mentions": [],
+        "risk": "low",
+        "scope": "kiosk",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/resume/components/ResumeUploadNotices.tsx",
+        "kind": "component",
+        "mentions": [],
+        "risk": "low",
+        "scope": "kiosk",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

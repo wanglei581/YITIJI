@@ -99,6 +99,11 @@ const STATE_QUERY: Record<string, Record<string, Record<string, string>>> = {
   '32-cashier.html': Object.fromEntries(PAY_CHANNEL_STATES.map((state) => [state, { channel: 'wechat' }])),
   // 14 的「已报价 / 权益未抵扣 / 零元单」摆的是示例金额，只在演示模式（debug=1）里画；不带就停在一屏说明。
   '14-print-confirm.html': Object.fromEntries(['quoted', 'benefit-unverified', 'zero-amount'].map((state) => [state, { debug: '1' }])),
+  // 稿 21：手里要有一份文件的态，不带 source 会落成 missing-file。
+  '21-resume-triage.html': Object.fromEntries(
+    ['summary', 'uploading', 'upload-failed', 'parsing', 'parse-failed', 'upload-unknown', 'upload-rechecking', 'parse-unknown', 'parse-rechecking']
+      .map((state) => [state, { source: 'usb' }]),
+  ),
 }
 
 const CANONICAL_ROUTE: Record<string, string> = {
