@@ -604,4 +604,126 @@ assertIncludes(formatChooser, 'aria-label="文件生成流程"', '导出等待�
 assertIncludes(formatChooser, '系统没有提供逐步进度', '流程说明不冒充服务端逐步进度')
 console.log('PASS batch D 免费标签、保存归属、取件摘要、空报告和导出流程')
 
+const PAGE_AIGC_NOTE = '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
+const FILE_AIGC_NOTE = '导出的文件末尾有一行：含人工智能辅助生成内容'
+const deliverPanel = read('src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx')
+for (const [src, label] of [[formatChooser, '选格式卡'], [deliverPanel, '导出格式区']]) {
+  assertIncludes(src, PAGE_AIGC_NOTE, `${label}含页脚标注说明`)
+  assertIncludes(src, FILE_AIGC_NOTE, `${label}含文末标注说明`)
+  assertIncludes(src, 'function resumeExportAigcNote', `${label}按格式选择标注说明`)
+}
+assertIncludes(formatChooser, '{resumeExportAigcNote(props.format)}', '选格式卡按当前格式渲染标注说明')
+assertIncludes(deliverPanel, '{resumeExportAigcNote(props.exportFormat)}', '导出格式区按当前格式渲染标注说明')
+assertIncludes(formatChooser, "props.screen === 'export-chooser'", '选格式卡只在选格式屏渲染')
+
+function textOf(node) {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(textOf).join('')
+  if (node && typeof node === 'object' && Array.isArray(node.children)) return textOf(node.children)
+  return ''
+}
+const useStateStub = (initial) => [typeof initial === 'function' ? initial() : initial, () => {}]
+const renderChooser = new Function('React', 'useState', 'ResumeLayoutControls', 'COMPRESS_ONE_PAGE', 'ResumeExportResult', 'ResumePricingBar', executable([
+  sourceNode(formatChooser, 'FORMATS'),
+  sourceNode(formatChooser, 'FONT_CHOICES'),
+  sourceNode(formatChooser, 'formatName'),
+  sourceNode(formatChooser, 'resumeExportAigcNote'),
+  sourceNode(formatChooser, 'ResumeFormatChooser').replace(/^export /, ''),
+  sourceNode(formatChooser, 'SyntheticFileCard'),
+  'return ResumeFormatChooser;',
+].join('\n')))(React, useStateStub, () => null, '压到一页', () => null, () => null)
+const chooserProps = {
+  screen: 'export-chooser',
+  format: 'pdf',
+  onFormatChange: () => {},
+  layout: { columns: 1, fontScale: 'standard', lineSpacing: 'standard', margin: 'standard', accent: 'teal' },
+  onLayoutChange: () => {},
+  templates: [],
+  templatesError: false,
+  selectedTemplateId: '',
+  onTemplateChange: () => {},
+  exporting: false,
+  exported: null,
+  exportError: null,
+  exportVersion: 0,
+  pricing: null,
+  pricingLoading: false,
+  blockedReason: null,
+  guest: true,
+  synthetic: false,
+  printNavigating: false,
+  onPrint: () => {},
+  onOpenPreview: () => {},
+  onClearExport: () => {},
+  onHelp: () => {},
+  estimatedPagesLabel: '导出后显示真实页数',
+}
+for (const format of ['pdf', 'docx']) {
+  const shown = textOf(renderChooser({ ...chooserProps, format }))
+  assert.match(shown, new RegExp(PAGE_AIGC_NOTE), `${format} 选格式卡渲染页脚标注说明`)
+  assert.doesNotMatch(shown, new RegExp(FILE_AIGC_NOTE), `${format} 选格式卡不渲染文末标注说明`)
+}
+for (const format of ['txt', 'md']) {
+  const shown = textOf(renderChooser({ ...chooserProps, format }))
+  assert.match(shown, new RegExp(FILE_AIGC_NOTE), `${format} 选格式卡渲染文末标注说明`)
+  assert.doesNotMatch(shown, new RegExp(PAGE_AIGC_NOTE), `${format} 选格式卡不渲染页脚标注说明`)
+}
+assert.doesNotMatch(textOf(renderChooser({ ...chooserProps, screen: 'export-exporting' })), /含人工智能辅助生成内容/, '还没进入选格式时不渲染标注说明')
+
+const deliverConstants = read('src/pages/resume/components/resume-deliver/constants.ts')
+const renderDeliver = new Function('React', 'ResumeLayoutControls', 'COMPRESS_ONE_PAGE', 'EXPORT_FORMAT_OPTIONS', 'ResumeExportResult', 'ResumePricingBar', executable([
+  sourceNode(deliverPanel, 'resumeExportAigcNote'),
+  sourceNode(deliverPanel, 'ResumeDeliverPanel').replace(/^export /, ''),
+  'return ResumeDeliverPanel;',
+].join('\n')))(React, () => null, '压到一页', new Function(executable(`${sourceNode(deliverConstants, 'EXPORT_FORMAT_OPTIONS')}\nreturn EXPORT_FORMAT_OPTIONS;`))(), () => null, () => null)
+const deliverProps = {
+  layout: chooserProps.layout,
+  onLayoutChange: () => {},
+  templates: [],
+  templatesError: false,
+  selectedTemplateId: '',
+  onTemplateChange: () => {},
+  exportFormat: 'pdf',
+  onExportFormatChange: () => {},
+  exporting: false,
+  printNavigating: false,
+  exported: null,
+  exportKind: 'resume',
+  exportError: null,
+  exportVersion: 0,
+  pricing: null,
+  pricingLoading: false,
+  blockedReason: null,
+  exportBlocked: false,
+  onRequestExport: () => {},
+  showChangeList: false,
+  onPrint: () => {},
+  onOpenPreview: () => {},
+  guest: true,
+  estimatedPagesLabel: '导出后显示真实页数',
+}
+for (const exportFormat of ['pdf', 'docx']) {
+  const shown = textOf(renderDeliver({ ...deliverProps, exportFormat }))
+  assert.match(shown, new RegExp(PAGE_AIGC_NOTE), `${exportFormat} 导出格式区渲染页脚标注说明`)
+  assert.doesNotMatch(shown, new RegExp(FILE_AIGC_NOTE), `${exportFormat} 导出格式区不渲染文末标注说明`)
+}
+for (const exportFormat of ['txt', 'md']) {
+  const shown = textOf(renderDeliver({ ...deliverProps, exportFormat }))
+  assert.match(shown, new RegExp(FILE_AIGC_NOTE), `${exportFormat} 导出格式区渲染文末标注说明`)
+  assert.doesNotMatch(shown, new RegExp(PAGE_AIGC_NOTE), `${exportFormat} 导出格式区不渲染页脚标注说明`)
+}
+
+const draftStart = generate.indexOf('const handleExportDraft')
+const draftEnd = generate.indexOf('const availability', draftStart)
+assert.ok(draftStart >= 0 && draftEnd > draftStart, '填写页有按原样导出函数')
+const draftBranch = generate.slice(draftStart, draftEnd)
+assert.match(draftBranch, /exportResumeDraft\(/, '按原样导出走 exportResumeDraft')
+assert.doesNotMatch(draftBranch, /含人工智能辅助生成内容/, '按原样导出分支不渲染人工智能标注说明')
+assert.doesNotMatch(draftBranch, /resumeExportAigcNote/, '按原样导出分支不调用标注说明')
+assertNotIncludes(generate, PAGE_AIGC_NOTE, '按原样导出页不含页脚标注说明')
+assertNotIncludes(generate, FILE_AIGC_NOTE, '按原样导出页不含文末标注说明')
+assertNotIncludes(generate, 'ResumeFormatChooser', '按原样导出不渲染选格式卡')
+assertNotIncludes(generate, 'ResumeDeliverPanel', '按原样导出不渲染优化导出区')
+console.log('PASS 导出标注说明按格式显示，按原样导出不渲染')
+
 console.log('PASS resume diagnosis flow UI verification')

@@ -2495,3 +2495,108 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
   await expect(page.locator('.resume-source-phone-session svg[width="150"]')).toBeVisible()
   expect(creates).toBe(1)
 })
+
+const PAGE_AIGC_NOTE = '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
+const FILE_AIGC_NOTE = '导出的文件末尾有一行：含人工智能辅助生成内容'
+
+async function expectAigcNote(page: Page, sentence: string): Promise<void> {
+  const note = page.getByTestId('resume-export-aigc-note')
+  await expect(note).toBeVisible()
+  await expect(note).toHaveText(sentence)
+  const fontSize = await note.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+  expect(fontSize).toBeGreaterThanOrEqual(20)
+}
+
+test('生成预览导出选 PDF 与 TXT 时说明人工智能标注位置 @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/resume/generate/preview?state=export-chooser&capture=1')
+  await expect(page.getByRole('heading', { name: '选导出格式' })).toBeVisible()
+  await expectAigcNote(page, PAGE_AIGC_NOTE)
+  await expect(page.getByText(FILE_AIGC_NOTE)).toHaveCount(0)
+
+  await page.getByTestId('resume-generate-preview-fmt-txt').click()
+  await expectAigcNote(page, FILE_AIGC_NOTE)
+  await expect(page.getByText(PAGE_AIGC_NOTE)).toHaveCount(0)
+
+  await page.getByTestId('resume-generate-preview-fmt-docx').click()
+  await expectAigcNote(page, PAGE_AIGC_NOTE)
+
+  await page.getByTestId('resume-generate-preview-fmt-md').click()
+  await expectAigcNote(page, FILE_AIGC_NOTE)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectAigcNote(page, FILE_AIGC_NOTE)
+  await assertNoHorizontalOverflow(page)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+})
+
+test('优化页导出格式区选 PDF 与 TXT 时说明人工智能标注位置 @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/resume/records/resume-w3-aigc-note/optimize', {
+    status: 200,
+    json: {
+      taskId: 'resume-w3-aigc-note',
+      status: 'completed',
+      providerName: 'llm',
+      modules: [],
+      optimizedResume: {
+        basic: { name: '标注样本', city: '青岛' },
+        intention: { position: '前端开发工程师', city: '青岛' },
+        summary: '基于本人真实经历整理的简历摘要。',
+        education: [{ school: '测试大学', major: '计算机科学', degree: '本科' }],
+        experience: [],
+        projects: [],
+        skills: ['TypeScript'],
+        certificates: [],
+      },
+    },
+  })
+  await page.goto('/resume/optimize?taskId=resume-w3-aigc-note')
+  await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '导出格式' })).toBeVisible()
+  await expectAigcNote(page, PAGE_AIGC_NOTE)
+
+  await page.locator('.qx-rd-fmt').getByRole('button', { name: 'TXT', exact: true }).click()
+  await expectAigcNote(page, FILE_AIGC_NOTE)
+  await expect(page.getByText(PAGE_AIGC_NOTE)).toHaveCount(0)
+
+  await page.locator('.qx-rd-fmt').getByRole('button', { name: 'Word', exact: true }).click()
+  await expectAigcNote(page, PAGE_AIGC_NOTE)
+
+  await page.locator('.qx-rd-fmt').getByRole('button', { name: 'Markdown', exact: true }).click()
+  await expectAigcNote(page, FILE_AIGC_NOTE)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectAigcNote(page, FILE_AIGC_NOTE)
+  await assertNoHorizontalOverflow(page)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+})
+
+test('按原样导出不显示人工智能标注说明 @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/resume/generate', {
+    status: 200,
+    json: { taskId: 'draft-only', status: 'failed', failReason: '本次没能生成简历。' },
+  })
+  await page.goto('/resume/generate')
+  await expect(page.locator('[data-kiosk-screen="resume-generate"]')).toBeVisible()
+  await expect(page.getByText(PAGE_AIGC_NOTE)).toHaveCount(0)
+  await expect(page.getByText(FILE_AIGC_NOTE)).toHaveCount(0)
+
+  await page.getByLabel('姓名').fill('原样样本')
+  await page.getByRole('button', { name: '下一步：求职意向' }).click()
+  await page.getByLabel('目标岗位').fill('门店运营')
+  await page.getByRole('button', { name: '下一步：教育经历' }).click()
+  await page.getByRole('button', { name: '下一步：工作经历' }).click()
+  await page.getByRole('button', { name: '下一步：项目经历' }).click()
+  await page.getByRole('button', { name: '下一步：技能证书' }).click()
+  await page.getByRole('button', { name: '去核对' }).click()
+  await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
+
+  const draftExport = page.getByRole('button', { name: '导出并打印我填的内容（未经 AI 润色）' })
+  await expect(draftExport).toBeVisible()
+  await expect(page.getByText(PAGE_AIGC_NOTE)).toHaveCount(0)
+  await expect(page.getByText(FILE_AIGC_NOTE)).toHaveCount(0)
+  await expect(page.getByTestId('resume-export-aigc-note')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+})
