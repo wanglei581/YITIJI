@@ -1,5 +1,9 @@
 # 当前开发进度
 
+## 2026-10-06：小程序 ai-access 门禁偶发失败（只改测试）（分支 `claude/miniapp-ai-access-flake`）
+
+- `apps/miniapp/scripts/tests/ai-access.test.mjs` 第一个场景 `resumeAiConsentRecoversOnce` 偶发失败（单跑约 1/20，机器忙时更高）：本文件冷启动加五轮来回，超过 `settle` 默认的 400ms 看门狗，报 ok=false。只给这一处放宽到 2000ms；默认值不动（别的场景靠它等到超时，整体改成 2000ms 会让文件从 7 秒变 12 秒）。改后单跑 30 次 0 失败，`verify:static` 全链 0 失败。产品代码不变。
+
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
 - **决定：** 10/4 21:5x 产品负责人定主原则「设备现场不需要工作人员，是自助的、自动的，这个是主要的」。
