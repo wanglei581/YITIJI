@@ -33,7 +33,7 @@ check(page.includes("import './job-fit-qx.css'"), '职业规划页必须导入�
 check(page.includes("import './resume-decision-qx.css'"), '职业规划页必须导入宿主 46 的四栏样式')
 check(!/careerPlan-(?:inkpaper|lightflow)\.css/.test(page), '职业规划页不得再导入 InkPaper / LightFlow 样式')
 check(!/KioskFullscreenShell|KioskPageFrame|service-desk/.test(page), '职业规划页不再混入旧壳与旧色系')
-check(page.includes('<JobFitStage>'), '职业规划页挂宿主 46 的共用舞台（1080×1920 定高 + 手机/横屏流式）')
+check(page.includes('<JobFitStage>'), '职业规划页挂宿主 46 的共用舞台（1080×1920 定高；手机流式，横屏电脑与一体机同缩放）')
 check((page.match(/<QxPageFrame/g) ?? []).length === 1, '全部状态共用一层 QxPageFrame，不按屏各挂一个壳')
 check(page.includes('data-kiosk-screen="resume-career-plan"'), '职业规划保留稳定 landmark')
 check(page.includes('data-state={screen}'), '职业规划把当前状态铺到 DOM 上供断言')

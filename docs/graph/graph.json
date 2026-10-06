@@ -12904,7 +12904,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 635,
+      "reachableFileCount": 636,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15880,7 +15880,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 729
+      "sourceFileCount": 730
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18999,6 +18999,7 @@
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/hooks/useKioskStageFit.ts": [
+      "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
     "apps/kiosk/src/hooks/useSmartCampusConfig.ts": [
@@ -19604,6 +19605,7 @@
       "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/kiosk/src/pages/legal/LegalDocPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
@@ -20397,6 +20399,7 @@
     ],
     "apps/kiosk/src/pages/resume/JobFitPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
+      "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
@@ -20589,6 +20592,9 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts": [
+      "apps/kiosk/scripts/verify-resume-decisions.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/resumeEntryTitles.ts": [
       "apps/kiosk/scripts/verify-resume-decisions.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts": [
@@ -28600,10 +28606,13 @@
           "apps/kiosk/scripts/lib/shell-chrome-contract.mjs",
           "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
           "apps/kiosk/src/components/kiosk-shell/KioskStageFit.tsx",
+          "apps/kiosk/src/hooks/useKioskStageFit.ts",
           "apps/kiosk/src/index.css",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/layouts/KioskRuntimeRoot.tsx",
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
+          "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
+          "apps/kiosk/src/pages/resume/JobFitPage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-route-cases.ts",
@@ -31037,6 +31046,7 @@
           "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/resumeEntryTitles.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts"
         ],
         "missing": []
