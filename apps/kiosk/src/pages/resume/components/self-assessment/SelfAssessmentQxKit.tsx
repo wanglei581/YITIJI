@@ -50,6 +50,7 @@ export function SaFrame({
   ask,
   doing,
   rail,
+  steps,
   gate,
   back,
   ctabar,
@@ -66,6 +67,8 @@ export function SaFrame({
   doing: ReactNode
   /** 底部一行不可关闭的边界声明。 */
   rail: readonly string[]
+  /** 英雄区三步。文案由调用方传入，本文件不写业务句子。 */
+  steps?: readonly { n: string; text: string }[]
   /**
    * 「这一步能不能往下走、为什么」那一条。它**不进滚动区**：
    * 说明页的同意条款把一屏撑满之后，闸门条会被顶到折线以下 —— 1080×1920 实测过，
@@ -111,6 +114,11 @@ export function SaFrame({
                 <p className="sa-xq-doing">{doing}</p>
               </div>
             </div>
+            {steps && steps.length > 0 ? (
+              <ol className="sa-steps">
+                {steps.map((step) => <li key={step.n}><b>{step.n}</b>{step.text}</li>)}
+              </ol>
+            ) : null}
           </section>
 
           <div className="qx-scroll">{children}</div>
@@ -170,14 +178,14 @@ export function SaChips({ items }: { items: readonly { key: string; text: ReactN
 export function SaFlow({
   items,
 }: {
-  items: readonly { key: string; step: string; title: string; desc: string; current?: boolean }[]
+  items: readonly { key: string; step: string; title?: string; desc: string; current?: boolean }[]
 }) {
   return (
     <div className="sa-flow">
       {items.map((item) => (
         <div key={item.key} data-current={item.current ? 'true' : undefined}>
           <small>{item.step}</small>
-          <b>{item.title}</b>
+          {item.title ? <b>{item.title}</b> : null}
           <p>{item.desc}</p>
         </div>
       ))}
@@ -372,10 +380,16 @@ export function SaConfirmOverlay({
   )
 }
 
-/** 稿的 `.mini`：键值对。值缺失时由调用方传出「服务端未返回」的原话，不留空。 */
-export function SaMeta({ items }: { items: readonly { key: string; label: string; value: ReactNode; mono?: boolean }[] }) {
+/** 稿的 `.mini`：键值对。值缺失时由调用方传出「服务端未返回」的原话，不留空。三列只给拦截态的状态格。 */
+export function SaMeta({
+  cols = 2,
+  items,
+}: {
+  cols?: 2 | 3
+  items: readonly { key: string; label: string; value: ReactNode; mono?: boolean }[]
+}) {
   return (
-    <dl className="sa-meta">
+    <dl className="sa-meta" data-cols={cols === 3 ? '3' : undefined}>
       {items.map((item) => (
         <div key={item.key}>
           <dt>{item.label}</dt>

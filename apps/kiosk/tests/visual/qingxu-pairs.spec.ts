@@ -207,6 +207,12 @@ async function capturePair(
         sessionStorage.setItem('s16.scan.workbench.v1', JSON.stringify({ v: 1, step: 'waiting-delivery', scanType: 'resume' }))
       })
     }
+    if (target.protoStorage) {
+      const storage = target.protoStorage
+      await protoPage.addInitScript((items) => {
+        for (const [key, value] of Object.entries(items)) sessionStorage.setItem(key, value)
+      }, storage)
+    }
     await protoPage.goto(`${protoOrigin}/${target.file}${target.protoQuery}`, { waitUntil: 'load', timeout: 20_000 })
     if (target.waitProtoState) {
       await protoPage.locator(`[data-state="${target.state}"]`).waitFor({ state: 'visible', timeout: 12_000 }).catch(() => undefined)

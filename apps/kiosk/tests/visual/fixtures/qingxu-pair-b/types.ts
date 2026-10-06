@@ -8,6 +8,8 @@ export interface ResumePagesPlan {
   reason: string | null
   marker: string | null
   runtimePath: string | null
+  /** 截原稿前写入的 sessionStorage。值已是字符串，稿用它落到真实态，而不是拦截态。 */
+  protoStorage?: Record<string, string>
 }
 
 export interface ResumePageExtraPair {

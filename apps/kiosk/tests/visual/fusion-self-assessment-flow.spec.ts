@@ -77,6 +77,20 @@ function collectRuntimeErrors(page: Page): string[] {
   return errors
 }
 
+/** 叶子法：滚动列里相邻块、以及最后一块到列底的空隙，取最大的一条。整行 ≥160 不算排满。 */
+async function columnGap(page: Page, state: string): Promise<number> {
+  return page.locator(`.sa-qx[data-state="${state}"] .qx-scroll`).evaluate((scroll) => {
+    const kids = [...scroll.children].filter((el) => (el as HTMLElement).getBoundingClientRect().height > 8)
+    const rects = kids.map((el) => el.getBoundingClientRect())
+    const box = scroll.getBoundingClientRect()
+    const gaps: number[] = []
+    if (rects[0]) gaps.push(Math.max(0, rects[0].top - box.top))
+    for (let i = 1; i < rects.length; i += 1) gaps.push(Math.max(0, rects[i].top - rects[i - 1].bottom))
+    if (rects.length) gaps.push(Math.max(0, box.bottom - rects[rects.length - 1].bottom))
+    return gaps.length ? Math.max(...gaps) : box.height
+  })
+}
+
 test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
   test('§1.4 三方 taskId 一致 + §1.7 summary 不注入 LLM @kiosk', async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)
@@ -304,5 +318,49 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     await expect(page.getByText(submissionData.summary)).toBeVisible()
     expect(bodies.map((b) => b.consent?.consentVersion)).toEqual(['sa-consent-v1.2026-08-16', CURRENT_SELF_ASSESSMENT_CONSENT_VERSION])
     expect(api.requestCount('POST', '/api/v1/resume/self-assessment')).toBe(2)
+  })
+
+  test('拦截态写明原因和当前状态，底栏两个按钮等宽 @w3-kiosk', async ({ page, api }) => {
+    registerSelfAssessmentApi(api, page)
+    await page.goto('/resume/self-assessment/questions')
+    const quiz = page.locator('[data-kiosk-screen="resume-self-assessment-quiz"]')
+    await expect(quiz).toHaveAttribute('data-state', 'recover-consent')
+    await expect(page.getByText('还不能进入作答')).toBeVisible()
+    await expect(page.getByText('为什么会这样')).toBeVisible()
+    await expect(page.getByText('这次作答现在的状态')).toBeVisible()
+    await expect(page.getByText('不显示你打开的链接参数内容')).toBeVisible()
+    await expect(page.getByText('尚未确认，不能开始作答。')).toBeVisible()
+    const widths = await page.locator('.qx-ctabar > .qx-btn, .qx-ctabar > .sa-guarded').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width))
+    expect(widths).toHaveLength(2)
+    expect(Math.abs(widths[0] - widths[1])).toBeLessThan(8)
+    expect(await columnGap(page, 'recover-consent')).toBeLessThan(160)
+
+    await page.goto('/resume/self-assessment/result')
+    await expect(page.locator('[data-kiosk-screen="resume-self-assessment-result"]')).toHaveAttribute('data-state', 'result-empty')
+    await expect(page.getByText('还没有可查看的完成结果')).toBeVisible()
+    await expect(page.getByText('答满并提交之后，这一页会列出')).toBeVisible()
+    await expect(page.getByText('不显示你打开的链接参数内容')).toBeVisible()
+    expect(await columnGap(page, 'result-empty')).toBeLessThan(160)
+
+    await page.addInitScript(({ key, value }) => {
+      sessionStorage.setItem(key, JSON.stringify(value))
+    }, {
+      key: 'self_assessment_session_v1',
+      value: {
+        answers: {},
+        consent: { nonSensitive: true, sensitive: false },
+        consentVersion: CURRENT_SELF_ASSESSMENT_CONSENT_VERSION,
+        result: {
+          taskId: 'sa-20261006-7f3c91',
+          status: 'completed',
+          dimensions: [],
+          summary: null,
+          expiresAt: '2026-10-07T09:30:00.000Z',
+        },
+      },
+    })
+    await page.goto('/resume/self-assessment/questions')
+    await expect(quiz).toHaveAttribute('data-state', 'recover-submitted')
+    await expect(page.getByRole('heading', { name: '本次作答已经提交' }).or(page.getByText('本次作答已经提交'))).toBeVisible()
   })
 })

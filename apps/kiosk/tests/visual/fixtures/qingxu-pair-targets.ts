@@ -132,6 +132,8 @@ export interface QingxuPairTarget {
   waitProtoState: boolean
   /** 截原稿前写入 sessionStorage，让稿自己落到 session-lost。 */
   protoSessionLost: boolean
+  /** 截原稿前写入的 sessionStorage。空对象表示这一对不额外播种。 */
+  protoStorage: Record<string, string> | null
   route: string | null
   runtimeUrl: string | null
   readyMarker: string | null
@@ -806,6 +808,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
         protoQuery: withoutCaptureFor(file, pair.protoQuery ?? queryFor(pair.axis, pair.screen, pair.state, extra)),
         waitProtoState: Boolean(pair.waitProtoState),
         protoSessionLost: Boolean(pair.protoSessionLost),
+        protoStorage: priority && 'protoStorage' in priority ? (priority.protoStorage ?? null) : null,
         route: runtimeRoute,
         runtimeUrl: decided.plan.kind === 'none' ? null : (priority?.runtimePath ?? runtimeUrlFor(runtimeRoute)),
         readyMarker: decided.plan.kind === 'none' ? null : marker,

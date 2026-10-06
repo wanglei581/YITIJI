@@ -101,14 +101,21 @@ import {
   type SaStatus,
 } from './components/self-assessment/SelfAssessmentQxKit'
 import { SaConsentBox, SaConsentLinkedCheck, SaConsentList } from './components/self-assessment/SelfAssessmentConsentKit'
+import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 
-/** 稿底部那一行不可关闭的边界声明，四个页面共用。 */
-const SA_RAIL = ['结果仅供自我参考', '不评分不排名', '不替代能力证明'] as const
+/** 稿底部那一行不可关闭的边界声明，四个页面共用。9/29 定稿把「不评分」写成「不打总分」。 */
+const SA_RAIL = ['结果仅供自我参考', '不打总分不排名', '不替代能力证明'] as const
 const SA_EYEBROW = '自我探索'
 const SA_TITLE = '自我探索 · 倾向参考'
+/** 英雄区三步，四条路由都有。二十五是 v1 题库题数，敏感题为 0。 */
+const SA_STEPS = [
+  { n: '1', text: '先读说明，勾选后再开始' },
+  { n: '2', text: '二十五道题，按平时的习惯选' },
+  { n: '3', text: '带走强弱和 AI 解读，可打印' },
+] as const
 /** 四条路由共用的固定壳 props：标题、域标识与底部边界声明逐页相同。 */
-const SA_FRAME_BASE = { title: SA_TITLE, eyebrow: SA_EYEBROW, rail: SA_RAIL } as const
+const SA_FRAME_BASE = { title: SA_TITLE, eyebrow: SA_EYEBROW, rail: SA_RAIL, steps: SA_STEPS } as const
 /** 返回口：稿的返回键指向「简历服务」服务台，不是浏览器历史（一体机没有后退键）。 */
 const SA_BACK_ROUTE = '/resume-service'
 
@@ -150,9 +157,48 @@ function GuardedButton({
   )
 }
 
-function GhostButton({ label, route, onClick }: { label: string; route?: string; onClick: () => void }) {
+function GhostButton({ label, route, testId, onClick }: { label: string; route?: string; testId?: string; onClick: () => void }) {
   return (
-    <button type="button" className="qx-btn" data-variant="ghost" data-route={route} onClick={onClick}>{label}</button>
+    <button type="button" className="qx-btn" data-variant="ghost" data-route={route} data-testid={testId} onClick={onClick}>{label}</button>
+  )
+}
+
+/** 底栏「问小青」：整颗等宽按钮，进顾问页，不在这里编一句假答复。 */
+function askXiaoqing(go: NavigateFunction) {
+  rememberAssistantDraft('我想了解这次自我探索的选择能怎么用，以及强弱和解读分别代表什么。')
+  go('/assistant')
+}
+
+/** 拦截态中间三格。数字来自这次作答，不写死成「已完成」。 */
+function saNow(consented: boolean, done: number, total: number, submitted: boolean) {
+  return [
+    { key: 'consent', label: '是否已确认说明', value: consented ? '已确认，可以作答。' : '尚未确认，不能开始作答。' },
+    { key: 'done', label: '已作答题数', value: `${done} / ${total} 题${total > 0 && done >= total ? '，已答满。' : '，未答满不进入确认。'}` },
+    { key: 'submit', label: '是否已提交', value: submitted ? '已提交，可查看结果。' : '未提交，不生成任何结果。' },
+  ]
+}
+
+function SaWhy({ facts }: { facts: readonly { key: string; step: string; desc: string; current?: boolean }[] }) {
+  return (
+    <SaCard head="为什么会这样" hint="三条都可核对">
+      <SaFlow items={facts} />
+    </SaCard>
+  )
+}
+
+function SaNowCard({ consented, done, total, submitted }: { consented: boolean; done: number; total: number; submitted: boolean }) {
+  return (
+    <SaCard head="这次作答现在的状态" hint="页面按这次作答如实显示">
+      <SaMeta cols={3} items={saNow(consented, done, total, submitted)} />
+    </SaCard>
+  )
+}
+
+function SaParamNotice() {
+  return (
+    <SaNotice>
+      <b>不显示你打开的链接参数内容。</b>这里只说明是哪一类前置条件没满足，不回显参数原值。
+    </SaNotice>
   )
 }
 
@@ -235,7 +281,7 @@ export function SelfAssessmentIntroPage() {
       state={!bundle ? (consentBundle.state.status === 'error' ? 'intro-consent-error' : 'intro-consent-loading') : ok ? 'intro-ready' : 'intro-consent-pending'}
       status={status}
       ask={<>把职业倾向，<em>说得更明白</em>。</>}
-      doing={<>{total} 道选择题，覆盖 {dimCount} 个方向；<b>不评分、不排名，结果只给你自己看。</b></>}
+      doing={<>{total} 道选择题，覆盖 {dimCount} 个方向；<b>算出各方向的强弱，不打总分、不排名，只给你自己看。</b></>}
       back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
       gate={
         <SaGate tone={ok ? 'ok' : 'warn'}>
@@ -250,6 +296,7 @@ export function SelfAssessmentIntroPage() {
       }
       ctabar={
         <>
+          <GhostButton label="问小青" testId="self-assessment-ask" onClick={() => askXiaoqing(navigate)} />
           <GhostButton label="返回简历服务" route={SA_BACK_ROUTE} onClick={() => navigate(SA_BACK_ROUTE)} />
           <GuardedButton variant="primary" testId="self-assessment-primary" onClick={start}
             blockedReason={!bundle ? '同意说明还没有读到，读到并勾选后才能开始' : ok ? null : '需先勾选第一项同意才能开始作答'}>{startLabel}</GuardedButton>
@@ -262,7 +309,7 @@ export function SelfAssessmentIntroPage() {
             { key: 'count', text: <><b>{total}</b> 道选择题</> },
             { key: 'dims', text: <>覆盖 <b>{dimCount}</b> 个方向</> },
             { key: 'back', text: '随时可返回修改' },
-            { key: 'norank', text: '不评分、不排名' },
+            { key: 'norank', text: '不打总分、不排名' },
           ]}
         />
         <p className="sa-sub">
@@ -271,15 +318,12 @@ export function SelfAssessmentIntroPage() {
         </p>
       </SaCard>
 
-      <SaCard head="这一页里，哪部分是 AI" hint="分工写在前面，不等结果出来才说">
-        <p className="sa-sub" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <AiCapabilityChip tone="ai" />
-          <span>记分不经过 AI，解读才经过 AI。</span>
-        </p>
+      <SaCard head="你会经历哪三步" hint="每一步都要你自己确认">
         <SaFlow
           items={[
-            { key: 'e2', step: '记分 · 不经过 AI', title: '维度强度与依据题号', current: true, desc: `${dimCount} 个方向的强度由固定权重算出，依据只有你自己的选择 —— AI 不可用时照样出。` },
-            { key: 'e3', step: '解读 · 由 AI 生成', title: `${dimCount} 段陈述式解读`, desc: '它不打分、不排名，也不说你适合或不适合哪类岗位；AI 不可用时会如实缺，不拿别的东西顶上。' },
+            { key: 's1', step: '第 1 步', title: '逐题作答', current: true, desc: `${total} 道选择题分属${bank.dimensions.map((d) => d.label).join(' / ')}，一次一题，可随时回上一题改。` },
+            { key: 's2', step: '第 2 步', title: '提交前确认', desc: `答满 ${total} 题后，先按方向看一遍你的选择，再决定是否提交。` },
+            { key: 's3', step: '第 3 步', title: '看结果、可打印', desc: '强弱按固定规则算出，AI 写解读，仅供参考。' },
           ]}
         />
       </SaCard>
@@ -316,6 +360,19 @@ export function SelfAssessmentIntroPage() {
           <p className="sa-sub" role="status">正在读取这次要确认的说明。读到之前不显示任何条款，也不能勾选。</p>
         </SaCard>
       )}
+
+      <SaCard head="这一页里，哪部分是 AI" hint="分工写在前面，不等结果出来才说">
+        <p className="sa-sub" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <AiCapabilityChip tone="ai" />
+          <span>记分不经过 AI，解读才经过 AI。</span>
+        </p>
+        <SaFlow
+          items={[
+            { key: 'e2', step: '记分 · 不经过 AI', title: '维度强度与依据题号', current: true, desc: `${dimCount} 个方向的强度由固定权重算出，依据只有你自己的选择 —— AI 不可用时照样出。` },
+            { key: 'e3', step: '解读 · 由 AI 生成', title: `${dimCount} 段陈述式解读`, desc: '它不打分、不排名，也不说你适合或不适合哪类岗位；AI 不可用时会如实缺，不拿别的东西顶上。' },
+          ]}
+        />
+      </SaCard>
 
       <SaNotice>
         <b>本页是自我探索，不是心理、临床或能力测评。</b>它不会参与岗位排序，也不会把你的答案提供给企业或合作机构。
@@ -399,7 +456,27 @@ export function SelfAssessmentQuizPage() {
    * 两个 fail-closed 拦截面（稿 recover-consent / recover-submitted）。
    * 共用一套版式：说清「为什么不放行」+「已有的东西不会被动」+ 两个真出口。
    * 它们不是错误提示 —— 这一步本来就有前置条件，所以不用红色错误块，用 down 卡。
+   * 条数不写死：说明页渲染的是这次下发的条款，这里只说「每一条」，避免和条数对不上。
    */
+  const emptyBank = consentOk && flat.length === 0
+  const staleConsent = !consentOk && session.resubmitAfterConsent === true
+  const consentFacts = emptyBank
+    ? [
+        { key: 'f1', step: '事实 1', desc: '当前题目集是空的，没有可以作答的题。', current: true },
+        { key: 'f2', step: '事实 2', desc: '说明已经确认，但没有题目就不能进入作答。' },
+        { key: 'f3', step: '事实 3', desc: '不会补一套题目，也不会跳过这一步。' },
+      ]
+    : staleConsent
+      ? [
+          { key: 'f1', step: '事实 1', desc: '说明已经更新，这次作答里的确认不再算数。', current: true },
+          { key: 'f2', step: '事实 2', desc: `你已答的 ${done} 题都还在，确认后会自动重新提交，不用重答。` },
+          { key: 'f3', step: '事实 3', desc: '不会因为你直接打开答题链接就当作已按新说明同意。' },
+        ]
+      : [
+          { key: 'f1', step: '事实 1', desc: '这次作答里没有「已确认说明」的记录。', current: true },
+          { key: 'f2', step: '事实 2', desc: '说明里的每一条前提，都要读完并勾选后才开始作答。' },
+          { key: 'f3', step: '事实 3', desc: '不会因为你直接打开答题链接就当作已同意。' },
+        ]
   const blocked = !consentOk || flat.length === 0
     ? {
         state: 'recover-consent',
@@ -408,6 +485,7 @@ export function SelfAssessmentQuizPage() {
         doing: <>这一步需要先在说明页确认。<b>页面不会跳过这一步，也不会补一个假结果给你看。</b></>,
         head: '还不能进入作答',
         hint: '这一步本来就有前置条件',
+        facts: consentFacts,
         chips: [
           { key: 'blocked', text: <>当前入口<b>不放行</b></>, tone: 'warn' as const },
           { key: 'keep', text: '已有作答不会被清空' },
@@ -425,10 +503,15 @@ export function SelfAssessmentQuizPage() {
       ? {
           state: 'recover-submitted',
           pill: '本次已提交',
-          ask: <>本次作答<em>已经提交</em>。</>,
-          doing: <>已提交的答案不再改动。<b>想换答案就重新开始一次新的作答。</b></>,
-          head: '答题页已关闭',
-          hint: '这次办理已提交',
+          ask: <>这一步<em>还打不开</em>。</>,
+          doing: <>已提交的答案不再改动。<b>页面不会跳过这一步，也不会补一个假结果给你看。</b></>,
+          head: '本次作答已经提交',
+          hint: '已提交的答案不再改动',
+          facts: [
+            { key: 'f1', step: '事实 1', desc: `本次 ${total} 题已提交，答题页不再打开以免答案与提交不一致。`, current: true },
+            { key: 'f2', step: '事实 2', desc: '可以回完成页查看这次的结果。' },
+            { key: 'f3', step: '事实 3', desc: '想换答案就重新开始一次新的作答。' },
+          ],
           chips: [
             { key: 'blocked', text: <>答题入口<b>不放行</b></>, tone: 'warn' as const },
             { key: 'kept', text: '本次结果仍可查看' },
@@ -446,10 +529,10 @@ export function SelfAssessmentQuizPage() {
         {...SA_FRAME_BASE}
         screen="resume-self-assessment-quiz"
         state={blocked.state}
-          status={{ tone: 'warn', label: blocked.pill }}
-          ask={blocked.ask}
+        status={{ tone: 'warn', label: blocked.pill }}
+        ask={blocked.ask}
         doing={blocked.doing}
-          back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
+        back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
         ctabar={
           <>
             <GhostButton label={blocked.secondary.label} route={blocked.secondary.route} onClick={blocked.secondary.onClick} />
@@ -461,9 +544,12 @@ export function SelfAssessmentQuizPage() {
           <SaChips items={blocked.chips} />
           <p className="sa-sub">{blocked.body}</p>
         </SaCard>
+        <SaWhy facts={blocked.facts} />
+        <SaNowCard consented={consentOk} done={done} total={total} submitted={Boolean(session.result)} />
         <SaCard head="现在可以做什么" hint="都是现在就能打开的入口">
           <SaPicks items={saExits(navigate, '/resume/self-assessment/questions', consentOk && !alreadySubmitted)} />
         </SaCard>
+        <SaParamNotice />
       </SaFrame>
     )
   }
@@ -580,13 +666,14 @@ export function SelfAssessmentQuizPage() {
             { key: 'left', text: <>还剩 <b>{total - done}</b> 题</> },
             { key: 'dim', text: <>方向 <b>{current.dimLabel}</b></> },
             { key: 'notimer', text: '没有倒计时' },
+            { key: 'back', text: '可返回修改' },
           ]}
         />
       </SaCard>
 
       <SaCard head={<span className="sa-qnum">第 {cursor} 题<em>{current.dimLabel}</em></span>}>
         <h2 className="sa-question" id="self-assessment-prompt" data-testid="self-assessment-prompt">{current.prompt}</h2>
-        <p className="sa-qhint">选你平时更舒服的那一项，不用揣摩哪个答案更好；选完还可以改。这一页不打分、不排名。</p>
+        <p className="sa-qhint">选你平时更舒服的那一项，不用揣摩哪个答案更好；选完还可以改。</p>
         <div className="sa-answers" role="radiogroup" aria-labelledby="self-assessment-prompt" data-testid="self-assessment-list">
           {current.choices.map((c) => (
             <button
@@ -794,6 +881,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
     hasResult: hasInterpretation,
   })
 
+  const live = progress(questionsFor(session.consent.sensitive === true), session.answers)
   if (!result || !taskId || !dimensions) {
     const failure = taskError ?? (malformed ? '这次返回的结果缺少维度数据，本页不展示不完整结果。' : null)
     const state = inflight === 'submit' ? 'submitting' : inflight === 'fetch' ? 'fetching' : failure ? 'result-error' : 'result-empty'
@@ -808,12 +896,12 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         screen="resume-self-assessment-result"
         state={state}
           status={status}
-          ask={inflight ? <>请稍候，<em>这一步还在等结果</em>。</> : failure ? <>这次<em>没能拿到结果</em>。</> : <>还没有<em>可查看的结果</em>。</>}
+          ask={inflight ? <>请稍候，<em>这一步还在等结果</em>。</> : failure ? <>这次<em>没能拿到结果</em>。</> : <>这一步<em>还打不开</em>。</>}
         doing={inflight
           ? <>页面不设倒计时，也不会自己变成「完成」；<b>只有系统真实返回才会换屏。</b></>
           : failure
             ? <>失败原因写在下面。<b>页面不会用别的东西顶上，也不会假装已完成。</b></>
-            : <>完成页只在本次答满并提交后才有内容。<b>直接打开这个地址不会补一个结果给你看。</b></>}
+            : <>这次作答没有「答满并提交」的标记。<b>页面不会跳过这一步，也不会补一个假结果给你看。</b></>}
           back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
         ctabar={
           <>
@@ -852,21 +940,39 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
             </SaCard>
           }
           idle={
-            <SaCard head="暂无最近结果" hint="不是没加载出来，是本来就不存" tone="down">
+            <SaCard head="还没有可查看的完成结果" hint="这次作答没有「答满并提交」的标记" tone="down" testId="self-assessment-recover">
               <SaChips
                 items={[
-                  { key: 'none', text: <>这次办理<b>没有已提交的作答</b></>, tone: 'warn' },
-                  { key: 'ttl', text: '结果只在本机保留 24 小时' },
-                  { key: 'noguess', text: '不补一个示例结果' },
+                  { key: 'none', text: <>当前入口<b>不放行</b></>, tone: 'warn' },
+                  { key: 'keep', text: '已有作答不会被清空' },
+                  { key: 'noguess', text: '不生成任何结果' },
                 ]}
               />
-              <p className="sa-sub">请先完成作答；结果只在本机保留 24 小时，过期会自动清理。</p>
+              <p className="sa-sub">这不是错误提示，而是这一步本来就有前置条件。结果只在本机保留 24 小时，过期会自动清理。按下面任意一个出口继续即可。</p>
             </SaCard>
           }
         />
+        {state === 'result-empty' ? (
+          <>
+            <SaWhy facts={[
+              { key: 'f1', step: '事实 1', desc: `完成页只在本次 ${live.total} 题答满并明确提交后才显示。`, current: true },
+              { key: 'f2', step: '事实 2', desc: '直接打开完成页的链接不会放行，也不会补一个结果给你看。' },
+              { key: 'f3', step: '事实 3', desc: '之前的作答如果还在，可以接着答完再提交。' },
+            ]} />
+            <SaNowCard consented={consentOk} done={live.done} total={live.total} submitted={false} />
+            <SaCard head="答满并提交之后，这一页会列出" hint="现在没有这些内容，也不展示示例">
+              <SaFlow items={[
+                { key: 'cov', step: '会列出', title: '五个方向的强弱', current: true, desc: '按固定规则从你的选择算出，不经过 AI。现在没有作答，这里不显示数字。' },
+                { key: 'read', step: '会列出', title: 'AI 解读', desc: '只在真的生成之后出现。这次没有提交，不会写一段看起来像结论的话。' },
+                { key: 'print', step: '会列出', title: '打印与撤回', desc: '生成 PDF、送到打印工作台，或撤回这一次，都要等结果真实存在。' },
+              ]} />
+            </SaCard>
+          </>
+        ) : null}
         <SaCard head="现在可以做什么" hint="都是现在就能打开的入口">
           <SaPicks items={saExits(navigate, '/resume/self-assessment/result', false)} />
         </SaCard>
+        {state === 'result-empty' ? <SaParamNotice /> : null}
       </SaFrame>
     )
   }
@@ -968,16 +1074,26 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       screen="resume-self-assessment-result"
       state={aiFailed ? 'result-ai-down' : 'result-ready'}
       status={aiFailed ? { tone: 'warn', label: 'AI 解读缺失' } : { tone: 'ok', label: '本次结果已生成' }}
-      ask={<>本次作答<em>已完成并提交</em>。</>}
-      doing={<>本页只陈述本次作答的倾向参考。<b>不评分、不排名，不生成人格类型，也不判断适不适合某个岗位。</b></>}
+      ask={aiFailed ? <>强弱照常算出，<em>这次缺 AI 解读</em>。</> : <>本次 {live.total} 题<em>已完成并提交</em>。</>}
+      doing={aiFailed
+        ? <>AI 解读暂时不可用。<b>作答、强弱和依据都不经过 AI，照样能看、能打印；缺的只是解读文字。</b></>
+        : <>强弱按固定规则算出，解读由 AI 写，仅供参考。<b>不打总分、不排名、不贴类型，也不判断适不适合某个岗位。</b></>}
       back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
       ctabar={
         <>
-          <GhostButton label="查看记录" route="/resume/self-assessment/history" onClick={() => navigate('/resume/self-assessment/history')} />
-          <GuardedButton variant="teal" testId="self-assessment-print" onClick={() => void handlePrint()}
-            blockedReason={printing ? '正在生成 PDF，请稍候' : accessReason}>{printing ? '生成 PDF 中…' : '生成 PDF 预览'}</GuardedButton>
           <GuardedButton variant="danger" testId="self-assessment-withdraw" onClick={handleWithdraw}
             blockedReason={withdrawing ? '正在撤回，请稍候' : accessReason}>{withdrawing ? '撤回中…' : '撤回本次探索'}</GuardedButton>
+          {aiFailed && fallback.action ? (
+            <GhostButton
+              label={fallback.action.label.startsWith('重新作答') ? '重新作答' : fallback.action.label}
+              testId="self-assessment-retry"
+              onClick={fallback.action.onClick}
+            />
+          ) : (
+            <GhostButton label="问小青" testId="self-assessment-ask" onClick={() => askXiaoqing(navigate)} />
+          )}
+          <GuardedButton variant="teal" testId="self-assessment-print" onClick={() => void handlePrint()}
+            blockedReason={printing ? '正在生成 PDF，请稍候' : accessReason}>{printing ? '生成 PDF 中…' : '生成 PDF 预览'}</GuardedButton>
         </>
       }
     >
@@ -985,7 +1101,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         <SaChips
           items={[
             { key: 'dims', text: <>覆盖 <b>{dimensions.length}</b> 个方向</> },
-            { key: 'norank', text: '不评分、不排名' },
+            { key: 'norank', text: '不打总分、不排名' },
             { key: 'self', text: '仅本人可见' },
             aiFailed
               ? { key: 'ai', text: <>AI 解读<b>本次未生成</b></>, tone: 'warn' as const }
@@ -996,17 +1112,26 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           本结果基于本人作答的 {dimensions.length} 维度倾向，不含临床 / 心理 / 人格诊断；
           不代任何招聘结果、能力证明或心理评估；不向企业、合作机构或第三方推送。
         </p>
-        <SaMeta
-          items={[
-            { key: 'task', label: '记录编号', value: taskId, mono: true },
-            { key: 'consented', label: '同意时间', value: completedAt ?? '这台机器上的这次使用未记录' },
-            { key: 'version', label: '同意版本', value: session.consentVersion ?? '这台机器上的这次使用未记录（本次结果由记录编号读回）' },
-            { key: 'expires', label: '保留至', value: expiresAt ?? '未返回到期时间（撤回后或整体拒答时无到期）' },
-          ]}
-        />
       </SaCard>
 
-      {/* AI 只负责这一块，它挂了不影响下面的维度强度与依据题号。走到这里 result
+      <SaCard head="五个方向的倾向强弱" hint="按固定规则算出 · 不经过 AI">
+        <div className="sa-cov" data-testid="self-assessment-coverage">
+          {dimensions.map((d) => {
+            const label = SELF_ASSESSMENT_DIMENSIONS.find((dim) => dim.key === d.key)?.label ?? d.label
+            const di = SELF_ASSESSMENT_DIMENSIONS.findIndex((dim) => dim.key === d.key)
+            const start = di >= 0 ? di * 5 + 1 : 0
+            return (
+              <div key={d.key}>
+                <small>{label}</small>
+                <b>强度 {d.strength} / 5</b>
+                <p>{start > 0 ? `依据 ${start}–${start + 4} 题` : '依据 —'}</p>
+              </div>
+            )
+          })}
+        </div>
+      </SaCard>
+
+      {/* AI 只负责这一块，它挂了不影响上面的强弱和下面的依据题号。走到这里 result
           一定在手，四态只可能是 done / failed，running / idle 由上一支负责。 */}
       <AiTaskRegion task={task} label="AI 陈述式解读" className="sa-ai-region" fallback={fallback}>
         <SaCard head="整体解读" hint={<AigcMark />}>
@@ -1019,7 +1144,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         </SaCard>
       </AiTaskRegion>
 
-      <SaCard head="维度强度与依据" hint="这一块不经过 AI">
+      <SaCard head="每个方向的依据与解读" hint="这一块的强度不经过 AI">
         <p className="sa-sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <EvidenceBadge level="E2" />
           <span>
@@ -1031,6 +1156,28 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         <div className="sa-dims">
           {dimensions.map((d) => <DimensionCard key={d.key} d={d} aiFailed={aiFailed} />)}
         </div>
+      </SaCard>
+
+      <SaCard head="这次留下的记录" hint="仅供本人核对，不是完成证明">
+        <SaMeta
+          items={[
+            { key: 'task', label: '记录编号', value: taskId, mono: true },
+            { key: 'consented', label: '同意时间', value: completedAt ?? '这台机器上的这次使用未记录' },
+            { key: 'version', label: '同意版本', value: session.consentVersion ?? '这台机器上的这次使用未记录（本次结果由记录编号读回）' },
+            { key: 'expires', label: '保留至', value: expiresAt ?? '未返回到期时间（撤回后或整体拒答时无到期）' },
+          ]}
+        />
+      </SaCard>
+
+      <SaCard head="接下来可以做什么" hint="都是现在就能打开的功能">
+        <SaPicks cols={3} items={[
+          { key: 'ask', icon: '青', title: '问小青怎么用这些偏好', desc: '把这次的选择说给小青，整理成能写进简历的话。', lead: true, route: '/assistant', onClick: () => askXiaoqing(navigate) },
+          { key: 'interview', icon: '练', title: '做一次模拟面试', desc: '把偏好换成能说出口的表达，练完可以复盘。', route: '/interview?stage=setup', onClick: () => navigate('/interview?stage=setup') },
+          { key: 'hub', icon: '简', title: '回简历服务', desc: '改简历、生成材料或安排打印，按各自页面的实际状态确认。', route: SA_BACK_ROUTE, onClick: () => navigate(SA_BACK_ROUTE) },
+          { key: 'choices', icon: '查', title: `查看本次 ${live.total} 个选择`, desc: '提交后答题页不再打开，以免和已提交的结果不一致。点这里会说明原因。', route: '/resume/self-assessment/questions', onClick: () => navigate('/resume/self-assessment/questions') },
+          { key: 'history', icon: '录', title: '查看评估记录', desc: '看这台机器上的这次记录；已登录的也记在「我的」里。', route: '/resume/self-assessment/history', onClick: () => navigate('/resume/self-assessment/history') },
+          { key: 'records', icon: '我', title: '去 AI 服务记录', desc: '已登录时，结果在这里保留 24 小时。', route: '/me/ai-records', onClick: () => navigate('/me/ai-records') },
+        ]} />
       </SaCard>
 
       {error ? (
@@ -1106,6 +1253,9 @@ export function SelfAssessmentHistoryPage() {
   const consentedAt = formatDateTime(session.consentedAt)
   const expiresAt = formatDateTime(session.result?.expiresAt)
   const answered = session.result?.dimensions?.length ?? 0
+  const bank = useMemo(() => questionsFor(session.consent.sensitive === true), [session.consent.sensitive])
+  const tally = progress(bank, session.answers)
+  const consented = hasRecordedConsent(session)
 
   return (
     <SaFrame
@@ -1158,6 +1308,21 @@ export function SelfAssessmentHistoryPage() {
           </p>
         </SaCard>
       )}
+
+      {current ? null : (
+        <SaCard head="有记录时这里显示什么" hint="会列出哪些内容，不是已有数据">
+          <SaMeta
+            cols={3}
+            items={[
+              { key: 'done', label: '完成情况', value: '是否五个方向都已算出。' },
+              { key: 'keep', label: '保留期限', value: '结果保留 24 小时，到期自动清理。' },
+              { key: 'next', label: '还能做什么', value: '回看结果、打印或撤回。' },
+            ]}
+          />
+        </SaCard>
+      )}
+
+      <SaNowCard consented={consented} done={tally.done} total={tally.total} submitted={Boolean(session.result)} />
 
       <SaCard head="这里没有什么" hint="每一条都可核对">
         <SaMeta
