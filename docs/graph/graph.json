@@ -12989,7 +12989,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 639,
+      "reachableFileCount": 646,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15397,6 +15397,7 @@
           "path": "/resume/optimize/compare",
           "styles": [
             "apps/kiosk/src/pages/resume/resume-optimize-compare.css",
+            "apps/kiosk/src/pages/resume/resume-optimize-overview-qx.css",
             "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15965,7 +15966,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 736
+      "sourceFileCount": 743
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
