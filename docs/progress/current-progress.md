@@ -1,5 +1,17 @@
 # 当前开发进度
 
+## 2026-10-06：终端程序接后台远程指令（分支 `claude/agent-remote-commands-1006`，本地提交 `85d616a63`，未推送）
+
+- **改了什么：** 心跳带上本进程启动时刻 `agentStartedAt`（进程启动时取一次，之后不变）。旧服务器开了字段白名单，不认识这个字段会回 400，终端会被看成离线。心跳若收到 400 且 `error.message` 或 `error.details` 指向 `agentStartedAt`，本进程停发该字段并立刻重发一次，日志记 `heartbeat: server does not accept agentStartedAt, disabled`。其他 400 仍按原来的失败处理。
+- **两种指令：** `restart_agent`、`clear_print_queue`。缺 id、认不出的类型、时间解析不了的，只记日志、不回执。同一条 id 只处理一次，一次只处理一条。过期回 `expired`。忙则回 `rejected_busy`，不执行。
+- **重启：** 不忙先回 `accepted`。回执成功后走现有的停止路径暂停队列，再以退出码 1 退出，交给 Windows 服务恢复策略拉起。回执失败不退出，领取闸门放开，下次心跳再处理。从回执发出到退出，不再领新单。
+- **清空：** 只删配置打印机上的全部作业，不按账号过滤，不碰别的打印机。删完再数一次，剩 0 回 `done`，否则回 `failed` 并带剩余个数。列或删失败时用最后一次读到的数，一次都没读到填 0。开着空闲暂停时清完仍保持暂停。非 Windows 不碰队列，回 `done` 且剩余 0。回执只有 `result` 和 `remainingJobs`。日志只记指令 id 前 8 位、类型、结果、数量。
+- **忙碌信号：** 扫描用 `scan-watcher.ts` 现成的 `inFlightPaths`（处理单个扫描件的整段，包含向服务端投递）。打印用本进程正在发出的领取请求，加上正在执行的打印任务。崩溃后留在本地库里的 `dispatching` / `spooled` 不单独算忙：下次领到同一单会报无法确认、不重打；若把这些旧行算忙，一次崩溃会把远程重启和清空一直拒绝掉。
+- **门禁：** `verify:remote-commands`（假后端，不建打印机）已挂进 `ci.yml`。`verify:remote-commands-windows`（两台本地端口打印机；清空只动配置的那台，含另一账号的作业；结束删掉测试打印机）已挂进 `windows-agent-installer.yml`。本机：Agent `tsc --noEmit` 退出 0；`package.json` 里全部 `verify*` 退出 0。其中 `verify:remote-commands-windows` 与 `verify:print-queue-residue-windows` 在 macOS 上打印 skipped 后退出 0，没有建打印机。`verify:scan-watcher`、`verify:task-reliability` 会临时改写源文件做反向变异，两条都跑完；跑完 `instance-lock.ts`、`scan-candidate-barrier.ts` 没有残留。仓库根 `verify-repository-integrity` 退出 0。项目图谱重新生成后 `--check` 通过，图谱文件没有变化。
+- **反向测试（先提交再改坏）：** 六条都让 `verify:remote-commands` 退出 1，然后 `git checkout` 还原。1 回执失败后仍然退出；2 忙的时候仍然清空（回执变成 `done`，期望是 `rejected_busy`）；3 全部作业分支按 SID 过滤；4 回执带上作业名；5 遇到指向 `agentStartedAt` 的 400 不降级（心跳返回失败）；6 `restart_agent` 回 `done` 而不是 `accepted`。还原后工作区干净。
+- **没验证：** 真 Windows 打印机没跑，真后端没跑。服务端（PR #1288 重启、#1303 清空队列，第八次 10/30）必须先于这个 Agent 上线。400 降级已经做了，旧服务器不会因为新字段把终端判离线。
+- 停放、隐藏、改名、降级：无。
+
 ## 2026-10-06：小青语音通话没声音也没字幕时，带用户回到文字对话（分支 `claude/kiosk-b-advisor-call-silent-fallback-1006`）
 
 - 问题：小青语音进房后，如果机器人没进房、语音合成出错或网络只通了一半，屏幕一直显示「通话中」，用户听不到声音也看不到字幕，只能干等。现场没有工作人员，必须自己把人带回文字对话。
