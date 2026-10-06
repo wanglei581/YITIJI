@@ -22,7 +22,8 @@ import { AuditService } from '../audit/audit.service'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
 import { CHANNEL_ACCEPTED_UNCONFIRMED_REASON } from './channel-accepted-signal'
-import { OrderStatusService, pickupCodeVisibleFor } from './order-status.service'
+import { OrderStatusService } from './order-status.service'
+import { arrivalViewForOrder } from '../print-jobs/self-service-reprint'
 import {
   ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES,
   ONLINE_PAID_PENDING_REFUND_REASON,
@@ -133,7 +134,7 @@ export interface PayStatusView {
   payChannel: string | null
   amountCents: number
   paidAt: string | null
-  /** 有哈希且按 pickupCodeVisibleFor 可见时才返回。现场单没有哈希，不下发。 */
+  /** 到机码。可取或可续打时解密下发；现场单没有哈希，为 null。不读明文列。 */
   pickupCode: string | null
   attempt: {
     attemptId: string
@@ -536,11 +537,7 @@ export class OnlinePaymentService {
       where: { orderId: order.id },
       orderBy: { createdAt: 'desc' },
     })
-    const visible = pickupCodeVisibleFor({
-      payStatus: order.payStatus,
-      taskStatus: order.taskStatus,
-      refundedAt: order.refundedAt,
-    })
+    const arrival = await arrivalViewForOrder(this.prisma, order)
     return {
       orderId: order.id,
       orderNo: order.orderNo,
@@ -549,7 +546,7 @@ export class OnlinePaymentService {
       payChannel: order.payChannel,
       amountCents: order.amountCents,
       paidAt: order.paidAt?.toISOString() ?? null,
-      pickupCode: visible && order.pickupCodeHash ? order.pickupCode : null,
+      pickupCode: arrival.pickupCode,
       attempt: latest
         ? {
             attemptId: latest.id,

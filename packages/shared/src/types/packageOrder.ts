@@ -18,7 +18,12 @@ export interface PackageOrderItem {
 export interface PackageOrderView {
   orderId: string
   orderNo: string
+  /** 到机码。可取，或失败后仍可续打时解密下发；否则 null。 */
   pickupCode: string | null
+  /** 绑定的那台终端此刻用同一个到机码能否把失败任务拉回待打印。 */
+  reprintAllowed: boolean
+  /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希，为 null。 */
+  reprintRemaining: number | null
   expiresAt: string | null
   pickupStatus: 'pending' | 'claimed' | 'used' | 'expired' | 'cancelled' | 'none'
   payStatus: OrderPayStatus

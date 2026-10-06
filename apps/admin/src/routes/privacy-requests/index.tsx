@@ -4,7 +4,7 @@ import { Drawer, ConsoleTable, StatusBadge } from '@ai-job-print/ui'
 import {
   ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT,
   ADMIN_DATA_REQUEST_REJECT_HINT,
-  MEMBER_DATA_REQUEST_SCOPE,
+  ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM as ADMIN_MEMBER_DATA_REQUEST_SCOPE,
 } from '@ai-job-print/shared'
 import { RefreshCwIcon, RotateCcwIcon, XCircleIcon } from 'lucide-react'
 import { Page } from '../Page'
@@ -239,7 +239,7 @@ export default function PrivacyRequestsPage() {
       }
     >
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
-        {MEMBER_DATA_REQUEST_SCOPE}
+        {ADMIN_MEMBER_DATA_REQUEST_SCOPE}
       </div>
       <p className="mb-4 text-[12.5px] text-neutral-500">{ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT}</p>
 
