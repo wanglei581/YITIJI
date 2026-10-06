@@ -1,5 +1,6 @@
 import { MemberClosureService } from './member-closure.service'
 import { MemberClosureRedisService } from './member-closure-redis.service'
+import { PersonalDataRetentionTask } from './personal-data-retention'
 import { Module } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
 import { AuthModule } from '../auth/auth.module'
@@ -37,7 +38,7 @@ const redisUrl = process.env['REDIS_URL']
     MemberDataExportController,
   ],
   providers: [
-    MemberClosureService, MemberClosureRedisService,
+    MemberClosureService, MemberClosureRedisService, PersonalDataRetentionTask,
     MemberPrivacyService,
     MemberDataRequestService,
     MemberDataExportMapper,
