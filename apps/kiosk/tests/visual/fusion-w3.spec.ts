@@ -13,6 +13,7 @@ import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
 import { mockAssistantVoice } from './fixtures/assistant-voice'
 import { chooseGenericResumeDirection, chooseTargetedResumeDirection, expectResumeDirectionUnselected, expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
+import { setReactRouterState } from './fixtures/fusion-w2-state'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -178,6 +179,7 @@ test('USB resume keeps its purpose and reaches AI parsing @w3-kiosk', async ({ p
   await chooseTargetedResumeDirection(page)
   await page.getByRole('button', { name: /U盘上传/ }).click()
   await page.getByRole('button', { name: /U盘简历\.pdf/ }).click()
+  await page.getByRole('button', { name: '继续：确认这次办理' }).click()
   await page.locator('.qx-rt-preview > summary').click()
   await expect(page.locator('[data-file-preview-kind="pdf"]')).toBeVisible()
   expect(uploadBody).toEqual({ safeId: 'usb-safe-resume', purpose: 'resume_upload' })
@@ -246,6 +248,7 @@ test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', 
   await expect(page.getByRole('button', { name: /my_pdf_resume\.jpg/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /too-large\.pdf/ })).toHaveCount(0)
   await page.getByRole('button', { name: /my_pdf_resume\.jpg/ }).click()
+  await page.getByRole('button', { name: '继续：确认这次办理' }).click()
   await page.locator('.qx-rt-preview > summary').click()
   const preview = page.locator('[data-file-preview-kind="image"]')
   await expect(preview).toBeVisible()
@@ -2628,7 +2631,9 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
   await page.getByRole('button', { name: /手机扫码/ }).click()
   await expect.poll(() => creates).toBe(1)
   try {
+    await page.getByRole('button', { name: '回到来源选择' }).click()
     await page.getByRole('button', { name: /本机文件/ }).click()
+    await page.getByRole('button', { name: '回到来源选择' }).click()
     await page.getByRole('button', { name: /手机扫码/ }).click()
   } finally {
     release()
@@ -2713,9 +2718,13 @@ test('T21a source screen follows the 2.0 order and the target workbench stays on
   const localCard = page.getByTestId('resume-local-file-card')
   await expect(localCard).toBeEnabled()
   await expect(localCard).not.toContainText(KIOSK_LOCAL_REASON)
-  const chooser = page.waitForEvent('filechooser')
   await localCard.click()
+  await expect(page.getByRole('button', { name: '打开文件选择' })).toBeVisible()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: '打开文件选择' }).click()
   await (await chooser).setFiles([])
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(root).toHaveAttribute('data-state', 'source')
 
   await page.getByRole('button', { name: '设置诊断方向与目标背景' }).click()
   await expect(root).toHaveAttribute('data-screen', 'target')
@@ -2869,4 +2878,124 @@ test('T21b confirm screen, pinned sendoff, industry label and first-screen exits
   expect(unknownText).not.toContain('工作人员')
   expect(unknownText).not.toContain('服务台')
   await expect(page.getByRole('button', { name: '找现场工作人员' })).toHaveCount(0)
+})
+
+async function routeT21cUsb(page: Page, mode: 'list' | 'read-failed' | 'offline'): Promise<void> {
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const origin = new URL(page.url()).origin
+    const headers = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers })
+      return
+    }
+    if (mode === 'offline') {
+      await route.abort('failed')
+      return
+    }
+    if (mode === 'read-failed') {
+      await route.fulfill({ status: 500, headers, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'USB_READ_FAILED', message: '读盘失败' } }) })
+      return
+    }
+    const path = new URL(request.url()).pathname
+    const present = true
+    if (path.endsWith('/status')) {
+      await route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify({ success: true, data: { present, driveLabel: 'RESUME' } }) })
+      return
+    }
+    await route.fulfill({
+      status: 200, headers, contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: { present, driveLabel: 'RESUME', files: [{ safeId: 't21c-sun', filename: '孙晓雯-仓储主管简历.pdf', extension: '.pdf', sizeBytes: 892_416 }] } }),
+    })
+  })
+}
+
+async function expectChannelHasNoStaff(page: Page): Promise<void> {
+  const text = withoutKnownStaffSentences(await page.locator('[data-kiosk-screen="resume-source"]').innerText())
+  expect(text).not.toContain('工作人员')
+  expect(text).not.toContain('服务台')
+  await expect(page.getByRole('button', { name: '找现场工作人员' })).toHaveCount(0)
+}
+
+test('T21c channel screens enter and return, and dead ends have an exit @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await routeT21cUsb(page, 'list')
+  await page.goto('/resume/source')
+  const root = page.locator('[data-kiosk-screen="resume-source"]')
+  await page.getByRole('button', { name: /U盘上传/ }).click()
+  await expect(root).toHaveAttribute('data-state', 'usb-list')
+  await expect(page.getByRole('button', { name: /孙晓雯-仓储主管简历\.pdf/ })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(root).toHaveAttribute('data-state', 'source')
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+
+  await page.unroute('http://127.0.0.1:9527/local/usb/**')
+  await routeT21cUsb(page, 'read-failed')
+  await page.getByRole('button', { name: /U盘上传/ }).click()
+  await expect(root).toHaveAttribute('data-state', 'usb-read-failed')
+  await expect(page.getByRole('button', { name: '重新读一次 U 盘' })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+
+  await page.getByRole('button', { name: /本机文件/ }).click()
+  await expect(root).toHaveAttribute('data-state', 'local-guide')
+  await expect(page.getByRole('button', { name: '打开文件选择' })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+
+  api.respond('POST', '/api/v1/upload-sessions', { status: 201, json: { success: true, data: {
+    sessionId: 't21c-phone', uploadUrl: '/upload/phone', uploadToken: 't21c-upload', controlToken: 't21c-control', expiresAt: '2099-01-01T00:00:00.000Z',
+  } } })
+  api.respond('GET', '/api/v1/upload-sessions/t21c-phone', { status: 200, json: { success: true, data: {
+    sessionId: 't21c-phone', status: 'expired', purpose: 'resume_upload', mode: 'temporary',
+    file: null, requiresKioskConfirmation: false, expiresAt: '2000-01-01T00:00:00.000Z',
+  } } })
+  await page.getByRole('button', { name: /手机扫码/ }).click()
+  await expect(root).toHaveAttribute('data-state', 'phone')
+  await expect(page.getByText('二维码已过期', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '刷新二维码' })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+
+  await setReactRouterState(page, '/resume/source', {
+    scanHandoff: {
+      fileId: 'file-t21c-scan',
+      file: { name: '孙晓雯-仓储主管简历.pdf', size: 892_416, format: 'pdf', fileUrl: '/w3-fixtures/sun-scan.pdf', mimeType: 'application/pdf' },
+    },
+  })
+  await expect(root).toHaveAttribute('data-state', 'scan-ready')
+  const scan = page.getByRole('region', { name: '扫描件交接' })
+  await expect(scan.getByText('扫描原件 · 由扫描工作台交接')).toBeVisible()
+  await expect(scan.getByText('孙晓雯-仓储主管简历.pdf', { exact: true })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await scan.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(root).toHaveAttribute('data-state', 'source')
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+  await expect(page.getByText('孙晓雯-仓储主管简历.pdf', { exact: true })).toHaveCount(0)
+})
+
+test('T21c usb offline screen keeps a way back to source choice @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await routeT21cUsb(page, 'offline')
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /U盘上传/ }).click()
+  const root = page.locator('[data-kiosk-screen="resume-source"]')
+  await expect(root).toHaveAttribute('data-state', 'usb-agent-offline')
+  await expect(page.getByRole('button', { name: '重试读 U 盘' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '改用手机扫码' })).toBeVisible()
+  const back = page.getByRole('button', { name: '回到来源选择' })
+  await expect(back).toHaveCount(1)
+  await expectChannelHasNoStaff(page)
+  await back.click()
+  await expect(root).toHaveAttribute('data-state', 'source')
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
 })
