@@ -1,5 +1,6 @@
 import { AiContentBlockedError } from '../llm/llm-guard'
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { contentBlockedException } from '../safety/content-blocked'
 import type {
   GeneratedResume,
   ResumeOptimizeModule,
@@ -376,7 +377,7 @@ export class LlmResumeOptimizeService {
         { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_optimize', forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {

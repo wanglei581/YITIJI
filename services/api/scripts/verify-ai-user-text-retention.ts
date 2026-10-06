@@ -194,6 +194,8 @@ const NO_TTL_REGISTRY: Record<string, string> = {
     '权益核销流水（机构发放的 AI 次数被用掉一次记一行），属财务与权益账，只有权益号、用途、数量与幂等键，无用户文本；随订单与权益流水的保留期走，不随 AI 会话 TTL 走',
   AiUsageMonthlySummary:
     '按月费用汇总，只存北京时间月份、功能、厂商、型号、状态、调用次数、已计量金额与未计量次数；不含会员、终端、机构或任何用户文本，长期保留，不随明细到期删除。',
+  AiSafetyTerm:
+    '只存类别、词条和开关，没有会员、终端或用户提问；种子在代码里，账号注销不删这张表。',
 }
 
 const writtenModels = new Map<string, string[]>()
