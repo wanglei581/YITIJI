@@ -43,3 +43,10 @@ test('后端中文 message 原样，已登记码走码表', () => {
     '保存失败，请检查后重试',
   )
 })
+
+test('后端返回的英文原文（如框架默认的 Forbidden resource）不透出，用兜底或状态码对应的中文', () => {
+  const forbidden = Object.assign(new Error('Forbidden resource'), { name: 'ApiHttpError', code: 'HTTP_403', status: 403 })
+  assert.equal(userMessageOf(forbidden, '没有权限执行这项操作'), '没有权限执行这项操作')
+  const server = Object.assign(new Error('Internal server error'), { name: 'ApiHttpError', code: 'HTTP_500', status: 500 })
+  assert.equal(userMessageOf(server, '兜底'), '服务暂时不可用，请稍后重试')
+})

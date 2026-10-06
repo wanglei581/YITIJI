@@ -70,7 +70,7 @@ function fromHttpFields(
 }
 
 export function userMessageOf(error: unknown, fallback: string): string {
-  if (isHttpError(error)) return fromHttpFields(error.code, error.message, error.status, fallback, true)
+  if (isHttpError(error)) return fromHttpFields(error.code, error.message, error.status, fallback, false)
   if (error instanceof TypeError) {
     if (NETWORK_TYPE_ERROR.test(error.message)) return CODE_MESSAGES.NETWORK_ERROR
     return fallback
