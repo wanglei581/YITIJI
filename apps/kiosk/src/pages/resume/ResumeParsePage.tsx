@@ -14,7 +14,7 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { AI_PUBLIC_QUOTA_EXCEEDED_COPY } from '../../services/api/userErrorMessage'
-import { aiErrorCodeOf, aiErrorMessageOf, isAiOutage } from '../../ai'
+import { AI_OUTAGE_CODES, aiErrorCodeOf, aiErrorMessageOf, isAiOutage } from '../../ai'
 import { inspectionSignalsEncrypted } from '../print/components/printPreviewKind'
 import {
   canonicalResumeParsePayload,
@@ -222,16 +222,20 @@ export function ResumeParsePage() {
     if (!samePerson(ownerId)) return
     if (result.status !== 'completed') {
       if (result.status === 'failed') {
+        const capability = typeof result.failCode === 'string' && AI_OUTAGE_CODES.has(result.failCode)
+        const reason = capability
+          ? 'AI 暂时不可用，你可以先打印原件或手动填写简历'
+          : (result.failReason ?? '简历解析未能完成，请重试')
         if (!result.taskId) {
-          navigateFail(result.failReason ?? '简历解析未能完成，请重试')
+          navigateFail(reason, undefined, capability, result.failCode)
           return
         }
         // 凭证已在上面写后读回。同一次意图清掉之后，报告页「重新解析」才会铸新的一对请求头。
         if (!await dropHeldIntent(ownerId, '本机解析标识已不在，没有打开失败报告，也没有另起一次解析。')) return
-        navigateFail(result.failReason ?? '简历解析未能完成，请重试', {
+        navigateFail(reason, {
           taskId: result.taskId,
           accessToken: keptTokenRef.current?.accessToken,
-        })
+        }, capability, result.failCode)
         return
       }
       if (result.status !== 'pending' && result.status !== 'processing') {

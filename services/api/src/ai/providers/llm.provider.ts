@@ -17,6 +17,14 @@ import { LlmResumeService } from '../resume/llm-resume.service'
 import { computeMissingHints, LlmResumeGenerateService } from '../resume/llm-resume-generate.service'
 import { LlmResumeOptimizeService } from '../resume/llm-resume-optimize.service'
 import { AiUsageAccumulator } from '../ai-log.service'
+import { AI_UNKNOWN } from '../llm/llm-failure'
+
+const DIAGNOSIS_MANUAL_REASON = 'AI 暂时不可用，可以先打印原件或手动填写简历'
+const TEMPLATE_MANUAL_REASON = 'AI 暂时不可用，可以先按模板手动填写'
+
+function isAccountOrModelCode(code: string | undefined): boolean {
+  return code === 'AI_PROVIDER_ACCOUNT_UNAVAILABLE' || code === 'AI_PROVIDER_MODEL_INVALID'
+}
 
 let taskCounter = 0
 const nextTaskId = (): string => `llm-ai-${Date.now()}-${++taskCounter}`
@@ -78,7 +86,14 @@ export class LlmResumeProvider implements AiProvider {
       return { taskId: nextTaskId(), status: 'completed', report, usage: usageOf(usage) }
     } catch (err) {
       // 失败也要回报：重试期间的调用照样计费，丢账就等于少算成本。
-      return { taskId: nextTaskId(), status: 'failed', failReason: this.failReasonOf(err), usage: usageOf(usage) }
+      const code = errorCodeOf(err)
+      return {
+        taskId: nextTaskId(),
+        status: 'failed',
+        failCode: code ?? AI_UNKNOWN,
+        failReason: isAccountOrModelCode(code) ? DIAGNOSIS_MANUAL_REASON : this.failReasonOf(err),
+        usage: usageOf(usage),
+      }
     }
   }
 
@@ -126,7 +141,9 @@ export class LlmResumeProvider implements AiProvider {
     } catch (err) {
       const code = errorCodeOf(err)
       let failReason: string
-      if (code === 'AI_PROVIDER_NOT_CONFIGURED') {
+      if (isAccountOrModelCode(code)) {
+        failReason = TEMPLATE_MANUAL_REASON
+      } else if (code === 'AI_PROVIDER_NOT_CONFIGURED') {
         failReason = 'AI 简历优化模型尚未配置，请联系管理员后重试'
       } else if (code === 'AI_OPTIMIZE_INVALID_OUTPUT') {
         // 防编造校验拦截:两次输出均含无法从原文确认的信息,绝不放行
@@ -135,7 +152,7 @@ export class LlmResumeProvider implements AiProvider {
         failReason = 'AI 简历优化服务暂时不可用，请稍后重试'
       }
       // 失败也要回报：重试期间的调用照样计费，丢账就等于少算成本。
-      return { taskId, status: 'failed', failReason, usage: usageOf(usage) }
+      return { taskId, status: 'failed', failCode: code ?? AI_UNKNOWN, failReason, usage: usageOf(usage) }
     }
   }
 
@@ -157,12 +174,19 @@ export class LlmResumeProvider implements AiProvider {
       }
     } catch (err) {
       const code = errorCodeOf(err)
-      const failReason =
-        code === 'AI_PROVIDER_NOT_CONFIGURED'
+      const failReason = isAccountOrModelCode(code)
+        ? TEMPLATE_MANUAL_REASON
+        : code === 'AI_PROVIDER_NOT_CONFIGURED'
           ? 'AI 简历生成模型尚未配置，请联系管理员后重试'
           : 'AI 简历生成服务暂时不可用，请稍后重试'
       // 失败也要回报：重试期间的调用照样计费，丢账就等于少算成本。
-      return { taskId: nextTaskId(), status: 'failed', failReason, usage: usageOf(usage) }
+      return {
+        taskId: nextTaskId(),
+        status: 'failed',
+        failCode: code ?? AI_UNKNOWN,
+        failReason,
+        usage: usageOf(usage),
+      }
     }
   }
 
