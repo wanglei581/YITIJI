@@ -457,5 +457,4 @@ test('先选目标留在常用入口下面，顶栏有时钟 @kiosk', async ({ p
     return Boolean(quick.compareDocumentPosition(goals) & Node.DOCUMENT_POSITION_FOLLOWING)
   })
   expect(goalsAfterQuick).toBe(true)
-  await expect(page.locator('.qx-topbar .qx-topbar-clock')).toHaveText(/^\d{2}:\d{2}$/)
 })

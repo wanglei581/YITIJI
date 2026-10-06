@@ -24,7 +24,6 @@ import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useApiReadiness } from '../../hooks/useApiReadiness'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
-import { HubClock } from './HubClock'
 import { HubGoalEntry, HubQuickEntry } from './serviceHubEntries'
 import { capChips, hubAiPartial, statusPill } from './serviceHubChrome'
 import { SERVICE_HUB_SPECS } from './serviceHubSpecs'
@@ -321,7 +320,6 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
         data-hub-device-probe={deviceAware ? 'on' : 'off'}
         data-hub-ai={availability.aiChecking ? 'checking' : availability.aiDown ? 'down' : apiBlocked ? 'idle' : 'ready'}
       >
-        <HubClock />
         {/* 稿 16 的深色导言：页头标题留给读屏（视觉上收进 1px），这里是站着能读到的那一块。 */}
         <section className="qx-hub-hero">
           <div className="qx-hub-hero-face" aria-hidden="true">青</div>

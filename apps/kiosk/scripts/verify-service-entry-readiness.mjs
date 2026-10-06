@@ -388,7 +388,6 @@ check(
     featureOffAt > 0 && onlineAt > featureOffAt,
     'AI 能力单独不可用时先返回 AI 原因，不会落到「在线服务当前不可用」'
   )
-  check(hubPage.includes('<HubClock />'), '服务中心顶栏补当前时间')
   check(
     read('src/pages/service-hubs/serviceHubChrome.ts').includes('AI能力 · 暂不可用'),
     '只有 AI 不可用时，能力条写「AI能力 · 暂不可用」'
