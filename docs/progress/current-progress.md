@@ -7,7 +7,7 @@
 - **付费单（实付 > 0）：** 两种状态都不自助重打，409 `PICKUP_RESUME_REFUND_PENDING`「这单没有打完，费用会按原路退回，需要帮助请拨打服务电话」，并把订单标成已付未履约待退款（复用 `PAID_UNFULFILLED_PENDING_REFUND`）；没来续打的，付款满 7 天由现有到期清扫补标并走同一 `RefundService`（新原因 `paid_output_anomaly`，审计 `order.paid_output_anomaly_auto_refund`）。不新建退款流程。管理员后台对这两种状态的处置不变。
 - **订单视图：** `reprintAllowed` / `reprintRemaining` 按上面规则算，新增 `reprintNotice: 'may_have_printed' | 'partial_output' | null`（会员订单列表、套餐单、时间线、取件视图同一口径）。
 - **文案：** `paid-reprint-eligibility.ts` 里未确认、部分出纸两条去掉「工作人员」。打印状态页其余失败文案（`print-jobs.service.ts` 的 `PRINTER_OFFLINE`、`PRINT_JOB_UNCONFIRMED` 等）仍含「工作人员」，归「230 处标准句」那批，本次不动。
-- **验证：** `verify:pickup-code-resume` 扩展；本机 API / 一体机 / 后台 typecheck、lint 与图谱点名的 46 条门禁全部退出码 0（含 `verify:member-closure` closure 环境、一体机 `verify:pickup-claim-error-coverage`、小程序 `verify:package-chain`、Agent `verify:print-truth-hardening`）。反向变异四处全红：去冷却期、付费单也自助重打、未确认续打不计数、视图不带 `reprintNotice`。两条 `:postgres` 门禁未在本机 PostgreSQL 上跑，交 CI。
+- **验证：** `verify:pickup-code-resume` 扩展；本机 API / 一体机 / 后台 typecheck、lint 4 项与图谱点名的 42 条门禁全部退出码 0（含 `verify:member-closure` closure 环境、一体机 `verify:pickup-claim-error-coverage`、小程序 `verify:package-chain`、Agent `verify:print-truth-hardening`）。反向变异四处全红：去冷却期、付费单也自助重打、未确认续打不计数、视图不带 `reprintNotice`。两条 `:postgres` 门禁未在本机 PostgreSQL 上跑，交 CI。
 
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
