@@ -1,3 +1,5 @@
+/* 思源宋体 / 思源黑体子集（字族名 Qingxu Serif / Qingxu Sans），生成脚本 apps/kiosk/scripts/fonts/build_source_han_subset.py。 */
+@import "./styles/fonts/source-han.css";
 @import "@ai-job-print/ui/styles/tokens.css";
 /* Kiosk presentation styles remain attribute-scoped by data-kiosk-presentation. */
 @import "@ai-job-print/ui/styles/fusion-youth.css";

@@ -12903,7 +12903,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 636,
+      "reachableFileCount": 637,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15879,7 +15879,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 730
+      "sourceFileCount": 731
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18701,7 +18701,8 @@
       "apps/admin/scripts/verify-admin-login-second-factor.mjs"
     ],
     "apps/kiosk/index.html": [
-      "scripts/verify-compliance-copy.mjs"
+      "scripts/verify-compliance-copy.mjs",
+      "scripts/verify-kiosk-font-subset.mjs"
     ],
     "apps/kiosk/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -19014,7 +19015,8 @@
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
-      "packages/ui/scripts/verify-service-desk-foundation.mjs"
+      "packages/ui/scripts/verify-service-desk-foundation.mjs",
+      "scripts/verify-kiosk-font-subset.mjs"
     ],
     "apps/kiosk/src/layouts/KioskRoot.tsx": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
@@ -21242,6 +21244,9 @@
     "apps/kiosk/src/styles/ai-primitives.css": [
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
     ],
+    "apps/kiosk/src/styles/fonts/source-han.css": [
+      "scripts/verify-kiosk-font-subset.mjs"
+    ],
     "apps/kiosk/src/styles/kiosk-stage-fit.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
@@ -21253,6 +21258,9 @@
     ],
     "apps/kiosk/src/styles/qingxu/primitives.css": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/styles/qingxu/tokens.css": [
+      "scripts/verify-kiosk-font-subset.mjs"
     ],
     "apps/kiosk/src/styles/warm-professional-override.css": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
@@ -32993,6 +33001,27 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:fixture-time-bombs"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/index.html",
+          "apps/kiosk/src/index.css",
+          "apps/kiosk/src/styles/fonts/source-han.css",
+          "apps/kiosk/src/styles/qingxu/tokens.css"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-kiosk-font-subset.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:kiosk-font-subset"
       ],
       "wired": true
     },

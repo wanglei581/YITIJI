@@ -49,6 +49,16 @@
 ## 2026-10-06：小程序 ai-access 门禁偶发失败（只改测试）（分支 `claude/miniapp-ai-access-flake`）
 
 - `apps/miniapp/scripts/tests/ai-access.test.mjs` 第一个场景 `resumeAiConsentRecoversOnce` 偶发失败（单跑约 1/20，机器忙时更高）：本文件冷启动加五轮来回，超过 `settle` 默认的 400ms 看门狗，报 ok=false。只给这一处放宽到 2000ms；默认值不动（别的场景靠它等到超时，整体改成 2000ms 会让文件从 7 秒变 12 秒）。改后单跑 30 次 0 失败，`verify:static` 全链 0 失败。产品代码不变。
+## 2026-10-06：一体机打包思源宋体 / 思源黑体子集（分支 `claude/kiosk-fonts-source-han-1006`）
+
+- 产品负责人 10/6 在主执行窗口同意下载。来源：Adobe 官方 GitHub 发布页 `14_SourceHanSerifCN.zip`、`19_SourceHanSansCN.zip`，SIL OFL 1.1；原始包不进仓库。
+- 宋体 400 / 700 / 900、黑体 400 / 500 / 700。字集是 GB2312 全部汉字加一体机与共享包源码用字，共 7168 字。每个字重按码位切三段（unicode-range），18 个 woff2，单个不超过 1MB，合计约 7.5MB，浏览器只下载页面用到的段。
+- OFL 保留名「Source」：子集属修改版，内部名与 CSS 字族名改为 Qingxu Serif / Qingxu Sans，版权与许可证条目保留，两份 OFL 许可证（`OFL-SourceHanSerif.txt` / `OFL-SourceHanSans.txt`）和改名、子集说明 `README.md` 与字体放在一起：`apps/kiosk/src/assets/fonts/source-han/`。字体放在 `src/assets` 下由 Vite 打包，产物文件名带内容哈希，字体没变时跨发布不重下。
+- 字体栈 51 处：宋体栈第一位是 Qingxu Serif；黑体栈把 Qingxu Sans 排在微软雅黑之前（Mac 仍是苹方，Windows 用思源黑体）。
+- 新门禁 `verify:kiosk-font-subset` 接 CI（构建之后跑）：源码用字都在子集、声明是相对地址且与文件一一对应、许可证与说明在、产物里每个字体带哈希；反向变异 7 处全红。
+- 线上缓存（10/6 只读探测）：`/assets/` 目前只有 ETag 和 Last-Modified，没有 Cache-Control。字体没变时浏览器重新验证只拿到 304，不重下；要做到「一年不变、不发请求」，需要在服务器 nginx 上给 `/assets/` 加 `Cache-Control: public, max-age=31536000, immutable`。这是改生产配置，要产品负责人点头、在发布窗口里做，本分支不改。重新生成用 `apps/kiosk/scripts/fonts/build_source_han_subset.py`（本机，需要 fonttools）。
+- 本机按 Windows 字体栈渲染核对：/help 标题是 Qingxu Serif，正文是 Qingxu Sans。Windows 真机效果待每周五真机录屏确认。
+- 停放、隐藏、改名、降级：无。
 
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
