@@ -1,5 +1,5 @@
 import type { MemberInterviewItem } from '@ai-job-print/shared'
-import { EyeIcon, Trash2Icon } from 'lucide-react'
+import { Trash2Icon } from 'lucide-react'
 import { KIcon } from '../../../components/kiosk-icon'
 import { formatTime } from '../assets/format'
 
@@ -39,13 +39,18 @@ export function MockInterviewRecords({
               </span>
               <span className="qx-me-row-title" style={{ marginTop: 8 }}>{item.position}</span>
               <span className="qx-me-row-sub">{metaLine(item)}</span>
+              {item.hasReport ? null : <span className="qx-me-reason">报告生成后可以打开，也可以接着打印</span>}
             </span>
             <span className="qx-me-acts">
               {item.hasReport ? (
-                <button type="button" className="qx-me-small" onClick={() => onOpen(item.sessionId)} aria-label={`查看模拟面试报告 ${item.position}`}>
-                  <EyeIcon className="h-4 w-4" aria-hidden="true" />
-                  <span className="ml-1">查看</span>
-                </button>
+                <>
+                  <button type="button" className="qx-me-small" onClick={() => onOpen(item.sessionId)} aria-label={`查看模拟面试报告 ${item.position}`}>
+                    打开
+                  </button>
+                  <button type="button" className="qx-me-small" onClick={() => onOpen(item.sessionId)} aria-label={`接着打印模拟面试报告 ${item.position}`}>
+                    接着打印
+                  </button>
+                </>
               ) : null}
               <button
                 type="button"

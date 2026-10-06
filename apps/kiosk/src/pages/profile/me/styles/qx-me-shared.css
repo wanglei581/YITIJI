@@ -270,8 +270,16 @@ button.qx-me-row { cursor: pointer; }
   border-radius: 17px;
   display: grid;
   place-items: center;
+  overflow: hidden;
   background: var(--qx-teal-soft);
   color: var(--qx-teal-d);
+}
+/* KIcon 的 svg 没有宽高，默认会撑出图标盒。跟 lucide 的 28px 对齐。 */
+.qx-me-row-ico svg {
+  width: 28px;
+  height: 28px;
+  max-width: 28px;
+  max-height: 28px;
 }
 .qx-me-row-ico[data-tone='slate'] { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
 .qx-me-row-ico[data-tone='clay'] { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }

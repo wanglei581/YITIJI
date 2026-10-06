@@ -608,6 +608,62 @@ test('me list rows do not overlap on notifications, documents and resumes @w5-ki
   expect(errors).toEqual([])
 })
 
+test('resume row titles do not include an 8-character hex task id @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const createdAt = '2026-10-06T09:12:00.000+08:00'
+  const expiresAt = '2099-12-20T09:12:00.000+08:00'
+  api.respond('GET', '/api/v1/me/resumes', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [
+          {
+            id: 'resume-hex',
+            taskId: 'task-7f3a91c2',
+            kind: 'parse',
+            status: 'completed',
+            provider: 'demo',
+            optimized: true,
+            hasDraft: false,
+            latestVersion: 1,
+            createdAt,
+            updatedAt: createdAt,
+            expiresAt,
+          },
+          {
+            id: 'resume-hex-gen',
+            taskId: 'task-2c8e44b1',
+            kind: 'generate',
+            status: 'completed',
+            provider: 'demo',
+            optimized: false,
+            hasDraft: false,
+            latestVersion: null,
+            createdAt,
+            updatedAt: createdAt,
+            expiresAt,
+          },
+        ],
+        nextCursor: null,
+        total: 2,
+      },
+    },
+  })
+
+  await loginThroughVisibleUi(page, '/me/resumes')
+  const titles = page.getByRole('region', { name: '我的简历' }).locator('.qx-me-row-title')
+  await expect(titles).toHaveCount(2)
+  const texts = await titles.allInnerTexts()
+  for (const text of texts) {
+    expect(text, text).not.toMatch(/\b[0-9a-f]{8,}\b/i)
+    expect(text).toMatch(/上传诊断简历|AI 生成简历/)
+  }
+  expect(errors).toEqual([])
+})
+
 for (const item of ME_SHELL_PAGES) {
   test(`me shell signed-out ${item.path} shows page name, back, ask and 20px floor @w5-kiosk`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)

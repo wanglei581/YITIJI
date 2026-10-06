@@ -11,6 +11,7 @@
   flex: none;
 }
 .qx-me-detail-head .qx-me-row-ico { width: 70px; height: 70px; }
+.qx-me-detail-head .qx-me-row-ico svg { width: 32px; height: 32px; max-width: 32px; max-height: 32px; }
 .qx-me-detail-head h2 { margin: 0; font-size: 31px; font-weight: 800; line-height: 1.28; }
 .qx-me-detail-head p { margin: 6px 0 0; font-size: 21px; color: var(--qx-ink-2); }
 

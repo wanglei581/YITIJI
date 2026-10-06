@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import type { MemberAssetPage, MemberBrowseLogItem, MemberJumpLogItem } from '@ai-job-print/shared'
 import { ArrowRightIcon, BriefcaseIcon, ClockIcon, EyeIcon, LockIcon, LogInIcon, RefreshCwIcon, RouteIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { getMyBrowseLogs, getMyJumpLogs } from '../../services/api/activity'
 import { formatTime } from '../profile/assets/format'
 import { actionLabel, detailRoute, TYPE_LABEL } from '../profile/me/activityPresentation'
@@ -40,6 +41,7 @@ export default function MeActivityDetailPage() {
   const navigate = useNavigate()
   const { id = '' } = useParams()
   const { isLoggedIn, getToken } = useAuth()
+  const hostingOpen = useRecruitmentHosting().enabled
   const [state, setState] = useState<LoadState>('loading')
   const [record, setRecord] = useState<ActivityRecord | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -70,11 +72,12 @@ export default function MeActivityDetailPage() {
 
   const item = record?.item
   const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : !record || !item ? 'not-found' : 'detail'
+  const structMode = !isLoggedIn ? 'lock' : state === 'loading' ? 'loading' : 'error'
   const struct = (
     <>
-      <QxMeStructRow icon={EyeIcon} title="这条记录的内容类型" desc="岗位 / 招聘会 / 政策 / 企业" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-detail-0" />
-      <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由系统返回" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-detail-1" />
-      <QxMeStructRow icon={RouteIcon} title="回到原内容" desc="一步回到来源详情" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-activity-detail-2" />
+      <QxMeStructRow icon={EyeIcon} title="这条记录的内容类型" desc={hostingOpen ? '岗位 / 招聘会 / 政策 / 企业' : '政策或机构官方渠道'} mode={structMode} testid="member-records-struct-activity-detail-0" />
+      <QxMeStructRow icon={ClockIcon} title="记录时间" desc="由系统返回" mode={structMode} testid="member-records-struct-activity-detail-1" />
+      <QxMeStructRow icon={RouteIcon} title="回到原内容" desc="一步回到来源详情" mode={structMode} testid="member-records-struct-activity-detail-2" />
     </>
   )
 
@@ -82,7 +85,7 @@ export default function MeActivityDetailPage() {
   if (!isLoggedIn) {
     inner = <QxMeLoginBlock title="登录后查看本人记录" desc="游客模式不把浏览记录留到下一次使用，这条记录只对本人可见。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
-    inner = <QxMeLoadingBlock title="正在读取这条记录" />
+    inner = <QxMeLoadingBlock title="正在读取这条记录" struct={struct} />
   } else if (state === 'error') {
     inner = <QxMeErrorBlock title="这条记录这次没有读到" desc="当前没有读到这条记录。请检查网络后重试。" struct={struct} />
   } else if (!record || !item) {
@@ -92,21 +95,26 @@ export default function MeActivityDetailPage() {
           <span className="qx-me-banner-ico" aria-hidden="true"><EyeIcon size={34} /></span>
           <span className="qx-me-banner-main">
             <h2 className="qx-me-banner-t">未找到这条记录</h2>
-            <span className="qx-me-banner-p">记录可能已清理，或不属于当前登录账号。<b>本页不会拿别的记录顶替。</b></span>
+            <span className="qx-me-banner-p">记录可能已按留存期限清理，或不属于当前登录账号。<b>本页不会拿别的记录顶替。</b></span>
           </span>
         </section>
-        <section className="qx-me-list qx-me-grow" aria-label="这条记录本应包含的内容">{struct}</section>
+        <section className="qx-me-list qx-me-grow" aria-label="这条记录本应包含的内容">
+          {struct}
+          <div className="qx-me-legal">这条记录没有单独的地址。按编号在浏览和打开两类记录里查找，找不到就是找不到。</div>
+        </section>
         <QxMeGuide items={[['可能原因', '记录已被清理', '记录按各自留存期限清理'], ['也可能', '不属于当前账号', '记录只对本人可见'], ['下一步', '回列表重新选择', '列表里只显示本人记录']]} />
       </>
     )
   } else {
-    const actionText = record.kind === 'browse' ? '浏览' : actionLabel(record.item.action, item.targetType)
+    const rawAction = record.kind === 'browse' ? '浏览' : actionLabel(record.item.action, item.targetType)
+    const actionText = hostingOpen || record.kind === 'browse' || !/岗位|招聘会|企业/.test(rawAction) ? rawAction : '官方入口'
+    const typeLabel = hostingOpen || item.targetType === 'policy' ? TYPE_LABEL[item.targetType] : '原内容'
     inner = (
       <>
         <section className="qx-me-detail-head" data-testid="member-records-detail">
           <span className="qx-me-row-ico" aria-hidden="true"><EyeIcon size={32} /></span>
           <div>
-            <h2>{item.targetTitle ?? `${TYPE_LABEL[item.targetType]}详情`}</h2>
+            <h2>{item.targetTitle ?? `${typeLabel}详情`}</h2>
             <p>{record.kind === 'browse' ? '浏览记录' : actionText} · 仅本人可见</p>
           </div>
         </section>
@@ -115,9 +123,9 @@ export default function MeActivityDetailPage() {
             <span className="qx-me-row-ico" aria-hidden="true"><EyeIcon size={28} /></span>
             <span className="qx-me-row-main">
               <span className="qx-me-row-title">内容类型</span>
-              <span className="qx-me-row-sub">这条记录指向一条来源{TYPE_LABEL[item.targetType]}</span>
+              <span className="qx-me-row-sub">{hostingOpen ? `这条记录指向一条来源${TYPE_LABEL[item.targetType]}` : item.targetType === 'policy' ? '这条记录指向一则政策说明' : '这条记录指向原内容'}</span>
             </span>
-            <span className="qx-me-acts"><span className="qx-me-chip">{TYPE_LABEL[item.targetType]}</span></span>
+            <span className="qx-me-acts"><span className="qx-me-chip">{typeLabel}</span></span>
           </div>
           <div className="qx-me-row" data-detail-field="1">
             <span className="qx-me-row-ico" data-tone="slate" aria-hidden="true"><RouteIcon size={28} /></span>
@@ -139,7 +147,7 @@ export default function MeActivityDetailPage() {
             <span className="qx-me-row-ico" aria-hidden="true"><BriefcaseIcon size={28} /></span>
             <span className="qx-me-row-main">
               <span className="qx-me-row-title">来源机构</span>
-              <span className="qx-me-row-sub">来源机构与外部投递入口以岗位详情页为准</span>
+              <span className="qx-me-row-sub">{hostingOpen ? '来源机构与外部投递入口以岗位详情页为准' : '来源以原内容页为准'}</span>
             </span>
             <span className="qx-me-acts"><span className="qx-me-chip">{item.sourceName ?? '以详情页为准'}</span></span>
           </div>

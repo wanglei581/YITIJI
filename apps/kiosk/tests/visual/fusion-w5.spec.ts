@@ -451,7 +451,7 @@ test('activity detail renders an honest missing-record empty state after visible
   await loginThroughVisibleUi(page, '/me/activity/missing-w5-record')
   await expect(page.getByRole('heading', { name: '未找到这条记录' })).toBeVisible()
   await expect(
-    page.getByText('记录可能已清理，或不属于当前登录账号。本页不会拿别的记录顶替。', { exact: true }),
+    page.getByText('记录可能已按留存期限清理，或不属于当前登录账号。本页不会拿别的记录顶替。', { exact: true }),
   ).toBeVisible()
   await expectFusionAcceptance(page, errors)
   pagination.assertNoUnhandledRequests()

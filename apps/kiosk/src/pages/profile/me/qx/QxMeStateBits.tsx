@@ -31,9 +31,12 @@ export function QxMeStructRow({
   icon: LucideIcon
   title: string
   desc: string
-  mode: 'lock' | 'error'
+  mode: 'lock' | 'error' | 'loading'
   testid: string
 }) {
+  const titleSlot = mode === 'lock' ? '标题登录后显示' : mode === 'loading' ? '标题读取中' : '标题本次未取到'
+  const timeSlot = mode === 'lock' ? '时间登录后显示' : mode === 'loading' ? '时间读取中' : '时间本次未取到'
+  const tail = mode === 'lock' ? '登录后显示' : mode === 'loading' ? '读取中' : '本次未取到'
   return (
     <div className="qx-me-row" data-dead="true" data-slot-mode={mode} data-testid={testid}>
       <span className="qx-me-row-ico" data-tone="off" aria-hidden="true"><Icon size={28} /></span>
@@ -41,12 +44,12 @@ export function QxMeStructRow({
         <span className="qx-me-row-title">{title}</span>
         <span className="qx-me-row-sub">{desc}</span>
         <span className="qx-me-row-foot" style={{ marginTop: 9, display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-          <span className="qx-me-slot">{mode === 'lock' ? '标题登录后显示' : '标题本次未取到'}</span>
-          <span className="qx-me-slot">{mode === 'lock' ? '时间登录后显示' : '时间本次未取到'}</span>
+          <span className="qx-me-slot">{titleSlot}</span>
+          <span className="qx-me-slot">{timeSlot}</span>
         </span>
       </span>
       <span className="qx-me-acts">
-        <span className="qx-me-small" aria-disabled="true">{mode === 'lock' ? '登录后显示' : '本次未取到'}</span>
+        <span className="qx-me-small" aria-disabled="true">{tail}</span>
       </span>
     </div>
   )
@@ -177,11 +180,18 @@ export function QxMeLoginBlock({
   )
 }
 
-export function QxMeLoadingBlock({ title }: { title: string }) {
+export function QxMeLoadingBlock({ title, struct }: { title: string; struct?: ReactNode }) {
   return (
     <>
       <QxMeBanner tone="calm" title={title} desc={<>正在读取当前登录账号的记录。<b>返回前先显示「—」</b>。上一位若没点结束使用，读出来的仍是那个账号。</>} minis={['共 —', '正在安全读取']} />
-      <QxMeSkeletonList foot="这次读取失败不会删除任何记录，也不会改动任何已保存的内容。" />
+      {struct ? (
+        <section className="qx-me-list qx-me-grow" aria-label="正在读取的内容结构">
+          {struct}
+          <div className="qx-me-legal">这次读取失败不会删除任何记录，也不会改动任何已保存的内容。</div>
+        </section>
+      ) : (
+        <QxMeSkeletonList foot="这次读取失败不会删除任何记录，也不会改动任何已保存的内容。" />
+      )}
       <QxMeGuide items={[...QX_ME_GUIDE.loading]} />
     </>
   )
