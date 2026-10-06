@@ -65,6 +65,11 @@
 - 新门禁 `verify:kiosk-font-subset` 接 CI（构建之后跑）：源码用字都在子集、声明是相对地址且与文件一一对应、许可证与说明在、产物里每个字体带哈希；反向变异 7 处全红。
 - 线上缓存（10/6 只读探测）：`/assets/` 目前只有 ETag 和 Last-Modified，没有 Cache-Control。字体没变时浏览器重新验证只拿到 304，不重下；要做到「一年不变、不发请求」，需要在服务器 nginx 上给 `/assets/` 加 `Cache-Control: public, max-age=31536000, immutable`。这是改生产配置，要产品负责人点头、在发布窗口里做，本分支不改。重新生成用 `apps/kiosk/scripts/fonts/build_source_han_subset.py`（本机，需要 fonttools）。
 - 本机按 Windows 字体栈渲染核对：/help 标题是 Qingxu Serif，正文是 Qingxu Sans。Windows 真机效果待每周五真机录屏确认。
+## 2026-10-06：无人值守标准句与服务联系方式的共享代码先行合入（分支 `claude/kiosk-support-contact-shared-1006`）
+
+- 从全量替换线（`claude/kiosk-unattended-copy-1004`，随第七次）里原样拆出三个共享文件先合，供前端 C 等页面线直接用：`copy/unattendedCopy.ts`（标准句 1–5、禁用说法表、续打句）、`services/api/supportContact.ts`（读 `GET /api/v1/public/support-contact?terminalId=`，404 / 超时 / 缺字段按最保守的一套）、`hooks/useSupportContact.ts`；测试夹具默认应答同步。导出名以后保持不变。
+- 补了一个漏洞：这组单测 12 条原先没挂在任何 CI 会跑的门禁上，现登记为 `verify:kiosk-support-contact` 并接进 CI；另补一条单测：文案层 resolveSupportContact 缺字段或非布尔一律按保守值（原先「小程序发布字段缺失当成已发布」的变异没被拦住）；现在 13 条，反向变异三处（换机不看附近终端、发布缺省当真、附近终端非布尔当真）全红。
+- 本 PR 只加代码，不改任何页面文案；页面换句随全量替换线和各页面线。
 - 停放、隐藏、改名、降级：无。
 
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
