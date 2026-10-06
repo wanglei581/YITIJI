@@ -162,6 +162,7 @@ test('扫码登录各错误态不出现工作人员，有号码和没号码两�
 })
 
 test('390×844 可见文字不小于 15px，三张单卡屏整行空白小于 160px @mobile', async ({ page, api }) => {
+  test.setTimeout(120_000)
   const screens: Array<{ screen: 'qr-login' | 'phone-upload'; state: string; url: string }> = [
     { screen: 'qr-login', state: 'missing-ticket', url: '/member/qr-login' },
     { screen: 'qr-login', state: 'checking', url: '/member/qr-login?ticketId=relay51qr0123456789abcdef' },
@@ -172,6 +173,7 @@ test('390×844 可见文字不小于 15px，三张单卡屏整行空白小于 16
     { screen: 'phone-upload', state: 'idle', url: '/upload/phone#sessionId=upl51haichuan&token=tok51haichuan&purpose=resume_upload' },
   ]
   for (const item of screens) {
+    await page.goto('about:blank')
     await prepareRelayPages(page, api, asTarget(item.screen, item.state, item.url))
     const small = await page.evaluate(() => {
       const root = document.querySelector('main')
@@ -203,6 +205,7 @@ test('390×844 可见文字不小于 15px，三张单卡屏整行空白小于 16
     { screen: 'phone-upload' as const, state: 'invalid', url: '/upload/phone', root: '.k1-phone-upload-content' },
     { screen: 'phone-upload' as const, state: 'signature-blocked', url: '/upload/phone#purpose=signature_image', root: '.k1-phone-upload-content' },
   ]) {
+    await page.goto('about:blank')
     await prepareRelayPages(page, api, asTarget(item.screen, item.state, item.url))
     const gap = await page.evaluate((selector) => {
       const root = document.querySelector(selector)
@@ -246,13 +249,23 @@ test('390×844 可见文字不小于 15px，三张单卡屏整行空白小于 16
 })
 
 test('390×844 四态预检错误说明的底边不超过首屏 @mobile', async ({ page, api }) => {
+  test.setTimeout(90_000)
   for (const state of ['empty-error', 'too-large', 'type-error', 'content-type-error']) {
+    // 四态只改 hash。同一文档里改 hash 不会卸掉已选文件，下一态就等不到 idle。
+    await page.goto('about:blank')
     await prepareRelayPages(page, api, asTarget('phone-upload', state, `/upload/phone#sessionId=upl51haichuan&token=tok51haichuan&purpose=resume_upload`))
     const note = page.getByTestId('phone-upload-precheck-error')
     await expect(note).toBeVisible()
-    const box = await note.boundingBox()
-    expect(box, `${state} 没有量到预检错误说明`).toBeTruthy()
-    const bottom = box!.y + box!.height
-    expect(bottom, `${state} 预检错误说明底边 ${bottom}`).toBeLessThanOrEqual(844)
+    const metrics = await note.evaluate((el) => {
+      const rect = el.getBoundingClientRect()
+      const flow = el.closest('.ph-up-flow')
+      const flowRect = flow instanceof HTMLElement ? flow.getBoundingClientRect() : null
+      return { bottom: rect.bottom, flowBottom: flowRect ? flowRect.bottom : null }
+    })
+    console.log(`预检错误说明底边 ${state} ${metrics.bottom} 可见流 ${metrics.flowBottom}`)
+    expect(metrics.bottom, `${state} 预检错误说明底边 ${metrics.bottom}`).toBeLessThanOrEqual(844)
+    expect(metrics.flowBottom, `${state} 没有量到可见流`).not.toBeNull()
+    // 844 含页脚占位。说明若落在滚动流外面，底边仍可能小于 844，但首屏看不全。
+    expect(metrics.bottom, `${state} 预检错误说明底边 ${metrics.bottom} 超过可见流底边 ${metrics.flowBottom}`).toBeLessThanOrEqual(metrics.flowBottom ?? 0)
   }
 })

@@ -21,7 +21,7 @@ import { useSupportContact } from '../../hooks/useSupportContact'
 import { uploadPhoneSessionFile, uploadSessionUserMessage } from '../../services/api/uploadSessions'
 
 const XIAOQING_FOOT = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
-/** 空文件、超限、格式、类型。红色预检说明要在 390×844 首屏里看全，这四态的页脚跟在说明后面。 */
+/** 空文件、超限、格式、类型。红色预检说明放到文件信息上面，390×844 首屏看全。 */
 const PRECHECK_ERROR_STATES = new Set<string>(['empty-error', 'too-large', 'type-error', 'content-type-error'])
 import {
   useDocumentConversionCapabilities,
@@ -327,7 +327,6 @@ export function PhoneUploadPage() {
                       <span><Rich text={view.fileNote.text} /></span>
                     </p>
                   )}
-                  {precheckError && <RelayFoot icon={chrome.icon} text={chrome.foot} />}
                   {!view.facts && (
                     <ol className="ph-up-steps" aria-label="手机上传的三步">
                       {UPLOAD_STEPS.map((step, index) => (
@@ -374,7 +373,7 @@ export function PhoneUploadPage() {
           )}
         </div>
 
-        {!precheckError && <RelayFoot icon={chrome.icon} text={chrome.foot} />}
+        <RelayFoot icon={chrome.icon} text={chrome.foot} />
       </section>
     </main>
   )
