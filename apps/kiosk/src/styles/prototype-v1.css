@@ -44,8 +44,8 @@
   --pv-dark: var(--k-dark, #10302b);
   --pv-r-sm: 14px;
   --pv-r-md: 18px;
-  --pv-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
-  --pv-sans: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --pv-serif: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --pv-sans: 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', system-ui, sans-serif;
 }
 
 /* ── 品类色映射（shared.css .a-* → .kpv1 作用域） ── */

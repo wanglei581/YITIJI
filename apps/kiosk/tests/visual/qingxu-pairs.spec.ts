@@ -1,4 +1,5 @@
 // 青序流光原稿 ↔ 一体机运行页并排截图。按需跑，不进 CI。
+// 预览端口由 QX_PAIRS_PORT 指定（不设时为 4217，须是 1024–65534 的整数），稿服务用该端口 +1。
 // 每一对用全新 browser context。造状态只走 qingxu-pair-targets 里复用的注册器。
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -16,11 +17,22 @@ import {
   type QingxuPairTarget,
 } from './fixtures/qingxu-pair-targets'
 
+function qingxuPairsPort(): number {
+  const raw = process.env.QX_PAIRS_PORT
+  if (raw === undefined) return 4217
+  const port = Number(raw)
+  if (!/^[0-9]+$/.test(raw) || port < 1024 || port > 65534) {
+    throw new Error(`QX_PAIRS_PORT 必须是 1024–65534 的整数，当前是「${raw}」`)
+  }
+  return port
+}
+
 const here = path.dirname(fileURLToPath(import.meta.url))
 const kioskRoot = path.resolve(here, '../..')
 const repoRoot = path.resolve(kioskRoot, '../..')
-const PREVIEW = 'http://127.0.0.1:4217'
-const PROTO_PORT = 4218
+const PREVIEW_PORT = qingxuPairsPort()
+const PREVIEW = `http://127.0.0.1:${PREVIEW_PORT}`
+const PROTO_PORT = PREVIEW_PORT + 1
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css',
@@ -53,7 +65,13 @@ async function listenProto(): Promise<{ origin: string; close: () => Promise<voi
     fs.createReadStream(file).pipe(res)
   })
   await new Promise<void>((resolve, reject) => {
-    server.once('error', reject)
+    server.once('error', (error: Error & { code?: string }) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`稿服务端口 ${PROTO_PORT} 已被占用`)
+        process.exit(1)
+      }
+      reject(error)
+    })
     server.listen(PROTO_PORT, '127.0.0.1', () => resolve())
   })
   return {

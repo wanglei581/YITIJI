@@ -17,7 +17,13 @@ import {
   llmTimeoutMessage,
 } from '../llm/llm-http'
 import { deepseekThinkingOff } from '../llm/deepseek-thinking'
-import { llmEndpointNotAllowedError } from '../llm/llm-failure'
+import {
+  AI_PROVIDER_ACCOUNT_UNAVAILABLE,
+  AI_PROVIDER_MODEL_INVALID,
+  llmEndpointNotAllowedError,
+  llmExceptionCode,
+  llmUpstreamStatusError,
+} from '../llm/llm-failure'
 import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { withAiSafety } from '../llm/ai-prompt-safety'
@@ -395,7 +401,12 @@ export class LlmResumeOptimizeService {
     if (!res.ok) {
       // 打到模型了但没拿到 usage：如实回报「调用发生过、token 未知」，不塞 tokenUsage。
       onLlmCall?.({ provider: providerLabel })
+      // 只记状态码。账户级 / 模型名问题用新码；其余非 2xx 仍是 AI_OPTIMIZE_UNAVAILABLE
+      // （版式调整与小程序仍按这个旧码识别「其他原因」）。
       this.logger.error(`resume optimize http ${res.status}`)
+      const upstream = llmUpstreamStatusError('AI 简历优化服务', res.status, res.data)
+      const code = llmExceptionCode(upstream)
+      if (code === AI_PROVIDER_ACCOUNT_UNAVAILABLE || code === AI_PROVIDER_MODEL_INVALID) throw upstream
       throw new ServiceUnavailableException({
         error: { code: 'AI_OPTIMIZE_UNAVAILABLE', message: `AI 简历优化服务返回错误 (${res.status})` },
       })

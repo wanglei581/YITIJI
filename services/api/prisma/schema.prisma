@@ -3381,3 +3381,14 @@ model AiQuotaReservation {
   @@index([endUserId, bucket, day])
   @@index([status, reservedAt])
 }
+
+// 平台级公开键值。没有 endUserId，不是会员数据，不进注销删除或置空清单。
+// 为什么不复用现成表：一体机统一配置按终端；法务文档是带版本的正文；
+// 价目属于收费；线下网点电话属于招聘内容；Redis 上的 AI 开关会过期。
+// 服务电话只由管理员写入，本模型与迁移不放任何号码。
+model PlatformSetting {
+  key       String   @id
+  value     String?
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}

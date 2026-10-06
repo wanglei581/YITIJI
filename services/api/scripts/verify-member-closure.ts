@@ -412,6 +412,13 @@ async function main() {
     const actualModels = Object.entries(metadata).filter(([, model]: any) => model.fields.some((field: any) => field.name === 'endUserId')).map(([name]) => name).sort()
     const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
     assert.deepEqual(actualModels, expectedModels, '新增会员模型必须显式纳入注销处置')
+    const platformSetting = metadata.PlatformSetting
+    assert.ok(platformSetting, 'PlatformSetting 必须存在')
+    assert.equal(
+      platformSetting.fields.some((field: { name: string }) => field.name === 'endUserId'),
+      false,
+      '新增会员模型必须显式纳入注销处置',
+    )
     assert.deepEqual(scan.hits, [], `全库遗留身份: ${scan.hits.join(',')}`)
     assert.ok(scan.columns > 200)
     assert.equal(scan.exempted.length, 1)
