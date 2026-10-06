@@ -15,8 +15,11 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.qx-stage:has(.i2p-page) > .qx-ctabar { flex-wrap: wrap; align-items: center; }
-.qx-stage:has(.i2p-page) > .qx-ctabar > .i2p-cta-reason { flex: 1 0 100%; }
+.qx-stage:has(.i2p-page) > .qx-ctabar {
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 2px 36px 6px;
+}
 .qx-stage:has(.i2p-page) > .qx-ctabar > .qx-step-actions { flex: 1 0 100%; }
 .qx-stage:has(.i2p-page) .qx-pill { font-size: 22px; }
 
@@ -31,26 +34,27 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.i2p-scroll {
-  flex: 1;
+.i2p-page > .i2p-scroll {
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 0 44px 16px;
+  gap: 8px;
+  padding: 8px 44px 8px;
   touch-action: pan-y;
   overscroll-behavior: contain;
 }
 
 .i2p-xq {
   flex: none;
-  margin: 16px 44px 0;
+  margin: 8px 44px 0;
   border-radius: 30px;
-  padding: 20px 34px 18px;
+  padding: 6px 28px;
   background: linear-gradient(158deg, var(--qx-deep-2) 0%, var(--qx-deep) 68%);
   color: var(--qx-paper);
   position: relative;
@@ -79,11 +83,35 @@
   color: var(--qx-emerald);
 }
 /* 眉题 2026-09-30 换成中文「图片转 PDF」，字号、字距、颜色照稿 19 v2 覆盖块。 */
-.i2p-xq-eyebrow { font-size: var(--qx-fs-aux-lg); letter-spacing: 2px; color: color-mix(in srgb, var(--qx-paper) 90%, transparent); margin-bottom: 6px; }
-.i2p-xq-take { font-size: 23px; line-height: 1.4; font-weight: 650; color: color-mix(in srgb, var(--qx-paper) 92%, transparent); margin-bottom: 6px; }
+.i2p-xq-eyebrow { font-size: 21px; letter-spacing: 2px; color: color-mix(in srgb, var(--qx-paper) 90%, transparent); margin-bottom: 2px; }
 .i2p-xq-ask { font-family: var(--qx-serif); font-size: 36px; line-height: 1.35; font-weight: 700; }
 .i2p-xq-ask em { font-style: normal; color: var(--qx-emerald); }
-.i2p-xq-doing { margin-top: 8px; font-size: 23px; line-height: 1.45; color: color-mix(in srgb, var(--qx-paper) 90%, transparent); }
+.i2p-xq-doing { margin-top: 4px; font-size: 23px; line-height: 1.45; color: color-mix(in srgb, var(--qx-paper) 90%, transparent); }
+
+.i2p-fxbar {
+  flex: none;
+  margin: 6px 44px 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--qx-wheat-soft);
+  color: var(--qx-wheat-d);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.i2p-fxbar .i2p-fx-b {
+  flex: none;
+  background: var(--qx-wheat-d);
+  color: var(--qx-on-solid);
+  border-radius: 9px;
+  padding: 4px 11px;
+  font-size: 20px;
+  letter-spacing: 1px;
+}
+.i2p-fxbar b { color: var(--qx-wheat-d); font-weight: 700; }
 .i2p-xq-doing b { color: var(--qx-on-solid); font-weight: 600; }
 
 .i2p-sec-label { display: flex; align-items: baseline; gap: 16px; }
@@ -217,9 +245,9 @@
 
 .i2p-lrows {
   flex: 0 0 auto;
-  /* 三行大约 348px。再多就在卡片里滚，不把列表压没，也不盖住下面的排序按钮。 */
+  /* 稿 19 v2：有几张露几张。放不下时整页在 .i2p-scroll 里滚，不让底栏盖住。 */
   min-height: 0;
-  max-height: 380px;
+  max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
@@ -233,7 +261,8 @@
 
 .i2p-irow {
   display: flex; align-items: center; gap: 12px;
-  min-height: 116px;
+  height: 104px;
+  min-height: 104px;
   border-bottom: 1px solid var(--qx-line);
 }
 .i2p-irow:last-child { border-bottom: 0; }
@@ -241,7 +270,8 @@
   flex: 1; min-width: 0;
   display: flex; align-items: center; gap: 14px;
   text-align: left;
-  min-height: 100px;
+  min-height: 0;
+  height: 100%;
   border-radius: 18px;
   padding: 0 10px;
   border: 2px solid transparent;
@@ -297,8 +327,8 @@
   background: var(--qx-surface);
   border: 1px solid var(--qx-line);
   border-radius: 24px;
-  padding: 14px 20px;
-  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 4px;
 }
 .i2p-pgrp h4 { margin: 0; font-size: 26px; font-weight: 700; }
 .i2p-plan { margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
@@ -332,9 +362,20 @@
   .i2p-dot { animation: none; }
 }
 
+.i2p-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px 16px;
+  padding: 6px 44px 2px;
+}
+.i2p-actions > .qx-btn { flex: 1 1 0; min-width: 0; }
+.i2p-actions > .qx-btn[data-variant='primary'] { flex: 1.6 1 0; }
+.i2p-actions > .i2p-cta-reason { flex: 1 0 100%; padding: 0; }
+
 .i2p-cta-reason {
   flex: none;
-  padding: 0 44px 10px;
   font-size: 21px;
   font-weight: 600;
   color: var(--qx-wheat-d);
@@ -342,7 +383,7 @@
 
 .i2p-truth {
   flex: none;
-  padding: 14px 44px 8px;
+  padding: 4px 28px;
   display: flex;
   gap: 26px;
 }

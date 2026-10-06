@@ -5,7 +5,15 @@ import type { ApiRouter } from '../../../fixtures/api-router'
 import type { QingxuPairTarget } from '../qingxu-pair-targets'
 import type { ResumePageFixture } from './types'
 
-const PAIRED = new Set(['empty', 'ready-three', 'merging', 'completed-auth', 'known-failed'])
+const PAIRED = new Set([
+  'empty',
+  'ready-three',
+  'merging',
+  'completed-auth',
+  'completed-anonymous',
+  'known-failed',
+  'local-uploading',
+])
 
 type Rgb = [number, number, number]
 
@@ -65,26 +73,35 @@ function paperLines(x: number, y: number, ink: Rgb, paper: Rgb): Rgb {
   return paper
 }
 
-const idFront = png(240, 320, (x, y) => {
+function paintId(x: number, y: number): Rgb {
   if (y < 56) return [18, 74, 138]
   if (inside(x, y, 18, 78, 78, 96)) return [186, 204, 224]
   if (inside(x, y, 36, 96, 42, 52)) return [90, 112, 132]
   return paperLines(x, y, [28, 58, 96], [244, 247, 252])
-})
+}
 
-const diploma = png(240, 320, (x, y) => {
+function paintDiploma(x: number, y: number): Rgb {
   if (x < 14 || y < 14 || x > 225 || y > 305) return [156, 42, 36]
   if (inside(x, y, 78, 210, 84, 84) && (x - 120) ** 2 + (y - 252) ** 2 < 34 ** 2) return [168, 48, 42]
   if (y > 48 && y < 78) return [120, 36, 32]
   return paperLines(x, y, [90, 62, 40], [255, 248, 236])
-})
+}
 
-const transcript = png(240, 320, (x, y) => {
+function paintScore(x: number, y: number): Rgb {
   if (y < 48) return [20, 90, 70]
   if (y > 64 && (y - 64) % 36 < 2) return [180, 190, 186]
   if (x > 24 && x < 216 && x % 64 < 2 && y > 64 && y < 280) return [180, 190, 186]
   return [252, 252, 248]
-})
+}
+
+/** 画在 240×320 的格子上，再铺到稿上的像素尺寸，合计才是 517 万像素。 */
+function scaled(width: number, height: number, paint: (x: number, y: number) => Rgb): (x: number, y: number) => Rgb {
+  return (x, y) => paint(Math.min(239, Math.floor((x * 240) / width)), Math.min(319, Math.floor((y * 320) / height)))
+}
+
+const idFront = png(900, 1200, scaled(900, 1200, paintId))
+const diploma = png(1600, 1200, scaled(1600, 1200, paintDiploma))
+const transcript = png(1240, 1754, scaled(1240, 1754, paintScore))
 
 const DOCS = [
   { name: '身份证-正面.jpg', fileId: 'pair19-id-front', url: '/pair19/id-front.png', bytes: idFront, mb: 1.2 },
@@ -100,27 +117,31 @@ async function routeThumbs(page: Page): Promise<void> {
   }
 }
 
+function uploadBody(doc: (typeof DOCS)[number]) {
+  return {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: doc.fileId,
+        filename: doc.name,
+        sizeBytes: Math.round(doc.mb * 1024 * 1024),
+        mimeType: 'image/png',
+        sha256: 'a'.repeat(64),
+        signedUrl: doc.url,
+        signedUrlExpiresAt: '2026-10-07T00:10:00.000Z',
+        fileExpiresAt: '2026-10-08T00:00:00.000Z',
+      },
+    },
+  }
+}
+
 function registerUploads(api: ApiRouter): void {
   let next = 0
   api.respondWith('POST', '/api/v1/files/kiosk-upload', () => {
     const doc = DOCS[Math.min(next, DOCS.length - 1)]!
     next += 1
-    return {
-      status: 200,
-      json: {
-        success: true,
-        data: {
-          fileId: doc.fileId,
-          filename: doc.name,
-          sizeBytes: Math.round(doc.mb * 1024 * 1024),
-          mimeType: 'image/jpeg',
-          sha256: 'a'.repeat(64),
-          signedUrl: doc.url,
-          signedUrlExpiresAt: '2026-10-07T00:10:00.000Z',
-          fileExpiresAt: '2026-10-08T00:00:00.000Z',
-        },
-      },
-    }
+    return uploadBody(doc)
   })
 }
 
@@ -135,8 +156,48 @@ async function uploadThree(page: Page): Promise<void> {
   await expect.poll(() => thumb.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0)
 }
 
-async function openConvert(page: Page): Promise<void> {
-  await page.goto('/print-scan/convert', { waitUntil: 'load' })
+async function openConvert(page: Page, example = false): Promise<void> {
+  await page.goto(example ? '/print-scan/convert?example=1' : '/print-scan/convert', { waitUntil: 'load' })
+  await expect(page.locator('[data-w2-page="print-scan-convert"]')).toBeVisible()
+}
+
+function registerMemberLogin(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        token: 'pair19-member-token',
+        user: { id: 'member-pair19', phoneMasked: '138****8000', nickname: '图片转 PDF 验收' },
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+}
+
+async function loginKeepingExample(page: Page): Promise<void> {
+  const back = '/print-scan/convert?example=1'
+  await page.goto(`/login?from=${encodeURIComponent(back)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  await page.getByRole('button', { name: '手机号（11 位本人号码）', exact: true }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+  await page.getByRole('button', { name: '确认登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/print-scan/convert' && url.searchParams.get('example') === '1')
   await expect(page.locator('[data-w2-page="print-scan-convert"]')).toBeVisible()
 }
 
@@ -156,11 +217,39 @@ export const page19: ResumePageFixture = {
     if (target.state === 'empty') {
       await openConvert(page)
       await expect(page.locator('[data-state="empty"]')).toBeVisible()
-      await expect(page.getByText('带走一份按顺序排好的 PDF').first()).toBeVisible()
+      await expect(page.getByText('先加第一张').first()).toBeVisible()
+      await expect(page.getByTestId('img2pdf-fixture')).toHaveCount(0)
       return
     }
 
     registerUploads(api)
+    if (target.state === 'local-uploading') {
+      // 稿上这一态是前两张已经在列表里，第三张还在传。第一张就挂住的话，列表是空的，对不上。
+      let next = 0
+      api.respondWith('POST', '/api/v1/files/kiosk-upload', () => {
+        if (next >= 2) return new Promise<{ status: number; json: unknown }>(() => undefined)
+        const doc = DOCS[next]!
+        next += 1
+        return uploadBody(doc)
+      })
+      await openConvert(page, true)
+      const input = page.locator('input[type="file"]')
+      for (const doc of DOCS.slice(0, 2)) {
+        await input.setInputFiles({ name: doc.name, mimeType: 'image/png', buffer: doc.bytes })
+        await expect(page.getByText(doc.name, { exact: true })).toBeVisible()
+      }
+      await input.setInputFiles({
+        name: DOCS[2]!.name,
+        mimeType: 'image/png',
+        buffer: DOCS[2]!.bytes,
+      })
+      await expect(page.locator('[data-state="uploading"]')).toBeVisible()
+      await expect(page.getByText('已经在列表里的还在')).toBeVisible()
+      await expect(page.getByText('这一批还没提交')).toBeVisible()
+      await expect(page.getByTestId('img2pdf-fixture')).toBeVisible()
+      return
+    }
+    if (target.state === 'completed-auth') registerMemberLogin(api)
     if (target.state === 'merging') {
       api.respondWith(
         'POST',
@@ -182,6 +271,21 @@ export const page19: ResumePageFixture = {
           },
         },
       })
+    } else if (target.state === 'completed-anonymous') {
+      api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+        status: 200,
+        json: {
+          success: true,
+          data: {
+            fileId: 'pair19-pdf-guest',
+            printFileUrl: '/pair19/out.pdf',
+            fileMd5: 'c'.repeat(32),
+            sizeBytes: Math.round(2.4 * 1024 * 1024),
+            pages: 3,
+            hasEndUser: false,
+          },
+        },
+      })
     } else if (target.state === 'known-failed') {
       api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
         status: 422,
@@ -189,7 +293,8 @@ export const page19: ResumePageFixture = {
       })
     }
 
-    await openConvert(page)
+    await openConvert(page, true)
+    if (target.state === 'completed-auth') await loginKeepingExample(page)
     await uploadThree(page)
     await expect(page.locator('[data-state="edit"]')).toBeVisible()
     if (target.state === 'ready-three') return
@@ -202,7 +307,14 @@ export const page19: ResumePageFixture = {
     }
     if (target.state === 'completed-auth') {
       await expect(page.locator('[data-state="completed"]')).toBeVisible()
-      await expect(page.getByText('PDF 已生成').first()).toBeVisible()
+      await expect(page.getByText('PDF 已生成 · 已进我的文档')).toBeVisible()
+      await expect(page.getByTestId('img2pdf-retention')).toHaveAttribute('data-auth', 'in')
+      return
+    }
+    if (target.state === 'completed-anonymous') {
+      await expect(page.locator('[data-state="completed"]')).toBeVisible()
+      await expect(page.getByText('已生成 · 未登录不留存')).toBeVisible()
+      await expect(page.getByTestId('img2pdf-retention')).toHaveAttribute('data-auth', 'out')
       return
     }
     await expect(page.getByText('PDF 生成校验失败，请重试', { exact: true })).toBeVisible()

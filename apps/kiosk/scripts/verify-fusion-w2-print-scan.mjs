@@ -487,10 +487,23 @@ assert.match(
   /idempotencyKey:\s*nextKey\.key/,
   'convert still sends the idempotency key on the request',
 )
+// 2026-10-06 T19-fix1：共享无人值守文案已进候选。失败态不再放「联系工作人员」
+// 那颗按钮（点了只是去帮助页，现场没有人接），改用 helpNeededLine，号码从接口来；
+// 出路是「返回打印扫描」和页上的「问小青」。
 assert.match(
   read('src/pages/print-scan/ConvertImagesPanels.tsx'),
-  /联系工作人员/,
-  'existing error CTA still says 联系工作人员 until the site-wide help replacement',
+  /helpNeededLine\(useSupportContact\(\)\)/,
+  'convert failure help uses the shared unattended phone line',
+)
+assert.doesNotMatch(
+  convertImages,
+  /联系工作人员|服务台/,
+  'convert page does not tell the user to find staff or a service desk',
+)
+assert.match(
+  convertImages,
+  /旋转 90° <b>现在不能用<\/b>。这一页先不改图片方向，避免你以为转过了、打出来却没变。/,
+  'rotate note uses the v2 sentence: the control does not change the picture',
 )
 assert.match(
   read('src/pages/print-scan/styles/convert-images-qx.css'),

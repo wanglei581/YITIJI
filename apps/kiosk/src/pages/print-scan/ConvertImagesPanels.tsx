@@ -14,12 +14,16 @@ import {
   XIcon,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import {
   MAX_IMAGES,
   MAX_OUTPUT_BYTES,
   MAX_SINGLE_IMAGE_BYTES,
   MAX_TOTAL_INPUT_BYTES,
   formatBytes,
+  imageMetaLine,
+  listCountsLabel,
   totalBytesOf,
   type ConvertError,
   type ConvertPhase,
@@ -71,12 +75,13 @@ export function Rules() {
   )
 }
 
-export function Retention({ loggedIn }: { loggedIn: boolean }) {
+export function Retention({ saved }: { saved: boolean }) {
   return (
-    <div className="i2p-pgrp" data-testid="img2pdf-retention" data-auth={loggedIn ? 'in' : 'out'}>
+    <div className="i2p-pgrp" data-testid="img2pdf-retention" data-auth={saved ? 'in' : 'out'}>
       <h4>生成之后放哪</h4>
+      <div className="i2p-band-p">带走一份按顺序排好的 PDF。</div>
       <div className="i2p-band-p">
-        {loggedIn
+        {saved
           ? <>转换生成的 PDF 会进<b>「我的文档」</b>，默认保存约 24 小时，可以在那一页手动延长保存期限。</>
           : <><b>登录后再转换，才会存进「我的文档」</b>；不登录也能转换、直接打印，但转好之后再登录也存不进去。这是公用终端，也<b>不会下载到本机</b>。</>}
       </div>
@@ -145,35 +150,37 @@ export function ImageList({
   selected,
   onSelect,
   onPreview,
+  mode = 'edit',
 }: {
   images: SelectedImage[]
   selected: number | null
   onSelect: (index: number) => void
   onPreview: (index: number) => void
+  mode?: 'edit' | 'output'
 }) {
   const names = images.map((img) => img.name)
-  const total = totalBytesOf(images)
+  const output = mode === 'output'
   return (
-    <div className="i2p-lwrap qx-grow" data-testid="img2pdf-list" data-count={images.length}>
+    <div className="i2p-lwrap qx-grow" data-testid="img2pdf-list" data-count={images.length} data-mode={mode}>
       <div className="i2p-lhead">
-        <span>待合并图片</span>
+        <span>{output ? '页序与来源' : '待合并图片'}</span>
         <span className="sub" data-testid="img2pdf-counts">
-          {images.length} / {MAX_IMAGES} 张 · 合计 {formatBytes(total)} / {formatBytes(MAX_TOTAL_INPUT_BYTES)}
+          {output ? `${images.length} 页 · 与提交顺序一致` : listCountsLabel(images)}
         </span>
       </div>
       <div
         className="i2p-lrows"
         data-testid="img2pdf-scroll"
         tabIndex={0}
-        aria-label="待合并图片列表，可上下滚动"
+        aria-label={output ? 'PDF 页序列表，可上下滚动' : '待合并图片列表，可上下滚动'}
       >
         {images.map((img, index) => (
           <div key={img.fileId} className="i2p-irow" data-testid={`img2pdf-row-${index}`} data-name={img.name}>
             <button
               type="button"
               className="i2p-ipick"
-              aria-pressed={selected === index}
-              aria-label={`选中第 ${index + 1} 张：${img.name}`}
+              aria-pressed={output ? undefined : selected === index}
+              aria-label={output ? `打开这份 PDF 的第 ${index + 1} 页（来自 ${img.name}）` : `选中第 ${index + 1} 张：${img.name}`}
               onClick={() => onSelect(index)}
             >
               <span className="i2p-idx">{index + 1}</span>
@@ -181,14 +188,14 @@ export function ImageList({
                 <img src={img.fileAccessUrl} alt={`${img.name} 缩略图`} />
               </span>
               <span className="i2p-imeta">
-                <b>{img.name}</b>
-                <span>{img.size} · {img.source === 'qr' ? '手机扫码上传' : '本机上传'}</span>
+                <b>{output ? `第 ${index + 1} 页` : img.name}</b>
+                <span>{output ? `来自 ${img.name} · 按 A4 居中放大，不裁切` : imageMetaLine(img)}</span>
               </span>
             </button>
             <button
               type="button"
               className="i2p-ibtn"
-              aria-label={`完整查看第 ${index + 1} 张：${img.name}`}
+              aria-label={output ? `完整查看第 ${index + 1} 页` : `完整查看第 ${index + 1} 张：${img.name}`}
               onClick={() => onPreview(index)}
             >
               <EyeIcon size={26} />
@@ -250,7 +257,7 @@ export function SelBar({
       </div>
       {reason ? <div className="i2p-rotnote" id="selreason" data-testid="img2pdf-selreason">{reason}</div> : null}
       <div className="i2p-rotnote" id="rotreason" data-testid="img2pdf-rotnote">
-        旋转 90° <b>当前不可用</b>：格式转换还不能旋转，这一步也还没接上。按钮保持禁用，不会制造“已经旋转但导出没变化”的假操作。
+        旋转 90° <b>现在不能用</b>。这一页先不改图片方向，避免你以为转过了、打出来却没变。
       </div>
     </>
   )
@@ -364,7 +371,7 @@ export function EmptyBody({
           <div className="i2p-epsteps">
             <div className="i2p-epstep"><span className="i2p-sn">1</span><span className="i2p-sb"><b>选中一张，排顺序</b>选中之后上移 / 下移立刻改写序号；移除之后剩下的序号也会重排，不留空位。</span></div>
             <div className="i2p-epstep"><span className="i2p-sn">2</span><span className="i2p-sb"><b>一张图占一页</b>按 A4 居中放大，不裁切也不拼版。<em>旋转 90° 当前不可用</em>，按钮一直保持禁用。</span></div>
-            <div className="i2p-epstep"><span className="i2p-sn">3</span><span className="i2p-sb"><b>合成一份 PDF</b>带走一份按顺序排好的 PDF。这里不显示百分比，结果回来才算完成。</span></div>
+            <div className="i2p-epstep"><span className="i2p-sn">3</span><span className="i2p-sb"><b>合成一份 PDF</b>做完才能带走。这里不显示百分比，结果回来才算完成。</span></div>
           </div>
           <div className="i2p-ep-cap">左边是<b>空位示意</b>，不是已有文件。这一页<b>不替你排序</b>，也不按文件名或时间自动排。</div>
         </div>
@@ -509,18 +516,18 @@ export function ConvertImagesCta(props: {
   onPrint: () => void
   onLogin: () => void
   onDocuments: () => void
-  onHelp: () => void
   onCancelUpload: () => void
   onCloseUsb: () => void
   onPickLocal: () => void
 }) {
+  const helpText = helpNeededLine(useSupportContact())
   const { phase, imageCount, error, generating, rechecking, uploading, hasEndUser } = props
   const convertLabel = `合成 ${imageCount} 张为一份 PDF`
   const ghostBack = (
     <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onBack}>返回打印扫描</button>
   )
-  const help = (
-    <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onHelp}>联系工作人员</button>
+  const helpLine = (
+    <div className="i2p-cta-reason" data-testid="img2pdf-help">{helpText}</div>
   )
 
   if (phase === 'empty') {
@@ -592,7 +599,8 @@ export function ConvertImagesCta(props: {
   if (error?.kind === 'in-progress' || error?.kind === 'result-unknown' || phase === 'rechecking') {
     return (
       <>
-        {help}
+        {helpLine}
+        {ghostBack}
         <button
           type="button"
           className="qx-btn"
@@ -609,9 +617,10 @@ export function ConvertImagesCta(props: {
   if (error?.kind === 'known-failed' || error?.kind === 'source-unavailable' || error?.kind === 'source-expired' || error?.kind === 'total-too-large' || error?.kind === 'dimensions' || error?.kind === 'output-too-large' || error?.kind === 'capability') {
     return (
       <>
-        {help}
+        {helpLine}
+        {ghostBack}
         <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" disabled={generating} onClick={props.onConvert}>
-          {generating ? '正在生成…' : '改完之后重试合成'}
+          {generating ? '正在生成…' : error?.kind === 'known-failed' ? '按原样重试合成' : '改完之后重试合成'}
         </button>
       </>
     )
