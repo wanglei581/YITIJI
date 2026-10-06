@@ -32,6 +32,7 @@ import { w6RouteCases, type W6RouteCase } from './fusion-w6-route-cases'
 import { preparePrioritySeed, priorityPlan } from './qingxu-pair-seeds'
 import { policyPagesExtraPairs, policyPagesPlan, preparePolicyPages } from './qingxu-pair-policy-pages'
 import { prepareResumePages, resumePagesExtraPairs, resumePagesPlan } from './qingxu-pair-resume-pages'
+import { mePagesPlan, prepareMePages } from './qingxu-pair-me-pages'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const PROTO_DIR = path.resolve(here, '../../../../../docs/design/kiosk-redesign-2026-08')
@@ -162,6 +163,8 @@ export type RuntimePlan =
   | { kind: 'policy-pages' }
   /** B 路 16/18–25/29/34/46/52（qingxu-pair-resume-pages.ts）。 */
   | { kind: 'resume-pages' }
+  /** 35 消息、38 文档与订单、39 简历/收藏/AI 记录/足迹（qingxu-pair-me-pages.ts）。 */
+  | { kind: 'me-pages' }
 
 interface RawPair {
   screen: string
@@ -772,7 +775,10 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
     for (const pair of raw) {
       const siblings = byScreen.get(pair.screen) ?? [pair.state]
       const route = routeOf(file, pair)
-      const priority = resumePagesPlan(file, pair.screen, pair.state) ?? priorityPlan(file, pair.screen, pair.state) ?? policyPagesPlan(file, pair.screen, pair.state)
+      const priority = resumePagesPlan(file, pair.screen, pair.state)
+        ?? priorityPlan(file, pair.screen, pair.state)
+        ?? policyPagesPlan(file, pair.screen, pair.state)
+        ?? mePagesPlan(file, pair.screen, pair.state)
       const decided = priority
         ? { plan: priority.plan, reason: priority.reason, marker: priority.marker }
         : planOf(file, pair.screen, pair.state, siblings)
@@ -810,7 +816,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
         runtimeUrl: decided.plan.kind === 'none' ? null : (priority?.runtimePath ?? runtimeUrlFor(runtimeRoute)),
         readyMarker: decided.plan.kind === 'none' ? null : marker,
         capture: !REGISTER_ONLY.has(file),
-        missingReason: decided.plan.kind === 'none' ? (decided.reason ?? (runtimeRoute ? '没有现成注册器覆盖这一态' : '稿没有对应运行时路由')) : null,
+        missingReason: decided.reason ?? (decided.plan.kind === 'none' ? (runtimeRoute ? '没有现成注册器覆盖这一态' : '稿没有对应运行时路由') : null),
         plan: decided.plan.kind === 'w6' && !runtimeUrlFor(runtimeRoute)
           ? { kind: 'none' }
           : decided.plan,
@@ -890,6 +896,11 @@ export async function prepareRuntime(page: Page, api: ApiRouter, target: QingxuP
   if (target.plan.kind === 'resume-pages') {
     registerEvidenceShell(api)
     await prepareResumePages(page, api, target)
+    return
+  }
+  if (target.plan.kind === 'me-pages') {
+    registerEvidenceShell(api)
+    await prepareMePages(page, api, target)
     return
   }
   if (target.plan.kind === 'fair') {
