@@ -192,6 +192,8 @@ jobs:
           # 统一清场（隐私 P0，W-42/W-43/W-75/W-64/B-12）：所有离场出口经 endKioskUse、首页登录态不露个人信息、
           # 个人资产页进门前 30 秒「还是你吗？」。源码文本断言 + 四步顺序与 30 秒判据单测真跑，不连网。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-end-use
+          # 无人值守标准句与公开服务联系方式（10/6）：读不到接口时按最保守的一套，号码 / 服务时间 / 附近终端 / 小程序发布从接口读，单测真跑源码。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-support-contact
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
@@ -337,6 +339,10 @@ jobs:
       - name: Production builds are not React development builds
         # 10/4 W-118：走查栈用 NODE_ENV=development 构出了 React 开发版，StrictMode 把挂载副作用执行两遍，造出成对请求的假象。
         run: pnpm verify:prod-react-build
+
+      - name: Kiosk web font subset covers every character in source
+        # 10/6 一体机打包思源宋体 / 思源黑体子集（Qingxu Serif / Qingxu Sans）；新文案里的字不在子集就会退回系统字体。在构建之后跑，顺带核对产物里有字体文件。
+        run: pnpm verify:kiosk-font-subset
 
       - name: Release provenance fixture
         # 仅验证临时 release/artifact 目录与 fake PM2/health；不得连接任何环境。
@@ -735,6 +741,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:legal-doc-version
+          pnpm --filter @ai-job-print/api verify:support-contact
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-auth-races
           pnpm --filter @ai-job-print/api verify:member-step-up
@@ -766,6 +773,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:recruitment-integration-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:llm-account-unavailable
           pnpm --filter @ai-job-print/api verify:advisor-work
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment-consent
@@ -789,6 +797,8 @@ jobs:
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
           pnpm --filter @ai-job-print/api verify:ai-quota
+          # 后台定时任务一次失败不能让 API 进程退出（10/6 P0：P2028 让 Node 22 直接退出）；import src，放在建库之后。
+          pnpm --filter @ai-job-print/api verify:background-task-safety
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:kiosk-session
@@ -1067,6 +1077,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:llm-account-unavailable
           pnpm --filter @ai-job-print/api verify:advisor-work
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment
@@ -1335,6 +1346,12 @@ jobs:
         # 与既有 mock 包的 27 条用例互不影响（另起端口、另起 webServer）。
         working-directory: apps/admin
         run: node scripts/run-e2e.mjs --config=playwright.screen.config.ts
+
+      - name: Run Admin member-closure browser E2E
+        # 会员账号注销的管理员执行：mock 包里用户列表恒为空，走不到注销对话框，
+        # 所以与大屏一样用 VITE_API_MODE=http 构建 + page.route 夹具单独跑（不访问真实用户）。
+        working-directory: apps/admin
+        run: node scripts/run-e2e.mjs --config=playwright.users.config.ts
 
       - name: Run Partner data-screen browser E2E
         run: pnpm --filter @ai-job-print/partner test:e2e:screen

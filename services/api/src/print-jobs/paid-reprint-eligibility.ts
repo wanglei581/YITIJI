@@ -179,12 +179,19 @@ async function latestAgentVersions(
   return versions
 }
 
+export async function latestHeartbeatAgentVersions(
+  prisma: HeartbeatReader | PrismaService,
+  terminalIds: string[],
+): Promise<Map<string, string | null>> {
+  return latestAgentVersions(prisma, terminalIds)
+}
+
 export async function latestHeartbeatAgentVersion(
   prisma: HeartbeatReader | PrismaService,
   terminalId: string | null | undefined,
 ): Promise<string | null> {
   if (!terminalId) return null
-  const versions = await latestAgentVersions(prisma, [terminalId])
+  const versions = await latestHeartbeatAgentVersions(prisma, [terminalId])
   return versions.get(terminalId) ?? null
 }
 
