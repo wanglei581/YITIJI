@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 579,
+    "endpointCount": 580,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -8533,6 +8533,28 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
+        "handler": "CreateInterviewDto.printTranscript",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "MockInterviewReport",
+          "MockInterviewSession",
+          "MockInterviewTurn",
+          "PrintTask"
+        ],
+        "path": "/api/v1/mock-interviews/:id/transcript/print",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/mock-interview/interview-transcript-print.service.ts"
+        ],
+        "services": [
+          "InterviewTranscriptPrintService"
+        ]
+      },
+      {
+        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
         "handler": "CreateInterviewDto.questionAudio",
         "method": "POST",
         "models": [
@@ -12195,7 +12217,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 236,
+      "reachableFileCount": 238,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12963,11 +12985,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 262
+      "sourceFileCount": 264
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 638,
+      "reachableFileCount": 639,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15943,7 +15965,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 735
+      "sourceFileCount": 736
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -17271,6 +17293,7 @@
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/member-privacy/member-closure-files.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -17282,6 +17305,7 @@
         ],
         "usedBy": [
           "services/api/src/member-privacy/member-closure.service.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ]
       },
@@ -19174,9 +19198,18 @@
     "apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/ai-plan/AdvisorTakeaway.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
     "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-public-screen-mask.mjs"
+    ],
+    "apps/kiosk/src/pages/ai-plan/advisorArtifactModel.ts": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
+    "apps/kiosk/src/pages/ai-plan/styles/advisor-artifact-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
@@ -24633,6 +24666,9 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "services/api/scripts/verify-miniapp-review-backend.ts"
     ],
+    "services/api/src/common/process/background-task.ts": [
+      "services/api/scripts/verify-background-task-safety.ts"
+    ],
     "services/api/src/common/recruitment-capability.ts": [
       "services/api/scripts/verify-recruitment-capability-gate.ts"
     ],
@@ -25886,6 +25922,12 @@
       "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
+    "services/api/src/mock-interview/interview-transcript-pdf.service.ts": [
+      "services/api/scripts/verify-mock-interview.ts"
+    ],
+    "services/api/src/mock-interview/interview-transcript-print.service.ts": [
+      "services/api/scripts/verify-mock-interview.ts"
+    ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -25899,6 +25941,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
     "services/api/src/mock-interview/mock-interview.module.ts": [
@@ -27034,6 +27077,7 @@
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-background-task-safety.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
@@ -28889,7 +28933,10 @@
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx",
+          "apps/kiosk/src/pages/ai-plan/AdvisorTakeaway.tsx",
           "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx",
+          "apps/kiosk/src/pages/ai-plan/advisorArtifactModel.ts",
+          "apps/kiosk/src/pages/ai-plan/styles/advisor-artifact-qx.css",
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx",
@@ -35282,6 +35329,25 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/common/process/background-task.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-background-task-safety.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:background-task-safety"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "services",
           "services/api/prisma/postgres/migrations"
@@ -38816,7 +38882,10 @@
           "services/api/src/mock-interview/interview-practice-sheet-pdf.service.ts",
           "services/api/src/mock-interview/interview-practice-sheet.ts",
           "services/api/src/mock-interview/interview-report-pdf.service.ts",
+          "services/api/src/mock-interview/interview-transcript-pdf.service.ts",
+          "services/api/src/mock-interview/interview-transcript-print.service.ts",
           "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
