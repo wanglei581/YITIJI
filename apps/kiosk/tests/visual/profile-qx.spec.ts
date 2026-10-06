@@ -1,9 +1,16 @@
 import type { Page } from '@playwright/test'
+import { UNATTENDED_FORBIDDEN_PHRASES } from '../../src/copy/unattendedCopy'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
+
+/** 默认夹具号码与服务时间，见 tests/fixtures/api-router.ts 的 support-contact。 */
+const FIXTURE_SERVICE_PHONE = '18369161921'
+const FIXTURE_SERVICE_HOURS = '工作日 9:00–18:00'
+const NO_PHONE_HINT = '查看《隐私政策》里的联系方式'
+const FIXTURE_HELP_LINE = `需要帮助？拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）`
 
 const MEMBER_TOKEN = 'qx-profile-member-token'
 const MEMBER_PHONE = '13800138000'
@@ -482,14 +489,15 @@ test('me error cta on documents and notifications includes 问小青 @w5-kiosk',
 
   await loginThroughVisibleUi(page, '/me/documents')
   const documentsRow = page.locator('.qx-me-cta-row')
-  await expect(documentsRow.getByRole('button', { name: '联系工作人员', exact: true })).toBeVisible()
+  // 2026-10-06：10/4 无人值守。失败态不再叫「联系工作人员」，改为「帮助中心」，仍去 /help。
+  await expect(documentsRow.getByRole('button', { name: '帮助中心', exact: true })).toBeVisible()
   await expect(documentsRow.getByTestId('qx-me-ask')).toHaveAccessibleName('问小青：怎么打')
   await expect(documentsRow.getByRole('button', { name: '重新加载', exact: true }).locator('svg')).toHaveCount(1)
   await expect(documentsRow.locator('.qx-btn')).toHaveCount(3)
 
   await loginThroughVisibleUi(page, '/me/notifications')
   const notificationsRow = page.locator('.qx-me-cta-row')
-  await expect(notificationsRow.getByRole('button', { name: '联系工作人员', exact: true })).toBeVisible()
+  await expect(notificationsRow.getByRole('button', { name: '帮助中心', exact: true })).toBeVisible()
   await expect(notificationsRow.getByTestId('qx-me-ask')).toHaveAccessibleName('问小青')
   await expect(notificationsRow.getByRole('button', { name: '重新加载', exact: true }).locator('svg')).toHaveCount(1)
   await expect(notificationsRow.locator('.qx-btn')).toHaveCount(3)
@@ -740,5 +748,77 @@ test('profile empty third row points at official channels when hosting is closed
   await expectEmptyThirdRow(page, '看看机构官方渠道', '看看就业政策并收藏')
   await expect(page.getByTestId('profile-empty-start-third')).toContainText('这里只放本机构的官方入口，报名不在这台机器上办。')
   await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+const ME_READ_FAILURES = [
+  { path: '/me/documents', heading: '文档这次没有加载出来' },
+  { path: '/me/notifications', heading: '消息这次没有加载出来' },
+  { path: '/me/resumes', heading: '简历记录这次没有加载出来' },
+  // 记录详情的「联系工作人员」键在加载失败态。不存在的 id 配上读失败，就是这一屏。
+  { path: '/me/activity/missing-c15', heading: '这条记录这次没有读到' },
+] as const
+
+function registerMeReadFailures(api: ApiRouter): void {
+  const down = { status: 500 as const, json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } } }
+  api.respond('GET', '/api/v1/me/documents', down)
+  api.respond('GET', '/api/v1/me/notifications', down)
+  api.respond('GET', '/api/v1/me/resumes', down)
+  api.respond('GET', '/api/v1/me/browse-logs', down)
+  api.respond('GET', '/api/v1/me/external-jump-logs', down)
+}
+
+async function expectNoStaffHandoff(page: Page): Promise<void> {
+  const text = await page.locator('body').innerText()
+  for (const phrase of UNATTENDED_FORBIDDEN_PHRASES) {
+    expect(text, `可见文字不含禁用说法「${phrase}」`).not.toContain(phrase)
+  }
+}
+
+test('me error pages show the fixture service phone and no staff handoff @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  registerMeReadFailures(api)
+
+  for (const item of ME_READ_FAILURES) {
+    const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.ok())
+    await loginThroughVisibleUi(page, item.path)
+    expect(await (await contact).json()).toMatchObject({
+      data: { servicePhone: FIXTURE_SERVICE_PHONE, serviceHours: FIXTURE_SERVICE_HOURS },
+    })
+    await expect(page.getByRole('heading', { name: item.heading })).toBeVisible()
+    await expect(page.locator('.qx-me-cta-row').getByRole('button', { name: '帮助中心', exact: true })).toHaveAttribute('data-route', '/help')
+    await expect(page.locator('.qx-me-legal').last()).toContainText(`多次重试仍失败时，${FIXTURE_HELP_LINE}`)
+    await expect(page.locator('.qx-me-guide')).toContainText(FIXTURE_SERVICE_PHONE)
+    await expect(page.locator('.qx-me-guide')).toContainText(FIXTURE_SERVICE_HOURS)
+    await expectNoStaffHandoff(page)
+  }
+
+  await page.locator('.qx-me-cta-row').getByRole('button', { name: '帮助中心', exact: true }).click()
+  await expect(page).toHaveURL(/\/help$/)
+  expect(errors).toEqual([])
+})
+
+test('me error pages point at the privacy policy when support contact is missing @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  registerMeReadFailures(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 404,
+    json: { success: false, error: { code: 'NOT_FOUND', message: 'no contact' } },
+  })
+
+  for (const item of ME_READ_FAILURES) {
+    const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+    await loginThroughVisibleUi(page, item.path)
+    expect((await contact).status()).toBe(404)
+    await expect(page.getByRole('heading', { name: item.heading })).toBeVisible()
+    await expect(page.locator('.qx-me-legal').last()).toContainText(`多次重试仍失败时，需要帮助？${NO_PHONE_HINT}`)
+    await expect(page.locator('.qx-me-guide')).toContainText(NO_PHONE_HINT)
+    await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
+    await expectNoStaffHandoff(page)
+  }
   expect(errors).toEqual([])
 })

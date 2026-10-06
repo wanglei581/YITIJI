@@ -404,7 +404,7 @@ function QxMeRecordsCta({
   if (uiState === 'error' || uiState.endsWith('error')) {
     return (
       <>
-        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
+        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>帮助中心</button>
         {askButton}
         <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={retry}>
           <RefreshCwIcon size={24} aria-hidden />
@@ -479,10 +479,5 @@ export const QX_ME_GUIDE = {
     ['读取范围', '只读当前账号', '不会展示其他账号的数据'],
     ['显示规则', '先显示「—」', '离开前请点结束使用，否则一段时间无操作后才会自动退出'],
     ['失败怎么办', '保留重试入口', '读取失败不会改动任何已有数据'],
-  ],
-  error: [
-    ['数据', '已保存内容不受影响', '这次加载失败不会删除任何记录'],
-    ['先试这个', '检查网络后重试', '重试不会重复创建记录'],
-    ['仍不行', '联系现场工作人员', '可在帮助页找到联系方式'],
   ],
 } as const satisfies Record<string, [string, string, string][]>

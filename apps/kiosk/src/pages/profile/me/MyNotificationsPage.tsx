@@ -20,6 +20,8 @@ import {
   XIcon,
 } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
+import { helpNeededLine, servicePhoneLine, type PublicSupportContact } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { API_MODE } from '../../../services/api/client'
 import {
   deleteMyNotification,
@@ -47,11 +49,17 @@ const LOADING_GUIDE: [string, string, string][] = [
   ['显示规则', '不闪回旧消息', '离开前请点结束使用，否则一段时间无操作后才会自动退出'],
   ['失败怎么办', '保留重试入口', '读取失败不会改动已读状态'],
 ]
-const ERROR_GUIDE: [string, string, string][] = [
-  ['数据', '已有消息不受影响', '这次加载失败不会删除任何消息'],
-  ['先试这个', '检查网络后重试', '重试不会重复标记已读'],
-  ['仍不行', '联系现场工作人员', '可在帮助页找到联系方式'],
-]
+/** 第三格是号码与服务时间。没号码时改为隐私政策里的联系方式，不重复「拨打服务电话 」前缀。 */
+function notificationErrorGuide(contact: PublicSupportContact): [string, string, string][] {
+  const line = servicePhoneLine(contact)
+  const prefix = '拨打服务电话 '
+  const detail = line.startsWith(prefix) ? line.slice(prefix.length) : line
+  return [
+    ['数据', '已有消息不受影响', '这次加载失败不会删除任何消息'],
+    ['先试这个', '检查网络后重试', '重试不会重复标记已读'],
+    ['仍不行', '拨打服务电话', detail],
+  ]
+}
 
 type LoadState = 'loading' | 'error' | 'ready'
 type Toast = { tone: 'ok' | 'bad'; text: string }
@@ -74,6 +82,7 @@ function screenStateOf(opts: {
 }
 
 export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { loginFrom?: string }) {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -196,9 +205,9 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
           <QxMeBanner tone="warn" title="消息这次没有加载出来" desc={<>当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>，所以一律显示「—」；已读状态和已有消息不会因为这次失败而改变。</>} minis={['未读 —', '本次未取到']} />
           <section className="qx-me-list qx-me-grow" aria-label="本次未取到的消息类型">
             {CAT_ORDER.map((cat) => <CategoryStructRow key={cat} cat={cat} mode="error" />)}
-            <div className="qx-me-legal">重试不会重复标记已读，也不会删除消息。多次重试仍失败时，可以让现场工作人员协助查询。</div>
+            <div className="qx-me-legal">重试不会重复标记已读，也不会删除消息。多次重试仍失败时，{helpNeededLine(contact)}</div>
           </section>
-          <QxMeGuide items={ERROR_GUIDE} />
+          <QxMeGuide items={notificationErrorGuide(contact)} />
         </>
       )
     } else {
@@ -308,7 +317,7 @@ function notificationCtabar({
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
+        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>帮助中心</button>
         <QxMeAskSlot />
         <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={refresh}>
           <RefreshCwIcon size={24} aria-hidden />

@@ -167,7 +167,7 @@ export default function MeActivityDetailPage() {
 
   const ctabar = uiState === 'error' ? (
     <>
-      <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
+      <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>帮助中心</button>
       <QxMeAskSlot />
       <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={load}>
         <RefreshCwIcon size={24} aria-hidden />
