@@ -1,6 +1,7 @@
 /**
- * 远程重启终端程序：真实 Nest HTTP + 真实守卫。
- * 覆盖接口定稿第 7 节。终端名与网点名用真实网点口径。
+ * 远程终端命令：真实 Nest HTTP + 真实守卫。
+ * 覆盖接口定稿第 7 节（restart_agent）和第 8 节（clear_print_queue）。
+ * 终端名与网点名用真实网点口径。
  */
 import { createServer, type AddressInfo } from 'node:http'
 import { inspect } from 'node:util'
@@ -41,7 +42,10 @@ async function main(): Promise<void> {
   const memberPhone = '13966081234'
   const orderId = `ord_tcmd_${suffix}`
   const fileId = `file_tcmd_${suffix}`
-  const leaked = [memberNickname, memberPhone, orderId, fileId, endUserId]
+  const documentName = 'qingxu-resume-draft.pdf'
+  const accountName = 'queue-account-88'
+  const jobTitle = '前台文员'
+  const leaked = [memberNickname, memberPhone, orderId, fileId, endUserId, documentName, accountName, jobTitle]
 
   const app = await NestFactory.create<INestApplication>(AppModule, { logger: ['error'] })
   app.setGlobalPrefix('api/v1')
@@ -167,6 +171,30 @@ async function main(): Promise<void> {
       code: `QD-LS-${suffix}`,
       name: '崂山区就业服务中心 4 号机',
       token: `tok-laoshan-${suffix}`,
+    })
+    const queue = await terminal({
+      key: 'queue',
+      code: `QD-XH-${suffix}`,
+      name: '西海岸新区就业服务中心 11 号机',
+      token: `tok-queue-${suffix}`,
+    })
+    const mix = await terminal({
+      key: 'mix',
+      code: `QD-GX-${suffix}`,
+      name: '高新区就业服务中心 12 号机',
+      token: `tok-mix-${suffix}`,
+    })
+    const expiry = await terminal({
+      key: 'expiry',
+      code: `QD-LG-${suffix}`,
+      name: '蓝谷就业服务中心 13 号机',
+      token: `tok-expiry-${suffix}`,
+    })
+    const zero = await terminal({
+      key: 'zero',
+      code: `QD-SN2-${suffix}`,
+      name: '市南区就业服务中心 14 号机',
+      token: `tok-zero-${suffix}`,
     })
     const blocked = [
       ['planned', '黄岛区就业服务中心 5 号机', 'planned', true, `planned$${suffix}huangdao`],
@@ -370,34 +398,178 @@ async function main(): Promise<void> {
     assert(failedRow.status === 'failed' && failedRow.resultCode === 'no_heartbeat_after_restart', '超过 15 分钟没有完成则失败')
     assert(hits.some((hit) => hit.includes('远程重启后没有恢复心跳') && hit.includes('崂山区就业服务中心 4 号机')), '失败时推送没有恢复心跳')
 
+    const ackPath = (terminalId: string, commandId: string) => `/terminals/${terminalId}/commands/${commandId}/ack`
+    const commandRow = (id: string) => prisma.terminalCommand.findUniqueOrThrow({ where: { id } })
+
+    const queued = await send('POST', issuePath(queue.id), adminToken, { type: 'clear_print_queue' })
+    assert(queued.status === 200 && queued.body.data?.type === 'clear_print_queue' && queued.body.data?.status === 'pending', '可以下发清空打印队列')
+    assert(queued.body.data?.remainingJobs === null, '未回执的清空命令还没有剩余作业数')
+    const queuedId = queued.body.data.id as string
+    const queuedBeat = await beat(queue)
+    assert(queuedBeat.body.commands?.[0]?.id === queuedId && queuedBeat.body.commands?.[0]?.type === 'clear_print_queue', '心跳带出 clear_print_queue')
+    const northDuring = await beat(north)
+    const northDuringIds = (northDuring.body.commands ?? []).map((item: { id: string }) => item.id)
+    assert(!northDuringIds.includes(queuedId), '清空队列命令不出现在别的终端心跳里')
+
+    const dirtyAck = await send('POST', ackPath(queue.id, queuedId), queue.agentToken, {
+      result: 'done',
+      documentName,
+      account: accountName,
+      jobTitle,
+    })
+    assert(dirtyAck.status === 400 && dirtyAck.body.error?.code === 'VALIDATION_FAILED', '回执里的文档名和账号被拒绝')
+    assert((await commandRow(queuedId)).status === 'pending', '非法回执不改变待执行状态')
+
+    const doneNonZero = await send('POST', ackPath(queue.id, queuedId), queue.agentToken, { result: 'done', remainingJobs: 2 })
+    assert(doneNonZero.status === 400 && doneNonZero.body.error?.code === 'TERMINAL_COMMAND_ACK_INVALID', 'done 带非 0 被拒绝')
+    const failedMissing = await send('POST', ackPath(queue.id, queuedId), queue.agentToken, { result: 'failed' })
+    assert(failedMissing.status === 400 && failedMissing.body.error?.code === 'TERMINAL_COMMAND_ACK_INVALID', 'failed 不带 remainingJobs 被拒绝')
+    const failedNegative = await send('POST', ackPath(queue.id, queuedId), queue.agentToken, { result: 'failed', remainingJobs: -1 })
+    assert(failedNegative.status === 400 && failedNegative.body.error?.code === 'TERMINAL_COMMAND_ACK_INVALID', 'failed 带负数被拒绝')
+    const failedFloat = await send('POST', ackPath(queue.id, queuedId), queue.agentToken, { result: 'failed', remainingJobs: 1.5 })
+    assert(failedFloat.status === 400 && failedFloat.body.error?.code === 'TERMINAL_COMMAND_ACK_INVALID', 'failed 带小数被拒绝')
+    assert((await commandRow(queuedId)).status === 'pending', '无效回执后清空命令仍待执行')
+
+    const doneAck = await send('POST', ackPath(queue.id, queuedId), queue.agentToken, { result: 'done' })
+    assert(doneAck.status === 200 && doneAck.body.data?.result === 'done' && Object.keys(doneAck.body.data).length === 1, '省略剩余作业数时完成回执只返回结果')
+    const doneRow = await commandRow(queuedId)
+    assert(doneRow.status === 'done' && doneRow.remainingJobs === 0 && doneRow.acceptedAt === null, '完成不经过 accepted，剩余作业数记 0')
+    const doneAgain = await send('POST', ackPath(queue.id, queuedId), queue.agentToken, { result: 'failed', remainingJobs: 9 })
+    assert(doneAgain.body.data?.result === 'done', '清空完成后的重复回执幂等')
+    const doneFinishedBefore = await prisma.auditLog.count({
+      where: { action: 'terminal.command.finished', payloadJson: { contains: queuedId } },
+    })
+    await send('POST', ackPath(queue.id, queuedId), queue.agentToken, { result: 'done' })
+    const doneFinishedAfter = await prisma.auditLog.count({
+      where: { action: 'terminal.command.finished', payloadJson: { contains: queuedId } },
+    })
+    assert(doneFinishedBefore === 1 && doneFinishedAfter === 1, '清空完成的重复回执不再写第二条结束审计')
+    const doneBeat = await beat(queue)
+    assert(!Object.prototype.hasOwnProperty.call(doneBeat.body, 'commands'), '清空完成后心跳不再带这条命令')
+
+    const restartOnQueue = await send('POST', issuePath(queue.id), adminToken, { type: 'restart_agent' })
+    const restartOnQueueId = restartOnQueue.body.data.id as string
+    const restartDone = await send('POST', ackPath(queue.id, restartOnQueueId), queue.agentToken, { result: 'done' })
+    assert(restartDone.status === 400 && restartDone.body.error?.code === 'TERMINAL_COMMAND_ACK_INVALID', 'restart_agent 回 done 被拒绝')
+    const restartFailed = await send('POST', ackPath(queue.id, restartOnQueueId), queue.agentToken, { result: 'failed', remainingJobs: 1 })
+    assert(restartFailed.status === 400 && restartFailed.body.error?.code === 'TERMINAL_COMMAND_ACK_INVALID', 'restart_agent 回 failed 被拒绝')
+    assert((await commandRow(restartOnQueueId)).status === 'pending', '不匹配的回执不推进重启命令')
+    const restartBusy = await send('POST', ackPath(queue.id, restartOnQueueId), queue.agentToken, { result: 'rejected_busy' })
+    assert(restartBusy.body.data?.result === 'rejected_busy', '重启命令仍可以因终端忙结束')
+
+    const failedIssue = await send('POST', issuePath(queue.id), adminToken, { type: 'clear_print_queue' })
+    const failedId = failedIssue.body.data.id as string
+    const hitsBefore = hits.length
+    const failedAck = await send('POST', ackPath(queue.id, failedId), queue.agentToken, { result: 'failed', remainingJobs: 4 })
+    assert(failedAck.status === 200 && failedAck.body.data?.result === 'failed' && Object.keys(failedAck.body.data).length === 1, '失败回执只返回结果')
+    const clearFailedRow = await commandRow(failedId)
+    assert(clearFailedRow.status === 'failed' && clearFailedRow.remainingJobs === 4 && clearFailedRow.acceptedAt === null, '失败直接落库并记下剩余作业数')
+    const failedAgain = await send('POST', ackPath(queue.id, failedId), queue.agentToken, { result: 'done' })
+    assert(failedAgain.body.data?.result === 'failed', '失败后的重复回执返回已落库结果')
+    const clearHits = hits.filter((hit) => hit.includes('清空打印队列失败'))
+    assert(clearHits.length === 1, '失败只推一条清空队列告警')
+    assert(clearHits[0]?.includes('还剩 4 个作业') && clearHits[0]?.includes('西海岸新区就业服务中心 11 号机'), '告警标题含网点名和剩余数量')
+    assert(!clearHits[0]?.includes(documentName) && !clearHits[0]?.includes(jobTitle) && !clearHits[0]?.includes(accountName), '告警不含文档名、账号或作业标题')
+    assert(hits.length === hitsBefore + 1, '重复失败回执不再推第二条告警')
+
+    const fourthOnQueue = await send('POST', issuePath(queue.id), adminToken, { type: 'restart_agent' })
+    assert(fourthOnQueue.status === 429 && fourthOnQueue.body.error?.code === 'TERMINAL_COMMAND_RATE_LIMITED', '清空和重启合计满 3 次后被限频')
+
+    const mixOpen = await send('POST', issuePath(mix.id), adminToken, { type: 'restart_agent' })
+    const mixBlocked = await send('POST', issuePath(mix.id), adminToken, { type: 'clear_print_queue' })
+    assert(mixBlocked.status === 409 && mixBlocked.body.error?.code === 'TERMINAL_COMMAND_PENDING', '未结束的重启挡住清空队列')
+    assert(mixBlocked.body.error?.commandId === mixOpen.body.data?.id, '跨类型冲突带上已存在命令的 id')
+    assert(await prisma.terminalCommand.count({ where: { terminalId: mix.id, status: { in: ['pending', 'accepted'] } } }) === 1, '跨类型仍只有一条未结束命令')
+    await send('POST', ackPath(mix.id, mixOpen.body.data.id), mix.agentToken, { result: 'rejected_busy' })
+    const mixSecond = await send('POST', issuePath(mix.id), adminToken, { type: 'restart_agent' })
+    await send('POST', ackPath(mix.id, mixSecond.body.data.id), mix.agentToken, { result: 'rejected_busy' })
+    const mixClear = await send('POST', issuePath(mix.id), adminToken, { type: 'clear_print_queue' })
+    const mixClearAck = await send('POST', ackPath(mix.id, mixClear.body.data.id), mix.agentToken, { result: 'rejected_busy' })
+    assert(mixClearAck.body.data?.result === 'rejected_busy', '清空队列可以因终端忙结束')
+    assert((await commandRow(mixClear.body.data.id)).remainingJobs === null, '终端忙不记剩余作业数')
+    const mixFourth = await send('POST', issuePath(mix.id), adminToken, { type: 'restart_agent' })
+    assert(mixFourth.status === 429 && mixFourth.body.error?.code === 'TERMINAL_COMMAND_RATE_LIMITED', '2 次重启加 1 次清队列后第 4 次被限频')
+    const mixFourthClear = await send('POST', issuePath(mix.id), adminToken, { type: 'clear_print_queue' })
+    assert(mixFourthClear.status === 429, '合计限频对清空队列同样生效')
+
+    const agentExpired = await send('POST', issuePath(expiry.id), adminToken, { type: 'clear_print_queue' })
+    const agentExpiredAck = await send('POST', ackPath(expiry.id, agentExpired.body.data.id), expiry.agentToken, { result: 'expired' })
+    assert(agentExpiredAck.body.data?.result === 'expired', '清空队列可以回执已过期')
+    const serverExpiredClear = await send('POST', issuePath(expiry.id), adminToken, { type: 'clear_print_queue' })
+    await prisma.terminalCommand.update({
+      where: { id: serverExpiredClear.body.data.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    })
+    const forcedClear = await send('POST', ackPath(expiry.id, serverExpiredClear.body.data.id), expiry.agentToken, { result: 'done', remainingJobs: 3 })
+    assert(forcedClear.body.data?.result === 'expired', '已过期的清空命令一律返回 expired')
+    const forcedClearRow = await commandRow(serverExpiredClear.body.data.id)
+    assert(forcedClearRow.status === 'expired' && forcedClearRow.remainingJobs === null, '过期回执不记剩余作业数')
+    const sweepClear = await send('POST', issuePath(expiry.id), adminToken, { type: 'clear_print_queue' })
+    await prisma.terminalCommand.update({
+      where: { id: sweepClear.body.data.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    })
+    await commands.sweep(new Date())
+    assert((await commandRow(sweepClear.body.data.id)).status === 'expired', '清扫会把过期的待执行清空命令改成已过期')
+    await prisma.terminalCommand.update({
+      where: { id: sweepClear.body.data.id },
+      data: { status: 'accepted', acceptedAt: new Date(Date.now() - 16 * 60 * 1000), resultCode: null, finishedAt: null },
+    })
+    await commands.sweep(new Date())
+    const parkedClear = await commandRow(sweepClear.body.data.id)
+    assert(parkedClear.status === 'accepted' && parkedClear.resultCode !== 'no_heartbeat_after_restart', '清空队列不因接受后无心跳被判失败')
+
+    const zeroIssue = await send('POST', issuePath(zero.id), adminToken, { type: 'clear_print_queue' })
+    const zeroWrong = await send('POST', ackPath(zero.id, zeroIssue.body.data.id), zero.agentToken, { result: 'accepted' })
+    assert(zeroWrong.status === 400 && zeroWrong.body.error?.code === 'TERMINAL_COMMAND_ACK_INVALID', '清空队列回 accepted 被拒绝')
+    const zeroAck = await send('POST', ackPath(zero.id, zeroIssue.body.data.id), zero.agentToken, { result: 'done', remainingJobs: 0 })
+    assert(zeroAck.body.data?.result === 'done', 'done 带 0 可以完成')
+    assert((await commandRow(zeroIssue.body.data.id)).remainingJobs === 0, '显式 0 也记成没有剩余作业')
+
     const listed = await send('GET', `${issuePath(south.id)}?limit=20`, adminToken)
     assert(listed.status === 200 && Array.isArray(listed.body.data) && listed.body.data.length >= 2, '可以查看最近命令')
     assert(listed.body.data[0].requestedAt >= listed.body.data[1].requestedAt, '命令按时间倒序')
     const sample = listed.body.data[0]
-    for (const key of ['id', 'type', 'status', 'requestedBy', 'requestedAt', 'expiresAt', 'acceptedAt', 'finishedAt', 'completedVerified', 'resultCode']) {
+    for (const key of ['id', 'type', 'status', 'requestedBy', 'requestedAt', 'expiresAt', 'acceptedAt', 'finishedAt', 'completedVerified', 'resultCode', 'remainingJobs']) {
       assert(Object.prototype.hasOwnProperty.call(sample, key), `视图含 ${key}`)
     }
+    assert(sample.remainingJobs === null, '重启命令的视图不带剩余作业数')
     assert(sample.requestedBy?.name === '周启明', '视图里的下发人姓名正确')
+    const queueListed = await send('GET', `${issuePath(queue.id)}?limit=20`, adminToken)
+    const failedView = queueListed.body.data.find((row: { id: string }) => row.id === failedId)
+    const doneView = queueListed.body.data.find((row: { id: string }) => row.id === queuedId)
+    assert(failedView?.remainingJobs === 4 && failedView?.status === 'failed', '失败命令的视图带剩余作业数')
+    assert(doneView?.remainingJobs === 0 && doneView?.status === 'done', '完成命令的视图剩余作业数是 0')
 
     const audits = await prisma.auditLog.findMany({ where: { targetId: { in: terminalCodes } } })
     const actions = new Set(audits.map((row) => row.action))
     assert(actions.has('terminal.command.requested'), '有下发审计')
     assert(actions.has('terminal.command.acked'), '有回执审计')
     assert(actions.has('terminal.command.finished'), '有结束审计')
-    const allowedKeys = new Set(['terminalCode', 'type', 'commandId', 'result', 'resultCode'])
+    const allowedKeys = new Set(['terminalCode', 'type', 'commandId', 'result', 'resultCode', 'remainingJobs'])
     for (const row of audits) {
       const payload = JSON.parse(row.payloadJson) as Record<string, unknown>
       assert(Object.keys(payload).every((key) => allowedKeys.has(key)), `审计只含约定字段 ${row.action}`)
+      assert(!('jobTitle' in payload) && !('documentName' in payload) && !('account' in payload), '回执审计不含作业标题、文档名或账号')
       assert(!JSON.stringify(payload).includes(memberNickname), '审计不含会员昵称')
+      assert(!JSON.stringify(payload).includes(documentName) && !JSON.stringify(payload).includes(jobTitle), '审计不含文档名或作业标题')
     }
+    const failedFinished = audits.find((row) => row.action === 'terminal.command.finished' && row.payloadJson.includes(failedId))
+    const failedPayload = JSON.parse(failedFinished?.payloadJson ?? '{}') as Record<string, unknown>
+    assert(failedPayload.type === 'clear_print_queue' && failedPayload.remainingJobs === 4, '失败结束审计带类型和剩余作业数')
+    const doneFinished = audits.find((row) => row.action === 'terminal.command.finished' && row.payloadJson.includes(queuedId))
+    const donePayload = JSON.parse(doneFinished?.payloadJson ?? '{}') as Record<string, unknown>
+    assert(donePayload.type === 'clear_print_queue' && !('remainingJobs' in donePayload), '完成审计带类型，不带剩余作业数')
     const blob = `${captured.join('\n')}\n${audits.map((row) => row.payloadJson).join('\n')}`
     for (const secretText of leaked) assert(!blob.includes(secretText), `响应和审计不含 ${secretText}`)
     assert(!blob.includes('工作人员'), '响应不含工作人员')
 
     const labels = readFileSync(resolve(__dirname, '../../../apps/admin/src/lib/auditActionLabels.ts'), 'utf8')
-    assert(labels.includes("'terminal.command.requested': '下发远程重启终端程序'"), '下发审计有中文名')
-    assert(labels.includes("'terminal.command.acked': '终端回执远程重启'"), '回执审计有中文名')
-    assert(labels.includes("'terminal.command.finished': '远程重启结束'"), '结束审计有中文名')
+    assert(labels.includes("'terminal.command.requested': '下发远程终端命令'"), '下发审计有中文名')
+    assert(labels.includes("'terminal.command.acked': '终端回执远程命令'"), '回执审计有中文名')
+    assert(labels.includes("'terminal.command.finished': '远程命令结束'"), '结束审计有中文名')
+    const serviceSource = readFileSync(resolve(__dirname, '../src/terminals/terminal-commands.service.ts'), 'utf8')
+    assert(!serviceSource.includes('工作人员') && !labels.includes('工作人员'), '命令文案不含工作人员')
   } finally {
     await prisma.terminalCommand.deleteMany({ where: { terminalId: { in: terminalIds } } }).catch(() => undefined)
     await prisma.auditLog.deleteMany({

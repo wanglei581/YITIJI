@@ -1,7 +1,7 @@
 import { Body, Controller, Headers, HttpCode, HttpStatus, Param, Post } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { AckTerminalCommandDto } from './dto/ack-terminal-command.dto'
-import { TerminalCommandService } from './terminal-commands.service'
+import { TerminalCommandService, type TerminalCommandAckResult } from './terminal-commands.service'
 
 @Controller()
 export class TerminalCommandsController {
@@ -14,7 +14,12 @@ export class TerminalCommandsController {
     @Param('commandId') commandId: string,
     @Body() dto: AckTerminalCommandDto,
     @Headers('authorization') auth: string | undefined,
-  ): Promise<ApiResponse<{ result: 'accepted' | 'rejected_busy' | 'expired' }>> {
-    return ApiResponse.ok(await this.commands.ack(terminalId, commandId, dto.result, auth))
+  ): Promise<ApiResponse<{ result: TerminalCommandAckResult }>> {
+    return ApiResponse.ok(await this.commands.ack(
+      terminalId,
+      commandId,
+      { result: dto.result, remainingJobs: dto.remainingJobs },
+      auth,
+    ))
   }
 }
