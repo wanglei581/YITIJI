@@ -189,18 +189,18 @@ export function statusForPhase(
       phase === 'uploading'
         ? '正在上传 · 结果未确认'
         : phase === 'rechecking'
-          ? '正在用同一标记再查'
-          : '正在合成 · 无进度回传'
+          ? '正在再查刚才那一次'
+          : '正在合成 · 做完才会告诉你'
     return { tone: 'unknown', label }
   }
-  if (phase === 'usb') return { tone: 'warn', label: 'U 盘来源 · 待接线' }
+  if (phase === 'usb') return { tone: 'warn', label: 'U 盘里的图还不能直接加进来' }
   if (phase === 'completed') {
     return recovered
       ? { tone: 'ok', label: '已恢复 · 没有生成第二份' }
       : { tone: 'ok', label: 'PDF 已生成' }
   }
   if (phase === 'conflict' || error?.kind === 'conflict') {
-    return { tone: 'bad', label: '同一标记、不同输入 · 冲突' }
+    return { tone: 'bad', label: '顺序和刚才那一次对不上' }
   }
   if (error) {
     if (error.kind === 'format') return { tone: 'warn', label: '有图片未能加入 · 格式' }
@@ -211,8 +211,8 @@ export function statusForPhase(
     if (error.kind === 'total-too-large') return { tone: 'warn', label: '这一批合计超过 40 MB' }
     if (error.kind === 'dimensions') return { tone: 'bad', label: '有图片像素超出上限' }
     if (error.kind === 'output-too-large') return { tone: 'warn', label: '合成结果超过 15 MB' }
-    if (error.kind === 'in-progress') return { tone: 'warn', label: '同一标记的生成还在进行' }
-    if (error.kind === 'result-unknown') return { tone: 'warn', label: '结果未知 · 需同一标记查询' }
+    if (error.kind === 'in-progress') return { tone: 'warn', label: '上一次的合成还在跑' }
+    if (error.kind === 'result-unknown') return { tone: 'warn', label: '结果未知 · 先查刚才那一次' }
     if (error.kind === 'known-failed') return { tone: 'bad', label: '明确失败 · 可原样重试' }
     return { tone: 'bad', label: '转换暂未完成' }
   }
@@ -234,16 +234,16 @@ export function advisorCopy(
     return { ask: '正在传这一张。', doing: '一次一张，没有进度百分比可显示。传成功它才进列表。' }
   }
   if (phase === 'converting') {
-    return { ask: '正在合成。', doing: '一次性请求，没有进度回传。结果出来之前我不说做完了。' }
+    return { ask: '正在合成。', doing: '做完才会告诉你。结果出来之前我不说做完了。' }
   }
   if (phase === 'rechecking') {
-    return { ask: '正在再查一次。', doing: '还是用同一个标记，没有另起一次。这一屏不会自己变成完成。' }
+    return { ask: '正在再查一次。', doing: '查的是刚才那一次，没有重新提交。这一屏不会自己变成完成。' }
   }
   if (phase === 'completed') {
     return { ask: '合好了。', doing: `${imageCount} 张图 ${imageCount} 页，页序和你排的一样。` }
   }
   if (phase === 'conflict') {
-    return { ask: '这个标识对不上。', doing: '同一个标记，顺序变了就是另一批输入。我停在这里，等你决定。' }
+    return { ask: '这一批对不上。', doing: '顺序变了，就不是刚才那一批了。我停在这里，等你决定。' }
   }
   if (error?.kind === 'format') {
     return { ask: '这张加不进来。', doing: '只收 JPG / PNG。它没进列表，顺序没被打乱。' }
@@ -252,16 +252,16 @@ export function advisorCopy(
     return { ask: '这张太大了。', doing: '单张 10 MB 以内。它没进列表，顺序没被打乱。' }
   }
   if (error?.kind === 'upload-failed') {
-    return { ask: '这张没传上去。', doing: '没拿到系统确认。它没进列表，已有的还在。' }
+    return { ask: '这张没传上去。', doing: '没拿到已经确认。它没进列表，已有的还在。' }
   }
   if (error?.kind === 'in-progress') {
-    return { ask: '上一次还在跑。', doing: '同一个标记下已经有一次在合成。不发起新的生成，拿同一个标记再查。' }
+    return { ask: '上一次还在跑。', doing: '刚才那一次已经在合成了。不重新提交，过一会儿再查它。' }
   }
   if (error?.kind === 'result-unknown') {
-    return { ask: '结果还不知道：系统的确认没送到这台机器。', doing: '不能直接再发一次，得拿同一个标记去查。' }
+    return { ask: '结果还不知道。', doing: '上一次的结果还没确认，先别重复生成。' }
   }
   if (error?.kind === 'known-failed') {
-    return { ask: '这次明确失败。', doing: '图片和顺序都还在，不用重传。用同一个标记原样重试。' }
+    return { ask: '这次明确失败。', doing: '图片和顺序都还在，不用重传。直接原样重试就行。' }
   }
   if (imageCount >= MAX_IMAGES) {
     return { ask: '已经 20 张了。', doing: '到上限了。想换一张，先选中列表里的某一张再移除。' }

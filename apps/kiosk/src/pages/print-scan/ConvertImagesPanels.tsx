@@ -364,7 +364,7 @@ export function EmptyBody({
           <div className="i2p-epsteps">
             <div className="i2p-epstep"><span className="i2p-sn">1</span><span className="i2p-sb"><b>选中一张，排顺序</b>选中之后上移 / 下移立刻改写序号；移除之后剩下的序号也会重排，不留空位。</span></div>
             <div className="i2p-epstep"><span className="i2p-sn">2</span><span className="i2p-sb"><b>一张图占一页</b>按 A4 居中放大，不裁切也不拼版。<em>旋转 90° 当前不可用</em>，按钮一直保持禁用。</span></div>
-            <div className="i2p-epstep"><span className="i2p-sn">3</span><span className="i2p-sb"><b>合成一份 PDF</b>一次性提交，系统不回传中间进度，结果回来才算完成。</span></div>
+            <div className="i2p-epstep"><span className="i2p-sn">3</span><span className="i2p-sb"><b>合成一份 PDF</b>带走一份按顺序排好的 PDF。这里不显示百分比，结果回来才算完成。</span></div>
           </div>
           <div className="i2p-ep-cap">左边是<b>空位示意</b>，不是已有文件。这一页<b>不替你排序</b>，也不按文件名或时间自动排。</div>
         </div>
@@ -379,7 +379,7 @@ export function EmptyBody({
           <span className="i2p-chip">合计 ≤ 40 MB</span>
           <span className="i2p-chip">生成的 PDF ≤ 15 MB</span>
         </div>
-        <div className="i2p-lb-n">上传<b>没拿到系统确认</b>的那一张不会进列表，已经排好的顺序也不会被打乱。</div>
+        <div className="i2p-lb-n">上传<b>没拿到已经确认</b>的那一张不会进列表，已经排好的顺序也不会被打乱。</div>
       </div>
     </>
   )
@@ -404,7 +404,7 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
   if (error.kind === 'upload-failed') {
     return (
       <Band kind="error" title="这一张没传上去" chips={['没有拿到确认', '没有进列表', '已有顺序不受影响']}>
-        <div className="i2p-band-p">上传这一张的时候<b>没有拿到系统的确认</b>。这一张<b>没有进列表</b>；已经在列表里的图片和它们的顺序都没受影响。</div>
+        <div className="i2p-band-p">上传这一张的时候<b>没有拿到已经确认</b>。这一张<b>没有进列表</b>；已经在列表里的图片和它们的顺序都没受影响。</div>
         <div className="i2p-band-p">{error.message}</div>
       </Band>
     )
@@ -450,16 +450,16 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
   }
   if (error.kind === 'in-progress') {
     return (
-      <Band kind="lock" title="上一次用同一标记的生成还在进行" chips={['系统：正在进行中', '不发起新的生成', '用同一标记再查']}>
-        <div className="i2p-band-p">系统回的是 <b>「上一次生成仍在进行中，请稍候重试」</b>。这时候<b>不发起新的生成</b>。正确做法是拿同一个标记<b>再查一次</b>。</div>
+      <Band kind="lock" title="刚才那一次的合成还在跑" chips={['上一次还在进行', '不重新提交', '再查刚才那一次']}>
+        <div className="i2p-band-p">收到的说明是 <b>「上一次生成仍在进行中，请稍候重试」</b>。这时候<b>不重新提交</b>。正确做法是<b>再查刚才那一次</b>。</div>
       </Band>
     )
   }
   if (error.kind === 'result-unknown') {
     return (
-      <Band kind="warn" title="这一次的结果不知道" chips={['结果未知', '不发起新的生成', '用同一标记查询']}>
-        <div className="i2p-band-p">请求发出去了，但<b>结果没有送到这台机器</b>。所以现在有两种可能：系统已经做完了，或者根本没做成。</div>
-        <div className="i2p-band-p">在弄清楚之前，<b>不能直接再发一次</b>。正确做法是拿<b>同一个标记</b>去查这一次的结果。</div>
+      <Band kind="warn" title="这一次的结果不知道" chips={['结果未知', '不重新提交', '只查刚才那一次']}>
+        <div className="i2p-band-p">这一批交出去了，但<b>结果没有送到这台机器</b>。所以现在有两种可能：已经做完了，或者根本没做成。</div>
+        <div className="i2p-band-p">在弄清楚之前，<b>不能当作新的一次再交</b>。正确做法是<b>再查刚才那一次</b>的结果。</div>
       </Band>
     )
   }
@@ -467,14 +467,14 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
     return (
       <Band kind="error" title="这一次明确失败了" chips={['系统已明确失败', '没有生成 PDF', '列表和顺序保留']}>
         <div className="i2p-band-p">{error.message}</div>
-        <div className="i2p-band-p">你排好的图片和顺序<b>都还在</b>，不用重新传。明确失败之后，可以再用这个标识原样提交一次。</div>
+        <div className="i2p-band-p">你排好的图片和顺序<b>都还在</b>，不用重新传。明确失败之后，可以原样再提交一次。</div>
       </Band>
     )
   }
   if (error.kind === 'conflict') {
     return (
-      <Band kind="error" title="这个标识已经用在另一批图片上了" chips={['系统已拒绝', '没有生成任何 PDF', '不自动替你决定']}>
-        <div className="i2p-band-p">系统拒绝了：<b>「该请求标识已用于另一批图片，请更换标识重试」</b>。本页<b>就停在这里</b>：不自动换标识、不自动改回旧顺序。</div>
+      <Band kind="error" title="这一批和刚才那一次对不上" chips={['已经被退回', '没有生成任何 PDF', '不自动替你决定']}>
+        <div className="i2p-band-p">这一批被退回来了：<b>刚才那一次交的是另一个顺序</b>，同样的图片换了先后，和它对不上。本页<b>就停在这里</b>：不自动重新开始、不自动改回旧顺序。</div>
       </Band>
     )
   }
@@ -557,7 +557,7 @@ export function ConvertImagesCta(props: {
   if (phase === 'converting') {
     return (
       <>
-        <div className="i2p-cta-reason">系统还没返回合成结果</div>
+        <div className="i2p-cta-reason">合成结果还没回来</div>
         {ghostBack}
         <button type="button" className="qx-btn" data-variant="primary" disabled data-testid="img2pdf-primary">
           <LoaderIcon size={22} />合成完成后可继续
@@ -582,7 +582,7 @@ export function ConvertImagesCta(props: {
   if (phase === 'conflict') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onNewKey}>换一个新标识重新提交</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onNewKey}>重新开始，当作新的一次</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" onClick={props.onRestoreOrder}>
           恢复上一次的顺序
         </button>
@@ -601,7 +601,7 @@ export function ConvertImagesCta(props: {
           disabled={rechecking}
           onClick={props.onRecheck}
         >
-          {rechecking ? '正在查询…' : error?.kind === 'result-unknown' ? '用同一个标记查这一次的结果' : '用同一个标记再查一次'}
+          {rechecking ? '正在查询…' : error?.kind === 'result-unknown' ? '再查一下刚才那一次的结果' : '再查刚才那一次'}
         </button>
       </>
     )

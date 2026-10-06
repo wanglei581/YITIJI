@@ -9,6 +9,7 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
@@ -144,7 +145,7 @@ export function ConvertImagesPage() {
       setError({
         kind: 'upload-failed',
         message: userMessageOf(err, '上传失败，请重试'),
-        rejected: { name: selectedFile.name, detail: '没有拿到系统确认' },
+        rejected: { name: selectedFile.name, detail: '没有拿到已经确认' },
       })
     } finally {
       if (gen === uploadGen.current) setUploading(false)
@@ -287,37 +288,46 @@ export function ConvertImagesPage() {
     <QxPageFrame
       back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
       title="图片转 PDF"
-      subtitle="几张图拼成一份 PDF。顺序你自己排，一张一页。"
+      subtitle="带走一份按顺序排好的 PDF。顺序你自己排，一张一页。"
       status={status}
       terminalLabel={terminalLabel}
       ctabar={
-        <ConvertImagesCta
-          phase={phase}
-          imageCount={images.length}
-          error={error}
-          generating={generating}
-          rechecking={rechecking}
-          uploading={uploading}
-          hasEndUser={hasEndUser}
-          onBack={() => navigate('/print-scan')}
-          onConvert={() => void runConvert('convert')}
-          onRecheck={() => void runConvert('recheck')}
-          onNewKey={() => void runConvert('convert', true)}
-          onRestoreOrder={handleRestoreOrder}
-          onPrint={handlePrint}
-          onLogin={handleLogin}
-          onDocuments={() => navigate('/me/documents')}
-          onHelp={() => navigate('/help')}
-          onCancelUpload={() => {
-            uploadGen.current += 1
-            setUploading(false)
-          }}
-          onCloseUsb={() => {
-            setUsbOpen(false)
-            handlePickLocal()
-          }}
-          onPickLocal={handlePickLocal}
-        />
+        <>
+          <ConvertImagesCta
+            phase={phase}
+            imageCount={images.length}
+            error={error}
+            generating={generating}
+            rechecking={rechecking}
+            uploading={uploading}
+            hasEndUser={hasEndUser}
+            onBack={() => navigate('/print-scan')}
+            onConvert={() => void runConvert('convert')}
+            onRecheck={() => void runConvert('recheck')}
+            onNewKey={() => void runConvert('convert', true)}
+            onRestoreOrder={handleRestoreOrder}
+            onPrint={handlePrint}
+            onLogin={handleLogin}
+            onDocuments={() => navigate('/me/documents')}
+            onHelp={() => navigate('/help')}
+            onCancelUpload={() => {
+              uploadGen.current += 1
+              setUploading(false)
+            }}
+            onCloseUsb={() => {
+              setUsbOpen(false)
+              handlePickLocal()
+            }}
+            onPickLocal={handlePickLocal}
+          />
+          <QxStepActions onPrev={() => navigate('/print-scan')} prevLabel="返回打印扫描">
+            <QxAiHelp
+              label="问小青：这几张图怎么排 →"
+              draft="我有几张图片，想按我排的顺序合成一份 PDF。请告诉我怎么排、排完能带走什么。"
+              testId="img2pdf-ask"
+            />
+          </QxStepActions>
+        </>
       }
       navbar={
         <>

@@ -325,6 +325,59 @@ test('guest login from a finished conversion comes back to convert again, not to
   await expectHealthy(page, errors, 'print-scan-convert')
 })
 
+test('finished conversion hides file id, checksum and request key, and offers 问小青 @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerConvertUpload(api, '毕业证-正面.jpg', 'w2-image-honest')
+  const fileId = 'w2-pdf-honest-9f3c'
+  const fileMd5 = '9f3c1a7e4b20d8569f3c1a7e4b20d856'
+  let requestKey = ''
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/print/convert/images-to-pdf')) {
+      requestKey = request.headers()['idempotency-key'] ?? ''
+    }
+  })
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId,
+        printFileUrl: '/w2-fixtures/image.png',
+        fileMd5,
+        sizeBytes: 2048,
+        pages: 1,
+        hasEndUser: false,
+      },
+    },
+  })
+
+  await page.goto('/print-scan/convert')
+  await page.locator('input[type="file"]').setInputFiles({
+    name: '毕业证-正面.jpg',
+    mimeType: 'image/png',
+    buffer: PNG_BYTES,
+  })
+  await expect(page.getByText('毕业证-正面.jpg', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
+  await expect(page.getByTestId('img2pdf-fileid')).toHaveText('看文件名和页数')
+  await expect(page.getByText('怎么认', { exact: true })).toBeVisible()
+
+  expect(requestKey).toMatch(/^convert-\d+-[a-z0-9]+$/)
+  const text = await page.locator('.qx-stage').innerText()
+  expect(text).not.toContain(fileId)
+  expect(text).not.toContain(fileMd5)
+  expect(text).not.toContain(fileMd5.slice(0, 12))
+  expect(text).not.toContain(requestKey)
+  expect(text).toContain('问小青')
+  expect(text).not.toContain('工作人员')
+  await expect(page.getByTestId('img2pdf-ask')).toContainText('问小青：这几张图怎么排')
+  await expect(page).toHaveURL(/\/print-scan\/convert$/)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
 const W2_MEMBER_TOKEN = 'w2-sign-memory-token'
 const W2_MEMBER_PHONE = '13800138000'
 const W2_MEMBER_CODE = '123456'
