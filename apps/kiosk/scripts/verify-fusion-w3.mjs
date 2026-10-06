@@ -346,6 +346,31 @@ includes('src/pages/assistant/AssistantSessionSummaryBar.tsx', 'navigate(`/ai/pl
 includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', 'data-testid="advisor-artifact-quote"', 'covered evidence is rendered as a quotation landmark')
 includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', '<blockquote className="aa-quote"', 'covered evidence uses a blockquote, not an AI voice')
 includes('src/pages/ai-plan/AiPlanPage.tsx', 'printAdvisorArtifact', 'artifact page prints through the existing print endpoint')
+includes('src/pages/ai-plan/AdvisorTakeaway.tsx', 'data-testid="advisor-artifact-kinds"', 'empty and expired states name the three jobs')
+includes('src/pages/ai-plan/AdvisorTakeaway.tsx', 'data-testid="advisor-artifact-take"', 'takeaway block keeps its test id')
+includes('src/pages/ai-plan/AdvisorTakeaway.tsx', 'data-testid="advisor-artifact-print-unavailable"', 'print-unavailable warning keeps its test id')
+includes('src/pages/ai-plan/AdvisorTakeaway.tsx', '正文照常可看，打印按钮先不放出来。等打印恢复后回到这里再打。', 'print-unavailable warning keeps the body and drops the on-site half sentence')
+includes('src/pages/ai-plan/advisorArtifactModel.ts', '这份可以打印带走', 'content states say the page can be printed and taken')
+includes('src/pages/ai-plan/advisorArtifactModel.ts', '还没有可带走的内容', 'empty and expired say nothing is ready to take')
+includes('src/pages/ai-plan/advisorArtifactModel.ts', "statusLabel: '正在读取'", 'loading pill says it is reading')
+includes('src/pages/ai-plan/advisorArtifactModel.ts', "statusLabel: '这次没读到'", 'error pill says this read failed')
+includes('src/pages/ai-plan/AiPlanPage.tsx', "isContentState(derivedState) || derivedState === 'print-unavailable'", 'print-unavailable keeps the legend with the body')
+includes('src/pages/ai-plan/AiPlanPage.tsx', '打开我的 AI 记录', 'empty state opens AI records with the design label')
+includes('src/pages/ai-plan/AiPlanPage.tsx', 'data-testid="advisor-artifact-cta-redo"', 'expired state has a redo button')
+includes('src/pages/ai-plan/AiPlanPage.tsx', '回去重做一次', 'expired redo uses the design label')
+includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', 'justify-content: space-evenly', 'body spreads leftover space as gaps')
+includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', 'font-size: 42px', 'hero sentence uses the 2.0 size')
+check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('qx-grow'), 'artifact page no longer stretches cards with qx-grow')
+for (const file of [
+  'src/pages/ai-plan/AiPlanPage.tsx',
+  'src/pages/ai-plan/AdvisorArtifactPanels.tsx',
+  'src/pages/ai-plan/AdvisorTakeaway.tsx',
+  'src/pages/ai-plan/advisorArtifactModel.ts',
+  'src/pages/ai-plan/styles/advisor-artifact-qx.css',
+]) {
+  check(!read(file).includes('工作人员'), `${file} does not ask for on-site staff`)
+  check(!read(file).includes('服务台'), `${file} does not mention a service desk`)
+}
 check(!existsSync(join(ROOT, 'src/pages/resume/ResumeExportPage.tsx')), 'AI-07 ResumeExportPage is deleted')
 includes('src/routes/index.tsx', 'path: \'resume/export\'', 'AI-07 keeps /resume/export as a compatibility route')
 includes('src/routes/index.tsx', '<Navigate to="/resume/optimize" replace />', 'AI-07 /resume/export redirects to real optimize export')
@@ -390,7 +415,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, and the W-16 declaration scenario')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
-  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
+  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }
