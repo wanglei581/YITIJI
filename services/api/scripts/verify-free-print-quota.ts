@@ -142,7 +142,8 @@ function assertStatic(): void {
   assert.equal(ci.split('verify:free-print-quota').length - 1, 1)
   const sqliteJob = ci.slice(ci.indexOf('Prepare fresh SQLite db'), ci.indexOf('postgres-readiness'))
   assert.ok(sqliteJob.includes('verify:free-print-quota'))
-  assert.ok(progress.includes('默认值待产品负责人确认'))
+  // 默认值 10/6 已定；只钉数值与「可配」，不钉「待确认 / 已确认」这类会随时间变的措辞。
+  assert.ok(/每台每天 300 面/.test(progress) && /每天 50 面/.test(progress) && /每单 20 面/.test(progress) && /80%/.test(progress))
   assert.ok(progress.includes('全部可配'))
   assert.ok(usage.includes('terminalInFlight'))
   assert.ok(decide.includes('if (input.payableCents > 0) return'))
