@@ -23,7 +23,8 @@ from fontTools import subset
 from fontTools.ttLib import TTFont
 
 ROOT = Path(__file__).resolve().parents[4]
-OUT_DIR = ROOT / 'apps/kiosk/public/fonts/source-han'
+# 放在 src/assets 下由 Vite 打包：产物文件名带内容哈希，字体没变时跨发布不重下。
+OUT_DIR = ROOT / 'apps/kiosk/src/assets/fonts/source-han'
 CSS_PATH = ROOT / 'apps/kiosk/src/styles/fonts/source-han.css'
 CHARS_PATH = OUT_DIR / 'chars.txt'
 SCAN_ROOTS = ['apps/kiosk/src', 'apps/kiosk/index.html', 'packages/shared/src']
@@ -145,7 +146,7 @@ def main():
                 f'  font-weight: {weight};\n'
                 '  font-style: normal;\n'
                 '  font-display: swap;\n'
-                f"  src: url('/fonts/source-han/{prefix}-{key}.woff2') format('woff2');\n"
+                f"  src: url('../../assets/fonts/source-han/{prefix}-{key}.woff2') format('woff2');\n"
                 f'  unicode-range: {css_ranges(ranges)};\n'
                 '}\n'
             )
@@ -153,7 +154,7 @@ def main():
     CHARS_PATH.write_text(''.join(sorted(chars)), encoding='utf-8')
     CSS_PATH.write_text(
         '/* 由 apps/kiosk/scripts/fonts/build_source_han_subset.py 生成，不要手改。\n'
-        '   思源宋体 / 思源黑体（SIL OFL 1.1，许可证见 public/fonts/source-han/LICENSE-*.txt）。\n'
+        '   思源宋体 / 思源黑体（SIL OFL 1.1，许可证见 src/assets/fonts/source-han/OFL-*.txt）。\n'
         '   OFL 保留字体名「Source」：子集是修改版，故字族名改为 Qingxu Serif / Qingxu Sans；各页字体栈引用这两个名字。 */\n\n'
         + '\n'.join(rules),
         encoding='utf-8',
