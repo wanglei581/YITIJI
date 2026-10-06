@@ -12903,7 +12903,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 636,
+      "reachableFileCount": 637,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15879,7 +15879,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 730
+      "sourceFileCount": 731
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19075,9 +19075,18 @@
     "apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/ai-plan/AdvisorTakeaway.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
     "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-public-screen-mask.mjs"
+    ],
+    "apps/kiosk/src/pages/ai-plan/advisorArtifactModel.ts": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
+    "apps/kiosk/src/pages/ai-plan/styles/advisor-artifact-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
@@ -28682,7 +28691,10 @@
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx",
+          "apps/kiosk/src/pages/ai-plan/AdvisorTakeaway.tsx",
           "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx",
+          "apps/kiosk/src/pages/ai-plan/advisorArtifactModel.ts",
+          "apps/kiosk/src/pages/ai-plan/styles/advisor-artifact-qx.css",
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx",

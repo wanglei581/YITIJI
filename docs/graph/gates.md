@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1850 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1853 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -419,7 +419,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 536 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 539 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -481,7 +481,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/activities/activities-detail-inkpaper.css` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx` | `verify-fusion-w3.mjs` |
+| `apps/kiosk/src/pages/ai-plan/AdvisorTakeaway.tsx` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-public-screen-mask.mjs` |
+| `apps/kiosk/src/pages/ai-plan/advisorArtifactModel.ts` | `verify-fusion-w3.mjs` |
+| `apps/kiosk/src/pages/ai-plan/styles/advisor-artifact-qx.css` | `verify-fusion-w3.mjs` |
 | `apps/kiosk/src/pages/assistant/AdvisorCockpit.tsx` | `verify-kiosk-ai-label-copy.mjs` |
 | `apps/kiosk/src/pages/assistant/AdvisorConversation.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/AdvisorTools.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
