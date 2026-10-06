@@ -27,7 +27,10 @@ import {
   takeoverCopy,
 } from './mobileQrLoginCopy'
 import { DeviceCard, Facts, QrForm, QrIcon, StateCard, Steps } from './components/MobileQrLoginParts'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import './mobile-qr-service-desk.css'
+
+const XIAOQING_FOOT = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
 
 /* 手机确认登录（/member/qr-login）。视觉与口径真值：稿 51-phone-relay.html screen=qr-login。
  * 手机端从头到尾拿不到登录态：服务端只回 confirmed，一体机还要自己 claim。
@@ -213,9 +216,10 @@ export function MobileQrLoginPage() {
     setS((prev) => ({ ...prev, state: formEntryState(prev.deviceLabel), locked: false, hasUsableCode: false, code: '', cooldown: 0 }))
   }, [])
 
+  const contact = useSupportContact()
   const ready = isFormState(s.state)
   const takeover = takeoverCopy(s.state, s.deviceLabel)
-  const alert = ready ? formAlertCopy(s) : null
+  const alert = ready ? formAlertCopy(s, contact) : null
   const compact = s.locked || alert !== null
   const device = formDeviceCopy(s.deviceLabel, compact)
   const chrome = chromeCopy(s.state)
@@ -270,7 +274,7 @@ export function MobileQrLoginPage() {
               <Steps />
               <QrForm
                 facts={s}
-                notices={formNoticesCopy(s, s.sentSeconds)}
+                notices={formNoticesCopy(s, s.sentSeconds, contact)}
                 phoneRef={phoneRef}
                 codeRef={codeRef}
                 onPhone={(phone) => setS((prev) => ({ ...prev, phone }))}
@@ -279,7 +283,7 @@ export function MobileQrLoginPage() {
                 onChangePhone={handleChangePhone}
               />
               <div className="k1-mobile-qr-grow" />
-              <Facts rows={formFactsCopy(s)} />
+              <Facts rows={formFactsCopy(s, contact)} />
             </>
           )}
         </div>
@@ -304,6 +308,7 @@ export function MobileQrLoginPage() {
           </div>
         )}
 
+        <p className="k1-mobile-qr-xiaoqing">{XIAOQING_FOOT}</p>
         <p className="k1-mobile-qr-footer">
           <ShieldCheckIcon aria-hidden="true" />
           <span>本页只做这一次登录确认，不读取手机里的其他信息；手机号在系统中加密存储，完整号码只在输入框内供本人核对，获取验证码后改为脱敏显示。</span>

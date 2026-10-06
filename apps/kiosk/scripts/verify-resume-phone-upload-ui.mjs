@@ -268,7 +268,10 @@ assertIncludes(phone, 'PHONE_UPLOAD_PURPOSES', 'phone page maps each supported p
 // 稿 51 ⑥：CreateUploadSessionDto 的 @IsIn 不含 signature_image，一体机开不出这种会话。
 // 手机端不给它任何「看起来能走通」的上传配置，只给诚实不可用态，并指回现场已验证的「本机上传」。
 assertIncludes(phoneModel, "if (purpose === 'signature_image') return 'signature-blocked'", 'signature links are an honest dead end, not an upload flow')
-assertIncludes(phoneModel, '本人手写签名暂不支持手机上传', 'signature dead end tells the user it is unavailable on the phone')
+assertIncludes(phoneModel, "head: '签名暂不支持手机上传'", 'signature dead end tells the user it is unavailable on the phone')
+assertNotIncludes(phoneModel, '本人手写签名暂不支持手机上传', 'signature title matches the 9/29 wording, not the longer earlier title')
+assertIncludes(phoneModel, '本机上传', 'signature dead end points at the on-device upload step')
+assertNotIncludes(phoneModel, '工作人员', 'signature dead end does not hand the user to on-site staff')
 assertNotIncludes(phone, 'signature_image', 'phone page offers no signature_image purpose config or file filter')
 // 稿 51 ⑧：fragment 里的 purpose 可被随手改掉，上传前只按受支持用途 accept 的交集放行。
 assertIncludes(phone, 'genericPolicy(SESSION_PURPOSES.map((purpose) => purposes[purpose].accept))', 'phone pre-upload filter is the intersection of all supported purposes')

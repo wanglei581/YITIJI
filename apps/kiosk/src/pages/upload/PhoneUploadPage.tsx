@@ -17,7 +17,11 @@ import {
   UploadIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { uploadPhoneSessionFile, uploadSessionUserMessage } from '../../services/api/uploadSessions'
+
+const XIAOQING_FOOT = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
 import {
   useDocumentConversionCapabilities,
   WORD_CONVERSION_DISCLOSURE,
@@ -161,6 +165,9 @@ function FileBox({ file, removable, note, onRemove }: {
 }
 
 export function PhoneUploadPage() {
+  const contact = useSupportContact()
+  const helpLine = helpNeededLine(contact)
+  const helpSentence = /[。！？]$/.test(helpLine) ? helpLine : `${helpLine}。`
   const kiosk = useTerminalKiosk()
   const location = useLocation()
   const { capabilities: conversionCapabilities, loading: conversionLoading } = useDocumentConversionCapabilities()
@@ -192,7 +199,7 @@ export function PhoneUploadPage() {
     : null
   const canPick = !kiosk && ready && view?.picker === 'ready'
   const chrome = chromeCopy(issue, s.state, confirmed?.label ?? null)
-  const takeover = issue ? takeoverCopy(issue) : null
+  const takeover = issue ? takeoverCopy(issue, helpSentence) : null
   const chipsText = policy.chips.join(' / ')
   const formatsNote = conversionCapabilities.wordToPdf
     ? `在系统核对用途之前，本页只放行 **${chipsText}**；Word ${WORD_CONVERSION_DISCLOSURE}。要传其他格式，请回一体机按那一步屏幕上的说明操作。`
@@ -348,6 +355,7 @@ export function PhoneUploadPage() {
           )}
         </div>
 
+        <p className="ph-up-xiaoqing">{XIAOQING_FOOT}</p>
         <p className="ph-up-footer">
           <Icon name={chrome.icon} />
           <span>{chrome.foot}</span>
