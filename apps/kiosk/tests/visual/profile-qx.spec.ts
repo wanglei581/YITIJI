@@ -496,6 +496,118 @@ test('me error cta on documents and notifications includes 问小青 @w5-kiosk',
   expect(errors).toEqual([])
 })
 
+/** 行盒子，以及行里画出来的内容，都不得压进下一行。 */
+async function expectListRowsDoNotOverlap(page: Page, listName: string): Promise<void> {
+  const list = page.getByRole('region', { name: listName })
+  await expect(list.locator(':scope > .qx-me-row').nth(1)).toBeVisible()
+  const hits = await list.evaluate((root) => {
+    const rows = [...root.querySelectorAll(':scope > .qx-me-row')]
+    const found: string[] = []
+    for (let index = 0; index < rows.length - 1; index += 1) {
+      const nextTop = rows[index + 1].getBoundingClientRect().top
+      const pieces = [rows[index], ...rows[index].querySelectorAll('*')]
+      for (const piece of pieces) {
+        const box = piece.getBoundingClientRect()
+        if (box.width < 1 || box.height < 1) continue
+        if (box.bottom > nextTop + 0.5) {
+          found.push(`第 ${index + 1} 行内容 bottom ${box.bottom.toFixed(1)} > 下一行 top ${nextTop.toFixed(1)}`)
+          break
+        }
+      }
+    }
+    return found
+  })
+  expect(hits, hits.join('\n')).toEqual([])
+}
+
+test('me list rows do not overlap on notifications, documents and resumes @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const createdAt = '2026-09-01T08:00:00.000Z'
+  const expiresAt = '2099-03-01T00:00:00.000Z'
+  api.respond('GET', '/api/v1/me/notifications', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: Array.from({ length: 8 }, (_, index) => ({
+          id: `n-${index}`,
+          kind: 'personal',
+          title: `打印进度提醒 ${index + 1}：这份材料已经排到队列里`,
+          content: '取件前请核对页数和颜色。这条说明要占一整行，避免行被压扁后文字叠到下一条。',
+          category: index % 2 === 0 ? 'print' : 'feedback',
+          relatedType: index % 2 === 0 ? null : 'feedback_ticket',
+          relatedId: index % 2 === 0 ? null : `ticket-${index}`,
+          isRead: false,
+          createdAt,
+        })),
+        nextCursor: null,
+        total: 8,
+        unreadCount: 8,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/documents', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: Array.from({ length: 6 }, (_, index) => ({
+          id: `doc-${index}`,
+          filename: `2026届求职材料-个人简历与成绩单-第${index + 1}份-请勿外传.pdf`,
+          mimeType: 'application/pdf',
+          sizeBytes: 245760,
+          purpose: 'print_doc',
+          sensitiveLevel: 'normal',
+          assetCategory: 'original',
+          retentionPolicy: 'months_3',
+          allowedRetentionPolicies: ['months_3', 'months_6', 'long_term'],
+          createdAt,
+          expiresAt,
+          downloadUrlPath: `/files/doc-${index}/download-url`,
+          previewUrlPath: `/files/doc-${index}/preview-url`,
+          materialCheckRequired: false,
+          pageCount: 2,
+        })),
+        nextCursor: null,
+        total: 6,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/resumes', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: Array.from({ length: 6 }, (_, index) => ({
+          id: `resume-${index}`,
+          taskId: `task-${index}`,
+          kind: 'parse',
+          status: 'completed',
+          provider: 'demo',
+          optimized: false,
+          hasDraft: false,
+          latestVersion: null,
+          createdAt,
+          updatedAt: createdAt,
+          expiresAt,
+        })),
+        nextCursor: null,
+        total: 6,
+      },
+    },
+  })
+
+  await loginThroughVisibleUi(page, '/me/notifications')
+  await expectListRowsDoNotOverlap(page, '消息通知')
+  await loginThroughVisibleUi(page, '/me/documents')
+  await expectListRowsDoNotOverlap(page, '我的文档')
+  await loginThroughVisibleUi(page, '/me/resumes')
+  await expectListRowsDoNotOverlap(page, '我的简历')
+  expect(errors).toEqual([])
+})
+
 for (const item of ME_SHELL_PAGES) {
   test(`me shell signed-out ${item.path} shows page name, back, ask and 20px floor @w5-kiosk`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)

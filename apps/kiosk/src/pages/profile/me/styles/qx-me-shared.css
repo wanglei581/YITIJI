@@ -243,8 +243,8 @@
   scrollbar-width: none;
 }
 .qx-me-list::-webkit-scrollbar { display: none; }
-.qx-me-list > .qx-me-row { flex: 0 1 auto; min-height: 104px; max-height: 240px; }
-.qx-me-list[data-fill-rows='true'] > .qx-me-row { flex: 1 1 auto; }
+/* 行不许被压扁，也不许拉高去填空。内容高出时由列表自己滚动。 */
+.qx-me-list > .qx-me-row { flex: none; min-height: 104px; }
 
 .qx-me-row {
   min-height: 132px;

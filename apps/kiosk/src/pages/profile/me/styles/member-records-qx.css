@@ -30,6 +30,9 @@
   --ink-2: var(--qx-ink-2);
 }
 .qx-me-assets .qx-me-list > .qx-me-asset-item { flex: none; }
+/* 文档行是 .qx-me-row，伸缩只跟共用列表规则走，这里不另写 flex。 */
+.qx-me-list > .qx-me-doc-row { flex-direction: column; align-items: stretch; }
+.qx-me-doc-row[data-expired='true'] { background: var(--qx-muted-bg); border-color: var(--qx-muted-line); }
 .qx-me-asset-item {
   display: flex;
   flex-direction: column;

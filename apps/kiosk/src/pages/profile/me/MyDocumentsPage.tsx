@@ -354,7 +354,7 @@ export function MyDocumentsPage() {
             // 置灰原因常显在行内：一体机是触屏，没有 hover，写在 title 里永远读不到。
             const printReasonId = reprintBlocked ? `doc-print-blocked-${doc.id}` : !printable && !expired ? `doc-print-format-${doc.id}` : undefined
             return (
-              <article key={doc.id} className="qx-me-asset-item" data-server-slot="document" data-expired={expired || undefined} data-testid="member-assets-document">
+              <article key={doc.id} className="qx-me-row qx-me-doc-row" data-server-slot="document" data-expired={expired || undefined} data-testid="member-assets-document">
                 <div className="qx-me-asset-main">
                   <span className="qx-me-row-ico" data-tone={expired ? 'off' : 'slate'} aria-hidden="true"><FileTextIcon size={28} /></span>
                   <div className="qx-me-row-main">
