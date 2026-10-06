@@ -137,6 +137,8 @@
   justify-content: flex-end;
   gap: 10px 14px;
 }
+/* 稿 .sec-hint：提示是标题行的直接子项时贴最右。读不到最新时提示和「重新读取」包在 .aa-sec-side 里，整组靠右。 */
+.aa-sec-h > .aa-sec-hint { margin-left: auto; }
 .aa-sec-hint { font-size: 21px; line-height: 1.45; color: var(--qx-ink-3); }
 .aa-stale { font-size: 21px; line-height: 1.45; color: var(--qx-ink-3); }
 .aa-scroll { flex: none; overflow: visible; }
@@ -300,7 +302,7 @@
   background: var(--qx-teal-soft);
 }
 
-.aa-take { flex-direction: row; align-items: flex-start; gap: 30px; }
+.aa-take { flex-direction: row; align-items: stretch; gap: 30px; }
 .aa-paper {
   flex: none;
   align-self: flex-start;
@@ -369,15 +371,16 @@
   justify-content: center;
   font-size: 22px;
 }
+/* 句子里的下划线链接。上下内边距撑点击框，等量负外边距不改行高。 */
 .aa-doc-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 48px;
-  margin: -6px 0;
-  padding: 0 4px;
+  display: inline;
+  margin: -14px 0;
+  padding: 14px 0;
   color: var(--qx-teal-d);
   font-weight: 700;
-  text-decoration: none;
+  line-height: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 .aa-has {
   margin-top: auto;

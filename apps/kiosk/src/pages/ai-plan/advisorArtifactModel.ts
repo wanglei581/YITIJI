@@ -345,19 +345,19 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
       }
     case 'loading':
       return {
-        heroBefore: '正在把这一趟的产物',
+        heroBefore: '正在把刚做好的作业',
         heroEm: '读回来',
         heroAfter: '。',
-        sub: '读到之前这一页不假装已经有结果。',
+        sub: '读到之前不显示任何结果。',
         statusLabel: '正在读取',
         statusTone: 'unknown',
       }
     case 'error':
       return {
-        heroBefore: '这一趟的产物',
+        heroBefore: '刚做好的作业',
         heroEm: '这次没读到',
         heroAfter: '。',
-        sub: '不是没有做过，是这一次请求没有成功。',
+        sub: '不是没有做过，是这一次没读回来。',
         statusLabel: '这次没读到',
         statusTone: 'bad',
       }

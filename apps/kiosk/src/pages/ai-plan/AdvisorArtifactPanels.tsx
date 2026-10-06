@@ -76,7 +76,7 @@ function SectionHead({
       <span className="aa-sec-n">{n}</span>
       <span className="aa-sec-t">{title}</span>
       <span className="aa-sec-side">
-        {stale ? <span className="aa-stale">刚才没读到最新的，先显示带过来的内容</span> : null}
+        {stale ? <span className="aa-stale">刚才没读到最新的，先显示刚做好的内容</span> : null}
         {hint ? <span className="aa-sec-hint">{hint}</span> : null}
         {stale ? reread : null}
       </span>
@@ -227,7 +227,7 @@ export function ArtifactStatePanel({
       <section className="aa-sec aa-state" data-tone="info" data-testid="advisor-artifact-loading">
         <span className="aa-state-ic"><StateIcon state={state} /></span>
         <span className="aa-state-tx">
-          <p className="aa-state-t">正在读取这一趟的产物</p>
+          <p className="aa-state-t">正在读取刚做好的作业</p>
           <p className="aa-state-d">读到之前不会拿旧的或编的顶上。</p>
         </span>
       </section>
@@ -238,8 +238,8 @@ export function ArtifactStatePanel({
       <section className="aa-sec aa-state" data-tone="error" data-testid="advisor-artifact-error">
         <span className="aa-state-ic"><StateIcon state={state} /></span>
         <span className="aa-state-tx">
-          <p className="aa-state-t">产物这次没读到</p>
-          <p className="aa-state-d">网络不稳，或这次没有把这一份带回来。可以再试一次，或回去问小青重做。</p>
+          <p className="aa-state-t">作业内容这次没读到</p>
+          <p className="aa-state-d">网络不稳或读取超时。可以点「重新读取」再试一次，或回去问小青重做。</p>
           {reread}
         </span>
       </section>

@@ -2051,7 +2051,13 @@ test('advisor artifact content state opens my documents @w3-kiosk', async ({ pag
 
   await page.goto('/ai/plan?state=qa-pins&capture=1')
   await expect(page.getByTestId('advisor-artifact-take')).toBeVisible()
-  await page.getByRole('link', { name: '我的文档' }).click()
+  const documentsLink = page.getByRole('link', { name: '我的文档' })
+  // 1080×1920 视口下舞台缩放是 1；换算后再比，避免别的视口把屏幕像素当成 CSS 像素。
+  const scale = await readEnabledStageScale(page)
+  const documentsBox = await documentsLink.boundingBox()
+  expect(documentsBox, '我的文档链接必须有点击框').not.toBeNull()
+  expect(documentsBox!.height / scale, '我的文档链接点击框换算到舞台 CSS px 后高度不得小于 48').toBeGreaterThanOrEqual(48)
+  await documentsLink.click()
   await page.waitForURL((url) => url.pathname === '/me/documents')
   expect(runtimeErrors).toEqual([])
 })
