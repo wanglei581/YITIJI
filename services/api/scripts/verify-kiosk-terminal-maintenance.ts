@@ -7,6 +7,8 @@
  * 运行: pnpm --filter @ai-job-print/api verify:kiosk-terminal-maintenance
  */
 import 'dotenv/config'
+// 本门禁不测招聘托管；按托管 a 的目标口径显式关闭，避免受 .env 影响（verify:recruitment-hosting-gate-declares 要求显式赋值）。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
