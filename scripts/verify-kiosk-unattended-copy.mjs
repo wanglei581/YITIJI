@@ -5,9 +5,12 @@
  * 2026-10-04：一体机现场不安排工作人员。apps/kiosk/src 的字符串字面量与 JSX 文本
  * （不含注释）不得再出现禁用说法。TypeScript 的 .text 会解开 \u 转义，所以转义写不出门。
  *
- * 取件凭证码白名单已清空（方案②，2026-10-06）。
- * 只留 A 包标准句 6 点名不改的注销 / 复制个人信息三句：那三句含「找现场工作人员」，
- * 任务包禁止改写，所以不能从扫描里消失。上限 3，不许增加。
+ * 白名单必须为空（2026-10-06 合并候选后核对）。
+ * 原先放过的注销三句是旧文案，里面有「找现场工作人员」：
+ * - MySettingsPage：「注销账号、复制个人信息，请找现场工作人员，或按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。」
+ * - ProfilePage / MyPrivacyRequestsPage：「当前可撤回 AI 使用授权；注销账号、复制个人信息，请找现场工作人员或按《隐私政策》的联系方式申请。」
+ * 候选侧定稿后这三处都不含工作人员，统一为「注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。」
+ * 所以不再放过。取件凭证码白名单仍为空。
  *
  * 另外两道能静态判的条件：
  * - 金额为 0 / free 的分支里出现「退款」就红。
@@ -38,15 +41,8 @@ const FORBIDDEN = [
   '取件凭证码',
 ]
 
-/** A 包标准句 6：PR #1257 定稿，本任务不改。上限 3。 */
-const CLOSURE_ALLOWLIST_CAP = 3
-const CLOSURE_ALLOWLIST = [
-  { file: 'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx', text: '注销账号、复制个人信息，请找现场工作人员，或按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。' },
-  { file: 'apps/kiosk/src/pages/profile/ProfilePage.tsx', text: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请找现场工作人员或按《隐私政策》的联系方式申请。' },
-  { file: 'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx', text: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请找现场工作人员或按《隐私政策》的联系方式申请。' },
-]
-
-const ALLOWLIST = [...CLOSURE_ALLOWLIST]
+/** 必须为空。注销统一句不含禁用词，取件凭证码方案也不再单列放过。 */
+const ALLOWLIST = []
 
 function squash(text) {
   return text.replace(/\s+/g, '')
@@ -247,8 +243,8 @@ function fail(message) {
   process.exitCode = 1
 }
 
-if (CLOSURE_ALLOWLIST.length > CLOSURE_ALLOWLIST_CAP) {
-  fail(`注销 / 复制个人信息白名单 ${CLOSURE_ALLOWLIST.length} 条，超过上限 ${CLOSURE_ALLOWLIST_CAP}（A 包标准句 6，本任务不改）。`)
+if (ALLOWLIST.length !== 0) {
+  fail(`白名单必须为空，当前 ${ALLOWLIST.length} 条。注销统一句不含工作人员，不再放过。`)
 }
 
 const probe = { violations: [], allowed: 0, used: new Set() }
@@ -270,12 +266,6 @@ if (switchProbe.violations.length < 2) {
 const hits = { violations: [], allowed: 0, used: new Set() }
 walk(scanRoot, hits)
 
-for (const entry of ALLOWLIST) {
-  if (!hits.used.has(entry)) {
-    fail(`白名单条目没有命中，请删掉或改回原文：${entry.file} :: ${entry.text}`)
-  }
-}
-
 if (hits.violations.length > 0) {
   for (const hit of hits.violations) {
     console.error(`${hit.rel}:${hit.line}  [${hit.phrases.join('、')}]  ${hit.text}`)
@@ -286,4 +276,4 @@ if (hits.violations.length > 0) {
 if (process.exitCode) {
   process.exit(process.exitCode)
 }
-console.log(`✓ verify:kiosk-unattended-copy 通过（取件白名单 0；注销三句放过 ${hits.allowed} 处）`)
+console.log(`✓ verify:kiosk-unattended-copy 通过（白名单 ${ALLOWLIST.length}）`)

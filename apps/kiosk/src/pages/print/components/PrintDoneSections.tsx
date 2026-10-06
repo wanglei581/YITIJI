@@ -18,7 +18,7 @@ import { FileTextIcon, PrinterIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_COMPACT } from '../../../lib/fileName'
 import { formatCents } from '../cashierStatus'
-import { machineCannotPrintLine, refundApplyLine } from '../../../copy/unattendedCopy'
+import { helpNeededLine, machineCannotPrintLine, refundApplyLine } from '../../../copy/unattendedCopy'
 import { jobSubline, pagesPerCopy, publicOrderNo, type OutOfPaperMoney } from '../printProgressModel'
 import { PrintFileDeletionRecords } from './PrintFileDeletionRecords'
 import { PrintFileRetentionNotice } from './PrintFileRetentionNotice'
@@ -231,13 +231,14 @@ export function PrintOutOfPaperPanel({
   )
 }
 
-/** 稿 15 paper-jam 的三步和求助条。不写收款；订单号没有时只说「这一单」。 */
+/** 稿 15 paper-jam 的三步和求助条。不写收款；订单号没有时只说「这一单」。不叫人去找工作人员。 */
 export function PrintJamGuide({ orderNo }: { orderNo: string | null }) {
   const orderRef = orderNo ? `订单号 ${orderNo}` : '这一单'
+  const help = helpNeededLine()
   return (
-    <section className="pff-jam-fill" aria-label="找工作人员之前先做这三件">
+    <section className="pff-jam-fill" aria-label="处理之前先做这三件">
       <div className="pff-sec-h">
-        <span className="t">找工作人员之前先做这三件</span>
+        <span className="t">处理之前先做这三件</span>
         <span className="hint">当场处理最快</span>
       </div>
       <div className="pff-jam-steps">
@@ -251,11 +252,11 @@ export function PrintJamGuide({ orderNo }: { orderNo: string | null }) {
         </div>
         <div className="pff-step">
           <span className="pff-step-no">3</span>
-          <span className="pff-step-txt">记下<b>{orderRef}</b>，补打时工作人员按它找这一单。</span>
+          <span className="pff-step-txt">记下<b>{orderRef}</b>。{help}。</span>
         </div>
       </div>
       <div className="pff-help">
-        <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>，找现场工作人员处理。</span>
+        <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>。{help}。</span>
       </div>
       <PrintAiHelp
         label="问小青：取纸或异常怎么办 →"

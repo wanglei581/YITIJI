@@ -118,17 +118,24 @@ export function PrintConfirmPage() {
   } = usePrintConfirmHandoff(capability)
   const file: PrintFile = handoff?.file ?? { name: '未知文件', size: '-', pages: null }
   const {
+    kind: printerKind,
+    printer,
     printerReady,
     printerLabel,
     printerNotice,
     loading: printerLoading,
   } = useTerminalDeviceStatus()
   const printerBlocked = printerLoading || !printerReady
+  // 缺纸、离线、异常仍写明「当前不能下单，不会扣费」（0 元单在传入前剥掉这句）。求助改走标准句 2。
   const printerBlockedReason = printerLoading
     ? '正在确认打印机状态，请稍候'
     : printerNotice
       ? printerNotice
-      : machineCannotPrintLine()
+      : printer.errorCode === 'paperEmpty'
+        ? `打印机缺纸，当前不能下单，不会扣费。${machineCannotPrintLine()}`
+        : printerKind === 'offline'
+          ? `${printerLabel}。当前不能下单，不会扣费。${machineCannotPrintLine()}`
+          : `${printerLabel}。当前不能下单，不会扣费。${machineCannotPrintLine()}`
   const adjusted = adjustments.length > 0
   const materialCheck = handoff?.materialCheck
   const source = handoff?.source

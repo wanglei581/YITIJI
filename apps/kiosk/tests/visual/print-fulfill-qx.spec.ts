@@ -309,7 +309,8 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   await expect(jam).not.toContainText('在手机上申请')
   await expect(jam).not.toContainText('换一台机器')
   await expect(jam).toContainText('你的订单和已付金额都保留着')
-  await expect(page.getByRole('region', { name: '找工作人员之前先做这三件' })).toBeVisible()
+  // 2026-10-06：卡纸三步不再叫人找工作人员，区域名改成「处理之前先做这三件」。
+  await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
   await expectTouchAndBounds(page)
   if (page.viewportSize()?.width === 1080) {
@@ -374,7 +375,8 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
   await expect(jam).toContainText('你的订单还在，处理好后可以继续打印')
   await expect(jam).not.toContainText('已付金额')
   await expect(jam).not.toContainText('已支付')
-  await expect(page.getByRole('region', { name: '找工作人员之前先做这三件' })).toBeVisible()
+  // 2026-10-06：卡纸三步不再叫人找工作人员，区域名改成「处理之前先做这三件」。
+  await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   expect(errors).toEqual([])
 })
 

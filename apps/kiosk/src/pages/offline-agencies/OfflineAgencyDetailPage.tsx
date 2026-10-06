@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { helpNeededLine } from '../../copy/unattendedCopy'
+import { helpNeededLine, servicePhoneLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BuildingIcon, BriefcaseIcon, ClockIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
@@ -175,7 +175,7 @@ export default function OfflineAgencyDetailPage() {
                   ['机构类型', agency.type],
                   ['服务项目', (Array.isArray(agency.services) ? agency.services : []).join('、') || '以门店公示为准'],
                   ['营业时间', agency.hours || '服务时间以机构公示为准'],
-                  ['联系电话', agency.phone || '请向门店工作人员咨询'],
+                  ['联系电话', agency.phone || servicePhoneLine(contact)],
                   ['机构地址', agency.address],
                   ['来源编号', agency.orgCode || '来源平台未提供'],
                   ['收录状态', '机构信息已审核'],

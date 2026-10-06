@@ -448,10 +448,13 @@ test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保
 
 const { PrintJamGuide } = await import(doneSectionsUrl)
 test('卡纸三步不提收款', () => {
+  // 2026-10-06：标题从「找工作人员之前先做这三件」改成「处理之前先做这三件」，求助条改走标准句 1。
   const text = renderToStaticMarkup(createElement(PrintJamGuide, { orderNo: 'ORD-20261003-JAM' })).replace(/<[^>]*>/g, '')
-  assert.match(text, /找工作人员之前先做这三件/)
+  assert.match(text, /处理之前先做这三件/)
   assert.match(text, /别硬拉纸/)
   assert.match(text, /订单号 ORD-20261003-JAM/)
+  assert.match(text, /需要帮助？/)
+  assert.doesNotMatch(text, /工作人员/)
   assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)
 })
 

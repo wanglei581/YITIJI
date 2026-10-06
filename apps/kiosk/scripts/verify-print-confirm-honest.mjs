@@ -558,7 +558,9 @@ const realSideGates = [
   { needle: '预计出纸', label: '「预计出纸」行' },
   { needle: '常见情况处理', label: '真实常见情况处理区(aria-label/标题)' },
   { needle: '打印机缺纸 / 卡纸', label: '真实 FAQ「打印机缺纸 / 卡纸」' },
-  { needle: '已支付但打印失败', label: '真实 FAQ「已支付但打印失败」' },
+  // 2026-10-06：收费失败不再写「已支付但打印失败…退款以工作人员核查为准」。
+  // 同一条仍必须落在 !isSim 里；改钉源码「订单与支付记录都在」（金额 > 0 才接标准句 5）。
+  { needle: '订单与支付记录都在', label: '真实 FAQ「打印失败且订单与支付记录都在」' },
   { needle: '请勿离开，打印完成后请及时取走文件', label: '出纸口隐私提示' },
 ]
 let realSideIsolated = true
