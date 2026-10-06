@@ -1,0 +1,240 @@
+/* 稿 46 英雄区、单行真话栏、余高不再撑成空盒。
+ * 选择器都以 .jfq- 开头，只在宿主 46 的 .jfq-root 里生效。
+ * 颜色只用 --qx-* 或 color-mix，不写死色值。
+ */
+
+.jfq-root .qx-pagehead { display: none; }
+
+/* 手机关掉舞台缩放后，壳仍要占满这一屏：正文在 .qx-scroll 里滚，底栏留在视口内。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .jfq-root {
+    height: 100dvh;
+    min-height: 0;
+  }
+  [data-kiosk-stage-fit='off'] .jfq-root .qx-stage {
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+/* 390 切到 1440 的那一帧，舞台开关还停在 off，壳高是 100dvh，底栏已经在视口里。
+ * 几何轮询会把这一帧当成落定；紧接着舞台缩到约 0.47，返回键和主按钮量出来只有 30 和 45。
+ * 宽视口上先把壳撑回 1080×1920，底栏留在折线下面，轮询会等到真正的 scale。
+ * 模板页挂在 KioskRoot 里，百分比高度穿不过布局壳，底栏贴在内容底下，
+ * 舞台再高也会被居中抬进 900 的视口。这一页的壳直接定成 1920，并贴住视口上沿。 */
+@media (min-width: 961px) {
+  [data-kiosk-stage-fit='off'] .kiosk-stage:has(.jfq-root),
+  [data-kiosk-stage-fit='off'] .kiosk-stage-scaler:has(.jfq-root) {
+    width: 1080px !important;
+    height: 1920px !important;
+  }
+  [data-kiosk-stage-fit='off'].kiosk-stage-host:has([data-kiosk-screen='resume-templates']) {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  [data-kiosk-stage-fit='off'] .jfq-root:has([data-kiosk-screen='resume-templates']),
+  [data-kiosk-stage-fit='off'] .jfq-root:has([data-kiosk-screen='resume-templates']) .qx-stage {
+    height: 1920px !important;
+    min-height: 1920px !important;
+  }
+}
+
+.jfq-hero {
+  flex: none;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  column-gap: 24px;
+  align-items: center;
+  margin: 14px 0 0;
+  padding: 22px 34px;
+  border-radius: 36px;
+  background: linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep) 68%);
+  color: var(--qx-paper);
+  overflow: hidden;
+  position: relative;
+}
+.jfq-hero::after {
+  content: "";
+  position: absolute;
+  right: -150px;
+  top: -150px;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--qx-emerald) 15%, transparent), transparent 65%);
+  pointer-events: none;
+}
+.jfq-hero-mark {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  position: relative;
+  z-index: 1;
+  font-family: var(--qx-serif);
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--qx-emerald);
+  background: color-mix(in srgb, var(--qx-emerald) 14%, transparent);
+  border: 2px solid var(--qx-emerald);
+}
+.jfq-hero-eyebrow,
+.jfq-hero-title,
+.jfq-hero-copy { grid-column: 2; position: relative; z-index: 1; }
+.jfq-hero-eyebrow {
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: 2px;
+  color: var(--qx-paper);
+}
+.jfq-hero-title {
+  margin: 4px 0 0;
+  font-family: var(--qx-serif);
+  font-size: 36px;
+  line-height: 1.28;
+  font-weight: 700;
+}
+.jfq-hero-title em { font-style: normal; color: var(--qx-emerald); }
+.jfq-hero-copy {
+  margin: 8px 0 0;
+  font-size: 23px;
+  line-height: 1.45;
+  color: var(--qx-paper);
+}
+.jfq-hero-steps {
+  grid-column: 1 / -1;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 14px;
+  list-style: none;
+  width: 100%;
+  margin: 14px 0 0;
+  padding: 0;
+}
+.jfq-hero-steps li {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 2px solid color-mix(in srgb, var(--qx-paper) 35%, transparent);
+  font-size: 21px;
+  line-height: 1.35;
+}
+.jfq-hero-steps b {
+  font-family: var(--qx-serif);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--qx-emerald);
+}
+
+/* 02 这类区块不再被 .qx-grow 拉成空盒。余高仍平分到各区块上方（稿 9/28），
+ * 但行本身按稿的触控高度排，避免短屏把整行空白拆到 160px 以上。 */
+.jfq-root .jfq-sec.qx-grow {
+  flex: 0 0 auto;
+  min-height: min-content;
+  height: auto;
+}
+.jfq-root .qx-scroll { gap: 10px; }
+.jfq-root .qx-scroll > .jfq-sec { margin-top: auto; }
+.jfq-root .jfq-not { min-height: 88px; }
+.jfq-root .jfq-step { min-height: 96px; }
+.jfq-root .jfq-why > div { min-height: 96px; }
+/* 短清单排两列，右半边也有字；奇数时第一条通栏。行高补回两列省下的高度。 */
+.jfq-root .jfq-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.jfq-root .jfq-list > .jfq-list-row:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
+.jfq-root .jfq-list-row {
+  min-height: 112px;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+}
+/* 只有一张模板时通栏横排：示意在左，说明在右，右半边不空。 */
+.jfq-root .rdq-tpl-grid > .rdq-tpl:only-child {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  column-gap: 22px;
+  align-items: start;
+}
+.jfq-root .rdq-tpl-grid > .rdq-tpl:only-child > * { grid-column: 2; }
+.jfq-root .rdq-tpl-grid > .rdq-tpl:only-child > .rdq-tpl-art {
+  grid-column: 1;
+  grid-row: 1 / span 6;
+  width: 148px;
+  height: 148px;
+}
+
+.jfq-root .qx-ctabar { flex-wrap: wrap; align-items: center; }
+.jfq-truth {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--qx-line);
+  color: var(--qx-ink-2);
+  font-size: 21px;
+  line-height: 1.45;
+}
+.jfq-truth-ic { flex: none; display: flex; color: var(--qx-teal-d); }
+.jfq-truth p { margin: 0; flex: 1; min-width: 0; }
+.jfq-truth b { margin-right: 8px; color: var(--qx-teal-d); }
+.jfq-truth-help {
+  flex: none;
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--qx-r);
+  background: transparent;
+  color: var(--qx-teal-d);
+  font: inherit;
+  font-size: 21px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.jfq-truth-help:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .jfq-root .jfq-hero {
+    grid-template-columns: 44px minmax(0, 1fr);
+    column-gap: 10px;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border-radius: 18px;
+  }
+  .jfq-root .jfq-hero-mark { width: 44px; height: 44px; font-size: 20px; }
+  .jfq-root .jfq-hero-eyebrow { font-size: 14px; letter-spacing: 1px; }
+  .jfq-root .jfq-hero-title { font-size: 18px; }
+  .jfq-root .jfq-hero-copy { margin-top: 2px; font-size: 14px; }
+  .jfq-root .jfq-hero-steps { gap: 6px; margin-top: 8px; }
+  .jfq-root .jfq-hero-steps li { font-size: 14px; gap: 4px; padding-top: 4px; }
+  .jfq-root .jfq-hero-steps b { font-size: 14px; }
+  .jfq-root .jfq-truth { font-size: 14px; gap: 8px; padding-top: 6px; }
+  .jfq-root .jfq-truth-help { font-size: 14px; padding: 0 8px; }
+  .jfq-root .jfq-list { grid-template-columns: minmax(0, 1fr); }
+  .jfq-root .jfq-list > .jfq-list-row { grid-column: auto; }
+  .jfq-root .rdq-tpl-grid > .rdq-tpl:only-child {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .jfq-root .rdq-tpl-grid > .rdq-tpl:only-child > .rdq-tpl-art {
+    grid-column: 1;
+    grid-row: auto;
+    width: auto;
+    height: 96px;
+  }
+  .jfq-root .rdq-tpl-grid > .rdq-tpl:only-child > * { grid-column: 1; }
+}

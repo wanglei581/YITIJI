@@ -248,8 +248,10 @@ check(/viewport\s*===\s*['"]kiosk['"]/.test(fullscreenShell), 'stage-fit is limi
 // /resume/job-fit 仍是 KioskRoot 之外的整屏路由（fusion-w6 的 expectedFullScreen 钉着 depth=2），
 // 所以迁进青序流光之后舞台缩放必须自己挂 KioskStageFit —— QxPageFrame 本身不缩放，
 // 少挂这一层，1080×1920 的稿在别的分辨率上会直接溢出屏幕。
-includes('src/pages/resume/JobFitPage.tsx', 'KioskStageFit', 'job-fit keeps the fixed 1080x1920 stage after the Qingxu migration')
-check(!read('src/pages/resume/JobFitPage.tsx').includes('KioskFullscreenShell'), 'job-fit has left the V6 fullscreen chrome')
+// T46：KioskStageFit 随舞台拆到 jobFit/JobFitStage.tsx（500 行上限）。断言改为壳与舞台的并集，不删除「必须挂舞台」。
+const jobFitStageSources = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/jobFit/JobFitStage.tsx')}`
+check(jobFitStageSources.includes('KioskStageFit'), 'job-fit keeps the fixed 1080x1920 stage after the Qingxu migration')
+check(!jobFitStageSources.includes('KioskFullscreenShell'), 'job-fit has left the V6 fullscreen chrome')
 // 宿主 46 的另外两条整屏 route 复用 JobFitPage 导出的同一个舞台（缩放判据只有一份）；
 // /resume/templates 在 KioskRoot 之内，舞台由 KioskRoot 负责，页面不得再挂第二层缩放。
 for (const path of ['src/pages/resume/CareerPlanPage.tsx', 'src/pages/resume/JobFitActionsPage.tsx']) {
@@ -403,7 +405,15 @@ check(!read('src/pages/interview/InterviewReportPage.tsx').includes('岗位匹�
 check(!read('src/pages/interview/InterviewReportPage.tsx').includes('练习表现等级'), 'interview report must not say 练习表现等级')
 includes('src/pages/interview/InterviewSetupPage.tsx', "label: 'HR 面试'", 'setup interviewer label is HR 面试')
 includes('src/pages/interview/InterviewSessionPage.tsx', "hr: 'HR 面试'", 'session interviewer label is HR 面试')
-const jobGuidancePresentation = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/CareerPlanPage.tsx')}\n${read('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')}`
+const jobGuidancePresentation = [
+  read('src/pages/resume/JobFitPage.tsx'),
+  read('src/pages/resume/jobFit/JobFitInteractiveViews.tsx'),
+  read('src/pages/resume/jobFitActionsView.tsx'),
+  read('src/pages/resume/CareerPlanPage.tsx'),
+  read('src/pages/resume/careerPlanView.tsx'),
+  read('src/pages/resume/careerPlanUnreadyView.tsx'),
+  read('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx'),
+].join('\n')
 for (const forbidden of ['录用概率', '保证录用', '一键投递', '立即投递']) check(!jobGuidancePresentation.includes(forbidden), `job guidance rejects ${forbidden}`)
 for (const forbidden of ['localStorage', 'sessionStorage']) check(!read('src/pages/assistant/AssistantPage.tsx').includes(forbidden), `assistant avoids ${forbidden}`)
 // 其他页交来的问题（v2 草稿约定）只经 services/assistantDraft 读一次就删；顾问页自己不写存储，
