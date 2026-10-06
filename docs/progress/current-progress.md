@@ -28,6 +28,15 @@
 - 助手页（`AssistantPage.tsx`）只改两处：`switchVoiceToText` 多一个「转文字原因」参数（不传时行为不变）；有 `voice-` 开头的系统消息时展开对话区（原来没有用户发言时，这条说明会写进状态但看不见）。
 - 验证：一体机类型检查、eslint；`verify-fusion-w3`（它按字节冻结通话钩子，哈希按新内容更新，旧哈希留在注释里）、`verify-assistant-trtc-guard`、`verify-advisor-provider-gate`、`verify-ai-down-fallbacks`、`verify-kiosk-ai-declaration`、`verify-runtime-terminal-identity` 全过；W3 语音相关浏览器用例 14 条通过（新加 3 条：12 秒提示后改用文字、30 秒自动转文字、有字幕时过 40 秒仍在通话中）。反向变异：「字幕不算接通」「30 秒改成 300 秒」「不启动计时」三处都让用例变红；「转文字时不先挂断」用例不红——面板关闭时钩子卸载的清理本来也会调停止接口，停止计费由两处兜底，用例断言的是停止接口恰好被调一次。
 - 停放、隐藏、改名、降级：无。Grok 实现，一体机前端 B 窗口审。
+## 2026-10-06：一体机 52 号「小青的作业面」照青序 2.0 定稿补齐（分支 `claude/kiosk-b-52-advisor-artifact-1006`）
+
+- 打印读不到时（从小青保存要点进来、打印能力读不到）原来把正文和图例都藏了，只剩一张卡却写着「产物正文还在，可以先看」。现在照稿照常显示图例和正文，下面「带走这一页」里加黄色提示「这台机器的打印暂时读不到」，打印按钮仍不出现。稿上提示末尾「或者问现场工作人员」按现场无人值守删掉。
+- 9/29 拍板保留的「02 带走这一页」做上：A4 打印稿缩略样子（按问答、成稿、比对三种画法，纯装饰）、两步说明（第二步「我的文档」可点）、「打印稿上有：……」。没有作业和过期时，照稿加「01 小青能帮你做的三种作业」和「02 做完以后怎么带走」，不再是一张卡加大片空白。
+- 过期只留主按钮「回去重做一次」；没有作业时「去问小青」+「打开我的 AI 记录」。顶部胶囊照稿写「这份可以打印带走」「还没有可带走的内容」。字号按 2.0（小青这句 42、说明 23、条目 24、分区标题 30、图例与出处 21、按钮 27）；卡片不再被拉满剩余高度。
+- 稿上没有的读取中、读取失败两态，用同样的横排卡并接三种作业；这两态的文字改成人话（「正在读取刚做好的作业」「作业内容这次没读到」等，agy 挑过）。原有功能都在：读取重试 3 次、读不到时用带过来的要点兜底并可「重新读取」、打印防连点、打印失败提示、生成打印稿后进打印链、过期判断、夹具门。
+- 验证：一体机类型检查、eslint；`verify-fusion-w3`（新加 20 余条断言，含五个文件不出现「工作人员」「服务台」）、`verify-public-screen-mask`、`verify-ai-artifact-print-url-contract`、`verify-fusion-w6` 全过；W3 作业面浏览器用例 7 条通过（新加 3 条）；并排图 52 号 8 态全部配上，有内容的 5 态走真实会话接口（「打印带走」可点）。反向变异四处（打印读不到又藏正文、去掉带走区、塞进「请找现场工作人员」、去掉「回去重做一次」）全部变红。
+- 停放、隐藏、改名、降级：无。Grok 实现，一体机前端 B 窗口审。
+
 ## 2026-10-06：终端程序 Agent 升 0.4.14（分支 `claude/agent-0.4.14-package`）
 
 - **为什么：** 10/6 产品负责人批准全面检查报告，第五节按推荐执行；其中「下一个安装包 10/12 前」。#1206（机器标识原子落盘）、#1229（U 盘文件读不了提示换一个）、#1237（U 盘按能力开关拦截，W-125）都已在候选，但 0.4.13 安装包不含；不升版本号，两个不同的包会同名同版本。
@@ -92,6 +101,20 @@
 - 补了一个漏洞：这组单测 12 条原先没挂在任何 CI 会跑的门禁上，现登记为 `verify:kiosk-support-contact` 并接进 CI；另补一条单测：文案层 resolveSupportContact 缺字段或非布尔一律按保守值（原先「小程序发布字段缺失当成已发布」的变异没被拦住）；现在 13 条，反向变异三处（换机不看附近终端、发布缺省当真、附近终端非布尔当真）全红。
 - 本 PR 只加代码，不改任何页面文案；页面换句随全量替换线和各页面线。
 - 停放、隐藏、改名、降级：无。
+## 2026-10-06：后台定时任务一次失败不再让 API 进程退出（P0，随第六次；分支 `claude/backend-hardening-20261006-timer-crash`）
+
+- **问题：** `terminals-agent.service.ts` 的 `setInterval(() => void this.resetExpiredClaims(), 30_000)` 没有 catch，`services/api/src` 也没有进程级兜底。一次 Prisma P2028（事务 5 秒内起不来）就是未处理的 Promise 拒绝，Node 22 直接退出整个 API；PM2 拉起前一体机、小程序、后台请求全部失败。走查 10/4、10/6 在本地 rc 栈复现两次。
+- **改法：** 新增 `src/common/process/background-task.ts`：`scheduleBackground` / `runBackground` 把后台异步任务的错误在本处收住、记日志、下一轮再试；日志只记错误类型、错误码与抛出位置，**不记 message**（可能带用户输入或手机号）。回收定时器与 TRTC 到期扫描都改用它。`main.ts` 装进程级兜底 `installUnhandledRejectionGuard`：未处理拒绝记日志并推企业微信（每小时最多一条），**进程不退出**；同步未捕获异常仍按 Node 默认退出、由 PM2 拉起。
+- **复核：** `@Cron` 方法由 `@nestjs/schedule` 的 `wrapFunctionInTryCatchBlocks` `await` 后捕获，安全；扫描心跳定时器自带 `.catch`；TRTC 的 `expireSessions` 内部有 try，仍统一换成 `scheduleBackground`；会员注销 Redis 租约续期已接 `.catch`。
+- **门禁：** `verify:background-task-safety`（进 CI）：静态扫描定时器回调里不接 `.catch` 的 `void 调用`；`scheduleBackground` 次次失败仍照跑；真实 `TerminalAgentService` 遇 P2028 只记一行 warn；兜底记日志并告警、不含原文。反向变异见 PR。
+## 2026-10-06：数据库异地备份脚本与另一台机器恢复演练（本机临时库，未连接生产）
+
+- **范围：** 产品负责人 10/6 批准数据库备份要有异地副本，并在另一台机器上恢复一次。本包只做脚本、rclone 配置样例、运维文档和本机可验证的部分。没有连接生产，没有写入真实桶名、密钥、账号或服务器地址。对象存储的桶仍由产品负责人开通。
+- **补上的缺口：** `backup-postgres.sh` 原来上传后不校验；本机和异地共用 `RETENTION_DAYS`；`BACKUP_UPLOAD_ENABLED` 未开时没有提示。没有「另一台机器从异地拉最新 dump、校验、恢复到新建 drill 库、只读核对」的脚本。
+- **脚本：** 上传后用 `rclone check`（只含当天那一个文件）核对；本地目录模式比对字节数和 SHA-256。上传失败和校验失败都走原来的 `fail` 告警。异地保留天数改为 `BACKUP_REMOTE_RETENTION_DAYS`（默认 30，不跟随本机 `RETENTION_DAYS`）。未开启上传时，本机备份仍成功，标准错误只提示一次。新脚本 `restore-offsite-drill.sh` 在拉取之前拒绝库名不含 `drill` 的目标；库已存在则拒绝覆盖；可选 `DRILL_DROP_DATABASE=1` 只删除这个临时库。
+- **本机演练：** 本机没有 rclone，也没有 shellcheck。用本地目录模式，在临时 PostgreSQL 16.15（127.0.0.1:55486，`LC_ALL=C`，只走 TCP）上跑通：`initdb`、94 个迁移、插入 1 行演练用户、备份、拷到另一目录、`pg_restore -l`、恢复到 `offsite_drill`、核对、删除临时库。源库用户行数仍是 1。跑完已停库，数据目录、备份目录和拉回目录已删。演练记录：时间 2026-10-06 14:04:52 +0800；文件 `postgres_2026-10-06.dump`；大小 368868；`pg_restore -l` 通过，sha256 `9ee4fffa705f95dac31a75e9f5b24cddd0b39ea6294b835308c39d9a90669e5a`；脚本计时 2 秒（不含前面的迁移）；表数 112；`_prisma_migrations` 94；User 1；Organization 0；Terminal 0；库迁移与仓库迁移都是 `20261003120000_ai_quota_per_user`；结论通过。
+- **门禁：** `pnpm --filter @ai-job-print/api verify:backup-ops` 最后一行 `backup ops gates passed`。`node scripts/verify-repository-integrity.mjs`、`node scripts/verify-ci-gate-coverage.mjs` 通过。图谱重新生成后 `--check` 通过（`docs/graph/` 三份产物跟着门禁对新文档的引用更新）。反向变异三处都是退出码 1，已还原：去掉库名校验后生产库名被放行（退出码 0）；上传后不校验则日志里没有 `rclone check`；校验失败不告警则没有 `curl`。
+- **还要人做的：** 按 `docs/device/postgres-operations.md` 第 10 节开桶、建子账号、放 `chmod 600` 的 rclone 配置，并在服务器 `.env` 里设置第 10.2 节的变量。若生产已经把 `RETENTION_DAYS` 设成不是 30 的数，异地不再跟着它走，要单独设 `BACKUP_REMOTE_RETENTION_DAYS`。每季度在另一台机器上演练一次。
 
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
@@ -165,6 +188,22 @@
 ### 缓存与节流
 
 按请求里的 `terminalId` 做进程内缓存，不带参数单独一个键，缓存整份公开响应（含附近是否在线），5 分钟。后台改完配置不主动清缓存，最迟一个缓存周期后一体机和小程序才看到新值。节流与一体机 AI 能力公开读相同：`@TerminalScopedThrottle(30)`。
+## 2026-10-04：取件码方案②（候选分支，未合入、未上线）
+
+产品负责人 10/4 拍板「取件码按推荐」。本段是后端契约，一体机与小程序按同一批字段改前端。字段名不要改。
+
+- 明文列写入路径（本分支核实）：全仓生产代码里，新铸一枚明文 `Order.pickupCode` 的路径原来只有 `order-status.service.ts` 的 `settleRedemptionInTransaction`（`generateUniquePickupCode` 重试循环）。该循环与辅助函数已删。`markPaid` / `markPaidOnline` 本来就不写这一列。建单与作废重发只写 `pickupCodeHash` + `pickupCodeEnc`。退款（`refund.service.ts` 两处）和账号注销保留（`member-closure-retention.ts`）只把这一列置 null。退款来源含糊判断仍会读这一列，不下发。列保留，不迁移存量。
+- 响应里的 `pickupCode` 只可能是解密后的到机码或 null。有哈希、且（仍可取，或此刻可续打）才解密 `pickupCodeEnc`。没有哈希的现场单保持 null。可取口径：`pickupStatus=pending`，付款态为 unpaid / paying / paid，且 `pickupCodeExpiresAt` 仍在未来。
+- 上限：每单自助续打 2 次（`SELF_SERVICE_REPRINT_LIMIT`，加上首次出纸最多 3 次）。计数：该任务状态日志里 `fromStatus=failed`、`toStatus=pending`、`errorCode` 属于 `kiosk_retry` 或 `pickup_code_resume` 的条数。管理员重试（`admin_retry`）不计入、也不受限。`POST /api/v1/print-jobs/:taskId/retry` 与到机码续打共用这个数。旧的 `reprintAttemptsByTaskId` 仍统计全部 failed→pending，不含这次过滤。
+- 两个字段，挂在下发 `pickupCode` 的订单视图上（云打印与材料包的列表和详情、我的打印订单列表与详情、跨端时间线）。在线支付状态和管理员订单动作不带这两个字段。
+  - `reprintAllowed`：此刻绑定终端用同一个到机码能否续打。任务失败、`paidReprintBlockReason` 为空（含 Agent 版本）、任务终端与订单终端相同、取件窗口未关、自助次数未到上限，才为 true。没任务、没失败、现场单、退款中为 false。
+  - `reprintRemaining`：剩余自助次数 0–2。没有任务或现场单（没有哈希）为 null。有任务且有哈希时给数字，哪怕此刻 `reprintAllowed` 为 false。
+  - `reprintAllowed` 为 true 时继续下发到机码。已用且不可续打的单不下发。
+- 续打：认领入口在已放行（used / 有 printTaskId）之后、10 分钟回放之前。满足上面条件则把同一个任务和订单的 `taskStatus` 从 failed 改回 pending，状态日志 `errorCode=pickup_code_resume`，刷新 30 分钟签名文件地址。返回与正常放行同一形状，并多一个 `resumed: true`。不建任务、不改金额、不新建订单。正常放行和 10 分钟回放不带 `resumed`。回放窗口仍从任务最初的 `createdAt` 算，续打不重置。
+- 拒绝：次数用完 409 `PICKUP_RESUME_LIMIT_REACHED`「这单已经接着打过 2 次，不能再打了」。结果未确认 409 `PICKUP_RESUME_UNCONFIRMED`「这单的出纸结果还没确认，暂时不能接着打，请稍后再试」。已出部分纸 409 `PICKUP_RESUME_PARTIAL_OUTPUT`「这单已经出了一部分纸，不能整单重打」。其它不可续打原因沿用既有 `REPRINT_BLOCKED_CODE` 与对应文案；既有「未确认」那句本包不改。会员 `/retry` 超限 409 `PRINT_RETRY_LIMIT_REACHED`，文案与次数用完那句相同。取件窗口已关沿用 400 `PICKUP_CODE_EXPIRED`。退款中 / 已退沿用认领入口既有 400 `ORDER_REFUNDED`，走不到续打。别的终端输这个码仍是认领入口既有 404 `PICKUP_CODE_INVALID`。任务还在排队、打印中或已完成，仍走 10 分钟回放。
+- 管理员可见性：只读订单视图与 `POST /admin/orders/:id/mark-paid` 都不把到机码交给管理员浏览器。`mark-paid` 的 `pickupCode` 恒为 null（字段还在，避免旧客户端缺键）。密文列也不回。
+- 新门禁 `verify:pickup-code-resume` 挂在 `verify:print-jobs` 后面，CI 已有的 `verify:print-jobs` 行会带上它，未改 `.github/`。
+- 停放、隐藏、改名、降级：无。存量明文列留在库里，任何接口不再把它读出来。
 
 ## 2026-10-04：R-6 简历优化页可改经历 / 教育的标题、可删整条（产品负责人 10/4 单独批准的冻结稿例外）
 
@@ -213,6 +252,20 @@
 - **决定：** 10/4 20:2x 产品负责人按推荐定了试用协议第 5 项：管理员密码由本公司保管，不交站点；站点负责人只持打印机台和主机锁盒的钥匙；现场要进系统时电话联系本公司远程处理。
 - **改了什么：** 母盘清单 B11 改成上述口径；现场故障处置单里两处让现场清 Windows 打印队列的步骤（「给现场工作人员」第 2 步、缺纸恢复的人工步骤）改成「奔图面板上取消残留作业，Windows 队列由本公司远程清」。其余写到管理员账号的地方都是装机人员（本公司）操作，未改。
 - **合规引用：** 「给现场工作人员」节名没改（合规制度 6 按节名引用），只改了第 2 步内容。
+## 2026-10-04：W-129 后端接口——打印本场面试题目和我的回答（不含 AI 点评）（分支 `claude/backend-hardening-20261004-interview-transcript-print`；Grok 实现、Claude 审）
+
+- 接口：`POST /api/v1/mock-interviews/:id/transcript/print`。入参 `{}` 或 `{ includeSkipped?: boolean }`，默认 false；非布尔返回 400 `VALIDATION_FAILED`。不调用模型。`in_progress` 且没有报告行、以及 `completed`，都能出。`configured`（还没有第一题）按没有回答处理。
+- 没有任何非跳过的候选人回答时返回 400 `INTERVIEW_NO_ANSWERS`，文案「这一场还没有作答，暂时没有可打印的内容」。只剩跳过题时，即使 `includeSkipped` 为 true，同样返回这个 400。
+- 跳过判定：候选人回合 `MockInterviewTurn.skipped === true`。`answer()` 在 `input.skip` 时写入该布尔值，并把 content 写成「（跳过）」；`buildQaExcerpts` 也只看这个布尔值。判定依据是布尔值。后面没有候选人回合的题不算回答，纸上也不印。空白内容不算回答。
+- 出参与练习卷相同：`fileId`、`filename`、`sizeBytes`、`pageCount`、`printFileUrl`、`signedUrl`、`expiresAt`，另加 `variant: 'transcript'`、`questionCount`、`answerCount`。`questionCount` 是这张纸上的题数，只有开关打开才把跳过题算进去。`answerCount` 只数非跳过的真实回答，开关打开时不变。一场里一题已答、一题跳过、还有一题未答：关为题 1 答 1，开为题 2 答 1，未答题两档都不印。
+- PDF 含岗位、行业、面试官中文称呼（沿用 `PRACTICE_SHEET_INTERVIEWER_LABEL`）、每题和紧跟的回答。开关打开时跳过题标「本题跳过」。页脚「本页为练习记录，不含 AI 点评」，并带现有免责声明。不含报告、评分或点评正文。**协调方审核时改：** 题目是 AI 面试官（模型）出的，Grok 原写元数据 `AIGenerated=false` 且纸上没说明题目来源，不符合 AI 生成内容标识要求；现表头下加「题目由 AI 面试官生成；回答为你本人作答，未经 AI 修改。」，元数据 `AIGenerated=true`，门禁加两条断言，两处反向变异（改回 false、去掉来源说明）都红。
+- 归属与练习卷相同：会员本人，或匿名凭令牌；越权一律 404 `INTERVIEW_NOT_FOUND`。校验从 `loadAuthorized` 照抄到新服务。`mock-interview.service.ts` 未改。
+- 文件落库与练习卷相同：`purpose=print_doc`，`assetCategory=derived`，`derivationKind=ai_generated`（生产隐私闸门与题目单同一口径），`createdBy=mock_interview_transcript`。`printFileUrl` 用 30 分钟 `PRINT_ARTIFACT_URL_TTL_MS`。
+- 审计动作 `mock_interview.transcript_print`。payload 只有 `sessionId`、`questionCount`、`answerCount`、`includeSkipped`，不带题目和回答原文。管理员中文名「打印面试作答记录（不含 AI 点评）」。节流与 `@AiUse('export')` 与练习卷相同。`verify:ai-quota-coverage`（Q2a 起才有）只扫 generate / voice，`export` 不进登记。
+- 文件：新增 `services/api/src/mock-interview/interview-transcript-pdf.service.ts`（104 行）、`interview-transcript-print.service.ts`（188 行）。`mock-interview.controller.ts` 增加 DTO 与路由（+23，现 332 行），新服务放在构造函数最后一个参数。`mock-interview.module.ts` +4（52 行）。`apps/admin/src/lib/auditActionLabels.ts` +1。`verify-derivation-kind.ts` +1。`verify-mock-interview.ts` 增加用例 20（+242，现 1032 行）。`docs/graph/` 由生成脚本重写。
+- 验证最后一行：`verify:mock-interview` 为 `=== ALL PASS (24 checks) ===`；`verify:ai-safety-aigc` 为 `AI 标识与提示词安全句：PASS`；`verify:ai-access` 为 `verify:ai-access：ALL PASS`；`verify:console-plain-copy` 为 `verify:console-plain-copy passed`；`verify:derivation-kind` 为 `verify:derivation-kind：40/40 通过`；`verify:ai-cost-coverage` 为 `A-6 成本覆盖验证: 178 PASS, 0 FAIL`（其中调用了没有独立脚本名的 `verify-ai-cost-ui-coverage`）；`verify:ai-usage-budget` 覆盖面为 `✅ verify:ai-usage-budget（覆盖面）21/21 通过`；`verify:ai-down-fallbacks` 为 `verify-ai-down-fallbacks passed (31 files checked)`；`verify:multipart-field-nesting` 为 `PASS: multipart 字段嵌套与体积上限防护已验证`；`verify:admin-partner-contact-phone-ui` 为 `PASS 适配器、资格判断与弹层文案`；`verify:recruitment-hosting-gate-declares` 为 `verify:recruitment-hosting-gate-declares PASS`；`verify:ai-user-text-retention` 为 `ALL PASS (536)`；`verify:ai-artifact-print-url-contract` 为 `✅ ALL PASS — AI / 求职产物只使用内部 HMAC printFileUrl 打印`。API `typecheck`、`lint` 退出码 0。图谱 `--check` 为 `PASS docs/graph/ 与当前代码一致`。
+- 反向变异已还原，还原后用例 20 再跑仍是 `=== ALL PASS (24 checks) ===`。去掉归属校验：退出码 1，`FAIL 20d. 会员越权应为 404，实际 0`。没有回答仍出 PDF：退出码 1，`FAIL 20b. 没有回答应为 400，实际 0`。审计 payload 写入回答原文：退出码 1，`FAIL 20f. 审计 payload 含题目或回答原文`。忽略 `includeSkipped`：退出码 1，`FAIL 20c. includeSkipped 两种取值的题数或答数应不同`。
+- 一体机按钮由主执行窗口接 `beginPrintHandoff`。本分支没有改前端页面（只加一条后台审计中文名）。
 
 ## 2026-10-04：W-118 一体机这一半——检查任务防重、被拒后带文件回材料检查、隐私摘要说实话、开发版构建闸
 
@@ -302,6 +355,13 @@
 - **空会话：** 开场失败仍把会话滚回 `configured` 并原样抛错（503 `AI_INTERVIEW_QUESTION_FAILED`），不立刻删——一体机与小程序失败后都会拿这个会话号打通用题目单（现有门禁第 15 条），但都不会再对它调 `/start`。本人面试记录本来就只收 `completed`；每小时的 `cleanupExpired` 另删超过 30 分钟、仍是 `configured`、且没有任何题目的会话。未满 30 分钟、已有题目、进行中、开场成功的会话都不删。
 - **验证：** 见 PR 描述。三处反向变异（去掉管理员角色、去掉审计、去掉空会话清理）对应断言都红过，已改回。
 - **已知未做：** 会员数据导出里的面试查询不按状态过滤，空会话在被清理前（最长约 1.5 小时）仍会出现在导出里。
+## 2026-10-04：模型账户不可用时给人话和手动出路；简历解析失败不扣次（分支 `claude/backend-hardening-20261004-ai-account-unavailable`；Grok 实现、Claude 审）
+
+- **问题：** 上游 401 / 402 / 403 与已停用的模型名，原先都落成 `AI_PROVIDER_REQUEST_ERROR` 或 HTTP 200 的「请稍后重试」，一体机进不了「AI 暂不可用」。小青裸字符串异常对外是 `Service Unavailable`。
+- **改了什么：** 新增 503 码 `AI_PROVIDER_ACCOUNT_UNAVAILABLE`（401/402/403）和 `AI_PROVIDER_MODEL_INVALID`（404，或 400 且响应体能看出模型名无效）。给用户的句子不带状态码。诊断 / 优化 / 生成的 200-failed 增加 `failCode`。简历解析在这类我们这边的失败上退回本次公共次数；文件本身无法识别不退。合同审查账户级失败改说「AI 服务暂时不可用」。一体机把两个新码放进能力级表，诊断、优化、生成、职业规划、自我探索走已有手动出路。小程序未改，只留契约。
+- **验证：** API 与一体机 typecheck、lint、`verify:llm-account-unavailable`、`verify:ai-down-fallbacks` 及图谱点名的相关门禁通过。六处反向变异对应断言变红后已改回。未做浏览器点击。未部署。
+- **协调方审核时改的退次口径（总指挥 10/4：失败不扣、成功只扣一次）：** Grok 原来只在账户 / 模型名 / 上游 5xx / 连不上时退次。走查在正式构建上模拟 402 实测：每失败一次会员、终端、IP 三项各加 1，连点约 4 分钟会员当天 20 次就用完，终端 120 次、IP 240 次同样会被烧掉，上游一次故障整台机甚至整个场地当天都用不了 AI。现改为：模型这一环的失败（带机器码：抛错、上游 4xx / 5xx、限流、超时、忙、空回复、未归类）一律退三项计数；只有内容审核拦下用户自己的内容、以及文件本身的问题（无法提取文本，没有机器码）照扣；意图路径抛错也退（只减计数，不删去重标记，同一意图不会再打一次模型）。门禁加了三项计数逐一核对、成功三项各只扣一次、同一意图重放不再扣、超时与普通 4xx 退、内容审核照扣；三处变异（内容审核也退、意图路径抛错不退、超时不退）都红。其它公共次数调用点（岗位推荐 / 解读 / 匹配）本来就在失败时回滚，没有同类问题。
+- **关联门禁：** 按图谱查出 74 条加类型检查共 77 条，76 条通过；`verify:resume-export-formats` 的 6g 在本机长期复用的测试库上红，换全新库与文件目录复跑通过（本机残留，与本次无关）。
 
 ## 2026-10-04：第二次发布清单补上「三个开关各自要同批改的文字」（分支 `claude/release2-switch-texts-1004`，只改文档）
 
@@ -372,6 +432,17 @@
 - **改法（一体机）：** `userErrorMessage.ts` 给两个码加固定说法：读不了是「这个文件读不了，请换一个文件」，列表过期是「文件列表已过期，请重新读取 U 盘后再选」，都不说「请重试」。
 - **门禁：** `verify:usb-import-agent` 加三条：注入「读的那一下抛错」必须是 unreadable 且日志不含文件名；列出后删除的文件是 unreadable、同编号再用是 expired；HTTP 层 422 与原文、不转发后端。`verify-kiosk-runtime-error-boundary.mjs` 加两个码的显示断言。反向测试四次都红：读失败改回 expired、日志带回原文、接口把 unreadable 当 410、删掉一体机新文案。
 - **没有验证：** 真 Windows Defender 与 EICAR 测试文件没跑过（试点 U 盘口先锁着，开放前按装机清单 G 段做 EICAR 验收）。0.4.13 不含此改动，下次出包带上。
+
+## 2026-10-04：管理员后台接上会员账号注销的管理员执行（用户管理页内，不新建页）
+
+- **入口**：管理员后台「用户管理」。列表在状态旁标「申请注销」（悬停看申请时间与来源），新增「注销」筛选（待执行的本人申请 / 已按线下凭据执行 / 已注销）；详情抽屉显示申请信息，admin 角色可见「注销账号」。
+- **执行**：页内两步对话框（不用浏览器自带确认框）。先填办理来源（按本人申请 / 凭线下申请）、事由（1–200 字）、手机尾号四位、线下凭据编号（线下必填）；再看「注销后会发生什么」四段清单（合规窗口 10/4 定稿，逐字），勾选「已确认是这位用户（线下办理已在凭据上核对本人），知道注销后不能恢复」后才能提交。手机尾号只用来确认是这位用户、防止点错，不作身份核验（合规窗口 10/4 定：本人申请靠申请时的二次短信验证，线下办理靠凭据并由管理员核对本人）。接口 `POST /admin/users/:endUserId/closure`（后端 #1221）。
+- **拒绝与失败**：尾号不符不回显正确尾号；没有待处理申请时引导改选线下；有未完成订单时列出订单号与中文状态；执行中、上下文不一致、执行失败（账号停在注销中，保留已填内容原样重试）各有中文提示。已注销账号手机号显示 `***`，不再提供停用、恢复、注销操作。
+- **共用文案**：`packages/shared/src/types/memberPrivacy.ts` 只改了管理员后台专用的两句（驳回只记录处理结论；注销在用户管理页执行）；一体机引用的四个常量逐字节未变，小程序不引用该文件。
+- **演示模式**：用户列表为空，注销请求明确拒绝并提示「演示模式不执行账号注销」。
+- **验证**：门禁 `verify-admin-users-ui`（含新的 `verify-user-closure-ui`：真实校验函数、适配器、对话框事件、清单逐字）、文案 / 合规 / 时间 / 原始错误 / mock 契约门禁、管理员状态单测、admin / shared / kiosk 类型检查通过；四处反向变异（去掉勾选禁用、回显尾号、线下不要求凭据、已注销仍显示注销按钮）都会红。浏览器测试新增 8 条（HTTP 构建 + 请求拦截，不访问真实用户），由新增的 CI 步骤 `playwright.users.config.ts` 执行。未做生产验证。
+- **新增文件**：`apps/admin/src/routes/users/UserClosureDialog.tsx`、`userClosurePresentation.ts`、`apps/admin/scripts/verify-user-closure-ui.mjs`、`apps/admin/tests/e2e/users.closure.spec.ts`、`apps/admin/playwright.users.config.ts`；无删除。
+
 ## 2026-10-04：会员账号注销后端（本人申请 + 管理员执行）（分支 `claude/backend-hardening-20261003-member-closure`；**各端入口还没接，用户暂时看不到变化**）
 
 - **做了什么（Codex 实现、协调方审）：** 本人在 `POST /me/data-requests` 提交注销申请（要二次短信验证，登记为待处理，不自动执行，可撤回）；管理员在 `POST /admin/users/:endUserId/closure` 执行，必须填事由、核对手机尾号，凭本人申请或线下凭据编号。执行器分步、可重入：停用并撤销登录态 → 硬删个人数据与文件 → 保留的记录去标识 → 手机号换成纯随机值、账号标为已匿名 → 写审计。有已付款未取件、退款中、打印中的订单时拒绝并列出订单号。同一手机号之后登录是全新账号，读不到任何旧数据。

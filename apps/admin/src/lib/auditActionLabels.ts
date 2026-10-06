@@ -130,6 +130,7 @@ const ACTION_LABELS: Record<string, string> = {
   'mock_interview.practice_sheet_print': '打印面试练习单',
   'mock_interview.report_generated': '生成模拟面试报告',
   'mock_interview.report_print': '打印模拟面试报告',
+  'mock_interview.transcript_print': '打印面试作答记录（不含 AI 点评）',
   'offline_agency.create': '新建线下机构',
   'offline_agency.update': '更新线下机构',
   'offline_agency_job.create': '新建线下机构岗位入口',

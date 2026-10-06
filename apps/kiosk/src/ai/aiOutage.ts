@@ -22,13 +22,14 @@ import type { AiAvailability } from './useAiTask'
 /**
  * 会把**整条 AI 能力**判成不可用的错误码。
  *
- * 其余错误（限流 429、参数错误 400、鉴权 401 等）只是**本次调用**失败，
+ * 其余错误（限流 429、普通参数 400、上游 5xx、空回复）只是**本次调用**失败，
  * 不是能力不可用 —— 那些必须保留重试入口，
  * 不许拿去把按钮永久置灰（置灰了用户就再也点不动，而服务其实是好的）。
  *
- * 准入标准只有一条：**这个码只可能由「能力没配好 / 根本没接真模型」产生**。
- * 只要后端同一个码还会用于「这次没成」（超时、限流、空回复、上游 4xx/5xx），
- * 就不能进这张表 —— 把限流显示成「这个功能不可用」本身就是伪造能力。
+ * 准入标准：**配置恢复之前每一次都会失败**。连不上、账户级拒绝（401/402/403）、
+ * 模型名无效（404 或模型名 400）都算。只要后端同一个码还会用于「这次没成」
+ * （超时、限流、空回复、上游 5xx、其它一次性 4xx），就不能进这张表 ——
+ * 把限流显示成「这个功能不可用」本身就是伪造能力。
  *
  * 移出记录（2026-08-19，四家只读审查 3:1）：
  * - `AI_UNAVAILABLE`：后端曾把「连不上」「上游任意非 2xx（含 429 限流）」「模型没返回内容」
@@ -42,13 +43,17 @@ import type { AiAvailability } from './useAiTask'
  * 不再混着限流，可以安全地判成能力级。
  *
  * 仍然不进表的：`AI_RATE_LIMITED`（限流）、`AI_PROVIDER_ERROR`（上游 5xx）、
- * `AI_PROVIDER_REQUEST_ERROR`（其它 4xx）、`AI_EMPTY_RESPONSE`（空回复）。
+ * `AI_PROVIDER_REQUEST_ERROR`（其它一次性 4xx）、`AI_EMPTY_RESPONSE`（空回复）。
  * 5xx 尤其不能进：上游已经响应了，502/503/504 常见于瞬时过载与滚动发布，
  * 下一次可能就成功；要判「能力不可用」得靠连续失败阈值或健康探针。
+ * `AI_PROVIDER_REQUEST_ERROR` 也不进：4xx 里还有一次性的请求问题，和「每次都失败」不是一回事。
  *
- * `AI_OPTIMIZE_UNAVAILABLE` 尚未拆（`llm-resume-optimize.service.ts` 本轮刻意未动，
- * 因为小程序 `pages/resume-optimize/resume-optimize.js:87` 精确匹配该码，
- * 拆了会改变小程序文案）。它仍是三义复用码，因此仍不进表。
+ * 2026-10-04 补进表的：`AI_PROVIDER_ACCOUNT_UNAVAILABLE`（401/402/403）、
+ * `AI_PROVIDER_MODEL_INVALID`（404，或 400 且响应体能看出模型名无效）。
+ * 这两类在密钥、账户或模型名恢复之前每一次都会失败，属于能力级。
+ *
+ * `AI_OPTIMIZE_UNAVAILABLE` 仍不进表。优化链路只把账户级 / 模型名问题拆成上面两个新码；
+ * 连接失败、空回复和其余非 2xx 仍用旧码（小程序精确匹配它）。它仍是多义码。
  */
 export const AI_OUTAGE_CODES: ReadonlySet<string> = new Set([
   // 功能位未启用 / 无密钥：只可能是没配好，不可能是「这次没成」。
@@ -60,8 +65,12 @@ export const AI_OUTAGE_CODES: ReadonlySet<string> = new Set([
   // 由 verify-ai-down-fallbacks.mjs 运行时钉死必须正好是这个值。
   'MOCK_MODE',
   // fetch 层根本没连上（DNS / TLS / 连接被拒 / 网络不可达）。
-  // 拆码后它不再混着 429 与 5xx，是唯一能代表「模型真的够不着」的信号。
+  // 拆码后它不再混着 429 与 5xx。
   'AI_PROVIDER_UNREACHABLE',
+  // 上游 401 / 402 / 403。密钥或账户侧拒绝，恢复配置前每次都失败。
+  'AI_PROVIDER_ACCOUNT_UNAVAILABLE',
+  // 上游 404，或 400 且能看出是模型名问题。换对模型名前每次都失败。
+  'AI_PROVIDER_MODEL_INVALID',
   // ── 服务端「能力级停用」503（services/api/src/ai-access/ai-access.service.ts enforce，
   //    在调用模型之前就拦下）。重试不会变好，只能等后台恢复 / 次日额度重置，因此与上面同类：
   //    不再引导重试，页面落到不用 AI 的手动路径。
