@@ -2901,13 +2901,13 @@ test('按原样导出不显示人工智能标注说明 @w3-kiosk', async ({ page
   await expect(page.getByText(PAGE_AIGC_NOTE)).toHaveCount(0)
   await expect(page.getByText(FILE_AIGC_NOTE)).toHaveCount(0)
 
-  await page.getByLabel('姓名').fill('原样样本')
+  // #1315 起生成页先停在第 0 屏，四步填写（经历一步含教育、工作、项目三个页签）。
+  await page.getByTestId('resume-generate-primary').click()
+  await page.getByRole('textbox', { name: '姓名' }).fill('原样样本')
   await page.getByRole('button', { name: '下一步：求职意向' }).click()
-  await page.getByLabel('目标岗位').fill('门店运营')
-  await page.getByRole('button', { name: '下一步：教育经历' }).click()
-  await page.getByRole('button', { name: '下一步：工作经历' }).click()
-  await page.getByRole('button', { name: '下一步：项目经历' }).click()
-  await page.getByRole('button', { name: '下一步：技能证书' }).click()
+  await page.getByRole('textbox', { name: /^目标岗位/ }).fill('门店运营')
+  await page.getByRole('button', { name: '下一步：经历' }).click()
+  await page.getByRole('button', { name: '下一步：技能与自评' }).click()
   await page.getByRole('button', { name: '去核对' }).click()
   await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
 
