@@ -5,7 +5,7 @@
 // 合规：仅供本人练习参考，不代表任何招聘结果承诺。
 // ============================================================
 
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
@@ -38,14 +38,15 @@ import {
 } from '../../ai'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
-import { createInterview, getVoiceCapability, printInterviewPracticeSheet, startInterview } from '../../services/api/interview'
-import { FileContentPreview } from '../../components/FileContentPreview'
+import { createInterview, printInterviewPracticeSheet, startInterview } from '../../services/api/interview'
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
 import { ResumeUsbImportPanel } from '../resume/components/ResumeUsbImportPanel'
 import { InterviewAiDownScreen } from './InterviewAiDownScreen'
+import { InterviewModePicker, InterviewVoiceProbe, OptionButton } from './InterviewModePicker'
+import { InterviewResumePreview } from './InterviewResumePreview'
 import { InterviewShell } from './InterviewShell'
 import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus, InterviewSteps } from './interviewQxParts'
 import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
@@ -94,48 +95,6 @@ const DURATIONS: Array<{ key: InterviewDuration; label: string; desc: string }> 
 ]
 
 const POSITION_EXAMPLES = ['前端开发工程师', '行政专员', '市场运营', '机械工程师', '会计', '销售代表']
-
-const PREVIEWABLE_EXT = new Set(['pdf', 'jpg', 'jpeg', 'png', 'webp', 'doc', 'docx'])
-
-function resumePreviewable(file: InterviewResumeFile): boolean {
-  const ext = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? ''
-  const format = (file.format ?? '').replace(/^\./, '').toLowerCase()
-  const mime = (file.mimeType ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
-  if (PREVIEWABLE_EXT.has(ext) || PREVIEWABLE_EXT.has(format)) return true
-  if (mime === 'application/pdf' || mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/webp') return true
-  if (mime === 'application/msword' || mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return true
-  return false
-}
-
-function OptionButton({
-  active,
-  onClick,
-  children,
-  className = '',
-  disabled = false,
-}: {
-  active: boolean
-  onClick: () => void
-  children: ReactNode
-  className?: string
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => { if (!disabled) onClick() }}
-      aria-pressed={disabled ? false : active}
-      aria-disabled={disabled || undefined}
-      className={[
-        'interview-option min-h-[52px] rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors',
-        active ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300',
-        className,
-      ].join(' ')}
-    >
-      {children}
-    </button>
-  )
-}
 
 export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
@@ -187,26 +146,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)
 
   useEffect(() => {
-    let cancelled = false
-    getVoiceCapability()
-      .then((cap) => {
-        if (cancelled) return
-        if (cap.asrEnabled === true) {
-          setVoiceAsr('on')
-          return
-        }
-        if (cap.asrEnabled === false) {
-          setVoiceAsr('off')
-          setInteractionMode('text')
-          return
-        }
-        setVoiceAsr('unknown')
-      })
-      .catch(() => { if (!cancelled) setVoiceAsr('unknown') })
-    return () => { cancelled = true }
-  }, [])
-
-  useEffect(() => {
     patchInterviewWorkbenchSession({
       setup: {
         directionSelectionVersion: 1,
@@ -236,12 +175,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     try {
       const uploaded = await kioskUploadFile(file, 'resume_upload', getToken())
       setResumePreviewOpen(false)
-      setResumeFile({
-        fileId: uploaded.fileId,
-        name: uploaded.filename,
-        mimeType: uploaded.mimeType,
-        fileUrl: uploaded.signedUrl,
-      })
+      setResumeFile({ fileId: uploaded.fileId, name: uploaded.filename, mimeType: uploaded.mimeType, fileUrl: uploaded.signedUrl })
     } catch (err) {
       setError(userMessageOf(err, '简历上传失败，请重试'))
     } finally {
@@ -431,27 +365,26 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     ? '这台机器的语音识别暂时没开，这一场先用文字答。AI 面试官暂时不能出题，语音回合先不开放。'
     : 'AI 面试官暂时不能出题，语音回合先不开放。'
 
-  if (aiOutage && !showSetupForm) {
-    return (
-      <InterviewAiDownScreen
-        voiceReason={voiceDownReason}
-        error={error}
-        onOpenTips={goTips}
-        onHome={() => navigate('/')}
-        onReviewSetup={() => setShowSetupForm(true)}
-        fallback={(
-          <AiTaskRegion
-            className="interview-setup-fallback"
-            task={aiTask}
-            label="AI 面试官出题与点评"
-            fallback={fallback}
-          />
-        )}
-      />
-    )
-  }
-
   return (
+    <>
+      <InterviewVoiceProbe setVoiceAsr={setVoiceAsr} setInteractionMode={setInteractionMode} />
+      {aiOutage && !showSetupForm ? (
+        <InterviewAiDownScreen
+          voiceReason={voiceDownReason}
+          error={error}
+          onOpenTips={goTips}
+          onHome={() => navigate('/')}
+          onReviewSetup={() => setShowSetupForm(true)}
+          fallback={(
+            <AiTaskRegion
+              className="interview-setup-fallback"
+              task={aiTask}
+              label="AI 面试官出题与点评"
+              fallback={fallback}
+            />
+          )}
+        />
+      ) : (
     <InterviewShell
       title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
       subtitle={copy.subtitle}
@@ -575,24 +508,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
               </div>
             </div>
           </div>
-          <div className="iv-choice" data-testid="interview-interaction-mode">
-            <p>交互方式</p>
-            <div className="iv-chips">
-              <OptionButton active={interactionMode === 'text'} onClick={() => setInteractionMode('text')}>纯文字</OptionButton>
-              <OptionButton
-                active={interactionMode === 'voice'}
-                disabled={voiceAsr === 'off'}
-                onClick={() => setInteractionMode('voice')}
-              >
-                语音回合（文字兜底）
-              </OptionButton>
-            </div>
-            {voiceAsr === 'off' && (
-              <p className="iv-hint" role="status" data-testid="interview-mode-voice-reason">
-                这台机器的语音识别暂时没开，这一场先用文字答。
-              </p>
-            )}
-          </div>
+          <InterviewModePicker mode={interactionMode} voiceAsr={voiceAsr} onModeChange={setInteractionMode} />
         </section>
 
         <section className="iv-card">
@@ -601,30 +517,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             <div className="iv-panel">
               <div className="iv-head"><b>{resumeFile.name}</b><span>这场练习会用这份简历出题</span></div>
               <p className="iv-copy">移除后按通用问题练习，不会因此少一道题。</p>
-              <button
-                type="button"
-                className="iv-mini-btn"
-                aria-expanded={resumePreviewOpen}
-                onClick={() => setResumePreviewOpen((open) => !open)}
-              >
-                {resumePreviewOpen ? '收起预览' : '预览这份简历'}
-              </button>
-              {resumePreviewOpen && (
-                resumePreviewable(resumeFile) ? (
-                  <div className="iv-resume-preview">
-                    <FileContentPreview
-                      fileUrl={resumeFile.fileUrl}
-                      fileName={resumeFile.name}
-                      mimeType={resumeFile.mimeType}
-                      format={resumeFile.format}
-                      fileId={resumeFile.fileId}
-                      token={getToken()}
-                    />
-                  </div>
-                ) : (
-                  <p className="iv-copy" data-testid="interview-resume-preview-unsupported">这种格式不能在这里预览，不影响这场练习。</p>
-                )
-              )}
+              <InterviewResumePreview file={resumeFile} open={resumePreviewOpen} onOpenChange={setResumePreviewOpen} token={getToken()} />
               <button
                 type="button"
                 onClick={() => { setResumeFile(null); setResumePreviewOpen(false) }}
@@ -664,13 +557,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                     confirmLabel="确认使用这份简历"
                     onUploaded={(file) => {
                       setResumePreviewOpen(false)
-                      setResumeFile({
-                        fileId: file.fileId,
-                        name: file.name,
-                        mimeType: file.mimeType,
-                        fileUrl: file.fileUrl,
-                        format: file.format,
-                      })
+                      setResumeFile({ fileId: file.fileId, name: file.name, mimeType: file.mimeType, fileUrl: file.fileUrl, format: file.format })
                     }}
                     onBusyChange={setQrBusy}
                   />
@@ -678,13 +565,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                   <ResumeUsbImportPanel
                     onUploaded={(file) => {
                       setResumePreviewOpen(false)
-                      setResumeFile({
-                        fileId: file.fileId,
-                        name: file.name,
-                        mimeType: file.mimeType,
-                        fileUrl: file.fileUrl,
-                        format: file.format,
-                      })
+                      setResumeFile({ fileId: file.fileId, name: file.name, mimeType: file.mimeType, fileUrl: file.fileUrl, format: file.format })
                     }}
                     onBusyChange={setUsbBusy}
                   />
@@ -746,5 +627,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       </div>
     </div>
     </InterviewShell>
+      )}
+    </>
   )
 }

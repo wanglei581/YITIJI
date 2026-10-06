@@ -192,6 +192,15 @@ for (const token of [
 ]) {
   check(setup.includes(token), `${pages[0]} — Setup 真实链路合同缺失：${token}`)
 }
+// 交互方式与简历预览从设置页拆出后，属于这两块的字样改从新文件读。一条不删。
+const modePicker = read('src/pages/interview/InterviewModePicker.tsx')
+const resumePreview = read('src/pages/interview/InterviewResumePreview.tsx')
+const modePickerTokens = new Set([
+  '交互方式',
+  '纯文字',
+  '语音回合（文字兜底）',
+  '这台机器的语音识别暂时没开，这一场先用文字答。',
+])
 for (const token of [
   '交互方式',
   '纯文字',
@@ -209,9 +218,22 @@ for (const token of [
     ? read('src/pages/interview/session/InterviewSessionInvalid.tsx')
     : token === '报告包含的复盘区' || token === '问答摘录' || token === '不把回答印进打印件'
       ? read(pages[2])
-      : setup
+      : modePickerTokens.has(token)
+        ? modePicker
+        : token === '这种格式不能在这里预览，不影响这场练习。'
+          ? resumePreview
+          : setup
   check(haystack.includes(token), `面试 2.0 合同缺失：${token}`)
 }
+check(setup.includes('<InterviewModePicker'), '设置页必须渲染 InterviewModePicker')
+check(setup.includes('<InterviewResumePreview'), '设置页必须渲染 InterviewResumePreview')
+let handleStartSource = ''
+try {
+  handleStartSource = sourceNode(setupAst, 'handleStart')
+} catch {
+  handleStartSource = ''
+}
+check(handleStartSource.includes('interactionMode: mode'), 'interactionMode: mode 必须留在页面的 handleStart 里')
 
 for (const token of [
   'answerInterview(',
