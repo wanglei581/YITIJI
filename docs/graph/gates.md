@@ -1149,7 +1149,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/screen/metricLabels.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenTabs.ts` | `verify-console-screen-details.mjs` |
-| `apps/partner/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/partner/src/routes/smart-campus/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/sources/ExcelImportModal.tsx` | `verify-excel-template-download-ui.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-job-headcount.ts`<br/>`verify-partner-excel-import.ts` |
 | `apps/partner/src/routes/sources/RotateCredentialDrawer.tsx` | `verify-backend-p0-contracts.mjs` |

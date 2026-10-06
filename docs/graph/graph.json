@@ -21620,7 +21620,8 @@
       "apps/admin/scripts/verify-console-screen-details.mjs"
     ],
     "apps/partner/src/routes/screen/screenView.tsx": [
-      "apps/admin/scripts/verify-console-screen-ui.mjs"
+      "apps/admin/scripts/verify-console-screen-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/partner/src/routes/smart-campus/index.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
@@ -33126,6 +33127,7 @@
           "apps/kiosk/src/services/files/usbImportApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/kiosk/src/services/print/printJobsApi.ts",
+          "apps/partner/src/routes/screen/screenView.tsx",
           "apps/partner/src/routes/sources/index.tsx"
         ],
         "missing": []
