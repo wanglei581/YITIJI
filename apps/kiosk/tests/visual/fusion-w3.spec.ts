@@ -2191,6 +2191,182 @@ test('advisor artifact content state opens my documents @w3-kiosk', async ({ pag
   expect(runtimeErrors).toEqual([])
 })
 
+// 真实产物常常只有两三条。条目写具体的事，量的是相邻区块的空隙，不是「测试」占位。
+const SPARSE_PIN_TEXT = [
+  '面试时先说清自己在仓储实习里负责的盘点流程',
+  '投递前把成绩单和英语四级证书扫成一份 PDF',
+  '简历里的仓储实习写了盘点和出库核对，面试时可以按这个顺序讲',
+  '被问到为什么看文员岗时，可以把重点放在核对细、能坐得住',
+] as const
+
+const SPARSE_PIN_NOTES = [
+  '来源：你在第 3 轮说的原话',
+  '来源：你在第 6 轮说的原话',
+  '来源：本机已有的简历诊断结果',
+  'AI 的建议，仅供参考 —— 说不说、怎么说由你定',
+] as const
+
+const SPARSE_PIN_LEVELS = ['E1', 'E1', 'E2', 'E3'] as const
+
+function sparsePins(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    content: SPARSE_PIN_TEXT[index % SPARSE_PIN_TEXT.length]!,
+    evidenceLevel: SPARSE_PIN_LEVELS[index % SPARSE_PIN_LEVELS.length]!,
+    sourceNote: SPARSE_PIN_NOTES[index % SPARSE_PIN_NOTES.length]!,
+  }))
+}
+
+function qaPinsSession(sessionId: string, count: number) {
+  return {
+    sessionId,
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    artifacts: [{
+      artifactId: `${sessionId}-art`,
+      kind: 'qa_pins',
+      status: 'completed',
+      payload: { kind: 'qa_pins', title: '你钉住的条目', pins: sparsePins(count) },
+      provider: 'llm:deepseek',
+      printedFileId: null,
+      createdAt: '2026-10-06T00:00:00.000Z',
+      updatedAt: '2026-10-06T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    }],
+  }
+}
+
+/** 相邻区块：上一块下沿到下一块上沿。舞台缩放后的屏幕像素要除回 CSS 像素。 */
+async function readAdvisorBandGaps(page: Page) {
+  const scale = await readEnabledStageScale(page)
+  const raw = await page.evaluate(() => {
+    const pick = (selector: string) => document.querySelector(selector)
+    const box = (node: Element) => {
+      const rect = node.getBoundingClientRect()
+      return { top: rect.top, bottom: rect.bottom, height: rect.height }
+    }
+    const named = [
+      ['.aa-hero', '横幅'],
+      ['.aa-legend', '图例'],
+      ['[data-testid="advisor-artifact-qa"]', '01'],
+      ['[data-testid="advisor-artifact-take"]', '带走'],
+      ['.qx-ctabar', '底栏'],
+      ['.qx-navbar', '导航'],
+    ] as const
+    const blocks = named.flatMap(([selector, name]) => {
+      const node = pick(selector)
+      return node ? [{ name, ...box(node) }] : []
+    })
+    const card = pick('[data-testid="advisor-artifact-qa"]') as HTMLElement | null
+    const body = pick('.aa-body') as HTMLElement | null
+    const scroll = card?.querySelector('.aa-scroll') as HTMLElement | null
+    const header = card?.querySelector('.aa-sec-h')
+    const pins = [...(card?.querySelectorAll('.aa-pin') ?? [])].map(box)
+    return {
+      justify: body ? getComputedStyle(body).justifyContent : '',
+      blocks,
+      pins,
+      cardHeight: card ? card.getBoundingClientRect().height : 0,
+      headerBottom: header ? header.getBoundingClientRect().bottom : 0,
+      bodyBottom: body ? body.getBoundingClientRect().bottom : 0,
+      bodyScroll: body?.scrollHeight ?? 0,
+      bodyClient: body?.clientHeight ?? 0,
+      scrollScroll: scroll?.scrollHeight ?? 0,
+      scrollClient: scroll?.clientHeight ?? 0,
+      takeHeight: (pick('[data-testid="advisor-artifact-take"]') as HTMLElement | null)?.offsetHeight ?? 0,
+      barHeight: (pick('.qx-ctabar') as HTMLElement | null)?.offsetHeight ?? 0,
+      navHeight: (pick('.qx-navbar') as HTMLElement | null)?.offsetHeight ?? 0,
+    }
+  })
+  const css = (px: number) => px / scale
+  const gaps = raw.blocks.slice(1).map((block, index) => ({
+    from: raw.blocks[index]!.name,
+    to: block.name,
+    gap: css(block.top - raw.blocks[index]!.bottom),
+  }))
+  const pinGaps = raw.pins.slice(1).map((pin, index) => css(pin.top - raw.pins[index]!.bottom))
+  const itemsHeight = raw.pins.length >= 2
+    ? css(raw.pins[raw.pins.length - 1]!.bottom - raw.pins[0]!.top)
+    : css(raw.pins[0]?.height ?? 0)
+  return {
+    justify: raw.justify,
+    gaps,
+    pinGaps,
+    cardHeight: css(raw.cardHeight),
+    itemsHeight,
+    headerToFirstPin: raw.pins.length ? css(raw.pins[0]!.top - raw.headerBottom) : 0,
+    trailing: css(raw.bodyBottom - (raw.blocks.find((block) => block.name === '带走')?.bottom ?? raw.bodyBottom)),
+    bodyOverflow: raw.bodyScroll - raw.bodyClient,
+    scrollOverflow: raw.scrollScroll - raw.scrollClient,
+    takeHeight: raw.takeHeight,
+    barHeight: raw.barHeight,
+    navHeight: raw.navHeight,
+  }
+}
+
+test('advisor artifact sparse pins stack from the top without open bands @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  for (const count of [2, 4]) {
+    const sessionId = `w3-pin-${count}`
+    api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, {
+      status: 200,
+      json: qaPinsSession(sessionId, count),
+    })
+    await page.goto(`/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
+    await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'qa-pins')
+    await expect(page.getByTestId('advisor-artifact-qa')).toBeVisible()
+    await expect(page.locator('.aa-pin')).toHaveCount(count)
+    await expect(page.getByText(SPARSE_PIN_TEXT[0])).toBeVisible()
+    const stack = await readAdvisorBandGaps(page)
+    // 01 卡用 flex-grow 吃掉余高之后，单看空隙分不出 space-evenly。
+    // 计算样式钉住 .aa-body：改回 space-evenly 时这条必须红。
+    expect(stack.justify, `${count} 条时正文从上往下排`).toBe('flex-start')
+    for (const band of stack.gaps) {
+      expect(band.gap, `${count} 条时「${band.from}」到「${band.to}」的空隙不超过 40px，量到 ${band.gap.toFixed(1)}`).toBeLessThanOrEqual(40)
+      expect(band.gap, `${count} 条时「${band.from}」不应盖住「${band.to}」`).toBeGreaterThanOrEqual(-1)
+    }
+    for (const gap of stack.pinGaps) {
+      expect(gap, `${count} 条时条目之间不拉开`).toBeLessThanOrEqual(40)
+    }
+    expect(stack.headerToFirstPin, `${count} 条时第一条贴着标题往下排`).toBeLessThanOrEqual(40)
+    expect(stack.headerToFirstPin, `${count} 条时标题不盖住第一条`).toBeGreaterThanOrEqual(-1)
+    expect(stack.cardHeight, `${count} 条时 01 卡片高于条目本身，余高在卡片里`).toBeGreaterThanOrEqual(stack.itemsHeight)
+    expect(stack.trailing, `${count} 条时带走区贴着正文底部，余高不堆在区块下面`).toBeLessThanOrEqual(40)
+    expect(stack.bodyOverflow, `${count} 条时一屏放得下，不应先滚`).toBeLessThanOrEqual(2)
+    expect(stack.barHeight, '底栏保持原高').toBeGreaterThanOrEqual(90)
+    expect(stack.navHeight, '导航保持原高').toBeGreaterThanOrEqual(100)
+  }
+
+  const manyId = 'w3-pin-many'
+  api.respond('GET', `/api/v1/advisor/sessions/${manyId}`, {
+    status: 200,
+    json: qaPinsSession(manyId, 12),
+  })
+  await page.goto(`/ai/plan?sessionId=${manyId}&artifactId=${manyId}-art`)
+  await expect(page.locator('.aa-pin')).toHaveCount(12)
+  const crowded = await readAdvisorBandGaps(page)
+  expect(crowded.bodyOverflow, '条目多到放不下时由正文区整页滚动').toBeGreaterThan(40)
+  expect(crowded.scrollOverflow, '条目多时不改成卡片内部滚动').toBeLessThanOrEqual(2)
+  expect(crowded.takeHeight, '带走区不被压扁').toBeGreaterThanOrEqual(180)
+  expect(crowded.barHeight, '底栏不被挤掉').toBeGreaterThanOrEqual(90)
+  expect(crowded.navHeight, '导航不被挤掉').toBeGreaterThanOrEqual(100)
+  const covered = await page.evaluate(() => {
+    const body = document.querySelector('.aa-body') as HTMLElement | null
+    const take = document.querySelector('[data-testid="advisor-artifact-take"]')
+    const bar = document.querySelector('.qx-ctabar')
+    if (!body || !take || !bar) return null
+    body.scrollTop = body.scrollHeight
+    const takeBox = take.getBoundingClientRect()
+    const barBox = bar.getBoundingClientRect()
+    return { takeBottom: takeBox.bottom, barTop: barBox.top, barHeight: barBox.height }
+  })
+  expect(covered, '滚到底之后仍能量到底栏和带走区').not.toBeNull()
+  expect(covered!.barHeight, '滚到底栏仍在').toBeGreaterThanOrEqual(90)
+  expect(covered!.barTop - covered!.takeBottom, '底栏不盖住带走区').toBeGreaterThanOrEqual(-1)
+  expect(runtimeErrors).toEqual([])
+})
+
 // ── 岗位匹配参考（/resume/job-fit）──────────────────────────────────────────
 // 这一组只断言「页面说的话有没有依据」和「取消之后还会不会被翻盘」，不比像素。
 const JOB_FIT_JOB = { id: 'j1', title: '前端开发工程师', company: '示例来源企业', sourceName: '来源平台', externalId: 'X-1' }
