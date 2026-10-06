@@ -126,7 +126,10 @@ const frozen = {
   // 未同意就不发创建请求，也不把画面停在连接中。停止接口仍是 keepalive fetch。
   // 旧哈希 365da6215997c51c4f8d4a2f41ca623302431fefe2e463864c42c06c760c3a29。
   // 2026-09-30 产品负责人授权：单次通话截止及文字降级；原有身份/声明/退出门禁仍由 assistant-trtc-guard 钉住。
-  'src/hooks/useAiAdvisorCallSession.ts': '7f4c697aca220e1c48f3a9df2f450800d0aec72b4c391488fed62caff797d0c6',
+  // 2026-10-06 重新冻结：live 后若一直没有远端音量也没有字幕，12 秒提示、30 秒结束会话并转文字。
+  // 身份、声明、停止与到点降级仍由 assistant-trtc-guard 钉住。冻结仍是逐字节校验，没有删断言。
+  // 旧哈希 7f4c697aca220e1c48f3a9df2f450800d0aec72b4c391488fed62caff797d0c6。
+  'src/hooks/useAiAdvisorCallSession.ts': '9843b115f8bec2868e4f5c961ac3a3ab9cd3f5f77b5c2cd623ec3af82a65bfe4',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
 

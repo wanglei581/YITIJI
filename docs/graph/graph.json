@@ -12903,7 +12903,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 637,
+      "reachableFileCount": 638,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15879,7 +15879,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 731
+      "sourceFileCount": 735
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -42702,6 +42702,29 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/copy/unattendedCopy.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/hooks/useSupportContact.ts",
+        "kind": "component",
+        "mentions": [
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/progress/current-progress.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/assistant/assistant-advisor.css",
         "kind": "style",
         "mentions": [
@@ -43929,6 +43952,18 @@
         "risk": "low",
         "scope": "kiosk",
         "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/services/api/supportContact.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
+          "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

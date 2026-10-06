@@ -2342,6 +2342,64 @@ test('assistant voice deadline warns then preserves text conversation @w3-kiosk'
   expect(api.requestCount('POST', '/api/v1/trtc/session')).toBe(1)
 })
 
+const VOICE_SILENT_TEXT = '这次语音没有接通声音，已为你转成文字对话，可以接着问'
+
+async function beginAdvisorCall(page: Page) {
+  await page.goto('/assistant')
+  await page.getByRole('button', { name: '语音咨询', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
+  await dialog.getByRole('button', { name: /直接语音通话/ }).click()
+  await expect(dialog).toHaveAttribute('data-state', 'voice-live')
+  return dialog
+}
+
+test('assistant voice silent prompt switches to text @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api, false, { silent: true })
+  await page.clock.install()
+  const dialog = await beginAdvisorCall(page)
+  await expect(dialog.getByTestId('assistant-voice-silent')).toHaveCount(0)
+  await page.clock.fastForward(12_000)
+  const notice = dialog.getByTestId('assistant-voice-silent')
+  await expect(notice).toBeVisible()
+  await expect(notice).toHaveAttribute('role', 'status')
+  await expect(notice.getByRole('heading', { name: '小青这边没有声音，也没有字幕' })).toBeVisible()
+  await expect(notice).toContainText('可能是网络或语音服务没接通。可以改用文字继续问。')
+  const toText = dialog.getByTestId('assistant-voice-silent-to-text')
+  const retry = notice.getByRole('button', { name: '重新连接', exact: true })
+  expect(await toText.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(64)
+  expect(await retry.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(64)
+  await toText.click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByLabel('输入咨询问题')).toBeEnabled()
+  await expect(page.getByText(VOICE_SILENT_TEXT)).toHaveCount(1)
+  await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+})
+
+test('assistant voice silent call switches to text at 30s @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api, false, { silent: true })
+  await page.clock.install()
+  const dialog = await beginAdvisorCall(page)
+  await page.clock.fastForward(30_000)
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByLabel('输入咨询问题')).toBeEnabled()
+  await expect(page.getByText(VOICE_SILENT_TEXT)).toHaveCount(1)
+  await expect.poll(() => api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(1)
+})
+
+test('assistant voice with subtitle stays in the call past 40s @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await mockAssistantVoice(page, api)
+  await page.clock.install()
+  const dialog = await beginAdvisorCall(page)
+  await expect(dialog.getByText('可以先说说你最想解决的问题。', { exact: true })).toBeVisible()
+  await page.clock.fastForward(40_000)
+  await expect(dialog.getByTestId('assistant-voice-silent')).toHaveCount(0)
+  await expect(dialog).toHaveAttribute('data-state', 'voice-live')
+  expect(api.requestCount('POST', '/api/v1/trtc/session/stop')).toBe(0)
+})
+
 test('W-118 resume diagnosis phone entry creates only one upload session @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   let creates = 0

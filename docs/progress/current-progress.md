@@ -24,6 +24,14 @@
 - **本机验证（2026-10-06）：** `tsc --noEmit -p .` 退出 0。`verify:boot-spool-guard`、`verify:windows-service-recovery`、`verify:installer-inputs`、`verify:production-provisioning`、`verify:print-scan-agent` 退出 0。`node scripts/verify-repository-integrity.mjs` 退出 0（5117 个文件，6 个 workflow YAML）。`node scripts/generate-project-graph.mjs` 后 `--check` 通过，图谱 0 个文件变化。`verify:singleton-process` 退出 0。`verify:scan-watcher` 重跑退出 0（同一次在机器忙时有一条反向子进程超时，重跑通过）。`verify:task-reliability` 退出 1，两处都在本分支原有文件上、这次没改它们：`dead-letter list` 在 15 秒内没有退出（status 为 null）；内嵌的单实例检查限时 120 秒，身份竞争约 95 秒后整体超时。单独的 `verify:singleton-process` 已通过。其余 `package.json` 里能在 macOS 跑的 `verify*` 在本分支上此前已逐个退出 0；两个 Windows 专属脚本在 macOS 上跳过，靠 CI。反向测试（改坏后 `verify:boot-spool-guard` 必须非 0，再 `git checkout` 还原）：1 运行中也删，退出码 1；2 删除失败仍启动 Spooler，退出码 1；3 日志写进文件名，退出码 1；4 去掉工作电脑模式回退，退出码 1；5 第三次恢复改回 none，退出码 1；6 `-DailyRebootAt off` 仍注册，退出码 1。还原后工作区干净。
 - **停放、隐藏、改名、降级：** 无。没有新增岗位、招聘会、企业功能。
 
+
+## 2026-10-06：小青语音通话没声音也没字幕时，带用户回到文字对话（分支 `claude/kiosk-b-advisor-call-silent-fallback-1006`）
+
+- 问题：小青语音进房后，如果机器人没进房、语音合成出错或网络只通了一半，屏幕一直显示「通话中」，用户听不到声音也看不到字幕，只能干等。现场没有工作人员，必须自己把人带回文字对话。
+- 改法：通话接通后开始计时。只要收到过一次小青的声音（远端音量大于 5，与现有「说话中」判断同一个阈值）或一条字幕，就算接通，这一通不再判，所以对话中间安静不会误报。12 秒还没接通：通话面板出现提示「小青这边没有声音，也没有字幕」，给「改用文字继续问」「重新连接」两个按钮。30 秒还没接通：自动结束这一通（调停止接口，停止计费），转到文字对话，并在对话里说明「这次语音没有接通声音，已为你转成文字对话，可以接着问」。挂断、出错、到时长上限、重新连接、离开页面都会清掉计时。原有的自动播放被拦、只听模式、到时长上限转文字三种兜底不变。
+- 助手页（`AssistantPage.tsx`）只改两处：`switchVoiceToText` 多一个「转文字原因」参数（不传时行为不变）；有 `voice-` 开头的系统消息时展开对话区（原来没有用户发言时，这条说明会写进状态但看不见）。
+- 验证：一体机类型检查、eslint；`verify-fusion-w3`（它按字节冻结通话钩子，哈希按新内容更新，旧哈希留在注释里）、`verify-assistant-trtc-guard`、`verify-advisor-provider-gate`、`verify-ai-down-fallbacks`、`verify-kiosk-ai-declaration`、`verify-runtime-terminal-identity` 全过；W3 语音相关浏览器用例 14 条通过（新加 3 条：12 秒提示后改用文字、30 秒自动转文字、有字幕时过 40 秒仍在通话中）。反向变异：「字幕不算接通」「30 秒改成 300 秒」「不启动计时」三处都让用例变红；「转文字时不先挂断」用例不红——面板关闭时钩子卸载的清理本来也会调停止接口，停止计费由两处兜底，用例断言的是停止接口恰好被调一次。
+- 停放、隐藏、改名、降级：无。Grok 实现，一体机前端 B 窗口审。
 ## 2026-10-06：终端程序 Agent 升 0.4.14（分支 `claude/agent-0.4.14-package`）
 
 - **为什么：** 10/6 产品负责人批准全面检查报告，第五节按推荐执行；其中「下一个安装包 10/12 前」。#1206（机器标识原子落盘）、#1229（U 盘文件读不了提示换一个）、#1237（U 盘按能力开关拦截，W-125）都已在候选，但 0.4.13 安装包不含；不升版本号，两个不同的包会同名同版本。
@@ -82,6 +90,11 @@
 - 新门禁 `verify:kiosk-font-subset` 接 CI（构建之后跑）：源码用字都在子集、声明是相对地址且与文件一一对应、许可证与说明在、产物里每个字体带哈希；反向变异 7 处全红。
 - 线上缓存（10/6 只读探测）：`/assets/` 目前只有 ETag 和 Last-Modified，没有 Cache-Control。字体没变时浏览器重新验证只拿到 304，不重下；要做到「一年不变、不发请求」，需要在服务器 nginx 上给 `/assets/` 加 `Cache-Control: public, max-age=31536000, immutable`。这是改生产配置，要产品负责人点头、在发布窗口里做，本分支不改。重新生成用 `apps/kiosk/scripts/fonts/build_source_han_subset.py`（本机，需要 fonttools）。
 - 本机按 Windows 字体栈渲染核对：/help 标题是 Qingxu Serif，正文是 Qingxu Sans。Windows 真机效果待每周五真机录屏确认。
+## 2026-10-06：无人值守标准句与服务联系方式的共享代码先行合入（分支 `claude/kiosk-support-contact-shared-1006`）
+
+- 从全量替换线（`claude/kiosk-unattended-copy-1004`，随第七次）里原样拆出三个共享文件先合，供前端 C 等页面线直接用：`copy/unattendedCopy.ts`（标准句 1–5、禁用说法表、续打句）、`services/api/supportContact.ts`（读 `GET /api/v1/public/support-contact?terminalId=`，404 / 超时 / 缺字段按最保守的一套）、`hooks/useSupportContact.ts`；测试夹具默认应答同步。导出名以后保持不变。
+- 补了一个漏洞：这组单测 12 条原先没挂在任何 CI 会跑的门禁上，现登记为 `verify:kiosk-support-contact` 并接进 CI；另补一条单测：文案层 resolveSupportContact 缺字段或非布尔一律按保守值（原先「小程序发布字段缺失当成已发布」的变异没被拦住）；现在 13 条，反向变异三处（换机不看附近终端、发布缺省当真、附近终端非布尔当真）全红。
+- 本 PR 只加代码，不改任何页面文案；页面换句随全量替换线和各页面线。
 - 停放、隐藏、改名、降级：无。
 
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
