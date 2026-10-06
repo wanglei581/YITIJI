@@ -327,7 +327,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/toolbox/constants.ts` | `verify-console-batch5-copy.mjs`<br/>`verify-toolbox-review-ui.mjs`<br/>`verify-terminal-device-config.ts` |
 | `apps/admin/src/routes/toolbox/index.tsx` | `verify-toolbox-review-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
 | `apps/admin/src/routes/toolbox/toolboxActionState.ts` | `verify-no-raw-error-render.mjs` |
-| `apps/admin/src/routes/users/UserClosureDialog.tsx` | `verify-user-closure-ui.mjs` |
+| `apps/admin/src/routes/users/UserClosureDialog.tsx` | `verify-user-closure-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/users/UserDetailDrawer.tsx` | `verify-admin-users-ui.mjs`<br/>`verify-user-closure-ui.mjs` |
 | `apps/admin/src/routes/users/UserStatusDialog.tsx` | `verify-admin-users-ui.mjs` |
 | `apps/admin/src/routes/users/index.tsx` | `verify-admin-users-ui.mjs`<br/>`verify-user-closure-ui.mjs` |

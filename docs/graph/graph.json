@@ -18701,7 +18701,8 @@
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/admin/src/routes/users/UserClosureDialog.tsx": [
-      "apps/admin/scripts/verify-user-closure-ui.mjs"
+      "apps/admin/scripts/verify-user-closure-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/admin/src/routes/users/UserDetailDrawer.tsx": [
       "apps/admin/scripts/verify-admin-users-ui.mjs",
@@ -33371,6 +33372,7 @@
           "apps/admin/src/routes/sync-sources/index.tsx",
           "apps/admin/src/routes/sync-sources/syncSourcesApi.ts",
           "apps/admin/src/routes/toolbox/toolboxActionState.ts",
+          "apps/admin/src/routes/users/UserClosureDialog.tsx",
           "apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
