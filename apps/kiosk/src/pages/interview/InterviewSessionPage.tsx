@@ -51,6 +51,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const location = useLocation()
   const { getToken } = useAuth()
   const storedLive = readInterviewWorkbenchSession()?.live
+  // 设置屏的选择在进场时定死。纯文字即使语音可用也不自动切过去。
+  const entryInteractionMode = storedLive?.interactionMode === 'voice' ? 'voice' : 'text'
   const state = resolveInterviewSessionState(location.state as InterviewSessionRouteState | null)
 
   const [messages, setMessages] = useState<InterviewMessage[]>(() =>
@@ -102,6 +104,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     remainingSec,
     omitPrintAnswers,
     answersRecorded,
+    interactionMode: entryInteractionMode,
   })
 
   const access = useMemo(
@@ -116,8 +119,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     let asrOn = false
 
     // 探测的是「机器上有没有音频输入设备」，不是「浏览器有没有这个 API」。
-    // 只在服务端 ASR 已启用时才自动切语音模式；能力探测本身始终执行，
-    // 这样状态胶囊与常显原因永远反映真实硬件情况。
+    // 自动切语音只发生在设置屏选了「语音回合」，并且服务端识别开着、麦克风可用。
+    // 选纯文字时探测照旧做，状态胶囊仍说真话，但不改作答方式。
     const runDetect = (autoSwitch: boolean) => {
       void detectMicCapability().then((capability) => {
         if (cancelled) return
@@ -136,14 +139,14 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         asrOn = asr === true
         setAsrEnabled(asrOn)
         setTtsOfficial(ttsEnabled === true)
-        runDetect(true)
+        runDetect(entryInteractionMode === 'voice')
       })
       .catch(() => { if (!cancelled) runDetect(false) })
 
     // 用户可能后插一个 USB 麦克风：热插拔后重新探测，语音入口自动恢复。
     const unsubscribe = subscribeMicDeviceChange(() => runDetect(false))
     return () => { cancelled = true; unsubscribe() }
-  }, [])
+  }, [entryInteractionMode])
 
   /** 手动重探（改权限后 / 插上麦克风后）。 */
   const recheckMic = () => {
@@ -212,6 +215,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     return (
       <InterviewSessionInvalid
         onRestart={() => onGoStage ? onGoStage('setup') : navigate('/interview/setup')}
+        onOpenReports={() => onGoStage ? onGoStage('reports') : navigate('/interview/reports')}
       />
     )
   }

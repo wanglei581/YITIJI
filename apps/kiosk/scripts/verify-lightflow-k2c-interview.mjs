@@ -161,7 +161,10 @@ try {
     assert.ok(result.errors.at(-1)?.includes(expected), `缺少${expected}提示本人填写或选择`)
   }
   const result = await runStart({ position: '  机械工程师  ' })
-  assert.deepEqual(result.requests, [{ interviewerType: 'hr', industry: '制造业', position: '机械工程师', experience: 'y3_5', difficulty: 'standard', durationMin: 5 }, 'start'], '本人选项原样创建后再开始')
+  // 2026-10-06：建场请求开始带 interactionMode。门禁把 handleStart 抽出来单独跑时
+  // 没有页面状态，函数按 globalThis 缺省收成 text。这条期望从「不带该字段」改成
+  // 「缺省就是 text」，用来钉住默认纯文字；没有删掉创建体里的其他字段。
+  assert.deepEqual(result.requests, [{ interviewerType: 'hr', industry: '制造业', position: '机械工程师', experience: 'y3_5', difficulty: 'standard', durationMin: 5, interactionMode: 'text' }, 'start'], '本人选项原样创建后再开始')
   check(true, '模拟面试不预选与本人选择校验')
 } catch (error) {
   check(false, `模拟面试不预选与本人选择校验：${error.message}`)
@@ -186,6 +189,26 @@ for (const token of [
   'className="flex h-12 w-12',
 ]) {
   check(setup.includes(token), `${pages[0]} — Setup 真实链路合同缺失：${token}`)
+}
+for (const token of [
+  '交互方式',
+  '纯文字',
+  '语音回合（文字兜底）',
+  '语音识别没有开启，这一场先用文字。',
+  '这种格式不能在这里预览',
+  'interactionMode: mode',
+  '这场练习的状态',
+  '这一场留下了什么',
+  '报告包含的复盘区',
+  '问答摘录',
+  '不把回答印进打印件',
+]) {
+  const haystack = token.startsWith('这场') || token.startsWith('这一场')
+    ? read('src/pages/interview/session/InterviewSessionInvalid.tsx')
+    : token === '报告包含的复盘区' || token === '问答摘录' || token === '不把回答印进打印件'
+      ? read(pages[2])
+      : setup
+  check(haystack.includes(token), `面试 2.0 合同缺失：${token}`)
 }
 
 for (const token of [

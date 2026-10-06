@@ -1715,6 +1715,33 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await expect(reportNote).toContainText('也不会发送给任何企业。')
   await expect(page.getByText('模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。')).toBeVisible()
   await expect(page.getByRole('heading', { name: '和目标岗位要求的对照' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '报告与打印状态' })).toBeVisible()
+  await expect(page.getByTestId('interview-report-overview')).toBeVisible()
+  await expect(page.getByText('综合表现概览', { exact: true })).toBeVisible()
+  await expect(page.getByText('五项能力维度', { exact: true })).toBeVisible()
+  await expect(page.getByText('下一轮准备', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('interview-report-review')).toBeVisible()
+  await expect(page.getByText('风险点', { exact: true })).toBeVisible()
+  await expect(page.getByText('高频问题', { exact: true })).toBeVisible()
+  await expect(page.getByText('STAR 建议', { exact: true })).toBeVisible()
+  await expect(page.getByText('表达结构基本完整，仍需用真实数据补充结果。')).toHaveCount(2)
+  await expect(page.getByText('回答顺序清楚')).toBeVisible()
+  await expect(page.getByText('能联系目标岗位')).toBeVisible()
+  await expect(page.getByText('只保留本人真实经历')).toBeVisible()
+  await expect(page.getByText('术语使用基本准确')).toBeVisible()
+  await expect(page.getByText('能回应追问')).toBeVisible()
+  await expect(page.getByText('结果量化不足')).toBeVisible()
+  await expect(page.getByText('你的具体贡献是什么？')).toBeVisible()
+  await expect(page.getByText('核实个人职责')).toBeVisible()
+  await expect(page.getByText('用真实行动回答')).toBeVisible()
+  await expect(page.getByText('交代背景')).toBeVisible()
+  await expect(page.getByText('说明任务')).toBeVisible()
+  await expect(page.getByText('说明行动')).toBeVisible()
+  await expect(page.getByText('说明结果')).toBeVisible()
+  await expect(page.getByText('不要编造数据')).toBeVisible()
+  await expect(page.getByText('复核简历事实')).toBeVisible()
+  await expect(page.getByText('准备真实项目例子')).toBeVisible()
+  await expect(page.getByText('工作人员')).toHaveCount(0)
   await expect(page.getByText('前端开发工程师 · 互联网/科技 · HR 面试')).toHaveCount(2)
   await expect(page.getByText('岗位匹配度参考')).toHaveCount(0)
   await expect(page.getByText('HR 初筛')).toHaveCount(0)
@@ -1837,6 +1864,65 @@ test('interview setup failure stays inside the first screen @w3-kiosk', async ({
   await expect(alert).toBeVisible()
   await expect(alert).toBeInViewport()
   await expect(alert).toContainText('AI 服务暂停中')
+})
+
+test('interview setup grays voice turns when recognition is off @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/interview/setup')
+  const voice = page.getByRole('button', { name: '语音回合（文字兜底）', exact: true })
+  await expect(voice).toBeVisible()
+  await expect(voice).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('interview-mode-voice-reason')).toContainText('语音识别没有开启，这一场先用文字。')
+  await expect(page.getByRole('button', { name: '纯文字', exact: true })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('interview expired screen lists what remains and can start over @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/interview/session')
+  const status = page.getByRole('region', { name: '这场练习的状态' })
+  await expect(status).toBeVisible()
+  await expect(status.getByText('已过期', { exact: true })).toBeVisible()
+  await expect(status.getByText('已失效', { exact: true })).toBeVisible()
+  await expect(status.getByText('不受影响', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新创建一场练习' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看本人练习记录' })).toBeVisible()
+  await expect(page.getByText('登录后可保存练习报告')).toBeVisible()
+  await expect(page.getByText('现在没有本人记录可看')).toBeVisible()
+  for (const text of ['按系统记录保留', '不保留', '未生成则不会补生成', '按文件留存期限管理']) {
+    await expect(page.getByText(text, { exact: true })).toBeVisible()
+  }
+  await page.getByRole('button', { name: '重新创建练习' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=setup/)
+  await expect(page.locator('[data-kiosk-screen="interview-setup"]')).toBeVisible()
+})
+
+test('interview report still shows answer excerpts when the print copy leaves them out @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, { status: 200, json: interviewReport })
+  api.respond('GET', `/api/v1/mock-interviews/${INTERVIEW_ID}/report`, {
+    status: 200,
+    json: {
+      data: {
+        ...interviewReport.data,
+        includeAnswersInPrint: false,
+        qaExcerpts: [{
+          question: '请讲一次你把库存差异查清楚的经历。',
+          answerExcerpt: '我按货位把进出记录对了一遍，发现夜班记到了隔壁库位。',
+          skipped: false,
+        }],
+      },
+    },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  await page.waitForURL(/\/interview\?stage=report/)
+  await expect(page.getByRole('heading', { name: '问答摘录' })).toBeVisible()
+  await expect(page.getByText('你选择了不把回答印进打印件。下面仍可在屏幕上回看摘录。')).toBeVisible()
+  await expect(page.getByText('我按货位把进出记录对了一遍，发现夜班记到了隔壁库位。')).toBeVisible()
+  await expect(page.getByText('工作人员')).toHaveCount(0)
 })
 
 const COVERED_EVIDENCE = '我做过两年社群运营，最多同时管 6 个群'
