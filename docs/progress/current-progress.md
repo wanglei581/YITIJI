@@ -105,6 +105,43 @@
 ## 2026-10-04：小程序按「现场无人值守」改文字（分支 `claude/miniapp-unattended-copy`，叠在 #1219 上）
 
 产品负责人 10/4 主原则：设备现场没有工作人员，全程自助、自动。小程序里让用户「联系现场工作人员 / 找工作人员核对 / 工作人员处理后 / 到店核对」的地方（注册页面里 6 处，加 3 处「到店」）改成自助出路：手机上重试或重新下单、拨打服务电话。「换一台机器」要等后端接口说附近有别的在线终端才说，接口接上前一律不说（取件页两处；材料包那句「换一个服务点」是原有的、指选服务点，保留）。服务电话号码等后端公开接口（GET /api/v1/public/support-contact?terminalId=，返回 servicePhone / serviceHours / otherOnlineTerminalNearby / miniappPublished，开发中）再接，在那之前只说「号码在首页底部『经营者信息』里」，不写死（`utils/user-error.js` 的 `SUPPORT_HINT`）。停放的招聘会页面不打包，那里说的是主办方的现场人员，没动。新门禁（`free-pilot-copy.test.mjs`）：全部注册页面的 WXML、页面目录 JS 与 utils JS 的文字里不许出现找工作人员、店员、服务台、到店；`supportHint` 在页面 data 里实跑有值。只改文字与接线，不改样式。11 处改动逐处反向变异全部转红。
+## 2026-10-04：公开只读接口 support-contact（服务电话与提示条件）
+
+一体机出错时按条件显示「拨打服务电话」「换一台机器」「用手机继续」。本段是后端判断。一体机和小程序的句子由主执行窗口接，本分支不改那三端。
+
+### 契约
+
+`GET /api/v1/public/support-contact?terminalId=<终端号>`，不需要登录。一体机手里是终端号 `terminalCode`（也有内部 id）。接口两种都接受：先按内部 id 查，没有再按终端号查。
+
+`200 { success: true, data: { servicePhone, serviceHours, otherOnlineTerminalNearby, miniappPublished } }`
+
+- `servicePhone`：管理员填写。没配返回 `null`，不会返回空串。
+- `serviceHours`：管理员填写。没配时公开接口返回「工作日 9:00–18:00」。
+- `miniappPublished`：后台开关，默认 false。库存值只有精确的 `true` 才算已发布。
+- 管理员 `GET /api/v1/admin/support-contact` 在服务时间没配时返回 `null`，表单才能区分「没填」和「改过」。公开接口才补上默认句子。
+- 读不到终端、不带 `terminalId`、终端号不存在、超过 128 字、本机已退役：`otherOnlineTerminalNearby=false`，仍然 200。
+
+### 判据
+
+同一机构（`orgId` 非空且相同）下、除本机外，至少一台终端在线。
+
+在线沿用 `services/api/src/terminals/printer-availability.ts` 的 `TERMINAL_ONLINE_WINDOW_MS`，以及 `terminals-admin.service.ts` `listTerminalsForAdmin` 第 328 行：有心跳，且最近心跳落在窗口内。心跳取终端列 `lastHeartbeatAt` 与最新一条 `TerminalHeartbeat.createdAt` 里较新的那个。不用 `lastSeenAt`（它是 `@updatedAt`，改名称也会刷新）。比较是严格小于窗口。
+
+其它终端不计入：已退役（`lifecycleStatus=retired`）、计划中（`lifecycleStatus=planned`，后台称待安装）、停用（`enabled=false`）。维护中、安装中、已暂停不因此排除。
+
+本机没绑机构 → false。本机已退役 → false，即使同机构还有别的在线终端。响应只有这一个布尔值，不带其它终端的编号、数量或位置。
+
+### 存储
+
+新建模型 `PlatformSetting`（键 `support.servicePhone`、`support.serviceHours`、`support.miniappPublished`）。没有可复用的平台级键值：一体机统一配置按终端，法务文档是带版本的正文，价目属于收费，线下网点电话属于招聘内容，Redis 上的 AI 开关会过期。本表没有 `endUserId`，不是会员数据，不进注销删除或置空清单。号码只由管理员写入，代码、迁移、种子和文档里不放号码。
+
+### 后台在哪一页改
+
+管理员后台现有页「法务文档版本」（路由 `/legal-docs`）里的「服务联系」卡片。不新页面、不新菜单。`PUT /api/v1/admin/support-contact` 仅管理员，与配置在同一事务里写审计 `support_contact.update`。公开读取不写审计。
+
+### 缓存与节流
+
+按请求里的 `terminalId` 做进程内缓存，不带参数单独一个键，缓存整份公开响应（含附近是否在线），5 分钟。后台改完配置不主动清缓存，最迟一个缓存周期后一体机和小程序才看到新值。节流与一体机 AI 能力公开读相同：`@TerminalScopedThrottle(30)`。
 
 ## 2026-10-04：R-6 简历优化页可改经历 / 教育的标题、可删整条（产品负责人 10/4 单独批准的冻结稿例外）
 

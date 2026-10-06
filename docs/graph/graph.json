@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 576,
+    "endpointCount": 579,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -4002,6 +4002,46 @@
         ],
         "services": [
           "SmartCampusService"
+        ]
+      },
+      {
+        "controller": "services/api/src/support-contact/support-contact.admin.controller.ts",
+        "handler": "SupportContactAdminController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/support-contact",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/support-contact/support-contact.service.ts"
+        ],
+        "services": [
+          "SupportContactService"
+        ]
+      },
+      {
+        "controller": "services/api/src/support-contact/support-contact.admin.controller.ts",
+        "handler": "SupportContactAdminController.update",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/support-contact",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/support-contact/support-contact.service.ts"
+        ],
+        "services": [
+          "SupportContactService"
         ]
       },
       {
@@ -10760,6 +10800,24 @@
         ]
       },
       {
+        "controller": "services/api/src/support-contact/support-contact.public.controller.ts",
+        "handler": "SupportContactPublicController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal"
+        ],
+        "path": "/api/v1/public/support-contact",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/support-contact/support-contact.service.ts"
+        ],
+        "services": [
+          "SupportContactService"
+        ]
+      },
+      {
         "controller": "services/api/src/ai/career-plan.controller.ts",
         "handler": "CareerPlanController.latest",
         "method": "GET",
@@ -12136,7 +12194,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 234,
+      "reachableFileCount": 236,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12899,7 +12957,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 260
+      "sourceFileCount": 262
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -16305,7 +16363,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 111,
+    "modelCount": 112,
     "models": [
       {
         "fieldCount": 7,
@@ -17428,6 +17486,14 @@
         ]
       },
       {
+        "fieldCount": 4,
+        "name": "PlatformSetting",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/support-contact/support-contact.service.ts"
+        ]
+      },
+      {
         "fieldCount": 10,
         "name": "PolicyEligibilityRule",
         "relations": [
@@ -17716,6 +17782,7 @@
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
+          "services/api/src/support-contact/support-contact.service.ts",
           "services/api/src/terminals/kiosk-job-board.service.ts",
           "services/api/src/terminals/release-observation.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
@@ -18247,6 +18314,9 @@
     ],
     "apps/admin/src/routes/legal-docs/LegalDocPreview.tsx": [
       "services/api/scripts/verify-legal-doc-version.ts"
+    ],
+    "apps/admin/src/routes/legal-docs/SupportContactCard.tsx": [
+      "services/api/scripts/verify-support-contact.ts"
     ],
     "apps/admin/src/routes/legal-docs/index.tsx": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
@@ -22092,6 +22162,7 @@
       "services/api/scripts/verify-job-info-ai-real-acceptance.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts",
       "services/api/scripts/verify-toolbox-ai-skill-real-acceptance.ts",
       "services/api/scripts/verify-toolbox-governance-acceptance.ts",
@@ -22672,6 +22743,7 @@
       "services/api/scripts/verify-recruitment-p1-schema.ts",
       "services/api/scripts/verify-release-observation-contract.mjs",
       "services/api/scripts/verify-scan-input-lockout-telemetry.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-network-diagnostics.ts",
@@ -24137,6 +24209,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -24399,6 +24472,7 @@
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -24441,7 +24515,8 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
-      "services/api/scripts/verify-redis-degradation-truth.ts"
+      "services/api/scripts/verify-redis-degradation-truth.ts",
+      "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/common/guards/member-closure-receipt.guard.ts": [
       "services/api/scripts/verify-member-account-status.ts"
@@ -24463,7 +24538,8 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
-      "services/api/scripts/verify-recruitment-content-http.ts"
+      "services/api/scripts/verify-recruitment-content-http.ts",
+      "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/common/health.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -24597,6 +24673,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-quota-once.ts",
       "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-scene.ts",
@@ -26510,6 +26587,7 @@
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-screensaver-content.ts",
+      "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
@@ -26713,6 +26791,18 @@
       "services/api/scripts/verify-upload-sessions.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
+    ],
+    "services/api/src/support-contact/support-contact.admin.controller.ts": [
+      "services/api/scripts/verify-support-contact.ts"
+    ],
+    "services/api/src/support-contact/support-contact.online.ts": [
+      "services/api/scripts/verify-support-contact.ts"
+    ],
+    "services/api/src/support-contact/support-contact.public.controller.ts": [
+      "services/api/scripts/verify-support-contact.ts"
+    ],
+    "services/api/src/support-contact/support-contact.service.ts": [
+      "services/api/scripts/verify-support-contact.ts"
     ],
     "services/api/src/sync/dto/webhook-payload.dto.ts": [
       "services/api/scripts/verify-job-customer-sample-readiness.ts"
@@ -41570,6 +41660,38 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:sms-send"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services"
+        ],
+        "files": [
+          "apps/admin/src/routes/legal-docs/SupportContactCard.tsx",
+          "docs/progress/current-progress.md",
+          "services/api/prisma/schema.prisma",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/support-contact/support-contact.admin.controller.ts",
+          "services/api/src/support-contact/support-contact.online.ts",
+          "services/api/src/support-contact/support-contact.public.controller.ts",
+          "services/api/src/support-contact/support-contact.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-support-contact.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:support-contact"
       ],
       "wired": true
     },

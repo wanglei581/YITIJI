@@ -313,6 +313,7 @@ const ACTION_LABELS: Record<string, string> = {
   'legal_doc.view': '查看法务文档正文',
   'legal_doc.create': '新建法务文档版本',
   'legal_doc.activate': '启用法务文档版本',
+  'support_contact.update': '修改服务联系方式',
   'policy.publish': '政策发布',
   'policy.review': '政策审核',
   'screensaver_config.update': '待机宣传屏配置更新',

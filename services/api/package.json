@@ -349,6 +349,7 @@
     "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts",
     "verify:print-sign": "node -r @swc-node/register scripts/verify-print-sign.ts",
     "verify:legal-doc-version": "node -r @swc-node/register scripts/verify-legal-doc-version.ts",
+    "verify:support-contact": "node -r @swc-node/register scripts/verify-support-contact.ts",
     "verify:self-assessment": "node -r @swc-node/register scripts/verify-self-assessment.ts",
     "verify:self-assessment-consent": "node -r @swc-node/register --test src/ai/resume/__tests__/self-assessment-consent.test.ts src/ai/resume/__tests__/self-assessment-consent-reconfirm.test.ts",
     "verify:self-assessment-ai-gate": "node -r @swc-node/register scripts/verify-self-assessment-ai-gate.ts",
