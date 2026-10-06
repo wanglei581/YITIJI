@@ -21,6 +21,11 @@ import { getTerminalId } from '../services/api/screensaver'
 import { terminalProtectedFetch } from '../services/terminalAuth'
 import { prepareAiDeclaration } from '../ai/aiDeclarationGate'
 import { aiDeclarationDeclineMessage } from '../ai/aiDeclarationErrors'
+import {
+  ADVISOR_HEARD_VOLUME_THRESHOLD,
+  createAdvisorSilentWatch,
+  type AdvisorSilentWatch,
+} from '../pages/assistant/advisorCallSilent'
 
 // 通知后端结束腾讯云 AI 会话（StopAIConversation），立即停止按分钟计费。
 //  - keepalive：保证在组件卸载 / 切走页面 / 关闭标签页时请求仍能发出
@@ -95,6 +100,7 @@ export function useAiAdvisorCallSession() {
   const [micBlocked, setMicBlocked] = useState(false)
   const [deadline, setDeadline] = useState<{ at: number; maxSeconds: number } | null>(null)
   const [limitWarning, setLimitWarning] = useState(false)
+  const [silentStage, setSilentStage] = useState<'none' | 'prompt' | 'fallback'>('none')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const trtcRef       = useRef<any>(null)
@@ -106,6 +112,11 @@ export function useAiAdvisorCallSession() {
   const sessionEpochRef = useRef(0)
   const remoteAudioUsersRef = useRef<Set<string>>(new Set())
   const autoplayResumeRef   = useRef<(() => Promise<void>) | null>(null)
+  const silentWatchRef = useRef<AdvisorSilentWatch | null>(null)
+  if (silentWatchRef.current === null) {
+    silentWatchRef.current = createAdvisorSilentWatch(setSilentStage)
+  }
+  const silentWatch = silentWatchRef.current
 
   // 卸载清理 + 关闭标签页/浏览器兜底
   useEffect(() => {
@@ -122,6 +133,7 @@ export function useAiAdvisorCallSession() {
     return () => {
       window.removeEventListener('pagehide', onPageHide)
       destroyedRef.current = true
+      silentWatchRef.current?.dispose()
       void cleanup()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,6 +187,7 @@ export function useAiAdvisorCallSession() {
       sessionEpochRef.current += 1
       // 不等待 SDK 的退出 promise；页面立即转文字，后端另有独立硬截止。
       void cleanup()
+      silentWatch.disarm()
       setDeadline(null)
       setPhase('expired')
     }
@@ -187,7 +200,7 @@ export function useAiAdvisorCallSession() {
       window.removeEventListener('focus', checkDeadline)
       document.removeEventListener('visibilitychange', checkDeadline)
     }
-  }, [deadline, cleanup])
+  }, [deadline, cleanup, silentWatch])
 
   // SDK 加载、进房与运行期错误都必须先释放后端任务和房间，再展示可重试错误。
   // startedRef 同步归零可防 EVENT.ERROR 与外层 catch 对同一故障重复清理。
@@ -197,11 +210,12 @@ export function useAiAdvisorCallSession() {
     sessionEpochRef.current += 1
     setDeadline(null)
     setLimitWarning(false)
+    silentWatch.disarm()
     await cleanup()
     if (destroyedRef.current) return
     setErrMsg(message)
     setPhase('error')
-  }, [cleanup])
+  }, [cleanup, silentWatch])
 
   // ── 启动通话（用户点击后调用，满足自动播放策略）──────────
   const startCall = useCallback(async () => {
@@ -234,6 +248,7 @@ export function useAiAdvisorCallSession() {
     startedRef.current = true
     const sessionEpoch = sessionEpochRef.current + 1
     sessionEpochRef.current = sessionEpoch
+    silentWatch.disarm()
     setPhase('connecting')
 
     try {
@@ -304,6 +319,10 @@ export function useAiAdvisorCallSession() {
       const EVENT = TRTC.EVENT
       const trtc  = TRTC.create()
       trtcRef.current = trtc
+      const markAdvisorHeard = () => {
+        if (sessionEpochRef.current !== sessionEpoch) return
+        silentWatch.markHeard()
+      }
 
       // 远端音频可用 → 确保播放
       trtc.on(EVENT.REMOTE_AUDIO_AVAILABLE, (e: { userId: string }) => {
@@ -318,7 +337,10 @@ export function useAiAdvisorCallSession() {
       trtc.on(EVENT.CUSTOM_MESSAGE, (e: { userId: string; cmdId: number; data: ArrayBuffer }) => {
         try {
           const subtitleText = extractAssistantSubtitleText(new TextDecoder().decode(e.data))
-          if (subtitleText) setSubtitle(subtitleText)
+          if (subtitleText) {
+            setSubtitle(subtitleText)
+            markAdvisorHeard()
+          }
         } catch { /* ignore */ }
       })
 
@@ -330,8 +352,10 @@ export function useAiAdvisorCallSession() {
           if (r.userId === '') localVol = r.volume   // 本地用户 userId 为空串
           else remoteVol = Math.max(remoteVol, r.volume)
         }
-        if (remoteVol > 5) setAiState('speaking')
-        else if (localVol > 5) setAiState('listening')
+        if (remoteVol > ADVISOR_HEARD_VOLUME_THRESHOLD) {
+          setAiState('speaking')
+          markAdvisorHeard()
+        } else if (localVol > ADVISOR_HEARD_VOLUME_THRESHOLD) setAiState('listening')
         else setAiState('idle')
       })
 
@@ -380,6 +404,8 @@ export function useAiAdvisorCallSession() {
       }
       setPhase('live')
       setAiState('speaking') // AI 先播欢迎语
+      // 欢迎语或字幕若在进房前已经到过，arm 会直接跳过。只在这一通 live 里计时。
+      silentWatch.arm()
     } catch (err: unknown) {
       if (destroyedRef.current || !startedRef.current || sessionEpochRef.current !== sessionEpoch) return
       if (aiDeclarationDeclineMessage(err)) {
@@ -389,7 +415,7 @@ export function useAiAdvisorCallSession() {
       }
       await failCall(err instanceof Error ? err.message : String(err))
     }
-  }, [failCall, restoreRemoteAudio])
+  }, [failCall, restoreRemoteAudio, silentWatch])
 
   // 用户主动挂断、切换咨询方式或重试时，先释放真实会话，再回到未接通状态。
   // cleanup 本身幂等；这里同步重置 startedRef，允许下一次明确点击重新发起通话。
@@ -398,6 +424,7 @@ export function useAiAdvisorCallSession() {
     sessionEpochRef.current += 1
     setDeadline(null)
     setLimitWarning(false)
+    silentWatch.disarm()
     await cleanup()
     autoplayResumeRef.current = null
     setPhase('gate')
@@ -408,7 +435,7 @@ export function useAiAdvisorCallSession() {
     setElapsed(0)
     setNeedResume(false)
     setMicBlocked(false)
-  }, [cleanup])
+  }, [cleanup, silentWatch])
 
   // ── 恢复播放（AUTOPLAY_FAILED 后用户点击）─────────────────
   const resumePlay = useCallback(async () => {
@@ -441,6 +468,7 @@ export function useAiAdvisorCallSession() {
     needResume,
     micBlocked,
     limitWarning,
+    silentStage,
     startCall,
     resumePlay,
     toggleMute,
