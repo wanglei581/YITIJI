@@ -64,11 +64,29 @@ export function sourceFrameStatus(input: {
  * 本机文件：BASE_ACCEPT 含 WEBP；Word 只在 wordConversionAvailable 时追加。
  * 一体机上本机文件卡置灰，它的 accept 不计入这行。
  */
+const FORMAT_LINE = {
+  kiosk: '可接收：PDF、JPG、PNG。单份不超过 10MB。U 盘和手机扫码都只收这三种。',
+  kioskWord: '可接收：PDF、JPG、PNG、DOC、DOCX。单份不超过 10MB。U 盘只列 PDF / JPG / PNG；DOC 与 DOCX 只在手机扫码、且本机已开通 Word 转换时能收。',
+  desktop: '可接收：PDF、JPG、PNG、WEBP。单份不超过 10MB。U 盘和手机扫码只收 PDF / JPG / PNG；WEBP 只在本机文件里选。',
+  desktopWord: '可接收：PDF、JPG、PNG、WEBP、DOC、DOCX。单份不超过 10MB。U 盘只列 PDF / JPG / PNG；手机扫码收 PDF / JPG / PNG / DOC / DOCX；WEBP 只在本机文件里选。',
+} as const
+
+/** 标签与说明从上面四句拆出来，页面只画这一次，不再另写一行重复的格式说明。 */
+function viewFromLine(line: string): { tags: readonly string[]; note: string } {
+  const body = line.slice('可接收：'.length)
+  const splitAt = body.indexOf('。')
+  return { tags: body.slice(0, splitAt).split('、'), note: body.slice(splitAt + 1) }
+}
+
 export function receivableFormatLine(kiosk: boolean, word: boolean): string {
-  if (kiosk && !word) return '可接收：PDF、JPG、PNG。单份不超过 10MB。U 盘和手机扫码都只收这三种。'
-  if (kiosk && word) return '可接收：PDF、JPG、PNG、DOC、DOCX。单份不超过 10MB。U 盘只列 PDF / JPG / PNG；DOC 与 DOCX 只在手机扫码、且本机已开通 Word 转换时能收。'
-  if (!word) return '可接收：PDF、JPG、PNG、WEBP。单份不超过 10MB。U 盘和手机扫码只收 PDF / JPG / PNG；WEBP 只在本机文件里选。'
-  return '可接收：PDF、JPG、PNG、WEBP、DOC、DOCX。单份不超过 10MB。U 盘只列 PDF / JPG / PNG；手机扫码收 PDF / JPG / PNG / DOC / DOCX；WEBP 只在本机文件里选。'
+  if (kiosk && !word) return FORMAT_LINE.kiosk
+  if (kiosk && word) return FORMAT_LINE.kioskWord
+  if (!word) return FORMAT_LINE.desktop
+  return FORMAT_LINE.desktopWord
+}
+
+export function receivableFormatView(kiosk: boolean, word: boolean): { tags: readonly string[]; note: string } {
+  return viewFromLine(receivableFormatLine(kiosk, word))
 }
 
 export function inferFormat(mimeOrName: string): string {

@@ -9,7 +9,16 @@ export async function expectResumeDirectionUnselected(page: Page): Promise<void>
 }
 
 export async function chooseGenericResumeDirection(page: Page): Promise<void> {
-  await expect(page.locator('[data-kiosk-screen="resume-source"]')).toBeVisible()
+  const screen = page.locator('[data-kiosk-screen="resume-source"]')
+  await expect(screen).toBeVisible()
+  // 确认屏（已有文件）不再放「改回通用诊断」。进到这一屏时默认就是通用诊断，
+  // 方向按钮只在来源屏。这里核对三行，避免扫描交接后再去点一个不存在的按钮。
+  if (await screen.getAttribute('data-screen') === 'summary') {
+    await expect(page.getByTestId('resume-direction-scope')).toHaveText('通用诊断 · 暂不指定')
+    await expect(page.getByTestId('resume-direction-dims')).toHaveText('暂不指定')
+    await expect(page.getByTestId('resume-direction-target')).toHaveText('暂不指定')
+    return
+  }
   const stay = page.getByRole('button', { name: '先不设方向，按通用诊断' })
   const back = page.getByRole('button', { name: '改回通用诊断' })
   await expect(stay.or(back).first()).toBeVisible()
@@ -28,11 +37,12 @@ export async function chooseTargetedResumeDirection(page: Page): Promise<void> {
   await expectResumeDirectionUnselected(page)
   await page.getByRole('button', { name: '设置诊断方向与目标背景' }).click()
   await page.getByRole('button', { name: /^定向诊断/ }).click()
+  await page.getByRole('button', { name: '下一步：设目标岗位与背景' }).click()
   await page.getByRole('button', { name: '制造业', exact: true }).click()
   const experience = page.getByRole('group', { name: '经验' })
   await experience.getByRole('button', { name: '1年以内', exact: true }).click()
   await expect(experience.getByRole('button', { name: '1年以内', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await page.getByRole('button', { name: '按这个方向诊断' }).click()
+  await page.getByRole('button', { name: '用这些设置，去取文件' }).click()
   await expect(page.getByTestId('resume-direction-target')).toContainText('制造业')
   await expect(page.getByTestId('resume-direction-target')).toContainText('1年以内')
 }

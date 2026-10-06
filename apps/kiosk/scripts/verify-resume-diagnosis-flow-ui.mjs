@@ -27,6 +27,62 @@ function assertNotIncludes(src, marker, label) {
   console.log(`PASS ${label}`)
 }
 
+function balancedSlice(text, openIndex, openChar, closeChar) {
+  let depth = 0
+  let quote = ''
+  let escaped = false
+  for (let index = openIndex; index < text.length; index += 1) {
+    const char = text[index]
+    if (escaped) { escaped = false; continue }
+    if (char === '\\') { escaped = true; continue }
+    if (quote) {
+      if (char === quote) quote = ''
+      continue
+    }
+    if (char === '"' || char === "'" || char === '`') { quote = char; continue }
+    if (char === openChar) depth += 1
+    else if (char === closeChar) {
+      depth -= 1
+      if (depth === 0) return text.slice(openIndex, index + 1)
+    }
+  }
+  return ''
+}
+
+function jsxConsequents(text, marker) {
+  const branches = []
+  let from = 0
+  while (from < text.length) {
+    const at = text.indexOf(marker, from)
+    if (at < 0) break
+    const tail = text.slice(at + marker.length, at + marker.length + 24)
+    const match = tail.match(/^\s*\?\s*\(/)
+    if (!match) { from = at + marker.length; continue }
+    const open = at + marker.length + match[0].lastIndexOf('(')
+    const slice = balancedSlice(text, open, '(', ')')
+    if (slice) branches.push(slice)
+    from = at + marker.length
+  }
+  return branches
+}
+
+function nearestTernaryCondition(text, usageIndex) {
+  let found = ''
+  let from = 0
+  while (from < usageIndex) {
+    const mark = text.indexOf('? (', from)
+    if (mark < 0 || mark > usageIndex) break
+    const open = mark + 2
+    const slice = balancedSlice(text, open, '(', ')')
+    if (slice && open < usageIndex && open + slice.length > usageIndex) {
+      const start = Math.max(text.lastIndexOf('{', mark), text.lastIndexOf('\n', mark))
+      found = text.slice(start + 1, mark)
+    }
+    from = mark + 3
+  }
+  return found
+}
+
 function assertCountAtLeast(src, marker, min, label) {
   const count = src.split(marker).length - 1
   if (count < min) throw new Error(`${label}: expected at least ${min} ${marker}, got ${count}`)
@@ -230,9 +286,36 @@ assertIncludes(layoutControls, 'min-w-[48px]', 'layout control choices meet the 
 // 事故原样：56px 的「开始 AI 诊断」首屏只露 21px（内容 1903px 挤进 1844px 可视区）。
 // 一体机没有滚动条，用户看到的就是一个被切坏的条。复验还发现两处更糟的：
 // `?intent=optimize` 与「上传失败横幅在屏」时 CTA 完全 0px 可见。
-// 修法：诊断维度清单收进可折叠区（默认收起）+ 削掉纵向留白。
-assertIncludes(source, '<details', 'source page collapses the diagnosis dimension list so the primary CTA stays on the first screen')
-// 折叠掉的只能是清单本身；「不编造结论」这句合规声明必须常驻可见。
+// 旧修法把维度清单收进 <details>。稿 21 v2 把方向设置改成独立画面之后，
+// 同一条约束改由结构来守：首屏（screen === 'source'）不渲染 DiagnosisDirectionForm，
+// 维度清单只出现在 target 及之后的画面；首屏仍有「设置诊断方向与目标背景」。
+// 这不是放宽：把工作台或维度清单塞回首屏分支，下面的断言会红。
+{
+  const consequents = jsxConsequents(source, "screen === 'source'")
+  if (consequents.length === 0) throw new Error('source screen branch is missing')
+  for (const branch of consequents) {
+    if (branch.includes('DiagnosisDirectionForm') || branch.includes('重点关注维度') || branch.includes('qx-rt-dimchip')) {
+      throw new Error('source screen renders the diagnosis workbench; the dimension list must stay off the first screen')
+    }
+  }
+  if (!consequents.some((branch) => branch.includes('ResumeSourceActions'))) {
+    throw new Error('source screen does not render ResumeSourceActions')
+  }
+  const actions = read('src/pages/resume/components/ResumeSourceActions.tsx')
+  if (!actions.includes('设置诊断方向与目标背景')) {
+    throw new Error('source screen is missing the direction settings button')
+  }
+  const formUses = [...source.matchAll(/<DiagnosisDirectionForm/g)]
+  if (formUses.length === 0) throw new Error('diagnosis form is not rendered on the workbench screens')
+  for (const use of formUses) {
+    const condition = nearestTernaryCondition(source, use.index ?? 0)
+    if (!condition.includes('target') || condition.includes("screen === 'source'")) {
+      throw new Error(`DiagnosisDirectionForm is not limited to a target screen: ${condition}`)
+    }
+  }
+  console.log('PASS source screen keeps the dimension list off the first screen and still offers direction settings')
+}
+// 「不编造结论」仍必须写在上传页本身，不能只藏进工作台。
 assertIncludes(source, '系统不会编造', 'source page keeps the no-fabrication statement outside the collapsed area')
 
 // ── R5b 上传成功与预览失败不得同屏互相打脸 ────────────────────────────────

@@ -512,6 +512,11 @@ export async function fillDiagnosisDirection(page: Page, journey: string, collec
     act: async () => { await page.getByRole('button', { name: /^定向诊断/ }).click() },
   })
   await recordStep({
+    page, journey, step: 'open-target-context', control: '下一步：设目标岗位与背景', selectorHint: 'button:下一步：设目标岗位与背景',
+    kind: 'click', collectors,
+    act: async () => { await page.getByRole('button', { name: '下一步：设目标岗位与背景' }).click() },
+  })
+  await recordStep({
     page, journey, step: 'open-other-job', control: '其他岗位', selectorHint: 'button:其他岗位',
     kind: 'click', collectors,
     act: async () => { await page.getByRole('button', { name: '其他岗位', exact: true }).click() },
@@ -529,9 +534,9 @@ export async function fillDiagnosisDirection(page: Page, journey: string, collec
     act: async () => { await page.getByRole('button', { name: '制造业', exact: true }).click() },
   })
   await recordStep({
-    page, journey, step: 'apply-direction', control: '按这个方向诊断', selectorHint: 'button:按这个方向诊断',
+    page, journey, step: 'apply-direction', control: '用这些设置，去取文件', selectorHint: 'button:用这些设置，去取文件',
     kind: 'click', collectors,
-    act: async () => { await page.getByRole('button', { name: '按这个方向诊断' }).click() },
+    act: async () => { await page.getByRole('button', { name: '用这些设置，去取文件' }).click() },
   })
 }
 
