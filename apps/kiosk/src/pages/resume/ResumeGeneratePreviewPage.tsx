@@ -10,6 +10,7 @@ import type {
 } from '@ai-job-print/shared'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
+import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { exportGeneratedResume, getResumeGenerate } from '../../services/api'
@@ -29,6 +30,8 @@ import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './compone
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
 import { GeneratePreviewCta, GeneratePreviewEmptyExits, GeneratePreviewNavbar } from './GeneratePreviewChrome'
 import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
+import { ResumeGeneratePreviewEmpty } from './components/ResumeGeneratePreviewEmpty'
+import { readHandoff } from './components/resumeGenerateModel'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-preview-qx.css'
@@ -259,12 +262,12 @@ export function ResumeGeneratePreviewPage() {
   const emptyCopy = view === 'preview-failed'
     ? { title: '这条记录没读回来', description: '可能已过留存期、不是本人，或者网络不通。不拿别的结果凑数。' }
     : view === 'preview-no-result'
-      ? { title: '没有可看的结果', description: '预览要有一次已经完成的生成。这次进来没带结果，不会拿示例冒充你的简历。' }
+      ? { title: '没有可预览的结果', description: '这次进来没有带结果。这一页不显示任何简历内容，也不会拿示例冒充你的简历。' }
       : view === 'illegal'
         ? { title: '认不出这个页面状态', description: '地址里的状态没有登记。这一页不猜你想去哪一步，也不把原始参数显示出来。' }
         : view === 'preview-loading'
           ? { title: '正在读取生成结果…', description: '读回来之前，这一页不显示任何简历内容。' }
-          : { title: '生成结果已清除', description: '公共设备不保留个人信息。刷新、返回或待机之后，这一份要重新填写。' }
+          : { title: '这一份要从头填', description: '填写内容只在这次访问的内存里。刷新、返回或待机之后，这一份要重新填写。' }
 
   const emptyNext = view === 'preview-failed'
     ? { ask: '换条路继续', doing: '可以再读一次，或者回去重填一遍。' }
@@ -279,6 +282,12 @@ export function ResumeGeneratePreviewPage() {
   const showWorkspace = Boolean(resume && result) && !['session-lost', 'preview-no-result', 'preview-loading', 'preview-failed', 'illegal'].includes(view)
   const canRetry = Boolean(restoreTaskId) && !synthetic
   const go = (to: string) => navigate(to)
+  const refill = () => {
+    const handoff = readHandoff(location.state)
+    navigate('/resume/generate', {
+      state: { generateHandoff: { step: 0, ...(handoff?.form ? { form: handoff.form, seg: handoff.seg } : {}) } },
+    })
+  }
   const onExportScreen = showWorkspace && phase === 'export'
   useEffect(() => {
     const id = pendingTitleFocus.current
@@ -300,7 +309,7 @@ export function ResumeGeneratePreviewPage() {
     canRetry,
     onHome: () => go('/'),
     onSource: () => go('/resume/source'),
-    onRefill: () => go('/resume/generate'),
+    onRefill: refill,
     onRetry: () => { setRestoreFailed(false); setRestoring(true); setRetryNonce((n) => n + 1) },
     onOpenExport: openExport,
     onBackToPreview: backToPreview,
@@ -328,7 +337,7 @@ export function ResumeGeneratePreviewPage() {
       }}
       back={{
         label: onExportScreen ? '返回预览' : '返回填写',
-        onBack: () => { if (onExportScreen) backToPreview(); else go('/resume/generate') },
+        onBack: () => { if (onExportScreen) backToPreview(); else refill() },
       }}
       navbar={<GeneratePreviewNavbar onNavigate={go} />}
       ctabar={<>{ctabar}<ResumeGenerateAiRow /></>}
@@ -343,15 +352,15 @@ export function ResumeGeneratePreviewPage() {
         data-synthetic={resolved.synthetic ? '1' : undefined}
       >
         <ResumeGenerateAdvisor eyebrow={advisor.eyebrow} ask={advisor.ask} doing={advisor.doing} />
-        <ResumeAigcBadge synthetic={resolved.synthetic} />
+        {showWorkspace && <ResumeAigcBadge synthetic={resolved.synthetic} />}
+        {!showWorkspace && view === 'preview-loading' && (
+          <ResumeStatePanel tone="info" title={emptyCopy.title} description={emptyCopy.description} synthetic={resolved.synthetic} />
+        )}
+        {!showWorkspace && view !== 'preview-loading' && (
+          <ResumeGeneratePreviewEmpty view={view} withTask={Boolean(query.taskId)} />
+        )}
         {!showWorkspace && (
           <>
-            <ResumeStatePanel
-              tone={view === 'preview-failed' || view === 'illegal' ? 'error' : view === 'preview-loading' ? 'info' : 'empty'}
-              title={emptyCopy.title}
-              description={emptyCopy.description}
-              synthetic={resolved.synthetic}
-            />
             {view === 'preview-failed' && !canRetry && (
               <p id="resume-generate-preview-retry-why" className="qx-rd-why">没有可回读的记录。请重新填一份，或从「我的简历」打开还在保存期限内的版本。</p>
             )}
@@ -391,7 +400,7 @@ export function ResumeGeneratePreviewPage() {
             </div>
             <div className="qx-rg-help">
               <p>{token ? '这一页先在屏幕上核对。导出之后可以扫码带走，登录状态下按保存期限留在账号里。' : '这一页只在屏幕上。没登录时导出的文件不会进账号，事后登录也不补绑。要留底就先登录，再生成、再导出。'}</p>
-              <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={() => go('/help')}>找工作人员</button>
+              <QxAiHelp label="问小青" draft="我在核对生成的简历，帮我看看这一页怎么核对、怎么导出。" testId="resume-generate-preview-help" />
             </div>
             <p className="qx-rg-reason">学校、专业、公司和职务改完就留在这一份上。学历、时间段、项目名和证书要改，得回填写页。</p>
           </div>

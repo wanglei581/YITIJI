@@ -5,6 +5,7 @@ import type {
 } from '@ai-job-print/shared'
 import { PenLineIcon } from 'lucide-react'
 import { maskEmail, maskPhone } from '../../../utils/maskPii'
+import type { HistorySeg } from './resumeGenerateModel'
 
 /** 与 ResumeGeneratePage.buildInput 同一条提交规则：半空条目不送出。 */
 function splitList(text: string, cap: number): string[] {
@@ -38,7 +39,7 @@ export function ResumeGenerateReview(props: {
   skillsText: string
   certsText: string
   selfIntro: string
-  onEdit: (step: number) => void
+  onEdit: (step: number, seg?: HistorySeg) => void
 }) {
   const eduKept = props.education.filter((item) => item.school.trim()).length
   const expKept = props.experience.filter((item) => item.company.trim() && item.role.trim()).length
@@ -78,11 +79,11 @@ export function ResumeGenerateReview(props: {
         <div className="qx-rg-rows">
           <Row title="基本信息" detail={joined([props.basic.name, props.basic.city, maskPhone(props.basic.phone), maskEmail(props.basic.email)])} onEdit={() => props.onEdit(0)} />
           <Row title="求职意向" detail={joined([props.intention.position, props.intention.city, props.intention.jobType, props.intention.salary])} onEdit={() => props.onEdit(1)} />
-          <Row title="教育经历" detail={countLine(eduKept, eduSkip, '段', '空着（预览页会提示你补）')} onEdit={() => props.onEdit(2)} />
-          <Row title="工作 / 实习经历" detail={countLine(expKept, expSkip, '段', '空着（预览页会提示你补）')} onEdit={() => props.onEdit(3)} />
-          <Row title="项目经历" detail={countLine(projKept, projSkip, '个', '空着（选填）')} onEdit={() => props.onEdit(4)} />
-          <Row title="技能 / 证书" detail={`${skills.length} 项技能 · ${certs.length} 项证书`} onEdit={() => props.onEdit(5)} />
-          <Row title="自我评价" detail={props.selfIntro.trim() || '空着（AI 不会替你写一段没有的评价）'} onEdit={() => props.onEdit(5)} />
+          <Row title="教育经历" detail={countLine(eduKept, eduSkip, '段', '空着（预览页会提示你补）')} onEdit={() => props.onEdit(2, 'edu')} />
+          <Row title="工作 / 实习经历" detail={countLine(expKept, expSkip, '段', '空着（预览页会提示你补）')} onEdit={() => props.onEdit(2, 'exp')} />
+          <Row title="项目经历" detail={countLine(projKept, projSkip, '个', '空着（选填）')} onEdit={() => props.onEdit(2, 'proj')} />
+          <Row title="技能 / 证书" detail={`${skills.length} 项技能 · ${certs.length} 项证书`} onEdit={() => props.onEdit(3)} />
+          <Row title="自我评价" detail={props.selfIntro.trim() || '空着（AI 不会替你写一段没有的评价）'} onEdit={() => props.onEdit(3)} />
         </div>
       </div>
       <p className="qx-rg-submit">

@@ -1,38 +1,22 @@
 // ============================================================
-// AI 简历生成 - 引导式表单(阶段2A)
+// AI 简历生成 - 第 0 屏 + 四步填写（基本 / 意向 / 经历 / 技能与自评）
 //
 // 合规红线:
 //   - AI 只润色用户提供的信息,不编造学历/证书/公司/项目;缺失内容提示补充,不代填。
-//   - 公共一体机:表单数据只在组件内存,离开页面/进入待机即丢失;
+//   - 公共一体机:表单只在这次访问的内存里。刷新、返回或待机即丢失。
+//     预览页回来改资料时,用本次跳转自带的内容还原,不另写一份留在机器上。
 //     生成结果走后端 AiResumeResult TTL 清理,不长期保留。
 // ============================================================
 
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { SparklesIcon } from 'lucide-react'
+import type { GeneratedResume, ResumeGenerateInput, ResumeGenerateResponse } from '@ai-job-print/shared'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import type {
-  GeneratedResume,
-  ResumeGenEducation,
-  ResumeGenExperience,
-  ResumeGenProject,
-  ResumeGenerateInput,
-  ResumeGenerateResponse,
-} from '@ai-job-print/shared'
-import { EDUCATION_LEVEL_OPTIONS } from '@ai-job-print/shared'
 import { AiTaskRegion, useAiTask, isAiOutage, type AiAvailability, type AiTaskFallback } from '../../ai'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage, isAiDeclarationUserText } from '../../ai/aiDeclarationErrors'
-import {
-  GraduationCapIcon,
-  BriefcaseIcon,
-  FolderGitIcon,
-  PlusIcon,
-  SparklesIcon,
-  Trash2Icon,
-  UserRoundIcon,
-  WrenchIcon,
-} from 'lucide-react'
 import { exportResumeDraft, submitResumeGenerate } from '../../services/api'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -42,120 +26,65 @@ import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
 import { ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
+import { ResumeGenerateEntry } from './components/ResumeGenerateEntry'
+import { ResumeGenerateBasicStep } from './components/ResumeGenerateBasicStep'
+import { ResumeGenerateIntentionStep } from './components/ResumeGenerateIntentionStep'
+import { ResumeGenerateHistoryStep } from './components/ResumeGenerateHistoryStep'
+import { ResumeGenerateStrengthsStep } from './components/ResumeGenerateStrengthsStep'
+import { GenerateHelper, GenerateProgress } from './components/ResumeGenerateShell'
+import {
+  STEPS,
+  STEP_STATE,
+  bootGenerate,
+  splitList,
+  type GenerateFormSnapshot,
+  type HistorySeg,
+} from './components/resumeGenerateModel'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-flow-qx.css'
-
-const STEPS = [
-  { title: '基本信息', description: '姓名与联系方式', ask: '先留下能联系上你的方式', doing: '这一步只有姓名必填。城市和联系方式可以空着。' },
-  { title: '求职意向', description: '目标岗位', ask: '你想找什么方向的工作？', doing: '这一步只有目标岗位必填。' },
-  { title: '教育经历', description: '学校与专业', ask: '把上过的学校说清楚', doing: '学校、专业和学历由你填写，整理时这些事实一个字都不会改。' },
-  { title: '工作经历', description: '实习 / 工作', ask: '把做过的事说清楚', doing: '公司和职务由你填写。描述可以直接说，不用打字。' },
-  { title: '项目经历', description: '可选', ask: '有项目就写一段', doing: '没有项目可以跳过。有的话，项目名由你填写。' },
-  { title: '技能证书', description: '技能与自我评价', ask: '还有会什么，和怎么做事', doing: '技能和证书只填你真有的。自我评价写一两句，整理时帮你顺一下。' },
-] as const
-
-const inputCls = 'qx-rd-field'
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <label className="qx-rd-label">
-      <span>
-        {label}
-        {required && <span className="ml-0.5 text-error-fg">*</span>}
-      </span>
-      {children}
-    </label>
-  )
-}
-
-/** 列表分组卡(教育/经历/项目共用):新增/删除条目,触控友好。 */
-function EntryList<T>({
-  items,
-  onAdd,
-  onRemove,
-  addLabel,
-  maxItems,
-  emptyHint,
-  renderItem,
-}: {
-  items: T[]
-  onAdd: () => void
-  onRemove: (index: number) => void
-  addLabel: string
-  maxItems: number
-  emptyHint: string
-  renderItem: (item: T, index: number) => React.ReactNode
-}) {
-  return (
-    <div className="space-y-4">
-      {items.length === 0 && (
-        <p className="qx-rd-empty">{emptyHint}</p>
-      )}
-      {items.map((item, i) => (
-        <div key={i} className="qx-card qx-rd-entry">
-          <button
-            type="button"
-            onClick={() => onRemove(i)}
-            className="qx-rd-remove"
-            aria-label="删除该条"
-          >
-            <Trash2Icon className="h-5 w-5" />
-          </button>
-          <div className="pr-10">{renderItem(item, i)}</div>
-        </div>
-      ))}
-      {items.length < maxItems && (
-        <button
-          type="button"
-          onClick={onAdd}
-          className="qx-rd-add"
-        >
-          <PlusIcon className="h-5 w-5" />
-          {addLabel}
-        </button>
-      )}
-    </div>
-  )
-}
-
-const EMPTY_EDU: ResumeGenEducation = { school: '', major: '', degree: '', period: '' }
-const EMPTY_EXP: ResumeGenExperience = { company: '', role: '', period: '', description: '' }
-const EMPTY_PROJ: ResumeGenProject = { name: '', role: '', description: '' }
 
 function appendVoiceText(current: string | undefined, transcript: string): string {
   return [current?.trim(), transcript.trim()].filter(Boolean).join('\n')
 }
 
+const HELP_TEXT = [
+  '姓名、手机号这两项建议自己核对一遍，简历印出来就是这个。',
+  '岗位写具体一点，整理时才知道往哪个方向顺你的经历。写「工作」不如写「仓储管理员」。',
+  '一段经历不知道怎么讲？先问一句再写，比对着空框发呆快。',
+  '证书这一栏别写没拿到的。简历上写了对方就会问，整理时也不会替你圆。',
+]
+
 export function ResumeGeneratePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const consent = useResumeAiConsent()
+  const [boot] = useState(() => bootGenerate(location.search, location.state))
+  const [phase, setPhase] = useState(boot.phase)
+  const [step, setStep] = useState(boot.step)
+  const [seg, setSeg] = useState(boot.seg)
+  const [reviewing, setReviewing] = useState(boot.reviewing)
   const [showConsent, setShowConsent] = useState(false)
-  const [step, setStep] = useState(0)
-  const [reviewing, setReviewing] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /** AI 能力级不可用的**真实原因**（原样透出后端 message）；null 表示未观测到不可用。 */
+  /** AI 能力级不可用的人话；null 表示未观测到不可用。 */
   const [aiOutage, setAiOutage] = useState<string | null>(null)
   /** 已完成过一次真实往返 —— 没探到之前一律 fail-closed（aiOutage.ts 的口径）。 */
   const [probed, setProbed] = useState(false)
   /** 原样草稿导出中（不经过 AI，只是服务端排版 + 上传）。 */
   const [exportingDraft, setExportingDraft] = useState(false)
+  const [basic, setBasic] = useState(boot.basic)
+  const [intention, setIntention] = useState(boot.intention)
+  const [education, setEducation] = useState(boot.education)
+  const [experience, setExperience] = useState(boot.experience)
+  const [projects, setProjects] = useState(boot.projects)
+  const [skillsText, setSkillsText] = useState(boot.skillsText)
+  const [certsText, setCertsText] = useState(boot.certsText)
+  const [selfIntro, setSelfIntro] = useState(boot.selfIntro)
 
-  // 表单数据只在组件内存(公共设备隐私):刷新/待机即丢失,不写任何本地存储。
-  const [basic, setBasic] = useState({ name: '', phone: '', email: '', city: '' })
-  const [intention, setIntention] = useState({ position: '', city: '', jobType: '', salary: '' })
-  const [education, setEducation] = useState<ResumeGenEducation[]>([{ ...EMPTY_EDU }])
-  const [experience, setExperience] = useState<ResumeGenExperience[]>([{ ...EMPTY_EXP }])
-  const [projects, setProjects] = useState<ResumeGenProject[]>([])
-  const [skillsText, setSkillsText] = useState('')
-  const [certsText, setCertsText] = useState('')
-  const [selfIntro, setSelfIntro] = useState('')
-
-  // 生成期间豁免待机宣传屏(打断会丢表单)。导出草稿同样豁免：那一步正在把用户
-  // 填的内容变成一张能带走的纸，被待机屏打断等于把它又弄丢一次。
+  // 生成期间豁免待机宣传屏(打断会丢表单)。导出草稿同样豁免。
   useBusyLock(generating || exportingDraft)
 
   const canNext = useMemo(() => {
@@ -163,6 +92,10 @@ export function ResumeGeneratePage() {
     if (step === 1) return intention.position.trim().length > 0
     return true
   }, [step, basic.name, intention.position])
+
+  const snapshot = (): GenerateFormSnapshot => ({
+    basic, intention, education, experience, projects, skillsText, certsText, selfIntro,
+  })
 
   const buildInput = (): ResumeGenerateInput => ({
     basic: {
@@ -177,31 +110,42 @@ export function ResumeGeneratePage() {
       jobType: intention.jobType.trim() || undefined,
       salary: intention.salary.trim() || undefined,
     },
-    // 只提交填了关键字段的条目(学校/公司+职务/项目名),半空条目不提交
     education: education
-      .filter((e) => e.school.trim())
-      .map((e) => ({
-        school: e.school.trim(),
-        major: e.major?.trim() || undefined,
-        degree: e.degree?.trim() || undefined,
-        period: e.period?.trim() || undefined,
-        description: e.description?.trim() || undefined,
+      .filter((item) => item.school.trim())
+      .map((item) => ({
+        school: item.school.trim(),
+        major: item.major?.trim() || undefined,
+        degree: item.degree?.trim() || undefined,
+        period: item.period?.trim() || undefined,
+        description: item.description?.trim() || undefined,
       })),
     experience: experience
-      .filter((e) => e.company.trim() && e.role.trim())
-      .map((e) => ({
-        company: e.company.trim(),
-        role: e.role.trim(),
-        period: e.period?.trim() || undefined,
-        description: e.description.trim(),
+      .filter((item) => item.company.trim() && item.role.trim())
+      .map((item) => ({
+        company: item.company.trim(),
+        role: item.role.trim(),
+        period: item.period?.trim() || undefined,
+        description: item.description.trim(),
       })),
     projects: projects
-      .filter((p) => p.name.trim())
-      .map((p) => ({ name: p.name.trim(), role: p.role?.trim() || undefined, description: p.description.trim() })),
-    skills: skillsText.split(/[,，、\n]/).map((s) => s.trim()).filter(Boolean).slice(0, 20),
-    certificates: certsText.split(/[,，、\n]/).map((s) => s.trim()).filter(Boolean).slice(0, 15),
+      .filter((item) => item.name.trim())
+      .map((item) => ({ name: item.name.trim(), role: item.role?.trim() || undefined, description: item.description.trim() })),
+    skills: splitList(skillsText, 20),
+    certificates: splitList(certsText, 15),
     selfIntro: selfIntro.trim() || undefined,
   })
+
+  const openStep = (next: number) => {
+    setPhase('form')
+    setReviewing(false)
+    setStep(next)
+  }
+  const editFromReview = (next: number, nextSeg?: HistorySeg) => {
+    setReviewing(false)
+    setPhase('form')
+    setStep(next)
+    if (nextSeg) setSeg(nextSeg)
+  }
 
   const runGenerate = async () => {
     setGenerating(true)
@@ -214,14 +158,14 @@ export function ResumeGeneratePage() {
         setAiOutage('AI 暂时不可用，你可以先导出并打印已填的内容')
         return
       }
-      // 拿到结构化响应就算一次真实往返 —— 账户级 / 模型名问题除外，那种每次都会失败。
       setProbed(true)
       if (result.status !== 'completed' || !result.resume) {
         setError(result.failReason ?? 'AI 简历生成失败，请稍后重试')
         return
       }
-      // 只传 result：预览页的 LocationState 虽然声明了 input，但从未解引用过。
-      navigate('/resume/generate/preview', { state: { result } })
+      navigate('/resume/generate/preview', {
+        state: { result, generateHandoff: { step: 0, seg, form: snapshot() } },
+      })
     } catch (err) {
       const declined = aiDeclarationDeclineMessage(err)
       if (declined) {
@@ -230,8 +174,6 @@ export function ResumeGeneratePage() {
       }
       const message = userMessageOf(err, 'AI 简历生成失败，请稍后重试')
       setError(message)
-      // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误等只是本次失败，
-      // 那些必须保留重试入口，不许拿去把能力说成挂了（aiOutage.ts 口径）。
       if (isAiOutage(err)) setAiOutage(message)
       else setProbed(true)
     } finally {
@@ -249,14 +191,8 @@ export function ResumeGeneratePage() {
   }
 
   /**
-   * 原样草稿：把用户**已经填好的内容**逐字导出成 PDF，进既有打印链路。
-   *
-   * 这条路径不经过任何模型 —— 服务端 `/resume/generate/export` 只做 pdfkit 排版，
-   * 所以 AI 挂掉时它照常可用。它**不是** AI 润色的等价替代：拿到的就是自己写的原话，
-   * 页面与产物元数据都如实标成「未经 AI 润色」，不冒充成品。
-   *
-   * 口径来源：docs/design/kiosk-ai-os-v3-2026-08/10-resume-interview.html 的 ai-down 支线
-   * （:394「现在可以把已答的部分导出成草稿带走」/ :523「草稿 ≠ 成文简历」）。
+   * 原样草稿：把用户已经填好的内容逐字导出成 PDF，进既有打印链路。
+   * 不经过模型。它不是 AI 润色的等价替代，页面如实标成「未经 AI 润色」。
    */
   const handleExportDraft = async () => {
     if (exportingDraft) return
@@ -266,7 +202,6 @@ export function ResumeGeneratePage() {
     const draft: GeneratedResume = {
       basic: input.basic,
       intention: input.intention,
-      // AI 不介入时不替用户写个人简介：他自己填了什么就是什么，没填就留空。
       summary: input.selfIntro ?? '',
       education: input.education,
       experience: input.experience,
@@ -299,10 +234,8 @@ export function ResumeGeneratePage() {
   }
 
   /**
-   * 降级处置只用 `blocked`，不用 `manual`：
-   * 「导出原样草稿」拿到的**不是**同一份结果（没有润色、没有缺失提示），
-   * 套 manual 等于宣称有一条等价的手动路径，那是伪造能力（CLAUDE.md §9）。
-   * 它是 `stillAvailable` 里如实说明的「仍然拿得到的东西」，并挂成可用动作。
+   * 降级只用 blocked，不用 manual：原样草稿不是同一份润色结果。
+   * 它挂在 stillAvailable 里，说明「仍然拿得到的东西」。
    */
   const availability: AiAvailability = aiOutage ? 'unavailable' : probed ? 'available' : 'unknown'
   const aiTask = useAiTask({
@@ -327,55 +260,68 @@ export function ResumeGeneratePage() {
         action: draftAction,
       }
     : aiOutage
-    ? {
-        // 能力级不可用：底部「让 AI 整理成新简历」这次按了也没用，置灰它并写清原因。
-        mode: 'blocked',
-        reason: aiOutage,
-        blockedActionLabel: 'AI 润色成文',
-        stillAvailable: STILL_AVAILABLE,
-        action: draftAction,
-      }
-    : {
-        // 模型跑了但这一次没出可用结果：**不是**能力不可用。
-        // 这里若也用 blocked，就会出现「灰按钮说不可用」和「底部生成按钮仍可点」自相矛盾。
-        mode: 'result-unavailable',
-        reason: error ?? '本次没能生成简历。',
-        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「让 AI 整理成新简历」；不想等的话，${STILL_AVAILABLE}`,
-        action: draftAction,
-      }
+      ? {
+          mode: 'blocked',
+          reason: aiOutage,
+          blockedActionLabel: 'AI 润色成文',
+          stillAvailable: STILL_AVAILABLE,
+          action: draftAction,
+        }
+      : {
+          mode: 'result-unavailable',
+          reason: error ?? '本次没能生成简历。',
+          retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「让 AI 整理成新简历」；不想等的话，${STILL_AVAILABLE}`,
+          action: draftAction,
+        }
 
-  const stepIcon = [UserRoundIcon, BriefcaseIcon, GraduationCapIcon, BriefcaseIcon, FolderGitIcon, WrenchIcon][step]
-  const StepIcon = stepIcon
+  const viewState = boot.forcedState ?? (phase === 'entry' ? 'entry' : reviewing ? 'review' : STEP_STATE[step])
+  const helpDraft = reviewing
+    ? '我在核对从零填写的简历，帮我看看还有哪一项没填。'
+    : `我在填简历第 ${step + 1} 步，帮我看看这一步怎么填`
+  const nameBlocked = phase === 'form' && !reviewing && step === 0 && !canNext
+  const positionBlocked = phase === 'form' && !reviewing && step === 1 && !canNext
+  const statusLabel = generating
+    ? '正在整理你的资料'
+    : exportingDraft
+      ? '正在把你填的内容排成 PDF'
+      : aiOutage
+        ? '整理暂时不可用'
+        : error
+          ? '这次没整理出来'
+          : phase === 'entry'
+            ? '从零生成 · 先看要问什么'
+            : reviewing
+              ? '核对 · 准备提交一次'
+              : `第 ${step + 1} 步 / 共 4 步 · ${STEPS[step].title}`
 
-  const openReview = () => setReviewing(true)
-  const editStep = (next: number) => {
-    setReviewing(false)
-    setStep(next)
-  }
   const ctabar = (
     <>
-      <button
-        type="button"
-        className="qx-btn"
-        data-variant="ghost"
-        disabled={generating}
-        onClick={() => {
-          if (reviewing) {
-            setReviewing(false)
-            return
-          }
-          if (step === 0) navigate('/resume/source')
-          else setStep((s) => s - 1)
-        }}
-      >
-        {reviewing || step > 0 ? '上一步' : '返回简历服务'}
-      </button>
-      {reviewing ? (
+      {phase === 'entry' ? (
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-primary" onClick={() => openStep(0)}>
+          开始填写（第 1 步）
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="ghost"
+          disabled={generating}
+          onClick={() => {
+            if (reviewing) { setReviewing(false); return }
+            if (step === 0) navigate('/resume/source')
+            else setStep((current) => current - 1)
+          }}
+        >
+          {reviewing || step > 0 ? '上一步' : '返回简历服务'}
+        </button>
+      )}
+      {phase !== 'entry' && (reviewing ? (
         <span className="qx-ai-declaration-slot">
           <button
             type="button"
             className="qx-btn"
             data-variant="primary"
+            data-testid="resume-generate-primary"
             disabled={generating || Boolean(aiOutage)}
             onClick={() => { if (!aiOutage) void handleGenerate() }}
           >
@@ -384,28 +330,23 @@ export function ResumeGeneratePage() {
           </button>
           <AiDeclarationNote />
         </span>
-      ) : step < STEPS.length - 1 ? (
+      ) : step < 3 ? (
         <button
           type="button"
           className="qx-btn"
           data-variant="primary"
+          data-testid="resume-generate-primary"
           disabled={!canNext}
-          aria-describedby={step === 0 && !canNext ? 'resume-generate-name-reason' : undefined}
-          onClick={() => setStep((s) => s + 1)}
+          aria-describedby={nameBlocked ? 'resume-generate-name-reason' : positionBlocked ? 'resume-generate-position-reason' : undefined}
+          onClick={() => setStep((current) => current + 1)}
         >
           下一步：{STEPS[step + 1].title}
         </button>
       ) : (
-        <button
-          type="button"
-          className="qx-btn"
-          data-variant="primary"
-          disabled={generating}
-          onClick={openReview}
-        >
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-primary" disabled={generating} onClick={() => setReviewing(true)}>
           去核对
         </button>
-      )}
+      ))}
       <ResumeGenerateAiRow />
     </>
   )
@@ -416,309 +357,129 @@ export function ResumeGeneratePage() {
       subtitle="分步问完，一次整理。只整理你说的，不替你编。"
       status={{
         tone: aiOutage || error ? 'bad' : generating || exportingDraft ? 'warn' : reviewing ? 'ok' : 'unknown',
-        label: generating
-          ? '正在整理你的资料'
-          : exportingDraft
-            ? '正在把你填的内容排成 PDF'
-            : aiOutage
-              ? '整理暂时不可用'
-              : error
-                ? '这次没整理出来'
-                : reviewing
-                  ? '核对 · 准备提交一次'
-                  : `第 ${step + 1} 步 / 共 ${STEPS.length} 步 · ${STEPS[step].title}`,
+        label: statusLabel,
       }}
       back={{ label: '返回简历服务', onBack: () => navigate('/resume/source') }}
       navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
       ctabar={ctabar}
     >
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
-      <ResumeGenerateAdvisor
-        eyebrow="AI 简历生成"
-        ask={reviewing ? <>提交前<em>你先核一遍</em></> : STEPS[step].ask}
-        doing={reviewing ? '先核对资料，再让小青整理成新简历。信息不完整的经历可点开补充。' : STEPS[step].doing}
-      />
-      {!reviewing && (
-        <ol className="qx-rg-prog" aria-label={`填写进度：第 ${step + 1} 步，共 ${STEPS.length} 步`}>
-          {STEPS.map((item, index) => {
-            const mark = index < step ? 'done' : index === step ? 'now' : undefined
-            return (
-              <li key={item.title} data-on={mark} aria-current={mark === 'now' ? 'step' : undefined}>
-                <u aria-hidden="true" />
-                {index + 1} {item.title}
-              </li>
-            )
-          })}
-        </ol>
-      )}
-      {reviewing ? (
-        <ResumeGenerateReview
-          basic={basic}
-          intention={intention}
-          education={education}
-          experience={experience}
-          projects={projects}
-          skillsText={skillsText}
-          certsText={certsText}
-          selfIntro={selfIntro}
-          onEdit={editStep}
+      <section
+        data-kiosk-domain="resume"
+        data-kiosk-screen="resume-generate"
+        data-generate-state={viewState}
+        className="qx-resume-generate qx-scroll"
+      >
+        <ResumeGenerateAdvisor
+          eyebrow="AI 简历生成"
+          ask={phase === 'entry' ? <>先看清<em>这四步</em>再填</> : reviewing ? <>提交前<em>你先核一遍</em></> : STEPS[step].ask}
+          doing={phase === 'entry' ? '只有姓名和目标岗位必填。点一行就能直接进那一步。' : reviewing ? '先核对资料，再让小青整理成新简历。信息不完整的经历可点开补充。' : STEPS[step].doing}
         />
-      ) : (
-      <div className="qx-rd-work">
-        <div className="qx-rd-main">
-            <div className="qx-card qx-rg-card" key={step}>
-              <div className="qx-rd-heading">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
-                  <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-                </span>
-                <b>{STEPS[step].title}</b>
+        {phase === 'entry' ? <ResumeGenerateEntry onOpen={openStep} /> : (
+          <>
+            {!reviewing && <GenerateProgress step={step} />}
+            {reviewing ? (
+              <ResumeGenerateReview
+                basic={basic}
+                intention={intention}
+                education={education}
+                experience={experience}
+                projects={projects}
+                skillsText={skillsText}
+                certsText={certsText}
+                selfIntro={selfIntro}
+                onEdit={editFromReview}
+              />
+            ) : (
+              <div className="qx-rd-work">
+                <div className="qx-rd-main">
+                  <div className="qx-card qx-rg-card">
+                    {step === 0 && <ResumeGenerateBasicStep basic={basic} invalidName={boot.forcedState === 'validate-name'} onChange={setBasic} />}
+                    {step === 1 && <ResumeGenerateIntentionStep intention={intention} invalidPosition={boot.forcedState === 'validate-position'} onChange={setIntention} />}
+                    {step === 2 && (
+                      <ResumeGenerateHistoryStep
+                        seg={seg}
+                        onSeg={setSeg}
+                        education={education}
+                        experience={experience}
+                        projects={projects}
+                        onEducation={setEducation}
+                        onExperience={setExperience}
+                        onProjects={setProjects}
+                        educationVoice={(index) => (
+                          <ResumeVoiceInputButton
+                            label="在校情况"
+                            className="qx-rd-voice"
+                            disabled={generating}
+                            onConfirm={(text) => setEducation((list) => list.map((row, idx) => idx === index ? { ...row, description: appendVoiceText(row.description, text) } : row))}
+                          />
+                        )}
+                        experienceVoice={(index) => (
+                          <ResumeVoiceInputButton
+                            label="工作内容"
+                            className="qx-rd-voice"
+                            disabled={generating}
+                            onConfirm={(text) => setExperience((list) => list.map((row, idx) => idx === index ? { ...row, description: appendVoiceText(row.description, text) } : row))}
+                          />
+                        )}
+                        projectVoice={(index) => (
+                          <ResumeVoiceInputButton
+                            label="项目内容"
+                            className="qx-rd-voice"
+                            disabled={generating}
+                            onConfirm={(text) => setProjects((list) => list.map((row, idx) => idx === index ? { ...row, description: appendVoiceText(row.description, text) } : row))}
+                          />
+                        )}
+                      />
+                    )}
+                    {step === 3 && (
+                      <ResumeGenerateStrengthsStep
+                        skillsText={skillsText}
+                        certsText={certsText}
+                        selfIntro={selfIntro}
+                        onSkills={setSkillsText}
+                        onCerts={setCertsText}
+                        onIntro={setSelfIntro}
+                        skillsVoice={<ResumeVoiceInputButton className="qx-rd-voice" label="技能" disabled={generating} onConfirm={(text) => setSkillsText((current) => appendVoiceText(current, text))} />}
+                        certsVoice={<ResumeVoiceInputButton className="qx-rd-voice" label="证书资质" disabled={generating} onConfirm={(text) => setCertsText((current) => appendVoiceText(current, text))} />}
+                        introVoice={<ResumeVoiceInputButton className="qx-rd-voice" label="自我评价" disabled={generating} onConfirm={(text) => setSelfIntro((current) => appendVoiceText(current, text))} />}
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
-
-          {step === 0 && (
-            <>
-            {/*
-              这一步在说什么（2026-09-09 第 5 条并排比对补齐）：
-              设计稿 24-resume-generate 的 input-basic 态，正文之外还有一张说明卡、
-              两张「为什么要填」卡和一条底部自查行；正是它们把 1080×1920 竖屏填满。
-              删掉稿里没有的右侧「填写进度」面板之后，这些必须补上，否则下半屏是空的。
-            */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field label="姓名" required>
-                <input className={inputCls} value={basic.name} onChange={(e) => setBasic((b) => ({ ...b, name: e.target.value }))} />
-              </Field>
-              <Field label="所在城市">
-                <input className={inputCls} value={basic.city} onChange={(e) => setBasic((b) => ({ ...b, city: e.target.value }))} />
-              </Field>
-              <Field label="联系电话">
-                <input className={inputCls} inputMode="tel" placeholder="用于简历上的联系方式" value={basic.phone} onChange={(e) => setBasic((b) => ({ ...b, phone: e.target.value }))} />
-              </Field>
-              <Field label="邮箱">
-                <input className={inputCls} inputMode="email" value={basic.email} onChange={(e) => setBasic((b) => ({ ...b, email: e.target.value }))} />
-              </Field>
-            </div>
-            <div className="qx-rd-notes">
-              <div className="qx-card">
-                <b>这几项印在最上面</b>
-                <p>姓名和联系方式是对方找到你的唯一入口。写错一个数字，后面全白做 —— 这一栏值得你自己核一遍。</p>
-              </div>
-              <div className="qx-card">
-                <b>除了姓名都能空着</b>
-                <p>城市、手机号、邮箱空着也能往下走。空着的话，生成之后会算一条提示让你回来补，AI 不会替你编一个。</p>
-              </div>
-            </div>
-            </>
-          )}
-
-          {step === 1 && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field label="目标岗位" required>
-                <input className={inputCls} placeholder="如 前端开发工程师" value={intention.position} onChange={(e) => setIntention((v) => ({ ...v, position: e.target.value }))} />
-              </Field>
-              <Field label="意向城市">
-                <input className={inputCls} value={intention.city} onChange={(e) => setIntention((v) => ({ ...v, city: e.target.value }))} />
-              </Field>
-              <Field label="工作类型">
-                <select className={inputCls} value={intention.jobType} onChange={(e) => setIntention((v) => ({ ...v, jobType: e.target.value }))}>
-                  <option value="">不填写</option>
-                  <option value="全职">全职</option>
-                  <option value="实习">实习</option>
-                  <option value="兼职">兼职</option>
-                </select>
-              </Field>
-              <Field label="期望薪资">
-                <input className={inputCls} placeholder="如 8k-12k(可不填)" value={intention.salary} onChange={(e) => setIntention((v) => ({ ...v, salary: e.target.value }))} />
-              </Field>
-            </div>
-          )}
-
-          {step === 2 && (
-            <EntryList
-              items={education}
-              maxItems={6}
-              addLabel="添加一段教育经历"
-              emptyHint="暂未填写教育经历(可跳过,生成后会提示补充)"
-              onAdd={() => setEducation((list) => [...list, { ...EMPTY_EDU }])}
-              onRemove={(i) => setEducation((list) => list.filter((_, idx) => idx !== i))}
-              renderItem={(e, i) => (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Field label="学校" required>
-                    <input className={inputCls} value={e.school} onChange={(ev) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, school: ev.target.value } : x))} />
-                  </Field>
-                  <Field label="专业">
-                    <input className={inputCls} value={e.major ?? ''} onChange={(ev) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, major: ev.target.value } : x))} />
-                  </Field>
-                  <Field label="学历">
-                    <select className={inputCls} value={e.degree ?? ''} onChange={(ev) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, degree: ev.target.value } : x))}>
-                      <option value="">不填写</option>
-                      {EDUCATION_LEVEL_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="起止时间">
-                    <input className={inputCls} placeholder="如 2021.09 - 2025.06" value={e.period ?? ''} onChange={(ev) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, period: ev.target.value } : x))} />
-                  </Field>
-                  <div className="md:col-span-2">
-                    <Field label="在校情况(选填,AI 会帮你润色)">
-                      <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 主修课程、成绩排名、获奖情况" value={e.description ?? ''} onChange={(ev) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, description: ev.target.value } : x))} />
-                      <div className="mt-2 flex justify-end">
-                        <ResumeVoiceInputButton
-                          label="在校情况"
-                          className="qx-rd-voice"
-                          disabled={generating}
-                          onConfirm={(text) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, description: appendVoiceText(x.description, text) } : x))}
-                        />
-                      </div>
-                    </Field>
-                  </div>
-                </div>
-              )}
-            />
-          )}
-
-          {step === 3 && (
-            <EntryList
-              items={experience}
-              maxItems={8}
-              addLabel="添加一段实习 / 工作经历"
-              emptyHint="暂未填写经历(可跳过,生成后会提示补充)"
-              onAdd={() => setExperience((list) => [...list, { ...EMPTY_EXP }])}
-              onRemove={(i) => setExperience((list) => list.filter((_, idx) => idx !== i))}
-              renderItem={(e, i) => (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Field label="公司 / 单位" required>
-                    <input className={inputCls} value={e.company} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, company: ev.target.value } : x))} />
-                  </Field>
-                  <Field label="职位" required>
-                    <input className={inputCls} value={e.role} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, role: ev.target.value } : x))} />
-                  </Field>
-                  <div className="md:col-span-2">
-                    <Field label="起止时间">
-                      <input className={inputCls} placeholder="如 2024.07 - 2025.03" value={e.period ?? ''} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, period: ev.target.value } : x))} />
-                    </Field>
-                  </div>
-                  <div className="md:col-span-2">
-                    <Field label="做了什么(写真实内容,AI 会帮你润色)">
-                      <textarea className={`${inputCls} h-24 resize-none`} placeholder="如 负责的工作内容、用到的工具、取得的成果(有数字写数字)" value={e.description} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, description: ev.target.value } : x))} />
-                      <div className="mt-2 flex justify-end">
-                        <ResumeVoiceInputButton
-                          label="工作内容"
-                          className="qx-rd-voice"
-                          disabled={generating}
-                          onConfirm={(text) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, description: appendVoiceText(x.description, text) } : x))}
-                        />
-                      </div>
-                    </Field>
-                  </div>
-                </div>
-              )}
-            />
-          )}
-
-          {step === 4 && (
-            <EntryList
-              items={projects}
-              maxItems={6}
-              addLabel="添加一个项目经历"
-              emptyHint="项目经历为选填,没有可直接下一步"
-              onAdd={() => setProjects((list) => [...list, { ...EMPTY_PROJ }])}
-              onRemove={(i) => setProjects((list) => list.filter((_, idx) => idx !== i))}
-              renderItem={(p, i) => (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Field label="项目名称" required>
-                    <input className={inputCls} value={p.name} onChange={(ev) => setProjects((list) => list.map((x, idx) => idx === i ? { ...x, name: ev.target.value } : x))} />
-                  </Field>
-                  <Field label="担任角色">
-                    <input className={inputCls} value={p.role ?? ''} onChange={(ev) => setProjects((list) => list.map((x, idx) => idx === i ? { ...x, role: ev.target.value } : x))} />
-                  </Field>
-                  <div className="md:col-span-2">
-                    <Field label="项目内容(写真实内容,AI 会帮你润色)">
-                      <textarea className={`${inputCls} h-24 resize-none`} value={p.description} onChange={(ev) => setProjects((list) => list.map((x, idx) => idx === i ? { ...x, description: ev.target.value } : x))} />
-                      <div className="mt-2 flex justify-end">
-                        <ResumeVoiceInputButton
-                          label="项目内容"
-                          className="qx-rd-voice"
-                          disabled={generating}
-                          onConfirm={(text) => setProjects((list) => list.map((x, idx) => idx === i ? { ...x, description: appendVoiceText(x.description, text) } : x))}
-                        />
-                      </div>
-                    </Field>
-                  </div>
-                </div>
-              )}
-            />
-          )}
-
-          {step === 5 && (
-            <div className="space-y-4">
-              <Field label="技能(用逗号或换行分隔)">
-                <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 JavaScript, Excel, 英语六级" value={skillsText} onChange={(e) => setSkillsText(e.target.value)} />
-                <div className="mt-2 flex justify-end">
-                  <ResumeVoiceInputButton className="qx-rd-voice" label="技能" disabled={generating} onConfirm={(text) => setSkillsText((current) => appendVoiceText(current, text))} />
-                </div>
-              </Field>
-              <Field label="证书 / 资质(用逗号或换行分隔;只填真实持有的)">
-                <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 普通话二级甲等, 机动车驾驶证 C1" value={certsText} onChange={(e) => setCertsText(e.target.value)} />
-                <div className="mt-2 flex justify-end">
-                  <ResumeVoiceInputButton className="qx-rd-voice" label="证书资质" disabled={generating} onConfirm={(text) => setCertsText((current) => appendVoiceText(current, text))} />
-                </div>
-              </Field>
-              <Field label="自我评价草稿(选填,AI 会基于它润色个人简介)">
-                <textarea className={`${inputCls} h-24 resize-none`} value={selfIntro} onChange={(e) => setSelfIntro(e.target.value)} />
-                <div className="mt-2 flex justify-end">
-                  <ResumeVoiceInputButton className="qx-rd-voice" label="自我评价" disabled={generating} onConfirm={(text) => setSelfIntro((current) => appendVoiceText(current, text))} />
-                </div>
-              </Field>
-            </div>
-          )}
-            </div>
-        </div>
-      </div>
+            )}
+            <GenerateHelper text={reviewing ? '可以慢慢核对，准备好后再点生成。' : HELP_TEXT[step]} draft={helpDraft} />
+          </>
+        )}
+        {nameBlocked && (
+          <p className="qx-rg-reason" id="resume-generate-name-reason">
+            姓名还没填，填完才能进下一步。其余三项可以空着。
+          </p>
+        )}
+        {positionBlocked && (
+          <p className="qx-rg-reason" id="resume-generate-position-reason">
+            目标岗位还没填，填完才能进下一步。城市、类型、薪资都可以空着。
+          </p>
+        )}
+        {error && <p className="qx-rd-error" role="alert">{error}</p>}
+        <AiTaskRegion className="resume-generate-fallback" task={aiTask} label="AI 简历润色成文" fallback={fallback} />
+        <p className="rg-truth">AI 只整理你提供的描述；学校、公司和时间请本人核对。</p>
+      </section>
+      {showConsent && (
+        <ResumeAiConsentDialog
+          busy={consent.busy}
+          error={consent.error}
+          guest={!getToken()}
+          onCancel={() => setShowConsent(false)}
+          onConfirm={() => {
+            void consent.confirm().then((ok) => {
+              if (!ok) return
+              setShowConsent(false)
+              void runGenerate()
+            })
+          }}
+        />
       )}
-      {(reviewing || step === 0) && (
-        <div className="qx-rg-helper">
-          <span>
-            {reviewing
-              ? '可以慢慢核对，准备好后再点生成。'
-              : '姓名、手机号这两项建议自己核对一遍，简历印出来就是这个。'}
-          </span>
-          <button type="button" onClick={() => navigate('/help')}>找工作人员</button>
-        </div>
-      )}
-      {!reviewing && step === 0 && !basic.name.trim() && (
-        <p className="qx-rg-reason" id="resume-generate-name-reason">
-          姓名还没填，填完才能进下一步。其余三项可以空着。
-        </p>
-      )}
-      {/*
-        失败态不再只剩一行红字。红字保留（它是原因），下面挂上不依赖 AI 的出路：
-        内容没丢 + 可以把已填内容原样导出打印带走。AiTaskRegion 的 fallback 是
-        必填 prop，由类型系统保证这条支线不会在后续改动里被悄悄摘掉。
-      */}
-      {error && (
-        <p className="qx-rd-error" role="alert">{error}</p>
-      )}
-      <AiTaskRegion
-        className="resume-generate-fallback"
-        task={aiTask}
-        label="AI 简历润色成文"
-        fallback={fallback}
-      />
-      <p className="rg-truth">AI 只整理你提供的描述；学校、公司和时间请本人核对。</p>
-    </section>
-    {showConsent && (
-      <ResumeAiConsentDialog
-        busy={consent.busy}
-        error={consent.error}
-        guest={!getToken()}
-        onCancel={() => setShowConsent(false)}
-        onConfirm={() => {
-          void consent.confirm().then((ok) => {
-            if (!ok) return
-            setShowConsent(false)
-            void runGenerate()
-          })
-        }}
-      />
-    )}
     </QxPageFrame>
   )
 }

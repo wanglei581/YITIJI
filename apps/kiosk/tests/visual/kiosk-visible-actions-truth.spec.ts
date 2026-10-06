@@ -240,7 +240,7 @@ test('生成预览空态按稿只留两个出口且都能到达 @kiosk', async (
   registerGeneratePreviewBaseline(api)
   await page.goto('/resume/generate/preview')
   await expect(page.locator('[data-kiosk-screen="resume-generate-preview"]')).toBeVisible()
-  await expect(page.getByText('生成结果已清除')).toBeVisible()
+  await expect(page.getByText('这一份要从头填')).toBeVisible()
   await expect(page.getByRole('button', { name: '重新填写生成', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新填写', exact: true })).toHaveCount(0)
   await expect(page.getByTestId('resume-generate-preview-cta-home')).toHaveText('返回服务大厅')
@@ -352,7 +352,7 @@ test('生成预览读回失败展示空态而不是伪造结果 @kiosk', async (
     json: { error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新生成简历' } },
   })
   await page.goto('/resume/generate/preview?taskId=missing-task')
-  await expect(page.getByText('没有可看的结果')).toBeVisible()
+  await expect(page.getByText('没有可预览的结果')).toBeVisible()
   await expect(page.getByText('青岛求职者')).toHaveCount(0)
   await expect(page.getByTestId('resume-generate-preview-cta-source')).toHaveText('返回简历服务')
   await expect(page.getByTestId('resume-generate-preview-cta-refill')).toHaveText('去填资料')
