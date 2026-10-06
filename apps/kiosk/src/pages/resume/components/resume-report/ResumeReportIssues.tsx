@@ -3,10 +3,6 @@ import type { ResumeContentBlock, ResumeIssue, ResumeReport, ResumeContentBlockK
 import { RESUME_CONTENT_BLOCKS } from '@ai-job-print/shared'
 import { blockLabel, dimLabel, displayResumeExcerpt, evidenceCountOfBlock, evidenceLineSet, issuesOfBlock, sevOf } from '../../resume-report-model'
 
-function Prov({ kind }: { kind: 'contract' | 'derived' | 'fixture' }) {
-  return <span className="rrp-prov" data-p={kind} aria-hidden="true" />
-}
-
 export function IssueCard({
   issue,
   index,
@@ -105,7 +101,7 @@ export function StructureZone({
       <div className="rrp-zh">
         简历被读成了这 {shown.length} 块
         <span>
-          共 {shown.length} 块 · 命中 {issues.length} 条问题 <Prov kind={fixture ? 'fixture' : 'contract'} />
+          共 {shown.length} 块 · 命中 {issues.length} 条问题
           {hint ? <span className="rrp-more" data-testid="resume-report-scroll-hint">{` ${hint}`}</span> : null}
         </span>
       </div>
@@ -160,7 +156,7 @@ export function IssuesZone({
     <section className="rrp-zone" data-testid="resume-report-zone" data-zone="issues" data-sev-high={cnt.high} data-sev-mid={cnt.mid} data-sev-low={cnt.low}>
       <div className="rrp-zh">
         每条问题都指到原文那一句
-        <span>高 {cnt.high} · 中 {cnt.mid} · 低 {cnt.low} <Prov kind="derived" /></span>
+        <span>高 {cnt.high} · 中 {cnt.mid} · 低 {cnt.low}</span>
       </div>
       <div className="rrp-scroll" data-testid="resume-report-list">
         {issues.map((issue, i) => (

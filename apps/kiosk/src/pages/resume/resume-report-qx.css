@@ -78,14 +78,6 @@
 .rrp-cc[data-zero='1'] { border-style: dashed; }
 .rrp-legend { margin: 8px 0 0; font-size: var(--qx-fs-aux); color: var(--qx-ink-3); line-height: 1.4; }
 
-.rrp-prov {
-  display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 8px;
-  font-size: var(--qx-fs-aux); font-weight: 800; margin-left: 6px; vertical-align: middle;
-}
-.rrp-prov[data-p='contract'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); border: 1px solid var(--qx-teal); }
-.rrp-prov[data-p='derived'] { background: var(--qx-slate-soft); color: var(--qx-slate); border: 1px solid var(--qx-line); }
-.rrp-prov[data-p='fixture'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); border: 1px solid var(--qx-line-2); }
-
 .rrp-segs {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 6px;
   border-radius: 20px; background: var(--qx-paper); border: 1px solid var(--qx-line);

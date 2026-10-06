@@ -65,7 +65,6 @@
 .rrp-idbar, .rrp-banner, .rrp-dir { order: 1; }
 .rrp-cbar { order: 2; min-height: 132px; display: flex; align-items: center; }
 .rrp-cgrid { width: 100%; }
-.rrp-prov { display: none; }
 .rrp-segs { order: 3; margin-top: 8px; }
 .rrp-zone { order: 4; }
 /* 七块和另外三个页签按内容往下排。超出 1920 时滚的是整页（.qx-scroll），不再在块里开小滚框。 */

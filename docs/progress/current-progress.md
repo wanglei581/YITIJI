@@ -1,5 +1,12 @@
 # 当前开发进度
 
+## 2026-10-06：22 号诊断报告去掉空出处小方块（分支 `claude/kiosk-b-22-resume-report-1006`）
+
+- 诊断报告计数格和内容结构标题上的空浅色方块，是原型出处标记（合同 / 本页算 / 夹具）删字留壳：`Prov` 仍渲染没有文字的 `.rrp-prov`。2.0 规则 4 要求这类标记不上屏。已删掉两个报告组件里的 `Prov` 和调用，并删掉 `resume-report-qx.css` 的底色边框，以及 `resume-r1-qx2.css` 里压不住层叠的 `display: none`。
+- 门禁和用例原先都没有断言这个空标签。`fusion-w3` 的报告态用例加上一条：页面上没有 `.rrp-prov`。
+- 验证：一体机 `tsc --noEmit`、报告组件 eslint、`verify-resume-report-qx`、`verify-resume-diagnosis-flow-ui`、`verify-fusion-w3`、`verify-ai-down-fallbacks` 退出码都是 0。`QXB_BASE=w3 QXB_PORT=4371` 的 `-g "report"` 7 过。并排图 22 号 9 对全部配上。清单在 `test-results/qingxu-pairs/3a797f6/manifest.json`（目录名是截图时的 HEAD，画面含这次改动）。
+- 停放、隐藏、改名、降级：无。
+
 ## 2026-10-06：22 号诊断报告补下滑提示和出路图标（分支 `claude/kiosk-b-22-resume-report-1006`）
 
 - 内容结构标题用 IntersectionObserver 随整页滚动显示「· 下滑还有 N 块」；带走区还没露出来时写成「· 下滑还有 N 块，最下面可以带走报告」；七块都进了可视区就不再显示。不用定时器。

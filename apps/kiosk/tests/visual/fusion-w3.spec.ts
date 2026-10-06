@@ -1315,6 +1315,8 @@ test('resume report expands seven blocks, drops the inner scroller, and fills th
   api.respond('GET', '/api/v1/resume/export/pricing', { status: 200, json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null } })
   await page.goto('/resume/report?capture=1&state=report&taskId=paircapture01')
   await expect(page.getByTestId('resume-report-state-report')).toBeVisible()
+  // 2.0 规则 4：出处标记不上屏。空的 .rrp-prov 没有文字，底色和边框仍会画出浅色小方块。
+  await expect(page.locator('.rrp-prov')).toHaveCount(0)
 
   const blockKeys = ['basic', 'objective', 'education', 'experience', 'project', 'skill', 'selfintro']
   for (const key of blockKeys) {

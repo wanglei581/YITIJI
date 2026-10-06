@@ -12,10 +12,6 @@ import {
 import { IssuesZone, StructureZone } from './ResumeReportIssues'
 import { DimensionTalk, ScoresZone } from './ResumeReportScores'
 
-function Prov({ kind }: { kind: 'contract' | 'derived' | 'fixture' }) {
-  return <span className="rrp-prov" data-p={kind} aria-hidden="true" />
-}
-
 export function ResumeReportBody({
   report,
   issues,
@@ -52,15 +48,15 @@ export function ResumeReportBody({
       <section className="rrp-cbar" data-testid="resume-report-counts">
         <div className="rrp-cgrid">
           {[
-            ['内容块', blocks.length, fixture ? 'fixture' : 'contract'],
-            ['问题', issues.length, fixture ? 'fixture' : 'contract'],
-            ['原文证据', evidenceN, fixture ? 'fixture' : 'contract'],
-            ['量化命中', quantHits(blocks), 'derived'],
-            ['评分维度', report.sections.length, 'contract'],
-            ['结论条目', conclN, 'contract'],
-          ].map(([label, count, prov]) => (
-            <span key={String(label)} className="rrp-cc" data-zero={count ? '0' : '1'} data-prov={String(prov)}>
-              <u>{label} <Prov kind={prov as 'contract' | 'derived' | 'fixture'} /></u>
+            ['内容块', blocks.length],
+            ['问题', issues.length],
+            ['原文证据', evidenceN],
+            ['量化命中', quantHits(blocks)],
+            ['评分维度', report.sections.length],
+            ['结论条目', conclN],
+          ].map(([label, count]) => (
+            <span key={String(label)} className="rrp-cc" data-zero={count ? '0' : '1'}>
+              <u>{label}</u>
               <b>{count as number}</b>
             </span>
           ))}
@@ -133,7 +129,7 @@ function ReportReading({
         </section>
         {priorities.length > 0 ? (
           <section className="rrp-pri" data-testid="resume-report-priorities">
-            <div className="rrp-zh">先改这几处<span>{prioritiesFromReport ? '报告自带' : '按低分分项机械列出'} <Prov kind={prioritiesFromReport ? 'contract' : 'derived'} /></span></div>
+            <div className="rrp-zh">先改这几处<span>{prioritiesFromReport ? '报告自带' : '按低分分项机械列出'}</span></div>
             <ol>
               {priorities.map((item, i) => (
                 <li key={`${item.focus}-${i}`}>
