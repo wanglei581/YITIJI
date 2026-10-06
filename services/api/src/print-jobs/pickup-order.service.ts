@@ -185,6 +185,16 @@ export class PickupOrderService {
     // 打印机检查放在过期、状态、文件、能力判定之后、任何写库之前：
     // 过期码仍先说「已过期」，不能被说成「到机码没有作废」；被拒时不认领、不建任务、不计输错。
     await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, via === 'member_order' ? 'claim_here' : 'pickup')
+    // 免费额度在写库前先预判一次：被拒时不认领、不抵失败计数，订单保持待领取，明天还能直接领。
+    // release 事务里同口径再判一次，那一次才是并发下的准绳。
+    await assertFreePrintQuota(this.prisma, {
+      terminalId: terminal.id,
+      endUserId: order.endUserId,
+      requestedSides: firstItem
+        ? firstItem.billablePages * firstItem.copies
+        : printOrderSideCount([], { billablePages: order.billablePages, printParamsJson: order.printParamsJson }),
+      payableCents: payableCents(order),
+    })
 
     if (order.pickupStatus === 'pending') {
       const claimed = await this.prisma.order.updateMany({
