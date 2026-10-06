@@ -296,8 +296,6 @@ export function MyPrivacyRequestsPage() {
             {layout !== 'state' ? <RequestList items={items} /> : null}
             {layout !== 'list' ? <Guide state={uiState} contact={contact} /> : null}
           </div>
-
-          <p className="qx-me-truth pr-truth"><b>诚实说明</b><span>{BOUNDARY_NOTE}</span></p>
         </div>
       </QxPageFrame>
 
@@ -414,6 +412,12 @@ function CapabilityRows({
   )
 }
 
+function requestMark(type: MemberDataRequestItem['requestType']): LucideIcon {
+  if (type === 'export') return FileDownIcon
+  if (type === 'delete') return Trash2Icon
+  return ShieldOffIcon
+}
+
 function RequestList({ items }: { items: MemberDataRequestItem[] }) {
   return (
     <section className="pr-list" aria-label="我的请求记录" data-testid="member-privacy-list">
@@ -422,16 +426,19 @@ function RequestList({ items }: { items: MemberDataRequestItem[] }) {
       ) : (
         <>
           <p className="pr-note">每条记录的提交时间与处理状态都以实际记录为准。</p>
-          {items.map((item) => (
-            <div key={item.id} className="pr-row" data-request-type={item.requestType} data-request-status={item.status}>
-              <span className="pr-ico" data-tone="plum" aria-hidden="true"><ShieldOffIcon size={28} /></span>
-              <span className="pr-cap-main">
-                <span className="pr-cap-t">{MEMBER_DATA_REQUEST_TYPE_LABEL[item.requestType]}</span>
-                <span className="pr-cap-p">{formatDateTime(item.requestedAt)}</span>
-              </span>
-              <span className="pr-st" data-tone={statusTone(item.status)}>{MEMBER_DATA_REQUEST_STATUS_LABEL[item.status]}</span>
-            </div>
-          ))}
+          {items.map((item) => {
+            const Icon = requestMark(item.requestType)
+            return (
+              <div key={item.id} className="pr-row" data-request-type={item.requestType} data-request-status={item.status}>
+                <span className="pr-ico" data-tone="plum" aria-hidden="true"><Icon size={28} /></span>
+                <span className="pr-cap-main">
+                  <span className="pr-cap-t">{MEMBER_DATA_REQUEST_TYPE_LABEL[item.requestType]}</span>
+                  <span className="pr-cap-p">{formatDateTime(item.requestedAt)}</span>
+                </span>
+                <span className="pr-st" data-tone={statusTone(item.status)}>{MEMBER_DATA_REQUEST_STATUS_LABEL[item.status]}</span>
+              </div>
+            )
+          })}
           <p className="pr-foot">请求记录只显示本人提交的隐私数据请求；撤回授权不会删除简历、文档、打印订单或收藏。</p>
         </>
       )}
@@ -514,23 +521,26 @@ function PrivacyCta({
             : { label: '撤回 AI 使用授权', disabled: locked, onClick: onRevoke }
 
   return (
-    <>
-      <button type="button" className="qx-btn" data-variant="ghost" disabled={locked} onClick={onSettings}>‹ 返回账号设置</button>
-      {locked ? (
-        <button type="button" className="qx-ai-help" disabled>{REVOKE_ASK_LABEL}</button>
-      ) : (
-        <QxAiHelp label={REVOKE_ASK_LABEL} draft={REVOKE_ASK_DRAFT} testId="member-privacy-ask" />
-      )}
-      <button
-        type="button"
-        className="qx-btn"
-        data-variant="primary"
-        data-testid="member-privacy-primary"
-        disabled={primary.disabled}
-        onClick={primary.onClick}
-      >
-        {primary.label}
-      </button>
-    </>
+    <div className="pr-cta">
+      <div className="pr-cta-row">
+        <button type="button" className="qx-btn" data-variant="ghost" disabled={locked} onClick={onSettings}>‹ 返回账号设置</button>
+        {locked ? (
+          <button type="button" className="qx-ai-help" disabled>{REVOKE_ASK_LABEL}</button>
+        ) : (
+          <QxAiHelp label={REVOKE_ASK_LABEL} draft={REVOKE_ASK_DRAFT} testId="member-privacy-ask" />
+        )}
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="primary"
+          data-testid="member-privacy-primary"
+          disabled={primary.disabled}
+          onClick={primary.onClick}
+        >
+          {primary.label}
+        </button>
+      </div>
+      <p className="pr-truth"><b>诚实说明</b><span>{BOUNDARY_NOTE}</span></p>
+    </div>
   )
 }

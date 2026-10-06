@@ -956,6 +956,67 @@ test('privacy revoke failure opens the failure screen and retry can succeed @w5-
   expect(errors).toEqual([])
 })
 
+test('privacy bottom bar fills the row and the honest note sits under the buttons @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/data-requests', privacyList([
+    privacyCreated('req-revoke'),
+    {
+      ...privacyCreated('req-export'),
+      requestType: 'export',
+      requestedAt: '2026-09-11T11:06:00.000+08:00',
+      handledAt: '2026-09-16T09:40:00.000+08:00',
+    },
+  ]))
+
+  await loginThroughVisibleUi(page, '/me/privacy-requests')
+  await expect(page.getByTestId('member-privacy-state-history-ready')).toBeVisible()
+  const exportSvg = await page.locator('[data-request-type="export"] .pr-ico svg').innerHTML()
+  const revokeSvg = await page.locator('[data-request-type="revoke_consent"] .pr-ico svg').first().innerHTML()
+  const capExportSvg = await page.locator('[data-capability="export"] .pr-ico svg').innerHTML()
+  expect(exportSvg).toBe(capExportSvg)
+  expect(exportSvg).not.toBe(revokeSvg)
+
+  const metrics = await page.evaluate(() => {
+    const bar = document.querySelector('.qx-ctabar')
+    const truth = document.querySelector('.pr-cta .pr-truth')
+    const buttons = [...document.querySelectorAll('.pr-cta-row > .qx-btn, .pr-cta-row > .qx-ai-help')]
+    if (!bar || !truth || buttons.length !== 3) return null
+    const stage = document.querySelector('.kiosk-stage')
+    const transform = stage ? getComputedStyle(stage).transform : 'none'
+    const scale = transform === 'none' ? 1 : Number(/^matrix\(([^,]+)/.exec(transform)?.[1] ?? 1)
+    const barRect = bar.getBoundingClientRect()
+    const pad = parseFloat(getComputedStyle(bar).paddingLeft) + parseFloat(getComputedStyle(bar).paddingRight)
+    const boxes = buttons.map((element) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        width: rect.width,
+        height: rect.height,
+        y: rect.top,
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        text: element.textContent ?? '',
+      }
+    })
+    return {
+      scale,
+      barWidth: barRect.width - pad,
+      sum: boxes.reduce((total, box) => total + box.width, 0),
+      boxes,
+      truthY: truth.getBoundingClientRect().top,
+    }
+  })
+  expect(metrics).not.toBeNull()
+  expect(metrics!.sum / metrics!.barWidth).toBeGreaterThanOrEqual(0.95)
+  for (const box of metrics!.boxes) {
+    expect(box.height / metrics!.scale, box.text).toBeGreaterThanOrEqual(72)
+    expect(box.scrollWidth, box.text).toBeLessThanOrEqual(box.clientWidth + 1)
+    expect(metrics!.truthY).toBeGreaterThan(box.y)
+  }
+  expect(errors).toEqual([])
+})
+
 function registerEmptyAccount(api: ApiRouter): void {
   registerMemberLogin(api)
   registerAssetCounts(api, { resumes: 0, documents: 0, orders: 0, favorites: 0, benefits: 0, ai: 0 })

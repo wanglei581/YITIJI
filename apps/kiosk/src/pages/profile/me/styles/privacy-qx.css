@@ -258,13 +258,21 @@
 .pr-guide-t { margin-top: 8px; font-size: 24px; font-weight: 800; line-height: 1.3; }
 .pr-guide-p { margin: 7px 0 0; font-size: 21px; line-height: 1.45; color: var(--qx-ink-2); }
 
-.pr-page .qx-me-truth {
+.pr-truth {
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  padding-top: 8px;
+  display: flex;
   align-items: flex-start;
+  gap: 10px;
+  border-top: 1px solid var(--qx-line);
   font-size: 21px;
   line-height: 1.45;
   color: var(--qx-ink-2);
 }
-.pr-page .qx-me-truth b { font-size: 21px; color: var(--qx-ink); }
+.pr-truth b { flex: none; font-size: 21px; color: var(--qx-ink); white-space: nowrap; }
+.pr-truth span { min-width: 0; }
 
 .pr-overlay {
   position: absolute;
@@ -291,33 +299,53 @@
 .pr-dlg-acts .qx-btn { flex: 1; min-height: 72px; font-size: 26px; }
 
 .qx-stage:has(.pr-page) > .qx-ctabar {
-  gap: 14px;
-  padding: 12px var(--qx-gutter);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 12px var(--qx-gutter) 8px;
 }
-.qx-stage:has(.pr-page) > .qx-ctabar > .qx-btn,
-.qx-stage:has(.pr-page) > .qx-ctabar > .qx-ai-help {
-  flex: 1 1 auto;
+.pr-cta {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
+}
+.pr-cta-row {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+/* nowrap 时 basis 必须是 0。basis:auto 会把三键收成内容宽度，右边空一截。
+   问小青那句最长，1.25 装不下 26px，所以中间提到 1.55，字号不降。 */
+.pr-cta-row > .qx-btn,
+.pr-cta-row > .qx-ai-help {
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 72px;
   height: auto;
-  margin-left: 0;
-  padding: 8px 12px;
+  margin: 0;
+  padding: 0 12px;
   font-size: 26px;
   font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
   text-align: center;
+  justify-content: center;
 }
-.qx-stage:has(.pr-page) > .qx-ctabar > .qx-ai-help { flex-grow: 1.25; }
-.qx-stage:has(.pr-page) > .qx-ctabar > .qx-btn[data-variant='primary'] { flex-grow: 1.35; min-height: 72px; }
-.qx-stage:has(.pr-page) > .qx-ctabar > .qx-ai-help {
+.pr-cta-row > .qx-ai-help { flex: 1.55 1 0; }
+.pr-cta-row > .qx-btn[data-variant='primary'] { flex: 1.5 1 0; min-height: 72px; }
+.pr-cta-row > .qx-ai-help {
   justify-content: center;
   border: 1px solid var(--qx-line-2);
   border-radius: var(--qx-r);
   background: var(--qx-paper);
   color: var(--qx-ink);
 }
-.qx-stage:has(.pr-page) > .qx-ctabar > .qx-btn:disabled,
-.qx-stage:has(.pr-page) > .qx-ctabar > .qx-ai-help:disabled {
+.pr-cta-row > .qx-btn:disabled,
+.pr-cta-row > .qx-ai-help:disabled {
   opacity: 1;
   background: var(--qx-muted-line);
   border-color: var(--qx-muted-line);
@@ -328,9 +356,9 @@
   [data-kiosk-stage-fit='off'] .pr-take { grid-template-columns: 1fr 1fr; }
   [data-kiosk-stage-fit='off'] .pr-guide { grid-template-columns: 1fr; }
   [data-kiosk-stage-fit='off'] .pr-cap { flex-wrap: wrap; }
-  [data-kiosk-stage-fit='off'] .qx-stage:has(.pr-page) > .qx-ctabar { flex-wrap: wrap; }
-  [data-kiosk-stage-fit='off'] .qx-stage:has(.pr-page) > .qx-ctabar > .qx-btn,
-  [data-kiosk-stage-fit='off'] .qx-stage:has(.pr-page) > .qx-ctabar > .qx-ai-help {
+  [data-kiosk-stage-fit='off'] .pr-cta-row { flex-wrap: wrap; }
+  [data-kiosk-stage-fit='off'] .pr-cta-row > .qx-btn,
+  [data-kiosk-stage-fit='off'] .pr-cta-row > .qx-ai-help {
     flex: 1 1 100%;
     min-height: 56px;
     font-size: 26px;
