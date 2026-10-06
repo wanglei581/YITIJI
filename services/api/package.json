@@ -362,6 +362,7 @@
     "verify:conversion-queue-bound": "node scripts/verify-conversion-queue-bound.mjs",
     "verify:miniapp-code": "node scripts/verify-miniapp-code.mjs",
     "verify:backup-ops": "node scripts/verify-backup-ops.mjs",
+    "verify:background-task-safety": "node -r @swc-node/register scripts/verify-background-task-safety.ts",
     "verify:alert-push": "node -r @swc-node/register scripts/verify-alert-push.cjs"
   },
   "dependencies": {
