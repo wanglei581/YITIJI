@@ -492,14 +492,20 @@ test('生成预览页删掉一条经历需确认，取消不变，确认后预�
   await expect(page.getByRole('heading', { name: /实习 \/ 工作经历/ })).toHaveCount(0)
 })
 
-test('生成预览页公司名为空或超过 100 字时就地提示且导出不发出请求 @kiosk', async ({ page, api }) => {
+test('生成预览页公司名空着不拦导出、超过 100 字才就地提示并拦住 @kiosk', async ({ page, api }) => {
   await openGenerateTitleEditor(page, api, 'r6-gen-title-invalid', [
     { company: SHORT_COMPANY, role: '店员', period: '2022-2024', description: '负责门店日常运营。' },
   ])
   const company = page.getByRole('textbox', { name: '第 1 条经历的公司' })
-  await company.fill('')
-  await expect(page.getByText('公司名不能空', { exact: true })).toBeVisible()
+  const role = page.getByRole('textbox', { name: '第 1 条经历的职务' })
   const goExport = page.getByTestId('resume-generate-preview-cta-export')
+  // 10/6：原件没写公司 / 职务时如实留空，和服务端 DTO 一致，空着不提示也不拦（走查 W-119 回归）。
+  await company.fill('')
+  await role.fill('')
+  await expect(page.getByText(/不能空/)).toHaveCount(0)
+  await expect(goExport).not.toHaveAttribute('aria-disabled', 'true')
+  await company.fill('司'.repeat(101))
+  await expect(page.getByText('公司名最多 100 字', { exact: true })).toBeVisible()
   await expect(goExport).toHaveAttribute('aria-disabled', 'true')
   await goExport.click({ force: true })
   await expect(page.getByRole('heading', { name: '选导出格式' })).toHaveCount(0)
