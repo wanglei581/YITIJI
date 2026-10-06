@@ -131,5 +131,6 @@ export const PAYLOAD_LABELS: Record<string, string> = {
   password: '密码', token: '令牌', accessToken: '访问令牌', refreshToken: '刷新令牌',
   apiKey: '接口密钥', secret: '密钥', authorization: '身份验证信息', cookie: '登录凭据',
   action: '操作', rows: '行数', cleaned: '清理数量', enabled: '是否启用', field: '变更字段',
+  type: '类型', commandId: '命令编号', resultCode: '结果代码', remainingJobs: '剩余作业数',
 }
 

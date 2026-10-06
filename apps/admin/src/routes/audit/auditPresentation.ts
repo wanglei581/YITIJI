@@ -2,6 +2,7 @@ import type { AuditLogRecord } from '../../services/api/audit'
 import { USER_STATUS_LABELS } from '../users/userPresentation'
 import { taskStatusLabel } from '../screen/metricLabels'
 import { getAuditRoleLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
+import { COMMAND_AUDIT_VALUE_LABELS } from '../terminals/terminalCommandViews'
 
 export function auditActorText(record: AuditLogRecord): string {
   const role = getAuditRoleLabel(record.actorRole)
@@ -70,6 +71,8 @@ export function sanitizeAuditValue(value: unknown, key = ''): unknown {
   if (typeof value !== 'string') return value
   const safe = safeAuditText(value)
   if (safe !== value) return safe
+  const commandLabels = Object.prototype.hasOwnProperty.call(COMMAND_AUDIT_VALUE_LABELS, key) ? COMMAND_AUDIT_VALUE_LABELS[key] : null
+  if (commandLabels && Object.prototype.hasOwnProperty.call(commandLabels, value)) return commandLabels[value]
   if (key === 'sections') return Object.prototype.hasOwnProperty.call(SECTION_LABELS, value) ? SECTION_LABELS[value] : value
   if (['fromStatus', 'toStatus', 'status', 'result'].includes(key)) {
     const label = USER_STATUS_LABELS[value as keyof typeof USER_STATUS_LABELS] ?? taskStatusLabel(value)

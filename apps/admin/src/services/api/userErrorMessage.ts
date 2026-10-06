@@ -34,6 +34,12 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   ADMIN_POLICY_PUBLISH_DISABLED: '管理员不能审核或发布政策，政策由机构自行审核发布',
   CONTENT_NOT_FOUND: '内容不存在或已被删除，请刷新列表',
   CIRCUIT_BREAK_TARGET_REQUIRED: '请指定要熔断的机构或来源',
+  // 终端远程命令（重启终端程序、清空打印队列）
+  TERMINAL_COMMAND_PENDING: '这台终端还有一条远程命令没结束，请等它结束后再试',
+  TERMINAL_COMMAND_RATE_LIMITED: '这台终端一小时内的远程命令已达 3 次，请稍后再试',
+  TERMINAL_NOT_OPERATIONAL: '终端不在运营中，不能下发远程命令',
+  TERMINAL_COMMAND_TYPE_INVALID: '远程命令类型不正确，请刷新页面后重试',
+  TERMINAL_NOT_FOUND: '终端不存在，请刷新列表',
 }
 
 const ENGLISH_STATUS_TEXT = /^(OK|Created|Bad Request|Unauthorized|Forbidden|Not Found|Conflict|Too Many Requests|Internal Server Error|Bad Gateway|Service Unavailable)$/i

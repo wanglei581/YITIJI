@@ -12,6 +12,7 @@ import type {
 import { isParkedOrgType } from '../partners/orgTypeOptions'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
+import { TerminalRemoteCommands } from './TerminalRemoteCommands'
 import { fmtDisk, lifecycleView, printerStatusView, scanInputView } from './terminalStatusViews'
 
 type Notice = { type: 'success' | 'error'; text: string }
@@ -194,13 +195,17 @@ export function TerminalDetailDrawer({
           <DetailRow label="磁盘可用">{fmtDisk(terminal.diskFreeGb)}</DetailRow>
           <div><p className="mb-1 text-xs text-neutral-500">链路诊断</p><TerminalNetworkDiagnostics online={terminal.online} wiredNetworkStatus={terminal.wiredNetworkStatus} printerNetworkStatus={terminal.printerNetworkStatus} /></div>
           <DetailRow label="打印机状态">{terminal.online ? <StatusBadge dot status={printer.badge} label={printer.label} /> : <OfflineReportedStatus originalLabel={terminal.printerStatus ? printer.label : null} observedAt={terminal.lastHeartbeatAt} />}</DetailRow>
-          <div data-testid="terminal-scan-input"><p className="mb-1 text-xs text-neutral-500">扫描输入</p><div className="space-y-1">{terminal.online ? <><StatusBadge dot status={scan.badge} label={scan.label} />{scan.detail && <p className="text-xs text-warning-fg">{scan.detail}</p>}{scan.restart && <p className="text-xs text-warning-fg">需重启终端程序（Terminal Agent）恢复（不支持远程解除）</p>}{terminal.scanInputObservedAt && <p className="text-[11px] text-neutral-500" title={formatDateTime(terminal.scanInputObservedAt)}>{formatRelativeTime(terminal.scanInputObservedAt)}</p>}</> : <OfflineReportedStatus originalLabel={terminal.scanInputHealth ? scan.label : null} observedAt={terminal.scanInputObservedAt ?? terminal.lastHeartbeatAt} />}</div></div>
+          <div data-testid="terminal-scan-input"><p className="mb-1 text-xs text-neutral-500">扫描输入</p><div className="space-y-1">{terminal.online ? <><StatusBadge dot status={scan.badge} label={scan.label} />{scan.detail && <p className="text-xs text-warning-fg">{scan.detail}</p>}{scan.restart && <p className="text-xs text-warning-fg">需重启终端程序（Terminal Agent）恢复，可在下方「远程操作」里下发重启</p>}{terminal.scanInputObservedAt && <p className="text-[11px] text-neutral-500" title={formatDateTime(terminal.scanInputObservedAt)}>{formatRelativeTime(terminal.scanInputObservedAt)}</p>}</> : <OfflineReportedStatus originalLabel={terminal.scanInputHealth ? scan.label : null} observedAt={terminal.scanInputObservedAt ?? terminal.lastHeartbeatAt} />}</div></div>
         </Section>
 
         <Section title="生命周期与启停">
           <div><p className="mb-2 text-sm text-neutral-500">生命周期操作</p><TerminalLifecycleActions terminal={terminal} disabled={statusSaving || lifecycleSaving || profileSaving || savingOrg} onBusyChange={onLifecycleBusy} onUpdated={onLifecycleUpdated} onConflict={onLifecycleConflict} onNotice={onNotice} /></div>
           <div className="border-t border-neutral-900/[0.06] pt-3"><button type="button" onClick={() => onOpenBindCode(terminal)} disabled={statusSaving || lifecycleSaving || !terminal.enabled || !canCreateBindCode} title={bindCodeTitle} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-primary-200 bg-primary-50 px-3 text-xs font-medium text-primary-700 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"><KeyRoundIcon className="h-3.5 w-3.5" />生成绑定码</button><p className="mt-1 text-[11px] text-neutral-500">{bindCodeTitle}</p></div>
           <div className="flex items-center justify-between gap-3"><span className="text-sm text-neutral-500">启停状态</span><div className="flex items-center gap-2"><StatusBadge dot status={terminal.enabled ? 'success' : 'error'} label={terminal.enabled ? '启用' : '停用'} /><button type="button" onClick={() => onToggleStatus(terminal)} disabled={statusSaving || profileSaving || savingOrg || lifecycleSaving || terminal.lifecycleStatus === 'retired'} className={`rounded-md border px-2 py-1 text-xs font-medium ${terminal.enabled ? 'border-error/20 text-error-fg hover:bg-error-bg' : 'border-success/20 text-success-fg hover:bg-success-bg'}`}>{statusSaving ? '保存中' : terminal.enabled ? '停用' : '启用'}</button></div></div>
+        </Section>
+
+        <Section title="远程操作">
+          <TerminalRemoteCommands key={terminal.id} terminal={terminal} onNotice={onNotice} />
         </Section>
 
         <Section title="更新观察与注册信息">

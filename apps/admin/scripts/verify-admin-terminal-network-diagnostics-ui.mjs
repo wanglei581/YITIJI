@@ -93,7 +93,7 @@ assert.doesNotMatch(detail, /const PARKED_ORG_TYPES\s*=/)
 assert.match(views, /'已锁死'/, 'locked_out must be rendered as a distinct state')
 assert.match(views, /'未上报'/, 'missing telemetry must read as 未上报, never as healthy')
 assert.match(views, /restart_required/, 'restart_required must be distinguishable')
-assert.match(terminalUi, /需重启终端程序（Terminal Agent）恢复（不支持远程解除）/)
+assert.match(terminalUi, /需重启终端程序（Terminal Agent）恢复，可在下方「远程操作」里下发重启/)
 assert.match(views, /badge: 'error' as const,\s*\n\s*label: '已锁死'/, 'locked_out must not render as a neutral badge')
 
 // 原因码走白名单中文表（枚举，不是自由文本），未知码原样显示，不拼接任意载荷。

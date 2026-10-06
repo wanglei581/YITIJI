@@ -145,7 +145,7 @@ export function peripheralItems(t: AdminTerminalRecord): PeripheralItem[] {
       advice: !t.online
         ? OFFLINE_ITEM_ADVICE
         : scan.badge === 'error'
-          ? `${scan.restart ? '需到现场重启终端程序（Terminal Agent）恢复（不支持远程解除）；' : ''}先核对扫描目录配置与共享权限。`
+          ? `${scan.restart ? '需重启终端程序（Terminal Agent）恢复，可在终端详情「远程操作」里远程重启；' : ''}先核对扫描目录配置与共享权限。`
           : null,
     },
     {

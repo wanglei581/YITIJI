@@ -7,6 +7,7 @@ const auditLabels = labels
 const { getAuditActionLabel } = labels
 const auditPresentation = runFile('apps/admin/src/routes/audit/auditPresentation.ts', {
   './auditPayloadLabels': runFile('apps/admin/src/routes/audit/auditPayloadLabels.ts'),
+  '../terminals/terminalCommandViews': runFile('apps/admin/src/routes/terminals/terminalCommandViews.ts'),
   '../../lib/auditActionLabels': auditLabels,
   '../users/userPresentation': runFile('apps/admin/src/routes/users/userPresentation.ts'),
   '../screen/metricLabels': runFile('apps/admin/src/routes/screen/metricLabels.ts', { '@ai-job-print/shared': shared, '@ai-job-print/ui': ui }),
@@ -33,6 +34,16 @@ for (const action of [...actions, ...auditExtraActions]) {
 for (const [role, label] of [['system', '系统'], ['system-cli', '系统'], ['enduser', '用户'], ['partner', '合作机构']]) {
   const visible = auditPresentation.auditActorText({ ...auditRecord, actorRole: role })
   if (!visible.startsWith(label) || (label === '系统' && visible !== '系统')) fail(`操作人角色 ${role} 未中文化`)
+}
+// 远程命令审计：五个字段有中文名，命令类型与结果值中文化；未登记的值与原型链键原样不动。
+{
+  const payloadJson = JSON.stringify({ terminalCode: 'QD-SN-001', commandId: 'cmd_fixture_1', type: 'clear_print_queue', result: 'rejected_busy', resultCode: 'no_heartbeat_after_restart', remainingJobs: 2 })
+  const visible = textOf(auditDrawer.AuditDetailDrawer({ record: { ...auditRecord, action: 'terminal.command.finished', payloadJson }, onClose: () => {} }))
+  for (const text of ['类型', '命令编号', '结果', '结果代码', '剩余作业数', '清空打印队列', '终端忙', '重启后终端没有回来']) {
+    if (!visible.includes(text)) fail(`远程命令审计详情缺「${text}」`)
+  }
+  if (visible.includes('未登记字段') || /clear_print_queue|rejected_busy|no_heartbeat_after_restart/.test(visible)) fail('远程命令审计详情不得露原始码或未登记字段')
+  if (auditPresentation.sanitizeAuditValue('constructor', 'type') !== 'constructor' || auditPresentation.sanitizeAuditValue('restart_agent', 'type') !== '重启终端程序') fail('命令类型取值映射只认登记值')
 }
 // 真实抽屉：编号优先，只有内部 ID 时显示尾号，完整原值仅保留悬停。
 for (const numbered of [true, false]) {
