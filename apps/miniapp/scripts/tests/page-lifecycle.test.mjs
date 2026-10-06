@@ -6797,7 +6797,9 @@ test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，
   assert.equal(formats.join('|'), 'PDF|JPG|PNG', '与 usb-files.ts 的 ALLOWED_USB_EXTENSIONS 对应')
   const steps = page.data.steps.map((s) => `${s.title} ${s.desc}`).join('\n')
   assert.match(steps, /另存为 PDF/)
-  assert.match(steps, /最外层/)
+  // 产品负责人 10/6：Agent 多读一层子文件夹，文字统一说「最外层和下一层文件夹」
+  assert.match(steps, /最外层和下一层文件夹/)
+  assert.doesNotMatch(steps, /不要放进文件夹|不进子文件夹/, '与 Agent 实际行为一致')
   assert.match(steps, /15MB/)
   assert.match(steps, /「U 盘导入打印」/, '入口名与一体机打印扫描页的卡片标题一致')
   assert.match(steps, /彩色、双面按每台机器开通[^。]*暂未开通/)
