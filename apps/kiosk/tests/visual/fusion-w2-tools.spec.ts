@@ -324,6 +324,319 @@ test('guest login from a finished conversion comes back to convert again, not to
   await expectHealthy(page, errors, 'print-scan-convert')
 })
 
+test('finished conversion hides file id, checksum and request key, and offers 问小青 @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerConvertUpload(api, '毕业证-正面.jpg', 'w2-image-honest')
+  const fileId = 'w2-pdf-honest-9f3c'
+  const fileMd5 = '9f3c1a7e4b20d8569f3c1a7e4b20d856'
+  let requestKey = ''
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/print/convert/images-to-pdf')) {
+      requestKey = request.headers()['idempotency-key'] ?? ''
+    }
+  })
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId,
+        printFileUrl: '/w2-fixtures/image.png',
+        fileMd5,
+        sizeBytes: 2048,
+        pages: 1,
+        hasEndUser: false,
+      },
+    },
+  })
+
+  await page.goto('/print-scan/convert')
+  await page.locator('input[type="file"]').setInputFiles({
+    name: '毕业证-正面.jpg',
+    mimeType: 'image/png',
+    buffer: PNG_BYTES,
+  })
+  await expect(page.getByText('毕业证-正面.jpg', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
+  await expect(page.getByTestId('img2pdf-fileid')).toHaveText('看文件名和页数')
+  await expect(page.getByText('怎么认', { exact: true })).toBeVisible()
+
+  expect(requestKey).toMatch(/^convert-\d+-[a-z0-9]+$/)
+  const text = await page.locator('.qx-stage').innerText()
+  expect(text).not.toContain(fileId)
+  expect(text).not.toContain(fileMd5)
+  expect(text).not.toContain(fileMd5.slice(0, 12))
+  expect(text).not.toContain(requestKey)
+  expect(text).toContain('问小青')
+  expect(text).not.toContain('工作人员')
+  await expect(page.getByTestId('img2pdf-ask')).toContainText('问小青：这几张图怎么排')
+  await expect(page).toHaveURL(/\/print-scan\/convert$/)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
+test('completed conversion says the same save fact in the pill, the card and the footer when logged in @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  registerConvertUpload(api)
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: 'w2-pdf-member',
+        printFileUrl: '/w2-fixtures/image.png',
+        fileMd5: 'a'.repeat(32),
+        sizeBytes: 2048,
+        pages: 1,
+        hasEndUser: true,
+      },
+    },
+  })
+
+  await loginThroughVisibleUi(page, '/print-scan/convert')
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'w2-image.png',
+    mimeType: 'image/png',
+    buffer: PNG_BYTES,
+  })
+  await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+
+  await expect(page.locator('.qx-pill')).toHaveText('PDF 已生成 · 已进我的文档')
+  const band = page.getByTestId('img2pdf-band')
+  await expect(band).toContainText('已进我的文档')
+  await expect(band).not.toContainText('未登录')
+  await expect(band).not.toContainText('存不进去')
+  const card = page.getByTestId('img2pdf-retention')
+  await expect(card).toHaveAttribute('data-auth', 'in')
+  await expect(card).toContainText('带走一份按顺序排好的 PDF')
+  await expect(card).toContainText('默认保存约 24 小时')
+  await expect(card).not.toContainText('存不进去')
+  await expect(card).not.toContainText('未登录')
+  const truth = page.getByTestId('img2pdf-truth')
+  await expect(truth).toContainText('登录后 PDF 进「我的文档」')
+  await expect(truth).not.toContainText('未登录')
+  await expect(page.getByRole('button', { name: '查看我的文档', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '先登录再转换', exact: true })).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
+test('completed conversion says the same save fact in the pill, the card and the footer when logged out @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerConvertUpload(api)
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: 'w2-pdf-guest-agree',
+        printFileUrl: '/w2-fixtures/image.png',
+        fileMd5: 'b'.repeat(32),
+        sizeBytes: 2048,
+        pages: 1,
+        hasEndUser: false,
+      },
+    },
+  })
+
+  await page.goto('/print-scan/convert')
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'w2-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('synthetic-w2-image'),
+  })
+  await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+
+  await expect(page.locator('.qx-pill')).toHaveText('已生成 · 未登录不留存')
+  const band = page.getByTestId('img2pdf-band')
+  await expect(band).toContainText('未登录 · 不进我的文档')
+  await expect(band).toContainText('转好之后再登录也存不进去')
+  const card = page.getByTestId('img2pdf-retention')
+  await expect(card).toHaveAttribute('data-auth', 'out')
+  await expect(card).toContainText('转好之后再登录也存不进去')
+  await expect(card).not.toContainText('默认保存约 24 小时')
+  const truth = page.getByTestId('img2pdf-truth')
+  await expect(truth).toContainText('未登录时 PDF 不会进入「我的文档」')
+  await expect(truth).not.toContainText('登录后 PDF 进「我的文档」')
+  await expect(page.getByRole('button', { name: '先登录再转换', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '先登录再保存', exact: true })).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
+test('example bar on the conversion page appears only with example=1 and never on the empty screen @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerConvertUpload(api)
+
+  await page.goto('/print-scan/convert')
+  await expect(page.getByText('先加第一张。', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('img2pdf-fixture')).toHaveCount(0)
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'w2-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('synthetic-w2-image'),
+  })
+  await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('img2pdf-fixture')).toHaveCount(0)
+
+  await page.goto('/print-scan/convert?example=1')
+  await expect(page.getByText('先加第一张。', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('img2pdf-fixture')).toHaveCount(0)
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'w2-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('synthetic-w2-image'),
+  })
+  await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
+  const bar = page.getByTestId('img2pdf-fixture')
+  await expect(bar).toBeVisible()
+  await expect(bar.locator('.i2p-fx-b')).toHaveText('示例')
+  await expect(bar).toContainText('这一屏是示例：图片、文件名和转换结果都是示例，不是哪位用户的文件。')
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
+test('known conversion failure offers the service phone and a real retry, not a staff button @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerConvertUpload(api)
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 422,
+    json: { success: false, error: { code: 'CONVERT_FAILED', message: 'PDF 生成校验失败，请重试' } },
+  })
+
+  await page.goto('/print-scan/convert')
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'w2-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('synthetic-w2-image'),
+  })
+  await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+
+  await expect(page.getByText('PDF 生成校验失败，请重试', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '按原样重试合成', exact: true })).toBeVisible()
+  await expect(page.getByText('图片和顺序都保留着', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '返回打印扫描', exact: true }).first()).toBeVisible()
+  await expect(page.getByTestId('img2pdf-ask')).toContainText('问小青')
+  const help = page.getByTestId('img2pdf-help')
+  await expect(help).toContainText('需要帮助？')
+  await expect(help).toContainText('18369161921')
+  await expect(help).not.toContainText('工作人员')
+  const text = await page.locator('.qx-stage').innerText()
+  expect(text).not.toContain('工作人员')
+  expect(text).not.toContain('服务台')
+  await expect(page.getByRole('button', { name: '联系工作人员' })).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
+async function assertRetentionNotCoveredByTruth(page: Page): Promise<void> {
+  const report = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="img2pdf-retention"]')
+    const truth = document.querySelector('[data-testid="img2pdf-truth"]')
+    const scroll = document.querySelector('.i2p-scroll')
+    if (!(card instanceof HTMLElement) || !(truth instanceof HTMLElement) || !(scroll instanceof HTMLElement)) {
+      return { ok: false, reason: 'missing' }
+    }
+    const measure = (block: 'start' | 'end') => {
+      const before = card.getBoundingClientRect()
+      const frame = scroll.getBoundingClientRect()
+      scroll.scrollTop += block === 'start' ? before.top - frame.top : before.bottom - frame.bottom
+      const cr = card.getBoundingClientRect()
+      const tr = truth.getBoundingClientRect()
+      const sr = scroll.getBoundingClientRect()
+      const top = Math.max(cr.top, sr.top)
+      const bottom = Math.min(cr.bottom, sr.bottom)
+      const left = Math.max(cr.left, sr.left)
+      const right = Math.min(cr.right, sr.right)
+      const visible = bottom - top > 8 && right - left > 8
+      const overlapY = Math.min(bottom, tr.bottom) - Math.max(top, tr.top)
+      const overlapX = Math.min(right, tr.right) - Math.max(left, tr.left)
+      return {
+        visible,
+        covered: visible && overlapY > 1 && overlapX > 1,
+        overlapY,
+        cardBottom: cr.bottom,
+        truthTop: tr.top,
+        scrollBottom: sr.bottom,
+      }
+    }
+    const atStart = measure('start')
+    const atEnd = measure('end')
+    return { ok: atStart.visible && !atStart.covered && atEnd.visible && !atEnd.covered, atStart, atEnd }
+  })
+  expect(report.ok, JSON.stringify(report)).toBe(true)
+}
+
+test('bottom truth bar does not cover the retention card on ready or completed conversion @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  api.respondWith('POST', '/api/v1/files/kiosk-upload', (requestNumber) => ({
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: `w2-cover-00${requestNumber}`,
+        filename: `w2-cover-${requestNumber}.png`,
+        sizeBytes: 1024,
+        mimeType: 'image/png',
+        sha256: 'c'.repeat(64),
+        signedUrl: '/w2-fixtures/image.png',
+        signedUrlExpiresAt: '2026-07-24T00:10:00.000Z',
+        fileExpiresAt: '2026-07-25T00:00:00.000Z',
+      },
+    },
+  }))
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: 'w2-pdf-cover',
+        printFileUrl: '/w2-fixtures/image.png',
+        fileMd5: 'c'.repeat(32),
+        sizeBytes: 4096,
+        pages: 3,
+        hasEndUser: false,
+      },
+    },
+  })
+
+  await page.goto('/print-scan/convert')
+  const upload = page.locator('input[type="file"]')
+  for (const name of ['w2-cover-1.png', 'w2-cover-2.png', 'w2-cover-3.png']) {
+    await upload.setInputFiles({ name, mimeType: 'image/png', buffer: Buffer.from(`synthetic-${name}`) })
+    await expect(page.getByText(name, { exact: true })).toBeVisible()
+  }
+  await expect(page.getByTestId('img2pdf-list')).toHaveAttribute('data-count', '3')
+  await expect(page.getByTestId('img2pdf-rotnote')).toContainText(
+    '旋转 90° 现在不能用。这一页先不改图片方向，避免你以为转过了、打出来却没变。',
+  )
+  await assertRetentionNotCoveredByTruth(page)
+
+  await page.getByRole('button', { name: /合成 3 张为一份 PDF/ }).click()
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
+  await expect(page.getByTestId('img2pdf-list')).toHaveAttribute('data-mode', 'output')
+  await expect(page.getByText('页序与来源', { exact: true })).toBeVisible()
+  await expect(page.getByText('3 页 · 与提交顺序一致', { exact: true })).toBeVisible()
+  await expect(page.getByText('来自 w2-cover-1.png · 按 A4 居中放大，不裁切', { exact: true })).toBeVisible()
+  await assertRetentionNotCoveredByTruth(page)
+  await expect(page.getByTestId('img2pdf-fixture')).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
 const W2_MEMBER_TOKEN = 'w2-sign-memory-token'
 const W2_MEMBER_PHONE = '13800138000'
 const W2_MEMBER_CODE = '123456'

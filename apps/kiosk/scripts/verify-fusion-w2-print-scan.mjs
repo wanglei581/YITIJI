@@ -455,6 +455,60 @@ assert.match(
   /U 盘图片导入尚未接到转换列表/,
   'USB entry is kept and explained as unwired, not deleted'
 )
+// 2026-10-06 青序 2.0 第 19 页：屏上用文件名和页数认结果，编号与请求标记留在代码里。
+assert.match(convertImages, /带走一份按顺序排好的 PDF/, 'convert page says the takeaway is one ordered PDF')
+const convertView = read('src/pages/print-scan/ConvertImagesView.tsx')
+assert.match(convertView, /怎么认/, 'convert result is recognized in user language')
+assert.match(convertView, /看文件名和页数/, 'convert result points at filename and page count')
+assert.match(convertView, /同一批只算一次/, 'convert page explains one batch is counted once')
+assert.doesNotMatch(
+  convertView,
+  /\{result\.fileId\}|fileMd5\.slice|\{requestKey\}/,
+  'convert view does not interpolate file id, checksum, or request key onto the screen',
+)
+assert.doesNotMatch(
+  convertView,
+  /文件标识|校验值|这一次的标记/,
+  'convert view does not label file id, checksum, or request key',
+)
+assert.match(
+  read('src/pages/print-scan/ConvertImagesPage.tsx'),
+  /问小青：这几张图怎么排/,
+  'convert page keeps the 问小青 row from the v2 draft',
+)
+assert.match(
+  read('src/pages/print-scan/ConvertImagesPage.tsx'),
+  /requestKey=\{idempotency\?\.key \?\? null\}/,
+  'request key is still passed into the view for the batch panel, not dropped',
+)
+assert.match(
+  convertImages,
+  /idempotencyKey:\s*nextKey\.key/,
+  'convert still sends the idempotency key on the request',
+)
+// 2026-10-06 T19-fix1：共享无人值守文案已进候选。失败态不再放「联系工作人员」
+// 那颗按钮（点了只是去帮助页，现场没有人接），改用 helpNeededLine，号码从接口来；
+// 出路是「返回打印扫描」和页上的「问小青」。
+assert.match(
+  read('src/pages/print-scan/ConvertImagesPanels.tsx'),
+  /helpNeededLine\(useSupportContact\(\)\)/,
+  'convert failure help uses the shared unattended phone line',
+)
+assert.doesNotMatch(
+  convertImages,
+  /联系工作人员|服务台/,
+  'convert page does not tell the user to find staff or a service desk',
+)
+assert.match(
+  convertImages,
+  /旋转 90° <b>现在不能用<\/b>。这一页先不改图片方向，避免你以为转过了、打出来却没变。/,
+  'rotate note uses the v2 sentence: the control does not change the picture',
+)
+assert.match(
+  read('src/pages/print-scan/styles/convert-images-qx.css'),
+  /\.qx-pagehead/,
+  'convert page hides the duplicate qingxu page head in its own stylesheet',
+)
 const scanResultPreviewSource = read('src/pages/scan/ScanResultPage.tsx')
 assert.match(
   scanResultPreviewSource,
