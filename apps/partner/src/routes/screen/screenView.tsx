@@ -3,7 +3,6 @@ import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
 import { formatDateTime, type ScreenSnapshot } from '@ai-job-print/shared'
 import type { ScreenHeadingLevel, TwinChrome, TwinForbiddenCopy, TwinShellMeta } from '@ai-job-print/ui'
 import { ScreenFetchError, loadPartnerScreenSnapshot, type ScreenFetchResult } from '../../services/api/consoleScreen'
-import { userMessageOf } from '../../services/api/userErrorMessage'
 import { accessText, countFailedSlices } from './screenMeta'
 
 /**
@@ -48,9 +47,9 @@ export const describePartnerForbidden: TwinForbiddenCopy = (result) =>
   result.code === 'ORG_REQUIRED'
     ? {
         title: '当前账号未绑定机构',
-        description: `${userMessageOf(result, '当前账号未绑定机构，无法查看本机构数据')}。大屏只展示本机构数据，账号没有机构归属时没有可展示的范围，请联系平台侧为该账号绑定机构。`,
+        description: `${result.message}。大屏只展示本机构数据，账号没有机构归属时没有可展示的范围，请联系平台侧为该账号绑定机构。`,
       }
-    : { title: '无权查看本大屏', description: userMessageOf(result, '当前账号没有查看本大屏的权限') }
+    : { title: '无权查看本大屏', description: result.message }
 
 /** 本机构快照取数：不带任何 query；失败保留上一次成功的数据（keep-last），陈旧由横幅说明。 */
 export function usePartnerSnapshot(pollSeconds: number) {

@@ -207,6 +207,11 @@ if (failures === 0) pass(`本包 ${PACKET_PAGES.length} 个页面/入口不再�
 //    经 userMessageOf(...) 包一层的不算。下面每条允许都写明为什么不是给人看的异常原文。
 const MESSAGE_ALLOW = [
   {
+    rel: 'apps/partner/src/routes/screen/screenView.tsx',
+    ok: (line) => line.includes('result.message'),
+    why: 'result 来自 consoleScreen.ts 的 ScreenFetchResult，message 已由 readableMessage 按大屏专用码表转成中文（如「当前账号没有查看机构数据大屏的权限」），比通用码表更具体。',
+  },
+  {
     rel: 'apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx',
     ok: (line) => line.includes('reasonProblem.message'),
     why: '本页自己的中文校验文案（请填写切换事由 / 长度限制），不是异常原文。',
