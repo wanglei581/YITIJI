@@ -19,7 +19,7 @@
   --sd-color-warning-soft: var(--color-wheat-soft);
   --sd-control-min: 56px;
   --sd-primary-control-min: 72px;
-  --sd-serif: "Noto Serif SC", "Source Han Serif SC", serif;
+  --sd-serif: "Qingxu Serif", "Noto Serif SC", "Source Han Serif SC", serif;
   position: relative;
   min-height: 100dvh;
   background: var(--sd-color-canvas-outer);

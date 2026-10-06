@@ -28,8 +28,8 @@
   --tw-cap: #93b9ad;
   --tw-line: rgba(46, 230, 168, 0.2);
   --tw-num: 'Bahnschrift', 'DIN Alternate', 'Oxanium', 'Segoe UI', ui-sans-serif, sans-serif;
-  --tw-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
-  --tw-sans: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --tw-serif: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --tw-sans: 'Noto Sans SC', 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', system-ui, sans-serif;
 
   position: relative;
   overflow: hidden;

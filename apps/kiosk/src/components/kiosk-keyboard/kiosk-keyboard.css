@@ -36,7 +36,7 @@
   box-shadow: 0 -18px 48px rgba(16, 48, 43, 0.16);
   border-radius: 22px 22px 0 0;
   animation: kkbUp 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', sans-serif;
 }
 @keyframes kkbUp {
   from {
