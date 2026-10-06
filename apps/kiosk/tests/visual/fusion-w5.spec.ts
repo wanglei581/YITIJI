@@ -639,6 +639,11 @@ test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', 
   const errors = runtimeErrors(page)
   registerMemberLogin(api)
   registerKioskShell(api)
+  // 会员令牌只在内存里。整页跳转会丢掉登录态，所以失败这条从活动列表点进去。
+  api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
   const successId = 'spring-print-2026'
   const failureId = 'resume-diagnosis-quota'
   let springClaimed = false
@@ -694,6 +699,24 @@ test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', 
     status: 409,
     json: { error: { code: 'BENEFIT_ACTIVITY_NOT_CLAIMABLE', message: '当前不可领取' } },
   })
+  api.respond('GET', '/api/v1/activities', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        total: 1,
+        items: [
+          benefitActivityFixture({
+            id: failureId,
+            title: '简历诊断体验次数',
+            description: '领取后记入本人权益，用于本机简历诊断。',
+            benefitType: 'ai_quota',
+            quantityTotal: 2,
+          }),
+        ],
+      },
+    },
+  })
 
   await loginThroughVisibleUi(page, `/activities/${successId}`)
   const successPrimary = page.getByTestId('activity-primary')
@@ -703,7 +726,10 @@ test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', 
   await expect(successPrimary).toHaveText('查看我的权益')
   await expect(page.getByText('领取成功，已加入我的权益', { exact: true })).toBeVisible()
 
-  await page.goto(`/activities/${failureId}`)
+  await page.getByRole('button', { name: '返回活动列表', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/activities$/)
+  await page.getByTestId('activities-row-1').click()
+  await expect(page).toHaveURL(new RegExp(`/activities/${failureId}$`))
   const failurePrimary = page.getByTestId('activity-primary')
   await expect(failurePrimary).toHaveText('领取这项权益')
   await failurePrimary.click()
