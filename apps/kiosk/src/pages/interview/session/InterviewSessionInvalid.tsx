@@ -74,7 +74,7 @@ export function InterviewSessionInvalid({
                   title: '查看本人练习记录',
                   desc: isLoggedIn
                     ? '过期前已经生成过的报告仍按保存规则保留。'
-                    : '登录后可保存练习报告。现在没有本人记录可看。',
+                    : '登录后可以保存和查看自己的练习报告。',
                   onClick: onOpenReports,
                 },
               ]}

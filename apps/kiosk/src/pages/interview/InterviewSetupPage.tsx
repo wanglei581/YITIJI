@@ -428,7 +428,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const goTips = () => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))
   const interviewerDesc = INTERVIEWERS.find((it) => it.key === interviewerType)?.desc
   const voiceDownReason = voiceAsr === 'off'
-    ? '语音识别没有开启，这一场先用文字。AI 面试官暂时不能出题，语音回合先不开放。'
+    ? '这台机器的语音识别暂时没开，这一场先用文字答。AI 面试官暂时不能出题，语音回合先不开放。'
     : 'AI 面试官暂时不能出题，语音回合先不开放。'
 
   if (aiOutage && !showSetupForm) {
@@ -589,7 +589,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             </div>
             {voiceAsr === 'off' && (
               <p className="iv-hint" role="status" data-testid="interview-mode-voice-reason">
-                语音识别没有开启，这一场先用文字。
+                这台机器的语音识别暂时没开，这一场先用文字答。
               </p>
             )}
           </div>
@@ -622,7 +622,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                     />
                   </div>
                 ) : (
-                  <p className="iv-copy" data-testid="interview-resume-preview-unsupported">这种格式不能在这里预览</p>
+                  <p className="iv-copy" data-testid="interview-resume-preview-unsupported">这种格式不能在这里预览，不影响这场练习。</p>
                 )
               )}
               <button
