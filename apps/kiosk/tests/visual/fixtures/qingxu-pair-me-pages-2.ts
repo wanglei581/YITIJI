@@ -366,13 +366,22 @@ const TICKETS: Ticket[] = [
     status: 'processing',
     createdAt: '2026-10-02T09:18:00.000+08:00',
     updatedAt: '2026-10-03T11:05:00.000+08:00',
-    replies: [{
-      id: 'rp-preview-1',
-      senderType: 'admin',
-      actorId: null,
-      content: '已经看到这条反馈。我们会在这台机器上对一下预览和出纸是不是同一处裁切。核对完把结果写在这条记录里，先不约具体时间。',
-      createdAt: '2026-10-03T11:05:00.000+08:00',
-    }],
+    replies: [
+      {
+        id: 'rp-preview-user',
+        senderType: 'user',
+        actorId: 'member-linxiaowen',
+        content: '晚上又打开预览看了一眼，最下面一行还是缺着。',
+        createdAt: '2026-10-02T21:08:00.000+08:00',
+      },
+      {
+        id: 'rp-preview-1',
+        senderType: 'admin',
+        actorId: null,
+        content: '已经看到这条反馈。我们会在这台机器上对一下预览和出纸是不是同一处裁切。核对完把结果写在这条记录里，先不约具体时间。',
+        createdAt: '2026-10-03T11:05:00.000+08:00',
+      },
+    ],
   }),
   ticket({
     id: DETAIL_ID,
@@ -381,14 +390,23 @@ const TICKETS: Ticket[] = [
     content: '10 月 1 日上午用简历诊断，转圈转了很久，最后也没有给出诊断。不知道是没生成，还是页面卡住了。',
     status: 'replied',
     createdAt: '2026-09-28T10:42:00.000+08:00',
-    updatedAt: '2026-09-29T15:18:00.000+08:00',
-    replies: [{
-      id: 'rp-ai-1',
-      senderType: 'admin',
-      actorId: null,
-      content: '诊断等待过久这件事我们已经记下。这次如果没有生成结果，可以再提交一次。还是一直转圈的话，可以拨打服务电话，我们远程查这台机器的网络。不承诺当天一定出结果。',
-      createdAt: '2026-09-29T15:18:00.000+08:00',
-    }],
+    updatedAt: '2026-10-02T15:18:00.000+08:00',
+    replies: [
+      {
+        id: 'rp-ai-user',
+        senderType: 'user',
+        actorId: 'member-linxiaowen',
+        content: '下午 3 点左右又试了一次，还是转圈。',
+        createdAt: '2026-10-01T20:40:00.000+08:00',
+      },
+      {
+        id: 'rp-ai-1',
+        senderType: 'admin',
+        actorId: null,
+        content: '诊断等待过久这件事我们已经记下。这次如果没有生成结果，可以再提交一次。还是一直转圈的话，可以拨打服务电话，我们远程查这台机器的网络。不承诺当天一定出结果。',
+        createdAt: '2026-10-02T15:18:00.000+08:00',
+      },
+    ],
   }),
   ticket({
     id: 'fb-font',
@@ -464,6 +482,24 @@ function listItem(item: Ticket) {
   void replies
   return rest
 }
+
+// 量尺专用：运行时只有一条服务回复。不放进 TICKETS，13 态的列表排版不变。
+export const FEEDBACK_ONE_REPLY: Ticket = ticket({
+  id: 'fb-one-reply',
+  category: 'device',
+  title: '取件码页面停住了',
+  content: '扫完到机码之后，页面停在读取，没有进入取件。',
+  status: 'replied',
+  createdAt: '2026-10-04T16:12:00.000+08:00',
+  updatedAt: '2026-10-05T09:26:00.000+08:00',
+  replies: [{
+    id: 'rp-one-1',
+    senderType: 'admin',
+    actorId: null,
+    content: '取件页停住这件事已经记下。再试一次如果还是停在读取，把大概时间留在这条反馈里。先不约上门。',
+    createdAt: '2026-10-05T09:26:00.000+08:00',
+  }],
+})
 
 const NEW_TICKET: Ticket = ticket({
   id: NEW_ID,

@@ -143,7 +143,9 @@
   scrollbar-width: none;
 }
 .fb-detail-scroll::-webkit-scrollbar { display: none; }
-.fb-detail-scroll .fb-textarea { min-height: 128px; max-height: 128px; }
+/* 详情余量交给补充描述。输入框是可打字的控件，最小 128，最多 420。 */
+.fb-detail-scroll > .fb-field { flex: 1 1 auto; min-height: 0; }
+.fb-detail-scroll .fb-textarea { flex: 1 1 auto; min-height: 128px; max-height: 420px; }
 .fb-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
 .fb-dl > div {
   display: flex;
@@ -157,12 +159,16 @@
 }
 .fb-dl dt { color: var(--qx-ink-3); font-weight: 700; }
 .fb-dl dd { margin: 0; font-weight: 750; text-align: right; }
+/* 沟通记录跟着内容走：从框顶排，最少一条记录那么高，最多 520px，再多在框内滚动。
+   框里不放说明。黄色正文条和工单网格不拉伸。 */
 .fb-thread {
-  flex: 1 1 auto;
+  flex: none;
+  align-self: stretch;
   min-height: 120px;
+  max-height: 520px;
   display: flex;
   flex-direction: column;
-  justify-content: safe center;
+  justify-content: flex-start;
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--qx-line);
@@ -172,16 +178,13 @@
   scrollbar-width: none;
 }
 .fb-thread::-webkit-scrollbar { display: none; }
-/* 记录区拿最大一份余量。正文条和工单网格各拿一小份，避免一条回复
-   被单独撑开后，记录框内部出现超过 160px 的纸色空白。补充描述不参与拉伸。 */
 .fb-detail-scroll > .fb-note,
-.fb-detail-scroll > .fb-dl { flex: 0.45 1 auto; }
-.fb-detail-scroll > .fb-field,
+.fb-detail-scroll > .fb-dl,
 .fb-detail-scroll > .fb-closed-note,
 .fb-detail-scroll > .fb-new,
 .fb-detail-scroll > .fb-sec { flex: none; }
 .fb-thread-empty { margin: 0; text-align: center; color: var(--qx-ink-2); line-height: 1.45; }
-.fb-bubble { padding: 14px 16px; border-radius: 18px; background: var(--qx-surface); border: 1px solid var(--qx-line); }
+.fb-bubble { flex: none; padding: 14px 16px; border-radius: 18px; background: var(--qx-surface); border: 1px solid var(--qx-line); }
 .fb-bubble-mine { background: var(--qx-teal-soft); border-color: #c6e2d8; }
 .fb-bubble-head { display: flex; justify-content: space-between; gap: 12px; font-weight: 800; color: var(--qx-ink-3); }
 .fb-bubble-mine .fb-bubble-head { color: var(--qx-teal-d); }
