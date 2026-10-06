@@ -199,13 +199,19 @@ assertContains(llmProvider, 'onLlmCall: usage.add', 'llm provider: 把 usage sin
 assertContains(llmProvider, 'usage: usageOf(usage)', 'llm provider: 成功/失败都回传用量')
 
 const aiSvc = read('src/ai/ai.service.ts')
+// 小青文字落账已随计次拆到 ai-assistant-charge.ts。
+const assistantCharge = read('src/ai/quota/ai-assistant-charge.ts')
 assertContains(aiSvc, 'aiLogFieldsFromUsageReport', 'ai.service: 落账走统一用量翻译层')
-// 关键回归点：这五个落账点过去写死 provider: this.provider.name（恒为 'llm'）
+assertContains(assistantCharge, 'aiLogFieldsFromUsageReport', '小青文字: 落账走统一用量翻译层')
+// 关键回归点：这五个落账点过去写死 provider: this.provider.name（恒为 'llm'）。
+// 小青文字的落账随计次拆到 ai-assistant-charge.ts，避免服务文件继续加长。
 for (const op of ['parseResume', 'optimizeResume', 'adjustResumeLayout', 'generateResume', 'chatAssistant']) {
-  const idx = aiSvc.indexOf(`operation: '${op}'`)
-  const block = idx >= 0 ? aiSvc.slice(Math.max(0, idx - 500), idx) : ''
-  if (block.includes('aiLogFieldsFromUsageReport')) pass(`ai.service: ${op} 落账带真实厂商标识 + token`)
-  else fail(`ai.service: ${op} 落账未走 aiLogFieldsFromUsageReport —— 会退回恒为 'llm' 的标签，永远定不了价`)
+  const src = op === 'chatAssistant' ? assistantCharge : aiSvc
+  const where = op === 'chatAssistant' ? 'ai-assistant-charge' : 'ai.service'
+  const idx = src.indexOf(`operation: '${op}'`)
+  const block = idx >= 0 ? src.slice(Math.max(0, idx - 500), idx) : ''
+  if (block.includes('aiLogFieldsFromUsageReport')) pass(`${where}: ${op} 落账带真实厂商标识 + token`)
+  else fail(`${where}: ${op} 落账未走 aiLogFieldsFromUsageReport —— 会退回恒为 'llm' 的标签，永远定不了价`)
 }
 
 // 四个 LLM 服务必须真的从上游回包读 usage，并带含厂商名的标签
@@ -301,6 +307,7 @@ async function runtimeChecks(): Promise<void> {
     getSession: async () => ({
       turns: [{ idx: 0, role: 'interviewer', content: '请做个自我介绍。' }],
     }),
+    assertTranscribeAllowed: async () => undefined,
   }
   // requesterOf 依赖 jwt/redis/prisma 解析可选会员；无 authorization 头时
   // resolveOptionalEndUser 返回 null，走匿名 accessToken 分支，不需要真 redis。

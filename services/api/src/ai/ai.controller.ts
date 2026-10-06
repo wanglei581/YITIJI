@@ -8,6 +8,8 @@ import { TerminalScopedThrottle, PaidAiThrottle } from '../common/throttler/term
 import { currentAiRequestContext, resolveAiCaller } from './usage/ai-usage-context'
 import { TerminalSessionService } from '../terminals/terminal-session.service'
 import { AiPublicQuotaService } from './ai-public-quota.service'
+import { AiQuotaService } from './quota/ai-quota.service'
+import { assertMemberAssistantRemaining, assertMemberResumeRemaining } from './quota/ai-quota-run'
 import { JwtService } from '@nestjs/jwt'
 import { AsrService } from '../asr/asr.service'
 import { AiService } from './ai.service'
@@ -151,6 +153,7 @@ export class AiController {
     private readonly draftSource: ResumeDraftSourceService,
     @Optional() private readonly resumeParseIntent?: ResumeParseIntentRunner,
     @Optional() private readonly terminalSessions?: TerminalSessionService,
+    @Optional() private readonly quota?: AiQuotaService,
   ) {}
 
   /** 先复用 AI 访问守卫/用量中间件的惰性缓存；直接调用 handler 时再验签。 */
@@ -219,7 +222,7 @@ export class AiController {
       : await (async () => {
         const quotaTicket = await this.publicQuota.consume('resume_parse', quotaContext)
         return runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
-          this.aiService.submitResumeParse(dto, quotaContext.member),
+          this.aiService.submitResumeParse(dto, quotaContext.member, undefined, req),
         )
       })()
     await this.audit.write({
@@ -299,7 +302,7 @@ export class AiController {
     }
     // 历史记录回看不懒生成，也不核销权益。
     if (existingOnly === '1') return this.aiService.getResumeOptimize(taskId, requester, true)
-    const result = await this.aiService.getResumeOptimize(taskId, requester)
+    const result = await this.aiService.getResumeOptimize(taskId, requester, false, req)
     await this.draftSource.tagOptimizeTerminal(taskId, req)
 
     // 权益核销：仅当优化结果真实生成（completed）且显式传入 benefitGrantId 时才核销；
@@ -411,7 +414,7 @@ export class AiController {
     @Req() req: ReqLike,
   ) {
     const requester = await this.resolveAiResultRequester(req)
-    const result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester)
+    const result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester, req)
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -448,7 +451,7 @@ export class AiController {
     if (endUser) {
       await this.privacy.requireActiveConsent(endUser.endUserId, 'resume_ai')
     }
-    const result = await this.aiService.submitResumeGenerate(dto, endUser?.endUserId ?? null)
+    const result = await this.aiService.submitResumeGenerate(dto, endUser?.endUserId ?? null, req)
     await this.draftSource.recordGenerateInput(result.taskId, dto, req) // 按原样导出只认这份原话，见 resume-draft-source.service.ts
     await this.audit.write({
       actorId: null,
@@ -508,6 +511,8 @@ export class AiController {
     }
     // A-6 成本可见性：ASR 按时长计费，tokenUsage 恒为空，不编造单价。
     const voiceMember = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    // 转写本身不占次数。会员当天简历次数已经用完时才拒绝，避免白转写进不了生成。
+    await assertMemberResumeRemaining(this.quota, voiceMember?.endUserId)
     const asrStartedAt = Date.now()
     const result = await this.asr.recognizeWav(audio.buffer)
     this.logService.record({
@@ -621,6 +626,7 @@ export class AiController {
         dto,
         assistantOwnerKey(chatMember?.endUserId ?? null, ipOf(req)),
         chatMember?.endUserId ?? null,
+        req,
       ),
     )
     await this.audit.write({
@@ -646,11 +652,7 @@ export class AiController {
     return result
   }
 
-  /**
-   * 小青文字对话的「按住说话」转写。multipart 字段名 audio，仅内存 WAV。
-   * 与 /assistant/chat 共用 assistant_chat 日配额；ASR 未配置返回 ASR_NOT_CONFIGURED。
-   * 转写正文不进日志 / 审计。
-   */
+  /** 小青按住说话。转写不占小青次数；会员当天次数用完才拒绝。终端与 IP 日配额仍在。 */
   @Post('assistant/voice')
   @TerminalScopedThrottle(12)
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
@@ -674,6 +676,7 @@ export class AiController {
       if (!isWavBuffer(audio.buffer)) {
         throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
       }
+      await assertMemberAssistantRemaining(this.quota, voiceMember?.endUserId)
       const asrStartedAt = Date.now()
       const result = await this.asr.recognizeWav(audio.buffer)
       this.logService.record({

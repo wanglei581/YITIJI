@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
@@ -42,6 +43,8 @@ export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
   '5. 没有待办就返回空数组，不要编「下一步」。',
   '只输出 JSON（不要 markdown 代码块）：{"highlights":["要点"],"todos":["待办"]}',
 ].join('\n'))
+import { AiQuotaService } from '../ai/quota/ai-quota.service'
+import { quotaSequence, runWithAiQuota } from '../ai/quota/ai-quota-run'
 import { AdvisorArtifactService } from './advisor-artifact.service'
 import { ADVISOR_DISCLAIMER } from './advisor-skills'
 import type { QaPinsPayload } from './advisor-artifact.types'
@@ -87,6 +90,8 @@ export interface AssistantSessionSummaryView {
   printUnavailableReason?: string
 }
 
+type SavedSummary = { row: { id: string }; saved: { artifactId: string } }
+
 @Injectable()
 export class AssistantSummaryService {
   private readonly logger = new Logger(AssistantSummaryService.name)
@@ -98,6 +103,7 @@ export class AssistantSummaryService {
     private readonly artifacts: AdvisorArtifactService,
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
+    @Optional() private readonly quota?: AiQuotaService,
   ) {}
 
   async summarize(
@@ -128,16 +134,75 @@ export class AssistantSummaryService {
 
     const usage = new AiUsageAccumulator()
     const startedAt = Date.now()
-    let parsed: { highlights: string[]; todos: string[] }
+    const work = async (): Promise<{ highlights: string[]; todos: string[] }> => {
+      try {
+        const condensed = await this.condense(turns, usage.add)
+        this.recordLog(usage, startedAt, 'success', endUserId)
+        return condensed
+      } catch (error) {
+        this.recordLog(usage, startedAt, 'failed', endUserId, aiErrorCodeOf(error))
+        throw error
+      }
+    }
+    // 小结归小青桶，每次生成扣 1 次（设计文档第二节）。要点先存成本人「我的」里能重开的
+    // 顾问记录再结算；模型报错等服务端确认的失败归还。操作号由服务端签发。
+    let stored: SavedSummary | null = null
+    const persist = async (value: { highlights: string[]; todos: string[] }): Promise<string> => {
+      stored = await this.persistSummary(value, userTurns[0]!.content, endUserId)
+      return stored.row.id
+    }
+    const parsed = this.quota
+      ? await runWithAiQuota({
+        quota: this.quota,
+        bucket: 'ai_assistant',
+        operationKey: `assistant-summary:${quotaSequence()}`,
+        endUserId,
+      }, work, persist)
+      : await work().then(async (value) => { await persist(value); return value })
+    const { row, saved } = stored as unknown as SavedSummary
+
+    let document: AssistantSessionSummaryView['document'] = null
+    let printUnavailableReason: string | undefined
     try {
-      parsed = await this.condense(turns, usage.add)
-      this.recordLog(usage, startedAt, 'success', endUserId)
+      const printed = await this.artifacts.print(saved.artifactId, row.id, { endUserId })
+      document = {
+        fileId: printed.fileId,
+        filename: printed.filename,
+        mimeType: 'application/pdf',
+        sizeBytes: printed.sizeBytes,
+        pageCount: printed.pageCount,
+        signedUrl: printed.signedUrl,
+        expiresAt: printed.expiresAt,
+        printFileUrl: printed.printFileUrl,
+      }
     } catch (error) {
-      this.recordLog(usage, startedAt, 'failed', endUserId, aiErrorCodeOf(error))
-      throw error
+      const code = (error as { getResponse?: () => { error?: { code?: string; message?: string } } })
+        .getResponse?.()?.error?.code
+      printUnavailableReason = code === 'ADVISOR_PDF_FONT_NOT_FOUND'
+        ? '服务器缺少中文字体，要点已保存但暂时无法生成打印稿'
+        : '打印稿暂时无法生成，要点已保存，请稍后再试'
+      this.logger.warn(`assistant.summary_print_failed code=${code ?? 'unknown'}`)
     }
 
-    const firstUser = userTurns[0]!.content.trim().slice(0, 600)
+    return {
+      advisorSessionId: row.id,
+      artifactId: saved.artifactId,
+      highlights: parsed.highlights,
+      todos: parsed.todos,
+      disclaimer: ADVISOR_DISCLAIMER,
+      savedToDocuments: true,
+      document,
+      printUnavailableReason,
+    }
+  }
+
+  /** 把浓缩后的要点存成本人的顾问记录与 qa_pins 产物，写审计。结算只在这之后。 */
+  private async persistSummary(
+    parsed: { highlights: string[]; todos: string[] },
+    firstUserText: string,
+    endUserId: string,
+  ): Promise<SavedSummary> {
+    const firstUser = firstUserText.trim().slice(0, 600)
     const nowIso = new Date().toISOString()
     const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000)
     const row = await this.prisma.advisorSession.create({
@@ -194,40 +259,7 @@ export class AssistantSummaryService {
       userAgent: null,
       requestId: null,
     })
-
-    let document: AssistantSessionSummaryView['document'] = null
-    let printUnavailableReason: string | undefined
-    try {
-      const printed = await this.artifacts.print(saved.artifactId, row.id, { endUserId })
-      document = {
-        fileId: printed.fileId,
-        filename: printed.filename,
-        mimeType: 'application/pdf',
-        sizeBytes: printed.sizeBytes,
-        pageCount: printed.pageCount,
-        signedUrl: printed.signedUrl,
-        expiresAt: printed.expiresAt,
-        printFileUrl: printed.printFileUrl,
-      }
-    } catch (error) {
-      const code = (error as { getResponse?: () => { error?: { code?: string; message?: string } } })
-        .getResponse?.()?.error?.code
-      printUnavailableReason = code === 'ADVISOR_PDF_FONT_NOT_FOUND'
-        ? '服务器缺少中文字体，要点已保存但暂时无法生成打印稿'
-        : '打印稿暂时无法生成，要点已保存，请稍后再试'
-      this.logger.warn(`assistant.summary_print_failed code=${code ?? 'unknown'}`)
-    }
-
-    return {
-      advisorSessionId: row.id,
-      artifactId: saved.artifactId,
-      highlights: parsed.highlights,
-      todos: parsed.todos,
-      disclaimer: ADVISOR_DISCLAIMER,
-      savedToDocuments: true,
-      document,
-      printUnavailableReason,
-    }
+    return { row, saved }
   }
 
   private async condense(

@@ -16,6 +16,8 @@ import {
   type DegradedSelfAssessmentDimension,
 } from './career-plan-degraded'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
+import { AiQuotaService } from '../quota/ai-quota.service'
+import { runWithAiQuota, type QuotaAbortRequest } from '../quota/ai-quota-run'
 import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
 import { storedJobFitUsesSystemJob } from './job-fit-hosting'
 import { formatBeijingDate } from '../../common/beijing-display-time'
@@ -144,12 +146,14 @@ export class CareerPlanService {
     @Optional()
     @Inject(CAREER_PLAN_JOB_REQUIREMENT_STATS)
     private readonly jobRequirementStats?: CareerPlanJobRequirementStatsPort,
+    @Optional() private readonly quota?: AiQuotaService,
   ) {}
 
   async generate(
     taskId: string,
     requester: CareerPlanRequester,
     options?: { includeJobFitTitle?: boolean },
+    req?: QuotaAbortRequest,
   ) {
     const includeJobFitTitle = options?.includeJobFitTitle !== false
     const parse = await this.loadAuthorizedParse(taskId, requester)
@@ -219,54 +223,68 @@ export class CareerPlanService {
 
     // A-6 成本可见性：本能力此前完全不落 AiServiceLog，Admin 看不到调用量与成本。
     // 用量按重试累计；成功/失败都落一条（失败也真实花钱）。
-    const usage = new AiUsageAccumulator()
-    const startedAt = Date.now()
-    let payload: CareerPlanPayload
-    try {
-      payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx, selfAssessment: selfAssessmentCtx, onLlmCall: usage.add })
-    } catch (error) {
-      this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_CAREER_PLAN_FAILED'))
-      throw error
+    const produce = async () => {
+      const usage = new AiUsageAccumulator()
+      const startedAt = Date.now()
+      let payload: CareerPlanPayload
+      try {
+        payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx, selfAssessment: selfAssessmentCtx, onLlmCall: usage.add })
+      } catch (error) {
+        this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_CAREER_PLAN_FAILED'))
+        throw error
+      }
+      this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
+      const stored: StoredCareerPlan = {
+        payload,
+        basedOn: {
+          resume: true,
+          jobFit: jobFitCtx?.jobTitle ?? null,
+          jobFitSource: jobFitCtx?.source ?? null,
+          interview: interviewCtx?.position ?? null,
+          selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
+        },
+        providerName: 'llm',
+        selfAssessmentExcluded: selfAssessmentUse.excluded,
+      }
+      const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
+      await this.prisma.aiResumeResult.upsert({
+        where: { taskId_kind: { taskId, kind: 'career_plan' } },
+        update: { status: 'completed', payloadJson: JSON.stringify(stored), expiresAt },
+        create: {
+          taskId,
+          kind: 'career_plan',
+          status: 'completed',
+          provider: 'llm',
+          payloadJson: JSON.stringify(stored),
+          endUserId: parse.endUserId,
+          accessTokenHash: parse.accessTokenHash,
+          expiresAt,
+        },
+      })
+      await this.audit.write({
+        actorId: null,
+        actorRole: parse.endUserId ? 'enduser' : 'kiosk',
+        action: 'resume.career_plan',
+        targetType: 'ai_task',
+        targetId: taskId,
+        payload: { hasJobFitCtx: !!jobFitCtx, hasInterviewCtx: !!interviewCtx, hasEndUser: !!parse.endUserId },
+        ipAddress: null, userAgent: null, requestId: null,
+      })
+      return this.toResponse(taskId, stored)
     }
-    this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
-    const stored: StoredCareerPlan = {
-      payload,
-      basedOn: {
-        resume: true,
-        jobFit: jobFitCtx?.jobTitle ?? null,
-        jobFitSource: jobFitCtx?.source ?? null,
-        interview: interviewCtx?.position ?? null,
-        selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
+    if (!this.quota || !parse.endUserId) return produce()
+    return runWithAiQuota({
+      quota: this.quota,
+      bucket: 'ai_resume',
+      operationKey: `${taskId}:career_plan`,
+      endUserId: parse.endUserId,
+      req,
+      loadStored: async () => {
+        const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'career_plan' } } })
+        if (!row?.expiresAt || row.expiresAt.getTime() < Date.now() || row.status !== 'completed') return null
+        try { return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredCareerPlan) } catch { return null }
       },
-      providerName: 'llm',
-      selfAssessmentExcluded: selfAssessmentUse.excluded,
-    }
-    const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
-    await this.prisma.aiResumeResult.upsert({
-      where: { taskId_kind: { taskId, kind: 'career_plan' } },
-      update: { status: 'completed', payloadJson: JSON.stringify(stored), expiresAt },
-      create: {
-        taskId,
-        kind: 'career_plan',
-        status: 'completed',
-        provider: 'llm',
-        payloadJson: JSON.stringify(stored),
-        endUserId: parse.endUserId,
-        accessTokenHash: parse.accessTokenHash,
-        expiresAt,
-      },
-    })
-    await this.audit.write({
-      actorId: null,
-      actorRole: parse.endUserId ? 'enduser' : 'kiosk',
-      action: 'resume.career_plan',
-      targetType: 'ai_task',
-      targetId: taskId,
-      // 仅元数据：不含简历/规划内容
-      payload: { hasJobFitCtx: !!jobFitCtx, hasInterviewCtx: !!interviewCtx, hasEndUser: !!parse.endUserId },
-      ipAddress: null, userAgent: null, requestId: null,
-    })
-    return this.toResponse(taskId, stored)
+    }, produce, async () => taskId)
   }
 
   /** 读回最近一次规划（刷新恢复 / 会员回看）。 */

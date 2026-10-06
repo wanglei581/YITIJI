@@ -1,5 +1,6 @@
 /**
  * resume_parse consumeOnce。隔离的本机 redis-server，不连生产。
+ * 会员次数改由按人账本接管，本脚本只断言终端与 IP 仍计数、会员键不再增加。
  * 同意图回放不计第二次；超限在 Lua 内整单拒绝。marker 过期后不退回已计数。
  */
 import assert from 'node:assert/strict'
@@ -244,7 +245,8 @@ async function main(): Promise<void> {
     })))
     assert.equal(raced.filter((item) => item.outcome === 'charged').length, 1)
     assert.equal(raced.filter((item) => item.outcome === 'replay').length, 7)
-    assert.equal(await count('member', 'member-a', DAY_ONE), 1)
+    assert.equal(await count('member', 'member-a', DAY_ONE), 0)
+    assert.equal(await count('terminal', 'term-a', DAY_ONE), 1)
     assert.equal(await count('ip', '203.0.113.10', DAY_ONE), 1)
     const markerTtl = await client.ttl(resumeParseQuotaMarkerKey(shared))
     assert.ok(markerTtl >= Math.ceil(resumeParseIntentTtlMs() / 1000) - 2)
@@ -260,16 +262,16 @@ async function main(): Promise<void> {
       429,
       'AI_PUBLIC_QUOTA_EXCEEDED',
     )
-    assert.equal(await count('member', 'member-a', DAY_ONE), 1)
+    assert.equal(await count('member', 'member-a', DAY_ONE), 0)
     assert.equal(await count('member', 'member-b', DAY_ONE), 0)
     assert.equal(await count('ip', '203.0.113.20', DAY_ONE), 1)
     pass('a second intent over the IP limit does not partially increment the member counter')
 
     await client.flushdb()
-    limits(1, 120, 240)
+    limits(1, 1, 240)
     const [left, right] = await Promise.allSettled([
-      quota.consumeOnce({ intentId: intent(), markerTtlSeconds: 60, context: { member: 'only', terminal: null, ip: null }, now: DAY_ONE }),
-      quota.consumeOnce({ intentId: intent(), markerTtlSeconds: 60, context: { member: 'only', terminal: null, ip: null }, now: DAY_ONE }),
+      quota.consumeOnce({ intentId: intent(), markerTtlSeconds: 60, context: { member: 'only', terminal: 'desk-shinan-01', ip: null }, now: DAY_ONE }),
+      quota.consumeOnce({ intentId: intent(), markerTtlSeconds: 60, context: { member: 'only', terminal: 'desk-shinan-01', ip: null }, now: DAY_ONE }),
     ])
     const fulfilled = [left, right].filter((item): item is PromiseFulfilledResult<{ outcome: string }> => item.status === 'fulfilled')
     const rejected = [left, right].filter((item) => item.status === 'rejected')
@@ -278,8 +280,9 @@ async function main(): Promise<void> {
     assert.equal(rejected.length, 1)
     assert.ok(rejected[0]?.status === 'rejected' && rejected[0].reason instanceof HttpException)
     assert.equal(rejected[0]?.status === 'rejected' ? rejected[0].reason.getStatus() : 0, 429)
-    assert.equal(await count('member', 'only', DAY_ONE), 1)
-    pass('two different intents at a limit of one produce a single charge')
+    assert.equal(await count('member', 'only', DAY_ONE), 0)
+    assert.equal(await count('terminal', 'desk-shinan-01', DAY_ONE), 1)
+    pass('two different intents at a terminal limit of one produce a single charge and do not count the member key')
 
     await client.flushdb()
     limits(5, 120, 240)
@@ -292,13 +295,17 @@ async function main(): Promise<void> {
     assert.equal(replayed.outcome, 'replay')
     assert.equal(replayed.day, '2026-09-25')
     assert.equal(await client.get(resumeParseQuotaMarkerKey(lasting)), '2026-09-24')
-    assert.equal(await count('member', 'day-user', DAY_ONE), 1)
+    assert.equal(await count('member', 'day-user', DAY_ONE), 0)
     assert.equal(await count('member', 'day-user', DAY_TWO), 0)
+    assert.equal(await count('ip', '203.0.113.30', DAY_ONE), 1)
+    assert.equal(await count('ip', '203.0.113.30', DAY_TWO), 0)
     await client.del(resumeParseQuotaMarkerKey(lasting))
     const afterExpiry = await quota.consumeOnce({ intentId: lasting, markerTtlSeconds: 60, context: dayContext, now: DAY_TWO })
     assert.equal(afterExpiry.outcome, 'charged')
-    assert.equal(await count('member', 'day-user', DAY_ONE), 1)
-    assert.equal(await count('member', 'day-user', DAY_TWO), 1)
+    assert.equal(await count('member', 'day-user', DAY_ONE), 0)
+    assert.equal(await count('member', 'day-user', DAY_TWO), 0)
+    assert.equal(await count('ip', '203.0.113.30', DAY_ONE), 1)
+    assert.equal(await count('ip', '203.0.113.30', DAY_TWO), 1)
     pass('day rollover replays until the marker is gone, then charges the new day without refunding the old day')
 
     await client.flushdb()
@@ -312,7 +319,8 @@ async function main(): Promise<void> {
     })
     const wideTtl = await client.ttl(resumeParseQuotaMarkerKey(wide))
     assert.ok(wideTtl >= Math.ceil(resumeParseIntentTtlMs() / 1000) - 2)
-    pass('marker TTL stays at least the configured intent TTL')
+    assert.equal(await count('member', 'wide', DAY_ONE), 0)
+    pass('marker TTL stays at least the configured intent TTL and a member-only intent does not increment the member key')
 
     await client.flushdb()
     process.env['AI_RESUME_RESULT_TTL_HOURS'] = '24'
@@ -320,11 +328,15 @@ async function main(): Promise<void> {
     const legacyContext: AiPublicQuotaContext = { member: 'legacy', terminal: null, ip: '203.0.113.40' }
     const firstTicket = await quota.consume('resume_parse', legacyContext)
     const secondTicket = await quota.consume('resume_parse', legacyContext)
-    assert.equal(await count('member', 'legacy', new Date()), 2)
+    assert.equal(await count('member', 'legacy', new Date()), 0)
+    assert.equal(await count('ip', '203.0.113.40', new Date()), 2)
     await quota.rollback(secondTicket)
-    assert.equal(await count('member', 'legacy', new Date()), 1)
+    assert.equal(await count('member', 'legacy', new Date()), 0)
+    assert.equal(await count('ip', '203.0.113.40', new Date()), 1)
     assert.equal(firstTicket.keys.length > 0, true)
-    const assistant = await quota.consume('assistant_chat', { member: 'chat', terminal: null, ip: null })
+    const assistant = await quota.consume('assistant_chat', { member: 'chat', terminal: 'desk-shinan-01', ip: null })
+    assert.equal(assistant.keys.some((key) => key.includes(':member:')), false)
+    assert.equal(assistant.keys.some((key) => key.includes(':terminal:')), true)
     assert.equal(assistant.keys.length, 1)
     pass('legacy consume and rollback still count every call and do not use the intent marker')
     failIfRedisDied()
