@@ -125,3 +125,14 @@ export function TruthBar() {
     </div>
   )
 }
+
+/** 底栏两层：上面只放按钮，说明和底注各占一行。长句不进按钮的 flex 行。 */
+export function ActivityCtaStack({ note, children }: { note?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="act-cta-stack">
+      <div className="act-cta-row">{children}</div>
+      {note ? <p className="act-cta-note">{note}</p> : null}
+      <TruthBar />
+    </div>
+  )
+}

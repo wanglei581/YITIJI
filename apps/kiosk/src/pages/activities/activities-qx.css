@@ -6,11 +6,9 @@
 .act-root { min-height: 0; }
 
 .qx-stage:has(.act-root) > .qx-ctabar {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding-top: 12px;
-  padding-bottom: 12px;
+  display: block;
+  padding: 0;
+  gap: 0;
 }
 
 .act-scroll,
@@ -294,31 +292,58 @@
 .act-alt-t { display: block; font-size: var(--qx-fs-btn); font-weight: 700; }
 .act-alt-d { display: block; margin-top: 5px; font-size: var(--qx-fs-aux-lg); line-height: 1.4; color: var(--qx-ink-2); }
 
-.act-cta-row { display: flex; gap: 14px; align-items: center; }
-.act-cta-row .why {
-  flex: 1.15;
+.act-cta-stack { display: flex; flex-direction: column; width: 100%; }
+.act-cta-row {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  width: 100%;
+  padding: 14px var(--qx-gutter);
+}
+.act-cta-row > .qx-btn,
+.act-cta-row > .qx-ai-help {
+  flex: 1 1 auto;
+  min-width: max-content;
+  min-height: 72px;
+  padding: 0 16px;
+  border-radius: var(--qx-r);
+  font-size: var(--qx-fs-btn);
+  line-height: 1.2;
+  white-space: nowrap;
+  justify-content: center;
+}
+.act-cta-row > .qx-btn[data-variant='primary'] { flex: 1.5 1 auto; min-height: 72px; }
+.act-cta-row > .qx-ai-help {
+  margin-left: 0;
+  border: 1px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  font-weight: 700;
+  font-family: var(--qx-sans);
+  text-align: center;
+}
+.act-cta-note {
   margin: 0;
+  padding: 0 var(--qx-gutter) 12px;
   font-size: var(--qx-fs-aux-lg);
-  line-height: 1.4;
-  color: var(--qx-wheat-d);
+  line-height: 1.45;
+  color: var(--qx-ink-2);
   font-weight: 600;
 }
-.act-cta-row .qx-btn { flex: 1; }
-.act-cta-row .qx-btn.narrow { flex: none; min-width: 240px; }
-.act-cta-row .qx-ai-help { flex: none; min-height: 56px; padding: 0 12px; font-size: var(--qx-fs-body); }
 
 .act-truth {
   display: flex;
   align-items: center;
   gap: 16px;
   min-height: 58px;
+  padding: 11px var(--qx-gutter);
+  border-top: 1px solid var(--qx-line);
 }
-.act-truth p { flex: 1; margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+.act-truth p { flex: 1; min-width: 0; margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
 .act-truth b { color: var(--qx-ink); font-weight: 600; }
 .act-truth button {
   flex: none;
-  min-height: 56px;
-  min-width: 120px;
+  min-height: 48px;
   padding: 0 14px;
   border: 0;
   border-radius: var(--qx-r-s);
@@ -326,6 +351,7 @@
   color: var(--qx-teal-d);
   font-size: var(--qx-fs-aux-lg);
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 

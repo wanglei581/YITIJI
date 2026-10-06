@@ -6,7 +6,7 @@ import { useAuth } from '../../auth/useAuth'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { listBenefitActivities } from '../../services/api/benefitActivities'
 import { QxMemberNavbar } from '../profile/components/QxMemberNavbar'
-import { ActivityLead, ActivityTabs, AskQing, HelpLine, LedgerRules, ServiceAlts, StateBlock, TruthBar } from './ActivityChrome'
+import { ActivityCtaStack, ActivityLead, ActivityTabs, AskQing, HelpLine, LedgerRules, ServiceAlts, StateBlock } from './ActivityChrome'
 import {
   FAIR_NOTE,
   LIST_COMPLIANCE,
@@ -199,15 +199,11 @@ function ListCta({ uiState, onRetry }: { uiState: ListUi; onRetry: () => void })
   const navigate = useNavigate()
   const primary = uiState === 'error'
     ? <button type="button" className="qx-btn" data-variant="primary" data-testid="activities-primary" onClick={onRetry}>重新加载</button>
-    : <button type="button" className="qx-btn narrow" data-variant="primary" data-testid="activities-primary" onClick={() => navigate('/me/benefits')}>回我的权益</button>
+    : <button type="button" className="qx-btn" data-variant="primary" data-testid="activities-primary" onClick={() => navigate('/me/benefits')}>回我的权益</button>
   return (
-    <>
-      <div className="act-cta-row">
-        {uiState === 'list' ? <p className="why">活动是否收费、名额是否还有，以主办方说明和实际结果为准。</p> : null}
-        <AskQing testId="activities-ask" />
-        {primary}
-      </div>
-      <TruthBar />
-    </>
+    <ActivityCtaStack note={uiState === 'list' ? '活动是否收费、名额是否还有，以主办方说明和实际结果为准。' : null}>
+      <AskQing testId="activities-ask" />
+      {primary}
+    </ActivityCtaStack>
   )
 }

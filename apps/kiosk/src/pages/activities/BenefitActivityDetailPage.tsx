@@ -9,7 +9,7 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { BenefitActivitiesApiError, claimBenefitActivity, getBenefitActivity } from '../../services/api/benefitActivities'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { QxMemberNavbar } from '../profile/components/QxMemberNavbar'
-import { AskQing, HelpLine, ServiceAlts, StateBlock, TruthBar } from './ActivityChrome'
+import { ActivityCtaStack, AskQing, HelpLine, ServiceAlts, StateBlock } from './ActivityChrome'
 import {
   DETAIL_COMPLIANCE,
   FEE_LINE,
@@ -164,29 +164,27 @@ export function BenefitActivityDetailPage() {
         back={{ label: '返回活动列表', onBack: () => navigate('/activities') }}
         status={status}
         ctabar={(
-          <>
-            <div className="act-cta-row">
-              {uiState === 'signed-out' ? <p className="why">领取要确认是你本人，没登录没法验证身份；规则和条件不登录也能完整看。</p> : null}
-              <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate('/activities')}>返回活动列表</button>
-              {uiState !== 'loading' && uiState !== 'error' ? (
-                <button
-                  type="button"
-                  className="qx-btn"
-                  data-variant="primary"
-                  data-testid="activity-primary"
-                  disabled={primaryDisabled}
-                  onClick={handlePrimary}
-                  aria-label={primaryLabel}
-                >
-                  {primaryLabel}
-                </button>
-              ) : null}
-              {uiState === 'error' ? (
-                <button type="button" className="qx-btn" data-variant="primary" data-testid="activity-primary" onClick={load}>重新加载</button>
-              ) : null}
-            </div>
-            <TruthBar />
-          </>
+          <ActivityCtaStack
+            note={uiState === 'signed-out' ? '领取要确认是你本人，没登录没法验证身份；规则和条件不登录也能完整看。' : null}
+          >
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/activities')}>返回活动列表</button>
+            {uiState !== 'loading' && uiState !== 'error' ? (
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="primary"
+                data-testid="activity-primary"
+                disabled={primaryDisabled}
+                onClick={handlePrimary}
+                aria-label={primaryLabel}
+              >
+                {primaryLabel}
+              </button>
+            ) : null}
+            {uiState === 'error' ? (
+              <button type="button" className="qx-btn" data-variant="primary" data-testid="activity-primary" onClick={load}>重新加载</button>
+            ) : null}
+          </ActivityCtaStack>
         )}
         navbar={<QxMemberNavbar current="profile" />}
       >
