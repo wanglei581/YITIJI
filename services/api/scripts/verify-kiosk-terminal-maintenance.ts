@@ -9,7 +9,7 @@
 import 'dotenv/config'
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { copyFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UnauthorizedException } from '@nestjs/common'
@@ -377,6 +377,24 @@ async function assertDisabledSessionCanRead(): Promise<void> {
     fail('确认打印的终端就绪拦截被改动了')
   }
   pass('确认打印的 PRINT_TERMINAL_NOT_READY 拦截保持原样')
+
+  // 放宽只许用在只读配置上：全 src 只能有一处 @AllowDisabledTerminalIdentity()，且紧挨着配置路由。
+  // 以后有人把它挂到下单、领取、扫描等接口上，停用的终端就又能接单了。
+  const listTs = (dir: string): string[] => readdirSync(dir).flatMap((entry) => {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) return entry === 'generated' ? [] : listTs(full)
+    return entry.endsWith('.ts') ? [full] : []
+  })
+  const uses = listTs(join(process.cwd(), 'src')).flatMap((file) => {
+    const lines = readFileSync(file, 'utf8').split('\n')
+    return lines.flatMap((line, i) => (/^\s*@AllowDisabledTerminalIdentity\(\)/.test(line) ? [{ file, i, lines }] : []))
+  })
+  if (uses.length !== 1) fail(`@AllowDisabledTerminalIdentity() 只许出现一处（配置路由），实际 ${uses.length} 处`)
+  const near = uses[0]!.lines.slice(Math.max(0, uses[0]!.i - 3), uses[0]!.i + 4).join('\n')
+  if (!uses[0]!.file.endsWith('terminals.controller.ts') || !near.includes("@Get('terminals/:terminalId/config')")) {
+    fail('@AllowDisabledTerminalIdentity() 只许挂在 GET terminals/:terminalId/config 上')
+  }
+  pass('停用可读标记全仓只有一处，就在只读配置路由上')
 }
 
 async function main(): Promise<void> {
