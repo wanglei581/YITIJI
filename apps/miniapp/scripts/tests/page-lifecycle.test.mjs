@@ -6798,8 +6798,9 @@ function makePrivacy({ available = true, items = [], createResult, cancelResult 
     cancelMemberDataRequest: (id) => { calls.cancel.push(id); return cancelResult ? cancelResult() : Promise.resolve({ id, status: 'cancelled' }) },
     getMemberAiConsentStatus: () => Promise.resolve({}),
   }
-  const page = makePage('pages/privacy/privacy.js', { auth: createAuth('A'), api, wx })
-  return { page, wx, modals, calls, state }
+  const auth = createAuth('A')
+  const page = makePage('pages/privacy/privacy.js', { auth, api, wx })
+  return { page, wx, modals, calls, state, auth }
 }
 const PENDING_CLOSURE = { id: 'rq-1', requestType: 'delete', status: 'pending', requestedAt: '2026-10-04T02:00:00Z' }
 
@@ -6911,6 +6912,43 @@ test('privacy 注销：服务端的原话能到用户眼前；幂等键的工程
   assert.ok(!Object.prototype.hasOwnProperty.call(ue.SHARED_USER_MESSAGES, 'IDEMPOTENCY_KEY_REUSED'))
   const kept = dr.CLOSURE_NOTES.find((n) => n.k === '会保留')
   assert.match(kept.v, /权益领取与核销流水/)
+})
+
+test('privacy 注销：退出登录后不再挂着上一位的注销申请', async () => {
+  const { page, auth } = makePrivacy({ items: [PENDING_CLOSURE] })
+  page.onLoad(); page.onShow()
+  await flush()
+  assert.equal(page.data.activeClosure.id, 'rq-1')
+  auth.logout()
+  page.onShow()
+  await flush()
+  assert.equal(page.data.activeClosure, null, '共用手机上换人或退出后，不能还显示上一位的「已受理，等待处理」')
+  assert.equal(page.data.requests.length, 0)
+  assert.equal(page.data.capabilityLoaded, false)
+  page.onUnload()
+})
+
+test('privacy 注销：撤回走真实请求层，打到 POST /me/data-requests/:id/cancel', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const seen = await captureRequest(wx, (realApi) => realApi.cancelMemberDataRequest('rq 1'))
+  assert.equal(seen.error, undefined, String(seen.error && seen.error.message))
+  assert.equal(seen.length, 1, '真的发出去了一次请求')
+  assert.equal(seen[0].method, 'POST')
+  assert.match(String(seen[0].url), /\/me\/data-requests\/rq%201\/cancel$/)
+})
+
+test('privacy 注销：模板里开放时有说明块、待处理状态行、「本页下方申请」的指引', () => {
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/privacy/privacy.wxml'), 'utf8')
+  // 说明块只在服务端开放注销时出现，逐行来自 data.closureNotes
+  assert.match(wxml, /<block wx:if="\{\{accountClosureAvailable\}\}">[\s\S]*?wx:for="\{\{closureNotes\}\}"[\s\S]*?<\/block>/)
+  // 入口下面：有进行中的注销申请时写它的状态，排在「已开放」那句之前
+  const row = wxml.indexOf('bindtap="requestAccountClosure"')
+  const active = wxml.indexOf('wx:elif="{{activeClosure}}">{{activeClosure.statusLabel}}', row)
+  const open = wxml.indexOf('wx:elif="{{accountClosureAvailable}}"', row)
+  assert.ok(row > 0 && active > row && open > active, '状态行在开放说明之前')
+  // 「办不了的」那行：开放后告诉用户注销在本页下方申请
+  assert.match(wxml, /accountClosureAvailable \? '[^']*注销账号在本页下方申请/)
 })
 
 test('privacy 注销：提交失败时如实说，幂等键留着给下一次重试用', async () => {
