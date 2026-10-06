@@ -22844,6 +22844,7 @@
       "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/scripts/support/boot-api-child.ts": [
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-error-observability.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
@@ -22855,6 +22856,7 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
     "services/api/scripts/support/dead-redis-gate-env.ts": [
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-error-observability.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
     ],
@@ -22862,6 +22864,7 @@
       "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
     "services/api/scripts/support/ephemeral-redis-server.ts": [
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
     "services/api/scripts/support/inmemory-redis-server.ts": [
@@ -22881,6 +22884,7 @@
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
@@ -24198,6 +24202,7 @@
     ],
     "services/api/src/auth/password-proof-state.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts",
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
@@ -24234,6 +24239,9 @@
     ],
     "services/api/src/common/auth/admin-ip-allowlist.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts"
+    ],
+    "services/api/src/common/auth/internal-session-revocation.ts": [
+      "services/api/scripts/verify-admin-session-revocation.ts"
     ],
     "services/api/src/common/auth/optional-end-user.ts": [
       "services/api/scripts/verify-member-account-status.ts",
@@ -25817,6 +25825,7 @@
       "services/api/scripts/verify-admin-orgs-delete-concurrency.ts",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-admin-orgs.ts",
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
@@ -26335,6 +26344,7 @@
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
@@ -34121,6 +34131,31 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:admin-print-scan"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/dead-redis-gate-env.ts",
+          "services/api/scripts/support/ephemeral-redis-server.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/auth/password-proof-state.ts",
+          "services/api/src/common/auth/internal-session-revocation.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-admin-session-revocation.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:admin-session-revocation"
       ],
       "wired": true
     },
