@@ -68,6 +68,19 @@ export function formatShanghaiMinute(date: Date): string {
   return formatBeijingMinute(date)
 }
 
+/**
+ * 「多久以前」给人看：不满 1 小时写分钟，不满 1 天写小时加分钟，1 天以上写天加小时。
+ * 终端离线几天时以前会写成「5211 分钟前」，值班人员还得自己换算。
+ */
+export function formatElapsedAgo(ms: number): string {
+  const minutes = Math.max(0, Math.floor(ms / 60000))
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return minutes % 60 ? `${hours} 小时 ${minutes % 60} 分钟前` : `${hours} 小时前`
+  const days = Math.floor(hours / 24)
+  return hours % 24 ? `${days} 天 ${hours % 24} 小时前` : `${days} 天前`
+}
+
 /** 打印失败告警正文。时刻只出现在这句话里，occurredAt 仍是 UTC。 */
 export function printFailedAlertDetail(task: {
   id: string
@@ -245,7 +258,6 @@ function buildTerminalAlert(
   const offlineMs = nowMs - lastSeen.getTime()
 
   if (offlineMs >= ONLINE_WINDOW_MS) {
-    const minutes = Math.floor(offlineMs / 60000)
     const subjectKey = buildSubjectKey('terminal_offline', terminal.id)
     return {
       id: subjectKey,
@@ -255,7 +267,7 @@ function buildTerminalAlert(
       type: 'terminal_offline',
       severity: offlineMs >= 30 * 60 * 1000 ? 'error' : 'warning',
       title: `终端 ${terminal.terminalCode} 离线`,
-      detail: `最近一次心跳在 ${minutes} 分钟前(${formatShanghaiMinute(lastSeen)})`,
+      detail: `最近一次心跳在 ${formatElapsedAgo(offlineMs)}(${formatShanghaiMinute(lastSeen)})`,
       terminalCode: terminal.terminalCode,
       occurredAt: lastSeen.toISOString(),
     }
