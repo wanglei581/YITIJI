@@ -12279,7 +12279,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 241,
+      "reachableFileCount": 249,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13047,7 +13047,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 268
+      "sourceFileCount": 277
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -43046,6 +43046,17 @@
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/terminals/terminalCommandViews.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/terminals/terminalProvisionViews.test.ts",
         "kind": "test",
         "mentions": [
           "apps/admin/package.json"

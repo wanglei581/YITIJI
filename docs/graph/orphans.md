@@ -41,7 +41,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 82 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 83 |
 | **medium** | 只被文档或其它文件提及 | 29 |
 | **low** | 全仓零提及 | 94 |
 
@@ -230,7 +230,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（82）
+## high — 仍被 CI / 门禁 / 包脚本引用（83）
 
 ### 页面/组件（37）
 
@@ -319,7 +319,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/scan/styles/scan-fusion.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 
-### 测试（5）
+### 测试（6）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -327,6 +327,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/screensaver/terminalConfigState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/terminals/terminalCommandViews.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
+| `apps/admin/src/routes/terminals/terminalProvisionViews.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 | `apps/admin/src/routes/toolbox/toolboxActionState.test.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json |
 
 
