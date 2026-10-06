@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import type { ResumeReportExportKind, ResumeReportExportResponse } from '@ai-job-print/shared'
 import { FilePreviewDialog } from '../../../../components/FilePreviewDialog'
 import { useCountdown } from '../../../../hooks/useCountdown'
@@ -89,9 +88,7 @@ export function ResumeReportTakeaway(props: {
   taskId?: string
   accessToken?: string
   capture?: ExportCaptureState | null
-  onJobFit: () => void
 }) {
-  const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const token = getToken()
@@ -182,6 +179,7 @@ export function ResumeReportTakeaway(props: {
   return (
     <>
       <div className="rrp-export-panel" data-testid="resume-report-export-actions" data-exported={exported ? '1' : '0'}>
+        <div className="rrp-take-h" data-testid="resume-report-takeaway-title">带走</div>
         <ResumePricingBar pricing={pricing} loading={pricingLoading} blockedReason={blockedReason} />
         <div className="rrp-export">
           <TakeawayButton
@@ -221,15 +219,6 @@ export function ResumeReportTakeaway(props: {
         {exportError ? <p className="rrp-export-error" role="alert" data-testid="resume-report-export-error">{exportError}</p> : null}
         {exported ? <ResultCard exported={exported} kind={exportKind} guest={guest} /> : null}
       </div>
-      <button type="button" className="rrp-jobfit" onClick={props.onJobFit} data-route="/resume/job-fit">
-        目标岗位匹配参考（仅供参考）
-      </button>
-      <p className="rrp-self">
-        想了解自己的倾向？
-        <button type="button" className="rrp-self" onClick={() => navigate('/resume/self-assessment/intro')}>
-          做一次自我探索
-        </button>
-      </p>
       {previewOpen && exported?.signedUrl ? (
         <FilePreviewDialog
           fileUrl={exported.signedUrl}

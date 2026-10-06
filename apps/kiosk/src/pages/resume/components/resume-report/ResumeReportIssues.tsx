@@ -1,6 +1,6 @@
 import type { ResumeContentBlock, ResumeIssue, ResumeReport, ResumeContentBlockKey, ResumeScoringDimensionKey } from '@ai-job-print/shared'
 import { RESUME_CONTENT_BLOCKS } from '@ai-job-print/shared'
-import { blockLabel, dimLabel, displayResumeExcerpt, evidenceLineSet, issuesOfBlock, sevOf } from '../../resume-report-model'
+import { blockLabel, dimLabel, displayResumeExcerpt, evidenceCountOfBlock, evidenceLineSet, issuesOfBlock, sevOf } from '../../resume-report-model'
 
 function Prov({ kind }: { kind: 'contract' | 'derived' | 'fixture' }) {
   return <span className="rrp-prov" data-p={kind} aria-hidden="true" />
@@ -65,15 +65,16 @@ export function StructureZone({
       <div className="rrp-scroll" data-testid="resume-report-list">
         {shown.map((block, i) => {
           const hit = issuesOfBlock(issues, block.key)
+          const evidenceN = evidenceCountOfBlock(issues, block.key)
           const marks = evidenceLineSet(issues, block.key)
           return (
             <div key={block.key} className="rrp-blk" data-on={activeBlk === block.key ? '1' : '0'} data-block={block.key} data-testid={`resume-report-block-${block.key}`}>
               <span className="bno">{i + 1}</span>
               <span className="btx">
-                <span className="bhd" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="bhd">
                   <b>{block.label}</b>
                   <span className="rrp-tag" data-hit={hit.length ? '1' : '0'}>
-                    {hit.length ? `命中 ${hit.length} 条问题` : '本块没有命中问题'}
+                    {hit.length ? `命中 ${hit.length} 条问题 · ${evidenceN} 条证据` : '本块没有命中问题'}
                   </span>
                 </span>
                 <span className="lines">

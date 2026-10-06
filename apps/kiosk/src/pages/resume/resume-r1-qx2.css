@@ -68,7 +68,8 @@
 .rrp-prov { display: none; }
 .rrp-segs { order: 3; margin-top: 8px; }
 .rrp-zone { order: 4; }
-.rrp-zone .rrp-scroll { max-height: 440px; overflow-y: auto; overscroll-behavior: contain; }
+/* 七块和另外三个页签按内容往下排。超出 1920 时滚的是整页（.qx-scroll），不再在块里开小滚框。 */
+.rrp-zone .rrp-scroll { max-height: none; overflow: visible; }
 .rrp-export-panel { order: 5; }
 .rrp-explanation { order: 6; }
 .rrp-jobfit, .rrp-self { order: 7; }
@@ -142,7 +143,6 @@
   .rrp-head-tag { display: none; }
   .rrp-head { min-height: 0; }
   .rrp-page .rrp-export { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .rrp-zone .rrp-scroll { max-height: 480px; }
   .qx-r1-stats { flex-wrap: wrap; }
   .qx-r1-stats span { min-width: 85px; }
   .qx-stage:has(:is(.qx-resume-optimize, .qx-resume-compare)) .qx-pagehead { min-height: 0; padding: 16px; }
