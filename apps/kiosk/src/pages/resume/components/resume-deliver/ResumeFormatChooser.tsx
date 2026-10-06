@@ -29,6 +29,11 @@ function formatName(format: ResumeExportFormat): string {
   return FORMATS.find((item) => item.value === format)?.name ?? 'PDF'
 }
 
+function resumeExportAigcNote(format: ResumeExportFormat): string {
+  if (format === 'txt' || format === 'md') return '导出的文件末尾有一行：含人工智能辅助生成内容'
+  return '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
+}
+
 export function ResumeFormatChooser(props: {
   screen: GeneratePreviewViewState
   format: ResumeExportFormat
@@ -240,6 +245,7 @@ export function ResumeFormatChooser(props: {
               : `${formatName(props.format)} 的页数固定是 0，也不套版式。这一份暂不开放打印。`}
           </p>
           <p className="qx-rg-note">导出后给你的是一条有时效的下载链接，过期后重导一次就有新链接。打印走另一条链接，下载链接进不了打印。</p>
+          <p className="qx-rg-note" data-testid="resume-export-aigc-note">{resumeExportAigcNote(props.format)}</p>
           <ResumePricingBar pricing={props.pricing} loading={props.pricingLoading} blockedReason={props.blockedReason} />
         </div>
       )}

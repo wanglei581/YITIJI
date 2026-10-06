@@ -98,7 +98,7 @@ export function registerMemberLogin(api: ApiRouter): void {
       success: true,
       data: {
         token: MEMBER_TOKEN,
-        user: { id: 'member-p1', phoneMasked: '138****8000', nickname: '视觉验收用户' },
+        user: { id: 'member-p1', phoneMasked: '138****8000', nickname: '林晓雯' },
       },
     },
   })
@@ -126,7 +126,7 @@ export function registerAuthenticatedMemberApis(api: ApiRouter): void {
       success: true,
       data: {
         phoneMasked: '138****8000',
-        nickname: '视觉验收用户',
+        nickname: '林晓雯',
         consents: { job_ai: { status: 'granted' } },
       },
     },
@@ -149,7 +149,7 @@ export function registerAuthenticatedMemberApis(api: ApiRouter): void {
     status: 200,
     json: {
       success: true,
-      data: { id: 'member-p1', phoneMasked: '138****8000', nickname: '视觉验收用户' },
+      data: { id: 'member-p1', phoneMasked: '138****8000', nickname: '林晓雯' },
     },
   })
 }

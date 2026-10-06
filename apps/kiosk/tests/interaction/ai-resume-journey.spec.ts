@@ -85,10 +85,10 @@ async function startDiagnosis(page: Page, journey: string, collectors: ReturnTyp
   await uploadResumePdf(page, journey, collectors)
   await fillDiagnosisDirection(page, journey, collectors)
   await recordStep({
-    page, journey, step: 'start-diagnosis', control: '开始 AI 诊断', selectorHint: 'button:开始 AI 诊断',
+    page, journey, step: 'start-diagnosis', control: 'AI 诊断，看改进建议', selectorHint: 'button:AI 诊断，看改进建议',
     kind: 'click', collectors,
     act: async () => {
-      await page.getByRole('button', { name: /开始 AI 诊断/ }).click()
+      await page.getByRole('button', { name: /AI 诊断，看改进建议/ }).click()
       await page.waitForURL((url) => url.pathname === '/resume/parse' || url.pathname === '/resume/report', { timeout: 20_000 })
     },
   })
