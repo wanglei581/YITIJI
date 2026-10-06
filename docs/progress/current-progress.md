@@ -1,5 +1,10 @@
 # 当前开发进度
 
+## 2026-10-06：管理员后台审计列表显示操作人姓名
+
+- 审计列表与详情抽屉的「操作人」改用服务端新给的 `actorDisplayName`（上一条）：内部账号显示姓名，机构账号显示「机构名 · 账号名」。为 null、缺字段、空白或像手机号时退回原来的「角色 · 尾号」，系统操作仍显示「系统」；完整账号编号仍只在悬停里。只改 `apps/admin/src/routes/audit/auditPresentation.ts` 一个函数，不新建页面。
+- 验证：`verify:console-plain-copy` 加显示名六种情况（姓名、机构名 · 账号名、null、缺字段、空白、手机号），审计页浏览器测试加一条「有名显示名、无名退回尾号、悬停仍是编号」，1920 与 1440 两档 12 条全过；admin 类型检查、`verify:admin-partner-contact-phone-ui` 通过。反向变异两处全红：不用显示名、显示名不挡手机号。
+
 ## 2026-10-06：两个后台要的两处后端小改（审计操作人显示名、智慧校园管理员列表）
 
 - **审计列表 `actorDisplayName`（只读）：** `GET /api/v1/admin/audit-logs` 每条加 `actorDisplayName: string | null`，`packages/shared` 的 `AuditLogRecord` 同步（可选字段）。内部账号取姓名，没有姓名用登录名；机构账号「机构名 · 账号名」；系统操作、会员、账号已删除为 null。姓名或登录名长得像手机号（含空格、短横分组）就跳过它，绝不带手机号。一页只多一次批量查 User。来由：9/30 总指挥转两后台需求。
