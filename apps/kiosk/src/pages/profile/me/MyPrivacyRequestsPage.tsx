@@ -1,12 +1,11 @@
 // 隐私与数据请求 — /me/privacy-requests
 // 一体机只提交「撤回 AI 使用授权」。导出和注销是说明，不能在这台机器上提交。
-// 范围事实来自 MEMBER_DATA_REQUEST_SCOPE；整段含「由他人代办」的旧说法，公共屏不整段上屏，
-// 清单改写进底部边界说明。
+// 资料清单只用共享的导出清单常量。范围横幅原文不上屏：里面有代办和注销未开放，和这台机器的口径冲突。
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  MEMBER_DATA_REQUEST_SCOPE,
+  MEMBER_DATA_EXPORT_INVENTORY,
   MEMBER_DATA_REQUEST_STATUS_LABEL,
   MEMBER_DATA_REQUEST_TYPE_HINT,
   MEMBER_DATA_REQUEST_TYPE_LABEL,
@@ -46,6 +45,8 @@ const REVOKE_ASK_DRAFT = '撤回 AI 使用授权以后，我的简历和记录�
 const SUCCESS_TEXT = '已撤回 AI 使用授权，请求已记录'
 const FAILURE_FALLBACK = '提交失败，请稍后重试'
 const KEPT_ASSETS = '撤回不会删除简历、文档、打印订单或收藏；也不等于账号注销。'
+const BOUNDARY_NOTE = '结束这次办理，只清除本机登录和这一次的临时信息；已经提交的订单、文件和记录按各自保存期限管理。导出和注销这台机器都不办理，撤回授权也不会删除简历、文档、打印订单或收藏。'
+const EXPORT_INVENTORY_NOTE = `导出的是本人资料清单（${MEMBER_DATA_EXPORT_INVENTORY}），不含文件原文与简历正文全文。`
 
 type PrivacyUiState =
   | 'login'
@@ -70,27 +71,15 @@ const TAKE = [
 ] as const
 
 function exportLine(contact: PublicSupportContact): string {
-  return `公共屏上不导出个人资料。需要复制个人信息的，${whenMiniapp(contact, '可以在手机上的职易达小程序里申请导出，')}也可以${servicePhoneLine(contact)}申请，我们核实是你本人后处理。`
+  const phone = servicePhoneLine(contact)
+  const lead = whenMiniapp(contact, '可以在手机上的职易达小程序里申请导出，也可以') || '可以'
+  return `公共屏上不导出个人资料。需要复制个人信息的，${lead}${phone}申请，我们核实是你本人后处理。${EXPORT_INVENTORY_NOTE}`
 }
 
 function closureLine(contact: PublicSupportContact): string {
-  return `这台机器上不办理注销。${whenMiniapp(contact, '可以在手机上的职易达小程序「我的 → 账号设置」里，短信验证本人后提交申请；')}也可以${servicePhoneLine(contact)}申请。我们核实是你本人后，15 个工作日内处理。`
-}
-
-/** 底注覆盖范围横幅里还能对用户说的清单。整段旧文案不上屏。 */
-function boundaryNote(): string {
-  const scope = MEMBER_DATA_REQUEST_SCOPE
-  const inventoryOk = [
-    '文件清单',
-    '打印订单',
-    '收藏',
-    'AI 用量（功能、时间、状态、金额）',
-    '不含文件原文与简历正文全文',
-  ].every((part) => scope.includes(part))
-  const machine = '结束这次办理，只清除本机登录和这一次的临时信息。已经提交的订单、文件和记录按各自保存期限管理。'
-  const inventory = '导出的是本人资料清单：账号摘要、文件清单、AI 服务记录摘要、AI 用量（功能、时间、状态、金额）、打印订单、收藏、权益、浏览与打开来源记录、求职进度、通知、反馈、授权与历史请求，不含文件原文与简历正文全文。'
-  const kept = '撤回或注销入口不会删除简历、文档、打印订单或收藏。'
-  return inventoryOk ? `${machine}${inventory}${kept}` : scope
+  const phone = servicePhoneLine(contact)
+  const lead = whenMiniapp(contact, '可以在手机上的职易达小程序「我的 → 账号设置」里，短信验证本人后提交申请；也可以') || '可以'
+  return `这台机器上不办理注销。${lead}${phone}申请。我们核实是你本人后，15 个工作日内处理。`
 }
 
 function safeMessage(error: unknown, fallback: string): string {
@@ -260,7 +249,7 @@ export function MyPrivacyRequestsPage() {
                 tone="calm"
                 icon={ClockIcon}
                 title="正在加载请求记录"
-                desc={<>正在读取当前账号的隐私请求记录。<b>返回前一律显示「—」</b>，不会闪回上一位用户的记录。</>}
+                desc={<>正在读取当前账号的隐私请求记录。<b>读取完成前不显示内容</b>，不会闪回上一位用户的记录。</>}
                 minis={['记录 —', '正在读取']}
               />
             ) : null}
@@ -270,7 +259,7 @@ export function MyPrivacyRequestsPage() {
                 icon={TriangleAlertIcon}
                 title="请求记录这次没有加载出来"
                 desc={<>当前记录没有更新。<b>本次加载失败不会撤回或恢复任何授权</b>。{loadMessage ? `${loadMessage}。` : null}{helpNeededLine(contact)}</>}
-                minis={['记录 —', '本次未取到']}
+                minis={['记录 —', '这次没取到']}
               />
             ) : null}
             {uiState === 'empty' ? (
@@ -303,12 +292,12 @@ export function MyPrivacyRequestsPage() {
 
             <CapabilityRows contact={contact} mode={capModeOf(uiState)} onRevoke={() => setConfirmRevoke(true)} />
 
-            {layout === 'state' ? <p className="pr-note">{stateNote(uiState, contact)}</p> : null}
+            {uiState === 'login' || uiState === 'loading' || uiState === 'error' ? <p className="pr-note">{stateNote(uiState, contact)}</p> : null}
             {layout !== 'state' ? <RequestList items={items} /> : null}
-            {layout !== 'list' ? <Guide state={uiState} /> : null}
+            {layout !== 'list' ? <Guide state={uiState} contact={contact} /> : null}
           </div>
 
-          <p className="qx-me-truth pr-truth"><b>诚实说明</b><span>{boundaryNote()}</span></p>
+          <p className="qx-me-truth pr-truth"><b>诚实说明</b><span>{BOUNDARY_NOTE}</span></p>
         </div>
       </QxPageFrame>
 
@@ -338,13 +327,12 @@ export function MyPrivacyRequestsPage() {
   )
 }
 
-function stateNote(uiState: PrivacyUiState, contact: PublicSupportContact): string {
+function stateNote(uiState: 'login' | 'loading' | 'error', contact: PublicSupportContact): string {
   if (uiState === 'login') {
     return '登录只用来确认「是你本人」。结束这次办理只清除本机登录状态和这一次的临时信息；订单、文件与记录按各自留存期限管理，不会因此删除。'
   }
   if (uiState === 'loading') return '返回前不展示上一位用户的记录。这次读取不会撤回或恢复任何授权。'
-  if (uiState === 'error') return `重试不会重复提交请求。${helpNeededLine(contact)}`
-  return '提交撤回授权后，记录会出现在这里。空就是空，本页不会造记录让页面好看。'
+  return `重试不会重复提交请求。${helpNeededLine(contact)}`
 }
 
 function StateBanner({
@@ -382,7 +370,7 @@ function CapabilityRows({
   onRevoke: () => void
 }) {
   const revokeTail = mode === 'dialog'
-    ? <span className="pr-flag" data-testid="member-privacy-revoke-entry">确认弹层已打开</span>
+    ? <span className="pr-flag" data-testid="member-privacy-revoke-entry">等你确认</span>
     : mode === 'revoked'
       ? <span className="pr-flag" data-testid="member-privacy-revoke-entry">已撤回 · 下次使用时重新确认</span>
       : mode === 'failed'
@@ -393,7 +381,7 @@ function CapabilityRows({
               撤回授权
             </button>
           )
-          : <span className="pr-flag">{mode === 'locked' ? '登录后可用' : mode === 'loading' ? '正在读取' : '本次未取到'}</span>
+          : <span className="pr-flag">{mode === 'locked' ? '登录后可用' : mode === 'loading' ? '正在读取' : '这次没取到'}</span>
   const live = mode === 'open' || mode === 'dialog' || mode === 'failed'
 
   return (
@@ -451,34 +439,39 @@ function RequestList({ items }: { items: MemberDataRequestItem[] }) {
   )
 }
 
-const GUIDE: Record<string, Array<[string, string, string]>> = {
-  login: [
-    ['隐私', '只对本人可见', '请求记录与账号绑定，退出后本机不留明细'],
-    ['可做什么', '撤回 AI 使用授权', '撤回后再次使用时需重新确认'],
-    ['不会发生', '不删除已有资产', '简历、文档、打印订单与收藏都不受影响'],
-  ],
-  loading: [
-    ['读取范围', '只读当前账号', '不会展示其他账号的请求记录'],
-    ['显示规则', '不闪回旧记录', '上一位用户的内容不会残留在屏幕上'],
-    ['失败怎么办', '保留重试入口', '读取失败不会改动授权状态'],
-  ],
-  error: [
-    ['授权状态', '未被改动', '这次加载失败不会撤回或恢复任何授权'],
-    ['先试这个', '重新加载', '重试不会重复提交请求'],
-    ['仍不行', '按本页的联系方式', '需要帮助时，用本页写出的电话或《隐私政策》'],
-  ],
-  history: [
+function guideRows(state: PrivacyUiState, contact: PublicSupportContact): Array<[string, string, string]> {
+  if (state === 'loading') {
+    return [
+      ['读取范围', '只读当前账号', '不会展示其他账号的请求记录'],
+      ['显示规则', '不闪回旧记录', '上一位用户的内容不会残留在屏幕上'],
+      ['失败怎么办', '可以重试', '读取失败不会改动授权状态'],
+    ]
+  }
+  if (state === 'error') {
+    return [
+      ['授权状态', '未被改动', '这次加载失败不会撤回或恢复任何授权'],
+      ['先试这个', '重新加载', '重试不会重复提交请求'],
+      ['仍不行', '按本页的联系方式', helpNeededLine(contact)],
+    ]
+  }
+  if (state === 'login') {
+    return [
+      ['隐私', '只对本人可见', '请求记录与账号绑定，退出后本机不留明细'],
+      ['可做什么', '撤回 AI 使用授权', '撤回后再次使用时需重新确认'],
+      ['不会发生', '不删除已有资产', '简历、文档、打印订单与收藏都不受影响'],
+    ]
+  }
+  return [
     ['撤回范围', '只影响 AI 使用授权', '不影响简历诊断、打印、收藏或已保存文件'],
     ['再次使用', '需要重新确认', '下次使用时会再次请求授权'],
     ['记录', '只留处理记录', '不会因此删除任何已有资产'],
-  ],
+  ]
 }
 
-function Guide({ state }: { state: PrivacyUiState }) {
-  const key = state === 'loading' ? 'loading' : state === 'error' ? 'error' : state === 'login' ? 'login' : 'history'
+function Guide({ state, contact }: { state: PrivacyUiState; contact: PublicSupportContact }) {
   return (
     <section className="pr-guide" aria-label="说明">
-      {GUIDE[key].map(([k, title, text]) => (
+      {guideRows(state, contact).map(([k, title, text]) => (
         <div key={k} className="pr-guide-item">
           <div className="pr-guide-k">{k}</div>
           <div className="pr-guide-t">{title}</div>

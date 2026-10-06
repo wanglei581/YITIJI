@@ -572,11 +572,12 @@ async function prepareFeedback(page: Page, api: ApiRouter, state: string): Promi
 
 // ── 41 隐私与数据请求 ────────────────────────────────────────────
 
+// 两三条、类型混合、时间拉开。导出这一条是打电话申请后办完的：这台机器不提交导出。
+// 不放 delete。类型名「账号注销（暂未开放）」只在共享常量里，这条夹具不会把它送上屏。
 const PRIVACY_ROWS = [
-  { id: 'dr-20261004', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-10-04T15:20:00.000+08:00', handledAt: '2026-10-04T15:20:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
-  { id: 'dr-20260927', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-09-27T11:06:00.000+08:00', handledAt: '2026-09-27T11:06:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
-  { id: 'dr-20260919', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-09-19T16:42:00.000+08:00', handledAt: '2026-09-19T16:42:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
-  { id: 'dr-20260912', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-09-12T09:18:00.000+08:00', handledAt: '2026-09-12T09:18:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
+  { id: 'dr-20261002', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-10-02T15:20:00.000+08:00', handledAt: '2026-10-02T15:20:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
+  { id: 'dr-20260911', requestType: 'export', status: 'completed', requestedAt: '2026-09-11T11:06:00.000+08:00', handledAt: '2026-09-16T09:40:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
+  { id: 'dr-20260806', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-08-06T09:18:00.000+08:00', handledAt: '2026-08-06T09:18:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
 ]
 
 const PRIVACY_NEW = {
