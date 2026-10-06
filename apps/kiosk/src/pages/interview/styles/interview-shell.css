@@ -21,8 +21,8 @@
   --interview-dark: var(--k-ink);
   --interview-radius-sm: 14px;
   --interview-radius-md: 18px;
-  --interview-serif: var(--font-heading, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif);
-  --interview-sans: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --interview-serif: var(--font-heading, 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif);
+  --interview-sans: 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', system-ui, sans-serif;
   position: relative;
   display: flex;
   width: 100%;

@@ -173,6 +173,8 @@ const JS_ALLOW = {
   // 两句都只在 pricing.mode === 'charged'（服务端说导出要收费）时出现
   'pages/resume-diagnose/resume-diagnose.js': ['未找到可核销权益', '未取得可核销权益'],
   'pages/resume-optimize/resume-optimize.js': ['未找到可核销权益', '未取得可核销权益'],
+  // 账号注销说明：列举注销后删除和保留的数据类别（订单、支付流水、权益），不是价格或购买引导
+  'pages/privacy/data-rights.js': ['还没用完的权益会作废', '支付与退款流水'],
 }
 
 /** 取 JS 里的字符串字面量（跳过注释）。模板字符串按整段取。 */
