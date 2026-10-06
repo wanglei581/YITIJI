@@ -1,11 +1,11 @@
 import { QRCodeSVG } from 'qrcode.react'
 import { FileContentPreview } from '../../../../components/FileContentPreview'
 import { useCountdown } from '../../../../hooks/useCountdown'
-import type { ResumeGenerateExportResponse } from '@ai-job-print/shared'
+import type { OptimizeStoredExport } from './useOptimizeSession'
 import { formatFileSize, PRINT_THIS_COPY } from './constants'
 
 export function ResumeExportResult(props: {
-  exported: ResumeGenerateExportResponse
+  exported: OptimizeStoredExport
   formatLabel: string
   version: number
   kind: 'resume' | 'change_list'

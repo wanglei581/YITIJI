@@ -17795,6 +17795,7 @@
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/ai/resume/resume-unlabeled-export.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
           "services/api/src/ai/usage/ai-usage-summary.ts",
           "services/api/src/console-screen/console-screen.queries.ts",
@@ -22344,6 +22345,7 @@
       "services/api/scripts/verify-job-ai.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-voice-generate.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
@@ -22640,7 +22642,8 @@
       "scripts/verify-fixture-time-bombs.mjs"
     ],
     "services/api/.env.example": [
-      "services/api/scripts/d2-same-host/verify-cleanup-contract.mjs"
+      "services/api/scripts/d2-same-host/verify-cleanup-contract.mjs",
+      "services/api/scripts/verify-resume-export-label.ts"
     ],
     "services/api/fixtures/zh-cmap.pdf": [
       "services/api/scripts/verify-pdf-cmap.ts"
@@ -41236,8 +41239,13 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "services/api/src",
+          "services/worker"
+        ],
         "files": [
+          "packages/shared/src/types/ai.ts",
+          "services/api/.env.example",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/providers/mock.provider.ts",
