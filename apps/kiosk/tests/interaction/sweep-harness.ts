@@ -502,68 +502,37 @@ export async function clickProfileEntry(page: Page, label: string, path: string)
 
 export async function fillDiagnosisDirection(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
   await recordStep({
-    page, journey, step: 'open-direction-settings', control: '改诊断方向', selectorHint: '.qx-rt-settings > summary',
+    page, journey, step: 'open-direction-settings', control: '设置诊断方向与目标背景', selectorHint: 'button:设置诊断方向与目标背景',
     kind: 'click', collectors,
-    act: async () => { await page.locator('.qx-rt-settings > summary').click() },
+    act: async () => { await page.getByRole('button', { name: '设置诊断方向与目标背景' }).click() },
   })
   await recordStep({
-    page, journey, step: 'fill-target-job', control: '目标岗位', selectorHint: 'input[placeholder*=前端工程师]',
+    page, journey, step: 'choose-targeted', control: '定向诊断', selectorHint: 'button:定向诊断',
+    kind: 'click', collectors,
+    act: async () => { await page.getByRole('button', { name: /^定向诊断/ }).click() },
+  })
+  await recordStep({
+    page, journey, step: 'open-other-job', control: '其他岗位', selectorHint: 'button:其他岗位',
+    kind: 'click', collectors,
+    act: async () => { await page.getByRole('button', { name: '其他岗位', exact: true }).click() },
+  })
+  await recordStep({
+    page, journey, step: 'fill-target-job', control: '其他岗位', selectorHint: 'textbox:其他岗位',
     kind: 'fill', collectors,
     act: async () => {
-      await page.getByPlaceholder(/前端工程师|财务助理/).fill('前端工程师')
+      await page.getByRole('textbox', { name: '其他岗位' }).fill('前端工程师')
     },
   })
   await recordStep({
-    page, journey, step: 'open-industry', control: '选择行业方向', selectorHint: 'button[aria-label="选择行业方向"]',
+    page, journey, step: 'pick-industry', control: '制造业', selectorHint: 'button:制造业',
     kind: 'click', collectors,
-    act: async () => {
-      await page.getByRole('button', { name: '选择行业方向' }).click()
-    },
+    act: async () => { await page.getByRole('button', { name: '制造业', exact: true }).click() },
   })
-  const industryButtons = page.locator('[role="dialog"] button, .ui-kiosk-modal button')
-  const industryCount = await industryButtons.count()
-  if (industryCount >= 3) {
-    await recordStep({
-      page, journey, step: 'pick-industry-second', control: '行业第二项', selectorHint: 'industry-option-1',
-      kind: 'click', collectors,
-      act: async () => {
-        // index 0 is often 暂不指定
-        await industryButtons.nth(1).click()
-      },
-    })
-  }
-  if (await page.getByRole('button', { name: '完成' }).count()) {
-    await recordStep({
-      page, journey, step: 'industry-done', control: '完成', selectorHint: 'button:完成',
-      kind: 'click', collectors,
-      act: async () => {
-        await page.getByRole('button', { name: '完成' }).click()
-      },
-    })
-  }
-  const selects = page.locator('select')
-  const selectCount = await selects.count()
-  for (let i = 0; i < selectCount; i += 1) {
-    const select = selects.nth(i)
-    if (!(await select.isVisible().catch(() => false))) continue
-    if (await select.isDisabled().catch(() => false)) continue
-    const label = (await select.evaluate((el) => {
-      const field = el.closest('label')
-      return field?.querySelector('span')?.textContent?.trim() || `下拉#${i}`
-    }).catch(() => `下拉#${i}`))
-    await recordStep({
-      page, journey, step: `select-${i}-second`, control: label, selectorHint: `selectnth=${i}`,
-      kind: 'select', collectors,
-      act: async () => {
-        const options = select.locator('option')
-        const count = await options.count()
-        if (count >= 2) {
-          const current = await select.evaluate((el) => (el as HTMLSelectElement).selectedIndex)
-          await select.selectOption({ index: (current + 1) % count })
-        }
-      },
-    })
-  }
+  await recordStep({
+    page, journey, step: 'apply-direction', control: '按这个方向诊断', selectorHint: 'button:按这个方向诊断',
+    kind: 'click', collectors,
+    act: async () => { await page.getByRole('button', { name: '按这个方向诊断' }).click() },
+  })
 }
 
 export async function uploadResumePdf(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
@@ -573,7 +542,7 @@ export async function uploadResumePdf(page: Page, journey: string, collectors: R
     kind: 'fill', collectors,
     act: async () => {
       await fileInput.setInputFiles(FIXTURE_PDF)
-      await page.getByText(/已就绪|valid-2p|开始 AI 诊断/).first().waitFor({ timeout: 20_000 })
+      await page.getByText(/valid-2p|待你确认|AI 诊断，看改进建议/).first().waitFor({ timeout: 20_000 })
     },
   })
 }

@@ -2,43 +2,39 @@ import { expect, type Page } from '@playwright/test'
 
 /** 通用诊断可以直接继续，但目标行业、经验、场景不得替本人填入。 */
 export async function expectResumeDirectionUnselected(page: Page): Promise<void> {
-  const settings = page.locator('.qx-rt-settings')
-  await settings.locator('summary').click()
-  await expect(settings).toHaveAttribute('open', '')
   await expect(page.getByText('没选方向，按通用标准看', { exact: true })).toBeVisible()
-  await expect(settings.getByRole('button', { name: /^通用诊断/ })).toHaveAttribute('aria-pressed', 'true')
-  await expect(settings.getByRole('button', { name: /^定向诊断/ })).toHaveAttribute('aria-pressed', 'false')
-  await expect(settings.getByRole('group', { name: /重点关注维度/ }).getByRole('button', { pressed: true })).toHaveCount(0)
-  await expect(settings.getByRole('textbox', { name: '目标岗位' })).toHaveValue('')
-  // 诊断页的空值文案是「暂不指定」，面试页才叫「尚未选择」。
-  await expect(settings.getByRole('button', { name: '选择行业方向' })).toContainText('暂不指定')
-  for (const label of ['经验级别', '求职场景']) {
-    const group = settings.getByRole('group', { name: label })
-    await expect(group.getByRole('button', { name: '暂不指定', exact: true })).toHaveAttribute('aria-pressed', 'true')
-    await expect(group.locator('button:not([data-mute="true"])[aria-pressed="true"]')).toHaveCount(0)
-  }
+  await expect(page.getByTestId('resume-direction-scope')).toHaveText('通用诊断 · 暂不指定')
+  await expect(page.getByTestId('resume-direction-dims')).toHaveText('暂不指定')
+  await expect(page.getByTestId('resume-direction-target')).toHaveText('暂不指定')
 }
 
 export async function chooseGenericResumeDirection(page: Page): Promise<void> {
-  await expectResumeDirectionUnselected(page)
-  await page.getByRole('button', { name: /^通用诊断/ }).click()
-  await page.locator('.qx-rt-settings > summary').click()
+  await expect(page.locator('[data-kiosk-screen="resume-source"]')).toBeVisible()
+  const stay = page.getByRole('button', { name: '先不设方向，按通用诊断' })
+  const back = page.getByRole('button', { name: '改回通用诊断' })
+  await expect(stay.or(back).first()).toBeVisible()
+  if (await stay.count()) {
+    await stay.click()
+    await expectResumeDirectionUnselected(page)
+    return
+  }
+  await back.click()
+  await expect(page.getByTestId('resume-direction-scope')).toHaveText('通用诊断 · 暂不指定')
+  await expect(page.getByTestId('resume-direction-dims')).toHaveText('暂不指定')
+  await expect(page.getByTestId('resume-direction-target')).toHaveText('暂不指定')
 }
 
 export async function chooseTargetedResumeDirection(page: Page): Promise<void> {
   await expectResumeDirectionUnselected(page)
+  await page.getByRole('button', { name: '设置诊断方向与目标背景' }).click()
   await page.getByRole('button', { name: /^定向诊断/ }).click()
-  await page.getByRole('button', { name: '选择行业方向' }).click()
-  const dialog = page.getByRole('dialog', { name: '选择行业门类' })
-  await expect(dialog.getByText('当前：暂不指定', { exact: true })).toBeVisible()
-  await expect(dialog.locator('button[aria-pressed="true"]')).toHaveText('暂不指定')
-  await dialog.getByRole('button', { name: '制造业', exact: true }).click()
-  await expect(dialog.getByRole('button', { name: '制造业', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await dialog.getByRole('button', { name: '完成' }).click()
-  const experience = page.getByRole('group', { name: '经验级别' })
+  await page.getByRole('button', { name: '制造业', exact: true }).click()
+  const experience = page.getByRole('group', { name: '经验' })
   await experience.getByRole('button', { name: '1年以内', exact: true }).click()
   await expect(experience.getByRole('button', { name: '1年以内', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await page.locator('.qx-rt-settings > summary').click()
+  await page.getByRole('button', { name: '按这个方向诊断' }).click()
+  await expect(page.getByTestId('resume-direction-target')).toContainText('制造业')
+  await expect(page.getByTestId('resume-direction-target')).toContainText('1年以内')
 }
 
 export async function expectInterviewDirectionUnselected(page: Page): Promise<void> {
