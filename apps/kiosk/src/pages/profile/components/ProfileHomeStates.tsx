@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BellIcon, FileTextIcon, GiftIcon, HelpCircleIcon, InboxIcon, LockIcon, MessageSquareIcon, PrinterIcon, ShieldIcon, StarIcon, TriangleAlertIcon } from 'lucide-react'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { useOfficialChannels } from '../../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import type { PendingTask } from '../../../services/api/pendingTasks'
 
 export type ProfileUiState = 'signed-out' | 'loading' | 'error' | 'empty' | 'member' | 'ready' | 'printing'
@@ -134,7 +136,13 @@ export function ProfileLoadingFacts() {
 }
 
 export function ProfileErrorFacts() {
-  return <ProfileFactGrid title="这次没取到，什么受影响" hint="分开说，不含糊" rows={ERROR_FACTS} />
+  const contact = useSupportContact()
+  return (
+    <>
+      <ProfileFactGrid title="这次没取到，什么受影响" hint="分开说，不含糊" rows={ERROR_FACTS} />
+      <p className="pf-reading-note" data-testid="profile-help-line">{helpNeededLine(contact)}</p>
+    </>
+  )
 }
 
 export function SignedOutBody() {
@@ -303,7 +311,7 @@ export function ProfileCta({
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" data-narrow="1" onClick={onHelp}>找工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" data-narrow="1" onClick={onHelp}>帮助中心</button>
         <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" onClick={onRetry}>
           重新加载
         </button>

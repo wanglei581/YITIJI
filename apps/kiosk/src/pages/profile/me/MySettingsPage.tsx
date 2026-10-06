@@ -15,6 +15,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { accountErrorMessage, accountPhoneDisplay } from '../../auth/accountUserMessage'
 import { useKioskSessionControl } from '../../../auth/KioskSessionControlContext'
 import { getJobAiConsentStatus, revokeJobAiConsent } from '../../../services/api/jobAi'
@@ -106,8 +108,14 @@ export function MySettingsPage() {
   const [hint, setHint] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
 
   const phoneMasked = accountPhoneDisplay(user?.phoneMasked ?? '')
+  const contact = useSupportContact()
   const [clearing, setClearing] = useState(false)
-  const [clearError, setClearError] = useState<string | null>(null)
+  const [clearFailure, setClearFailure] = useState<'logout' | 'switch' | null>(null)
+  const clearError = clearFailure === 'logout'
+    ? `本机登录尚未清除，请重试。${helpNeededLine(contact)}`
+    : clearFailure === 'switch'
+      ? `还不能切换账号，请重试。${helpNeededLine(contact)}`
+      : null
 
   useEffect(() => {
     let cancelled = false
@@ -144,22 +152,22 @@ export function MySettingsPage() {
   const closeConfirm = () => {
     setConfirm(null)
     setRevokeError(null)
-    setClearError(null)
+    setClearFailure(null)
   }
 
   // 退出登录：走统一的结束使用，回到首页，与闲置清场同一目的地。
   const handleLogout = () => {
-    setClearing(true); setClearError(null)
+    setClearing(true); setClearFailure(null)
     try { endKioskUse('end_use') } catch {
-      setClearing(false); setClearError('本机登录尚未清除，请重试或联系工作人员。')
+      setClearing(false); setClearFailure('logout')
     }
   }
 
   // 切换账号（W-64）：先把上一位完整清掉（人次、本机数据、登录），再进登录页用另一手机号登录。
   const handleSwitch = () => {
-    setClearing(true); setClearError(null)
+    setClearing(true); setClearFailure(null)
     try { endKioskUse('switch_account') } catch {
-      setClearing(false); setClearError('还不能切换账号，请重试或联系工作人员。')
+      setClearing(false); setClearFailure('switch')
     }
   }
 

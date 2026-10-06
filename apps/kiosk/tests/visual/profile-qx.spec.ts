@@ -822,3 +822,139 @@ test('me error pages point at the privacy policy when support contact is missing
   }
   expect(errors).toEqual([])
 })
+
+function hideSupportContact(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 404,
+    json: { success: false, error: { code: 'NOT_FOUND', message: 'no contact' } },
+  })
+}
+
+function registerProfileReadFailure(api: ApiRouter): void {
+  for (const path of ['/api/v1/me/resumes', '/api/v1/me/documents', '/api/v1/me/print-orders', '/api/v1/me/favorites', '/api/v1/me/benefits', '/api/v1/me/ai-records']) {
+    api.respond('GET', path, { status: 500, json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } } })
+  }
+  api.respond('GET', '/api/v1/me/pending-tasks', {
+    status: 500,
+    json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } },
+  })
+}
+
+function registerSettingsAccount(api: ApiRouter): void {
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/ai-consents/status', {
+    status: 200,
+    json: { success: true, data: [{ scope: 'job_ai', granted: false }] },
+  })
+  api.respond('POST', '/api/v1/member/auth/logout', { status: 200, json: { success: true } })
+}
+
+async function openSettingsLogoutFailure(page: Page): Promise<void> {
+  await page.getByRole('button', { name: '结束使用并退出登录', exact: true }).click()
+  await page.evaluate(() => {
+    Object.defineProperty(crypto, 'randomUUID', {
+      configurable: true,
+      value: () => {
+        throw new Error('fixture: privacy boundary token failed')
+      },
+    })
+  })
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+}
+
+test('profile error shows the fixture service phone and no staff handoff @w5-kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerMemberLogin(api)
+  registerProfileReadFailure(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await loginThroughVisibleUi(page, '/profile')
+  expect(await (await contact).json()).toMatchObject({ data: { servicePhone: FIXTURE_SERVICE_PHONE, serviceHours: FIXTURE_SERVICE_HOURS } })
+  await expect(page.getByTestId('profile-state-error')).toBeVisible()
+  await expect(page.locator('.qx-ctabar').getByRole('button', { name: '帮助中心', exact: true })).toBeVisible()
+  await expect(page.getByTestId('profile-help-line')).toContainText(`需要帮助？拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）`)
+  await expectNoStaffHandoff(page)
+})
+
+test('profile error points at the privacy policy when support contact is missing @w5-kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerMemberLogin(api)
+  registerProfileReadFailure(api)
+  hideSupportContact(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+
+  await loginThroughVisibleUi(page, '/profile')
+  expect((await contact).status()).toBe(404)
+  await expect(page.getByTestId('profile-help-line')).toContainText(`需要帮助？${NO_PHONE_HINT}`)
+  await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
+  await expect(page.getByText('拨打服务电话')).toHaveCount(0)
+  await expectNoStaffHandoff(page)
+})
+
+// 清场入口同步抛错时，隐私守卫保持遮罩、不渲染设置页。
+// 「本机登录尚未清除，请重试。需要帮助？…」「还不能切换账号，请重试。需要帮助？…」
+// 仍写在设置页里，但被遮罩挡住，这条路径看不到。这是原有行为。
+async function expectLogoutFailureStaysCovered(page: Page): Promise<void> {
+  await openSettingsLogoutFailure(page)
+  await expect(page.getByTestId('session-guard-state-clearing')).toBeVisible()
+  await expect(page.getByText('本机登录尚未清除')).toHaveCount(0)
+  await expect(page.getByText('还不能切换账号')).toHaveCount(0)
+  await expect(page.getByTestId('member-settings-state-member')).toHaveCount(0)
+  await expectNoStaffHandoff(page)
+}
+
+test('settings logout failure keeps the clearing overlay and does not reveal the page @w5-kiosk', async ({ page, api }) => {
+  registerSettingsAccount(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await loginThroughVisibleUi(page, '/me/settings')
+  expect(await (await contact).json()).toMatchObject({ data: { servicePhone: FIXTURE_SERVICE_PHONE } })
+  await expectLogoutFailureStaysCovered(page)
+})
+
+test('settings logout failure keeps the clearing overlay when support contact is missing @w5-kiosk', async ({ page, api }) => {
+  registerSettingsAccount(api)
+  hideSupportContact(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+
+  await loginThroughVisibleUi(page, '/me/settings')
+  expect((await contact).status()).toBe(404)
+  await expectLogoutFailureStaysCovered(page)
+  await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
+})
+
+test('benefits error shows the fixture service phone and no staff handoff @w5-kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 503,
+    json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } },
+  })
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await loginThroughVisibleUi(page, '/me/benefits')
+  expect(await (await contact).json()).toMatchObject({ data: { servicePhone: FIXTURE_SERVICE_PHONE } })
+  await expect(page.getByTestId('benefits-state-error')).toBeVisible()
+  await expect(page.locator('.qx-ctabar').getByRole('button', { name: '帮助中心', exact: true })).toBeVisible()
+  await expect(page.getByTestId('benefits-fallback')).toContainText(`需要帮助？拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）`)
+  await expectNoStaffHandoff(page)
+})
+
+test('benefits error points at the privacy policy when support contact is missing @w5-kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 503,
+    json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } },
+  })
+  hideSupportContact(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+
+  await loginThroughVisibleUi(page, '/me/benefits')
+  expect((await contact).status()).toBe(404)
+  await expect(page.getByTestId('benefits-fallback')).toContainText(`需要帮助？${NO_PHONE_HINT}`)
+  await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
+  await expect(page.getByText('拨打服务电话')).toHaveCount(0)
+  await expectNoStaffHandoff(page)
+})
