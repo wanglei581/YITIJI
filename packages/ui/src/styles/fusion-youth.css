@@ -75,7 +75,7 @@
   --color-surface: #fffdf8;
 
   /* ── Typography ───────────────────────────────────────────── */
-  --font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-serif: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
 
   /* ── Border Radius（触控版，比后台更圆润） ────────────────── */
   --radius-md: 0.875rem;   /* 14px — 原型 r-sm */
@@ -90,7 +90,7 @@
 
 /* 共用组件换肤间接层：PageHeader 等经 var(--font-heading) 取标题字体 */
 :root {
-  --font-heading: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-heading: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
 }
 
 /* ── Kiosk fusion presentation primitives ─────────────────── */
@@ -113,8 +113,8 @@
   --fy-wheat-soft: #f2ead6;
   --fy-slate: #3f68b0;
   --fy-slate-soft: #e5edf4;
-  --fy-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
-  --fy-sans: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --fy-serif: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --fy-sans: 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', system-ui, sans-serif;
 }
 
 [data-kiosk-presentation='fusion-youth'] .ui-kiosk-page-frame {
