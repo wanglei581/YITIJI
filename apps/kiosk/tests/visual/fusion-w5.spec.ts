@@ -641,7 +641,8 @@ test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', 
   registerKioskShell(api)
   const successId = 'spring-print-2026'
   const failureId = 'resume-diagnosis-quota'
-  api.respondWith('GET', `/api/v1/activities/${successId}`, (requestNumber) => ({
+  let springClaimed = false
+  api.respondWith('GET', `/api/v1/activities/${successId}`, () => ({
     status: 200,
     json: {
       success: true,
@@ -649,29 +650,32 @@ test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', 
         id: successId,
         title: '春季现场打印体验',
         description: '到店打印简历时，可领取一次黑白打印体验额度。',
-        claimed: requestNumber > 1,
+        claimed: springClaimed,
       }),
     },
   }))
-  api.respond('POST', `/api/v1/activities/${successId}/claim`, {
-    status: 200,
-    json: {
-      success: true,
-      data: {
-        id: 'grant-spring-print-2026',
-        benefitType: 'free_quota',
-        serviceKey: null,
-        title: '春季现场打印体验',
-        description: '到店打印简历时，可领取一次黑白打印体验额度。',
-        quantityTotal: 1,
-        quantityRemaining: 1,
-        status: 'active',
-        sourceType: 'platform',
-        validFrom: null,
-        validUntil: null,
-        createdAt: '2026-07-24T00:00:00.000Z',
+  api.respondWith('POST', `/api/v1/activities/${successId}/claim`, () => {
+    springClaimed = true
+    return {
+      status: 200,
+      json: {
+        success: true,
+        data: {
+          id: 'grant-spring-print-2026',
+          benefitType: 'free_quota',
+          serviceKey: null,
+          title: '春季现场打印体验',
+          description: '到店打印简历时，可领取一次黑白打印体验额度。',
+          quantityTotal: 1,
+          quantityRemaining: 1,
+          status: 'active',
+          sourceType: 'platform',
+          validFrom: null,
+          validUntil: null,
+          createdAt: '2026-07-24T00:00:00.000Z',
+        },
       },
-    },
+    }
   })
   api.respond('GET', `/api/v1/activities/${failureId}`, {
     status: 200,
