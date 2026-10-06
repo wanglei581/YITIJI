@@ -2,11 +2,11 @@ import { KioskLayout, type KioskTab } from '@ai-job-print/ui'
 import { useLayoutEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { KioskTopbarStatus } from '../components/kiosk-shell/KioskAppTopbar'
-import { KioskStageFit } from '../components/kiosk-shell/KioskStageFit'
+import { KioskRootStageScope, KioskStageFit } from '../components/kiosk-shell/KioskStageFit'
 import { getTerminalCode } from '../services/api/terminalConfig'
 import { KioskIconSprite } from '../components/kiosk-icon'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
-import { useKioskStageFit } from '../hooks/useKioskStageFit'
+import { isKioskCompactViewport, useKioskStageFit, usesKioskFluidViewport } from '../hooks/useKioskStageFit'
 import { useTerminalDeviceStatus } from '../hooks/useTerminalDeviceStatus'
 import '../styles/v6-runtime-shell.css'
 
@@ -293,10 +293,11 @@ function KioskShell() {
   const isV6Route = v6Shell !== null && !isQxRoute
   const v6DomainTitle = v6Shell?.domainTitle ?? null
   const usesPageActionbar = routeUsesPageActionbar(pathname)
-  const isCompactViewport = viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
+  const isCompactViewport = isKioskCompactViewport(viewportW, viewportH)
   // 青序首页自带窄屏布局；旧 kiosk-home-mobile 会再次改壳尺寸，造成两套首页壳叠加。
   const isResponsiveHome = pathname === '/' && isCompactViewport && !isQxRoute
-  const usesFluidViewport = isCompactViewport || (viewportW > 960 && viewportW > viewportH)
+  // 流式只留给手机。横屏电脑与竖屏一体机共用外层舞台，见 usesKioskFluidViewport。
+  const usesFluidViewport = usesKioskFluidViewport(viewportW, viewportH)
 
   const shell = (
     <KioskLayout
@@ -320,12 +321,15 @@ function KioskShell() {
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
           为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
-      <FavoritesProvider>
-        <Outlet context={deviceStatus} />
-      </FavoritesProvider>
+      <KioskRootStageScope>
+        <FavoritesProvider>
+          <Outlet context={deviceStatus} />
+        </FavoritesProvider>
+      </KioskRootStageScope>
     </KioskLayout>
   )
 
-  // 手机首页关闭舞台缩放，但保留相同的 host/scaler/stage DOM，避免旋转时替换布局根。
+  // 手机紧凑视口关闭舞台缩放，但保留相同的 host/scaler/stage DOM，避免旋转时替换布局根。
+  // 横屏电脑不再铺满全宽，和竖屏一体机共用这一层 1080×1920 缩放。
   return <KioskStageFit enabled={!usesFluidViewport}>{shell}</KioskStageFit>
 }

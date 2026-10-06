@@ -49,12 +49,16 @@ export function interviewReportDisplayDate(at: Date): string {
 // - 匿名行：创建时铸 192-bit accessToken，只回传一次；DB 只存 SHA-256；
 //   后续凭 x-interview-access-token header + timingSafeEqual 校验。
 // 留存：匿名会话/报告 2 小时、会员 7 天（expiresAt），每小时清理任务物理删除
-//   过期行（级联 turns/report）。对话与报告原文不写日志、不进审计 payload。
+//   过期行（级联 turns/report）。开场失败留下的 configured 且没有任何题目的会话，
+//   满 30 分钟后由同一次清理硬删；这 30 分钟内题目单仍用这个会话号。
+//   对话与报告原文不写日志、不进审计 payload。
 // 合规：练习工具；报告只给本人；删除留审计。
 // ============================================================
 
 const ANON_TTL_MS = 2 * 60 * 60 * 1000
 const MEMBER_TTL_MS = 7 * 24 * 60 * 60 * 1000
+/** 开场没写出任何题目的 configured 会话，超过这个时长由 cleanupExpired 硬删。 */
+export const EMPTY_CONFIGURED_SESSION_MAX_AGE_MS = 30 * 60 * 1000
 const MAX_ANSWER_CHARS = 2000
 
 const DURATION_TARGET: Record<number, number> = { 3: 4, 5: 6, 8: 8 }
@@ -562,6 +566,7 @@ export class MockInterviewService {
 
   async listMine(endUserId: string, cursor: string | null, pageSize: number) {
     const rows = await this.prisma.mockInterviewSession.findMany({
+      // 只收已完成。开场失败回滚的 configured 空会话不是面试记录。
       where: { endUserId, status: 'completed', expiresAt: { gt: new Date() } },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: pageSize + 1,
@@ -609,9 +614,21 @@ export class MockInterviewService {
   // ── 留存清理（每小时；物理删除过期会话，级联 turns/report）─────────────────
 
   @Cron(CronExpression.EVERY_HOUR)
-  async cleanupExpired(): Promise<void> {
-    const res = await this.prisma.mockInterviewSession.deleteMany({ where: { expiresAt: { lt: new Date() } } })
-    if (res.count > 0) this.logger.log(`interview.cleanup removed=${res.count}`)
+  async cleanupExpired(now = new Date()): Promise<void> {
+    const expired = await this.prisma.mockInterviewSession.deleteMany({ where: { expiresAt: { lt: now } } })
+    const emptyConfigured = await this.prisma.mockInterviewSession.deleteMany({
+      where: {
+        status: 'configured',
+        createdAt: { lt: new Date(now.getTime() - EMPTY_CONFIGURED_SESSION_MAX_AGE_MS) },
+        turns: { none: {} },
+      },
+    })
+    const removed = expired.count + emptyConfigured.count
+    if (removed > 0) {
+      this.logger.log(
+        `interview.cleanup removed=${removed} expired=${expired.count} emptyConfigured=${emptyConfigured.count}`,
+      )
+    }
   }
 
   // ── 内部 ──────────────────────────────────────────────────────────────────
