@@ -88,7 +88,7 @@
 
     <view class="next-card" wx:elif="{{statusKey === 'queued' || statusKey === 'printing'}}">
       <view class="next-title">订单已进入终端打印流程</view>
-      <view class="next-text">请不要离开设备。若长时间没有出纸，请先查看终端错误提示，再联系现场工作人员。</view>
+      <view class="next-text">请不要离开设备。若长时间没有出纸，请先查看终端屏幕上的提示；{{supportHint}}</view>
     </view>
 
     <view class="info-card" wx:if="{{orderNo || taskStatus || pickupStatus}}">

@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`576` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`579` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -71,10 +71,11 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/users` | AdminUsersController.list | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/admin/users/:endUserId` | AdminUsersController.getDetail | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/admin/users/:endUserId/disable` | AdminUsersController.disable | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/admin/users/:endUserId/restore` | AdminUsersController.restore | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask |
+| GET | `/api/v1/admin/users` | AdminUsersController.list | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
+| GET | `/api/v1/admin/users/:endUserId` | AdminUsersController.getDetail | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
+| POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>StorageDeletion<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
+| POST | `/api/v1/admin/users/:endUserId/disable` | AdminUsersController.disable | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
+| POST | `/api/v1/admin/users/:endUserId/restore` | AdminUsersController.restore | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>UserDataRequest |
 
 ## `services/api/src/advisor/advisor.controller.ts`
 
@@ -384,20 +385,20 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/files` | FilesController.list | admin | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/files` | FilesController.upload | — | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| DELETE | `/api/v1/files/:id` | FilesController.remove | — | AuditService<br/>FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/files/:id/complete` | FilesController.complete | — | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/files/:id/content` | FilesController.content | — | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| GET | `/api/v1/files` | FilesController.list | admin | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
+| POST | `/api/v1/files` | FilesController.upload | — | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
+| DELETE | `/api/v1/files/:id` | FilesController.remove | — | AuditService<br/>FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
+| POST | `/api/v1/files/:id/complete` | FilesController.complete | — | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
+| GET | `/api/v1/files/:id/content` | FilesController.content | — | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
 | GET | `/api/v1/files/:id/download-url` | FilesController.downloadUrl | — | — | — |
 | GET | `/api/v1/files/:id/preview-url` | FilesController.previewUrl | — | — | — |
 | PUT | `/api/v1/files/:id/raw` | FilesController.rawUpload | — | — | — |
-| PATCH | `/api/v1/files/:id/retention` | FilesController.updateRetention | — | AuditService<br/>FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/files/:id/url` | FilesController.signedUrl | — | AuditService<br/>FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/files/cleanup-expired` | FilesController.cleanupExpired | admin | AuditService<br/>FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| PATCH | `/api/v1/files/:id/retention` | FilesController.updateRetention | — | AuditService<br/>FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
+| GET | `/api/v1/files/:id/url` | FilesController.signedUrl | — | AuditService<br/>FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
+| POST | `/api/v1/files/cleanup-expired` | FilesController.cleanupExpired | admin | AuditService<br/>FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
 | POST | `/api/v1/files/kiosk-upload` | FilesController.kioskUpload | — | — | — |
-| GET | `/api/v1/files/lifecycle-summary` | FilesController.lifecycleSummary | admin | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/files/upload-intent` | FilesController.uploadIntent | — | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| GET | `/api/v1/files/lifecycle-summary` | FilesController.lifecycleSummary | admin | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
+| POST | `/api/v1/files/upload-intent` | FilesController.uploadIntent | — | FilesService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>StorageDeletion |
 
 ## `services/api/src/help/help.controller.ts`
 
@@ -728,6 +729,7 @@
 | GET | `/api/v1/me/ai-consents` | MemberPrivacyController.list | — | — | — |
 | POST | `/api/v1/me/ai-consents` | MemberPrivacyController.grantConsent | — | MemberPrivacyService | ContractReviewTask<br/>UserAiConsent |
 | POST | `/api/v1/me/ai-consents` | MemberPrivacyController.create | — | — | — |
+| POST | `/api/v1/me/ai-consents/:id/cancel` | MemberPrivacyController.cancel | — | — | — |
 | POST | `/api/v1/me/ai-consents/:id/download-authorizations` | MemberPrivacyController.authorizeDownload | — | — | — |
 | POST | `/api/v1/me/ai-consents/:scope/revoke` | MemberPrivacyController.revokeConsent | — | MemberPrivacyService | ContractReviewTask<br/>UserAiConsent |
 | GET | `/api/v1/me/ai-consents/status` | MemberPrivacyController.getConsentStatus | — | MemberPrivacyService | ContractReviewTask<br/>UserAiConsent |
@@ -1033,6 +1035,7 @@
 | POST | `/api/v1/admin/terminals` | AdminTerminalsController.createPlannedTerminal | admin | AuditService<br/>TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | POST | `/api/v1/admin/terminals/:terminalId/bind-code` | AdminTerminalsController.createBindCode | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/admin/terminals/:terminalId/capabilities` | AdminTerminalsController.listCapabilities | admin | — | — |
+| DELETE | `/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey` | AdminTerminalsController.clearCapability | admin | — | — |
 | PUT | `/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey` | AdminTerminalsController.updateCapability | admin | — | — |
 | POST | `/api/v1/admin/terminals/:terminalId/emergency-revoke` | AdminTerminalsController.emergencyRevoke | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | PATCH | `/api/v1/admin/terminals/:terminalId/lifecycle` | AdminTerminalsController.updateLifecycle | admin | TerminalsService | AuditLog<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |

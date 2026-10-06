@@ -4,12 +4,14 @@
  * SQLite 环境重放正式 migration；PostgreSQL readiness 使用该 job 的空库。
  * 覆盖：
  *   - 唯一请求服务 activeKey 互斥
- *   - delete 零副作用 fail-closed（DATA_DELETION_ENABLED 默认 false）
+ *   - delete 无二次验证不创建人工申请
  *   - revoke_consent 同事务完成
  *   - 队列缺失时 export 不创建伪 pending 记录
  *   - reconciler / download-service 结构存在性
- *   - DATA_DELETION_ENABLED 运行时开关门控
+ *   - DATA_DELETION_ENABLED 不能绕过二次验证
  */
+import { UnauthorizedException } from '@nestjs/common'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { closeSync, mkdtempSync, openSync, rmSync } from 'node:fs'
@@ -22,6 +24,7 @@ import { MemberDataRequestService } from '../src/member-privacy/member-data-requ
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 
+assertIsolatedVerificationDatabase()
 const originalDatabaseUrl = process.env['DATABASE_URL']
 const usesPostgres = /^(postgres|postgresql):\/\//.test(originalDatabaseUrl ?? '')
 const tempDir = usesPostgres ? null : mkdtempSync(join(tmpdir(), 'member-data-request-truth-'))
@@ -33,11 +36,11 @@ function cleanupEnvironment(): void {
 }
 
 if (tempDir) {
-  const databasePath = join(tempDir, 'truth.db')
+  const databasePath = join(tempDir, 'verify-truth.db')
   closeSync(openSync(databasePath, 'a'))
   process.env['DATABASE_URL'] = `file:${databasePath}`
   try {
-    execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
+    execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
       cwd: process.cwd(),
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -86,7 +89,7 @@ async function main(): Promise<void> {
   const stepUp = {
     consumeGrant: async () => {
       counters.stepUp += 1
-      throw new Error('queue gate should run before step-up')
+      throw new UnauthorizedException({ error: { code: 'STEP_UP_TOKEN_INVALID' } })
     },
   }
   const redis = {
@@ -129,17 +132,18 @@ async function main(): Promise<void> {
     const afterDeleteRows = await prisma.userDataRequest.count({ where: { endUserId } })
     const afterDeleteAudits = await prisma.auditLog.count({ where: { targetId: endUserId } })
     if (
-      deleteCode === 'ACCOUNT_CLOSURE_NOT_AVAILABLE'
+      deleteCode === 'STEP_UP_TOKEN_INVALID'
       && beforeDeleteRows === afterDeleteRows
       && beforeDeleteAudits === afterDeleteAudits
-      && counters.stepUp === 0
+      && counters.stepUp === 1
       && counters.redis === 0
     ) {
-      pass('delete 在 DB/审计/Redis/step-up 前 ACCOUNT_CLOSURE_NOT_AVAILABLE')
+      pass('delete 无有效二次验证时不创建请求、不改变账号、不进队列')
     } else {
       fail(`delete 零副作用失败 code=${deleteCode ?? 'none'} rows=${afterDeleteRows} audit=${afterDeleteAudits}`)
     }
 
+    counters.stepUp = 0
     await consent.grantConsent(endUserId, 'job_ai', null)
     const revokeKey = randomUUID()
     const revoked = await requests.create(endUserId, 'revoke_consent', revokeKey, null, null)
@@ -201,7 +205,7 @@ async function main(): Promise<void> {
       fail(`MemberDataExportDownloadService 缺少方法: ${missingDownloadMethods.join(', ')}`)
     }
 
-    // DATA_DELETION_ENABLED 开关：delete 始终 fail-closed（默认 false，无论环境变量值）
+    // 旧开关不能绕过人工申请的二次验证。
     const savedDeletionEnv = process.env['DATA_DELETION_ENABLED']
     process.env['DATA_DELETION_ENABLED'] = 'true'
     const deletionWithFlagCode = await captureCode(() => requests.create(
@@ -213,10 +217,9 @@ async function main(): Promise<void> {
     ))
     if (savedDeletionEnv === undefined) delete process.env['DATA_DELETION_ENABLED']
     else process.env['DATA_DELETION_ENABLED'] = savedDeletionEnv
-    // Wave 1-B 最小版：实际注销执行未实现，DATA_DELETION_ENABLED=true 仍返回 ACCOUNT_CLOSURE_NOT_AVAILABLE
-    // （法务矩阵签字前不允许任何路径产生实际 PII 删除）
-    if (deletionWithFlagCode === 'ACCOUNT_CLOSURE_NOT_AVAILABLE') {
-      pass('DATA_DELETION_ENABLED=true 仍 fail-closed（注销执行尚未实现，法务矩阵未签字）')
+    // 本门禁无授权；完整人工申请/管理员执行由 verify-member-closure 覆盖。
+    if (deletionWithFlagCode === 'STEP_UP_TOKEN_INVALID') {
+      pass('DATA_DELETION_ENABLED=true 不能绕过注销申请二次验证')
     } else {
       fail(`DATA_DELETION_ENABLED=true 意外执行了删除路径 code=${deletionWithFlagCode ?? 'none（无异常！）'}`)
     }

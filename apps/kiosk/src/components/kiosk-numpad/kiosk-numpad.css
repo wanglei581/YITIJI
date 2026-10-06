@@ -33,11 +33,13 @@
   .knp-key { transition: none; }
   .knp-key:active:not(:disabled) { transform: none; }
 }
-/* Windows 横屏调试形态下压缩，与页面既有 landscape 收窄口径一致 */
+/* 窄横屏且舞台关闭时压缩键高。电脑横屏走 1080×1920 缩放，不再把竖屏稿里的键压到 64px。 */
 @media (max-height: 900px) and (orientation: landscape) {
-  .knp { gap: 10px; margin-top: 14px; }
-  .knp-key { min-height: 64px; font-size: 26px; }
-  .knp-fn { font-size: 18px; }
+  [data-kiosk-stage-fit='off'] {
+    .knp { gap: 10px; margin-top: 14px; }
+    .knp-key { min-height: 64px; font-size: 26px; }
+    .knp-fn { font-size: 18px; }
+  }
 }
 
 /* 左下角替换键（如取件码页的「输入历史码」）：它是一次模式选择，
