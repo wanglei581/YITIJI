@@ -1,5 +1,6 @@
 import type { FeedbackReplyItem, MemberFeedbackTicketDetail } from '../../../../services/api/memberFeedback'
 import { formatTime } from '../../assets/format'
+import { AI_COMPLAINT_REPLY_DAYS } from './aiComplaint'
 import { FeedbackMark } from './FeedbackMark'
 import { CATEGORY_META, STATUS_META } from './types'
 
@@ -49,7 +50,7 @@ export function FeedbackDetailPanel({
         <div className="fb-sec">沟通记录</div>
         <div className="fb-thread" data-testid="member-feedback-thread" data-reply-count={detail.replies.length}>
           {detail.replies.length === 0 ? (
-            <p className="fb-thread-empty">暂无补充描述或回复。是否回复与处理时间由现场运营决定，本页不承诺时限。</p>
+            <p className="fb-thread-empty">还没有补充描述或回复。有回复会显示在这里；AI 内容投诉 {AI_COMPLAINT_REPLY_DAYS} 个工作日内答复，其他反馈不承诺回复时间。</p>
           ) : (
             detail.replies.map((reply) => <ReplyBubble key={reply.id} reply={reply} />)
           )}

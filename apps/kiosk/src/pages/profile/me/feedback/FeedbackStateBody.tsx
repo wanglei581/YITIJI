@@ -12,7 +12,7 @@ export function FeedbackStateBody({ state, contact }: { state: FeedbackStateScre
       <StateBanner state={state} />
       <section
         className="qx-me-list fb-list fb-fill"
-        aria-label={state === 'loading' || state === 'detail-loading' ? '正在加载的工单占位' : '反馈分类'}
+        aria-label={state === 'loading' || state === 'detail-loading' ? '正在加载工单' : '反馈分类'}
       >
         {state === 'loading' || state === 'detail-loading'
           ? [0, 1, 2, 3, 4].map((index) => (
@@ -84,8 +84,8 @@ function bannerCopy(state: FeedbackStateScreen): { title: string; desc: ReactNod
   if (state === 'service-unavailable') {
     return {
       title: '当前无法提交反馈',
-      desc: <>没有连接到会员服务，或当前没有有效的会员登录。<b>本页不做本地假提交</b>：连接真实服务并登录后，才可查看和提交本人反馈。</>,
-      minis: ['共 —', '服务未连接'],
+      desc: <>反馈服务暂时不可用，或登录已经失效。登录后可以查看和提交本人反馈。</>,
+      minis: ['共 —', '反馈服务暂时不可用'],
     }
   }
   if (state === 'loading') {
@@ -114,11 +114,11 @@ function foot(state: FeedbackStateScreen, help: string): ReactNode {
     return <>登录只用来确认「是你本人」。不想登录也可以反馈：<b>打印完成页有免登录的问题反馈入口</b>，那条只提交、不建档，也看不到状态。</>
   }
   if (state === 'service-unavailable') {
-    return <>这五类反馈都需要会员服务在线才能建档。<b>现在仍然可以走的路</b>：在打印完成页用免登录的问题反馈。{help}</>
+    return <>这五类反馈要登录后才能提交，提交后可以查看进度。<b>现在仍然可以走的路</b>：在打印完成页用免登录的问题反馈。{help}</>
   }
   if (state === 'loading') return '这次读取失败不会丢失草稿，也不会重复创建工单。'
   if (state === 'detail-loading') return '读取失败不会改动这条工单的状态，也不会丢失已提交的内容。'
-  return <>重试不会重复创建工单。多次重试仍失败时，{help}</>
+  return <>重试不会重复创建工单。多次重试仍不成功的话，可以稍后再来。{help}</>
 }
 
 function Guide({ state, help }: { state: FeedbackUiState; help: string }) {
@@ -130,7 +130,7 @@ function Guide({ state, help }: { state: FeedbackUiState; help: string }) {
     ]
     : state === 'service-unavailable'
       ? [
-        ['当前状态', '未连接会员服务', '没有会员令牌时不做本地假提交'],
+        ['当前状态', '反馈服务暂时不可用', '登录后可以查看和提交本人反馈'],
         ['能做什么', '先完成登录', '登录后即可提交并查看本人工单'],
         ['另一条路', '免登录反馈', '打印完成页的问题反馈只提交、不建档'],
       ]

@@ -423,7 +423,7 @@ const TICKETS: Ticket[] = [
     updatedAt: '2026-09-24T09:30:00.000+08:00',
     replies: [
       { id: 'rp-font-1', senderType: 'user', actorId: 'member-linxiaowen', content: '主要是预览和底部按钮，站远一点看不清。', createdAt: '2026-09-23T11:12:00.000+08:00' },
-      { id: 'rp-font-2', senderType: 'admin', actorId: null, content: '字号我们按现场看屏幕的距离再核一遍。这条先关闭。之后如果还是看不清，可以再开一条新的反馈。', createdAt: '2026-09-24T09:30:00.000+08:00' },
+      { id: 'rp-font-2', senderType: 'admin', actorId: null, content: '字号我们按你站在机器前的距离再核一遍。这条先关闭。之后如果还是看不清，可以再开一条新的反馈。', createdAt: '2026-09-24T09:30:00.000+08:00' },
     ],
   }),
   ticket({
