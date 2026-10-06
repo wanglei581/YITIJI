@@ -3,7 +3,10 @@ import { USER_STATUS_LABELS } from '../users/userPresentation'
 import { taskStatusLabel } from '../screen/metricLabels'
 import { getAuditRoleLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
 
+/** 操作人：服务端给了显示名就用；没有（系统、会员、已删除账号、旧接口）退回「角色 · 尾号」。显示名若像手机号等敏感文本也退回。 */
 export function auditActorText(record: AuditLogRecord): string {
+  const name = record.actorDisplayName?.trim()
+  if (name && safeAuditText(name) === name) return name
   const role = getAuditRoleLabel(record.actorRole)
   if (role === '系统') return '系统'
   return record.actorId ? `${role} · 尾号 ${record.actorId.slice(-6)}` : role
