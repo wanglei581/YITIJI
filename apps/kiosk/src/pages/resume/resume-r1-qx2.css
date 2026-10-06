@@ -338,3 +338,55 @@
   position: relative;
   z-index: 1;
 }
+
+/* 390×844：任务头、四步轨和来源标题把来源卡组顶出滚动视口。
+   只收这一屏、并且只在已有的 640 窄屏查询里收；1080 仍用上面不带媒体查询的来源首屏尺寸。 */
+@media (max-width: 640px) {
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] {
+    padding-top: 6px;
+    gap: 6px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-xq {
+    padding: 6px 12px 4px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-eyebrow {
+    line-height: 1.2;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-title {
+    margin-top: 0;
+    font-size: var(--qx-fs-aux);
+    line-height: 1.25;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-doing {
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-rail {
+    margin-top: 4px;
+    padding-top: 4px;
+    gap: 2px 8px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-rail li {
+    gap: 6px;
+    line-height: 1.2;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-rail i {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-scroll {
+    padding-top: 0;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-pick {
+    gap: 4px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-pick .qx-rt-sec-h {
+    font-size: var(--qx-fs-aux);
+    line-height: 1.25;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-pick .qx-rt-sec-h small {
+    margin-top: 0;
+    line-height: 1.25;
+  }
+}
