@@ -499,14 +499,15 @@ const NEW_TICKET: Ticket = ticket({
 })
 
 function feedbackPlan(state: string): MePages2Plan {
+  // 「正在提交…」写在按钮里的 span 上。button:text-is 只认按钮自己的文本节点，配不到。
   const marker = state === 'submit-busy'
-    ? 'button[disabled]:text-is("正在提交…")'
+    ? 'button[disabled] span:text-is("正在提交…")'
     : state === 'success'
       ? '.fb-toast:text-is("反馈已提交")'
       : state === 'failure'
         ? '.fb-toast:text-is("提交失败，请检查登录状态或稍后重试")'
         : state === 'reply-busy'
-          ? 'button[disabled]:text-is("正在提交…")'
+          ? 'button[disabled] span:text-is("正在提交…")'
           : state === 'close-busy'
             ? 'button[disabled]:text-is("正在关闭…")'
             : `[data-testid="member-feedback-state-${state}"]`
