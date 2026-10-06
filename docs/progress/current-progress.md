@@ -24,6 +24,15 @@
 - 验证：一体机类型检查、eslint；`verify-fusion-w3`（新加 20 余条断言，含五个文件不出现「工作人员」「服务台」）、`verify-public-screen-mask`、`verify-ai-artifact-print-url-contract`、`verify-fusion-w6` 全过；W3 作业面浏览器用例 7 条通过（新加 3 条）；并排图 52 号 8 态全部配上，有内容的 5 态走真实会话接口（「打印带走」可点）。反向变异四处（打印读不到又藏正文、去掉带走区、塞进「请找现场工作人员」、去掉「回去重做一次」）全部变红。
 - 停放、隐藏、改名、降级：无。Grok 实现，一体机前端 B 窗口审。
 
+## 2026-10-06：管理员 / 合作机构登录凭证即时失效（服务端会话，未提交、未部署）
+
+- **基线：** 候选 `07e0ad943`，工作区 `bh-g-adminsess`。改前守卫已经每次读库，核对账号存在、`enabled`、`deletedAt` 和 JWT 的 `ver` 是否等于 `User.tokenVersion`；签发声明是 `sub`、`role`、`orgId`、`ver`、`jti`（`randomUUID()`），有效期仍是 `auth.module.ts` 的 `24h`。`POST /auth/logout` 当时只清理管理员近期高风险验证，注释写明不撤销已签发 JWT。`tokenVersion` 在本人改密、手机号重置、首个管理员改密、内部账号启停、合作机构启停 / 重置密码 / 换邮箱 / 删除、备用管理员紧急启用、手机号从机构账号转出、机构手机号换绑上已经递增。没有改 `User.role` 的 HTTP 写路径。合作机构与管理员走同一套 `JwtAuthGuard`。
+- **这次补上：** 退出把当前 `jti` 写入 Redis `internal:session-revoked:{jti}`，TTL 取该 JWT 剩余寿命。守卫先验这份名单，再读库。名单读不到时继续查库：仍启用且版本匹配的凭证放行，停用、删除、版本不一致拒绝。名单写失败时退出返回 503 `AUTH_LOGOUT_UNAVAILABLE`（「暂时无法退出，请稍后再试」），不返回成功。身份不成立时 401，错误码 `AUTH_TOKEN_INVALID`，文案「登录已失效，请重新登录」。鉴权不把 `internal:session-state` 当读缓存；写路径照旧发布更高版本或删除该键。未加会话表，未改有效期，未改会员登录。
+- **改密后的当前请求：** 接口仍只返回 `{ success: true }`，不发新凭证。管理员账号设置页（`apps/admin/src/routes/account-settings/index.tsx`）成功后 1.2 秒调用 `logout()` 再跳登录页；该文件头注释已经按这个行为写。合作机构账号页同样先改密再本地退出。本次唯一改过的前端文件是审计中文名。
+- **审计：** 新动作 `auth.logout`，后台中文名「退出登录」。改密、停用、删除沿用原动作。
+- **门禁：** `verify:admin-session-revocation` 56/56 通过（2026-10-06 15:05 复跑，退出码 0）。已登记 `services/api/package.json`，并写进 `.github/workflows/ci.yml` SQLite 主作业、「Prepare fresh SQLite db」之后、`verify:change-password` 的下一行。`verify:ci-gate-coverage`、`pnpm verify:repository-integrity`、`node scripts/generate-project-graph.mjs` 与 `--check` 通过（图谱 0 个文件变化）。反向变异四处都已改回源码：不比 `tokenVersion` 50/56、退出不撤 `jti` 53/56、停用不递增 `tokenVersion` 54/56、Redis 不可用时放行 54/56，退出码都是 1。
+- **`verify:change-password` 的 9e：** 本机红。守卫的会话状态写入被 500ms 超时放弃后，用改密前读到的数据库行放行。把 `optional-internal-user.ts` 换回 `07e0ad943` 再跑，同一条同样红（15:00，`session-state:set timeoutMs=500`）。本机 bcrypt cost 10 单次约 1.2–3.2 秒，改密在挡住的写入被放开之前要做两次 compare 和一次 hash。这条超时和单调版本写入在基线上已经如此。本次没有改超时，也没有改这条断言。
+- **留下的缝：** 合作机构后台的 `logout()` 只清本地存储，不调用 `POST /auth/logout`，页面上的退出不会写入 `jti` 名单；服务端端点对合作机构凭证已经按同一守卫生效，门禁直接打了这个端点。管理员 `logout()` 会打端点。`apps/admin/src/services/auth/index.ts` 里仍有一句「服务端端点不声称撤销当前无 jti 的 JWT」，与现在的退出端点不一致，这次不许改那个文件。`admin-orgs.service.ts` 约 844 行仍写「缓存最多接受 60 秒」，守卫实际不读这份缓存。退出写入成功之后 Redis 再不可用时，名单读不到，版本仍匹配且账号仍启用的凭证会再通过数据库检查，直到 JWT 到期；停用和版本变化仍拒绝。管理员把手机号绑到自己身上时不递增管理员自己的 `tokenVersion`（转出的机构账号会递增）。没有「管理员重置另一名管理员密码」的端点。
 ## 2026-10-06：终端程序 Agent 升 0.4.14（分支 `claude/agent-0.4.14-package`）
 
 - **为什么：** 10/6 产品负责人批准全面检查报告，第五节按推荐执行；其中「下一个安装包 10/12 前」。#1206（机器标识原子落盘）、#1229（U 盘文件读不了提示换一个）、#1237（U 盘按能力开关拦截，W-125）都已在候选，但 0.4.13 安装包不含；不升版本号，两个不同的包会同名同版本。
