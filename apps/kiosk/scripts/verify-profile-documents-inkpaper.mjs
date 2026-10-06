@@ -165,8 +165,10 @@ expectIncludes(page, 'disabled={deleteDisabled}', '删除按钮保留禁用态')
 
 expectIncludes(retentionOverlay, 'role="dialog"', '保存期限确认弹层保留 dialog 语义')
 expectIncludes(page, 'aria-modal="true"', '保存期限确认弹层保留 aria-modal')
-expectIncludes(page, '还没有文档', '我的文档保留空态标题')
-expectIncludes(page, '保存简历 / 打印材料等文档后，这里会显示你的文档记录', '我的文档保留空态说明')
+// 2026-10-06 C1-3：空态标题和说明改成稿 38「还没有保存的文档」/「这个账号下没有已保存的文件…」。
+// 旧句「还没有文档」「保存简历 / 打印材料等文档后…」不再出现；断言改成稿文案，不放宽「空态必须有标题和说明」。
+expectIncludes(page, '还没有保存的文档', '我的文档保留空态标题')
+expectIncludes(page, '这个账号下没有已保存的文件。还没有任何记录。办过之后会列在这里。', '我的文档保留空态说明')
 expectIncludes(page, '访问链接短期有效', '我的文档保留短期访问链接合规说明')
 expectIncludes(page, '原始简历/求职材料默认 90 天', '我的文档保留默认保存期限说明')
 expectIncludes(page, 'documentsLoggedInTruth(resultIdleLogoutLabel())', '已登录的文档说明引用结果页空闲时长')

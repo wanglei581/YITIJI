@@ -102,7 +102,7 @@ export function SignStampWorkbench({
               <div className="ss-grp">
                 <h3>
                   <CheckCircleIcon size={24} />
-                  这份生成的新 PDF
+                  这份签好的 PDF
                 </h3>
                 <div className="ss-kv" data-testid="sign-stamp-output">
                   <div>
@@ -126,7 +126,11 @@ export function SignStampWorkbench({
                     <b>{outErr === 'expired' ? '已过期 · 30 分钟有效' : '有效期 30 分钟'}</b>
                   </div>
                 </div>
-                <p className="note">交出去的就是这份生成的新 PDF，标记不放进地址栏。图片排版，不是电子签名。</p>
+                <p className="note">
+                  下一步用的是<b>这份签好的 PDF</b>，<b>不是原件</b>。
+                  <br />
+                  <span data-disclaimer="true">原件没有被改写。</span>
+                </p>
               </div>
               <div className="ss-grp">
                 <h3>这一次用的输入</h3>
@@ -159,7 +163,7 @@ export function SignStampWorkbench({
                 <div className="ss-kv" data-testid="sign-stamp-next-round">
                   <div>
                     <span>原文档</span>
-                    <b>换成这份生成的新 PDF</b>
+                    <b>换成这份签好的 PDF</b>
                   </div>
                   <div>
                     <span>签名图</span>
@@ -182,8 +186,8 @@ export function SignStampWorkbench({
               {isLockedPhase(phase) && (
                 <p className="ss-reason lockline" id="sign-stamp-lock-reason" data-testid="sign-stamp-lock-reason">
                   {phase === 'result-unknown'
-                    ? '结果还没确认，页码、位置和大小已锁定：改一点就是另一次，可能真的生成两份。'
-                    : '正在提交这一次合成，页码、位置和大小已锁定，也不能再次提交，避免生成两份。'}
+                    ? '结果还没确认，参数已锁定：改一点就算新的一次，可能真的生成两份。'
+                    : '正在提交这一次合成，参数与再次提交都已锁定，避免生成两份。'}
                 </p>
               )}
               <div className="ss-grp">
@@ -283,8 +287,8 @@ export function SignStampWorkbench({
                       {AUTHORIZATION_LABEL}。
                     </span>
                   </button>
-                  <p className="note">
-                    勾选只表示你有这张图的使用权，不是签署协议，不产生法律凭证。伪造印章或冒用他人签名违法，责任自负。换图后要重新确认。
+                  <p className="note" data-disclaimer="true">
+                    勾选只表示你有这张图的使用权，<b>不是签署协议</b>，不产生法律凭证。<b>伪造印章或冒用他人签名违法</b>，责任自负。换图后要重新确认。
                   </p>
                 </div>
               ) : (
@@ -300,15 +304,15 @@ export function SignStampWorkbench({
                     </div>
                     <div>
                       <span>签名图</span>
-                      <b>{stamp ? `${stamp.name} · 这一次` : '—'}</b>
+                      <b>{stamp ? `${stamp.name} · 这次办理` : '—'}</b>
                     </div>
                     <div>
                       <span>授权</span>
                       <b>{authorized ? '已确认' : '未确认'}</b>
                     </div>
                     <div>
-                      <span>标记</span>
-                      <b>已绑定 · 不显示编号</b>
+                      <span>参数一改</span>
+                      <b>就算新的一次</b>
                     </div>
                   </div>
                 </div>
@@ -325,45 +329,45 @@ export function SignStampWorkbench({
               <>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>去材料检查核对隐私与可打印性，那之后才谈报价。</span>
+                  <span>去<b>材料检查</b>核对隐私与可打印性，那之后才谈报价。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>也可以拿它再叠一处。</span>
+                  <span>也可以拿它<b>再叠一处</b>。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>再叠要重新传签名图。</span>
+                  <span>再叠要<b>重新传签名图</b>。</span>
                 </li>
               </>
             ) : phase !== 'idle' ? (
               <>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>一次性请求，没有进度也没有阶段。</span>
+                  <span>交出去之后只等结果，<b>没有进度也没有阶段</b>。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>结果还没确认时，只能原样再试一次，并保持同一组页码、位置和大小。</span>
+                  <span>结果没确认时，只许<b>原样重试刚才那一次</b>。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>记录这次操作如果失败会报错，但生成的新 PDF可能已经有了。</span>
+                  <span>如果这次没记成功，会告诉你出错了，但签好的 PDF <b>可能已经生成</b>。</span>
                 </li>
               </>
             ) : (
               <>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>原 PDF：永不改写。</span>
+                  <span><b>原 PDF</b>：永不改写。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>签名图：只能这次新传，约 1 小时，不进我的文档。</span>
+                  <span><b>签名图</b>：只能这次新传，约 1 小时，不进我的文档。</span>
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>生成的新 PDF：每次都是新文件。</span>
+                  <span><b>签好的 PDF</b>：每次都是新文件。</span>
                 </li>
               </>
             )}
@@ -383,7 +387,7 @@ export function SignStampWorkbench({
                   <span>不下单、不出纸、不显示金额。</span>
                 </li>
               </>
-            ) : (
+            ) : phase !== 'idle' ? (
               <>
                 <li>
                   <span className="sq" aria-hidden />
@@ -391,7 +395,18 @@ export function SignStampWorkbench({
                 </li>
                 <li>
                   <span className="sq" aria-hidden />
-                  <span>不覆盖原 PDF。不判断该签在哪。不做防篡改，不发证书。</span>
+                  <span>不覆盖原 PDF。</span>
+                </li>
+              </>
+            ) : (
+              <>
+                <li>
+                  <span className="sq" aria-hidden />
+                  <span>不判断该签在哪。</span>
+                </li>
+                <li>
+                  <span className="sq" aria-hidden />
+                  <span>不做防篡改，不发证书。</span>
                 </li>
               </>
             )}

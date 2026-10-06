@@ -4,7 +4,7 @@ import type { MemberAssetCounts } from '../assets/useMemberAssetCounts'
 const MAIN = [
   { key: 'resumes' as const, label: '我的简历', desc: '这次要用哪一份', route: '/me/resumes' },
   { key: 'documents' as const, label: '我的文档', desc: '传上来和生成的文件', route: '/me/documents' },
-  { key: 'orders' as const, label: '打印订单', desc: '含取件码与出纸状态', route: '/me/print-orders' },
+  { key: 'orders' as const, label: '打印订单', desc: '进度与出纸状态', route: '/me/print-orders' },
 ]
 
 const MORE = [
