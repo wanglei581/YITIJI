@@ -472,7 +472,7 @@ function numKb(inert){
   var rows=[['1','2','3'],['4','5','6'],['7','8','9']];
   var h='<div class="kb'+(inert?' inert':'')+'" data-testid="'+SCREEN+'-keyboard"><div class="kb-note">'+
     (inert?'正在校验，键盘暂时不可用——校验结果出来后会自动恢复。'
-          :'新码是 <b>8 位纯数字</b>：输满 8 位稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>10 位旧码</b>点左下角「输入历史码」。没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。')+'</div>';
+          :'新码是 <b>8 位纯数字</b>：输满 8 位稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>10 位旧码</b>点左下角「输入历史码」。')+'</div>';
   rows.forEach(function(r){h+='<div class="kb-row">'+r.map(function(k){
     return '<button type="button" class="key m-press" data-key="'+k+'"'+(inert?' aria-disabled="true"':'')+'>'+k+'</button>';}).join('')+'</div>';});
   h+='<div class="kb-row"><button type="button" class="key abc m-press" data-key="__legacy"'+(inert?' aria-disabled="true"':'')+'>输入历史码</button>'+
@@ -483,7 +483,7 @@ function numKb(inert){
 }
 function alphaKb(inert){
   var rows=[['2','3','4','5','6','7','8','9'],['A','B','C','D','E','F','G','H'],['J','K','M','N','P','Q','R','S'],['T','U','V','W','X','Y','Z']];
-  var h='<div class="kb alpha'+(inert?' inert':'')+'" data-testid="'+SCREEN+'-keyboard"><div class="kb-note">历史码 <b>10 位</b>，不含 <b>0、O、1、I、L</b>；输满自动校验。'+(inert?'':'没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。')+'</div>';
+  var h='<div class="kb alpha'+(inert?' inert':'')+'" data-testid="'+SCREEN+'-keyboard"><div class="kb-note">历史码 <b>10 位</b>，不含 <b>0、O、1、I、L</b>；输满自动校验。</div>';
   rows.forEach(function(r,i){
     h+='<div class="kb-row">'+r.map(function(k){
       return '<button type="button" class="key m-press" data-key="'+k+'"'+(inert?' aria-disabled="true"':'')+'>'+k+'</button>';}).join('');
@@ -599,7 +599,7 @@ function vsCard(cur){
   return '<div class="vs" data-testid="'+SCREEN+'-list"><div class="vs-t">'+
     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>'+
     '两种码，别搞混</div><div class="vs-cols">'+
-    '<div class="vs-col'+(cur==='arrival'?' cur':'')+'"><b>到机码 · 本页用</b>8 位纯数字（旧码 10 位），对应一笔打印订单。取件和接着打都用它。</div>'+
+    '<div class="vs-col'+(cur==='arrival'?' cur':'')+'"><b>到机码 · 本页用</b>8 位纯数字（旧码 10 位），对应一笔打印订单。取件和接着打都用它。<br>没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。</div>'+
     '<div class="vs-col"><b>上传码 · 手机传文件用</b>用于把手机文件传到本机。</div></div></div>';
 }
 function outs(){

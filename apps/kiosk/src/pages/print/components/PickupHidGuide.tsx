@@ -109,7 +109,8 @@ export function PickupHidGuide({
   )
 }
 
-/** 方案②：到机码就是取件码，不再单列第三种码。函数名沿用，避免改动页面对这张卡的引用锚点。 */
+/** 方案②：到机码就是取件码，不再单列第三种码。函数名沿用，避免改动页面对这张卡的引用锚点。
+ *  续打说明放在这一栏，不放键盘说明：键盘说明多一行会在 1280×720 横屏把「确认校验」挤出可视区。 */
 export function PickupThreeCodeCard() {
   return (
     <section className="qx-card pcp-ab" aria-label="两种码的区别">
@@ -118,6 +119,7 @@ export function PickupThreeCodeCard() {
         <div className="pcp-ab-col is-current">
           <b>到机码 · 本页用</b>
           <span>{PICKUP_CODE_LENGTH} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。取件和接着打都用它。</span>
+          <span className="pcp-ab-note">{PICKUP_SAME_CODE_RESUME_NOTE}</span>
         </div>
         <div className="pcp-ab-col">
           <b>上传码 · 手机传文件用</b>
@@ -221,8 +223,8 @@ export function PickupKeypadCard({
         {loading
           ? '正在校验，键盘暂时不可用——校验结果出来后会自动恢复。'
           : legacyMode
-            ? <>历史码一共 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位</b>，不含 <b>0、O、1、I、L</b>，键盘上没有这几个键——不用担心认错。读满 {PICKUP_CODE_MAX_INPUT_LENGTH} 位自动校验。{PICKUP_SAME_CODE_RESUME_NOTE}</>
-            : <>新码是 <b>{PICKUP_CODE_LENGTH} 位纯数字</b>：输满稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码</b>点左下角「输入历史码」。{PICKUP_SAME_CODE_RESUME_NOTE}</>}
+            ? <>历史码一共 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位</b>，不含 <b>0、O、1、I、L</b>，键盘上没有这几个键——不用担心认错。读满 {PICKUP_CODE_MAX_INPUT_LENGTH} 位自动校验。</>
+            : <>新码是 <b>{PICKUP_CODE_LENGTH} 位纯数字</b>：输满稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码</b>点左下角「输入历史码」。</>}
       </p>
       {legacyMode ? (
         <PickupAlphaKeys value={code} onChange={onChange} disabled={loading} />
