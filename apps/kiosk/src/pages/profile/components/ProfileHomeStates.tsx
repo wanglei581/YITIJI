@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BellIcon, FileTextIcon, GiftIcon, HelpCircleIcon, InboxIcon, LockIcon, MessageSquareIcon, PrinterIcon, ShieldIcon, StarIcon, TriangleAlertIcon } from 'lucide-react'
+import { useOfficialChannels } from '../../../hooks/useOfficialChannels'
+import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import type { PendingTask } from '../../../services/api/pendingTasks'
 
 export type ProfileUiState = 'signed-out' | 'loading' | 'error' | 'empty' | 'member' | 'ready' | 'printing'
@@ -45,8 +47,9 @@ export function profileChrome(state: ProfileUiState): {
   if (state === 'ready') {
     return { status: { tone: 'unknown', label: '有一笔待付款' }, subtitle: '有未付款的打印，先把这件事办完再走。' }
   }
+  // 10/4 方案②：取件凭证码取消，到机码是唯一的码。一体机当场出纸本来就不用码。稿 30 早于这个决定。
   if (state === 'printing') {
-    return { status: { tone: 'unknown', label: '正在出纸，取件码已生成' }, subtitle: '正在出纸，凭取件码到出纸口取。' }
+    return { status: { tone: 'warn', label: '有文件正在出纸' }, subtitle: '文件正在出纸，请在出纸口等候取走。' }
   }
   return {
     status: { tone: 'unknown', label: '以你账号里的实际记录为准' },
@@ -59,7 +62,7 @@ export function ProfileSupportRows() {
   const rows = [
     { icon: BellIcon, title: '消息通知', desc: '系统下发的会员通知，已读与标记都会记录。', to: '/me/notifications', testid: 'profile-notifications' },
     { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》的联系方式申请。', to: '/me/privacy-requests', testid: 'profile-privacy' },
-    { icon: HelpCircleIcon, title: '帮助中心', desc: '服务台位置、常见问题与找人处理。', to: '/help', testid: 'profile-help' },
+    { icon: HelpCircleIcon, title: '帮助中心', desc: '常见问题与操作说明。', to: '/help', testid: 'profile-help' },
     { icon: MessageSquareIcon, title: '意见反馈', desc: '提交后能看到处理状态。', to: '/me/feedback', testid: 'profile-feedback' },
   ]
   return (
@@ -187,6 +190,25 @@ export function SignedOutBody() {
 
 export function EmptyStartRows() {
   const navigate = useNavigate()
+  const recruitment = useRecruitmentHosting()
+  const channels = useOfficialChannels()
+  // 与首页同一条：读到托管关闭，并且至少有一个官方渠道，才指向渠道页。
+  // 自营点位没配渠道时，那一页是空的，这一行改回就业政策。
+  const showOfficialChannels = recruitment.status === 'ready' && !recruitment.enabled && channels.status === 'ready' && channels.items.length > 0
+  const third = showOfficialChannels
+    ? {
+        title: '看看机构官方渠道',
+        desc: '这里只放本机构的官方入口，报名不在这台机器上办。',
+        to: '/official-channels',
+        icon: StarIcon,
+      }
+    : {
+        title: '看看就业政策并收藏',
+        desc: '查看办事指引，资格与办理以官方核验为准。',
+        to: '/policy-service',
+        icon: FileTextIcon,
+      }
+  const ThirdIcon = third.icon
   return (
     <section>
       <div className="qx-sec-h">
@@ -209,11 +231,11 @@ export function EmptyStartRows() {
           </span>
           <span className="qx-row-go" aria-hidden="true">›</span>
         </button>
-        <button type="button" className="qx-row" onClick={() => navigate('/official-channels')}>
-          <span className="qx-row-ic" aria-hidden="true"><StarIcon size={24} /></span>
+        <button type="button" className="qx-row" data-testid="profile-empty-start-third" onClick={() => navigate(third.to)}>
+          <span className="qx-row-ic" aria-hidden="true"><ThirdIcon size={24} /></span>
           <span className="qx-row-tx">
-            <span className="qx-row-t">看看机构官方渠道</span>
-            <span className="qx-row-d">这里只放本机构的官方入口，报名不在这台机器上办。</span>
+            <span className="qx-row-t">{third.title}</span>
+            <span className="qx-row-d">{third.desc}</span>
           </span>
           <span className="qx-row-go" aria-hidden="true">›</span>
         </button>

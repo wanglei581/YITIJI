@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
-import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
+import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 
@@ -493,3 +493,60 @@ for (const item of ME_SHELL_PAGES) {
     expect(errors).toEqual([])
   })
 }
+
+function registerEmptyAccount(api: ApiRouter): void {
+  registerMemberLogin(api)
+  registerAssetCounts(api, { resumes: 0, documents: 0, orders: 0, favorites: 0, benefits: 0, ai: 0 })
+  api.respond('GET', '/api/v1/me/pending-tasks', {
+    status: 200,
+    json: { success: true, data: [] },
+  })
+}
+
+async function expectEmptyThirdRow(page: Page, title: string, absent: string): Promise<void> {
+  await loginThroughVisibleUi(page, '/profile')
+  await expect(page.getByTestId('profile-state-empty')).toBeVisible()
+  const third = page.getByTestId('profile-empty-start-third')
+  await expect(third).toContainText(title)
+  await expect(third).not.toContainText(absent)
+  await expect(page.getByTestId('profile-help')).toContainText('帮助中心')
+  await expect(page.getByTestId('profile-help')).toContainText('常见问题与操作说明。')
+}
+
+test('profile empty third row points at policy when no official channel is configured @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerEmptyAccount(api)
+
+  await expectEmptyThirdRow(page, '看看就业政策并收藏', '看看机构官方渠道')
+  await expect(page.getByTestId('profile-empty-start-third')).toContainText('查看办事指引，资格与办理以官方核验为准。')
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+test('profile empty third row points at official channels when hosting is closed and one channel exists @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerEmptyAccount(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'qx-profile-hosting-off'),
+  })
+  api.respond('GET', '/api/v1/terminals/KSK-001/official-channels', {
+    status: 200,
+    json: {
+      items: [{
+        name: '青岛示例大学就业信息网',
+        url: 'https://career.example.edu.cn/jobs?from=kiosk',
+        displayOrder: 1,
+        organizationName: '青岛示例大学就业指导中心',
+      }],
+      legacyPlatforms: [],
+    },
+  })
+
+  await expectEmptyThirdRow(page, '看看机构官方渠道', '看看就业政策并收藏')
+  await expect(page.getByTestId('profile-empty-start-third')).toContainText('这里只放本机构的官方入口，报名不在这台机器上办。')
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})

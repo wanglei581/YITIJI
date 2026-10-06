@@ -197,7 +197,7 @@ export function MySettingsPage() {
       onCancel={() => setShowRebind(false)} />
   )
   const ctabar = <>
-    <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/profile')}>返回我的</button>
+    <button type="button" className="qx-btn" data-variant="ghost" data-narrow="1" onClick={() => navigate('/profile')}>返回我的</button>
     {isLoggedIn ? <button type="button" className="qx-btn" data-variant="danger" data-testid="member-settings-primary" onClick={() => setConfirm('logout')}><LogOutIcon size={24} aria-hidden="true" />结束使用并退出登录</button>
       : <button type="button" className="qx-btn" data-variant="primary" data-testid="member-settings-primary" onClick={() => navigate('/login', { state: { from: '/me/settings' } })}>手机号登录</button>}
   </>
@@ -286,7 +286,7 @@ export function MySettingsPage() {
         <section className="qx-me-list" aria-label="协议与帮助">
           <SettingsRow icon={FileTextIcon} title="《用户服务协议》" desc="服务范围、账号、收费与打印说明" route="/legal/terms" testid="member-settings-terms" onClick={() => navigate('/legal/terms')} />
           <SettingsRow icon={ShieldCheckIcon} tone="slate" title="《隐私政策》" desc="信息收集、使用与文件留存说明" route="/legal/privacy" testid="member-settings-privacy-doc" onClick={() => navigate('/legal/privacy')} />
-          <SettingsRow icon={HelpCircleIcon} title="帮助与求助" desc="常见问题与操作说明。" route="/help" testid="member-settings-help" onClick={() => navigate('/help')} />
+          <SettingsRow icon={HelpCircleIcon} title="帮助中心" desc="常见问题与操作说明。" route="/help" testid="member-settings-help" onClick={() => navigate('/help')} />
         </section>
 
         <section className="settings-note" aria-label="公共终端使用说明">

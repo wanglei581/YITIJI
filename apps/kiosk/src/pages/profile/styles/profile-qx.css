@@ -281,6 +281,9 @@
 .pf-root .qx-ctabar .why { flex: 1; font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
 .pf-root .qx-ctabar .qx-btn { flex: none; }
 .pf-root .qx-ctabar .qx-btn[data-grow='1'] { flex: 1 1 auto; }
+/* 三个及以上的键时，说明句单独占整行，放在键的上面。两个键时仍和键并排。 */
+.pf-root .qx-ctabar:has(.why):has(.qx-btn:nth-of-type(3)) { flex-wrap: wrap; }
+.pf-root .qx-ctabar:has(.why):has(.qx-btn:nth-of-type(3)) .why { flex: 1 0 100%; }
 .pf-root .pf-truth { margin: 0; }
 
 @media (max-width: 640px) {
@@ -312,6 +315,8 @@
 .pf-root .qx-sec-h .hint { font-size: var(--qx-fs-aux-lg); color: var(--qx-ink-2); }
 .pf-root .pf-meta2 small { font-size: var(--qx-fs-aux-lg); }
 .pf-root .qx-row-t { font-size: var(--qx-fs-btn); }
+/* 稿 30 的行尾箭头是 21px。按钮继承的 16px 低于字阶下限。 */
+.pf-root .qx-row-go { font-size: var(--qx-fs-aux-lg); line-height: 1; }
 .pf-root .qx-ctabar .qx-btn[data-narrow='1'] { flex: none; min-width: 220px; }
 .pf-root .pf-state { flex-direction: column; gap: 16px; padding: 28px 34px; }
 .pf-root .pf-state[data-tone='error'] { background: var(--qx-cinnabar-soft); border-color: var(--qx-cinnabar-soft); }
