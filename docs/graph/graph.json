@@ -20696,7 +20696,8 @@
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-r1-qx2.css": [
-      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-report-fixture.ts": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
@@ -31156,6 +31157,7 @@
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx",
+          "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
           "apps/kiosk/src/pages/resume/resume-report-fixture.ts",
           "apps/kiosk/src/pages/resume/resume-report-model.ts",
           "apps/kiosk/src/pages/resume/resume-report-qx.css"

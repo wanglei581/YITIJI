@@ -822,7 +822,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/resume-library-lightflow.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-materials-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-optimize-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
-| `apps/kiosk/src/pages/resume/resume-r1-qx2.css` | `verify-resume-diagnosis-flow-ui.mjs` |
+| `apps/kiosk/src/pages/resume/resume-r1-qx2.css` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-fixture.ts` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-model.ts` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-qx.css` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-report-qx.mjs` |
