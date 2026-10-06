@@ -70,8 +70,8 @@ const COPY: Record<StateView, { h: string; p: string; exits: Exit[] }> = {
     h: '诊断报告能力当前不可用',
     p: '没有接通真实 AI 服务时，读取报告会被直接拒绝，不会返回任何「读过你简历」的结论 —— 这是有意为之，避免把演示分数当成真实评价。',
     exits: [
-      { title: '打印简历或材料', desc: '选好份数和单双面就能出纸', to: '/print-scan', testid: 'resume-report-exit-print', icon: 'print' },
-      { title: '扫描纸质简历', desc: '在奔图面板扫描，回传成 PDF', to: '/scan', testid: 'resume-report-exit-scan', icon: 'scan' },
+      { title: '打印简历或材料', desc: '选好文件、份数和单双面就能出纸', to: '/print-scan', testid: 'resume-report-exit-print', icon: 'print' },
+      { title: '扫描纸质简历', desc: '在打印机面板上扫描，存成 PDF', to: '/scan', testid: 'resume-report-exit-scan', icon: 'scan' },
       { title: '打开我的简历', desc: '查看和整理已保存的版本', to: '/me/ai-records', testid: 'resume-report-exit-records', icon: 'folder' },
       { title: '查政策', desc: '查看本机构发布的政策与办理说明', to: '/policy-service', testid: 'resume-report-exit-policies', icon: 'policy' },
       { title: '本机构官方渠道', desc: '扫码查看官网或官方账号', to: '/official-channels', testid: 'resume-report-exit-channels', icon: 'qr' },

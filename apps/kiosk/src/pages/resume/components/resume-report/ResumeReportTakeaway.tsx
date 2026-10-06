@@ -179,7 +179,7 @@ export function ResumeReportTakeaway(props: {
   return (
     <>
       <div className="rrp-export-panel" data-testid="resume-report-export-actions" data-exported={exported ? '1' : '0'}>
-        <div className="rrp-take-h" data-testid="resume-report-takeaway-title">带走</div>
+        <div className="rrp-take-h" data-testid="resume-report-takeaway-title">带走这份报告</div>
         <ResumePricingBar pricing={pricing} loading={pricingLoading} blockedReason={blockedReason} />
         <div className="rrp-export">
           <TakeawayButton

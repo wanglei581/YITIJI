@@ -39,7 +39,7 @@ interface Props {
 
 /** 拿不到这份原件时的真实原因。写在按钮旁边常驻可见，不放 tooltip。 */
 const NO_PRINT_URL_REASON =
-  '这里拿不到你刚上传的那份原件（刷新或重新进入后就拿不到了）。请回到简历来源重新选取文件，再去打印。'
+  '这里拿不到你刚上传的那份原件（离开这一页再回来就拿不到了）。请回到简历来源重新选取文件，再去打印。'
 
 function RowIcon({ children }: { children: ReactNode }) {
   return <span className="rrp-ic" aria-hidden="true">{children}</span>

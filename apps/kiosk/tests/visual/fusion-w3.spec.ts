@@ -1338,7 +1338,7 @@ test('resume report expands seven blocks, drops the inner scroller, and fills th
   })
   expect(tagFlush).toBeLessThanOrEqual(8)
 
-  await expect(page.getByTestId('resume-report-takeaway-title')).toHaveText('带走')
+  await expect(page.getByTestId('resume-report-takeaway-title')).toHaveText('带走这份报告')
   const takeawayButtons = page.locator('[data-testid="resume-report-export-actions"] .rrp-export > button')
   await expect(takeawayButtons).toHaveCount(4)
   const takeawayRow = await takeawayButtons.evaluateAll((els) => els.map((el) => {
@@ -1425,7 +1425,7 @@ test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @
     }
     if (state === 'diagnose-failed') {
       await expect(page.getByRole('button', { name: /打印我上传的原件/ })).toContainText('本次不可用')
-      await expect(page.getByText('这里拿不到你刚上传的那份原件（刷新或重新进入后就拿不到了）。请回到简历来源重新选取文件，再去打印。')).toBeVisible()
+      await expect(page.getByText('这里拿不到你刚上传的那份原件（离开这一页再回来就拿不到了）。请回到简历来源重新选取文件，再去打印。')).toBeVisible()
     }
   }
 

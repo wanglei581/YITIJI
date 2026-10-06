@@ -107,7 +107,7 @@ assert(taskIdRe.test(sixtyFour) && !/^[A-Za-z0-9_-]{1,24}$/.test(sixtyFour), 'a 
 assert(!taskIdRe.test('a'.repeat(65)) && !taskIdRe.test('bad id') && !taskIdRe.test(''), 'task id still rejects overlong, spaced, and empty values')
 assert(has(files.model, 'evidenceCountOfBlock'), 'block tags count evidence lines separately from issues')
 assert(has(files.issues, '条证据'), 'structure blocks show how many evidence lines they hit')
-assert(has(files.takeaway, '带走'), 'takeaway section is titled 带走')
+assert(has(files.takeaway, '带走这份报告'), 'takeaway section is titled 带走这份报告')
 assert(has(files.takeaway, 'data-testid="resume-report-takeaway-title"'), 'takeaway title has a stable test id')
 assert(has(files.css, '#resume-report-why'), 'bottom actions fill the row after the why line')
 assert(has(files.css, "flex: 1.35 1 0"), 'primary action stays wider than the ghost action')
