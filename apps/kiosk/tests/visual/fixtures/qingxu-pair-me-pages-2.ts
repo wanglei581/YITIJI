@@ -34,11 +34,11 @@ const NEW_ID = 'fb-new-1006'
 const NO_SCREEN = '运行页没有整屏态'
 
 const ACTIVITY_REASON: Record<string, string> = {
-  'claim-pending': `${NO_SCREEN}。点「立即领取」后按钮停在「领取中…」，整页仍是活动详情。`,
-  'claim-success': `${NO_SCREEN}。领取成功只在详情页上出一句「领取成功，已加入我的权益」。`,
-  'claim-error': `${NO_SCREEN}。领取失败只在详情页上出一句「领取失败，请稍后重试」。`,
-  ended: `${NO_SCREEN}。没有单独的结束页，仍是活动详情，库存标成「已结束」，领取按钮禁用。`,
-  'sold-out': `${NO_SCREEN}。没有单独的领完页，仍是活动详情，库存标成「已领完」，领取按钮禁用。`,
+  'claim-pending': '页头保持「活动详情」。主键按任务写成置灰的「正在领取…」，稿上是「返回我的权益」。',
+  'claim-success': '主键按任务写成「查看我的权益」，稿上是「去我的权益查看」。页头保持「活动详情」。',
+  'claim-error': '主键按任务写成「重试」，稿上是「看清条件再试一次」。失败说明只写这次没有记入、没有扣减名额。',
+  ended: '主键按任务置灰并写「已结束」，稿上是「看还在进行的活动」。页头保持「活动详情」。',
+  'sold-out': '主键按任务置灰并写「已领完」，稿上是「看别的活动」。页头保持「活动详情」。',
 }
 
 const PRIVACY_REASON: Record<string, string> = {}
@@ -266,33 +266,10 @@ function activityRuntime(state: string): string {
 function benefitsPlan(screen: string, state: string): MePages2Plan {
   if (screen === 'benefits') return hit(`[data-testid="benefits-state-${state}"]`, '/me/benefits')
   if (screen === 'activities') {
-    const marker = state === 'loading'
-      ? '[data-kiosk-screen="activities"] p:text-is("加载中…")'
-      : state === 'empty'
-        ? '[data-kiosk-screen="activities"] p:text-is("暂无可领取活动")'
-        : state === 'error'
-          ? '[data-kiosk-screen="activities"] p:text-is("出现了一些问题")'
-          : '[data-kiosk-screen="activities"] h2:text-is("海川区就业服务点 · 试运行打印服务")'
-    return hit(marker, '/activities')
+    return hit(`[data-testid="activities-state-${state}"]`, '/activities')
   }
   if (screen === 'activity') {
-    const marker = state === 'detail'
-      ? '[data-kiosk-screen="activity-detail"] button[aria-label="立即领取"]'
-      : state === 'signed-out'
-        ? '[data-kiosk-screen="activity-detail"] button[aria-label="登录后领取"]'
-        : state === 'claim-pending'
-          ? '[data-kiosk-screen="activity-detail"] button[aria-label="领取中…"]'
-          : state === 'claim-success'
-            ? '.k8-act-message.is-success'
-            : state === 'claim-error'
-              ? '.k8-act-message.is-error'
-              : state === 'ended'
-                ? '.k8-act-stock:text-is("已结束")'
-                : state === 'sold-out'
-                  ? '.k8-act-stock:text-is("已领完")'
-                  : null
-    if (!marker) return missing(`这一态没有现成注册器：activity/${state}`)
-    return hit(marker, activityRuntime(state), ACTIVITY_REASON[state] ?? null)
+    return hit(`[data-testid="activity-state-${state}"]`, activityRuntime(state), ACTIVITY_REASON[state] ?? null)
   }
   return missing(`这一态没有现成注册器：${screen}/${state}`)
 }
@@ -339,7 +316,7 @@ async function prepareBenefits(page: Page, api: ApiRouter, target: QingxuPairTar
   if (state === 'signed-out') await page.goto(runtime, { waitUntil: 'domcontentloaded' })
   else await loginTo(page, runtime)
   if (state !== 'claim-pending' && state !== 'claim-success' && state !== 'claim-error') return
-  const button = page.getByRole('button', { name: '立即领取', exact: true })
+  const button = page.getByRole('button', { name: '领取这项权益', exact: true })
   await button.waitFor({ state: 'visible', timeout: 20_000 })
   await button.click()
 }

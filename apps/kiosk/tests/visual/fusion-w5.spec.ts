@@ -544,7 +544,11 @@ test('benefit activity detail keeps the shared shell, real content and return pa
 
   await page.goto('/activities/w5-benefit-detail')
   await expect(page.locator('[data-kiosk-domain="profile"][data-kiosk-screen="activity-detail"]')).toBeVisible()
-  await expectSharedPageShell(page, '权益活动详情')
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('.qx-topbar')).not.toContainText('KSK-001')
+  await expect(page.locator('.ui-kiosk-page-header')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '活动详情', exact: true })).toBeVisible()
+  await expect(page.getByTestId('qx-nav-profile')).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { name: 'W5 打印服务体验权益', exact: true })).toBeVisible()
   await expect(page.getByText('这是来自真实活动详情接口的验收内容。', { exact: true })).toBeVisible()
   const backButton = page.getByRole('button', { name: /返回活动/ }).first()
