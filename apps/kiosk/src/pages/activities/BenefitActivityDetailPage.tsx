@@ -224,11 +224,11 @@ export function BenefitActivityDetailPage() {
                 </StateBlock>
               ) : null}
               <DetailCards item={item} />
-              {message && (
+              {message && uiState !== 'claim-error' ? (
                 <p className={message.kind === 'success' ? 'act-message k8-act-message is-success' : 'act-message k8-act-message is-error'} role="status">
                   {message.text}
                 </p>
-              )}
+              ) : null}
               <ServiceAlts screen="activity" />
             </>
           )}
