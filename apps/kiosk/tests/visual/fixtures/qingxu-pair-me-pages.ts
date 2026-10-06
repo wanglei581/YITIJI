@@ -39,10 +39,10 @@ const AI_DELETE_ID = 'ai-parse-20261006'
 const DETAIL_ID = 'br-20261002-haichuan-skill'
 
 const ACCESS_REASON: Record<string, string> = {
-  'documents-access-loading': '运行页没有整屏态。最接近的操作是点开第一份未到期文件，查看按钮停在「打开中」（预览链接不返回）。整页仍是 documents-ready。',
-  'documents-access-expired': '运行页没有整屏态。已过保存期限的文件只把这一行的按钮改成「已到期」，并不发请求，也没有单独的过期页。整页仍是 documents-ready。',
-  'documents-access-error': '运行页没有整屏态。点开文件后预览链接失败，只出现同一句「文档打开失败，可能已到期或被清理」，没有单独的访问失败页。',
-  'documents-access-ready': '运行页没有整屏态。点开文件后只弹出预览层，没有整屏的访问成功页。预览字节不走 /api/v1，层内可能显示无法预览。',
+  'documents-access-loading': '访问链接四态是列表上方的横幅，不是整页换态。点预览后请求挂起，横幅停在「正在为这份文件取得新的访问链接」。整页仍是 documents-ready。',
+  'documents-access-expired': '访问链接四态是列表上方的横幅。预览接口返回已经过去的 expiresAt，横幅写「刚取得的访问链接已经过期」，不打开预览。保存期限到期的「已到期」行是另一件事。整页仍是 documents-ready。',
+  'documents-access-error': '访问链接四态是列表上方的横幅。预览接口失败时横幅写「这次没有取得可用链接」，不把失败叫成链接过期。整页仍是 documents-ready。',
+  'documents-access-ready': '访问链接四态是列表上方的横幅。预览接口返回未过期链接后，横幅写「预览链接已就绪」，并在当前页打开预览层。整页仍是 documents-ready。',
 }
 
 type JsonReply = { status: number; json: unknown }
@@ -257,10 +257,10 @@ const PRINT_ORDERS = [
 ]
 
 const ACCESS_MARKER: Record<string, string> = {
-  'documents-access-loading': 'text=打开中',
-  'documents-access-expired': '[data-expired="true"]',
-  'documents-access-error': '[data-testid="member-assets-toast"]',
-  'documents-access-ready': '#document-preview-title',
+  'documents-access-loading': '[data-testid="member-assets-access"][data-access="loading"]',
+  'documents-access-expired': '[data-testid="member-assets-access"][data-access="expired"]',
+  'documents-access-error': '[data-testid="member-assets-access"][data-access="error"]',
+  'documents-access-ready': '[data-testid="member-assets-access"][data-access="ready"]',
 }
 
 function assetsPlan(state: string): MePagesPlan {
@@ -284,19 +284,28 @@ async function prepareAssets(page: Page, api: ApiRouter, state: string): Promise
   const openPath = `/api/v1/files/${OPEN_DOC_ID}/preview-url`
   if (state === 'documents-access-loading') api.respondWith('GET', openPath, hang)
   if (state === 'documents-access-error') api.respond('GET', openPath, fail())
+  if (state === 'documents-access-expired') {
+    api.respond('GET', openPath, ok({
+      fileId: OPEN_DOC_ID,
+      url: 'http://127.0.0.1:9/linxiaowen-resume.pdf',
+      printFileUrl: 'http://127.0.0.1:9/linxiaowen-resume-print.pdf',
+      expiresAt: '2020-01-01T00:00:00.000Z',
+      disposition: 'inline',
+    }))
+  }
   if (state === 'documents-access-ready') {
     api.respond('GET', openPath, ok({
       fileId: OPEN_DOC_ID,
       url: 'http://127.0.0.1:9/linxiaowen-resume.pdf',
       printFileUrl: 'http://127.0.0.1:9/linxiaowen-resume-print.pdf',
-      expiresAt: '2026-10-06T18:00:00.000+08:00',
+      expiresAt: '2099-01-01T00:00:00.000Z',
       disposition: 'inline',
     }))
   }
   await enter(page, runtimePath, !state.endsWith('-login'))
-  if (!access || state === 'documents-access-expired') return
+  if (!access) return
   await see(page, assetState('documents-ready'))
-  await page.getByRole('button', { name: '查看', exact: true }).first().click()
+  await page.getByRole('button', { name: '预览', exact: true }).first().click()
 }
 
 // ── 39 记录 ──────────────────────────────────────────────────────────

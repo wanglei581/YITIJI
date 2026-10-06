@@ -418,10 +418,10 @@ button.qx-me-row { cursor: pointer; }
 .qx-me-skel-s { display: block; width: 36%; height: 18px; margin-top: 12px; }
 
 .qx-me-unread {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: var(--qx-ink);
+  background: var(--qx-teal);
   flex: none;
 }
 

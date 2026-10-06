@@ -433,6 +433,10 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   // 包 L1 第 1 次（2026-09-07）：我的文档 Word 转 PDF 入口拆子组件，避免主文件超 500 行。
   'apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx',
+  // C 路 C1-3（2026-10-06）：我的文档页内照稿。分类与访问链接横幅拆到 documents/，
+  // 主文件仍保留打印、预览、删除、签名与保存期限。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/documents/documentClassify.ts',
+  'apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx',
   'apps/kiosk/src/pages/profile/me/components/documentReprint.ts',
   'apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',

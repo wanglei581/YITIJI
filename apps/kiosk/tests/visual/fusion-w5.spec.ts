@@ -1358,14 +1358,14 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   // 置灰原因常显在行内（触屏没有 hover，title 读不到）。
   await expect(page.getByText('该文件格式暂不支持打印', { exact: true })).toBeVisible()
   await expect(rows.filter({ hasText: '已过期的求职信.pdf' }).getByRole('button', { name: '已到期' })).toBeDisabled()
-  await expect(rows.filter({ hasText: '作品集源文件.zip' }).getByRole('button', { name: '打印' })).toBeDisabled()
+  await expect(rows.filter({ hasText: '作品集源文件.zip' }).getByRole('button', { name: '用于打印' })).toBeDisabled()
   await assetShot(page, 'documents-ready')
   await assertNoElementCrossesViewport(page)
   await expectFusionAcceptance(page, errors)
 
   // 查看：凭本人 token 现换短期链接，在当前页内预览。
   const previewRequest = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/v1/files/doc-photo/preview-url')
-  await rows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' }).click()
+  await rows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '预览' }).click()
   expect((await (await previewRequest).allHeaders()).authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
   const dialog = page.getByRole('dialog', { name: '一寸证件照.png' })
   await expect(dialog).toBeVisible()
@@ -1382,7 +1382,8 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   await page.getByRole('button', { name: '同意并保存' }).click()
   await expect(page.getByTestId('member-assets-toast')).toHaveText('保存期限已更新')
   expect(api.requestCount('PATCH', '/api/v1/files/doc-long/retention')).toBe(1)
-  await expect(longRow.locator('.qx-me-chip')).toContainText('保存 6 个月')
+  // 2026-10-06 C1-3：一行里分类标签和三个小标签都用 .qx-me-chip。按「保存 6 个月」这一枚定位，期限回填这件事不放宽。
+  await expect(longRow.locator('.qx-me-chip', { hasText: '保存 6 个月' })).toBeVisible()
 
   // 删除：两步确认，服务端成功后才从列表移除。
   const zipRow = rows.filter({ hasText: '作品集源文件.zip' })
@@ -1397,7 +1398,7 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   const inspectionCreated = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks',
   )
-  await longRow.getByRole('button', { name: '打印', exact: true }).click()
+  await longRow.getByRole('button', { name: '用于打印', exact: true }).click()
   await page.waitForURL(/\/print\/desk\?step=check$/)
   await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
   expect((await inspectionCreated).postDataJSON()).toMatchObject({ kind: 'inspection', sourceFileId: 'doc-long' })
@@ -1442,7 +1443,7 @@ test('documents: derived AI output skips the material check and goes straight to
   const quoteRequest = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/orders/quote',
   )
-  await page.getByTestId('member-assets-document').filter({ hasText: '简历对照.pdf' }).getByRole('button', { name: '打印', exact: true }).click()
+  await page.getByTestId('member-assets-document').filter({ hasText: '简历对照.pdf' }).getByRole('button', { name: '用于打印', exact: true }).click()
   await page.waitForURL('**/print/confirm')
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
   expect((await quoteRequest).postDataJSON()).toMatchObject({ fileUrl: '/api/v1/files/doc-ai-report/content?sig=print' })
@@ -1463,7 +1464,7 @@ test('documents and orders: error then empty come from the server, never a cache
   await assetShot(page, 'documents-error')
   api.respond('GET', '/api/v1/me/documents', memberPage([]))
   await page.getByRole('button', { name: '重新加载', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '还没有文档' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '还没有保存的文档' })).toBeVisible()
   await expect(page.getByRole('region', { name: '文档资产概览' })).toContainText('0')
   await expectFusionAcceptance(page, errors)
 
@@ -1569,7 +1570,7 @@ test('documents and orders stay operable at 390x844 without overlap @w5-mobile',
     await docRows.nth(index).scrollIntoViewIfNeeded()
     await expectNameClearOfActions(docRows.nth(index))
   }
-  const view = docRows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' })
+  const view = docRows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '预览' })
   await view.scrollIntoViewIfNeeded()
   await assertTapTargetPointerHit(view)
   await view.click()

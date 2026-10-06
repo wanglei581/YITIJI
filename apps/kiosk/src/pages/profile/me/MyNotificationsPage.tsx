@@ -29,7 +29,7 @@ import {
   type MemberNotificationItem,
 } from '../../../services/api/memberNotifications'
 import { formatTime } from '../assets/format'
-import { QxMeAskSlot, QxMeBanner, QxMeCta, QxMeGuide, QxMePage, QxMeSummary, QX_ME_GUIDE } from './qx/QxMeChrome'
+import { QxMeAskSlot, QxMeBanner, QxMeCta, QxMeGuide, QxMePage, QxMeSummary } from './qx/QxMeChrome'
 import './styles/notifications-qx.css'
 
 const CATEGORY_META: Record<string, { label: string; icon: typeof BellIcon; tone: 'slate' | 'clay' | 'plum' | 'wheat' | undefined; hint: string }> = {
@@ -41,6 +41,17 @@ const CATEGORY_META: Record<string, { label: string; icon: typeof BellIcon; tone
   system: { label: '系统', icon: BellIcon, tone: 'clay', hint: '账号与安全相关的系统消息' },
 }
 const CAT_ORDER = ['print', 'ai', 'feedback', 'maintenance', 'notice', 'system'] as const
+
+const LOADING_GUIDE: [string, string, string][] = [
+  ['读取范围', '只读当前账号', '不会展示其他账号的消息'],
+  ['显示规则', '不闪回旧消息', '离开前请点结束使用，否则一段时间无操作后才会自动退出'],
+  ['失败怎么办', '保留重试入口', '读取失败不会改动已读状态'],
+]
+const ERROR_GUIDE: [string, string, string][] = [
+  ['数据', '已有消息不受影响', '这次加载失败不会删除任何消息'],
+  ['先试这个', '检查网络后重试', '重试不会重复标记已读'],
+  ['仍不行', '联系现场工作人员', '可在帮助页找到联系方式'],
+]
 
 type LoadState = 'loading' | 'error' | 'ready'
 type Toast = { tone: 'ok' | 'bad'; text: string }
@@ -69,6 +80,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
   const [reloadKey, setReloadKey] = useState(0)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
+  const [knownAllTotal, setKnownAllTotal] = useState<number | null>(null)
 
   const canUseRemote = API_MODE === 'http' && Boolean(getToken())
 
@@ -77,6 +89,15 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
   const pagination = useMemberCursorPage<MemberNotificationItem, Awaited<ReturnType<typeof getMyNotifications>>>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
   const { items, state: state } = pagination
   const unreadCount = pagination.page?.unreadCount ?? 0
+
+  useEffect(() => {
+    setKnownAllTotal(null)
+  }, [token])
+
+  useEffect(() => {
+    if (unreadOnly || state !== 'ready' || !pagination.page) return
+    if (typeof pagination.page.total === 'number') setKnownAllTotal(pagination.page.total)
+  }, [unreadOnly, state, pagination.page])
 
   useEffect(() => {
     if (!toast) return
@@ -162,11 +183,11 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
       body = (
         <>
           <QxMeBanner tone="calm" title="正在加载本人消息" desc={<>正在读取当前账号的消息。<b>返回前一律显示「—」</b>，不会闪回上一位用户的消息。</>} minis={['未读 —', '正在安全读取']} />
-          <section className="qx-me-list qx-me-grow" aria-label="正在加载的消息占位">
-            {[0, 1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)}
+          <section className="qx-me-list qx-me-grow" aria-label="正在读取的消息类型">
+            {CAT_ORDER.map((cat, index) => <CategoryStructRow key={cat} cat={cat} mode="loading" index={index} />)}
             <div className="qx-me-legal">这次读取失败不会改动任何已读状态，也不会删除消息。</div>
           </section>
-          <QxMeGuide items={[...QX_ME_GUIDE.loading]} />
+          <QxMeGuide items={LOADING_GUIDE} />
         </>
       )
     } else if (state === 'error') {
@@ -177,11 +198,13 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
             {CAT_ORDER.map((cat) => <CategoryStructRow key={cat} cat={cat} mode="error" />)}
             <div className="qx-me-legal">重试不会重复标记已读，也不会删除消息。多次重试仍失败时，可以让现场工作人员协助查询。</div>
           </section>
-          <QxMeGuide items={[...QX_ME_GUIDE.error]} />
+          <QxMeGuide items={ERROR_GUIDE} />
         </>
       )
     } else {
     const empty = !canUseRemote || items.length === 0
+    const allTotal = unreadOnly ? knownAllTotal : (pagination.page?.total ?? items.length)
+    const allTotalText = allTotal === null ? '—' : String(allTotal)
     body = (
       <>
         <QxMeSummary
@@ -189,12 +212,12 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
           icon={<BellIcon size={32} />}
           label="消息中心"
           big={unreadCount}
-          desc="未读消息来自本人设备、打印、文件与服务状态"
-          minis={[`当前 ${items.length}`, canUseRemote ? '已连接' : '待登录']}
+          desc="未读消息来自本人打印、AI、文件与系统状态"
+          minis={[`当前 ${allTotalText}`, '本页无实时推送']}
         />
         <div className="qx-me-tabbar" data-n="2" role="group" aria-label="消息筛选">
           {[
-            { key: false, label: '全部', count: items.length, testid: 'notifications-tab-all' },
+            { key: false, label: '全部', count: allTotalText, testid: 'notifications-tab-all' },
             { key: true, label: '未读', count: unreadCount, testid: 'notifications-tab-unread' },
           ].map((tab) => (
             <button key={String(tab.key)} type="button" className="qx-me-tab" aria-current={unreadOnly === tab.key ? 'true' : undefined} data-testid={tab.testid} onClick={() => setUnreadOnly(tab.key)}>
@@ -346,11 +369,18 @@ function notificationCtabar({
   )
 }
 
-function CategoryStructRow({ cat, mode }: { cat: string; mode: 'lock' | 'error' }) {
+function CategoryStructRow({ cat, mode, index = 0 }: { cat: string; mode: 'lock' | 'error' | 'loading'; index?: number }) {
   const meta = CATEGORY_META[cat]
   const Icon = meta.icon
+  const tail = mode === 'lock' ? '登录后显示' : mode === 'loading' ? '读取中' : '本次未取到'
   return (
-    <div className="qx-me-row" data-dead="true" data-notification-category={cat} data-slot-mode={mode} data-testid={`notifications-cat-${cat}`}>
+    <div
+      className="qx-me-row"
+      data-dead="true"
+      data-notification-category={cat}
+      data-slot-mode={mode}
+      data-testid={mode === 'loading' ? `notifications-skeleton-${index}` : `notifications-cat-${cat}`}
+    >
       <span className="qx-me-row-ico" data-tone="off" aria-hidden="true"><Icon size={28} /></span>
       <span className="qx-me-row-main">
         <span className="qx-me-row-title">{meta.label}消息</span>
@@ -360,18 +390,11 @@ function CategoryStructRow({ cat, mode }: { cat: string; mode: 'lock' | 'error' 
         </span>
       </span>
       <span className="qx-me-acts">
-        <span className="qx-me-small" aria-disabled="true">{mode === 'lock' ? '登录后显示' : '本次未取到'}</span>
+        <span className="qx-me-small" aria-disabled="true">
+          {mode === 'loading' ? <ClockIcon size={19} aria-hidden /> : null}
+          {tail}
+        </span>
       </span>
-    </div>
-  )
-}
-
-function SkeletonRow() {
-  return (
-    <div className="qx-me-row" aria-hidden="true">
-      <span className="qx-me-row-ico" data-tone="off" />
-      <span className="qx-me-row-main"><span className="qx-me-skel" /><span className="qx-me-skel qx-me-skel-s" /></span>
-      <span className="qx-me-acts"><span className="qx-me-skel" style={{ width: 110, height: 50, borderRadius: 16 }} /></span>
     </div>
   )
 }
@@ -394,7 +417,7 @@ function NotificationRow({
   const deleting = busyId === `delete-${item.kind}-${item.id}`
   return (
     <div
-      className="qx-me-row"
+      className="qx-me-row qx-me-notice-row"
       data-notification-kind={item.kind}
       data-notification-category={item.category}
       data-notification-read={item.isRead ? 'read' : 'unread'}
@@ -414,6 +437,7 @@ function NotificationRow({
         <span className="qx-me-row-foot">
           {feedbackRelated ? (
             <button type="button" className="qx-me-small" data-variant="primary" data-testid={`${tid}-feedback`} onClick={onFeedback}>
+              <MessageSquareIcon size={19} aria-hidden />
               查看相关反馈
             </button>
           ) : null}
