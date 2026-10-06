@@ -12136,7 +12136,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 234,
+      "reachableFileCount": 236,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12899,7 +12899,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 260
+      "sourceFileCount": 263
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15883,7 +15883,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 83,
+      "reachableFileCount": 84,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16301,7 +16301,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 84
+      "sourceFileCount": 85
     }
   },
   "dataModel": {
@@ -18417,10 +18417,16 @@
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
+    "apps/admin/src/routes/print-scan/ClearCapabilityButton.tsx": [
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
+    ],
     "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/PrintRetryButton.tsx": [
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
+    ],
+    "apps/admin/src/routes/print-scan/SignatureCapabilityRow.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/index.tsx": [
@@ -27433,15 +27439,14 @@
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
+          "apps/admin/src/routes/print-scan/ClearCapabilityButton.tsx",
           "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx",
           "apps/admin/src/routes/print-scan/PrintRetryButton.tsx",
+          "apps/admin/src/routes/print-scan/SignatureCapabilityRow.tsx",
           "apps/admin/src/routes/print-scan/index.tsx",
           "apps/admin/src/services/api/printScan.ts"
         ],
-        "missing": [
-          "src/routes/print-scan/ClearCapabilityButton.tsx",
-          "src/routes/print-scan/SignatureCapabilityRow.tsx"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "helper": false,
@@ -42571,6 +42576,17 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/services/api/userErrorMessage.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
