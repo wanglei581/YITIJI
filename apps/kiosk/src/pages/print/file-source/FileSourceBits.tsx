@@ -271,7 +271,7 @@ const CHANNEL_COPY: Record<UploadTab, { name: string; desc: string; limit: strin
   },
   usb: {
     name: 'U 盘导入',
-    desc: '插右侧 USB 口，本地服务列出根目录里的文件，你在屏幕上选。',
+    desc: '插右侧 USB 口，本地服务列出最外层和下一层文件夹里的文件，你在屏幕上选。',
     limit: 'PDF / JPG / PNG · 单份 ≤ 15MB',
     tone: 'slate',
   },

@@ -594,16 +594,16 @@ export function FileSourceView(props: FileSourceViewProps) {
                 : screen === 'usb-agent-offline'
                   ? '暂时无法读取 U 盘。可以重新连接，或改用手机上传。'
                   : screen === 'usb-wait'
-                    ? '还没有检测到 U 盘。插上之后本地服务会列出根目录里能打印的文件。本机不会自动读整盘，也不进子文件夹。'
+                    ? '还没有检测到 U 盘。插上之后本地服务会列出最外层和下一层文件夹里能打印的文件。本机不会自动读整盘，更深的文件夹不读。'
                     : screen === 'usb-detecting'
-                      ? '本地服务在列根目录。不画进度条——读盘这件事没有可确认的百分比。读完之前不显示任何文件名。'
+                      ? '本地服务在读最外层和下一层文件夹。不画进度条——读盘这件事没有可确认的百分比。读完之前不显示任何文件名。'
                       : screen === 'usb-empty'
-                        ? '根目录里没有找到 PDF / JPG / PNG。常见原因：简历是 DOCX、文件放在子文件夹里、或者单份超过 15MB。'
+                        ? '最外层和下一层文件夹里都没有找到 PDF / JPG / PNG。常见原因：简历是 DOCX、文件放在更深的文件夹里、或者单份超过 15MB。'
                         : '本地服务连上了，但这次没能列出文件。本机不显示上一次的列表。'}
             </div>
           </FileSourceStatus>
           {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (
-            <div className="qx-card"><FileSourceSteps title={screen === 'usb-empty' ? '对号入座' : '重试是安全的'} items={screen === 'usb-empty' ? ['Word 另存为 PDF，再放到 U 盘最外层。', '不进入子文件夹，请把文件移到最外层。', '单份超过 15MB 时，降低分辨率再导出。'] : ['重新插入 U 盘，或换一个 USB 口。', '重新读取最外层文件，不改动盘上内容。', '仍没有结果时，换手机上传或联系工作人员。']} /></div>
+            <div className="qx-card"><FileSourceSteps title={screen === 'usb-empty' ? '对号入座' : '重试是安全的'} items={screen === 'usb-empty' ? ['Word 另存为 PDF，再放到 U 盘最外层。', '只看到下一层文件夹，再深的请把文件移出来。', '单份超过 15MB 时，降低分辨率再导出。'] : ['重新插入 U 盘，或换一个 USB 口。', '重新读取最外层和下一层文件夹，不改动盘上内容。', '仍没有结果时，换手机上传或联系工作人员。']} /></div>
           ) : null}
           {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (
             <section className="fs-sec">
@@ -614,7 +614,7 @@ export function FileSourceView(props: FileSourceViewProps) {
               <div className="qx-card fs-file-work" style={{ flex: 1 }}>
                 <FileSourceSteps
                   title="插上之后会发生什么"
-                  items={['检测已插入的 U 盘。', '列出根目录里可打印的 PDF / JPG / PNG。', '选择一份文件，再点「导入这一份」。']}
+                  items={['检测已插入的 U 盘。', '列出最外层和下一层文件夹里可打印的 PDF / JPG / PNG。', '选择一份文件，再点「导入这一份」。']}
                 />
                 <div style={{ marginTop: 14 }}>
                   <FileSourceNote>屏幕上只列文件名，不显示完整路径。</FileSourceNote><FileSourceNote>整个过程只读不写，不会往你的 U 盘里放东西。</FileSourceNote>
@@ -640,7 +640,7 @@ export function FileSourceView(props: FileSourceViewProps) {
                 : screen === 'usb-safeid-expired' ? '请重新选择这份文件'
                   : screen === 'usb-importing' ? '正在从 U 盘导入'
                     : screen === 'usb-import-failed' ? '这一份没导进来'
-                      : 'U 盘根目录'
+                      : 'U 盘最外层和下一层文件夹'
             }
             pulsing={screen === 'usb-importing'}
           >
@@ -683,7 +683,7 @@ export function FileSourceView(props: FileSourceViewProps) {
               <div className="fs-empty"><span>{screen === 'usb-list' ? '一次只选一份，再点导入。' : screen === 'usb-selected' ? '只选中了这一份，还没有上传任何东西。' : screen === 'usb-importing' ? '系统确认保存之前，当前文件仍然是空的。这期间别拔 U 盘。' : '当前文件仍然是空的。重新读盘，在新列表里再选一份。'}</span></div>
               <FileSourceSteps title={screen === 'usb-importing' ? '导入完成之后' : screen === 'usb-list' || screen === 'usb-selected' ? '选中之后会怎样' : '重新读盘之后'} items={['从最新列表选择一份文件。', '导入后系统校验并保存这一份。', '系统确认收到后，才能进入材料检查。']} />
               <div style={{ marginTop: 12 }}>
-                <FileSourceNote>只列根目录里能打印的文件。超过上限的不列。子文件夹里的东西不在这里。</FileSourceNote>
+                <FileSourceNote>只列最外层和下一层文件夹里能打印的文件。超过上限的不列。更深的文件夹不在这里。</FileSourceNote>
               </div>
             </div>
           </section>
