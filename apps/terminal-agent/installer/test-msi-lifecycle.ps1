@@ -96,7 +96,7 @@ function Assert-ControlCenterSmoke {
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $controlCenterScriptPath -SmokeTest -SmokeTestOutput $outputPath
   if ($LASTEXITCODE -ne 0) { throw "Terminal control center smoke test failed" }
   $snapshot = Get-Content -Raw -Encoding UTF8 -LiteralPath $outputPath | ConvertFrom-Json
-  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne "0.4.13") {
+  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne "0.4.14") {
     throw "Terminal control center smoke snapshot is invalid"
   }
 }
