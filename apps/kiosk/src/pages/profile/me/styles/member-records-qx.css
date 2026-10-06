@@ -12,7 +12,7 @@
 }
 .qx-me-detail-head .qx-me-row-ico { width: 70px; height: 70px; }
 .qx-me-detail-head h2 { margin: 0; font-size: 31px; font-weight: 800; line-height: 1.28; }
-.qx-me-detail-head p { margin: 6px 0 0; font-size: 18px; color: var(--qx-ink-3); }
+.qx-me-detail-head p { margin: 6px 0 0; font-size: 21px; color: var(--qx-ink-2); }
 
 /* 招聘内容托管关闭（3.13）时收藏说明只剩「政策收藏」一条：占满一行，不挤在三栏的第一栏里。 */
 .qx-me-fav-next[data-n='1'] { grid-template-columns: minmax(0, 1fr); }
@@ -132,14 +132,14 @@
   min-width: 0;
   padding: 9px 0;
   border-bottom: 1px dashed var(--qx-line);
-  font-size: 17px;
+  font-size: 21px;
   color: var(--qx-ink-3);
 }
 .qx-me-assets .me-payment-row strong { color: var(--qx-ink); font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
-.qx-me-assets .me-payment-row em { display: block; font-style: normal; font-size: 15px; font-weight: 600; color: var(--qx-ink-3); }
-.qx-me-assets .me-payment-empty { margin: 0; font-size: 17px; font-weight: 750; color: var(--qx-ink-2); }
+.qx-me-assets .me-payment-row em { display: block; font-style: normal; font-size: 21px; font-weight: 600; color: var(--qx-ink-3); }
+.qx-me-assets .me-payment-empty { margin: 0; font-size: 21px; font-weight: 750; color: var(--qx-ink-2); }
 .qx-me-assets .me-payment-empty span { display: block; margin-top: 4px; font-weight: 500; color: var(--qx-ink-3); }
-.qx-me-assets .me-note { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--qx-wheat-soft); color: var(--qx-wheat-d); font-size: 17px; line-height: 1.5; }
+.qx-me-assets .me-note { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--qx-wheat-soft); color: var(--qx-wheat-d); font-size: 21px; line-height: 1.5; }
 .qx-me-assets .me-pickup-panel {
   display: flex;
   flex-direction: column;
@@ -150,10 +150,10 @@
   background: var(--qx-teal-soft);
   color: var(--qx-teal-d);
 }
-.qx-me-assets .me-pickup-panel p { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 750; }
+.qx-me-assets .me-pickup-panel p { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 21px; font-weight: 750; }
 .qx-me-assets .me-pickup-panel p svg { width: 20px; height: 20px; }
 .qx-me-assets .me-pickup-panel strong { font-family: var(--qx-mono); font-size: 40px; letter-spacing: 6px; color: var(--qx-ink); overflow-wrap: anywhere; }
-.qx-me-assets .me-pickup-panel span { font-size: 16px; color: var(--qx-ink-2); }
+.qx-me-assets .me-pickup-panel span { font-size: 21px; color: var(--qx-ink-2); }
 .qx-me-assets .me-print-document-action,
 .qx-me-assets .me-doc-action,
 .qx-me-assets .me-dialog-button {
@@ -166,14 +166,14 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 750;
   color: var(--qx-ink);
   cursor: pointer;
 }
 .qx-me-assets .me-print-document-action { align-self: flex-start; }
 .qx-me-assets .me-print-document-action svg { width: 19px; height: 19px; }
-.qx-me-assets .me-print-document-note { margin: 0; font-size: 16px; color: var(--qx-ink-3); }
+.qx-me-assets .me-print-document-note { margin: 0; font-size: 21px; color: var(--qx-ink-3); }
 
 /* 转 PDF（DocumentConvertAction）与保存期限确认（RetentionConfirmOverlay） */
 .qx-me-assets .me-doc-action.is-disabled,
@@ -184,8 +184,8 @@
   color: var(--qx-muted-ink);
   cursor: not-allowed;
 }
-.qx-me-assets .me-row-title { margin: 0; font-size: 19px; font-weight: 800; overflow-wrap: anywhere; }
-.qx-me-assets .me-row-meta { margin: 0; font-size: 16px; line-height: 1.45; color: var(--qx-ink-3); }
+.qx-me-assets .me-row-title { margin: 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere; }
+.qx-me-assets .me-row-meta { margin: 0; font-size: 21px; line-height: 1.45; color: var(--qx-ink-2); }
 .qx-me-assets .me-retention-dialog {
   width: min(92%, 640px);
   padding: 32px;
@@ -196,7 +196,7 @@
 }
 /* 组件自带 text-base / text-sm 是手机字号，27 寸竖屏上读不清，按青序正文字阶放大。 */
 .qx-me-assets .me-retention-dialog #retention-confirm-title { font-size: 26px; font-weight: 800; }
-.qx-me-assets .me-retention-dialog #retention-confirm-desc { margin-top: 12px; font-size: 19px; line-height: 1.6; }
+.qx-me-assets .me-retention-dialog #retention-confirm-desc { margin-top: 12px; font-size: 21px; line-height: 1.6; }
 .qx-me-assets .me-dialog-button { flex: 1 1 0; }
 .qx-me-assets .me-dialog-button.primary { background: var(--qx-deep); border-color: var(--qx-deep); color: var(--qx-paper); }
 

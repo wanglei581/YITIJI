@@ -1,15 +1,21 @@
-import { type ReactNode } from 'react'
+import { Children, cloneElement, createContext, isValidElement, useContext, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  ArrowRightIcon,
   BellIcon,
+  ChevronLeftIcon,
   ClockIcon,
   LockIcon,
+  LogInIcon,
+  RefreshCwIcon,
+  SparklesIcon,
   TriangleAlertIcon,
+  type LucideIcon,
 } from 'lucide-react'
 import { QxPageFrame } from '../../../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../../../components/qingxu/QxAppNavbar'
 import { useRecruitmentHosting } from '../../../../hooks/useRecruitmentHosting'
-import { useTerminalDeviceStatus } from '../../../../hooks/useTerminalDeviceStatus'
+import { rememberAssistantDraft } from '../../../../services/assistantDraft'
 import { getTerminalCode } from '../../../../services/api/terminalConfig'
 import '../styles/qx-me-shared.css'
 
@@ -24,19 +30,75 @@ export type QxMeView =
   | 'orders'
   | 'settings'
 
-export type QxMeStatusTone = 'ok' | 'warn' | 'bad' | 'unknown'
+type QxMeTab = { key: QxMeView; label: string; hint: string; to: string }
 
-function qxStatusFromDevice(device: ReturnType<typeof useTerminalDeviceStatus>): {
-  tone: QxMeStatusTone
-  label: string
-} {
-  if (device.loading || device.kind === 'unknown') return { tone: 'unknown', label: '状态未知' }
-  if (device.printerReady) return { tone: device.kind === 'low_paper' ? 'warn' : 'ok', label: device.printerLabel }
-  if (device.kind === 'offline') return { tone: 'bad', label: device.printerLabel }
-  return { tone: 'bad', label: device.printerLabel }
+/** 顶栏胶囊写页名。机器状态仍在首页和机器状态页，不在这几页重复。 */
+const QX_ME_CAPSULE: Record<QxMeView, string> = {
+  notifications: '消息通知',
+  documents: '我的文档',
+  orders: '我的打印订单',
+  resumes: '我的简历',
+  favorites: '我的收藏',
+  'ai-records': 'AI服务记录',
+  activity: '浏览与跳转记录',
+  'activity-detail': '记录详情',
+  settings: '账号设置',
 }
 
-type QxMeTab = { key: QxMeView; label: string; hint: string; to: string }
+/** 稿 38「带走」六格。文档 / 订单两个视图用这组。 */
+const QX_ME_TAKE_ASSETS: readonly (readonly [string, string])[] = [
+  ['带走', '同一份文件接着预览或打印'],
+  ['订单', '看到进行到哪一步'],
+  ['只给你', '文件名只在登录后出现'],
+  ['留存', '要长期留下，请自己打印'],
+  ['价格', '以现场公示为准'],
+  ['问小青', '不知道下一步可以问怎么打'],
+]
+
+/** 记录四个视图（含记录详情）照稿 38 的格子，文字按记录来说。 */
+const QX_ME_TAKE_RECORDS: readonly (readonly [string, string])[] = [
+  ['带走', '简历、AI 报告接着打开或打印'],
+  ['收藏', '收藏过的内容，登录后再打开'],
+  ['足迹', '浏览、跳转和自填的求职进度'],
+  ['只给你', '明细只在本人登录后出现'],
+  ['删除', 'AI 记录可删除，删后不能恢复'],
+  ['问小青', '不知道下一步可以问'],
+]
+
+const QX_ME_ASK = {
+  notifications: { label: '问小青', draft: '收到这条通知，接下来我该怎么做？' },
+  assets: { label: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
+  records: { label: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+} as const
+
+/** 39 有内容的状态只有两个键；未登录、加载、空、失败（含 not-found）才加问小青。 */
+const QX_ME_SPARSE = /(?:^|-)(?:login|loading|empty|error|not-found)(?:$|-)/
+
+type QxMeAsk = { label: string; draft: string }
+
+function takeFor(view: QxMeView): readonly (readonly [string, string])[] | null {
+  if (view === 'documents' || view === 'orders') return QX_ME_TAKE_ASSETS
+  if (view === 'resumes' || view === 'favorites' || view === 'ai-records' || view === 'activity' || view === 'activity-detail') {
+    return QX_ME_TAKE_RECORDS
+  }
+  return null
+}
+
+function askFor(view: QxMeView, screenState: string): QxMeAsk | null {
+  if (view === 'notifications') return QX_ME_ASK.notifications
+  if (view === 'documents' || view === 'orders') return QX_ME_ASK.assets
+  if (view === 'resumes' || view === 'favorites' || view === 'ai-records' || view === 'activity' || view === 'activity-detail') {
+    return QX_ME_SPARSE.test(screenState) ? QX_ME_ASK.records : null
+  }
+  return null
+}
+
+const QxMeChromeContext = createContext<{ view: QxMeView; screenState: string } | null>(null)
+
+function useMeAsk(): QxMeAsk | null {
+  const ctx = useContext(QxMeChromeContext)
+  return ctx ? askFor(ctx.view, ctx.screenState) : null
+}
 
 const RECORD_VIEWS: QxMeTab[] = [
   { key: 'resumes', label: '简历', hint: '诊断与生成', to: '/me/resumes' },
@@ -84,8 +146,6 @@ export function QxMePage({
   children: ReactNode
 }) {
   const navigate = useNavigate()
-  const device = useTerminalDeviceStatus()
-  const status = qxStatusFromDevice(device)
   // 招聘内容托管（3.13）关闭时收藏里只有政策：分类提示不再写岗位与招聘会。
   const hostingOpen = useRecruitmentHosting().enabled
   const terminalLabel = getTerminalCode() || '设备未绑定'
@@ -93,19 +153,25 @@ export function QxMePage({
   /* 账号设置（稿 30 ?screen=settings）不是记录分类，也不属本人资产分域：不挂分类 Tab。 */
   const isSettingsView = view === 'settings'
   const tabs = isAssetView ? ASSET_VIEWS : view === 'notifications' || isSettingsView ? [] : RECORD_VIEWS
+  const take = takeFor(view)
   const testScope = view === 'notifications'
     ? 'notifications'
     : isSettingsView
       ? 'member-settings'
       : isAssetView ? 'member-assets' : 'member-records'
   const pageClass = isAssetView ? 'qx-me-page qx-me-assets' : isSettingsView ? 'qx-me-page qx-me-settings' : 'qx-me-page'
+  const back = view === 'activity-detail'
+    ? { label: '返回足迹', onBack: () => navigate('/me/activity') }
+    : { label: '返回我的', onBack: () => navigate('/profile') }
 
   return (
+    <QxMeChromeContext.Provider value={{ view, screenState }}>
     <QxPageFrame
       title={title}
-      status={status}
+      back={back}
+      status={{ tone: 'unknown', label: QX_ME_CAPSULE[view] }}
       terminalLabel={terminalLabel}
-      ctabar={ctabar}
+      ctabar={<QxMeCtaStack truth={truth}>{ctabar}</QxMeCtaStack>}
       navbar={
         <QxAppNavbar
           onHome={() => navigate('/')}
@@ -132,6 +198,11 @@ export function QxMePage({
               <p className="qx-me-xq-doing">{doing}</p>
             </div>
           </div>
+          {take ? (
+            <ol className="qx-me-take" data-testid="qx-me-take">
+              {take.map(([label, body]) => <li key={label}><b>{label}</b>{body}</li>)}
+            </ol>
+          ) : null}
         </section>
 
         {tabs.length > 0 ? (
@@ -167,10 +238,9 @@ export function QxMePage({
         ) : null}
 
         {children}
-
-        <p className="qx-me-truth"><b>本人可见</b><span>{truth}</span></p>
       </div>
     </QxPageFrame>
+    </QxMeChromeContext.Provider>
   )
 }
 
@@ -246,6 +316,69 @@ export function QxMeGuide({ items }: { items: [string, string, string][] }) {
   )
 }
 
+function childText(node: ReactNode): string {
+  return Children.toArray(node).map((kid) => (typeof kid === 'string' || typeof kid === 'number' ? String(kid) : '')).join('')
+}
+
+function primaryIcon(text: string): LucideIcon {
+  if (text.includes('登录')) return LogInIcon
+  if (text.includes('还未加载') || text.includes('正在')) return ClockIcon
+  if (text.includes('重新')) return RefreshCwIcon
+  return ArrowRightIcon
+}
+
+/** 给还没有图标的底栏键补一枚。写着「工作人员」「服务台」的键一个字都不动。 */
+function paintButton(node: ReactNode): ReactNode {
+  if (!isValidElement<{ children?: ReactNode }>(node)) return node
+  if (node.type !== 'button' && node.type !== 'span') return node
+  const text = childText(node.props.children)
+  if (text.includes('工作人员') || text.includes('服务台')) return node
+  if (Children.toArray(node.props.children).some((kid) => isValidElement(kid))) return node
+  const Icon = primaryIcon(text)
+  return cloneElement(node, {}, <Icon size={24} aria-hidden />, node.props.children)
+}
+
+export function QxMeAskButton({ label, draft }: QxMeAsk) {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      className="qx-btn"
+      data-testid="qx-me-ask"
+      data-route="/assistant"
+      onClick={() => {
+        rememberAssistantDraft(draft)
+        navigate('/assistant')
+      }}
+    >
+      <SparklesIcon size={24} aria-hidden />
+      {label}
+    </button>
+  )
+}
+
+/** 操作条两行：上面整行按钮，下面通栏「本人可见」。放进 QxPageFrame 的 ctabar 插槽，不改共享壳。 */
+function QxMeCtaStack({ truth, children }: { truth: string; children: ReactNode }) {
+  const ask = useMeAsk()
+  const nodes = Children.toArray(children)
+  const flat = nodes.length >= 2 && nodes.every((node) => isValidElement(node) && (node.type === 'button' || node.type === 'span'))
+  const row = flat
+    ? nodes.flatMap((node, index) => {
+        const painted = paintButton(node)
+        const keyed = isValidElement(painted) ? cloneElement(painted, { key: `cta-${index}` }) : painted
+        return index === nodes.length - 1 && ask
+          ? [<QxMeAskButton key="qx-me-ask" {...ask} />, keyed]
+          : [keyed]
+      })
+    : children
+  return (
+    <div className="qx-me-cta-stack">
+      <div className="qx-me-cta-row">{row}</div>
+      <p className="qx-me-truth"><b>本人可见</b><span>{truth}</span></p>
+    </div>
+  )
+}
+
 export function QxMeCta({
   secondaryLabel,
   onSecondary,
@@ -257,12 +390,15 @@ export function QxMeCta({
   secondaryRoute: string
   primary: ReactNode
 }) {
+  const ask = useMeAsk()
   return (
     <>
       <button type="button" className="qx-btn" data-variant="ghost" data-route={secondaryRoute} onClick={onSecondary}>
+        <ChevronLeftIcon size={24} aria-hidden />
         {secondaryLabel}
       </button>
-      {primary}
+      {ask ? <QxMeAskButton {...ask} /> : null}
+      {paintButton(primary)}
     </>
   )
 }

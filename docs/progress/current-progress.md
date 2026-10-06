@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-10-06：C 路 C1-2「我的」共用外壳照青序 2.0（分支 `grok/kiosk-c-me-1006`）
+
+- **范围：** 只改共用外壳 `QxMeChrome` / `QxMeStateBits` / `qx-me-shared.css`，以及通知、记录样式里低于 20px 的可见字号。页内列表、筛选、删除、留存、转 PDF、订单同步、支付摘要、投诉入口、足迹子页签都没动。未改 `MyPrintOrdersPage.tsx`、`printOrders/` 下支付与取件码三个文件、`ProfilePage.tsx`、`MySettingsPage.tsx`、`profile-qx.css`、`settings-qx2.css`、`QxPageFrame.tsx`、`docs/design/`。
+- **外壳按 view 推出：** 返回键（子页「返回我的」去 `/profile`，记录详情「返回足迹」去 `/me/activity`，≥64×64）；顶栏胶囊改页名、tone 为 `unknown`。机器状态仍由 `KioskRoot` 的 `useTerminalDeviceStatus(true)` 在首页和机器状态页显示，这几页不再重复「打印机在线」。
+- **带走六格：** 文档 / 订单用稿 38 原文；简历、收藏、AI 记录、足迹（含记录详情）用同款样式、记录文案，把页签上边压到舞台 y≥500。消息通知不加六格。
+- **底栏：** 整行 gap 14px，键 flex 1、主键 flex 1.5、最小高 72px、字号 26px。问小青是大按钮，先写入顾问预填句再进 `/assistant`。失败态仍是「联系工作人员」原文，中间加上问小青。本人可见那一行挪到操作条下面、底栏导航上面。
+- **未登录第一行：** 托管关闭且本机构有官方渠道时，换成「看本机构官方渠道」（与首页 `officialChannelCount` 同一条件）；否则仍是「查看就业政策」或「看第三方岗位与招聘会」。
+- **停放、隐藏、改名、降级：** 无。门禁断言未放宽。
+
 ## 2026-10-06：一体机「我的」与账号设置对齐青序 2.0 稿 30（分支 `grok/kiosk-c-profile-1006`）
 
 - **范围：** 只改 kiosk `/profile`、`/me/settings` 的运行页和写死旧文案的两条门禁、一条浏览器用例。稿 `docs/design/kiosk-redesign-2026-08-v2/30-my-profile.html` 未改。未 push。

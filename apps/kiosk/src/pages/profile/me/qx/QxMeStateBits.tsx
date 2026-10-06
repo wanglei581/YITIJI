@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { BriefcaseIcon, LandmarkIcon, PrinterIcon } from 'lucide-react'
+import { BriefcaseIcon, LandmarkIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
+import { useOfficialChannels } from '../../../../hooks/useOfficialChannels'
 import { useRecruitmentHosting, type RecruitmentHostingState } from '../../../../hooks/useRecruitmentHosting'
 import { QxMeBanner, QxMeGuide, QX_ME_GUIDE } from './QxMeChrome'
 
@@ -118,13 +119,19 @@ export function QxMePendingRow({
   )
 }
 
-/** `hostingOpen`：招聘内容托管（3.13）关闭时没有岗位与招聘会可看，这一行换成同样不用登录的政策服务。 */
+/** `hostingOpen`：招聘内容托管（3.13）关闭时没有岗位与招聘会可看，这一行换成同样不用登录的政策服务。
+ *  托管已读到「关闭」且本机构有官方渠道时，第一行改成官方渠道（与首页 HomePage 的 officialChannelCount 同一条件）。 */
 export function QxMeGuestRows({ onJobs, onPrint, hostingOpen }: { onJobs: () => void; onPrint: () => void; hostingOpen: boolean }) {
   const navigate = useNavigate()
+  const recruitment = useRecruitmentHosting()
+  const channels = useOfficialChannels()
+  const officialChannelCount = recruitment.status === 'ready' && !recruitment.enabled && channels.status === 'ready' ? channels.items.length : 0
   return (
     <>
       <div className="qx-me-legal">不用登录也能办 · 这两项在这台机器上不需要账号</div>
-      {hostingOpen ? (
+      {officialChannelCount > 0 ? (
+        <QxMeStartRow icon={QrCodeIcon} tone="slate" title="看本机构官方渠道" desc="二维码和官方入口都在这一页" label="去看看" route="/official-channels" testid="member-records-guest-channels" onClick={() => navigate('/official-channels')} />
+      ) : hostingOpen ? (
         <QxMeStartRow icon={BriefcaseIcon} title="看第三方岗位与招聘会" desc="来源机构、更新时间与外部入口都在详情页里" label="查看岗位" route="/jobs" testid="member-records-guest-jobs" onClick={onJobs} />
       ) : (
         <QxMeStartRow icon={LandmarkIcon} tone="slate" title="查看就业政策" desc="政策、社保与登记指引，资格以官方核验为准" label="查看政策" route="/policy-service" testid="member-records-guest-policy" onClick={() => navigate('/policy-service')} />

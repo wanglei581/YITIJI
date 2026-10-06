@@ -366,3 +366,130 @@ test('privacy revoke posts revoke_consent and does not claim account deletion @w
   await page.screenshot({ path: test.info().outputPath('privacy-revoke.png'), fullPage: true })
   expect(errors).toEqual([])
 })
+
+// ── 「我的」共用外壳（C1-2）：返回键、页名胶囊、页签下移、问小青、字号下限 ──
+
+const ME_SHELL_PAGES: { path: string; name: string; tabs: boolean; ask: string; draft: string }[] = [
+  { path: '/me/documents', name: '我的文档', tabs: true, ask: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
+  { path: '/me/print-orders', name: '我的打印订单', tabs: true, ask: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
+  { path: '/me/resumes', name: '我的简历', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/favorites', name: '我的收藏', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/ai-records', name: 'AI服务记录', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/activity', name: '浏览与跳转记录', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/notifications', name: '消息通知', tabs: false, ask: '问小青', draft: '收到这条通知，接下来我该怎么做？' },
+]
+
+async function stageScale(page: Page): Promise<number> {
+  const scaler = page.locator('.kiosk-stage')
+  if (await scaler.count() === 0) return 1
+  const transform = await scaler.evaluate((element) => getComputedStyle(element).transform)
+  return transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+}
+
+async function stageBox(page: Page): Promise<{ x: number; y: number }> {
+  const box = await page.locator('.kiosk-stage').boundingBox()
+  return { x: box?.x ?? 0, y: box?.y ?? 0 }
+}
+
+function registerMeShellLists(api: ApiRouter): void {
+  registerAssetCounts(api, {})
+  const empty = { status: 200 as const, json: emptyPage(0) }
+  api.respond('GET', '/api/v1/me/notifications', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0, unreadCount: 0 } },
+  })
+  api.respond('GET', '/api/v1/me/browse-logs', empty)
+  api.respond('GET', '/api/v1/me/external-jump-logs', empty)
+  api.respond('GET', '/api/v1/me/job-ai-sessions', empty)
+  api.respond('GET', '/api/v1/me/job-applications', empty)
+  api.respond('GET', '/api/v1/me/mock-interviews', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null } },
+  })
+}
+
+async function countSmallVisibleText(page: Page): Promise<number> {
+  return page.locator('.qx-stage').evaluate((root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    const seen = new Set<Element>()
+    let count = 0
+    let node = walker.nextNode()
+    while (node) {
+      const text = node.textContent?.replace(/\s+/g, '') ?? ''
+      const el = node.parentElement
+      node = walker.nextNode()
+      if (!text || !el || seen.has(el)) continue
+      if (/备案/.test(text)) continue
+      seen.add(el)
+      const style = getComputedStyle(el)
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue
+      const rect = el.getBoundingClientRect()
+      if (rect.width < 2 || rect.height < 2) continue
+      if (parseFloat(style.fontSize) < 20) count += 1
+    }
+    return count
+  })
+}
+
+/** 点「问小青」会进顾问页，顾问页挂载时读语音能力。登记上，避免拆卸时报未处理请求。 */
+function registerAssistantLanding(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+}
+
+async function expectMeShell(page: Page, item: (typeof ME_SHELL_PAGES)[number]): Promise<void> {
+  const scale = await stageScale(page)
+  const origin = await stageBox(page)
+  const back = page.locator('.qx-topbar-back')
+  await expect(page.locator('[data-kiosk-domain="profile"]')).not.toHaveAttribute('data-state', /(^|-)loading$/)
+  await expect(back).toHaveCount(1)
+  await expect(back).toHaveAccessibleName('返回我的')
+  const backBox = await back.boundingBox()
+  expect(backBox, '返回键有盒子').not.toBeNull()
+  expect(backBox!.width / scale).toBeGreaterThanOrEqual(64)
+  expect(backBox!.height / scale).toBeGreaterThanOrEqual(64)
+  await expect(page.locator('.qx-pill')).toHaveText(item.name)
+  if (item.tabs) {
+    const tab = page.locator('.qx-me-vtab').first()
+    const tabBox = await tab.boundingBox()
+    expect(tabBox, '页签有盒子').not.toBeNull()
+    expect((tabBox!.y - origin.y) / scale, `${item.path} 页签上边`).toBeGreaterThanOrEqual(500)
+  } else {
+    await expect(page.locator('.qx-me-vtab')).toHaveCount(0)
+    await expect(page.getByTestId('qx-me-take')).toHaveCount(0)
+  }
+  expect(await countSmallVisibleText(page), `${item.path} 小于 20px 的可见文字`).toBe(0)
+  const keys = page.locator('.qx-me-cta-row .qx-btn')
+  await expect(keys).toHaveCount(3)
+  await expect(page.getByTestId('qx-me-ask')).toHaveAccessibleName(item.ask)
+  await page.getByTestId('qx-me-ask').click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await expect(page.locator('#assistant-question')).toHaveValue(item.draft)
+  await page.goto(item.path)
+  await back.click()
+  await expect(page).toHaveURL(/\/profile$/)
+}
+
+for (const item of ME_SHELL_PAGES) {
+  test(`me shell signed-out ${item.path} shows page name, back, ask and 20px floor @w5-kiosk`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    registerAssistantLanding(api)
+    await page.goto(item.path)
+    await expectMeShell(page, item)
+    expect(errors).toEqual([])
+  })
+
+  test(`me shell signed-in empty ${item.path} keeps the same chrome @w5-kiosk`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    registerAssistantLanding(api)
+    registerMemberLogin(api)
+    registerMeShellLists(api)
+    await loginThroughVisibleUi(page, item.path)
+    await expectMeShell(page, item)
+    expect(errors).toEqual([])
+  })
+}
