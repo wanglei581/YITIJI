@@ -451,7 +451,7 @@ Page({
       ? '服务端当前未开放线上自助注销，提交后会被服务端直接拒绝，你会看到它的原话。'
         + '本入口不会删除简历、文档或打印订单。'
         + '现在就能做的：导出我的数据、撤回 AI 分析授权、在「我的文档」里删除文件、退出登录。'
-      : `账号注销不可逆，会删什么、保留什么见本页说明。提交后由工作人员核实处理，${this.data.privacyRequestDays} 个工作日内处理完；处理之前可以在本页撤回。`
+      : `账号注销不可逆，会删什么、保留什么见本页说明。提交后由我们核实处理，${this.data.privacyRequestDays} 个工作日内处理完；处理之前可以在本页撤回。`
         + '确认后会向你账号绑定的手机号发送验证码。'
 
     if (!unavailable && this.data.activeClosure) {
@@ -513,7 +513,7 @@ Page({
         this.setData({ busy: '' })
         wx.showModal({
           title: dr.CLOSURE_PENDING_LABEL,
-          content: `注销申请已受理，账号此刻还没有注销。工作人员核实后 ${this.data.privacyRequestDays} 个工作日内处理完；处理完成后会自动退出登录。处理之前可以在「处理记录」里撤回。`,
+          content: `注销申请已受理，账号此刻还没有注销。我们核实后 ${this.data.privacyRequestDays} 个工作日内处理完；处理完成后会自动退出登录。处理之前可以在「处理记录」里撤回。`,
           showCancel: false,
           confirmText: '知道了',
         })

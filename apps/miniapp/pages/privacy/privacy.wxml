@@ -158,7 +158,7 @@
             <view class="pv-t danger">账号注销</view>
             <view class="pv-s" wx:if="{{!capabilityLoaded}}">正在读取服务端状态…</view>
             <view class="pv-s" wx:elif="{{activeClosure}}">{{activeClosure.statusLabel}}</view>
-            <view class="pv-s" wx:elif="{{accountClosureAvailable}}">提交申请后由工作人员核实处理；不可逆，需短信验证</view>
+            <view class="pv-s" wx:elif="{{accountClosureAvailable}}">提交申请后由我们核实处理；不可逆，需短信验证</view>
             <view class="pv-s" wx:else>服务端当前未开放线上自助注销，提交会被拒绝</view>
           </view>
           <text class="ficon i-right pv-go danger"></text>
