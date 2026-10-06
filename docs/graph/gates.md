@@ -51,20 +51,16 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 断言了不存在的路径（10）
+## 断言了不存在的路径（6）
 
 门禁里写着某个仓库路径，但该路径在 git 里不存在。可能是文件被移动/删除后门禁
 没跟着改 —— 这类断言往往已经恒真或恒假，需要人确认。
 
 | 门禁脚本 | 找不到的路径 |
 | --- | --- |
-| `apps/admin/scripts/verify-admin-users-ui.mjs` | `src/routes/users/activityDisplay.ts` |
-| `apps/admin/scripts/verify-console-batch5-copy.mjs` | `apps/admin/src/routes/screen/measureUnit.ts` |
-| `apps/admin/scripts/verify-console-batch6-copy.mjs` | `apps/admin/src/routes/screen/measureUnit.ts` |
 | `apps/kiosk/scripts/verify-data-request-ui.mjs` | `apps/admin/src/routes/member-privacy/index.tsx`<br/>`apps/admin/src/services/api/memberPrivacyAdmin.ts` |
 | `apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs` | `src/pages/resume/ResumeExportPage.tsx` |
 | `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs` | `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs` |
-| `apps/partner/scripts/verify-partner-stats-contract.mjs` | `src/routes/stats/ServiceVisitsCard.tsx` |
 | `services/api/scripts/verify-legal-doc-version.ts` | `services/api/legalDocs.ts` |
 | `services/api/scripts/verify-policy-eligibility-authoring.ts` | `services/api/policies.ts` |
 | `services/api/scripts/verify-wave2-account-rebind.ts` | `services/auth/memberAuthApi.ts` |
@@ -73,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1855 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1860 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -170,7 +166,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/scripts/</code> — 10 个文件</summary>
+<summary><code>apps/admin/scripts/</code> — 11 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -184,11 +180,12 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/scripts/verify-console-privacy-copy.mjs` | `verify-console-plain-copy.mjs` |
 | `apps/admin/scripts/verify-console-screen-details.mjs` | `verify-console-screen-ui.mjs` |
 | `apps/admin/scripts/verify-honest-placeholders.mjs` | `verify-partner-stats-contract.mjs` |
+| `apps/admin/scripts/verify-measure-spacing.mjs` | `verify-console-plain-copy.mjs` |
 
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 173 个文件</summary>
+<summary><code>apps/admin/src/</code> — 175 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -298,6 +295,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/screen/UsageView.tsx` | `verify-console-batch6-copy.mjs`<br/>`verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/aiScreenDisplay.ts` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/admin/src/routes/screen/measureUnit.ts` | `verify-console-batch5-copy.mjs`<br/>`verify-console-batch6-copy.mjs`<br/>`verify-measure-spacing.mjs` |
 | `apps/admin/src/routes/screen/metricLabels.ts` | `verify-console-batch5-copy.mjs`<br/>`verify-console-privacy-copy.mjs` |
 | `apps/admin/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/admin/src/routes/screen/screenTabs.ts` | `verify-console-screen-details.mjs` |
@@ -331,6 +329,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/toolbox/toolboxActionState.ts` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/users/UserDetailDrawer.tsx` | `verify-admin-users-ui.mjs` |
 | `apps/admin/src/routes/users/UserStatusDialog.tsx` | `verify-admin-users-ui.mjs` |
+| `apps/admin/src/routes/users/activityDisplay.ts` | `verify-admin-users-ui.mjs` |
 | `apps/admin/src/routes/users/index.tsx` | `verify-admin-users-ui.mjs` |
 | `apps/admin/src/routes/users/userPresentation.ts` | `verify-admin-users-ui.mjs`<br/>`verify-console-privacy-copy.mjs` |
 | `apps/admin/src/services/api/adminAiHttpAdapter.ts` | `verify-job-ai-ops-dashboard-ui.mjs` |
@@ -1122,7 +1121,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 49 个文件</summary>
+<summary><code>apps/partner/src/</code> — 51 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1150,6 +1149,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/screen/PartnerUsageView.tsx` | `verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/PartnerVisitStat.tsx` | `verify-console-screen-details.mjs` |
 | `apps/partner/src/routes/screen/index.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/measureUnit.ts` | `verify-measure-spacing.mjs` |
 | `apps/partner/src/routes/screen/metricLabels.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenTabs.ts` | `verify-console-screen-details.mjs` |
@@ -1159,6 +1159,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/sources/RotateCredentialDrawer.tsx` | `verify-backend-p0-contracts.mjs` |
 | `apps/partner/src/routes/sources/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/partner/src/routes/sources/omitWebhookSecretOnce.ts` | `verify-backend-p0-contracts.mjs` |
+| `apps/partner/src/routes/stats/ServiceVisitsCard.tsx` | `verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/stats/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/sync-logs/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/terminals/TerminalOpsCards.tsx` | `verify-honest-placeholders.mjs`<br/>`verify-partner-stats-contract.mjs`<br/>`verify-partner-terminal-ops-honesty.mjs` |

@@ -12136,7 +12136,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 236,
+      "reachableFileCount": 238,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12893,8 +12893,17 @@
         {
           "component": "UsersPage",
           "endpoints": [
+            "GET /admin/import-batches",
+            "GET /admin/orders",
+            "GET /admin/orders/:param",
             "GET /admin/users",
             "GET /admin/users/:param",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
+            "POST /admin/orders/:param/mark-paid",
+            "POST /admin/orders/:param/refund",
             "POST /admin/users/:param/disable",
             "POST /admin/users/:param/restore"
           ],
@@ -12907,7 +12916,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 263
+      "sourceFileCount": 267
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -15891,7 +15900,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 84,
+      "reachableFileCount": 86,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16309,7 +16318,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 85
+      "sourceFileCount": 87
     }
   },
   "dataModel": {
@@ -18075,6 +18084,9 @@
     "apps/admin/scripts/verify-honest-placeholders.mjs": [
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
+    "apps/admin/scripts/verify-measure-spacing.mjs": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/src/UnhandledRejectionBanner.tsx": [
       "scripts/verify-no-raw-error-render.mjs"
     ],
@@ -18478,6 +18490,11 @@
     "apps/admin/src/routes/screen/index.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
+    "apps/admin/src/routes/screen/measureUnit.ts": [
+      "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
+      "apps/admin/scripts/verify-measure-spacing.mjs"
+    ],
     "apps/admin/src/routes/screen/metricLabels.ts": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
       "apps/admin/scripts/verify-console-privacy-copy.mjs"
@@ -18602,6 +18619,9 @@
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
     "apps/admin/src/routes/users/UserStatusDialog.tsx": [
+      "apps/admin/scripts/verify-admin-users-ui.mjs"
+    ],
+    "apps/admin/src/routes/users/activityDisplay.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
     "apps/admin/src/routes/users/index.tsx": [
@@ -21620,6 +21640,9 @@
     "apps/partner/src/routes/screen/index.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
+    "apps/partner/src/routes/screen/measureUnit.ts": [
+      "apps/admin/scripts/verify-measure-spacing.mjs"
+    ],
     "apps/partner/src/routes/screen/metricLabels.ts": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
@@ -21653,6 +21676,9 @@
     ],
     "apps/partner/src/routes/sources/omitWebhookSecretOnce.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
+    "apps/partner/src/routes/stats/ServiceVisitsCard.tsx": [
+      "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/routes/stats/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
@@ -27527,6 +27553,7 @@
         "files": [
           "apps/admin/src/routes/users/UserDetailDrawer.tsx",
           "apps/admin/src/routes/users/UserStatusDialog.tsx",
+          "apps/admin/src/routes/users/activityDisplay.ts",
           "apps/admin/src/routes/users/index.tsx",
           "apps/admin/src/routes/users/userPresentation.ts",
           "apps/admin/src/services/api/adminUsers.ts",
@@ -27535,9 +27562,7 @@
           "packages/shared/src/types/partner.ts",
           "packages/ui/src/components/Drawer.tsx"
         ],
-        "missing": [
-          "src/routes/users/activityDisplay.ts"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-admin-users-ui.mjs",
       "helper": false,
@@ -27561,6 +27586,7 @@
           "apps/admin/src/routes/screen/TerminalTwinView.tsx",
           "apps/admin/src/routes/screen/UsageHostingOff.tsx",
           "apps/admin/src/routes/screen/aiScreenDisplay.ts",
+          "apps/admin/src/routes/screen/measureUnit.ts",
           "apps/admin/src/routes/screen/metricLabels.ts",
           "apps/admin/src/routes/screensaver/AssetUploadNotice.tsx",
           "apps/admin/src/routes/screensaver/AssetsTab.tsx",
@@ -27572,9 +27598,7 @@
           "packages/ui/src/screen/twin/TwinCharts.tsx",
           "packages/ui/src/screen/twin/TwinTerminalBoard.tsx"
         ],
-        "missing": [
-          "apps/admin/src/routes/screen/measureUnit.ts"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-console-batch5-copy.mjs",
       "helper": true,
@@ -27591,6 +27615,7 @@
           "apps/admin/src/routes/ai-services/aiLogDisplay.ts",
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "apps/admin/src/routes/screen/UsageView.tsx",
+          "apps/admin/src/routes/screen/measureUnit.ts",
           "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
@@ -27598,9 +27623,7 @@
           "packages/ui/src/screen/twin/TwinCharts.tsx",
           "packages/ui/src/screen/twin/TwinTerminalBoard.tsx"
         ],
-        "missing": [
-          "apps/admin/src/routes/screen/measureUnit.ts"
-        ]
+        "missing": []
       },
       "file": "apps/admin/scripts/verify-console-batch6-copy.mjs",
       "helper": true,
@@ -27647,6 +27670,7 @@
           "apps/admin/scripts/verify-console-batch6-copy.mjs",
           "apps/admin/scripts/verify-console-batch7-copy.mjs",
           "apps/admin/scripts/verify-console-privacy-copy.mjs",
+          "apps/admin/scripts/verify-measure-spacing.mjs",
           "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/lib/printErrorText.ts",
           "apps/admin/src/routes/ai-services/AiLogsTable.tsx",
@@ -27878,6 +27902,23 @@
         "@ai-job-print/admin::verify:job-ai-ops-dashboard-ui"
       ],
       "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/screen/measureUnit.ts",
+          "apps/partner/src/routes/screen/measureUnit.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-measure-spacing.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/admin",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
@@ -31926,6 +31967,7 @@
           "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
+          "apps/partner/src/routes/stats/ServiceVisitsCard.tsx",
           "apps/partner/src/routes/stats/index.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
@@ -31935,9 +31977,7 @@
           "apps/partner/src/services/api/stats.ts",
           "apps/partner/src/services/api/terminalOps.ts"
         ],
-        "missing": [
-          "src/routes/stats/ServiceVisitsCard.tsx"
-        ]
+        "missing": []
       },
       "file": "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "helper": false,
@@ -42528,6 +42568,17 @@
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/orders/orderDisplay.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
         "kind": "test",
         "mentions": [
@@ -42572,6 +42623,17 @@
         "mentions": [
           "apps/admin/package.json",
           "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/users/activityDisplay.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
         ],
         "risk": "high",
         "scope": "admin",
