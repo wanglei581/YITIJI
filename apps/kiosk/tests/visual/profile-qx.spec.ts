@@ -1,9 +1,16 @@
 import type { Page } from '@playwright/test'
+import { UNATTENDED_FORBIDDEN_PHRASES } from '../../src/copy/unattendedCopy'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
-import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
+import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
+
+/** 默认夹具号码与服务时间，见 tests/fixtures/api-router.ts 的 support-contact。 */
+const FIXTURE_SERVICE_PHONE = '18369161921'
+const FIXTURE_SERVICE_HOURS = '工作日 9:00–18:00'
+const NO_PHONE_HINT = '查看《隐私政策》里的联系方式'
+const FIXTURE_HELP_LINE = `需要帮助？拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）`
 
 const MEMBER_TOKEN = 'qx-profile-member-token'
 const MEMBER_PHONE = '13800138000'
@@ -364,5 +371,618 @@ test('privacy revoke posts revoke_consent and does not claim account deletion @w
   await expect(page.getByText('账号注销成功')).toHaveCount(0)
   await expectComplianceCopy(page)
   await page.screenshot({ path: test.info().outputPath('privacy-revoke.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
+// ── 「我的」共用外壳（C1-2）：返回键、页名胶囊、页签下移、问小青、字号下限 ──
+
+const ME_SHELL_PAGES: { path: string; name: string; tabs: boolean; ask: string; draft: string }[] = [
+  { path: '/me/documents', name: '我的文档', tabs: true, ask: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
+  { path: '/me/print-orders', name: '我的打印订单', tabs: true, ask: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
+  { path: '/me/resumes', name: '我的简历', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/favorites', name: '我的收藏', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/ai-records', name: 'AI服务记录', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/activity', name: '浏览与跳转记录', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/notifications', name: '消息通知', tabs: false, ask: '问小青', draft: '收到这条通知，接下来我该怎么做？' },
+]
+
+async function stageScale(page: Page): Promise<number> {
+  const scaler = page.locator('.kiosk-stage')
+  if (await scaler.count() === 0) return 1
+  const transform = await scaler.evaluate((element) => getComputedStyle(element).transform)
+  return transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+}
+
+async function stageBox(page: Page): Promise<{ x: number; y: number }> {
+  const box = await page.locator('.kiosk-stage').boundingBox()
+  return { x: box?.x ?? 0, y: box?.y ?? 0 }
+}
+
+function registerMeShellLists(api: ApiRouter): void {
+  registerAssetCounts(api, {})
+  const empty = { status: 200 as const, json: emptyPage(0) }
+  api.respond('GET', '/api/v1/me/notifications', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0, unreadCount: 0 } },
+  })
+  api.respond('GET', '/api/v1/me/browse-logs', empty)
+  api.respond('GET', '/api/v1/me/external-jump-logs', empty)
+  api.respond('GET', '/api/v1/me/job-ai-sessions', empty)
+  api.respond('GET', '/api/v1/me/job-applications', empty)
+  api.respond('GET', '/api/v1/me/mock-interviews', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null } },
+  })
+}
+
+async function countSmallVisibleText(page: Page): Promise<number> {
+  return page.locator('.qx-stage').evaluate((root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    const seen = new Set<Element>()
+    let count = 0
+    let node = walker.nextNode()
+    while (node) {
+      const text = node.textContent?.replace(/\s+/g, '') ?? ''
+      const el = node.parentElement
+      node = walker.nextNode()
+      if (!text || !el || seen.has(el)) continue
+      if (/备案/.test(text)) continue
+      seen.add(el)
+      const style = getComputedStyle(el)
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue
+      const rect = el.getBoundingClientRect()
+      if (rect.width < 2 || rect.height < 2) continue
+      if (parseFloat(style.fontSize) < 20) count += 1
+    }
+    return count
+  })
+}
+
+/** 点「问小青」会进顾问页，顾问页挂载时读语音能力。登记上，避免拆卸时报未处理请求。 */
+function registerAssistantLanding(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+}
+
+async function expectMeShell(page: Page, item: (typeof ME_SHELL_PAGES)[number]): Promise<void> {
+  const scale = await stageScale(page)
+  const origin = await stageBox(page)
+  const back = page.locator('.qx-topbar-back')
+  await expect(page.locator('[data-kiosk-domain="profile"]')).not.toHaveAttribute('data-state', /(^|-)loading$/)
+  await expect(back).toHaveCount(1)
+  await expect(back).toHaveAccessibleName('返回我的')
+  const backBox = await back.boundingBox()
+  expect(backBox, '返回键有盒子').not.toBeNull()
+  expect(backBox!.width / scale).toBeGreaterThanOrEqual(64)
+  expect(backBox!.height / scale).toBeGreaterThanOrEqual(64)
+  await expect(page.locator('.qx-pill')).toHaveText(item.name)
+  if (item.tabs) {
+    const tab = page.locator('.qx-me-vtab').first()
+    const tabBox = await tab.boundingBox()
+    expect(tabBox, '页签有盒子').not.toBeNull()
+    expect((tabBox!.y - origin.y) / scale, `${item.path} 页签上边`).toBeGreaterThanOrEqual(500)
+  } else {
+    await expect(page.locator('.qx-me-vtab')).toHaveCount(0)
+    await expect(page.getByTestId('qx-me-take')).toHaveCount(0)
+  }
+  expect(await countSmallVisibleText(page), `${item.path} 小于 20px 的可见文字`).toBe(0)
+  const keys = page.locator('.qx-me-cta-row .qx-btn')
+  await expect(keys).toHaveCount(3)
+  await expect(page.getByTestId('qx-me-ask')).toHaveAccessibleName(item.ask)
+  await page.getByTestId('qx-me-ask').click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await expect(page.locator('#assistant-question')).toHaveValue(item.draft)
+  await page.goto(item.path)
+  await back.click()
+  await expect(page).toHaveURL(/\/profile$/)
+}
+
+test('me error cta on documents and notifications includes 问小青 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const down = { status: 500 as const, json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } } }
+  api.respond('GET', '/api/v1/me/documents', down)
+  api.respond('GET', '/api/v1/me/notifications', down)
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  const documentsRow = page.locator('.qx-me-cta-row')
+  // 2026-10-06：10/4 无人值守。失败态不再叫「联系工作人员」，改为「帮助中心」，仍去 /help。
+  await expect(documentsRow.getByRole('button', { name: '帮助中心', exact: true })).toBeVisible()
+  await expect(documentsRow.getByTestId('qx-me-ask')).toHaveAccessibleName('问小青：怎么打')
+  await expect(documentsRow.getByRole('button', { name: '重新加载', exact: true }).locator('svg')).toHaveCount(1)
+  await expect(documentsRow.locator('.qx-btn')).toHaveCount(3)
+
+  await loginThroughVisibleUi(page, '/me/notifications')
+  const notificationsRow = page.locator('.qx-me-cta-row')
+  await expect(notificationsRow.getByRole('button', { name: '帮助中心', exact: true })).toBeVisible()
+  await expect(notificationsRow.getByTestId('qx-me-ask')).toHaveAccessibleName('问小青')
+  await expect(notificationsRow.getByRole('button', { name: '重新加载', exact: true }).locator('svg')).toHaveCount(1)
+  await expect(notificationsRow.locator('.qx-btn')).toHaveCount(3)
+  expect(errors).toEqual([])
+})
+
+/** 行盒子，以及行里画出来的内容，都不得压进下一行。 */
+async function expectListRowsDoNotOverlap(page: Page, listName: string): Promise<void> {
+  const list = page.getByRole('region', { name: listName })
+  await expect(list.locator(':scope > .qx-me-row').nth(1)).toBeVisible()
+  const hits = await list.evaluate((root) => {
+    const rows = [...root.querySelectorAll(':scope > .qx-me-row')]
+    const found: string[] = []
+    for (let index = 0; index < rows.length - 1; index += 1) {
+      const nextTop = rows[index + 1].getBoundingClientRect().top
+      const pieces = [rows[index], ...rows[index].querySelectorAll('*')]
+      for (const piece of pieces) {
+        const box = piece.getBoundingClientRect()
+        if (box.width < 1 || box.height < 1) continue
+        if (box.bottom > nextTop + 0.5) {
+          found.push(`第 ${index + 1} 行内容 bottom ${box.bottom.toFixed(1)} > 下一行 top ${nextTop.toFixed(1)}`)
+          break
+        }
+      }
+    }
+    return found
+  })
+  expect(hits, hits.join('\n')).toEqual([])
+}
+
+test('me list rows do not overlap on notifications, documents and resumes @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const createdAt = '2026-09-01T08:00:00.000Z'
+  const expiresAt = '2099-03-01T00:00:00.000Z'
+  api.respond('GET', '/api/v1/me/notifications', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: Array.from({ length: 8 }, (_, index) => ({
+          id: `n-${index}`,
+          kind: 'personal',
+          title: `打印进度提醒 ${index + 1}：这份材料已经排到队列里`,
+          content: '取件前请核对页数和颜色。这条说明要占一整行，避免行被压扁后文字叠到下一条。',
+          category: index % 2 === 0 ? 'print' : 'feedback',
+          relatedType: index % 2 === 0 ? null : 'feedback_ticket',
+          relatedId: index % 2 === 0 ? null : `ticket-${index}`,
+          isRead: false,
+          createdAt,
+        })),
+        nextCursor: null,
+        total: 8,
+        unreadCount: 8,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/documents', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: Array.from({ length: 6 }, (_, index) => ({
+          id: `doc-${index}`,
+          filename: `2026届求职材料-个人简历与成绩单-第${index + 1}份-请勿外传.pdf`,
+          mimeType: 'application/pdf',
+          sizeBytes: 245760,
+          purpose: 'print_doc',
+          sensitiveLevel: 'normal',
+          assetCategory: 'original',
+          retentionPolicy: 'months_3',
+          allowedRetentionPolicies: ['months_3', 'months_6', 'long_term'],
+          createdAt,
+          expiresAt,
+          downloadUrlPath: `/files/doc-${index}/download-url`,
+          previewUrlPath: `/files/doc-${index}/preview-url`,
+          materialCheckRequired: false,
+          pageCount: 2,
+        })),
+        nextCursor: null,
+        total: 6,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/resumes', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: Array.from({ length: 6 }, (_, index) => ({
+          id: `resume-${index}`,
+          taskId: `task-${index}`,
+          kind: 'parse',
+          status: 'completed',
+          provider: 'demo',
+          optimized: false,
+          hasDraft: false,
+          latestVersion: null,
+          createdAt,
+          updatedAt: createdAt,
+          expiresAt,
+        })),
+        nextCursor: null,
+        total: 6,
+      },
+    },
+  })
+
+  await loginThroughVisibleUi(page, '/me/notifications')
+  await expectListRowsDoNotOverlap(page, '消息通知')
+  await loginThroughVisibleUi(page, '/me/documents')
+  await expectListRowsDoNotOverlap(page, '我的文档')
+  await loginThroughVisibleUi(page, '/me/resumes')
+  await expectListRowsDoNotOverlap(page, '我的简历')
+  expect(errors).toEqual([])
+})
+
+test('resume row titles do not include an 8-character hex task id @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const createdAt = '2026-10-06T09:12:00.000+08:00'
+  const expiresAt = '2099-12-20T09:12:00.000+08:00'
+  api.respond('GET', '/api/v1/me/resumes', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [
+          {
+            id: 'resume-hex',
+            taskId: 'task-7f3a91c2',
+            kind: 'parse',
+            status: 'completed',
+            provider: 'demo',
+            optimized: true,
+            hasDraft: false,
+            latestVersion: 1,
+            createdAt,
+            updatedAt: createdAt,
+            expiresAt,
+          },
+          {
+            id: 'resume-hex-gen',
+            taskId: 'task-2c8e44b1',
+            kind: 'generate',
+            status: 'completed',
+            provider: 'demo',
+            optimized: false,
+            hasDraft: false,
+            latestVersion: null,
+            createdAt,
+            updatedAt: createdAt,
+            expiresAt,
+          },
+        ],
+        nextCursor: null,
+        total: 2,
+      },
+    },
+  })
+
+  await loginThroughVisibleUi(page, '/me/resumes')
+  const titles = page.getByRole('region', { name: '我的简历' }).locator('.qx-me-row-title')
+  await expect(titles).toHaveCount(2)
+  const texts = await titles.allInnerTexts()
+  for (const text of texts) {
+    expect(text, text).not.toMatch(/\b[0-9a-f]{8,}\b/i)
+    expect(text).toMatch(/上传诊断简历|AI 生成简历/)
+  }
+  expect(errors).toEqual([])
+})
+
+for (const item of ME_SHELL_PAGES) {
+  test(`me shell signed-out ${item.path} shows page name, back, ask and 20px floor @w5-kiosk`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    registerAssistantLanding(api)
+    await page.goto(item.path)
+    await expectMeShell(page, item)
+    expect(errors).toEqual([])
+  })
+
+  test(`me shell signed-in empty ${item.path} keeps the same chrome @w5-kiosk`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    registerAssistantLanding(api)
+    registerMemberLogin(api)
+    registerMeShellLists(api)
+    await loginThroughVisibleUi(page, item.path)
+    await expectMeShell(page, item)
+    expect(errors).toEqual([])
+  })
+}
+
+function registerEmptyAccount(api: ApiRouter): void {
+  registerMemberLogin(api)
+  registerAssetCounts(api, { resumes: 0, documents: 0, orders: 0, favorites: 0, benefits: 0, ai: 0 })
+  api.respond('GET', '/api/v1/me/pending-tasks', {
+    status: 200,
+    json: { success: true, data: [] },
+  })
+}
+
+async function expectEmptyThirdRow(page: Page, title: string, absent: string): Promise<void> {
+  await loginThroughVisibleUi(page, '/profile')
+  await expect(page.getByTestId('profile-state-empty')).toBeVisible()
+  const third = page.getByTestId('profile-empty-start-third')
+  await expect(third).toContainText(title)
+  await expect(third).not.toContainText(absent)
+  await expect(page.getByTestId('profile-help')).toContainText('帮助中心')
+  await expect(page.getByTestId('profile-help')).toContainText('常见问题与操作说明。')
+}
+
+test('profile empty third row points at policy when no official channel is configured @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerEmptyAccount(api)
+
+  await expectEmptyThirdRow(page, '看看就业政策并收藏', '看看机构官方渠道')
+  await expect(page.getByTestId('profile-empty-start-third')).toContainText('查看办事指引，资格与办理以官方核验为准。')
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+test('profile empty third row points at official channels when hosting is closed and one channel exists @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerEmptyAccount(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'qx-profile-hosting-off'),
+  })
+  api.respond('GET', '/api/v1/terminals/KSK-001/official-channels', {
+    status: 200,
+    json: {
+      items: [{
+        name: '青岛示例大学就业信息网',
+        url: 'https://career.example.edu.cn/jobs?from=kiosk',
+        displayOrder: 1,
+        organizationName: '青岛示例大学就业指导中心',
+      }],
+      legacyPlatforms: [],
+    },
+  })
+
+  await expectEmptyThirdRow(page, '看看机构官方渠道', '看看就业政策并收藏')
+  await expect(page.getByTestId('profile-empty-start-third')).toContainText('这里只放本机构的官方入口，报名不在这台机器上办。')
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+const ME_READ_FAILURES = [
+  { path: '/me/documents', heading: '文档这次没有加载出来' },
+  { path: '/me/notifications', heading: '消息这次没有加载出来' },
+  { path: '/me/resumes', heading: '简历记录这次没有加载出来' },
+  // 记录详情的「联系工作人员」键在加载失败态。不存在的 id 配上读失败，就是这一屏。
+  { path: '/me/activity/missing-c15', heading: '这条记录这次没有读到' },
+] as const
+
+function registerMeReadFailures(api: ApiRouter): void {
+  const down = { status: 500 as const, json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } } }
+  api.respond('GET', '/api/v1/me/documents', down)
+  api.respond('GET', '/api/v1/me/notifications', down)
+  api.respond('GET', '/api/v1/me/resumes', down)
+  api.respond('GET', '/api/v1/me/browse-logs', down)
+  api.respond('GET', '/api/v1/me/external-jump-logs', down)
+}
+
+async function expectNoStaffHandoff(page: Page): Promise<void> {
+  const text = await page.locator('body').innerText()
+  for (const phrase of UNATTENDED_FORBIDDEN_PHRASES) {
+    expect(text, `可见文字不含禁用说法「${phrase}」`).not.toContain(phrase)
+  }
+}
+
+test('me error pages show the fixture service phone and no staff handoff @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  registerMeReadFailures(api)
+
+  for (const item of ME_READ_FAILURES) {
+    const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.ok())
+    await loginThroughVisibleUi(page, item.path)
+    expect(await (await contact).json()).toMatchObject({
+      data: { servicePhone: FIXTURE_SERVICE_PHONE, serviceHours: FIXTURE_SERVICE_HOURS },
+    })
+    await expect(page.getByRole('heading', { name: item.heading })).toBeVisible()
+    await expect(page.locator('.qx-me-cta-row').getByRole('button', { name: '帮助中心', exact: true })).toHaveAttribute('data-route', '/help')
+    // 文案审查（C1-6）：「……时，」后接设问读起来断了。标准句不动，改成先说可以稍后再来。
+    await expect(page.locator('.qx-me-legal').last()).toContainText(`多次重试仍不成功的话，可以稍后再来。${FIXTURE_HELP_LINE}`)
+    await expect(page.locator('.qx-me-guide')).toContainText(FIXTURE_SERVICE_PHONE)
+    await expect(page.locator('.qx-me-guide')).toContainText(FIXTURE_SERVICE_HOURS)
+    await expectNoStaffHandoff(page)
+  }
+
+  await page.locator('.qx-me-cta-row').getByRole('button', { name: '帮助中心', exact: true }).click()
+  await expect(page).toHaveURL(/\/help$/)
+  expect(errors).toEqual([])
+})
+
+test('me error pages point at the privacy policy when support contact is missing @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  registerMeReadFailures(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 404,
+    json: { success: false, error: { code: 'NOT_FOUND', message: 'no contact' } },
+  })
+
+  for (const item of ME_READ_FAILURES) {
+    const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+    await loginThroughVisibleUi(page, item.path)
+    expect((await contact).status()).toBe(404)
+    await expect(page.getByRole('heading', { name: item.heading })).toBeVisible()
+    // 文案审查（C1-6）：同上，404 时标准句是「需要帮助？查看《隐私政策》里的联系方式」。
+    await expect(page.locator('.qx-me-legal').last()).toContainText(`多次重试仍不成功的话，可以稍后再来。需要帮助？${NO_PHONE_HINT}`)
+    await expect(page.locator('.qx-me-guide')).toContainText(NO_PHONE_HINT)
+    await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
+    await expectNoStaffHandoff(page)
+  }
+  expect(errors).toEqual([])
+})
+
+function hideSupportContact(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 404,
+    json: { success: false, error: { code: 'NOT_FOUND', message: 'no contact' } },
+  })
+}
+
+function registerProfileReadFailure(api: ApiRouter): void {
+  for (const path of ['/api/v1/me/resumes', '/api/v1/me/documents', '/api/v1/me/print-orders', '/api/v1/me/favorites', '/api/v1/me/benefits', '/api/v1/me/ai-records']) {
+    api.respond('GET', path, { status: 500, json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } } })
+  }
+  api.respond('GET', '/api/v1/me/pending-tasks', {
+    status: 500,
+    json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } },
+  })
+}
+
+function registerSettingsAccount(api: ApiRouter): void {
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/ai-consents/status', {
+    status: 200,
+    json: { success: true, data: [{ scope: 'job_ai', granted: false }] },
+  })
+  api.respond('POST', '/api/v1/member/auth/logout', { status: 200, json: { success: true } })
+}
+
+async function openSettingsLogoutFailure(page: Page): Promise<void> {
+  await page.getByRole('button', { name: '结束使用并退出登录', exact: true }).click()
+  await page.evaluate(() => {
+    Object.defineProperty(crypto, 'randomUUID', {
+      configurable: true,
+      value: () => {
+        throw new Error('fixture: privacy boundary token failed')
+      },
+    })
+  })
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+}
+
+test('profile error shows the fixture service phone and no staff handoff @w5-kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerMemberLogin(api)
+  registerProfileReadFailure(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await loginThroughVisibleUi(page, '/profile')
+  expect(await (await contact).json()).toMatchObject({ data: { servicePhone: FIXTURE_SERVICE_PHONE, serviceHours: FIXTURE_SERVICE_HOURS } })
+  await expect(page.getByTestId('profile-state-error')).toBeVisible()
+  await expect(page.locator('.qx-ctabar').getByRole('button', { name: '帮助中心', exact: true })).toBeVisible()
+  await expect(page.getByTestId('profile-help-line')).toContainText(`需要帮助？拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）`)
+  await expectNoStaffHandoff(page)
+})
+
+test('profile error points at the privacy policy when support contact is missing @w5-kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerMemberLogin(api)
+  registerProfileReadFailure(api)
+  hideSupportContact(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+
+  await loginThroughVisibleUi(page, '/profile')
+  expect((await contact).status()).toBe(404)
+  await expect(page.getByTestId('profile-help-line')).toContainText(`需要帮助？${NO_PHONE_HINT}`)
+  await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
+  await expect(page.getByText('拨打服务电话')).toHaveCount(0)
+  await expectNoStaffHandoff(page)
+})
+
+// 清场入口同步抛错时，隐私守卫保持遮罩、不渲染设置页。
+// 「本机登录尚未清除，请重试。需要帮助？…」「还不能切换账号，请重试。需要帮助？…」
+// 仍写在设置页里，但被遮罩挡住，这条路径看不到。这是原有行为。
+async function expectLogoutFailureStaysCovered(page: Page): Promise<void> {
+  await openSettingsLogoutFailure(page)
+  await expect(page.getByTestId('session-guard-state-clearing')).toBeVisible()
+  await expect(page.getByText('本机登录尚未清除')).toHaveCount(0)
+  await expect(page.getByText('还不能切换账号')).toHaveCount(0)
+  await expect(page.getByTestId('member-settings-state-member')).toHaveCount(0)
+  await expectNoStaffHandoff(page)
+}
+
+test('settings logout failure keeps the clearing overlay and does not reveal the page @w5-kiosk', async ({ page, api }) => {
+  registerSettingsAccount(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await loginThroughVisibleUi(page, '/me/settings')
+  expect(await (await contact).json()).toMatchObject({ data: { servicePhone: FIXTURE_SERVICE_PHONE } })
+  await expectLogoutFailureStaysCovered(page)
+})
+
+test('settings logout failure keeps the clearing overlay when support contact is missing @w5-kiosk', async ({ page, api }) => {
+  registerSettingsAccount(api)
+  hideSupportContact(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+
+  await loginThroughVisibleUi(page, '/me/settings')
+  expect((await contact).status()).toBe(404)
+  await expectLogoutFailureStaysCovered(page)
+  await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
+})
+
+test('benefits error shows the fixture service phone and no staff handoff @w5-kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 503,
+    json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } },
+  })
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await loginThroughVisibleUi(page, '/me/benefits')
+  expect(await (await contact).json()).toMatchObject({ data: { servicePhone: FIXTURE_SERVICE_PHONE } })
+  await expect(page.getByTestId('benefits-state-error')).toBeVisible()
+  await expect(page.locator('.qx-ctabar').getByRole('button', { name: '帮助中心', exact: true })).toBeVisible()
+  await expect(page.getByTestId('benefits-fallback')).toContainText(`需要帮助？拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）`)
+  await expectNoStaffHandoff(page)
+})
+
+test('benefits error points at the privacy policy when support contact is missing @w5-kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 503,
+    json: { success: false, error: { code: 'DOWN', message: 'fixture unavailable' } },
+  })
+  hideSupportContact(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+
+  await loginThroughVisibleUi(page, '/me/benefits')
+  expect((await contact).status()).toBe(404)
+  await expect(page.getByTestId('benefits-fallback')).toContainText(`需要帮助？${NO_PHONE_HINT}`)
+  await expect(page.getByText(FIXTURE_SERVICE_PHONE)).toHaveCount(0)
+  await expect(page.getByText('拨打服务电话')).toHaveCount(0)
+  await expectNoStaffHandoff(page)
+})
+
+test('me error guide says 联系我们 and hides 拨打服务电话 when support contact is 404 @w5-kiosk', async ({ page, api }) => {
+  // 文案审查（C1-6）：读不到号码时第三格粗体不再写「拨打服务电话」，改成「联系我们」。
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  registerMeReadFailures(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 404,
+    json: { success: false, error: { code: 'NOT_FOUND', message: 'no contact' } },
+  })
+
+  for (const item of ME_READ_FAILURES) {
+    const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact'))
+    await loginThroughVisibleUi(page, item.path)
+    expect((await contact).status()).toBe(404)
+    await expect(page.getByRole('heading', { name: item.heading })).toBeVisible()
+    const third = page.locator('.qx-me-guide-item').nth(2)
+    await expect(third.locator('.qx-me-guide-k')).toHaveText('仍不行')
+    await expect(third.locator('.qx-me-guide-t')).toHaveText('联系我们')
+    await expect(third.locator('.qx-me-guide-p')).toHaveText(NO_PHONE_HINT)
+    expect(await page.locator('body').innerText()).not.toContain('拨打服务电话')
+    await expectNoStaffHandoff(page)
+  }
   expect(errors).toEqual([])
 })
