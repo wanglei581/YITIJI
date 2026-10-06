@@ -80,8 +80,22 @@
 .rrp-page :is(.rrp-export-reason, .qx-rd-price, .qx-rd-price p) { font-size: var(--qx-fs-aux); line-height: var(--qx-lh-body); }
 .rrp-page .rrp-jobfit { min-height: 56px; }
 .rrp-page .rrp-self { margin: 0; font-size: var(--qx-fs-aux); }
-.rrp-page[data-state='diagnose-failed'] .rrp-state,
-.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal']) .rrp-state:first-of-type { min-height: 210px; }
+/* 没报告的这几屏按内容排进一屏：任务头不再撑到 188，出口行收到 72（仍不低于 64）。 */
+.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) {
+  gap: 8px; padding-top: 8px; padding-bottom: 8px;
+}
+.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) .rrp-head {
+  min-height: 0;
+}
+.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) .rrp-state {
+  padding-top: 14px; padding-bottom: 14px;
+}
+.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) .rrp-row {
+  min-height: 72px;
+}
+.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) .rrp-checks .list > div {
+  min-height: 64px;
+}
 
 /* 稿 23：只读任务区在上，概览 / 编辑工作区在触达区，按钮保持真实动作。 */
 .qx-stage:has(:is(.qx-resume-optimize, .qx-resume-compare)) .qx-pagehead {

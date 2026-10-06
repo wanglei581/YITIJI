@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { ResumeContentBlock, ResumeIssue, ResumeReport, ResumeContentBlockKey, ResumeScoringDimensionKey } from '@ai-job-print/shared'
 import { RESUME_CONTENT_BLOCKS } from '@ai-job-print/shared'
 import { blockLabel, dimLabel, displayResumeExcerpt, evidenceCountOfBlock, evidenceLineSet, issuesOfBlock, sevOf } from '../../resume-report-model'
@@ -44,6 +45,48 @@ export function IssueCard({
   )
 }
 
+/** 整页滚动时，数底边还在可视区之下的内容块。带走区露出来之后不再附那一句。 */
+function useStructureScrollHint(blockCount: number) {
+  const zoneRef = useRef<HTMLElement>(null)
+  const [hint, setHint] = useState<string | null>(null)
+
+  useEffect(() => {
+    const zone = zoneRef.current
+    const root = zone?.closest('.qx-scroll')
+    if (!zone || !(root instanceof HTMLElement) || blockCount === 0) return
+
+    const read = () => {
+      const rootBottom = root.getBoundingClientRect().bottom
+      let hidden = 0
+      zone.querySelectorAll<HTMLElement>('.rrp-blk').forEach((block) => {
+        if (block.getBoundingClientRect().bottom > rootBottom + 1) hidden += 1
+      })
+      const takeaway = root.querySelector('[data-testid="resume-report-export-actions"]')
+      const takeawayBelow = !takeaway || takeaway.getBoundingClientRect().top >= rootBottom - 1
+      const next = hidden === 0
+        ? null
+        : takeawayBelow
+          ? `· 下滑还有 ${hidden} 块，最下面可以带走报告`
+          : `· 下滑还有 ${hidden} 块`
+      setHint((prev) => (prev === next ? prev : next))
+    }
+
+    // 阈值跨过时回调；一次滑过整块时观察器可能不报，滚动事件补上。不是定时轮询。
+    const observer = new IntersectionObserver(read, { root, threshold: [0, 0.25, 0.5, 0.75, 1] })
+    zone.querySelectorAll('.rrp-blk').forEach((block) => observer.observe(block))
+    const takeaway = root.querySelector('[data-testid="resume-report-export-actions"]')
+    if (takeaway) observer.observe(takeaway)
+    root.addEventListener('scroll', read, { passive: true })
+    read()
+    return () => {
+      observer.disconnect()
+      root.removeEventListener('scroll', read)
+    }
+  }, [blockCount])
+
+  return { zoneRef, hint }
+}
+
 export function StructureZone({
   blocks,
   issues,
@@ -56,11 +99,15 @@ export function StructureZone({
   fixture: boolean
 }) {
   const shown = RESUME_CONTENT_BLOCKS.map((meta) => blocks.find((b) => b.key === meta.key)).filter((b): b is ResumeContentBlock => Boolean(b))
+  const { zoneRef, hint } = useStructureScrollHint(shown.length)
   return (
-    <section className="rrp-zone" data-testid="resume-report-zone" data-zone="structure">
+    <section ref={zoneRef} className="rrp-zone" data-testid="resume-report-zone" data-zone="structure">
       <div className="rrp-zh">
         简历被读成了这 {shown.length} 块
-        <span>共 {shown.length} 块 · 命中 {issues.length} 条问题 <Prov kind={fixture ? 'fixture' : 'contract'} /></span>
+        <span>
+          共 {shown.length} 块 · 命中 {issues.length} 条问题 <Prov kind={fixture ? 'fixture' : 'contract'} />
+          {hint ? <span className="rrp-more" data-testid="resume-report-scroll-hint">{` ${hint}`}</span> : null}
+        </span>
       </div>
       <div className="rrp-scroll" data-testid="resume-report-list">
         {shown.map((block, i) => {

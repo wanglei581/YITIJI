@@ -1386,6 +1386,57 @@ test('resume report expands seven blocks, drops the inner scroller, and fills th
   expect(failRatio).toBeGreaterThanOrEqual(0.45)
 })
 
+test('resume report scroll hint clears after the page is scrolled to the bottom @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/resume/export/pricing', { status: 200, json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null } })
+  await page.goto('/resume/report?capture=1&state=report&taskId=paircapture01')
+  await expect(page.getByTestId('resume-report-state-report')).toBeVisible()
+  const hint = page.getByTestId('resume-report-scroll-hint')
+  await expect(hint).toBeVisible()
+  await expect(hint).toContainText(/下滑还有 [1-9]\d* 块/)
+  await expect(hint).toContainText('最下面可以带走报告')
+
+  const scroller = page.locator('[data-kiosk-screen="resume-report"]')
+  await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight })
+  await expect(hint).toHaveCount(0)
+
+  await scroller.evaluate((el) => { el.scrollTop = 0 })
+  await expect(hint).toBeVisible()
+  await expect(hint).toContainText('最下面可以带走报告')
+})
+
+test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  for (const state of ['unavailable', 'diagnose-failed', 'read-error', 'no-context'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    const rows = page.locator('.rrp-exits .rrp-row')
+    const count = await rows.count()
+    expect(count).toBeGreaterThan(0)
+    for (let i = 0; i < count; i += 1) {
+      const row = rows.nth(i)
+      const box = await row.boundingBox()
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(64)
+      await expect(row.locator('.rrp-ic')).toHaveCount(1)
+      const disabled = await row.getAttribute('aria-disabled')
+      await expect(row.locator('.rrp-go')).toHaveCount(disabled === 'true' ? 0 : 1)
+    }
+    if (state === 'diagnose-failed') {
+      await expect(page.getByRole('button', { name: /打印我上传的原件/ })).toContainText('本次不可用')
+      await expect(page.getByText('这里拿不到你刚上传的那份原件（刷新或重新进入后就拿不到了）。请回到简历来源重新选取文件，再去打印。')).toBeVisible()
+    }
+  }
+
+  for (const state of ['no-context', 'read-error', 'unavailable', 'illegal', 'diagnose-failed'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    const minHeight = await page.locator('.rrp-state').first().evaluate((el) => getComputedStyle(el).minHeight)
+    expect(minHeight === '0px' || minHeight === 'auto').toBe(true)
+    const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
+    const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
+    expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
+  }
+})
+
 test('assistant first screen keeps composer and send above the Qingxu navbar @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   await page.goto('/assistant')

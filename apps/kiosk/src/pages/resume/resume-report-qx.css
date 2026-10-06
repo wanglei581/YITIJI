@@ -102,6 +102,7 @@
 .rrp-zone { flex: none; display: flex; flex-direction: column; padding: 16px 22px 18px; }
 .rrp-zh { display: flex; align-items: center; gap: 12px; margin-bottom: 11px; font-size: var(--qx-fs-sec); font-weight: 800; }
 .rrp-zh span { margin-left: auto; font-size: var(--qx-fs-aux); color: var(--qx-ink-3); font-weight: 700; }
+.rrp-zh .rrp-more { margin-left: 0; }
 .rrp-scroll { display: flex; flex-direction: column; gap: 10px; }
 .rrp-scroll::-webkit-scrollbar { display: none; }
 .rrp-zfoot { margin: 10px 0 0; padding: 11px 15px; border-radius: 15px; background: var(--qx-teal-soft); border: 1px solid var(--qx-line); font-size: var(--qx-fs-aux); line-height: 1.44; color: var(--qx-ink-2); }
@@ -164,8 +165,21 @@
   display: flex; align-items: center; gap: 16px; min-height: 88px; width: 100%; padding: 0 18px;
   border-radius: 18px; background: var(--qx-paper); border: 1px solid var(--qx-line); text-align: left; cursor: pointer; color: inherit;
 }
+.rrp-row .rrp-ic {
+  flex: none; width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d);
+}
+.rrp-row .tx { flex: 1; min-width: 0; }
 .rrp-row .tx b { display: block; font-size: var(--qx-fs-body); font-weight: 800; }
 .rrp-row .tx span { display: block; margin-top: 5px; font-size: var(--qx-fs-aux); color: var(--qx-ink-2); }
+.rrp-row .rrp-go {
+  flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--qx-paper); border: 1px solid var(--qx-line-2); color: var(--qx-ink-3);
+}
+.rrp-row[aria-disabled='true'] { border-style: dashed; color: var(--qx-ink-3); cursor: not-allowed; }
+.rrp-row[aria-disabled='true'] .rrp-ic { background: var(--qx-line); color: var(--qx-ink-3); }
+.rrp-row[aria-disabled='true'] .tx b,
+.rrp-row[aria-disabled='true'] .tx span { color: var(--qx-ink-3); }
 .rrp-dnames { margin-top: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .rrp-dn {
   display: flex; align-items: center; gap: 11px; min-height: 64px; padding: 0 14px; border-radius: 15px;

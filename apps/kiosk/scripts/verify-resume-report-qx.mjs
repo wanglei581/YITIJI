@@ -118,6 +118,15 @@ assert(has(files.body, "navigate('/resume/self-assessment/intro')"), 'self-asses
 const r1 = read('src/pages/resume/resume-r1-qx2.css')
 assert(has(r1, '.rrp-zone .rrp-scroll { max-height: none; overflow: visible; }'), 'report zones grow with content instead of an inner scroller')
 assert(!has(r1, 'max-height: 440px'), 'report zone no longer caps the list at 440px')
+assert(!/min-height:\s*210px/.test(r1), 'no-context, read-error, unavailable and illegal state cards size to their content')
+assert(has(files.issues, 'new IntersectionObserver'), 'structure scroll hint uses IntersectionObserver')
+assert(!has(files.issues, 'setInterval'), 'structure scroll hint does not poll on a timer')
+assert(has(files.issues, '· 下滑还有'), 'structure title says how many blocks are still below')
+assert(has(files.issues, '最下面可以带走报告'), 'scroll hint mentions the takeaway while it is still below')
+assert(has(files.issues, 'data-testid="resume-report-scroll-hint"'), 'scroll hint has a stable test id')
+assert(has(files.states, 'className="rrp-ic"') && has(files.states, 'className="rrp-go"'), 'non-report exit rows have an icon and a round arrow')
+assert(has(files.css, '.rrp-row .rrp-go'), 'the round arrow is a 40px circle on the exit row')
+assert(/min-height:\s*(\d+)px/.test(files.css) && Number(/\.rrp-row\s*\{[^}]*min-height:\s*(\d+)px/.exec(files.css)?.[1] ?? 0) >= 64, 'exit rows stay at least 64px tall')
 
 if (failures.length) {
   console.error('verify-resume-report-qx failed:')
