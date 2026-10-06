@@ -207,20 +207,22 @@
 .act-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .act-step { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
 .act-step > div { min-width: 0; }
-.act-step b { display: block; font-size: var(--qx-fs-body); }
-.act-step span { display: block; margin-top: 4px; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
-.act-step-num {
+.act-step > div > b { display: block; font-size: var(--qx-fs-body); }
+.act-step > div > span { display: block; margin-top: 4px; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+.act-step > .act-step-num {
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  margin: 0;
   border-radius: 50%;
   background: var(--qx-deep);
   color: var(--qx-emerald);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--qx-fs-aux-lg);
+  font-size: var(--qx-fs-btn);
   font-weight: 700;
+  line-height: 1;
 }
 
 .act-explain { border-left: 4px solid var(--qx-plum); }
