@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1871 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1872 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -185,7 +185,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 171 个文件</summary>
+<summary><code>apps/admin/src/</code> — 172 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -314,6 +314,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/terminals/TerminalLifecycleActions.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalNetworkDiagnostics.tsx` | `verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/terminals/index.tsx` | `verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-console-plain-copy.mjs`<br/>`verify-datetime-honesty.mjs`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-device-config.ts` |
+| `apps/admin/src/routes/terminals/terminalCommandViews.ts` | `verify-console-privacy-copy.mjs` |
 | `apps/admin/src/routes/terminals/terminalStatusViews.ts` | `verify-admin-peripheral-views.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs` |
 | `apps/admin/src/routes/toolbox/components/TerminalToolboxPanel.tsx` | `verify-toolbox-review-ui.mjs` |
 | `apps/admin/src/routes/toolbox/components/TerminalToolboxRow.tsx` | `verify-toolbox-review-ui.mjs`<br/>`verify-terminal-device-config.ts` |

@@ -12279,7 +12279,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 238,
+      "reachableFileCount": 241,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13047,7 +13047,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 264
+      "sourceFileCount": 268
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -18729,6 +18729,9 @@
       "scripts/verify-datetime-honesty.mjs",
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-device-config.ts"
+    ],
+    "apps/admin/src/routes/terminals/terminalCommandViews.ts": [
+      "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
     "apps/admin/src/routes/terminals/terminalStatusViews.ts": [
       "apps/admin/scripts/verify-admin-peripheral-views.mjs",
@@ -27988,6 +27991,7 @@
           "apps/admin/src/routes/partners/orgPresentation.ts",
           "apps/admin/src/routes/privacy-requests/index.tsx",
           "apps/admin/src/routes/screen/metricLabels.ts",
+          "apps/admin/src/routes/terminals/terminalCommandViews.ts",
           "apps/admin/src/routes/users/userPresentation.ts",
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/profile/ComplianceRestrictions.tsx",
@@ -43038,6 +43042,17 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/terminals/terminalCommandViews.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
