@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1871 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1876 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -423,7 +423,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 541 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 546 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -622,12 +622,17 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-p39-print-hub-fidelity.mjs` |
 | `apps/kiosk/src/pages/print-scan/convert-images-model.ts` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print-scan/printHubContent.ts` | `verify-p39-print-hub-fidelity.mjs` |
-| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx` | `verify-fusion-w5.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx` | `verify-fusion-w2-print-scan.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx` | `verify-fusion-w2-print-scan.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx` | `verify-fusion-w2-print-scan.mjs` |
+| `apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-p39-print-hub-fidelity.mjs` |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css` | `verify-kiosk-visual-unity.mjs` |
+| `apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/CashierPaymentPanel.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-input-safety.mjs`<br/>`verify-payment-codepay.ts` |
 | `apps/kiosk/src/pages/print/DevSandboxControls.tsx` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/PdfPreviewFrame.tsx` | `verify-print-parameter-capability.mjs` |
