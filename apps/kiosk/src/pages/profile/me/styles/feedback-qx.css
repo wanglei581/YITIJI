@@ -185,7 +185,7 @@
 .fb-detail-scroll > .fb-sec { flex: none; }
 .fb-thread-empty { margin: 0; text-align: center; color: var(--qx-ink-2); line-height: 1.45; }
 .fb-bubble { flex: none; padding: 14px 16px; border-radius: 18px; background: var(--qx-surface); border: 1px solid var(--qx-line); }
-.fb-bubble-mine { background: var(--qx-teal-soft); border-color: #c6e2d8; }
+.fb-bubble-mine { background: var(--qx-teal-soft); border-color: var(--qx-teal-soft); }
 .fb-bubble-head { display: flex; justify-content: space-between; gap: 12px; font-weight: 800; color: var(--qx-ink-3); }
 .fb-bubble-mine .fb-bubble-head { color: var(--qx-teal-d); }
 .fb-bubble p { margin: 8px 0 0; line-height: 1.5; color: var(--qx-ink-2); }
@@ -193,8 +193,8 @@
   margin: 0;
   padding: 16px 20px;
   border-radius: 18px;
-  background: #efeade;
-  border: 1px solid #ddd8c8;
+  background: var(--qx-muted-bg);
+  border: 1px solid var(--qx-muted-line);
   color: var(--qx-ink-2);
   text-align: center;
   line-height: 1.45;
@@ -214,7 +214,7 @@
 }
 .fb-new i { font-style: normal; margin-left: auto; font-size: 21px; font-weight: 700; color: var(--qx-ink-3); }
 
-.fb-skel { display: block; height: 22px; border-radius: 8px; background: #b3ac99; }
+.fb-skel { display: block; height: 22px; border-radius: 8px; background: var(--qx-line-2); }
 .fb-skel-t { width: 46%; }
 .fb-skel-s { width: 32%; height: 18px; margin-top: 12px; }
 
@@ -262,9 +262,9 @@
 .qx-stage:has(.fb-page) .fb-hold small { font-size: 21px; font-weight: 700; letter-spacing: 0; white-space: normal; }
 .qx-stage:has(.fb-page) .fb-cta-row > .qx-btn[data-variant='primary']:disabled {
   opacity: 1;
-  background: #dcd8cc;
-  border-color: #dcd8cc;
-  color: #2c332c;
+  background: var(--qx-muted-line);
+  border-color: var(--qx-muted-line);
+  color: var(--qx-ink);
 }
 /* 纸飞机 svg 自身没有宽高。尺寸挂在图标上，而不是 fb-hold：
    提交中、重试、以及没有第二行小字时都没有 fb-hold，flex 会把默认替换尺寸拉开。 */
