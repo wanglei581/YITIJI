@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`576` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`578` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -172,6 +172,13 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/resume/records/:taskId/export` | ResumeReportExportController.export | — | — | — |
+
+## `services/api/src/ai/safety/ai-safety-lexicon.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/ai-safety/lexicon` | AiSafetyLexiconController.get | admin | AiSafetyLexiconService | AiSafetyTerm<br/>AuditLog |
+| PUT | `/api/v1/admin/ai-safety/lexicon` | AiSafetyLexiconController.put | admin | AiSafetyLexiconService | AiSafetyTerm<br/>AuditLog |
 
 ## `services/api/src/ai/self-assessment.controller.ts`
 
