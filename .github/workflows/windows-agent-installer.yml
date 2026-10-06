@@ -183,6 +183,14 @@ jobs:
           pnpm --filter ./apps/terminal-agent verify:print-queue-residue-windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Same pre-staging window: ts-node is gone after build-staging --prod.
+      # Two local port printers; clear only the configured one, including another account's job.
+      - name: Verify remote clear deletes every job on the configured printer
+        shell: pwsh
+        run: |
+          pnpm --filter ./apps/terminal-agent verify:remote-commands-windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Same pre-staging window. Junction case uses New-Item -ItemType Junction.
       - name: Verify known legacy residue cleanup
         shell: pwsh

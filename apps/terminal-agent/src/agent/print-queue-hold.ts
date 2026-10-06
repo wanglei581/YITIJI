@@ -40,6 +40,7 @@
 
 import { spawn } from 'child_process'
 import { log } from '../logger'
+import { pauseQueueAfterTerminalState } from './print-dispatch-gate'
 import { queryWin32PrinterLine } from './wmi'
 import { ESCAPE_WQL_LITERAL_FUNCTION, POWERSHELL_STDIN_UTF8 } from './wql-literal'
 
@@ -172,18 +173,31 @@ ${RESOLVE_PRINT_JOB_USER_SID}
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
 $name = [string]$payload.printerName
 if ([string]::IsNullOrWhiteSpace($name)) { throw 'printer name missing' }
-$currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-if ($null -eq $currentIdentity -or $null -eq $currentIdentity.User -or [string]::IsNullOrWhiteSpace([string]$currentIdentity.User.Value)) {
-  throw 'current process sid is unreadable'
+$scope = 'own'
+if ($null -ne $payload.scope -and -not [string]::IsNullOrWhiteSpace([string]$payload.scope)) {
+  $scope = [string]$payload.scope
 }
-$currentSid = $currentIdentity.User
+if ($scope -ne 'own' -and $scope -ne 'all') { throw 'scope rejected' }
+$currentSid = $null
+if ($scope -eq 'own') {
+  $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+  if ($null -eq $currentIdentity -or $null -eq $currentIdentity.User -or [string]::IsNullOrWhiteSpace([string]$currentIdentity.User.Value)) {
+    throw 'current process sid is unreadable'
+  }
+  $currentSid = $currentIdentity.User
+}
 $raw = @(Get-PrintJob -PrinterName $name -ErrorAction Stop)
 $jobs = New-Object System.Collections.Generic.List[object]
 $skippedUnreadable = 0
+$listed = 0
 foreach ($job in $raw) {
   if ($null -eq $job) { continue }
+  $listed += 1
   $owned = $false
   $unreadable = $false
+  if ($scope -eq 'all') {
+    # remote-clear-all: every job on this printer, no SID comparison
+  } else {
   try {
     $resolved = Resolve-PrintJobUserSid ([string]$job.UserName)
     $jobSid = New-Object System.Security.Principal.SecurityIdentifier($resolved)
@@ -193,6 +207,7 @@ foreach ($job in $raw) {
     # ID 是否能删由 Node 判断。
     $skippedUnreadable += 1
     $unreadable = $true
+  }
   }
   $idText = ''
   if ($null -ne $job.ID) { $idText = [string]$job.ID }
@@ -204,7 +219,7 @@ foreach ($job in $raw) {
   # Argument types do not match（队列里一有作业就失败，CI 真队列实测）。ConvertTo-Json 只用来转义单个字符串。
   [void]$jobs.Add('{"id":' + (ConvertTo-Json -InputObject $idText -Compress) + ',"owned":' + $ownedText + ',"unreadable":' + $unreadableText + '}')
 }
-'{"jobs":[' + ($jobs -join ',') + '],"unreadable":' + [int]$skippedUnreadable + '}'
+'{"jobs":[' + ($jobs -join ',') + '],"unreadable":' + [int]$skippedUnreadable + ',"total":' + [int]$listed + '}'
 `.trim()
 
 export const REMOVE_JOBS_SCRIPT = `
@@ -448,6 +463,105 @@ export async function listConfiguredPrintJobs(printerName: string): Promise<{ jo
   } catch (error) {
     tagQueueStep('list', error)
   }
+}
+
+export interface AllPrintJobsSnapshot {
+  total: number
+  ids: number[]
+}
+
+/** 全部作业，不按 SID 取舍。total 含删不掉的异常 ID，ids 只含能删的正整数。 */
+export function parseAllPrintJobsOutput(raw: string): AllPrintJobsSnapshot {
+  const listed = parsePrintJobListOutput(raw)
+  let total = listed.jobs.length
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new PrintQueueHoldError('print job list is unreadable')
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const reported = (parsed as { total?: unknown }).total
+    if (typeof reported === 'number' && Number.isInteger(reported) && reported >= 0) total = reported
+  }
+  const ids = listed.jobs.map((job) => job.id)
+  return { total: Math.max(total, ids.length), ids }
+}
+
+export async function listAllConfiguredPrintJobs(printerName: string): Promise<AllPrintJobsSnapshot> {
+  try {
+    const stdout = await runPowerShellOrThrow(
+      LIST_JOBS_SCRIPT,
+      JSON.stringify({ printerName: requirePrinterName(printerName), scope: 'all' }),
+    )
+    return parseAllPrintJobsOutput(stdout)
+  } catch (error) {
+    tagQueueStep('list', error)
+  }
+}
+
+export interface ClearAllPrintJobsOptions {
+  holdWhenIdle?: boolean
+  /** 测试注入。缺省看 process.platform，非 win32 不碰队列。 */
+  platform?: NodeJS.Platform
+  runList?: (printerName: string) => Promise<AllPrintJobsSnapshot>
+  runRemove?: (printerName: string, ids: number[]) => Promise<void>
+  pause?: (printerName: string) => Promise<void>
+}
+
+/**
+ * 删掉配置打印机上的全部作业，不按 SID 过滤。
+ * 非 Windows 安全空转，回 done / 0。
+ * 列或删失败时，剩余数用最后一次成功读到的数；一次都没读到则为 0。
+ */
+export async function clearAllJobsOnConfiguredPrinter(
+  printerName: string,
+  options: ClearAllPrintJobsOptions = {},
+): Promise<{ result: 'done' | 'failed'; remainingJobs: number }> {
+  const platform = options.platform ?? process.platform
+  if (platform !== 'win32') return { result: 'done', remainingJobs: 0 }
+  const list = options.runList ?? listAllConfiguredPrintJobs
+  const remove = options.runRemove ?? removePrintJobs
+  const finish = async (result: 'done' | 'failed', remainingJobs: number) => {
+    if (options.holdWhenIdle) {
+      const pause = options.pause ?? ((name: string) => pauseConfiguredPrinterQueue(name).then(() => undefined))
+      await pauseQueueAfterTerminalState(() => pause(printerName))
+    }
+    return { result, remainingJobs }
+  }
+  let lastCount: number | null = null
+  let removeFailed = false
+  try {
+    const before = await list(printerName)
+    lastCount = before.total
+    if (before.ids.length > 0) {
+      try {
+        await remove(printerName, before.ids)
+      } catch {
+        removeFailed = true
+      }
+    }
+  } catch {
+    log('remote-command: clear list failed before a count; remaining reported as 0')
+    return finish('failed', 0)
+  }
+  let recounted = false
+  try {
+    const after = await list(printerName)
+    lastCount = after.total
+    recounted = true
+  } catch {
+    if (lastCount === null) {
+      log('remote-command: clear recount failed; remaining reported as 0')
+      lastCount = 0
+    } else {
+      log('remote-command: clear recount failed; remaining reported as last count')
+    }
+  }
+  const remaining = lastCount ?? 0
+  if (recounted && remaining === 0) return finish('done', 0)
+  if (removeFailed || !recounted || remaining > 0) return finish('failed', remaining)
+  return finish('done', 0)
 }
 
 /** 与 resolvePrintJobUserSid 同一段脚本、同一份 stdin。门禁用它重放失败的那一次。 */

@@ -274,6 +274,11 @@ function guessMimeType(filename: string): string {
  */
 const inFlightPaths = new Set<string>()
 
+/** 有扫描件正在处理（含向服务端投递）时为 true。远程指令用它判断忙碌。 */
+export function isScanDeliveryInFlight(): boolean {
+  return inFlightPaths.size > 0
+}
+
 /**
  * 启动时识别出的历史 backlog 文件路径集合（resolved absolute path）。
  * 在本进程生命周期内永久 never-deliver：绝不能进入服务端租约申请或正常投递；

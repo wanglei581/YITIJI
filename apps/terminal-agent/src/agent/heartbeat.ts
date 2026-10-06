@@ -21,6 +21,7 @@
  */
 
 import os from 'os'
+import axios from 'axios'
 import type {
   AgentConfig,
   HeartbeatPayload,
@@ -88,6 +89,38 @@ export interface HeartbeatOptions {
   onObservation?: (observation: HeartbeatObservation) => void
   /** Read on every send because heartbeat starts before the scan watcher. */
   getScanInputTelemetry?: () => ScanInputRuntimeTelemetry
+  /** 心跳成功后处理服务端下发的远程指令。没有指令时不调用。 */
+  onRemoteCommands?: (commands: unknown) => Promise<void>
+}
+
+/** 进程启动时取一次，之后不变。后端靠它判断重启是否已经完成。 */
+const AGENT_STARTED_AT = new Date().toISOString()
+/** 旧服务器 forbidNonWhitelisted 会因这个字段回 400。本进程内停发。 */
+let sendAgentStartedAt = true
+
+export function resetAgentStartedAtFallbackForTests(): void {
+  sendAgentStartedAt = true
+}
+
+function validationText(value: unknown): string[] {
+  if (typeof value === 'string') return [value]
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
+/** 只看 400 的 error.message / error.details（以及顶层 message）。别的状态不算。 */
+export function heartbeatRejectsAgentStartedAt(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 400) return false
+  const data = error.response.data
+  if (!data || typeof data !== 'object') return false
+  const root = data as { message?: unknown; error?: unknown }
+  const lines = validationText(root.message)
+  const nested = root.error
+  if (nested && typeof nested === 'object') {
+    const errBody = nested as { message?: unknown; details?: unknown }
+    lines.push(...validationText(errBody.message), ...validationText(errBody.details))
+  }
+  return lines.some((line) => line.includes('agentStartedAt'))
 }
 
 export interface HeartbeatObservation {
@@ -113,6 +146,10 @@ function notifyObservation(
  * Never throws.
  */
 export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean> {
+  return deliverHeartbeat(options, true)
+}
+
+async function deliverHeartbeat(options: HeartbeatOptions, allowStartedAtFallback: boolean): Promise<boolean> {
   const { config, onConfigUpdate, failureCounter, onObservation } = options
   const localTaskDatabaseAvailable = options.localTaskDatabaseAvailable ?? true
 
@@ -163,6 +200,7 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     payload.scanInputReason = scanInputTelemetry.reason
     payload.scanInputObservedAt = scanInputTelemetry.observedAt
   }
+  if (sendAgentStartedAt) payload.agentStartedAt = AGENT_STARTED_AT
 
   try {
     const resp = await client.put<HeartbeatResponse>(
@@ -183,12 +221,29 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
       onConfigUpdate(resp.data.config as Partial<AgentConfig>)
     }
 
+    if (options.onRemoteCommands && resp.data != null && Object.prototype.hasOwnProperty.call(resp.data, 'commands')) {
+      try {
+        await options.onRemoteCommands(resp.data.commands)
+      } catch {
+        warn('remote-command: processing failed')
+      }
+    }
+
     // Separate from the mutable `config` response: this only observes a plan
     // and reports the already-running version. It cannot change runtime state.
     void observeReleasePlan(config)
 
     return true
   } catch (e) {
+    if (
+      allowStartedAtFallback
+      && sendAgentStartedAt
+      && heartbeatRejectsAgentStartedAt(e)
+    ) {
+      sendAgentStartedAt = false
+      log('heartbeat: server does not accept agentStartedAt, disabled')
+      return deliverHeartbeat(options, false)
+    }
     if (isUnauthorizedHttpError(e)) {
       markUnauthorized()
       writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
