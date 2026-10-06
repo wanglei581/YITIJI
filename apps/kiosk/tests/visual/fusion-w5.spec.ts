@@ -558,6 +558,67 @@ test('benefit activity detail keeps the shared shell, real content and return pa
   await expect(page).toHaveURL(/\/activities$/)
 })
 
+function benefitActivityFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'w5-benefit-detail',
+    title: 'W5 打印服务体验权益',
+    description: '这是来自真实活动详情接口的验收内容。',
+    rulesText: '每人限领一次；仅用于现场打印服务。',
+    benefitType: 'free_quota',
+    sourceType: 'platform',
+    quantityTotal: 1,
+    stockTotal: 20,
+    stockRemaining: 8,
+    claimLimitPerUser: 1,
+    status: 'published',
+    validFrom: null,
+    validUntil: null,
+    grantValidDays: 30,
+    claimable: true,
+    claimed: false,
+    soldOut: false,
+    ended: false,
+    createdAt: '2026-07-24T00:00:00.000Z',
+    updatedAt: '2026-07-24T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+/** 稿 31：活动列表和详情都用青序顶栏，不再渲染终端编号，底部当前项是「我的」。 */
+async function expectBenefitQingxuShell(page: Page): Promise<void> {
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('.qx-topbar')).not.toContainText('KSK-001')
+  await expect(page.locator('.ui-kiosk-page-header')).toHaveCount(0)
+  await expect(page.getByTestId('qx-nav-profile')).toContainText('我的')
+  await expect(page.getByTestId('qx-nav-profile')).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByTestId('qx-nav-home')).not.toHaveAttribute('aria-current', 'page')
+}
+
+test('benefit activities list and detail drop the terminal code and mark 我的 current @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities', {
+    status: 200,
+    json: { success: true, data: { items: [], total: 0 } },
+  })
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: { success: true, data: benefitActivityFixture() },
+  })
+
+  await page.goto('/activities')
+  await expect(page.getByTestId('activities-state-empty')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '可参加的活动', exact: true })).toBeVisible()
+  await expectBenefitQingxuShell(page)
+  await expectFusionAcceptance(page, errors)
+
+  await page.goto('/activities/w5-benefit-detail')
+  await expect(page.getByTestId('activity-state-signed-out')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '活动详情', exact: true })).toBeVisible()
+  await expectBenefitQingxuShell(page)
+  await expectFusionAcceptance(page, errors)
+})
+
 test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
