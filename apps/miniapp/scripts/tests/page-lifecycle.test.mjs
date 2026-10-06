@@ -7392,3 +7392,14 @@ test('有服务电话时点号码会拨出，取消也静默', async () => {
   assert.equal(calls[1], '010-12345678')
   assert.equal(wx2.calls.showToast.length, 0)
 })
+
+// 「还能续打 N 次」只认 reprintAllowed === true：待到机的新码旁边不能出现续打次数，
+// 哪怕服务端顺带给了 reprintRemaining（审稿反向变异 10/6 发现的空档）。
+test('续打次数只在服务端允许续打时写，待到机的码旁不写', () => {
+  const { reprintNoteText } = requireMiniapp('../utils/support-contact.js')
+  assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 2 }), '还能续打 2 次')
+  assert.equal(reprintNoteText({ reprintAllowed: false, reprintRemaining: 2 }), '')
+  assert.equal(reprintNoteText({ reprintRemaining: 2 }), '')
+  assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 0 }), '')
+  assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 1.5 }), '')
+})
