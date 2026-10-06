@@ -75,7 +75,9 @@ assert.match(optimizeExportErrorMessage(validation('education.0.school should no
 assert.match(optimizeExportErrorMessage(validation('projects.0.role should not be empty')), /项目经历第 1 条的职务.*不能在本页修改.*重新上传并诊断/)
 assert.match(optimizeExportErrorMessage(validation('education.0.degree should not be empty')), /教育经历第 1 条的学历.*不能在本页修改.*重新上传并诊断/)
 assert.match(optimizeExportErrorMessage(validation('experience[0].description: description must be shorter than or equal to 1000 characters')), /工作经历第 1 条的描述.*编辑区.*1000 字以内/)
-assert.match(optimizeExportErrorMessage(validation('intention.position should not be empty')), /求职意向可以留空.*现场工作人员.*修改清单/)
+// 旧句含「现场工作人员」。优化页不许出现这个词；求职意向仍可以留空，出路仍是先导出修改清单。
+assert.match(optimizeExportErrorMessage(validation('intention.position should not be empty')), /求职意向可以留空.*修改清单/)
+assert.doesNotMatch(optimizeExportErrorMessage(validation('intention.position should not be empty')), /工作人员/)
 assert.doesNotMatch(optimizeExportErrorMessage(validation('unknown.field secret technical payload')), /unknown|secret|technical/)
 assert.equal(optimizeExportErrorMessage({ code: 'NETWORK_ERROR' }), fallback)
 assert.match(page, /setExportError\(optimizeExportErrorMessage\(err\)\)/, '优化稿导出接入专用错误文案')
