@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  BellIcon,
   ChevronRightIcon,
   FileTextIcon,
+  HelpCircleIcon,
+  InfoIcon,
   LogOutIcon,
   PhoneIcon,
   RepeatIcon,
@@ -29,6 +32,16 @@ type JobAiConsent = 'idle' | 'loading' | 'granted' | 'not-granted' | 'error'
 // 10/4 产品负责人：设备现场无人值守、全自助，一体机不再把用户引向线下人工，只指向政策里的电话、邮箱。
 // 电话、邮箱不写死，引用隐私政策。一体机上不直接提交注销，也没有自助导出。
 const ACCOUNT_CLOSURE_NOTE = '注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。'
+
+function settingsChrome(state: string): { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string; subtitle: string } {
+  if (state === 'anonymous') return { tone: 'warn', label: '未登录，部分设置不可用', subtitle: '未登录时只显示真实可用的项，不放假开关。' }
+  if (state === 'loading') return { tone: 'unknown', label: '正在读取账号设置状态', subtitle: '授权状态返回前不放开关，也不显示上一次的结果。' }
+  if (state === 'error') return { tone: 'bad', label: '账号设置状态没取到', subtitle: '状态没取到时，不猜你授权了什么。' }
+  if (state === 'switch-confirm') return { tone: 'warn', label: '换账号 · 等你二次确认', subtitle: '换账号要先退出并清干净这台机器。' }
+  if (state === 'switching') return { tone: 'warn', label: '换账号 · 正在退出并清场', subtitle: '清场做完之前不会打开登录页。' }
+  if (state === 'switch-failed') return { tone: 'bad', label: '换账号失败 · 仍是当前账号', subtitle: '没切成功，当前账号仍在登录状态。' }
+  return { tone: 'unknown', label: '只列当前已实现的设置项', subtitle: '手机号、隐私授权、协议与结束使用都在这一页。' }
+}
 
 const CONSENT_BADGE: Record<JobAiConsent, { text: string; tone?: 'run' | 'bad' | 'off' }> = {
   idle: { text: '—', tone: 'off' },
@@ -176,6 +189,7 @@ export function MySettingsPage() {
   const badge = CONSENT_BADGE[jobAi]
   const screenState = confirm === 'switch' ? (clearError ? 'switch-failed' : clearing ? 'switching' : 'switch-confirm')
     : !isLoggedIn ? 'anonymous' : jobAi === 'loading' ? 'loading' : jobAi === 'error' ? 'error' : 'member'
+  const chrome = settingsChrome(screenState)
 
   if (showRebind && isLoggedIn && getToken()) return (
     <PhoneRebindPanel phoneMasked={phoneMasked} token={getToken()!} onDone={handleRebindDone}
@@ -190,8 +204,8 @@ export function MySettingsPage() {
 
   return (
     <div className="settings-page fusion-w5" data-kiosk-screen="member-settings" data-qx-view="settings" data-state={screenState} data-testid={`member-settings-state-${screenState}`} data-takeaway="本人账号设置与授权状态">
-    <QxPageFrame title="账号设置" subtitle="换号、管理授权或结束使用，都在这里。"
-      status={{ tone: jobAi === 'error' ? 'warn' : 'unknown', label: isLoggedIn ? '公共设备，请保护个人信息' : '当前是游客' }}
+    <QxPageFrame title="账号设置" subtitle={chrome.subtitle}
+      status={{ tone: chrome.tone, label: chrome.label }}
       back={{ label: '返回我的', onBack: () => navigate('/profile') }}
       ctabar={ctabar} navbar={<QxMemberNavbar current="profile" />}>
       <div className="qx-scroll qx-grow settings-body">
@@ -221,7 +235,10 @@ export function MySettingsPage() {
         )}
         {isLoggedIn && (
           <>
-            <h2 className="settings-section-title">账号</h2>
+            <div className="settings-sec">
+              <h2 className="settings-section-title">账号</h2>
+              <span className="hint">公共终端默认遮挡个人信息</span>
+            </div>
             <section className="qx-me-list" aria-label="账号操作">
               <SettingsRow icon={PhoneIcon} tone="wheat" title="换绑手机号" desc="验证旧手机号后，再验证新手机号；成功后退出并重新登录。" testid="member-settings-rebind" onClick={() => setShowRebind(true)} />
               <SettingsRow icon={RepeatIcon} tone="plum" title="换一个账号登录" desc="先二次确认，再退出并清除本机这一次的登录，然后才去登录页。" testid="member-settings-switch" onClick={() => setConfirm('switch')} />
@@ -234,6 +251,7 @@ export function MySettingsPage() {
                 testid="member-settings-privacy"
                 onClick={() => navigate('/me/privacy-requests')}
               />
+              <SettingsRow icon={BellIcon} title="消息通知" desc="系统下发的会员通知。" route="/me/notifications" testid="member-settings-notifications" onClick={() => navigate('/me/notifications')} />
             </section>
           </>
         )}
@@ -266,13 +284,14 @@ export function MySettingsPage() {
         {/* 协议 / 隐私入口：不登录也能读 */}
         <h2 className="settings-section-title">协议与帮助</h2>
         <section className="qx-me-list" aria-label="协议与帮助">
-          <SettingsRow icon={FileTextIcon} title="用户服务协议" desc="服务范围、账号、收费与打印说明" route="/legal/terms" testid="member-settings-terms" onClick={() => navigate('/legal/terms')} />
-          <SettingsRow icon={ShieldCheckIcon} tone="slate" title="隐私政策" desc="信息收集、使用与文件留存说明" route="/legal/privacy" testid="member-settings-privacy-doc" onClick={() => navigate('/legal/privacy')} />
+          <SettingsRow icon={FileTextIcon} title="《用户服务协议》" desc="服务范围、账号、收费与打印说明" route="/legal/terms" testid="member-settings-terms" onClick={() => navigate('/legal/terms')} />
+          <SettingsRow icon={ShieldCheckIcon} tone="slate" title="《隐私政策》" desc="信息收集、使用与文件留存说明" route="/legal/privacy" testid="member-settings-privacy-doc" onClick={() => navigate('/legal/privacy')} />
+          <SettingsRow icon={HelpCircleIcon} title="帮助与求助" desc="常见问题与操作说明。" route="/help" testid="member-settings-help" onClick={() => navigate('/help')} />
         </section>
 
         <section className="settings-note" aria-label="公共终端使用说明">
-          <h2>结束使用之后会发生什么</h2>
-          <p>结束使用或闲置超时，会退出本机登录并清除这一次的临时信息。已经提交的订单、文件和记录按各自的保存期限管理。</p>
+          <h2><InfoIcon size={24} aria-hidden />结束使用之后会发生什么</h2>
+          <p>点「结束使用」或闲置超时，会退出本机登录并清除这一次的临时信息。屏幕上没提交的内容会消失。已经提交的订单、文件和记录按各自的保存期限管理。</p>
         </section>
       </div>
 

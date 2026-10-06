@@ -1655,7 +1655,8 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   await page.goto('/me/settings')
   await expectQxSettingsShell(page, 'anonymous')
   await expect(page.getByRole('region', { name: '登录引导' })).toBeVisible()
-  await expect(page.getByRole('region', { name: '协议与帮助' }).getByRole('button')).toHaveCount(2)
+  // 稿 30 在「协议与帮助」增加「帮助与求助」，所以这里是三行，不再是协议两行。
+  await expect(page.getByRole('region', { name: '协议与帮助' }).getByRole('button')).toHaveCount(3)
   await expect(page.getByRole('region', { name: '隐私与 AI 授权管理' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /换绑手机号|切换账号|隐私与数据请求/ })).toHaveCount(0)
   // 游客只看到登录后会出现哪几项：不可点、明确「登录后可用」。
