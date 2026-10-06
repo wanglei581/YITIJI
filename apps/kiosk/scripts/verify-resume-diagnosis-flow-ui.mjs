@@ -143,7 +143,9 @@ assertIncludes(optimize, "navigate('/resume/optimize/compare'", 'optimize page l
 // 拆出去的那页必须诚实说明「本次选择不保存」——没有采纳落库端点。
 assertIncludes(optimizeCompare, '未保存', 'compare page states the adoption selection is not persisted')
 assertNotIncludes(optimizeCompare, '已保存', 'compare page avoids copy implying the selection was saved')
-assertIncludes(optimizeCompare, '这是阅读草稿，不是简历最终稿', 'compare draft states it is a reading draft, not the final resume')
+// 旧句「这是阅读草稿，不是简历最终稿」说对照页草稿不写进导出。
+// 产品负责人 10/6：选择写进优化稿。对照页现在说明：这里的选择还没进导出稿，回优化页确认后才进入。
+assertIncludes(optimizeCompare, '对照页上的选择还没写进这份优化稿，回到优化页确认应用之后才会进入导出。', 'compare draft states selections are not in the export resume yet')
 assertIncludes(optimizeCompare, '已采纳', 'compare draft labels adopted items as 已采纳 (reading-layer, not persisted)')
 assertIncludes(optimizeCompare, '可采纳的全部采纳', 'compare page exposes batch adopt')
 assertIncludes(optimizeCompare, '其余保留原文', 'compare page exposes batch keep original')

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ResumeExportFormat } from '@ai-job-print/shared'
-import { QxAiHelp, QxStepActions } from '../../../../components/qingxu/QxAiHelp'
+import { QxStepActions } from '../../../../components/qingxu/QxAiHelp'
 import { SOURCE_MISSING_REASON } from './optimizeSourceFile'
 
 function formatLabel(format: ResumeExportFormat): string {

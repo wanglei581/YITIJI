@@ -12,6 +12,8 @@ export function OptimizeSaveExtras(props: {
   taskId?: string
   token: string | null
   exportVersion: number
+  onContinue: () => void
+  onRestart: () => void
 }) {
   return (
     <div className="qx-opt-save-extra">
@@ -19,8 +21,8 @@ export function OptimizeSaveExtras(props: {
         guest={props.guest}
         loading={false}
         choicePending={false}
-        onContinue={() => undefined}
-        onRestart={() => undefined}
+        onContinue={props.onContinue}
+        onRestart={props.onRestart}
         saveStatus={props.guest ? 'guest' : props.draft.status}
         savedAt={props.draft.savedAt}
       />

@@ -362,6 +362,177 @@
   color: var(--qx-emerald);
 }
 
+/* 稿第 9 节浮层（.pv-box / .pv-hd / .pv-warn / .fin / .fb-item）和原件预览层。
+ * 颜色、字号只用青序令牌，不抄稿里的字面色值。 */
+.qx-opt-cta { flex-wrap: wrap; }
+.qx-opt-source-reason {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--qx-ink-2);
+  font-size: var(--qx-fs-aux);
+  font-weight: 700;
+  line-height: 1.45;
+}
+.qx-rd-overlay .qx-opt-layer {
+  width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 26px;
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line-2);
+}
+.qx-opt-layer-h {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--qx-line);
+}
+.qx-opt-layer-h h2 {
+  margin: 0;
+  font-size: var(--qx-fs-sec);
+  font-weight: 800;
+}
+.qx-opt-layer-h .qx-btn {
+  margin-left: auto;
+  min-height: 56px;
+  min-width: 56px;
+}
+.qx-opt-final-warn,
+.qx-opt-source-note {
+  flex: none;
+  margin: 14px 22px 0;
+  padding: 12px 16px;
+  border-radius: 15px;
+  background: var(--qx-wheat-soft);
+  border: 1px solid var(--qx-line);
+  color: var(--qx-wheat-d);
+  font-size: var(--qx-fs-body);
+  line-height: 1.44;
+  font-weight: 700;
+}
+.qx-opt-source-meta {
+  flex: none;
+  margin: 14px 22px 0;
+  color: var(--qx-ink);
+  font-size: var(--qx-fs-body);
+  font-weight: 800;
+}
+.qx-opt-final-export {
+  flex: none;
+  max-height: 280px;
+  margin: 12px 22px 0;
+  padding: 16px 18px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border-radius: 17px;
+  border: 1px solid var(--qx-line);
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  font-family: inherit;
+  font-size: var(--qx-fs-body);
+  line-height: 1.5;
+}
+.qx-opt-final-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 12px 22px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  overflow-y: auto;
+}
+.qx-opt-final-item {
+  flex: none;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--qx-wheat-soft);
+  border: 1px solid var(--qx-line);
+}
+.qx-opt-final-item[data-used='未写入稿'],
+.qx-opt-final-item[data-used='自己写'] { background: var(--qx-paper); }
+.qx-opt-final-h {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 5px;
+}
+.qx-opt-final-h b { font-size: var(--qx-fs-body); font-weight: 800; }
+.qx-opt-final-choice,
+.qx-opt-final-item .chip {
+  min-height: 32px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--qx-line);
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  font-size: var(--qx-fs-aux);
+  font-weight: 800;
+}
+.qx-opt-final-item .chip[data-d='改写'] {
+  border-color: var(--qx-teal-line);
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+.qx-opt-final-item .chip[data-d='原文'] {
+  border-color: color-mix(in srgb, var(--qx-slate) 30%, var(--qx-line));
+  background: var(--qx-slate-soft);
+  color: var(--qx-slate-d);
+}
+.qx-opt-final-item .chip[data-d='自己写'] {
+  border-color: color-mix(in srgb, var(--qx-wheat) 30%, var(--qx-line));
+  background: var(--qx-wheat-soft);
+  color: var(--qx-wheat-d);
+}
+.qx-opt-final-item p {
+  margin: 0;
+  color: var(--qx-ink);
+  font-size: var(--qx-fs-body);
+  line-height: 1.5;
+}
+.qx-opt-final-item .why {
+  display: block;
+  margin-top: 5px;
+  color: var(--qx-wheat-d);
+  font-size: var(--qx-fs-aux);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.qx-opt-final-act {
+  flex: none;
+  margin: 12px 22px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.qx-opt-final-act .qx-opt-sbtn { min-height: 84px; }
+.qx-opt-final-act .qx-opt-sbtn:disabled {
+  background: var(--qx-line-2);
+  border-color: var(--qx-line);
+  color: var(--qx-ink-3);
+  cursor: default;
+}
+.qx-opt-layer > .file-content-preview,
+.qx-opt-layer > [data-preview] {
+  flex: 1 1 auto;
+  min-height: 240px;
+  margin: 12px 22px 18px;
+  overflow: auto;
+}
+.qx-opt-save-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+.qx-opt-overview > .qx-opt-sec--save > .qx-opt-exits { margin-top: auto; }
+.qx-opt-draft-open { min-height: 56px; margin-top: 12px; }
+
 @media (prefers-reduced-motion: reduce) {
   .qx-opt-overview * { transition: none !important; }
 }

@@ -21,12 +21,13 @@ function charCount(text: string): number {
 
 /**
  * 稿 23（2.0）总览。没点过的条目是待定：稿里仍是改写，导出也用这一句。
- * 点了「用改写 / 保留原文」立刻写进优化稿。自己写只在编辑区里改，计数保持 0。
+ * 点了「用改写 / 保留原文」立刻写进优化稿。自己写按导出稿里对不上原文也对不上改写的条数计。
  */
 export function OptimizeOverview(props: {
   modules: ResumeOptimizeModule[]
   decisions: ResumeDecisionMap
   baseResume: GeneratedResume | null
+  exportResume: GeneratedResume | null
   synthetic: boolean
   disabled: boolean
   batchNote: string | null
@@ -40,8 +41,11 @@ export function OptimizeOverview(props: {
   onReport: () => void
 }) {
   const rows = buildOverviewRows(props.modules, props.decisions, props.baseResume)
-  const stats = overviewStats(rows)
+  const stats = overviewStats(rows, props.exportResume)
   const total = stats.total
+  const canAdopt = rows.some((row) => row.switchable && row.additions.length === 0 && row.decision !== 'optimized')
+  const canKeep = rows.some((row) => row.switchable && row.decision === 'todo')
+  const canClear = rows.some((row) => row.decision !== 'todo')
 
   return (
     <div className="qx-opt-overview" data-testid="resume-optimize-overview">
@@ -65,36 +69,38 @@ export function OptimizeOverview(props: {
         <div className="qx-opt-seg" aria-hidden="true">
           {rows.map((row) => <u key={row.key} data-d={row.switchable ? row.decision : 'manual'} />)}
         </div>
-        <div className="qx-opt-batch" data-testid="resume-optimize-batch">
-          <button
-            type="button"
-            className="qx-opt-bx"
-            data-testid="resume-optimize-batch-adopt"
-            disabled={props.disabled || !stats.canSwitch}
-            onClick={() => props.onBatch('adopt-eligible')}
-          >
-            可采纳的全部采纳<small>跳过有待确认事实的那几条</small>
-          </button>
-          <button
-            type="button"
-            className="qx-opt-bx"
-            data-testid="resume-optimize-batch-keep"
-            disabled={props.disabled || !stats.canSwitch}
-            onClick={() => props.onBatch('keep-undecided')}
-          >
-            其余保留原文<small>把还没决定的都记为保留</small>
-          </button>
-          <button
-            type="button"
-            className="qx-opt-bx"
-            data-tone="danger"
-            data-testid="resume-optimize-batch-clear"
-            disabled={props.disabled || !stats.canSwitch}
-            onClick={() => props.onBatch('clear')}
-          >
-            清空全部选择<small>全部回到待定</small>
-          </button>
-        </div>
+        {stats.canSwitch ? (
+          <div className="qx-opt-batch" data-testid="resume-optimize-batch">
+            <button
+              type="button"
+              className="qx-opt-bx"
+              data-testid="resume-optimize-batch-adopt"
+              disabled={props.disabled || !canAdopt}
+              onClick={() => props.onBatch('adopt-eligible')}
+            >
+              可采纳的全部采纳<small>跳过有待确认事实的那几条</small>
+            </button>
+            <button
+              type="button"
+              className="qx-opt-bx"
+              data-testid="resume-optimize-batch-keep"
+              disabled={props.disabled || !canKeep}
+              onClick={() => props.onBatch('keep-undecided')}
+            >
+              其余保留原文<small>把还没决定的都记为保留</small>
+            </button>
+            <button
+              type="button"
+              className="qx-opt-bx"
+              data-tone="danger"
+              data-testid="resume-optimize-batch-clear"
+              disabled={props.disabled || !canClear}
+              onClick={() => props.onBatch('clear')}
+            >
+              清空全部选择<small>全部回到待定</small>
+            </button>
+          </div>
+        ) : null}
         {props.batchNote ? <p className="qx-opt-batch-note" data-testid="resume-optimize-batch-note" role="status">{props.batchNote}</p> : null}
       </section>
 

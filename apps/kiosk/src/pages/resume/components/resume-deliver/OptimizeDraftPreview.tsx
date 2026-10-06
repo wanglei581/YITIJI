@@ -1,11 +1,13 @@
 import type { DraftPreviewItem } from './optimizeOverviewModel'
+import '../../resume-optimize-overview-qx.css'
 
 /**
- * 草稿预览：把每条当前选择拼成将要导出的那一版。
- * 待定的句子就是稿里的改写，不是原文。自己写不会出现在这里。
+ * 草稿预览展示的就是将要导出的那份优化稿，不另用建议的原文/改写拼一份。
  */
 export function OptimizeDraftPreview(props: {
+  documentText: string
   items: DraftPreviewItem[]
+  notice: string
   onClose: () => void
   onEdit: () => void
 }) {
@@ -18,14 +20,20 @@ export function OptimizeDraftPreview(props: {
             关闭
           </button>
         </div>
-        <p className="qx-opt-final-warn">
-          这是按你现在的选择拼出来的、将要导出的那一版。选了「用改写」或「保留原文」的，已经写进优化稿。还没点选的，导出仍用稿里的改写。自己写要在编辑区里改，这里不会自动替换。
-        </p>
+        <p className="qx-opt-final-warn">{props.notice}</p>
+        <pre className="qx-opt-final-export" data-testid="resume-optimize-final-export">{props.documentText}</pre>
         <div className="qx-opt-final-list" data-testid="resume-optimize-final-body">
           {props.items.map((item) => (
-            <article key={item.index} className="qx-opt-final-item" data-used={item.label} data-testid={`resume-optimize-final-item-${item.index + 1}`}>
+            <article
+              key={item.index}
+              className="qx-opt-final-item"
+              data-used={item.label}
+              data-choice={item.choice}
+              data-testid={`resume-optimize-final-item-${item.index + 1}`}
+            >
               <div className="qx-opt-final-h">
                 <b>{item.title}</b>
+                <span className="qx-opt-final-choice">{item.choiceLabel}</span>
                 <span className="chip" data-d={item.label}>{item.label}</span>
               </div>
               {item.text ? <p>{item.text}</p> : null}

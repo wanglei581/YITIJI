@@ -48,15 +48,86 @@ export function buildOverviewRows(
   })
 }
 
-export function overviewStats(rows: OverviewRow[]) {
+function resumeHas(resume: unknown, text: string): boolean {
+  if (!text) return false
+  if (typeof resume === 'string') return resume.includes(text)
+  if (Array.isArray(resume)) return resume.some((value) => resumeHas(value, text))
+  if (resume && typeof resume === 'object') {
+    return Object.values(resume as Record<string, unknown>).some((value) => resumeHas(value, text))
+  }
+  return false
+}
+
+export type ExportUsage = '原文' | '改写' | '自己写' | '未写入稿'
+
+/**
+ * 看将要导出的那份稿里，这一条实际落的是哪一句。
+ * 改写常常把原文包在更长的句子里，两句都能对上时认更长的那句。
+ * 切不了、两句又都不在稿里的，不算自己写。
+ */
+export function exportUsageOf(
+  resume: GeneratedResume,
+  module: ResumeOptimizeModule,
+  switchable: boolean,
+): ExportUsage {
+  const before = module.before.trim()
+  const after = module.after.trim()
+  const hasBefore = before.length > 0 && resumeHas(resume, before)
+  const hasAfter = after.length > 0 && resumeHas(resume, after)
+  if (hasBefore && hasAfter) {
+    if (before !== after && after.includes(before)) return '改写'
+    if (before !== after && before.includes(after)) return '原文'
+    return '改写'
+  }
+  if (hasBefore) return '原文'
+  if (hasAfter) return '改写'
+  return switchable ? '自己写' : '未写入稿'
+}
+
+function joinParts(parts: Array<string | null | undefined>): string {
+  return parts.map((part) => part?.trim() ?? '').filter(Boolean).join(' · ')
+}
+
+/** 和导出请求体同一份简历：只拼用户能看见的字段，顺序固定。 */
+export function exportResumeDocument(resume: GeneratedResume): string {
+  const lines: string[] = []
+  const push = (line: string | null | undefined) => {
+    const text = line?.trim() ?? ''
+    if (text) lines.push(text)
+  }
+  push(resume.basic?.name)
+  push(joinParts([resume.basic?.phone, resume.basic?.email, resume.basic?.city]))
+  push(joinParts([resume.intention?.position, resume.intention?.city, resume.intention?.jobType, resume.intention?.salary]))
+  push(resume.summary)
+  for (const item of resume.education ?? []) {
+    push(joinParts([item.school, item.major, item.degree, item.period]))
+    push(item.description)
+  }
+  for (const item of resume.experience ?? []) {
+    push(joinParts([item.company, item.role, item.period]))
+    push(item.description)
+  }
+  for (const item of resume.projects ?? []) {
+    push(joinParts([item.name, item.role]))
+    push(item.description)
+  }
+  push((resume.skills ?? []).map((item) => item.trim()).filter(Boolean).join('、'))
+  push((resume.certificates ?? []).map((item) => item.trim()).filter(Boolean).join('、'))
+  return lines.join('\n')
+}
+
+export function overviewStats(rows: OverviewRow[], resume: GeneratedResume | null) {
   const adopt = rows.filter((row) => row.decision === 'optimized').length
   const keep = rows.filter((row) => row.decision === 'original').length
+  const custom = resume
+    ? rows.filter((row) => row.switchable && exportUsageOf(resume, row.module, true) === '自己写').length
+    : 0
   return {
     total: rows.length,
     decided: adopt + keep,
     adopt,
     keep,
-    custom: 0,
+    custom,
     facts: rows.filter((row) => row.additions.length > 0).length,
     canSwitch: rows.some((row) => row.switchable),
   }
@@ -65,48 +136,61 @@ export function overviewStats(rows: OverviewRow[]) {
 export interface DraftPreviewItem {
   index: number
   title: string
-  label: string
+  label: ExportUsage
+  choice: 'todo' | 'optimized' | 'original' | 'custom'
+  choiceLabel: string
   text: string
   note: string | null
 }
 
-export function draftPreviewItems(rows: OverviewRow[]): DraftPreviewItem[] {
+const OVERVIEW_CHOICE_LABEL: Record<OverviewChoice, string> = {
+  optimized: '采纳',
+  original: '保留原文',
+  todo: '待定',
+}
+
+export function overviewPreviewItems(rows: OverviewRow[], resume: GeneratedResume): DraftPreviewItem[] {
   return rows.map((row) => {
     const title = row.module.title || `第 ${row.index + 1} 条`
+    const label = exportUsageOf(resume, row.module, row.switchable)
     const fact = row.additions.length > 0
       ? `这一条还有 ${row.additions.length} 处待确认事实（${row.additions.join('、')}）。导出前要逐项确认。`
       : null
-    if (!row.switchable) {
+    const choiceLabel = OVERVIEW_CHOICE_LABEL[row.decision]
+    if (label === '未写入稿') {
       return {
         index: row.index,
         title,
-        label: '未写入稿',
+        label,
+        choice: row.decision,
+        choiceLabel,
         text: '',
         note: row.block === 'original-empty'
-          ? '这条是新加的一句，原文里没有对应的句子。导出里有没有它，以编辑区为准。'
+          ? '这条是新加的一句，原文里没有对应的句子。导出里有没有它，以上面全文为准。'
           : '这条改写没有原样写进优化稿。要改哪一句，请到编辑区里对照着改。',
       }
     }
-    if (row.decision === 'original') {
-      return { index: row.index, title, label: '原文', text: row.module.before, note: fact }
-    }
-    if (row.decision === 'optimized') {
+    if (label === '自己写') {
       return {
         index: row.index,
         title,
-        label: '改写',
-        text: row.module.after,
-        note: fact ? `${fact}这一句用的是改写。` : null,
+        label,
+        choice: row.decision,
+        choiceLabel,
+        text: '',
+        note: '这一句在编辑区里改过，和原文、改写都对不上。上面全文才是将要导出的内容。',
       }
     }
+    const pending = row.decision === 'todo' ? '还没点选，导出仍用稿里的这一句改写。' : null
+    const note = [fact, pending].filter(Boolean).join('') || null
     return {
       index: row.index,
       title,
-      label: '待定',
-      text: row.module.after,
-      note: fact
-        ? `${fact}还没点选，导出仍用稿里的这一句改写，不是原文。`
-        : '还没点选，导出仍用稿里的这一句改写。',
+      label,
+      choice: row.decision,
+      choiceLabel,
+      text: label === '原文' ? row.module.before : row.module.after,
+      note,
     }
   })
 }

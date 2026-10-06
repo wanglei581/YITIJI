@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
+import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
 import { OptimizePageCta } from './components/resume-deliver/OptimizePageCta'
-import { OptimizeDraftPreview } from './components/resume-deliver/OptimizeDraftPreview'
+import { OptimizePageDialogs } from './components/resume-deliver/OptimizePageDialogs'
 import { OptimizeSaveExtras } from './components/resume-deliver/OptimizeSaveExtras'
-import { OptimizeSourcePreview } from './components/resume-deliver/OptimizeSourcePreview'
-import { applyOverviewBatch, buildOverviewRows, draftPreviewItems, type OverviewBatchAction } from './components/resume-deliver/optimizeOverviewModel'
-import { readOptimizeSourceFile } from './components/resume-deliver/optimizeSourceFile'
+import { applyOverviewBatch, buildOverviewRows, type OverviewBatchAction } from './components/resume-deliver/optimizeOverviewModel'
+import { carryOptimizeSource, readOptimizeSourceFile } from './components/resume-deliver/optimizeSourceFile'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { getMyDocuments } from '../../services/api/memberAssets'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -32,8 +31,6 @@ import { OptimizeWorkArea } from './components/resume-deliver/OptimizeWorkArea'
 import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
 import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle, optimizeStatusCapsule } from './components/resume-deliver/optimizeStateCopy'
 import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
-import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
-import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOptimizeLeaveDialog'
 import { ResumeOptimizeNavbar } from './components/resume-deliver/ResumeOptimizeNavbar'
 import { ResumeStatePanel } from './components/resume-deliver/ResumeStatePanel'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
@@ -52,7 +49,6 @@ import {
   type ResumeDecisionFailure,
   type ResumeModuleDecision,
 } from './components/resume-deliver/resumeDecisions'
-import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
 import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
 import { focusResumeTitleIssue, resumeTitleIssues } from './components/resume-deliver/resumeEntryTitles'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
@@ -213,8 +209,9 @@ export function ResumeOptimizePage() {
     setBatchNote(result.note)
     if (result.changed) markEdited()
   }
+  const restartFromResult = () => { setDecisions({}); draft.requestOverwrite(); setDraftAccepted(true); setWorkView('overview') }
   const openCompare = (focusIndex?: number) => requestLeave(() => navigate('/resume/optimize/compare', {
-    state: { taskId, accessToken, decisions, existingOnly, ...(typeof focusIndex === 'number' ? { focusIndex } : {}) },
+    state: { taskId, accessToken, decisions, existingOnly, ...carryOptimizeSource(state), ...(typeof focusIndex === 'number' ? { focusIndex } : {}) },
   }))
   const compareReturn = useCompareDecisionsReturn({
     state, modules, optimizedResume, decisions, ready: editorOpen,
@@ -373,14 +370,14 @@ export function ResumeOptimizePage() {
             onMyResumes={() => navigate('/me/resumes')}
           />
         )}
-        {view === 'ready' && (!showOverview || choicePending || (Boolean(token) && draft.loading)) && (
+        {view === 'ready' && !(editorOpen && showOverview) && (!showOverview || choicePending || (Boolean(token) && draft.loading)) && (
           <ResumeDraftBanner
             guest={!token}
             loading={Boolean(token && draft.loading)}
             choicePending={choicePending}
             draftUpdatedAt={draft.remoteDraft?.updatedAt}
             onContinue={handleContinueDraft}
-            onRestart={() => { setDecisions({}); draft.requestOverwrite(); setDraftAccepted(true); setWorkView('overview') }}
+            onRestart={restartFromResult}
             saveStatus={draft.status}
             savedAt={draft.savedAt}
           />
@@ -390,11 +387,12 @@ export function ResumeOptimizePage() {
             modules={modules}
             decisions={decisions}
             baseResume={baseResume}
+            exportResume={assembled}
             synthetic={resolved.synthetic}
             disabled={loading || exporting || Boolean(adjusting)}
             batchNote={batchNote}
             decisionIssues={decisionIssues}
-            saveExtra={<OptimizeSaveExtras guest={!token} draft={draft} pricing={pricing} taskId={taskId} token={token} exportVersion={exportVersion} />}
+            saveExtra={<OptimizeSaveExtras guest={!token} draft={draft} pricing={pricing} taskId={taskId} token={token} exportVersion={exportVersion} onContinue={handleContinueDraft} onRestart={restartFromResult} />}
             onDecisionChange={handleDecisionChange}
             onBatch={handleBatch}
             onCompare={openCompare}
@@ -457,43 +455,41 @@ export function ResumeOptimizePage() {
             onOpenPreview={() => setPreviewOpen(true)}
           />
         )}
-        {finalOpen && editorOpen && showOverview && (
-          <OptimizeDraftPreview
-            items={draftPreviewItems(overviewRows)}
-            onClose={() => setFinalOpen(false)}
-            onEdit={() => { setFinalOpen(false); setWorkView('editor') }}
-          />
-        )}
-        {sourceOpen && sourceFile && (
-          <OptimizeSourcePreview file={sourceFile} token={token} onClose={() => setSourceOpen(false)} />
-        )}
-        {factOpen && assembled && (
-          <ResumeFactConfirmDialog
-            facts={facts}
-            unconfirmed={unconfirmed}
-            busy={exporting}
-            onCancel={() => setFactOpen(null)}
-            onConfirm={(at) => { void (factOpen === 'change_list' ? runChangeList(at) : runResumeExport(at)) }}
-          />
-        )}
-        {previewOpen && exported?.signedUrl && (
-          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportKind === 'change_list' ? 'pdf' : exportFormat} mimeType={exportKind === 'change_list' ? 'application/pdf' : undefined} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && (exportKind === 'change_list' || exportFormat === 'pdf') ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
-        )}
-        {confirmLeave && (
-          <ResumeOptimizeLeaveDialog
-            guest={!token}
-            onStay={() => setConfirmLeave(null)}
-            onLeave={() => { const action = confirmLeave; setConfirmLeave(null); action() }}
-          />
-        )}
-        {compareReturn.pending && (
-          <CompareDecisionsApplyDialog
-            count={compareReturn.pending.count}
-            customCount={compareReturn.pending.customCount}
-            onApply={compareReturn.confirm}
-            onSkip={compareReturn.dismiss}
-          />
-        )}
+        <OptimizePageDialogs
+          filePreview={FilePreviewDialog}
+          finalOpen={finalOpen}
+          editorOpen={editorOpen}
+          showOverview={showOverview}
+          assembled={assembled}
+          overviewRows={overviewRows}
+          onCloseFinal={() => setFinalOpen(false)}
+          onEditFinal={() => { setFinalOpen(false); setWorkView('editor') }}
+          sourceOpen={sourceOpen}
+          sourceFile={sourceFile}
+          token={token}
+          onCloseSource={() => setSourceOpen(false)}
+          factOpen={factOpen}
+          facts={facts}
+          unconfirmed={unconfirmed}
+          exporting={exporting}
+          onCancelFact={() => setFactOpen(null)}
+          onConfirmFact={(at) => { void (factOpen === 'change_list' ? runChangeList(at) : runResumeExport(at)) }}
+          previewOpen={previewOpen}
+          exported={exported}
+          exportKind={exportKind}
+          exportFormat={exportFormat}
+          printNavigating={printNavigating}
+          titleBlocked={titleBlocked}
+          onPrint={handlePrint}
+          onClosePreview={() => setPreviewOpen(false)}
+          confirmLeave={Boolean(confirmLeave)}
+          guest={!token}
+          onStay={() => setConfirmLeave(null)}
+          onLeave={() => { const action = confirmLeave; setConfirmLeave(null); if (action) action() }}
+          comparePending={compareReturn.pending}
+          onApplyCompare={compareReturn.confirm}
+          onSkipCompare={compareReturn.dismiss}
+        />
       </section>
     </QxPageFrame>
   )
