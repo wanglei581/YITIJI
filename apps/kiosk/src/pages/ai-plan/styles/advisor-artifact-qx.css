@@ -97,31 +97,52 @@
 .aa-lg[data-e='E2'] b { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
 .aa-lg[data-e='E3'] b { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
 
-/* 钉住条目通常只有两三条。从上往下排，间距固定 20px，不再把余高摊进区块之间。 */
+/* 稿 52 第 242–253 行的 2.0 覆盖：默认竖向拉开区块，不拉空卡片。 */
 .aa-body {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: space-evenly;
   gap: 20px;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
 }
 .aa-body::-webkit-scrollbar { display: none; }
-/* 稿 52 第 121、432 行：只有「01 你钉住的条目」伸长，条目贴着卡顶往下排。
-   flex-shrink 为 0、min-height 保持 auto：条目放不下时不把卡片压扁，
-   由 .aa-body 整页滚动，带走区和底栏留在原位，不盖住正文。
-   成稿、比对、打印读不到、空态和过期内容本来就铺满，不拉卡片，版式保持原样。 */
-.aa-root[data-state='qa-pins'] .aa-body > [data-testid='advisor-artifact-qa'] {
+/* 条目面板按内容吸收余高，打印读不到但仍有条目时也适用。
+ * 四条基准：top 26 加正文外的 20 = 46，mid 46，bot 25。
+ * 各处下限 0 / 20 / 0，基准合计正好占完稿上四条的余高，不长不缩。
+ * 增长权重 31、50、条目间距数 × 80、170 是各处最多再长的像素。
+ * 收缩量 flex-shrink × flex-basis：26、26、25、113 是各处最多能缩的像素；
+ * 按能吸收多少分配，各处一起到头。带走卡 486 = 纸高 424 + 内边距 60 + 边框 2；
+ * 373 / 656 对应纸高 311 / 594，宽 220 / 420，保持 A4 比例。
+ */
+.aa-body:has(> .aa-qa) { justify-content: flex-start; gap: 0; }
+/* 到上限后仍剩的高度（只有一条时出现）上下平分；放不下时归零，从顶部滚。
+   一条只靠排版压不到 160 以内，等产品负责人定要不要加提示。 */
+.aa-body:has(> .aa-qa)::before,
+.aa-body:has(> .aa-qa)::after { content: ''; flex: 1 0 0px; }
+.aa-gap { display: block; min-height: 0; }
+.aa-gap[data-p='top'] { flex: 31 1 26px; max-height: 57px; }
+.aa-gap[data-p='mid'] { flex: 0 0.565 46px; min-height: 20px; }
+.aa-gap[data-p='bot'] { flex: 50 1 25px; max-height: 75px; }
+.aa-body > .aa-qa { flex: calc(var(--aa-pin-gaps, 0) * 80) 0 auto; }
+.aa-qa .aa-scroll { flex: 1 1 auto; display: flex; flex-direction: column; }
+.aa-qa .aa-pin {
   flex: 1 0 auto;
-  min-height: auto;
-  justify-content: flex-start;
+  display: grid; grid-template-columns: 52px minmax(0, 1fr); column-gap: 16px;
+  align-items: start; align-content: center;
 }
-.aa-root:not([data-state='qa-pins']) .aa-body {
-  justify-content: space-evenly;
-}
+/* 首尾各用中间条目一半的增长权重，并贴上 / 贴下：相邻文字等距，分隔线居中。 */
+.aa-qa .aa-pin:first-child { flex-grow: 0.5; align-content: start; }
+.aa-qa .aa-pin:last-child { flex-grow: 0.5; align-content: end; }
+.aa-qa .aa-pin:only-child { flex-grow: 0; }
+.aa-body:has(> .aa-qa) > .aa-take { flex: 170 0.2325 486px; min-height: 373px; max-height: 656px; }
+.aa-body:has(> .aa-qa) .aa-paper { align-self: stretch; width: auto; min-height: 311px; }
+.aa-body:has(> .aa-qa) .aa-steps { margin-block: auto; }
+.aa-body:has(> .aa-qa) .aa-steps + .aa-has { margin-top: 0; }
+.aa-body:has(> .aa-qa) .aa-warn { margin-bottom: auto; }
 
 .aa-sec {
   flex: none;
