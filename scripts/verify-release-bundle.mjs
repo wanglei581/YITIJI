@@ -39,7 +39,7 @@ function verifyStaticContractsFromSources({ deploy, ci, client }) {
   assert.match(diagnoseStep, /continue-on-error:\s*true[\s\S]*bos-object\.mjs diagnose/, 'CI must diagnose BOS before reading the baseline, without failing the job')
   assert.equal(releaseJob.includes('无可用基线，本次发布将回退到 GitHub 拉取'), false, 'missing baseline must still create a bundle')
   assert.equal(/^\s*exit 0\s*$/m.test(releaseJob), false, 'release-bundle must not skip bundle creation')
-  for (const label of ['基线来源：latest-deployed', '基线来源：14 天前兜底', '基线来源：完整包']) {
+  for (const label of ['基线来源：latest-deployed', '基线来源：14 天前兜底', '基线来源：最早提交兜底', '基线来源：完整包']) {
     if (!releaseJob.includes(label)) fail(`release-bundle must print ${label}`)
   }
   required(releaseJob, /git rev-list -1 --before="14 days ago" "\$RELEASE_SHA"/, 'fallback baseline is the commit from 14 days ago')
@@ -563,7 +563,7 @@ async function verifyBaselineFallback() {
     const recentMiddle = await commitFile(recent, 'b.txt', 'b\n', 'b')
     const recentTip = await commitFile(recent, 'c.txt', 'c\n', 'c')
     const recentFallback = await runBaselineCase(script, recent, recentTip, '')
-    if (!recentFallback.out.includes('基线来源：14 天前兜底')) fail(`14 天内的历史没有改用最早的非根提交：${recentFallback.out}`)
+    if (!recentFallback.out.includes('基线来源：最早提交兜底')) fail(`14 天内的历史没有改用最早的非根提交：${recentFallback.out}`)
     if (!recentFallback.report.includes(recentMiddle)) fail('根提交之外的最早提交没有成为 bundle 前置')
     if (recentFallback.report.includes('complete history')) fail('还有非根提交时不应打完整包')
 

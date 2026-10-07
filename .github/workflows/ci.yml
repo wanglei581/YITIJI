@@ -1466,7 +1466,7 @@ jobs:
               fi
               if [ -n "$EARLIEST_SHA" ] && [ "$EARLIEST_SHA" != "$RELEASE_SHA" ] && git merge-base --is-ancestor "$EARLIEST_SHA" "$RELEASE_SHA"; then
                 BASE_SHA="$EARLIEST_SHA"
-                echo "基线来源：14 天前兜底"
+                echo "基线来源：最早提交兜底"
               else
                 BASE_SHA=""
                 echo "基线来源：完整包"
