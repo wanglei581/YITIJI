@@ -1349,3 +1349,197 @@ test('me error guide says 联系我们 and hides 拨打服务电话 when support
   }
   expect(errors).toEqual([])
 })
+
+
+/** 在等待失败后读取状态，避免只报告等待前的状态。 */
+async function withNotificationStateDiagnostics(page: Page, action: () => Promise<void>): Promise<void> {
+  try {
+    await action()
+  } catch (error: unknown) {
+    const markers = await page.locator('[data-testid^="notifications-state-"]').evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('data-testid')),
+    ).catch(() => ['状态标记读取失败'])
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`${detail}\n当时页面根状态标记：${markers.length ? markers.join('、') : '未找到 notifications-state-*'}`)
+  }
+}
+
+/** 复用九态并排图的夹具；只准备页面，不执行截图。 */
+async function prepareNotificationState(page: Page, api: ApiRouter, state: string): Promise<void> {
+  const { buildQingxuPairs } = await import('./fixtures/qingxu-pair-targets')
+  const { prepareMePages } = await import('./fixtures/qingxu-pair-me-pages')
+  const target = buildQingxuPairs().find((item) => item.nn === '35' && item.screen === 'main' && item.state === state)
+  expect(target, `消息夹具应包含状态：${state}`).toBeDefined()
+  registerShell(api)
+  await withNotificationStateDiagnostics(page, async () => {
+    await prepareMePages(page, api, target!)
+    await expect(page.getByTestId(`notifications-state-${state}`)).toBeVisible()
+  })
+}
+
+test('消息页置灰的主按钮画成置灰 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await prepareNotificationState(page, api, 'ready-all')
+  const primary = page.getByTestId('notifications-primary')
+  await expect(primary).toHaveText('全部标记为已读')
+  await expect(primary).not.toHaveAttribute('aria-disabled', 'true')
+  const enabledBackground = await primary.evaluate((element) => getComputedStyle(element).backgroundColor)
+
+  for (const state of ['loading', 'operation-busy']) {
+    await prepareNotificationState(page, api, state)
+    await expect(primary, `${state} 主按钮应禁用`).toHaveAttribute('aria-disabled', 'true')
+    await expect.poll(async () => {
+      const background = await primary.evaluate((element) => getComputedStyle(element).backgroundColor)
+      return `${state}：置灰背景=${background}；可点击背景=${enabledBackground}`
+    }, { message: `${state} 的计算背景色应与可点击主按钮不同` }).not.toContain(`置灰背景=${enabledBackground}；`)
+  }
+
+  // 九态夹具会登录并完成全部已读操作，保留消息且未读为零。
+  await prepareNotificationState(page, api, 'operation-toast')
+  await expect(primary).toHaveText('全部已读')
+  await expect(primary).toHaveAttribute('aria-disabled', 'true')
+  await expect.poll(async () => {
+    const background = await primary.evaluate((element) => getComputedStyle(element).backgroundColor)
+    return `无未读：置灰背景=${background}；可点击背景=${enabledBackground}`
+  }, { message: '无未读时的计算背景色应与可点击主按钮不同' }).not.toContain(`置灰背景=${enabledBackground}；`)
+  expect(errors).toEqual([])
+})
+
+test('消息全空时主按钮去我的记录 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await prepareNotificationState(page, api, 'all-empty')
+  registerMeShellLists(api)
+  const primary = page.getByTestId('notifications-primary')
+  await expect(primary).toHaveText('去我的记录')
+  await expect(primary).not.toHaveAttribute('aria-disabled')
+  await expect(primary).toBeEnabled()
+  await expect(primary).toHaveAttribute('data-route', '/me/ai-records')
+  await expect(primary.locator('svg')).toHaveCount(1)
+  await primary.click()
+  await expect(page).toHaveURL(/\/me\/ai-records$/)
+  expect(errors).toEqual([])
+})
+
+test('消息行时间在标题行右侧，四条和加载更多在首屏 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  const response = page.waitForResponse((reply) => new URL(reply.url()).pathname === '/api/v1/me/notifications' && reply.status() === 200)
+  await prepareNotificationState(page, api, 'ready-all')
+  const payload = await (await response).json() as { success: boolean; data: import('../../src/services/api/memberNotifications').MemberNotificationPage }
+  expect(payload.data.items.length, `现有夹具消息数=${payload.data.items.length}，应超过四条`).toBeGreaterThan(4)
+  // unreadOnly 改变 fetchPage，分页钩子会重新读取；页签切换保留内存登录态。
+  await withNotificationStateDiagnostics(page, async () => {
+    const unreadItems = payload.data.items.filter((item) => !item.isRead)
+    api.respond('GET', '/api/v1/me/notifications', {
+      status: 200,
+      json: { ...payload, data: { ...payload.data, items: unreadItems, total: unreadItems.length, nextCursor: null } },
+    })
+    const unreadResponse = page.waitForResponse((reply) => {
+      const url = new URL(reply.url())
+      return url.pathname === '/api/v1/me/notifications' && url.searchParams.get('unreadOnly') === 'true' && reply.status() === 200
+    })
+    await page.getByTestId('notifications-tab-unread').click()
+    await unreadResponse
+    await expect(page.getByTestId('notifications-state-ready-unread')).toBeVisible()
+
+    // 使用现有八条消息的首批四条，游标证明还有下一批，不另造消息。
+    api.respond('GET', '/api/v1/me/notifications', {
+      status: 200,
+      json: { ...payload, data: { ...payload.data, items: payload.data.items.slice(0, 4), nextCursor: payload.data.items[3].id } },
+    })
+    const allResponse = page.waitForResponse((reply) => {
+      const url = new URL(reply.url())
+      return url.pathname === '/api/v1/me/notifications' && !url.searchParams.has('unreadOnly') && reply.status() === 200
+    })
+    await page.getByTestId('notifications-tab-all').click()
+    await allResponse
+    await expect(page.getByTestId('notifications-state-ready-all')).toBeVisible()
+  })
+  const list = page.getByTestId('notifications-list')
+  const rows = list.locator('.qx-me-notice-row')
+  await expect(rows).toHaveCount(4)
+  const more = page.getByRole('button', { name: '加载更多', exact: true })
+  await expect(more).toHaveCount(1)
+  const scale = await stageScale(page)
+  expect(scale, `舞台缩放=${scale}`).toBeGreaterThan(0)
+  const measured = await list.evaluate((root) => {
+    const listRect = root.getBoundingClientRect()
+    const ratio = listRect.height / (root as HTMLElement).offsetHeight
+    return {
+      scrollTop: root.scrollTop,
+      top: listRect.top + root.clientTop * ratio,
+      bottom: listRect.top + (root.clientTop + root.clientHeight) * ratio,
+      rows: [...root.querySelectorAll('.qx-me-notice-row')].map((row) => {
+        const title = row.querySelector('.qx-me-row-title')!
+        const time = row.querySelector('.qx-me-notice-time')!
+        const titleRect = title.getBoundingClientRect()
+        const timeRect = time.getBoundingClientRect()
+        const timeStyle = getComputedStyle(time)
+        return {
+          title: title.textContent,
+          time: time.textContent,
+          sameHead: title.parentElement === time.parentElement && time.parentElement?.classList.contains('qx-me-row-head'),
+          centerDelta: Math.abs(titleRect.top + titleRect.height / 2 - timeRect.top - timeRect.height / 2),
+          titleRight: titleRect.right,
+          timeLeft: timeRect.left,
+          timeRight: timeRect.right,
+          headRight: time.parentElement!.getBoundingClientRect().right,
+          timeFont: parseFloat(timeStyle.fontSize),
+          timeWhiteSpace: timeStyle.whiteSpace,
+          timeOverflow: time.scrollWidth - time.clientWidth,
+          bottom: row.getBoundingClientRect().bottom,
+        }
+      }),
+    }
+  })
+  expect(measured.scrollTop, `首屏列表滚动位置=${measured.scrollTop}`).toBe(0)
+  const { formatTime } = await import('../../src/pages/profile/assets/format')
+  for (const [index, row] of measured.rows.entries()) {
+    const reading = `第${index + 1}条「${row.title}」：时间=${row.time}，中心差=${(row.centerDelta / scale).toFixed(2)}px，标题右边=${row.titleRight.toFixed(2)}，时间左右=${row.timeLeft.toFixed(2)}/${row.timeRight.toFixed(2)}，标题行右边=${row.headRight.toFixed(2)}，缩放=${scale}`
+    expect(row.sameHead, reading).toBe(true)
+    expect(row.centerDelta / scale, reading).toBeLessThan(16)
+    expect(row.timeLeft - row.titleRight, reading).toBeGreaterThanOrEqual(0)
+    expect(Math.abs(row.headRight - row.timeRight) / scale, reading).toBeLessThanOrEqual(1)
+    expect(row.timeFont, `${reading}，时间字号=${row.timeFont}`).toBe(21)
+    expect(row.timeWhiteSpace, `${reading}，换行规则=${row.timeWhiteSpace}`).toBe('nowrap')
+    expect(row.timeOverflow, `${reading}，时间横向溢出=${row.timeOverflow}`).toBeLessThanOrEqual(1)
+    expect(row.time, reading).toBe(formatTime(payload.data.items[index].createdAt))
+  }
+  const fourthBottom = measured.rows[3].bottom
+  expect(fourthBottom, `第四条底边=${fourthBottom.toFixed(2)}，列表可见底边=${measured.bottom.toFixed(2)}，缩放=${scale}`).toBeLessThanOrEqual(measured.bottom)
+  const moreBox = await more.boundingBox()
+  expect(moreBox, '加载更多应有盒子').not.toBeNull()
+  const moreBottom = moreBox!.y + moreBox!.height
+  expect(moreBox!.y, `加载更多顶边=${moreBox!.y.toFixed(2)}，列表可见顶边=${measured.top.toFixed(2)}`).toBeGreaterThanOrEqual(measured.top)
+  expect(moreBottom, `加载更多底边=${moreBottom.toFixed(2)}，列表可见底边=${measured.bottom.toFixed(2)}，缩放=${scale}`).toBeLessThanOrEqual(measured.bottom)
+  expect(errors).toEqual([])
+})
+
+test('占位行胶囊带图标 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  for (const state of ['login', 'error']) {
+    await prepareNotificationState(page, api, state)
+    const mode = state === 'login' ? 'lock' : 'error'
+    const rows = page.locator(`[data-notification-category][data-slot-mode="${mode}"]`)
+    await expect(rows, `${state} 占位行数量应为六条`).toHaveCount(6)
+    const measured = await rows.evaluateAll((elements) => elements.map((row) => {
+      const capsule = row.querySelector('.qx-me-acts .qx-me-small')!
+      const icons = capsule.querySelectorAll('svg')
+      return {
+        category: row.getAttribute('data-notification-category'),
+        text: capsule.textContent,
+        count: icons.length,
+        width: icons[0]?.getAttribute('width'),
+        height: icons[0]?.getAttribute('height'),
+        icon: icons[0]?.getAttribute('class'),
+      }
+    }))
+    for (const row of measured) {
+      const reading = `${state} ${row.category} 胶囊「${row.text}」：图标数=${row.count}，尺寸=${row.width}×${row.height}，图标=${row.icon}`
+      expect(row.count, reading).toBe(1)
+      expect(row.width, reading).toBe('19')
+      expect(row.height, reading).toBe('19')
+      expect(row.icon, reading).toContain(state === 'login' ? 'lucide-lock' : 'lucide-triangle-alert')
+    }
+  }
+  expect(errors).toEqual([])
+})

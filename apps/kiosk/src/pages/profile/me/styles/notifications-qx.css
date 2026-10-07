@@ -1,6 +1,10 @@
 @import './qx-me-shared.css';
 
 .qx-me-list > .qx-me-notice-row { align-items: flex-start; }
+.qx-me-notice-row .qx-me-row-head { flex-wrap: nowrap; }
+.qx-me-notice-row .qx-me-row-title { min-width: 0; overflow-wrap: anywhere; }
+.qx-me-notice-row .qx-me-row-head > :not(.qx-me-row-title) { flex-shrink: 0; }
+.qx-me-notice-row .qx-me-notice-time { margin-top: 0; margin-left: auto; white-space: nowrap; }
 .qx-me-notice-body {
   display: -webkit-box;
   -webkit-box-orient: vertical;
