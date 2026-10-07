@@ -1,7 +1,7 @@
 // 51 手机接力：小青页脚、签名屏、扫码登录错误态、390×844 字号、单卡留白、预检错误说明在首屏。
 import type { Page } from '@playwright/test'
 import { expect, test } from '../fixtures/kiosk-test'
-import { prepareRelayPages, type RelayPagesPlan } from './fixtures/qingxu-pair-relay-pages'
+import { prepareRelayPages, QR_STATES, UPLOAD_STATES, relayPagesPlan, type RelayPagesPlan } from './fixtures/qingxu-pair-relay-pages'
 import type { QingxuPairTarget } from './fixtures/qingxu-pair-targets'
 
 const XIAOQING = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
@@ -267,5 +267,203 @@ test('390×844 四态预检错误说明的底边不超过首屏 @mobile', async 
     expect(metrics.flowBottom, `${state} 没有量到可见流`).not.toBeNull()
     // 844 含页脚占位。说明若落在滚动流外面，底边仍可能小于 844，但首屏看不全。
     expect(metrics.bottom, `${state} 预检错误说明底边 ${metrics.bottom} 超过可见流底边 ${metrics.flowBottom}`).toBeLessThanOrEqual(metrics.flowBottom ?? 0)
+  }
+})
+
+async function visibleMetrics(page: Page, selector: string) {
+  return page.locator(selector).evaluate((el) => {
+    const rect = el.getBoundingClientRect()
+    const dock = document.querySelector('.k1-mobile-qr-dock')?.getBoundingClientRect()
+    return {
+      top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right,
+      viewport: window.innerHeight, width: window.innerWidth,
+      dockTop: dock?.top ?? window.innerHeight,
+    }
+  })
+}
+
+async function expectInViewport(page: Page, selector: string, name: string, aboveDock = false) {
+  await expect(page.locator(selector)).toBeVisible()
+  let lastMetrics: Awaited<ReturnType<typeof visibleMetrics>> | null = null
+  const message = `${name} 应完整可见${aboveDock ? '且不被按钮条挡住' : ''}`
+  try {
+    await expect.poll(async () => {
+      const m = await visibleMetrics(page, selector)
+      lastMetrics = m
+      const bottom = aboveDock ? Math.min(m.viewport, m.dockTop) : m.viewport
+      return { 合格: m.top >= -1 && m.bottom <= bottom + 1 && m.left >= -1 && m.right <= m.width + 1, 读数: m }
+    }, { message }).toMatchObject({ 合格: true })
+  } catch (error) {
+    throw new Error(`${message}，最后读数 ${JSON.stringify(lastMetrics)}\n${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+test('390×844 三态手机号输入框在首屏 @mobile', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  await page.setViewportSize({ width: 390, height: 844 })
+  for (const state of ['ready', 'device-missing', 'send-loading']) {
+    await page.goto('about:blank')
+    const plan = relayPagesPlan('51-phone-relay.html', 'qr-login', state)
+    expect(plan?.runtimePath, `${state} 应有夹具地址`).toBeTruthy()
+    await prepareRelayPages(page, api, asTarget('qr-login', state, plan!.runtimePath!))
+    await expect.poll(async () => page.getByLabel('手机号，11 位数字').evaluate((el) => {
+      const input = el.getBoundingClientRect()
+      const flow = document.querySelector('.k1-mobile-qr-flow')!.getBoundingClientRect()
+      return { 合格: input.top >= flow.top && input.bottom <= flow.bottom, 输入框上: input.top, 输入框下: input.bottom, 滚动区上: flow.top, 滚动区下: flow.bottom }
+    }), { message: `${state} 手机号输入框应完整落在首屏滚动区内` }).toMatchObject({ 合格: true })
+    const cardLines = await page.locator('.k1-mobile-qr-device').evaluate((el) => {
+      const chip = el.querySelector('.k1-mobile-qr-device-chip')!
+      const note = el.querySelector('.k1-mobile-qr-device-note > span')!
+      const chipStyle = getComputedStyle(chip)
+      const chipBox = chip.getBoundingClientRect()
+      const chipTextHeight = chipBox.height - Number.parseFloat(chipStyle.paddingTop) - Number.parseFloat(chipStyle.paddingBottom)
+        - Number.parseFloat(chipStyle.borderTopWidth) - Number.parseFloat(chipStyle.borderBottomWidth)
+      return {
+        chipLines: chipTextHeight / Number.parseFloat(chipStyle.lineHeight),
+        noteLines: note.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(note).lineHeight),
+      }
+    })
+    expect(cardLines.chipLines, `${state} 胶囊应为一行，读数 ${JSON.stringify(cardLines)}`).toBe(1)
+    expect(cardLines.noteLines, `${state} 核对说明应为两行，读数 ${JSON.stringify(cardLines)}`).toBe(2)
+    if (state === 'device-missing') {
+      const clearance = await page.getByLabel('手机号，11 位数字').evaluate((el) => {
+        const input = el.getBoundingClientRect()
+        const flow = document.querySelector('.k1-mobile-qr-flow')!.getBoundingClientRect()
+        return { inputBottom: input.bottom, flowBottom: flow.bottom, gap: flow.bottom - input.bottom }
+      })
+      expect(clearance.gap, `${state} 输入框下方至少留 12px，读数 ${JSON.stringify(clearance)}`).toBeGreaterThanOrEqual(12)
+    }
+    expect(await page.locator('.k1-mobile-qr-flow').evaluate((el) => el.scrollTop), `${state} 首屏不应靠滚动凑出输入框`).toBe(0)
+  }
+})
+
+test('比稿矮或比稿窄的视口主路径可见 @mobile', async ({ page, api }) => {
+  test.setTimeout(180_000)
+  const screens = [
+    { screen: 'qr-login', state: 'ready', selector: 'input[aria-label="手机号，11 位数字"]' },
+    { screen: 'qr-login', state: 'code-sent', selector: 'input[aria-label="短信验证码，6 位数字"]' },
+    { screen: 'phone-upload', state: 'idle', selector: '.ph-up-pill' },
+    ...['empty-error', 'too-large', 'type-error', 'content-type-error'].map((state) => ({ screen: 'phone-upload', state, selector: '[data-testid="phone-upload-precheck-error"]' })),
+  ]
+  for (const viewport of [{ width: 390, height: 700 }, { width: 360, height: 640 }, { width: 390, height: 800 }, { width: 375, height: 812 }]) {
+    await page.setViewportSize(viewport)
+    for (const item of screens) {
+      await page.goto('about:blank')
+      const plan = relayPagesPlan('51-phone-relay.html', item.screen, item.state)
+      expect(plan?.runtimePath, `${item.screen}/${item.state} 应有夹具地址`).toBeTruthy()
+      await prepareRelayPages(page, api, asTarget(item.screen, item.state, plan!.runtimePath!))
+      const name = `${viewport.width}×${viewport.height} ${item.screen}/${item.state}`
+      const qr = item.screen === 'qr-login'
+      await expectInViewport(page, item.selector, name, qr)
+      if (qr) {
+        await expectInViewport(page, '.k1-mobile-qr-confirm', `${name} 确认按钮`)
+        const button = await visibleMetrics(page, '.k1-mobile-qr-confirm')
+        expect(button.bottom - button.top, `${name} 主按钮高度 ${button.bottom - button.top}`).toBeGreaterThanOrEqual(56)
+      } else if (item.state === 'idle') {
+        const button = await visibleMetrics(page, '.ph-up-pill')
+        expect(button.bottom - button.top, `${name} 选择文件按钮高度 ${button.bottom - button.top}`).toBeGreaterThanOrEqual(56)
+      } else {
+        await expect(page.getByTestId('phone-upload-precheck-error')).toHaveAttribute('data-tone', 'error')
+      }
+      const content = qr ? '.k1-mobile-qr-content' : '.k1-phone-upload-content'
+      if (item.state !== 'code-sent') {
+        expect(await page.locator(content).evaluate((el) => el.scrollTop), `${name} 主路径首屏不能靠滚动凑出来`).toBe(0)
+      }
+      // 每屏先量首屏，再滚到底，正文和页脚都不能被嵌套滚动或隐藏规则卡住。
+      for (const position of ['首屏', '底部']) {
+        if (position === '底部') {
+          await page.locator(content).evaluate((el) => { el.scrollTop = el.scrollHeight })
+          await expectInViewport(page, qr ? '.k1-mobile-qr-xiaoqing' : '.ph-up-xiaoqing', `${name} 小青全文`)
+          await expectInViewport(page, qr ? '.k1-mobile-qr-footer' : '.ph-up-footer', `${name} 隐私全文`)
+          await expect(page.locator(qr ? '.k1-mobile-qr-xiaoqing' : '.ph-up-xiaoqing')).toHaveText(XIAOQING)
+          const scroll = await page.locator(content).evaluate((el) => ({ top: el.scrollTop, height: el.clientHeight, total: el.scrollHeight }))
+          expect(Math.abs(scroll.top + scroll.height - scroll.total), `${name} 滚到底读数 ${JSON.stringify(scroll)}`).toBeLessThanOrEqual(1)
+        }
+        const metrics = await page.evaluate(() => {
+          const small: string[] = []
+          const tiny: string[] = []
+          const hiddenFoot: string[] = []
+          const visible = (el: Element) => {
+            const rect = el.getBoundingClientRect()
+            if (rect.bottom <= 0 || rect.top >= innerHeight || rect.width < 1 || rect.height < 1) return false
+            for (let parent: Element | null = el; parent; parent = parent.parentElement) {
+              const style = getComputedStyle(parent)
+              if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false
+            }
+            return true
+          }
+          document.querySelectorAll('main *').forEach((el) => {
+            if (!visible(el)) return
+            const style = getComputedStyle(el)
+            const rect = el.getBoundingClientRect()
+            const text = [...el.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent ?? '').join('').trim()
+            if ((text || el instanceof HTMLInputElement) && Number.parseFloat(style.fontSize) < 15) small.push(`${el.className} ${style.fontSize} ${text.slice(0, 16)}`)
+            if (el.matches('button, .ph-up-picker') && (rect.width < 48 || rect.height < 48)) tiny.push(`${el.className} ${rect.width}×${rect.height}`)
+            for (const pseudo of ['::before', '::after']) {
+              const ps = getComputedStyle(el, pseudo)
+              if (ps.content && !['none', 'normal', '""', "''"].includes(ps.content) && Number.parseFloat(ps.fontSize) < 15) small.push(`${el.className}${pseudo} ${ps.fontSize}`)
+            }
+          })
+          document.querySelectorAll('.k1-mobile-qr-xiaoqing, .k1-mobile-qr-footer, .ph-up-xiaoqing, .ph-up-footer').forEach((el) => {
+            const style = getComputedStyle(el)
+            if (style.display === 'none' || style.maxHeight !== 'none' || ['hidden', 'clip'].includes(style.overflowY) || (style.webkitLineClamp && style.webkitLineClamp !== 'none')) hiddenFoot.push(`${el.className} ${style.cssText}`)
+          })
+          return { small, tiny, hiddenFoot, documentWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth }
+        })
+        expect(metrics.small, `${name} ${position} 小字号 ${JSON.stringify(metrics.small)}`).toEqual([])
+        expect(metrics.tiny, `${name} ${position} 小点击区 ${JSON.stringify(metrics.tiny)}`).toEqual([])
+        expect(metrics.hiddenFoot, `${name} 页脚隐藏规则 ${JSON.stringify(metrics.hiddenFoot)}`).toEqual([])
+        expect(metrics.documentWidth, `${name} ${position} 文档宽 ${metrics.documentWidth}，视口宽 ${metrics.viewportWidth}`).toBeLessThanOrEqual(metrics.viewportWidth)
+      }
+    }
+  }
+})
+
+test('29 态顶栏副标题不被截断 @mobile', async ({ page, api }) => {
+  test.setTimeout(360_000)
+  expect(QR_STATES.length + UPLOAD_STATES.length, '夹具状态应完整覆盖 29 态').toBe(29)
+  for (const width of [390, 360]) {
+    await page.setViewportSize({ width, height: 844 })
+    for (const item of [
+      ...QR_STATES.map((state) => ({ screen: 'qr-login', state, selector: '.k1-mobile-qr-brand small' })),
+      ...UPLOAD_STATES.map((state) => ({ screen: 'phone-upload', state, selector: '.ph-up-brand small' })),
+    ]) {
+      await page.goto('about:blank')
+      const plan = relayPagesPlan('51-phone-relay.html', item.screen, item.state)
+      expect(plan?.runtimePath, `${item.screen}/${item.state} 应有夹具地址`).toBeTruthy()
+      await prepareRelayPages(page, api, asTarget(item.screen, item.state, plan!.runtimePath!))
+      const metrics = await page.locator(item.selector).evaluate((el) => {
+        const style = getComputedStyle(el)
+        const rect = el.getBoundingClientRect()
+        const segments = [...el.querySelectorAll('span')].map((span) => {
+          const range = document.createRange()
+          range.selectNodeContents(span)
+          const rects = [...range.getClientRects()].filter((box) => box.width > 0 && box.height > 0)
+          return { text: span.textContent, rects: rects.map((box) => ({ top: box.top, bottom: box.bottom, left: box.left, right: box.right })) }
+        })
+        return { scroll: el.scrollWidth, client: el.clientWidth, overflow: style.textOverflow, whitespace: style.whiteSpace, lines: rect.height / Number.parseFloat(style.lineHeight), top: rect.top, bottom: rect.bottom, segments }
+      })
+      const name = `${width} ${item.screen}/${item.state} 副标题读数 ${JSON.stringify(metrics)}`
+      expect(metrics.scroll, name).toBeLessThanOrEqual(metrics.client)
+      expect(metrics.overflow === 'ellipsis' && metrics.whitespace === 'nowrap', name).toBe(false)
+      expect(metrics.lines, name).toBeLessThanOrEqual(2.01)
+      if (metrics.lines > 1.01) {
+        expect(metrics.segments, `${name} 折行副标题应分成两段`).toHaveLength(2)
+        expect(metrics.segments[0].text, `${name} 第一段应以「·」结尾`).toMatch(/·$/)
+        for (const [index, segment] of metrics.segments.entries()) {
+          const label = index === 0 ? '第一段应整段同行' : '第二段应整段同行，不能从词中间断开'
+          expect(segment.rects.length, `${name} ${label}，应有可见矩形`).toBeGreaterThan(0)
+          const tops = segment.rects.map((rect) => rect.top)
+          expect(Math.max(...tops) - Math.min(...tops), `${name} ${label}`).toBeLessThanOrEqual(1)
+        }
+        const firstBottom = Math.max(...metrics.segments[0].rects.map((rect) => rect.bottom))
+        const secondTop = Math.min(...metrics.segments[1].rects.map((rect) => rect.top))
+        expect(secondTop, `${name} 第二段应从第二行开始`).toBeGreaterThan(firstBottom - 1)
+      }
+      await expectInViewport(page, item.selector, name)
+      if (width === 390 && item.screen === 'qr-login' && !['ticket-expired', 'confirm-unknown'].includes(item.state)) {
+        expect(metrics.lines, `${name} 默认副标题在 390 宽仍应只有一行`).toBeLessThanOrEqual(1.01)
+      }
+    }
   }
 })

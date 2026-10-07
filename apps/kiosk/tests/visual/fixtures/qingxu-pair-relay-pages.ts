@@ -23,13 +23,13 @@ const SMS = '/api/v1/member/auth/sms-code'
 const FILES_PATH = `/api/v1/upload-sessions/${SESSION}/files`
 const DEVICE = '大厅里的这台机器'
 
-const QR_STATES = [
+export const QR_STATES = [
   'missing-ticket', 'checking', 'status-error', 'ticket-expired', 'ready', 'device-missing',
   'send-loading', 'send-error', 'send-limited', 'code-sent', 'confirming',
   'confirm-code-invalid', 'confirm-code-expired', 'confirm-code-locked', 'confirm-unknown', 'confirmed',
 ] as const
 
-const UPLOAD_STATES = [
+export const UPLOAD_STATES = [
   'invalid', 'idle', 'uploading', 'upload-in-progress', 'outcome-unknown', 'empty-error', 'too-large',
   'type-error', 'content-type-error', 'service-error', 'session-expired', 'success', 'signature-blocked',
 ] as const
@@ -74,7 +74,7 @@ const PICK: Record<string, { name: string; mimeType: string; buffer: Buffer }> =
   'type-error': { name: '周宁-作品集.heic', mimeType: 'image/heic', buffer: Buffer.from('heic-fixture') },
   'content-type-error': { name: '周宁-证件照.png', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-photo') },
   'service-error': pdf('录用通知书.pdf', 428_032),
-  'session-expired': { name: '周宁-学历证明.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('jpeg-fixture') },
+  'session-expired': { name: '周宁-学历证明.jpg', mimeType: 'image/jpeg', buffer: Buffer.alloc(1_048_576, 0xff) },
   success: pdf('周宁-产品运营简历.pdf', 1_887_437),
 }
 

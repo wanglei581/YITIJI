@@ -79,7 +79,7 @@
 .k1-phone-upload .ph-up-brand { position: relative; z-index: 1; min-width: 0; flex: 1; }
 .k1-phone-upload .ph-up-brand strong { display: block; font-family: var(--m-serif); font-size: 18px; font-weight: 800; letter-spacing: 1.5px; }
 .k1-phone-upload .ph-up-brand small {
-  display: block; margin-top: 2px; overflow: hidden; color: rgba(242, 239, 228, .72); font-size: 15px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap;
+  display: block; margin-top: 2px; color: rgba(242, 239, 228, .72); font-size: 15px; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere;
 }
 .k1-phone-upload .ph-up-tag {
   position: relative; z-index: 1; display: inline-flex; flex: 0 0 auto; align-items: center; height: 26px; padding: 0 11px;
@@ -257,6 +257,19 @@
 .k1-phone-upload button:focus-visible { outline: 3px solid var(--m-teal); outline-offset: 2px; }
 .k1-phone-upload .ph-up-flow > * { animation: ph-up-rise 240ms var(--m-ease) both; }
 .k1-phone-upload .ph-up-takeover > * { animation: ph-up-rise 240ms var(--m-ease) both; }
+
+/* 比 390×844 稿矮或窄：整页滚动，页脚全文排在内容最后，选择文件按钮仍保持主操作尺寸。 */
+@media (max-height: 843px), (max-width: 389px) {
+  .k1-phone-upload .k1-phone-upload-content { overflow-y: auto; overscroll-behavior: contain; }
+  .k1-phone-upload .ph-up-flow { overflow: visible; flex: none; gap: 8px; }
+  .k1-phone-upload .ph-up-target { gap: 6px; padding: 8px; }
+  .k1-phone-upload .ph-up-steps { padding-top: 6px; padding-bottom: 6px; }
+  .k1-phone-upload .ph-up-picker { gap: 8px; padding: 12px; }
+  /* 长格式说明排在主按钮之后，全部保留并可继续滚动阅读。 */
+  .k1-phone-upload .ph-up-hint { order: 1; }
+  .k1-phone-upload .ph-up-xiaoqing { flex: 0 0 auto; }
+  .k1-phone-upload .ph-up-pill { min-height: 56px; }
+}
 
 /* 宽屏（平板、桌面、1080×1920 竖屏）：同一列居中成 390 宽；够高时收成 844 高的手机卡 */
 @media (min-width: 431px) {

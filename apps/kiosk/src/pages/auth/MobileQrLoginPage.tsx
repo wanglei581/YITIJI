@@ -91,6 +91,7 @@ export function MobileQrLoginPage() {
   const codeRef = useRef<HTMLInputElement>(null)
   const focusRef = useRef<'phone' | 'code' | null>(null)
   const flowRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLElement>(null)
 
   useLayoutEffect(() => {
     liveSidRef.current = s.sid
@@ -107,6 +108,9 @@ export function MobileQrLoginPage() {
   // 换态即回到顶部：结论、原因与下一步必须先落在首屏，不能沿用上一屏的滚动位置。
   useEffect(() => {
     flowRef.current?.scrollTo({ top: 0 })
+    contentRef.current?.scrollTo({ top: 0 })
+    // 这一行滚动本身不抢焦点；发码成功后的验证码焦点仍由原有 focusRef 逻辑给出。
+    if (s.state === 'code-sent') codeRef.current?.scrollIntoView({ block: 'nearest' })
   }, [s.state])
 
   useEffect(() => {
@@ -226,12 +230,12 @@ export function MobileQrLoginPage() {
 
   return (
     <main className="fusion-w5 fusion-w5--auth service-desk k1-mobile-qr-login" data-kiosk-screen="member-qr-login" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-mobile-qr-state={s.state}>
-      <section className="k1-mobile-qr-content">
+      <section className="k1-mobile-qr-content" ref={contentRef}>
         <header className="k1-mobile-qr-relaybar">
           <span className="k1-mobile-qr-seal" aria-hidden="true">职</span>
           <div className="k1-mobile-qr-brand">
             <strong>职易达</strong>
-            <small><span>手机确认登录</span><span> · {chrome.suffix}</span></small>
+            <small><span>手机确认登录 ·</span>{' '}<span>{chrome.suffix}</span></small>
           </div>
           <span className="k1-mobile-qr-tag">{chrome.tag}</span>
         </header>
@@ -263,7 +267,7 @@ export function MobileQrLoginPage() {
               <DeviceCard
                 {...device}
                 compact={compact}
-                chip={s.remain === null ? null : <>打开本页时剩余 <b>{s.remain} 秒</b> · <span>自一体机生成起共 {QR_TICKET_TTL_SECONDS} 秒</span></>}
+                chip={s.remain === null ? null : <>打开本页时剩余 <b>{s.remain} 秒</b> · <span>共 {QR_TICKET_TTL_SECONDS} 秒</span></>}
               />
               {alert && (
                 <section className={alert.tone === 'error' ? 'k1-mobile-qr-alert k1-mobile-qr-error' : 'k1-mobile-qr-alert'} data-tone={alert.tone} role={alert.tone === 'error' ? 'alert' : 'status'}>

@@ -145,7 +145,7 @@ export const UPLOAD_STEPS = ['选手机里的文件', '系统接收', '回一体
 
 export function chromeCopy(issue: LinkIssue, state: UploadState, confirmedLabel: string | null) {
   if (issue === 'signature-blocked') {
-    return { sub: '本人手写签名 · 手机端不可用', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前没有可用的上传入口，也不会发送任何文件；本人手写签名图片请回一体机在原步骤上传。' }
+    return { sub: '签名 · 手机端不可用', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前没有可用的上传入口，也不会发送任何文件；本人手写签名图片请回一体机在原步骤上传。' }
   }
   if (issue === 'invalid' || state === 'session-expired') {
     return { sub: issue === 'invalid' ? '上传链接不可用' : '手机上传 · 需回一体机重新生成', tag: '需回一体机', icon: 'ban' as IconKey, foot: '本页当前不能再发送文件；请回一体机重新生成上传二维码后再扫一次。' }

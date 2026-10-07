@@ -20,9 +20,6 @@ import {
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { uploadPhoneSessionFile, uploadSessionUserMessage } from '../../services/api/uploadSessions'
 
-const XIAOQING_FOOT = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
-/** 空文件、超限、格式、类型。红色预检说明放到文件信息上面，390×844 首屏看全。 */
-const PRECHECK_ERROR_STATES = new Set<string>(['empty-error', 'too-large', 'type-error', 'content-type-error'])
 import {
   useDocumentConversionCapabilities,
   WORD_CONVERSION_DISCLOSURE,
@@ -54,6 +51,10 @@ import {
   takeoverCopy,
   uploadView,
 } from './phoneUploadModel'
+
+const XIAOQING_FOOT = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
+/** 空文件、超限、格式、类型。红色预检说明放到文件信息上面，390×844 首屏看全。 */
+const PRECHECK_ERROR_STATES = new Set<string>(['empty-error', 'too-large', 'type-error', 'content-type-error'])
 
 /* 手机上传（/upload/phone）。视觉与口径真值：稿 51-phone-relay.html screen=phone-upload。
  * 手机端只有 fragment 里的 sessionId / token / purpose：purpose 可被随手改掉，只作未确认提示；
@@ -198,10 +199,12 @@ export function PhoneUploadPage() {
   if (s.link !== linkKey) setS(initialSession(linkKey))
   const attemptRef = useRef(0)
   const flowRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLElement>(null)
 
   // 换态即回到顶部：结论、原因与下一步先落在首屏。
   useEffect(() => {
     flowRef.current?.scrollTo({ top: 0 })
+    contentRef.current?.scrollTo({ top: 0 })
   }, [s.state, issue])
 
   const confirmed = s.confirmed ? purposes[s.confirmed] : null
@@ -211,6 +214,7 @@ export function PhoneUploadPage() {
   const canPick = !kiosk && ready && view?.picker === 'ready'
   const precheckError = PRECHECK_ERROR_STATES.has(s.state)
   const chrome = chromeCopy(issue, s.state, confirmed?.label ?? null)
+  const [subtitleLead, subtitleTail] = chrome.sub.split(' · ')
   const takeover = issue ? takeoverCopy(issue) : null
   const chipsText = policy.chips.join(' / ')
   const formatsNote = conversionCapabilities.wordToPdf
@@ -284,12 +288,12 @@ export function PhoneUploadPage() {
 
   return (
     <main className="fusion-w5 fusion-w5--auth k1-phone-upload service-desk" data-kiosk-screen="phone-upload" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-phone-upload-state={issue ?? s.state} data-purpose={s.confirmed ?? 'unconfirmed'} data-purpose-confirmed={s.confirmed ? '1' : '0'}>
-      <section className="k1-phone-upload-content">
+      <section className="k1-phone-upload-content" ref={contentRef}>
         <header className="ph-up-relaybar">
           <span className="ph-up-seal" aria-hidden="true">职</span>
           <div className="ph-up-brand">
             <strong>职易达</strong>
-            <small>{chrome.sub}</small>
+            <small>{subtitleTail ? <><span>{subtitleLead} ·</span>{' '}<span>{subtitleTail}</span></> : subtitleLead}</small>
           </div>
           <span className="ph-up-tag">{chrome.tag}</span>
         </header>
