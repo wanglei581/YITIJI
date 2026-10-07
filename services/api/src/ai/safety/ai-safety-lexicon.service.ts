@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, type OnModuleInit } from '@nestjs/common'
 import { AuditService } from '../../audit/audit.service'
+import { withBootTimeout } from '../../common/boot/boot-readiness'
 import type { AuthedUser } from '../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
 import { registerSafetyBlockSink } from './block-log'
@@ -64,10 +65,19 @@ export class AiSafetyLexiconService implements OnModuleInit {
         position: record.position,
       },
     }))
+    // 启动期读库必须有界：库慢或不可达时先用种子词库启动，库迟到返回再补上后台增删的词。
     try {
-      const rows = await this.prisma.aiSafetyTerm.findMany({
-        select: { category: true, term: true, kind: true, enabled: true },
-      })
+      const rows = await withBootTimeout(
+        () => this.prisma.aiSafetyTerm.findMany({ select: { category: true, term: true, kind: true, enabled: true } }),
+        {
+          subsystem: 'ai_safety_lexicon',
+          operation: 'loadLexicon',
+          timeoutMs: 5000,
+          onSettleAfterTimeout: (result) => {
+            if (result.ok) applyLexiconRows(result.value)
+          },
+        },
+      )
       applyLexiconRows(rows)
     } catch {
       resetLexiconToSeed()

@@ -585,7 +585,7 @@ async function main(): Promise<void> {
     }))
     await capture('fair.visit', () => fair.build({
       mode: 'preparation', resumeText: CLEAN_RESUME,
-      fair: { id: 'fair-1', title: '示例招聘会', sourceName: '示例来源', sourceUrl: 'https://example.com/fair', startAt: '2026-10-20T01:00:00.000Z', endAt: '2026-10-20T09:00:00.000Z', venue: '示例馆', city: '上海' },
+      fair: { id: 'fair-1', title: '示例招聘会', sourceName: '示例来源', sourceUrl: 'https://example.com/fair', startAt: '2099-10-20T01:00:00.000Z', endAt: '2099-10-20T09:00:00.000Z', venue: '示例馆', city: '上海' },
       fairCompanies: [{ companyName: '示例公司', industry: '软件', sourceUrl: 'https://example.com/company', positions: [{ title: '前端开发', requirements: '熟悉 TypeScript', education: null, location: '上海' }] }],
     }))
     await capture('job.fit', () => jobFit.analyze(CLEAN_RESUME, { title: '前端开发', company: '示例公司', description: '负责页面开发', requirements: '熟悉 TypeScript' }))
