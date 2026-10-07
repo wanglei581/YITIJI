@@ -18144,6 +18144,7 @@
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs"
     ],
     "apps/admin/scripts/support/auth-second-factor-module.mjs": [
+      "apps/admin/scripts/logout-keepalive.test.mjs",
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-login-second-factor.mjs",
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs"
@@ -18814,6 +18815,7 @@
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/services/auth/index.ts": [
+      "apps/admin/scripts/logout-keepalive.test.mjs",
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-login-second-factor.mjs",
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs",
@@ -27255,6 +27257,25 @@
     }
   ],
   "gates": [
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/scripts/support/auth-second-factor-module.mjs",
+          "apps/admin/src/services/auth/index.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/logout-keepalive.test.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:partner-account-action-ui"
+      ],
+      "wired": true
+    },
     {
       "asserts": {
         "absent": [],
