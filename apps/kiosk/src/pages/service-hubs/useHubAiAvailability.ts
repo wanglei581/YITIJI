@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { API_BASE_URL } from '../../services/api/client'
+import { terminalAttributedFetch } from '../../services/terminalAuth'
 import {
   platformAiUnavailable,
   type HubAiFeatureStatus,
@@ -7,7 +8,7 @@ import {
 
 /**
  * 后端已经可达时，再读现有的 GET /kiosk/ai/capabilities。
- * 一体机里没有现成客户端，所以探测写在服务中心这一页，不新造接口。
+ * 探测在服务中心经现有终端身份封装发出，不新造接口。
  *
  * `enabled === false`（/health 还在确认或已经断开）时不发这条请求：
  * 整站不通仍走原来的 apiDown，不把「读不到能力清单」误当成「只有 AI 挂了」。
@@ -69,7 +70,7 @@ export function useHubAiAvailability(enabled: boolean): HubAiProbe {
     const timeoutId = window.setTimeout(() => controller.abort(), AI_CAPABILITY_TIMEOUT_MS)
     setProbe({ phase: 'checking', features: new Map() })
 
-    void fetch(`${API_BASE_URL}/kiosk/ai/capabilities`, {
+    void terminalAttributedFetch(`${API_BASE_URL}/kiosk/ai/capabilities`, {
       cache: 'no-store',
       headers: { Accept: 'application/json' },
       signal: controller.signal,

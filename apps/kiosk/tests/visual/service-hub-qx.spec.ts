@@ -11,6 +11,7 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { kioskAiCapabilityItems } from '../../src/pages/service-hubs/serviceHubModel'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
 
 const AI_CAPABILITIES = '/api/v1/kiosk/ai/capabilities'
@@ -457,4 +458,40 @@ test('先选目标留在常用入口下面，顶栏有时钟 @kiosk', async ({ p
     return Boolean(quick.compareDocumentPosition(goals) & Node.DOCUMENT_POSITION_FOLLOWING)
   })
   expect(goalsAfterQuick).toBe(true)
+})
+
+test('服务中心读取 AI 能力清单带终端身份和会话票 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+
+  for (const path of ['/resume-service', '/interview-service', '/policy-service']) {
+    const capabilityRequest = page.waitForRequest((request) => (
+      request.method() === 'GET' && new URL(request.url()).pathname === AI_CAPABILITIES
+    ))
+    await page.goto(path)
+    const headers = (await capabilityRequest).headers()
+    expect(headers['x-terminal-id']).toBe('KSK-001')
+    expect(headers['x-terminal-session-token']?.trim()).toBeTruthy()
+    await readHub(page)
+  }
+})
+
+test('服务中心只读 AI 能力清单不弹使用声明或年龄确认 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: {
+      ...terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'service-hub-declaration'),
+      ai: { loginGate: 'off', declarationEnforced: true, paused: false },
+    },
+  })
+
+  // capabilities 登记为 read：scopesForKind 返回空数组，prepareAiDeclaration 直接放行。
+  // 即使声明开关打开，也必须读完清单进入就绪态，不能被声明弹窗拦住。
+  for (const path of ['/resume-service', '/interview-service', '/policy-service']) {
+    await page.goto(path)
+    const hub = await readHub(page)
+    expect(hub.readiness).toBe('ready')
+    await expect(page.locator('[data-ai-declaration-dialog]')).toHaveCount(0)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  }
 })
