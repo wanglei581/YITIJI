@@ -1,5 +1,72 @@
 # 当前开发进度
 
+## 2026-10-07：发布增量包（BOS）加固——Codex 接续 Grok 半成品（`bh-g-bos`，基线 `06eab394471278ec182ee4af73b6ffd9e0a4d212`，尚未合入）
+
+- **根因链（main CI run 37573717358 的 release-bundle 作业，Claude 已核对日志）：** 第一步 `bos-object.mjs get latest-deployed.txt` 就是 HTTP 403（requestId=`4aff1534-5d77-41da-8be5-3e955ed19cc8`）→ `BASE_SHA` 为空 → 第二步打印「无可用基线，本次发布将回退到 GitHub 拉取」后 `exit 0`，没有生成、没有上传 bundle。10/7 第六次发布时服务器因此取不到 `release-<sha>.bundle`（同样 403）；直连 GitHub 两次各在 600 秒断开；结束时 `latest-deployed.txt` 回写失败；最后是人工传包。10/4 及更早的 main CI 读基线正常（`BASE_SHA` 有值）。`scripts/release-bundle/` 与 `deploy.yml` 在 10/3 之后没有改过，变化在 BOS 一侧。
+- **BOS 一侧仍要人进百度云控制台确认。本包不改密钥、桶策略、生命周期或账户，也不对线上机器做任何操作。四种可能：** 1) 密钥停用或过期；2) 桶策略拒绝这次访问；3) 生命周期规则删了对象；4) 账户欠费。
+- **范围与方案审查：** 只解决 BOS 发布通道无基线不出包及 403 无法诊断。文件预算 5 个：客户端、现有 release verify、CI/deploy 两份 workflow、当前进度文档；复用既有 BOS 签名、bundle/checksum/回退链。无新增页面、服务、业务模型或依赖；不触碰招聘、简历、打印、硬件、真实数据库、密钥或生产。验证仅在本工作区内创建独立临时 Git 仓库和 SQLite 库（Git 写操作仅发生于任务要求的临时测试仓库，当前检出无 Git 写操作）。临时验证资产使用现有忽略目录 `.codex-tmp/`。方案复核后继续实现：统一错误路径、有界完整 JSON、逐步诊断、分档基线、保留服务器校验与回退。
+- **实现：** 非 2xx 只保留最多 2048 字节完整 JSON、最多等 3 秒；超长、超时、中断、非 JSON 不带 code，保留原 HTTP 错误。code 必须是符合白名单的字符串（数组、超 64 字符、尾随换行均拒绝），message 永不打印；优先使用响应头 requestId，再取 JSON 的安全 requestId。GET / PUT / HEAD 共用错误格式，HEAD 404 打印错误行并保留原退出码 3。诊断缺凭证则退出 1。
+- **diagnose：** 依次 HEAD 基线、PUT 时间戳与 PID 命名的小对象、GET 比对、DELETE；输出步骤、结果、HTTP、code、requestId、Date 时钟差，超过 900 秒警告。HEAD 404、读写失败、内容不一致、DELETE 拒绝均令诊断失败；DELETE 405/501（不支持）作为跳过并提示对象留存，不算失败。客户端基线 403、diagnose 非零都不阻断工作流。
+- **CI/deploy：** CI 在读基线之前新增 best-effort diagnose。空基线、非祖先（含不存在 SHA）或与目标相同不跳过出包：14 天前 → 最早非根且非目标提交 → 完整 bundle（打印大小）。来源使用 `latest-deployed / 14 天前兜底 / 完整包` 三种日志；第二档的最早非根提交也归入兜底并在此说明。服务器取包前 diagnose 失败仅告警，bundle verify 与 GitHub 回退保留；回写 latest-deployed 失败打印客户端 stderr（code、requestId）。未修改其它工作流步骤。
+- **接续修正：** Grok 半成品把慢响应的完整 JSON 前缀当作 code、把 HEAD 404 算作诊断通过、HEAD 404 静默；这些已修正。补充响应中断/请求错误并发不覆盖 HTTP 403、严格字符串白名单、精确 2048 字节、缺凭证退出码、读回不一致和 DELETE 拒绝用例。修正原 bundle 接收测试：接收仓库预先只有基线，先证明目标不存在，再 verify/fetch；另测缺前置提交确实 verify 失败。
+- **当前验收：PARTIAL。** 本次全量 `node --test scripts/release-bundle/bos-object.mjs` 退出 1：17 用例中 7 通过、10 因沙箱禁止监听 127.0.0.1（EPERM）失败，无跳过。`node scripts/verify-release-bundle.mjs` 退出 1：静态契约、原有反向断言、真实 Git round-trip、有效/空/非祖先基线、最早非根与完整包均通过，随后本地 HTTP 桩因 EPERM 未完成。不能沿用上一位写在半成品里的“全通过”结论。
+- **可执行的补充验证：** `node --test --test-name-pattern="fixed vector|HEAD failure|code accepts|bounded body|without credentials|transport-stream" scripts/release-bundle/bos-object.mjs` 退出 0，7 PASS / 0 FAIL；真实 Node 流与模拟 HTTP 传输覆盖诊断全过/部分失败、HTTP 错误保留、时限/长度/白名单、日志不含测试 secretKey 与实际 Authorization 值。这不替代本地 HTTP 监听实测，也不代表真实 BOS 可用。
+- **指定门禁：** `pnpm verify:repository-integrity` 退出 0，最后 `OK: no tracked file exceeds 1 MB (6 registered exceptions)`（同时 `OK: 6 workflow YAML files have valid syntax`）；`node scripts/verify-ci-gate-coverage.mjs` 退出 0，最后 `OK: 21 deterministic CI gates are directly executed; 531/541 verify/ui 门禁在 CI 执行闭包内，10 条已登记豁免（其中 0 条待接线，上限 1）；588 个门禁脚本文件中 0 个无脚本名（全部已登记，上限 0）`；生成图谱 0 文件变化，`--check` 最后 `PASS docs/graph/ 与当前代码一致`。两份脚本 node --check、git diff --check 通过。
+- **四处反向变异（均实际跑命令、立即恢复，退出码均 1）：** 错误插入 message → `HEAD failure includes code ... never includes message` 红；读体去掉长度限制 → `bounded body reader rejects oversize ...` 红；空基线仍 exit 0 → 临时仓库无 bundle，`生成的 bundle 不能 verify` 红；diagnose 输出 Authorization → `diagnose transport-stream ... secret-free logs` 红。恢复后 7 条流级用例通过；完整 HTTP 验证仍受沙箱限制。
+- **图谱门禁说明：** 每个改动文件均运行 `project-graph-query.mjs file <路径>`，去重得到 47 条可执行门禁，44 条退出 0；release-bundle、server-maintenance-workflows、support-contact 三条因监听/套接字限制退出 1；deploy-rollback 首次 90 秒预算不够，重跑已通过；`scripts/project-graph/gates.mjs` 是无脚本名 helper，无命令可跑。policy-eligibility-authoring 的旧 DATABASE_URL 缺失问题已通过独立空 SQLite 库解决；ai-usage-retention 增加其要求的 `VERIFICATION_DATABASE_TARGET=isolated` 与 `.verify.db` 目标名后通过；file-assets 门禁初次被未忽略的临时验证资产影响，移动到现有 `.codex-tmp/` 后通过。完整命令与最后结果见下表。
+- **待复核：** 在允许本地监听/套接字的环境补跑两条 BOS 全量命令、server-maintenance-workflows 与 support-contact，Claude 独立审查待进行。HEAD 按 HTTP 协议通常无响应体，实际只能有 HTTP/requestId，不能保证从 HEAD 获得 code；GET/PUT 可有。服务器取包前运行当前服务器检出的客户端，首次更新时旧客户端可能尚不认识 diagnose（失败仍不阻断）；未碰生产核对版本。BOS 四种控制台可能仍待人工确认。
+- **体积与归位：** 客户端含按任务要求内置的 node:test，约前 423 行为运行逻辑，其余为测试；这次不新增测试文件或依赖。门禁/脚本不属于 `.ccg/spec/guides/index.md` 的业务 src 文件行数阈值。无停放、删除、隐藏、迁移。Grok 半成品由 Codex 审读、修正与补测；没有声称 Claude 已审、已合并、已上线。
+
+| 图谱点名命令（去重 47 条） | 退出码 | 最后一条结果（省略 pnpm 的 `$ ...` 命令回显与空行） |
+|---|---:|---|
+| `pnpm --filter ai-job-print-terminal verify:release-bundle` | 1 | FAIL: listen EPERM: operation not permitted 127.0.0.1 |
+| `pnpm --filter @ai-job-print/kiosk verify:kiosk-browser-spec-coverage` | 0 | ✅ ALL PASS — 浏览器用例 CI 覆盖 |
+| `pnpm --filter @ai-job-print/admin verify:data-request-ui` | 0 | === ALL PASS === |
+| `pnpm --filter @ai-job-print/kiosk verify:data-request-ui` | 0 | === ALL PASS === |
+| `pnpm --filter @ai-job-print/kiosk verify:fusion-w6` | 0 | ALL PASS fusion W6 integration contract |
+| `pnpm --filter @ai-job-print/kiosk verify:job-ai-history-privacy-ui` | 0 | ✅ ALL PASS — Kiosk 岗位 AI 历史 / 隐私闭环门禁一致 |
+| `pnpm --filter @ai-job-print/kiosk verify:job-ai-ui` | 0 | ✅ ALL PASS — Kiosk 岗位 AI UI 授权 / 推荐 / 解读门禁一致 |
+| `pnpm --filter @ai-job-print/kiosk verify:job-fit-m1-5-ui` | 0 | ✅ ALL PASS — 岗位匹配复用 2D、打印、历史与数据边界一致 |
+| `pnpm --filter @ai-job-print/kiosk verify:kiosk-end-use` | 0 | # duration_ms 256.947875 |
+| `pnpm --filter @ai-job-print/kiosk verify:lightflow-k2b-ai-resume` | 0 | ALL PASS K2b AI 简历青序 LightFlow 静态合同 |
+| `pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview` | 0 | PASS lightflow K2c interview contract: 122 checks |
+| `pnpm --filter @ai-job-print/kiosk verify:member-login-dialog` | 0 | ALL PASS — Kiosk 真实会员登录弹窗符合冻结合同 |
+| `pnpm --filter @ai-job-print/kiosk verify:mic-capability-truth` | 0 | verify-mic-capability-truth passed (3 files, 4 capability states derived from source) |
+| `pnpm --filter @ai-job-print/kiosk verify:profile-commercial-first-batch` | 0 | ✅ ALL PASS — Profile 商用闭环第一批守卫通过 |
+| `pnpm --filter @ai-job-print/kiosk verify:profile-documents-inkpaper` | 0 | ✅ ALL PASS — /me/documents 页面/行为合同守卫通过（不含文件范围检查） |
+| `pnpm --filter @ai-job-print/kiosk verify:profile-feedback-inkpaper` | 0 | ✅ ALL PASS — /me/feedback 拆分与墨青纸感换装守卫通过 |
+| `pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home` | 0 | ✅ ALL PASS — Profile 主入口 LightFlow 与低风险 /me 明细边界保持符合预期 |
+| `pnpm --filter @ai-job-print/kiosk verify:profile-print-orders-inkpaper` | 0 | ✅ ALL PASS — /me/print-orders 页面/行为合同守卫通过（不含文件范围检查） |
+| `pnpm --filter @ai-job-print/kiosk verify:profile-print-orders-login-smoke` | 0 | ✅ ALL PASS — /me/print-orders 登录态 smoke fixture 守卫通过 |
+| `pnpm --filter @ai-job-print/kiosk verify:profile-resumes-notifications-inkpaper` | 0 | ✅ ALL PASS — /me/resumes 与 /me/notifications 墨青纸感换装守卫通过 |
+| `pnpm --filter @ai-job-print/ui verify:service-desk-foundation` | 0 | VISUAL_STYLE_BOUNDARY_VERIFY_OK |
+| `pnpm --filter ai-job-print-terminal verify:ci-gate-coverage` | 0 | OK: 21 deterministic CI gates are directly executed; 531/541 verify/ui 门禁在 CI 执行闭包内，10 条已登记豁免（其中 0 条待接线，上限 1）；588 个门禁脚本文件中 0 个无脚本名（全部已登记，上限 0） |
+| `pnpm --filter ai-job-print-terminal verify:ci-main-runs-complete` | 0 | ✅ ALL PASS — main CI 必须跑完 |
+| `pnpm --filter @ai-job-print/api verify:contract-review:preprod-readiness` | 0 | ✅ ALL PASS — AI 签约风险提示预生产验收包门禁一致 |
+| `pnpm --filter @ai-job-print/api verify:job-ai-backend` | 0 | ✅ ALL PASS — 岗位 AI 后端推荐 / 会话 API 门禁一致 |
+| `pnpm --filter @ai-job-print/api verify:job-ai-ops-dashboard` | 0 | ✅ ALL PASS — 岗位 AI Admin/Partner 运营看板门禁一致 |
+| `pnpm --filter @ai-job-print/api verify:job-ai-privacy` | 0 | ✅ ALL PASS — 岗位 AI 用户同意 / 隐私 / 配额治理门禁一致 |
+| `pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness` | 0 | ✅ ALL PASS — 客户真实岗位样本导入 readiness 一致 |
+| `pnpm --filter @ai-job-print/api verify:job-data-quality` | 0 | ✅ ALL PASS — 岗位数据质量与来源可用性门禁一致 |
+| `pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance` | 0 | ✅ ALL PASS — 岗位信息 AI 真实验收证据包门禁一致 |
+| `pnpm --filter @ai-job-print/api verify:partner-excel-template` | 0 | ALL PASS |
+| `pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring` | 0 | === P21 申领条件录入面验证通过：43 PASS === |
+| `pnpm --filter @ai-job-print/api verify:print-scan-first-release` | 0 | ✅ ALL PASS — print-scan first-release safety invariants hold |
+| `pnpm --filter @ai-job-print/api verify:profile-commercial-first-batch-acceptance` | 0 | ✅ ALL PASS — 我的页商用闭环第一批 P0b 预生产验收执行包门禁一致 |
+| `pnpm --filter @ai-job-print/kiosk verify:deploy-vite-env-coverage` | 0 | PASS kiosk VITE_* 覆盖度：代码读 20 / deploy.yml 设 4 / 登记 20（其中 4 项待裁决：VITE_ENABLE_CONTRACT_REVIEW、VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT、VITE_QR_LOGIN_PUBLIC_BASE_URL、VITE_AMAP_KEY） |
+| `pnpm --filter ai-job-print-terminal verify:deploy-authorization-gate` | 0 | ALL PASS: deploy requires explicit authorization and persistent PII scan gating |
+| `pnpm --filter ai-job-print-terminal verify:deploy-gates-in-sync` | 0 | ✅ verify:deploy-gates-in-sync 通过 |
+| `pnpm --filter ai-job-print-terminal verify:deploy-rollback` | 0 | verify:deploy-rollback 通过（真跑发布脚本 + 磁盘门槛与原子备份 + 静态目录 + 清理分组 / 构建前检查 / 预检 + 信号 / 数字 / 锚点 / bundle） |
+| `pnpm --filter ai-job-print-terminal verify:server-maintenance-workflows` | 1 | Node.js v22.23.2 |
+| `pnpm --filter ai-job-print-terminal verify:repository-integrity` | 0 | OK: no tracked file exceeds 1 MB (6 registered exceptions) |
+| `pnpm --filter @ai-job-print/api verify:ai-usage-retention` | 0 | 66 PASS / 0 FAIL / 66 checks |
+| `pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance` | 0 | verify:file-assets-trial-acceptance passed |
+| `pnpm --filter @ai-job-print/api verify:support-contact` | 1 | } |
+| `pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-intents` | 0 | ✅ ALL PASS — 百宝箱全部 AI skill intent 接线一致 |
+| `pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-real-acceptance` | 0 | ✅ ALL PASS — 百宝箱首批低风险 AI skill 真实验收执行包门禁一致 |
+| `pnpm --filter @ai-job-print/api verify:toolbox-governance-acceptance` | 0 | ✅ ALL PASS — 百宝箱微应用审核发布真实验收执行包门禁一致 |
+| `pnpm --filter @ai-job-print/api verify:toolbox-preprod-acceptance` | 0 | ✅ ALL PASS — 百宝箱预生产验收执行包门禁一致 |
+
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）
 
 - **依据：** 产品负责人 10/6 晚拍板，AI 简历导出默认在文件里印一行「含人工智能辅助生成内容」（后端开关 10/9 打开，判定见 `services/api/src/common/pdf/aigc-label.ts`）。一体机这一步只加说明文字，不加勾选框、不改颜色；勾选不印那一步等后端字段，排第八或第九次。
