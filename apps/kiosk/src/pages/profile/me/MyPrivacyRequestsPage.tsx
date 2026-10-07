@@ -27,7 +27,6 @@ import {
   containsStaffHandoff,
   helpNeededLine,
   servicePhoneLine,
-  whenMiniapp,
   type PublicSupportContact,
 } from '../../../copy/unattendedCopy'
 import { useSupportContact } from '../../../hooks/useSupportContact'
@@ -72,14 +71,12 @@ const TAKE = [
 
 function exportLine(contact: PublicSupportContact): string {
   const phone = servicePhoneLine(contact)
-  const lead = whenMiniapp(contact, '可以在手机上的职易达小程序里申请导出，也可以') || '可以'
-  return `公共屏上不导出个人资料。需要复制个人信息的，${lead}${phone}申请，我们核实是你本人后处理。${EXPORT_INVENTORY_NOTE}`
+  return `公共屏上不导出个人资料。需要复制个人信息的，可以${phone}申请。我们核实是你本人后，15 个工作日内处理。${EXPORT_INVENTORY_NOTE}`
 }
 
 function closureLine(contact: PublicSupportContact): string {
   const phone = servicePhoneLine(contact)
-  const lead = whenMiniapp(contact, '可以在手机上的职易达小程序「我的 → 账号设置」里，短信验证本人后提交申请；也可以') || '可以'
-  return `这台机器上不办理注销。${lead}${phone}申请。我们核实是你本人后，15 个工作日内处理。`
+  return `这台机器上不办理注销。可以${phone}申请。我们核实是你本人后，15 个工作日内处理。`
 }
 
 function safeMessage(error: unknown, fallback: string): string {

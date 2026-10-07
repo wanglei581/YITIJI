@@ -499,6 +499,12 @@ button.qx-me-row { cursor: pointer; }
   font-size: 26px;
 }
 .qx-me-cta-row > .qx-btn[data-variant='primary'] { flex: 1.5 1 0; min-height: 72px; }
+.qx-me-cta-row > .qx-btn[aria-disabled='true'] {
+  background: var(--qx-muted-bg);
+  border-color: var(--qx-muted-line);
+  color: var(--qx-muted-ink);
+  cursor: not-allowed;
+}
 
 /* ── 账号设置（/me/settings，稿 30-my-profile ?screen=settings） ──
    只在 .qx-me-settings（QxMePage 的 settings 视图）里生效，令牌一律 var(--qx-*)。
