@@ -814,12 +814,10 @@ for (const item of ME_SHELL_PAGES) {
 
 const EXPORT_INVENTORY = '账号摘要、文件清单、AI 服务记录摘要、AI 用量（功能、时间、状态、金额）、打印订单、收藏、权益、浏览与打开来源记录、求职进度、通知、反馈、授权与历史请求'
 const EXPORT_TAIL = `导出的是本人资料清单（${EXPORT_INVENTORY}），不含文件原文与简历正文全文。`
-const EXPORT_WITH_PHONE = `公共屏上不导出个人资料。需要复制个人信息的，可以拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）申请，我们核实是你本人后处理。${EXPORT_TAIL}`
+const EXPORT_WITH_PHONE = `公共屏上不导出个人资料。需要复制个人信息的，可以拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）申请。我们核实是你本人后，15 个工作日内处理。${EXPORT_TAIL}`
 const CLOSURE_WITH_PHONE = `这台机器上不办理注销。可以拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）申请。我们核实是你本人后，15 个工作日内处理。`
-const EXPORT_WITHOUT_PHONE = `公共屏上不导出个人资料。需要复制个人信息的，可以查看《隐私政策》里的联系方式申请，我们核实是你本人后处理。${EXPORT_TAIL}`
+const EXPORT_WITHOUT_PHONE = `公共屏上不导出个人资料。需要复制个人信息的，可以查看《隐私政策》里的联系方式申请。我们核实是你本人后，15 个工作日内处理。${EXPORT_TAIL}`
 const CLOSURE_WITHOUT_PHONE = '这台机器上不办理注销。可以查看《隐私政策》里的联系方式申请。我们核实是你本人后，15 个工作日内处理。'
-const EXPORT_PUBLISHED_WITHOUT_PHONE = `公共屏上不导出个人资料。需要复制个人信息的，可以在手机上的职易达小程序里申请导出，也可以查看《隐私政策》里的联系方式申请，我们核实是你本人后处理。${EXPORT_TAIL}`
-const CLOSURE_PUBLISHED_WITHOUT_PHONE = '这台机器上不办理注销。可以在手机上的职易达小程序「我的 → 账号设置」里，短信验证本人后提交申请；也可以查看《隐私政策》里的联系方式申请。我们核实是你本人后，15 个工作日内处理。'
 
 function privacyList(items: unknown[]) {
   return {
@@ -843,7 +841,7 @@ function privacyCreated(id: string) {
   }
 }
 
-test('privacy export and closure stay on the fixture phone while the miniapp is unpublished @w5-kiosk', async ({ page, api }) => {
+test('小程序未发布且有电话时，隐私导出与注销只指向服务电话 @w5-kiosk', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
@@ -863,7 +861,7 @@ test('privacy export and closure stay on the fixture phone while the miniapp is 
   expect(errors).toEqual([])
 })
 
-test('privacy export and closure point at the privacy policy when support contact is missing @w5-kiosk', async ({ page, api }) => {
+test('小程序未发布且无电话时，隐私导出与注销指向隐私政策联系方式 @w5-kiosk', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   hideSupportContact(api)
@@ -875,6 +873,8 @@ test('privacy export and closure point at the privacy policy when support contac
   await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_WITHOUT_PHONE)
   await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('也可以')
   await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('也可以')
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('小程序')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('小程序')
   await expect(page.getByText(NO_PHONE_HINT).first()).toBeVisible()
   const body = await page.locator('body').innerText()
   expect(body.split('拨打服务电话').length - 1).toBe(0)
@@ -882,7 +882,34 @@ test('privacy export and closure point at the privacy policy when support contac
   expect(errors).toEqual([])
 })
 
-test('privacy export and closure use the miniapp when it is published and no phone is on file @w5-kiosk', async ({ page, api }) => {
+test('小程序已发布且有电话时，隐私导出与注销和未发布时逐字相同 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone: FIXTURE_SERVICE_PHONE,
+        serviceHours: FIXTURE_SERVICE_HOURS,
+        otherOnlineTerminalNearby: false,
+        miniappPublished: true,
+      },
+    },
+  })
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await page.goto('/me/privacy-requests')
+  await contact
+  await expect(page.getByTestId('member-privacy-export-line')).toHaveText(EXPORT_WITH_PHONE)
+  await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_WITH_PHONE)
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('小程序')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('小程序')
+  await expectNoStaffHandoff(page)
+  expect(errors).toEqual([])
+})
+
+test('小程序已发布且无电话时，隐私导出与注销和未发布时逐字相同 @w5-kiosk', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   api.respond('GET', '/api/v1/public/support-contact', {
@@ -901,10 +928,10 @@ test('privacy export and closure use the miniapp when it is published and no pho
 
   await page.goto('/me/privacy-requests')
   await contact
-  await expect(page.getByTestId('member-privacy-export-line')).toHaveText(EXPORT_PUBLISHED_WITHOUT_PHONE)
-  await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_PUBLISHED_WITHOUT_PHONE)
-  await expect(page.getByTestId('member-privacy-export-line')).toContainText('职易达小程序')
-  await expect(page.getByTestId('member-privacy-closure-line')).toContainText('职易达小程序')
+  await expect(page.getByTestId('member-privacy-export-line')).toHaveText(EXPORT_WITHOUT_PHONE)
+  await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_WITHOUT_PHONE)
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('小程序')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('小程序')
   const body = await page.locator('body').innerText()
   expect(body.split('拨打服务电话').length - 1).toBe(0)
   await expectNoStaffHandoff(page)
