@@ -17,6 +17,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { createRequire } from 'node:module'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
@@ -34,10 +36,14 @@ const socialPanel = read('src/pages/renshi/SocialPanel.tsx')
 const registerPanel = read('src/pages/renshi/RegisterPanel.tsx')
 const noticePanel = read('src/pages/renshi/NoticePanel.tsx')
 const components = read('src/pages/renshi/components.tsx')
+const policyFallback = read('src/pages/renshi/PolicyAiFallback.tsx')
+const advisorApi = read('src/services/api/advisor.ts')
+const advisorHook = read('src/pages/renshi/usePolicyAdvisorAvailability.ts')
+const policyStatesCss = read('src/pages/renshi/renshi-policy-states.css')
 const homeServiceGroups = read('src/pages/home/serviceGroups.ts')
 const packageJson = read('package.json')
 
-const allRenshi = page + shared + builtinData + policyPanel + socialPanel + registerPanel + noticePanel + components
+const allRenshi = page + shared + builtinData + policyPanel + socialPanel + registerPanel + noticePanel + components + policyFallback
 
 console.log('\n=== 政策服务页真实性契约验证 ===')
 
@@ -276,6 +282,71 @@ if (!hasHonestUploadButton(miswiredUploadFixture)) {
   pass('I3. 路由与诚实文案绑定在同一按钮内')
 } else {
   fail('I3. 注释或相邻文案不得掩盖错误的 /print/upload 按钮标签')
+}
+
+// C3-2c：验证新增组件真正渲染出的两种小青文案，不靠注释充当按钮。
+const localRequire = createRequire(import.meta.url)
+function loadTs(source, requireModule) {
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText
+  const module = { exports: {} }
+  new Function('require', 'exports', 'module', output)(requireModule, module.exports, module)
+  return module.exports
+}
+const react = localRequire('react')
+const componentRequire = (name) => {
+  if (name === './shared') return { AUDIENCE_CHIPS: [] }
+  if (name.endsWith('/SourceUrlQr')) return { SourceUrlQr: () => null }
+  if (name.endsWith('/QxAiHelp')) return { QxAiHelp: ({ label }) => react.createElement('button', null, label) }
+  return localRequire(name)
+}
+try {
+  const { PolicyAiFallback } = loadTs(policyFallback, componentRequire)
+  for (const unavailable of [false, true]) {
+    const html = renderToStaticMarkup(react.createElement(PolicyAiFallback, { unavailable, aiLabel: '问小青别的问题，不判断能不能办', aiDraft: '', policyId: 'policy-001', onManual: () => {} }))
+    const title = unavailable ? '小青暂时不可用' : '本条政策暂未接入小青'
+    for (const text of [title, '自己看原文与来源', '不经过模型的人工核对', '问小青别的问题，不判断能不能办', 'aria-disabled="true"', 'aria-disabled="false"']) {
+      if (!html.includes(text)) throw new Error(`缺少「${text}」，实际：${html}`)
+    }
+  }
+  if (!page.includes('manual-view-source') || !policyPanel.includes('manual ? null : (') || !policyPanel.includes('返回政策库')) throw new Error('人工核对状态、隐藏小青或返回出口缺失')
+  pass('L2. 两种小青控件均有置灰原因、人工核对与问别的问题；人工视图可返回')
+} catch (err) {
+  fail(`L. 小青控件渲染错误：${err.message}`)
+}
+try {
+  // 复用现有 request，验证布尔判据与演示模式；HTTP 失败交给页面的静默默认态。
+  for (const [mode, body, expected] of [
+    ['http', { available: false }, false], ['http', { available: true }, true],
+    ['http', { available: 'false' }, undefined], ['http', {}, undefined],
+    ['http', null, undefined], ['http', [{ available: false }], undefined],
+    ['http', { data: { available: false } }, undefined], ['mock', { available: false }, undefined],
+  ]) {
+    let calls = 0
+    const module = loadTs(advisorApi, (name) => {
+      if (name === './client') return { API_MODE: mode, API_BASE_URL: '/api/v1' }
+      if (name === '../terminalAuth') return { terminalAttributedFetch: async (url, init) => {
+        calls++
+        if (url !== '/api/v1/advisor/availability' || init.method !== 'GET' || init.headers.Authorization) throw new Error(`公开读取错误：${url}`)
+        return { ok: true, json: async () => body }
+      } }
+      if (name === './httpAdapter') return { ApiHttpError: Error }
+      if (name === './throwHttpError') return { networkError: (err) => err, throwHttpError: async () => { throw new Error('读取失败') } }
+      throw new Error(`未登记依赖：${name}`)
+    })
+    const actual = await module.getAdvisorAvailability()
+    if (actual !== expected || calls !== (mode === 'http' ? 1 : 0)) throw new Error(`模式 ${mode}，回包 ${JSON.stringify(body)}，读到 ${actual}，请求 ${calls} 次`)
+  }
+  if (!page.includes('advisorAvailable === false') || !advisorHook.includes('if (cancelled) return') || !advisorHook.includes('.catch(() => undefined)') || !advisorHook.includes('pending.current ??=')) throw new Error('明确不可用判据、静默失败、一次读取或切走取消缺失')
+  pass('M. 可用性只认布尔，演示模式不请求；读取失败默认、切走取消且本次只读一次')
+} catch (err) {
+  fail(`M. 可用性判据错误：${err.message}`)
+}
+if (socialPanel.includes('办理步骤') && socialPanel.includes('ArrowRightIcon') && policyStatesCss.includes('.rq-social .rq-steps-mini li') && policyStatesCss.includes('background: var(--qx-paper)')) {
+  pass('N. 社保四卡共用办理步骤小标题与当前色板的步骤底色')
+} else {
+  fail('N. 社保办理步骤小标题或步骤底色缺失')
 }
 
 console.log('')

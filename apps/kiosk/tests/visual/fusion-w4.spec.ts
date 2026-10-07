@@ -749,3 +749,272 @@ test('/renshi 库内政策与内置指引分区渲染 @w4', async ({ page, api }
   await expect(builtin.getByText('高校毕业生就业服务指引')).toHaveCount(0)
   await verifyPage(page, errors)
 })
+
+// 政策页现在独立读公开可用性；为本文件既有用例补默认回包，各场景再单独覆盖。
+test.beforeEach(({ api }) => {
+  api.respond('GET', '/api/v1/advisor/availability', { status: 200, json: { available: true } })
+})
+
+const POLICY_GAP_ROWS = [
+  {
+    id: 'policy-001', kind: 'policy_guide', title: '高校毕业生就业服务指引',
+    summary: '请通过官方入口查看办理条件。', audience: 'graduate',
+    content: '毕业年度内可在户籍地或常住地办理就业登记。\n申请人需准备身份证明和毕业证书，办理时间以当地通知为准。',
+    sourceName: '海川区人力资源和社会保障局', syncTime: '2026-07-24T08:00:00.000Z',
+    publishedDate: '2026-07-24', externalId: 'HRSS-2026-0724', externalUrl: 'https://hrss.example.gov.cn/policy/001',
+  },
+  {
+    id: 'policy-002', kind: 'policy_guide', title: '失业人员灵活就业社保补贴',
+    summary: '办理要求以发布机构原文为准。', audience: 'flexible',
+    content: '已办理失业登记、以灵活就业方式就业的人员，可按当地公布的条件申领。\n需在本市以灵活就业人员身份参加社会保险，具体材料以经办窗口告知为准。',
+    sourceName: '海川区公共就业服务中心', syncTime: '2026-09-20T08:00:00.000Z',
+    publishedDate: '2026-09-18', externalId: null, externalUrl: 'https://hrss.example.gov.cn/policy/2026-0918',
+  },
+]
+const NOTICE_GAP_ROWS = [
+  {
+    id: 'notice-001', kind: 'notice', category: 'notice', title: '关于调整失业保险金线上申领流程的通知',
+    content: '自 2026 年 10 月 1 日起，失业保险金申领改为先在线上预审、再到经办窗口复核。',
+    sourceName: '海川区公共就业服务中心', syncTime: '2026-09-22T08:00:00.000Z',
+    publishedDate: '2026-09-22', externalId: 'NOTICE-2026-0922', externalUrl: 'https://hrss.example.gov.cn/notice/2026-0922',
+  },
+  {
+    id: 'notice-002', kind: 'notice', category: 'notice', title: '就业服务月活动安排',
+    content: '活动时间与办理材料以发布机构最新公告为准。',
+    sourceName: '海川区人力资源和社会保障局', syncTime: '2026-07-24T08:00:00.000Z',
+    publishedDate: '2026-07-24', externalId: null, externalUrl: 'https://hrss.example.gov.cn/notice/002',
+  },
+]
+
+/** 和政策并排夹具一致：按 kind / audience 答列表，按编号答同一条政策。 */
+async function registerPolicyGapApi(page: Page, api: Parameters<typeof registerW4Api>[0]): Promise<void> {
+  registerW4Api(api)
+  await page.route((url) => url.pathname === '/api/v1/policies' || /^\/api\/v1\/policies\/(policy|notice)-\d+$/.test(url.pathname), async (route) => {
+    const url = new URL(route.request().url())
+    const id = url.pathname.split('/').at(-1)
+    const all = [...POLICY_GAP_ROWS, ...NOTICE_GAP_ROWS]
+    if (url.pathname !== '/api/v1/policies') {
+      const row = all.find((item) => item.id === id)
+      await route.fulfill({ status: row ? 200 : 404, contentType: 'application/json', body: JSON.stringify({ success: Boolean(row), data: row }) })
+      return
+    }
+    const audience = url.searchParams.get('audience')
+    const rows = url.searchParams.get('kind') === 'notice' ? NOTICE_GAP_ROWS : POLICY_GAP_ROWS
+    const data = audience ? rows.filter((row) => 'audience' in row && row.audience === audience) : rows
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      success: true, data, pagination: { page: 1, pageSize: 200, total: data.length, totalPages: 1 },
+    }) })
+  })
+}
+
+async function expectPolicyText(scope: Locator, text: string): Promise<void> {
+  const read = await scope.innerText()
+  await expect(scope, `应包含「${text}」，读到：${read}`).toContainText(text)
+}
+
+function capturePolicyAiRequests(page: Page): string[] {
+  const requests: string[] = []
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (path.startsWith('/api/v1/advisor/') && path !== '/api/v1/advisor/availability'
+      || path === '/api/v1/assistant/chat' || path.startsWith('/api/v1/ai/')) requests.push(`${request.method()} ${path}`)
+  })
+  return requests
+}
+
+test('政策库条目有人工核对入口，点开后不出现小青块 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  const aiRequests = capturePolicyAiRequests(page)
+  await registerPolicyGapApi(page, api)
+  await page.goto('/renshi?tab=policy&policy=policy-002')
+  const card = page.locator('[data-policy-id="policy-002"]')
+  const manual = card.getByTestId('renshi-policy-manual-source')
+  await expect(manual).toBeVisible()
+  await expectPolicyText(manual, '自己看原文与来源')
+  await expectPolicyText(manual, '不经过模型的人工核对')
+  await expect(page.locator('[data-policy-section="builtin"]').getByTestId('renshi-policy-manual-source')).toHaveCount(0)
+  await manual.click()
+  const state = page.getByTestId('renshi-policy-state-manual-view-source')
+  await expect(state, `读到状态：${await page.locator('.w4-policy-page').getAttribute('data-state')}`).toHaveAttribute('data-state', 'manual-view-source')
+  await expectPolicyText(page.locator('.qx-pagehead p'), '不经过模型的人工核对：直接看这条政策的原文与来源。')
+  await expectPolicyText(state.locator('.rq-srcline'), '人工核对：不经过模型，直接看这条政策的原文与来源')
+  await expect(card.locator('.rq-item-main')).toHaveAttribute('aria-expanded', 'true')
+  await expect(card.locator('.rq-quote p')).toHaveText(POLICY_GAP_ROWS[1]!.content)
+  await expectPolicyText(card.locator('.rq-facts'), POLICY_GAP_ROWS[1]!.sourceName)
+  await expect(page.locator('.rq-ai-off')).toHaveCount(0)
+  await expect(page.getByTestId('renshi-ask-ai')).toHaveCount(0)
+  await expectPolicyText(page.getByTestId('renshi-ctabar'), '原文只做展示；需要纸质件请上传你自己的材料。')
+  expect(aiRequests, `人工核对期间的 AI 请求：${aiRequests.join('、') || '0 条'}`).toEqual([])
+  const exits = card.locator('.rq-acc > .rq-strip')
+  const back = exits.getByTestId('renshi-policy-manual-back')
+  await expect(back, `返回入口应在展开条目的出口区，读到：${await card.innerText()}`).toHaveCount(1)
+  await expect(page.getByTestId('renshi-policy-manual-back'), `全页返回入口数量：${await page.getByTestId('renshi-policy-manual-back').count()}`).toHaveCount(1)
+  await expect(back, `返回入口样式：${await back.getAttribute('class')}`).toHaveClass('rq-exit')
+  await expect(back.locator('svg.lucide-arrow-left'), `返回入口图标：${await back.innerHTML()}`).toHaveCount(1)
+  await expectPolicyText(back.locator('b'), '返回政策库')
+  await expectPolicyText(back.locator('small'), '回到这条的常规说明')
+  await expect(exits.getByRole('button'), `展开条目的出口文字：${await exits.innerText()}`).toHaveCount(3)
+  // 先换算为舞台坐标，避免缩放后把折行高度与未缩放的行高混在一起。
+  const layout = await exits.evaluate((root) => {
+    const stage = root.closest<HTMLElement>('.kiosk-stage')
+    const scale = stage ? stage.getBoundingClientRect().width / stage.offsetWidth : 1
+    const strip = root.getBoundingClientRect()
+    return {
+      scale,
+      width: strip.width / scale,
+      buttons: Array.from(root.querySelectorAll('button')).map((button) => {
+        const box = button.getBoundingClientRect()
+        const title = button.querySelector('b')!
+        return {
+          text: title.textContent,
+          width: box.width / scale,
+          top: (box.top - strip.top) / scale,
+          bottom: (box.bottom - strip.top) / scale,
+          titleHeight: title.getBoundingClientRect().height / scale,
+          lineHeight: Number.parseFloat(getComputedStyle(title).lineHeight),
+        }
+      }),
+    }
+  })
+  const [backExit, sourceExit, printExit] = layout.buttons
+  const readings = JSON.stringify(layout)
+  expect(backExit!.width, `返回入口宽度应占出口区至少 90%，舞台读数：${readings}`).toBeGreaterThanOrEqual(layout.width * 0.9)
+  expect(Math.abs(sourceExit!.top - printExit!.top), `扫码与打印顶边差应小于 2px，舞台读数：${readings}`).toBeLessThan(2)
+  for (const exit of [sourceExit!, printExit!]) {
+    expect(exit.top, `「${exit.text}」应在返回入口下方，舞台读数：${readings}`).toBeGreaterThanOrEqual(backExit!.bottom)
+  }
+  for (const exit of layout.buttons) {
+    expect(exit.titleHeight, `「${exit.text}」主文应只有一行，高度 ${exit.titleHeight}px，行高 ${exit.lineHeight}px，缩放 ${layout.scale}`).toBeLessThan(exit.lineHeight * 1.5)
+  }
+  await back.click()
+  await expect(card.locator('.rq-ai-off')).toBeVisible()
+  await expectPolicyText(page.locator('.qx-pagehead p'), '政策库条目与本机整理的指引分区展示，展开即看原文、条件与办理路径。')
+  await expect(page).toHaveURL(/policy=policy-002/)
+  expect(aiRequests, `返回政策库后的 AI 请求：${aiRequests.join('、') || '0 条'}`).toEqual([])
+  await verifyPage(page, errors)
+})
+
+for (const scenario of [
+  { name: '明确不可用', status: 200, json: { available: false }, unavailable: true },
+  { name: '明确可用', status: 200, json: { available: true }, unavailable: false },
+  { name: '回 500', status: 500, json: { error: { code: 'SERVICE_UNAVAILABLE' } }, unavailable: false },
+  { name: '不回', status: 0, json: null, unavailable: false },
+  { name: '布尔值变成字符串', status: 200, json: { available: 'false' }, unavailable: false },
+  { name: '缺少布尔字段', status: 200, json: {}, unavailable: false },
+] as const) {
+  test(`小青明确不可用时才显示暂时不可用：${scenario.name} @w4`, async ({ page, api }) => {
+    const errors = runtimeErrors(page)
+    await registerPolicyGapApi(page, api)
+    if (scenario.status === 0) api.respondWith('GET', '/api/v1/advisor/availability', () => new Promise(() => undefined))
+    else api.respond('GET', '/api/v1/advisor/availability', { status: scenario.status, json: scenario.json })
+    const response = scenario.status === 0 ? null : page.waitForResponse((reply) => new URL(reply.url()).pathname === '/api/v1/advisor/availability')
+    await page.goto('/renshi?tab=policy')
+    await response
+    await expect.poll(() => api.requestCount('GET', '/api/v1/advisor/availability'), '可用性请求次数').toBe(1)
+    const card = page.locator('[data-policy-id="policy-001"]')
+    const label = scenario.unavailable ? '小青暂时不可用' : '本条政策暂未接入小青'
+    await expectPolicyText(card.locator('.rq-ai-off'), label)
+    if (scenario.unavailable) {
+      await expect(page.getByTestId('renshi-policy-state-ai-unavailable')).toBeVisible()
+      await expectPolicyText(page.locator('.qx-pagehead p'), '小青暂时不可用；这一屏其余功能照常，条件核对本来也不用小青。')
+      await expectPolicyText(page.locator('.rq-srcline'), '小青暂时不可用；看原文、筛选、扫码与条件核对都照常可用')
+      await expectPolicyText(card, '这一页其余功能照常')
+      await expectPolicyText(card, '小青暂时不可用。看原文、筛选、扫码与条件核对都不经过它，可以继续用。')
+    } else {
+      await expect(card.getByText('小青暂时不可用', { exact: true })).toHaveCount(0)
+      await expectPolicyText(page.locator('.qx-pagehead p'), '政策库条目与本机整理的指引分区展示，展开即看原文、条件与办理路径。')
+    }
+    await expect(card.getByTestId('renshi-policy-manual-source')).toBeEnabled()
+    await expect(card.getByTestId('renshi-ask-ai')).toBeEnabled()
+    await expect(card.getByRole('button', { name: '收藏政策', exact: true })).toBeEnabled()
+    await page.getByRole('button', { name: '高校毕业生', exact: true }).click()
+    await expect(page.getByRole('button', { name: '高校毕业生', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await card.getByRole('button', { name: /扫码打开来源链接/ }).click()
+    await expectPolicyText(page.getByRole('dialog'), POLICY_GAP_ROWS[0]!.sourceName)
+    await page.getByRole('button', { name: '关闭二维码', exact: true }).click()
+    expect(api.requestCount('GET', '/api/v1/advisor/availability'), `筛选、扫码后的可用性请求数：${api.requestCount('GET', '/api/v1/advisor/availability')}`).toBe(1)
+    await card.getByRole('button', { name: /上传自备材料打印/ }).click()
+    await expect(page).toHaveURL(/\/print\/upload$/)
+    // 新进入政策服务可重新读一次；一次进入中的筛选和来源二维码不重复读。
+    await page.goto('/renshi?tab=policy')
+    await expect(page.getByTestId('renshi-tab-eligibility')).toBeEnabled()
+    api.respondWith('GET', '/api/v1/policies/eligibility-questions', () => new Promise(() => undefined))
+    api.respondWith('POST', '/api/v1/policies/eligibility-check', () => new Promise(() => undefined))
+    await page.getByTestId('renshi-tab-eligibility').click()
+    await expect(page.locator('.k8-elig')).toBeVisible()
+    await expect(page.getByTestId('renshi-tab-eligibility')).toHaveAttribute('aria-pressed', 'true')
+    await verifyPage(page, errors)
+  })
+}
+
+test('社保四卡都有办理步骤小标题 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  await page.goto('/renshi?tab=social')
+  const cards = page.locator('.rq-social .rq-blk')
+  await expect(cards, `读到社保卡数量：${await cards.count()}`).toHaveCount(4)
+  for (let index = 0; index < 4; index += 1) {
+    const card = cards.nth(index)
+    await expectPolicyText(card.locator('.rq-social-steps-h'), '办理步骤')
+    const steps = card.locator('.rq-steps-mini li')
+    expect(await steps.count(), `第 ${index + 1} 卡的步骤数量：${await steps.count()}`).toBeGreaterThan(0)
+    const colors = await steps.evaluateAll((rows) => rows.map((row) => getComputedStyle(row).backgroundColor))
+    expect(colors.every((color) => color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent'), `第 ${index + 1} 卡步骤底色：${colors.join('、')}`).toBe(true)
+    await expect(card.getByRole('button'), `第 ${index + 1} 卡按钮文字：${await card.innerText()}`).toHaveCount(1)
+  }
+  await expect(page.getByRole('button', { name: /扫码查询/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '扫码打开国家医保服务平台', exact: true })).toBeEnabled()
+  await expect(page.locator('.rq-social').getByRole('button', { name: '上传自备材料打印', exact: true })).toHaveCount(2)
+  await verifyPage(page, errors)
+})
+
+test('小青可用性读取超时仍显示默认态，政策列表不等它 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  await page.clock.install()
+  await registerPolicyGapApi(page, api)
+  api.respondWith('GET', '/api/v1/advisor/availability', () => new Promise(() => undefined))
+  await page.goto('/renshi?tab=policy')
+  const card = page.locator('[data-policy-id="policy-001"]')
+  await expectPolicyText(card.locator('.rq-ai-off'), '本条政策暂未接入小青')
+  await expect(page.getByTestId('renshi-tab-eligibility')).toBeEnabled()
+  await page.clock.runFor(15_001)
+  await expectPolicyText(card.locator('.rq-ai-off'), '本条政策暂未接入小青')
+  await expect(page.getByTestId('renshi-policy-state-ai-unavailable')).toHaveCount(0)
+  expect(api.requestCount('GET', '/api/v1/advisor/availability'), `超时后可用性请求数：${api.requestCount('GET', '/api/v1/advisor/availability')}`).toBe(1)
+  await verifyPage(page, errors)
+})
+
+for (const exit of ['切换分区', '离开页面'] as const) {
+  test(`小青可用性的迟到回包在${exit}后不改当前状态 @w4`, async ({ page, api }) => {
+    const errors = runtimeErrors(page)
+    await registerPolicyGapApi(page, api)
+    let release: ((value: { status: number; json: unknown }) => void) | undefined
+    api.respondWith('GET', '/api/v1/advisor/availability', (n) => {
+      if (n > 1) return { status: 200, json: { available: true } }
+      return new Promise((resolve) => { release = resolve })
+    })
+    try {
+      await page.goto('/renshi?tab=policy')
+      await expectPolicyText(page.locator('[data-policy-id="policy-001"] .rq-ai-off'), '本条政策暂未接入小青')
+      await expect.poll(() => api.requestCount('GET', '/api/v1/advisor/availability'), '迟到回包前的请求数').toBe(1)
+      if (exit === '切换分区') await page.getByTestId('renshi-tab-social').click()
+      else await page.getByTestId('renshi-ctabar').getByRole('button', { name: /上传自备材料打印/ }).click()
+      const response = page.waitForResponse((reply) => new URL(reply.url()).pathname === '/api/v1/advisor/availability')
+      release?.({ status: 200, json: { available: false } })
+      await response
+      if (exit === '切换分区') {
+        await expect(page.getByTestId('renshi-tab-social')).toHaveAttribute('aria-pressed', 'true')
+        await expectPolicyText(page.locator('.rq-srcline'), '本机整理的办事指引，办理以对应平台为准')
+        await expect(page.locator('.rq-social .rq-blk')).toHaveCount(4)
+        await expect(page.getByTestId('renshi-policy-state-ai-unavailable')).toHaveCount(0)
+      } else {
+        await expect(page).toHaveURL(/\/print\/upload$/)
+        await page.goto('/renshi?tab=policy')
+        await expectPolicyText(page.locator('[data-policy-id="policy-001"] .rq-ai-off'), '本条政策暂未接入小青')
+        await expect(page.getByTestId('renshi-policy-state-ai-unavailable')).toHaveCount(0)
+      }
+      await verifyPage(page, errors)
+    } finally {
+      release?.({ status: 200, json: { available: false } })
+    }
+  })
+}
