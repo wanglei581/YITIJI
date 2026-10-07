@@ -355,15 +355,14 @@ assert.match(
   /ARRIVAL_CODE_ENTRY\s*=\s*\{[\s\S]{0,600}?to:\s*['"]\/print\/pickup-claim['"]/,
   'print-scan home exposes a visible arrival-code (到机码) entry'
 )
-// 话术口径：后端与小程序下单页都把这个码叫「到机码」
-// （pickup-order.service.ts 的「到机码无效或已过期」、小程序 print-pay 的
-// 「提交并生成到机码」），它与付款后才生成的「取件凭证码」(Order.pickupCode)
-// 是两个不同的码。原型据此要求卡面显式区分，避免两码同名继续互相污染。
-assert.match(printScanHome, /到机码/, 'arrival-code entry uses the backend/miniapp name 到机码')
+// 话术口径：卡面必须出现「到机码」。
+// 2026-10-06 方案②：到机码就是取件码，不再另有付款后的第二种码。
+// 「不是取件码」这句留下，是打印 Hub 把本入口和上传码分开，不是在维护旧的两码模型。
+assert.match(printScanHome, /到机码/, 'arrival-code entry uses the name 到机码')
 assert.match(
   printScanHomeView,
   /不是取件码/,
-  'arrival-code entry disambiguates itself from the post-payment 取件凭证码'
+  'arrival-code entry keeps the upload-code disambiguation 不是取件码'
 )
 // 核销的是订单而非新建打印任务，不得被本机打印/扫描能力探测结果关闭。
 // 只在 CARD_CAPABILITY_KEY 的字面量块内查找，避免正则跨越整个文件误报。
@@ -456,6 +455,60 @@ assert.match(
   /U 盘图片导入尚未接到转换列表/,
   'USB entry is kept and explained as unwired, not deleted'
 )
+// 2026-10-06 青序 2.0 第 19 页：屏上用文件名和页数认结果，编号与请求标记留在代码里。
+assert.match(convertImages, /带走一份按顺序排好的 PDF/, 'convert page says the takeaway is one ordered PDF')
+const convertView = read('src/pages/print-scan/ConvertImagesView.tsx')
+assert.match(convertView, /怎么认/, 'convert result is recognized in user language')
+assert.match(convertView, /看文件名和页数/, 'convert result points at filename and page count')
+assert.match(convertView, /同一批只算一次/, 'convert page explains one batch is counted once')
+assert.doesNotMatch(
+  convertView,
+  /\{result\.fileId\}|fileMd5\.slice|\{requestKey\}/,
+  'convert view does not interpolate file id, checksum, or request key onto the screen',
+)
+assert.doesNotMatch(
+  convertView,
+  /文件标识|校验值|这一次的标记/,
+  'convert view does not label file id, checksum, or request key',
+)
+assert.match(
+  read('src/pages/print-scan/ConvertImagesPage.tsx'),
+  /问小青：这几张图怎么排/,
+  'convert page keeps the 问小青 row from the v2 draft',
+)
+assert.match(
+  read('src/pages/print-scan/ConvertImagesPage.tsx'),
+  /requestKey=\{idempotency\?\.key \?\? null\}/,
+  'request key is still passed into the view for the batch panel, not dropped',
+)
+assert.match(
+  convertImages,
+  /idempotencyKey:\s*nextKey\.key/,
+  'convert still sends the idempotency key on the request',
+)
+// 2026-10-06 T19-fix1：共享无人值守文案已进候选。失败态不再放「联系工作人员」
+// 那颗按钮（点了只是去帮助页，现场没有人接），改用 helpNeededLine，号码从接口来；
+// 出路是「返回打印扫描」和页上的「问小青」。
+assert.match(
+  read('src/pages/print-scan/ConvertImagesPanels.tsx'),
+  /helpNeededLine\(useSupportContact\(\)\)/,
+  'convert failure help uses the shared unattended phone line',
+)
+assert.doesNotMatch(
+  convertImages,
+  /联系工作人员|服务台/,
+  'convert page does not tell the user to find staff or a service desk',
+)
+assert.match(
+  convertImages,
+  /旋转 90° <b>现在不能用<\/b>。这一页先不改图片方向，避免你以为转过了、打出来却没变。/,
+  'rotate note uses the v2 sentence: the control does not change the picture',
+)
+assert.match(
+  read('src/pages/print-scan/styles/convert-images-qx.css'),
+  /\.qx-pagehead/,
+  'convert page hides the duplicate qingxu page head in its own stylesheet',
+)
 const scanResultPreviewSource = read('src/pages/scan/ScanResultPage.tsx')
 assert.match(
   scanResultPreviewSource,
@@ -509,6 +562,82 @@ assert.match(
   /mapComposeError/,
   'sign-stamp classifies compose failures without fabricating a completed result',
 )
+const signPick = read('src/pages/print-scan/sign-stamp/SignStampPickView.tsx')
+const signPreview = read('src/pages/print-scan/sign-stamp/SignStampPreview.tsx')
+const signCss = read('src/pages/print-scan/styles/sign-stamp-qx.css')
+const signFlow = read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts')
+assert.match(
+  signPick,
+  /签名图片暂不支持手机上传，请在本机上传。/,
+  'stamp phone card stays on screen and explains why phone upload is unavailable',
+)
+assert.match(
+  signPick,
+  /sign-stamp-pick-stamp-phone[\s\S]{0,240}disabled/,
+  'stamp phone card is disabled instead of opening an upload session',
+)
+assert.doesNotMatch(
+  signPick,
+  /sign-stamp-pick-stamp-phone[\s\S]{0,240}onClick/,
+  'stamp phone card has no click handler',
+)
+assert.doesNotMatch(
+  signStamp,
+  /purpose="signature_image"/,
+  'sign page no longer creates a signature_image upload session',
+)
+assert.match(signStamp, /purpose="print_doc"/, 'document phone upload still uses print_doc')
+assert.match(
+  signFlow,
+  /kioskUploadFile\([\s\S]{0,80}'signature_image'/,
+  'local stamp upload still sends signature_image',
+)
+assert.match(
+  read('src/pages/print-scan/sign-stamp/constants.ts'),
+  /我确认本人拥有该本人手写签名的使用授权，仅用于本人材料的版式整理/,
+  'authorization label matches the v2 draft and only talks about a handwritten signature',
+)
+assert.match(signStamp, /问小青：签名放在哪一页/, 'sign page keeps the ask-xiaoqing row')
+assert.match(signStamp, /KIOSK_PRINT_SCAN_ESIGN_NOTICE/, 'long esign notice still comes from the frozen constant')
+assert.match(signStamp, /展开完整说明/, 'long esign notice sits behind an expand control')
+assert.match(
+  signStamp,
+  /data-testid="sign-stamp-truth"[\s\S]*data-testid="sign-stamp-fixture-bar"/,
+  'sample fixture sits in the truth bar, on the same row as the disclaimer',
+)
+const signCtx = signStamp.match(/className="ss-ctxbar"[\s\S]*?<\/div>/)
+assert.ok(signCtx && !signCtx[0].includes('sign-stamp-fixture-bar'), 'sample fixture is no longer a context-bar row')
+assert.match(signPick, /传这次的本人手写签名/, 'stamp section title follows the v2 draft')
+assert.match(signPick, /ss-note-span/, 'stamp retention note spans the full pick row')
+assert.match(signPick, /只收本人这一次新拍的手写签名。/, 'stamp retention note follows the v2 draft')
+assert.match(signPick, /直接在屏幕上写，要先校准触屏。现在请用白纸签字后拍照。/, 'handwrite card follows the v2 draft')
+assert.match(signFlow, /传好签名图再继续/, 'stamp primary follows the v2 draft')
+assert.match(signStamp, /再加一处签名/, 'add-another button follows the v2 draft')
+assert.match(
+  signCss,
+  /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+  'blocked-state alternatives are a 2 by 2 grid',
+)
+assert.match(
+  read('src/pages/print-scan/sign-stamp/SignStampGateView.tsx'),
+  /helpNeededLine\(useSupportContact\(\)\)/,
+  'blocked-state help lines use the unattended help sentence',
+)
+assert.doesNotMatch(
+  read('src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx'),
+  /标记不放进地址栏/,
+  'output note no longer uses the address-bar wording',
+)
+assert.match(
+  signPreview,
+  /data-testid="sign-stamp-pv-view"[\s\S]*\{toolbar\}/,
+  'preview toolbar is placed after the preview view',
+)
+const signPageHead = signCss.match(/\.qx-stage:has\(\.ss-page\) > \.qx-pagehead\s*\{[^}]*\}/)
+assert.ok(signPageHead, 'this page hides the duplicate page head')
+assert.match(signPageHead[0], /margin:\s*0/, 'hidden page head does not use a negative margin')
+assert.match(signPageHead[0], /clip-path:\s*inset\(50%\)/, 'hidden page head is clipped in place')
+assert.doesNotMatch(signPageHead[0], /margin:\s*-/, 'hidden page head rule has no negative margin')
 
 const printUploadPage = read('src/pages/print/PrintUploadPage.tsx')
 const printUploadView = read('src/pages/print/file-source/FileSourceView.tsx')

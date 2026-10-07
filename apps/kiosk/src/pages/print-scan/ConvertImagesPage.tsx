@@ -6,9 +6,11 @@
 // 生成成功后进入 /print/material-check，不直达报价或出纸。
 
 import { useRef, useState, type ChangeEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { loginPathForCurrentLocation } from '../../auth/returnPath'
+import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
@@ -18,17 +20,18 @@ import { convertImagesToPdf } from '../../services/api/printConversion'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import type { PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
-import { ConvertImagesCta } from './ConvertImagesPanels'
 import { ConvertImagesView } from './ConvertImagesView'
 import {
   MAX_IMAGES,
   MAX_SINGLE_IMAGE_BYTES,
   classifyConvertError,
   formatBytes,
+  imageFormatLabel,
   keyForImages,
   mintIdempotencyKey,
   outputFileName,
   parseSizeBytes,
+  readImageFacts,
   statusForPhase,
   derivePhase,
   type ConvertError,
@@ -42,6 +45,8 @@ const LIMIT_MESSAGE = `最多支持 ${MAX_IMAGES} 张图片，已达上限`
 
 export function ConvertImagesPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const example = new URLSearchParams(location.search).get('example') === '1'
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -80,7 +85,7 @@ export function ConvertImagesPage() {
     error,
     imageCount: images.length,
   })
-  const status = statusForPhase(phase, images.length, error, selected, recovered)
+  const status = statusForPhase(phase, images.length, error, selected, recovered, hasEndUser)
 
   const addImage = (image: SelectedImage) => {
     setImages((prev) => {
@@ -128,7 +133,10 @@ export function ConvertImagesPage() {
     setUploading(true)
     setError(null)
     try {
-      const res = await kioskUploadFile(selectedFile, getToken())
+      const [res, facts] = await Promise.all([
+        kioskUploadFile(selectedFile, getToken()),
+        readImageFacts(selectedFile),
+      ])
       if (gen !== uploadGen.current) return
       addImage({
         fileId: res.fileId,
@@ -138,13 +146,16 @@ export function ConvertImagesPage() {
         sizeBytes: res.sizeBytes,
         source: 'local',
         expiresAt: res.signedUrlExpiresAt,
+        format: facts.format,
+        width: facts.width,
+        height: facts.height,
       })
     } catch (err) {
       if (gen !== uploadGen.current) return
       setError({
         kind: 'upload-failed',
         message: userMessageOf(err, '上传失败，请重试'),
-        rejected: { name: selectedFile.name, detail: '没有拿到系统确认' },
+        rejected: { name: selectedFile.name, detail: '没有拿到已经确认' },
       })
     } finally {
       if (gen === uploadGen.current) setUploading(false)
@@ -163,6 +174,7 @@ export function ConvertImagesPage() {
       size: file.size,
       sizeBytes: parseSizeBytes(file.size),
       source: 'qr',
+      format: imageFormatLabel(file.mimeType, file.name) ?? imageFormatLabel(file.format, file.name),
     })
     setShowQr(false)
   }
@@ -270,7 +282,7 @@ export function ConvertImagesPage() {
   // 所以登录回来回到本页重新选图、由用户自己再点转换；不替用户把这份带去打印台，免得让人以为它被保存了。
   // 已转好的这份要打印，走旁边的「拿这份 PDF 去打印」，不需要登录。
   const handleLogin = () => {
-    navigate(`/login?from=${encodeURIComponent('/print-scan/convert')}`)
+    navigate(loginPathForCurrentLocation())
   }
 
   const handleRestoreOrder = () => {
@@ -287,37 +299,17 @@ export function ConvertImagesPage() {
     <QxPageFrame
       back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
       title="图片转 PDF"
-      subtitle="几张图拼成一份 PDF。顺序你自己排，一张一页。"
+      subtitle="带走一份按顺序排好的 PDF。顺序你自己排，一张一页。"
       status={status}
       terminalLabel={terminalLabel}
       ctabar={
-        <ConvertImagesCta
-          phase={phase}
-          imageCount={images.length}
-          error={error}
-          generating={generating}
-          rechecking={rechecking}
-          uploading={uploading}
-          hasEndUser={hasEndUser}
-          onBack={() => navigate('/print-scan')}
-          onConvert={() => void runConvert('convert')}
-          onRecheck={() => void runConvert('recheck')}
-          onNewKey={() => void runConvert('convert', true)}
-          onRestoreOrder={handleRestoreOrder}
-          onPrint={handlePrint}
-          onLogin={handleLogin}
-          onDocuments={() => navigate('/me/documents')}
-          onHelp={() => navigate('/help')}
-          onCancelUpload={() => {
-            uploadGen.current += 1
-            setUploading(false)
-          }}
-          onCloseUsb={() => {
-            setUsbOpen(false)
-            handlePickLocal()
-          }}
-          onPickLocal={handlePickLocal}
-        />
+        <QxStepActions onPrev={() => navigate('/print-scan')} prevLabel="返回打印扫描">
+          <QxAiHelp
+            label="问小青：这几张图怎么排 →"
+            draft="我有几张图片，想按我排的顺序合成一份 PDF。请告诉我怎么排、排完能带走什么。"
+            testId="img2pdf-ask"
+          />
+        </QxStepActions>
       }
       navbar={
         <>
@@ -338,6 +330,7 @@ export function ConvertImagesPage() {
     >
       <ConvertImagesView
         loggedIn={loggedIn}
+        example={example}
         hasEndUser={hasEndUser}
         kiosk={kiosk}
         phase={phase}
@@ -377,7 +370,6 @@ export function ConvertImagesPage() {
         onPrint={handlePrint}
         onLogin={handleLogin}
         onDocuments={() => navigate('/me/documents')}
-        onHelp={() => navigate('/help')}
         onBack={() => navigate('/print-scan')}
       />
     </QxPageFrame>

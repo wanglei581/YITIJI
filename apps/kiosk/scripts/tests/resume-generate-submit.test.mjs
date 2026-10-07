@@ -36,3 +36,17 @@ test('确认页计数与提交同一条规则', () => {
   assert.equal(mod.isSubmittableExperience({ company: '青序门店' }), true)
   assert.equal(mod.isSubmittableExperience({ company: ' ' }), false)
 })
+
+test('经历步骤的计数与状态和提交同一条规则，不再把职务当必填', () => {
+  // 24 号页重做（#1315）后，经历步骤自己又写了一遍「公司且职务」；和提交规则对不上时，
+  // 这一步显示「0/1、缺公司或职务」，实际却会提交，或者反过来。
+  for (const rel of [
+    'src/pages/resume/components/ResumeGenerateHistoryStep.tsx',
+    'src/pages/resume/components/ResumeGenerateReview.tsx',
+    'src/pages/resume/ResumeGeneratePage.tsx',
+  ]) {
+    const text = readFileSync(join(kioskRoot, rel), 'utf8')
+    assert.doesNotMatch(text, /company\.trim\(\)\s*&&\s*\w+\.role\.trim\(\)/, `${rel} 仍把职务当必填`)
+    assert.match(text, /isSubmittableExperience|toSubmittedExperience/, `${rel} 没有走 resumeGenerateSubmit`)
+  }
+})

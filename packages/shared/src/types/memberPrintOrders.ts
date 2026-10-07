@@ -65,8 +65,12 @@ export interface MemberPrintOrderItem {
   billablePages?: number | null
   /** 计费页数来源；无 Order 为 null。 */
   billingPageSource?: BillingPageSource | null
-  /** 取件凭证码；仅 paid 且未退款、任务未进入完成/取消/失败终态时返回，否则 null。 */
+  /** 到机码。可取，或失败后仍可续打时解密下发；否则 null。不再读明文列。 */
   pickupCode?: string | null
+  /** 绑定的那台终端此刻用同一个到机码能否把失败任务拉回待打印。 */
+  reprintAllowed?: boolean
+  /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希的现场单，为 null。 */
+  reprintRemaining?: number | null
   // ── C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）：无 Order 一律 null ──
   /** 已退金额累计（分）；未退款为 0，无 Order 为 null。 */
   refundedAmountCents?: number | null
@@ -97,8 +101,8 @@ export interface MemberPrintOrderItem {
 // 这里把三路来源（一体机现场任务 / 手机单件未到机 / 材料包）按时间归并成一条时间线。
 // 后端副本：services/api/src/member-print-orders/member-print-orders.types.ts（改一处必须同改两处）。
 //
-// 公共屏约束：**不含到机码明文**，只给 hasArrivalCode / arrivalCodeExpiresAt；
-// 用户要看码请回手机。pickupCode 是付款后的取件凭证码，门控与旧列表一致。
+// 到机码明文只在可取，或失败后仍可续打时，经 pickupCode 下发。
+// 没有哈希的现场单保持 null。reprintAllowed / reprintRemaining 与订单列表同一口径。
 // ============================================================
 
 /** 来源：一体机现场打印任务 / 手机下单单件（未到机）/ 材料包。 */
@@ -161,12 +165,16 @@ export interface MemberOrderTimelineItem {
   /** Order.pickupStatus；无 Order 的历史任务为 null。 */
   pickupStatus: string | null
   displayStatus: MemberOrderTimelineDisplayStatus
-  /** 到机码截止（只有手机下单的单才有）；明文不下发。 */
+  /** 到机码截止（只有手机下单的单才有）。明文是否下发看 pickupCode。 */
   arrivalCodeExpiresAt: string | null
-  /** 本单当前有一枚可用的到机码（码本身只在本人手机上看）。 */
+  /** 本单当前处于「可取」：pending、付款态允许、窗口未关。续打不改变这个布尔。 */
   hasArrivalCode: boolean
-  /** 取件凭证码；仅 paid 且未退款、任务未进入完成/取消/失败终态时返回，否则 null。 */
+  /** 到机码。可取，或失败后仍可续打时解密下发；否则 null。不再读明文列。 */
   pickupCode: string | null
+  /** 绑定的那台终端此刻用同一个到机码能否把失败任务拉回待打印。 */
+  reprintAllowed: boolean
+  /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希的现场单，为 null。 */
+  reprintRemaining: number | null
   terminal: MemberOrderTimelineTerminal | null
   /** 当前这台一体机（已验明身份）可以直接领取本单。 */
   claimableHere: boolean

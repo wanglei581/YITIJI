@@ -27,6 +27,7 @@
     "verify:fixture-time-bombs": "node scripts/verify-fixture-time-bombs.mjs",
     "verify:repository-integrity": "node scripts/verify-repository-integrity.mjs",
     "verify:prod-react-build": "node scripts/verify-prod-react-build.mjs",
+    "verify:kiosk-font-subset": "node scripts/verify-kiosk-font-subset.mjs",
     "verify:deploy-gates-in-sync": "node scripts/verify-deploy-gates-in-sync.mjs",
     "verify:deploy-rollback": "node scripts/verify-deploy-rollback.mjs",
     "verify:server-maintenance-workflows": "node scripts/verify-server-maintenance-workflows.mjs",

@@ -5,6 +5,11 @@ import { ResumeExportResult } from './ResumeExportResult'
 import { ResumePricingBar } from './ResumePricingBar'
 import type { ResumeExportPricing } from '@ai-job-print/shared'
 
+function resumeExportAigcNote(format: ResumeExportFormat): string {
+  if (format === 'txt' || format === 'md') return '导出的文件末尾有一行：含人工智能辅助生成内容'
+  return '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
+}
+
 export function ResumeDeliverPanel(props: {
   layout: Required<ResumeLayoutSettings>
   onLayoutChange: (next: Required<ResumeLayoutSettings>) => void
@@ -107,6 +112,7 @@ export function ResumeDeliverPanel(props: {
           ))}
         </div>
         <p>PDF 直接打印；Word/TXT/Markdown 供到手机保存。导出成功后才会出现预览与打印入口。</p>
+        <p className="qx-rd-aigc-note" data-testid="resume-export-aigc-note">{resumeExportAigcNote(props.exportFormat)}</p>
         <ResumePricingBar pricing={props.pricing} loading={props.pricingLoading} blockedReason={props.blockedReason} />
       </div>
 

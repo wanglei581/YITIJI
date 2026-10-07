@@ -400,7 +400,10 @@ function memberWithAge(opts) {
  */
 async function resumeAiConsentRecoversOnce(opts) {
   const ctx = memberWithAge(opts)
-  const pending = settle(ctx.net.request('/resume/parse', { method: 'POST', ai: 'generate', resumeAi: true, needAuth: true }))
+  // 本文件第一个场景，冷启动加上五轮来回，机器忙时会超过 settle 默认的 400ms，
+  // 看门狗先到就报 ok=false（2026-10-06 实测单跑约 1/20）。这里只放宽这一处；
+  // 默认值不动，因为别的场景就是靠它等到超时的。
+  const pending = settle(ctx.net.request('/resume/parse', { method: 'POST', ai: 'generate', resumeAi: true, needAuth: true }), 2000)
   await flush()
   assert.equal(ctx.aiCalls().length, 1)
   reply(ctx.aiCalls()[0], 403, CONSENT_403)

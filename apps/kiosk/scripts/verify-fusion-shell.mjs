@@ -173,6 +173,8 @@ function assertMobilePageContract(page, { label, stylesheet, services }) {
 function assertImportOrder(css) {
   const imports = [...css.matchAll(/@import\s+["']([^"']+)["']\s*;/g)].map((match) => match[1])
   assert.deepEqual(imports, [
+    // 10/6：字体声明（Qingxu Serif / Qingxu Sans）只有 @font-face，不定义令牌也不覆盖样式，放最前面。
+    './styles/fonts/source-han.css',
     '@ai-job-print/ui/styles/tokens.css',
     '@ai-job-print/ui/styles/fusion-youth.css',
     // service-desk 在 kiosk-shell 之前：避免冰蓝 --sd-color-primary 盖住 fusion 青绿。
@@ -183,7 +185,7 @@ function assertImportOrder(css) {
     './pages/jobs-fairs-prototype.css',
     'tailwindcss',
     './styles/warm-professional-override.css',
-  ], 'index.css must preserve tokens -> fusion-youth -> service-desk -> kiosk-shell/components -> stage-fit -> local CSS -> Tailwind -> warm override import order')
+  ], 'index.css must preserve fonts -> tokens -> fusion-youth -> service-desk -> kiosk-shell/components -> stage-fit -> local CSS -> Tailwind -> warm override import order')
 }
 
 const packageJson = JSON.parse(await read('package.json'))

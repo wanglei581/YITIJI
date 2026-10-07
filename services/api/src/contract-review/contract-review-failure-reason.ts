@@ -42,6 +42,9 @@ const FAILURE_REASONS: Readonly<Record<string, string>> = Object.freeze({
   // ── 上游可用性 ────────────────────────────────────────────────────────────
   CONTRACT_PROVIDER_TRANSPORT_FAILED:
     'AI 服务暂时连接不上，请稍后重试。',
+  // 401/402/403 与模型名无效：不是网络不通，重试也不会变好。不向用户解释账户或状态码。
+  CONTRACT_PROVIDER_ACCOUNT_UNAVAILABLE:
+    'AI 服务暂时不可用。',
   CONTRACT_PROVIDER_NOT_APPROVED:
     'AI 合同分析服务当前未开放，请稍后再试。',
   CONTRACT_PROVIDER_CONFIG_INVALID:
