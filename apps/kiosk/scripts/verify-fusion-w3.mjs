@@ -401,6 +401,8 @@ const artifactBodyRule = cssRuleBody(read('src/pages/ai-plan/styles/advisor-arti
 check(artifactBodyRule.includes('justify-content: space-evenly'), '作业正文保留稿的默认区块排法')
 check(artifactBodyRule.includes('gap: 20px'), '作业正文保留稿的默认 20px 间距')
 const artifactCss = read('src/pages/ai-plan/styles/advisor-artifact-qx.css')
+check(artifactCss.includes('.aa-take-tx::after') && cssRuleBody(artifactCss, '.aa-body:has(> .aa-qa) .aa-take-tx::after').includes('max-height: 135px'), '带走卡右栏用伪元素先增长稿上已有间距，上限 135px')
+check(!artifactCss.includes('.aa-steps { margin-block: auto'), '带走卡两步不再用自动外边距上下居中')
 check(!cssRuleBody(artifactCss, '.aa-body > .aa-qa').includes('flex: 1 0 auto') && !artifactCss.includes("[data-testid='advisor-artifact-qa']"), '01 卡不再按旧规则拉空')
 includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', '.aa-body:has(> .aa-qa)', '按实际条目面板规划空间，也覆盖打印读不到态')
 includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', '--aa-pin-gaps', '条目间距数决定可吸收的余高')

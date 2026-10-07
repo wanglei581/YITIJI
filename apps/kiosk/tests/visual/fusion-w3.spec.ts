@@ -2251,6 +2251,9 @@ async function readAdvisorContentLayout(page: Page) {
     const node = (selector: string) => document.querySelector<HTMLElement>(selector)!
     const box = (selector: string) => node(selector).getBoundingClientRect()
     const qa = box('.aa-qa'), take = box('.aa-take'), paper = box('.aa-paper')
+    const takeTitle = box('.aa-take-tx > .aa-sec-h'), has = box('.aa-take-tx > .aa-has')
+    const steps = document.querySelector('.aa-take-tx > .aa-steps')?.getBoundingClientRect()
+    const warn = document.querySelector('.aa-take-tx > .aa-warn')?.getBoundingClientRect()
     const body = node('.aa-body'), list = node('.aa-qa .aa-scroll')
     const pins = [...list.querySelectorAll('.aa-pin')].map((pin) => pin.getBoundingClientRect())
     const texts = [...list.querySelectorAll('.aa-pin')].map((pin) => ({
@@ -2264,6 +2267,11 @@ async function readAdvisorContentLayout(page: Page) {
       cardTail: css(qa.bottom - pins[pins.length - 1]!.bottom),
       textGaps: texts.slice(1).map((text, index) => css(text.top - texts[index]!.bottom)),
       paperWidth: css(paper.width), paperHeight: css(paper.height),
+      titleToSteps: steps ? css(steps.top - takeTitle.bottom) : null,
+      stepsToHas: steps ? css(has.top - steps.bottom) : null,
+      hasBottomToPaper: css(has.bottom - paper.bottom),
+      hasToWarn: warn ? css(warn.top - has.bottom) : null,
+      warnBottomToPaper: warn ? css(warn.bottom - paper.bottom) : null,
       bodyOverflow: body.scrollHeight - body.clientHeight, listOverflow: list.scrollHeight - list.clientHeight,
       bodyTop: body.getBoundingClientRect().top, firstTop: pins[0]!.top,
       firstBottom: pins[0]!.bottom, bodyBottom: body.getBoundingClientRect().bottom,
@@ -2313,11 +2321,19 @@ test('advisor artifact plans leftover height into content at every pin count @w3
         expect(layout.paperWidth, '纸样宽度上限').toBeLessThanOrEqual(420.5)
         expect(layout.mid, '01 到带走间距下限').toBeGreaterThanOrEqual(20)
         expect(layout.mid, '01 到带走间距上限').toBeLessThanOrEqual(48)
+        if (count === 2 || count === 3) {
+          expect(layout.titleToSteps, `${item.name}：标题到两步留有间隔`).toBeGreaterThan(0)
+          expect(layout.stepsToHas, `${item.name}：两步到说明留有间隔`).toBeGreaterThan(0)
+          expect(layout.titleToSteps, `${item.name}：先增长两步到说明的间距`).toBeLessThanOrEqual(layout.stepsToHas!)
+        }
         if (item.name === '4 条稿四条') {
           for (const [actual, target] of [[layout.top, 46], [layout.mid, 46], [layout.bot, 25]]) {
             expect(Math.abs(actual! - target!), '稿四条间距与原稿一致').toBeLessThanOrEqual(3)
           }
           expect(Math.abs(layout.paperWidth - 300), '稿四条纸样宽 300').toBeLessThanOrEqual(2)
+          expect(layout.titleToSteps, '稿四条两步紧跟标题，间距下限 14px').toBeGreaterThanOrEqual(14)
+          expect(layout.titleToSteps, '稿四条两步紧跟标题，间距上限 18px').toBeLessThanOrEqual(18)
+          expect(Math.abs(layout.hasBottomToPaper), '稿四条打印稿说明和纸样下沿对齐').toBeLessThanOrEqual(2)
           shell = layout
         }
       } else {
@@ -2340,20 +2356,35 @@ test('advisor artifact plans leftover height into content at every pin count @w3
       }
     })
   }
-  await test.step('真实会话两条，导航标明打印读不到', async () => {
-    const sessionId = 'w3-content-unavailable'
-    api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, { status: 200, json: qaPinsSession(sessionId, cases[1]!.pins) })
-    await page.goto('/ai/plan')
-    await page.evaluate((sessionId) => {
-      history.pushState({ usr: { printUnavailableReason: '打印状态暂时读不到' }, key: 'k', idx: 1 }, '', `/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
-      window.dispatchEvent(new PopStateEvent('popstate'))
-    }, sessionId)
+  for (const item of cases.slice(1, 3)) {
+    await test.step(`真实会话${item.name}，导航标明打印读不到`, async () => {
+      const sessionId = `w3-content-unavailable-${item.pins.length}`
+      api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, { status: 200, json: qaPinsSession(sessionId, item.pins) })
+      await page.goto('/ai/plan')
+      await page.evaluate((sessionId) => {
+        history.pushState({ usr: { printUnavailableReason: '打印状态暂时读不到' }, key: 'k', idx: 1 }, '', `/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }, sessionId)
+      await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'print-unavailable')
+      await expect(page.locator('.aa-pin')).toHaveCount(item.pins.length)
+      expect(api.requestCount('GET', `/api/v1/advisor/sessions/${sessionId}`), '确实读取真实会话接口，不用预览夹具态冒充').toBeGreaterThan(0)
+      await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
+      await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
+      await assertNoLargeBlankBands(page, `打印读不到${item.name}`)
+    })
+  }
+  await test.step('打印读不到稿四条，说明紧挨提示框并贴底', async () => {
+    await page.goto('/ai/plan?state=print-unavailable&capture=1')
     await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'print-unavailable')
-    await expect(page.locator('.aa-pin')).toHaveCount(2)
-    expect(api.requestCount('GET', `/api/v1/advisor/sessions/${sessionId}`), '确实读取真实会话接口，不用预览夹具态冒充').toBeGreaterThan(0)
+    await expect(page.locator('.aa-pin')).toHaveCount(4)
     await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
     await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
-    await assertNoLargeBlankBands(page, '打印读不到两条')
+    await page.evaluate(() => document.fonts.ready)
+    const layout = await readAdvisorContentLayout(page)
+    expect(layout.hasToWarn, '说明和提示框不重叠').toBeGreaterThanOrEqual(0)
+    expect(layout.hasToWarn, '说明紧挨提示框，间隔不超过 6px').toBeLessThanOrEqual(6)
+    expect(Math.abs(layout.warnBottomToPaper!), '提示框和纸样下沿对齐').toBeLessThanOrEqual(2)
+    await assertNoLargeBlankBands(page, '打印读不到稿四条')
   })
   expect(runtimeErrors).toEqual([])
 })

@@ -140,9 +140,20 @@
 .aa-qa .aa-pin:only-child { flex-grow: 0; }
 .aa-body:has(> .aa-qa) > .aa-take { flex: 170 0.2325 486px; min-height: 373px; max-height: 656px; }
 .aa-body:has(> .aa-qa) .aa-paper { align-self: stretch; width: auto; min-height: 311px; }
-.aa-body:has(> .aa-qa) .aa-steps { margin-block: auto; }
-.aa-body:has(> .aa-qa) .aa-steps + .aa-has { margin-top: 0; }
-.aa-body:has(> .aa-qa) .aa-warn { margin-bottom: auto; }
+/* 纸样没放大时照稿排：两步紧跟标题，打印稿说明贴底；打印读不到时说明和提示框一起贴底。
+   纸样放大后，先把稿上已有的空隙长到上限，再让另一处长。两个伪元素留出空隙，order 把它们放到对应位置。 */
+.aa-body:has(> .aa-qa) .aa-has { margin-top: 0; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-sec-h { order: 1; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-steps { order: 3; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-has { order: 5; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-has:has(+ .aa-warn) { order: 3; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-warn { order: 5; }
+.aa-body:has(> .aa-qa) .aa-take-tx::before { content: ''; order: 2; flex: 1 1 0px; }
+.aa-body:has(> .aa-qa) .aa-take-tx::after { content: ''; order: 4; flex: 1000 1 0px; max-height: 135px; }
+.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::before { flex: 1000 1 0px; max-height: 137px; }
+.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::after { flex: 1 1 0px; max-height: none; }
+/* 打印读不到时底栏少了深色按钮，卡片到灰字本来就更空，底部间距只再长一点。 */
+.aa-root[data-state='print-unavailable'] .aa-gap[data-p='bot'] { flex-grow: 5; max-height: 30px; }
 
 .aa-sec {
   flex: none;
