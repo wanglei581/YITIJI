@@ -89,6 +89,8 @@ test('签名屏不指向本机上传，不写工作人员 @mobile', async ({ pag
   await expect(root.getByRole('heading', { name: '签名暂不支持手机上传', exact: true })).toBeVisible()
   const text = await root.innerText()
   expect(text).not.toContain('本机上传')
+  expect(text).not.toContain('在原步骤上传')
+  expect(text).toContain('可用的签名方式请回一体机在「签名」那一步查看。')
   expect(text).toContain('请回到「签名」的原步骤查看可用方式。没有可用方式时，需要帮助？查看《隐私政策》里的联系方式。')
   expect(text).toContain('回到原步骤查看可用方式；只接受本人手写签名图片。')
   expect(text).toContain('返回上一步。需要帮助？查看《隐私政策》里的联系方式。本页没有别的上传方式可试。')
