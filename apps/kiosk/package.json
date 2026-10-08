@@ -114,7 +114,7 @@
     "verify:fusion-w4": "node scripts/verify-fusion-w4.mjs",
     "verify:fusion-w5": "node scripts/verify-fusion-w5.mjs",
     "verify:fusion-w6": "node scripts/verify-fusion-w6.mjs",
-    "verify:print-done-truth": "node scripts/verify-print-done-truth.mjs && node --test scripts/tests/print-walk-copy.test.mjs",
+    "verify:print-done-truth": "node scripts/verify-print-done-truth.mjs && node --test scripts/tests/print-walk-copy.test.mjs scripts/tests/print-progress-polling.test.mjs",
     "verify:scan-session-truth": "node scripts/verify-scan-session-truth.mjs",
     "verify:visible-actions-truth": "node scripts/verify-kiosk-visible-actions-truth.mjs",
     "verify:deploy-vite-env-coverage": "node scripts/verify-deploy-vite-env-coverage.mjs",

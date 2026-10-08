@@ -230,6 +230,13 @@
 - **本机演练：** 本机没有 rclone，也没有 shellcheck。用本地目录模式，在临时 PostgreSQL 16.15（127.0.0.1:55486，`LC_ALL=C`，只走 TCP）上跑通：`initdb`、94 个迁移、插入 1 行演练用户、备份、拷到另一目录、`pg_restore -l`、恢复到 `offsite_drill`、核对、删除临时库。源库用户行数仍是 1。跑完已停库，数据目录、备份目录和拉回目录已删。演练记录：时间 2026-10-06 14:04:52 +0800；文件 `postgres_2026-10-06.dump`；大小 368868；`pg_restore -l` 通过，sha256 `9ee4fffa705f95dac31a75e9f5b24cddd0b39ea6294b835308c39d9a90669e5a`；脚本计时 2 秒（不含前面的迁移）；表数 112；`_prisma_migrations` 94；User 1；Organization 0；Terminal 0；库迁移与仓库迁移都是 `20261003120000_ai_quota_per_user`；结论通过。
 - **门禁：** `pnpm --filter @ai-job-print/api verify:backup-ops` 最后一行 `backup ops gates passed`。`node scripts/verify-repository-integrity.mjs`、`node scripts/verify-ci-gate-coverage.mjs` 通过。图谱重新生成后 `--check` 通过（`docs/graph/` 三份产物跟着门禁对新文档的引用更新）。反向变异三处都是退出码 1，已还原：去掉库名校验后生产库名被放行（退出码 0）；上传后不校验则日志里没有 `rclone check`；校验失败不告警则没有 `curl`。
 - **还要人做的：** 按 `docs/device/postgres-operations.md` 第 10 节开桶、建子账号、放 `chmod 600` 的 rclone 配置，并在服务器 `.env` 里设置第 10.2 节的变量。若生产已经把 `RETENTION_DAYS` 设成不是 30 的数，异地不再跟着它走，要单独设 `BACKUP_REMOTE_RETENTION_DAYS`。每季度在另一台机器上演练一次。
+## 2026-10-06：N-2 打印中途断网不再判打印失败（分支 `claude/kiosk-print-progress-offline-1006`，随第七次）
+
+- 走查 N-2（P0）：原来进度页每 3 秒查一次，连续 5 次请求失败（约 15 秒断网）就跳失败页并给「重新打印」，而本机此时可能还在出纸。
+- 改后：只有服务端明确回 failed / cancelled / abandoned 才进失败页。请求失败只记「读不到」，留在进度页，提示「网络中断，打印可能仍在进行，请先看出纸口」，只留「重新查询状态」，不给重新打印、再印一份、重新下单。从最后一次读到状态起超过 10 分钟进「结果未确认」，仍不跳页。断网和结果未确认都持忙碌锁（放锁会被早已过期的隐私硬截止立刻清场，这一屏看不到）；隐私守卫的顺延上限保证机器不会锁死。
+- 失败完成页：结果未确认时，说明区也不再写「可点下方重新提交打印」（合规 10/6 报）；「联系工作人员核查」由全量替换线换成标准句。
+- 门禁：新单测 `print-progress-polling.test.mjs` 6 条挂 `verify:print-done-truth`；`verify-print-confirm-honest`、`verify-print-done-truth` 同步；浏览器用例 `print-progress-offline.spec.ts`（@w2）4 条。
+- 停放、隐藏、改名、降级：无。
 
 ## 2026-10-04：设备文档按「现场无人值守」改（只改文档，分支 `claude/unattended-device-docs-1004`）
 
