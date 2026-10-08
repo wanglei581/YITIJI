@@ -155,3 +155,60 @@ export async function assertDialogWithinViewport(page: Page): Promise<void> {
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width)
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height)
 }
+
+/** 与 audit-qingxu-v2-drafts.mjs 的 BLANK_PROBE 逐行同口径：截图像素，y 60–1900。 */
+export async function readPixelBlankBands(page: Page) {
+  await page.evaluate(() => document.fonts.ready)
+  const shot = await page.screenshot({ scale: 'css' })
+  return page.evaluate(async ({ b64, top, bottom }) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${b64}`
+    await img.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(img, 0, 0)
+    const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height)
+    const half = width >> 1
+    const left = new Uint8Array(height)
+    const right = new Uint8Array(height)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4
+        const lo = Math.min(data[i]!, data[i + 1]!, data[i + 2]!)
+        const hi = Math.max(data[i]!, data[i + 1]!, data[i + 2]!)
+        if (lo < 165 || (hi - lo > 45 && lo < 220)) {
+          if (x < half) left[y] = 1
+          else right[y] = 1
+          if (left[y] && right[y]) break
+        }
+      }
+    }
+    const longest = (ink: (y: number) => number) => {
+      let best: [number, number, number] = [0, 0, 0]
+      let start = -1
+      for (let y = top; y <= Math.min(bottom, height); y++) {
+        const blank = y < Math.min(bottom, height) && !ink(y)
+        if (blank && start < 0) start = y
+        if (!blank && start >= 0) {
+          if (y - start > best[0]) best = [y - start, start, y]
+          start = -1
+        }
+      }
+      return best
+    }
+    return {
+      full: longest((y) => left[y]! || right[y]!),
+      left: longest((y) => left[y]!),
+      right: longest((y) => right[y]!),
+    }
+  }, { b64: shot.toString('base64'), top: 60, bottom: 1900 })
+}
+
+export async function assertNoLargeBlankBands(page: Page, label: string): Promise<void> {
+  const bands = await readPixelBlankBands(page)
+  expect(bands.full[0], `${label}：整行最长空白 < 160px`).toBeLessThan(160)
+  expect(bands.left[0], `${label}：左半最长空白 < 240px`).toBeLessThan(240)
+  expect(bands.right[0], `${label}：右半最长空白 < 240px`).toBeLessThan(240)
+}
