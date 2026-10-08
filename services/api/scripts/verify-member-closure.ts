@@ -35,7 +35,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { createPrismaClient } from '../src/prisma/create-client'
 import { StorageService } from '../src/storage/storage.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
-import { ClosureMemoryRedis, scanClosureDatabase, scanClosureRedis, type ClosureScanIdentity } from './support/member-closure-verification'
+import { ClosureMemoryRedis, collectBoundedFourDigitTokens, scanClosureDatabase, scanClosureRedis, type ClosureScanIdentity } from './support/member-closure-verification'
 
 // 不允许把外部未标记的库偷偷替换成临时库来绕过保护。
 assertIsolatedVerificationDatabase()
@@ -116,8 +116,13 @@ async function grant(id: string, action = 'close_account') {
   return token
 }
 
+// PG 作业里本门禁与种子、上百条门禁共用一个库；第 11 组按后四位边界反查，后四位必须避开库里已有的 4 位数。
+let takenTails: Set<string> | undefined
 async function member(nickname: string) {
-  const phone = `139${randomInt(10000000, 99999999)}`
+  takenTails ??= await collectBoundedFourDigitTokens(scanClient)
+  assert.ok(takenTails.size < 9000, `库里已有 ${takenTails.size} 个独立 4 位数，选不出不撞号的手机号`)
+  let phone: string
+  do phone = `139${randomInt(10000000, 99999999)}`; while (takenTails.has(phone.slice(-4)))
   const identity: ClosureScanIdentity = { phone, phoneHash: hashPhone(phone), phoneEnc: encryptPhone(phone),
     wxOpenId: `wx-${randomUUID()}`, nickname: `${nickname}·${tag.slice(0, 6)}-${memberIds.length}` }
   const row = await put('endUser', { ...identity, phone: undefined, status: 'active', enabled: true })
