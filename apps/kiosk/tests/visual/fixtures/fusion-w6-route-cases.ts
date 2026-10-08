@@ -163,11 +163,12 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // featureText 顺势从栏目名改钉那五句**合规诚实性声明**——钉合规边界比钉栏目名有判别力：
   // 迁移里最容易丢的就是这几句，钉住它们，漏抄当场变红。
   { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("把简历这件事，做得更清楚")', featureText: '系统不代投、不替企业筛选或邀约。' },
-  { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
-  { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
+  // 冷开没有会话或结果：progress / result 也回选类型页，2.0 不默认选中材料。
+  { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '先选类型，再开始这次扫描' },
+  { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '先选类型，再开始这次扫描' },
   { pattern: '/scan/settings', url: '/scan/settings', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
-  { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
-  { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
+  { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan', marker: w2('scan-start'), featureText: '先选类型，再开始这次扫描' },
+  { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '先选类型，再开始这次扫描' },
 
   { pattern: '/jobs', url: '/jobs', marker: qx, featureText: '岗位信息' },
   { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("看清来源，再决定去哪里投")', featureText: '投递在来源平台完成。' },
