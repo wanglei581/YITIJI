@@ -96,6 +96,11 @@ export class ApiRouter {
         },
       },
     })
+    // 48 政策页挂载时读取 AI 可用性。默认可用，降级或失败态的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/advisor/availability', {
+      status: 200,
+      json: { available: true, providerLabel: null, reason: null, degradedCapabilities: [], disclaimer: '' },
+    })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
       status: 200,
