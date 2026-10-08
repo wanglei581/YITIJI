@@ -1452,6 +1452,140 @@ test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @
   }
 })
 
+/** 相邻区块：上一块下沿到下一块上沿。舞台缩放后的屏幕像素要除回 CSS 像素。 */
+async function readReportBandGaps(page: Page) {
+  const scale = await readEnabledStageScale(page)
+  const raw = await page.evaluate(() => {
+    const pageEl = document.querySelector('.rrp-page') as HTMLElement | null
+    const box = (node: Element) => {
+      const rect = node.getBoundingClientRect()
+      return { top: rect.top, bottom: rect.bottom }
+    }
+    const blocks = pageEl
+      ? [...pageEl.children].flatMap((node) => {
+        const rect = node.getBoundingClientRect()
+        if (rect.height <= 0) return []
+        const className = (node as HTMLElement).className
+        const name = node.getAttribute('data-testid')
+          || (typeof className === 'string' ? className.split(' ').find((item) => item.startsWith('rrp-')) : undefined)
+          || node.tagName.toLowerCase()
+        return [{ name, ...box(node) }]
+      })
+      : []
+    const rows = [...document.querySelectorAll('.rrp-exits .rrp-row')].map(box)
+    const scrolls = [...document.querySelectorAll('.rrp-page .rrp-scroll')].map((node) => {
+      const el = node as HTMLElement
+      return { overflowY: getComputedStyle(el).overflowY, extra: el.scrollHeight - el.clientHeight }
+    })
+    return {
+      justify: pageEl ? getComputedStyle(pageEl).justifyContent : '',
+      blocks,
+      rows,
+      pageBottom: pageEl ? pageEl.getBoundingClientRect().bottom : 0,
+      scrolls,
+    }
+  })
+  const css = (px: number) => px / scale
+  const gaps = raw.blocks.slice(1).map((block, index) => ({
+    from: raw.blocks[index]!.name,
+    to: block.name,
+    gap: css(block.top - raw.blocks[index]!.bottom),
+  }))
+  const rowGaps = raw.rows.slice(1).map((row, index) => css(row.top - raw.rows[index]!.bottom))
+  const last = raw.blocks[raw.blocks.length - 1]
+  return {
+    justify: raw.justify,
+    gaps,
+    rowGaps,
+    trailing: last ? css(raw.pageBottom - last.bottom) : 0,
+    scrolls: raw.scrolls,
+  }
+}
+
+test('resume report failure and no-report screens keep exit rows and close the open band @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  // 402 和返回格式坏都落到同一张诊断失败屏，版式相同，这里量这一张；无报告是另一张。
+  // 出路行读的是计算后的 min-height：行本身还会按余高拉高，把最小高度改回 73px 左右时这条必须红。
+  for (const state of ['diagnose-failed', 'no-context'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    const stack = await readReportBandGaps(page)
+    expect(stack.justify, `${state} 从上往下排`).toBe('flex-start')
+    for (const band of stack.gaps) {
+      expect(band.gap, `${state}「${band.from}」到「${band.to}」不超过 40px，量到 ${band.gap.toFixed(1)}`).toBeLessThanOrEqual(40)
+      expect(band.gap, `${state}「${band.from}」不应盖住「${band.to}」`).toBeGreaterThanOrEqual(-1)
+    }
+    for (const gap of stack.rowGaps) {
+      expect(gap, `${state} 出路行之间不拉开`).toBeLessThanOrEqual(40)
+      expect(gap, `${state} 出路行不应互相盖住`).toBeGreaterThanOrEqual(-1)
+    }
+    expect(stack.trailing, `${state} 最后一块贴着正文底部`).toBeLessThanOrEqual(40)
+    expect(stack.trailing, `${state} 最后一块仍在正文里面`).toBeGreaterThanOrEqual(-1)
+    const minHeight = await page.locator('.rrp-exits .rrp-row').first().evaluate((el) => Number.parseFloat(getComputedStyle(el).minHeight))
+    expect(minHeight, `${state} 出路行最小高度`).toBeGreaterThanOrEqual(state === 'diagnose-failed' ? 104 : 88)
+    for (const scroll of stack.scrolls) {
+      expect(scroll.overflowY).not.toBe('auto')
+      expect(scroll.overflowY).not.toBe('scroll')
+      expect(scroll.extra).toBeLessThanOrEqual(2)
+    }
+    const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
+    const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
+    expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
+  }
+
+  await page.goto('/resume/report?capture=1&state=no-context&taskId=paircapture01')
+  const records = page.locator('.qx-ctabar').getByRole('button', { name: '我的诊断记录', exact: true })
+  await expect(records).toHaveAttribute('data-route', '/me/ai-records')
+  const upload = page.getByTestId('resume-report-primary')
+  await expect(upload).toHaveText('去上传简历')
+  await expect(upload).toHaveAttribute('data-route', '/resume/source')
+  await records.click()
+  await page.waitForURL((url) => url.pathname === '/me/ai-records')
+  await page.goto('/resume/report?capture=1&state=no-context&taskId=paircapture01')
+  await page.getByTestId('resume-report-primary').click()
+  await page.waitForURL((url) => url.pathname === '/resume/source')
+
+  await page.goto('/resume/report?capture=1&state=diagnose-failed&taskId=paircapture01')
+  await expect(page.locator('.qx-ctabar').getByRole('button', { name: '返回首页', exact: true })).toBeVisible()
+  await expect(page.getByTestId('resume-report-primary')).toHaveText('重新解析')
+})
+
+test('resume report read-error and illegal screens keep exit rows and close the open band @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  // 读取失败、地址打不开只用这一屏已经接上的三条出路。出路行最小高度按稿是 88；
+  // 行本身还会按余高拉高，把其中一屏的最小高度改到 73px 左右时这条必须红。
+  const exits: Record<'read-error' | 'illegal', string[]> = {
+    'read-error': ['返回简历来源', '打开我的诊断记录', '去打印 / 扫描'],
+    illegal: ['返回简历来源', '打开我的诊断记录', '返回首页'],
+  }
+  for (const state of ['read-error', 'illegal'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    const stack = await readReportBandGaps(page)
+    expect(stack.justify, `${state} 从上往下排`).toBe('flex-start')
+    for (const band of stack.gaps) {
+      expect(band.gap, `${state}「${band.from}」到「${band.to}」不超过 40px，量到 ${band.gap.toFixed(1)}`).toBeLessThanOrEqual(40)
+      expect(band.gap, `${state}「${band.from}」不应盖住「${band.to}」`).toBeGreaterThanOrEqual(-1)
+    }
+    for (const gap of stack.rowGaps) {
+      expect(gap, `${state} 出路行之间不拉开`).toBeLessThanOrEqual(40)
+      expect(gap, `${state} 出路行不应互相盖住`).toBeGreaterThanOrEqual(-1)
+    }
+    expect(stack.trailing, `${state} 最后一块贴着正文底部`).toBeLessThanOrEqual(40)
+    expect(stack.trailing, `${state} 最后一块仍在正文里面`).toBeGreaterThanOrEqual(-1)
+    const rows = page.locator('.rrp-exits .rrp-row')
+    await expect(rows).toHaveCount(exits[state].length)
+    for (const [index, title] of exits[state].entries()) {
+      await expect(rows.nth(index)).toContainText(title)
+    }
+    const minHeight = await rows.first().evaluate((el) => Number.parseFloat(getComputedStyle(el).minHeight))
+    expect(minHeight, `${state} 出路行最小高度`).toBeGreaterThanOrEqual(88)
+    const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
+    const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
+    expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
+  }
+})
+
 test('assistant first screen keeps composer and send above the Qingxu navbar @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   await page.goto('/assistant')
