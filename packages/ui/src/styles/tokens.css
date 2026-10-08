@@ -75,7 +75,7 @@
    * Inter for Latin; PingFang SC for macOS/iOS Chinese;
    * Noto Sans SC as cross-platform fallback for Chinese.
    */
-  --font-sans: 'Inter', 'PingFang SC', 'Noto Sans SC', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', 'PingFang SC', 'Noto Sans SC', 'Qingxu Sans', ui-sans-serif, system-ui, sans-serif;
 
   /* ── Border Radius (overrides Tailwind defaults) ──────────── */
   --radius-sm:   0.375rem;   /*  6px — badges, tags, small inputs   */

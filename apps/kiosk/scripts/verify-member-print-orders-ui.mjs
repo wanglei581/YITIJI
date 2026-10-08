@@ -109,8 +109,24 @@ expectMatches(summarySrc, /\{item\.pickupCode\s*&&\s*<PickupCodePanel/, '详单�
     fail(`PickupCodePanel 存在未门控渲染：总 ${panelUses} 处，门控 ${gatedUses} 处`)
   }
 }
-// PickupCodePanel 组件本身：取件码只来自 prop code，不含任何生成/推断逻辑。
-expectMatches(panelSrc, /\{\s*code\s*\}\s*:\s*\{\s*code:\s*string\s*\}/, 'PickupCodePanel 取件码只来自 prop code（非内部生成）')
+// PickupCodePanel 组件本身：到机码只来自 prop code，不含任何生成/推断逻辑。
+// 2026-10-06 方案②：签名从 `{ code }: { code: string }` 扩成 code 与续打字段的交叉类型。
+// 码仍只来自 code: string；续打句只读传入的 reprintAllowed / reprintRemaining，不在组件内生成码。
+expectMatches(panelSrc, /code:\s*string/, 'PickupCodePanel 到机码仍只来自 code: string prop（非内部生成）')
+expectMatches(panelSrc, /Pick<MemberPrintOrderItem, 'reprintAllowed' \| 'reprintRemaining'>/, '续打条件只读共享会员订单类型上的 reprint 字段')
+expectMatches(panelSrc, /到机码/, '面板标题是到机码')
+expectAbsent(panelSrc, /取件凭证码|出示给工作人员|出示给现场工作人员|请向现场工作人员出示/, '面板不再把到机码说成取件凭证或让人出示给工作人员')
+expectMatches(panelSrc, /reprintAllowed === true && typeof reprintRemaining === 'number'/, '还能续打只在 reprintAllowed 为真且剩余次数是数字时出现')
+expectMatches(panelSrc, /还能续打 \$\{reprintRemaining\} 次/, '续打句带上剩余次数，不写死次数以外的承诺')
+expectMatches(panelSrc, /reprintAllowed === false && reprintRemaining === 0/, '次数用尽只在 reprintAllowed 为假且剩余为 0 时出现')
+expectMatches(panelSrc, /这单已经接着打过 2 次，不能再打了。/, '次数用尽的句子与后端一致')
+expectMatches(summarySrc, /reprintAllowed=\{item\.reprintAllowed\}/, '详单把 reprintAllowed 原样传给面板')
+expectMatches(summarySrc, /reprintRemaining=\{item\.reprintRemaining\}/, '详单把 reprintRemaining 原样传给面板')
+{
+  // 续打字段由后端 #1261 加在共享类型 MemberPrintOrderItem 上，一体机不再另起一份声明。
+  const shared = fs.readFileSync(path.join(root, '..', '..', 'packages/shared/src/types/memberPrintOrders.ts'), 'utf8')
+  expectMatches(shared, /reprintAllowed\?: boolean[\s\S]*reprintRemaining\?: number \| null/, '共享会员打印订单类型带 reprintAllowed / reprintRemaining')
+}
 for (const [name, src] of all) {
   expectAbsent(src, /^.*pickupCode.*payStatus.*$|^.*payStatus.*pickupCode.*$/m, `${name} 不依据 payStatus 推断取件码可见性（门控在服务端）`)
   expectAbsent(src, /pickupCode\s*=[^=]/, `${name} 不本地赋值 / 生成取件码`)

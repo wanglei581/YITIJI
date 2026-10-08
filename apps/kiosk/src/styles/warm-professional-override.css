@@ -40,7 +40,7 @@
   --k-line:  #E5DDD0;
 
   /* 中文优先圆润无衬线 */
-  --k-serif: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+  --k-serif: 'PingFang SC', 'Noto Sans SC', 'Qingxu Sans', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
   --k-page-inset: 48px;
 
   /* service-desk 色覆写 */
@@ -97,8 +97,8 @@
   --pv-action-deep: #C43E0E;
   --pv-action-soft: #FDEEE8;
   --pv-dark:        #0E2238;
-  --pv-serif: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
-  --pv-sans:  'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+  --pv-serif: 'PingFang SC', 'Noto Sans SC', 'Qingxu Sans', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+  --pv-sans:  'PingFang SC', 'Noto Sans SC', 'Qingxu Sans', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
 
   /* fy-* primitive tokens */
   --fy-paper:       #FAF8F4;
@@ -112,8 +112,8 @@
   --fy-action:      #E8551A;
   --fy-action-deep: #C43E0E;
   --fy-action-soft: #FDEEE8;
-  --fy-serif: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
-  --fy-sans:  'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+  --fy-serif: 'PingFang SC', 'Noto Sans SC', 'Qingxu Sans', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+  --fy-sans:  'PingFang SC', 'Noto Sans SC', 'Qingxu Sans', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
 }
 
 /* ══════════════════════════════════════════════════════════════

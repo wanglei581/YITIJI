@@ -2,6 +2,7 @@ import type { AdminUserActivityType, AdminUserListItem, AdminUserListQuery } fro
 
 export interface UserFilterState {
   search: string
+  closure: '' | NonNullable<AdminUserListQuery['closure']>
   enabled: 'all' | 'enabled' | 'disabled'
   registeredFrom: string
   registeredTo: string
@@ -9,6 +10,7 @@ export interface UserFilterState {
 
 export const EMPTY_USER_FILTERS: UserFilterState = {
   search: '',
+  closure: '',
   enabled: 'all',
   registeredFrom: '',
   registeredTo: '',
@@ -84,6 +86,7 @@ export function buildAdminUserQuery(
     pageSize,
     ...(search && (/^1[3-9]\d{9}$/.test(search) ? { phone: search } : { keyword: search })),
     ...(filters.enabled === 'all' ? {} : { enabled: filters.enabled === 'enabled' }),
+    ...(filters.closure ? { closure: filters.closure } : {}),
     ...(filters.registeredFrom ? { registeredFrom: toLocalBoundary(filters.registeredFrom, false) } : {}),
     ...(filters.registeredTo ? { registeredTo: toLocalBoundary(filters.registeredTo, true) } : {}),
   }
@@ -92,8 +95,23 @@ export function buildAdminUserQuery(
 export function hasUserFilters(filters: UserFilterState): boolean {
   return Boolean(
     filters.search.trim()
+    || filters.closure
     || filters.enabled !== 'all'
     || filters.registeredFrom
     || filters.registeredTo,
   )
 }
+
+export function userPhone(user: Pick<AdminUserListItem, 'status' | 'maskedPhone'>): string {
+  return user.status === 'anonymized' ? '***' : user.maskedPhone
+}
+
+export function canCloseUser(user: Pick<AdminUserListItem, 'status'>): boolean {
+  return ['active', 'disabled', 'closing'].includes(user.status)
+}
+
+export function hasPendingClosure(user: AdminUserListItem): boolean {
+  return ['active', 'disabled'].includes(user.status) && user.closureRequest?.source === 'member_request'
+}
+
+export const CLOSURE_SOURCE_LABELS = { member_request: '本人申请', offline: '线下办理' }

@@ -1,7 +1,7 @@
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 import { QaRecords } from './QaRecords'
-import { aiRecordPath, recordUnavailableReason } from './aiRecordNavigation'
+import { aiRecordPath, aiRecordPrintPath, recordUnavailableReason } from './aiRecordNavigation'
 import { clearResumeReferences } from '../../resume/clearResumeReferences'
 // AI 服务记录 — /me/ai-records（本人，仅元数据）。
 // 删除成功只在服务端回执后展示；确认超时回到未确认，不乐观移除。
@@ -256,11 +256,13 @@ export function MyAiRecordsPage() {
                     ? 'delete-confirm'
                     : 'ready'
 
+  const structMode = !isLoggedIn ? 'lock' : state === 'loading' ? 'loading' : 'error'
   const struct = (
     <>
-      <QxMeStructRow icon={FileCheckIcon} title="简历诊断与优化记录" desc="只存服务记录，不存原文与模型输出" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-0" />
-      <QxMeStructRow icon={RouteIcon} title="职业规划建议记录" desc="阶段性行动建议的服务记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-1" />
-      {hostingOpen ? <QxMeStructRow icon={BriefcaseIcon} title="岗位 AI 参考记录" desc="基于公开岗位内容的解读记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-2" /> : null}
+      <QxMeStructRow icon={FileCheckIcon} title="简历诊断与优化记录" desc="只存服务记录，不存原文与模型输出" mode={structMode} testid="member-records-struct-ai-records-0" />
+      <QxMeStructRow icon={RouteIcon} title="职业规划建议记录" desc="阶段性行动建议的服务记录" mode={structMode} testid="member-records-struct-ai-records-1" />
+      <QxMeStructRow icon={SparklesIcon} title="模拟面试反馈" desc="练完的逐题反馈，可打开可打印" mode={structMode} testid="member-records-struct-ai-records-interview" />
+      {hostingOpen ? <QxMeStructRow icon={BriefcaseIcon} title="岗位 AI 参考记录" desc="基于公开岗位内容的解读记录" mode={structMode} testid="member-records-struct-ai-records-2" /> : null}
     </>
   )
 
@@ -268,7 +270,7 @@ export function MyAiRecordsPage() {
   if (!isLoggedIn) {
     body = <QxMeLoginBlock title="登录后查看 AI 服务记录" desc="AI 服务记录只在登录后与账号绑定；公共一体机不保存游客记录。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
-    body = <QxMeLoadingBlock title="正在加载 AI 服务记录" />
+    body = <QxMeLoadingBlock title="正在加载 AI 服务记录" struct={struct} />
   } else if (state === 'error') {
     body = <QxMeErrorBlock title="AI 服务记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。" struct={struct} />
   } else if (empty) {
@@ -335,7 +337,9 @@ export function MyAiRecordsPage() {
             const kind = KIND_META[item.kind] ?? { label: 'AI 服务记录', hint: '本人 AI 服务记录', tone: 'slate' as const }
             const status = STATUS_META[item.status]
             const openPath = aiRecordPath(item)
+            const printPath = aiRecordPrintPath(item)
             const openReason = recordUnavailableReason(item)
+            const fairReady = hostingOpen && item.kind === 'fair_visit_plan' && item.ref?.type === 'job_fair' && Boolean(item.ref.id) && item.status === 'completed'
             const confirming = confirmId === item.id
             const expired = confirmExpired && !confirmId && items[0]?.id === item.id
             const busy = busyId === item.id
@@ -353,12 +357,14 @@ export function MyAiRecordsPage() {
                   {confirming && item.kind === 'parse' ? <span className="qx-me-reason">删除这条诊断记录时，会同时删除这份简历的优化稿、简历对照、职业规划及相关 AI 分析记录。</span> : null}
                   {expired ? <span className="qx-me-reason">上一次确认已超时失效，删除未执行；需要重新点击删除。</span> : null}
                   {confirming ? <span className="qx-me-reason">成功即完成删除，失败会提示稍后重试；本页不会提前显示成功。</span> : null}
-                  {hostingOpen && item.kind === 'fair_visit_plan' && item.ref?.type === 'job_fair' && item.ref.id && item.status === 'completed' ? (
+                  {fairReady ? (
                     <button type="button" className="qx-me-small" style={{ marginTop: 8 }} onClick={() => openFairPlan(item)}>打开这场招聘会规划</button>
                   ) : null}
                 </span>
                 <span className="qx-me-acts">
                   {openPath ? <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(openPath)}>打开</button> : null}
+                  {printPath ? <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(printPath)}>接着打印</button> : null}
+                  {fairReady ? <button type="button" className="qx-me-small" disabled={busy} onClick={() => openFairPlan(item)}>接着打印</button> : null}
                   {confirming ? (
                     <>
                       <button type="button" className="qx-me-small" aria-label="取消删除这条记录" onClick={() => setConfirmId(null)}>

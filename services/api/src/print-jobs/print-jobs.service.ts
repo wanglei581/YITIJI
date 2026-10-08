@@ -21,6 +21,7 @@ import {
   throwIfMemberReprintBlocked,
 } from './paid-reprint-eligibility'
 import { lockPrintTaskRow } from '../terminals/print-status-attempt'
+import { assertSelfServiceReprintRemaining, KIOSK_RETRY_LOG_CODE } from './self-service-reprint'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
@@ -135,7 +136,6 @@ const USER_FAILURE_REASONS: Record<string, string> = {
 
 /** 未知错误码 / 仅有原始 errorMessage 时的统一安全兜底文案。 */
 const DEFAULT_USER_FAILURE_REASON = '打印任务失败，请联系工作人员处理或稍后重试'
-const KIOSK_RETRY_LOG_CODE = 'kiosk_retry'
 
 const printJobFileSelect = {
   id: true,
@@ -777,6 +777,7 @@ export class PrintJobsService {
           error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: REPRINT_BLOCKED_MESSAGE.file_unavailable },
         })
       }
+      await assertSelfServiceReprintRemaining(tx, task.id)
 
       const updatedOrder = await tx.order.updateMany({
         where: {

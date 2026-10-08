@@ -10,6 +10,7 @@
 - 收尾明确领取打印件，有效期只认手机订单，删除固定 24 小时承诺（规则 3、4）。
 - AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
 - 9/28 留白：数字键 88→100px、码格 84×108，余下空白分到输码卡、扫码区、键盘三块之间，键盘下面不再空一截。只改样式。
+- 2026-10-06 方案②：本稿停用。顶部加停用说明，取件凭证码取消，到机码就是取件码，续打见 11。正文保留。
 -->
 <html lang="zh-CN">
 <head>
@@ -209,6 +210,7 @@ a{color:inherit;text-decoration:none}.xq{height:250px;padding:24px 40px}.xq-row{
 .body{justify-content:space-between;padding-bottom:22px}
 .key{height:100px}
 .code-cell{width:84px;height:108px;font-size:48px}
+.retired-note{flex:none;margin:0;padding:10px 18px;border-radius:14px;background:#f8e4e1;color:#b23a2e;font-size:22px;font-weight:700;line-height:1.4;text-align:center}
 
 </style>
 </head>
@@ -241,6 +243,8 @@ a{color:inherit;text-decoration:none}.xq{height:250px;padding:24px 40px}.xq-row{
 
   <!-- 主体 -->
   <div class="body">
+
+    <div class="retired-note" role="note">本稿已停用：取件凭证码取消，到机码就是取件码，续打见 11</div>
 
     <!-- 取件码输入 -->
     <div class="code-card">
@@ -291,7 +295,7 @@ a{color:inherit;text-decoration:none}.xq{height:250px;padding:24px 40px}.xq-row{
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           </div>
           <div class="order-item-info">
-            <div class="order-item-name">请向工作人员出示手机订单</div>
+            <div class="order-item-name">到机码在这台机器上输入</div>
             <div class="order-item-meta">核对文件与页数，再领取打印件</div>
           </div>
           <a class="order-item-status qx2-ai" href="../kiosk-redesign-2026-08/06-help.html">联系工作人员 →</a>

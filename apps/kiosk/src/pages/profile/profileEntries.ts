@@ -7,7 +7,7 @@ const ASSETS: Entry[] = [
   { icon: 'resume', tone: 'teal', label: '我的简历', desc: '原始 / 诊断 / 优化版', route: '/me/resumes' },
   { icon: 'files', tone: 'slate', label: '我的文档', desc: '扫描件、证明材料', route: '/me/documents' },
   { icon: 'sparkle', tone: 'plum', label: 'AI服务记录', desc: '建议、面试、问答', route: '/me/ai-records' },
-  { icon: 'receipt', tone: 'wheat', label: '打印订单', desc: '取件码、打印状态', route: '/me/print-orders' },
+  { icon: 'receipt', tone: 'wheat', label: '打印订单', desc: '打印进度与出纸状态', route: '/me/print-orders' },
   { icon: 'heart', tone: 'rose', label: '我的收藏', desc: '岗位、招聘会、政策', route: '/me/favorites' },
   { icon: 'ticket', tone: 'clay', label: '我的权益', desc: '券与活动权益', route: '/me/benefits' },
 ]

@@ -27,6 +27,62 @@ function assertNotIncludes(src, marker, label) {
   console.log(`PASS ${label}`)
 }
 
+function balancedSlice(text, openIndex, openChar, closeChar) {
+  let depth = 0
+  let quote = ''
+  let escaped = false
+  for (let index = openIndex; index < text.length; index += 1) {
+    const char = text[index]
+    if (escaped) { escaped = false; continue }
+    if (char === '\\') { escaped = true; continue }
+    if (quote) {
+      if (char === quote) quote = ''
+      continue
+    }
+    if (char === '"' || char === "'" || char === '`') { quote = char; continue }
+    if (char === openChar) depth += 1
+    else if (char === closeChar) {
+      depth -= 1
+      if (depth === 0) return text.slice(openIndex, index + 1)
+    }
+  }
+  return ''
+}
+
+function jsxConsequents(text, marker) {
+  const branches = []
+  let from = 0
+  while (from < text.length) {
+    const at = text.indexOf(marker, from)
+    if (at < 0) break
+    const tail = text.slice(at + marker.length, at + marker.length + 24)
+    const match = tail.match(/^\s*\?\s*\(/)
+    if (!match) { from = at + marker.length; continue }
+    const open = at + marker.length + match[0].lastIndexOf('(')
+    const slice = balancedSlice(text, open, '(', ')')
+    if (slice) branches.push(slice)
+    from = at + marker.length
+  }
+  return branches
+}
+
+function nearestTernaryCondition(text, usageIndex) {
+  let found = ''
+  let from = 0
+  while (from < usageIndex) {
+    const mark = text.indexOf('? (', from)
+    if (mark < 0 || mark > usageIndex) break
+    const open = mark + 2
+    const slice = balancedSlice(text, open, '(', ')')
+    if (slice && open < usageIndex && open + slice.length > usageIndex) {
+      const start = Math.max(text.lastIndexOf('{', mark), text.lastIndexOf('\n', mark))
+      found = text.slice(start + 1, mark)
+    }
+    from = mark + 3
+  }
+  return found
+}
+
 function assertCountAtLeast(src, marker, min, label) {
   const count = src.split(marker).length - 1
   if (count < min) throw new Error(`${label}: expected at least ${min} ${marker}, got ${count}`)
@@ -101,7 +157,9 @@ assertNotIncludes(parse, 'function delay(', 'parse page removes timer-driven sta
 assertNotIncludes(parse, "setCurrent('ocr')", 'parse page does not claim a live OCR stage without server evidence')
 assertNotIncludes(parse, "setCurrent('extracting')", 'parse page does not claim a live extraction stage without server evidence')
 assertNotIncludes(parse, '评分维度准备进度（逐项点亮）', 'parse page does not present dimensions as live progress')
-assertIncludes(parse, '处理内容说明 · 非实时阶段', 'parse page visibly labels the stage list as non-realtime')
+// 稿 21 把开发向的「处理内容说明 · 非实时阶段」换成用户能看懂的「这次要看的内容，不是进度」。
+// 「不代表实时进度」仍守住「这不是服务端阶段回传」。
+assertIncludes(parse, '这次要看的内容，不是进度', 'parse page labels the stage list in user language')
 assertIncludes(parse, '不代表实时进度', 'parse page explains that capability steps are not server telemetry')
 assertIncludes(parse, 'useBusyLock(Boolean(fileId) && !failed)', 'parse page prevents standby only while waiting for a real result')
 assertIncludes(parse, 'startedRef', 'parse page prevents duplicate submit in repeated effect setup')
@@ -110,6 +168,8 @@ assertIncludes(parse, "result.status !== 'completed'", 'parse page only treats t
 assertIncludes(parse, 'failTimerRef', 'parse page tracks the failure navigation timer')
 assertIncludes(parse, 'clearTimeout(failTimerRef.current)', 'parse page clears the failure timer on leave')
 assertIncludes(parse, '未找到简历文件', 'parse page fails closed when opened without a real file id')
+assertIncludes(parse, '不会自动挑一份文件', 'missing file says this page will not pick a file on its own')
+assertNotIncludes(parse, '之前选的诊断方向和目标背景还在', 'direction state does not survive leaving this page')
 assertIncludes(parse, '返回上一步', 'parse page does not falsely claim it can cancel the submitted server task')
 assertNotIncludes(parse, '取消解析', 'parse page removes the misleading server-cancel label')
 assertIncludes(parse, '简历原文不会发送给企业', 'parse page retains the enterprise non-disclosure privacy boundary')
@@ -143,7 +203,9 @@ assertIncludes(optimize, "navigate('/resume/optimize/compare'", 'optimize page l
 // 拆出去的那页必须诚实说明「本次选择不保存」——没有采纳落库端点。
 assertIncludes(optimizeCompare, '未保存', 'compare page states the adoption selection is not persisted')
 assertNotIncludes(optimizeCompare, '已保存', 'compare page avoids copy implying the selection was saved')
-assertIncludes(optimizeCompare, '这是阅读草稿，不是简历最终稿', 'compare draft states it is a reading draft, not the final resume')
+// 旧句「这是阅读草稿，不是简历最终稿」说对照页草稿不写进导出。
+// 产品负责人 10/6：选择写进优化稿。对照页现在说明：这里的选择还没进导出稿，回优化页确认后才进入。
+assertIncludes(optimizeCompare, '对照页上的选择还没写进这份优化稿，回到优化页确认应用之后才会进入导出。', 'compare draft states selections are not in the export resume yet')
 assertIncludes(optimizeCompare, '已采纳', 'compare draft labels adopted items as 已采纳 (reading-layer, not persisted)')
 assertIncludes(optimizeCompare, '可采纳的全部采纳', 'compare page exposes batch adopt')
 assertIncludes(optimizeCompare, '其余保留原文', 'compare page exposes batch keep original')
@@ -230,9 +292,36 @@ assertIncludes(layoutControls, 'min-w-[48px]', 'layout control choices meet the 
 // 事故原样：56px 的「开始 AI 诊断」首屏只露 21px（内容 1903px 挤进 1844px 可视区）。
 // 一体机没有滚动条，用户看到的就是一个被切坏的条。复验还发现两处更糟的：
 // `?intent=optimize` 与「上传失败横幅在屏」时 CTA 完全 0px 可见。
-// 修法：诊断维度清单收进可折叠区（默认收起）+ 削掉纵向留白。
-assertIncludes(source, '<details', 'source page collapses the diagnosis dimension list so the primary CTA stays on the first screen')
-// 折叠掉的只能是清单本身；「不编造结论」这句合规声明必须常驻可见。
+// 旧修法把维度清单收进 <details>。稿 21 v2 把方向设置改成独立画面之后，
+// 同一条约束改由结构来守：首屏（screen === 'source'）不渲染 DiagnosisDirectionForm，
+// 维度清单只出现在 target 及之后的画面；首屏仍有「设置诊断方向与目标背景」。
+// 这不是放宽：把工作台或维度清单塞回首屏分支，下面的断言会红。
+{
+  const consequents = jsxConsequents(source, "screen === 'source'")
+  if (consequents.length === 0) throw new Error('source screen branch is missing')
+  for (const branch of consequents) {
+    if (branch.includes('DiagnosisDirectionForm') || branch.includes('重点关注维度') || branch.includes('qx-rt-dimchip')) {
+      throw new Error('source screen renders the diagnosis workbench; the dimension list must stay off the first screen')
+    }
+  }
+  if (!consequents.some((branch) => branch.includes('ResumeSourceActions'))) {
+    throw new Error('source screen does not render ResumeSourceActions')
+  }
+  const actions = read('src/pages/resume/components/ResumeSourceActions.tsx')
+  if (!actions.includes('设置诊断方向与目标背景')) {
+    throw new Error('source screen is missing the direction settings button')
+  }
+  const formUses = [...source.matchAll(/<DiagnosisDirectionForm/g)]
+  if (formUses.length === 0) throw new Error('diagnosis form is not rendered on the workbench screens')
+  for (const use of formUses) {
+    const condition = nearestTernaryCondition(source, use.index ?? 0)
+    if (!condition.includes('target') || condition.includes("screen === 'source'")) {
+      throw new Error(`DiagnosisDirectionForm is not limited to a target screen: ${condition}`)
+    }
+  }
+  console.log('PASS source screen keeps the dimension list off the first screen and still offers direction settings')
+}
+// 「不编造结论」仍必须写在上传页本身，不能只藏进工作台。
 assertIncludes(source, '系统不会编造', 'source page keeps the no-fabrication statement outside the collapsed area')
 
 // ── R5b 上传成功与预览失败不得同屏互相打脸 ────────────────────────────────
@@ -274,7 +363,10 @@ assertIncludes(diagnosisForm, 'targetMajor', 'diagnosis form receives major prop
 assertIncludes(diagnosisForm, 'targetDegree', 'diagnosis form receives degree props')
 assertNotIncludes(source, '补充方向（可选）', 'source page no longer uses orphan context card that creates L-shaped void')
 assertNotIncludes(source, 'resume-source-context', 'source page removes separate context card class')
-assertIncludes(source, '更换文件', 'source action bar exposes change-file when a resume is staged')
+// 稿 21 确认屏次按钮写「换一份文件」。旧字「更换文件」和稿不一致，断言改钉真实按钮文案。
+assertIncludes(source, "const changeFileLabel = '换一份文件'", 'summary secondary action uses the design label 换一份文件')
+const sourceCards = read('src/pages/resume/components/ResumeSourceCards.tsx')
+assertIncludes(sourceCards, "const kioskLocal = kiosk && card.type === 'cloud'", 'kiosk local-file card is unavailable only for the local-file channel on a kiosk')
 // 2026-09-23 迁入青序流光（稿 21）：两条拉伸断言从 Tailwind 类串改锚到本页 Qx 样式，判据不变。
 const triageCss = read('src/pages/resume/resume-triage-qx.css')
 assertIncludes(source, 'className="qx-rt-dropzone"', 'upload dropzone stretches to balance the direction column')
@@ -603,5 +695,127 @@ const formatChooser = read('src/pages/resume/components/resume-deliver/ResumeFor
 assertIncludes(formatChooser, 'aria-label="文件生成流程"', '导出等待态四步流程常驻')
 assertIncludes(formatChooser, '系统没有提供逐步进度', '流程说明不冒充服务端逐步进度')
 console.log('PASS batch D 免费标签、保存归属、取件摘要、空报告和导出流程')
+
+const PAGE_AIGC_NOTE = '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
+const FILE_AIGC_NOTE = '导出的文件末尾有一行：含人工智能辅助生成内容'
+const deliverPanel = read('src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx')
+for (const [src, label] of [[formatChooser, '选格式卡'], [deliverPanel, '导出格式区']]) {
+  assertIncludes(src, PAGE_AIGC_NOTE, `${label}含页脚标注说明`)
+  assertIncludes(src, FILE_AIGC_NOTE, `${label}含文末标注说明`)
+  assertIncludes(src, 'function resumeExportAigcNote', `${label}按格式选择标注说明`)
+}
+assertIncludes(formatChooser, '{resumeExportAigcNote(props.format)}', '选格式卡按当前格式渲染标注说明')
+assertIncludes(deliverPanel, '{resumeExportAigcNote(props.exportFormat)}', '导出格式区按当前格式渲染标注说明')
+assertIncludes(formatChooser, "props.screen === 'export-chooser'", '选格式卡只在选格式屏渲染')
+
+function textOf(node) {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(textOf).join('')
+  if (node && typeof node === 'object' && Array.isArray(node.children)) return textOf(node.children)
+  return ''
+}
+const useStateStub = (initial) => [typeof initial === 'function' ? initial() : initial, () => {}]
+const renderChooser = new Function('React', 'useState', 'ResumeLayoutControls', 'COMPRESS_ONE_PAGE', 'ResumeExportResult', 'ResumePricingBar', executable([
+  sourceNode(formatChooser, 'FORMATS'),
+  sourceNode(formatChooser, 'FONT_CHOICES'),
+  sourceNode(formatChooser, 'formatName'),
+  sourceNode(formatChooser, 'resumeExportAigcNote'),
+  sourceNode(formatChooser, 'ResumeFormatChooser').replace(/^export /, ''),
+  sourceNode(formatChooser, 'SyntheticFileCard'),
+  'return ResumeFormatChooser;',
+].join('\n')))(React, useStateStub, () => null, '压到一页', () => null, () => null)
+const chooserProps = {
+  screen: 'export-chooser',
+  format: 'pdf',
+  onFormatChange: () => {},
+  layout: { columns: 1, fontScale: 'standard', lineSpacing: 'standard', margin: 'standard', accent: 'teal' },
+  onLayoutChange: () => {},
+  templates: [],
+  templatesError: false,
+  selectedTemplateId: '',
+  onTemplateChange: () => {},
+  exporting: false,
+  exported: null,
+  exportError: null,
+  exportVersion: 0,
+  pricing: null,
+  pricingLoading: false,
+  blockedReason: null,
+  guest: true,
+  synthetic: false,
+  printNavigating: false,
+  onPrint: () => {},
+  onOpenPreview: () => {},
+  onClearExport: () => {},
+  onHelp: () => {},
+  estimatedPagesLabel: '导出后显示真实页数',
+}
+for (const format of ['pdf', 'docx']) {
+  const shown = textOf(renderChooser({ ...chooserProps, format }))
+  assert.match(shown, new RegExp(PAGE_AIGC_NOTE), `${format} 选格式卡渲染页脚标注说明`)
+  assert.doesNotMatch(shown, new RegExp(FILE_AIGC_NOTE), `${format} 选格式卡不渲染文末标注说明`)
+}
+for (const format of ['txt', 'md']) {
+  const shown = textOf(renderChooser({ ...chooserProps, format }))
+  assert.match(shown, new RegExp(FILE_AIGC_NOTE), `${format} 选格式卡渲染文末标注说明`)
+  assert.doesNotMatch(shown, new RegExp(PAGE_AIGC_NOTE), `${format} 选格式卡不渲染页脚标注说明`)
+}
+assert.doesNotMatch(textOf(renderChooser({ ...chooserProps, screen: 'export-exporting' })), /含人工智能辅助生成内容/, '还没进入选格式时不渲染标注说明')
+
+const deliverConstants = read('src/pages/resume/components/resume-deliver/constants.ts')
+const renderDeliver = new Function('React', 'ResumeLayoutControls', 'COMPRESS_ONE_PAGE', 'EXPORT_FORMAT_OPTIONS', 'ResumeExportResult', 'ResumePricingBar', executable([
+  sourceNode(deliverPanel, 'resumeExportAigcNote'),
+  sourceNode(deliverPanel, 'ResumeDeliverPanel').replace(/^export /, ''),
+  'return ResumeDeliverPanel;',
+].join('\n')))(React, () => null, '压到一页', new Function(executable(`${sourceNode(deliverConstants, 'EXPORT_FORMAT_OPTIONS')}\nreturn EXPORT_FORMAT_OPTIONS;`))(), () => null, () => null)
+const deliverProps = {
+  layout: chooserProps.layout,
+  onLayoutChange: () => {},
+  templates: [],
+  templatesError: false,
+  selectedTemplateId: '',
+  onTemplateChange: () => {},
+  exportFormat: 'pdf',
+  onExportFormatChange: () => {},
+  exporting: false,
+  printNavigating: false,
+  exported: null,
+  exportKind: 'resume',
+  exportError: null,
+  exportVersion: 0,
+  pricing: null,
+  pricingLoading: false,
+  blockedReason: null,
+  exportBlocked: false,
+  onRequestExport: () => {},
+  showChangeList: false,
+  onPrint: () => {},
+  onOpenPreview: () => {},
+  guest: true,
+  estimatedPagesLabel: '导出后显示真实页数',
+}
+for (const exportFormat of ['pdf', 'docx']) {
+  const shown = textOf(renderDeliver({ ...deliverProps, exportFormat }))
+  assert.match(shown, new RegExp(PAGE_AIGC_NOTE), `${exportFormat} 导出格式区渲染页脚标注说明`)
+  assert.doesNotMatch(shown, new RegExp(FILE_AIGC_NOTE), `${exportFormat} 导出格式区不渲染文末标注说明`)
+}
+for (const exportFormat of ['txt', 'md']) {
+  const shown = textOf(renderDeliver({ ...deliverProps, exportFormat }))
+  assert.match(shown, new RegExp(FILE_AIGC_NOTE), `${exportFormat} 导出格式区渲染文末标注说明`)
+  assert.doesNotMatch(shown, new RegExp(PAGE_AIGC_NOTE), `${exportFormat} 导出格式区不渲染页脚标注说明`)
+}
+
+const draftStart = generate.indexOf('const handleExportDraft')
+const draftEnd = generate.indexOf('const availability', draftStart)
+assert.ok(draftStart >= 0 && draftEnd > draftStart, '填写页有按原样导出函数')
+const draftBranch = generate.slice(draftStart, draftEnd)
+assert.match(draftBranch, /exportResumeDraft\(/, '按原样导出走 exportResumeDraft')
+assert.doesNotMatch(draftBranch, /含人工智能辅助生成内容/, '按原样导出分支不渲染人工智能标注说明')
+assert.doesNotMatch(draftBranch, /resumeExportAigcNote/, '按原样导出分支不调用标注说明')
+assertNotIncludes(generate, PAGE_AIGC_NOTE, '按原样导出页不含页脚标注说明')
+assertNotIncludes(generate, FILE_AIGC_NOTE, '按原样导出页不含文末标注说明')
+assertNotIncludes(generate, 'ResumeFormatChooser', '按原样导出不渲染选格式卡')
+assertNotIncludes(generate, 'ResumeDeliverPanel', '按原样导出不渲染优化导出区')
+console.log('PASS 导出标注说明按格式显示，按原样导出不渲染')
 
 console.log('PASS resume diagnosis flow UI verification')
