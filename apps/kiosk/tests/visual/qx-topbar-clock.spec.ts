@@ -27,7 +27,8 @@ test('help topbar shows one HH:MM clock and advances on the minute @kiosk', asyn
 
   const before = ((await clock.textContent()) ?? '').trim()
   expect(before).toMatch(/^\d{2}:\d{2}$/)
-  await expect(clock).toHaveAccessibleName(`当前时间 ${before}`)
+  // time 角色禁止命名；校验机器可读时间与页面显示一致，不把 aria-label 当成读屏证据。
+  await expect(clock).toHaveAttribute('datetime', before)
 
   const waitMs = await page.evaluate(() => 60_000 - (Date.now() % 60_000))
   await page.clock.fastForward(waitMs + 50)
@@ -35,5 +36,5 @@ test('help topbar shows one HH:MM clock and advances on the minute @kiosk', asyn
   await expect(clock).not.toHaveText(before)
   const after = ((await clock.textContent()) ?? '').trim()
   expect(after).toMatch(/^\d{2}:\d{2}$/)
-  await expect(clock).toHaveAccessibleName(`当前时间 ${after}`)
+  await expect(clock).toHaveAttribute('datetime', after)
 })

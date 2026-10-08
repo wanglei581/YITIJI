@@ -75,7 +75,7 @@ export function QxPageFrame({
           {status?.label ?? '状态未知'}
         </span>
         {/* 稿的顶栏最右是时钟，在状态胶囊之后。首页和待机屏不走这个壳，各自只留自己的那一只。 */}
-        <time className="qx-topbar-clock" dateTime={clock} aria-label={`当前时间 ${clock}`}>{clock}</time>
+        <time className="qx-topbar-clock" dateTime={clock}>{clock}</time>
       </header>
 
       <section className="qx-pagehead">
