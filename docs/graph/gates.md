@@ -51,7 +51,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 断言了不存在的路径（6）
+## 断言了不存在的路径（7）
 
 门禁里写着某个仓库路径，但该路径在 git 里不存在。可能是文件被移动/删除后门禁
 没跟着改 —— 这类断言往往已经恒真或恒假，需要人确认。
@@ -61,6 +61,7 @@ _（空）_
 | `apps/kiosk/scripts/verify-data-request-ui.mjs` | `apps/admin/src/routes/member-privacy/index.tsx`<br/>`apps/admin/src/services/api/memberPrivacyAdmin.ts` |
 | `apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs` | `src/pages/resume/ResumeExportPage.tsx` |
 | `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs` | `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs` |
+| `scripts/verify-kiosk-unattended-copy.mjs` | `apps/kiosk/src/refund-ok-probe.tsx`<br/>`apps/kiosk/src/refund-probe.tsx`<br/>`apps/kiosk/src/switch-probe.tsx` |
 | `services/api/scripts/verify-legal-doc-version.ts` | `services/api/legalDocs.ts` |
 | `services/api/scripts/verify-policy-eligibility-authoring.ts` | `services/api/policies.ts` |
 | `services/api/scripts/verify-wave2-account-rebind.ts` | `services/auth/memberAuthApi.ts` |
@@ -69,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1884 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1885 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -423,7 +424,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 553 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 554 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -466,6 +467,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/components/kiosk-shell/KioskStageFit.tsx` | `verify-fusion-shell.mjs` |
 | `apps/kiosk/src/components/qingxu/QxAppNavbar.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-fusion-w5.mjs` |
+| `apps/kiosk/src/copy/unattendedCopy.ts` | `verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-pickup-claim-error-coverage.mjs`<br/>`verify-w4-login-profile-l1.mjs` |
 | `apps/kiosk/src/favorites/localFavorites.ts` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/hooks/useAiAdvisorCallSession.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/hooks/useApiReadiness.ts` | `verify-service-entry-readiness.mjs` |
