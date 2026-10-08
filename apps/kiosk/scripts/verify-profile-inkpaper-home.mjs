@@ -244,15 +244,16 @@ for (const marker of [
 }
 
 /* 2026-09-08 青序流光迁移（稿 30-my-profile）：ProfilePage 不再直接写
- * navigate('/me/notifications')，消息通知移到了页面自己的磁贴列表
- * （ProfilePage.tsx 的 `{ icon: BellIcon, title: '消息通知', to: '/me/notifications' }`）。
- * 形状变了，能力没变——把一条形状锚点换成两条能力锚点，只增不减。
+ * navigate('/me/notifications')，消息通知移到了页面自己的磁贴列表。
+ * C2-2（2026-10-06）：磁贴在 ProfileHomeStates.tsx（四行带说明），不再写在 ProfilePage.tsx。
+ * 形状变了，能力没变——两条能力锚点改为两份源码一起读，一条不删。
  * 同一处替换也已应用于 verify-lightflow-profile-entry.mjs。 */
+const profileActions = `${profile}\n${read('src/pages/profile/components/ProfileHomeStates.tsx')}`
 for (const [marker, message] of [
   ["'/me/notifications'", 'ProfilePage 仍能到达消息通知'],
   ['消息通知', 'ProfilePage 仍展示消息通知入口'],
 ]) {
-  expectIncludes(profile, marker, message)
+  expectIncludes(profileActions, marker, message)
 }
 for (const marker of ['onPrintFile', 'onDeleteResume', 'onDeleteScan', 'onDeleteAiRecord']) {
   expectIncludes(records, marker, `ProfileSessionRecords preserves ${marker}`)
@@ -389,6 +390,9 @@ const allowedProfileLandingChanged = new Set([
   'apps/kiosk/src/pages/profile/styles/profile-qx.css',
   'apps/kiosk/src/pages/profile/assets/useMemberAssetCounts.ts',
   'apps/kiosk/src/pages/profile/components/ProfileHeader.tsx',
+  // C2-2（2026-10-06）：稿 30 的状态条、四行通知、底部操作条从 ProfilePage 拆出，
+  // 让主文件停在 500 行内。能力仍由本守卫和 lightflow 的 profileActions 钉住，不是新入口。
+  'apps/kiosk/src/pages/profile/components/ProfileHomeStates.tsx',
   'apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx',
   'apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx',
   'apps/kiosk/src/pages/profile/components/ProfileContinueCard.tsx',
@@ -429,6 +433,10 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   // 包 L1 第 1 次（2026-09-07）：我的文档 Word 转 PDF 入口拆子组件，避免主文件超 500 行。
   'apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx',
+  // C 路 C1-3（2026-10-06）：我的文档页内照稿。分类与访问链接横幅拆到 documents/，
+  // 主文件仍保留打印、预览、删除、签名与保存期限。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/documents/documentClassify.ts',
+  'apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx',
   'apps/kiosk/src/pages/profile/me/components/documentReprint.ts',
   'apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
@@ -439,6 +447,9 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
   'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
   'apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx',
+  // C 路 C1-6（2026-10-06）文案审查：失败指引第三格收成一份。
+  // 从组件文件导出非组件函数会触发 react-refresh 警告，所以单独成这个小文件。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts',
   'apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css',
   'apps/kiosk/src/pages/profile/me/styles/notifications-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/member-records-qx.css',

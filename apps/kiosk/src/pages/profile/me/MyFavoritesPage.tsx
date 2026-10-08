@@ -58,7 +58,9 @@ export function MyFavoritesPage() {
   const [state, setState] = useState<LoadState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const requestedTab = getFavoriteTab(searchParams)
-  // 托管关闭时只有「全部」与「政策」两种视角，且两者内容相同：不摆分类条，旧链接里的岗位 / 招聘会分类回到全部。
+  // 真实分类不含「全部」。托管关闭时只剩政策一类，「全部」和「政策」是同一份列表，不摆分类条。
+  // 托管打开时有岗位、招聘会、政策，分类条照旧。旧链接里的岗位 / 招聘会分类在关闭时回到全部。
+  const favoriteCategories: FavoriteTargetType[] = hostingOpen ? ['job', 'job_fair', 'policy'] : ['policy']
   const tab: FavoriteTab = hostingOpen || requestedTab === 'policy' ? requestedTab : 'all'
   const setTab = (next: FavoriteTab) => {
     setSearchParams(next === 'all' ? {} : { tab: next }, { replace: true })
@@ -151,7 +153,7 @@ export function MyFavoritesPage() {
           desc="只记录本人浏览兴趣，不含投递或预约结果"
           minis={minis}
         />
-        {hostingOpen ? (
+        {favoriteCategories.length >= 2 ? (
           <div className="qx-me-tabbar" data-n="4" role="group" aria-label="记录筛选">
             {TABS.map((t) => (
               <button key={t.key} type="button" className="qx-me-tab" aria-current={tab === t.key ? 'true' : undefined} data-testid={`member-records-fav-tab-${t.key}`} onClick={() => setTab(t.key)}>
@@ -177,14 +179,20 @@ export function MyFavoritesPage() {
               </button>
             )
           })}
-          <div className="qx-me-fav-next" data-n={hostingOpen ? 3 : 1} aria-label="收藏使用说明">
+          <div className="qx-me-fav-next" data-n={3} aria-label="收藏使用说明">
             {hostingOpen ? (
               <>
                 <div><b>岗位收藏</b><span>打开岗位详情后，按来源平台的规则完成投递。</span></div>
                 <div><b>招聘会收藏</b><span>查看活动详情；预约和签到以来源平台或现场规则为准。</span></div>
+                <div><b>政策收藏</b><span>再打开这则说明，办理仍以官方入口为准。</span></div>
               </>
-            ) : null}
-            <div><b>政策收藏</b><span>再打开这则说明，办理仍以官方入口为准。</span></div>
+            ) : (
+              <>
+                <div><b>政策</b><span>再打开这则说明，办理仍以官方入口为准。</span></div>
+                <div><b>机构官方渠道</b><span>本机构的二维码和官方入口在『本机构官方渠道』页查看</span></div>
+                <div><b>不会发生</b><span>这里不代收简历，也不记报名结果。</span></div>
+              </>
+            )}
           </div>
           <div className="qx-me-legal">{hostingOpen
             ? <>收藏只记录本人收藏行为；<b>投递与预约都在来源平台完成</b>，本机不代收简历，也不记录结果。</>
@@ -204,9 +212,14 @@ export function MyFavoritesPage() {
       ask={hostingOpen ? <>收藏的岗位与招聘会，<em>随时找回</em>。</> : <>收藏的政策，<em>随时找回</em>。</>}
       doing={<>只记录<b>本人收藏行为</b>，不含投递或预约结果。</>}
       truth={hostingOpen ? '投递与预约都在来源平台完成；本机不代收简历，也不记录结果。' : '收藏只记录本人收藏行为；本机不代收简历，也不记录办理结果。'}
-      ctabar={hostingOpen
-        ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看岗位', () => navigate('/jobs'))
-        : recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看政策', () => navigate('/policy-service'))}
+      ctabar={recordsCtabar(
+        uiState,
+        navigate,
+        () => setReloadKey((k) => k + 1),
+        '/me/favorites',
+        hostingOpen ? '查看岗位' : '查看政策',
+        () => navigate(hostingOpen ? '/jobs' : '/policy-service'),
+      )}
     >
       {body}
     </QxMePage>

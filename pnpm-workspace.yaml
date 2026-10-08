@@ -10,9 +10,15 @@ overrides:
   # The previous pin 6.15.2 sits inside both ranges. express@5.2.1 asks for
   # qs@^6.14.0, so 6.16.0 stays inside that range.
   qs: 6.16.0
+  # source-map-js: GHSA-68fv-2mgg-jv7q（HIGH，2026-09-18 发布）：带索引的 source map 段偏移可致事件循环 DoS；
+  # 影响 >= 1.0.0 < 1.2.2，首修 1.2.2（2026-09-30 发布，已过 minimumReleaseAge）。传递依赖（postcss / vite 一系）。
+  source-map-js: 1.2.2
+  # proxy-addr: GHSA-jqcg-44mw-7w3h（CRITICAL）：信任子网遇 IPv4 映射的 IPv6 地址时可伪造来源 IP；
+  # 影响 >= 1.1.0 < 2.0.8，首修 2.0.8（2026-09-15 发布，已过 minimumReleaseAge）。传递依赖（express ← @nestjs/platform-express）。
+  proxy-addr: 2.0.8
   '@hono/node-server': 2.0.10
   uuid: 14.0.0
-  shell-quote: 1.9.0
+  shell-quote: 1.11.0
   # hono: seven open advisories. The four below 4.12.34
   # (GHSA-f23p-vx2j-j53r, GHSA-79qm-7rj5-m7r9, GHSA-54fx-42gc-7vw4, GHSA-8j4g-w8fx-2239)
   # and the three below 4.13.5

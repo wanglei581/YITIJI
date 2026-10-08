@@ -114,8 +114,9 @@ export async function assertQxPillReadable(page: Page, where: string): Promise<v
   expect(lines.length, detail).toBeLessThanOrEqual(2)
   expect(Math.min(...lines.map((line) => line.length)), `${detail}：有一行只剩一个字`).toBeGreaterThanOrEqual(2)
   if (text.includes(' · ')) {
-    for (const phrase of text.split('·').map((part) => part.replace(/\s/g, '')).filter(Boolean)) {
-      expect(lines.some((line) => line.includes(phrase)), `${detail}：「${phrase}」被拆到两行`).toBe(true)
+    const compact = (value: string) => value.replace(/\s/g, '')
+    for (const phrase of text.split('·').map((part) => compact(part)).filter(Boolean)) {
+      expect(lines.some((line) => compact(line).includes(phrase)), `${detail}：「${phrase}」被拆到两行`).toBe(true)
     }
   }
 }

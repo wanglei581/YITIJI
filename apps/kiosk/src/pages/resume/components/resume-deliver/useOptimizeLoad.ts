@@ -4,8 +4,8 @@ import type { GeneratedResume, ResumeOptimizeModule, ResumeTemplate } from '@ai-
 import { getResumeOptimize, type ResumeReadAccess } from '../../../../services/api'
 import { getResumeTemplates } from '../../../../services/api/jobMaterials'
 import { errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
-import { isAiOutage } from '../../../../ai/aiOutage'
-import { SYNTHETIC_MODULES, SYNTHETIC_RESUME } from './fixtures'
+import { AI_OUTAGE_CODES, isAiOutage } from '../../../../ai/aiOutage'
+import { PAGE23_CAPTURE_MODULES, PAGE23_CAPTURE_RESUME } from './fixtures'
 import type { OptimizeViewState } from './constants'
 
 import { useBusyLock } from '../../../../contexts/KioskBusyContext'
@@ -62,8 +62,8 @@ export function useOptimizeLoad(opts: {
     if (syntheticReady && (requested === 'ready' || requested === 'empty')) {
       setLoading(false)
       setFailMsg(null)
-      setModules(requested === 'ready' ? SYNTHETIC_MODULES : [])
-      const nextResume = requested === 'ready' ? SYNTHETIC_RESUME : null
+      setModules(requested === 'ready' ? PAGE23_CAPTURE_MODULES : [])
+      const nextResume = requested === 'ready' ? PAGE23_CAPTURE_RESUME : null
       setOptimizedResume(nextResume)
       setBaseResume?.(nextResume)
       return
@@ -95,6 +95,9 @@ export function useOptimizeLoad(opts: {
             setFailKind('retry')
             setFailMsg('暂无优化建议，可重试一次；若仍没有内容请返回重新解析')
           }
+        } else if (typeof res.failCode === 'string' && AI_OUTAGE_CODES.has(res.failCode)) {
+          setFailKind('outage')
+          setFailMsg('AI 暂时不可用，你可以先按模板手动填写')
         } else {
           const reason = resumeUserReason(res.failReason, '本次没有生成优化建议，可重试或返回重新解析')
           setFailKind(reason.includes('重新上传') ? 'expired' : 'retry')

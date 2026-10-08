@@ -39,6 +39,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { BenefitRedemptionService } from '../benefit-redemption/benefit-redemption.service'
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { runWithPublicQuota } from './ai-request-guard'
+import { isRefundableAiFailure } from './llm/llm-failure'
 import { readResumeParseIntentHeaders } from './resume-parse-intent'
 import { ResumeParseIntentRunner } from './resume-parse-intent-runner.service'
 import { assistantOwnerKey } from './llm/llm-chat.service'
@@ -220,6 +221,7 @@ export class AiController {
         const quotaTicket = await this.publicQuota.consume('resume_parse', quotaContext)
         return runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
           this.aiService.submitResumeParse(dto, quotaContext.member),
+          (result) => result.status === 'failed' && isRefundableAiFailure(result.failCode),
         )
       })()
     await this.audit.write({

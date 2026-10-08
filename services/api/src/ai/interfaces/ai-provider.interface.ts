@@ -251,6 +251,8 @@ export interface ParseResumeOutput {
   providerName?: AiProviderName
   report?: ResumeReport
   failReason?: string
+  /** 失败机器码。账户级 / 模型名问题时前端据此走手动出路。没有码时为 AI_UNKNOWN。 */
+  failCode?: string
   /**
    * 提取层提示（Stage 3 OCR）：来源（pdf_ocr/image_ocr）+ 置信度 + 用户须知
    * （如「置信度有限请人工核对」「仅识别前 N 页」）。仅元数据，不含简历原文。
@@ -294,6 +296,8 @@ export interface OptimizeResumeOutput {
   status: AiTaskStatus
   modules?: ResumeOptimizeModule[]
   failReason?: string
+  /** 失败机器码。语义同 ParseResumeOutput.failCode。 */
+  failCode?: string
   /** 实际生成结果的 provider;前端据此显示演示标记(阶段2B) */
   providerName?: AiProviderName
   /**
@@ -400,6 +404,8 @@ export interface GenerateResumeOutput {
   /** 服务端确定性计算的缺失提示(如"未填写教育经历"),提示用户补充,AI 不代填 */
   missingHints?: string[]
   failReason?: string
+  /** 失败机器码。语义同 ParseResumeOutput.failCode。 */
+  failCode?: string
   /** 匿名结果一次性访问令牌,语义同 ParseResumeOutput.accessToken */
   accessToken?: string
   /** 本次调用的真实用量回报（AI-COST-TRUTH，additive 可选）。语义同 ParseResumeOutput.usage。 */

@@ -1,0 +1,32 @@
+# rclone 异地备份配置样例（腾讯云 COS，S3 兼容）。
+# 仓库里只保留这一份占位文件。填好的文件放在服务器上，不要提交。
+#
+# 放置：
+#   复制到 /etc/ai-job-print/rclone-offsite.conf
+#   chmod 600
+#   chown root:root
+#   当前 systemd unit 没有 User=，备份以 root 运行，属主就是 root。
+#   如果以后给 unit 加了 User=，属主改成那个用户，仍然是 600。
+# 环境变量 RCLONE_CONFIG 指向这份填好的文件。
+# 远端名 offsite 与 BACKUP_OBJECT_URI 里的远端名要一致，例如 offsite:<桶名>/<前缀>
+#
+# 子账号最小权限，只授权这一个桶：
+#   PutObject、GetObject、ListBucket、DeleteObject。
+#   控制台里 ListBucket 通常对应 CAM 的 cos:GetBucket；rclone 校验有时还要 cos:HeadObject。
+#   不要授予列出所有桶、建桶、删桶、改桶策略或 CAM 管理权限。
+# 建议打开版本控制，并加生命周期：当前版本和非当前版本都在
+# BACKUP_REMOTE_RETENTION_DAYS 之后删除。版本控制会让已经删掉的对象继续留着，
+# 等待期要把生命周期天数算进去。
+#
+# 端点形态见 docs/device/postgres-operations.md 第 10 节。下面的尖括号都是占位，
+# 服务器上替换成真实值；替换后的文件不要放回仓库。
+
+[offsite]
+type = s3
+provider = TencentCOS
+env_auth = false
+access_key_id = <子账号 SecretId>
+secret_access_key = <子账号 SecretKey>
+endpoint = <S3 兼容端点>
+region = <地域>
+acl = private

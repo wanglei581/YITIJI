@@ -2,7 +2,12 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
 
 /** 仅浏览器 UI 夹具：替换 SDK chunk，不申请麦克风、不连接真实房间。 */
-export async function mockAssistantVoice(page: Page, api: ApiRouter, micDenied = false) {
+export async function mockAssistantVoice(
+  page: Page,
+  api: ApiRouter,
+  micDenied = false,
+  options?: { silent?: boolean },
+) {
   api.respond('POST', '/api/v1/trtc/session', {
     status: 200,
     json: { sdkAppId: 1, roomId: 'm5-fixture-room', userId: 'm5-fixture-user', userSig: 'synthetic', taskId: 'm5-fixture-task' },
@@ -16,6 +21,10 @@ export async function mockAssistantVoice(page: Page, api: ApiRouter, micDenied =
       .flatMap((match) => match[1]!.split(','))
       .map((part) => part.trim().split(/\s+as\s+/).at(-1)!)
       .filter((name) => name !== 'default' && /^[a-zA-Z_$][\w$]*$/.test(name))
+    const playback = options?.silent
+      ? ''
+      : "handlers[EVENT.CUSTOM_MESSAGE]?.({ data: new TextEncoder().encode(JSON.stringify({ type: 'subtitle', text: '可以先说说你最想解决的问题。' })).buffer });\n"
+        + 'handlers[EVENT.AUDIO_VOLUME]?.({ result: [] });'
     await route.fulfill({ contentType: 'text/javascript', body: `
       const EVENT = Object.fromEntries(['REMOTE_AUDIO_AVAILABLE', 'REMOTE_AUDIO_UNAVAILABLE', 'CUSTOM_MESSAGE', 'AUDIO_VOLUME', 'AUTOPLAY_FAILED', 'ERROR'].map(k => [k, k]));
       const fixture = { EVENT, create() {
@@ -31,8 +40,7 @@ export async function mockAssistantVoice(page: Page, api: ApiRouter, micDenied =
           async exitRoom() {},
           destroy() {},
           enableAudioVolumeEvaluation() {
-            handlers[EVENT.CUSTOM_MESSAGE]?.({ data: new TextEncoder().encode(JSON.stringify({ type: 'subtitle', text: '可以先说说你最想解决的问题。' })).buffer });
-            handlers[EVENT.AUDIO_VOLUME]?.({ result: [] });
+            ${playback}
           },
         };
       } };
