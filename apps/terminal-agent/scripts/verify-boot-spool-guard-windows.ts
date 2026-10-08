@@ -2,11 +2,14 @@
  * Windows CI：开机打印防护与每日维护重启。
  * 会停止本机 Spooler、清空测试期间 PRINTERS 下的假脱机文件。只在 windows-2022 上跑。
  * 非 Windows 直接退出 0。每个用例结束后把 Spooler 恢复为 Automatic 且 Running，并删掉测试打印机。
+ * 用例会在 Program Files 和 ProgramData 下建 AIJobPrintAgent 目录（放脚本、配置、日志）。
+ * 开始前没有的，结束时整个删掉；同一个 CI 作业里后面的升级测试要求这两个目录不存在。
+ * 开始前就有的（装过 Agent 的机器）不删。
  * 不打印假脱机文件名。
  */
 import assert from 'node:assert/strict'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -473,7 +476,21 @@ Write-Output 'jobs=cleared'
   }
 }
 
-function cleanup(): void {
+function agentRoot(envName: 'ProgramFiles' | 'ProgramData'): string {
+  const root = process.env[envName]
+  if (!root) throw new Error(`${envName} is not set`)
+  return join(root, 'AIJobPrintAgent')
+}
+
+type AgentRootsBefore = { installRootExisted: boolean; stateRootExisted: boolean }
+
+function removeCreatedRoot(path: string, existedBefore: boolean): void {
+  if (existedBefore || !existsSync(path)) return
+  rmSync(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  if (existsSync(path)) throw new Error(`test-created directory remained: ${path}`)
+}
+
+function cleanup(before: AgentRootsBefore): void {
   const errors: string[] = []
   const run = (label: string, action: () => void): void => {
     try {
@@ -508,6 +525,8 @@ Write-Output 'lockFile=cleared'
   })
   run('restore-spooler', restoreSpooler)
   run('remove-printer', removePrinter)
+  run('remove-created-install-root', () => removeCreatedRoot(agentRoot('ProgramFiles'), before.installRootExisted))
+  run('remove-created-state-root', () => removeCreatedRoot(agentRoot('ProgramData'), before.stateRootExisted))
   if (errors.length > 0) throw new Error(errors.join('\n'))
 }
 
@@ -515,6 +534,10 @@ function main(): void {
   if (process.platform !== 'win32') {
     console.log('verify-boot-spool-guard-windows: skipped (not win32)')
     return
+  }
+  const before: AgentRootsBefore = {
+    installRootExisted: existsSync(agentRoot('ProgramFiles')),
+    stateRootExisted: existsSync(agentRoot('ProgramData')),
   }
   let scenarioError: unknown
   try {
@@ -530,7 +553,7 @@ function main(): void {
     scenarioError = error
   } finally {
     try {
-      cleanup()
+      cleanup(before)
     } catch (cleanupError) {
       console.error(cleanupError instanceof Error ? cleanupError.message : String(cleanupError))
       if (!scenarioError) scenarioError = cleanupError
