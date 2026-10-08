@@ -128,6 +128,8 @@ test('没有设备能力的服务台不探测、也不播报本机设备 @kiosk'
   registerShell(api, { api: 'ready', printer: { isOnline: false, printerStatus: 'offline' } })
 
   await page.goto('/jobs-service')
+  // 联系方式预取与 readiness 探测并行；可见 DOM 不代表探测完成，先等精确终态再取快照。
+  await expect(page.locator('.qx-hub-notice')).toHaveAttribute('data-readiness', 'ready')
   const jobs = await readHub(page)
   // 壳层顶栏自己会轮询一次设备状态（KioskShell 对全路由无条件调用），
   // 这里记下它作为基线——本断言要证的是服务台**没有再加一次**。
@@ -143,6 +145,7 @@ test('没有设备能力的服务台不探测、也不播报本机设备 @kiosk'
 
   // 同样的离线打印机，简历服务台必须说，并且恰好多探一次（壳层 + 本页）。
   await page.goto('/resume-service')
+  await expect(page.locator('.qx-hub-notice')).toHaveAttribute('data-readiness', 'degraded')
   const resume = await readHub(page)
   const withHub = api.requestCount('GET', PRINTER_STATUS)
 
