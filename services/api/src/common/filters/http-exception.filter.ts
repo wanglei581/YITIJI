@@ -8,6 +8,7 @@ import {
   safeRoutePattern,
   stackFramesOnly,
 } from './error-log'
+import { isPostgresBusyError } from '../prisma/postgres-busy'
 
 function isMachineErrorCode(value: string): boolean {
   return /^[A-Z][A-Z0-9_]+$/.test(value)
@@ -180,6 +181,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status = HttpStatus.FORBIDDEN
       code = 'ACCOUNT_UNAVAILABLE'
       message = '账号当前不可用'
+    }
+
+    // 锁等待（55P03）或语句超时（57014）。固定句，不回显驱动原文（里面可能有 SQL）。
+    // 领任务自己抛带 TERMINAL_CLAIM_BUSY 的 HttpException，不会走到这里。
+    if (!(exception instanceof HttpException) && isPostgresBusyError(exception)) {
+      status = HttpStatus.SERVICE_UNAVAILABLE
+      code = 'DB_BUSY'
+      message = '服务器忙，请稍后再试'
     }
 
     // Nest Throttler 429 的 body.message 含空格/非机器码（如 "ThrottlerException: Too Many Requests"），

@@ -1231,6 +1231,7 @@ jobs:
           # DriverAdapterError（不是 P2034），重试逻辑必须认得出，不能变成 500。
           pnpm --filter @ai-job-print/api verify:pg-serialization-conflict
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-serialization-conflict:postgres
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-lock-timeout:postgres
           pnpm --filter @ai-job-print/api verify:partner-contact-phone-registration
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
