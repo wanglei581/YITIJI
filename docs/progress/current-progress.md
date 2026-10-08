@@ -83,6 +83,12 @@
 - **反向变异（已改回）：** 不设 `lock_timeout` → `SHOW` 得到 0，退出码 1。从忙码里拿掉 55P03 → 持锁更新不再被认成忙，退出码 1。重试循环把锁超时当成可重试 → 尝试次数 3，退出码 1。
 - **另外跑过：** API `typecheck`、`lint`、`verify:http-exception-filter`（ALL PASS）、`verify:pg-serialization-conflict`（7/7）、`verify:production-db-guard`、`verify:print-jobs`（ALL PASS）、`verify:queue-dispatch-printer-status`、`node scripts/verify-ci-gate-coverage.mjs`（532/542 在闭包内）。`node scripts/generate-project-graph.mjs` 与 `--check` 通过（图谱 0 个文件变化）。没有 push。
 - **停放、隐藏、改名、降级：** 无。
+## 2026-10-06：两个后台要的两处后端小改（审计操作人显示名、智慧校园管理员列表）
+
+- **审计列表 `actorDisplayName`（只读）：** `GET /api/v1/admin/audit-logs` 每条加 `actorDisplayName: string | null`，`packages/shared` 的 `AuditLogRecord` 同步（可选字段）。内部账号取姓名，没有姓名用登录名；机构账号「机构名 · 账号名」；系统操作、会员、账号已删除为 null。姓名或登录名长得像手机号（含空格、短横分组）就跳过它，绝不带手机号。一页只多一次批量查 User。来由：9/30 总指挥转两后台需求。
+- **智慧校园管理员列表：** 以前只从配置表出发，没有任何配置行时永远显示「暂无终端」，管理员没法给学校终端开第一份配置（10/6 两后台窗口报）。改为列两类：已有配置的终端；归属「可管智慧校园」机构（学校就业中心）的启用、未退役终端（config 可为 null）。与学校无关、没配置过的终端仍不列，保留 #891 ⑯ 的过滤口径；预置未注册的配置行照旧补上。返回结构不变。
+- **验证：** `verify:audit-logs` 加第 6 组（显示名五种情况 + 列表不含手机号），`verify:partner-smart-campus` 加 Case0b 与一台非学校机构终端夹具。图谱点名的 110 条门禁与 `verify:member-closure`（closure 环境）本机全绿。反向变异两处全红：去掉学校过滤、显示名不挡手机号。
+
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）
 
 - **依据：** 产品负责人 10/6 晚拍板，AI 简历导出默认在文件里印一行「含人工智能辅助生成内容」（后端开关 10/9 打开，判定见 `services/api/src/common/pdf/aigc-label.ts`）。一体机这一步只加说明文字，不加勾选框、不改颜色；勾选不印那一步等后端字段，排第八或第九次。
