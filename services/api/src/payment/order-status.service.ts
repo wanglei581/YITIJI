@@ -1,8 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
-// 取件码长度/字符集/签发的唯一定义。曾在本文件和
-// member-print-orders/member-print-order-create.service.ts 各写一份 PICKUP_CODE_LEN=10。
-import { randomPickupCode } from '../common/pickup-code'
 import {
   collectPickupFileIds,
   extendActivePrintFilesToDeadline,
@@ -20,14 +17,6 @@ type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUn
 
 type RedemptionSettlementOptions = { discountCents: number; benefitRef: string; operatorId?: string }
 type OrderClient = Pick<PrismaTransactionClient, 'order'>
-
-/**
- * 撞码重试上限。注意它与码长是耦合的：取件码只增不减（`pickupCode` 全表永久
- * @unique，订单完成/过期都不回收），6 位 = 10^6 空间，累计签发量抬高后
- * `generateUniquePickupCode` 会更频繁地用掉这 6 次预检。回收机制见
- * `common/pickup-code.ts` 里的长期问题说明。
- */
-const PICKUP_MAX_ATTEMPTS = 6
 
 /**
  * 一体机现场履约租约：pending→claimed 时写下 `pickupClaimedAt`。
@@ -117,16 +106,6 @@ export function isPickupWindowClosed(
   if (isLiveKioskPickupLease(order, now)) return false
   if (order.pickupStatus === 'claimed') return true
   return Boolean(order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= now)
-}
-
-/** 判断是否为 pickupCode 唯一约束冲突（Prisma P2002）。有哈希的核销入账仍会写明文 pickupCode。 */
-function isPickupCodeUniqueConflict(e: unknown): boolean {
-  const err = e as { code?: string; meta?: { target?: unknown } }
-  if (err?.code !== 'P2002') return false
-  const target = err.meta?.target
-  if (typeof target === 'string') return target.includes('pickupCode')
-  if (Array.isArray(target)) return target.some((t) => String(t).includes('pickupCode'))
-  return true // 缺 meta 时按 pickupCode 冲突处理（本更新唯一可能冲突的列）
 }
 
 /**
@@ -434,43 +413,20 @@ export class OrderStatusService {
       paidBy: 'redemption' as const,
       ...(anchoredExpiry ? { pickupCodeExpiresAt: anchoredExpiry } : {}),
     }
-    // 现场单没有哈希：不铸明文码，也不做唯一冲突重试。
-    if (!order.pickupCodeHash) {
-      const res = await tx.order.updateMany({
-        where: { id: orderId, payStatus: 'unpaid' },
-        data: settlement,
-      })
-      if (res.count === 0) {
-        const fresh = await this.requireOrder(tx, orderId)
-        if (fresh.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
-        throw new BadRequestException('ORDER_INVALID_TRANSITION')
-      }
-      return this.requireOrder(tx, orderId)
+    // 不写明文列。有哈希的单只把截止锚到付款时刻，并延长仍有效的源文件。认领继续只认哈希。
+    const res = await tx.order.updateMany({
+      where: { id: orderId, payStatus: 'unpaid' },
+      data: settlement,
+    })
+    if (res.count === 0) {
+      const fresh = await this.requireOrder(tx, orderId)
+      if (fresh.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+      throw new BadRequestException('ORDER_INVALID_TRANSITION')
     }
-    // 有哈希的云打印 / 材料包仍写一枚明文（与改前一致）。认领继续只认哈希。
-    for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
-      const pickupCode = await this.generateUniquePickupCode(tx)
-      let res: { count: number }
-      try {
-        res = await tx.order.updateMany({
-          where: { id: orderId, payStatus: 'unpaid' }, // compare-and-set
-          data: { ...settlement, pickupCode },
-        })
-      } catch (e) {
-        if (isPickupCodeUniqueConflict(e)) continue // 取件码唯一冲突 → 换码重试
-        throw e
-      }
-      if (res.count === 0) {
-        const fresh = await this.requireOrder(tx, orderId)
-        if (fresh.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
-        throw new BadRequestException('ORDER_INVALID_TRANSITION')
-      }
-      if (anchoredExpiry) {
-        await extendActivePrintFilesToDeadline(tx, await collectPickupFileIds(tx, order), anchoredExpiry)
-      }
-      return this.requireOrder(tx, orderId)
+    if (anchoredExpiry) {
+      await extendActivePrintFilesToDeadline(tx, await collectPickupFileIds(tx, order), anchoredExpiry)
     }
-    throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
+    return this.requireOrder(tx, orderId)
   }
 
   /** 已付款云打印单：把源文件延长到落库的到机码截止。不改截止本身。 */
@@ -560,13 +516,4 @@ export class OrderStatusService {
     })
   }
 
-  /** 生成库内唯一取件码；有界重试（不无限循环），穷尽后 fail-closed。唯一索引为最终防撞。 */
-  private async generateUniquePickupCode(client: OrderClient): Promise<string> {
-    for (let i = 0; i < PICKUP_MAX_ATTEMPTS; i += 1) {
-      const code = randomPickupCode()
-      const existing = await client.order.findUnique({ where: { pickupCode: code } })
-      if (!existing) return code
-    }
-    throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
-  }
 }

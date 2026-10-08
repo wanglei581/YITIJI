@@ -171,8 +171,8 @@ type ArrivalOrder = {
 }
 
 /**
- * 本单当前有一枚可用的到机码。判据与小程序订单视图出码（visibleCode）一致：
- * 有码、pending、付款在 unpaid/paying/paid、截止在未来。只给布尔，码本身不下发到公共屏。
+ * 本单当前处于「可取」。判据：有哈希、pending、付款在 unpaid/paying/paid、截止在未来。
+ * 这个函数只回答布尔。明文是否下发由订单视图决定：可取，或失败后仍可续打，才解密到机码。
  */
 export function hasUsableArrivalCode(order: ArrivalOrder | null, now: Date = new Date()): boolean {
   if (!order?.pickupCodeHash) return false

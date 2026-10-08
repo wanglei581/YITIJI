@@ -412,6 +412,13 @@ async function main() {
     const actualModels = Object.entries(metadata).filter(([, model]: any) => model.fields.some((field: any) => field.name === 'endUserId')).map(([name]) => name).sort()
     const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
     assert.deepEqual(actualModels, expectedModels, '新增会员模型必须显式纳入注销处置')
+    const platformSetting = metadata.PlatformSetting
+    assert.ok(platformSetting, 'PlatformSetting 必须存在')
+    assert.equal(
+      platformSetting.fields.some((field: { name: string }) => field.name === 'endUserId'),
+      false,
+      '新增会员模型必须显式纳入注销处置',
+    )
     assert.deepEqual(scan.hits, [], `全库遗留身份: ${scan.hits.join(',')}`)
     assert.ok(scan.columns > 200)
     assert.equal(scan.exempted.length, 1)
@@ -426,6 +433,17 @@ async function main() {
     const finalBlock = executorSource.slice(executorSource.indexOf('...newClosurePhoneIdentity()'), executorSource.indexOf('if (changed.count !== 1)', executorSource.indexOf('...newClosurePhoneIdentity()')))
     assert.ok(!/phoneHash\s*:|phoneEnc\s*:|hashPhone|initial\./.test(finalBlock), '墓碑不得使用原身份派生值覆盖')
     assert.deepEqual(readClosureRetentionYears(), { orders: null, consents: null })
+  })
+  await check('TerminalCommand 无会员字段且不进注销清单', async () => {
+    const models = (scanClient as { _runtimeDataModel: { models: Record<string, { fields: Array<{ name: string }> }> } })._runtimeDataModel.models
+    const command = models['TerminalCommand']
+    assert.ok(command, 'TerminalCommand 必须存在')
+    const names = command.fields.map((field) => field.name)
+    for (const forbidden of ['endUserId', 'memberId', 'phone', 'phoneHash', 'phoneEnc', 'nickname', 'orderId', 'fileId']) {
+      assert.equal(names.includes(forbidden), false, forbidden)
+    }
+    assert.equal((CLOSURE_DELETE_MODELS as readonly string[]).includes('terminalCommand'), false)
+    assert.equal(names.includes('endUserId'), false)
   })
   let newId = ''
   await check('4 原手机号重新登录产生新 id，本人文件/订单/AI列表全部为空', async () => {

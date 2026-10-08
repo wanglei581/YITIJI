@@ -1,6 +1,6 @@
 {
   "frozenAt": "2026-09-29",
-  "updatedAt": "2026-10-06",
+  "updatedAt": "2026-10-08",
   "note": "青序流光 2.0 最终版。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md、STATUS.md 不在冻结范围。",
   "files": {
     "00-standby.html": "f3a0dd5cdd58c8a6e75647ed8ab50f2f2738937b091b73c06a382dd78e44a131",
@@ -14,7 +14,7 @@
     "08-legal.html": "faff7ce1ed1ddbc78f1ddfbe7eb72743cd8b172df693396a582a206190f2ba12",
     "09-system-state.html": "8d91978b986f23b1ea514a22763efae59be26f13553d5768aee8168ef8857726",
     "10-print-hub.html": "00bda86110a6ca8ad190840aa256226561193b006eb68154b50ef65f7ffd4933",
-    "11-arrival-code.html": "f32a1f347000994a2b74b6c22ccef64e16ecbf7e2eed5e9aa6950f661403b3b3",
+    "11-arrival-code.html": "10633d8481129a5d92bd6ea7b93589dd41109d5d3d34a5934ffd6bfe8a8f4e24",
     "12-file-source.html": "02852614de0846b77a7843ae02ec3834a17ccadfe26cff5b0917cc582dd9f3f7",
     "13-print-desk.html": "82e3bccba3a664245da14fcc75a32e584a59d61b44bea083ff82893b206731fd",
     "14-print-confirm.html": "3af05d538c300071eabad917f67d3a23836d49d04dfc58c137bd3b48822296d6",
@@ -33,7 +33,7 @@
     "30-my-profile.html": "60acd2b887d8b7dfcca2667a3a3754c2912cce7b437d7f12b0b0462acbc5184c",
     "31-benefits.html": "81d3ed45d02a418971b4099ea58c28c845cf14f06dfd652575534a391bd9960f",
     "32-cashier.html": "944700aeb9b04e1974d3ab48b961807927b64011b80d0329dd0d08eb7ea0dcd0",
-    "33-pickup-code.html": "a47031c6f0720604c82bcac2d625bf74888760fa90f61e90be8224610d462c48",
+    "33-pickup-code.html": "87b7e15108a0d7149850ec42498b7ead10630ed22cd8bca591c1116151c0ed6c",
     "34-self-assessment.html": "6b23f0d0dee4c6461638f2276332b0c86ab69d5518f20192b21d1ee572cbbd8b",
     "35-notifications.html": "6ea118e7d38c02ff763ba6b83290b447d620163fb217fd97dc6dd4e87b53ae5d",
     "37-pay-states.html": "80cbd2ee907afb5687c8b05f8beaa62ddbf8acf00d6a5399e693726672020431",

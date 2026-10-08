@@ -1,9 +1,13 @@
 @import './qx-me-shared.css';
 
+.qx-me-list > .qx-me-notice-row { align-items: flex-start; }
 .qx-me-notice-body {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
   margin-top: 8px;
-  font-size: 18px;
+  font-size: 21px;
   line-height: 1.5;
   color: var(--qx-ink-2);
 }

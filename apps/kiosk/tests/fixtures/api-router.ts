@@ -81,6 +81,21 @@ export class ApiRouter {
     this.respond('GET', SELF_ASSESSMENT_QUESTIONS_PATH, { status: 200, json: selfAssessmentQuestionsResponse() })
     // W-125：打印上传页与简历来源页挂载时读终端能力。默认空列表 = 没接管，U 盘保持可用。
     this.respond('GET', '/api/v1/terminals/KSK-001/capabilities', { status: 200, json: { capabilities: [] } })
+    // 无人值守服务联系方式。默认给出公示号码与服务时间，两个布尔都是假：
+    // 单点位不出现「换一台机器」，小程序未发布不出现「手机上能看到 / 用手机继续」。
+    // 要看换机、小程序已发布或 404 的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/public/support-contact', {
+      status: 200,
+      json: {
+        success: true,
+        data: {
+          servicePhone: '18369161921',
+          serviceHours: '工作日 9:00–18:00',
+          otherOnlineTerminalNearby: false,
+          miniappPublished: false,
+        },
+      },
+    })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
       status: 200,

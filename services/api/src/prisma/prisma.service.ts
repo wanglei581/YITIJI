@@ -86,6 +86,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminal
   }
 
+  get terminalCommand() {
+    return this.client.terminalCommand
+  }
+
   get printTask() {
     return this.client.printTask
   }
@@ -554,6 +558,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get recruitmentCircuitBreak() {
     return this.client.recruitmentCircuitBreak
+  }
+
+  get platformSetting() {
+    return this.client.platformSetting
   }
 
   // ── Transaction ────────────────────────────────────────────────────────────
