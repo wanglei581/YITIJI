@@ -253,20 +253,24 @@ for (const [label, source] of [['后端', pickupCodeSrc], ['shared', pickupCodeS
   )
 }
 
-// 单一来源：两个签发点都不许再自带长度/字符集，必须 import 同一份。
-for (const [label, source] of [
-  ['member-print-order-create.service.ts', orderCreateSrc],
-  ['order-status.service.ts', orderStatusSrc],
-]) {
-  check(
-    !/const\s+PICKUP_CODE_LEN\b/.test(source) && !/const\s+PICKUP_ALPHABET\b/.test(source),
-    `${label} 不再自带取件码长度/字符集（重复定义正是本次要根治的 bug）`,
-  )
-  check(
-    /from '\.\.\/common\/pickup-code'/.test(source) && source.includes('randomPickupCode'),
-    `${label} 从 common/pickup-code 取签发函数`,
-  )
-}
+// 单一来源：建单签发点不许再自带长度/字符集，必须 import 同一份。
+// 权益核销不再铸明文码，order-status 不得再引用签发函数。
+check(
+  !/const\s+PICKUP_CODE_LEN\b/.test(orderCreateSrc) && !/const\s+PICKUP_ALPHABET\b/.test(orderCreateSrc),
+  'member-print-order-create.service.ts 不再自带取件码长度/字符集（重复定义正是本次要根治的 bug）',
+)
+check(
+  /from '\.\.\/common\/pickup-code'/.test(orderCreateSrc) && orderCreateSrc.includes('randomPickupCode'),
+  'member-print-order-create.service.ts 从 common/pickup-code 取签发函数',
+)
+check(
+  !/const\s+PICKUP_CODE_LEN\b/.test(orderStatusSrc) && !/const\s+PICKUP_ALPHABET\b/.test(orderStatusSrc),
+  'order-status.service.ts 不再自带取件码长度/字符集',
+)
+check(
+  !orderStatusSrc.includes('randomPickupCode') && !orderStatusSrc.includes('generateUniquePickupCode'),
+  'order-status.service.ts 不再铸明文取件码（权益核销不再写 pickupCode 列）',
+)
 check(
   !/function\s+randomPickupCode/.test(orderCreateSrc) && !/function\s+randomPickupCode/.test(orderStatusSrc),
   '两个签发点都不再各自实现 randomPickupCode',

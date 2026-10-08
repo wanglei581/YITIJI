@@ -13,6 +13,7 @@ import {
   type ContractProviderTransportRequest,
 } from '../contract-review-provider.service'
 import { CONTRACT_PROVIDER_MIN_TIMEOUT_MS } from '../contract-review-timing'
+import { contractReviewFailureReason } from '../contract-review-failure-reason'
 
 const deepseekEnv = {
   CONTRACT_REVIEW_PROVIDER: 'deepseek', CONTRACT_REVIEW_BASE_URL: 'https://api.deepseek.com/',
@@ -373,6 +374,28 @@ test('accepts ordinary legal prose with PII nouns in model findings', async () =
     const service = approvedService(async () => ({ status: 200, redirected: false, body: wireBody(draft) }))
     assert.equal((await service.review(maskedInput())).findings[0]!.explanation, passage)
   }
+})
+
+test('account and model upstream failures are not reported as a connection problem', async () => {
+  const cases = [
+    { status: 402, body: '{"error":{"message":"Insufficient Balance"}}' },
+    { status: 401, body: '{}' },
+    { status: 403, body: '{}' },
+    { status: 404, body: '{}' },
+    { status: 400, body: '{"error":{"message":"The model `deepseek-chat` does not exist"}}' },
+  ]
+  for (const response of cases) {
+    const service = approvedService(async () => ({ ...response, redirected: false }))
+    await assert.rejects(() => service.review(maskedInput()), /CONTRACT_PROVIDER_ACCOUNT_UNAVAILABLE/)
+  }
+  assert.equal(
+    contractReviewFailureReason('CONTRACT_PROVIDER_ACCOUNT_UNAVAILABLE'),
+    'AI 服务暂时不可用。',
+  )
+  assert.equal(
+    contractReviewFailureReason('CONTRACT_PROVIDER_TRANSPORT_FAILED'),
+    'AI 服务暂时连接不上，请稍后重试。',
+  )
 })
 
 test('fails closed without retry or fallback for transport and response failures', async () => {

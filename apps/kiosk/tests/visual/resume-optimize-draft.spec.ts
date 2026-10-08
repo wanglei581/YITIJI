@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs'
 import type { Locator, Page } from '@playwright/test'
+import type { GeneratedResume } from '@ai-job-print/shared'
 import { expect, test } from '../fixtures/kiosk-test'
 import { registerW6Api } from './fixtures/fusion-w6-api'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
+import { exportResumeDocument } from '../../src/pages/resume/components/resume-deliver/optimizeOverviewModel'
 
 const TASK_ID = 'l2-draft-2099'
 const DRAFT_UPDATED_AT = '2099-03-15T08:30:00.000Z'
@@ -266,13 +268,20 @@ test('改写没有原样写进优化稿的条目标为只能手改，能切换�
   await expect(rows.nth(0).getByRole('button', { name: '保留原文', exact: true })).toBeVisible()
   await expect(rows.nth(1).getByTestId('resume-optimize-row-manual')).toHaveText('这条改写没有原样写进优化稿，这里没法切换；要用哪一版，请在编辑区里对照着改。')
   expect(await rows.nth(1).getByRole('button', { name: /^(用改写|保留原文)$/ }).count()).toBe(0)
-  await expect(counts.locator('[data-d="optimized"] b')).toHaveText('1 / 1')
-  await expect(counts.locator('[data-d="manual"]')).toHaveText('只能手改1')
+  // 旧文字「1 / 1」在 data-d=optimized：没点过曾默认算已采纳。现在没点过是待定，已决定按五格计，两条里已决定是 0/2。
+  await expect(rows.nth(0).locator('.qx-opt-chip')).toHaveText('待定')
+  await expect(counts.locator('[data-d="decided"] b')).toHaveText('0/2')
+  await expect(counts.locator('[data-d="adopt"] b')).toHaveText('0')
+  // 旧文字「只能手改1」是计数格。手改不再占一格；「只能手改」留在那一条的标签上。
+  await expect(rows.nth(1).locator('.qx-opt-chip[data-d="manual"]')).toHaveText('只能手改')
 
   await rows.nth(0).getByRole('button', { name: '保留原文', exact: true }).click()
-  await expect(counts.locator('[data-d="original"] b')).toHaveText('1')
-  await expect(counts.locator('[data-d="optimized"] b')).toHaveText('0 / 1')
-  await expect(page.getByTestId('resume-optimize-batch').getByRole('button', { name: /全部保留原文/ })).toBeDisabled()
+  // 旧文字「保留原文 1」「用改写 0 / 1」换成五格：点了保留原文后已决定 1/2、保留原文 1、采纳 0。
+  await expect(counts.locator('[data-d="keep"] b')).toHaveText('1')
+  await expect(counts.locator('[data-d="adopt"] b')).toHaveText('0')
+  await expect(counts.locator('[data-d="decided"] b')).toHaveText('1/2')
+  // 旧按钮「全部保留原文」换成「其余保留原文」：它只动待定。这一条已经是保留原文，没有待定可切，所以停用。
+  await expect(page.getByTestId('resume-optimize-batch').getByRole('button', { name: /其余保留原文/ })).toBeDisabled()
   await page.getByTestId('resume-optimize-open-editor').click()
   await expect(page.locator('textarea').first()).toBeVisible()
   const values = await textareaValues(page)
@@ -292,9 +301,15 @@ test('一条都切换不了时（演示建议句）不画切换、计数与批�
   const list = page.getByTestId('resume-optimize-list')
   const counts = page.getByTestId('resume-optimize-counts')
   await expect(list.getByTestId('resume-optimize-row-manual')).toHaveCount(2)
-  await expect(counts.locator('[data-d="manual"] b')).toHaveText('2')
+  // 旧计数「只能手改 2」不再占格。两条都不能切时五格仍在：已决定 0/2，采纳 0，保留原文 0。标签仍是只能手改。
+  await expect(list.locator('.qx-opt-chip[data-d="manual"]')).toHaveCount(2)
+  await expect(list.locator('.qx-opt-chip[data-d="manual"]').first()).toHaveText('只能手改')
+  await expect(counts.locator('[data-d="decided"] b')).toHaveText('0/2')
+  await expect(counts.locator('[data-d="adopt"] b')).toHaveText('0')
+  await expect(counts.locator('[data-d="keep"] b')).toHaveText('0')
   await expect(page.getByText('上面这几条都没法在这里切换，要用哪一版，请在编辑区里对照着改')).toBeVisible()
   expect(await list.getByRole('button', { name: /^(用改写|保留原文)$/ }).count()).toBe(0)
+  // 旧断言：计数里没有 optimized / original 格。五格的 data-d 是 decided / adopt / keep / custom / facts，这条仍然成立。
   expect(await counts.locator('[data-d="optimized"], [data-d="original"]').count()).toBe(0)
   expect(await page.getByTestId('resume-optimize-batch').count()).toBe(0)
 })
@@ -350,7 +365,8 @@ test('AI provider outage shows an honest unavailable state without removing the 
   await expect(page.locator('.qx-pill')).toHaveText('AI 暂时用不了')
   await expect(page.locator('.qx-pill')).not.toContainText('等待优化建议')
   await expect(page.getByText('简历优化当前不可用', { exact: true })).toBeVisible()
-  await expect(page.getByText('AI 能力尚未启用，请联系现场工作人员', { exact: true })).toBeVisible()
+  // 旧文字「AI 能力尚未启用，请联系现场工作人员」来自公共错误表。优化页不再原样展示，换成同一条兜底，页面上不出现工作人员。
+  await expect(page.getByText('暂时无法生成优化建议，可以先手动整理或返回上传。', { exact: true })).toBeVisible()
   await expect(page.getByTestId('resume-optimize-empty-fallback')).toBeVisible()
   await expect(page.getByTestId('resume-optimize-empty-paths').getByRole('button')).toHaveCount(3)
   await expect(page.getByTestId('resume-optimize-empty-steps').locator('li')).toHaveCount(8)
@@ -479,15 +495,22 @@ test('删掉多出来的经历需确认，取消不变，确认后预览和导�
   await expect(page.getByText('实习 / 工作经历', { exact: true })).toHaveCount(0)
 })
 
-test('公司名为空或超过 100 字时就地提示且导出不发出请求 @kiosk', async ({ page, api }) => {
+test('公司名空着不拦导出、超过 100 字才就地提示并拦住 @kiosk', async ({ page, api }) => {
   await openEntryEditor(page, api, 'r6-title-invalid-2099', [
     { company: SHORT_COMPANY, role: '店员', period: '2022-2024', description: '负责门店日常运营。' },
   ])
   const company = page.getByRole('textbox', { name: '第 1 条经历的公司' })
-  await company.fill('')
-  await expect(page.getByText('公司名不能空', { exact: true })).toBeVisible()
+  const role = page.getByRole('textbox', { name: '第 1 条经历的职务' })
   const sideExport = page.getByRole('button', { name: '导出 PDF', exact: true })
   const bottomExport = page.getByRole('button', { name: '确认优化版，导出 PDF' })
+  // 10/6：原件没写公司 / 职务时如实留空，和服务端 DTO 一致，空着不提示也不拦（走查 W-119 回归：没写职务的简历导不出）。
+  await company.fill('')
+  await role.fill('')
+  await expect(page.getByText(/不能空/)).toHaveCount(0)
+  await expect(sideExport).not.toHaveAttribute('aria-disabled', 'true')
+  await expect(bottomExport).not.toHaveAttribute('aria-disabled', 'true')
+  await company.fill('司'.repeat(101))
+  await expect(page.getByText('公司名最多 100 字', { exact: true })).toBeVisible()
   await expect(sideExport).toHaveAttribute('aria-disabled', 'true')
   await expect(bottomExport).toHaveAttribute('aria-disabled', 'true')
   // aria-disabled 会被当成不可点；force 用来确认即使用户点下去，也不会打开发出导出。
@@ -517,4 +540,182 @@ test('删掉一条经历后没删的那条仍在导出里 @kiosk', async ({ page
   const companies = body.experience?.map((item) => item.company) ?? []
   expect(companies).toContain(SHORT_COMPANY)
   expect(companies).not.toContain(LONG_COMPANY)
+})
+
+const BATCH_AFTER_KEEP = '在仓储部按入库单核对货位，并整理了当日台账。'
+const BATCH_AFTER_FACT = '主导盘点并完成 5000 条记录校验。'
+const BATCH_BEFORE_KEEP = '在仓储部按入库单核对货位。'
+
+function batchResume(): GeneratedResume {
+  return {
+    basic: { name: '孙晓雯', phone: '13853201826', city: '青岛' },
+    intention: { position: '仓储专员', city: '青岛' },
+    summary: '青岛职业技术学院物流管理 2026 届，在青岛某物流公司仓储部实习。',
+    education: [{ school: '青岛职业技术学院', major: '物流管理', degree: '专科', period: '2023-2026' }],
+    experience: [{
+      company: '青岛某物流公司',
+      role: '仓储部实习生',
+      period: '2025-2026',
+      description: `${BATCH_AFTER_KEEP}${BATCH_AFTER_FACT}`,
+    }],
+    projects: [],
+    skills: ['入库核对'],
+    certificates: [],
+  }
+}
+
+test('五格计数随选择变化，批量采纳跳过待确认事实，其余保留原文只动待定，清空回到待定 @kiosk', async ({ page, api }) => {
+  registerOptimizeShell(api)
+  api.respond('GET', `/api/v1/resume/records/${HONEST_SWITCH_TASK_ID}/optimize`, {
+    status: 200,
+    json: {
+      taskId: HONEST_SWITCH_TASK_ID,
+      status: 'completed',
+      providerName: 'llm',
+      modules: [
+        { title: '仓储实习', before: BATCH_BEFORE_KEEP, after: BATCH_AFTER_KEEP },
+        { title: '盘点记录', before: '参与过一次盘点。', after: BATCH_AFTER_FACT },
+      ],
+      optimizedResume: batchResume(),
+    },
+  })
+  await page.addInitScript(({ taskId, accessToken }) => {
+    window.sessionStorage.setItem('ai-job-print:current-ai-resume', JSON.stringify({ taskId, accessToken }))
+  }, { taskId: HONEST_SWITCH_TASK_ID, accessToken: HONEST_SWITCH_ACCESS_TOKEN })
+  await page.goto('/resume/optimize')
+  const screen = page.locator('[data-kiosk-screen="resume-optimize"]')
+  await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+  await expect(screen).not.toContainText('工作人员')
+  await expect(screen).not.toContainText('服务台')
+  expect(await page.locator('[data-draft-banner]').count()).toBe(1)
+
+  const rows = page.getByTestId('resume-optimize-list').locator('li')
+  const counts = page.getByTestId('resume-optimize-counts')
+  await expect(rows.nth(0).locator('.qx-opt-chip')).toHaveText('待定')
+  await expect(rows.nth(1).locator('.qx-opt-chip')).toHaveText('待定')
+  await expect(counts.locator('[data-d="decided"] b')).toHaveText('0/2')
+  await expect(counts.locator('[data-d="adopt"] b')).toHaveText('0')
+  await expect(counts.locator('[data-d="keep"] b')).toHaveText('0')
+  await expect(counts.locator('[data-d="custom"] b')).toHaveText('0')
+  await expect(counts.locator('[data-d="facts"] b')).toHaveText('1')
+
+  await page.getByTestId('resume-optimize-batch-adopt').click()
+  await expect(page.getByTestId('resume-optimize-batch-note')).toContainText('跳过 1 条')
+  await expect(rows.nth(0).locator('.qx-opt-chip')).toHaveText('采纳')
+  await expect(rows.nth(1).locator('.qx-opt-chip')).toHaveText('待定')
+  await expect(counts.locator('[data-d="adopt"] b')).toHaveText('1')
+  await expect(counts.locator('[data-d="facts"] b')).toHaveText('1')
+  await expect(counts.locator('[data-d="decided"] b')).toHaveText('1/2')
+
+  await page.getByTestId('resume-optimize-batch-keep').click()
+  await expect(rows.nth(0).locator('.qx-opt-chip')).toHaveText('采纳')
+  await expect(rows.nth(1).locator('.qx-opt-chip')).toHaveText('保留原文')
+  await expect(counts.locator('[data-d="keep"] b')).toHaveText('1')
+  await expect(counts.locator('[data-d="adopt"] b')).toHaveText('1')
+  await expect(counts.locator('[data-d="decided"] b')).toHaveText('2/2')
+  await expect(page.getByTestId('resume-optimize-batch-keep')).toBeDisabled()
+
+  await page.getByTestId('resume-optimize-batch-clear').click()
+  await expect(rows.nth(0).locator('.qx-opt-chip')).toHaveText('待定')
+  await expect(rows.nth(1).locator('.qx-opt-chip')).toHaveText('待定')
+  await expect(counts.locator('[data-d="decided"] b')).toHaveText('0/2')
+  await expect(counts.locator('[data-d="adopt"] b')).toHaveText('0')
+  await expect(counts.locator('[data-d="keep"] b')).toHaveText('0')
+})
+
+const OWN_SENTENCE = '按班次把入库货位抄进纸质台账。'
+
+test('草稿预览的全文和导出请求里的优化稿一致 @kiosk', async ({ page, api }) => {
+  registerOptimizeShell(api)
+  api.respond('GET', `/api/v1/resume/records/${HONEST_SWITCH_TASK_ID}/optimize`, {
+    status: 200,
+    json: {
+      taskId: HONEST_SWITCH_TASK_ID,
+      status: 'completed',
+      providerName: 'llm',
+      modules: [
+        { title: '仓储实习', before: BATCH_BEFORE_KEEP, after: BATCH_AFTER_KEEP },
+      ],
+      optimizedResume: {
+        ...batchResume(),
+        experience: [{
+          company: '青岛某物流公司',
+          role: '仓储部实习生',
+          period: '2025-2026',
+          description: BATCH_AFTER_KEEP,
+        }],
+      },
+    },
+  })
+  api.respond('POST', '/api/v1/resume/generate/export', {
+    status: 200,
+    json: {
+      fileId: 'preview-match-file',
+      filename: '优化版简历.pdf',
+      sizeBytes: 2048,
+      pageCount: 1,
+      signedUrl: '/e2e-fixtures/entry-resume.pdf',
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      printFileUrl: '/api/v1/files/preview-match-file/content?expires=1&sig=test',
+    },
+  })
+  await page.route('**/e2e-fixtures/entry-resume.pdf', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: VISIBLE_PDF,
+  }))
+  await page.addInitScript(({ taskId, accessToken }) => {
+    window.sessionStorage.setItem('ai-job-print:current-ai-resume', JSON.stringify({ taskId, accessToken }))
+  }, { taskId: HONEST_SWITCH_TASK_ID, accessToken: HONEST_SWITCH_ACCESS_TOKEN })
+  await page.goto('/resume/optimize')
+  await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+  await page.getByTestId('resume-optimize-open-editor').click()
+  const description = page.getByRole('textbox', { name: '第 1 条经历的描述' })
+  await description.fill(OWN_SENTENCE)
+  await page.getByRole('button', { name: '返回建议总览' }).click()
+  await page.getByTestId('resume-optimize-final-open').click()
+  const preview = await page.getByTestId('resume-optimize-final-export').innerText()
+  expect(preview).toContain(OWN_SENTENCE)
+  expect(preview).not.toContain(BATCH_AFTER_KEEP)
+  await expect(page.getByTestId('resume-optimize-final-item-1')).toHaveAttribute('data-used', '自己写')
+  await expect(page.getByTestId('resume-optimize-counts').locator('[data-d="custom"] b')).toHaveText('1')
+  await page.getByTestId('resume-optimize-final-close').click()
+  await page.getByTestId('resume-optimize-open-editor').click()
+  const body = await exportBody(page)
+  expect(exportResumeDocument(body as GeneratedResume)).toBe(preview)
+})
+
+test('看上传原件没带原件时写明原因，带上临时地址就能打开 @kiosk', async ({ page, api }) => {
+  registerOptimizeShell(api)
+  await page.route('**/e2e-fixtures/source-resume.pdf', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: VISIBLE_PDF,
+  }))
+  await page.goto('/resume/optimize?state=ready&capture=1&taskId=paircapture01')
+  await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+  const source = page.getByTestId('resume-optimize-source-open')
+  await expect(source).toBeDisabled()
+  await expect(page.getByTestId('resume-optimize-source-reason')).toHaveText('这次办理没带上原件，回到简历来源可以重新选')
+
+  await page.evaluate(() => {
+    const current = history.state ?? {}
+    const usr = {
+      ...(current.usr ?? {}),
+      fileId: 'src-sun-01',
+      file: {
+        name: '孙晓雯-物流实习简历.pdf',
+        fileUrl: '/e2e-fixtures/source-resume.pdf',
+        format: 'pdf',
+        mimeType: 'application/pdf',
+      },
+    }
+    history.replaceState({ ...current, usr }, '')
+  })
+  await page.reload()
+  await expect(page.getByTestId('resume-optimize-overview')).toBeVisible()
+  await expect(source).toBeEnabled()
+  await source.click()
+  await expect(page.getByTestId('resume-optimize-source-preview')).toBeVisible()
+  await expect(page.getByTestId('resume-optimize-source-preview')).toContainText('孙晓雯-物流实习简历.pdf')
 })

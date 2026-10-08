@@ -15,13 +15,13 @@
   --lf-blue-soft: var(--k-teal-soft);
   --lf-cyan-soft: var(--k-teal-soft);
   --lf-lavender-soft: var(--color-plum-soft);
-  --lf-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --lf-serif: 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
   min-block-size: 100%;
   padding-block-end: 24px;
   overflow-x: clip;
   color: var(--lf-ink);
   background: var(--lf-canvas);
-  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', system-ui, sans-serif;
   line-height: normal;
 }
 

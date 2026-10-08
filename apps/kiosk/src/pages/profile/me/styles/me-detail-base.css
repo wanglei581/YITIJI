@@ -21,7 +21,7 @@
     radial-gradient(circle at 88% 4%, rgba(233, 207, 153, 0.42), transparent 26%),
     linear-gradient(180deg, var(--paper), var(--paper-2));
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', sans-serif;
 }
 
 .me-inkdetail::before {

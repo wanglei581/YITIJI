@@ -40,7 +40,7 @@
   --k-dark: #10302b;
   --k-r-sm: 14px;
   --k-r-md: 18px;
-  --k-serif: var(--font-heading, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif);
+  --k-serif: var(--font-heading, 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif);
   --k-page-inset: 48px;
 
   /*

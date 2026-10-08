@@ -196,7 +196,7 @@ export class LlmResumeGenerateService {
       // 打到模型了但没拿到 usage：如实回报「调用发生过、token 未知」，不塞 tokenUsage。
       onLlmCall?.({ provider: providerLabel })
       this.logger.error(`resume generate http ${res.status}`)
-      throw llmUpstreamStatusError('AI 简历生成服务', res.status)
+      throw llmUpstreamStatusError('AI 简历生成服务', res.status, res.data)
     }
 
     const data = res.data as {
