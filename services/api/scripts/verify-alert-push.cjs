@@ -24,5 +24,22 @@ state.alerts = []; await service.pushDerivedAlerts(); assert.equal(calls.length,
 await service.pushDerivedAlerts(); assert.equal(calls.length, 2)
 const retryCalls = []; const retry = make('https://example.invalid', { alerts: [alert] }, retryCalls, true)
 await retry.pushDerivedAlerts(); await retry.pushDerivedAlerts(); assert.equal(retryCalls.length, 2)
+// 终端被转成计划中 / 退役 / 停用后从告警里消失：不推「已恢复」；仍在考察范围内的真恢复照推。
+{
+  const scopeState = { alerts: [alert], terminalSubjectKeysInScope: ['terminal_offline:t1', 'printer_issue:t1'] }
+  const scopeCalls = []
+  const scoped = make('https://example.invalid', scopeState, scopeCalls)
+  scoped.collectAlerts = async () => ({ alerts: scopeState.alerts, terminalSubjectKeysInScope: scopeState.terminalSubjectKeysInScope })
+  await scoped.pushDerivedAlerts(); assert.equal(scopeCalls.length, 1)
+  scopeState.alerts = []; scopeState.terminalSubjectKeysInScope = []
+  await scoped.pushDerivedAlerts(); assert.equal(scopeCalls.length, 1, '被筛掉的终端不得推「已恢复」')
+  const backCalls = []
+  const back = make('https://example.invalid', { alerts: [{ ...alert, episodeToken: 'ep2' }] }, backCalls)
+  const backState = { alerts: [{ ...alert, episodeToken: 'ep2' }], terminalSubjectKeysInScope: ['terminal_offline:t1'] }
+  back.collectAlerts = async () => ({ alerts: backState.alerts, terminalSubjectKeysInScope: backState.terminalSubjectKeysInScope })
+  await back.pushDerivedAlerts(); backState.alerts = []
+  await back.pushDerivedAlerts(); assert.equal(backCalls.length, 2, '仍在范围内的终端回到在线要推「已恢复」')
+  assert.match(JSON.parse(String(backCalls[1].body)).text.content, /已恢复/)
+}
 console.log('alert push gates passed')
 })().catch((error) => { console.error(error); process.exitCode = 1 })

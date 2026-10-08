@@ -3,6 +3,7 @@ import { BriefcaseIcon } from 'lucide-react'
 import { EDUCATION_LEVEL_OPTIONS } from '@ai-job-print/shared'
 import type { ResumeGenEducation, ResumeGenExperience, ResumeGenProject } from '@ai-job-print/shared'
 import { ChipRow, EntryList, Field, GenerateStepHeading } from './ResumeGenerateShell'
+import { isSubmittableExperience } from '../resumeGenerateSubmit'
 import {
   EMPTY_EDU,
   EMPTY_EXP,
@@ -18,7 +19,8 @@ function keptCount(kind: HistorySeg, education: ResumeGenEducation[], experience
     return `${kept}/${education.length}`
   }
   if (kind === 'exp') {
-    const kept = experience.filter((item) => item.company.trim() && item.role.trim()).length
+    // 与提交同一条规则：经历只看公司，职务可以空（resumeGenerateSubmit）。
+    const kept = experience.filter(isSubmittableExperience).length
     return `${kept}/${experience.length}`
   }
   const kept = projects.filter((item) => item.name.trim()).length
@@ -187,7 +189,7 @@ function ExpCard(props: { item: ResumeGenExperience; index: number; voice: React
     <div data-testid={`resume-generate-exp-${props.index}`}>
       <div className="qx-rg-ent-h">
         <b>经历 第 {props.index + 1} 条</b>
-        <Status ok={Boolean(item.company.trim() && item.role.trim())} need="缺公司或职务" />
+        <Status ok={isSubmittableExperience(item)} need="缺公司" />
       </div>
       <div className="qx-rg-grid">
         <Field label="公司 / 单位" required>
