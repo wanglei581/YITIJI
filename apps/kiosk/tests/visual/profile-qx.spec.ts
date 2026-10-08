@@ -1492,7 +1492,15 @@ test('消息行时间在标题行右侧，四条和加载更多在首屏 @w5-kio
     }
   })
   expect(measured.scrollTop, `首屏列表滚动位置=${measured.scrollTop}`).toBe(0)
-  const { formatTime } = await import('../../src/pages/profile/assets/format')
+  // 和页面一样在浏览器时区格式化，避免 Node 进程的时区影响期望值。
+  const expectedTimes = await page.evaluate((timestamps) => timestamps.map((iso) => {
+    const d = new Date(iso)
+    const M = d.getMonth() + 1
+    const D = d.getDate()
+    const h = String(d.getHours()).padStart(2, '0')
+    const m = String(d.getMinutes()).padStart(2, '0')
+    return `${M}月${D}日 ${h}:${m}`
+  }), payload.data.items.slice(0, 4).map((item) => item.createdAt))
   for (const [index, row] of measured.rows.entries()) {
     const reading = `第${index + 1}条「${row.title}」：时间=${row.time}，中心差=${(row.centerDelta / scale).toFixed(2)}px，标题右边=${row.titleRight.toFixed(2)}，时间左右=${row.timeLeft.toFixed(2)}/${row.timeRight.toFixed(2)}，标题行右边=${row.headRight.toFixed(2)}，缩放=${scale}`
     expect(row.sameHead, reading).toBe(true)
@@ -1502,7 +1510,7 @@ test('消息行时间在标题行右侧，四条和加载更多在首屏 @w5-kio
     expect(row.timeFont, `${reading}，时间字号=${row.timeFont}`).toBe(21)
     expect(row.timeWhiteSpace, `${reading}，换行规则=${row.timeWhiteSpace}`).toBe('nowrap')
     expect(row.timeOverflow, `${reading}，时间横向溢出=${row.timeOverflow}`).toBeLessThanOrEqual(1)
-    expect(row.time, reading).toBe(formatTime(payload.data.items[index].createdAt))
+    expect(row.time, reading).toBe(expectedTimes[index])
   }
   const fourthBottom = measured.rows[3].bottom
   expect(fourthBottom, `第四条底边=${fourthBottom.toFixed(2)}，列表可见底边=${measured.bottom.toFixed(2)}，缩放=${scale}`).toBeLessThanOrEqual(measured.bottom)
