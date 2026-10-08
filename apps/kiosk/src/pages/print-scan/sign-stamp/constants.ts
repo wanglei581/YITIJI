@@ -1,8 +1,8 @@
 import type { SignStampPosition, SignStampSize } from '@ai-job-print/shared'
 
-/** 授权勾选文案；改动必须同步后端 AUTHORIZATION_NOTICE_VERSION（print-sign.service.ts） */
+/** 授权勾选文案，照稿 20 只讲本人手写签名。服务端只记版本号，不核对这句原文。 */
 export const AUTHORIZATION_LABEL =
-  '我确认本人拥有该签名/印章图片的使用授权，仅用于本人材料的版式整理'
+  '我确认本人拥有该本人手写签名的使用授权，仅用于本人材料的版式整理'
 
 export const MAX_DOC_BYTES = 15 * 1024 * 1024
 export const MAX_STAMP_BYTES = 10 * 1024 * 1024

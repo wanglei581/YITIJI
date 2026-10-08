@@ -9,7 +9,7 @@
 // - 有 Order 且不是 0 元单 → 展示后端真实字段：下单金额、优惠/权益抵扣、已退款、支付状态、来源、计费页数。
 //   0 元单（金额为 0 或来源为免费）整块不展示，避免把免费说成支付、实付或抵扣。
 //   实付：金额为 0 时写「0 元（免费试运营）」；其余没有单独的实付字段，标「未记录」，不按应付减优惠推算。
-// - 取件码仅在后端返回时渲染（门控在服务端）。
+// - 到机码（pickupCode）仅在后端返回时渲染（门控在服务端）。续打句只转发订单上的 reprint 字段。
 // - 「再打一份」本批不做订单侧直连（PrintTask 无可重签文件源），
 //   只提供「去我的文档再打印」诚实引导：走我的文档重签 URL → 打印确认，
 //   天然创建新 PrintTask + 新 Order，绝不复用旧任务或旧签名链接。
@@ -101,7 +101,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
         </p>
       )}
 
-      {item.pickupCode && <PickupCodePanel code={item.pickupCode} />}
+      {item.pickupCode && <PickupCodePanel code={item.pickupCode} reprintAllowed={item.reprintAllowed} reprintRemaining={item.reprintRemaining} />}
 
       <button
         type="button"

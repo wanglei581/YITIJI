@@ -179,6 +179,7 @@
     "verify:redis-degradation-truth": "node -r @swc-node/register scripts/verify-redis-degradation-truth.ts",
     "verify:ai-platform-degradation": "node -r @swc-node/register scripts/verify-ai-platform-degradation.ts",
     "verify:internal-login-real-redis": "node -r @swc-node/register scripts/verify-internal-login-real-redis.ts",
+    "verify:admin-session-revocation": "node -r @swc-node/register scripts/verify-admin-session-revocation.ts",
     "verify:error-observability": "node -r @swc-node/register scripts/verify-error-observability.ts",
     "verify:admin-order-filters": "node -r @swc-node/register scripts/verify-admin-order-filters.ts",
     "verify:contract-review:gate0": "node -r @swc-node/register scripts/verify-contract-review-gate0.ts",
