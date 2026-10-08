@@ -5,7 +5,7 @@ import { getResumeOptimize, type ResumeReadAccess } from '../../../../services/a
 import { getResumeTemplates } from '../../../../services/api/jobMaterials'
 import { errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
 import { AI_OUTAGE_CODES, isAiOutage } from '../../../../ai/aiOutage'
-import { SYNTHETIC_MODULES, SYNTHETIC_RESUME } from './fixtures'
+import { PAGE23_CAPTURE_MODULES, PAGE23_CAPTURE_RESUME } from './fixtures'
 import type { OptimizeViewState } from './constants'
 
 import { useBusyLock } from '../../../../contexts/KioskBusyContext'
@@ -62,8 +62,8 @@ export function useOptimizeLoad(opts: {
     if (syntheticReady && (requested === 'ready' || requested === 'empty')) {
       setLoading(false)
       setFailMsg(null)
-      setModules(requested === 'ready' ? SYNTHETIC_MODULES : [])
-      const nextResume = requested === 'ready' ? SYNTHETIC_RESUME : null
+      setModules(requested === 'ready' ? PAGE23_CAPTURE_MODULES : [])
+      const nextResume = requested === 'ready' ? PAGE23_CAPTURE_RESUME : null
       setOptimizedResume(nextResume)
       setBaseResume?.(nextResume)
       return
