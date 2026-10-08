@@ -1,3 +1,4 @@
+import { peekSupportContact, containsStaffHandoff, helpNeededLine } from '../../../../copy/unattendedCopy'
 import type { OptimizeViewState } from './constants'
 import { errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
 
@@ -59,8 +60,8 @@ export function optimizeStatusCapsule(view: OptimizeViewState): { tone: 'ok' | '
 }
 
 function withoutOnSiteStaff(text: string): string {
-  if (!text.includes('工作人员') && !text.includes('服务台')) return text
-  return '暂时无法生成优化建议，可以先手动整理或返回上传。'
+  if (!text.includes('工作人员') && !containsStaffHandoff(text)) return text
+  return `暂时无法生成优化建议，可以先手动整理或返回上传。${helpNeededLine(peekSupportContact())}`
 }
 
 export function optimizeStateDescription(view: OptimizeViewState, failMsg: string | null): string {

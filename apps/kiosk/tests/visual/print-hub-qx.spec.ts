@@ -59,7 +59,7 @@ test('print hub default state reads capabilities and never claims 设备正常 @
   await expect(page.getByRole('button', { name: /文档打印/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /U 盘导入打印/ })).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /到机码核销/ })).toContainText('取件就用它')
+  await expect(page.getByRole('button', { name: /到机码核销/ })).toContainText('不是取件码')
   await expect(page.getByText('在打印机面板上操作，取走纸质复印件。')).toBeVisible()
   await expect(page.getByRole('button', { name: '问小青：怎么选打印方式 →' })).toBeVisible()
   await page.locator('.ph-page').evaluate((element) => { element.scrollTop = 0 })

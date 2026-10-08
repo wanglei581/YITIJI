@@ -69,7 +69,7 @@ const FROZEN = new Map([
   // 状态改写「免费」；付过钱的单仍按 refundRequired 优先显示待退款。待退款说明不再写工作人员。
   // 冻结契约不放宽，仍逐字节校验，只是基线随这次合并前移。
   // 旧哈希 50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'bbdbe3a0c7dbfc33b3f04e8b3f96eef7a26d2a30beb5fc87c34976e2f2058e29'],
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
