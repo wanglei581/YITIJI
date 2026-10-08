@@ -120,7 +120,7 @@
  */
 .aa-body:has(> .aa-qa) { justify-content: flex-start; gap: 0; }
 /* 到上限后仍剩的高度（只有一条时出现）上下平分；放不下时归零，从顶部滚。
-   一条只靠排版压不到 160 以内，等产品负责人定要不要加提示。 */
+   只有一条时已加提示，并增大条目内边距与纸样上限来分配余高。 */
 .aa-body:has(> .aa-qa)::before,
 .aa-body:has(> .aa-qa)::after { content: ''; flex: 1 0 0px; }
 .aa-gap { display: block; min-height: 0; }
@@ -150,7 +150,7 @@
 .aa-body:has(> .aa-qa) .aa-take-tx > .aa-warn { order: 5; }
 .aa-body:has(> .aa-qa) .aa-take-tx::before { content: ''; order: 2; flex: 1 1 0px; }
 .aa-body:has(> .aa-qa) .aa-take-tx::after { content: ''; order: 4; flex: 1000 1 0px; max-height: 135px; }
-.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::before { flex: 1000 1 0px; max-height: 137px; }
+.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::before { flex: 1000 1 0px; max-height: 165px; }
 .aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::after { flex: 1 1 0px; max-height: none; }
 /* 打印读不到时底栏少了深色按钮，卡片到灰字本来就更空，底部间距只再长一点。 */
 .aa-root[data-state='print-unavailable'] .aa-gap[data-p='bot'] { flex-grow: 5; max-height: 30px; }
@@ -210,6 +210,19 @@
 .aa-pin[data-e='E3'] .aa-pin-e { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
 .aa-pin-c { margin: 0; font-size: 24px; line-height: 1.5; }
 .aa-pin-s { margin: 10px 0 0; font-size: 21px; line-height: 1.45; color: var(--qx-ink-3); }
+
+/* 只有 1 条时的提示：虚线隔开，字号和「打印稿上有…」那句同一档。 */
+.aa-more {
+  margin: 0;
+  padding-top: 24px;
+  border-top: 1px dashed var(--qx-line-2);
+  font-size: 22px;
+  line-height: 1.55;
+  color: var(--qx-ink-2);
+}
+/* 只有 1 条：这一条上下多留一点，纸样可以再放大一档（高 674、宽 477），剩下的高度就够分了。 */
+.aa-qa .aa-pin:only-child { padding: 30px 0 36px; }
+.aa-body:has(.aa-pin:only-child) > .aa-take { max-height: 736px; }
 
 .aa-draft {
   margin: 0;
