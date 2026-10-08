@@ -6,7 +6,7 @@ import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -17,6 +17,7 @@ process.env['FILE_SIGNING_SECRET'] ||= 'verify-free-print-file-signing-secret-01
 process.env['SECRET_ENCRYPTION_KEY'] ||= 'verify-free-print-quota-secret-key-0123456789'
 process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-free-print-quota-payment-secret-0123456789'
 process.env['ADMIN_IP_ALLOWLIST'] = ''
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 process.env['PRINT_REQUIRE_PII_SCAN'] = 'false'
 process.env['PRINT_REQUIRE_PRINTER_ONLINE'] = 'false'
 process.env['PRINT_SCAN_CAPABILITY_MODE'] = 'managed'
@@ -41,6 +42,7 @@ import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { collectDerivedAlerts, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
+import { ALERT_TYPES } from '../src/admin-ops/derived-alert-identity'
 import { AdminPrintScanController } from '../src/admin-print-scan/admin-print-scan.controller'
 import { AdminPrintScanService } from '../src/admin-print-scan/admin-print-scan.service'
 import { PrintJobsController } from '../src/print-jobs/print-jobs.controller'
@@ -115,7 +117,6 @@ function assertStatic(): void {
   const usage = read(join(API_ROOT, 'src/print-jobs/free-print-quota.usage.ts'))
   const decide = read(join(API_ROOT, 'src/print-jobs/free-print-quota.decide.ts'))
   const alerts = read(join(API_ROOT, 'src/admin-ops/derived-alerts.ts'))
-  const identity = read(join(API_ROOT, 'src/admin-ops/derived-alert-identity.ts'))
   const planned = read(join(API_ROOT, 'prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql'))
   const retired = read(join(API_ROOT, 'prisma/migrations/20260726003000_guard_retired_terminal/migration.sql'))
   const sqliteMigration = read(join(API_ROOT, 'prisma/migrations/20261006120000_add_terminal_daily_free_print_sides/migration.sql'))
@@ -127,8 +128,7 @@ function assertStatic(): void {
   assert.equal(policy.includes('我的文档'), false)
   assert.ok(policy.includes('今天这台机器的免费打印量已用完，明天 0 点恢复。'))
   assert.ok(policy.includes('屏幕上的服务电话'))
-  assert.equal(identity.includes("'print_terminal_quota_high']"), true)
-  assert.equal((identity.match(/print_terminal_quota_high/g) ?? []).length, 1)
+  assert.equal(ALERT_TYPES.filter((type) => type === 'print_terminal_quota_high').length, 1)
   assert.equal((alerts.match(/collectPrintQuotaAlerts\(/g) ?? []).length, 1)
   assert.ok(alerts.includes("alert.type === 'print_terminal_quota_high'"))
   assert.ok(alerts.includes("type === 'print_terminal_quota_high'"))
@@ -183,11 +183,14 @@ function quotaDetails(result: CallResult): NonNullable<ErrorBody['details']> {
 async function main(): Promise<void> {
   assertStatic()
   const dir = mkdtempSync(join(tmpdir(), 'free-print-quota-'))
-  const databaseUrl = `file:${join(dir, 'verify-free-print-quota.db')}`
+  const databasePath = join(dir, 'verify-free-print-quota.db')
+  const databaseUrl = `file:${databasePath}`
   process.env['DATABASE_URL'] = databaseUrl
   process.env['VERIFICATION_DATABASE_TARGET'] = 'isolated'
   process.env['FILE_STORAGE_DIR'] = join(dir, 'files')
   assertIsolatedVerificationDatabase()
+  // Prisma 7 的 schema engine 要求文件已存在；独占新临时目录，wx 防止覆盖。
+  closeSync(openSync(databasePath, 'wx'))
   pushSchema(databaseUrl)
   execFileSync('sqlite3', [join(dir, 'verify-free-print-quota.db')], {
     input: read(join(API_ROOT, 'prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql')),
