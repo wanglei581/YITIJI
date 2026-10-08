@@ -9,8 +9,12 @@
 // assertNoUnhandledRequests() 抛错。所以「这一页到底发了哪些请求」本身也是被断言的。
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
+import { kioskAiCapabilityItems } from '../../src/pages/service-hubs/serviceHubModel'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
+
+const AI_CAPABILITIES = '/api/v1/kiosk/ai/capabilities'
 
 const PRINTER_STATUS = '/api/v1/terminals/KSK-001/printer-status'
 
@@ -88,6 +92,15 @@ interface HubSnapshot {
  */
 async function readHub(page: Page): Promise<HubSnapshot> {
   await page.waitForSelector('[data-qx-page="service-hub"]')
+  // 后端已就绪时，要等 AI 能力清单落定。清单回来前 AI 卡是「正在确认」，
+  // 那一帧不能当成 device-off 或就绪态的结论。整站不通时不发这条请求，立刻取快照。
+  await page.waitForFunction(() => {
+    const hub = document.querySelector('[data-qx-page="service-hub"]')
+    if (!hub) return false
+    if (hub.getAttribute('data-hub-api-blocked') === 'true') return true
+    const ai = hub.getAttribute('data-hub-ai')
+    return ai === 'ready' || ai === 'down'
+  }, undefined, { timeout: 8_000 })
   return page.evaluate(() => {
     const hub = document.querySelector('[data-qx-page="service-hub"]')!
     const entry = (el: Element, titleSel: string, reasonSel: string): {
@@ -203,6 +216,7 @@ test('在线服务 503：白名单离线入口仍可进，其余一律不可点 
   expect(byTitle(hub.cards, '简历对照').reason).toBe('AI能力当前不可用')
   expect(hub.cards.filter((card) => card.clickable).map((card) => card.title)).toEqual([])
   expect(hub.readiness).toBe('unavailable')
+  expect(api.requestCount('GET', AI_CAPABILITIES)).toBe(0)
 
   // 白名单照样放行：这一页上登记在白名单里的只剩常用入口「招聘会」（换一个服务台，/fairs-service）。
   // 它真的能走通，不是只长得像可点。
@@ -226,6 +240,7 @@ test('在线服务「正在确认」同样不放行，白名单不受影响 @kio
     reason: '正在确认在线服务',
   })
   expect(byTitle(hub.cards, '打开AI顾问').reason).toBe('正在确认AI能力状态')
+  expect(api.requestCount('GET', AI_CAPABILITIES)).toBe(0)
   // 白名单的两条静态指引不依赖后端，checking 期间照样可进。
   expect(hub.cards.filter((card) => card.clickable).map((card) => card.title).sort()).toEqual(
     ['社保指南', '档案与登记'].sort(),
@@ -335,4 +350,148 @@ test('阳性对照：在线服务就绪时，同一个按钮真的会进入 setu
   await dialog.getByRole('button', { name: '制造业', exact: true }).click()
   await dialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
+})
+
+function registerAi(api: ApiRouter, items: ReturnType<typeof kioskAiCapabilityItems>): void {
+  api.respond('GET', AI_CAPABILITIES, {
+    status: 200,
+    json: { success: true, data: { items } },
+  })
+}
+
+test('AI 能力整体关闭时只置灰依赖 AI 的入口 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  registerAi(api, kioskAiCapabilityItems('off'))
+
+  await page.goto('/resume-service')
+  const resume = await readHub(page)
+
+  expect(resume.readiness).toBe('degraded')
+  expect(resume.pill).toBe('AI能力不可用，其他服务仍按实际状态办理')
+  expect(resume.noticeTitle).toBe('AI能力当前不可用。')
+  expect(resume.noticeDetail).toBe('不依赖AI的浏览、材料和本机服务仍可进入。')
+  await expect(page.locator('.qx-hub-chip', { hasText: 'AI能力 · 暂不可用' })).toBeVisible()
+  for (const title of ['AI简历诊断', 'AI简历优化', '从零生成简历', '职业规划', '简历对照']) {
+    expect(byTitle(resume.cards, title)).toEqual({ title, clickable: false, reason: 'AI能力当前不可用' })
+  }
+  for (const title of ['简历素材库', '求职材料', '简历打印']) {
+    expect(byTitle(resume.cards, title).clickable).toBe(true)
+  }
+  expect(resume.quick.filter((link) => !link.clickable)).toEqual([])
+  for (const title of ['我有简历要体检', '我没简历要新建', '我要对着岗位改']) {
+    expect(byTitle(resume.goals, title)).toMatchObject({ clickable: false, reason: 'AI能力当前不可用' })
+  }
+  await expect(page.locator('.qx-hub-retry')).toBeVisible()
+
+  await page.goto('/policy-service')
+  const policy = await readHub(page)
+  expect(byTitle(policy.cards, '就业政策').clickable).toBe(true)
+  expect(byTitle(policy.cards, '打开AI顾问')).toEqual({
+    title: '打开AI顾问',
+    clickable: false,
+    reason: 'AI能力当前不可用',
+  })
+  expect(policy.goals.filter((goal) => !goal.clickable)).toEqual([])
+})
+
+test('只有一项 AI 关闭时，其余 AI 入口仍可进 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  registerAi(api, kioskAiCapabilityItems('available').map((item) => (
+    item.key === 'assistant_chat' ? { ...item, status: 'off' as const } : item
+  )))
+
+  await page.goto('/interview-service')
+  const hub = await readHub(page)
+  expect(hub.readiness).toBe('degraded')
+  expect(hub.pill).toBe('部分 AI 能力不可用，其他入口仍可进入')
+  expect(hub.noticeTitle).toBe('部分 AI 能力当前不可用。')
+  expect(byTitle(hub.cards, '行业薪资参考')).toEqual({
+    title: '行业薪资参考',
+    clickable: false,
+    reason: 'AI能力当前不可用',
+  })
+  expect(byTitle(hub.cards, '开始模拟面试').clickable).toBe(true)
+  expect(byTitle(hub.cards, '面试技巧').clickable).toBe(true)
+  expect(byTitle(hub.goals, '马上练一场').clickable).toBe(true)
+  await expect(page.locator('.qx-hub-retry')).toHaveCount(0)
+})
+
+test('能力清单是降级而不是关闭时，AI 入口仍可进 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  registerAi(api, kioskAiCapabilityItems('degraded'))
+
+  await page.goto('/resume-service')
+  const hub = await readHub(page)
+  expect(hub.readiness).toBe('ready')
+  expect(hub.cards.filter((card) => !card.clickable)).toEqual([])
+  expect(hub.goals.filter((goal) => !goal.clickable)).toEqual([])
+})
+
+test('能力清单读失败时退回手动，重新检测后恢复 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  api.abort('GET', AI_CAPABILITIES, 'internetdisconnected')
+
+  await page.goto('/resume-service')
+  const down = await readHub(page)
+  expect(byTitle(down.cards, 'AI简历诊断').clickable).toBe(false)
+  expect(byTitle(down.cards, '简历打印').clickable).toBe(true)
+  expect(down.noticeTitle).toBe('AI能力当前不可用。')
+
+  registerAi(api, kioskAiCapabilityItems('available'))
+  await page.locator('.qx-hub-retry').click()
+  // 点下去的瞬间属性还是 down。先等到 ready，再取快照，避免读回旧的置灰。
+  await page.locator('[data-qx-page="service-hub"][data-hub-ai="ready"]').waitFor({ timeout: 8_000 })
+  const restored = await readHub(page)
+  expect(byTitle(restored.cards, 'AI简历诊断').clickable).toBe(true)
+  expect(restored.readiness).toBe('ready')
+})
+
+test('先选目标留在常用入口下面，顶栏有时钟 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  await page.goto('/resume-service')
+  await readHub(page)
+  const goalsAfterQuick = await page.evaluate(() => {
+    const hub = document.querySelector('[data-qx-page="service-hub"]')
+    const quick = hub?.querySelector('.qx-hub-quick-section')
+    const goals = hub?.querySelector('.qx-hub-goals')
+    if (!quick || !goals) return false
+    return Boolean(quick.compareDocumentPosition(goals) & Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+  expect(goalsAfterQuick).toBe(true)
+})
+
+test('服务中心读取 AI 能力清单带终端身份和会话票 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+
+  for (const path of ['/resume-service', '/interview-service', '/policy-service']) {
+    const capabilityRequest = page.waitForRequest((request) => (
+      request.method() === 'GET' && new URL(request.url()).pathname === AI_CAPABILITIES
+    ))
+    await page.goto(path)
+    const headers = (await capabilityRequest).headers()
+    expect(headers['x-terminal-id']).toBe('KSK-001')
+    expect(headers['x-terminal-session-token']?.trim()).toBeTruthy()
+    await readHub(page)
+  }
+})
+
+test('服务中心只读 AI 能力清单不弹使用声明或年龄确认 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: {
+      ...terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'service-hub-declaration'),
+      ai: { loginGate: 'off', declarationEnforced: true, paused: false },
+    },
+  })
+
+  // capabilities 登记为 read：scopesForKind 返回空数组，prepareAiDeclaration 直接放行。
+  // 即使声明开关打开，也必须读完清单进入就绪态，不能被声明弹窗拦住。
+  for (const path of ['/resume-service', '/interview-service', '/policy-service']) {
+    await page.goto(path)
+    const hub = await readHub(page)
+    expect(hub.readiness).toBe('ready')
+    await expect(page.locator('[data-ai-declaration-dialog]')).toHaveCount(0)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  }
 })
