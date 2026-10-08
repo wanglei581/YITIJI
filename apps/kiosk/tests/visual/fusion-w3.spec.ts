@@ -1991,6 +1991,35 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await expect(reportNote).toContainText('也不会发送给任何企业。')
   await expect(page.getByText('模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。')).toBeVisible()
   await expect(page.getByRole('heading', { name: '和目标岗位要求的对照' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '报告与打印状态' })).toBeVisible()
+  await expect(page.locator('.iv-head').getByText('本场练习报告', { exact: true })).toBeVisible()
+  await expect(page.locator('.iv-head').getByText('报告包含的复盘区', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('interview-report-overview')).toBeVisible()
+  await expect(page.getByText('综合表现概览', { exact: true })).toBeVisible()
+  await expect(page.getByText('五项能力维度', { exact: true })).toBeVisible()
+  await expect(page.getByText('下一轮准备', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('interview-report-review')).toBeVisible()
+  await expect(page.getByText('风险点', { exact: true })).toBeVisible()
+  await expect(page.getByText('高频问题', { exact: true })).toBeVisible()
+  await expect(page.getByText('STAR 建议', { exact: true })).toBeVisible()
+  await expect(page.getByText('表达结构基本完整，仍需用真实数据补充结果。')).toHaveCount(2)
+  await expect(page.getByText('回答顺序清楚')).toBeVisible()
+  await expect(page.getByText('能联系目标岗位')).toBeVisible()
+  await expect(page.getByText('只保留本人真实经历')).toBeVisible()
+  await expect(page.getByText('术语使用基本准确')).toBeVisible()
+  await expect(page.getByText('能回应追问')).toBeVisible()
+  await expect(page.getByText('结果量化不足')).toBeVisible()
+  await expect(page.getByText('你的具体贡献是什么？')).toBeVisible()
+  await expect(page.getByText('核实个人职责')).toBeVisible()
+  await expect(page.getByText('用真实行动回答')).toBeVisible()
+  await expect(page.getByText('交代背景')).toBeVisible()
+  await expect(page.getByText('说明任务')).toBeVisible()
+  await expect(page.getByText('说明行动')).toBeVisible()
+  await expect(page.getByText('说明结果')).toBeVisible()
+  await expect(page.getByText('不要编造数据')).toBeVisible()
+  await expect(page.getByText('复核简历事实')).toBeVisible()
+  await expect(page.getByText('准备真实项目例子')).toBeVisible()
+  await expect(page.getByText('工作人员')).toHaveCount(0)
   await expect(page.getByText('前端开发工程师 · 互联网/科技 · HR 面试')).toHaveCount(2)
   await expect(page.getByText('岗位匹配度参考')).toHaveCount(0)
   await expect(page.getByText('HR 初筛')).toHaveCount(0)
@@ -2113,6 +2142,191 @@ test('interview setup failure stays inside the first screen @w3-kiosk', async ({
   await expect(alert).toBeVisible()
   await expect(alert).toBeInViewport()
   await expect(alert).toContainText('AI 服务暂停中')
+})
+
+test('interview setup grays voice turns when recognition is off @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/interview/setup')
+  const voice = page.getByRole('button', { name: '语音回合（文字兜底）', exact: true })
+  await expect(voice).toBeVisible()
+  await expect(voice).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('interview-mode-voice-reason')).toContainText('这台机器的语音识别暂时没开，这一场先用文字答。')
+  await expect(page.getByRole('button', { name: '纯文字', exact: true })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('interview expired screen lists what remains and can start over @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/interview/session')
+  const status = page.getByRole('region', { name: '这场练习的状态' })
+  await expect(status).toBeVisible()
+  await expect(page.locator('.iv-head').getByText('接下来', { exact: true })).toBeVisible()
+  await expect(page.locator('.iv-head').getByText('这一场留下了什么', { exact: true })).toBeVisible()
+  await expect(status.getByText('已过期', { exact: true })).toBeVisible()
+  await expect(status.getByText('已失效', { exact: true })).toBeVisible()
+  await expect(status.getByText('不受影响', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新创建一场练习' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看本人练习记录' })).toBeVisible()
+  await expect(page.getByText('登录后可以保存和查看自己的练习报告。', { exact: true })).toBeVisible()
+  for (const text of ['按系统记录保留', '不保留', '未生成则不会补生成', '按文件留存期限管理']) {
+    await expect(page.getByText(text, { exact: true })).toBeVisible()
+  }
+  await page.getByRole('button', { name: '重新创建练习' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=setup/)
+  await expect(page.locator('[data-kiosk-screen="interview-setup"]')).toBeVisible()
+})
+
+test('interview report still shows answer excerpts when the print copy leaves them out @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, { status: 200, json: interviewReport })
+  api.respond('GET', `/api/v1/mock-interviews/${INTERVIEW_ID}/report`, {
+    status: 200,
+    json: {
+      data: {
+        ...interviewReport.data,
+        includeAnswersInPrint: false,
+        qaExcerpts: [{
+          question: '请讲一次你把库存差异查清楚的经历。',
+          answerExcerpt: '我按货位把进出记录对了一遍，发现夜班记到了隔壁库位。',
+          skipped: false,
+        }],
+      },
+    },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  await page.waitForURL(/\/interview\?stage=report/)
+  await expect(page.getByRole('heading', { name: '问答摘录' })).toBeVisible()
+  await expect(page.getByText('你选择了不把回答印进打印件。下面仍可在屏幕上回看摘录。')).toBeVisible()
+  await expect(page.getByText('我按货位把进出记录对了一遍，发现夜班记到了隔壁库位。')).toBeVisible()
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+})
+
+test('interview report unavailable offers three real exits @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  const openUnavailable = async () => {
+    await page.goto('/interview/report')
+    await expect(page.locator('[data-interview-state="report-unavailable"]')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '报告不存在或已过期' })).toBeVisible()
+    await expect(page.locator('.iv-head').getByText('对上原因，再选一条路', { exact: true })).toBeVisible()
+    await expect(page.locator('.iv-head').getByText('不受影响的入口', { exact: true })).toBeVisible()
+    await expect(page.getByText('工作人员')).toHaveCount(0)
+    await expect(page.getByText('服务台')).toHaveCount(0)
+  }
+
+  await openUnavailable()
+  await page.getByRole('button', { name: '还没有完成过练习' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=setup/)
+  await expect(page.locator('[data-kiosk-screen="interview-setup"]')).toBeVisible()
+
+  await openUnavailable()
+  await page.getByRole('button', { name: '报告已过期或换了入口' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=reports/)
+  await expect(page.getByRole('heading', { name: '登录后可保存练习报告' })).toBeVisible()
+
+  await openUnavailable()
+  await page.getByRole('button', { name: '当前账号没有访问权限' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=reports/)
+  await expect(page.getByRole('heading', { name: '登录后可保存练习报告' })).toBeVisible()
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+})
+
+test('interview AI outage still prints the practice sheet @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/mock-interviews', { status: 200, json: interviewCreated })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/start`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/practice-sheet`, {
+    status: 200,
+    json: {
+      data: {
+        fileId: 'pair-sheet',
+        filename: '通用题目与答案单.pdf',
+        sizeBytes: 48_000,
+        pageCount: 2,
+        signedUrl: '/api/v1/files/pair-sheet/content?expires=4102444800000&sig=preview',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        printFileUrl: '/api/v1/files/pair-sheet/content?expires=4102444800000&sig=sheet',
+        variant: 'degraded',
+        questionCount: 4,
+      },
+    },
+  })
+  api.respond('POST', '/api/v1/orders/quote', {
+    status: 200,
+    json: {
+      amountCents: 200,
+      billablePages: 2,
+      billingPageSource: 'detected',
+      priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+    },
+  })
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await dialog.getByRole('button', { name: '交通运输、仓储和邮政业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
+  await page.getByPlaceholder(/输入目标岗位/).fill('仓储主管')
+  await page.getByRole('button', { name: '创建并开始练习' }).click()
+  const down = page.locator('[data-interview-state="ai-down"]')
+  await expect(down).toBeVisible()
+  await expect(down.getByRole('region', { name: '当前能力状态' })).toBeVisible()
+  await expect(down.locator('.iv-head').getByText('不靠 AI 也能做的事', { exact: true })).toBeVisible()
+  await expect(down.locator('.iv-head').getByText('语音回合', { exact: true })).toBeVisible()
+  await expect(down.locator('.iv-head').getByText('恢复后才重新开放', { exact: true })).toBeVisible()
+  await expect(down.locator('.iv-head').getByText('能力边界', { exact: true })).toBeVisible()
+  await expect(down.getByRole('button', { name: '语音回合（文字兜底）', exact: true })).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('interview-mode-voice-reason')).toContainText('这台机器的语音识别暂时没开，这一场先用文字答。')
+  await expect(page.getByTestId('interview-mode-voice-reason')).toContainText('AI 面试官暂时不能出题')
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+  await page.getByRole('button', { name: '打印通用题目与答案单', exact: true }).click()
+  await expect(page).toHaveURL(/\/print\/confirm/)
+})
+
+test('interview report pending names its sections while generating @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respondWith('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, () => new Promise(() => {}))
+  await beginTextInterview(page)
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  const pending = page.locator('[data-interview-state="report-pending"]')
+  await expect(pending).toBeVisible()
+  await expect(pending.getByRole('region', { name: '报告生成状态' })).toBeVisible()
+  await expect(pending.locator('.iv-head').getByText('报告只归纳这些', { exact: true })).toBeVisible()
+  await expect(pending.locator('.iv-head').getByText('等待时可以先做', { exact: true })).toBeVisible()
+})
+
+test('interview network error names its sections after a failed submit @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.abort('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, 'internetdisconnected')
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  const failed = page.locator('[data-interview-state="network-error"]')
+  await expect(failed).toBeVisible()
+  await expect(failed.getByRole('region', { name: '本次提交状态' })).toBeVisible()
+  await expect(failed.locator('.iv-head').getByText('重试提交本题', { exact: true })).toBeVisible()
+  await expect(failed.locator('.iv-head').getByText('这三种结果分别意味着', { exact: true })).toBeVisible()
+  await expect(failed.locator('.iv-head').getByText('不想重试的话', { exact: true })).toBeVisible()
+})
+
+test('interview tips AI advisor opens the assistant @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  await page.goto('/interview?stage=tips')
+  await expect(page.locator('[data-kiosk-screen="interview-tips"]')).toBeVisible()
+  await expect(page.getByTestId('interview-primary')).toHaveText(/设置一场练习/)
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+  await page.getByTestId('interview-ai-advisor').click()
+  await expect(page).toHaveURL(/\/assistant/)
+  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
 })
 
 const COVERED_EVIDENCE = '我做过两年社群运营，最多同时管 6 个群'
