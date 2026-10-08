@@ -41,6 +41,11 @@
 - **用户看到什么：** 三种拦截态（还不能进入作答 / 本次作答已经提交 / 还没有可查看的完成结果）照稿补「为什么会这样」三条事实、「这次作答现在的状态」三格、「不显示你打开的链接参数内容」说明；底栏改成整行两个等宽按钮；结果空态排满，不再空约 700px。说明页、答题、复核、结果、AI 不可用、记录页原有内容（同意清单、敏感题勾选、题号地图、会发生/不会发生、年龄声明、真实解读与依据题号、撤回、PDF 预览、记录说明）全部保留。
 - **拆分：** `SelfAssessmentFlow.tsx` 改前 1185 行，这次新加的块拆到 `components/self-assessment/SelfAssessmentInterceptFacts.tsx`、`SelfAssessmentResultEmpty.tsx`，主文件 1177 行（仍在 1000 行以上的重构清单里）。后端合规扫描 `services/api/scripts/verify-compliance.ts` 的自我探索名单原来只列主文件，补上整个 `components/self-assessment/` 目录（阳性对照：新组件加临床禁词 → 红）。
 - **验证：** 一体机 `tsc`、eslint 0；`verify-self-assessment-consent-source`、`verify-browser-spec-coverage`、`verify-compliance-copy`、API `verify:compliance` 0；w3 整组 91 过 1 条偶发（职业规划 1440×900 触控高度，重试过）。反向检查：拦截态去掉「为什么会这样」→ 红；结果空态改回不排满 → 红；还原 → 绿。并排 6 对全配上（答题、结果两对现在配的是真实页，不再两边都是拦截态）。
+## 2026-10-07：一体机 25 号求职材料库补「遇到问题」、边界收成一句、十态夹具（分支 `claude/kiosk-b-25-materials-1007`）
+
+- **用户看到什么：** 底部右侧照稿补「遇到问题」（站内出路，不写「找工作人员」）；页脚两句边界声明收成一句（「不代投递」与「系统不收取求职者简历给企业」并进同一句，边界意思不删）。其余（筛选胶囊、「生成后 1→2→3」、模板卡「带走：xxx.pdf」、右侧表单、「生成可打印版 / 登录后生成」、上一步与问小青、生成后的预览弹层、登录回来带回草稿）都在。
+- **拆分：** `JobMaterialLibraryPage.tsx` 的部件拆到 `jobMaterialLibraryParts.tsx`。
+- **验证：** 门禁 `verify-job-material-library-ui`（只加断言）0；w3 材料库用例通过；并排 10 对配上 9 对（「演示结果」只有稿，不造一份假的已生成文件）。读取失败态仍显示既有错误映射里的旧句（含「工作人员」），等全站替换。
 - **停放、隐藏、改名、降级：** 无。Grok 实现，一体机前端 B 窗口审。
 
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）
