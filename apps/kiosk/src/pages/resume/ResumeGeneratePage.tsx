@@ -47,6 +47,7 @@ import {
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-flow-qx.css'
+import { toSubmittedExperience } from './resumeGenerateSubmit'
 
 function appendVoiceText(current: string | undefined, transcript: string): string {
   return [current?.trim(), transcript.trim()].filter(Boolean).join('\n')
@@ -114,6 +115,7 @@ export function ResumeGeneratePage() {
       jobType: intention.jobType.trim() || undefined,
       salary: intention.salary.trim() || undefined,
     },
+    // 只提交填了关键字段的条目(学校/公司/项目名)；经历只看公司，职务可以空（见 resumeGenerateSubmit）
     education: education
       .filter((item) => item.school.trim())
       .map((item) => ({
@@ -123,14 +125,7 @@ export function ResumeGeneratePage() {
         period: item.period?.trim() || undefined,
         description: item.description?.trim() || undefined,
       })),
-    experience: experience
-      .filter((item) => item.company.trim() && item.role.trim())
-      .map((item) => ({
-        company: item.company.trim(),
-        role: item.role.trim(),
-        period: item.period?.trim() || undefined,
-        description: item.description.trim(),
-      })),
+    experience: toSubmittedExperience(experience),
     projects: projects
       .filter((item) => item.name.trim())
       .map((item) => ({ name: item.name.trim(), role: item.role?.trim() || undefined, description: item.description.trim() })),
