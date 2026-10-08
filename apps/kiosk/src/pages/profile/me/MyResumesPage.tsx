@@ -1,5 +1,5 @@
 import { clearResumeReferences } from '../../resume/clearResumeReferences'
-import { recordUnavailableReason, resumeLabel } from './aiRecordNavigation'
+import { recordUnavailableReason, resumeActionReason, resumeLabel } from './aiRecordNavigation'
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 // 我的简历 — /me/resumes（本人，仅元数据）。
@@ -28,15 +28,6 @@ const STATUS_META: Record<MemberResumeItem['status'], { label: string; tone?: 'w
   processing: { label: '处理中', tone: 'run' },
   completed: { label: '已完成' },
   failed: { label: '失败', tone: 'bad' },
-}
-
-/**
- * 行内说明只写时间与留存期。2026-09-30 A 批：原来写「模型名 · 任务 编号 · 时间」，
- * 模型名（如 demo / llm）和任务编号都是工程信息，稿 39 只显示名称和状态（v2 规则 4）。
- */
-function metaLine(item: MemberResumeItem): string {
-  const expires = item.expiresAt ? ` · 留存至 ${formatTime(item.expiresAt)}` : ''
-  return `${formatTime(item.createdAt)}${expires}`
 }
 
 function isActionable(item: MemberResumeItem): boolean {
@@ -137,9 +128,10 @@ export function MyResumesPage() {
           {items.map((item) => {
             const status = STATUS_META[item.status] ?? { label: '未知状态', tone: 'run' as const }
             const actionable = isActionable(item)
-            const disabledReason = recordUnavailableReason(item) ?? ''
+            const disabledReason = resumeActionReason(item)
             const isParse = item.kind === 'parse'
             const taskLabel = formatTime(item.createdAt)
+            const sentence = `${isParse ? '上传简历后生成的诊断记录' : 'AI 引导生成的简历版本'}${item.expiresAt ? `，留存至 ${formatTime(item.expiresAt)}` : ''}`
             return (
               <div key={item.id} className="qx-me-row" data-flag={item.status === 'failed' ? 'true' : undefined} data-record-status={item.status} data-record-kind={item.kind}>
                 <span className="qx-me-row-ico" data-tone={isParse ? undefined : 'plum'} aria-hidden="true">
@@ -151,21 +143,23 @@ export function MyResumesPage() {
                     <span className="qx-me-st" data-tone={status.tone}>{status.label}</span>
                     {isParse ? <span className="qx-me-chip">{item.optimized ? '已生成优化版' : '未优化'}</span> : null}
                   </span>
-                  <span className="qx-me-row-sub">{isParse ? '上传简历后生成的诊断记录' : 'AI 引导生成的简历版本'}</span>
-                  <span className="qx-me-row-sub">{metaLine(item)}</span>
+                  <span className="qx-me-row-sub">{sentence}</span>
                   {!isParse ? <span className="qx-me-reason">生成简历暂不能直接对照；请先导出，再上传诊断。</span> : null}
                   {!actionable ? <span className="qx-me-reason">{isParse ? '报告与优化：' : ''}{disabledReason}</span> : null}
                 </span>
                 <span className="qx-me-acts">
                   {isParse ? (
                     <>
-                      <SmallAct label="查看报告" disabled={!actionable} reason={disabledReason} aria={`查看 ${taskLabel} 这份简历的诊断报告`} onClick={() => openReport(item.taskId)} primary />
-                      <SmallAct label={item.optimized ? '查看优化版' : '继续优化'} disabled={!actionable} reason={disabledReason} aria={`${item.optimized ? '查看' : '继续生成'} ${taskLabel} 这份简历的优化版`} onClick={() => openOptimize(item.taskId, item.optimized)} />
-                      <SmallAct label="简历对照" disabled={!actionable} reason={disabledReason} aria={`用这份简历做简历对照`} onClick={() => openJobFit(item)} />
+                      <SmallAct label="打开" disabled={!actionable} reason={disabledReason} aria={`打开 ${taskLabel} 这份简历的诊断`} onClick={() => openReport(item.taskId)} />
+                      <SmallAct label={item.optimized ? '查看优化版' : '继续优化'} disabled={!actionable} reason={disabledReason} aria={`${item.optimized ? '查看' : '继续生成'} ${taskLabel} 这份简历的优化版`} onClick={() => openOptimize(item.taskId, item.optimized)} primary />
+                      <SmallAct label="接着打印" disabled={!actionable} reason={disabledReason} aria={`把 ${taskLabel} 这份简历接着打印`} onClick={() => openReport(item.taskId)} />
+                      <SmallAct label="查看报告" disabled={!actionable} reason={disabledReason} aria={`查看 ${taskLabel} 这份简历的诊断报告`} onClick={() => openReport(item.taskId)} />
+                      <SmallAct label="简历对照" disabled={!actionable} reason={disabledReason} aria="用这份简历做简历对照" onClick={() => openJobFit(item)} />
                     </>
                   ) : (
                     <>
-                      <SmallAct label="查看并打印" disabled={!actionable} reason={disabledReason} aria={`查看并打印 ${taskLabel} 这份 AI 生成简历`} onClick={() => openGenerate(item.taskId)} primary />
+                      <SmallAct label="打开" disabled={!actionable} reason={disabledReason} aria={`打开 ${taskLabel} 这份 AI 生成简历`} onClick={() => openGenerate(item.taskId)} />
+                      <SmallAct label="接着打印" disabled={!actionable} reason={disabledReason} aria={`把 ${taskLabel} 这份 AI 生成简历接着打印`} onClick={() => openGenerate(item.taskId)} primary />
                       <SmallAct label="简历对照" disabled reason="生成简历请先导出再上传诊断" aria="用这份简历做简历对照" onClick={() => {}} />
                     </>
                   )}
@@ -176,6 +170,7 @@ export function MyResumesPage() {
           })}
           <div className="qx-me-legal">
             仅展示本人简历记录；原始简历短留存，到期后无法恢复，<b>不向企业提供或投递</b>。
+            需要纸质版时，点「接着打印」。诊断报告和生成预览页里再核价出纸。
             「简历对照」会使用你在这里选中的这份简历。
             {total > items.length ? `当前显示最近 ${items.length} / ${total} 条` : ''}
           </div>

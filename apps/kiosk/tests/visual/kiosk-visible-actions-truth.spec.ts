@@ -196,9 +196,23 @@ test('对照页批量采纳跳过未确认事实且清空后回到待定 @kiosk'
   await page.getByRole('button', { name: '可采纳的全部采纳' }).click()
   await expect(page.getByText('已采纳 1 条；跳过 1 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。')).toBeVisible()
   await expect(page.getByRole('button', { name: '用改写' })).toBeDisabled()
-  await page.getByText('选择草稿').click()
-  await expect(page.getByText('项目成果 · 待定')).toBeVisible()
-  await expect(page.getByText('团队协作 · 已采纳')).toBeVisible()
+  // 旧「选择草稿」折叠项并进草稿预览浮层。对照页的选择还不写进导出稿，所以两条在稿里仍是改写。
+  await page.getByTestId('resume-optimize-final-open').click()
+  const item1 = page.getByTestId('resume-optimize-final-item-1')
+  const item2 = page.getByTestId('resume-optimize-final-item-2')
+  await expect(page.getByTestId('resume-optimize-final-export')).toContainText('主导数据整理，完成 5000 条记录校验。')
+  await expect(page.getByTestId('resume-optimize-final-export')).toContainText('对齐需求，持续跟进问题至闭环。')
+  // 旧可见文案「项目成果 · 待定」拆成标题和选择。
+  await expect(item1.getByText('项目成果', { exact: true })).toBeVisible()
+  await expect(item1.getByText('待定', { exact: true })).toBeVisible()
+  await expect(item1).toHaveAttribute('data-choice', 'todo')
+  await expect(item1).toHaveAttribute('data-used', '改写')
+  // 旧可见文案「团队协作 · 已采纳」同样拆开。已采纳是对照页上的选择，导出稿里这一句仍是改写。
+  await expect(item2.getByText('团队协作', { exact: true })).toBeVisible()
+  await expect(item2.getByText('已采纳', { exact: true })).toBeVisible()
+  await expect(item2).toHaveAttribute('data-choice', 'optimized')
+  await expect(item2).toHaveAttribute('data-used', '改写')
+  await page.getByTestId('resume-optimize-final-close').click()
 
   await page.getByRole('checkbox', { name: /5000/ }).check()
   await page.getByRole('checkbox', { name: /主导/ }).check()
@@ -210,8 +224,12 @@ test('对照页批量采纳跳过未确认事实且清空后回到待定 @kiosk'
   await expect(page.getByRole('button', { name: '用改写' })).toBeDisabled()
   await expect(page.getByRole('checkbox', { name: /5000/ })).not.toBeChecked()
   await expect(page.getByRole('checkbox', { name: /主导/ })).not.toBeChecked()
-  await expect(page.getByText('项目成果 · 待定')).toBeVisible()
-  await expect(page.getByText('团队协作 · 待定')).toBeVisible()
+  await page.getByTestId('resume-optimize-final-open').click()
+  // 旧文案「项目成果 · 待定」「团队协作 · 待定」：清空后两条选择都回到待定。
+  await expect(page.getByTestId('resume-optimize-final-item-1')).toHaveAttribute('data-choice', 'todo')
+  await expect(page.getByTestId('resume-optimize-final-item-1').getByText('待定', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('resume-optimize-final-item-2')).toHaveAttribute('data-choice', 'todo')
+  await expect(page.getByTestId('resume-optimize-final-item-2').getByText('待定', { exact: true })).toBeVisible()
 })
 
 const GENERATE_TASK_ID = 'gen-preview-1'
@@ -240,7 +258,7 @@ test('生成预览空态按稿只留两个出口且都能到达 @kiosk', async (
   registerGeneratePreviewBaseline(api)
   await page.goto('/resume/generate/preview')
   await expect(page.locator('[data-kiosk-screen="resume-generate-preview"]')).toBeVisible()
-  await expect(page.getByText('生成结果已清除')).toBeVisible()
+  await expect(page.getByText('这一份要从头填')).toBeVisible()
   await expect(page.getByRole('button', { name: '重新填写生成', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新填写', exact: true })).toHaveCount(0)
   await expect(page.getByTestId('resume-generate-preview-cta-home')).toHaveText('返回服务大厅')
@@ -352,7 +370,7 @@ test('生成预览读回失败展示空态而不是伪造结果 @kiosk', async (
     json: { error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新生成简历' } },
   })
   await page.goto('/resume/generate/preview?taskId=missing-task')
-  await expect(page.getByText('没有可看的结果')).toBeVisible()
+  await expect(page.getByText('没有可预览的结果')).toBeVisible()
   await expect(page.getByText('青岛求职者')).toHaveCount(0)
   await expect(page.getByTestId('resume-generate-preview-cta-source')).toHaveText('返回简历服务')
   await expect(page.getByTestId('resume-generate-preview-cta-refill')).toHaveText('去填资料')

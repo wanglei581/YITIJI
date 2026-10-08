@@ -439,7 +439,7 @@ test('H7 after 结束使用 the print desk shows only the empty state @w2', asyn
 
   await page.goto(`/login?from=${encodeURIComponent('/me/documents')}`)
   await loginOnCurrentPage(page, '/me/documents')
-  await page.getByTestId('member-assets-document').filter({ hasText: doc.filename }).getByRole('button', { name: '打印', exact: true }).click()
+  await page.getByTestId('member-assets-document').filter({ hasText: doc.filename }).getByRole('button', { name: '用于打印', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/print/confirm')
   await expect(page.locator('.print-file-name')).toHaveText(doc.filename)
 
