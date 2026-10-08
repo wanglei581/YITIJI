@@ -24257,7 +24257,8 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
     "services/api/src/ai/llm/ai-prompt-safety.ts": [
-      "services/api/scripts/verify-ai-safety-aigc.ts"
+      "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
     "services/api/src/ai/llm/assistant-channel.ts": [
       "services/api/scripts/verify-miniapp-review-backend.ts"
@@ -24685,6 +24686,9 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
     "services/api/src/ai/safety/normalize.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
+    ],
+    "services/api/src/ai/safety/policy-constraint.ts": [
       "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
     "services/api/src/ai/safety/refusal.ts": [
@@ -27863,6 +27867,7 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
     "services/api/src/trtc/trtc-session-registry.service.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-trtc-session-deadline.ts"
     ],
     "services/api/src/trtc/trtc.controller.ts": [
@@ -35654,6 +35659,7 @@
           "services/api/src/ai/ai-public-quota.service.ts",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/llm/ai-prompt-safety.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
           "services/api/src/ai/llm/llm-config.service.ts",
           "services/api/src/ai/llm/llm-guard.ts",
@@ -35674,6 +35680,7 @@
           "services/api/src/ai/safety/lexicon.seed.json",
           "services/api/src/ai/safety/matcher.ts",
           "services/api/src/ai/safety/normalize.ts",
+          "services/api/src/ai/safety/policy-constraint.ts",
           "services/api/src/ai/safety/refusal.ts",
           "services/api/src/ai/usage/ai-request-context.middleware.ts",
           "services/api/src/asr/asr.service.ts",
@@ -35690,6 +35697,7 @@
           "services/api/src/mock-interview/mock-interview-llm.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/trtc/trtc-session-registry.service.ts",
           "services/api/src/trtc/trtc.service.ts"
         ],
         "missing": []

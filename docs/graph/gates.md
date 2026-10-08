@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1907 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1908 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2279,7 +2279,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 618 个文件</summary>
+<summary><code>services/api/src/</code> — 619 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2340,7 +2340,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/kiosk-ai-capabilities.ts` | `verify-kiosk-ai-capabilities.ts` |
 | `services/api/src/ai/llm/ai-config-audit.ts` | `verify-ai-contract-mirror.mjs` |
 | `services/api/src/ai/llm/ai-config.controller.ts` | `verify-ai-endpoint-allowlist.ts` |
-| `services/api/src/ai/llm/ai-prompt-safety.ts` | `verify-ai-safety-aigc.ts` |
+| `services/api/src/ai/llm/ai-prompt-safety.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts` |
 | `services/api/src/ai/llm/assistant-channel.ts` | `verify-miniapp-review-backend.ts` |
 | `services/api/src/ai/llm/deepseek-thinking.ts` | `verify-llm-thinking-off.ts` |
 | `services/api/src/ai/llm/llm-base-url.ts` | `verify-ai-config.ts` |
@@ -2411,6 +2411,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/safety/lexicon.seed.json` | `verify-ai-safety-lexicon.ts` |
 | `services/api/src/ai/safety/matcher.ts` | `verify-ai-safety-lexicon.ts` |
 | `services/api/src/ai/safety/normalize.ts` | `verify-ai-safety-lexicon.ts` |
+| `services/api/src/ai/safety/policy-constraint.ts` | `verify-ai-safety-lexicon.ts` |
 | `services/api/src/ai/safety/refusal.ts` | `verify-ai-safety-lexicon.ts` |
 | `services/api/src/ai/self-assessment.controller.ts` | `verify-ai-access.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/usage/admin-ai-usage.controller.ts` | `verify-admin-ai-usage-contract.mjs`<br/>`verify-ai-usage-budget.ts` |
@@ -2893,7 +2894,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/terminals/toolbox-policy.ts` | `verify-terminal-device-config.ts`<br/>`verify-toolbox-micro-app-platform.ts` |
 | `services/api/src/terminals/toolbox-projection.ts` | `verify-toolbox-review-workflow.ts` |
 | `services/api/src/trtc/tencent-api.util.ts` | `verify-ai-endpoint-allowlist.ts` |
-| `services/api/src/trtc/trtc-session-registry.service.ts` | `verify-trtc-session-deadline.ts` |
+| `services/api/src/trtc/trtc-session-registry.service.ts` | `verify-ai-safety-lexicon.ts`<br/>`verify-trtc-session-deadline.ts` |
 | `services/api/src/trtc/trtc.controller.ts` | `verify-ai-access.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/trtc/trtc.module.ts` | `verify-trtc-terminal-http.ts` |
 | `services/api/src/trtc/trtc.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-trtc-session-deadline.ts`<br/>`verify-trtc-terminal-http.ts` |
