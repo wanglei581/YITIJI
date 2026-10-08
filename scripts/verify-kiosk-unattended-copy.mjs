@@ -164,9 +164,45 @@ function checkBranches(sf, rel, hits) {
         pushStatic(hits, rel, lineOf(sf, node.right), '金额为 0 或免费的分支里出现了「退款」')
       }
     }
+    // 退款句只许出现在「金额大于 0」的分支里：没有守卫的调用，免费单也会看到退款。
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'refundApplyLine'
+      && !isUnderPaidGuard(sf, node)) {
+      pushStatic(hits, rel, lineOf(sf, node), 'refundApplyLine 没有放在「金额大于 0」的分支里')
+    }
     ts.forEachChild(node, visit)
   }
   visit(sf)
+}
+
+/** 「付过钱」的条件：直接比金额，或用本文件里叫 paid 的布尔量（不带取反）。 */
+function isPaidGuard(src) {
+  return isPaidCondition(src) || /(?:^|[^!\w.])paid\b/.test(src)
+}
+
+function isUnderPaidGuard(sf, call, depth = 0) {
+  for (let child = call, parent = call.parent; parent; child = parent, parent = parent.parent) {
+    if (ts.isConditionalExpression(parent) || ts.isIfStatement(parent)) {
+      const cond = conditionSource(sf, branchCondition(parent))
+      const whenTrue = ts.isConditionalExpression(parent) ? parent.whenTrue : parent.thenStatement
+      const whenFalse = ts.isConditionalExpression(parent) ? parent.whenFalse : parent.elseStatement
+      if (whenTrue === child && isPaidGuard(cond)) return true
+      // 免费分支的另一侧：c.free ? 求助句 : 退款句。
+      if (whenFalse === child && isFreeCondition(cond)) return true
+    }
+    if (ts.isBinaryExpression(parent) && parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+      && parent.right === child && isPaidGuard(conditionSource(sf, parent.left))) return true
+    // 包在本文件的小函数里：看这个函数的每个调用点是不是都有守卫。
+    if (ts.isFunctionDeclaration(parent) && parent.name && depth < 2) {
+      const sites = []
+      const collect = (n) => {
+        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === parent.name.text) sites.push(n)
+        ts.forEachChild(n, collect)
+      }
+      collect(sf)
+      return sites.length > 0 && sites.every((site) => isUnderPaidGuard(sf, site, depth + 1))
+    }
+  }
+  return false
 }
 
 function checkSwitchMachineLiterals(sf, rel, hits) {
@@ -255,6 +291,24 @@ const probe = { violations: [], allowed: 0, used: new Set() }
 scanSource('apps/kiosk/src/probe.tsx', "export const probe = '请联系现场工作人员'\n", probe)
 if (probe.violations.length !== 1) {
   fail('反向探针没有拦住「请联系现场工作人员」')
+}
+
+// 退款句守卫：没守卫的要拦住，有守卫的（比金额、paid 布尔量、免费分支另一侧）不能误拦。
+const refundProbe = { violations: [], allowed: 0, used: new Set() }
+scanSource('apps/kiosk/src/refund-probe.tsx', 'export const bad = (c) => refundApplyLine(c)\n', refundProbe)
+if (refundProbe.violations.length !== 1) {
+  fail('反向探针没有拦住不带金额守卫的 refundApplyLine')
+}
+const refundOkProbe = { violations: [], allowed: 0, used: new Set() }
+scanSource(
+  'apps/kiosk/src/refund-ok-probe.tsx',
+  'export const a = (c, amountCents) => amountCents > 0 ? refundApplyLine(c) : null\n'
+    + 'export const b = (c, paid) => paid && refundApplyLine(c)\n'
+    + 'export const d = (c, x) => x.free ? null : refundApplyLine(c)\n',
+  refundOkProbe,
+)
+if (refundOkProbe.violations.length !== 0) {
+  fail('退款句守卫规则把有守卫的写法误判成不合格')
 }
 
 const switchProbe = { violations: [], allowed: 0, used: new Set() }
