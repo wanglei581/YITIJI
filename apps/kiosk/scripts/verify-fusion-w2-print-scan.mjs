@@ -888,7 +888,6 @@ for (const phase of ['failed', 'closed', 'expired', 'refunded']) {
 }
 const printProgress = read('src/pages/print/PrintProgressPage.tsx')
 for (const marker of [
-  'POLL_INTERVAL_MS = 3000',
   'REAL_POLL_TIMEOUT_MS = 10 \* 60 \* 1000',
   'API_MODE',
   'taskId',
@@ -961,10 +960,18 @@ assert.match(
   /export function QxAppNavbar/,
   'shared Qingxu navbar component exists'
 )
+// N-2（2026-10-06）：3 秒间隔挪到 printProgressPolling.ts，页面不再留第二份数字。
+// 断网期间仍用同一个 setInterval，不改成停掉，也不改成拉长到 10 秒上限。
+const printProgressPolling = read('src/pages/print/printProgressPolling.ts')
+assert.match(
+  printProgressPolling,
+  /export const POLL_INTERVAL_MS = 3000/,
+  'print progress polling interval stays 3 seconds'
+)
 assert.match(
   printProgress,
-  /POLL_INTERVAL_MS = 3000/,
-  'print progress still polls every 3 seconds from Agent hardware reflux'
+  /setInterval\(\(\) => void tick\(\), POLL_INTERVAL_MS\)/,
+  'print progress still polls every 3 seconds from Agent hardware reflux, including while the status read is failing'
 )
 // 2026-09-29 W-43：完成页不再自己只清打印材料，到点与「我拿走了，结束使用」都走统一的 endKioskUse，
 // 由它的 clearLocal（clearKioskSensitiveSession）清掉打印材料在内的本机数据并退出登录。
