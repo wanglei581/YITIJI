@@ -150,7 +150,7 @@
 .aa-body:has(> .aa-qa) .aa-take-tx > .aa-warn { order: 5; }
 .aa-body:has(> .aa-qa) .aa-take-tx::before { content: ''; order: 2; flex: 1 1 0px; }
 .aa-body:has(> .aa-qa) .aa-take-tx::after { content: ''; order: 4; flex: 1000 1 0px; max-height: 135px; }
-.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::before { flex: 1000 1 0px; max-height: 165px; }
+.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::before { flex: 1000 1 0px; max-height: 137px; }
 .aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::after { flex: 1 1 0px; max-height: none; }
 /* 打印读不到时底栏少了深色按钮，卡片到灰字本来就更空，底部间距只再长一点。 */
 .aa-root[data-state='print-unavailable'] .aa-gap[data-p='bot'] { flex-grow: 5; max-height: 30px; }
@@ -223,6 +223,9 @@
 /* 只有 1 条：这一条上下多留一点，纸样可以再放大一档（高 674、宽 477），剩下的高度就够分了。 */
 .aa-qa .aa-pin:only-child { padding: 30px 0 36px; }
 .aa-body:has(.aa-pin:only-child) > .aa-take { max-height: 736px; }
+/* 只有 1 条又读不到打印：纸样更高，右栏先长的那处多给一点（137 → 165），和下面那处更匀。
+   只给这一种情形；2 条以上保持 137，右栏两处间距仍是 189 / 188。 */
+.aa-body:has(.aa-pin:only-child) .aa-take-tx:has(> .aa-warn)::before { max-height: 165px; }
 
 .aa-draft {
   margin: 0;
